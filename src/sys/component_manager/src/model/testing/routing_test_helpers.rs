@@ -25,7 +25,7 @@ use {
     ::routing_test_helpers::{generate_storage_path, RoutingTestModel, RoutingTestModelBuilder},
     anyhow::anyhow,
     async_trait::async_trait,
-    cm_moniker::InstancedAbsoluteMoniker,
+    cm_moniker::InstancedMoniker,
     cm_rust::*,
     cm_types::{Name, Url},
     fidl::{
@@ -39,7 +39,7 @@ use {
     fuchsia_inspect as inspect, fuchsia_zircon as zx,
     futures::lock::Mutex,
     futures::{channel::oneshot, prelude::*},
-    moniker::{AbsoluteMoniker, AbsoluteMonikerBase, ChildMoniker, ChildMonikerBase},
+    moniker::{ChildMoniker, ChildMonikerBase, Moniker, MonikerBase},
     std::{
         collections::{HashMap, HashSet},
         default::Default,
@@ -342,7 +342,7 @@ impl RoutingTest {
     /// Creates a dynamic child `child_decl` in `moniker`'s `collection`.
     pub async fn create_dynamic_child<'a>(
         &'a self,
-        moniker: &AbsoluteMoniker,
+        moniker: &Moniker,
         collection: &'a str,
         decl: impl Into<ChildDecl>,
     ) {
@@ -358,7 +358,7 @@ impl RoutingTest {
     /// Creates a dynamic child `child_decl` in `moniker`'s `collection`.
     pub async fn create_dynamic_child_with_args<'a>(
         &'a self,
-        moniker: &AbsoluteMoniker,
+        moniker: &Moniker,
         collection: &'a str,
         decl: impl Into<ChildDecl>,
         args: fcomponent::CreateChildArgs,
@@ -378,7 +378,7 @@ impl RoutingTest {
     /// to complete.
     pub async fn destroy_dynamic_child<'a>(
         &'a self,
-        moniker: AbsoluteMoniker,
+        moniker: Moniker,
         collection: &'a str,
         name: &'a str,
     ) {
@@ -391,7 +391,7 @@ impl RoutingTest {
         component.remove_dynamic_child(&child_moniker).await.expect("failed to remove child");
     }
 
-    pub async fn bind_and_get_namespace(&self, moniker: AbsoluteMoniker) -> Arc<ManagedNamespace> {
+    pub async fn bind_and_get_namespace(&self, moniker: Moniker) -> Arc<ManagedNamespace> {
         let component_name = self.start_instance_and_wait_start(&moniker).await.unwrap();
         let component_resolved_url = Self::resolved_url(&component_name);
         let namespace = self
@@ -406,7 +406,7 @@ impl RoutingTest {
     pub async fn list_directory_in_storage(
         &self,
         subdir: Option<&str>,
-        relation: InstancedAbsoluteMoniker,
+        relation: InstancedMoniker,
         instance_id: Option<&ComponentInstanceId>,
         relative_path: &str,
     ) -> Vec<String> {
@@ -492,11 +492,7 @@ impl RoutingTest {
 
     /// Checks a `use /svc/fuchsia.component.Realm` declaration at `moniker` by calling
     /// `BindChild`.
-    pub async fn check_use_realm(
-        &self,
-        moniker: AbsoluteMoniker,
-        bind_calls: Arc<Mutex<Vec<String>>>,
-    ) {
+    pub async fn check_use_realm(&self, moniker: Moniker, bind_calls: Arc<Mutex<Vec<String>>>) {
         let component_name =
             self.start_instance_and_wait_start(&moniker).await.expect("bind instance failed");
         let component_resolved_url = Self::resolved_url(&component_name);
@@ -571,7 +567,7 @@ impl RoutingTest {
     /// default reason of StartReason::Eager.
     ///
     /// On success, returns the short name of the component.
-    pub async fn start_instance(&self, moniker: &AbsoluteMoniker) -> Result<String, ModelError> {
+    pub async fn start_instance(&self, moniker: &Moniker) -> Result<String, ModelError> {
         self.start_instance_with(moniker, StartReason::Eager, false).await
     }
 
@@ -583,14 +579,14 @@ impl RoutingTest {
     /// On success, returns the short name of the component.
     pub async fn start_instance_and_wait_start(
         &self,
-        moniker: &AbsoluteMoniker,
+        moniker: &Moniker,
     ) -> Result<String, ModelError> {
         self.start_instance_with(moniker, StartReason::Eager, true).await
     }
 
     async fn start_instance_with(
         &self,
-        moniker: &AbsoluteMoniker,
+        moniker: &Moniker,
         reason: StartReason,
         wait_for_start: bool,
     ) -> Result<String, ModelError> {
@@ -608,7 +604,7 @@ impl RoutingTest {
 
     pub async fn start_and_get_instance<'a>(
         &self,
-        moniker: &AbsoluteMoniker,
+        moniker: &Moniker,
         reason: StartReason,
         wait_for_start: bool,
     ) -> Result<(Arc<ComponentInstance>, String), ModelError> {
@@ -634,7 +630,7 @@ impl RoutingTest {
 impl RoutingTestModel for RoutingTest {
     type C = ComponentInstance;
 
-    async fn check_use(&self, moniker: AbsoluteMoniker, check: CheckUse) {
+    async fn check_use(&self, moniker: Moniker, check: CheckUse) {
         let (component, component_name) = self
             .start_and_get_instance(&moniker, StartReason::Eager, true)
             .await
@@ -834,7 +830,7 @@ impl RoutingTestModel for RoutingTest {
         }
     }
 
-    async fn check_use_exposed_dir(&self, moniker: AbsoluteMoniker, check: CheckUse) {
+    async fn check_use_exposed_dir(&self, moniker: Moniker, check: CheckUse) {
         match check {
             CheckUse::Protocol { path, expected_res } => {
                 capability_util::call_echo_svc_from_exposed_dir(
@@ -909,12 +905,12 @@ impl RoutingTestModel for RoutingTest {
 
     async fn look_up_instance(
         &self,
-        moniker: &AbsoluteMoniker,
+        moniker: &Moniker,
     ) -> Result<Arc<ComponentInstance>, anyhow::Error> {
         self.model.look_up(&moniker).await.map_err(|err| anyhow!(err))
     }
 
-    async fn check_open_file(&self, moniker: AbsoluteMoniker, path: cm_types::Path) {
+    async fn check_open_file(&self, moniker: Moniker, path: cm_types::Path) {
         let component_name =
             self.start_instance_and_wait_start(&moniker).await.expect("start instance failed");
         let component_resolved_url = Self::resolved_url(&component_name);
@@ -1125,7 +1121,7 @@ pub mod capability_util {
     pub async fn check_file_in_storage(
         storage_subdir: Option<String>,
         persistent_storage: bool,
-        relation: InstancedAbsoluteMoniker,
+        relation: InstancedMoniker,
         instance_id: Option<&ComponentInstanceId>,
         test_dir_proxy: &fio::DirectoryProxy,
     ) -> Result<(), anyhow::Error> {
@@ -1148,7 +1144,7 @@ pub mod capability_util {
     pub async fn confirm_storage_is_deleted_for_component(
         storage_subdir: Option<String>,
         persistent_storage: bool,
-        relation: InstancedAbsoluteMoniker,
+        relation: InstancedMoniker,
         instance_id: Option<&ComponentInstanceId>,
         test_dir_proxy: &fio::DirectoryProxy,
     ) {
@@ -1332,7 +1328,7 @@ pub mod capability_util {
     pub async fn read_data_from_exposed_dir<'a>(
         path: cm_types::Path,
         file: &str,
-        abs_moniker: &'a AbsoluteMoniker,
+        abs_moniker: &'a Moniker,
         model: &'a Arc<Model>,
         expected_res: ExpectedResult,
     ) {
@@ -1382,7 +1378,7 @@ pub mod capability_util {
     /// directory.
     pub async fn call_echo_svc_from_exposed_dir<'a>(
         path: cm_types::Path,
-        abs_moniker: &'a AbsoluteMoniker,
+        abs_moniker: &'a Moniker,
         model: &'a Arc<Model>,
         expected_res: ExpectedResult,
     ) {
@@ -1396,7 +1392,7 @@ pub mod capability_util {
         path: cm_types::Path,
         instance: String,
         member: String,
-        abs_moniker: &AbsoluteMoniker,
+        abs_moniker: &Moniker,
         model: &Arc<Model>,
         expected_res: ExpectedResult,
     ) {
@@ -1420,7 +1416,7 @@ pub mod capability_util {
 
     pub async fn read_service_from_exposed_dir(
         path: cm_types::Path,
-        abs_moniker: &AbsoluteMoniker,
+        abs_moniker: &Moniker,
         model: &Arc<Model>,
     ) -> Vec<String> {
         let (node_proxy, server_end) = endpoints::create_proxy::<fio::NodeMarker>().unwrap();
@@ -1517,7 +1513,7 @@ pub mod capability_util {
     /// Open the exposed dir for `abs_moniker`.
     async fn open_exposed_dir<'a>(
         path: &'a cm_types::Path,
-        abs_moniker: &'a AbsoluteMoniker,
+        abs_moniker: &'a Moniker,
         model: &'a Arc<Model>,
         directory: bool,
         server_end: ServerEnd<fio::NodeMarker>,

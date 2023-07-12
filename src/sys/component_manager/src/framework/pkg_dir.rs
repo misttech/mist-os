@@ -21,7 +21,7 @@ use {
     fidl::endpoints::ServerEnd,
     fidl_fuchsia_io as fio, fuchsia_zircon as zx,
     futures::lock::Mutex,
-    moniker::AbsoluteMoniker,
+    moniker::Moniker,
     std::{
         path::PathBuf,
         sync::{Arc, Weak},
@@ -29,12 +29,12 @@ use {
 };
 
 struct PkgDirectoryProvider {
-    _abs_moniker: AbsoluteMoniker,
+    _abs_moniker: Moniker,
     package: Option<Package>,
 }
 
 impl PkgDirectoryProvider {
-    pub fn new(abs_moniker: AbsoluteMoniker, package: Option<Package>) -> Self {
+    pub fn new(abs_moniker: Moniker, package: Option<Package>) -> Self {
         PkgDirectoryProvider { _abs_moniker: abs_moniker, package }
     }
 }

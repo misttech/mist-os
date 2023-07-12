@@ -7,11 +7,11 @@ use cm_rust::NativeIntoFidl;
 use config_value_file::field::config_value_from_json_value;
 use fidl_fuchsia_component_decl as fdecl;
 use fidl_fuchsia_sys2 as fsys;
-use moniker::{AbsoluteMoniker, AbsoluteMonikerBase, ChildMonikerBase};
+use moniker::{ChildMonikerBase, Moniker, MonikerBase};
 
 pub async fn resolve_raw_config_overrides(
     realm_query: &fsys::RealmQueryProxy,
-    moniker: &AbsoluteMoniker,
+    moniker: &Moniker,
     url: &str,
     raw_overrides: &[RawConfigOverride],
 ) -> Result<Vec<fdecl::ConfigOverride>, ConfigResolveError> {
@@ -67,7 +67,7 @@ impl std::str::FromStr for RawConfigOverride {
 #[derive(Debug, thiserror::Error)]
 pub enum ConfigResolveError {
     #[error("`{_0}` does not reference a dynamic instance.")]
-    BadMoniker(AbsoluteMoniker),
+    BadMoniker(Moniker),
 
     #[error("Failed to get component manifest: {_0:?}")]
     FailedToGetManifest(

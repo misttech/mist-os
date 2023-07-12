@@ -4,7 +4,7 @@
 
 use diagnostics_data::{LogsData, Severity};
 use fuchsia_zircon_types::zx_koid_t;
-use moniker::AbsoluteMoniker;
+use moniker::Moniker;
 use std::str::FromStr;
 
 use crate::{
@@ -141,8 +141,8 @@ impl LogFilterCriteria {
     /// Returns true if the given 'LogsData' matches the filter string by
     /// message, moniker, or component URL.
     fn matches_filter_string(filter_string: &str, message: &str, log: &LogsData) -> bool {
-        let filter_moniker = AbsoluteMoniker::from_str(filter_string);
-        let moniker = AbsoluteMoniker::from_str(log.moniker.as_str());
+        let filter_moniker = Moniker::from_str(filter_string);
+        let moniker = Moniker::from_str(log.moniker.as_str());
         return message.contains(filter_string)
             || log.moniker.contains(filter_string)
             || moniker.clone().map(|m| m.to_string().contains(filter_string)).unwrap_or(false)
@@ -155,8 +155,8 @@ impl LogFilterCriteria {
 
     /// Returns true if the given `LogsData` matches the moniker string.
     fn matches_filter_by_moniker_string(filter_string: &str, log: &LogsData) -> bool {
-        let filter_moniker = AbsoluteMoniker::from_str(filter_string);
-        let moniker = AbsoluteMoniker::from_str(log.moniker.as_str());
+        let filter_moniker = Moniker::from_str(filter_string);
+        let moniker = Moniker::from_str(log.moniker.as_str());
         matches!((moniker, filter_moniker), (Ok(a), Ok(b)) if a == b)
     }
 

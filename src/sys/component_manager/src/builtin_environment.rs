@@ -84,7 +84,7 @@ use {
     fuchsia_zbi::{ZbiParser, ZbiType},
     fuchsia_zircon::{self as zx, Clock, HandleBased, Resource},
     futures::prelude::*,
-    moniker::{AbsoluteMoniker, AbsoluteMonikerBase},
+    moniker::{Moniker, MonikerBase},
     std::sync::Arc,
     tracing::{info, warn},
 };
@@ -910,7 +910,7 @@ impl BuiltinEnvironment {
                 fasync::Task::spawn(async move {
                     scope
                         .add_task(async move {
-                            lifecycle_controller.serve(AbsoluteMoniker::root(), stream).await;
+                            lifecycle_controller.serve(Moniker::root(), stream).await;
                         })
                         .await;
                 })
@@ -930,7 +930,7 @@ impl BuiltinEnvironment {
                 fasync::Task::spawn(async move {
                     scope
                         .add_task(async move {
-                            realm_query.serve(AbsoluteMoniker::root(), stream).await;
+                            realm_query.serve(Moniker::root(), stream).await;
                         })
                         .await;
                 })

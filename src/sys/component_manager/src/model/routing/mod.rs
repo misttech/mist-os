@@ -23,11 +23,11 @@ use {
         mapper::NoopRouteMapper, router::RouteBundle,
     },
     async_trait::async_trait,
-    cm_moniker::InstancedAbsoluteMoniker,
+    cm_moniker::InstancedMoniker,
     cm_rust::{CapabilityTypeName, ExposeDecl, ExposeDeclCommon, UseDecl, UseStorageDecl},
     fidl::epitaph::ChannelEpitaphExt,
     fuchsia_zircon as zx,
-    moniker::AbsoluteMonikerBase,
+    moniker::MonikerBase,
     std::{collections::BTreeMap, sync::Arc},
     tracing::{debug, info, warn},
 };
@@ -202,7 +202,7 @@ pub(super) async fn route_and_delete_storage(
 
     // As of today, the storage component instance must contain the target. This is because
     // it is impossible to expose storage declarations up.
-    let relative_moniker = InstancedAbsoluteMoniker::scope_down(
+    let relative_moniker = InstancedMoniker::scope_down(
         &backing_dir_info.storage_source_moniker,
         &target.instanced_moniker(),
     )

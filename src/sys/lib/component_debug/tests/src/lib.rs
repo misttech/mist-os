@@ -13,7 +13,7 @@ use {
     },
     fidl_fuchsia_component_decl as fdecl, fidl_fuchsia_sys2 as fsys,
     fuchsia_component::client::connect_to_protocol,
-    moniker::{AbsoluteMoniker, AbsoluteMonikerBase},
+    moniker::{Moniker, MonikerBase},
     std::str::FromStr,
 };
 
@@ -26,17 +26,17 @@ async fn list() {
     assert_eq!(instances.len(), 3);
 
     let instance = instances.remove(0);
-    assert_eq!(instance.moniker, AbsoluteMoniker::root());
+    assert_eq!(instance.moniker, Moniker::root());
     assert!(instance.url.ends_with("#meta/test.cm"));
     let resolved = instance.resolved_info.unwrap();
     resolved.execution_info.unwrap();
 
     let instance = instances.remove(0);
-    assert_eq!(instance.moniker, AbsoluteMoniker::parse_str("/echo_server").unwrap());
+    assert_eq!(instance.moniker, Moniker::parse_str("/echo_server").unwrap());
     assert!(instance.url.ends_with("#meta/echo_server.cm"));
 
     let instance = instances.remove(0);
-    assert_eq!(instance.moniker, AbsoluteMoniker::parse_str("/foo").unwrap());
+    assert_eq!(instance.moniker, Moniker::parse_str("/foo").unwrap());
     assert!(instance.url.ends_with("#meta/foo.cm"));
 }
 
@@ -76,7 +76,7 @@ async fn show() {
     resolved.started.unwrap();
 
     let instance = show_cmd_serialized("foo.cm".to_string(), realm_query).await.unwrap();
-    assert_eq!(instance.moniker, AbsoluteMoniker::parse_str("/foo").unwrap());
+    assert_eq!(instance.moniker, Moniker::parse_str("/foo").unwrap());
     assert!(instance.url.ends_with("#meta/foo.cm"));
 
     let resolved = instance.resolved.unwrap();
@@ -226,9 +226,7 @@ async fn expected_foo_manifest() -> cm_rust::ComponentDecl {
 async fn get_manifest_static_instance() {
     let realm_query = connect_to_protocol::<fsys::RealmQueryMarker>().unwrap();
     let manifest =
-        get_resolved_declaration(&AbsoluteMoniker::parse_str("/foo").unwrap(), &realm_query)
-            .await
-            .unwrap();
+        get_resolved_declaration(&Moniker::parse_str("/foo").unwrap(), &realm_query).await.unwrap();
     assert_eq!(manifest, expected_foo_manifest().await);
 }
 
@@ -237,7 +235,7 @@ async fn get_manifest_potential_dynamic_instance_relative_url() {
     let realm_query = connect_to_protocol::<fsys::RealmQueryMarker>().unwrap();
     let manifest = resolve_declaration(
         &realm_query,
-        &AbsoluteMoniker::parse_str("/").unwrap(),
+        &Moniker::parse_str("/").unwrap(),
         &fsys::ChildLocation::Collection("for_manifest_resolution".to_string()),
         "#meta/foo.cm",
     )
@@ -251,7 +249,7 @@ async fn get_manifest_potential_dynamic_instance_absolute_url() {
     let realm_query = connect_to_protocol::<fsys::RealmQueryMarker>().unwrap();
     let manifest = resolve_declaration(
         &realm_query,
-        &AbsoluteMoniker::parse_str("/").unwrap(),
+        &Moniker::parse_str("/").unwrap(),
         &fsys::ChildLocation::Collection("for_manifest_resolution".to_string()),
         "fuchsia-pkg://fuchsia.com/component_debug_integration_tests#meta/foo.cm",
     )
@@ -283,7 +281,7 @@ async fn resolve_raw_foo_config_override() {
     ];
     let resolved_overrides = resolve_raw_config_overrides(
         &realm_query,
-        &AbsoluteMoniker::parse_str("/for_manifest_resolution:foo").unwrap(),
+        &Moniker::parse_str("/for_manifest_resolution:foo").unwrap(),
         "#meta/foo.cm",
         raw_overrides,
     )

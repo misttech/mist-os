@@ -44,7 +44,7 @@ use {
     },
     async_trait::async_trait,
     cm_fidl_validator::error::DeclType,
-    cm_moniker::{IncarnationId, InstancedAbsoluteMoniker, InstancedChildMoniker},
+    cm_moniker::{IncarnationId, InstancedChildMoniker, InstancedMoniker},
     cm_runner::{component_controller::ComponentController, NullRunner, RemoteRunner, Runner},
     cm_rust::{
         self, ChildDecl, CollectionDecl, ComponentDecl, FidlIntoNative, NativeIntoFidl,
@@ -65,7 +65,7 @@ use {
         future::{join_all, BoxFuture, Either, FutureExt},
         lock::{MappedMutexGuard, Mutex, MutexGuard},
     },
-    moniker::{AbsoluteMoniker, AbsoluteMonikerBase, ChildMoniker, ChildMonikerBase},
+    moniker::{ChildMoniker, ChildMonikerBase, Moniker, MonikerBase},
     std::iter::Iterator,
     std::{
         boxed::Box,
@@ -90,7 +90,7 @@ pub type WeakExtendedInstance = WeakExtendedInstanceInterface<ComponentInstance>
 pub enum StartReason {
     /// Indicates that the target is starting the component because it wishes to access
     /// the capability at path.
-    AccessCapability { target: AbsoluteMoniker, name: Name },
+    AccessCapability { target: Moniker, name: Name },
     /// Indicates that the component is starting because it is in a single-run collection.
     SingleRun,
     /// Indicates that the component was explicitly started for debugging purposes.
@@ -341,9 +341,9 @@ pub struct ComponentInstance {
     /// The parent instance. Either a component instance or component manager's instance.
     pub parent: WeakExtendedInstance,
     /// The instanced absolute moniker of this instance.
-    instanced_moniker: InstancedAbsoluteMoniker,
+    instanced_moniker: InstancedMoniker,
     /// The partial absolute moniker of this instance.
-    pub abs_moniker: AbsoluteMoniker,
+    pub abs_moniker: Moniker,
     /// The hooks scoped to this instance.
     pub hooks: Arc<Hooks>,
     /// Whether to persist isolated storage data of this component instance after it has been
@@ -381,7 +381,7 @@ impl ComponentInstance {
     ) -> Arc<Self> {
         Self::new(
             Arc::new(environment),
-            InstancedAbsoluteMoniker::root(),
+            InstancedMoniker::root(),
             component_url,
             fdecl::StartupMode::Lazy,
             fdecl::OnTerminate::None,
@@ -397,7 +397,7 @@ impl ComponentInstance {
     // TODO(https://fxbug.dev/127057) convert this to a builder API
     pub fn new(
         environment: Arc<Environment>,
-        instanced_moniker: InstancedAbsoluteMoniker,
+        instanced_moniker: InstancedMoniker,
         component_url: String,
         startup: fdecl::StartupMode,
         on_terminate: fdecl::OnTerminate,
@@ -1086,11 +1086,11 @@ fn offer_target_mut(offer: &mut fdecl::Offer) -> Option<&mut Option<fdecl::Ref>>
 impl ComponentInstanceInterface for ComponentInstance {
     type TopInstance = ComponentManagerInstance;
 
-    fn instanced_moniker(&self) -> &InstancedAbsoluteMoniker {
+    fn instanced_moniker(&self) -> &InstancedMoniker {
         &self.instanced_moniker
     }
 
-    fn abs_moniker(&self) -> &AbsoluteMoniker {
+    fn abs_moniker(&self) -> &Moniker {
         &self.abs_moniker
     }
 
@@ -1962,7 +1962,7 @@ pub mod tests {
         fuchsia_async as fasync,
         fuchsia_zircon::{self as zx, AsHandleRef, Koid},
         futures::lock::Mutex,
-        moniker::AbsoluteMoniker,
+        moniker::Moniker,
         routing_test_helpers::component_id_index::make_index_file,
         std::panic,
         std::{boxed::Box, collections::HashMap, str::FromStr, sync::Arc, task::Poll},
@@ -2444,7 +2444,7 @@ pub mod tests {
         let model = test.model.clone();
         let (f, bind_handle) = async move {
             model
-                .start_instance(&AbsoluteMoniker::root(), &StartReason::Root)
+                .start_instance(&Moniker::root(), &StartReason::Root)
                 .await
                 .expect("failed to bind")
         }
@@ -2500,15 +2500,15 @@ pub mod tests {
             .await
             .expect("couldn't susbscribe to event stream");
 
-        let a_moniker: AbsoluteMoniker = vec!["a"].try_into().unwrap();
-        let b_moniker: AbsoluteMoniker = vec!["a", "b"].try_into().unwrap();
+        let a_moniker: Moniker = vec!["a"].try_into().unwrap();
+        let b_moniker: Moniker = vec!["a", "b"].try_into().unwrap();
 
         let component_b = test.look_up(b_moniker.clone()).await;
 
         // Start the root so it and its eager children start.
         let _root = test
             .model
-            .start_instance(&AbsoluteMoniker::root(), &StartReason::Root)
+            .start_instance(&Moniker::root(), &StartReason::Root)
             .await
             .expect("failed to start root");
         test.runner
@@ -2560,7 +2560,7 @@ pub mod tests {
         let test = ActionsTest::new("root", components, None).await;
 
         // Resolve each component.
-        test.look_up(AbsoluteMoniker::root()).await;
+        test.look_up(Moniker::root()).await;
         let component_a = test.look_up(vec!["a"].try_into().unwrap()).await;
         let component_b = test.look_up(vec!["a", "b"].try_into().unwrap()).await;
         let component_c = test.look_up(vec!["a", "b", "c"].try_into().unwrap()).await;
@@ -2590,7 +2590,7 @@ pub mod tests {
         let component_id_index_path = make_index_file(component_id_index::Index {
             instances: vec![component_id_index::InstanceIdEntry {
                 instance_id: instance_id.clone(),
-                moniker: Some(AbsoluteMoniker::root()),
+                moniker: Some(Moniker::root()),
             }],
             ..component_id_index::Index::default()
         })
@@ -2603,7 +2603,7 @@ pub mod tests {
             .await;
 
         let root_realm =
-            test.model.start_instance(&AbsoluteMoniker::root(), &StartReason::Root).await.unwrap();
+            test.model.start_instance(&Moniker::root(), &StartReason::Root).await.unwrap();
         assert_eq!(
             instance_id.map(|id| ComponentInstanceId::from_str(&id)
                 .expect("generated instance ID could not be parsed into ComponentInstanceId")),
@@ -2612,7 +2612,7 @@ pub mod tests {
 
         let a_realm = test
             .model
-            .start_instance(&AbsoluteMoniker::try_from(vec!["a"]).unwrap(), &StartReason::Root)
+            .start_instance(&Moniker::try_from(vec!["a"]).unwrap(), &StartReason::Root)
             .await
             .unwrap();
         assert_eq!(None, a_realm.instance_id());
@@ -2622,13 +2622,7 @@ pub mod tests {
         event_stream: &mut EventStream,
         event_type: EventType,
     ) -> zx::Time {
-        event_stream
-            .wait_until(event_type, AbsoluteMoniker::root())
-            .await
-            .unwrap()
-            .event
-            .timestamp
-            .clone()
+        event_stream.wait_until(event_type, Moniker::root()).await.unwrap().event.timestamp.clone()
     }
 
     #[fuchsia::test]
@@ -2693,7 +2687,7 @@ pub mod tests {
         let test = RoutingTestBuilder::new("root", components).build().await;
 
         let root_component =
-            test.model.start_instance(&AbsoluteMoniker::root(), &StartReason::Root).await.unwrap();
+            test.model.start_instance(&Moniker::root(), &StartReason::Root).await.unwrap();
 
         let root_resolved = root_component.lock_resolved_state().await.expect("resolve failed");
 
@@ -2777,7 +2771,7 @@ pub mod tests {
             ("b", component_decl_with_test_runner()),
         ];
 
-        let test = ActionsTest::new("root", components, Some(AbsoluteMoniker::root())).await;
+        let test = ActionsTest::new("root", components, Some(Moniker::root())).await;
 
         test.create_dynamic_child("coll_1", "a").await;
         test.create_dynamic_child_with_args(
@@ -2816,7 +2810,7 @@ pub mod tests {
             availability: Availability::Required,
         });
 
-        let root_component = test.look_up(AbsoluteMoniker::root()).await;
+        let root_component = test.look_up(Moniker::root()).await;
 
         {
             let root_resolved = root_component.lock_resolved_state().await.expect("resolving");
@@ -2991,7 +2985,7 @@ pub mod tests {
             ("static_child", component_decl_with_test_runner()),
         ];
 
-        let test = ActionsTest::new("root", components, Some(AbsoluteMoniker::root())).await;
+        let test = ActionsTest::new("root", components, Some(Moniker::root())).await;
 
         let res = test
             .create_dynamic_child_with_args(
@@ -3046,7 +3040,7 @@ pub mod tests {
                 .build(),
         )];
 
-        let test = ActionsTest::new("root", components, Some(AbsoluteMoniker::root())).await;
+        let test = ActionsTest::new("root", components, Some(Moniker::root())).await;
         test.create_dynamic_child("coll2", "dynamic_src").await;
         let cycle_res = test
             .create_dynamic_child_with_args(
@@ -3083,7 +3077,7 @@ pub mod tests {
                 .build(),
         )];
 
-        let test = ActionsTest::new("root", components, Some(AbsoluteMoniker::root())).await;
+        let test = ActionsTest::new("root", components, Some(Moniker::root())).await;
 
         let res = test
             .create_dynamic_child_with_args(
@@ -3118,7 +3112,7 @@ pub mod tests {
                 .build(),
         )];
 
-        let test = ActionsTest::new("root", components, Some(AbsoluteMoniker::root())).await;
+        let test = ActionsTest::new("root", components, Some(Moniker::root())).await;
 
         let res = test
             .create_dynamic_child_with_args(
@@ -3147,7 +3141,7 @@ pub mod tests {
     async fn new_component() -> Arc<ComponentInstance> {
         ComponentInstance::new(
             Arc::new(Environment::empty()),
-            InstancedAbsoluteMoniker::root(),
+            InstancedMoniker::root(),
             "fuchsia-pkg://fuchsia.com/foo#at_root.cm".to_string(),
             fdecl::StartupMode::Lazy,
             fdecl::OnTerminate::None,
@@ -3270,12 +3264,12 @@ pub mod tests {
         let test = ActionsTest::new("root", components, None).await;
         let _root = test
             .model
-            .start_instance(&AbsoluteMoniker::root(), &StartReason::Root)
+            .start_instance(&Moniker::root(), &StartReason::Root)
             .await
             .expect("failed to start root");
         test.runner.wait_for_urls(&["test:///root_resolved"]).await;
 
-        let root_component = test.look_up(AbsoluteMoniker::root()).await;
+        let root_component = test.look_up(Moniker::root()).await;
 
         let collection_decl = root_component
             .lock_resolved_state()

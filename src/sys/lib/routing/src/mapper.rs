@@ -9,7 +9,7 @@ use {
         UseDecl, UseDeclCommon,
     },
     cm_types::Name,
-    moniker::AbsoluteMoniker,
+    moniker::Moniker,
 };
 
 #[cfg(feature = "serde")]
@@ -24,19 +24,19 @@ use serde::{Deserialize, Serialize};
 #[derive(Clone, Debug, PartialEq)]
 pub enum RouteSegment {
     /// The capability was used by a component instance in its manifest.
-    UseBy { moniker: AbsoluteMoniker, capability: UseDecl },
+    UseBy { moniker: Moniker, capability: UseDecl },
 
     /// The capability was offered by a component instance in its manifest.
-    OfferBy { moniker: AbsoluteMoniker, capability: OfferDecl },
+    OfferBy { moniker: Moniker, capability: OfferDecl },
 
     /// The capability was exposed by a component instance in its manifest.
-    ExposeBy { moniker: AbsoluteMoniker, capability: ExposeDecl },
+    ExposeBy { moniker: Moniker, capability: ExposeDecl },
 
     /// The capability was declared by a component instance in its manifest.
-    DeclareBy { moniker: AbsoluteMoniker, capability: CapabilityDecl },
+    DeclareBy { moniker: Moniker, capability: CapabilityDecl },
 
     /// The capability was registered in a component instance's environment in its manifest.
-    RegisterBy { moniker: AbsoluteMoniker, capability: RegistrationDecl },
+    RegisterBy { moniker: Moniker, capability: RegistrationDecl },
 
     /// This is a framework capability served by component manager.
     ProvideFromFramework { capability: Name },
@@ -101,7 +101,7 @@ impl std::fmt::Display for RouteSegment {
 
 impl RouteSegment {
     /// Get the moniker of the component instance where this segment occurred, if any.
-    pub fn moniker(&self) -> Option<AbsoluteMoniker> {
+    pub fn moniker(&self) -> Option<Moniker> {
         match self {
             Self::UseBy { moniker, .. }
             | Self::DeclareBy { moniker, .. }
@@ -129,32 +129,24 @@ impl RouteMapper {
 }
 
 impl DebugRouteMapper for RouteMapper {
-    fn add_use(&mut self, abs_moniker: AbsoluteMoniker, use_decl: UseDecl) {
+    fn add_use(&mut self, abs_moniker: Moniker, use_decl: UseDecl) {
         self.route.push(RouteSegment::UseBy { moniker: abs_moniker, capability: use_decl })
     }
 
-    fn add_offer(&mut self, abs_moniker: AbsoluteMoniker, offer_decl: OfferDecl) {
+    fn add_offer(&mut self, abs_moniker: Moniker, offer_decl: OfferDecl) {
         self.route.push(RouteSegment::OfferBy { moniker: abs_moniker, capability: offer_decl })
     }
 
-    fn add_expose(&mut self, abs_moniker: AbsoluteMoniker, expose_decl: ExposeDecl) {
+    fn add_expose(&mut self, abs_moniker: Moniker, expose_decl: ExposeDecl) {
         self.route.push(RouteSegment::ExposeBy { moniker: abs_moniker, capability: expose_decl })
     }
 
-    fn add_registration(
-        &mut self,
-        abs_moniker: AbsoluteMoniker,
-        registration_decl: RegistrationDecl,
-    ) {
+    fn add_registration(&mut self, abs_moniker: Moniker, registration_decl: RegistrationDecl) {
         self.route
             .push(RouteSegment::RegisterBy { moniker: abs_moniker, capability: registration_decl })
     }
 
-    fn add_component_capability(
-        &mut self,
-        abs_moniker: AbsoluteMoniker,
-        capability_decl: CapabilityDecl,
-    ) {
+    fn add_component_capability(&mut self, abs_moniker: Moniker, capability_decl: CapabilityDecl) {
         self.route
             .push(RouteSegment::DeclareBy { moniker: abs_moniker, capability: capability_decl })
     }
@@ -180,29 +172,19 @@ impl DebugRouteMapper for NoopRouteMapper {}
 /// Provides methods to record and retrieve a summary of a capability route.
 pub trait DebugRouteMapper: Send + Sync + Clone {
     #[allow(unused_variables)]
-    fn add_use(&mut self, abs_moniker: AbsoluteMoniker, use_decl: UseDecl) {}
+    fn add_use(&mut self, abs_moniker: Moniker, use_decl: UseDecl) {}
 
     #[allow(unused_variables)]
-    fn add_offer(&mut self, abs_moniker: AbsoluteMoniker, offer_decl: OfferDecl) {}
+    fn add_offer(&mut self, abs_moniker: Moniker, offer_decl: OfferDecl) {}
 
     #[allow(unused_variables)]
-    fn add_expose(&mut self, abs_moniker: AbsoluteMoniker, expose_decl: ExposeDecl) {}
+    fn add_expose(&mut self, abs_moniker: Moniker, expose_decl: ExposeDecl) {}
 
     #[allow(unused_variables)]
-    fn add_registration(
-        &mut self,
-        abs_moniker: AbsoluteMoniker,
-        registration_decl: RegistrationDecl,
-    ) {
-    }
+    fn add_registration(&mut self, abs_moniker: Moniker, registration_decl: RegistrationDecl) {}
 
     #[allow(unused_variables)]
-    fn add_component_capability(
-        &mut self,
-        abs_moniker: AbsoluteMoniker,
-        capability_decl: CapabilityDecl,
-    ) {
-    }
+    fn add_component_capability(&mut self, abs_moniker: Moniker, capability_decl: CapabilityDecl) {}
 
     #[allow(unused_variables)]
     fn add_framework_capability(&mut self, capability_name: Name) {}

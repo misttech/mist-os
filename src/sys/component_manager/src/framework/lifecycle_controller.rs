@@ -22,7 +22,7 @@ use {
     futures::lock::Mutex,
     futures::prelude::*,
     lazy_static::lazy_static,
-    moniker::{AbsoluteMoniker, AbsoluteMonikerBase, ChildMoniker, MonikerError},
+    moniker::{ChildMoniker, Moniker, MonikerBase, MonikerError},
     std::convert::TryFrom,
     std::path::PathBuf,
     std::sync::{Arc, Weak},
@@ -54,7 +54,7 @@ impl LifecycleController {
 
     async fn resolve_instance(
         &self,
-        scope_moniker: &AbsoluteMoniker,
+        scope_moniker: &Moniker,
         moniker: String,
     ) -> Result<(), fsys::ResolveError> {
         let moniker =
@@ -69,7 +69,7 @@ impl LifecycleController {
 
     async fn start_instance(
         &self,
-        scope_moniker: &AbsoluteMoniker,
+        scope_moniker: &Moniker,
         moniker: String,
         binder: ServerEnd<fcomponent::BinderMarker>,
     ) -> Result<(), fsys::StartError> {
@@ -88,7 +88,7 @@ impl LifecycleController {
 
     async fn stop_instance(
         &self,
-        scope_moniker: &AbsoluteMoniker,
+        scope_moniker: &Moniker,
         moniker: String,
     ) -> Result<(), fsys::StopError> {
         let moniker =
@@ -103,7 +103,7 @@ impl LifecycleController {
 
     async fn unresolve_instance(
         &self,
-        scope_moniker: &AbsoluteMoniker,
+        scope_moniker: &Moniker,
         moniker: String,
     ) -> Result<(), fsys::UnresolveError> {
         let moniker =
@@ -119,7 +119,7 @@ impl LifecycleController {
 
     async fn create_instance(
         &self,
-        scope_moniker: &AbsoluteMoniker,
+        scope_moniker: &Moniker,
         parent_moniker: String,
         collection: fdecl::CollectionRef,
         child_decl: fdecl::Child,
@@ -159,7 +159,7 @@ impl LifecycleController {
 
     async fn destroy_instance(
         &self,
-        scope_moniker: &AbsoluteMoniker,
+        scope_moniker: &Moniker,
         parent_moniker: String,
         child: fdecl::ChildRef,
     ) -> Result<(), fsys::DestroyError> {
@@ -180,7 +180,7 @@ impl LifecycleController {
 
     pub async fn serve(
         &self,
-        scope_moniker: AbsoluteMoniker,
+        scope_moniker: Moniker,
         mut stream: fsys::LifecycleControllerRequestStream,
     ) {
         while let Ok(Some(operation)) = stream.try_next().await {
@@ -278,11 +278,11 @@ impl Hook for LifecycleController {
 
 pub struct LifecycleControllerCapabilityProvider {
     control: Arc<LifecycleController>,
-    scope_moniker: AbsoluteMoniker,
+    scope_moniker: Moniker,
 }
 
 impl LifecycleControllerCapabilityProvider {
-    pub fn new(control: Arc<LifecycleController>, scope_moniker: AbsoluteMoniker) -> Self {
+    pub fn new(control: Arc<LifecycleController>, scope_moniker: Moniker) -> Self {
         Self { control, scope_moniker }
     }
 }
@@ -327,11 +327,8 @@ impl CapabilityProvider for LifecycleControllerCapabilityProvider {
 
 /// Takes the scoped component's moniker and a relative moniker string and joins them into an
 /// absolute moniker.
-fn join_monikers(
-    scope_moniker: &AbsoluteMoniker,
-    moniker_str: &str,
-) -> Result<AbsoluteMoniker, MonikerError> {
-    let relative_moniker = AbsoluteMoniker::try_from(moniker_str)?;
+fn join_monikers(scope_moniker: &Moniker, moniker_str: &str) -> Result<Moniker, MonikerError> {
+    let relative_moniker = Moniker::try_from(moniker_str)?;
     let abs_moniker = scope_moniker.descendant(&relative_moniker);
     Ok(abs_moniker)
 }
@@ -404,7 +401,7 @@ mod tests {
 
         // async move {} is used here because we want this to own the lifecycle_controller
         let _lifecycle_server_task = fasync::Task::local(async move {
-            lifecycle_controller.serve(AbsoluteMoniker::root(), lifecycle_request_stream).await
+            lifecycle_controller.serve(Moniker::root(), lifecycle_request_stream).await
         });
 
         assert_eq!(lifecycle_proxy.resolve_instance(".").await.unwrap(), Ok(()));
@@ -472,7 +469,7 @@ mod tests {
 
         // async move {} is used here because we want this to own the lifecycle_controller
         let _lifecycle_server_task = fasync::Task::local(async move {
-            lifecycle_controller.serve(AbsoluteMoniker::root(), lifecycle_request_stream).await
+            lifecycle_controller.serve(Moniker::root(), lifecycle_request_stream).await
         });
 
         lifecycle_proxy.resolve_instance(".").await.unwrap().unwrap();
@@ -525,7 +522,7 @@ mod tests {
 
         // async move {} is used here because we want this to own the lifecycle_controller
         let _lifecycle_server_task = fasync::Task::local(async move {
-            lifecycle_controller.serve(AbsoluteMoniker::root(), lifecycle_request_stream).await
+            lifecycle_controller.serve(Moniker::root(), lifecycle_request_stream).await
         });
 
         assert_eq!(
@@ -594,7 +591,7 @@ mod tests {
 
         // async move {} is used here because we want this to own the lifecycle_controller
         let _lifecycle_server_task = fasync::Task::local(async move {
-            lifecycle_controller.serve(AbsoluteMoniker::root(), lifecycle_request_stream).await
+            lifecycle_controller.serve(Moniker::root(), lifecycle_request_stream).await
         });
 
         assert_eq!(

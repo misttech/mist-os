@@ -6,7 +6,7 @@ use {
     crate::storage::{copy, delete, list, make_directory},
     anyhow::{format_err, Result},
     fidl_fuchsia_sys2 as fsys,
-    moniker::{AbsoluteMoniker, AbsoluteMonikerBase},
+    moniker::{Moniker, MonikerBase},
 };
 
 async fn get_storage_admin(
@@ -14,10 +14,9 @@ async fn get_storage_admin(
     storage_provider_moniker: String,
     storage_capability_name: String,
 ) -> Result<fsys::StorageAdminProxy> {
-    let storage_provider_moniker =
-        AbsoluteMoniker::parse_str(&storage_provider_moniker).map_err(|e| {
-            format_err!("Error: {} is not a valid moniker ({})", storage_provider_moniker, e)
-        })?;
+    let storage_provider_moniker = Moniker::parse_str(&storage_provider_moniker).map_err(|e| {
+        format_err!("Error: {} is not a valid moniker ({})", storage_provider_moniker, e)
+    })?;
 
     let (storage_admin, server_end) =
         fidl::endpoints::create_proxy::<fsys::StorageAdminMarker>().unwrap();
@@ -25,7 +24,7 @@ async fn get_storage_admin(
     // Convert the absolute moniker into a relative moniker w.r.t. root.
     // LifecycleController expects relative monikers only.
     let storage_provider_moniker =
-        AbsoluteMoniker::scope_down(&AbsoluteMoniker::root(), &storage_provider_moniker).unwrap();
+        Moniker::scope_down(&Moniker::root(), &storage_provider_moniker).unwrap();
 
     realm_query
         .connect_to_storage_admin(

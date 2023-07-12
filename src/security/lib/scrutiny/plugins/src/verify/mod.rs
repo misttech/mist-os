@@ -162,7 +162,7 @@ mod tests {
         fidl_fuchsia_component_decl as fdecl,
         fidl_fuchsia_component_internal as component_internal, fidl_fuchsia_io as fio,
         maplit::hashset,
-        moniker::{AbsoluteMoniker, AbsoluteMonikerBase},
+        moniker::{Moniker, MonikerBase},
         routing::{
             component_id_index::{ComponentIdIndex, ComponentInstanceId},
             component_instance::ComponentInstanceInterface,
@@ -562,7 +562,7 @@ mod tests {
             component_id_index::Index {
                 instances: vec![component_id_index::InstanceIdEntry {
                     instance_id: Some(iid.clone()),
-                    moniker: Some(AbsoluteMoniker::parse_str("/a/b/c").unwrap()),
+                    moniker: Some(Moniker::parse_str("/a/b/c").unwrap()),
                 }],
                 ..component_id_index::Index::default()
             },
@@ -579,7 +579,7 @@ mod tests {
             Some(&ComponentInstanceId::from_str(&iid).unwrap()),
             root_instance
                 .component_id_index()
-                .look_up_moniker(&AbsoluteMoniker::parse_str("/a/b/c").unwrap())
+                .look_up_moniker(&Moniker::parse_str("/a/b/c").unwrap())
         );
         Ok(())
     }

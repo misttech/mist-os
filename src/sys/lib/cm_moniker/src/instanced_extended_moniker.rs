@@ -3,9 +3,9 @@
 // found in the LICENSE file.
 
 use {
-    crate::instanced_abs_moniker::InstancedAbsoluteMoniker,
+    crate::instanced_moniker::InstancedMoniker,
     core::cmp::Ord,
-    moniker::{AbsoluteMonikerBase, MonikerError},
+    moniker::{MonikerBase, MonikerError},
     std::fmt,
 };
 
@@ -14,7 +14,7 @@ use {
 /// - A marker representing component manager's realm
 #[derive(Eq, Ord, PartialOrd, PartialEq, Debug, Clone, Hash)]
 pub enum InstancedExtendedMoniker {
-    ComponentInstance(InstancedAbsoluteMoniker),
+    ComponentInstance(InstancedMoniker),
     ComponentManager,
 }
 
@@ -26,16 +26,14 @@ impl InstancedExtendedMoniker {
         if rep == EXTENDED_MONIKER_COMPONENT_MANAGER_STR {
             Ok(InstancedExtendedMoniker::ComponentManager)
         } else {
-            Ok(InstancedExtendedMoniker::ComponentInstance(InstancedAbsoluteMoniker::parse_str(
-                rep,
-            )?))
+            Ok(InstancedExtendedMoniker::ComponentInstance(InstancedMoniker::parse_str(rep)?))
         }
     }
 
     pub fn unwrap_instance_moniker_or<E: std::error::Error>(
         &self,
         error: E,
-    ) -> Result<&InstancedAbsoluteMoniker, E> {
+    ) -> Result<&InstancedMoniker, E> {
         match self {
             Self::ComponentManager => Err(error),
             Self::ComponentInstance(moniker) => Ok(moniker),
@@ -65,8 +63,8 @@ impl fmt::Display for InstancedExtendedMoniker {
     }
 }
 
-impl From<InstancedAbsoluteMoniker> for InstancedExtendedMoniker {
-    fn from(m: InstancedAbsoluteMoniker) -> Self {
+impl From<InstancedMoniker> for InstancedExtendedMoniker {
+    fn from(m: InstancedMoniker) -> Self {
         Self::ComponentInstance(m)
     }
 }
@@ -84,13 +82,13 @@ mod tests {
         assert_eq!(
             InstancedExtendedMoniker::parse_str("/foo:0/bar:0").unwrap(),
             InstancedExtendedMoniker::ComponentInstance(
-                InstancedAbsoluteMoniker::parse_str("/foo:0/bar:0").unwrap()
+                InstancedMoniker::parse_str("/foo:0/bar:0").unwrap()
             )
         );
         assert_eq!(
             InstancedExtendedMoniker::parse_str("foo:0/bar:0").unwrap(),
             InstancedExtendedMoniker::ComponentInstance(
-                InstancedAbsoluteMoniker::parse_str("/foo:0/bar:0").unwrap()
+                InstancedMoniker::parse_str("/foo:0/bar:0").unwrap()
             )
         );
         assert!(InstancedExtendedMoniker::parse_str("").is_err(), "cannot be empty");

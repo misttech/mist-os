@@ -8,7 +8,7 @@ use {
     component_id_index, fidl,
     fidl::unpersist,
     fidl_fuchsia_component_internal as fcomponent_internal,
-    moniker::{AbsoluteMoniker, MonikerError},
+    moniker::{Moniker, MonikerError},
     std::{
         collections::{HashMap, HashSet},
         path::PathBuf,
@@ -120,7 +120,7 @@ pub struct ComponentIdIndex {
     ///
     /// The moniker does not contain instances, i.e. all of the ChildMonikers in the
     /// path have the (moniker, not index) instance ID set to zero.
-    moniker_to_instance_id: HashMap<AbsoluteMoniker, ComponentInstanceId>,
+    moniker_to_instance_id: HashMap<Moniker, ComponentInstanceId>,
 
     /// Stores all instance IDs from the index.
     /// This is used by StorageAdmin for methods that operate directly on instance IDs.
@@ -140,7 +140,7 @@ impl ComponentIdIndex {
     }
 
     pub fn new_from_index(index: component_id_index::Index) -> Result<Self, ComponentIdIndexError> {
-        let mut moniker_to_instance_id = HashMap::<AbsoluteMoniker, ComponentInstanceId>::new();
+        let mut moniker_to_instance_id = HashMap::<Moniker, ComponentInstanceId>::new();
         let mut all_instance_ids = HashSet::<ComponentInstanceId>::new();
         for entry in index.instances {
             let instance_id = entry
@@ -171,7 +171,7 @@ impl ComponentIdIndex {
         Ok(Self { moniker_to_instance_id, all_instance_ids })
     }
 
-    pub fn look_up_moniker(&self, moniker: &AbsoluteMoniker) -> Option<&ComponentInstanceId> {
+    pub fn look_up_moniker(&self, moniker: &Moniker) -> Option<&ComponentInstanceId> {
         self.moniker_to_instance_id.get(&moniker)
     }
 
@@ -183,14 +183,14 @@ impl ComponentIdIndex {
 #[cfg(test)]
 pub mod tests {
     use super::*;
-    use moniker::{AbsoluteMonikerBase, ChildMoniker};
+    use moniker::{ChildMoniker, MonikerBase};
     use routing_test_helpers::component_id_index::make_index_file;
 
     #[fuchsia::test]
     async fn look_up_moniker_no_exists() {
         let index_file = make_index_file(component_id_index::Index::default()).unwrap();
         let index = ComponentIdIndex::new(index_file.path().to_str().unwrap()).unwrap();
-        assert!(index.look_up_moniker(&AbsoluteMoniker::parse_str("/a/b/c").unwrap()).is_none());
+        assert!(index.look_up_moniker(&Moniker::parse_str("/a/b/c").unwrap()).is_none());
     }
 
     #[fuchsia::test]
@@ -199,7 +199,7 @@ pub mod tests {
         let index_file = make_index_file(component_id_index::Index {
             instances: vec![component_id_index::InstanceIdEntry {
                 instance_id: Some(iid.clone()),
-                moniker: Some(AbsoluteMoniker::parse_str("/a/b/c").unwrap()),
+                moniker: Some(Moniker::parse_str("/a/b/c").unwrap()),
             }],
             ..component_id_index::Index::default()
         })
@@ -207,9 +207,7 @@ pub mod tests {
         let index = ComponentIdIndex::new(index_file.path().to_str().unwrap()).unwrap();
         assert_eq!(
             Some(iid),
-            index
-                .look_up_moniker(&AbsoluteMoniker::parse_str("/a/b/c").unwrap())
-                .map(|id| id.to_string())
+            index.look_up_moniker(&Moniker::parse_str("/a/b/c").unwrap()).map(|id| id.to_string())
         );
     }
 
@@ -219,7 +217,7 @@ pub mod tests {
         let index_file = make_index_file(component_id_index::Index {
             instances: vec![component_id_index::InstanceIdEntry {
                 instance_id: Some(iid.clone()),
-                moniker: Some(AbsoluteMoniker::parse_str("/a/coll:name").unwrap()),
+                moniker: Some(Moniker::parse_str("/a/coll:name").unwrap()),
             }],
             ..component_id_index::Index::default()
         })
@@ -228,7 +226,7 @@ pub mod tests {
         assert_eq!(
             Some(iid),
             index
-                .look_up_moniker(&AbsoluteMoniker::new(vec![
+                .look_up_moniker(&Moniker::new(vec![
                     ChildMoniker::try_new("a", None).unwrap(),
                     ChildMoniker::try_new("name", Some("coll")).unwrap(),
                 ]))
@@ -242,7 +240,7 @@ pub mod tests {
         let inner_index = component_id_index::Index {
             instances: vec![component_id_index::InstanceIdEntry {
                 instance_id: Some(iid.clone()),
-                moniker: Some(AbsoluteMoniker::parse_str("/a/b/c").unwrap()),
+                moniker: Some(Moniker::parse_str("/a/b/c").unwrap()),
             }],
             ..component_id_index::Index::default()
         };
@@ -250,9 +248,7 @@ pub mod tests {
             .expect("failed to create component id index from inner index");
         assert_eq!(
             Some(iid),
-            index
-                .look_up_moniker(&AbsoluteMoniker::parse_str("/a/b/c").unwrap())
-                .map(|id| id.to_string())
+            index.look_up_moniker(&Moniker::parse_str("/a/b/c").unwrap()).map(|id| id.to_string())
         );
     }
 

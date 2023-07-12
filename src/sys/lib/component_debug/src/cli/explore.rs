@@ -6,7 +6,7 @@ use {
     crate::{explore::*, query::get_cml_moniker_from_query},
     anyhow::Result,
     fidl_fuchsia_dash as fdash, fidl_fuchsia_sys2 as fsys,
-    moniker::{AbsoluteMoniker, AbsoluteMonikerBase},
+    moniker::{Moniker, MonikerBase},
 };
 
 pub async fn explore_cmd(
@@ -24,7 +24,7 @@ pub async fn explore_cmd(
 
     // Convert the absolute moniker into a relative moniker w.r.t. root.
     // LifecycleController expects relative monikers only.
-    let relative_moniker = AbsoluteMoniker::scope_down(&AbsoluteMoniker::root(), &moniker).unwrap();
+    let relative_moniker = Moniker::scope_down(&Moniker::root(), &moniker).unwrap();
 
     let (client, server) = fidl::Socket::create_stream();
 

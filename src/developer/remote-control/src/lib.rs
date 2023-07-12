@@ -17,7 +17,7 @@ use {
     fuchsia_zircon as zx,
     futures::future::join,
     futures::prelude::*,
-    moniker::{AbsoluteMoniker, AbsoluteMonikerBase},
+    moniker::{Moniker, MonikerBase},
     selector_maps::{MappingError, SelectorMappingList},
     selectors::{StringSelector, TreeSelector},
     std::{borrow::Borrow, cell::RefCell, collections::HashMap, net::SocketAddr, rc::Rc, rc::Weak},
@@ -489,8 +489,7 @@ impl RemoteControlService {
             rcs::ConnectCapabilityError::CapabilityConnectFailed
         })?;
 
-        let moniker =
-            parse_moniker(moniker).ok_or(rcs::ConnectCapabilityError::InvalidMoniker)?;
+        let moniker = parse_moniker(moniker).ok_or(rcs::ConnectCapabilityError::InvalidMoniker)?;
         connect_to_exposed_capability(moniker, capability_name, server_end, flags, lifecycle, query)
             .await
     }
@@ -556,12 +555,12 @@ impl RemoteControlService {
     }
 }
 
-fn parse_moniker(moniker: String) -> Option<AbsoluteMoniker> {
-    AbsoluteMoniker::try_from(moniker.as_str()).ok()
+fn parse_moniker(moniker: String) -> Option<Moniker> {
+    Moniker::try_from(moniker.as_str()).ok()
 }
 
 async fn connect_to_exposed_capability(
-    moniker: AbsoluteMoniker,
+    moniker: Moniker,
     capability_name: String,
     server_end: zx::Channel,
     flags: io::OpenFlags,
@@ -594,7 +593,7 @@ async fn connect_to_exposed_capability(
 
 fn extract_moniker_and_protocol_from_selector(
     selector: diagnostics::Selector,
-) -> Option<(AbsoluteMoniker, String)> {
+) -> Option<(Moniker, String)> {
     // Construct the moniker from the selector
     let moniker_segments = selector.component_selector?.moniker_segments?;
     let mut children = vec![];
@@ -617,7 +616,7 @@ fn extract_moniker_and_protocol_from_selector(
     let protocol_name = property_selector.exact_match()?.to_string();
 
     // Make sure the moniker is valid
-    let moniker = AbsoluteMoniker::try_from(moniker.as_str())
+    let moniker = Moniker::try_from(moniker.as_str())
         .map_err(|err| {
             error!(%err, "moniker invalid");
             err
@@ -1013,7 +1012,7 @@ mod tests {
             parse_selector::<VerboseError>("core/my_component:expose:fuchsia.foo.bar").unwrap();
         let (moniker, protocol) = extract_moniker_and_protocol_from_selector(selector).unwrap();
 
-        assert_eq!(moniker, AbsoluteMoniker::try_from("./core/my_component").unwrap());
+        assert_eq!(moniker, Moniker::try_from("./core/my_component").unwrap());
         assert_eq!(protocol, "fuchsia.foo.bar");
 
         for selector in [
@@ -1038,7 +1037,7 @@ mod tests {
         let lifecycle = setup_fake_lifecycle_controller();
         let query = setup_fake_realm_query();
         connect_to_exposed_capability(
-            AbsoluteMoniker::try_from("./core/my_component").unwrap(),
+            Moniker::try_from("./core/my_component").unwrap(),
             "fuchsia.hwinfo.Board".to_string(),
             server,
             io::OpenFlags::RIGHT_READABLE,
@@ -1056,7 +1055,7 @@ mod tests {
         let lifecycle = setup_fake_lifecycle_controller();
         let query = setup_fake_realm_query();
         let error = connect_to_exposed_capability(
-            AbsoluteMoniker::try_from("./core/my_component").unwrap(),
+            Moniker::try_from("./core/my_component").unwrap(),
             "fuchsia.not.exposed".to_string(),
             server,
             io::OpenFlags::RIGHT_READABLE,

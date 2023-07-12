@@ -28,7 +28,7 @@ use {
     cm_types::Name,
     flyweights::FlyStr,
     futures::lock::Mutex,
-    moniker::{AbsoluteMoniker, AbsoluteMonikerBase, ChildMonikerBase, ExtendedMoniker},
+    moniker::{ChildMonikerBase, ExtendedMoniker, Moniker, MonikerBase},
     std::{
         collections::{HashMap, HashSet},
         sync::{Arc, Weak},
@@ -176,9 +176,7 @@ impl EventRegistry {
                 .iter()
                 .map(|source_name| RoutedEvent {
                     source_name: source_name.source_name.clone(),
-                    scopes: vec![
-                        EventDispatcherScope::new(AbsoluteMoniker::root().into()).for_debug()
-                    ],
+                    scopes: vec![EventDispatcherScope::new(Moniker::root().into()).for_debug()],
                     route: vec![],
                 })
                 .collect(),
@@ -281,7 +279,7 @@ impl EventRegistry {
     /// Returns the event_stream capabilities.
     pub async fn route_events(
         &self,
-        target_moniker: &AbsoluteMoniker,
+        target_moniker: &Moniker,
         events: &HashSet<UseEventStreamDecl>,
     ) -> Result<RouteEventsResult, ModelError> {
         let model = self.model.upgrade().ok_or(EventsError::ModelNotAvailable)?;
@@ -422,7 +420,7 @@ mod tests {
         cm_rust::{Availability, UseSource},
         fuchsia_zircon as zx,
         futures::StreamExt,
-        moniker::AbsoluteMoniker,
+        moniker::Moniker,
         std::str::FromStr,
     };
 
@@ -430,10 +428,10 @@ mod tests {
         let (_, capability_server_end) = zx::Channel::create();
         let capability_server_end = Arc::new(Mutex::new(Some(capability_server_end)));
         let event = ComponentEvent::new_for_test(
-            AbsoluteMoniker::root(),
+            Moniker::root(),
             "fuchsia-pkg://root",
             EventPayload::CapabilityRequested {
-                source_moniker: AbsoluteMoniker::root(),
+                source_moniker: Moniker::root(),
                 name: "foo".to_string(),
                 capability: capability_server_end,
             },
@@ -443,7 +441,7 @@ mod tests {
 
     async fn dispatch_fake_event(registry: &EventRegistry) {
         let event = ComponentEvent::new_for_test(
-            AbsoluteMoniker::root(),
+            Moniker::root(),
             "fuchsia-pkg://root",
             EventPayload::Discovered,
         );

@@ -9,7 +9,7 @@ use {
     },
     anyhow::Error,
     fidl_fuchsia_component as fcomponent,
-    moniker::AbsoluteMoniker,
+    moniker::Moniker,
     regex::RegexSet,
     std::{convert::TryFrom, fmt, str::FromStr},
     thiserror::Error,
@@ -107,7 +107,7 @@ impl RawFieldMatcher<String> for CapabilityNameMatcher {
 #[derive(Clone, Debug)]
 pub enum MonikerMatcher {
     Regex(RegexSet),
-    Direct(Vec<AbsoluteMoniker>),
+    Direct(Vec<Moniker>),
 }
 
 impl MonikerMatcher {
@@ -125,7 +125,7 @@ impl MonikerMatcher {
         I: IntoIterator<Item = S>,
     {
         let monikers =
-            monikers.into_iter().map(|m| AbsoluteMoniker::try_from(m.as_ref()).unwrap()).collect();
+            monikers.into_iter().map(|m| Moniker::try_from(m.as_ref()).unwrap()).collect();
         Self::Direct(monikers)
     }
 }
@@ -143,7 +143,7 @@ impl RawFieldMatcher<String> for MonikerMatcher {
     const NAME: &'static str = "target_monikers";
 
     fn matches(&self, other: &String) -> bool {
-        let moniker_result = AbsoluteMoniker::from_str(other);
+        let moniker_result = Moniker::from_str(other);
         match self {
             Self::Regex(regex_set) => regex_set.is_match(other),
             Self::Direct(monikers) => match moniker_result {

@@ -7,7 +7,7 @@
 use {
     anyhow::{anyhow, Context, Result},
     fidl_fuchsia_component_internal as fcomponent_internal,
-    moniker::{AbsoluteMoniker, AbsoluteMonikerBase},
+    moniker::{Moniker, MonikerBase},
     serde::{Deserialize, Deserializer, Serialize, Serializer},
     std::collections::HashMap,
     std::convert::TryFrom,
@@ -26,24 +26,21 @@ pub struct InstanceIdEntry {
         deserialize_with = "str_to_abs_moniker",
         serialize_with = "abs_moniker_to_str"
     )]
-    pub moniker: Option<AbsoluteMoniker>,
+    pub moniker: Option<Moniker>,
 }
 
-fn str_to_abs_moniker<'de, D>(deserializer: D) -> Result<Option<AbsoluteMoniker>, D::Error>
+fn str_to_abs_moniker<'de, D>(deserializer: D) -> Result<Option<Moniker>, D::Error>
 where
     D: Deserializer<'de>,
 {
     let moniker: Option<String> = Option::deserialize(deserializer)?;
     match &moniker {
-        Some(m) => Ok(Some(AbsoluteMoniker::parse_str(m).map_err(serde::de::Error::custom)?)),
+        Some(m) => Ok(Some(Moniker::parse_str(m).map_err(serde::de::Error::custom)?)),
         None => Ok(None),
     }
 }
 
-fn abs_moniker_to_str<S>(
-    abs_moniker: &Option<AbsoluteMoniker>,
-    serializer: S,
-) -> Result<S::Ok, S::Error>
+fn abs_moniker_to_str<S>(abs_moniker: &Option<Moniker>, serializer: S) -> Result<S::Ok, S::Error>
 where
     S: Serializer,
 {
@@ -344,10 +341,9 @@ mod tests {
     #[test]
     fn serialize_deserialize_valid_absolute_moniker() -> Result<()> {
         let mut expected_index = gen_index(3);
-        expected_index.instances[0].moniker = Some(AbsoluteMoniker::parse_str("/a/b/c").unwrap());
-        expected_index.instances[1].moniker =
-            Some(AbsoluteMoniker::parse_str("/a/b:b/c/b:b").unwrap());
-        expected_index.instances[2].moniker = Some(AbsoluteMoniker::parse_str("/").unwrap());
+        expected_index.instances[0].moniker = Some(Moniker::parse_str("/a/b/c").unwrap());
+        expected_index.instances[1].moniker = Some(Moniker::parse_str("/a/b:b/c/b:b").unwrap());
+        expected_index.instances[2].moniker = Some(Moniker::parse_str("/").unwrap());
 
         let json_index = serde_json::to_string(&expected_index)?;
         let actual_index = serde_json::from_str(&json_index)?;

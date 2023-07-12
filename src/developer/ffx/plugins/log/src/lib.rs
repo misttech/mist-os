@@ -26,7 +26,7 @@ use fidl_fuchsia_developer_ffx::{
 use fidl_fuchsia_developer_remotecontrol::{ArchiveIteratorError, RemoteControlProxy};
 use fidl_fuchsia_diagnostics::LogSettingsProxy;
 use futures::{AsyncWrite, AsyncWriteExt};
-use moniker::AbsoluteMoniker;
+use moniker::Moniker;
 use std::{fs, iter::Iterator, str::FromStr, sync::Arc, time::SystemTime};
 
 use ffx_log_frontend::{RemoteDiagnosticsBridgeProxyWrapper, StreamDiagnostics};
@@ -172,8 +172,8 @@ impl LogFilterCriteria {
     }
 
     fn matches_filter_string(filter_string: &str, message: &str, log: &LogsData) -> bool {
-        let filter_moniker = AbsoluteMoniker::from_str(filter_string);
-        let moniker = AbsoluteMoniker::from_str(log.moniker.as_str());
+        let filter_moniker = Moniker::from_str(filter_string);
+        let moniker = Moniker::from_str(log.moniker.as_str());
         return message.contains(filter_string)
             || log.moniker.contains(filter_string)
             || moniker.clone().map(|m| m.to_string().contains(filter_string)).unwrap_or(false)
@@ -185,8 +185,8 @@ impl LogFilterCriteria {
     }
 
     fn matches_filter_by_moniker_string(filter_string: &str, log: &LogsData) -> bool {
-        let filter_moniker = AbsoluteMoniker::from_str(filter_string);
-        let moniker = AbsoluteMoniker::from_str(log.moniker.as_str());
+        let filter_moniker = Moniker::from_str(filter_string);
+        let moniker = Moniker::from_str(log.moniker.as_str());
         matches!((moniker, filter_moniker), (Ok(a), Ok(b)) if a == b)
     }
 

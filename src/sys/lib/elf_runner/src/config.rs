@@ -139,7 +139,7 @@ mod tests {
         assert_matches::assert_matches,
         fidl_fuchsia_data as fdata,
         lazy_static::lazy_static,
-        moniker::{AbsoluteMoniker, AbsoluteMonikerBase},
+        moniker::{Moniker, MonikerBase},
         std::{collections::HashMap, default::Default, sync::Arc},
         test_case::test_case,
     };
@@ -148,7 +148,7 @@ mod tests {
     const TEST_BINARY: &str = "test_binary";
 
     lazy_static! {
-        static ref TEST_MONIKER: AbsoluteMoniker = AbsoluteMoniker::root();
+        static ref TEST_MONIKER: Moniker = Moniker::root();
         static ref PERMISSIVE_SECURITY_POLICY: Arc<SecurityPolicy> = Arc::new(SecurityPolicy {
             job_policy: JobPolicyAllowlists {
                 ambient_mark_vmo_exec: vec![AllowlistEntryBuilder::build_exact_from_moniker(

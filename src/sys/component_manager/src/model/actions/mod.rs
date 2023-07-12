@@ -441,7 +441,7 @@ pub mod tests {
 pub(crate) mod test_utils {
     use {
         crate::model::component::{ComponentInstance, InstanceState},
-        moniker::{AbsoluteMonikerBase, ChildMoniker},
+        moniker::{ChildMoniker, MonikerBase},
         routing::component_instance::ComponentInstanceInterface,
     };
 

@@ -7,12 +7,12 @@ use {
         CheckUse, ComponentEventRoute, ExpectedResult, RoutingTestModel, RoutingTestModelBuilder,
         ServiceInstance,
     },
-    cm_moniker::InstancedAbsoluteMoniker,
+    cm_moniker::InstancedMoniker,
     cm_rust::*,
     cm_rust_testing::{ComponentDeclBuilder, DirectoryDeclBuilder, ProtocolDeclBuilder},
     fidl_fuchsia_component_decl as fdecl, fidl_fuchsia_io as fio,
     fuchsia_zircon_status as zx_status,
-    moniker::{AbsoluteMoniker, AbsoluteMonikerBase},
+    moniker::{Moniker, MonikerBase},
     std::{
         convert::TryInto,
         marker::PhantomData,
@@ -253,9 +253,7 @@ impl<T: RoutingTestModelBuilder> CommonAvailabilityTest<T> {
                 },
                 CheckUse::Storage {
                     path: "/storage".parse().unwrap(),
-                    storage_relation: Some(
-                        InstancedAbsoluteMoniker::try_from(vec!["c:0"]).unwrap(),
-                    ),
+                    storage_relation: Some(InstancedMoniker::try_from(vec!["c:0"]).unwrap()),
                     from_cm_namespace: false,
                     storage_subdir: Some("cache".to_string()),
                     expected_res: ExpectedResult::Ok,
@@ -579,7 +577,7 @@ impl<T: RoutingTestModelBuilder> CommonAvailabilityTest<T> {
                     expected_res: ExpectedResult::Ok,
                 },
             ] {
-                model.check_use(AbsoluteMoniker::root(), check_use).await;
+                model.check_use(Moniker::root(), check_use).await;
             }
 
             for check_use in vec![
@@ -744,7 +742,7 @@ impl<T: RoutingTestModelBuilder> CommonAvailabilityTest<T> {
                     expected_res: ExpectedResult::Err(zx_status::Status::UNAVAILABLE),
                 },
             ] {
-                model.check_use(AbsoluteMoniker::root(), check_use).await;
+                model.check_use(Moniker::root(), check_use).await;
             }
         }
     }

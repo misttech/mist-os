@@ -6,7 +6,7 @@ use {
     crate::realm::{get_all_instances, Instance},
     anyhow::Result,
     fidl_fuchsia_sys2 as fsys,
-    moniker::AbsoluteMonikerBase,
+    moniker::MonikerBase,
     std::{collections::HashSet, fmt::Write, str::FromStr},
     url::Url,
 };
@@ -254,12 +254,12 @@ pub fn create_dot_graph(instances: Vec<Instance>, orientation: GraphOrientation)
 mod test {
     use super::*;
     use crate::realm::{ExecutionInfo, ResolvedInfo};
-    use moniker::AbsoluteMoniker;
+    use moniker::Moniker;
 
     fn instances_for_test() -> Vec<Instance> {
         vec![
             Instance {
-                moniker: AbsoluteMoniker::root(),
+                moniker: Moniker::root(),
                 url: "fuchsia-boot:///#meta/root.cm".to_owned(),
                 environment: None,
                 instance_id: None,
@@ -269,7 +269,7 @@ mod test {
                 }),
             },
             Instance {
-                moniker: AbsoluteMoniker::parse_str("appmgr").unwrap(),
+                moniker: Moniker::parse_str("appmgr").unwrap(),
                 url: "fuchsia-pkg://fuchsia.com/appmgr#meta/appmgr.cm".to_owned(),
                 environment: None,
                 instance_id: None,
@@ -281,7 +281,7 @@ mod test {
                 }),
             },
             Instance {
-                moniker: AbsoluteMoniker::parse_str("sys").unwrap(),
+                moniker: Moniker::parse_str("sys").unwrap(),
                 url: "fuchsia-pkg://fuchsia.com/sys#meta/sys.cm".to_owned(),
                 environment: None,
                 instance_id: None,
@@ -291,7 +291,7 @@ mod test {
                 }),
             },
             Instance {
-                moniker: AbsoluteMoniker::parse_str("sys/baz").unwrap(),
+                moniker: Moniker::parse_str("sys/baz").unwrap(),
                 url: "fuchsia-pkg://fuchsia.com/baz#meta/baz.cm".to_owned(),
                 environment: None,
                 instance_id: None,
@@ -303,7 +303,7 @@ mod test {
                 }),
             },
             Instance {
-                moniker: AbsoluteMoniker::parse_str("sys/fuzz").unwrap(),
+                moniker: Moniker::parse_str("sys/fuzz").unwrap(),
                 url: "fuchsia-pkg://fuchsia.com/fuzz#meta/fuzz.cm".to_owned(),
                 environment: None,
                 instance_id: None,
@@ -313,7 +313,7 @@ mod test {
                 }),
             },
             Instance {
-                moniker: AbsoluteMoniker::parse_str("sys/fuzz/hello").unwrap(),
+                moniker: Moniker::parse_str("sys/fuzz/hello").unwrap(),
                 url: "fuchsia-pkg://fuchsia.com/hello#meta/hello.cm".to_owned(),
                 environment: None,
                 instance_id: None,

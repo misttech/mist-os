@@ -41,7 +41,7 @@ use {
     cm_types::Name,
     derivative::Derivative,
     from_enum::FromEnum,
-    moniker::{AbsoluteMoniker, ChildMoniker, ChildMonikerBase},
+    moniker::{ChildMoniker, ChildMonikerBase, Moniker},
     std::collections::{HashMap, HashSet},
     std::{fmt, slice},
     std::{marker::PhantomData, sync::Arc},
@@ -552,7 +552,7 @@ pub trait Sources: Clone + Send + Sync {
     fn find_component_source<V, M>(
         &self,
         name: &Name,
-        abs_moniker: &AbsoluteMoniker,
+        abs_moniker: &Moniker,
         capabilities: &[CapabilityDecl],
         visitor: &mut V,
         mapper: &mut M,
@@ -748,7 +748,7 @@ where
     fn find_component_source<V, M>(
         &self,
         name: &Name,
-        abs_moniker: &AbsoluteMoniker,
+        abs_moniker: &Moniker,
         capabilities: &[CapabilityDecl],
         visitor: &mut V,
         mapper: &mut M,
@@ -1699,7 +1699,7 @@ where
 /// Implemented by declaration types to emit a proper error when a matching offer is not found in the parent.
 pub trait ErrorNotFoundFromParent {
     fn error_not_found_from_parent(
-        decl_site_moniker: AbsoluteMoniker,
+        decl_site_moniker: Moniker,
         capability_name: Name,
     ) -> RoutingError;
 }
@@ -1707,7 +1707,7 @@ pub trait ErrorNotFoundFromParent {
 /// Implemented by declaration types to emit a proper error when a matching expose is not found in the child.
 pub trait ErrorNotFoundInChild {
     fn error_not_found_in_child(
-        decl_site_moniker: AbsoluteMoniker,
+        decl_site_moniker: Moniker,
         child_moniker: ChildMoniker,
         capability_name: Name,
     ) -> RoutingError;

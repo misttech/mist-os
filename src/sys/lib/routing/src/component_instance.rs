@@ -12,11 +12,11 @@ use {
         resolving::{ComponentAddress, ComponentResolutionContext},
     },
     async_trait::async_trait,
-    cm_moniker::InstancedAbsoluteMoniker,
+    cm_moniker::InstancedMoniker,
     cm_rust::{CapabilityDecl, CollectionDecl, ExposeDecl, OfferDecl, OfferSource, UseDecl},
     cm_types::Name,
     derivative::Derivative,
-    moniker::{AbsoluteMoniker, ChildMoniker, ExtendedMoniker},
+    moniker::{ChildMoniker, ExtendedMoniker, Moniker},
     std::{
         clone::Clone,
         sync::{Arc, Weak},
@@ -38,10 +38,10 @@ pub trait ComponentInstanceInterface: Sized + Send + Sync {
     fn child_moniker(&self) -> Option<&ChildMoniker>;
 
     /// Returns this `ComponentInstanceInterface`'s instanced absolute moniker.
-    fn instanced_moniker(&self) -> &InstancedAbsoluteMoniker;
+    fn instanced_moniker(&self) -> &InstancedMoniker;
 
     /// Returns this `ComponentInstanceInterface`'s absolute moniker.
-    fn abs_moniker(&self) -> &AbsoluteMoniker;
+    fn abs_moniker(&self) -> &Moniker;
 
     /// Returns this `ComponentInstanceInterface`'s component URL.
     fn url(&self) -> &str;
@@ -207,7 +207,7 @@ where
 pub struct WeakComponentInstanceInterface<C: ComponentInstanceInterface> {
     #[derivative(Debug = "ignore")]
     inner: Weak<C>,
-    pub abs_moniker: AbsoluteMoniker,
+    pub abs_moniker: Moniker,
 }
 
 impl<C: ComponentInstanceInterface> WeakComponentInstanceInterface<C> {

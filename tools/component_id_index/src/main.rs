@@ -108,7 +108,7 @@ fn main() -> anyhow::Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use moniker::{AbsoluteMoniker, AbsoluteMonikerBase};
+    use moniker::{Moniker, MonikerBase};
     use pretty_assertions::assert_eq;
     use regex;
     use std::io::Write;
@@ -119,7 +119,7 @@ mod tests {
             instances: (0..num_instances)
                 .map(|_i| InstanceIdEntry {
                     instance_id: Some(gen_instance_id(&mut rand::thread_rng())),
-                    moniker: Some(AbsoluteMoniker::parse_str("/a/b/c").unwrap()),
+                    moniker: Some(Moniker::parse_str("/a/b/c").unwrap()),
                 })
                 .collect(),
         }

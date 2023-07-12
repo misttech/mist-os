@@ -19,7 +19,7 @@ use {
     cm_util::channel,
     fidl_fuchsia_io as fio, fuchsia_zircon as zx,
     lazy_static::lazy_static,
-    moniker::{AbsoluteMoniker, ExtendedMoniker},
+    moniker::{ExtendedMoniker, Moniker},
     routing::capability_source::{ComponentCapability, InternalCapability},
     std::{
         path::PathBuf,
@@ -112,7 +112,7 @@ impl BinderCapabilityHost {
     async fn on_scoped_framework_capability_routed_async<'a>(
         self: Arc<Self>,
         source: WeakComponentInstance,
-        target_moniker: AbsoluteMoniker,
+        target_moniker: Moniker,
         capability: &'a InternalCapability,
         capability_provider: Option<Box<dyn CapabilityProvider>>,
     ) -> Result<Option<Box<dyn CapabilityProvider>>, ModelError> {
@@ -191,7 +191,7 @@ mod tests {
         fidl::{client::Client, handle::AsyncChannel},
         fuchsia_zircon as zx,
         futures::{lock::Mutex, StreamExt},
-        moniker::{AbsoluteMoniker, AbsoluteMonikerBase},
+        moniker::{Moniker, MonikerBase},
         std::path::PathBuf,
     };
 
@@ -213,8 +213,8 @@ mod tests {
 
         async fn provider(
             &self,
-            source: AbsoluteMoniker,
-            target: AbsoluteMoniker,
+            source: Moniker,
+            target: Moniker,
         ) -> Box<BinderCapabilityProvider> {
             let builtin_environment = self.builtin_environment.lock().await;
             let source = builtin_environment
@@ -253,7 +253,7 @@ mod tests {
             .new_event_stream(vec![EventType::Resolved.into(), EventType::Started.into()])
             .await;
         let (_client_end, mut server_end) = zx::Channel::create();
-        let moniker: AbsoluteMoniker = vec!["source"].try_into().unwrap();
+        let moniker: Moniker = vec!["source"].try_into().unwrap();
 
         let task_scope = TaskScope::new();
         fixture
@@ -281,11 +281,11 @@ mod tests {
         )])
         .await;
         let (client_end, mut server_end) = zx::Channel::create();
-        let moniker: AbsoluteMoniker = vec!["foo"].try_into().unwrap();
+        let moniker: Moniker = vec!["foo"].try_into().unwrap();
 
         let task_scope = TaskScope::new();
         fixture
-            .provider(moniker, AbsoluteMoniker::root())
+            .provider(moniker, Moniker::root())
             .await
             .open(task_scope.clone(), fio::OpenFlags::empty(), PathBuf::new(), &mut server_end)
             .await

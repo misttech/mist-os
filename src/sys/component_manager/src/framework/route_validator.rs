@@ -23,7 +23,7 @@ use {
     fuchsia_zircon as zx,
     futures::{future::join_all, lock::Mutex, TryStreamExt},
     lazy_static::lazy_static,
-    moniker::{AbsoluteMoniker, AbsoluteMonikerBase, ExtendedMoniker},
+    moniker::{ExtendedMoniker, Moniker, MonikerBase},
     std::{
         cmp::Ordering,
         path::PathBuf,
@@ -80,11 +80,11 @@ impl RouteValidator {
 
     async fn validate(
         self: &Arc<Self>,
-        scope_moniker: &AbsoluteMoniker,
+        scope_moniker: &Moniker,
         relative_moniker_str: &str,
     ) -> Result<Vec<fsys::RouteReport>, fcomponent::Error> {
         // Construct the complete moniker using the scope moniker and the relative moniker string.
-        let relative_moniker = AbsoluteMoniker::try_from(relative_moniker_str)
+        let relative_moniker = Moniker::try_from(relative_moniker_str)
             .map_err(|_| fcomponent::Error::InvalidArguments)?;
         let moniker = scope_moniker.descendant(&relative_moniker);
 
@@ -117,12 +117,12 @@ impl RouteValidator {
 
     async fn route(
         &self,
-        scope_moniker: &AbsoluteMoniker,
+        scope_moniker: &Moniker,
         relative_moniker_str: &str,
         targets: Vec<fsys::RouteTarget>,
     ) -> Result<Vec<fsys::RouteReport>, fsys::RouteValidatorError> {
         // Construct the complete moniker using the scope moniker and the relative moniker string.
-        let relative_moniker = AbsoluteMoniker::try_from(relative_moniker_str)
+        let relative_moniker = Moniker::try_from(relative_moniker_str)
             .map_err(|_| fsys::RouteValidatorError::InvalidArguments)?;
         let moniker = scope_moniker.descendant(&relative_moniker);
 
@@ -267,7 +267,7 @@ impl RouteValidator {
     /// Serve the fuchsia.sys2.RouteValidator protocol for a given scope on a given stream
     async fn serve(
         self: Arc<Self>,
-        scope_moniker: AbsoluteMoniker,
+        scope_moniker: Moniker,
         mut stream: fsys::RouteValidatorRequestStream,
     ) {
         let res: Result<(), fidl::Error> = async move {
@@ -299,7 +299,7 @@ impl RouteValidator {
     ///
     /// Returns information to populate in `fuchsia.sys2.RouteReport`.
     async fn route_instance(
-        scope_moniker: &AbsoluteMoniker,
+        scope_moniker: &Moniker,
         request: RouteRequest,
         target: &Arc<ComponentInstance>,
     ) -> Result<(String, Option<Vec<fsys::ServiceInstance>>), RoutingError> {
@@ -354,15 +354,13 @@ impl RouteValidator {
         Ok((moniker, service_info))
     }
 
-    fn extended_moniker_to_str(scope_moniker: &AbsoluteMoniker, m: ExtendedMoniker) -> String {
+    fn extended_moniker_to_str(scope_moniker: &Moniker, m: ExtendedMoniker) -> String {
         match m {
             ExtendedMoniker::ComponentManager => m.to_string(),
-            ExtendedMoniker::ComponentInstance(m) => {
-                match AbsoluteMoniker::scope_down(scope_moniker, &m) {
-                    Ok(r) => r.to_string(),
-                    Err(_) => "<above scope>".to_string(),
-                }
-            }
+            ExtendedMoniker::ComponentInstance(m) => match Moniker::scope_down(scope_moniker, &m) {
+                Ok(r) => r.to_string(),
+                Err(_) => "<above scope>".to_string(),
+            },
         }
     }
 }
@@ -383,11 +381,11 @@ impl Hook for RouteValidator {
 
 pub struct RouteValidatorCapabilityProvider {
     query: Arc<RouteValidator>,
-    scope_moniker: AbsoluteMoniker,
+    scope_moniker: Moniker,
 }
 
 impl RouteValidatorCapabilityProvider {
-    pub fn query(query: Arc<RouteValidator>, scope_moniker: AbsoluteMoniker) -> Self {
+    pub fn query(query: Arc<RouteValidator>, scope_moniker: Moniker) -> Self {
         Self { query, scope_moniker }
     }
 }
@@ -568,7 +566,7 @@ mod tests {
             endpoints::create_proxy_and_stream::<fsys::RouteValidatorMarker>().unwrap();
 
         let _validator_task = fasync::Task::local(async move {
-            validator_server.serve(AbsoluteMoniker::root(), request_stream).await
+            validator_server.serve(Moniker::root(), request_stream).await
         });
 
         model.start().await;
@@ -704,7 +702,7 @@ mod tests {
             endpoints::create_proxy_and_stream::<fsys::RouteValidatorMarker>().unwrap();
 
         let _validator_task = fasync::Task::local(async move {
-            validator_server.serve(AbsoluteMoniker::root(), validator_request_stream).await
+            validator_server.serve(Moniker::root(), validator_request_stream).await
         });
 
         model.start().await;
@@ -843,7 +841,7 @@ mod tests {
         let (validator, request_stream) =
             endpoints::create_proxy_and_stream::<fsys::RouteValidatorMarker>().unwrap();
         let _validator_task = fasync::Task::local(async move {
-            validator_server.serve(AbsoluteMoniker::root(), request_stream).await
+            validator_server.serve(Moniker::root(), request_stream).await
         });
 
         model.start().await;
@@ -981,7 +979,7 @@ mod tests {
         let (validator, request_stream) =
             endpoints::create_proxy_and_stream::<fsys::RouteValidatorMarker>().unwrap();
         let _validator_task = fasync::Task::local(async move {
-            validator_server.serve(AbsoluteMoniker::root(), request_stream).await
+            validator_server.serve(Moniker::root(), request_stream).await
         });
 
         model.start().await;
@@ -1107,7 +1105,7 @@ mod tests {
         let (validator, request_stream) =
             endpoints::create_proxy_and_stream::<fsys::RouteValidatorMarker>().unwrap();
         let _validator_task = fasync::Task::local(async move {
-            validator_server.serve(AbsoluteMoniker::root(), request_stream).await
+            validator_server.serve(Moniker::root(), request_stream).await
         });
 
         model.start().await;
@@ -1227,7 +1225,7 @@ mod tests {
         let TestModelResult { model, builtin_environment, realm_proxy, mock_runner, .. } =
             TestEnvironmentBuilder::new()
                 .set_components(components)
-                .set_realm_moniker(AbsoluteMoniker::root())
+                .set_realm_moniker(Moniker::root())
                 .build()
                 .await;
         let realm_proxy = realm_proxy.unwrap();
@@ -1239,7 +1237,7 @@ mod tests {
         let (validator, request_stream) =
             endpoints::create_proxy_and_stream::<fsys::RouteValidatorMarker>().unwrap();
         let _validator_task = fasync::Task::local(async move {
-            validator_server.serve(AbsoluteMoniker::root(), request_stream).await
+            validator_server.serve(Moniker::root(), request_stream).await
         });
 
         model.start().await;
@@ -1393,7 +1391,7 @@ mod tests {
         let (validator, request_stream) =
             endpoints::create_proxy_and_stream::<fsys::RouteValidatorMarker>().unwrap();
         let _validator_task = fasync::Task::local(async move {
-            validator_server.serve(AbsoluteMoniker::root(), request_stream).await
+            validator_server.serve(Moniker::root(), request_stream).await
         });
 
         model.start().await;

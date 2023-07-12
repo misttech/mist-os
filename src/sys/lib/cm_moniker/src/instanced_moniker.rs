@@ -5,7 +5,7 @@
 use {
     crate::instanced_child_moniker::InstancedChildMoniker,
     core::cmp::{self, Ord, Ordering},
-    moniker::{AbsoluteMoniker, AbsoluteMonikerBase, ChildMoniker, ChildMonikerBase, MonikerError},
+    moniker::{ChildMoniker, ChildMonikerBase, Moniker, MonikerBase, MonikerError},
     std::{fmt, hash::Hash},
 };
 
@@ -24,20 +24,20 @@ use serde::{Deserialize, Serialize};
 /// Display notation: ".", "name1:1", "name1:1/name2:2", ...
 #[cfg_attr(feature = "serde", derive(Deserialize, Serialize))]
 #[derive(Eq, PartialEq, Clone, Hash, Default)]
-pub struct InstancedAbsoluteMoniker {
+pub struct InstancedMoniker {
     path: Vec<InstancedChildMoniker>,
 }
 
-impl InstancedAbsoluteMoniker {
-    /// Convert an InstancedAbsoluteMoniker into an allocated AbsoluteMoniker without InstanceIds
-    pub fn without_instance_ids(&self) -> AbsoluteMoniker {
+impl InstancedMoniker {
+    /// Convert an InstancedMoniker into an allocated Moniker without InstanceIds
+    pub fn without_instance_ids(&self) -> Moniker {
         let path: Vec<ChildMoniker> = self.path().iter().map(|p| p.without_instance_id()).collect();
-        AbsoluteMoniker::new(path)
+        Moniker::new(path)
     }
 
-    /// Transforms an `InstancedAbsoluteMoniker` into a representation where all dynamic children
+    /// Transforms an `InstancedMoniker` into a representation where all dynamic children
     /// have `0` value instance ids.
-    pub fn with_zero_value_instance_ids(&self) -> InstancedAbsoluteMoniker {
+    pub fn with_zero_value_instance_ids(&self) -> InstancedMoniker {
         let path = self
             .path()
             .iter()
@@ -46,11 +46,11 @@ impl InstancedAbsoluteMoniker {
                     .expect("down path moniker is guaranteed to be valid")
             })
             .collect();
-        InstancedAbsoluteMoniker::new(path)
+        InstancedMoniker::new(path)
     }
 }
 
-impl AbsoluteMonikerBase for InstancedAbsoluteMoniker {
+impl MonikerBase for InstancedMoniker {
     type Part = InstancedChildMoniker;
 
     fn new(path: Vec<Self::Part>) -> Self {
@@ -66,7 +66,7 @@ impl AbsoluteMonikerBase for InstancedAbsoluteMoniker {
     }
 }
 
-impl TryFrom<&str> for InstancedAbsoluteMoniker {
+impl TryFrom<&str> for InstancedMoniker {
     type Error = MonikerError;
 
     fn try_from(input: &str) -> Result<Self, MonikerError> {
@@ -74,7 +74,7 @@ impl TryFrom<&str> for InstancedAbsoluteMoniker {
     }
 }
 
-impl TryFrom<Vec<&str>> for InstancedAbsoluteMoniker {
+impl TryFrom<Vec<&str>> for InstancedMoniker {
     type Error = MonikerError;
 
     fn try_from(rep: Vec<&str>) -> Result<Self, MonikerError> {
@@ -82,25 +82,25 @@ impl TryFrom<Vec<&str>> for InstancedAbsoluteMoniker {
     }
 }
 
-impl cmp::Ord for InstancedAbsoluteMoniker {
+impl cmp::Ord for InstancedMoniker {
     fn cmp(&self, other: &Self) -> cmp::Ordering {
         self.compare(other)
     }
 }
 
-impl PartialOrd for InstancedAbsoluteMoniker {
+impl PartialOrd for InstancedMoniker {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
         Some(self.cmp(other))
     }
 }
 
-impl fmt::Display for InstancedAbsoluteMoniker {
+impl fmt::Display for InstancedMoniker {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         self.format(f)
     }
 }
 
-impl fmt::Debug for InstancedAbsoluteMoniker {
+impl fmt::Debug for InstancedMoniker {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         self.format(f)
     }
@@ -110,23 +110,23 @@ mod tests {
     use {
         super::*,
         cm_types::Name,
-        moniker::{AbsoluteMonikerBase, ChildMonikerBase, MonikerError},
+        moniker::{ChildMonikerBase, MonikerBase, MonikerError},
     };
 
     #[test]
     fn instanced_absolute_monikers() {
-        let root = InstancedAbsoluteMoniker::root();
+        let root = InstancedMoniker::root();
         assert_eq!(true, root.is_root());
         assert_eq!(".", format!("{}", root));
-        assert_eq!(root, InstancedAbsoluteMoniker::try_from(vec![]).unwrap());
+        assert_eq!(root, InstancedMoniker::try_from(vec![]).unwrap());
 
-        let m = InstancedAbsoluteMoniker::new(vec![
+        let m = InstancedMoniker::new(vec![
             InstancedChildMoniker::try_new("a", None, 1).unwrap(),
             InstancedChildMoniker::try_new("b", Some("coll"), 2).unwrap(),
         ]);
         assert_eq!(false, m.is_root());
         assert_eq!("a:1/coll:b:2", format!("{}", m));
-        assert_eq!(m, InstancedAbsoluteMoniker::try_from(vec!["a:1", "coll:b:2"]).unwrap());
+        assert_eq!(m, InstancedMoniker::try_from(vec!["a:1", "coll:b:2"]).unwrap());
         assert_eq!(m.leaf().map(|m| m.collection()).flatten(), Some(&Name::new("coll").unwrap()));
         assert_eq!(m.leaf().map(|m| m.name()), Some("b"));
         assert_eq!(m.leaf().map(|m| m.instance()), Some(2));
@@ -135,11 +135,11 @@ mod tests {
 
     #[test]
     fn instanced_absolute_moniker_parent() {
-        let root = InstancedAbsoluteMoniker::root();
+        let root = InstancedMoniker::root();
         assert_eq!(true, root.is_root());
         assert_eq!(None, root.parent());
 
-        let m = InstancedAbsoluteMoniker::new(vec![
+        let m = InstancedMoniker::new(vec![
             InstancedChildMoniker::try_new("a", None, 1).unwrap(),
             InstancedChildMoniker::try_new("b", None, 2).unwrap(),
         ]);
@@ -152,28 +152,28 @@ mod tests {
 
     #[test]
     fn instanced_absolute_moniker_compare() {
-        let a = InstancedAbsoluteMoniker::new(vec![
+        let a = InstancedMoniker::new(vec![
             InstancedChildMoniker::try_new("a", None, 1).unwrap(),
             InstancedChildMoniker::try_new("b", None, 2).unwrap(),
             InstancedChildMoniker::try_new("c", None, 3).unwrap(),
         ]);
-        let a2 = InstancedAbsoluteMoniker::new(vec![
+        let a2 = InstancedMoniker::new(vec![
             InstancedChildMoniker::try_new("a", None, 1).unwrap(),
             InstancedChildMoniker::try_new("b", None, 3).unwrap(),
             InstancedChildMoniker::try_new("c", None, 3).unwrap(),
         ]);
-        let b = InstancedAbsoluteMoniker::new(vec![
+        let b = InstancedMoniker::new(vec![
             InstancedChildMoniker::try_new("a", None, 1).unwrap(),
             InstancedChildMoniker::try_new("b", None, 2).unwrap(),
             InstancedChildMoniker::try_new("b", None, 3).unwrap(),
         ]);
-        let c = InstancedAbsoluteMoniker::new(vec![
+        let c = InstancedMoniker::new(vec![
             InstancedChildMoniker::try_new("a", None, 1).unwrap(),
             InstancedChildMoniker::try_new("b", None, 2).unwrap(),
             InstancedChildMoniker::try_new("c", None, 3).unwrap(),
             InstancedChildMoniker::try_new("d", None, 4).unwrap(),
         ]);
-        let d = InstancedAbsoluteMoniker::new(vec![
+        let d = InstancedMoniker::new(vec![
             InstancedChildMoniker::try_new("a", None, 1).unwrap(),
             InstancedChildMoniker::try_new("b", None, 2).unwrap(),
             InstancedChildMoniker::try_new("c", None, 3).unwrap(),
@@ -197,20 +197,18 @@ mod tests {
 
     #[test]
     fn instanced_absolute_monikers_contains_in_realm() {
-        let root = InstancedAbsoluteMoniker::root();
-        let a = InstancedAbsoluteMoniker::new(vec![
-            InstancedChildMoniker::try_new("a", None, 1).unwrap()
-        ]);
-        let ab = InstancedAbsoluteMoniker::new(vec![
+        let root = InstancedMoniker::root();
+        let a = InstancedMoniker::new(vec![InstancedChildMoniker::try_new("a", None, 1).unwrap()]);
+        let ab = InstancedMoniker::new(vec![
             InstancedChildMoniker::try_new("a", None, 1).unwrap(),
             InstancedChildMoniker::try_new("b", None, 2).unwrap(),
         ]);
-        let abc = InstancedAbsoluteMoniker::new(vec![
+        let abc = InstancedMoniker::new(vec![
             InstancedChildMoniker::try_new("a", None, 1).unwrap(),
             InstancedChildMoniker::try_new("b", None, 2).unwrap(),
             InstancedChildMoniker::try_new("c", None, 3).unwrap(),
         ]);
-        let abd = InstancedAbsoluteMoniker::new(vec![
+        let abd = InstancedMoniker::new(vec![
             InstancedChildMoniker::try_new("a", None, 1).unwrap(),
             InstancedChildMoniker::try_new("b", None, 2).unwrap(),
             InstancedChildMoniker::try_new("d", None, 3).unwrap(),
@@ -249,21 +247,18 @@ mod tests {
 
     #[test]
     fn instanced_absolute_moniker_parse_str() -> Result<(), MonikerError> {
-        let under_test = |s| InstancedAbsoluteMoniker::parse_str(s);
+        let under_test = |s| InstancedMoniker::parse_str(s);
 
-        assert_eq!(under_test(".")?, InstancedAbsoluteMoniker::root());
+        assert_eq!(under_test(".")?, InstancedMoniker::root());
 
         let a = InstancedChildMoniker::try_new("a", None, 0).unwrap();
         let bb = InstancedChildMoniker::try_new("b", Some("b"), 0).unwrap();
 
-        assert_eq!(under_test("a:0")?, InstancedAbsoluteMoniker::new(vec![a.clone()]));
-        assert_eq!(
-            under_test("a:0/b:b:0")?,
-            InstancedAbsoluteMoniker::new(vec![a.clone(), bb.clone()])
-        );
+        assert_eq!(under_test("a:0")?, InstancedMoniker::new(vec![a.clone()]));
+        assert_eq!(under_test("a:0/b:b:0")?, InstancedMoniker::new(vec![a.clone(), bb.clone()]));
         assert_eq!(
             under_test("a:0/b:b:0/a:0/b:b:0")?,
-            InstancedAbsoluteMoniker::new(vec![a.clone(), bb.clone(), a.clone(), bb.clone()])
+            InstancedMoniker::new(vec![a.clone(), bb.clone(), a.clone(), bb.clone()])
         );
 
         assert!(under_test("").is_err(), "cannot be empty");

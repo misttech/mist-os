@@ -5,7 +5,7 @@
 use diagnostics_message::MonikerWithUrl;
 use fidl_fuchsia_diagnostics::{ComponentSelector, Selector};
 use flyweights::FlyStr;
-use moniker::{AbsoluteMoniker, AbsoluteMonikerBase, ExtendedMoniker};
+use moniker::{ExtendedMoniker, Moniker, MonikerBase};
 use std::{borrow::Borrow, string::ToString};
 
 #[derive(Debug, Eq, Hash, PartialEq)]
@@ -34,7 +34,7 @@ impl ComponentIdentity {
 #[cfg(test)]
 impl From<Vec<&str>> for ComponentIdentity {
     fn from(moniker_segments: Vec<&str>) -> Self {
-        let abs_moniker = AbsoluteMoniker::try_from(moniker_segments).unwrap();
+        let abs_moniker = Moniker::try_from(moniker_segments).unwrap();
         Self { moniker: ExtendedMoniker::from(abs_moniker), url: "".into() }
     }
 }
@@ -193,7 +193,7 @@ where
     }
 }
 
-fn segments(moniker: &AbsoluteMoniker) -> impl Iterator<Item = String> + '_ {
+fn segments(moniker: &Moniker) -> impl Iterator<Item = String> + '_ {
     let iter = moniker.path().iter().map(|s| s.to_string());
     if iter.len() == 0 {
         return SegmentIterator::Root(false);

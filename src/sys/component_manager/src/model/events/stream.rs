@@ -20,7 +20,7 @@ use {
 #[cfg(test)]
 use {
     crate::model::hooks::{EventType, HasEventType},
-    moniker::AbsoluteMoniker,
+    moniker::Moniker,
 };
 
 pub struct EventStream {
@@ -83,7 +83,7 @@ impl EventStream {
     pub async fn wait_until(
         &mut self,
         expected_event_type: EventType,
-        expected_moniker: AbsoluteMoniker,
+        expected_moniker: Moniker,
     ) -> Option<Event> {
         let expected_moniker = ExtendedMoniker::ComponentInstance(expected_moniker);
         while let Some((event, _)) = self.next().await {

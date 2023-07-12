@@ -149,7 +149,7 @@ pub mod tests {
         },
         assert_matches::assert_matches,
         cm_rust_testing::ComponentDeclBuilder,
-        moniker::{AbsoluteMoniker, AbsoluteMonikerBase},
+        moniker::{Moniker, MonikerBase},
     };
 
     /// Check unresolve for _nonrecursive_ case. The system has a root with the child `a` and `a`
@@ -167,7 +167,7 @@ pub mod tests {
         ];
         // Resolve and start the components.
         let test = ActionsTest::new("root", components, None).await;
-        let component_root = test.look_up(AbsoluteMoniker::root()).await;
+        let component_root = test.look_up(Moniker::root()).await;
         let component_a = test.start(vec!["a"].try_into().unwrap()).await;
         assert!(is_executing(&component_a).await);
         assert!(is_resolved(&component_root).await);

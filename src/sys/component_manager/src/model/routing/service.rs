@@ -26,7 +26,7 @@ use {
     futures::future::{join_all, BoxFuture},
     futures::lock::Mutex,
     futures::FutureExt,
-    moniker::{AbsoluteMoniker, AbsoluteMonikerBase, ChildMoniker, ExtendedMoniker},
+    moniker::{ChildMoniker, ExtendedMoniker, Moniker, MonikerBase},
     routing::capability_source::{
         CollectionAggregateCapabilityProvider, OfferAggregateCapabilityProvider,
     },
@@ -494,7 +494,7 @@ impl AggregateServiceDirectory {
 #[derive(Debug, Hash, PartialEq, Eq, Clone)]
 pub struct CollectionServiceRoute {
     /// Moniker of the component that contains the collection.
-    pub source_moniker: AbsoluteMoniker,
+    pub source_moniker: Moniker,
 
     /// All collections over which the aggregated service is exposed.
     pub collections: Vec<Name>,
@@ -505,7 +505,7 @@ pub struct CollectionServiceRoute {
 
 impl CollectionServiceRoute {
     /// Returns true if the component with `moniker` is a child of the collection in this route.
-    fn matches_child_component(&self, moniker: &AbsoluteMoniker) -> bool {
+    fn matches_child_component(&self, moniker: &Moniker) -> bool {
         let component_parent_moniker = match moniker.parent() {
             Some(moniker) => moniker,
             None => {
@@ -772,7 +772,7 @@ impl CollectionServiceDirectory {
 
     async fn on_started_async(
         self: Arc<Self>,
-        component_moniker: &AbsoluteMoniker,
+        component_moniker: &Moniker,
         component_decl: &ComponentDecl,
     ) -> Result<(), ModelError> {
         // If this component is a child in a collection from which the aggregated service
@@ -789,7 +789,7 @@ impl CollectionServiceDirectory {
         Ok(())
     }
 
-    async fn on_stopped_async(&self, target_moniker: &AbsoluteMoniker) -> Result<(), ModelError> {
+    async fn on_stopped_async(&self, target_moniker: &Moniker) -> Result<(), ModelError> {
         // If this component is a child in a collection from which the aggregated service
         // is routed, remove any of its service instances from the aggregated service.
         if self.route.matches_child_component(target_moniker) {
@@ -957,7 +957,7 @@ mod tests {
         cm_rust_testing::{ChildDeclBuilder, CollectionDeclBuilder, ComponentDeclBuilder},
         fuchsia_async as fasync,
         futures::StreamExt,
-        moniker::{AbsoluteMoniker, AbsoluteMonikerBase, ChildMoniker},
+        moniker::{ChildMoniker, Moniker, MonikerBase},
         proptest::prelude::*,
         rand::SeedableRng,
         std::{
@@ -989,7 +989,7 @@ mod tests {
                     .ok_or_else(|| RoutingError::OfferFromChildInstanceNotFound {
                         capability_id: "my.service.Service".to_string(),
                         child_moniker: instance.clone(),
-                        moniker: AbsoluteMoniker::root(),
+                        moniker: Moniker::root(),
                     })?
                     .clone(),
             })
@@ -1158,19 +1158,19 @@ mod tests {
             .await;
 
         test.create_dynamic_child(
-            &AbsoluteMoniker::root(),
+            &Moniker::root(),
             "coll1",
             ChildDeclBuilder::new_lazy_child("foo"),
         )
         .await;
         test.create_dynamic_child(
-            &AbsoluteMoniker::root(),
+            &Moniker::root(),
             "coll1",
             ChildDeclBuilder::new_lazy_child("bar"),
         )
         .await;
         test.create_dynamic_child(
-            &AbsoluteMoniker::root(),
+            &Moniker::root(),
             "coll2",
             ChildDeclBuilder::new_lazy_child("baz"),
         )
@@ -1202,7 +1202,7 @@ mod tests {
         };
 
         let route = CollectionServiceRoute {
-            source_moniker: AbsoluteMoniker::root(),
+            source_moniker: Moniker::root(),
             collections: vec!["coll1".parse().unwrap(), "coll2".parse().unwrap()],
             service_name: "my.service.Service".parse().unwrap(),
         };
@@ -1403,13 +1403,13 @@ mod tests {
             .await;
 
         test.create_dynamic_child(
-            &AbsoluteMoniker::root(),
+            &Moniker::root(),
             "coll1",
             ChildDeclBuilder::new_lazy_child("foo"),
         )
         .await;
         test.create_dynamic_child(
-            &AbsoluteMoniker::root(),
+            &Moniker::root(),
             "coll1",
             ChildDeclBuilder::new_lazy_child("bar"),
         )
@@ -1430,7 +1430,7 @@ mod tests {
         };
 
         let route = CollectionServiceRoute {
-            source_moniker: AbsoluteMoniker::root(),
+            source_moniker: Moniker::root(),
             collections: vec!["coll1".parse().unwrap()],
             service_name: "my.service.Service".parse().unwrap(),
         };
@@ -1474,13 +1474,13 @@ mod tests {
             .await;
 
         test.create_dynamic_child(
-            &AbsoluteMoniker::root(),
+            &Moniker::root(),
             "coll1",
             ChildDeclBuilder::new_lazy_child("foo"),
         )
         .await;
         test.create_dynamic_child(
-            &AbsoluteMoniker::root(),
+            &Moniker::root(),
             "coll2",
             ChildDeclBuilder::new_lazy_child("bar"),
         )
@@ -1506,7 +1506,7 @@ mod tests {
         };
 
         let route = CollectionServiceRoute {
-            source_moniker: AbsoluteMoniker::root(),
+            source_moniker: Moniker::root(),
             collections: vec!["coll1".parse().unwrap(), "coll2".parse().unwrap()],
             service_name: "my.service.Service".parse().unwrap(),
         };
@@ -1568,7 +1568,7 @@ mod tests {
             .await;
 
         test.create_dynamic_child(
-            &AbsoluteMoniker::root(),
+            &Moniker::root(),
             "coll1",
             ChildDeclBuilder::new_lazy_child("foo"),
         )
@@ -1645,7 +1645,7 @@ mod tests {
             .await;
 
         test.create_dynamic_child(
-            &AbsoluteMoniker::root(),
+            &Moniker::root(),
             "coll1",
             ChildDeclBuilder::new_lazy_child("foo"),
         )
@@ -1726,7 +1726,7 @@ mod tests {
             .await;
 
         test.create_dynamic_child(
-            &AbsoluteMoniker::root(),
+            &Moniker::root(),
             "coll1",
             ChildDeclBuilder::new_lazy_child("foo"),
         )

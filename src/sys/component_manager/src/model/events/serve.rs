@@ -18,7 +18,7 @@ use {
     },
     futures::{lock::Mutex, StreamExt},
     measure_tape_for_events::Measurable,
-    moniker::{AbsoluteMoniker, AbsoluteMonikerBase, ChildMonikerBase, ExtendedMoniker},
+    moniker::{ChildMonikerBase, ExtendedMoniker, Moniker, MonikerBase},
     std::sync::Arc,
     tracing::{error, warn},
 };
@@ -88,7 +88,7 @@ fn event_filter_contains_ref(
 /// Some(false) if the route is explicitly rejected,
 /// or None if allowed because no route explicitly rejected it.
 fn validate_component_instance(
-    instance: &AbsoluteMoniker,
+    instance: &Moniker,
     mut iter: std::slice::Iter<'_, ComponentEventRoute>,
 ) -> bool {
     let path = instance.path();
@@ -155,7 +155,7 @@ fn filter_event(moniker: &mut ExtendedMoniker, route: &[ComponentEventRoute]) ->
             path.pop();
         }
         path.reverse();
-        *instance = AbsoluteMoniker::new(path);
+        *instance = Moniker::new(path);
     }
     true
 }
@@ -411,12 +411,12 @@ async fn create_event_fidl_object(event: Event) -> Result<fcomponent::Event, any
     let moniker_string = match (&event.event.target_moniker, &event.scope_moniker) {
         (moniker @ ExtendedMoniker::ComponentManager, _) => moniker.to_string(),
         (ExtendedMoniker::ComponentInstance(target), ExtendedMoniker::ComponentManager) => {
-            AbsoluteMoniker::scope_down(&AbsoluteMoniker::root(), target)
+            Moniker::scope_down(&Moniker::root(), target)
                 .expect("every component can be scoped down from the root")
                 .to_string()
         }
         (ExtendedMoniker::ComponentInstance(target), ExtendedMoniker::ComponentInstance(scope)) => {
-            AbsoluteMoniker::scope_down(scope, target)
+            Moniker::scope_down(scope, target)
                 .expect("target must be a child of event scope")
                 .to_string()
         }
@@ -438,10 +438,10 @@ mod tests {
     use crate::model::events::serve::ComponentEventRoute;
     use cm_rust::ChildRef;
     use cm_rust::EventScope;
-    use moniker::AbsoluteMoniker;
-    use moniker::AbsoluteMonikerBase;
     use moniker::ChildMoniker;
     use moniker::ExtendedMoniker;
+    use moniker::Moniker;
+    use moniker::MonikerBase;
 
     // Route: /root(coll)
     // Event: /root
@@ -449,7 +449,7 @@ mod tests {
     #[test]
     fn test_validate_and_filter_event_at_root() {
         let mut moniker =
-            ExtendedMoniker::ComponentInstance(AbsoluteMoniker::new(vec![ChildMoniker::try_new(
+            ExtendedMoniker::ComponentInstance(Moniker::new(vec![ChildMoniker::try_new(
                 "root",
                 Some("coll"),
             )
@@ -472,7 +472,7 @@ mod tests {
     // Output: (rejected)
     #[test]
     fn test_validate_and_filter_event_empty_moniker() {
-        let mut event = ExtendedMoniker::ComponentInstance(AbsoluteMoniker::root());
+        let mut event = ExtendedMoniker::ComponentInstance(Moniker::root());
         let route = vec![
             ComponentEventRoute {
                 component: ChildRef { name: "<root>".into(), collection: None },
@@ -495,7 +495,7 @@ mod tests {
     // Output: /
     #[test]
     fn test_validate_and_filter_event_moniker_root() {
-        let mut event = ExtendedMoniker::ComponentInstance(AbsoluteMoniker::new(vec![
+        let mut event = ExtendedMoniker::ComponentInstance(Moniker::new(vec![
             ChildMoniker::try_new("a", None).unwrap(),
             ChildMoniker::try_new("b", None).unwrap(),
             ChildMoniker::try_new("c", None).unwrap(),
@@ -525,7 +525,7 @@ mod tests {
             },
         ];
         assert!(super::validate_and_filter_event(&mut event, &route));
-        assert_eq!(event, ExtendedMoniker::ComponentInstance(AbsoluteMoniker::root()));
+        assert_eq!(event, ExtendedMoniker::ComponentInstance(Moniker::root()));
     }
 
     // Route: a(b)/b(c)/c
@@ -533,7 +533,7 @@ mod tests {
     // Output: d
     #[test]
     fn test_validate_and_filter_event_moniker_children_scoped() {
-        let mut event = ExtendedMoniker::ComponentInstance(AbsoluteMoniker::new(vec![
+        let mut event = ExtendedMoniker::ComponentInstance(Moniker::new(vec![
             ChildMoniker::try_new("a", None).unwrap(),
             ChildMoniker::try_new("b", None).unwrap(),
             ChildMoniker::try_new("c", None).unwrap(),
@@ -566,7 +566,7 @@ mod tests {
         assert!(super::validate_and_filter_event(&mut event, &route));
         assert_eq!(
             event,
-            ExtendedMoniker::ComponentInstance(AbsoluteMoniker::new(vec![ChildMoniker::try_new(
+            ExtendedMoniker::ComponentInstance(Moniker::new(vec![ChildMoniker::try_new(
                 "d", None
             )
             .unwrap()]))
@@ -579,7 +579,7 @@ mod tests {
     #[test]
     fn test_validate_and_filter_event_moniker_above_root_rejected() {
         let mut event =
-            ExtendedMoniker::ComponentInstance(AbsoluteMoniker::new(vec![ChildMoniker::try_new(
+            ExtendedMoniker::ComponentInstance(Moniker::new(vec![ChildMoniker::try_new(
                 "a", None,
             )
             .unwrap()]));
@@ -604,7 +604,7 @@ mod tests {
         assert!(!super::validate_and_filter_event(&mut event, &route));
         assert_eq!(
             event,
-            ExtendedMoniker::ComponentInstance(AbsoluteMoniker::new(vec![ChildMoniker::try_new(
+            ExtendedMoniker::ComponentInstance(Moniker::new(vec![ChildMoniker::try_new(
                 "a", None
             )
             .unwrap()]))
@@ -616,7 +616,7 @@ mod tests {
     // Output: (rejected)
     #[test]
     fn test_validate_and_filter_event_moniker_ambiguous() {
-        let mut event = ExtendedMoniker::ComponentInstance(AbsoluteMoniker::new(vec![
+        let mut event = ExtendedMoniker::ComponentInstance(Moniker::new(vec![
             ChildMoniker::try_new("f", None).unwrap(),
             ChildMoniker::try_new("i", None).unwrap(),
         ]));
@@ -646,7 +646,7 @@ mod tests {
     // Output: (rejected)
     #[test]
     fn test_validate_and_filter_event_moniker_root_rejected() {
-        let mut event = ExtendedMoniker::ComponentInstance(AbsoluteMoniker::new(vec![
+        let mut event = ExtendedMoniker::ComponentInstance(Moniker::new(vec![
             ChildMoniker::try_new("core", None).unwrap(),
             ChildMoniker::try_new("feedback", None).unwrap(),
         ]));
@@ -676,7 +676,7 @@ mod tests {
     // Output: (rejected)
     #[test]
     fn test_validate_child_under_scoped_collection_is_root() {
-        let mut event = ExtendedMoniker::ComponentInstance(AbsoluteMoniker::new(vec![
+        let mut event = ExtendedMoniker::ComponentInstance(Moniker::new(vec![
             ChildMoniker::try_new("core", None).unwrap(),
             ChildMoniker::try_new("test_manager", None).unwrap(),
             ChildMoniker::try_new("auto-3fc01a79864c741", Some("tests")).unwrap(),

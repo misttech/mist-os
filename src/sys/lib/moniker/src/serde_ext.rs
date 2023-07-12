@@ -4,8 +4,8 @@
 
 use {
     crate::{
-        abs_moniker::{AbsoluteMoniker, AbsoluteMonikerBase},
         child_moniker::{ChildMoniker, ChildMonikerBase},
+        moniker::{Moniker, MonikerBase},
     },
     serde::{
         de::{self, Deserializer, Visitor},
@@ -52,7 +52,7 @@ impl<'de> Deserialize<'de> for ChildMoniker {
     }
 }
 
-impl Serialize for AbsoluteMoniker {
+impl Serialize for Moniker {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
         S: Serializer,
@@ -61,10 +61,10 @@ impl Serialize for AbsoluteMoniker {
     }
 }
 
-struct AbsoluteMonikerVisitor;
+struct MonikerVisitor;
 
-impl<'de> Visitor<'de> for AbsoluteMonikerVisitor {
-    type Value = AbsoluteMoniker;
+impl<'de> Visitor<'de> for MonikerVisitor {
+    type Value = Moniker;
 
     fn expecting(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         formatter.write_str("an absolute moniker of a component instance")
@@ -74,18 +74,18 @@ impl<'de> Visitor<'de> for AbsoluteMonikerVisitor {
     where
         E: de::Error,
     {
-        match AbsoluteMoniker::parse_str(value) {
+        match Moniker::parse_str(value) {
             Ok(moniker) => Ok(moniker),
-            Err(err) => Err(E::custom(format!("Failed to parse AbsoluteMoniker: {}", err))),
+            Err(err) => Err(E::custom(format!("Failed to parse Moniker: {}", err))),
         }
     }
 }
 
-impl<'de> Deserialize<'de> for AbsoluteMoniker {
-    fn deserialize<D>(deserializer: D) -> Result<AbsoluteMoniker, D::Error>
+impl<'de> Deserialize<'de> for Moniker {
+    fn deserialize<D>(deserializer: D) -> Result<Moniker, D::Error>
     where
         D: Deserializer<'de>,
     {
-        deserializer.deserialize_str(AbsoluteMonikerVisitor)
+        deserializer.deserialize_str(MonikerVisitor)
     }
 }

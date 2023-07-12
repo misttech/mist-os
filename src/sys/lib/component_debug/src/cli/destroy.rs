@@ -9,7 +9,7 @@ use {
     },
     anyhow::{format_err, Result},
     fidl_fuchsia_sys2 as fsys,
-    moniker::{AbsoluteMoniker, AbsoluteMonikerBase, ChildMonikerBase},
+    moniker::{ChildMonikerBase, Moniker, MonikerBase},
 };
 
 pub async fn destroy_cmd<W: std::io::Write>(
@@ -36,7 +36,7 @@ pub async fn destroy_cmd<W: std::io::Write>(
 
     // Convert the absolute moniker into a relative moniker w.r.t. root.
     // LifecycleController expects relative monikers only.
-    let parent_relative = AbsoluteMoniker::scope_down(&AbsoluteMoniker::root(), &parent).unwrap();
+    let parent_relative = Moniker::scope_down(&Moniker::root(), &parent).unwrap();
 
     destroy_instance_in_collection(&lifecycle_controller, &parent_relative, collection, child_name)
         .await
@@ -69,8 +69,8 @@ mod test {
                     responder,
                 } => {
                     assert_eq!(
-                        AbsoluteMoniker::parse_str(expected_moniker),
-                        AbsoluteMoniker::parse_str(&parent_moniker)
+                        Moniker::parse_str(expected_moniker),
+                        Moniker::parse_str(&parent_moniker)
                     );
                     assert_eq!(expected_collection, child.collection.unwrap());
                     assert_eq!(expected_name, child.name);

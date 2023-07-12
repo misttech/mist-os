@@ -11,7 +11,7 @@ use {
         ComponentInstanceVisitor, ComponentModelWalker,
     },
     cm_rust::UseDecl,
-    moniker::AbsoluteMonikerBase,
+    moniker::MonikerBase,
     routing::component_instance::{ComponentInstanceInterface, ExtendedInstanceInterface},
     scrutiny::{model::controller::DataController, model::model::*},
     serde::{Deserialize, Serialize},
@@ -97,7 +97,7 @@ impl ComponentResolversVisitor {
                 }
             };
 
-            let moniker = moniker::AbsoluteMoniker::parse_str(&self.request.moniker)?;
+            let moniker = moniker::Moniker::parse_str(&self.request.moniker)?;
 
             if *resolver_source.abs_moniker() == moniker {
                 for use_decl in &resolver_source.decl_for_testing().uses {

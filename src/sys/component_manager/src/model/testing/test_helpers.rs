@@ -37,7 +37,7 @@ use {
     },
     fuchsia_zircon::{self as zx, AsHandleRef, Koid},
     futures::{channel::mpsc::Receiver, lock::Mutex, StreamExt, TryStreamExt},
-    moniker::{AbsoluteMoniker, ChildMoniker},
+    moniker::{ChildMoniker, Moniker},
     std::collections::HashSet,
     std::default::Default,
     std::sync::Arc,
@@ -295,7 +295,7 @@ pub struct TestEnvironmentBuilder {
     config_values: Vec<(&'static str, ConfigValuesData)>,
     runtime_config: RuntimeConfig,
     component_id_index_path: Option<String>,
-    realm_moniker: Option<AbsoluteMoniker>,
+    realm_moniker: Option<Moniker>,
     hooks: Vec<HooksRegistration>,
 }
 
@@ -340,7 +340,7 @@ impl TestEnvironmentBuilder {
         self
     }
 
-    pub fn set_realm_moniker(mut self, moniker: AbsoluteMoniker) -> Self {
+    pub fn set_realm_moniker(mut self, moniker: Moniker) -> Self {
         self.realm_moniker = Some(moniker);
         self
     }
@@ -433,7 +433,7 @@ impl ActionsTest {
     pub async fn new(
         root_component: &'static str,
         components: Vec<(&'static str, ComponentDecl)>,
-        moniker: Option<AbsoluteMoniker>,
+        moniker: Option<Moniker>,
     ) -> Self {
         Self::new_with_hooks(root_component, components, moniker, vec![]).await
     }
@@ -441,7 +441,7 @@ impl ActionsTest {
     pub async fn new_with_hooks(
         root_component: &'static str,
         components: Vec<(&'static str, ComponentDecl)>,
-        moniker: Option<AbsoluteMoniker>,
+        moniker: Option<Moniker>,
         extra_hooks: Vec<HooksRegistration>,
     ) -> Self {
         let test_hook = Arc::new(TestHook::new());
@@ -466,14 +466,14 @@ impl ActionsTest {
         }
     }
 
-    pub async fn look_up(&self, moniker: AbsoluteMoniker) -> Arc<ComponentInstance> {
+    pub async fn look_up(&self, moniker: Moniker) -> Arc<ComponentInstance> {
         self.model
             .look_up(&moniker)
             .await
             .unwrap_or_else(|e| panic!("could not look up {}: {:?}", moniker, e))
     }
 
-    pub async fn start(&self, moniker: AbsoluteMoniker) -> Arc<ComponentInstance> {
+    pub async fn start(&self, moniker: Moniker) -> Arc<ComponentInstance> {
         self.model
             .start_instance(&moniker, &StartReason::Eager)
             .await

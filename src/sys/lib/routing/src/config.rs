@@ -14,8 +14,7 @@ use {
         DebugRegistrationPolicyAllowlists, LogDestination, RealmBuilderResolverAndRunner,
     },
     moniker::{
-        AbsoluteMoniker, AbsoluteMonikerBase, ChildMoniker, ChildMonikerBase, ExtendedMoniker,
-        MonikerError,
+        ChildMoniker, ChildMonikerBase, ExtendedMoniker, Moniker, MonikerBase, MonikerError,
     },
     std::{
         collections::{HashMap, HashSet},
@@ -139,7 +138,7 @@ impl AllowlistEntryBuilder {
         Self { parts: vec![] }
     }
 
-    pub fn build_exact_from_moniker(m: &AbsoluteMoniker) -> AllowlistEntry {
+    pub fn build_exact_from_moniker(m: &Moniker) -> AllowlistEntry {
         Self::new().exact_from_moniker(m).build()
     }
 
@@ -148,7 +147,7 @@ impl AllowlistEntryBuilder {
         self
     }
 
-    pub fn exact_from_moniker(mut self, m: &AbsoluteMoniker) -> Self {
+    pub fn exact_from_moniker(mut self, m: &Moniker) -> Self {
         let mut parts = m.path().clone().into_iter().map(|c| AllowlistMatcher::Exact(c)).collect();
         self.parts.append(&mut parts);
         self
@@ -226,7 +225,7 @@ impl DebugCapabilityAllowlistEntry {
         Self { source, dest }
     }
 
-    pub fn matches(&self, source: &ExtendedMoniker, dest: &AbsoluteMoniker) -> bool {
+    pub fn matches(&self, source: &ExtendedMoniker, dest: &Moniker) -> bool {
         let source_absolute = match source {
             // Currently no debug capabilities are routed from cm.
             ExtendedMoniker::ComponentManager => return false,
@@ -311,7 +310,7 @@ impl Default for AbiRevisionPolicy {
 }
 
 impl AbiRevisionPolicy {
-    fn is_supported(moniker: &AbsoluteMoniker, abi_revision: Option<AbiRevision>) -> bool {
+    fn is_supported(moniker: &Moniker, abi_revision: Option<AbiRevision>) -> bool {
         match abi_revision {
             Some(abi) => {
                 let is_supported = version_history::is_supported_abi_revision(abi);
@@ -331,7 +330,7 @@ impl AbiRevisionPolicy {
     /// ABI revision is missing or not supported by the platform.
     pub fn check_compatibility(
         &self,
-        moniker: &AbsoluteMoniker,
+        moniker: &Moniker,
         abi_revision: Option<AbiRevision>,
     ) -> Result<(), AbiRevisionError> {
         let is_supported_abi = Self::is_supported(moniker, abi_revision);

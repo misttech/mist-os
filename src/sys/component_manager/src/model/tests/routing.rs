@@ -48,7 +48,7 @@ use {
     fuchsia_zircon as zx,
     futures::{channel::oneshot, join, lock::Mutex, StreamExt, TryStreamExt},
     maplit::btreemap,
-    moniker::{AbsoluteMoniker, AbsoluteMonikerBase, ChildMoniker, ChildMonikerBase},
+    moniker::{ChildMoniker, ChildMonikerBase, Moniker, MonikerBase},
     routing_test_helpers::{
         default_service_capability, instantiate_common_routing_tests, RoutingTestModel,
     },
@@ -72,12 +72,12 @@ instantiate_common_routing_tests! { RoutingTestBuilder }
 #[fuchsia::test]
 async fn use_framework_service() {
     pub struct MockRealmCapabilityProvider {
-        scope_moniker: AbsoluteMoniker,
+        scope_moniker: Moniker,
         host: MockRealmCapabilityHost,
     }
 
     impl MockRealmCapabilityProvider {
-        pub fn new(scope_moniker: AbsoluteMoniker, host: MockRealmCapabilityHost) -> Self {
+        pub fn new(scope_moniker: Moniker, host: MockRealmCapabilityHost) -> Self {
             Self { scope_moniker, host }
         }
     }
@@ -147,7 +147,7 @@ async fn use_framework_service() {
 
         async fn serve(
             &self,
-            scope_moniker: AbsoluteMoniker,
+            scope_moniker: Moniker,
             mut stream: fcomponent::RealmRequestStream,
         ) -> Result<(), Error> {
             while let Some(request) = stream.try_next().await? {
@@ -171,7 +171,7 @@ async fn use_framework_service() {
 
         pub async fn on_scoped_framework_capability_routed_async<'a>(
             &'a self,
-            scope_moniker: AbsoluteMoniker,
+            scope_moniker: Moniker,
             capability: &'a InternalCapability,
             capability_provider: Option<Box<dyn CapabilityProvider>>,
         ) -> Result<Option<Box<dyn CapabilityProvider>>, ModelError> {
@@ -276,7 +276,7 @@ async fn capability_requested_event_at_parent() {
         .build()
         .await;
 
-    let namespace_root = test.bind_and_get_namespace(AbsoluteMoniker::root()).await;
+    let namespace_root = test.bind_and_get_namespace(Moniker::root()).await;
     let event_stream =
         capability_util::connect_to_svc_in_namespace::<fcomponent::EventStreamMarker>(
             &namespace_root,
@@ -729,7 +729,7 @@ async fn dynamic_offer_siblings_same_collection() {
     let test = RoutingTest::new("a", components).await;
 
     test.create_dynamic_child(
-        &AbsoluteMoniker::root(),
+        &Moniker::root(),
         "coll",
         ChildDecl {
             name: "b".to_string(),
@@ -742,7 +742,7 @@ async fn dynamic_offer_siblings_same_collection() {
     )
     .await;
     test.create_dynamic_child_with_args(
-        &AbsoluteMoniker::root(),
+        &Moniker::root(),
         "coll",
         ChildDecl {
             name: "c".to_string(),
@@ -832,7 +832,7 @@ async fn dynamic_offer_siblings_cross_collection() {
     let test = RoutingTest::new("a", components).await;
 
     test.create_dynamic_child(
-        &AbsoluteMoniker::root(),
+        &Moniker::root(),
         "source_coll",
         ChildDecl {
             name: "b".to_string(),
@@ -845,7 +845,7 @@ async fn dynamic_offer_siblings_cross_collection() {
     )
     .await;
     test.create_dynamic_child_with_args(
-        &AbsoluteMoniker::root(),
+        &Moniker::root(),
         "target_coll",
         ChildDecl {
             name: "c".to_string(),
@@ -932,7 +932,7 @@ async fn dynamic_offer_destroyed_on_source_destruction() {
     let test = RoutingTest::new("a", components).await;
 
     test.create_dynamic_child(
-        &AbsoluteMoniker::root(),
+        &Moniker::root(),
         "coll",
         ChildDecl {
             name: "b".to_string(),
@@ -945,7 +945,7 @@ async fn dynamic_offer_destroyed_on_source_destruction() {
     )
     .await;
     test.create_dynamic_child_with_args(
-        &AbsoluteMoniker::root(),
+        &Moniker::root(),
         "coll",
         ChildDecl {
             name: "c".to_string(),
@@ -976,9 +976,9 @@ async fn dynamic_offer_destroyed_on_source_destruction() {
     )
     .await;
 
-    test.destroy_dynamic_child(AbsoluteMoniker::root(), "coll", "b").await;
+    test.destroy_dynamic_child(Moniker::root(), "coll", "b").await;
     test.create_dynamic_child(
-        &AbsoluteMoniker::root(),
+        &Moniker::root(),
         "coll",
         ChildDecl {
             name: "b".to_string(),
@@ -1060,7 +1060,7 @@ async fn dynamic_offer_destroyed_on_target_destruction() {
     let test = RoutingTest::new("a", components).await;
 
     test.create_dynamic_child(
-        &AbsoluteMoniker::root(),
+        &Moniker::root(),
         "coll",
         ChildDecl {
             name: "b".to_string(),
@@ -1073,7 +1073,7 @@ async fn dynamic_offer_destroyed_on_target_destruction() {
     )
     .await;
     test.create_dynamic_child_with_args(
-        &AbsoluteMoniker::root(),
+        &Moniker::root(),
         "coll",
         ChildDecl {
             name: "c".to_string(),
@@ -1104,9 +1104,9 @@ async fn dynamic_offer_destroyed_on_target_destruction() {
     )
     .await;
 
-    test.destroy_dynamic_child(AbsoluteMoniker::root(), "coll", "c").await;
+    test.destroy_dynamic_child(Moniker::root(), "coll", "c").await;
     test.create_dynamic_child(
-        &AbsoluteMoniker::root(),
+        &Moniker::root(),
         "coll",
         ChildDecl {
             name: "c".to_string(),
@@ -1200,7 +1200,7 @@ async fn dynamic_offer_to_static_offer() {
     let test = RoutingTest::new("a", components).await;
 
     test.create_dynamic_child_with_args(
-        &AbsoluteMoniker::root(),
+        &Moniker::root(),
         "coll",
         ChildDecl {
             name: "c".to_string(),
@@ -1260,7 +1260,7 @@ async fn destroying_instance_kills_framework_service_task() {
     .await;
 
     // Destroy `b`. This should cause the task hosted for `Realm` to be cancelled.
-    let root = test.model.look_up(&AbsoluteMoniker::root()).await.unwrap();
+    let root = test.model.look_up(&Moniker::root()).await.unwrap();
     ActionSet::register(root.clone(), DestroyChildAction::new("b".try_into().unwrap(), 0))
         .await
         .expect("destroy failed");
@@ -1373,7 +1373,7 @@ async fn destroying_instance_blocks_on_routing() {
     capability_util::add_dir_to_namespace(&namespace, "/data", dir_proxy).await;
 
     // Destroy `b`.
-    let root = test.model.look_up(&AbsoluteMoniker::root()).await.unwrap();
+    let root = test.model.look_up(&Moniker::root()).await.unwrap();
     let mut actions = root.lock_actions().await;
     let destroy_nf =
         actions.register_no_wait(&root, DestroyChildAction::new("b".try_into().unwrap(), 0));
@@ -1515,7 +1515,7 @@ async fn use_runner_from_environment_in_collection() {
         .await;
     universe
         .create_dynamic_child(
-            &AbsoluteMoniker::root(),
+            &Moniker::root(),
             "coll",
             ChildDecl {
                 name: "b".to_string(),
@@ -1858,7 +1858,7 @@ async fn use_runner_from_environment_failed() {
             Arc::downgrade(&runner_host) as Weak<dyn Hook>,
         )])
         .await;
-    let namespace_root = test.bind_and_get_namespace(AbsoluteMoniker::root()).await;
+    let namespace_root = test.bind_and_get_namespace(Moniker::root()).await;
     let event_stream =
         capability_util::connect_to_svc_in_namespace::<fcomponent::EventStreamMarker>(
             &namespace_root,
@@ -1955,7 +1955,7 @@ async fn use_runner_from_environment_not_found() {
             },
             ..
         }
-        if moniker == AbsoluteMoniker::try_from(vec!["b"]).unwrap() &&
+        if moniker == Moniker::try_from(vec!["b"]).unwrap() &&
         capability_type == "runner" &&
         capability_name == "hobbit");
 }
@@ -2025,7 +2025,7 @@ async fn use_with_destroyed_parent() {
     ];
     let test = RoutingTest::new("a", components).await;
     test.create_dynamic_child(
-        &AbsoluteMoniker::root(),
+        &Moniker::root(),
         "coll",
         ChildDecl {
             name: "b".to_string(),
@@ -2048,7 +2048,7 @@ async fn use_with_destroyed_parent() {
     // Destroy "b", but preserve a reference to "c" so we can route from it below.
     let moniker = vec!["coll:b", "c"].try_into().unwrap();
     let realm_c = test.model.look_up(&moniker).await.expect("failed to look up realm b");
-    test.destroy_dynamic_child(AbsoluteMoniker::root(), "coll", "b").await;
+    test.destroy_dynamic_child(Moniker::root(), "coll", "b").await;
 
     // Now attempt to route the service from "c". Should fail because "b" does not exist so we
     // cannot follow it.
@@ -2580,8 +2580,8 @@ async fn verify_service_route(
     child_monikers: &[&str],
     route_type: RouteType,
 ) {
-    let target_moniker: AbsoluteMoniker = target_moniker.try_into().unwrap();
-    let agg_moniker: AbsoluteMoniker = agg_moniker.try_into().unwrap();
+    let target_moniker: Moniker = target_moniker.try_into().unwrap();
+    let agg_moniker: Moniker = agg_moniker.try_into().unwrap();
     let child_monikers: Vec<_> =
         child_monikers.into_iter().map(|m| ChildMoniker::parse(m).unwrap()).collect();
 
@@ -3185,19 +3185,19 @@ async fn list_service_instances_from_collections() {
 
     // Start a few dynamic children in the collections.
     test.create_dynamic_child(
-        &AbsoluteMoniker::root(),
+        &Moniker::root(),
         "coll1",
         ChildDeclBuilder::new_lazy_child("service_child_a"),
     )
     .await;
     test.create_dynamic_child(
-        &AbsoluteMoniker::root(),
+        &Moniker::root(),
         "coll1",
         ChildDeclBuilder::new_lazy_child("non_service_child"),
     )
     .await;
     test.create_dynamic_child(
-        &AbsoluteMoniker::root(),
+        &Moniker::root(),
         "coll2",
         ChildDeclBuilder::new_lazy_child("service_child_b"),
     )

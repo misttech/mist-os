@@ -9,7 +9,7 @@ use component_debug::{
     explore::DashNamespaceLayout,
 };
 use fuchsia_url::AbsoluteComponentUrl;
-use moniker::AbsoluteMoniker;
+use moniker::Moniker;
 
 #[derive(FromArgs, PartialEq, Debug)]
 #[argh(
@@ -54,7 +54,7 @@ pub struct ShowArgs {
 #[argh(subcommand, name = "create", description = "Same as `ffx component create`")]
 pub struct CreateArgs {
     #[argh(positional)]
-    pub moniker: AbsoluteMoniker,
+    pub moniker: Moniker,
 
     #[argh(positional)]
     pub url: AbsoluteComponentUrl,
@@ -151,7 +151,7 @@ pub struct GraphArgs {
 #[argh(subcommand, name = "run", description = "Same as `ffx component run`")]
 pub struct RunArgs {
     #[argh(positional)]
-    pub moniker: AbsoluteMoniker,
+    pub moniker: Moniker,
 
     #[argh(positional)]
     pub url: AbsoluteComponentUrl,

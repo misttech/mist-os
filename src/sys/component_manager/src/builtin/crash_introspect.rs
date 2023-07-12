@@ -55,8 +55,7 @@ impl BuiltinCapability for CrashIntrospectSvc {
 mod tests {
     use {
         super::*, elf_runner::crash_info::ComponentCrashInfo,
-        fidl::endpoints::create_proxy_and_stream, fuchsia_async as fasync,
-        moniker::AbsoluteMoniker,
+        fidl::endpoints::create_proxy_and_stream, fuchsia_async as fasync, moniker::Moniker,
     };
 
     #[fuchsia::test]
@@ -71,7 +70,7 @@ mod tests {
         let koid_raw = 123;
         let koid = zx::Koid::from_raw(koid_raw);
         let url = "456".to_string();
-        let moniker = AbsoluteMoniker::try_from(vec!["a"]).unwrap();
+        let moniker = Moniker::try_from(vec!["a"]).unwrap();
         let crash_report = ComponentCrashInfo { url: url.clone(), moniker: moniker.clone() };
 
         assert_eq!(

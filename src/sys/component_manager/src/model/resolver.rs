@@ -209,12 +209,12 @@ mod tests {
         anyhow::{format_err, Error},
         assert_matches::assert_matches,
         async_trait::async_trait,
-        cm_moniker::InstancedAbsoluteMoniker,
+        cm_moniker::InstancedMoniker,
         cm_rust::NativeIntoFidl,
         cm_rust_testing::new_decl_from_json,
         fidl_fuchsia_component_decl as fdecl,
         lazy_static::lazy_static,
-        moniker::AbsoluteMonikerBase,
+        moniker::MonikerBase,
         routing::environment::{DebugRegistry, RunnerRegistry},
         routing::resolving::{ComponentAddress, ComponentResolutionContext},
         serde_json::json,
@@ -611,7 +611,7 @@ mod tests {
         );
         let child = ComponentInstance::new(
             root.environment.clone(),
-            InstancedAbsoluteMoniker::parse_str("/root:0/child:0")?,
+            InstancedMoniker::parse_str("/root:0/child:0")?,
             "subpackage#meta/subcomp.cm".to_string(),
             fdecl::StartupMode::Lazy,
             fdecl::OnTerminate::None,
@@ -682,7 +682,7 @@ mod tests {
         );
         let child = ComponentInstance::new(
             root.environment.clone(),
-            InstancedAbsoluteMoniker::parse_str("/root:0/child:0")?,
+            InstancedMoniker::parse_str("/root:0/child:0")?,
             "subpackage#meta/subcomp.cm".to_string(),
             fdecl::StartupMode::Lazy,
             fdecl::OnTerminate::None,
@@ -741,7 +741,7 @@ mod tests {
         );
         let child = ComponentInstance::new(
             root.environment.clone(),
-            InstancedAbsoluteMoniker::parse_str("/root:0/child:0")?,
+            InstancedMoniker::parse_str("/root:0/child:0")?,
             "subpackage#meta/subcomp.cm".to_string(),
             fdecl::StartupMode::Lazy,
             fdecl::OnTerminate::None,
@@ -800,7 +800,7 @@ mod tests {
 
         let child = ComponentInstance::new(
             root.environment.clone(),
-            InstancedAbsoluteMoniker::parse_str("/root:0/child:0")?,
+            InstancedMoniker::parse_str("/root:0/child:0")?,
             "#meta/my-child.cm".to_string(),
             fdecl::StartupMode::Lazy,
             fdecl::OnTerminate::None,
@@ -864,7 +864,7 @@ mod tests {
 
         let child_one = ComponentInstance::new(
             root.environment.clone(),
-            InstancedAbsoluteMoniker::parse_str("/root:0/child:0")?,
+            InstancedMoniker::parse_str("/root:0/child:0")?,
             "#meta/my-child.cm".to_string(),
             fdecl::StartupMode::Lazy,
             fdecl::OnTerminate::None,
@@ -877,7 +877,7 @@ mod tests {
 
         let child_two = ComponentInstance::new(
             root.environment.clone(),
-            InstancedAbsoluteMoniker::parse_str("/root:0/child:0")?,
+            InstancedMoniker::parse_str("/root:0/child:0")?,
             "#meta/my-child2.cm".to_string(),
             fdecl::StartupMode::Lazy,
             fdecl::OnTerminate::None,
@@ -935,7 +935,7 @@ mod tests {
 
         let child = ComponentInstance::new(
             root.environment.clone(),
-            InstancedAbsoluteMoniker::parse_str("/root:0/child:0")?,
+            InstancedMoniker::parse_str("/root:0/child:0")?,
             "#meta/my-child.cm".to_string(),
             fdecl::StartupMode::Lazy,
             fdecl::OnTerminate::None,
@@ -993,7 +993,7 @@ mod tests {
 
         let child = ComponentInstance::new(
             root.environment.clone(),
-            InstancedAbsoluteMoniker::parse_str("/root:0/child:0")?,
+            InstancedMoniker::parse_str("/root:0/child:0")?,
             "#meta/my-child.cm".to_string(),
             fdecl::StartupMode::Lazy,
             fdecl::OnTerminate::None,
@@ -1034,7 +1034,7 @@ mod tests {
 
         let child = ComponentInstance::new(
             root.environment.clone(),
-            InstancedAbsoluteMoniker::parse_str("/root:0/child:0")?,
+            InstancedMoniker::parse_str("/root:0/child:0")?,
             "#meta/my-child.cm".to_string(),
             fdecl::StartupMode::Lazy,
             fdecl::OnTerminate::None,
@@ -1092,7 +1092,7 @@ mod tests {
 
         let child_one = ComponentInstance::new(
             root.environment.clone(),
-            InstancedAbsoluteMoniker::parse_str("/root:0/child:0")?,
+            InstancedMoniker::parse_str("/root:0/child:0")?,
             "my-subpackage#meta/my-child.cm".to_string(),
             fdecl::StartupMode::Lazy,
             fdecl::OnTerminate::None,
@@ -1105,7 +1105,7 @@ mod tests {
 
         let child_two = ComponentInstance::new(
             root.environment.clone(),
-            InstancedAbsoluteMoniker::parse_str("/root:0/child:0/child2:0")?,
+            InstancedMoniker::parse_str("/root:0/child:0/child2:0")?,
             "#meta/my-child2.cm".to_string(),
             fdecl::StartupMode::Lazy,
             fdecl::OnTerminate::None,
@@ -1173,7 +1173,7 @@ mod tests {
 
         let child_one = ComponentInstance::new(
             root.environment.clone(),
-            InstancedAbsoluteMoniker::parse_str("/root:0/child:0")?,
+            InstancedMoniker::parse_str("/root:0/child:0")?,
             "my-subpackage#meta/my-child.cm".to_string(),
             fdecl::StartupMode::Lazy,
             fdecl::OnTerminate::None,
@@ -1186,7 +1186,7 @@ mod tests {
 
         let child_two = ComponentInstance::new(
             root.environment.clone(),
-            InstancedAbsoluteMoniker::parse_str("/root:0/child:0/child2:0")?,
+            InstancedMoniker::parse_str("/root:0/child:0/child2:0")?,
             "#meta/my-child2.cm".to_string(),
             fdecl::StartupMode::Lazy,
             fdecl::OnTerminate::None,
@@ -1199,7 +1199,7 @@ mod tests {
 
         let child_three = ComponentInstance::new(
             root.environment.clone(),
-            InstancedAbsoluteMoniker::parse_str("/root:0/child:0/child2:0/child3:0")?,
+            InstancedMoniker::parse_str("/root:0/child:0/child2:0/child3:0")?,
             "#meta/my-child3.cm".to_string(),
             fdecl::StartupMode::Lazy,
             fdecl::OnTerminate::None,
@@ -1280,7 +1280,7 @@ mod tests {
 
         let realm = ComponentInstance::new(
             root.environment.clone(),
-            InstancedAbsoluteMoniker::parse_str("/root:0/realm:0/child:0")?,
+            InstancedMoniker::parse_str("/root:0/realm:0/child:0")?,
             "realm-builder://0/my-realm".to_string(),
             fdecl::StartupMode::Lazy,
             fdecl::OnTerminate::None,
@@ -1293,7 +1293,7 @@ mod tests {
 
         let child_one = ComponentInstance::new(
             root.environment.clone(),
-            InstancedAbsoluteMoniker::parse_str("/root:0/realm:0/child:0")?,
+            InstancedMoniker::parse_str("/root:0/realm:0/child:0")?,
             "my-subpackage1#meta/sub1.cm".to_string(),
             fdecl::StartupMode::Lazy,
             fdecl::OnTerminate::None,
@@ -1306,7 +1306,7 @@ mod tests {
 
         let child_two = ComponentInstance::new(
             root.environment.clone(),
-            InstancedAbsoluteMoniker::parse_str("/root:0/realm:0/child:0/child2:0")?,
+            InstancedMoniker::parse_str("/root:0/realm:0/child:0/child2:0")?,
             "#meta/sub1-child.cm".to_string(),
             fdecl::StartupMode::Lazy,
             fdecl::OnTerminate::None,
@@ -1319,7 +1319,7 @@ mod tests {
 
         let child_three = ComponentInstance::new(
             root.environment.clone(),
-            InstancedAbsoluteMoniker::parse_str("/root:0/realm:0/child:0/child2:0/child3:0")?,
+            InstancedMoniker::parse_str("/root:0/realm:0/child:0/child2:0/child3:0")?,
             "my-subpackage2#meta/sub2.cm".to_string(),
             fdecl::StartupMode::Lazy,
             fdecl::OnTerminate::None,
@@ -1332,9 +1332,7 @@ mod tests {
 
         let child_four = ComponentInstance::new(
             root.environment.clone(),
-            InstancedAbsoluteMoniker::parse_str(
-                "/root:0/realm:0/child:0/child2:0/child3:0/child4:0",
-            )?,
+            InstancedMoniker::parse_str("/root:0/realm:0/child:0/child2:0/child3:0/child4:0")?,
             "#meta/sub2-child.cm".to_string(),
             fdecl::StartupMode::Lazy,
             fdecl::OnTerminate::None,

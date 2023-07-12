@@ -17,7 +17,7 @@ use {
     fidl::endpoints::ServerEnd,
     fidl_fuchsia_io as fio, fuchsia_async as fasync, fuchsia_fs, fuchsia_zircon as zx,
     futures::stream::StreamExt,
-    moniker::AbsoluteMoniker,
+    moniker::Moniker,
     std::{
         sync::{Arc, Mutex, Weak},
         time::Duration,
@@ -68,7 +68,7 @@ impl DirectoryReadyNotifier {
 
     async fn on_component_started(
         self: &Arc<Self>,
-        target_moniker: &AbsoluteMoniker,
+        target_moniker: &Moniker,
         outgoing_dir: &fio::DirectoryProxy,
         decl: ComponentDecl,
     ) -> Result<(), ModelError> {
@@ -417,7 +417,7 @@ mod tests {
         testing::test_helpers::{TestEnvironmentBuilder, TestModelResult},
     };
     use cm_rust_testing::ComponentDeclBuilder;
-    use moniker::AbsoluteMonikerBase;
+    use moniker::MonikerBase;
     use zerocopy::AsBytes;
 
     #[fuchsia::test]
@@ -449,7 +449,7 @@ mod tests {
             )
             .await
             .unwrap();
-        assert_eq!(event.target_moniker, AbsoluteMoniker::root().into());
+        assert_eq!(event.target_moniker, Moniker::root().into());
         assert_eq!(event.component_url, "test:///root");
         let payload = event.payload;
 

@@ -25,7 +25,7 @@ use {
     fidl_fuchsia_io as fio, fidl_fuchsia_mem as fmem, fidl_fuchsia_process as fprocess,
     fidl_fuchsia_sys2 as fsys, fuchsia_async as fasync, fuchsia_zircon as zx,
     futures::lock::Mutex,
-    moniker::AbsoluteMoniker,
+    moniker::Moniker,
     std::sync::Arc,
     tracing::warn,
 };
@@ -227,7 +227,7 @@ async fn configure_component_runtime(
 pub fn should_return_early(
     component: &InstanceState,
     execution: &ExecutionState,
-    abs_moniker: &AbsoluteMoniker,
+    abs_moniker: &Moniker,
 ) -> Option<Result<fsys::StartResult, StartActionError>> {
     match component {
         InstanceState::New | InstanceState::Unresolved | InstanceState::Resolved(_) => {}
@@ -398,7 +398,7 @@ mod tests {
         cm_rust::ComponentDecl,
         cm_rust_testing::{ChildDeclBuilder, ComponentDeclBuilder},
         fidl_fuchsia_sys2 as fsys, fuchsia, fuchsia_zircon as zx,
-        moniker::AbsoluteMoniker,
+        moniker::Moniker,
         routing::resolving::ComponentAddress,
         std::sync::{Arc, Weak},
     };
@@ -442,7 +442,7 @@ mod tests {
         .await
         {
             Err(StartActionError::InstanceShutDown { moniker: m }) => {
-                assert_eq!(AbsoluteMoniker::try_from(vec![TEST_CHILD_NAME]).unwrap(), m);
+                assert_eq!(Moniker::try_from(vec![TEST_CHILD_NAME]).unwrap(), m);
             }
             e => panic!("Unexpected result from component start: {:?}", e),
         }
@@ -575,7 +575,7 @@ mod tests {
 
     #[fuchsia::test]
     async fn check_should_return_early() {
-        let m = AbsoluteMoniker::try_from(vec!["foo"]).unwrap();
+        let m = Moniker::try_from(vec!["foo"]).unwrap();
         let es = ExecutionState::new();
 
         // Checks based on InstanceState:

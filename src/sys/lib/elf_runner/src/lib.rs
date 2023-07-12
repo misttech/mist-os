@@ -39,7 +39,7 @@ use {
     fuchsia_runtime::{duplicate_utc_clock_handle, job_default, HandleInfo, HandleType},
     fuchsia_zircon::{self as zx, AsHandleRef, HandleBased},
     futures::channel::oneshot,
-    moniker::AbsoluteMoniker,
+    moniker::Moniker,
     runner::component::ChannelEpitaph,
     std::convert::TryFrom,
     std::{convert::TryInto, path::Path, sync::Arc},
@@ -251,7 +251,7 @@ impl ElfRunner {
     async fn start_component_helper(
         &self,
         mut start_info: fcrunner::ComponentStartInfo,
-        moniker: AbsoluteMoniker,
+        moniker: Moniker,
         resolved_url: String,
         program_config: ElfProgramConfig,
     ) -> Result<ElfComponent, StartComponentError> {
@@ -615,7 +615,7 @@ mod tests {
         fuchsia_fs,
         fuchsia_zircon::{self as zx, AsHandleRef, Task},
         futures::{channel::mpsc, join, lock::Mutex, StreamExt, TryStreamExt},
-        moniker::{AbsoluteMoniker, AbsoluteMonikerBase},
+        moniker::{Moniker, MonikerBase},
         runner::component::Controllable,
         scoped_task,
         std::{convert::TryFrom, sync::Arc, task::Poll},
@@ -849,7 +849,7 @@ mod tests {
         let runner = new_elf_runner_for_test();
         let runner = runner.get_scoped_runner(ScopedPolicyChecker::new(
             Arc::new(SecurityPolicy::default()),
-            AbsoluteMoniker::root(),
+            Moniker::root(),
         ));
         let (controller, server_controller) = create_proxy::<fcrunner::ComponentControllerMarker>()
             .expect("could not create component controller endpoints");
@@ -1121,7 +1121,7 @@ mod tests {
         let runner = new_elf_runner_for_test();
         let runner = runner.get_scoped_runner(ScopedPolicyChecker::new(
             Arc::new(SecurityPolicy::default()),
-            AbsoluteMoniker::root(),
+            Moniker::root(),
         ));
         let (controller, server_controller) = create_proxy::<fcrunner::ComponentControllerMarker>()
             .expect("could not create component controller endpoints");
@@ -1152,7 +1152,7 @@ mod tests {
         let runner = new_elf_runner_for_test();
         let runner = runner.get_scoped_runner(ScopedPolicyChecker::new(
             Arc::new(policy),
-            AbsoluteMoniker::try_from(vec!["foo"]).unwrap(),
+            Moniker::try_from(vec!["foo"]).unwrap(),
         ));
         let (controller, server_controller) = create_proxy::<fcrunner::ComponentControllerMarker>()
             .expect("could not create component controller endpoints");
@@ -1188,7 +1188,7 @@ mod tests {
         let runner = new_elf_runner_for_test();
         let runner = runner.get_scoped_runner(ScopedPolicyChecker::new(
             Arc::new(SecurityPolicy::default()),
-            AbsoluteMoniker::root(),
+            Moniker::root(),
         ));
         let (controller, server_controller) = create_proxy::<fcrunner::ComponentControllerMarker>()
             .expect("could not create component controller endpoints");
@@ -1223,8 +1223,8 @@ mod tests {
             ..Default::default()
         };
         let runner = new_elf_runner_for_test();
-        let runner = runner
-            .get_scoped_runner(ScopedPolicyChecker::new(Arc::new(policy), AbsoluteMoniker::root()));
+        let runner =
+            runner.get_scoped_runner(ScopedPolicyChecker::new(Arc::new(policy), Moniker::root()));
         let (controller, server_controller) = create_proxy::<fcrunner::ComponentControllerMarker>()
             .expect("could not create component controller endpoints");
 
@@ -1303,7 +1303,7 @@ mod tests {
             let runner = new_elf_runner_for_test();
             let runner = runner.get_scoped_runner(ScopedPolicyChecker::new(
                 Arc::new(SecurityPolicy::default()),
-                AbsoluteMoniker::root(),
+                Moniker::root(),
             ));
             let (client_controller, server_controller) =
                 create_proxy::<fcrunner::ComponentControllerMarker>()
@@ -1360,7 +1360,7 @@ mod tests {
         let runner = new_elf_runner_for_test();
         let runner = runner.get_scoped_runner(ScopedPolicyChecker::new(
             Arc::new(SecurityPolicy::default()),
-            AbsoluteMoniker::root(),
+            Moniker::root(),
         ));
         let (controller, server_controller) = create_proxy::<fcrunner::ComponentControllerMarker>()
             .expect("could not create component controller endpoints");
@@ -1495,7 +1495,7 @@ mod tests {
         let runner = ElfRunner::new(Box::new(connector), None, CrashRecords::new());
         let policy_checker = ScopedPolicyChecker::new(
             Arc::new(SecurityPolicy::default()),
-            AbsoluteMoniker::try_from(vec!["foo"]).unwrap(),
+            Moniker::try_from(vec!["foo"]).unwrap(),
         );
 
         // Create a clock and pass it to the component as the UTC clock through numbered_handles.

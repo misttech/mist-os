@@ -8,7 +8,7 @@ use {
     cm_rust::CapabilityTypeName,
     cm_types::Name,
     fidl_fuchsia_component as fcomponent, fuchsia_zircon_status as zx,
-    moniker::{AbsoluteMoniker, ChildMoniker, MonikerError},
+    moniker::{ChildMoniker, Moniker, MonikerError},
     thiserror::Error,
 };
 
@@ -20,19 +20,19 @@ use serde::{Deserialize, Serialize};
 #[derive(Debug, Error, Clone)]
 pub enum ComponentInstanceError {
     #[error("component instance {} not found", moniker)]
-    InstanceNotFound { moniker: AbsoluteMoniker },
+    InstanceNotFound { moniker: Moniker },
     #[error("component manager instance unavailable")]
     ComponentManagerInstanceUnavailable {},
     #[error("malformed url {} for component instance {}", url, moniker)]
-    MalformedUrl { url: String, moniker: AbsoluteMoniker },
+    MalformedUrl { url: String, moniker: Moniker },
     #[error("url {} for component {} does not resolve to an absolute url", url, moniker)]
-    NoAbsoluteUrl { url: String, moniker: AbsoluteMoniker },
+    NoAbsoluteUrl { url: String, moniker: Moniker },
     // The capability routing static analyzer never produces this error subtype, so we don't need
     // to serialize it.
     #[cfg_attr(feature = "serde", serde(skip))]
     #[error("Failed to resolve `{}`: {}", moniker, err)]
     ResolveFailed {
-        moniker: AbsoluteMoniker,
+        moniker: Moniker,
         #[source]
         err: ClonableError,
     },
@@ -41,7 +41,7 @@ pub enum ComponentInstanceError {
     #[cfg_attr(feature = "serde", serde(skip))]
     #[error("Failed to unresolve `{}`: {}", moniker, err)]
     UnresolveFailed {
-        moniker: AbsoluteMoniker,
+        moniker: Moniker,
         #[source]
         err: ClonableError,
     },
@@ -56,7 +56,7 @@ impl ComponentInstanceError {
         }
     }
 
-    pub fn instance_not_found(moniker: AbsoluteMoniker) -> ComponentInstanceError {
+    pub fn instance_not_found(moniker: Moniker) -> ComponentInstanceError {
         ComponentInstanceError::InstanceNotFound { moniker }
     }
 
@@ -64,11 +64,11 @@ impl ComponentInstanceError {
         ComponentInstanceError::ComponentManagerInstanceUnavailable {}
     }
 
-    pub fn resolve_failed(moniker: AbsoluteMoniker, err: impl Into<anyhow::Error>) -> Self {
+    pub fn resolve_failed(moniker: Moniker, err: impl Into<anyhow::Error>) -> Self {
         Self::ResolveFailed { moniker, err: err.into().into() }
     }
 
-    pub fn unresolve_failed(moniker: AbsoluteMoniker, err: impl Into<anyhow::Error>) -> Self {
+    pub fn unresolve_failed(moniker: Moniker, err: impl Into<anyhow::Error>) -> Self {
         Self::UnresolveFailed { moniker, err: err.into().into() }
     }
 }
@@ -104,7 +104,7 @@ pub enum RoutingError {
     )]
     StorageFromChildExposeNotFound {
         child_moniker: ChildMoniker,
-        moniker: AbsoluteMoniker,
+        moniker: Moniker,
         capability_id: String,
     },
 
@@ -113,7 +113,7 @@ pub enum RoutingError {
         See: https://fuchsia.dev/go/components/instance-id.",
         target_moniker, source_moniker
     )]
-    ComponentNotInIdIndex { source_moniker: AbsoluteMoniker, target_moniker: AbsoluteMoniker },
+    ComponentNotInIdIndex { source_moniker: Moniker, target_moniker: Moniker },
 
     #[error("`{}` is not a built-in capability.", capability_id)]
     UseFromComponentManagerNotFound { capability_id: String },
@@ -125,21 +125,17 @@ pub enum RoutingError {
     OfferFromComponentManagerNotFound { capability_id: String },
 
     #[error("`{}` was not offered to `{}` by parent.", capability_id, moniker)]
-    UseFromParentNotFound { moniker: AbsoluteMoniker, capability_id: String },
+    UseFromParentNotFound { moniker: Moniker, capability_id: String },
 
     #[error("`{}` does not have child `#{}`.", moniker, child_moniker)]
     UseFromChildInstanceNotFound {
         child_moniker: ChildMoniker,
-        moniker: AbsoluteMoniker,
+        moniker: Moniker,
         capability_id: String,
     },
 
     #[error("`{}` was not registered in environment of `{}`.", capability_name, moniker)]
-    UseFromEnvironmentNotFound {
-        moniker: AbsoluteMoniker,
-        capability_type: String,
-        capability_name: Name,
-    },
+    UseFromEnvironmentNotFound { moniker: Moniker, capability_type: String, capability_name: Name },
 
     #[error(
         "`{}` tried to use {} `{}` from the root environment. This is not allowed.",
@@ -148,14 +144,14 @@ pub enum RoutingError {
         capability_name
     )]
     UseFromRootEnvironmentNotAllowed {
-        moniker: AbsoluteMoniker,
+        moniker: Moniker,
         capability_type: String,
         capability_name: Name,
     },
 
     #[error("`{}` was not offered to `{}` by parent.", capability_name, moniker)]
     EnvironmentFromParentNotFound {
-        moniker: AbsoluteMoniker,
+        moniker: Moniker,
         capability_type: String,
         capability_name: Name,
     },
@@ -168,7 +164,7 @@ pub enum RoutingError {
     )]
     EnvironmentFromChildExposeNotFound {
         child_moniker: ChildMoniker,
-        moniker: AbsoluteMoniker,
+        moniker: Moniker,
         capability_type: String,
         capability_name: Name,
     },
@@ -176,26 +172,26 @@ pub enum RoutingError {
     #[error("`{}` does not have child `#{}`.", moniker, child_moniker)]
     EnvironmentFromChildInstanceNotFound {
         child_moniker: ChildMoniker,
-        moniker: AbsoluteMoniker,
+        moniker: Moniker,
         capability_name: Name,
         capability_type: String,
     },
 
     #[error("`{}` was not offered to `{}` by parent.", capability_id, moniker)]
-    OfferFromParentNotFound { moniker: AbsoluteMoniker, capability_id: String },
+    OfferFromParentNotFound { moniker: Moniker, capability_id: String },
 
     #[error("`{}` was not offered to `{}` by parent.", capability_id, moniker)]
-    StorageFromParentNotFound { moniker: AbsoluteMoniker, capability_id: String },
+    StorageFromParentNotFound { moniker: Moniker, capability_id: String },
 
     #[error("`{}` does not have child `#{}`.", moniker, child_moniker)]
     OfferFromChildInstanceNotFound {
         child_moniker: ChildMoniker,
-        moniker: AbsoluteMoniker,
+        moniker: Moniker,
         capability_id: String,
     },
 
     #[error("`{}` does not have collection `#{}`.", moniker, collection)]
-    OfferFromCollectionNotFound { collection: String, moniker: AbsoluteMoniker, capability: Name },
+    OfferFromCollectionNotFound { collection: String, moniker: Moniker, capability: Name },
 
     #[error(
         "`{}` was not exposed to `{}` from child `#{}`.",
@@ -205,20 +201,20 @@ pub enum RoutingError {
     )]
     OfferFromChildExposeNotFound {
         child_moniker: ChildMoniker,
-        moniker: AbsoluteMoniker,
+        moniker: Moniker,
         capability_id: String,
     },
 
     // TODO: Could this be distinguished by use/offer/expose?
     #[error("`{}` is not a framework capability.", capability_id)]
-    CapabilityFromFrameworkNotFound { moniker: AbsoluteMoniker, capability_id: String },
+    CapabilityFromFrameworkNotFound { moniker: Moniker, capability_id: String },
 
     #[error(
         "A capability was sourced to a base capability `{}` from `{}`, but this is unsupported.",
         capability_id,
         moniker
     )]
-    CapabilityFromCapabilityNotFound { moniker: AbsoluteMoniker, capability_id: String },
+    CapabilityFromCapabilityNotFound { moniker: Moniker, capability_id: String },
 
     // TODO: Could this be distinguished by use/offer/expose?
     #[error("`{}` is not a framework capability.", capability_id)]
@@ -235,12 +231,12 @@ pub enum RoutingError {
     #[error("`{}` does not have child `#{}`.", moniker, child_moniker)]
     ExposeFromChildInstanceNotFound {
         child_moniker: ChildMoniker,
-        moniker: AbsoluteMoniker,
+        moniker: Moniker,
         capability_id: String,
     },
 
     #[error("`{}` does not have collection `#{}`.", moniker, collection)]
-    ExposeFromCollectionNotFound { collection: String, moniker: AbsoluteMoniker, capability: Name },
+    ExposeFromCollectionNotFound { collection: String, moniker: Moniker, capability: Name },
 
     #[error(
         "`{}` was not exposed to `{}` from child `#{}`.",
@@ -250,7 +246,7 @@ pub enum RoutingError {
     )]
     ExposeFromChildExposeNotFound {
         child_moniker: ChildMoniker,
-        moniker: AbsoluteMoniker,
+        moniker: Moniker,
         capability_id: String,
     },
 
@@ -259,7 +255,7 @@ pub enum RoutingError {
         moniker,
         capability_id
     )]
-    ExposeFromFrameworkNotFound { moniker: AbsoluteMoniker, capability_id: String },
+    ExposeFromFrameworkNotFound { moniker: Moniker, capability_id: String },
 
     #[error(
         "`{}` was not exposed to `{}` from child `#{}`.",
@@ -269,7 +265,7 @@ pub enum RoutingError {
     )]
     UseFromChildExposeNotFound {
         child_moniker: ChildMoniker,
-        moniker: AbsoluteMoniker,
+        moniker: Moniker,
         capability_id: String,
     },
 
@@ -279,11 +275,7 @@ pub enum RoutingError {
         capability,
         moniker
     )]
-    UnexpectedChildInAggregate {
-        child_moniker: ChildMoniker,
-        moniker: AbsoluteMoniker,
-        capability: Name,
-    },
+    UnexpectedChildInAggregate { child_moniker: ChildMoniker, moniker: Moniker, capability: Name },
 
     #[error("Routing a capability from an unsupported source type: {}.", source_type)]
     UnsupportedRouteSource { source_type: String },
@@ -330,7 +322,7 @@ impl RoutingError {
 
     pub fn storage_from_child_expose_not_found(
         child_moniker: &ChildMoniker,
-        moniker: &AbsoluteMoniker,
+        moniker: &Moniker,
         capability_id: impl Into<String>,
     ) -> Self {
         Self::StorageFromChildExposeNotFound {
@@ -352,10 +344,7 @@ impl RoutingError {
         Self::OfferFromComponentManagerNotFound { capability_id: capability_id.into() }
     }
 
-    pub fn use_from_parent_not_found(
-        moniker: &AbsoluteMoniker,
-        capability_id: impl Into<String>,
-    ) -> Self {
+    pub fn use_from_parent_not_found(moniker: &Moniker, capability_id: impl Into<String>) -> Self {
         Self::UseFromParentNotFound {
             moniker: moniker.clone(),
             capability_id: capability_id.into(),
@@ -364,7 +353,7 @@ impl RoutingError {
 
     pub fn use_from_child_instance_not_found(
         child_moniker: &ChildMoniker,
-        moniker: &AbsoluteMoniker,
+        moniker: &Moniker,
         capability_id: impl Into<String>,
     ) -> Self {
         Self::UseFromChildInstanceNotFound {
@@ -375,7 +364,7 @@ impl RoutingError {
     }
 
     pub fn offer_from_parent_not_found(
-        moniker: &AbsoluteMoniker,
+        moniker: &Moniker,
         capability_id: impl Into<String>,
     ) -> Self {
         Self::OfferFromParentNotFound {
@@ -385,7 +374,7 @@ impl RoutingError {
     }
 
     pub fn storage_from_parent_not_found(
-        moniker: &AbsoluteMoniker,
+        moniker: &Moniker,
         capability_id: impl Into<String>,
     ) -> Self {
         Self::StorageFromParentNotFound {
@@ -396,7 +385,7 @@ impl RoutingError {
 
     pub fn offer_from_child_instance_not_found(
         child_moniker: &ChildMoniker,
-        moniker: &AbsoluteMoniker,
+        moniker: &Moniker,
         capability_id: impl Into<String>,
     ) -> Self {
         Self::OfferFromChildInstanceNotFound {
@@ -408,7 +397,7 @@ impl RoutingError {
 
     pub fn offer_from_child_expose_not_found(
         child_moniker: &ChildMoniker,
-        moniker: &AbsoluteMoniker,
+        moniker: &Moniker,
         capability_id: impl Into<String>,
     ) -> Self {
         Self::OfferFromChildExposeNotFound {
@@ -420,7 +409,7 @@ impl RoutingError {
 
     pub fn expose_from_child_instance_not_found(
         child_moniker: &ChildMoniker,
-        moniker: &AbsoluteMoniker,
+        moniker: &Moniker,
         capability_id: impl Into<String>,
     ) -> Self {
         Self::ExposeFromChildInstanceNotFound {
@@ -432,7 +421,7 @@ impl RoutingError {
 
     pub fn expose_from_child_expose_not_found(
         child_moniker: &ChildMoniker,
-        moniker: &AbsoluteMoniker,
+        moniker: &Moniker,
         capability_id: impl Into<String>,
     ) -> Self {
         Self::ExposeFromChildExposeNotFound {
@@ -443,7 +432,7 @@ impl RoutingError {
     }
 
     pub fn capability_from_framework_not_found(
-        moniker: &AbsoluteMoniker,
+        moniker: &Moniker,
         capability_id: impl Into<String>,
     ) -> Self {
         Self::CapabilityFromFrameworkNotFound {
@@ -453,7 +442,7 @@ impl RoutingError {
     }
 
     pub fn capability_from_capability_not_found(
-        moniker: &AbsoluteMoniker,
+        moniker: &Moniker,
         capability_id: impl Into<String>,
     ) -> Self {
         Self::CapabilityFromCapabilityNotFound {
@@ -477,7 +466,7 @@ impl RoutingError {
     }
 
     pub fn expose_from_framework_not_found(
-        moniker: &AbsoluteMoniker,
+        moniker: &Moniker,
         capability_id: impl Into<String>,
     ) -> Self {
         Self::ExposeFromFrameworkNotFound {

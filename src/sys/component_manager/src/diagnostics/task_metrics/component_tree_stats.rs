@@ -28,7 +28,7 @@ use {
     },
     injectable_time::{MonotonicTime, TimeSource},
     lazy_static::lazy_static,
-    moniker::{AbsoluteMoniker, AbsoluteMonikerBase, ExtendedMoniker},
+    moniker::{ExtendedMoniker, Moniker, MonikerBase},
     std::{
         boxed::Box,
         collections::{BTreeMap, VecDeque},
@@ -256,7 +256,7 @@ impl<T: 'static + RuntimeStatsSource + Debug + Send + Sync> ComponentTreeStats<T
             let key = match moniker {
                 ExtendedMoniker::ComponentManager => moniker.to_string(),
                 ExtendedMoniker::ComponentInstance(m) => {
-                    if *m == AbsoluteMoniker::root() {
+                    if *m == Moniker::root() {
                         "<root>".to_string()
                     } else {
                         m.to_string()
@@ -377,7 +377,7 @@ impl<T: 'static + RuntimeStatsSource + Debug + Send + Sync> ComponentTreeStats<T
         }
     }
 
-    async fn on_component_started<P, C>(self: &Arc<Self>, moniker: &AbsoluteMoniker, runtime: &P)
+    async fn on_component_started<P, C>(self: &Arc<Self>, moniker: &Moniker, runtime: &P)
     where
         P: ComponentStartedInfo<C, T>,
         C: RuntimeStatsContainer<T> + Send + Sync + 'static,
@@ -559,7 +559,7 @@ mod tests {
         fuchsia_inspect::testing::{assert_data_tree, AnyProperty, DiagnosticsHierarchyGetter},
         fuchsia_zircon::{AsHandleRef, DurationNum},
         injectable_time::{FakeTime, IncrementingFakeTime},
-        moniker::AbsoluteMoniker,
+        moniker::Moniker,
     };
 
     #[fuchsia::test]
@@ -580,8 +580,7 @@ mod tests {
                 create_measurements_vec_for_fake_task(COMPONENT_CPU_MAX_SAMPLES as i64 * 3, 2, 4),
             );
 
-            let moniker =
-                AbsoluteMoniker::try_from(vec![format!("moniker-{}", i).as_ref()]).unwrap();
+            let moniker = Moniker::try_from(vec![format!("moniker-{}", i).as_ref()]).unwrap();
             let fake_runtime =
                 FakeRuntime::new(FakeDiagnosticsContainer::new(component_task, None));
             stats.on_component_started(&moniker, &fake_runtime).await;
@@ -625,8 +624,7 @@ mod tests {
 
         // Terminate all tasks
         for i in 0..10 {
-            let moniker =
-                AbsoluteMoniker::try_from(vec![format!("moniker-{}", i).as_ref()]).unwrap();
+            let moniker = Moniker::try_from(vec![format!("moniker-{}", i).as_ref()]).unwrap();
             for task in stats
                 .tree
                 .lock()
@@ -742,7 +740,7 @@ mod tests {
             clock.clone(),
         )
         .await;
-        let moniker: AbsoluteMoniker = vec!["a"].try_into().unwrap();
+        let moniker: Moniker = vec!["a"].try_into().unwrap();
         let moniker: ExtendedMoniker = moniker.into();
         stats.track_ready(moniker.clone(), FakeTask::default()).await;
         for _ in 0..=COMPONENT_CPU_MAX_SAMPLES {
@@ -824,8 +822,7 @@ mod tests {
             let component_task =
                 FakeTask::new(i as u64, create_measurements_vec_for_fake_task(300, 2, 4));
 
-            let moniker =
-                AbsoluteMoniker::try_from(vec![format!("moniker-{}", i).as_ref()]).unwrap();
+            let moniker = Moniker::try_from(vec![format!("moniker-{}", i).as_ref()]).unwrap();
             let fake_runtime =
                 FakeRuntime::new(FakeDiagnosticsContainer::new(component_task, None));
             stats.on_component_started(&moniker, &fake_runtime).await;
@@ -877,8 +874,7 @@ mod tests {
         let mut moniker_list = vec![];
         for i in 0..(max_dead_tasks * 2) {
             clock.add_ticks(1);
-            let moniker =
-                AbsoluteMoniker::try_from(vec![format!("moniker-{}", i).as_ref()]).unwrap();
+            let moniker = Moniker::try_from(vec![format!("moniker-{}", i).as_ref()]).unwrap();
             moniker_list.push(moniker.clone());
             let component_task =
                 FakeTask::new(i as u64, create_measurements_vec_for_fake_task(5, 1, 1));
@@ -1250,19 +1246,14 @@ mod tests {
             IncrementingFakeTime::new(3, std::time::Duration::from_nanos(5)),
         );
         stats
-            .on_component_started(
-                &AbsoluteMoniker::try_from(vec!["parent"]).unwrap(),
-                &fake_runtime,
-            )
+            .on_component_started(&Moniker::try_from(vec!["parent"]).unwrap(), &fake_runtime)
             .await;
 
         let fake_runtime = FakeRuntime::new_with_start_times(
             FakeDiagnosticsContainer::new(component_task, Some(parent_task)),
             IncrementingFakeTime::new(8, std::time::Duration::from_nanos(5)),
         );
-        stats
-            .on_component_started(&AbsoluteMoniker::try_from(vec!["child"]).unwrap(), &fake_runtime)
-            .await;
+        stats.on_component_started(&Moniker::try_from(vec!["child"]).unwrap(), &fake_runtime).await;
 
         // Wait for diagnostics data to be received since it's done in a non-blocking way on
         // started.
@@ -1334,13 +1325,10 @@ mod tests {
         let fake_parent_runtime =
             FakeRuntime::new(FakeDiagnosticsContainer::new(parent_task.clone(), None));
         stats
-            .on_component_started(
-                &AbsoluteMoniker::try_from(vec!["parent"]).unwrap(),
-                &fake_parent_runtime,
-            )
+            .on_component_started(&Moniker::try_from(vec!["parent"]).unwrap(), &fake_parent_runtime)
             .await;
 
-        let child_moniker = AbsoluteMoniker::try_from(vec!["child"]).unwrap();
+        let child_moniker = Moniker::try_from(vec!["child"]).unwrap();
         let fake_runtime =
             FakeRuntime::new(FakeDiagnosticsContainer::new(component_task, Some(parent_task)));
         stats.on_component_started(&child_moniker, &fake_runtime).await;

@@ -9,7 +9,7 @@ use {
     },
     anyhow::Result,
     fidl_fuchsia_sys2 as fsys,
-    moniker::{AbsoluteMoniker, AbsoluteMonikerBase},
+    moniker::{Moniker, MonikerBase},
 };
 
 pub async fn resolve_cmd<W: std::io::Write>(
@@ -25,7 +25,7 @@ pub async fn resolve_cmd<W: std::io::Write>(
 
     // Convert the absolute moniker into a relative moniker w.r.t. root.
     // LifecycleController expects relative monikers only.
-    let relative_moniker = AbsoluteMoniker::scope_down(&AbsoluteMoniker::root(), &moniker).unwrap();
+    let relative_moniker = Moniker::scope_down(&Moniker::root(), &moniker).unwrap();
 
     resolve_instance(&lifecycle_controller, &relative_moniker)
         .await
@@ -51,10 +51,7 @@ mod test {
             let req = stream.try_next().await.unwrap().unwrap();
             match req {
                 fsys::LifecycleControllerRequest::ResolveInstance { moniker, responder } => {
-                    assert_eq!(
-                        AbsoluteMoniker::parse_str(expected_moniker),
-                        AbsoluteMoniker::parse_str(&moniker)
-                    );
+                    assert_eq!(Moniker::parse_str(expected_moniker), Moniker::parse_str(&moniker));
                     responder.send(Ok(())).unwrap();
                 }
                 _ => panic!("Unexpected Lifecycle Controller request"),

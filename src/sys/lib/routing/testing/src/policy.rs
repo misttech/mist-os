@@ -5,10 +5,10 @@
 use {
     anyhow::Error,
     assert_matches::assert_matches,
-    cm_moniker::InstancedAbsoluteMoniker,
+    cm_moniker::InstancedMoniker,
     cm_rust::{CapabilityTypeName, ProtocolDecl, StorageDecl, StorageDirectorySource},
     fidl_fuchsia_component_decl as fdecl,
-    moniker::{AbsoluteMoniker, ExtendedMoniker},
+    moniker::{ExtendedMoniker, Moniker},
     routing::{
         capability_source::{CapabilitySource, ComponentCapability, InternalCapability},
         component_instance::ComponentInstanceInterface,
@@ -64,8 +64,8 @@ pub trait GlobalPolicyCheckerTest<C>
 where
     C: ComponentInstanceInterface,
 {
-    // Creates a `ComponentInstanceInterface` with the given `InstancedAbsoluteMoniker`.
-    fn make_component(&self, instanced_moniker: InstancedAbsoluteMoniker) -> Arc<C>;
+    // Creates a `ComponentInstanceInterface` with the given `InstancedMoniker`.
+    fn make_component(&self, instanced_moniker: InstancedMoniker) -> Arc<C>;
 
     // Tests `GlobalPolicyChecker::can_route_capability()` for framework capability sources.
     fn global_policy_checker_can_route_capability_framework_cap(&self) -> Result<(), Error> {
@@ -73,7 +73,7 @@ where
         policy_builder.add_capability_policy(
             CapabilityAllowlistKey {
                 source_moniker: ExtendedMoniker::ComponentInstance(
-                    AbsoluteMoniker::try_from(vec!["foo", "bar"]).unwrap(),
+                    Moniker::try_from(vec!["foo", "bar"]).unwrap(),
                 ),
                 source_name: "fuchsia.component.Realm".parse().unwrap(),
                 source: CapabilityAllowlistSource::Framework,
@@ -91,10 +91,10 @@ where
             capability: InternalCapability::Protocol("fuchsia.component.Realm".parse().unwrap()),
             component: component.as_weak(),
         };
-        let valid_path_0 = AbsoluteMoniker::try_from(vec!["foo", "bar"]).unwrap();
-        let valid_path_1 = AbsoluteMoniker::try_from(vec!["foo", "bar", "baz"]).unwrap();
-        let invalid_path_0 = AbsoluteMoniker::try_from(vec!["foobar"]).unwrap();
-        let invalid_path_1 = AbsoluteMoniker::try_from(vec!["foo", "bar", "foobar"]).unwrap();
+        let valid_path_0 = Moniker::try_from(vec!["foo", "bar"]).unwrap();
+        let valid_path_1 = Moniker::try_from(vec!["foo", "bar", "baz"]).unwrap();
+        let invalid_path_0 = Moniker::try_from(vec!["foobar"]).unwrap();
+        let invalid_path_1 = Moniker::try_from(vec!["foo", "bar", "foobar"]).unwrap();
 
         assert_matches!(
             global_policy_checker.can_route_capability(&protocol_capability, &valid_path_0),
@@ -140,11 +140,11 @@ where
             }),
             top_instance: Weak::new(),
         };
-        let valid_path_0 = AbsoluteMoniker::try_from(vec!["root"]).unwrap();
-        let valid_path_2 = AbsoluteMoniker::try_from(vec!["root", "core"]).unwrap();
-        let valid_path_1 = AbsoluteMoniker::try_from(vec!["root", "bootstrap"]).unwrap();
-        let invalid_path_0 = AbsoluteMoniker::try_from(vec!["foobar"]).unwrap();
-        let invalid_path_1 = AbsoluteMoniker::try_from(vec!["foo", "bar", "foobar"]).unwrap();
+        let valid_path_0 = Moniker::try_from(vec!["root"]).unwrap();
+        let valid_path_2 = Moniker::try_from(vec!["root", "core"]).unwrap();
+        let valid_path_1 = Moniker::try_from(vec!["root", "bootstrap"]).unwrap();
+        let invalid_path_0 = Moniker::try_from(vec!["foobar"]).unwrap();
+        let invalid_path_1 = Moniker::try_from(vec!["foo", "bar", "foobar"]).unwrap();
 
         assert_matches!(
             global_policy_checker.can_route_capability(&protocol_capability, &valid_path_0),
@@ -175,7 +175,7 @@ where
         policy_builder.add_capability_policy(
             CapabilityAllowlistKey {
                 source_moniker: ExtendedMoniker::ComponentInstance(
-                    AbsoluteMoniker::try_from(vec!["foo"]).unwrap(),
+                    Moniker::try_from(vec!["foo"]).unwrap(),
                 ),
                 source_name: "fuchsia.foo.FooBar".parse().unwrap(),
                 source: CapabilityAllowlistSource::Self_,
@@ -197,10 +197,10 @@ where
             }),
             component: component.as_weak(),
         };
-        let valid_path_0 = AbsoluteMoniker::try_from(vec!["root", "bootstrap"]).unwrap();
-        let valid_path_1 = AbsoluteMoniker::try_from(vec!["root", "core"]).unwrap();
-        let invalid_path_0 = AbsoluteMoniker::try_from(vec!["foobar"]).unwrap();
-        let invalid_path_1 = AbsoluteMoniker::try_from(vec!["foo", "bar", "foobar"]).unwrap();
+        let valid_path_0 = Moniker::try_from(vec!["root", "bootstrap"]).unwrap();
+        let valid_path_1 = Moniker::try_from(vec!["root", "core"]).unwrap();
+        let invalid_path_0 = Moniker::try_from(vec!["foobar"]).unwrap();
+        let invalid_path_1 = Moniker::try_from(vec!["foo", "bar", "foobar"]).unwrap();
 
         assert_matches!(
             global_policy_checker.can_route_capability(&protocol_capability, &valid_path_0),
@@ -227,7 +227,7 @@ where
         policy_builder.add_capability_policy(
             CapabilityAllowlistKey {
                 source_moniker: ExtendedMoniker::ComponentInstance(
-                    AbsoluteMoniker::try_from(vec!["foo"]).unwrap(),
+                    Moniker::try_from(vec!["foo"]).unwrap(),
                 ),
                 source_name: "cache".parse().unwrap(),
                 source: CapabilityAllowlistSource::Capability,
@@ -252,10 +252,10 @@ where
             }),
             component: component.as_weak(),
         };
-        let valid_path_0 = AbsoluteMoniker::try_from(vec!["root", "bootstrap"]).unwrap();
-        let valid_path_1 = AbsoluteMoniker::try_from(vec!["root", "core"]).unwrap();
-        let invalid_path_0 = AbsoluteMoniker::try_from(vec!["foobar"]).unwrap();
-        let invalid_path_1 = AbsoluteMoniker::try_from(vec!["foo", "bar", "foobar"]).unwrap();
+        let valid_path_0 = Moniker::try_from(vec!["root", "bootstrap"]).unwrap();
+        let valid_path_1 = Moniker::try_from(vec!["root", "core"]).unwrap();
+        let invalid_path_0 = Moniker::try_from(vec!["foobar"]).unwrap();
+        let invalid_path_1 = Moniker::try_from(vec!["foo", "bar", "foobar"]).unwrap();
 
         assert_matches!(
             global_policy_checker.can_route_capability(&protocol_capability, &valid_path_0),
@@ -311,24 +311,18 @@ where
         };
 
         let valid_cases = vec![
-            (
-                AbsoluteMoniker::try_from(vec!["root", "bootstrap"]).unwrap(),
-                "bootstrap_env".to_string(),
-            ),
-            (AbsoluteMoniker::try_from(vec!["foo"]).unwrap(), "foo_env".to_string()),
+            (Moniker::try_from(vec!["root", "bootstrap"]).unwrap(), "bootstrap_env".to_string()),
+            (Moniker::try_from(vec!["foo"]).unwrap(), "foo_env".to_string()),
         ];
 
         let invalid_cases = vec![
-            (AbsoluteMoniker::try_from(vec!["foobar"]).unwrap(), "foobar_env".to_string()),
-            (
-                AbsoluteMoniker::try_from(vec!["foo", "bar", "foobar"]).unwrap(),
-                "foobar_env".to_string(),
-            ),
-            (AbsoluteMoniker::try_from(vec!["root", "bootstrap"]).unwrap(), "foo_env".to_string()),
-            (AbsoluteMoniker::try_from(vec!["root", "baz"]).unwrap(), "foo_env".to_string()),
+            (Moniker::try_from(vec!["foobar"]).unwrap(), "foobar_env".to_string()),
+            (Moniker::try_from(vec!["foo", "bar", "foobar"]).unwrap(), "foobar_env".to_string()),
+            (Moniker::try_from(vec!["root", "bootstrap"]).unwrap(), "foo_env".to_string()),
+            (Moniker::try_from(vec!["root", "baz"]).unwrap(), "foo_env".to_string()),
         ];
 
-        let target_moniker = AbsoluteMoniker::try_from(vec!["target"]).unwrap();
+        let target_moniker = Moniker::try_from(vec!["target"]).unwrap();
 
         for valid_case in valid_cases {
             assert_matches!(
@@ -430,7 +424,7 @@ where
             (vec!["baz:0", "child:0"], vec!["root", "bootstrap"], "baz_env".to_string()),
         ];
 
-        let target_moniker = AbsoluteMoniker::try_from(vec!["target"]).unwrap();
+        let target_moniker = Moniker::try_from(vec!["target"]).unwrap();
 
         for (source, dest, env) in valid_cases {
             let component = self.make_component(source.clone().try_into().unwrap());
@@ -444,7 +438,7 @@ where
             assert_matches!(
                 global_policy_checker.can_route_debug_capability(
                     &protocol_capability,
-                    &AbsoluteMoniker::try_from(dest.clone()).unwrap(),
+                    &Moniker::try_from(dest.clone()).unwrap(),
                     &env,
                     &target_moniker
                 ),
@@ -466,7 +460,7 @@ where
             assert_matches!(
                 global_policy_checker.can_route_debug_capability(
                     &protocol_capability,
-                    &AbsoluteMoniker::try_from(dest.clone()).unwrap(),
+                    &Moniker::try_from(dest.clone()).unwrap(),
                     &env,
                     &target_moniker
                 ),
@@ -558,7 +552,7 @@ where
             (vec!["baz:0", "child:0"], vec!["root", "bootstrap"], "baz_env".to_string()),
         ];
 
-        let target_moniker = AbsoluteMoniker::try_from(vec!["target"]).unwrap();
+        let target_moniker = Moniker::try_from(vec!["target"]).unwrap();
 
         for (source, dest, env) in valid_cases {
             let component = self.make_component(source.clone().try_into().unwrap());
@@ -572,7 +566,7 @@ where
             assert_matches!(
                 global_policy_checker.can_route_debug_capability(
                     &protocol_capability,
-                    &AbsoluteMoniker::try_from(dest.clone()).unwrap(),
+                    &Moniker::try_from(dest.clone()).unwrap(),
                     &env,
                     &target_moniker
                 ),
@@ -594,7 +588,7 @@ where
             assert_matches!(
                 global_policy_checker.can_route_debug_capability(
                     &protocol_capability,
-                    &AbsoluteMoniker::try_from(dest.clone()).unwrap(),
+                    &Moniker::try_from(dest.clone()).unwrap(),
                     &env,
                     &target_moniker
                 ),
@@ -628,10 +622,10 @@ where
             capability: InternalCapability::Directory("test".parse().unwrap()),
             top_instance: Weak::new(),
         };
-        let valid_path_0 = AbsoluteMoniker::try_from(vec!["root"]).unwrap();
-        let valid_path_1 = AbsoluteMoniker::try_from(vec!["root", "core"]).unwrap();
-        let invalid_path_0 = AbsoluteMoniker::try_from(vec!["foobar"]).unwrap();
-        let invalid_path_1 = AbsoluteMoniker::try_from(vec!["foo", "bar", "foobar"]).unwrap();
+        let valid_path_0 = Moniker::try_from(vec!["root"]).unwrap();
+        let valid_path_1 = Moniker::try_from(vec!["root", "core"]).unwrap();
+        let invalid_path_0 = Moniker::try_from(vec!["foobar"]).unwrap();
+        let invalid_path_1 = Moniker::try_from(vec!["foo", "bar", "foobar"]).unwrap();
 
         assert_matches!(
             global_policy_checker.can_route_capability(&dir_capability, &valid_path_0),
@@ -685,27 +679,18 @@ where
             };
         }
 
-        assert!(can_route!(&AbsoluteMoniker::try_from(vec!["tests", "test1"]).unwrap()).is_ok());
-        assert!(
-            can_route!(&AbsoluteMoniker::try_from(vec!["tests", "coll:test1"]).unwrap()).is_ok()
-        );
-        assert!(
-            can_route!(&AbsoluteMoniker::try_from(vec!["tests", "test1", "util"]).unwrap()).is_ok()
-        );
-        assert!(can_route!(&AbsoluteMoniker::try_from(vec!["tests", "test2"]).unwrap()).is_ok());
-        assert!(
-            can_route!(&AbsoluteMoniker::try_from(vec!["core", "tests", "test"]).unwrap()).is_ok()
-        );
-        assert!(can_route!(&AbsoluteMoniker::try_from(vec!["core", "tests", "coll:t"]).unwrap())
-            .is_ok());
+        assert!(can_route!(&Moniker::try_from(vec!["tests", "test1"]).unwrap()).is_ok());
+        assert!(can_route!(&Moniker::try_from(vec!["tests", "coll:test1"]).unwrap()).is_ok());
+        assert!(can_route!(&Moniker::try_from(vec!["tests", "test1", "util"]).unwrap()).is_ok());
+        assert!(can_route!(&Moniker::try_from(vec!["tests", "test2"]).unwrap()).is_ok());
+        assert!(can_route!(&Moniker::try_from(vec!["core", "tests", "test"]).unwrap()).is_ok());
+        assert!(can_route!(&Moniker::try_from(vec!["core", "tests", "coll:t"]).unwrap()).is_ok());
 
-        assert!(can_route!(&AbsoluteMoniker::try_from(vec!["foo"]).unwrap()).is_err());
-        assert!(can_route!(&AbsoluteMoniker::try_from(vec!["tests"]).unwrap()).is_err());
-        assert!(can_route!(&AbsoluteMoniker::try_from(vec!["core", "foo"]).unwrap()).is_err());
-        assert!(can_route!(&AbsoluteMoniker::try_from(vec!["core", "tests"]).unwrap()).is_err());
-        assert!(
-            can_route!(&AbsoluteMoniker::try_from(vec!["core", "tests:test"]).unwrap()).is_err()
-        );
+        assert!(can_route!(&Moniker::try_from(vec!["foo"]).unwrap()).is_err());
+        assert!(can_route!(&Moniker::try_from(vec!["tests"]).unwrap()).is_err());
+        assert!(can_route!(&Moniker::try_from(vec!["core", "foo"]).unwrap()).is_err());
+        assert!(can_route!(&Moniker::try_from(vec!["core", "tests"]).unwrap()).is_err());
+        assert!(can_route!(&Moniker::try_from(vec!["core", "tests:test"]).unwrap()).is_err());
         Ok(())
     }
 
@@ -742,19 +727,17 @@ where
             };
         }
 
-        assert!(can_route!(&AbsoluteMoniker::try_from(vec!["tests:t1"]).unwrap()).is_ok());
-        assert!(can_route!(&AbsoluteMoniker::try_from(vec!["tests:t2"]).unwrap()).is_ok());
-        assert!(can_route!(&AbsoluteMoniker::try_from(vec!["tests:t1", "util"]).unwrap()).is_ok());
-        assert!(can_route!(&AbsoluteMoniker::try_from(vec!["core", "tests:t1"]).unwrap()).is_ok());
-        assert!(can_route!(&AbsoluteMoniker::try_from(vec!["core", "tests:t2"]).unwrap()).is_ok());
+        assert!(can_route!(&Moniker::try_from(vec!["tests:t1"]).unwrap()).is_ok());
+        assert!(can_route!(&Moniker::try_from(vec!["tests:t2"]).unwrap()).is_ok());
+        assert!(can_route!(&Moniker::try_from(vec!["tests:t1", "util"]).unwrap()).is_ok());
+        assert!(can_route!(&Moniker::try_from(vec!["core", "tests:t1"]).unwrap()).is_ok());
+        assert!(can_route!(&Moniker::try_from(vec!["core", "tests:t2"]).unwrap()).is_ok());
 
-        assert!(can_route!(&AbsoluteMoniker::try_from(vec!["foo"]).unwrap()).is_err());
-        assert!(can_route!(&AbsoluteMoniker::try_from(vec!["tests"]).unwrap()).is_err());
-        assert!(can_route!(&AbsoluteMoniker::try_from(vec!["coll:foo"]).unwrap()).is_err());
-        assert!(can_route!(&AbsoluteMoniker::try_from(vec!["core", "foo"]).unwrap()).is_err());
-        assert!(
-            can_route!(&AbsoluteMoniker::try_from(vec!["core", "coll:tests"]).unwrap()).is_err()
-        );
+        assert!(can_route!(&Moniker::try_from(vec!["foo"]).unwrap()).is_err());
+        assert!(can_route!(&Moniker::try_from(vec!["tests"]).unwrap()).is_err());
+        assert!(can_route!(&Moniker::try_from(vec!["coll:foo"]).unwrap()).is_err());
+        assert!(can_route!(&Moniker::try_from(vec!["core", "foo"]).unwrap()).is_err());
+        assert!(can_route!(&Moniker::try_from(vec!["core", "coll:tests"]).unwrap()).is_err());
         Ok(())
     }
 }

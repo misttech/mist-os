@@ -31,7 +31,7 @@ use {
     futures::StreamExt,
     lazy_static::lazy_static,
     measure_tape_for_instance::Measurable,
-    moniker::{AbsoluteMoniker, AbsoluteMonikerBase},
+    moniker::{Moniker, MonikerBase},
     routing::{
         component_instance::{ComponentInstanceInterface, ResolvedInstanceInterface},
         environment::EnvironmentInterface,
@@ -107,7 +107,7 @@ impl RealmQuery {
     /// Serve the fuchsia.sys2.RealmQuery protocol for a given scope on a given stream
     pub async fn serve(
         self: Arc<Self>,
-        scope_moniker: AbsoluteMoniker,
+        scope_moniker: Moniker,
         mut stream: fsys::RealmQueryRequestStream,
     ) {
         loop {
@@ -225,11 +225,11 @@ impl Hook for RealmQuery {
 
 pub struct RealmQueryCapabilityProvider {
     query: Arc<RealmQuery>,
-    scope_moniker: AbsoluteMoniker,
+    scope_moniker: Moniker,
 }
 
 impl RealmQueryCapabilityProvider {
-    pub fn query(query: Arc<RealmQuery>, scope_moniker: AbsoluteMoniker) -> Self {
+    pub fn query(query: Arc<RealmQuery>, scope_moniker: Moniker) -> Self {
         Self { query, scope_moniker }
     }
 }
@@ -275,12 +275,12 @@ impl CapabilityProvider for RealmQueryCapabilityProvider {
 /// Create the state matching the given moniker string in this scope
 pub async fn get_instance(
     model: &Arc<Model>,
-    scope_moniker: &AbsoluteMoniker,
+    scope_moniker: &Moniker,
     moniker_str: &str,
 ) -> Result<fsys::Instance, fsys::GetInstanceError> {
     // Construct the complete moniker using the scope moniker and the relative moniker string.
     let relative_moniker =
-        AbsoluteMoniker::try_from(moniker_str).map_err(|_| fsys::GetInstanceError::BadMoniker)?;
+        Moniker::try_from(moniker_str).map_err(|_| fsys::GetInstanceError::BadMoniker)?;
     let moniker = scope_moniker.descendant(&relative_moniker);
 
     // TODO(https://fxbug.dev/108532): Close the connection if the scope root cannot be found.
@@ -331,12 +331,12 @@ pub async fn get_instance(
 /// Encode the component manifest of an instance into a standalone persistable FIDL format.
 pub async fn get_resolved_declaration(
     model: &Arc<Model>,
-    scope_moniker: &AbsoluteMoniker,
+    scope_moniker: &Moniker,
     moniker_str: &str,
 ) -> Result<ClientEnd<fsys::ManifestBytesIteratorMarker>, fsys::GetDeclarationError> {
     // Construct the complete moniker using the scope moniker and the relative moniker string.
-    let relative_moniker = AbsoluteMoniker::try_from(moniker_str)
-        .map_err(|_| fsys::GetDeclarationError::BadMoniker)?;
+    let relative_moniker =
+        Moniker::try_from(moniker_str).map_err(|_| fsys::GetDeclarationError::BadMoniker)?;
     let moniker = scope_moniker.descendant(&relative_moniker);
 
     // TODO(https://fxbug.dev/108532): Close the connection if the scope root cannot be found.
@@ -371,14 +371,14 @@ pub async fn get_resolved_declaration(
 /// Encode the component manifest of a potential instance into a standalone persistable FIDL format.
 async fn resolve_declaration(
     model: &Arc<Model>,
-    scope_moniker: &AbsoluteMoniker,
+    scope_moniker: &Moniker,
     parent_moniker_str: &str,
     child_location: &fsys::ChildLocation,
     url: &str,
 ) -> Result<ClientEnd<fsys::ManifestBytesIteratorMarker>, fsys::GetDeclarationError> {
     // Construct the complete moniker using the scope moniker and the relative moniker string.
-    let parent_relative_moniker = AbsoluteMoniker::try_from(parent_moniker_str)
-        .map_err(|_| fsys::GetDeclarationError::BadMoniker)?;
+    let parent_relative_moniker =
+        Moniker::try_from(parent_moniker_str).map_err(|_| fsys::GetDeclarationError::BadMoniker)?;
     let parent_moniker = scope_moniker.descendant(&parent_relative_moniker);
 
     let collection = match child_location {
@@ -450,12 +450,12 @@ async fn resolve_declaration(
 /// Get the structured config of an instance
 pub async fn get_structured_config(
     model: &Arc<Model>,
-    scope_moniker: &AbsoluteMoniker,
+    scope_moniker: &Moniker,
     moniker_str: &str,
 ) -> Result<fcdecl::ResolvedConfig, fsys::GetStructuredConfigError> {
     // Construct the complete moniker using the scope moniker and the relative moniker string.
-    let relative_moniker = AbsoluteMoniker::try_from(moniker_str)
-        .map_err(|_| fsys::GetStructuredConfigError::BadMoniker)?;
+    let relative_moniker =
+        Moniker::try_from(moniker_str).map_err(|_| fsys::GetStructuredConfigError::BadMoniker)?;
     let moniker = scope_moniker.descendant(&relative_moniker);
 
     // TODO(https://fxbug.dev/108532): Close the connection if the scope root cannot be found.
@@ -476,12 +476,12 @@ pub async fn get_structured_config(
 
 async fn construct_namespace(
     model: &Arc<Model>,
-    scope_moniker: &AbsoluteMoniker,
+    scope_moniker: &Moniker,
     moniker_str: &str,
 ) -> Result<Vec<fcrunner::ComponentNamespaceEntry>, fsys::ConstructNamespaceError> {
     // Construct the complete moniker using the scope moniker and the relative moniker string.
-    let relative_moniker = AbsoluteMoniker::try_from(moniker_str)
-        .map_err(|_| fsys::ConstructNamespaceError::BadMoniker)?;
+    let relative_moniker =
+        Moniker::try_from(moniker_str).map_err(|_| fsys::ConstructNamespaceError::BadMoniker)?;
     let moniker = scope_moniker.descendant(&relative_moniker);
 
     // TODO(https://fxbug.dev/108532): Close the connection if the scope root cannot be found.
@@ -501,7 +501,7 @@ async fn construct_namespace(
 
 async fn open(
     model: &Arc<Model>,
-    scope_moniker: &AbsoluteMoniker,
+    scope_moniker: &Moniker,
     moniker_str: &str,
     dir_type: fsys::OpenDirType,
     flags: fio::OpenFlags,
@@ -511,7 +511,7 @@ async fn open(
 ) -> Result<(), fsys::OpenError> {
     // Construct the complete moniker using the scope moniker and the relative moniker string.
     let relative_moniker =
-        AbsoluteMoniker::try_from(moniker_str).map_err(|_| fsys::OpenError::BadMoniker)?;
+        Moniker::try_from(moniker_str).map_err(|_| fsys::OpenError::BadMoniker)?;
     let moniker = scope_moniker.descendant(&relative_moniker);
 
     // TODO(https://fxbug.dev/108532): Close the connection if the scope root cannot be found.
@@ -584,14 +584,14 @@ async fn open(
 
 async fn connect_to_storage_admin(
     model: &Arc<Model>,
-    scope_moniker: &AbsoluteMoniker,
+    scope_moniker: &Moniker,
     moniker_str: &str,
     storage_name: String,
     server_end: ServerEnd<fsys::StorageAdminMarker>,
 ) -> Result<(), fsys::ConnectToStorageAdminError> {
     // Construct the complete moniker using the scope moniker and the relative moniker string.
-    let relative_moniker = AbsoluteMoniker::try_from(moniker_str)
-        .map_err(|_| fsys::ConnectToStorageAdminError::BadMoniker)?;
+    let relative_moniker =
+        Moniker::try_from(moniker_str).map_err(|_| fsys::ConnectToStorageAdminError::BadMoniker)?;
     let moniker = scope_moniker.descendant(&relative_moniker);
 
     // TODO(https://fxbug.dev/108532): Close the connection if the scope root cannot be found.
@@ -636,7 +636,7 @@ async fn connect_to_storage_admin(
 /// over the snapshots.
 async fn get_all_instances(
     model: &Arc<Model>,
-    scope_moniker: &AbsoluteMoniker,
+    scope_moniker: &Moniker,
 ) -> Result<ClientEnd<fsys::InstanceIteratorMarker>, fsys::GetAllInstancesError> {
     let mut instances = vec![];
 
@@ -669,10 +669,10 @@ async fn get_all_instances(
 /// and return all live children of the instance.
 async fn get_fidl_instance_and_children(
     model: &Arc<Model>,
-    scope_moniker: &AbsoluteMoniker,
+    scope_moniker: &Moniker,
     instance: &Arc<ComponentInstance>,
 ) -> (fsys::Instance, Vec<Arc<ComponentInstance>>) {
-    let relative_moniker = AbsoluteMoniker::scope_down(scope_moniker, &instance.abs_moniker)
+    let relative_moniker = Moniker::scope_down(scope_moniker, &instance.abs_moniker)
         .expect("instance must have been a child of scope root");
     let instance_id = model.component_id_index().look_up_moniker(&instance.abs_moniker).cloned();
 
@@ -803,7 +803,7 @@ mod tests {
         let index_file = make_index_file(component_id_index::Index {
             instances: vec![component_id_index::InstanceIdEntry {
                 instance_id: Some(iid.clone()),
-                moniker: Some(AbsoluteMoniker::parse_str("/").unwrap()),
+                moniker: Some(Moniker::parse_str("/").unwrap()),
             }],
             ..component_id_index::Index::default()
         })
@@ -826,7 +826,7 @@ mod tests {
             create_proxy_and_stream::<fsys::RealmQueryMarker>().unwrap();
 
         let _query_task = fasync::Task::local(async move {
-            realm_query.serve(AbsoluteMoniker::root(), query_request_stream).await
+            realm_query.serve(Moniker::root(), query_request_stream).await
         });
 
         model.start().await;
@@ -887,7 +887,7 @@ mod tests {
             create_proxy_and_stream::<fsys::RealmQueryMarker>().unwrap();
 
         let _query_task = fasync::Task::local(async move {
-            realm_query.serve(AbsoluteMoniker::root(), query_request_stream).await
+            realm_query.serve(Moniker::root(), query_request_stream).await
         });
 
         model.start().await;
@@ -968,7 +968,7 @@ mod tests {
             create_proxy_and_stream::<fsys::RealmQueryMarker>().unwrap();
 
         let _query_task = fasync::Task::local(async move {
-            realm_query.serve(AbsoluteMoniker::root(), query_request_stream).await
+            realm_query.serve(Moniker::root(), query_request_stream).await
         });
 
         model.start().await;
@@ -1021,7 +1021,7 @@ mod tests {
             create_proxy_and_stream::<fsys::RealmQueryMarker>().unwrap();
 
         let _query_task = fasync::Task::local(async move {
-            realm_query.serve(AbsoluteMoniker::root(), query_request_stream).await
+            realm_query.serve(Moniker::root(), query_request_stream).await
         });
 
         model.start().await;
@@ -1162,7 +1162,7 @@ mod tests {
             create_proxy_and_stream::<fsys::RealmQueryMarker>().unwrap();
 
         let _query_task = fasync::Task::local(async move {
-            realm_query.serve(AbsoluteMoniker::root(), query_request_stream).await
+            realm_query.serve(Moniker::root(), query_request_stream).await
         });
 
         model.start().await;
@@ -1250,7 +1250,7 @@ mod tests {
             create_proxy_and_stream::<fsys::RealmQueryMarker>().unwrap();
 
         let _query_task = fasync::Task::local(async move {
-            realm_query.serve(AbsoluteMoniker::root(), query_request_stream).await
+            realm_query.serve(Moniker::root(), query_request_stream).await
         });
 
         model.start().await;

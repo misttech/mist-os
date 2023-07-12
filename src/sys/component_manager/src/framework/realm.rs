@@ -26,7 +26,7 @@ use {
     fuchsia_zircon as zx,
     futures::prelude::*,
     lazy_static::lazy_static,
-    moniker::{AbsoluteMoniker, ChildMoniker, ChildMonikerBase},
+    moniker::{ChildMoniker, ChildMonikerBase, Moniker},
     std::{
         cmp,
         path::PathBuf,
@@ -45,12 +45,12 @@ lazy_static! {
 // namespace, the following CapabilityProvider will support both paths.
 // Tracking bug: https://fxbug.dev/85183.
 pub struct RealmCapabilityProvider {
-    scope_moniker: AbsoluteMoniker,
+    scope_moniker: Moniker,
     host: Arc<RealmCapabilityHost>,
 }
 
 impl RealmCapabilityProvider {
-    pub fn new(scope_moniker: AbsoluteMoniker, host: Arc<RealmCapabilityHost>) -> Self {
+    pub fn new(scope_moniker: Moniker, host: Arc<RealmCapabilityHost>) -> Self {
         Self { scope_moniker, host }
     }
 }
@@ -285,7 +285,7 @@ impl RealmCapabilityHost {
 
     async fn on_scoped_framework_capability_routed_async<'a>(
         self: Arc<Self>,
-        scope_moniker: AbsoluteMoniker,
+        scope_moniker: Moniker,
         capability: &'a InternalCapability,
         capability_provider: Option<Box<dyn CapabilityProvider>>,
     ) -> Result<Option<Box<dyn CapabilityProvider>>, ModelError> {
@@ -424,7 +424,7 @@ mod tests {
         fidl_fuchsia_component_decl as fdecl, fidl_fuchsia_io as fio, fuchsia_async as fasync,
         fuchsia_component::client,
         futures::lock::Mutex,
-        moniker::{AbsoluteMoniker, AbsoluteMonikerBase},
+        moniker::{Moniker, MonikerBase},
         routing_test_helpers::component_decl_with_exposed_binder,
         std::collections::HashSet,
     };
@@ -440,7 +440,7 @@ mod tests {
     impl RealmCapabilityTest {
         async fn new(
             components: Vec<(&'static str, ComponentDecl)>,
-            component_moniker: AbsoluteMoniker,
+            component_moniker: Moniker,
         ) -> Self {
             // Init model.
             let config = RuntimeConfig { list_children_batch_size: 2, ..Default::default() };
@@ -1180,7 +1180,7 @@ mod tests {
         // Create a root component with a collection.
         let mut test = RealmCapabilityTest::new(
             vec![("root", ComponentDeclBuilder::new().add_transient_collection("coll").build())],
-            AbsoluteMoniker::root(),
+            Moniker::root(),
         )
         .await;
 
@@ -1231,7 +1231,7 @@ mod tests {
                         .build(),
                 ),
             ],
-            AbsoluteMoniker::root(),
+            Moniker::root(),
         )
         .await;
         let (_event_source, mut event_stream) = test
@@ -1296,7 +1296,7 @@ mod tests {
                         .build(),
                 ),
             ],
-            AbsoluteMoniker::root(),
+            Moniker::root(),
         )
         .await;
 
@@ -1373,7 +1373,7 @@ mod tests {
                 ("system", component_decl_with_test_runner()),
                 ("unrunnable", component_decl_with_test_runner()),
             ],
-            AbsoluteMoniker::root(),
+            Moniker::root(),
         )
         .await;
         test.mock_runner.cause_failure("unrunnable");

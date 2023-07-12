@@ -15,10 +15,10 @@ use {
         resolving::ResolverError,
     },
     clonable_error::ClonableError,
-    cm_moniker::{InstancedAbsoluteMoniker, InstancedExtendedMoniker},
+    cm_moniker::{InstancedExtendedMoniker, InstancedMoniker},
     cm_types::Name,
     fidl_fuchsia_component as fcomponent, fidl_fuchsia_sys2 as fsys, fuchsia_zircon as zx,
-    moniker::{AbsoluteMoniker, ChildMoniker, MonikerError},
+    moniker::{ChildMoniker, Moniker, MonikerError},
     std::path::PathBuf,
     thiserror::Error,
 };
@@ -54,7 +54,7 @@ pub enum ModelError {
     )]
     OpenStorageFailed {
         moniker: InstancedExtendedMoniker,
-        relative_moniker: InstancedAbsoluteMoniker,
+        relative_moniker: InstancedMoniker,
         path: String,
         #[source]
         err: fidl::Error,
@@ -71,13 +71,13 @@ pub enum ModelError {
     },
     #[error("error in collection service dir VFS for component {moniker}: {err}")]
     CollectionServiceDirError {
-        moniker: AbsoluteMoniker,
+        moniker: Moniker,
 
         #[source]
         err: VfsError,
     },
     #[error("failed to open directory '{}' for component '{}'", relative_path, moniker)]
-    OpenDirectoryError { moniker: AbsoluteMoniker, relative_path: String },
+    OpenDirectoryError { moniker: Moniker, relative_path: String },
     #[error("events error: {}", err)]
     EventsError {
         #[from]
@@ -126,7 +126,7 @@ pub enum ModelError {
 }
 
 impl ModelError {
-    pub fn instance_not_found(moniker: AbsoluteMoniker) -> ModelError {
+    pub fn instance_not_found(moniker: Moniker) -> ModelError {
         ModelError::from(ComponentInstanceError::instance_not_found(moniker))
     }
 
@@ -134,10 +134,7 @@ impl ModelError {
         ModelError::PathIsNotUtf8 { path }
     }
 
-    pub fn open_directory_error(
-        moniker: AbsoluteMoniker,
-        relative_path: impl Into<String>,
-    ) -> ModelError {
+    pub fn open_directory_error(moniker: Moniker, relative_path: impl Into<String>) -> ModelError {
         ModelError::OpenDirectoryError { moniker, relative_path: relative_path.into() }
     }
 
@@ -314,7 +311,7 @@ impl Into<fsys::CreateError> for AddDynamicChildError {
 #[derive(Debug, Error, Clone)]
 pub enum AddChildError {
     #[error("component instance {} in realm {} already exists", child, moniker)]
-    InstanceAlreadyExists { moniker: AbsoluteMoniker, child: ChildMoniker },
+    InstanceAlreadyExists { moniker: Moniker, child: ChildMoniker },
     #[error("dynamic offer error: {}", err)]
     DynamicOfferError {
         #[from]
@@ -343,7 +340,7 @@ pub enum DynamicOfferError {
 #[derive(Debug, Clone, Error)]
 pub enum DiscoverActionError {
     #[error("instance {moniker} was destroyed")]
-    InstanceDestroyed { moniker: AbsoluteMoniker },
+    InstanceDestroyed { moniker: Moniker },
 }
 
 #[derive(Debug, Clone, Error)]
@@ -354,9 +351,9 @@ pub enum ResolveActionError {
         err: DiscoverActionError,
     },
     #[error("instance {moniker} was shut down")]
-    InstanceShutDown { moniker: AbsoluteMoniker },
+    InstanceShutDown { moniker: Moniker },
     #[error("instance {moniker} was destroyed")]
-    InstanceDestroyed { moniker: AbsoluteMoniker },
+    InstanceDestroyed { moniker: Moniker },
     #[error(
         "component address could not parsed for moniker '{}' at url '{}': {}",
         moniker,
@@ -365,7 +362,7 @@ pub enum ResolveActionError {
     )]
     ComponentAddressParseError {
         url: String,
-        moniker: AbsoluteMoniker,
+        moniker: Moniker,
         #[source]
         err: ResolverError,
     },
@@ -378,14 +375,14 @@ pub enum ResolveActionError {
     #[error("error in expose dir VFS for component {moniker}: {err}")]
     // TODO(https://fxbug.dev/120627): Determine whether this is expected to fail.
     ExposeDirError {
-        moniker: AbsoluteMoniker,
+        moniker: Moniker,
 
         #[source]
         err: VfsError,
     },
     #[error("error in namespace dir VFS for component {moniker}: {err}")]
     NamespaceDirError {
-        moniker: AbsoluteMoniker,
+        moniker: Moniker,
 
         #[source]
         err: VfsError,
@@ -628,43 +625,43 @@ impl RouteAndOpenCapabilityError {
 #[derive(Debug, Clone, Error)]
 pub enum StartActionError {
     #[error("Couldn't start `{moniker}` because it was shutdown")]
-    InstanceShutDown { moniker: AbsoluteMoniker },
+    InstanceShutDown { moniker: Moniker },
     #[error("Couldn't start `{moniker}` because it has been destroyed")]
-    InstanceDestroyed { moniker: AbsoluteMoniker },
+    InstanceDestroyed { moniker: Moniker },
     #[error("Couldn't start `{moniker}` because it couldn't resolve: {err}")]
     ResolveActionError {
-        moniker: AbsoluteMoniker,
+        moniker: Moniker,
         #[source]
         err: ResolveActionError,
     },
     #[error("Couldn't start `{moniker}` because the runner `{runner}` couldn't resolve: {err}")]
     ResolveRunnerError {
-        moniker: AbsoluteMoniker,
+        moniker: Moniker,
         runner: Name,
         #[source]
         err: Box<RouteAndOpenCapabilityError>,
     },
     #[error("Couldn't start `{moniker}` because it uses `\"on_terminate\": \"reboot\"` but is not allowed to by policy: {err}")]
     RebootOnTerminateForbidden {
-        moniker: AbsoluteMoniker,
+        moniker: Moniker,
         #[source]
         err: PolicyError,
     },
     #[error("Couldn't start `{moniker}` because we failed to populate its namespace: {err}")]
     NamespacePopulateError {
-        moniker: AbsoluteMoniker,
+        moniker: Moniker,
         #[source]
         err: NamespacePopulateError,
     },
     #[error("Couldn't start `{moniker}` due to a structured configuration error: {err}")]
     StructuredConfigError {
-        moniker: AbsoluteMoniker,
+        moniker: Moniker,
         #[source]
         err: StructuredConfigError,
     },
     #[error("Couldn't start `{moniker}` because one of its eager children failed to start: {err}")]
     EagerStartError {
-        moniker: AbsoluteMoniker,
+        moniker: Moniker,
         #[source]
         err: Box<StartActionError>,
     },
@@ -790,9 +787,9 @@ pub enum DestroyActionError {
         err: Box<StopActionError>,
     },
     #[error("could not find instance with moniker {}", moniker)]
-    InstanceNotFound { moniker: AbsoluteMoniker },
+    InstanceNotFound { moniker: Moniker },
     #[error("instance with moniker {} is not resolved", moniker)]
-    InstanceNotResolved { moniker: AbsoluteMoniker },
+    InstanceNotResolved { moniker: Moniker },
 }
 
 // This is implemented for fuchsia.component.Realm protocol.
@@ -823,9 +820,9 @@ pub enum UnresolveActionError {
         err: StopActionError,
     },
     #[error("{moniker} cannot be unresolved while it is running")]
-    InstanceRunning { moniker: AbsoluteMoniker },
+    InstanceRunning { moniker: Moniker },
     #[error("{moniker} was destroyed")]
-    InstanceDestroyed { moniker: AbsoluteMoniker },
+    InstanceDestroyed { moniker: Moniker },
 }
 
 // This is implemented for fuchsia.sys2.LifecycleController protocol.

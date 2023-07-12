@@ -12,7 +12,7 @@ use {
     cm_rust::DictionaryValue,
     futures::{channel::mpsc, lock::Mutex, sink::SinkExt},
     maplit::btreemap,
-    moniker::{AbsoluteMonikerBase, ExtendedMoniker},
+    moniker::{ExtendedMoniker, MonikerBase},
 };
 /// EventDispatcher and EventStream are two ends of a channel.
 ///
@@ -171,7 +171,7 @@ mod tests {
         assert_matches::assert_matches,
         fuchsia_zircon as zx,
         futures::StreamExt,
-        moniker::{AbsoluteMoniker, AbsoluteMonikerBase},
+        moniker::{Moniker, MonikerBase},
         std::{
             convert::TryInto,
             sync::{Arc, Weak},
@@ -198,20 +198,19 @@ mod tests {
         }
 
         fn create_dispatcher(&self, subscriber: ExtendedMoniker) -> Arc<EventDispatcher> {
-            let scopes =
-                vec![EventDispatcherScope::new(AbsoluteMoniker::root().into()).for_debug()];
+            let scopes = vec![EventDispatcherScope::new(Moniker::root().into()).for_debug()];
             Arc::new(EventDispatcher::new(subscriber, scopes, self.tx.clone()))
         }
     }
 
     async fn dispatch_capability_requested_event(
         dispatcher: &EventDispatcher,
-        source_moniker: &AbsoluteMoniker,
+        source_moniker: &Moniker,
     ) -> Result<(), Error> {
         let (_, capability_server_end) = zx::Channel::create();
         let capability_server_end = Arc::new(Mutex::new(Some(capability_server_end)));
         let event = ComponentEvent::new_for_test(
-            AbsoluteMoniker::root(),
+            Moniker::root(),
             "fuchsia-pkg://root/a/b/c",
             EventPayload::CapabilityRequested {
                 source_moniker: source_moniker.clone(),
@@ -225,7 +224,7 @@ mod tests {
     async fn dispatch_capability_routed_event(dispatcher: &EventDispatcher) -> Result<(), Error> {
         let empty_capability_provider = Arc::new(Mutex::new(None));
         let event = ComponentEvent::new_for_test(
-            AbsoluteMoniker::root(),
+            Moniker::root(),
             "fuchsia-pkg://root/a/b/c",
             EventPayload::CapabilityRouted {
                 source: CapabilitySource::Builtin {

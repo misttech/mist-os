@@ -6,7 +6,7 @@ use component_debug::lifecycle::{
     ActionError, CreateError, DestroyError, ResolveError, StartError,
 };
 use errors::ffx_error;
-use moniker::AbsoluteMoniker;
+use moniker::Moniker;
 
 static LIFECYCLE_ERROR_HELP: &'static str =
     "To learn more, see https://fuchsia.dev/go/components/run-errors";
@@ -18,7 +18,7 @@ static CHECK_TARGET_LOGS: &'static str =
     "Check target logs (`ffx log`) for error details printed by component_manager.";
 
 /// Format an ActionError into an error message that is suitable for `ffx component`.
-pub fn format_action_error(moniker: &AbsoluteMoniker, err: ActionError) -> errors::FfxError {
+pub fn format_action_error(moniker: &Moniker, err: ActionError) -> errors::FfxError {
     match err {
         ActionError::InstanceNotFound => ffx_error!(
             "\nError: The instance {} does not exist.\n{}\n{}\n",
@@ -53,8 +53,8 @@ pub fn format_action_error(moniker: &AbsoluteMoniker, err: ActionError) -> error
 
 /// Format a CreateError into an error message that is suitable for `ffx component`.
 pub fn format_create_error(
-    moniker: &AbsoluteMoniker,
-    parent: &AbsoluteMoniker,
+    moniker: &Moniker,
+    parent: &Moniker,
     collection: &str,
     err: CreateError,
 ) -> errors::FfxError {
@@ -67,7 +67,7 @@ pub fn format_create_error(
 }
 
 /// Format a DestroyError into an error message that is suitable for `ffx component`.
-pub fn format_destroy_error(moniker: &AbsoluteMoniker, err: DestroyError) -> errors::FfxError {
+pub fn format_destroy_error(moniker: &Moniker, err: DestroyError) -> errors::FfxError {
     match err {
         DestroyError::BadChildRef => ffx_error!(
             "\nError: Component manager cannot parse the child reference created by ffx. {}\n",
@@ -78,7 +78,7 @@ pub fn format_destroy_error(moniker: &AbsoluteMoniker, err: DestroyError) -> err
 }
 
 /// Format a ResolveError into an error message that is suitable for `ffx component`.
-pub fn format_resolve_error(moniker: &AbsoluteMoniker, err: ResolveError) -> errors::FfxError {
+pub fn format_resolve_error(moniker: &Moniker, err: ResolveError) -> errors::FfxError {
     match err {
         ResolveError::PackageNotFound => ffx_error!("\nError: The package associated with the instance {} could not be found.\nEnsure that your package server is running and the package is added to it.\n", moniker),
         ResolveError::ManifestNotFound => ffx_error!("\nError: The manifest associated with the instance {} could not be found.\nEnsure that your package contains the manifest.\n", moniker),
@@ -87,7 +87,7 @@ pub fn format_resolve_error(moniker: &AbsoluteMoniker, err: ResolveError) -> err
 }
 
 /// Format a StartError into an error message that is suitable for `ffx component`.
-pub fn format_start_error(moniker: &AbsoluteMoniker, err: StartError) -> errors::FfxError {
+pub fn format_start_error(moniker: &Moniker, err: StartError) -> errors::FfxError {
     match err {
         StartError::PackageNotFound => ffx_error!("\nError: The package associated with the instance {} could not be found.\nEnsure that your package server is running and the package is added to it.\n", moniker),
         StartError::ManifestNotFound => ffx_error!("\nError: The manifest associated with the instance {} could not be found.\nEnsure that your package contains the manifest.\n", moniker),

@@ -15,7 +15,7 @@ use {
     cm_task_scope::TaskScope,
     cm_types::Name,
     futures::{channel::mpsc, future::join_all, stream, SinkExt, StreamExt},
-    moniker::{AbsoluteMoniker, AbsoluteMonikerBase, ExtendedMoniker},
+    moniker::{ExtendedMoniker, Moniker, MonikerBase},
     std::{
         collections::{HashMap, HashSet},
         sync::{Arc, Weak},
@@ -179,7 +179,7 @@ impl SynthesisTask {
                     {
                         return Ok(());
                     }
-                    AbsoluteMoniker::root()
+                    Moniker::root()
                 }
                 ExtendedMoniker::ComponentInstance(ref scope_moniker) => scope_moniker.clone(),
             };
@@ -227,7 +227,7 @@ impl SynthesisTask {
 /// branch.
 fn get_subcomponents(
     root: Arc<ComponentInstance>,
-    visited: HashSet<AbsoluteMoniker>,
+    visited: HashSet<Moniker>,
 ) -> stream::BoxStream<'static, Arc<ComponentInstance>> {
     let pending = vec![root];
     stream::unfold((pending, visited), move |(mut pending, mut visited)| async move {
@@ -281,7 +281,7 @@ mod tests {
 
     struct CreateStreamArgs<'a> {
         registry: &'a EventRegistry,
-        scope_monikers: Vec<AbsoluteMoniker>,
+        scope_monikers: Vec<Moniker>,
         events: Vec<EventType>,
         include_builtin: bool,
     }

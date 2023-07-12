@@ -6,7 +6,7 @@ use {
     crate::lifecycle::{ActionError, CreateError, DestroyError, ResolveError, StartError},
     anyhow::{format_err, Error},
     cm_types::Name,
-    moniker::AbsoluteMoniker,
+    moniker::Moniker,
 };
 
 static LIFECYCLE_ERROR_HELP: &'static str =
@@ -19,7 +19,7 @@ static CHECK_TARGET_LOGS: &'static str =
     "Check target logs for error details printed by component_manager.";
 
 /// Format an ActionError into an error message that is suitable for a CLI tool.
-pub fn format_action_error(moniker: &AbsoluteMoniker, err: ActionError) -> Error {
+pub fn format_action_error(moniker: &Moniker, err: ActionError) -> Error {
     match err {
         ActionError::InstanceNotFound => format_err!(
             "\nError: The instance {} does not exist.\n{}\n{}\n",
@@ -54,8 +54,8 @@ pub fn format_action_error(moniker: &AbsoluteMoniker, err: ActionError) -> Error
 
 /// Format a CreateError into an error message that is suitable for a CLI tool.
 pub fn format_create_error(
-    moniker: &AbsoluteMoniker,
-    parent: &AbsoluteMoniker,
+    moniker: &Moniker,
+    parent: &Moniker,
     collection: &Name,
     err: CreateError,
 ) -> Error {
@@ -68,7 +68,7 @@ pub fn format_create_error(
 }
 
 /// Format a DestroyError into an error message that is suitable for a CLI tool.
-pub fn format_destroy_error(moniker: &AbsoluteMoniker, err: DestroyError) -> Error {
+pub fn format_destroy_error(moniker: &Moniker, err: DestroyError) -> Error {
     match err {
         DestroyError::BadChildRef => format_err!(
             "\nError: Component manager cannot parse the child reference. {}\n",
@@ -79,7 +79,7 @@ pub fn format_destroy_error(moniker: &AbsoluteMoniker, err: DestroyError) -> Err
 }
 
 /// Format a ResolveError into an error message that is suitable for a CLI tool.
-pub fn format_resolve_error(moniker: &AbsoluteMoniker, err: ResolveError) -> Error {
+pub fn format_resolve_error(moniker: &Moniker, err: ResolveError) -> Error {
     match err {
         ResolveError::PackageNotFound => format_err!("\nError: The package associated with the instance {} could not be found.\nEnsure that your package server is running and the package is added to it.\n", moniker),
         ResolveError::ManifestNotFound => format_err!("\nError: The manifest associated with the instance {} could not be found.\nEnsure that your package contains the manifest.\n", moniker),
@@ -88,7 +88,7 @@ pub fn format_resolve_error(moniker: &AbsoluteMoniker, err: ResolveError) -> Err
 }
 
 /// Format a StartError into an error message that is suitable for a CLI tool.
-pub fn format_start_error(moniker: &AbsoluteMoniker, err: StartError) -> Error {
+pub fn format_start_error(moniker: &Moniker, err: StartError) -> Error {
     match err {
         StartError::PackageNotFound => format_err!("\nError: The package associated with the instance {} could not be found.\nEnsure that your package server is running and the package is added to it.\n", moniker),
         StartError::ManifestNotFound => format_err!("\nError: The manifest associated with the instance {} could not be found.\nEnsure that your package contains the manifest.\n", moniker),

@@ -32,7 +32,7 @@ use {
     fidl_fuchsia_hardware_power_statecontrol as fstatecontrol, fidl_fuchsia_sys2 as fsys,
     fuchsia_async as fasync, fuchsia_zircon as zx,
     futures::{channel::mpsc, future::pending, join, lock::Mutex, prelude::*},
-    moniker::{AbsoluteMoniker, AbsoluteMonikerBase, ChildMoniker},
+    moniker::{ChildMoniker, Moniker, MonikerBase},
     std::sync::{Arc, Weak},
     std::{collections::HashSet, convert::TryFrom},
 };
@@ -57,7 +57,7 @@ async fn new_model_with(
 async fn bind_root() {
     let (model, _builtin_environment, mock_runner) =
         new_model(vec![("root", component_decl_with_test_runner())]).await;
-    let m: AbsoluteMoniker = AbsoluteMoniker::root();
+    let m: Moniker = Moniker::root();
     let res = model.start_instance(&m, &StartReason::Root).await;
     assert!(res.is_ok());
     mock_runner.wait_for_url("test:///root_resolved").await;
@@ -69,7 +69,7 @@ async fn bind_root() {
 async fn bind_non_existent_root_child() {
     let (model, _builtin_environment, _mock_runner) =
         new_model(vec![("root", component_decl_with_test_runner())]).await;
-    let m: AbsoluteMoniker = vec!["no-such-instance"].try_into().unwrap();
+    let m: Moniker = vec!["no-such-instance"].try_into().unwrap();
     let res = model.start_instance(&m, &StartReason::Root).await;
     let expected_res: Result<Arc<ComponentInstance>, ModelError> =
         Err(ModelError::instance_not_found(vec!["no-such-instance"].try_into().unwrap()));
@@ -96,7 +96,7 @@ impl Hook for StartBlocker {
             .target_moniker
             .unwrap_instance_moniker_or(ModelError::UnexpectedComponentManagerMoniker)
             .unwrap();
-        let expected_moniker: AbsoluteMoniker = vec!["system"].try_into().unwrap();
+        let expected_moniker: Moniker = vec!["system"].try_into().unwrap();
         if moniker == &expected_moniker {
             let mut rx = self.rx.lock().await;
             rx.next().await.unwrap();
@@ -178,7 +178,7 @@ async fn bind_parent_then_child() {
     )
     .await;
     // Start the system.
-    let m: AbsoluteMoniker = vec!["system"].try_into().unwrap();
+    let m: Moniker = vec!["system"].try_into().unwrap();
     assert!(model.start_instance(&m, &StartReason::Root).await.is_ok());
     mock_runner.wait_for_urls(&["test:///system_resolved"]).await;
 
@@ -198,7 +198,7 @@ async fn bind_parent_then_child() {
         InstanceState::New | InstanceState::Unresolved
     );
     // Start echo.
-    let m: AbsoluteMoniker = vec!["echo"].try_into().unwrap();
+    let m: Moniker = vec!["echo"].try_into().unwrap();
     assert!(model.start_instance(&m, &StartReason::Root).await.is_ok());
     mock_runner.wait_for_urls(&["test:///system_resolved", "test:///echo_resolved"]).await;
 
@@ -232,17 +232,17 @@ async fn bind_child_doesnt_bind_parent() {
     .await;
 
     // Start logger (before ever starting system).
-    let m: AbsoluteMoniker = vec!["system", "logger"].try_into().unwrap();
+    let m: Moniker = vec!["system", "logger"].try_into().unwrap();
     assert!(model.start_instance(&m, &StartReason::Root).await.is_ok());
     mock_runner.wait_for_urls(&["test:///logger_resolved"]).await;
 
     // Start netstack.
-    let m: AbsoluteMoniker = vec!["system", "netstack"].try_into().unwrap();
+    let m: Moniker = vec!["system", "netstack"].try_into().unwrap();
     assert!(model.start_instance(&m, &StartReason::Root).await.is_ok());
     mock_runner.wait_for_urls(&["test:///logger_resolved", "test:///netstack_resolved"]).await;
 
     // Finally, start the system.
-    let m: AbsoluteMoniker = vec!["system"].try_into().unwrap();
+    let m: Moniker = vec!["system"].try_into().unwrap();
     assert!(model.start_instance(&m, &StartReason::Root).await.is_ok());
     mock_runner
         .wait_for_urls(&[
@@ -264,12 +264,12 @@ async fn bind_child_non_existent() {
     ])
     .await;
     // Start the system.
-    let m: AbsoluteMoniker = vec!["system"].try_into().unwrap();
+    let m: Moniker = vec!["system"].try_into().unwrap();
     assert!(model.start_instance(&m, &StartReason::Root).await.is_ok());
     mock_runner.wait_for_urls(&["test:///system_resolved"]).await;
 
     // Can't start the logger. It does not exist.
-    let m: AbsoluteMoniker = vec!["system", "logger"].try_into().unwrap();
+    let m: Moniker = vec!["system", "logger"].try_into().unwrap();
     let res = model.start_instance(&m, &StartReason::Root).await;
     let expected_res: Result<(), ModelError> = Err(ModelError::instance_not_found(m));
     assert_eq!(format!("{:?}", res), format!("{:?}", expected_res));
@@ -305,7 +305,7 @@ async fn bind_eager_children() {
 
     // Start the top component, and check that it and the eager components were started.
     {
-        let m = AbsoluteMoniker::parse_str("/a").unwrap();
+        let m = Moniker::parse_str("/a").unwrap();
         let res = model.start_instance(&m, &StartReason::Root).await;
         assert!(res.is_ok());
         mock_runner
@@ -374,7 +374,7 @@ async fn bind_eager_children_reentrant() {
     // Start the top component, and check that it and the eager components were started.
     {
         let (f, bind_handle) = async move {
-            let m = AbsoluteMoniker::parse_str("/a").unwrap();
+            let m = Moniker::parse_str("/a").unwrap();
             model.start_instance(&m, &StartReason::Root).await
         }
         .remote_handle();
@@ -404,7 +404,7 @@ async fn bind_no_execute() {
 
     // Start the parent component. The child should be started. However, the parent component
     // is non-executable so it is not run.
-    let m: AbsoluteMoniker = vec!["a"].try_into().unwrap();
+    let m: Moniker = vec!["a"].try_into().unwrap();
     assert!(model.start_instance(&m, &StartReason::Root).await.is_ok());
     mock_runner.wait_for_urls(&["test:///b_resolved"]).await;
 }
@@ -449,7 +449,7 @@ async fn bind_action_sequence() {
         .expect("subscribe to event stream");
 
     // Child of root should start out discovered but not resolved yet.
-    let m = AbsoluteMoniker::parse_str("/system").unwrap();
+    let m = Moniker::parse_str("/system").unwrap();
     model.start().await;
     event_stream.wait_until(EventType::Resolved, vec![].try_into().unwrap()).await.unwrap();
     event_stream.wait_until(EventType::Discovered, m.clone()).await.unwrap();
@@ -485,7 +485,7 @@ async fn reboot_on_terminate_disallowed() {
 
     let res =
         test.model.start_instance(&vec!["system"].try_into().unwrap(), &StartReason::Debug).await;
-    let expected_moniker = AbsoluteMoniker::try_from(vec!["system"]).unwrap();
+    let expected_moniker = Moniker::try_from(vec!["system"]).unwrap();
     assert_matches!(res, Err(ModelError::StartActionError {
         err: StartActionError::RebootOnTerminateForbidden {
             err: PolicyError::ChildPolicyDisallowed {

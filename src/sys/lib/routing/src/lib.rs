@@ -53,7 +53,7 @@ use {
     cm_types::Name,
     fidl_fuchsia_component_decl as fdecl, fidl_fuchsia_io as fio,
     from_enum::FromEnum,
-    moniker::{AbsoluteMoniker, ChildMoniker},
+    moniker::{ChildMoniker, Moniker},
     std::{path::PathBuf, sync::Arc},
     tracing::warn,
 };
@@ -1140,19 +1140,13 @@ pub enum RegistrationDecl {
 // Error trait impls
 
 impl ErrorNotFoundFromParent for UseProtocolDecl {
-    fn error_not_found_from_parent(
-        moniker: AbsoluteMoniker,
-        capability_name: Name,
-    ) -> RoutingError {
+    fn error_not_found_from_parent(moniker: Moniker, capability_name: Name) -> RoutingError {
         RoutingError::UseFromParentNotFound { moniker, capability_id: capability_name.into() }
     }
 }
 
 impl ErrorNotFoundFromParent for DebugRegistration {
-    fn error_not_found_from_parent(
-        moniker: AbsoluteMoniker,
-        capability_name: Name,
-    ) -> RoutingError {
+    fn error_not_found_from_parent(moniker: Moniker, capability_name: Name) -> RoutingError {
         RoutingError::EnvironmentFromParentNotFound {
             moniker,
             capability_name: capability_name,
@@ -1163,7 +1157,7 @@ impl ErrorNotFoundFromParent for DebugRegistration {
 
 impl ErrorNotFoundInChild for DebugRegistration {
     fn error_not_found_in_child(
-        moniker: AbsoluteMoniker,
+        moniker: Moniker,
         child_moniker: ChildMoniker,
         capability_name: Name,
     ) -> RoutingError {
@@ -1177,17 +1171,14 @@ impl ErrorNotFoundInChild for DebugRegistration {
 }
 
 impl ErrorNotFoundFromParent for OfferProtocolDecl {
-    fn error_not_found_from_parent(
-        moniker: AbsoluteMoniker,
-        capability_name: Name,
-    ) -> RoutingError {
+    fn error_not_found_from_parent(moniker: Moniker, capability_name: Name) -> RoutingError {
         RoutingError::OfferFromParentNotFound { moniker, capability_id: capability_name.into() }
     }
 }
 
 impl ErrorNotFoundInChild for UseProtocolDecl {
     fn error_not_found_in_child(
-        moniker: AbsoluteMoniker,
+        moniker: Moniker,
         child_moniker: ChildMoniker,
         capability_name: Name,
     ) -> RoutingError {
@@ -1201,7 +1192,7 @@ impl ErrorNotFoundInChild for UseProtocolDecl {
 
 impl ErrorNotFoundInChild for UseEventStreamDecl {
     fn error_not_found_in_child(
-        moniker: AbsoluteMoniker,
+        moniker: Moniker,
         child_moniker: ChildMoniker,
         capability_name: Name,
     ) -> RoutingError {
@@ -1215,7 +1206,7 @@ impl ErrorNotFoundInChild for UseEventStreamDecl {
 
 impl ErrorNotFoundInChild for OfferProtocolDecl {
     fn error_not_found_in_child(
-        moniker: AbsoluteMoniker,
+        moniker: Moniker,
         child_moniker: ChildMoniker,
         capability_name: Name,
     ) -> RoutingError {
@@ -1229,7 +1220,7 @@ impl ErrorNotFoundInChild for OfferProtocolDecl {
 
 impl ErrorNotFoundInChild for OfferEventStreamDecl {
     fn error_not_found_in_child(
-        moniker: AbsoluteMoniker,
+        moniker: Moniker,
         child_moniker: ChildMoniker,
         capability_name: Name,
     ) -> RoutingError {
@@ -1243,7 +1234,7 @@ impl ErrorNotFoundInChild for OfferEventStreamDecl {
 
 impl ErrorNotFoundInChild for ExposeProtocolDecl {
     fn error_not_found_in_child(
-        moniker: AbsoluteMoniker,
+        moniker: Moniker,
         child_moniker: ChildMoniker,
         capability_name: Name,
     ) -> RoutingError {
@@ -1256,26 +1247,20 @@ impl ErrorNotFoundInChild for ExposeProtocolDecl {
 }
 
 impl ErrorNotFoundFromParent for UseServiceDecl {
-    fn error_not_found_from_parent(
-        moniker: AbsoluteMoniker,
-        capability_name: Name,
-    ) -> RoutingError {
+    fn error_not_found_from_parent(moniker: Moniker, capability_name: Name) -> RoutingError {
         RoutingError::UseFromParentNotFound { moniker, capability_id: capability_name.into() }
     }
 }
 
 impl ErrorNotFoundFromParent for OfferServiceDecl {
-    fn error_not_found_from_parent(
-        moniker: AbsoluteMoniker,
-        capability_name: Name,
-    ) -> RoutingError {
+    fn error_not_found_from_parent(moniker: Moniker, capability_name: Name) -> RoutingError {
         RoutingError::OfferFromParentNotFound { moniker, capability_id: capability_name.into() }
     }
 }
 
 impl ErrorNotFoundInChild for UseServiceDecl {
     fn error_not_found_in_child(
-        moniker: AbsoluteMoniker,
+        moniker: Moniker,
         child_moniker: ChildMoniker,
         capability_name: Name,
     ) -> RoutingError {
@@ -1289,7 +1274,7 @@ impl ErrorNotFoundInChild for UseServiceDecl {
 
 impl ErrorNotFoundInChild for OfferServiceDecl {
     fn error_not_found_in_child(
-        moniker: AbsoluteMoniker,
+        moniker: Moniker,
         child_moniker: ChildMoniker,
         capability_name: Name,
     ) -> RoutingError {
@@ -1303,7 +1288,7 @@ impl ErrorNotFoundInChild for OfferServiceDecl {
 
 impl ErrorNotFoundInChild for ExposeServiceDecl {
     fn error_not_found_in_child(
-        moniker: AbsoluteMoniker,
+        moniker: Moniker,
         child_moniker: ChildMoniker,
         capability_name: Name,
     ) -> RoutingError {
@@ -1316,26 +1301,20 @@ impl ErrorNotFoundInChild for ExposeServiceDecl {
 }
 
 impl ErrorNotFoundFromParent for UseDirectoryDecl {
-    fn error_not_found_from_parent(
-        moniker: AbsoluteMoniker,
-        capability_name: Name,
-    ) -> RoutingError {
+    fn error_not_found_from_parent(moniker: Moniker, capability_name: Name) -> RoutingError {
         RoutingError::UseFromParentNotFound { moniker, capability_id: capability_name.into() }
     }
 }
 
 impl ErrorNotFoundFromParent for OfferDirectoryDecl {
-    fn error_not_found_from_parent(
-        moniker: AbsoluteMoniker,
-        capability_name: Name,
-    ) -> RoutingError {
+    fn error_not_found_from_parent(moniker: Moniker, capability_name: Name) -> RoutingError {
         RoutingError::OfferFromParentNotFound { moniker, capability_id: capability_name.into() }
     }
 }
 
 impl ErrorNotFoundInChild for UseDirectoryDecl {
     fn error_not_found_in_child(
-        moniker: AbsoluteMoniker,
+        moniker: Moniker,
         child_moniker: ChildMoniker,
         capability_name: Name,
     ) -> RoutingError {
@@ -1349,7 +1328,7 @@ impl ErrorNotFoundInChild for UseDirectoryDecl {
 
 impl ErrorNotFoundInChild for OfferDirectoryDecl {
     fn error_not_found_in_child(
-        moniker: AbsoluteMoniker,
+        moniker: Moniker,
         child_moniker: ChildMoniker,
         capability_name: Name,
     ) -> RoutingError {
@@ -1363,7 +1342,7 @@ impl ErrorNotFoundInChild for OfferDirectoryDecl {
 
 impl ErrorNotFoundInChild for ExposeDirectoryDecl {
     fn error_not_found_in_child(
-        moniker: AbsoluteMoniker,
+        moniker: Moniker,
         child_moniker: ChildMoniker,
         capability_name: Name,
     ) -> RoutingError {
@@ -1376,26 +1355,20 @@ impl ErrorNotFoundInChild for ExposeDirectoryDecl {
 }
 
 impl ErrorNotFoundFromParent for UseStorageDecl {
-    fn error_not_found_from_parent(
-        moniker: AbsoluteMoniker,
-        capability_name: Name,
-    ) -> RoutingError {
+    fn error_not_found_from_parent(moniker: Moniker, capability_name: Name) -> RoutingError {
         RoutingError::UseFromParentNotFound { moniker, capability_id: capability_name.into() }
     }
 }
 
 impl ErrorNotFoundFromParent for OfferStorageDecl {
-    fn error_not_found_from_parent(
-        moniker: AbsoluteMoniker,
-        capability_name: Name,
-    ) -> RoutingError {
+    fn error_not_found_from_parent(moniker: Moniker, capability_name: Name) -> RoutingError {
         RoutingError::OfferFromParentNotFound { moniker, capability_id: capability_name.into() }
     }
 }
 
 impl ErrorNotFoundInChild for StorageDeclAsRegistration {
     fn error_not_found_in_child(
-        moniker: AbsoluteMoniker,
+        moniker: Moniker,
         child_moniker: ChildMoniker,
         capability_name: Name,
     ) -> RoutingError {
@@ -1408,19 +1381,13 @@ impl ErrorNotFoundInChild for StorageDeclAsRegistration {
 }
 
 impl ErrorNotFoundFromParent for StorageDeclAsRegistration {
-    fn error_not_found_from_parent(
-        moniker: AbsoluteMoniker,
-        capability_name: Name,
-    ) -> RoutingError {
+    fn error_not_found_from_parent(moniker: Moniker, capability_name: Name) -> RoutingError {
         RoutingError::StorageFromParentNotFound { moniker, capability_id: capability_name.into() }
     }
 }
 
 impl ErrorNotFoundFromParent for RunnerRegistration {
-    fn error_not_found_from_parent(
-        moniker: AbsoluteMoniker,
-        capability_name: Name,
-    ) -> RoutingError {
+    fn error_not_found_from_parent(moniker: Moniker, capability_name: Name) -> RoutingError {
         RoutingError::UseFromEnvironmentNotFound {
             moniker,
             capability_name,
@@ -1431,7 +1398,7 @@ impl ErrorNotFoundFromParent for RunnerRegistration {
 
 impl ErrorNotFoundInChild for RunnerRegistration {
     fn error_not_found_in_child(
-        moniker: AbsoluteMoniker,
+        moniker: Moniker,
         child_moniker: ChildMoniker,
         capability_name: Name,
     ) -> RoutingError {
@@ -1445,17 +1412,14 @@ impl ErrorNotFoundInChild for RunnerRegistration {
 }
 
 impl ErrorNotFoundFromParent for OfferRunnerDecl {
-    fn error_not_found_from_parent(
-        moniker: AbsoluteMoniker,
-        capability_name: Name,
-    ) -> RoutingError {
+    fn error_not_found_from_parent(moniker: Moniker, capability_name: Name) -> RoutingError {
         RoutingError::OfferFromParentNotFound { moniker, capability_id: capability_name.into() }
     }
 }
 
 impl ErrorNotFoundInChild for OfferRunnerDecl {
     fn error_not_found_in_child(
-        moniker: AbsoluteMoniker,
+        moniker: Moniker,
         child_moniker: ChildMoniker,
         capability_name: Name,
     ) -> RoutingError {
@@ -1469,7 +1433,7 @@ impl ErrorNotFoundInChild for OfferRunnerDecl {
 
 impl ErrorNotFoundInChild for ExposeRunnerDecl {
     fn error_not_found_in_child(
-        moniker: AbsoluteMoniker,
+        moniker: Moniker,
         child_moniker: ChildMoniker,
         capability_name: Name,
     ) -> RoutingError {
@@ -1482,10 +1446,7 @@ impl ErrorNotFoundInChild for ExposeRunnerDecl {
 }
 
 impl ErrorNotFoundFromParent for ResolverRegistration {
-    fn error_not_found_from_parent(
-        moniker: AbsoluteMoniker,
-        capability_name: Name,
-    ) -> RoutingError {
+    fn error_not_found_from_parent(moniker: Moniker, capability_name: Name) -> RoutingError {
         RoutingError::EnvironmentFromParentNotFound {
             moniker,
             capability_name,
@@ -1496,7 +1457,7 @@ impl ErrorNotFoundFromParent for ResolverRegistration {
 
 impl ErrorNotFoundInChild for ResolverRegistration {
     fn error_not_found_in_child(
-        moniker: AbsoluteMoniker,
+        moniker: Moniker,
         child_moniker: ChildMoniker,
         capability_name: Name,
     ) -> RoutingError {
@@ -1510,17 +1471,14 @@ impl ErrorNotFoundInChild for ResolverRegistration {
 }
 
 impl ErrorNotFoundFromParent for OfferResolverDecl {
-    fn error_not_found_from_parent(
-        moniker: AbsoluteMoniker,
-        capability_name: Name,
-    ) -> RoutingError {
+    fn error_not_found_from_parent(moniker: Moniker, capability_name: Name) -> RoutingError {
         RoutingError::OfferFromParentNotFound { moniker, capability_id: capability_name.into() }
     }
 }
 
 impl ErrorNotFoundInChild for OfferResolverDecl {
     fn error_not_found_in_child(
-        moniker: AbsoluteMoniker,
+        moniker: Moniker,
         child_moniker: ChildMoniker,
         capability_name: Name,
     ) -> RoutingError {
@@ -1534,7 +1492,7 @@ impl ErrorNotFoundInChild for OfferResolverDecl {
 
 impl ErrorNotFoundInChild for ExposeResolverDecl {
     fn error_not_found_in_child(
-        moniker: AbsoluteMoniker,
+        moniker: Moniker,
         child_moniker: ChildMoniker,
         capability_name: Name,
     ) -> RoutingError {
@@ -1547,19 +1505,13 @@ impl ErrorNotFoundInChild for ExposeResolverDecl {
 }
 
 impl ErrorNotFoundFromParent for UseEventStreamDecl {
-    fn error_not_found_from_parent(
-        moniker: AbsoluteMoniker,
-        capability_name: Name,
-    ) -> RoutingError {
+    fn error_not_found_from_parent(moniker: Moniker, capability_name: Name) -> RoutingError {
         RoutingError::UseFromParentNotFound { moniker, capability_id: capability_name.into() }
     }
 }
 
 impl ErrorNotFoundFromParent for OfferEventStreamDecl {
-    fn error_not_found_from_parent(
-        moniker: AbsoluteMoniker,
-        capability_name: Name,
-    ) -> RoutingError {
+    fn error_not_found_from_parent(moniker: Moniker, capability_name: Name) -> RoutingError {
         RoutingError::OfferFromParentNotFound { moniker, capability_id: capability_name.into() }
     }
 }

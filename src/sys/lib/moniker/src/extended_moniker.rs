@@ -4,8 +4,8 @@
 
 use {
     crate::{
-        abs_moniker::{AbsoluteMoniker, AbsoluteMonikerBase},
         error::MonikerError,
+        moniker::{Moniker, MonikerBase},
     },
     core::cmp::Ord,
     std::fmt,
@@ -20,7 +20,7 @@ use serde::{Deserialize, Serialize};
 #[cfg_attr(feature = "serde", derive(Deserialize, Serialize), serde(rename_all = "snake_case"))]
 #[derive(Eq, Ord, PartialOrd, PartialEq, Debug, Clone, Hash)]
 pub enum ExtendedMoniker {
-    ComponentInstance(AbsoluteMoniker),
+    ComponentInstance(Moniker),
     ComponentManager,
 }
 
@@ -31,7 +31,7 @@ impl ExtendedMoniker {
     pub fn unwrap_instance_moniker_or<E: std::error::Error>(
         &self,
         error: E,
-    ) -> Result<&AbsoluteMoniker, E> {
+    ) -> Result<&Moniker, E> {
         match self {
             Self::ComponentManager => Err(error),
             Self::ComponentInstance(moniker) => Ok(moniker),
@@ -50,7 +50,7 @@ impl ExtendedMoniker {
         if rep == EXTENDED_MONIKER_COMPONENT_MANAGER_STR {
             Ok(ExtendedMoniker::ComponentManager)
         } else {
-            Ok(ExtendedMoniker::ComponentInstance(AbsoluteMoniker::parse_str(rep)?))
+            Ok(ExtendedMoniker::ComponentInstance(Moniker::parse_str(rep)?))
         }
     }
 }
@@ -69,8 +69,8 @@ impl fmt::Display for ExtendedMoniker {
     }
 }
 
-impl From<AbsoluteMoniker> for ExtendedMoniker {
-    fn from(m: AbsoluteMoniker) -> Self {
+impl From<Moniker> for ExtendedMoniker {
+    fn from(m: Moniker) -> Self {
         Self::ComponentInstance(m)
     }
 }
@@ -87,7 +87,7 @@ mod tests {
         );
         assert_eq!(
             ExtendedMoniker::parse_str("/foo/bar").unwrap(),
-            ExtendedMoniker::ComponentInstance(AbsoluteMoniker::parse_str("/foo/bar").unwrap())
+            ExtendedMoniker::ComponentInstance(Moniker::parse_str("/foo/bar").unwrap())
         );
         assert!(ExtendedMoniker::parse_str("").is_err(), "cannot be empty");
     }

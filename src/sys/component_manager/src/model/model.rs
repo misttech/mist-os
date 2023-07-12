@@ -11,7 +11,7 @@ use {
         error::ModelError,
     },
     ::routing::{component_id_index::ComponentIdIndex, config::RuntimeConfig},
-    moniker::{AbsoluteMoniker, AbsoluteMonikerBase},
+    moniker::{Moniker, MonikerBase},
     std::sync::Arc,
     tracing::warn,
 };
@@ -79,7 +79,7 @@ impl Model {
     /// resolved if that has not already happened.
     pub async fn look_up(
         &self,
-        look_up_abs_moniker: &AbsoluteMoniker,
+        look_up_abs_moniker: &Moniker,
     ) -> Result<Arc<ComponentInstance>, ModelError> {
         let mut cur = self.root.clone();
         for moniker in look_up_abs_moniker.path().iter() {
@@ -98,10 +98,7 @@ impl Model {
 
     /// Finds a component matching the absolute moniker, if such a component exists.
     /// This function has no side-effects.
-    pub async fn find(
-        &self,
-        look_up_abs_moniker: &AbsoluteMoniker,
-    ) -> Option<Arc<ComponentInstance>> {
+    pub async fn find(&self, look_up_abs_moniker: &Moniker) -> Option<Arc<ComponentInstance>> {
         let mut cur = self.root.clone();
         for moniker in look_up_abs_moniker.path().iter() {
             cur = {
@@ -126,7 +123,7 @@ impl Model {
     #[cfg(test)]
     pub async fn find_resolved(
         &self,
-        find_abs_moniker: &AbsoluteMoniker,
+        find_abs_moniker: &Moniker,
     ) -> Option<Arc<ComponentInstance>> {
         let mut cur = self.root.clone();
         for moniker in find_abs_moniker.path().iter() {
@@ -184,7 +181,7 @@ impl Model {
     #[cfg(test)]
     pub async fn start_instance<'a>(
         self: &Arc<Model>,
-        abs_moniker: &'a AbsoluteMoniker,
+        abs_moniker: &'a Moniker,
         reason: &StartReason,
     ) -> Result<Arc<ComponentInstance>, ModelError> {
         let component = self.look_up(abs_moniker).await?;
@@ -207,7 +204,7 @@ pub mod tests {
         assert_matches::assert_matches,
         cm_rust_testing::ComponentDeclBuilder,
         fidl_fuchsia_component_decl as fdecl,
-        moniker::{AbsoluteMoniker, AbsoluteMonikerBase},
+        moniker::{Moniker, MonikerBase},
     };
 
     #[fuchsia::test]
@@ -283,7 +280,7 @@ pub mod tests {
         );
 
         // Resolve each component.
-        test.look_up(AbsoluteMoniker::root()).await;
+        test.look_up(Moniker::root()).await;
         let component_a = test.look_up(vec!["a"].try_into().unwrap()).await;
         let component_b = test.look_up(vec!["a", "b"].try_into().unwrap()).await;
         let component_c = test.look_up(vec!["a", "b", "c"].try_into().unwrap()).await;

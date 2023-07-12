@@ -9,7 +9,7 @@ use {
     },
     async_trait::async_trait,
     futures::{executor::block_on, lock::Mutex, prelude::*},
-    moniker::{AbsoluteMoniker, AbsoluteMonikerBase, ChildMonikerBase},
+    moniker::{ChildMonikerBase, Moniker, MonikerBase},
     std::{
         cmp::Eq,
         collections::HashMap,
@@ -21,7 +21,7 @@ use {
 };
 
 struct ComponentInstance {
-    pub moniker: AbsoluteMoniker,
+    pub moniker: Moniker,
     pub children: Mutex<Vec<Arc<ComponentInstance>>>,
 }
 
@@ -80,9 +80,9 @@ impl ComponentInstance {
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub enum Lifecycle {
-    Start(AbsoluteMoniker),
-    Stop(AbsoluteMoniker),
-    Destroy(AbsoluteMoniker),
+    Start(Moniker),
+    Stop(Moniker),
+    Destroy(Moniker),
 }
 
 impl fmt::Display for Lifecycle {
@@ -98,7 +98,7 @@ impl fmt::Display for Lifecycle {
 /// TestHook is a Hook that generates a strings representing the component
 /// topology.
 pub struct TestHook {
-    instances: Mutex<HashMap<AbsoluteMoniker, Arc<ComponentInstance>>>,
+    instances: Mutex<HashMap<Moniker, Arc<ComponentInstance>>>,
     lifecycle_events: Mutex<Vec<Lifecycle>>,
 }
 
@@ -132,7 +132,7 @@ impl TestHook {
     /// topology.
     pub fn print(&self) -> String {
         let instances = block_on(self.instances.lock());
-        let moniker = AbsoluteMoniker::root();
+        let moniker = Moniker::root();
         let root_instance =
             instances.get(&moniker).map(|x| x.clone()).expect("Unable to find root instance.");
         block_on(root_instance.print())
@@ -145,7 +145,7 @@ impl TestHook {
 
     pub async fn on_started_async<'a>(
         &'a self,
-        target_moniker: &AbsoluteMoniker,
+        target_moniker: &Moniker,
     ) -> Result<(), ModelError> {
         self.create_instance_if_necessary(target_moniker).await?;
         let mut events = self.lifecycle_events.lock().await;
@@ -155,7 +155,7 @@ impl TestHook {
 
     pub async fn on_stopped_async<'a>(
         &'a self,
-        target_moniker: &AbsoluteMoniker,
+        target_moniker: &Moniker,
     ) -> Result<(), ModelError> {
         let mut events = self.lifecycle_events.lock().await;
         events.push(Lifecycle::Stop(target_moniker.clone()));
@@ -164,7 +164,7 @@ impl TestHook {
 
     pub async fn on_destroyed_async<'a>(
         &'a self,
-        target_moniker: &AbsoluteMoniker,
+        target_moniker: &Moniker,
     ) -> Result<(), ModelError> {
         // TODO: Can this be changed not restrict to dynamic instances? Static instances can be
         // deleted too.
@@ -179,10 +179,7 @@ impl TestHook {
         Ok(())
     }
 
-    pub async fn create_instance_if_necessary(
-        &self,
-        moniker: &AbsoluteMoniker,
-    ) -> Result<(), ModelError> {
+    pub async fn create_instance_if_necessary(&self, moniker: &Moniker) -> Result<(), ModelError> {
         let mut instances = self.instances.lock().await;
         let new_instance = match instances.get(moniker) {
             Some(old_instance) => Arc::new((old_instance.deref()).clone()),
@@ -209,7 +206,7 @@ impl TestHook {
         Ok(())
     }
 
-    pub async fn remove_instance(&self, moniker: &AbsoluteMoniker) -> Result<(), ModelError> {
+    pub async fn remove_instance(&self, moniker: &Moniker) -> Result<(), ModelError> {
         let mut instances = self.instances.lock().await;
         if let Some(parent_moniker) = moniker.parent() {
             instances.remove(moniker);
@@ -257,13 +254,13 @@ mod tests {
 
     #[fuchsia::test]
     async fn test_hook_test() {
-        let root = AbsoluteMoniker::root();
-        let a: AbsoluteMoniker = vec!["a"].try_into().unwrap();
-        let ab: AbsoluteMoniker = vec!["a", "b"].try_into().unwrap();
-        let ac: AbsoluteMoniker = vec!["a", "c"].try_into().unwrap();
-        let abd: AbsoluteMoniker = vec!["a", "b", "d"].try_into().unwrap();
-        let abe: AbsoluteMoniker = vec!["a", "b", "e"].try_into().unwrap();
-        let acf: AbsoluteMoniker = vec!["a", "c", "f"].try_into().unwrap();
+        let root = Moniker::root();
+        let a: Moniker = vec!["a"].try_into().unwrap();
+        let ab: Moniker = vec!["a", "b"].try_into().unwrap();
+        let ac: Moniker = vec!["a", "c"].try_into().unwrap();
+        let abd: Moniker = vec!["a", "b", "d"].try_into().unwrap();
+        let abe: Moniker = vec!["a", "b", "e"].try_into().unwrap();
+        let acf: Moniker = vec!["a", "c", "f"].try_into().unwrap();
 
         // Try adding parent followed by children then verify the topology string
         // is correct.

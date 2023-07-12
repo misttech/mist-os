@@ -9,11 +9,11 @@ use {
         node_path::NodePath,
     },
     async_trait::async_trait,
-    cm_moniker::{InstancedAbsoluteMoniker, InstancedChildMoniker},
+    cm_moniker::{InstancedChildMoniker, InstancedMoniker},
     cm_rust::{CapabilityDecl, CollectionDecl, ComponentDecl, ExposeDecl, OfferDecl, UseDecl},
     cm_types::Name,
     config_encoder::ConfigFields,
-    moniker::{AbsoluteMoniker, AbsoluteMonikerBase, ChildMoniker, ChildMonikerBase},
+    moniker::{ChildMoniker, ChildMonikerBase, Moniker, MonikerBase},
     routing::{
         capability_source::{BuiltinCapabilities, NamespaceCapabilities},
         component_id_index::ComponentIdIndex,
@@ -36,8 +36,8 @@ use {
 /// A representation of a v2 component instance.
 #[derive(Debug)]
 pub struct ComponentInstanceForAnalyzer {
-    instanced_moniker: InstancedAbsoluteMoniker,
-    abs_moniker: AbsoluteMoniker,
+    instanced_moniker: InstancedMoniker,
+    abs_moniker: Moniker,
     pub(crate) decl: ComponentDecl,
     config: Option<ConfigFields>,
     url: String,
@@ -72,7 +72,7 @@ impl ComponentInstanceForAnalyzer {
     ) -> Arc<Self> {
         let environment =
             EnvironmentForAnalyzer::new_root(runner_registry, &runtime_config, &top_instance);
-        let instanced_moniker = InstancedAbsoluteMoniker::root();
+        let instanced_moniker = InstancedMoniker::root();
         let abs_moniker = instanced_moniker.clone().without_instance_ids();
         Arc::new(Self {
             instanced_moniker,
@@ -163,11 +163,11 @@ impl ComponentInstanceForAnalyzer {
 impl ComponentInstanceInterface for ComponentInstanceForAnalyzer {
     type TopInstance = TopInstanceForAnalyzer;
 
-    fn instanced_moniker(&self) -> &InstancedAbsoluteMoniker {
+    fn instanced_moniker(&self) -> &InstancedMoniker {
         &self.instanced_moniker
     }
 
-    fn abs_moniker(&self) -> &AbsoluteMoniker {
+    fn abs_moniker(&self) -> &Moniker {
         &self.abs_moniker
     }
 

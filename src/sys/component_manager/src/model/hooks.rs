@@ -18,7 +18,7 @@ use {
     fidl_fuchsia_component as fcomponent, fidl_fuchsia_diagnostics_types as fdiagnostics,
     fidl_fuchsia_io as fio, fuchsia_zircon as zx,
     futures::{channel::oneshot, lock::Mutex},
-    moniker::{AbsoluteMoniker, ExtendedMoniker},
+    moniker::{ExtendedMoniker, Moniker},
     std::{
         collections::HashMap,
         convert::TryFrom,
@@ -215,7 +215,7 @@ impl HooksRegistration {
 pub enum EventPayload {
     // Keep the events listed below in alphabetical order!
     CapabilityRequested {
-        source_moniker: AbsoluteMoniker,
+        source_moniker: Moniker,
         name: String,
         capability: Arc<Mutex<Option<zx::Channel>>>,
     },
@@ -359,7 +359,7 @@ impl Event {
 
     #[cfg(test)]
     pub fn new_for_test(
-        target_moniker: AbsoluteMoniker,
+        target_moniker: Moniker,
         component_url: impl Into<String>,
         payload: EventPayload,
     ) -> Self {
@@ -508,7 +508,7 @@ impl Hooks {
 
 #[cfg(test)]
 mod tests {
-    use {super::*, moniker::AbsoluteMonikerBase, std::sync::Arc};
+    use {super::*, moniker::MonikerBase, std::sync::Arc};
 
     // This test verifies that the payload of the CapabilityRequested event will be transferred.
     #[fuchsia::test]
@@ -516,10 +516,10 @@ mod tests {
         let (_, capability_server_end) = zx::Channel::create();
         let capability_server_end = Arc::new(Mutex::new(Some(capability_server_end)));
         let event = Event::new_for_test(
-            AbsoluteMoniker::root(),
+            Moniker::root(),
             "fuchsia-pkg://root",
             EventPayload::CapabilityRequested {
-                source_moniker: AbsoluteMoniker::root(),
+                source_moniker: Moniker::root(),
                 name: "foo".to_string(),
                 capability: capability_server_end,
             },

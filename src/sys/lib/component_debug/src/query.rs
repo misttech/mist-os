@@ -6,7 +6,7 @@ use {
     crate::realm::{get_all_instances, Instance},
     anyhow::{bail, Result},
     fidl_fuchsia_sys2 as fsys,
-    moniker::{AbsoluteMoniker, AbsoluteMonikerBase},
+    moniker::{Moniker, MonikerBase},
 };
 
 /// Retrieves a list of CML instances that match a given string query.
@@ -20,7 +20,7 @@ pub async fn get_instances_from_query(
     realm_query: &fsys::RealmQueryProxy,
 ) -> Result<Vec<Instance>> {
     let instances = get_all_instances(realm_query).await?;
-    let query_moniker = AbsoluteMoniker::parse_str(&query).ok();
+    let query_moniker = Moniker::parse_str(&query).ok();
 
     // Try and find instances that contain the query in any of the identifiers
     // (moniker, URL, instance ID).
@@ -88,10 +88,10 @@ pub async fn get_single_instance_from_query(
 pub async fn get_cml_monikers_from_query(
     query: &str,
     realm_query: &fsys::RealmQueryProxy,
-) -> Result<Vec<AbsoluteMoniker>> {
+) -> Result<Vec<Moniker>> {
     // Special-case the root moniker since it will substring match every moniker
     // below.
-    let query_moniker = AbsoluteMoniker::parse_str(&query).ok();
+    let query_moniker = Moniker::parse_str(&query).ok();
     if let Some(m) = &query_moniker {
         if m.is_root() {
             return Ok(vec![m.clone()]);
@@ -99,7 +99,7 @@ pub async fn get_cml_monikers_from_query(
     }
 
     let instances = get_instances_from_query(query, realm_query).await?;
-    let monikers: Vec<AbsoluteMoniker> = instances.into_iter().map(|i| i.moniker).collect();
+    let monikers: Vec<Moniker> = instances.into_iter().map(|i| i.moniker).collect();
 
     // If the query is an exact-match of any of the results, return that
     // result only.
@@ -124,7 +124,7 @@ pub async fn get_cml_monikers_from_query(
 pub async fn get_cml_moniker_from_query(
     query: &str,
     realm_query: &fsys::RealmQueryProxy,
-) -> Result<AbsoluteMoniker> {
+) -> Result<Moniker> {
     // Get all instance monikers that match the query and ensure there is only one.
     let mut monikers = get_cml_monikers_from_query(&query, &realm_query).await?;
     if monikers.len() > 1 {
@@ -141,7 +141,7 @@ pub async fn get_cml_moniker_from_query(
 
 #[cfg(test)]
 mod tests {
-    use {super::*, crate::test_utils::serve_realm_query_instances, moniker::AbsoluteMonikerBase};
+    use {super::*, crate::test_utils::serve_realm_query_instances, moniker::MonikerBase};
 
     fn setup_fake_realm_query() -> fsys::RealmQueryProxy {
         setup_fake_realm_query_with_entries(vec![
@@ -177,24 +177,24 @@ mod tests {
 
         assert_eq!(
             get_cml_monikers_from_query("/", &realm_query).await.unwrap(),
-            vec![AbsoluteMoniker::parse_str("/").unwrap()]
+            vec![Moniker::parse_str("/").unwrap()]
         );
 
         assert_eq!(
             get_cml_monikers_from_query("/core", &realm_query).await.unwrap(),
-            vec![AbsoluteMoniker::parse_str("/core").unwrap()]
+            vec![Moniker::parse_str("/core").unwrap()]
         );
 
         assert_eq!(
             get_cml_monikers_from_query("/core:one", &realm_query).await.unwrap(),
-            vec![AbsoluteMoniker::parse_str("/core:one").unwrap()]
+            vec![Moniker::parse_str("/core:one").unwrap()]
         );
 
         assert_eq!(
             get_cml_monikers_from_query("/core:o", &realm_query).await.unwrap(),
             vec![
-                AbsoluteMoniker::parse_str("/core:one").unwrap(),
-                AbsoluteMoniker::parse_str("/core:one/child").unwrap(),
+                Moniker::parse_str("/core:one").unwrap(),
+                Moniker::parse_str("/core:one/child").unwrap(),
             ]
         );
     }
@@ -206,8 +206,8 @@ mod tests {
         assert_eq!(
             results,
             vec![
-                AbsoluteMoniker::parse_str("/core/boo").unwrap(),
-                AbsoluteMoniker::parse_str("/core/foo").unwrap()
+                Moniker::parse_str("/core/boo").unwrap(),
+                Moniker::parse_str("/core/foo").unwrap()
             ]
         );
     }
@@ -216,7 +216,7 @@ mod tests {
     async fn test_get_cml_monikers_from_query_moniker_exactly_1() {
         let realm_query = setup_fake_realm_query();
         let results = get_cml_monikers_from_query("foo", &realm_query).await.unwrap();
-        assert_eq!(results, vec![AbsoluteMoniker::parse_str("/core/foo").unwrap()]);
+        assert_eq!(results, vec![Moniker::parse_str("/core/foo").unwrap()]);
     }
 
     #[fuchsia_async::run_singlethreaded(test)]
@@ -226,8 +226,8 @@ mod tests {
         assert_eq!(
             results,
             vec![
-                AbsoluteMoniker::parse_str("/core/boo").unwrap(),
-                AbsoluteMoniker::parse_str("/core/foo").unwrap()
+                Moniker::parse_str("/core/boo").unwrap(),
+                Moniker::parse_str("/core/foo").unwrap()
             ]
         );
     }
@@ -236,7 +236,7 @@ mod tests {
     async fn test_get_cml_monikers_from_query_url_exactly_1() {
         let realm_query = setup_fake_realm_query();
         let results = get_cml_monikers_from_query("2bar.cm", &realm_query).await.unwrap();
-        assert_eq!(results, vec![AbsoluteMoniker::parse_str("/core/boo").unwrap()]);
+        assert_eq!(results, vec![Moniker::parse_str("/core/boo").unwrap()]);
     }
 
     #[fuchsia_async::run_singlethreaded(test)]
@@ -246,8 +246,8 @@ mod tests {
         assert_eq!(
             results,
             vec![
-                AbsoluteMoniker::parse_str("/core/boo").unwrap(),
-                AbsoluteMoniker::parse_str("/core/foo").unwrap()
+                Moniker::parse_str("/core/boo").unwrap(),
+                Moniker::parse_str("/core/foo").unwrap()
             ]
         );
     }
@@ -256,7 +256,7 @@ mod tests {
     async fn test_get_cml_monikers_from_query_id_exactly_1() {
         let realm_query = setup_fake_realm_query();
         let results = get_cml_monikers_from_query("123", &realm_query).await.unwrap();
-        assert_eq!(results, vec![AbsoluteMoniker::parse_str("/core/foo").unwrap()]);
+        assert_eq!(results, vec![Moniker::parse_str("/core/foo").unwrap()]);
     }
 
     #[fuchsia_async::run_singlethreaded(test)]
@@ -282,24 +282,24 @@ mod tests {
     async fn test_get_cml_moniker_from_query_moniker_single_match() {
         let realm_query = setup_fake_realm_query();
         let moniker = get_cml_moniker_from_query("foo", &realm_query).await.unwrap();
-        assert_eq!(moniker, AbsoluteMoniker::parse_str("/core/foo").unwrap());
+        assert_eq!(moniker, Moniker::parse_str("/core/foo").unwrap());
 
         let realm_query = setup_fake_realm_query();
         let moniker = get_cml_moniker_from_query("/core/foo", &realm_query).await.unwrap();
-        assert_eq!(moniker, AbsoluteMoniker::parse_str("/core/foo").unwrap());
+        assert_eq!(moniker, Moniker::parse_str("/core/foo").unwrap());
     }
 
     #[fuchsia_async::run_singlethreaded(test)]
     async fn test_get_cml_moniker_from_url_moniker_single_match() {
         let realm_query = setup_fake_realm_query();
         let moniker = get_cml_moniker_from_query("2bar.cm", &realm_query).await.unwrap();
-        assert_eq!(moniker, AbsoluteMoniker::parse_str("/core/boo").unwrap());
+        assert_eq!(moniker, Moniker::parse_str("/core/boo").unwrap());
     }
 
     #[fuchsia_async::run_singlethreaded(test)]
     async fn test_get_cml_moniker_from_url_id_single_match() {
         let realm_query = setup_fake_realm_query();
         let moniker = get_cml_moniker_from_query("123", &realm_query).await.unwrap();
-        assert_eq!(moniker, AbsoluteMoniker::parse_str("/core/foo").unwrap());
+        assert_eq!(moniker, Moniker::parse_str("/core/foo").unwrap());
     }
 }

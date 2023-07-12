@@ -10,7 +10,7 @@ use {
     async_trait::async_trait,
     fuchsia_inspect as inspect, fuchsia_zircon as zx,
     lazy_static::lazy_static,
-    moniker::AbsoluteMoniker,
+    moniker::Moniker,
     std::sync::{
         atomic::{AtomicUsize, Ordering},
         Arc, Weak,
@@ -46,11 +46,7 @@ impl ComponentEarlyStartupTimeStats {
         )]
     }
 
-    async fn on_component_started(
-        self: &Arc<Self>,
-        moniker: &AbsoluteMoniker,
-        start_time: zx::Time,
-    ) {
+    async fn on_component_started(self: &Arc<Self>, moniker: &Moniker, start_time: zx::Time) {
         let id = self.next_id.fetch_add(1, Ordering::Relaxed);
         if id >= MAX_NUMBER_OF_STARTUP_TIME_TRACKED_COMPONENTS {
             return;
@@ -90,7 +86,7 @@ mod tests {
     };
     use cm_rust_testing::ComponentDeclBuilder;
     use fuchsia_inspect::{assert_data_tree, DiagnosticsHierarchyGetter};
-    use moniker::{AbsoluteMonikerBase, ChildMoniker, ChildMonikerBase};
+    use moniker::{ChildMoniker, ChildMonikerBase, MonikerBase};
 
     #[fuchsia::test]
     async fn tracks_started_components() {
@@ -108,7 +104,7 @@ mod tests {
         test.model.root().hooks.install(stats.hooks()).await;
 
         let root_timestamp =
-            start_and_get_timestamp(test.model.clone(), AbsoluteMoniker::root()).await.into_nanos();
+            start_and_get_timestamp(test.model.clone(), Moniker::root()).await.into_nanos();
         let a_timestamp =
             start_and_get_timestamp(test.model.clone(), vec!["a"].try_into().unwrap())
                 .await
@@ -146,7 +142,7 @@ mod tests {
         for i in 0..2 * MAX_NUMBER_OF_STARTUP_TIME_TRACKED_COMPONENTS {
             stats
                 .on_component_started(
-                    &AbsoluteMoniker::new(vec![ChildMoniker::parse(format!("{}", i)).unwrap()]),
+                    &Moniker::new(vec![ChildMoniker::parse(format!("{}", i)).unwrap()]),
                     zx::Time::from_nanos(i as i64),
                 )
                 .await;
@@ -157,7 +153,7 @@ mod tests {
         assert_eq!(child_count, MAX_NUMBER_OF_STARTUP_TIME_TRACKED_COMPONENTS);
     }
 
-    async fn start_and_get_timestamp(model: Arc<Model>, moniker: AbsoluteMoniker) -> zx::Time {
+    async fn start_and_get_timestamp(model: Arc<Model>, moniker: Moniker) -> zx::Time {
         let component =
             model.start_instance(&moniker, &StartReason::Root).await.expect("failed to bind");
         let exec = component.lock_execution().await;

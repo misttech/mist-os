@@ -12,7 +12,7 @@ pub mod storage_admin;
 use {
     assert_matches::assert_matches,
     async_trait::async_trait,
-    cm_moniker::InstancedAbsoluteMoniker,
+    cm_moniker::InstancedMoniker,
     cm_rust::{
         Availability, CapabilityDecl, CapabilityTypeName, ChildRef, ComponentDecl, DependencyType,
         EventScope, EventStreamDecl, ExposeDecl, ExposeDirectoryDecl, ExposeProtocolDecl,
@@ -30,7 +30,7 @@ use {
     fidl::endpoints::ProtocolMarker,
     fidl_fuchsia_component as fcomponent, fidl_fuchsia_component_decl as fdecl,
     fidl_fuchsia_data as fdata, fidl_fuchsia_io as fio, fuchsia_zircon_status as zx,
-    moniker::{AbsoluteMoniker, AbsoluteMonikerBase, ExtendedMoniker},
+    moniker::{ExtendedMoniker, Moniker, MonikerBase},
     routing::{
         capability_source::{
             AggregateCapability, CapabilitySource, ComponentCapability, InternalCapability,
@@ -144,7 +144,7 @@ pub enum CheckUse {
         path: cm_types::Path,
         // The relative moniker from the storage declaration to the use declaration. Only
         // used if `expected_res` is Ok.
-        storage_relation: Option<InstancedAbsoluteMoniker>,
+        storage_relation: Option<InstancedMoniker>,
         // The backing directory for this storage is in component manager's namespace, not the
         // test's isolated test directory.
         from_cm_namespace: bool,
@@ -153,7 +153,7 @@ pub enum CheckUse {
     },
     StorageAdmin {
         // The relative moniker from the storage declaration to the use declaration.
-        storage_relation: InstancedAbsoluteMoniker,
+        storage_relation: InstancedMoniker,
         // The backing directory for this storage is in component manager's namespace, not the
         // test's isolated test directory.
         from_cm_namespace: bool,
@@ -182,7 +182,7 @@ impl CheckUse {
 // This function should reproduce the logic of `crate::storage::generate_storage_path`.
 pub fn generate_storage_path(
     subdir: Option<String>,
-    relative_moniker: &InstancedAbsoluteMoniker,
+    relative_moniker: &InstancedMoniker,
     instance_id: Option<&ComponentInstanceId>,
 ) -> PathBuf {
     if let Some(id) = instance_id {
@@ -218,20 +218,17 @@ pub trait RoutingTestModel {
     type C: ComponentInstanceInterface + std::fmt::Debug + 'static;
 
     /// Checks a `use` declaration at `moniker` by trying to use `capability`.
-    async fn check_use(&self, moniker: AbsoluteMoniker, check: CheckUse);
+    async fn check_use(&self, moniker: Moniker, check: CheckUse);
 
     /// Checks using a capability from a component's exposed directory.
-    async fn check_use_exposed_dir(&self, moniker: AbsoluteMoniker, check: CheckUse);
+    async fn check_use_exposed_dir(&self, moniker: Moniker, check: CheckUse);
 
     /// Looks up a component instance by its absolute moniker.
-    async fn look_up_instance(
-        &self,
-        moniker: &AbsoluteMoniker,
-    ) -> Result<Arc<Self::C>, anyhow::Error>;
+    async fn look_up_instance(&self, moniker: &Moniker) -> Result<Arc<Self::C>, anyhow::Error>;
 
     /// Checks that a use declaration of `path` at `moniker` can be opened with
     /// Fuchsia file operations.
-    async fn check_open_file(&self, moniker: AbsoluteMoniker, path: cm_types::Path);
+    async fn check_open_file(&self, moniker: Moniker, path: cm_types::Path);
 
     /// Create a file with the given contents in the test dir, along with any subdirectories
     /// required.
@@ -546,12 +543,10 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
             ),
         ];
         let model = T::new("a", components).build().await;
-        model
-            .check_use(AbsoluteMoniker::root(), CheckUse::default_directory(ExpectedResult::Ok))
-            .await;
+        model.check_use(Moniker::root(), CheckUse::default_directory(ExpectedResult::Ok)).await;
         model
             .check_use(
-                AbsoluteMoniker::root(),
+                Moniker::root(),
                 CheckUse::Protocol {
                     path: default_service_capability(),
                     expected_res: ExpectedResult::Ok,
@@ -578,7 +573,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
         let model = T::new("a", components).build().await;
         model
             .check_use(
-                AbsoluteMoniker::root(),
+                Moniker::root(),
                 CheckUse::Protocol {
                     path: default_service_capability(),
                     expected_res: ExpectedResult::Ok,
@@ -670,12 +665,10 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
             ),
         ];
         let model = T::new("a", components).build().await;
-        model
-            .check_use(AbsoluteMoniker::root(), CheckUse::default_directory(ExpectedResult::Ok))
-            .await;
+        model.check_use(Moniker::root(), CheckUse::default_directory(ExpectedResult::Ok)).await;
         model
             .check_use(
-                AbsoluteMoniker::root(),
+                Moniker::root(),
                 CheckUse::Protocol {
                     path: default_service_capability(),
                     expected_res: ExpectedResult::Ok,
@@ -1437,12 +1430,10 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
         let model = builder.build().await;
 
         model.install_namespace_directory("/use_from_cm_namespace");
-        model
-            .check_use(AbsoluteMoniker::root(), CheckUse::default_directory(ExpectedResult::Ok))
-            .await;
+        model.check_use(Moniker::root(), CheckUse::default_directory(ExpectedResult::Ok)).await;
         model
             .check_use(
-                AbsoluteMoniker::root(),
+                Moniker::root(),
                 CheckUse::Protocol {
                     path: default_service_capability(),
                     expected_res: ExpectedResult::Ok,
@@ -1862,9 +1853,8 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
             ),
         ];
         let model = T::new("a", components).build().await;
-        let root_instance =
-            model.look_up_instance(&AbsoluteMoniker::root()).await.expect("root instance");
-        let expected_source_moniker = AbsoluteMoniker::parse_str("/b").unwrap();
+        let root_instance = model.look_up_instance(&Moniker::root()).await.expect("root instance");
+        let expected_source_moniker = Moniker::parse_str("/b").unwrap();
 
         assert_matches!(
         route_capability(RouteRequest::ExposeProtocol(expose_decl), &root_instance, &mut NoopRouteMapper).await,
@@ -2697,7 +2687,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
             .expect("failed to create file");
         model
             .check_use_exposed_dir(
-                AbsoluteMoniker::root(),
+                Moniker::root(),
                 CheckUse::Directory {
                     path: "/hippo_data".parse().unwrap(),
                     file: PathBuf::from("inner"),
@@ -2893,7 +2883,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
         let model = T::new("a", components).build().await;
         model
             .check_use(
-                AbsoluteMoniker::root(),
+                Moniker::root(),
                 CheckUse::Protocol {
                     path: "/svc/valid".parse().unwrap(),
                     expected_res: ExpectedResult::Err(zx::Status::UNAVAILABLE),
@@ -3226,7 +3216,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
         let model = builder.build().await;
         model
             .check_use(
-                AbsoluteMoniker::root(),
+                Moniker::root(),
                 CheckUse::EventStream {
                     expected_res: ExpectedResult::Ok,
                     path: "/event/stream".parse().unwrap(),
@@ -3485,7 +3475,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
         let mut builder = T::new("a", components);
         builder.add_capability_policy(
             CapabilityAllowlistKey {
-                source_moniker: ExtendedMoniker::ComponentInstance(AbsoluteMoniker::root()),
+                source_moniker: ExtendedMoniker::ComponentInstance(Moniker::root()),
                 source_name: "hippo_svc".parse().unwrap(),
                 source: CapabilityAllowlistSource::Self_,
                 capability: CapabilityTypeName::Protocol,
@@ -3548,7 +3538,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
         let mut builder = T::new("a", components);
         builder.add_capability_policy(
             CapabilityAllowlistKey {
-                source_moniker: ExtendedMoniker::ComponentInstance(AbsoluteMoniker::root()),
+                source_moniker: ExtendedMoniker::ComponentInstance(Moniker::root()),
                 source_name: "foo_data".parse().unwrap(),
                 source: CapabilityAllowlistSource::Self_,
                 capability: CapabilityTypeName::Directory,
@@ -3631,7 +3621,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
         let mut builder = T::new("a", components);
         builder.add_capability_policy(
             CapabilityAllowlistKey {
-                source_moniker: ExtendedMoniker::ComponentInstance(AbsoluteMoniker::root()),
+                source_moniker: ExtendedMoniker::ComponentInstance(Moniker::root()),
                 source_name: "hippo_svc".parse().unwrap(),
                 source: CapabilityAllowlistSource::Self_,
                 capability: CapabilityTypeName::Protocol,
@@ -3743,7 +3733,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
         let mut builder = T::new("a", components);
         builder.add_capability_policy(
             CapabilityAllowlistKey {
-                source_moniker: ExtendedMoniker::ComponentInstance(AbsoluteMoniker::root()),
+                source_moniker: ExtendedMoniker::ComponentInstance(Moniker::root()),
                 source_name: "hippo_svc".parse().unwrap(),
                 source: CapabilityAllowlistSource::Self_,
                 capability: CapabilityTypeName::Protocol,
@@ -3810,7 +3800,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
         model.install_namespace_directory("/use_from_cm_namespace");
         model
             .check_use(
-                AbsoluteMoniker::root(),
+                Moniker::root(),
                 CheckUse::Protocol {
                     path: default_service_capability(),
                     expected_res: ExpectedResult::Err(zx::Status::ACCESS_DENIED),
@@ -3895,8 +3885,8 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
 
         let mut allowlist = HashSet::new();
         allowlist.insert(DebugCapabilityAllowlistEntry::new(
-            AllowlistEntryBuilder::build_exact_from_moniker(&AbsoluteMoniker::root()),
-            AllowlistEntryBuilder::build_exact_from_moniker(&AbsoluteMoniker::root()),
+            AllowlistEntryBuilder::build_exact_from_moniker(&Moniker::root()),
+            AllowlistEntryBuilder::build_exact_from_moniker(&Moniker::root()),
         ));
 
         let mut builder = T::new("a", components);
@@ -4505,8 +4495,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
         let model = T::new("a", components).build().await;
         let b_component =
             model.look_up_instance(&vec!["b"].try_into().unwrap()).await.expect("b instance");
-        let a_component =
-            model.look_up_instance(&AbsoluteMoniker::root()).await.expect("root instance");
+        let a_component = model.look_up_instance(&Moniker::root()).await.expect("root instance");
         let source = route_capability(
             RouteRequest::UseService(use_decl),
             &b_component,
@@ -4576,8 +4565,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
             ),
         ];
         let model = T::new("a", components).build().await;
-        let a_component =
-            model.look_up_instance(&AbsoluteMoniker::root()).await.expect("root instance");
+        let a_component = model.look_up_instance(&Moniker::root()).await.expect("root instance");
         let b_component =
             model.look_up_instance(&vec!["b"].try_into().unwrap()).await.expect("b instance");
         let source = route_capability(
@@ -4924,8 +4912,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
         ];
 
         let model = T::new("a", components).build().await;
-        let a_component =
-            model.look_up_instance(&AbsoluteMoniker::root()).await.expect("a instance");
+        let a_component = model.look_up_instance(&Moniker::root()).await.expect("a instance");
         let b_component =
             model.look_up_instance(&vec!["b"].try_into().unwrap()).await.expect("b instance");
         let source = route_capability(
@@ -5008,8 +4995,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
         ];
 
         let model = T::new("a", components).build().await;
-        let a_component =
-            model.look_up_instance(&AbsoluteMoniker::root()).await.expect("a instance");
+        let a_component = model.look_up_instance(&Moniker::root()).await.expect("a instance");
         let c_component =
             model.look_up_instance(&vec!["b", "c"].try_into().unwrap()).await.expect("c instance");
         let source = route_capability(
@@ -5173,8 +5159,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
         ];
 
         let model = T::new("a", components).build().await;
-        let a_component =
-            model.look_up_instance(&AbsoluteMoniker::root()).await.expect("a instance");
+        let a_component = model.look_up_instance(&Moniker::root()).await.expect("a instance");
         let c_component =
             model.look_up_instance(&vec!["b", "c"].try_into().unwrap()).await.expect("c instance");
         let source = route_capability(
@@ -5343,8 +5328,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
         builder.register_mock_builtin_runner("elf");
         let model = builder.build().await;
 
-        let a_component =
-            model.look_up_instance(&AbsoluteMoniker::root()).await.expect("a instance");
+        let a_component = model.look_up_instance(&Moniker::root()).await.expect("a instance");
         let source = route_capability(
             RouteRequest::Runner("elf".parse().unwrap()),
             &a_component,
@@ -5438,8 +5422,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
         })]);
         let model = builder.build().await;
 
-        let a_component =
-            model.look_up_instance(&AbsoluteMoniker::root()).await.expect("a instance");
+        let a_component = model.look_up_instance(&Moniker::root()).await.expect("a instance");
         let route_result = route_capability(
             RouteRequest::Runner("hobbit".parse().unwrap()),
             &a_component,

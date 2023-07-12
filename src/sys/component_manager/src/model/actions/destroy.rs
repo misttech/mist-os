@@ -149,7 +149,7 @@ pub mod tests {
         fidl_fuchsia_component_decl as fdecl, fidl_fuchsia_sys2 as fsys, fuchsia_async as fasync,
         fuchsia_zircon as zx,
         futures::{channel::mpsc, lock::Mutex, StreamExt},
-        moniker::{AbsoluteMoniker, AbsoluteMonikerBase, ChildMoniker},
+        moniker::{ChildMoniker, Moniker, MonikerBase},
         std::fmt::Debug,
         std::sync::atomic::Ordering,
     };
@@ -162,7 +162,7 @@ pub mod tests {
         ];
         let test = ActionsTest::new("root", components, None).await;
         // Start the component. This should cause the component to have an `Execution`.
-        let component_root = test.look_up(AbsoluteMoniker::root()).await;
+        let component_root = test.look_up(Moniker::root()).await;
         let component_a = test.look_up(vec!["a"].try_into().unwrap()).await;
         test.model
             .start_instance(&component_a.abs_moniker, &StartReason::Eager)
@@ -233,7 +233,7 @@ pub mod tests {
         test.create_dynamic_child("coll", "b").await;
 
         // Start the components. This should cause them to have an `Execution`.
-        let component_root = test.look_up(AbsoluteMoniker::root()).await;
+        let component_root = test.look_up(Moniker::root()).await;
         let component_container = test.look_up(vec!["container"].try_into().unwrap()).await;
         let component_a = test.look_up(vec!["container", "coll:a"].try_into().unwrap()).await;
         let component_b = test.look_up(vec!["container", "coll:b"].try_into().unwrap()).await;
@@ -275,7 +275,7 @@ pub mod tests {
             ("b", component_decl_with_test_runner()),
         ];
         let test = ActionsTest::new("root", components, None).await;
-        let component_root = test.look_up(AbsoluteMoniker::root()).await;
+        let component_root = test.look_up(Moniker::root()).await;
         let component_a = test.look_up(vec!["a"].try_into().unwrap()).await;
         let component_b = test.look_up(vec!["a", "b"].try_into().unwrap()).await;
 
@@ -498,7 +498,7 @@ pub mod tests {
     async fn destroy_registers_discover() {
         let components = vec![("root", ComponentDeclBuilder::new().build())];
         let test = ActionsTest::new("root", components, None).await;
-        let component_root = test.look_up(AbsoluteMoniker::root()).await;
+        let component_root = test.look_up(Moniker::root()).await;
         // This setup circumvents the registration of the Discover action on component_a.
         {
             let mut resolved_state = component_root.lock_resolved_state().await.unwrap();
@@ -522,7 +522,7 @@ pub mod tests {
         .await;
 
         // Shut down component so we can destroy it.
-        let component_root = test.look_up(AbsoluteMoniker::root()).await;
+        let component_root = test.look_up(Moniker::root()).await;
         let component_a = match *component_root.lock_state().await {
             InstanceState::Resolved(ref s) => s
                 .get_child(&ChildMoniker::try_from("a").unwrap())
@@ -569,7 +569,7 @@ pub mod tests {
             ("c", component_decl_with_test_runner()),
         ];
         let test = ActionsTest::new("root", components, None).await;
-        let component_root = test.look_up(AbsoluteMoniker::root()).await;
+        let component_root = test.look_up(Moniker::root()).await;
         let component_a = test.look_up(vec!["a"].try_into().unwrap()).await;
         test.model
             .start_instance(&component_a.abs_moniker, &StartReason::Eager)
@@ -639,7 +639,7 @@ pub mod tests {
             ("x", component_decl_with_test_runner()),
         ];
         let test = ActionsTest::new("root", components, None).await;
-        let component_root = test.look_up(AbsoluteMoniker::root()).await;
+        let component_root = test.look_up(Moniker::root()).await;
         let component_a = test.look_up(vec!["a"].try_into().unwrap()).await;
         let component_b = test.look_up(vec!["a", "b"].try_into().unwrap()).await;
         let component_c = test.look_up(vec!["a", "b", "c"].try_into().unwrap()).await;
@@ -758,7 +758,7 @@ pub mod tests {
             ("b", ComponentDeclBuilder::new().add_lazy_child("b").build()),
         ];
         let test = ActionsTest::new("root", components, None).await;
-        let component_root = test.look_up(AbsoluteMoniker::root()).await;
+        let component_root = test.look_up(Moniker::root()).await;
         let component_a = test.look_up(vec!["a"].try_into().unwrap()).await;
         let component_b = test.look_up(vec!["a", "b"].try_into().unwrap()).await;
         let component_b2 = test.look_up(vec!["a", "b", "b"].try_into().unwrap()).await;
@@ -849,7 +849,7 @@ pub mod tests {
             ("d", component_decl_with_test_runner()),
         ];
         let test = ActionsTest::new("root", components, None).await;
-        let component_root = test.look_up(AbsoluteMoniker::root()).await;
+        let component_root = test.look_up(Moniker::root()).await;
         let component_a = test.look_up(vec!["a"].try_into().unwrap()).await;
         let component_b = test.look_up(vec!["a", "b"].try_into().unwrap()).await;
         let component_c = test.look_up(vec!["a", "b", "c"].try_into().unwrap()).await;
@@ -975,7 +975,7 @@ pub mod tests {
             ("a", component_decl_with_test_runner()),
             ("b", component_decl_with_test_runner()),
         ];
-        let test = ActionsTest::new("root", components, Some(AbsoluteMoniker::root())).await;
+        let test = ActionsTest::new("root", components, Some(Moniker::root())).await;
 
         // Create dynamic instance in "coll".
         test.create_dynamic_child("coll", "a").await;
@@ -985,7 +985,7 @@ pub mod tests {
 
         // We're going to run the destroy action for `a` twice. One after the other finishes, so
         // the actions semantics don't dedup them to the same work item.
-        let component_root = test.look_up(AbsoluteMoniker::root()).await;
+        let component_root = test.look_up(Moniker::root()).await;
         let destroy_fut_1 = ActionSet::register(
             component_root.clone(),
             DestroyChildAction::new("coll:a".try_into().unwrap(), 1),

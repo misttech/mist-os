@@ -10,7 +10,7 @@ mod tests {
             ExposeSource, ExposeTarget,
         },
         cm_rust_testing::ComponentDeclBuilder,
-        moniker::{AbsoluteMoniker, AbsoluteMonikerBase},
+        moniker::{Moniker, MonikerBase},
         routing_test_helpers::{
             availability::CommonAvailabilityTest, CheckUse, ExpectedResult, RoutingTestModel,
             RoutingTestModelBuilder, ServiceInstance,
@@ -154,7 +154,7 @@ mod tests {
                     expected_res: test_case.expected_res.clone(),
                 },
             ] {
-                model.check_use_exposed_dir(AbsoluteMoniker::root(), check_use).await;
+                model.check_use_exposed_dir(Moniker::root(), check_use).await;
             }
         }
     }

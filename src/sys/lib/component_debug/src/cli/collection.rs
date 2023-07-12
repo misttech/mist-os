@@ -7,13 +7,13 @@ use {
     anyhow::{bail, Result},
     cm_rust::{OfferDeclCommon, OfferTarget},
     fidl_fuchsia_sys2 as fsys,
-    moniker::AbsoluteMoniker,
+    moniker::Moniker,
     prettytable::{cell, format::consts::FORMAT_CLEAN, row, Table},
 };
 
 struct Collection {
     name: String,
-    moniker: AbsoluteMoniker,
+    moniker: Moniker,
     durability: Durability,
     environment: Option<String>,
     offered_capabilities: Vec<String>,
@@ -70,7 +70,7 @@ async fn get_all_collections(realm_query: &fsys::RealmQueryProxy) -> Result<Vec<
 }
 
 async fn get_all_collections_of_instance(
-    moniker: &AbsoluteMoniker,
+    moniker: &Moniker,
     realm_query: &fsys::RealmQueryProxy,
 ) -> Result<Vec<Collection>> {
     let manifest = get_resolved_declaration(moniker, realm_query).await?;
@@ -141,7 +141,7 @@ mod tests {
     use super::*;
     use crate::test_utils::*;
     use fidl_fuchsia_component_decl as fdecl;
-    use moniker::{AbsoluteMoniker, AbsoluteMonikerBase};
+    use moniker::{Moniker, MonikerBase};
     use std::collections::HashMap;
 
     fn create_query() -> fsys::RealmQueryProxy {
@@ -197,7 +197,7 @@ mod tests {
         let collection = collections.remove(0);
 
         assert_eq!(collection.name, "coll1");
-        assert_eq!(collection.moniker, AbsoluteMoniker::parse_str("/my_foo").unwrap());
+        assert_eq!(collection.moniker, Moniker::parse_str("/my_foo").unwrap());
         assert_eq!(collection.durability, Durability::Transient);
         assert!(collection.environment.is_none());
         assert_eq!(collection.offered_capabilities, vec!["fuchsia.foo.bar"]);

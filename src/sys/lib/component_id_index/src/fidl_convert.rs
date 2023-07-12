@@ -4,7 +4,7 @@
 
 use crate::{Index, InstanceIdEntry};
 use fidl_fuchsia_component_internal as fcomponent_internal;
-use moniker::{AbsoluteMoniker, AbsoluteMonikerBase, MonikerError};
+use moniker::{Moniker, MonikerBase, MonikerError};
 use std::convert::TryFrom;
 use thiserror::Error;
 
@@ -32,7 +32,7 @@ impl TryFrom<fcomponent_internal::ComponentIdIndex> for Index {
                 instance_id: entry.instance_id,
                 moniker: entry
                     .moniker
-                    .map(|moniker_str| AbsoluteMoniker::parse_str(&moniker_str))
+                    .map(|moniker_str| Moniker::parse_str(&moniker_str))
                     .transpose()?,
             });
         }
@@ -77,7 +77,7 @@ mod tests {
         let native_index = Index {
             instances: vec![InstanceIdEntry {
                 instance_id: Some("abc".to_string()),
-                moniker: Some(AbsoluteMoniker::parse_str("a/b/c").unwrap()),
+                moniker: Some(Moniker::parse_str("a/b/c").unwrap()),
             }],
         };
 

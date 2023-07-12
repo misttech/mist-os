@@ -4,7 +4,7 @@
 
 use {
     fidl_fuchsia_sys2 as fsys, fuchsia_async as fasync, fuchsia_zircon as zx, futures::lock::Mutex,
-    moniker::AbsoluteMoniker, std::sync::Arc, tracing::*,
+    moniker::Moniker, std::sync::Arc, tracing::*,
 };
 
 /// Any stored data is removed after this amount of time
@@ -13,7 +13,7 @@ const CLEANUP_DEADLINE_SECONDS: i64 = 600;
 #[derive(Debug, Clone, PartialEq)]
 pub struct ComponentCrashInfo {
     pub url: String,
-    pub moniker: AbsoluteMoniker,
+    pub moniker: Moniker,
 }
 
 impl Into<fsys::ComponentCrashInfo> for ComponentCrashInfo {

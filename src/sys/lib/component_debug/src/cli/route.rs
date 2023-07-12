@@ -9,7 +9,7 @@ use {
     },
     anyhow::{format_err, Result},
     fidl_fuchsia_sys2 as fsys,
-    moniker::{AbsoluteMoniker, AbsoluteMonikerBase},
+    moniker::{Moniker, MonikerBase},
 };
 
 pub async fn route_cmd_print<W: std::io::Write>(
@@ -23,7 +23,7 @@ pub async fn route_cmd_print<W: std::io::Write>(
 
     // Convert the absolute moniker into a relative moniker w.r.t. root.
     // RouteValidator expects relative monikers only.
-    let relative_moniker = AbsoluteMoniker::scope_down(&AbsoluteMoniker::root(), &moniker).unwrap();
+    let relative_moniker = Moniker::scope_down(&Moniker::root(), &moniker).unwrap();
 
     writeln!(writer, "Moniker: {}", &moniker)?;
 
@@ -47,7 +47,7 @@ pub async fn route_cmd_serialized(
 
     // Convert the absolute moniker into a relative moniker w.r.t. root.
     // RouteValidator expects relative monikers only.
-    let relative_moniker = AbsoluteMoniker::scope_down(&AbsoluteMoniker::root(), &moniker).unwrap();
+    let relative_moniker = Moniker::scope_down(&Moniker::root(), &moniker).unwrap();
     let targets = route_targets_from_filter(filter)?;
     route::route(&route_validator, relative_moniker, targets).await
 }

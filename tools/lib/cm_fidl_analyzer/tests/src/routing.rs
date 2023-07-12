@@ -30,7 +30,7 @@ use {
     fidl::prelude::*,
     fidl_fuchsia_component_decl as fdecl, fidl_fuchsia_component_internal as component_internal,
     fidl_fuchsia_io as fio, fidl_fuchsia_sys2 as fsys, fuchsia_zircon_status as zx_status,
-    moniker::{AbsoluteMoniker, AbsoluteMonikerBase, ChildMonikerBase},
+    moniker::{ChildMonikerBase, Moniker, MonikerBase},
     routing::{
         component_id_index::ComponentIdIndex,
         component_instance::ComponentInstanceInterface,
@@ -409,7 +409,7 @@ fn add_component_to_route(
 impl RoutingTestModel for RoutingTestForAnalyzer {
     type C = ComponentInstanceForAnalyzer;
 
-    async fn check_use(&self, moniker: AbsoluteMoniker, check: CheckUse) {
+    async fn check_use(&self, moniker: Moniker, check: CheckUse) {
         let target_id = NodePath::new(moniker.path().clone());
         let target = self.model.get_instance(&target_id).expect("target instance not found");
         let scope =
@@ -465,7 +465,7 @@ impl RoutingTestModel for RoutingTestForAnalyzer {
         }
     }
 
-    async fn check_use_exposed_dir(&self, moniker: AbsoluteMoniker, check: CheckUse) {
+    async fn check_use_exposed_dir(&self, moniker: Moniker, check: CheckUse) {
         let target =
             self.model.get_instance(&NodePath::from(moniker)).expect("target instance not found");
 
@@ -509,7 +509,7 @@ impl RoutingTestModel for RoutingTestForAnalyzer {
 
     async fn look_up_instance(
         &self,
-        moniker: &AbsoluteMoniker,
+        moniker: &Moniker,
     ) -> Result<Arc<ComponentInstanceForAnalyzer>, anyhow::Error> {
         self.model.get_instance(&NodePath::from(moniker.clone())).map_err(|err| anyhow!(err))
     }
@@ -518,7 +518,7 @@ impl RoutingTestModel for RoutingTestForAnalyzer {
     //
     // All file and directory operations are no-ops for the static model.
     #[allow(unused_variables)]
-    async fn check_open_file(&self, moniker: AbsoluteMoniker, path: cm_types::Path) {}
+    async fn check_open_file(&self, moniker: Moniker, path: cm_types::Path) {}
 
     #[allow(unused_variables)]
     async fn create_static_file(&self, path: &Path, contents: &str) -> Result<(), anyhow::Error> {
@@ -706,7 +706,7 @@ mod tests {
         let model = RoutingTestBuilderForAnalyzer::new("a", components).build().await;
         model
             .check_use(
-                AbsoluteMoniker::root(),
+                Moniker::root(),
                 CheckUse::Service {
                     path: "/foo".parse().unwrap(),
                     instance: ServiceInstance::Named("".into()),
@@ -875,7 +875,7 @@ mod tests {
         let model = builder.build().await;
         model
             .check_use(
-                AbsoluteMoniker::root(),
+                Moniker::root(),
                 CheckUse::EventStream {
                     expected_res: ExpectedResult::Ok,
                     path: "/event/stream".parse().unwrap(),
@@ -1307,9 +1307,9 @@ mod tests {
                     moniker: vec!["b"].try_into().unwrap(),
                     capability: use_decl
                 },
-                RouteSegment::OfferBy { moniker: AbsoluteMoniker::root(), capability: offer_decl },
+                RouteSegment::OfferBy { moniker: Moniker::root(), capability: offer_decl },
                 RouteSegment::DeclareBy {
-                    moniker: AbsoluteMoniker::root(),
+                    moniker: Moniker::root(),
                     capability: CapabilityDecl::Protocol(protocol_decl)
                 }
             ]
@@ -1350,8 +1350,7 @@ mod tests {
             ),
         ];
         let test = RoutingTestBuilderForAnalyzer::new("a", components).build().await;
-        let a_component =
-            test.look_up_instance(&AbsoluteMoniker::root()).await.expect("a instance");
+        let a_component = test.look_up_instance(&Moniker::root()).await.expect("a instance");
         let route_results = test.model.check_use_capability(&use_decl, &a_component);
         assert_eq!(route_results.len(), 1);
         let route_result = &route_results[0];
@@ -1360,7 +1359,7 @@ mod tests {
         assert_eq!(
             route_result.route,
             vec![
-                RouteSegment::UseBy { moniker: AbsoluteMoniker::root(), capability: use_decl },
+                RouteSegment::UseBy { moniker: Moniker::root(), capability: use_decl },
                 RouteSegment::ExposeBy {
                     moniker: vec!["b"].try_into().unwrap(),
                     capability: expose_decl
@@ -1393,8 +1392,7 @@ mod tests {
         )];
 
         let test = RoutingTestBuilderForAnalyzer::new("a", components).build().await;
-        let a_component =
-            test.look_up_instance(&AbsoluteMoniker::root()).await.expect("a instance");
+        let a_component = test.look_up_instance(&Moniker::root()).await.expect("a instance");
         let route_results = test.model.check_use_capability(&use_decl, &a_component);
         assert_eq!(route_results.len(), 1);
         let route_result = &route_results[0];
@@ -1403,9 +1401,9 @@ mod tests {
         assert_eq!(
             route_result.route,
             vec![
-                RouteSegment::UseBy { moniker: AbsoluteMoniker::root(), capability: use_decl },
+                RouteSegment::UseBy { moniker: Moniker::root(), capability: use_decl },
                 RouteSegment::DeclareBy {
-                    moniker: AbsoluteMoniker::root(),
+                    moniker: Moniker::root(),
                     capability: CapabilityDecl::Protocol(protocol_decl)
                 }
             ]
@@ -1504,10 +1502,7 @@ mod tests {
                     moniker: vec!["c"].try_into().unwrap(),
                     capability: use_decl
                 },
-                RouteSegment::OfferBy {
-                    moniker: AbsoluteMoniker::root(),
-                    capability: a_offer_decl
-                },
+                RouteSegment::OfferBy { moniker: Moniker::root(), capability: a_offer_decl },
                 RouteSegment::ExposeBy {
                     moniker: vec!["b"].try_into().unwrap(),
                     capability: b_expose_decl
@@ -1581,11 +1576,11 @@ mod tests {
             route_result.route,
             vec![
                 RouteSegment::RegisterBy {
-                    moniker: AbsoluteMoniker::root(),
+                    moniker: Moniker::root(),
                     capability: RegistrationDecl::Runner(runner_reg)
                 },
                 RouteSegment::DeclareBy {
-                    moniker: AbsoluteMoniker::root(),
+                    moniker: Moniker::root(),
                     capability: CapabilityDecl::Runner(runner_decl)
                 },
             ]
@@ -1657,12 +1652,9 @@ mod tests {
                     moniker: vec!["b"].try_into().unwrap(),
                     capability: use_storage_decl
                 },
-                RouteSegment::OfferBy {
-                    moniker: AbsoluteMoniker::root(),
-                    capability: offer_storage_decl
-                },
+                RouteSegment::OfferBy { moniker: Moniker::root(), capability: offer_storage_decl },
                 RouteSegment::DeclareBy {
-                    moniker: AbsoluteMoniker::root(),
+                    moniker: Moniker::root(),
                     capability: CapabilityDecl::Storage(storage_decl.clone())
                 }
             ]
@@ -1671,11 +1663,11 @@ mod tests {
             backing_dir_route_result.route,
             vec![
                 RouteSegment::RegisterBy {
-                    moniker: AbsoluteMoniker::root(),
+                    moniker: Moniker::root(),
                     capability: RegistrationDecl::Storage(storage_decl.into())
                 },
                 RouteSegment::DeclareBy {
-                    moniker: AbsoluteMoniker::root(),
+                    moniker: Moniker::root(),
                     capability: CapabilityDecl::Directory(directory_decl)
                 }
             ]
@@ -1764,10 +1756,7 @@ mod tests {
                     moniker: vec!["b"].try_into().unwrap(),
                     capability: use_realm_decl
                 },
-                RouteSegment::OfferBy {
-                    moniker: AbsoluteMoniker::root(),
-                    capability: offer_realm_decl
-                },
+                RouteSegment::OfferBy { moniker: Moniker::root(), capability: offer_realm_decl },
                 RouteSegment::ProvideFromFramework {
                     capability: "fuchsia.component.Realm".parse().unwrap()
                 }
@@ -1788,7 +1777,7 @@ mod tests {
                     capability: use_event_source_decl
                 },
                 RouteSegment::OfferBy {
-                    moniker: AbsoluteMoniker::root(),
+                    moniker: Moniker::root(),
                     capability: offer_event_source_decl
                 },
                 RouteSegment::ProvideAsBuiltin { capability: event_source_decl }
@@ -1852,7 +1841,7 @@ mod tests {
                     moniker: vec!["b"].try_into().unwrap(),
                     capability: use_decl
                 },
-                RouteSegment::OfferBy { moniker: AbsoluteMoniker::root(), capability: offer_decl },
+                RouteSegment::OfferBy { moniker: Moniker::root(), capability: offer_decl },
                 RouteSegment::ProvideFromNamespace { capability: capability_decl }
             ]
         );
@@ -1925,7 +1914,7 @@ mod tests {
             route_map.route,
             vec![
                 RouteSegment::RegisterBy {
-                    moniker: AbsoluteMoniker::root(),
+                    moniker: Moniker::root(),
                     capability: RegistrationDecl::Resolver(registration_decl)
                 },
                 RouteSegment::ExposeBy {
@@ -2001,11 +1990,11 @@ mod tests {
             route_map.route,
             vec![
                 RouteSegment::RegisterBy {
-                    moniker: AbsoluteMoniker::root(),
+                    moniker: Moniker::root(),
                     capability: RegistrationDecl::Resolver(registration_decl)
                 },
                 RouteSegment::DeclareBy {
-                    moniker: AbsoluteMoniker::root(),
+                    moniker: Moniker::root(),
                     capability: CapabilityDecl::Resolver(resolver_decl)
                 }
             ]
@@ -2108,11 +2097,11 @@ mod tests {
             route_map.route,
             vec![
                 RouteSegment::RegisterBy {
-                    moniker: AbsoluteMoniker::root(),
+                    moniker: Moniker::root(),
                     capability: RegistrationDecl::Resolver(resolver_registration)
                 },
                 RouteSegment::DeclareBy {
-                    moniker: AbsoluteMoniker::root(),
+                    moniker: Moniker::root(),
                     capability: CapabilityDecl::Resolver(resolver_decl)
                 }
             ]
@@ -2135,8 +2124,7 @@ mod tests {
         builder.set_builtin_capabilities(vec![elf_runner_decl.clone()]);
         builder.register_mock_builtin_runner("elf");
         let test = builder.build().await;
-        let a_component =
-            test.look_up_instance(&AbsoluteMoniker::root()).await.expect("a instance");
+        let a_component = test.look_up_instance(&Moniker::root()).await.expect("a instance");
 
         let route_result = test
             .model
@@ -2292,11 +2280,11 @@ mod tests {
                         capability: use_directory_decl,
                     },
                     RouteSegment::OfferBy {
-                        moniker: AbsoluteMoniker::root(),
+                        moniker: Moniker::root(),
                         capability: offer_directory_decl,
                     },
                     RouteSegment::DeclareBy {
-                        moniker: AbsoluteMoniker::root(),
+                        moniker: Moniker::root(),
                         capability: CapabilityDecl::Directory(directory_decl),
                     }
                 ]
@@ -2312,11 +2300,11 @@ mod tests {
                 error: None,
                 route: vec![
                     RouteSegment::RegisterBy {
-                        moniker: AbsoluteMoniker::root(),
+                        moniker: Moniker::root(),
                         capability: RegistrationDecl::Runner(runner_registration_decl)
                     },
                     RouteSegment::DeclareBy {
-                        moniker: AbsoluteMoniker::root(),
+                        moniker: Moniker::root(),
                         capability: CapabilityDecl::Runner(runner_decl)
                     }
                 ]
@@ -2333,11 +2321,11 @@ mod tests {
                 error: None,
                 route: vec![
                     RouteSegment::RegisterBy {
-                        moniker: AbsoluteMoniker::root(),
+                        moniker: Moniker::root(),
                         capability: RegistrationDecl::Resolver(resolver_registration_decl)
                     },
                     RouteSegment::DeclareBy {
-                        moniker: AbsoluteMoniker::root(),
+                        moniker: Moniker::root(),
                         capability: CapabilityDecl::Resolver(resolver_decl)
                     }
                 ]
@@ -2457,8 +2445,7 @@ mod tests {
 
         let test =
             RoutingTestBuilderForAnalyzer::new_with_custom_urls(a_url, components).build().await;
-        let root_component =
-            test.look_up_instance(&AbsoluteMoniker::root()).await.expect("a instance");
+        let root_component = test.look_up_instance(&Moniker::root()).await.expect("a instance");
 
         let route_maps = test.model.check_routes_for_instance(
             &root_component,
@@ -2480,7 +2467,7 @@ mod tests {
                     },
                 )),
                 route: vec![RouteSegment::OfferBy {
-                    moniker: AbsoluteMoniker::root(),
+                    moniker: Moniker::root(),
                     capability: offer_protocol_decl
                 }]
             }]

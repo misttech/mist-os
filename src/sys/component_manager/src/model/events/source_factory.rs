@@ -16,7 +16,7 @@ use {
     },
     ::routing::capability_source::InternalCapability,
     async_trait::async_trait,
-    moniker::{AbsoluteMoniker, ExtendedMoniker},
+    moniker::{ExtendedMoniker, Moniker},
     std::sync::{Arc, Weak},
 };
 
@@ -57,7 +57,7 @@ impl EventSourceFactory {
     }
 
     /// Creates a `EventSource` for the given `subscriber`.
-    async fn create(&self, subscriber: AbsoluteMoniker) -> Result<EventSource, ModelError> {
+    async fn create(&self, subscriber: Moniker) -> Result<EventSource, ModelError> {
         EventSource::new(
             ExtendedMoniker::ComponentInstance(subscriber),
             self.model.clone(),
@@ -77,12 +77,12 @@ impl EventSourceFactory {
         .await
     }
 
-    /// Returns an EventSource. An EventSource holds an InstancedAbsoluteMoniker that
+    /// Returns an EventSource. An EventSource holds an InstancedMoniker that
     /// corresponds to the component in which it will receive events.
     async fn on_capability_routed_async(
         self: Arc<Self>,
         capability_decl: &InternalCapability,
-        target_moniker: AbsoluteMoniker,
+        target_moniker: Moniker,
         capability: Option<Box<dyn CapabilityProvider>>,
     ) -> Result<Option<Box<dyn CapabilityProvider>>, ModelError> {
         match capability_decl {

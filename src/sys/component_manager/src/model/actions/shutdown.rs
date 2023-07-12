@@ -818,7 +818,7 @@ mod tests {
         cm_types::AllowedOffers,
         fidl_fuchsia_component as fcomponent, fidl_fuchsia_component_decl as fdecl,
         maplit::{btreeset, hashmap, hashset},
-        moniker::{AbsoluteMoniker, ChildMoniker},
+        moniker::{ChildMoniker, Moniker},
         std::collections::{BTreeSet, HashMap},
         std::convert::TryFrom,
         test_case::test_case,
@@ -3427,12 +3427,12 @@ mod tests {
                     .build(),
             ),
         ];
-        let moniker_a: AbsoluteMoniker = vec!["a"].try_into().unwrap();
-        let moniker_b: AbsoluteMoniker = vec!["a", "b"].try_into().unwrap();
-        let moniker_c: AbsoluteMoniker = vec!["a", "b", "c"].try_into().unwrap();
-        let moniker_d: AbsoluteMoniker = vec!["a", "b", "d"].try_into().unwrap();
-        let moniker_e: AbsoluteMoniker = vec!["a", "b", "e"].try_into().unwrap();
-        let moniker_f: AbsoluteMoniker = vec!["a", "b", "f"].try_into().unwrap();
+        let moniker_a: Moniker = vec!["a"].try_into().unwrap();
+        let moniker_b: Moniker = vec!["a", "b"].try_into().unwrap();
+        let moniker_c: Moniker = vec!["a", "b", "c"].try_into().unwrap();
+        let moniker_d: Moniker = vec!["a", "b", "d"].try_into().unwrap();
+        let moniker_e: Moniker = vec!["a", "b", "e"].try_into().unwrap();
+        let moniker_f: Moniker = vec!["a", "b", "f"].try_into().unwrap();
         let test = ActionsTest::new("root", components, None).await;
         let component_a = test.look_up(moniker_a.clone()).await;
         let component_b = test.look_up(moniker_b.clone()).await;
@@ -3472,7 +3472,7 @@ mod tests {
         component_e_info.check_is_shut_down(&test.runner).await;
         component_f_info.check_is_shut_down(&test.runner).await;
 
-        let mut comes_after: HashMap<AbsoluteMoniker, Vec<AbsoluteMoniker>> = HashMap::new();
+        let mut comes_after: HashMap<Moniker, Vec<Moniker>> = HashMap::new();
         comes_after.insert(moniker_a.clone(), vec![moniker_b.clone()]);
         // technically we could just depend on 'D' since it is the last of b's
         // children, but we add all the children for resilence against the
@@ -3651,12 +3651,12 @@ mod tests {
                     .build(),
             ),
         ];
-        let moniker_a: AbsoluteMoniker = vec!["a"].try_into().unwrap();
-        let moniker_b: AbsoluteMoniker = vec!["a", "b"].try_into().unwrap();
-        let moniker_c: AbsoluteMoniker = vec!["a", "b", "c"].try_into().unwrap();
-        let moniker_d: AbsoluteMoniker = vec!["a", "b", "d"].try_into().unwrap();
-        let moniker_e: AbsoluteMoniker = vec!["a", "b", "e"].try_into().unwrap();
-        let moniker_f: AbsoluteMoniker = vec!["a", "b", "f"].try_into().unwrap();
+        let moniker_a: Moniker = vec!["a"].try_into().unwrap();
+        let moniker_b: Moniker = vec!["a", "b"].try_into().unwrap();
+        let moniker_c: Moniker = vec!["a", "b", "c"].try_into().unwrap();
+        let moniker_d: Moniker = vec!["a", "b", "d"].try_into().unwrap();
+        let moniker_e: Moniker = vec!["a", "b", "e"].try_into().unwrap();
+        let moniker_f: Moniker = vec!["a", "b", "f"].try_into().unwrap();
         let test = ActionsTest::new("root", components, None).await;
         let component_a = test.look_up(moniker_a.clone()).await;
         let component_b = test.look_up(moniker_b.clone()).await;
@@ -3696,7 +3696,7 @@ mod tests {
         component_e_info.check_is_shut_down(&test.runner).await;
         component_f_info.check_is_shut_down(&test.runner).await;
 
-        let mut comes_after: HashMap<AbsoluteMoniker, Vec<AbsoluteMoniker>> = HashMap::new();
+        let mut comes_after: HashMap<Moniker, Vec<Moniker>> = HashMap::new();
         comes_after.insert(moniker_a.clone(), vec![moniker_b.clone()]);
         // technically we could just depend on 'D' since it is the last of b's
         // children, but we add all the children for resilence against the

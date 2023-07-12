@@ -4,11 +4,11 @@
 
 use {
     crate::{CheckUse, ExpectedResult, RoutingTestModel, RoutingTestModelBuilder},
-    cm_moniker::InstancedAbsoluteMoniker,
+    cm_moniker::InstancedMoniker,
     cm_rust::*,
     cm_rust_testing::*,
     fidl_fuchsia_component_decl as fdecl, fidl_fuchsia_io as fio,
-    moniker::{AbsoluteMoniker, AbsoluteMonikerBase},
+    moniker::{Moniker, MonikerBase},
     std::{
         convert::{TryFrom, TryInto},
         marker::PhantomData,
@@ -101,7 +101,7 @@ impl<T: RoutingTestModelBuilder> CommonStorageAdminTest<T> {
             .check_use(
                 vec!["c"].try_into().unwrap(),
                 CheckUse::StorageAdmin {
-                    storage_relation: InstancedAbsoluteMoniker::try_from(vec!["b:0"]).unwrap(),
+                    storage_relation: InstancedMoniker::try_from(vec!["b:0"]).unwrap(),
                     from_cm_namespace: false,
                     storage_subdir: None,
                     expected_res: ExpectedResult::Ok,
@@ -185,7 +185,7 @@ impl<T: RoutingTestModelBuilder> CommonStorageAdminTest<T> {
             .check_use(
                 vec!["b", "c"].try_into().unwrap(),
                 CheckUse::StorageAdmin {
-                    storage_relation: InstancedAbsoluteMoniker::try_from(vec!["c:0"]).unwrap(),
+                    storage_relation: InstancedMoniker::try_from(vec!["c:0"]).unwrap(),
                     from_cm_namespace: false,
                     storage_subdir: Some("foo/bar".to_string()),
                     expected_res: ExpectedResult::Ok,
@@ -284,7 +284,7 @@ impl<T: RoutingTestModelBuilder> CommonStorageAdminTest<T> {
         test.check_use(
             vec!["b"].try_into().unwrap(),
             CheckUse::StorageAdmin {
-                storage_relation: InstancedAbsoluteMoniker::try_from(vec!["d:0"]).unwrap(),
+                storage_relation: InstancedMoniker::try_from(vec!["d:0"]).unwrap(),
                 from_cm_namespace: false,
                 storage_subdir: None,
                 expected_res: ExpectedResult::Ok,
@@ -351,9 +351,9 @@ impl<T: RoutingTestModelBuilder> CommonStorageAdminTest<T> {
         let model = T::new("a", components).build().await;
         model
             .check_use(
-                AbsoluteMoniker::root(),
+                Moniker::root(),
                 CheckUse::StorageAdmin {
-                    storage_relation: InstancedAbsoluteMoniker::try_from(vec!["b:0"]).unwrap(),
+                    storage_relation: InstancedMoniker::try_from(vec!["b:0"]).unwrap(),
                     from_cm_namespace: false,
                     storage_subdir: None,
                     expected_res: ExpectedResult::Ok,
@@ -422,9 +422,9 @@ impl<T: RoutingTestModelBuilder> CommonStorageAdminTest<T> {
         let model = T::new("a", components).build().await;
         model
             .check_use(
-                AbsoluteMoniker::root(),
+                Moniker::root(),
                 CheckUse::StorageAdmin {
-                    storage_relation: InstancedAbsoluteMoniker::try_from(vec!["b:0"]).unwrap(),
+                    storage_relation: InstancedMoniker::try_from(vec!["b:0"]).unwrap(),
                     from_cm_namespace: false,
                     storage_subdir: None,
                     expected_res: ExpectedResult::ErrWithNoEpitaph,
@@ -490,7 +490,7 @@ impl<T: RoutingTestModelBuilder> CommonStorageAdminTest<T> {
             .check_use(
                 vec!["b"].try_into().unwrap(),
                 CheckUse::StorageAdmin {
-                    storage_relation: InstancedAbsoluteMoniker::try_from(vec!["b:0"]).unwrap(),
+                    storage_relation: InstancedMoniker::try_from(vec!["b:0"]).unwrap(),
                     from_cm_namespace: false,
                     storage_subdir: None,
                     expected_res: ExpectedResult::ErrWithNoEpitaph,
@@ -592,7 +592,7 @@ impl<T: RoutingTestModelBuilder> CommonStorageAdminTest<T> {
             .check_use(
                 vec!["b"].try_into().unwrap(),
                 CheckUse::StorageAdmin {
-                    storage_relation: InstancedAbsoluteMoniker::try_from(vec!["d:0"]).unwrap(),
+                    storage_relation: InstancedMoniker::try_from(vec!["d:0"]).unwrap(),
                     from_cm_namespace: false,
                     storage_subdir: None,
                     expected_res: ExpectedResult::ErrWithNoEpitaph,
@@ -660,9 +660,9 @@ impl<T: RoutingTestModelBuilder> CommonStorageAdminTest<T> {
         let model = T::new("a", components).build().await;
         model
             .check_use(
-                AbsoluteMoniker::root(),
+                Moniker::root(),
                 CheckUse::StorageAdmin {
-                    storage_relation: InstancedAbsoluteMoniker::try_from(vec!["b:0"]).unwrap(),
+                    storage_relation: InstancedMoniker::try_from(vec!["b:0"]).unwrap(),
                     from_cm_namespace: false,
                     storage_subdir: None,
                     expected_res: ExpectedResult::ErrWithNoEpitaph,
@@ -726,7 +726,7 @@ impl<T: RoutingTestModelBuilder> CommonStorageAdminTest<T> {
             .check_use(
                 vec!["b"].try_into().unwrap(),
                 CheckUse::StorageAdmin {
-                    storage_relation: InstancedAbsoluteMoniker::try_from(vec!["b:0"]).unwrap(),
+                    storage_relation: InstancedMoniker::try_from(vec!["b:0"]).unwrap(),
                     from_cm_namespace: false,
                     storage_subdir: None,
                     expected_res: ExpectedResult::ErrWithNoEpitaph,
@@ -826,7 +826,7 @@ impl<T: RoutingTestModelBuilder> CommonStorageAdminTest<T> {
             .check_use(
                 vec!["b"].try_into().unwrap(),
                 CheckUse::StorageAdmin {
-                    storage_relation: InstancedAbsoluteMoniker::try_from(vec!["d:0"]).unwrap(),
+                    storage_relation: InstancedMoniker::try_from(vec!["d:0"]).unwrap(),
                     from_cm_namespace: false,
                     storage_subdir: None,
                     expected_res: ExpectedResult::ErrWithNoEpitaph,

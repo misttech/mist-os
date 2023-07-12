@@ -7,7 +7,7 @@ use {
     ansi_term::Colour,
     anyhow::Result,
     fidl_fuchsia_sys2 as fsys,
-    moniker::AbsoluteMonikerBase,
+    moniker::MonikerBase,
     prettytable::{cell, format::consts::FORMAT_CLEAN, row, Table},
     std::collections::HashSet,
     std::str::FromStr,
@@ -194,7 +194,7 @@ fn filter_relatives(instances: Vec<Instance>, child_str: String) -> Vec<Instance
 mod tests {
     use super::*;
     use crate::test_utils::*;
-    use moniker::{AbsoluteMoniker, AbsoluteMonikerBase};
+    use moniker::{Moniker, MonikerBase};
     use std::collections::HashMap;
 
     fn create_query() -> fsys::RealmQueryProxy {
@@ -262,9 +262,9 @@ mod tests {
         assert_eq!(
             instances.iter().map(|i| i.moniker.clone()).collect::<Vec<_>>(),
             vec![
-                AbsoluteMoniker::root(),
-                AbsoluteMoniker::parse_str("/core").unwrap(),
-                AbsoluteMoniker::parse_str("/core/appmgr").unwrap(),
+                Moniker::root(),
+                Moniker::parse_str("/core").unwrap(),
+                Moniker::parse_str("/core/appmgr").unwrap(),
             ]
         );
     }
@@ -277,10 +277,7 @@ mod tests {
             get_instances_matching_filter(Some(ListFilter::Running), &query).await.unwrap();
         assert_eq!(
             instances.iter().map(|i| i.moniker.clone()).collect::<Vec<_>>(),
-            vec![
-                AbsoluteMoniker::parse_str("/core").unwrap(),
-                AbsoluteMoniker::parse_str("/core/appmgr").unwrap(),
-            ]
+            vec![Moniker::parse_str("/core").unwrap(), Moniker::parse_str("/core/appmgr").unwrap(),]
         );
     }
 
@@ -292,7 +289,7 @@ mod tests {
             get_instances_matching_filter(Some(ListFilter::Stopped), &query).await.unwrap();
         assert_eq!(
             instances.iter().map(|i| i.moniker.clone()).collect::<Vec<_>>(),
-            [AbsoluteMoniker::root()]
+            [Moniker::root()]
         );
     }
 
@@ -306,10 +303,7 @@ mod tests {
                 .unwrap();
         assert_eq!(
             instances.iter().map(|i| i.moniker.clone()).collect::<Vec<_>>(),
-            vec![
-                AbsoluteMoniker::parse_str("/core").unwrap(),
-                AbsoluteMoniker::parse_str("/core/appmgr").unwrap(),
-            ]
+            vec![Moniker::parse_str("/core").unwrap(), Moniker::parse_str("/core/appmgr").unwrap(),]
         );
     }
 
@@ -323,7 +317,7 @@ mod tests {
                 .unwrap();
         assert_eq!(
             instances.iter().map(|i| i.moniker.clone()).collect::<Vec<_>>(),
-            vec![AbsoluteMoniker::root(), AbsoluteMoniker::parse_str("/core").unwrap()]
+            vec![Moniker::root(), Moniker::parse_str("/core").unwrap()]
         );
     }
 
@@ -338,9 +332,9 @@ mod tests {
         assert_eq!(
             instances.iter().map(|i| i.moniker.clone()).collect::<Vec<_>>(),
             vec![
-                AbsoluteMoniker::root(),
-                AbsoluteMoniker::parse_str("/core").unwrap(),
-                AbsoluteMoniker::parse_str("/core/appmgr").unwrap(),
+                Moniker::root(),
+                Moniker::parse_str("/core").unwrap(),
+                Moniker::parse_str("/core/appmgr").unwrap(),
             ]
         );
     }

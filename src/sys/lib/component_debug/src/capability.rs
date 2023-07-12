@@ -8,7 +8,7 @@ use {
     },
     cm_rust::{ComponentDecl, SourceName},
     fidl_fuchsia_sys2 as fsys,
-    moniker::AbsoluteMoniker,
+    moniker::Moniker,
     thiserror::Error,
 };
 
@@ -22,7 +22,7 @@ pub enum FindInstancesError {
 
     #[error("failed to get manifest for {moniker}: {err}")]
     GetDeclarationError {
-        moniker: AbsoluteMoniker,
+        moniker: Moniker,
         #[source]
         err: GetDeclarationError,
     },
@@ -57,11 +57,7 @@ pub async fn get_all_route_segments(
 
 /// Determine if a capability matching the |query| is declared, exposed, used or offered by
 /// this component.
-fn get_segments(
-    moniker: &AbsoluteMoniker,
-    manifest: ComponentDecl,
-    query: &str,
-) -> Vec<RouteSegment> {
+fn get_segments(moniker: &Moniker, manifest: ComponentDecl, query: &str) -> Vec<RouteSegment> {
     let mut segments = vec![];
 
     for capability in manifest.capabilities {

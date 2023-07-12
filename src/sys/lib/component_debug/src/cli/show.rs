@@ -15,7 +15,7 @@ use {
     anyhow::Result,
     cm_rust::ExposeDeclCommon,
     fidl_fuchsia_sys2 as fsys,
-    moniker::AbsoluteMoniker,
+    moniker::Moniker,
     prettytable::{cell, format::FormatBuilder, row, Table},
 };
 
@@ -24,7 +24,7 @@ use serde::Serialize;
 
 #[cfg_attr(feature = "serde", derive(Serialize))]
 pub struct ShowCmdInstance {
-    pub moniker: AbsoluteMoniker,
+    pub moniker: Moniker,
     pub url: String,
     pub environment: Option<String>,
     pub instance_id: Option<String>,
@@ -230,7 +230,7 @@ mod tests {
     use super::*;
     use crate::test_utils::*;
     use fidl_fuchsia_component_decl as fdecl;
-    use moniker::{AbsoluteMoniker, AbsoluteMonikerBase};
+    use moniker::{Moniker, MonikerBase};
     use std::collections::HashMap;
     use std::fs;
     use tempfile::TempDir;
@@ -361,7 +361,7 @@ mod tests {
 
         let instance = get_instance_by_query("foo.cm".to_string(), query).await.unwrap();
 
-        assert_eq!(instance.moniker, AbsoluteMoniker::parse_str("/my_foo").unwrap());
+        assert_eq!(instance.moniker, Moniker::parse_str("/my_foo").unwrap());
         assert_eq!(instance.url, "fuchsia-pkg://fuchsia.com/foo#meta/foo.cm");
         assert_eq!(instance.instance_id.unwrap(), "1234567890");
         assert!(instance.resolved.is_some());
@@ -409,7 +409,7 @@ mod tests {
 
         let instance = get_instance_by_query("my_foo".to_string(), query).await.unwrap();
 
-        assert_eq!(instance.moniker, AbsoluteMoniker::parse_str("/my_foo").unwrap());
+        assert_eq!(instance.moniker, Moniker::parse_str("/my_foo").unwrap());
         assert_eq!(instance.url, "fuchsia-pkg://fuchsia.com/foo#meta/foo.cm");
         assert_eq!(instance.instance_id.unwrap(), "1234567890");
     }
@@ -420,7 +420,7 @@ mod tests {
 
         let instance = get_instance_by_query("1234567".to_string(), query).await.unwrap();
 
-        assert_eq!(instance.moniker, AbsoluteMoniker::parse_str("/my_foo").unwrap());
+        assert_eq!(instance.moniker, Moniker::parse_str("/my_foo").unwrap());
         assert_eq!(instance.url, "fuchsia-pkg://fuchsia.com/foo#meta/foo.cm");
         assert_eq!(instance.instance_id.unwrap(), "1234567890");
     }

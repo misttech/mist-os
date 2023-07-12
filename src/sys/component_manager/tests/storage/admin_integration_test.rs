@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use {
-    cm_moniker::InstancedAbsoluteMoniker,
+    cm_moniker::InstancedMoniker,
     component_events::{events::*, matcher::*},
     fidl::endpoints::{create_endpoints, create_proxy, ClientEnd},
     fidl_fuchsia_io as fio, fidl_fuchsia_sys2 as fsys, fuchsia_async as fasync,
@@ -16,7 +16,7 @@ use {
         channel::mpsc, future::BoxFuture, sink::SinkExt, Future, FutureExt, StreamExt, TryStreamExt,
     },
     maplit::hashset,
-    moniker::AbsoluteMonikerBase,
+    moniker::MonikerBase,
     std::collections::HashSet,
 };
 
@@ -108,12 +108,10 @@ async fn single_storage_user() {
     assert_eq!(
         storage_users
             .iter()
-            .map(|moniker_with_instances| InstancedAbsoluteMoniker::parse_str(
-                moniker_with_instances
-            )
-            .unwrap()
-            .without_instance_ids()
-            .to_string())
+            .map(|moniker_with_instances| InstancedMoniker::parse_str(moniker_with_instances)
+                .unwrap()
+                .without_instance_ids()
+                .to_string())
             .collect::<HashSet<_>>(),
         hashset! {
             storage_user_moniker.clone()
@@ -187,12 +185,10 @@ async fn multiple_storage_users() {
     assert_eq!(
         storage_users
             .iter()
-            .map(|moniker_with_instances| InstancedAbsoluteMoniker::parse_str(
-                moniker_with_instances
-            )
-            .unwrap()
-            .without_instance_ids()
-            .to_string())
+            .map(|moniker_with_instances| InstancedMoniker::parse_str(moniker_with_instances)
+                .unwrap()
+                .without_instance_ids()
+                .to_string())
             .collect::<HashSet<_>>(),
         expected_storage_users
     );
@@ -225,12 +221,10 @@ async fn destroyed_storage_user() {
     assert_eq!(
         storage_users
             .iter()
-            .map(|moniker_with_instances| InstancedAbsoluteMoniker::parse_str(
-                moniker_with_instances
-            )
-            .unwrap()
-            .without_instance_ids()
-            .to_string())
+            .map(|moniker_with_instances| InstancedMoniker::parse_str(moniker_with_instances)
+                .unwrap()
+                .without_instance_ids()
+                .to_string())
             .collect::<HashSet<_>>(),
         hashset! {
             storage_user_moniker.clone()
@@ -250,7 +244,7 @@ async fn destroyed_storage_user() {
         .await
         .iter()
         .map(|moniker_with_instances| {
-            InstancedAbsoluteMoniker::parse_str(moniker_with_instances)
+            InstancedMoniker::parse_str(moniker_with_instances)
                 .unwrap()
                 .without_instance_ids()
                 .to_string()

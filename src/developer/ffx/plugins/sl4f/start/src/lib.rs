@@ -87,7 +87,7 @@ async fn start_remote_component(
     lifecycle_controller: &LifecycleControllerProxy,
     moniker: &str,
 ) -> Result<()> {
-    // LifecycleController accepts AbsoluteMonikers only.
+    // LifecycleController accepts Monikers only.
     let moniker = format!(".{}", moniker.to_string());
     let (_, binder_server) = fidl::endpoints::create_endpoints::<fcomponent::BinderMarker>();
     let start_result = lifecycle_controller

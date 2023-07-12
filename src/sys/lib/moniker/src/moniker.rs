@@ -11,14 +11,12 @@ use {
     std::{fmt, hash::Hash},
 };
 
-/// AbsoluteMonikerBase is the common trait for both InstancedAbsoluteMoniker
-/// and AbsoluteMoniker concrete types.
+/// MonikerBase is the common trait for both InstancedMoniker
+/// and Moniker concrete types.
 ///
-/// AbsoluteMonikerBase describes the identity of a component instance in terms of its path
+/// MonikerBase describes the identity of a component instance in terms of its path
 /// relative to the root of the component instance tree.
-pub trait AbsoluteMonikerBase:
-    Default + Eq + PartialEq + fmt::Debug + Clone + Hash + fmt::Display
-{
+pub trait MonikerBase: Default + Eq + PartialEq + fmt::Debug + Clone + Hash + fmt::Display {
     type Part: ChildMonikerBase;
 
     fn new(path: Vec<Self::Part>) -> Self;
@@ -51,7 +49,7 @@ pub trait AbsoluteMonikerBase:
     }
 
     // Creates an absolute moniker for a descendant of this component instance.
-    fn descendant<T: AbsoluteMonikerBase<Part = Self::Part>>(&self, descendant: &T) -> Self {
+    fn descendant<T: MonikerBase<Part = Self::Part>>(&self, descendant: &T) -> Self {
         let mut path = self.path().clone();
         let mut relative_path = descendant.path().clone();
         path.append(&mut relative_path);
@@ -63,8 +61,8 @@ pub trait AbsoluteMonikerBase:
     fn path_mut(&mut self) -> &mut Vec<Self::Part>;
 
     /// Indicates whether `other` is contained within the realm specified by
-    /// this AbsoluteMonikerBase.
-    fn contains_in_realm<S: AbsoluteMonikerBase<Part = Self::Part>>(&self, other: &S) -> bool {
+    /// this MonikerBase.
+    fn contains_in_realm<S: MonikerBase<Part = Self::Part>>(&self, other: &S) -> bool {
         if other.path().len() < self.path().len() {
             return false;
         }
@@ -99,7 +97,7 @@ pub trait AbsoluteMonikerBase:
         Self::new(path)
     }
 
-    fn scope_down<T: AbsoluteMonikerBase<Part = Self::Part>>(
+    fn scope_down<T: MonikerBase<Part = Self::Part>>(
         parent_scope: &T,
         child: &T,
     ) -> Result<Self, MonikerError> {
@@ -147,18 +145,18 @@ pub trait AbsoluteMonikerBase:
     }
 }
 
-/// AbsoluteMoniker describes the identity of a component instance
+/// Moniker describes the identity of a component instance
 /// in terms of its path relative to the root of the component instance
-/// tree. The constituent parts of a AbsoluteMoniker do not include the
+/// tree. The constituent parts of a Moniker do not include the
 /// instance ID of the child.
 ///
 /// Display notation: ".", "name1", "name1/name2", ...
 #[derive(Eq, PartialEq, Clone, Hash, Default)]
-pub struct AbsoluteMoniker {
+pub struct Moniker {
     path: Vec<ChildMoniker>,
 }
 
-impl AbsoluteMonikerBase for AbsoluteMoniker {
+impl MonikerBase for Moniker {
     type Part = ChildMoniker;
 
     fn new(path: Vec<Self::Part>) -> Self {
@@ -174,7 +172,7 @@ impl AbsoluteMonikerBase for AbsoluteMoniker {
     }
 }
 
-impl TryFrom<Vec<&str>> for AbsoluteMoniker {
+impl TryFrom<Vec<&str>> for Moniker {
     type Error = MonikerError;
 
     fn try_from(rep: Vec<&str>) -> Result<Self, MonikerError> {
@@ -182,7 +180,7 @@ impl TryFrom<Vec<&str>> for AbsoluteMoniker {
     }
 }
 
-impl TryFrom<&str> for AbsoluteMoniker {
+impl TryFrom<&str> for Moniker {
     type Error = MonikerError;
 
     fn try_from(input: &str) -> Result<Self, MonikerError> {
@@ -190,32 +188,32 @@ impl TryFrom<&str> for AbsoluteMoniker {
     }
 }
 
-impl std::str::FromStr for AbsoluteMoniker {
+impl std::str::FromStr for Moniker {
     type Err = MonikerError;
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         Self::parse_str(s)
     }
 }
 
-impl cmp::Ord for AbsoluteMoniker {
+impl cmp::Ord for Moniker {
     fn cmp(&self, other: &Self) -> cmp::Ordering {
         self.compare(other)
     }
 }
 
-impl PartialOrd for AbsoluteMoniker {
+impl PartialOrd for Moniker {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
         Some(self.cmp(other))
     }
 }
 
-impl fmt::Display for AbsoluteMoniker {
+impl fmt::Display for Moniker {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         self.format(f)
     }
 }
 
-impl fmt::Debug for AbsoluteMoniker {
+impl fmt::Debug for Moniker {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         self.format(f)
     }
@@ -228,19 +226,19 @@ mod tests {
 
     #[test]
     fn absolute_monikers() {
-        let root = AbsoluteMoniker::root();
+        let root = Moniker::root();
         assert_eq!(true, root.is_root());
         assert_eq!(".", format!("{}", root));
-        assert_eq!(root, AbsoluteMoniker::new(vec![]));
-        assert_eq!(root, AbsoluteMoniker::try_from(vec![]).unwrap());
+        assert_eq!(root, Moniker::new(vec![]));
+        assert_eq!(root, Moniker::try_from(vec![]).unwrap());
 
-        let m = AbsoluteMoniker::new(vec![
+        let m = Moniker::new(vec![
             ChildMoniker::try_new("a", None).unwrap(),
             ChildMoniker::try_new("b", Some("coll")).unwrap(),
         ]);
         assert_eq!(false, m.is_root());
         assert_eq!("a/coll:b", format!("{}", m));
-        assert_eq!(m, AbsoluteMoniker::try_from(vec!["a", "coll:b"]).unwrap());
+        assert_eq!(m, Moniker::try_from(vec!["a", "coll:b"]).unwrap());
         assert_eq!(m.leaf().map(|m| m.collection()).flatten(), Some(&Name::new("coll").unwrap()));
         assert_eq!(m.leaf().map(|m| m.name()), Some("b"));
         assert_eq!(m.leaf(), Some(&ChildMoniker::try_from("coll:b").unwrap()));
@@ -248,11 +246,11 @@ mod tests {
 
     #[test]
     fn absolute_moniker_parent() {
-        let root = AbsoluteMoniker::root();
+        let root = Moniker::root();
         assert_eq!(true, root.is_root());
         assert_eq!(None, root.parent());
 
-        let m = AbsoluteMoniker::new(vec![
+        let m = Moniker::new(vec![
             ChildMoniker::try_new("a", None).unwrap(),
             ChildMoniker::try_new("b", None).unwrap(),
         ]);
@@ -265,44 +263,29 @@ mod tests {
 
     #[test]
     fn absolute_moniker_descendant() {
-        let scope_root: AbsoluteMoniker = vec!["a:test1", "b:test2"].try_into().unwrap();
+        let scope_root: Moniker = vec!["a:test1", "b:test2"].try_into().unwrap();
 
-        let relative: AbsoluteMoniker = vec!["c:test3", "d:test4"].try_into().unwrap();
+        let relative: Moniker = vec!["c:test3", "d:test4"].try_into().unwrap();
         let descendant = scope_root.descendant(&relative);
         assert_eq!("a:test1/b:test2/c:test3/d:test4", format!("{}", descendant));
 
-        let relative: AbsoluteMoniker = vec![].try_into().unwrap();
+        let relative: Moniker = vec![].try_into().unwrap();
         let descendant = scope_root.descendant(&relative);
         assert_eq!("a:test1/b:test2", format!("{}", descendant));
     }
 
     #[test]
     fn absolute_moniker_parse_str() {
-        assert_eq!(
-            AbsoluteMoniker::try_from("/foo").unwrap(),
-            AbsoluteMoniker::try_from(vec!["foo"]).unwrap()
-        );
-        assert_eq!(
-            AbsoluteMoniker::try_from("./foo").unwrap(),
-            AbsoluteMoniker::try_from(vec!["foo"]).unwrap()
-        );
-        assert_eq!(
-            AbsoluteMoniker::try_from("foo").unwrap(),
-            AbsoluteMoniker::try_from(vec!["foo"]).unwrap()
-        );
-        assert_eq!(
-            AbsoluteMoniker::try_from("/").unwrap(),
-            AbsoluteMoniker::try_from(vec![]).unwrap()
-        );
-        assert_eq!(
-            AbsoluteMoniker::try_from("./").unwrap(),
-            AbsoluteMoniker::try_from(vec![]).unwrap()
-        );
+        assert_eq!(Moniker::try_from("/foo").unwrap(), Moniker::try_from(vec!["foo"]).unwrap());
+        assert_eq!(Moniker::try_from("./foo").unwrap(), Moniker::try_from(vec!["foo"]).unwrap());
+        assert_eq!(Moniker::try_from("foo").unwrap(), Moniker::try_from(vec!["foo"]).unwrap());
+        assert_eq!(Moniker::try_from("/").unwrap(), Moniker::try_from(vec![]).unwrap());
+        assert_eq!(Moniker::try_from("./").unwrap(), Moniker::try_from(vec![]).unwrap());
 
-        assert!(AbsoluteMoniker::try_from("//foo").is_err());
-        assert!(AbsoluteMoniker::try_from(".//foo").is_err());
-        assert!(AbsoluteMoniker::try_from("/./foo").is_err());
-        assert!(AbsoluteMoniker::try_from("../foo").is_err());
-        assert!(AbsoluteMoniker::try_from(".foo").is_err());
+        assert!(Moniker::try_from("//foo").is_err());
+        assert!(Moniker::try_from(".//foo").is_err());
+        assert!(Moniker::try_from("/./foo").is_err());
+        assert!(Moniker::try_from("../foo").is_err());
+        assert!(Moniker::try_from(".foo").is_err());
     }
 }

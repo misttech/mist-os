@@ -771,7 +771,7 @@ pub trait ComponentInstance {
     fn capabilities(&self) -> Box<dyn Iterator<Item = Self::ComponentInstanceCapability>>;
 }
 
-// TODO(fxbug.dev/112121): Define API compatible with moniker::AbsoluteMoniker.
+// TODO(fxbug.dev/112121): Define API compatible with moniker::Moniker.
 
 /// Model of a component instance moniker, the instance's identifier in the context of
 /// the component tree constructed by the underlying [`Scrutiny`] instance. See

@@ -15,7 +15,7 @@ use fidl_fuchsia_sys2 as fsys2;
 use fuchsia_async;
 use fuchsia_zircon_status::Status;
 use futures::{StreamExt, TryStreamExt};
-use moniker::{AbsoluteMoniker, AbsoluteMonikerBase};
+use moniker::{Moniker, MonikerBase};
 use std::collections::HashMap;
 use std::io::Write;
 use std::path::Path;
@@ -49,8 +49,8 @@ pub struct MockRealmQueryBuilder {
 /// Inner struct of `MockRealmQueryBuilder` to provide a builder interface for
 /// RealmQuery protocol responses.
 pub struct MockRealmQueryBuilderInner {
-    when: AbsoluteMoniker,
-    moniker: AbsoluteMoniker,
+    when: Moniker,
+    moniker: Moniker,
     exposes: Vec<Expose>,
     diagnostics_dir_entry: Vec<String>,
     parent: Option<Box<MockRealmQueryBuilder>>,
@@ -146,7 +146,7 @@ impl MockRealmQueryBuilder {
     pub fn when(self, at: &str) -> MockRealmQueryBuilderInner {
         MockRealmQueryBuilderInner {
             when: at.try_into().unwrap(),
-            moniker: AbsoluteMoniker::root(),
+            moniker: Moniker::root(),
             exposes: vec![],
             diagnostics_dir_entry: vec![],
             parent: Some(Box::new(self)),
@@ -232,12 +232,12 @@ impl MockRealmQuery {
         while let Ok(Some(request)) = stream.try_next().await {
             match request {
                 fsys2::RealmQueryRequest::GetInstance { moniker, responder } => {
-                    let query_moniker = AbsoluteMoniker::from_str(moniker.as_str()).unwrap();
+                    let query_moniker = Moniker::from_str(moniker.as_str()).unwrap();
                     let res = self.mapping.get(&query_moniker.to_string()).unwrap();
                     responder.send(Ok(&res.to_instance())).unwrap();
                 }
                 fsys2::RealmQueryRequest::Open { moniker, dir_type, object, responder, .. } => {
-                    let query_moniker = AbsoluteMoniker::from_str(moniker.as_str()).unwrap();
+                    let query_moniker = Moniker::from_str(moniker.as_str()).unwrap();
                     if let Some(res) = self.mapping.get(&query_moniker.to_string()) {
                         if dir_type == fsys2::OpenDirType::OutgoingDir {
                             // Serve the out dir, everything else doesn't get served.
@@ -249,7 +249,7 @@ impl MockRealmQuery {
                     }
                 }
                 fsys2::RealmQueryRequest::GetManifest { moniker, responder, .. } => {
-                    let query_moniker = AbsoluteMoniker::from_str(moniker.as_str()).unwrap();
+                    let query_moniker = Moniker::from_str(moniker.as_str()).unwrap();
                     let res = self.mapping.get(&query_moniker.to_string()).unwrap();
                     let manifest = res.make_manifest();
                     let manifest = fidl::persist(&manifest).unwrap();
@@ -270,7 +270,7 @@ impl MockRealmQuery {
                     responder.send(Ok(client_end)).unwrap();
                 }
                 fsys2::RealmQueryRequest::GetResolvedDeclaration { moniker, responder, .. } => {
-                    let query_moniker = AbsoluteMoniker::from_str(moniker.as_str()).unwrap();
+                    let query_moniker = Moniker::from_str(moniker.as_str()).unwrap();
                     let res = self.mapping.get(&query_moniker.to_string()).unwrap();
                     let manifest = res.make_manifest();
                     let manifest = fidl::encoding::persist(&manifest).unwrap();

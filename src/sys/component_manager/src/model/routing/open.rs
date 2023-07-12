@@ -24,12 +24,12 @@ use {
         },
     },
     ::routing::{component_instance::ComponentInstanceInterface, path::PathBufExt},
-    cm_moniker::{InstancedAbsoluteMoniker, InstancedExtendedMoniker},
+    cm_moniker::{InstancedExtendedMoniker, InstancedMoniker},
     cm_util::channel,
     fidl::endpoints::ServerEnd,
     fidl_fuchsia_io as fio, fuchsia_zircon as zx,
     futures::lock::Mutex,
-    moniker::AbsoluteMonikerBase,
+    moniker::MonikerBase,
     std::{path::PathBuf, sync::Arc},
 };
 
@@ -147,7 +147,7 @@ impl<'a> OpenRequest<'a> {
     ) -> Result<(), ModelError> {
         // As of today, the storage component instance must contain the target. This is because it
         // is impossible to expose storage declarations up.
-        let relative_moniker = InstancedAbsoluteMoniker::scope_down(
+        let relative_moniker = InstancedMoniker::scope_down(
             &source.storage_source_moniker,
             &target.instanced_moniker(),
         )

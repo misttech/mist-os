@@ -130,7 +130,7 @@ mod tests {
         fuchsia_runtime::{job_default, HandleInfo, HandleType},
         fuchsia_zircon::HandleBased,
         futures::lock::Mutex,
-        moniker::{AbsoluteMoniker, AbsoluteMonikerBase},
+        moniker::{Moniker, MonikerBase},
         std::{mem, sync::Weak},
         vfs::{
             directory::entry::DirectoryEntry, execution_scope::ExecutionScope,
@@ -167,7 +167,7 @@ mod tests {
         let (client, mut server) = zx::Channel::create();
 
         let event = Event::new_for_test(
-            AbsoluteMoniker::root(),
+            Moniker::root(),
             "fuchsia-pkg://root",
             EventPayload::CapabilityRouted {
                 source,

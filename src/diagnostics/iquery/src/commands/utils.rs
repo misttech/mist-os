@@ -11,7 +11,7 @@ use cm_rust::SourceName;
 use component_debug::realm::*;
 use fidl_fuchsia_sys2 as fsys2;
 use lazy_static::lazy_static;
-use moniker::{AbsoluteMoniker, AbsoluteMonikerBase};
+use moniker::{Moniker, MonikerBase};
 use regex::Regex;
 
 lazy_static! {
@@ -97,7 +97,7 @@ pub(crate) async fn get_instance_infos(
 /// Helper method to normalize a moniker into its canonical string form. Returns
 /// the input moniker unchanged if it cannot be parsed.
 pub fn normalize_moniker(moniker: &str) -> String {
-    AbsoluteMoniker::parse_str(moniker).map_or(String::from(moniker), |m| m.to_string())
+    Moniker::parse_str(moniker).map_or(String::from(moniker), |m| m.to_string())
 }
 
 /// Get all the exposed `ArchiveAccessor` from any child component which

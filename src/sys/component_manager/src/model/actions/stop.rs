@@ -50,7 +50,7 @@ pub mod tests {
         cm_rust_testing::ComponentDeclBuilder,
         futures::channel::oneshot,
         futures::lock::Mutex,
-        moniker::{AbsoluteMoniker, AbsoluteMonikerBase},
+        moniker::{Moniker, MonikerBase},
         std::sync::{atomic::Ordering, Weak},
     };
 
@@ -66,7 +66,7 @@ pub mod tests {
         test.start(vec!["a"].try_into().unwrap()).await;
 
         // Register `stopped` action, and wait for it. Component should be stopped.
-        let component_root = test.look_up(AbsoluteMoniker::root()).await;
+        let component_root = test.look_up(Moniker::root()).await;
         let component_a = test.look_up(vec!["a"].try_into().unwrap()).await;
         ActionSet::register(component_a.clone(), StopAction::new(false))
             .await
@@ -107,14 +107,14 @@ pub mod tests {
     #[fuchsia::test]
     async fn stopped_cancels_watcher() {
         struct StopHook {
-            moniker: AbsoluteMoniker,
+            moniker: Moniker,
             stopped_tx: Mutex<Option<oneshot::Sender<()>>>,
             continue_rx: Mutex<Option<oneshot::Receiver<()>>>,
         }
 
         impl StopHook {
             fn new(
-                moniker: AbsoluteMoniker,
+                moniker: Moniker,
                 stopped_tx: oneshot::Sender<()>,
                 continue_rx: oneshot::Receiver<()>,
             ) -> Self {
@@ -133,10 +133,7 @@ pub mod tests {
                 )]
             }
 
-            async fn on_stopped_async(
-                &self,
-                target_moniker: &AbsoluteMoniker,
-            ) -> Result<(), ModelError> {
+            async fn on_stopped_async(&self, target_moniker: &Moniker) -> Result<(), ModelError> {
                 if *target_moniker == self.moniker {
                     let stopped_tx = self.stopped_tx.lock().await.take().unwrap();
                     stopped_tx.send(()).unwrap();
@@ -177,7 +174,7 @@ pub mod tests {
         // Register `stopped` action, and make sure there are two clients waiting on the action
         // (the test, and the task spawned by the exit listener), plus the reference in ActionSet,
         // for a total of 3
-        let component_root = test.look_up(AbsoluteMoniker::root()).await;
+        let component_root = test.look_up(Moniker::root()).await;
         let component_a = test.look_up(vec!["a"].try_into().unwrap()).await;
         let mut actions = component_a.lock_actions().await;
         let nf = actions.register_no_wait(&component_a, StopAction::new(false));

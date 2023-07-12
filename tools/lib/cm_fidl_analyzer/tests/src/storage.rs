@@ -5,7 +5,7 @@
 mod tests {
     use {
         crate::routing::RoutingTestBuilderForAnalyzer,
-        cm_moniker::InstancedAbsoluteMoniker,
+        cm_moniker::InstancedMoniker,
         cm_rust::{
             Availability, OfferDecl, OfferSource, OfferStorageDecl, OfferTarget, StorageDecl,
             StorageDirectorySource, UseDecl, UseStorageDecl,
@@ -14,7 +14,7 @@ mod tests {
         component_id_index::gen_instance_id,
         fidl_fuchsia_component_decl as fdecl, fidl_fuchsia_io as fio,
         fuchsia_zircon_status as zx_status,
-        moniker::{AbsoluteMoniker, AbsoluteMonikerBase},
+        moniker::{Moniker, MonikerBase},
         routing_test_helpers::{
             component_id_index::make_index_file, storage::CommonStorageTest, CheckUse,
             ExpectedResult, RoutingTestModel, RoutingTestModelBuilder,
@@ -158,7 +158,7 @@ mod tests {
         let component_id_index_path = make_index_file(component_id_index::Index {
             instances: vec![component_id_index::InstanceIdEntry {
                 instance_id: parent_consumer_instance_id.clone(),
-                moniker: Some(AbsoluteMoniker::parse_str("/parent_consumer").unwrap()),
+                moniker: Some(Moniker::parse_str("/parent_consumer").unwrap()),
             }],
             ..component_id_index::Index::default()
         })
@@ -209,12 +209,10 @@ mod tests {
 
         model
             .check_use(
-                AbsoluteMoniker::parse_str("/consumer").unwrap(),
+                Moniker::parse_str("/consumer").unwrap(),
                 CheckUse::Storage {
                     path: "/storage".parse().unwrap(),
-                    storage_relation: Some(
-                        InstancedAbsoluteMoniker::try_from(vec!["consumer:0"]).unwrap(),
-                    ),
+                    storage_relation: Some(InstancedMoniker::try_from(vec!["consumer:0"]).unwrap()),
                     from_cm_namespace: false,
                     storage_subdir: None,
                     expected_res: ExpectedResult::Err(zx_status::Status::UNAVAILABLE),

@@ -8,7 +8,7 @@ use {
     crate::stressor::Stressor,
     anyhow::Result,
     futures::{future::BoxFuture, FutureExt},
-    moniker::{AbsoluteMoniker, AbsoluteMonikerBase, ChildMonikerBase},
+    moniker::{ChildMonikerBase, Moniker, MonikerBase},
     rand::prelude::SliceRandom,
     rand::rngs::SmallRng,
     rand::Rng,
@@ -70,11 +70,11 @@ pub fn destroy_child<'a>(
         // The root cannot be destroyed. Remove it.
         let instances: Vec<String> = instances
             .into_iter()
-            .filter(|m| !AbsoluteMoniker::try_from(m.as_str()).unwrap().is_root())
+            .filter(|m| !Moniker::try_from(m.as_str()).unwrap().is_root())
             .collect();
 
         if let Some(moniker) = instances.choose(&mut rng) {
-            let mut moniker = AbsoluteMoniker::parse_str(moniker).unwrap();
+            let mut moniker = Moniker::parse_str(moniker).unwrap();
             let child_moniker = moniker.path_mut().pop().unwrap();
             let child_name = child_moniker.name().to_string();
             let parent_moniker = moniker.to_string();

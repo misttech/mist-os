@@ -7,12 +7,12 @@ use {
     anyhow::{format_err, Result},
     fidl_fuchsia_component_decl as fdecl, fidl_fuchsia_sys2 as fsys,
     fuchsia_url::AbsoluteComponentUrl,
-    moniker::{AbsoluteMoniker, AbsoluteMonikerBase, ChildMonikerBase},
+    moniker::{ChildMonikerBase, Moniker, MonikerBase},
 };
 
 pub async fn create_cmd<W: std::io::Write>(
     url: AbsoluteComponentUrl,
-    moniker: AbsoluteMoniker,
+    moniker: Moniker,
     config_overrides: Vec<fdecl::ConfigOverride>,
     lifecycle_controller: fsys::LifecycleControllerProxy,
     mut writer: W,
@@ -34,7 +34,7 @@ pub async fn create_cmd<W: std::io::Write>(
 
     // Convert the absolute moniker into a relative moniker w.r.t. root.
     // LifecycleController expects relative monikers only.
-    let parent_relative = AbsoluteMoniker::scope_down(&AbsoluteMoniker::root(), &parent).unwrap();
+    let parent_relative = Moniker::scope_down(&Moniker::root(), &parent).unwrap();
 
     create_instance_in_collection(
         &lifecycle_controller,
@@ -75,8 +75,8 @@ mod test {
                     ..
                 } => {
                     assert_eq!(
-                        AbsoluteMoniker::parse_str(expected_moniker),
-                        AbsoluteMoniker::parse_str(&parent_moniker)
+                        Moniker::parse_str(expected_moniker),
+                        Moniker::parse_str(&parent_moniker)
                     );
                     assert_eq!(expected_collection, collection.name);
                     assert_eq!(expected_name, decl.name.unwrap());

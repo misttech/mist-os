@@ -15,13 +15,13 @@ use {
         component_id_index::make_index_file, storage::CommonStorageTest, RoutingTestModel,
     },
     assert_matches::assert_matches,
-    cm_moniker::InstancedAbsoluteMoniker,
+    cm_moniker::InstancedMoniker,
     cm_rust::*,
     cm_rust_testing::*,
     component_id_index::gen_instance_id,
     fidl_fuchsia_component_decl as fdecl, fidl_fuchsia_io as fio, fidl_fuchsia_sys2 as fsys,
     fuchsia_zircon as zx,
-    moniker::{AbsoluteMoniker, AbsoluteMonikerBase},
+    moniker::{Moniker, MonikerBase},
     routing::{component_id_index::ComponentInstanceId, error::RoutingError, RouteRequest},
     std::{
         convert::TryInto,
@@ -205,7 +205,7 @@ async fn use_in_collection_from_parent() {
         vec!["b", "coll:c"].try_into().unwrap(),
         CheckUse::Storage {
             path: "/data".parse().unwrap(),
-            storage_relation: Some(InstancedAbsoluteMoniker::try_from(vec!["coll:c:1"]).unwrap()),
+            storage_relation: Some(InstancedMoniker::try_from(vec!["coll:c:1"]).unwrap()),
             from_cm_namespace: false,
             storage_subdir: Some("data".to_string()),
             expected_res: ExpectedResult::Ok,
@@ -216,7 +216,7 @@ async fn use_in_collection_from_parent() {
         vec!["b", "coll:c"].try_into().unwrap(),
         CheckUse::Storage {
             path: "/cache".parse().unwrap(),
-            storage_relation: Some(InstancedAbsoluteMoniker::try_from(vec!["coll:c:1"]).unwrap()),
+            storage_relation: Some(InstancedMoniker::try_from(vec!["coll:c:1"]).unwrap()),
             from_cm_namespace: false,
             storage_subdir: Some("cache".to_string()),
             expected_res: ExpectedResult::Ok,
@@ -225,46 +225,24 @@ async fn use_in_collection_from_parent() {
     .await;
     // Confirm storage directory exists for component in collection
     assert_eq!(
-        test.list_directory_in_storage(
-            Some("data"),
-            InstancedAbsoluteMoniker::new(vec![]),
-            None,
-            ""
-        )
-        .await,
+        test.list_directory_in_storage(Some("data"), InstancedMoniker::new(vec![]), None, "").await,
         vec!["coll:c:1".to_string()],
     );
     assert_eq!(
-        test.list_directory_in_storage(
-            Some("cache"),
-            InstancedAbsoluteMoniker::new(vec![]),
-            None,
-            ""
-        )
-        .await,
+        test.list_directory_in_storage(Some("cache"), InstancedMoniker::new(vec![]), None, "")
+            .await,
         vec!["coll:c:1".to_string()],
     );
     test.destroy_dynamic_child(vec!["b"].try_into().unwrap(), "coll", "c").await;
 
     // Confirm storage no longer exists.
     assert_eq!(
-        test.list_directory_in_storage(
-            Some("data"),
-            InstancedAbsoluteMoniker::new(vec![]),
-            None,
-            ""
-        )
-        .await,
+        test.list_directory_in_storage(Some("data"), InstancedMoniker::new(vec![]), None, "").await,
         Vec::<String>::new(),
     );
     assert_eq!(
-        test.list_directory_in_storage(
-            Some("cache"),
-            InstancedAbsoluteMoniker::new(vec![]),
-            None,
-            ""
-        )
-        .await,
+        test.list_directory_in_storage(Some("cache"), InstancedMoniker::new(vec![]), None, "")
+            .await,
         Vec::<String>::new(),
     );
 }
@@ -386,9 +364,7 @@ async fn use_in_collection_from_grandparent() {
         vec!["b", "coll:c"].try_into().unwrap(),
         CheckUse::Storage {
             path: "/data".parse().unwrap(),
-            storage_relation: Some(
-                InstancedAbsoluteMoniker::try_from(vec!["b:0", "coll:c:1"]).unwrap(),
-            ),
+            storage_relation: Some(InstancedMoniker::try_from(vec!["b:0", "coll:c:1"]).unwrap()),
             from_cm_namespace: false,
             storage_subdir: Some("data".to_string()),
             expected_res: ExpectedResult::Ok,
@@ -399,9 +375,7 @@ async fn use_in_collection_from_grandparent() {
         vec!["b", "coll:c"].try_into().unwrap(),
         CheckUse::Storage {
             path: "/cache".parse().unwrap(),
-            storage_relation: Some(
-                InstancedAbsoluteMoniker::try_from(vec!["b:0", "coll:c:1"]).unwrap(),
-            ),
+            storage_relation: Some(InstancedMoniker::try_from(vec!["b:0", "coll:c:1"]).unwrap()),
             from_cm_namespace: false,
             storage_subdir: Some("cache".to_string()),
             expected_res: ExpectedResult::Ok,
@@ -411,7 +385,7 @@ async fn use_in_collection_from_grandparent() {
     assert_eq!(
         test.list_directory_in_storage(
             Some("data"),
-            InstancedAbsoluteMoniker::try_from(vec!["b:0"]).unwrap(),
+            InstancedMoniker::try_from(vec!["b:0"]).unwrap(),
             None,
             "children",
         )
@@ -421,7 +395,7 @@ async fn use_in_collection_from_grandparent() {
     assert_eq!(
         test.list_directory_in_storage(
             Some("cache"),
-            InstancedAbsoluteMoniker::try_from(vec!["b:0"]).unwrap(),
+            InstancedMoniker::try_from(vec!["b:0"]).unwrap(),
             None,
             "children",
         )
@@ -434,7 +408,7 @@ async fn use_in_collection_from_grandparent() {
     assert_eq!(
         test.list_directory_in_storage(
             Some("data"),
-            InstancedAbsoluteMoniker::try_from(vec!["b:0"]).unwrap(),
+            InstancedMoniker::try_from(vec!["b:0"]).unwrap(),
             None,
             "children"
         )
@@ -444,7 +418,7 @@ async fn use_in_collection_from_grandparent() {
     assert_eq!(
         test.list_directory_in_storage(
             Some("cache"),
-            InstancedAbsoluteMoniker::try_from(vec!["b:0"]).unwrap(),
+            InstancedMoniker::try_from(vec!["b:0"]).unwrap(),
             None,
             "children"
         )
@@ -506,7 +480,7 @@ async fn use_restricted_storage_start_failure() {
     let component_id_index_path = make_index_file(component_id_index::Index {
         instances: vec![component_id_index::InstanceIdEntry {
             instance_id: parent_consumer_instance_id.clone(),
-            moniker: Some(AbsoluteMoniker::parse_str("/parent_consumer").unwrap()),
+            moniker: Some(Moniker::parse_str("/parent_consumer").unwrap()),
         }],
         ..component_id_index::Index::default()
     })
@@ -572,13 +546,12 @@ async fn use_restricted_storage_start_failure() {
         .build()
         .await;
 
-    test.start_instance(&AbsoluteMoniker::parse_str("/parent_consumer").unwrap())
+    test.start_instance(&Moniker::parse_str("/parent_consumer").unwrap())
         .await
         .expect("start /parent_consumer failed");
 
-    let child_bind_result = test
-        .start_instance(&AbsoluteMoniker::parse_str("/parent_consumer/child_consumer").unwrap())
-        .await;
+    let child_bind_result =
+        test.start_instance(&Moniker::parse_str("/parent_consumer/child_consumer").unwrap()).await;
     assert_matches!(
         child_bind_result,
         Err(ModelError::StartActionError {
@@ -586,7 +559,7 @@ async fn use_restricted_storage_start_failure() {
                 err: NamespacePopulateError::InstanceNotInInstanceIdIndex(_),
                 moniker,
             }
-        }) if moniker == AbsoluteMoniker::try_from(vec!["parent_consumer", "child_consumer"]).unwrap()
+        }) if moniker == Moniker::try_from(vec!["parent_consumer", "child_consumer"]).unwrap()
     );
 }
 
@@ -606,7 +579,7 @@ async fn use_restricted_storage_open_failure() {
     let component_id_index_path = make_index_file(component_id_index::Index {
         instances: vec![component_id_index::InstanceIdEntry {
             instance_id: parent_consumer_instance_id.clone(),
-            moniker: Some(AbsoluteMoniker::parse_str("/parent_consumer/child_consumer").unwrap()),
+            moniker: Some(Moniker::parse_str("/parent_consumer/child_consumer").unwrap()),
         }],
         ..component_id_index::Index::default()
     })
@@ -654,7 +627,7 @@ async fn use_restricted_storage_open_failure() {
         .build()
         .await;
 
-    let parent_consumer_moniker = AbsoluteMoniker::parse_str("/parent_consumer").unwrap();
+    let parent_consumer_moniker = Moniker::parse_str("/parent_consumer").unwrap();
     let (parent_consumer_instance, _) = test
         .start_and_get_instance(&parent_consumer_moniker, StartReason::Eager, false)
         .await
@@ -682,7 +655,7 @@ async fn use_restricted_storage_open_failure() {
 
     // now modify StorageDecl so that it restricts storage
     let (provider_instance, _) = test
-        .start_and_get_instance(&AbsoluteMoniker::root(), StartReason::Eager, false)
+        .start_and_get_instance(&Moniker::root(), StartReason::Eager, false)
         .await
         .expect("could not resolve state");
     {
@@ -737,7 +710,7 @@ async fn open_storage_subdirectory() {
     let component_id_index_path = make_index_file(component_id_index::Index {
         instances: vec![component_id_index::InstanceIdEntry {
             instance_id: parent_consumer_instance_id.clone(),
-            moniker: Some(AbsoluteMoniker::parse_str("/consumer").unwrap()),
+            moniker: Some(Moniker::parse_str("/consumer").unwrap()),
         }],
         ..component_id_index::Index::default()
     })
@@ -785,7 +758,7 @@ async fn open_storage_subdirectory() {
         .build()
         .await;
 
-    let consumer_moniker = AbsoluteMoniker::parse_str("/consumer").unwrap();
+    let consumer_moniker = Moniker::parse_str("/consumer").unwrap();
     let (consumer_instance, _) = test
         .start_and_get_instance(&consumer_moniker, StartReason::Eager, false)
         .await
@@ -1024,7 +997,7 @@ async fn storage_persistence_relative_moniker_path() {
     capability_util::confirm_storage_is_deleted_for_component(
         None,
         true,
-        InstancedAbsoluteMoniker::try_from(vec!["b:0", "persistent_coll:c:0"]).unwrap(),
+        InstancedMoniker::try_from(vec!["b:0", "persistent_coll:c:0"]).unwrap(),
         None,
         &test.test_dir_proxy,
     )
@@ -1205,7 +1178,7 @@ async fn storage_persistence_instance_id_path() {
     capability_util::confirm_storage_is_deleted_for_component(
         None,
         true,
-        InstancedAbsoluteMoniker::try_from(vec!["b:0", "persistent_coll:c:0"]).unwrap(),
+        InstancedMoniker::try_from(vec!["b:0", "persistent_coll:c:0"]).unwrap(),
         Some(
             &ComponentInstanceId::from_str(&instance_id)
                 .expect("instance id could not be parsed into ComponentInstanceId"),
@@ -1381,7 +1354,7 @@ async fn storage_persistence_inheritance() {
         CheckUse::Storage {
             path: "/data".parse().unwrap(),
             storage_relation: Some(
-                InstancedAbsoluteMoniker::try_from(vec!["b:0", "persistent_coll:c:1"]).unwrap(),
+                InstancedMoniker::try_from(vec!["b:0", "persistent_coll:c:1"]).unwrap(),
             ),
             from_cm_namespace: false,
             storage_subdir: None,
@@ -1396,8 +1369,7 @@ async fn storage_persistence_inheritance() {
         CheckUse::Storage {
             path: "/data".parse().unwrap(),
             storage_relation: Some(
-                InstancedAbsoluteMoniker::try_from(vec!["b:0", "persistent_coll:c:1", "d:0"])
-                    .unwrap(),
+                InstancedMoniker::try_from(vec!["b:0", "persistent_coll:c:1", "d:0"]).unwrap(),
             ),
             from_cm_namespace: false,
             storage_subdir: None,
@@ -1427,12 +1399,8 @@ async fn storage_persistence_inheritance() {
         CheckUse::Storage {
             path: "/data".parse().unwrap(),
             storage_relation: Some(
-                InstancedAbsoluteMoniker::try_from(vec![
-                    "b:0",
-                    "persistent_coll:c:1",
-                    "lower_coll:e:1",
-                ])
-                .unwrap(),
+                InstancedMoniker::try_from(vec!["b:0", "persistent_coll:c:1", "lower_coll:e:1"])
+                    .unwrap(),
             ),
             from_cm_namespace: false,
             storage_subdir: None,
@@ -1653,7 +1621,7 @@ async fn storage_persistence_disablement() {
         CheckUse::Storage {
             path: "/data".parse().unwrap(),
             storage_relation: Some(
-                InstancedAbsoluteMoniker::try_from(vec!["b:0", "persistent_coll:c:1"]).unwrap(),
+                InstancedMoniker::try_from(vec!["b:0", "persistent_coll:c:1"]).unwrap(),
             ),
             from_cm_namespace: false,
             storage_subdir: None,
@@ -1668,8 +1636,7 @@ async fn storage_persistence_disablement() {
         CheckUse::Storage {
             path: "/data".parse().unwrap(),
             storage_relation: Some(
-                InstancedAbsoluteMoniker::try_from(vec!["b:0", "persistent_coll:c:1", "d:0"])
-                    .unwrap(),
+                InstancedMoniker::try_from(vec!["b:0", "persistent_coll:c:1", "d:0"]).unwrap(),
             ),
             from_cm_namespace: false,
             storage_subdir: None,
@@ -1699,7 +1666,7 @@ async fn storage_persistence_disablement() {
         CheckUse::Storage {
             path: "/data".parse().unwrap(),
             storage_relation: Some(
-                InstancedAbsoluteMoniker::try_from(vec![
+                InstancedMoniker::try_from(vec![
                     "b:0",
                     "persistent_coll:c:1",
                     "non_persistent_coll:e:1",
@@ -1751,12 +1718,8 @@ async fn storage_persistence_disablement() {
     capability_util::confirm_storage_is_deleted_for_component(
         None,
         false,
-        InstancedAbsoluteMoniker::try_from(vec![
-            "b:0",
-            "persistent_coll:c:1",
-            "non_persistent_coll:e:1",
-        ])
-        .unwrap(),
+        InstancedMoniker::try_from(vec!["b:0", "persistent_coll:c:1", "non_persistent_coll:e:1"])
+            .unwrap(),
         None,
         &test.test_dir_proxy,
     )

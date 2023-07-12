@@ -4,7 +4,7 @@
 
 use anyhow::{format_err, Result};
 use fidl_fuchsia_sys2 as fsys;
-use moniker::AbsoluteMoniker;
+use moniker::Moniker;
 use prettytable::{cell, format::consts::FORMAT_CLEAN, row, Row, Table};
 
 const USE_TITLE: &'static str = "Used Capability";
@@ -57,7 +57,7 @@ impl TryFrom<fsys::DeclType> for DeclType {
 
 pub async fn validate_routes(
     route_validator: &fsys::RouteValidatorProxy,
-    moniker: AbsoluteMoniker,
+    moniker: Moniker,
 ) -> Result<Vec<RouteReport>> {
     let reports = match route_validator.validate(&moniker.to_string()).await? {
         Ok(reports) => reports,
@@ -116,7 +116,7 @@ mod test {
         super::*,
         fidl::endpoints::create_proxy_and_stream,
         futures::TryStreamExt,
-        moniker::{AbsoluteMoniker, AbsoluteMonikerBase},
+        moniker::{Moniker, MonikerBase},
     };
 
     fn route_validator(
@@ -128,10 +128,7 @@ mod test {
         fuchsia_async::Task::local(async move {
             match stream.try_next().await.unwrap().unwrap() {
                 fsys::RouteValidatorRequest::Validate { moniker, responder, .. } => {
-                    assert_eq!(
-                        AbsoluteMoniker::parse_str(expected_moniker),
-                        AbsoluteMoniker::parse_str(&moniker)
-                    );
+                    assert_eq!(Moniker::parse_str(expected_moniker), Moniker::parse_str(&moniker));
                     responder.send(Ok(&reports)).unwrap();
                 }
                 fsys::RouteValidatorRequest::Route { .. } => {
@@ -159,9 +156,7 @@ mod test {
         );
 
         let mut reports =
-            validate_routes(&validator, AbsoluteMoniker::parse_str("test").unwrap())
-                .await
-                .unwrap();
+            validate_routes(&validator, Moniker::parse_str("test").unwrap()).await.unwrap();
         assert_eq!(reports.len(), 1);
 
         let report = reports.remove(0);
@@ -185,9 +180,7 @@ mod test {
         );
 
         let mut reports =
-            validate_routes(&validator, AbsoluteMoniker::parse_str("test").unwrap())
-                .await
-                .unwrap();
+            validate_routes(&validator, Moniker::parse_str("test").unwrap()).await.unwrap();
         assert_eq!(reports.len(), 1);
 
         let report = reports.remove(0);
@@ -200,9 +193,8 @@ mod test {
     async fn test_no_routes() {
         let validator = route_validator("test", vec![]);
 
-        let reports = validate_routes(&validator, AbsoluteMoniker::parse_str("test").unwrap())
-            .await
-            .unwrap();
+        let reports =
+            validate_routes(&validator, Moniker::parse_str("test").unwrap()).await.unwrap();
         assert!(reports.is_empty());
     }
 
@@ -216,8 +208,7 @@ mod test {
             ],
         );
 
-        let result =
-            validate_routes(&validator, AbsoluteMoniker::parse_str("test").unwrap()).await;
+        let result = validate_routes(&validator, Moniker::parse_str("test").unwrap()).await;
         assert!(result.is_err());
     }
 }

@@ -6,7 +6,7 @@ use {
     anyhow::{format_err, Result},
     fidl_fuchsia_dash as fdash,
     futures::prelude::*,
-    moniker::AbsoluteMoniker,
+    moniker::Moniker,
     std::str::FromStr,
 };
 
@@ -38,7 +38,7 @@ impl Into<fdash::DashNamespaceLayout> for DashNamespaceLayout {
 }
 
 pub async fn explore_over_socket(
-    moniker: AbsoluteMoniker,
+    moniker: Moniker,
     pty_server: fidl::Socket,
     tools_urls: Vec<String>,
     command: Option<String>,

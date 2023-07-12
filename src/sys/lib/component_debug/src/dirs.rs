@@ -8,7 +8,7 @@
 use {
     fidl::endpoints::{create_proxy, ProtocolMarker},
     fidl_fuchsia_io as fio, fidl_fuchsia_sys2 as fsys,
-    moniker::AbsoluteMoniker,
+    moniker::Moniker,
     thiserror::Error,
 };
 
@@ -16,17 +16,17 @@ use {
 #[derive(Debug, Error)]
 pub enum OpenError {
     #[error("instance {0} could not be found")]
-    InstanceNotFound(AbsoluteMoniker),
+    InstanceNotFound(Moniker),
     #[error("opening {0} requires {1} to be resolved")]
-    InstanceNotResolved(OpenDirType, AbsoluteMoniker),
+    InstanceNotResolved(OpenDirType, Moniker),
     #[error("opening {0} requires {1} to be running")]
-    InstanceNotRunning(OpenDirType, AbsoluteMoniker),
+    InstanceNotRunning(OpenDirType, Moniker),
     #[error("component manager's open request on the directory returned a FIDL error")]
     OpenFidlError,
     #[error("{0} does not have a {1}")]
-    NoSuchDir(AbsoluteMoniker, OpenDirType),
+    NoSuchDir(Moniker, OpenDirType),
     #[error("component manager could not parse moniker: {0}")]
-    BadMoniker(AbsoluteMoniker),
+    BadMoniker(Moniker),
     #[error("component manager could not parse dir type: {0}")]
     BadDirType(OpenDirType),
     #[error("component manager could not parse path: {0}")]
@@ -78,7 +78,7 @@ impl Into<fsys::OpenDirType> for OpenDirType {
 
 /// Opens a protocol in a component instance directory, assuming it is located at the root.
 pub async fn connect_to_instance_protocol_at_dir_root<P: ProtocolMarker>(
-    moniker: &AbsoluteMoniker,
+    moniker: &Moniker,
     dir_type: OpenDirType,
     realm: &fsys::RealmQueryProxy,
 ) -> Result<P::Proxy, OpenError> {
@@ -87,7 +87,7 @@ pub async fn connect_to_instance_protocol_at_dir_root<P: ProtocolMarker>(
 
 /// Opens a protocol in a component instance directory, assuming it is located under `/svc`.
 pub async fn connect_to_instance_protocol_at_dir_svc<P: ProtocolMarker>(
-    moniker: &AbsoluteMoniker,
+    moniker: &Moniker,
     dir_type: OpenDirType,
     realm: &fsys::RealmQueryProxy,
 ) -> Result<P::Proxy, OpenError> {
@@ -97,7 +97,7 @@ pub async fn connect_to_instance_protocol_at_dir_svc<P: ProtocolMarker>(
 
 /// Opens a protocol in a component instance directory at the given |path|.
 pub async fn connect_to_instance_protocol_at_path<P: ProtocolMarker>(
-    moniker: &AbsoluteMoniker,
+    moniker: &Moniker,
     dir_type: OpenDirType,
     path: &str,
     realm: &fsys::RealmQueryProxy,
@@ -119,7 +119,7 @@ pub async fn connect_to_instance_protocol_at_path<P: ProtocolMarker>(
 
 /// Opens the root of a component instance directory with read rights.
 pub async fn open_instance_dir_root_readable(
-    moniker: &AbsoluteMoniker,
+    moniker: &Moniker,
     dir_type: OpenDirType,
     realm: &fsys::RealmQueryProxy,
 ) -> Result<fio::DirectoryProxy, OpenError> {
@@ -140,7 +140,7 @@ pub async fn open_instance_dir_root_readable(
 
 /// Opens the subdirectory of a component instance directory with read rights.
 pub async fn open_instance_subdir_readable(
-    moniker: &AbsoluteMoniker,
+    moniker: &Moniker,
     dir_type: OpenDirType,
     path: &str,
     realm: &fsys::RealmQueryProxy,
@@ -164,7 +164,7 @@ pub async fn open_instance_subdir_readable(
 /// Component manager will make the corresponding `fuchsia.io.Directory/Open` call on
 /// the directory.
 pub async fn open_in_instance_dir(
-    moniker: &AbsoluteMoniker,
+    moniker: &Moniker,
     dir_type: OpenDirType,
     flags: fio::OpenFlags,
     mode: fio::ModeType,

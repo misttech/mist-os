@@ -18,7 +18,7 @@ use {
     fidl_fuchsia_process as fprocess, fidl_fuchsia_sys2 as fsys,
     fuchsia_url::AbsoluteComponentUrl,
     futures::AsyncReadExt,
-    moniker::{AbsoluteMoniker, AbsoluteMonikerBase, ChildMonikerBase},
+    moniker::{ChildMonikerBase, Moniker, MonikerBase},
     std::io::Read,
 };
 
@@ -107,7 +107,7 @@ impl Stdio {
 }
 
 pub async fn run_cmd<W: std::io::Write>(
-    moniker: AbsoluteMoniker,
+    moniker: Moniker,
     url: AbsoluteComponentUrl,
     recreate: bool,
     connect_stdio: bool,
@@ -128,7 +128,7 @@ pub async fn run_cmd<W: std::io::Write>(
 
     // Convert the absolute moniker into a relative moniker w.r.t. root.
     // LifecycleController expects relative monikers only.
-    let parent_relative = AbsoluteMoniker::scope_down(&AbsoluteMoniker::root(), &parent).unwrap();
+    let parent_relative = Moniker::scope_down(&Moniker::root(), &parent).unwrap();
 
     if recreate {
         // First try to destroy any existing instance at this monker.
@@ -189,7 +189,7 @@ pub async fn run_cmd<W: std::io::Write>(
         Ok(()) => {}
     }
 
-    let child_relative = AbsoluteMoniker::scope_down(&AbsoluteMoniker::root(), &moniker).unwrap();
+    let child_relative = Moniker::scope_down(&Moniker::root(), &moniker).unwrap();
     writeln!(writer, "Resolving component instance...")?;
     resolve_instance(&lifecycle_controller, &child_relative)
         .await
@@ -236,8 +236,8 @@ mod test {
                         responder,
                     } => {
                         assert_eq!(
-                            AbsoluteMoniker::parse_str(expected_parent_moniker),
-                            AbsoluteMoniker::parse_str(&parent_moniker)
+                            Moniker::parse_str(expected_parent_moniker),
+                            Moniker::parse_str(&parent_moniker)
                         );
                         assert_eq!(expected_name, child.name);
                         assert_eq!(expected_collection, child.collection.unwrap());
@@ -257,8 +257,8 @@ mod test {
                     args: _,
                 } => {
                     assert_eq!(
-                        AbsoluteMoniker::parse_str(expected_parent_moniker),
-                        AbsoluteMoniker::parse_str(&parent_moniker)
+                        Moniker::parse_str(expected_parent_moniker),
+                        Moniker::parse_str(&parent_moniker)
                     );
                     assert_eq!(expected_collection, collection.name);
                     assert_eq!(expected_name, decl.name.unwrap());
@@ -271,10 +271,7 @@ mod test {
             let req = stream.try_next().await.unwrap().unwrap();
             match req {
                 fsys::LifecycleControllerRequest::ResolveInstance { moniker, responder } => {
-                    assert_eq!(
-                        AbsoluteMoniker::parse_str(expected_moniker),
-                        AbsoluteMoniker::parse_str(&moniker)
-                    );
+                    assert_eq!(Moniker::parse_str(expected_moniker), Moniker::parse_str(&moniker));
                     responder.send(Ok(())).unwrap();
                 }
                 _ => panic!("Unexpected Lifecycle Controller request: {:?}", req),
@@ -287,10 +284,7 @@ mod test {
                     binder: _,
                     responder,
                 } => {
-                    assert_eq!(
-                        AbsoluteMoniker::parse_str(expected_moniker),
-                        AbsoluteMoniker::parse_str(&moniker)
-                    );
+                    assert_eq!(Moniker::parse_str(expected_moniker), Moniker::parse_str(&moniker));
                     responder.send(Ok(())).unwrap();
                 }
                 _ => panic!("Unexpected Lifecycle Controller request: {:?}", req),
@@ -317,8 +311,8 @@ mod test {
                     responder,
                 } => {
                     assert_eq!(
-                        AbsoluteMoniker::parse_str(expected_parent_moniker),
-                        AbsoluteMoniker::parse_str(&parent_moniker)
+                        Moniker::parse_str(expected_parent_moniker),
+                        Moniker::parse_str(&parent_moniker)
                     );
                     assert_eq!(expected_name, child.name);
                     assert_eq!(expected_collection, child.collection.unwrap());
@@ -337,8 +331,8 @@ mod test {
                     args: _,
                 } => {
                     assert_eq!(
-                        AbsoluteMoniker::parse_str(expected_parent_moniker),
-                        AbsoluteMoniker::parse_str(&parent_moniker)
+                        Moniker::parse_str(expected_parent_moniker),
+                        Moniker::parse_str(&parent_moniker)
                     );
                     assert_eq!(expected_collection, collection.name);
                     assert_eq!(expected_name, decl.name.unwrap());
@@ -370,8 +364,8 @@ mod test {
                     responder,
                 } => {
                     assert_eq!(
-                        AbsoluteMoniker::parse_str(expected_parent_moniker),
-                        AbsoluteMoniker::parse_str(&parent_moniker)
+                        Moniker::parse_str(expected_parent_moniker),
+                        Moniker::parse_str(&parent_moniker)
                     );
                     assert_eq!(expected_name, child.name);
                     assert_eq!(expected_collection, child.collection.unwrap());
@@ -390,8 +384,8 @@ mod test {
                     args: _,
                 } => {
                     assert_eq!(
-                        AbsoluteMoniker::parse_str(expected_parent_moniker),
-                        AbsoluteMoniker::parse_str(&parent_moniker)
+                        Moniker::parse_str(expected_parent_moniker),
+                        Moniker::parse_str(&parent_moniker)
                     );
                     assert_eq!(expected_collection, collection.name);
                     assert_eq!(expected_name, decl.name.unwrap());
@@ -404,10 +398,7 @@ mod test {
             let req = stream.try_next().await.unwrap().unwrap();
             match req {
                 fsys::LifecycleControllerRequest::ResolveInstance { moniker, responder } => {
-                    assert_eq!(
-                        AbsoluteMoniker::parse_str(expected_moniker),
-                        AbsoluteMoniker::parse_str(&moniker)
-                    );
+                    assert_eq!(Moniker::parse_str(expected_moniker), Moniker::parse_str(&moniker));
                     responder.send(Ok(())).unwrap();
                 }
                 _ => panic!("Unexpected Lifecycle Controller request: {:?}", req),
@@ -420,10 +411,7 @@ mod test {
                     binder: _,
                     responder,
                 } => {
-                    assert_eq!(
-                        AbsoluteMoniker::parse_str(expected_moniker),
-                        AbsoluteMoniker::parse_str(&moniker)
-                    );
+                    assert_eq!(Moniker::parse_str(expected_moniker), Moniker::parse_str(&moniker));
                     responder.send(Ok(())).unwrap();
                 }
                 _ => panic!("Unexpected Lifecycle Controller request: {:?}", req),

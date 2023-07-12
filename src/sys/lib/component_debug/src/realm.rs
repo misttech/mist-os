@@ -10,7 +10,7 @@ use {
     fidl_fuchsia_component_decl as fcdecl, fidl_fuchsia_io as fio, fidl_fuchsia_sys2 as fsys,
     fuchsia_async::TimeoutExt,
     futures::TryFutureExt,
-    moniker::{AbsoluteMoniker, AbsoluteMonikerBase, MonikerError},
+    moniker::{Moniker, MonikerBase, MonikerError},
     thiserror::Error,
 };
 
@@ -42,10 +42,10 @@ pub enum ParseError {
 #[derive(Debug, Error)]
 pub enum GetInstanceError {
     #[error("instance {0} could not be found")]
-    InstanceNotFound(AbsoluteMoniker),
+    InstanceNotFound(Moniker),
 
     #[error("component manager could not parse {0}")]
-    BadMoniker(AbsoluteMoniker),
+    BadMoniker(Moniker),
 
     #[error(transparent)]
     ParseError(#[from] ParseError),
@@ -120,13 +120,13 @@ pub enum GetDeclarationError {
     Fidl(#[from] fidl::Error),
 
     #[error("instance {0} could not be found")]
-    InstanceNotFound(AbsoluteMoniker),
+    InstanceNotFound(Moniker),
 
     #[error("instance {0} is not resolved")]
-    InstanceNotResolved(AbsoluteMoniker),
+    InstanceNotResolved(Moniker),
 
     #[error("component manager could not parse {0}")]
-    BadMoniker(AbsoluteMoniker),
+    BadMoniker(Moniker),
 
     #[error("component manager failed to encode the manifest")]
     EncodeFailed,
@@ -153,13 +153,13 @@ pub enum GetStructuredConfigError {
     ParseError(#[from] ParseError),
 
     #[error("instance {0} could not be found")]
-    InstanceNotFound(AbsoluteMoniker),
+    InstanceNotFound(Moniker),
 
     #[error("instance {0} is not resolved")]
-    InstanceNotResolved(AbsoluteMoniker),
+    InstanceNotResolved(Moniker),
 
     #[error("component manager could not parse {0}")]
-    BadMoniker(AbsoluteMoniker),
+    BadMoniker(Moniker),
 
     #[error("component manager responded with an unknown error code")]
     UnknownError,
@@ -169,7 +169,7 @@ pub enum GetStructuredConfigError {
 #[derive(Debug, Clone)]
 pub struct Instance {
     /// Moniker of the component.
-    pub moniker: AbsoluteMoniker,
+    pub moniker: Moniker,
 
     /// URL of the component.
     pub url: String,
@@ -191,8 +191,8 @@ impl TryFrom<fsys::Instance> for Instance {
         let moniker = instance
             .moniker
             .ok_or(ParseError::MissingField { struct_name: "Instance", field_name: "moniker" })?;
-        let moniker = AbsoluteMoniker::parse_str(&moniker)?;
-        let moniker = AbsoluteMoniker::root().descendant(&moniker);
+        let moniker = Moniker::parse_str(&moniker)?;
+        let moniker = Moniker::root().descendant(&moniker);
         let url = instance
             .url
             .ok_or(ParseError::MissingField { struct_name: "Instance", field_name: "url" })?;
@@ -341,7 +341,7 @@ pub async fn get_all_instances(
 }
 
 pub async fn get_resolved_declaration(
-    moniker: &AbsoluteMoniker,
+    moniker: &Moniker,
     realm_query: &fsys::RealmQueryProxy,
 ) -> Result<ComponentDecl, GetDeclarationError> {
     let moniker_str = moniker.to_string();
@@ -385,7 +385,7 @@ async fn drain_manifest_bytes_iterator(
 
 pub async fn resolve_declaration(
     realm_query: &fsys::RealmQueryProxy,
-    parent: &AbsoluteMoniker,
+    parent: &Moniker,
     child_location: &fsys::ChildLocation,
     url: &str,
 ) -> Result<ComponentDecl, GetDeclarationError> {
@@ -418,7 +418,7 @@ pub async fn resolve_declaration(
 }
 
 pub async fn get_config_fields(
-    moniker: &AbsoluteMoniker,
+    moniker: &Moniker,
     realm_query: &fsys::RealmQueryProxy,
 ) -> Result<Option<Vec<ConfigField>>, GetStructuredConfigError> {
     // Parse the runtime directory and add it into the State object
@@ -445,7 +445,7 @@ pub async fn get_config_fields(
 }
 
 pub async fn get_runtime(
-    moniker: &AbsoluteMoniker,
+    moniker: &Moniker,
     realm_query: &fsys::RealmQueryProxy,
 ) -> Result<Runtime, GetRuntimeError> {
     // Parse the runtime directory and add it into the State object
@@ -502,7 +502,7 @@ async fn parse_runtime_from_dir(runtime_dir: RemoteDirectory) -> Result<Runtime,
 }
 
 pub async fn get_instance(
-    moniker: &AbsoluteMoniker,
+    moniker: &Moniker,
     realm_query: &fsys::RealmQueryProxy,
 ) -> Result<Instance, GetInstanceError> {
     let moniker_str = moniker.to_string();
@@ -522,7 +522,7 @@ pub async fn get_instance(
 }
 
 pub async fn get_outgoing_capabilities(
-    moniker: &AbsoluteMoniker,
+    moniker: &Moniker,
     realm_query: &fsys::RealmQueryProxy,
 ) -> Result<Vec<String>, GetOutgoingCapabilitiesError> {
     let moniker_str = moniker.to_string();
@@ -547,7 +547,7 @@ pub async fn get_outgoing_capabilities(
 }
 
 pub async fn get_merkle_root(
-    moniker: &AbsoluteMoniker,
+    moniker: &Moniker,
     realm_query: &fsys::RealmQueryProxy,
 ) -> Result<String, GetMerkleRootError> {
     let moniker_str = moniker.to_string();
@@ -616,7 +616,7 @@ mod tests {
         assert_eq!(instances.len(), 1);
         let instance = instances.remove(0);
 
-        let moniker = AbsoluteMoniker::parse_str("/my_foo").unwrap();
+        let moniker = Moniker::parse_str("/my_foo").unwrap();
         assert_eq!(instance.moniker, moniker);
         assert_eq!(instance.url, "#meta/foo.cm");
         assert_eq!(instance.instance_id.unwrap(), "1234567890");
@@ -663,7 +663,7 @@ mod tests {
             HashMap::new(),
         );
 
-        let moniker = AbsoluteMoniker::parse_str("/my_foo").unwrap();
+        let moniker = Moniker::parse_str("/my_foo").unwrap();
         let manifest = get_resolved_declaration(&moniker, &query).await.unwrap();
 
         assert_eq!(manifest.uses.len(), 1);
@@ -689,7 +689,7 @@ mod tests {
             HashMap::from([(("./my_foo".to_string(), fsys::OpenDirType::PackageDir), pkg_dir)]),
         );
 
-        let moniker = AbsoluteMoniker::parse_str("/my_foo").unwrap();
+        let moniker = Moniker::parse_str("/my_foo").unwrap();
         let merkle_root = get_merkle_root(&moniker, &query).await.unwrap();
 
         assert_eq!(merkle_root, "1234");
@@ -712,7 +712,7 @@ mod tests {
             ..Default::default()
         }]);
 
-        let moniker = AbsoluteMoniker::parse_str("/my_foo").unwrap();
+        let moniker = Moniker::parse_str("/my_foo").unwrap();
         let instance = get_instance(&moniker, &realm_query).await.unwrap();
 
         assert_eq!(instance.moniker, moniker);

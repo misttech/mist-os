@@ -22,7 +22,7 @@ use {
     fuchsia_url::AbsoluteComponentUrl,
     fuchsia_zircon_status as zx_status,
     futures::FutureExt,
-    moniker::{AbsoluteMoniker, AbsoluteMonikerBase, ChildMoniker, ChildMonikerBase},
+    moniker::{ChildMoniker, ChildMonikerBase, Moniker, MonikerBase},
     routing::{
         capability_source::{CapabilitySource, ComponentCapability},
         component_id_index::ComponentIdIndex,
@@ -140,9 +140,9 @@ impl ModelBuilderForAnalyzer {
 
     fn load_dynamic_components(
         input: HashMap<NodePath, (AbsoluteComponentUrl, Option<String>)>,
-    ) -> (HashMap<AbsoluteMoniker, Vec<Child>>, Vec<anyhow::Error>) {
+    ) -> (HashMap<Moniker, Vec<Child>>, Vec<anyhow::Error>) {
         let mut errors: Vec<anyhow::Error> = vec![];
-        let mut dynamic_components: HashMap<AbsoluteMoniker, Vec<Child>> = HashMap::new();
+        let mut dynamic_components: HashMap<Moniker, Vec<Child>> = HashMap::new();
         for (node_path, (url, environment)) in input.into_iter() {
             let mut moniker_vec = node_path.as_vec();
             let child_moniker_str = moniker_vec.pop();
@@ -154,7 +154,7 @@ impl ModelBuilderForAnalyzer {
             }
             let child_moniker_str = child_moniker_str.unwrap();
 
-            let abs_moniker: AbsoluteMoniker = AbsoluteMoniker::parse(&moniker_vec)
+            let abs_moniker: Moniker = Moniker::parse(&moniker_vec)
                 .expect("node path could not be converted back to absolute moniker");
             let child_moniker: ChildMoniker = ChildMoniker::parse(child_moniker_str)
                 .expect("node path part could not be converted back to child moniker");
@@ -297,7 +297,7 @@ impl ModelBuilderForAnalyzer {
     fn add_descendants(
         instance: &Arc<ComponentInstanceForAnalyzer>,
         decls_by_url: &HashMap<Url, (ComponentDecl, Option<ConfigFields>)>,
-        dynamic_components: &HashMap<AbsoluteMoniker, Vec<Child>>,
+        dynamic_components: &HashMap<Moniker, Vec<Child>>,
         model: &mut ComponentModelForAnalyzer,
         result: &mut BuildModelResult,
     ) {
@@ -535,16 +535,12 @@ impl ComponentModelForAnalyzer {
         match self.instances.get(id) {
             Some(instance) => Ok(Arc::clone(instance)),
             None => Err(ComponentInstanceError::instance_not_found(
-                AbsoluteMoniker::parse_str(&id.to_string()).unwrap(),
+                Moniker::parse_str(&id.to_string()).unwrap(),
             )),
         }
     }
 
-    fn does_child_reference_offer(
-        self: &Arc<Self>,
-        offer: &OfferDecl,
-        child: AbsoluteMoniker,
-    ) -> bool {
+    fn does_child_reference_offer(self: &Arc<Self>, offer: &OfferDecl, child: Moniker) -> bool {
         let instance = if let Ok(i) = self.get_instance(&child.clone().into()) {
             i
         } else {
@@ -1211,7 +1207,7 @@ mod tests {
         super::ModelBuilderForAnalyzer,
         crate::{environment::BOOT_SCHEME, node_path::NodePath, ComponentModelForAnalyzer},
         anyhow::Result,
-        cm_moniker::InstancedAbsoluteMoniker,
+        cm_moniker::InstancedMoniker,
         cm_rust::{
             Availability, ComponentDecl, DependencyType, RegistrationSource, ResolverRegistration,
             RunnerRegistration, UseProtocolDecl, UseSource, UseStorageDecl,
@@ -1222,7 +1218,7 @@ mod tests {
         fidl_fuchsia_component_decl as fdecl,
         fidl_fuchsia_component_internal as component_internal,
         maplit::hashmap,
-        moniker::{AbsoluteMoniker, AbsoluteMonikerBase, ChildMoniker},
+        moniker::{ChildMoniker, Moniker, MonikerBase},
         routing::{
             component_id_index::ComponentIdIndex,
             component_instance::{
@@ -1285,20 +1281,20 @@ mod tests {
         assert_eq!(
             get_other_result.err().unwrap().to_string(),
             ComponentInstanceError::instance_not_found(
-                AbsoluteMoniker::parse_str(&other_id.to_string()).unwrap()
+                Moniker::parse_str(&other_id.to_string()).unwrap()
             )
             .to_string()
         );
 
         // Include tests for `.instanced_moniker()` alongside `.abs_moniker()`
         // until`.instanced_moniker()` is removed from the public API.
-        assert_eq!(root_instance.abs_moniker(), &AbsoluteMoniker::root());
-        assert_eq!(root_instance.instanced_moniker(), &InstancedAbsoluteMoniker::root());
+        assert_eq!(root_instance.abs_moniker(), &Moniker::root());
+        assert_eq!(root_instance.instanced_moniker(), &InstancedMoniker::root());
 
-        assert_eq!(child_instance.abs_moniker(), &AbsoluteMoniker::parse_str("/child").unwrap());
+        assert_eq!(child_instance.abs_moniker(), &Moniker::parse_str("/child").unwrap());
         assert_eq!(
             child_instance.instanced_moniker(),
-            &InstancedAbsoluteMoniker::parse_str("/child:0").unwrap()
+            &InstancedMoniker::parse_str("/child:0").unwrap()
         );
 
         match root_instance.try_get_parent()? {
@@ -1531,7 +1527,7 @@ mod tests {
         let (child_runner_registrar, child_runner) = get_child_runner_result.unwrap();
         match child_runner_registrar {
             ExtendedInstanceInterface::Component(instance) => {
-                assert_eq!(instance.abs_moniker(), &AbsoluteMoniker::root());
+                assert_eq!(instance.abs_moniker(), &Moniker::root());
             }
             ExtendedInstanceInterface::AboveRoot(_) => {
                 panic!("expected child_env_runner to be registered by the root instance")
@@ -1546,7 +1542,7 @@ mod tests {
         let (child_resolver_registrar, child_resolver) = get_child_resolver_result.unwrap();
         match child_resolver_registrar {
             ExtendedInstanceInterface::Component(instance) => {
-                assert_eq!(instance.abs_moniker(), &AbsoluteMoniker::root());
+                assert_eq!(instance.abs_moniker(), &Moniker::root());
             }
             ExtendedInstanceInterface::AboveRoot(_) => {
                 panic!("expected child_env_resolver to be registered by the root instance")

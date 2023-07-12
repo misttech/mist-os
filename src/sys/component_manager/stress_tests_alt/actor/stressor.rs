@@ -7,7 +7,7 @@ use {
     fidl_fuchsia_component as fcomponent, fidl_fuchsia_component_decl as fdecl,
     fidl_fuchsia_sys2 as fsys,
     fuchsia_component::client::connect_to_protocol,
-    moniker::{AbsoluteMoniker, AbsoluteMonikerBase, ChildMoniker},
+    moniker::{ChildMoniker, Moniker, MonikerBase},
 };
 
 pub struct Stressor {
@@ -72,7 +72,7 @@ impl Stressor {
                 )
             })?;
 
-        let child_moniker = AbsoluteMoniker::try_from(parent_moniker)
+        let child_moniker = Moniker::try_from(parent_moniker)
             .unwrap()
             .child(ChildMoniker::try_new(child_name, Some(collection)).unwrap());
         let (_, binder_server) = fidl::endpoints::create_endpoints::<fcomponent::BinderMarker>();

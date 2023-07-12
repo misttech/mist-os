@@ -143,7 +143,7 @@ mod tests {
         cm_rust::{CapabilityDecl, RunnerDecl},
         cm_rust_testing::*,
         futures::{lock::Mutex, prelude::*},
-        moniker::{AbsoluteMoniker, AbsoluteMonikerBase},
+        moniker::{Moniker, MonikerBase},
         std::sync::Weak,
     };
 
@@ -160,7 +160,7 @@ mod tests {
 
     async fn start_component_through_hooks(
         hooks: &Hooks,
-        moniker: AbsoluteMoniker,
+        moniker: Moniker,
         url: &str,
     ) -> Result<TaskScope, Error> {
         let provider_result = Arc::new(Mutex::new(None));
@@ -217,19 +217,15 @@ mod tests {
 
         // Case 1: The started component's moniker matches the allowlist entry above.
         let url = "xxx://test";
-        let _task_scope = start_component_through_hooks(
-            &hooks,
-            AbsoluteMoniker::try_from(vec!["foo"]).unwrap(),
-            url,
-        )
-        .await?;
+        let _task_scope =
+            start_component_through_hooks(&hooks, Moniker::try_from(vec!["foo"]).unwrap(), url)
+                .await?;
         runner.wait_for_url(&url).await;
         let checker = runner.last_checker().expect("No PolicyChecker held by MockRunner");
         assert_matches!(checker.ambient_mark_vmo_exec_allowed(), Ok(()));
 
         // Case 2: Moniker does not match allowlist entry.
-        let _task_scope =
-            start_component_through_hooks(&hooks, AbsoluteMoniker::root(), url).await?;
+        let _task_scope = start_component_through_hooks(&hooks, Moniker::root(), url).await?;
         runner.wait_for_url(&url).await;
         let checker = runner.last_checker().expect("No PolicyChecker held by MockRunner");
         assert_matches!(checker.ambient_mark_vmo_exec_allowed(), Err(_));
@@ -304,7 +300,7 @@ mod tests {
             .await;
 
         // Bind the root component.
-        universe.start_instance(&AbsoluteMoniker::root()).await.expect("bind failed");
+        universe.start_instance(&Moniker::root()).await.expect("bind failed");
 
         // Ensure the instance starts up.
         mock_runner.wait_for_url("test:///a_resolved").await;

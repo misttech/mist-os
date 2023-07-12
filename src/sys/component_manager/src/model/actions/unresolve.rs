@@ -111,7 +111,7 @@ pub mod tests {
         cm_rust_testing::{CollectionDeclBuilder, ComponentDeclBuilder},
         cm_types::Name,
         fidl_fuchsia_component_decl as fdecl, fuchsia_async as fasync,
-        moniker::{AbsoluteMoniker, AbsoluteMonikerBase},
+        moniker::{Moniker, MonikerBase},
         std::sync::Arc,
     };
 
@@ -134,7 +134,7 @@ pub mod tests {
         ];
         // Resolve components without starting them.
         let test = ActionsTest::new("root", components, None).await;
-        let component_root = test.look_up(AbsoluteMoniker::root()).await;
+        let component_root = test.look_up(Moniker::root()).await;
         let component_a = test.look_up(vec!["a"].try_into().unwrap()).await;
         let component_b = test.look_up(vec!["a", "b"].try_into().unwrap()).await;
         let component_c = test.look_up(vec!["a", "b", "c"].try_into().unwrap()).await;
@@ -181,7 +181,7 @@ pub mod tests {
         let test = ActionsTest::new("root", components, None).await;
 
         // Resolve each component.
-        test.look_up(AbsoluteMoniker::root()).await;
+        test.look_up(Moniker::root()).await;
         let component_a = test.look_up(vec!["a"].try_into().unwrap()).await;
         let component_b = test.look_up(vec!["a", "b"].try_into().unwrap()).await;
         let component_c = test.look_up(vec!["a", "b", "c"].try_into().unwrap()).await;
@@ -243,7 +243,7 @@ pub mod tests {
             ("b", component_decl_with_test_runner()),
         ];
         let test = ActionsTest::new("root", components, None).await;
-        test.start(AbsoluteMoniker::root()).await;
+        test.start(Moniker::root()).await;
         let component_a = test.start(vec!["a"].try_into().unwrap()).await;
         test.start(vec!["a", "b"].try_into().unwrap()).await;
 

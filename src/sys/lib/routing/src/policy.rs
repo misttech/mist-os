@@ -12,7 +12,7 @@ use {
         },
     },
     fuchsia_zircon_status as zx,
-    moniker::{AbsoluteMoniker, AbsoluteMonikerBase, ChildMonikerBase, ExtendedMoniker},
+    moniker::{ChildMonikerBase, ExtendedMoniker, Moniker, MonikerBase},
     std::sync::Arc,
     thiserror::Error,
     tracing::{error, warn},
@@ -26,10 +26,10 @@ use serde::{Deserialize, Serialize};
 #[derive(Debug, Clone, Error, PartialEq)]
 pub enum PolicyError {
     #[error("security policy disallows \"{policy}\" job policy for \"{moniker}\"")]
-    JobPolicyDisallowed { policy: String, moniker: AbsoluteMoniker },
+    JobPolicyDisallowed { policy: String, moniker: Moniker },
 
     #[error("security policy disallows \"{policy}\" child policy for \"{moniker}\"")]
-    ChildPolicyDisallowed { policy: String, moniker: AbsoluteMoniker },
+    ChildPolicyDisallowed { policy: String, moniker: Moniker },
 
     #[error("security policy was unable to extract the source from the routed capability")]
     InvalidCapabilitySource,
@@ -38,16 +38,16 @@ pub enum PolicyError {
     CapabilityUseDisallowed {
         cap: String,
         source_moniker: ExtendedMoniker,
-        target_moniker: AbsoluteMoniker,
+        target_moniker: Moniker,
     },
 
     #[error("debug security policy disallows \"{cap}\" from \"{source_moniker}\" being routed from environment \"{env_moniker}:{env_name}\" to \"{target_moniker}\"")]
     DebugCapabilityUseDisallowed {
         cap: String,
         source_moniker: ExtendedMoniker,
-        env_moniker: AbsoluteMoniker,
+        env_moniker: Moniker,
         env_name: String,
-        target_moniker: AbsoluteMoniker,
+        target_moniker: Moniker,
     },
 }
 
@@ -148,7 +148,7 @@ impl GlobalPolicyChecker {
     pub fn can_route_capability<'a, C>(
         &self,
         capability_source: &'a CapabilitySource<C>,
-        target_moniker: &'a AbsoluteMoniker,
+        target_moniker: &'a Moniker,
     ) -> Result<(), PolicyError>
     where
         C: ComponentInstanceInterface,
@@ -197,9 +197,9 @@ impl GlobalPolicyChecker {
     pub fn can_route_debug_capability<'a, C>(
         &self,
         capability_source: &'a CapabilitySource<C>,
-        env_moniker: &'a AbsoluteMoniker,
+        env_moniker: &'a Moniker,
         env_name: &'a str,
-        target_moniker: &'a AbsoluteMoniker,
+        target_moniker: &'a Moniker,
     ) -> Result<(), PolicyError>
     where
         C: ComponentInstanceInterface,
@@ -239,10 +239,7 @@ impl GlobalPolicyChecker {
     }
 
     /// Returns Ok(()) if `target_moniker` is allowed to have `on_terminate=REBOOT` set.
-    pub fn reboot_on_terminate_allowed(
-        &self,
-        target_moniker: &AbsoluteMoniker,
-    ) -> Result<(), PolicyError> {
+    pub fn reboot_on_terminate_allowed(&self, target_moniker: &Moniker) -> Result<(), PolicyError> {
         self.policy
             .child_policy
             .reboot_on_terminate
@@ -258,7 +255,7 @@ impl GlobalPolicyChecker {
 
 pub(crate) fn allowlist_entry_matches(
     allowlist_entry: &AllowlistEntry,
-    target_moniker: &AbsoluteMoniker,
+    target_moniker: &Moniker,
 ) -> bool {
     let mut iter = target_moniker.path().iter();
 
@@ -326,17 +323,17 @@ pub(crate) fn allowlist_entry_matches(
 }
 
 /// Evaluates security policy relative to a specific Component (based on that Component's
-/// AbsoluteMoniker).
+/// Moniker).
 pub struct ScopedPolicyChecker {
     /// The security policy to apply.
     policy: Arc<SecurityPolicy>,
 
     /// The absolute moniker of the component that policy will be evaluated for.
-    pub scope: AbsoluteMoniker,
+    pub scope: Moniker,
 }
 
 impl ScopedPolicyChecker {
-    pub fn new(policy: Arc<SecurityPolicy>, scope: AbsoluteMoniker) -> Self {
+    pub fn new(policy: Arc<SecurityPolicy>, scope: Moniker) -> Self {
         ScopedPolicyChecker { policy, scope }
     }
 
@@ -391,27 +388,25 @@ mod tests {
             AllowlistEntryBuilder, ChildPolicyAllowlists, JobPolicyAllowlists, SecurityPolicy,
         },
         assert_matches::assert_matches,
-        moniker::{AbsoluteMoniker, AbsoluteMonikerBase, ChildMoniker},
+        moniker::{ChildMoniker, Moniker, MonikerBase},
         std::collections::HashMap,
     };
 
     #[test]
     fn allowlist_entry_checker() {
-        let root = AbsoluteMoniker::root();
-        let allowed = AbsoluteMoniker::try_from(vec!["foo", "bar"]).unwrap();
-        let disallowed_child_of_allowed =
-            AbsoluteMoniker::try_from(vec!["foo", "bar", "baz"]).unwrap();
-        let disallowed = AbsoluteMoniker::try_from(vec!["baz", "fiz"]).unwrap();
+        let root = Moniker::root();
+        let allowed = Moniker::try_from(vec!["foo", "bar"]).unwrap();
+        let disallowed_child_of_allowed = Moniker::try_from(vec!["foo", "bar", "baz"]).unwrap();
+        let disallowed = Moniker::try_from(vec!["baz", "fiz"]).unwrap();
         let allowlist_exact = AllowlistEntryBuilder::new().exact_from_moniker(&allowed).build();
         assert!(allowlist_entry_matches(&allowlist_exact, &allowed));
         assert!(!allowlist_entry_matches(&allowlist_exact, &root));
         assert!(!allowlist_entry_matches(&allowlist_exact, &disallowed));
         assert!(!allowlist_entry_matches(&allowlist_exact, &disallowed_child_of_allowed));
 
-        let allowed_realm_root = AbsoluteMoniker::try_from(vec!["qux"]).unwrap();
-        let allowed_child_of_realm = AbsoluteMoniker::try_from(vec!["qux", "quux"]).unwrap();
-        let allowed_nested_child_of_realm =
-            AbsoluteMoniker::try_from(vec!["qux", "quux", "foo"]).unwrap();
+        let allowed_realm_root = Moniker::try_from(vec!["qux"]).unwrap();
+        let allowed_child_of_realm = Moniker::try_from(vec!["qux", "quux"]).unwrap();
+        let allowed_nested_child_of_realm = Moniker::try_from(vec!["qux", "quux", "foo"]).unwrap();
         let allowlist_realm =
             AllowlistEntryBuilder::new().exact_from_moniker(&allowed_realm_root).any_descendant();
         assert!(!allowlist_entry_matches(&allowlist_realm, &allowed_realm_root));
@@ -420,12 +415,11 @@ mod tests {
         assert!(!allowlist_entry_matches(&allowlist_realm, &disallowed));
         assert!(!allowlist_entry_matches(&allowlist_realm, &root));
 
-        let collection_holder = AbsoluteMoniker::try_from(vec!["corge"]).unwrap();
-        let collection_child =
-            AbsoluteMoniker::try_from(vec!["corge", "collection:child"]).unwrap();
+        let collection_holder = Moniker::try_from(vec!["corge"]).unwrap();
+        let collection_child = Moniker::try_from(vec!["corge", "collection:child"]).unwrap();
         let collection_nested_child =
-            AbsoluteMoniker::try_from(vec!["corge", "collection:child", "inner-child"]).unwrap();
-        let non_collection_child = AbsoluteMoniker::try_from(vec!["corge", "grault"]).unwrap();
+            Moniker::try_from(vec!["corge", "collection:child", "inner-child"]).unwrap();
+        let non_collection_child = Moniker::try_from(vec!["corge", "grault"]).unwrap();
         let allowlist_collection = AllowlistEntryBuilder::new()
             .exact_from_moniker(&collection_holder)
             .any_descendant_in_collection("collection");
@@ -436,13 +430,12 @@ mod tests {
         assert!(!allowlist_entry_matches(&allowlist_collection, &disallowed));
         assert!(!allowlist_entry_matches(&allowlist_collection, &root));
 
-        let collection_a = AbsoluteMoniker::try_from(vec!["foo", "bar:a", "baz", "qux"]).unwrap();
-        let collection_b = AbsoluteMoniker::try_from(vec!["foo", "bar:b", "baz", "qux"]).unwrap();
-        let parent_not_allowed = AbsoluteMoniker::try_from(vec!["foo", "bar:b", "baz"]).unwrap();
-        let collection_not_allowed =
-            AbsoluteMoniker::try_from(vec!["foo", "bar:b", "baz"]).unwrap();
+        let collection_a = Moniker::try_from(vec!["foo", "bar:a", "baz", "qux"]).unwrap();
+        let collection_b = Moniker::try_from(vec!["foo", "bar:b", "baz", "qux"]).unwrap();
+        let parent_not_allowed = Moniker::try_from(vec!["foo", "bar:b", "baz"]).unwrap();
+        let collection_not_allowed = Moniker::try_from(vec!["foo", "bar:b", "baz"]).unwrap();
         let different_collection_not_allowed =
-            AbsoluteMoniker::try_from(vec!["foo", "test:b", "baz", "qux"]).unwrap();
+            Moniker::try_from(vec!["foo", "test:b", "baz", "qux"]).unwrap();
         let allowlist_exact_in_collection = AllowlistEntryBuilder::new()
             .exact("foo")
             .any_child_in_collection("bar")
@@ -459,9 +452,9 @@ mod tests {
         ));
 
         let any_child_allowlist = AllowlistEntryBuilder::new().exact("core").any_child().build();
-        let allowed = AbsoluteMoniker::try_from(vec!["core", "abc"]).unwrap();
-        let disallowed_1 = AbsoluteMoniker::try_from(vec!["not_core", "abc"]).unwrap();
-        let disallowed_2 = AbsoluteMoniker::try_from(vec!["core", "abc", "def"]).unwrap();
+        let allowed = Moniker::try_from(vec!["core", "abc"]).unwrap();
+        let disallowed_1 = Moniker::try_from(vec!["not_core", "abc"]).unwrap();
+        let disallowed_2 = Moniker::try_from(vec!["core", "abc", "def"]).unwrap();
         assert!(allowlist_entry_matches(&any_child_allowlist, &allowed));
         assert!(!allowlist_entry_matches(&any_child_allowlist, &disallowed_1));
         assert!(!allowlist_entry_matches(&any_child_allowlist, &disallowed_2));
@@ -471,12 +464,10 @@ mod tests {
             .any_child()
             .any_child_in_collection("foo")
             .any_descendant();
-        let allowed = AbsoluteMoniker::try_from(vec!["core", "abc", "foo:def", "ghi"]).unwrap();
-        let disallowed_1 =
-            AbsoluteMoniker::try_from(vec!["not_core", "abc", "foo:def", "ghi"]).unwrap();
-        let disallowed_2 =
-            AbsoluteMoniker::try_from(vec!["core", "abc", "not_foo:def", "ghi"]).unwrap();
-        let disallowed_3 = AbsoluteMoniker::try_from(vec!["core", "abc", "foo:def"]).unwrap();
+        let allowed = Moniker::try_from(vec!["core", "abc", "foo:def", "ghi"]).unwrap();
+        let disallowed_1 = Moniker::try_from(vec!["not_core", "abc", "foo:def", "ghi"]).unwrap();
+        let disallowed_2 = Moniker::try_from(vec!["core", "abc", "not_foo:def", "ghi"]).unwrap();
+        let disallowed_3 = Moniker::try_from(vec!["core", "abc", "foo:def"]).unwrap();
         assert!(allowlist_entry_matches(&multiwildcard_allowlist, &allowed));
         assert!(!allowlist_entry_matches(&multiwildcard_allowlist, &disallowed_1));
         assert!(!allowlist_entry_matches(&multiwildcard_allowlist, &disallowed_2));
@@ -502,11 +493,11 @@ mod tests {
             };
         }
         let policy = Arc::new(SecurityPolicy::default());
-        assert_vmex_disallowed!(policy, AbsoluteMoniker::root());
-        assert_vmex_disallowed!(policy, AbsoluteMoniker::try_from(vec!["foo"]).unwrap());
+        assert_vmex_disallowed!(policy, Moniker::root());
+        assert_vmex_disallowed!(policy, Moniker::try_from(vec!["foo"]).unwrap());
 
-        let allowed1 = AbsoluteMoniker::try_from(vec!["foo", "bar"]).unwrap();
-        let allowed2 = AbsoluteMoniker::try_from(vec!["baz", "fiz"]).unwrap();
+        let allowed1 = Moniker::try_from(vec!["foo", "bar"]).unwrap();
+        let allowed2 = Moniker::try_from(vec!["baz", "fiz"]).unwrap();
         let policy = Arc::new(SecurityPolicy {
             job_policy: JobPolicyAllowlists {
                 ambient_mark_vmo_exec: vec![
@@ -533,7 +524,7 @@ mod tests {
         });
         assert_vmex_allowed_matches!(policy, allowed1, Ok(()));
         assert_vmex_allowed_matches!(policy, allowed2, Ok(()));
-        assert_vmex_disallowed!(policy, AbsoluteMoniker::root());
+        assert_vmex_disallowed!(policy, Moniker::root());
         assert_vmex_disallowed!(policy, allowed1.parent().unwrap());
         assert_vmex_disallowed!(policy, allowed1.child(ChildMoniker::try_from("baz").unwrap()));
     }
@@ -557,14 +548,11 @@ mod tests {
             };
         }
         let policy = Arc::new(SecurityPolicy::default());
-        assert_create_raw_processes_disallowed!(policy, AbsoluteMoniker::root());
-        assert_create_raw_processes_disallowed!(
-            policy,
-            AbsoluteMoniker::try_from(vec!["foo"]).unwrap()
-        );
+        assert_create_raw_processes_disallowed!(policy, Moniker::root());
+        assert_create_raw_processes_disallowed!(policy, Moniker::try_from(vec!["foo"]).unwrap());
 
-        let allowed1 = AbsoluteMoniker::try_from(vec!["foo", "bar"]).unwrap();
-        let allowed2 = AbsoluteMoniker::try_from(vec!["baz", "fiz"]).unwrap();
+        let allowed1 = Moniker::try_from(vec!["foo", "bar"]).unwrap();
+        let allowed2 = Moniker::try_from(vec!["baz", "fiz"]).unwrap();
         let policy = Arc::new(SecurityPolicy {
             job_policy: JobPolicyAllowlists {
                 ambient_mark_vmo_exec: vec![],
@@ -580,7 +568,7 @@ mod tests {
         });
         assert_create_raw_processes_allowed_matches!(policy, allowed1, Ok(()));
         assert_create_raw_processes_allowed_matches!(policy, allowed2, Ok(()));
-        assert_create_raw_processes_disallowed!(policy, AbsoluteMoniker::root());
+        assert_create_raw_processes_disallowed!(policy, Moniker::root());
         assert_create_raw_processes_disallowed!(policy, allowed1.parent().unwrap());
         assert_create_raw_processes_disallowed!(
             policy,
@@ -607,11 +595,11 @@ mod tests {
             };
         }
         let policy = Arc::new(SecurityPolicy::default());
-        assert_critical_disallowed!(policy, AbsoluteMoniker::root());
-        assert_critical_disallowed!(policy, AbsoluteMoniker::try_from(vec!["foo"]).unwrap());
+        assert_critical_disallowed!(policy, Moniker::root());
+        assert_critical_disallowed!(policy, Moniker::try_from(vec!["foo"]).unwrap());
 
-        let allowed1 = AbsoluteMoniker::try_from(vec!["foo", "bar"]).unwrap();
-        let allowed2 = AbsoluteMoniker::try_from(vec!["baz", "fiz"]).unwrap();
+        let allowed1 = Moniker::try_from(vec!["foo", "bar"]).unwrap();
+        let allowed2 = Moniker::try_from(vec!["baz", "fiz"]).unwrap();
         let policy = Arc::new(SecurityPolicy {
             job_policy: JobPolicyAllowlists {
                 ambient_mark_vmo_exec: vec![
@@ -633,7 +621,7 @@ mod tests {
         });
         assert_critical_allowed_matches!(policy, allowed1, Ok(()));
         assert_critical_allowed_matches!(policy, allowed2, Ok(()));
-        assert_critical_disallowed!(policy, AbsoluteMoniker::root());
+        assert_critical_disallowed!(policy, Moniker::root());
         assert_critical_disallowed!(policy, allowed1.parent().unwrap());
         assert_critical_disallowed!(policy, allowed1.child(ChildMoniker::try_from("baz").unwrap()));
     }
@@ -659,12 +647,12 @@ mod tests {
 
         // Empty policy and enabled.
         let policy = Arc::new(SecurityPolicy::default());
-        assert_reboot_disallowed!(policy, AbsoluteMoniker::root());
-        assert_reboot_disallowed!(policy, AbsoluteMoniker::try_from(vec!["foo"]).unwrap());
+        assert_reboot_disallowed!(policy, Moniker::root());
+        assert_reboot_disallowed!(policy, Moniker::try_from(vec!["foo"]).unwrap());
 
         // Nonempty policy.
-        let allowed1 = AbsoluteMoniker::try_from(vec!["foo", "bar"]).unwrap();
-        let allowed2 = AbsoluteMoniker::try_from(vec!["baz", "fiz"]).unwrap();
+        let allowed1 = Moniker::try_from(vec!["foo", "bar"]).unwrap();
+        let allowed2 = Moniker::try_from(vec!["baz", "fiz"]).unwrap();
         let policy = Arc::new(SecurityPolicy {
             job_policy: JobPolicyAllowlists {
                 ambient_mark_vmo_exec: vec![],
@@ -682,7 +670,7 @@ mod tests {
         });
         assert_reboot_allowed_matches!(policy, allowed1, Ok(()));
         assert_reboot_allowed_matches!(policy, allowed2, Ok(()));
-        assert_reboot_disallowed!(policy, AbsoluteMoniker::root());
+        assert_reboot_disallowed!(policy, Moniker::root());
         assert_reboot_disallowed!(policy, allowed1.parent().unwrap());
         assert_reboot_disallowed!(policy, allowed1.child(ChildMoniker::try_from("baz").unwrap()));
     }

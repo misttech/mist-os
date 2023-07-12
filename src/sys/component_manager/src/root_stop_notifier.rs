@@ -9,7 +9,7 @@ use {
     },
     async_trait::async_trait,
     futures::{channel::*, lock::Mutex},
-    moniker::AbsoluteMonikerBase,
+    moniker::MonikerBase,
     std::sync::{Arc, Weak},
 };
 

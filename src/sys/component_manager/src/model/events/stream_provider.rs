@@ -16,7 +16,7 @@ use {
     async_trait::async_trait,
     cm_rust::{ComponentDecl, UseDecl, UseEventStreamDecl},
     futures::lock::Mutex,
-    moniker::{AbsoluteMoniker, ExtendedMoniker},
+    moniker::{ExtendedMoniker, Moniker},
     std::{
         collections::HashMap,
         sync::{Arc, Weak},
@@ -44,7 +44,7 @@ struct AbsolutePath {
 /// Mutable event stream state, guarded by a mutex in the
 /// EventStreamProvider which allows for mutation.
 struct StreamState {
-    /// A mapping from a component instance's InstancedAbsoluteMoniker, to the set of
+    /// A mapping from a component instance's InstancedMoniker, to the set of
     /// event streams and their corresponding paths in the component instance's out directory.
     streams: HashMap<ExtendedMoniker, Vec<EventStreamAttachment>>,
 
@@ -142,7 +142,7 @@ impl EventStreamProvider {
             .and_then(|attachment| attachment.server_end.take())
     }
 
-    async fn on_component_destroyed(self: &Arc<Self>, target_moniker: &AbsoluteMoniker) {
+    async fn on_component_destroyed(self: &Arc<Self>, target_moniker: &Moniker) {
         let mut state = self.state.lock().await;
         // Remove all event streams associated with the `target_moniker` component.
         state.streams.remove(&ExtendedMoniker::ComponentInstance(target_moniker.clone()));

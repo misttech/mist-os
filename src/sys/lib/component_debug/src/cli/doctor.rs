@@ -9,7 +9,7 @@ use {
     },
     anyhow::Result,
     fidl_fuchsia_sys2 as fsys,
-    moniker::{AbsoluteMoniker, AbsoluteMonikerBase},
+    moniker::{Moniker, MonikerBase},
 };
 
 pub async fn doctor_cmd_print<W: std::io::Write>(
@@ -22,7 +22,7 @@ pub async fn doctor_cmd_print<W: std::io::Write>(
 
     // Convert the absolute moniker into a relative moniker w.r.t. root.
     // LifecycleController expects relative monikers only.
-    let relative_moniker = AbsoluteMoniker::scope_down(&AbsoluteMoniker::root(), &moniker).unwrap();
+    let relative_moniker = Moniker::scope_down(&Moniker::root(), &moniker).unwrap();
 
     writeln!(writer, "Moniker: {}", &moniker)?;
 
@@ -47,7 +47,7 @@ pub async fn doctor_cmd_serialized(
 
     // Convert the absolute moniker into a relative moniker w.r.t. root.
     // LifecycleController expects relative monikers only.
-    let relative_moniker = AbsoluteMoniker::scope_down(&AbsoluteMoniker::root(), &moniker).unwrap();
+    let relative_moniker = Moniker::scope_down(&Moniker::root(), &moniker).unwrap();
 
     validate_routes(&route_validator, relative_moniker).await
 }

@@ -41,11 +41,11 @@ rustc_library("moniker") {
   ]
 
   sources = [
-    "src/abs_moniker.rs",
     "src/child_moniker.rs",
     "src/error.rs",
     "src/extended_moniker.rs",
     "src/lib.rs",
+    "src/moniker.rs",
   ]
 
   # Some host tools use serde to serialize/deserialize moniker types. This
