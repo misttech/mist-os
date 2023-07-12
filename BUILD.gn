@@ -64,6 +64,18 @@ declare_args() {
   universe_package_labels = []
   legacy_universe_package_labels = []
 
+  # If you add package labels to this variable, the packages will be included in
+  # the 'discoverable' package set, as defined by RFC-0212 "Package Sets":
+  # https://fuchsia.dev/fuchsia-src/contribute/governance/rfcs/0212_package_sets
+  #
+  # They will be compiled, and published, but not added as dependencies of the
+  # assembled images, and so will not be able to cause the inclusion of
+  # 'config_data' or 'shell_command' entries.
+  #
+  # As these cannot be part of the legacy AIB for a product, there is no
+  # "legacy" version of this argument.
+  discoverable_package_labels = []
+
   # A list of binary labels to include in ZBIs built for this product.
   # product_bootfs_labels = []  (defined in product.gni)
   legacy_product_bootfs_labels = []
@@ -1580,6 +1592,14 @@ group("legacy_universe_packages") {
   testonly = fuchsia_zbi_testonly
   visibility = [ "//build/images/*" ]
   public_deps = legacy_universe_package_labels
+}
+
+# Packages that are compiled and published, but unable to contribute to the
+# product in any way.
+group("discoverable_packages") {
+  testonly = true
+  visibility = [ "//build/images/updates:universe_packages" ]
+  public_deps = discoverable_package_labels
 }
 
 group("host") {

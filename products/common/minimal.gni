@@ -21,6 +21,7 @@ cache_package_labels = []
 legacy_cache_package_labels = []
 universe_package_labels = []
 legacy_universe_package_labels = []
+discoverable_package_labels = []
 package_flavor_selections = []
 sdk_archive_labels = []
 

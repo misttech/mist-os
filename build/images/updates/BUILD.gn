@@ -46,10 +46,11 @@ if (use_bringup_assembly) {
   # These are the package groups that are used to build the system
 
   group("universe_packages") {
-    testonly = fuchsia_zbi_testonly
+    testonly = true
     visibility = [ ":*" ]
     public_deps = [
       "//:developer_universe_packages",
+      "//:discoverable_packages",
       "//:legacy_universe_packages",
     ]
   }
