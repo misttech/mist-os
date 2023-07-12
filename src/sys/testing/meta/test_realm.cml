@@ -29,6 +29,7 @@
         // Required: Include other required shards.
         "sys/component/realm_builder.shard.cml",
         "syslog/client.shard.cml",
+        "trace/client.shard.cml",
     ],
     expose: [
         // Required: Expose Realm protocol so that test manager can launch tests
@@ -57,6 +58,10 @@
                 {
                     runner: "elf_test_create_raw_processes_runner",
                     from: "#elf_test_create_raw_processes_runner",
+                },
+                {
+                    runner: "elf_test_create_raw_processes_ambient_exec_runner",
+                    from: "#elf_test_create_raw_processes_ambient_exec_runner",
                 },
                 {
                     runner: "gtest_runner",
