@@ -50,6 +50,7 @@ pub mod tmpfs;
 pub mod tracefs;
 
 pub use anon_node::*;
+pub use buffers::*;
 pub use dir_entry::*;
 pub use directory_file::*;
 pub use dirent_sink::*;

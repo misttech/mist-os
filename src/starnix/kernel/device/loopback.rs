@@ -455,3 +455,98 @@ pub fn create_loop_device(
 ) -> Result<Box<dyn FileOps>, Errno> {
     Ok(current_task.kernel().loop_device_registry.get_or_create(id.minor()).create_file_ops())
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::{fs::buffers::*, testing::*};
+
+    #[derive(Clone)]
+    struct PassthroughTestFile(Vec<u8>);
+
+    impl PassthroughTestFile {
+        pub fn new_node(bytes: &[u8]) -> impl FsNodeOps {
+            DynamicFile::new_node(Self(bytes.to_owned()))
+        }
+    }
+
+    impl DynamicFileSource for PassthroughTestFile {
+        fn generate(&self, sink: &mut DynamicFileBuf) -> Result<(), Errno> {
+            sink.write(&self.0);
+            Ok(())
+        }
+    }
+
+    fn bind_simple_loop_device(
+        current_task: &CurrentTask,
+        backing_file: FileHandle,
+        open_flags: OpenFlags,
+    ) -> FileHandle {
+        let backing_fd = current_task
+            .task
+            .files
+            .add_with_flags(&current_task, backing_file, FdFlags::empty())
+            .unwrap();
+
+        let loop_file = Anon::new_file(
+            &current_task,
+            Box::new(LoopDeviceFile { device: Arc::new(LoopDevice::default()) }),
+            open_flags,
+        );
+
+        let config_addr = map_object_anywhere(
+            &current_task,
+            &uapi::loop_config {
+                block_size: MIN_BLOCK_SIZE,
+                fd: backing_fd.raw() as u32,
+                ..Default::default()
+            },
+        );
+        loop_file.ioctl(&current_task, LOOP_CONFIGURE, config_addr.into()).unwrap();
+
+        loop_file
+    }
+
+    #[::fuchsia::test]
+    async fn basic_read() {
+        let expected_contents = b"hello, world!";
+        let (_kernel, current_task) = create_kernel_and_task();
+
+        let backing_node = FsNode::new_root(PassthroughTestFile::new_node(expected_contents));
+        let backing_file = Anon::new_file(
+            &current_task,
+            backing_node.create_file_ops(&current_task, OpenFlags::RDONLY).unwrap(),
+            OpenFlags::RDONLY,
+        );
+        let loop_file = bind_simple_loop_device(&current_task, backing_file, OpenFlags::RDONLY);
+
+        let mut buf = VecOutputBuffer::new(expected_contents.len());
+        loop_file.read(&current_task, &mut buf).unwrap();
+
+        assert_eq!(buf.data(), expected_contents);
+    }
+
+    #[::fuchsia::test]
+    async fn offset_works() {
+        let (_kernel, current_task) = create_kernel_and_task();
+
+        let backing_node = FsNode::new_root(PassthroughTestFile::new_node(b"hello, world!"));
+        let backing_file = Anon::new_file(
+            &current_task,
+            backing_node.create_file_ops(&current_task, OpenFlags::RDONLY).unwrap(),
+            OpenFlags::RDONLY,
+        );
+        let loop_file = bind_simple_loop_device(&current_task, backing_file, OpenFlags::RDONLY);
+
+        let info_addr = map_object_anywhere(
+            &current_task,
+            &uapi::loop_info64 { lo_offset: 3, ..Default::default() },
+        );
+        loop_file.ioctl(&current_task, LOOP_SET_STATUS64, info_addr.into()).unwrap();
+
+        let mut buf = VecOutputBuffer::new(25);
+        loop_file.read(&current_task, &mut buf).unwrap();
+
+        assert_eq!(buf.data(), b"lo, world!");
+    }
+}
