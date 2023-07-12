@@ -92,7 +92,7 @@ pub async fn setup_ramdisk(
     }
 
     // Open ramdisk device again as fidl_fuchsia_device::ControllerProxy
-    let client_end = ramdisk.open_controller().await.expect("Could not re-open ramdisk");
+    let client_end = ramdisk.open_controller().expect("Could not re-open ramdisk");
     let controller =
         client_end.into_proxy().expect("Could not convert ramdisk channel to async channel");
 

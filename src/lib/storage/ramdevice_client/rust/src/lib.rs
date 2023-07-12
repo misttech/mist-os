@@ -111,21 +111,26 @@ pub struct RamdiskClient {
 impl RamdiskClient {
     async fn new(dev_root: fio::DirectoryProxy, instance_name: &str) -> Result<Self, Error> {
         let ramdisk_path = format!("{RAMCTL_PATH}/{instance_name}");
+        let ramdisk_controller_path = format!("{ramdisk_path}/device_controller");
         let block_path = format!("{ramdisk_path}/{BLOCK_EXTENSION}");
 
         // Wait for ramdisk path to appear
-        let ramdisk_controller =
-            device_watcher::recursive_wait_and_open::<ControllerMarker>(&dev_root, &ramdisk_path)
-                .await
-                .with_context(|| format!("waiting for {}", &ramdisk_path))?;
+        let ramdisk_controller = device_watcher::recursive_wait_and_open::<ControllerMarker>(
+            &dev_root,
+            &ramdisk_controller_path,
+        )
+        .await
+        .with_context(|| format!("waiting for {}", &ramdisk_controller_path))?;
 
         // Wait for the block path to appear
         let block_dir = device_watcher::recursive_wait_and_open_directory(&dev_root, &block_path)
             .await
             .with_context(|| format!("waiting for {}", &block_path))?;
 
-        let block_controller =
-            connect_to_named_protocol_at_dir_root::<ControllerMarker>(&block_dir, ".")?;
+        let block_controller = connect_to_named_protocol_at_dir_root::<ControllerMarker>(
+            &block_dir,
+            "device_controller",
+        )?;
 
         Ok(RamdiskClient {
             block_dir: Some(block_dir),
@@ -183,7 +188,7 @@ impl RamdiskClient {
     }
 
     /// Get an open channel to the underlying ramdevice's controller.
-    pub async fn open_controller(
+    pub fn open_controller(
         &self,
     ) -> Result<fidl::endpoints::ClientEnd<fidl_fuchsia_device::ControllerMarker>, Error> {
         let block_dir = self.as_dir().ok_or_else(|| anyhow!("directory is invalid"))?;

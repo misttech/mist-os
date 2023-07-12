@@ -11,8 +11,8 @@ use {
     anyhow::{anyhow, Context as _, Error},
     delivery_blob::{delivery_blob_path, CompressionMode, Type1Blob},
     fdio::{SpawnAction, SpawnOptions},
-    fidl::endpoints::{ClientEnd, Proxy, ServerEnd},
-    fidl_fuchsia_fxfs as ffxfs, fidl_fuchsia_io as fio, fuchsia_async as fasync,
+    fidl::endpoints::ClientEnd,
+    fidl_fuchsia_fxfs as ffxfs, fidl_fuchsia_io as fio,
     fuchsia_component::server::ServiceFs,
     fuchsia_merkle::{Hash, MerkleTreeBuilder},
     fuchsia_zircon::{self as zx, prelude::*},
@@ -112,9 +112,7 @@ impl BlobfsRamdiskBuilder {
             None => (Ramdisk::start().await.context("creating backing ramdisk for blobfs")?, true),
         };
 
-        let ramdisk_controller = Proxy::from_channel(fasync::Channel::from_channel(
-            ramdisk.clone_channel().context("cloning ramdisk channel")?,
-        )?);
+        let ramdisk_controller = ramdisk.client.open_controller()?.into_proxy()?;
 
         // Spawn blobfs on top of the ramdisk.
         let mut fs = match implementation {
@@ -422,12 +420,6 @@ impl Ramdisk {
     /// drive with 512MiB capacity.
     pub async fn start() -> Result<Self, Error> {
         Self::builder().start().await
-    }
-
-    fn clone_channel(&self) -> Result<zx::Channel, Error> {
-        let (result, server_end) = zx::Channel::create();
-        self.proxy.clone(fio::OpenFlags::CLONE_SAME_RIGHTS, ServerEnd::new(server_end))?;
-        Ok(result)
     }
 
     /// Shuts down this ramdisk.

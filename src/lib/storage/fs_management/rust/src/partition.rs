@@ -74,9 +74,11 @@ pub async fn find_partition_in(
                     if filename == "." {
                         continue;
                     }
-                    let proxy =
-                        connect_to_named_protocol_at_dir_root::<ControllerMarker>(&dir, filename)
-                            .context("opening partition path")?;
+                    let proxy = connect_to_named_protocol_at_dir_root::<ControllerMarker>(
+                        &dir,
+                        &format!("{filename}/device_controller"),
+                    )
+                    .context("opening partition path")?;
                     match partition_matches_with_proxy(&proxy, &matcher).await {
                         Ok(true) => {
                             return Ok(proxy);

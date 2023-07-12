@@ -51,13 +51,16 @@ zx_status_t RamNand::Create(fuchsia_hardware_nand::wire::RamNandInfo config,
     return status;
   }
 
-  zx::result channel = device_watcher::RecursiveWaitForFile(ram_nand_ctl.get(), name.c_str());
-  if (channel.is_error()) {
-    fprintf(stderr, "could not open ram_nand at '%s': %s\n", name.c_str(), channel.status_string());
-    return channel.error_value();
+  std::string controller_path = name + "/device_controller";
+  zx::result controller =
+      device_watcher::RecursiveWaitForFile(ram_nand_ctl.get(), controller_path.c_str());
+  if (controller.is_error()) {
+    fprintf(stderr, "could not open ram_nand at '%s': %s\n", name.c_str(),
+            controller.status_string());
+    return controller.error_value();
   }
 
-  *out = RamNand(fidl::ClientEnd<fuchsia_device::Controller>(std::move(channel.value())),
+  *out = RamNand(fidl::ClientEnd<fuchsia_device::Controller>(std::move(controller.value())),
                  fbl::String::Concat({kBasePath, "/", name}), name);
 
   return ZX_OK;

@@ -32,11 +32,12 @@ namespace {
 constexpr std::string_view sparse_image_path = "/pkg/data/test_fvm.sparse.blk";
 
 zx::result<std::string> AttachFvm(const std::string& device_path) {
-  zx::result device = component::Connect<fuchsia_device::Controller>(device_path);
-  if (device.is_error()) {
-    return device.take_error();
+  std::string controller_path = device_path + "/device_controller";
+  zx::result controller = component::Connect<fuchsia_device::Controller>(controller_path);
+  if (controller.is_error()) {
+    return controller.take_error();
   }
-  if (auto status = storage::BindFvm(device.value()); status.is_error())
+  if (auto status = storage::BindFvm(controller.value()); status.is_error())
     return status.take_error();
   std::string fvm_disk_path = device_path + "/fvm";
   if (zx::result channel = device_watcher::RecursiveWaitForFile(fvm_disk_path.c_str(), zx::sec(3));

@@ -5,7 +5,6 @@
 use {
     crate::gpt,
     anyhow::{Context, Error},
-    fidl_fuchsia_device::ControllerMarker,
     fidl_fuchsia_fshost::{BlockWatcherMarker, BlockWatcherProxy},
     fidl_fuchsia_hardware_block::BlockMarker,
     fidl_fuchsia_hardware_block_partition::PartitionMarker,
@@ -114,7 +113,7 @@ impl FvmRamdisk {
             fidl::endpoints::create_proxy::<fidl_fuchsia_paver::DynamicDataSinkMarker>()?;
         let () = paver.use_block_device(
             client_end,
-            self.ramdisk.open_controller().await.context("Opening ramdisk controller")?,
+            self.ramdisk.open_controller().context("Opening ramdisk controller")?,
             remote,
         )?;
 
@@ -164,10 +163,7 @@ impl FvmRamdisk {
 
     /// Explicitly binds the GPT driver to the given ramdisk.
     async fn rebind_gpt_driver(&self) -> Result<(), Error> {
-        let client_end = self.ramdisk.open().await?;
-        // TODO(https://fxbug.dev/112484): this relies on multiplexing.
-        let client_end =
-            fidl::endpoints::ClientEnd::<ControllerMarker>::new(client_end.into_channel());
+        let client_end = self.ramdisk.open_controller()?;
         let controller = client_end.into_proxy()?;
         controller.rebind("gpt.cm").await?.map_err(zx::Status::from_raw)?;
         Ok(())

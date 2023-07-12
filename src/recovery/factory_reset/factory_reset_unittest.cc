@@ -272,9 +272,8 @@ class FactoryResetTest : public gtest::RealLoopFixture {
 
   void BindFvm() {
     const std::string_view driver = "fvm.cm";
-    // TODO(https://fxbug.dev/112484): this relies on multiplexing.
     fidl::UnownedClientEnd<fuchsia_device::Controller> channel(
-        ramdisk_get_block_interface(ramdisk_client_));
+        ramdisk_get_block_controller_interface(ramdisk_client_));
     const fidl::WireResult result =
         fidl::WireCall(channel)->Bind(fidl::StringView::FromExternal(driver));
     ASSERT_TRUE(result->is_ok()) << result.FormatDescription();

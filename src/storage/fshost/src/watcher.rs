@@ -286,13 +286,21 @@ mod tests {
     async fn watcher_populates_device_stream() {
         // Start with a couple of devices
         let block = vfs::mut_pseudo_directory! {
-            "000" => fshost_controller("block-000"),
-            "001" => fshost_controller("block-001"),
+            "000" => vfs::pseudo_directory! {
+                "device_controller" => fshost_controller("block-000"),
+            },
+            "001" => vfs::pseudo_directory! {
+                "device_controller" => fshost_controller("block-001"),
+            },
         };
 
         let nand = vfs::mut_pseudo_directory! {
-            "000" => fshost_controller("nand-000"),
-            "001" => fshost_controller("nand-001"),
+            "000" => vfs::pseudo_directory! {
+                "device_controller" => fshost_controller("nand-000"),
+            },
+            "001" => vfs::pseudo_directory! {
+                "device_controller" => fshost_controller("nand-001"),
+            },
         };
 
         let class_block_and_nand = vfs::pseudo_directory! {
@@ -341,7 +349,12 @@ mod tests {
 
         // Adding an entry generates a new block device.
         block
-            .add_entry("002", fshost_controller("block-002"))
+            .add_entry(
+                "002",
+                vfs::pseudo_directory! {
+                    "device_controller" => fshost_controller("block-002"),
+                },
+            )
             .expect("failed to add dir entry 002");
 
         assert_eq!(device_stream.next().await.unwrap().topological_path(), "block-002");
@@ -349,14 +362,25 @@ mod tests {
         // Pausing stops events from being generated.
         watcher.pause().await.expect("failed to pause");
 
-        nand.add_entry("002", fshost_controller("nand-002")).expect("failed to add dir entry 002");
+        nand.add_entry(
+            "002",
+            vfs::pseudo_directory! {
+                "device_controller" => fshost_controller("nand-002"),
+            },
+        )
+        .expect("failed to add dir entry 002");
 
         // When we resume, events start flowing again. We don't see any devices which were added
         // while we were paused (or before).
         watcher.resume().await.expect("failed to resume");
 
         block
-            .add_entry("003", fshost_controller("block-003"))
+            .add_entry(
+                "003",
+                vfs::pseudo_directory! {
+                    "device_controller" => fshost_controller("block-003"),
+                },
+            )
             .expect("failed to add dir entry 003");
 
         assert_eq!(device_stream.next().await.unwrap().topological_path(), "block-003");

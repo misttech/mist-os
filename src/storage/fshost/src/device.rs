@@ -205,7 +205,8 @@ pub struct BlockDevice {
 impl BlockDevice {
     pub async fn new(path: impl ToString) -> Result<Self, Error> {
         let path = path.to_string();
-        let controller = connect_to_protocol_at_path::<ControllerMarker>(&path)?;
+        let controller =
+            connect_to_protocol_at_path::<ControllerMarker>(&format!("{path}/device_controller"))?;
         Self::from_proxy(controller, path).await
     }
 
@@ -304,7 +305,10 @@ impl Device for BlockDevice {
     }
 
     fn reopen_controller(&self) -> Result<ControllerProxy, Error> {
-        Ok(connect_to_protocol_at_path::<ControllerMarker>(&self.path)?)
+        Ok(connect_to_protocol_at_path::<ControllerMarker>(&format!(
+            "{}/device_controller",
+            self.path
+        ))?)
     }
 
     fn block_proxy(&self) -> Result<BlockProxy, Error> {

@@ -143,7 +143,6 @@ mod tests {
             partition_types::{OperatingSystem, Type},
             GptConfig,
         },
-        fidl_fuchsia_device::ControllerMarker,
         fidl_fuchsia_hardware_block_partition::PartitionMarker,
         ramdevice_client::{RamdiskClient, RamdiskClientBuilder},
         std::collections::BTreeMap,
@@ -179,10 +178,7 @@ mod tests {
 
         disk.write().expect("writing GPT succeeds");
 
-        let client_end = ramdisk.open().await.expect("opening ramdisk OK");
-        // TODO(https://fxbug.dev/112484): this relies on multiplexing.
-        let client_end =
-            fidl::endpoints::ClientEnd::<ControllerMarker>::new(client_end.into_channel());
+        let client_end = ramdisk.open_controller().expect("opening ramdisk OK");
         let controller = client_end.into_proxy().unwrap();
         controller
             .rebind("gpt.cm")

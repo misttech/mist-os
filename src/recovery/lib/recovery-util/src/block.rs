@@ -4,9 +4,8 @@
 
 use {
     anyhow::{anyhow, Context as _, Error},
-    fidl::endpoints::Proxy,
-    fidl_fuchsia_device::ControllerProxy,
-    fidl_fuchsia_hardware_block::{BlockMarker, BlockProxy},
+    fidl_fuchsia_device::ControllerMarker,
+    fidl_fuchsia_hardware_block::BlockMarker,
     fuchsia_zircon as zx,
 };
 
@@ -32,12 +31,9 @@ impl BlockDevice {
 }
 
 pub async fn get_block_device(class_path: &str) -> Result<Option<BlockDevice>, Error> {
-    let block = fuchsia_component::client::connect_to_protocol_at_path::<BlockMarker>(class_path)?;
-    // TODO(https://fxbug.dev/112484): this relies on multiplexing.
-    let channel = block
-        .into_channel()
-        .map_err(|_: BlockProxy| anyhow!("could not get channel from proxy"))?;
-    let controller = ControllerProxy::from_channel(channel);
+    let controller = fuchsia_component::client::connect_to_protocol_at_path::<ControllerMarker>(
+        format!("{class_path}/device_controller").as_str(),
+    )?;
     let topo_path = controller
         .get_topological_path()
         .await
@@ -48,10 +44,8 @@ pub async fn get_block_device(class_path: &str) -> Result<Option<BlockDevice>, E
         // This is probably ram, skip it
         Ok(None)
     } else {
-        let channel = controller
-            .into_channel()
-            .map_err(|_: ControllerProxy| anyhow!("could not get channel from proxy"))?;
-        let block = BlockProxy::from_channel(channel);
+        let block =
+            fuchsia_component::client::connect_to_protocol_at_path::<BlockMarker>(class_path)?;
         let info = block
             .get_info()
             .await

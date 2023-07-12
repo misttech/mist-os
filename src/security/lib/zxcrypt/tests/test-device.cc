@@ -125,10 +125,8 @@ void TestDevice::Bind(Volume::Version version, bool fvm) {
 
 void TestDevice::BindFvmDriver() {
   // Binds the FVM driver to the active ramdisk_.
-  //
-  // TODO(https://fxbug.dev/112484): this relies on multiplexing.
   const fidl::UnownedClientEnd<fuchsia_device::Controller> channel(
-      ramdisk_get_block_interface(ramdisk_));
+      ramdisk_get_block_controller_interface(ramdisk_));
   const fidl::WireResult result =
       fidl::WireCall(channel)->Bind(fidl::StringView::FromExternal(kFvmDriver));
   ASSERT_OK(result.status());

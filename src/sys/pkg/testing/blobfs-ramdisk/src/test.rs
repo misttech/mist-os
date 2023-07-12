@@ -5,6 +5,7 @@
 use {
     super::*,
     assert_matches::assert_matches,
+    fidl::endpoints::ServerEnd,
     fidl_fuchsia_io as fio,
     fuchsia_merkle::MerkleTree,
     fuchsia_zircon::Status,

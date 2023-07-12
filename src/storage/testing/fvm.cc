@@ -34,7 +34,7 @@ zx::result<> BindFvm(fidl::UnownedClientEnd<fuchsia_device::Controller> device) 
     }
   }
   if (status.is_error()) {
-    FX_LOGS(ERROR) << "Could not bind disk to FVM driver";
+    FX_LOGS(ERROR) << "Could not bind disk to FVM driver: " << status.status_string();
     return status.take_error();
   }
   return zx::ok();
