@@ -17,7 +17,7 @@ from honeydew.utils import properties
 
 TIMEOUTS: Dict[str, float] = {
     "OFFLINE": 60,
-    "ONLINE": 60,
+    "ONLINE": 120,
 }
 
 
