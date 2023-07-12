@@ -112,9 +112,9 @@ struct BinderConnection {
 }
 
 impl BinderConnection {
-    fn proc(&self, task: &CurrentTask) -> Result<Arc<BinderProcess>, Errno> {
+    fn proc(&self, current_task: &CurrentTask) -> Result<Arc<BinderProcess>, Errno> {
         let process = self.driver.find_process(self.identifier)?;
-        if process.pid == task.get_pid() {
+        if process.pid == current_task.get_pid() {
             Ok(process)
         } else {
             error!(EINVAL)
@@ -2453,29 +2453,6 @@ impl ResourceAccessor for CurrentTask {
     }
 }
 
-impl MemoryAccessor for CurrentTask {
-    fn read_memory_to_slice(&self, addr: UserAddress, bytes: &mut [u8]) -> Result<(), Errno> {
-        log_trace!("Reading {} bytes of memory from {:?}", bytes.len(), addr);
-        self.mm.read_memory_to_slice(addr, bytes)
-    }
-    fn read_memory_partial_to_slice(
-        &self,
-        addr: UserAddress,
-        bytes: &mut [u8],
-    ) -> Result<usize, Errno> {
-        log_trace!("Reading up to {} bytes of memory from {:?}", bytes.len(), addr);
-        self.mm.read_memory_partial_to_slice(addr, bytes)
-    }
-    fn write_memory(&self, addr: UserAddress, bytes: &[u8]) -> Result<usize, Errno> {
-        log_trace!("Writing {} bytes to {:?}", bytes.len(), addr);
-        self.mm.write_memory(addr, bytes)
-    }
-    fn write_memory_partial(&self, addr: UserAddress, bytes: &[u8]) -> Result<usize, Errno> {
-        log_trace!("Writing up to {} bytes to {:?}", bytes.len(), addr);
-        self.mm.write_memory_partial(addr, bytes)
-    }
-}
-
 /// Implementation of `ResourceAccessor` for a local client represented as a `Task`.
 impl ResourceAccessor for Task {
     fn close_fd(&self, fd: FdNumber) -> Result<(), Errno> {
@@ -3958,11 +3935,15 @@ pub mod tests {
 
     /// Simulates an mmap call on the binder driver, setting up shared memory between the driver and
     /// `proc`.
-    fn mmap_shared_memory(driver: &BinderDriver, task: &CurrentTask, proc: &Arc<BinderProcess>) {
+    fn mmap_shared_memory(
+        driver: &BinderDriver,
+        current_task: &CurrentTask,
+        proc: &Arc<BinderProcess>,
+    ) {
         let prot_flags = ProtectionFlags::READ;
         driver
             .mmap(
-                task,
+                current_task,
                 proc,
                 DesiredAddress::Any,
                 VMO_LENGTH,

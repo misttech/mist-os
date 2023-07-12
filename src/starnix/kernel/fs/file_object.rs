@@ -526,25 +526,25 @@ pub fn default_ioctl(
         FS_IOC_FSGETXATTR => {
             not_implemented!("FS_IOC_FSGETXATTR");
             let arg = UserAddress::from(arg).into();
-            current_task.mm.write_object(arg, &fsxattr::default())?;
+            current_task.write_object(arg, &fsxattr::default())?;
             Ok(SUCCESS)
         }
         FS_IOC_FSSETXATTR => {
             not_implemented!("FS_IOC_FSSETXATTR");
             let arg = UserAddress::from(arg).into();
-            let _: fsxattr = current_task.mm.read_object(arg)?;
+            let _: fsxattr = current_task.read_object(arg)?;
             Ok(SUCCESS)
         }
         FS_IOC_GETFLAGS => {
             not_implemented!("FS_IOC_GETFLAGS");
             let arg = UserAddress::from(arg).into();
-            current_task.mm.write_object(arg, &u32::default())?;
+            current_task.write_object(arg, &u32::default())?;
             Ok(SUCCESS)
         }
         FS_IOC_SETFLAGS => {
             not_implemented!("FS_IOC_SETFLAGS");
             let arg = UserAddress::from(arg).into();
-            let _: u32 = current_task.mm.read_object(arg)?;
+            let _: u32 = current_task.read_object(arg)?;
             Ok(SUCCESS)
         }
         _ => {

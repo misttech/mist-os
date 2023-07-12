@@ -44,7 +44,7 @@ where
 {
     Ok(if item_count > 0 {
         let user_ref: UserRef<T> = addr.into();
-        current_task.mm.read_objects_to_vec(user_ref, item_count)?
+        current_task.read_objects_to_vec(user_ref, item_count)?
     } else {
         vec![T::default()]
     })
@@ -93,10 +93,10 @@ pub fn create_image(
     connection: &Arc<MagmaConnection>,
 ) -> Result<BufferInfo, Errno> {
     let create_info_address = UserAddress::from(control.create_info);
-    let create_info_ptr: u64 = current_task.mm.read_object(UserRef::new(create_info_address))?;
+    let create_info_ptr: u64 = current_task.read_object(UserRef::new(create_info_address))?;
 
     let create_info_address = UserAddress::from(create_info_ptr);
-    let create_info = current_task.mm.read_object(UserRef::new(create_info_address))?;
+    let create_info = current_task.read_object(UserRef::new(create_info_address))?;
 
     response.hdr.type_ =
         virtio_magma_ctrl_type_VIRTIO_MAGMA_RESP_VIRT_CONNECTION_CREATE_IMAGE as u32;
@@ -247,12 +247,12 @@ pub fn execute_command(
 ) -> Result<(), Errno> {
     let virtmagma_command_descriptor_addr =
         UserRef::<virtmagma_command_descriptor>::new(control.descriptor.into());
-    let command_descriptor = current_task.mm.read_object(virtmagma_command_descriptor_addr)?;
+    let command_descriptor = current_task.read_object(virtmagma_command_descriptor_addr)?;
 
     // Read the virtmagma-internal struct that contains the counts and flags for the magma command
     // descriptor.
     let wire_descriptor: WireDescriptor =
-        current_task.mm.read_object(UserAddress::from(command_descriptor.descriptor).into())?;
+        current_task.read_object(UserAddress::from(command_descriptor.descriptor).into())?;
 
     // This is the command descriptor that will be populated from the virtmagma
     // descriptor and subsequently passed to magma_execute_command.
@@ -326,7 +326,7 @@ pub fn execute_immediate_commands(
 
     for i in 0..control.command_count as usize {
         let size = descriptors[i].command_buffer_size;
-        let data = current_task.mm.read_buffer(&UserBuffer {
+        let data = current_task.read_buffer(&UserBuffer {
             address: UserAddress::from(descriptors[i].command_buffers),
             length: size as usize,
         })?;
@@ -560,7 +560,7 @@ pub fn read_notification_channel(
     response.hdr.type_ =
         virtio_magma_ctrl_type_VIRTIO_MAGMA_RESP_CONNECTION_READ_NOTIFICATION_CHANNEL as u32;
 
-    current_task.mm.write_memory(UserAddress::from(control.buffer), &buffer)?;
+    current_task.write_memory(UserAddress::from(control.buffer), &buffer)?;
 
     Ok(())
 }

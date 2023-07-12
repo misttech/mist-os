@@ -330,18 +330,18 @@ impl FileOps for DevPtmxFile {
             TIOCGPTN => {
                 // Get the therminal id.
                 let value: u32 = self.terminal.id;
-                current_task.mm.write_object(UserRef::<u32>::new(user_addr), &value)?;
+                current_task.write_object(UserRef::<u32>::new(user_addr), &value)?;
                 Ok(SUCCESS)
             }
             TIOCGPTLCK => {
                 // Get the lock status.
                 let value = i32::from(self.terminal.read().locked);
-                current_task.mm.write_object(UserRef::<i32>::new(user_addr), &value)?;
+                current_task.write_object(UserRef::<i32>::new(user_addr), &value)?;
                 Ok(SUCCESS)
             }
             TIOCSPTLCK => {
                 // Lock/Unlock the terminal.
-                let value = current_task.mm.read_object(UserRef::<i32>::new(user_addr))?;
+                let value = current_task.read_object(UserRef::<i32>::new(user_addr))?;
                 self.terminal.write().locked = value != 0;
                 Ok(SUCCESS)
             }
@@ -438,7 +438,7 @@ fn shared_ioctl(
         FIONREAD => {
             // Get the main terminal available bytes for reading.
             let value = terminal.read().get_available_read_size(is_main) as u32;
-            current_task.mm.write_object(UserRef::<u32>::new(user_addr), &value)?;
+            current_task.write_object(UserRef::<u32>::new(user_addr), &value)?;
             Ok(SUCCESS)
         }
         TIOCSCTTY => {
@@ -465,12 +465,12 @@ fn shared_ioctl(
         TIOCGPGRP => {
             // Get the foreground process group.
             let pgid = current_task.thread_group.get_foreground_process_group(terminal, is_main)?;
-            current_task.mm.write_object(UserRef::<pid_t>::new(user_addr), &pgid)?;
+            current_task.write_object(UserRef::<pid_t>::new(user_addr), &pgid)?;
             Ok(SUCCESS)
         }
         TIOCSPGRP => {
             // Set the foreground process group.
-            let pgid = current_task.mm.read_object(UserRef::<pid_t>::new(user_addr))?;
+            let pgid = current_task.read_object(UserRef::<pid_t>::new(user_addr))?;
             current_task.thread_group.set_foreground_process_group(
                 current_task,
                 terminal,
@@ -481,7 +481,7 @@ fn shared_ioctl(
         }
         TIOCGWINSZ => {
             // Get the window size
-            current_task.mm.write_object(
+            current_task.write_object(
                 UserRef::<uapi::winsize>::new(user_addr),
                 &terminal.read().window_size,
             )?;
@@ -490,7 +490,7 @@ fn shared_ioctl(
         TIOCSWINSZ => {
             // Set the window size
             terminal.write().window_size =
-                current_task.mm.read_object(UserRef::<uapi::winsize>::new(user_addr))?;
+                current_task.read_object(UserRef::<uapi::winsize>::new(user_addr))?;
 
             // Send a SIGWINCH signal to the foreground process group.
             let foreground_process_group = terminal
@@ -506,7 +506,7 @@ fn shared_ioctl(
         TCGETS => {
             // N.B. TCGETS on the main terminal actually returns the configuration of the replica
             // end.
-            current_task.mm.write_object(
+            current_task.write_object(
                 UserRef::<uapi::termios>::new(user_addr),
                 terminal.read().termios(),
             )?;
@@ -515,19 +515,19 @@ fn shared_ioctl(
         TCSETS => {
             // N.B. TCSETS on the main terminal actually affects the configuration of the replica
             // end.
-            let termios = current_task.mm.read_object(UserRef::<uapi::termios>::new(user_addr))?;
+            let termios = current_task.read_object(UserRef::<uapi::termios>::new(user_addr))?;
             terminal.set_termios(termios);
             Ok(SUCCESS)
         }
         TCSETSF => {
             // This should drain the output queue and discard the pending input first.
-            let termios = current_task.mm.read_object(UserRef::<uapi::termios>::new(user_addr))?;
+            let termios = current_task.read_object(UserRef::<uapi::termios>::new(user_addr))?;
             terminal.set_termios(termios);
             Ok(SUCCESS)
         }
         TCSETSW => {
             // TODO(qsr): This should drain the output queue first.
-            let termios = current_task.mm.read_object(UserRef::<uapi::termios>::new(user_addr))?;
+            let termios = current_task.read_object(UserRef::<uapi::termios>::new(user_addr))?;
             terminal.set_termios(termios);
             Ok(SUCCESS)
         }
@@ -573,25 +573,26 @@ mod tests {
     };
 
     fn ioctl<T: zerocopy::AsBytes + zerocopy::FromBytes + Copy>(
-        task: &CurrentTask,
+        current_task: &CurrentTask,
         file: &FileHandle,
         command: u32,
         value: &T,
     ) -> Result<T, Errno> {
-        let address = map_memory(task, UserAddress::default(), std::mem::size_of::<T>() as u64);
+        let address =
+            map_memory(current_task, UserAddress::default(), std::mem::size_of::<T>() as u64);
         let address_ref = UserRef::<T>::new(address);
-        task.mm.write_object(address_ref, value)?;
-        file.ioctl(task, command, address.into())?;
-        task.mm.read_object(address_ref)
+        current_task.write_object(address_ref, value)?;
+        file.ioctl(current_task, command, address.into())?;
+        current_task.read_object(address_ref)
     }
 
     fn set_controlling_terminal(
-        task: &CurrentTask,
+        current_task: &CurrentTask,
         file: &FileHandle,
         steal: bool,
     ) -> Result<SyscallResult, Errno> {
         #[allow(clippy::bool_to_int_with_if)]
-        file.ioctl(task, TIOCSCTTY, steal.into())
+        file.ioctl(current_task, TIOCSCTTY, steal.into())
     }
 
     fn lookup_node(
@@ -604,31 +605,31 @@ mod tests {
     }
 
     fn open_file_with_flags(
-        task: &CurrentTask,
+        current_task: &CurrentTask,
         fs: &FileSystemHandle,
         name: &FsStr,
         flags: OpenFlags,
     ) -> Result<FileHandle, Errno> {
-        let node = lookup_node(task, fs, name)?;
-        node.open(task, flags, true)
+        let node = lookup_node(current_task, fs, name)?;
+        node.open(current_task, flags, true)
     }
 
     fn open_file(
-        task: &CurrentTask,
+        current_task: &CurrentTask,
         fs: &FileSystemHandle,
         name: &FsStr,
     ) -> Result<FileHandle, Errno> {
-        open_file_with_flags(task, fs, name, OpenFlags::RDWR | OpenFlags::NOCTTY)
+        open_file_with_flags(current_task, fs, name, OpenFlags::RDWR | OpenFlags::NOCTTY)
     }
 
     fn open_ptmx_and_unlock(
-        task: &CurrentTask,
+        current_task: &CurrentTask,
         fs: &FileSystemHandle,
     ) -> Result<FileHandle, Errno> {
-        let file = open_file_with_flags(task, fs, b"ptmx", OpenFlags::RDWR)?;
+        let file = open_file_with_flags(current_task, fs, b"ptmx", OpenFlags::RDWR)?;
 
         // Unlock terminal
-        ioctl::<i32>(task, &file, TIOCSPTLCK, &0)?;
+        ioctl::<i32>(current_task, &file, TIOCSPTLCK, &0)?;
 
         Ok(file)
     }

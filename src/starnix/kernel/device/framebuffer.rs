@@ -175,19 +175,19 @@ impl FileOps for Arc<Framebuffer> {
                     line_length: info.bits_per_pixel / 8 * info.xres,
                     ..fb_fix_screeninfo::default()
                 };
-                current_task.mm.write_object(UserRef::new(user_addr), &finfo)?;
+                current_task.write_object(UserRef::new(user_addr), &finfo)?;
                 Ok(SUCCESS)
             }
 
             FBIOGET_VSCREENINFO => {
                 let info = self.info.read();
-                current_task.mm.write_object(UserRef::new(user_addr), &*info)?;
+                current_task.write_object(UserRef::new(user_addr), &*info)?;
                 Ok(SUCCESS)
             }
 
             FBIOPUT_VSCREENINFO => {
                 let new_info: fb_var_screeninfo =
-                    current_task.mm.read_object(UserRef::new(user_addr))?;
+                    current_task.read_object(UserRef::new(user_addr))?;
                 let old_info = self.info.read();
                 // We don't yet support actually changing anything
                 if new_info.as_bytes() != old_info.as_bytes() {

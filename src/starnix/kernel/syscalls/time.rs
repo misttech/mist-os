@@ -29,7 +29,7 @@ pub fn sys_clock_getres(
             timespec { tv_sec: 0, tv_nsec: 1 }
         }
     };
-    current_task.mm.write_object(tp_addr, &tv)?;
+    current_task.write_object(tp_addr, &tv)?;
     Ok(())
 }
 
@@ -52,7 +52,7 @@ pub fn sys_clock_gettime(
         }
     };
     let tv = timespec { tv_sec: nanos / NANOS_PER_SECOND, tv_nsec: nanos % NANOS_PER_SECOND };
-    current_task.mm.write_object(tp_addr, &tv)?;
+    current_task.write_object(tp_addr, &tv)?;
     Ok(())
 }
 
@@ -63,7 +63,7 @@ pub fn sys_gettimeofday(
 ) -> Result<(), Errno> {
     if !user_tv.is_null() {
         let tv = timeval_from_time(utc_now());
-        current_task.mm.write_object(user_tv, &tv)?;
+        current_task.write_object(user_tv, &tv)?;
     }
     if !user_tz.is_null() {
         not_implemented!("gettimeofday does not implement tz argument");
@@ -89,7 +89,7 @@ pub fn sys_clock_nanosleep(
         not_implemented!("clock_nanosleep, clock {:?}, flags {:?}", which_clock, flags);
         return error!(EINVAL);
     }
-    let request = current_task.mm.read_object(user_request)?;
+    let request = current_task.read_object(user_request)?;
     log_trace!("clock_nanosleep({}, {}, {:?})", which_clock, flags, request);
 
     if timespec_is_zero(request) {
@@ -171,7 +171,7 @@ fn clock_nanosleep_monotonic_with_deadline(
                 };
                 let remaining =
                     timespec_from_duration(std::cmp::max(zx::Duration::from_nanos(0), remaining));
-                current_task.mm.write_object(user_remaining, &remaining)?;
+                current_task.write_object(user_remaining, &remaining)?;
             }
             current_task.set_syscall_restart_func(move |current_task| {
                 clock_nanosleep_monotonic_with_deadline(
@@ -287,9 +287,9 @@ pub fn sys_timer_create(
 ) -> Result<(), Errno> {
     not_implemented!("timer_create");
     let timers = &current_task.thread_group.read().timers;
-    let user_event = current_task.mm.read_object(event)?;
+    let user_event = current_task.read_object(event)?;
     let id = timers.create(clockid, &user_event)? as uapi::__kernel_timer_t;
-    current_task.mm.write_object(timerid, &id)?;
+    current_task.write_object(timerid, &id)?;
     Ok(())
 }
 
@@ -308,7 +308,7 @@ pub fn sys_timer_gettime(
     curr_value: UserRef<itimerspec>,
 ) -> Result<(), Errno> {
     let timers = &current_task.thread_group.read().timers;
-    current_task.mm.write_object(curr_value, &timers.get_time(id as usize)?)?;
+    current_task.write_object(curr_value, &timers.get_time(id as usize)?)?;
     Ok(())
 }
 
@@ -337,7 +337,7 @@ pub fn sys_getitimer(
     user_curr_value: UserRef<itimerval>,
 ) -> Result<(), Errno> {
     let remaining = current_task.thread_group.get_itimer(which)?;
-    current_task.mm.write_object(user_curr_value, &remaining)?;
+    current_task.write_object(user_curr_value, &remaining)?;
     Ok(())
 }
 
@@ -347,12 +347,12 @@ pub fn sys_setitimer(
     user_new_value: UserRef<itimerval>,
     user_old_value: UserRef<itimerval>,
 ) -> Result<(), Errno> {
-    let new_value = current_task.mm.read_object(user_new_value)?;
+    let new_value = current_task.read_object(user_new_value)?;
 
     let old_value = current_task.thread_group.set_itimer(which, new_value)?;
 
     if !user_old_value.is_null() {
-        current_task.mm.write_object(user_old_value, &old_value)?;
+        current_task.write_object(user_old_value, &old_value)?;
     }
 
     Ok(())
@@ -384,7 +384,7 @@ mod test {
             UserAddress::default(),
             std::mem::size_of::<timespec>() as u64,
         );
-        current_task.mm.write_object(address.into(), &duration).expect("write_object");
+        current_task.write_object(address.into(), &duration).expect("write_object");
 
         // nanosleep will be interrupted by the current thread and should not fail with EFAULT
         // because the remainder pointer is null.

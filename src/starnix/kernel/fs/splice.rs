@@ -150,7 +150,7 @@ impl SplicedFile {
             if !file.is_seekable() {
                 return error!(ESPIPE);
             }
-            let offset = current_task.mm.read_object(offset_ref)?;
+            let offset = current_task.read_object(offset_ref)?;
             if offset < 0 {
                 return error!(EINVAL);
             } else {

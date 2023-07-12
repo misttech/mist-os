@@ -306,7 +306,7 @@ async fn create_container(
 }
 
 fn create_fs_context(
-    task: &CurrentTask,
+    current_task: &CurrentTask,
     config: &ConfigWrapper,
     pkg_dir_proxy: &fio::DirectorySynchronousProxy,
 ) -> Result<Arc<FsContext>, Error> {
@@ -315,7 +315,7 @@ fn create_fs_context(
     // applied on top of it.
     let mut mounts_iter = config.mounts.iter();
     let (root_point, root_fs) = create_filesystem_from_spec(
-        task,
+        current_task,
         pkg_dir_proxy,
         mounts_iter.next().ok_or_else(|| anyhow!("Mounts list is empty"))?,
     )?;
@@ -332,7 +332,7 @@ fn create_fs_context(
     // /container will mount the container pkg
     // /container/component will be a tmpfs where component using the starnix kernel will have their
     // package mounted.
-    let kernel = task.kernel();
+    let kernel = current_task.kernel();
     let rights = fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_EXECUTABLE;
     let container_fs = LayeredFs::new_fs(
         kernel,

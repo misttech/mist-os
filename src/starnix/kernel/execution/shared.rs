@@ -186,7 +186,7 @@ pub fn create_remotefs_filesystem(
 }
 
 pub fn create_filesystem_from_spec<'a>(
-    task: &CurrentTask,
+    current_task: &CurrentTask,
     pkg: &fio::DirectorySynchronousProxy,
     spec: &'a str,
 ) -> Result<(&'a [u8], WhatToMount), Error> {
@@ -208,11 +208,11 @@ pub fn create_filesystem_from_spec<'a>(
     // manifest file, for whatever reason. Anything else is passed to create_filesystem, which is
     // common code that also handles the mount() system call.
     let fs = match fs_type {
-        "bind" => Bind(task.lookup_path_from_root(fs_src.as_bytes())?),
-        "remote_bundle" => Fs(RemoteBundle::new_fs(task.kernel(), pkg, rights, fs_src)?),
-        "remotefs" => Fs(create_remotefs_filesystem(task.kernel(), pkg, rights, fs_src)?),
+        "bind" => Bind(current_task.lookup_path_from_root(fs_src.as_bytes())?),
+        "remote_bundle" => Fs(RemoteBundle::new_fs(current_task.kernel(), pkg, rights, fs_src)?),
+        "remotefs" => Fs(create_remotefs_filesystem(current_task.kernel(), pkg, rights, fs_src)?),
         _ => create_filesystem(
-            task,
+            current_task,
             fs_type.as_bytes(),
             fs_src.as_bytes(),
             MountFlags::empty(),

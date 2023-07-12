@@ -329,7 +329,7 @@ pub fn sys_time(
     let time = (utc::utc_now().into_nanos() / zx::Duration::from_seconds(1).into_nanos())
         as __kernel_time_t;
     if !time_addr.is_null() {
-        current_task.mm.write_object(time_addr, &time)?;
+        current_task.write_object(time_addr, &time)?;
     }
     Ok(time)
 }
@@ -384,7 +384,7 @@ mod tests {
         let (_kernel, current_task) = create_kernel_and_task();
         let path_addr = map_memory(&current_task, UserAddress::default(), *PAGE_SIZE);
         let path = b"newfile.txt";
-        current_task.mm.write_memory(path_addr, path)?;
+        current_task.write_memory(path_addr, path)?;
         let fd = sys_creat(&current_task, UserCString::new(path_addr), FileMode::default())?;
         let _file_handle = current_task.open_file(path, OpenFlags::RDONLY)?;
         assert!(!current_task.files.get_fd_flags(fd)?.contains(FdFlags::CLOEXEC));
@@ -405,8 +405,7 @@ mod tests {
         let time2 = sys_time(&current_task, address.into()).expect("time");
         assert!(time2 >= time1 + 2);
         assert!(time2 < time1 + 10);
-        let time3: __kernel_time_t =
-            current_task.mm.read_object(address.into()).expect("read_object");
+        let time3: __kernel_time_t = current_task.read_object(address.into()).expect("read_object");
         assert_eq!(time2, time3);
     }
 }

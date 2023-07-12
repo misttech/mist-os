@@ -83,14 +83,14 @@ impl FileOps for DevFuse {
 }
 
 pub fn new_fuse_fs(
-    task: &CurrentTask,
+    current_task: &CurrentTask,
     options: FileSystemOptions,
 ) -> Result<FileSystemHandle, Errno> {
     let mut mount_options = fs_args::generic_parse_mount_options(&options.params);
     let fd = fs_args::parse::<FdNumber>(
         mount_options.remove(b"fd" as &FsStr).ok_or_else(|| errno!(EINVAL))?,
     )?;
-    let connection = task
+    let connection = current_task
         .files
         .get(fd)?
         .downcast_file::<DevFuse>()
@@ -99,17 +99,18 @@ pub fn new_fuse_fs(
         .clone();
 
     let fs =
-        FileSystem::new(task.kernel(), CacheMode::Cached, FuseFs::new(connection.clone()), options);
+        FileSystem::new(current_task.kernel(), CacheMode::Cached, FuseFs::new(connection.clone()), options);
     let fuse_node = Arc::new(FuseNode {
         connection: connection.clone(),
         nodeid: uapi::FUSE_ROOT_ID as u64,
         state: Default::default(),
     });
     fuse_node.state.lock().nlookup += 1;
+
     let mut root_node = FsNode::new_root(fuse_node.clone());
     root_node.node_id = uapi::FUSE_ROOT_ID as u64;
     fs.set_root_node(root_node);
-    connection.execute_operation(task, &fuse_node, FuseOperation::Init)?;
+    connection.execute_operation(current_task, &fuse_node, FuseOperation::Init)?;
     Ok(fs)
 }
 
@@ -900,26 +901,26 @@ impl FuseConnection {
     /// being unmounted.
     fn execute_operation(
         &self,
-        task: &CurrentTask,
+        current_task: &CurrentTask,
         node: &FuseNode,
         operation: FuseOperation,
     ) -> Result<FuseResponse, Errno> {
         let configuration = match operation {
             FuseOperation::Init => Arc::new(FuseConfiguration::for_init()),
-            _ => self.get_configuration(task)?,
+            _ => self.get_configuration(current_task)?,
         };
         let mut state = self.state.lock();
         if let Some(result) = state.operations_state.get(&operation.opcode()) {
             return result.clone();
         }
         if !operation.has_response() {
-            state.queue_operation(task, node, operation, configuration, None)?;
+            state.queue_operation(current_task, node, operation, configuration, None)?;
             return Ok(FuseResponse::None);
         }
         let waiter = Waiter::new();
         let is_async = operation.is_async();
         let unique_id =
-            state.queue_operation(task, node, operation, configuration.clone(), Some(&waiter))?;
+            state.queue_operation(current_task, node, operation, configuration.clone(), Some(&waiter))?;
         if is_async {
             return Ok(FuseResponse::None);
         }
@@ -928,13 +929,13 @@ impl FuseConnection {
             if let Some(response) = state.get_response(unique_id) {
                 return response;
             }
-            match MutexGuard::unlocked(&mut state, || waiter.wait(task)) {
+            match MutexGuard::unlocked(&mut state, || waiter.wait(current_task)) {
                 Ok(()) => {}
                 Err(e) if e == EINTR => {
                     // If interrupted by another process, send an interrupt command to the server
                     // the first time, then wait unconditionally.
                     if first_loop {
-                        state.interrupt(task, node, unique_id, configuration.clone())?;
+                        state.interrupt(current_task, node, unique_id, configuration.clone())?;
                         first_loop = false;
                     }
                 }
@@ -1054,7 +1055,7 @@ impl FuseMutableState {
     /// operation. This should only be used if the operation expects a response.
     fn queue_operation(
         &mut self,
-        task: &CurrentTask,
+        current_task: &CurrentTask,
         node: &FuseNode,
         operation: FuseOperation,
         configuration: Arc<FuseConfiguration>,
@@ -1066,8 +1067,13 @@ impl FuseMutableState {
         }
         let operation = Arc::new(operation);
         self.last_unique_id += 1;
-        let message =
-            FuseKernelMessage::new(self.last_unique_id, task, node, operation, configuration)?;
+        let message = FuseKernelMessage::new(
+            self.last_unique_id,
+            current_task,
+            node,
+            operation,
+            configuration,
+        )?;
         if let Some(waiter) = waiter {
             self.waiters.wait_async_value(waiter, self.last_unique_id);
         }
@@ -1087,7 +1093,7 @@ impl FuseMutableState {
     /// If not, it will send an interrupt operation.
     fn interrupt(
         &mut self,
-        task: &CurrentTask,
+        current_task: &CurrentTask,
         node: &FuseNode,
         unique_id: u64,
         configuration: Arc<FuseConfiguration>,
@@ -1109,7 +1115,7 @@ impl FuseMutableState {
             return error!(EINTR);
         }
         self.queue_operation(
-            task,
+            current_task,
             node,
             FuseOperation::Interrupt { unique_id },
             configuration,
@@ -1237,12 +1243,12 @@ struct FuseKernelMessage {
 impl FuseKernelMessage {
     fn new(
         unique: u64,
-        task: &CurrentTask,
+        current_task: &CurrentTask,
         node: &FuseNode,
         operation: Arc<FuseOperation>,
         configuration: Arc<FuseConfiguration>,
     ) -> Result<Self, Errno> {
-        let creds = task.creds();
+        let creds = current_task.creds();
         Ok(Self {
             header: uapi::fuse_in_header {
                 len: u32::try_from(
@@ -1254,7 +1260,7 @@ impl FuseKernelMessage {
                 nodeid: node.nodeid,
                 uid: creds.uid,
                 gid: creds.gid,
-                pid: task.get_tid() as u32,
+                pid: current_task.get_tid() as u32,
                 padding: 0,
             },
             operation,

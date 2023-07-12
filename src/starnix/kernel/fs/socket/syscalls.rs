@@ -292,19 +292,19 @@ pub fn sys_connect(
 }
 
 fn write_socket_address(
-    task: &Task,
+    current_task: &CurrentTask,
     user_socket_address: UserAddress,
     user_address_length: UserRef<socklen_t>,
     address_bytes: &[u8],
 ) -> Result<(), Errno> {
-    let capacity = task.mm.read_object(user_address_length)?;
+    let capacity = current_task.read_object(user_address_length)?;
     if capacity > i32::MAX as socklen_t {
         return error!(EINVAL);
     }
     let length = address_bytes.len() as socklen_t;
     let actual = std::cmp::min(length, capacity) as usize;
-    task.mm.write_memory(user_socket_address, &address_bytes[..actual])?;
-    task.mm.write_object(user_address_length, &length)?;
+    current_task.write_memory(user_socket_address, &address_bytes[..actual])?;
+    current_task.write_object(user_address_length, &length)?;
     Ok(())
 }
 
@@ -364,7 +364,7 @@ pub fn sys_socketpair(
 
     let fds = [left_fd, right_fd];
     log_trace!("socketpair -> [{:#x}, {:#x}]", fds[0].raw(), fds[1].raw());
-    current_task.mm.write_object(user_sockets, &fds)?;
+    current_task.write_object(user_sockets, &fds)?;
 
     Ok(())
 }
@@ -376,9 +376,9 @@ fn recvmsg_internal(
     flags: u32,
     deadline: Option<zx::Time>,
 ) -> Result<usize, Errno> {
-    let mut message_header = current_task.mm.read_object(user_message_header.clone())?;
+    let mut message_header = current_task.read_object(user_message_header.clone())?;
     let iovec =
-        current_task.mm.read_iovec(message_header.msg_iov, message_header.msg_iovlen as i32)?;
+        current_task.read_iovec(message_header.msg_iov, message_header.msg_iovlen as i32)?;
 
     let flags = SocketMessageFlags::from_bits_truncate(flags);
     let socket_ops = file.downcast_file::<SocketFile>().unwrap();
@@ -425,7 +425,6 @@ fn recvmsg_internal(
 
         if !message_bytes.is_empty() {
             current_task
-                .mm
                 .write_memory(message_header.msg_control + cmsg_bytes_written, &message_bytes)?;
             cmsg_bytes_written += message_bytes.len();
             if !truncated {
@@ -440,7 +439,7 @@ fn recvmsg_internal(
         Some(address) if !message_header.msg_name.is_null() => {
             let bytes = address.to_bytes();
             let num_bytes = std::cmp::min(message_header.msg_namelen as usize, bytes.len());
-            current_task.mm.write_memory(message_header.msg_name, &bytes[..num_bytes])?;
+            current_task.write_memory(message_header.msg_name, &bytes[..num_bytes])?;
         }
         _ => {}
     };
@@ -449,7 +448,7 @@ fn recvmsg_internal(
         message_header.msg_flags |= MSG_TRUNC as u64;
     }
 
-    current_task.mm.write_object(user_message_header, &message_header)?;
+    current_task.write_object(user_message_header, &message_header)?;
 
     if flags.contains(SocketMessageFlags::TRUNC) {
         Ok(info.message_length)
@@ -491,7 +490,7 @@ pub fn sys_recvmmsg(
     let deadline = if user_timeout.is_null() {
         None
     } else {
-        let ts = current_task.mm.read_object(user_timeout)?;
+        let ts = current_task.read_object(user_timeout)?;
         Some(zx::Time::after(duration_from_timespec(ts)?))
     };
 
@@ -509,7 +508,7 @@ pub fn sys_recvmmsg(
             Ok(bytes_read) => {
                 let msg_len = bytes_read as u32;
                 let user_msg_len = UserRef::<u32>::new(user_mmsghdr.addr() + size_of::<msghdr>());
-                current_task.mm.write_object(user_msg_len, &msg_len)?;
+                current_task.write_object(user_msg_len, &msg_len)?;
             }
         }
         index += 1;
@@ -553,7 +552,7 @@ pub fn sys_recvfrom(
                 &address.to_bytes(),
             )?;
         } else {
-            current_task.mm.write_object(user_src_address_length, &0)?;
+            current_task.write_object(user_src_address_length, &0)?;
         }
     }
 
@@ -570,7 +569,7 @@ fn sendmsg_internal(
     user_message_header: UserRef<msghdr>,
     flags: u32,
 ) -> Result<usize, Errno> {
-    let message_header = current_task.mm.read_object(user_message_header)?;
+    let message_header = current_task.read_object(user_message_header)?;
 
     let dest_address = maybe_parse_socket_address(
         current_task,
@@ -578,7 +577,7 @@ fn sendmsg_internal(
         message_header.msg_namelen as usize,
     )?;
     let iovec =
-        current_task.mm.read_iovec(message_header.msg_iov, message_header.msg_iovlen as i32)?;
+        current_task.read_iovec(message_header.msg_iov, message_header.msg_iovlen as i32)?;
 
     let mut next_message_offset = 0;
     let mut ancillary_data = Vec::new();
@@ -589,7 +588,7 @@ fn sendmsg_internal(
             break;
         }
         let cmsg_ref = UserRef::<cmsghdr>::from(message_header.msg_control + next_message_offset);
-        let cmsg = current_task.mm.read_object(cmsg_ref)?;
+        let cmsg = current_task.read_object(cmsg_ref)?;
         // If the message header is not long enough to fit the required fields of the
         // control data, return EINVAL.
         if cmsg.cmsg_len < header_size {
@@ -597,7 +596,7 @@ fn sendmsg_internal(
         }
 
         let data_size = std::cmp::min(cmsg.cmsg_len - header_size, space);
-        let data = current_task.mm.read_memory_to_vec(
+        let data = current_task.read_memory_to_vec(
             message_header.msg_control + next_message_offset + header_size,
             data_size,
         )?;
@@ -664,7 +663,7 @@ pub fn sys_sendmmsg(
             Ok(bytes_read) => {
                 let msg_len = bytes_read as u32;
                 let user_msg_len = UserRef::<u32>::new(user_mmsghdr.addr() + size_of::<msghdr>());
-                current_task.mm.write_object(user_msg_len, &msg_len)?;
+                current_task.write_object(user_msg_len, &msg_len)?;
             }
         }
         index += 1;
@@ -706,8 +705,8 @@ pub fn sys_getsockopt(
     let file = current_task.files.get(fd)?;
     let socket = file.node().socket().ok_or_else(|| errno!(ENOTSOCK))?;
 
-    let optlen = current_task.mm.read_object(user_optlen)?;
-    let optval = current_task.mm.read_memory_to_vec(user_optval, optlen as usize)?;
+    let optlen = current_task.read_object(user_optlen)?;
+    let optval = current_task.read_memory_to_vec(user_optval, optlen as usize)?;
 
     let opt_value = if socket.domain.is_inet() && IpTables::can_handle_getsockopt(level, optname) {
         current_task.kernel().iptables.read().getsockopt(socket, optname, optval)?
@@ -719,8 +718,8 @@ pub fn sys_getsockopt(
     if optlen < actual_optlen {
         return error!(EINVAL);
     }
-    current_task.mm.write_memory(user_optval, &opt_value)?;
-    current_task.mm.write_object(user_optlen, &actual_optlen)?;
+    current_task.write_memory(user_optval, &opt_value)?;
+    current_task.write_object(user_optlen, &actual_optlen)?;
 
     Ok(())
 }

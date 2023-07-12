@@ -60,9 +60,12 @@ impl TTYState {
     }
 
     /// Returns the next available terminal.
-    pub fn get_next_terminal(self: &Arc<Self>, task: &CurrentTask) -> Result<Arc<Terminal>, Errno> {
+    pub fn get_next_terminal(
+        self: &Arc<Self>,
+        current_task: &CurrentTask,
+    ) -> Result<Arc<Terminal>, Errno> {
         let id = self.pts_ids_set.lock().get()?;
-        let terminal = Arc::new(Terminal::new(self.clone(), task.as_fscred(), id));
+        let terminal = Arc::new(Terminal::new(self.clone(), current_task.as_fscred(), id));
         self.terminals.write().insert(id, Arc::downgrade(&terminal));
         Ok(terminal)
     }

@@ -745,7 +745,7 @@ impl SocketOps for UnixSocket {
             FIONREAD if socket.socket_type == SocketType::Stream => {
                 let length: i32 =
                     self.lock().messages.len().try_into().map_err(|_| errno!(EINVAL))?;
-                current_task.mm.write_object(UserRef::<i32>::new(user_addr), &length)?;
+                current_task.write_object(UserRef::<i32>::new(user_addr), &length)?;
                 Ok(SUCCESS)
             }
             _ => default_ioctl(file, current_task, request, arg),
@@ -908,7 +908,7 @@ mod tests {
         let opt_size = std::mem::size_of::<socklen_t>();
         let user_address = map_memory(&current_task, UserAddress::default(), opt_size as u64);
         let send_capacity: socklen_t = 4 * 4096;
-        current_task.mm.write_memory(user_address, &send_capacity.to_ne_bytes()).unwrap();
+        current_task.write_memory(user_address, &send_capacity.to_ne_bytes()).unwrap();
         let user_buffer = UserBuffer { address: user_address, length: opt_size };
         server_socket.setsockopt(&current_task, SOL_SOCKET, SO_SNDBUF, user_buffer).unwrap();
 

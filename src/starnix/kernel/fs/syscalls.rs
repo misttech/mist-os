@@ -133,7 +133,7 @@ pub fn sys_fcntl(
             if let Some(owner) = maybe_owner {
                 let user_owner: UserRef<f_owner_ex> =
                     UserRef::<uapi::f_owner_ex>::new(UserAddress::from(arg));
-                current_task.mm.write_object(user_owner, &owner)?;
+                current_task.write_object(user_owner, &owner)?;
             }
             Ok(SUCCESS)
         }
@@ -154,7 +154,7 @@ pub fn sys_fcntl(
         F_SETOWN_EX => {
             let file = current_task.files.get_unless_opath(fd)?;
             let user_owner = UserRef::<uapi::f_owner_ex>::new(UserAddress::from(arg));
-            let requested_owner = current_task.mm.read_object(user_owner)?;
+            let requested_owner = current_task.read_object(user_owner)?;
             let mut owner = match requested_owner.type_ as u32 {
                 F_OWNER_TID => FileAsyncOwner::Thread(requested_owner.pid),
                 F_OWNER_PID => FileAsyncOwner::Process(requested_owner.pid),
@@ -192,10 +192,10 @@ pub fn sys_fcntl(
         F_SETLK | F_SETLKW | F_GETLK | F_OFD_GETLK | F_OFD_SETLK | F_OFD_SETLKW => {
             let file = current_task.files.get_unless_opath(fd)?;
             let flock_ref = UserRef::<uapi::flock>::new(arg.into());
-            let flock = current_task.mm.read_object(flock_ref)?;
+            let flock = current_task.read_object(flock_ref)?;
             let cmd = RecordLockCommand::from_raw(cmd).ok_or_else(|| errno!(EINVAL))?;
             if let Some(flock) = file.record_lock(current_task, cmd, flock)? {
-                current_task.mm.write_object(flock_ref, &flock)?;
+                current_task.write_object(flock_ref, &flock)?;
             }
             Ok(SUCCESS)
         }
@@ -253,7 +253,7 @@ fn do_readv(
         not_implemented!("preadv2: flags: 0x{:x}", flags);
     }
     let file = current_task.files.get(fd)?;
-    let iovec = current_task.mm.read_iovec(iovec_addr, iovec_count)?;
+    let iovec = current_task.read_iovec(iovec_addr, iovec_count)?;
     let mut data = UserBuffersOutputBuffer::new(&current_task.mm, iovec)?;
     if let Some(offset) = offset {
         file.read_at(current_task, offset.try_into().map_err(|_| errno!(EINVAL))?, &mut data)
@@ -310,7 +310,7 @@ fn do_writev(
     }
     // TODO(fxbug.dev/117677) Allow partial writes.
     let file = current_task.files.get(fd)?;
-    let iovec = current_task.mm.read_iovec(iovec_addr, iovec_count)?;
+    let iovec = current_task.read_iovec(iovec_addr, iovec_count)?;
     let mut data = UserBuffersInputBuffer::new(&current_task.mm, iovec)?;
     if let Some(offset) = offset {
         file.write_at(current_task, offset.try_into().map_err(|_| errno!(EINVAL))?, &mut data)
@@ -358,7 +358,7 @@ pub fn sys_fstatfs(
 ) -> Result<(), Errno> {
     let file = current_task.files.get(fd)?;
     let stat = file.fs.statfs(current_task)?;
-    current_task.mm.write_object(user_buf, &stat)?;
+    current_task.write_object(user_buf, &stat)?;
     Ok(())
 }
 
@@ -370,7 +370,7 @@ pub fn sys_statfs(
     let node = lookup_at(current_task, FdNumber::AT_FDCWD, user_path, LookupFlags::default())?;
     let file_system = node.entry.node.fs();
     let stat = file_system.statfs(current_task)?;
-    current_task.mm.write_object(user_buf, &stat)?;
+    current_task.write_object(user_buf, &stat)?;
 
     Ok(())
 }
@@ -395,7 +395,7 @@ fn open_file_at(
     flags: u32,
     mode: FileMode,
 ) -> Result<FileHandle, Errno> {
-    let path = current_task.mm.read_c_string_to_vec(user_path, PATH_MAX as usize)?;
+    let path = current_task.read_c_string_to_vec(user_path, PATH_MAX as usize)?;
     log_trace!("open_file_at(dir_fd={}, path={})", dir_fd, String::from_utf8_lossy(&path));
     current_task.open_file_at(dir_fd, &path, OpenFlags::from_bits_truncate(flags), mode)
 }
@@ -409,7 +409,7 @@ fn lookup_parent_at<T, F>(
 where
     F: Fn(LookupContext, NamespaceNode, &FsStr) -> Result<T, Errno>,
 {
-    let path = current_task.mm.read_c_string_to_vec(user_path, PATH_MAX as usize)?;
+    let path = current_task.read_c_string_to_vec(user_path, PATH_MAX as usize)?;
     log_trace!("lookup_parent_at(dir_fd={}, path={})", dir_fd, String::from_utf8_lossy(&path));
     if path.is_empty() {
         return error!(ENOENT);
@@ -476,7 +476,7 @@ fn lookup_at(
     user_path: UserCString,
     options: LookupFlags,
 ) -> Result<NamespaceNode, Errno> {
-    let path = current_task.mm.read_c_string_to_vec(user_path, PATH_MAX as usize)?;
+    let path = current_task.read_c_string_to_vec(user_path, PATH_MAX as usize)?;
     log_trace!("lookup_at(dir_fd={}, path={})", dir_fd, String::from_utf8_lossy(&path));
     if path.is_empty() {
         if options.allow_empty_path {
@@ -584,7 +584,7 @@ pub fn sys_fstat(
 ) -> Result<(), Errno> {
     let file = current_task.files.get(fd)?;
     let result = file.node().stat(current_task)?;
-    current_task.mm.write_object(buffer, &result)?;
+    current_task.write_object(buffer, &result)?;
     Ok(())
 }
 
@@ -603,7 +603,7 @@ pub fn sys_newfstatat(
     let flags = LookupFlags::from_bits(flags, AT_EMPTY_PATH | AT_SYMLINK_NOFOLLOW)?;
     let name = lookup_at(current_task, dir_fd, user_path, flags)?;
     let result = name.entry.node.stat(current_task)?;
-    current_task.mm.write_object(buffer, &result)?;
+    current_task.write_object(buffer, &result)?;
     Ok(())
 }
 
@@ -624,7 +624,7 @@ pub fn sys_statx(
 
     let name = lookup_at(current_task, dir_fd, user_path, LookupFlags::from(flags))?;
     let result = name.entry.node.statx(current_task, flags, mask)?;
-    current_task.mm.write_object(statxbuf, &result)?;
+    current_task.write_object(statxbuf, &result)?;
     Ok(())
 }
 
@@ -644,7 +644,7 @@ pub fn sys_readlinkat(
 
     // Cap the returned length at buffer_size.
     let length = std::cmp::min(buffer_size, target.len());
-    current_task.mm.write_memory(buffer, &target[..length])?;
+    current_task.write_memory(buffer, &target[..length])?;
     Ok(length)
 }
 
@@ -673,7 +673,7 @@ pub fn sys_mkdirat(
     user_path: UserCString,
     mode: FileMode,
 ) -> Result<(), Errno> {
-    let path = current_task.mm.read_c_string_to_vec(user_path, PATH_MAX as usize)?;
+    let path = current_task.read_c_string_to_vec(user_path, PATH_MAX as usize)?;
 
     if path.is_empty() {
         return error!(ENOENT);
@@ -898,7 +898,7 @@ fn do_getxattr(
     if size < value.len() {
         return error!(ERANGE);
     }
-    current_task.mm.write_memory(value_addr, &value)
+    current_task.write_memory(value_addr, &value)
 }
 
 pub fn sys_getxattr(
@@ -958,7 +958,7 @@ fn do_setxattr(
         _ => return error!(EINVAL),
     };
     let name = read_xattr_name(current_task, name_addr)?;
-    let value = current_task.mm.read_memory_to_vec(value_addr, size)?;
+    let value = current_task.read_memory_to_vec(value_addr, size)?;
     node.entry.node.set_xattr(current_task, &name, &value, op)
 }
 
@@ -1063,7 +1063,7 @@ fn do_listxattr(
     if size < list.len() {
         return error!(ERANGE);
     }
-    current_task.mm.write_memory(list_addr, &list)
+    current_task.write_memory(list_addr, &list)
 }
 
 pub fn sys_listxattr(
@@ -1116,7 +1116,7 @@ pub fn sys_getcwd(
     if user_cwd.len() > size {
         return error!(ERANGE);
     }
-    current_task.mm.write_memory(buf, &user_cwd)?;
+    current_task.write_memory(buf, &user_cwd)?;
     Ok(user_cwd.len())
 }
 
@@ -1152,9 +1152,9 @@ pub fn sys_pipe2(
     let fd_write = current_task.add_file(write, fd_flags)?;
     log_trace!("pipe2 -> [{:#x}, {:#x}]", fd_read.raw(), fd_write.raw());
 
-    current_task.mm.write_object(user_pipe, &fd_read)?;
+    current_task.write_object(user_pipe, &fd_read)?;
     let user_pipe = user_pipe.next();
-    current_task.mm.write_object(user_pipe, &fd_write)?;
+    current_task.write_object(user_pipe, &fd_write)?;
 
     Ok(())
 }
@@ -1175,12 +1175,12 @@ pub fn sys_symlinkat(
     new_dir_fd: FdNumber,
     user_path: UserCString,
 ) -> Result<(), Errno> {
-    let target = current_task.mm.read_c_string_to_vec(user_target, PATH_MAX as usize)?;
+    let target = current_task.read_c_string_to_vec(user_target, PATH_MAX as usize)?;
     if target.is_empty() {
         return error!(ENOENT);
     }
 
-    let path = current_task.mm.read_c_string_to_vec(user_path, PATH_MAX as usize)?;
+    let path = current_task.read_c_string_to_vec(user_path, PATH_MAX as usize)?;
     // TODO: This check could probably be moved into parent.symlink(..).
     if path.is_empty() {
         return error!(ENOENT);
@@ -1390,15 +1390,15 @@ fn do_mount_create(
     let source = if source_addr.is_null() {
         b""
     } else {
-        current_task.mm.read_c_string_to_slice(source_addr, &mut buf)?
+        current_task.read_c_string_to_slice(source_addr, &mut buf)?
     };
     let mut buf = [0u8; PATH_MAX as usize];
-    let fs_type = current_task.mm.read_c_string_to_slice(filesystemtype_addr, &mut buf)?;
+    let fs_type = current_task.read_c_string_to_slice(filesystemtype_addr, &mut buf)?;
     let mut buf = [0u8; PATH_MAX as usize];
     let data = if data_addr.is_null() {
         b""
     } else {
-        current_task.mm.read_c_string_to_slice(data_addr, &mut buf)?
+        current_task.read_c_string_to_slice(data_addr, &mut buf)?
     };
     log_trace!(
         "mount(source={:?}, target={:?}, type={:?}, data={:?})",
@@ -1516,7 +1516,7 @@ pub fn sys_timerfd_gettime(
     let timer_file = file.downcast_file::<TimerFile>().ok_or_else(|| errno!(EBADF))?;
     let timer_info = timer_file.current_timer_spec();
     log_trace!("timerfd_gettime(fd={:?}, current_value={:?})", fd, timer_info);
-    current_task.mm.write_object(user_current_value, &timer_info)?;
+    current_task.write_object(user_current_value, &timer_info)?;
     Ok(())
 }
 
@@ -1540,7 +1540,7 @@ pub fn sys_timerfd_settime(
     let file = current_task.files.get(fd)?;
     let timer_file = file.downcast_file::<TimerFile>().ok_or_else(|| errno!(EBADF))?;
 
-    let new_timer_spec = current_task.mm.read_object(user_new_value)?;
+    let new_timer_spec = current_task.read_object(user_new_value)?;
     let old_timer_spec = timer_file.set_timer_spec(new_timer_spec, flags)?;
     log_trace!(
         "timerfd_settime(fd={:?}, flags={:#x}, new_value={:?}, current_value={:?})",
@@ -1550,7 +1550,7 @@ pub fn sys_timerfd_settime(
         old_timer_spec
     );
     if !user_old_value.is_null() {
-        current_task.mm.write_object(user_old_value, &old_timer_spec)?;
+        current_task.write_object(user_old_value, &old_timer_spec)?;
     }
     Ok(())
 }
@@ -1584,7 +1584,7 @@ fn select(
         if addr.is_null() {
             Ok(Default::default())
         } else {
-            current_task.mm.read_object(addr)
+            current_task.read_object(addr)
         }
     };
 
@@ -1618,14 +1618,14 @@ fn select(
     }
 
     let mask = if !sigmask_addr.is_null() {
-        let sigmask = current_task.mm.read_object(sigmask_addr)?;
+        let sigmask = current_task.read_object(sigmask_addr)?;
         let mask = if sigmask.ss.is_null() {
             current_task.read().signals.mask()
         } else {
             if sigmask.ss_len < std::mem::size_of::<sigset_t>() {
                 return error!(EINVAL);
             }
-            current_task.mm.read_object(sigmask.ss.into())?
+            current_task.read_object(sigmask.ss.into())?
         };
         Some(mask)
     } else {
@@ -1659,7 +1659,7 @@ fn select(
     let write_fd_set =
         |addr: UserRef<__kernel_fd_set>, value: __kernel_fd_set| -> Result<(), Errno> {
             if !addr.is_null() {
-                current_task.mm.write_object(addr, &value)?;
+                current_task.write_object(addr, &value)?;
             }
             Ok(())
         };
@@ -1683,7 +1683,7 @@ pub fn sys_pselect6(
     let deadline = if timeout_addr.is_null() {
         zx::Time::INFINITE
     } else {
-        let timespec = current_task.mm.read_object(timeout_addr)?;
+        let timespec = current_task.read_object(timeout_addr)?;
         start_time + duration_from_timespec(timespec)?
     };
 
@@ -1700,7 +1700,7 @@ pub fn sys_pselect6(
     if !timeout_addr.is_null() {
         let now = zx::Time::get_monotonic();
         let remaining = std::cmp::max(deadline - now, zx::Duration::from_seconds(0));
-        current_task.mm.write_object(timeout_addr, &timespec_from_duration(remaining))?;
+        current_task.write_object(timeout_addr, &timespec_from_duration(remaining))?;
     }
 
     Ok(num_fds)
@@ -1720,7 +1720,7 @@ pub fn sys_select(
     let deadline = if timeout_addr.is_null() {
         zx::Time::INFINITE
     } else {
-        let timeval = current_task.mm.read_object(timeout_addr)?;
+        let timeval = current_task.read_object(timeout_addr)?;
         start_time + duration_from_timeval(timeval)?
     };
 
@@ -1737,7 +1737,7 @@ pub fn sys_select(
     if !timeout_addr.is_null() {
         let now = zx::Time::get_monotonic();
         let remaining = std::cmp::max(deadline - now, zx::Duration::from_seconds(0));
-        current_task.mm.write_object(timeout_addr, &timeval_from_duration(remaining))?;
+        current_task.write_object(timeout_addr, &timeval_from_duration(remaining))?;
     }
 
     Ok(num_fds)
@@ -1770,11 +1770,11 @@ pub fn sys_epoll_ctl(
     let ctl_file = current_task.files.get(fd)?;
     match op {
         EPOLL_CTL_ADD => {
-            let epoll_event = current_task.mm.read_object(event)?;
+            let epoll_event = current_task.read_object(event)?;
             epoll_file.add(current_task, &ctl_file, &file, epoll_event)?;
         }
         EPOLL_CTL_MOD => {
-            let epoll_event = current_task.mm.read_object(event)?;
+            let epoll_event = current_task.read_object(event)?;
             epoll_file.modify(current_task, &ctl_file, epoll_event)?;
         }
         EPOLL_CTL_DEL => epoll_file.delete(&ctl_file)?,
@@ -1809,7 +1809,7 @@ fn do_epoll_pwait(
         .check_plausible(events.addr(), max_events * std::mem::size_of::<epoll_event>())?;
 
     let active_events = if !user_sigmask.is_null() {
-        let signal_mask = current_task.mm.read_object(user_sigmask)?;
+        let signal_mask = current_task.read_object(user_sigmask)?;
         current_task.wait_with_temporary_mask(signal_mask, |current_task| {
             epoll_file.wait(current_task, max_events, deadline)
         })?
@@ -1819,7 +1819,7 @@ fn do_epoll_pwait(
 
     let mut event_ref = events;
     for event in active_events.iter() {
-        current_task.mm.write_object(UserRef::new(event_ref.addr()), event)?;
+        current_task.write_object(UserRef::new(event_ref.addr()), event)?;
         event_ref = event_ref.next();
     }
 
@@ -1849,7 +1849,7 @@ pub fn sys_epoll_pwait2(
     let deadline = if user_timespec.is_null() {
         zx::Time::INFINITE
     } else {
-        let ts = current_task.mm.read_object(user_timespec)?;
+        let ts = current_task.read_object(user_timespec)?;
         zx::Time::after(duration_from_timespec(ts)?)
     };
     do_epoll_pwait(current_task, epfd, events, max_events, deadline, user_sigmask)
@@ -1931,7 +1931,7 @@ pub fn poll(
     let waiter = FileWaiter::<usize>::default();
 
     for (index, poll_descriptor) in pollfds.iter_mut().enumerate() {
-        *poll_descriptor = current_task.mm.read_object(user_pollfds.at(index))?;
+        *poll_descriptor = current_task.read_object(user_pollfds.at(index))?;
         poll_descriptor.revents = 0;
         if poll_descriptor.fd < 0 {
             continue;
@@ -1957,7 +1957,7 @@ pub fn poll(
     }
 
     for (index, poll_descriptor) in pollfds.iter().enumerate() {
-        current_task.mm.write_object(user_pollfds.at(index), poll_descriptor)?;
+        current_task.write_object(user_pollfds.at(index), poll_descriptor)?;
     }
 
     Ok(ready_items.len())
@@ -1977,7 +1977,7 @@ pub fn sys_ppoll(
         // Passing -1 to poll is equivalent to an infinite timeout.
         -1
     } else {
-        let ts = current_task.mm.read_object(user_timespec)?;
+        let ts = current_task.read_object(user_timespec)?;
         duration_from_timespec(ts)?.into_millis() as i32
     };
 
@@ -1987,7 +1987,7 @@ pub fn sys_ppoll(
         if sigset_size != std::mem::size_of::<SigSet>() {
             return error!(EINVAL);
         }
-        let mask = current_task.mm.read_object(user_mask)?;
+        let mask = current_task.read_object(user_mask)?;
         Some(mask)
     } else {
         None
@@ -2007,7 +2007,7 @@ pub fn sys_ppoll(
     // handled by the application (i.e. returns ERESTARTNOHAND). However, if
     // [copy out] failed, then the restarted ppoll would use the wrong timeout, so the
     // error should be left as EINTR."
-    match (current_task.mm.write_object(user_timespec, &remaining_timespec), poll_result) {
+    match (current_task.write_object(user_timespec, &remaining_timespec), poll_result) {
         // If write was ok, and poll was ok, return poll result.
         (Ok(_), Ok(num_events)) => Ok(num_events),
         // TODO: Here we should return an error that indicates the syscall should return EINTR if
@@ -2157,7 +2157,7 @@ pub fn sys_utimensat(
         // If user_times is null, the timestamps are updated to the current time.
         (TimeUpdateType::Now, TimeUpdateType::Now)
     } else {
-        let ts: [timespec; 2] = current_task.mm.read_object(user_times)?;
+        let ts: [timespec; 2] = current_task.read_object(user_times)?;
         let atime = ts[0];
         let mtime = ts[1];
         let parse_timespec = |spec: timespec| match spec.tv_nsec {
@@ -2286,7 +2286,7 @@ mod tests {
         let (_kernel, current_task) = create_kernel_and_task_with_pkgfs();
         let path_addr = map_memory(&current_task, UserAddress::default(), *PAGE_SIZE);
         let path = b"data/testfile.txt\0";
-        current_task.mm.write_memory(path_addr, path)?;
+        current_task.write_memory(path_addr, path)?;
         let fd = sys_openat(
             &current_task,
             FdNumber::AT_FDCWD,
@@ -2318,7 +2318,7 @@ mod tests {
 
         // Write the path to user memory.
         let path_addr = map_memory(&current_task, UserAddress::default(), *PAGE_SIZE);
-        current_task.mm.write_memory(path_addr, file_path).expect("failed to clear struct");
+        current_task.write_memory(path_addr, file_path).expect("failed to clear struct");
 
         let user_stat = UserRef::new(path_addr + file_path.len());
         current_task
@@ -2330,7 +2330,7 @@ mod tests {
 
         assert_eq!(sys_statfs(&current_task, user_path, user_stat), Ok(()));
 
-        let returned_stat = current_task.mm.read_object(user_stat).expect("failed to read struct");
+        let returned_stat = current_task.read_object(user_stat).expect("failed to read struct");
         assert_eq!(returned_stat, statfs::default(u32::from_be_bytes(*b"f.io")));
     }
 
@@ -2356,7 +2356,7 @@ mod tests {
 
         let slash_path = b"testdir/";
         let slash_path_addr = map_memory(&current_task, UserAddress::default(), *PAGE_SIZE);
-        current_task.mm.write_memory(slash_path_addr, slash_path).expect("failed to write path");
+        current_task.write_memory(slash_path_addr, slash_path).expect("failed to write path");
         let slash_user_path = UserCString::new(slash_path_addr);
 
         // Try to remove a directory without specifying AT_REMOVEDIR.
@@ -2382,7 +2382,7 @@ mod tests {
 
         // Write the path to user memory.
         let old_path_addr = map_memory(&current_task, UserAddress::default(), *PAGE_SIZE);
-        current_task.mm.write_memory(old_path_addr, old_user_path).expect("failed to clear struct");
+        current_task.write_memory(old_path_addr, old_user_path).expect("failed to clear struct");
 
         // Create a second file that we will attempt to rename to.
         let new_user_path = b"data/testfile2.txt";
@@ -2390,7 +2390,7 @@ mod tests {
 
         // Write the path to user memory.
         let new_path_addr = map_memory(&current_task, UserAddress::default(), *PAGE_SIZE);
-        current_task.mm.write_memory(new_path_addr, new_user_path).expect("failed to clear struct");
+        current_task.write_memory(new_path_addr, new_user_path).expect("failed to clear struct");
 
         // Try to rename first file to second file's name with RENAME_NOREPLACE flag.
         // This should fail with EEXIST.

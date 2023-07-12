@@ -34,7 +34,7 @@ pub fn sys_uname(current_task: &CurrentTask, name: UserRef<utsname_t>) -> Result
     init_array(&mut result.version, b"starnix");
     init_array(&mut result.machine, b"x86_64");
     init_array(&mut result.domainname, uts_ns.domainname.as_slice());
-    current_task.mm.write_object(name, &result)?;
+    current_task.write_object(name, &result)?;
     Ok(())
 }
 
@@ -59,7 +59,7 @@ pub fn sys_sysinfo(current_task: &CurrentTask, info: UserRef<uapi::sysinfo>) -> 
         ..Default::default()
     };
 
-    current_task.mm.write_object(info, &result)?;
+    current_task.write_object(info, &result)?;
     Ok(())
 }
 
@@ -72,7 +72,7 @@ fn read_name(current_task: &CurrentTask, name: UserCString, len: u64) -> Result<
     }
 
     // Read a maximum of 65 characters and mark the null terminator.
-    let mut name = current_task.mm.read_c_string_to_vec(name, 65)?;
+    let mut name = current_task.read_c_string_to_vec(name, 65)?;
 
     // Syscall may have specified an even smaller length, so trim to the requested length.
     if len < name.len() {
@@ -128,7 +128,7 @@ pub fn sys_getrandom(
     }
     let mut buf = vec![0; size];
     zx::cprng_draw(&mut buf);
-    current_task.mm.write_memory(buf_addr, &buf[0..size])?;
+    current_task.write_memory(buf_addr, &buf[0..size])?;
     Ok(size)
 }
 

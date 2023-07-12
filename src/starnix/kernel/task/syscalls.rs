@@ -75,7 +75,7 @@ pub fn sys_clone3(
     // The most recent version of the struct size should match our definition.
     const_assert!(std::mem::size_of::<clone_args>() == CLONE_ARGS_SIZE_VER2 as usize);
 
-    let clone_args = current_task.mm.read_object_partial(user_clone_args, user_clone_args_size)?;
+    let clone_args = current_task.read_object_partial(user_clone_args, user_clone_args_size)?;
     do_clone(current_task, &clone_args)
 }
 
@@ -159,7 +159,7 @@ pub fn sys_execveat(
         )?
     };
 
-    let path = &current_task.mm.read_c_string_to_vec(user_path, PATH_MAX as usize)?;
+    let path = &current_task.read_c_string_to_vec(user_path, PATH_MAX as usize)?;
 
     log_trace!(
         "execveat({}, {}, argv={:?}, environ={:?}, flags={})",
@@ -238,8 +238,8 @@ pub fn sys_getcpu(
 ) -> Result<(), Errno> {
     // TODO(https://fxbug.dev/76948) make this a real implementation
     let fake_cpu_and_node = std::u32::MAX;
-    current_task.mm.write_object(cpu_out, &fake_cpu_and_node)?;
-    current_task.mm.write_object(node_out, &fake_cpu_and_node)?;
+    current_task.write_object(cpu_out, &fake_cpu_and_node)?;
+    current_task.write_object(node_out, &fake_cpu_and_node)?;
     Ok(())
 }
 
@@ -358,9 +358,9 @@ pub fn sys_getresuid(
     suid_addr: UserRef<uid_t>,
 ) -> Result<(), Errno> {
     let creds = current_task.creds();
-    current_task.mm.write_object(ruid_addr, &creds.uid)?;
-    current_task.mm.write_object(euid_addr, &creds.euid)?;
-    current_task.mm.write_object(suid_addr, &creds.saved_uid)?;
+    current_task.write_object(ruid_addr, &creds.uid)?;
+    current_task.write_object(euid_addr, &creds.euid)?;
+    current_task.write_object(suid_addr, &creds.saved_uid)?;
     Ok(())
 }
 
@@ -371,9 +371,9 @@ pub fn sys_getresgid(
     sgid_addr: UserRef<gid_t>,
 ) -> Result<(), Errno> {
     let creds = current_task.creds();
-    current_task.mm.write_object(rgid_addr, &creds.gid)?;
-    current_task.mm.write_object(egid_addr, &creds.egid)?;
-    current_task.mm.write_object(sgid_addr, &creds.saved_gid)?;
+    current_task.write_object(rgid_addr, &creds.gid)?;
+    current_task.write_object(egid_addr, &creds.egid)?;
+    current_task.write_object(sgid_addr, &creds.saved_gid)?;
     Ok(())
 }
 
@@ -517,7 +517,7 @@ pub fn sys_sched_setscheduler(
     let target_task = get_task_or_current(current_task, pid)?;
     let rlimit = target_task.thread_group.get_rlimit(Resource::RTPRIO);
 
-    let param: sched_param = current_task.mm.read_object(param.into())?;
+    let param: sched_param = current_task.read_object(param.into())?;
     let policy = SchedulerPolicy::from_raw(policy, param, rlimit)?;
     // TODO(https://fxbug.dev/123174) make zircon aware of this update
     target_task.write().scheduler_policy = policy;
@@ -559,7 +559,7 @@ pub fn sys_sched_getaffinity(
 
     // sched_setaffinity() is not implemented. Fake affinity mask based on the number of CPUs.
     let mask = get_default_cpumask();
-    current_task.mm.write_memory(user_mask, &mask.to_ne_bytes())?;
+    current_task.write_memory(user_mask, &mask.to_ne_bytes())?;
     Ok(CPU_AFFINITY_MASK_SIZE as usize)
 }
 
@@ -578,7 +578,7 @@ pub fn sys_sched_setaffinity(
         return error!(EINVAL);
     }
 
-    let mask = current_task.mm.read_object::<CpuAffinityMask>(user_mask.into())?;
+    let mask = current_task.read_object::<CpuAffinityMask>(user_mask.into())?;
 
     // Specified mask must include at least one valid CPU.
     if mask & get_default_cpumask() == 0 {
@@ -601,7 +601,7 @@ pub fn sys_sched_getparam(
 
     let target_task = get_task_or_current(current_task, pid)?;
     let param_value = target_task.read().scheduler_policy.raw_params();
-    current_task.mm.write_object(param.into(), &param_value)?;
+    current_task.write_object(param.into(), &param_value)?;
     Ok(())
 }
 
@@ -634,7 +634,7 @@ pub fn sys_prctl(
                 None
             } else {
                 let name = UserCString::new(UserAddress::from(arg5));
-                let name = current_task.mm.read_c_string_to_vec(name, 256).map_err(|e| {
+                let name = current_task.read_c_string_to_vec(name, 256).map_err(|e| {
                     // An overly long name produces EINVAL and not ENAMETOOLONG in Linux 5.15.
                     if e == errno!(ENAMETOOLONG) {
                         errno!(EINVAL)
@@ -675,7 +675,7 @@ pub fn sys_prctl(
         }
         PR_SET_NAME => {
             let addr = UserAddress::from(arg2);
-            let mut name = current_task.mm.read_memory_to_array::<16>(addr)?;
+            let mut name = current_task.read_memory_to_array::<16>(addr)?;
             // The name is truncated to 16 bytes (including the nul)
             name[15] = 0;
             // this will succeed, because we set 0 at end above
@@ -692,7 +692,7 @@ pub fn sys_prctl(
         }
         PR_GET_NAME => {
             let addr = UserAddress::from(arg2);
-            current_task.mm.write_memory(addr, current_task.command().to_bytes_with_nul())?;
+            current_task.write_memory(addr, current_task.command().to_bytes_with_nul())?;
             Ok(().into())
         }
         PR_SET_PTRACER => {
@@ -753,7 +753,7 @@ pub fn sys_prctl(
             #[allow(clippy::bool_to_int_with_if)]
             let value: i32 =
                 if current_task.thread_group.read().is_child_subreaper { 1 } else { 0 };
-            current_task.mm.write_object(addr.into(), &value)?;
+            current_task.write_object(addr.into(), &value)?;
             Ok(().into())
         }
         PR_SET_CHILD_SUBREAPER => {
@@ -878,7 +878,7 @@ pub fn sys_getrusage(
         ru_stime: timeval_from_duration(time_stats.system_time),
         ..rusage::default()
     };
-    current_task.mm.write_object(user_usage, &usage)?;
+    current_task.write_object(user_usage, &usage)?;
 
     Ok(())
 }
@@ -916,7 +916,7 @@ pub fn sys_prlimit64(
     let resource = Resource::from_raw(user_resource)?;
 
     let maybe_new_limit = if !user_new_limit.is_null() {
-        let new_limit = current_task.mm.read_object(user_new_limit)?;
+        let new_limit = current_task.read_object(user_new_limit)?;
         if new_limit.rlim_cur > new_limit.rlim_max {
             return error!(EINVAL);
         }
@@ -942,7 +942,7 @@ pub fn sys_prlimit64(
     };
 
     if !user_old_limit.is_null() {
-        current_task.mm.write_object(user_old_limit, &old_limit)?;
+        current_task.write_object(user_old_limit, &old_limit)?;
     }
     Ok(())
 }
@@ -953,14 +953,14 @@ pub fn sys_capget(
     user_data: UserRef<__user_cap_data_struct>,
 ) -> Result<(), Errno> {
     if user_data.is_null() {
-        current_task.mm.write_object(
+        current_task.write_object(
             user_header,
             &__user_cap_header_struct { version: _LINUX_CAPABILITY_VERSION_3, pid: 0 },
         )?;
         return Ok(());
     }
 
-    let header = current_task.mm.read_object(user_header)?;
+    let header = current_task.read_object(user_header)?;
     let target_task = get_task_or_current(current_task, header.pid)?;
 
     let (permitted, effective, inheritable) = {
@@ -985,7 +985,7 @@ pub fn sys_capget(
                     permitted: permitted.1,
                 },
             ];
-            current_task.mm.write_objects(user_data, &data)?;
+            current_task.write_objects(user_data, &data)?;
         }
         _ => return error!(EINVAL),
     }
@@ -997,7 +997,7 @@ pub fn sys_capset(
     user_header: UserRef<__user_cap_header_struct>,
     user_data: UserRef<__user_cap_data_struct>,
 ) -> Result<(), Errno> {
-    let header = current_task.mm.read_object(user_header)?;
+    let header = current_task.read_object(user_header)?;
     if header.pid != 0 && header.pid != current_task.id {
         return error!(EINVAL);
     }
@@ -1006,7 +1006,7 @@ pub fn sys_capset(
     let (new_permitted, new_effective, new_inheritable) = match header.version {
         _LINUX_CAPABILITY_VERSION_3 => {
             let data =
-                current_task.mm.read_objects_to_array::<__user_cap_data_struct, 2>(user_data)?;
+                current_task.read_objects_to_array::<__user_cap_data_struct, 2>(user_data)?;
             (
                 Capabilities::from_abi_v3((data[0].permitted, data[1].permitted)),
                 Capabilities::from_abi_v3((data[0].effective, data[1].effective)),
@@ -1089,7 +1089,7 @@ pub fn sys_seccomp(
             if flags != 0 || args.is_null() {
                 return error!(EINVAL);
             }
-            let action: u32 = current_task.mm.read_object(UserRef::new(args))?;
+            let action: u32 = current_task.read_object(UserRef::new(args))?;
             SeccompState::is_action_available(action)
         }
         SECCOMP_GET_NOTIF_SIZES => {
@@ -1111,7 +1111,7 @@ pub fn sys_setgroups(
     if size > NGROUPS_MAX as usize {
         return error!(EINVAL);
     }
-    let groups = current_task.mm.read_objects_to_vec::<gid_t>(groups_addr.into(), size)?;
+    let groups = current_task.read_objects_to_vec::<gid_t>(groups_addr.into(), size)?;
     let mut creds = current_task.creds();
     if !creds.is_superuser() {
         return error!(EPERM);
@@ -1134,7 +1134,7 @@ pub fn sys_getgroups(
         if size < creds.groups.len() {
             return error!(EINVAL);
         }
-        current_task.mm.write_memory(groups_addr, creds.groups.as_slice().as_bytes())?;
+        current_task.write_memory(groups_addr, creds.groups.as_slice().as_bytes())?;
     }
     Ok(creds.groups.len())
 }
@@ -1250,7 +1250,7 @@ mod tests {
         let mapped_address = map_memory(&current_task, UserAddress::default(), *PAGE_SIZE);
         let name_addr = mapped_address + 128u64;
         let name = "test-name\0";
-        current_task.mm.write_memory(name_addr, name.as_bytes()).expect("failed to write name");
+        current_task.write_memory(name_addr, name.as_bytes()).expect("failed to write name");
         sys_prctl(
             &mut current_task,
             PR_SET_VMA,
@@ -1283,7 +1283,7 @@ mod tests {
 
         for c in 1..255 {
             let vma_name = CString::new([c]).unwrap();
-            current_task.mm.write_memory(name_addr, vma_name.as_bytes_with_nul()).unwrap();
+            current_task.write_memory(name_addr, vma_name.as_bytes_with_nul()).unwrap();
 
             let result = sys_prctl(
                 &mut current_task,
@@ -1319,7 +1319,7 @@ mod tests {
 
         let name_too_long = CString::new(vec![b'a'; 256]).unwrap();
 
-        current_task.mm.write_memory(name_addr, name_too_long.as_bytes_with_nul()).unwrap();
+        current_task.write_memory(name_addr, name_too_long.as_bytes_with_nul()).unwrap();
 
         assert_eq!(
             sys_prctl(
@@ -1335,7 +1335,7 @@ mod tests {
 
         let name_just_long_enough = CString::new(vec![b'a'; 255]).unwrap();
 
-        current_task.mm.write_memory(name_addr, name_just_long_enough.as_bytes_with_nul()).unwrap();
+        current_task.write_memory(name_addr, name_just_long_enough.as_bytes_with_nul()).unwrap();
 
         assert_eq!(
             sys_prctl(
@@ -1437,7 +1437,7 @@ mod tests {
     async fn test_set_affinity_size() {
         let (_kernel, current_task) = create_kernel_and_task();
         let mapped_address = map_memory(&current_task, UserAddress::default(), *PAGE_SIZE);
-        current_task.mm.write_memory(mapped_address, &[0xffu8]).expect("failed to cpumask");
+        current_task.write_memory(mapped_address, &[0xffu8]).expect("failed to cpumask");
         let pid = current_task.get_pid();
         assert_eq!(sys_sched_setaffinity(&current_task, pid, u32::MAX, mapped_address), Ok(()));
         assert_eq!(sys_sched_setaffinity(&current_task, pid, 1, mapped_address), error!(EINVAL));
@@ -1466,7 +1466,7 @@ mod tests {
 
         let name_length = name.len();
 
-        let out_name = current_task.mm.read_memory_to_vec(mapped_address, name_length).unwrap();
+        let out_name = current_task.read_memory_to_vec(mapped_address, name_length).unwrap();
         assert_eq!(name.as_bytes(), &out_name);
     }
 
@@ -1507,7 +1507,7 @@ mod tests {
 
         let mapped_address = map_memory(&current_task, UserAddress::default(), *PAGE_SIZE);
         let requested_params = sched_param { sched_priority: 15 };
-        current_task.mm.write_object(mapped_address.into(), &requested_params).unwrap();
+        current_task.write_object(mapped_address.into(), &requested_params).unwrap();
 
         sys_sched_setscheduler(&current_task, 0, SCHED_FIFO, mapped_address).unwrap();
 
@@ -1517,7 +1517,7 @@ mod tests {
         let mapped_address = map_memory(&current_task, UserAddress::default(), *PAGE_SIZE);
         sys_sched_getparam(&current_task, 0, mapped_address).expect("sched_getparam");
         let param_value: sched_param =
-            current_task.mm.read_object(mapped_address.into()).expect("read_object");
+            current_task.read_object(mapped_address.into()).expect("read_object");
         assert_eq!(param_value.sched_priority, 15);
     }
 
@@ -1527,7 +1527,7 @@ mod tests {
         let mapped_address = map_memory(&current_task, UserAddress::default(), *PAGE_SIZE);
         sys_sched_getparam(&current_task, 0, mapped_address).expect("sched_getparam");
         let param_value: sched_param =
-            current_task.mm.read_object(mapped_address.into()).expect("read_object");
+            current_task.read_object(mapped_address.into()).expect("read_object");
         assert_eq!(param_value.sched_priority, 0);
     }
 

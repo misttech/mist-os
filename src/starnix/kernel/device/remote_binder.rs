@@ -801,8 +801,8 @@ impl<F: RemoteControllerConnector> RemoteBinderHandle<F> {
         current_task: &CurrentTask,
         service_address_ref: UserRef<UserCString>,
     ) -> Result<(), Errno> {
-        let service_address = current_task.mm.read_object(service_address_ref)?;
-        let service = current_task.mm.read_c_string_to_vec(service_address, PATH_MAX as usize)?;
+        let service_address = current_task.read_object(service_address_ref)?;
+        let service = current_task.read_c_string_to_vec(service_address, PATH_MAX as usize)?;
         let service_name = String::from_utf8(service.to_vec()).map_err(|_| errno!(EINVAL))?;
         let remote_controller_client =
             F::connect_to_remote_controller(current_task, &service_name)?;
@@ -905,7 +905,7 @@ impl<F: RemoteControllerConnector> RemoteBinderHandle<F> {
                     let wait_command = uapi::remote_binder_wait_command {
                         spawn_thread: if spawn_thread { 1 } else { 0 },
                     };
-                    current_task.mm.write_object(wait_command_ref, &wait_command)?;
+                    current_task.write_object(wait_command_ref, &wait_command)?;
                     return Ok(());
                 }
             };

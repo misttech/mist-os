@@ -235,11 +235,11 @@ impl FileOps for Arc<InputFile> {
         let user_addr = UserAddress::from(arg);
         match request {
             uapi::EVIOCGVERSION => {
-                current_task.mm.write_object(UserRef::new(user_addr), &self.driver_version)?;
+                current_task.write_object(UserRef::new(user_addr), &self.driver_version)?;
                 Ok(SUCCESS)
             }
             uapi::EVIOCGID => {
-                current_task.mm.write_object(UserRef::new(user_addr), &self.input_id)?;
+                current_task.write_object(UserRef::new(user_addr), &self.input_id)?;
                 Ok(SUCCESS)
             }
             uapi::EVIOCGBIT_EV_KEY => {
@@ -249,14 +249,14 @@ impl FileOps for Arc<InputFile> {
                 Ok(SUCCESS)
             }
             uapi::EVIOCGBIT_EV_ABS => {
-                current_task.mm.write_object(
+                current_task.write_object(
                     UserRef::new(user_addr),
                     &self.supported_position_attributes.bytes,
                 )?;
                 Ok(SUCCESS)
             }
             uapi::EVIOCGBIT_EV_REL => {
-                current_task.mm.write_object(
+                current_task.write_object(
                     UserRef::new(user_addr),
                     &self.supported_motion_attributes.bytes,
                 )?;
@@ -287,15 +287,15 @@ impl FileOps for Arc<InputFile> {
                 Ok(SUCCESS)
             }
             uapi::EVIOCGPROP => {
-                current_task.mm.write_object(UserRef::new(user_addr), &self.properties.bytes)?;
+                current_task.write_object(UserRef::new(user_addr), &self.properties.bytes)?;
                 Ok(SUCCESS)
             }
             uapi::EVIOCGABS_X => {
-                current_task.mm.write_object(UserRef::new(user_addr), &self.x_axis_info)?;
+                current_task.write_object(UserRef::new(user_addr), &self.x_axis_info)?;
                 Ok(SUCCESS)
             }
             uapi::EVIOCGABS_Y => {
-                current_task.mm.write_object(UserRef::new(user_addr), &self.y_axis_info)?;
+                current_task.write_object(UserRef::new(user_addr), &self.y_axis_info)?;
                 Ok(SUCCESS)
             }
             _ => {
@@ -608,11 +608,11 @@ mod test {
     fn read_uapi_events(
         file: Arc<InputFile>,
         file_object: &FileObject,
-        task: &CurrentTask,
+        current_task: &CurrentTask,
     ) -> Vec<uapi::input_event> {
         std::iter::from_fn(|| {
             let mut event_bytes = VecOutputBuffer::new(INPUT_EVENT_SIZE);
-            match file.read(file_object, task, 0, &mut event_bytes) {
+            match file.read(file_object, current_task, 0, &mut event_bytes) {
                 Ok(INPUT_EVENT_SIZE) => Some(
                     uapi::input_event::read_from(Vec::from(event_bytes).as_slice())
                         .ok_or(anyhow!("failed to read input_event from buffer")),

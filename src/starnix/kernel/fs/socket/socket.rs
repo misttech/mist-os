@@ -393,7 +393,7 @@ impl Socket {
         //     the family or type.
         match request {
             SIOCGIFADDR => {
-                let in_ifreq: ifreq = current_task.mm.read_object(UserRef::new(user_addr))?;
+                let in_ifreq: ifreq = current_task.read_object(UserRef::new(user_addr))?;
                 let mut read_buf = VecOutputBuffer::new(NETLINK_ROUTE_BUF_SIZE);
                 let (_socket, address_msgs, _if_index) =
                     get_netlink_ipv4_addresses(current_task, &in_ifreq, &mut read_buf)?;
@@ -439,11 +439,11 @@ impl Socket {
                     ifr_ifrn.ifrn_name: unsafe { in_ifreq.ifr_ifrn.ifrn_name },
                     ifr_ifru.ifru_addr: ifru_addr,
                 });
-                current_task.mm.write_object(UserRef::new(user_addr), &out_ifreq)?;
+                current_task.write_object(UserRef::new(user_addr), &out_ifreq)?;
                 Ok(SUCCESS)
             }
             SIOCSIFADDR => {
-                let in_ifreq: ifreq = current_task.mm.read_object(UserRef::new(user_addr))?;
+                let in_ifreq: ifreq = current_task.read_object(UserRef::new(user_addr))?;
                 let mut read_buf = VecOutputBuffer::new(NETLINK_ROUTE_BUF_SIZE);
                 let (socket, address_msgs, if_index) =
                     get_netlink_ipv4_addresses(current_task, &in_ifreq, &mut read_buf)?;
@@ -512,7 +512,7 @@ impl Socket {
             }
             SIOCGIFHWADDR => {
                 let user_addr = UserAddress::from(arg);
-                let in_ifreq: ifreq = current_task.mm.read_object(UserRef::new(user_addr))?;
+                let in_ifreq: ifreq = current_task.read_object(UserRef::new(user_addr))?;
                 let mut read_buf = VecOutputBuffer::new(NETLINK_ROUTE_BUF_SIZE);
                 let (_socket, link_msg) =
                     get_netlink_interface_info(current_task, &in_ifreq, &mut read_buf)?;
@@ -555,11 +555,11 @@ impl Socket {
                         }).unwrap_or_else(Default::default),
                     }
                 );
-                current_task.mm.write_object(UserRef::new(user_addr), &out_ifreq)?;
+                current_task.write_object(UserRef::new(user_addr), &out_ifreq)?;
                 Ok(SUCCESS)
             }
             SIOCGIFINDEX => {
-                let in_ifreq: ifreq = current_task.mm.read_object(UserRef::new(user_addr))?;
+                let in_ifreq: ifreq = current_task.read_object(UserRef::new(user_addr))?;
                 let mut read_buf = VecOutputBuffer::new(NETLINK_ROUTE_BUF_SIZE);
                 let (_socket, link_msg) =
                     get_netlink_interface_info(current_task, &in_ifreq, &mut read_buf)?;
@@ -570,18 +570,18 @@ impl Socket {
                         i32::try_from(index).expect("interface ID should fit in an i32")
                     },
                 });
-                current_task.mm.write_object(UserRef::new(user_addr), &out_ifreq)?;
+                current_task.write_object(UserRef::new(user_addr), &out_ifreq)?;
                 Ok(SUCCESS)
             }
             SIOCGIFMTU => {
-                let in_ifreq: ifreq = current_task.mm.read_object(UserRef::new(user_addr))?;
+                let in_ifreq: ifreq = current_task.read_object(UserRef::new(user_addr))?;
                 let out_ifreq: [u8; std::mem::size_of::<ifreq>()] = struct_with_union_into_bytes!(ifreq {
                     ifr_ifrn.ifrn_name: unsafe { in_ifreq.ifr_ifrn.ifrn_name },
                     // TODO(https://fxbug.dev/129165): Return the actual MTU instead
                     // of this hard-coded value.
                     ifr_ifru.ifru_mtu: 1280 /* IPv6 MIN MTU */,
                 });
-                current_task.mm.write_object(UserRef::new(user_addr), &out_ifreq)?;
+                current_task.write_object(UserRef::new(user_addr), &out_ifreq)?;
                 Ok(SUCCESS)
             }
             _ => self.ops.ioctl(self, file, current_task, request, arg),
@@ -860,7 +860,7 @@ mod tests {
         let opt_size = std::mem::size_of::<u32>();
         let user_address = map_memory(&current_task, UserAddress::default(), opt_size as u64);
         let opt_ref = UserRef::<u32>::new(user_address);
-        current_task.mm.write_object(opt_ref, &passcred).unwrap();
+        current_task.write_object(opt_ref, &passcred).unwrap();
         let opt_buf = UserBuffer { address: user_address, length: opt_size };
         rec_dgram.setsockopt(&current_task, SOL_SOCKET, SO_PASSCRED, opt_buf).unwrap();
 

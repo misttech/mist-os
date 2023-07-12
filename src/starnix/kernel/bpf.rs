@@ -115,7 +115,7 @@ fn read_attr<Attr: FromBytes>(
     // Verify that the extra is all zeros.
     if attr_size > sizeof_attr {
         let tail =
-            current_task.mm.read_memory_to_vec(attr_addr + sizeof_attr, attr_size - sizeof_attr)?;
+            current_task.read_memory_to_vec(attr_addr + sizeof_attr, attr_size - sizeof_attr)?;
         for byte in tail {
             if byte != 0 {
                 return error!(E2BIG);
@@ -129,7 +129,7 @@ fn read_attr<Attr: FromBytes>(
     // SAFETY: attr is FromBytes, meaning it is safe to write any bit pattern to its storage. (The
     // unsafe slice construction is necessary because it's not necessarily safe to read from its
     // storage directly.)
-    current_task.mm.read_memory_to_slice(attr_addr, unsafe {
+    current_task.read_memory_to_slice(attr_addr, unsafe {
         std::slice::from_raw_parts_mut(&mut attr as *mut Attr as *mut u8, sizeof_attr)
     })?;
 
@@ -259,7 +259,7 @@ pub fn sys_bpf(
             // SAFETY: this union object was created with FromBytes so it's safe to access any
             // variant (right?)
             let next_key_addr = unsafe { elem_attr.__bindgen_anon_1.next_key };
-            current_task.mm.write_memory(UserAddress::from(next_key_addr), next_key)?;
+            current_task.write_memory(UserAddress::from(next_key_addr), next_key)?;
             Ok(SUCCESS)
         }
 
@@ -286,7 +286,7 @@ pub fn sys_bpf(
             log_trace!("BPF_OBJ_PIN {:?}", pin_attr);
             let object = get_bpf_fd(current_task, pin_attr.bpf_fd)?;
             let path_addr = UserCString::new(UserAddress::from(pin_attr.pathname));
-            let pathname = current_task.mm.read_c_string_to_vec(path_addr, PATH_MAX as usize)?;
+            let pathname = current_task.read_c_string_to_vec(path_addr, PATH_MAX as usize)?;
             let (parent, basename) = current_task.lookup_parent_at(
                 &mut LookupContext::default(),
                 FdNumber::AT_FDCWD,
@@ -308,7 +308,7 @@ pub fn sys_bpf(
             let path_attr: bpf_attr__bindgen_ty_5 = read_attr(current_task, attr_addr, attr_size)?;
             log_trace!("BPF_OBJ_GET {:?}", path_attr);
             let path_addr = UserCString::new(UserAddress::from(path_attr.pathname));
-            let pathname = current_task.mm.read_c_string_to_vec(path_addr, PATH_MAX as usize)?;
+            let pathname = current_task.read_c_string_to_vec(path_addr, PATH_MAX as usize)?;
             let node = current_task.lookup_path_from_root(&pathname)?;
             // TODO(tbodt): This might be the wrong error code, write a test program to find out
             let node =
@@ -353,8 +353,8 @@ pub fn sys_bpf(
             // but could be wrong.
             info.truncate(get_info_attr.info_len as usize);
             get_info_attr.info_len = info.len() as u32;
-            current_task.mm.write_memory(UserAddress::from(get_info_attr.info), &info)?;
-            current_task.mm.write_memory(attr_addr, get_info_attr.as_bytes())?;
+            current_task.write_memory(UserAddress::from(get_info_attr.info), &info)?;
+            current_task.write_memory(attr_addr, get_info_attr.as_bytes())?;
             Ok(SUCCESS)
         }
 

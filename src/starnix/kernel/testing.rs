@@ -140,7 +140,7 @@ pub fn remap_memory(
 #[track_caller]
 pub fn fill_page(current_task: &CurrentTask, addr: UserAddress, data: char) {
     let data = [data as u8].repeat(*PAGE_SIZE as usize);
-    if let Err(err) = current_task.mm.write_memory(addr, &data) {
+    if let Err(err) = current_task.write_memory(addr, &data) {
         panic!("write page: failed to fill page @ {addr:?} with {data:?}: {err:?}");
     }
 }
@@ -152,7 +152,7 @@ pub fn fill_page(current_task: &CurrentTask, addr: UserAddress, data: char) {
 /// number in the event of a panic. This makes it easier to find test regressions.
 #[track_caller]
 pub fn check_page_eq(current_task: &CurrentTask, addr: UserAddress, data: char) {
-    let buf = match current_task.mm.read_memory_to_vec(addr, *PAGE_SIZE as usize) {
+    let buf = match current_task.read_memory_to_vec(addr, *PAGE_SIZE as usize) {
         Ok(b) => b,
         Err(err) => panic!("read page: failed to read page @ {addr:?}: {err:?}"),
     };
@@ -169,7 +169,7 @@ pub fn check_page_eq(current_task: &CurrentTask, addr: UserAddress, data: char) 
 /// number in the event of a panic. This makes it easier to find test regressions.
 #[track_caller]
 pub fn check_page_ne(current_task: &CurrentTask, addr: UserAddress, data: char) {
-    let buf = match current_task.mm.read_memory_to_vec(addr, *PAGE_SIZE as usize) {
+    let buf = match current_task.read_memory_to_vec(addr, *PAGE_SIZE as usize) {
         Ok(b) => b,
         Err(err) => panic!("read page: failed to read page @ {addr:?}: {err:?}"),
     };
@@ -186,7 +186,7 @@ pub fn check_page_ne(current_task: &CurrentTask, addr: UserAddress, data: char) 
 /// number in the event of a panic. This makes it easier to find test regressions.
 #[track_caller]
 pub fn check_unmapped(current_task: &CurrentTask, addr: UserAddress) {
-    match current_task.mm.read_memory_to_vec(addr, *PAGE_SIZE as usize) {
+    match current_task.read_memory_to_vec(addr, *PAGE_SIZE as usize) {
         Ok(_) => panic!("read page: page @ {addr:?} should be unmapped"),
         Err(err) if err == crate::types::errno::EFAULT => {}
         Err(err) => {

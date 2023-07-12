@@ -177,12 +177,12 @@ impl IpTables {
 
     pub fn setsockopt(
         &mut self,
-        task: &CurrentTask,
+        current_task: &CurrentTask,
         socket: &SocketHandle,
         optname: u32,
         user_opt: UserBuffer,
     ) -> Result<(), Errno> {
-        let mut bytes = task.mm.read_buffer(&user_opt)?;
+        let mut bytes = current_task.read_buffer(&user_opt)?;
         match optname {
             // Replaces the [`IpTable`] specified by `user_opt`.
             IPT_SO_SET_REPLACE => {

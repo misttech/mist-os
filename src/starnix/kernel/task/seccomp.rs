@@ -178,7 +178,7 @@ impl SeccompFilterContainer {
 
     /// Runs all of the seccomp filters in this container, most-to-least recent.  Returns the
     /// highest priority result (which contains a reference to the filter that generated it)
-    pub fn run_all(&self, task: &CurrentTask, syscall: &Syscall) -> SeccompFilterResult {
+    pub fn run_all(&self, current_task: &CurrentTask, syscall: &Syscall) -> SeccompFilterResult {
         let mut r = SeccompFilterResult { action: SECCOMP_RET_ALLOW, filter: None };
 
         // VDSO calls can't be caught by seccomp, so most seccomp filters forget to declare them.
@@ -202,7 +202,7 @@ impl SeccompFilterContainer {
         // Filters are executed in reverse order of addition
         for filter in self.filters.iter().rev() {
             let mut data =
-                make_seccomp_data(syscall, task.registers.instruction_pointer_register());
+                make_seccomp_data(syscall, current_task.registers.instruction_pointer_register());
 
             let new_result = filter.run(&mut data);
             if ((new_result & SECCOMP_RET_ACTION_FULL) as i32)
@@ -320,7 +320,7 @@ impl SeccompState {
     #[allow(clippy::wildcard_in_or_patterns)]
     pub fn do_user_defined(
         result: SeccompFilterResult,
-        task: &mut CurrentTask,
+        current_task: &mut CurrentTask,
         syscall: &Syscall,
     ) -> Option<Result<SyscallResult, Errno>> {
         let action = result.action;
@@ -333,8 +333,8 @@ impl SeccompState {
             SECCOMP_RET_KILL_THREAD => {
                 let siginfo = SignalInfo::default(SIGSYS);
 
-                let is_last_thread = task.thread_group.read().tasks_count() == 1;
-                let mut task_state = task.write();
+                let is_last_thread = current_task.thread_group.read().tasks_count() == 1;
+                let mut task_state = current_task.write();
 
                 if is_last_thread {
                     task_state.dump_on_exit = true;
@@ -345,10 +345,10 @@ impl SeccompState {
                 Some(Err(errno_from_code!(0)))
             }
             SECCOMP_RET_LOG => {
-                let creds = task.creds();
+                let creds = current_task.creds();
                 let uid = creds.uid;
                 let gid = creds.gid;
-                let comm_r = task.command();
+                let comm_r = current_task.command();
                 let comm = if let Ok(c) = comm_r.to_str() { c } else { "???" };
 
                 let arch = if cfg!(target_arch = "x86_64") {
@@ -362,10 +362,10 @@ impl SeccompState {
                     "uid={} gid={} pid={} comm={} syscall={} ip={} ARCH={} SYSCALL={}",
                     uid,
                     gid,
-                    task.thread_group.leader,
+                    current_task.thread_group.leader,
                     comm,
                     syscall.decl.number,
-                    task.registers.instruction_pointer_register(),
+                    current_task.registers.instruction_pointer_register(),
                     arch,
                     syscall.decl.name
                 );
@@ -388,26 +388,26 @@ impl SeccompState {
                     errno: (action & SECCOMP_RET_DATA) as i32,
                     code: SYS_SECCOMP as i32,
                     detail: SignalDetail::SigSys {
-                        call_addr: task.registers.instruction_pointer_register().into(),
+                        call_addr: current_task.registers.instruction_pointer_register().into(),
                         syscall: syscall.decl.number as i32,
                         arch: arch_val,
                     },
                     force: true,
                 };
 
-                send_signal(task, siginfo);
+                send_signal(current_task, siginfo);
                 Some(Err(errno_from_code!(-(syscall.decl.number as i16))))
             }
             SECCOMP_RET_USER_NOTIF => {
-                if let Some(notifier) = task.get_seccomp_notifier() {
+                if let Some(notifier) = current_task.get_seccomp_notifier() {
                     let cookie = result.filter.unwrap().cookie.fetch_add(1, Ordering::Relaxed);
                     let msg = seccomp_notif {
                         id: cookie,
-                        pid: task.id as u32,
+                        pid: current_task.id as u32,
                         flags: 0,
                         data: make_seccomp_data(
                             syscall,
-                            task.registers.instruction_pointer_register(),
+                            current_task.registers.instruction_pointer_register(),
                         ),
                     };
                     // First, add a pending notification, and wake up the supervisor waiting for it.
@@ -418,7 +418,7 @@ impl SeccompState {
                             // Someone explicitly close()d the fd with the notifier, which does not
                             // clear the thread-local notifier.  Do it now.
                             drop(notifier);
-                            task.set_seccomp_notifier(None);
+                            current_task.set_seccomp_notifier(None);
                             return Some(Err(errno!(ENOSYS)));
                         }
                         notifier.create_notification(cookie, msg);
@@ -426,7 +426,7 @@ impl SeccompState {
                     }
 
                     // Next, wait for a response from the supervisor
-                    if let Err(e) = waiter.wait(task) {
+                    if let Err(e) = waiter.wait(current_task) {
                         return Some(Err(e));
                     }
 
@@ -460,7 +460,7 @@ impl SeccompState {
                 }
             }
             SECCOMP_RET_KILL_PROCESS | _ => {
-                task.thread_group.exit(ExitStatus::CoreDump(SignalInfo::default(SIGSYS)));
+                current_task.thread_group.exit(ExitStatus::CoreDump(SignalInfo::default(SIGSYS)));
                 Some(Err(errno_from_code!(0)))
             }
         }

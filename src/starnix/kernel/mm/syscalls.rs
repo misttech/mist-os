@@ -300,7 +300,7 @@ pub fn sys_futex(
                 // In theory, we should adjust this for a realtime
                 // futex when the system gets suspended, but Zircon
                 // does  not give us a way to do this.
-                let duration = current_task.mm.read_object(utime)?;
+                let duration = current_task.read_object(utime)?;
                 zx::Time::after(duration_from_timespec(duration)?)
             };
             futexes.wait(current_task, addr, value, FUTEX_BITSET_MATCH_ANY, deadline)?;
@@ -316,9 +316,9 @@ pub fn sys_futex(
             let deadline = if utime.is_null() {
                 zx::Time::INFINITE
             } else if is_realtime {
-                realtime_deadline_to_monotonic(current_task.mm.read_object(utime)?)?
+                realtime_deadline_to_monotonic(current_task.read_object(utime)?)?
             } else {
-                let deadline = current_task.mm.read_object(utime)?;
+                let deadline = current_task.read_object(utime)?;
                 time_from_timespec(deadline)?
             };
             futexes.wait(current_task, addr, value, value3, deadline)?;
@@ -357,8 +357,8 @@ pub fn sys_get_robust_list(
 
     match task {
         Some(t) => {
-            current_task.mm.write_object(user_head_ptr, &t.read().robust_list_head)?;
-            current_task.mm.write_object(user_len_ptr, &std::mem::size_of::<robust_list_head>())?;
+            current_task.write_object(user_head_ptr, &t.read().robust_list_head)?;
+            current_task.write_object(user_len_ptr, &std::mem::size_of::<robust_list_head>())?;
             Ok(())
         }
         None => error!(ESRCH),
@@ -464,7 +464,7 @@ mod tests {
         assert_eq!(sys_munmap(&current_task, mapped_address, *PAGE_SIZE as usize), Ok(()));
 
         // Verify that the memory is no longer readable.
-        assert_eq!(current_task.mm.read_memory_to_array::<5>(mapped_address), error!(EFAULT));
+        assert_eq!(current_task.read_memory_to_array::<5>(mapped_address), error!(EFAULT));
     }
 
     /// It is ok to call munmap on an unmapped range.
@@ -498,7 +498,7 @@ mod tests {
         );
 
         // Verify that the memory is still readable.
-        assert!(current_task.mm.read_memory_to_array::<5>(mapped_address).is_ok());
+        assert!(current_task.read_memory_to_array::<5>(mapped_address).is_ok());
     }
 
     /// The entire page should be unmapped, not just the range [address, address + length).
@@ -510,9 +510,9 @@ mod tests {
         assert_eq!(sys_munmap(&current_task, mapped_address, (*PAGE_SIZE as usize) / 2), Ok(()));
 
         // Verify that memory can't be read in either half of the page.
-        assert_eq!(current_task.mm.read_memory_to_array::<5>(mapped_address), error!(EFAULT));
+        assert_eq!(current_task.read_memory_to_array::<5>(mapped_address), error!(EFAULT));
         assert_eq!(
-            current_task.mm.read_memory_to_array::<5>(mapped_address + (*PAGE_SIZE - 2)),
+            current_task.read_memory_to_array::<5>(mapped_address + (*PAGE_SIZE - 2)),
             error!(EFAULT)
         );
     }
@@ -526,9 +526,9 @@ mod tests {
         assert_eq!(sys_munmap(&current_task, mapped_address, (*PAGE_SIZE as usize) + 1), Ok(()));
 
         // Verify that neither page is readable.
-        assert_eq!(current_task.mm.read_memory_to_array::<5>(mapped_address), error!(EFAULT));
+        assert_eq!(current_task.read_memory_to_array::<5>(mapped_address), error!(EFAULT));
         assert_eq!(
-            current_task.mm.read_memory_to_array::<5>(mapped_address + *PAGE_SIZE + 1u64),
+            current_task.read_memory_to_array::<5>(mapped_address + *PAGE_SIZE + 1u64),
             error!(EFAULT)
         );
     }
@@ -542,7 +542,7 @@ mod tests {
         assert_eq!(sys_munmap(&current_task, mapped_address, (*PAGE_SIZE as usize) - 1), Ok(()));
 
         // Verify that the second page is still readable.
-        assert_eq!(current_task.mm.read_memory_to_array::<5>(mapped_address), error!(EFAULT));
+        assert_eq!(current_task.read_memory_to_array::<5>(mapped_address), error!(EFAULT));
         assert!(current_task
             .mm
             .read_memory_to_array::<5>(mapped_address + *PAGE_SIZE + 1u64)
@@ -561,12 +561,9 @@ mod tests {
         );
 
         // Verify that the first and third pages are still readable.
-        assert!(current_task.mm.read_memory_to_vec(mapped_address, 5).is_ok());
-        assert_eq!(
-            current_task.mm.read_memory_to_vec(mapped_address + *PAGE_SIZE, 5),
-            error!(EFAULT)
-        );
-        assert!(current_task.mm.read_memory_to_vec(mapped_address + (*PAGE_SIZE * 2), 5).is_ok());
+        assert!(current_task.read_memory_to_vec(mapped_address, 5).is_ok());
+        assert_eq!(current_task.read_memory_to_vec(mapped_address + *PAGE_SIZE, 5), error!(EFAULT));
+        assert!(current_task.read_memory_to_vec(mapped_address + (*PAGE_SIZE * 2), 5).is_ok());
     }
 
     /// Unmap a range of pages that includes disjoint mappings.
@@ -587,7 +584,7 @@ mod tests {
 
         // Verify that none of the mapped pages are readable.
         for mapped_address in mapped_addresses {
-            assert_eq!(current_task.mm.read_memory_to_vec(mapped_address, 5), error!(EFAULT));
+            assert_eq!(current_task.read_memory_to_vec(mapped_address, 5), error!(EFAULT));
         }
     }
 

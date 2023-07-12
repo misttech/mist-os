@@ -180,7 +180,7 @@ impl FileOps for LoopDeviceFile {
                 state.check_bound()?;
                 let size = state.size_limit / (state.block_size as u64);
                 std::mem::drop(state);
-                current_task.mm.write_object(user_size, &size)?;
+                current_task.write_object(user_size, &size)?;
                 Ok(SUCCESS)
             }
             BLKGETSIZE64 => {
@@ -189,7 +189,7 @@ impl FileOps for LoopDeviceFile {
                 state.check_bound()?;
                 let size = state.size_limit;
                 std::mem::drop(state);
-                current_task.mm.write_object(user_size, &size)?;
+                current_task.write_object(user_size, &size)?;
                 Ok(SUCCESS)
             }
             BLKFLSBUF => {
@@ -213,7 +213,7 @@ impl FileOps for LoopDeviceFile {
                 let modifiable_flags = LoopDeviceFlags::AUTOCLEAR | LoopDeviceFlags::PARTSCAN;
 
                 let user_info = UserRef::<uapi::loop_info>::from(arg);
-                let info = current_task.mm.read_object(user_info)?;
+                let info = current_task.read_object(user_info)?;
                 let flags = LoopDeviceFlags::from_bits_truncate(info.lo_flags as u32);
                 let encrypt_key_size = info.lo_encrypt_key_size.clamp(0, LO_KEY_SIZE as i32);
                 let mut state = self.device.state.lock();
@@ -248,7 +248,7 @@ impl FileOps for LoopDeviceFile {
                     ..Default::default()
                 };
                 std::mem::drop(state);
-                current_task.mm.write_object(user_info, &info)?;
+                current_task.write_object(user_info, &info)?;
                 Ok(SUCCESS)
             }
             LOOP_CHANGE_FD => {
@@ -291,7 +291,7 @@ impl FileOps for LoopDeviceFile {
             }
             LOOP_CONFIGURE => {
                 let user_config = UserRef::<uapi::loop_config>::from(arg);
-                let config = current_task.mm.read_object(user_config)?;
+                let config = current_task.read_object(user_config)?;
                 let fd = FdNumber::from_raw(config.fd as i32);
                 check_block_size(config.block_size)?;
                 let mut state = self.device.state.lock();
@@ -306,7 +306,7 @@ impl FileOps for LoopDeviceFile {
             }
             LOOP_SET_STATUS64 => {
                 let user_info = UserRef::<uapi::loop_info64>::from(arg);
-                let info = current_task.mm.read_object(user_info)?;
+                let info = current_task.read_object(user_info)?;
                 let mut state = self.device.state.lock();
                 state.check_bound()?;
                 state.set_info(&info);
@@ -337,7 +337,7 @@ impl FileOps for LoopDeviceFile {
                     ..Default::default()
                 };
                 std::mem::drop(state);
-                current_task.mm.write_object(user_info, &info)?;
+                current_task.write_object(user_info, &info)?;
                 Ok(SUCCESS)
             }
             _ => default_ioctl(file, current_task, request, arg),

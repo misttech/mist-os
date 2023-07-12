@@ -216,7 +216,7 @@ impl Pipe {
             FIONREAD => {
                 let addr = UserRef::<i32>::new(user_addr);
                 let value: i32 = self.messages.len().try_into().map_err(|_| errno!(EINVAL))?;
-                current_task.mm.write_object(addr, &value)?;
+                current_task.write_object(addr, &value)?;
                 Ok(SUCCESS)
             }
             _ => default_ioctl(file, current_task, request, arg),

@@ -514,13 +514,13 @@ impl fmt::Debug for Mount {
 }
 
 pub fn create_filesystem(
-    task: &CurrentTask,
+    current_task: &CurrentTask,
     fs_type: &FsStr,
     source: &FsStr,
     flags: MountFlags,
     data: &FsStr,
 ) -> Result<WhatToMount, Errno> {
-    let kernel = task.kernel();
+    let kernel = current_task.kernel();
     let options = FileSystemOptions {
         source: source.to_vec(),
         flags: flags & MountFlags::STORED_ON_FILESYSTEM,
@@ -531,7 +531,7 @@ pub fn create_filesystem(
         b"bpf" => BpfFs::new_fs(kernel, options)?,
         b"devpts" => dev_pts_fs(kernel, options).clone(),
         b"devtmpfs" => dev_tmp_fs(kernel).clone(),
-        b"fuse" => new_fuse_fs(task, options)?,
+        b"fuse" => new_fuse_fs(current_task, options)?,
         b"proc" => proc_fs(kernel.clone(), options),
         b"selinuxfs" => selinux_fs(kernel, options).clone(),
         b"sysfs" => sys_fs(kernel, options).clone(),

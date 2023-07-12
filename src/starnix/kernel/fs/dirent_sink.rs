@@ -117,7 +117,6 @@ impl<'a> BaseDirentSink<'a> {
             return error!(ENOSPC);
         }
         self.current_task
-            .mm
             .write_memory(self.user_buffer + self.actual, buffer)
             .map_err(|_| errno!(ENOSPC))?;
         self.actual += buffer.len();

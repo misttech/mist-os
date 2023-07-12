@@ -29,11 +29,11 @@ pub fn read_magma_command_and_type(
     command_address: UserAddress,
 ) -> Result<(virtmagma_ioctl_args_magma_command, virtio_magma_ctrl_type), Errno> {
     let command: virtmagma_ioctl_args_magma_command =
-        current_task.mm.read_object(UserRef::new(command_address))?;
+        current_task.read_object(UserRef::new(command_address))?;
 
     let request_address = UserAddress::from(command.request_address);
     let header: virtio_magma_ctrl_hdr_t =
-        current_task.mm.read_object(UserRef::new(request_address))?;
+        current_task.read_object(UserRef::new(request_address))?;
 
     Ok((command, header.type_ as u16))
 }
@@ -48,7 +48,7 @@ pub fn read_control_and_response<C: Default + AsBytes + FromBytes, R: Default>(
     command: &virtmagma_ioctl_args_magma_command,
 ) -> Result<(C, R), Errno> {
     let request_address = UserAddress::from(command.request_address);
-    let ctrl = current_task.mm.read_object(UserRef::new(request_address))?;
+    let ctrl = current_task.read_object(UserRef::new(request_address))?;
 
     Ok((ctrl, R::default()))
 }

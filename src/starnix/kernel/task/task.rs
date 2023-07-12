@@ -24,7 +24,7 @@ use crate::{
     loader::*,
     lock::{Mutex, RwLock, RwLockReadGuard, RwLockWriteGuard},
     logging::*,
-    mm::{MemoryAccessorExt, MemoryManager},
+    mm::{MemoryAccessor, MemoryAccessorExt, MemoryManager},
     signals::{types::*, SignalInfo},
     syscalls::{decls::Syscall, SyscallResult},
     task::*,
@@ -90,6 +90,25 @@ impl std::ops::Deref for CurrentTask {
     type Target = Task;
     fn deref(&self) -> &Self::Target {
         &self.task
+    }
+}
+
+impl MemoryAccessor for CurrentTask {
+    fn read_memory_to_slice(&self, addr: UserAddress, bytes: &mut [u8]) -> Result<(), Errno> {
+        self.mm.read_memory_to_slice(addr, bytes)
+    }
+    fn read_memory_partial_to_slice(
+        &self,
+        addr: UserAddress,
+        bytes: &mut [u8],
+    ) -> Result<usize, Errno> {
+        self.mm.read_memory_partial_to_slice(addr, bytes)
+    }
+    fn write_memory(&self, addr: UserAddress, bytes: &[u8]) -> Result<usize, Errno> {
+        self.mm.write_memory(addr, bytes)
+    }
+    fn write_memory_partial(&self, addr: UserAddress, bytes: &[u8]) -> Result<usize, Errno> {
+        self.mm.write_memory_partial(addr, bytes)
     }
 }
 
@@ -1660,7 +1679,7 @@ impl CurrentTask {
                 return;
             };
             let owner_died = FUTEX_OWNER_DIED | futex;
-            if self.mm.write_object(futex_ref, &owner_died).is_err() {
+            if self.write_object(futex_ref, &owner_died).is_err() {
                 return;
             }
             curr_ptr = curr.next;

@@ -3028,7 +3028,7 @@ mod tests {
         let name_addr = map_memory(&current_task, UserAddress::default(), *PAGE_SIZE);
 
         let vma_name = b"vma name".to_vec();
-        current_task.mm.write_memory(name_addr, vma_name.as_bytes()).unwrap();
+        current_task.write_memory(name_addr, vma_name.as_bytes()).unwrap();
 
         let mapping_addr = map_memory(&current_task, UserAddress::default(), *PAGE_SIZE);
 
