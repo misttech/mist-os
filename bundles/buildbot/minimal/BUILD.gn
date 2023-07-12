@@ -29,8 +29,7 @@ group("additional_build_targets") {
     # Flutter deps are removed on RISC-V.
     # sdk:tests
 
-    # TODO(fxbug.dev/122609): Enable the rest after removing Go dependencies and
-    # fixing fxbug.dev/129093.
+    # TODO(fxbug.dev/122609): Enable the rest after removing Go dependencies.
     # "//src/connectivity/network:tests",
     "//src/connectivity/network/tests/fidl:netstack-fidl-tests-with-expectations",
     "//src/connectivity/network/tests/fidl:netstack-debug-fidl-test",
@@ -44,7 +43,7 @@ group("additional_build_targets") {
     "//src/hwinfo:tests",
     "//src/intl:tests",
 
-    # TODO(fxbug.dev/129093): Enable once the bug is fixed.
+    # TODO(fxbug.dev/129959): Enable after disabling failing targets on RISC-V.
     # "//src/lib:tests",
 
     "//src/power:tests",
