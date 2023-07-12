@@ -5,7 +5,7 @@
 use {
     crate::instanced_child_moniker::InstancedChildMoniker,
     core::cmp::{self, Ord, Ordering},
-    moniker::{AbsoluteMoniker, AbsoluteMonikerBase, ChildMoniker, MonikerError},
+    moniker::{AbsoluteMoniker, AbsoluteMonikerBase, ChildMoniker, ChildMonikerBase, MonikerError},
     std::{fmt, hash::Hash},
 };
 
@@ -34,6 +34,20 @@ impl InstancedAbsoluteMoniker {
         let path: Vec<ChildMoniker> = self.path().iter().map(|p| p.without_instance_id()).collect();
         AbsoluteMoniker::new(path)
     }
+
+    /// Transforms an `InstancedAbsoluteMoniker` into a representation where all dynamic children
+    /// have `0` value instance ids.
+    pub fn with_zero_value_instance_ids(&self) -> InstancedAbsoluteMoniker {
+        let path = self
+            .path()
+            .iter()
+            .map(|c| {
+                InstancedChildMoniker::try_new(c.name(), c.collection().map(|c| c.as_str()), 0)
+                    .expect("down path moniker is guaranteed to be valid")
+            })
+            .collect();
+        InstancedAbsoluteMoniker::new(path)
+    }
 }
 
 impl AbsoluteMonikerBase for InstancedAbsoluteMoniker {
@@ -49,6 +63,14 @@ impl AbsoluteMonikerBase for InstancedAbsoluteMoniker {
 
     fn path_mut(&mut self) -> &mut Vec<Self::Part> {
         &mut self.path
+    }
+}
+
+impl TryFrom<&str> for InstancedAbsoluteMoniker {
+    type Error = MonikerError;
+
+    fn try_from(input: &str) -> Result<Self, MonikerError> {
+        Self::parse_str(input)
     }
 }
 

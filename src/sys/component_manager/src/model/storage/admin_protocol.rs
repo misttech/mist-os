@@ -25,7 +25,7 @@ use {
     ::routing::capability_source::ComponentCapability,
     anyhow::{format_err, Context, Error},
     async_trait::async_trait,
-    cm_moniker::InstancedRelativeMoniker,
+    cm_moniker::InstancedAbsoluteMoniker,
     cm_rust::{ExposeDecl, OfferDecl, StorageDecl, UseDecl},
     cm_task_scope::TaskScope,
     cm_types::Name,
@@ -41,7 +41,7 @@ use {
         Future, TryFutureExt, TryStreamExt,
     },
     lazy_static::lazy_static,
-    moniker::{AbsoluteMonikerBase, RelativeMoniker, RelativeMonikerBase},
+    moniker::{AbsoluteMoniker, AbsoluteMonikerBase},
     routing::{
         component_id_index::ComponentInstanceId, component_instance::ComponentInstanceInterface,
         RouteRequest,
@@ -331,7 +331,7 @@ impl StorageAdmin {
                     control_handle: _,
                 } => {
                     let instanced_relative_moniker =
-                        InstancedRelativeMoniker::try_from(relative_moniker.as_str())?;
+                        InstancedAbsoluteMoniker::try_from(relative_moniker.as_str())?;
                     let abs_moniker = component
                         .abs_moniker()
                         .descendant(&instanced_relative_moniker.without_instance_ids());
@@ -354,7 +354,7 @@ impl StorageAdmin {
                 } => {
                     let fut = async {
                         let model = self.model.upgrade().ok_or(fcomponent::Error::Internal)?;
-                        let relative_moniker = RelativeMoniker::parse_str(&relative_moniker)
+                        let relative_moniker = AbsoluteMoniker::parse_str(&relative_moniker)
                             .map_err(|_| fcomponent::Error::InvalidArguments)?;
                         let absolute_moniker = component.abs_moniker.descendant(&relative_moniker);
                         let root_component = model
@@ -413,7 +413,7 @@ impl StorageAdmin {
                     relative_moniker,
                     responder,
                 } => {
-                    let response = match InstancedRelativeMoniker::try_from(
+                    let response = match InstancedAbsoluteMoniker::try_from(
                         relative_moniker.as_str(),
                     ) {
                         Err(error) => {
@@ -801,7 +801,7 @@ impl StorageAdmin {
                     };
 
                 if backing_dir_info == storage_capability_source_info {
-                    let relative_moniker = InstancedRelativeMoniker::scope_down(
+                    let relative_moniker = InstancedAbsoluteMoniker::scope_down(
                         &backing_dir_info.storage_source_moniker,
                         &component.instanced_moniker(),
                     )

@@ -13,7 +13,7 @@ use fidl_fuchsia_io as fio;
 use fidl_fuchsia_sys2 as fsys;
 use fuchsia_component::client::connect_to_protocol;
 use fuchsia_zircon as zx;
-use moniker::{RelativeMoniker, RelativeMonikerBase};
+use moniker::{AbsoluteMoniker, AbsoluteMonikerBase};
 use tracing::warn;
 
 pub async fn explore_over_socket(
@@ -51,7 +51,7 @@ async fn explore_over_handles(
     let query =
         connect_to_protocol::<fsys::RealmQueryMarker>().map_err(|_| LauncherError::RealmQuery)?;
 
-    let moniker = RelativeMoniker::parse_str(moniker).map_err(|_| LauncherError::BadMoniker)?;
+    let moniker = AbsoluteMoniker::parse_str(moniker).map_err(|_| LauncherError::BadMoniker)?;
     let moniker = moniker.to_string();
 
     let out_dir = open_outgoing_dir(&query, &moniker).await?;

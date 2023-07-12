@@ -7,10 +7,7 @@ use {
     anyhow::{format_err, Result},
     fidl_fuchsia_component_decl as fdecl, fidl_fuchsia_sys2 as fsys,
     fuchsia_url::AbsoluteComponentUrl,
-    moniker::{
-        AbsoluteMoniker, AbsoluteMonikerBase, ChildMonikerBase, RelativeMoniker,
-        RelativeMonikerBase,
-    },
+    moniker::{AbsoluteMoniker, AbsoluteMonikerBase, ChildMonikerBase},
 };
 
 pub async fn create_cmd<W: std::io::Write>(
@@ -37,7 +34,7 @@ pub async fn create_cmd<W: std::io::Write>(
 
     // Convert the absolute moniker into a relative moniker w.r.t. root.
     // LifecycleController expects relative monikers only.
-    let parent_relative = RelativeMoniker::scope_down(&AbsoluteMoniker::root(), &parent).unwrap();
+    let parent_relative = AbsoluteMoniker::scope_down(&AbsoluteMoniker::root(), &parent).unwrap();
 
     create_instance_in_collection(
         &lifecycle_controller,

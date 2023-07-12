@@ -15,7 +15,7 @@ use {
         resolving::ResolverError,
     },
     clonable_error::ClonableError,
-    cm_moniker::{InstancedExtendedMoniker, InstancedRelativeMoniker},
+    cm_moniker::{InstancedAbsoluteMoniker, InstancedExtendedMoniker},
     cm_types::Name,
     fidl_fuchsia_component as fcomponent, fidl_fuchsia_sys2 as fsys, fuchsia_zircon as zx,
     moniker::{AbsoluteMoniker, ChildMoniker, MonikerError},
@@ -54,7 +54,7 @@ pub enum ModelError {
     )]
     OpenStorageFailed {
         moniker: InstancedExtendedMoniker,
-        relative_moniker: InstancedRelativeMoniker,
+        relative_moniker: InstancedAbsoluteMoniker,
         path: String,
         #[source]
         err: fidl::Error,

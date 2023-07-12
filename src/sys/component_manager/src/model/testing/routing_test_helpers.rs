@@ -25,7 +25,7 @@ use {
     ::routing_test_helpers::{generate_storage_path, RoutingTestModel, RoutingTestModelBuilder},
     anyhow::anyhow,
     async_trait::async_trait,
-    cm_moniker::InstancedRelativeMoniker,
+    cm_moniker::InstancedAbsoluteMoniker,
     cm_rust::*,
     cm_types::{Name, Url},
     fidl::{
@@ -406,7 +406,7 @@ impl RoutingTest {
     pub async fn list_directory_in_storage(
         &self,
         subdir: Option<&str>,
-        relation: InstancedRelativeMoniker,
+        relation: InstancedAbsoluteMoniker,
         instance_id: Option<&ComponentInstanceId>,
         relative_path: &str,
     ) -> Vec<String> {
@@ -1125,7 +1125,7 @@ pub mod capability_util {
     pub async fn check_file_in_storage(
         storage_subdir: Option<String>,
         persistent_storage: bool,
-        relation: InstancedRelativeMoniker,
+        relation: InstancedAbsoluteMoniker,
         instance_id: Option<&ComponentInstanceId>,
         test_dir_proxy: &fio::DirectoryProxy,
     ) -> Result<(), anyhow::Error> {
@@ -1148,7 +1148,7 @@ pub mod capability_util {
     pub async fn confirm_storage_is_deleted_for_component(
         storage_subdir: Option<String>,
         persistent_storage: bool,
-        relation: InstancedRelativeMoniker,
+        relation: InstancedAbsoluteMoniker,
         instance_id: Option<&ComponentInstanceId>,
         test_dir_proxy: &fio::DirectoryProxy,
     ) {

@@ -8,7 +8,7 @@ use {
     fidl_fuchsia_sys2 as fsys,
     fuchsia_url::AbsoluteComponentUrl,
     futures::{future::BoxFuture, FutureExt, StreamExt},
-    moniker::RelativeMoniker,
+    moniker::AbsoluteMoniker,
     thiserror::Error,
 };
 
@@ -71,7 +71,7 @@ pub enum ResolveError {
 /// with the given `moniker` and `url`.
 pub async fn create_instance_in_collection(
     lifecycle_controller: &fsys::LifecycleControllerProxy,
-    parent: &RelativeMoniker,
+    parent: &AbsoluteMoniker,
     collection: &Name,
     child_name: &str,
     url: &AbsoluteComponentUrl,
@@ -114,7 +114,7 @@ pub async fn create_instance_in_collection(
 /// with the given `moniker`.
 pub async fn destroy_instance_in_collection(
     lifecycle_controller: &fsys::LifecycleControllerProxy,
-    parent: &RelativeMoniker,
+    parent: &AbsoluteMoniker,
     collection: &Name,
     child_name: &str,
 ) -> Result<(), DestroyError> {
@@ -145,7 +145,7 @@ type StopFuture = BoxFuture<'static, Result<(), fidl::Error>>;
 /// Returns a future that can be waited on to know when the component instance has stopped.
 pub async fn start_instance(
     lifecycle_controller: &fsys::LifecycleControllerProxy,
-    moniker: &RelativeMoniker,
+    moniker: &AbsoluteMoniker,
 ) -> Result<StopFuture, StartError> {
     let (client, server) = fidl::endpoints::create_proxy::<fcomponent::BinderMarker>().unwrap();
     lifecycle_controller
@@ -176,7 +176,7 @@ pub async fn start_instance(
 /// with the given `moniker`.
 pub async fn stop_instance(
     lifecycle_controller: &fsys::LifecycleControllerProxy,
-    moniker: &RelativeMoniker,
+    moniker: &AbsoluteMoniker,
 ) -> Result<(), ActionError> {
     lifecycle_controller
         .stop_instance(&moniker.to_string())
@@ -195,7 +195,7 @@ pub async fn stop_instance(
 /// with the given `moniker`.
 pub async fn resolve_instance(
     lifecycle_controller: &fsys::LifecycleControllerProxy,
-    moniker: &RelativeMoniker,
+    moniker: &AbsoluteMoniker,
 ) -> Result<(), ResolveError> {
     lifecycle_controller
         .resolve_instance(&moniker.to_string())
@@ -216,7 +216,7 @@ pub async fn resolve_instance(
 /// with the given `moniker`.
 pub async fn unresolve_instance(
     lifecycle_controller: &fsys::LifecycleControllerProxy,
-    moniker: &RelativeMoniker,
+    moniker: &AbsoluteMoniker,
 ) -> Result<(), ActionError> {
     lifecycle_controller
         .unresolve_instance(&moniker.to_string())
@@ -234,13 +234,9 @@ pub async fn unresolve_instance(
 #[cfg(test)]
 mod test {
     use {
-        super::*,
-        assert_matches::assert_matches,
-        fidl::endpoints::create_proxy_and_stream,
-        fidl::HandleBased,
-        fidl_fuchsia_process as fprocess,
-        futures::TryStreamExt,
-        moniker::{AbsoluteMoniker, AbsoluteMonikerBase, RelativeMonikerBase},
+        super::*, assert_matches::assert_matches, fidl::endpoints::create_proxy_and_stream,
+        fidl::HandleBased, fidl_fuchsia_process as fprocess, futures::TryStreamExt,
+        moniker::AbsoluteMonikerBase,
     };
 
     fn lifecycle_create_instance(
@@ -432,7 +428,7 @@ mod test {
 
     #[fuchsia_async::run_singlethreaded(test)]
     async fn test_create_child() {
-        let parent = RelativeMoniker::parse_str("/core").unwrap();
+        let parent = AbsoluteMoniker::parse_str("core").unwrap();
         let url =
             AbsoluteComponentUrl::parse("fuchsia-pkg://fuchsia.com/test#meta/test.cm").unwrap();
         let lc = lifecycle_create_instance(
@@ -457,7 +453,7 @@ mod test {
 
     #[fuchsia_async::run_singlethreaded(test)]
     async fn test_create_child_with_numbered_handles() {
-        let parent = RelativeMoniker::parse_str("/core").unwrap();
+        let parent = AbsoluteMoniker::parse_str("core").unwrap();
         let url =
             AbsoluteComponentUrl::parse("fuchsia-pkg://fuchsia.com/test#meta/test.cm").unwrap();
         let lc = lifecycle_create_instance(
@@ -490,7 +486,7 @@ mod test {
 
     #[fuchsia_async::run_singlethreaded(test)]
     async fn test_create_already_exists() {
-        let parent = RelativeMoniker::parse_str("/core").unwrap();
+        let parent = AbsoluteMoniker::parse_str("core").unwrap();
         let url =
             AbsoluteComponentUrl::parse("fuchsia-pkg://fuchsia.com/test#meta/test.cm").unwrap();
         let lc = lifecycle_create_fail(fsys::CreateError::InstanceAlreadyExists);
@@ -510,42 +506,42 @@ mod test {
 
     #[fuchsia_async::run_singlethreaded(test)]
     async fn test_destroy_child() {
-        let parent = RelativeMoniker::parse_str("/core").unwrap();
-        let lc = lifecycle_destroy_instance("/core", "foo", "bar");
+        let parent = AbsoluteMoniker::parse_str("core").unwrap();
+        let lc = lifecycle_destroy_instance("core", "foo", "bar");
         destroy_instance_in_collection(&lc, &parent, &"foo".parse().unwrap(), "bar").await.unwrap();
     }
 
     #[fuchsia_async::run_singlethreaded(test)]
     async fn test_start() {
-        let moniker = RelativeMoniker::parse_str("/core/foo").unwrap();
-        let lc = lifecycle_start("/core/foo");
+        let moniker = AbsoluteMoniker::parse_str("core/foo").unwrap();
+        let lc = lifecycle_start("core/foo");
         start_instance(&lc, &moniker).await.unwrap();
     }
 
     #[fuchsia_async::run_singlethreaded(test)]
     async fn test_stop() {
-        let moniker = RelativeMoniker::parse_str("/core/foo").unwrap();
-        let lc = lifecycle_stop("/core/foo");
+        let moniker = AbsoluteMoniker::parse_str("core/foo").unwrap();
+        let lc = lifecycle_stop("core/foo");
         stop_instance(&lc, &moniker).await.unwrap();
     }
 
     #[fuchsia_async::run_singlethreaded(test)]
     async fn test_resolve() {
-        let moniker = RelativeMoniker::parse_str("/core/foo").unwrap();
-        let lc = lifecycle_resolve("/core/foo");
+        let moniker = AbsoluteMoniker::parse_str("core/foo").unwrap();
+        let lc = lifecycle_resolve("core/foo");
         resolve_instance(&lc, &moniker).await.unwrap();
     }
 
     #[fuchsia_async::run_singlethreaded(test)]
     async fn test_unresolve() {
-        let moniker = RelativeMoniker::parse_str("/core/foo").unwrap();
-        let lc = lifecycle_unresolve("/core/foo");
+        let moniker = AbsoluteMoniker::parse_str("core/foo").unwrap();
+        let lc = lifecycle_unresolve("core/foo");
         unresolve_instance(&lc, &moniker).await.unwrap();
     }
 
     #[fuchsia_async::run_singlethreaded(test)]
     async fn test_instance_not_found() {
-        let moniker = RelativeMoniker::parse_str("/core/foo").unwrap();
+        let moniker = AbsoluteMoniker::parse_str("core/foo").unwrap();
         let lc = lifecycle_start_fail(fsys::StartError::InstanceNotFound);
         match start_instance(&lc, &moniker).await {
             Ok(_) => panic!("start shouldn't succeed"),

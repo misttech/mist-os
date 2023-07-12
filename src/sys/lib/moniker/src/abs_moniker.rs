@@ -6,7 +6,6 @@ use {
     crate::{
         child_moniker::{ChildMoniker, ChildMonikerBase},
         error::MonikerError,
-        relative_moniker::RelativeMonikerBase,
     },
     core::cmp::{self, Ord, Ordering, PartialEq},
     std::{fmt, hash::Hash},
@@ -52,7 +51,7 @@ pub trait AbsoluteMonikerBase:
     }
 
     // Creates an absolute moniker for a descendant of this component instance.
-    fn descendant<T: RelativeMonikerBase<Part = Self::Part>>(&self, descendant: &T) -> Self {
+    fn descendant<T: AbsoluteMonikerBase<Part = Self::Part>>(&self, descendant: &T) -> Self {
         let mut path = self.path().clone();
         let mut relative_path = descendant.path().clone();
         path.append(&mut relative_path);
@@ -98,6 +97,23 @@ pub trait AbsoluteMonikerBase:
         let mut path = self.path().clone();
         path.push(child);
         Self::new(path)
+    }
+
+    fn scope_down<T: AbsoluteMonikerBase<Part = Self::Part>>(
+        parent_scope: &T,
+        child: &T,
+    ) -> Result<Self, MonikerError> {
+        if !parent_scope.contains_in_realm(child) {
+            return Err(MonikerError::ParentDoesNotContainChild {
+                parent: parent_scope.to_string(),
+                child: child.to_string(),
+            });
+        }
+
+        let parent_len = parent_scope.path().len();
+        let mut children = child.path().clone();
+        children.drain(0..parent_len);
+        Ok(Self::new(children))
     }
 
     fn compare(&self, other: &Self) -> cmp::Ordering {
@@ -208,7 +224,6 @@ impl fmt::Debug for AbsoluteMoniker {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::relative_moniker::RelativeMoniker;
     use cm_types::Name;
 
     #[test]
@@ -252,11 +267,11 @@ mod tests {
     fn absolute_moniker_descendant() {
         let scope_root: AbsoluteMoniker = vec!["a:test1", "b:test2"].try_into().unwrap();
 
-        let relative: RelativeMoniker = vec!["c:test3", "d:test4"].try_into().unwrap();
+        let relative: AbsoluteMoniker = vec!["c:test3", "d:test4"].try_into().unwrap();
         let descendant = scope_root.descendant(&relative);
         assert_eq!("a:test1/b:test2/c:test3/d:test4", format!("{}", descendant));
 
-        let relative: RelativeMoniker = vec![].try_into().unwrap();
+        let relative: AbsoluteMoniker = vec![].try_into().unwrap();
         let descendant = scope_root.descendant(&relative);
         assert_eq!("a:test1/b:test2", format!("{}", descendant));
     }

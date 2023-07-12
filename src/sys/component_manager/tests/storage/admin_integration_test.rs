@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use {
-    cm_moniker::InstancedRelativeMoniker,
+    cm_moniker::InstancedAbsoluteMoniker,
     component_events::{events::*, matcher::*},
     fidl::endpoints::{create_endpoints, create_proxy, ClientEnd},
     fidl_fuchsia_io as fio, fidl_fuchsia_sys2 as fsys, fuchsia_async as fasync,
@@ -16,7 +16,7 @@ use {
         channel::mpsc, future::BoxFuture, sink::SinkExt, Future, FutureExt, StreamExt, TryStreamExt,
     },
     maplit::hashset,
-    moniker::RelativeMonikerBase,
+    moniker::AbsoluteMonikerBase,
     std::collections::HashSet,
 };
 
@@ -108,7 +108,7 @@ async fn single_storage_user() {
     assert_eq!(
         storage_users
             .iter()
-            .map(|moniker_with_instances| InstancedRelativeMoniker::parse_str(
+            .map(|moniker_with_instances| InstancedAbsoluteMoniker::parse_str(
                 moniker_with_instances
             )
             .unwrap()
@@ -187,7 +187,7 @@ async fn multiple_storage_users() {
     assert_eq!(
         storage_users
             .iter()
-            .map(|moniker_with_instances| InstancedRelativeMoniker::parse_str(
+            .map(|moniker_with_instances| InstancedAbsoluteMoniker::parse_str(
                 moniker_with_instances
             )
             .unwrap()
@@ -225,7 +225,7 @@ async fn destroyed_storage_user() {
     assert_eq!(
         storage_users
             .iter()
-            .map(|moniker_with_instances| InstancedRelativeMoniker::parse_str(
+            .map(|moniker_with_instances| InstancedAbsoluteMoniker::parse_str(
                 moniker_with_instances
             )
             .unwrap()
@@ -250,7 +250,7 @@ async fn destroyed_storage_user() {
         .await
         .iter()
         .map(|moniker_with_instances| {
-            InstancedRelativeMoniker::parse_str(moniker_with_instances)
+            InstancedAbsoluteMoniker::parse_str(moniker_with_instances)
                 .unwrap()
                 .without_instance_ids()
                 .to_string()

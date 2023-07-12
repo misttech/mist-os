@@ -5,7 +5,7 @@
 use {
     anyhow::{format_err, Result},
     fidl_fuchsia_sys2 as fsys,
-    moniker::{AbsoluteMoniker, AbsoluteMonikerBase, RelativeMoniker, RelativeMonikerBase},
+    moniker::{AbsoluteMoniker, AbsoluteMonikerBase},
     prettytable::{cell, format::consts::FORMAT_CLEAN, row, Table},
     std::fmt,
 };
@@ -98,7 +98,7 @@ impl TryFrom<fsys::DeclType> for DeclType {
 /// Call `RouteValidator/Route` with `moniker` and `targets`.
 pub async fn route(
     route_validator: &fsys::RouteValidatorProxy,
-    moniker: RelativeMoniker,
+    moniker: AbsoluteMoniker,
     targets: Vec<fsys::RouteTarget>,
 ) -> Result<Vec<RouteReport>> {
     let reports = match route_validator.route(&moniker.to_string(), &targets).await? {
@@ -145,7 +145,7 @@ fn add_report(report: RouteReport, table: &mut Table) {
     };
     table.add_row(row!(r->"Result: ", &format!("{} {}", mark, summary)));
     if let Some(source_moniker) = report.source_moniker {
-        let source_moniker = match RelativeMoniker::parse_str(&source_moniker) {
+        let source_moniker = match AbsoluteMoniker::parse_str(&source_moniker) {
             Ok(m) => AbsoluteMoniker::root().descendant(&m).to_string(),
             Err(_) => "<invalid moniker>".to_string(),
         };
@@ -223,7 +223,7 @@ mod test {
             }],
         );
 
-        let mut reports = route(&validator, RelativeMoniker::parse_str("./test").unwrap(), targets)
+        let mut reports = route(&validator, AbsoluteMoniker::parse_str("./test").unwrap(), targets)
             .await
             .unwrap();
         assert_eq!(reports.len(), 1);
@@ -280,7 +280,7 @@ mod test {
             ],
         );
 
-        let mut reports = route(&validator, RelativeMoniker::parse_str("./test").unwrap(), targets)
+        let mut reports = route(&validator, AbsoluteMoniker::parse_str("./test").unwrap(), targets)
             .await
             .unwrap();
         assert_eq!(reports.len(), 2);
@@ -327,7 +327,7 @@ mod test {
         let validator = route_validator("/test", vec![], vec![]);
 
         let reports =
-            route(&validator, RelativeMoniker::parse_str("./test").unwrap(), vec![]).await.unwrap();
+            route(&validator, AbsoluteMoniker::parse_str("./test").unwrap(), vec![]).await.unwrap();
         assert!(reports.is_empty());
     }
 
@@ -342,7 +342,7 @@ mod test {
             ],
         );
 
-        let result = route(&validator, RelativeMoniker::parse_str("./test").unwrap(), vec![]).await;
+        let result = route(&validator, AbsoluteMoniker::parse_str("./test").unwrap(), vec![]).await;
         assert_matches!(result, Err(_));
     }
 }

@@ -44,7 +44,7 @@ use {
         prelude::*,
         FutureExt,
     },
-    moniker::RelativeMonikerBase,
+    moniker::AbsoluteMonikerBase,
     resolver::AllowedPackages,
     std::{
         collections::HashSet,
@@ -372,14 +372,14 @@ impl RunningSuite {
             // Monikers should be reported relative to the test root, so strip away the wrapping
             // components from the path.
             let moniker_parsed =
-                cm_moniker::InstancedRelativeMoniker::try_from(storage_moniker.as_str()).unwrap();
+                cm_moniker::InstancedAbsoluteMoniker::try_from(storage_moniker.as_str()).unwrap();
             let path = moniker_parsed
                 .path()
                 .iter()
                 .skip(1)
                 .map(Clone::clone)
                 .collect::<Vec<cm_moniker::InstancedChildMoniker>>();
-            let instanced_moniker = cm_moniker::InstancedRelativeMoniker::new(path);
+            let instanced_moniker = cm_moniker::InstancedAbsoluteMoniker::new(path);
             let moniker_relative_to_test_root = instanced_moniker.without_instance_ids();
             sender
                 .send(Ok(SuiteEvents::suite_custom_artifact(ftest_manager::CustomArtifact {

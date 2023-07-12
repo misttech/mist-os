@@ -23,9 +23,7 @@ use {
     fuchsia_zircon as zx,
     futures::{future::join_all, lock::Mutex, TryStreamExt},
     lazy_static::lazy_static,
-    moniker::{
-        AbsoluteMoniker, AbsoluteMonikerBase, ExtendedMoniker, RelativeMoniker, RelativeMonikerBase,
-    },
+    moniker::{AbsoluteMoniker, AbsoluteMonikerBase, ExtendedMoniker},
     std::{
         cmp::Ordering,
         path::PathBuf,
@@ -86,7 +84,7 @@ impl RouteValidator {
         relative_moniker_str: &str,
     ) -> Result<Vec<fsys::RouteReport>, fcomponent::Error> {
         // Construct the complete moniker using the scope moniker and the relative moniker string.
-        let relative_moniker = RelativeMoniker::try_from(relative_moniker_str)
+        let relative_moniker = AbsoluteMoniker::try_from(relative_moniker_str)
             .map_err(|_| fcomponent::Error::InvalidArguments)?;
         let moniker = scope_moniker.descendant(&relative_moniker);
 
@@ -124,7 +122,7 @@ impl RouteValidator {
         targets: Vec<fsys::RouteTarget>,
     ) -> Result<Vec<fsys::RouteReport>, fsys::RouteValidatorError> {
         // Construct the complete moniker using the scope moniker and the relative moniker string.
-        let relative_moniker = RelativeMoniker::try_from(relative_moniker_str)
+        let relative_moniker = AbsoluteMoniker::try_from(relative_moniker_str)
             .map_err(|_| fsys::RouteValidatorError::InvalidArguments)?;
         let moniker = scope_moniker.descendant(&relative_moniker);
 
@@ -360,7 +358,7 @@ impl RouteValidator {
         match m {
             ExtendedMoniker::ComponentManager => m.to_string(),
             ExtendedMoniker::ComponentInstance(m) => {
-                match RelativeMoniker::scope_down(scope_moniker, &m) {
+                match AbsoluteMoniker::scope_down(scope_moniker, &m) {
                     Ok(r) => r.to_string(),
                     Err(_) => "<above scope>".to_string(),
                 }

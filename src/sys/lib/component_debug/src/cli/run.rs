@@ -18,10 +18,7 @@ use {
     fidl_fuchsia_process as fprocess, fidl_fuchsia_sys2 as fsys,
     fuchsia_url::AbsoluteComponentUrl,
     futures::AsyncReadExt,
-    moniker::{
-        AbsoluteMoniker, AbsoluteMonikerBase, ChildMonikerBase, RelativeMoniker,
-        RelativeMonikerBase,
-    },
+    moniker::{AbsoluteMoniker, AbsoluteMonikerBase, ChildMonikerBase},
     std::io::Read,
 };
 
@@ -131,7 +128,7 @@ pub async fn run_cmd<W: std::io::Write>(
 
     // Convert the absolute moniker into a relative moniker w.r.t. root.
     // LifecycleController expects relative monikers only.
-    let parent_relative = RelativeMoniker::scope_down(&AbsoluteMoniker::root(), &parent).unwrap();
+    let parent_relative = AbsoluteMoniker::scope_down(&AbsoluteMoniker::root(), &parent).unwrap();
 
     if recreate {
         // First try to destroy any existing instance at this monker.
@@ -192,7 +189,7 @@ pub async fn run_cmd<W: std::io::Write>(
         Ok(()) => {}
     }
 
-    let child_relative = RelativeMoniker::scope_down(&AbsoluteMoniker::root(), &moniker).unwrap();
+    let child_relative = AbsoluteMoniker::scope_down(&AbsoluteMoniker::root(), &moniker).unwrap();
     writeln!(writer, "Resolving component instance...")?;
     resolve_instance(&lifecycle_controller, &child_relative)
         .await

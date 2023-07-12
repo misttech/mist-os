@@ -6,7 +6,6 @@ mod abs_moniker;
 mod child_moniker;
 mod error;
 mod extended_moniker;
-mod relative_moniker;
 #[cfg(feature = "serde")]
 mod serde_ext;
 
@@ -15,5 +14,4 @@ pub use self::{
     child_moniker::{ChildMoniker, ChildMonikerBase},
     error::MonikerError,
     extended_moniker::ExtendedMoniker,
-    relative_moniker::{RelativeMoniker, RelativeMonikerBase},
 };

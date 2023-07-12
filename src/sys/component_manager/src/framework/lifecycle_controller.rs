@@ -22,7 +22,7 @@ use {
     futures::lock::Mutex,
     futures::prelude::*,
     lazy_static::lazy_static,
-    moniker::{AbsoluteMoniker, AbsoluteMonikerBase, ChildMoniker, MonikerError, RelativeMoniker},
+    moniker::{AbsoluteMoniker, AbsoluteMonikerBase, ChildMoniker, MonikerError},
     std::convert::TryFrom,
     std::path::PathBuf,
     std::sync::{Arc, Weak},
@@ -331,7 +331,7 @@ fn join_monikers(
     scope_moniker: &AbsoluteMoniker,
     moniker_str: &str,
 ) -> Result<AbsoluteMoniker, MonikerError> {
-    let relative_moniker = RelativeMoniker::try_from(moniker_str)?;
+    let relative_moniker = AbsoluteMoniker::try_from(moniker_str)?;
     let abs_moniker = scope_moniker.descendant(&relative_moniker);
     Ok(abs_moniker)
 }

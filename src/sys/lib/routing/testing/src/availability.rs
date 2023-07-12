@@ -7,7 +7,7 @@ use {
         CheckUse, ComponentEventRoute, ExpectedResult, RoutingTestModel, RoutingTestModelBuilder,
         ServiceInstance,
     },
-    cm_moniker::InstancedRelativeMoniker,
+    cm_moniker::InstancedAbsoluteMoniker,
     cm_rust::*,
     cm_rust_testing::{ComponentDeclBuilder, DirectoryDeclBuilder, ProtocolDeclBuilder},
     fidl_fuchsia_component_decl as fdecl, fidl_fuchsia_io as fio,
@@ -254,7 +254,7 @@ impl<T: RoutingTestModelBuilder> CommonAvailabilityTest<T> {
                 CheckUse::Storage {
                     path: "/storage".parse().unwrap(),
                     storage_relation: Some(
-                        InstancedRelativeMoniker::try_from(vec!["c:0"]).unwrap(),
+                        InstancedAbsoluteMoniker::try_from(vec!["c:0"]).unwrap(),
                     ),
                     from_cm_namespace: false,
                     storage_subdir: Some("cache".to_string()),

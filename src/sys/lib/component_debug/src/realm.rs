@@ -10,9 +10,7 @@ use {
     fidl_fuchsia_component_decl as fcdecl, fidl_fuchsia_io as fio, fidl_fuchsia_sys2 as fsys,
     fuchsia_async::TimeoutExt,
     futures::TryFutureExt,
-    moniker::{
-        AbsoluteMoniker, AbsoluteMonikerBase, MonikerError, RelativeMoniker, RelativeMonikerBase,
-    },
+    moniker::{AbsoluteMoniker, AbsoluteMonikerBase, MonikerError},
     thiserror::Error,
 };
 
@@ -193,7 +191,7 @@ impl TryFrom<fsys::Instance> for Instance {
         let moniker = instance
             .moniker
             .ok_or(ParseError::MissingField { struct_name: "Instance", field_name: "moniker" })?;
-        let moniker = RelativeMoniker::parse_str(&moniker)?;
+        let moniker = AbsoluteMoniker::parse_str(&moniker)?;
         let moniker = AbsoluteMoniker::root().descendant(&moniker);
         let url = instance
             .url

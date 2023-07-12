@@ -18,11 +18,11 @@ use {
     },
     anyhow::Error,
     clonable_error::ClonableError,
-    cm_moniker::{InstancedAbsoluteMoniker, InstancedRelativeMoniker},
+    cm_moniker::InstancedAbsoluteMoniker,
     derivative::Derivative,
     fidl::endpoints,
     fidl_fuchsia_io as fio,
-    moniker::RelativeMonikerBase,
+    moniker::AbsoluteMonikerBase,
     std::{
         path::{Path, PathBuf},
         sync::Arc,
@@ -95,7 +95,7 @@ pub enum StorageError {
     Open {
         dir_source_moniker: Option<InstancedAbsoluteMoniker>,
         dir_source_path: cm_types::Path,
-        relative_moniker: InstancedRelativeMoniker,
+        relative_moniker: InstancedAbsoluteMoniker,
         instance_id: Option<ComponentInstanceId>,
         #[source]
         err: ClonableError,
@@ -125,7 +125,7 @@ pub enum StorageError {
     Remove {
         dir_source_moniker: Option<InstancedAbsoluteMoniker>,
         dir_source_path: cm_types::Path,
-        relative_moniker: InstancedRelativeMoniker,
+        relative_moniker: InstancedAbsoluteMoniker,
         instance_id: Option<ComponentInstanceId>,
         #[source]
         err: ClonableError,
@@ -136,7 +136,7 @@ pub enum StorageError {
         instance_id
     )]
     InvalidStoragePath {
-        relative_moniker: InstancedRelativeMoniker,
+        relative_moniker: InstancedAbsoluteMoniker,
         instance_id: Option<ComponentInstanceId>,
     },
 }
@@ -153,7 +153,7 @@ impl StorageError {
     pub fn open(
         dir_source_moniker: Option<InstancedAbsoluteMoniker>,
         dir_source_path: cm_types::Path,
-        relative_moniker: InstancedRelativeMoniker,
+        relative_moniker: InstancedAbsoluteMoniker,
         instance_id: Option<ComponentInstanceId>,
         err: impl Into<Error>,
     ) -> Self {
@@ -178,7 +178,7 @@ impl StorageError {
     pub fn remove(
         dir_source_moniker: Option<InstancedAbsoluteMoniker>,
         dir_source_path: cm_types::Path,
-        relative_moniker: InstancedRelativeMoniker,
+        relative_moniker: InstancedAbsoluteMoniker,
         instance_id: Option<ComponentInstanceId>,
         err: impl Into<Error>,
     ) -> Self {
@@ -192,7 +192,7 @@ impl StorageError {
     }
 
     pub fn invalid_storage_path(
-        relative_moniker: InstancedRelativeMoniker,
+        relative_moniker: InstancedAbsoluteMoniker,
         instance_id: Option<ComponentInstanceId>,
     ) -> Self {
         Self::InvalidStoragePath { relative_moniker, instance_id }
@@ -314,7 +314,7 @@ pub async fn route_backing_directory(
 pub async fn open_isolated_storage(
     storage_source_info: &BackingDirectoryInfo,
     persistent_storage: bool,
-    relative_moniker: InstancedRelativeMoniker,
+    relative_moniker: InstancedAbsoluteMoniker,
     instance_id: Option<&ComponentInstanceId>,
 ) -> Result<fio::DirectoryProxy, ModelError> {
     let root_dir = open_storage_root(storage_source_info).await?;
@@ -382,7 +382,7 @@ pub async fn open_isolated_storage_by_id(
 pub async fn delete_isolated_storage(
     storage_source_info: BackingDirectoryInfo,
     persistent_storage: bool,
-    relative_moniker: InstancedRelativeMoniker,
+    relative_moniker: InstancedAbsoluteMoniker,
     instance_id: Option<&ComponentInstanceId>,
 ) -> Result<(), ModelError> {
     let root_dir = open_storage_root(&storage_source_info).await?;
@@ -511,7 +511,7 @@ pub async fn delete_isolated_storage(
 /// When `d` attempts to access `/my_cache` the framework creates the sub-directory
 /// `b:0/children/c:0/children/d:0/data` in the directory used by `a` to declare storage
 /// capabilities.  Then, the framework gives 'd' access to this new directory.
-fn generate_moniker_based_storage_path(relative_moniker: &InstancedRelativeMoniker) -> PathBuf {
+fn generate_moniker_based_storage_path(relative_moniker: &InstancedAbsoluteMoniker) -> PathBuf {
     assert!(
         !relative_moniker.path().is_empty(),
         "storage capability appears to have been exposed or used by its source"
@@ -594,7 +594,7 @@ mod tests {
             .await
             .expect("failed to find component for b:0");
         let dir_source_path: cm_types::Path = "/data".parse().unwrap();
-        let relative_moniker = InstancedRelativeMoniker::try_from(vec!["c:0", "coll:d:1"]).unwrap();
+        let relative_moniker = InstancedAbsoluteMoniker::try_from(vec!["c:0", "coll:d:1"]).unwrap();
 
         // Open.
         let dir = open_isolated_storage(
@@ -634,7 +634,7 @@ mod tests {
 
         // Open another component's storage.
         let relative_moniker =
-            InstancedRelativeMoniker::try_from(vec!["c:0", "coll:d:1", "e:0"]).unwrap();
+            InstancedAbsoluteMoniker::try_from(vec!["c:0", "coll:d:1", "e:0"]).unwrap();
         let dir = open_isolated_storage(
             &BackingDirectoryInfo {
                 storage_provider: Some(Arc::clone(&b_component)),
@@ -685,7 +685,7 @@ mod tests {
             .await
             .expect("failed to find component for b:0");
         let dir_source_path: cm_types::Path = "/data".parse().unwrap();
-        let relative_moniker = InstancedRelativeMoniker::try_from(vec!["c:0", "coll:d:1"]).unwrap();
+        let relative_moniker = InstancedAbsoluteMoniker::try_from(vec!["c:0", "coll:d:1"]).unwrap();
 
         // open the storage directory using instance ID.
         let instance_id: ComponentInstanceId = ComponentInstanceId::from_str(
@@ -761,7 +761,7 @@ mod tests {
         test.start_instance_and_wait_start(&AbsoluteMoniker::root()).await.unwrap();
 
         // Try to open the storage. We expect an error.
-        let relative_moniker = InstancedRelativeMoniker::try_from(vec!["c:0", "coll:d:1"]).unwrap();
+        let relative_moniker = InstancedAbsoluteMoniker::try_from(vec!["c:0", "coll:d:1"]).unwrap();
         let res = open_isolated_storage(
             &BackingDirectoryInfo {
                 storage_provider: Some(Arc::clone(&test.model.root())),
@@ -810,8 +810,8 @@ mod tests {
             .expect("failed to find component for b:0");
         let dir_source_path: cm_types::Path = "/data".parse().unwrap();
         let storage_moniker = InstancedAbsoluteMoniker::try_from(vec!["c:0"]).unwrap();
-        let parent_moniker = InstancedRelativeMoniker::try_from(vec!["c:0"]).unwrap();
-        let child_moniker = InstancedRelativeMoniker::try_from(vec!["c:0", "coll:d:1"]).unwrap();
+        let parent_moniker = InstancedAbsoluteMoniker::try_from(vec!["c:0"]).unwrap();
+        let child_moniker = InstancedAbsoluteMoniker::try_from(vec!["c:0", "coll:d:1"]).unwrap();
 
         // Open and write to the storage for child.
         let dir = open_isolated_storage(
@@ -945,7 +945,7 @@ mod tests {
             .expect("failed to find component for b:0");
         let dir_source_path: cm_types::Path = "/data".parse().unwrap();
         let parent_moniker = InstancedAbsoluteMoniker::try_from(vec!["c:0"]).unwrap();
-        let child_moniker = InstancedRelativeMoniker::try_from(vec!["c:0", "coll:d:1"]).unwrap();
+        let child_moniker = InstancedAbsoluteMoniker::try_from(vec!["c:0", "coll:d:1"]).unwrap();
         let instance_id = ComponentInstanceId::from_str(&component_id_index::gen_instance_id(
             &mut rand::thread_rng(),
         ))

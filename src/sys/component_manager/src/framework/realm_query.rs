@@ -31,7 +31,7 @@ use {
     futures::StreamExt,
     lazy_static::lazy_static,
     measure_tape_for_instance::Measurable,
-    moniker::{AbsoluteMoniker, AbsoluteMonikerBase, RelativeMoniker, RelativeMonikerBase},
+    moniker::{AbsoluteMoniker, AbsoluteMonikerBase},
     routing::{
         component_instance::{ComponentInstanceInterface, ResolvedInstanceInterface},
         environment::EnvironmentInterface,
@@ -280,7 +280,7 @@ pub async fn get_instance(
 ) -> Result<fsys::Instance, fsys::GetInstanceError> {
     // Construct the complete moniker using the scope moniker and the relative moniker string.
     let relative_moniker =
-        RelativeMoniker::try_from(moniker_str).map_err(|_| fsys::GetInstanceError::BadMoniker)?;
+        AbsoluteMoniker::try_from(moniker_str).map_err(|_| fsys::GetInstanceError::BadMoniker)?;
     let moniker = scope_moniker.descendant(&relative_moniker);
 
     // TODO(https://fxbug.dev/108532): Close the connection if the scope root cannot be found.
@@ -335,7 +335,7 @@ pub async fn get_resolved_declaration(
     moniker_str: &str,
 ) -> Result<ClientEnd<fsys::ManifestBytesIteratorMarker>, fsys::GetDeclarationError> {
     // Construct the complete moniker using the scope moniker and the relative moniker string.
-    let relative_moniker = RelativeMoniker::try_from(moniker_str)
+    let relative_moniker = AbsoluteMoniker::try_from(moniker_str)
         .map_err(|_| fsys::GetDeclarationError::BadMoniker)?;
     let moniker = scope_moniker.descendant(&relative_moniker);
 
@@ -377,7 +377,7 @@ async fn resolve_declaration(
     url: &str,
 ) -> Result<ClientEnd<fsys::ManifestBytesIteratorMarker>, fsys::GetDeclarationError> {
     // Construct the complete moniker using the scope moniker and the relative moniker string.
-    let parent_relative_moniker = RelativeMoniker::try_from(parent_moniker_str)
+    let parent_relative_moniker = AbsoluteMoniker::try_from(parent_moniker_str)
         .map_err(|_| fsys::GetDeclarationError::BadMoniker)?;
     let parent_moniker = scope_moniker.descendant(&parent_relative_moniker);
 
@@ -454,7 +454,7 @@ pub async fn get_structured_config(
     moniker_str: &str,
 ) -> Result<fcdecl::ResolvedConfig, fsys::GetStructuredConfigError> {
     // Construct the complete moniker using the scope moniker and the relative moniker string.
-    let relative_moniker = RelativeMoniker::try_from(moniker_str)
+    let relative_moniker = AbsoluteMoniker::try_from(moniker_str)
         .map_err(|_| fsys::GetStructuredConfigError::BadMoniker)?;
     let moniker = scope_moniker.descendant(&relative_moniker);
 
@@ -480,7 +480,7 @@ async fn construct_namespace(
     moniker_str: &str,
 ) -> Result<Vec<fcrunner::ComponentNamespaceEntry>, fsys::ConstructNamespaceError> {
     // Construct the complete moniker using the scope moniker and the relative moniker string.
-    let relative_moniker = RelativeMoniker::try_from(moniker_str)
+    let relative_moniker = AbsoluteMoniker::try_from(moniker_str)
         .map_err(|_| fsys::ConstructNamespaceError::BadMoniker)?;
     let moniker = scope_moniker.descendant(&relative_moniker);
 
@@ -511,7 +511,7 @@ async fn open(
 ) -> Result<(), fsys::OpenError> {
     // Construct the complete moniker using the scope moniker and the relative moniker string.
     let relative_moniker =
-        RelativeMoniker::try_from(moniker_str).map_err(|_| fsys::OpenError::BadMoniker)?;
+        AbsoluteMoniker::try_from(moniker_str).map_err(|_| fsys::OpenError::BadMoniker)?;
     let moniker = scope_moniker.descendant(&relative_moniker);
 
     // TODO(https://fxbug.dev/108532): Close the connection if the scope root cannot be found.
@@ -590,7 +590,7 @@ async fn connect_to_storage_admin(
     server_end: ServerEnd<fsys::StorageAdminMarker>,
 ) -> Result<(), fsys::ConnectToStorageAdminError> {
     // Construct the complete moniker using the scope moniker and the relative moniker string.
-    let relative_moniker = RelativeMoniker::try_from(moniker_str)
+    let relative_moniker = AbsoluteMoniker::try_from(moniker_str)
         .map_err(|_| fsys::ConnectToStorageAdminError::BadMoniker)?;
     let moniker = scope_moniker.descendant(&relative_moniker);
 
@@ -672,7 +672,7 @@ async fn get_fidl_instance_and_children(
     scope_moniker: &AbsoluteMoniker,
     instance: &Arc<ComponentInstance>,
 ) -> (fsys::Instance, Vec<Arc<ComponentInstance>>) {
-    let relative_moniker = RelativeMoniker::scope_down(scope_moniker, &instance.abs_moniker)
+    let relative_moniker = AbsoluteMoniker::scope_down(scope_moniker, &instance.abs_moniker)
         .expect("instance must have been a child of scope root");
     let instance_id = model.component_id_index().look_up_moniker(&instance.abs_moniker).cloned();
 

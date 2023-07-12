@@ -8,7 +8,7 @@ use {
     fidl_fuchsia_component as fcomponent,
     fidl_fuchsia_component_decl::Offer,
     fidl_fuchsia_io as fio, fidl_fuchsia_sys2 as fsys,
-    moniker::{AbsoluteMoniker, AbsoluteMonikerBase, RelativeMoniker, RelativeMonikerBase},
+    moniker::{AbsoluteMoniker, AbsoluteMonikerBase},
     thiserror::Error,
 };
 const CAPABILITY_REQUESTED_EVENT: &str = "capability_requested";
@@ -170,7 +170,7 @@ pub async fn parse_provided_realm(
         }
     };
     let abs_moniker = AbsoluteMoniker::try_from(moniker)?;
-    let relative_moniker = RelativeMoniker::scope_down(&AbsoluteMoniker::root(), &abs_moniker)?;
+    let relative_moniker = AbsoluteMoniker::scope_down(&AbsoluteMoniker::root(), &abs_moniker)?;
 
     component_debug::lifecycle::resolve_instance(&lifecycle_controller, &relative_moniker)
         .await

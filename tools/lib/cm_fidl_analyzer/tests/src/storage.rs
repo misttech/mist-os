@@ -5,7 +5,7 @@
 mod tests {
     use {
         crate::routing::RoutingTestBuilderForAnalyzer,
-        cm_moniker::InstancedRelativeMoniker,
+        cm_moniker::InstancedAbsoluteMoniker,
         cm_rust::{
             Availability, OfferDecl, OfferSource, OfferStorageDecl, OfferTarget, StorageDecl,
             StorageDirectorySource, UseDecl, UseStorageDecl,
@@ -213,7 +213,7 @@ mod tests {
                 CheckUse::Storage {
                     path: "/storage".parse().unwrap(),
                     storage_relation: Some(
-                        InstancedRelativeMoniker::try_from(vec!["consumer:0"]).unwrap(),
+                        InstancedAbsoluteMoniker::try_from(vec!["consumer:0"]).unwrap(),
                     ),
                     from_cm_namespace: false,
                     storage_subdir: None,
