@@ -365,6 +365,7 @@ void Driver::PrepareStop(fdf::PrepareStopCompleter completer) {
   }
 
   system_state_ = result->state;
+  stop_triggered_ = true;
 
   executor_.schedule_task(device_.HandleStopSignal().then(
       [completer = std::move(completer)](fpromise::result<void>& init) mutable {

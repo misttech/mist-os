@@ -312,12 +312,17 @@ const char* Device::Name() const { return name_.data(); }
 
 bool Device::HasChildren() const { return !children_.empty(); }
 
-fuchsia_device_manager::wire::SystemPowerState Device::system_power_state() const {
+fdm::SystemPowerState Device::system_power_state() const {
   return driver_ ? driver_->system_state() : fdm::SystemPowerState::kFullyOn;
 }
 
+bool Device::stop_triggered() const { return driver_ ? driver_->stop_triggered() : false; }
+
 zx_status_t Device::Add(device_add_args_t* zx_args, zx_device_t** out) {
   if (HasChildNamed(zx_args->name)) {
+    return ZX_ERR_BAD_STATE;
+  }
+  if (stop_triggered()) {
     return ZX_ERR_BAD_STATE;
   }
   device_t compat_device = {

@@ -73,6 +73,8 @@ class Driver : public fdf::DriverBase {
 
   fuchsia_device_manager::wire::SystemPowerState system_state() const { return system_state_; }
 
+  bool stop_triggered() const { return stop_triggered_; }
+
  private:
   bool IsComposite();
 
@@ -115,6 +117,7 @@ class Driver : public fdf::DriverBase {
 
   fuchsia_device_manager::wire::SystemPowerState system_state_ =
       fuchsia_device_manager::wire::SystemPowerState::kFullyOn;
+  bool stop_triggered_ = false;
 
   std::unique_ptr<fs::SynchronousVfs> diagnostics_vfs_;
   fbl::RefPtr<fs::PseudoDir> diagnostics_dir_ = fbl::MakeRefCounted<fs::PseudoDir>();

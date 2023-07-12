@@ -177,6 +177,8 @@ class Device : public std::enable_shared_from_this<Device>, public devfs_fidl::D
 
   fuchsia_device_manager::wire::SystemPowerState system_power_state() const;
 
+  bool stop_triggered() const;
+
   // This arena backs `properties_`.
   // This should be declared before any objects it backs so it is destructed last.
   fidl::Arena<512> arena_;
