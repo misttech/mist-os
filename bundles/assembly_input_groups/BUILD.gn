@@ -48,7 +48,6 @@ assembly_input_groups("network") {
   base_packages = [
     "//src/connectivity/network/netcfg:config-default",
     "//src/connectivity/network:for_transition",
-    "//src/sys/pkg:tools",
   ]
 }
 

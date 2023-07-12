@@ -59,12 +59,13 @@ renamed_binary("update-binary") {
   source = "$root_out_dir/multi_universal_tool"
   source_deps = [ "//src/sys/pkg/bin/multi-universal-tool" ]
   dest = "bin/update"
-  fuchsia_shell_package_name = "update-bin"
 }
 
-fuchsia_package_with_single_component("update-bin") {
+fuchsia_package_with_single_component("update") {
+  # We have to rename the package to avoid colliding with the update package.
+  package_name = "update-bin"
   component_name = "update"
-  shell_commands = [ ":update-binary" ]
+  deps = [ ":update-binary" ]
   manifest = "meta/update.cml"
 }
 

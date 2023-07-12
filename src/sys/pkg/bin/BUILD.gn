@@ -8,11 +8,11 @@ group("bin") {
     "omaha-client",
     "package-tool",
     "package-tool:host",
-    "pkgctl:pkgctl-bin",
+    "pkgctl",
     "pm",
     "pm:host",
     "system-update-configurator",
-    "update:update-bin",
+    "update",
   ]
 }
 

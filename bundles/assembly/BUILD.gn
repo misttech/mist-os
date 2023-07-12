@@ -864,7 +864,21 @@ assembly_input_bundle("common_minimal_eng") {
 # higher service level.
 #
 assembly_input_bundle("common_minimal_userdebug") {
-  base_packages = [ "//src/diagnostics/detect:triage-detect" ]
+  base_packages = [
+    "//src/diagnostics/detect:triage-detect",
+    "//src/sys/pkg/bin/pkgctl",
+    "//src/sys/pkg/bin/update",
+  ]
+  shell_commands = [
+    {
+      package = "pkgctl"
+      components = [ "pkgctl" ]
+    },
+    {
+      package = "update-bin"
+      components = [ "update" ]
+    },
+  ]
   compiled_packages = [
     {
       name = "diagnostics"

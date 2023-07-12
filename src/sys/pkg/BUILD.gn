@@ -52,13 +52,8 @@ group("recovery") {
   ]
 }
 
-# Shell control commands
+# TODO(fxbug.dev/122864) Remove transitional labels
 group("tools") {
-  public_deps = [
-    "bin/pkgctl:pkgctl-bin",
-    "bin/update:update-bin",
-  ]
-  deps = [ "//build/validate:non_production_tag" ]
 }
 
 group("system-update-configurator") {

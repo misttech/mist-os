@@ -59,12 +59,10 @@ renamed_binary("pkgctl-binary") {
   source = "$root_out_dir/multi_universal_tool"
   source_deps = [ "//src/sys/pkg/bin/multi-universal-tool" ]
   dest = "bin/pkgctl"
-  fuchsia_shell_package_name = "pkgctl"
 }
 
-fuchsia_package("pkgctl-bin") {
-  package_name = "pkgctl"
-  shell_commands = [ ":pkgctl-binary" ]
+fuchsia_package("pkgctl") {
+  deps = [ ":pkgctl-binary" ]
 }
 
 fuchsia_unittest_package("pkgctl-tests") {
