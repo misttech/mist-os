@@ -36,15 +36,11 @@ use std::sync::Mutex;
 mod menu;
 use menu::{Key, MenuButtonType, MenuEvent, MenuState, MenuStateMachine};
 
-pub mod installer;
 use installer::{
-    find_install_source, get_bootloader_type, paver_connect, restart, set_active_configuration,
-    BootloaderType,
+    find_install_source, get_bootloader_type, partition::Partition, paver_connect, restart,
+    set_active_configuration, BootloaderType,
 };
 use recovery_util::block::{get_block_device, get_block_devices, BlockDevice};
-
-pub mod partition;
-use partition::Partition;
 
 const INSTALLER_HEADLINE: &'static str = "Fuchsia Workstation Installer";
 

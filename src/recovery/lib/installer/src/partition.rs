@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use {
-    crate::installer::BootloaderType,
+    crate::BootloaderType,
     anyhow::{Context as _, Error},
     fidl::endpoints::Proxy,
     fidl_fuchsia_fshost::{BlockWatcherMarker, BlockWatcherProxy},
@@ -412,14 +412,14 @@ mod tests {
         while let Some(req) = stream.try_next().await? {
             match req {
                 PartitionRequest::GetName { responder } => responder.send(0, Some(label))?,
-                PartitionRequest::GetInfo { responder } => responder.send(&mut Ok(BlockInfo {
+                PartitionRequest::GetInfo { responder } => responder.send(Ok(&BlockInfo {
                     block_count,
                     block_size,
                     max_transfer_size: 0,
                     flags: Flag::empty(),
                 }))?,
                 PartitionRequest::GetTypeGuid { responder } => {
-                    responder.send(0, Some(&mut Guid { value: guid }))?
+                    responder.send(0, Some(&Guid { value: guid }))?
                 }
                 _ => panic!("Expected a GetInfo/GetName request, but did not get one."),
             }

@@ -2,8 +2,15 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+//! # Installer library
+//!
+//! The installer library exposes functionality to install Fuchsia to a disk by copying images from
+//! one block device to another. The primary use case is an installer USB, which contains the images
+//! to write to persistent storage.
+
+pub mod partition;
+
 use {
-    crate::partition::Partition,
     anyhow::{anyhow, Context, Error},
     fdio,
     fidl::endpoints::{ClientEnd, Proxy, ServerEnd},
@@ -14,6 +21,7 @@ use {
     fidl_fuchsia_sysinfo::SysInfoMarker,
     fuchsia_component::client,
     fuchsia_zircon as zx,
+    partition::Partition,
     recovery_util::block::BlockDevice,
 };
 
