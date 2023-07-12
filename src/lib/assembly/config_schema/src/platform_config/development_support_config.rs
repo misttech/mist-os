@@ -17,4 +17,8 @@ pub struct DevelopmentSupportConfig {
     /// Path to a file containing ssh keys that are authorized to connect to the
     /// device.
     pub authorized_ssh_keys_path: Option<Utf8PathBuf>,
+
+    /// Path to a file containing CA certs that are trusted roots for signed ssh
+    /// keys that are authorized to connect to the device.
+    pub authorized_ssh_ca_certs_path: Option<Utf8PathBuf>,
 }

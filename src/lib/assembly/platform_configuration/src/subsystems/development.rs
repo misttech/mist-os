@@ -46,6 +46,22 @@ impl DefineSubsystemConfiguration<DevelopmentSupportConfig> for DevelopmentConfi
             _ => {}
         }
 
+        match (context.build_type, &config.authorized_ssh_ca_certs_path) {
+            (BuildType::User, Some(_)) => {
+                anyhow::bail!("authorized_ssh_ca_certs_path cannot be provided on user builds")
+            }
+            (_, Some(authorized_ssh_ca_certs_path)) => {
+                builder
+                    .package("sshd-host")
+                    .config_data(assembly_config_schema::FileEntry {
+                        source: authorized_ssh_ca_certs_path.clone(),
+                        destination: "ssh_ca_pub_keys".into(),
+                    })
+                    .context("Setting authorized ssh ca certs")?;
+            }
+            _ => {}
+        }
+
         Ok(())
     }
 }

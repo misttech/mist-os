@@ -418,7 +418,10 @@ template("product_assembly_configuration") {
     },
     {
       node_path = "development_support"
-      fields = [ "authorized_ssh_keys_path" ]
+      fields = [
+        "authorized_ssh_keys_path",
+        "authorized_ssh_ca_certs_path",
+      ]
     },
   ]
 

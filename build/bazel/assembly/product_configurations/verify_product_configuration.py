@@ -93,6 +93,8 @@ def normalize_platform(config, root_dir):
     # likelihood of merge conflicts.
     files_to_normalize = []
     files_to_normalize.append("development_support.authorized_ssh_keys_path")
+    files_to_normalize.append(
+        "development_support.authorized_ssh_ca_certs_path")
     files_to_normalize.append("ui.sensor_config")
     normalize_files_in_config(platform, files_to_normalize, root_dir)
 
