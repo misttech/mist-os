@@ -590,6 +590,10 @@ class DownloadStubFormatError(Exception):
         super().__init__(message)
 
 
+def download_temp_location(dest: Path) -> Path:
+    return Path(str(dest) + '.download-tmp')
+
+
 class DownloadStubInfo(object):
     """Contains infomation about a remotely stored artifact."""
 
@@ -693,8 +697,10 @@ class DownloadStubInfo(object):
         )
 
     def download(
-            self, downloader: remotetool.RemoteTool,
-            working_dir_abs: Path) -> cl_utils.SubprocessResult:
+            self,
+            downloader: remotetool.RemoteTool,
+            working_dir_abs: Path,
+            dest: Path = None) -> cl_utils.SubprocessResult:
         """Retrieves the file or dir referenced by the stub.
 
         Reads the stub info from file.
@@ -706,6 +712,7 @@ class DownloadStubInfo(object):
         Args:
           downloader: 'remotetool' instance to use to download.
           working_dir_abs: working dir.
+          dest: (optional) path to download to, overriding self.path.
 
         Returns:
           subprocess results, including exit code.
@@ -713,8 +720,10 @@ class DownloadStubInfo(object):
         # TODO: use filelock.FileLock when downloading from outside
         # of this remote action, e.g. when lazily fetching local inputs.
         # This would gracefully handle concurrent requests for the same file.
-        dest = working_dir_abs / self.path  # this is a symlink
-        temp_dl = Path(str(dest) + '.download-tmp')
+
+        # self.path assumes that the working dir == build subbdir
+        dest_abs = working_dir_abs / (dest or self.path)
+        temp_dl = download_temp_location(dest_abs)
 
         downloader = {
             "dir": downloader.download_dir,
@@ -729,10 +738,10 @@ class DownloadStubInfo(object):
 
         if status.returncode == 0:  # download complete, success
             # Reflect the mode/permissions from stub to the real file.
-            temp_dl.chmod(dest.stat().st_mode)
+            temp_dl.chmod(dest_abs.stat().st_mode)
             # Backup the download stub.  This preserves the xattr.
-            dest.rename(Path(str(dest) + _RBE_DOWNLOAD_STUB_SUFFIX))
-            temp_dl.rename(dest)
+            dest_abs.rename(Path(str(dest_abs) + _RBE_DOWNLOAD_STUB_SUFFIX))
+            temp_dl.rename(dest_abs)
 
         return status
 

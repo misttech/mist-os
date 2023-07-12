@@ -74,8 +74,8 @@ class ReadDownloadStubInfosTests(unittest.TestCase):
             with mock.patch.object(remote_action.DownloadStubInfo,
                                    'read_from_file',
                                    return_value=stub_info) as mock_read:
-                stub_infos = list(dlwrap.read_download_stub_infos([path]))
-        self.assertEqual(stub_infos, [stub_info])
+                stub_infos = dlwrap.read_download_stub_infos([path])
+        self.assertEqual(stub_infos, {path: stub_info})
         mock_is_stub.assert_called_with(path)
         mock_read.assert_called_with(path)
 
@@ -83,8 +83,8 @@ class ReadDownloadStubInfosTests(unittest.TestCase):
         path = 'path/to/already/downloaded.obj'
         with mock.patch.object(remote_action, 'is_download_stub_file',
                                return_value=False) as mock_is_stub:
-            stub_infos = list(dlwrap.read_download_stub_infos([path]))
-        self.assertEqual(stub_infos, [])
+            stub_infos = dlwrap.read_download_stub_infos([path])
+        self.assertEqual(stub_infos, {})
         mock_is_stub.assert_called_with(path)
 
 
@@ -97,22 +97,22 @@ _fake_downloader = remotetool.RemoteTool(
 
 def _fake_download(
     packed_args: Tuple[remote_action.DownloadStubInfo, remotetool.RemoteTool,
-                       Path]
+                       Path, Path]
 ) -> Tuple[Path, cl_utils.SubprocessResult]:
     # For mocking dlwrap._download_for_mp.
     # defined because multiprocessing cannot serialize mocks
-    stub_info, downloader, working_dir_abs = packed_args
-    return (stub_info.path, cl_utils.SubprocessResult(0))
+    stub_info, downloader, working_dir_abs, dest = packed_args
+    return (dest, cl_utils.SubprocessResult(0))
 
 
 def _fake_download_fail(
     packed_args: Tuple[remote_action.DownloadStubInfo, remotetool.RemoteTool,
-                       Path]
+                       Path, Path]
 ) -> Tuple[Path, cl_utils.SubprocessResult]:
     # For mocking dlwrap._download_for_mp.
     # defined because multiprocessing cannot serialize mocks
-    stub_info, downloader, working_dir_abs = packed_args
-    return (stub_info.path, cl_utils.SubprocessResult(1))
+    stub_info, downloader, working_dir_abs, dest = packed_args
+    return (dest, cl_utils.SubprocessResult(1))
 
 
 class DownloadArtifactsTests(unittest.TestCase):
@@ -132,8 +132,8 @@ class DownloadArtifactsTests(unittest.TestCase):
         working_dir = exec_root / 'work'
         download_status = 0
         with mock.patch.object(dlwrap, 'read_download_stub_infos',
-                               return_value=iter([self._stub_info(path)
-                                                 ])) as mock_read_stubs:
+                               return_value={path: self._stub_info(path)
+                                            }) as mock_read_stubs:
             with mock.patch.object(dlwrap, '_download_for_mp',
                                    new=_fake_download) as mock_download:
                 status = dlwrap.download_artifacts(
@@ -149,8 +149,8 @@ class DownloadArtifactsTests(unittest.TestCase):
         working_dir = exec_root / 'work'
         download_status = 1
         with mock.patch.object(dlwrap, 'read_download_stub_infos',
-                               return_value=iter([self._stub_info(path)
-                                                 ])) as mock_read_stubs:
+                               return_value={path: self._stub_info(path)
+                                            }) as mock_read_stubs:
             with mock.patch.object(dlwrap, '_download_for_mp',
                                    new=_fake_download_fail) as mock_download:
                 status = dlwrap.download_artifacts(

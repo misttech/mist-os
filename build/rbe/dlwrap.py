@@ -21,7 +21,7 @@ import remote_action
 import remotetool
 
 from pathlib import Path
-from typing import Iterable, Sequence, Tuple
+from typing import Dict, Iterable, Sequence, Tuple
 
 _SCRIPT_BASENAME = Path(__file__).name
 
@@ -94,26 +94,29 @@ def read_download_stub_infos(
     stub_paths: Iterable[Path],
     verbose: bool = False,
     dry_run: bool = False,
-) -> Iterable[remote_action.DownloadStubInfo]:
+) -> Dict[Path, remote_action.DownloadStubInfo]:
+    result = dict()
     for p in stub_paths:
         if remote_action.is_download_stub_file(p):
             vmsg(verbose, f"Read download stub for {p}.")
-            yield remote_action.DownloadStubInfo.read_from_file(p)
+            result[p] = remote_action.DownloadStubInfo.read_from_file(p)
         else:
             vmsg(verbose, f"{p} is not a download stub, skipping.")
+    return result
 
 
 def _download_for_mp(
     packed_args: Tuple[remote_action.DownloadStubInfo, remotetool.RemoteTool,
-                       Path]
+                       Path, Path]
 ) -> Tuple[Path, cl_utils.SubprocessResult]:
     """multiprocessing requires functions to be pickle-able,
     thus this function must exist at the module-level scope.
     """
-    stub, downloader, working_dir_abs = packed_args
+    stub, downloader, working_dir_abs, dest = packed_args
     return (
-        stub.path,
-        stub.download(downloader=downloader, working_dir_abs=working_dir_abs))
+        dest,
+        stub.download(
+            downloader=downloader, working_dir_abs=working_dir_abs, dest=dest))
 
 
 def download_artifacts(
@@ -133,7 +136,8 @@ def download_artifacts(
         set(stub_paths), verbose=verbose, dry_run=dry_run)
 
     download_args = [
-        (stub_info, downloader, working_dir_abs) for stub_info in stub_infos
+        (stub_info, downloader, working_dir_abs, p)
+        for p, stub_info in stub_infos.items()
     ]
     try:
         with multiprocessing.Pool() as pool:

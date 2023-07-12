@@ -2002,6 +2002,39 @@ remote_metadata: {{
             read_back = remote_action.DownloadStubInfo.read_from_file(full_path)
             self.assertEqual(read_back, stub)
 
+    def test_download_to_alt_dest(self):
+        blob_digest = "00111ddeee000aa/24"
+        stub = remote_action.DownloadStubInfo(
+            path=Path('foo/bar.baz'),
+            type="file",
+            blob_digest=blob_digest,
+            action_digest="bce876da011112/14",
+            build_id="random-id777",
+        )
+        working_dir = Path('/root/work')
+        dest = Path('some/where/else.baz')
+        download_status = 0
+        with mock.patch.object(remotetool.RemoteTool, 'download_blob',
+                               return_value=cl_utils.SubprocessResult(
+                                   download_status)) as mock_download:
+            with mock.patch.object(Path, 'rename') as mock_rename:
+                with mock.patch.object(Path, 'chmod') as mock_chmod:
+                    with mock.patch.object(Path, 'stat') as mock_stat:
+                        status = stub.download(
+                            downloader=self.downloader,
+                            working_dir_abs=Path('/root/work'),
+                            dest=dest,
+                        )
+        self.assertEqual(status.returncode, download_status)
+        mock_download.assert_called_with(
+            path=remote_action.download_temp_location(working_dir / dest),
+            digest=blob_digest,
+            cwd=working_dir,
+        )
+        mock_stat.assert_called()
+        mock_chmod.assert_called()
+        mock_rename.assert_called()
+
     def test_download_fail(self):
         stub = remote_action.DownloadStubInfo(
             path=Path('foo/bar.baz'),
