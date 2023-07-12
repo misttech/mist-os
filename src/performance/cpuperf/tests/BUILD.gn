@@ -87,6 +87,7 @@ fuchsia_unittest_package("cpuperf_integration_tests") {
     ":cpuperf_resources",
     "//src/performance/cpuperf:bin",
   ]
+  test_type = "system"
 }
 
 resource("cpuperf_resources") {
