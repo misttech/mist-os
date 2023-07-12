@@ -279,6 +279,20 @@ pub struct TaskMutableState {
     /// A pointer to the head of the robust futex list of this thread in
     /// userspace. See get_robust_list(2)
     pub robust_list_head: UserRef<robust_list_head>,
+
+    /// The timer slack used to group timer expirations for the calling thread.
+    ///
+    /// Timers may expire up to `timerslack_ns` late, but never early.
+    ///
+    /// If this value is 0, the task's default timerslack is used.
+    timerslack_ns: u64,
+
+    /// The default value for `timerslack_ns`. This value cannot change during the lifetime of a
+    /// task.
+    ///
+    /// This value is set to the `timerslack_ns` of the creating thread, and thus is not constant
+    /// across tasks.
+    default_timerslack_ns: u64,
 }
 
 impl TaskMutableState {
@@ -290,6 +304,21 @@ impl TaskMutableState {
     /// it to anything else.
     pub fn enable_no_new_privs(&mut self) {
         self.no_new_privs = true;
+    }
+
+    pub fn get_timerslack_ns(&self) -> u64 {
+        self.timerslack_ns
+    }
+
+    /// Sets the current timerslack of the task to `ns`.
+    ///
+    /// If `ns` is zero, the current timerslack gets reset to the task's default timerslack.
+    pub fn set_timerslack_ns(&mut self, ns: u64) {
+        if ns == 0 {
+            self.timerslack_ns = self.default_timerslack_ns;
+        } else {
+            self.timerslack_ns = ns;
+        }
     }
 }
 
@@ -509,6 +538,7 @@ impl Task {
         seccomp_filter_state: SeccompState,
         seccomp_filters: SeccompFilterContainer,
         robust_list_head: UserRef<robust_list_head>,
+        timerslack_ns: u64,
     ) -> Self {
         let fs = {
             let result = OnceCell::new();
@@ -540,6 +570,9 @@ impl Task {
                 oom_score_adj: Default::default(),
                 seccomp_filters,
                 robust_list_head,
+                timerslack_ns,
+                // The default timerslack is set to the current timerslack of the creating thread.
+                default_timerslack_ns: timerslack_ns,
             }),
             persistent_info: TaskPersistentInfoState::new(id, pid, command, creds, exit_signal),
             seccomp_filter_state,
@@ -673,6 +706,11 @@ impl Task {
 
         process_group.insert(&thread_group);
 
+        // > The timer slack values of init (PID 1), the ancestor of all processes, are 50,000
+        // > nanoseconds (50 microseconds).  The timer slack value is inherited by a child created
+        // > via fork(2), and is preserved across execve(2).
+        // https://man7.org/linux/man-pages/man2/prctl.2.html
+        let default_timerslack = 50_000;
         let current_task = CurrentTask::new(Self::new(
             pid,
             initial_name,
@@ -693,6 +731,7 @@ impl Task {
             SeccompState::default(),
             SeccompFilterContainer::default(),
             UserAddress::NULL.into(),
+            default_timerslack,
         ));
         current_task.thread_group.add(&current_task.task)?;
 
@@ -786,6 +825,7 @@ impl Task {
         let seccomp_filters;
         let robust_list_head = UserAddress::NULL.into();
         let child_signal_mask;
+        let timerslack_ns;
 
         let TaskInfo { thread, thread_group, memory_manager } = {
             // Make sure to drop these locks ASAP to avoid inversion
@@ -800,6 +840,7 @@ impl Task {
             command = self.command();
             creds = self.creds();
             priority = state.priority;
+            timerslack_ns = state.timerslack_ns;
 
             uts_ns = if new_uts {
                 if !self.creds().has_capability(CAP_SYS_ADMIN) {
@@ -867,6 +908,7 @@ impl Task {
             SeccompState::from(&self.seccomp_filter_state),
             seccomp_filters,
             robust_list_head,
+            timerslack_ns,
         ));
 
         // Drop the pids lock as soon as possible after creating the child. Destroying the child

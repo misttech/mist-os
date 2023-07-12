@@ -843,6 +843,10 @@ pub fn sys_prctl(
                 _ => error!(EINVAL),
             }
         }
+        PR_SET_TIMERSLACK => {
+            current_task.write().set_timerslack_ns(arg2);
+            Ok(().into())
+        }
         _ => {
             not_implemented!("prctl: Unknown option: 0x{:x}", option);
             error!(ENOSYS)
