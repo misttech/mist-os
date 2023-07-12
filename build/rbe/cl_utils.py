@@ -10,6 +10,7 @@ import asyncio
 import collections
 import contextlib
 import dataclasses
+import filecmp
 import io
 import os
 import shlex
@@ -21,9 +22,15 @@ import platform
 from pathlib import Path
 from typing import Any, Callable, Dict, FrozenSet, Iterable, Optional, Sequence, Tuple
 
+_SCRIPT_BASENAME = Path(__file__).name
+
 # Local subprocess and remote environment calls need this when a
 # command is prefixed with an X=Y environment variable.
 _ENV = '/usr/bin/env'
+
+
+def msg(text: str):
+    print(f'[{_SCRIPT_BASENAME}] {text}')
 
 
 def auto_env_prefix_command(command: Sequence[str]) -> Sequence[str]:
@@ -68,6 +75,17 @@ def copy_preserve_subpath(src: Path, dest_dir: Path):
     ), f'source file to be copied should be relative, but got: {src}'
     dest_subdir = dest_dir / src.parent
     dest_subdir.mkdir(parents=True, exist_ok=True)
+    dest_file = dest_subdir / src.name
+    if dest_file.exists():
+        # If files are identical, don't copy again.
+        # This helps if dest_file is not write-able.
+        if not filecmp.cmp(src, dest_file, shallow=True):
+            # files are different, keep the existing copy.
+            msg(
+                f'[copy_preserve_subpath()] Warning: Files {src} and {dest_file} are different.  Not copying to the latter.'
+            )
+        return
+
     shutil.copy2(src, dest_subdir)
 
 

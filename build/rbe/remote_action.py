@@ -1409,7 +1409,7 @@ class RemoteAction(object):
             # Outputs were already copied by the check-determinism script.
             # Copy just the inputs.
             with cl_utils.chdir_cm(self.project_root):
-                for f in self.inputs_relative_to_working_dir:
+                for f in self.inputs_relative_to_project_root:
                     cl_utils.copy_preserve_subpath(f, export_dir)
 
         exec_strategy = self.exec_strategy or "remote"  # rewrapper default

@@ -204,6 +204,7 @@ class RustRemoteAction(object):
 
         self._cleanup_files: Sequence[Path] = []
         self._prepare_status: int = None  # 0 means success, like an exit code
+        self._remote_action = None  # will be set by prepare() step
 
     @property
     def _c_sysroot_is_outside_exec_root(self) -> bool:
@@ -853,9 +854,13 @@ class RustRemoteAction(object):
 
         # Optional: on determinism failures, copy data.
         if exit_code != 0 and self.check_determinism and export_dir:
+            # Compute the inputs that would have been used for remote execution
+            if not self.remote_action:
+                self.prepare()
             # Check determinism script already copies outputs, we just copy the inputs.
-            for f in self._remote_action.inputs_relative_to_working_dir:
-                cl_utils.copy_preserve_subpath(f, export_dir)
+            with cl_utils.chdir_cm(self.exec_root):
+                for f in self.remote_action.inputs_relative_to_project_root:
+                    cl_utils.copy_preserve_subpath(f, export_dir)
 
         return exit_code
 

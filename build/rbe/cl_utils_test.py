@@ -6,6 +6,7 @@
 import contextlib
 import filecmp
 import os
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -73,6 +74,43 @@ class CopyPreserveSubpathTests(unittest.TestCase):
                 cl_utils.copy_preserve_subpath(src_file, dest_dir)
                 dest_file = dest_dir / src_file
                 self.assertTrue(filecmp.cmp(src_file, dest_file, shallow=False))
+
+    def test_do_not_recopy_if_identical(self):
+        with tempfile.TemporaryDirectory() as td1:
+            tdp1 = Path(td1)
+            dest_dir = tdp1 / 'backups'
+            with cl_utils.chdir_cm(tdp1):  # working directory
+                srcdir = Path('aa/bb')
+                srcdir.mkdir(parents=True, exist_ok=True)
+                src_file = srcdir / 'c.txt'
+                src_file.write_text('hello\n')
+                cl_utils.copy_preserve_subpath(src_file, dest_dir)
+                dest_file = dest_dir / src_file
+                self.assertTrue(filecmp.cmp(src_file, dest_file, shallow=False))
+
+                # Attempting to copy over identical file should be suppressed.
+                with mock.patch.object(shutil, 'copy2') as mock_copy:
+                    cl_utils.copy_preserve_subpath(src_file, dest_dir)
+                mock_copy.assert_not_called()
+
+    def test_do_not_copy_overwrite_if_different(self):
+        with tempfile.TemporaryDirectory() as td1:
+            tdp1 = Path(td1)
+            dest_dir = tdp1 / 'backups'
+            with cl_utils.chdir_cm(tdp1):  # working directory
+                srcdir = Path('aa/bb')
+                srcdir.mkdir(parents=True, exist_ok=True)
+                src_file = srcdir / 'c.txt'
+                src_file.write_text('hello\n')
+                cl_utils.copy_preserve_subpath(src_file, dest_dir)
+                dest_file = dest_dir / src_file
+                self.assertTrue(filecmp.cmp(src_file, dest_file, shallow=False))
+
+                # Attempting to copy over different file is suppressed
+                src_file.write_text('not hello\n')
+                with mock.patch.object(shutil, 'copy2') as mock_copy:
+                    cl_utils.copy_preserve_subpath(src_file, dest_dir)
+                mock_copy.assert_not_called()
 
 
 class PartitionSequenceTests(unittest.TestCase):
