@@ -115,6 +115,9 @@ group("non_hermetic_deps") {
     "//build/bazel/tests/*",
   ]
 
+  # Products which use Bazel-based assembly have non-hermetic outputs
+  visibility += [ "//products/workbench:*" ]
+
   # FIXME(http://fxbug.dev/121915): //build/packages/prebuilt_packages.gni
   # needs `hermetic_action_ignored_prefixes`. Remove these entries when
   # `prebuilt_package` is hermetic.

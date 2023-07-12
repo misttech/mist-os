@@ -1,0 +1,256 @@
+# Copyright 2023 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+load(
+    "@fuchsia_sdk//fuchsia:assembly.bzl",
+    "ARCH",
+    "PARTITION_TYPE",
+    "SLOT",
+    "fuchsia_bootloader_partition",
+    "fuchsia_filesystem_blobfs",
+    "fuchsia_filesystem_empty_data",
+    "fuchsia_fvm_sparse",
+    "fuchsia_fvm_standard",
+    "fuchsia_images_configuration",
+    "fuchsia_partition",
+    "fuchsia_partitions_configuration",
+    "fuchsia_product_bundle",
+    "fuchsia_product_configuration",
+    "fuchsia_product_image",
+    "fuchsia_vbmeta",
+    "fuchsia_virtual_device",
+    "fuchsia_zbi",
+)
+load("//products/workbench:platform_config.bzl", "workbench_platform_config")
+
+package(default_visibility = [
+    "//build/bazel/assembly:__pkg__",
+    "//vendor/google:__subpackages__",
+])
+
+fuchsia_product_bundle(
+    name = "product_bundle_eng.x64",
+    board_name = "x64",
+    default_virtual_device = ":workbench_emu",
+    partitions_config = ":partitions.x64",
+    product_image = ":assembly_eng.x64",
+    product_name = "workbench_eng",
+    recovery = ":assembly_eng.x64_recovery",
+    repository_keys = "//src/sys/pkg/repositories/devhost/keys",
+    update_epoch = "1",
+    update_version_file = "@legacy_ninja_build_outputs//:build_info_version.txt",
+    virtual_devices = [
+        ":workbench_emu",
+    ],
+)
+
+fuchsia_product_bundle(
+    name = "product_bundle_eng.vim3",
+    board_name = "vim3",
+    partitions_config = "//build/bazel/assembly/partitions_configurations:vim3",
+    product_image = ":assembly_eng.vim3",
+    product_name = "workbench_eng",
+    recovery = ":assembly_eng.vim3_recovery",
+    repository_keys = "//src/sys/pkg/repositories/devhost/keys",
+    update_epoch = "1",
+    update_version_file = "@legacy_ninja_build_outputs//:build_info_version.txt",
+)
+
+fuchsia_partitions_configuration(
+    name = "partitions.x64",
+    bootloader_partitions = [
+        ":fuchsia_esp",
+    ],
+    hardware_revision = "x64",
+    partitions = [
+        ":vbmeta_a",
+        ":zircon_a",
+        ":fvm",
+        ":zircon_r",
+        ":vbmeta_r",
+    ],
+)
+
+fuchsia_bootloader_partition(
+    name = "fuchsia_esp",
+    image = "@legacy_ninja_build_outputs//:fuchsia.esp.blk",
+    partition_name = "fuchsia-esp",
+    type = "esp",
+)
+
+fuchsia_partition(
+    name = "vbmeta_a",
+    partition_name = "vbmeta_a",
+    slot = SLOT.A,
+    type = PARTITION_TYPE.VBMETA,
+)
+
+fuchsia_partition(
+    name = "zircon_a",
+    partition_name = "zircon-a",
+    slot = SLOT.A,
+    type = PARTITION_TYPE.ZBI,
+)
+
+fuchsia_partition(
+    name = "fvm",
+    partition_name = "fvm",
+    type = PARTITION_TYPE.FVM,
+)
+
+fuchsia_partition(
+    name = "zircon_r",
+    partition_name = "zircon-r",
+    slot = SLOT.R,
+    type = PARTITION_TYPE.ZBI,
+)
+
+fuchsia_partition(
+    name = "vbmeta_r",
+    partition_name = "vbmeta_r",
+    slot = SLOT.R,
+    type = PARTITION_TYPE.VBMETA,
+)
+
+fuchsia_product_image(
+    name = "assembly_eng.x64_recovery",
+    board_config = "//boards:x64",
+    image = ":recovery_images_config",
+    legacy_aib = "//build/bazel/assembly/assembly_input_bundles:legacy_fuchsia",
+    platform_aibs = "//build/bazel/assembly/assembly_input_bundles:platform_eng",
+    product_config = ":assembly_config_eng",
+)
+
+fuchsia_product_image(
+    name = "assembly_eng.x64",
+    board_config = "//boards:x64",
+    image = ":images_config",
+    legacy_aib = "//build/bazel/assembly/assembly_input_bundles:legacy_fuchsia",
+    platform_aibs = "//build/bazel/assembly/assembly_input_bundles:platform_eng",
+    product_config = ":assembly_config_eng",
+)
+
+fuchsia_product_image(
+    name = "assembly_eng.vim3",
+    board_config = "//boards:vim3",
+    image = "//build/bazel/assembly/images_configurations:fuchsia_vim3",
+    legacy_aib = "//build/bazel/assembly/assembly_input_bundles:legacy_fuchsia",
+    platform_aibs = "//build/bazel/assembly/assembly_input_bundles:platform_eng",
+    product_config = ":assembly_config_eng",
+)
+
+fuchsia_product_image(
+    name = "assembly_eng.vim3_recovery",
+    board_config = "//boards:vim3",
+    image = ":recovery_images_config",
+    legacy_aib = "//build/bazel/assembly/assembly_input_bundles:legacy_fuchsia",
+    platform_aibs = "//build/bazel/assembly/assembly_input_bundles:platform_eng",
+    product_config = ":assembly_config_eng",
+)
+
+fuchsia_virtual_device(
+    name = "workbench_emu",
+    arch = ARCH.X64,
+    device_name = "workbench_emu",
+    window_height_px = 1200,
+    window_width_px = 720,
+)
+
+fuchsia_product_configuration(
+    name = "assembly_config_eng",
+    cache_packages = [
+    ],
+    json_config = {
+        "platform": workbench_platform_config,
+        "product": {
+            "session_url": "",
+        },
+    },
+)
+
+fuchsia_images_configuration(
+    name = "images_config",
+    fvm_slice_size = "8388608",
+    images = [
+        ":fuchsia_vbmeta",
+        ":fuchsia_zbi",
+        ":standard_fvm",
+        ":fastboot_fvm",
+        ":sparse_fvm",
+        ":blob_sparse_fvm",
+    ],
+)
+
+fuchsia_images_configuration(
+    name = "recovery_images_config",
+    fvm_slice_size = "8388608",
+    images = [
+        ":zedboot_zbi",
+        ":zedboot_vbmeta",
+    ],
+)
+
+fuchsia_vbmeta(
+    name = "fuchsia_vbmeta",
+    key = "//:third_party/android/platform/external/avb/test/data/testkey_atx_psk.pem",
+    key_metadata = "//:third_party/android/platform/external/avb/test/data/atx_metadata.bin",
+)
+
+fuchsia_vbmeta(
+    name = "zedboot_vbmeta",
+    key = "//:third_party/android/platform/external/avb/test/data/testkey_atx_psk.pem",
+    key_metadata = "//:third_party/android/platform/external/avb/test/data/atx_metadata.bin",
+    vbmeta_name = "zedboot",
+)
+
+fuchsia_zbi(
+    name = "zedboot_zbi",
+    zbi_name = "zedboot",
+)
+
+fuchsia_zbi(
+    name = "fuchsia_zbi",
+)
+
+fuchsia_fvm_standard(
+    name = "standard_fvm",
+    filesystems = [
+        ":empty_data",
+        ":blobfs",
+    ],
+    fvm_standard_name = "fvm",
+)
+
+fuchsia_fvm_standard(
+    name = "fastboot_fvm",
+    filesystems = [
+        ":empty_data",
+        ":blobfs",
+    ],
+    fvm_standard_name = "fvm.fastboot",
+    resize_image_file_to_fit = True,
+    truncate_to_length = "17179869184",
+)
+
+# Currently required by bazel_assembled_system
+fuchsia_fvm_sparse(
+    name = "sparse_fvm",
+    filesystems = [":blobfs"],
+    fvm_sparse_name = "fvm.sparse",
+)
+
+# Currently required by bazel_assembled_system
+fuchsia_fvm_sparse(
+    name = "blob_sparse_fvm",
+    filesystems = [":blobfs"],
+    fvm_sparse_name = "fvm.blob.sparse",
+)
+
+fuchsia_filesystem_blobfs(
+    name = "blobfs",
+)
+
+fuchsia_filesystem_empty_data(
+    name = "empty_data",
+)

@@ -11,6 +11,7 @@ load("//:bundles/assembly/platform_aib_names.bzl", "BRINGUP_PLATFORM_AIB_NAMES",
 
 package(default_visibility = [
     "//build/bazel/assembly:__subpackages__",
+    "//products/workbench:__subpackages__",
     "//vendor/google:__subpackages__",
 ])
 
