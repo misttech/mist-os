@@ -95,7 +95,12 @@ class I8042Device : public DeviceType, public ddk::EmptyProtocol<ZX_PROTOCOL_INP
   zx_status_t Bind();
 
   void DdkRelease() {
-    irq_thread_.join();
+    if (irq_.is_valid()) {
+      irq_.destroy();
+    }
+    if (irq_thread_.joinable()) {
+      irq_thread_.join();
+    }
     delete this;
   }
   void DdkUnbind(ddk::UnbindTxn txn);
