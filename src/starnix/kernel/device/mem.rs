@@ -115,6 +115,7 @@ impl FileOps for DevZero {
             // the output of `/proc/self/maps` and identifies this mapping as
             // file-based.
             MappingName::File(filename),
+            FileWriteGuardRef(None),
         )?;
         Ok(MappedVmo::new(vmo, addr))
     }

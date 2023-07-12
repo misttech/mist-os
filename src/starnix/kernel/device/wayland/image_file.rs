@@ -90,7 +90,7 @@ impl FileOps for ImageFile {
         offset: usize,
         data: &mut dyn InputBuffer,
     ) -> Result<usize, Errno> {
-        VmoFileObject::write(&self.vmo, file, current_task, offset, data, None)
+        VmoFileObject::write(&self.vmo, file, current_task, offset, data)
     }
 
     fn get_vmo(

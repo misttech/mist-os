@@ -12,8 +12,8 @@ use crate::{
         fileops_impl_nonseekable, fs_node_impl_dir_readonly,
         fuchsia::new_remote_file,
         CacheMode, DirEntryHandle, FdEvents, FdFlags, FdNumber, FileHandle, FileObject, FileOps,
-        FileSystem, FileSystemHandle, FileSystemOps, FileSystemOptions, FsNode, FsNodeOps, FsStr,
-        FsString, MemoryDirectoryFile, NamespaceNode, SpecialNode,
+        FileSystem, FileSystemHandle, FileSystemOps, FileSystemOptions, FileWriteGuardRef, FsNode,
+        FsNodeOps, FsStr, FsString, MemoryDirectoryFile, NamespaceNode, SpecialNode,
     },
     lock::{Mutex, MutexGuard, RwLock},
     logging::*,
@@ -3478,6 +3478,7 @@ impl BinderDriver {
             prot_flags,
             mapping_options,
             MappingName::File(filename),
+            FileWriteGuardRef(None),
         )?;
 
         // Map the VMO into the driver's address space.

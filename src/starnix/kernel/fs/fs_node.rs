@@ -72,6 +72,9 @@ pub struct FsNode {
     /// Records locks associated with this node.
     record_locks: RecordLocks,
 
+    /// Tracks lock state for this file.
+    pub write_guard_state: Mutex<FileWriteGuardState>,
+
     /// Inotify watchers on this node. See inotify(7).
     pub watchers: inotify::InotifyWatchers,
 }
@@ -761,12 +764,14 @@ impl FsNode {
                 flock_info: Default::default(),
                 record_locks: Default::default(),
                 watchers: Default::default(),
+                write_guard_state: Default::default(),
             };
             #[cfg(any(test, debug_assertions))]
             {
                 let _l1 = result.append_lock.raw_read();
                 let _l2 = result.info.read();
                 let _l3 = result.flock_info.lock();
+                let _l4 = result.write_guard_state.lock();
             }
             result
         }
@@ -1403,6 +1408,13 @@ impl FsNode {
             })?;
         }
         Ok(())
+    }
+
+    pub fn create_write_guard(
+        self: &Arc<Self>,
+        mode: FileWriteGuardMode,
+    ) -> Result<FileWriteGuard, Errno> {
+        self.write_guard_state.lock().create_write_guard(self.clone(), mode)
     }
 }
 

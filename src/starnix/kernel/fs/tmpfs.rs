@@ -194,8 +194,7 @@ impl FsNodeOps for TmpfsDirectory {
         owner: FsCred,
     ) -> Result<FsNodeHandle, Errno> {
         let ops: Box<dyn FsNodeOps> = match mode.fmt() {
-            // For files created in tmpfs, forbid sealing, by sealing the seal operation.
-            FileMode::IFREG => Box::new(VmoFileNode::new(SealFlags::SEAL)?),
+            FileMode::IFREG => Box::new(VmoFileNode::new()?),
             FileMode::IFIFO | FileMode::IFBLK | FileMode::IFCHR | FileMode::IFSOCK => {
                 Box::new(TmpfsSpecialNode::new())
             }
@@ -209,6 +208,12 @@ impl FsNodeOps for TmpfsDirectory {
             info.blksize = *PAGE_SIZE as usize;
             info
         });
+
+        if mode.fmt() == FileMode::IFREG {
+            // For files created in tmpfs, forbid sealing, by sealing the seal operation.
+            node.write_guard_state.lock().enable_sealing(SealFlags::SEAL);
+        }
+
         Ok(node)
     }
 

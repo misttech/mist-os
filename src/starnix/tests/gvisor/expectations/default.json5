@@ -223,11 +223,6 @@
                 "MadviseDontforkTest.DontforkShared",
                 "MadviseDontforkTest.DontforkAnonPrivate",
 
-                // memfd_test
-                "MemfdTest.SealWriteWithMmap",
-                "MemfdTest.SealWriteWithOutstandingWritbleMapping",
-                "MemfdTest.NoPartialSealApplicationWhenWriteSealRejected",
-
                 // memory_accounting_test
                 "MemoryAccounting.AnonAccountingPreservedOnSaveRestore",
 

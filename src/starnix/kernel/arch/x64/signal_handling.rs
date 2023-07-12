@@ -172,6 +172,7 @@ mod tests {
 
     use super::*;
     use crate::{
+        fs::FileWriteGuardRef,
         mm::{DesiredAddress, MappingName, MappingOptions, ProtectionFlags},
         testing::*,
     };
@@ -444,6 +445,7 @@ mod tests {
                 prot_flags,
                 MappingOptions::empty(),
                 MappingName::Stack,
+                FileWriteGuardRef(None),
             )
             .expect("failed to map stack VMO");
         current_task.registers.rsp = (stack_base + (STACK_SIZE - 8)).ptr() as u64;

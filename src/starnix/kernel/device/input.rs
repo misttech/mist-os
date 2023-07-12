@@ -601,7 +601,8 @@ mod test {
                 .lookup_path_from_root(b".")
                 .expect("failed to get namespace node for root"),
             OpenFlags::empty(),
-        );
+        )
+        .expect("FileObject::new failed");
         (kernel, current_task, file_object)
     }
 

@@ -183,7 +183,7 @@ pub trait FileOps: Send + Sync + AsAny + 'static {
         let min_vmo_size = (vmo_offset as usize)
             .checked_add(round_up_to_system_page_size(length)?)
             .ok_or(errno!(EINVAL))?;
-        let vmo = if options.contains(MappingOptions::SHARED) {
+        let mut vmo = if options.contains(MappingOptions::SHARED) {
             self.get_vmo(file, current_task, Some(min_vmo_size), prot_flags)?
         } else {
             // TODO(tbodt): Use PRIVATE_CLONE to have the filesystem server do the clone for us.
@@ -198,6 +198,36 @@ pub trait FileOps: Send + Sync + AsAny + 'static {
                     .map_err(impossible_error)?,
             )
         };
+
+        // Write guard is necessary only for shared mappings. Note that this doesn't depend on
+        // `prot_flags` since these can be changed later with `mprotect()`.
+        let file_write_guard = if options.contains(MappingOptions::SHARED) && file.can_write() {
+            let node = &file.name.entry.node;
+            let mut state = node.write_guard_state.lock();
+
+            // `F_SEAL_FUTURE_WRITE` should allow `mmap(PROT_READ)`, but block
+            // `mprotect(PROT_WRITE)`. This is different from `F_SEAL_WRITE`, which blocks
+            // `mmap(PROT_READ)`. To handle this case correctly remove `WRITE` right from the
+            // VMO handle to ensure `mprotect(PROT_WRITE)` fails.
+            let seals = state.get_seals().unwrap_or(SealFlags::empty());
+            if seals.contains(SealFlags::FUTURE_WRITE)
+                && !seals.contains(SealFlags::WRITE)
+                && !prot_flags.contains(ProtectionFlags::WRITE)
+            {
+                let mut new_rights = zx::Rights::VMO_DEFAULT - zx::Rights::WRITE;
+                if prot_flags.contains(ProtectionFlags::EXEC) {
+                    new_rights -= zx::Rights::EXECUTE;
+                }
+                vmo = Arc::new(vmo.duplicate_handle(new_rights).map_err(impossible_error)?);
+
+                FileWriteGuardRef(None)
+            } else {
+                state.create_write_guard(node.clone(), FileWriteGuardMode::WriteMapping)?.into_ref()
+            }
+        } else {
+            FileWriteGuardRef(None)
+        };
+
         let addr = current_task.mm.map(
             addr,
             vmo.clone(),
@@ -206,6 +236,7 @@ pub trait FileOps: Send + Sync + AsAny + 'static {
             prot_flags,
             options,
             MappingName::File(filename),
+            file_write_guard,
         )?;
         Ok(MappedVmo::new(vmo, addr))
     }
@@ -798,6 +829,8 @@ pub struct FileObject {
     flags: Mutex<OpenFlags>,
 
     async_owner: Mutex<FileAsyncOwner>,
+
+    _file_write_guard: Option<FileWriteGuard>,
 }
 
 pub type FileHandle = Arc<FileObject>;
@@ -817,13 +850,23 @@ impl FileObject {
     ) -> FileHandle {
         assert!(!node.fs().has_permanent_entries());
         Self::new(ops, NamespaceNode::new_anonymous_unrooted(node), flags)
+            .expect("Failed to create anonymous FileObject")
     }
 
     /// Create a FileObject with an associated NamespaceNode.
     ///
     /// This function is not typically called directly. Instead, consider
     /// calling NamespaceNode::open.
-    pub fn new(ops: Box<dyn FileOps>, name: NamespaceNode, flags: OpenFlags) -> FileHandle {
+    pub fn new(
+        ops: Box<dyn FileOps>,
+        name: NamespaceNode,
+        flags: OpenFlags,
+    ) -> Result<FileHandle, Errno> {
+        let file_write_guard = if flags.can_write() {
+            Some(name.entry.node.create_write_guard(FileWriteGuardMode::WriteFile)?)
+        } else {
+            None
+        };
         let fs = name.entry.node.fs();
         let file = Self {
             name,
@@ -832,9 +875,10 @@ impl FileObject {
             offset: Mutex::new(0),
             flags: Mutex::new(flags - OpenFlags::CREAT),
             async_owner: Default::default(),
+            _file_write_guard: file_write_guard,
         };
         file.notify(InotifyMask::OPEN);
-        Arc::new(file)
+        Ok(Arc::new(file))
     }
 
     /// A unique identifier for this file object.

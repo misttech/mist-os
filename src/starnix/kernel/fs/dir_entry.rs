@@ -130,11 +130,11 @@ impl DirEntry {
         current_task: &CurrentTask,
         flags: OpenFlags,
     ) -> Result<FileHandle, Errno> {
-        Ok(FileObject::new(
+        FileObject::new(
             self.node.create_file_ops(current_task, flags)?,
             NamespaceNode::new_anonymous(self.clone()),
             flags,
-        ))
+        )
     }
 
     fn lock_children<'a>(self: &'a DirEntryHandle) -> DirEntryLockedChildren<'a> {

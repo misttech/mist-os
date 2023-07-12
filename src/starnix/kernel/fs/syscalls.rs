@@ -199,6 +199,24 @@ pub fn sys_fcntl(
             }
             Ok(SUCCESS)
         }
+        F_ADD_SEALS => {
+            let file = current_task.files.get_unless_opath(fd)?;
+
+            if !file.can_write() {
+                // Cannot add seals if the file is not writable
+                return error!(EPERM);
+            }
+
+            let mut state = file.name.entry.node.write_guard_state.lock();
+            let flags = SealFlags::from_bits_truncate(arg as u32);
+            state.try_add_seal(flags)?;
+            Ok(SUCCESS)
+        }
+        F_GET_SEALS => {
+            let file = current_task.files.get_unless_opath(fd)?;
+            let state = file.name.entry.node.write_guard_state.lock();
+            Ok(state.get_seals()?.into())
+        }
         _ => {
             let file = current_task.files.get(fd)?;
             file.fcntl(current_task, cmd, arg)
@@ -1264,6 +1282,7 @@ pub fn sys_memfd_create(
     };
 
     let file = new_memfd(current_task, name, seals, OpenFlags::RDWR)?;
+
     let mut fd_flags = FdFlags::empty();
     if flags & MFD_CLOEXEC != 0 {
         fd_flags |= FdFlags::CLOEXEC;

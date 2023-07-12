@@ -11,7 +11,7 @@ use std::{
 };
 
 use crate::{
-    fs::FileHandle,
+    fs::{FileHandle, FileWriteGuardMode, FileWriteGuardRef},
     logging::*,
     mm::{vmo::round_up_to_system_page_size, *},
     task::*,
@@ -162,6 +162,7 @@ fn elf_load_error_to_errno(err: elf_load::ElfLoadError) -> Errno {
 struct Mapper<'a> {
     file: &'a FileHandle,
     mm: &'a MemoryManager,
+    file_write_guard: FileWriteGuardRef,
 }
 impl elf_load::Mapper for Mapper<'_> {
     fn map(
@@ -182,6 +183,7 @@ impl elf_load::Mapper for Mapper<'_> {
                 ProtectionFlags::from_vmar_flags(vmar_flags),
                 MappingOptions::ELF_BINARY,
                 MappingName::File(self.file.name.clone()),
+                self.file_write_guard.clone(),
             )
             .map_err(|e| {
                 // TODO: Find a way to propagate this errno to the caller.
@@ -196,6 +198,7 @@ fn load_elf(
     elf: FileHandle,
     elf_vmo: Arc<zx::Vmo>,
     mm: &MemoryManager,
+    file_write_guard: FileWriteGuardRef,
 ) -> Result<LoadedElf, Errno> {
     let headers = elf_parse::Elf64Headers::from_vmo(&elf_vmo).map_err(elf_parse_error_to_errno)?;
     let elf_info = elf_load::loaded_elf_info(&headers);
@@ -207,7 +210,7 @@ fn load_elf(
         _ => return error!(EINVAL),
     };
     let vaddr_bias = file_base.wrapping_sub(elf_info.low);
-    let mapper = Mapper { file: &elf, mm };
+    let mapper = Mapper { file: &elf, mm, file_write_guard };
     elf_load::map_elf_segments(&elf_vmo, &headers, &mapper, mm.base_addr.ptr(), vaddr_bias)
         .map_err(elf_load_error_to_errno)?;
     Ok(LoadedElf { headers, file_base, vaddr_bias })
@@ -230,6 +233,8 @@ pub struct ResolvedElf {
     pub argv: Vec<CString>,
     /// The environment to initialize for the new process.
     pub environ: Vec<CString>,
+    /// Exec/write lock.
+    pub file_write_guard: FileWriteGuardRef,
 }
 
 /// Holds a resolved ELF interpreter VMO.
@@ -238,6 +243,8 @@ pub struct ResolvedInterpElf {
     file: FileHandle,
     /// A VMO to the resolved ELF interpreter.
     vmo: Arc<zx::Vmo>,
+    /// Exec/write lock.
+    file_write_guard: FileWriteGuardRef,
 }
 
 // The magic bytes of a script file.
@@ -381,11 +388,15 @@ fn resolve_elf(
             None,
             ProtectionFlags::READ | ProtectionFlags::EXEC,
         )?;
-        Some(ResolvedInterpElf { file: interp_file, vmo: interp_vmo })
+        let file_write_guard =
+            interp_file.name.entry.node.create_write_guard(FileWriteGuardMode::Exec)?.into_ref();
+        Some(ResolvedInterpElf { file: interp_file, vmo: interp_vmo, file_write_guard })
     } else {
         None
     };
-    Ok(ResolvedElf { file, vmo, interp, argv, environ })
+    let file_write_guard =
+        file.name.entry.node.create_write_guard(FileWriteGuardMode::Exec)?.into_ref();
+    Ok(ResolvedElf { file, vmo, interp, argv, environ, file_write_guard })
 }
 
 /// Loads a resolved ELF into memory, along with an interpreter if one is defined, and initializes
@@ -395,10 +406,15 @@ pub fn load_executable(
     resolved_elf: ResolvedElf,
     original_path: &CStr,
 ) -> Result<ThreadStartInfo, Errno> {
-    let main_elf = load_elf(resolved_elf.file, resolved_elf.vmo, &current_task.mm)?;
+    let main_elf = load_elf(
+        resolved_elf.file,
+        resolved_elf.vmo,
+        &current_task.mm,
+        resolved_elf.file_write_guard,
+    )?;
     let interp_elf = resolved_elf
         .interp
-        .map(|interp| load_elf(interp.file, interp.vmo, &current_task.mm))
+        .map(|interp| load_elf(interp.file, interp.vmo, &current_task.mm, interp.file_write_guard))
         .transpose()?;
 
     let entry_elf = interp_elf.as_ref().unwrap_or(&main_elf);
@@ -427,6 +443,7 @@ pub fn load_executable(
             prot_flags,
             MappingOptions::empty(),
             MappingName::Vdso,
+            FileWriteGuardRef(None),
         )?;
         map_result.ptr() as u64
     } else {
@@ -476,6 +493,7 @@ pub fn load_executable(
         prot_flags,
         MappingOptions::empty(),
         MappingName::Stack,
+        FileWriteGuardRef(None),
     )?;
     let stack = stack_base + (stack_size - 8);
 

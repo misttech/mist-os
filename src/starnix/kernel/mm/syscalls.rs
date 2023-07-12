@@ -127,6 +127,7 @@ pub fn do_mmap(
             prot_flags,
             options,
             MappingName::None,
+            FileWriteGuardRef(None),
         )?;
         MappedVmo::new(vmo, user_address)
     } else {

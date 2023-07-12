@@ -47,7 +47,7 @@ impl FsNodeOps for SdcardHackNode {
             self.0.entry.node.create_file_ops(current_task, flags)?,
             self.0.clone(),
             flags,
-        ))))
+        )?)))
     }
 
     fn lookup(

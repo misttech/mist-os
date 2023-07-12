@@ -137,6 +137,9 @@ struct Mapping {
     /// Because of this exception, avoid using this field to check if a mapping is anonymous.
     /// Instead, check if `options` bitfield contains `MappingOptions::ANONYMOUS`.
     name: MappingName,
+
+    /// Lock guard held to prevent this file from being written while it's being executed.
+    file_write_guard: FileWriteGuardRef,
 }
 
 impl Mapping {
@@ -146,8 +149,17 @@ impl Mapping {
         vmo_offset: u64,
         prot_flags: ProtectionFlags,
         options: MappingOptions,
+        file_write_guard: FileWriteGuardRef,
     ) -> Mapping {
-        Mapping { base, vmo, vmo_offset, prot_flags, options, name: MappingName::None }
+        Mapping {
+            base,
+            vmo,
+            vmo_offset,
+            prot_flags,
+            options,
+            name: MappingName::None,
+            file_write_guard,
+        }
     }
 
     /// Converts a `UserAddress` to an offset in this mapping's VMO.
@@ -323,6 +335,7 @@ impl MemoryManagerState {
         prot_flags: ProtectionFlags,
         options: MappingOptions,
         name: MappingName,
+        file_write_guard: FileWriteGuardRef,
         released_mappings: &mut Vec<Mapping>,
     ) -> Result<UserAddress, Errno> {
         let mapped_addr = self.map_internal(addr, &vmo, vmo_offset, length, prot_flags, options)?;
@@ -343,7 +356,8 @@ impl MemoryManagerState {
             self.update_after_unmap(addr, end - addr, released_mappings)?;
         }
 
-        let mut mapping = Mapping::new(mapped_addr, vmo, vmo_offset, prot_flags, options);
+        let mut mapping =
+            Mapping::new(mapped_addr, vmo, vmo_offset, prot_flags, options, file_write_guard);
         mapping.name = name;
         self.mappings.insert(mapped_addr..end, mapping);
 
@@ -492,6 +506,7 @@ impl MemoryManagerState {
             prot_flags,
             original_mapping.options,
             original_mapping.name,
+            original_mapping.file_write_guard,
             released_mappings,
         )?))
     }
@@ -593,6 +608,7 @@ impl MemoryManagerState {
             src_mapping.prot_flags,
             src_mapping.options,
             src_mapping.name,
+            src_mapping.file_write_guard,
             released_mappings,
         )?;
 
@@ -947,6 +963,7 @@ impl MemoryManagerState {
             0,
             mapping_to_grow.prot_flags,
             mapping_to_grow.options,
+            FileWriteGuardRef(None),
         );
         let vmar_offset = self
             .user_address_to_vmar_offset(low_addr)
@@ -1424,6 +1441,7 @@ impl MemoryManager {
                     prot_flags,
                     MappingOptions::empty(),
                     MappingName::Heap,
+                    FileWriteGuardRef(None),
                     &mut released_mappings,
                 )?;
                 let brk = ProgramBreak { base: addr, current: addr };
@@ -1607,6 +1625,7 @@ impl MemoryManager {
                 mapping.prot_flags,
                 mapping.options,
                 mapping.name.clone(),
+                FileWriteGuardRef(None),
                 &mut released_mappings,
             )?;
             assert!(released_mappings.is_empty());
@@ -1664,6 +1683,7 @@ impl MemoryManager {
         prot_flags: ProtectionFlags,
         options: MappingOptions,
         name: MappingName,
+        file_write_guard: FileWriteGuardRef,
     ) -> Result<UserAddress, Errno> {
         // Unmapped mappings must be released after the state is unlocked.
         let mut released_mappings = vec![];
@@ -1676,6 +1696,7 @@ impl MemoryManager {
             prot_flags,
             options,
             name,
+            file_write_guard,
             &mut released_mappings,
         );
 
@@ -1797,6 +1818,7 @@ impl MemoryManager {
                     mapping.vmo_offset,
                     mapping.prot_flags,
                     mapping.options,
+                    mapping.file_write_guard.clone(),
                 );
                 state.mappings.insert(start_split_range, start_split_mapping);
 
@@ -1830,6 +1852,7 @@ impl MemoryManager {
                     mapping.vmo_offset + tail_offset as u64,
                     mapping.prot_flags,
                     mapping.options,
+                    mapping.file_write_guard.clone(),
                 );
                 state.mappings.insert(tail_range, tail_mapping);
                 range.end = end;
@@ -2993,6 +3016,7 @@ mod tests {
                 prot_flags,
                 MappingOptions::empty(),
                 MappingName::None,
+                FileWriteGuardRef(None),
             )
             .expect("map failed");
 

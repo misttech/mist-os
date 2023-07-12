@@ -165,7 +165,6 @@
                 "epoll_ctl04",
                 "epoll_pwait04",
                 "eventfd01",
-                "execve04",
                 "execve06",
                 "execveat03",
                 "fallocate02",

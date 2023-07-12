@@ -212,6 +212,7 @@ rustc_binary("starnix_kernel_bin") {
     "fs/file_object.rs",
     "fs/file_server.rs",
     "fs/file_system.rs",
+    "fs/file_write_guard.rs",
     "fs/fs_args.rs",
     "fs/fs_context.rs",
     "fs/fs_node.rs",
