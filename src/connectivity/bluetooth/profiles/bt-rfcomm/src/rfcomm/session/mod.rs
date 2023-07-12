@@ -977,7 +977,7 @@ impl Session {
     ) {
         loop {
             select! {
-                incoming_bytes = l2cap_channel.next().fuse() => {
+                incoming_bytes = l2cap_channel.next() => {
                     match incoming_bytes {
                         Some(Ok(bytes)) => {
                             trace!("Received packet from peer: {:?}", bytes);

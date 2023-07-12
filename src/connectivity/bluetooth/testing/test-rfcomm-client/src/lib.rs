@@ -9,7 +9,7 @@ use fidl_fuchsia_bluetooth_bredr as bredr;
 use fidl_fuchsia_bluetooth_rfcomm_test as rfcomm;
 use fuchsia_async as fasync;
 use fuchsia_bluetooth::types::{Channel, PeerId, Uuid};
-use futures::{channel::mpsc, select, FutureExt, StreamExt};
+use futures::{channel::mpsc, select, StreamExt};
 use parking_lot::Mutex;
 use profile_client::{ProfileClient, ProfileEvent};
 use std::{cell::Cell, collections::HashMap, convert::TryFrom, sync::Arc};
@@ -91,7 +91,7 @@ impl RfcommSession {
                 // The `fuse()` call is in the loop because `channel` is both borrowed as a stream
                 // and used to send data. It is safe because once `channel` is closed, the loop will
                 // break and `channel.next()` will never be polled thereafter.
-                bytes_from_peer = channel.next().fuse() => {
+                bytes_from_peer = channel.next() => {
                     let user_data = match bytes_from_peer {
                         Some(Ok(bytes)) => bytes,
                         Some(Err(e)) => {

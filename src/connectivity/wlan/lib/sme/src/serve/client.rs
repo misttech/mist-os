@@ -183,7 +183,7 @@ async fn serve_connect_txn_stream(
 ) -> Result<(), anyhow::Error> {
     if let Some(handle) = handle {
         loop {
-            match connect_txn_stream.next().fuse().await {
+            match connect_txn_stream.next().await {
                 Some(event) => match event {
                     ConnectTransactionEvent::OnConnectResult { result, is_reconnect } => {
                         let connect_result = convert_connect_result(&result, is_reconnect);

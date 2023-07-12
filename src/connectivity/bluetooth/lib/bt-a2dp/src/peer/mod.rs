@@ -457,7 +457,7 @@ impl Peer {
         mut reservations_receiver: mpsc::UnboundedReceiver<BoxFuture<'static, StreamPermit>>,
     ) {
         let lock = self.inner.lock();
-        let mut request_stream = lock.peer.take_request_stream();
+        let mut request_stream = lock.peer.take_request_stream().fuse();
         let id = self.id.clone();
         let peer = Arc::downgrade(&self.inner);
         let mut stream_reservations = FuturesUnordered::new();
@@ -465,7 +465,7 @@ impl Peer {
         fuchsia_async::Task::local(async move {
             loop {
                 select! {
-                    request = request_stream.next().fuse() => {
+                    request = request_stream.next() => {
                         match request {
                             None => break,
                             Some(Err(e)) => info!(peer_id = %id, ?e, "Request stream error"),

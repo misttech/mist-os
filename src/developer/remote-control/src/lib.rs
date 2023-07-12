@@ -327,7 +327,7 @@ impl RemoteControlService {
         listen_addr: SocketAddr,
         client: rcs::ForwardCallbackProxy,
     ) -> Result<(), std::io::Error> {
-        let mut listener = fasync::net::TcpListener::bind(&listen_addr)?.accept_stream();
+        let mut listener = fasync::net::TcpListener::bind(&listen_addr)?.accept_stream().fuse();
 
         fasync::Task::local(async move {
             let mut client_closed = client.on_closed().fuse();
@@ -335,7 +335,7 @@ impl RemoteControlService {
             loop {
                 // Listen for a connection, or exit if the client has gone away.
                 let (stream, addr) = futures::select! {
-                    result = listener.next().fuse() => {
+                    result = listener.next() => {
                         match result {
                             Some(Ok(x)) => x,
                             Some(Err(e)) => {

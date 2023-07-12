@@ -242,7 +242,8 @@ async fn run_server(
     let mut incoming = futures::stream::select(
         listener.incoming().map_ok(ConnectionStream::Tcp).map_err(Into::into),
         tunnel_conns,
-    );
+    )
+    .fuse();
 
     // Spawn all connections and related tasks in this executor.
     let executor = TaskExecutor::new();
@@ -251,9 +252,8 @@ async fn run_server(
     let server_sse_response_creators = Arc::new(SyncRwLock::new(HashMap::new()));
 
     loop {
-        let mut next = incoming.next().fuse();
         let conn = futures::select! {
-            conn = next => {
+            conn = incoming.next() => {
                 match conn {
                     Some(Ok(conn)) => conn,
                     Some(Err(err)) => {
@@ -1252,10 +1252,10 @@ mod tests {
             let timestamp_file = timestamp_file.clone();
             async move {
                 let url = format!("{server_url}/devhost/auto");
-                let mut sse_client = SseClient::connect(client.clone(), url).await.unwrap();
+                let mut sse_client = SseClient::connect(client.clone(), url).await.unwrap().fuse();
 
                 futures::select! {
-                    value = sse_client.next().fuse() => {
+                    value = sse_client.next() => {
                         assert_eq!(value.unwrap().unwrap().data(), "1");
                     },
                     () = fuchsia_async::Timer::new(Duration::from_secs(3)).fuse() => {

@@ -33,7 +33,7 @@ pub async fn run(hd: HostDispatcher, mut stream: AccessRequestStream) -> Result<
 
     loop {
         select! {
-            event_opt = stream.next().fuse() => {
+            event_opt = stream.next() => {
                 match event_opt {
                     Some(event) => handler(hd.clone(), &mut watch_peers_subscriber, &mut session, event?).await?,
                     None => break,

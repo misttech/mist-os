@@ -404,7 +404,7 @@ impl SessionChannel {
                 // form, and in the receive_data_from_peer() call. This fuse() is OK because when
                 // the stream terminates, `data_from_client` will be None, and we will break
                 // out of the loop - `channel.next()` will never be polled again.
-                data_from_client = channel.next().fuse() => {
+                data_from_client = channel.next() => {
                     match data_from_client {
                         Some(Ok(bytes)) => {
                             trace!("Sending user-data packet for DLCI {:?}: {:?}", dlci, bytes);

@@ -418,7 +418,7 @@ async fn main() {
     let mut present_count = 0;
     loop {
         futures::select! {
-          message = internal_receiver.next().fuse() => {
+          message = internal_receiver.next() => {
             if let Some(message) = message {
               match message {
                 InternalMessage::CreateView(view_creation_token, view_identity) => {

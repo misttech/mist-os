@@ -143,7 +143,7 @@ impl PeerTaskInner {
     async fn main_loop(&mut self) -> Result<(), ()> {
         loop {
             select! {
-                profile_event_option = self.profile_event_receiver.next().fuse() => {
+                profile_event_option = self.profile_event_receiver.next() => {
                     match profile_event_option {
                         None => {
                             error!("Profile event channel closed unexpectedly for peer {:} in main loop.", self.peer_id);
@@ -159,7 +159,7 @@ impl PeerTaskInner {
                         }
                     }
                 }
-                control_message = self.control_channel.next().fuse() => {
+                control_message = self.control_channel.next() => {
                     debug!("Got control message for Peer {:}: {:?}", self.peer_id, control_message);
                     match control_message {
                         Some(Ok(control_message)) => self.handle_control_message(control_message),
@@ -169,7 +169,7 @@ impl PeerTaskInner {
                         }
                     }
                 }
-                interrupt_message = self.interrupt_channel.next().fuse() => {
+                interrupt_message = self.interrupt_channel.next() => {
                     debug!("Got interrupt message for Peer {:}: {:?}", self.peer_id, interrupt_message);
                     match interrupt_message {
                         Some(Ok(interrupt_message)) => self.handle_interrupt_message(interrupt_message),

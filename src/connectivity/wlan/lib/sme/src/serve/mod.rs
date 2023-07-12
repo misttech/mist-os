@@ -264,7 +264,7 @@ where
             // Fuse rationale: any `none`s in the MLME stream should result in
             // bailing immediately, so we don't need to track if we've seen a
             // `None` or not and can `fuse` directly in the `select` call.
-            mlme_event = event_stream.next().fuse() => match mlme_event {
+            mlme_event = event_stream.next() => match mlme_event {
                 Some(mlme_event) => station.lock().unwrap().on_mlme_event(mlme_event),
                 None => return Ok(()),
             },

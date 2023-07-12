@@ -42,7 +42,7 @@ impl FileActor {
                         {
                             panic!("No progress made after {:?}", duration_clone);
                         }
-                    _ = rx.next().fuse() => continue,
+                    _ = rx.next() => continue,
                 }
             }
         });

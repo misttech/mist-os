@@ -212,7 +212,7 @@ impl TestGraphicalPresenter {
                     }
                 }
                 // Read the event stream to manage our present credit budget.
-                event = self.flatland_events.next().fuse() => match event {
+                event = self.flatland_events.next() => match event {
                     Some(Ok(FlatlandEvent::OnNextFrameBegin { values })) => {
                         if let Some(credits) = values.additional_present_credits {
                             self.present_credits += credits;

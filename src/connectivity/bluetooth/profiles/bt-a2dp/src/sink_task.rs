@@ -266,10 +266,11 @@ impl MediaTask for RunningSinkTask {
 /// playback error.  Reports stream progress using `inspect`.
 async fn media_stream_task(
     peer_id: PeerId,
-    mut stream: (impl futures::Stream<Item = avdtp::Result<Vec<u8>>> + std::marker::Unpin),
+    stream: (impl futures::Stream<Item = avdtp::Result<Vec<u8>>> + std::marker::Unpin),
     player_gen: Box<dyn Fn() -> Result<player::Player, Error> + Send>,
     mut inspect: DataStreamInspect,
 ) -> StreamingError {
+    let mut stream = stream.fuse();
     let mut player: Option<player::Player> = None;
     let mut packet_count: u64 = 0;
     inspect.start();
@@ -278,7 +279,7 @@ async fn media_stream_task(
             player.as_mut().map(|p| p.next_event().fuse()).unwrap_or(Fuse::terminated());
 
         select! {
-            stream_packet = stream.next().fuse() => {
+            stream_packet = stream.next() => {
                 drop(player_event_fut);
                 let pkt = match stream_packet {
                     None => break StreamingError::MediaStreamEnd,

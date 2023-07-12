@@ -17,7 +17,7 @@ use fidl_fuchsia_bluetooth_le::{
 };
 use fuchsia_async as fasync;
 use fuchsia_component as app;
-use futures::{select, FutureExt, StreamExt};
+use futures::{select, StreamExt};
 use parking_lot::RwLock;
 use std::collections::HashMap;
 use std::str::FromStr;
@@ -602,8 +602,8 @@ impl GattClientFacade {
     ) {
         let tag = "GattClientFacade::connection_event_task";
         select! {
-           _ = connection_stream.next().fuse() => info!(tag = &with_line!(tag) , "Connection to {} closed", peer_id),
-           _ = client_stream.next().fuse() => info!(tag = &with_line!(tag), "Client for {} closed", peer_id),
+           _ = connection_stream.next() => info!(tag = &with_line!(tag) , "Connection to {} closed", peer_id),
+           _ = client_stream.next() => info!(tag = &with_line!(tag), "Client for {} closed", peer_id),
         }
         inner.write().clients.remove(&peer_id);
     }

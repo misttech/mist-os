@@ -41,7 +41,7 @@ pub fn start_flatland_presentation_loop(
 
         loop {
             futures::select! {
-                message = receiver.next().fuse() => {
+                message = receiver.next() => {
                     match message {
                         Some(channel) => {
                             assert!(pingback_channel.is_none());

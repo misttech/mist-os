@@ -432,7 +432,7 @@ impl TerminalViewAssistant {
                             app_sender.request_render(view_key);
                         }
                     },
-                    result = resize_receiver.next().fuse() => {
+                    result = resize_receiver.next() => {
                         if let Some(event) = result {
                             process.pty.resize(event.window_size).await.unwrap_or_else(|e: anyhow::Error| {
                                 error!("failed to send resize message to pty: {:?}", e)
@@ -1049,7 +1049,7 @@ mod tests {
         #[allow(clippy::never_loop)] // TODO(fxbug.dev/95065)
         loop {
             let timeout = Timer::new(5000_i64.millis().after_now());
-            let either = futures::future::select(timeout, receiver.next().fuse());
+            let either = futures::future::select(timeout, receiver.next());
             let resolved = either.await;
             match resolved {
                 Either::Left(_) => {

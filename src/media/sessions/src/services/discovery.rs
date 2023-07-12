@@ -346,7 +346,7 @@ impl Discovery {
                     self.interrupt_paused_players.remove(&removal);
                 }
                 // Drive dispatch of events to watcher clients.
-                _ = self.watchers.next().fuse() => {
+                _ = self.watchers.next() => {
                 },
                 // A new player has been published to `fuchsia.media.sessions2.Publisher`.
                 mut new_player = self.player_stream.select_next_some() => {
@@ -356,7 +356,7 @@ impl Discovery {
                     self.players.insert(new_player.id(), new_player);
                 }
                 // A player answered a hanging get for its status.
-                player_update = self.players.next().fuse() => {
+                player_update = self.players.next() => {
                     if let Some(player_update) = player_update {
                         self.handle_player_update(player_update).await;
                     }

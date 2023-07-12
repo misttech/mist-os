@@ -52,10 +52,10 @@ async fn set_pairing_delegate() {
             _pairing_result = run_pairing.fuse() => {
                 panic!("`sys.Pairing` server unexpectedly terminated");
             }
-            result = delegate_server1.next().fuse() => {
+            result = delegate_server1.next() => {
                 panic!("First delegate should be stay open: {:?}", result);
             }
-            result = delegate_server2.next().fuse() => {
+            result = delegate_server2.next() => {
                 assert_matches!(result, None);
                 break;
             }

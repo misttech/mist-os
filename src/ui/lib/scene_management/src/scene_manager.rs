@@ -293,7 +293,7 @@ pub fn start_flatland_presentation_loop(
 
         loop {
             futures::select! {
-                message = receiver.next().fuse() => {
+                message = receiver.next() => {
                     match message {
                         Some(PresentationMessage::RequestPresent) => {
                             scheduler.request_present();

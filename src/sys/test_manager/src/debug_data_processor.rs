@@ -198,7 +198,7 @@ pub(crate) async fn serve_debug_data_publisher(
             // Poll for completion of both stop_recv and any futures serving the publisher
             // together. This allows us to accept any new serve requests even if stop is
             // called, so long as at least one other request is still being served.
-            maybe_result = drain_tasks.next().fuse() => match maybe_result {
+            maybe_result = drain_tasks.next() => match maybe_result {
                 Some(result) => {
                     result?;
                 },

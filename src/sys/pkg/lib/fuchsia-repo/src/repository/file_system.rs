@@ -702,12 +702,12 @@ mod tests {
         // We support watch.
         assert!(env.repo.supports_watch());
 
-        let mut watch_stream = env.repo.watch().unwrap();
+        let mut watch_stream = env.repo.watch().unwrap().fuse();
 
         // Try to read from the stream. This should not return anything since we haven't created a
         // file yet.
         futures::select! {
-            _ = watch_stream.next().fuse() => panic!("should not have received an event"),
+            _ = watch_stream.next() => panic!("should not have received an event"),
             _ = fasync::Timer::new(Duration::from_millis(10)).fuse() => (),
         };
 
@@ -715,7 +715,7 @@ mod tests {
         env.write_metadata("timestamp.json", br#"{"version":1}"#);
 
         futures::select! {
-            result = watch_stream.next().fuse() => {
+            result = watch_stream.next() => {
                 assert_eq!(result, Some(()));
             },
             _ = fasync::Timer::new(Duration::from_secs(10)).fuse() => {
@@ -727,7 +727,7 @@ mod tests {
         env.write_metadata("timestamp.json", br#"{"version":2}"#);
 
         futures::select! {
-            result = watch_stream.next().fuse() => {
+            result = watch_stream.next() => {
                 assert_eq!(result, Some(()));
             },
             _ = fasync::Timer::new(Duration::from_secs(10)).fuse() => {

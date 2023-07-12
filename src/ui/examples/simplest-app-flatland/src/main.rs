@@ -219,7 +219,7 @@ async fn main() {
 
     loop {
         futures::select! {
-          message = internal_receiver.next().fuse() => {
+          message = internal_receiver.next() => {
             if let Some(message) = message {
               match message {
                   InternalMessage::Relayout { size } => {

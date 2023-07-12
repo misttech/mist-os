@@ -179,7 +179,7 @@ impl Client {
                     // `None`, so no need to track state of the channel between
                     // loop iterations. NOTE: for this to remain true, no other code
                     // can be given access to mutate `self.tasks`.
-                    task = self.tasks.next().fuse() => {
+                    task = self.tasks.next() => {
                         // A new closure has been received.
                         //
                         // We unwrap since we retain a reference to the

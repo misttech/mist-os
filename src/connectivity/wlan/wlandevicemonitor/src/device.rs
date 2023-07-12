@@ -7,7 +7,6 @@ use {
     fidl_fuchsia_wlan_device as fidl_wlan_dev, fidl_fuchsia_wlan_sme as fidl_wlan_sme,
     fuchsia_inspect_contrib::inspect_log,
     futures::{
-        future::FutureExt,
         pin_mut, select,
         stream::{FuturesUnordered, StreamExt, TryStreamExt},
     },
@@ -64,14 +63,12 @@ pub async fn serve_phys(
     inspect_tree: Arc<inspect::WlanMonitorTree>,
     device_directory: &str,
 ) -> Result<Infallible, Error> {
-    let new_phys = device_watch::watch_phy_devices(device_directory)?;
+    let new_phys = device_watch::watch_phy_devices(device_directory)?.fuse();
     pin_mut!(new_phys);
     let mut active_phys = FuturesUnordered::new();
     loop {
         select! {
-            // OK to fuse directly in the `select!` since we bail immediately
-            // when a `None` is encountered.
-            new_phy = new_phys.next().fuse() => match new_phy {
+            new_phy = new_phys.next() => match new_phy {
                 None => return Err(format_err!("new phy stream unexpectedly finished")),
                 Some(Err(e)) => return Err(format_err!("new phy stream returned an error: {}", e)),
                 Some(Ok(new_phy)) => {

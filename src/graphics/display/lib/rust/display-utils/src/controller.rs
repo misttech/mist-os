@@ -507,7 +507,7 @@ mod tests {
         const STAMP: display::ConfigStamp = display::ConfigStamp { value: 1 };
         let event_handlers = async {
             select! {
-                event = vsync.next().fuse() => event.ok_or(format_err!("did not receive vsync event")),
+                event = vsync.next() => event.ok_or(format_err!("did not receive vsync event")),
                 result = coordinator.handle_events().fuse() => {
                     result.context("FIDL event handler failed")?;
                     Err(format_err!("FIDL event handler completed before client vsync event"))
@@ -589,7 +589,7 @@ mod tests {
         let mut vsync = coordinator.add_vsync_listener(Some(ID2))?;
         let event_handlers = async {
             select! {
-                event = vsync.next().fuse() => event.ok_or(format_err!("did not receive vsync event")),
+                event = vsync.next() => event.ok_or(format_err!("did not receive vsync event")),
                 result = coordinator.handle_events().fuse() => {
                     result.context("FIDL event handler failed")?;
                     Err(format_err!("FIDL event handler completed before client vsync event"))

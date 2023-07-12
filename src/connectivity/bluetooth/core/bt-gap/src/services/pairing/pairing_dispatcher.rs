@@ -182,7 +182,7 @@ impl PairingDispatcher {
                     }
                 }
             },
-            host_added = self.hosts_added.next().fuse() => {
+            host_added = self.hosts_added.next() => {
                 match host_added {
                     Some((id, proxy)) => {
                         if let Err(_) = self.start_handling_host(id.clone(), proxy) {
@@ -194,7 +194,7 @@ impl PairingDispatcher {
                     None => true,
                 }
             },
-            event = self.upstream_events.next().fuse() => {
+            event = self.upstream_events.next() => {
                 match event {
                      // TODO(fxbug.dev/76133): Handle OnLocalKeypress event.
                      Some(Ok(PairingDelegateEvent::OnLocalKeypress {id: _, keypress: _})) => {
