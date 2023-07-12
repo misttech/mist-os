@@ -432,10 +432,11 @@ class KernelDriver {
     uart_.SetLineControl(io_, data_bits, parity, stop_bits);
   }
 
-  template <typename LockPolicy = DefaultLockPolicy>
-  void InitInterrupt() {
+  // TODO(fxbug.dev/129378): Asses the need of |enable_interrupt_callback|.
+  template <typename LockPolicy = DefaultLockPolicy, typename EnableInterruptCallback>
+  void InitInterrupt(EnableInterruptCallback&& enable_interrupt_callback) {
     Guard<LockPolicy> lock(&lock_, SOURCE_TAG);
-    uart_.InitInterrupt(io_);
+    uart_.InitInterrupt(io_, std::forward<EnableInterruptCallback>(enable_interrupt_callback));
   }
 
   template <typename Tx, typename Rx>

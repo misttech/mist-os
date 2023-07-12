@@ -397,14 +397,25 @@ class DriverImpl : public DriverBase<DriverImpl<KdrvExtra, KdrvConfig>, KdrvExtr
     ier.set_rx_available(enable).WriteTo(io.io());
   }
 
-  template <class IoProvider>
-  void InitInterrupt(IoProvider& io) {
+  template <class IoProvider, typename EnableInterruptCallback>
+  void InitInterrupt(IoProvider& io, EnableInterruptCallback&& enable_interrupt_callback) {
+    // In x86 drivers enabling the interrupt after setting up the hardware
+    // may cause the Rx Interrupt never to fire.
+    if constexpr (KdrvExtra == ZBI_KERNEL_DRIVER_I8250_PIO_UART ||
+                  KdrvExtra == ZBI_KERNEL_DRIVER_I8250_MMIO32_UART) {
+      enable_interrupt_callback();
+    }
     // Enable receive interrupts.
     EnableRxInterrupt(io);
 
     // Modem Control Register: Auxiliary Output 2 is another IRQ enable bit.
     auto mcr = ModemControlRegister::Get().FromValue(0);
     mcr.set_auxiliary_out_2(true).WriteTo(io.io());
+
+    if constexpr (KdrvExtra == ZBI_KERNEL_DRIVER_DW8250_UART ||
+                  KdrvExtra == ZBI_KERNEL_DRIVER_I8250_MMIO8_UART) {
+      enable_interrupt_callback();
+    }
   }
 
   template <class IoProvider, typename Lock, typename Waiter, typename Tx, typename Rx>

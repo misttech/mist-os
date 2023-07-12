@@ -148,8 +148,8 @@ struct Driver : public DriverBase<Driver, ZBI_KERNEL_DRIVER_IMX_UART, zbi_dcfg_s
     // TODO(fxbug.dev/115620): implement me
   }
 
-  template <class IoProvider>
-  void InitInterrupt(IoProvider& io) {
+  template <class IoProvider, class EnableInterruptCallback>
+  void InitInterrupt(IoProvider& io, EnableInterruptCallback&& enable_interrupt_callback) {
     // Stubber out implementation.
     // TODO(fxbug.dev/115620): implement me
   }

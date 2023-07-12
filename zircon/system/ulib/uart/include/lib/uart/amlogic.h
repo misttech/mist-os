@@ -161,14 +161,15 @@ struct Driver : public DriverBase<Driver, ZBI_KERNEL_DRIVER_AMLOGIC_UART, zbi_dc
     cr.set_rx_interrupt(enable).WriteTo(io.io());
   }
 
-  template <class IoProvider>
-  void InitInterrupt(IoProvider& io) {
+  template <class IoProvider, typename EnableInterruptCallback>
+  void InitInterrupt(IoProvider& io, EnableInterruptCallback&& enable_interrupt_callback) {
     auto icr = IrqControlRegister::Get().ReadFrom(io.io());
     icr.set_tx_irq_count(kFifoDepth / 8).set_rx_irq_count(1).WriteTo(io.io());
 
     // Enable receive interrupts.
     // Transmit interrupts are enabled only when there is a blocked writer.
     EnableRxInterrupt(io);
+    enable_interrupt_callback();
   }
 
   template <class IoProvider, typename Lock, typename Waiter, typename Tx, typename Rx>

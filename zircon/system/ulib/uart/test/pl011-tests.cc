@@ -89,7 +89,7 @@ void InitWithInterrupt(SimpleTestDriver& driver) {
       .ExpectWrite<uint16_t>(0b0011'0000'0001, 0x30);  // Enable RX.
 
   driver.Init();
-  driver.InitInterrupt();
+  driver.InitInterrupt([]() {});
   driver.io().mock().VerifyAndClear();
 }
 
@@ -108,7 +108,9 @@ TEST(Pl011Tests, InitInterrupt) {
       .ExpectRead<uint16_t>(0b0001'0000'0001, 0x30)  // Read Control Register State
       .ExpectWrite<uint16_t>(0b0011'0000'0001, 0x30);  // Enable RX.
 
-  driver.InitInterrupt();
+  bool unmasked_irq = false;
+  driver.InitInterrupt([&unmasked_irq]() { unmasked_irq = true; });
+  EXPECT_TRUE(unmasked_irq);
 }
 
 TEST(Pl011Tests, RxIrqEmptyFifo) {

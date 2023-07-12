@@ -243,9 +243,8 @@ void UartDriverHandoffLate(const uart::all::Driver& serial) {
       zx_status_t irq_register_result =
           register_permanent_int_handler(*uart_irq, irq_handler, &driver);
       DEBUG_ASSERT(irq_register_result == ZX_OK);
-      unmask_interrupt(*uart_irq);
       // Init Rx Interrupt.
-      driver.InitInterrupt();
+      driver.InitInterrupt([uart_irq]() { unmask_interrupt(*uart_irq); });
     });
 
     if (!polling_mode) {

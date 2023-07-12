@@ -105,8 +105,8 @@ struct Driver {
   void EnableRxInterrupt(IoProvider& io) {}
 
   // Set the UART up to deliver interrupts.  This is called after Init.
-  template <typename IoProvider>
-  void InitInterrupt(IoProvider& io) {}
+  template <typename IoProvider, typename EnableInterruptCallback>
+  void InitInterrupt(IoProvider& io, EnableInterruptCallback&& enable_interrupt_callback) {}
 
   template <typename IoProvider, typename Lock, typename Waiter, typename Tx, typename Rx>
   void Interrupt(IoProvider&, Lock&, Waiter&, Tx&&, Rx&&) {}

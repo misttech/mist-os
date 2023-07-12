@@ -213,10 +213,11 @@ struct Driver : public DriverBase<Driver, ZBI_KERNEL_DRIVER_MOTMOT_UART, zbi_dcf
     // Stubbed out implementation that does nothing.
   }
 
-  template <class IoProvider>
-  void InitInterrupt(IoProvider& io) {
-    // Stubber out implementation.
+  template <class IoProvider, typename EnableInterruptCallback>
+  void InitInterrupt(IoProvider& io, EnableInterruptCallback&& enable_interrupt_callback) {
+    // Stubbed out implementation.
     // TODO(fxbug.dev/115620): implement me
+    enable_interrupt_callback();
   }
 
   template <class IoProvider, class Lock, class Waiter, class Tx, class Rx>
