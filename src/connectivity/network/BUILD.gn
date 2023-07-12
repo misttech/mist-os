@@ -113,8 +113,8 @@ fuchsia_package("netstack3") {
   ]
 }
 
-core_shard("virtualization-core-shard") {
-  shard_file = "meta/virtualization.core_shard.cml"
+# TODO(fxbug.dev/122864) Remove transitional labels
+group("virtualization-core-shard") {
 }
 
 core_shard("persistence-core-shard") {

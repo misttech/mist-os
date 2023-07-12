@@ -667,6 +667,7 @@ assembly_input_bundle("common_minimal") {
   base_packages = [
     # The SWD stack artifacts that enable OTAs
     "//src/sys/pkg/bin/system-updater",
+    "//src/sys/full-resolver:full-resolver-pkg",
 
     # Diagnostics
     "//src/cobalt/bin/app:cobalt",
@@ -686,6 +687,12 @@ assembly_input_bundle("common_minimal") {
 
     # Developer
     "//src/developer/memory/monitor",
+
+    # Recovery
+    "//src/recovery/factory_reset:factory_reset_pkg",
+
+    # Connectivity
+    "//src/connectivity/network/mdns/service:mdns",
   ]
 
   config_data = [
@@ -759,6 +766,12 @@ assembly_input_bundle("common_minimal") {
                     "//src/intl/tzdata_provider/meta/tzdata_provider.core_shard.cml",
                     "//src/sys/cache_manager/meta/cache_manager.core_shard.cml",
                     "//src/sys/pkg/bin/system-updater/meta/system_updater.core_shard.cml",
+                    "//src/developer/memory/monitor/meta/memory_monitor.core_shard.cml",
+                    "//src/recovery/factory_reset/meta/factory_reset.core_shard.cml",
+
+                    # TODO(fxbug.dev/80375): only include in eng builds
+                    "//src/sys/test_manager/meta/test_manager.core_shard.cml",
+                    "//src/sys/testing/meta/test_realm.core_shard.cml",
 
                     # TODO(fxbug.dev/112433): The trace manager core shard should only
                     # appear in eng builds, however, many components do not properly
@@ -1326,6 +1339,7 @@ assembly_input_bundle("virtualization_support") {
           component_name = "core"
           shards = rebase_path(
                   [
+                    "//src/connectivity/network/meta/virtualization.core_shard.cml",
                     "//src/virtualization/bin/vmm_launcher/meta/vmm_launcher.core_shard.cml",
                     "//src/virtualization/bin/guest_manager/meta/debian_guest_manager.core_shard.cml",
                     "//src/virtualization/bin/guest_manager/meta/termina_guest_manager.core_shard.cml",

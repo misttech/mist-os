@@ -24,16 +24,7 @@ legacy_universe_package_labels = []
 discoverable_package_labels = []
 package_flavor_selections = []
 sdk_archive_labels = []
-
-core_realm_shards = [
-  "//src/connectivity/network:virtualization-core-shard",
-  "//src/developer/memory/monitor:memory_monitor_core_shard",
-  "//src/recovery/factory_reset:factory_reset_core_shard",
-
-  # TODO(fxbug.dev/80375): only include in eng builds
-  "//src/sys/test_manager:test_manager_core_shard",
-  "//src/sys/testing:test_realm_core_shard",
-]
+core_realm_shards = []
 
 legacy_base_package_labels += [
   # TODO(http://fxb/91760): remove once build_info is supported in assembly_input_bundle()
@@ -49,9 +40,6 @@ legacy_base_package_labels += [
   "//src/connectivity/network/mdns/bundles:config",
 
   # TODO(http://fxb/100451): remove once core_realm shards can be compiled via
-  "//src/connectivity/network/mdns/bundles:services",
-
-  # TODO(http://fxb/100451): remove once core_realm shards can be compiled via
   # assembly_input_bundle()
   "//src/connectivity/network",
 
@@ -60,13 +48,6 @@ legacy_base_package_labels += [
 
   # TODO(http://fxb/103965): remove once we have config_data support in assembly_input_bundle()
   "//src/hwinfo:default_product_config",
-
-  # TODO(http://fxb/100451): remove once core_realm shards can be compiled via
-  # assembly_input_bundle()
-  "//src/recovery/factory_reset",
-
-  # TODO(http://fxb/103965): remove once we have config_data support in assembly_input_bundle()
-  "//src/sys/full-resolver",  # This seems needed to run the session manager
 
   # Tools to control the pkg subsystem are in the base package set by default
   # so the software delivery system can be debugged and reconfigured without

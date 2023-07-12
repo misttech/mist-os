@@ -56,8 +56,13 @@ fuchsia_component("component") {
   deps = [ ":bin" ]
 }
 
-fuchsia_package("full-resolver") {
+fuchsia_package("full-resolver-pkg") {
+  package_name = "full-resolver"
   deps = [ ":component" ]
+}
+
+# TODO(fxbug.dev/122864) Remove transitional labels
+group("full-resolver") {
 }
 
 fuchsia_component("example") {

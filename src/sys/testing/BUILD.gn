@@ -3,7 +3,6 @@
 # found in the LICENSE file.
 
 import("//build/components.gni")
-import("//src/sys/core/build/core_shard.gni")
 
 fuchsia_component("test_realm") {
   testonly = true
@@ -18,8 +17,4 @@ fuchsia_package("testing") {
     ":test_realm",
     "//src/lib/fuchsia-component-test/realm_builder_server:realm_builder_server_component",
   ]
-}
-
-core_shard("test_realm_core_shard") {
-  shard_file = "meta/test_realm.core_shard.cml"
 }
