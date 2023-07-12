@@ -5,6 +5,8 @@
 #ifndef LIB_DRIVER_TESTING_CPP_DRIVER_LIFECYCLE_H_
 #define LIB_DRIVER_TESTING_CPP_DRIVER_LIFECYCLE_H_
 
+#if __Fuchsia_API_level__ >= 13
+
 #include <lib/driver/component/cpp/driver_base.h>
 #include <lib/driver/component/cpp/internal/lifecycle.h>
 #include <lib/driver/symbols/symbols.h>
@@ -92,5 +94,7 @@ class DriverUnderTest : public DriverUnderTestBase {
 };
 
 }  // namespace fdf_testing
+
+#endif
 
 #endif  // LIB_DRIVER_TESTING_CPP_DRIVER_LIFECYCLE_H_

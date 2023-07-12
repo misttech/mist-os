@@ -100,11 +100,15 @@ sdk_source_set("driver_runtime_env_cpp") {
   sources = [ "env.cc" ]
 }
 
-source_set("driver_runtime_testing") {
+sdk_source_set("driver_runtime_testing") {
+  category = "partner"
+  sdk_name = "driver_runtime_testing"
+
   sources = [ "include/lib/fdf/testing.h" ]
   visibility = [
+    "//build/sdk:sdk_versioned_source_sets",
     "//sdk/lib/driver/runtime/*",
-    "//sdk/lib/driver/testing/cpp",
+    "//sdk/lib/driver/testing/*",
     "//sdk/lib/fidl_driver/tests/transport/*",
     "//src/devices/bin/driver_host/*",
     "//src/devices/bin/driver_host2/*",

@@ -4,6 +4,7 @@
 
 #include <fidl/fuchsia.logger/cpp/fidl.h>
 #include <lib/async/default.h>
+#include <lib/component/incoming/cpp/protocol.h>
 #include <lib/driver/testing/cpp/test_environment.h>
 
 namespace fdf_testing {

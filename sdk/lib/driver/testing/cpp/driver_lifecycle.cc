@@ -2,6 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#if __Fuchsia_API_level__ >= 13
+
 #include <lib/driver/testing/cpp/driver_lifecycle.h>
 
 #include <chrono>
@@ -167,3 +169,5 @@ void* DriverUnderTestBase::GetDriver() {
 }
 
 }  // namespace fdf_testing
+
+#endif

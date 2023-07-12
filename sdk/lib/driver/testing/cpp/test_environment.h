@@ -5,7 +5,9 @@
 #ifndef LIB_DRIVER_TESTING_CPP_TEST_ENVIRONMENT_H_
 #define LIB_DRIVER_TESTING_CPP_TEST_ENVIRONMENT_H_
 
-#include <lib/driver/component/cpp/driver_base.h>
+#include <fidl/fuchsia.io/cpp/wire.h>
+#include <lib/driver/outgoing/cpp/outgoing_directory.h>
+#include <lib/fdf/dispatcher.h>
 
 namespace fdf_testing {
 
@@ -39,7 +41,7 @@ class TestEnvironment {
  public:
   explicit TestEnvironment(fdf_dispatcher_t* dispatcher = nullptr);
 
-  // Get the component::OutgoingDirectory that backs the driver's incoming namespace.
+  // Get the fdf::OutgoingDirectory that backs the driver's incoming namespace.
   fdf::OutgoingDirectory& incoming_directory() {
     std::lock_guard guard(checker_);
     return incoming_directory_server_;
