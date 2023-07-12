@@ -74,9 +74,7 @@ pub async fn handle_suite_requests(
                         )
                         .await?
                     }
-                    TestType::Ltp => {
-                        get_cases_list_for_ltp(test_start_info, &container.component_runner).await?
-                    }
+                    TestType::Ltp => get_cases_list_for_ltp(test_start_info).await?,
                     TestType::BinderLatency | TestType::Gbenchmark | TestType::SingleTest => {
                         let name = test_start_info
                             .resolved_url

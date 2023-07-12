@@ -11,7 +11,7 @@ use fidl_fuchsia_io as fio;
 use fidl_fuchsia_test as ftest;
 use fuchsia_async as fasync;
 use fuchsia_zircon as zx;
-use futures::{AsyncReadExt, StreamExt};
+use futures::StreamExt;
 use socket_parsing::NewlineChunker;
 use std::collections::HashMap;
 
@@ -104,37 +104,43 @@ impl Results {
     }
 }
 
+struct LtpTestDefinition {
+    name: String,
+    command: String,
+}
+
+fn parse_test_definition(test_def: &str) -> LtpTestDefinition {
+    let test_def = test_def.trim();
+    match test_def.split_once(' ') {
+        Some((name, command)) => {
+            LtpTestDefinition { name: name.to_string(), command: command.trim().to_string() }
+        }
+        None => LtpTestDefinition { name: test_def.to_string(), command: test_def.to_string() },
+    }
+}
+
+async fn read_tests_list(
+    start_info: &mut frunner::ComponentStartInfo,
+) -> Result<Vec<LtpTestDefinition>, Error> {
+    let program = start_info.program.as_ref().unwrap();
+    let tests_list_file = get_str_value_from_dict(program, "tests_list")?;
+    Ok(read_file_from_component_ns(start_info, &tests_list_file)
+        .await
+        .with_context(|| format!("Failed to read {}", tests_list_file))?
+        .split('\n')
+        .filter(|s| !s.is_empty())
+        .map(parse_test_definition)
+        .collect())
+}
+
 pub async fn get_cases_list_for_ltp(
     mut start_info: frunner::ComponentStartInfo,
-    component_runner: &frunner::ComponentRunnerProxy,
 ) -> Result<Vec<ftest::Case>, Error> {
-    let program = start_info.program.as_ref().unwrap();
-    let base_path = get_str_value_from_dict(program, "tests_dir")?;
-
-    let tests_list = match get_opt_str_value_from_dict(program, "tests_list")? {
-        Some(list_file) => read_file_from_component_ns(&mut start_info, &list_file)
-            .await
-            .with_context(|| format!("Failed to read {}", list_file))?
-            .split('\n')
-            .filter(|s| !s.is_empty())
-            .map(|s| s.to_string())
-            .collect::<Vec<String>>(),
-        None => {
-            // If tests list file is not specified then run `/system/bin/ls <base_path>` to get list
-            // of all files in the target directory.
-            let (_ls_component_controller, std_handles) = start_command(
-                &mut start_info,
-                component_runner,
-                "/",
-                "/system/bin/ls",
-                &[base_path.as_str()],
-            )?;
-
-            read_lines_from_socket(std_handles.out.unwrap())
-                .await
-                .with_context(|| format!("Failed to enumerate tests in {}", base_path))?
-        }
-    };
+    let tests_list = read_tests_list(&mut start_info)
+        .await?
+        .iter()
+        .map(|t| t.name.clone())
+        .collect::<Vec<String>>();
 
     Ok(tests_list
         .iter()
@@ -151,6 +157,11 @@ pub async fn run_ltp_cases(
     let program = start_info.program.as_ref().unwrap();
     let base_path = get_str_value_from_dict(program, "tests_dir")?;
 
+    let mut test_commands = HashMap::<String, String>::new();
+    read_tests_list(&mut start_info).await?.drain(..).for_each(|t| {
+        test_commands.insert(t.name, t.command);
+    });
+
     // TODO(b/287506763): Parse the expected test results, if available. This is a temporary
     // measure, eventually the LTP test package will always contain this file.
     let expected_test_results: Option<HashMap<String, String>> = {
@@ -162,9 +173,13 @@ pub async fn run_ltp_cases(
 
     for test in tests {
         let test_name = test.name.as_ref().expect("No test name");
-        let test_path = format!("{}/{}", base_path, test_name);
+        let test_command: &String = test_commands
+            .get(test_name)
+            .ok_or_else(|| anyhow!("Invalid test name: {}", test_name))?;
+        let command = vec!["/bin/sh", "-c", test_command];
+
         let (component_controller, component_std_handles) =
-            start_command(&mut start_info, component_runner, &base_path, &test_path, &[])?;
+            start_command(&mut start_info, component_runner, &base_path, &command)?;
 
         // Create the proxy socket endpoints to hand off to the run listener.
         let (sender_stderr, listener_stderr) = zx::Socket::create_stream();
@@ -253,24 +268,12 @@ async fn read_file_from_component_ns(
     Err(anyhow!("/pkg is not in the namespace"))
 }
 
-async fn read_lines_from_socket(socket: fidl::Socket) -> Result<Vec<String>, Error> {
-    let mut async_socket = fidl::AsyncSocket::from_socket(socket)?;
-    let mut buffer = vec![];
-    async_socket.read_to_end(&mut buffer).await?;
-    Ok(String::from_utf8(buffer)?
-        .split('\n')
-        .filter(|s| !s.is_empty())
-        .map(|s| s.to_string())
-        .collect())
-}
-
 // Starts a component that runs the specified `binary` with the specified `args`.
 fn start_command(
     base_start_info: &mut frunner::ComponentStartInfo,
     component_runner: &frunner::ComponentRunnerProxy,
     cwd: &str,
-    binary: &str,
-    args: &[&str],
+    command: &[&str],
 ) -> Result<(frunner::ComponentControllerProxy, ftest::StdHandles), Error> {
     let mut program_entries = vec![
         fdata::DictionaryEntry {
@@ -279,12 +282,12 @@ fn start_command(
         },
         fdata::DictionaryEntry {
             key: "binary".to_string(),
-            value: Some(Box::new(fdata::DictionaryValue::Str(binary.to_string()))),
+            value: Some(Box::new(fdata::DictionaryValue::Str(command[0].to_string()))),
         },
         fdata::DictionaryEntry {
             key: "args".to_string(),
             value: Some(Box::new(fdata::DictionaryValue::StrVec(
-                args.iter().map(|s| s.to_string()).collect::<Vec<String>>(),
+                command.iter().skip(1).map(|s| s.to_string()).collect::<Vec<String>>(),
             ))),
         },
     ];
