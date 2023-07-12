@@ -81,7 +81,7 @@ success("PresentNullableVectorOfHandles") {
 
 decode_failure("AbsentNonnullableVectorOfHandlesError") {
     // TODO(fxbug.dev/58385): Close handles on encode/decode failure.
-    bindings_denylist = [rust, dart],
+    bindings_denylist = [dart],
     handle_defs = {
         #0 = event(),
         #1 = event(),
@@ -105,7 +105,7 @@ decode_failure("AbsentNonnullableVectorOfHandlesError") {
 
 decode_failure("InvalidAbsentNonnullableVectorOfHandlesError") {
     // TODO(fxbug.dev/58385): Close handles on encode/decode failure.
-    bindings_denylist = [rust, dart],
+    bindings_denylist = [dart],
     handle_defs = {
         #0 = event(),
         #1 = event(),
@@ -202,7 +202,7 @@ success("PresentNullableBoundedVectorOfHandles") {
 
 decode_failure("AbsentNonnullableBoundedVectorOfHandlesError") {
     // TODO(fxbug.dev/58385): Close handles on encode/decode failure.
-    bindings_denylist = [rust, dart],
+    bindings_denylist = [dart],
     handle_defs = {
         #0 = event(),
         #1 = event(),
@@ -226,7 +226,7 @@ decode_failure("AbsentNonnullableBoundedVectorOfHandlesError") {
 
 decode_failure("InvalidAbsentNonnullableBoundedVectorOfHandlesError") {
     // TODO(fxbug.dev/58385): Close handles on encode/decode failure.
-    bindings_denylist = [rust, dart],
+    bindings_denylist = [dart],
     handle_defs = {
         #0 = event(),
         #1 = event(),
@@ -265,7 +265,7 @@ success("AbsentNullableBoundedVectorOfHandles") {
 
 decode_failure("PresentNonnullableBoundedVectorOfHandlesShortError") {
     // TODO(fxbug.dev/58385): Close handles on encode/decode failure.
-    bindings_denylist = [rust, dart],
+    bindings_denylist = [dart],
     handle_defs = {
         #0 = event(),
         #1 = event(),
@@ -305,7 +305,7 @@ decode_failure("PresentNonnullableBoundedVectorOfHandlesShortError") {
 
 decode_failure("PresentNullableBoundedVectorOfHandlesShortError") {
     // TODO(fxbug.dev/58385): Close handles on encode/decode failure.
-    bindings_denylist = [rust, dart],
+    bindings_denylist = [dart],
     handle_defs = {
         #0 = event(),
         #1 = event(),

@@ -14,11 +14,6 @@ import (
 )
 
 func buildEqualityCheck(actualExpr string, expectedValue ir.Value, decl mixer.Declaration) string {
-	if canAssertEq(expectedValue) {
-		// Asserting on the entire value is a special case because otherwise
-		// there are errors about comparing T and &T.
-		return fmt.Sprintf("assert_eq!(%s, &%s);", actualExpr, visit(expectedValue, decl))
-	}
 	var b equalityCheckBuilder
 	b.visit(actualExpr, expectedValue, decl)
 	return b.String()

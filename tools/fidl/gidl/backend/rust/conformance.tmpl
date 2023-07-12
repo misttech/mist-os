@@ -30,11 +30,12 @@ fn test_{{ .Name }}_encode() {
     {{- if .HandleDefs }}
     let handle_defs = create_handles(&{{ .HandleDefs }});
     {{- end }}
-    let value = &{{ if .IsResource }}mut {{ end }}{{ .Value }};
-    let bytes = &mut Vec::new();
-    let handle_dispositions = &mut Vec::new();
+    let{{ if .IsResource }} mut{{ end }} value = {{ .Value }};
+    let mut bytes = Vec::new();
+    let mut handle_dispositions = Vec::new();
     bytes.resize(65536, 0xcd); // fill with junk data
-    Encoder::encode_with_context::<{{ .ValueType }}>({{ .Context }}, bytes, handle_dispositions, value).unwrap();
+    Encoder::encode_with_context::<{{ .ValueType }}>(
+        {{ .Context }}, &mut bytes, &mut handle_dispositions, &{{ if .IsResource }}mut {{ end }} value).unwrap();
     assert_eq!(bytes, &{{ .Bytes }});
     {{- if .HandleDispositions }}
     assert_eq!(
@@ -59,12 +60,12 @@ fn test_{{ .Name }}_decode() {
     {{- if .HandleDefs }}
     let handle_defs = create_handles(&{{ .HandleDefs }});
     let _handle_koids = handle_defs.iter().map(get_handle_koid).collect::<Vec<_>>();
-    let handle_infos = &mut select_handle_infos(&handle_defs, &{{ .Handles }});
+    let mut handle_infos = select_handle_infos(&handle_defs, &{{ .Handles }});
     {{- else }}
-    let handle_infos = &mut Vec::new();
+    let mut handle_infos = Vec::new();
     {{- end }}
-    let value = &mut fidl::new_empty!({{ .ValueType }});
-    Decoder::decode_with_context::<{{ .ValueType }}>({{ .Context }}, bytes, handle_infos, value).unwrap();
+    let mut value = fidl::new_empty!({{ .ValueType }});
+    Decoder::decode_with_context::<{{ .ValueType }}>({{ .Context }}, bytes, &mut handle_infos, &mut value).unwrap();
     {{ .EqualityCheck }}
     {{- if .UnusedHandles }}
     let unused_handles = select_raw_handle_infos(&handle_defs, &{{ .UnusedHandles }});
@@ -82,15 +83,19 @@ fn test_{{ .Name }}_encode_failure() {
     {{- if .HandleDefs }}
     let handle_defs = create_handles(&{{ .HandleDefs }});
     {{- end }}
-    let value = &{{ if .IsResource }}mut {{ end }}{{ .Value }};
-    let bytes = &mut Vec::new();
-    let handles = &mut Vec::new();
+    let{{ if .IsResource }} mut{{ end }} value = {{ .Value }};
+    let mut bytes = Vec::new();
+    let mut handles = Vec::new();
     bytes.resize(65536, 0xcd); // fill with junk data
-    match Encoder::encode_with_context::<{{ .ValueType }}>({{ .Context }}, bytes, handles, value) {
+    match Encoder::encode_with_context::<{{ .ValueType }}>(
+        {{ .Context }}, &mut bytes, &mut handles, &{{ if .IsResource }}mut {{ end }}value
+    ) {
         Err(err) => assert_matches!(err, {{ .ErrorCode }} { .. }),
         Ok(_) => panic!("unexpected successful encoding"),
     }
     {{- if .HandleDefs }}
+    drop(value);
+    drop(handles);
     assert_eq!(
         handle_defs.iter().map(get_info_handle_valid).collect::<Vec<_>>(),
         repeat(Err(Status::BAD_HANDLE), handle_defs.len()),
@@ -105,22 +110,22 @@ fn test_{{ .Name }}_decode_failure() {
     let bytes = &{{ .Bytes }};
     {{- if .HandleDefs }}
     let handle_defs = create_handles(&{{ .HandleDefs }});
-    let handle_infos = &mut select_handle_infos(&handle_defs, &{{ .Handles }});
+    let mut handle_infos = select_handle_infos(&handle_defs, &{{ .Handles }});
     {{- else }}
-    let handle_infos = &mut Vec::new();
+    let mut handle_infos = Vec::new();
     {{- end }}
-    let value = &mut fidl::new_empty!({{ .ValueType }});
-    match Decoder::decode_with_context::<{{ .ValueType }}>({{ .Context }}, bytes, handle_infos, value) {
+    let mut value = fidl::new_empty!({{ .ValueType }});
+    match Decoder::decode_with_context::<{{ .ValueType }}>({{ .Context }}, bytes, &mut handle_infos, &mut value) {
         Err(err) => assert_matches!(err, {{ .ErrorCode }} { .. }),
         Ok(_) => panic!("unexpected successful decoding"),
     }
-    {{- /* TODO(fxbug.dev/58385): Close handles on decode failure.
     {{- if .HandleDefs }}
+    drop(value);
+    drop(handle_infos);
     assert_eq!(
         handle_defs.iter().map(get_info_handle_valid).collect::<Vec<_>>(),
         repeat(Err(Status::BAD_HANDLE), handle_defs.len()),
     );
     {{- end }}
-    */}}
 }
 {{ end }}
