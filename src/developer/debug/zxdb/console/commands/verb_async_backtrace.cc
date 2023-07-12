@@ -303,6 +303,16 @@ fxl::RefPtr<AsyncOutputBuffer> FormatPin(const ExprValue& pin, const FormatFutur
   return FormatFuture(pointer.value(), options, context, indent);
 }
 
+fxl::RefPtr<AsyncOutputBuffer> FormatTaskRunner(const ExprValue& task_runner,
+                                                const FormatFutureOptions& options,
+                                                const fxl::RefPtr<EvalContext>& context,
+                                                int indent) {
+  ErrOrValue future = ResolveNonstaticMember(context, task_runner, {"task"});
+  if (future.has_error())
+    return FormatError("Invalid TaskRunner", future.err());
+  return FormatFuture(future.value(), options, context, indent);
+}
+
 fxl::RefPtr<AsyncOutputBuffer> FormatFuture(const ExprValue& future,
                                             const FormatFutureOptions& options,
                                             const fxl::RefPtr<EvalContext>& context, int indent,
@@ -342,6 +352,8 @@ fxl::RefPtr<AsyncOutputBuffer> FormatFuture(const ExprValue& future,
     return FormatRemote(future, options, context, indent);
   if (type == "core::pin::Pin")
     return FormatPin(future, options, context, indent);
+  if (type == "vfs::execution_scope::TaskRunner")
+    return FormatTaskRunner(future, options, context, indent);
 
   // NOTE: `select!` and `join!` macro expand to PollFn. It'll be useful if we could describe it.
   // However, PollFn could encode an arbitrary function so there's a chance we're doing very wrong.

@@ -273,12 +273,16 @@ impl Drop for TaskState {
 }
 
 #[pin_project]
+// The debugger knows how to get to `task`. If this changes, or its fully-qualified name changes,
+// the debugger will need updating.
+// LINT.IfChange
 struct TaskRunner<F> {
     #[pin]
     task: F,
     // Must be dropped *after* task above.
     task_state: TaskState,
 }
+// LINT.ThenChange(//src/developer/debug/zxdb/console/commands/verb_async_backtrace.cc)
 
 impl<F: 'static + Future<Output = ()> + Send> Future for TaskRunner<F> {
     type Output = ();
