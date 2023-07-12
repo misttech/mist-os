@@ -542,7 +542,6 @@ sdk("fuchsia_dart") {
 
     # Direct FIDL deps.
     # If a FIDL deps is part of the SDK, it should be explicitly listed here.
-    "//sdk/dart/fuchsia:fuchsia_sdk($dart_toolchain)",
     "//sdk/fidl/fuchsia.auth:fuchsia.auth_sdk($fidl_toolchain)",
     "//sdk/fidl/fuchsia.element:fuchsia.element_sdk($fidl_toolchain)",
     "//sdk/fidl/fuchsia.hardware.audio:fuchsia.hardware.audio_sdk($fidl_toolchain)",

@@ -173,10 +173,7 @@ template("flutter_dart_test_component") {
     # speed up compilation times by skipping these checks
     disable_analysis = true
 
-    deps = [
-      ":$_test_package_target_name",
-      "//src/flutter/lib/fuchsia_test_helper",
-    ]
+    deps = [ ":$_test_package_target_name" ]
     non_dart_deps = [ ":$_generate_test_main_target_name($target_toolchain)" ]
   }
 
