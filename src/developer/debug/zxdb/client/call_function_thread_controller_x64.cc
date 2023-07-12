@@ -4,18 +4,15 @@
 
 #include "src/developer/debug/zxdb/client/call_function_thread_controller_x64.h"
 
+#include <lib/stdcompat/vector.h>
+
 #include <memory>
 
-#include "lib/fit/defer.h"
-#include "lib/stdcompat/vector.h"
-#include "src/developer/debug/ipc/protocol.h"
 #include "src/developer/debug/shared/register_id.h"
 #include "src/developer/debug/shared/register_info.h"
 #include "src/developer/debug/zxdb/client/finish_thread_controller.h"
 #include "src/developer/debug/zxdb/client/frame.h"
 #include "src/developer/debug/zxdb/client/process.h"
-#include "src/developer/debug/zxdb/client/remote_api.h"
-#include "src/developer/debug/zxdb/client/session.h"
 #include "src/developer/debug/zxdb/client/thread.h"
 #include "src/developer/debug/zxdb/common/join_callbacks.h"
 
@@ -26,9 +23,10 @@ constexpr uint64_t kRedZoneSize = 128ull;
 }  // namespace
 
 CallFunctionThreadControllerX64::CallFunctionThreadControllerX64(const AddressRanges& range,
-                                                                 FunctionReturnCallback cb,
+                                                                 EvalCallback on_function_completed,
                                                                  fit::deferred_callback on_done)
-    : CallFunctionThreadController(range, std::move(cb), std::move(on_done)), weak_factory_(this) {}
+    : CallFunctionThreadController(range, std::move(on_function_completed), std::move(on_done)),
+      weak_factory_(this) {}
 
 CallFunctionThreadControllerX64::~CallFunctionThreadControllerX64() = default;
 
@@ -40,6 +38,12 @@ void CallFunctionThreadControllerX64::InitWithThread(Thread* thread,
   CollectAllRegisterCategories(thread, [weak_this = weak_factory_.GetWeakPtr(),
                                         weak_thread = thread->GetWeakPtr(),
                                         cb = std::move(cb)](const Err& err) mutable {
+    if (!weak_this) {
+      cb(Err("CallFunctionThreadControllerX64 disappeared."));
+    } else if (!weak_thread) {
+      return cb(Err("thread disappeared."));
+    }
+
     // This will be the new PC of the stack frame we create.
     uint64_t function_start_addr = weak_this->address_ranges_.begin()->begin();
 

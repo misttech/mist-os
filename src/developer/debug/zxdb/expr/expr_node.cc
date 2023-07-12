@@ -8,7 +8,6 @@
 
 #include <ostream>
 
-#include "src/developer/debug/shared/message_loop.h"
 #include "src/developer/debug/zxdb/common/err.h"
 #include "src/developer/debug/zxdb/expr/cast.h"
 #include "src/developer/debug/zxdb/expr/eval_context.h"
@@ -480,8 +479,12 @@ void FunctionCallExprNode::EmitBytecode(VmStream& stream) const {
 
           auto fn = err_or_fn.value();
           eval_context->GetDataProvider()->MakeFunctionCall(
-              fn.get(), [&eval_context, fn, cb = std::move(cb)](const Err& val) mutable {
-                GetReturnValue(eval_context, fn.get(), std::move(cb));
+              fn.get(), [cb = std::move(cb)](const Err& err, fxl::RefPtr<Type> type,
+                                             std::vector<uint8_t> data) mutable {
+                if (err.has_error())
+                  return cb(err);
+
+                cb(ExprValue(std::move(type), std::move(data)));
               });
         }));
   } else {

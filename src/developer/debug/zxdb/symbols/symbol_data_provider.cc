@@ -136,10 +136,9 @@ void SymbolDataProvider::WriteMemory(uint64_t address, std::vector<uint8_t> data
                                           [cb = std::move(cb)]() mutable { cb(NoProcessErr()); });
 }
 
-void SymbolDataProvider::MakeFunctionCall(const Function* fn,
-                                          fit::callback<void(const Err&)> cb) const {
+void SymbolDataProvider::MakeFunctionCall(const Function* fn, FunctionCallCallback cb) const {
   debug::MessageLoop::Current()->PostTask(
-      FROM_HERE, [cb = std::move(cb)]() mutable { cb(Err("No Thread.")); });
+      FROM_HERE, [cb = std::move(cb)]() mutable { cb(Err("No Thread."), nullptr, {}); });
 }
 
 }  // namespace zxdb

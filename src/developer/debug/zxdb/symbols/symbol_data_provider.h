@@ -18,7 +18,9 @@
 #include "src/developer/debug/zxdb/common/err_or.h"
 #include "src/developer/debug/zxdb/common/int128_t.h"
 #include "src/developer/debug/zxdb/symbols/symbol.h"
+#include "src/developer/debug/zxdb/symbols/type.h"
 #include "src/lib/fxl/memory/ref_counted.h"
+#include "src/lib/fxl/memory/ref_ptr.h"
 
 namespace zxdb {
 
@@ -56,6 +58,13 @@ class SymbolDataProvider : public fxl::RefCountedThreadSafe<SymbolDataProvider> 
   using GetFrameBaseCallback = fit::callback<void(const Err&, uint64_t value)>;
 
   using WriteCallback = fit::callback<void(const Err&)>;
+
+  // We would like to be able to pass an ExprValue here, but that would introduce a dependency to
+  // the expr library here which is undesirable. Instead we have to deconstruct the ExprValue in
+  // FrameSymbolDataProvider and then reconstruct it using the type and data given to the callback
+  // in FunctionCallExprNode.
+  using FunctionCallCallback =
+      fit::callback<void(const Err&, fxl::RefPtr<Type>, std::vector<uint8_t>)>;
 
   virtual debug::Arch GetArch();
 
@@ -134,7 +143,7 @@ class SymbolDataProvider : public fxl::RefCountedThreadSafe<SymbolDataProvider> 
   //
   // |fn| must be resolved to a concrete Function object before calling this function, see
   // ResolveFunction.
-  virtual void MakeFunctionCall(const Function* fn, fit::callback<void(const Err&)> cb) const;
+  virtual void MakeFunctionCall(const Function* fn, FunctionCallCallback cb) const;
 
  protected:
   FRIEND_MAKE_REF_COUNTED(SymbolDataProvider);

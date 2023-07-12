@@ -11,7 +11,10 @@ namespace zxdb {
 
 class CallFunctionThreadControllerArm64 : public CallFunctionThreadController {
  public:
-  CallFunctionThreadControllerArm64(const AddressRanges& range, FunctionReturnCallback cb,
+  // Constructs the thread controller. |on_function_completed| is called once the thread state has
+  // been restored to what it was before the function call, but before this controller has been
+  // destroyed.
+  CallFunctionThreadControllerArm64(const AddressRanges& range, EvalCallback on_function_completed,
                                     fit::deferred_callback on_done = {});
 
   ~CallFunctionThreadControllerArm64() override;

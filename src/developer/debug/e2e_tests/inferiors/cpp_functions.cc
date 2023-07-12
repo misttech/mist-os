@@ -6,6 +6,7 @@
 
 namespace {
 int SomeGlobal = 0;
+constexpr char kHello[] = "Hello!";
 
 void LeafNoArgs() {
   // Create a local variable so something happens to the stack.
@@ -17,6 +18,14 @@ void NestedNoArgs() { LeafNoArgs(); }
 
 void NestedTwiceNoArgs() { NestedNoArgs(); }
 
+int ReturnGlobalPlusOne() { return SomeGlobal + 1; }
+
+int* GetIntPointer() { return &SomeGlobal; }
+
+float GetFloat() { return 3.14159f; }
+
+const char* GetCharPtr() { return kHello; }
+
 void PrintHello() { std::cout << "Hello! SomeGlobal = " << SomeGlobal << std::endl; }
 
 }  // namespace
@@ -24,4 +33,8 @@ void PrintHello() { std::cout << "Hello! SomeGlobal = " << SomeGlobal << std::en
 int main() {
   NestedTwiceNoArgs();
   PrintHello();
+  std::cout << ReturnGlobalPlusOne() << "\n";
+  std::cout << *GetIntPointer() << "\n";
+  std::cout << GetFloat() << "\n";
+  std::cout << GetCharPtr() << "\n";
 }

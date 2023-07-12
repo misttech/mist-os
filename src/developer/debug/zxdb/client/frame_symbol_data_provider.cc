@@ -18,6 +18,9 @@
 #include "src/developer/debug/zxdb/client/session.h"
 #include "src/developer/debug/zxdb/client/thread.h"
 #include "src/developer/debug/zxdb/common/err.h"
+#include "src/developer/debug/zxdb/common/err_or.h"
+#include "src/developer/debug/zxdb/expr/return_value.h"
+#include "src/developer/debug/zxdb/symbols/base_type.h"
 #include "src/developer/debug/zxdb/symbols/function.h"
 #include "src/lib/fxl/strings/string_printf.h"
 
@@ -32,13 +35,14 @@ Err RegisterUnavailableErr(debug::RegisterID id) {
 }
 
 std::unique_ptr<CallFunctionThreadController> MakeCallFunctionThreadController(
-    debug::Arch arch, const AddressRanges& ranges, FunctionReturnCallback return_cb,
-    fit::deferred_callback on_done = {}) {
+    debug::Arch arch, const AddressRanges& ranges, EvalCallback on_function_completed) {
   switch (arch) {
     case debug::Arch::kX64:
-      return std::make_unique<CallFunctionThreadControllerX64>(ranges, std::move(return_cb));
+      return std::make_unique<CallFunctionThreadControllerX64>(ranges,
+                                                               std::move(on_function_completed));
     case debug::Arch::kArm64:
-      return std::make_unique<CallFunctionThreadControllerArm64>(ranges, std::move(return_cb));
+      return std::make_unique<CallFunctionThreadControllerArm64>(ranges,
+                                                                 std::move(on_function_completed));
     default:
       return nullptr;
   }
@@ -150,33 +154,45 @@ uint64_t FrameSymbolDataProvider::GetCanonicalFrameAddress() const {
   return frame_->GetCanonicalFrameAddress();
 }
 
-void FrameSymbolDataProvider::MakeFunctionCall(const Function* fn,
-                                               fit::callback<void(const Err&)> cb) const {
+void FrameSymbolDataProvider::MakeFunctionCall(const Function* fn, FunctionCallCallback cb) const {
   if (!frame_) {
-    return cb(CallFrameDestroyedErr());
+    return cb(CallFrameDestroyedErr(), nullptr, {});
   } else if (!frame_->GetThread()) {
-    return cb(Err("No thread."));
+    return cb(Err("No thread."), nullptr, {});
   } else if (!fn) {
-    return cb(Err("Bad function."));
+    return cb(Err("Bad function."), nullptr, {});
   }
 
   Thread* thread = frame_->GetThread();
   if (!thread->CurrentStopSupportsFrames()) {
-    cb(Err("Thread must be stopped to call functions."));
+    cb(Err("Thread must be stopped to call functions."), nullptr, {});
   }
 
   AddressRanges range(fn->GetAbsoluteCodeRanges(
       fn->GetSymbolContext(frame_->GetEvalContext()->GetProcessSymbols())));
 
   std::unique_ptr<CallFunctionThreadController> controller = MakeCallFunctionThreadController(
-      frame_->session()->arch(), range,
-      [cb = std::move(cb)](const FunctionReturnInfo& return_info) mutable {
-        // TODO(https://fxbug.dev/5457): Figure out the return type here and return that.
-        cb(Err());
+      frame_->session()->arch(), range, [cb = std::move(cb)](ErrOrValue err_or_value) mutable {
+        if (err_or_value.has_error()) {
+          debug::MessageLoop::Current()->PostTask(
+              FROM_HERE, [err = err_or_value.err(), cb = std::move(cb)]() mutable {
+                return cb(err, nullptr, {});
+              });
+          return;
+        }
+
+        // All we have to do is convert the returned ExprValue to its basic
+        // building blocks so it can be reconstructed later. Post this to the
+        // message loop so the output is always showing the return value as the
+        // thing immediately before the new prompt.
+        debug::MessageLoop::Current()->PostTask(
+            FROM_HERE, [err_or_value, cb = std::move(cb)]() mutable {
+              cb(Err(), RefPtrTo(err_or_value.value().type()), err_or_value.value().data().bytes());
+            });
       });
 
   if (!controller) {
-    return cb(Err("Failed to make ABI function call thread controller"));
+    return cb(Err("Failed to make ABI function call thread controller"), nullptr, {});
   }
 
   thread->ContinueWith(std::move(controller), [](const Err&) {});

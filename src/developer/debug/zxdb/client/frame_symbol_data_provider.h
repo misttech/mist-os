@@ -26,7 +26,7 @@ class FrameSymbolDataProvider : public ProcessSymbolDataProvider {
   std::optional<uint64_t> GetFrameBase() override;
   void GetFrameBaseAsync(GetFrameBaseCallback callback) override;
   uint64_t GetCanonicalFrameAddress() const override;
-  void MakeFunctionCall(const Function* fn, fit::callback<void(const Err&)> cb) const override;
+  void MakeFunctionCall(const Function* fn, FunctionCallCallback cb) const override;
 
  private:
   FRIEND_MAKE_REF_COUNTED(FrameSymbolDataProvider);

@@ -8,11 +8,12 @@
 #include <map>
 
 #include "src/developer/debug/shared/register_info.h"
-#include "src/developer/debug/zxdb/client/arch_info.h"
 #include "src/developer/debug/zxdb/client/finish_thread_controller.h"
 #include "src/developer/debug/zxdb/client/function_return_info.h"
 #include "src/developer/debug/zxdb/client/thread_controller.h"
 #include "src/developer/debug/zxdb/common/address_ranges.h"
+#include "src/developer/debug/zxdb/expr/eval_callback.h"
+#include "src/developer/debug/zxdb/expr/expr_value.h"
 
 namespace zxdb {
 
@@ -47,7 +48,7 @@ class CallFunctionThreadController : public ThreadController {
     std::vector<debug::RegisterValue> registers;
   };
 
-  CallFunctionThreadController(const AddressRanges& ranges, FunctionReturnCallback cb,
+  CallFunctionThreadController(const AddressRanges& ranges, EvalCallback on_function_completed,
                                fit::deferred_callback on_done);
 
   // Finds |id| in |regs| and updates its value to |value|. Does not perform any
@@ -86,9 +87,6 @@ class CallFunctionThreadController : public ThreadController {
   // synthetic stack frame that the ABI thread controller creates.
   std::unique_ptr<FinishThreadController> finish_controller_;
 
-  // This callback is instantiated from
-  FunctionReturnCallback function_return_callback_;
-
   // This will be a copy of the general registers that existed at the time
   // of calling the function. It will start as an exact copy of that data and be
   // changed as the thread state is configured for the new function, then the
@@ -101,9 +99,25 @@ class CallFunctionThreadController : public ThreadController {
 
   void CleanupFunction(fit::callback<void(const Err&)> cb);
 
+  // Fetch and figure out the return type of the function using the info returned by
+  // |finish_controller_|.
+  void ResolveReturnValue(const FunctionReturnInfo& return_info, EvalCallback cb);
+
+  // Callback that will be called once the thread state has been restored to the
+  // same state it was in prior to the function call, with the resulting value.
+  // If this has not been called at the time this controller is destroyed, it
+  // will be invoked with an error, it should always be called. We'd prefer to
+  // use a fit::deferred_ variant, but none of those constructs can take
+  // callables with arguments.
+  EvalCallback on_function_completed_;
+
   // The complete collection of registers before any modifications by the ABI
   // specific controllers.
   RegisterMap saved_register_state_;
+
+  // This is returned by |finish_controller_|'s callback when it steps out of the target frame. We
+  // save it there so we can keep the logic clean when |finish_controller_| reports it is done.
+  FunctionReturnInfo return_info_;
 
   fxl::WeakPtrFactory<CallFunctionThreadController> weak_factory_;
 };

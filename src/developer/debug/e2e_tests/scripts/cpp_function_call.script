@@ -1,37 +1,74 @@
-[zxdb] b cpp_functions.cc:25
-Created Breakpoint 1 @ cpp_functions.cc:25
+## require optimize=none
+[zxdb] b $main
+Created Breakpoint 1 @ $main
 Pending: No current matches for location. It will be matched against new
          processes and shared libraries.
 
 [zxdb] run-component fuchsia-pkg://fuchsia.com/zxdb_e2e_inferiors#meta/cpp_functions.cm
 run-component won't work for many v2 components. See "help run-component".
 Launched Process 1 state=Running koid=?? name=cpp_functions.cm component=cpp_functions.cm
-Breakpoint 1 now matching 1 addrs for cpp_functions.cc:25
+Breakpoint 1 now matching 1 addrs for $main
 🛑 on bp 1 main() • cpp_functions.cc:??
 
+# This will re-hit the user installed breakpoint.
 [zxdb] p PrintHello()
-<No type>
 🛑 on bp 1 main() • cpp_functions.cc:??
+void
 
-# Issue "next" twice to hit the original breakpoint again and then step over the line.
+# FIXME(https://fxbug.dev/126756): This should be unnecessary.
 [zxdb] n
 🛑 on bp 1 main() • cpp_functions.cc:??
-
 [zxdb] n
 🛑 main() • cpp_functions.cc:??
 
+# Now it stops on a generic breakpoint.
 [zxdb] p NestedTwiceNoArgs()
-<No type>
 🛑 main() • cpp_functions.cc:??
+void
 
 # The global variable should have been updated.
 [zxdb] p SomeGlobal
 10
 
+# This adds one to the number printed right above.
+[zxdb] p ReturnGlobalPlusOne()
+🛑 main() • cpp_functions.cc:??
+11
+
 # Should be at the same location as before.
 [zxdb] f
 ▶ 0 main() • cpp_functions.cc:??
   1…4 «libc startup» (-r expands)
+
+# Should be able to chain return values with more expressions.
+[zxdb] p ReturnGlobalPlusOne() - 1
+🛑 main() • cpp_functions.cc:??
+10
+
+# TODO(https://fxbug.dev/129958): this should also work as
+# ReturnGlobalPlusOne() - 1 == SomeGlobal
+[zxdb] p SomeGlobal == ReturnGlobalPlusOne() - 1
+🛑 main() • cpp_functions.cc:??
+true
+
+# Pointers should also work.
+[zxdb] p GetIntPointer()
+🛑 main() • cpp_functions.cc:??
+(*)0x?? ➔ 10
+
+# Expressions should still work.
+[zxdb] p *GetIntPointer() * 2
+🛑 main() • cpp_functions.cc:??
+20
+
+# Other built in types should work.
+[zxdb] p GetFloat()
+🛑 main() • cpp_functions.cc:??
+3.14159
+
+[zxdb] p GetCharPtr()
+🛑 main() • cpp_functions.cc:??
+Hello!
 
 # Let the program finish.
 [zxdb] c

@@ -4,27 +4,25 @@
 
 #include "src/developer/debug/zxdb/client/call_function_thread_controller_arm64.h"
 
+#include <lib/stdcompat/vector.h>
+
 #include <memory>
 #include <utility>
 
-#include "lib/fit/defer.h"
-#include "lib/stdcompat/vector.h"
-#include "src/developer/debug/ipc/protocol.h"
 #include "src/developer/debug/shared/register_id.h"
 #include "src/developer/debug/shared/register_info.h"
 #include "src/developer/debug/zxdb/client/frame.h"
 #include "src/developer/debug/zxdb/client/process.h"
-#include "src/developer/debug/zxdb/client/remote_api.h"
-#include "src/developer/debug/zxdb/client/session.h"
 #include "src/developer/debug/zxdb/client/thread.h"
 #include "src/developer/debug/zxdb/common/join_callbacks.h"
+#include "src/developer/debug/zxdb/expr/eval_callback.h"
 
 namespace zxdb {
 
-CallFunctionThreadControllerArm64::CallFunctionThreadControllerArm64(const AddressRanges& range,
-                                                                     FunctionReturnCallback cb,
-                                                                     fit::deferred_callback on_done)
-    : CallFunctionThreadController(range, std::move(cb), std::move(on_done)), weak_factory_(this) {}
+CallFunctionThreadControllerArm64::CallFunctionThreadControllerArm64(
+    const AddressRanges& range, EvalCallback on_function_completed, fit::deferred_callback on_done)
+    : CallFunctionThreadController(range, std::move(on_function_completed), std::move(on_done)),
+      weak_factory_(this) {}
 
 CallFunctionThreadControllerArm64::~CallFunctionThreadControllerArm64() = default;
 
