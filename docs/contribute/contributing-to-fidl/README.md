@@ -496,7 +496,6 @@ useful for debugging issues that prevent boot of the device.
 | New C++ wire tests       | `fx test //src/lib/fidl/llcpp`      | //sdk/lib/fidl/cpp/wire
 | New C++ tests            | `fx test //src/lib/fidl/cpp`        | //src/lib/fidl/cpp
 | go bindings tests        | `fx test go-fidl-tests`             | //third_party/go/syscall/zx/fidl //third_party/go/syscall/zx/fidl/fidl_test //src/tests/fidl/go_bindings_test |
-| dart bindings tests      | `fx test dart-bindings-test`<br>(_see note below_) | //sdk/dart/fidl                                                  |
 | rust bindings tests      | `fx test //src/lib/fidl/rust`           | //src/lib/fidl/rust |
 
 Note: `fx test dart-bindings-test` needs `--with-base //src/dart:dart_jit_runner` or it will fail.

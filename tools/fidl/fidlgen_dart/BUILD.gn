@@ -2,7 +2,6 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-import("//build/dart/dart_library.gni")
 import("//build/go/go_binary.gni")
 import("//build/go/go_library.gni")
 import("//build/host.gni")
@@ -45,64 +44,9 @@ if (is_host) {
     output_name = "fidlgen_dart"
     deps = [ ":fidlgen_dart" ]
   }
-
-  golden_files("fidlgen_dart_golden_tests") {
-    testonly = true
-
-    formatter = {
-      script = prebuilt_dart
-      args = [
-        "format",
-        "-o",
-        "show",
-      ]
-    }
-
-    deps = []
-    comparisons = []
-    foreach(info, fidl_testdata_info) {
-      if (info.denylist + [ "fidlgen_dart" ] - [ "fidlgen_dart" ] ==
-          info.denylist) {
-        deps += [ "${info.target}_dart_generate($dart_toolchain)" ]
-        comparisons += [
-          {
-            golden = "goldens/${info.name}_async.dart.golden"
-            candidate = "${info.fidl_gen_dir}/${info.target_name}/dart/lib/fidl_async.dart"
-          },
-          {
-            golden = "goldens/${info.name}_test.dart.golden"
-            candidate = "${info.fidl_gen_dir}/${info.target_name}/dart/lib/fidl_test.dart"
-          },
-        ]
-      }
-    }
-  }
 }
 
 install_host_tools("host") {
   deps = [ ":fidlgen_dart" ]
   outputs = [ "fidlgen_dart" ]
-}
-
-if (current_toolchain == dart_toolchain) {
-  group("goldens") {
-    testonly = true
-
-    deps = []
-    foreach(info, fidl_testdata_info) {
-      if (info.build_denylist + [ "fidlgen_dart" ] - [ "fidlgen_dart" ] ==
-          info.build_denylist) {
-        deps += [ info.target + "_dart" ]
-      }
-    }
-  }
-}
-
-group("tests") {
-  # TODO(fxbug.dev/118283): put fidlgen_dart non-host test targets here
-  testonly = true
-  deps = [
-    ":fidlgen_dart_golden_tests($host_toolchain)",
-    ":goldens($dart_toolchain)",
-  ]
 }

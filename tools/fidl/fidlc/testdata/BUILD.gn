@@ -86,9 +86,6 @@ foreach(filename, standalone_libraries) {
       available = [ "test:HEAD" ]
     }
 
-    # To ensure quality of generated Dart bindings.
-    dart_analysis = true
-
     # To output index jsons
     experimental_flags += [ "output_index_json" ]
 

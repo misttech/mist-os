@@ -4,8 +4,6 @@
 
 import("//build/fidl/fidl.gni")
 
-is_dart = current_toolchain == dart_toolchain
-
 # List of contexts where dangerous identifiers can be used
 uses = [
   "constants",
@@ -197,18 +195,9 @@ if (toolchain_variant.base == default_toolchain) {
       }
     }
 
-    # Define all Dart target deps
-    group("dart_targets") {
-      deps = []
-      foreach(test, dangerous_tests) {
-        deps += [ ":${test.fidl_target}_dart($dart_toolchain)" ]
-      }
-    }
-
     group("tests") {
       testonly = true
       deps = fidl_targets + [
-               ":dart_targets",
                ":hlcpp_targets",
                ":rust_targets",
              ]

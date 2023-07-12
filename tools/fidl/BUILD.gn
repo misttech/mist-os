@@ -55,7 +55,6 @@ group("tests") {
     "fidlc:tests",
     "fidldoc:tests",
     "fidlgen_cpp:tests",
-    "fidlgen_dart:tests",
     "fidlgen_go:tests",
     "fidlgen_hlcpp:tests",
     "fidlgen_libfuzzer:tests",

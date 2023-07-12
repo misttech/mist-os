@@ -155,7 +155,6 @@ deserialization, and dispatch.
 * [C](/sdk/lib/fidl_base)
 * [C++](/sdk/lib/fidl/cpp/)
 * [Rust](/src/lib/fidl/rust/fidl)
-* [Dart](/sdk/dart/fidl/)
 * [Go](https://fuchsia.googlesource.com/third_party/go/+/HEAD/src/syscall/zx/fidl/)
 
 ## POSIX-style IO

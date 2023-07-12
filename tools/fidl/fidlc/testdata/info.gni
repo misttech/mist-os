@@ -15,14 +15,14 @@ import("//build/fidl/toolchain.gni")
 #
 #   denylist
 #     List of tools that should not generate golden files.
-#     Allowed items: fidldoc, fidlgen_banjo, fidlgen_dart, fidlgen_go,
+#     Allowed items: fidldoc, fidlgen_banjo, fidlgen_go,
 #       fidlgen_hlcpp, fidlgen_libfuzzer, fidlgen_cpp, fidlgen_rust,
 #       fidlgen_syzkaller.
 #     To exclude a library from fidlc goldens, simply comment the whole item.
 #
 #   build_denylist
 #     List of tools that should not compile golden bindings.
-#     Allowed items: fidlgen_dart, fidlgen_go, fidlgen_hlcpp, fidlgen_libfuzzer,
+#     Allowed items: fidlgen_go, fidlgen_hlcpp, fidlgen_libfuzzer,
 #       fidlgen_cpp, fidlgen_rust.
 #     Tools from `denylist` are implicitly included.
 #
@@ -54,10 +54,6 @@ fidl_testdata_info = [
   {
     name = "anonymous"
     target = "//tools/fidl/fidlc/testdata:test.anonymous"
-    build_denylist = [
-      # TODO(fxbug.dev/7644): Dart does not support recursive types
-      "fidlgen_dart",
-    ]
     host_build_denylist = [
       # TODO(fxbug.dev/62573): Add ifdefs so that protocols compile on host.
       "fidlgen_cpp",
@@ -99,9 +95,6 @@ fidl_testdata_info = [
       "fidlgen_libfuzzer",
       "fidlgen_cpp",
       "fidlgen_go",
-
-      # TODO(fxbug.dev/62763): Fix undefined_identifier errors.
-      "fidlgen_dart",
     ]
   },
   {
@@ -109,7 +102,6 @@ fidl_testdata_info = [
     target = "//tools/fidl/fidlc/testdata:test.constants"
     denylist = [
       # TODO(fxbug.dev/45006): Implement const expressions in fidlgen.
-      "fidlgen_dart",
       "fidlgen_hlcpp",
       "fidlgen_libfuzzer",
       "fidlgen_cpp",
@@ -155,7 +147,6 @@ fidl_testdata_info = [
     build_denylist = [
       # TODO(fxbug.dev/105845): These bindings don't support driver protocols in
       # services.
-      "fidlgen_dart",
       "fidlgen_go",
       "fidlgen_hlcpp",
       "fidlgen_libfuzzer",
@@ -282,7 +273,6 @@ fidl_testdata_info = [
       # TODO(fxbug.dev/7807): Handle the IR changes for each language binding and other tools
       "fidldoc",
       "fidlgen_banjo",
-      "fidlgen_dart",
       "fidlgen_go",
       "fidlgen_hlcpp",
       "fidlgen_libfuzzer",
@@ -404,10 +394,6 @@ fidl_testdata_info = [
       # in struct defaults.
       "fidlgen_syzkaller",
     ]
-    build_denylist = [
-      # TODO(fxbug.dev/62761): Fix error about default value not being constant.
-      "fidlgen_dart",
-    ]
   },
   {
     name = "table"
@@ -475,7 +461,6 @@ fidl_testdata_info = [
     denylist = [
       "fidldoc",
       "fidlgen_banjo",
-      "fidlgen_dart",
       "fidlgen_go",
       "fidlgen_hlcpp",
       "fidlgen_libfuzzer",
@@ -490,7 +475,6 @@ fidl_testdata_info = [
     denylist = [
       "fidldoc",
       "fidlgen_banjo",
-      "fidlgen_dart",
       "fidlgen_go",
       "fidlgen_hlcpp",
       "fidlgen_libfuzzer",
@@ -505,7 +489,6 @@ fidl_testdata_info = [
     denylist = [
       "fidldoc",
       "fidlgen_banjo",
-      "fidlgen_dart",
       "fidlgen_go",
       "fidlgen_hlcpp",
       "fidlgen_libfuzzer",
