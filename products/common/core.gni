@@ -23,7 +23,6 @@ core_realm_shards += [
   "//src/sys/fuzzing:fuzzing-core-shard",
   "//src/developer:default-laboratory-env-core-shard",
   "//src/developer/remote-control:laboratory-core-shard",
-  "//src/developer/process_explorer:process_explorer_core_shard",
 ]
 
 core_realm_shards += [

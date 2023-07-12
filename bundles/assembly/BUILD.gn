@@ -824,7 +824,11 @@ assembly_input_bundle("common_minimal") {
 assembly_input_bundle("common_minimal_eng") {
   testonly = true
   base_packages = []
-  cache_packages = [ "//src/devices/bin/driver_playground:pkg" ]
+  cache_packages = [
+    # Backend for ffx process command.
+    "//src/developer/process_explorer:process_explorer_package",
+    "//src/devices/bin/driver_playground:pkg",
+  ]
   compiled_packages = [
     {
       name = "core"
@@ -832,7 +836,10 @@ assembly_input_bundle("common_minimal_eng") {
         {
           component_name = "core"
           shards = rebase_path(
-                  [ "//src/devices/bin/driver_playground/meta/driver_playground.core_shard.cml" ],
+                  [
+                    "//src/developer/process_explorer/meta/process_explorer.core_shard.cml",
+                    "//src/devices/bin/driver_playground/meta/driver_playground.core_shard.cml",
+                  ],
                   root_build_dir)
         },
       ]
