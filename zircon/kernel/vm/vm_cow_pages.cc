@@ -3077,6 +3077,9 @@ zx_status_t VmCowPages::DecommitRangeLocked(uint64_t offset, uint64_t len) {
     return status;
   }
 
+  // We were successfully able to remove pages. Increment the gen count.
+  IncrementHierarchyGenerationCountLocked();
+
   FreePagesLocked(&freed_list, /*freeing_owned_pages=*/true);
 
   return status;
@@ -3200,6 +3203,16 @@ zx_status_t VmCowPages::ZeroPagesLocked(uint64_t page_start_base, uint64_t page_
     // or by turning them into markers and it's more efficient to unmap once in bulk here.
     RangeChangeUpdateLocked(page_start_base, page_end_base - page_start_base, RangeChangeOp::Unmap);
   }
+
+  // Increment the gen count early as it's possible to fail part way through and this function
+  // doesn't unroll its actions. If we were able to successfully decommit pages above,
+  // DecommitRangeLocked would have incremented the gen count already, so we can do this after the
+  // decommit attempt.
+  //
+  // Zeroing pages of a contiguous VMO doesn't commit or decommit any pages currently, but we
+  // increment the generation count anyway in case that changes in future, and to keep the tests
+  // more consistent.
+  IncrementHierarchyGenerationCountLocked();
 
   // We stack-own loaned pages from when they're removed until they're freed.
   __UNINITIALIZED StackOwnedLoanedPagesInterval raii_interval;
@@ -4748,6 +4761,10 @@ zx_status_t VmCowPages::TakePagesLocked(uint64_t offset, uint64_t len, VmPageSpl
   if (children_list_len_) {
     return ZX_ERR_BAD_STATE;
   }
+
+  // Now that all early checks are done, increment the gen count since we're going to remove pages.
+  IncrementHierarchyGenerationCountLocked();
+
   VmCompression* compression = pmm_page_compression();
 
   bool found_page = false;
@@ -4796,7 +4813,6 @@ zx_status_t VmCowPages::SupplyPages(uint64_t offset, uint64_t len, VmPageSpliceL
                                     LazyPageRequest* page_request) {
   canary_.Assert();
   Guard<CriticalMutex> guard{lock()};
-  IncrementHierarchyGenerationCountLocked();
   return SupplyPagesLocked(offset, len, pages, new_zeroed_pages, supplied_len, page_request);
 }
 
@@ -4819,6 +4835,10 @@ zx_status_t VmCowPages::SupplyPagesLocked(uint64_t offset, uint64_t len, VmPageS
   if (page_source_->is_detached()) {
     return ZX_ERR_BAD_STATE;
   }
+
+  // It is possible that we fail to insert pages below and we increment the gen count needlessly,
+  // but the user is certainly expecting it to succeed.
+  IncrementHierarchyGenerationCountLocked();
 
   const uint64_t start = offset;
   const uint64_t end = offset + len;

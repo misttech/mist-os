@@ -1133,11 +1133,7 @@ zx_status_t VmObjectPaged::DecommitRangeLocked(uint64_t offset, uint64_t len) {
   // Decommit of pages from a contiguous VMO relies on contiguous VMOs not being resizable.
   DEBUG_ASSERT(!is_resizable() || !is_contiguous());
 
-  zx_status_t status = cow_pages_locked()->DecommitRangeLocked(offset, len);
-  if (status == ZX_OK) {
-    IncrementHierarchyGenerationCountLocked();
-  }
-  return status;
+  return cow_pages_locked()->DecommitRangeLocked(offset, len);
 }
 
 zx_status_t VmObjectPaged::ZeroPartialPageLocked(uint64_t page_base_offset,
@@ -1254,14 +1250,6 @@ zx_status_t VmObjectPaged::ZeroRange(uint64_t offset, uint64_t len) {
   // We might need a page request if the VMO is backed by a page source.
   __UNINITIALIZED LazyPageRequest page_request;
   while (start < end) {
-    // Increment the gen count as it's possible for ZeroPagesLocked to fail part way through
-    // and it doesn't unroll its actions.
-    //
-    // Zeroing pages of a contiguous VMO doesn't commit or de-commit any pages currently, but we
-    // increment the generation count anyway in case that changes in future, and to keep the tests
-    // more consistent.
-    IncrementHierarchyGenerationCountLocked();
-
     uint64_t zeroed_len = 0;
     zx_status_t status =
         cow_pages_locked()->ZeroPagesLocked(start, end, &page_request, &zeroed_len);
@@ -1736,12 +1724,7 @@ zx_status_t VmObjectPaged::TakePages(uint64_t offset, uint64_t len, VmPageSplice
   if (children_list_len_) {
     return ZX_ERR_BAD_STATE;
   }
-  zx_status_t status = cow_pages_locked()->TakePagesLocked(offset, len, pages);
-
-  if (status == ZX_OK) {
-    IncrementHierarchyGenerationCountLocked();
-  }
-  return status;
+  return cow_pages_locked()->TakePagesLocked(offset, len, pages);
 }
 
 zx_status_t VmObjectPaged::SupplyPages(uint64_t offset, uint64_t len, VmPageSpliceList* pages) {
@@ -1750,10 +1733,6 @@ zx_status_t VmObjectPaged::SupplyPages(uint64_t offset, uint64_t len, VmPageSpli
   __UNINITIALIZED LazyPageRequest page_request;
   while (len > 0) {
     Guard<CriticalMutex> guard{lock()};
-
-    // It is possible that supply pages fails and we increment the gen count needlessly, but the
-    // user is certainly expecting it to succeed.
-    IncrementHierarchyGenerationCountLocked();
 
     uint64_t supply_len = 0;
     zx_status_t status = cow_pages_locked()->SupplyPagesLocked(
