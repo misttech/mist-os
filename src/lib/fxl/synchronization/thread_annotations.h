@@ -12,12 +12,13 @@
 // particular, |TRY_ACQUIRE()| doesn't work: b/19264527).
 // https://github.com/domokit/mojo/issues/314
 
-#ifndef LIB_FXL_SYNCHRONIZATION_THREAD_ANNOTATIONS_H_
-#define LIB_FXL_SYNCHRONIZATION_THREAD_ANNOTATIONS_H_
+#ifndef SRC_LIB_FXL_SYNCHRONIZATION_THREAD_ANNOTATIONS_H_
+#define SRC_LIB_FXL_SYNCHRONIZATION_THREAD_ANNOTATIONS_H_
 
-// Enable thread-safety attributes only with clang.
+// Enable thread-safety attributes only with clang, and only when annotations are enabled in libc++.
 // The attributes can be safely erased when compiling with other compilers.
-#if defined(__clang__)
+#if defined(__clang__) && defined(_LIBCPP_ENABLE_THREAD_SAFETY_ANNOTATIONS) && \
+    __has_attribute(acquire_capability)
 #define FXL_THREAD_ANNOTATION_ATTRIBUTE__(x) __attribute__((x))
 #else
 #define FXL_THREAD_ANNOTATION_ATTRIBUTE__(x)
@@ -83,4 +84,4 @@
 // implementations.
 #define FXL_NOT_THREAD_SAFE FXL_NO_THREAD_SAFETY_ANALYSIS
 
-#endif  // LIB_FXL_SYNCHRONIZATION_THREAD_ANNOTATIONS_H_
+#endif  // SRC_LIB_FXL_SYNCHRONIZATION_THREAD_ANNOTATIONS_H_
