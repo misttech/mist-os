@@ -64,6 +64,7 @@ fuchsia_structured_config_values("tiles_config_values") {
 
 fuchsia_package("tiles-session") {
   package_name = "tiles-session"
+  subpackages = [ "//src/session/bin/element_manager" ]
 
   deps = [
     ":tiles_component",

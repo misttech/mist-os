@@ -14,7 +14,7 @@
     children: [
         {
             name: "element_manager",
-            url: "fuchsia-pkg://fuchsia.com/element_manager#meta/element_manager.cm",
+            url: "element_manager#meta/element_manager.cm",
         },
     ],
     collections: [
