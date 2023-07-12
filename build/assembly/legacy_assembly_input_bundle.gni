@@ -493,11 +493,6 @@ template("legacy_assembly_input_bundle") {
     if (!use_assembly_fshost) {
       deps += [ ":${labels.fshost}" ]
     }
-
-    # Only builds which support blobs need base-resolver.
-    if (invoker.supports_blobs) {
-      deps += [ "//src/sys/base-resolver:bootfs" ]
-    }
   }
 
   fuchsia_package(labels.bootfs_files_package) {

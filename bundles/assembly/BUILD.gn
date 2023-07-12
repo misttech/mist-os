@@ -313,6 +313,7 @@ assembly_input_bundle("kernel_args_user") {
 # All children in `/core` receive InspectSink and LogSink.
 #
 assembly_input_bundle("core_realm") {
+  bootfs_files_labels = [ "//src/sys/base-resolver:bootfs" ]
   base_packages = [
     # The required SWD stack artifacts to enable packages in an FVM.
     "//src/sys/pkg/bin/pkg-cache",

@@ -298,6 +298,12 @@ template("assemble_security_pkg_test_system") {
     } else {
       assembly_images_config_label = ":${labels.images_config_fxfs}"
     }
+
+    # We use a bootstrap assembly, because this is a test
+    # Even though we are building a fvm/fxfs, a bootstrap assembly cannot load
+    # blobs. The blobs are necessary for the test to exercise blob resolution.
+    # The test never tries to boot using this assembly, and uses the resolution
+    # code from the "main" assembly.
     product_assembly_config_label = "//build/assembly:default_product_config"
     use_bringup_platform_bundles_only = true
     board_name = invoker.board_name

@@ -50,11 +50,6 @@ legacy_base_package_labels += [
   "//src/hwinfo:default_product_config",
 ]
 
-product_bootfs_labels += [
-  # Core products have pkgfs, so include the base resolver.
-  "//src/sys/base-resolver:bootfs",
-]
-
 # Set the SWD policy for core.gni, details can be found in
 # //build/security/policies_swd.gni.
 policy_labels.swd = "unrestricted"
