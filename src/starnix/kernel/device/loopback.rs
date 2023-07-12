@@ -14,6 +14,7 @@ use crate::{
     types::*,
 };
 use bitflags::bitflags;
+use fuchsia_zircon::{Vmo, VmoChildOptions};
 use std::{
     collections::btree_map::{BTreeMap, Entry},
     sync::Arc,
@@ -70,12 +71,16 @@ impl LoopDeviceState {
         }
     }
 
-    fn set_backing_file(&mut self, backing_file: FileHandle) -> Result<(), Errno> {
+    fn set_backing_file(
+        &mut self,
+        current_task: &CurrentTask,
+        backing_file: FileHandle,
+    ) -> Result<(), Errno> {
         if self.backing_file.is_some() {
             return error!(EBUSY);
         }
         self.backing_file = Some(backing_file);
-        self.update_size_limit();
+        self.update_size_limit(current_task)?;
         Ok(())
     }
 
@@ -88,10 +93,12 @@ impl LoopDeviceState {
         self.init = info.lo_init;
     }
 
-    fn update_size_limit(&mut self) {
+    fn update_size_limit(&mut self, current_task: &CurrentTask) -> Result<(), Errno> {
         if let Some(backing_file) = &self.backing_file {
-            self.size_limit = backing_file.node().info().size as u64;
+            let backing_stat = backing_file.node().stat(current_task)?;
+            self.size_limit = backing_stat.st_size as u64;
         }
+        Ok(())
     }
 }
 
@@ -166,6 +173,49 @@ impl FileOps for LoopDeviceFile {
         }
     }
 
+    fn get_vmo(
+        &self,
+        file: &FileObject,
+        current_task: &CurrentTask,
+        requested_length: Option<usize>,
+        prot: ProtectionFlags,
+    ) -> Result<Arc<Vmo>, Errno> {
+        let backing_file = self.device.backing_file().ok_or_else(|| errno!(EBADF))?;
+
+        let configured_offset = { *file.offset.lock() as u64 };
+        let configured_size_limit = {
+            match self.device.state.lock().size_limit {
+                // If the size limit is 0, use all available bytes from the backing file.
+                0 => u64::MAX,
+                n => n,
+            }
+        };
+
+        let backing_vmo = backing_file.get_vmo(
+            current_task,
+            requested_length.map(|l| l + configured_offset as usize),
+            prot,
+        )?;
+
+        let slice_len = backing_vmo
+            .get_size()
+            .map_err(|e| errno!(EBADF, e))?
+            .min(configured_size_limit)
+            .min(requested_length.unwrap_or(usize::MAX) as u64);
+
+        let vmo_slice = backing_vmo
+            .create_child(VmoChildOptions::SLICE, configured_offset, slice_len)
+            .map_err(|e| errno!(EINVAL, e))?;
+
+        let backing_content_size = backing_vmo.get_content_size().map_err(|e| errno!(EIO, e))?;
+        if backing_content_size < slice_len {
+            let new_content_size = backing_content_size.saturating_sub(configured_offset);
+            vmo_slice.set_content_size(&new_content_size).map_err(|e| errno!(EIO, e))?;
+        }
+
+        Ok(Arc::new(vmo_slice))
+    }
+
     fn ioctl(
         &self,
         file: &FileObject,
@@ -200,7 +250,7 @@ impl FileOps for LoopDeviceFile {
                 let fd = arg.into();
                 let backing_file = current_task.files.get_unless_opath(fd)?;
                 let mut state = self.device.state.lock();
-                state.set_backing_file(backing_file)?;
+                state.set_backing_file(current_task, backing_file)?;
                 Ok(SUCCESS)
             }
             LOOP_CLR_FD => {
@@ -274,7 +324,7 @@ impl FileOps for LoopDeviceFile {
             LOOP_SET_CAPACITY => {
                 let mut state = self.device.state.lock();
                 state.check_bound()?;
-                state.update_size_limit();
+                state.update_size_limit(current_task)?;
                 Ok(SUCCESS)
             }
             LOOP_SET_DIRECT_IO => {
@@ -296,7 +346,7 @@ impl FileOps for LoopDeviceFile {
                 check_block_size(config.block_size)?;
                 let mut state = self.device.state.lock();
                 if let Ok(backing_file) = current_task.files.get_unless_opath(fd) {
-                    state.set_backing_file(backing_file)?;
+                    state.set_backing_file(current_task, backing_file)?;
                 }
                 state.block_size = config.block_size;
                 state.set_info(&config.info);
@@ -459,7 +509,13 @@ pub fn create_loop_device(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{fs::buffers::*, testing::*};
+    use crate::{
+        fs::{buffers::*, fuchsia::new_remote_file},
+        testing::*,
+    };
+    use fidl::endpoints::Proxy;
+    use fidl_fuchsia_io as fio;
+    use fuchsia_zircon as zx;
 
     #[derive(Clone)]
     struct PassthroughTestFile(Vec<u8>);
@@ -548,5 +604,67 @@ mod tests {
         loop_file.read(&current_task, &mut buf).unwrap();
 
         assert_eq!(buf.data(), b"lo, world!");
+    }
+
+    #[::fuchsia::test]
+    async fn basic_get_vmo() {
+        let test_data_path = "/pkg/data/testfile.txt";
+        let expected_contents = std::fs::read(test_data_path).unwrap();
+        let (kernel, current_task) = create_kernel_and_task();
+
+        let txt_channel: zx::Channel =
+            fuchsia_fs::file::open_in_namespace(test_data_path, fio::OpenFlags::RIGHT_READABLE)
+                .unwrap()
+                .into_channel()
+                .unwrap()
+                .into();
+
+        let backing_file = new_remote_file(&kernel, txt_channel.into(), OpenFlags::RDONLY).unwrap();
+        let loop_file = bind_simple_loop_device(&current_task, backing_file, OpenFlags::RDONLY);
+
+        let vmo = loop_file.get_vmo(&current_task, None, ProtectionFlags::READ).unwrap();
+        let size = vmo.get_content_size().unwrap();
+        let vmo_contents = vmo.read_to_vec(0, size).unwrap();
+        assert_eq!(vmo_contents, expected_contents);
+    }
+
+    #[::fuchsia::test]
+    async fn get_vmo_offset_and_size_limit_work() {
+        // VMO slice children require a page-aligned offset, so we need a file that's big enough to
+        // have multiple pages to support creating a child with a meaningful offset, our own
+        // binary should do the trick.
+        let test_data_path = std::env::args().next().unwrap();
+        let expected_offset = *PAGE_SIZE;
+        let expected_size_limit = *PAGE_SIZE;
+        let expected_contents = std::fs::read(&test_data_path).unwrap();
+        let expected_contents = &expected_contents
+            [expected_offset as usize..(expected_offset + expected_size_limit) as usize];
+
+        let (kernel, current_task) = create_kernel_and_task();
+
+        let txt_channel: zx::Channel =
+            fuchsia_fs::file::open_in_namespace(&test_data_path, fio::OpenFlags::RIGHT_READABLE)
+                .unwrap()
+                .into_channel()
+                .unwrap()
+                .into();
+
+        let backing_file = new_remote_file(&kernel, txt_channel.into(), OpenFlags::RDONLY).unwrap();
+        let loop_file = bind_simple_loop_device(&current_task, backing_file, OpenFlags::RDONLY);
+
+        let info_addr = map_object_anywhere(
+            &current_task,
+            &uapi::loop_info64 {
+                lo_offset: expected_offset,
+                lo_sizelimit: expected_size_limit,
+                ..Default::default()
+            },
+        );
+        loop_file.ioctl(&current_task, LOOP_SET_STATUS64, info_addr.into()).unwrap();
+
+        let vmo = loop_file.get_vmo(&current_task, None, ProtectionFlags::READ).unwrap();
+        let size = vmo.get_content_size().unwrap();
+        let vmo_contents = vmo.read_to_vec(0, size).unwrap();
+        assert_eq!(vmo_contents, expected_contents);
     }
 }
