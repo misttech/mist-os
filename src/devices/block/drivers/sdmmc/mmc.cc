@@ -295,15 +295,19 @@ zx_status_t SdmmcBlockDevice::ProbeMmc(
   auto reset_retries = fit::defer([&sdmmc = sdmmc_]() { sdmmc.SetRequestRetries(0); });
 
   // Query OCR
-  uint32_t ocr = 0;
-  zx_status_t st = sdmmc_.MmcSendOpCond(ocr, &ocr);
-  if (st != ZX_OK) {
-    zxlogf(ERROR, "MMC_SEND_OP_COND failed: %s", zx_status_get_string(st));
-    return st;
+  zx::result<uint32_t> ocr = sdmmc_.MmcSendOpCond();
+  if (ocr.is_error()) {
+    zxlogf(ERROR, "MMC_SEND_OP_COND failed: %s", ocr.status_string());
+    return ocr.status_value();
   }
 
-  // Indicate sector mode
-  if ((st = sdmmc_.MmcSendOpCond(ocr, &ocr)) != ZX_OK) {
+  // Indicate support for sector mode addressing. Byte mode addressing is not implemented, which
+  // effectively limits us to >2GB devices. The capacity is validated later when reading the CSD
+  // register.
+  *ocr = (*ocr & ~MMC_OCR_ACCESS_MODE_MASK) | MMC_OCR_SECTOR_MODE;
+
+  zx_status_t st = sdmmc_.MmcWaitForReadyState(*ocr);
+  if (st != ZX_OK) {
     zxlogf(ERROR, "MMC_SEND_OP_COND failed: %s", zx_status_get_string(st));
     return st;
   }

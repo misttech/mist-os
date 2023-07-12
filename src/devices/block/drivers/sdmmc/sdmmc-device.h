@@ -8,6 +8,7 @@
 #include <fuchsia/hardware/sdmmc/cpp/banjo.h>
 #include <lib/sdmmc/hw.h>
 #include <lib/stdcompat/span.h>
+#include <lib/zx/result.h>
 #include <lib/zx/time.h>
 
 #include <array>
@@ -68,7 +69,8 @@ class SdmmcDevice {
                                cpp20::span<const sdmmc_buffer_region_t> buffers);
 
   // MMC ops
-  zx_status_t MmcSendOpCond(uint32_t ocr, uint32_t* rocr);
+  zx::result<uint32_t> MmcSendOpCond();
+  zx_status_t MmcWaitForReadyState(uint32_t ocr);
   zx_status_t MmcAllSendCid(std::array<uint8_t, SDMMC_CID_SIZE>& cid);
   zx_status_t MmcSetRelativeAddr(uint16_t rca);
   zx_status_t MmcSendCsd(std::array<uint8_t, SDMMC_CSD_SIZE>& csd);

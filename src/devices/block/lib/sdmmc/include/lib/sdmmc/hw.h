@@ -142,6 +142,8 @@ __BEGIN_CDECLS
 
 // OCR fields (MMC)
 #define MMC_OCR_BUSY (1 << 31)
+#define MMC_OCR_ACCESS_MODE_MASK (0b11 << 29)
+#define MMC_OCR_SECTOR_MODE      (0b10 << 29)
 
 // EXT_CSD fields (MMC)
 #define MMC_EXT_CSD_SIZE 512

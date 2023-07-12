@@ -446,12 +446,23 @@ zx_status_t SdmmcDevice::SdioIoRwExtended(uint32_t caps, bool write, uint8_t fn_
 
 // MMC ops
 
-zx_status_t SdmmcDevice::MmcSendOpCond(uint32_t ocr, uint32_t* rocr) {
-  // Request sector addressing if not probing
-  uint32_t arg = (ocr == 0) ? ocr : ((1 << 30) | ocr);
+zx::result<uint32_t> SdmmcDevice::MmcSendOpCond() {
+  const sdmmc_req_t request = {
+      .cmd_idx = MMC_SEND_OP_COND,
+      .cmd_flags = MMC_SEND_OP_COND_FLAGS,
+      .arg = 0,  // Use zero to request the device's OCR without changing its state.
+  };
+  uint32_t response[4];
+  if (zx_status_t status = Request(request, response); status != ZX_OK) {
+    return zx::error(status);
+  }
+  return zx::ok(response[0]);
+}
+
+zx_status_t SdmmcDevice::MmcWaitForReadyState(uint32_t ocr) {
   sdmmc_req_t req = {};
   req.cmd_idx = MMC_SEND_OP_COND;
-  req.arg = arg;
+  req.arg = ocr;
   req.cmd_flags = MMC_SEND_OP_COND_FLAGS;
   zx_status_t st;
   for (int i = 100; i; i--) {
@@ -460,9 +471,7 @@ zx_status_t SdmmcDevice::MmcSendOpCond(uint32_t ocr, uint32_t* rocr) {
       // fail on request error
       break;
     }
-    // No need to wait for busy clear if probing
-    if ((arg == 0) || (response[0] & MMC_OCR_BUSY)) {
-      *rocr = response[0];
+    if (response[0] & MMC_OCR_BUSY) {
       break;
     }
     zx::nanosleep(zx::deadline_after(zx::msec(10)));
