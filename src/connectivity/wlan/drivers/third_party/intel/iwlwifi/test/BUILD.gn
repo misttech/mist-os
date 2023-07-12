@@ -87,6 +87,25 @@ executable("driver_inspector_test") {
   ]
 }
 
+executable("driver_lifecycle_test") {
+  output_name = "driver_lifecycle_test"
+  testonly = true
+  sources = [ "driver-lifecycle-test.cc" ]
+  deps = [
+    "//sdk/fidl/fuchsia.wlan.phyimpl:fuchsia.wlan.phyimpl_cpp_driver",
+    "//sdk/fidl/fuchsia.wlan.softmac:fuchsia.wlan.softmac_cpp_driver",
+    "//sdk/lib/async_patterns/testing/cpp:cpp",
+    "//sdk/lib/driver/compat/cpp",
+    "//sdk/lib/driver/testing/cpp",
+    "//src/connectivity/wlan/drivers/third_party/intel/iwlwifi/platform:fuchsia_device",
+    "//src/devices/pci/lib/device-protocol-pci",
+    "//src/devices/testing/fake-bti",
+    "//src/lib/fxl/test:gtest_main",
+    "//zircon/system/ulib/async",
+    "//zircon/system/ulib/async-loop:async-loop-cpp",
+  ]
+}
+
 # The dummy code for developer to start a new test.
 executable("dummy_test") {
   output_name = "dummy_test"
@@ -213,7 +232,6 @@ executable("pcie_test") {
     "//sdk/fidl/fuchsia.wlan.phyimpl:fuchsia.wlan.phyimpl_cpp_driver",
     "//sdk/lib/async-loop-testing/cpp",
     "//sdk/lib/component/outgoing/cpp",
-    "//src/connectivity/wlan/drivers/testing/lib/DFv2:sim-driver-host",
     "//src/connectivity/wlan/drivers/third_party/intel/iwlwifi:core",
     "//src/connectivity/wlan/drivers/third_party/intel/iwlwifi/fw:api",
     "//src/connectivity/wlan/drivers/third_party/intel/iwlwifi/pcie",
@@ -340,6 +358,7 @@ executable("wlan_phy_impl_device_test") {
 
 _tests = [
   "driver_inspector_test",
+  "driver_lifecycle_test",
   "dummy_test",
   "fw_test",
   "fw_dbg_test",

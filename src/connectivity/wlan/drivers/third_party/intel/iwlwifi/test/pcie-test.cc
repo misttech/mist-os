@@ -14,7 +14,6 @@
  * CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
 
-#include <fidl/fuchsia.hardware.pci/cpp/wire.h>
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async-loop/default.h>
 #include <lib/async-loop/testing/cpp/real_loop.h>
@@ -34,7 +33,6 @@
 #include <wlan/drivers/log_instance.h>
 #include <zxtest/zxtest.h>
 
-#include "src/connectivity/wlan/drivers/testing/lib/DFv2/sim-driver-host.h"
 #include "src/connectivity/wlan/drivers/third_party/intel/iwlwifi/iwl-fh.h"
 #include "src/connectivity/wlan/drivers/third_party/intel/iwlwifi/platform/compiler.h"
 
@@ -49,142 +47,16 @@ extern "C" {
 #include "src/connectivity/wlan/drivers/third_party/intel/iwlwifi/platform/irq.h"
 #include "src/connectivity/wlan/drivers/third_party/intel/iwlwifi/platform/kernel.h"
 #include "src/connectivity/wlan/drivers/third_party/intel/iwlwifi/platform/memory.h"
-#include "src/connectivity/wlan/drivers/third_party/intel/iwlwifi/platform/pcie-iwlwifi-driver.h"
 #include "src/connectivity/wlan/drivers/third_party/intel/iwlwifi/platform/stats.h"
 #include "src/connectivity/wlan/drivers/third_party/intel/iwlwifi/test/wlan-pkt-builder.h"
 #include "src/devices/pci/testing/pci_protocol_fake.h"
 
 namespace {
 
-constexpr int kTestDeviceId = 0x095a;
-constexpr int kTestSubsysDeviceId = 0x9e10;
-
 // This const is actually defined in queue/tx.h. However, including the header file would
 // introduce unnecessary complexity. So we just define it here.
 // TODO(fxbug.dev/119415): come back to review this after uprev.
 #define TX_RESERVED_SPACE 3
-
-class MockDdkTesterPci : public zxtest::Test, public loop_fixture::RealLoop {};
-// Note: which dispatcher will this run on?
-// Implement all the WireServer handlers of fuchsia_hardware_pci::Device as protocol as required by
-// FIDL.
-class FakePciParent : public fidl::WireServer<fuchsia_hardware_pci::Device> {
- public:
-  void GetDeviceInfo(GetDeviceInfoCompleter::Sync& completer) override {
-    fuchsia_hardware_pci::wire::DeviceInfo info;
-    info.device_id = kTestDeviceId;
-    completer.Reply(info);
-  }
-  void GetBar(GetBarRequestView request, GetBarCompleter::Sync& completer) override {
-    fuchsia_hardware_pci::wire::Bar bar;
-    completer.ReplySuccess(std::move(bar));
-  }
-
-  void SetBusMastering(SetBusMasteringRequestView request,
-                       SetBusMasteringCompleter::Sync& completer) override {
-    completer.ReplySuccess();
-  }
-
-  void ResetDevice(ResetDeviceCompleter::Sync& completer) override { completer.ReplySuccess(); }
-
-  void AckInterrupt(AckInterruptCompleter::Sync& completer) override { completer.ReplySuccess(); }
-
-  void MapInterrupt(MapInterruptRequestView request,
-                    MapInterruptCompleter::Sync& completer) override {
-    zx::interrupt interrupt;
-    completer.ReplySuccess(std::move(interrupt));
-  }
-
-  void GetInterruptModes(GetInterruptModesCompleter::Sync& completer) override {
-    fuchsia_hardware_pci::wire::InterruptModes modes;
-    completer.Reply(modes);
-  }
-
-  void SetInterruptMode(SetInterruptModeRequestView request,
-                        SetInterruptModeCompleter::Sync& completer) override {
-    completer.ReplySuccess();
-  }
-
-  void ReadConfig8(ReadConfig8RequestView request, ReadConfig8Completer::Sync& completer) override {
-    completer.ReplySuccess(0);
-  }
-
-  void ReadConfig16(ReadConfig16RequestView request,
-                    ReadConfig16Completer::Sync& completer) override {
-    // Always return the fake sub-system device id to pass the initialization.
-    completer.ReplySuccess(kTestSubsysDeviceId);
-  }
-
-  void ReadConfig32(ReadConfig32RequestView request,
-                    ReadConfig32Completer::Sync& completer) override {
-    completer.ReplySuccess(0);
-  }
-
-  void WriteConfig8(WriteConfig8RequestView request,
-                    WriteConfig8Completer::Sync& completer) override {
-    completer.ReplySuccess();
-  }
-
-  void WriteConfig16(WriteConfig16RequestView request,
-                     WriteConfig16Completer::Sync& completer) override {
-    completer.ReplySuccess();
-  }
-
-  void WriteConfig32(WriteConfig32RequestView request,
-                     WriteConfig32Completer::Sync& completer) override {
-    completer.ReplySuccess();
-  }
-
-  void GetCapabilities(GetCapabilitiesRequestView request,
-                       GetCapabilitiesCompleter::Sync& completer) override {
-    std::vector<uint8_t> dummy_vec;
-    auto dummy_vec_view = fidl::VectorView<uint8_t>::FromExternal(dummy_vec);
-    completer.Reply(dummy_vec_view);
-  }
-
-  void GetExtendedCapabilities(GetExtendedCapabilitiesRequestView request,
-                               GetExtendedCapabilitiesCompleter::Sync& completer) override {
-    std::vector<uint16_t> dummy_vec;
-    auto dummy_vec_view = fidl::VectorView<uint16_t>::FromExternal(dummy_vec);
-    completer.Reply(dummy_vec_view);
-  }
-
-  void GetBti(GetBtiRequestView request, GetBtiCompleter::Sync& completer) override {
-    zx_handle_t fake_handle;
-    fake_bti_create(&fake_handle);
-    zx::bti bti(fake_handle);
-    completer.ReplySuccess(std::move(bti));
-  }
-};
-
-// clang-format off
-class DriverLifeCycleTest : public zxtest::Test {
- public:
-  DriverLifeCycleTest() {
-    fake_pci_parent_ = std::make_unique<FakePciParent>();
-    sim_driver_host_.StartDriver(std::move(fake_pci_parent_));
-  }
-  ~DriverLifeCycleTest() = default;
-
-  wlan::simulation::SimDriverHost<wlan::iwlwifi::PcieIwlwifiDriver, fuchsia_hardware_pci::Service,
-                                  fuchsia_hardware_pci::Device> sim_driver_host_;
-  std::unique_ptr<FakePciParent> fake_pci_parent_;
-};
-// clang-format on
-
-TEST_F(DriverLifeCycleTest, DeviceLifeCycle) {
-  // Start PcieIwlwifiDriver will trigger AddNode for wlanphy virtual device.
-  EXPECT_EQ(sim_driver_host_.ChildNodeCount(), 1);
-
-  sim_driver_host_.PrepareStopDriver();
-  sim_driver_host_.StopDriver();
-  sim_driver_host_.WaitForNextNodeRemoval();
-
-  EXPECT_EQ(sim_driver_host_.ChildNodeCount(), 0);
-
-  // TODO(b/281685553): Add more operations here like AddWlansoftmacDevice() and
-  // RemoveWlansoftmacDevice().
-}
 
 class PcieTest;
 

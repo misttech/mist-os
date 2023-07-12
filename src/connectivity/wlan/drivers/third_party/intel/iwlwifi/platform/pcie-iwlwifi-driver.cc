@@ -125,7 +125,7 @@ zx_status_t PcieIwlwifiDriver::AddWlanphyChild() {
     return ZX_ERR_INTERNAL;
   }
 
-  wlanphy_controller_client_.Bind(std::move(endpoints->client), dispatcher());
+  wlanphy_controller_client_.Bind(std::move(endpoints->client), dispatcher(), this);
 
   return ZX_OK;
 }
@@ -172,7 +172,7 @@ zx_status_t PcieIwlwifiDriver::AddWlansoftmacDevice(uint16_t iface_id, struct iw
     return endpoints.status_value();
   }
 
-  wlansoftmac_controller_client_.Bind(std::move(endpoints->client), dispatcher());
+  wlansoftmac_controller_client_.Bind(std::move(endpoints->client), dispatcher(), this);
 
   // Add wlansoftmac child node for the node that this driver is binding to. Doing a sync version
   // here to reduce chaos.
@@ -214,7 +214,6 @@ zx::result<> PcieIwlwifiDriver::Start() {
     IWL_ERR(nullptr, "ServeRuntimeProtocolForV1Devices failed: %s", zx_status_get_string(status));
     return zx::error(status);
   }
-
   // Initialize the driver.
   Init();
 
@@ -226,21 +225,14 @@ void PcieIwlwifiDriver::PrepareStop(fdf::PrepareStopCompleter completer) {
   zx_handle_close(pci_dev_.dev.bti);
   pci_dev_.dev.bti = ZX_HANDLE_INVALID;
   ZX_DEBUG_ASSERT(pci_dev_.drvdata == nullptr);
-  completer(zx::ok());
-}
+  prepare_stop_completer_.emplace(std::move(completer));
 
-void PcieIwlwifiDriver::Stop() {
   auto result = wlanphy_controller_client_->Remove();
   if (!result.ok()) {
     IWL_ERR(this, "Remove wlanphy child node failed: %s", result.status_string());
   }
-  if (wlan_softmac_device_) {
-    result = wlansoftmac_controller_client_->Remove();
-    if (!result.ok()) {
-      IWL_ERR(nullptr, "Softmac child remove failed, FIDL error: %s", result.status_string());
-    }
-    wlan_softmac_device_.reset();
-  }
+  // wlansoftmac node will be removed when wlanphy node is removed, this happens when the server end
+  // of the wlanphy node controller fires the event to WlanPhyEventHandler to indicate its removal.
 }
 
 iwl_trans* PcieIwlwifiDriver::drvdata() { return pci_dev_.drvdata; }

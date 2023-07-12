@@ -28,7 +28,9 @@ class RcuManager;
 
 // This class contains the Fuchsia-specific PCIE bus initialization logic, and uses DDKTL class
 // to manage the lifetime of a iwlwifi driver instance.
-class PcieIwlwifiDriver : public wlan::iwlwifi::WlanPhyImplDevice, public fdf::DriverBase {
+class PcieIwlwifiDriver : public wlan::iwlwifi::WlanPhyImplDevice,
+                          public fdf::DriverBase,
+                          public fidl::WireAsyncEventHandler<fdf::NodeController> {
  public:
   PcieIwlwifiDriver(const PcieIwlwifiDriver& driver) = delete;
   PcieIwlwifiDriver& operator=(const PcieIwlwifiDriver& driver_in) = delete;
@@ -42,7 +44,6 @@ class PcieIwlwifiDriver : public wlan::iwlwifi::WlanPhyImplDevice, public fdf::D
   zx::result<> Start() override;
   void PrepareStop(fdf::PrepareStopCompleter completer) override;
 
-  void Stop() override;
   // Device implementation.
   iwl_trans* drvdata() override;
   const iwl_trans* drvdata() const override;
@@ -64,6 +65,21 @@ class PcieIwlwifiDriver : public wlan::iwlwifi::WlanPhyImplDevice, public fdf::D
   // and size.
   zx_status_t LoadFirmware(const char* name, zx_handle_t* vmo, size_t* size);
 
+  // Overriding on_fidl_error from WireAsyncEventHandler.
+  void on_fidl_error(fidl::UnbindInfo error) override {
+    ZX_ASSERT(error.status() == ZX_ERR_PEER_CLOSED);
+    if (!wlan_softmac_device_) {
+      if (prepare_stop_completer_)
+        (*prepare_stop_completer_)(zx::ok());
+      return;
+    }
+
+    wlan_softmac_device_.reset();
+    auto result = wlansoftmac_controller_client_->Remove();
+    ZX_ASSERT_MSG(result.ok(), "Softmac child remove failed, FIDL error: %s",
+                  result.status_string());
+  }
+
  private:
   zx_status_t Init();
 
@@ -77,11 +93,13 @@ class PcieIwlwifiDriver : public wlan::iwlwifi::WlanPhyImplDevice, public fdf::D
 
   // FIDL client of the node that this driver binds to.
   fidl::WireClient<fdf::Node> node_client_;
-  fidl::WireSharedClient<fdf::NodeController> wlanphy_controller_client_;
+  fidl::WireClient<fdf::NodeController> wlanphy_controller_client_;
 
   // Iwlwifi only supports client iface now.
-  fidl::WireSharedClient<fdf::NodeController> wlansoftmac_controller_client_;
+  fidl::WireClient<fdf::NodeController> wlansoftmac_controller_client_;
   std::unique_ptr<WlanSoftmacDevice> wlan_softmac_device_;
+
+  std::optional<fdf::PrepareStopCompleter> prepare_stop_completer_;
 
   iwl_pci_dev pci_dev_;
 };
