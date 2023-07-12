@@ -1759,4 +1759,65 @@ TEST_F(VmoClone2TestCase, MapRangeReadOnly) {
   EXPECT_EQ(kNumPages * zx_system_get_page_size(), info.committed_bytes);
 }
 
+// Regression test for fxbug.dev/129800. The hierarchy generation count was previously incremented
+// in the VmObjectPaged destructor, not in the VmCowPages destructor. But the actual changes to the
+// page list take place in the VmCowPages destructor, which would affect attribution counts. We drop
+// the lock between invoking the two destructors, so it was possible for someone to query the
+// attribution count in between and see an old cached count.
+TEST_F(VmoClone2TestCase, DropParentCommittedBytes) {
+  // Try some N times and hope that if there is a bug we get the right timing. Prior to fixing
+  // fxbug.dev/129800 this was enough iterations to reliably trigger.
+  for (size_t i = 0; i < 1000; i++) {
+    zx::vmo vmo;
+    ASSERT_NO_FATAL_FAILURE(InitPageTaggedVmo(3, &vmo));
+
+    // Create a child that sees the parent partially.
+    zx::vmo child;
+    ASSERT_OK(vmo.create_child(ZX_VMO_CHILD_SNAPSHOT, zx_system_get_page_size(),
+                               2 * zx_system_get_page_size(), &child));
+
+    // Check that the child has the right data.
+    ASSERT_NO_FATAL_FAILURE(VmoCheck(child, 2));
+    ASSERT_NO_FATAL_FAILURE(VmoCheck(child, 3, zx_system_get_page_size()));
+
+    // Fork a page in the child.
+    ASSERT_NO_FATAL_FAILURE(VmoWrite(child, 4, zx_system_get_page_size()));
+
+    // The child is only attributed for the forked page.
+    ASSERT_EQ(zx_system_get_page_size(), VmoCommittedBytes(child));
+
+    // Use a three step ready protocol to ensure both threads can issue their requests at close to
+    // the same time.
+    std::atomic<bool> ready = true;
+
+    std::thread thread{[&ready, &child] {
+      ready = false;
+      while (!ready) {
+        yield();
+      }
+      size_t committed = VmoCommittedBytes(child);
+      // Depending on who wins the race between this thread and the thread destroying the parent,
+      // the child will either continue having a single page attributed to it, or both pages.
+      ASSERT_TRUE(
+          committed == zx_system_get_page_size() || committed == 2 * zx_system_get_page_size(),
+          "committed bytes in child: %zu\n", committed);
+    }};
+    while (ready) {
+      yield();
+    }
+    ready = true;
+    // Drop the parent.
+    vmo.reset();
+    thread.join();
+
+    // Check that we don't change the child.
+    ASSERT_NO_FATAL_FAILURE(VmoCheck(child, 2));
+    ASSERT_NO_FATAL_FAILURE(VmoCheck(child, 4, zx_system_get_page_size()));
+
+    // The parent is gone now, so the remaining page that the child could see should also have
+    // moved to the child.
+    ASSERT_EQ(2 * zx_system_get_page_size(), VmoCommittedBytes(child));
+  }
+}
+
 }  // namespace vmo_test

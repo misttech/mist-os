@@ -340,6 +340,10 @@ void VmCowPages::fbl_recycle() {
   // dropped, but that is always done without holding the lock.
   {  // scope guard
     Guard<CriticalMutex> guard{lock()};
+
+    // We'll be making changes to the hierarchy we're part of.
+    IncrementHierarchyGenerationCountLocked();
+
     // At the point of destruction we should no longer have any mappings or children still
     // referencing us, and by extension our priority count must therefore be back to zero.
     DEBUG_ASSERT(high_priority_count_ == 0);

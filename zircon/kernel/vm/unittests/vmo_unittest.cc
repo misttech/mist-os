@@ -1988,9 +1988,10 @@ static bool vmo_attribution_clones_test() {
   EXPECT_EQ(true,
             verify_object_page_attribution(slice.get(), expected_gen_count, AttributionCounts{}));
 
-  // Removing the clone should increment the generation count.
+  // Removing the clone should increment the generation count twice, one per VmCowPages destruction
+  // (the clone and the hidden parent).
   clone.reset();
-  ++expected_gen_count;
+  expected_gen_count += 2;
   EXPECT_EQ(true, verify_object_page_attribution(vmo.get(), expected_gen_count,
                                                  AttributionCounts{4u, 0u}));
   EXPECT_EQ(true,

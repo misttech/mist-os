@@ -71,9 +71,6 @@ VmObjectPaged::~VmObjectPaged() {
 
   Guard<CriticalMutex> guard{lock()};
 
-  AssertHeld(hierarchy_state_ptr_->lock_ref());
-  hierarchy_state_ptr_->IncrementHierarchyGenerationCountLocked();
-
   // Only clear the backlink if we are not a reference. A reference does not "own" the VmCowPages,
   // so in the typical case, the VmCowPages will not have its backlink set to a reference. There
   // does exist an edge case where the backlink can be a reference, which is handled by the else
