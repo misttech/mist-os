@@ -150,11 +150,13 @@ pub struct LogFormatterOptions {
     pub display: Option<LogTextDisplayOptions>,
     /// If true, highlights spam, if false, filters it out.
     pub highlight_spam: bool,
+    /// If true, displays "raw" logs without symbolization.
+    pub raw: bool,
 }
 
 impl Default for LogFormatterOptions {
     fn default() -> Self {
-        LogFormatterOptions { display: Some(Default::default()), highlight_spam: false }
+        LogFormatterOptions { display: Some(Default::default()), highlight_spam: false, raw: false }
     }
 }
 
@@ -208,7 +210,7 @@ where
             None => {
                 match log_entry {
                     LogEntry { data: LogData::SymbolizedTargetLog(_, ref symbolized), .. } => {
-                        if symbolized.is_empty() {
+                        if !self.options.raw && symbolized.is_empty() {
                             return Ok(());
                         }
                     }
@@ -317,10 +319,11 @@ where
                 writeln!(self.writer, "{}", LogTextPresenter::new(&data, text_options))?;
             }
             LogEntry { data: LogData::SymbolizedTargetLog(mut data, symbolized), .. } => {
-                *data
-                    .msg_mut()
-                    .expect("if a symbolized message is provided then the payload has a message") =
-                    symbolized;
+                if !options.raw {
+                    *data.msg_mut().expect(
+                        "if a symbolized message is provided then the payload has a message",
+                    ) = symbolized;
+                }
                 writeln!(self.writer, "{}", LogTextPresenter::new(&data, text_options))?;
             }
             LogEntry { data: LogData::MalformedTargetLog(raw), timestamp } => {
@@ -393,6 +396,22 @@ mod test {
         async fn push_log(&mut self, log_entry: LogEntry) -> anyhow::Result<()> {
             self.logs.push(log_entry);
             Ok(())
+        }
+    }
+
+    /// Symbolizer that prints "Fuchsia".
+    pub struct FakeFuchsiaSymbolizer;
+
+    #[async_trait(?Send)]
+    impl Symbolize for FakeFuchsiaSymbolizer {
+        async fn symbolize(&self, entry: LogEntry) -> LogEntry {
+            LogEntry {
+                data: LogData::SymbolizedTargetLog(
+                    entry.data.as_target_log().unwrap().clone(),
+                    "Fuchsia".to_string(),
+                ),
+                timestamp: entry.timestamp,
+            }
         }
     }
 
@@ -638,9 +657,82 @@ mod test {
     }
 
     #[fuchsia::test]
+    async fn test_raw_omits_symbolized_output() {
+        let symbolizer = FakeFuchsiaSymbolizer;
+        let buffers = TestBuffers::default();
+        let output = MachineWriter::<LogEntry>::new_test(None, &buffers);
+        let mut formatter = DefaultLogFormatter::new(
+            LogFilterCriteria::default(),
+            output,
+            LogFormatterOptions { raw: true, ..Default::default() },
+        );
+        let target_log = LogsDataBuilder::new(diagnostics_data::BuilderArgs {
+            moniker: "ffx".into(),
+            timestamp_nanos: Timestamp::from(0),
+            component_url: Some("ffx".into()),
+            severity: Severity::Info,
+        })
+        .set_message("Hello world!")
+        .set_pid(1)
+        .set_tid(2)
+        .build();
+        let (sender, receiver) = fuchsia_zircon::Socket::create_stream();
+        sender
+            .write(serde_json::to_string(&target_log).unwrap().as_bytes())
+            .expect("failed to write target log");
+        drop(sender);
+        dump_logs_from_socket(
+            fuchsia_async::Socket::from_socket(receiver).unwrap(),
+            &mut formatter,
+            &symbolizer,
+        )
+        .await
+        .unwrap();
+        assert_eq!(buffers.stdout.into_string(), "[00000.000000][1][2][ffx] INFO: Hello world!\n");
+    }
+
+    #[fuchsia::test]
+    async fn test_raw_false_includes_symbolized_output() {
+        let symbolizer = FakeFuchsiaSymbolizer;
+        let buffers = TestBuffers::default();
+        let output = MachineWriter::<LogEntry>::new_test(None, &buffers);
+        let mut formatter = DefaultLogFormatter::new(
+            LogFilterCriteria::default(),
+            output,
+            LogFormatterOptions { raw: false, ..Default::default() },
+        );
+        let target_log = LogsDataBuilder::new(diagnostics_data::BuilderArgs {
+            moniker: "ffx".into(),
+            timestamp_nanos: Timestamp::from(0),
+            component_url: Some("ffx".into()),
+            severity: Severity::Info,
+        })
+        .set_pid(1)
+        .set_tid(2)
+        .set_message("Hello world!")
+        .build();
+        let (sender, receiver) = fuchsia_zircon::Socket::create_stream();
+        sender
+            .write(serde_json::to_string(&target_log).unwrap().as_bytes())
+            .expect("failed to write target log");
+        drop(sender);
+        dump_logs_from_socket(
+            fuchsia_async::Socket::from_socket(receiver).unwrap(),
+            &mut formatter,
+            &symbolizer,
+        )
+        .await
+        .unwrap();
+        assert_eq!(buffers.stdout.into_string(), "[00000.000000][1][2][ffx] INFO: Fuchsia\n");
+    }
+
+    #[fuchsia::test]
     async fn test_spam_list_applies_highlighting_only_to_spam_line() {
-        let options =
-            LogFormatterOptions { display: Some(Default::default()), highlight_spam: true };
+        let options = LogFormatterOptions {
+            display: Some(Default::default()),
+            highlight_spam: true,
+            raw: false,
+        };
 
         let mut filter = LogFilterCriteria::default();
         filter.with_spam_filter(AlternatingSpamFilter { last_message_was_spam: Cell::new(false) });
