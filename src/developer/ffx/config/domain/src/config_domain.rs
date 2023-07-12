@@ -171,12 +171,7 @@ mod tests {
     use assert_matches::assert_matches;
 
     use super::*;
-
-    const TEST_DATA_PATH: &str = env!("TEST_DATA_PATH");
-
-    fn test_data_path() -> &'static Utf8Path {
-        Utf8Path::new(TEST_DATA_PATH)
-    }
+    use crate::tests::*;
 
     #[test]
     fn adjacent_files() {
@@ -214,5 +209,14 @@ mod tests {
             domain.get_explicit_sdk_root(),
             Some(basic_root.join("bazel-project/external/fuchsia_sdk")).as_deref()
         );
+    }
+
+    #[test]
+    fn build_dir_ref_path() {
+        let basic_root = test_data_path().join("build_dir_path_ref").canonicalize_utf8().unwrap();
+        let basic_root_env = basic_root.join("fuchsia_env.toml");
+
+        let domain = ConfigDomain::load_from(&basic_root_env).unwrap();
+        assert_eq!(domain.get_build_dir(), Some(basic_root.join("build-dir")).as_deref(),);
     }
 }

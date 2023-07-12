@@ -2,7 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use std::io::Read;
+use std::{
+    fs::File,
+    io::{BufRead, BufReader, Read},
+};
 
 use camino::{Utf8Path, Utf8PathBuf};
 use serde::{Deserialize, Serialize};
@@ -16,6 +19,22 @@ pub struct PathRef {
     /// the actual path that should be loaded. This is used for things like
     /// the `.fx-build-dir` file at the root of the fuchsia.git tree.
     path_ref: Utf8PathBuf,
+}
+
+impl<T: AsRef<str>> From<T> for PathRef {
+    fn from(value: T) -> Self {
+        let path_ref = value.as_ref().into();
+        Self { path_ref }
+    }
+}
+
+impl PathRef {
+    pub fn resolve(&self, root: &Utf8Path) -> Option<Utf8PathBuf> {
+        let path_ref_file = root.join(&self.path_ref);
+        let contents = BufReader::new(File::open(&path_ref_file).ok()?);
+        let inner_path = Utf8PathBuf::from(&contents.lines().next()?.ok()?);
+        Some(root.join(&inner_path))
+    }
 }
 
 /// A path that will either be just a simple path string that points to a file
@@ -36,7 +55,7 @@ impl ConfigPath {
     pub fn resolve(&self, root: &Utf8Path) -> Option<Utf8PathBuf> {
         match self {
             ConfigPath::Relative(path) => Some(root.join(path)),
-            _ => None,
+            ConfigPath::Indirect(path_ref) => path_ref.resolve(root),
         }
     }
 }
@@ -167,9 +186,10 @@ mod tests {
     use serde_json::{json, Value};
 
     pub use super::*;
+    pub use crate::tests::*;
 
     #[test]
-    fn config_paths() {
+    fn parsing_config_paths() {
         fn parse(json: Value) -> serde_json::Result<ConfigPath> {
             serde_json::from_value(json)
         }
@@ -186,6 +206,26 @@ mod tests {
         );
         parse(json!({ "something else": "is wrong" }))
             .expect_err("a different kind of object should fail");
+    }
+
+    #[test]
+    fn config_path_resolution() {
+        let path_ref_root = test_data_path().join("path_refs");
+
+        assert_eq!(
+            ConfigPath::Relative("hi".into()).resolve("/tmp/blah".into()),
+            Some("/tmp/blah/hi".into())
+        );
+        assert_eq!(ConfigPath::Indirect("does-not-exist".into()).resolve(&path_ref_root), None);
+        assert_eq!(ConfigPath::Indirect("empty-path-ref".into()).resolve(&path_ref_root), None);
+        assert_eq!(
+            ConfigPath::Indirect("path-ref-to-absolute".into()).resolve(&path_ref_root),
+            Some("/tmp/blah".into())
+        );
+        assert_eq!(
+            ConfigPath::Indirect("path-ref-to-relative".into()).resolve(&path_ref_root),
+            Some(path_ref_root.join("build-config-file"))
+        );
     }
 
     #[test]

@@ -7,3 +7,14 @@ mod fuchsia_env;
 
 pub use config_domain::*;
 pub use fuchsia_env::*;
+
+#[cfg(test)]
+pub mod tests {
+    use camino::Utf8Path;
+
+    const TEST_DATA_PATH: &str = env!("TEST_DATA_PATH");
+
+    pub fn test_data_path() -> &'static Utf8Path {
+        Utf8Path::new(TEST_DATA_PATH)
+    }
+}

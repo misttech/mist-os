@@ -40,8 +40,14 @@ host_test_data("test_data") {
   sources = [
     "test_data/basic_example/fuchsia_env.toml",
     "test_data/basic_example/stuff/keep-me.txt",
+    "test_data/build_dir_path_ref/build-dir-ref",
+    "test_data/build_dir_path_ref/build-dir/build-dir-config.json",
+    "test_data/build_dir_path_ref/fuchsia_env.toml",
     "test_data/conflicting_files/fuchsia_env.json5",
     "test_data/conflicting_files/fuchsia_env.toml",
+    "test_data/path_refs/empty-path-ref",
+    "test_data/path_refs/path-ref-to-absolute",
+    "test_data/path_refs/path-ref-to-relative",
   ]
 }
 
