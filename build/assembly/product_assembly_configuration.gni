@@ -341,37 +341,171 @@ template("product_assembly_configuration") {
     }
   }
 
-  _sensor_config = false
+  # Platform configuration schema fields that are paths to files.  These need to
+  # be tracked as GN action `inputs`.
+  #
+  # Each is a path to a 'node' in the schema, and then a list of field names on
+  # that node:
+  #
+  #  platform: {
+  #    foo: {
+  #      bar: {
+  #        field: "../../path/to/source/filename.json"
+  #      }
+  #    }
+  #  }
+  #
+  # is the following:
+  #
+  #  {
+  #    node_path = "foo.bar"
+  #    items = [ "field" ]
+  #  }
+  #
+  # These paths need to be present in the generated assembly configuration json
+  # file as _rebased_ paths.  In the example above, the GN label in GN for that
+  # file is: `//path/to/source/filename.json`
+  #
+  # Assembly runs in a root_build_dir such as `//out/default`, and so the
+  # rebased path from the root_build_dir to the file is
+  # `../../path/to/source/filename.json`
+  #
+  # The GN label for the file needs to be passed to GN in the `inputs` list for
+  # the `target_name` action defined by this template (below).
+  #
+  # However, because GN doesn't allow us to set the value of a variable in a
+  # scope using the `scope_name[var_name]` syntax, only read it, we cannot do
+  # any sort of programmatic field replacement, at least not without hard-coded
+  # logic that's repeated for each field (which prior versions of this file did
+  # when there was only field to deal with), e.g.:
+  #
+  #  _p = invoker.platform
+  #
+  #  # platform configuration with rebased contents:
+  #  _new_platform_config = {
+  #    forward_variables_from(_p, "*", [ "foo" ])
+  #    if (defined(_p.foo)) {
+  #      _foo = _p.foo
+  #
+  #      # 'foo' with rebased contents:
+  #      foo = {
+  #        forward_variables_from(_p.foo, "*", ["bar"])
+  #
+  #        if (defined(_foo.bar)) {
+  #          _bar = _foo.bar
+  #
+  #          # 'bar' with rebased contents:
+  #          bar = {
+  #            forward_variables_from(_bar, "*", ["field"])
+  #            if (defined(_bar.field)) {
+  #              field = rebase_path(_bar.field, root_build_dir)
+  #            }
+  #          }
+  #        }
+  #      }
+  #    }
+  #  }
+  #
+  # The original invoker.platform scope would need to be carefully reconstructed
+  # at every level using this pattern of forwarding variables that weren't part
+  # of the newly-constructed ones, and then assigning the newly-constructed ones
+  # to the appropriate variables in each of the nested scopes.
+
+  platform_config_file_potential_inputs = [
+    {
+      node_path = "ui"
+      fields = [ "sensor_config" ]
+    },
+    {
+      node_path = "development_support"
+      fields = [ "authorized_ssh_keys_path" ]
+    },
+  ]
+
+  # The assembly configuration
+  platform_config_inputs = []
+
   if (defined(invoker.platform)) {
     _p = invoker.platform
-    if (defined(_p.ui)) {
-      _ui = _p.ui
-      if (defined(_ui.sensor_config)) {
-        # If the path has not already been rebased, then do so (this is soon to
-        # be removed).
-        if ("../../" + string_replace(_ui.sensor_config, "../../", "") !=
-            _ui.sensor_config) {
-          _sensor_config = _ui.sensor_config
-        }
-      } else {
-        not_needed([ "_ui" ])
+
+    # Iterate over each item in the list above.
+    foreach(potential_input, platform_config_file_potential_inputs) {
+      _node = {
       }
-    } else {
-      not_needed([ "_p" ])
+      _node = _p
+
+      # Since we can't use recursion, iteratively change `_node` to the next
+      # child in the path, e.g. 'foo', then 'bar'.  The `continue` var is used
+      # to signal that some node along the path has been omitted, and this will
+      # be a no-op for the rest of the iteration (since it can't exit early)
+      _continue = true
+      foreach(_node_name, string_split(potential_input.node_path, ".")) {
+        if (_continue && defined(_node[_node_name])) {
+          # because GN will not let you replace a non-empty scope, this does a
+          # little workaround to what would be the following, if it was allowed:
+          #
+          #  _node = _node[_node_name]
+          #
+          # Instead, we need to create a _next_node temporary to hold the next
+          # node, but even that temporary lives across iterations of the loop,
+          # and must be reset to an empty scope before re-assigning to it.
+          #
+
+          # Clear the previous _next_node, and then cache the next node to look
+          # at in _next_node.
+          _next_node = {
+          }
+          _next_node = _node[_node_name]
+
+          # Clear the _node var, so that we can assign _next_node to it.
+          _node = {
+          }
+          _node = _next_node
+        } else {
+          # The node wasn't found, so do nothing for the rest of the iteration.
+          _continue = false
+        }
+      }
+
+      # 'continue' will still be true if the all the nodes in the path were
+      # found.
+      if (_continue) {
+        foreach(_field_name, potential_input.fields) {
+          if (defined(_node[_field_name])) {
+            _file_path = _node[_field_name]
+
+            # Here the rebased path is converted back in to an abosolute GN
+            # file label, from the GN root dir `//`:
+            #
+            # ../../path/to/filename.json
+            #
+            # becomes:
+            #
+            # //path/to/filename.json
+            #
+            # and if a file in root_build_dir:
+            #
+            # path/to/filename.json
+            #
+            # it becomes (for `root_build_dir` == "//out/default"):
+            #
+            # //out/default/path/to/filename.json
+            #
+            # And the resultant (non-rebased) path can be used in the GN
+            # action's `inputs` list
+            _gn_path = "//" + rebase_path(_file_path, "//", root_build_dir)
+            platform_config_inputs += [ _gn_path ]
+          }
+        }
+      }
     }
   }
 
   _assembly_config = {
     # Create the platform configuration section from the caller's argument
-    platform = {
-      if (defined(invoker.platform)) {
-        forward_variables_from(invoker.platform, "*")
-      }
-      if (_sensor_config != false) {
-        ui.sensor_config = rebase_path(_sensor_config, root_build_dir)
-      }
-      assert(defined(build_type), "The platform build-type must be specified.")
-    }
+    platform = invoker.platform
+    assert(defined(platform.build_type),
+           "The platform build-type must be specified.")
 
     # Create the product configuration section from the caller's arguments.
     product = {
@@ -488,9 +622,11 @@ template("product_assembly_configuration") {
     if (!defined(inputs)) {
       inputs = []
     }
-    if (_sensor_config != false) {
-      inputs += [ _sensor_config ]
-    }
+
+    # Add any inputs found by looking at the known platform config schema items
+    # that contain paths to files, so that they are guaranteed to be added to
+    # the ninja deps for the product assembly configuration.
+    inputs += platform_config_inputs
 
     if (!defined(deps)) {
       deps = []
