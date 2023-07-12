@@ -32,6 +32,8 @@ if (is_host) {
 
     sources = [
       "src/env_info.rs",
+      "src/ga4_event.rs",
+      "src/ga4_poster.rs",
       "src/ga_event.rs",
       "src/lib.rs",
       "src/metrics_event_batch.rs",
