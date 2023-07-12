@@ -21,6 +21,7 @@ if (is_host) {
       "fake-cpuid-tests.cc",
       "fake-msr-tests.cc",
       "nop-tests.cc",
+      "paging-tests.cc",
       "power-tests.cc",
       "speculation-tests.cc",
     ]

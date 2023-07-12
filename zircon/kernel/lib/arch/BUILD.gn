@@ -51,6 +51,13 @@ library_headers("common-headers") {
     # <lib/arch/x86/cpuid.h> has #include <hwreg/bitfields.h>.
     "//zircon/system/ulib/hwreg:headers",
   ]
+
+  if (is_kernel) {
+    # <lib/arch/riscv64/page-table.h> has #include <fbl/bits.h>
+    public_deps += [ "//zircon/system/ulib/fbl:headers" ]
+  } else {
+    public_deps += [ "//zircon/system/ulib/fbl" ]
+  }
 }
 
 static_library("arch") {
