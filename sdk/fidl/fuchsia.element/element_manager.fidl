@@ -9,18 +9,15 @@ using fuchsia.url;
 /// An interface used to add elements to a session.
 ///
 /// An *element* is a component that is expected to be instantiated as a child
-/// of the session and to interact with the user in some way. An *element proposer*
-/// is a component that calls `ProposeElement` to add an element to the session.
+/// of the session and to interact with the user in some way.
 ///
-/// The session will typically implement `Manager` and provide it
-/// to its child element proposers.
+/// The session will typically implement `Manager` and route it where needed.
+/// For tools like `ffx session add` to work, the session must expose `Manager`
+/// to its parent.
 ///
-/// For example, an element proposer may be a non-interactive application that
+/// For example, a component in the session may be a non-interactive application that
 /// listens to the network for a command to display an element to the user.
-/// When it receives the command, the element proposer proposes to add an
-/// element to the session via the `Manager` protocol. Similarly,
-/// the element proposer may be part of an interactive user interface that
-/// proposes elements based on user input.
+/// When it receives the command, the component calls `ProposeElement()`.
 @discoverable
 closed protocol Manager {
     /// Proposes to add an element to the session.

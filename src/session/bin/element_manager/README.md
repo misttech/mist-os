@@ -10,6 +10,9 @@ composed into a session as a child.
 `element_manager` launches all elements proposed using `Manager` in
 a collection.
 
+Use this if you want to use tools such as `ffx session add`, but don't want to
+write your own implementation of `fuchsia.element.Manager`.
+
 ## Building
 
 To add this project to your build, append
