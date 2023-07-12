@@ -14,11 +14,6 @@
     ],
     offer: [
         {
-            protocol: "fuchsia.update.installer.Installer",
-            from: "#system-updater",
-            to: [ "#system-update" ],
-        },
-        {
             protocol: "fuchsia.cobalt.SystemDataUpdater",
             from: "#cobalt",
             to: "#system-update",

@@ -21,11 +21,6 @@
             availability: "optional",
         },
         {
-            protocol: "fuchsia.update.installer.Installer",
-            from: "#system-updater",
-            to: "#system-update",
-        },
-        {
             protocol: [
                 "fuchsia.cobalt.SystemDataUpdater",
                 "fuchsia.metrics.MetricEventLoggerFactory",

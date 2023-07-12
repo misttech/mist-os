@@ -368,9 +368,9 @@
                 capability: "directory",
                 target_monikers: [
                     "/bootstrap/fshost",
-                    "/core/system-updater",
                     "/core/system-update/omaha-client-service",
                     "/core/system-update/system-update-checker",
+                    "/core/system-update/system-updater",
                 ],
             },
             {
@@ -403,15 +403,12 @@
                     // into the dash environment.
                     "/core/debug-dash-launcher",
 
-                    // system-updater still runs as a v1 component and is a
-                    // valid client of PackageResolver.  appmgr has its own
-                    // allowlist for v1 components accessing pkg-resolver.
                     "/core",
                     "/core/process_resolver",
                     "/core/full-resolver",
                     "/core/system-update/omaha-client-service",
                     "/core/system-update/system-update-checker",
-                    "/core/system-updater",
+                    "/core/system-update/system-updater",
                 ],
             },
             {
@@ -504,7 +501,7 @@
                 target_monikers: [
                     "/core",
                     "/core/pkg-resolver",
-                    "/core/system-updater",
+                    "/core/system-update/system-updater",
                 ],
             },
             {
@@ -516,7 +513,7 @@
                 source_name: "fuchsia.pkg.RetainedPackages",
                 capability: "protocol",
                 target_monikers: [
-                    "/core/system-updater",
+                    "/core/system-update/system-updater",
                 ],
             },
             {
@@ -552,7 +549,7 @@
                     "/core/sshd-host",
                     "/core/system-update/omaha-client-service",
                     "/core/system-update/system-update-checker",
-                    "/core/system-updater",
+                    "/core/system-update/system-updater",
 
                     // TODO(crbug.com/1326674): Is this still needed for one
                     // or both realms?
@@ -618,9 +615,9 @@
                     "/bootstrap/driver_manager",
                     "/core",
                     "/core/sshd-host",
-                    "/core/system-updater",
                     "/core/system-update/omaha-client-service",
                     "/core/system-update/system-update-checker",
+                    "/core/system-update/system-updater",
                 ],
             },
 

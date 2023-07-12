@@ -804,6 +804,17 @@ assembly_input_bundle("common_minimal") {
         },
       ]
     },
+    {
+      name = "system-update-realm"
+      component_shards = [
+        {
+          component_name = "system-update-realm"
+          shards = rebase_path(
+                  [ "//src/sys/pkg/bin/system-updater/meta/system_updater.system_update_shard.cml" ],
+                  root_build_dir)
+        },
+      ]
+    },
   ]
 }
 

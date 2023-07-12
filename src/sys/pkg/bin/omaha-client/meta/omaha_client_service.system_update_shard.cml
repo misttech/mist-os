@@ -19,7 +19,7 @@
         },
         {
             protocol: "fuchsia.update.installer.Installer",
-            from: "parent",
+            from: "#system-updater",
             to: "#omaha-client-service",
         },
         {
