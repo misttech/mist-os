@@ -6,7 +6,7 @@ use fidl_fuchsia_developer_remotecontrol::{ArchiveIteratorGetNextResult, Archive
 use futures::stream::{FusedStream, FuturesOrdered, ReadyChunks, Stream, StreamExt};
 use std::{future::Future, pin::Pin, task::Poll};
 
-pub mod symbolizer;
+pub use ffx_tool_log_ng::symbolizer_impl as symbolizer;
 
 pub struct OrderedBatchPipeline<'a, T> {
     max_size: usize,

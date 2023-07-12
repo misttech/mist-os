@@ -21,21 +21,30 @@ rustc_library("lib") {
     "//src/developer/ffx/config:lib",
     "//src/developer/ffx/lib/fho:lib",
     "//src/developer/ffx/lib/rcs:lib",
+    "//src/developer/ffx/lib/symbol-index",
     "//src/diagnostics/lib/log-command",
     "//src/lib/diagnostics/data/rust",
     "//src/lib/fidl/rust/fidl",
     "//src/lib/fuchsia-async",
     "//third_party/rust_crates:anyhow",
+    "//third_party/rust_crates:async-channel",
+    "//third_party/rust_crates:async-io",
+    "//third_party/rust_crates:async-lock",
     "//third_party/rust_crates:async-trait",
+    "//third_party/rust_crates:futures",
+    "//third_party/rust_crates:futures-lite",
     "//third_party/rust_crates:regex",
     "//third_party/rust_crates:serde",
     "//third_party/rust_crates:thiserror",
+    "//third_party/rust_crates:tracing",
   ]
 
   sources = [
     "src/error.rs",
     "src/lib.rs",
     "src/spam_filter.rs",
+    "src/symbolizer.rs",
+    "src/symbolizer_impl.rs",
     "src/testing_utils.rs",
   ]
 
@@ -45,8 +54,11 @@ rustc_library("lib") {
     "//src/lib/fidl/rust/fidl",
     "//src/lib/fuchsia",
     "//third_party/rust_crates:assert_matches",
+    "//third_party/rust_crates:async-channel",
+    "//third_party/rust_crates:futures",
     "//third_party/rust_crates:futures",
     "//third_party/rust_crates:serde_json",
+    "//third_party/rust_crates:tracing",
   ]
 }
 

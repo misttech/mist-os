@@ -6,12 +6,51 @@ use anyhow::{Context, Result};
 use async_channel::{Receiver, Sender};
 use async_io::Async;
 use async_lock::Mutex;
+use async_trait::async_trait;
 use ffx_config::global_env_context;
 use fuchsia_async::Task;
 use futures::{AsyncBufReadExt, AsyncWriteExt, FutureExt, StreamExt};
 use futures_lite::io::BufReader;
-use std::process::{Child, Command, Stdio};
+use std::{
+    cell::Cell,
+    process::{Child, Command, Stdio},
+};
 use symbol_index::ensure_symbol_index_registered;
+
+// TODO(https://fxbug.dev/121413): Remove this.
+pub(crate) struct NoOpSymbolizer {
+    _task: Cell<Option<fuchsia_async::Task<Result<(), async_channel::SendError<String>>>>>,
+}
+
+impl std::fmt::Debug for NoOpSymbolizer {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("NoOpSymbolizer").finish()
+    }
+}
+
+impl NoOpSymbolizer {
+    pub(crate) fn new() -> Self {
+        Self { _task: Cell::new(None) }
+    }
+}
+
+#[async_trait(?Send)]
+impl Symbolizer for NoOpSymbolizer {
+    async fn start(
+        &self,
+        mut rx: Receiver<String>,
+        tx: Sender<String>,
+        _extra_args: Vec<String>,
+    ) -> anyhow::Result<()> {
+        self._task.set(Some(fuchsia_async::Task::local(async move {
+            while let Some(value) = rx.next().await {
+                tx.send(value).await?;
+            }
+            Ok(())
+        })));
+        Ok(())
+    }
+}
 
 const BARRIER: &str = "<ffx symbolizer>\n";
 
@@ -161,6 +200,7 @@ impl Drop for LogSymbolizer {
 
 /// A fake symbolizer that simply prepends a fixed string to every line passed to it.
 /// As the name implies, it should only be used in tests.
+#[derive(Debug)]
 pub struct FakeSymbolizerForTest {
     prefix: String,
     expected_args: Vec<String>,

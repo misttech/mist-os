@@ -47,6 +47,24 @@ pub enum LogData {
     FfxEvent(EventType),
 }
 
+impl LogData {
+    /// Gets the LogData as a target log.
+    pub fn as_target_log(&self) -> Option<&LogsData> {
+        match self {
+            LogData::TargetLog(log) => Some(log),
+            _ => None,
+        }
+    }
+
+    /// Gets the LogData as a symbolized log.
+    pub fn as_symbolized_log(&self) -> Option<(&LogsData, &String)> {
+        match self {
+            LogData::SymbolizedTargetLog(log, message) => Some((log, message)),
+            _ => None,
+        }
+    }
+}
+
 impl From<LogsData> for LogData {
     fn from(data: LogsData) -> Self {
         Self::TargetLog(data)

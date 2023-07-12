@@ -27,6 +27,8 @@ pub enum LogError {
     IOError(#[from] std::io::Error),
     #[error("Cannot use dump with --since now")]
     DumpWithSinceNow,
+    #[error("No symbolizer configuration provided")]
+    NoSymbolizerConfig,
 }
 
 impl From<LogError> for fho::Error {

@@ -2,8 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use std::io::Write;
-
 use diagnostics_data::LogTextDisplayOptions;
 use error::LogError;
 use fho::{daemon_protocol, AvailabilityFlag, FfxMain, FfxTool, MachineWriter, ToolIO};
@@ -16,13 +14,18 @@ use log_command::{
     filter::LogFilterCriteria,
     log_formatter::{
         dump_logs_from_socket, BootTimeAccessor, DefaultLogFormatter, LogEntry, LogFormatter,
-        LogFormatterOptions, NoOpSymbolizer, WriterContainer,
+        LogFormatterOptions, WriterContainer,
     },
     LogCommand, LogSubCommand, WatchCommand,
 };
+use std::io::Write;
+use symbolizer::SymbolizerChannel;
+use symbolizer_impl::NoOpSymbolizer;
 
 mod error;
 pub mod spam_filter;
+mod symbolizer;
+pub mod symbolizer_impl;
 #[cfg(test)]
 mod testing_utils;
 
@@ -163,8 +166,12 @@ where
         if !cmd.select.is_empty() {
             connection.log_settings_client.set_interest(&cmd.select).await?;
         }
-        let maybe_err =
-            dump_logs_from_socket(connection.log_socket, &mut formatter, &NoOpSymbolizer {}).await;
+        let maybe_err = dump_logs_from_socket(
+            connection.log_socket,
+            &mut formatter,
+            &SymbolizerChannel::new(NoOpSymbolizer::new()).await?,
+        )
+        .await;
         if stream_mode == fidl_fuchsia_diagnostics::StreamMode::Snapshot {
             break;
         }
