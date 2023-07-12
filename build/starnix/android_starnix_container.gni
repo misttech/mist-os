@@ -20,6 +20,9 @@ import("//build/compiled_action.gni")
 #   hals (optional; default=[])
 #     [list of labels] Labels of HAL fuchsia packages to add as subpackages.
 #
+#     If a HAL package contains `system/init.rc`, that file will be copied to
+#     `data/init/${hal_package_name}.rc` in the resulting container package.
+#
 template("android_starnix_container") {
   assert(defined(invoker.base), "Need to define base")
   assert(defined(invoker.system), "Need to define system")

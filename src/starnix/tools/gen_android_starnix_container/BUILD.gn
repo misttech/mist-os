@@ -38,7 +38,6 @@ if (is_host) {
 
     test_deps = [
       ":test_ext4_image",
-      "//src/lib/fuchsia-async",
       "//third_party/rust_crates:tempfile",
     ]
 
