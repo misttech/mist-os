@@ -37,6 +37,12 @@ type UnaryArg = struct {
 protocol Inverter {
     Invert(UnaryArg) -> (UnaryArg);
 };
+protocol TableResponse {
+    Foo() -> (table {});
+};
+protocol ErrorSyntax {
+    Foo() -> () error uint32;
+};
 `
 )
 
@@ -1451,6 +1457,62 @@ protocol Calculator {
     {
         "kind": "struct",
         "name": "l/Foo"
+    },
+    {
+        "kind": "library",
+        "name": "l"
+    }
+]
+`,
+		},
+		{
+			name: "compose foreign method with table response",
+			dep:  l2Library,
+			fidl: `
+library l;
+using l2;
+protocol P {
+    compose l2.TableResponse;
+};
+`,
+			expected: `[
+    {
+        "kind": "protocol/member",
+        "name": "l/P.Foo",
+        "ordinal": "3518338923794038768",
+        "type": "() -> (l2/TableResponseFooResponse payload)"
+    },
+    {
+        "kind": "protocol",
+        "name": "l/P"
+    },
+    {
+        "kind": "library",
+        "name": "l"
+    }
+]
+`,
+		},
+		{
+			name: "compose foreign method with error syntax",
+			dep:  l2Library,
+			fidl: `
+library l;
+using l2;
+protocol P {
+    compose l2.ErrorSyntax;
+};
+`,
+			expected: `[
+    {
+        "kind": "protocol/member",
+        "name": "l/P.Foo",
+        "ordinal": "1974636303379855936",
+        "type": "() -> (l2/ErrorSyntax_Foo_Result result)"
+    },
+    {
+        "kind": "protocol",
+        "name": "l/P"
     },
     {
         "kind": "library",

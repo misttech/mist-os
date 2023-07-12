@@ -13,8 +13,7 @@ import (
 
 type typePrinter = func(t fidlgen.Type) Type
 
-// structPayload is a thin wrapper around the Struct type imported from fidlgen.
-// It exists solely to implement the parameterizer interface over that type.
+// structPayload is a wrapper for implementing parameterizer on fidlgen.Struct.
 type structPayload struct {
 	fidlgen.Struct
 }
@@ -24,7 +23,7 @@ func (p *structPayload) Name() fidlgen.EncodedCompoundIdentifier {
 }
 
 func (p *structPayload) AsParameters(tp typePrinter) string {
-	members := p.Struct.Members
+	members := p.Members
 	var ps []string
 	for _, m := range members {
 		ps = append(ps, fmt.Sprintf("%v %v", tp(m.Type), m.Name))
@@ -32,31 +31,16 @@ func (p *structPayload) AsParameters(tp typePrinter) string {
 	return fmt.Sprintf("(%v)", strings.Join(ps, ","))
 }
 
-// tablePayload is a thin wrapper around the Table type imported from fidlgen.
-// It exists solely to implement the parameterizer interface over that type.
-type tablePayload struct {
-	fidlgen.Table
+// identifierPayload is a wrapper for implementing parameterizer on fidlgen.EncodedCompoundIdentifier.
+type identifierPayload struct {
+	fidlgen.EncodedCompoundIdentifier
 }
 
-func (p *tablePayload) Name() fidlgen.EncodedCompoundIdentifier {
-	return p.Table.Name
+func (p *identifierPayload) Name() fidlgen.EncodedCompoundIdentifier {
+	return p.EncodedCompoundIdentifier
 }
 
-func (p *tablePayload) AsParameters(_ typePrinter) string {
-	return fmt.Sprintf("(%v payload)", p.Name())
-}
-
-// unionPayload is a thin wrapper around the Union type imported from fidlgen.
-// It exists solely to implement the parameterizer interface over that type.
-type unionPayload struct {
-	fidlgen.Union
-}
-
-func (p *unionPayload) Name() fidlgen.EncodedCompoundIdentifier {
-	return p.Union.Name
-}
-
-func (p *unionPayload) AsParameters(_ typePrinter) string {
+func (p *identifierPayload) AsParameters(_ typePrinter) string {
 	return fmt.Sprintf("(%v payload)", p.Name())
 }
 
@@ -76,8 +60,7 @@ type parameterizer interface {
 // All implementers of parameterizer.
 var _ = []parameterizer{
 	(*structPayload)(nil),
-	(*tablePayload)(nil),
-	(*unionPayload)(nil),
+	(*identifierPayload)(nil),
 }
 
 // symbolTable knows how to represent a symbol's type as a string.
@@ -93,11 +76,6 @@ type symbolTable struct {
 	// resolving optional structs which have a different syntax
 	// (box<Foo> instead of Foo:optional).
 	structDecls map[fidlgen.EncodedCompoundIdentifier]*fidlgen.Struct
-
-	// payloads contains all struct, table, or union layouts used in any of the
-	// protocol methods in the library being summarized. Used for generating
-	// parameter lists for method signatures.
-	payloads payloadDict
 }
 
 // addProtocol registers that name corresponds to a FIDL protocol.
@@ -128,18 +106,12 @@ func (n *symbolTable) isStruct(name fidlgen.EncodedCompoundIdentifier) bool {
 	return ok
 }
 
-// addPayloads registers that a map of each `name` that corresponds to a FIDL
-// payload layout.
-func (n *symbolTable) addPayloads(payloads payloadDict) {
-	n.payloads = payloads
-}
-
 // getPayload returns the stored payload definition, if one exists.
 func (n *symbolTable) getPayload(name fidlgen.EncodedCompoundIdentifier) parameterizer {
-	if def, ok := n.payloads[name]; ok {
-		return def
+	if theStruct, ok := n.structDecls[name]; ok {
+		return &structPayload{*theStruct}
 	}
-	return nil
+	return &identifierPayload{name}
 }
 
 // fidlTypeString converts the FIDL type declaration into a string per RFC-0050.

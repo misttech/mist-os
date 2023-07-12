@@ -103,9 +103,11 @@ func (m *method) Serialize() ElementStr {
 
 // getParamList formats a parameter list, as in Foo(ty1 a, ty2b)
 func (m method) getParamList(hasParams bool, payload parameterizer) string {
+	// Not applicable, e.g. the response of `Foo();`.
 	if !hasParams {
 		return ""
 	}
+	// Empty, e.g. the request of `Foo();`.
 	if payload == nil {
 		payload = &structPayload{}
 	}
