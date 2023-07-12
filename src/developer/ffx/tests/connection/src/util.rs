@@ -6,6 +6,7 @@ use anyhow::{anyhow, Result};
 use async_lock::Mutex;
 use fidl::endpoints::{create_proxy, DiscoverableProtocolMarker};
 use fidl_fuchsia_developer_remotecontrol::RemoteControlProxy;
+use fidl_fuchsia_io::OpenFlags;
 use fidl_test_proxy_stress::{StressorMarker, StressorProxy};
 use fuchsia_async as fasync;
 use hoist::Hoist;
@@ -45,15 +46,17 @@ impl LaunchedComponentConnector {
         rcs_proxy: &RemoteControlProxy,
         moniker: &str,
     ) -> Result<StressorProxy> {
-        let selector = selectors::parse_selector::<selectors::VerboseError>(&format!(
-            "{}:expose:{}",
-            &selectors::sanitize_moniker_for_selectors(moniker)[1..],
-            StressorMarker::PROTOCOL_NAME
-        ))
-        .expect("Selector is invalid");
         loop {
             let (proxy, server_end) = create_proxy::<StressorMarker>()?;
-            match rcs_proxy.connect(&selector, server_end.into_channel()).await {
+            match rcs_proxy
+                .connect_capability(
+                    &moniker,
+                    StressorMarker::PROTOCOL_NAME,
+                    server_end.into_channel(),
+                    OpenFlags::empty(),
+                )
+                .await
+            {
                 Ok(_) => return Ok(proxy),
                 _ => continue,
             }

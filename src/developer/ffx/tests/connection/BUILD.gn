@@ -18,12 +18,12 @@ if (is_host) {
     ]
     deps = [
       "//sdk/fidl/fuchsia.developer.remotecontrol:fuchsia.developer.remotecontrol_rust",
+      "//sdk/fidl/fuchsia.io:fuchsia.io_rust",
       "//src/connectivity/overnet/lib/hoist",
       "//src/developer/ffx/config:lib",
       "//src/developer/ffx/daemon:lib",
       "//src/developer/ffx/lib/isolate:lib",
       "//src/developer/ffx/lib/target:lib",
-      "//src/lib/diagnostics/selectors",
       "//src/lib/fidl/rust/fidl",
       "//src/lib/fuchsia",
       "//src/lib/fuchsia-async",
