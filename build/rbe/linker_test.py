@@ -15,6 +15,31 @@ from typing import Iterable, Sequence
 import linker
 
 
+class TryLinkerScriptTextTests(unittest.TestCase):
+
+    def test_empty_text(self):
+        text = ''
+        with mock.patch.object(Path, 'read_text',
+                               return_value=text) as mock_read:
+            self.assertEqual(
+                linker.try_linker_script_text(Path('foo.so')), text)
+
+    def test_nonempty_text(self):
+        text = 'INPUT(libfoo.so.4)\n'
+        with tempfile.TemporaryDirectory() as td:
+            tdp = Path(td)
+            text_file = tdp / 'libbar.so'
+            text_file.write_text(text)
+            self.assertEqual(linker.try_linker_script_text(text_file), text)
+
+    def test_binary_file(self):
+        with tempfile.TemporaryDirectory() as td:
+            tdp = Path(td)
+            bin_file = tdp / 'libbar.so'
+            bin_file.write_bytes(b'\xd0\xff\xfe\x07')
+            self.assertIsNone(linker.try_linker_script_text(bin_file))
+
+
 class LinkerScriptParseTests(unittest.TestCase):
 
     def test_empty(self):

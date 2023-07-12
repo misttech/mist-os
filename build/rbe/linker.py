@@ -265,7 +265,9 @@ class LinkerInvocation(object):
     def sysroot(self) -> Optional[Path]:
         return self._sysroot
 
-    def expand_linker_script(self, text: str) -> Iterable[Path]:
+    def expand_linker_script(self, text: Optional[str]) -> Iterable[Path]:
+        if text is None:
+            return
         directives = _parse_linker_script_directives(
             _filter_tokens(_lex_linker_script(text)))
         yield from self.handle_directives(directives)
@@ -278,7 +280,8 @@ class LinkerInvocation(object):
                 # Want the included script, and whatever else it points to.
                 yield p
                 p_abs = self.abs_path(p)
-                yield from self.expand_linker_script(p_abs.read_text())
+                yield from self.expand_linker_script(
+                    try_linker_script_text(p_abs))
 
     def _input(self, directive: Directive) -> Iterable[Path]:
         """Directly use these as linker arguments.  These are not linker scripts."""
@@ -429,21 +432,19 @@ class LinkerInvocation(object):
     def expand_possible_linker_script(self, lib: Path) -> Iterable[Path]:
         """Finds other files referenced if `lib` is a linker script."""
         yield lib
-        if is_linker_script(lib):
-            # parse it and expand
-            yield from self.expand_linker_script(lib.read_text())
+        # parse it and expand
+        yield from self.expand_linker_script(try_linker_script_text(lib))
 
         # Otherwise, it is a regular linker binary file.
         # Nothing else to do.
 
 
-def is_linker_script(path: Path) -> bool:
-    """Returns true if file is recognized as a (text file) linker script."""
+def try_linker_script_text(path: Path) -> Optional[str]:
+    """Returns text from linker script, or None if it is not a linker script."""
     try:
-        with open(path, 'rt') as text_file:
-            return True
-    except OSError:
-        return False
+        return path.read_text()
+    except UnicodeDecodeError:
+        return None
 
 
 def _main_arg_parser() -> argparse.ArgumentParser:
