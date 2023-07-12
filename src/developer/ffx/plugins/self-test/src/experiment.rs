@@ -5,7 +5,7 @@
 use crate::test::new_isolate;
 use anyhow::*;
 
-pub(crate) async fn test_not_enabled() -> Result<Option<ffx_isolate::Isolate>> {
+pub(crate) async fn test_not_enabled() -> Result<()> {
     let isolate = new_isolate("experiment-not-enabled").await?;
     let out = isolate.ffx(&["self-test", "experiment"]).await?;
 
@@ -14,10 +14,10 @@ pub(crate) async fn test_not_enabled() -> Result<Option<ffx_isolate::Isolate>> {
     ensure!(out.stderr.contains("experimental subcommand"), "stderr is unexpected: {:?}", out);
     ensure!(out.stderr.contains("selftest.experiment"), "stderr is unexpected: {:?}", out);
 
-    Ok(Some(isolate))
+    Ok(())
 }
 
-pub(crate) async fn test_enabled() -> Result<Option<ffx_isolate::Isolate>> {
+pub(crate) async fn test_enabled() -> Result<()> {
     let isolate = new_isolate("experiment-enabled").await?;
     let _ = isolate.ffx(&["config", "set", "selftest.experiment", "true"]).await?;
 
@@ -26,5 +26,5 @@ pub(crate) async fn test_enabled() -> Result<Option<ffx_isolate::Isolate>> {
     ensure!(out.stderr.lines().count() == 0, "stderr is unexpected: {:?}", out);
     ensure!(out.status.success());
 
-    Ok(Some(isolate))
+    Ok(())
 }

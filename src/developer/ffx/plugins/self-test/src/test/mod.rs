@@ -8,7 +8,6 @@ use ffx_config::{
     global_env_context,
     logging::{change_log_file, reset_log_file},
 };
-use ffx_daemon::{DaemonConfig, SocketDetails};
 use fuchsia_async::TimeoutExt;
 use serde_json::Value;
 use std::{future::Future, io::Write, path::PathBuf, pin::Pin, time::Duration};
@@ -67,22 +66,6 @@ pub async fn new_isolate(name: &str) -> Result<ffx_isolate::Isolate> {
     Ok(isolate)
 }
 
-const EXIT_WAIT_TIME_MS: u32 = 300;
-
-async fn cleanup_isolate(isolate: ffx_isolate::Isolate) -> Result<()> {
-    let socket_path = isolate.env_context().get_ascendd_path().await?;
-    let details = SocketDetails::new(socket_path.clone());
-    let pid = details.get_running_pid();
-    // Give isolate a chance to clean up
-    drop(isolate);
-    if let Some(pid) = pid {
-        // If the pid _was_ running, wait for it to exit, and kill it if it doesn't quit
-        // within EXIT_WAIT_TIME_MS
-        ffx_daemon::wait_for_daemon_to_exit(pid, EXIT_WAIT_TIME_MS).await?;
-    }
-    Ok(())
-}
-
 /// Get the target nodename we're expected to interact with in this test, or
 /// pick the first discovered target. If nodename is set via $FUCHSIA_NODENAME
 /// that is returned, if the nodename is not given, and zero targets are found,
@@ -101,7 +84,7 @@ pub async fn get_target_nodename() -> Result<String> {
     }
 
     let out = isolate.ffx(&["target", "list", "-f", "j"]).await.context("getting target list")?;
-    cleanup_isolate(isolate).await?;
+    drop(isolate);
 
     ensure!(out.status.success(), "Looking up a target name failed: {:?}", out);
 
@@ -148,11 +131,8 @@ pub async fn run(tests: Vec<TestCase>, timeout: Duration, case_timeout: Duration
                 .on_timeout(case_timeout, || ffx_bail!("timed out after {:?}", case_timeout))
                 .await
             {
-                Ok(oi) => {
+                Ok(_) => {
                     writeln!(&mut writer, "{green}ok{nocol}",)?;
-                    if let Some(isolate) = oi {
-                        cleanup_isolate(isolate).await?;
-                    }
                 }
                 Err(err) => {
                     // Unfortunately we didn't get a chance to get back any
@@ -225,8 +205,7 @@ macro_rules! tests {
 
 // We need to store a boxed pinned future: boxed because we need it to be Sized since it's going
 // in a Vec; pinned because it's asynchronous.
-// Return an optional isolate, so that the runner can clean up our daemon if we created one.
-pub type TestFn = fn() -> Pin<Box<dyn Future<Output = Result<Option<ffx_isolate::Isolate>>>>>;
+pub type TestFn = fn() -> Pin<Box<dyn Future<Output = Result<()>>>>;
 
 pub struct TestCase {
     pub name: &'static str,

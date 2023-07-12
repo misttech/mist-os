@@ -76,10 +76,10 @@ pub async fn selftest(cmd: SelftestCommand) -> Result<()> {
     run(tests, Duration::from_secs(cmd.timeout), Duration::from_secs(cmd.case_timeout)).await
 }
 
-async fn test_isolated() -> Result<Option<ffx_isolate::Isolate>> {
+async fn test_isolated() -> Result<()> {
     let isolate = new_isolate("isolated").await?;
     let out = isolate.ffx(&["config", "get", "test.is-isolated"]).await?;
     assert_eq!(out.stdout, "true\n");
 
-    Ok(Some(isolate))
+    Ok(())
 }

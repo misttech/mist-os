@@ -25,14 +25,10 @@ ffx_plugin("ffx_selftest") {
     "src/test/mod.rs",
   ]
 
-  plugin_deps = [
-    "drop-isolate:ffx_selftest_drop_isolate",
-    "experiment:ffx_selftest_experiment",
-  ]
+  plugin_deps = [ "experiment:ffx_selftest_experiment" ]
 
   deps = [
     "//src/developer/ffx/config:lib",
-    "//src/developer/ffx/daemon:lib",
     "//src/developer/ffx/lib/errors:lib",
     "//src/developer/ffx/lib/fho:lib",
     "//src/developer/ffx/lib/isolate:lib",

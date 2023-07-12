@@ -9,7 +9,7 @@ use ffx_config::EnvironmentContext;
 use fidl::endpoints::DiscoverableProtocolMarker;
 use fidl_fuchsia_developer_ffx::{DaemonMarker, DaemonProxy};
 use fidl_fuchsia_overnet_protocol::NodeId;
-use fuchsia_async::{Time, Timer};
+use fuchsia_async::Timer;
 use futures::prelude::*;
 use hoist::{Hoist, OvernetInstance};
 use nix::sys::signal;
@@ -211,24 +211,6 @@ pub async fn try_to_kill_pid(pid: u32) -> Result<()> {
             };
 
             bail!("Daemon did not exit. Giving up.  Proc status: {status}")
-        }
-    }
-}
-
-// Similar to ffx_daemon::wait_for_daemon_to_exit(), but this version is
-// for non-interactive use.
-pub async fn wait_for_daemon_to_exit(pid: u32, timeout_ms: u32) -> Result<()> {
-    let start_time = Time::now();
-    let nix_pid = nix::unistd::Pid::from_raw(pid as i32);
-    loop {
-        if let Err(nix::errno::Errno::ESRCH) = signal::kill(nix_pid, None) {
-            // The pid has exited
-            return Ok(());
-        }
-
-        Timer::new(STOP_WAIT_POLL_TIME).await;
-        if Time::now() - start_time > Duration::from_millis(timeout_ms.into()) {
-            return try_to_kill_pid(pid).await;
         }
     }
 }

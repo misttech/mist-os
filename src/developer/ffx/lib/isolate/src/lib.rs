@@ -12,7 +12,7 @@ use std::{
     borrow::Cow,
     collections::HashMap,
     path::{Path, PathBuf},
-    process::ExitStatus,
+    process::{Child, ExitStatus},
     time::SystemTime,
 };
 use tempfile::TempDir;
@@ -275,12 +275,26 @@ impl Isolate {
         &self.log_dir
     }
 
+    pub fn dir(&self) -> &Path {
+        self.tmpdir.path()
+    }
+
     pub fn ascendd_path(&self) -> PathBuf {
         self.tmpdir.path().join("daemon.sock")
     }
 
     pub fn env_context(&self) -> &EnvironmentContext {
         &self.env_ctx
+    }
+
+    // Manually spawning the daemon allow it to remain under our process group instead of
+    // daemonizing. These daemons will be sent signals directed towards this process group.
+    pub async fn start_daemon(&self) -> Result<Child> {
+        let daemon = ffx_daemon::run_daemon(self.env_context()).await?;
+        const DAEMON_WAIT_TIME: u64 = 2000;
+        // Wait a bit to make sure the daemon has had a chance to start up.
+        fuchsia_async::Timer::new(fuchsia_async::Duration::from_millis(DAEMON_WAIT_TIME)).await;
+        Ok(daemon)
     }
 
     pub async fn ffx_cmd(&self, args: &[&str]) -> Result<std::process::Command> {
@@ -304,6 +318,7 @@ impl Isolate {
 
 #[derive(Serialize, Debug)]
 struct UserConfig<'a> {
+    daemon: UserConfigDaemon,
     log: UserConfigLog<'a>,
     test: UserConfigTest,
     targets: UserConfigTargets<'a>,
@@ -354,6 +369,11 @@ struct UserConfigMdns {
     enabled: bool,
 }
 
+#[derive(Serialize, Debug)]
+struct UserConfigDaemon {
+    autostart: bool,
+}
+
 impl<'a> UserConfig<'a> {
     fn for_test(
         log_dir: Cow<'a, str>,
@@ -380,6 +400,7 @@ impl<'a> UserConfig<'a> {
             discovery: UserConfigDiscovery { mdns: UserConfigMdns { enabled: discovery } },
             ffx: UserConfigFfx { subtool_search_paths },
             sdk,
+            daemon: UserConfigDaemon { autostart: false },
         }
     }
 }

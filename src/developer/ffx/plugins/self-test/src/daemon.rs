@@ -4,80 +4,52 @@
 
 use crate::{assert_eq, test::new_isolate};
 use anyhow::*;
-use ffx_daemon::SocketDetails;
 use fuchsia_async::Duration;
 use nix::{sys::signal, unistd::Pid};
-use std::{
-    io::{BufRead, BufReader, Write},
-    process::Child,
-    thread::sleep,
-    time::Duration as StdDuration,
-};
+use std::{path::PathBuf, thread::sleep, time::Duration as StdDuration};
 
-async fn run_daemon(isolate: &ffx_isolate::Isolate) -> Result<Child> {
-    let mut daemon = ffx_daemon::run_daemon(isolate.env_context()).await?;
-
-    #[cfg(target_os = "macos")]
-    let daemon_wait_time = 500;
-    #[cfg(not(target_os = "macos"))]
-    let daemon_wait_time = 100;
-    // wait a bit to make sure the daemon has had a chance to start up, then check that it's
-    // still running
-    fuchsia_async::Timer::new(Duration::from_millis(daemon_wait_time)).await;
-    assert_eq!(None, daemon.try_wait()?, "Daemon exited quickly after starting");
-    Ok(daemon)
-}
-
-pub(crate) async fn test_echo() -> Result<Option<ffx_isolate::Isolate>> {
+pub(crate) async fn test_echo() -> Result<()> {
     let isolate = new_isolate("daemon-echo").await?;
+    isolate.start_daemon().await?;
     let out = isolate.ffx(&["daemon", "echo"]).await?;
 
     let want = "SUCCESS: received \"Ffx\"\n";
     assert_eq!(out.stdout, want);
 
-    Ok(Some(isolate))
+    Ok(())
 }
 
-pub(crate) async fn test_isolate_cleanup() -> Result<Option<ffx_isolate::Isolate>> {
-    let isolate = new_isolate("isolate-cleanup").await?;
-    isolate
-        .env_context()
-        .query("selftest.drop-isolate")
-        .level(Some(ffx_config::ConfigLevel::User))
-        .set(true.into())
-        .await
-        .unwrap();
-    let mut child = isolate
-        .ffx_cmd(&["self-test", "drop-isolate"])
-        .await?
-        .stdin(std::process::Stdio::piped())
-        .stdout(std::process::Stdio::piped())
-        .spawn()
-        .unwrap();
-    let mut child_stdin = child.stdin.take().unwrap();
-    let mut stdout_lines = BufReader::new(child.stdout.take().unwrap()).lines();
+pub(crate) async fn test_isolate_cleanup() -> Result<()> {
+    let isolate = std::panic::AssertUnwindSafe(new_isolate("isolate-cleanup").await?);
+    let isolate_dir = PathBuf::from(isolate.dir());
+    let mut daemon = isolate.start_daemon().await?;
 
-    let daemon_socket_output = stdout_lines.next().unwrap().unwrap();
-    let socket_details: SocketDetails = serde_json::from_str(&daemon_socket_output).unwrap();
+    assert!(isolate_dir.exists());
 
-    assert!(socket_details.is_currently_running());
+    // Move the isolate into the closure, then panic.
+    let result = std::panic::catch_unwind(move || {
+        let _isolate = isolate;
+        panic!()
+    });
 
-    writeln!(&mut child_stdin, "drop isolate please").unwrap();
-    child.wait().unwrap();
+    result.expect_err("Closure somehow did not panic");
 
-    loop {
-        if !socket_details.is_currently_running() {
-            break;
-        }
+    // The isolate directory is cleaned up on panic.
+    assert!(!isolate_dir.exists());
+
+    // This also triggers the daemon to shutdown.
+    while let None = daemon.try_wait().expect("failed to wait for daemon exit") {
         sleep(StdDuration::from_secs(1));
     }
 
-    Ok(Some(isolate))
+    Ok(())
 }
 
-pub(crate) async fn test_config_flag() -> Result<Option<ffx_isolate::Isolate>> {
+pub(crate) async fn test_config_flag() -> Result<()> {
     let isolate = new_isolate("daemon-config-flag").await?;
-    let mut daemon = run_daemon(&isolate).await?;
+    let mut daemon = isolate.start_daemon().await?;
+
+    assert_eq!(None, daemon.try_wait()?, "Daemon exited quickly after starting");
 
     // This should not terminate the daemon just started, as it won't
     // share an overnet socket with it.
@@ -115,33 +87,39 @@ pub(crate) async fn test_config_flag() -> Result<Option<ffx_isolate::Isolate>> {
     // until we wait() for it. So instead we drop the isolate here, then wait.
     drop(isolate);
     fuchsia_async::unblock(move || daemon.wait()).await?;
-    Ok(None)
+    Ok(())
 }
 
-pub(crate) async fn test_stop() -> Result<Option<ffx_isolate::Isolate>> {
+pub(crate) async fn test_stop() -> Result<()> {
     let isolate = new_isolate("daemon-stop").await?;
     let out = isolate.ffx(&["daemon", "stop", "-t", "3000"]).await?;
     let want = "No daemon was running.\n";
     assert_eq!(out.stdout, want);
 
-    let _ = isolate.ffx(&["daemon", "echo"]).await?;
+    let daemon = isolate.start_daemon().await?;
+
+    // Reap the daemon in another thread so the daemon exits.
+    // Otherwise the process will still exist but in a zombie state.
+    let _ = std::thread::spawn(move || { daemon }.wait());
+
     let out = isolate.ffx(&["daemon", "stop", "-t", "3000"]).await?;
     let want = "Stopped daemon.\n";
     assert_eq!(out.stdout, want);
 
-    Ok(Some(isolate))
+    Ok(())
 }
 
-pub(crate) async fn test_no_autostart() -> Result<Option<ffx_isolate::Isolate>> {
+pub(crate) async fn test_no_autostart() -> Result<()> {
     let isolate = new_isolate("daemon-no-autostart").await?;
-    let out = isolate.ffx(&["config", "set", "daemon.autostart", "false"]).await?;
-    assert!(out.status.success());
     let out = isolate.ffx(&["daemon", "echo"]).await?;
     assert!(!out.status.success());
     assert!(out.stderr.contains(
         "FFX Daemon was told not to autostart and no existing Daemon instance was found"
     ));
-    let mut daemon = run_daemon(&isolate).await?;
+
+    let mut daemon = isolate.start_daemon().await?;
+
+    assert_eq!(None, daemon.try_wait()?, "Daemon exited quickly after starting");
 
     let out = isolate.ffx(&["daemon", "echo"]).await?;
     // Don't assert here -- it if fails, we still want to kill the daemon
@@ -154,12 +132,12 @@ pub(crate) async fn test_no_autostart() -> Result<Option<ffx_isolate::Isolate>> 
 
     assert!(echo_succeeded);
 
-    Ok(Some(isolate))
+    Ok(())
 }
 
-pub(crate) async fn test_cleanup_on_signal() -> Result<Option<ffx_isolate::Isolate>> {
+pub(crate) async fn test_cleanup_on_signal() -> Result<()> {
     let isolate = new_isolate("daemon-cleanup-on-signal").await?;
-    let mut daemon = run_daemon(&isolate).await?;
+    let mut daemon = isolate.start_daemon().await?;
     let socket_out = isolate.ffx(&["--machine", "json", "daemon", "socket"]).await?.stdout;
     let socket_details: serde_json::Value = serde_json::from_str(&socket_out)?;
     let path: std::path::PathBuf = socket_details
@@ -176,5 +154,5 @@ pub(crate) async fn test_cleanup_on_signal() -> Result<Option<ffx_isolate::Isola
     fuchsia_async::unblock(move || daemon.wait()).await?;
     assert!(!path.exists());
     // We don't need to return the isolate, since we've already killed the daemon
-    Ok(None)
+    Ok(())
 }
