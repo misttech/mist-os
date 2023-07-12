@@ -24,6 +24,7 @@ zx_host_tool("zbi") {
 group("tests") {
   testonly = true
   deps = [
+    ":zbi-deduplication-test",
     ":zbi-input-size-limit-test",
     ":zbi-storage-kernel-test",
   ]
@@ -159,4 +160,67 @@ input_test("zbi-storage-kernel-test") {
   ]
 
   deps = [ ":bootfs-manifest" ]
+}
+
+deduplication_manifest = "$target_gen_dir/deduplication-manifest.txt"
+deduplication_files = [
+  {
+    dest = "file"
+    source = "testdata/file.txt"
+  },
+  {
+    dest = "copy"
+    source = "testdata/copy.txt"
+  },
+  {
+    dest = "symlink"
+    source = "testdata/symlink.txt"
+  },
+]
+
+generated_file("deduplication-manifest") {
+  output_conversion = "list lines"
+  contents = []
+  foreach(file, deduplication_files) {
+    contents += [ "${file.dest}=" + rebase_path(file.source, root_build_dir) ]
+  }
+  outputs = [ deduplication_manifest ]
+}
+
+input_test("zbi-deduplication-test") {
+  args = [
+    "--uncompressed",
+    "--files-type=RAMDISK",
+  ]
+  sources = [ deduplication_manifest ]
+  fields = [
+    "type",
+    "contents",
+  ]
+  expected = [
+    {
+      type = "RAMDISK"
+      contents = [
+        {
+          length = 8
+          name = "copy"
+          offset = 4096
+          size = 4096
+        },
+        {
+          length = 8
+          name = "file"
+          offset = 4096
+          size = 4096
+        },
+        {
+          length = 8
+          name = "symlink"
+          offset = 4096
+          size = 4096
+        },
+      ]
+    },
+  ]
+  deps = [ ":deduplication-manifest" ]
 }

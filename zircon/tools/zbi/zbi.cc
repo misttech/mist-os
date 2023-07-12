@@ -987,6 +987,19 @@ class FileContents final {
     return result;
   }
 
+  bool HasSameContentAs(const FileContents& other) const {
+    if (exact_size_ != other.exact_size_)
+      return false;
+
+    if (mapped_ == other.mapped_)
+      return true;
+
+    if (!mapped_ || !other.mapped_)
+      return false;
+
+    return ::memcmp(mapped_, other.mapped_, exact_size_) == 0;
+  }
+
   static FileContents Read(fbl::unique_fd fd, const std::filesystem::path& file,
                            size_t size_limit) {
     void* mapped = mmap(nullptr, size_limit, PROT_READ | PROT_WRITE, MAP_ANON | MAP_PRIVATE, -1, 0);
@@ -1071,6 +1084,13 @@ class File final {
   auto AsDir() const { return dir_.get(); }
 
   auto AsContents() const { return file_.get(); }
+
+  bool HasSameContentAs(const File& other) const {
+    if (file_ && other.file_)
+      return file_->HasSameContentAs(*other.file_);
+
+    return false;
+  }
 
  private:
   std::unique_ptr<const FileContents> file_;
@@ -1187,7 +1207,6 @@ struct PathHash final {
 //    input file names reaching the same actual file (via different
 //    unnormalized paths or links) reuse the same mapped contents
 //  * directories read are cached fully
-//  * TODO(mcgrathr): identical contents from disparate sources
 class FileOpener final {
  public:
   DISALLOW_COPY_AND_ASSIGN_ALLOW_MOVE(FileOpener);
@@ -1215,7 +1234,24 @@ class FileOpener final {
     if (S_ISDIR(st.st_mode)) {
       return OpenDirectory(cached_file, std::move(fd), std::move(file), cache);
     }
-    return OpenFile(cached_file, std::move(fd), st, std::move(file), cache, input_size_limit);
+
+    // Open file then find duplicates.
+    const File* result =
+        OpenFile(cached_file, std::move(fd), st, std::move(file), cache, input_size_limit);
+    if (result) {
+      for (const auto& pair : name_cache_) {
+        const File* cur_file = pair.second;
+        if (cur_file && cur_file != result && result->HasSameContentAs(*cur_file)) {
+          // This result file is a duplicate of an existing entry. Do not
+          // remove it from file_cache_ but adjust the name_cache_ and the
+          // returned value.
+          name_cache_[file] = cur_file;
+          result = cur_file;
+          break;
+        }
+      }
+    }
+    return result;
   }
 
   // Construct a new "unowned" FileContents in place.  The returned
@@ -1301,7 +1337,7 @@ class FileOpener final {
   }
 
   const File* OpenFile(File* cached, fbl::unique_fd fd, const struct stat& st,
-                       std::filesystem::path file, const File*& cache_slot,
+                       const std::filesystem::path& file, const File*& cache_slot,
                        std::optional<uint32_t> input_size_limit = {}) {
     if (S_ISREG(st.st_mode)) {
       *cached = File(
