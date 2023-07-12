@@ -52,10 +52,17 @@ impl CapabilityProvider for PkgDirectoryProvider {
             relative_path.to_str().ok_or(CapabilityProviderError::BadPath)?.to_string();
         let server_end = ServerEnd::new(channel::take_channel(server_end));
         if let Some(package) = &self.package {
-            package
-                .package_dir
-                .open(flags, fio::ModeType::empty(), &relative_path, server_end)
-                .map_err(|err| PkgDirError::OpenFailed { err })?;
+            if relative_path.is_empty() {
+                package
+                    .package_dir
+                    .clone(flags, server_end)
+                    .map_err(|err| PkgDirError::OpenFailed { err })?;
+            } else {
+                package
+                    .package_dir
+                    .open(flags, fio::ModeType::empty(), &relative_path, server_end)
+                    .map_err(|err| PkgDirError::OpenFailed { err })?;
+            }
         } else {
             return Err(CapabilityProviderError::PkgDirError { err: PkgDirError::NoPkgDir });
         }

@@ -12,29 +12,22 @@ use {
     futures::{channel::mpsc, FutureExt, SinkExt, StreamExt},
 };
 
-// The path in our namespace we can read the example configuration from, which is used to compare
-// against the values read from the routed pkg dir.
-const EXAMPLE_CONFIG_PATH: &'static str = "/pkg/data/example_config";
-const EXAMPLE_CONFIG_FILENAME: &'static str = "example_config";
-
 fn get_expected_config_contents() -> String {
-    std::fs::read_to_string(EXAMPLE_CONFIG_PATH)
+    std::fs::read_to_string("/pkg/data/example_config")
         .expect("failed to read example config from test namespace")
 }
 
 async fn read_example_config_and_assert_contents(
+    path: &str,
     handles: LocalComponentHandles,
     mut success_sender: mpsc::Sender<()>,
 ) -> Result<(), Error> {
     let config_dir =
         handles.clone_from_namespace("config").expect("failed to clone config from namespace");
-    let example_config_file = fuchsia_fs::directory::open_file(
-        &config_dir,
-        EXAMPLE_CONFIG_FILENAME,
-        fio::OpenFlags::RIGHT_READABLE,
-    )
-    .await
-    .expect("failed to open example config file");
+    let example_config_file =
+        fuchsia_fs::directory::open_file(&config_dir, path, fio::OpenFlags::RIGHT_READABLE)
+            .await
+            .expect("failed to open example config file");
     let example_config_contents = fuchsia_fs::file::read_to_string(&example_config_file)
         .await
         .expect("failed to read example config file");
@@ -51,7 +44,10 @@ async fn offer_pkg_from_framework() {
     let config_reader = builder
         .add_local_child(
             "config-reader",
-            move |h| read_example_config_and_assert_contents(h, success_sender.clone()).boxed(),
+            move |h| {
+                read_example_config_and_assert_contents("example_config", h, success_sender.clone())
+                    .boxed()
+            },
             ChildOptions::new().eager(),
         )
         .await
@@ -81,6 +77,49 @@ async fn offer_pkg_from_framework() {
 }
 
 #[fuchsia::test]
+async fn offer_pkg_from_framework_no_subdir() {
+    let (success_sender, mut success_receiver) = mpsc::channel(1);
+
+    let builder = RealmBuilder::new().await.unwrap();
+    let config_reader = builder
+        .add_local_child(
+            "config-reader",
+            move |h| {
+                read_example_config_and_assert_contents(
+                    "data/example_config",
+                    h,
+                    success_sender.clone(),
+                )
+                .boxed()
+            },
+            ChildOptions::new().eager(),
+        )
+        .await
+        .unwrap();
+    builder
+        .add_route(
+            Route::new()
+                .capability(
+                    Capability::directory("pkg")
+                        .as_("config")
+                        .path("/config")
+                        .rights(fio::R_STAR_DIR),
+                )
+                .from(Ref::framework())
+                .to(&config_reader),
+        )
+        .await
+        .unwrap();
+    let _instance =
+        builder.build_in_nested_component_manager("#meta/component_manager.cm").await.unwrap();
+
+    assert!(
+        success_receiver.next().await.is_some(),
+        "failed to receive success signal from local component"
+    );
+}
+
+#[fuchsia::test]
 async fn expose_pkg_from_framework() {
     let (success_sender, mut success_receiver) = mpsc::channel(1);
 
@@ -88,7 +127,10 @@ async fn expose_pkg_from_framework() {
     let config_reader = builder
         .add_local_child(
             "config-reader",
-            move |h| read_example_config_and_assert_contents(h, success_sender.clone()).boxed(),
+            move |h| {
+                read_example_config_and_assert_contents("example_config", h, success_sender.clone())
+                    .boxed()
+            },
             ChildOptions::new().eager(),
         )
         .await
@@ -138,7 +180,10 @@ async fn use_pkg_from_framework() {
     let config_reader = builder
         .add_local_child(
             "config-reader",
-            move |h| read_example_config_and_assert_contents(h, success_sender.clone()).boxed(),
+            move |h| {
+                read_example_config_and_assert_contents("example_config", h, success_sender.clone())
+                    .boxed()
+            },
             ChildOptions::new().eager(),
         )
         .await
