@@ -1184,7 +1184,7 @@ template("assembled_system") {
             {
               name = "${namespace}.fxfs"
               path = rebase_path(files.fxfs, root_build_dir)
-              type = "blk"
+              type = "fxfs-blk"
               forward_variables_from(_image_overrides["fxfs"], "*")
             },
             {
