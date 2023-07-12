@@ -624,7 +624,6 @@
                 "NetdeviceTest.InterfaceQLEN",
                 "NetdeviceTest.Netmask",
                 "NetdeviceTest.EthtoolGetTSInfo",
-                "NetdeviceTest.InterfaceFlags",
 
                 // socket_netlink_route_test
                 // TODO(https://issuetracker.google.com/290605547): support

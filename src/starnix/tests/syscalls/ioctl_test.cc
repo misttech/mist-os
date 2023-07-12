@@ -20,6 +20,9 @@ namespace {
 constexpr char kLoopbackIfName[] = "lo";
 constexpr char kUnknownIfName[] = "unknown";
 
+constexpr short kLoopbackIfFlagsEnabled = IFF_UP | IFF_LOOPBACK | IFF_RUNNING;
+constexpr short kLoopbackIfFlagsDisabled = IFF_LOOPBACK;
+
 class IoctlTest : public ::testing::Test {
  public:
   void SetUp() override {
@@ -50,6 +53,9 @@ TEST_P(IoctlInvalidTest, InvalidRequest) {
   }
   if (req == SIOCSIFADDR && !test_helper::HasSysAdmin()) {
     GTEST_SKIP() << "SIOCSIFADDR requires root, skipping...";
+  }
+  if (req == SIOCSIFFLAGS && !test_helper::HasSysAdmin()) {
+    GTEST_SKIP() << "SIOCSIFFLAGS requires root, skipping...";
   }
 
   ifreq ifr;
@@ -97,6 +103,16 @@ INSTANTIATE_TEST_SUITE_P(IoctlInvalidTest, IoctlInvalidTest,
                                  .family = AF_INET6,
                                  .name = kLoopbackIfName,
                                  .expected_errno = EINVAL,
+                             },
+                             IoctlInvalidTestCase{
+                                 .req = SIOCGIFFLAGS,
+                                 .name = kUnknownIfName,
+                                 .expected_errno = ENODEV,
+                             },
+                             IoctlInvalidTestCase{
+                                 .req = SIOCSIFFLAGS,
+                                 .name = kUnknownIfName,
+                                 .expected_errno = ENODEV,
                              }));
 
 void GetIfAddr(fbl::unique_fd& fd, in_addr_t expected_addr) {
@@ -132,6 +148,49 @@ TEST_F(IoctlTest, SIOCSIFADDR_Success) {
   }
   ASSERT_NO_FATAL_FAILURE(SetIfAddr(fd, INADDR_ANY));
   ASSERT_NO_FATAL_FAILURE(SetIfAddr(fd, INADDR_LOOPBACK));
+}
+
+short GetLoopbackIfFlags(fbl::unique_fd& fd) {
+  ifreq ifr;
+  strncpy(ifr.ifr_name, kLoopbackIfName, IFNAMSIZ);
+  EXPECT_EQ(ioctl(fd.get(), SIOCGIFFLAGS, &ifr), 0) << strerror(errno);
+
+  EXPECT_EQ(strncmp(ifr.ifr_name, kLoopbackIfName, IFNAMSIZ), 0);
+  return ifr.ifr_ifru.ifru_flags;
+}
+
+TEST_F(IoctlTest, SIOCGIFFLAGS_Success) {
+  EXPECT_EQ(GetLoopbackIfFlags(fd), kLoopbackIfFlagsEnabled);
+}
+
+void SetLoopbackIfFlags(fbl::unique_fd& fd, short flags) {
+  ifreq ifr;
+  strncpy(ifr.ifr_name, kLoopbackIfName, IFNAMSIZ);
+  ifr.ifr_ifru.ifru_flags = flags;
+  ASSERT_EQ(ioctl(fd.get(), SIOCSIFFLAGS, &ifr), 0) << strerror(errno);
+
+  if ((flags & IFF_UP) == IFF_UP) {
+    // TODO(https://issuetracker.google.com/290372180): Once Netlink properly
+    // synchronizes enable requests, replace this "wait for expected flags" with
+    //  a single check.
+    while (true) {
+      if (GetLoopbackIfFlags(fd) == flags) {
+        break;
+      }
+      sleep(1);
+    }
+  } else {
+    EXPECT_EQ(GetLoopbackIfFlags(fd), flags);
+  }
+}
+
+TEST_F(IoctlTest, SIOCSIFFLAGS_Success) {
+  if (!test_helper::HasSysAdmin()) {
+    GTEST_SKIP() << "SIOCSIFFLAGS requires root, skipping...";
+  }
+  ASSERT_EQ(GetLoopbackIfFlags(fd), kLoopbackIfFlagsEnabled);
+  ASSERT_NO_FATAL_FAILURE(SetLoopbackIfFlags(fd, kLoopbackIfFlagsDisabled));
+  ASSERT_NO_FATAL_FAILURE(SetLoopbackIfFlags(fd, kLoopbackIfFlagsEnabled));
 }
 
 TEST_F(IoctlTest, SIOCGIFHWADDR_Success) {

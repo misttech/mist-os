@@ -458,9 +458,29 @@ impl Socket {
                     header
                 };
 
+                // Helper to verify the response of a Netlink request
+                let expect_ack = |msg: NetlinkMessage<RtnlMessage>| {
+                    match msg.payload {
+                        NetlinkPayload::Error(ErrorMessage {
+                            code: Some(code), header: _, ..
+                        }) => {
+                            // Don't propagate the error up because its not the fault of the
+                            // caller - the stack state can change underneath the caller.
+                            log_warn!(
+                            "got NACK netlink route response when handling ioctl(_, {:#x}, _): {}",
+                            request,
+                            code
+                        );
+                        }
+                        // `ErrorMessage` with no code represents an ACK.
+                        NetlinkPayload::Error(ErrorMessage { code: None, header: _, .. }) => {}
+                        payload => panic!("unexpected message = {:?}", payload),
+                    }
+                };
+
                 // First remove all IPv4 addresses for the requested interface.
                 for addr in address_msgs.into_iter() {
-                    send_netlink_msg_and_wait_response(
+                    let resp = send_netlink_msg_and_wait_response(
                         current_task,
                         &socket,
                         NetlinkMessage::new(
@@ -468,8 +488,8 @@ impl Socket {
                             NetlinkPayload::InnerMessage(RtnlMessage::DelAddress(addr)),
                         ),
                         &mut read_buf,
-                        SIOCSIFADDR,
                     )?;
+                    expect_ack(resp);
                 }
 
                 // Next, add the requested address.
@@ -481,7 +501,7 @@ impl Socket {
                 .sin_addr
                 .s_addr;
                 if addr != 0 {
-                    send_netlink_msg_and_wait_response(
+                    let resp = send_netlink_msg_and_wait_response(
                         current_task,
                         &socket,
                         NetlinkMessage::new(
@@ -504,8 +524,8 @@ impl Socket {
                             })),
                         ),
                         &mut read_buf,
-                        SIOCSIFADDR,
                     )?;
+                    expect_ack(resp);
                 }
 
                 Ok(SUCCESS)
@@ -583,6 +603,31 @@ impl Socket {
                 });
                 current_task.write_object(UserRef::new(user_addr), &out_ifreq)?;
                 Ok(SUCCESS)
+            }
+            SIOCGIFFLAGS => {
+                let in_ifreq: ifreq = current_task.mm.read_object(UserRef::new(user_addr))?;
+                let mut read_buf = VecOutputBuffer::new(NETLINK_ROUTE_BUF_SIZE);
+                let (_socket, link_msg) =
+                    get_netlink_interface_info(current_task, &in_ifreq, &mut read_buf)?;
+                let out_ifreq: [u8; std::mem::size_of::<ifreq>()] = struct_with_union_into_bytes!(ifreq {
+                    ifr_ifrn.ifrn_name: unsafe { in_ifreq.ifr_ifrn.ifrn_name },
+                    ifr_ifru.ifru_flags: {
+                        // Perform an `as` cast rather than `try_into` because:
+                        //   - flags are a bit mask and should not be
+                        //     interpreted as negative,
+                        //   - SIOCGIFFLAGS returns a subset of the flags
+                        //     returned by netlink; the flags lost by truncating
+                        //     from 32 to 16 bits is expected.
+                        link_msg.header.flags as i16
+                    },
+                });
+                current_task.mm.write_object(UserRef::new(user_addr), &out_ifreq)?;
+                Ok(SUCCESS)
+            }
+            SIOCSIFFLAGS => {
+                let user_addr = UserAddress::from(arg);
+                let in_ifreq: ifreq = current_task.mm.read_object(UserRef::new(user_addr))?;
+                set_netlink_interface_flags(current_task, &in_ifreq).map(|()| SUCCESS)
             }
             _ => self.ops.ioctl(self, file, current_task, request, arg),
         }
@@ -696,53 +741,34 @@ fn get_netlink_interface_info(
 
     // Send the request to get the link details with the requested
     // interface name.
-    {
-        let mut msg = NetlinkMessage::new(
-            {
-                let mut header = NetlinkHeader::default();
-                header.flags = netlink_packet_core::NLM_F_REQUEST;
-                header
-            },
-            NetlinkPayload::InnerMessage(RtnlMessage::GetLink({
-                let mut msg = LinkMessage::default();
-                msg.nlas = vec![LinkNla::IfName(iface_name.to_string())];
-                msg
-            })),
-        );
-        msg.finalize();
-        let mut buf = vec![0; msg.buffer_len()];
-        msg.serialize(&mut buf[..]);
-        assert_eq!(
-            socket.write(current_task, &mut VecInputBuffer::from(buf))?,
-            msg.buffer_len(),
-            "netlink sockets do not support partial writes",
-        );
-    }
-
-    // Read the response to get the link-layer info, or error.
-    let link_msg = {
-        read_buf.reset();
-        let n = socket.read(current_task, read_buf)?;
-
-        let msg = NetlinkMessage::<RtnlMessage>::deserialize(&read_buf.data()[..n])
-            .expect("netlink should always send well-formed messages");
-        match msg.payload {
-            NetlinkPayload::Error(ErrorMessage { code: Some(code), header: _, .. }) => {
-                // `e.code` is an `i32` and may hold negative values so
-                // we need to do an `as u64` cast instead of `try_into`.
-                // Note that `ErrnoCode::from_return_value` will
-                // cast the value to an `i64` to check that it is a
-                // valid (negative) errno value.
-                let code = ErrnoCode::from_return_value(code.get() as u64);
-                return Err(Errno::new(code, "error code from RTM_GETLINK", None));
-            }
-            NetlinkPayload::InnerMessage(RtnlMessage::NewLink(msg)) => msg,
-            // netlink is only expected to return an error or
-            // RTM_NEWLINK response for our RTM_GETLINK request.
-            payload => panic!("unexpected message = {:?}", payload),
+    let msg = NetlinkMessage::new(
+        {
+            let mut header = NetlinkHeader::default();
+            header.flags = netlink_packet_core::NLM_F_REQUEST;
+            header
+        },
+        NetlinkPayload::InnerMessage(RtnlMessage::GetLink({
+            let mut msg = LinkMessage::default();
+            msg.nlas = vec![LinkNla::IfName(iface_name.to_string())];
+            msg
+        })),
+    );
+    let resp = send_netlink_msg_and_wait_response(current_task, &socket, msg, read_buf)?;
+    let link_msg = match resp.payload {
+        NetlinkPayload::Error(ErrorMessage { code: Some(code), header: _, .. }) => {
+            // `code` is an `i32` and may hold negative values so
+            // we need to do an `as u64` cast instead of `try_into`.
+            // Note that `ErrnoCode::from_return_value` will
+            // cast the value to an `i64` to check that it is a
+            // valid (negative) errno value.
+            let code = ErrnoCode::from_return_value(code.get() as u64);
+            return Err(Errno::new(code, "error code from RTM_GETLINK", None));
         }
+        NetlinkPayload::InnerMessage(RtnlMessage::NewLink(msg)) => msg,
+        // netlink is only expected to return an error or
+        // RTM_NEWLINK response for our RTM_GETLINK request.
+        payload => panic!("unexpected message = {:?}", payload),
     };
-
     Ok((socket, link_msg))
 }
 
@@ -806,13 +832,68 @@ fn get_netlink_ipv4_addresses(
     Ok((socket, addrs, if_index))
 }
 
+/// Creates a netlink socket and performs `RTM_SETLINK` to update the flags.
+fn set_netlink_interface_flags(current_task: &CurrentTask, in_ifreq: &ifreq) -> Result<(), Errno> {
+    let iface_name = unsafe { CStr::from_ptr(in_ifreq.ifr_ifrn.ifrn_name.as_ptr()) }
+        .to_str()
+        .map_err(|std::str::Utf8Error { .. }| errno!(EINVAL))?;
+    let flags: i16 = unsafe { in_ifreq.ifr_ifru.ifru_flags };
+    // Perform an `as` cast rather than `try_into` because:
+    //   - flags are a bit mask and should not be interpreted as negative,
+    //   - no loss in precision when upcasting 16 bits to 32 bits.
+    let flags: u32 = flags as u32;
+
+    let socket = new_socket_file(
+        current_task,
+        SocketDomain::Netlink,
+        SocketType::Datagram,
+        OpenFlags::RDWR,
+        SocketProtocol::from_raw(NetlinkFamily::Route.as_raw()),
+    )?;
+
+    // Send the request to set the link flags with the requested interface name.
+    let msg = NetlinkMessage::new(
+        {
+            let mut header = NetlinkHeader::default();
+            header.flags = netlink_packet_core::NLM_F_REQUEST | netlink_packet_core::NLM_F_ACK;
+            header
+        },
+        NetlinkPayload::InnerMessage(RtnlMessage::SetLink({
+            let mut msg = LinkMessage::default();
+            msg.header.flags = flags;
+            // Only attempt to change flags in the first 16 bits, because
+            // `ifreq` represents flags as a short (i16).
+            msg.header.change_mask = u16::MAX.into();
+            msg.nlas = vec![LinkNla::IfName(iface_name.to_string())];
+            msg
+        })),
+    );
+    let mut read_buf = VecOutputBuffer::new(NETLINK_ROUTE_BUF_SIZE);
+    let resp = send_netlink_msg_and_wait_response(current_task, &socket, msg, &mut read_buf)?;
+    match resp.payload {
+        NetlinkPayload::Error(ErrorMessage { code: Some(code), header: _, .. }) => {
+            // `code` is an `i32` and may hold negative values so
+            // we need to do an `as u64` cast instead of `try_into`.
+            // Note that `ErrnoCode::from_return_value` will
+            // cast the value to an `i64` to check that it is a
+            // valid (negative) errno value.
+            let code = ErrnoCode::from_return_value(code.get() as u64);
+            Err(Errno::new(code, "error code from RTM_SETLINK", None))
+        }
+        // `ErrorMessage` with no code represents an ACK.
+        NetlinkPayload::Error(ErrorMessage { code: None, header: _, .. }) => Ok(()),
+        // Netlink is only expected to return an error or an ack.
+        payload => panic!("unexpected message = {:?}", payload),
+    }
+}
+
+/// Sends the msg on the provided NETLINK ROUTE socket, returning the response.
 fn send_netlink_msg_and_wait_response(
     current_task: &CurrentTask,
     socket: &FileHandle,
     mut msg: NetlinkMessage<RtnlMessage>,
     read_buf: &mut VecOutputBuffer,
-    req: u32,
-) -> Result<(), Errno> {
+) -> Result<NetlinkMessage<RtnlMessage>, Errno> {
     msg.finalize();
     let mut buf = vec![0; msg.buffer_len()];
     msg.serialize(&mut buf[..]);
@@ -822,22 +903,7 @@ fn send_netlink_msg_and_wait_response(
     let n = socket.read(current_task, read_buf)?;
     let msg = NetlinkMessage::<RtnlMessage>::deserialize(&read_buf.data()[..n])
         .expect("netlink should always send well-formed messages");
-    match msg.payload {
-        // Errors with a `None` code are acks.
-        NetlinkPayload::Error(ErrorMessage { code: None, header: _, .. }) => {}
-        NetlinkPayload::Error(ErrorMessage { code: Some(code), header: _, .. }) => {
-            // Don't propagate the error up because its not the fault of the
-            // caller - the stack state can change underneath the caller.
-            log_warn!(
-                "got NACK netlink route response when handling ioctl(_, {:#x}, _): {}",
-                req,
-                code
-            );
-        }
-        payload => panic!("unexpected message = {:?}", payload),
-    }
-
-    Ok(())
+    Ok(msg)
 }
 
 #[cfg(test)]
