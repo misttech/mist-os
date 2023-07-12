@@ -147,9 +147,6 @@ action("dart_sdk_docs") {
     rebase_path("$docs_out_dir"),
     "--prebuilts-dir",
     rebase_path("$dart_sdk/bin"),
-
-    # packages
-    rebase_path("//sdk/dart/zircon"),
   ]
 
   deps = [ ":${_gen_reference_docs_script_target}" ]

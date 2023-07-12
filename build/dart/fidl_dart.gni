@@ -136,7 +136,6 @@ template("fidl_dart") {
     deps = [
       ":$copy_pubspec_target",
       ":$generation_target",
-      "//sdk/dart/zircon",
       "//third_party/dart-pkg/pub/meta",
     ]
 

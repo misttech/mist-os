@@ -26,7 +26,6 @@
                     "src/tests",
                     "src/ui/lib/escher/test/gtest_escher.cc",
                     "src/sys/component_manager/tests",
-                    "sdk/dart/zircon/test",
                     "tools/fidl/fidlc/tests",
                     "tools/auto_owners/tests",
                     "build/bazel_sdk/tests"
