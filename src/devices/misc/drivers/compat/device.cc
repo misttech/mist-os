@@ -415,6 +415,9 @@ zx_status_t Device::Add(device_add_args_t* zx_args, zx_device_t** out) {
 }
 
 zx_status_t Device::ExportAfterInit() {
+  if (stop_triggered()) {
+    return ZX_ERR_BAD_STATE;
+  }
   if (zx_status_t status = device_server_.Serve(dispatcher_, &driver()->outgoing());
       status != ZX_OK) {
     FDF_LOGL(INFO, *logger_, "Device %s failed to add to outgoing directory: %s",
