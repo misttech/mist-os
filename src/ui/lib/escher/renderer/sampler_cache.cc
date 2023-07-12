@@ -33,6 +33,8 @@ SamplerPtr SamplerCache::ObtainYuvSampler(vk::Format format, vk::Filter filter,
 }
 
 SamplerPtr SamplerCache::ObtainSampler(const Key& key) {
+  std::lock_guard<std::mutex> lock(mutex_);
+
   auto it = samplers_.find(key);
   if (it != samplers_.end()) {
     return it->second;

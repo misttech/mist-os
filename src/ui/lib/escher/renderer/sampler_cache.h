@@ -5,6 +5,9 @@
 #ifndef SRC_UI_LIB_ESCHER_RENDERER_SAMPLER_CACHE_H_
 #define SRC_UI_LIB_ESCHER_RENDERER_SAMPLER_CACHE_H_
 
+#include <mutex>
+
+#include "src/lib/fxl/synchronization/thread_annotations.h"
 #include "src/ui/lib/escher/resources/resource_recycler.h"
 #include "src/ui/lib/escher/vk/color_space.h"
 #include "src/ui/lib/escher/vk/sampler.h"
@@ -21,7 +24,10 @@ class SamplerCache final {
                               bool use_unnormalized_coordinates = false);
 
   // Return the number of samplers in the cache.
-  size_t size() const { return samplers_.size(); }
+  size_t size() const {
+    std::lock_guard<std::mutex> lock(mutex_);
+    return samplers_.size();
+  }
 
  private:
   struct Key {
@@ -39,9 +45,11 @@ class SamplerCache final {
 
   SamplerPtr ObtainSampler(const Key& key);
 
-  std::unordered_map<Key, SamplerPtr, Key::Hash> samplers_;
+  std::unordered_map<Key, SamplerPtr, Key::Hash> samplers_ FXL_GUARDED_BY(mutex_);
 
   fxl::WeakPtr<ResourceRecycler> resource_recycler_;
+
+  mutable std::mutex mutex_;
 };
 
 }  // namespace escher
