@@ -47,15 +47,9 @@ renamed_binary("update-binary") {
   dest = "bin/update"
 }
 
-fuchsia_component("update-component") {
-  component_name = "update"
-  manifest = "//src/sys/pkg/bin/update/meta/update.cml"
-  deps = [ ":update-binary" ]
-}
-
 fuchsia_test_package("update-integration-tests") {
   test_components = [ ":update-integration-test-component" ]
-  deps = [ ":update-component" ]
+  deps = [ ":update-binary" ]
 }
 
 group("tests") {

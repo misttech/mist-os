@@ -61,12 +61,10 @@ renamed_binary("update-binary") {
   dest = "bin/update"
 }
 
-fuchsia_package_with_single_component("update") {
+fuchsia_package("update") {
   # We have to rename the package to avoid colliding with the update package.
   package_name = "update-bin"
-  component_name = "update"
   deps = [ ":update-binary" ]
-  manifest = "meta/update.cml"
 }
 
 fuchsia_unittest_package("update-lib-tests") {
