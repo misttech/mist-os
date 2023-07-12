@@ -11,6 +11,7 @@ const (
 	ImageTypeZBI        string = "zbi"
 	ImageTypeVBMeta     string = "vbmeta"
 	ImageTypeBlk        string = "blk"
+	ImageTypeFxfsBlk    string = "fxfs-blk"
 )
 
 // Image represents an entry in an image manifest.

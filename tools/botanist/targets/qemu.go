@@ -300,6 +300,13 @@ func (t *QEMU) Start(ctx context.Context, images []bootserver.Image, args []stri
 				break
 			}
 		}
+	} else if t.imageOverrides.Fxfs != "" {
+		for _, img := range images {
+			if img.Label == t.imageOverrides.Fxfs && img.Type == build.ImageTypeFxfsBlk {
+				fxfsImage = &img
+				break
+			}
+		}
 	}
 
 	if err := copyImagesToDir(ctx, workdir, false, qemuKernel, zbi, efiDisk, fvmImage, fxfsImage); err != nil {
