@@ -41,6 +41,8 @@ BOOTSTRAP_ENG_PLATFORM_AIB_NAMES = [
 BRINGUP_PLATFORM_AIB_NAMES = BOOTSTRAP_USER_PLATFORM_AIB_NAMES + BOOTSTRAP_USERDEBUG_PLATFORM_AIB_NAMES + BOOTSTRAP_ENG_PLATFORM_AIB_NAMES
 
 # The names of all of the platform's 'testonly=false' Assembly Input Bundles
+# Please keep sorted, it makes merge conflicts less likely vs adding to the
+# end of the list.
 USER_PLATFORM_AIB_NAMES_RISCV64 = BOOTSTRAP_USER_PLATFORM_AIB_NAMES + [
     "audio_device_registry",
     "battery_manager",
@@ -62,6 +64,9 @@ USER_PLATFORM_AIB_NAMES_RISCV64 = BOOTSTRAP_USER_PLATFORM_AIB_NAMES + [
     "intl_services.icu_default_{}".format(icu_flavors.default_git_commit),
     "intl_services.icu_latest_{}".format(icu_flavors.latest_git_commit),
     "intl_services.icu_stable_{}".format(icu_flavors.stable_git_commit),
+    "intl_services_small.icu_default_{}".format(icu_flavors.default_git_commit),
+    "intl_services_small.icu_latest_{}".format(icu_flavors.latest_git_commit),
+    "intl_services_small.icu_stable_{}".format(icu_flavors.stable_git_commit),
     "netstack3",
     "no_update_checker",
     "omaha_client",

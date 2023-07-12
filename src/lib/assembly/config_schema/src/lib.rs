@@ -16,5 +16,6 @@ pub use image_assembly_config::{ImageAssemblyConfig, PartialImageAssemblyConfig}
 pub use platform_config::{
     example_config::ExampleConfig,
     icu_config::{ICUConfig, Revision},
+    intl_config::IntlConfig,
     BuildType, FeatureSupportLevel,
 };

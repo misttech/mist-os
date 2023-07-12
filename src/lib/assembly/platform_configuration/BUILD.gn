@@ -25,6 +25,7 @@ rustc_library("platform_configuration") {
     "src/subsystems/graphics.rs",
     "src/subsystems/identity.rs",
     "src/subsystems/input.rs",
+    "src/subsystems/intl.rs",
     "src/subsystems/media.rs",
     "src/subsystems/radar.rs",
     "src/subsystems/rcs.rs",

@@ -128,6 +128,10 @@ user_platform_aib_names =
       "intl_services.icu_latest_${icu_git_info.latest}",
       "intl_services.icu_stable_${icu_git_info.stable}",
 
+      "intl_services_small.icu_default_${icu_git_info.default}",
+      "intl_services_small.icu_latest_${icu_git_info.latest}",
+      "intl_services_small.icu_stable_${icu_git_info.stable}",
+
       # UI
       "ui",
       "ui_legacy",

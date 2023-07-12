@@ -15,6 +15,7 @@ pub mod graphics_config;
 pub mod icu_config;
 pub mod identity_config;
 pub mod input_config;
+pub mod intl_config;
 pub mod media_config;
 pub mod session_manager_config;
 pub mod starnix_config;
@@ -128,6 +129,10 @@ pub struct PlatformConfig {
     /// Platform configuration options for fonts.
     #[serde(default)]
     pub fonts: fonts_config::FontsConfig,
+
+    /// Platform configuration options for internationalization.
+    #[serde(default)]
+    pub intl: intl_config::IntlConfig,
 
     /// Assembly option triggering the inclusion of test AIBs
     ///

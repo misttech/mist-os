@@ -78,11 +78,14 @@ template("icu_rust_library") {
                                "testonly",
                              ])
 
+      # For some reason using `.icu...` in the output names causes a compile
+      # error which disappears if the same compilation is run multiple times.
+      # For now, we keep `_icu_...` here.
       if (defined(output_name)) {
-        output_name = "${invoker.output_name}.icu_${icu_flavor.name}_${icu_flavor.commit_id}"
+        output_name = "${invoker.output_name}_icu_${icu_flavor.name}_${icu_flavor.commit_id}"
       } else {
         output_name =
-            "${target_name}.icu_${icu_flavor.name}_${icu_flavor.commit_id}"
+            "${target_name}_icu_${icu_flavor.name}_${icu_flavor.commit_id}"
       }
 
       # Add the appropriate ICU rust configuration.

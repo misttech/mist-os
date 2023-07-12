@@ -6,20 +6,7 @@ use once_cell::sync::Lazy;
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Default, Deserialize, Serialize)]
-pub struct ICUMap(std::collections::HashMap<Revision, String>);
-
-impl ICUMap {
-    /// Gets the commit ID corresponding to the given `revision`.
-    pub fn get(&self, revision: &Revision) -> Option<&str> {
-        self.0.get(revision).map(|k| k.as_str())
-    }
-
-    /// Maps back from `commit_id` to a `Revision` if possible.
-    pub fn revision_for(&self, commit_id: &str) -> Option<&Revision> {
-        // Small map, and a quick but easy way to map back from value to key.
-        self.0.iter().filter(|(_, v)| &v[..] == commit_id).map(|(k, _)| k).next()
-    }
-}
+pub struct ICUMap(pub std::collections::HashMap<Revision, String>);
 
 // See `rustenv` in //src/lib/assembly/config_schema:config_schema.
 pub static ICU_CONFIG_INFO: Lazy<ICUMap> = Lazy::new(|| {
@@ -52,6 +39,17 @@ pub enum Revision {
     /// Where the value of `commit_id` is a fully specified git
     /// commit hash.
     CommitId(String),
+}
+
+impl std::fmt::Display for Revision {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Revision::Default => write!(f, "default"),
+            Revision::Stable => write!(f, "stable"),
+            Revision::Latest => write!(f, "latest"),
+            Revision::CommitId(id) => write!(f, "commit_id({})", &id),
+        }
+    }
 }
 
 /// System assembly configuration for the ICU subsystem.
@@ -88,12 +86,5 @@ mod tests {
             let parsed: ICUConfig = serde_json::from_value(json).unwrap();
             assert_eq!(parsed, test.expected);
         }
-    }
-
-    #[test]
-    fn check_icu_map() {
-        assert!(ICU_CONFIG_INFO.get(&Revision::Stable).is_some());
-        assert!(ICU_CONFIG_INFO.get(&Revision::Latest).is_some());
-        assert!(ICU_CONFIG_INFO.get(&Revision::Default).is_some());
     }
 }

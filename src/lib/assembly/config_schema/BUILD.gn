@@ -71,6 +71,7 @@ rustc_library("config_schema") {
     "src/platform_config/icu_config.rs",
     "src/platform_config/identity_config.rs",
     "src/platform_config/input_config.rs",
+    "src/platform_config/intl_config.rs",
     "src/platform_config/media_config.rs",
     "src/platform_config/session_manager_config.rs",
     "src/platform_config/starnix_config.rs",

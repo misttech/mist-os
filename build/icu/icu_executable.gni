@@ -15,7 +15,7 @@ template("_common") {
   assert(defined(invoker.icu_flavor), "icu_flavor is required")
   not_needed([ "output_name" ])
 
-  _shadow = "${target_name}.original"
+  _original_target = "${target_name}.original"
 
   if (defined(output_name)) {
     original_output_name = output_name
@@ -23,7 +23,7 @@ template("_common") {
     original_output_name = target_name
   }
 
-  executable(_shadow) {
+  executable(_original_target) {
     forward_variables_from(invoker,
                            "*",
                            [
@@ -82,12 +82,14 @@ template("_common") {
     }
   }
 
-  # The shadow binary must be renamed after compilation, because otherwise it
+  # The binary must be renamed after compilation, because otherwise it
   # will have the same name as the binary produced by $target_name.
   renamed_binary(target_name) {
     forward_variables_from(invoker,
                            "*",
                            [
+                             "deps",
+                             "public_deps",
                              "testonly",
                              "visibility",
                              "icu_deps",
@@ -100,11 +102,7 @@ template("_common") {
                            ])
     source = "$root_out_dir/${output_name}.icu_${icu_flavor.name}_${icu_flavor.commit_id}"
     dest = "bin/${original_output_name}"
-    source_deps = [ ":${_shadow}" ]
-    if (!defined(deps)) {
-      deps = []
-    }
-    deps += [ ":${_shadow}" ]
+    source_deps = [ ":${_original_target}" ]
   }
 }
 

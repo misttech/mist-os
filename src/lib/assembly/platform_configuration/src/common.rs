@@ -6,6 +6,7 @@ use anyhow::{anyhow, Context, Result};
 use serde::Serialize;
 use std::collections::{btree_map::Entry, BTreeSet};
 
+use assembly_config_schema::platform_config::icu_config::{ICUMap, Revision, ICU_CONFIG_INFO};
 use assembly_config_schema::{BoardInformation, BuildType, FileEntry, ICUConfig};
 use assembly_util::NamedMap;
 
@@ -101,7 +102,7 @@ pub(crate) struct ConfigurationContext<'a> {
     /// ICU-flavor aware.
     ///
     /// If not set, the, use the unflavored version of the component.
-    pub _icu_config: &'a Option<ICUConfig>,
+    pub icu_config: &'a Option<ICUConfig>,
 }
 
 impl Default for ConfigurationContext<'_> {
@@ -121,7 +122,7 @@ impl Default for ConfigurationContext<'_> {
             feature_set_level: &FeatureSupportLevel::Minimal,
             build_type: &BuildType::User,
             board_info: None,
-            _icu_config: &None,
+            icu_config: &None,
         }
     }
 }
@@ -155,6 +156,13 @@ pub(crate) trait ConfigurationBuilder {
     /// Add a platform assembly input bundle that should be included in the
     /// assembled platform.
     fn platform_bundle(&mut self, name: &str);
+
+    /// Add an ICU-flavored platform assembly input bundle that should
+    /// be included in the assembled platform, with a specified ICU configuration.
+    ///
+    /// If `icu_config` is `None`, an unflavored version of the bundle is used,
+    /// as if [platform_bundle] was called.
+    fn icu_platform_bundle(&mut self, name: &str, icu_config: &Option<ICUConfig>) -> Result<()>;
 
     /// Add configuration for items in bootfs.
     fn bootfs(&mut self) -> &mut dyn BootfsConfigBuilder;
@@ -348,6 +356,31 @@ pub struct DomainConfigDirectory {
     pub entries: NamedMap<FileEntry>,
 }
 
+trait ICUMapExt<'a> {
+    /// Resolves a [Revision] into a computed revision, and a commit ID. If both
+    /// can not be computed, an error is returned.
+    fn resolve_revision(&'a self, requested_revision: &'a Revision) -> Result<(&Revision, &str)>;
+}
+
+impl<'a> ICUMapExt<'a> for ICUMap {
+    fn resolve_revision(&'a self, requested_revision: &'a Revision) -> Result<(&Revision, &str)> {
+        let (computed_revision, computed_commit_id) = match requested_revision {
+            Revision::Default | Revision::Stable | Revision::Latest => (
+                Some(requested_revision),
+                ICU_CONFIG_INFO.commit_id_for_revision(requested_revision),
+            ),
+            Revision::CommitId(ref commit_id) => {
+                (self.revision_for_commit_id(commit_id), Some(commit_id.as_ref()))
+            }
+        };
+        match (computed_revision, computed_commit_id) {
+            (None, _) => Err(anyhow!("revision not found for: {:?}", requested_revision)),
+            (_, None) => Err(anyhow!("commit ID not found for: {:?}", requested_revision)),
+            (Some(revision), Some(commit_id)) => Ok((revision, commit_id)),
+        }
+    }
+}
+
 impl ConfigurationBuilder for ConfigurationBuilderImpl {
     fn platform_bundle(&mut self, name: &str) {
         self.bundles.insert(name.to_string());
@@ -372,6 +405,23 @@ impl ConfigurationBuilder for ConfigurationBuilderImpl {
             directories: NamedMap::new("directories"),
             name: name.to_owned(),
         })
+    }
+
+    fn icu_platform_bundle(&mut self, name: &str, icu_config: &Option<ICUConfig>) -> Result<()> {
+        let bundle_name = match &icu_config {
+            // Use the unflavored platform bundle if icu_config is left unspecified.
+            None => name.into(),
+            // Use the ICU flavored platform bundle.
+            Some(ref icu_config) => {
+                let (revision, commit_id) =
+                    ICU_CONFIG_INFO.resolve_revision(&icu_config.revision).with_context(|| {
+                        format!("while resolving revision: {}", &icu_config.revision)
+                    })?;
+                format!("{}.icu_{}_{}", name, &revision, commit_id)
+            }
+        };
+        self.platform_bundle(&bundle_name);
+        Ok(())
     }
 }
 
@@ -545,6 +595,25 @@ pub(crate) trait OptionDefaultByBuildTypeExt<T: DefaultByBuildType> {
 impl<T: DefaultByBuildType> OptionDefaultByBuildTypeExt<T> for Option<T> {
     fn value_or_default_from_build_type(self, build_type: &BuildType) -> T {
         self.unwrap_or_else(|| T::default_by_build_type(build_type))
+    }
+}
+// An extension trait to get revision information out of an [ICUMap].
+trait ICUMapGetExt {
+    /// Gets the commit ID corresponding to the given `revision`.
+    fn commit_id_for_revision(&self, revision: &Revision) -> Option<&str>;
+
+    /// Maps back from `commit_id` to a `Revision` if possible.
+    fn revision_for_commit_id(&self, commit_id: &str) -> Option<&Revision>;
+}
+
+impl ICUMapGetExt for ICUMap {
+    fn commit_id_for_revision(&self, revision: &Revision) -> Option<&str> {
+        self.0.get(revision).map(|k| k.as_str())
+    }
+
+    fn revision_for_commit_id(&self, commit_id: &str) -> Option<&Revision> {
+        // Slow but easy inverse mapping, since the map is small.
+        self.0.iter().filter(|(_, v)| &v[..] == commit_id).map(|(k, _)| k).next()
     }
 }
 

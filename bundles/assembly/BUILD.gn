@@ -1837,8 +1837,45 @@ group("third_party_sbase_for_transition") {
   public_deps = [ "//third_party/sbase" ]
 }
 
+# Assembly may select at most one bundle with `intl_services` name prefix.
 icu_assembly_input_bundle("intl_services") {
   icu_base_packages = [ "//src/intl/intl_services:pkg" ]
+
+  compiled_packages = [
+    {
+      name = "core"
+      component_shards = [
+        {
+          component_name = "core"
+          shards = rebase_path(
+                  [ "//src/intl/intl_services/meta/intl.core_shard.cml" ],
+                  root_build_dir)
+        },
+      ]
+    },
+  ]
+}
+
+# Assembly may select at most one bundle with `intl_services` name prefix.
+icu_assembly_input_bundle("intl_services_small") {
+  icu_base_packages = [ "//src/intl/intl_services:pkg_small" ]
+
+  compiled_packages = [
+    {
+      name = "core"
+      component_shards = [
+        {
+          component_name = "core"
+          shards = rebase_path(
+                  [
+                    "//src/intl/intl_services/meta/intl_small_timezones.core_shard.cml",
+                    "//src/intl/intl_services/meta/intl_small.core_shard.cml",
+                  ],
+                  root_build_dir)
+        },
+      ]
+    },
+  ]
 }
 
 # Legacy fonts setup: fonts sourced from config-data.

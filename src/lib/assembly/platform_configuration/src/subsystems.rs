@@ -32,6 +32,7 @@ mod fonts;
 mod graphics;
 mod identity;
 mod input;
+mod intl;
 mod media;
 mod radar;
 mod rcs;
@@ -70,12 +71,8 @@ pub fn define_configuration(
 
         // Set up the context that's used by each subsystem to get the generally-
         // available platform information.
-        let context = ConfigurationContext {
-            feature_set_level,
-            build_type,
-            board_info,
-            _icu_config: icu_config,
-        };
+        let context =
+            ConfigurationContext { feature_set_level, build_type, board_info, icu_config };
 
         // Call the configuration functions for each subsystem.
         configure_subsystems(&context, config, &mut builder)?;
@@ -276,6 +273,9 @@ fn configure_subsystems(
 
     fonts::FontsSubsystem::define_configuration(context, &config.platform.fonts, builder)
         .context("Configuring the 'fonts' subsystem")?;
+
+    intl::IntlSubsystem::define_configuration(context, &config.platform.intl, builder)
+        .context("Confguring the 'intl' subsystem")?;
 
     Ok(())
 }
