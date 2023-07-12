@@ -6,6 +6,14 @@ import("//build/components.gni")
 import("//build/dist/renamed_binary.gni")
 import("//build/test.gni")
 
+group("tests") {
+  testonly = true
+  deps = [
+    ":integration-tests-pkg",
+    ":standalone-test-pkg",
+  ]
+}
+
 executable("fuzzer-bin") {
   testonly = true
   output_name = "realmfuzzer_test_fuzzer"
@@ -44,7 +52,7 @@ fuchsia_test_component("integration-tests") {
   ]
 }
 
-fuchsia_test_package("tests") {
+fuchsia_test_package("integration-tests-pkg") {
   package_name = "realmfuzzer-integration-tests"
   test_components = [ ":integration-tests" ]
   deps = [
@@ -52,4 +60,30 @@ fuchsia_test_package("tests") {
     "//src/sys/fuzzing/realmfuzzer/coverage",
     "//src/sys/fuzzing/realmfuzzer/engine",
   ]
+}
+
+# This test verifies that an instrumented executable linked against the target runtime can function
+# normally even if the coverage component is not found. In order to use existing component manifests
+# for the realms being fuzzed, program binary names must be unchanged. Since executables are
+# uniquely named per build, the same executable used for fuzzing may be available outside the test
+# realm for "normal" use. As a result, fuzzing-related behavior must be strictly optional depending
+# on the availability of the coverage component.
+test("standalone") {
+  output_name = "realmfuzzer_standalone_test"
+  sources = [ "standalone-test.cc" ]
+  deps = [
+    "//src/sys/fuzzing/common/testing:sanitizer",
+    "//src/sys/fuzzing/realmfuzzer/target:instrumented",
+  ]
+  exclude_toolchain_tags = [ "instrumented" ]
+}
+
+fuchsia_test_component("standalone-test") {
+  manifest = "meta/standalone-test.cml"
+  deps = [ ":standalone" ]
+}
+
+fuchsia_test_package("standalone-test-pkg") {
+  package_name = "realmfuzzer-standalone-test"
+  test_components = [ ":standalone-test" ]
 }
