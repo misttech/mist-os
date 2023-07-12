@@ -18,8 +18,6 @@ import("//build/testing/verify_files_match.gni")
 import("//build/zbi/zbi.gni")
 import("//build/zircon/tools.gni")
 import("//src/developer/ffx/build/ffx_action.gni")
-import("//src/storage/fshost/fshost.gni")
-import("//src/storage/fshost/generated_fshost_config.gni")
 
 # Assembles a Fuchsia system.
 #
@@ -131,7 +129,7 @@ import("//src/storage/fshost/generated_fshost_config.gni")
 #     arguments come before other arguments set by build args.
 #
 #   use_assembly_fshost (default: false)
-#   [boolean] Whether to build the fshost component
+#     [boolean] Whether to build the fshost component
 #
 #   cmdline (optional)
 #     [list of strings] Kernel command line text.
@@ -375,12 +373,13 @@ template("assembled_system") {
     meta_packages_group = "${namespace}.meta_packages"
     all_packages_group = "${namespace}.packages"
     legacy_assembly_input_bundle = "${namespace}.legacy_input_bundle"
+    fshost = "${legacy_assembly_input_bundle}.fshost"
+    fshost_validator = "${namespace}.fshost_validator"
     image_assembly_inputs = "${namespace}.image_assembly_inputs"
     gn_images_config = "${namespace}.images_config"
     images_config_matches = "${namespace}.images_config_matches"
     product_assembler = "${namespace}.product_assembler"
     image_assembler = "${namespace}.image_assembler"
-    fshost_validator = "${namespace}.fshost_validator"
     copy_vbmeta = "${namespace}.copy_vbmeta"
     copy_zbi = "${namespace}.copy_zbi"
     copy_zbi_signed = "${namespace}.copy_zbi_signed"
@@ -388,7 +387,6 @@ template("assembled_system") {
     copy_images = "${namespace}.copy_images"
     shell_commands = "${namespace}.shell_commands"
     assembly_generated_packages = "${namespace}.assembly_generated_packages"
-    fshost = "${namespace}.fs_host"
     compare_command_logs = "${namespace}.compare_command_logs"
     compare_images_manifests = "${namespace}.compare_images_manifests"
 
@@ -448,7 +446,8 @@ template("assembled_system") {
     gendir = "$outdir/gen"
 
     # The cmc_merge() template this is used with prepends $target_out_dir.
-    fshost_merged_cml = "${namespace}/fshost.merged.cml"
+    fshost_merged_cml =
+        "${labels.legacy_assembly_input_bundle}/fshost.merged.cml"
 
     legacy_assembly_input_bundle_dir = "${outdir}/legacy"
     legacy_assembly_input_bundle_manifest =
@@ -567,12 +566,6 @@ template("assembled_system") {
   use_assembly_fshost =
       defined(invoker.use_assembly_fshost) && invoker.use_assembly_fshost
 
-  fshost_config = {
-  }
-  if (defined(invoker.fshost_config)) {
-    fshost_config = invoker.fshost_config
-  }
-
   # Defaults to true if the invoker doesn't pass "include_shell_commands"
   include_shell_commands = _supports_blobs
   if (defined(invoker.include_shell_commands)) {
@@ -586,37 +579,6 @@ template("assembled_system") {
 
   if (!include_shell_commands) {
     not_needed([ "_universe_packages" ])
-  }
-
-  # Compile the fshost component and configuration needed for this assembly
-  fshost_component_and_config(labels.fshost) {
-    # THIS CANNOT BE MARKED TESTONLY, EVEN IF THE ASSEMBLY IS.  This template
-    # changes behavior to create a non-bootable fshost if testly is set to true.
-    testonly = false
-
-    # Correct the component name since the target_name is per-image.
-    component_name = "fshost"
-
-    # This is picked up by the `cmc_merge()` within `fshost_cml()`, through its
-    # use of foward_variables_from(invoker, ["output_name" ...]).
-    output_name = files.fshost_merged_cml
-
-    options = {
-      # Use the defaults from the build args set in generated_fshost_config.gni
-      data_filesystem_format = data_filesystem_format
-      use_disk_migration = use_disk_migration
-
-      # Override with anything passed from `fshost_config`
-      forward_variables_from(fshost_config, "*")
-
-      # Always set ramdisk_image if the assmebled ZBI contains a ramdisk.
-      if (ramdisk_in_zbi) {
-        ramdisk_image = true
-      }
-
-      fxfs_blob = fxfs_blob
-      fxfs_vmex = fxfs_blob
-    }
   }
 
   # Create GN groups for each of the package sets.
@@ -831,6 +793,7 @@ template("assembled_system") {
                              "system_image_deps",
                              "cmdline_deps",
                              "cmdline",
+                             "fshost_config",
                            ])
     bundles_dir = files.outdir
     include_config_data = _supports_blobs
@@ -859,11 +822,8 @@ template("assembled_system") {
     cache_packages = _cache_packages
     universe_packages = _universe_packages
     additional_boot_args = _additional_boot_args
-
-    # TODO: move fshost into the legacy bundle template.
-    if (!use_assembly_fshost) {
-      non_assembly_fshost_label = ":${labels.fshost}"
-    }
+    use_assembly_fshost = use_assembly_fshost
+    ramdisk_in_zbi = ramdisk_in_zbi
   }
 
   # Run product assembly.

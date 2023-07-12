@@ -8,6 +8,8 @@ import("//build/assembly/generated_image_assembly_config.gni")
 import("//build/assembly/package_manifests_list.gni")
 import("//build/dist/distribution_manifest.gni")
 import("//build/python/python_action.gni")
+import("//src/storage/fshost/fshost.gni")
+import("//src/storage/fshost/generated_fshost_config.gni")
 
 # Create a "legacy" assembly input bundle from an image assembly configuration,
 # so that product assembly can use it to produce a matching image assembly
@@ -54,9 +56,16 @@ import("//build/python/python_action.gni")
 #   core_realm_definition [optional]
 #     [label] The GN label of a `core_realm_definition()` template
 #
-#   non_assembly_fshost_label [optional]
-#     [label] The GN label of a fshost component and config to add to bootfs
-#     when assembly is not generating it.
+#   use_assembly_fshost [optional; default: false]
+#     [boolean] Whether to build the fshost component
+#
+#   fshost_config [optional; default: {}]
+#     [scope] Arguments to add to fshost's configuration. These arguments come
+#     before other arguments set by build args.
+#
+#   ramdisk_in_zbi [optional; default: false]
+#     [boolean] Whether the FVM or Fxfs image should be embedded into the ZBI as
+#     a ramdisk.
 #
 #   system_image_deps (optional)
 #     [list of labels] The objects installed in the system image.
@@ -149,6 +158,9 @@ template("legacy_assembly_input_bundle") {
     _core_realm_definition = invoker.core_realm_definition
   }
 
+  use_assembly_fshost =
+      defined(invoker.use_assembly_fshost) && invoker.use_assembly_fshost
+
   labels = {
     image_assembly_config = "${target_name}.generated_image_assembly_config"
     bootfs_files = "${target_name}.bootfs_files"
@@ -175,6 +187,7 @@ template("legacy_assembly_input_bundle") {
     core_realm_default_includes = "${target_name}.core_realm_default_includes"
     core_realm_main_cml = "${target_name}.core_realm_main_cml"
     core_realm_proxy_manifest = "${target_name}.core_realm_proxy_manifest"
+    fshost = "${target_name}.fshost"
   }
 
   files = {
@@ -219,6 +232,9 @@ template("legacy_assembly_input_bundle") {
     core_realm_includes = "${assembly_input_bundle_dir}.core_realm_includes"
     core_realm_proxy_manifest =
         "${assembly_input_bundle_dir}.core_realm_proxy_distribution_manifest"
+
+    # The cmc_merge() template this is used with prepends $target_out_dir.
+    fshost_merged_cml = "${target_name}/fshost.merged.cml"
   }
 
   package_manifests_list(labels.base_driver_package_list) {
@@ -432,6 +448,40 @@ template("legacy_assembly_input_bundle") {
     }
   }
 
+  # Compile the fshost component and configuration needed for this assembly
+  fshost_component_and_config(labels.fshost) {
+    # THIS CANNOT BE MARKED TESTONLY, EVEN IF THE ASSEMBLY IS.  This template
+    # changes behavior to create a non-bootable fshost if testonly is set to
+    # true.
+    testonly = false
+
+    # Correct the component name since the target_name is per-image.
+    component_name = "fshost"
+
+    # This is picked up by the `cmc_merge()` within `fshost_cml()`, through its
+    # use of foward_variables_from(invoker, ["output_name" ...]).
+    output_name = files.fshost_merged_cml
+
+    options = {
+      # Use the defaults from the build args set in generated_fshost_config.gni
+      data_filesystem_format = data_filesystem_format
+      use_disk_migration = use_disk_migration
+
+      if (defined(invoker.fshost_config)) {
+        # Override with anything passed from `fshost_config`
+        forward_variables_from(invoker.fshost_config, "*")
+      }
+
+      # Always set ramdisk_image if the assmebled ZBI contains a ramdisk.
+      if (defined(invoker.ramdisk_in_zbi) && invoker.ramdisk_in_zbi) {
+        ramdisk_image = true
+      }
+
+      fxfs_blob = fxfs_blob
+      fxfs_vmex = fxfs_blob
+    }
+  }
+
   # Search for BootFS files in these targets.
   bootfs_files_for_assembly(labels.bootfs_files) {
     forward_variables_from(invoker,
@@ -440,8 +490,8 @@ template("legacy_assembly_input_bundle") {
                              "visibility",
                            ])
     deps = invoker.bootfs_labels + component_id_index_dep + [ kernel_zbi ]
-    if (defined(invoker.non_assembly_fshost_label)) {
-      deps += [ invoker.non_assembly_fshost_label ]
+    if (!use_assembly_fshost) {
+      deps += [ ":${labels.fshost}" ]
     }
 
     # Only builds which support blobs need base-resolver.
