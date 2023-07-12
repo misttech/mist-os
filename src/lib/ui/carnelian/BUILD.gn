@@ -393,6 +393,7 @@ fuchsia_unittest_package("carnelian-render-tests") {
 fuchsia_unittest_package("carnelian-tests") {
   manifest = "meta/carnelian_lib_test.cml"
   deps = [ ":carnelian_test" ]
+  test_type = "system"
 }
 
 fuchsia_unittest_package("carnelian-layout-tests") {

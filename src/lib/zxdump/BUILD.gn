@@ -342,6 +342,7 @@ action("test-child-elf-search") {
 fuchsia_unittest_package("zxdump-tests") {
   deps = [ ":zxdump-unittests" ]
   manifest = "meta/zxdump-tests.cml"
+  test_type = "system"
 }
 
 group("tests") {

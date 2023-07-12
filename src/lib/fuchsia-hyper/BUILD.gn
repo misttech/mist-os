@@ -67,10 +67,10 @@ rustc_library("fuchsia-hyper") {
   configs -= [ "//build/config/rust/lints:allow_unused_results" ]
 }
 
-fuchsia_component("fuchsia-hyper-lib-test") {
-  testonly = true
+fuchsia_test_component("fuchsia-hyper-lib-test") {
   manifest = "meta/fuchsia_hyper_lib_test.cml"
   deps = [ ":fuchsia-hyper_test" ]
+  test_type = "system"
 }
 
 fuchsia_test_package("fuchsia-hyper-tests") {

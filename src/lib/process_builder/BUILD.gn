@@ -107,6 +107,9 @@ fuchsia_unittest_package("process-builder-tests") {
     ":test_util",
     "//src/sys/testing/elftest",
   ]
+
+  # Needed for fuchsia.kernel.RootJob
+  test_type = "system"
 }
 
 group("tests") {

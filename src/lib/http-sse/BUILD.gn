@@ -41,6 +41,9 @@ fuchsia_unittest_package("rust-http-sse-tests") {
     "//src/connectivity/network/dns:component",
     "//src/connectivity/network/netstack:component",
   ]
+
+  # This test depends on root ssl certificate which is a system capability.
+  test_type = "system"
 }
 
 group("tests") {

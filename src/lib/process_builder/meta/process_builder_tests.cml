@@ -4,9 +4,6 @@
 {
     include: [
         "//src/sys/test_runners/elf/create_raw_processes.shard.cml",
-
-        // Needed for fuchsia.kernel.RootJob
-        "sys/testing/system-test.shard.cml",
         "syslog/client.shard.cml",
     ],
     program: {

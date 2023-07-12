@@ -76,6 +76,7 @@ fuchsia_unittest_package("fostr-tests") {
   package_name = "fostr_unittests"
   manifest = "meta/fostr_unittests.cml"
   deps = [ ":fostr-test-bin" ]
+  test_type = "system"
 }
 
 group("tests") {

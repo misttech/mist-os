@@ -26,6 +26,7 @@ fuchsia_unittest_package("image-pipe-swapchain-tests") {
   test_specs = {
     environments = vulkan_envs
   }
+  test_type = "system"
 }
 
 test("test_image_pipe_swapchain") {
