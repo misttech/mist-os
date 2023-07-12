@@ -4,5 +4,11 @@
 
 group("tests") {
   testonly = true
-  deps = [ "go:tests" ]
+
+  # The Go toolchain does not support RISC-V.
+  # TODO(fxbug.dev/130020): Ensure this directory has sufficient test coverage
+  # on all platforms.
+  if (current_cpu != "riscv64") {
+    deps = [ "go:tests" ]
+  }
 }

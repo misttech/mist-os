@@ -81,7 +81,6 @@ group("tests") {
     "chunked-compression:tests",
     "cmx:tests",
     "cobalt:tests",
-    "component:tests",
     "containers/cpp:tests",
     "cstr:tests",
     "cutex:tests",
@@ -117,7 +116,6 @@ group("tests") {
     "fuchsia-url:tests",
     "fxl:tests",
     "gcs:tests($host_toolchain)",
-    "go-benchmarking:tests",
     "http-sse:tests",
     "http-uri-ext:tests",
     "icu:tests",
@@ -175,6 +173,16 @@ group("tests") {
     "zxc:tests",
     "zxdump:tests",
   ]
+
+  if (current_cpu != "riscv64") {
+    deps += [
+      # The Go toolchain does not support RISC-V.
+      # TODO(fxbug.dev/129980): Rename `components` to indicate that it is
+      # specific to Go.
+      "component:tests",
+      "go-benchmarking:tests",
+    ]
+  }
 }
 
 group("boot_tests") {
