@@ -17,6 +17,7 @@
     offer: [
         {
             protocol: [
+                "fuchsia.inspect.InspectSink",
                 "fuchsia.kernel.HypervisorResource",
                 "fuchsia.kernel.VmexResource",
                 "fuchsia.logger.LogSink",

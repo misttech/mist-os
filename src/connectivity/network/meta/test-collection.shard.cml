@@ -17,6 +17,7 @@
         {
             protocol: [
                 "fuchsia.device.NameProvider",
+                "fuchsia.inspect.InspectSink",
                 "fuchsia.logger.LogSink",
             ],
             from: "parent",

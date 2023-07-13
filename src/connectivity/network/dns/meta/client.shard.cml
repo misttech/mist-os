@@ -23,5 +23,10 @@
             from: "parent",
             to: "#dns_resolver",
         },
+        {
+            protocol: "fuchsia.inspect.InspectSink",
+            from: "parent",
+            to: [ "#dns_resolver" ],
+        },
     ],
 }

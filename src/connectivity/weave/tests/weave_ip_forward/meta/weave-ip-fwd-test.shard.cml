@@ -151,5 +151,18 @@
             from: "#wpan-netstack",
             to: "#wpan-node",
         },
+        {
+            protocol: "fuchsia.inspect.InspectSink",
+            from: "parent",
+            to: [
+                "#fuchsia-netstack",
+                "#fuchsia-node",
+                "#sync-manager",
+                "#weave-netstack",
+                "#weave-node",
+                "#wlan-netstack",
+                "#wpan-netstack",
+            ],
+        },
     ],
 }

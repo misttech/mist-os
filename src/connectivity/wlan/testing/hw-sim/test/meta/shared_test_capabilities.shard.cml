@@ -104,5 +104,16 @@
             from: "parent",
             to: "#regulatory_region",
         },
+        {
+            protocol: "fuchsia.inspect.InspectSink",
+            from: "parent",
+            to: [
+                "#regulatory_region",
+                "#stash",
+                "#wlancfg",
+                "#wlandevicemonitor",
+                "#wlanstack",
+            ],
+        },
     ],
 }

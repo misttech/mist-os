@@ -141,5 +141,19 @@
             from: "#remote-netstack",
             to: "#remote-mdns",
         },
+        {
+            protocol: "fuchsia.inspect.InspectSink",
+            from: "parent",
+            to: [
+                "#local-mdns",
+                "#local-name-provider",
+                "#local-netstack",
+                "#publisher",
+                "#remote-mdns",
+                "#remote-name-provider",
+                "#remote-netstack",
+                "#test-driver",
+            ],
+        },
     ],
 }

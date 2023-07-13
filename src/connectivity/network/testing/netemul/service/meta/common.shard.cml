@@ -70,6 +70,15 @@
             from: "parent",
             to: "#netemul",
         },
+        {
+            protocol: "fuchsia.inspect.InspectSink",
+            from: "parent",
+            to: [
+                "#netemul",
+                "#network-context",
+                "#network-tun",
+            ],
+        },
     ],
     environments: [
         {

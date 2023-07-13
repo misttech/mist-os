@@ -4,6 +4,7 @@
 {
     include: [
         "//src/connectivity/network/testing/netemul/runner/default.shard.cml",
+        "inspect/offer.shard.cml",
         "syslog/client.shard.cml",
     ],
     program: {

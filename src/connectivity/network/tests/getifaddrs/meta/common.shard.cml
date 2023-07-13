@@ -73,5 +73,10 @@
             from: "#netstack",
             to: "#test-driver",
         },
+        {
+            protocol: "fuchsia.inspect.InspectSink",
+            from: "parent",
+            to: [ "#test-driver" ],
+        },
     ],
 }

@@ -68,6 +68,16 @@
             from: "#netstack",
             to: [ "#dhcpd" ],
         },
+        {
+            protocol: "fuchsia.inspect.InspectSink",
+            from: "parent",
+            to: [
+                "#dhcpd",
+                "#dhcpv6-client",
+                "#dns-resolver",
+                "#stubs",
+            ],
+        },
     ],
     expose: [
         {

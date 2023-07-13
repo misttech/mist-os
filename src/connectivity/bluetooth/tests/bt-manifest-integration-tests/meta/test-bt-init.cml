@@ -4,6 +4,7 @@
 {
     include: [
         "//src/connectivity/bluetooth/core/bt-init/meta/bt-init.shard.cml",
+        "inspect/offer.shard.cml",
         "syslog/client.shard.cml",
     ],
     children: [

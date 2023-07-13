@@ -2,7 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 {
-    include: [ "//src/connectivity/network/testing/netemul/runner/default.shard.cml" ],
+    include: [
+        "//src/connectivity/network/testing/netemul/runner/default.shard.cml",
+        "inspect/offer.shard.cml",
+    ],
     program: {
         networks: [
             {
