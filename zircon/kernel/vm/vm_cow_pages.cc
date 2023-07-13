@@ -3030,16 +3030,15 @@ zx_status_t VmCowPages::PinRangeLocked(uint64_t offset, uint64_t len) {
 zx_status_t VmCowPages::DecommitRangeLocked(uint64_t offset, uint64_t len) {
   canary_.Assert();
 
-  // Trim the size and perform our zero-length hot-path check before we recurse
+  // Validate the size and perform our zero-length hot-path check before we recurse
   // up to our top-level ancestor.  Size bounding needs to take place relative
   // to the child the operation was originally targeted against.
-  uint64_t new_len;
-  if (!TrimRange(offset, len, size_, &new_len)) {
+  if (!InRange(offset, len, size_)) {
     return ZX_ERR_OUT_OF_RANGE;
   }
 
   // was in range, just zero length
-  if (new_len == 0) {
+  if (len == 0) {
     return ZX_OK;
   }
 
@@ -3054,7 +3053,7 @@ zx_status_t VmCowPages::DecommitRangeLocked(uint64_t offset, uint64_t len) {
     VmCowPages* parent = PagedParentOfSliceLocked(&parent_offset);
     AssertHeld(parent->lock_ref());
     DEBUG_ASSERT(!parent->is_slice_locked());  // assert bounded recursion.
-    return parent->DecommitRangeLocked(offset + parent_offset, new_len);
+    return parent->DecommitRangeLocked(offset + parent_offset, len);
   }
 
   // Currently, we can't decommit if the absence of a page doesn't imply zeroes.
@@ -3072,7 +3071,7 @@ zx_status_t VmCowPages::DecommitRangeLocked(uint64_t offset, uint64_t len) {
 
   list_node_t freed_list;
   list_initialize(&freed_list);
-  zx_status_t status = UnmapAndRemovePagesLocked(offset, new_len, &freed_list);
+  zx_status_t status = UnmapAndRemovePagesLocked(offset, len, &freed_list);
   if (status != ZX_OK) {
     return status;
   }

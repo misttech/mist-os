@@ -1953,25 +1953,25 @@ TEST(VmoTestCase, DecommitChildSliceTests) {
     // Make sure that we test ranges which have starting and ending points
     // entirely inside of the VMO, in the region after the VMO but inside the
     // root VMO, and entirely outside of even the root VMO.
-    size_t root_end = level.size + level.size_past_end;
+    const size_t root_end = level.size + level.size_past_end;
     bool exercised_out_of_range = false;
     bool exercised_ok = false;
     for (size_t start = 0; start <= (root_end + zx_system_get_page_size());
          start += zx_system_get_page_size()) {
       for (size_t end = start + zx_system_get_page_size();
            end <= (root_end + (2 * zx_system_get_page_size())); end += zx_system_get_page_size()) {
-        size_t size = end - start;
+        ASSERT_LT(start, end);
+        const size_t size = end - start;
 
         // Attempt to completely commit the root before the decommit operation.
         EXPECT_OK(levels[0].vmo.op_range(ZX_VMO_OP_COMMIT, 0, levels[0].size, nullptr, 0));
 
         // Now attempt to decommit our test range and check to make sure that we
-        // get the expected result.  We only expect failure if our offset is out
-        // of range for our child VMO.  We expect extra long sizes to be
-        // silently trimmed for us.
+        // get the expected result.  We expect failure if our [start, start + size) is out
+        // of range for our child VMO, not the parent.
         zx_status_t expected_status;
 
-        if (start > level.size) {
+        if (start + size > level.size) {
           expected_status = ZX_ERR_OUT_OF_RANGE;
           exercised_out_of_range = true;
         } else {
@@ -1981,7 +1981,7 @@ TEST(VmoTestCase, DecommitChildSliceTests) {
 
         EXPECT_STATUS(
             level.vmo.op_range(ZX_VMO_OP_DECOMMIT, start, size, nullptr, 0), expected_status,
-            "Decommit op was offset 0x%zx size 0x%zx in VMO (offset 0x%zx size 0x%zx spe 0x%zx)",
+            "\nDecommit op was offset 0x%zx size 0x%zx in VMO (offset 0x%zx size 0x%zx spe 0x%zx)",
             start, size, level.offset, level.size, level.size_past_end);
       }
     }
@@ -2225,9 +2225,11 @@ TEST(VmoTestCase, OpOutOfBounds) {
   EXPECT_EQ(ZX_ERR_OUT_OF_RANGE,
             vmo.op_range(ZX_VMO_OP_ZERO, 0, 2 * zx_system_get_page_size(), nullptr, 0));
 
-  // TODO(fxbug.dev/130470): These should fail as well instead of trimming to fit.
+  // TODO(fxbug.dev/130470): This should fail as well instead of trimming to fit.
   EXPECT_OK(vmo.op_range(ZX_VMO_OP_COMMIT, 0, 2 * zx_system_get_page_size(), nullptr, 0));
-  EXPECT_OK(vmo.op_range(ZX_VMO_OP_DECOMMIT, 0, 2 * zx_system_get_page_size(), nullptr, 0));
+
+  EXPECT_EQ(ZX_ERR_OUT_OF_RANGE,
+            vmo.op_range(ZX_VMO_OP_DECOMMIT, 0, 2 * zx_system_get_page_size(), nullptr, 0));
 }
 
 }  // namespace
