@@ -14,6 +14,7 @@ Usage:
 import argparse
 import difflib
 import filecmp
+import hashlib
 import multiprocessing
 import os
 import re
@@ -584,6 +585,17 @@ _RBE_DOWNLOAD_STUB_SUFFIX = '.dl-stub'
 _RBE_XATTR_NAME = 'user.fuchsia.rbe.digest.sha256'
 
 
+def download_stub_backup_location(path: Path) -> Path:
+    return Path(str(path) + _RBE_DOWNLOAD_STUB_SUFFIX)
+
+
+def get_blob_digest(path: Path) -> str:
+    contents = path.read_bytes()  # could be large
+    readable_hash = hashlib.sha256(contents).hexdigest()
+    length = len(contents)
+    return f'{readable_hash}/{length}'
+
+
 class DownloadStubFormatError(Exception):
 
     def __init__(self, message: str):
@@ -647,7 +659,7 @@ class DownloadStubInfo(object):
         ]
         _write_lines_to_file(output_abspath, lines)
 
-    def create(self, working_dir_abs: Path):
+    def create(self, working_dir_abs: Path, dest: Path = None):
         """Create a download stub file.
 
         The stub file will be backed-up to PATH.dl-stub when it is 'downloaded'.
@@ -656,9 +668,10 @@ class DownloadStubInfo(object):
           working_dir_abs: absolute path to the working dir, to which
             all referenced paths are relative.  This is passed so that
             this operation does not depend on os.curdir.
+          dest: (optional) alternate location to write download stub.
         """
         assert working_dir_abs.is_absolute()
-        path = working_dir_abs / self.path
+        path = working_dir_abs / (dest or self.path)
         path.parent.mkdir(parents=True, exist_ok=True)
         self._write(path)
 
@@ -740,7 +753,7 @@ class DownloadStubInfo(object):
             # Reflect the mode/permissions from stub to the real file.
             temp_dl.chmod(dest_abs.stat().st_mode)
             # Backup the download stub.  This preserves the xattr.
-            dest_abs.rename(Path(str(dest_abs) + _RBE_DOWNLOAD_STUB_SUFFIX))
+            dest_abs.rename(download_stub_backup_location(dest_abs))
             temp_dl.rename(dest_abs)
 
         return status
@@ -770,7 +783,7 @@ def undownload(path: Path) -> bool:
     Returns:
       True if a stub was moved back.
     """
-    stub_path = Path(str(path) + _RBE_DOWNLOAD_STUB_SUFFIX)
+    stub_path = download_stub_backup_location(path)
     if stub_path.exists() and is_download_stub_file(stub_path):
         stub_path.rename(path)
         return True
@@ -1063,6 +1076,11 @@ class RemoteAction(object):
         return list(self._generate_options())
 
     @property
+    def preserve_unchanged_output_mtime(self) -> bool:
+        """If true, local outputs that already match remote results will be untouched."""
+        return '--preserve_unchanged_output_mtime' in self._options
+
+    @property
     def canonicalize_working_dir(self) -> Optional[bool]:
         return self._rewrapper_known_options.canonicalize_working_dir
 
@@ -1319,10 +1337,9 @@ class RemoteAction(object):
         )
 
         # Write download stubs out.
-        # What if download was skipped due to preserving mtime???
         for stub_info in stub_infos.values():
             self.vmsg(f"  {stub_info.path}: {stub_info.blob_digest}")
-            stub_info.create(self.working_dir)
+            self._update_stub(stub_info)
 
         if not self.always_download:
             return
@@ -1342,6 +1359,80 @@ class RemoteAction(object):
             statuses = map(_download_for_mp, download_args)
 
         return {path: status for path, status in statuses}
+
+    def _update_stub(self, stub_info: DownloadStubInfo):
+        """Write a download stub (or not, depending on conditions)."""
+        path = self.working_dir / stub_info.path
+        if self.preserve_unchanged_output_mtime and path.exists():
+            # Consider the cases where the existing output is or is not
+            # a download stub.
+            if is_download_stub_file(path):
+                # What if the local file is itself a download stub (w/ xattr)?
+                # If a download was skipped because the local and remote results
+                # already match, the blob_digests already matches, however, the
+                # stub's action_digest may have changed, as different actions
+                # can produce the same result.  The build_id will definitely
+                # change across builds.  Our choices are:
+                #   a) leave the old stub with its old action_digest.
+                #     Pro: preserving the stub file's timestamp lets the build
+                #       prune actions (ninja restat).
+                #     Con: action_digest does not reflect the latest remote
+                #       action that produced this artifact.
+                #   b) rewrite the stub file with the new action_digest.
+                #     Pro: action_digest reflects the latest remote action that
+                #       produced this artifact.
+                #     Con: Unconditionally updating the stub file takes away the
+                #       opportunity to prune build actions (ninja restat).
+                #
+                # We opt for a) because it will be possible to recover the
+                # latest action_digest from the action_log that produced the
+                # stub info.
+                old_stub_info = DownloadStubInfo.read_from_file(path)
+                # The blob_digest is all that matters for being able to download
+                # later.
+                if old_stub_info.blob_digest != stub_info.blob_digest:
+                    stub_info.create(self.working_dir)  # overwrite the old stub
+                # otherwise, just leave the old stub as-is.
+                return
+
+            else:  # existing output is not a download stub
+                # When we *are* preserving timestamps of unchanged local
+                # (non-stub) artifacts, an existing output could mean:
+                # 1) The remote output was unchanged from the old local copy,
+                #   in which case, we want to keep it without overwriting it
+                #   with a download stub.  It would be ok to write a download
+                #   stub to the download_stub_backup_location(), but not necessary.
+                # 2) The local output is stale, and different from what would
+                #   have been downloaded, in which case, the new download stub
+                #   should be written over it.
+                # Reproxy might be able to distinguish which case applies, but this
+                # information isn't reflected in the action_log, unfortunately.
+                # In the worst case, we re-compute the digest of the file in
+                # question to determine the correct action.
+                #
+                # First, check whether or not the output is paired with a backup
+                # download stub (which is left behind by a stub_info.download()
+                # operation).
+                stub_backup_path = download_stub_backup_location(path)
+                if stub_backup_path.exists():  # assume it is a stub
+                    old_stub_info = DownloadStubInfo.read_from_file(
+                        stub_backup_path)
+                    old_blob_digest = old_stub_info.blob_digest
+                else:
+                    old_blob_digest = get_blob_digest(path)  # slow
+
+                if stub_info.blob_digest != old_blob_digest:
+                    if stub_backup_path.exists():
+                        stub_backup_path.unlink()
+
+                    stub_info.path.unlink()
+                    stub_info.create(self.working_dir)
+                # else blob_digests match, leave the old stub as-is.
+                return
+
+        # When we are *not* preserving timestamps of unchanged local
+        # artifacts, always writing the download stub is valid.
+        stub_info.create(self.working_dir)
 
     def downloader(self) -> remotetool.RemoteTool:
         with open(self.exec_root / _REPROXY_CFG) as cfg:

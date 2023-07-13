@@ -132,9 +132,7 @@ def setup_logdir_for_logdump(path: Path, verbose: bool = False) -> Path:
     # Otherwise, this is assumed to be a .rrpl or .rpl file.
     # Copy it to a cached location.
     tmpdir = Path(os.environ.get('TMPDIR', '/tmp'))
-    with open(path, "rb") as f:
-        contents = f.read()
-    readable_hash = hashlib.sha256(contents).hexdigest()
+    readable_hash = hashlib.sha256(path.read_bytes()).hexdigest()
     cached_log_dir = tmpdir / 'action_diff_py' / 'cache' / readable_hash
     if verbose:
         msg(f'Copying log to {cached_log_dir} for logdump processing.')

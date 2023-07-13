@@ -5,6 +5,7 @@
 
 import argparse
 import contextlib
+import copy
 import io
 import os
 import subprocess
@@ -2303,6 +2304,189 @@ remote_metadata: {{
         mock_run.assert_called()
         mock_parse_log.assert_called_with(Path(output + '.rrpl'))
         mock_stub.assert_not_called()
+
+    def _setup_update_stub_test(
+        self,
+        tdp: Path,
+        output_contents: str = None
+    ) -> Tuple[remote_action.RemoteAction, FakeReproxyLogEntry]:
+        exec_root = tdp
+        build_dir = Path('build-out')
+        self.working_dir = exec_root / build_dir
+        download_option = '--download_outputs=false'
+        p = remote_action._MAIN_ARG_PARSER
+        command = ['echo']
+        self.output = Path('out.out')
+        main_args, other = p.parse_known_args(
+            [download_option, '--preserve_unchanged_output_mtime', '--'] +
+            command)
+        action = remote_action.remote_action_from_args(
+            main_args,
+            remote_options=other,
+            exec_root=exec_root,
+            working_dir=self.working_dir,
+            output_files=[self.output],
+        )
+        self.assertEqual(action.local_only_command, command)
+        self.assertFalse(action.download_outputs)
+        self.assertTrue(action.preserve_unchanged_output_mtime)
+        options = action.options
+        self.assertIn(download_option, options)
+        logdir = '/fake/tmp/rpl/logz.532874'
+
+        if output_contents is not None:
+            self.working_dir.mkdir(parents=True, exist_ok=True)
+            (self.working_dir / self.output).write_text(output_contents)
+            output_digest = remote_action.get_blob_digest(
+                self.working_dir / self.output)
+        else:
+            output_digest = 'aa55aa55/33'  # fake
+
+        fake_log_record = FakeReproxyLogEntry(
+            completion_status='SUCCESS',
+            output_file_digests={self.output: output_digest},
+            action_digest='765321/44',
+        )
+        return action, fake_log_record
+
+    def test_update_stub_preserve_unchanged_output_mtime_existing_stub_matches_digest(
+            self):
+        with tempfile.TemporaryDirectory() as td:
+            action, fake_log_record = self._setup_update_stub_test(Path(td))
+
+            # create a pre-existing stub-file with the same digest as the new output
+            old_stub_info = fake_log_record.make_download_stub_info(
+                self.output, build_id='new-build-id')
+            old_stub_info.create(self.working_dir)
+            self.assertTrue(
+                remote_action.is_download_stub_file(
+                    self.working_dir / old_stub_info.path))
+
+            # bypass the remote action running
+            with mock.patch.object(remote_action.DownloadStubInfo,
+                                   'create') as mock_create_stub:
+                action._update_stub(old_stub_info)
+
+            mock_create_stub.assert_not_called()
+
+    def test_update_stub_preserve_unchanged_output_mtime_existing_stub_mismatches_digest(
+            self):
+        with tempfile.TemporaryDirectory() as td:
+            action, fake_log_record = self._setup_update_stub_test(Path(td))
+            # create a pre-existing stub-file with a different digest as the new output
+            old_stub_info = fake_log_record.make_download_stub_info(
+                self.output, build_id='new-build-id')
+            new_stub_info = copy.deepcopy(old_stub_info)
+            old_stub_info._blob_digest = '66776677/33'  # mismatched digest
+            old_stub_info.create(self.working_dir)
+            self.assertTrue(
+                remote_action.is_download_stub_file(
+                    self.working_dir / old_stub_info.path))
+
+            # bypass the remote action running
+            with mock.patch.object(remote_action.DownloadStubInfo,
+                                   'create') as mock_create_stub:
+                action._update_stub(new_stub_info)
+
+            mock_create_stub.assert_called_with(self.working_dir)
+
+    def test_update_stub_preserve_unchanged_output_mtime_existing_file_matches_digest_with_backup_stub(
+            self):
+        with tempfile.TemporaryDirectory() as td:
+            action, fake_log_record = self._setup_update_stub_test(
+                Path(td), output_contents='h3llo')
+
+            # pre-existing output file's digest matches that from the remote
+            # action, along with its backup download stub.
+            stub_location = remote_action.download_stub_backup_location(
+                self.output)
+            old_stub_info = fake_log_record.make_download_stub_info(
+                self.output, build_id='new-build-id')
+            old_stub_info.create(self.working_dir, dest=stub_location)
+            self.assertTrue(
+                remote_action.is_download_stub_file(
+                    self.working_dir / stub_location))
+
+            # bypass the remote action running
+            with mock.patch.object(remote_action.DownloadStubInfo,
+                                   'create') as mock_create_stub:
+                with mock.patch.object(Path, 'unlink') as mock_remove:
+                    action._update_stub(old_stub_info)
+
+            # old file (and its stub) are left untouched
+            mock_remove.assert_not_called()
+            mock_create_stub.assert_not_called()
+
+    def test_update_stub_preserve_unchanged_output_mtime_existing_file_matches_digest_without_backup_stub(
+            self):
+        with tempfile.TemporaryDirectory() as td:
+            action, fake_log_record = self._setup_update_stub_test(
+                Path(td), output_contents='h3llo')
+
+            # pre-existing output file's digest matches that from the remote
+            # action, without backup download stub.
+            old_stub_info = fake_log_record.make_download_stub_info(
+                self.output, build_id='new-build-id')
+
+            # bypass the remote action running
+            with mock.patch.object(remote_action.DownloadStubInfo,
+                                   'create') as mock_create_stub:
+                with mock.patch.object(Path, 'unlink') as mock_remove:
+                    action._update_stub(old_stub_info)
+
+            # old file is left untouched
+            mock_remove.assert_not_called()
+            mock_create_stub.assert_not_called()
+
+    def test_update_stub_preserve_unchanged_output_mtime_existing_file_mismatches_digest_with_backup_stub(
+            self):
+        with tempfile.TemporaryDirectory() as td:
+            action, fake_log_record = self._setup_update_stub_test(
+                Path(td), output_contents='h3llo')
+
+            # pre-existing output file's digest does not match that from the
+            # remote action.
+            stub_location = remote_action.download_stub_backup_location(
+                self.output)
+            old_stub_info = fake_log_record.make_download_stub_info(
+                self.output, build_id='new-build-id')
+            new_stub_info = copy.deepcopy(old_stub_info)
+            old_stub_info.create(self.working_dir, dest=stub_location)
+            new_stub_info._blob_digest = '43218765/11'  # mismatched digest
+            self.assertTrue(
+                remote_action.is_download_stub_file(
+                    self.working_dir / stub_location))
+
+            # bypass the remote action running
+            with mock.patch.object(remote_action.DownloadStubInfo,
+                                   'create') as mock_create_stub:
+                with mock.patch.object(Path, 'unlink') as mock_remove:
+                    action._update_stub(new_stub_info)
+
+            # old file is replaced with new stub, old stub is removed
+            mock_remove.assert_called_with()
+            mock_create_stub.assert_called_with(self.working_dir)
+
+    def test_update_stub_preserve_unchanged_output_mtime_existing_file_mismatches_digest_without_backup_stub(
+            self):
+        with tempfile.TemporaryDirectory() as td:
+            action, fake_log_record = self._setup_update_stub_test(
+                Path(td), output_contents='h3llo')
+            # pre-existing output file's digest does not match that from the
+            # remote action.
+            new_stub_info = fake_log_record.make_download_stub_info(
+                self.output, build_id='new-build-id')
+            new_stub_info._blob_digest = '43218765/11'  # mismatched digest
+
+            # bypass the remote action running
+            with mock.patch.object(remote_action.DownloadStubInfo,
+                                   'create') as mock_create_stub:
+                with mock.patch.object(Path, 'unlink') as mock_remove:
+                    action._update_stub(new_stub_info)
+
+            # old file is replaced with new stub
+            mock_remove.assert_called_with()
+            mock_create_stub.assert_called_with(self.working_dir)
 
     def test_explicit_always_download(self):
         exec_root = Path('/home/project')
