@@ -58,12 +58,6 @@ requires_next_vdso = [
   "restricted-mode",
 ]
 
-system_tests = [
-  # Due to fuchsia.kernel.RootJob
-  "process-shared",  # requires ZX_POL_NEW_PROCESS,
-                     # ZX_POL_AMBIENT_MARK_VMO_EXEC, and the next vDSO
-]
-
 # These tests require custom component manifests to execute as components.
 core_tests_with_custom_manifests =
     [
@@ -71,10 +65,12 @@ core_tests_with_custom_manifests =
       "channel",
       "memory-mapping",
       "port",
+      "process-shared",  # requires ZX_POL_NEW_PROCESS,
+                         # ZX_POL_AMBIENT_MARK_VMO_EXEC, and the next vDSO
 
       # Some tests require ZX_POL_AMBIENT_MARK_VMO_EXEC.
       "vmo",
-    ] + requires_next_vdso + system_tests
+    ] + requires_next_vdso
 
 # These tests need to run in a bootfs environment and can't run as a Fuchsia
 # component even with additional configuration.
@@ -172,11 +168,6 @@ foreach(test_name, core_tests_with_custom_manifests) {
   fuchsia_unittest_package(fuchsia_test_package_name) {
     deps = [ ":${test_name}" ]
     manifest = "${test_name}/meta/${test_name}_test.cml"
-
-    # check if `test_name` is present in `system_tests`
-    if (system_tests + [ test_name ] - [ test_name ] != system_tests) {
-      test_type = "system"
-    }
   }
 }
 
