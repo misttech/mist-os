@@ -551,7 +551,7 @@ class Dispatcher : public async_dispatcher_t,
 
     // driver_runtime::Callback can store only 2 pointers, so we store other state in the async
     // wait.
-    zx_packet_signal_t signal_packet_ = {};
+    std::optional<zx_packet_signal_t> signal_packet_;
   };
 
   // A task which will be triggered at some point in the future.

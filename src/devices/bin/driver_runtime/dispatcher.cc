@@ -126,7 +126,8 @@ Dispatcher::AsyncWait::AsyncWait(async_wait_t* original_wait, Dispatcher& dispat
                                zx_status_t status) {
         // Clear the pointer to the AsyncWait object.
         original_wait_->state.reserved[0] = 0;
-        original_wait_->handler(async_dispatcher, original_wait_, status, &signal_packet_);
+        zx_packet_signal_t* signal_packet = signal_packet_ ? &signal_packet_.value() : nullptr;
+        original_wait_->handler(async_dispatcher, original_wait_, status, signal_packet);
       };
   // Note that this callback is called *after* |OnSignal|, which is the immediate callback that is
   // invoked when the async wait is signaled.
@@ -193,7 +194,11 @@ void Dispatcher::AsyncWait::OnSignal(async_dispatcher_t* async_dispatcher, zx_st
   ZX_DEBUG_ASSERT(dispatcher_ref != nullptr);
   auto dispatcher = fbl::ImportFromRawPtr(dispatcher_ref);
 
-  signal_packet_ = *signal;
+  if (signal) {
+    signal_packet_ = *signal;
+  } else {
+    signal_packet_ = std::nullopt;
+  }
 
   dispatcher->QueueWait(this, status);
   dispatcher->thread_pool()->OnThreadWakeup();
