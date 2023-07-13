@@ -27,6 +27,7 @@ rustc_library("cap") {
     "//third_party/rust_crates:downcast-rs",
     "//third_party/rust_crates:dyn-clone",
     "//third_party/rust_crates:futures",
+    "//third_party/rust_crates:scopeguard",
     "//third_party/rust_crates:thiserror",
   ]
 

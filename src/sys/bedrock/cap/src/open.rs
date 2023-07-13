@@ -4,11 +4,14 @@
 use {
     crate::cap::{Capability, Remote},
     core::fmt,
+    fidl::endpoints::create_endpoints,
     fidl::endpoints::ServerEnd,
     fidl_fuchsia_io as fio, fuchsia_zircon as zx,
+    fuchsia_zircon::HandleBased,
     futures::future::BoxFuture,
+    futures::FutureExt,
     std::sync::Arc,
-    vfs::{execution_scope::ExecutionScope, path::Path, remote},
+    vfs::{directory::entry::DirectoryEntry, execution_scope::ExecutionScope, path::Path},
 };
 
 pub type OpenFn = dyn Fn(ExecutionScope, fio::OpenFlags, Path, zx::Channel) -> () + Send + Sync;
@@ -23,6 +26,7 @@ pub type OpenFn = dyn Fn(ExecutionScope, fio::OpenFlags, Path, zx::Channel) -> (
 pub struct Open {
     open: Arc<OpenFn>,
     entry_type: fio::DirentType,
+    open_flags: fio::OpenFlags,
 }
 
 impl fmt::Debug for Open {
@@ -30,6 +34,7 @@ impl fmt::Debug for Open {
         f.debug_struct("Open")
             .field("open", &"[open function]")
             .field("entry_type", &self.entry_type)
+            .field("open_flags", &self.open_flags)
             .finish()
     }
 }
@@ -37,16 +42,27 @@ impl fmt::Debug for Open {
 impl Capability for Open {}
 
 impl Open {
-    pub fn new<T>(open: T, entry_type: fio::DirentType) -> Self
+    /// Creates an [Open] capability.
+    ///
+    /// Arguments:
+    ///
+    /// * `open` - The function that will be called when this capability is opened.
+    ///
+    /// * `entry_type` - The type of the node that will be returned when the [Open] is mounted
+    ///   within a directory and the user enumerates that directory.
+    ///
+    /// * `open_flags` - The flags that will be used to open a new connection to this capability
+    ///   during [Remote].
+    pub fn new<F>(open: F, entry_type: fio::DirentType, open_flags: fio::OpenFlags) -> Self
     where
-        T: Fn(ExecutionScope, fio::OpenFlags, Path, zx::Channel) -> () + Send + Sync + 'static,
+        F: Fn(ExecutionScope, fio::OpenFlags, Path, zx::Channel) -> () + Send + Sync + 'static,
     {
-        Open { open: Arc::new(open), entry_type }
+        Open { open: Arc::new(open), entry_type, open_flags }
     }
 
-    pub fn into_remote(self) -> Arc<remote::Remote> {
+    pub(crate) fn into_remote(self) -> Arc<vfs::remote::Remote> {
         let open = self.open;
-        remote::remote_boxed_with_type(
+        vfs::remote::remote_boxed_with_type(
             Box::new(
                 move |scope: ExecutionScope,
                       flags: fio::OpenFlags,
@@ -61,9 +77,30 @@ impl Open {
 }
 
 impl Remote for Open {
+    /// This implementation opens the remote and returns a client endpoint.
     fn to_zx_handle(self: Box<Self>) -> (zx::Handle, Option<BoxFuture<'static, ()>>) {
-        // TODO: this should return a `fuchsia.io/Directory` handle with max rights.
-        todo!("This should return a `fuchsia.io/Directory` handle with max rights.")
+        let open_flags = self.open_flags;
+        let remote = self.into_remote();
+        let scope = ExecutionScope::new();
+        let (client_end, server_end) = create_endpoints::<fio::DirectoryMarker>();
+        remote.clone().open(
+            scope.clone(),
+            open_flags,
+            vfs::path::Path::dot(),
+            server_end.into_channel().into(),
+        );
+
+        // If this future is dropped, stop serving the connection.
+        let guard = scopeguard::guard(scope.clone(), move |scope| {
+            scope.shutdown();
+        });
+        let fut = async move {
+            let _guard = guard;
+            scope.wait().await;
+        }
+        .boxed();
+
+        (client_end.into_handle(), Some(fut))
     }
 }
 
@@ -71,7 +108,6 @@ impl Remote for Open {
 mod tests {
     use {
         super::*,
-        fidl::endpoints::create_endpoints,
         fuchsia_async as fasync, fuchsia_zircon as zx,
         lazy_static::lazy_static,
         test_util::Counter,
@@ -97,6 +133,7 @@ mod tests {
                 drop(server_end);
             },
             fio::DirentType::Directory,
+            fio::OpenFlags::DIRECTORY,
         );
         let remote = open.into_remote();
         let dir = pfs::simple();
@@ -116,6 +153,33 @@ mod tests {
         let dir = dir_client_end.channel();
         fdio::service_connect_at(dir, "foo/bar", server_end).unwrap();
         fasync::Channel::from_channel(client_end).unwrap().on_closed().await.unwrap();
+        assert_eq!(OPEN_COUNT.get(), 1);
+    }
+
+    #[fuchsia::test]
+    async fn test_remote() {
+        lazy_static! {
+            static ref OPEN_COUNT: Counter = Counter::new(0);
+        }
+
+        let open = Open::new(
+            move |_scope: ExecutionScope,
+                  flags: fio::OpenFlags,
+                  relative_path: Path,
+                  server_end: zx::Channel| {
+                assert_eq!(relative_path.into_string(), "");
+                assert_eq!(flags, fio::OpenFlags::DIRECTORY);
+                OPEN_COUNT.inc();
+                drop(server_end);
+            },
+            fio::DirentType::Directory,
+            fio::OpenFlags::DIRECTORY,
+        );
+
+        assert_eq!(OPEN_COUNT.get(), 0);
+        let (client_end, fut) = Box::new(open).to_zx_handle();
+        drop(client_end);
+        fut.unwrap().await;
         assert_eq!(OPEN_COUNT.get(), 1);
     }
 }

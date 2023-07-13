@@ -13,8 +13,11 @@ use {
     fidl_fuchsia_component_bedrock as fbedrock, fidl_fuchsia_io as fio, fuchsia_async as fasync,
     fuchsia_zircon as zx,
     fuchsia_zircon::HandleBased,
-    futures::TryStreamExt,
-    futures::{future::BoxFuture, FutureExt},
+    futures::{
+        channel::mpsc::{unbounded, UnboundedSender},
+        future::BoxFuture,
+        FutureExt, SinkExt, TryStreamExt,
+    },
     std::collections::hash_map::Entry,
     std::collections::HashMap,
     vfs::{
@@ -35,11 +38,22 @@ pub type Key = String;
 #[derive(Debug, Clone)]
 pub struct Dict<T> {
     pub entries: HashMap<Key, T>,
+
+    /// When an external request tries to access a non-existent entry,
+    /// the name of the entry will be sent using `not_found`.
+    not_found: UnboundedSender<Key>,
 }
 
 impl<T> Dict<T> {
+    /// Creates an empty dictionary.
     pub fn new() -> Self {
-        Dict { entries: HashMap::new() }
+        Dict { entries: HashMap::new(), not_found: unbounded().0 }
+    }
+
+    /// Creates an empty dictionary. When an external request tries to access a non-existent entry,
+    /// the name of the entry will be sent using `not_found`.
+    pub fn new_with_not_found(not_found: UnboundedSender<Key>) -> Self {
+        Dict { entries: HashMap::new(), not_found }
     }
 }
 
@@ -82,7 +96,12 @@ where
                             }
                             Ok(handle)
                         }
-                        None => Err(fbedrock::DictError::NotFound),
+                        None => {
+                            // Ignore the result of sending. The receiver is free to break away to
+                            // ignore all the not-found errors.
+                            let _ = self.not_found.send(key);
+                            Err(fbedrock::DictError::NotFound)
+                        }
                     };
                     responder.send(result).context("failed to send response")?;
                 }
@@ -116,6 +135,12 @@ where
                 }
             }
         }
+        let not_found = self.not_found.clone();
+        dir.clone().set_not_found_handler(Box::new(move |path| {
+            // Ignore the result of sending. The receiver is free to break away to ignore all the
+            // not-found errors.
+            let _ = not_found.unbounded_send(path.to_owned());
+        }));
         Ok(Open::new(
             move |scope: ExecutionScope,
                   flags: fio::OpenFlags,
@@ -124,6 +149,9 @@ where
                 dir.clone().open(scope.clone(), flags, relative_path, server_end.into())
             },
             fio::DirentType::Directory,
+            // TODO(https://fxbug.dev/129636): Remove RIGHT_READABLE when `opendir` no longer
+            // requires READABLE.
+            fio::OpenFlags::DIRECTORY | fio::OpenFlags::RIGHT_READABLE,
         ))
     }
 }
@@ -404,6 +432,7 @@ mod tests {
                 unreachable!();
             },
             fio::DirentType::Directory,
+            fio::OpenFlags::DIRECTORY,
         );
         let mut dict = Dict::<AnyCapability>::new();
         // This string is too long to be a valid fuchsia.io name.
@@ -429,6 +458,7 @@ mod tests {
                 drop(server_end);
             },
             fio::DirentType::Directory,
+            fio::OpenFlags::DIRECTORY,
         );
         let mut dict = Dict::<AnyCapability>::new();
         dict.entries.insert(CAP_KEY.to_string(), Box::new(open));
@@ -469,6 +499,7 @@ mod tests {
                 drop(server_end);
             },
             fio::DirentType::Directory,
+            fio::OpenFlags::DIRECTORY,
         );
         let mut inner_dict = Dict::<AnyCapability>::new();
         inner_dict.entries.insert(CAP_KEY.to_string(), Box::new(open));

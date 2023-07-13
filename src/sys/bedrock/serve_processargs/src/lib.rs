@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 use {
-    cap::{dict::Key, open::Open, AnyCapability, Dict, TryIntoOpenError},
+    cap::{dict::Key, AnyCapability, Dict},
     fuchsia_runtime::{HandleInfo, HandleType},
     futures::channel::mpsc::UnboundedSender,
     futures::future::{BoxFuture, FutureExt},
@@ -90,10 +90,7 @@ pub fn add_to_processargs(
     let dict = visit_map(delivery_map, dict, &mut |cap: AnyCapability, delivery: &Delivery| {
         match delivery {
             Delivery::NamespacedObject(path) => {
-                let open: Open = cap.try_into().map_err(|e| {
-                    DeliveryError::NamespacedObjectTryIntoOpenError { path: path.clone(), err: e }
-                })?;
-                namespace.add_open(open, path).map_err(DeliveryError::NamespaceError)
+                namespace.add(cap, path).map_err(DeliveryError::NamespaceError)
             }
             // TODO: implement namespace entry
             Delivery::NamespaceEntry(_) => todo!(),
@@ -107,7 +104,7 @@ pub fn add_to_processargs(
     // Finally, verify that all dict entries are empty (or empty dictionaries).
     check_empty_dict(&dict)?;
 
-    let (namespace, namespace_fut) = namespace.serve();
+    let (namespace, namespace_fut) = namespace.serve().map_err(DeliveryError::NamespaceError)?;
     processargs.namespace_entries.extend(namespace);
     futures.push(namespace_fut);
 
@@ -134,16 +131,6 @@ pub enum DeliveryError {
 
     #[error("namespace configuration error: `{0}`")]
     NamespaceError(namespace::NamespaceError),
-
-    #[error(
-        "while installing the capability as a namespaced object at `{path}`, \
-        failed to convert it to Open"
-    )]
-    NamespacedObjectTryIntoOpenError {
-        path: cm_types::Path,
-        #[source]
-        err: TryIntoOpenError,
-    },
 }
 
 fn translate_handle(
@@ -234,7 +221,7 @@ mod test_util {
             service.clone().open(scope, flags, path, server_end.into());
         };
 
-        let open = Open::new(open_fn, fio::DirentType::Service);
+        let open = Open::new(open_fn, fio::DirentType::Service, fio::OpenFlags::empty());
 
         (open, Receiver(receiver))
     }
@@ -252,7 +239,7 @@ mod tests {
         fuchsia_zircon as zx,
         fuchsia_zircon::{AsHandleRef, HandleBased, Peered},
         maplit::hashmap,
-        namespace::ignore_not_found as ignore,
+        namespace::{ignore_not_found as ignore, NamespaceError},
         std::str::FromStr,
         test_util::multishot,
     };
@@ -477,6 +464,28 @@ mod tests {
         drop(processargs);
         fut.await;
         Ok(())
+    }
+
+    #[fuchsia::test]
+    async fn test_handle_unsupported_in_namespace() {
+        let (sock0, _sock1) = zx::Socket::create_stream();
+
+        let mut processargs = ProcessArgs::new();
+        let mut dict = Dict::new();
+        dict.entries.insert("stdin".to_string(), sock0.into());
+        let delivery_map = hashmap! {
+            "stdin".to_string() => DeliveryMapEntry::Delivery(
+                Delivery::NamespacedObject(cm_types::Path::from_str("/svc/fuchsia.Normal").unwrap())
+            )
+        };
+
+        assert_matches!(
+            add_to_processargs(dict, &mut processargs, &delivery_map, ignore()).err().unwrap(),
+            DeliveryError::NamespaceError(NamespaceError::TryIntoOpenError {
+                path, ..
+            })
+            if &path == "/svc"
+        );
     }
 
     #[fuchsia::test]

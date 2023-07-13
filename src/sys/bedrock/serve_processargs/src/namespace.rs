@@ -3,35 +3,30 @@
 // found in the LICENSE file.
 
 use {
-    cap::open::Open,
+    cap::{open::Open, AnyCapability, Dict, Remote, TryIntoOpenError},
     cm_types::Path,
-    fidl::endpoints::create_endpoints,
-    fidl_fuchsia_io as fio,
-    fuchsia_zircon::{HandleBased, Status},
+    fuchsia_zircon::HandleBased,
+    futures::stream::FuturesUnordered,
     futures::{
         channel::mpsc::{unbounded, UnboundedSender},
         future::BoxFuture,
-        FutureExt,
+        FutureExt, StreamExt,
     },
     process_builder::NamespaceEntry,
+    std::collections::HashMap,
     std::ffi::CString,
-    std::{collections::HashMap, sync::Arc},
     thiserror::Error,
-    vfs::{
-        directory::entry::DirectoryEntry, directory::helper::DirectlyMutable,
-        directory::immutable::simple as pfs, execution_scope::ExecutionScope,
-    },
 };
-
-type Directory = Arc<pfs::Simple>;
 
 /// A builder object for assembling a program's incoming namespace.
 pub struct Namespace {
     /// Directories that hold namespaced objects.
-    dirs: HashMap<CString, Directory>,
+    dicts: HashMap<CString, Dict>,
 
     /// Path-not-found errors are sent here.
     not_found: UnboundedSender<String>,
+
+    futures: FuturesUnordered<BoxFuture<'static, ()>>,
 
     namespace_checker: NamespaceChecker,
 }
@@ -49,67 +44,79 @@ pub enum NamespaceError {
 
     #[error("cannot install two capabilities at the same namespace path `{0}`")]
     Duplicate(Path),
+
+    #[error(
+        "while installing capabilities within the namespace entry `{path}`, \
+        failed to convert the namespace entry to Open"
+    )]
+    TryIntoOpenError {
+        path: String,
+        #[source]
+        err: TryIntoOpenError,
+    },
 }
 
 impl Namespace {
     pub fn new(not_found: UnboundedSender<String>) -> Self {
         return Namespace {
-            dirs: Default::default(),
+            dicts: Default::default(),
             not_found,
+            futures: FuturesUnordered::new(),
             namespace_checker: NamespaceChecker::new(),
         };
     }
 
-    /// Add an open capability `open` at `path`. As a result, the framework will create a
+    /// Add a capability `cap` at `path`. As a result, the framework will create a
     /// namespace entry at the parent directory of `path`.
-    pub fn add_open(self: &mut Self, open: Open, path: &Path) -> Result<(), NamespaceError> {
+    pub fn add(self: &mut Self, cap: AnyCapability, path: &Path) -> Result<(), NamespaceError> {
         self.namespace_checker
             .add(path)
             .map_err(|_e: ShadowError| NamespaceError::Shadow(path.clone()))?;
 
         let c_str = CString::new(path.dirname().to_string())
             .map_err(|_| NamespaceError::EmbeddedNul(path.dirname().to_string()))?;
-        let service_dir = self.dirs.entry(c_str).or_insert_with(|| {
-            make_dir_with_not_found_logging(path.dirname().clone().into(), self.not_found.clone())
-        });
-        service_dir.clone().add_entry(path.basename(), open.into_remote()).map_err(|e| {
-            if e == Status::ALREADY_EXISTS {
-                return NamespaceError::Duplicate(path.clone());
-            }
-            panic!("unexpected error {e}");
-        })?;
 
+        let dict = self.dicts.entry(c_str).or_insert_with(|| {
+            let (dict, fut) = make_dict_with_not_found_logging(
+                path.dirname().clone().into(),
+                self.not_found.clone(),
+            );
+            self.futures.push(fut);
+            dict
+        });
+        // TODO: we can replace this dance with `try_insert` when
+        // https://github.com/rust-lang/rust/issues/82766 is stabilized.
+        if dict.entries.contains_key(path.basename()) {
+            return Err(NamespaceError::Duplicate(path.clone()));
+        }
+        if let Some(_) = dict.entries.insert(path.basename().to_owned(), cap) {
+            unreachable!("should not find existing entry");
+        }
         Ok(())
     }
 
-    pub fn serve(self: Self) -> (Vec<NamespaceEntry>, BoxFuture<'static, ()>) {
+    pub fn serve(
+        self: Self,
+    ) -> Result<(Vec<NamespaceEntry>, BoxFuture<'static, ()>), NamespaceError> {
         let mut ns = vec![];
-        let scope = ExecutionScope::new();
+        let mut futures = self.futures;
 
-        for (path, dir) in self.dirs {
-            let (client_end, server_end) = create_endpoints::<fio::DirectoryMarker>();
-            dir.clone().open(
-                scope.clone(),
-                // TODO(https://fxbug.dev/129636): Remove RIGHT_READABLE when `opendir` no longer
-                // requires READABLE.
-                fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::DIRECTORY,
-                vfs::path::Path::dot(),
-                server_end.into_channel().into(),
-            );
+        for (path, dict) in self.dicts {
+            let dict: AnyCapability = Box::new(dict);
+            let open: Open = dict.try_into().map_err(|e| NamespaceError::TryIntoOpenError {
+                path: path.to_string_lossy().into_owned(),
+                err: e,
+            })?;
+            let (client_end, fut) = Box::new(open).to_zx_handle();
 
-            ns.push(NamespaceEntry { path, directory: client_end });
+            ns.push(NamespaceEntry { path, directory: client_end.into() });
+            if let Some(fut) = fut {
+                futures.push(fut);
+            }
         }
 
-        // If this future is dropped, stop serving the namespace.
-        let guard = scopeguard::guard(scope.clone(), move |scope| {
-            scope.shutdown();
-        });
-        let fut = async move {
-            let _guard = guard;
-            scope.wait().await;
-        }
-        .boxed();
-        (ns, fut)
+        let fut = async move { while let Some(()) = futures.next().await {} };
+        Ok((ns, fut.boxed()))
     }
 }
 
@@ -119,21 +126,25 @@ pub fn ignore_not_found() -> UnboundedSender<String> {
     sender
 }
 
-fn make_dir_with_not_found_logging(
+fn make_dict_with_not_found_logging(
     root_path: String,
     not_found: UnboundedSender<String>,
-) -> Arc<pfs::Simple> {
-    let new_dir = pfs::simple();
+) -> (Dict, BoxFuture<'static, ()>) {
+    let (entry_not_found, mut entry_not_found_receiver) = unbounded();
+    let new_dict = Dict::new_with_not_found(entry_not_found);
     let not_found = not_found.clone();
     // Grab a copy of the directory path, it will be needed if we log a
     // failed open request.
-    new_dir.clone().set_not_found_handler(Box::new(move |path| {
-        let requested_path = format!("{}/{}", root_path, path);
-        // Ignore the result of sending. The receiver is free to break away to ignore all the
-        // not-found errors.
-        let _ = not_found.unbounded_send(requested_path);
-    }));
-    new_dir
+    let fut = async move {
+        while let Some(path) = entry_not_found_receiver.next().await {
+            let requested_path = format!("{}/{}", root_path, path);
+            // Ignore the result of sending. The receiver is free to break away to ignore all the
+            // not-found errors.
+            let _ = not_found.unbounded_send(requested_path);
+        }
+    }
+    .boxed();
+    (new_dict, fut)
 }
 
 enum TreeNode {
@@ -231,18 +242,18 @@ mod tests {
         assert_matches!(paths_valid(vec!["/a", "/b", "/c"]), Ok(()));
     }
 
-    fn open_cap() -> Open {
+    fn open_cap() -> AnyCapability {
         let (open, _receiver) = multishot();
-        open
+        Box::new(open)
     }
 
     #[fuchsia::test]
     fn test_duplicate() {
         let mut namespace = Namespace::new(ignore_not_found());
-        namespace.add_open(open_cap(), &Path::from_str("/svc/a").unwrap()).expect("");
+        namespace.add(open_cap(), &Path::from_str("/svc/a").unwrap()).expect("");
         // Adding again will fail.
         assert_matches!(
-            namespace.add_open(open_cap(), &Path::from_str("/svc/a").unwrap()),
+            namespace.add(open_cap(), &Path::from_str("/svc/a").unwrap()),
             Err(NamespaceError::Duplicate(path))
             if path.as_str() == "/svc/a"
         );
@@ -251,7 +262,7 @@ mod tests {
     #[fuchsia::test]
     async fn test_empty() {
         let namespace = Namespace::new(ignore_not_found());
-        let (ns, fut) = namespace.serve();
+        let (ns, fut) = namespace.serve().unwrap();
         let fut = fasync::Task::spawn(fut);
         assert_eq!(ns.len(), 0);
         fut.await;
@@ -262,8 +273,8 @@ mod tests {
         let (open, receiver) = multishot();
 
         let mut namespace = Namespace::new(ignore_not_found());
-        namespace.add_open(open.into(), &Path::from_str("/svc/a").unwrap()).unwrap();
-        let (mut ns, fut) = namespace.serve();
+        namespace.add(Box::new(open), &Path::from_str("/svc/a").unwrap()).unwrap();
+        let (mut ns, fut) = namespace.serve().unwrap();
         let fut = fasync::Task::spawn(fut);
 
         assert_eq!(ns.len(), 1);
@@ -293,9 +304,9 @@ mod tests {
     #[fuchsia::test]
     async fn test_two_senders_in_same_namespace_entry() {
         let mut namespace = Namespace::new(ignore_not_found());
-        namespace.add_open(open_cap(), &Path::from_str("/svc/a").unwrap()).unwrap();
-        namespace.add_open(open_cap(), &Path::from_str("/svc/b").unwrap()).unwrap();
-        let (mut ns, fut) = namespace.serve();
+        namespace.add(open_cap(), &Path::from_str("/svc/a").unwrap()).unwrap();
+        namespace.add(open_cap(), &Path::from_str("/svc/b").unwrap()).unwrap();
+        let (mut ns, fut) = namespace.serve().unwrap();
         let fut = fasync::Task::spawn(fut);
 
         assert_eq!(ns.len(), 1);
@@ -319,9 +330,9 @@ mod tests {
     #[fuchsia::test]
     async fn test_two_senders_in_different_namespace_entries() {
         let mut namespace = Namespace::new(ignore_not_found());
-        namespace.add_open(open_cap(), &Path::from_str("/svc1/a").unwrap()).unwrap();
-        namespace.add_open(open_cap(), &Path::from_str("/svc2/b").unwrap()).unwrap();
-        let (ns, fut) = namespace.serve();
+        namespace.add(open_cap(), &Path::from_str("/svc1/a").unwrap()).unwrap();
+        namespace.add(open_cap(), &Path::from_str("/svc2/b").unwrap()).unwrap();
+        let (ns, fut) = namespace.serve().unwrap();
         let fut = fasync::Task::spawn(fut);
 
         assert_eq!(ns.len(), 2);
@@ -355,8 +366,8 @@ mod tests {
     async fn test_not_found() {
         let (not_found_sender, mut not_found_receiver) = unbounded();
         let mut namespace = Namespace::new(not_found_sender);
-        namespace.add_open(open_cap(), &Path::from_str("/svc/a").unwrap()).unwrap();
-        let (mut ns, fut) = namespace.serve();
+        namespace.add(open_cap(), &Path::from_str("/svc/a").unwrap()).unwrap();
+        let (mut ns, fut) = namespace.serve().unwrap();
         let fut = fasync::Task::spawn(fut);
 
         assert_eq!(ns.len(), 1);
