@@ -7,10 +7,13 @@
 #include <fuchsia/io/cpp/fidl.h>
 #include <fuchsia/sys2/cpp/fidl.h>
 #include <fuchsia/vulkan/loader/cpp/fidl.h>
+#include <lib/async-loop/cpp/loop.h>
+#include <lib/async-loop/default.h>
 #include <lib/fdio/directory.h>
 #include <lib/fdio/namespace.h>
 #include <lib/fit/defer.h>
 #include <lib/fzl/vmo-mapper.h>
+#include <lib/sys/component/cpp/testing/realm_builder.h>
 #include <lib/zx/vmo.h>
 #include <zircon/status.h>
 #include <zircon/types.h>
@@ -28,10 +31,27 @@ zx_status_t ForceWaitForIdle(fuchsia::vulkan::loader::LoaderSyncPtr& loader) {
   return loader->Get(kIcdFilename, &vmo);
 }
 
-TEST(VulkanLoader, ManifestLoad) {
-  fuchsia::vulkan::loader::LoaderSyncPtr loader;
-  EXPECT_EQ(ZX_OK, fdio_service_connect("/svc/fuchsia.vulkan.loader.Loader",
-                                        loader.NewRequest().TakeChannel().release()));
+class VulkanLoader : public testing::Test {
+ public:
+  void SetUp() override {
+    loop_.StartThread();
+    auto builder = component_testing::RealmBuilder::CreateFromRelativeUrl("#meta/test_realm.cm");
+
+    realm_ = builder.Build(loop_.dispatcher());
+  }
+
+  void TearDown() override { loop_.Shutdown(); }
+
+  component_testing::RealmRoot& realm() { return *realm_; }
+
+ protected:
+  async::Loop loop_{&kAsyncLoopConfigNoAttachToCurrentThread};
+  std::optional<component_testing::RealmRoot> realm_;
+};
+
+TEST_F(VulkanLoader, ManifestLoad) {
+  fuchsia::vulkan::loader::LoaderSyncPtr loader =
+      realm().component().ConnectSync<fuchsia::vulkan::loader::Loader>();
 
   zx::vmo vmo_out;
   // manifest.json remaps this to bin/pkg-server.
@@ -48,10 +68,9 @@ TEST(VulkanLoader, ManifestLoad) {
 
 // Check that writes to one VMO returned by the server will not modify a separate VMO returned by
 // the service.
-TEST(VulkanLoader, VmosIndependent) {
-  fuchsia::vulkan::loader::LoaderSyncPtr loader;
-  EXPECT_EQ(ZX_OK, fdio_service_connect("/svc/fuchsia.vulkan.loader.Loader",
-                                        loader.NewRequest().TakeChannel().release()));
+TEST_F(VulkanLoader, VmosIndependent) {
+  fuchsia::vulkan::loader::LoaderSyncPtr loader =
+      realm().component().ConnectSync<fuchsia::vulkan::loader::Loader>();
 
   zx::vmo vmo_out;
   // manifest.json remaps this to bin/pkg-server.
@@ -89,10 +108,9 @@ TEST(VulkanLoader, VmosIndependent) {
   EXPECT_EQ(original_value, *static_cast<uint8_t*>(mapper2.start()));
 }
 
-TEST(VulkanLoader, DeviceFs) {
-  fuchsia::vulkan::loader::LoaderSyncPtr loader;
-  ASSERT_EQ(ZX_OK, fdio_service_connect("/svc/fuchsia.vulkan.loader.Loader",
-                                        loader.NewRequest().TakeChannel().release()));
+TEST_F(VulkanLoader, DeviceFs) {
+  fuchsia::vulkan::loader::LoaderSyncPtr loader =
+      realm().component().ConnectSync<fuchsia::vulkan::loader::Loader>();
 
   fidl::InterfaceHandle<fuchsia::io::Directory> dir;
   ASSERT_EQ(ZX_OK, loader->ConnectToDeviceFs(dir.NewRequest().TakeChannel()));
@@ -109,10 +127,9 @@ TEST(VulkanLoader, DeviceFs) {
   EXPECT_EQ(5u, query_result.response().simple_result());
 }
 
-TEST(VulkanLoader, Features) {
-  fuchsia::vulkan::loader::LoaderSyncPtr loader;
-  EXPECT_EQ(ZX_OK, fdio_service_connect("/svc/fuchsia.vulkan.loader.Loader",
-                                        loader.NewRequest().TakeChannel().release()));
+TEST_F(VulkanLoader, Features) {
+  fuchsia::vulkan::loader::LoaderSyncPtr loader =
+      realm().component().ConnectSync<fuchsia::vulkan::loader::Loader>();
 
   fuchsia::vulkan::loader::Features features;
   EXPECT_EQ(ZX_OK, loader->GetSupportedFeatures(&features));
@@ -123,10 +140,9 @@ TEST(VulkanLoader, Features) {
   EXPECT_EQ(kExpectedFeatures, features);
 }
 
-TEST(VulkanLoader, ManifestFs) {
-  fuchsia::vulkan::loader::LoaderSyncPtr loader;
-  EXPECT_EQ(ZX_OK, fdio_service_connect("/svc/fuchsia.vulkan.loader.Loader",
-                                        loader.NewRequest().TakeChannel().release()));
+TEST_F(VulkanLoader, ManifestFs) {
+  fuchsia::vulkan::loader::LoaderSyncPtr loader =
+      realm().component().ConnectSync<fuchsia::vulkan::loader::Loader>();
 
   fidl::InterfaceHandle<fuchsia::io::Directory> dir;
   EXPECT_EQ(ZX_OK, loader->ConnectToManifestFs(
@@ -149,10 +165,9 @@ TEST(VulkanLoader, ManifestFs) {
   close(dir_fd);
 }
 
-TEST(VulkanLoader, GoldfishSyncDeviceFs) {
-  fuchsia::vulkan::loader::LoaderSyncPtr loader;
-  EXPECT_EQ(ZX_OK, fdio_service_connect("/svc/fuchsia.vulkan.loader.Loader",
-                                        loader.NewRequest().TakeChannel().release()));
+TEST_F(VulkanLoader, GoldfishSyncDeviceFs) {
+  fuchsia::vulkan::loader::LoaderSyncPtr loader =
+      realm().component().ConnectSync<fuchsia::vulkan::loader::Loader>();
 
   fidl::InterfaceHandle<fuchsia::io::Directory> dir;
   EXPECT_EQ(ZX_OK, loader->ConnectToDeviceFs(dir.NewRequest().TakeChannel()));
@@ -178,15 +193,13 @@ TEST(VulkanLoader, GoldfishSyncDeviceFs) {
   }
 }
 
-TEST(VulkanLoader, DebugFilesystems) {
-  fuchsia::vulkan::loader::LoaderSyncPtr loader;
-  EXPECT_EQ(ZX_OK, fdio_service_connect("/svc/fuchsia.vulkan.loader.Loader",
-                                        loader.NewRequest().TakeChannel().release()));
+TEST_F(VulkanLoader, DebugFilesystems) {
+  fuchsia::vulkan::loader::LoaderSyncPtr loader =
+      realm().component().ConnectSync<fuchsia::vulkan::loader::Loader>();
   ForceWaitForIdle(loader);
 
-  fuchsia::sys2::RealmQuerySyncPtr query;
-  EXPECT_EQ(ZX_OK, fdio_service_connect("/svc/fuchsia.sys2.RealmQuery",
-                                        query.NewRequest().TakeChannel().release()));
+  fuchsia::sys2::RealmQuerySyncPtr query =
+      realm().component().ConnectSync<fuchsia::sys2::RealmQuery>();
 
   fuchsia::sys2::RealmQuery_Open_Result result;
   fidl::InterfaceHandle<fuchsia::io::Node> dir;

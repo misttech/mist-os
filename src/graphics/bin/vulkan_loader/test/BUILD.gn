@@ -19,9 +19,12 @@ executable("test_bin") {
     "//sdk/fidl/fuchsia.sys2:fuchsia.sys2_hlcpp",
     "//sdk/fidl/fuchsia.vulkan.loader:fuchsia.vulkan.loader_hlcpp",
     "//sdk/lib/fdio",
+    "//sdk/lib/sys/component/cpp/testing:cpp",
     "//src/lib/fxl",
     "//src/lib/fxl/test:gtest_main",
     "//third_party/googletest:gtest",
+    "//zircon/system/ulib/async-loop:async-loop-cpp",
+    "//zircon/system/ulib/async-loop:async-loop-default",
     "//zircon/system/ulib/fzl",
   ]
 }
@@ -68,12 +71,6 @@ executable("pkg-server-bin") {
   ]
 }
 
-fuchsia_component("vulkan_loader_test_driver") {
-  testonly = true
-  manifest = "meta/vulkan_loader_test_driver.cml"
-  deps = [ ":test_bin" ]
-}
-
 fuchsia_component("vulkan_loader_test_lib_provider") {
   testonly = true
   manifest = "meta/vulkan_loader_test_lib_provider.cml"
@@ -83,6 +80,7 @@ fuchsia_component("vulkan_loader_test_lib_provider") {
 fuchsia_component("vulkan_loader_test") {
   testonly = true
   manifest = "meta/vulkan_loader_test.cml"
+  deps = [ ":test_bin" ]
 }
 
 fuchsia_component("vulkan_loader_unittest_driver") {
@@ -112,6 +110,11 @@ fuchsia_component("test_vulkan_driver") {
   deps = [ ":metadata" ]
 }
 
+fuchsia_component("test_realm") {
+  testonly = true
+  manifest = "meta/test_realm.cml"
+}
+
 fuchsia_test_package("vulkan_loader_tests") {
   test_components = [
     ":vulkan_loader_test",
@@ -119,8 +122,8 @@ fuchsia_test_package("vulkan_loader_tests") {
   ]
   deps = [
     ":manifest-json",
+    ":test_realm",
     ":test_vulkan_driver",
-    ":vulkan_loader_test_driver",
     ":vulkan_loader_test_lib_provider",
     ":vulkan_loader_unittest_driver",
     "..:vulkan_loader_cmp",
