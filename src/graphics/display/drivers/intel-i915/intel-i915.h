@@ -108,7 +108,7 @@ class Controller : public DeviceType,
   void DisplayControllerImplReleaseImage(image_t* image);
   config_check_result_t DisplayControllerImplCheckConfiguration(
       const display_config_t** banjo_display_configs, size_t display_config_count,
-      uint32_t** layer_cfg_result, size_t* layer_cfg_result_count);
+      client_composition_opcode_t** layer_cfg_result, size_t* layer_cfg_result_count);
   void DisplayControllerImplApplyConfiguration(const display_config_t** banjo_display_configs,
                                                size_t display_config_count,
                                                const config_stamp_t* banjo_config_stamp);
@@ -263,7 +263,8 @@ class Controller : public DeviceType,
   // Validates that a basic layer configuration can be supported for the
   // given modes of the displays.
   bool CheckDisplayLimits(cpp20::span<const display_config_t*> banjo_display_configs,
-                          uint32_t** layer_cfg_results) __TA_REQUIRES(display_lock_);
+                          client_composition_opcode_t** layer_cfg_results)
+      __TA_REQUIRES(display_lock_);
 
   bool CalculatePipeAllocation(cpp20::span<const display_config_t*> banjo_display_configs,
                                cpp20::span<display::DisplayId> display_allocated_to_pipe)

@@ -111,9 +111,10 @@ TEST_F(GoldfishDisplayTest, CheckConfigMultiLayer) {
   EXPECT_OK(res);
   for (size_t j = 0; j < kNumDisplays; j++) {
     EXPECT_EQ(kMaxLayerCount, result_count_[j]);
-    EXPECT_EQ(CLIENT_MERGE_BASE, results_[j][0] & CLIENT_MERGE_BASE);
+    EXPECT_EQ(CLIENT_COMPOSITION_OPCODE_MERGE_BASE,
+              results_[j][0] & CLIENT_COMPOSITION_OPCODE_MERGE_BASE);
     for (unsigned i = 1; i < kMaxLayerCount; i++) {
-      EXPECT_EQ(CLIENT_MERGE_SRC, results_[j][i]);
+      EXPECT_EQ(CLIENT_COMPOSITION_OPCODE_MERGE_SRC, results_[j][i]);
     }
   }
 }
@@ -130,7 +131,8 @@ TEST_F(GoldfishDisplayTest, CheckConfigLayerColor) {
   EXPECT_OK(res);
   for (size_t i = 0; i < kNumDisplays; i++) {
     EXPECT_EQ(1u, result_count_[i]);
-    EXPECT_EQ(CLIENT_USE_PRIMARY, results_[i][0] & CLIENT_USE_PRIMARY);
+    EXPECT_EQ(CLIENT_COMPOSITION_OPCODE_USE_PRIMARY,
+              results_[i][0] & CLIENT_COMPOSITION_OPCODE_USE_PRIMARY);
   }
 }
 
@@ -146,7 +148,8 @@ TEST_F(GoldfishDisplayTest, CheckConfigLayerCursor) {
   EXPECT_OK(res);
   for (size_t i = 0; i < kNumDisplays; i++) {
     EXPECT_EQ(1u, result_count_[i]);
-    EXPECT_EQ(CLIENT_USE_PRIMARY, results_[i][0] & CLIENT_USE_PRIMARY);
+    EXPECT_EQ(CLIENT_COMPOSITION_OPCODE_USE_PRIMARY,
+              results_[i][0] & CLIENT_COMPOSITION_OPCODE_USE_PRIMARY);
   }
 }
 
@@ -212,7 +215,7 @@ TEST_F(GoldfishDisplayTest, CheckConfigLayerDestFrame) {
   EXPECT_OK(res);
   for (size_t i = 0; i < kNumDisplays; i++) {
     EXPECT_EQ(1u, result_count_[i]);
-    EXPECT_EQ(CLIENT_FRAME_SCALE, results_[i][0]);
+    EXPECT_EQ(CLIENT_COMPOSITION_OPCODE_FRAME_SCALE, results_[i][0]);
   }
 }
 
@@ -243,7 +246,7 @@ TEST_F(GoldfishDisplayTest, CheckConfigLayerSrcFrame) {
   EXPECT_OK(res);
   for (size_t i = 0; i < kNumDisplays; i++) {
     EXPECT_EQ(1u, result_count_[i]);
-    EXPECT_EQ(CLIENT_SRC_FRAME, results_[i][0]);
+    EXPECT_EQ(CLIENT_COMPOSITION_OPCODE_SRC_FRAME, results_[i][0]);
   }
 }
 
@@ -275,7 +278,7 @@ TEST_F(GoldfishDisplayTest, CheckConfigLayerAlpha) {
   EXPECT_OK(res);
   for (size_t i = 0; i < kNumDisplays; i++) {
     EXPECT_EQ(1u, result_count_[i]);
-    EXPECT_EQ(CLIENT_ALPHA, results_[i][0]);
+    EXPECT_EQ(CLIENT_COMPOSITION_OPCODE_ALPHA, results_[i][0]);
   }
 }
 
@@ -307,7 +310,7 @@ TEST_F(GoldfishDisplayTest, CheckConfigLayerTransform) {
   EXPECT_OK(res);
   for (size_t i = 0; i < kNumDisplays; i++) {
     EXPECT_EQ(1u, result_count_[i]);
-    EXPECT_EQ(CLIENT_TRANSFORM, results_[i][0]);
+    EXPECT_EQ(CLIENT_COMPOSITION_OPCODE_TRANSFORM, results_[i][0]);
   }
 }
 
@@ -341,7 +344,7 @@ TEST_F(GoldfishDisplayTest, CheckConfigLayerColorCoversion) {
     EXPECT_EQ(0u, result_count_[i]);
     // TODO(payamm): For now, driver will pretend it supports color conversion
     // EXPECT_EQ(1, result_count_[i]);
-    // EXPECT_EQ(CLIENT_COLOR_CONVERSION, results_[i][0]);
+    // EXPECT_EQ(CLIENT_COMPOSITION_OPCODE_COLOR_CONVERSION, results_[i][0]);
   }
 }
 
@@ -375,13 +378,17 @@ TEST_F(GoldfishDisplayTest, CheckConfigAllFeatures) {
   EXPECT_OK(res);
   for (size_t i = 0; i < kNumDisplays; i++) {
     EXPECT_EQ(1u, result_count_[i]);
-    EXPECT_EQ(CLIENT_FRAME_SCALE, results_[i][0] & CLIENT_FRAME_SCALE);
-    EXPECT_EQ(CLIENT_SRC_FRAME, results_[i][0] & CLIENT_SRC_FRAME);
-    EXPECT_EQ(CLIENT_ALPHA, results_[i][0] & CLIENT_ALPHA);
+    EXPECT_EQ(CLIENT_COMPOSITION_OPCODE_FRAME_SCALE,
+              results_[i][0] & CLIENT_COMPOSITION_OPCODE_FRAME_SCALE);
+    EXPECT_EQ(CLIENT_COMPOSITION_OPCODE_SRC_FRAME,
+              results_[i][0] & CLIENT_COMPOSITION_OPCODE_SRC_FRAME);
+    EXPECT_EQ(CLIENT_COMPOSITION_OPCODE_ALPHA, results_[i][0] & CLIENT_COMPOSITION_OPCODE_ALPHA);
 
-    EXPECT_EQ(CLIENT_TRANSFORM, results_[i][0] & CLIENT_TRANSFORM);
+    EXPECT_EQ(CLIENT_COMPOSITION_OPCODE_TRANSFORM,
+              results_[i][0] & CLIENT_COMPOSITION_OPCODE_TRANSFORM);
     // TODO(payamm): Driver will pretend it supports color conversion for now
-    // EXPECT_EQ(CLIENT_COLOR_CONVERSION, results_[i][0] & CLIENT_COLOR_CONVERSION);
+    // EXPECT_EQ(CLIENT_COMPOSITION_OPCODE_COLOR_CONVERSION, results_[i][0] &
+    // CLIENT_COMPOSITION_OPCODE_COLOR_CONVERSION);
   }
 }
 

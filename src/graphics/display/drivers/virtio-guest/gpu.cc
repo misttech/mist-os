@@ -276,8 +276,8 @@ void GpuDevice::DisplayControllerImplReleaseImage(image_t* image) {
 }
 
 config_check_result_t GpuDevice::DisplayControllerImplCheckConfiguration(
-    const display_config_t** display_configs, size_t display_count, uint32_t** layer_cfg_results,
-    size_t* layer_cfg_result_count) {
+    const display_config_t** display_configs, size_t display_count,
+    client_composition_opcode_t** layer_cfg_results, size_t* layer_cfg_result_count) {
   if (display_count != 1) {
     ZX_DEBUG_ASSERT(display_count == 0);
     return CONFIG_CHECK_RESULT_OK;
@@ -303,9 +303,9 @@ config_check_result_t GpuDevice::DisplayControllerImplCheckConfiguration(
               display_configs[0]->cc_flags == 0 && layer->alpha_mode == ALPHA_DISABLE;
   }
   if (!success) {
-    layer_cfg_results[0][0] = CLIENT_MERGE_BASE;
+    layer_cfg_results[0][0] = CLIENT_COMPOSITION_OPCODE_MERGE_BASE;
     for (unsigned i = 1; i < display_configs[0]->layer_count; i++) {
-      layer_cfg_results[0][i] = CLIENT_MERGE_SRC;
+      layer_cfg_results[0][i] = CLIENT_COMPOSITION_OPCODE_MERGE_SRC;
     }
     layer_cfg_result_count[0] = display_configs[0]->layer_count;
   }

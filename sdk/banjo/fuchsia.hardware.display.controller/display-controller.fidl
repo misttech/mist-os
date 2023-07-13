@@ -344,7 +344,16 @@ type ConfigCheckResult = strict enum : uint32 {
     UNSUPPORTED_MODES = 2;
 };
 
-type Client = strict enum : uint32 {
+/// Contains client operations needed on a Layer to make it supported by
+/// the display device. There may be multiple operations to be applied on a
+/// single Layer.
+///
+/// Individual bit positions map to the values of the FIDL enum
+/// [`fuchsia.hardware.display/ClientCompositionOpcode`].
+//
+// TODO(fxbug.dev/130427): The type (bitfield) doesn't match the
+// corresponding type in FIDL which is an enum.
+type ClientCompositionOpcode = strict bits : uint32 {
     /// The client should convert the corresponding layer to a primary layer.
     USE_PRIMARY = 0x1;
     /// The client should compose all layers with MERGE_BASE and MERGE_SRC into a new,
@@ -487,7 +496,7 @@ closed protocol DisplayControllerImpl {
     }) -> (struct {
         display_cfg_result ConfigCheckResult;
         @callee_allocated
-        layer_cfg_result vector<uint32>:MAX;
+        layer_cfg_result vector<ClientCompositionOpcode>:MAX;
     });
 
     /// Applies the configuration.

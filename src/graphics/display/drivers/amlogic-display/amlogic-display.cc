@@ -370,8 +370,8 @@ void AmlogicDisplay::DisplayControllerImplReleaseImage(image_t* image) {
 
 // part of ZX_PROTOCOL_DISPLAY_CONTROLLER_IMPL ops
 config_check_result_t AmlogicDisplay::DisplayControllerImplCheckConfiguration(
-    const display_config_t** display_configs, size_t display_count, uint32_t** layer_cfg_results,
-    size_t* layer_cfg_result_count) {
+    const display_config_t** display_configs, size_t display_count,
+    client_composition_opcode_t** layer_cfg_results, size_t* layer_cfg_result_count) {
   if (display_count != 1) {
     ZX_DEBUG_ASSERT(display_count == 0);
     return CONFIG_CHECK_RESULT_OK;
@@ -425,7 +425,7 @@ config_check_result_t AmlogicDisplay::DisplayControllerImplCheckConfiguration(
 
     if (layer.alpha_mode == ALPHA_PREMULTIPLIED) {
       // we don't support pre-multiplied alpha mode
-      layer_cfg_results[0][0] |= CLIENT_ALPHA;
+      layer_cfg_results[0][0] |= CLIENT_COMPOSITION_OPCODE_ALPHA;
     }
     success = display_configs[0]->layer_list[0]->type == LAYER_TYPE_PRIMARY &&
               layer.transform_mode == FRAME_TRANSFORM_IDENTITY && layer.image.width == width &&
@@ -434,9 +434,9 @@ config_check_result_t AmlogicDisplay::DisplayControllerImplCheckConfiguration(
               memcmp(&layer.src_frame, &frame, sizeof(frame_t)) == 0;
   }
   if (!success) {
-    layer_cfg_results[0][0] = CLIENT_MERGE_BASE;
+    layer_cfg_results[0][0] = CLIENT_COMPOSITION_OPCODE_MERGE_BASE;
     for (unsigned i = 1; i < display_configs[0]->layer_count; i++) {
-      layer_cfg_results[0][i] = CLIENT_MERGE_SRC;
+      layer_cfg_results[0][i] = CLIENT_COMPOSITION_OPCODE_MERGE_SRC;
     }
   }
   return CONFIG_CHECK_RESULT_OK;

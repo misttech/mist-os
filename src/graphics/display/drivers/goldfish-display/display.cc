@@ -482,8 +482,8 @@ void Display::DisplayControllerImplReleaseImage(image_t* image) {
 }
 
 config_check_result_t Display::DisplayControllerImplCheckConfiguration(
-    const display_config_t** display_configs, size_t display_count, uint32_t** layer_cfg_results,
-    size_t* layer_cfg_result_count) {
+    const display_config_t** display_configs, size_t display_count,
+    client_composition_opcode_t** layer_cfg_results, size_t* layer_cfg_result_count) {
   if (display_count == 0) {
     return CONFIG_CHECK_RESULT_OK;
   }
@@ -505,7 +505,7 @@ config_check_result_t Display::DisplayControllerImplCheckConfiguration(
       if (display_configs[i]->layer_list[0]->type != LAYER_TYPE_PRIMARY) {
         // We only support PRIMARY layer. Notify client to convert layer to
         // primary type.
-        layer_cfg_results[i][0] |= CLIENT_USE_PRIMARY;
+        layer_cfg_results[i][0] |= CLIENT_COMPOSITION_OPCODE_USE_PRIMARY;
         layer_cfg_result_count[i] = 1;
       } else {
         primary_layer_t* layer = &display_configs[i]->layer_list[0]->cfg.primary;
@@ -526,20 +526,20 @@ config_check_result_t Display::DisplayControllerImplCheckConfiguration(
         if (memcmp(&layer->dest_frame, &dest_frame, sizeof(frame_t)) != 0) {
           // TODO(fxbug.dev/36222): Need to provide proper flag to indicate driver only
           // accepts full screen dest frame.
-          layer_cfg_results[i][0] |= CLIENT_FRAME_SCALE;
+          layer_cfg_results[i][0] |= CLIENT_COMPOSITION_OPCODE_FRAME_SCALE;
         }
         if (memcmp(&layer->src_frame, &src_frame, sizeof(frame_t)) != 0) {
-          layer_cfg_results[i][0] |= CLIENT_SRC_FRAME;
+          layer_cfg_results[i][0] |= CLIENT_COMPOSITION_OPCODE_SRC_FRAME;
         }
 
         if (layer->alpha_mode != ALPHA_DISABLE) {
           // Alpha is not supported.
-          layer_cfg_results[i][0] |= CLIENT_ALPHA;
+          layer_cfg_results[i][0] |= CLIENT_COMPOSITION_OPCODE_ALPHA;
         }
 
         if (layer->transform_mode != FRAME_TRANSFORM_IDENTITY) {
           // Transformation is not supported.
-          layer_cfg_results[i][0] |= CLIENT_TRANSFORM;
+          layer_cfg_results[i][0] |= CLIENT_COMPOSITION_OPCODE_TRANSFORM;
         }
 
         // Check if any changes to the base layer were required.
@@ -549,9 +549,9 @@ config_check_result_t Display::DisplayControllerImplCheckConfiguration(
       }
       // If there is more than one layer, the rest need to be merged into the base layer.
       if (layer_count > 1) {
-        layer_cfg_results[i][0] |= CLIENT_MERGE_BASE;
+        layer_cfg_results[i][0] |= CLIENT_COMPOSITION_OPCODE_MERGE_BASE;
         for (unsigned j = 1; j < layer_count; j++) {
-          layer_cfg_results[i][j] |= CLIENT_MERGE_SRC;
+          layer_cfg_results[i][j] |= CLIENT_COMPOSITION_OPCODE_MERGE_SRC;
         }
         layer_cfg_result_count[i] = layer_count;
       }

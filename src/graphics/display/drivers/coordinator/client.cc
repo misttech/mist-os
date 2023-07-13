@@ -1016,9 +1016,11 @@ bool Client::CheckConfig(fhd::wire::ConfigResult* res,
   // comments to make sure that any change of type Client in
   // //sdk/banjo/fuchsia.hardware.display.controller/display-controller.fidl
   // will cause the definition of `kAllErrors` to change as well.
-  constexpr uint32_t kAllErrors = CLIENT_USE_PRIMARY | CLIENT_MERGE_BASE | CLIENT_MERGE_SRC |
-                                  CLIENT_FRAME_SCALE | CLIENT_SRC_FRAME | CLIENT_TRANSFORM |
-                                  CLIENT_COLOR_CONVERSION | CLIENT_ALPHA;
+  constexpr uint32_t kAllErrors =
+      CLIENT_COMPOSITION_OPCODE_USE_PRIMARY | CLIENT_COMPOSITION_OPCODE_MERGE_BASE |
+      CLIENT_COMPOSITION_OPCODE_MERGE_SRC | CLIENT_COMPOSITION_OPCODE_FRAME_SCALE |
+      CLIENT_COMPOSITION_OPCODE_SRC_FRAME | CLIENT_COMPOSITION_OPCODE_TRANSFORM |
+      CLIENT_COMPOSITION_OPCODE_COLOR_CONVERSION | CLIENT_COMPOSITION_OPCODE_ALPHA;
 
   layer_idx = 0;
   for (auto& display_config : configs_) {
@@ -1030,13 +1032,13 @@ bool Client::CheckConfig(fhd::wire::ConfigResult* res,
     for (auto& layer_node : display_config.pending_layers_) {
       uint32_t err = kAllErrors & layer_cfg_results[layer_idx];
       // Fixup the error flags if the driver impl incorrectly set multiple MERGE_BASEs
-      if (err & CLIENT_MERGE_BASE) {
+      if (err & CLIENT_COMPOSITION_OPCODE_MERGE_BASE) {
         if (seen_base) {
-          err &= ~CLIENT_MERGE_BASE;
-          err |= CLIENT_MERGE_SRC;
+          err &= ~CLIENT_COMPOSITION_OPCODE_MERGE_BASE;
+          err |= CLIENT_COMPOSITION_OPCODE_MERGE_SRC;
         } else {
           seen_base = true;
-          err &= ~CLIENT_MERGE_SRC;
+          err &= ~CLIENT_COMPOSITION_OPCODE_MERGE_SRC;
         }
       }
 
@@ -1817,49 +1819,37 @@ ClientProxy::~ClientProxy() {
 
 }  // namespace display
 
-// Banjo C macros and Fidl C++ enum member names collide. Some trickery is required.
+// Checks the FIDL ClientCompositionOpcode enum matches the corresponding bits
+// in banjo ClientCompositionOpcode bitfield.
+//
+// TODO(fxbug.dev/130427): In the short term, instead of checking this in
+// Coordinator, a bridging type should be used for conversion of the types. In
+// the long term, these two types should be unified.
 namespace {
 
-constexpr auto banjo_CLIENT_USE_PRIMARY = CLIENT_USE_PRIMARY;
-constexpr auto banjo_CLIENT_MERGE_BASE = CLIENT_MERGE_BASE;
-constexpr auto banjo_CLIENT_MERGE_SRC = CLIENT_MERGE_SRC;
-constexpr auto banjo_CLIENT_FRAME_SCALE = CLIENT_FRAME_SCALE;
-constexpr auto banjo_CLIENT_SRC_FRAME = CLIENT_SRC_FRAME;
-constexpr auto banjo_CLIENT_TRANSFORM = CLIENT_TRANSFORM;
-constexpr auto banjo_CLIENT_COLOR_CONVERSION = CLIENT_COLOR_CONVERSION;
-constexpr auto banjo_CLIENT_ALPHA = CLIENT_ALPHA;
-#undef CLIENT_USE_PRIMARY
-#undef CLIENT_MERGE_BASE
-#undef CLIENT_MERGE_SRC
-#undef CLIENT_FRAME_SCALE
-#undef CLIENT_SRC_FRAME
-#undef CLIENT_TRANSFORM
-#undef CLIENT_COLOR_CONVERSION
-#undef CLIENT_ALPHA
-
 static_assert((1 << static_cast<int>(fhd::wire::ClientCompositionOpcode::kClientUsePrimary)) ==
-                  banjo_CLIENT_USE_PRIMARY,
+                  CLIENT_COMPOSITION_OPCODE_USE_PRIMARY,
               "Const mismatch");
 static_assert((1 << static_cast<int>(fhd::wire::ClientCompositionOpcode::kClientMergeBase)) ==
-                  banjo_CLIENT_MERGE_BASE,
+                  CLIENT_COMPOSITION_OPCODE_MERGE_BASE,
               "Const mismatch");
 static_assert((1 << static_cast<int>(fhd::wire::ClientCompositionOpcode::kClientMergeSrc)) ==
-                  banjo_CLIENT_MERGE_SRC,
+                  CLIENT_COMPOSITION_OPCODE_MERGE_SRC,
               "Const mismatch");
 static_assert((1 << static_cast<int>(fhd::wire::ClientCompositionOpcode::kClientFrameScale)) ==
-                  banjo_CLIENT_FRAME_SCALE,
+                  CLIENT_COMPOSITION_OPCODE_FRAME_SCALE,
               "Const mismatch");
 static_assert((1 << static_cast<int>(fhd::wire::ClientCompositionOpcode::kClientSrcFrame)) ==
-                  banjo_CLIENT_SRC_FRAME,
+                  CLIENT_COMPOSITION_OPCODE_SRC_FRAME,
               "Const mismatch");
 static_assert((1 << static_cast<int>(fhd::wire::ClientCompositionOpcode::kClientTransform)) ==
-                  banjo_CLIENT_TRANSFORM,
+                  CLIENT_COMPOSITION_OPCODE_TRANSFORM,
               "Const mismatch");
 static_assert((1 << static_cast<int>(fhd::wire::ClientCompositionOpcode::kClientColorConversion)) ==
-                  banjo_CLIENT_COLOR_CONVERSION,
+                  CLIENT_COMPOSITION_OPCODE_COLOR_CONVERSION,
               "Const mismatch");
 static_assert((1 << static_cast<int>(fhd::wire::ClientCompositionOpcode::kClientAlpha)) ==
-                  banjo_CLIENT_ALPHA,
+                  CLIENT_COMPOSITION_OPCODE_ALPHA,
               "Const mismatch");
 
 }  // namespace

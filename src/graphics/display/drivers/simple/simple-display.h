@@ -77,8 +77,8 @@ class SimpleDisplay : public DeviceType,
   }
   void DisplayControllerImplReleaseImage(image_t* image);
   config_check_result_t DisplayControllerImplCheckConfiguration(
-      const display_config_t** display_configs, size_t display_count, uint32_t** layer_cfg_results,
-      size_t* layer_cfg_result_count);
+      const display_config_t** display_configs, size_t display_count,
+      client_composition_opcode_t** layer_cfg_results, size_t* layer_cfg_result_count);
   void DisplayControllerImplApplyConfiguration(const display_config_t** display_config,
                                                size_t display_count,
                                                const config_stamp_t* banjo_config_stamp);
