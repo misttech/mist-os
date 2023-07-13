@@ -1186,12 +1186,14 @@ template("assembled_system") {
               name = "${namespace}.fxfs"
               path = rebase_path(files.fxfs, root_build_dir)
               type = "fxfs-blk"
+              forward_variables_from(_common_metadata, "*")
               forward_variables_from(_image_overrides["fxfs"], "*")
             },
             {
               name = "${namespace}.fxfs_sparse"
               path = rebase_path(files.fxfs_sparse, root_build_dir)
               type = "blk"
+              forward_variables_from(_common_metadata, "*")
               forward_variables_from(_image_overrides["fxfs_sparse"], "*")
             },
           ]
