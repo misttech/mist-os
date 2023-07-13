@@ -51,10 +51,6 @@ assembly_input_groups("network") {
   ]
 }
 
-assembly_input_groups("ssh") {
-  visibility = [ "*" ]
-}
-
 assembly_input_groups("debug") {
   visibility = [ "*" ]
   base_packages = [

@@ -13,7 +13,6 @@ cuckoo_kernel_zbi_test_params = {
     "bootstrap",
     "legacy",
     "network",
-    "ssh",
     "debug",
     "test",
     "swd_policy.unrestricted",
