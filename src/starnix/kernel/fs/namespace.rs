@@ -8,7 +8,7 @@ use super::{
 use crate::{
     bpf::BpfFs,
     device::BinderFs,
-    fs::{buffers::InputBuffer, fuse::new_fuse_fs, tracefs::trace_fs},
+    fs::{buffers::InputBuffer, ext4::ExtFilesystem, fuse::new_fuse_fs, tracefs::trace_fs},
     lock::{Mutex, RwLock},
     mutable_state::*,
     selinux::selinux_fs,
@@ -532,6 +532,7 @@ pub fn create_filesystem(
         b"devpts" => dev_pts_fs(kernel, options).clone(),
         b"devtmpfs" => dev_tmp_fs(kernel).clone(),
         b"fuse" => new_fuse_fs(current_task, options)?,
+        b"ext4" => ExtFilesystem::new_fs(kernel, current_task, options)?,
         b"proc" => proc_fs(kernel.clone(), options),
         b"selinuxfs" => selinux_fs(kernel, options).clone(),
         b"sysfs" => sys_fs(kernel, options).clone(),

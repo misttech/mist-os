@@ -34,6 +34,7 @@ pub mod cgroup;
 pub mod devpts;
 pub mod devtmpfs;
 pub mod eventfd;
+pub mod ext4;
 pub mod file_server;
 pub mod fs_args;
 pub mod fuchsia;

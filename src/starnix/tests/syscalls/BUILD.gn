@@ -78,6 +78,14 @@ if (target_cpu == "x64" || target_cpu == "arm64") {
   }
 }
 
+resource("simple_ext4_image") {
+  sources = [
+    "data/hello_world.txt",
+    "data/simple_ext4.img",
+  ]
+  outputs = [ "data/{{source_file_part}}" ]
+}
+
 test("syscalls_test_bin") {
   exclude_toolchain_tags = [ "asan" ]
   sources = [
@@ -201,6 +209,7 @@ starnix_linux_test_component("syscalls_test") {
   test_binary = "syscalls_test_bin"
   deps = [
     ":fuse_overlayfs",
+    ":simple_ext4_image",
     ":syscall_test_exec_child_resource($target_linux_toolchain)",
   ]
   uses_expectations = true
