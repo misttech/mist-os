@@ -96,7 +96,7 @@ zx::result<> QemuRiscv64Pciroot::Create(PciRootHost* root_host, QemuRiscv64Pciro
 }
 
 zx::result<> QemuRiscv64::PcirootInit() {
-  zx::unowned_resource root_resource(get_root_resource());
+  zx::unowned_resource root_resource(get_root_resource(parent()));
 
   pci_root_host_.mcfgs().push_back(kVirtPcieMcfg);
   pci_root_host_.Io().AddRegion(kVirtPciePio);
@@ -116,7 +116,7 @@ zx::result<> QemuRiscv64::PcirootInit() {
 }
 
 zx::result<> QemuRiscv64Pciroot::CreateInterrupts() {
-  zx::unowned_resource root_resource(get_root_resource());
+  zx::unowned_resource root_resource(get_root_resource(parent()));
 
   for (uint32_t vector_offset = 0; vector_offset < kVirtPcieIrqCount; vector_offset++) {
     zx::interrupt interrupt;

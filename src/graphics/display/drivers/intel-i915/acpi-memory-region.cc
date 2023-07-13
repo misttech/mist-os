@@ -24,7 +24,8 @@
 namespace i915 {
 
 // static
-zx::result<AcpiMemoryRegion> AcpiMemoryRegion::Create(zx_paddr_t region_base, size_t region_size) {
+zx::result<AcpiMemoryRegion> AcpiMemoryRegion::Create(zx_device_t* parent, zx_paddr_t region_base,
+                                                      size_t region_size) {
   auto [first_page_physical_address, vmo_size] = RoundToPageBoundaries(region_base, region_size);
 
   // The static_cast below is lossless because of this.
@@ -43,7 +44,7 @@ zx::result<AcpiMemoryRegion> AcpiMemoryRegion::Create(zx_paddr_t region_base, si
   // that returns a VMO representing the ACPI custom Operation Region that
   // contains a given physical address.
   zx::vmo region_vmo;
-  zx_status_t status = zx::vmo::create_physical(*zx::unowned_resource(get_root_resource()),
+  zx_status_t status = zx::vmo::create_physical(*zx::unowned_resource(get_root_resource(parent)),
                                                 first_page_physical_address, vmo_size, &region_vmo);
   if (status != ZX_OK) {
     return zx::error_result(status);

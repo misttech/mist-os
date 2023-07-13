@@ -50,7 +50,7 @@ zx_status_t ChromiumosEcLpc::Bind() {
            {EC_LPC_ADDR_MEMMAP, EC_MEMMAP_SIZE},
        }) {
     // Please do not use get_root_resource() in new code. See fxbug.dev/31358.
-    zx_status_t status = zx_ioports_request(get_root_resource(), region.base, region.size);
+    zx_status_t status = zx_ioports_request(get_root_resource(parent()), region.base, region.size);
     if (status != ZX_OK) {
       zxlogf(ERROR, "ioports request for range 0x%x-0x%x failed: %s", region.base,
              region.base + region.size - 1, zx_status_get_string(status));

@@ -93,10 +93,11 @@ fuchsia_hardware_acpi::wire::ObjectType AcpiTypeToFidlType(ACPI_OBJECT_TYPE type
 
 }  // namespace
 
-EvaluateObjectFidlHelper EvaluateObjectFidlHelper::FromRequest(acpi::Acpi* acpi, ACPI_HANDLE device,
+EvaluateObjectFidlHelper EvaluateObjectFidlHelper::FromRequest(zx_handle_t mmio_resource,
+                                                               acpi::Acpi* acpi, ACPI_HANDLE device,
                                                                EvaluateObjectRequestView& request) {
   std::string path(request->path.data(), request->path.size());
-  return EvaluateObjectFidlHelper(acpi, device, std::move(path), request->mode,
+  return EvaluateObjectFidlHelper(mmio_resource, acpi, device, std::move(path), request->mode,
                                   request->parameters);
 }
 

@@ -135,7 +135,7 @@ zx_status_t I8042Device::Bind() {
 #ifndef PS2_TEST
   // Map interrupt. We should get this from ACPI eventually.
   // Please do not use get_root_resource() in new code. See fxbug.dev/31358.
-  zx_status_t status = zx::interrupt::create(*zx::unowned_resource(get_root_resource()),
+  zx_status_t status = zx::interrupt::create(*zx::unowned_resource(get_root_resource(parent())),
                                              kPortInfo[port_].irq, ZX_INTERRUPT_REMAP_IRQ, &irq_);
   if (status != ZX_OK) {
     return status;

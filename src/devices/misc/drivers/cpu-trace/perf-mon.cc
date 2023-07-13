@@ -111,10 +111,11 @@ PerfmonDevice::PerfmonDevice(zx_device_t* parent, zx::bti bti, perfmon::PmuHwPro
       pmu_hw_properties_(props),
       mtrace_control_(mtrace_control) {}
 
-zx_status_t PerfmonDevice::GetHwProperties(mtrace_control_func_t* mtrace_control,
+zx_status_t PerfmonDevice::GetHwProperties(zx_device_t* parent,
+                                           mtrace_control_func_t* mtrace_control,
                                            PmuHwProperties* out_props) {
   // Please do not use get_root_resource() in new code. See fxbug.dev/31358.
-  zx_handle_t resource = get_root_resource();
+  zx_handle_t resource = get_root_resource(parent);
   zx_status_t status = mtrace_control(resource, MTRACE_KIND_PERFMON, MTRACE_PERFMON_GET_PROPERTIES,
                                       0, out_props, sizeof(*out_props));
   if (status != ZX_OK) {
@@ -454,7 +455,7 @@ zx_status_t PerfmonDevice::PmuStart() {
 #endif
 
   // Please do not use get_root_resource() in new code. See fxbug.dev/31358.
-  zx_handle_t resource = get_root_resource();
+  zx_handle_t resource = get_root_resource(parent());
 
   zx_status_t status =
       mtrace_control_(resource, MTRACE_KIND_PERFMON, MTRACE_PERFMON_INIT, 0, nullptr, 0);
@@ -490,7 +491,7 @@ zx_status_t PerfmonDevice::PmuStart() {
   active_ = true;
   return ZX_OK;
 
-fail : {
+fail: {
   [[maybe_unused]] zx_status_t status2 =
       mtrace_control_(resource, MTRACE_KIND_PERFMON, MTRACE_PERFMON_FINI, 0, nullptr, 0);
   assert(status2 == ZX_OK);
@@ -507,7 +508,7 @@ void PerfmonDevice::PmuStop() {
   }
 
   // Please do not use get_root_resource() in new code. See fxbug.dev/31358.
-  zx_handle_t resource = get_root_resource();
+  zx_handle_t resource = get_root_resource(parent());
   [[maybe_unused]] zx_status_t status =
       mtrace_control_(resource, MTRACE_KIND_PERFMON, MTRACE_PERFMON_STOP, 0, nullptr, 0);
   assert(status == ZX_OK);
@@ -613,7 +614,7 @@ zx_status_t perfmon_bind(void* ctx, zx_device_t* parent) {
   }
 
   perfmon::PmuHwProperties props;
-  status = perfmon::PerfmonDevice::GetHwProperties(zx_mtrace_control, &props);
+  status = perfmon::PerfmonDevice::GetHwProperties(parent, zx_mtrace_control, &props);
   if (status != ZX_OK) {
     return status;
   }

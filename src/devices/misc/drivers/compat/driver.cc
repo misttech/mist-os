@@ -45,7 +45,6 @@ using fpromise::result;
 // drivers and other threads within the process.
 // Currently this protects the root resource and the loader service.
 std::mutex kDriverGlobalsLock;
-zx::resource kRootResource;
 
 namespace {
 
@@ -254,19 +253,6 @@ void Driver::Start(fdf::StartCompleter completer) {
     return;
   }
 
-  {
-    std::scoped_lock lock(kDriverGlobalsLock);
-    if (!kRootResource.is_valid()) {
-      zx::result resource = GetRootResource(*incoming());
-      // We don't log on error here because every compat driver will try and access this,
-      // but most aren't expected to have it available.
-      if (resource.is_ok()) {
-        FDF_LOGL(INFO, *logger_, "Successfully got root resource");
-        kRootResource = std::move(resource.value());
-      }
-    }
-  }
-
   zx::result loader_vmo = LoadVmo(*incoming(), kLibDriverPath, kOpenFlags);
   if (loader_vmo.is_error()) {
     FDF_LOGL(ERROR, *logger_, "Failed to open loader vmo: %s", loader_vmo.status_string());
@@ -315,6 +301,18 @@ void Driver::Start(fdf::StartCompleter completer) {
 }
 
 bool Driver::IsComposite() { return !parent_clients_.empty(); }
+
+zx_handle_t Driver::GetRootResource() {
+  if (!root_resource_.is_valid()) {
+    zx::result resource = ::GetRootResource(*incoming());
+    if (resource.is_ok()) {
+      root_resource_ = std::move(resource.value());
+    } else {
+      FDF_LOGL(WARNING, *logger_, "Failed to get root_resource '%s'", resource.status_string());
+    }
+  }
+  return root_resource_.get();
+}
 
 bool Driver::IsRunningOnDispatcher() const {
   fdf::Unowned<fdf::Dispatcher> current_dispatcher = fdf::Dispatcher::GetCurrent();

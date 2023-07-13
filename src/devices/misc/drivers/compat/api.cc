@@ -58,9 +58,8 @@ __EXPORT zx_status_t device_close_protocol_session_multibindable(zx_device_t* de
 
 // LibDriver Misc Interfaces
 
-__EXPORT zx_handle_t get_root_resource() {
-  std::scoped_lock lock(kDriverGlobalsLock);
-  return kRootResource.get();
+__EXPORT zx_handle_t get_root_resource(zx_device_t* device) {
+  return device->driver()->GetRootResource();
 }
 
 __EXPORT zx_status_t load_firmware_from_driver(zx_driver_t* drv, zx_device_t* dev, const char* path,

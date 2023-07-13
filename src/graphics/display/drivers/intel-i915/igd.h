@@ -235,7 +235,7 @@ class IgdOpRegion {
   // Returns ZX_ERR_NOT_SUPPORTED if the boot firmware doesn't support the
   // OpRegion protocol. The firmware might be completely missing OpRegion
   // support, or may have a broken implementation that reports invalid data.
-  zx_status_t Init(ddk::Pci& pci);
+  zx_status_t Init(zx_device_t* parent, ddk::Pci& pci);
 
   bool HasDdi(DdiId ddi_id) const { return ddi_features_.find(ddi_id) != ddi_features_.end(); }
   bool SupportsHdmi(DdiId ddi_id) const {

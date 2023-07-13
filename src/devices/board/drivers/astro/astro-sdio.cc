@@ -161,7 +161,7 @@ zx_status_t Astro::SdEmmcConfigurePortB() {
   zx_status_t status;
   std::optional<fdf::MmioBuffer> gpio_base;
   // Please do not use get_root_resource() in new code. See fxbug.dev/31358.
-  zx::unowned_resource resource(get_root_resource());
+  zx::unowned_resource resource(get_root_resource(parent()));
 
   size_t aligned_size = ZX_ROUNDUP((S905D2_GPIO_BASE - kGpioBase) + S905D2_GPIO_LENGTH, PAGE_SIZE);
 

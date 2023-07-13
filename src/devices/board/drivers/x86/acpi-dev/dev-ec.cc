@@ -19,15 +19,20 @@ class RealIoPort : public IoPortInterface {
 
   zx_status_t Map(uint16_t port) override {
     // Please do not use get_root_resource() in new code. See fxbug.dev/31358.
-    return zx_ioports_request(get_root_resource(), port, 1);
+    return zx_ioports_request(get_root_resource(parent_), port, 1);
   }
 
+  explicit RealIoPort(zx_device_t* parent) : parent_(parent) {}
   ~RealIoPort() override = default;
+
+ private:
+  zx_device_t* parent_;
 };
 }  // namespace
 
 zx_status_t EcDevice::Create(zx_device_t* parent, acpi::Acpi* acpi, ACPI_HANDLE handle) {
-  auto device = std::make_unique<EcDevice>(parent, acpi, handle, std::make_unique<RealIoPort>());
+  auto device =
+      std::make_unique<EcDevice>(parent, acpi, handle, std::make_unique<RealIoPort>(parent));
   zx_status_t status = device->Init();
   if (status == ZX_OK) {
     // The DDK takes ownership of the device.

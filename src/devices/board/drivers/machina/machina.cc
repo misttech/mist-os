@@ -28,7 +28,7 @@
 namespace machina {
 namespace fpbus = fuchsia_hardware_platform_bus;
 
-static zx_status_t machina_pci_init(void) {
+static zx_status_t machina_pci_init(zx_device_t* parent) {
   zx_status_t status;
 
   zx_pci_init_arg_t* arg;
@@ -41,8 +41,8 @@ static zx_status_t machina_pci_init(void) {
   auto defer = fit::defer([arg]() { free(arg); });
 
   // Please do not use get_root_resource() in new code. See fxbug.dev/31358.
-  status = zx_pci_add_subtract_io_range(get_root_resource(), true /* mmio */, PCIE_MMIO_BASE_PHYS,
-                                        PCIE_MMIO_SIZE, true /* add */);
+  status = zx_pci_add_subtract_io_range(get_root_resource(parent), true /* mmio */,
+                                        PCIE_MMIO_BASE_PHYS, PCIE_MMIO_SIZE, true /* add */);
   if (status != ZX_OK) {
     return status;
   }
@@ -66,7 +66,7 @@ static zx_status_t machina_pci_init(void) {
   arg->addr_windows[0].bus_end = (PCIE_ECAM_SIZE / ZX_PCI_ECAM_BYTE_PER_BUS) - 1;
 
   // Please do not use get_root_resource() in new code. See fxbug.dev/31358.
-  status = zx_pci_init(get_root_resource(), arg, arg_size);
+  status = zx_pci_init(get_root_resource(parent), arg, arg_size);
   if (status != ZX_OK) {
     zxlogf(ERROR, "%s: error %d in zx_pci_init", __FUNCTION__, status);
     return status;
@@ -171,7 +171,7 @@ static zx_status_t machina_board_bind(void* ctx, zx_device_t* parent) {
 
   bus->client.Bind(std::move(endpoints->client));
 
-  status = machina_pci_init();
+  status = machina_pci_init(parent);
   if (status != ZX_OK) {
     zxlogf(ERROR, "machina_pci_init failed: %d", status);
   }

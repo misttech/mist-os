@@ -271,7 +271,7 @@ static zx_status_t read_mcfg_table(std::vector<McfgAllocation>* mcfg_table) {
   return ZX_OK;
 }
 
-zx_status_t pci_init_interrupts(acpi::Acpi* acpi, ACPI_HANDLE object,
+zx_status_t pci_init_interrupts(zx_device_t* parent, acpi::Acpi* acpi, ACPI_HANDLE object,
                                 AcpiPciroot::Context* dev_ctx) {
   zx::vmo routing_vmo{};
   if (acpi::GetPciRootIrqRouting(acpi, object, dev_ctx) != AE_OK) {
@@ -289,7 +289,7 @@ zx_status_t pci_init_interrupts(acpi::Acpi* acpi, ACPI_HANDLE object,
     const uint32_t& vector = e.first;
     const acpi_legacy_irq& irq_cfg = e.second;
     zx::resource resource;
-    zx_status_t status = zx::resource::create(*zx::unowned_resource(get_root_resource()),
+    zx_status_t status = zx::resource::create(*zx::unowned_resource(get_root_resource(parent)),
                                               ZX_RSRC_KIND_IRQ | ZX_RSRC_FLAG_EXCLUSIVE, vector, 1,
                                               name.data(), name.size(), &resource);
 
@@ -317,7 +317,7 @@ zx_status_t pci_init_interrupts(acpi::Acpi* acpi, ACPI_HANDLE object,
   return ZX_OK;
 }
 
-zx_status_t pci_init_segment_and_ecam(acpi::Acpi* acpi, ACPI_HANDLE object,
+zx_status_t pci_init_segment_and_ecam(zx_device_t* parent, acpi::Acpi* acpi, ACPI_HANDLE object,
                                       AcpiPciroot::Context* dev_ctx) {
   auto bbn = acpi->CallBbn(object);
   if (bbn.is_error() && acpi_to_zx_status(bbn.error_value()) != ZX_ERR_NOT_FOUND) {
@@ -375,7 +375,8 @@ zx_status_t pci_init_segment_and_ecam(acpi::Acpi* acpi, ACPI_HANDLE object,
     size_t ecam_size = (pinfo.end_bus_num - pinfo.start_bus_num + 1) * PCIE_ECAM_BYTES_PER_BUS;
     zx_paddr_t vmo_base = mcfg_alloc.address + (pinfo.start_bus_num * PCIE_ECAM_BYTES_PER_BUS);
     // Please do not use get_root_resource() in new code. See fxbug.dev/31358.
-    status = zx_vmo_create_physical(get_root_resource(), vmo_base, ecam_size, &pinfo.ecam_vmo);
+    status =
+        zx_vmo_create_physical(get_root_resource(parent), vmo_base, ecam_size, &pinfo.ecam_vmo);
     if (status != ZX_OK) {
       zxlogf(ERROR, "couldn't create VMO for ecam, mmio cfg will not work: %s!",
              zx_status_get_string(status));
@@ -400,7 +401,7 @@ zx_status_t pci_init_segment_and_ecam(acpi::Acpi* acpi, ACPI_HANDLE object,
 
 // Parse the MCFG table and initialize the window allocators for the RootHost if this is the first
 // root found.
-zx_status_t pci_root_host_init(acpi::Acpi* acpi) {
+zx_status_t pci_root_host_init(zx_device_t* parent, acpi::Acpi* acpi) {
   static bool initialized = false;
   if (initialized) {
     return ZX_OK;
@@ -411,7 +412,8 @@ zx_status_t pci_root_host_init(acpi::Acpi* acpi) {
 #ifdef __aarch64__
     io_type = PCI_ADDRESS_SPACE_MEMORY;
 #endif
-    RootHost = std::make_unique<PciRootHost>(zx::unowned_resource(get_root_resource()), io_type);
+    RootHost =
+        std::make_unique<PciRootHost>(zx::unowned_resource(get_root_resource(parent)), io_type);
   }
 
   zx_status_t st = read_mcfg_table(&RootHost->mcfgs());
@@ -420,7 +422,7 @@ zx_status_t pci_root_host_init(acpi::Acpi* acpi) {
            zx_status_get_string(st));
   }
 
-  st = scan_acpi_tree_for_resources(acpi, get_root_resource());
+  st = scan_acpi_tree_for_resources(acpi, get_root_resource(parent));
   if (st != ZX_OK) {
     zxlogf(ERROR, "Scanning acpi resources failed: %s", zx_status_get_string(st));
     return st;
@@ -433,7 +435,7 @@ zx_status_t pci_root_host_init(acpi::Acpi* acpi) {
 zx_status_t pci_init(zx_device_t* parent, ACPI_HANDLE object,
                      acpi::UniquePtr<ACPI_DEVICE_INFO> info, acpi::Manager* manager,
                      std::vector<pci_bdf_t> acpi_bdfs) {
-  zx_status_t status = pci_root_host_init(manager->acpi());
+  zx_status_t status = pci_root_host_init(parent, manager->acpi());
   if (status != ZX_OK) {
     zxlogf(ERROR, "Error initializing PCI root host: %s", zx_status_get_string(status));
     return status;
@@ -451,14 +453,14 @@ zx_status_t pci_init(zx_device_t* parent, ACPI_HANDLE object,
   memcpy(dev_ctx.name, &dev_ctx.acpi_device_info->Name, ACPI_NAMESEG_SIZE);
   dev_ctx.name[sizeof(dev_ctx.name) - 1] = '\0';
 
-  status = pci_init_segment_and_ecam(manager->acpi(), object, &dev_ctx);
+  status = pci_init_segment_and_ecam(parent, manager->acpi(), object, &dev_ctx);
   if (status != ZX_OK) {
     zxlogf(ERROR, "Initializing %s ecam and bus information failed: %s", dev_ctx.name,
            zx_status_get_string(status));
     return status;
   }
 
-  status = pci_init_interrupts(manager->acpi(), object, &dev_ctx);
+  status = pci_init_interrupts(parent, manager->acpi(), object, &dev_ctx);
   if (status != ZX_OK) {
     zxlogf(ERROR, "Initializing %s interrupt information failed: %s", dev_ctx.name,
            zx_status_get_string(status));

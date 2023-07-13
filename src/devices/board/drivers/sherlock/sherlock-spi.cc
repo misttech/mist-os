@@ -110,7 +110,7 @@ zx_status_t Sherlock::SpiInit() {
   // dividers
   {
     // Please do not use get_root_resource() in new code. See fxbug.dev/31358.
-    zx::unowned_resource resource(get_root_resource());
+    zx::unowned_resource resource(get_root_resource(parent()));
     std::optional<fdf::MmioBuffer> buf;
     zx_status_t status = fdf::MmioBuffer::Create(T931_HIU_BASE, T931_HIU_LENGTH, *resource,
                                                  ZX_CACHE_POLICY_UNCACHED_DEVICE, &buf);

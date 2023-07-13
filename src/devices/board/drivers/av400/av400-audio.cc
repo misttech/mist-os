@@ -119,13 +119,13 @@ static const std::vector<fpbus::Irq> toddr_b_irqs{
     }},
 };
 
-static zx_status_t InitAudioTop(void) {
+static zx_status_t InitAudioTop(zx_device_t* parent) {
   // For some amlogic chips, they has Audio Top Clock Gating Control.
   // This part will affect audio registers access, to avoid bus hang,
   // we need call it before we access the registers.
   zx_status_t status;
   // Please do not use get_root_resource() in new code. See fxbug.dev/31358.
-  zx::unowned_resource resource(get_root_resource());
+  zx::unowned_resource resource(get_root_resource(parent));
   std::optional<fdf::MmioBuffer> buf;
   status = fdf::MmioBuffer::Create(A5_EE_AUDIO2_BASE_ALIGN, A5_EE_AUDIO2_LENGTH_ALIGN, *resource,
                                    ZX_CACHE_POLICY_UNCACHED_DEVICE, &buf);
@@ -194,7 +194,7 @@ zx_status_t Av400::AudioInit() {
     return status;
   }
 
-  status = InitAudioTop();
+  status = InitAudioTop(parent());
   if (status != ZX_OK)
     return status;
 

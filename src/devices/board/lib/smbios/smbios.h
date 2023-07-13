@@ -5,6 +5,7 @@
 #ifndef SRC_DEVICES_BOARD_LIB_SMBIOS_SMBIOS_H_
 #define SRC_DEVICES_BOARD_LIB_SMBIOS_SMBIOS_H_
 
+#include <lib/zx/resource.h>
 #include <zircon/compiler.h>
 #include <zircon/types.h>
 
@@ -14,7 +15,7 @@ namespace smbios {
 
 class SmbiosInfo {
  public:
-  zx_status_t Load();
+  zx_status_t Load(zx::unowned_resource root_resource);
 
   const std::string& board_name() const { return board_name_; }
   const std::string& vendor() const { return vendor_; }

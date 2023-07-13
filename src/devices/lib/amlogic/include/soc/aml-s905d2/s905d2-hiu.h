@@ -40,7 +40,7 @@ __BEGIN_CDECLS
 /*
     Maps the hiu register block (containing all the pll controls).
 */
-zx_status_t s905d2_hiu_init(aml_hiu_dev_t* device);
+zx_status_t s905d2_hiu_init(zx_handle_t root_resource, aml_hiu_dev_t* device);
 
 /*
     Initializes the aml_hiu_dev_t struct assuming the register block is already

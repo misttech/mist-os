@@ -970,7 +970,7 @@ zx_status_t PlatformBus::Init() {
   // does not set a real one.
   zx_iommu_desc_dummy_t desc;
   // Please do not use get_root_resource() in new code. See fxbug.dev/31358.
-  zx::unowned_resource root_resource(get_root_resource());
+  zx::unowned_resource root_resource(get_root_resource(parent()));
   if (root_resource->is_valid()) {
     status =
         zx::iommu::create(*root_resource, ZX_IOMMU_TYPE_DUMMY, &desc, sizeof(desc), &iommu_handle_);

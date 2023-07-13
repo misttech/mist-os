@@ -98,7 +98,9 @@ class PlatformBus : public PlatformBusType,
   // Currently this just returns the root resource, but we may change this to a more
   // limited resource in the future.
   // Please do not use get_root_resource() in new code. See fxbug.dev/31358.
-  zx::unowned_resource GetResource() const { return zx::unowned_resource(get_root_resource()); }
+  zx::unowned_resource GetResource() const {
+    return zx::unowned_resource(get_root_resource(parent()));
+  }
 
   struct BootItemResult {
     zx::vmo vmo;

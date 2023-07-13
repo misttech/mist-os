@@ -130,7 +130,8 @@ class SystemRamMemoryAllocator : public MemoryAllocator {
 
 class ContiguousSystemRamMemoryAllocator : public MemoryAllocator {
  public:
-  explicit ContiguousSystemRamMemoryAllocator(Owner* parent_device)
+  explicit ContiguousSystemRamMemoryAllocator(zx::unowned_resource root_resource,
+                                              Owner* parent_device)
       : MemoryAllocator(BuildHeapPropertiesWithCoherencyDomainSupport(
             /*cpu_supported=*/true, /*ram_supported=*/true,
             /*inaccessible_supported=*/true,
@@ -142,7 +143,8 @@ class ContiguousSystemRamMemoryAllocator : public MemoryAllocator {
             // zero-fill already flushed to RAM (at least for the RAM coherency
             // domain, this should probably remain true).
             /*need_clear=*/false, /*need_flush=*/true)),
-        parent_device_(parent_device) {
+        parent_device_(parent_device),
+        root_resource_(std::move(root_resource)) {
     node_ = parent_device_->heap_node()->CreateChild("ContiguousSystemRamMemoryAllocator");
     node_.CreateUint("id", id(), &properties_);
   }
@@ -162,7 +164,7 @@ class ContiguousSystemRamMemoryAllocator : public MemoryAllocator {
           "status: %d",
           size, status);
       zx_info_kmem_stats_t kmem_stats;
-      status = zx_object_get_info(get_root_resource(), ZX_INFO_KMEM_STATS, &kmem_stats,
+      status = zx_object_get_info(root_resource_->get(), ZX_INFO_KMEM_STATS, &kmem_stats,
                                   sizeof(kmem_stats), nullptr, nullptr);
       if (status == ZX_OK) {
         DRIVER_ERROR(
@@ -195,6 +197,7 @@ class ContiguousSystemRamMemoryAllocator : public MemoryAllocator {
 
  private:
   Owner* const parent_device_;
+  zx::unowned_resource root_resource_;
   inspect::Node node_;
   inspect::ValueList properties_;
 };
@@ -643,7 +646,8 @@ zx_status_t Device::Bind() {
     pooled_allocator->SetupUnusedPages();
     contiguous_system_ram_allocator_ = std::move(pooled_allocator);
   } else {
-    contiguous_system_ram_allocator_ = std::make_unique<ContiguousSystemRamMemoryAllocator>(this);
+    contiguous_system_ram_allocator_ = std::make_unique<ContiguousSystemRamMemoryAllocator>(
+        zx::unowned_resource(get_root_resource(parent())), this);
   }
 
   // TODO: Separate protected memory allocator into separate driver or library
@@ -1054,7 +1058,7 @@ const zx::bti& Device::bti() { return bti_; }
 zx_status_t Device::CreatePhysicalVmo(uint64_t base, uint64_t size, zx::vmo* vmo_out) {
   zx::vmo result_vmo;
   // Please do not use get_root_resource() in new code. See fxbug.dev/31358.
-  zx::unowned_resource root_resource(get_root_resource());
+  zx::unowned_resource root_resource(get_root_resource(parent()));
   zx_status_t status = zx::vmo::create_physical(*root_resource, base, size, &result_vmo);
   if (status != ZX_OK) {
     return status;

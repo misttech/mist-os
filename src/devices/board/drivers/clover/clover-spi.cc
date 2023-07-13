@@ -82,7 +82,7 @@ zx_status_t Clover::SpiInit() {
       spicc0_clk_sel_fclk_div2 | spicc0_clk_en | spicc0_clk_div(24);
   {
     // Please do not use get_root_resource() in new code. See fxbug.dev/31358.
-    zx::unowned_resource resource(get_root_resource());
+    zx::unowned_resource resource(get_root_resource(parent()));
     std::optional<fdf::MmioBuffer> buf;
     status = fdf::MmioBuffer::Create(A1_CLK_BASE_ALIGN, A1_CLK_LENGTH_ALIGN, *resource,
                                      ZX_CACHE_POLICY_UNCACHED_DEVICE, &buf);

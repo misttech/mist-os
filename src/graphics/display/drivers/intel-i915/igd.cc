@@ -396,7 +396,7 @@ void IgdOpRegion::ProcessBacklightData() {
   }
 }
 
-zx_status_t IgdOpRegion::Init(ddk::Pci& pci) {
+zx_status_t IgdOpRegion::Init(zx_device_t* parent, ddk::Pci& pci) {
   PciConfigOpRegion pci_op_region(pci);
 
   zx::result<zx_paddr_t> memory_op_region_address = pci_op_region.ReadMemoryOpRegionAddress();
@@ -413,7 +413,7 @@ zx_status_t IgdOpRegion::Init(ddk::Pci& pci) {
   zxlogf(TRACE, "Memory OpRegion start: %08" PRIx64, memory_op_region_address.value());
   {
     zx::result<AcpiMemoryRegion> memory_op_region =
-        AcpiMemoryRegion::Create(memory_op_region_address.value(), kIgdOpRegionLen);
+        AcpiMemoryRegion::Create(parent, memory_op_region_address.value(), kIgdOpRegionLen);
     if (memory_op_region.is_error()) {
       zxlogf(ERROR, "Failed to map IGD Memory OpRegion: %s",
              zx_status_get_string(memory_op_region.error_value()));
@@ -435,7 +435,7 @@ zx_status_t IgdOpRegion::Init(ddk::Pci& pci) {
     auto [rvda, rvds] = igd_opregion_->vbt_region();
 
     zx::result<AcpiMemoryRegion> extended_vbt_region =
-        AcpiMemoryRegion::Create(memory_op_region_address.value() + rvda, rvds);
+        AcpiMemoryRegion::Create(parent, memory_op_region_address.value() + rvda, rvds);
     if (extended_vbt_region.is_error()) {
       zxlogf(ERROR, "Failed to map extended VBT: %s",
              zx_status_get_string(extended_vbt_region.error_value()));

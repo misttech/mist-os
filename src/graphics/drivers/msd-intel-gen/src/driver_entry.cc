@@ -117,7 +117,7 @@ zx_status_t IntelDevice::Init() {
 
 static zx_status_t sysdrv_bind(void* ctx, zx_device_t* parent) {
   DLOG("sysdrv_bind start zx_device %p", parent);
-  magma::PlatformBusMapper::SetInfoResource(zx::unowned_resource(get_root_resource()));
+  magma::PlatformBusMapper::SetInfoResource(zx::unowned_resource(get_root_resource(parent)));
 
   auto gpu = std::make_unique<IntelDevice>(parent);
   if (!gpu)

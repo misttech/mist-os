@@ -525,7 +525,7 @@ zx_status_t bind_simple_pci_display_bootloader(zx_device_t* dev, const char* nam
   uint32_t width, height, stride;
   // Please do not use get_root_resource() in new code. See fxbug.dev/31358.
   zx_status_t status =
-      zx_framebuffer_get_info(get_root_resource(), &format, &width, &height, &stride);
+      zx_framebuffer_get_info(get_root_resource(dev), &format, &width, &height, &stride);
   if (status != ZX_OK) {
     printf("%s: failed to get bootloader dimensions: %d\n", name, status);
     return ZX_ERR_NOT_SUPPORTED;

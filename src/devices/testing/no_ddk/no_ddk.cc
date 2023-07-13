@@ -101,7 +101,7 @@ __EXPORT void device_get_fragments(zx_device_t* dev, composite_device_fragment_t
 
 // Please do not use get_root_resource() in new code. See ZX-1467.
 __EXPORT
-zx_handle_t get_root_resource() { return ZX_HANDLE_INVALID; }
+zx_handle_t get_root_resource(zx_device_t* parent) { return ZX_HANDLE_INVALID; }
 
 __EXPORT zx_status_t device_get_variable(zx_device_t* device, const char* name, char* out,
                                          size_t out_size, size_t* size_actual) {

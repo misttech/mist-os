@@ -15,35 +15,6 @@
 
 #define DIV_ROUND_UP(n, d) ((n + d - 1) / d)
 
-/* create instance of a113_clock_t and do basic initialization.
- */
-zx_status_t a113_clk_init(a113_clk_dev_t **device) {
-  *device = calloc(1, sizeof(a113_clk_dev_t));
-  if (!(*device)) {
-    return ZX_ERR_NO_MEMORY;
-  }
-
-  // Please do not use get_root_resource() in new code. See fxbug.dev/31358.
-  zx_handle_t resource = get_root_resource();
-  zx_status_t status;
-
-  status = mmio_buffer_init_physical(&(*device)->mmio, A113_CLOCKS_BASE_PHYS, PAGE_SIZE, resource,
-                                     ZX_CACHE_POLICY_UNCACHED_DEVICE);
-
-  if (status != ZX_OK) {
-    zxlogf(ERROR, "a113_clk_init: mmio_buffer_init_physical failed %d", status);
-    goto init_fail;
-  }
-  (*device)->regs_vaddr = (*device)->mmio.vaddr;
-
-  return ZX_OK;
-
-init_fail:
-  mmio_buffer_release(&(*device)->mmio);
-  free(*device);
-  return status;
-}
-
 static void a113_clk_update_reg(a113_clk_dev_t *dev, uint32_t offset, uint32_t pos, uint32_t bits,
                                 uint32_t value) {
   uint32_t reg = a113_clk_get_reg(dev, offset);

@@ -22,7 +22,6 @@
 #include "src/lib/storage/vfs/cpp/synchronous_vfs.h"
 
 extern std::mutex kDriverGlobalsLock;
-extern zx::resource kRootResource __TA_GUARDED(kDriverGlobalsLock);
 
 namespace compat {
 
@@ -42,6 +41,8 @@ class Driver : public fdf::DriverBase {
   void* Context() const;
 
   zx::result<zx::vmo> LoadFirmware(Device* device, const char* filename, size_t* size);
+
+  zx_handle_t GetRootResource();
 
   // # Threading notes
   //

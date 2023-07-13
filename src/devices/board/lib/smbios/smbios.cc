@@ -54,7 +54,7 @@ class SmbiosState {
   // Must only be invoked once on an instance.  On success, |entry_point()|
   // and |struct_table_mapping()| are usable.  |entry_point()| will be
   // guaranteed to be a valid SMBIOS entry point structure.
-  zx_status_t LoadFromFirmware();
+  zx_status_t LoadFromFirmware(zx::unowned_resource root_resource);
 
   // These values are only valid as long as the instance is around.
   const smbios::EntryPoint* entry_point() const {
@@ -70,10 +70,7 @@ class SmbiosState {
   uintptr_t struct_table_start_ = 0;
 };
 
-zx_status_t SmbiosState::LoadFromFirmware() {
-  // Please do not use get_root_resource() in new code. See fxbug.dev/31358.
-  zx::unowned_resource root_resource(get_root_resource());
-
+zx_status_t SmbiosState::LoadFromFirmware(zx::unowned_resource root_resource) {
   zx_paddr_t acpi_rsdp, smbios_ep;
   zx_status_t status = zx_pc_firmware_tables(root_resource->get(), &acpi_rsdp, &smbios_ep);
   if (status != ZX_OK) {
@@ -137,9 +134,9 @@ bool smbios_product_name_is_valid(const char* product_name) {
   return true;
 }
 
-zx_status_t SmbiosInfo::Load() {
+zx_status_t SmbiosInfo::Load(zx::unowned_resource root_resource) {
   SmbiosState smbios;
-  zx_status_t status = smbios.LoadFromFirmware();
+  zx_status_t status = smbios.LoadFromFirmware(std::move(root_resource));
   if (status != ZX_OK) {
     return status;
   }

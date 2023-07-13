@@ -119,7 +119,8 @@ zx_status_t AmlGpu::Gp0Init() {
   gp0_pll_dev_ = std::make_unique<aml_pll_dev_t>();
 
   // HIU Init.
-  zx_status_t status = s905d2_hiu_init(hiu_dev_.get());
+  // Please do not use get_root_resource() in new code. See fxbug.dev/31358.
+  zx_status_t status = s905d2_hiu_init(get_root_resource(parent()), hiu_dev_.get());
   if (status != ZX_OK) {
     zxlogf(ERROR, "aml_gp0_init: hiu_init failed: %d", status);
     return status;

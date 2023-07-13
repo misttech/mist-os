@@ -110,7 +110,7 @@ zx_status_t GpuDevice::Init() {
 
 static zx_status_t driver_bind(void* context, zx_device_t* parent) {
   MAGMA_LOG(INFO, "driver_bind: binding\n");
-  magma::PlatformBusMapper::SetInfoResource(zx::unowned_resource(get_root_resource()));
+  magma::PlatformBusMapper::SetInfoResource(zx::unowned_resource(get_root_resource(parent)));
   auto gpu = std::make_unique<GpuDevice>(parent);
   if (!gpu)
     return ZX_ERR_NO_MEMORY;

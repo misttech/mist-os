@@ -696,24 +696,6 @@ TEST_F(DriverTest, Start_CheckCompatService) {
   UnbindAndFreeDriver(std::move(driver));
 }
 
-TEST_F(DriverTest, DISABLED_Start_RootResourceIsConstant) {
-  // Set the root resource before the test starts.
-  zx_handle_t resource;
-  {
-    std::scoped_lock lock(kDriverGlobalsLock);
-    ASSERT_EQ(ZX_OK, zx_event_create(0, kRootResource.reset_and_get_address()));
-    resource = kRootResource.get();
-  }
-
-  auto driver = StartDriver({
-      .v1_driver_path = "/pkg/driver/v1_device_add_null_test.so",
-  });
-  zx_handle_t resource2 = get_root_resource();
-
-  // Check that the root resource's value did not change.
-  ASSERT_EQ(resource, resource2);
-}
-
 TEST_F(DriverTest, Start_GetBackingMemory) {
   auto driver = StartDriver({
       .v1_driver_path = "/pkg/driver/v1_test.so",

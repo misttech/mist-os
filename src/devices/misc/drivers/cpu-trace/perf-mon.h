@@ -125,7 +125,7 @@ class PerfmonDevice : public DeviceType, public fidl::WireServer<fidl_perfmon::C
   static constexpr uint32_t kMaxPerTraceSpaceInPages = (256 * 1024 * 1024) / kPageSize;
 
   // Fetch the pmu hw properties from the kernel.
-  static zx_status_t GetHwProperties(mtrace_control_func_t* mtrace_control,
+  static zx_status_t GetHwProperties(zx_device_t* parent, mtrace_control_func_t* mtrace_control,
                                      PmuHwProperties* out_props);
 
   // Architecture-provided routine to initialize static state.

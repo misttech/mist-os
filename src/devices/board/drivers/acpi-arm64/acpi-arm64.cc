@@ -61,7 +61,7 @@ zx_status_t AcpiArm64::Create(void* ctx, zx_device_t* parent) {
 
 void AcpiArm64::DdkInit(ddk::InitTxn txn) {
   // Please do not use get_root_resource() in new code. See fxbug.dev/31358.
-  zx_status_t status = iommu_manager_.Init(zx::unowned_resource(get_root_resource()));
+  zx_status_t status = iommu_manager_.Init(zx::unowned_resource(get_root_resource(parent())));
   if (status != ZX_OK) {
     zxlogf(ERROR, "failed to init iommu manager: %s", zx_status_get_string(status));
     txn.Reply(status);
@@ -70,7 +70,7 @@ void AcpiArm64::DdkInit(ddk::InitTxn txn) {
   manager_.emplace(&acpi_, &iommu_manager_, zxdev_);
 
   // Please do not use get_root_resource() in new code. See fxbug.dev/31358.
-  root_resource_handle = get_root_resource();
+  root_resource_handle = get_root_resource(parent());
 
   auto dispatcher = fdf::Dispatcher::GetCurrent();
   async::PostTask(dispatcher->async_dispatcher(), [txn = std::move(txn), this]() mutable {
@@ -119,7 +119,7 @@ zx::result<> AcpiArm64::SmbiosInit() {
 
   // Load SMBIOS information.
   smbios::SmbiosInfo smbios;
-  zx_status_t status = smbios.Load();
+  zx_status_t status = smbios.Load(zx::unowned_resource(get_root_resource(parent())));
   if (status == ZX_OK) {
     board_info.board_name() = smbios.board_name();
     bootloader_info.vendor() = smbios.vendor();

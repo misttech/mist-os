@@ -40,13 +40,11 @@ static inline uint32_t hiu_get_pll_offs(aml_pll_dev_t* pll_dev) {
   return 0;
 }
 
-zx_status_t s905d2_hiu_init(aml_hiu_dev_t* device) {
-  // Please do not use get_root_resource() in new code. See fxbug.dev/31358.
-  zx_handle_t resource = get_root_resource();
+zx_status_t s905d2_hiu_init(zx_handle_t root_resource, aml_hiu_dev_t* device) {
   zx_status_t status;
 
-  status = mmio_buffer_init_physical(&device->mmio, S905D2_HIU_BASE, S905D2_HIU_LENGTH, resource,
-                                     ZX_CACHE_POLICY_UNCACHED_DEVICE);
+  status = mmio_buffer_init_physical(&device->mmio, S905D2_HIU_BASE, S905D2_HIU_LENGTH,
+                                     root_resource, ZX_CACHE_POLICY_UNCACHED_DEVICE);
   if (status != ZX_OK) {
     zxlogf(ERROR, "%s: mmio_buffer_init_physical failed %d", __func__, status);
     return status;

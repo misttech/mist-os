@@ -152,7 +152,7 @@ TEST_F(FidlEvaluateObjectTest, TestCantEvaluateParent) {
   ASSERT_NO_FATAL_FAILURE(InsertDeviceBelow("\\_SB_.PCI0", std::make_unique<Device>("I2C0")));
 
   acpi::EvaluateObjectFidlHelper helper(
-      &acpi_, acpi_.GetDeviceRoot()->FindByPath("\\_SB_.PCI0.I2C0"), "\\_SB_.PCI0",
+      {}, &acpi_, acpi_.GetDeviceRoot()->FindByPath("\\_SB_.PCI0.I2C0"), "\\_SB_.PCI0",
       EvaluateObjectMode::kPlainObject, fidl::VectorView<facpi::Object>(nullptr, 0));
 
   auto result = helper.ValidateAndLookupPath("\\_SB_.PCI0");
@@ -164,9 +164,9 @@ TEST_F(FidlEvaluateObjectTest, TestCantEvaluateSibling) {
   ASSERT_NO_FATAL_FAILURE(InsertDeviceBelow("\\_SB_", std::make_unique<Device>("PCI0")));
   ASSERT_NO_FATAL_FAILURE(InsertDeviceBelow("\\_SB_", std::make_unique<Device>("PCI1")));
 
-  acpi::EvaluateObjectFidlHelper helper(&acpi_, acpi_.GetDeviceRoot()->FindByPath("\\_SB_.PCI1"),
-                                        "\\_SB_.PCI0", EvaluateObjectMode::kPlainObject,
-                                        fidl::VectorView<facpi::Object>(nullptr, 0));
+  acpi::EvaluateObjectFidlHelper helper(
+      {}, &acpi_, acpi_.GetDeviceRoot()->FindByPath("\\_SB_.PCI1"), "\\_SB_.PCI0",
+      EvaluateObjectMode::kPlainObject, fidl::VectorView<facpi::Object>(nullptr, 0));
 
   auto result = helper.ValidateAndLookupPath("\\_SB_.PCI0");
   ASSERT_EQ(result.status_value(), AE_ACCESS);
@@ -177,9 +177,9 @@ TEST_F(FidlEvaluateObjectTest, TestCanEvaluateChild) {
   ASSERT_NO_FATAL_FAILURE(InsertDeviceBelow("\\_SB_", std::make_unique<Device>("PCI0")));
   ASSERT_NO_FATAL_FAILURE(InsertDeviceBelow("\\_SB_.PCI0", std::make_unique<Device>("I2C0")));
 
-  acpi::EvaluateObjectFidlHelper helper(&acpi_, acpi_.GetDeviceRoot()->FindByPath("\\_SB_.PCI0"),
-                                        "I2C0", EvaluateObjectMode::kPlainObject,
-                                        fidl::VectorView<facpi::Object>(nullptr, 0));
+  acpi::EvaluateObjectFidlHelper helper(
+      {}, &acpi_, acpi_.GetDeviceRoot()->FindByPath("\\_SB_.PCI0"), "I2C0",
+      EvaluateObjectMode::kPlainObject, fidl::VectorView<facpi::Object>(nullptr, 0));
 
   ACPI_HANDLE hnd;
   auto result = helper.ValidateAndLookupPath("I2C0", &hnd);
@@ -189,7 +189,7 @@ TEST_F(FidlEvaluateObjectTest, TestCanEvaluateChild) {
 }
 
 TEST_F(FidlEvaluateObjectTest, TestDecodeInteger) {
-  acpi::EvaluateObjectFidlHelper helper(&acpi_, acpi_.GetDeviceRoot(), "\\",
+  acpi::EvaluateObjectFidlHelper helper({}, &acpi_, acpi_.GetDeviceRoot(), "\\",
                                         EvaluateObjectMode::kPlainObject,
                                         fidl::VectorView<facpi::Object>(nullptr, 0));
 
@@ -210,7 +210,7 @@ TEST_F(FidlEvaluateObjectTest, TestDecodeInteger) {
 }
 
 TEST_F(FidlEvaluateObjectTest, TestDecodeString) {
-  acpi::EvaluateObjectFidlHelper helper(&acpi_, acpi_.GetDeviceRoot(), "\\",
+  acpi::EvaluateObjectFidlHelper helper({}, &acpi_, acpi_.GetDeviceRoot(), "\\",
                                         EvaluateObjectMode::kPlainObject,
                                         fidl::VectorView<facpi::Object>(nullptr, 0));
 
@@ -231,7 +231,7 @@ TEST_F(FidlEvaluateObjectTest, TestDecodeString) {
 }
 
 TEST_F(FidlEvaluateObjectTest, TestDecodeBuffer) {
-  acpi::EvaluateObjectFidlHelper helper(&acpi_, acpi_.GetDeviceRoot(), "\\",
+  acpi::EvaluateObjectFidlHelper helper({}, &acpi_, acpi_.GetDeviceRoot(), "\\",
                                         EvaluateObjectMode::kPlainObject,
                                         fidl::VectorView<facpi::Object>(nullptr, 0));
 
@@ -255,7 +255,7 @@ TEST_F(FidlEvaluateObjectTest, TestDecodeBuffer) {
 }
 
 TEST_F(FidlEvaluateObjectTest, TestDecodePowerResource) {
-  acpi::EvaluateObjectFidlHelper helper(&acpi_, acpi_.GetDeviceRoot(), "\\",
+  acpi::EvaluateObjectFidlHelper helper({}, &acpi_, acpi_.GetDeviceRoot(), "\\",
                                         EvaluateObjectMode::kPlainObject,
                                         fidl::VectorView<facpi::Object>(nullptr, 0));
 
@@ -279,7 +279,7 @@ TEST_F(FidlEvaluateObjectTest, TestDecodePowerResource) {
 }
 
 TEST_F(FidlEvaluateObjectTest, TestDecodeProcessorVal) {
-  acpi::EvaluateObjectFidlHelper helper(&acpi_, acpi_.GetDeviceRoot(), "\\",
+  acpi::EvaluateObjectFidlHelper helper({}, &acpi_, acpi_.GetDeviceRoot(), "\\",
                                         EvaluateObjectMode::kPlainObject,
                                         fidl::VectorView<facpi::Object>(nullptr, 0));
 
@@ -309,7 +309,7 @@ TEST_F(FidlEvaluateObjectTest, TestDecodeReference) {
   ASSERT_NO_FATAL_FAILURE(InsertDeviceBelow("\\_SB_", std::make_unique<Device>("PCI0")));
   ASSERT_NO_FATAL_FAILURE(InsertDeviceBelow("\\_SB_.PCI0", std::make_unique<Device>("I2C0")));
 
-  acpi::EvaluateObjectFidlHelper helper(&acpi_, acpi_.GetDeviceRoot()->FindByPath("\\_SB_"),
+  acpi::EvaluateObjectFidlHelper helper({}, &acpi_, acpi_.GetDeviceRoot()->FindByPath("\\_SB_"),
                                         "\\_SB_", EvaluateObjectMode::kPlainObject,
                                         fidl::VectorView<facpi::Object>(nullptr, 0));
   facpi::Object obj;
@@ -338,7 +338,7 @@ TEST_F(FidlEvaluateObjectTest, TestDecodeParentReferenceFails) {
   ASSERT_NO_FATAL_FAILURE(InsertDeviceBelow("\\_SB_", std::make_unique<Device>("PCI0")));
   ASSERT_NO_FATAL_FAILURE(InsertDeviceBelow("\\_SB_.PCI0", std::make_unique<Device>("I2C0")));
 
-  acpi::EvaluateObjectFidlHelper helper(&acpi_, acpi_.GetDeviceRoot()->FindByPath("\\_SB_"),
+  acpi::EvaluateObjectFidlHelper helper({}, &acpi_, acpi_.GetDeviceRoot()->FindByPath("\\_SB_"),
                                         "\\_SB_", EvaluateObjectMode::kPlainObject,
                                         fidl::VectorView<facpi::Object>(nullptr, 0));
   facpi::Object obj;
@@ -354,7 +354,7 @@ TEST_F(FidlEvaluateObjectTest, TestDecodeParentReferenceFails) {
 }
 
 TEST_F(FidlEvaluateObjectTest, TestDecodePackage) {
-  acpi::EvaluateObjectFidlHelper helper(&acpi_, acpi_.GetDeviceRoot(), "\\",
+  acpi::EvaluateObjectFidlHelper helper({}, &acpi_, acpi_.GetDeviceRoot(), "\\",
                                         EvaluateObjectMode::kPlainObject,
                                         fidl::VectorView<facpi::Object>(nullptr, 0));
 
@@ -411,7 +411,7 @@ TEST_F(FidlEvaluateObjectTest, TestDecodeParameters) {
       fidl::VectorView<uint8_t>::FromExternal(const_cast<uint8_t *>(kData), std::size(kData))));
 
   auto view = fidl::VectorView<facpi::Object>::FromExternal(params);
-  acpi::EvaluateObjectFidlHelper helper(&acpi_, acpi_.GetDeviceRoot(), "\\",
+  acpi::EvaluateObjectFidlHelper helper({}, &acpi_, acpi_.GetDeviceRoot(), "\\",
                                         EvaluateObjectMode::kPlainObject, view);
 
   auto result = helper.DecodeParameters(view);
@@ -429,7 +429,7 @@ TEST_F(FidlEvaluateObjectTest, TestDecodeParameters) {
 }
 
 TEST_F(FidlEvaluateObjectTest, TestEncodeInt) {
-  acpi::EvaluateObjectFidlHelper helper(&acpi_, acpi_.GetDeviceRoot(), "\\",
+  acpi::EvaluateObjectFidlHelper helper({}, &acpi_, acpi_.GetDeviceRoot(), "\\",
                                         EvaluateObjectMode::kPlainObject,
                                         fidl::VectorView<facpi::Object>(nullptr, 0));
   fidl::Arena<> alloc;
@@ -442,7 +442,7 @@ TEST_F(FidlEvaluateObjectTest, TestEncodeInt) {
 }
 
 TEST_F(FidlEvaluateObjectTest, TestEncodeString) {
-  acpi::EvaluateObjectFidlHelper helper(&acpi_, acpi_.GetDeviceRoot(), "\\",
+  acpi::EvaluateObjectFidlHelper helper({}, &acpi_, acpi_.GetDeviceRoot(), "\\",
                                         EvaluateObjectMode::kPlainObject,
                                         fidl::VectorView<facpi::Object>(nullptr, 0));
   fidl::Arena<> alloc;
@@ -459,7 +459,7 @@ TEST_F(FidlEvaluateObjectTest, TestEncodeString) {
 }
 
 TEST_F(FidlEvaluateObjectTest, TestEncodeBuffer) {
-  acpi::EvaluateObjectFidlHelper helper(&acpi_, acpi_.GetDeviceRoot(), "\\",
+  acpi::EvaluateObjectFidlHelper helper({}, &acpi_, acpi_.GetDeviceRoot(), "\\",
                                         EvaluateObjectMode::kPlainObject,
                                         fidl::VectorView<facpi::Object>(nullptr, 0));
   fidl::Arena<> alloc;
@@ -479,7 +479,7 @@ TEST_F(FidlEvaluateObjectTest, TestEncodeBuffer) {
 }
 
 TEST_F(FidlEvaluateObjectTest, TestEncodeProcessorVal) {
-  acpi::EvaluateObjectFidlHelper helper(&acpi_, acpi_.GetDeviceRoot(), "\\",
+  acpi::EvaluateObjectFidlHelper helper({}, &acpi_, acpi_.GetDeviceRoot(), "\\",
                                         EvaluateObjectMode::kPlainObject,
                                         fidl::VectorView<facpi::Object>(nullptr, 0));
 
@@ -509,7 +509,7 @@ TEST_F(FidlEvaluateObjectTest, TestEncodeReference) {
   ASSERT_NO_FATAL_FAILURE(InsertDeviceBelow("\\_SB_", std::make_unique<Device>("PCI0")));
   ASSERT_NO_FATAL_FAILURE(InsertDeviceBelow("\\_SB_.PCI0", std::make_unique<Device>("I2C0")));
 
-  acpi::EvaluateObjectFidlHelper helper(&acpi_, acpi_.GetDeviceRoot()->FindByPath("\\_SB_"),
+  acpi::EvaluateObjectFidlHelper helper({}, &acpi_, acpi_.GetDeviceRoot()->FindByPath("\\_SB_"),
                                         "\\_SB_", EvaluateObjectMode::kPlainObject,
                                         fidl::VectorView<facpi::Object>(nullptr, 0));
   fidl::Arena<> alloc;
@@ -534,7 +534,7 @@ TEST_F(FidlEvaluateObjectTest, TestEncodeParentReferenceFails) {
   ASSERT_NO_FATAL_FAILURE(InsertDeviceBelow("\\_SB_", std::make_unique<Device>("PCI0")));
   ASSERT_NO_FATAL_FAILURE(InsertDeviceBelow("\\_SB_.PCI0", std::make_unique<Device>("I2C0")));
 
-  acpi::EvaluateObjectFidlHelper helper(&acpi_, acpi_.GetDeviceRoot()->FindByPath("\\_SB_"),
+  acpi::EvaluateObjectFidlHelper helper({}, &acpi_, acpi_.GetDeviceRoot()->FindByPath("\\_SB_"),
                                         "\\_SB_", EvaluateObjectMode::kPlainObject,
                                         fidl::VectorView<facpi::Object>(nullptr, 0));
   ACPI_OBJECT obj = {.Reference = {
@@ -548,7 +548,7 @@ TEST_F(FidlEvaluateObjectTest, TestEncodeParentReferenceFails) {
 }
 
 TEST_F(FidlEvaluateObjectTest, TestEncodePackage) {
-  acpi::EvaluateObjectFidlHelper helper(&acpi_, acpi_.GetDeviceRoot(), "\\",
+  acpi::EvaluateObjectFidlHelper helper({}, &acpi_, acpi_.GetDeviceRoot(), "\\",
                                         EvaluateObjectMode::kPlainObject,
                                         fidl::VectorView<facpi::Object>(nullptr, 0));
   constexpr ACPI_OBJECT kObjects[2] = {
@@ -590,7 +590,7 @@ TEST_F(FidlEvaluateObjectTest, TestEncodePackage) {
 
 TEST_F(FidlEvaluateObjectTest, TestEncodeReturnValue) {
   ACPI_OBJECT obj = {.Integer = {.Type = ACPI_TYPE_INTEGER, .Value = 47}};
-  acpi::EvaluateObjectFidlHelper helper(&acpi_, acpi_.GetDeviceRoot(), "\\",
+  acpi::EvaluateObjectFidlHelper helper({}, &acpi_, acpi_.GetDeviceRoot(), "\\",
                                         EvaluateObjectMode::kPlainObject,
                                         fidl::VectorView<facpi::Object>(nullptr, 0));
 
@@ -605,7 +605,7 @@ TEST_F(FidlEvaluateObjectTest, TestEncodeReturnValue) {
 }
 
 TEST_F(FidlEvaluateObjectTest, TestEncodeMmioResource) {
-  acpi::EvaluateObjectFidlHelper helper(&acpi_, acpi_.GetDeviceRoot(), "\\",
+  acpi::EvaluateObjectFidlHelper helper({}, &acpi_, acpi_.GetDeviceRoot(), "\\",
                                         EvaluateObjectMode::kParseResources,
                                         fidl::VectorView<facpi::Object>(nullptr, 0));
 
@@ -665,7 +665,7 @@ TEST_F(FidlEvaluateObjectTest, TestEncodeMmioResource) {
 }
 
 TEST_F(FidlEvaluateObjectTest, TestMethodReturnsNothing) {
-  acpi::EvaluateObjectFidlHelper helper(&acpi_, acpi_.GetDeviceRoot(), "\\",
+  acpi::EvaluateObjectFidlHelper helper({}, &acpi_, acpi_.GetDeviceRoot(), "\\",
                                         EvaluateObjectMode::kPlainObject,
                                         fidl::VectorView<facpi::Object>());
 

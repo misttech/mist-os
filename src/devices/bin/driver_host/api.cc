@@ -368,7 +368,8 @@ __EXPORT zx_status_t device_connect_fragment_runtime_protocol(zx_device_t* dev,
 // LibDriver Misc Interfaces
 
 // Please do not use get_root_resource() in new code. See fxbug.dev/31358.
-__EXPORT zx_handle_t get_root_resource() {
+__EXPORT zx_handle_t get_root_resource(zx_device_t* dev) {
+  DEBUG_ASSERT_VALID_DEVICE(dev);
   return internal::ContextForApi()->root_resource().get();
 }
 

@@ -100,7 +100,8 @@ zx_status_t X86::Create(void* ctx, zx_device_t* parent, std::unique_ptr<X86>* ou
   }
 
   // Please do not use get_root_resource() in new code. See fxbug.dev/31358.
-  root_resource_handle = get_root_resource();
+  ZX_ASSERT(zx_handle_duplicate(get_root_resource(parent), ZX_RIGHT_SAME_RIGHTS,
+                                &root_resource_handle) == ZX_OK);
 
   fbl::AllocChecker ac;
   *out = fbl::make_unique_checked<X86>(&ac, parent, std::move(endpoints->client),
@@ -163,7 +164,7 @@ zx_status_t X86::Bind() {
 
   // Load SMBIOS information.
   smbios::SmbiosInfo smbios;
-  status = smbios.Load();
+  status = smbios.Load(zx::unowned_resource(get_root_resource(parent())));
   if (status == ZX_OK) {
     SetField("board name", smbios.board_name(), board_info.board_name());
     SetField("vendor", smbios.vendor(), bootloader_info.vendor());

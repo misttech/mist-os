@@ -391,7 +391,7 @@ zx_status_t device_add_composite(zx_device_t* dev, const char* name,
                                  const composite_device_desc_t* comp_desc);
 
 // temporary accessor for root resource handle
-zx_handle_t get_root_resource(void);
+zx_handle_t get_root_resource(zx_device_t* dev);
 
 zx_status_t load_firmware_from_driver(zx_driver_t* drv, zx_device_t* device, const char* path,
                                       zx_handle_t* fw, size_t* size);

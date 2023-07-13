@@ -69,11 +69,12 @@ __attribute__((unused)) static void gga_dump_regs() {
   }
 }
 
-static zx_status_t gga_disp_setup(uint16_t width, uint16_t height, uint16_t bits_per_pixel) {
+static zx_status_t gga_disp_setup(zx_device_t* dev, uint16_t width, uint16_t height,
+                                  uint16_t bits_per_pixel) {
   // TODO(fxbug.dev/84561): Drivers shouldn't request root resource to get IO
   // ports. Instead the board driver should provide the port access over PCI
   // root protocol and PCI bus driver should pass them to corresponding devices.
-  zx_handle_t root = get_root_resource();
+  zx_handle_t root = get_root_resource(dev);
 
   zx_status_t status = zx_ioports_request(root, GGA_VBE_INDEX_REG, 1u);
   if (status != ZX_OK) {
@@ -119,7 +120,7 @@ static zx_status_t gga_disp_setup(uint16_t width, uint16_t height, uint16_t bits
 static zx_status_t gga_disp_bind(void* ctx, zx_device_t* dev) {
   uint32_t format, width, height, stride;
   zx_status_t status =
-      zx_framebuffer_get_info(get_root_resource(), &format, &width, &height, &stride);
+      zx_framebuffer_get_info(get_root_resource(dev), &format, &width, &height, &stride);
   if (status != ZX_OK) {
     zxlogf(ERROR, "%s: failed to get bootloader dimensions: %d\n", __func__, status);
     return ZX_ERR_NOT_SUPPORTED;
@@ -131,7 +132,7 @@ static zx_status_t gga_disp_bind(void* ctx, zx_device_t* dev) {
     zxlogf(ERROR, "%s: unsupported large width/height: %d %d\n", __func__, width, height);
     return ZX_ERR_NOT_SUPPORTED;
   }
-  status = gga_disp_setup(static_cast<uint16_t>(width), static_cast<uint16_t>(height),
+  status = gga_disp_setup(dev, static_cast<uint16_t>(width), static_cast<uint16_t>(height),
                           static_cast<uint16_t>(kBitsPerPixel));
   if (status != ZX_OK) {
     zxlogf(ERROR, "%s: Cannot set up GGA device registers: %d", __func__, status);

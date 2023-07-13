@@ -165,10 +165,10 @@ struct FramebufferInfo {
 // ZBI_TYPE_FRAMEBUFFER entry. We assume this information to be valid and unmodified by an
 // unauthorized call to zx_framebuffer_set_range(), however this is potentially an issue.
 // See fxbug.dev/77501.
-zx::result<FramebufferInfo> GetFramebufferInfo() {
+zx::result<FramebufferInfo> GetFramebufferInfo(zx_device_t* parent) {
   FramebufferInfo info;
   // Please do not use get_root_resource() in new code. See fxbug.dev/31358.
-  zx_status_t status = zx_framebuffer_get_info(get_root_resource(), &info.format, &info.width,
+  zx_status_t status = zx_framebuffer_get_info(get_root_resource(parent), &info.format, &info.width,
                                                &info.height, &info.stride);
   if (status != ZX_OK) {
     return zx::error(status);
@@ -413,7 +413,7 @@ bool Controller::BringUpDisplayEngine(bool resume) {
   constexpr uint8_t kClockingModeIdx = 1;
   constexpr uint8_t kClockingModeScreenOff = (1 << 5);
   // Please do not use get_root_resource() in new code. See fxbug.dev/31358.
-  zx_status_t status = zx_ioports_request(get_root_resource(), kSequencerIdx, 2);
+  zx_status_t status = zx_ioports_request(get_root_resource(parent()), kSequencerIdx, 2);
   if (status != ZX_OK) {
     zxlogf(ERROR, "Failed to map vga ports");
     return false;
@@ -2204,7 +2204,7 @@ void Controller::DdkRelease() {
 void Controller::DdkSuspend(ddk::SuspendTxn txn) {
   // TODO(fxbug.dev/43204): Implement the suspend hook based on suspendtxn
   if (txn.suspend_reason() == DEVICE_SUSPEND_REASON_MEXEC) {
-    zx::result<FramebufferInfo> fb_status = GetFramebufferInfo();
+    zx::result<FramebufferInfo> fb_status = GetFramebufferInfo(parent());
     if (fb_status.is_error()) {
       txn.Reply(ZX_OK, txn.requested_state());
       return;
@@ -2344,7 +2344,7 @@ zx_status_t Controller::Init() {
   pci_.ReadConfig16(fuchsia_hardware_pci::Config::kDeviceId, &device_id_);
   zxlogf(TRACE, "Device id %x", device_id_);
 
-  status = igd_opregion_.Init(pci_);
+  status = igd_opregion_.Init(parent(), pci_);
   if (status != ZX_OK) {
     if (status != ZX_ERR_NOT_SUPPORTED) {
       zxlogf(ERROR, "VBT initializaton failed: %s", zx_status_get_string(status));
@@ -2412,7 +2412,7 @@ zx_status_t Controller::Init() {
     // Prevent clients from allocating memory in this region by telling |gtt_| to exclude it from
     // the region allocator.
     uint32_t offset = 0u;
-    auto fb = GetFramebufferInfo();
+    auto fb = GetFramebufferInfo(parent());
     if (fb.is_error()) {
       zxlogf(INFO, "Failed to obtain framebuffer size (%s)", fb.status_string());
       // It is possible for zx_framebuffer_get_info to fail in a headless system as the bootloader

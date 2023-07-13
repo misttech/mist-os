@@ -21,7 +21,8 @@ class EvaluateObjectFidlHelper {
  public:
   using EvaluateObjectRequestView =
       fidl::WireServer<fuchsia_hardware_acpi::Device>::EvaluateObjectRequestView;
-  EvaluateObjectFidlHelper(acpi::Acpi* acpi, ACPI_HANDLE device, std::string request_path,
+  EvaluateObjectFidlHelper(zx_handle_t mmio_resource, acpi::Acpi* acpi, ACPI_HANDLE device,
+                           std::string request_path,
                            fuchsia_hardware_acpi::wire::EvaluateObjectMode mode,
                            fidl::VectorView<fuchsia_hardware_acpi::wire::Object> params)
       : acpi_(acpi),
@@ -29,10 +30,10 @@ class EvaluateObjectFidlHelper {
         request_path_(std::move(request_path)),
         mode_(mode),
         request_params_(params),
-        // Please do not use get_root_resource() in new code. See fxbug.dev/31358.
-        mmio_resource_(get_root_resource()) {}
+        mmio_resource_(std::move(mmio_resource)) {}
 
-  static EvaluateObjectFidlHelper FromRequest(acpi::Acpi* acpi, ACPI_HANDLE device,
+  static EvaluateObjectFidlHelper FromRequest(zx_handle_t mmio_resource, acpi::Acpi* acpi,
+                                              ACPI_HANDLE device,
                                               EvaluateObjectRequestView& request);
 
   // Calls AcpiEvaluateObject using the arguments supplied to the constructor in |request|, and

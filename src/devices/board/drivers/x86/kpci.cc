@@ -555,7 +555,8 @@ zx_status_t pci_init(zx_device_t* platform_bus, ACPI_HANDLE object,
                      std::vector<pci_bdf_t> acpi_bdfs) {
   // Report current resources to kernel PCI driver
   // Please do not use get_root_resource() in new code. See fxbug.dev/31358.
-  zx_status_t status = pci_report_current_resources(manager->acpi(), get_root_resource());
+  zx_status_t status =
+      pci_report_current_resources(manager->acpi(), get_root_resource(platform_bus));
   if (status != ZX_OK) {
     zxlogf(ERROR, "acpi: WARNING: ACPI failed to report all current resources!");
   }
@@ -570,7 +571,7 @@ zx_status_t pci_init(zx_device_t* platform_bus, ACPI_HANDLE object,
   }
 
   // Please do not use get_root_resource() in new code. See fxbug.dev/31358.
-  status = zx_pci_init(get_root_resource(), arg, arg_size);
+  status = zx_pci_init(get_root_resource(platform_bus), arg, arg_size);
   if (status != ZX_OK) {
     zxlogf(ERROR, "acpi: error %d in zx_pci_init", status);
     return AE_ERROR;

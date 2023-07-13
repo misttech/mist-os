@@ -54,8 +54,8 @@ zx_status_t pci_get_bar(kpci_device* device, uint32_t bar_id, pci_bar_t* out_res
     out_res->type = bar.type;
     if (out_res->type == PCI_BAR_TYPE_IO) {
       char name[] = "kPCI IO";
-      st = zx_resource_create(get_root_resource(), ZX_RSRC_KIND_IOPORT, bar.addr, bar.size, name,
-                              sizeof(name), &handle);
+      st = zx_resource_create(get_root_resource(device->zxdev), ZX_RSRC_KIND_IOPORT, bar.addr,
+                              bar.size, name, sizeof(name), &handle);
       out_res->result.io.address = bar.addr;
       out_res->result.io.resource = handle;
     } else {
@@ -183,7 +183,7 @@ static zx_status_t pci_init_child(zx_device_t* parent, uint32_t index,
 
   // This is a legacy function to get the 'nth' device on a bus. Please do not
   // use get_root_resource() in new code. See fxbug.dev/31358.
-  zx_status_t status = zx_pci_get_nth_device(get_root_resource(), index, &info, &handle);
+  zx_status_t status = zx_pci_get_nth_device(get_root_resource(parent), index, &info, &handle);
   if (status != ZX_OK) {
     return status;
   }

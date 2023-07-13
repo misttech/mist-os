@@ -264,7 +264,7 @@ void Device::GetMmio(GetMmioRequestView request, GetMmioCompleter::Sync& complet
   zx_handle_t vmo;
   size_t size{res.address_length};
   // Please do not use get_root_resource() in new code. See fxbug.dev/31358.
-  st = zx_vmo_create_physical(get_root_resource(), res.base_address, size, &vmo);
+  st = zx_vmo_create_physical(get_root_resource(parent()), res.base_address, size, &vmo);
   if (st != ZX_OK) {
     zxlogf(ERROR, "Internal error creating VMO: %s", zx_status_get_string(st));
     completer.ReplyError(ZX_ERR_INTERNAL);
@@ -713,7 +713,8 @@ void Device::GetBusId(GetBusIdCompleter::Sync& completer) {
 
 void Device::EvaluateObject(EvaluateObjectRequestView request,
                             EvaluateObjectCompleter::Sync& completer) {
-  auto helper = EvaluateObjectFidlHelper::FromRequest(acpi_, acpi_handle_, request);
+  auto helper = EvaluateObjectFidlHelper::FromRequest(get_root_resource(parent()), acpi_,
+                                                      acpi_handle_, request);
   fidl::Arena<> alloc;
   auto result = helper.Evaluate(alloc);
   if (result.is_error()) {
@@ -778,7 +779,7 @@ zx::result<zx::interrupt> Device::GetInterrupt(size_t index) {
   }
   // Please do not use get_root_resource() in new code. See fxbug.dev/31358.
   zx::interrupt out_irq;
-  st = zx::interrupt::create(*zx::unowned_resource{get_root_resource()}, irq.pin,
+  st = zx::interrupt::create(*zx::unowned_resource{get_root_resource(parent())}, irq.pin,
                              ZX_INTERRUPT_REMAP_IRQ | mode, &out_irq);
   if (st != ZX_OK) {
     zxlogf(ERROR, "Internal error creating interrupt: %s", zx_status_get_string(st));
@@ -819,7 +820,7 @@ void Device::GetPio(GetPioRequestView request, GetPioCompleter::Sync& completer)
   zx::resource out_pio;
   // Please do not use get_root_resource() in new code. See fxbug.dev/31358.
   zx_status_t status =
-      zx::resource::create(*zx::unowned_resource{get_root_resource()}, ZX_RSRC_KIND_IOPORT,
+      zx::resource::create(*zx::unowned_resource{get_root_resource(parent())}, ZX_RSRC_KIND_IOPORT,
                            res.base_address, res.address_length, name, 0, &out_pio);
   if (status != ZX_OK) {
     zxlogf(ERROR, "Internal error creating resource: %s", zx_status_get_string(status));
