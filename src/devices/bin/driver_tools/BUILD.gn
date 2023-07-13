@@ -83,6 +83,8 @@ rustc_library("lib") {
     "src/subcommands/debug_bind/mod.rs",
     "src/subcommands/device/args.rs",
     "src/subcommands/device/mod.rs",
+    "src/subcommands/disable/args.rs",
+    "src/subcommands/disable/mod.rs",
     "src/subcommands/dump/args.rs",
     "src/subcommands/dump/mod.rs",
     "src/subcommands/i2c/args.rs",

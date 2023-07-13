@@ -4,6 +4,7 @@
 
 pub mod debug_bind;
 pub mod device;
+pub mod disable;
 pub mod dump;
 #[cfg(any(not(target_os = "fuchsia"), test))]
 pub mod i2c;

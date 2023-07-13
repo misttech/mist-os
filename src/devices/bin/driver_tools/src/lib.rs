@@ -199,6 +199,15 @@ pub async fn driver(
                 .await
                 .context("AddTestNode subcommand failed")?;
         }
+        DriverSubCommand::Disable(subcmd) => {
+            let driver_development_proxy = driver_connector
+                .get_driver_development_proxy(subcmd.select)
+                .await
+                .context("Failed to get driver development proxy")?;
+            subcommands::disable::disable(subcmd, writer, driver_development_proxy)
+                .await
+                .context("Disable subcommand failed")?;
+        }
     };
     Ok(())
 }

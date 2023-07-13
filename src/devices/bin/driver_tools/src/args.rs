@@ -4,8 +4,9 @@
 
 use {
     super::subcommands::{
-        debug_bind::args::DebugBindCommand, device::args::DeviceCommand, dump::args::DumpCommand,
-        list::args::ListCommand, list_composite_node_specs::args::ListCompositeNodeSpecsCommand,
+        debug_bind::args::DebugBindCommand, device::args::DeviceCommand,
+        disable::args::DisableCommand, dump::args::DumpCommand, list::args::ListCommand,
+        list_composite_node_specs::args::ListCompositeNodeSpecsCommand,
         list_composites::args::ListCompositesCommand, list_devices::args::ListDevicesCommand,
         list_hosts::args::ListHostsCommand, register::args::RegisterCommand,
         restart::args::RestartCommand, test_node::args::TestNodeCommand,
@@ -41,6 +42,7 @@ pub struct DriverCommand {
 pub enum DriverSubCommand {
     DebugBind(DebugBindCommand),
     Device(DeviceCommand),
+    Disable(DisableCommand),
     Dump(DumpCommand),
     List(ListCommand),
     ListComposites(ListCompositesCommand),
@@ -59,6 +61,7 @@ pub enum DriverSubCommand {
     Conformance(ConformanceCommand),
     DebugBind(DebugBindCommand),
     Device(DeviceCommand),
+    Disable(DisableCommand),
     Dump(DumpCommand),
     I2c(I2cCommand),
     List(ListCommand),
