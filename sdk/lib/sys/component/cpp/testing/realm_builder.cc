@@ -144,7 +144,6 @@ Realm& Realm::RouteReadOnlyDirectory(const std::string& name, std::vector<Ref> t
   return *this;
 }
 
-#if __Fuchsia_API_level__ >= 9
 Realm& Realm::InitMutableConfigFromPackage(const std::string& name) {
   fuchsia::component::test::Realm_InitMutableConfigFromPackage_Result result;
   ZX_COMPONENT_ASSERT_STATUS_AND_RESULT_OK(
@@ -152,9 +151,7 @@ Realm& Realm::InitMutableConfigFromPackage(const std::string& name) {
       realm_proxy_->InitMutableConfigFromPackage(name, &result), result);
   return *this;
 }
-#endif
 
-#if __Fuchsia_API_level__ >= 9
 Realm& Realm::InitMutableConfigToEmpty(const std::string& name) {
   fuchsia::component::test::Realm_InitMutableConfigToEmpty_Result result;
   ZX_COMPONENT_ASSERT_STATUS_AND_RESULT_OK("Realm/InitMutableConfigToEmpty",
@@ -162,7 +159,6 @@ Realm& Realm::InitMutableConfigToEmpty(const std::string& name) {
                                            result);
   return *this;
 }
-#endif
 
 Realm& Realm::SetConfigValue(const std::string& name, const std::string& key, ConfigValue value) {
   fuchsia::component::test::Realm_SetConfigValue_Result result;
@@ -324,19 +320,15 @@ RealmBuilder& RealmBuilder::RouteReadOnlyDirectory(const std::string& name, std:
   return *this;
 }
 
-#if __Fuchsia_API_level__ >= 9
 RealmBuilder& RealmBuilder::InitMutableConfigFromPackage(const std::string& name) {
   root_.InitMutableConfigFromPackage(name);
   return *this;
 }
-#endif
 
-#if __Fuchsia_API_level__ >= 9
 RealmBuilder& RealmBuilder::InitMutableConfigToEmpty(const std::string& name) {
   root_.InitMutableConfigToEmpty(name);
   return *this;
 }
-#endif
 
 RealmBuilder& RealmBuilder::SetConfigValue(const std::string& name, const std::string& key,
                                            ConfigValue value) {

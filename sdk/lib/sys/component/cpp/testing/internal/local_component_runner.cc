@@ -49,14 +49,7 @@ std::unique_ptr<LocalComponentHandles> CreateHandlesFromStartInfo(
   }
 
   sys::OutgoingDirectory outgoing_dir;
-  outgoing_dir.Serve(
-#if __Fuchsia_API_level__ < 10
-      start_info.mutable_outgoing_dir()->TakeChannel()
-#else
-      std::move(*start_info.mutable_outgoing_dir())
-#endif
-          ,
-      dispatcher);
+  outgoing_dir.Serve(std::move(*start_info.mutable_outgoing_dir()), dispatcher);
   return std::make_unique<LocalComponentHandles>(ns, std::move(outgoing_dir));
 }
 

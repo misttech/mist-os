@@ -190,7 +190,6 @@ class Realm final {
                        const ChildOptions& options = kDefaultChildOptions)
       ZX_DEPRECATED_SINCE(1, 9, "Use AddLocalChild(..., LocalComponentFactory, ...) instead.");
 
-#if __Fuchsia_API_level__ >= 9
   // Add a component by implementing a factory function that creates and returns
   // a new instance of a |LocalComponentImpl|-derived class. The factory
   // function will be called whenever the local child is started.
@@ -210,7 +209,6 @@ class Realm final {
   // Names must be unique. Duplicate names will result in a panic.
   Realm& AddLocalChild(const std::string& child_name, LocalComponentFactory local_impl,
                        const ChildOptions& options = kDefaultChildOptions);
-#endif
 
   // Create a sub realm as child of this Realm instance. The constructed
   // Realm is returned.
@@ -226,15 +224,11 @@ class Realm final {
   Realm& RouteReadOnlyDirectory(const std::string& name, std::vector<Ref> to,
                                 DirectoryContents directory);
 
-#if __Fuchsia_API_level__ >= 9
   // Load the packaged configuration of the component if available.
   Realm& InitMutableConfigFromPackage(const std::string& name);
-#endif
 
-#if __Fuchsia_API_level__ >= 9
   // Allow setting configuration values without loading packaged configuration.
   Realm& InitMutableConfigToEmpty(const std::string& name);
-#endif
 
   // Replaces the value of a given configuration field
   Realm& SetConfigValue(const std::string& name, const std::string& key, ConfigValue value);
@@ -334,14 +328,12 @@ class RealmBuilder final {
                               const ChildOptions& options = kDefaultChildOptions)
       ZX_DEPRECATED_SINCE(1, 9, "Use AddLocalChild(..., LocalComponentFactory, ...) instead.");
 
-#if __Fuchsia_API_level__ >= 9
   // Add a component by LocalComponentFactory.
   //
   // See |Realm.AddLocalChild| for more details.
 
   RealmBuilder& AddLocalChild(const std::string& child_name, LocalComponentFactory local_impl,
                               const ChildOptions& options = kDefaultChildOptions);
-#endif
 
   // Create a sub realm as child of the root realm. The constructed
   // Realm is returned.
@@ -358,15 +350,11 @@ class RealmBuilder final {
   RealmBuilder& RouteReadOnlyDirectory(const std::string& name, std::vector<Ref> to,
                                        DirectoryContents directory);
 
-#if __Fuchsia_API_level__ >= 9
   // Load the packaged configuration of the component if available.
   RealmBuilder& InitMutableConfigFromPackage(const std::string& name);
-#endif
 
-#if __Fuchsia_API_level__ >= 9
   // Allow setting configuration values without loading packaged configuration.
   RealmBuilder& InitMutableConfigToEmpty(const std::string& name);
-#endif
 
   // Replaces the value of a given configuration field for the root realm.
   RealmBuilder& SetConfigValue(const std::string& name, const std::string& key, ConfigValue value);
@@ -386,7 +374,6 @@ class RealmBuilder final {
   // Updates the Component decl of this root realm.
   void ReplaceRealmDecl(fuchsia::component::decl::Component decl);
 
-#if __Fuchsia_API_level__ >= 10
   // Set the name of the collection that the realm will be added to.
   // By default this is set to |kDefaultCollection|.
   //
@@ -400,7 +387,6 @@ class RealmBuilder final {
   // Set the name for the constructed realm. By default, a randomly
   // generated string is used.
   RealmBuilder& SetRealmName(const std::string& name);
-#endif
 
   // Build the realm root prepared by the associated builder methods, e.g. |AddComponent|.
   // |dispatcher| must be non-null, or |async_get_default_dispatcher| must be
