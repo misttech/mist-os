@@ -9,9 +9,9 @@ pub mod populate_bundle_visitor;
 use {
     crate::docker_archive::DockerArchive,
     crate::layered_image::LayeredImage,
-    crate::populate_bundle_visitor::{PopulateBundleVisitor, S_IFDIR},
+    crate::populate_bundle_visitor::PopulateBundleVisitor,
     anyhow::{bail, Error},
-    ext4_metadata::ROOT_INODE_NUM,
+    ext4_metadata::{ROOT_INODE_NUM, S_IFDIR},
     std::{collections::HashMap, fs::File, path::Path, str::FromStr},
 };
 

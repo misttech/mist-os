@@ -11,6 +11,11 @@ use {
 // This is deliberately the same as ext4.
 pub const ROOT_INODE_NUM: u64 = 2;
 
+pub const S_IFDIR: u16 = 0x4000;
+pub const S_IFREG: u16 = 0x8000;
+pub const S_IFLNK: u16 = 0xa000;
+pub const S_IFMT: u16 = 0xf000;
+
 #[derive(Error, Debug)]
 pub enum MetadataError {
     #[error("Node not found")]
@@ -78,6 +83,7 @@ impl Metadata {
         gid: u16,
         extended_attributes: ExtendedAttributes,
     ) {
+        assert_eq!(mode & S_IFMT, S_IFDIR);
         self.nodes.insert(
             inode_num,
             Node {
@@ -99,6 +105,7 @@ impl Metadata {
         gid: u16,
         extended_attributes: ExtendedAttributes,
     ) {
+        assert_eq!(mode & S_IFMT, S_IFREG);
         self.nodes.insert(
             inode_num,
             Node { info: NodeInfo::File(File), mode, uid, gid, extended_attributes },
@@ -115,6 +122,7 @@ impl Metadata {
         gid: u16,
         extended_attributes: ExtendedAttributes,
     ) {
+        assert_eq!(mode & S_IFMT, S_IFLNK);
         self.nodes.insert(
             inode_num,
             Node {
@@ -196,7 +204,7 @@ pub struct Symlink {
 #[cfg(test)]
 mod tests {
     use {
-        super::{Metadata, NodeInfo, ROOT_INODE_NUM},
+        super::{Metadata, NodeInfo, ROOT_INODE_NUM, S_IFDIR, S_IFLNK, S_IFREG},
         assert_matches::assert_matches,
         std::collections::HashMap,
     };
@@ -206,18 +214,18 @@ mod tests {
         let mut m = Metadata::new();
         let xattr: HashMap<_, _> =
             [((*b"a").into(), (*b"apple").into()), ((*b"b").into(), (*b"ball").into())].into();
-        m.insert_directory(ROOT_INODE_NUM, 1, 2, 3, Default::default());
-        m.insert_directory(3, 1, 2, 3, xattr.clone());
+        m.insert_directory(ROOT_INODE_NUM, S_IFDIR | 0o755, 2, 3, Default::default());
+        m.insert_directory(3, S_IFDIR | 0o775, 2, 3, xattr.clone());
         m.add_child(&["foo"], 3);
-        m.insert_file(4, 1, 2, 3, xattr.clone());
+        m.insert_file(4, S_IFREG | 0o644, 2, 3, xattr.clone());
         m.add_child(&["foo/bar"], 4);
-        m.insert_symlink(5, "symlink-target".to_string(), 1, 2, 3, xattr.clone());
+        m.insert_symlink(5, "symlink-target".to_string(), S_IFLNK | 0o777, 2, 3, xattr.clone());
         m.add_child(&["foo/baz"], 5);
 
         let m = Metadata::deserialize(&m.serialize()).expect("deserialize failed");
         let node = m.get(ROOT_INODE_NUM).expect("root not found");
         assert_matches!(node.info(), NodeInfo::Directory(_));
-        assert_eq!(node.mode, 1);
+        assert_eq!(node.mode, S_IFDIR | 0o755);
         assert_eq!(node.uid, 2);
         assert_eq!(node.gid, 3);
         assert_eq!(node.extended_attributes, [].into());
@@ -225,7 +233,7 @@ mod tests {
         assert_eq!(m.lookup(ROOT_INODE_NUM, "foo").expect("foo not found"), 3);
         let node = m.get(3).expect("root not found");
         assert_matches!(node.info(), NodeInfo::Directory(_));
-        assert_eq!(node.mode, 1);
+        assert_eq!(node.mode, S_IFDIR | 0o775);
         assert_eq!(node.uid, 2);
         assert_eq!(node.gid, 3);
         assert_eq!(&node.extended_attributes, &xattr);
@@ -233,7 +241,7 @@ mod tests {
         assert_eq!(m.lookup(ROOT_INODE_NUM, "foo/bar").expect("foo/bar not found"), 4);
         let node = m.get(4).expect("root not found");
         assert_matches!(node.info(), NodeInfo::File(_));
-        assert_eq!(node.mode, 1);
+        assert_eq!(node.mode, S_IFREG | 0o644);
         assert_eq!(node.uid, 2);
         assert_eq!(node.gid, 3);
         assert_eq!(&node.extended_attributes, &xattr);
@@ -241,7 +249,7 @@ mod tests {
         assert_eq!(m.lookup(ROOT_INODE_NUM, "foo/baz").expect("foo/baz not found"), 5);
         let node = m.get(5).expect("root not found");
         assert_matches!(node.info(), NodeInfo::Symlink(_));
-        assert_eq!(node.mode, 1);
+        assert_eq!(node.mode, S_IFLNK | 0o777);
         assert_eq!(node.uid, 2);
         assert_eq!(node.gid, 3);
         assert_eq!(&node.extended_attributes, &xattr);
