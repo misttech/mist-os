@@ -1,4 +1,3 @@
-aaronwood@google.com
-awolter@google.com
+include /src/lib/assembly/OWNERS
 
 # Component: ProductAssembly

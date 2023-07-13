@@ -6,8 +6,8 @@ set noparent
 #
 # Read the README.md for more information.
 
-aaronwood@google.com
-awolter@google.com
+include /src/lib/assembly/OWNERS
+
 jamesr@google.com
 jayzhuang@google.com
 rudymathu@google.com
