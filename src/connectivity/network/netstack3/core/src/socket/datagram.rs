@@ -614,14 +614,8 @@ where
     S::UnboundSharingState: Clone + Into<S::ListenerSharingState>,
     S::ListenerSharingState: Default,
 {
-    let id = match id {
-        SocketId::Unbound(id) => id,
-        SocketId::Bound(_) => return Err(Either::Left(ExpectedUnboundError)),
-    };
     sync_ctx.with_sockets_mut(|sync_ctx, sockets, _allocator| {
         listen_inner::<A, C, _, S>(sync_ctx, ctx, sockets, id, addr, local_id)
-            .map(|id| SocketId::Bound(BoundSocketId::Listener(id)))
-            .map_err(Either::Right)
     })
 }
 
@@ -639,10 +633,10 @@ fn listen_inner<
     sync_ctx: &mut SC,
     ctx: &mut C,
     sockets: &mut Sockets<A, S>,
-    id: S::UnboundId,
+    id: SocketId<S>,
     addr: Option<ZonedAddr<A::IpAddr, SC::DeviceId>>,
     local_id: Option<A::LocalIdentifier>,
-) -> Result<S::ListenerId, LocalAddressError>
+) -> Result<SocketId<S>, Either<ExpectedUnboundError, LocalAddressError>>
 where
     Bound<S>: Tagged<AddrVec<A>>,
     S::ListenerAddrState:
@@ -651,6 +645,17 @@ where
     S::ListenerSharingState: Default,
 {
     let Sockets { state, bound } = sockets;
+
+    let unbound_entry = match state.entry(id.clone()) {
+        IdMapCollectionEntry::Vacant(_) => panic!("unbound ID {:?} is invalid", id),
+        IdMapCollectionEntry::Occupied(o) => o,
+    };
+
+    let UnboundSocketState { device, sharing, ip_options: _ } = match unbound_entry.get() {
+        SocketState::Unbound(state) => state,
+        SocketState::Bound(_) => return Err(Either::Left(ExpectedUnboundError)),
+    };
+
     let identifier = match local_id {
         Some(local_id) => Ok(local_id),
         None => {
@@ -667,22 +672,16 @@ where
                 })
             })
         }
-        .ok_or(LocalAddressError::FailedToAllocateLocalPort),
+        .ok_or(Either::Right(LocalAddressError::FailedToAllocateLocalPort)),
     }?;
 
-    let unbound_entry = match state.entry(SocketId::Unbound(id.clone())) {
-        IdMapCollectionEntry::Vacant(_) => panic!("unbound ID {:?} is invalid", id),
-        IdMapCollectionEntry::Occupied(o) => o,
-    };
-
-    let UnboundSocketState { device, sharing, ip_options: _ } = assert_matches!(
-        unbound_entry.get(), SocketState::Unbound(state) => state);
     let (addr, device, identifier) = match addr {
         Some(addr) => {
             // Extract the specified address and the device. The device
             // is either the one from the address or the one to which
             // the socket was previously bound.
-            let (addr, device) = crate::transport::resolve_addr_with_device(addr, device.clone())?;
+            let (addr, device) = crate::transport::resolve_addr_with_device(addr, device.clone())
+                .map_err(|e| Either::Right(e.into()))?;
 
             // Binding to multicast addresses is allowed regardless.
             // Other addresses can only be bound to if they are assigned
@@ -691,11 +690,11 @@ where
                 let mut assigned_to = sync_ctx.get_devices_with_assigned_addr(addr);
                 if let Some(device) = &device {
                     if !assigned_to.any(|d| device == &EitherDeviceId::Strong(d)) {
-                        return Err(LocalAddressError::AddressMismatch);
+                        return Err(Either::Right(LocalAddressError::AddressMismatch));
                     }
                 } else {
                     if !assigned_to.any(|_: SC::DeviceId| true) {
-                        return Err(LocalAddressError::CannotBindToAddress);
+                        return Err(Either::Right(LocalAddressError::CannotBindToAddress));
                     }
                 }
             }
@@ -715,7 +714,7 @@ where
             // Remove the unbound state only after we're sure the
             // insertion is going to succeed.
             let UnboundSocketState { device: _, sharing: _, ip_options } = assert_matches!(
-                state.remove(&SocketId::Unbound(id)), Some(SocketState::Unbound(state)) => state);
+                state.remove(&id), Some(SocketState::Unbound(state)) => state);
             let entry = state.push_entry(
                 |index| SocketId::Bound(BoundSocketId::Listener(S::ListenerId::from(index))),
                 SocketState::Bound(BoundSocketState::Listener((
@@ -727,7 +726,7 @@ where
             assert_matches!(entry.key(), SocketId::Bound(BoundSocketId::Listener(id)) => id.clone())
         },
     ) {
-        Ok(entry) => Ok(entry.id()),
+        Ok(entry) => Ok(SocketId::Bound(BoundSocketId::Listener(entry.id()))),
         Err((
             InsertError::ShadowAddrExists
             | InsertError::Exists
@@ -736,7 +735,7 @@ where
             sharing,
         )) => {
             let _: S::ListenerSharingState = sharing;
-            Err(LocalAddressError::AddressInUse)
+            Err(Either::Right(LocalAddressError::AddressInUse))
         }
     }
 }
@@ -1213,22 +1212,17 @@ where
     S::ListenerSharingState: Default,
 {
     sync_ctx.with_sockets_buf_mut(|sync_ctx, state, _allocator| {
-        let (id, new_id) = match id {
-            SocketId::Unbound(id) => match listen_inner(sync_ctx, ctx, state, id, None, None) {
-                Ok(listen) => (
-                    BoundSocketId::Listener(listen.clone()),
-                    Some(SocketId::Bound(BoundSocketId::Listener(listen))),
-                ),
-                Err(e) => return Err(Either::Left((body, e))),
-            },
-            SocketId::Bound(id) => (id, None),
+        let (id, new_id) = match listen_inner(sync_ctx, ctx, state, id.clone(), None, None) {
+            Ok(listen) => (listen.clone(), Some(listen)),
+            Err(Either::Right(e)) => return Err(Either::Left((body, e))),
+            Err(Either::Left(ExpectedUnboundError)) => (id, None),
         };
 
         // TODO(https://github.com/rust-lang/rust/issues/31436): Replace this
         // closure with a try-block.
         let send_result = (|| {
             let Sockets { state, bound: _ } = state;
-            let state = match state.get(&SocketId::Bound(id)).expect("no such socket") {
+            let state = match state.get(&id).expect("no such socket") {
                 SocketState::Unbound(_) => panic!("expected bound socket"),
                 SocketState::Bound(state) => state,
             };
