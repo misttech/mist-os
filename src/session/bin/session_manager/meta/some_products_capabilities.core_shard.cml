@@ -272,7 +272,7 @@
         },
         {
             protocol: "fuchsia.update.installer.Installer",
-            from: "#system-updater",
+            from: "#system-update",
             to: "#session-manager",
             source_availability: "unknown",
         },
