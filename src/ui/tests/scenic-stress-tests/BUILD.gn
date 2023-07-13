@@ -8,41 +8,6 @@ import("//build/rust/rustc_library.gni")
 import("//build/rust/rustc_test.gni")
 import("//src/ui/lib/escher/build_args.gni")
 
-rustc_test("scenic-stressor-bin") {
-  name = "scenic_stressor"
-  edition = "2021"
-  testonly = true
-  source_root = "src/gfx_main.rs"
-
-  deps = [
-    "//sdk/fidl/fuchsia.ui.gfx:fuchsia.ui.gfx_rust",
-    "//sdk/fidl/fuchsia.ui.pointerinjector:fuchsia.ui.pointerinjector_rust",
-    "//sdk/fidl/fuchsia.ui.scenic:fuchsia.ui.scenic_rust",
-    "//sdk/fidl/fuchsia.ui.views:fuchsia.ui.views_rust",
-    "//src/lib/diagnostics/log/rust",
-    "//src/lib/fidl/rust/fidl",
-    "//src/lib/fuchsia-async",
-    "//src/lib/fuchsia-component-test",
-    "//src/lib/ui/fuchsia-scenic",
-    "//src/lib/zircon/rust:fuchsia-zircon",
-    "//src/sys/lib/stress-test",
-    "//third_party/rust_crates:argh",
-    "//third_party/rust_crates:async-trait",
-    "//third_party/rust_crates:futures",
-    "//third_party/rust_crates:rand",
-    "//third_party/rust_crates:tracing",
-  ]
-
-  sources = [
-    "src/gfx_environment.rs",
-    "src/gfx_main.rs",
-    "src/input_actor.rs",
-    "src/pointer_state.rs",
-    "src/session.rs",
-    "src/session_actor.rs",
-  ]
-}
-
 rustc_test("scenic-stressor-flatland-bin") {
   name = "scenic_stressor_flatland"
   edition = "2021"
@@ -78,67 +43,6 @@ rustc_test("scenic-stressor-flatland-bin") {
     "src/input_listener.rs",
     "src/pointer_state.rs",
   ]
-}
-
-fuchsia_unittest_package("scenic-stress-tests") {
-  manifest = "meta/scenic_stressor.cml"
-  deps = [
-    ":scenic-stressor-bin",
-    "//src/graphics/display/testing/fake-coordinator-connector:component",
-    "//src/lib/vulkan/validation_layers",
-    "//src/ui/scenic:scenic_with_default_config",
-  ]
-
-  if (escher_use_runtime_glsl) {
-    deps += [ "//src/ui/lib/escher/shaders:escher_shaders_resources" ]
-  } else {
-    deps += [ "//src/ui/lib/escher/shaders:escher_shaders_spirv_resources" ]
-  }
-
-  test_specs = {
-    log_settings = {
-      max_severity = "ERROR"
-    }
-    environments = [
-      {
-        dimensions = {
-          device_type = "AEMU"
-        }
-        tags = [ "stress-tests" ]
-      },
-    ]
-  }
-  test_type = "vulkan"
-}
-
-fuchsia_unittest_package("scenic-stress-tests-short") {
-  manifest = "meta/scenic_stressor_short.cml"
-  deps = [
-    ":scenic-stressor-bin",
-    "//src/graphics/display/testing/fake-coordinator-connector:component",
-    "//src/lib/vulkan/validation_layers",
-    "//src/ui/scenic:scenic_with_default_config",
-  ]
-
-  if (escher_use_runtime_glsl) {
-    deps += [ "//src/ui/lib/escher/shaders:escher_shaders_resources" ]
-  } else {
-    deps += [ "//src/ui/lib/escher/shaders:escher_shaders_spirv_resources" ]
-  }
-
-  test_specs = {
-    log_settings = {
-      max_severity = "ERROR"
-    }
-    environments = [
-      {
-        dimensions = {
-          device_type = "AEMU"
-        }
-      },
-    ]
-  }
-  test_type = "vulkan"
 }
 
 source_set("stress-test-flatland") {
@@ -207,7 +111,5 @@ group("tests") {
   deps = [
     ":scenic-stress-test-flatland",
     ":scenic-stress-test-flatland-short",
-    ":scenic-stress-tests",
-    ":scenic-stress-tests-short",
   ]
 }
