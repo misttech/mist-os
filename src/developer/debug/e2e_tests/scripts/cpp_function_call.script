@@ -15,9 +15,6 @@ Breakpoint 1 now matching 1 addrs for $main
 🛑 on bp 1 main() • cpp_functions.cc:??
 void
 
-# FIXME(https://fxbug.dev/126756): This should be unnecessary.
-[zxdb] n
-🛑 on bp 1 main() • cpp_functions.cc:??
 [zxdb] n
 🛑 main() • cpp_functions.cc:??
 

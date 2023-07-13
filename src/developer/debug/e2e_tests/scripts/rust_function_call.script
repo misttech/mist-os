@@ -16,9 +16,6 @@ Breakpoint 1 now matching 1 addrs for $main
 🛑 on bp 1 rust_functions::main() • rust_functions.rs:??
 void
 
-# FIXME(https://fxbug.dev/126756): This should be unnecessary.
-[zxdb] n
-🛑 on bp 1 rust_functions::main() • rust_functions.rs:??
 [zxdb] n
 🛑 rust_functions::main() • rust_functions.rs:??
 

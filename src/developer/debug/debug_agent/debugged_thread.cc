@@ -28,6 +28,7 @@
 #include "src/developer/debug/ipc/records.h"
 #include "src/developer/debug/shared/logging/logging.h"
 #include "src/developer/debug/shared/platform_message_loop.h"
+#include "src/developer/debug/shared/register_value.h"
 #include "src/developer/debug/shared/stream_buffer.h"
 #include "src/developer/debug/shared/zx_status.h"
 #include "src/lib/fxl/strings/string_printf.h"
@@ -469,25 +470,30 @@ std::vector<debug::RegisterValue> DebuggedThread::ReadRegisters(
 
 std::vector<debug::RegisterValue> DebuggedThread::WriteRegisters(
     const std::vector<debug::RegisterValue>& regs) {
-  std::vector<debug::RegisterValue> written = thread_handle_->WriteRegisters(regs);
-
-  // If we're updating the instruction pointer directly, current state is no longer valid.
-  // Specifically, if we're currently on a breakpoint, we have to now know the fact that we're no
-  // longer in a breakpoint.
+  // If we're updating the instruction pointer to a new value directly, current state is no longer
+  // valid. Specifically, if we're currently on a breakpoint, we have to now know the fact that
+  // we're no longer in a breakpoint.
   //
   // This is necessary to avoid the single-stepping logic that the thread does when resuming from
   // a breakpoint.
   bool rip_change = false;
   debug::RegisterID rip_id =
       GetSpecialRegisterID(arch::GetCurrentArch(), debug::SpecialRegisterType::kIP);
-  for (const debug::RegisterValue& reg : regs) {
-    if (reg.id == rip_id) {
+
+  auto ip = std::find_if(regs.begin(), regs.end(),
+                         [rip_id](const debug::RegisterValue& rv) { return rv.id == rip_id; });
+
+  if (ip != regs.end()) {
+    auto current_registers = thread_handle_->GetGeneralRegisters();
+    if (current_registers && ip->GetValue() != current_registers->ip()) {
       rip_change = true;
-      break;
     }
   }
+
   if (rip_change)
     current_breakpoint_ = nullptr;
+
+  std::vector<debug::RegisterValue> written = thread_handle_->WriteRegisters(regs);
 
   return written;
 }
