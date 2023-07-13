@@ -141,7 +141,6 @@
 //src/devices/cpu/drivers/aml-cpu:aml-cpu-driver
 //src/devices/gpio/drivers/aml-gpio:aml-gpio-driver
 //src/devices/gpio/drivers/as370-gpio:as370-gpio-driver
-//src/devices/gpio/drivers/gpio-test:gpio-test-driver
 //src/devices/gpio/drivers/gpio:gpio-driver
 //src/devices/gpio/drivers/imx8m-gpio:imx8m-gpio-driver
 //src/devices/gpio/drivers/ti-tca6408a:ti-tca6408a-driver

@@ -9,7 +9,6 @@ group("tests") {
     "aml-gpio:tests",
     "as370-gpio:tests",
     "gpio:tests",
-    "gpio-test:tests",
     "imx8m-gpio:tests",
     "ti-tca6408a:tests",
   ]

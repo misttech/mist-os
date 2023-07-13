@@ -218,7 +218,6 @@ assembly_input_bundle("bootstrap_eng") {
     "//src/zircon/tests/evil:bootfs",
 
     # drivers
-    "//src/devices/gpio/drivers/gpio-test:bootfs",
     "//src/devices/misc/drivers/test:bootfs",
     "//src/devices/tests/sysdev:bootfs",
     "//src/devices/usb/drivers/usb-peripheral-test:bootfs",
