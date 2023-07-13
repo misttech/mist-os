@@ -36,6 +36,23 @@ def vmsg(text: str):
         msg(text)
 
 
+# Set of known headers of various library file types.
+# We just need the subset of headers that covers
+# library files we expect to encounter.
+# Source: https://en.wikipedia.org/wiki/List_of_file_signatures
+LIBRARY_FILE_MAGIC_NUMBERS = {
+    b'!<arch>',  # archives (.a) (on Linux, MacOS)
+    b'\x7fELF',  # ELF files
+    b'\xfe\xed\xfa\xce',  # Mach-O 32b
+    b'\xfe\xed\xfa\xcf',  # Mach-O 64b
+    b'\xce\xfa\xed\xfe',  # Mach-O 32b, reverse byte-ordering
+    b'\xcf\xfa\xed\xfe',  # Mach-O 32b, reverse byte-ordering
+    b'\xca\xfe\xfa\xbe',  # Mach-O Fat binary
+    b'\x5a\x4d',  # MS-DOS compatible, Portable Executable (PE-COFF)
+    # TODO: handle other PE cases: .LIB
+}
+
+
 class TokenType(enum.Enum):
     KEYWORD = 0  # e.g. INCLUDE, INPUT, GROUP, etc.
     ARG = 1
@@ -422,11 +439,13 @@ class LinkerInvocation(object):
           paths to linker input files.
         """
         for lib in self.l_libs:
+            vmsg(f'Expanding: {lib}')
             resolved = self.resolve_lib(lib)
             if resolved:
                 yield from self.expand_possible_linker_script(resolved)
 
         for f in self.direct_files:
+            vmsg(f'Expanding: {f}')
             yield from self.expand_possible_linker_script(f)
 
     def expand_possible_linker_script(self, lib: Path) -> Iterable[Path]:
@@ -442,9 +461,19 @@ class LinkerInvocation(object):
 def try_linker_script_text(path: Path) -> Optional[str]:
     """Returns text from linker script, or None if it is not a linker script."""
     try:
-        return path.read_text()
+        contents = path.read_text()
     except UnicodeDecodeError:
         return None
+
+    # It is possible for some binary formats to successfully read as text,
+    # so we must check some headers of known library file formats.
+    first_bytes = contents[:8].encode()
+    if any(first_bytes.startswith(prefix)
+           for prefix in LIBRARY_FILE_MAGIC_NUMBERS):
+        # Not a linker script.
+        return None
+
+    return contents
 
 
 def _main_arg_parser() -> argparse.ArgumentParser:
@@ -492,6 +521,7 @@ _MAIN_ARG_PARSER = _main_arg_parser()
 def _main(argv: Sequence[str], working_dir_abs: Path) -> int:
     args = _MAIN_ARG_PARSER.parse_args(argv)
 
+    global _VERBOSE
     _VERBOSE = args.verbose
 
     link = LinkerInvocation(

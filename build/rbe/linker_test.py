@@ -19,10 +19,11 @@ class TryLinkerScriptTextTests(unittest.TestCase):
 
     def test_empty_text(self):
         text = ''
-        with mock.patch.object(Path, 'read_text',
-                               return_value=text) as mock_read:
-            self.assertEqual(
-                linker.try_linker_script_text(Path('foo.so')), text)
+        with tempfile.TemporaryDirectory() as td:
+            tdp = Path(td)
+            text_file = tdp / 'foo.so'
+            text_file.write_text(text)
+            self.assertEqual(linker.try_linker_script_text(text_file), text)
 
     def test_nonempty_text(self):
         text = 'INPUT(libfoo.so.4)\n'
@@ -38,6 +39,38 @@ class TryLinkerScriptTextTests(unittest.TestCase):
             bin_file = tdp / 'libbar.so'
             bin_file.write_bytes(b'\xd0\xff\xfe\x07')
             self.assertIsNone(linker.try_linker_script_text(bin_file))
+
+    def test_archive_header(self):
+        text = b'!<arch>xyzxyzxyz'
+        with tempfile.TemporaryDirectory() as td:
+            tdp = Path(td)
+            text_file = tdp / 'libarxiv.a'
+            text_file.write_bytes(text)
+            self.assertIsNone(linker.try_linker_script_text(text_file))
+
+    def test_elf_header(self):
+        text = b'\x7fELF-on-the-shelf'
+        with tempfile.TemporaryDirectory() as td:
+            tdp = Path(td)
+            text_file = tdp / 'libbar.so'
+            text_file.write_bytes(text)
+            self.assertIsNone(linker.try_linker_script_text(text_file))
+
+    def test_macho_header(self):
+        text = b'\xca\xfe\xba\xbe\x01\x02'
+        with tempfile.TemporaryDirectory() as td:
+            tdp = Path(td)
+            text_file = tdp / 'libmar.dylib'
+            text_file.write_bytes(text)
+            self.assertIsNone(linker.try_linker_script_text(text_file))
+
+    def test_dll_header(self):
+        text = b'\x5a\x4d\xee\xaa\xee\xaa'
+        with tempfile.TemporaryDirectory() as td:
+            tdp = Path(td)
+            text_file = tdp / 'libzzz.dll'
+            text_file.write_bytes(text)
+            self.assertIsNone(linker.try_linker_script_text(text_file))
 
 
 class LinkerScriptParseTests(unittest.TestCase):
