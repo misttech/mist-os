@@ -14,7 +14,7 @@ use {
 
 const DETAILS_FAILURE: &str = "Could not get session information from the target. This may be
 because there are no running sessions, or because the target is using a product configuration
-that does not support the session framework.";
+that does not include `session_manager`.";
 
 #[derive(FfxTool)]
 pub struct ShowTool {
@@ -47,7 +47,7 @@ async fn show_impl<W: std::io::Write>(
         .map_err(|i| Status::ok(i).unwrap_err())
         .context("opening realm query")?;
 
-    show_cmd_print("session:session".to_string(), query_proxy, writer)
+    show_cmd_print("core/session-manager/session:session".to_string(), query_proxy, writer)
         .await
         .context(DETAILS_FAILURE)?;
 
