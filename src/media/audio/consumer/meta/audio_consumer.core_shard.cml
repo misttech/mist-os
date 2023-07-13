@@ -20,10 +20,7 @@
         {
             protocol: "fuchsia.media.SessionAudioConsumerFactory",
             from: "#audio_consumer",
-            to: [
-                "#test_manager",
-                "#testing",
-            ],
+            to: "#test_manager",
         },
         {
             protocol: [ "fuchsia.media.AudioCore" ],
