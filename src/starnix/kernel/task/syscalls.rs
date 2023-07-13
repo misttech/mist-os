@@ -964,7 +964,10 @@ pub fn sys_capget(
         return Ok(());
     }
 
-    let header = current_task.read_object(user_header)?;
+    let mut header = current_task.read_object(user_header)?;
+    if header.pid < 0 {
+        return error!(EINVAL);
+    }
     let target_task = get_task_or_current(current_task, header.pid)?;
 
     let (permitted, effective, inheritable) = {
@@ -973,7 +976,15 @@ pub fn sys_capget(
     };
 
     match header.version {
-        _LINUX_CAPABILITY_VERSION_3 => {
+        _LINUX_CAPABILITY_VERSION_1 => {
+            let data: [__user_cap_data_struct; 1] = [__user_cap_data_struct {
+                effective: effective.as_abi_v1(),
+                inheritable: inheritable.as_abi_v1(),
+                permitted: permitted.as_abi_v1(),
+            }];
+            current_task.write_objects(user_data, &data)?;
+        }
+        _LINUX_CAPABILITY_VERSION_2 | _LINUX_CAPABILITY_VERSION_3 => {
             // Return 64 bit capabilities as two sets of 32 bit capabilities, little endian
             let (permitted, effective, inheritable) =
                 (permitted.as_abi_v3(), effective.as_abi_v3(), inheritable.as_abi_v3());
@@ -991,7 +1002,11 @@ pub fn sys_capget(
             ];
             current_task.write_objects(user_data, &data)?;
         }
-        _ => return error!(EINVAL),
+        _ => {
+            header.version = _LINUX_CAPABILITY_VERSION_3;
+            current_task.write_object(user_header, &header)?;
+            return error!(EINVAL);
+        }
     }
     Ok(())
 }
@@ -1001,14 +1016,22 @@ pub fn sys_capset(
     user_header: UserRef<__user_cap_header_struct>,
     user_data: UserRef<__user_cap_data_struct>,
 ) -> Result<(), Errno> {
-    let header = current_task.read_object(user_header)?;
+    let mut header = current_task.read_object(user_header)?;
     if header.pid != 0 && header.pid != current_task.id {
-        return error!(EINVAL);
+        return error!(EPERM);
     }
     let target_task = get_task_or_current(current_task, header.pid)?;
 
     let (new_permitted, new_effective, new_inheritable) = match header.version {
-        _LINUX_CAPABILITY_VERSION_3 => {
+        _LINUX_CAPABILITY_VERSION_1 => {
+            let data = current_task.read_object(user_data)?;
+            (
+                Capabilities::from_abi_v1(data.permitted),
+                Capabilities::from_abi_v1(data.effective),
+                Capabilities::from_abi_v1(data.inheritable),
+            )
+        }
+        _LINUX_CAPABILITY_VERSION_2 | _LINUX_CAPABILITY_VERSION_3 => {
             let data =
                 current_task.read_objects_to_array::<__user_cap_data_struct, 2>(user_data)?;
             (
@@ -1017,7 +1040,11 @@ pub fn sys_capset(
                 Capabilities::from_abi_v3((data[0].inheritable, data[1].inheritable)),
             )
         }
-        _ => return error!(EINVAL),
+        _ => {
+            header.version = _LINUX_CAPABILITY_VERSION_3;
+            current_task.write_object(user_header, &header)?;
+            return error!(EINVAL);
+        }
     };
 
     // Permission checks. Copied out of TLPI section 39.7.

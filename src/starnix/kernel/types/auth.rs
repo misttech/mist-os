@@ -46,6 +46,14 @@ impl Capabilities {
         *self &= !caps;
     }
 
+    pub fn as_abi_v1(self) -> u32 {
+        self.mask as u32
+    }
+
+    pub fn from_abi_v1(bits: u32) -> Self {
+        Self { mask: bits as u64 }
+    }
+
     pub fn as_abi_v3(self) -> (u32, u32) {
         (self.mask as u32, (self.mask >> 32) as u32)
     }
