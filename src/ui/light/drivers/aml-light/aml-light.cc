@@ -9,6 +9,7 @@
 #include <lib/ddk/platform-defs.h>
 #include <lib/device-protocol/pdev-fidl.h>
 #include <string.h>
+#include <zircon/errors.h>
 
 #include <cmath>
 
@@ -195,10 +196,6 @@ zx_status_t AmlLight::Create(void* ctx, zx_device_t* parent) {
 
 zx_status_t AmlLight::Init() {
   zx_status_t status = ZX_OK;
-  auto fragment_count = DdkGetFragmentCount();
-  if (fragment_count <= 0) {
-    return ZX_ERR_INTERNAL;
-  }
   struct name_t {
     char name[kNameLength];
   };
@@ -216,13 +213,6 @@ zx_status_t AmlLight::Init() {
     return ZX_ERR_INTERNAL;
   }
 
-  size_t actual;
-  composite_device_fragment_t fragments[fragment_count];
-  DdkGetFragments(fragments, fragment_count, &actual);
-  if (actual != fragment_count) {
-    return ZX_ERR_INTERNAL;
-  }
-
   ddk::PDevFidl pdev(parent(), "pdev");
   pdev_board_info_t board_info = {};
   status = ZX_OK;
@@ -234,31 +224,37 @@ zx_status_t AmlLight::Init() {
 
   zxlogf(INFO, "PWM period: %ld ns", pwm_period.to_nsecs());
 
-  uint32_t count = 1;
   for (uint32_t i = 0; i < configs->size(); i++) {
     auto* config = &configs.value()[i];
     char* name = names.value()[i].name;
 
-    const auto& gpio_fragment_name = fragments[count].name;
+    std::string fragment_name;
+    if (std::string("AMBER_LED") == name) {
+      fragment_name = "amber-led";
+    } else if (std::string("GREEN_LED") == name) {
+      fragment_name = "green-led";
+    } else {
+      zxlogf(ERROR, "Unsupported light: %s", name);
+      return ZX_ERR_NOT_SUPPORTED;
+    }
+
     zx::result gpio = DdkConnectFragmentFidlProtocol<fuchsia_hardware_gpio::Service::Device>(
-        parent(), gpio_fragment_name);
+        parent(), ("gpio-" + fragment_name).c_str());
     if (gpio.is_error()) {
-      zxlogf(ERROR, "Failed to get gpio protocol from fragment %s: %s", gpio_fragment_name,
+      zxlogf(ERROR, "Failed to get gpio protocol from fragment gpio-%s: %s", fragment_name.c_str(),
              gpio.status_string());
       return gpio.status_value();
     }
-    count++;
 
     if (config->brightness) {
       zx::result client_end = DdkConnectFragmentFidlProtocol<fuchsia_hardware_pwm::Service::Pwm>(
-          parent(), fragments[count].name);
+          parent(), ("pwm-" + fragment_name).c_str());
       if (client_end.is_error()) {
         zxlogf(ERROR, "Failed to initialize PWM Client, st = %s", client_end.status_string());
         return client_end.status_value();
       }
       fidl::WireSyncClient<fuchsia_hardware_pwm::Pwm> pwm(std::move(client_end.value()));
 
-      count++;
       lights_.emplace_back(name, std::move(gpio.value()), std::move(pwm), pwm_period);
     } else {
       lights_.emplace_back(name, std::move(gpio.value()), std::nullopt, pwm_period);
