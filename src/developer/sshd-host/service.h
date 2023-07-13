@@ -8,11 +8,14 @@
 #include <lib/sys/cpp/service_directory.h>
 #include <lib/zx/job.h>
 #include <lib/zx/process.h>
+#include <sys/socket.h>
 
+#include <optional>
 #include <string>
 #include <vector>
 
 #include "constants.h"
+#include "fbl/unique_fd.h"
 #include "src/lib/fsl/tasks/fd_waiter.h"
 
 namespace sshd_host {
@@ -35,13 +38,23 @@ class Service {
   ~Service();
 
  private:
-  void Wait();
+  enum class IpVersion { V4 = AF_INET, V6 = AF_INET6 };
+
+  struct Socket {
+    fbl::unique_fd fd;
+    fsl::FDWaiter waiter;
+  };
+
+  static fbl::unique_fd MakeSocket(IpVersion ip_version, uint16_t port);
+
+  void Wait(std::optional<IpVersion> ip_version);
   void Launch(int conn, const std::string& peer_name);
   void ProcessTerminated(zx::process process, zx::job job);
 
   uint16_t port_;
-  int sock_;
-  fsl::FDWaiter waiter_;
+  // TODO(https://fxbug.dev/21198): Replace these with a single dual-stack
+  // socket once Netstack3 supports that.
+  Socket v4_socket_, v6_socket_;
   zx::job job_;
 
   std::vector<std::unique_ptr<async::Wait>> process_waiters_;
