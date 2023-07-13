@@ -6,7 +6,6 @@
 
 #include <lib/ddk/binding_driver.h>
 #include <lib/ddk/debug.h>
-#include <lib/ddk/fragment-device.h>
 #include <lib/ddk/trace/event.h>
 #include <stdio.h>
 #include <string.h>
@@ -35,13 +34,7 @@ void MakeUniqueName(char name[ZX_DEVICE_NAME_MAX + 1]) {
 template <typename ProtoClientType, typename ProtoType>
 ProtocolClient<ProtoClientType, ProtoType>::ProtocolClient(zx_device_t* parent, uint32_t proto_id) {
   ProtoClientType* protoptr = &proto_client_;
-  zx_status_t status = device_open_protocol_session_multibindable(parent, proto_id, &proto_);
-  ZX_DEBUG_ASSERT(status == ZX_OK || status == ZX_ERR_NOT_SUPPORTED);
-  if (status == ZX_OK) {
-    is_session_ = true;
-  } else if (status == ZX_ERR_NOT_SUPPORTED) {
-    device_get_protocol(parent, proto_id, &proto_);
-  }
+  device_get_protocol(parent, proto_id, &proto_);
   *protoptr = ProtoClientType(&proto_);
 }
 

@@ -26,7 +26,6 @@
 #include <lib/component/outgoing/cpp/outgoing_directory.h>
 #include <lib/ddk/device.h>
 #include <lib/ddk/driver.h>
-#include <lib/ddk/fragment-device.h>
 #include <lib/sync/completion.h>
 #include <lib/zx/channel.h>
 
@@ -40,14 +39,8 @@ class ProtocolClient {
   ProtocolClient() { parent_ = nullptr; }
   ProtocolClient(zx_device_t* parent, uint32_t proto_id);
   ProtoClientType& proto_client() { return proto_client_; }
-  ~ProtocolClient() {
-    if (is_session_) {
-      ZX_DEBUG_ASSERT(device_close_protocol_session_multibindable(parent_, proto_.ctx) == ZX_OK);
-    }
-  }
 
  private:
-  bool is_session_ = false;
   ProtoType proto_;
   ProtoClientType proto_client_;
   zx_device_t* parent_;

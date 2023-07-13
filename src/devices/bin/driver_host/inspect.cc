@@ -279,12 +279,6 @@ void DeviceInspect::set_ops(const zx_protocol_device_t& ops) {
   if (ops.child_pre_release) {
     ops_str.Append("child_pre_release");
   }
-  if (ops.open_protocol_session_multibindable) {
-    ops_str.Append("open_protocol_session_multibindable");
-  }
-  if (ops.close_protocol_session_multibindable) {
-    ops_str.Append("close_protocol_session_multibindable");
-  }
   ops_.Set({ops_str.data(), ops_str.length()});
 }
 

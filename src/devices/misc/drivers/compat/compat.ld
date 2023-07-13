@@ -11,8 +11,6 @@
     device_resume_reply;
     device_set_profile_by_role;
     device_get_protocol;
-    device_open_protocol_session_multibindable;
-    device_close_protocol_session_multibindable;
     get_root_resource;
     load_firmware_from_driver;
     device_get_metadata;

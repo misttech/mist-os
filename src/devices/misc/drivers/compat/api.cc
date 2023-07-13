@@ -47,15 +47,6 @@ __EXPORT zx_status_t device_get_protocol(const zx_device_t* dev, uint32_t proto_
   return dev->GetProtocol(proto_id, out);
 }
 
-__EXPORT zx_status_t device_open_protocol_session_multibindable(zx_device_t* dev, uint32_t proto_id,
-                                                                void* out) {
-  return ZX_ERR_NOT_SUPPORTED;
-}
-
-__EXPORT zx_status_t device_close_protocol_session_multibindable(zx_device_t* dev, void* proto) {
-  return ZX_ERR_NOT_SUPPORTED;
-}
-
 // LibDriver Misc Interfaces
 
 __EXPORT zx_handle_t get_root_resource(zx_device_t* device) {

@@ -4,7 +4,6 @@
   "pkg/ddk/include/lib/ddk/device.h": "9836af4dfcf2ba9d0b6b33cc1955c879",
   "pkg/ddk/include/lib/ddk/driver.h": "a7c41a090fdd1541774a4b168a7109d7",
   "pkg/ddk/include/lib/ddk/fidl-protodefs.h": "37425ee47361d6009f0f7acbf3b7cb2d",
-  "pkg/ddk/include/lib/ddk/fragment-device.h": "fcbfff749bc40f5b9de20763e1174c03",
   "pkg/ddk/include/lib/ddk/hw/arch_ops.h": "ef8c3cb79d2112918bf853ff82cd7f0e",
   "pkg/ddk/include/lib/ddk/hw/inout.h": "c642e13fad48e9de276f39a7128d778d",
   "pkg/ddk/include/lib/ddk/hw/reg.h": "e1d0e2aa641d218daf1d624d244e984d",

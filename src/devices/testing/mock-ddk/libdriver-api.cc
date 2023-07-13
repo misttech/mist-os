@@ -194,12 +194,6 @@ __EXPORT zx_status_t device_connect_fragment_fidl_protocol2(zx_device_t* device,
 
 // Unsupported calls:
 __EXPORT
-zx_status_t device_open_protocol_session_multibindable(const zx_device_t* dev, uint32_t proto_id,
-                                                       void* protocol) {
-  return ZX_ERR_NOT_SUPPORTED;
-}
-
-__EXPORT
 zx_status_t device_set_profile_by_role(zx_device_t* device, zx_handle_t thread, const char* role,
                                        size_t role_size) {
   // This is currently a no-op.

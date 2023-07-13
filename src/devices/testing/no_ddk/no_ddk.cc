@@ -50,11 +50,6 @@ __EXPORT
 zx_status_t device_get_protocol(const zx_device_t* device, uint32_t proto_id, void* protocol) {
   return ZX_ERR_NOT_SUPPORTED;
 }
-__EXPORT
-zx_status_t device_open_protocol_session_multibindable(const zx_device_t* dev, uint32_t proto_id,
-                                                       void* protocol) {
-  return ZX_ERR_NOT_SUPPORTED;
-}
 
 __EXPORT
 zx_status_t device_get_metadata(zx_device_t* device, uint32_t type, void* buf, size_t buflen,
