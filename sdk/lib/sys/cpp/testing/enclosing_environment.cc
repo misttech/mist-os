@@ -32,12 +32,7 @@ EnvironmentServices::EnvironmentServices(const fuchsia::sys::EnvironmentPtr& par
                                          ParentOverrides parent_overrides,
                                          async_dispatcher_t* dispatcher)
     : svc_(std::make_unique<vfs::PseudoDir>()), dispatcher_(dispatcher) {
-#if __Fuchsia_API_level__ < 10
-  zx::channel
-#else
-  fidl::InterfaceRequest<fuchsia::io::Directory>
-#endif
-      request;
+  fidl::InterfaceRequest<fuchsia::io::Directory> request;
   parent_svc_ = sys::ServiceDirectory::CreateWithRequest(&request);
   parent_env->GetDirectory(std::move(request));
   if (parent_overrides.loader_service_) {
@@ -173,12 +168,7 @@ EnclosingEnvironment::EnclosingEnvironment(std::string label,
   // Start environment with services.
   fuchsia::sys::ServiceListPtr service_list(new fuchsia::sys::ServiceList);
   service_list->names = std::move(services_->svc_names_);
-  service_list->host_directory = services_
-                                     ->ServeServiceDir()
-#if __Fuchsia_API_level__ < 10
-                                     .TakeChannel()
-#endif
-      ;
+  service_list->host_directory = services_->ServeServiceDir();
   fuchsia::sys::EnvironmentPtr env;
 
   parent_env->CreateNestedEnvironment(env.NewRequest(), env_controller_.NewRequest(), label_,
@@ -187,12 +177,7 @@ EnclosingEnvironment::EnclosingEnvironment(std::string label,
   // Connect to launcher
   env->GetLauncher(launcher_.NewRequest());
 
-#if __Fuchsia_API_level__ < 10
-  zx::channel
-#else
-  fidl::InterfaceRequest<fuchsia::io::Directory>
-#endif
-      request;
+  fidl::InterfaceRequest<fuchsia::io::Directory> request;
   service_provider_ = sys::ServiceDirectory::CreateWithRequest(&request);
   // Connect to service
   env->GetDirectory(std::move(request));

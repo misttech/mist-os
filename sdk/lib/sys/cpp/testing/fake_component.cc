@@ -23,14 +23,8 @@ void FakeComponent::Register(std::string url, FakeLauncher& fake_launcher,
       [this, dispatcher](fuchsia::sys::LaunchInfo launch_info,
                          fidl::InterfaceRequest<fuchsia::sys::ComponentController> ctrl) {
         ctrls_.push_back(std::move(ctrl));
-        zx_status_t status = directory_->Serve({},
-#if __Fuchsia_API_level__ < 10
-                                               std::move(launch_info.directory_request)
-#else
-                                               launch_info.directory_request.TakeChannel()
-#endif
-                                                   ,
-                                               dispatcher);
+        zx_status_t status =
+            directory_->Serve({}, launch_info.directory_request.TakeChannel(), dispatcher);
         ZX_ASSERT(status == ZX_OK);
       });
 }
