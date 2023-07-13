@@ -95,12 +95,16 @@ zx_status_t VmarLoader::MapWritable(uintptr_t vmar_offset, zx::unowned_vmo vmo,
     return status;
   }
 
+  // If the size is not page-aligned, zero the last page beyond the size.
   if constexpr (ZeroInVmo) {
-    const size_t zero_offset = size;
-    const size_t zero_size = page_size() - (size & (page_size() - 1));
-    status = writable_vmo.op_range(ZX_VMO_OP_ZERO, zero_offset, zero_size, nullptr, 0);
-    if (status != ZX_OK) [[unlikely]] {
-      return status;
+    const size_t subpage_size = size & (page_size() - 1);
+    if (subpage_size > 0) {
+      const size_t zero_offset = size;
+      const size_t zero_size = page_size() - subpage_size;
+      status = writable_vmo.op_range(ZX_VMO_OP_ZERO, zero_offset, zero_size, nullptr, 0);
+      if (status != ZX_OK) [[unlikely]] {
+        return status;
+      }
     }
   }
 
