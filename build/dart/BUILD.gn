@@ -78,8 +78,6 @@ group("dart_allowlist") {
     "//src/experiences/tests/chrome:*",
     "//src/experiences/tests/e2e:*",
     "//src/experiences/tests/performance:*",
-    "//src/flutter/lib/fuchsia_test_helper:*",
-    "//src/flutter/sky_engine:*",
     "//src/lib/diagnostics/inspect/dart/bench:*",
     "//src/lib/fidl/dart/gidl:*",
     "//src/testing/fidl:*",
@@ -175,16 +173,6 @@ python_binary("run_analysis") {
 python_binary("gen_meta_file") {
   main_source = "sdk/gen_meta_file.py"
   deps = [ "//third_party/pyyaml:yaml" ]
-}
-
-# Copies the patched SDK files for the dart runner
-copy("platform_files") {
-  sources = [
-    "//prebuilt/third_party/flutter/$target_cpu/release/aot/dart_runner_patched_sdk/platform_strong.dill",
-    "//prebuilt/third_party/flutter/$target_cpu/release/aot/dart_runner_patched_sdk/platform_strong.dill.d",
-    "//prebuilt/third_party/flutter/$target_cpu/release/aot/dart_runner_patched_sdk/vm_outline_strong.dill",
-  ]
-  outputs = [ "$root_out_dir/dart_runner_patched_sdk/{{source_file_part}}" ]
 }
 
 # A toolchain dedicated to processing and analyzing Dart packages.

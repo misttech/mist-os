@@ -46,7 +46,6 @@ import("//products/core.gni")
 
 legacy_base_package_labels += [
   "//src/chromium:web_engine",
-  "//src/flutter",
   "//src/fonts",
 ]
 

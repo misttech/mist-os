@@ -27,22 +27,11 @@ IGNORED_EXTENSIONS = [
 ]
 
 LOCAL_PACKAGES = {
-    'build_integration':
-        '//third_party/dart/pkg/build_integration',
-    'flutter':
-        '//third_party/dart-pkg/git/flutter/packages/flutter',
-    'flutter_test':
-        '//third_party/dart-pkg/git/flutter/packages/flutter_test',
-    'flutter_web_plugins':
-        '//third_party/dart-pkg/git/flutter/packages/flutter_web_plugins',
-    'func':
-        '//third_party/dart/third_party/pkg/func',
-    'sky_engine':
-        '//prebuilt/third_party/sky_engine',
-    'testing':
-        '//third_party/dart/pkg/testing',
-    'typed_mock':
-        '//third_party/dart/pkg/typed_mock',
+    'build_integration': '//third_party/dart/pkg/build_integration',
+    'func': '//third_party/dart/third_party/pkg/func',
+    'sky_engine': '//prebuilt/third_party/sky_engine',
+    'testing': '//third_party/dart/pkg/testing',
+    'typed_mock': '//third_party/dart/pkg/typed_mock',
 }
 
 FORBIDDEN_PACKAGES = ['mojo', 'mojo_services']

@@ -18,7 +18,13 @@ group("core-tools") {
     "//bundles/packages/prod:tracing",
     "//src/connectivity:tools",
     "//src/dart",
+    "//src/fonts",
     "//src/graphics/lib/magma:magma-tools",
+    "//src/media/audio/bundles:services",
+    "//src/media/audio/consumer/bundles:services",
+    "//src/media/bundles:tools",
+    "//src/media/codec/bundles:services",
+    "//src/media/sessions/bundles:services",
     "//src/recovery/factory_reset:tools",
     "//src/sys/pkg/bin/pm:host",
     "//src/ui/tools:scenic",
@@ -30,17 +36,5 @@ group("core-tools") {
     "//tools/fidl/fidlmerge:host",
     "//tools/fidl/gidl:host",
     "//tools/whereiscl:host($host_toolchain)",
-
-    # We don't include the AOT flutter tools due to ABI stability.
-    # SDK customers should download the AOT tools directly from
-    # the flutter respository or use JIT instead.
-    "//src/flutter:flutter_jit",
-    "//src/flutter:flutter_jit_product",
-    "//src/fonts",
-    "//src/media/audio/bundles:services",
-    "//src/media/audio/consumer/bundles:services",
-    "//src/media/bundles:tools",
-    "//src/media/codec/bundles:services",
-    "//src/media/sessions/bundles:services",
   ]
 }

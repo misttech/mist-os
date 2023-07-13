@@ -21,7 +21,6 @@ group("integration") {
     # TODO(fxbug.dev/119212): Should these be deps of the individual test
     # targets above?
     "//src/chromium:web_context_provider_for_test",
-    "//src/flutter",
   ]
 }
 
