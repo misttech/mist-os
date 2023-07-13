@@ -59,25 +59,6 @@ struct GicV2Regs {
 // Which is a special case of the memory node. This specific incantation may never happen in the
 // real world, if ever needed then this
 // constexpr std::string_view kMemoryRegion = "region";
-
-std::optional<devicetree::RangesProperty> GetRanges(const devicetree::PropertyDecoder& decoder) {
-  auto ranges = decoder.FindProperty("ranges");
-  if (!ranges) {
-    return std::nullopt;
-  }
-
-  return ranges->AsRanges(decoder);
-}
-
-std::optional<devicetree::RangesProperty> GetParentRanges(
-    const devicetree::PropertyDecoder& decoder) {
-  if (!decoder.parent()) {
-    return std::nullopt;
-  }
-
-  return GetRanges(*decoder.parent());
-}
-
 }  // namespace
 
 devicetree::ScanState ArmDevicetreePsciItem::HandlePsciNode(
@@ -480,8 +461,9 @@ devicetree::ScanState DevicetreeMemoryItem::HandleMemoryNode(
   ZX_DEBUG_ASSERT(path.back().name() == "memory");
 
   // see for ranges in parent.
-  if (!root_ranges_) {
-    root_ranges_ = GetParentRanges(decoder);
+  if (!root_ranges_ && decoder.parent()) {
+    root_ranges_ = decoder.parent()->FindAndDecodeProperty<&devicetree::PropertyValue::AsRanges>(
+        "ranges", *decoder.parent());
   }
 
   if (!AppendRangesFromReg(decoder, root_ranges_, memalloc::Type::kFreeRam)) {
@@ -501,12 +483,14 @@ devicetree::ScanState DevicetreeMemoryItem::HandleReservedMemoryNode(
   reserved_memory_root_ = &path.back();
 
   // see for ranges in parent.
-  if (!root_ranges_) {
-    root_ranges_ = GetParentRanges(decoder);
+  if (!root_ranges_ && decoder.parent()) {
+    root_ranges_ = decoder.parent()->FindAndDecodeProperty<&devicetree::PropertyValue::AsRanges>(
+        "ranges", *decoder.parent());
   }
 
   if (!reserved_memory_ranges_) {
-    reserved_memory_ranges_ = GetRanges(decoder);
+    reserved_memory_ranges_ =
+        decoder.FindAndDecodeProperty<&devicetree::PropertyValue::AsRanges>("ranges", decoder);
   }
 
   if (!AppendRangesFromReg(decoder, root_ranges_, memalloc::Type::kReserved)) {

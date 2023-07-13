@@ -652,6 +652,19 @@ class PropertyDecoder {
     return FindProperties(name)[0];
   }
 
+  // Performs property lookup and decoding, using the provided |PropertyValue::*| method pointer.
+  template <auto PropertyValue::*ValueDecoder, typename... Args>
+  constexpr auto FindAndDecodeProperty(std::string_view name, Args&&... args) const {
+    using ReturnValue = std::invoke_result_t<decltype(ValueDecoder), PropertyValue, Args...>;
+    auto prop = FindProperty(name);
+    if (!prop) {
+      return ReturnValue{std::nullopt};
+    }
+
+    auto* prop_value = &(*prop);
+    return (prop_value->*ValueDecoder)(std::forward<Args>(args)...);
+  }
+
   // On success, returns a |ResolvedPath| that contains the resolved aliases prefix and the suffix.
   // On failure, when an aliased path is met, the returned value is true if the caller should try
   // later (e.g. aliases node has not been found yet) or false if the aliases node was found, but
