@@ -16,9 +16,9 @@ const TIMEOUT: std::time::Duration = std::time::Duration::from_secs(15);
 /// Returns the absolute moniker for the container in the session, if there is one.
 async fn find_session_container(rcs_proxy: &rc::RemoteControlProxy) -> Result<String> {
     lazy_static! {
-        // Example: /core/session-manager/session:session/elements:5udqa81zlypamvgu/container
+        // Example: core/session-manager/session:session/elements:5udqa81zlypamvgu/container
         static ref SESSION_CONTAINER: Regex =
-            Regex::new(r"^/core/session-manager/session:session/elements:\w+/container$")
+            Regex::new(r"^core/session-manager/session:session/elements:\w+/container$")
                 .unwrap();
     }
 
