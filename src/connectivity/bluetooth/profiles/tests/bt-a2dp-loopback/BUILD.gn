@@ -57,6 +57,7 @@ fuchsia_test_component("bt-a2dp-loopback-component") {
   restricted_features = [ "allow_non_hermetic_packages" ]
   manifest = "meta/bt-a2dp-loopback.cml"
   deps = [ ":bin" ]
+  test_type = "system"
 }
 
 fuchsia_test_package("bt-a2dp-loopback-test") {
