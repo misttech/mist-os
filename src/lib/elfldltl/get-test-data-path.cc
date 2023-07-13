@@ -12,7 +12,9 @@
 #include <mach-o/dyld.h>
 #endif
 
-#include "tests.h"
+#include <lib/elfldltl/testing/get-test-data.h>
+
+namespace elfldltl::testing {
 
 std::filesystem::path GetTestDataPath(std::string_view filename) {
   std::filesystem::path path;
@@ -39,3 +41,5 @@ fbl::unique_fd GetTestLib(std::string_view libname) {
   return fbl::unique_fd(open(GetTestDataPath(libname).c_str(), O_RDONLY));
 }
 #endif
+
+}  // namespace elfldltl::testing

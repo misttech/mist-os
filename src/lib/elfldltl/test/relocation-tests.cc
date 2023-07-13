@@ -5,10 +5,11 @@
 #include <lib/elfldltl/layout.h>
 #include <lib/elfldltl/machine.h>
 #include <lib/elfldltl/relocation.h>
+#include <lib/elfldltl/testing/typed-test.h>
 
 #include <limits>
 
-#include "tests.h"
+#include <gtest/gtest.h>
 
 namespace {
 

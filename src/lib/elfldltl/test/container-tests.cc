@@ -6,14 +6,18 @@
 #include <lib/elfldltl/diagnostics.h>
 #include <lib/elfldltl/preallocated-vector.h>
 #include <lib/elfldltl/static-vector.h>
+#include <lib/elfldltl/testing/diagnostics.h>
 #include <lib/stdcompat/span.h>
 
 #include <array>
 #include <string_view>
 
-#include "tests.h"
+#include <gtest/gtest.h>
 
 namespace {
+
+using elfldltl::testing::ExpectedSingleError;
+using elfldltl::testing::ExpectOkDiagnostics;
 
 using namespace std::literals;
 

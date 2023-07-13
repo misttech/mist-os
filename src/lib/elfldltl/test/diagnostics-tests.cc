@@ -4,6 +4,7 @@
 
 #include <lib/elfldltl/diagnostics.h>
 #include <lib/elfldltl/posix.h>
+#include <lib/elfldltl/testing/diagnostics.h>
 
 #ifdef __Fuchsia__
 #include <lib/elfldltl/zircon.h>
@@ -16,9 +17,9 @@
 #include <utility>
 #include <vector>
 
-#include "tests.h"
-
 namespace {
+
+using elfldltl::testing::ExpectedSingleError;
 
 TEST(ElfldltlDiagnosticsTests, PrintfDiagnosticsReport) {
   std::array<char, 200> buffer{};

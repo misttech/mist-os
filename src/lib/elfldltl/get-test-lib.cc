@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 #include <fidl/fuchsia.ldsvc/cpp/wire.h>
+#include <lib/elfldltl/testing/get-test-data.h>
 #include <lib/fdio/fd.h>
 #include <lib/zx/channel.h>
 #include <zircon/dlfcn.h>
@@ -13,6 +14,8 @@
 
 #include <fbl/unique_fd.h>
 #include <gtest/gtest.h>
+
+namespace elfldltl::testing {
 
 // The fdio open doesn't support getting an fd that will allow PROT_EXEC mmap
 // usage, i.e. yield a VMO with ZX_RIGHT_EXECUTE.  Instead, use the loader
@@ -54,3 +57,5 @@ fbl::unique_fd GetTestLib(std::string_view libname) {
 
   return fbl::unique_fd{fd};
 }
+
+}  // namespace elfldltl::testing

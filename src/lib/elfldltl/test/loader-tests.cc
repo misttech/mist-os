@@ -9,9 +9,12 @@
 #include <lib/elfldltl/link.h>
 #include <lib/elfldltl/load.h>
 #include <lib/elfldltl/mmap-loader.h>
+#include <lib/elfldltl/testing/diagnostics.h>
+#include <lib/elfldltl/testing/get-test-data.h>
 #include <lib/fit/defer.h>
 #include <sys/mman.h>
 
+#include <filesystem>
 #include <vector>
 
 #include <fbl/unique_fd.h>
@@ -24,7 +27,6 @@
 #endif
 
 #include "test-data.h"
-#include "tests.h"
 
 namespace {
 
@@ -34,7 +36,7 @@ struct LocalVmarLoaderTraits {
 
   static auto MakeLoader() { return elfldltl::LocalVmarLoader{}; }
 
-  static inline auto TestLibProvider = GetTestLibVmo;
+  static inline auto TestLibProvider = elfldltl::testing::GetTestLibVmo;
 
   template <class Diagnostics>
   static auto MakeFile(zx::unowned_vmo vmo, Diagnostics& diagnostics) {
@@ -60,7 +62,7 @@ struct MmapLoaderTraits {
 
   static auto MakeLoader() { return elfldltl::MmapLoader{}; }
 
-  static inline auto TestLibProvider = GetTestLib;
+  static inline auto TestLibProvider = elfldltl::testing::GetTestLib;
 
   template <class Diagnostics>
   static auto MakeFile(int fd, Diagnostics& diagnostics) {
@@ -97,7 +99,7 @@ class ElfldltlLoaderTests : public testing::Test {
   }
 
   void Load(std::string_view so_path, LoadOptions options = {}) {
-    auto diag = ExpectOkDiagnostics();
+    auto diag = elfldltl::testing::ExpectOkDiagnostics();
 
     auto lib_file = Traits::TestLibProvider(so_path);
     if (HasFatalFailure()) {
@@ -192,7 +194,7 @@ class ElfldltlLoaderTests : public testing::Test {
   void protect_relro() {
     ASSERT_TRUE(loader_opt_);
     ASSERT_TRUE(relro_phdr_);
-    auto diag = ExpectOkDiagnostics();
+    auto diag = elfldltl::testing::ExpectOkDiagnostics();
 
     ASSERT_TRUE(loader_opt_->ProtectRelro(
         diag, ElfLoadInfo::RelroBounds(*relro_phdr_, loader_opt_->page_size())));

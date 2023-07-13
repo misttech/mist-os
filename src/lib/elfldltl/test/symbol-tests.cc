@@ -4,6 +4,8 @@
 
 #include "symbol-tests.h"
 
+#include <lib/elfldltl/testing/typed-test.h>
+
 #include <array>
 #include <set>
 #include <vector>

@@ -115,6 +115,39 @@ static_library("elfldltl") {
   }
 }
 
+library_headers("test-headers") {
+  testonly = true
+
+  headers = [
+    "lib/elfldltl/testing/diagnostics.h",
+    "lib/elfldltl/testing/get-test-data.h",
+    "lib/elfldltl/testing/typed-test.h",
+  ]
+
+  public_deps = [
+    ":elfldltl",
+    "//third_party/googletest:gtest",
+    "//zircon/system/ulib/fbl",
+  ]
+}
+
+static_library("elfldltl-testutils") {
+  testonly = true
+
+  public_deps = [ ":test-headers" ]
+
+  sources = [ "get-test-data-path.cc" ]
+  deps = []
+  if (is_fuchsia) {
+    sources += [ "get-test-lib.cc" ]
+    deps += [
+      "//sdk/fidl/fuchsia.ldsvc:fuchsia.ldsvc_cpp",
+      "//sdk/lib/fdio",
+      "//zircon/system/ulib/zx",
+    ]
+  }
+}
+
 if (is_elf) {
   # When the elfldltl::Self<...> code is not fully inlined, it's still used in
   # places where only the basic machine ABI is available.

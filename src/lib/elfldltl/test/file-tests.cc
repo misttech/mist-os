@@ -5,11 +5,10 @@
 #include <lib/elfldltl/fd.h>
 #include <lib/elfldltl/file.h>
 #include <lib/elfldltl/memory.h>
+#include <lib/elfldltl/testing/diagnostics.h>
 #include <stdio.h>
 
 #include <gtest/gtest.h>
-
-#include "tests.h"
 
 #ifdef __Fuchsia__
 #include <lib/elfldltl/vmo.h>
@@ -17,6 +16,9 @@
 #endif
 
 namespace {
+
+using elfldltl::testing::ExpectedSingleError;
+using elfldltl::testing::ExpectOkDiagnostics;
 
 struct TestFdFile {
   template <typename Diagnostics>

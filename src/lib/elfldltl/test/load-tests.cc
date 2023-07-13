@@ -8,13 +8,16 @@
 #include <lib/elfldltl/memory.h>
 #include <lib/elfldltl/phdr.h>
 #include <lib/elfldltl/static-vector.h>
+#include <lib/elfldltl/testing/diagnostics.h>
+#include <lib/elfldltl/testing/typed-test.h>
 #include <lib/stdcompat/source_location.h>
 #include <lib/stdcompat/span.h>
 #include <lib/symbolizer-markup/writer.h>
 
-#include "tests.h"
-
 namespace {
+
+using elfldltl::testing::ExpectedSingleError;
+using elfldltl::testing::ExpectOkDiagnostics;
 
 constexpr size_t kPageSize = 0x1000;
 

@@ -8,13 +8,20 @@
 #include <lib/elfldltl/load.h>
 #include <lib/elfldltl/mapped-fd-file.h>
 #include <lib/elfldltl/resolve.h>
+#include <lib/elfldltl/testing/diagnostics.h>
+#include <lib/elfldltl/testing/get-test-data.h>
+#include <lib/elfldltl/testing/typed-test.h>
 
+#include <filesystem>
 #include <string>
 #include <string_view>
 
 #include "symbol-tests.h"
 
 namespace {
+
+using elfldltl::testing::ExpectedSingleError;
+using elfldltl::testing::ExpectOkDiagnostics;
 
 template <class ElfLayout>
 class ElfldltlResolveTests : public testing::Test {
@@ -44,7 +51,7 @@ class ElfldltlResolveTests : public testing::Test {
 
       auto diag = ExpectOkDiagnostics();
 
-      std::filesystem::path path = GetTestDataPath(GetFileName(prefix));
+      std::filesystem::path path = elfldltl::testing::GetTestDataPath(GetFileName(prefix));
       fbl::unique_fd fd(open(path.c_str(), O_RDONLY));
       ASSERT_TRUE(fd) << path;
 
@@ -98,7 +105,7 @@ class ElfldltlResolveTests : public testing::Test {
   }
 };
 
-TYPED_TEST_SUITE(ElfldltlResolveTests, AllFormatsTypedTest);
+TYPED_TEST_SUITE(ElfldltlResolveTests, elfldltl::testing::AllFormatsTypedTest);
 
 constexpr elfldltl::SymbolName kASymbol("a"sv);
 constexpr elfldltl::SymbolName kBSymbol("b"sv);

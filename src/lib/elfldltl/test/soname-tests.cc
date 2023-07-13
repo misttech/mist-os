@@ -12,8 +12,6 @@
 
 #include <gtest/gtest.h>
 
-#include "tests.h"
-
 namespace {
 
 constexpr std::string_view kOther = "other";

@@ -11,8 +11,6 @@
 #include <string_view>
 #include <vector>
 
-#include "tests.h"
-
 using namespace std::string_view_literals;
 
 template <class Elf>

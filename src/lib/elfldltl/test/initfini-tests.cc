@@ -6,14 +6,13 @@
 #include <lib/elfldltl/dynamic.h>
 #include <lib/elfldltl/init-fini.h>
 #include <lib/elfldltl/memory.h>
+#include <lib/elfldltl/testing/typed-test.h>
 
 #include <array>
 #include <string>
 #include <vector>
 
 #include <gtest/gtest.h>
-
-#include "tests.h"
 
 namespace {
 using NativeInfo = elfldltl::InitFiniInfo<elfldltl::Elf<>>;

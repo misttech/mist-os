@@ -6,13 +6,14 @@
 #include <lib/elfldltl/diagnostics.h>
 #include <lib/elfldltl/memory.h>
 #include <lib/elfldltl/phdr.h>
+#include <lib/elfldltl/testing/typed-test.h>
 #include <lib/stdcompat/span.h>
 
 #include <optional>
 #include <string>
 #include <vector>
 
-#include "tests.h"
+#include <gtest/gtest.h>
 
 namespace {
 

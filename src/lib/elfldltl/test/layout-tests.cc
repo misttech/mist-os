@@ -5,6 +5,8 @@
 #include <lib/elfldltl/diagnostics.h>
 #include <lib/elfldltl/layout.h>
 #include <lib/elfldltl/machine.h>
+#include <lib/elfldltl/testing/diagnostics.h>
+#include <lib/elfldltl/testing/typed-test.h>
 
 #include <string_view>
 #include <tuple>
@@ -12,9 +14,9 @@
 
 #include <gtest/gtest.h>
 
-#include "tests.h"
-
 namespace {
+
+using elfldltl::testing::ExpectedSingleError;
 
 using Elf32Little = elfldltl::Elf32<elfldltl::ElfData::k2Lsb>;
 using Elf64Little = elfldltl::Elf64<elfldltl::ElfData::k2Lsb>;

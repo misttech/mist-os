@@ -3,8 +3,9 @@
 // found in the LICENSE file.
 
 #include <lib/elfldltl/abi-ptr.h>
+#include <lib/elfldltl/testing/typed-test.h>
 
-#include "tests.h"
+#include <gtest/gtest.h>
 
 namespace {
 

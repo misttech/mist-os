@@ -2,49 +2,22 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef SRC_LIB_ELFLDLTL_TEST_TESTS_H_
-#define SRC_LIB_ELFLDLTL_TEST_TESTS_H_
+#ifndef SRC_LIB_ELFLDLTL_INCLUDE_LIB_ELFLDLTL_TEST_DIAGNOSTICS_H_
+#define SRC_LIB_ELFLDLTL_INCLUDE_LIB_ELFLDLTL_TEST_DIAGNOSTICS_H_
 
 #include <lib/elfldltl/diagnostics.h>
-#include <lib/elfldltl/layout.h>
 
-#include <filesystem>
 #include <functional>
-#include <iostream>
 #include <sstream>
 #include <string>
+#include <string_view>
 #include <tuple>
 #include <type_traits>
+#include <utility>
 
-#include <fbl/unique_fd.h>
 #include <gtest/gtest.h>
 
-#ifdef __Fuchsia__
-#include <lib/zx/vmo.h>
-#endif
-
-// Get the full path to an arbitrary test data file.
-std::filesystem::path GetTestDataPath(std::string_view filename);
-
-// Get an open fd specifically on a test DSO file.
-fbl::unique_fd GetTestLib(std::string_view libname);
-
-using AllFormatsTypedTest = elfldltl::AllFormats<::testing::Types>;
-
-#ifdef __Fuchsia__
-// Get the vmo backing an arbitrary test data file.
-zx::vmo GetTestLibVmo(std::string_view libname);
-#endif
-
-template <class ElfLayout>
-struct FormatTypedTest : public testing::Test {
-  using Elf = ElfLayout;
-};
-
-#define FORMAT_TYPED_TEST_SUITE(Name) \
-  template <class Elf>                \
-  using Name = FormatTypedTest<Elf>;  \
-  TYPED_TEST_SUITE(Name, AllFormatsTypedTest)
+namespace elfldltl::testing {
 
 // This helper object is instantiated with the expected error string and its
 // diag() method returns a Diagnostics object.  When the helper object goes out
@@ -127,4 +100,6 @@ constexpr auto ExpectOkDiagnostics() {
   return elfldltl::Diagnostics(fail, elfldltl::DiagnosticsFlags{.extra_checking = true});
 }
 
-#endif  // SRC_LIB_ELFLDLTL_TEST_TESTS_H_
+}  // namespace elfldltl::testing
+
+#endif  // SRC_LIB_ELFLDLTL_INCLUDE_LIB_ELFLDLTL_TEST_DIAGNOSTICS_H_

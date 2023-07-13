@@ -64,23 +64,7 @@ source_set("test-utils") {
   visibility = [ ":*" ]
   testonly = true
 
-  public = [ "tests.h" ]
-  public_deps = [
-    "..",
-    "//third_party/googletest:gtest",
-    "//zircon/system/ulib/fbl",
-  ]
-
-  sources = [ "get-test-data-path.cc" ]
-  deps = []
-  if (is_fuchsia) {
-    sources += [ "get-test-lib.cc" ]
-    deps += [
-      "//sdk/fidl/fuchsia.ldsvc:fuchsia.ldsvc_cpp",
-      "//sdk/lib/fdio",
-      "//zircon/system/ulib/zx",
-    ]
-  }
+  public_deps = [ "..:elfldltl-testutils" ]
 }
 
 resolve_dsos = [

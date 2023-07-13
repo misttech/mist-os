@@ -6,6 +6,8 @@
 #include <lib/elfldltl/dynamic.h>
 #include <lib/elfldltl/machine.h>
 #include <lib/elfldltl/memory.h>
+#include <lib/elfldltl/testing/diagnostics.h>
+#include <lib/elfldltl/testing/typed-test.h>
 
 #include <string>
 #include <type_traits>
@@ -14,6 +16,8 @@
 #include "symbol-tests.h"
 
 namespace {
+
+using elfldltl::testing::ExpectOkDiagnostics;
 
 constexpr elfldltl::DiagnosticsFlags kDiagFlags = {.multiple_errors = true};
 
