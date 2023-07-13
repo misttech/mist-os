@@ -23,13 +23,101 @@
 #include <type_traits>
 
 #include <zxtest/zxtest.h>
-
-#include "fbl/type_info.h"
-
 namespace {
 
 using devicetree::testing::LoadDtb;
 using devicetree::testing::LoadedDtb;
+
+class ArmDevicetreeTest {
+ public:
+  static void SetUpTestSuite() {
+    auto loaded_dtb = LoadDtb("qemu-arm-gic3.dtb");
+    ASSERT_TRUE(loaded_dtb.is_ok(), "%s", loaded_dtb.error_value().c_str());
+    qemu_arm_gic3_ = std::move(loaded_dtb).value();
+
+    loaded_dtb = LoadDtb("qemu-arm-gic2.dtb");
+    ASSERT_TRUE(loaded_dtb.is_ok(), "%s", loaded_dtb.error_value().c_str());
+    qemu_arm_gic2_ = std::move(loaded_dtb).value();
+  }
+
+  static void TearDownTestSuite() {
+    qemu_arm_gic3_ = std::nullopt;
+    qemu_arm_gic2_ = std::nullopt;
+  }
+
+  devicetree::Devicetree qemu_arm_gic3() { return qemu_arm_gic3_->fdt(); }
+
+  devicetree::Devicetree qemu_arm_gic2() { return qemu_arm_gic2_->fdt(); }
+
+ private:
+  static std::optional<LoadedDtb> qemu_arm_gic3_;
+  static std::optional<LoadedDtb> qemu_arm_gic2_;
+};
+
+std::optional<LoadedDtb> ArmDevicetreeTest::qemu_arm_gic3_ = std::nullopt;
+std::optional<LoadedDtb> ArmDevicetreeTest::qemu_arm_gic2_ = std::nullopt;
+
+class RiscvDevicetreeTest {
+ public:
+  static void SetUpTestSuite() {
+    auto loaded_dtb = LoadDtb("qemu-riscv.dtb");
+    ASSERT_TRUE(loaded_dtb.is_ok(), "%s", loaded_dtb.error_value().c_str());
+    qemu_riscv_ = std::move(loaded_dtb).value();
+
+    loaded_dtb = LoadDtb("sifive-hifive-unmatched.dtb");
+    ASSERT_TRUE(loaded_dtb.is_ok(), "%s", loaded_dtb.error_value().c_str());
+    sifive_hifive_unmatched_ = std::move(loaded_dtb).value();
+
+    loaded_dtb = LoadDtb("vision-five-2.dtb");
+    ASSERT_TRUE(loaded_dtb.is_ok(), "%s", loaded_dtb.error_value().c_str());
+    vision_five_2_ = std::move(loaded_dtb).value();
+  }
+
+  static void TearDownTestSuite() {
+    qemu_riscv_ = std::nullopt;
+    vision_five_2_ = std::nullopt;
+    sifive_hifive_unmatched_ = std::nullopt;
+  }
+
+  devicetree::Devicetree qemu_riscv() { return qemu_riscv_->fdt(); }
+  devicetree::Devicetree sifive_hifive_unmatched() { return sifive_hifive_unmatched_->fdt(); }
+  devicetree::Devicetree vision_five_2() { return vision_five_2_->fdt(); }
+
+ private:
+  static std::optional<LoadedDtb> qemu_riscv_;
+  static std::optional<LoadedDtb> sifive_hifive_unmatched_;
+  static std::optional<LoadedDtb> vision_five_2_;
+};
+
+std::optional<LoadedDtb> RiscvDevicetreeTest::qemu_riscv_ = std::nullopt;
+std::optional<LoadedDtb> RiscvDevicetreeTest::sifive_hifive_unmatched_ = std::nullopt;
+std::optional<LoadedDtb> RiscvDevicetreeTest::vision_five_2_ = std::nullopt;
+
+template <typename... Base>
+class TestMixin : public zxtest::Test, public Base... {
+ public:
+  using Mixin = TestMixin;
+  static_assert(sizeof...(Base) > 0);
+
+  static void SetUpTestSuite() { SetUp<Base...>(); }
+  static void TearDownTestSuite() { TearDown<Base...>(); }
+
+ private:
+  template <typename Head, typename... Rest>
+  static void SetUp() {
+    Head::SetUpTestSuite();
+    if constexpr (sizeof...(Rest) > 0) {
+      SetUp<Rest...>();
+    }
+  }
+  template <typename Head, typename... Rest>
+  static void TearDown() {
+    Head::TearDownTestSuite();
+    if constexpr (sizeof...(Rest) > 1) {
+      TearDown<Head, Rest...>();
+    }
+  }
+};
 
 class ArmDevicetreePsciItemTest : public zxtest::Test {
  public:
@@ -111,41 +199,14 @@ TEST_F(ArmDevicetreePsciItemTest, ParseHvc) {
   ASSERT_TRUE(present, "ZBI Driver for PSCI missing.");
 }
 
-class ArmDevicetreeGicItemTest : public zxtest::Test {
- public:
-  static void SetUpTestSuite() {
-    auto loaded_dtb = LoadDtb("qemu-arm-gic2.dtb");
-    ASSERT_TRUE(loaded_dtb.is_ok(), "%s", loaded_dtb.error_value().c_str());
-    gic2_ldtb_ = std::move(loaded_dtb).value();
-
-    loaded_dtb = LoadDtb("qemu-arm-gic3.dtb");
-    ASSERT_TRUE(loaded_dtb.is_ok(), "%s", loaded_dtb.error_value().c_str());
-    gic3_ldtb_ = std::move(loaded_dtb).value();
-  }
-
-  static void TearDownTestSuite() {
-    gic2_ldtb_ = std::nullopt;
-    gic3_ldtb_ = std::nullopt;
-  }
-
-  devicetree::Devicetree qemu_gic2_msi() { return gic2_ldtb_->fdt(); }
-
-  devicetree::Devicetree qemu_gic3_msi() { return gic3_ldtb_->fdt(); }
-
- private:
-  static std::optional<LoadedDtb> gic2_ldtb_;
-  static std::optional<LoadedDtb> gic3_ldtb_;
-};
-
-std::optional<LoadedDtb> ArmDevicetreeGicItemTest::gic2_ldtb_ = std::nullopt;
-std::optional<LoadedDtb> ArmDevicetreeGicItemTest::gic3_ldtb_ = std::nullopt;
+using ArmDevicetreeGicItemTest = TestMixin<ArmDevicetreeTest>;
 
 TEST_F(ArmDevicetreeGicItemTest, ParseGicV2WithMsi) {
   std::array<std::byte, 256> image_buffer;
   zbitl::Image<cpp20::span<std::byte>> image(image_buffer);
   ASSERT_TRUE(image.clear().is_ok());
 
-  auto fdt = qemu_gic2_msi();
+  auto fdt = qemu_arm_gic2();
   boot_shim::DevicetreeBootShim<boot_shim::ArmDevicetreeGicItem> shim("test", fdt);
 
   shim.Init();
@@ -178,7 +239,7 @@ TEST_F(ArmDevicetreeGicItemTest, ParseGicV3) {
   zbitl::Image<cpp20::span<std::byte>> image(image_buffer);
   ASSERT_TRUE(image.clear().is_ok());
 
-  auto fdt = qemu_gic3_msi();
+  auto fdt = qemu_arm_gic3();
   boot_shim::DevicetreeBootShim<boot_shim::ArmDevicetreeGicItem> shim("test", fdt);
 
   shim.Init();
@@ -204,32 +265,26 @@ TEST_F(ArmDevicetreeGicItemTest, ParseGicV3) {
   ASSERT_TRUE(present, "ZBI Driver for GIC V3 missing.");
 }
 
-class BootstrapChosenItemTest : public zxtest::Test {
+class BootstrapChosenItemTest : public TestMixin<ArmDevicetreeTest, RiscvDevicetreeTest> {
  public:
   static void SetUpTestSuite() {
-    auto loaded_dtb = LoadDtb("qemu-arm-gic3.dtb");
-    ASSERT_TRUE(loaded_dtb.is_ok(), "%s", loaded_dtb.error_value().c_str());
-    qemu_dtb_ = std::move(loaded_dtb).value();
-
-    loaded_dtb = LoadDtb("chosen.dtb");
+    Mixin::SetUpTestSuite();
+    auto loaded_dtb = LoadDtb("chosen.dtb");
     ASSERT_TRUE(loaded_dtb.is_ok(), "%s", loaded_dtb.error_value().c_str());
     chosen_dtb_ = std::move(loaded_dtb).value();
   }
 
   static void TearDownTestSuite() {
-    qemu_dtb_ = std::nullopt;
     chosen_dtb_ = std::nullopt;
+    Mixin::TearDownTestSuite();
   }
 
-  devicetree::Devicetree qemu_dtb() { return qemu_dtb_->fdt(); }
-  devicetree::Devicetree chosen_dtb() { return chosen_dtb_->fdt(); }
+  devicetree::Devicetree chosen() { return chosen_dtb_->fdt(); }
 
  private:
-  static std::optional<LoadedDtb> qemu_dtb_;
   static std::optional<LoadedDtb> chosen_dtb_;
 };
 
-std::optional<LoadedDtb> BootstrapChosenItemTest::qemu_dtb_ = std::nullopt;
 std::optional<LoadedDtb> BootstrapChosenItemTest::chosen_dtb_ = std::nullopt;
 
 struct ExpectedChosen {
@@ -242,7 +297,8 @@ struct ExpectedChosen {
 };
 
 using AllUartDrivers =
-    std::variant<uart::null::Driver, uart::ns8250::LegacyDw8250Driver, uart::pl011::Driver>;
+    std::variant<uart::null::Driver, uart::ns8250::LegacyDw8250Driver, uart::pl011::Driver,
+                 uart::ns8250::Mmio8Driver, uart::ns8250::Mmio32Driver>;
 
 template <typename ChosenItemType>
 void CheckChosenItem(const ChosenItemType& item, const ExpectedChosen& expected) {
@@ -299,7 +355,7 @@ void CheckChosenItem(const ChosenItemType& item, const ExpectedChosen& expected)
 }
 
 TEST_F(BootstrapChosenItemTest, ParseChosen) {
-  auto fdt = chosen_dtb();
+  auto fdt = chosen();
   boot_shim::DevicetreeBootShim<boot_shim::DevicetreeBootstrapChosenNodeItem<AllUartDrivers>> shim(
       "test", fdt);
 
@@ -322,7 +378,7 @@ TEST_F(BootstrapChosenItemTest, ParseChosen) {
                   });
 }
 
-TEST_F(BootstrapChosenItemTest, ParseQemuDtb) {
+TEST_F(BootstrapChosenItemTest, ArmQemu) {
   constexpr std::string_view kQemuCmdline =
       "TERM=xterm-256color kernel.entropy-mixin=cd93b8955fc588b1bcde0d691a694b926d53faeca61c386635739b24df717363 kernel.halt-on-panic=true ";
   constexpr uint32_t kQemuRamdiskStart = 0x48000000;
@@ -332,7 +388,7 @@ TEST_F(BootstrapChosenItemTest, ParseQemuDtb) {
   zbitl::Image<cpp20::span<std::byte>> image(image_buffer);
   ASSERT_TRUE(image.clear().is_ok());
 
-  auto fdt = qemu_dtb();
+  auto fdt = qemu_arm_gic3();
   boot_shim::DevicetreeBootShim<boot_shim::DevicetreeBootstrapChosenNodeItem<AllUartDrivers>> shim(
       "test", fdt);
 
@@ -352,6 +408,70 @@ TEST_F(BootstrapChosenItemTest, ParseQemuDtb) {
                               .irq = 0,
                           },
                       .uart_absolute_path = "/pl011@9000000",
+                  });
+}
+
+TEST_F(BootstrapChosenItemTest, RiscvQemu) {
+  constexpr std::string_view kQemuCmdline =
+      "BOOT_IMAGE=/vmlinuz-5.19.0-1012-generic root=/dev/mapper/ubuntu--vg-ubuntu--lv ro";
+  constexpr uint32_t kQemuRamdiskStart = 0xD646A000;
+  constexpr uint32_t kQemuRamdiskEnd = 0xDAFEFDB6;
+
+  std::array<std::byte, 1024> image_buffer;
+  zbitl::Image<cpp20::span<std::byte>> image(image_buffer);
+  ASSERT_TRUE(image.clear().is_ok());
+
+  auto fdt = qemu_riscv();
+  boot_shim::DevicetreeBootShim<boot_shim::DevicetreeBootstrapChosenNodeItem<AllUartDrivers>> shim(
+      "test", fdt);
+
+  shim.Init();
+
+  auto& bootstrap_chosen_item =
+      shim.Get<boot_shim::DevicetreeBootstrapChosenNodeItem<AllUartDrivers>>();
+  CheckChosenItem(bootstrap_chosen_item,
+                  {
+                      .ramdisk_start = kQemuRamdiskStart,
+                      .ramdisk_end = kQemuRamdiskEnd,
+                      .cmdline = kQemuCmdline,
+                      .uart_config_name = uart::ns8250::Mmio8Driver::config_name(),
+                      .uart_config =
+                          {
+                              .mmio_phys = 0x10000000,
+                              .irq = 0,
+                          },
+                      .uart_absolute_path = "/soc/serial@10000000",
+                  });
+}
+
+TEST_F(BootstrapChosenItemTest, VisionFive2) {
+  constexpr std::string_view kCmdline =
+      "root=/dev/mmcblk1p4 rw console=tty0 console=ttyS0,115200 earlycon rootwait stmmaceth=chain_mode:1 selinux=0";
+
+  std::array<std::byte, 1024> image_buffer;
+  zbitl::Image<cpp20::span<std::byte>> image(image_buffer);
+  ASSERT_TRUE(image.clear().is_ok());
+
+  auto fdt = vision_five_2();
+  boot_shim::DevicetreeBootShim<boot_shim::DevicetreeBootstrapChosenNodeItem<AllUartDrivers>> shim(
+      "test", fdt);
+
+  shim.Init();
+
+  auto& bootstrap_chosen_item =
+      shim.Get<boot_shim::DevicetreeBootstrapChosenNodeItem<AllUartDrivers>>();
+  CheckChosenItem(bootstrap_chosen_item,
+                  {
+                      .ramdisk_start = 0x48100000,
+                      .ramdisk_end = 0x48fb3df5,
+                      .cmdline = kCmdline,
+                      .uart_config_name = uart::ns8250::LegacyDw8250Driver::config_name(),
+                      .uart_config =
+                          {
+                              .mmio_phys = 0x10000000,
+                              .irq = 0,
+                          },
+                      .uart_absolute_path = "/soc/serial@10000000",
                   });
 }
 
@@ -624,56 +744,34 @@ TEST_F(MemoryItemTest, ParseAllAndAppend) {
   ASSERT_TRUE(present);
 }
 
-class RiscvDevicetreeTimerItemTest : public zxtest::Test {
+class RiscvDevicetreeTimerItemTest : public TestMixin<RiscvDevicetreeTest> {
  public:
   static void SetUpTestSuite() {
+    Mixin::SetUpTestSuite();
     auto loaded_dtb = LoadDtb("cpus_riscv.dtb");
     ASSERT_TRUE(loaded_dtb.is_ok(), "%s", loaded_dtb.error_value().c_str());
-    cpus_dtb_ = std::move(loaded_dtb).value();
-
-    loaded_dtb = LoadDtb("sifive-hifive-unmatched.dtb");
-    ASSERT_TRUE(loaded_dtb.is_ok(), "%s", loaded_dtb.error_value().c_str());
-    sifive_hifive_unmatched_dtb_ = std::move(loaded_dtb).value();
-
-    loaded_dtb = LoadDtb("vision-five-2.dtb");
-    ASSERT_TRUE(loaded_dtb.is_ok(), "%s", loaded_dtb.error_value().c_str());
-    vision_five_2_dtb_ = std::move(loaded_dtb).value();
-
-    loaded_dtb = LoadDtb("qemu-riscv.dtb");
-    ASSERT_TRUE(loaded_dtb.is_ok(), "%s", loaded_dtb.error_value().c_str());
-    qemu_riscv_dtb_ = std::move(loaded_dtb).value();
+    cpus_ = std::move(loaded_dtb).value();
   }
 
   static void TearDownTestSuite() {
-    cpus_dtb_ = std::nullopt;
-    sifive_hifive_unmatched_dtb_ = std::nullopt;
-    vision_five_2_dtb_ = std::nullopt;
-    qemu_riscv_dtb_ = std::nullopt;
+    cpus_ = std::nullopt;
+    Mixin::TearDownTestSuite();
   }
 
-  devicetree::Devicetree cpus_dtb() { return cpus_dtb_->fdt(); }
-  devicetree::Devicetree sifive_hifive_unmatched() { return sifive_hifive_unmatched_dtb_->fdt(); }
-  devicetree::Devicetree vision_five_2() { return vision_five_2_dtb_->fdt(); }
-  devicetree::Devicetree qemu_riscv() { return qemu_riscv_dtb_->fdt(); }
+  devicetree::Devicetree cpus() { return cpus_->fdt(); }
 
  private:
-  static std::optional<LoadedDtb> cpus_dtb_;
-  static std::optional<LoadedDtb> sifive_hifive_unmatched_dtb_;
-  static std::optional<LoadedDtb> vision_five_2_dtb_;
-  static std::optional<LoadedDtb> qemu_riscv_dtb_;
+  static std::optional<LoadedDtb> cpus_;
 };
 
-std::optional<LoadedDtb> RiscvDevicetreeTimerItemTest::cpus_dtb_ = std::nullopt;
-std::optional<LoadedDtb> RiscvDevicetreeTimerItemTest::sifive_hifive_unmatched_dtb_ = std::nullopt;
-std::optional<LoadedDtb> RiscvDevicetreeTimerItemTest::vision_five_2_dtb_ = std::nullopt;
-std::optional<LoadedDtb> RiscvDevicetreeTimerItemTest::qemu_riscv_dtb_ = std::nullopt;
+std::optional<LoadedDtb> RiscvDevicetreeTimerItemTest::cpus_ = std::nullopt;
 
 TEST_F(RiscvDevicetreeTimerItemTest, ParseTimerFromCpus) {
   std::array<std::byte, 512> image_buffer;
   zbitl::Image<cpp20::span<std::byte>> image(image_buffer);
   ASSERT_TRUE(image.clear().is_ok());
 
-  auto fdt = cpus_dtb();
+  auto fdt = cpus();
   boot_shim::DevicetreeBootShim<boot_shim::RiscvDevicetreeTimerItem> shim("test", fdt);
   shim.Init();
   ASSERT_TRUE(shim.AppendItems(image).is_ok());
@@ -764,49 +862,27 @@ TEST_F(RiscvDevicetreeTimerItemTest, SifiveHifiveUnmatached) {
   ASSERT_TRUE(present);
 }
 
-class RiscvDevicetreePlicItemTest : public zxtest::Test {
+class RiscvDevicetreePlicItemTest : public TestMixin<RiscvDevicetreeTest> {
  public:
   static void SetUpTestSuite() {
+    Mixin::SetUpTestSuite();
     auto loaded_dtb = LoadDtb("plic_riscv.dtb");
     ASSERT_TRUE(loaded_dtb.is_ok(), "%s", loaded_dtb.error_value().c_str());
     plic_dtb_ = std::move(loaded_dtb).value();
-
-    loaded_dtb = LoadDtb("sifive-hifive-unmatched.dtb");
-    ASSERT_TRUE(loaded_dtb.is_ok(), "%s", loaded_dtb.error_value().c_str());
-    sifive_hifive_unmatched_dtb_ = std::move(loaded_dtb).value();
-
-    loaded_dtb = LoadDtb("vision-five-2.dtb");
-    ASSERT_TRUE(loaded_dtb.is_ok(), "%s", loaded_dtb.error_value().c_str());
-    vision_five_2_dtb_ = std::move(loaded_dtb).value();
-
-    loaded_dtb = LoadDtb("qemu-riscv.dtb");
-    ASSERT_TRUE(loaded_dtb.is_ok(), "%s", loaded_dtb.error_value().c_str());
-    qemu_riscv_dtb_ = std::move(loaded_dtb).value();
   }
 
   static void TearDownTestSuite() {
     plic_dtb_ = std::nullopt;
-    sifive_hifive_unmatched_dtb_ = std::nullopt;
-    vision_five_2_dtb_ = std::nullopt;
-    qemu_riscv_dtb_ = std::nullopt;
+    Mixin::TearDownTestSuite();
   }
 
   devicetree::Devicetree plic() { return plic_dtb_->fdt(); }
-  devicetree::Devicetree sifive_hifive_unmatched() { return sifive_hifive_unmatched_dtb_->fdt(); }
-  devicetree::Devicetree vision_five_2() { return vision_five_2_dtb_->fdt(); }
-  devicetree::Devicetree qemu_riscv() { return qemu_riscv_dtb_->fdt(); }
 
  private:
   static std::optional<LoadedDtb> plic_dtb_;
-  static std::optional<LoadedDtb> sifive_hifive_unmatched_dtb_;
-  static std::optional<LoadedDtb> vision_five_2_dtb_;
-  static std::optional<LoadedDtb> qemu_riscv_dtb_;
 };
 
 std::optional<LoadedDtb> RiscvDevicetreePlicItemTest::plic_dtb_ = std::nullopt;
-std::optional<LoadedDtb> RiscvDevicetreePlicItemTest::sifive_hifive_unmatched_dtb_ = std::nullopt;
-std::optional<LoadedDtb> RiscvDevicetreePlicItemTest::vision_five_2_dtb_ = std::nullopt;
-std::optional<LoadedDtb> RiscvDevicetreePlicItemTest::qemu_riscv_dtb_ = std::nullopt;
 
 TEST_F(RiscvDevicetreePlicItemTest, ParsePlic) {
   std::array<std::byte, 512> image_buffer;
