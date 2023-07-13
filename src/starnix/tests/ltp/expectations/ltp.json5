@@ -595,6 +595,9 @@
                 // TODO(fxbug.dev/128184) Re-enable once flake is resolved.
                 "linkat01",
 
+                   // TODO(fxbug.dev/130549) Re-enable once flake is resolved.
+                "prctl09",
+
                 // TODO(fxbug.dev/128583) Re-enable once flake is resolved.
                 "sigwait01",
 
