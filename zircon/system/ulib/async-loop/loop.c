@@ -534,10 +534,11 @@ static zx_status_t async_loop_begin_wait(async_dispatcher_t* async, async_wait_t
   ZX_DEBUG_ASSERT(loop);
   ZX_DEBUG_ASSERT(wait);
 
-  if (atomic_load_explicit(&loop->state, memory_order_acquire) == ASYNC_LOOP_SHUTDOWN)
-    return ZX_ERR_BAD_STATE;
-
   mtx_lock(&loop->lock);
+  if (atomic_load_explicit(&loop->state, memory_order_acquire) == ASYNC_LOOP_SHUTDOWN) {
+    mtx_unlock(&loop->lock);
+    return ZX_ERR_BAD_STATE;
+  }
 
   zx_status_t status =
       zx_object_wait_async(wait->object, loop->port, (uintptr_t)wait, wait->trigger, wait->options);
@@ -588,10 +589,11 @@ static zx_status_t async_loop_post_task(async_dispatcher_t* async, async_task_t*
   ZX_DEBUG_ASSERT(loop);
   ZX_DEBUG_ASSERT(task);
 
-  if (atomic_load_explicit(&loop->state, memory_order_acquire) == ASYNC_LOOP_SHUTDOWN)
-    return ZX_ERR_BAD_STATE;
-
   mtx_lock(&loop->lock);
+  if (atomic_load_explicit(&loop->state, memory_order_acquire) == ASYNC_LOOP_SHUTDOWN) {
+    mtx_unlock(&loop->lock);
+    return ZX_ERR_BAD_STATE;
+  }
 
   async_loop_insert_task_locked(loop, task);
   if (!loop->dispatching_tasks && task_to_node(task)->prev == &loop->task_list) {
@@ -794,10 +796,11 @@ static zx_status_t async_loop_bind_irq(async_dispatcher_t* dispatcher, async_irq
   ZX_DEBUG_ASSERT(loop);
   ZX_DEBUG_ASSERT(irq);
 
-  if (atomic_load_explicit(&loop->state, memory_order_acquire) == ASYNC_LOOP_SHUTDOWN)
-    return ZX_ERR_BAD_STATE;
-
   mtx_lock(&loop->lock);
+  if (atomic_load_explicit(&loop->state, memory_order_acquire) == ASYNC_LOOP_SHUTDOWN) {
+    mtx_unlock(&loop->lock);
+    return ZX_ERR_BAD_STATE;
+  }
 
   zx_status_t status =
       zx_interrupt_bind(irq->object, loop->port, (uintptr_t)irq, ZX_INTERRUPT_BIND);

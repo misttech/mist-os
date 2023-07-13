@@ -29,6 +29,7 @@
 #include <algorithm>
 #include <atomic>
 #include <random>
+#include <thread>
 #include <utility>
 
 #include <fbl/auto_lock.h>
@@ -1399,6 +1400,50 @@ TEST(Loop, ShutdownNoWorkerThreads) {
   shutdown_thread->join();
 
   EXPECT_TRUE(callback_called);
+}
+
+// Test that if PostTask races against Shutdown(), then either the Post will return an error or the
+// shutdown will run the task.
+TEST(Loop, PostTasksDestroyed) {
+  std::default_random_engine random(zxtest::Runner::GetInstance()->random_seed());
+
+  // Tuned to make PostTask() error around 50% of the time on a VIM3 in release mode.
+  std::uniform_int_distribution<int64_t> time_ns_distribution(0.0, 5000);
+  std::uniform_int_distribution<int64_t> main_thread_ns_distribution(0.0, 100000);
+  constexpr auto kCombinedDelayUs = zx::usec(100);
+
+  uint32_t post_success_count = 0;
+  uint32_t trial_count = 0;
+  auto end_time = zx::deadline_after(zx::sec(2));
+  constexpr uint32_t kMinTrialCount = 10;
+  while ((trial_count < kMinTrialCount) || (zx::clock::get_monotonic() < end_time)) {
+    trial_count++;
+    async::Loop loop(&kAsyncLoopConfigNoAttachToCurrentThread);
+
+    int64_t secondary_thread_sleep_ns = time_ns_distribution(random);
+    int64_t main_thread_sleep_ns = main_thread_ns_distribution(random);
+
+    TestTask task1;
+    auto start_time = zx::deadline_after(kCombinedDelayUs);
+    auto thread = std::thread([&] {
+      zx::nanosleep(start_time + zx::nsec(secondary_thread_sleep_ns));
+      loop.Shutdown();
+    });
+
+    zx::nanosleep(start_time + zx::nsec(main_thread_sleep_ns));
+    zx_status_t task_result = task1.Post(loop.dispatcher());
+
+    thread.join();
+
+    if (task_result == ZX_OK) {
+      post_success_count++;
+      EXPECT_EQ(1u, task1.run_count, "secondary sleep %ld main sleep %ld",
+                secondary_thread_sleep_ns, main_thread_sleep_ns);
+    }
+  }
+  // Print fraction of times PostTask is successful (as opposed to returning an error), to help get
+  // an understanding of whether the delay distributions are tuned to make a race condition likely.
+  printf("Post success rate: %d/%d\n", post_success_count, trial_count);
 }
 
 }  // namespace
