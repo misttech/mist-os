@@ -221,8 +221,9 @@ bool CompositeDeviceAssembler::BindNode(std::shared_ptr<Node> node) {
   for (auto& fragment : fragments_) {
     if (fragment.BindNode(node)) {
       matched = true;
-      LOGF(INFO, "Found a match for composite device '%s': fragment %s: device '%s'", name_.c_str(),
-           std::string(fragment.name()).c_str(), node->MakeComponentMoniker().c_str());
+      LOGF(DEBUG, "Found a match for composite device '%s': fragment %s: device '%s'",
+           name_.c_str(), std::string(fragment.name()).c_str(),
+           node->MakeComponentMoniker().c_str());
       break;
     }
   }

@@ -260,14 +260,8 @@ zx_status_t CompositeDevice::TryMatchBindFragments(const fbl::RefPtr<Device>& de
     return ZX_OK;
   }
 
-  if (dev->name() == "sysmem-fidl" || dev->name() == "sysmem-banjo") {
-    // Log sysmem matches at DEBUG as these logs are very frequent and noisy.
-    LOGF(DEBUG, "Device '%s' matched fragment %zu of composite '%s'", dev->name().data(), index,
-         name().data());
-  } else {
-    LOGF(INFO, "Device '%s' matched fragment %zu of composite '%s'", dev->name().data(), index,
-         name().data());
-  }
+  LOGF(DEBUG, "Device '%s' matched fragment %zu of composite '%s'", dev->name().data(), index,
+       name().data());
   auto status = BindFragment(index, dev);
   if (status != ZX_OK) {
     LOGF(ERROR, "Device '%s' failed to bind fragment %zu of composite '%s': %s", dev->name().data(),

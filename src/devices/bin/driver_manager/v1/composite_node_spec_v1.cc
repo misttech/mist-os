@@ -65,15 +65,9 @@ zx::result<std::optional<DeviceOrNode>> CompositeNodeSpecV1::BindParentImpl(
     return result.take_error();
   }
 
-  if (owned_device->name() == "sysmem-fidl" || owned_device->name() == "sysmem-banjo") {
-    LOGF(DEBUG, "Node '%s' matched composite node spec '%s' with parent spec '%s'",
-         owned_device->name().c_str(), std::string(info.name().get()).c_str(),
-         parent_names_[info.node_index()].c_str());
-  } else {
-    LOGF(INFO, "Node '%s' matched composite node spec '%s' with parent spec '%s'",
-         owned_device->name().c_str(), std::string(info.name().get()).c_str(),
-         parent_names_[info.node_index()].c_str());
-  }
+  LOGF(DEBUG, "Node '%s' matched composite node spec '%s' with parent spec '%s'",
+       owned_device->name().c_str(), std::string(info.name().get()).c_str(),
+       parent_names_[info.node_index()].c_str());
 
   return zx::ok(std::nullopt);
 }
