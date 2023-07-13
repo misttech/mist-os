@@ -309,8 +309,9 @@ async fn configure_interface(
                 .await?
             {
                 Ok(()) => Ok(()),
-                // TODO(https://fxbug.dev/129944): Remove or revise once ns2 and
-                // ns3 no longer diverge in their handling of duplicate routes.
+                // TODO(https://fxbug.dev/129218): Remove or revise once calls
+                // to fuchsia.net.stack/Stack.AddForwardingEntry() are replaced
+                // with their fuchsia.net.routes.admin equivalent.
                 Err(e @ fnet_stack::Error::AlreadyExists) => {
                     tracing::warn!("added duplicate forwarding entry: {:?}", e);
                     Ok(())
