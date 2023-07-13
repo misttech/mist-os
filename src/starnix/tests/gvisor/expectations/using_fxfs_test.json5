@@ -25,14 +25,6 @@
                 "FifoTest.FifoTruncNoOp",
                 "FifoTest.MknodAtFIFO",
 
-                // getdents_test
-                "GetdentsTest/*.LargeDir",
-                "GetdentsTest/*.PartialBuffer",
-                "GetdentsTest/*.SeekResetsCursor",
-                "GetdentsTest/*.SmallDir",
-                "GetdentsTest/*.VerifyEntries",
-                "GetdentsTest/*.VerifyPadding",
-
                 // link_test
                 "LinkTest.AbsPathsNonDirFDsWithOpath",
                 "LinkTest.AbsPathsWithNonDirFDs",

@@ -1014,6 +1014,15 @@ impl NamespaceNode {
         Some(mountpoint_or_self.with_new_entry(mountpoint_or_self.entry.parent()?))
     }
 
+    /// Returns the parent, but does not escape mounts i.e. returns None if this node
+    /// is the root of a mount.
+    pub fn parent_within_mount(&self) -> Option<DirEntryHandle> {
+        if let Ok(_) = self.mount_if_root() {
+            return None;
+        }
+        self.entry.parent()
+    }
+
     /// Whether this namespace node is a descendant of the given node.
     ///
     /// Walks up the namespace node tree looking for ancestor. If ancestor is

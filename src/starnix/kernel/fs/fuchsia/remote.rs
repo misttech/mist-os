@@ -659,9 +659,36 @@ pub fn zxio_query_events(zxio: &Arc<Zxio>) -> FdEvents {
 struct RemoteDirectoryIterator {
     iterator: Option<DirentIterator>,
 
-    /// If the last attempt to write to the sink failed, this contains the entry
-    /// that is pending to be added.
-    pending_entry: Option<ZxioDirent>,
+    /// If the last attempt to write to the sink failed, this contains the entry that is pending to
+    /// be added. This is also used to synthesize dot-dot.
+    pending_entry: Entry,
+}
+
+#[derive(Default)]
+enum Entry {
+    // Indicates no more entries.
+    #[default]
+    None,
+
+    Some(ZxioDirent),
+
+    // Indicates dot-dot should be synthesized.
+    DotDot,
+}
+
+impl Entry {
+    fn take(&mut self) -> Entry {
+        std::mem::replace(self, Entry::None)
+    }
+}
+
+impl From<Option<ZxioDirent>> for Entry {
+    fn from(value: Option<ZxioDirent>) -> Self {
+        match value {
+            None => Entry::None,
+            Some(x) => Entry::Some(x),
+        }
+    }
 }
 
 impl RemoteDirectoryIterator {
@@ -679,25 +706,28 @@ impl RemoteDirectoryIterator {
         error!(EIO)
     }
 
-    /// Returns the next dir entry. If no more entries are found, returns None.
-    /// Returns an error if the iterator fails for other reasons described by
-    /// the zxio library.
-    pub fn next(&mut self, zxio: &Zxio) -> Option<Result<ZxioDirent, Errno>> {
-        match self.pending_entry.take() {
-            Some(entry) => Some(Ok(entry)),
-            None => {
-                let iterator = match self.get_or_init_iterator(zxio) {
-                    Ok(iter) => iter,
-                    Err(e) => return Some(Err(e)),
-                };
-                let result = iterator.next();
-                match result {
-                    Some(Ok(v)) => Some(Ok(v)),
-                    Some(Err(status)) => Some(Err(from_status_like_fdio!(status))),
-                    None => None,
-                }
-            }
+    /// Returns the next dir entry. If no more entries are found, returns None.  Returns an error if
+    /// the iterator fails for other reasons described by the zxio library.
+    pub fn next(&mut self, zxio: &Zxio) -> Result<Entry, Errno> {
+        let mut next = self.pending_entry.take();
+        if let Entry::None = next {
+            next = self
+                .get_or_init_iterator(zxio)?
+                .next()
+                .transpose()
+                .map_err(|status| from_status_like_fdio!(status))?
+                .into();
         }
+        // We only want to synthesize .. if . exists because the . and .. entries get removed if the
+        // directory is unlinked, so if the remote filesystem has removed ., we know to omit the
+        // .. entry.
+        match &next {
+            Entry::Some(ZxioDirent { name, .. }) if name == b"." => {
+                self.pending_entry = Entry::DotDot;
+            }
+            _ => {}
+        }
+        Ok(next)
     }
 }
 
@@ -729,21 +759,21 @@ impl FileOps for RemoteDirectoryObject {
         let mut iterator_position = current_offset;
 
         if new_offset < iterator_position {
-            // Our iterator only goes forward, so reset it here.
-            *iterator = RemoteDirectoryIterator::default();
+            // Our iterator only goes forward, so reset it here.  Note: we *must* rewind it rather
+            // than just create a new iterator because the remote end maintains the offset.
+            if let Some(iterator) = &mut iterator.iterator {
+                iterator.rewind().map_err(|status| from_status_like_fdio!(status))?;
+            }
+            iterator.pending_entry = Entry::None;
             iterator_position = 0;
-        }
-
-        if iterator_position != new_offset {
-            iterator.pending_entry = None;
         }
 
         // Advance the iterator to catch up with the offset.
         for i in iterator_position..new_offset {
             match iterator.next(&self.zxio) {
-                Some(Ok(_)) => continue,
-                None => break, // No more entries.
-                Some(Err(_)) => {
+                Ok(Entry::Some(_) | Entry::DotDot) => {}
+                Ok(Entry::None) => break, // No more entries.
+                Err(_) => {
                     // In order to keep the offset and the iterator in sync, set the new offset
                     // to be as far as we could get.
                     // Note that failing the seek here would also cause the iterator and the
@@ -759,33 +789,41 @@ impl FileOps for RemoteDirectoryObject {
 
     fn readdir(
         &self,
-        _file: &FileObject,
+        file: &FileObject,
         _current_task: &CurrentTask,
         sink: &mut dyn DirentSink,
     ) -> Result<(), Errno> {
-        // It is important to acquire the lock to the offset before the context,
-        //  to avoid a deadlock where seek() tries to modify the context.
+        // It is important to acquire the lock to the offset before the context, to avoid a deadlock
+        // where seek() tries to modify the context.
         let mut iterator = self.iterator.lock();
 
-        let mut add_entry = |entry: &ZxioDirent| {
-            let inode_num: ino_t = entry.id.ok_or_else(|| errno!(EIO))?;
-            let entry_type = if entry.is_dir() {
-                DirectoryEntryType::DIR
-            } else if entry.is_file() {
-                DirectoryEntryType::REG
-            } else {
-                DirectoryEntryType::UNKNOWN
-            };
-            sink.add(inode_num, sink.offset() + 1, entry_type, &entry.name)?;
-            Ok(())
-        };
-
-        while let Some(entry) = iterator.next(&self.zxio) {
-            if let Ok(entry) = entry {
-                if let Err(e) = add_entry(&entry) {
-                    iterator.pending_entry = Some(entry);
-                    return Err(e);
+        loop {
+            let entry = iterator.next(&self.zxio)?;
+            if let Err(e) = match &entry {
+                Entry::Some(entry) => {
+                    let inode_num: ino_t = entry.id.ok_or_else(|| errno!(EIO))?;
+                    let entry_type = if entry.is_dir() {
+                        DirectoryEntryType::DIR
+                    } else if entry.is_file() {
+                        DirectoryEntryType::REG
+                    } else {
+                        DirectoryEntryType::UNKNOWN
+                    };
+                    sink.add(inode_num, sink.offset() + 1, entry_type, &entry.name)
                 }
+                Entry::DotDot => {
+                    let inode_num = if let Some(parent) = file.name.parent_within_mount() {
+                        parent.node.node_id
+                    } else {
+                        // For the root .. should have the same inode number as .
+                        file.name.entry.node.node_id
+                    };
+                    sink.add(inode_num, sink.offset() + 1, DirectoryEntryType::DIR, b"..")
+                }
+                Entry::None => break,
+            } {
+                iterator.pending_entry = entry;
+                return Err(e);
             }
         }
         Ok(())
@@ -1196,6 +1234,96 @@ mod test {
                 .lookup_child(&current_task, &mut context, b"file")
                 .expect("lookup_child failed");
             assert_eq!(child.entry.node.info().mode, MODE);
+        })
+        .await;
+
+        fixture.close().await;
+    }
+
+    #[::fuchsia::test]
+    async fn test_dot_dot_inode_numbers() {
+        let fixture = TestFixture::new().await;
+
+        let (server, client) = zx::Channel::create();
+        fixture
+            .root()
+            .clone(fio::OpenFlags::CLONE_SAME_RIGHTS, server.into())
+            .expect("clone failed");
+
+        const MODE: FileMode = FileMode::from_bits(FileMode::IFDIR.bits() | 0o777);
+
+        let (kernel, current_task) = create_kernel_and_task();
+        fasync::unblock(move || {
+            let rights = fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE;
+            let fs = RemoteFs::new_fs(&kernel, client, "/", rights).expect("new_fs failed");
+            let ns = Namespace::new(fs);
+            current_task.fs().set_umask(FileMode::from_bits(0));
+            let sub_dir1 = ns
+                .root()
+                .create_node(&current_task, b"dir", MODE, DeviceType::NONE)
+                .expect("create_node failed");
+            let sub_dir2 = sub_dir1
+                .create_node(&current_task, b"dir", MODE, DeviceType::NONE)
+                .expect("create_node failed");
+
+            let dir_handle = ns
+                .root()
+                .entry
+                .open_anonymous(&current_task, OpenFlags::RDONLY)
+                .expect("open failed");
+
+            #[derive(Default)]
+            struct Sink {
+                offset: off_t,
+                dot_dot_inode_num: u64,
+            }
+            impl DirentSink for Sink {
+                fn add(
+                    &mut self,
+                    inode_num: ino_t,
+                    offset: off_t,
+                    entry_type: DirectoryEntryType,
+                    name: &FsStr,
+                ) -> Result<(), Errno> {
+                    if name == b".." {
+                        self.dot_dot_inode_num = inode_num;
+                        assert_eq!(entry_type, DirectoryEntryType::DIR);
+                    }
+                    self.offset = offset;
+                    Ok(())
+                }
+                fn offset(&self) -> off_t {
+                    self.offset
+                }
+                fn actual(&self) -> usize {
+                    0
+                }
+            }
+            let mut sink = Sink::default();
+            dir_handle.readdir(&current_task, &mut sink).expect("readdir failed");
+
+            // inode_num for .. for the root should be the same as root.
+            assert_eq!(sink.dot_dot_inode_num, ns.root().entry.node.node_id);
+
+            let dir_handle = sub_dir1
+                .entry
+                .open_anonymous(&current_task, OpenFlags::RDONLY)
+                .expect("open failed");
+            let mut sink = Sink::default();
+            dir_handle.readdir(&current_task, &mut sink).expect("readdir failed");
+
+            // inode_num for .. for the first sub directory should be the same as root.
+            assert_eq!(sink.dot_dot_inode_num, ns.root().entry.node.node_id);
+
+            let dir_handle = sub_dir2
+                .entry
+                .open_anonymous(&current_task, OpenFlags::RDONLY)
+                .expect("open failed");
+            let mut sink = Sink::default();
+            dir_handle.readdir(&current_task, &mut sink).expect("readdir failed");
+
+            // inode_num for .. for the second sub directory should be the first sub directory.
+            assert_eq!(sink.dot_dot_inode_num, sub_dir1.entry.node.node_id);
         })
         .await;
 
