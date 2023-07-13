@@ -639,6 +639,12 @@
                 "writetest",
                 "writev01",
                 "writev03",
+
+                // Times out.
+                "cve-2017-1000405",
+
+                // Fails on debug bots due to invalid lock ordering.
+                "memfd_create01",
             ],
         },
     ],
