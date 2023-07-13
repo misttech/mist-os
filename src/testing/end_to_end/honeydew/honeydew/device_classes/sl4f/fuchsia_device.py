@@ -86,7 +86,6 @@ class FuchsiaDevice(base_fuchsia_device.BaseFuchsiaDevice,
         return sl4f_obj
 
     # List all the affordances in alphabetical order
-    # TODO(fxbug.dev/123944): Remove this after fxbug.dev/123944 is fixed
     @properties.Affordance
     def bluetooth_gap(self) -> bluetooth_gap_interface.BluetoothGap:
         """Returns a BluetoothGap affordance object.
@@ -95,7 +94,9 @@ class FuchsiaDevice(base_fuchsia_device.BaseFuchsiaDevice,
             bluetooth_gap.BluetoothGap object
         """
         return bluetooth_gap_sl4f.BluetoothGap(
-            device_name=self.device_name, sl4f=self.sl4f)
+            device_name=self.device_name,
+            sl4f=self.sl4f,
+            reboot_affordance=self)
 
     @properties.Affordance
     def component(self) -> component_interface.Component:
@@ -145,9 +146,7 @@ class FuchsiaDevice(base_fuchsia_device.BaseFuchsiaDevice,
         # Ensure device is healthy
         self.health_check()
 
-        # If applicable, initialize bluetooth stack
-        if "qemu" not in self.device_type:
-            self.bluetooth_gap.sys_init()
+        super().on_device_boot()
 
     # List all private properties in alphabetical order
     @property

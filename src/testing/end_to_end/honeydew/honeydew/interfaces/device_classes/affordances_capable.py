@@ -5,6 +5,7 @@
 """Contains Abstract Base Classes for all affordances capable devices."""
 
 import abc
+from typing import Callable
 
 from honeydew.interfaces.affordances import component
 from honeydew.interfaces.affordances import tracing
@@ -52,6 +53,10 @@ class RebootCapableDevice(abc.ABC):
     @abc.abstractmethod
     def on_device_boot(self) -> None:
         """Take actions after the device is rebooted."""
+
+    @abc.abstractmethod
+    def register_for_on_device_boot(self, fn: Callable[[], None]) -> None:
+        """Register a function that will be called in on_device_boot."""
 
     @abc.abstractmethod
     def wait_for_offline(

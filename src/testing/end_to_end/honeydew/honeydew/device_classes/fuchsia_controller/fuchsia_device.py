@@ -159,10 +159,7 @@ class FuchsiaDevice(base_fuchsia_device.BaseFuchsiaDevice,
         # Ensure device is healthy
         self.health_check()
 
-        # If applicable, initialize bluetooth stack
-        # TODO(b/285993492): Implement fuchsia-controller bluetooth affordance
-        # if "qemu" not in self.device_type:
-        #     self.bluetooth.sys_init()
+        super().on_device_boot()
 
     # List all private properties in alphabetical order
     @property

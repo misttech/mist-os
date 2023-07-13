@@ -161,29 +161,16 @@ class FuchsiaDeviceSL4FTests(unittest.TestCase):
         mock_sl4f_run.assert_called()
 
     @mock.patch.object(
-        fuchsia_device.FuchsiaDevice,
-        "device_type",
-        new_callable=mock.PropertyMock,
-        return_value="x64")
-    @mock.patch.object(
-        fuchsia_device.bluetooth_gap_sl4f.BluetoothGap,
-        "sys_init",
-        autospec=True)
-    @mock.patch.object(
         fuchsia_device.FuchsiaDevice, "health_check", autospec=True)
     @mock.patch.object(
         fuchsia_device.sl4f_transport.SL4F, "start_server", autospec=True)
     def test_on_device_boot(
-            self, mock_sl4f_start_server, mock_health_check,
-            mock_bluetooth_sys_init, mock_device_type) -> None:
+            self, mock_sl4f_start_server, mock_health_check) -> None:
         """Testcase for FuchsiaDevice.on_device_boot()"""
-        # pylint: disable=protected-access
         self.fd_obj.on_device_boot()
 
         mock_health_check.assert_called()
         mock_sl4f_start_server.assert_called()
-        mock_device_type.assert_called()
-        mock_bluetooth_sys_init.assert_called()
 
     @parameterized.expand(
         [

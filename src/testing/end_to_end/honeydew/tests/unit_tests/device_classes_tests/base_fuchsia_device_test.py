@@ -195,7 +195,7 @@ class BaseFuchsiaDeviceTests(unittest.TestCase):
         """Testcase for BaseFuchsiaDevice.serial_number property"""
         self.assertEqual(self.fd_obj.serial_number, "default-serial-number")
 
-    # # List all the tests related to dynamic properties in alphabetical order
+    # List all the tests related to dynamic properties in alphabetical order
     @mock.patch.object(
         base_fuchsia_device.BaseFuchsiaDevice,
         "_build_info",
@@ -207,7 +207,7 @@ class BaseFuchsiaDeviceTests(unittest.TestCase):
         """Testcase for BaseFuchsiaDevice.firmware_version property"""
         self.assertEqual(self.fd_obj.firmware_version, "1.2.3")
 
-    # # List all the tests related to transports in alphabetical order
+    # List all the tests related to transports in alphabetical order
     def test_fuchsia_device_is_fastboot_capable(self) -> None:
         """Test case to make sure fuchsia device is Fastboot capable"""
         self.assertIsInstance(
@@ -265,6 +265,48 @@ class BaseFuchsiaDeviceTests(unittest.TestCase):
             message=mock.ANY,
             level=parameterized_dict["log_level"])
 
+    @parameterized.expand(
+        [
+            (
+                {
+                    "label": "no_register_for_on_device_boot",
+                    "register_for_on_device_boot": None,
+                    "expected_exception": False,
+                },),
+            (
+                {
+                    "label": "register_for_on_device_boot_fn_returning_success",
+                    "register_for_on_device_boot": lambda: None,
+                    "expected_exception": False,
+                },),
+            (
+                {
+                    "label":
+                        "register_for_on_device_boot_fn_returning_exception",
+                    "register_for_on_device_boot":
+                        lambda: 1 / 0,
+                    "expected_exception":
+                        True,
+                },),
+        ],
+        name_func=_custom_test_name_func)
+    def test_on_device_boot(self, parameterized_dict) -> None:
+        """Testcase for BaseFuchsiaDevice.on_device_boot()"""
+        # Reset the `_on_device_boot_fns` variable at the beginning of the test
+        self.fd_obj._on_device_boot_fns = []
+
+        if parameterized_dict["register_for_on_device_boot"]:
+            self.fd_obj.register_for_on_device_boot(
+                parameterized_dict["register_for_on_device_boot"])
+        if parameterized_dict["expected_exception"]:
+            with self.assertRaises(Exception):
+                self.fd_obj.on_device_boot()
+        else:
+            self.fd_obj.on_device_boot()
+
+        # Reset the `_on_device_boot_fns` variable at the end of the test
+        self.fd_obj._on_device_boot_fns = []
+
     @mock.patch.object(
         base_fuchsia_device.ffx_transport.FFX,
         "is_target_connected",
@@ -315,6 +357,10 @@ class BaseFuchsiaDeviceTests(unittest.TestCase):
         self.assertEqual(mock_is_target_connected.call_count, 2)
         mock_send_reboot_command.assert_called()
         mock_on_device_boot.assert_called()
+
+    def test_register_for_on_device_boot(self) -> None:
+        """Testcase for BaseFuchsiaDevice.register_for_on_device_boot()"""
+        self.fd_obj.register_for_on_device_boot(fn=lambda: None)
 
     @parameterized.expand(
         [

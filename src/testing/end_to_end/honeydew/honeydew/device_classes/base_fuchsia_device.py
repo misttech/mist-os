@@ -9,7 +9,7 @@ from datetime import datetime
 import logging
 import os
 import time
-from typing import Any, Dict, Optional
+from typing import Any, Callable, Dict, List, Optional
 
 from honeydew import custom_types
 from honeydew import errors
@@ -49,6 +49,7 @@ class BaseFuchsiaDevice(fuchsia_device.FuchsiaDevice,
         self._name: str = device_name
         self._ssh_private_key: Optional[str] = ssh_private_key
         self._ssh_user: Optional[str] = ssh_user
+        self._on_device_boot_fns: List[Callable[[], None]] = []
         self.health_check()
 
     # List all the persistent properties in alphabetical order
@@ -203,6 +204,9 @@ class BaseFuchsiaDevice(fuchsia_device.FuchsiaDevice,
             errors.FuchsiaControllerError: On communications failure.
             errors.Sl4FError: On communications failure.
         """
+        for on_device_boot_fn in self._on_device_boot_fns:
+            _LOGGER.info("Calling %s", on_device_boot_fn.__qualname__)
+            on_device_boot_fn()
 
     def power_cycle(
             self,
@@ -259,6 +263,10 @@ class BaseFuchsiaDevice(fuchsia_device.FuchsiaDevice,
         self.log_message_to_device(
             message=f"Successfully rebooted {self.device_name}...",
             level=custom_types.LEVEL.INFO)
+
+    def register_for_on_device_boot(self, fn: Callable[[], None]) -> None:
+        """Register a function that will be called in on_device_boot."""
+        self._on_device_boot_fns.append(fn)
 
     def snapshot(
             self, directory: str, snapshot_file: Optional[str] = None) -> str:

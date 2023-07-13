@@ -250,7 +250,6 @@ class FuchsiaDeviceFCTests(unittest.TestCase):
             self, mock_ffx_get_config, mock_fc_context,
             mock_health_check) -> None:
         """Testcase for FuchsiaDevice._on_device_boot()"""
-        # pylint: disable=protected-access
         self.fd_obj.on_device_boot()
 
         mock_ffx_get_config.assert_called_once()

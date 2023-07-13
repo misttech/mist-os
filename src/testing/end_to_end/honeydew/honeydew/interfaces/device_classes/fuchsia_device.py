@@ -5,7 +5,7 @@
 """Abstract base class for Fuchsia device."""
 
 import abc
-from typing import Dict, Optional
+from typing import Callable, Dict, Optional
 
 from honeydew import custom_types
 from honeydew.interfaces.affordances import component
@@ -160,6 +160,10 @@ class FuchsiaDevice(abc.ABC):
     @abc.abstractmethod
     def reboot(self) -> None:
         """Soft reboot the device."""
+
+    @abc.abstractmethod
+    def register_for_on_device_boot(self, fn: Callable[[], None]) -> None:
+        """Register a function that will be called in on_device_boot."""
 
     @abc.abstractmethod
     def snapshot(

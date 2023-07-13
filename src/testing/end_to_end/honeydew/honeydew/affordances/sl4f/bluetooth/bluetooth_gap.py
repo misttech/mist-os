@@ -7,6 +7,7 @@
 from typing import Dict
 
 from honeydew.interfaces.affordances.bluetooth import bluetooth_gap
+from honeydew.interfaces.device_classes import affordances_capable
 from honeydew.transports import sl4f as sl4f_transport
 
 _SL4F_METHODS: Dict[str, str] = {
@@ -24,9 +25,16 @@ class BluetoothGap(bluetooth_gap.BluetoothGap):
         sl4f: SL4F transport.
     """
 
-    def __init__(self, device_name: str, sl4f: sl4f_transport.SL4F) -> None:
+    def __init__(
+            self, device_name: str, sl4f: sl4f_transport.SL4F,
+            reboot_affordance: affordances_capable.RebootCapableDevice) -> None:
         self._name: str = device_name
         self._sl4f: sl4f_transport.SL4F = sl4f
+        self._reboot_affordance: affordances_capable.RebootCapableDevice = \
+            reboot_affordance
+
+        # `sys_init` need to be called on every device bootup
+        self._reboot_affordance.register_for_on_device_boot(fn=self.sys_init)
 
         # Initialize the bluetooth stack
         self.sys_init()
