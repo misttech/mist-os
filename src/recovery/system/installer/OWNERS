@@ -1,7 +1,1 @@
-achyb@google.com
-alexlegg@google.com
-natlf@google.com
-simonshields@google.com
-smpham@google.com
-
-# Component: Workstation>platform
+include /src/firmware/OWNERS
