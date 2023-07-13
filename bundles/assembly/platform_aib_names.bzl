@@ -47,7 +47,6 @@ USER_PLATFORM_AIB_NAMES_RISCV64 = BOOTSTRAP_USER_PLATFORM_AIB_NAMES + [
     "audio_device_registry",
     "battery_manager",
     "common_minimal",
-    "common_minimal_userdebug",
     "core_realm",
     "core_realm_networking",
     "core_realm_user_and_userdebug",
@@ -67,6 +66,7 @@ USER_PLATFORM_AIB_NAMES_RISCV64 = BOOTSTRAP_USER_PLATFORM_AIB_NAMES + [
     "intl_services_small.icu_default_{}".format(icu_flavors.default_git_commit),
     "intl_services_small.icu_latest_{}".format(icu_flavors.latest_git_commit),
     "intl_services_small.icu_stable_{}".format(icu_flavors.stable_git_commit),
+    "minimal_user",
     "netstack3",
     "networking_with_virtualization",
     "networking_basic",
@@ -108,6 +108,8 @@ USERDEBUG_PLATFORM_AIB_NAMES_RISCV64 = BOOTSTRAP_USERDEBUG_PLATFORM_AIB_NAMES + 
     "core_realm_development_access",
     "core_realm_development_access_rcs_no_usb",
     "core_realm_development_access_rcs_usb",
+    "minimal_userdebug",
+    "minimal_userdebug_and_eng",
     "radar_proxy_with_injector",
 ]
 USERDEBUG_PLATFORM_AIB_NAMES = USERDEBUG_PLATFORM_AIB_NAMES_RISCV64 + USER_PLATFORM_AIB_NAMES_EXCLUDED_FROM_RISCV64
@@ -115,9 +117,9 @@ USERDEBUG_PLATFORM_AIB_NAMES = USERDEBUG_PLATFORM_AIB_NAMES_RISCV64 + USER_PLATF
 # The names of all of the platform's Assembly Input Bundles.
 ENG_PLATFORM_AIB_NAMES_RISCV64 = BOOTSTRAP_ENG_PLATFORM_AIB_NAMES + USERDEBUG_PLATFORM_AIB_NAMES_RISCV64 + [
     "audio_dev_support",
-    "common_minimal_eng",
     "core_realm_eng",
     "example_assembly_bundle",
+    "minimal_eng",
     "system_update_checker",
     "testing_support",
     "ui_eng",

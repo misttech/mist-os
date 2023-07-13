@@ -124,8 +124,8 @@ impl DefineSubsystemConfiguration<()> for CommonBundles {
                     "core_realm_eng",
                     "core_realm_development_access",
                     "common_minimal",
-                    "common_minimal_eng",
-                    "common_minimal_userdebug",
+                    "minimal_eng",
+                    "minimal_userdebug_and_eng",
                     "testing_support",
                 ]
             }
@@ -137,11 +137,18 @@ impl DefineSubsystemConfiguration<()> for CommonBundles {
                     "core_realm_development_access",
                     "core_realm_user_and_userdebug",
                     "common_minimal",
-                    "common_minimal_userdebug",
+                    "minimal_userdebug",
+                    "minimal_userdebug_and_eng",
                 ]
             }
             (FeatureSupportLevel::Minimal, BuildType::User) => {
-                vec!["bootstrap", "core_realm", "core_realm_user_and_userdebug", "common_minimal"]
+                vec![
+                    "bootstrap",
+                    "core_realm",
+                    "core_realm_user_and_userdebug",
+                    "common_minimal",
+                    "minimal_user",
+                ]
             }
         } {
             builder.platform_bundle(bundle_name);

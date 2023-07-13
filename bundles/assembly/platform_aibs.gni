@@ -86,7 +86,7 @@ user_platform_aib_names =
 
       # The minimal feature-set-level
       "common_minimal",
-      "common_minimal_userdebug",
+      "minimal_user",
 
       ###
       # Feature-level / Subsystem-level bundles
@@ -174,6 +174,8 @@ _userdebug_aib_names = bootstrap_userdebug_platform_aib_names + [
                          "core_realm_development_access",
                          "core_realm_development_access_rcs_no_usb",
                          "core_realm_development_access_rcs_usb",
+                         "minimal_userdebug",
+                         "minimal_userdebug_and_eng",
                          "radar_proxy_with_injector",
                        ]
 
@@ -187,7 +189,8 @@ eng_only_platform_aib_names =
       # the core realm additions for eng build-type assemblies
       "core_realm_eng",
 
-      "common_minimal_eng",
+      # The minimal additions for eng build-type assemblies
+      "minimal_eng",
 
       # SWD (Software Delivery)
       "system_update_checker",

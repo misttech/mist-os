@@ -850,10 +850,42 @@ assembly_input_bundle("common_minimal") {
   ]
 }
 
+# This is exclusive to user builds on the minimal support level.
+#
+assembly_input_bundle("minimal_user") {
+  config_data = [
+    {
+      package_name = "cobalt"
+      files = [
+        {
+          source = "//src/cobalt/bin/app/configs/user_config.json"
+          destination = "config.json"
+        },
+      ]
+    },
+  ]
+}
+
+# This is exclusive to userdebug builds on the minimal support level.
+#
+assembly_input_bundle("minimal_userdebug") {
+  config_data = [
+    {
+      package_name = "cobalt"
+      files = [
+        {
+          source = "//src/cobalt/bin/app/configs/userdebug_config.json"
+          destination = "config.json"
+        },
+      ]
+    },
+  ]
+}
+
 # This is common across all eng-mode products, at the minimal or higher service
 # level.
 #
-assembly_input_bundle("common_minimal_eng") {
+assembly_input_bundle("minimal_eng") {
   testonly = true
   base_packages = []
   cache_packages = [
@@ -877,12 +909,23 @@ assembly_input_bundle("common_minimal_eng") {
       ]
     },
   ]
+  config_data = [
+    {
+      package_name = "cobalt"
+      files = [
+        {
+          source = "//src/cobalt/bin/app/configs/default_config.json"
+          destination = "config.json"
+        },
+      ]
+    },
+  ]
 }
 
 # This is common across all eng-mode and user-debug products, at the minimal or
 # higher service level.
 #
-assembly_input_bundle("common_minimal_userdebug") {
+assembly_input_bundle("minimal_userdebug_and_eng") {
   base_packages = [
     "//src/diagnostics/detect:triage-detect",
     "//src/sys/pkg/bin/pkgctl",

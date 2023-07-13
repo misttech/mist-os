@@ -115,30 +115,12 @@ executable("app") {
   ]
 }
 
-# In the default config, Cobalt will upload all metrics (including max_release_stage=DEBUG metrics)
-config_data("config") {
-  for_pkg = "cobalt"
-
-  sources = [ "configs/default_config.json" ]
-  outputs = [ "config.json" ]
+# TODO(fxbug.dev/122864) Remove transitional labels
+group("config") {
 }
-
-# In the "user" config, Cobalt will behave like it will on an end-user device, meaning it will only
-# upload metrics marked with max_release_stage=GA.
-config_data("user_config") {
-  for_pkg = "cobalt"
-
-  sources = [ "configs/user_config.json" ]
-  outputs = [ "config.json" ]
+group("user_config") {
 }
-
-# In the "userdebug" config, Cobalt will behave like it will on an end-user device, except that it
-# will upload DEBUG metrics.
-config_data("userdebug_config") {
-  for_pkg = "cobalt"
-
-  sources = [ "configs/userdebug_config.json" ]
-  outputs = [ "config.json" ]
+group("userdebug_config") {
 }
 
 fuchsia_component("component-v2") {
