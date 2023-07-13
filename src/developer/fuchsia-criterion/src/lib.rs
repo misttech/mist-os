@@ -72,7 +72,8 @@ impl FuchsiaCriterion {
                  USAGE: {} [FLAGS] JSON_OUTPUT\n\
                  \n\
                  FLAGS:\n\
-                 -h, --help    Prints help information",
+                 --filter <string>  Only runs benchmarks with names that contain the given string\n\
+                 -h, --help         Prints help information",
                 name,
             );
 
@@ -88,6 +89,18 @@ impl FuchsiaCriterion {
         let args: Vec<&str> = args.iter().map(|s| &**s).collect();
 
         match &args[..] {
+            [_, "--filter", filter, json_output] => {
+                let output_directory =
+                    TempDir::new().expect("failed to access temporary directory");
+                let criterion = Criterion::default()
+                    .nresamples(10_000)
+                    .with_filter(*filter)
+                    .output_directory(output_directory.path());
+                Self {
+                    criterion,
+                    output: Some((output_directory, Path::new(*json_output).to_path_buf())),
+                }
+            }
             [_, arg] if !arg.starts_with('-') => {
                 let output_directory =
                     TempDir::new().expect("failed to access temporary directory");
