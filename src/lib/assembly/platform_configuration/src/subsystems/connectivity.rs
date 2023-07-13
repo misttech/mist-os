@@ -39,23 +39,20 @@ impl DefineSubsystemConfiguration<PlatformConnectivityConfig> for ConnectivitySu
             // otherwise, the 'standard' networking package is used
             (_, _, None) => Some(&NetworkingConfig::Standard),
         };
-        if let Some(_networking) = networking {
+        if let Some(networking) = networking {
             // The 'core_realm_networking' bundle is required if networking is
             // enabled.
             builder.platform_bundle("core_realm_networking");
 
-            //TODO(fxbug.dev/122862) - Include the networking bundles when they
-            //are ready to be included.
-            //
-            // // Which specific network package is selectable by the product.
-            // match networking {
-            //     NetworkingConfig::Standard => {
-            //         builder.platform_bundle("networking");
-            //     }
-            //     NetworkingConfig::Basic => {
-            //         builder.platform_bundle("networking-basic");
-            //     }
-            // }
+            // Which specific network package is selectable by the product.
+            match networking {
+                NetworkingConfig::Standard => {
+                    builder.platform_bundle("networking_with_virtualization");
+                }
+                NetworkingConfig::Basic => {
+                    builder.platform_bundle("networking_basic");
+                }
+            }
 
             // The use of netstack3 can be forcibly required by the board,
             // otherwise it's selectable by the product.

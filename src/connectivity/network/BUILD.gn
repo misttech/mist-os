@@ -72,7 +72,6 @@ template("network_package") {
 # Enabling a soft-transition, remove when complete
 # TODO(122864) Remove transitional labels
 group("for_transition") {
-  public_deps = [ ":network" ]
 }
 
 network_package("network") {
@@ -82,7 +81,6 @@ network_package("network") {
 # Enabling a soft-transition, remove when complete
 # TODO(122864) Remove transitional labels
 group("basic-for_transition") {
-  public_deps = [ ":network-basic" ]
 }
 
 network_package("network-basic") {

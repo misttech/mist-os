@@ -81,6 +81,8 @@ user_platform_aib_names =
 
       # The additional children of core we add when we have networking enabled
       "core_realm_networking",
+      "networking_with_virtualization",
+      "networking_basic",
 
       # The minimal feature-set-level
       "common_minimal",

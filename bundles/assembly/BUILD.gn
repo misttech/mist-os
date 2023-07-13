@@ -394,6 +394,24 @@ assembly_input_bundle("core_realm_networking") {
   ]
 }
 
+# networking_with_virtualization
+#
+# This AIB adds the networking capabilities that include virtualization support.
+# It is mutually-exclusive with networking_basic.
+#
+assembly_input_bundle("networking_with_virtualization") {
+  base_packages = [ "//src/connectivity/network" ]
+}
+
+# networking_basic
+#
+# This AIB adds the basic networking capabilities.
+# It is mutually-exclusive with networking_with_virtualization.
+#
+assembly_input_bundle("networking_basic") {
+  base_packages = [ "//src/connectivity/network:network-basic" ]
+}
+
 # This is common across all eng-mode products that include the core realm.
 #
 # This is mutually-exclusive with the `core_realm_user_and_userdebug` AIB.
