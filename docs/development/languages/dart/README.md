@@ -41,9 +41,6 @@ There are five gn targets for building Dart:
 
 - [`dart_library`][target-library] defines a library that can be used by other
 Dart targets;
-- [`dart_component`][target-dart-component] defines a Fuchsia component based on a Dart
-  library, that can be packaged using GN targets `fuchsia_package` or
-  `fuchsia_test_package`;
 - [`dart_tool`][target-tool] defines a Dart tool for the host;
 - [`dart_test`][target-test] defines a group of test.
 
@@ -77,7 +74,6 @@ my_package/
 [pub]: https://www.dartlang.org/tools/pub/get-started "Pub"
 [package-layout]: https://www.dartlang.org/tools/pub/package-layout "Package layout"
 [target-library]: /build/dart/dart_library.gni "dart_library target"
-[target-dart-component]: /build/dart/dart_component.gni "dart_component target"
 [target-tool]: /build/dart/dart_tool.gni "dart_tool target"
 [target-test]: /build/dart/dart.gni "dart_test target"
 [flutter]: https://flutter.io/ "Flutter"

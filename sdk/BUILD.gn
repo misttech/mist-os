@@ -56,7 +56,6 @@ generated_file("compatibility_testing_goldens") {
   testonly = true
   deps = [
     # Pulls in SDKs containing the FIDLs to generate golden files for
-    ":fuchsia_dart",
     "//sdk",
   ]
   outputs = [ "$root_build_dir/compatibility_testing_goldens.json" ]
@@ -82,7 +81,6 @@ group("archives") {
     ":core_archive",
     ":core_testing_archive",
     ":e2e_testing_archive",
-    ":fuchsia_dart_archive",
   ]
 }
 
@@ -92,7 +90,6 @@ _fuchsia_idk_deps = [
   ":core",
   ":core_testing",
   ":e2e_testing",
-  ":fuchsia_dart",
 ]
 
 # A target used to generate an IDK archive
@@ -130,7 +127,6 @@ group("tests_no_e2e") {
 
   deps = [
     "ctf/plasa:tests",
-    "dart:tests",
     "lib:tests",
   ]
 }
@@ -521,51 +517,6 @@ sdk("firmware") {
     "//third_party/android/platform/external/avb:avb_sdk",
     "//zircon/public/sysroot/sdk:sysroot_sdk",
   ]
-}
-
-# Tools and libraries to develop for Fuchsia with Dart.
-sdk("fuchsia_dart") {
-  category = "partner"
-
-  id = sdk_id
-
-  api = "manifests/fuchsia_dart.manifest"
-
-  deps = [
-    # TODO(fxbug.dev/122070): remove, needed to soft transition
-    # https://fuchsia-review.googlesource.com/c/fuchsia/+/399537
-    "//sdk/fidl/fuchsia.diagnostics:fuchsia.diagnostics_sdk($fidl_toolchain)",
-
-    # TODO(fxbug.dev/122070): remove, needed to soft transition
-    # https://fuchsia-review.googlesource.com/c/fuchsia/+/295264
-    "//sdk/fidl/fuchsia.ui.app:fuchsia.ui.app_sdk($fidl_toolchain)",
-
-    # Direct FIDL deps.
-    # If a FIDL deps is part of the SDK, it should be explicitly listed here.
-    "//sdk/fidl/fuchsia.auth:fuchsia.auth_sdk($fidl_toolchain)",
-    "//sdk/fidl/fuchsia.element:fuchsia.element_sdk($fidl_toolchain)",
-    "//sdk/fidl/fuchsia.hardware.audio:fuchsia.hardware.audio_sdk($fidl_toolchain)",
-    "//sdk/fidl/fuchsia.modular:fuchsia.modular_sdk($fidl_toolchain)",
-    "//sdk/fidl/fuchsia.ui.input:fuchsia.ui.input_sdk($fidl_toolchain)",
-    "//sdk/fidl/fuchsia.ui.input3:fuchsia.ui.input3_sdk($fidl_toolchain)",
-    "//sdk/fidl/fuchsia.ui.policy:fuchsia.ui.policy_sdk($fidl_toolchain)",
-  ]
-  if (!sdk_no_host_tools) {
-    deps += [
-      "//sdk/dart:gen_snapshot_sdk($dart_toolchain)",
-      "//sdk/dart:kernel_compiler_sdk($dart_toolchain)",
-    ]
-
-    toolchains = []
-    if (host_os == "linux") {
-      toolchains += [
-        host_x64_toolchain,
-        host_arm64_toolchain,
-      ]
-    } else if (host_os == "mac") {
-      toolchains += [ host_toolchain ]
-    }
-  }
 }
 
 # Tools Fuchsia driver developers used on the host platform; where host is often

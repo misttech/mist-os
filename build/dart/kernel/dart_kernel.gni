@@ -10,7 +10,6 @@ _gen_kernel_label = "//build/dart/kernel:gen_kernel($host_toolchain)"
 _gen_kernel_path =
     get_label_info(_gen_kernel_label, "root_out_dir") + "/dart-tools/gen_kernel"
 
-flutter_platform_name = "flutter_runner"
 dart_platform_name = "dart_runner"
 
 # Converts the kernel manifest file from fini format to JSON format and
@@ -66,7 +65,7 @@ template("_convert_kernel_manifest") {
 # Parameters
 #
 #  platform_name (required)
-#    The name of the platform, either "flutter_runner" or "dart_runner".
+#    The name of the platform, "dart_runner".
 #
 #  packages_path (required)
 #    Path to the package_config.json file.
@@ -194,15 +193,11 @@ template("dart_kernel") {
 
     _kernel_deps += [ _gen_kernel_label ]
 
-    if (invoker.platform_name == flutter_platform_name) {
-      _kernel_deps += [ "//build/flutter:platform_files" ]
-      _platform_path = "$root_out_dir/flutter_runner_patched_sdk"
-    } else if (invoker.platform_name == dart_platform_name) {
+    if (invoker.platform_name == dart_platform_name) {
       _kernel_deps += [ "//build/dart:platform_files" ]
       _platform_path = "$root_out_dir/dart_runner_patched_sdk"
     } else {
-      assert(false,
-             "platform_name must be either dart_runner or flutter_runner")
+      assert(false, "platform_name must be dart_runner")
     }
 
     _platform_strong_dill = "${_platform_path}/platform_strong.dill"

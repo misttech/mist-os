@@ -34,7 +34,6 @@ group("dart_allowlist") {
   visibility = [
     "//build/dart/kernel/tests:*",
     "//build/dart/sdk/detect_api_changes:*",
-    "//build/flutter/internal/build_test_bootstrap:*",
     "//examples/components/routing/fidl:*",
     "//examples/diagnostics/inspect/codelab/dart:*",
     "//examples/diagnostics/inspect/codelab/dart/client:*",
@@ -237,8 +236,5 @@ group("custom_analysis_options") {
   #
   # Introducing new dart_libraries with custom analysis options is not allowed.
   # See more details in https://fxbug.dev/84787.
-  visibility = [
-    "//build/flutter/internal/build_test_bootstrap/*",
-    "//src/tests/benchmarks/fidl/dart/*",
-  ]
+  visibility = [ "//src/tests/benchmarks/fidl/dart/*" ]
 }
