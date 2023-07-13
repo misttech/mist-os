@@ -15,6 +15,7 @@ void main() {
     await runTestComponent(
         packageName: 'kernel-boot-benchmarks',
         componentName: 'kernel-boot-benchmarks.cm',
+        realm: '/core/testing:system-tests',
         commandArgs: PerfTestHelper.componentOutputPath,
         expectedMetricNamesFile: 'fuchsia.kernel.boot.txt');
   }, timeout: Timeout.none);

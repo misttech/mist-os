@@ -161,6 +161,7 @@ fuchsia_test_package("cobalt-manual-tests") {
 fuchsia_test_component("cobalt_testapp_for_prober_do_not_run_manually") {
   manifest = "meta/cobalt_testapp_for_prober_do_not_run_manually.cml"
   deps = [ "testapp:cobalt_testapp" ]
+  test_type = "system"
 }
 
 # Tests that should be run on a schedule for probing cobalt.

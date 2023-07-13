@@ -21,6 +21,7 @@ executable("profiler_integration_test_bin") {
 fuchsia_test_component("profiler_integration_test_component") {
   manifest = "meta/profiler_integration_test.cml"
   deps = [ ":profiler_integration_test_bin" ]
+  test_type = "system"
 }
 
 fuchsia_test_package("profiler_integration_test") {
