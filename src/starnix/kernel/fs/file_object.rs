@@ -1216,7 +1216,6 @@ impl FileObject {
         if !self.can_write() {
             return error!(EINVAL);
         }
-
         self.node().ftruncate(current_task, length)
     }
 
@@ -1333,5 +1332,79 @@ impl fmt::Debug for FileObject {
             .field("offset", &self.offset)
             .field("flags", &self.flags)
             .finish()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::{
+        auth::FsCred,
+        fs::buffers::{VecInputBuffer, VecOutputBuffer},
+        fs::tmpfs::TmpFs,
+        testing::*,
+        types::{DeviceType, FileMode, OpenFlags},
+    };
+    use std::sync::{
+        atomic::{AtomicBool, Ordering},
+        Arc,
+    };
+    use zerocopy::{AsBytes, FromBytes, LE, U64};
+
+    #[::fuchsia::test]
+    async fn test_append_truncate_race() {
+        let (kernel, current_task) = create_kernel_and_task();
+        let root_fs = TmpFs::new_fs(&kernel);
+        let root_node = Arc::clone(root_fs.root());
+        let file = root_node
+            .create_node(
+                &current_task,
+                b"test",
+                FileMode::IFREG | FileMode::ALLOW_ALL,
+                DeviceType::NONE,
+                FsCred::root(),
+            )
+            .expect("create_node failed");
+        let file_handle = file
+            .open_anonymous(&current_task, OpenFlags::APPEND | OpenFlags::RDWR)
+            .expect("open failed");
+        let done = Arc::new(AtomicBool::new(false));
+
+        let fh = file_handle.clone();
+        let done_clone = done.clone();
+        let task = create_task(&kernel, "write_thread");
+        let write_thread = std::thread::spawn(move || {
+            for i in 0..2000 {
+                fh.write(&task, &mut VecInputBuffer::new(U64::<LE>::new(i).as_bytes()))
+                    .expect("write failed");
+            }
+            done_clone.store(true, Ordering::SeqCst);
+        });
+
+        let fh = file_handle.clone();
+        let done_clone = done.clone();
+        let task = create_task(&kernel, "truncate_thread");
+        let truncate_thread = std::thread::spawn(move || {
+            while !done_clone.load(Ordering::SeqCst) {
+                fh.ftruncate(&task, 0).expect("truncate failed");
+            }
+        });
+
+        // If we read from the file, we should always find an increasing sequence. If there are
+        // races, then we might unexpectedly see zeroes.
+        while !done.load(Ordering::SeqCst) {
+            let mut buffer = VecOutputBuffer::new(4096);
+            let amount = file_handle.read_at(&current_task, 0, &mut buffer).expect("read failed");
+            let mut last = None;
+            let buffer = &Vec::from(buffer)[..amount];
+            for i in buffer.chunks_exact(8).map(|chunk| U64::<LE>::read_from(chunk).unwrap()) {
+                if let Some(last) = last {
+                    assert!(i.get() > last, "buffer: {:?}", buffer);
+                }
+                last = Some(i.get());
+            }
+        }
+
+        write_thread.join().unwrap();
+        truncate_thread.join().unwrap();
     }
 }

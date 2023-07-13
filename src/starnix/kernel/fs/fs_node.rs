@@ -1002,14 +1002,8 @@ impl FsNode {
         }
 
         self.check_access(current_task, Access::WRITE)?;
-        if length > current_task.thread_group.get_rlimit(Resource::FSIZE) {
-            send_signal(current_task, SignalInfo::default(SIGXFSZ));
-            return error!(EFBIG);
-        }
-        self.clear_suid_and_sgid_bits(current_task)?;
-        self.ops().truncate(self, current_task, length)?;
-        self.update_ctime_mtime()?;
-        Ok(())
+
+        self.truncate_common(current_task, length)
     }
 
     /// Avoid calling this method directly. You probably want to call `FileObject::ftruncate()`
@@ -1038,11 +1032,19 @@ impl FsNode {
         // "With ftruncate(), the file must be open for writing; with truncate(),
         // the file must be writable."
 
+        self.truncate_common(current_task, length)
+    }
+
+    // Called by `truncate` and `ftruncate` above.
+    fn truncate_common(&self, current_task: &CurrentTask, length: u64) -> Result<(), Errno> {
         if length > current_task.thread_group.get_rlimit(Resource::FSIZE) {
             send_signal(current_task, SignalInfo::default(SIGXFSZ));
             return error!(EFBIG);
         }
         self.clear_suid_and_sgid_bits(current_task)?;
+        // We have to take the append lock since otherwise it would be possible to truncate and for
+        // an append to continue using the old size.
+        let _guard = self.append_lock.read(current_task);
         self.ops().truncate(self, current_task, length)?;
         self.update_ctime_mtime()?;
         Ok(())
