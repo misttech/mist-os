@@ -121,7 +121,7 @@ impl FileSystem {
             next_node_id: AtomicU64::new(1),
             ops: Box::new(ops),
             options,
-            dev_id: kernel.device_registry.write().next_anonymous_dev_id(),
+            dev_id: kernel.device_registry.next_anonymous_dev_id(),
             rename_mutex: Mutex::new(()),
             nodes: Mutex::new(HashMap::new()),
             entries: match cache_mode {

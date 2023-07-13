@@ -534,8 +534,7 @@ impl UEventNetlinkSocket {
         #[cfg(any(test, debug_assertions))]
         {
             let _l1 = result.device_listener_key.lock();
-            let _l2 = kernel.device_registry.read();
-            let _l3 = result.lock();
+            let _l2 = result.lock();
         }
         result
     }
@@ -552,8 +551,7 @@ impl UEventNetlinkSocket {
         std::mem::drop(state);
         let mut key_state = self.device_listener_key.lock();
         if key_state.is_none() {
-            *key_state =
-                Some(self.kernel.device_registry.write().register_listener(self.inner.clone()));
+            *key_state = Some(self.kernel.device_registry.register_listener(self.inner.clone()));
         }
     }
 }
@@ -639,7 +637,7 @@ impl SocketOps for UEventNetlinkSocket {
     fn close(&self, _socket: &Socket) {
         let id = self.device_listener_key.lock().take();
         if let Some(id) = id {
-            self.kernel.device_registry.write().unregister_listener(&id);
+            self.kernel.device_registry.unregister_listener(&id);
         }
     }
 

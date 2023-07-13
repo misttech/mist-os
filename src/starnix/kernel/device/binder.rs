@@ -3820,7 +3820,7 @@ fn make_binder_nodes(kernel: &Kernel, dir: &DirEntryHandle) -> Result<(), Errno>
     let mut registered_binders = kernel.binders.write();
     for name in BINDERS {
         let driver = BinderDriver::new();
-        let dev = kernel.device_registry.write().register_dyn_chrdev(driver.clone())?;
+        let dev = kernel.device_registry.register_dyn_chrdev(driver.clone())?;
         dir.add_node_ops_dev(
             kernel.kthreads.system_task(),
             name,
@@ -3830,7 +3830,7 @@ fn make_binder_nodes(kernel: &Kernel, dir: &DirEntryHandle) -> Result<(), Errno>
         )?;
         registered_binders.insert(dev, driver);
     }
-    let remote_dev = kernel.device_registry.write().register_dyn_chrdev(RemoteBinderDevice {})?;
+    let remote_dev = kernel.device_registry.register_dyn_chrdev(RemoteBinderDevice {})?;
     dir.add_node_ops_dev(
         kernel.kthreads.system_task(),
         b"remote",

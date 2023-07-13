@@ -31,24 +31,22 @@ pub fn run_features(entries: &Vec<String>, kernel: &Arc<Kernel>) -> Result<(), E
             }
             "selinux_enabled" => {}
             "framebuffer" => {
-                let mut device_registry = kernel.device_registry.write();
-
                 // Add framebuffer and input devices in the kobject tree.
-                let graphics_class = device_registry.virtual_bus().get_or_create_child(
+                let graphics_class = kernel.device_registry.virtual_bus().get_or_create_child(
                     b"graphics",
                     KType::Class,
                     SysFsDirectory::new,
                 );
-                device_registry.add_device(
+                kernel.device_registry.add_device(
                     graphics_class,
                     KObjectDeviceAttribute::new(b"fb0", b"fb0", DeviceType::FB0),
                 );
-                let input_class = device_registry.virtual_bus().get_or_create_child(
+                let input_class = kernel.device_registry.virtual_bus().get_or_create_child(
                     b"input",
                     KType::Class,
                     SysFsDirectory::new,
                 );
-                device_registry.add_device(
+                kernel.device_registry.add_device(
                     input_class,
                     KObjectDeviceAttribute::new(
                         b"event0",
@@ -58,7 +56,9 @@ pub fn run_features(entries: &Vec<String>, kernel: &Arc<Kernel>) -> Result<(), E
                 );
 
                 // Register a framebuffer.
-                device_registry.register_chrdev_major(FB_MAJOR, kernel.framebuffer.clone())?;
+                kernel
+                    .device_registry
+                    .register_chrdev_major(FB_MAJOR, kernel.framebuffer.clone())?;
 
                 // Also register an input device, which can be used to read pointer events
                 // associated with the framebuffer's `View`.
@@ -69,23 +69,24 @@ pub fn run_features(entries: &Vec<String>, kernel: &Arc<Kernel>) -> Result<(), E
                 // TODO(quiche): When adding support for multiple input devices, ensure
                 // that the appropriate `InputFile` is associated with the appropriate
                 // `INPUT_MINOR`.
-                device_registry.register_chrdev_major(INPUT_MAJOR, kernel.input_file.clone())?;
+                kernel
+                    .device_registry
+                    .register_chrdev_major(INPUT_MAJOR, kernel.input_file.clone())?;
             }
             "magma" => {
                 let magma_type = DeviceType::new(STARNIX_MAJOR, STARNIX_MINOR_MAGMA);
-                let mut device_registry = kernel.device_registry.write();
-                let starnix_class = device_registry.virtual_bus().get_or_create_child(
+                let starnix_class = kernel.device_registry.virtual_bus().get_or_create_child(
                     b"starnix",
                     KType::Class,
                     SysFsDirectory::new,
                 );
-                device_registry.add_device(
+                kernel.device_registry.add_device(
                     starnix_class,
                     KObjectDeviceAttribute::new(b"magma0", b"magma0", magma_type),
                 );
 
                 // Register the magma device.
-                device_registry.register_chrdev(
+                kernel.device_registry.register_chrdev(
                     STARNIX_MAJOR,
                     STARNIX_MINOR_MAGMA,
                     1,

@@ -86,7 +86,7 @@ pub struct Kernel {
     pub trace_fs: OnceCell<FileSystemHandle>,
 
     /// The registry of device drivers.
-    pub device_registry: RwLock<DeviceRegistry>,
+    pub device_registry: DeviceRegistry,
 
     // The features enabled for the container this kernel is associated with, as specified in
     // the container's configuration file.
@@ -214,7 +214,7 @@ impl Kernel {
             sys_fs: OnceCell::new(),
             selinux_fs: OnceCell::new(),
             trace_fs: OnceCell::new(),
-            device_registry: RwLock::new(DeviceRegistry::new_with_common_devices()),
+            device_registry: DeviceRegistry::new_with_common_devices(),
             features: HashSet::from_iter(features.iter().cloned()),
             container_svc,
             loop_device_registry: Default::default(),
@@ -240,8 +240,7 @@ impl Kernel {
         dev: DeviceType,
         mode: DeviceMode,
     ) -> Result<Box<dyn FileOps>, Errno> {
-        let registry = self.device_registry.read();
-        registry.open_device(current_task, node, flags, dev, mode)
+        self.device_registry.open_device(current_task, node, flags, dev, mode)
     }
 
     /// Return a reference to the GenericNetlink implementation.

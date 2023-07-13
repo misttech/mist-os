@@ -286,7 +286,6 @@ impl FileOps for UEventFile {
             current_task
                 .kernel()
                 .device_registry
-                .write()
                 .dispatch_uevent(command.try_into()?, self.kobject.clone());
         }
         Ok(content.len())

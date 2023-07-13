@@ -48,7 +48,7 @@ impl SysFs {
 
         // TODO(https://fxbug.dev/130408) include concrete block devices
         let virtual_block_class = {
-            kernel.device_registry.read().virtual_bus().get_or_create_child(
+            kernel.device_registry.virtual_bus().get_or_create_child(
                 b"block",
                 KType::Class,
                 SysFsDirectory::new,
@@ -58,7 +58,7 @@ impl SysFs {
 
         dir.entry(
             b"devices",
-            SysFsDirectory::new(Arc::downgrade(&kernel.device_registry.read().root_kobject())),
+            SysFsDirectory::new(Arc::downgrade(&kernel.device_registry.root_kobject())),
             dir_mode,
         );
 
@@ -74,7 +74,6 @@ impl SysFs {
         // Remove after registry.rs refactor is in place.
         kernel
             .device_registry
-            .read()
             .root_kobject()
             .get_or_create_child(b"system", KType::Bus, SysFsDirectory::new)
             .get_or_create_child(b"cpu", KType::Class, CpuClassDirectory::new);

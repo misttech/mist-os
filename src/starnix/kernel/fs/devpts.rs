@@ -61,17 +61,16 @@ fn init_devpts(kernel: &Arc<Kernel>, options: FileSystemOptions) -> FileSystemHa
     let state = Arc::new(TTYState::new());
     let device = DevPtsDevice::new(state.clone());
 
-    {
-        let mut registry = kernel.device_registry.write();
-        // Register /dev/pts/X device type.
-        for n in 0..DEVPTS_MAJOR_COUNT {
-            registry
-                .register_chrdev_major(DEVPTS_FIRST_MAJOR + n, device.clone())
-                .expect("Registering pts device");
-        }
-        // Register tty and ptmx device types.
-        registry.register_chrdev_major(TTY_ALT_MAJOR, device).unwrap();
+    // Register /dev/pts/X device type.
+    for n in 0..DEVPTS_MAJOR_COUNT {
+        kernel
+            .device_registry
+            .register_chrdev_major(DEVPTS_FIRST_MAJOR + n, device.clone())
+            .expect("Registering pts device");
     }
+    // Register tty and ptmx device types.
+    kernel.device_registry.register_chrdev_major(TTY_ALT_MAJOR, device).unwrap();
+
     let fs = FileSystem::new(kernel, CacheMode::Uncached, DevPtsFs, options);
     let mut root = FsNode::new_root_with_properties(DevPtsRootDir { state }, |info| {
         info.ino = ROOT_NODE_ID;
