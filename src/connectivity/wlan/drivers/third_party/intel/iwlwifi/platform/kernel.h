@@ -62,7 +62,6 @@ typedef char* acpi_string;
 //
 #define TU_TO_DURATION(time_unit) (ZX_USEC(1024) * time_unit)
 
-struct zx_device;
 struct async_dispatcher;
 struct driver_inspector;
 struct rcu_manager;

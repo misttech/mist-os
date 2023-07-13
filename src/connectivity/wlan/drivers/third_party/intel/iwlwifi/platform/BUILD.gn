@@ -53,13 +53,12 @@ source_set("platform") {
     "//zircon/system/ulib/async:async-cpp",
   ]
   public_deps = [
-    "//sdk/fidl/fuchsia.hardware.pci:fuchsia.hardware.pci_cpp_wire",
+    "//sdk/fidl/fuchsia.hardware.pci:fuchsia.hardware.pci_cpp_driver",
     "//sdk/fidl/fuchsia.wlan.softmac:fuchsia.wlan.softmac_cpp_driver",
     "//sdk/fidl/fuchsia.wlan.softmac:fuchsia.wlan.softmac_cpp_wire",
     "//src/connectivity/wlan/drivers/lib/log/c:dfv2",
     "//src/connectivity/wlan/lib/common/cpp:common",
     "//src/devices/lib/mmio",
-    "//src/devices/pci/lib/device-protocol-pci",
     "//zircon/system/public",
     "//zircon/system/ulib/async",
   ]

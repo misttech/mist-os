@@ -267,12 +267,7 @@ zx_status_t PcieIwlwifiDriver::Init() {
     IWL_ERR(nullptr, "Failed to connect to PCI service: %s", pci_client_end.status_string());
     return pci_client_end.status_value();
   }
-
-  if (iwl_pci_connect_fragment_protocol_with_client(std::move(pci_client_end.value()),
-                                                    &pci_dev_.fidl)) {
-    IWL_ERR(nullptr, "Failed to Create FIDL PCI object.");
-    return ZX_ERR_INTERNAL;
-  }
+  iwl_pci_connect_fragment_protocol_with_client(std::move(pci_client_end.value()), &pci_dev_.fidl);
 
   if ((status = StartPci()) != ZX_OK) {
     IWL_ERR(nullptr, "Failed to Start PCI: %s", zx_status_get_string(status));

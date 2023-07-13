@@ -35,7 +35,6 @@
  *****************************************************************************/
 #define _ALL_SOURCE  // for threads.h
 #include <lib/async/time.h>
-#include <lib/device-protocol/pci.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <threads.h>

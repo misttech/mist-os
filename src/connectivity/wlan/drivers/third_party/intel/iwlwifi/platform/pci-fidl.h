@@ -5,13 +5,14 @@
 #ifndef SRC_CONNECTIVITY_WLAN_DRIVERS_THIRD_PARTY_INTEL_IWLWIFI_PLATFORM_PCI_FIDL_H_
 #define SRC_CONNECTIVITY_WLAN_DRIVERS_THIRD_PARTY_INTEL_IWLWIFI_PLATFORM_PCI_FIDL_H_
 
-#include <lib/device-protocol/pci.h>
 #include <lib/mmio-ptr/mmio-ptr.h>
-#include <zircon/types.h>
 
+#include "src/connectivity/wlan/drivers/third_party/intel/iwlwifi/platform/banjo/pci.h"
 #include "src/connectivity/wlan/drivers/third_party/intel/iwlwifi/platform/kernel.h"
 
 #if defined(__cplusplus)
+#include <fidl/fuchsia.hardware.pci/cpp/wire.h>
+#include <fidl/fuchsia.hardware.pci/cpp/wire_types.h>
 extern "C" {
 #endif  // defined(__cplusplus)
 
@@ -35,17 +36,12 @@ zx_status_t iwl_pci_write_config8(const struct iwl_pci_fidl* fidl, uint16_t offs
 zx_status_t iwl_pci_map_bar_buffer(struct iwl_pci_fidl* fidl, uint32_t bar_id,
                                    uint32_t cache_policy, MMIO_PTR void** buffer);
 
-struct zx_device;
-
-zx_status_t iwl_pci_connect_fragment_protocol(struct zx_device* parent, const char* fragment_name,
-                                              struct iwl_pci_fidl** fidl);
-
 void iwl_pci_free(struct iwl_pci_fidl* fidl);
 
 #if defined(__cplusplus)
 }  // extern "C"
 
-zx_status_t iwl_pci_connect_fragment_protocol_with_client(
+void iwl_pci_connect_fragment_protocol_with_client(
     fidl::ClientEnd<fuchsia_hardware_pci::Device> client_end, struct iwl_pci_fidl** fidl);
 
 #endif  // defined(__cplusplus)
