@@ -16,6 +16,9 @@
                 "MapGrowsdownTest.Mprotect*",
                 "MapGrowsdownTest.Syscall*",
 
+                // TODO(https://fxbug.dev/129704): This test causes the test suite to fail on NUC.
+                "RestartRead.ReadFromPipeRestarts",
+
                 // TODO(https://fxbug.dev/127336)
                 "Shared/MMapProcStatmTest.RssAfterUnmap/0",
                 "Shared/MMapProcStatmTest.RssAfterMapOverride/0",
