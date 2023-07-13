@@ -6,7 +6,6 @@
     // in non-prod builds.
     include: [
         "//src/connectivity/network/meta/test-collection.shard.cml",
-        "inspect/offer.shard.cml",
         "trace/client.shard.cml",
     ],
     children: [
@@ -58,7 +57,10 @@
             to: [ "#dns-resolver" ],
         },
         {
-            protocol: [ "fuchsia.logger.LogSink" ],
+            protocol: [
+                "fuchsia.inspect.InspectSink",
+                "fuchsia.logger.LogSink",
+            ],
             from: "parent",
             to: [
                 "#dhcpd",
