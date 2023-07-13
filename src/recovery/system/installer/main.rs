@@ -31,14 +31,13 @@ use futures::StreamExt;
 use recovery_ui_config::Config as UiConfig;
 use rive_rs as rive;
 use std::path::PathBuf;
-use std::sync::Mutex;
 
 mod menu;
 use menu::{Key, MenuButtonType, MenuEvent, MenuState, MenuStateMachine};
 
 use installer::{
-    find_install_source, get_bootloader_type, partition::Partition, paver_connect, restart,
-    set_active_configuration, BootloaderType,
+    do_install, find_install_source, get_bootloader_type, restart, BootloaderType,
+    InstallationPaths,
 };
 use recovery_util::block::{get_block_device, get_block_devices, BlockDevice};
 
@@ -68,28 +67,6 @@ enum InstallerMessages {
     GotBlockDevices(Vec<BlockDevice>),
     ProgressUpdate(String),
     Success,
-}
-
-/// Installer
-#[derive(Clone, Debug, PartialEq)]
-struct InstallationPaths {
-    install_source: Option<BlockDevice>,
-    install_target: Option<BlockDevice>,
-    bootloader_type: Option<BootloaderType>,
-    install_destinations: Vec<BlockDevice>,
-    available_disks: Vec<BlockDevice>,
-}
-
-impl InstallationPaths {
-    pub fn new() -> InstallationPaths {
-        InstallationPaths {
-            install_source: None,
-            install_target: None,
-            bootloader_type: None,
-            install_destinations: Vec::new(),
-            available_disks: Vec::new(),
-        }
-    }
 }
 
 struct InstallerAppAssistant {
@@ -591,8 +568,14 @@ async fn fuchsia_install(
     view_key: ViewKey,
     installation_paths: InstallationPaths,
 ) {
+    let sender =
+        app_sender.create_cross_thread_sender::<InstallerMessages>(MessageTarget::View(view_key));
+    let progress_callback = |s: String| {
+        sender.unbounded_send(InstallerMessages::ProgressUpdate(s)).expect("unbounded send failed");
+    };
+
     // Execute install
-    match do_install(app_sender.clone(), view_key, installation_paths).await {
+    match do_install(installation_paths, &progress_callback).await {
         Ok(_) => {
             app_sender.queue_message(
                 MessageTarget::View(view_key),
@@ -607,130 +590,6 @@ async fn fuchsia_install(
             );
         }
     }
-}
-
-async fn do_install(
-    app_sender: AppSender,
-    view_key: ViewKey,
-    installation_paths: InstallationPaths,
-) -> Result<(), Error> {
-    let install_target =
-        installation_paths.install_target.ok_or(anyhow!("No installation target?"))?;
-    let install_source =
-        installation_paths.install_source.ok_or(anyhow!("No installation source?"))?;
-    let bootloader_type = installation_paths.bootloader_type.unwrap();
-
-    // TODO(fxbug.dev/100712): Remove this once flake is resolved.
-    tracing::info!(
-        "Installing to {} ({}), source {} ({})",
-        install_target.topo_path,
-        install_target.class_path,
-        install_source.topo_path,
-        install_source.class_path
-    );
-
-    let (paver, data_sink) =
-        paver_connect(&install_target.class_path).context("Could not contact paver")?;
-
-    tracing::info!("Wiping old partition tables...");
-    app_sender.clone().queue_message(
-        MessageTarget::View(view_key),
-        make_message(InstallerMessages::ProgressUpdate(String::from(
-            "Wiping old partition tables...",
-        ))),
-    );
-    data_sink.wipe_partition_tables().await?;
-    tracing::info!("Initializing Fuchsia partition tables...");
-    app_sender.queue_message(
-        MessageTarget::View(view_key),
-        make_message(InstallerMessages::ProgressUpdate(String::from(
-            "Initializing Fuchsia partition tables...",
-        ))),
-    );
-    data_sink.initialize_partition_tables().await?;
-    tracing::info!("Success.");
-
-    app_sender.queue_message(
-        MessageTarget::View(view_key),
-        make_message(InstallerMessages::ProgressUpdate(String::from("Getting source partitions"))),
-    );
-    let to_install = Partition::get_partitions(
-        &install_source,
-        &installation_paths.available_disks,
-        bootloader_type,
-    )
-    .await
-    .context("Getting source partitions")?;
-
-    let num_partitions = to_install.len();
-    let mut current_partition = 1;
-    for part in to_install {
-        app_sender.queue_message(
-            MessageTarget::View(view_key),
-            make_message(InstallerMessages::ProgressUpdate(String::from(format!(
-                "paving partition {} of {}",
-                current_partition, num_partitions
-            )))),
-        );
-
-        let sender = app_sender
-            .create_cross_thread_sender::<InstallerMessages>(MessageTarget::View(view_key));
-
-        let prev_percent = Mutex::new(0 as i64);
-
-        let progress_callback = Box::new(move |data_read, data_total| {
-            if data_total == 0 {
-                return;
-            }
-            let cur_percent: i64 =
-                unsafe { (((data_read as f64) / (data_total as f64)) * 100.0).to_int_unchecked() };
-            let mut prev = prev_percent.lock().unwrap();
-            if cur_percent == *prev {
-                return;
-            }
-            *prev = cur_percent;
-
-            sender
-                .unbounded_send(InstallerMessages::ProgressUpdate(String::from(format!(
-                    "paving partition {} of {}: {}%",
-                    current_partition, num_partitions, cur_percent
-                ))))
-                .expect("unbounded send failed");
-        });
-
-        tracing::info!("Paving partition: {:?}", part);
-        part.pave(&data_sink, progress_callback).await?;
-        if part.is_ab() {
-            tracing::info!("Paving partition: {:?} [-B]", part);
-            part.pave_b(&data_sink).await?
-        }
-
-        current_partition += 1;
-    }
-
-    app_sender.queue_message(
-        MessageTarget::View(view_key),
-        make_message(InstallerMessages::ProgressUpdate(String::from("Flushing Partitions"))),
-    );
-    zx::Status::ok(data_sink.flush().await.context("Sending flush")?)
-        .context("Flushing partitions")?;
-
-    app_sender.queue_message(
-        MessageTarget::View(view_key),
-        make_message(InstallerMessages::ProgressUpdate(String::from(
-            "Setting active configuration for the new system",
-        ))),
-    );
-    set_active_configuration(&paver)
-        .await
-        .context("Setting active configuration for the new system")?;
-
-    app_sender.queue_message(
-        MessageTarget::View(view_key),
-        make_message(InstallerMessages::ProgressUpdate(String::from("Configuration complete!!"))),
-    );
-
-    Ok(())
 }
 
 /// Wait for a display to become available.

@@ -23,12 +23,34 @@ use {
     fuchsia_zircon as zx,
     partition::Partition,
     recovery_util::block::BlockDevice,
+    std::sync::Mutex,
 };
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub enum BootloaderType {
     Efi,
     Coreboot,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct InstallationPaths {
+    pub install_source: Option<BlockDevice>,
+    pub install_target: Option<BlockDevice>,
+    pub bootloader_type: Option<BootloaderType>,
+    pub install_destinations: Vec<BlockDevice>,
+    pub available_disks: Vec<BlockDevice>,
+}
+
+impl InstallationPaths {
+    pub fn new() -> InstallationPaths {
+        InstallationPaths {
+            install_source: None,
+            install_target: None,
+            bootloader_type: None,
+            install_destinations: Vec::new(),
+            available_disks: Vec::new(),
+        }
+    }
 }
 
 pub async fn find_install_source(
@@ -53,7 +75,7 @@ pub async fn find_install_source(
     candidate
 }
 
-pub fn paver_connect(path: &str) -> Result<(PaverProxy, DynamicDataSinkProxy), Error> {
+fn paver_connect(path: &str) -> Result<(PaverProxy, DynamicDataSinkProxy), Error> {
     let (block_device_chan, block_remote) = zx::Channel::create();
     fdio::service_connect(&path, block_remote)?;
 
@@ -110,7 +132,7 @@ pub async fn restart() {
 
 /// Set the active boot configuration for the newly-installed system. We always boot from the "A"
 /// slot to start with.
-pub async fn set_active_configuration(paver: &PaverProxy) -> Result<(), Error> {
+async fn set_active_configuration(paver: &PaverProxy) -> Result<(), Error> {
     let (boot_manager, server) = fidl::endpoints::create_proxy::<BootManagerMarker>()
         .context("Creating boot manager endpoints")?;
 
@@ -126,4 +148,88 @@ pub async fn set_active_configuration(paver: &PaverProxy) -> Result<(), Error> {
 
     zx::Status::ok(boot_manager.flush().await.context("Sending boot manager flush")?)
         .context("Flushing active configuration")
+}
+
+pub async fn do_install<F>(
+    installation_paths: InstallationPaths,
+    progress_callback: &F,
+) -> Result<(), Error>
+where
+    F: Send + Sync + Fn(String),
+{
+    let install_target =
+        installation_paths.install_target.ok_or(anyhow!("No installation target?"))?;
+    let install_source =
+        installation_paths.install_source.ok_or(anyhow!("No installation source?"))?;
+    let bootloader_type = installation_paths.bootloader_type.unwrap();
+
+    let (paver, data_sink) =
+        paver_connect(&install_target.class_path).context("Could not contact paver")?;
+
+    tracing::info!("Wiping old partition tables...");
+    progress_callback(String::from("Wiping old partition tables..."));
+    data_sink.wipe_partition_tables().await?;
+
+    tracing::info!("Initializing Fuchsia partition tables...");
+    progress_callback(String::from("Initializing Fuchsia partition tables..."));
+    data_sink.initialize_partition_tables().await?;
+
+    tracing::info!("Getting source partitions");
+    progress_callback(String::from("Getting source partitions"));
+    let to_install = Partition::get_partitions(
+        &install_source,
+        &installation_paths.available_disks,
+        bootloader_type,
+    )
+    .await
+    .context("Getting source partitions")?;
+
+    let num_partitions = to_install.len();
+    let mut current_partition = 1;
+    for part in to_install {
+        progress_callback(String::from(format!(
+            "paving partition {} of {}",
+            current_partition, num_partitions
+        )));
+
+        let prev_percent = Mutex::new(0 as i64);
+
+        let pave_progress_callback = |data_read, data_total| {
+            if data_total == 0 {
+                return;
+            }
+            let cur_percent: i64 =
+                unsafe { (((data_read as f64) / (data_total as f64)) * 100.0).to_int_unchecked() };
+            let mut prev = prev_percent.lock().unwrap();
+            if cur_percent == *prev {
+                return;
+            }
+            *prev = cur_percent;
+
+            progress_callback(String::from(format!(
+                "paving partition {} of {}: {}%",
+                current_partition, num_partitions, cur_percent
+            )));
+        };
+
+        tracing::info!("Paving partition: {:?}", part);
+        part.pave(&data_sink, &pave_progress_callback).await?;
+        if part.is_ab() {
+            tracing::info!("Paving partition: {:?} [-B]", part);
+            part.pave_b(&data_sink).await?
+        }
+
+        current_partition += 1;
+    }
+
+    progress_callback(String::from("Flushing Partitions"));
+    zx::Status::ok(data_sink.flush().await.context("Sending flush")?)
+        .context("Flushing partitions")?;
+
+    progress_callback(String::from("Setting active configuration for the new system"));
+    set_active_configuration(&paver)
+        .await
+        .context("Setting active configuration for the new system")?;
+
+    Ok(())
 }

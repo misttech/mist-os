@@ -25,10 +25,8 @@ pub trait PayloadStreamer {
     async fn service_payload_stream_requests(
         self: Box<Self>,
         stream: PayloadStreamRequestStream,
+        status_callback: Option<&dyn StatusCallback>,
     ) -> Result<(), Error>;
-
-    /// Attach a callback that is called with status updates.
-    async fn set_status_callback(&self, callback: Box<dyn StatusCallback>);
 }
 
 struct ReaderPayloadStreamerInner {
@@ -37,7 +35,6 @@ struct ReaderPayloadStreamerInner {
     src_size: usize,           // Size of the reader.
     dest_buf: Option<Mapping>, // Maps the VMO used for the PayloadStream protocol.
     dest_size: usize,          // Size of the VMO used for the PayloadStream protocol.
-    status_callback: Option<Box<dyn StatusCallback>>,
 }
 
 /// Streams the contents of a reader over the PayloadStream protocol.
@@ -55,13 +52,16 @@ impl ReaderPayloadStreamer {
                 src_size,
                 dest_buf: None,
                 dest_size: 0,
-                status_callback: None,
             }),
         }
     }
 
     /// Handle a single request from a FIDL client.
-    async fn handle_request(self: &Self, req: PayloadStreamRequest) -> Result<(), Error> {
+    async fn handle_request(
+        self: &Self,
+        req: PayloadStreamRequest,
+        status_callback: Option<&dyn StatusCallback>,
+    ) -> Result<(), Error> {
         let mut unwrapped = self.inner.lock().await;
         match req {
             PayloadStreamRequest::RegisterVmo { vmo, responder } => {
@@ -126,7 +126,7 @@ impl ReaderPayloadStreamer {
 
                 let src_read = unwrapped.src_read;
                 let src_size = unwrapped.src_size;
-                if let Some(ref cb) = unwrapped.status_callback {
+                if let Some(cb) = status_callback {
                     cb(src_read, src_size);
                 }
             }
@@ -140,15 +140,12 @@ impl PayloadStreamer for ReaderPayloadStreamer {
     async fn service_payload_stream_requests(
         self: Box<Self>,
         stream: PayloadStreamRequestStream,
+        status_callback: Option<&dyn StatusCallback>,
     ) -> Result<(), Error> {
         stream
             .map(|result| result.context("failed request"))
-            .try_for_each(|request| async { self.handle_request(request).await })
+            .try_for_each(|request| async { self.handle_request(request, status_callback).await })
             .await
-    }
-
-    async fn set_status_callback(&self, callback: Box<dyn StatusCallback>) {
-        self.inner.lock().await.status_callback = Some(callback);
     }
 }
 
@@ -161,7 +158,6 @@ struct BlockDevicePayloadStreamerInner {
     device_vmo_read: usize, // Read offset into the VMO used to read from the block device.
     dest_buf: Option<Mapping>, // Maps the VMO used for the PayloadStream protocol.
     dest_size: usize,    // Size of the VMO used for the PayloadStream protocol.
-    status_callback: Option<Box<dyn StatusCallback>>,
 }
 
 /// Streams the contents of a block device over the PayloadStream protocol.
@@ -195,13 +191,16 @@ impl BlockDevicePayloadStreamer {
                 device_vmo_read: 0,
                 dest_buf: None,
                 dest_size: 0,
-                status_callback: None,
             }),
         })
     }
 
     /// Handle a single request from a FIDL client.
-    async fn handle_request(&self, req: PayloadStreamRequest) -> Result<(), Error> {
+    async fn handle_request(
+        &self,
+        req: PayloadStreamRequest,
+        status_callback: Option<&dyn StatusCallback>,
+    ) -> Result<(), Error> {
         let mut unwrapped = self.inner.lock().await;
         match req {
             PayloadStreamRequest::RegisterVmo { vmo, responder } => {
@@ -290,7 +289,7 @@ impl BlockDevicePayloadStreamer {
 
                 let device_read = unwrapped.device_read;
                 let device_size = unwrapped.device_size;
-                if let Some(ref cb) = unwrapped.status_callback {
+                if let Some(cb) = status_callback {
                     cb(device_read, device_size);
                 }
             }
@@ -307,17 +306,14 @@ impl BlockDevicePayloadStreamer {
 
 #[async_trait]
 impl PayloadStreamer for BlockDevicePayloadStreamer {
-    async fn set_status_callback(&self, callback: Box<dyn StatusCallback>) {
-        self.inner.lock().await.status_callback = Some(callback);
-    }
-
     async fn service_payload_stream_requests(
         self: Box<Self>,
         stream: PayloadStreamRequestStream,
+        status_callback: Option<&dyn StatusCallback>,
     ) -> Result<(), Error> {
         let result = stream
             .map(|result| result.context("failed request"))
-            .try_for_each(|request| async { self.handle_request(request).await })
+            .try_for_each(|request| async { self.handle_request(request, status_callback).await })
             .await;
 
         if let Err(e) = result {
@@ -351,29 +347,25 @@ mod tests {
         data_size: usize,
     }
 
-    async fn serve_payload(
-        streamer: Box<dyn PayloadStreamer>,
-    ) -> Result<
-        (PayloadStreamProxy, Arc<Mutex<StatusUpdate>>, impl Future<Output = Result<(), Error>>),
-        Error,
-    > {
-        let status = Arc::new(Mutex::new(StatusUpdate { data_read: 0, data_size: 0 }));
-        let status_clone = Arc::clone(&status);
-        let callback = move |data_read, data_size| {
-            let mut val = status_clone.lock().unwrap();
-            val.data_read = data_read;
-            val.data_size = data_size;
-        };
-        streamer.set_status_callback(Box::new(callback)).await;
+    impl StatusUpdate {
+        fn status_callback(&mut self, data_read: usize, data_size: usize) {
+            self.data_read = data_read;
+            self.data_size = data_size;
+        }
+    }
 
+    async fn serve_payload<'a>(
+        streamer: Box<dyn PayloadStreamer>,
+        status_callback: Option<&'a dyn StatusCallback>,
+    ) -> Result<(PayloadStreamProxy, impl Future<Output = Result<(), Error>> + 'a), Error> {
         let (client_end, server_end) = fidl::endpoints::create_endpoints::<PayloadStreamMarker>();
         let stream = server_end.into_stream()?;
 
         // Do not await as we return this Future so that the caller can run the client and server
         // concurrently.
-        let server = streamer.service_payload_stream_requests(stream);
+        let server = streamer.service_payload_stream_requests(stream, status_callback);
 
-        return Ok((client_end.into_proxy()?, status, server));
+        return Ok((client_end.into_proxy()?, server));
     }
 
     async fn create_ramdisk(src: Vec<u8>) -> Result<RamdiskClient, Error> {
@@ -484,9 +476,15 @@ mod tests {
             Box::new(ReaderPayloadStreamer::new(Box::new(Cursor::new(buf)), src_size))
         };
 
-        let (proxy, callback_status, server) =
-            serve_payload(streamer).await.context("serve payload failed")?;
-        try_join(server, run_client(proxy, src_size, dst_size, byte, callback_status)).await?;
+        let status_update = Arc::new(Mutex::new(StatusUpdate { data_read: 0, data_size: 0 }));
+        let status_callback = |data_read, data_size| {
+            status_update.lock().unwrap().status_callback(data_read, data_size)
+        };
+        let (proxy, server) = serve_payload(streamer, Some(&status_callback))
+            .await
+            .context("serve payload failed")?;
+        try_join(server, run_client(proxy, src_size, dst_size, byte, status_update.clone()))
+            .await?;
 
         Ok(())
     }
@@ -519,7 +517,7 @@ mod tests {
         let buf: Vec<u8> = vec![byte; src_size];
         let streamer: Box<dyn PayloadStreamer> =
             Box::new(ReaderPayloadStreamer::new(Box::new(Cursor::new(buf)), src_size));
-        let (proxy, _, server) = serve_payload(streamer).await?;
+        let (proxy, server) = serve_payload(streamer, None).await?;
 
         try_join(
             async move {
@@ -566,7 +564,7 @@ mod tests {
         let () = ramdisk_controller.connect_to_device_fidl(server.into_channel())?;
         let streamer: Box<dyn PayloadStreamer> =
             Box::new(BlockDevicePayloadStreamer::new(ramdisk_block).await?);
-        let (proxy, _, server) = serve_payload(streamer).await?;
+        let (proxy, server) = serve_payload(streamer, None).await?;
 
         try_join(
             async move {

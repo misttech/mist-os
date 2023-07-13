@@ -222,11 +222,14 @@ impl Partition {
     }
 
     /// Pave this partition to disk, using the given |DynamicDataSinkProxy|.
-    pub async fn pave(
+    pub async fn pave<F>(
         &self,
         data_sink: &DynamicDataSinkProxy,
-        progress_callback: Box<dyn Send + Sync + Fn(usize, usize) -> ()>,
-    ) -> Result<(), Error> {
+        progress_callback: &F,
+    ) -> Result<(), Error>
+    where
+        F: Send + Sync + Fn(usize, usize) -> (),
+    {
         match self.pave_type {
             PartitionPaveType::Asset { r#type: asset, config } => {
                 let fidl_buf = self.read_data().await?;
@@ -248,11 +251,14 @@ impl Partition {
     }
 
     /// Pave a volume while the block watcher is paused.
-    async fn pave_volume_paused(
+    async fn pave_volume_paused<F>(
         &self,
         data_sink: &DynamicDataSinkProxy,
-        progress_callback: Box<dyn Send + Sync + Fn(usize, usize) -> ()>,
-    ) -> Result<(), Error> {
+        progress_callback: &F,
+    ) -> Result<(), Error>
+    where
+        F: Send + Sync + Fn(usize, usize) -> (),
+    {
         // Set up a PayloadStream to serve the data sink.
         let partition_block =
             fuchsia_component::client::connect_to_protocol_at_path::<BlockMarker>(&self.src)?;
@@ -278,13 +284,12 @@ impl Partition {
                 *prev = percent;
             }
         };
-        streamer.set_status_callback(Box::new(status_callback)).await;
         let (client, server) =
             fidl::endpoints::create_request_stream::<fidl_fuchsia_paver::PayloadStreamMarker>()?;
 
         // Run the server and client ends of the PayloadStream concurrently.
         try_join(
-            streamer.service_payload_stream_requests(server),
+            streamer.service_payload_stream_requests(server, Some(&status_callback)),
             data_sink.write_volumes(client).map_err(|e| e.into()),
         )
         .await?;

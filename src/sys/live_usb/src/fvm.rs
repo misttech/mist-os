@@ -126,7 +126,7 @@ impl FvmRamdisk {
         let (client, server) =
             fidl::endpoints::create_request_stream::<fidl_fuchsia_paver::PayloadStreamMarker>()?;
 
-        let server = streamer.service_payload_stream_requests(server);
+        let server = streamer.service_payload_stream_requests(server, None);
 
         // Run the server and client ends of the PayloadStream concurrently.
         try_join(server, data_sink.write_volumes(client).map_err(|e| e.into())).await?;
