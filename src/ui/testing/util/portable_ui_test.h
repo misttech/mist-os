@@ -13,6 +13,7 @@
 #include <zircon/status.h>
 
 #include <optional>
+#include <utility>
 #include <vector>
 
 #include "src/lib/testing/loop_fixture/real_loop_fixture.h"
@@ -24,6 +25,10 @@ class PortableUITest : public ::loop_fixture::RealLoop, public ::testing::Test {
  public:
   static constexpr auto kTestUIStack = "ui";
   static constexpr auto kTestUIStackRef = component_testing::ChildRef{kTestUIStack};
+
+  PortableUITest() : realm_builder_(component_testing::RealmBuilder::Create()) {}
+  explicit PortableUITest(component_testing::RealmBuilder realm_builder)
+      : realm_builder_(std::move(realm_builder)) {}
 
   void SetUp() override;
   void TearDown() override;
@@ -131,7 +136,7 @@ class PortableUITest : public ::loop_fixture::RealLoop, public ::testing::Test {
   fuchsia::ui::observation::geometry::ViewTreeWatcherPtr view_tree_watcher_;
   std::optional<fuchsia::ui::composition::ScreenshotPtr> screenshotter_;
 
-  component_testing::RealmBuilder realm_builder_ = component_testing::RealmBuilder::Create();
+  component_testing::RealmBuilder realm_builder_;
   std::optional<component_testing::RealmRoot> realm_;
 
   // Counts the number of completed requests to inject touch reports into input
