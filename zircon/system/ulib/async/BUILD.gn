@@ -50,8 +50,6 @@ zx_library("async-cpp") {
   ]
 
   public_deps = [
-    ":headers",
-
     # <lib/async/cpp/executor.h> has #include <lib/zx/time.h>.
     # <lib/async/cpp/task.h> has #include <lib/zx/time.h>.
     "//zircon/system/ulib/zx:headers",

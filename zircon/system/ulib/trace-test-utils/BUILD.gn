@@ -28,8 +28,7 @@ zx_library("trace-test-utils") {
     "//third_party/re2",
 
     # <trace-test-utils/fixture.h> needs these
-    "//zircon/system/ulib/async-loop:async-loop-default.headers",
-    "//zircon/system/ulib/async-loop:headers",
+    "//zircon/system/ulib/async-loop",
     "//zircon/system/ulib/fbl",
     "//zircon/system/ulib/trace-engine",
     "//zircon/system/ulib/trace-reader",

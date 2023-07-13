@@ -18,7 +18,6 @@ zx_library("mtrace") {
     "//zircon/kernel/lib/libc",
     "//zircon/kernel/lib/perfmon:headers",
     "//zircon/kernel/object",
-    "//zircon/system/ulib/zircon-internal",
   ]
   public_deps = [
     # <lib/mtrace.h> has #include <lib/user_copy/user_ptr.h>

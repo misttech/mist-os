@@ -54,6 +54,13 @@ template("trace_engine_library") {
   }
 }
 
+source_set("trace-engine-headers") {
+  sources = []
+  foreach(header, trace_engine_headers) {
+    sources += [ "include/" + header ]
+  }
+}
+
 # The default version for the normal case.
 trace_engine_library("trace-engine") {
   sdk = "shared"

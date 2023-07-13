@@ -20,7 +20,6 @@ source_set("entropy") {
     "//zircon/kernel/lib/init",
     "//zircon/kernel/lib/ktl",
     "//zircon/kernel/lib/unittest",
-    "//zircon/system/ulib/lazy_init",
     "//zircon/third_party/lib/jitterentropy",
   ]
 }

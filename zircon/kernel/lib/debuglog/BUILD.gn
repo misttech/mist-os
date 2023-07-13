@@ -19,7 +19,6 @@ zx_library("debuglog") {
     "//zircon/kernel/lib/ktl",
     "//zircon/kernel/lib/persistent-debuglog",
     "//zircon/kernel/lib/version",
-    "//zircon/system/ulib/lazy_init",
   ]
 }
 
@@ -31,6 +30,5 @@ source_set("tests") {
   deps = [
     ":headers",
     "//zircon/kernel/lib/unittest",
-    "//zircon/system/ulib/zircon-internal",
   ]
 }

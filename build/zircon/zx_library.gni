@@ -2,7 +2,6 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-import("//build/cpp/library_headers.gni")
 import("//build/cpp/sdk_shared_library.gni")
 import("//build/cpp/sdk_source_set.gni")
 import("//build/cpp/sdk_static_library.gni")
@@ -101,61 +100,62 @@ template("zx_library") {
                "sdk_headers_for_internal_use",
              ])
 
-  main_target = target_name
-
-  # If the library has the same name as its directory, just create
-  # :headers and :headers.config sub-targets. Otherwise, create
-  # :foo.headers and :foo.headers.config
-  if (get_label_info(":$main_target", "name") ==
-      get_path_info(get_label_info(":$main_target", "dir"), "file")) {
-    headers_target = "headers"
-  } else {
-    headers_target = "$main_target.headers"
-  }
-
-  library_headers(headers_target) {
-    forward_variables_from(invoker,
-                           [
-                             "public_configs",
-                             "public_deps",
-                             "testonly",
-                             "visibility",
-                           ])
-    if (defined(visibility)) {
-      visibility += [ ":$main_target" ]
-    }
-
-    if (!defined(public_deps)) {
-      public_deps = []
-    }
-    public_deps += [ "//zircon/system/public" ]
-
-    headers = []
-    if (defined(invoker.sdk_headers)) {
-      headers += invoker.sdk_headers
-    }
-    if (defined(invoker.sdk_headers_for_internal_use)) {
-      headers += invoker.sdk_headers_for_internal_use
-    }
-  }
-
   if (zircon_toolchain != false) {
+    _library_name = target_name
+
     if (toolchain_environment == "kernel") {
       # In the kernel proper, zx_library() is always a source_set().
       # Everything goes into the kernel and anything unused gets linker GC.
-      kernel_target_type = "source_set"
+      kernel_library_target_type = "source_set"
     } else {
-      kernel_target_type = "static_library"
+      kernel_library_target_type = "static_library"
     }
 
-    target(kernel_target_type, main_target) {
-      if (kernel_target_type == "static_library") {
+    # If the library has the same name as its directory, just create
+    # :headers and :headers.config sub-targets. Otherwise, create
+    # :foo.headers and :foo.headers.config
+    if (get_label_info(":$_library_name", "name") ==
+        get_path_info(get_label_info(":$_library_name", "dir"), "file")) {
+      _headers_target = "headers"
+      _headers_config_target = "headers.config"
+    } else {
+      _headers_target = "$_library_name.headers"
+      _headers_config_target = "$_library_name.headers.config"
+    }
+
+    target(kernel_library_target_type, _library_name) {
+      if (kernel_library_target_type == "static_library") {
         complete_static_lib = true
       }
-
-      public_deps = []
       forward_variables_from(invoker, "*", template_params)
-      public_deps += [ ":$headers_target" ]
+      if (!defined(public_deps)) {
+        public_deps = []
+      }
+      public_deps += [ ":$_headers_target" ]
+    }
+
+    group(_headers_target) {
+      # Used to represent header dependencies.
+      # Direct use of public_configs should be rare but is sometimes needed.
+      forward_variables_from(invoker,
+                             [
+                               "public_configs",
+                               "public_deps",
+                               "testonly",
+                               "visibility",
+                             ])
+      if (!defined(public_configs)) {
+        public_configs = []
+      }
+      public_configs += [ ":${_headers_config_target}" ]
+      if (!defined(public_deps)) {
+        public_deps = []
+      }
+      public_deps += [ "//zircon/system/public" ]
+    }
+
+    config(_headers_config_target) {
+      include_dirs = [ "include" ]
     }
   } else {
     assert(
@@ -269,6 +269,8 @@ template("zx_library") {
     } else {
       assert(false, "Unknown library type: $shape")
     }
+
+    main_target_name = target_name
     config_target_name = "$target_name.config"
 
     config(config_target_name) {
@@ -328,7 +330,7 @@ template("zx_library") {
     _has_public_headers =
         defined(invoker.sdk_headers) && invoker.sdk_headers != []
 
-    target(target_type, main_target) {
+    target(target_type, main_target_name) {
       forward_variables_from(invoker,
                              "*",
                              template_params + [

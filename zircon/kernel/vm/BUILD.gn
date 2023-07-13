@@ -63,7 +63,6 @@ zx_library("vm") {
     "//zircon/kernel/lib/user_copy",
     "//zircon/kernel/lib/userabi",
     "//zircon/system/ulib/affine",
-    "//zircon/system/ulib/lazy_init",
     "//zircon/system/ulib/pretty",
 
     # TODO: testonly

@@ -18,6 +18,5 @@ zx_library("heap") {
 
     # TODO(fxbug.dev/51163): Remove headers when possible.
     "//zircon/kernel/lib/instrumentation:headers",
-    "//zircon/system/ulib/lazy_init",
   ]
 }
