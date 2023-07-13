@@ -23,13 +23,4 @@ ctf_test_realm("fuchsia.example_test_realm") {
   manifest = "meta/$target_name.cml"
   deps = [ "//examples/fidl/cpp/server:echo-server" ]
 }
-
 # [END example]
-
-ctf_test_realm("fuchsia.driver.test_test_realm") {
-  manifest = "meta/$target_name.cml"
-  deps = [
-    "//sdk/lib/driver_test_realm",
-    "//src/devices/misc/drivers/test-parent",
-  ]
-}

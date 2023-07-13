@@ -1,49 +1,43 @@
-// Copyright 2021 The Fuchsia Authors. All rights reserved.
+// Copyright 2023 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 {
     include: [
-        "//sdk/ctf/meta/test.shard.cml",
+        "//sdk/lib/driver_test_realm/meta/client.shard.cml",
         "inspect/offer.shard.cml",
-        "sys/testing/elf_test_runner.shard.cml",
         "syslog/client.shard.cml",
     ],
-    program: {
-        binary: "bin/driver_test_realm_cts_test",
-    },
     children: [
         {
-            name: "test_realm",
-            url: "fuchsia.driver.test_test_realm#meta/default.cm",
+            name: "test_suite",
+            url: "fuchsia-driver-test_tests#meta/test-suite.cm",
         },
     ],
-    use: [
+    offer: [
         {
             directory: "dev-topological",
-            from: "#test_realm",
+            from: "#driver_test_realm",
+            to: "#test_suite",
             rights: [ "r*" ],
-            path: "/dev",
         },
         {
             protocol: [
                 "fuchsia.device.manager.Administrator",
+                "fuchsia.device.manager.SystemStateTransition",
                 "fuchsia.driver.development.DriverDevelopment",
                 "fuchsia.driver.registrar.DriverRegistrar",
                 "fuchsia.driver.test.Realm",
                 "fuchsia.hardware.pci.DeviceWatcher",
                 "fuchsia.hardware.usb.DeviceWatcher",
             ],
-            from: "#test_realm",
+            from: "#driver_test_realm",
+            to: "#test_suite",
         },
     ],
-    offer: [
+    expose: [
         {
-            protocol: [
-                "fuchsia.logger.LogSink",
-                "fuchsia.process.Launcher",
-            ],
-            from: "parent",
-            to: "#test_realm",
+            protocol: "fuchsia.test.Suite",
+            from: "#test_suite",
         },
     ],
 }

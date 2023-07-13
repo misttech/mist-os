@@ -7,11 +7,16 @@ import("//sdk/ctf/build/ctf.gni")
 
 group("tests") {
   testonly = true
-  deps = [ ":fuchsia.driver.test_test" ]
+  deps = [
+    ":fuchsia-driver-test_tests-package",
+    # TODO(https://fxbug.dev/116940): Uncomment to include this test in CTF when it no longer
+    # depends on the experimental //sdk/lib/device_watcher API.
+    # ":fuchsia-driver-test_tests_archive",
+  ]
 }
 
 ctf_executable("bin") {
-  output_name = "driver_test_realm_cts_test"
+  output_name = "driver_test_realm_ctf_test"
   testonly = true
   sources = [ "test.cc" ]
   deps = [
@@ -24,18 +29,31 @@ ctf_executable("bin") {
   ]
 }
 
-ctf_fuchsia_component("test") {
-  component_name = "test"
-  manifest = "meta/fuchsia.driver.test_test.cml"
+ctf_fuchsia_component("test-suite") {
+  manifest = "meta/test-suite.cml"
   deps = [ ":bin" ]
   testonly = true
 }
 
-ctf_fuchsia_test_package("fuchsia.driver.test_test") {
-  enable_ctf_test_realms = true
-  plasa_element = "fidl/fuchsia.driver.test/Realm"
-  package_name = "fuchsia.driver.test_test"
-  test_components = [ ":test" ]
+ctf_fuchsia_package("fuchsia-driver-test_tests") {
+  testonly = true
+  package_name = "fuchsia-driver-test_tests"
+  deps = [ ":test-suite" ]
+}
+
+fuchsia_test_component("test-root") {
+  testonly = true
+  manifest = "meta/test-root.cml"
+  test_type = "ctf"
+}
+
+fuchsia_test_package("fuchsia-driver-test_tests-package") {
+  test_components = [ ":test-root" ]
+  subpackages = [ ":fuchsia-driver-test_tests" ]
+  deps = [
+    "//sdk/lib/driver_test_realm",
+    "//src/devices/misc/drivers/test-parent",
+  ]
   test_specs = {
     # Allow error logging for absent driver manifest files
     log_settings = {
