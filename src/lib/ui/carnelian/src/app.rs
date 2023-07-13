@@ -467,7 +467,7 @@ impl App {
                 std::thread::sleep(Config::get().startup_delay);
             }
             while let Some(message) = internal_receiver.next().await {
-                app.handle_message(message).await.expect("handle_message failed");
+                app.handle_message(message).await?;
             }
             Ok::<(), Error>(())
         };
