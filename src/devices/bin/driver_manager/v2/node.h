@@ -134,6 +134,8 @@ class Node : public fidl::WireServer<fuchsia_driver_framework::NodeController>,
 
   void OnBind() const;
 
+  bool is_bound() const { return driver_component_.has_value(); }
+
   // Begin the removal process for a Node. This function ensures that a Node is
   // only removed after all of its children are removed. It also ensures that
   // a Node is only removed after the driver that is bound to it has been stopped.

@@ -13,6 +13,7 @@ use {
     fuchsia_driver_test::{DriverTestRealmBuilder, DriverTestRealmInstance},
     fuchsia_zircon as zx,
     futures::{channel::mpsc, StreamExt, TryStreamExt},
+    reloadtest_tools,
     std::collections::{HashMap, HashSet},
 };
 
@@ -74,133 +75,6 @@ async fn get_device_info(
         device_infos.append(&mut device_info);
     }
     Ok(device_infos)
-}
-
-// Wait for the events from the |nodes| to be received. Updates the entries to be Some.
-async fn wait_for_nodes(
-    nodes: &mut HashMap<String, Option<Option<u64>>>,
-    receiver: &mut mpsc::Receiver<(String, String)>,
-) -> Result<()> {
-    while nodes.values().any(|&x| x.is_none()) {
-        let (from_node, _) = receiver.next().await.ok_or(anyhow!("Receiver failed"))?;
-        if !nodes.contains_key(&from_node) {
-            return Err(anyhow!("Couldn't find node '{}' in 'nodes'.", from_node.to_string()));
-        }
-        nodes.entry(from_node).and_modify(|x| {
-            *x = Some(None);
-        });
-    }
-
-    Ok(())
-}
-
-// Validates the host koids given the device infos.
-// Performs the following:
-// - Stores the host koid for nodes in changed_or_new as those are expected to be new/changed.
-// - Validate bound nodes are not in should_not_exist
-// - Validate bound nodes have the same koid as the most recent item in previous.
-// - Validate that items in changed_or_new have been changed from the most recent item in previous
-//   if they are not new.
-async fn validate_host_koids(
-    test_stage_name: &str,
-    device_infos: Vec<fdd::DeviceInfo>,
-    changed_or_new: &mut HashMap<String, Option<Option<u64>>>,
-    previous: Vec<&HashMap<String, Option<Option<u64>>>>,
-    should_not_exist: Option<&HashSet<String>>,
-) -> Result<()> {
-    for dev in &device_infos {
-        let key = dev.moniker.clone().unwrap().split(".").last().unwrap().to_string();
-
-        // Items in changed_or_new are expected to be different so just save that info and move on.
-        if changed_or_new.contains_key(&key) {
-            changed_or_new.entry(key).and_modify(|x| {
-                *x = Some(dev.driver_host_koid);
-            });
-
-            continue;
-        }
-
-        // Skip comparison and should_not_exist check as the koid is not valid when its unbound.
-        if dev.bound_driver_url == Some("unbound".to_string()) {
-            continue;
-        }
-
-        // Error if the item is in should not exist.
-        if let Some(should_not_exist_value) = &should_not_exist {
-            if should_not_exist_value.contains(&key) {
-                return Err(anyhow!(
-                    "Found node that should not exist after {}: '{}'.",
-                    test_stage_name,
-                    key
-                ));
-            }
-        }
-
-        // Go through the previous items (which should come in from most to least recent order)
-        // and make sure this matches the most recent instance.
-        for prev in &previous {
-            if let Some(prev_koid) = prev.get(&key) {
-                match prev_koid {
-                    Some(prev_koid_value) => {
-                        if *prev_koid_value != dev.driver_host_koid {
-                            return Err(anyhow!(
-                                "koid should not have changed for node '{}' after {}.",
-                                key,
-                                test_stage_name
-                            ));
-                        }
-
-                        break;
-                    }
-                    None => {
-                        return Err(anyhow!("prev koid not available after."));
-                    }
-                }
-            }
-        }
-    }
-
-    // Now we can make sure those items in changed_or_new are diffent than their most recent
-    // previous item. Skipping ones that are not seen in previous.
-    for changed_or_new_node in changed_or_new {
-        let key = changed_or_new_node.0;
-        let mut koid_before = None;
-        for prev in &previous {
-            if let Some(prev_at_key) = prev.get(key) {
-                match prev_at_key {
-                    Some(prev_at_key_value) => {
-                        koid_before = Some(prev_at_key_value);
-                        break;
-                    }
-                    None => {
-                        return Err(anyhow!("previous map entry cannot have None inner option."));
-                    }
-                }
-            }
-        }
-
-        match koid_before {
-            Some(koid_before) => match changed_or_new_node.1 {
-                Some(koid_after) => {
-                    if koid_before == koid_after {
-                        return Err(anyhow!(
-                            "koid should have changed for node '{}' after {}.",
-                            changed_or_new_node.0,
-                            test_stage_name
-                        ));
-                    }
-                }
-                None => {
-                    return Err(anyhow!("changed_or_new_node entry cannot be None."));
-                }
-            },
-            None => {
-                continue;
-            }
-        }
-    }
-
-    Ok(())
 }
 
 #[fasync::run_singlethreaded(test)]
@@ -267,11 +141,11 @@ async fn test_replace_target() -> Result<()> {
     ]);
 
     // First we want to wait for all the nodes.
-    wait_for_nodes(&mut nodes, &mut receiver).await?;
+    reloadtest_tools::wait_for_nodes(&mut nodes, &mut receiver).await?;
 
     // Now we collect their initial driver host koids.
     let device_infos = get_device_info(&driver_dev, &[], /* exact_match= */ true).await?;
-    validate_host_koids("init", device_infos, &mut nodes, vec![], None).await?;
+    reloadtest_tools::validate_host_koids("init", device_infos, &mut nodes, vec![], None).await?;
 
     // Let's disable the first target driver.
     let target_1_url =
@@ -294,7 +168,7 @@ async fn test_replace_target() -> Result<()> {
     let mut nodes_after_restart = HashMap::from([("G".to_string(), None), ("Z".to_string(), None)]);
 
     // Wait for them to start.
-    wait_for_nodes(&mut nodes_after_restart, &mut receiver).await?;
+    reloadtest_tools::wait_for_nodes(&mut nodes_after_restart, &mut receiver).await?;
 
     // These nodes should not exist anymore.
     // 'I' was the child of the driver being replaced.
@@ -305,7 +179,7 @@ async fn test_replace_target() -> Result<()> {
     // Make sure the host koid has changed from before the restart for the nodes that should have
     // restarted.
     let device_infos = get_device_info(&driver_dev, &[], /* exact_match= */ true).await?;
-    validate_host_koids(
+    reloadtest_tools::validate_host_koids(
         "first restart",
         device_infos,
         &mut nodes_after_restart,
@@ -332,7 +206,7 @@ async fn test_replace_target() -> Result<()> {
     let mut nodes_after_restart_2 = HashMap::from([("H".to_string(), None)]);
 
     // Wait for them to come back again.
-    wait_for_nodes(&mut nodes_after_restart_2, &mut receiver).await?;
+    reloadtest_tools::wait_for_nodes(&mut nodes_after_restart_2, &mut receiver).await?;
 
     // At this point we should have lost the following nodes as we have disabled the target driver
     // for 'J' and don't have a replacement driver yet.
@@ -343,7 +217,7 @@ async fn test_replace_target() -> Result<()> {
     // Make sure the host koid has changed from before the second restart for the nodes that should
     // have restarted.
     let device_infos = get_device_info(&driver_dev, &[], /* exact_match= */ true).await?;
-    validate_host_koids(
+    reloadtest_tools::validate_host_koids(
         "second restart",
         device_infos,
         &mut nodes_after_restart_2,
@@ -384,7 +258,7 @@ async fn test_replace_target() -> Result<()> {
         HashMap::from([("J".to_string(), None), ("Y".to_string(), None)]);
 
     // Wait for them to come up.
-    wait_for_nodes(&mut nodes_after_register, &mut receiver).await?;
+    reloadtest_tools::wait_for_nodes(&mut nodes_after_register, &mut receiver).await?;
 
     // These should not exist after our register call.
     let should_not_exist_after_register = HashSet::from(["K".to_string()]);
@@ -393,7 +267,7 @@ async fn test_replace_target() -> Result<()> {
     // Ensure same koid if not one of the ones expected to restart (comparing to most recent one).
     // Make sure the host koid has changed from before the register.
     let device_infos = get_device_info(&driver_dev, &[], /* exact_match= */ true).await?;
-    validate_host_koids(
+    reloadtest_tools::validate_host_koids(
         "register",
         device_infos,
         &mut nodes_after_register,

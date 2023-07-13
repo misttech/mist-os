@@ -5,7 +5,7 @@
 pub mod args;
 
 use {
-    anyhow::{format_err, Result},
+    anyhow::Result,
     args::ListHostsCommand,
     fidl_fuchsia_driver_development as fdd, fuchsia_driver_dev,
     std::collections::{BTreeMap, BTreeSet},
@@ -25,13 +25,14 @@ pub async fn list_hosts(
     let mut driver_hosts = BTreeMap::new();
 
     for device in device_info {
-        let koid = device.driver_host_koid.ok_or(format_err!("Missing driver host koid"))?;
-        if let Some(url) = device.bound_driver_url {
-            driver_hosts.entry(koid).or_insert(BTreeSet::new()).insert(url);
-        } else if let Some(name) = device.bound_driver_libname {
-            // Unbound devices have an empty name.
-            if !name.is_empty() {
-                driver_hosts.entry(koid).or_insert(BTreeSet::new()).insert(name);
+        if let Some(koid) = device.driver_host_koid {
+            if let Some(url) = device.bound_driver_url {
+                driver_hosts.entry(koid).or_insert(BTreeSet::new()).insert(url);
+            } else if let Some(name) = device.bound_driver_libname {
+                // Unbound devices have an empty name.
+                if !name.is_empty() {
+                    driver_hosts.entry(koid).or_insert(BTreeSet::new()).insert(name);
+                }
             }
         }
     }

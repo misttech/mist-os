@@ -69,7 +69,7 @@ zx::result<fdd::wire::DeviceInfo> CreateDeviceInfo(fidl::AnyArena& allocator,
   // TODO(fxbug.dev/90735): Get topological path
 
   auto driver_host = node->driver_host();
-  if (driver_host) {
+  if (node->is_bound() && driver_host) {
     auto result = driver_host->GetProcessKoid();
     if (result.is_error()) {
       LOGF(ERROR, "Failed to get the process KOID of a driver host: %s",

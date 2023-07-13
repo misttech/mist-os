@@ -12,6 +12,7 @@ use {
     fuchsia_driver_test::{DriverTestRealmBuilder, DriverTestRealmInstance},
     fuchsia_zircon as zx,
     futures::{channel::mpsc, StreamExt, TryStreamExt},
+    reloadtest_tools,
     std::collections::HashMap,
 };
 
@@ -130,26 +131,11 @@ async fn test_reload_target() -> Result<()> {
     ]);
 
     // First we want to wait for all the nodes.
-    while nodes.values().any(|&x| x.is_none()) {
-        let (from_node, _) = receiver.next().await.ok_or(anyhow!("Receiver failed"))?;
-        if !nodes.contains_key(&from_node) {
-            return Err(anyhow!("Couldn't find node '{}' in 'nodes'.", from_node.to_string()));
-        }
-        nodes.entry(from_node).and_modify(|x| {
-            *x = Some(None);
-        });
-    }
+    reloadtest_tools::wait_for_nodes(&mut nodes, &mut receiver).await?;
 
     // Now we collect their initial driver host koids.
     let device_infos = get_device_info(&driver_dev, &[], /* exact_match= */ true).await?;
-    for dev in device_infos {
-        let key = dev.moniker.unwrap().split(".").last().unwrap().to_string();
-        if nodes.contains_key(&key) {
-            nodes.entry(key).and_modify(|x| {
-                *x = Some(dev.driver_host_koid);
-            });
-        }
-    }
+    reloadtest_tools::validate_host_koids("init", device_infos, &mut nodes, vec![], None).await?;
 
     // Let's restart the first target driver.
     let restart_result = driver_dev
@@ -172,51 +158,21 @@ async fn test_reload_target() -> Result<()> {
     ]);
 
     // Wait for them to come back again.
-    while nodes_after_restart.values().any(|&x| x.is_none()) {
-        let (from_node, _) = receiver.next().await.ok_or(anyhow!("Receiver failed"))?;
-        if !nodes_after_restart.contains_key(&from_node) {
-            return Err(anyhow!(
-                "Couldn't find node '{}' in 'nodes_after_restart'.",
-                from_node.to_string()
-            ));
-        }
-        nodes_after_restart.entry(from_node).and_modify(|x| {
-            *x = Some(None);
-        });
-    }
+    reloadtest_tools::wait_for_nodes(&mut nodes_after_restart, &mut receiver).await?;
 
     // Collect the new driver host koids.
     // Ensure same koid if not one of the ones expected to restart.
-    let device_infos = get_device_info(&driver_dev, &[], /* exact_match= */ true).await?;
-    for dev in device_infos {
-        let key = dev.moniker.unwrap().split(".").last().unwrap().to_string();
-        if nodes_after_restart.contains_key(&key) {
-            nodes_after_restart.entry(key).and_modify(|x| {
-                *x = Some(dev.driver_host_koid);
-            });
-        } else if nodes.contains_key(&key) {
-            let koid = nodes.get(&key).unwrap().unwrap().unwrap();
-            if Some(koid) != dev.driver_host_koid {
-                return Err(anyhow!(
-                    "koid should not have changed for node '{}' after first restart.",
-                    key
-                ));
-            }
-        }
-    }
-
     // Make sure the host koid has changed from before the restart for the nodes that should have
     // restarted.
-    for node_after in &nodes_after_restart {
-        let koid_before = nodes[node_after.0].unwrap().unwrap();
-        let koid_after = node_after.1.unwrap().unwrap();
-        if koid_before == koid_after {
-            return Err(anyhow!(
-                "koid should have changed for node '{}' after first restart.",
-                node_after.0
-            ));
-        }
-    }
+    let device_infos = get_device_info(&driver_dev, &[], /* exact_match= */ true).await?;
+    reloadtest_tools::validate_host_koids(
+        "first restart",
+        device_infos,
+        &mut nodes_after_restart,
+        vec![&nodes],
+        None,
+    )
+    .await?;
 
     // Now let's restart the second target driver.
     let restart_result = driver_dev
@@ -231,59 +187,21 @@ async fn test_reload_target() -> Result<()> {
         HashMap::from([("H".to_string(), None), ("J".to_string(), None), ("K".to_string(), None)]);
 
     // Wait for them to come back again.
-    while nodes_after_restart_2.values().any(|&x| x.is_none()) {
-        let (from_node, _) = receiver.next().await.ok_or(anyhow!("Receiver failed"))?;
-        if !nodes_after_restart_2.contains_key(&from_node) {
-            return Err(anyhow!(
-                "Couldn't find node '{}' in 'nodes_after_restart_2'.",
-                from_node.to_string()
-            ));
-        }
-        nodes_after_restart_2.entry(from_node).and_modify(|x| {
-            *x = Some(None);
-        });
-    }
+    reloadtest_tools::wait_for_nodes(&mut nodes_after_restart_2, &mut receiver).await?;
 
     // Collect the newer driver host koids.
     // Ensure same koid if not one of the ones expected to restart (comparing to most recent one).
-    let device_infos = get_device_info(&driver_dev, &[], /* exact_match= */ true).await?;
-    for dev in device_infos {
-        let key = dev.moniker.unwrap().split(".").last().unwrap().to_string();
-        if nodes_after_restart_2.contains_key(&key) {
-            nodes_after_restart_2.entry(key).and_modify(|x| {
-                *x = Some(dev.driver_host_koid);
-            });
-        } else if nodes_after_restart.contains_key(&key) {
-            let koid = nodes_after_restart.get(&key).unwrap().unwrap().unwrap();
-            if Some(koid) != dev.driver_host_koid {
-                return Err(anyhow!(
-                    "koid should not have changed for node '{}' on second restart.",
-                    key
-                ));
-            }
-        } else if nodes.contains_key(&key) {
-            let koid = nodes.get(&key).unwrap().unwrap().unwrap();
-            if Some(koid) != dev.driver_host_koid {
-                return Err(anyhow!(
-                    "koid should not have changed for node '{}' on both restarts.",
-                    key
-                ));
-            }
-        }
-    }
-
     // Make sure the host koid has changed from before the second restart for the nodes that should
     // have restarted.
-    for node_after in &nodes_after_restart_2 {
-        let koid_before = nodes_after_restart[node_after.0].unwrap().unwrap();
-        let koid_after = node_after.1.unwrap().unwrap();
-        if koid_before == koid_after {
-            return Err(anyhow!(
-                "koid should have changed for node '{}' after second restart.",
-                node_after.0
-            ));
-        }
-    }
+    let device_infos = get_device_info(&driver_dev, &[], /* exact_match= */ true).await?;
+    reloadtest_tools::validate_host_koids(
+        "second restart",
+        device_infos,
+        &mut nodes_after_restart_2,
+        vec![&nodes_after_restart, &nodes],
+        None,
+    )
+    .await?;
 
     Ok(())
 }

@@ -41,6 +41,7 @@ rustc_test("bin") {
     "//sdk/fidl/fuchsia.driver.test:fuchsia.driver.test_rust",
     "//sdk/fidl/fuchsia.pkg:fuchsia.pkg_rust",
     "//sdk/lib/driver_test_realm/realm_builder/rust",
+    "//src/devices/tests/v2/reload-driver:reloadtest_tools",
     "//src/devices/tests/v2/reload-driver/fidl:fuchsia.reloaddriver.test_rust",
     "//src/lib/fidl/rust/fidl",
     "//src/lib/fuchsia-async",

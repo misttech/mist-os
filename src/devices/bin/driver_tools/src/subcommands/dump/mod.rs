@@ -59,12 +59,17 @@ impl DeviceInfoPrinter for DFv1Device {
 
 impl DeviceInfoPrinter for DFv2Node {
     fn print(&self, writer: &mut dyn Write, indent_level: usize) -> Result<()> {
+        let koid_str = match &self.0.driver_host_koid {
+            Some(koid) => format!("{}", koid),
+            None => format!("None"),
+        };
+
         writeln!(
             writer,
             "{:indent$}[{}] pid={} {}",
             "",
             self.extract_name()?,
-            self.0.driver_host_koid.as_ref().ok_or(format_err!("Missing driver host KOID"))?,
+            koid_str,
             self.0.bound_driver_url.as_deref().unwrap_or(""),
             indent = indent_level * INDENT_SIZE,
         )?;

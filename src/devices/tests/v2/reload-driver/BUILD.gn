@@ -3,6 +3,7 @@
 # found in the LICENSE file.
 
 import("//build/components.gni")
+import("//build/rust/rustc_library.gni")
 import("//build/rust/rustc_test.gni")
 
 group("tests") {
@@ -36,6 +37,18 @@ source_set("driver_helpers") {
   ]
 }
 
+rustc_library("reloadtest_tools") {
+  edition = "2021"
+  testonly = true
+  source_root = "reloadtest_tools.rs"
+  sources = [ "reloadtest_tools.rs" ]
+  deps = [
+    "//sdk/fidl/fuchsia.driver.development:fuchsia.driver.development_rust",
+    "//third_party/rust_crates:anyhow",
+    "//third_party/rust_crates:futures",
+  ]
+}
+
 rustc_test("bin") {
   edition = "2021"
   testonly = true
@@ -43,6 +56,7 @@ rustc_test("bin") {
   source_root = "test.rs"
   sources = [ "test.rs" ]
   deps = [
+    ":reloadtest_tools",
     "fidl:fuchsia.reloaddriver.test_rust",
     "//sdk/fidl/fuchsia.driver.development:fuchsia.driver.development_rust",
     "//sdk/fidl/fuchsia.driver.test:fuchsia.driver.test_rust",
