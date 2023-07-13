@@ -191,9 +191,6 @@ if (is_fuchsia) {
         # Use eng allowlists:
         "//src/security/policy:appmgr_policy_eng",
 
-        # Enable ffx support.
-        "//src/connectivity/network/mdns/service:mdns_fuchsia_udp_config",
-
         # The SWD stack for OTAs.
         "//src/sys/pkg/lib/isolated-swd:isolated-swd-components",
 
@@ -212,20 +209,7 @@ if (is_fuchsia) {
       ]
 
   recovery_installer_packages =
-      recovery_eng_packages - [
-        "//src/recovery/system:system_recovery",
-
-        # After issuing device reboot when `ffx target flash`, ffx will block
-        # on the first mdns respond from the target as a signal of re-discovery.
-        # It also seems to temporarily stop updating the target according to
-        # later responds that follow. If we are unlucky and this first responds
-        # is _fuchsia._udp instead of _fastboot._tcp, ffx will fail to
-        # recognize the device as being in the fastboot state. For now remove
-        # _fuchsia._udp service as a workaround in favor of _fastboot._tcp
-        # until we need both.
-        "//src/connectivity/network/mdns/service:mdns_fuchsia_udp_config",
-      ] +
-      [
+      recovery_eng_packages - [ "//src/recovery/system:system_recovery" ] + [
         "//src/recovery/system:system_recovery_installer",
         "//src/firmware/fastboot-tcp:fastboot_tcp_mdns_config",
       ]
@@ -416,6 +400,18 @@ if (is_fuchsia) {
       connectivity = {
         wlan = {
           legacy_privacy_support = true
+        }
+
+        # After issuing device reboot when `ffx target flash`, ffx will block
+        # on the first mdns respond from the target as a signal of re-discovery.
+        # It also seems to temporarily stop updating the target according to
+        # later responds that follow. If we are unlucky and this first responds
+        # is _fuchsia._udp instead of _fastboot._tcp, ffx will fail to
+        # recognize the device as being in the fastboot state. For now remove
+        # _fuchsia._udp service as a workaround in favor of _fastboot._tcp
+        # until we need both.
+        mdns = {
+          publish_fuchsia_dev_wired_service = false
         }
       }
     }

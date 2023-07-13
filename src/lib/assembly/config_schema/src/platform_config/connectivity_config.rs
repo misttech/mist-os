@@ -12,6 +12,8 @@ pub struct PlatformConnectivityConfig {
     pub network: PlatformNetworkConfig,
     #[serde(default)]
     pub wlan: PlatformWlanConfig,
+    #[serde(default)]
+    pub mdns: MdnsConfig,
 }
 
 /// Platform configuration options for the network area.
@@ -45,4 +47,12 @@ pub struct PlatformWlanConfig {
     /// Enable the use of legacy security types like WEP and/or WPA1.
     #[serde(default)]
     pub legacy_privacy_support: bool,
+}
+
+/// Platform configuration options to use for the mdns area.
+#[derive(Debug, Default, Deserialize, Serialize, PartialEq)]
+#[serde(deny_unknown_fields)]
+pub struct MdnsConfig {
+    /// Enable a wired service so that ffx can discover the device.
+    pub publish_fuchsia_dev_wired_service: Option<bool>,
 }

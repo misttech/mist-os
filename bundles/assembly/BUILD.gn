@@ -585,6 +585,11 @@ assembly_input_bundle("core_realm_development_access") {
   ]
 }
 
+assembly_input_bundle("mdns_fuchsia_dev_wired_service") {
+  config_data_labels =
+      [ "//src/connectivity/network/mdns/service:mdns_fuchsia_udp_config" ]
+}
+
 assembly_input_bundle("core_realm_development_access_rcs_usb") {
   base_driver_packages = [
     {

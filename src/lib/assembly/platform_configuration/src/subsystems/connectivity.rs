@@ -15,6 +15,29 @@ impl DefineSubsystemConfiguration<PlatformConnectivityConfig> for ConnectivitySu
         connectivity_config: &PlatformConnectivityConfig,
         builder: &mut dyn ConfigurationBuilder,
     ) -> anyhow::Result<()> {
+        let publish_fuchsia_dev_wired_service = match (
+            context.feature_set_level,
+            context.build_type,
+            connectivity_config.mdns.publish_fuchsia_dev_wired_service,
+        ) {
+            // FFX discovery is not enabled on bootstrap, therefore we do not need the wired
+            // udp service.
+            (FeatureSupportLevel::Bootstrap, _, _) => false,
+
+            // User builds cannot have this service enabled.
+            (_, BuildType::User, None) => false,
+            (_, BuildType::User, Some(true)) => {
+                bail!("A MDNS wired udp service cannot be enabled on user builds")
+            }
+            // Userdebug and eng builds have this service enabled by default.
+            (_, _, None) => true,
+            // The product can override the default only on userdebug and eng builds.
+            (_, _, Some(b)) => b,
+        };
+        if publish_fuchsia_dev_wired_service {
+            builder.platform_bundle("mdns_fuchsia_dev_wired_service");
+        }
+
         // The configuration of networking is dependent on all three of:
         // - the feature_set_level
         // - the build_type

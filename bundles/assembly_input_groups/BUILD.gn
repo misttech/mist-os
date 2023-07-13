@@ -54,7 +54,6 @@ assembly_input_groups("network") {
 assembly_input_groups("debug") {
   visibility = [ "*" ]
   base_packages = [
-    "//src/connectivity/network/mdns/service:mdns_fuchsia_udp_config",
     "//bundles/assembly:third_party_sbase_for_transition",
     "//src/diagnostics/log_listener:for_transition",
     "//src/connectivity/wlan/wlancfg/tool:for_transition",

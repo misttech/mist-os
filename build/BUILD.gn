@@ -354,7 +354,6 @@ group("config_data_template_allowlist") {
     "//src/chromium:*",
     "//src/cobalt/bin/app:*",
     "//src/connectivity/lowpan/drivers/lowpan-ot-driver:config-default",
-    "//src/connectivity/network/mdns/service:mdns_fuchsia_udp_config",
     "//src/connectivity/network/netcfg:config-default",
     "//src/connectivity/network/netcfg:config-no-ssh-over-wlan",
     "//src/connectivity/network/netcfg:config-prefer-wired",

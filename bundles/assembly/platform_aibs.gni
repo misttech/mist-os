@@ -176,6 +176,7 @@ _userdebug_aib_names = bootstrap_userdebug_platform_aib_names + [
                          "core_realm_development_access_rcs_usb",
                          "minimal_userdebug",
                          "minimal_userdebug_and_eng",
+                         "mdns_fuchsia_dev_wired_service",
                          "radar_proxy_with_injector",
                        ]
 

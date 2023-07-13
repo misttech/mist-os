@@ -2,8 +2,8 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
+import("//build/assembly/config_data_for_assembly.gni")
 import("//build/components.gni")
-import("//build/config.gni")
 import("//build/fuzz.gni")
 import("//build/test.gni")
 
@@ -191,12 +191,9 @@ fuchsia_package("mdns") {
   deps = [ ":component" ]
 }
 
-config_data("mdns_fuchsia_udp_config") {
+config_data_for_assembly("mdns_fuchsia_udp_config") {
   for_pkg = "mdns"
   sources = [ rebase_path("config/fuchsia_udp.config") ]
-
-  # Ensure exclusion from production builds.
-  deps = [ "//build/validate:non_production_tag" ]
 }
 
 group("tests") {

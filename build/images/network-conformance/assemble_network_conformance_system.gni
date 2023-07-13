@@ -72,7 +72,6 @@ template("assemble_network_conformance_system") {
     allow_eng_platform_bundle_use = true
 
     base_packages = [
-      "//src/connectivity/network/mdns/bundles:config",
       "//src/connectivity/network/mdns/bundles:services",
       "//src/connectivity/network/netcfg:config-default",
       "//src/connectivity/network/net-cli",
