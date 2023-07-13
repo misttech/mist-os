@@ -2273,6 +2273,7 @@ pub fn listen_udp<I: IpExt, C: crate::NonSyncContext>(
 mod tests {
     use alloc::{
         borrow::ToOwned,
+        boxed::Box,
         collections::{HashMap, HashSet},
         vec,
         vec::Vec,
@@ -2314,24 +2315,22 @@ mod tests {
             ResolveRouteError, SendIpPacketMeta,
         },
         socket::{self, datagram::MulticastInterfaceSelector, SocketState},
-        testutil::{assert_empty, set_logger_for_test, TestIpExt as _},
+        testutil::{set_logger_for_test, TestIpExt as _},
     };
 
-    /// The listener data sent through a [`FakeUdpCtx`].
+    /// A packet received on a socket.
     #[derive(Debug, PartialEq)]
-    struct ListenData<I: Ip> {
-        listener: ListenerId<I>,
-        src_ip: I::Addr,
-        dst_ip: I::Addr,
-        src_port: Option<NonZeroU16>,
+    struct ReceivedPacket<I: Ip> {
+        socket: SocketId<I>,
+        addr: ReceivedPacketAddrs<I>,
         body: Vec<u8>,
     }
 
-    /// The UDP connection data sent through a [`FakeUdpCtx`].
     #[derive(Debug, PartialEq)]
-    struct ConnData<I: Ip> {
-        conn: ConnId<I>,
-        body: Vec<u8>,
+    struct ReceivedPacketAddrs<I: Ip> {
+        src_ip: I::Addr,
+        dst_ip: I::Addr,
+        src_port: Option<NonZeroU16>,
     }
 
     /// An ICMP error delivered to a [`FakeUdpCtx`].
@@ -2399,17 +2398,16 @@ mod tests {
 
     #[derive(Default)]
     struct FakeNonSyncCtxState<I: TestIpExt> {
-        listen_data: Vec<ListenData<I>>,
-        conn_data: Vec<ConnData<I>>,
+        received_packets: Vec<ReceivedPacket<I>>,
         icmp_errors: Vec<IcmpError<I>>,
     }
 
     impl<I: TestIpExt> FakeNonSyncCtxState<I> {
-        fn listen_data(&self) -> HashMap<ListenerId<I>, Vec<&'_ [u8]>> {
-            self.listen_data.iter().fold(
+        fn socket_data(&self) -> HashMap<SocketId<I>, Vec<&'_ [u8]>> {
+            self.received_packets.iter().fold(
                 HashMap::new(),
-                |mut map, ListenData { listener, body, src_ip: _, dst_ip: _, src_port: _ }| {
-                    map.entry(*listener).or_default().push(&body);
+                |mut map, ReceivedPacket { socket, body, addr: _ }| {
+                    map.entry(*socket).or_default().push(&body);
                     map
                 },
             )
@@ -2470,23 +2468,12 @@ mod tests {
             (src_ip, src_port): (I::Addr, Option<NonZeroU16>),
             body: &B,
         ) {
-            let SocketId(id) = id;
-            let FakeNonSyncCtxState { conn_data, listen_data, icmp_errors: _ } = self.state_mut();
-            match id {
-                SocketIdInner::Unbound(_) => unreachable!("unbound sockets can't receive"),
-                SocketIdInner::Bound(BoundId::Connected(conn)) => {
-                    conn_data.push(ConnData { conn, body: body.as_ref().to_owned() })
-                }
-                SocketIdInner::Bound(BoundId::Listening(listener)) => {
-                    listen_data.push(ListenData {
-                        listener,
-                        src_ip,
-                        dst_ip,
-                        src_port,
-                        body: body.as_ref().to_owned(),
-                    })
-                }
-            }
+            let FakeNonSyncCtxState { received_packets, icmp_errors: _ } = self.state_mut();
+            received_packets.push(ReceivedPacket {
+                socket: id,
+                addr: ReceivedPacketAddrs { src_ip, dst_ip, src_port },
+                body: body.as_ref().to_owned(),
+            })
         }
     }
 
@@ -2660,13 +2647,19 @@ mod tests {
             &body[..],
         );
 
-        let listen_data = &non_sync_ctx.state().listen_data;
-        let pkt = assert_matches!(&listen_data[..], [pkt] => pkt);
-        assert_eq!(SocketId::from(pkt.listener), listener);
-        assert_eq!(pkt.src_ip, remote_ip.get());
-        assert_eq!(pkt.dst_ip, local_ip.get());
-        assert_eq!(pkt.src_port.unwrap().get(), 200);
-        assert_eq!(pkt.body, &body[..]);
+        let listen_data = &non_sync_ctx.state().received_packets;
+        assert_eq!(
+            assert_matches!(&listen_data[..], [pkt] => pkt),
+            &ReceivedPacket {
+                body: body.into(),
+                addr: ReceivedPacketAddrs {
+                    src_ip: remote_ip.get(),
+                    dst_ip: local_ip.get(),
+                    src_port: Some(nonzero!(200u16)),
+                },
+                socket: listener
+            }
+        );
 
         // Send a packet providing a local ip:
         assert_matches!(
@@ -2741,8 +2734,7 @@ mod tests {
             NonZeroU16::new(100).unwrap(),
             &body[..],
         );
-        assert_empty(non_sync_ctx.state().listen_data.iter());
-        assert_empty(non_sync_ctx.state().conn_data.iter());
+        assert_eq!(&non_sync_ctx.state().received_packets, &[]);
     }
 
     /// Tests that UDP connections can be created and data can be transmitted
@@ -2788,10 +2780,8 @@ mod tests {
             &body[..],
         );
 
-        let conn_data = &non_sync_ctx.state().conn_data;
-        assert_eq!(conn_data.len(), 1);
-        let pkt = &conn_data[0];
-        assert_eq!(pkt.conn, conn.try_into().unwrap());
+        let pkt = assert_matches!(&non_sync_ctx.state().received_packets[..], [pkt] => pkt);
+        assert_eq!(pkt.socket, conn);
         assert_eq!(pkt.body, &body[..]);
 
         // Now try to send something over this new connection.
@@ -3500,7 +3490,7 @@ mod tests {
             &packet[..],
         );
 
-        assert_matches!(&non_sync_ctx.state().conn_data[..], [_]);
+        assert_matches!(&non_sync_ctx.state().received_packets[..], [_]);
         SocketHandler::shutdown(&mut sync_ctx, &non_sync_ctx, conn, which).expect("is connected");
         receive_udp_packet(
             &mut sync_ctx,
@@ -3512,7 +3502,7 @@ mod tests {
             LOCAL_PORT,
             &packet[..],
         );
-        assert_matches!(&non_sync_ctx.state().conn_data[..], [_]);
+        assert_matches!(&non_sync_ctx.state().received_packets[..], [_]);
 
         // Calling shutdown for the send direction doesn't change anything.
         SocketHandler::shutdown(&mut sync_ctx, &non_sync_ctx, conn, ShutdownType::Send)
@@ -3527,7 +3517,7 @@ mod tests {
             LOCAL_PORT,
             &packet[..],
         );
-        assert_matches!(&non_sync_ctx.state().conn_data[..], [_]);
+        assert_matches!(&non_sync_ctx.state().received_packets[..], [_]);
     }
 
     /// Tests that if we have multiple listeners and connections, demuxing the
@@ -3607,6 +3597,7 @@ mod tests {
         )
         .expect("listen_udp failed");
 
+        let mut expectations = Vec::<Box<dyn FnOnce(&ReceivedPacket<I>)>>::new();
         // Now inject UDP packets that each of the created connections should
         // receive.
         let body_conn1 = [1, 1, 1, 1];
@@ -3620,6 +3611,11 @@ mod tests {
             local_port_d,
             &body_conn1[..],
         );
+        expectations.push(Box::new(|pkt| {
+            assert_eq!(pkt.socket, conn1);
+            assert_eq!(pkt.body, &body_conn1[..]);
+        }));
+
         let body_conn2 = [2, 2, 2, 2];
         receive_udp_packet(
             &mut sync_ctx,
@@ -3631,6 +3627,11 @@ mod tests {
             local_port_d,
             &body_conn2[..],
         );
+        expectations.push(Box::new(|pkt| {
+            assert_eq!(pkt.socket, conn2);
+            assert_eq!(pkt.body, &body_conn2[..]);
+        }));
+
         let body_list1 = [3, 3, 3, 3];
         receive_udp_packet(
             &mut sync_ctx,
@@ -3642,6 +3643,14 @@ mod tests {
             local_port_a,
             &body_list1[..],
         );
+        expectations.push(Box::new(|ReceivedPacket { socket, body, addr }| {
+            assert_eq!(socket, &list1);
+            assert_eq!(addr.src_ip, remote_ip_a.get());
+            assert_eq!(addr.dst_ip, local_ip.get());
+            assert_eq!(addr.src_port.unwrap(), remote_port_a);
+            assert_eq!(body, &body_list1[..]);
+        }));
+
         let body_list2 = [4, 4, 4, 4];
         receive_udp_packet(
             &mut sync_ctx,
@@ -3653,6 +3662,14 @@ mod tests {
             local_port_b,
             &body_list2[..],
         );
+        expectations.push(Box::new(|ReceivedPacket { socket, body, addr }| {
+            assert_eq!(socket, &list2);
+            assert_eq!(addr.src_ip, remote_ip_a.get());
+            assert_eq!(addr.dst_ip, local_ip.get());
+            assert_eq!(addr.src_port.unwrap(), remote_port_a);
+            assert_eq!(body, &body_list2[..]);
+        }));
+
         let body_wildcard_list = [5, 5, 5, 5];
         receive_udp_packet(
             &mut sync_ctx,
@@ -3664,38 +3681,18 @@ mod tests {
             local_port_c,
             &body_wildcard_list[..],
         );
+        expectations.push(Box::new(|ReceivedPacket { socket, body, addr }| {
+            assert_eq!(socket, &wildcard_list);
+            assert_eq!(addr.src_ip, remote_ip_a.get());
+            assert_eq!(addr.dst_ip, local_ip.get());
+            assert_eq!(addr.src_port.unwrap(), remote_port_a);
+            assert_eq!(body, &body_wildcard_list[..]);
+        }));
         // Check that we got everything in order.
-        let conn_packets = &non_sync_ctx.state().conn_data;
-        assert_eq!(conn_packets.len(), 2);
-        let pkt = &conn_packets[0];
-        assert_eq!(pkt.conn, conn1.try_into().unwrap());
-        assert_eq!(pkt.body, &body_conn1[..]);
-        let pkt = &conn_packets[1];
-        assert_eq!(pkt.conn, conn2.try_into().unwrap());
-        assert_eq!(pkt.body, &body_conn2[..]);
-
-        let list_packets = &non_sync_ctx.state().listen_data;
-        assert_eq!(list_packets.len(), 3);
-        let pkt = &list_packets[0];
-        assert_eq!(SocketId::from(pkt.listener), list1);
-        assert_eq!(pkt.src_ip, remote_ip_a.get());
-        assert_eq!(pkt.dst_ip, local_ip.get());
-        assert_eq!(pkt.src_port.unwrap(), remote_port_a);
-        assert_eq!(pkt.body, &body_list1[..]);
-
-        let pkt = &list_packets[1];
-        assert_eq!(SocketId::from(pkt.listener), list2);
-        assert_eq!(pkt.src_ip, remote_ip_a.get());
-        assert_eq!(pkt.dst_ip, local_ip.get());
-        assert_eq!(pkt.src_port.unwrap(), remote_port_a);
-        assert_eq!(pkt.body, &body_list2[..]);
-
-        let pkt = &list_packets[2];
-        assert_eq!(SocketId::from(pkt.listener), wildcard_list);
-        assert_eq!(pkt.src_ip, remote_ip_a.get());
-        assert_eq!(pkt.dst_ip, local_ip.get());
-        assert_eq!(pkt.src_port.unwrap(), remote_port_a);
-        assert_eq!(pkt.body, &body_wildcard_list[..]);
+        let received = &non_sync_ctx.state().received_packets;
+        for (received, expectation) in received.into_iter().zip(expectations) {
+            expectation(received)
+        }
     }
 
     /// Tests UDP wildcard listeners for different IP versions.
@@ -3744,24 +3741,32 @@ mod tests {
         );
 
         // Check that we received both packets for the listener.
-        let listen_packets = &non_sync_ctx.state().listen_data;
+        let listen_packets = &non_sync_ctx.state().received_packets;
         let [pkt1, pkt2] = assert_matches!(&listen_packets[..], [pkt1, pkt2] => [pkt1, pkt2]);
-        {
-            let pkt = pkt1;
-            assert_eq!(SocketId::from(pkt.listener), listener);
-            assert_eq!(pkt.src_ip, remote_ip_a.get());
-            assert_eq!(pkt.dst_ip, local_ip_a.get());
-            assert_eq!(pkt.src_port.unwrap(), remote_port);
-            assert_eq!(pkt.body, &body[..]);
-        }
-        {
-            let pkt = pkt2;
-            assert_eq!(SocketId::from(pkt.listener), listener);
-            assert_eq!(pkt.src_ip, remote_ip_b.get());
-            assert_eq!(pkt.dst_ip, local_ip_b.get());
-            assert_eq!(pkt.src_port.unwrap(), remote_port);
-            assert_eq!(pkt.body, &body[..]);
-        }
+        assert_eq!(
+            pkt1,
+            &ReceivedPacket {
+                socket: listener,
+                addr: ReceivedPacketAddrs {
+                    src_ip: remote_ip_a.get(),
+                    dst_ip: local_ip_a.get(),
+                    src_port: Some(remote_port),
+                },
+                body: body.into(),
+            }
+        );
+        assert_eq!(
+            pkt2,
+            &ReceivedPacket {
+                socket: listener,
+                addr: ReceivedPacketAddrs {
+                    src_ip: remote_ip_b.get(),
+                    dst_ip: local_ip_b.get(),
+                    src_port: Some(remote_port),
+                },
+                body: body.into()
+            }
+        );
     }
 
     #[ip_test]
@@ -3780,20 +3785,28 @@ mod tests {
         .expect("listen_udp failed");
 
         let body = [];
+        let (src_ip, src_port) = (I::FAKE_CONFIG.remote_ip.get(), 0u16);
+        let (dst_ip, dst_port) = (I::FAKE_CONFIG.local_ip.get(), LOCAL_PORT);
+
         receive_udp_packet(
             &mut sync_ctx,
             &mut non_sync_ctx,
             FakeDeviceId,
-            I::FAKE_CONFIG.remote_ip.get(),
-            I::FAKE_CONFIG.local_ip.get(),
-            0u16,
-            LOCAL_PORT,
+            src_ip,
+            dst_ip,
+            src_port,
+            dst_port,
             &body[..],
         );
         // Check that we received both packets for the listener.
+        let received = assert_matches!(&non_sync_ctx.state().received_packets[..], [pkt] => pkt);
         assert_eq!(
-            non_sync_ctx.state().listen_data(),
-            HashMap::from([(listener.try_into().unwrap(), vec![[].as_slice()])]),
+            received,
+            &ReceivedPacket {
+                body: vec![],
+                addr: ReceivedPacketAddrs { src_ip, dst_ip, src_port: None },
+                socket: listener,
+            }
         );
     }
 
@@ -3823,11 +3836,15 @@ mod tests {
             LOCAL_PORT,
             &body[..],
         );
-        // Check that we received both packets for the listener.
-        assert_eq!(
-            non_sync_ctx.state().listen_data(),
-            HashMap::from([(listener.try_into().unwrap(), vec![[].as_slice()])]),
-        );
+        // Check that we received the packet on the listener.
+        let socket = assert_matches!(
+            &non_sync_ctx.state().received_packets[..],
+            [ReceivedPacket {
+                socket,
+                addr: _,
+                body: _,
+            }] => socket);
+        assert_eq!(socket, &listener);
     }
 
     #[ip_test]
@@ -3948,12 +3965,7 @@ mod tests {
         receive_packet(3, multicast_addr_other);
 
         assert_eq!(
-            non_sync_ctx
-                .state()
-                .listen_data()
-                .into_iter()
-                .map(|(id, value)| (id.into(), value))
-                .collect::<HashMap<_, _>>(),
+            non_sync_ctx.state().socket_data(),
             HashMap::from([
                 (specific_listeners[0], vec![[1].as_slice(), &[2]]),
                 (specific_listeners[1], vec![&[1], &[2]]),
@@ -4047,9 +4059,6 @@ mod tests {
             &body[..],
         );
 
-        let conn_data = &non_sync_ctx.state().conn_data;
-        assert_matches!(&conn_data[..], &[ConnData {conn, body: _ }] if conn == bound_first_device.try_into().unwrap());
-
         // A second packet received on `MultipleDevicesId::B` will go to the
         // second socket.
         receive_udp_packet(
@@ -4063,10 +4072,12 @@ mod tests {
             &body[..],
         );
 
-        let listen_data = &non_sync_ctx.state().listen_data;
-        assert_matches!(&listen_data[..], &[ListenData {
-            listener, src_ip: _, dst_ip: _, src_port: _, body: _
-        }] if SocketId::from(listener) == bound_second_device);
+        let received = &non_sync_ctx.state().received_packets;
+        let [pkt1, pkt2] = assert_matches!(&received[..], [pkt1, pkt2] => [pkt1, pkt2]);
+        assert_matches!(pkt1, ReceivedPacket {socket, body: _, addr: _ }
+            if socket == &bound_first_device);
+        assert_matches!(pkt2, ReceivedPacket {socket, addr: _, body: _ }
+            if socket == &bound_second_device);
     }
 
     /// Tests that if sockets are bound to devices, they will send packets out
@@ -4170,17 +4181,17 @@ mod tests {
 
         // Since it is bound, it does not receive a packet from another device.
         receive_packet_on(sync_ctx, &mut non_sync_ctx, MultipleDevicesId::B);
-        let listen_data = &non_sync_ctx.state().listen_data;
-        assert_matches!(&listen_data[..], &[]);
+        let received = &non_sync_ctx.state().received_packets;
+        assert_matches!(&received[..], &[]);
 
         // When unbound, the socket can receive packets on the other device.
         SocketHandler::set_device(sync_ctx, &mut non_sync_ctx, socket, None)
             .expect("clearing bound device failed");
         receive_packet_on(sync_ctx, &mut non_sync_ctx, MultipleDevicesId::B);
-        let listen_data = &non_sync_ctx.state().listen_data;
-        assert_matches!(&listen_data[..],
-            &[ListenData {listener, body:_, src_ip: _, dst_ip: _, src_port: _ }] =>
-            assert_eq!(listener, socket.try_into().unwrap()));
+        let received = &non_sync_ctx.state().received_packets;
+        assert_matches!(&received[..],
+            &[ReceivedPacket {socket: s, body:_, addr: _}] => assert_eq!(s, socket)
+        );
     }
 
     /// Check that bind fails as expected when it would cause illegal shadowing.
@@ -4334,16 +4345,12 @@ mod tests {
             receive_packet(remote_ip, device);
         }
 
-        let listen_data = non_sync_ctx.state().listen_data();
-
+        let per_socket_data = non_sync_ctx.state().socket_data();
         for (device, listener) in bound_on_devices {
-            assert_eq!(
-                listen_data[&listener.try_into().unwrap()],
-                vec![&[index_for_device(device)]]
-            );
+            assert_eq!(per_socket_data[&listener], vec![&[index_for_device(device)]]);
         }
         let expected_listener_data = &MultipleDevicesId::all().map(|d| vec![index_for_device(d)]);
-        assert_eq!(&listen_data[&listener.try_into().unwrap()], expected_listener_data);
+        assert_eq!(&per_socket_data[&listener], expected_listener_data);
     }
 
     /// Tests establishing a UDP connection without providing a local IP
@@ -4387,64 +4394,6 @@ mod tests {
                 device: None
             }
         );
-    }
-
-    #[derive(Debug)]
-    pub(crate) struct ExpectedBoundError;
-
-    impl<I: IpExt, D: WeakId> TryFrom<SocketId<I>> for DatagramBoundId<Udp<I, D>> {
-        type Error = ExpectedBoundError;
-        fn try_from(SocketId(id): SocketId<I>) -> Result<Self, Self::Error> {
-            match id {
-                SocketIdInner::Unbound(_) => Err(ExpectedBoundError),
-                SocketIdInner::Bound(id) => Ok(id.into()),
-            }
-        }
-    }
-    impl<I: Ip> TryFrom<SocketId<I>> for ConnId<I> {
-        type Error = ExpectedConnError;
-        fn try_from(SocketId(id): SocketId<I>) -> Result<Self, Self::Error> {
-            match id {
-                SocketIdInner::Bound(id) => id.try_into(),
-                SocketIdInner::Unbound(_) => Err(ExpectedConnError),
-            }
-        }
-    }
-
-    impl<I: Ip> TryFrom<BoundId<I>> for ConnId<I> {
-        type Error = ExpectedConnError;
-        fn try_from(id: BoundId<I>) -> Result<Self, Self::Error> {
-            match id {
-                BoundId::Connected(id) => Ok(id),
-                BoundId::Listening(_) => Err(ExpectedConnError),
-            }
-        }
-    }
-    #[derive(Debug)]
-    pub(crate) struct ExpectedListenerError;
-
-    impl<I: Ip> TryFrom<SocketId<I>> for ListenerId<I> {
-        type Error = ExpectedListenerError;
-
-        fn try_from(SocketId(id): SocketId<I>) -> Result<Self, Self::Error> {
-            match id {
-                SocketIdInner::Unbound(_) | SocketIdInner::Bound(BoundId::Connected(_)) => {
-                    Err(ExpectedListenerError)
-                }
-                SocketIdInner::Bound(BoundId::Listening(id)) => Ok(id),
-            }
-        }
-    }
-
-    impl<I: Ip> TryFrom<SocketId<I>> for UnboundId<I> {
-        type Error = ExpectedUnboundError;
-
-        fn try_from(SocketId(id): SocketId<I>) -> Result<Self, Self::Error> {
-            match id {
-                SocketIdInner::Unbound(id) => Ok(id),
-                SocketIdInner::Bound(_) => Err(ExpectedUnboundError),
-            }
-        }
     }
 
     /// Tests local port allocation for [`connect`].
