@@ -52,7 +52,7 @@ async fn cmd_impl(
     .map_err(|e| FfxError::Error(e, 1))?;
 
     if args.follow_logs {
-        let log_filter = args.moniker.to_string().strip_prefix("/").unwrap().to_string();
+        let log_filter = args.moniker.to_string();
         let log_cmd = LogCommand { filter: vec![log_filter], ..LogCommand::default() };
 
         log_impl(
