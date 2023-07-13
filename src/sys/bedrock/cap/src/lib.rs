@@ -12,6 +12,7 @@ pub mod open;
 pub use self::cap::{
     AnyCapability, AnyCloneCapability, Capability, CloneCapability, Remote, TryIntoOpenError,
 };
+pub use self::dict::SomeDict;
 pub use self::handle::{CloneHandle, Handle};
 
 pub type CloneDict = dict::Dict<AnyCloneCapability>;

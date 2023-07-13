@@ -6,25 +6,18 @@ use {
         handle::{CloneHandle, Handle},
         open::Open,
     },
-    downcast_rs::{impl_downcast, Downcast},
     dyn_clone::{clone_trait_object, DynClone},
     fuchsia_zircon as zx,
     futures::future::BoxFuture,
+    std::fmt::Debug,
     thiserror::Error,
 };
 
 /// The capability trait, implemented by all capabilities.
-pub trait Capability: Downcast + Remote + TryIntoOpen + Send + Sync {}
-impl_downcast!(Capability);
+pub trait Capability: crate_local::AnyCast + Remote + TryIntoOpen + Debug + Send + Sync {}
 
 /// Trait object used to hold any kind of capability.
 pub type AnyCapability = Box<dyn Capability>;
-
-impl std::fmt::Debug for AnyCapability {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_tuple("Capability").field(&self.as_any().type_id()).finish()
-    }
-}
 
 impl<T> From<T> for AnyCapability
 where
@@ -36,11 +29,19 @@ where
 }
 
 /// A Capability that can be cloned.
-pub trait CloneCapability: Capability + DynClone {}
+pub trait CloneCapability: Capability + DynClone {
+    // TODO: When upcasting is stable in Rust, we can remove this helper.
+    // https://github.com/rust-lang/rust/issues/65991.
+    fn into_any_capability(self: Box<Self>) -> AnyCapability;
+}
 
 clone_trait_object!(CloneCapability);
 
-impl<T: Capability + Clone> CloneCapability for T {}
+impl<T: Capability + Clone> CloneCapability for T {
+    fn into_any_capability(self: Box<Self>) -> AnyCapability {
+        self
+    }
+}
 
 pub type AnyCloneCapability = Box<dyn CloneCapability>;
 
@@ -50,6 +51,28 @@ impl TryFrom<zx::Handle> for AnyCloneCapability {
     fn try_from(value: zx::Handle) -> Result<Self, Self::Error> {
         // TODO(fxbug.dev/122024): Convert Remote trait handles back to the original type
         Ok(Box::new(CloneHandle::try_from(value)?))
+    }
+}
+
+pub(crate) mod crate_local {
+    use std::any::Any;
+
+    /// Types implementing the [AnyCast] trait will be convertible to `dyn Any`.
+    ///
+    /// This trait is only visible to the `cap` crate so that external users are
+    /// prevented from downcasting capabilities.
+    pub trait AnyCast: Any {
+        fn into_any(self: Box<Self>) -> Box<dyn Any>;
+        fn as_any(&self) -> &dyn Any;
+    }
+
+    impl<T: Any> AnyCast for T {
+        fn into_any(self: Box<Self>) -> Box<dyn Any> {
+            self
+        }
+        fn as_any(&self) -> &dyn Any {
+            self
+        }
     }
 }
 

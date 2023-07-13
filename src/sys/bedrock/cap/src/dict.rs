@@ -183,6 +183,46 @@ impl TryIntoOpen for Dict<AnyCloneCapability> {
 impl Capability for Dict<AnyCapability> {}
 impl Capability for Dict<AnyCloneCapability> {}
 
+/// The trait implemented by all dictionary types.
+pub trait SomeDict {
+    fn list(&self) -> Vec<&Key>;
+    fn remove(&mut self, k: &Key) -> Option<AnyCapability>;
+}
+
+impl SomeDict for Dict<AnyCapability> {
+    fn list(&self) -> Vec<&Key> {
+        self.entries.keys().collect()
+    }
+
+    fn remove(&mut self, key: &Key) -> Option<AnyCapability> {
+        self.entries.remove(key)
+    }
+}
+
+impl SomeDict for Dict<AnyCloneCapability> {
+    fn list(&self) -> Vec<&Key> {
+        self.entries.keys().collect()
+    }
+
+    fn remove(&mut self, key: &Key) -> Option<AnyCapability> {
+        self.entries.remove(key).map(|c| c.into_any_capability())
+    }
+}
+
+impl TryFrom<AnyCapability> for Box<dyn SomeDict> {
+    type Error = AnyCapability;
+
+    fn try_from(value: AnyCapability) -> Result<Self, Self::Error> {
+        if value.as_any().is::<Dict<AnyCapability>>() {
+            return Ok(value.into_any().downcast::<Dict<AnyCapability>>().unwrap());
+        }
+        if value.as_any().is::<Dict<AnyCloneCapability>>() {
+            return Ok(value.into_any().downcast::<Dict<AnyCloneCapability>>().unwrap());
+        }
+        Err(value)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use {
@@ -232,12 +272,11 @@ mod tests {
         assert_eq!(dict.entries.len(), 1);
 
         // The entry that was inserted should now be in `entries`.
-        let handle = dict
+        let (handle, _fut) = dict
             .entries
-            .get(CAP_KEY)
+            .remove(CAP_KEY)
             .ok_or_else(|| anyhow!("not in entries after insert"))?
-            .downcast_ref::<Handle>()
-            .ok_or_else(|| anyhow!("entry is not a Handle"))?;
+            .to_zx_handle();
         let got_koid = handle.get_koid().unwrap();
         assert_eq!(got_koid, expected_koid);
 

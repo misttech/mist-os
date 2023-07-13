@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 use {
-    cap::{dict::Key, AnyCapability, Dict},
+    cap::{dict::Key, AnyCapability, CloneDict, Dict, SomeDict},
     fuchsia_runtime::{HandleInfo, HandleType},
     futures::channel::mpsc::UnboundedSender,
     futures::future::{BoxFuture, FutureExt},
@@ -87,7 +87,7 @@ pub fn add_to_processargs(
 
     // Iterate over the delivery map.
     // Take entries away from dict and install them accordingly.
-    let dict = visit_map(delivery_map, dict, &mut |cap: AnyCapability, delivery: &Delivery| {
+    visit_map(delivery_map, Box::new(dict), &mut |cap: AnyCapability, delivery: &Delivery| {
         match delivery {
             Delivery::NamespacedObject(path) => {
                 namespace.add(cap, path).map_err(DeliveryError::NamespaceError)
@@ -100,9 +100,6 @@ pub fn add_to_processargs(
             }
         }
     })?;
-
-    // Finally, verify that all dict entries are empty (or empty dictionaries).
-    check_empty_dict(&dict)?;
 
     let (namespace, namespace_fut) = namespace.serve().map_err(DeliveryError::NamespaceError)?;
     processargs.namespace_entries.extend(namespace);
@@ -150,34 +147,24 @@ fn translate_handle(
 
 fn visit_map(
     map: &DeliveryMap,
-    mut dict: Dict,
+    mut dict: Box<dyn SomeDict>,
     f: &mut impl FnMut(AnyCapability, &Delivery) -> Result<(), DeliveryError>,
-) -> Result<Dict, DeliveryError> {
+) -> Result<(), DeliveryError> {
     for (key, entry) in map {
-        match dict.entries.remove(key) {
+        match dict.remove(key) {
             Some(value) => match entry {
                 DeliveryMapEntry::Delivery(delivery) => f(value, delivery)?,
                 DeliveryMapEntry::Dict(sub_map) => {
-                    let nested_dict: Box<Dict> =
-                        value.downcast().map_err(|_| DeliveryError::NotADict(key.to_owned()))?;
-                    dict.entries
-                        .insert(key.to_owned(), Box::new(visit_map(sub_map, *nested_dict, f)?));
+                    let nested_dict: Box<dyn SomeDict> =
+                        value.try_into().map_err(|_| DeliveryError::NotADict(key.to_owned()))?;
+                    visit_map(sub_map, nested_dict, f)?;
                 }
             },
             None => return Err(DeliveryError::NotInDict(key.to_owned())),
         }
     }
-    Ok(dict)
-}
-
-fn check_empty_dict(dict: &Dict) -> Result<(), DeliveryError> {
-    for (key, entry) in dict.entries.iter() {
-        if let Some(nested_dict) = entry.downcast_ref::<Dict>() {
-            // Recursively check nested dictionary.
-            check_empty_dict(&nested_dict)?;
-        } else {
-            return Err(DeliveryError::UnusedCapability(key.to_owned()));
-        }
+    if let Some(key) = dict.list().into_iter().next() {
+        return Err(DeliveryError::UnusedCapability(key.to_owned()));
     }
     Ok(())
 }
@@ -237,7 +224,7 @@ mod tests {
         fidl_fuchsia_io as fio, fuchsia_async as fasync,
         fuchsia_fs::directory::DirEntry,
         fuchsia_zircon as zx,
-        fuchsia_zircon::{AsHandleRef, HandleBased, Peered},
+        fuchsia_zircon::{AsHandleRef, HandleBased, Peered, Signals, Time},
         maplit::hashmap,
         namespace::{ignore_not_found as ignore, NamespaceError},
         std::str::FromStr,
@@ -320,6 +307,43 @@ mod tests {
         assert_eq!(processargs.handles[0].info.handle_type(), HandleType::FileDescriptor);
         assert_eq!(processargs.handles[0].info.arg(), 0);
 
+        drop(processargs);
+        fut.await;
+        Ok(())
+    }
+
+    /// Test accessing capabilities from a CloneDict inside a Dict.
+    #[fuchsia::test]
+    async fn test_nested_clone_dict() -> Result<()> {
+        let (ep0, ep1) = zx::EventPair::create();
+
+        let mut processargs = ProcessArgs::new();
+
+        let mut handles = CloneDict::new();
+        handles.entries.insert("stdin".to_string(), ep0.into_handle().try_into().unwrap());
+        let mut dict = Dict::new();
+        dict.entries.insert("handles".to_string(), Box::new(handles));
+
+        let delivery_map = hashmap! {
+            "handles".to_string() => DeliveryMapEntry::Dict(hashmap! {
+                "stdin".to_string() => DeliveryMapEntry::Delivery(
+                    Delivery::Handle(HandleInfo::new(HandleType::FileDescriptor, 0))
+                )
+            })
+        };
+        let fut = add_to_processargs(dict, &mut processargs, &delivery_map, ignore())?;
+
+        assert_eq!(processargs.namespace_entries.len(), 0);
+        assert_eq!(processargs.handles.len(), 1);
+
+        assert_eq!(processargs.handles[0].info.handle_type(), HandleType::FileDescriptor);
+        assert_eq!(processargs.handles[0].info.arg(), 0);
+
+        let ep0 = processargs.handles.pop().unwrap().handle;
+        ep1.signal_peer(Signals::NONE, Signals::USER_1).unwrap();
+        assert_eq!(ep0.wait_handle(Signals::USER_1, Time::INFINITE).unwrap(), Signals::USER_1);
+
+        drop(ep0);
         drop(processargs);
         fut.await;
         Ok(())
