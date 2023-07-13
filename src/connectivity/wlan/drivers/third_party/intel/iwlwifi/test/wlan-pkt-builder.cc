@@ -18,9 +18,9 @@ WlanPktBuilder::WlanPkt::WlanPkt(const uint8_t* buf, size_t len)
       wlan_pkt_(std::make_unique<::fuchsia_wlan_softmac::wire::WlanTxPacket>()),
       buf_(new uint8_t[len]),
       len_(len) {
-  ASSERT_NOT_NULL(mac_pkt_);
-  ASSERT_NOT_NULL(wlan_pkt_);
-  ASSERT_NOT_NULL(buf_);
+  EXPECT_NOT_NULL(mac_pkt_);
+  EXPECT_NOT_NULL(wlan_pkt_);
+  EXPECT_NOT_NULL(buf_);
   std::memcpy(&*buf_, buf, len);
 
   *mac_pkt_ = {};

@@ -36,7 +36,6 @@
 
 #include "src/connectivity/wlan/drivers/third_party/intel/iwlwifi/fw/api/tx.h"
 
-#include "src/lib/debug/backtrace-request.h"
 #include <zircon/status.h>
 #include <zircon/types.h>
 
@@ -1894,7 +1893,6 @@ static zx_status_t iwl_pcie_send_hcmd_sync(struct iwl_trans* trans, struct iwl_h
   if (test_bit(STATUS_FW_ERROR, &trans->status)) {
     iwl_trans_pcie_dump_regs(trans);
     IWL_ERR(trans, "FW error in SYNC CMD %s\n", iwl_get_cmd_string(trans, cmd->id));
-    backtrace_request_all_threads();
     status = ZX_ERR_IO;
     goto cancel;
   }

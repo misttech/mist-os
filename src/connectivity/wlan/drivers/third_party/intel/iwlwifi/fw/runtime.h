@@ -43,6 +43,10 @@
 #include "src/connectivity/wlan/drivers/third_party/intel/iwlwifi/iwl-trans.h"
 #include "src/connectivity/wlan/drivers/third_party/intel/iwlwifi/platform/task.h"
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 struct iwl_fw_runtime_ops {
   int (*dump_start)(void* ctx);
   void (*dump_end)(void* ctx);
@@ -159,4 +163,7 @@ void iwl_get_shared_mem_conf(struct iwl_fw_runtime* fwrt);
 zx_status_t iwl_set_soc_latency(struct iwl_fw_runtime *fwrt);
 zx_status_t iwl_configure_rxq(struct iwl_fw_runtime *fwrt);
 
+#ifdef __cplusplus
+}
+#endif
 #endif  // SRC_CONNECTIVITY_WLAN_DRIVERS_THIRD_PARTY_INTEL_IWLWIFI_FW_RUNTIME_H_

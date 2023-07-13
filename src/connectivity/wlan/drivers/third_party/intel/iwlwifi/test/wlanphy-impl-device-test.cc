@@ -12,7 +12,6 @@
 
 #include <iterator>
 
-#include <fbl/string_buffer.h>
 #include <zxtest/zxtest.h>
 
 #include "fidl/fuchsia.wlan.phyimpl/cpp/wire_types.h"

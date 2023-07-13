@@ -4,7 +4,7 @@
 
 #include "src/connectivity/wlan/drivers/third_party/intel/iwlwifi/platform/wlanphyimpl-device.h"
 
-#include <lib/sync/cpp/completion.h>
+#include <lib/sync/completion.h>
 #include <zircon/status.h>
 
 #include <memory>

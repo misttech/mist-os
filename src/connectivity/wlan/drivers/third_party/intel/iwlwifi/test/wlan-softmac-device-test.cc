@@ -19,7 +19,6 @@
 #include <memory>
 #include <utility>
 
-#include <fbl/string_buffer.h>
 #include <zxtest/zxtest.h>
 
 #include "lib/fidl/cpp/wire/array.h"
@@ -71,7 +70,7 @@ class WlanSoftmacDeviceTest : public SingleApTest,
         std::make_unique<::wlan::iwlwifi::WlanSoftmacDevice>(sim_trans_.iwl_trans(), 0, mvmvif_);
 
     auto endpoints = fdf::CreateEndpoints<fuchsia_wlan_softmac::WlanSoftmac>();
-    ASSERT_FALSE(endpoints.is_error());
+    EXPECT_FALSE(endpoints.is_error());
 
     device_->ServiceConnectHandler(sim_trans_.fdf_driver_dispatcher(),
                                    std::move(endpoints->server));
@@ -80,7 +79,7 @@ class WlanSoftmacDeviceTest : public SingleApTest,
 
     // Create test arena.
     auto arena = fdf::Arena::Create(0, 0);
-    ASSERT_FALSE(arena.is_error());
+    EXPECT_FALSE(arena.is_error());
 
     test_arena_ = *std::move(arena);
   }
@@ -390,7 +389,7 @@ class MacInterfaceTest : public WlanSoftmacDeviceTest, public MockTrans {
     zx_handle_t wlan_phy_impl_channel = mvmvif_->mlme_channel;
 
     auto endpoints = fdf::CreateEndpoints<fuchsia_wlan_softmac::WlanSoftmacIfc>();
-    ASSERT_FALSE(endpoints.is_error());
+    EXPECT_FALSE(endpoints.is_error());
 
     // Created the end points for WlanSoftmacIfc protocol, and pass the client end to
     // WlanSoftmacDevice.
@@ -400,9 +399,9 @@ class MacInterfaceTest : public WlanSoftmacDeviceTest, public MockTrans {
     // the pointer will be copied to mvmvif_->ifc.ctx.
     auto result = client_.buffer(test_arena_)->Start(std::move(endpoints->client));
 
-    ASSERT_TRUE(result.ok());
+    EXPECT_TRUE(result.ok());
     EXPECT_FALSE(result->is_error());
-    ASSERT_EQ(wlan_phy_impl_channel, result->value()->sme_channel);
+    EXPECT_EQ(wlan_phy_impl_channel, result->value()->sme_channel);
 
     // Add the interface to MVM instance.
     mvmvif_->mvm->mvmvif[0] = mvmvif_;
@@ -418,7 +417,7 @@ class MacInterfaceTest : public WlanSoftmacDeviceTest, public MockTrans {
     // This must be called after we verify the expected commands and restore the mock command
     // callback so that the stop command doesn't mess up the test case expectation.
     auto result = client_.buffer(test_arena_)->Stop();
-    ASSERT_TRUE(result.ok());
+    EXPECT_TRUE(result.ok());
 
     // Deallocate the client station at id 0.
     mtx_lock(&mvmvif_->mvm->mutex);
@@ -665,7 +664,7 @@ class MacInterfaceTest : public WlanSoftmacDeviceTest, public MockTrans {
          it++) {
       printf("  ==> 0x%04x\n", it->cmd_id_);
     }
-    ASSERT_TRUE(expected_cmd_ids.empty(), "The expected command set is not empty.");
+    EXPECT_TRUE(expected_cmd_ids.empty());
 
     mock_tx_.VerifyAndClear();
   }

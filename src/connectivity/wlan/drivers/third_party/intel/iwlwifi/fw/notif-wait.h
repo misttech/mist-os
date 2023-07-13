@@ -43,6 +43,9 @@
 
 #include "src/connectivity/wlan/drivers/third_party/intel/iwlwifi/iwl-trans.h"
 
+#ifdef __cplusplus
+extern "C" {
+#endif
 struct iwl_notif_wait_data {
   list_node_t notif_waits;
   mtx_t notif_wait_lock;
@@ -149,4 +152,7 @@ zx_status_t iwl_wait_notification(struct iwl_notif_wait_data* notif_data,
 void iwl_remove_notification(struct iwl_notif_wait_data* notif_data,
                              struct iwl_notification_wait* wait_entry);
 
+#ifdef __cplusplus
+}
+#endif
 #endif  // SRC_CONNECTIVITY_WLAN_DRIVERS_THIRD_PARTY_INTEL_IWLWIFI_FW_NOTIF_WAIT_H_

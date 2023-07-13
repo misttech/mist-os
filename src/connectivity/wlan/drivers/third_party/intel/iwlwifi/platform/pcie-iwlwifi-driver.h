@@ -9,7 +9,7 @@
 #include <lib/driver/component/cpp/driver_base.h>
 #include <lib/driver/component/cpp/node_add_args.h>
 #include <lib/driver/outgoing/cpp/outgoing_directory.h>
-#include <lib/sync/cpp/completion.h>
+#include <lib/sync/completion.h>
 
 #include <memory>
 

@@ -114,7 +114,7 @@ class PcieTest : public zxtest::Test {
  public:
   PcieTest() {
     task_loop_ = std::make_unique<::async::Loop>(&kAsyncLoopConfigNoAttachToCurrentThread);
-    ASSERT_OK(task_loop_->StartThread("iwlwifi-test-task-worker", nullptr));
+    EXPECT_OK(task_loop_->StartThread("iwlwifi-test-task-worker", nullptr));
 
     std::vector<fuchsia_component_runner::ComponentNamespaceEntry> entries;
     zx::result open_result = component::OpenServiceRoot();
@@ -139,7 +139,7 @@ class PcieTest : public zxtest::Test {
     wlan::drivers::log::Instance::Init(0, std::move(*logger));
 
     irq_loop_ = std::make_unique<::async::Loop>(&kAsyncLoopConfigNoAttachToCurrentThread);
-    ASSERT_OK(irq_loop_->StartThread("iwlwifi-test-irq-worker", nullptr));
+    EXPECT_OK(irq_loop_->StartThread("iwlwifi-test-irq-worker", nullptr));
     pci_dev_.dev.task_dispatcher = task_loop_->dispatcher();
     pci_dev_.dev.irq_dispatcher = irq_loop_->dispatcher();
     fake_bti_create(&pci_dev_.dev.bti);
@@ -159,7 +159,7 @@ class PcieTest : public zxtest::Test {
     trans_cfg_.base_params = &base_params_;
     trans_ = iwl_trans_alloc(sizeof(struct iwl_trans_pcie_wrapper), &pci_dev_.dev, &trans_ops_,
                              &trans_cfg_);
-    ASSERT_NE(trans_, nullptr);
+    EXPECT_NE(trans_, nullptr);
     trans_->cfg = &cfg_;
     auto wrapper = reinterpret_cast<iwl_trans_pcie_wrapper*>(IWL_TRANS_GET_PCIE_TRANS(trans_));
     wrapper->test = this;

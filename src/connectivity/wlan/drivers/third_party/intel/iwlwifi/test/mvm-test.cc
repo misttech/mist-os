@@ -56,7 +56,7 @@ class TestRxcb : public iwl_rx_cmd_buffer {
  public:
   explicit TestRxcb(struct device* dev, void* pkt_data, size_t pkt_len) {
     struct iwl_iobuf* io_buf = nullptr;
-    ASSERT_OK(iwl_iobuf_allocate_contiguous(dev, pkt_len + sizeof(struct iwl_rx_packet), &io_buf));
+    EXPECT_OK(iwl_iobuf_allocate_contiguous(dev, pkt_len + sizeof(struct iwl_rx_packet), &io_buf));
     _iobuf = io_buf;
     _offset = 0;
 
@@ -1161,6 +1161,8 @@ class LmacScanTest : public MvmTest {
       sr->success = (status == ZX_OK ? true : false);
     };
 
+    scan_result.sme_notified = false;
+    scan_result.success = false;
     mvmvif_sta.ifc.ctx = &scan_result;
 
     trans_ = sim_trans_.iwl_trans();
@@ -1228,6 +1230,9 @@ class UmacScanTest : public FakeUcodeTest, public MockTrans {
       sr->sme_notified = true;
       sr->success = (status == ZX_OK ? true : false);
     };
+
+    scan_result_.sme_notified = false;
+    scan_result_.success = false;
     mvmvif_sta_.ifc.ctx = &scan_result_;
 
     active_scan_args_.ssids =
@@ -1719,7 +1724,7 @@ class TxqTest : public MvmTest, public MockTrans {
     mvm_->fw_id_to_mac_id[0] = &sta_;
     for (size_t i = 0; i < std::size(sta_.txq); ++i) {
       sta_.txq[i] = reinterpret_cast<struct iwl_mvm_txq*>(calloc(1, sizeof(struct iwl_mvm_txq)));
-      ASSERT_NE(nullptr, sta_.txq[i]);
+      EXPECT_NE(nullptr, sta_.txq[i]);
     }
   }
 

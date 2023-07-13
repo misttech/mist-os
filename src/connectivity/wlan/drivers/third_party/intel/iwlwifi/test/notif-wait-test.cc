@@ -8,13 +8,11 @@
 // IRQ) and the user (the driver code waiting for the notification from firmware). In this file,
 // we will act as those 2 parties in a test case.
 
+#include "src/connectivity/wlan/drivers/third_party/intel/iwlwifi/fw/notif-wait.h"
+
 #include <iterator>
 
 #include <zxtest/zxtest.h>
-
-extern "C" {
-#include "src/connectivity/wlan/drivers/third_party/intel/iwlwifi/fw/notif-wait.h"
-}
 
 namespace wlan {
 namespace testing {
@@ -57,9 +55,7 @@ static void helper_test_case_init(struct iwl_notif_wait_data* wait_data,
 
 class NotifWaitTest : public ::zxtest::Test {
  public:
-  NotifWaitTest() {
-    helper_test_case_init(&wait_data_, &wait_entry_);
-  }
+  NotifWaitTest() { helper_test_case_init(&wait_data_, &wait_entry_); }
   ~NotifWaitTest() { mtx_destroy(&wait_data_.notif_wait_lock); }
 
  protected:
@@ -120,7 +116,8 @@ TEST_F(NotifWaitTest, TestAbortion) {
   iwl_abort_notification_waits(&wait_data_);
 
   // Expect aborted.
-  EXPECT_EQ(ZX_ERR_CANCELED, iwl_wait_notification(&wait_data_, &wait_entry_, ZX_TIME_INFINITE_PAST));
+  EXPECT_EQ(ZX_ERR_CANCELED,
+            iwl_wait_notification(&wait_data_, &wait_entry_, ZX_TIME_INFINITE_PAST));
 }
 
 // Try to trigger it first, then abort it.
@@ -133,7 +130,8 @@ TEST_F(NotifWaitTest, TestTriggeredThenAborted) {
   iwl_abort_notification_waits(&wait_data_);
 
   // Expect aborted.
-  EXPECT_EQ(ZX_ERR_CANCELED, iwl_wait_notification(&wait_data_, &wait_entry_, ZX_TIME_INFINITE_PAST));
+  EXPECT_EQ(ZX_ERR_CANCELED,
+            iwl_wait_notification(&wait_data_, &wait_entry_, ZX_TIME_INFINITE_PAST));
 }
 
 class NotificationWaitTest : public ::zxtest::Test {

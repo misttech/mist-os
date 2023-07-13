@@ -64,6 +64,10 @@
 #include "src/connectivity/wlan/drivers/third_party/intel/iwlwifi/platform/regulatory.h"
 #include "src/connectivity/wlan/drivers/third_party/intel/iwlwifi/platform/task.h"
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #ifdef CPTCFG_IWLWIFI_LTE_COEX
 #include "src/connectivity/wlan/drivers/third_party/intel/iwlwifi/lte-coex.h"
 #endif
@@ -2280,5 +2284,9 @@ bool iwl_mvm_enable_txq(struct iwl_mvm* mvm, struct iwl_mvm_sta* sta, int queue,
 //
 size_t iwl_mvm_create_packet(struct ieee80211_frame_header* hdr, size_t len, size_t crypt_len,
                              struct wlan_rx_info* rx_info, struct iwl_rx_cmd_buffer* rxb);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif  // SRC_CONNECTIVITY_WLAN_DRIVERS_THIRD_PARTY_INTEL_IWLWIFI_MVM_MVM_H_

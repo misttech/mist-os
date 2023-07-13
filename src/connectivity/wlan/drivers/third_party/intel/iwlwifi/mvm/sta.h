@@ -47,6 +47,9 @@
 #include "src/connectivity/wlan/drivers/third_party/intel/iwlwifi/platform/banjo/ieee80211.h"
 #include "src/connectivity/wlan/drivers/third_party/intel/iwlwifi/platform/compiler.h"
 
+#ifdef __cplusplus
+extern "C" {
+#endif
 struct iwl_mvm;
 struct iwl_mvm_vif;
 
@@ -558,4 +561,7 @@ void iwl_mvm_modify_all_sta_disable_tx(struct iwl_mvm* mvm, struct iwl_mvm_vif* 
 void iwl_mvm_csa_client_absent(struct iwl_mvm* mvm, struct ieee80211_vif* vif);
 void iwl_mvm_add_new_dqa_stream_wk(struct work_struct* wk);
 
+#ifdef __cplusplus
+}
+#endif
 #endif  // SRC_CONNECTIVITY_WLAN_DRIVERS_THIRD_PARTY_INTEL_IWLWIFI_MVM_STA_H_

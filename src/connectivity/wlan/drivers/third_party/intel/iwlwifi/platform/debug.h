@@ -84,7 +84,6 @@ struct device;
 #define __iwl_warn(dev, fmt, args...) IWL_LOG(lwarn, fmt, ##args)
 #define __iwl_info(dev, fmt, args...) IWL_LOG(linfo, fmt, ##args)
 #define __iwl_crit(dev, fmt, args...) IWL_LOG(lerror, fmt, ##args)
-// function argument dropped since ltrace logs the function name already
 #define __iwl_dbg(dev, level, limit, function, fmt, args...) \
   IWL_LOG_FILTER_TAG(ltrace, IWL_LOG_DEBUG_FILTER, IWL_LOG_DEBUG_TAG, fmt, ##args)
 

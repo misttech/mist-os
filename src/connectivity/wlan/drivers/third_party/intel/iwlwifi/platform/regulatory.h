@@ -11,6 +11,10 @@
 
 #include "banjo/wlanphyimpl.h"
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 // The preserved channel number used in the |mcc_info| data structure.
 #define MAX_MCC_INFO_CH 64
 
@@ -39,5 +43,9 @@ bool reg_channel_is_txable(struct mcc_info* mcc_info, uint8_t ch_num);
 //
 size_t reg_filter_channels(bool active_scan, struct mcc_info* mcc_info, size_t num_ch,
                            const uint8_t* ch_list, uint8_t* out_list);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif  // SRC_CONNECTIVITY_WLAN_DRIVERS_THIRD_PARTY_INTEL_IWLWIFI_PLATFORM_REGULATORY_H_

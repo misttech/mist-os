@@ -19,9 +19,7 @@
 
 #include <zxtest/zxtest.h>
 
-extern "C" {
 #include "src/connectivity/wlan/drivers/third_party/intel/iwlwifi/mvm/mvm.h"
-}
 
 namespace {
 

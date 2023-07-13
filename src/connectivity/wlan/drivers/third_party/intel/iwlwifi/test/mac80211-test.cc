@@ -11,10 +11,7 @@
 
 #include <zxtest/zxtest.h>
 
-extern "C" {
 #include "src/connectivity/wlan/drivers/third_party/intel/iwlwifi/mvm/mvm.h"
-}
-
 #include "src/connectivity/wlan/drivers/third_party/intel/iwlwifi/test/fake-ucode-test.h"
 #include "src/connectivity/wlan/drivers/third_party/intel/iwlwifi/test/mock-trans.h"
 #include "src/connectivity/wlan/drivers/third_party/intel/iwlwifi/test/single-ap-test.h"
@@ -50,15 +47,15 @@ class ClientInterfaceHelper {
         .primary = 35,
     };
     uint16_t phy_ctxt_id;
-    ASSERT_EQ(ZX_OK, iwl_mvm_add_chanctx(mvm_, &chandef, &phy_ctxt_id));
+    EXPECT_EQ(ZX_OK, iwl_mvm_add_chanctx(mvm_, &chandef, &phy_ctxt_id));
     mvmvif_.phy_ctxt = &mvm_->phy_ctxts[phy_ctxt_id];
 
     // Assign the AP sta info.
-    ASSERT_EQ(fuchsia_wlan_ieee80211_TIDS_MAX + 1, std::size(ap_sta_.txq));
+    EXPECT_EQ(fuchsia_wlan_ieee80211_TIDS_MAX + 1, std::size(ap_sta_.txq));
     for (size_t i = 0; i < std::size(ap_sta_.txq); i++) {
       ap_sta_.txq[i] = &txqs_[i];
     }
-    ASSERT_EQ(ZX_OK, iwl_mvm_mac_sta_state(&mvmvif_, &ap_sta_, IWL_STA_NOTEXIST, IWL_STA_NONE));
+    EXPECT_EQ(ZX_OK, iwl_mvm_mac_sta_state(&mvmvif_, &ap_sta_, IWL_STA_NOTEXIST, IWL_STA_NONE));
 
     // Set it to associated.
     mvmvif_.bss_conf.assoc = true;

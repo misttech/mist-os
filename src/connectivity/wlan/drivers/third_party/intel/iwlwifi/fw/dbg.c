@@ -50,7 +50,6 @@
 #include "src/connectivity/wlan/drivers/third_party/intel/iwlwifi/iwl-trans.h"
 #include "src/connectivity/wlan/drivers/third_party/intel/iwlwifi/platform/debug.h"
 
-
 // TODO(fxbug.dev/119415): review these once we refactor (or reorder) the functions.
 static zx_status_t iwl_fw_dbg_restart_recording(struct iwl_trans *trans,
 					struct iwl_fw_dbg_params *params);

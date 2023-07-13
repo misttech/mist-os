@@ -11,15 +11,13 @@
 //
 //      https://gcc.gnu.org/onlinedocs/gcc/Zero-Length.html
 //
-#include <zxtest/zxtest.h>
-
-extern "C" {
 #include "src/connectivity/wlan/drivers/third_party/intel/iwlwifi/iwl-phy-db.h"
-}
+
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/driver/logging/cpp/logger.h>
 
 #include <wlan/drivers/log_instance.h>
+#include <zxtest/zxtest.h>
 
 namespace wlan {
 namespace testing {

@@ -6,11 +6,8 @@
 
 #include <zxtest/zxtest.h>
 
-extern "C" {
-#include "src/connectivity/wlan/drivers/third_party/intel/iwlwifi/mvm/mvm.h"
-}
-
 #include "src/connectivity/wlan/drivers/third_party/intel/iwlwifi/iwl-drv.h"
+#include "src/connectivity/wlan/drivers/third_party/intel/iwlwifi/mvm/mvm.h"
 #include "src/connectivity/wlan/drivers/third_party/intel/iwlwifi/platform/memory.h"
 #include "src/connectivity/wlan/drivers/third_party/intel/iwlwifi/test/sim-nvm.h"
 #include "src/connectivity/wlan/drivers/third_party/intel/iwlwifi/test/single-ap-test.h"
