@@ -86,9 +86,6 @@ var (
 		"//src/recovery/simulator:recovery_simulator_boot_test",
 		"//src/recovery/simulator:recovery_simulator_serial_test",
 		"//src/tests/installer:installer_test",
-		"//tools/fvdl/e2e:fvdl_intree_test_slirp",
-		"//tools/fvdl/e2e:fvdl_intree_test_tuntap",
-		"//tools/fvdl/e2e:fvdl_sdk_test",
 	}
 )
 

@@ -1468,8 +1468,6 @@ tools/x64/fserve
 tools/x64/fserve-meta.json
 tools/x64/fssh
 tools/x64/fssh-meta.json
-tools/x64/fvdl
-tools/x64/fvdl-meta.json
 tools/x64/fvm
 tools/x64/fvm-meta.json
 tools/x64/merkleroot

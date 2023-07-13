@@ -562,10 +562,7 @@ e2e_test_libs = [
   "//src/testing/end_to_end/honeydew($host_toolchain)",
 ]
 if (is_linux) {
-  e2e_test_libs += [
-    "//tools/emulator($host_toolchain)",
-    "//tools/fvdl/e2e/e2etest($host_toolchain)",
-  ]
+  e2e_test_libs += [ "//tools/emulator($host_toolchain)" ]
 }
 
 # [END e2e_test_libs]
