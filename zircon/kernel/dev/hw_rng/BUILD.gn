@@ -13,6 +13,7 @@ zx_library("hw_rng") {
   ]
   deps = [
     "//zircon/kernel/lib/console",
+    "//zircon/system/ulib/fbl",
     "//zircon/system/ulib/pretty",
   ]
 }

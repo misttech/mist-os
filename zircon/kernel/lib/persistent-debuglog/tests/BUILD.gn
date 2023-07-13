@@ -9,5 +9,6 @@ source_set("tests") {
   deps = [
     "//zircon/kernel/lib/persistent-debuglog",
     "//zircon/kernel/lib/unittest",
+    "//zircon/system/ulib/lazy_init",
   ]
 }

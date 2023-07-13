@@ -12,5 +12,6 @@ zx_library("io") {
     "tests",
     "//zircon/kernel/lib/debuglog:headers",
     "//zircon/kernel/lib/persistent-debuglog",
+    "//zircon/system/ulib/zircon-internal",
   ]
 }

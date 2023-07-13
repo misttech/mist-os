@@ -21,6 +21,7 @@ if (is_fuchsia) {
     sdk_publishable = true
     sdk_headers = [ "lib/fdio/spawn-actions.h" ]
 
+    public_deps = [ ":headers" ]
     deps = [
       ":fdio",
       "//zircon/system/ulib/zx",

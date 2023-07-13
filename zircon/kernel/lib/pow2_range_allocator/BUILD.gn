@@ -8,7 +8,10 @@ import("//build/zircon/migrated_targets.gni")
 
 zx_library("pow2_range_allocator") {
   sources = [ "pow2_range_allocator.cc" ]
-  deps = [ ":tests" ]
+  deps = [
+    ":tests",
+    "//zircon/system/ulib/fbl",
+  ]
 }
 
 source_set("tests") {

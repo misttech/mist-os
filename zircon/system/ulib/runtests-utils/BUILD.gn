@@ -34,6 +34,9 @@ zx_library("runtests-utils") {
 
     # <runtests-utils/runtests-utils.h> has #include <lib/debugdata/datasink.h>.
     "//zircon/system/ulib/debugdata",
+
+    # <runtests-utils/log-exporter.h> has #include <lib/async-loop/default.h>
+    "//zircon/system/ulib/async-loop:async-loop-default.headers",
   ]
   deps = [
     "//sdk/fidl/fuchsia.io:fuchsia.io_cpp_wire",

@@ -156,6 +156,7 @@ if (toolchain_environment == "physmem" ||
       "//zircon/kernel/vm",
       "//zircon/system/ulib/bitmap",
       "//zircon/system/ulib/fbl",
+      "//zircon/system/ulib/lazy_init",
       "//zircon/system/ulib/pretty",
       "//zircon/system/ulib/zx",
     ]

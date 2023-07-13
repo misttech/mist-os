@@ -47,6 +47,7 @@ source_set("fake-usb-endpoint-server") {
   public_deps = [
     "//sdk/lib/async_patterns/testing/cpp",
     "//sdk/lib/component/outgoing/cpp",
+    "//zircon/system/ulib/async-default:headers",
   ]
   deps = [ "//sdk/fidl/fuchsia.hardware.usb.endpoint:fuchsia.hardware.usb.endpoint_cpp" ]
 }

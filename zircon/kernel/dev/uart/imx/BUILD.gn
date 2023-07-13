@@ -20,6 +20,7 @@ source_set("imx") {
     "//zircon/kernel/lib/arch",
     "//zircon/kernel/lib/cbuf",
     "//zircon/kernel/lib/debuglog",
+    "//zircon/system/ulib/zircon-internal",
     "//zircon/system/ulib/zx",
   ]
 }

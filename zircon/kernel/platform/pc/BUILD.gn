@@ -59,6 +59,7 @@ zx_library("pc") {
     "//zircon/kernel/phys:handoff",
     "//zircon/kernel/platform:headers",
     "//zircon/system/ulib/explicit-memory",
+    "//zircon/system/ulib/lazy_init",
     "//zircon/system/ulib/ram-crashlog",
     "//zircon/system/ulib/smbios",
     "//zircon/system/ulib/uart",

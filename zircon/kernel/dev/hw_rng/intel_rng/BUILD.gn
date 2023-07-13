@@ -10,5 +10,6 @@ source_set("intel_rng") {
     "//zircon/kernel/dev/hw_rng",
     "//zircon/kernel/lib/arch",
     "//zircon/kernel/lib/init",
+    "//zircon/system/ulib/fbl",
   ]
 }
