@@ -118,15 +118,17 @@ impl FsNodeOps for VmoFileNode {
     ) -> Result<(), Errno> {
         match mode {
             FallocMode::PunchHole => {
+                // Lock `info()` before acquiring the `write_guard_state` lock to ensure consistent
+                // lock ordering.
+                let info = node.info();
+
                 // Check write seal. Hold the lock to ensure seals don't change.
                 let state = node.write_guard_state.lock();
                 state.check_no_seal(SealFlags::WRITE | SealFlags::FUTURE_WRITE)?;
 
                 let mut end = offset.checked_add(length).ok_or_else(|| errno!(EINVAL))? as usize;
 
-                let info = node.info();
                 let vmo_size = info.blksize * info.blocks;
-
                 if offset as usize >= vmo_size {
                     return Ok(());
                 }
