@@ -526,27 +526,35 @@ static zx_status_t hid_buttons_bind(void* ctx, zx_device_t* parent) {
   }
   size_t n_gpios = configs->size();
 
-  // Get the GPIOs.
-  auto fragment_count = device_get_fragment_count(parent);
-  if (fragment_count != n_gpios) {
-    zxlogf(ERROR, "Could not get fragment count");
-    return ZX_ERR_INTERNAL;
-  }
-  size_t actual;
-  composite_device_fragment_t fragments[fragment_count];
-  device_get_fragments(parent, fragments, fragment_count, &actual);
-  if (actual != fragment_count) {
-    zxlogf(ERROR, "Fragment count did not match");
-    return ZX_ERR_INTERNAL;
-  }
-
   // Prepare gpios array.
   auto gpios = fbl::Array(new (&ac) HidButtonsDevice::Gpio[n_gpios], n_gpios);
   if (!ac.check()) {
     return ZX_ERR_NO_MEMORY;
   }
   for (uint32_t i = 0; i < n_gpios; ++i) {
-    zx_status_t status = device_get_protocol(fragments[i].device, ZX_PROTOCOL_GPIO, &gpios[i].gpio);
+    const char* name;
+    switch (buttons[i].id) {
+      case BUTTONS_ID_VOLUME_UP:
+        name = "volume-up";
+        break;
+      case BUTTONS_ID_VOLUME_DOWN:
+        name = "volume-down";
+        break;
+      case BUTTONS_ID_FDR:
+        name = "volume-both";
+        break;
+      case BUTTONS_ID_MIC_MUTE:
+      case BUTTONS_ID_MIC_AND_CAM_MUTE:
+        name = "mic-privacy";
+        break;
+      case BUTTONS_ID_CAM_MUTE:
+        name = "cam-mute";
+        break;
+      default:
+        return ZX_ERR_NOT_SUPPORTED;
+    };
+    zx_status_t status =
+        device_get_fragment_protocol(parent, name, ZX_PROTOCOL_GPIO, &gpios[i].gpio);
     if (status != ZX_OK) {
       zxlogf(ERROR, "Could not get protocol");
       return ZX_ERR_INTERNAL;

@@ -1,6 +1,6 @@
 [
     {
-        "node": "mic-mute",
+        "node": "mic-privacy",
         "tests": [
             {
                 "name": "Match",

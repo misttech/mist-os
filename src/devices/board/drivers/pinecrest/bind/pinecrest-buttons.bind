@@ -6,7 +6,7 @@ composite pinecrest_buttons;
 
 using fuchsia.hardware.gpio;
 
-primary node "mic-mute" {
+primary node "mic-privacy" {
   fuchsia.BIND_PROTOCOL == fuchsia.hardware.gpio.BIND_PROTOCOL.DEVICE;
   fuchsia.BIND_GPIO_PIN == 11;  // GPIO_MIC_MUTE_STATUS
 }

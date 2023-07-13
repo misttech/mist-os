@@ -44,7 +44,7 @@ zx_status_t As370::ButtonsInit() {
       .props_count = std::size(props),
       .fragments = as370_buttons_fragments,
       .fragments_count = std::size(as370_buttons_fragments),
-      .primary_fragment = "mic-mute",
+      .primary_fragment = "mic-privacy",
       .spawn_colocated = false,
       .metadata_list = available_buttons_metadata,
       .metadata_count = std::size(available_buttons_metadata),

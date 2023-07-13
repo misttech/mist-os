@@ -42,7 +42,7 @@ static composite_device_desc_t comp_desc = []() {
   desc.props_count = std::size(props);
   desc.fragments = av400_buttons_fragments;
   desc.fragments_count = std::size(av400_buttons_fragments);
-  desc.primary_fragment = "mic-mute";
+  desc.primary_fragment = "mic-privacy";
   desc.spawn_colocated = false;
   return desc;
 }();

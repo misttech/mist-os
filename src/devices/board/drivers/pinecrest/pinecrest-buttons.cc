@@ -44,7 +44,7 @@ zx_status_t Pinecrest::ButtonsInit() {
       .props_count = std::size(props),
       .fragments = pinecrest_buttons_fragments,
       .fragments_count = std::size(pinecrest_buttons_fragments),
-      .primary_fragment = "mic-mute",
+      .primary_fragment = "mic-privacy",
       .spawn_colocated = false,
       .metadata_list = available_buttons_metadata,
       .metadata_count = std::size(available_buttons_metadata),
