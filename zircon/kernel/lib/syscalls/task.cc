@@ -431,15 +431,15 @@ zx_status_t sys_process_read_memory(zx_handle_t handle, zx_vaddr_t vaddr, user_o
 
   auto region = aspace->FindRegion(vaddr);
   if (!region)
-    return ZX_ERR_NO_MEMORY;
+    return ZX_ERR_NOT_FOUND;
 
   auto vm_mapping = region->as_vm_mapping();
   if (!vm_mapping)
-    return ZX_ERR_NO_MEMORY;
+    return ZX_ERR_NOT_FOUND;
 
   auto vmo = vm_mapping->vmo();
   if (!vmo)
-    return ZX_ERR_NO_MEMORY;
+    return ZX_ERR_NOT_FOUND;
 
   uint64_t offset;
   {
@@ -496,15 +496,15 @@ zx_status_t sys_process_write_memory(zx_handle_t handle, zx_vaddr_t vaddr,
 
   auto region = aspace->FindRegion(vaddr);
   if (!region)
-    return ZX_ERR_NO_MEMORY;
+    return ZX_ERR_NOT_FOUND;
 
   auto vm_mapping = region->as_vm_mapping();
   if (!vm_mapping)
-    return ZX_ERR_NO_MEMORY;
+    return ZX_ERR_NOT_FOUND;
 
   auto vmo = vm_mapping->vmo();
   if (!vmo)
-    return ZX_ERR_NO_MEMORY;
+    return ZX_ERR_NOT_FOUND;
 
   if (VDso::vmo_is_vdso(vmo)) {
     // Don't allow writes to the vDSO.

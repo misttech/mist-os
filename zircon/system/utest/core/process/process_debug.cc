@@ -109,26 +109,26 @@ TEST_F(ProcessDebugTest, WriteMemoryAtOffsetIsOk) {
   ASSERT_TRUE(VerifyXorShiftVmo(vmo(), kVmoSize));
 }
 
-TEST_F(ProcessDebugTest, ReadMemoryAtInvalidOffsetReturnsErrorNoMemory) {
+TEST_F(ProcessDebugTest, ReadMemoryAtInvalidOffsetReturnsErrorNotFound) {
   char buf[64];
   size_t actual = 0u;
-  ASSERT_EQ(zx::process::self()->read_memory(0u, buf, 64, &actual), ZX_ERR_NO_MEMORY);
+  ASSERT_STATUS(zx::process::self()->read_memory(0u, buf, 64, &actual), ZX_ERR_NOT_FOUND);
   // Either the first page or the last page of the mapping is invalid, use that address.
   auto read_start = (data_start() > vmar_start())
                         ? vmar_start()
                         : vmar_start() + kVmarSize - zx_system_get_page_size();
-  ASSERT_EQ(zx::process::self()->read_memory(read_start, buf, 64, &actual), ZX_ERR_NO_MEMORY);
+  ASSERT_STATUS(zx::process::self()->read_memory(read_start, buf, 64, &actual), ZX_ERR_NOT_FOUND);
 }
 
-TEST_F(ProcessDebugTest, WriteAtInvalidOffsetReturnsErrorNoMemory) {
+TEST_F(ProcessDebugTest, WriteAtInvalidOffsetReturnsErrorNotFound) {
   const char buf[64] = {0};
   size_t actual = 0u;
-  ASSERT_EQ(zx::process::self()->write_memory(0u, buf, 64, &actual), ZX_ERR_NO_MEMORY);
+  ASSERT_STATUS(zx::process::self()->write_memory(0u, buf, 64, &actual), ZX_ERR_NOT_FOUND);
   // Either the first page or the last page of the mapping is invalid, use that address.
   auto write_start = (data_start() > vmar_start())
                          ? vmar_start()
                          : vmar_start() + kVmarSize - zx_system_get_page_size();
-  ASSERT_EQ(zx::process::self()->write_memory(write_start, buf, 64, &actual), ZX_ERR_NO_MEMORY);
+  ASSERT_STATUS(zx::process::self()->write_memory(write_start, buf, 64, &actual), ZX_ERR_NOT_FOUND);
 }
 
 TEST(ProcessDebugVDSO, WriteToVdsoAddressReturnsAccessDenied) {

@@ -70,7 +70,7 @@ or the requested memory is not cacheable.
 **ZX_ERR_INVALID_ARGS** *buffer* is an invalid pointer or NULL,
 or *buffer_size* is zero or greater than 64MB.
 
-**ZX_ERR_NO_MEMORY** the process does not have any memory at the
+**ZX_ERR_NOT_FOUND** the process does not have any memory at the
 requested address.
 
 **ZX_ERR_WRONG_TYPE**  *handle* is not a process handle.

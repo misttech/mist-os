@@ -53,7 +53,7 @@ bool check_pages_mapped(zx_handle_t process, uintptr_t base, uint64_t bitmap, si
 
   size_t i = 0;
   while (bitmap && i < page_count) {
-    zx_status_t expected = (bitmap & 1) ? ZX_OK : ZX_ERR_NO_MEMORY;
+    zx_status_t expected = (bitmap & 1) ? ZX_OK : ZX_ERR_NOT_FOUND;
     if (zx_process_read_memory(process, base + i * zx_system_get_page_size(), buf, 1, &len) !=
         expected) {
       return false;
@@ -392,7 +392,7 @@ TEST(Vmar, DestroyedVmarTest) {
     {
       uint8_t buf;
       size_t read;
-      EXPECT_EQ(zx_process_read_memory(process, map_addr[i], &buf, 1, &read), ZX_ERR_NO_MEMORY);
+      EXPECT_STATUS(zx_process_read_memory(process, map_addr[i], &buf, 1, &read), ZX_ERR_NOT_FOUND);
     }
 
     // All operations on region[0] and region[1] should fail with ZX_ERR_BAD_STATE
@@ -473,7 +473,7 @@ TEST(Vmar, MapOverDestroyedTest) {
   {
     uint8_t buf;
     size_t read;
-    EXPECT_EQ(zx_process_read_memory(process, map_addr, &buf, 1, &read), ZX_ERR_NO_MEMORY);
+    EXPECT_STATUS(zx_process_read_memory(process, map_addr, &buf, 1, &read), ZX_ERR_NOT_FOUND);
   }
 
   uintptr_t new_map_addr;
@@ -964,9 +964,9 @@ TEST(Vmar, UnalignedLenTest) {
   {
     uint8_t buf;
     size_t read;
-    EXPECT_EQ(
+    EXPECT_STATUS(
         zx_process_read_memory(process, map_addr + 3 * zx_system_get_page_size(), &buf, 1, &read),
-        ZX_ERR_NO_MEMORY);
+        ZX_ERR_NOT_FOUND);
   }
 
   EXPECT_EQ(zx_handle_close(vmo), ZX_OK);
@@ -1006,9 +1006,9 @@ TEST(Vmar, UnalignedLenMapTest) {
     {
       uint8_t buf;
       size_t read;
-      EXPECT_EQ(
+      EXPECT_STATUS(
           zx_process_read_memory(process, map_addr + 3 * zx_system_get_page_size(), &buf, 1, &read),
-          ZX_ERR_NO_MEMORY);
+          ZX_ERR_NOT_FOUND);
     }
   }
 
@@ -2192,9 +2192,9 @@ TEST(Vmar, PartialUnmapAndRead) {
   EXPECT_EQ(actual_read, zx_system_get_page_size());
 
   // Second page fails.
-  EXPECT_EQ(zx_process_read_memory(zx_process_self(), mapping_addr + zx_system_get_page_size(),
-                                   buffer, zx_system_get_page_size(), &actual_read),
-            ZX_ERR_NO_MEMORY);
+  EXPECT_STATUS(zx_process_read_memory(zx_process_self(), mapping_addr + zx_system_get_page_size(),
+                                       buffer, zx_system_get_page_size(), &actual_read),
+                ZX_ERR_NOT_FOUND);
 
   // Reading the whole region succeeds, but only reads the first page.
   EXPECT_EQ(zx_process_read_memory(zx_process_self(), mapping_addr, buffer,
@@ -2240,9 +2240,9 @@ TEST(Vmar, PartialUnmapAndWrite) {
   EXPECT_EQ(actual_written, zx_system_get_page_size());
 
   // Second page fails.
-  EXPECT_EQ(zx_process_write_memory(zx_process_self(), mapping_addr + zx_system_get_page_size(),
-                                    buffer, zx_system_get_page_size(), &actual_written),
-            ZX_ERR_NO_MEMORY);
+  EXPECT_STATUS(zx_process_write_memory(zx_process_self(), mapping_addr + zx_system_get_page_size(),
+                                        buffer, zx_system_get_page_size(), &actual_written),
+                ZX_ERR_NOT_FOUND);
 
   // Writing to the whole region succeeds, but only writes the first page.
   EXPECT_EQ(zx_process_write_memory(zx_process_self(), mapping_addr, buffer,
@@ -2297,12 +2297,12 @@ TEST(Vmar, PartialUnmapWithVmarOffset) {
             ZX_OK);
 
   // That reads and writes one past the end fail.
-  EXPECT_EQ(zx_process_write_memory(zx_process_self(), mapping_addr + kVmoSize - kOffset, buffer, 1,
-                                    &actual),
-            ZX_ERR_NO_MEMORY);
-  EXPECT_EQ(zx_process_read_memory(zx_process_self(), mapping_addr + kVmoSize - kOffset, buffer, 1,
-                                   &actual),
-            ZX_ERR_NO_MEMORY);
+  EXPECT_STATUS(zx_process_write_memory(zx_process_self(), mapping_addr + kVmoSize - kOffset,
+                                        buffer, 1, &actual),
+                ZX_ERR_NOT_FOUND);
+  EXPECT_STATUS(zx_process_read_memory(zx_process_self(), mapping_addr + kVmoSize - kOffset, buffer,
+                                       1, &actual),
+                ZX_ERR_NOT_FOUND);
 
   // And crossing the boundary works as expected.
   EXPECT_EQ(zx_process_write_memory(zx_process_self(), mapping_addr + kVmoSize - kOffset - 1,

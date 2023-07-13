@@ -206,7 +206,7 @@ TEST(TopByteIgnoreTests, VmarTaggedAddress) {
   ASSERT_STATUS(
       zx::process::self()->read_memory(AddTagIfNeeded(vmar_addr), AddTagIfNeeded(buf.get()),
                                        kVmoSize, AddTagIfNeeded(&actual)),
-      ZX_ERR_NO_MEMORY);
+      ZX_ERR_NOT_FOUND);
   ASSERT_OK(zx::process::self()->read_memory(vmar_addr, AddTagIfNeeded(buf.get()), kVmoSize,
                                              AddTagIfNeeded(&actual)));
   ASSERT_EQ(actual, kVmoSize);
@@ -218,7 +218,7 @@ TEST(TopByteIgnoreTests, VmarTaggedAddress) {
   // Now write via zx_process_write_memory...
   ASSERT_STATUS(zx::process::self()->write_memory(AddTagIfNeeded(vmar_addr), AddTagIfNeeded(buff),
                                                   kVmoSize, AddTagIfNeeded(&actual)),
-                ZX_ERR_NO_MEMORY);
+                ZX_ERR_NOT_FOUND);
   ASSERT_OK(zx::process::self()->write_memory(vmar_addr, AddTagIfNeeded(buff), kVmoSize,
                                               AddTagIfNeeded(&actual)));
   ASSERT_EQ(actual, kVmoSize);
