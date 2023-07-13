@@ -412,10 +412,10 @@ rustc_binary("carnelian_integration_test_bin") {
   ]
 }
 
-fuchsia_component("carnelian-integration-test-component") {
-  testonly = true
+fuchsia_test_component("carnelian-integration-test-component") {
   manifest = "meta/carnelian_integration_test.cml"
   deps = [ ":carnelian_integration_test_bin" ]
+  test_type = "system"
 }
 
 fuchsia_test_package("carnelian-integration-test") {
@@ -441,10 +441,10 @@ rustc_binary("carnelian_fb_integration_test_bin") {
   ]
 }
 
-fuchsia_component("carnelian-fb-integration-test-component") {
-  testonly = true
+fuchsia_test_component("carnelian-fb-integration-test-component") {
   manifest = "meta/carnelian_fb_integration_test.cml"
   deps = [ ":carnelian_fb_integration_test_bin" ]
+  test_type = "system"
 }
 
 fuchsia_test_package("carnelian-fb-integration-test") {
