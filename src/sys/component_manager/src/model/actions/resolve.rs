@@ -44,7 +44,7 @@ async fn do_resolve(component: &Arc<ComponentInstance>) -> Result<Component, Res
         let execution = component.lock_execution().await;
         if execution.is_shut_down() {
             return Err(ResolveActionError::InstanceShutDown {
-                moniker: component.abs_moniker.clone(),
+                moniker: component.moniker.clone(),
             });
         }
     }
@@ -61,7 +61,7 @@ async fn do_resolve(component: &Arc<ComponentInstance>) -> Result<Component, Res
                 InstanceState::Resolved(_) => false,
                 InstanceState::Destroyed => {
                     return Err(ResolveActionError::InstanceDestroyed {
-                        moniker: component.abs_moniker.clone(),
+                        moniker: component.moniker.clone(),
                     });
                 }
             }
@@ -71,7 +71,7 @@ async fn do_resolve(component: &Arc<ComponentInstance>) -> Result<Component, Res
             ComponentAddress::from(component_url, component).await.map_err(|err| {
                 ResolveActionError::ComponentAddressParseError {
                     url: component.component_url.clone(),
-                    moniker: component.abs_moniker.clone(),
+                    moniker: component.moniker.clone(),
                     err,
                 }
             })?;
@@ -82,7 +82,7 @@ async fn do_resolve(component: &Arc<ComponentInstance>) -> Result<Component, Res
         let component_info =
             Component::resolve_with_config(component_info, component.config_parent_overrides())?;
         let policy = component.context.abi_revision_policy();
-        policy.check_compatibility(&component.abs_moniker, component_info.abi_revision).map_err(
+        policy.check_compatibility(&component.moniker, component_info.abi_revision).map_err(
             |err| ResolveActionError::AbiCompatibilityError { url: component_url.clone(), err },
         )?;
         if first_resolve {
@@ -94,7 +94,7 @@ async fn do_resolve(component: &Arc<ComponentInstance>) -> Result<Component, Res
                     }
                     InstanceState::Destroyed => {
                         return Err(ResolveActionError::InstanceDestroyed {
-                            moniker: component.abs_moniker.clone(),
+                            moniker: component.moniker.clone(),
                         });
                     }
                     InstanceState::New | InstanceState::Unresolved => {}

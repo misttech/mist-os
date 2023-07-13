@@ -202,7 +202,7 @@ pub(super) async fn route_and_delete_storage(
 
     // As of today, the storage component instance must contain the target. This is because
     // it is impossible to expose storage declarations up.
-    let relative_moniker = InstancedMoniker::scope_down(
+    let moniker = InstancedMoniker::scope_down(
         &backing_dir_info.storage_source_moniker,
         &target.instanced_moniker(),
     )
@@ -210,7 +210,7 @@ pub(super) async fn route_and_delete_storage(
     storage::delete_isolated_storage(
         backing_dir_info,
         target.persistent_storage,
-        relative_moniker,
+        moniker,
         target.instance_id().as_ref(),
     )
     .await
@@ -256,7 +256,7 @@ pub async fn report_routing_failure(
                         "Optional {} `{}` was not available for target component `{}`: {}\n{}",
                         cap.type_name(),
                         cap.source_id(),
-                        &target.abs_moniker,
+                        &target.moniker,
                         &err_str,
                         ROUTE_ERROR_HELP
                     );
@@ -288,7 +288,7 @@ pub async fn report_routing_failure(
                         "Optional {} `{}` was not available for target component `{}`: {}\n{}",
                         cap.type_name(),
                         cap.source_id(),
-                        &target.abs_moniker,
+                        &target.moniker,
                         &err_str,
                         ROUTE_ERROR_HELP
                     );
@@ -299,7 +299,7 @@ pub async fn report_routing_failure(
                         "Required {} `{}` was not available for target component `{}`: {}\n{}",
                         cap.type_name(),
                         cap.source_id(),
-                        &target.abs_moniker,
+                        &target.moniker,
                         &err_str,
                         ROUTE_ERROR_HELP
                     );

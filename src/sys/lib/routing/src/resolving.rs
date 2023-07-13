@@ -195,7 +195,7 @@ async fn get_parent<C: ComponentInstanceInterface>(
         component.try_get_parent().map_err(|err| {
             ResolverError::no_parent_context(anyhow::format_err!(
                 "Component {} ({}) has no parent for context: {:?}.",
-                component.abs_moniker(),
+                component.moniker(),
                 component.url(),
                 err,
             ))
@@ -205,7 +205,7 @@ async fn get_parent<C: ComponentInstanceInterface>(
     } else {
         Err(ResolverError::no_parent_context(anyhow::format_err!(
             "Component {} ({}) has no parent for context.",
-            component.abs_moniker(),
+            component.moniker(),
             component.url(),
         )))
     }

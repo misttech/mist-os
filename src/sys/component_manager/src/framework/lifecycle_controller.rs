@@ -250,11 +250,9 @@ impl LifecycleController {
                 // Set the capability provider, if not already set.
                 let mut capability_provider = capability_provider.lock().await;
                 if capability_provider.is_none() {
-                    *capability_provider =
-                        Some(Box::new(LifecycleControllerCapabilityProvider::new(
-                            self,
-                            component.abs_moniker.clone(),
-                        )));
+                    *capability_provider = Some(Box::new(
+                        LifecycleControllerCapabilityProvider::new(self, component.moniker.clone()),
+                    ));
                 }
             }
         }
@@ -328,9 +326,8 @@ impl CapabilityProvider for LifecycleControllerCapabilityProvider {
 /// Takes the scoped component's moniker and a relative moniker string and joins them into an
 /// absolute moniker.
 fn join_monikers(scope_moniker: &Moniker, moniker_str: &str) -> Result<Moniker, MonikerError> {
-    let relative_moniker = Moniker::try_from(moniker_str)?;
-    let abs_moniker = scope_moniker.descendant(&relative_moniker);
-    Ok(abs_moniker)
+    let moniker = Moniker::try_from(moniker_str)?;
+    Ok(scope_moniker.descendant(&moniker))
 }
 
 #[cfg(test)]

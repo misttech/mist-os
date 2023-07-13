@@ -141,7 +141,7 @@ impl DirectoryReadyNotifier {
             Some(outgoing_dir)
         }
         .await
-        .ok_or_else(|| ModelError::open_directory_error(target.abs_moniker.clone(), "/"));
+        .ok_or_else(|| ModelError::open_directory_error(target.moniker.clone(), "/"));
 
         let mut events = Vec::new();
         for expose_decl in matching_exposes {
@@ -206,7 +206,7 @@ impl DirectoryReadyNotifier {
                     Ok(node) => return Ok(node),
                     Err(TryOpenError::Fidl(_)) | Err(TryOpenError::Enumerate(_)) => {
                         break Err(ModelError::open_directory_error(
-                            target.abs_moniker.clone(),
+                            target.moniker.clone(),
                             source_path.clone(),
                         ));
                     }
@@ -224,7 +224,7 @@ impl DirectoryReadyNotifier {
                             }
                         }
                         break Err(ModelError::open_directory_error(
-                            target.abs_moniker.clone(),
+                            target.moniker.clone(),
                             source_path.clone(),
                         ));
                     }

@@ -154,7 +154,7 @@ impl ModelBuilderForAnalyzer {
             }
             let child_moniker_str = child_moniker_str.unwrap();
 
-            let abs_moniker: Moniker = Moniker::parse(&moniker_vec)
+            let moniker: Moniker = Moniker::parse(&moniker_vec)
                 .expect("node path could not be converted back to absolute moniker");
             let child_moniker: ChildMoniker = ChildMoniker::parse(child_moniker_str)
                 .expect("node path part could not be converted back to child moniker");
@@ -169,13 +169,13 @@ impl ModelBuilderForAnalyzer {
                 continue;
             }
 
-            let children = dynamic_components.entry(abs_moniker.clone()).or_insert_with(|| vec![]);
+            let children = dynamic_components.entry(moniker.clone()).or_insert_with(|| vec![]);
             match Url::parse(&url.to_string()) {
                 Ok(url) => {
                     children.push(Child { child_moniker, url, environment });
                 }
                 Err(_) => {
-                    let node_path: NodePath = abs_moniker.into();
+                    let node_path: NodePath = moniker.into();
                     errors.push(
                         BuildAnalyzerModelError::MalformedUrl(
                             url.to_string(),
@@ -281,7 +281,7 @@ impl ModelBuilderForAnalyzer {
 
                     model
                         .instances
-                        .insert(NodePath::from(root_instance.abs_moniker().clone()), root_instance);
+                        .insert(NodePath::from(root_instance.moniker().clone()), root_instance);
 
                     result.model = Some(Arc::new(model));
                 }
@@ -323,7 +323,7 @@ impl ModelBuilderForAnalyzer {
                 }
             }
         }
-        if let Some(dynamic_children) = dynamic_components.get(instance.abs_moniker()) {
+        if let Some(dynamic_children) = dynamic_components.get(instance.moniker()) {
             children.append(
                 &mut dynamic_children
                     .into_iter()
@@ -339,7 +339,7 @@ impl ModelBuilderForAnalyzer {
                     if child.child_moniker.name().is_empty() {
                         result.errors.push(anyhow!(BuildAnalyzerModelError::InvalidChildDecl(
                             absolute_url.to_string(),
-                            NodePath::from(instance.abs_moniker().clone()).to_string(),
+                            NodePath::from(instance.moniker().clone()).to_string(),
                         )));
                         continue;
                     }
@@ -375,7 +375,7 @@ impl ModelBuilderForAnalyzer {
                                     );
 
                                     model.instances.insert(
-                                        NodePath::from(child_instance.abs_moniker().clone()),
+                                        NodePath::from(child_instance.moniker().clone()),
                                         child_instance,
                                     );
                                 }
@@ -388,7 +388,7 @@ impl ModelBuilderForAnalyzer {
                             result.errors.push(anyhow!(
                                 BuildAnalyzerModelError::ComponentDeclNotFound(
                                     absolute_url.to_string(),
-                                    NodePath::from(instance.abs_moniker().clone()).to_string(),
+                                    NodePath::from(instance.moniker().clone()).to_string(),
                                 )
                             ));
                         }
@@ -580,7 +580,7 @@ impl ComponentModelForAnalyzer {
         offer_decl: &OfferDecl,
         target: &Arc<ComponentInstanceForAnalyzer>,
     ) -> Vec<VerifyRouteResult> {
-        let target_moniker = target.abs_moniker();
+        let target_moniker = target.moniker();
 
         let offer_target = offer_decl.target();
         let should_check_offer = match offer_target {
@@ -1107,7 +1107,7 @@ impl ComponentModelForAnalyzer {
         match component.decl.program {
             Some(_) => Ok(()),
             None => Err(AnalyzerModelError::SourceInstanceNotExecutable(
-                component.abs_moniker().to_string(),
+                component.moniker().to_string(),
             )),
         }
     }
@@ -1286,12 +1286,12 @@ mod tests {
             .to_string()
         );
 
-        // Include tests for `.instanced_moniker()` alongside `.abs_moniker()`
+        // Include tests for `.instanced_moniker()` alongside `.moniker()`
         // until`.instanced_moniker()` is removed from the public API.
-        assert_eq!(root_instance.abs_moniker(), &Moniker::root());
+        assert_eq!(root_instance.moniker(), &Moniker::root());
         assert_eq!(root_instance.instanced_moniker(), &InstancedMoniker::root());
 
-        assert_eq!(child_instance.abs_moniker(), &Moniker::parse_str("/child").unwrap());
+        assert_eq!(child_instance.moniker(), &Moniker::parse_str("/child").unwrap());
         assert_eq!(
             child_instance.instanced_moniker(),
             &InstancedMoniker::parse_str("/child:0").unwrap()
@@ -1303,7 +1303,7 @@ mod tests {
         }
         match child_instance.try_get_parent()? {
             ExtendedInstanceInterface::Component(component) => {
-                assert_eq!(component.abs_moniker(), root_instance.abs_moniker());
+                assert_eq!(component.moniker(), root_instance.moniker());
                 assert_eq!(component.instanced_moniker(), root_instance.instanced_moniker())
             }
             _ => panic!("child instance's parent should be root component"),
@@ -1313,7 +1313,7 @@ mod tests {
             .resolve()
             .map(|locked| locked.get_child(&ChildMoniker::try_new("child", None).unwrap()))?;
         assert!(get_child.is_some());
-        assert_eq!(get_child.as_ref().unwrap().abs_moniker(), child_instance.abs_moniker());
+        assert_eq!(get_child.as_ref().unwrap().moniker(), child_instance.moniker());
         assert_eq!(get_child.unwrap().instanced_moniker(), child_instance.instanced_moniker());
 
         let root_environment = root_instance.environment();
@@ -1328,7 +1328,7 @@ mod tests {
         assert_eq!(child_environment.name(), None);
         match child_environment.parent() {
             WeakExtendedInstanceInterface::Component(component) => {
-                assert_eq!(component.upgrade()?.abs_moniker(), root_instance.abs_moniker());
+                assert_eq!(component.upgrade()?.moniker(), root_instance.moniker());
                 assert_eq!(
                     component.upgrade()?.instanced_moniker(),
                     root_instance.instanced_moniker()
@@ -1527,7 +1527,7 @@ mod tests {
         let (child_runner_registrar, child_runner) = get_child_runner_result.unwrap();
         match child_runner_registrar {
             ExtendedInstanceInterface::Component(instance) => {
-                assert_eq!(instance.abs_moniker(), &Moniker::root());
+                assert_eq!(instance.moniker(), &Moniker::root());
             }
             ExtendedInstanceInterface::AboveRoot(_) => {
                 panic!("expected child_env_runner to be registered by the root instance")
@@ -1542,7 +1542,7 @@ mod tests {
         let (child_resolver_registrar, child_resolver) = get_child_resolver_result.unwrap();
         match child_resolver_registrar {
             ExtendedInstanceInterface::Component(instance) => {
-                assert_eq!(instance.abs_moniker(), &Moniker::root());
+                assert_eq!(instance.moniker(), &Moniker::root());
             }
             ExtendedInstanceInterface::AboveRoot(_) => {
                 panic!("expected child_env_resolver to be registered by the root instance")

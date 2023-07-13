@@ -280,7 +280,7 @@ struct ShutdownInfo {
 
 impl fmt::Debug for ShutdownInfo {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{{server: {{{:?}}}, ", self.component.abs_moniker.to_string())?;
+        write!(f, "{{server: {{{:?}}}, ", self.component.moniker.to_string())?;
         write!(f, "clients: [")?;
         for dep in &self.dependents {
             write!(f, "{{{:?}}}, ", dep)?;
@@ -2749,7 +2749,7 @@ mod tests {
         // Start the component. This should cause the component to have an `Execution`.
         let component = test.look_up(vec!["a"].try_into().unwrap()).await;
         test.model
-            .start_instance(&component.abs_moniker, &StartReason::Eager)
+            .start_instance(&component.moniker, &StartReason::Eager)
             .await
             .expect("could not start a");
         assert!(is_executing(&component).await);
@@ -2764,7 +2764,7 @@ mod tests {
 
         // Trying to start the component should fail because it's shut down.
         test.model
-            .start_instance(&a_info.component.abs_moniker, &StartReason::Eager)
+            .start_instance(&a_info.component.moniker, &StartReason::Eager)
             .await
             .expect_err("successfully bound to a after shutdown");
 
@@ -2803,19 +2803,19 @@ mod tests {
         let component_b = test.look_up(vec!["container", "coll:b"].try_into().unwrap()).await;
         let component_c = test.look_up(vec!["container", "c"].try_into().unwrap()).await;
         test.model
-            .start_instance(&component_container.abs_moniker, &StartReason::Eager)
+            .start_instance(&component_container.moniker, &StartReason::Eager)
             .await
             .expect("could not start container");
         test.model
-            .start_instance(&component_a.abs_moniker, &StartReason::Eager)
+            .start_instance(&component_a.moniker, &StartReason::Eager)
             .await
             .expect("could not start coll:a");
         test.model
-            .start_instance(&component_b.abs_moniker, &StartReason::Eager)
+            .start_instance(&component_b.moniker, &StartReason::Eager)
             .await
             .expect("could not start coll:b");
         test.model
-            .start_instance(&component_c.abs_moniker, &StartReason::Eager)
+            .start_instance(&component_c.moniker, &StartReason::Eager)
             .await
             .expect("could not start c");
         assert!(is_executing(&component_container).await);
@@ -2932,19 +2932,19 @@ mod tests {
         let component_b = test.look_up(vec!["container", "coll:b"].try_into().unwrap()).await;
         let component_c = test.look_up(vec!["container", "c"].try_into().unwrap()).await;
         test.model
-            .start_instance(&component_container.abs_moniker, &StartReason::Eager)
+            .start_instance(&component_container.moniker, &StartReason::Eager)
             .await
             .expect("could not start container");
         test.model
-            .start_instance(&component_a.abs_moniker, &StartReason::Eager)
+            .start_instance(&component_a.moniker, &StartReason::Eager)
             .await
             .expect("could not start coll:a");
         test.model
-            .start_instance(&component_b.abs_moniker, &StartReason::Eager)
+            .start_instance(&component_b.moniker, &StartReason::Eager)
             .await
             .expect("could not start coll:b");
         test.model
-            .start_instance(&component_c.abs_moniker, &StartReason::Eager)
+            .start_instance(&component_c.moniker, &StartReason::Eager)
             .await
             .expect("could not start c");
         assert!(is_executing(&component_container).await);
@@ -3059,7 +3059,7 @@ mod tests {
         let test = ActionsTest::new("root", components, None).await;
         let component_a = test.look_up(vec!["a"].try_into().unwrap()).await;
         test.model
-            .start_instance(&component_a.abs_moniker, &StartReason::Eager)
+            .start_instance(&component_a.moniker, &StartReason::Eager)
             .await
             .expect("could not start a");
         assert!(is_executing(&component_a).await);
@@ -3121,7 +3121,7 @@ mod tests {
 
         // Component startup was eager, so they should all have an `Execution`.
         test.model
-            .start_instance(&component_a.abs_moniker, &StartReason::Eager)
+            .start_instance(&component_a.moniker, &StartReason::Eager)
             .await
             .expect("could not start a");
         assert!(is_executing(&component_a).await);
@@ -3256,7 +3256,7 @@ mod tests {
 
         // Component startup was eager, so they should all have an `Execution`.
         test.model
-            .start_instance(&component_a.abs_moniker, &StartReason::Eager)
+            .start_instance(&component_a.moniker, &StartReason::Eager)
             .await
             .expect("could not start a");
         assert!(is_executing(&component_a).await);
@@ -3443,7 +3443,7 @@ mod tests {
 
         // Component startup was eager, so they should all have an `Execution`.
         test.model
-            .start_instance(&component_a.abs_moniker, &StartReason::Eager)
+            .start_instance(&component_a.moniker, &StartReason::Eager)
             .await
             .expect("could not start a");
         assert!(is_executing(&component_a).await);
@@ -3667,7 +3667,7 @@ mod tests {
 
         // Component startup was eager, so they should all have an `Execution`.
         test.model
-            .start_instance(&component_a.abs_moniker, &StartReason::Eager)
+            .start_instance(&component_a.moniker, &StartReason::Eager)
             .await
             .expect("could not start a");
         assert!(is_executing(&component_a).await);
@@ -3807,7 +3807,7 @@ mod tests {
 
         // Component startup was eager, so they should all have an `Execution`.
         test.model
-            .start_instance(&component_a.abs_moniker, &StartReason::Eager)
+            .start_instance(&component_a.moniker, &StartReason::Eager)
             .await
             .expect("could not start a");
 
@@ -3894,7 +3894,7 @@ mod tests {
 
         // Component startup was eager, so they should all have an `Execution`.
         test.model
-            .start_instance(&component_a.abs_moniker, &StartReason::Eager)
+            .start_instance(&component_a.moniker, &StartReason::Eager)
             .await
             .expect("could not start a");
 
@@ -4008,7 +4008,7 @@ mod tests {
 
         // Component startup was eager, so they should all have an `Execution`.
         test.model
-            .start_instance(&component_a.abs_moniker, &StartReason::Eager)
+            .start_instance(&component_a.moniker, &StartReason::Eager)
             .await
             .expect("could not start a");
 
@@ -4092,7 +4092,7 @@ mod tests {
 
         // Component startup was eager, so they should all have an `Execution`.
         test.model
-            .start_instance(&component_a.abs_moniker, &StartReason::Eager)
+            .start_instance(&component_a.moniker, &StartReason::Eager)
             .await
             .expect("could not start a");
 
@@ -4157,15 +4157,15 @@ mod tests {
 
         // Start second `b`.
         test.model
-            .start_instance(&component_a.abs_moniker, &StartReason::Eager)
+            .start_instance(&component_a.moniker, &StartReason::Eager)
             .await
             .expect("could not start b2");
         test.model
-            .start_instance(&component_b.abs_moniker, &StartReason::Eager)
+            .start_instance(&component_b.moniker, &StartReason::Eager)
             .await
             .expect("could not start b2");
         test.model
-            .start_instance(&component_b2.abs_moniker, &StartReason::Eager)
+            .start_instance(&component_b2.moniker, &StartReason::Eager)
             .await
             .expect("could not start b2");
         assert!(is_executing(&component_a).await);
@@ -4230,7 +4230,7 @@ mod tests {
 
         // Component startup was eager, so they should all have an `Execution`.
         test.model
-            .start_instance(&component_a.abs_moniker, &StartReason::Eager)
+            .start_instance(&component_a.moniker, &StartReason::Eager)
             .await
             .expect("could not start a");
         assert!(is_executing(&component_a).await);

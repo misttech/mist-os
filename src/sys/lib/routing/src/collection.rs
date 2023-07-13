@@ -118,7 +118,7 @@ where
         {
             return Err(RoutingError::UnexpectedChildInAggregate {
                 child_moniker: instance.clone(),
-                moniker: self.collection_component.abs_moniker.clone(),
+                moniker: self.collection_component.moniker.clone(),
                 capability: self.capability_name.clone(),
             });
         }
@@ -133,7 +133,7 @@ where
                 .find(|child| child.0.name() == instance.name())
                 .ok_or_else(|| RoutingError::OfferFromChildInstanceNotFound {
                     child_moniker: instance.clone(),
-                    moniker: collection_component.abs_moniker().clone(),
+                    moniker: collection_component.moniker().clone(),
                     capability_id: self.capability_name.clone().into(),
                 })?
         };
@@ -142,7 +142,7 @@ where
         let child_exposes = router::find_matching_exposes(&self.capability_name, &child_exposes)
             .ok_or_else(|| {
                 E::error_not_found_in_child(
-                    collection_component.abs_moniker().clone(),
+                    collection_component.moniker().clone(),
                     child_moniker,
                     self.capability_name.clone(),
                 )

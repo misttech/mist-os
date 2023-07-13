@@ -141,14 +141,11 @@ pub async fn list_files(
 
     let mut output_vec = vec![];
 
-    for moniker in &monikers {
-        let relative_moniker = moniker.as_str().try_into().unwrap();
-        let result = open_instance_dir_root_readable(
-            &relative_moniker,
-            OpenDirType::Outgoing,
-            &realm_query_proxy,
-        )
-        .await;
+    for moniker_string in &monikers {
+        let moniker = moniker_string.as_str().try_into().unwrap();
+        let result =
+            open_instance_dir_root_readable(&moniker, OpenDirType::Outgoing, &realm_query_proxy)
+                .await;
 
         let out_dir_proxy = match result {
             Ok(out_dir_proxy) => out_dir_proxy,
@@ -174,7 +171,7 @@ pub async fn list_files(
         files.sort();
 
         if files.len() > 0 {
-            output_vec.push(ListFilesResultItem { moniker: normalize_moniker(moniker), files })
+            output_vec.push(ListFilesResultItem { moniker: moniker.to_string(), files })
         }
     }
 

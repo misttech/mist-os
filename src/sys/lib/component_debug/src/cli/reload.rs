@@ -26,21 +26,21 @@ pub async fn reload_cmd<W: std::io::Write>(
 
     // Convert the absolute moniker into a relative moniker w.r.t. root.
     // LifecycleController expects relative monikers only.
-    let relative_moniker = Moniker::scope_down(&Moniker::root(), &moniker).unwrap();
+    let moniker = Moniker::scope_down(&Moniker::root(), &moniker).unwrap();
 
-    unresolve_instance(&lifecycle_controller, &relative_moniker)
+    unresolve_instance(&lifecycle_controller, &moniker)
         .await
         .map_err(|e| format_action_error(&moniker, e))?;
 
     writeln!(writer, "Resolving component instance...")?;
 
-    resolve_instance(&lifecycle_controller, &relative_moniker)
+    resolve_instance(&lifecycle_controller, &moniker)
         .await
         .map_err(|e| format_resolve_error(&moniker, e))?;
 
     writeln!(writer, "Starting component instance...")?;
 
-    start_instance(&lifecycle_controller, &relative_moniker)
+    start_instance(&lifecycle_controller, &moniker)
         .await
         .map_err(|e| format_start_error(&moniker, e))?;
 

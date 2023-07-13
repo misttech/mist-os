@@ -416,7 +416,7 @@ mod tests {
         let registered_runner =
             component.environment.get_registered_runner(&"test".parse().unwrap()).unwrap();
         assert_matches!(registered_runner, Some((ExtendedInstance::Component(c), r))
-            if r == runner_reg && c.abs_moniker == Moniker::root());
+            if r == runner_reg && c.moniker == Moniker::root());
         assert_matches!(
             component.environment.get_registered_runner(&"foo".parse().unwrap()),
             Ok(None)
@@ -425,7 +425,7 @@ mod tests {
         let debug_capability =
             component.environment.get_debug_capability(&"target_name".parse().unwrap()).unwrap();
         assert_matches!(debug_capability, Some((ExtendedInstance::Component(c), Some(_), d))
-            if d == debug_reg && c.abs_moniker == Moniker::root());
+            if d == debug_reg && c.moniker == Moniker::root());
         assert_matches!(
             component.environment.get_debug_capability(&"foo".parse().unwrap()),
             Ok(None)
@@ -532,7 +532,7 @@ mod tests {
         let registered_runner =
             component.environment.get_registered_runner(&"test".parse().unwrap()).unwrap();
         assert_matches!(registered_runner, Some((ExtendedInstance::Component(c), r))
-            if r == runner_reg && c.abs_moniker == Moniker::root());
+            if r == runner_reg && c.moniker == Moniker::root());
         assert_matches!(
             component.environment.get_registered_runner(&"foo".parse().unwrap()),
             Ok(None)
@@ -541,7 +541,7 @@ mod tests {
         let debug_capability =
             component.environment.get_debug_capability(&"target_name".parse().unwrap()).unwrap();
         assert_matches!(debug_capability, Some((ExtendedInstance::Component(c), Some(n), d))
-            if d == debug_reg && n == "env_a" && c.abs_moniker == Moniker::root());
+            if d == debug_reg && n == "env_a" && c.moniker == Moniker::root());
         assert_matches!(
             component.environment.get_debug_capability(&"foo".parse().unwrap()),
             Ok(None)

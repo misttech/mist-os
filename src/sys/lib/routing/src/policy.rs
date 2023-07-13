@@ -93,9 +93,7 @@ impl GlobalPolicyChecker {
             CapabilitySource::Component { capability, component }
             | CapabilitySource::FilteredService { capability, component, .. } => {
                 CapabilityAllowlistKey {
-                    source_moniker: ExtendedMoniker::ComponentInstance(
-                        component.abs_moniker.clone(),
-                    ),
+                    source_moniker: ExtendedMoniker::ComponentInstance(component.moniker.clone()),
                     source_name: capability
                         .source_name()
                         .ok_or(PolicyError::InvalidCapabilitySource)?
@@ -111,16 +109,14 @@ impl GlobalPolicyChecker {
                 capability: capability.type_name(),
             },
             CapabilitySource::Framework { capability, component } => CapabilityAllowlistKey {
-                source_moniker: ExtendedMoniker::ComponentInstance(component.abs_moniker.clone()),
+                source_moniker: ExtendedMoniker::ComponentInstance(component.moniker.clone()),
                 source_name: capability.source_name().clone(),
                 source: CapabilityAllowlistSource::Framework,
                 capability: capability.type_name(),
             },
             CapabilitySource::Capability { source_capability, component } => {
                 CapabilityAllowlistKey {
-                    source_moniker: ExtendedMoniker::ComponentInstance(
-                        component.abs_moniker.clone(),
-                    ),
+                    source_moniker: ExtendedMoniker::ComponentInstance(component.moniker.clone()),
                     source_name: source_capability
                         .source_name()
                         .ok_or(PolicyError::InvalidCapabilitySource)?
@@ -132,9 +128,7 @@ impl GlobalPolicyChecker {
             CapabilitySource::CollectionAggregate { capability, component, .. }
             | CapabilitySource::OfferAggregate { capability, component, .. } => {
                 CapabilityAllowlistKey {
-                    source_moniker: ExtendedMoniker::ComponentInstance(
-                        component.abs_moniker.clone(),
-                    ),
+                    source_moniker: ExtendedMoniker::ComponentInstance(component.moniker.clone()),
                     source_name: capability.source_name().clone(),
                     source: CapabilityAllowlistSource::Self_,
                     capability: capability.type_name(),

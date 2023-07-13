@@ -343,7 +343,7 @@ pub struct ComponentInstance {
     /// The instanced absolute moniker of this instance.
     instanced_moniker: InstancedMoniker,
     /// The partial absolute moniker of this instance.
-    pub abs_moniker: Moniker,
+    pub moniker: Moniker,
     /// The hooks scoped to this instance.
     pub hooks: Arc<Hooks>,
     /// Whether to persist isolated storage data of this component instance after it has been
@@ -407,11 +407,11 @@ impl ComponentInstance {
         hooks: Arc<Hooks>,
         persistent_storage: bool,
     ) -> Arc<Self> {
-        let abs_moniker = instanced_moniker.without_instance_ids();
+        let moniker = instanced_moniker.without_instance_ids();
         Arc::new(Self {
             environment,
             instanced_moniker,
-            abs_moniker,
+            moniker,
             component_url,
             startup,
             on_terminate,
@@ -477,7 +477,7 @@ impl ComponentInstance {
                 }
                 InstanceState::Destroyed => {
                     return Err(ResolveActionError::InstanceDestroyed {
-                        moniker: self.abs_moniker.clone(),
+                        moniker: self.moniker.clone(),
                     });
                 }
                 InstanceState::New | InstanceState::Unresolved => {}
@@ -487,9 +487,7 @@ impl ComponentInstance {
         self.resolve().await?;
         let state = self.state.lock().await;
         if let InstanceState::Destroyed = *state {
-            return Err(ResolveActionError::InstanceDestroyed {
-                moniker: self.abs_moniker.clone(),
-            });
+            return Err(ResolveActionError::InstanceDestroyed { moniker: self.moniker.clone() });
         }
         Ok(MutexGuard::map(state, get_resolved))
     }
@@ -519,7 +517,7 @@ impl ComponentInstance {
                 InstanceState::Resolved(ref s) => s.decl.get_runner().cloned(),
                 InstanceState::Destroyed => {
                     return Err(StartActionError::InstanceDestroyed {
-                        moniker: self.abs_moniker.clone(),
+                        moniker: self.moniker.clone(),
                     });
                 }
                 _ => {
@@ -543,7 +541,7 @@ impl ComponentInstance {
                 .await
                 .map_err(|err| StartActionError::ResolveRunnerError {
                     err: Box::new(err),
-                    moniker: self.abs_moniker.clone(),
+                    moniker: self.moniker.clone(),
                     runner,
                 })?;
 
@@ -627,14 +625,14 @@ impl ComponentInstance {
                 InstanceState::Resolved(ref s) => s,
                 _ => {
                     return Err(DestroyActionError::InstanceNotResolved {
-                        moniker: self.abs_moniker.clone(),
+                        moniker: self.moniker.clone(),
                     })
                 }
             };
             if let Some(c) = state.get_child(&child_moniker) {
                 c.incarnation_id()
             } else {
-                let moniker = self.abs_moniker.child(child_moniker.clone());
+                let moniker = self.moniker.child(child_moniker.clone());
                 return Err(DestroyActionError::InstanceNotFound { moniker });
             }
         };
@@ -694,7 +692,7 @@ impl ComponentInstance {
                     {
                         warn!(
                             "component {} did not stop in {:?}. Killed it.",
-                            self.abs_moniker,
+                            self.moniker,
                             self.environment.stop_timeout()
                         );
                     }
@@ -702,7 +700,7 @@ impl ComponentInstance {
                         warn!(
                             "Component with on_terminate=REBOOT terminated: {}. \
                             Rebooting the system",
-                            self.abs_moniker
+                            self.moniker
                         );
                         let top_instance = self
                             .top_instance()
@@ -798,7 +796,7 @@ impl ComponentInstance {
                     )
                     .await
                     {
-                        let moniker = component.abs_moniker.child(child_moniker);
+                        let moniker = component.moniker.child(child_moniker);
                         warn!(
                             %moniker,
                             %error,
@@ -843,7 +841,7 @@ impl ComponentInstance {
                         // be worse to not continue with destroying this instance. Log the error,
                         // and proceed.
                         warn!(
-                            component=%self.abs_moniker, %error,
+                            component=%self.moniker, %error,
                             "failed to delete storage during instance destruction, proceeding with destruction anyway",
                         );
                     }
@@ -938,7 +936,7 @@ impl ComponentInstance {
         {
             let state = self.lock_state().await;
             let execution = self.lock_execution().await;
-            if let Some(res) = start::should_return_early(&state, &execution, &self.abs_moniker) {
+            if let Some(res) = start::should_return_early(&state, &execution, &self.moniker) {
                 return res;
             }
         }
@@ -965,7 +963,7 @@ impl ComponentInstance {
                     .collect(),
                 InstanceState::Destroyed => {
                     return Err(StartActionError::InstanceDestroyed {
-                        moniker: self.abs_moniker.clone(),
+                        moniker: self.moniker.clone(),
                     });
                 }
                 InstanceState::New | InstanceState::Unresolved => {
@@ -976,7 +974,7 @@ impl ComponentInstance {
         Self::start_eager_children_recursive(eager_children).await.or_else(|e| match e {
             StartActionError::InstanceShutDown { .. } => Ok(()),
             _ => Err(StartActionError::EagerStartError {
-                moniker: self.abs_moniker.clone(),
+                moniker: self.moniker.clone(),
                 err: Box::new(e),
             }),
         })?;
@@ -1013,7 +1011,7 @@ impl ComponentInstance {
     }
 
     pub fn instance_id(self: &Arc<Self>) -> Option<ComponentInstanceId> {
-        self.context.component_id_index().look_up_moniker(&self.abs_moniker).cloned()
+        self.context.component_id_index().look_up_moniker(&self.moniker).cloned()
     }
 
     /// Run the provided closure with this component's logger (if any) as the default. If the
@@ -1090,12 +1088,12 @@ impl ComponentInstanceInterface for ComponentInstance {
         &self.instanced_moniker
     }
 
-    fn abs_moniker(&self) -> &Moniker {
-        &self.abs_moniker
+    fn moniker(&self) -> &Moniker {
+        &self.moniker
     }
 
     fn child_moniker(&self) -> Option<&ChildMoniker> {
-        self.abs_moniker.leaf()
+        self.moniker.leaf()
     }
 
     fn url(&self) -> &str {
@@ -1128,10 +1126,7 @@ impl ComponentInstanceInterface for ComponentInstance {
     {
         Ok(Box::new(ComponentInstance::lock_resolved_state(self).await.map_err(|err| {
             let err: anyhow::Error = err.into();
-            ComponentInstanceError::ResolveFailed {
-                moniker: self.abs_moniker.clone(),
-                err: err.into(),
-            }
+            ComponentInstanceError::ResolveFailed { moniker: self.moniker.clone(), err: err.into() }
         })?))
     }
 }
@@ -1141,7 +1136,7 @@ impl std::fmt::Debug for ComponentInstance {
         f.debug_struct("ComponentInstance")
             .field("component_url", &self.component_url)
             .field("startup", &self.startup)
-            .field("abs_moniker", &self.instanced_moniker)
+            .field("moniker", &self.instanced_moniker)
             .finish()
     }
 }
@@ -1555,7 +1550,7 @@ impl ResolvedInstanceState {
             ChildMoniker::try_new(child.name.as_str(), collection.map(|c| c.name.as_str()))?;
         if self.get_child(&child_moniker).is_some() {
             return Err(AddChildError::InstanceAlreadyExists {
-                moniker: component.abs_moniker().clone(),
+                moniker: component.moniker().clone(),
                 child: child_moniker,
             });
         }

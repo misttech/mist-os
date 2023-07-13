@@ -129,26 +129,25 @@ impl RouteMapper {
 }
 
 impl DebugRouteMapper for RouteMapper {
-    fn add_use(&mut self, abs_moniker: Moniker, use_decl: UseDecl) {
-        self.route.push(RouteSegment::UseBy { moniker: abs_moniker, capability: use_decl })
+    fn add_use(&mut self, moniker: Moniker, use_decl: UseDecl) {
+        self.route.push(RouteSegment::UseBy { moniker: moniker, capability: use_decl })
     }
 
-    fn add_offer(&mut self, abs_moniker: Moniker, offer_decl: OfferDecl) {
-        self.route.push(RouteSegment::OfferBy { moniker: abs_moniker, capability: offer_decl })
+    fn add_offer(&mut self, moniker: Moniker, offer_decl: OfferDecl) {
+        self.route.push(RouteSegment::OfferBy { moniker: moniker, capability: offer_decl })
     }
 
-    fn add_expose(&mut self, abs_moniker: Moniker, expose_decl: ExposeDecl) {
-        self.route.push(RouteSegment::ExposeBy { moniker: abs_moniker, capability: expose_decl })
+    fn add_expose(&mut self, moniker: Moniker, expose_decl: ExposeDecl) {
+        self.route.push(RouteSegment::ExposeBy { moniker: moniker, capability: expose_decl })
     }
 
-    fn add_registration(&mut self, abs_moniker: Moniker, registration_decl: RegistrationDecl) {
+    fn add_registration(&mut self, moniker: Moniker, registration_decl: RegistrationDecl) {
         self.route
-            .push(RouteSegment::RegisterBy { moniker: abs_moniker, capability: registration_decl })
+            .push(RouteSegment::RegisterBy { moniker: moniker, capability: registration_decl })
     }
 
-    fn add_component_capability(&mut self, abs_moniker: Moniker, capability_decl: CapabilityDecl) {
-        self.route
-            .push(RouteSegment::DeclareBy { moniker: abs_moniker, capability: capability_decl })
+    fn add_component_capability(&mut self, moniker: Moniker, capability_decl: CapabilityDecl) {
+        self.route.push(RouteSegment::DeclareBy { moniker: moniker, capability: capability_decl })
     }
 
     fn add_framework_capability(&mut self, capability_name: Name) {
@@ -172,19 +171,19 @@ impl DebugRouteMapper for NoopRouteMapper {}
 /// Provides methods to record and retrieve a summary of a capability route.
 pub trait DebugRouteMapper: Send + Sync + Clone {
     #[allow(unused_variables)]
-    fn add_use(&mut self, abs_moniker: Moniker, use_decl: UseDecl) {}
+    fn add_use(&mut self, moniker: Moniker, use_decl: UseDecl) {}
 
     #[allow(unused_variables)]
-    fn add_offer(&mut self, abs_moniker: Moniker, offer_decl: OfferDecl) {}
+    fn add_offer(&mut self, moniker: Moniker, offer_decl: OfferDecl) {}
 
     #[allow(unused_variables)]
-    fn add_expose(&mut self, abs_moniker: Moniker, expose_decl: ExposeDecl) {}
+    fn add_expose(&mut self, moniker: Moniker, expose_decl: ExposeDecl) {}
 
     #[allow(unused_variables)]
-    fn add_registration(&mut self, abs_moniker: Moniker, registration_decl: RegistrationDecl) {}
+    fn add_registration(&mut self, moniker: Moniker, registration_decl: RegistrationDecl) {}
 
     #[allow(unused_variables)]
-    fn add_component_capability(&mut self, abs_moniker: Moniker, capability_decl: CapabilityDecl) {}
+    fn add_component_capability(&mut self, moniker: Moniker, capability_decl: CapabilityDecl) {}
 
     #[allow(unused_variables)]
     fn add_framework_capability(&mut self, capability_name: Name) {}

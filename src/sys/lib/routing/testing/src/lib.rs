@@ -182,13 +182,13 @@ impl CheckUse {
 // This function should reproduce the logic of `crate::storage::generate_storage_path`.
 pub fn generate_storage_path(
     subdir: Option<String>,
-    relative_moniker: &InstancedMoniker,
+    moniker: &InstancedMoniker,
     instance_id: Option<&ComponentInstanceId>,
 ) -> PathBuf {
     if let Some(id) = instance_id {
         return id.into();
     }
-    let mut path = relative_moniker.path().iter();
+    let mut path = moniker.path().iter();
     let mut dir_path = vec![];
     if let Some(subdir) = subdir {
         dir_path.push(subdir);
@@ -1866,7 +1866,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                         component,
                     },
                 relative_path,
-            }) if protocol_decl == expected_protocol_decl && component.abs_moniker == expected_source_moniker && relative_path == PathBuf::new()
+            }) if protocol_decl == expected_protocol_decl && component.moniker == expected_source_moniker && relative_path == PathBuf::new()
         );
     }
 
@@ -5244,7 +5244,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                     capability_name,
                 }
             )
-                if moniker == *b_component.abs_moniker() &&
+                if moniker == *b_component.moniker() &&
                 capability_type == "runner" &&
                 capability_name == "hobbit"
         );
@@ -5438,7 +5438,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                     capability_name,
                 }
             )
-                if moniker == *a_component.abs_moniker()
+                if moniker == *a_component.moniker()
                 && capability_type == "runner".to_string()
                 && capability_name == "hobbit"
         );

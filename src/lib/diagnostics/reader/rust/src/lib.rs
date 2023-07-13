@@ -65,17 +65,17 @@ pub enum Error {
 
 /// An inspect tree selector for a component.
 pub struct ComponentSelector {
-    relative_moniker: Vec<String>,
+    moniker: Vec<String>,
     tree_selectors: Vec<String>,
 }
 
 impl ComponentSelector {
     /// Create a new component event selector.
     /// By default it will select the whole tree unless tree selectors are provided.
-    /// `relative_moniker` is the realm path relative to the realm of the running component plus the
+    /// `moniker` is the realm path relative to the realm of the running component plus the
     /// component name. For example: [a, b, component].
-    pub fn new(relative_moniker: Vec<String>) -> Self {
-        Self { relative_moniker, tree_selectors: Vec::new() }
+    pub fn new(moniker: Vec<String>) -> Self {
+        Self { moniker, tree_selectors: Vec::new() }
     }
 
     /// Select a section of the inspect tree.
@@ -84,8 +84,8 @@ impl ComponentSelector {
         self
     }
 
-    fn relative_moniker_str(&self) -> String {
-        self.relative_moniker.join("/")
+    fn moniker_str(&self) -> String {
+        self.moniker.join("/")
     }
 }
 
@@ -107,12 +107,12 @@ impl ToSelectorArguments for &str {
 
 impl ToSelectorArguments for ComponentSelector {
     fn to_selector_arguments(self) -> Vec<String> {
-        let relative_moniker = self.relative_moniker_str();
+        let moniker = self.moniker_str();
         // If not tree selectors were provided, select the full tree.
         if self.tree_selectors.is_empty() {
-            vec![format!("{}:root", relative_moniker)]
+            vec![format!("{}:root", moniker)]
         } else {
-            self.tree_selectors.iter().map(|s| format!("{}:{}", relative_moniker, s)).collect()
+            self.tree_selectors.iter().map(|s| format!("{}:{}", moniker, s)).collect()
         }
     }
 }
@@ -626,13 +626,13 @@ mod tests {
     #[fuchsia::test]
     async fn component_selector() {
         let selector = ComponentSelector::new(vec!["a".to_string()]);
-        assert_eq!(selector.relative_moniker_str(), "a");
+        assert_eq!(selector.moniker_str(), "a");
         let arguments: Vec<String> = selector.to_selector_arguments();
         assert_eq!(arguments, vec!["a:root".to_string()]);
 
         let selector =
             ComponentSelector::new(vec!["b".to_string(), "c".to_string(), "a".to_string()]);
-        assert_eq!(selector.relative_moniker_str(), "b/c/a");
+        assert_eq!(selector.moniker_str(), "b/c/a");
 
         let selector = selector.with_tree_selector("root/b/c:d").with_tree_selector("root/e:f");
         let arguments: Vec<String> = selector.to_selector_arguments();

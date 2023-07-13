@@ -43,9 +43,7 @@ async fn do_unresolve(component: &Arc<ComponentInstance>) -> Result<(), Unresolv
     ActionSet::register(component.clone(), ShutdownAction::new()).await?;
 
     if component.lock_execution().await.runtime.is_some() {
-        return Err(UnresolveActionError::InstanceRunning {
-            moniker: component.abs_moniker.clone(),
-        });
+        return Err(UnresolveActionError::InstanceRunning { moniker: component.moniker.clone() });
     }
 
     let children: Vec<Arc<ComponentInstance>> = {
@@ -53,7 +51,7 @@ async fn do_unresolve(component: &Arc<ComponentInstance>) -> Result<(), Unresolv
             InstanceState::Resolved(ref s) => s.children().map(|(_, c)| c.clone()).collect(),
             InstanceState::Destroyed => {
                 return Err(UnresolveActionError::InstanceDestroyed {
-                    moniker: component.abs_moniker.clone(),
+                    moniker: component.moniker.clone(),
                 })
             }
             InstanceState::Unresolved | InstanceState::New => return Ok(()),
@@ -79,7 +77,7 @@ async fn do_unresolve(component: &Arc<ComponentInstance>) -> Result<(), Unresolv
             }
             InstanceState::Destroyed => {
                 return Err(UnresolveActionError::InstanceDestroyed {
-                    moniker: component.abs_moniker.clone(),
+                    moniker: component.moniker.clone(),
                 })
             }
             InstanceState::Unresolved | InstanceState::New => return Ok(()),
@@ -313,15 +311,15 @@ pub mod tests {
         let component_a = test.look_up(vec!["container", "coll:a"].try_into().unwrap()).await;
         let component_b = test.look_up(vec!["container", "coll:b"].try_into().unwrap()).await;
         test.model
-            .start_instance(&component_container.abs_moniker, &StartReason::Eager)
+            .start_instance(&component_container.moniker, &StartReason::Eager)
             .await
             .expect("could not start container");
         test.model
-            .start_instance(&component_a.abs_moniker, &StartReason::Eager)
+            .start_instance(&component_a.moniker, &StartReason::Eager)
             .await
             .expect("could not start coll:a");
         test.model
-            .start_instance(&component_b.abs_moniker, &StartReason::Eager)
+            .start_instance(&component_b.moniker, &StartReason::Eager)
             .await
             .expect("could not start coll:b");
         assert!(is_executing(&component_container).await);

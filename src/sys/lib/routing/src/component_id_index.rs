@@ -160,9 +160,9 @@ impl ComponentIdIndex {
                 ComponentInstanceId::from_str(&instance_id)
                     .map_err(|_| ComponentIdIndexError::InvalidId)?,
             );
-            if let Some(absolute_moniker) = entry.moniker {
+            if let Some(moniker) = entry.moniker {
                 moniker_to_instance_id.insert(
-                    absolute_moniker,
+                    moniker,
                     ComponentInstanceId::from_str(&instance_id)
                         .map_err(|_| ComponentIdIndexError::InvalidId)?,
                 );

@@ -48,13 +48,13 @@ pub enum ModelError {
     #[error(
         "Failed to open path `{}`, in storage directory for `{}` backed by `{}`: {}",
         path,
-        relative_moniker,
         moniker,
+        source_moniker,
         err
     )]
     OpenStorageFailed {
-        moniker: InstancedExtendedMoniker,
-        relative_moniker: InstancedMoniker,
+        source_moniker: InstancedExtendedMoniker,
+        moniker: InstancedMoniker,
         path: String,
         #[source]
         err: fidl::Error,

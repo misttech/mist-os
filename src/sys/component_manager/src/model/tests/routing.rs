@@ -120,7 +120,7 @@ async fn use_framework_service() {
                 let mut capability_provider = capability_provider.lock().await;
                 *capability_provider = self
                     .on_scoped_framework_capability_routed_async(
-                        component.abs_moniker.clone(),
+                        component.moniker.clone(),
                         &capability,
                         capability_provider.take(),
                     )
@@ -3239,7 +3239,7 @@ async fn list_service_instances_from_collections() {
                 source_path.expect("source path"),
                 "/svc/foo.service".parse::<cm_types::Path>().unwrap()
             );
-            assert_eq!(component.abs_moniker, vec!["coll1:service_child_a"].try_into().unwrap());
+            assert_eq!(component.moniker, vec!["coll1:service_child_a"].try_into().unwrap());
         }
         _ => panic!("bad child capability source"),
     }

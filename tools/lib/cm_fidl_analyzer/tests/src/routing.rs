@@ -1093,7 +1093,7 @@ mod tests {
                     capability_type,
                     capability_name,
             }))
-                if moniker == *b_component.abs_moniker() &&
+                if moniker == *b_component.moniker() &&
                 capability_type == "runner" &&
                 capability_name == "hobbit"
         );
@@ -2343,7 +2343,7 @@ mod tests {
                     RoutingError::ExposeFromChildInstanceNotFound {
                         capability_id: "bad_protocol".to_string(),
                         child_moniker: "c".try_into().unwrap(),
-                        moniker: b_component.abs_moniker().clone(),
+                        moniker: b_component.moniker().clone(),
                     },
                 )),
                 route: vec![RouteSegment::ExposeBy {
@@ -2463,7 +2463,7 @@ mod tests {
                     RoutingError::OfferFromChildInstanceNotFound {
                         capability_id: "fuchsia.examples.Echo".to_string(),
                         child_moniker: "c".try_into().unwrap(),
-                        moniker: root_component.abs_moniker().clone(),
+                        moniker: root_component.moniker().clone(),
                     },
                 )),
                 route: vec![RouteSegment::OfferBy {

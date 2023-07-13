@@ -835,7 +835,7 @@ async fn open_storage_subdirectory() {
 /// The following storage paths are used:
 ///  - moniker path with instance ids cleared
 #[fuchsia::test]
-async fn storage_persistence_relative_moniker_path() {
+async fn storage_persistence_moniker_path() {
     let components = vec![
         (
             "a",

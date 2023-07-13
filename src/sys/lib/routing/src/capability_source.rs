@@ -146,7 +146,7 @@ impl<C: ComponentInstanceInterface> fmt::Display for CapabilitySource<C> {
             "{}",
             match self {
                 CapabilitySource::Component { capability, component } => {
-                    format!("{} '{}'", capability, component.abs_moniker)
+                    format!("{} '{}'", capability, component.moniker)
                 }
                 CapabilitySource::Framework { capability, .. } => capability.to_string(),
                 CapabilitySource::Builtin { capability, .. } => capability.to_string(),
@@ -164,11 +164,11 @@ impl<C: ComponentInstanceInterface> fmt::Display for CapabilitySource<C> {
                         "{} from collections '{}' of component '{}'",
                         capability,
                         collections.iter().map(|c| c.as_str()).collect::<Vec<_>>().join(","),
-                        &component.abs_moniker
+                        &component.moniker
                     )
                 }
                 Self::FilteredService { capability, component, .. } => {
-                    format!("{} '{}'", capability, component.abs_moniker)
+                    format!("{} '{}'", capability, component.moniker)
                 }
             }
         )

@@ -456,7 +456,7 @@ impl AggregateServiceDirectory {
                             target
                                 .with_logger_as_default(|| {
                                     warn!(
-                                        parent=%parent.abs_moniker, %e,
+                                        parent=%parent.moniker, %e,
                                         "Failed to route aggregate service instance",
                                     );
                                 })
@@ -483,7 +483,7 @@ impl AggregateServiceDirectory {
         let dir = simple_immutable_dir();
         for entry in join_all(futs).await.into_iter().flatten() {
             dir.add_node(&entry.name, entry.clone()).map_err(|err| {
-                ModelError::CollectionServiceDirError { moniker: target.abs_moniker.clone(), err }
+                ModelError::CollectionServiceDirError { moniker: target.moniker.clone(), err }
             })?;
         }
         Ok(dir)
@@ -710,11 +710,11 @@ impl CollectionServiceDirectory {
             error!(
                 "Error reading entries from service directory for component '{}', \
                 capability name '{}'. Error: {}",
-                target.abs_moniker.clone(),
+                target.moniker.clone(),
                 source.source_name().map(Name::as_str).unwrap_or("<no capability>"),
                 e
             );
-            ModelError::open_directory_error(target.abs_moniker.clone(), moniker.to_string())
+            ModelError::open_directory_error(target.moniker.clone(), moniker.to_string())
         })?;
         let rng = &mut rand::thread_rng();
         for dirent in dirents {
@@ -737,7 +737,7 @@ impl CollectionServiceDirectory {
                     parent: self.parent.clone(),
                 });
             inner.dir.add_node(&name, entry.clone()).map_err(|err| {
-                ModelError::CollectionServiceDirError { moniker: target.abs_moniker.clone(), err }
+                ModelError::CollectionServiceDirError { moniker: target.moniker.clone(), err }
             })?;
             inner.entries.insert(instance_key, entry);
         }
@@ -886,7 +886,7 @@ impl<T: Send + Sync + 'static + fmt::Display> DirectoryEntry for ServiceInstance
             let parent = match self.parent.upgrade() {
                 Ok(parent) => parent,
                 Err(_) => {
-                    warn!(moniker=%self.parent.abs_moniker, "parent component of aggregated service directory is gone");
+                    warn!(moniker=%self.parent.moniker, "parent component of aggregated service directory is gone");
                     return;
                 }
             };
@@ -1294,7 +1294,7 @@ mod tests {
             let dir_contents = wait_for_dir_content_change(&dir_proxy, dir_contents).await;
             assert_eq!(dir_contents.len(), 2);
 
-            test.start_instance_and_wait_start(baz_component.abs_moniker())
+            test.start_instance_and_wait_start(baz_component.moniker())
                 .await
                 .expect("component should start");
 

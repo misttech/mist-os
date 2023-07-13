@@ -330,18 +330,16 @@ impl StorageAdmin {
                     object,
                     control_handle: _,
                 } => {
-                    let instanced_relative_moniker =
-                        InstancedMoniker::try_from(relative_moniker.as_str())?;
-                    let abs_moniker = component
-                        .abs_moniker()
-                        .descendant(&instanced_relative_moniker.without_instance_ids());
+                    let instanced_moniker = InstancedMoniker::try_from(relative_moniker.as_str())?;
+                    let moniker =
+                        component.moniker().descendant(&instanced_moniker.without_instance_ids());
                     let instance_id =
-                        component.component_id_index().look_up_moniker(&abs_moniker).cloned();
+                        component.component_id_index().look_up_moniker(&moniker).cloned();
 
                     let dir_proxy = storage::open_isolated_storage(
                         &backing_dir_source_info,
                         component.persistent_storage,
-                        instanced_relative_moniker,
+                        instanced_moniker,
                         instance_id.as_ref(),
                     )
                     .await?;
@@ -354,11 +352,11 @@ impl StorageAdmin {
                 } => {
                     let fut = async {
                         let model = self.model.upgrade().ok_or(fcomponent::Error::Internal)?;
-                        let relative_moniker = Moniker::parse_str(&relative_moniker)
+                        let moniker = Moniker::parse_str(&relative_moniker)
                             .map_err(|_| fcomponent::Error::InvalidArguments)?;
-                        let absolute_moniker = component.abs_moniker.descendant(&relative_moniker);
+                        let moniker = component.moniker.descendant(&moniker);
                         let root_component = model
-                            .look_up(&absolute_moniker)
+                            .look_up(&moniker)
                             .await
                             .map_err(|_| fcomponent::Error::InstanceNotFound)?;
                         Ok(root_component)
@@ -418,18 +416,16 @@ impl StorageAdmin {
                             warn!(?error, "couldn't parse string as relative moniker for storage admin protocol");
                             Err(fcomponent::Error::InvalidArguments)
                         }
-                        Ok(instanced_relative_moniker) => {
-                            let abs_moniker = component
-                                .abs_moniker()
-                                .descendant(&instanced_relative_moniker.without_instance_ids());
-                            let instance_id = component
-                                .component_id_index()
-                                .look_up_moniker(&abs_moniker)
-                                .cloned();
+                        Ok(instanced_moniker) => {
+                            let moniker = component
+                                .moniker()
+                                .descendant(&instanced_moniker.without_instance_ids());
+                            let instance_id =
+                                component.component_id_index().look_up_moniker(&moniker).cloned();
                             let res = storage::delete_isolated_storage(
                                 backing_dir_source_info.clone(),
                                 component.persistent_storage,
-                                instanced_relative_moniker,
+                                instanced_moniker,
                                 instance_id.as_ref(),
                             )
                             .await;
@@ -799,12 +795,12 @@ impl StorageAdmin {
                     };
 
                 if backing_dir_info == storage_capability_source_info {
-                    let relative_moniker = InstancedMoniker::scope_down(
+                    let moniker = InstancedMoniker::scope_down(
                         &backing_dir_info.storage_source_moniker,
                         &component.instanced_moniker(),
                     )
                     .unwrap();
-                    storage_users.push(relative_moniker);
+                    storage_users.push(moniker);
                     break;
                 }
             }

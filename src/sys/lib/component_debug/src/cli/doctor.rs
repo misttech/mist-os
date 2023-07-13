@@ -22,11 +22,11 @@ pub async fn doctor_cmd_print<W: std::io::Write>(
 
     // Convert the absolute moniker into a relative moniker w.r.t. root.
     // LifecycleController expects relative monikers only.
-    let relative_moniker = Moniker::scope_down(&Moniker::root(), &moniker).unwrap();
+    let moniker = Moniker::scope_down(&Moniker::root(), &moniker).unwrap();
 
     writeln!(writer, "Moniker: {}", &moniker)?;
 
-    let reports = validate_routes(&route_validator, relative_moniker).await?;
+    let reports = validate_routes(&route_validator, moniker).await?;
 
     let (use_table, expose_table) = create_tables(reports);
     use_table.print(&mut writer)?;
@@ -47,7 +47,7 @@ pub async fn doctor_cmd_serialized(
 
     // Convert the absolute moniker into a relative moniker w.r.t. root.
     // LifecycleController expects relative monikers only.
-    let relative_moniker = Moniker::scope_down(&Moniker::root(), &moniker).unwrap();
+    let moniker = Moniker::scope_down(&Moniker::root(), &moniker).unwrap();
 
-    validate_routes(&route_validator, relative_moniker).await
+    validate_routes(&route_validator, moniker).await
 }

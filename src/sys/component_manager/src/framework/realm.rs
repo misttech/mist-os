@@ -211,7 +211,7 @@ impl RealmCapabilityHost {
             Err(e) => {
                 warn!(
                     "Failed to create child \"{}\" in collection \"{}\" of component \"{}\": {}",
-                    child_decl.name, collection.name, component.abs_moniker, e
+                    child_decl.name, collection.name, component.moniker, e
                 );
                 Err(e.into())
             }
@@ -227,7 +227,7 @@ impl RealmCapabilityHost {
         match Self::get_child(component, child.clone()).await? {
             Some(child) => {
                 child.start(&start_reason, None, numbered_handles, vec![]).await.map_err(|error| {
-                    debug!(%error, moniker=%child.abs_moniker, "failed to start component instance");
+                    debug!(%error, moniker=%child.moniker, "failed to start component instance");
                     error.into()
                 })?;
             }
@@ -250,7 +250,7 @@ impl RealmCapabilityHost {
                 child.resolve().await.map_err(|e| {
                     warn!(
                         "resolve failed for child {:?} of component {}: {}",
-                        child, component.abs_moniker, e
+                        child, component.moniker, e
                     );
                     return fcomponent::Error::InstanceCannotResolve;
                 })?;
@@ -305,7 +305,7 @@ impl RealmCapabilityHost {
     ) -> Result<Option<Arc<ComponentInstance>>, fcomponent::Error> {
         let parent = parent.upgrade().map_err(|_| fcomponent::Error::InstanceDied)?;
         let state = parent.lock_resolved_state().await.map_err(|error| {
-            debug!(%error, moniker=%parent.abs_moniker, "failed to resolve instance");
+            debug!(%error, moniker=%parent.moniker, "failed to resolve instance");
             fcomponent::Error::InstanceCannotResolve
         })?;
         let child_moniker = ChildMoniker::try_new(&child.name, child.collection.as_ref())
@@ -392,7 +392,7 @@ impl Hook for RealmCapabilityHost {
             let mut capability_provider = capability_provider.lock().await;
             *capability_provider = self
                 .on_scoped_framework_capability_routed_async(
-                    component.abs_moniker.clone(),
+                    component.moniker.clone(),
                     &capability,
                     capability_provider.take(),
                 )

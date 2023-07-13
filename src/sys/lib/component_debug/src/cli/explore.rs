@@ -24,12 +24,11 @@ pub async fn explore_cmd(
 
     // Convert the absolute moniker into a relative moniker w.r.t. root.
     // LifecycleController expects relative monikers only.
-    let relative_moniker = Moniker::scope_down(&Moniker::root(), &moniker).unwrap();
+    let moniker = Moniker::scope_down(&Moniker::root(), &moniker).unwrap();
 
     let (client, server) = fidl::Socket::create_stream();
 
-    explore_over_socket(relative_moniker, server, tools_urls, command, ns_layout, &dash_launcher)
-        .await?;
+    explore_over_socket(moniker, server, tools_urls, command, ns_layout, &dash_launcher).await?;
 
     socket_to_stdio::connect_socket_to_stdio(client, stdout).await?;
 

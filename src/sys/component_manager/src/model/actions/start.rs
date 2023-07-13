@@ -95,7 +95,7 @@ async fn do_start(
     {
         let state = component.lock_state().await;
         let execution = component.lock_execution().await;
-        if let Some(res) = should_return_early(&state, &execution, &component.abs_moniker) {
+        if let Some(res) = should_return_early(&state, &execution, &component.moniker) {
             return res;
         }
     }
@@ -103,12 +103,12 @@ async fn do_start(
     let result = async move {
         // Resolve the component.
         let component_info = component.resolve().await.map_err(|err|
-            StartActionError::ResolveActionError { moniker: component.abs_moniker.clone(), err }
+            StartActionError::ResolveActionError { moniker: component.moniker.clone(), err }
         )?;
 
         // Find the runner to use.
         let runner = component.resolve_runner().await.map_err(|err| {
-            warn!(moniker = %component.abs_moniker, %err, "Failed to resolve runner. A runner must be registered in a component's environment before being referenced. https://fuchsia.dev/go/components/runners#register");
+            warn!(moniker = %component.moniker, %err, "Failed to resolve runner. A runner must be registered in a component's environment before being referenced. https://fuchsia.dev/go/components/runners#register");
             err
         })?;
 
@@ -211,7 +211,7 @@ async fn configure_component_runtime(
     let state = component.lock_state().await;
     let mut execution = component.lock_execution().await;
 
-    if let Some(r) = should_return_early(&state, &execution, &component.abs_moniker) {
+    if let Some(r) = should_return_early(&state, &execution, &component.moniker) {
         return r;
     }
 
@@ -227,16 +227,16 @@ async fn configure_component_runtime(
 pub fn should_return_early(
     component: &InstanceState,
     execution: &ExecutionState,
-    abs_moniker: &Moniker,
+    moniker: &Moniker,
 ) -> Option<Result<fsys::StartResult, StartActionError>> {
     match component {
         InstanceState::New | InstanceState::Unresolved | InstanceState::Resolved(_) => {}
         InstanceState::Destroyed => {
-            return Some(Err(StartActionError::InstanceDestroyed { moniker: abs_moniker.clone() }));
+            return Some(Err(StartActionError::InstanceDestroyed { moniker: moniker.clone() }));
         }
     }
     if execution.is_shut_down() {
-        Some(Err(StartActionError::InstanceShutDown { moniker: abs_moniker.clone() }))
+        Some(Err(StartActionError::InstanceShutDown { moniker: moniker.clone() }))
     } else if execution.runtime.is_some() {
         Some(Ok(fsys::StartResult::AlreadyStarted))
     } else {
@@ -269,9 +269,9 @@ async fn make_execution_runtime(
     // TODO(https://fxbug.dev/120713): Consider moving this check to ComponentInstance::add_child
     match component.on_terminate {
         fdecl::OnTerminate::Reboot => {
-            checker.reboot_on_terminate_allowed(&component.abs_moniker).map_err(|err| {
+            checker.reboot_on_terminate_allowed(&component.moniker).map_err(|err| {
                 StartActionError::RebootOnTerminateForbidden {
-                    moniker: component.abs_moniker.clone(),
+                    moniker: component.moniker.clone(),
                     err,
                 }
             })?;
@@ -284,10 +284,10 @@ async fn make_execution_runtime(
     let (runtime_dir_client, runtime_dir_server) = zx::Channel::create();
     let mut namespace = IncomingNamespace::new(package);
     let original_ns = namespace.populate(component, decl).await.map_err(|err| {
-        StartActionError::NamespacePopulateError { moniker: component.abs_moniker.clone(), err }
+        StartActionError::NamespacePopulateError { moniker: component.moniker.clone(), err }
     })?;
     let ns = merge_namespace_entries(original_ns, additional_namespace_entries).map_err(|err| {
-        StartActionError::NamespacePopulateError { moniker: component.abs_moniker.clone(), err }
+        StartActionError::NamespacePopulateError { moniker: component.moniker.clone(), err }
     })?;
 
     let (controller_client, controller_server) =
@@ -317,7 +317,7 @@ async fn make_execution_runtime(
         })()
         .map_err(|s| StartActionError::StructuredConfigError {
             err: StructuredConfigError::VmoCreateFailed(s),
-            moniker: component.abs_moniker.clone(),
+            moniker: component.moniker.clone(),
         })?;
         Some(fmem::Data::Buffer(fmem::Buffer { vmo, size }))
     } else {

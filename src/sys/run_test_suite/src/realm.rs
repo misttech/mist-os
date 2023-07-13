@@ -169,15 +169,14 @@ pub async fn parse_provided_realm(
             return Err(RealmError::InvalidRealmStr);
         }
     };
-    let abs_moniker = Moniker::try_from(moniker)?;
-    let relative_moniker = Moniker::scope_down(&Moniker::root(), &abs_moniker)?;
+    let moniker = Moniker::try_from(moniker)?;
+    let moniker = Moniker::scope_down(&Moniker::root(), &moniker)?;
 
-    component_debug::lifecycle::resolve_instance(&lifecycle_controller, &relative_moniker)
+    component_debug::lifecycle::resolve_instance(&lifecycle_controller, &moniker)
         .await
         .map_err(RealmError::InstanceNotResolved)?;
 
-    let manifest =
-        component_debug::realm::get_resolved_declaration(&abs_moniker, &realm_query).await?;
+    let manifest = component_debug::realm::get_resolved_declaration(&moniker, &realm_query).await?;
 
     let offers = validate_and_get_offers(manifest, test_collection)?;
 
@@ -186,7 +185,7 @@ pub async fn parse_provided_realm(
     let server_end = ServerEnd::new(server_end.into_channel());
     realm_query
         .open(
-            &relative_moniker.to_string(),
+            &moniker.to_string(),
             fsys::OpenDirType::ExposedDir,
             fio::OpenFlags::RIGHT_READABLE,
             fio::ModeType::empty(),

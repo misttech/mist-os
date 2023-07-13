@@ -25,9 +25,9 @@ pub async fn start_cmd<W: std::io::Write>(
 
     // Convert the absolute moniker into a relative moniker w.r.t. root.
     // LifecycleController expects relative monikers only.
-    let relative_moniker = Moniker::scope_down(&Moniker::root(), &moniker).unwrap();
+    let moniker = Moniker::scope_down(&Moniker::root(), &moniker).unwrap();
 
-    start_instance(&lifecycle_controller, &relative_moniker)
+    start_instance(&lifecycle_controller, &moniker)
         .await
         .map_err(|e| format_start_error(&moniker, e))?;
 

@@ -185,12 +185,10 @@ async fn open_exposed_dir(
 
 async fn construct_namespace(
     query: &fsys::RealmQueryProxy,
-    relative_moniker: &str,
+    moniker: &str,
 ) -> Result<Vec<fcrunner::ComponentNamespaceEntry>, LauncherError> {
-    let result = query
-        .construct_namespace(&relative_moniker)
-        .await
-        .map_err(|_| LauncherError::RealmQuery)?;
+    let result =
+        query.construct_namespace(&moniker).await.map_err(|_| LauncherError::RealmQuery)?;
     match result {
         Ok(ns_entries) => Ok(ns_entries),
         Err(fsys::ConstructNamespaceError::BadMoniker) => Err(LauncherError::BadMoniker),

@@ -29,13 +29,13 @@ use {
 };
 
 struct PkgDirectoryProvider {
-    _abs_moniker: Moniker,
+    _moniker: Moniker,
     package: Option<Package>,
 }
 
 impl PkgDirectoryProvider {
-    pub fn new(abs_moniker: Moniker, package: Option<Package>) -> Self {
-        PkgDirectoryProvider { _abs_moniker: abs_moniker, package }
+    pub fn new(moniker: Moniker, package: Option<Package>) -> Self {
+        PkgDirectoryProvider { _moniker: moniker, package }
     }
 }
 
@@ -104,10 +104,9 @@ impl PkgDirectory {
             if capability_provider.is_none() {
                 let component = component.upgrade()?;
                 let resolved_state = component.lock_resolved_state().await?;
-                let abs_moniker = component.abs_moniker.clone();
+                let moniker = component.moniker.clone();
                 let package = resolved_state.package().cloned();
-                *capability_provider =
-                    Some(Box::new(PkgDirectoryProvider::new(abs_moniker, package)))
+                *capability_provider = Some(Box::new(PkgDirectoryProvider::new(moniker, package)))
             }
         }
         Ok(())

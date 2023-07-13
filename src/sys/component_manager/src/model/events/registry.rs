@@ -377,7 +377,7 @@ impl EventRegistry {
                         component,
                     },
                 relative_path: _,
-            } => Ok((source_name, component.abs_moniker.into(), route)),
+            } => Ok((source_name, component.moniker.into(), route)),
             RouteSource {
                 source:
                     CapabilitySource::Builtin {

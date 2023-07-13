@@ -187,7 +187,7 @@ impl SynthesisTask {
             let mut component_stream = get_subcomponents(root, visited_components.clone());
             let mut tasks = vec![];
             while let Some(component) = component_stream.next().await {
-                visited_components.insert(component.abs_moniker.clone());
+                visited_components.insert(component.moniker.clone());
                 let provider = info.provider.clone();
                 let scope = scope.clone();
                 let component = component.clone();
@@ -235,7 +235,7 @@ fn get_subcomponents(
             match pending.pop() {
                 None => return None,
                 Some(curr_component) => {
-                    if visited.contains(&curr_component.abs_moniker) {
+                    if visited.contains(&curr_component.moniker) {
                         continue;
                     }
                     let state_guard = curr_component.lock_state().await;
@@ -250,7 +250,7 @@ fn get_subcomponents(
                         }
                     }
                     drop(state_guard);
-                    visited.insert(curr_component.abs_moniker.clone());
+                    visited.insert(curr_component.moniker.clone());
                     return Some((curr_component, (pending, visited)));
                 }
             }

@@ -225,7 +225,7 @@ mod tests {
     use cm_types::Name;
 
     #[test]
-    fn absolute_monikers() {
+    fn monikers() {
         let root = Moniker::root();
         assert_eq!(true, root.is_root());
         assert_eq!(".", format!("{}", root));
@@ -245,7 +245,7 @@ mod tests {
     }
 
     #[test]
-    fn absolute_moniker_parent() {
+    fn moniker_parent() {
         let root = Moniker::root();
         assert_eq!(true, root.is_root());
         assert_eq!(None, root.parent());
@@ -262,7 +262,7 @@ mod tests {
     }
 
     #[test]
-    fn absolute_moniker_descendant() {
+    fn moniker_descendant() {
         let scope_root: Moniker = vec!["a:test1", "b:test2"].try_into().unwrap();
 
         let relative: Moniker = vec!["c:test3", "d:test4"].try_into().unwrap();
@@ -275,7 +275,7 @@ mod tests {
     }
 
     #[test]
-    fn absolute_moniker_parse_str() {
+    fn moniker_parse_str() {
         assert_eq!(Moniker::try_from("/foo").unwrap(), Moniker::try_from(vec!["foo"]).unwrap());
         assert_eq!(Moniker::try_from("./foo").unwrap(), Moniker::try_from(vec!["foo"]).unwrap());
         assert_eq!(Moniker::try_from("foo").unwrap(), Moniker::try_from(vec!["foo"]).unwrap());

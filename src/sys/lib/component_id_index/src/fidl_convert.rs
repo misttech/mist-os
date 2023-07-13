@@ -49,7 +49,7 @@ impl From<Index> for fcomponent_internal::ComponentIdIndex {
                     .into_iter()
                     .map(|entry| fcomponent_internal::InstanceIdEntry {
                         instance_id: entry.instance_id,
-                        moniker: entry.moniker.map(|abs_moniker| abs_moniker.to_string()),
+                        moniker: entry.moniker.map(|moniker| moniker.to_string()),
                         ..Default::default()
                     })
                     .collect(),

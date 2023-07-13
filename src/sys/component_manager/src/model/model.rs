@@ -79,16 +79,16 @@ impl Model {
     /// resolved if that has not already happened.
     pub async fn look_up(
         &self,
-        look_up_abs_moniker: &Moniker,
+        look_up_moniker: &Moniker,
     ) -> Result<Arc<ComponentInstance>, ModelError> {
         let mut cur = self.root.clone();
-        for moniker in look_up_abs_moniker.path().iter() {
+        for moniker in look_up_moniker.path().iter() {
             cur = {
                 let cur_state = cur.lock_resolved_state().await?;
                 if let Some(c) = cur_state.get_child(moniker) {
                     c.clone()
                 } else {
-                    return Err(ModelError::instance_not_found(look_up_abs_moniker.clone()));
+                    return Err(ModelError::instance_not_found(look_up_moniker.clone()));
                 }
             };
         }
@@ -98,9 +98,9 @@ impl Model {
 
     /// Finds a component matching the absolute moniker, if such a component exists.
     /// This function has no side-effects.
-    pub async fn find(&self, look_up_abs_moniker: &Moniker) -> Option<Arc<ComponentInstance>> {
+    pub async fn find(&self, look_up_moniker: &Moniker) -> Option<Arc<ComponentInstance>> {
         let mut cur = self.root.clone();
-        for moniker in look_up_abs_moniker.path().iter() {
+        for moniker in look_up_moniker.path().iter() {
             cur = {
                 let state = cur.lock_state().await;
                 match &*state {
@@ -121,12 +121,9 @@ impl Model {
     /// Finds a resolved component matching the absolute moniker, if such a component exists.
     /// This function has no side-effects.
     #[cfg(test)]
-    pub async fn find_resolved(
-        &self,
-        find_abs_moniker: &Moniker,
-    ) -> Option<Arc<ComponentInstance>> {
+    pub async fn find_resolved(&self, find_moniker: &Moniker) -> Option<Arc<ComponentInstance>> {
         let mut cur = self.root.clone();
-        for moniker in find_abs_moniker.path().iter() {
+        for moniker in find_moniker.path().iter() {
             cur = {
                 let state = cur.lock_state().await;
                 match &*state {
@@ -181,10 +178,10 @@ impl Model {
     #[cfg(test)]
     pub async fn start_instance<'a>(
         self: &Arc<Model>,
-        abs_moniker: &'a Moniker,
+        moniker: &'a Moniker,
         reason: &StartReason,
     ) -> Result<Arc<ComponentInstance>, ModelError> {
-        let component = self.look_up(abs_moniker).await?;
+        let component = self.look_up(moniker).await?;
         component.start(reason, None, vec![], vec![]).await?;
         Ok(component)
     }

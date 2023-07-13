@@ -43,7 +43,7 @@ async fn do_discover(component: &Arc<ComponentInstance>) -> Result<(), DiscoverA
             InstanceState::Resolved(_) => true,
             InstanceState::Destroyed => {
                 return Err(DiscoverActionError::InstanceDestroyed {
-                    moniker: component.abs_moniker.clone(),
+                    moniker: component.moniker.clone(),
                 });
             }
         }

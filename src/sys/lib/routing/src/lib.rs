@@ -517,7 +517,7 @@ where
                 Some((ExtendedInstanceInterface::AboveRoot(_), _, _)) => {
                     // Root environment.
                     return Err(RoutingError::UseFromRootEnvironmentNotAllowed {
-                        moniker: target.abs_moniker().clone(),
+                        moniker: target.moniker().clone(),
                         capability_name: use_decl.source_name.clone(),
                         capability_type: DebugRegistration::TYPE.to_string(),
                     }
@@ -525,7 +525,7 @@ where
                 }
                 None => {
                     return Err(RoutingError::UseFromEnvironmentNotFound {
-                        moniker: target.abs_moniker().clone(),
+                        moniker: target.moniker().clone(),
                         capability_name: use_decl.source_name.clone(),
                         capability_type: DebugRegistration::TYPE.to_string(),
                     }
@@ -535,12 +535,12 @@ where
             let env_name = env_name.unwrap_or_else(|| {
                 panic!(
                     "Environment name in component `{}` not found when routing `{}`.",
-                    target.abs_moniker(),
+                    target.moniker(),
                     use_decl.source_name
                 )
             });
 
-            let env_moniker = env_component_instance.abs_moniker();
+            let env_moniker = env_component_instance.moniker();
 
             let mut availability_visitor = AvailabilityProtocolVisitor::new(&use_decl);
             let source = router::route_from_registration(
@@ -559,7 +559,7 @@ where
 
             target
                 .policy_checker()
-                .can_route_debug_capability(&source, &env_moniker, &env_name, target.abs_moniker())
+                .can_route_debug_capability(&source, &env_moniker, &env_name, target.moniker())
                 .map_err(|err| {
                     warn!(?use_decl, %err, "route_protocol error 4");
                     err
@@ -591,7 +591,7 @@ where
             )
             .await?;
 
-            target.policy_checker().can_route_capability(&source, target.abs_moniker())?;
+            target.policy_checker().can_route_capability(&source, target.moniker())?;
             Ok(RouteSource::new(source))
         }
     }
@@ -625,7 +625,7 @@ where
     )
     .await?;
 
-    target.policy_checker().can_route_capability(&source, target.abs_moniker())?;
+    target.policy_checker().can_route_capability(&source, target.moniker())?;
     Ok(RouteSource::new(source))
 }
 
@@ -665,7 +665,7 @@ where
             )
             .await?;
 
-            target.policy_checker().can_route_capability(&source, target.abs_moniker())?;
+            target.policy_checker().can_route_capability(&source, target.moniker())?;
             Ok(RouteSource::new(source))
         }
     }
@@ -693,7 +693,7 @@ where
     )
     .await?;
 
-    target.policy_checker().can_route_capability(&source, target.abs_moniker())?;
+    target.policy_checker().can_route_capability(&source, target.moniker())?;
     Ok(RouteSource::new(source))
 }
 
@@ -830,7 +830,7 @@ where
             )
             .await?;
 
-            target.policy_checker().can_route_capability(&source, target.abs_moniker())?;
+            target.policy_checker().can_route_capability(&source, target.moniker())?;
             Ok(RouteSource::new_with_relative_path(source, state.subdir))
         }
     }
@@ -867,7 +867,7 @@ where
     )
     .await?;
 
-    target.policy_checker().can_route_capability(&source, target.abs_moniker())?;
+    target.policy_checker().can_route_capability(&source, target.moniker())?;
     Ok(RouteSource::new_with_relative_path(source, state.subdir))
 }
 
@@ -890,11 +890,11 @@ where
     };
 
     if storage_decl.storage_id == fdecl::StorageId::StaticInstanceId
-        && instance.component_id_index().look_up_moniker(instance.abs_moniker()) == None
+        && instance.component_id_index().look_up_moniker(instance.moniker()) == None
     {
         return Err(RoutingError::ComponentNotInIdIndex {
-            source_moniker: source_component.abs_moniker.clone(),
-            target_moniker: instance.abs_moniker().clone(),
+            source_moniker: source_component.moniker.clone(),
+            target_moniker: instance.moniker().clone(),
         });
     }
     Ok(())
@@ -938,7 +938,7 @@ where
 {
     let source = route_to_storage_decl(use_decl, &target, mapper).await?;
     verify_instance_in_component_id_index(&source, target)?;
-    target.policy_checker().can_route_capability(&source, target.abs_moniker())?;
+    target.policy_checker().can_route_capability(&source, target.moniker())?;
     Ok(RouteSource::new(source))
 }
 
@@ -966,7 +966,7 @@ where
     )
     .await?;
 
-    target.policy_checker().can_route_capability(&source, target.abs_moniker())?;
+    target.policy_checker().can_route_capability(&source, target.moniker())?;
 
     Ok(RouteSource::new_with_relative_path(source, state.subdir))
 }
@@ -1020,13 +1020,13 @@ where
             })
         }
         None => Err(RoutingError::UseFromEnvironmentNotFound {
-            moniker: target.abs_moniker().clone(),
+            moniker: target.moniker().clone(),
             capability_name: runner.clone(),
             capability_type: "runner".to_string(),
         }),
     }?;
 
-    target.policy_checker().can_route_capability(&source, target.abs_moniker())?;
+    target.policy_checker().can_route_capability(&source, target.moniker())?;
     Ok(RouteSource::new(source))
 }
 
@@ -1057,7 +1057,7 @@ where
     )
     .await?;
 
-    target.policy_checker().can_route_capability(&source, target.abs_moniker())?;
+    target.policy_checker().can_route_capability(&source, target.moniker())?;
     Ok(RouteSource::new(source))
 }
 
@@ -1086,7 +1086,7 @@ where
         route,
     )
     .await?;
-    target.policy_checker().can_route_capability(&source, target.abs_moniker())?;
+    target.policy_checker().can_route_capability(&source, target.moniker())?;
     Ok(RouteSource::new(source))
 }
 

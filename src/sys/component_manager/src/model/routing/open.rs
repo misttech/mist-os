@@ -147,7 +147,7 @@ impl<'a> OpenRequest<'a> {
     ) -> Result<(), ModelError> {
         // As of today, the storage component instance must contain the target. This is because it
         // is impossible to expose storage declarations up.
-        let relative_moniker = InstancedMoniker::scope_down(
+        let moniker = InstancedMoniker::scope_down(
             &source.storage_source_moniker,
             &target.instanced_moniker(),
         )
@@ -157,7 +157,7 @@ impl<'a> OpenRequest<'a> {
         let storage_dir_proxy = storage::open_isolated_storage(
             &source,
             target.persistent_storage,
-            relative_moniker.clone(),
+            moniker.clone(),
             target.instance_id().as_ref(),
         )
         .await
@@ -176,15 +176,15 @@ impl<'a> OpenRequest<'a> {
         storage_dir_proxy
             .open(flags, fio::ModeType::empty(), relative_path, ServerEnd::new(server_chan))
             .map_err(|err| {
-                let moniker = match &dir_source {
+                let source_moniker = match &dir_source {
                     Some(r) => {
                         InstancedExtendedMoniker::ComponentInstance(r.instanced_moniker().clone())
                     }
                     None => InstancedExtendedMoniker::ComponentManager,
                 };
                 ModelError::OpenStorageFailed {
+                    source_moniker,
                     moniker,
-                    relative_moniker,
                     path: relative_path.to_string(),
                     err,
                 }
@@ -273,7 +273,7 @@ impl<'a> OpenRequest<'a> {
                 let source_component_instance = component.upgrade()?;
 
                 let route = CollectionServiceRoute {
-                    source_moniker: source_component_instance.abs_moniker.clone(),
+                    source_moniker: source_component_instance.moniker.clone(),
                     collections: collections.clone(),
                     service_name: capability.source_name().clone(),
                 };
@@ -281,7 +281,7 @@ impl<'a> OpenRequest<'a> {
                 source_component_instance
                     .start(
                         &StartReason::AccessCapability {
-                            target: target.abs_moniker.clone(),
+                            target: target.moniker.clone(),
                             name: capability.source_name().clone(),
                         },
                         None,

@@ -73,7 +73,7 @@ impl CapabilityProvider for BinderCapabilityProvider {
                 };
 
                 let start_reason = StartReason::AccessCapability {
-                    target: target.abs_moniker.clone(),
+                    target: target.moniker.clone(),
                     name: BINDER_SERVICE.clone(),
                 };
                 match source.start(&start_reason, None, vec![], vec![]).await {
@@ -167,7 +167,7 @@ async fn report_routing_failure_to_target(
             report_routing_failure(&target, &*BINDER_CAPABILITY, err, server_end).await;
         }
         Err(err) => {
-            warn!(moniker=%target.abs_moniker, error=%err, "failed to upgrade reference");
+            warn!(moniker=%target.moniker, error=%err, "failed to upgrade reference");
         }
     }
 }

@@ -34,8 +34,8 @@ impl ComponentIdentity {
 #[cfg(test)]
 impl From<Vec<&str>> for ComponentIdentity {
     fn from(moniker_segments: Vec<&str>) -> Self {
-        let abs_moniker = Moniker::try_from(moniker_segments).unwrap();
-        Self { moniker: ExtendedMoniker::from(abs_moniker), url: "".into() }
+        let moniker = Moniker::try_from(moniker_segments).unwrap();
+        Self { moniker: ExtendedMoniker::from(moniker), url: "".into() }
     }
 }
 

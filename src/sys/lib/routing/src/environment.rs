@@ -208,7 +208,7 @@ pub fn find_first_absolute_ancestor_url<C: ComponentInstanceInterface>(
                     let parent_url = Url::parse(parent_component.url()).map_err(|_| {
                         ComponentInstanceError::MalformedUrl {
                             url: parent_component.url().to_string(),
-                            moniker: parent_component.abs_moniker().clone(),
+                            moniker: parent_component.moniker().clone(),
                         }
                     })?;
                     return Ok(parent_url);
@@ -218,7 +218,7 @@ pub fn find_first_absolute_ancestor_url<C: ComponentInstanceInterface>(
             ExtendedInstanceInterface::AboveRoot(_) => {
                 return Err(ComponentInstanceError::NoAbsoluteUrl {
                     url: component.url().to_string(),
-                    moniker: component.abs_moniker().clone(),
+                    moniker: component.moniker().clone(),
                 });
             }
         }

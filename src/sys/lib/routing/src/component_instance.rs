@@ -41,7 +41,7 @@ pub trait ComponentInstanceInterface: Sized + Send + Sync {
     fn instanced_moniker(&self) -> &InstancedMoniker;
 
     /// Returns this `ComponentInstanceInterface`'s absolute moniker.
-    fn abs_moniker(&self) -> &Moniker;
+    fn moniker(&self) -> &Moniker;
 
     /// Returns this `ComponentInstanceInterface`'s component URL.
     fn url(&self) -> &str;
@@ -207,12 +207,12 @@ where
 pub struct WeakComponentInstanceInterface<C: ComponentInstanceInterface> {
     #[derivative(Debug = "ignore")]
     inner: Weak<C>,
-    pub abs_moniker: Moniker,
+    pub moniker: Moniker,
 }
 
 impl<C: ComponentInstanceInterface> WeakComponentInstanceInterface<C> {
     pub fn new(component: &Arc<C>) -> Self {
-        Self { inner: Arc::downgrade(component), abs_moniker: component.abs_moniker().clone() }
+        Self { inner: Arc::downgrade(component), moniker: component.moniker().clone() }
     }
 
     /// Attempts to upgrade this `WeakComponentInterface<C>` into an `Arc<C>`, if the
@@ -220,13 +220,13 @@ impl<C: ComponentInstanceInterface> WeakComponentInstanceInterface<C> {
     pub fn upgrade(&self) -> Result<Arc<C>, ComponentInstanceError> {
         self.inner
             .upgrade()
-            .ok_or_else(|| ComponentInstanceError::instance_not_found(self.abs_moniker.clone()))
+            .ok_or_else(|| ComponentInstanceError::instance_not_found(self.moniker.clone()))
     }
 }
 
 impl<C: ComponentInstanceInterface> From<&Arc<C>> for WeakComponentInstanceInterface<C> {
     fn from(component: &Arc<C>) -> Self {
-        Self { inner: Arc::downgrade(component), abs_moniker: component.abs_moniker().clone() }
+        Self { inner: Arc::downgrade(component), moniker: component.moniker().clone() }
     }
 }
 
@@ -263,7 +263,7 @@ impl<C: ComponentInstanceInterface> WeakExtendedInstanceInterface<C> {
 
     pub fn extended_moniker(&self) -> ExtendedMoniker {
         match self {
-            Self::Component(p) => ExtendedMoniker::ComponentInstance(p.abs_moniker.clone()),
+            Self::Component(p) => ExtendedMoniker::ComponentInstance(p.moniker.clone()),
             Self::AboveRoot(_) => ExtendedMoniker::ComponentManager,
         }
     }

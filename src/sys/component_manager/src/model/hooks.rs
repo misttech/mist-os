@@ -327,7 +327,7 @@ impl Event {
     pub fn new(component: &Arc<ComponentInstance>, payload: EventPayload) -> Self {
         let timestamp = zx::Time::get_monotonic();
         Self::new_internal(
-            component.abs_moniker.clone().into(),
+            component.moniker.clone().into(),
             component.component_url.clone(),
             timestamp,
             payload,
@@ -350,7 +350,7 @@ impl Event {
         timestamp: zx::Time,
     ) -> Self {
         Self::new_internal(
-            component.abs_moniker.clone().into(),
+            component.moniker.clone().into(),
             component.component_url.clone(),
             timestamp,
             payload,

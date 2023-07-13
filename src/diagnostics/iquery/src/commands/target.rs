@@ -81,7 +81,7 @@ pub(crate) async fn connect_realm_query() -> Result<fsys2::RealmQueryProxy, Erro
 }
 
 /// Connect to `fuchsia.sys2.*ArchivistAccessor` with the provided selector string.
-/// The selector string should be in the form of "<relative_moniker>:expose:<service_name>".
+/// The selector string should be in the form of "<moniker>:expose:<service_name>".
 /// If no selector string is provided, it will try to connect to
 /// `./bootstrap/archivist:expose:fuchsia.sys2.ArchiveAccessor`.
 pub async fn connect_to_archivist_selector_str(

@@ -21,15 +21,11 @@ pub mod fidl_convert;
 #[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Clone)]
 pub struct InstanceIdEntry {
     pub instance_id: Option<String>,
-    #[serde(
-        default,
-        deserialize_with = "str_to_abs_moniker",
-        serialize_with = "abs_moniker_to_str"
-    )]
+    #[serde(default, deserialize_with = "str_to_moniker", serialize_with = "moniker_to_str")]
     pub moniker: Option<Moniker>,
 }
 
-fn str_to_abs_moniker<'de, D>(deserializer: D) -> Result<Option<Moniker>, D::Error>
+fn str_to_moniker<'de, D>(deserializer: D) -> Result<Option<Moniker>, D::Error>
 where
     D: Deserializer<'de>,
 {
@@ -40,12 +36,12 @@ where
     }
 }
 
-fn abs_moniker_to_str<S>(abs_moniker: &Option<Moniker>, serializer: S) -> Result<S::Ok, S::Error>
+fn moniker_to_str<S>(moniker: &Option<Moniker>, serializer: S) -> Result<S::Ok, S::Error>
 where
     S: Serializer,
 {
-    if let Some(abs_moniker) = abs_moniker {
-        serializer.serialize_str(&abs_moniker.to_string())
+    if let Some(moniker) = moniker {
+        serializer.serialize_str(&moniker.to_string())
     } else {
         serializer.serialize_none()
     }
@@ -339,7 +335,7 @@ mod tests {
     }
 
     #[test]
-    fn serialize_deserialize_valid_absolute_moniker() -> Result<()> {
+    fn serialize_deserialize_valid_moniker() -> Result<()> {
         let mut expected_index = gen_index(3);
         expected_index.instances[0].moniker = Some(Moniker::parse_str("/a/b/c").unwrap());
         expected_index.instances[1].moniker = Some(Moniker::parse_str("/a/b:b/c/b:b").unwrap());

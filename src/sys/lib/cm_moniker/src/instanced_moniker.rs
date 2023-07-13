@@ -114,7 +114,7 @@ mod tests {
     };
 
     #[test]
-    fn instanced_absolute_monikers() {
+    fn instanced_monikers() {
         let root = InstancedMoniker::root();
         assert_eq!(true, root.is_root());
         assert_eq!(".", format!("{}", root));
@@ -134,7 +134,7 @@ mod tests {
     }
 
     #[test]
-    fn instanced_absolute_moniker_parent() {
+    fn instanced_moniker_parent() {
         let root = InstancedMoniker::root();
         assert_eq!(true, root.is_root());
         assert_eq!(None, root.parent());
@@ -151,7 +151,7 @@ mod tests {
     }
 
     #[test]
-    fn instanced_absolute_moniker_compare() {
+    fn instanced_moniker_compare() {
         let a = InstancedMoniker::new(vec![
             InstancedChildMoniker::try_new("a", None, 1).unwrap(),
             InstancedChildMoniker::try_new("b", None, 2).unwrap(),
@@ -196,7 +196,7 @@ mod tests {
     }
 
     #[test]
-    fn instanced_absolute_monikers_contains_in_realm() {
+    fn instanced_monikers_contains_in_realm() {
         let root = InstancedMoniker::root();
         let a = InstancedMoniker::new(vec![InstancedChildMoniker::try_new("a", None, 1).unwrap()]);
         let ab = InstancedMoniker::new(vec![
@@ -246,7 +246,7 @@ mod tests {
     }
 
     #[test]
-    fn instanced_absolute_moniker_parse_str() -> Result<(), MonikerError> {
+    fn instanced_moniker_parse_str() -> Result<(), MonikerError> {
         let under_test = |s| InstancedMoniker::parse_str(s);
 
         assert_eq!(under_test(".")?, InstancedMoniker::root());

@@ -384,7 +384,7 @@ impl RoutingTest {
     ) {
         let component = self.model.look_up(&moniker).await.expect("failed to look up component");
         self.model
-            .start_instance(&component.abs_moniker, &StartReason::Eager)
+            .start_instance(&component.moniker, &StartReason::Eager)
             .await
             .expect("start instance failed");
         let child_moniker = ChildMoniker::try_new(name, Some(collection)).expect("invalid moniker");
@@ -707,7 +707,7 @@ impl RoutingTestModel for RoutingTest {
                 let instance_id =
                     self.model.root().component_id_index().look_up_moniker(&moniker).cloned();
 
-                if let Some(relative_moniker) = storage_relation {
+                if let Some(moniker) = storage_relation {
                     if from_cm_namespace {
                         // Check for the file in the /tmp in the test's namespace
                         let tmp_proxy = fuchsia_fs::directory::open_in_namespace(
@@ -718,7 +718,7 @@ impl RoutingTestModel for RoutingTest {
                         let res = capability_util::check_file_in_storage(
                             storage_subdir,
                             component.persistent_storage,
-                            relative_moniker,
+                            moniker,
                             instance_id.as_ref(),
                             &tmp_proxy,
                         )
@@ -731,7 +731,7 @@ impl RoutingTestModel for RoutingTest {
                         let res = capability_util::check_file_in_storage(
                             storage_subdir,
                             component.persistent_storage,
-                            relative_moniker,
+                            moniker,
                             instance_id.as_ref(),
                             &self.test_dir_proxy,
                         )
@@ -758,18 +758,18 @@ impl RoutingTestModel for RoutingTest {
                 let flags = fio::OpenFlags::RIGHT_WRITABLE
                     | fio::OpenFlags::CREATE
                     | fio::OpenFlags::DIRECTORY;
-                let relative_moniker_string = format!("{}", storage_relation);
-                let component_abs_moniker =
+                let moniker_string = format!("{}", storage_relation);
+                let component_moniker =
                     moniker.descendant(&storage_relation.without_instance_ids());
                 let component_instance_id = self
                     .model
                     .root()
                     .component_id_index()
-                    .look_up_moniker(&component_abs_moniker)
+                    .look_up_moniker(&component_moniker)
                     .cloned();
                 storage_admin_proxy
                     .open_component_storage(
-                        relative_moniker_string.as_str(),
+                        moniker_string.as_str(),
                         flags,
                         fio::ModeType::empty(),
                         server_end,
@@ -805,7 +805,7 @@ impl RoutingTestModel for RoutingTest {
                     .await
                     .expect("failed to read file");
                     storage_admin_proxy
-                        .delete_component_storage(relative_moniker_string.as_str())
+                        .delete_component_storage(moniker_string.as_str())
                         .await
                         .expect("failed to send fidl message")
                         .expect("error encountered while deleting component storage");
@@ -1323,17 +1323,17 @@ pub mod capability_util {
                 .expect("failed to open file");
     }
 
-    /// Attempts to read ${path}/hippo in `abs_moniker`'s exposed directory. The file should
+    /// Attempts to read ${path}/hippo in `moniker`'s exposed directory. The file should
     /// contain the string "hello".
     pub async fn read_data_from_exposed_dir<'a>(
         path: cm_types::Path,
         file: &str,
-        abs_moniker: &'a Moniker,
+        moniker: &'a Moniker,
         model: &'a Arc<Model>,
         expected_res: ExpectedResult,
     ) {
         let (node_proxy, server_end) = endpoints::create_proxy::<fio::NodeMarker>().unwrap();
-        open_exposed_dir(&path, abs_moniker, model, true, server_end).await;
+        open_exposed_dir(&path, moniker, model, true, server_end).await;
         let dir_proxy = fio::DirectoryProxy::new(node_proxy.into_channel().unwrap());
         match expected_res {
             ExpectedResult::Ok => {
@@ -1374,16 +1374,16 @@ pub mod capability_util {
         }
     }
 
-    /// Attempts to use the fidl.examples.routing.echo.Echo service at `path` in `abs_moniker`'s exposed
+    /// Attempts to use the fidl.examples.routing.echo.Echo service at `path` in `moniker`'s exposed
     /// directory.
     pub async fn call_echo_svc_from_exposed_dir<'a>(
         path: cm_types::Path,
-        abs_moniker: &'a Moniker,
+        moniker: &'a Moniker,
         model: &'a Arc<Model>,
         expected_res: ExpectedResult,
     ) {
         let (node_proxy, server_end) = endpoints::create_proxy::<fio::NodeMarker>().unwrap();
-        open_exposed_dir(&path, abs_moniker, model, false, server_end).await;
+        open_exposed_dir(&path, moniker, model, false, server_end).await;
         let echo_proxy = echo::EchoProxy::new(node_proxy.into_channel().unwrap());
         call_echo_and_validate_result(echo_proxy, expected_res).await;
     }
@@ -1392,12 +1392,12 @@ pub mod capability_util {
         path: cm_types::Path,
         instance: String,
         member: String,
-        abs_moniker: &Moniker,
+        moniker: &Moniker,
         model: &Arc<Model>,
         expected_res: ExpectedResult,
     ) {
         let (node_proxy, server_end) = endpoints::create_proxy::<fio::NodeMarker>().unwrap();
-        open_exposed_dir(&path, abs_moniker, model, true, server_end).await;
+        open_exposed_dir(&path, moniker, model, true, server_end).await;
         // TODO(fxbug.dev/118249): Utilize the new fuchsia_component::client method to connect to
         // the service instance, passing in the service_dir, instance name, and member path.
         let service_dir = fio::DirectoryProxy::from_channel(node_proxy.into_channel().unwrap());
@@ -1416,11 +1416,11 @@ pub mod capability_util {
 
     pub async fn read_service_from_exposed_dir(
         path: cm_types::Path,
-        abs_moniker: &Moniker,
+        moniker: &Moniker,
         model: &Arc<Model>,
     ) -> Vec<String> {
         let (node_proxy, server_end) = endpoints::create_proxy::<fio::NodeMarker>().unwrap();
-        open_exposed_dir(&path, abs_moniker, model, true, server_end).await;
+        open_exposed_dir(&path, moniker, model, true, server_end).await;
         // TODO(fxbug.dev/118249): Utilize the new fuchsia_component::client method to connect to
         // the service instance, passing in the service_dir, instance name, and member path.
         let service_dir = fio::DirectoryProxy::from_channel(node_proxy.into_channel().unwrap());
@@ -1510,22 +1510,19 @@ pub mod capability_util {
         });
     }
 
-    /// Open the exposed dir for `abs_moniker`.
+    /// Open the exposed dir for `moniker`.
     async fn open_exposed_dir<'a>(
         path: &'a cm_types::Path,
-        abs_moniker: &'a Moniker,
+        moniker: &'a Moniker,
         model: &'a Arc<Model>,
         directory: bool,
         server_end: ServerEnd<fio::NodeMarker>,
     ) {
         let component = model
-            .look_up(abs_moniker)
+            .look_up(moniker)
             .await
-            .unwrap_or_else(|e| panic!("component not found {}: {}", abs_moniker, e));
-        model
-            .start_instance(abs_moniker, &StartReason::Eager)
-            .await
-            .expect("failed to start instance");
+            .unwrap_or_else(|e| panic!("component not found {}: {}", moniker, e));
+        model.start_instance(moniker, &StartReason::Eager).await.expect("failed to start instance");
         let state = component.lock_state().await;
         match &*state {
             InstanceState::Resolved(resolved_instance_state) => {
@@ -1538,7 +1535,7 @@ pub mod capability_util {
                 resolved_instance_state.get_exposed_dir().open(flags, vns_path, server_end);
             }
             _ => {
-                panic!("Attempted to open exposed dir of unresolved component: {}", abs_moniker);
+                panic!("Attempted to open exposed dir of unresolved component: {}", moniker);
             }
         }
     }

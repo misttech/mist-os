@@ -52,7 +52,7 @@ impl CapabilityProvider for DefaultComponentCapabilityProvider {
             source
                 .start(
                     &StartReason::AccessCapability {
-                        target: self.target.abs_moniker.clone(),
+                        target: self.target.moniker.clone(),
                         name: self.name.clone(),
                     },
                     None,
@@ -67,7 +67,7 @@ impl CapabilityProvider for DefaultComponentCapabilityProvider {
                     .upgrade()
                     .map_err(|_| ComponentProviderError::TargetInstanceNotFound)?,
                 EventPayload::CapabilityRequested {
-                    source_moniker: source.abs_moniker.clone(),
+                    source_moniker: source.moniker.clone(),
                     name: self.name.to_string(),
                     capability: capability.clone(),
                 },

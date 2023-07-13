@@ -70,7 +70,7 @@ impl RouteValidator {
                 if capability_provider.is_none() {
                     *capability_provider = Some(Box::new(RouteValidatorCapabilityProvider::query(
                         self,
-                        component.abs_moniker.clone(),
+                        component.moniker.clone(),
                     )));
                 }
             }
@@ -311,7 +311,7 @@ impl RouteValidator {
             } => {
                 let component = component.upgrade()?;
                 let route = CollectionServiceRoute {
-                    source_moniker: component.abs_moniker.clone(),
+                    source_moniker: component.moniker.clone(),
                     collections: collections.clone(),
                     service_name: capability.source_name().clone(),
                 };

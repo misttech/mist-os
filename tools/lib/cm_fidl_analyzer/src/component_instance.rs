@@ -37,7 +37,7 @@ use {
 #[derive(Debug)]
 pub struct ComponentInstanceForAnalyzer {
     instanced_moniker: InstancedMoniker,
-    abs_moniker: Moniker,
+    moniker: Moniker,
     pub(crate) decl: ComponentDecl,
     config: Option<ConfigFields>,
     url: String,
@@ -56,7 +56,7 @@ impl ComponentInstanceForAnalyzer {
 
     /// Returns a representation of the instance's position in the component instance tree.
     pub fn node_path(&self) -> NodePath {
-        NodePath::new(self.abs_moniker.path().clone())
+        NodePath::new(self.moniker.path().clone())
     }
 
     // Creates a new root component instance.
@@ -73,10 +73,10 @@ impl ComponentInstanceForAnalyzer {
         let environment =
             EnvironmentForAnalyzer::new_root(runner_registry, &runtime_config, &top_instance);
         let instanced_moniker = InstancedMoniker::root();
-        let abs_moniker = instanced_moniker.clone().without_instance_ids();
+        let moniker = instanced_moniker.clone().without_instance_ids();
         Arc::new(Self {
             instanced_moniker,
-            abs_moniker,
+            moniker,
             decl,
             config,
             url,
@@ -109,10 +109,10 @@ impl ComponentInstanceForAnalyzer {
             )
             .expect("child moniker is guaranteed to be valid"),
         );
-        let abs_moniker = instanced_moniker.clone().without_instance_ids();
+        let moniker = instanced_moniker.clone().without_instance_ids();
         Ok(Arc::new(Self {
             instanced_moniker,
-            abs_moniker,
+            moniker,
             decl: child_component_decl,
             config,
             url: absolute_url,
@@ -167,12 +167,12 @@ impl ComponentInstanceInterface for ComponentInstanceForAnalyzer {
         &self.instanced_moniker
     }
 
-    fn abs_moniker(&self) -> &Moniker {
-        &self.abs_moniker
+    fn moniker(&self) -> &Moniker {
+        &self.moniker
     }
 
     fn child_moniker(&self) -> Option<&ChildMoniker> {
-        self.abs_moniker.leaf()
+        self.moniker.leaf()
     }
 
     fn url(&self) -> &str {

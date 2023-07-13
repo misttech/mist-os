@@ -101,7 +101,7 @@ where
                     let child_moniker =
                         child_component.child_moniker().expect("ChildMoniker should exist");
                     <U as ErrorNotFoundInChild>::error_not_found_in_child(
-                        use_target.abs_moniker().clone(),
+                        use_target.moniker().clone(),
                         child_moniker.clone(),
                         use_decl.source_name().clone(),
                     )
@@ -392,12 +392,12 @@ where
     V: Clone + Send + Sync + 'static,
     M: DebugRouteMapper + 'static,
 {
-    mapper.add_use(target.abs_moniker().clone(), use_decl.clone().into());
+    mapper.add_use(target.moniker().clone(), use_decl.clone().into());
     let target_capabilities = target.lock_resolved_state().await?.capabilities();
     Ok(CapabilitySource::<C>::Component {
         capability: sources.find_component_source(
             use_decl.source_name(),
-            target.abs_moniker(),
+            target.moniker(),
             &target_capabilities,
             visitor,
             mapper,
@@ -545,14 +545,14 @@ pub trait Sources: Clone + Send + Sync {
         M: DebugRouteMapper;
 
     /// Looks for a component capability in the list of capability sources for the component instance
-    /// with moniker `abs_moniker`.
+    /// with moniker `moniker`.
     /// If found, the declaration is visited by `visitor` and the declaration is wrapped
     /// in a [`ComponentCapability`].
     /// Returns [`RoutingError::UnsupportedRouteSource`] if component capabilities are unsupported.
     fn find_component_source<V, M>(
         &self,
         name: &Name,
-        abs_moniker: &Moniker,
+        moniker: &Moniker,
         capabilities: &[CapabilityDecl],
         visitor: &mut V,
         mapper: &mut M,
@@ -748,7 +748,7 @@ where
     fn find_component_source<V, M>(
         &self,
         name: &Name,
-        abs_moniker: &Moniker,
+        moniker: &Moniker,
         capabilities: &[CapabilityDecl],
         visitor: &mut V,
         mapper: &mut M,
@@ -765,7 +765,7 @@ where
                 .cloned()
                 .expect("CapabilityDecl missing, FIDL validation should catch this");
             visitor.visit(&decl)?;
-            mapper.add_component_capability(abs_moniker.clone(), decl.clone().into());
+            mapper.add_component_capability(moniker.clone(), decl.clone().into());
             Ok(decl.into())
         } else {
             Err(RoutingError::unsupported_route_source("component"))
@@ -809,7 +809,7 @@ where
         O: OfferDeclCommon + FromEnum<OfferDecl> + ErrorNotFoundFromParent + Clone,
         M: DebugRouteMapper,
     {
-        mapper.add_use(target.abs_moniker().clone(), use_.clone().into());
+        mapper.add_use(target.moniker().clone(), use_.clone().into());
         match use_.source() {
             UseSource::Framework => Ok(UseResult::Source(CapabilitySource::<C>::Framework {
                 capability: sources.framework_source(use_.source_name().clone(), mapper)?,
@@ -859,7 +859,7 @@ where
                         find_matching_offers(use_.source_name(), &child_moniker, &parent_offers)
                             .ok_or_else(|| {
                                 <U as ErrorNotFoundFromParent>::error_not_found_from_parent(
-                                    target.abs_moniker().clone(),
+                                    target.moniker().clone(),
                                     use_.source_name().clone(),
                                 )
                             })?;
@@ -867,7 +867,7 @@ where
                 }
             },
             UseSource::Child(name) => {
-                let moniker = target.abs_moniker();
+                let moniker = target.moniker();
                 let child_component = {
                     let child_moniker = ChildMoniker::try_new(name, None)?;
                     target.lock_resolved_state().await?.get_child(&child_moniker).ok_or_else(
@@ -934,14 +934,14 @@ where
         E: ExposeDeclCommon + FromEnum<ExposeDecl> + Clone,
         M: DebugRouteMapper,
     {
-        mapper.add_registration(target.abs_moniker().clone(), registration.clone().into());
+        mapper.add_registration(target.moniker().clone(), registration.clone().into());
         match registration.source() {
             RegistrationSource::Self_ => {
                 let target_capabilities = target.lock_resolved_state().await?.capabilities();
                 Ok(RegistrationResult::Source(CapabilitySource::<C>::Component {
                     capability: sources.find_component_source(
                         registration.source_name(),
-                        target.abs_moniker(),
+                        target.moniker(),
                         &target_capabilities,
                         visitor,
                         mapper,
@@ -991,7 +991,7 @@ where
                     )
                     .ok_or_else(|| {
                         <R as ErrorNotFoundFromParent>::error_not_found_from_parent(
-                            target.abs_moniker().clone(),
+                            target.moniker().clone(),
                             registration.source_name().clone(),
                         )
                     })?;
@@ -1004,7 +1004,7 @@ where
                     target.lock_resolved_state().await?.get_child(&child_moniker).ok_or_else(
                         || RoutingError::EnvironmentFromChildInstanceNotFound {
                             child_moniker,
-                            moniker: target.abs_moniker().clone(),
+                            moniker: target.moniker().clone(),
                             capability_name: registration.source_name().clone(),
                             capability_type: R::TYPE.to_string(),
                         },
@@ -1018,7 +1018,7 @@ where
                             let child_moniker =
                                 child_component.child_moniker().expect("ChildMoniker should exist");
                             <R as ErrorNotFoundInChild>::error_not_found_in_child(
-                                target.abs_moniker().clone(),
+                                target.moniker().clone(),
                                 child_moniker.clone(),
                                 registration.source_name().clone(),
                             )
@@ -1085,7 +1085,7 @@ where
                 }
             };
             if let Some(visit_offer) = visit_offer {
-                mapper.add_offer(target.abs_moniker().clone(), visit_offer.clone().into());
+                mapper.add_offer(target.moniker().clone(), visit_offer.clone().into());
                 OfferVisitor::visit(visitor, &visit_offer)?;
                 route.push(RouteInfo {
                     component: target.clone(),
@@ -1146,7 +1146,7 @@ where
                 let target_capabilities = target.lock_resolved_state().await?.capabilities();
                 let component_capability = sources.find_component_source(
                     offer.source_name(),
-                    target.abs_moniker(),
+                    target.moniker(),
                     &target_capabilities,
                     visitor,
                     mapper,
@@ -1237,7 +1237,7 @@ where
                     find_matching_offers(offer.source_name(), &child_moniker, &parent_offers)
                         .ok_or_else(|| {
                             <O as ErrorNotFoundFromParent>::error_not_found_from_parent(
-                                target.abs_moniker().clone(),
+                                target.moniker().clone(),
                                 offer.source_name().clone(),
                             )
                         })?;
@@ -1273,7 +1273,7 @@ where
                 component.lock_resolved_state().await?.get_child(&child_moniker).ok_or_else(
                     || RoutingError::OfferFromChildInstanceNotFound {
                         child_moniker,
-                        moniker: component.abs_moniker().clone(),
+                        moniker: component.moniker().clone(),
                         capability_id: offer.source_name().clone().into(),
                     },
                 )?
@@ -1284,7 +1284,7 @@ where
                     let child_moniker =
                         child_component.child_moniker().expect("ChildMoniker should exist");
                     <O as ErrorNotFoundInChild>::error_not_found_in_child(
-                        component.abs_moniker().clone(),
+                        component.moniker().clone(),
                         child_moniker.clone(),
                         offer.source_name().clone(),
                     )
@@ -1494,7 +1494,7 @@ where
                 }
             };
             if let Some(visit_expose) = visit_expose {
-                mapper.add_expose(target.abs_moniker().clone(), visit_expose.clone().into());
+                mapper.add_expose(target.moniker().clone(), visit_expose.clone().into());
                 ExposeVisitor::visit(visitor, &visit_expose)?;
                 route.push(RouteInfo {
                     component: target.clone(),
@@ -1552,7 +1552,7 @@ where
                 ExposeSegment::Done(ExposeResult::Source(CapabilitySource::<C>::Component {
                     capability: sources.find_component_source(
                         expose.source_name(),
-                        target.abs_moniker(),
+                        target.moniker(),
                         &target_capabilities,
                         visitor,
                         mapper,
@@ -1579,7 +1579,7 @@ where
                     target.lock_resolved_state().await?.get_child(&child_moniker).ok_or_else(
                         || RoutingError::ExposeFromChildInstanceNotFound {
                             child_moniker,
-                            moniker: target.abs_moniker().clone(),
+                            moniker: target.moniker().clone(),
                             capability_id: expose.source_name().clone().into(),
                         },
                     )?
@@ -1590,7 +1590,7 @@ where
                         let child_moniker =
                             child_component.child_moniker().expect("ChildMoniker should exist");
                         <E as ErrorNotFoundInChild>::error_not_found_in_child(
-                            target.abs_moniker().clone(),
+                            target.moniker().clone(),
                             child_moniker.clone(),
                             expose.source_name().clone(),
                         )
