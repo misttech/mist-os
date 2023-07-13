@@ -1606,7 +1606,7 @@ __attribute__((__visibility__("hidden"))) void* __tls_get_new(size_t offset, siz
     if (p->tls_id == modid)
       break;
   }
-  return mem + offset + DTP_OFFSET;
+  return mem + (ptrdiff_t)offset + (ptrdiff_t)DTP_OFFSET;
 }
 
 LIBC_NO_SAFESTACK thrd_info_t __init_main_thread(zx_handle_t thread_self) {
