@@ -63,9 +63,8 @@ import("//src/developer/ffx/build/ffx_action.gni")
 #     [bool] Usual GN meanings.
 #
 # Product parameters:
-#   assembly_images_config_label (optional)
-#     [label] A label for the above images config file. If not specified, global
-#     args will be used to generate an images config.
+#   assembly_images_config_label (required)
+#     [label] A label for the above images config file.
 #
 #   use_explicit_images_config_only (optional; default=false)
 #     [bool] Whether to bother building a GN-generated images config and
@@ -257,6 +256,8 @@ template("assembled_system") {
   assert(defined(invoker.bootfs_labels), "Need to define bootfs_labels")
   assert(defined(invoker.product_assembly_config_label),
          "Need to define product_assembly_config_label")
+  assert(defined(invoker.assembly_images_config_label),
+         "Need to define assembly_images_config_label")
 
   generate_fvm = false
   if (defined(invoker.generate_fvm)) {
