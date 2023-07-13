@@ -16,11 +16,10 @@
 
 #include "src/connectivity/wlan/drivers/third_party/broadcom/brcmfmac/sdio/sdio.h"
 
+#include <fuchsia/hardware/gpio/c/banjo.h>
+#include <fuchsia/hardware/gpio/cpp/banjo-mock.h>
 #include <fuchsia/hardware/sdio/c/banjo.h>
 #include <fuchsia/hardware/sdio/cpp/banjo-mock.h>
-#include <lib/async-loop/cpp/loop.h>
-#include <lib/async-loop/default.h>
-#include <lib/async_patterns/testing/cpp/dispatcher_bound.h>
 #include <lib/ddk/device.h>
 #include <lib/ddk/metadata.h>
 #include <zircon/errors.h>
@@ -38,7 +37,6 @@
 #include "src/connectivity/wlan/drivers/third_party/broadcom/brcmfmac/device.h"
 #include "src/connectivity/wlan/drivers/third_party/broadcom/brcmfmac/sdio/sdio_device.h"
 #include "src/connectivity/wlan/drivers/third_party/broadcom/brcmfmac/test/stub_device.h"
-#include "src/devices/gpio/testing/fake-gpio/fake-gpio.h"
 #include "src/devices/testing/mock-ddk/mock-device.h"
 
 // These numbers come from real bugs.
@@ -185,12 +183,7 @@ TEST(Sdio, IntrRegisterStartup) {
   sdio_func func1 = {};
   MockSdio sdio1;
   MockSdio sdio2;
-  async::Loop gpio_oob_loop{&kAsyncLoopConfigNoAttachToCurrentThread};
-  async_patterns::TestDispatcherBound<fake_gpio::FakeGpio> gpio_oob{gpio_oob_loop.dispatcher(),
-                                                                    std::in_place};
-  ASSERT_OK(gpio_oob_loop.StartThread("gpio-oob"));
-  // gpio_oob.SyncCall(&fake_gpio::FakeGpio::SetInterrupt,
-  // zx::ok(zx::interrupt(ZX_HANDLE_INVALID)));
+  ddk::MockGpio gpio;
   brcmf_bus bus_if = {};
   brcmf_mp_device settings = {};
   brcmf_sdio_pd sdio_settings = {};
@@ -199,7 +192,7 @@ TEST(Sdio, IntrRegisterStartup) {
   };
 
   sdio_dev.func1 = &func1;
-  sdio_dev.gpios[WIFI_OOB_IRQ_GPIO_INDEX].Bind(gpio_oob.SyncCall(&fake_gpio::FakeGpio::Connect));
+  sdio_dev.gpios[WIFI_OOB_IRQ_GPIO_INDEX] = *gpio.GetProto();
   sdio_dev.sdio_proto_fn1 = *sdio1.GetProto();
   sdio_dev.sdio_proto_fn2 = *sdio2.GetProto();
   sdio_dev.drvr = device.drvr();
@@ -209,22 +202,21 @@ TEST(Sdio, IntrRegisterStartup) {
   sdio_dev.settings = &settings;
   sdio_dev.settings->bus.sdio = &sdio_settings;
 
+  gpio.ExpectConfigIn(ZX_OK, GPIO_NO_PULL)
+      .ExpectGetInterrupt(ZX_OK, ZX_INTERRUPT_MODE_LEVEL_LOW, zx::interrupt(ZX_HANDLE_INVALID));
   sdio1.ExpectEnableFnIntr(ZX_OK).ExpectDoVendorControlRwByte(
       ZX_OK, true, SDIO_CCCR_BRCM_SEPINT, SDIO_CCCR_BRCM_SEPINT_MASK | SDIO_CCCR_BRCM_SEPINT_OE, 0);
   sdio2.ExpectEnableFnIntr(ZX_OK);
 
   EXPECT_OK(brcmf_sdiod_intr_register(&sdio_dev, false));
 
-  std::vector gpio_oob_states = gpio_oob.SyncCall(&fake_gpio::FakeGpio::GetStateLog);
-  ASSERT_EQ(1, gpio_oob_states.size());
-  ASSERT_EQ(fake_gpio::ReadState{.flags = fuchsia_hardware_gpio::GpioFlags::kNoPull},
-            gpio_oob_states[0]);
+  gpio.VerifyAndClear();
   sdio1.VerifyAndClear();
   sdio2.VerifyAndClear();
 
   // Manually join the ISR thread created when the interrupt is registered.
-  ASSERT_OK(sdio_dev.irq_handle.destroy());
   int retval = 0;
+  zx_handle_close(sdio_dev.irq_handle);
   thrd_join(sdio_dev.isr_thread, &retval);
 }
 
@@ -234,10 +226,7 @@ TEST(Sdio, IntrRegisterFwReload) {
   sdio_func func1 = {};
   MockSdio sdio1;
   MockSdio sdio2;
-  async::Loop gpio_oob_loop{&kAsyncLoopConfigNoAttachToCurrentThread};
-  async_patterns::TestDispatcherBound<fake_gpio::FakeGpio> gpio_oob{gpio_oob_loop.dispatcher(),
-                                                                    std::in_place};
-  ASSERT_OK(gpio_oob_loop.StartThread("gpio-oob"));
+  ddk::MockGpio gpio;
   brcmf_bus bus_if = {};
   brcmf_mp_device settings = {};
   brcmf_sdio_pd sdio_settings = {};
@@ -246,7 +235,7 @@ TEST(Sdio, IntrRegisterFwReload) {
   };
 
   sdio_dev.func1 = &func1;
-  sdio_dev.gpios[WIFI_OOB_IRQ_GPIO_INDEX].Bind(gpio_oob.SyncCall(&fake_gpio::FakeGpio::Connect));
+  sdio_dev.gpios[WIFI_OOB_IRQ_GPIO_INDEX] = *gpio.GetProto();
   sdio_dev.sdio_proto_fn1 = *sdio1.GetProto();
   sdio_dev.sdio_proto_fn2 = *sdio2.GetProto();
   sdio_dev.drvr = device.drvr();
@@ -262,8 +251,11 @@ TEST(Sdio, IntrRegisterFwReload) {
 
   EXPECT_OK(brcmf_sdiod_intr_register(&sdio_dev, true));
 
+  gpio.VerifyAndClear();
   sdio1.VerifyAndClear();
   sdio2.VerifyAndClear();
+
+  zx_handle_close(sdio_dev.irq_handle);
 }
 
 TEST(Sdio, IntrDeregister) {

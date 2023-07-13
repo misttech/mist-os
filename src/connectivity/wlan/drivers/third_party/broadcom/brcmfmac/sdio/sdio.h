@@ -17,7 +17,7 @@
 #ifndef SRC_CONNECTIVITY_WLAN_DRIVERS_THIRD_PARTY_BROADCOM_BRCMFMAC_SDIO_SDIO_H_
 #define SRC_CONNECTIVITY_WLAN_DRIVERS_THIRD_PARTY_BROADCOM_BRCMFMAC_SDIO_SDIO_H_
 
-#include <fidl/fuchsia.hardware.gpio/cpp/wire.h>
+#include <fuchsia/hardware/gpio/c/banjo.h>
 #include <fuchsia/hardware/sdio/c/banjo.h>
 #include <lib/ddk/device.h>
 #include <lib/sync/completion.h>
@@ -234,9 +234,9 @@ struct brcmf_sdio_dev {
   uint32_t product_id;
   sdio_protocol_t sdio_proto_fn1;
   sdio_protocol_t sdio_proto_fn2;
-  fidl::WireSyncClient<fuchsia_hardware_gpio::Gpio> gpios[GPIO_COUNT];
+  gpio_protocol_t gpios[GPIO_COUNT];
   bool has_debug_gpio;
-  zx::interrupt irq_handle;
+  zx_handle_t irq_handle;
   thrd_t isr_thread;
   struct brcmf_pub* drvr;
   uint32_t sbwad;             /* Save backplane window address */
@@ -609,7 +609,7 @@ struct brcmf_sdio {
   uint console_interval;
   struct brcmf_console console; /* Console output polling support */
   uint console_addr;            /* Console address from shared struct */
-#endif                          // BRCMF_CONSOLE_LOG
+#endif // BRCMF_CONSOLE_LOG
 
   uint clkstate;     /* State of sd and backplane clock(s) */
   int32_t idletime;  /* Control for activity timeout */
@@ -644,7 +644,7 @@ struct brcmf_sdio {
   bool sr_enabled; /* SaveRestore enabled */
   bool sleeping;
 
-  uint8_t tx_hdrlen; /* sdio bus header length for tx packet */
+  uint8_t tx_hdrlen;      /* sdio bus header length for tx packet */
   bool txglom;
   uint16_t head_align;    /* buffer pointer alignment */
   uint16_t sgentry_align; /* scatter-gather buffer alignment */
