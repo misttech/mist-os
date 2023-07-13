@@ -2218,4 +2218,16 @@ TEST(VmoTestCase, NoWriteResizable) {
                              zx_system_get_page_size(), &child));
 }
 
+TEST(VmoTestCase, OpOutOfBounds) {
+  zx::vmo vmo;
+  ASSERT_OK(zx::vmo::create(zx_system_get_page_size(), 0, &vmo));
+
+  EXPECT_EQ(ZX_ERR_OUT_OF_RANGE,
+            vmo.op_range(ZX_VMO_OP_ZERO, 0, 2 * zx_system_get_page_size(), nullptr, 0));
+
+  // TODO(fxbug.dev/130470): These should fail as well instead of trimming to fit.
+  EXPECT_OK(vmo.op_range(ZX_VMO_OP_COMMIT, 0, 2 * zx_system_get_page_size(), nullptr, 0));
+  EXPECT_OK(vmo.op_range(ZX_VMO_OP_DECOMMIT, 0, 2 * zx_system_get_page_size(), nullptr, 0));
+}
+
 }  // namespace

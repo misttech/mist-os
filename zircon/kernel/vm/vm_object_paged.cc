@@ -1178,15 +1178,14 @@ zx_status_t VmObjectPaged::ZeroRange(uint64_t offset, uint64_t len) {
     return ZX_ERR_BAD_STATE;
   }
 
-  // Trim the size and validate it is in range of the vmo.
-  uint64_t new_len;
-  if (!TrimRange(offset, len, size_locked(), &new_len)) {
+  // Validate the length is in range of the vmo.
+  if (!InRange(offset, len, size_locked())) {
     return ZX_ERR_OUT_OF_RANGE;
   }
 
   // Construct our initial range. Already checked the range above so we know it cannot overflow.
   uint64_t start = offset;
-  uint64_t end = start + new_len;
+  uint64_t end = start + len;
 
   // Helper that checks and establishes our invariants. We use this after calling functions that
   // may have temporarily released the lock.
