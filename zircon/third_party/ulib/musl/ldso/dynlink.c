@@ -60,6 +60,17 @@ static void loader_svc_config(const char* config);
 
 #define KEEP_DSO_VMAR __has_feature(xray_instrument)
 
+// TODO(fxbug.dev/130526): Some ubsan-instrumented functions in the dynlink
+// startup path use too much stack leading to early stackoverflows. In the long
+// run, we'll have a new libc/dynamic linker that can help alleviate this issue,
+// but in the interim, we can selectively disable ubsan instrumentation on
+// select functions to avoid the overflow.
+#if defined(__riscv) && __has_feature(undefined_behavior_sanitizer)
+#define NO_UBSAN_RISCV64 __attribute__((no_sanitize("undefined")))
+#else
+#define NO_UBSAN_RISCV64
+#endif
+
 struct dso {
   // Must be first.
   struct link_map l_map;
@@ -682,7 +693,16 @@ LIBC_NO_SAFESTACK NO_ASAN static void assign_module_id(struct dso* dso) {
 
 // Locate the build ID note just after mapping the segments in.
 // This is called from dls2, so it cannot use any non-static functions.
-LIBC_NO_SAFESTACK NO_ASAN static bool find_buildid_note(struct dso* dso, const Phdr* seg) {
+//
+// TODO(fxbug.dev/130526): Temporarily disable ubsan on this function but only
+// for riscv64. This function in particular has a large amount of type-mismatch
+// checks added via -fsanitize=null,object-size,alignment. The instrumented code
+// should call __ubsan_handle_type_mismatch_v1 on the failing case, and this
+// funciton takes a pointer to a global with type info. The codegen appears to
+// store all unique type info globals into the stack at the start of the
+// function which leads to the stackoverflow.
+LIBC_NO_SAFESTACK NO_ASAN NO_UBSAN_RISCV64 static bool find_buildid_note(struct dso* dso,
+                                                                         const Phdr* seg) {
   const char* end = laddr(dso, seg->p_vaddr + seg->p_filesz);
   for (const struct gnu_note* n = laddr(dso, seg->p_vaddr); (const char*)n < end;
        n = (const void*)((const char*)&n->name + ((n->nhdr.n_namesz + 3) & -4) +
