@@ -25,26 +25,6 @@
 #define DRIVER_NAME "test-composite"
 #define GOLDFISH_TEST_HEAP (0x100000000000fffful)
 
-enum Fragments_1 {
-  FRAGMENT_PDEV_1, /* Should be 1st fragment */
-  FRAGMENT_GPIO_1,
-  FRAGMENT_I2C_1,
-  FRAGMENT_POWER_1,
-  FRAGMENT_COUNT_1,
-};
-
-enum Fragments_2 {
-  FRAGMENT_PDEV_2, /* Should be 1st fragment */
-  FRAGMENT_POWER_2,
-  FRAGMENT_SPI_2,
-  FRAGMENT_COUNT_2,
-};
-
-enum Fragments_GoldfishControl {
-  FRAGMENT_PDEV_GOLDFISH_CTRL, /* Should be 1st fragment */
-  FRAGMENT_COUNT_GOLDFISH_CTRL,
-};
-
 typedef struct {
   zx_device_t* zxdev;
 } test_t;
@@ -154,22 +134,8 @@ static zx_status_t test_bind(void* ctx, zx_device_t* parent) {
 
   zxlogf(INFO, "test_bind: %s ", DRIVER_NAME);
 
-  uint32_t count = device_get_fragment_count(parent);
-  size_t actual;
-  composite_device_fragment_t fragments[FRAGMENT_COUNT_1] = {};
-  device_get_fragments(parent, fragments, count, &actual);
-  if (count != actual) {
-    zxlogf(ERROR, "%s: got the wrong number of fragments (%u, %zu)", DRIVER_NAME, count, actual);
-    return ZX_ERR_BAD_STATE;
-  }
-
   pdev_protocol_t pdev;
-  if (strncmp(fragments[FRAGMENT_PDEV_1].name, "pdev", 32)) {
-    zxlogf(ERROR, "%s: Unexpected name: %s", DRIVER_NAME, fragments[FRAGMENT_PDEV_1].name);
-    return ZX_ERR_INTERNAL;
-  }
-
-  status = device_get_protocol(fragments[FRAGMENT_PDEV_1].device, ZX_PROTOCOL_PDEV, &pdev);
+  status = device_get_fragment_protocol(parent, "pdev", ZX_PROTOCOL_PDEV, &pdev);
   if (status != ZX_OK) {
     zxlogf(ERROR, "%s: could not get protocol ZX_PROTOCOL_PDEV", DRIVER_NAME);
     return status;
@@ -177,14 +143,8 @@ static zx_status_t test_bind(void* ctx, zx_device_t* parent) {
 
   size_t size;
   composite_test_metadata metadata;
-  status =
-      device_get_metadata_size(fragments[FRAGMENT_PDEV_1].device, DEVICE_METADATA_PRIVATE, &size);
-  if (status != ZX_OK || size != sizeof(composite_test_metadata)) {
-    zxlogf(ERROR, "%s: device_get_metadata_size failed: %d", DRIVER_NAME, status);
-    return ZX_ERR_INTERNAL;
-  }
-  status = device_get_metadata(fragments[FRAGMENT_PDEV_1].device, DEVICE_METADATA_PRIVATE,
-                               &metadata, sizeof(metadata), &size);
+  status = device_get_fragment_metadata(parent, "pdev", DEVICE_METADATA_PRIVATE, &metadata,
+                                        sizeof(metadata), &size);
   if (status != ZX_OK || size != sizeof(composite_test_metadata)) {
     zxlogf(ERROR, "%s: device_get_metadata failed: %d", DRIVER_NAME, status);
     return ZX_ERR_INTERNAL;
@@ -199,41 +159,17 @@ static zx_status_t test_bind(void* ctx, zx_device_t* parent) {
   spi_protocol_t spi;
 
   if (metadata.composite_device_id == PDEV_DID_TEST_COMPOSITE_1) {
-    if (count != FRAGMENT_COUNT_1) {
-      zxlogf(ERROR, "%s: got the wrong number of fragments (%u, %d)", DRIVER_NAME, count,
-             FRAGMENT_COUNT_1);
-      return ZX_ERR_BAD_STATE;
-    }
-
-    if (strncmp(fragments[FRAGMENT_GPIO_1].name, "gpio", 32)) {
-      zxlogf(ERROR, "%s: Unexpected name: %s", DRIVER_NAME, fragments[FRAGMENT_GPIO_1].name);
-      return ZX_ERR_INTERNAL;
-    }
-    status = device_get_protocol(fragments[FRAGMENT_GPIO_1].device, ZX_PROTOCOL_GPIO, &gpio);
+    status = device_get_fragment_protocol(parent, "gpio", ZX_PROTOCOL_GPIO, &gpio);
     if (status != ZX_OK) {
       zxlogf(ERROR, "%s: could not get protocol ZX_PROTOCOL_GPIO", DRIVER_NAME);
       return status;
-    }
-    if (strncmp(fragments[FRAGMENT_I2C_1].name, "i2c", 32)) {
-      zxlogf(ERROR, "%s: Unexpected name: %s", DRIVER_NAME, fragments[FRAGMENT_I2C_1].name);
-      return ZX_ERR_INTERNAL;
     }
     if ((status = test_gpio(&gpio)) != ZX_OK) {
       zxlogf(ERROR, "%s: test_gpio failed: %d", DRIVER_NAME, status);
       return status;
     }
   } else if (metadata.composite_device_id == PDEV_DID_TEST_COMPOSITE_2) {
-    if (count != FRAGMENT_COUNT_2) {
-      zxlogf(ERROR, "%s: got the wrong number of components (%u, %d)", DRIVER_NAME, count,
-             FRAGMENT_COUNT_2);
-      return ZX_ERR_BAD_STATE;
-    }
-
-    if (strncmp(fragments[FRAGMENT_SPI_2].name, "spi", 32)) {
-      zxlogf(ERROR, "%s: Unexpected name: %s", DRIVER_NAME, fragments[FRAGMENT_SPI_2].name);
-      return ZX_ERR_INTERNAL;
-    }
-    status = device_get_protocol(fragments[FRAGMENT_SPI_2].device, ZX_PROTOCOL_SPI, &spi);
+    status = device_get_fragment_protocol(parent, "spi", ZX_PROTOCOL_SPI, &spi);
     if (status != ZX_OK) {
       zxlogf(ERROR, "%s: could not get protocol ZX_PROTOCOL_SPI", DRIVER_NAME);
       return status;
@@ -241,12 +177,6 @@ static zx_status_t test_bind(void* ctx, zx_device_t* parent) {
     if ((status = test_spi(&spi)) != ZX_OK) {
       zxlogf(ERROR, "%s: test_spi failed: %d", DRIVER_NAME, status);
       return status;
-    }
-  } else if (metadata.composite_device_id == PDEV_DID_TEST_GOLDFISH_CONTROL_COMPOSITE) {
-    if (count != FRAGMENT_COUNT_GOLDFISH_CTRL) {
-      zxlogf(ERROR, "%s: got the wrong number of fragments (%u, %d)", DRIVER_NAME, count,
-             FRAGMENT_COUNT_GOLDFISH_CTRL);
-      return ZX_ERR_BAD_STATE;
     }
   }
 
