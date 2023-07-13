@@ -108,9 +108,6 @@ if (is_fuchsia) {
     # Enable ffx support.
     "//src/connectivity/network/mdns/bundles:services",  # group for transition
 
-    # Enable SSH (for engineering builds):
-    "//src/developer/sshd-host:config-for_transition",
-
     # Basic command-line tools:
     "//bundles/assembly:third_party_sbase_for_transition",
     "//src/diagnostics/log_listener:for_transition",

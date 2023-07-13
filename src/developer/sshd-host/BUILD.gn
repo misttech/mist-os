@@ -65,11 +65,6 @@ icu_fuchsia_package("sshd-host") {
   icu_deps = [ ":sshd-host-component" ]
 }
 
-# Enabling a soft-transition, remove when complete
-# TODO(122864) Remove transitional labels
-group("config-for_transition") {
-}
-
 config_data_for_assembly("config") {
   for_pkg = "sshd-host"
   sources = [ "//third_party/openssh-portable/fuchsia/sshd_config" ]

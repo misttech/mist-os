@@ -36,9 +36,6 @@ legacy_base_package_labels += [
   "//src/connectivity/bluetooth:core",
   "//src/intl/intl_services:pkg_small",
   "//src/settings/service:setui_service",
-
-  # TODO(fxbug.dev/80375): only include in eng builds
-  "//src/developer/sshd-host:config-for_transition",
 ]
 
 # Add the cache storage manager.
