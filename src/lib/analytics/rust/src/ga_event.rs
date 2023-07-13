@@ -10,6 +10,9 @@ const GA_PROPERTY_KEY: &str = "tid";
 
 const GA_CLIENT_KEY: &str = "cid";
 
+// TODO(fxb/126764) Remove this file when UA is turned down (July 1, 2023)
+
+//
 // TODO(fxb/71579): match zxdb by changing category and action for analytics commands
 // const GA_EVENT_CATEGORY_ANALYTICS: &str = "analytics";
 // const GA_EVENT_CATEGORY_ANALYTICS_ACTION_ENABLE: &str = "manual-enable";
@@ -36,7 +39,7 @@ const GA_PROTOCOL_VAL: &str = "1";
 
 const GA_APP_NAME_KEY: &str = "an";
 const GA_APP_VERSION_KEY: &str = "av";
-const GA_APP_VERSION_DEFAULT: &str = "unknown";
+pub(crate) const GA_APP_VERSION_DEFAULT: &str = "unknown";
 
 const GA_CUSTOM_DIMENSION_1_KEY: &str = "cd1";
 
@@ -145,7 +148,7 @@ pub fn make_timing_body_with_hash(
     body
 }
 
-fn insert_if_present<'a>(
+pub(crate) fn insert_if_present<'a>(
     key: &'a str,
     params: &mut BTreeMap<&'a str, &'a str>,
     value: Option<&'a str>,
@@ -160,7 +163,7 @@ fn insert_if_present<'a>(
     };
 }
 
-fn insert_if_present_or<'a>(
+pub(crate) fn insert_if_present_or<'a>(
     key: &'a str,
     params: &mut BTreeMap<&'a str, &'a str>,
     value: Option<&'a str>,

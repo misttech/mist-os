@@ -13,20 +13,25 @@ const OPT_IN_STATUS_FILENAME: &str = "analytics-status";
 pub const UNKNOWN_APP_NAME: &str = "unknown_app";
 pub const UNKNOWN_VERSION: &str = "unknown build version";
 pub const UNKNOWN_PROPERTY_ID: &str = "unknown ga property id";
+pub const UNKNOWN_GA4_PRODUCT_CODE: &str = "unknown ga4 property";
+pub const UNKNOWN_GA4_KEY: &str = "unknown ga4 key";
 
 /// Maintains and memo-izes the operational state of the analytics service for the app.
-#[derive(Debug, PartialEq)]
+/// TODO(fxb/126764) Once we turn down UA analytics, ~July 2023, remove ga_product_code.
+#[derive(Clone, Debug, PartialEq)]
 pub struct MetricsState {
     pub(crate) app_name: String,
     pub(crate) build_version: String,
     pub(crate) ga_product_code: String,
+    pub(crate) ga4_product_code: String,
+    pub(crate) ga4_key: String,
     pub(crate) status: MetricsStatus,
     pub(crate) uuid: Option<Uuid>,
     metrics_dir: PathBuf,
     pub(crate) invoker: Option<String>,
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 pub(crate) enum MetricsStatus {
     Disabled,  // the environment is set to turn off analytics
     NewUser,   // user has never seen the full analytics notice for the Fuchsia tools
@@ -41,10 +46,21 @@ impl MetricsState {
         app_name: String,
         build_version: String,
         ga_product_code: String,
+        ga4_product_code: String,
+        ga4_key: String,
         disabled: bool,
         invoker: Option<String>,
     ) -> Self {
-        MetricsState::new(metrics_dir, app_name, build_version, ga_product_code, disabled, invoker)
+        MetricsState::new(
+            metrics_dir,
+            app_name,
+            build_version,
+            ga_product_code,
+            ga4_product_code,
+            ga4_key,
+            disabled,
+            invoker,
+        )
     }
 
     pub(crate) fn new(
@@ -52,6 +68,8 @@ impl MetricsState {
         app_name: String,
         build_version: String,
         ga_product_code: String,
+        ga4_product_code: String,
+        ga4_key: String,
         disabled: bool,
         invoker: Option<String>,
     ) -> MetricsState {
@@ -64,6 +82,8 @@ impl MetricsState {
         metrics.build_version = build_version;
         metrics.metrics_dir = PathBuf::from(metrics_dir);
         metrics.ga_product_code = ga_product_code;
+        metrics.ga4_product_code = ga4_product_code;
+        metrics.ga4_key = ga4_key;
         metrics.invoker = invoker;
 
         match read_opt_in_status(Path::new(&metrics_dir)) {
@@ -163,6 +183,8 @@ impl Default for MetricsState {
             app_name: String::from(UNKNOWN_APP_NAME),
             build_version: String::from(UNKNOWN_VERSION),
             ga_product_code: UNKNOWN_PROPERTY_ID.to_string(),
+            ga4_product_code: UNKNOWN_GA4_PRODUCT_CODE.to_string(),
+            ga4_key: UNKNOWN_GA4_KEY.to_string(),
             status: MetricsStatus::NewUser,
             uuid: None,
             metrics_dir: PathBuf::from("/tmp"),
@@ -254,6 +276,8 @@ mod tests {
             app_name: String::from(APP_NAME),
             build_version: String::from(BUILD_VERSION),
             ga_product_code: UNKNOWN_PROPERTY_ID.to_string(),
+            ga4_product_code: UNKNOWN_GA4_PRODUCT_CODE.to_string(),
+            ga4_key: UNKNOWN_GA4_KEY.to_string(),
             status: MetricsStatus::NewUser,
             uuid: Some(Uuid::new_v4()),
             metrics_dir: PathBuf::from("/tmp"),
@@ -269,6 +293,8 @@ mod tests {
             String::from(APP_NAME),
             String::from(BUILD_VERSION),
             UNKNOWN_PROPERTY_ID.to_string(),
+            UNKNOWN_GA4_PRODUCT_CODE.to_string(),
+            UNKNOWN_GA4_KEY.to_string(),
             false,
             None,
         );
@@ -298,6 +324,8 @@ mod tests {
             String::from(APP_NAME),
             String::from(BUILD_VERSION),
             UNKNOWN_PROPERTY_ID.to_string(),
+            UNKNOWN_GA4_PRODUCT_CODE.to_string(),
+            UNKNOWN_GA4_KEY.to_string(),
             false,
             None,
         );
@@ -325,6 +353,8 @@ mod tests {
             String::from(APP_NAME),
             String::from(BUILD_VERSION),
             UNKNOWN_PROPERTY_ID.to_string(),
+            UNKNOWN_GA4_PRODUCT_CODE.to_string(),
+            UNKNOWN_GA4_KEY.to_string(),
             false,
             None,
         );
@@ -348,6 +378,8 @@ mod tests {
             String::from(APP_NAME),
             String::from(BUILD_VERSION),
             UNKNOWN_PROPERTY_ID.to_string(),
+            UNKNOWN_GA4_PRODUCT_CODE.to_string(),
+            UNKNOWN_GA4_KEY.to_string(),
             false,
             None,
         );
@@ -368,6 +400,8 @@ mod tests {
             String::from(APP_NAME),
             String::from(BUILD_VERSION),
             UNKNOWN_PROPERTY_ID.to_string(),
+            UNKNOWN_GA4_PRODUCT_CODE.to_string(),
+            UNKNOWN_GA4_KEY.to_string(),
             true,
             None,
         );
@@ -389,6 +423,8 @@ mod tests {
             String::from(APP_NAME),
             String::from(BUILD_VERSION),
             UNKNOWN_PROPERTY_ID.to_string(),
+            UNKNOWN_GA4_PRODUCT_CODE.to_string(),
+            UNKNOWN_GA4_KEY.to_string(),
             false,
             None,
         );

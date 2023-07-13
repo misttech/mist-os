@@ -16,13 +16,22 @@ use std::{
 use tracing;
 
 pub const GA_PROPERTY_ID: &str = "UA-127897021-9";
+pub const GA4_PROPERTY_ID: &str = "G-L10R82HSYT";
+pub const GA4_KEY: &str = "mHeVJ5GxQTCvAVCmVHn_dw";
 
 pub const ANALYTICS_CLIENTID_CUSTOM_DIMENSION_KEY: &str = "cd5";
 
 pub async fn init_metrics_svc(build_info: VersionInfo, invoker: Option<String>) {
     let build_version = build_info.build_version;
-    init_with_invoker(String::from("ffx"), build_version, GA_PROPERTY_ID.to_string(), invoker)
-        .await;
+    init_with_invoker(
+        String::from("ffx"),
+        build_version,
+        GA_PROPERTY_ID.to_string(),
+        GA4_PROPERTY_ID.to_string(),
+        GA4_KEY.to_string(),
+        invoker,
+    )
+    .await;
 }
 
 pub async fn add_ffx_launch_and_timing_events(sanitized_args: String, time: String) -> Result<()> {

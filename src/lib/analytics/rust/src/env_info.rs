@@ -6,16 +6,19 @@ use home::home_dir;
 use std::path::PathBuf;
 
 pub fn os_and_release_desc() -> String {
-    let os = std::env::consts::OS;
-    format!("{} {}", &capitalize_first_letter(os), std::env::consts::ARCH)
+    format!("{} {}", get_os(), get_arch())
 }
 
-fn capitalize_first_letter(s: &str) -> String {
-    let mut chars = s.chars();
-    match chars.next() {
-        None => String::new(),
-        Some(c) => c.to_uppercase().chain(chars).collect(),
-    }
+pub fn get_os() -> String {
+    convert_macos_to_darwin(std::env::consts::OS)
+}
+
+pub fn get_arch() -> String {
+    std::env::consts::ARCH.to_string()
+}
+
+fn convert_macos_to_darwin(arch: &str) -> String {
+    arch.replace("macos", "Darwin")
 }
 
 pub fn analytics_folder() -> String {
@@ -113,7 +116,7 @@ mod test {
     }
 
     #[test]
-    pub fn test_capitalization() {
-        assert_eq!("Hello", capitalize_first_letter("hello"));
+    pub fn test_arch_macos_conversion() {
+        assert_eq!("Darwin", convert_macos_to_darwin("macos"))
     }
 }

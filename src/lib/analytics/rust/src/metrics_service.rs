@@ -2,6 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+// TODO(fxb/126764) Remove this file when UA is turned down (July 1, 2023)
+
 use {
     anyhow::Result,
     fuchsia_hyper::{new_https_client, HttpsClient},
@@ -15,7 +17,6 @@ use {
 
 use crate::ga_event::*;
 use crate::metrics_state::*;
-use crate::notice::{BRIEF_NOTICE, FULL_NOTICE};
 use crate::MetricsEventBatch;
 
 #[cfg(test)]
@@ -50,38 +51,15 @@ impl MetricsService {
         self.state = state;
     }
 
-    pub(crate) fn inner_get_notice(&self) -> Option<String> {
-        match self.state.status {
-            MetricsStatus::NewUser => {
-                let formatted_for_app: String =
-                    FULL_NOTICE.replace("{app_name}", &self.state.app_name);
-                Some(formatted_for_app.to_owned())
-            }
-            MetricsStatus::NewToTool => {
-                let formatted_for_app: String =
-                    BRIEF_NOTICE.replace("{app_name}", &self.state.app_name);
-                Some(formatted_for_app.to_owned())
-            }
-            _ => None,
-        }
-    }
-
-    pub(crate) fn inner_set_opt_in_status(&mut self, enabled: bool) -> Result<()> {
-        self.state.set_opt_in_status(enabled)
-    }
-
-    pub(crate) fn inner_is_opted_in(&self) -> bool {
+    fn inner_is_opted_in(&self) -> bool {
         self.state.is_opted_in()
     }
-
-    // disable analytics for this invocation only
-    // this does not affect the global analytics state
-    pub fn inner_opt_out_for_this_invocation(&mut self) -> Result<()> {
-        self.state.opt_out_for_this_invocation()
-    }
-
     pub fn uuid_as_str(&self) -> String {
         self.state.uuid.map_or("No uuid".to_string(), |u| u.to_string())
+    }
+
+    pub(crate) fn make_batch(&self) -> MetricsEventBatch {
+        MetricsEventBatch::new()
     }
 
     pub(crate) async fn inner_add_launch_event(
@@ -89,8 +67,6 @@ impl MetricsService {
         args: Option<&str>,
         batch_collector: Option<&mut MetricsEventBatch>,
     ) -> Result<()> {
-        // TODO(fxb/71580): extract param for category when requirements are clear.
-        // For tools with subcommands, e.g. ffx, could be subcommands for better analysis
         self.inner_add_custom_event(None, args, args, BTreeMap::new(), batch_collector).await
     }
 
@@ -102,42 +78,15 @@ impl MetricsService {
         custom_dimensions: BTreeMap<&str, String>,
         batch_collector: Option<&mut MetricsEventBatch>,
     ) -> Result<()> {
-        if self.inner_is_opted_in() {
-            let body = make_body_with_hash(
-                &self.state.app_name,
-                Some(&self.state.build_version),
-                &self.state.ga_product_code,
-                category,
-                action,
-                label,
-                custom_dimensions,
-                self.uuid_as_str(),
-                self.state.invoker.as_ref(),
-            );
-            match batch_collector {
-                None => {
-                    let req = Request::builder()
-                        .method(Method::POST)
-                        .uri(GA_URL)
-                        .body(Body::from(body))?;
-                    let res = self.client.request(req).await;
-                    match res {
-                        Ok(res) => tracing::debug!("Analytics response: {}", res.status()),
-                        Err(e) => tracing::warn!("Error posting analytics: {}", e),
-                    }
-                    Ok(())
-                }
-                Some(bc) => {
-                    bc.add_event_string(body);
-                    Ok(())
-                }
-            }
-        } else {
-            Ok(())
+        if !self.inner_is_opted_in() {
+            return Ok(());
         }
+        let ua_event_body = self.make_ua_post_body(category, action, label, &custom_dimensions);
+        self.handle_event(batch_collector, ua_event_body).await
     }
 
-    // TODO(fxb/70502): Add command crash
+    // TODO should we add the extra events, subcommand, etc now that GA4 is more flexible?
+    // UA format
     // fx exception in subcommand
     // "t=event" \
     // "ec=fx_exception" \
@@ -151,37 +100,24 @@ impl MetricsService {
         fatal: Option<&bool>,
         batch_collector: Option<&mut MetricsEventBatch>,
     ) -> Result<()> {
-        if self.inner_is_opted_in() {
-            let body = make_crash_body_with_hash(
-                &self.state.app_name,
-                Some(&self.state.build_version),
-                &self.state.ga_product_code,
-                description,
-                fatal,
-                BTreeMap::new(),
-                self.uuid_as_str(),
-                self.state.invoker.as_ref(),
-            );
-            match batch_collector {
-                None => {
-                    let req = Request::builder()
-                        .method(Method::POST)
-                        .uri(GA_URL)
-                        .body(Body::from(body))?;
-                    let res = self.client.request(req).await;
-                    match res {
-                        Ok(res) => tracing::debug!("Analytics response: {}", res.status()),
-                        Err(e) => tracing::warn!("Error posting analytics: {}", e),
-                    }
-                    Ok(())
-                }
-                Some(bc) => {
-                    bc.add_event_string(body);
-                    Ok(())
-                }
+        if !self.inner_is_opted_in() {
+            return Ok(());
+        }
+        let ua_event_body = self.make_ua_crash_body(&description, fatal);
+        self.handle_event(batch_collector, ua_event_body).await
+    }
+
+    async fn handle_event(
+        &self,
+        batch_collector: Option<&mut MetricsEventBatch>,
+        ua_event_body: String,
+    ) -> std::result::Result<(), anyhow::Error> {
+        match batch_collector {
+            None => self.http_post_to_ua(ua_event_body, GA_URL).await,
+            Some(bc) => {
+                bc.add_event_string(ua_event_body);
+                Ok(())
             }
-        } else {
-            Ok(())
         }
     }
 
@@ -196,67 +132,103 @@ impl MetricsService {
         custom_dimensions: BTreeMap<&str, String>,
         batch_collector: Option<&mut MetricsEventBatch>,
     ) -> Result<()> {
-        if self.inner_is_opted_in() {
-            let body = make_timing_body_with_hash(
-                &self.state.app_name,
-                Some(&self.state.build_version),
-                &self.state.ga_product_code,
-                category,
-                time,
-                variable,
-                label,
-                custom_dimensions,
-                self.uuid_as_str(),
-                self.state.invoker.as_ref(),
-            );
-            match batch_collector {
-                None => {
-                    let req = Request::builder()
-                        .method(Method::POST)
-                        .uri(GA_URL)
-                        .body(Body::from(body))?;
-                    let res = self.client.request(req).await;
-                    match res {
-                        Ok(res) => tracing::debug!("Analytics response: {}", res.status()),
-                        Err(e) => tracing::warn!("Error posting analytics: {}", e),
-                    }
-                    Ok(())
-                }
-                Some(bc) => {
-                    bc.add_event_string(body);
-                    Ok(())
-                }
-            }
-        } else {
-            Ok(())
+        if !self.inner_is_opted_in() {
+            return Ok(());
         }
+        let ua_event_body = self.make_ua_timing_body(
+            category,
+            time.clone(),
+            variable,
+            label,
+            custom_dimensions.clone(),
+        );
+
+        self.handle_event(batch_collector, ua_event_body).await
     }
 
-    pub(crate) async fn inner_send_events(&self, body: String, batch: bool) -> Result<()> {
-        if self.inner_is_opted_in() {
-            let url = match batch {
-                true => GA_BATCH_URL,
-                false => GA_URL,
-            };
-
-            tracing::trace!(%url, %body, "POSTING ANALYTICS");
-
-            let req = Request::builder().method(Method::POST).uri(url).body(Body::from(body))?;
-            let res = self.client.request(req).await;
-            match res {
-                Ok(mut res) => {
-                    tracing::debug!("Analytics response: {}", res.status());
-                    while let Some(chunk) = res.body_mut().data().await {
-                        tracing::trace!(?chunk);
-                    }
-                    //let result = String::from_utf8(bytes.into_iter().collect()).expect("");
+    async fn http_post_to_ua(&self, post_body: String, url: &str) -> Result<(), anyhow::Error> {
+        let req = Request::builder().method(Method::POST).uri(url).body(Body::from(post_body))?;
+        let res = self.client.request(req).await;
+        match res {
+            Ok(mut res) => {
+                tracing::debug!("UA Analytics response: {}", res.status());
+                while let Some(chunk) = res.body_mut().data().await {
+                    tracing::trace!(?chunk);
                 }
-                Err(e) => tracing::warn!("Error posting analytics: {}", e),
             }
-            Ok(())
-        } else {
-            Ok(())
+            Err(e) => tracing::warn!("Error posting UA analytics: {}", e),
         }
+        Ok(())
+    }
+
+    fn make_ua_post_body(
+        &self,
+        category: Option<&str>,
+        action: Option<&str>,
+        label: Option<&str>,
+        custom_dimensions: &BTreeMap<&str, String>,
+    ) -> String {
+        make_body_with_hash(
+            &self.state.app_name,
+            Some(&self.state.build_version),
+            &self.state.ga_product_code,
+            category,
+            action,
+            label,
+            custom_dimensions.clone(),
+            self.uuid_as_str(),
+            self.state.invoker.as_ref(),
+        )
+    }
+
+    fn make_ua_crash_body(&self, description: &str, fatal: Option<&bool>) -> String {
+        make_crash_body_with_hash(
+            &self.state.app_name,
+            Some(&self.state.build_version),
+            &self.state.ga_product_code,
+            description,
+            fatal,
+            BTreeMap::new(),
+            self.uuid_as_str(),
+            self.state.invoker.as_ref(),
+        )
+    }
+
+    /// Uses event parameters and property state to create post body for
+    /// Google Analytics (Universal)
+    fn make_ua_timing_body(
+        &self,
+        category: Option<&str>,
+        time: String,
+        variable: Option<&str>,
+        label: Option<&str>,
+        custom_dimensions: BTreeMap<&str, String>,
+    ) -> String {
+        make_timing_body_with_hash(
+            &self.state.app_name,
+            Some(&self.state.build_version),
+            &self.state.ga_product_code,
+            category,
+            time,
+            variable,
+            label,
+            custom_dimensions,
+            self.uuid_as_str(),
+            self.state.invoker.as_ref(),
+        )
+    }
+
+    pub(crate) async fn send_ua_events(&self, body: String, batch: bool) -> Result<()> {
+        if !self.inner_is_opted_in() {
+            return Ok(());
+        }
+        let url = match batch {
+            true => GA_BATCH_URL,
+            false => GA_URL,
+        };
+
+        tracing::debug!(%url, %body, "POSTING UA ANALYTICS");
+        self.http_post_to_ua(body, url).await
     }
 }
 
@@ -273,7 +245,6 @@ impl Default for MetricsService {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::metrics_state::write_app_status;
     use crate::metrics_state::write_opt_in_status;
     use crate::metrics_state::UNKNOWN_PROPERTY_ID;
     use std::path::PathBuf;
@@ -288,6 +259,8 @@ mod tests {
         app_name: String,
         build_version: String,
         ga_product_code: String,
+        ga4_product_code: String,
+        ga4_key: String,
         disabled: bool,
     ) -> MetricsService {
         MetricsService {
@@ -297,28 +270,13 @@ mod tests {
                 app_name,
                 build_version,
                 ga_product_code,
+                ga4_product_code,
+                ga4_key,
                 disabled,
                 None,
             ),
             client: new_https_client(),
         }
-    }
-
-    #[test]
-    fn new_user_of_any_tool() -> Result<()> {
-        let dir = create_tmp_metrics_dir()?;
-        let ms = test_metrics_svc(
-            &dir,
-            String::from(APP_NAME),
-            String::from(BUILD_VERSION),
-            UNKNOWN_PROPERTY_ID.to_string(),
-            false,
-        );
-
-        assert_eq!(ms.inner_get_notice(), Some(FULL_NOTICE.replace("{app_name}", APP_NAME)));
-
-        drop(dir);
-        Ok(())
     }
 
     #[test]
@@ -331,87 +289,12 @@ mod tests {
             String::from(APP_NAME),
             String::from(BUILD_VERSION),
             UNKNOWN_PROPERTY_ID.to_string(),
+            UNKNOWN_GA4_PRODUCT_CODE.to_string(),
+            UNKNOWN_GA4_KEY.to_string(),
             false,
         );
 
         assert_eq!(ms.state.status, MetricsStatus::NewToTool);
-        assert_eq!(ms.inner_get_notice(), Some(BRIEF_NOTICE.replace("{app_name}", APP_NAME)));
-        drop(dir);
-        Ok(())
-    }
-
-    #[test]
-    fn existing_user_of_this_tool_opted_in() -> Result<()> {
-        let dir = create_tmp_metrics_dir()?;
-        write_opt_in_status(&dir, true)?;
-        write_app_status(&dir, &APP_NAME, true)?;
-        let ms = test_metrics_svc(
-            &dir,
-            String::from(APP_NAME),
-            String::from(BUILD_VERSION),
-            UNKNOWN_PROPERTY_ID.to_string(),
-            false,
-        );
-
-        assert_eq!(ms.inner_get_notice(), None);
-        drop(dir);
-        Ok(())
-    }
-
-    #[test]
-    fn existing_user_of_this_tool_opted_out() -> Result<()> {
-        let dir = create_tmp_metrics_dir()?;
-        write_opt_in_status(&dir, false)?;
-        write_app_status(&dir, &APP_NAME, true)?;
-        let ms = test_metrics_svc(
-            &dir,
-            String::from(APP_NAME),
-            String::from(BUILD_VERSION),
-            UNKNOWN_PROPERTY_ID.to_string(),
-            false,
-        );
-
-        assert_eq!(ms.inner_get_notice(), None);
-
-        drop(dir);
-        Ok(())
-    }
-
-    #[test]
-    fn with_disable_env_var_set() -> Result<()> {
-        let dir = create_tmp_metrics_dir()?;
-        write_opt_in_status(&dir, true)?;
-        write_app_status(&dir, &APP_NAME, true)?;
-
-        let ms = test_metrics_svc(
-            &dir,
-            String::from(APP_NAME),
-            String::from(BUILD_VERSION),
-            UNKNOWN_PROPERTY_ID.to_string(),
-            true,
-        );
-
-        assert_eq!(ms.inner_get_notice(), None);
-
-        drop(dir);
-        Ok(())
-    }
-
-    #[test]
-    fn opt_out_for_this_invocation() -> Result<()> {
-        let dir = create_tmp_metrics_dir()?;
-        let mut ms = test_metrics_svc(
-            &dir,
-            String::from(APP_NAME),
-            String::from(BUILD_VERSION),
-            UNKNOWN_PROPERTY_ID.to_string(),
-            false,
-        );
-
-        assert_eq!(ms.state.status, MetricsStatus::NewUser);
-        let _res = ms.inner_opt_out_for_this_invocation().unwrap();
-        assert_eq!(ms.state.status, MetricsStatus::OptedOut);
-
         drop(dir);
         Ok(())
     }

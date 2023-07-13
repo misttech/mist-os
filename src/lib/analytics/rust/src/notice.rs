@@ -11,11 +11,11 @@ Fuchsia SDK.
 
 Analytics are not sent on this very first run. To disable reporting, type
 
-    {app_name} config analytics disable
+    ffx config analytics disable
 
 To display the current setting and what is collected, type
 
-    {app_name} config analytics show
+    ffx config analytics show
 
 If you opt out of analytics, an opt-out event will be sent, and then no
 further information will be sent by the developer tools to Google.
@@ -31,7 +31,7 @@ See Google's privacy policy:
 https://policies.google.com/privacy
 ";
 
-pub const BRIEF_NOTICE: &str = "Welcome to {app_name}!
+pub const BRIEF_NOTICE: &str = "Welcome to Fuchsia!
 
 As part of the Fuchsia developer tools, this tool uses Google Analytics to
 report feature usage statistics and basic crash reports. Google may examine the
@@ -40,12 +40,12 @@ Fuchsia tools, and the Fuchsia SDK.
 
 To disable reporting, type
 
-    {app_name} config analytics disable
+    ffx config analytics disable
 
 To display the current setting, a full list of tools sharing this setting, and
 what is collected, type
 
-    {app_name} config analytics show
+    ffx config analytics show
 
 If you opt out of analytics, an opt-out event will be sent, and then no further
 information will be sent by the developer tools to Google.
