@@ -2,13 +2,12 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#![allow(dead_code)]
-
 use anyhow::{bail, Result};
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, HashMap};
 use std::fmt::Debug;
 use std::time::{SystemTime, UNIX_EPOCH};
+use tracing;
 
 const POST_EVENT_COUNT_MAX: usize = 25;
 const EVENT_PARAM_COUNT_MAX: usize = 25;
@@ -20,7 +19,6 @@ const PARAM_VALUE_LENGTH_MAX: usize = 100;
 const USER_PROPERTY_NAME_LENGTH_MAX: usize = 24;
 const USER_PROPERTY_VALUE_LENGTH_MAX: usize = 36;
 const ITEM_PARAM_COUNT_MAX: usize = 10;
-const POST_BODY_SIZE_BYTES_MAX: usize = 133120;
 
 /// These structs model the Measurement Protocol format of Google Analytics 4.
 /// This is to provide easy validation and json serialization of POST data.
@@ -96,7 +94,7 @@ impl Params {
     }
 
     fn validate_params(&self) -> std::result::Result<(), anyhow::Error> {
-        validate_map_new(&self.params, PARAM_NAME_LENGTH_MAX, |v: &GA4Value| match v {
+        validate_map(&self.params, PARAM_NAME_LENGTH_MAX, |v: &GA4Value| match v {
             GA4Value::Str(s) => s.len() > PARAM_VALUE_LENGTH_MAX,
             _ => false,
         })
@@ -227,7 +225,7 @@ impl Post {
                 if props.keys().len() > EVENT_USER_PROPERTY_COUNT_MAX {
                     bail!("Too many user parameters. Limit is {}", EVENT_USER_PROPERTY_COUNT_MAX)
                 }
-                validate_map_new(props, USER_PROPERTY_NAME_LENGTH_MAX, |v: &ValueObject| {
+                validate_map(props, USER_PROPERTY_NAME_LENGTH_MAX, |v: &ValueObject| {
                     v.validate().is_err()
                 })
             }
@@ -361,17 +359,17 @@ pub fn validate_string_len(string: &str, max_len: usize) -> Result<(), anyhow::E
 
 /// Ensure that the keys and values of a map
 /// adhere to the Measurement Protocol constraints.
-/// The value_predicate parameter allows differing
-fn validate_map_new<'a, F: Fn(&V) -> bool, V: Debug>(
+/// The value_predicate parameter allows differing tests on values.
+fn validate_map<'a, F: Fn(&V) -> bool, V: Debug>(
     hash_map: &'a HashMap<String, V>,
     key_max_length: usize,
-    value_predicate: F,
+    value_error_predicate: F,
 ) -> std::result::Result<(), anyhow::Error> {
     for (k, v) in hash_map {
         if k.len() > key_max_length {
             bail!("Key too long: {:?}", k);
         }
-        if !value_predicate(v) {
+        if value_error_predicate(v) {
             bail!("Value too long: {:?}", v);
         }
     }
@@ -458,60 +456,75 @@ mod tests {
         assert!(result.is_ok());
     }
 
-    // #[test]
-    // fn validate_keys_none() {
-    //     let map: &mut HashMap<String, GA4Value> = &mut HashMap::new();
-    //     assert!(validate_keys(&map, 10).is_ok());
-    // }
+    #[test]
+    fn validate_keys_none() {
+        let map: &mut HashMap<String, GA4Value> = &mut HashMap::new();
+        assert!(validate_map(&map, 10, |v: &GA4Value| match v {
+            GA4Value::Str(s) => {
+                s.len() > 10
+            }
+            _ => false,
+        })
+        .is_ok());
+    }
 
-    // #[test]
-    // fn validate_keys_one_too_long() {
-    //     let map: &mut HashMap<String, GA4Value> =
-    //         &mut HashMap::from([("key_too_long".to_string(), GA4Value::Str("value".to_string()))]);
-    //     assert!(validate_keys(&map, 10).is_err());
-    // }
+    #[test]
+    fn validate_keys_one_too_long() {
+        let map: &mut HashMap<String, GA4Value> =
+            &mut HashMap::from([("key_too_long".to_string(), GA4Value::Str("value".to_string()))]);
+        assert!(validate_map(&map, 10, |v: &GA4Value| match v {
+            GA4Value::Str(s) => {
+                s.len() > 10
+            }
+            _ => false,
+        })
+        .is_err());
+    }
 
-    // #[test]
-    // fn validate_keys_one_ok() {
-    //     let map =
-    //         &mut HashMap::from([("key_too_long".to_string(), GA4Value::Str("value".to_string()))]);
-    //     assert!(validate_keys(&map, 12).is_ok());
-    // }
+    #[test]
+    fn validate_keys_one_ok() {
+        let map =
+            &mut HashMap::from([("key_too_long".to_string(), GA4Value::Str("value".to_string()))]);
+        assert!(validate_map(&map, 12, |v: &GA4Value| match v {
+            GA4Value::Str(s) => {
+                s.len() > 10
+            }
+            _ => false,
+        })
+        .is_ok());
+    }
 
-    // #[test]
-    // fn validate_values_none() {
-    //     let map: &mut HashMap<String, GA4Value> = &mut HashMap::new();
-    //     let predicate = |v: &&GA4Value| match v {
-    //         GA4Value::Str(s) => s.chars().count() > PARAM_VALUE_LENGTH_MAX,
-    //         _ => false,
-    //     };
-    //     let result = validate_values(&map, &predicate);
-    //     assert!(result.is_ok());
-    // }
+    #[test]
+    fn validate_values_none() {
+        let map: &mut HashMap<String, GA4Value> = &mut HashMap::new();
+        let result = validate_map(&map, PARAM_NAME_LENGTH_MAX, |v: &GA4Value| match v {
+            GA4Value::Str(s) => s.chars().count() > PARAM_VALUE_LENGTH_MAX,
+            _ => false,
+        });
+        assert!(result.is_ok());
+    }
 
-    // #[test]
-    // fn validate_values_one_good() {
-    //     let map: &mut HashMap<String, GA4Value> =
-    //         &mut HashMap::from([("ok_key".to_string(), GA4Value::Str("ok_value".to_string()))]);
-    //     let predicate = |v: &&GA4Value| match v {
-    //         GA4Value::Str(s) => s.chars().count() > PARAM_VALUE_LENGTH_MAX,
-    //         _ => false,
-    //     };
-    //     let result = validate_values(&map, &predicate);
-    //     assert!(result.is_ok());
-    // }
+    #[test]
+    fn validate_values_one_good() {
+        let map: &mut HashMap<String, GA4Value> =
+            &mut HashMap::from([("ok_key".to_string(), GA4Value::Str("ok_value".to_string()))]);
+        let result = validate_map(&map, PARAM_NAME_LENGTH_MAX, |v: &GA4Value| match v {
+            GA4Value::Str(s) => s.chars().count() > PARAM_VALUE_LENGTH_MAX,
+            _ => false,
+        });
+        assert!(result.is_ok());
+    }
 
-    // #[test]
-    // fn validate_values_one_too_long() {
-    //     let map: &mut HashMap<String, GA4Value> =
-    //         &mut HashMap::from([("ok_key".to_string(), GA4Value::Str("12345678901".to_string()))]);
-    //     let predicate = |v: &&GA4Value| match v {
-    //         GA4Value::Str(s) => s.chars().count() > 10,
-    //         _ => false,
-    //     };
-    //     let result = validate_values(&map, &predicate);
-    //     assert!(result.is_err());
-    // }
+    #[test]
+    fn validate_values_one_too_long() {
+        let map: &mut HashMap<String, GA4Value> =
+            &mut HashMap::from([("ok_key".to_string(), GA4Value::Str("12345678901".to_string()))]);
+        let result = validate_map(&map, PARAM_NAME_LENGTH_MAX, |v: &GA4Value| match v {
+            GA4Value::Str(s) => s.chars().count() > 10,
+            _ => false,
+        });
+        assert!(result.is_err());
+    }
 
     #[test]
     fn convert_to_ga4value_types() {
