@@ -75,79 +75,64 @@ For more details on component URL syntax, see the
 
 ## Monikers {#monikers}
 
-A [component moniker][glossary.moniker] identifies a specific component instance
-in the component instance tree using a topological path.
+A [component moniker][glossary.moniker] is a string that identifies a specific
+component instance in the component instance tree using a topological path. It
+follows similar semantics to `fuchsia.io` paths.
+
+Each path element is the name assigned by a parent component to its child,
+ultimately identifying the "leaf component" corresponding to the last path
+element.
+
+Monikers are always relative to something: a parent component, or the root of
+the entire component topology.
+
+### Usage
+
+Some examples of component monikers:
+
+- `.`: Self-referential moniker. For example, the root component (the
+  first component launched by `component_manager`) can be referred to using
+  this moniker. Other uses are context-dependent.
+- `alice/carol/sandy`: Uniquely identifies the component instance
+  "sandy" as the descendent of "alice" and "carol".
+- `alice/support:dan`: Uniquely identifies the component instance "dan"
+  as an element in the "support" collection descended from "alice".
+
+Monikers are passed to developer tools, such as
+[`ffx component explore`][component-explore], to identify specific component
+instances on a target device. They also make up the first part of the
+[diagnostic selectors][diagnostic-selectors] syntax.
+
+Monikers are used by [developer tool implementations][component-select] to
+interact with specific component instances on a target device.
+
+For more details on component moniker syntax, see the
+[component moniker reference][moniker-reference].
 
 ### Design principles
 
 #### Stability
 
-Monikers are stable identifiers. Assuming the component topology does not
-change, the monikers used to identify component instances in the topology
-will remain the same.
-
-#### Uniqueness
-
-Each time a component instance is destroyed and a new component instance with
-the same name is created in its place in the component topology (as a child
-of the same parent), the new instance is assigned a unique instance identifier
-to distinguish it from prior instances in that place.
-
-Monikers include unique instance identifiers to prevent confusion of old
-component instances with new component instances of the same name as the
-tree evolves.
+Monikers are stable identifiers so long as the component topology leading
+to that component does not change.
 
 #### Privacy
 
 Monikers may contain privacy-sensitive information about other components that
 the user is running.
 
-To preserve the encapsulation of the system, components should be unable to
-determine the identity of other components running outside of their own
-realm. Accordingly, monikers are only transmitted on a need-to-know basis
-or in an obfuscated form.
+To preserve the encapsulation of components, components are unable to
+determine the moniker of other components running outside of their own
+realm. Components cannot learn their own moniker, that of their parent, or
+of siblings.
 
-For example, components are not given information about their own absolute
-moniker because it would also reveal information about their parents and
-ancestors.
-
-Monikers may be collected in system logs. They are also used to implement the
-component framework's persistence features.
-
-### Usage
-
-The primary use of monikers is to identify component instances at runtime.
-There are three types of component monikers:
-
--   Absolute moniker: Denotes the path from the root of the component instance
-    tree to a target component instance.
--   Child moniker: Denotes the path of a child of a component instance relative
-    to its parent.
--   Relative moniker: Denotes the path from a source component instance to a
-    target component instance.
-
-Every component instance has a unique absolute moniker. Consider the following
-example component instance tree:
-
-<br>![Diagram of Absolute Monikers](/docs/reference/components/images/monikers_absolute.png)<br>
-
--   `/alice:0/carol:0/sandy:0`: Uniquely identifies the component instance
-    "sandy" as the descendent of "alice" and "carol".
--   `/alice:0/support:dan:0`: Uniquely identifies the component instance "dan"
-    as an element in the "support" collection descended from "alice".
-
-Note: Both components could resolve from the same **component URL**, but since
-they are two different instances at runtime they have different **monikers**.
-
-Monikers are used by [developer tools][component-select] to interact with
-component instances on a target device.
-
-For more details on component moniker syntax, see the
-[component moniker reference][moniker-reference].
+Monikers may appear in system logs and the output of developer tools.
 
 [glossary.component-url]: /docs/glossary/README.md#component-url
 [glossary.moniker]: /docs/glossary/README.md#moniker
+[component-explore]: /docs/development/sdk/ffx/explore-components.md
 [component-select]: /docs/development/tools/ffx/commands/component-select.md
+[diagnostic-selectors]: /docs/reference/diagnostics/selectors.md
 [doc-manifests-children]: https://fuchsia.dev/reference/cml#children
 [doc-manifests-declaration]: /docs/concepts/components/v2/component_manifests.md#component-declaration
 [doc-package]: /docs/concepts/packages/package.md
