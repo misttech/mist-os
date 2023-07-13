@@ -236,8 +236,8 @@ std::unique_ptr<async::Wait> ObjectLinkerBase::WaitForPeerDeath(zx_handle_t endp
   static_assert(ZX_SOCKET_PEER_CLOSED == __ZX_OBJECT_PEER_CLOSED, "enum mismatch");
   auto waiter = std::make_unique<async::Wait>(
       endpoint_handle, __ZX_OBJECT_PEER_CLOSED, 0,
-      [this, endpoint_id, is_import](async_dispatcher_t*, async::Wait*, zx_status_t status,
-                                     const zx_packet_signal_t*) {
+      [weak_this = weak_ptr_factory_.GetWeakPtr(), endpoint_id, is_import](
+          async_dispatcher_t*, async::Wait*, zx_status_t status, const zx_packet_signal_t*) {
         if (status == ZX_ERR_CANCELED) {
           // (1) Can happen if this callback's dispatcher is shutting down.
           //     GFX runs these callbacks on the main (render) thread, and Flatland runs it on the
@@ -248,25 +248,29 @@ std::unique_ptr<async::Wait> ObjectLinkerBase::WaitForPeerDeath(zx_handle_t endp
           return;
         }
 
-        auto access = GetScopedAccess();
-        auto& endpoints = is_import ? imports_ : exports_;
-        auto endpoint_iter = endpoints.find(endpoint_id);
-        if (endpoint_iter == endpoints.end()) {
-          // Can happen if this callback executes after the async::Wait object
-          // gets destroyed on another (Flatland) thread, and the cancel was lost.
-          return;
-        }
-        Endpoint& endpoint = endpoint_iter->second;
+        // If `this` has been destroyed, there isn't really anything we can do here, so skip
+        // entirely.
+        if (weak_this.get() != nullptr) {
+          auto access = weak_this->GetScopedAccess();
+          auto& endpoints = is_import ? weak_this->imports_ : weak_this->exports_;
+          auto endpoint_iter = endpoints.find(endpoint_id);
+          if (endpoint_iter == endpoints.end()) {
+            // Can happen if this callback executes after the async::Wait object
+            // gets destroyed on another (Flatland) thread, and the cancel was lost.
+            return;
+          }
+          Endpoint& endpoint = endpoint_iter->second;
 
-        // Invalidate the endpoint.  If Initialize() has
-        // already been called on the endpoint, then close
-        // its connection (which will cause it to be
-        // destroyed).  Any future connection attempts will
-        // fail immediately with a link_failed call, due to
-        // peer_endpoint_id being marked as invalid.
-        endpoint.peer_endpoint_id = ZX_KOID_INVALID;
-        if (endpoint.link) {
-          endpoint.link->Invalidate(/*on_destruction=*/false, /*invalidate_peer=*/true);
+          // Invalidate the endpoint.  If Initialize() has
+          // already been called on the endpoint, then close
+          // its connection (which will cause it to be
+          // destroyed).  Any future connection attempts will
+          // fail immediately with a link_failed call, due to
+          // peer_endpoint_id being marked as invalid.
+          endpoint.peer_endpoint_id = ZX_KOID_INVALID;
+          if (endpoint.link) {
+            endpoint.link->Invalidate(/*on_destruction=*/false, /*invalidate_peer=*/true);
+          }
         }
       });
 

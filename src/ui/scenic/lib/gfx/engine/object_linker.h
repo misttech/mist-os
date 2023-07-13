@@ -18,6 +18,7 @@
 #include <unordered_map>
 
 #include "src/lib/fxl/macros.h"
+#include "src/lib/fxl/memory/weak_ptr.h"
 #include "src/ui/scenic/lib/scenic/util/error_reporter.h"
 #include "src/ui/scenic/lib/utils/dispatcher_holder.h"
 
@@ -82,7 +83,7 @@ class ObjectLinkerBase {
     bool IsUnresolved() const { return peer_death_waiter != nullptr; }
   };
 
-  ObjectLinkerBase() = default;
+  ObjectLinkerBase() : weak_ptr_factory_(this) {}
 
   // Creates a new Endpoint for linking and reports any errors in creation
   // using |error_reporter|.
@@ -152,6 +153,8 @@ class ObjectLinkerBase {
 
  private:
   std::recursive_mutex mutex_;
+
+  fxl::WeakPtrFactory<ObjectLinkerBase> weak_ptr_factory_;
 
   FXL_DISALLOW_COPY_AND_ASSIGN(ObjectLinkerBase);
 };
