@@ -128,3 +128,5 @@ partitions_config_contents +=
 zedboot_images_config_label = "//boards/images:zedboot_vim3"
 bringup_images_config_label = "//boards/images:bringup_vim3"
 bringup_fastboot_images_config_label = "//boards/images:bringup_fastboot_vim3"
+
+bazel_product_bundle_board = "vim3"
