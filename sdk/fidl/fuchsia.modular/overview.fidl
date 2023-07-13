@@ -1,5 +1,13 @@
 // Copyright 2022 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
-@available(added=7)
+
+/// # Deprecation
+///
+/// The Modular framework, which serves and uses these protocols, has been
+/// removed from the Fuchsia platform in https://fxrev.dev/871560.
+///
+/// The fuchsia.session.* and fuchsia.element.* APIs are a replacement
+/// for Modular's session and module functionality, respectively.
+@available(added=7, removed=13)
 library fuchsia.modular;

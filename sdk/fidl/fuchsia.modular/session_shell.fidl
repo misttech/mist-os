@@ -71,7 +71,6 @@ closed protocol SessionShellContext {
         request server_end:ComponentContext;
     });
 
-    @available(removed=14, legacy=true)
     strict GetPresentation(resource struct {
         @available(deprecated=10, note="implementation deleted")
         request server_end:fuchsia.ui.policy.Presentation;
