@@ -2,15 +2,31 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 use {
-    crate::cap::{AnyCapability, AnyCloneCapability, Capability, Remote, TryIntoOpen},
+    crate::{
+        cap::{
+            AnyCapability, AnyCloneCapability, Capability, Remote, TryIntoOpen, TryIntoOpenError,
+        },
+        open::Open,
+    },
     anyhow::{Context, Error},
     fidl::endpoints::create_request_stream,
-    fidl_fuchsia_component_bedrock as fbedrock, fuchsia_async as fasync, fuchsia_zircon as zx,
+    fidl_fuchsia_component_bedrock as fbedrock, fidl_fuchsia_io as fio, fuchsia_async as fasync,
+    fuchsia_zircon as zx,
     fuchsia_zircon::HandleBased,
     futures::TryStreamExt,
     futures::{future::BoxFuture, FutureExt},
     std::collections::hash_map::Entry,
     std::collections::HashMap,
+    vfs::{
+        directory::{
+            entry::DirectoryEntry,
+            helper::{AlreadyExists, DirectlyMutable},
+            immutable::simple as pfs,
+        },
+        execution_scope::ExecutionScope,
+        name::{Name, ParseNameError},
+        path::Path,
+    },
 };
 
 pub type Key = String;
@@ -87,6 +103,29 @@ where
 
         (dict_client_end.into_handle(), Some(fut.boxed()))
     }
+
+    fn try_into_open(self: Box<Self>) -> Result<Open, TryIntoOpenError> {
+        let dir = pfs::simple();
+        for (key, value) in self.entries.into_iter() {
+            let key: Name =
+                key.try_into().map_err(|e: ParseNameError| TryIntoOpenError::ParseNameError(e))?;
+            match dir.add_entry_impl(key, value.try_into_open()?.into_remote(), false) {
+                Ok(()) => {}
+                Err(AlreadyExists) => {
+                    unreachable!("Dict items should be unique");
+                }
+            }
+        }
+        Ok(Open::new(
+            move |scope: ExecutionScope,
+                  flags: fio::OpenFlags,
+                  relative_path: Path,
+                  server_end: zx::Channel| {
+                dir.clone().open(scope.clone(), flags, relative_path, server_end.into())
+            },
+            fio::DirentType::Directory,
+        ))
+    }
 }
 
 impl Remote for Dict<AnyCapability> {
@@ -101,8 +140,17 @@ impl Remote for Dict<AnyCloneCapability> {
     }
 }
 
-impl TryIntoOpen for Dict<AnyCapability> {}
-impl TryIntoOpen for Dict<AnyCloneCapability> {}
+impl TryIntoOpen for Dict<AnyCapability> {
+    fn try_into_open(self: Box<Self>) -> Result<Open, TryIntoOpenError> {
+        self.try_into_open()
+    }
+}
+
+impl TryIntoOpen for Dict<AnyCloneCapability> {
+    fn try_into_open(self: Box<Self>) -> Result<Open, TryIntoOpenError> {
+        self.try_into_open()
+    }
+}
 
 impl Capability for Dict<AnyCapability> {}
 impl Capability for Dict<AnyCloneCapability> {}
@@ -116,10 +164,13 @@ mod tests {
         },
         anyhow::{anyhow, Error},
         assert_matches::assert_matches,
-        fidl::endpoints::create_proxy_and_stream,
+        fidl::endpoints::{create_endpoints, create_proxy_and_stream, Proxy},
         fidl_fuchsia_component_bedrock as fbedrock,
+        fuchsia_fs::directory::DirEntry,
         fuchsia_zircon::{self as zx, AsHandleRef},
         futures::try_join,
+        lazy_static::lazy_static,
+        test_util::Counter,
     };
 
     const CAP_KEY: &str = "cap";
@@ -333,5 +384,122 @@ mod tests {
         assert_eq!(got_koid, expected_koid);
 
         Ok(())
+    }
+
+    #[fuchsia::test]
+    async fn try_into_open_error_not_supported() {
+        let event = zx::Event::create();
+        let mut dict = Dict::<AnyCapability>::new();
+        dict.entries.insert(CAP_KEY.to_string(), Box::new(Handle::from(event.into_handle())));
+        assert_matches!(Box::new(dict).try_into_open(), Err(TryIntoOpenError::DoesNotSupportOpen));
+    }
+
+    #[fuchsia::test]
+    async fn try_into_open_error_invalid_name() {
+        let placeholder_open = Open::new(
+            move |_scope: ExecutionScope,
+                  _flags: fio::OpenFlags,
+                  _relative_path: Path,
+                  _server_end: zx::Channel| {
+                unreachable!();
+            },
+            fio::DirentType::Directory,
+        );
+        let mut dict = Dict::<AnyCapability>::new();
+        // This string is too long to be a valid fuchsia.io name.
+        let bad_name = "a".repeat(10000);
+        dict.entries.insert(bad_name, Box::new(placeholder_open));
+        assert_matches!(Box::new(dict).try_into_open(), Err(TryIntoOpenError::ParseNameError(_)));
+    }
+
+    /// Convert a dict `{ CAP_KEY: open }` to [Open].
+    #[fuchsia::test]
+    async fn try_into_open_success() {
+        lazy_static! {
+            static ref OPEN_COUNT: Counter = Counter::new(0);
+        }
+
+        let open = Open::new(
+            move |_scope: ExecutionScope,
+                  _flags: fio::OpenFlags,
+                  relative_path: Path,
+                  server_end: zx::Channel| {
+                assert_eq!(relative_path.into_string(), "bar");
+                OPEN_COUNT.inc();
+                drop(server_end);
+            },
+            fio::DirentType::Directory,
+        );
+        let mut dict = Dict::<AnyCapability>::new();
+        dict.entries.insert(CAP_KEY.to_string(), Box::new(open));
+        let dict_open = Box::new(dict).try_into_open().expect("convert dict into Open capability");
+
+        let remote = dict_open.into_remote();
+        let scope = ExecutionScope::new();
+        let (dir_client_end, dir_server_end) = create_endpoints::<fio::DirectoryMarker>();
+        remote.clone().open(
+            scope.clone(),
+            fio::OpenFlags::DIRECTORY,
+            vfs::path::Path::dot(),
+            dir_server_end.into_channel().into(),
+        );
+
+        assert_eq!(OPEN_COUNT.get(), 0);
+        let (client_end, server_end) = zx::Channel::create();
+        let dir = dir_client_end.channel();
+        fdio::service_connect_at(dir, &format!("{CAP_KEY}/bar"), server_end).unwrap();
+        fasync::Channel::from_channel(client_end).unwrap().on_closed().await.unwrap();
+        assert_eq!(OPEN_COUNT.get(), 1);
+    }
+
+    /// Convert a dict `{ CAP_KEY: { CAP_KEY: open } }` to [Open].
+    #[fuchsia::test]
+    async fn try_into_open_success_nested() {
+        lazy_static! {
+            static ref OPEN_COUNT: Counter = Counter::new(0);
+        }
+
+        let open = Open::new(
+            move |_scope: ExecutionScope,
+                  _flags: fio::OpenFlags,
+                  relative_path: Path,
+                  server_end: zx::Channel| {
+                assert_eq!(relative_path.into_string(), "bar");
+                OPEN_COUNT.inc();
+                drop(server_end);
+            },
+            fio::DirentType::Directory,
+        );
+        let mut inner_dict = Dict::<AnyCapability>::new();
+        inner_dict.entries.insert(CAP_KEY.to_string(), Box::new(open));
+        let mut dict = Dict::<AnyCapability>::new();
+        dict.entries.insert(CAP_KEY.to_string(), Box::new(inner_dict));
+
+        let dict_open = Box::new(dict).try_into_open().expect("convert dict into Open capability");
+
+        let remote = dict_open.into_remote();
+        let scope = ExecutionScope::new();
+        let (dir_client_end, dir_server_end) = create_endpoints::<fio::DirectoryMarker>();
+        remote.clone().open(
+            scope.clone(),
+            fio::OpenFlags::DIRECTORY,
+            vfs::path::Path::dot(),
+            dir_server_end.into_channel().into(),
+        );
+
+        // List the outer directory and verify the contents.
+        let dir = dir_client_end.into_proxy().unwrap();
+        assert_eq!(
+            fuchsia_fs::directory::readdir(&dir).await.unwrap(),
+            vec![DirEntry { name: CAP_KEY.to_string(), kind: fio::DirentType::Directory },]
+        );
+
+        // Open the inner most capability.
+        assert_eq!(OPEN_COUNT.get(), 0);
+        let (client_end, server_end) = zx::Channel::create();
+        let dir = dir.into_channel().unwrap().into_zx_channel();
+        fdio::service_connect_at(&dir, &format!("{CAP_KEY}/{CAP_KEY}/bar"), server_end).unwrap();
+        fasync::Channel::from_channel(client_end).unwrap().on_closed().await.unwrap();
+        assert_eq!(OPEN_COUNT.get(), 1)
     }
 }

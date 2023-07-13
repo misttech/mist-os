@@ -10,6 +10,7 @@ use {
     dyn_clone::{clone_trait_object, DynClone},
     fuchsia_zircon as zx,
     futures::future::BoxFuture,
+    thiserror::Error,
 };
 
 /// The capability trait, implemented by all capabilities.
@@ -67,8 +68,19 @@ pub trait Remote {
     fn to_zx_handle(self: Box<Self>) -> (zx::Handle, Option<BoxFuture<'static, ()>>);
 }
 
-/// This error is returned when a capability does not support the open operation.
-pub struct DoesNotSupportOpen;
+/// This error is returned when a capability cannot be converted into an [Open] capability.
+#[derive(Error, Debug)]
+pub enum TryIntoOpenError {
+    /// Converting to [Open] involved a string name that is not a valid `fuchsia.io` node name.
+    #[error(
+        "converting to Open involved a string name that is not a valid `fuchsia.io` node name"
+    )]
+    ParseNameError(#[from] vfs::name::ParseNameError),
+
+    /// The capability does not support converting into an [Open] capability.
+    #[error("the capability does not support converting into an Open capability")]
+    DoesNotSupportOpen,
+}
 
 /// This trait is introduced as an extra indirection behind [TryInto<Open>] because
 /// [TryInto] is not object-safe [1]. The type-erased `dyn Capability` will require all
@@ -78,19 +90,19 @@ pub struct DoesNotSupportOpen;
 pub trait TryIntoOpen {
     /// Attempt to transform the capability into an [Open] capability, which let us mount it
     /// as a node inside a `fuchsia.io` directory and open it using `fuchsia.io/Directory.Open`.
-    fn try_into_open(self: Box<Self>) -> Result<Open, DoesNotSupportOpen> {
-        Err(DoesNotSupportOpen {})
+    fn try_into_open(self: Box<Self>) -> Result<Open, TryIntoOpenError> {
+        Err(TryIntoOpenError::DoesNotSupportOpen)
     }
 }
 
 impl<T: Into<Open>> TryIntoOpen for T {
-    fn try_into_open(self: Box<Self>) -> Result<Open, DoesNotSupportOpen> {
+    fn try_into_open(self: Box<Self>) -> Result<Open, TryIntoOpenError> {
         Ok((*self).into())
     }
 }
 
 impl TryInto<Open> for AnyCapability {
-    type Error = DoesNotSupportOpen;
+    type Error = TryIntoOpenError;
 
     fn try_into(self: Self) -> Result<Open, Self::Error> {
         self.try_into_open()
@@ -98,7 +110,7 @@ impl TryInto<Open> for AnyCapability {
 }
 
 impl TryInto<Open> for AnyCloneCapability {
-    type Error = DoesNotSupportOpen;
+    type Error = TryIntoOpenError;
 
     fn try_into(self: Self) -> Result<Open, Self::Error> {
         self.try_into_open()

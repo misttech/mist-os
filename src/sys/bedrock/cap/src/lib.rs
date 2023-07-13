@@ -9,7 +9,9 @@ pub mod dict;
 pub mod handle;
 pub mod open;
 
-pub use self::cap::{AnyCapability, AnyCloneCapability, Capability, CloneCapability, Remote};
+pub use self::cap::{
+    AnyCapability, AnyCloneCapability, Capability, CloneCapability, Remote, TryIntoOpenError,
+};
 pub use self::handle::{CloneHandle, Handle};
 
 pub type CloneDict = dict::Dict<AnyCloneCapability>;

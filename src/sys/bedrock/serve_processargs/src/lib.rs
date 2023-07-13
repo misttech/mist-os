@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 use {
-    cap::{dict::Key, open::Open, AnyCapability, Dict},
+    cap::{dict::Key, open::Open, AnyCapability, Dict, TryIntoOpenError},
     fuchsia_runtime::{HandleInfo, HandleType},
     futures::channel::mpsc::UnboundedSender,
     futures::future::{BoxFuture, FutureExt},
@@ -90,9 +90,9 @@ pub fn add_to_processargs(
     let dict = visit_map(delivery_map, dict, &mut |cap: AnyCapability, delivery: &Delivery| {
         match delivery {
             Delivery::NamespacedObject(path) => {
-                let open: Open = cap
-                    .try_into()
-                    .map_err(|_| DeliveryError::NamespacedObjectDoesNotSupportOpen(path.clone()))?;
+                let open: Open = cap.try_into().map_err(|e| {
+                    DeliveryError::NamespacedObjectTryIntoOpenError { path: path.clone(), err: e }
+                })?;
                 namespace.add_open(open, path).map_err(DeliveryError::NamespaceError)
             }
             // TODO: implement namespace entry
@@ -135,8 +135,15 @@ pub enum DeliveryError {
     #[error("namespace configuration error: `{0}`")]
     NamespaceError(namespace::NamespaceError),
 
-    #[error("to install the capability as a namespaced object at `{0}`, it must support Open")]
-    NamespacedObjectDoesNotSupportOpen(cm_types::Path),
+    #[error(
+        "while installing the capability as a namespaced object at `{path}`, \
+        failed to convert it to Open"
+    )]
+    NamespacedObjectTryIntoOpenError {
+        path: cm_types::Path,
+        #[source]
+        err: TryIntoOpenError,
+    },
 }
 
 fn translate_handle(
