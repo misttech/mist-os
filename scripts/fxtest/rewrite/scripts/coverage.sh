@@ -27,8 +27,10 @@ fi
 
 echo "Running coverage tool..."
 coverage \
-    run -m unittest discover \
-    --top-level-directory $FXTEST_SRC \
+    run \
+    --source $FXTEST_SRC \
+    -m unittest discover \
+    --start-directory $FXTEST_SRC \
     --pattern "*_test.py"
 
 echo "Generating coverage stats..."
