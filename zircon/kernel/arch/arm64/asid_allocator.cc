@@ -31,14 +31,6 @@ AsidAllocator::~AsidAllocator() {}
 zx::result<uint16_t> AsidAllocator::Alloc() {
   uint16_t new_asid;
 
-  // Our current ASID allocation scheme is very naive and allocates a unique ASID to every address
-  // space, which means that there are often not enough ASIDs when the machine uses 8-bit ASIDs.
-  // Therefore, if we detect that we are only given 8-bit ASIDs, just assign the same ASID to every
-  // aspace, thus effectively not using them at all.
-  if (asid_width_ == arm64_asid_width::ASID_8) {
-    return zx::ok(MMU_ARM64_UNUSED_ASID);
-  }
-
   // use the bitmap allocator to allocate ids in the range of
   // [MMU_ARM64_FIRST_USER_ASID, MMU_ARM64_MAX_USER_ASID]
   // start the search from the last found id + 1 and wrap when hitting the end of the range
@@ -69,9 +61,6 @@ zx::result<uint16_t> AsidAllocator::Alloc() {
 
 zx::result<> AsidAllocator::Free(uint16_t asid) {
   LTRACEF("free asid %#x\n", asid);
-  if (asid_width_ == arm64_asid_width::ASID_8) {
-    return zx::ok();
-  }
 
   Guard<Mutex> al{&lock_};
 
@@ -83,25 +72,27 @@ zx::result<> AsidAllocator::Free(uint16_t asid) {
 // unit tests for the asid allocator
 namespace {
 
-bool asid_allocator_test_16bit() {
+bool asid_allocator_test_inner(enum arm64_asid_width asid_width) {
   BEGIN_TEST;
 
   fbl::AllocChecker ac;
-  ktl::unique_ptr<AsidAllocator> aa(new (&ac) AsidAllocator(arm64_asid_width::ASID_16));
+  ktl::unique_ptr<AsidAllocator> aa(new (&ac) AsidAllocator(asid_width));
   ASSERT_TRUE(ac.check());
 
   // test that it computed the correct asid width
-  ASSERT_EQ(aa->max_user_asid(), MMU_ARM64_MAX_USER_ASID_16);
+  uint32_t max_asid = (asid_width == arm64_asid_width::ASID_8) ? MMU_ARM64_MAX_USER_ASID_8
+                                                               : MMU_ARM64_MAX_USER_ASID_16;
+  ASSERT_EQ(aa->max_user_asid(), max_asid);
 
   // run the test twice to make sure it clears back to a default state
   for (auto j = 0; j < 2; j++) {
     // use up all the asids
-    for (uint32_t i = MMU_ARM64_FIRST_USER_ASID; i <= MMU_ARM64_MAX_USER_ASID_16; i++) {
+    for (uint32_t i = MMU_ARM64_FIRST_USER_ASID; i <= max_asid; i++) {
       auto status = aa->Alloc();
       ASSERT_TRUE(status.is_ok());
 
       ASSERT_GE(status.value(), MMU_ARM64_FIRST_USER_ASID);
-      ASSERT_LE(status.value(), MMU_ARM64_MAX_USER_ASID_16);
+      ASSERT_LE(status.value(), max_asid);
     }
 
     // expect the next one to fail
@@ -112,7 +103,7 @@ bool asid_allocator_test_16bit() {
     }
 
     // free them all
-    for (uint32_t i = MMU_ARM64_FIRST_USER_ASID; i <= MMU_ARM64_MAX_USER_ASID_16; i++) {
+    for (uint32_t i = MMU_ARM64_FIRST_USER_ASID; i <= max_asid; i++) {
       auto status = aa->Free(static_cast<uint16_t>(i));
       ASSERT_TRUE(status.is_ok());
     }
@@ -121,33 +112,9 @@ bool asid_allocator_test_16bit() {
   END_TEST;
 }
 
-bool asid_allocator_test_8bit() {
-  BEGIN_TEST;
+bool asid_allocator_test_8bit() { return asid_allocator_test_inner(arm64_asid_width::ASID_8); }
 
-  fbl::AllocChecker ac;
-  ktl::unique_ptr<AsidAllocator> aa(new (&ac) AsidAllocator(arm64_asid_width::ASID_8));
-  ASSERT_TRUE(ac.check());
-
-  // Test that it computed the correct asid width.
-  ASSERT_EQ(aa->max_user_asid(), MMU_ARM64_MAX_USER_ASID_8);
-
-  // Verify that all allocations return the unused ASID, and that we are not limited to
-  // the maximum ASID value.
-  for (uint32_t i = MMU_ARM64_FIRST_USER_ASID; i <= 2 * MMU_ARM64_MAX_USER_ASID_8; i++) {
-    auto status = aa->Alloc();
-    ASSERT_TRUE(status.is_ok());
-    ASSERT_EQ(status.value(), MMU_ARM64_UNUSED_ASID);
-  }
-
-  // Free the same number of times; this should be a no-op and always succeed regardless
-  // of the ASID given.
-  for (uint32_t i = MMU_ARM64_FIRST_USER_ASID; i <= 2 * MMU_ARM64_MAX_USER_ASID_8; i++) {
-    auto status = aa->Free(static_cast<uint16_t>(i));
-    ASSERT_TRUE(status.is_ok());
-  }
-
-  END_TEST;
-}
+bool asid_allocator_test_16bit() { return asid_allocator_test_inner(arm64_asid_width::ASID_16); }
 
 UNITTEST_START_TESTCASE(asid_allocator)
 UNITTEST("8 bit asid allocator test", asid_allocator_test_8bit)
