@@ -52,6 +52,9 @@ if (!is_host) {
 
       # For `fx update-rustc-third-party`.
       "//tools/cargo-gnaw:install-cargo-gnaw",
+
+      # For `fx test2`.
+      "//scripts/fxtest/rewrite:install($host_toolchain)",
     ]
   }
 }

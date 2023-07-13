@@ -12,6 +12,7 @@ group("tests") {
   deps = [
     ":fxtest_tests($host_toolchain)",
     ":test_runner_test($host_toolchain)",
+    "rewrite:tests",
     "scripts:tests",
   ]
 }
