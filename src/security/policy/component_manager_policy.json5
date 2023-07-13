@@ -632,7 +632,6 @@
                 target_monikers: [
                     "/core/test_manager",
                     "/core/testing/test-arch-tests:**",
-                    "/core/test_manager/system-tests:**",
                     "/core/full-resolver",
                 ],
             },

@@ -128,8 +128,7 @@ fuchsia_test_component("test_manager_stress_test_component") {
     "test_data:debug_data_spam_test",
   ]
 
-  # TODO(fxbug.dev/127684) : Port this to realm outside test manager
-  # test_type = "test_arch"
+  test_type = "test_arch"
 }
 
 fuchsia_test_package("test_manager_stress_test") {

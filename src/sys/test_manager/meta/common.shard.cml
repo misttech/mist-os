@@ -289,10 +289,6 @@
             protocol: [
                 "fuchsia.boot.ReadOnlyLog",
                 "fuchsia.boot.RootResource",
-
-                // Needed for test_manager_tests and test runner tests.
-                // TODO(fxbug.dev/86464): Remove this once we have facet API.
-                "fuchsia.component.resolution.Resolver",
                 "fuchsia.exception.Handler",
 
                 // fuchsia.hardware.pty.Device is needed for terminal_tests.
