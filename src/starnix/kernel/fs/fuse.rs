@@ -7,10 +7,10 @@ use crate::{
     fs::{
         buffers::{InputBuffer, OutputBuffer, OutputBufferCallback},
         default_eof_offset, default_fcntl, default_ioctl, default_seek, fileops_impl_nonseekable,
-        fs_args, CacheMode, DirEntry, DirectoryEntryType, DirentSink, FdEvents, FdNumber,
-        FileObject, FileOps, FileSystem, FileSystemHandle, FileSystemOps, FileSystemOptions,
-        FsNode, FsNodeHandle, FsNodeInfo, FsNodeOps, FsStr, FsString, SeekTarget, SymlinkTarget,
-        ValueOrSize, XattrOp,
+        fs_args, CacheMode, DirEntry, DirectoryEntryType, DirentSink, FallocMode, FdEvents,
+        FdNumber, FileObject, FileOps, FileSystem, FileSystemHandle, FileSystemOps,
+        FileSystemOptions, FsNode, FsNodeHandle, FsNodeInfo, FsNodeOps, FsStr, FsString,
+        SeekTarget, SymlinkTarget, ValueOrSize, XattrOp,
     },
     lock::{Mutex, MutexGuard, RwLock, RwLockReadGuard, RwLockWriteGuard},
     logging::{log_error, log_trace, log_warn, not_implemented, not_implemented_log_once},
@@ -736,7 +736,13 @@ impl FsNodeOps for Arc<FuseNode> {
         })
     }
 
-    fn allocate(&self, _node: &FsNode, _offset: u64, _length: u64) -> Result<(), Errno> {
+    fn allocate(
+        &self,
+        _node: &FsNode,
+        _mode: FallocMode,
+        _offset: u64,
+        _length: u64,
+    ) -> Result<(), Errno> {
         not_implemented!("FsNodeOps::allocate");
         error!(ENOTSUP)
     }

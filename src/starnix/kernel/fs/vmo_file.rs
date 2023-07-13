@@ -75,8 +75,10 @@ impl FsNodeOps for VmoFileNode {
         _current_task: &CurrentTask,
         length: u64,
     ) -> Result<(), Errno> {
+        let length = length as usize;
+
         node.update_info(|info| {
-            if info.size == length as usize {
+            if info.size == length {
                 // The file size remains unaffected.
                 return Ok(());
             }
@@ -85,7 +87,7 @@ impl FsNodeOps for VmoFileNode {
             // there is no change to the seals.
             let state = node.write_guard_state.lock();
 
-            if info.size > length as usize {
+            if info.size > length {
                 // A decrease in file size must pass the shrink seal check.
                 state.check_no_seal(SealFlags::SHRINK)?;
             } else {
@@ -93,41 +95,76 @@ impl FsNodeOps for VmoFileNode {
                 state.check_no_seal(SealFlags::GROW)?;
             }
 
-            self.vmo.set_size(length).map_err(|status| match status {
-                zx::Status::NO_MEMORY => errno!(ENOMEM),
-                zx::Status::OUT_OF_RANGE => errno!(ENOMEM),
-                _ => impossible_error(status),
-            })?;
-            info.size = length as usize;
-            info.blocks = self.vmo.get_size().map_err(impossible_error)? as usize / info.blksize;
+            let vmo_size = update_vmo_file_size(&self.vmo, info, length)?;
+            info.size = length;
+
+            // Zero unused parts of the VMO.
+            if vmo_size > length {
+                self.vmo
+                    .op_range(zx::VmoOp::ZERO, length as u64, (vmo_size - length) as u64)
+                    .map_err(impossible_error)?;
+            }
+
             Ok(())
         })
     }
 
-    fn allocate(&self, node: &FsNode, offset: u64, length: u64) -> Result<(), Errno> {
-        node.update_info(|info| {
-            let new_size = offset + length;
-            if info.size >= new_size as usize {
-                // The file size remains unaffected.
-                return Ok(());
+    fn allocate(
+        &self,
+        node: &FsNode,
+        mode: FallocMode,
+        offset: u64,
+        length: u64,
+    ) -> Result<(), Errno> {
+        match mode {
+            FallocMode::PunchHole => {
+                // Check write seal. Hold the lock to ensure seals don't change.
+                let state = node.write_guard_state.lock();
+                state.check_no_seal(SealFlags::WRITE | SealFlags::FUTURE_WRITE)?;
+
+                let mut end = offset.checked_add(length).ok_or_else(|| errno!(EINVAL))? as usize;
+
+                let info = node.info();
+                let vmo_size = info.blksize * info.blocks;
+
+                if offset as usize >= vmo_size {
+                    return Ok(());
+                }
+
+                // If punching hole at the end of the file then zero all the
+                // way to the end of the VMO to avoid keeping any pages for the tail.
+                if end >= info.size {
+                    end = vmo_size;
+                }
+
+                self.vmo
+                    .op_range(zx::VmoOp::ZERO, offset, end as u64 - offset)
+                    .map_err(impossible_error)?;
+
+                Ok(())
             }
 
-            // We must hold the lock till the end of the operation to guarantee that
-            // there is no change to the seals.
-            let state = node.write_guard_state.lock();
+            FallocMode::Allocate { keep_size } => {
+                node.update_info(|info| {
+                    let new_size = (offset + length) as usize;
+                    if new_size > info.size {
+                        // Check GROW seal (even with `keep_size=true`). Hold the lock to ensure
+                        // seals don't change.
+                        let state = node.write_guard_state.lock();
+                        state.check_no_seal(SealFlags::GROW)?;
 
-            // An increase in file size must pass the grow seal check.
-            state.check_no_seal(SealFlags::GROW)?;
+                        update_vmo_file_size(&self.vmo, info, new_size)?;
 
-            self.vmo.set_size(new_size).map_err(|status| match status {
-                zx::Status::NO_MEMORY => errno!(ENOMEM),
-                zx::Status::OUT_OF_RANGE => errno!(ENOMEM),
-                _ => impossible_error(status),
-            })?;
-            info.size = new_size as usize;
-            info.blocks = self.vmo.get_size().map_err(impossible_error)? as usize / info.blksize;
-            Ok(())
-        })
+                        if !keep_size {
+                            info.size = new_size;
+                        }
+                    }
+                    Ok(())
+                })
+            }
+
+            _ => error!(EOPNOTSUPP),
+        }
     }
 }
 
@@ -228,9 +265,7 @@ impl VmoFileObject {
 
             if write_end > info.size {
                 if write_end > info.storage_size() {
-                    let new_size = round_up_to_system_page_size(write_end)?;
-                    vmo.set_size(new_size as u64).map_err(|_| errno!(ENOMEM))?;
-                    info.blocks = new_size / info.blksize;
+                    update_vmo_file_size(vmo, info, write_end)?;
                 }
                 update_content_size = true;
             }
@@ -319,4 +354,20 @@ pub fn new_memfd(
     let name = NamespaceNode::new_anonymous(DirEntry::new(node, None, local_name));
 
     FileObject::new(ops, name, flags)
+}
+
+/// Sets VMO size to `min_size` rounded to whole pages. Returns the new size of the VMO in bytes.
+fn update_vmo_file_size(
+    vmo: &zx::Vmo,
+    node_info: &mut FsNodeInfo,
+    min_size: usize,
+) -> Result<usize, Errno> {
+    let size = round_up_to_system_page_size(min_size)?;
+    vmo.set_size(size as u64).map_err(|status| match status {
+        zx::Status::NO_MEMORY => errno!(ENOMEM),
+        zx::Status::OUT_OF_RANGE => errno!(ENOMEM),
+        _ => impossible_error(status),
+    })?;
+    node_info.blocks = size / node_info.blksize;
+    Ok(size)
 }

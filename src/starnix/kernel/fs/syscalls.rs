@@ -2109,10 +2109,6 @@ pub fn sys_fallocate(
     len: off_t,
 ) -> Result<(), Errno> {
     let file = current_task.files.get(fd)?;
-    if mode != 0 {
-        not_implemented!("fallocate({}, {}, {}, {})", fd, mode, offset, len);
-        return Ok(());
-    }
 
     // Offset must not be less than 0.
     // Length must not be less than or equal to 0.
@@ -2121,7 +2117,8 @@ pub fn sys_fallocate(
         return error!(EINVAL);
     }
 
-    file.fallocate(offset as u64, len as u64)?;
+    let mode = FallocMode::from_bits(mode).ok_or_else(|| errno!(EINVAL))?;
+    file.fallocate(mode, offset as u64, len as u64)?;
 
     Ok(())
 }

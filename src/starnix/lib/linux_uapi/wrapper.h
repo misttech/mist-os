@@ -24,6 +24,7 @@
 #include <linux/errno.h>
 #include <linux/eventpoll.h>
 #include <linux/fadvise.h>
+#include <linux/falloc.h>
 #include <linux/fb.h>
 #include <linux/fcntl.h>
 #include <linux/filter.h>

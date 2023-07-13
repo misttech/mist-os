@@ -373,6 +373,41 @@ impl<T> From<T> for ValueOrSize<T> {
     }
 }
 
+#[derive(Copy, Clone, Eq, PartialEq, Debug)]
+pub enum FallocMode {
+    Allocate { keep_size: bool },
+    PunchHole,
+    Collapse,
+    Zero { keep_size: bool },
+    InsertRange,
+    UnshareRange,
+}
+
+impl FallocMode {
+    pub fn from_bits(mode: u32) -> Option<Self> {
+        // `fallocate()` allows only the following values for `mode`.
+        if mode == 0 {
+            Some(Self::Allocate { keep_size: false })
+        } else if mode == FALLOC_FL_KEEP_SIZE {
+            Some(Self::Allocate { keep_size: true })
+        } else if mode == FALLOC_FL_PUNCH_HOLE | FALLOC_FL_KEEP_SIZE {
+            Some(Self::PunchHole)
+        } else if mode == FALLOC_FL_COLLAPSE_RANGE {
+            Some(Self::Collapse)
+        } else if mode == FALLOC_FL_ZERO_RANGE {
+            Some(Self::Zero { keep_size: false })
+        } else if mode == FALLOC_FL_ZERO_RANGE | FALLOC_FL_KEEP_SIZE {
+            Some(Self::Zero { keep_size: true })
+        } else if mode == FALLOC_FL_INSERT_RANGE {
+            Some(Self::InsertRange)
+        } else if mode == FALLOC_FL_UNSHARE_RANGE {
+            Some(Self::UnshareRange)
+        } else {
+            None
+        }
+    }
+}
+
 pub trait FsNodeOps: Send + Sync + AsAny + 'static {
     /// Build the `FileOps` for the file associated to this node.
     ///
@@ -486,7 +521,13 @@ pub trait FsNodeOps: Send + Sync + AsAny + 'static {
     }
 
     /// Manipulate allocated disk space for the file.
-    fn allocate(&self, _node: &FsNode, _offset: u64, _length: u64) -> Result<(), Errno> {
+    fn allocate(
+        &self,
+        _node: &FsNode,
+        _mode: FallocMode,
+        _offset: u64,
+        _length: u64,
+    ) -> Result<(), Errno> {
         error!(EINVAL)
     }
 
@@ -1009,8 +1050,8 @@ impl FsNode {
 
     /// Avoid calling this method directly. You probably want to call `FileObject::fallocate()`
     /// which will also perform additional verifications.
-    pub fn fallocate(&self, offset: u64, length: u64) -> Result<(), Errno> {
-        self.ops().allocate(self, offset, length)?;
+    pub fn fallocate(&self, mode: FallocMode, offset: u64, length: u64) -> Result<(), Errno> {
+        self.ops().allocate(self, mode, offset, length)?;
         self.update_ctime_mtime()?;
         Ok(())
     }

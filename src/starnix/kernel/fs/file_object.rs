@@ -1220,7 +1220,7 @@ impl FileObject {
         self.node().ftruncate(current_task, length)
     }
 
-    pub fn fallocate(&self, offset: u64, length: u64) -> Result<(), Errno> {
+    pub fn fallocate(&self, mode: FallocMode, offset: u64, length: u64) -> Result<(), Errno> {
         // If the file is a pipe or FIFO, ESPIPE is returned.
         // See https://man7.org/linux/man-pages/man2/fallocate.2.html#ERRORS
         if self.node().is_fifo() {
@@ -1239,7 +1239,7 @@ impl FileObject {
             return error!(EBADF);
         }
 
-        self.node().fallocate(offset, length)
+        self.node().fallocate(mode, offset, length)
     }
 
     pub fn to_handle(

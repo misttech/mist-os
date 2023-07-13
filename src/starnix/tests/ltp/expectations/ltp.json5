@@ -169,6 +169,7 @@
                 "execveat03",
                 "fallocate02",
                 "fallocate04",
+                "fallocate05",
                 "fanotify01",
                 "fanotify02",
                 "fanotify03",
@@ -504,7 +505,6 @@
                 "memcontrol03",
                 "memcontrol04",
                 "memctl_test01",
-                "memfd_create01",
                 "memfd_create03",
                 "migrate_pages01",
                 "migrate_pages02",
@@ -1429,8 +1429,6 @@
 
                 // These tests hang
                 "creat07",
-                "fallocate05",
-                "fallocate06",
                 "fs_fill",
                 "timerfd_settime02",
                 "sigrelse01",
