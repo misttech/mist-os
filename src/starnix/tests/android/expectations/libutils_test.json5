@@ -25,6 +25,9 @@
                 "SharedBufferTest.editResize_death",
                 "StrongPointer/0.AssertStrongRefExists",
                 "StrongPointer/1.AssertStrongRefExists",
+
+                // TODO(fxbug.dev/127475)
+                "SystemClock.SystemClock",
                 "Timers.systemTime_invalid",
                 "UnicodeTest.InvalidUtf8OverreadDetected",
                 "VectorTest.SetCapacity_Overflow",
