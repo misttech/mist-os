@@ -106,9 +106,7 @@ std::unique_ptr<PlatformDevice> PlatformDevice::Create(void* device_handle) {
   zx_status_t status = device_get_protocol(zx_device, ZX_PROTOCOL_PDEV, &pdev);
   if (status != ZX_OK) {
     // if ZX_PROTOCOL_PDEV is not available, try using find via fragment.
-    if (device_get_fragment_count(zx_device) > 0) {
-      status = device_get_fragment_protocol(zx_device, "pdev", ZX_PROTOCOL_PDEV, &pdev);
-    }
+    status = device_get_fragment_protocol(zx_device, "pdev", ZX_PROTOCOL_PDEV, &pdev);
   }
 
   if (status == ZX_ERR_NOT_SUPPORTED) {
