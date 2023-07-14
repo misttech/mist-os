@@ -1066,6 +1066,7 @@ void Device::Rebind(RebindRequestView request, RebindCompleter::Sync& completer)
               // We do not forward failures to find a driver to bind to back to the user.
               // TODO(https://fxbug.dev/125235): Forward ZX_ERR_NOT_FOUND to the user.
               completer.Reply(zx::ok());
+              return;
             }
             completer.Reply(result.value());
           });
