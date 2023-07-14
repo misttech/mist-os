@@ -9,7 +9,7 @@ use {
     },
     async_trait::async_trait,
     futures::{executor::block_on, lock::Mutex, prelude::*},
-    moniker::{ChildMonikerBase, Moniker, MonikerBase},
+    moniker::{ChildNameBase, Moniker, MonikerBase},
     std::{
         cmp::Eq,
         collections::HashMap,

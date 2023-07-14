@@ -149,7 +149,7 @@ pub mod tests {
         fidl_fuchsia_component_decl as fdecl, fidl_fuchsia_sys2 as fsys, fuchsia_async as fasync,
         fuchsia_zircon as zx,
         futures::{channel::mpsc, lock::Mutex, StreamExt},
-        moniker::{ChildMoniker, Moniker, MonikerBase},
+        moniker::{ChildName, Moniker, MonikerBase},
         std::fmt::Debug,
         std::sync::atomic::Ordering,
     };
@@ -396,10 +396,9 @@ pub mod tests {
 
         let component_root = test.model.root().clone();
         let component_a = match *component_root.lock_state().await {
-            InstanceState::Resolved(ref s) => s
-                .get_child(&ChildMoniker::try_from("a").unwrap())
-                .expect("child a not found")
-                .clone(),
+            InstanceState::Resolved(ref s) => {
+                s.get_child(&ChildName::try_from("a").unwrap()).expect("child a not found").clone()
+            }
             _ => panic!("not resolved"),
         };
 
@@ -524,10 +523,9 @@ pub mod tests {
         // Shut down component so we can destroy it.
         let component_root = test.look_up(Moniker::root()).await;
         let component_a = match *component_root.lock_state().await {
-            InstanceState::Resolved(ref s) => s
-                .get_child(&ChildMoniker::try_from("a").unwrap())
-                .expect("child a not found")
-                .clone(),
+            InstanceState::Resolved(ref s) => {
+                s.get_child(&ChildName::try_from("a").unwrap()).expect("child a not found").clone()
+            }
             _ => panic!("not resolved"),
         };
         ActionSet::register(component_a.clone(), ShutdownAction::new())
@@ -578,10 +576,9 @@ pub mod tests {
         assert!(is_executing(&component_a).await);
         // Get component_b without resolving it.
         let component_b = match *component_a.lock_state().await {
-            InstanceState::Resolved(ref s) => s
-                .get_child(&ChildMoniker::try_from("b").unwrap())
-                .expect("child b not found")
-                .clone(),
+            InstanceState::Resolved(ref s) => {
+                s.get_child(&ChildName::try_from("b").unwrap()).expect("child b not found").clone()
+            }
             _ => panic!("not resolved"),
         };
 
@@ -801,7 +798,7 @@ pub mod tests {
                 InstanceState::Resolved(ref s) => s.children().map(|(k, _)| k.clone()).collect(),
                 _ => panic!("not resolved"),
             };
-            assert_eq!(children, Vec::<ChildMoniker>::new());
+            assert_eq!(children, Vec::<ChildName>::new());
         }
         {
             let events: Vec<_> = test

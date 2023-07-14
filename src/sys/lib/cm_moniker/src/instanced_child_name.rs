@@ -5,7 +5,7 @@
 use {
     cm_types::{LongName, Name},
     core::cmp::{Ord, Ordering},
-    moniker::{ChildMoniker, ChildMonikerBase, MonikerError},
+    moniker::{ChildName, ChildNameBase, MonikerError},
     std::fmt,
 };
 
@@ -18,7 +18,7 @@ use serde::{Deserialize, Serialize};
 /// Display notation: "[collection:]name:instance_id".
 #[cfg_attr(feature = "serde", derive(Deserialize, Serialize))]
 #[derive(Eq, PartialEq, Clone, Hash)]
-pub struct InstancedChildMoniker {
+pub struct InstancedChildName {
     name: LongName,
     collection: Option<Name>,
     instance: IncarnationId,
@@ -26,8 +26,8 @@ pub struct InstancedChildMoniker {
 
 pub type IncarnationId = u32;
 
-impl ChildMonikerBase for InstancedChildMoniker {
-    /// Parses an `ChildMoniker` from a string.
+impl ChildNameBase for InstancedChildName {
+    /// Parses an `ChildName` from a string.
     ///
     /// Input strings should be of the format `(<collection>:)?<name>:<instance_id>`, e.g. `foo:42`
     /// or `coll:foo:42`.
@@ -63,7 +63,7 @@ impl ChildMonikerBase for InstancedChildMoniker {
     }
 }
 
-impl InstancedChildMoniker {
+impl InstancedChildName {
     pub fn try_new<S>(
         name: S,
         collection: Option<S>,
@@ -91,15 +91,15 @@ impl InstancedChildMoniker {
     }
 
     /// Converts this child moniker into an instanced moniker.
-    pub fn from_child_moniker(m: &ChildMoniker, instance: IncarnationId) -> Self {
+    pub fn from_child_moniker(m: &ChildName, instance: IncarnationId) -> Self {
         Self::try_new(m.name(), m.collection().map(|c| c.as_str()), instance)
             .expect("child moniker is guaranteed to be valid")
     }
 
-    /// Convert an InstancedChildMoniker to an allocated ChildMoniker
+    /// Convert an InstancedChildName to an allocated ChildName
     /// without an InstanceId
-    pub fn without_instance_id(&self) -> ChildMoniker {
-        ChildMoniker::try_new(self.name(), self.collection().map(|c| c.as_str()))
+    pub fn without_instance_id(&self) -> ChildName {
+        ChildName::try_new(self.name(), self.collection().map(|c| c.as_str()))
             .expect("moniker is guaranteed to be valid")
     }
 
@@ -116,15 +116,15 @@ impl InstancedChildMoniker {
     }
 }
 
-impl TryFrom<&str> for InstancedChildMoniker {
+impl TryFrom<&str> for InstancedChildName {
     type Error = MonikerError;
 
     fn try_from(rep: &str) -> Result<Self, MonikerError> {
-        InstancedChildMoniker::parse(rep)
+        InstancedChildName::parse(rep)
     }
 }
 
-impl Ord for InstancedChildMoniker {
+impl Ord for InstancedChildName {
     fn cmp(&self, other: &Self) -> Ordering {
         (&self.collection, &self.name, &self.instance).cmp(&(
             &other.collection,
@@ -134,19 +134,19 @@ impl Ord for InstancedChildMoniker {
     }
 }
 
-impl PartialOrd for InstancedChildMoniker {
+impl PartialOrd for InstancedChildName {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
         Some(self.cmp(other))
     }
 }
 
-impl fmt::Display for InstancedChildMoniker {
+impl fmt::Display for InstancedChildName {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         self.format(f)
     }
 }
 
-impl fmt::Debug for InstancedChildMoniker {
+impl fmt::Debug for InstancedChildName {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         self.format(f)
     }
@@ -161,30 +161,27 @@ mod tests {
 
     #[test]
     fn instanced_child_monikers() {
-        let m = InstancedChildMoniker::try_new("test", None, 42).unwrap();
+        let m = InstancedChildName::try_new("test", None, 42).unwrap();
         assert_eq!("test", m.name());
         assert_eq!(None, m.collection());
         assert_eq!(42, m.instance());
         assert_eq!("test:42", format!("{}", m));
-        assert_eq!(m, InstancedChildMoniker::try_from("test:42").unwrap());
+        assert_eq!(m, InstancedChildName::try_from("test:42").unwrap());
         assert_eq!("test", m.without_instance_id().to_string());
-        assert_eq!(m, InstancedChildMoniker::from_child_moniker(&"test".try_into().unwrap(), 42));
+        assert_eq!(m, InstancedChildName::from_child_moniker(&"test".try_into().unwrap(), 42));
 
-        let m = InstancedChildMoniker::try_new("test", Some("coll"), 42).unwrap();
+        let m = InstancedChildName::try_new("test", Some("coll"), 42).unwrap();
         assert_eq!("test", m.name());
         assert_eq!(Some(&Name::new("coll").unwrap()), m.collection());
         assert_eq!(42, m.instance());
         assert_eq!("coll:test:42", format!("{}", m));
-        assert_eq!(m, InstancedChildMoniker::try_from("coll:test:42").unwrap());
+        assert_eq!(m, InstancedChildName::try_from("coll:test:42").unwrap());
         assert_eq!("coll:test", m.without_instance_id().to_string());
-        assert_eq!(
-            m,
-            InstancedChildMoniker::from_child_moniker(&"coll:test".try_into().unwrap(), 42)
-        );
+        assert_eq!(m, InstancedChildName::from_child_moniker(&"coll:test".try_into().unwrap(), 42));
 
         let max_coll_length_part = "f".repeat(MAX_NAME_LENGTH);
         let max_name_length_part: LongName = "f".repeat(MAX_LONG_NAME_LENGTH).parse().unwrap();
-        let m = InstancedChildMoniker::parse(format!(
+        let m = InstancedChildName::parse(format!(
             "{}:{}:42",
             max_coll_length_part, max_name_length_part
         ))
@@ -193,63 +190,56 @@ mod tests {
         assert_eq!(Some(&Name::new(max_coll_length_part).unwrap()), m.collection());
         assert_eq!(42, m.instance());
 
-        assert!(InstancedChildMoniker::parse("").is_err(), "cannot be empty");
-        assert!(InstancedChildMoniker::parse(":").is_err(), "cannot be empty with colon");
-        assert!(InstancedChildMoniker::parse("::").is_err(), "cannot be empty with double colon");
+        assert!(InstancedChildName::parse("").is_err(), "cannot be empty");
+        assert!(InstancedChildName::parse(":").is_err(), "cannot be empty with colon");
+        assert!(InstancedChildName::parse("::").is_err(), "cannot be empty with double colon");
+        assert!(InstancedChildName::parse("f:").is_err(), "second part cannot be empty with colon");
+        assert!(InstancedChildName::parse(":1").is_err(), "first part cannot be empty with colon");
         assert!(
-            InstancedChildMoniker::parse("f:").is_err(),
-            "second part cannot be empty with colon"
-        );
-        assert!(
-            InstancedChildMoniker::parse(":1").is_err(),
-            "first part cannot be empty with colon"
-        );
-        assert!(
-            InstancedChildMoniker::parse("f:f:").is_err(),
+            InstancedChildName::parse("f:f:").is_err(),
             "third part cannot be empty with colon"
         );
         assert!(
-            InstancedChildMoniker::parse("f::1").is_err(),
+            InstancedChildName::parse("f::1").is_err(),
             "second part cannot be empty with colon"
         );
         assert!(
-            InstancedChildMoniker::parse(":f:1").is_err(),
+            InstancedChildName::parse(":f:1").is_err(),
             "first part cannot be empty with colon"
         );
         assert!(
-            InstancedChildMoniker::parse("f:f:1:1").is_err(),
+            InstancedChildName::parse("f:f:1:1").is_err(),
             "more than three colons not allowed"
         );
-        assert!(InstancedChildMoniker::parse("f:f").is_err(), "second part must be int");
-        assert!(InstancedChildMoniker::parse("f:f:f").is_err(), "third part must be int");
-        assert!(InstancedChildMoniker::parse("@:1").is_err(), "invalid character in name");
-        assert!(InstancedChildMoniker::parse("@:f:1").is_err(), "invalid character in collection");
+        assert!(InstancedChildName::parse("f:f").is_err(), "second part must be int");
+        assert!(InstancedChildName::parse("f:f:f").is_err(), "third part must be int");
+        assert!(InstancedChildName::parse("@:1").is_err(), "invalid character in name");
+        assert!(InstancedChildName::parse("@:f:1").is_err(), "invalid character in collection");
         assert!(
-            InstancedChildMoniker::parse("f:@:1").is_err(),
+            InstancedChildName::parse("f:@:1").is_err(),
             "invalid character in name with collection"
         );
         assert!(
-            InstancedChildMoniker::parse(&format!("f:{}", "x".repeat(MAX_LONG_NAME_LENGTH + 1)))
+            InstancedChildName::parse(&format!("f:{}", "x".repeat(MAX_LONG_NAME_LENGTH + 1)))
                 .is_err(),
             "name too long"
         );
         assert!(
-            InstancedChildMoniker::parse(&format!("{}:x", "f".repeat(MAX_NAME_LENGTH + 1)))
-                .is_err(),
+            InstancedChildName::parse(&format!("{}:x", "f".repeat(MAX_NAME_LENGTH + 1))).is_err(),
             "collection too long"
         );
     }
 
     #[test]
     fn instanced_child_moniker_compare() {
-        let a = InstancedChildMoniker::try_new("a", None, 1).unwrap();
-        let a2 = InstancedChildMoniker::try_new("a", None, 2).unwrap();
-        let aa = InstancedChildMoniker::try_new("a", Some("a"), 1).unwrap();
-        let aa2 = InstancedChildMoniker::try_new("a", Some("a"), 2).unwrap();
-        let ab = InstancedChildMoniker::try_new("a", Some("b"), 1).unwrap();
-        let ba = InstancedChildMoniker::try_new("b", Some("a"), 1).unwrap();
-        let bb = InstancedChildMoniker::try_new("b", Some("b"), 1).unwrap();
-        let aa_same = InstancedChildMoniker::try_new("a", Some("a"), 1).unwrap();
+        let a = InstancedChildName::try_new("a", None, 1).unwrap();
+        let a2 = InstancedChildName::try_new("a", None, 2).unwrap();
+        let aa = InstancedChildName::try_new("a", Some("a"), 1).unwrap();
+        let aa2 = InstancedChildName::try_new("a", Some("a"), 2).unwrap();
+        let ab = InstancedChildName::try_new("a", Some("b"), 1).unwrap();
+        let ba = InstancedChildName::try_new("b", Some("a"), 1).unwrap();
+        let bb = InstancedChildName::try_new("b", Some("b"), 1).unwrap();
+        let aa_same = InstancedChildName::try_new("a", Some("a"), 1).unwrap();
 
         assert_eq!(Ordering::Less, a.cmp(&a2));
         assert_eq!(Ordering::Greater, a2.cmp(&a));

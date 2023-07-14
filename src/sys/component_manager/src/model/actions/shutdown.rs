@@ -18,7 +18,7 @@ use {
     },
     cm_types::Name,
     futures::future::select_all,
-    moniker::{ChildMoniker, ChildMonikerBase},
+    moniker::{ChildName, ChildNameBase},
     std::collections::{HashMap, HashSet},
     std::fmt,
     std::sync::Arc,
@@ -257,11 +257,11 @@ async fn do_shutdown(component: &Arc<ComponentInstance>) -> Result<(), StopActio
 #[derive(Debug, Eq, PartialEq, Hash, Clone)]
 pub enum ComponentRef {
     Self_,
-    Child(ChildMoniker),
+    Child(ChildName),
 }
 
-impl From<ChildMoniker> for ComponentRef {
-    fn from(moniker: ChildMoniker) -> Self {
+impl From<ChildName> for ComponentRef {
+    fn from(moniker: ChildName) -> Self {
         ComponentRef::Child(moniker)
     }
 }
@@ -339,7 +339,7 @@ pub trait Component {
 pub struct Child {
     /// The moniker identifying the name of the child, complete with
     /// `instance_id`.
-    pub moniker: ChildMoniker,
+    pub moniker: ChildName,
 
     /// Name of the environment associated with this child, if any.
     pub environment_name: Option<String>,
@@ -818,7 +818,7 @@ mod tests {
         cm_types::AllowedOffers,
         fidl_fuchsia_component as fcomponent, fidl_fuchsia_component_decl as fdecl,
         maplit::{btreeset, hashmap, hashset},
-        moniker::{ChildMoniker, Moniker},
+        moniker::{ChildName, Moniker},
         std::collections::{BTreeSet, HashMap},
         std::convert::TryFrom,
         test_case::test_case,
@@ -869,7 +869,7 @@ mod tests {
                 .children
                 .iter()
                 .map(|c| Child {
-                    moniker: ChildMoniker::try_new(&c.name, None)
+                    moniker: ChildName::try_new(&c.name, None)
                         .expect("children should have valid monikers"),
                     environment_name: c.environment.clone(),
                 })
@@ -883,7 +883,7 @@ mod tests {
     /// Returns a `ComponentRef` for a child by parsing the moniker. Panics if
     /// the moniker is malformed.
     fn child(moniker: &str) -> ComponentRef {
-        ChildMoniker::try_from(moniker).unwrap().into()
+        ChildName::try_from(moniker).unwrap().into()
     }
 
     #[fuchsia::test]
@@ -2206,7 +2206,7 @@ mod tests {
             ..default_component_decl()
         };
 
-        let dynamic_child = ChildMoniker::try_new("dynamic_child", Some("coll")).unwrap();
+        let dynamic_child = ChildName::try_new("dynamic_child", Some("coll")).unwrap();
         let mut fake = FakeComponent::from_decl(decl);
         fake.dynamic_children
             .push(Child { moniker: dynamic_child.clone(), environment_name: None });
@@ -2257,8 +2257,8 @@ mod tests {
             ..default_component_decl()
         };
 
-        let dynamic_child1 = ChildMoniker::try_new("dynamic_child1", Some("coll")).unwrap();
-        let dynamic_child2 = ChildMoniker::try_new("dynamic_child2", Some("coll")).unwrap();
+        let dynamic_child1 = ChildName::try_new("dynamic_child1", Some("coll")).unwrap();
+        let dynamic_child2 = ChildName::try_new("dynamic_child2", Some("coll")).unwrap();
         let mut fake = FakeComponent::from_decl(decl);
         fake.dynamic_children
             .push(Child { moniker: dynamic_child1.clone(), environment_name: None });
@@ -2316,10 +2316,10 @@ mod tests {
             ..default_component_decl()
         };
 
-        let source_child1 = ChildMoniker::try_new("source_child1", Some(&c1_name)).unwrap();
-        let source_child2 = ChildMoniker::try_new("source_child2", Some(&c1_name)).unwrap();
-        let target_child1 = ChildMoniker::try_new("target_child1", Some(&c2_name)).unwrap();
-        let target_child2 = ChildMoniker::try_new("target_child2", Some(&c2_name)).unwrap();
+        let source_child1 = ChildName::try_new("source_child1", Some(&c1_name)).unwrap();
+        let source_child2 = ChildName::try_new("source_child2", Some(&c1_name)).unwrap();
+        let target_child1 = ChildName::try_new("target_child1", Some(&c2_name)).unwrap();
+        let target_child2 = ChildName::try_new("target_child2", Some(&c2_name)).unwrap();
 
         let mut fake = FakeComponent::from_decl(decl);
         fake.dynamic_children

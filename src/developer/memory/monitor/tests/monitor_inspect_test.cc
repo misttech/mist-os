@@ -37,9 +37,9 @@ class InspectTest : public gtest::RealLoopFixture {
 
   ~InspectTest() { DestroyChild(); }
 
-  std::string ChildMoniker() { return std::string(kTestCollectionName) + "\\:" + child_name_; }
+  std::string ChildName() { return std::string(kTestCollectionName) + "\\:" + child_name_; }
 
-  std::string ChildSelector() { return ChildMoniker() + ":root"; }
+  std::string ChildSelector() { return ChildName() + ":root"; }
 
   fuchsia::component::decl::ChildRef ChildRef() {
     return {
@@ -100,7 +100,7 @@ class InspectTest : public gtest::RealLoopFixture {
     fpromise::result<std::vector<InspectData>, std::string> result;
     async::Executor executor(dispatcher());
     executor.schedule_task(
-        reader.SnapshotInspectUntilPresent({ChildMoniker()})
+        reader.SnapshotInspectUntilPresent({ChildName()})
             .then([&](fpromise::result<std::vector<InspectData>, std::string>& rest) {
               result = std::move(rest);
             }));

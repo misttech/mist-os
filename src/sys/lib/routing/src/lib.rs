@@ -53,7 +53,7 @@ use {
     cm_types::Name,
     fidl_fuchsia_component_decl as fdecl, fidl_fuchsia_io as fio,
     from_enum::FromEnum,
-    moniker::{ChildMoniker, Moniker},
+    moniker::{ChildName, Moniker},
     std::{path::PathBuf, sync::Arc},
     tracing::warn,
 };
@@ -1158,7 +1158,7 @@ impl ErrorNotFoundFromParent for DebugRegistration {
 impl ErrorNotFoundInChild for DebugRegistration {
     fn error_not_found_in_child(
         moniker: Moniker,
-        child_moniker: ChildMoniker,
+        child_moniker: ChildName,
         capability_name: Name,
     ) -> RoutingError {
         RoutingError::EnvironmentFromChildExposeNotFound {
@@ -1179,7 +1179,7 @@ impl ErrorNotFoundFromParent for OfferProtocolDecl {
 impl ErrorNotFoundInChild for UseProtocolDecl {
     fn error_not_found_in_child(
         moniker: Moniker,
-        child_moniker: ChildMoniker,
+        child_moniker: ChildName,
         capability_name: Name,
     ) -> RoutingError {
         RoutingError::UseFromChildExposeNotFound {
@@ -1193,7 +1193,7 @@ impl ErrorNotFoundInChild for UseProtocolDecl {
 impl ErrorNotFoundInChild for UseEventStreamDecl {
     fn error_not_found_in_child(
         moniker: Moniker,
-        child_moniker: ChildMoniker,
+        child_moniker: ChildName,
         capability_name: Name,
     ) -> RoutingError {
         RoutingError::UseFromChildExposeNotFound {
@@ -1207,7 +1207,7 @@ impl ErrorNotFoundInChild for UseEventStreamDecl {
 impl ErrorNotFoundInChild for OfferProtocolDecl {
     fn error_not_found_in_child(
         moniker: Moniker,
-        child_moniker: ChildMoniker,
+        child_moniker: ChildName,
         capability_name: Name,
     ) -> RoutingError {
         RoutingError::OfferFromChildExposeNotFound {
@@ -1221,7 +1221,7 @@ impl ErrorNotFoundInChild for OfferProtocolDecl {
 impl ErrorNotFoundInChild for OfferEventStreamDecl {
     fn error_not_found_in_child(
         moniker: Moniker,
-        child_moniker: ChildMoniker,
+        child_moniker: ChildName,
         capability_name: Name,
     ) -> RoutingError {
         RoutingError::OfferFromChildExposeNotFound {
@@ -1235,7 +1235,7 @@ impl ErrorNotFoundInChild for OfferEventStreamDecl {
 impl ErrorNotFoundInChild for ExposeProtocolDecl {
     fn error_not_found_in_child(
         moniker: Moniker,
-        child_moniker: ChildMoniker,
+        child_moniker: ChildName,
         capability_name: Name,
     ) -> RoutingError {
         RoutingError::ExposeFromChildExposeNotFound {
@@ -1261,7 +1261,7 @@ impl ErrorNotFoundFromParent for OfferServiceDecl {
 impl ErrorNotFoundInChild for UseServiceDecl {
     fn error_not_found_in_child(
         moniker: Moniker,
-        child_moniker: ChildMoniker,
+        child_moniker: ChildName,
         capability_name: Name,
     ) -> RoutingError {
         RoutingError::UseFromChildExposeNotFound {
@@ -1275,7 +1275,7 @@ impl ErrorNotFoundInChild for UseServiceDecl {
 impl ErrorNotFoundInChild for OfferServiceDecl {
     fn error_not_found_in_child(
         moniker: Moniker,
-        child_moniker: ChildMoniker,
+        child_moniker: ChildName,
         capability_name: Name,
     ) -> RoutingError {
         RoutingError::OfferFromChildExposeNotFound {
@@ -1289,7 +1289,7 @@ impl ErrorNotFoundInChild for OfferServiceDecl {
 impl ErrorNotFoundInChild for ExposeServiceDecl {
     fn error_not_found_in_child(
         moniker: Moniker,
-        child_moniker: ChildMoniker,
+        child_moniker: ChildName,
         capability_name: Name,
     ) -> RoutingError {
         RoutingError::ExposeFromChildExposeNotFound {
@@ -1315,7 +1315,7 @@ impl ErrorNotFoundFromParent for OfferDirectoryDecl {
 impl ErrorNotFoundInChild for UseDirectoryDecl {
     fn error_not_found_in_child(
         moniker: Moniker,
-        child_moniker: ChildMoniker,
+        child_moniker: ChildName,
         capability_name: Name,
     ) -> RoutingError {
         RoutingError::UseFromChildExposeNotFound {
@@ -1329,7 +1329,7 @@ impl ErrorNotFoundInChild for UseDirectoryDecl {
 impl ErrorNotFoundInChild for OfferDirectoryDecl {
     fn error_not_found_in_child(
         moniker: Moniker,
-        child_moniker: ChildMoniker,
+        child_moniker: ChildName,
         capability_name: Name,
     ) -> RoutingError {
         RoutingError::OfferFromChildExposeNotFound {
@@ -1343,7 +1343,7 @@ impl ErrorNotFoundInChild for OfferDirectoryDecl {
 impl ErrorNotFoundInChild for ExposeDirectoryDecl {
     fn error_not_found_in_child(
         moniker: Moniker,
-        child_moniker: ChildMoniker,
+        child_moniker: ChildName,
         capability_name: Name,
     ) -> RoutingError {
         RoutingError::ExposeFromChildExposeNotFound {
@@ -1369,7 +1369,7 @@ impl ErrorNotFoundFromParent for OfferStorageDecl {
 impl ErrorNotFoundInChild for StorageDeclAsRegistration {
     fn error_not_found_in_child(
         moniker: Moniker,
-        child_moniker: ChildMoniker,
+        child_moniker: ChildName,
         capability_name: Name,
     ) -> RoutingError {
         RoutingError::StorageFromChildExposeNotFound {
@@ -1399,7 +1399,7 @@ impl ErrorNotFoundFromParent for RunnerRegistration {
 impl ErrorNotFoundInChild for RunnerRegistration {
     fn error_not_found_in_child(
         moniker: Moniker,
-        child_moniker: ChildMoniker,
+        child_moniker: ChildName,
         capability_name: Name,
     ) -> RoutingError {
         RoutingError::EnvironmentFromChildExposeNotFound {
@@ -1420,7 +1420,7 @@ impl ErrorNotFoundFromParent for OfferRunnerDecl {
 impl ErrorNotFoundInChild for OfferRunnerDecl {
     fn error_not_found_in_child(
         moniker: Moniker,
-        child_moniker: ChildMoniker,
+        child_moniker: ChildName,
         capability_name: Name,
     ) -> RoutingError {
         RoutingError::OfferFromChildExposeNotFound {
@@ -1434,7 +1434,7 @@ impl ErrorNotFoundInChild for OfferRunnerDecl {
 impl ErrorNotFoundInChild for ExposeRunnerDecl {
     fn error_not_found_in_child(
         moniker: Moniker,
-        child_moniker: ChildMoniker,
+        child_moniker: ChildName,
         capability_name: Name,
     ) -> RoutingError {
         RoutingError::ExposeFromChildExposeNotFound {
@@ -1458,7 +1458,7 @@ impl ErrorNotFoundFromParent for ResolverRegistration {
 impl ErrorNotFoundInChild for ResolverRegistration {
     fn error_not_found_in_child(
         moniker: Moniker,
-        child_moniker: ChildMoniker,
+        child_moniker: ChildName,
         capability_name: Name,
     ) -> RoutingError {
         RoutingError::EnvironmentFromChildExposeNotFound {
@@ -1479,7 +1479,7 @@ impl ErrorNotFoundFromParent for OfferResolverDecl {
 impl ErrorNotFoundInChild for OfferResolverDecl {
     fn error_not_found_in_child(
         moniker: Moniker,
-        child_moniker: ChildMoniker,
+        child_moniker: ChildName,
         capability_name: Name,
     ) -> RoutingError {
         RoutingError::OfferFromChildExposeNotFound {
@@ -1493,7 +1493,7 @@ impl ErrorNotFoundInChild for OfferResolverDecl {
 impl ErrorNotFoundInChild for ExposeResolverDecl {
     fn error_not_found_in_child(
         moniker: Moniker,
-        child_moniker: ChildMoniker,
+        child_moniker: ChildName,
         capability_name: Name,
     ) -> RoutingError {
         RoutingError::ExposeFromChildExposeNotFound {

@@ -9,7 +9,7 @@ use {
     std::fmt,
 };
 
-pub trait ChildMonikerBase: Eq + PartialOrd + Clone + fmt::Display {
+pub trait ChildNameBase: Eq + PartialOrd + Clone + fmt::Display {
     fn parse<T: AsRef<str>>(rep: T) -> Result<Self, MonikerError>
     where
         Self: Sized;
@@ -26,13 +26,13 @@ pub trait ChildMonikerBase: Eq + PartialOrd + Clone + fmt::Display {
 ///
 /// Display notation: "[collection:]name".
 #[derive(Eq, PartialEq, Clone, Hash)]
-pub struct ChildMoniker {
+pub struct ChildName {
     pub name: LongName,
     pub collection: Option<Name>,
 }
 
-impl ChildMonikerBase for ChildMoniker {
-    /// Parses a `ChildMoniker` from a string.
+impl ChildNameBase for ChildName {
+    /// Parses a `ChildName` from a string.
     ///
     /// Input strings should be of the format `[collection:]name`, e.g. `foo` or `biz:foo`.
     fn parse<T: AsRef<str>>(rep: T) -> Result<Self, MonikerError> {
@@ -43,7 +43,7 @@ impl ChildMonikerBase for ChildMoniker {
             2 => (Some(parts[0]), parts[1]),
             _ => return Err(MonikerError::invalid_moniker(rep)),
         };
-        ChildMoniker::try_new(name, coll)
+        ChildName::try_new(name, coll)
     }
 
     fn name(&self) -> &str {
@@ -55,7 +55,7 @@ impl ChildMonikerBase for ChildMoniker {
     }
 }
 
-impl ChildMoniker {
+impl ChildName {
     pub fn try_new<S>(name: S, collection: Option<S>) -> Result<Self, MonikerError>
     where
         S: AsRef<str> + Into<String>,
@@ -80,33 +80,33 @@ impl ChildMoniker {
     }
 }
 
-impl TryFrom<&str> for ChildMoniker {
+impl TryFrom<&str> for ChildName {
     type Error = MonikerError;
 
     fn try_from(rep: &str) -> Result<Self, MonikerError> {
-        ChildMoniker::parse(rep)
+        ChildName::parse(rep)
     }
 }
 
-impl Ord for ChildMoniker {
+impl Ord for ChildName {
     fn cmp(&self, other: &Self) -> Ordering {
         (&self.collection, &self.name).cmp(&(&other.collection, &other.name))
     }
 }
 
-impl PartialOrd for ChildMoniker {
+impl PartialOrd for ChildName {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
         Some(self.cmp(other))
     }
 }
 
-impl fmt::Display for ChildMoniker {
+impl fmt::Display for ChildName {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         self.format(f)
     }
 }
 
-impl fmt::Debug for ChildMoniker {
+impl fmt::Debug for ChildName {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         self.format(f)
     }
@@ -121,51 +121,51 @@ mod tests {
 
     #[test]
     fn child_monikers() {
-        let m = ChildMoniker::try_new("test", None).unwrap();
+        let m = ChildName::try_new("test", None).unwrap();
         assert_eq!("test", m.name());
         assert_eq!(None, m.collection());
         assert_eq!("test", format!("{}", m));
-        assert_eq!(m, ChildMoniker::try_from("test").unwrap());
+        assert_eq!(m, ChildName::try_from("test").unwrap());
 
-        let m = ChildMoniker::try_new("test", Some("coll")).unwrap();
+        let m = ChildName::try_new("test", Some("coll")).unwrap();
         assert_eq!("test", m.name());
         assert_eq!(Some(&Name::new("coll").unwrap()), m.collection());
         assert_eq!("coll:test", format!("{}", m));
-        assert_eq!(m, ChildMoniker::try_from("coll:test").unwrap());
+        assert_eq!(m, ChildName::try_from("coll:test").unwrap());
 
         let max_coll_length_part = "f".repeat(MAX_NAME_LENGTH);
         let max_name_length_part = "f".repeat(MAX_LONG_NAME_LENGTH);
         let max_moniker_length = format!("{}:{}", max_coll_length_part, max_name_length_part);
-        let m = ChildMoniker::parse(max_moniker_length).expect("valid moniker");
+        let m = ChildName::parse(max_moniker_length).expect("valid moniker");
         assert_eq!(&max_name_length_part, m.name());
         assert_eq!(Some(&Name::new(max_coll_length_part).unwrap()), m.collection());
 
-        assert!(ChildMoniker::parse("").is_err(), "cannot be empty");
-        assert!(ChildMoniker::parse(":").is_err(), "cannot be empty with colon");
-        assert!(ChildMoniker::parse("f:").is_err(), "second part cannot be empty with colon");
-        assert!(ChildMoniker::parse(":f").is_err(), "first part cannot be empty with colon");
-        assert!(ChildMoniker::parse("f:f:f").is_err(), "multiple colons not allowed");
-        assert!(ChildMoniker::parse("@").is_err(), "invalid character in name");
-        assert!(ChildMoniker::parse("@:f").is_err(), "invalid character in collection");
-        assert!(ChildMoniker::parse("f:@").is_err(), "invalid character in name with collection");
+        assert!(ChildName::parse("").is_err(), "cannot be empty");
+        assert!(ChildName::parse(":").is_err(), "cannot be empty with colon");
+        assert!(ChildName::parse("f:").is_err(), "second part cannot be empty with colon");
+        assert!(ChildName::parse(":f").is_err(), "first part cannot be empty with colon");
+        assert!(ChildName::parse("f:f:f").is_err(), "multiple colons not allowed");
+        assert!(ChildName::parse("@").is_err(), "invalid character in name");
+        assert!(ChildName::parse("@:f").is_err(), "invalid character in collection");
+        assert!(ChildName::parse("f:@").is_err(), "invalid character in name with collection");
         assert!(
-            ChildMoniker::parse(&format!("f:{}", "x".repeat(MAX_LONG_NAME_LENGTH + 1))).is_err(),
+            ChildName::parse(&format!("f:{}", "x".repeat(MAX_LONG_NAME_LENGTH + 1))).is_err(),
             "name too long"
         );
         assert!(
-            ChildMoniker::parse(&format!("{}:x", "f".repeat(MAX_NAME_LENGTH + 1))).is_err(),
+            ChildName::parse(&format!("{}:x", "f".repeat(MAX_NAME_LENGTH + 1))).is_err(),
             "collection too long"
         );
     }
 
     #[test]
     fn child_moniker_compare() {
-        let a = ChildMoniker::try_new("a", None).unwrap();
-        let aa = ChildMoniker::try_new("a", Some("a")).unwrap();
-        let ab = ChildMoniker::try_new("a", Some("b")).unwrap();
-        let ba = ChildMoniker::try_new("b", Some("a")).unwrap();
-        let bb = ChildMoniker::try_new("b", Some("b")).unwrap();
-        let aa_same = ChildMoniker::try_new("a", Some("a")).unwrap();
+        let a = ChildName::try_new("a", None).unwrap();
+        let aa = ChildName::try_new("a", Some("a")).unwrap();
+        let ab = ChildName::try_new("a", Some("b")).unwrap();
+        let ba = ChildName::try_new("b", Some("a")).unwrap();
+        let bb = ChildName::try_new("b", Some("b")).unwrap();
+        let aa_same = ChildName::try_new("a", Some("a")).unwrap();
 
         assert_eq!(Ordering::Less, a.cmp(&aa));
         assert_eq!(Ordering::Greater, aa.cmp(&a));

@@ -22,7 +22,7 @@ use {
     fuchsia_url::AbsoluteComponentUrl,
     fuchsia_zircon_status as zx_status,
     futures::FutureExt,
-    moniker::{ChildMoniker, ChildMonikerBase, Moniker, MonikerBase},
+    moniker::{ChildName, ChildNameBase, Moniker, MonikerBase},
     routing::{
         capability_source::{CapabilitySource, ComponentCapability},
         component_id_index::ComponentIdIndex,
@@ -156,7 +156,7 @@ impl ModelBuilderForAnalyzer {
 
             let moniker: Moniker = Moniker::parse(&moniker_vec)
                 .expect("node path could not be converted back to absolute moniker");
-            let child_moniker: ChildMoniker = ChildMoniker::parse(child_moniker_str)
+            let child_moniker: ChildName = ChildName::parse(child_moniker_str)
                 .expect("node path part could not be converted back to child moniker");
             if child_moniker.collection().is_none() {
                 errors.push(
@@ -303,7 +303,7 @@ impl ModelBuilderForAnalyzer {
     ) {
         let mut children = vec![];
         for child_decl in instance.decl.children.iter() {
-            let child_moniker = match ChildMoniker::try_new(&child_decl.name, None) {
+            let child_moniker = match ChildName::try_new(&child_decl.name, None) {
                 Ok(cm) => cm,
                 Err(err) => {
                     result.errors.push(anyhow!(err));
@@ -585,7 +585,7 @@ impl ComponentModelForAnalyzer {
         let offer_target = offer_decl.target();
         let should_check_offer = match offer_target {
             OfferTarget::Child(c) => {
-                let child = ChildMoniker::parse(&c.name).unwrap();
+                let child = ChildName::parse(&c.name).unwrap();
                 let offer_target_moniker = target_moniker.child(child);
 
                 // This offer should be checked if there is no reference to it in the child.
@@ -1196,7 +1196,7 @@ impl ComponentModelForAnalyzer {
 
 #[derive(Clone)]
 pub struct Child {
-    pub child_moniker: ChildMoniker,
+    pub child_moniker: ChildName,
     pub url: Url,
     pub environment: Option<String>,
 }
@@ -1218,7 +1218,7 @@ mod tests {
         fidl_fuchsia_component_decl as fdecl,
         fidl_fuchsia_component_internal as component_internal,
         maplit::hashmap,
-        moniker::{ChildMoniker, Moniker, MonikerBase},
+        moniker::{ChildName, Moniker, MonikerBase},
         routing::{
             component_id_index::ComponentIdIndex,
             component_instance::{
@@ -1311,7 +1311,7 @@ mod tests {
 
         let get_child = root_instance
             .resolve()
-            .map(|locked| locked.get_child(&ChildMoniker::try_new("child", None).unwrap()))?;
+            .map(|locked| locked.get_child(&ChildName::try_new("child", None).unwrap()))?;
         assert!(get_child.is_some());
         assert_eq!(get_child.as_ref().unwrap().moniker(), child_instance.moniker());
         assert_eq!(get_child.unwrap().instanced_moniker(), child_instance.instanced_moniker());

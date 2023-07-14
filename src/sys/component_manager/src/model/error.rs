@@ -18,7 +18,7 @@ use {
     cm_moniker::{InstancedExtendedMoniker, InstancedMoniker},
     cm_types::Name,
     fidl_fuchsia_component as fcomponent, fidl_fuchsia_sys2 as fsys, fuchsia_zircon as zx,
-    moniker::{ChildMoniker, Moniker, MonikerError},
+    moniker::{ChildName, Moniker, MonikerError},
     std::path::PathBuf,
     thiserror::Error,
 };
@@ -266,9 +266,9 @@ impl Into<fcomponent::Error> for AddDynamicChildError {
             AddDynamicChildError::AddChildError {
                 err: AddChildError::DynamicOfferError { .. },
             } => fcomponent::Error::InvalidArguments,
-            AddDynamicChildError::AddChildError {
-                err: AddChildError::ChildMonikerInvalid { .. },
-            } => fcomponent::Error::InvalidArguments,
+            AddDynamicChildError::AddChildError { err: AddChildError::ChildNameInvalid { .. } } => {
+                fcomponent::Error::InvalidArguments
+            }
             AddDynamicChildError::DiscoverActionError { .. } => fcomponent::Error::Internal,
             AddDynamicChildError::ResolveActionError { .. } => fcomponent::Error::Internal,
         }
@@ -298,9 +298,9 @@ impl Into<fsys::CreateError> for AddDynamicChildError {
             AddDynamicChildError::AddChildError {
                 err: AddChildError::DynamicOfferError { .. },
             } => fsys::CreateError::BadDynamicOffer,
-            AddDynamicChildError::AddChildError {
-                err: AddChildError::ChildMonikerInvalid { .. },
-            } => fsys::CreateError::BadMoniker,
+            AddDynamicChildError::AddChildError { err: AddChildError::ChildNameInvalid { .. } } => {
+                fsys::CreateError::BadMoniker
+            }
             AddDynamicChildError::NumberedHandleNotInSingleRunCollection => {
                 fsys::CreateError::NumberedHandlesForbidden
             }
@@ -311,14 +311,14 @@ impl Into<fsys::CreateError> for AddDynamicChildError {
 #[derive(Debug, Error, Clone)]
 pub enum AddChildError {
     #[error("component instance {} in realm {} already exists", child, moniker)]
-    InstanceAlreadyExists { moniker: Moniker, child: ChildMoniker },
+    InstanceAlreadyExists { moniker: Moniker, child: ChildName },
     #[error("dynamic offer error: {}", err)]
     DynamicOfferError {
         #[from]
         err: DynamicOfferError,
     },
     #[error("child moniker not valid: {}", err)]
-    ChildMonikerInvalid {
+    ChildNameInvalid {
         #[from]
         err: MonikerError,
     },

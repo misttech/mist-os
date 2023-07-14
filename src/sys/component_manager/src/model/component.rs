@@ -44,7 +44,7 @@ use {
     },
     async_trait::async_trait,
     cm_fidl_validator::error::DeclType,
-    cm_moniker::{IncarnationId, InstancedChildMoniker, InstancedMoniker},
+    cm_moniker::{IncarnationId, InstancedChildName, InstancedMoniker},
     cm_runner::{component_controller::ComponentController, NullRunner, RemoteRunner, Runner},
     cm_rust::{
         self, ChildDecl, CollectionDecl, ComponentDecl, FidlIntoNative, NativeIntoFidl,
@@ -65,7 +65,7 @@ use {
         future::{join_all, BoxFuture, Either, FutureExt},
         lock::{MappedMutexGuard, Mutex, MutexGuard},
     },
-    moniker::{ChildMoniker, ChildMonikerBase, Moniker, MonikerBase},
+    moniker::{ChildName, ChildNameBase, Moniker, MonikerBase},
     std::iter::Iterator,
     std::{
         boxed::Box,
@@ -617,7 +617,7 @@ impl ComponentInstance {
     /// destroy action.
     pub async fn remove_dynamic_child(
         self: &Arc<Self>,
-        child_moniker: &ChildMoniker,
+        child_moniker: &ChildName,
     ) -> Result<(), DestroyActionError> {
         let incarnation = {
             let state = self.lock_state().await;
@@ -762,7 +762,7 @@ impl ComponentInstance {
 
     async fn destroy_child_if_single_run(
         self: &Arc<Self>,
-        child_moniker: &ChildMoniker,
+        child_moniker: &ChildName,
         incarnation: IncarnationId,
     ) {
         let single_run_colls = {
@@ -1092,7 +1092,7 @@ impl ComponentInstanceInterface for ComponentInstance {
         &self.moniker
     }
 
-    fn child_moniker(&self) -> Option<&ChildMoniker> {
+    fn child_moniker(&self) -> Option<&ChildName> {
         self.moniker.leaf()
     }
 
@@ -1280,7 +1280,7 @@ pub struct ResolvedInstanceState {
     /// The component's declaration.
     decl: ComponentDecl,
     /// All child instances, indexed by child moniker.
-    children: HashMap<ChildMoniker, Arc<ComponentInstance>>,
+    children: HashMap<ChildName, Arc<ComponentInstance>>,
     /// The next unique identifier for a dynamic children created in this realm.
     /// (Static instances receive identifier 0.)
     next_dynamic_instance_id: IncarnationId,
@@ -1373,12 +1373,12 @@ impl ResolvedInstanceState {
     }
 
     /// Returns an iterator over all children.
-    pub fn children(&self) -> impl Iterator<Item = (&ChildMoniker, &Arc<ComponentInstance>)> {
+    pub fn children(&self) -> impl Iterator<Item = (&ChildName, &Arc<ComponentInstance>)> {
         self.children.iter().map(|(k, v)| (k, v))
     }
 
     /// Returns a reference to a child.
-    pub fn get_child(&self, m: &ChildMoniker) -> Option<&Arc<ComponentInstance>> {
+    pub fn get_child(&self, m: &ChildName) -> Option<&Arc<ComponentInstance>> {
         self.children.get(m)
     }
 
@@ -1386,7 +1386,7 @@ impl ResolvedInstanceState {
     pub fn children_in_collection(
         &self,
         collection: &Name,
-    ) -> Vec<(ChildMoniker, Arc<ComponentInstance>)> {
+    ) -> Vec<(ChildName, Arc<ComponentInstance>)> {
         self.children()
             .filter(move |(m, _)| match m.collection() {
                 Some(name) if name == collection => true,
@@ -1417,7 +1417,7 @@ impl ResolvedInstanceState {
     }
 
     /// Removes a child.
-    pub fn remove_child(&mut self, moniker: &ChildMoniker) {
+    pub fn remove_child(&mut self, moniker: &ChildName) {
         if self.children.remove(moniker).is_none() {
             return;
         }
@@ -1547,7 +1547,7 @@ impl ResolvedInstanceState {
         let dynamic_offers =
             self.validate_and_convert_dynamic_offers(dynamic_offers, child, collection)?;
         let child_moniker =
-            ChildMoniker::try_new(child.name.as_str(), collection.map(|c| c.name.as_str()))?;
+            ChildName::try_new(child.name.as_str(), collection.map(|c| c.name.as_str()))?;
         if self.get_child(&child_moniker).is_some() {
             return Err(AddChildError::InstanceAlreadyExists {
                 moniker: component.moniker().clone(),
@@ -1563,8 +1563,7 @@ impl ResolvedInstanceState {
             }
             None => 0,
         };
-        let instanced_moniker =
-            InstancedChildMoniker::from_child_moniker(&child_moniker, instance_id);
+        let instanced_moniker = InstancedChildName::from_child_moniker(&child_moniker, instance_id);
         let child = ComponentInstance::new(
             self.environment_for_child(component, child, collection.clone()),
             component.instanced_moniker.child(instanced_moniker),
@@ -1691,14 +1690,14 @@ impl ResolvedInstanceInterface for ResolvedInstanceState {
         self.decl.collections.clone()
     }
 
-    fn get_child(&self, moniker: &ChildMoniker) -> Option<Arc<ComponentInstance>> {
+    fn get_child(&self, moniker: &ChildName) -> Option<Arc<ComponentInstance>> {
         ResolvedInstanceState::get_child(self, moniker).map(Arc::clone)
     }
 
     fn children_in_collection(
         &self,
         collection: &Name,
-    ) -> Vec<(ChildMoniker, Arc<ComponentInstance>)> {
+    ) -> Vec<(ChildName, Arc<ComponentInstance>)> {
         ResolvedInstanceState::children_in_collection(self, collection)
     }
 

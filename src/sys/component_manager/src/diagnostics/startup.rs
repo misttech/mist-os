@@ -86,7 +86,7 @@ mod tests {
     };
     use cm_rust_testing::ComponentDeclBuilder;
     use fuchsia_inspect::{assert_data_tree, DiagnosticsHierarchyGetter};
-    use moniker::{ChildMoniker, ChildMonikerBase, MonikerBase};
+    use moniker::{ChildName, ChildNameBase, MonikerBase};
 
     #[fuchsia::test]
     async fn tracks_started_components() {
@@ -142,7 +142,7 @@ mod tests {
         for i in 0..2 * MAX_NUMBER_OF_STARTUP_TIME_TRACKED_COMPONENTS {
             stats
                 .on_component_started(
-                    &Moniker::new(vec![ChildMoniker::parse(format!("{}", i)).unwrap()]),
+                    &Moniker::new(vec![ChildName::parse(format!("{}", i)).unwrap()]),
                     zx::Time::from_nanos(i as i64),
                 )
                 .await;

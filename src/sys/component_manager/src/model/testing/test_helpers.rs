@@ -37,7 +37,7 @@ use {
     },
     fuchsia_zircon::{self as zx, AsHandleRef, Koid},
     futures::{channel::mpsc::Receiver, lock::Mutex, StreamExt, TryStreamExt},
-    moniker::{ChildMoniker, Moniker},
+    moniker::{ChildName, Moniker},
     std::collections::HashSet,
     std::default::Default,
     std::sync::Arc,
@@ -150,7 +150,7 @@ pub async fn get_incarnation_id<'a>(component: &'a ComponentInstance, moniker: &
 }
 
 /// Return all monikers of the live children of the given `component`.
-pub async fn get_live_children(component: &ComponentInstance) -> HashSet<ChildMoniker> {
+pub async fn get_live_children(component: &ComponentInstance) -> HashSet<ChildName> {
     match *component.lock_state().await {
         InstanceState::Resolved(ref s) => s.children().map(|(m, _)| m.clone()).collect(),
         InstanceState::Destroyed => HashSet::new(),

@@ -22,7 +22,7 @@ use {
     futures::lock::Mutex,
     futures::prelude::*,
     lazy_static::lazy_static,
-    moniker::{ChildMoniker, Moniker, MonikerBase, MonikerError},
+    moniker::{ChildName, Moniker, MonikerBase, MonikerError},
     std::convert::TryFrom,
     std::path::PathBuf,
     std::sync::{Arc, Weak},
@@ -169,7 +169,7 @@ impl LifecycleController {
             self.model.find(&parent_moniker).await.ok_or(fsys::DestroyError::InstanceNotFound)?;
 
         child.collection.as_ref().ok_or(fsys::DestroyError::BadChildRef)?;
-        let child_moniker = ChildMoniker::try_new(&child.name, child.collection.as_ref())
+        let child_moniker = ChildName::try_new(&child.name, child.collection.as_ref())
             .map_err(|_| fsys::DestroyError::BadChildRef)?;
 
         parent_component.remove_dynamic_child(&child_moniker).await.map_err(|error| {

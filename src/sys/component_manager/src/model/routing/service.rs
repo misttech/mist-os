@@ -26,7 +26,7 @@ use {
     futures::future::{join_all, BoxFuture},
     futures::lock::Mutex,
     futures::FutureExt,
-    moniker::{ChildMoniker, ExtendedMoniker, Moniker, MonikerBase},
+    moniker::{ChildName, ExtendedMoniker, Moniker, MonikerBase},
     routing::capability_source::{
         CollectionAggregateCapabilityProvider, OfferAggregateCapabilityProvider,
     },
@@ -546,8 +546,8 @@ struct CollectionServiceDirectoryInner {
     /// This is used to find directory entries after they have been inserted into `dir`,
     /// as `dir` does not directly expose its entries.
     entries: HashMap<
-        ServiceInstanceDirectoryKey<ChildMoniker>,
-        Arc<ServiceInstanceDirectoryEntry<ChildMoniker>>,
+        ServiceInstanceDirectoryKey<ChildName>,
+        Arc<ServiceInstanceDirectoryEntry<ChildName>>,
     >,
 }
 
@@ -602,12 +602,12 @@ impl CollectionServiceDirectory {
 
     /// Returns metadata about all the service instances in their original representation,
     /// useful for exposing debug info. The results are returned in no particular order.
-    pub async fn entries(&self) -> Vec<Arc<ServiceInstanceDirectoryEntry<ChildMoniker>>> {
+    pub async fn entries(&self) -> Vec<Arc<ServiceInstanceDirectoryEntry<ChildName>>> {
         self.inner.lock().await.entries.values().cloned().collect()
     }
 
     /// Adds directory entries from services exposed by a child in the aggregated collection.
-    pub async fn add_entries_from_child(&self, moniker: &ChildMoniker) -> Result<(), ModelError> {
+    pub async fn add_entries_from_child(&self, moniker: &ChildName) -> Result<(), ModelError> {
         let parent =
             self.parent.upgrade().map_err(|err| ModelError::ComponentInstanceError { err })?;
         match self.aggregate_capability_provider.route_instance(moniker).await {
@@ -645,7 +645,7 @@ impl CollectionServiceDirectory {
 
     async fn add_entries_from_capability_source_lazy(
         self: Arc<Self>,
-        moniker: &ChildMoniker,
+        moniker: &ChildName,
         source: CapabilitySource,
     ) -> Result<(), ModelError> {
         let task_scope = self.parent.upgrade()?.nonblocking_task_scope();
@@ -677,7 +677,7 @@ impl CollectionServiceDirectory {
     /// Returns an error if `source` is not a service capability, or could not be opened.
     pub async fn add_entries_from_capability_source(
         &self,
-        moniker: &ChildMoniker,
+        moniker: &ChildName,
         source: CapabilitySource,
     ) -> Result<(), ModelError> {
         let mut inner = self.inner.lock().await;
@@ -718,7 +718,7 @@ impl CollectionServiceDirectory {
         })?;
         let rng = &mut rand::thread_rng();
         for dirent in dirents {
-            let instance_key = ServiceInstanceDirectoryKey::<ChildMoniker> {
+            let instance_key = ServiceInstanceDirectoryKey::<ChildName> {
                 source_id: moniker.clone(),
                 service_instance: FlyStr::new(&dirent.name),
             };
@@ -728,8 +728,8 @@ impl CollectionServiceDirectory {
                 continue;
             }
             let name = Self::generate_instance_id(rng);
-            let entry: Arc<ServiceInstanceDirectoryEntry<ChildMoniker>> =
-                Arc::new(ServiceInstanceDirectoryEntry::<ChildMoniker> {
+            let entry: Arc<ServiceInstanceDirectoryEntry<ChildName>> =
+                Arc::new(ServiceInstanceDirectoryEntry::<ChildName> {
                     name: name.clone(),
                     capability_source: source.clone(),
                     source_id: instance_key.source_id.clone(),
@@ -957,7 +957,7 @@ mod tests {
         cm_rust_testing::{ChildDeclBuilder, CollectionDeclBuilder, ComponentDeclBuilder},
         fuchsia_async as fasync,
         futures::StreamExt,
-        moniker::{ChildMoniker, Moniker, MonikerBase},
+        moniker::{ChildName, Moniker, MonikerBase},
         proptest::prelude::*,
         rand::SeedableRng,
         std::{
@@ -969,14 +969,14 @@ mod tests {
 
     #[derive(Clone)]
     struct MockAggregateCapabilityProvider {
-        instances: HashMap<ChildMoniker, WeakComponentInstance>,
+        instances: HashMap<ChildName, WeakComponentInstance>,
     }
 
     #[async_trait]
     impl CollectionAggregateCapabilityProvider<ComponentInstance> for MockAggregateCapabilityProvider {
         async fn route_instance(
             &self,
-            instance: &ChildMoniker,
+            instance: &ChildName,
         ) -> Result<CapabilitySource, RoutingError> {
             Ok(CapabilitySource::Component {
                 capability: ComponentCapability::Service(ServiceDecl {
@@ -995,7 +995,7 @@ mod tests {
             })
         }
 
-        async fn list_instances(&self) -> Result<Vec<ChildMoniker>, RoutingError> {
+        async fn list_instances(&self) -> Result<Vec<ChildName>, RoutingError> {
             Ok(self.instances.keys().cloned().collect())
         }
 

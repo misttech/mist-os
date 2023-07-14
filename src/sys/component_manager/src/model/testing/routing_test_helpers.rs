@@ -39,7 +39,7 @@ use {
     fuchsia_inspect as inspect, fuchsia_zircon as zx,
     futures::lock::Mutex,
     futures::{channel::oneshot, prelude::*},
-    moniker::{ChildMoniker, ChildMonikerBase, Moniker, MonikerBase},
+    moniker::{ChildName, ChildNameBase, Moniker, MonikerBase},
     std::{
         collections::{HashMap, HashSet},
         default::Default,
@@ -387,7 +387,7 @@ impl RoutingTest {
             .start_instance(&component.moniker, &StartReason::Eager)
             .await
             .expect("start instance failed");
-        let child_moniker = ChildMoniker::try_new(name, Some(collection)).expect("invalid moniker");
+        let child_moniker = ChildName::try_new(name, Some(collection)).expect("invalid moniker");
         component.remove_dynamic_child(&child_moniker).await.expect("failed to remove child");
     }
 

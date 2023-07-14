@@ -48,7 +48,7 @@ use {
     fuchsia_zircon as zx,
     futures::{channel::oneshot, join, lock::Mutex, StreamExt, TryStreamExt},
     maplit::btreemap,
-    moniker::{ChildMoniker, ChildMonikerBase, Moniker, MonikerBase},
+    moniker::{ChildName, ChildNameBase, Moniker, MonikerBase},
     routing_test_helpers::{
         default_service_capability, instantiate_common_routing_tests, RoutingTestModel,
     },
@@ -1390,7 +1390,7 @@ async fn destroying_instance_blocks_on_routing() {
 
     // `b` is not yet destroyed.
     let state = root.lock_resolved_state().await.unwrap();
-    state.get_child(&ChildMoniker::parse("b").unwrap()).expect("b was destroyed");
+    state.get_child(&ChildName::parse("b").unwrap()).expect("b was destroyed");
     drop(state);
 
     // Let routing complete. This should allow destruction to complete.
@@ -2583,7 +2583,7 @@ async fn verify_service_route(
     let target_moniker: Moniker = target_moniker.try_into().unwrap();
     let agg_moniker: Moniker = agg_moniker.try_into().unwrap();
     let child_monikers: Vec<_> =
-        child_monikers.into_iter().map(|m| ChildMoniker::parse(m).unwrap()).collect();
+        child_monikers.into_iter().map(|m| ChildName::parse(m).unwrap()).collect();
 
     // Test routing directly.
     let target_component = test.model.look_up(&target_moniker).await.unwrap();
@@ -3218,7 +3218,7 @@ async fn list_service_instances_from_collections() {
     };
 
     // Check that only the instances that expose the service are listed.
-    let instances: HashSet<ChildMoniker> =
+    let instances: HashSet<ChildName> =
         aggregate_capability_provider.list_instances().await.unwrap().into_iter().collect();
     assert_eq!(instances.len(), 2);
     assert!(instances.contains(&"coll1:service_child_a".try_into().unwrap()));

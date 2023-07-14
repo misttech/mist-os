@@ -83,7 +83,7 @@ use {
         task::{Context, Poll},
         Future,
     },
-    moniker::ChildMoniker,
+    moniker::ChildName,
     std::any::Any,
     std::collections::HashMap,
     std::fmt::Debug,
@@ -112,7 +112,7 @@ pub enum ActionKey {
     Start,
     Stop,
     Shutdown,
-    DestroyChild(ChildMoniker, IncarnationId),
+    DestroyChild(ChildName, IncarnationId),
     Destroy,
 }
 
@@ -441,7 +441,7 @@ pub mod tests {
 pub(crate) mod test_utils {
     use {
         crate::model::component::{ComponentInstance, InstanceState},
-        moniker::{ChildMoniker, MonikerBase},
+        moniker::{ChildName, MonikerBase},
         routing::component_instance::ComponentInstanceInterface,
     };
 
@@ -478,7 +478,7 @@ pub(crate) mod test_utils {
             && child_execution.is_shut_down()
     }
 
-    pub async fn is_stopped(component: &ComponentInstance, moniker: &ChildMoniker) -> bool {
+    pub async fn is_stopped(component: &ComponentInstance, moniker: &ChildName) -> bool {
         match *component.lock_state().await {
             InstanceState::Resolved(ref s) => match s.get_child(moniker) {
                 Some(child) => {

@@ -28,7 +28,7 @@ rustc_library("cm_moniker") {
   ]
 
   sources = [
-    "src/instanced_child_moniker.rs",
+    "src/instanced_child_name.rs",
     "src/instanced_extended_moniker.rs",
     "src/instanced_moniker.rs",
     "src/lib.rs",

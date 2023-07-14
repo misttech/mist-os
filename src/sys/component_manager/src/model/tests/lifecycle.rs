@@ -32,7 +32,7 @@ use {
     fidl_fuchsia_hardware_power_statecontrol as fstatecontrol, fidl_fuchsia_sys2 as fsys,
     fuchsia_async as fasync, fuchsia_zircon as zx,
     futures::{channel::mpsc, future::pending, join, lock::Mutex, prelude::*},
-    moniker::{ChildMoniker, Moniker, MonikerBase},
+    moniker::{ChildName, Moniker, MonikerBase},
     std::sync::{Arc, Weak},
     std::{collections::HashSet, convert::TryFrom},
 };
@@ -184,7 +184,7 @@ async fn bind_parent_then_child() {
 
     // Validate children. system is resolved, but not echo.
     let actual_children = get_live_children(&*model.root()).await;
-    let mut expected_children: HashSet<ChildMoniker> = HashSet::new();
+    let mut expected_children: HashSet<ChildName> = HashSet::new();
     expected_children.insert("system".try_into().unwrap());
     expected_children.insert("echo".try_into().unwrap());
     assert_eq!(actual_children, expected_children);

@@ -4,7 +4,7 @@
 
 use {
     crate::{
-        child_moniker::{ChildMoniker, ChildMonikerBase},
+        child_name::{ChildName, ChildNameBase},
         error::MonikerError,
     },
     core::cmp::{self, Ord, Ordering, PartialEq},
@@ -17,7 +17,7 @@ use {
 /// MonikerBase describes the identity of a component instance in terms of its path
 /// relative to the root of the component instance tree.
 pub trait MonikerBase: Default + Eq + PartialEq + fmt::Debug + Clone + Hash + fmt::Display {
-    type Part: ChildMonikerBase;
+    type Part: ChildNameBase;
 
     fn new(path: Vec<Self::Part>) -> Self;
 
@@ -153,11 +153,11 @@ pub trait MonikerBase: Default + Eq + PartialEq + fmt::Debug + Clone + Hash + fm
 /// Display notation: ".", "name1", "name1/name2", ...
 #[derive(Eq, PartialEq, Clone, Hash, Default)]
 pub struct Moniker {
-    path: Vec<ChildMoniker>,
+    path: Vec<ChildName>,
 }
 
 impl MonikerBase for Moniker {
-    type Part = ChildMoniker;
+    type Part = ChildName;
 
     fn new(path: Vec<Self::Part>) -> Self {
         Self { path }
@@ -233,15 +233,15 @@ mod tests {
         assert_eq!(root, Moniker::try_from(vec![]).unwrap());
 
         let m = Moniker::new(vec![
-            ChildMoniker::try_new("a", None).unwrap(),
-            ChildMoniker::try_new("b", Some("coll")).unwrap(),
+            ChildName::try_new("a", None).unwrap(),
+            ChildName::try_new("b", Some("coll")).unwrap(),
         ]);
         assert_eq!(false, m.is_root());
         assert_eq!("a/coll:b", format!("{}", m));
         assert_eq!(m, Moniker::try_from(vec!["a", "coll:b"]).unwrap());
         assert_eq!(m.leaf().map(|m| m.collection()).flatten(), Some(&Name::new("coll").unwrap()));
         assert_eq!(m.leaf().map(|m| m.name()), Some("b"));
-        assert_eq!(m.leaf(), Some(&ChildMoniker::try_from("coll:b").unwrap()));
+        assert_eq!(m.leaf(), Some(&ChildName::try_from("coll:b").unwrap()));
     }
 
     #[test]
@@ -251,14 +251,14 @@ mod tests {
         assert_eq!(None, root.parent());
 
         let m = Moniker::new(vec![
-            ChildMoniker::try_new("a", None).unwrap(),
-            ChildMoniker::try_new("b", None).unwrap(),
+            ChildName::try_new("a", None).unwrap(),
+            ChildName::try_new("b", None).unwrap(),
         ]);
         assert_eq!("a/b", format!("{}", m));
         assert_eq!("a", format!("{}", m.parent().unwrap()));
         assert_eq!(".", format!("{}", m.parent().unwrap().parent().unwrap()));
         assert_eq!(None, m.parent().unwrap().parent().unwrap().parent());
-        assert_eq!(m.leaf(), Some(&ChildMoniker::try_from("b").unwrap()));
+        assert_eq!(m.leaf(), Some(&ChildName::try_from("b").unwrap()));
     }
 
     #[test]

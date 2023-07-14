@@ -24,7 +24,7 @@ use {
     derivative::Derivative,
     from_enum::FromEnum,
     futures::future::BoxFuture,
-    moniker::ChildMoniker,
+    moniker::ChildName,
     std::{collections::HashMap, fmt, sync::Weak},
     thiserror::Error,
 };
@@ -186,12 +186,12 @@ pub trait CollectionAggregateCapabilityProvider<C: ComponentInstanceInterface>:
     ///
     /// The instance is an opaque identifier that is only meaningful for a subsequent
     /// call to `route_instance`.
-    async fn list_instances(&self) -> Result<Vec<ChildMoniker>, RoutingError>;
+    async fn list_instances(&self) -> Result<Vec<ChildName>, RoutingError>;
 
     /// Route the given `instance` of the capability to its source.
     async fn route_instance(
         &self,
-        instance: &ChildMoniker,
+        instance: &ChildName,
     ) -> Result<CapabilitySource<C>, RoutingError>;
 
     /// Trait-object compatible clone.

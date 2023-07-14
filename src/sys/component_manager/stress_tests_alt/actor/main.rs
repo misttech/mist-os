@@ -8,7 +8,7 @@ use {
     crate::stressor::Stressor,
     anyhow::Result,
     futures::{future::BoxFuture, FutureExt},
-    moniker::{ChildMonikerBase, Moniker, MonikerBase},
+    moniker::{ChildNameBase, Moniker, MonikerBase},
     rand::prelude::SliceRandom,
     rand::rngs::SmallRng,
     rand::Rng,

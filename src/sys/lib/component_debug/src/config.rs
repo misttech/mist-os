@@ -7,7 +7,7 @@ use cm_rust::NativeIntoFidl;
 use config_value_file::field::config_value_from_json_value;
 use fidl_fuchsia_component_decl as fdecl;
 use fidl_fuchsia_sys2 as fsys;
-use moniker::{ChildMonikerBase, Moniker, MonikerBase};
+use moniker::{ChildNameBase, Moniker, MonikerBase};
 
 pub async fn resolve_raw_config_overrides(
     realm_query: &fsys::RealmQueryProxy,

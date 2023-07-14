@@ -3,9 +3,9 @@
 // found in the LICENSE file.
 
 use {
-    crate::instanced_child_moniker::InstancedChildMoniker,
+    crate::instanced_child_name::InstancedChildName,
     core::cmp::{self, Ord, Ordering},
-    moniker::{ChildMoniker, ChildMonikerBase, Moniker, MonikerBase, MonikerError},
+    moniker::{ChildName, ChildNameBase, Moniker, MonikerBase, MonikerError},
     std::{fmt, hash::Hash},
 };
 
@@ -25,13 +25,13 @@ use serde::{Deserialize, Serialize};
 #[cfg_attr(feature = "serde", derive(Deserialize, Serialize))]
 #[derive(Eq, PartialEq, Clone, Hash, Default)]
 pub struct InstancedMoniker {
-    path: Vec<InstancedChildMoniker>,
+    path: Vec<InstancedChildName>,
 }
 
 impl InstancedMoniker {
     /// Convert an InstancedMoniker into an allocated Moniker without InstanceIds
     pub fn without_instance_ids(&self) -> Moniker {
-        let path: Vec<ChildMoniker> = self.path().iter().map(|p| p.without_instance_id()).collect();
+        let path: Vec<ChildName> = self.path().iter().map(|p| p.without_instance_id()).collect();
         Moniker::new(path)
     }
 
@@ -42,7 +42,7 @@ impl InstancedMoniker {
             .path()
             .iter()
             .map(|c| {
-                InstancedChildMoniker::try_new(c.name(), c.collection().map(|c| c.as_str()), 0)
+                InstancedChildName::try_new(c.name(), c.collection().map(|c| c.as_str()), 0)
                     .expect("down path moniker is guaranteed to be valid")
             })
             .collect();
@@ -51,7 +51,7 @@ impl InstancedMoniker {
 }
 
 impl MonikerBase for InstancedMoniker {
-    type Part = InstancedChildMoniker;
+    type Part = InstancedChildName;
 
     fn new(path: Vec<Self::Part>) -> Self {
         Self { path }
@@ -110,7 +110,7 @@ mod tests {
     use {
         super::*,
         cm_types::Name,
-        moniker::{ChildMonikerBase, MonikerBase, MonikerError},
+        moniker::{ChildNameBase, MonikerBase, MonikerError},
     };
 
     #[test]
@@ -121,8 +121,8 @@ mod tests {
         assert_eq!(root, InstancedMoniker::try_from(vec![]).unwrap());
 
         let m = InstancedMoniker::new(vec![
-            InstancedChildMoniker::try_new("a", None, 1).unwrap(),
-            InstancedChildMoniker::try_new("b", Some("coll"), 2).unwrap(),
+            InstancedChildName::try_new("a", None, 1).unwrap(),
+            InstancedChildName::try_new("b", Some("coll"), 2).unwrap(),
         ]);
         assert_eq!(false, m.is_root());
         assert_eq!("a:1/coll:b:2", format!("{}", m));
@@ -130,7 +130,7 @@ mod tests {
         assert_eq!(m.leaf().map(|m| m.collection()).flatten(), Some(&Name::new("coll").unwrap()));
         assert_eq!(m.leaf().map(|m| m.name()), Some("b"));
         assert_eq!(m.leaf().map(|m| m.instance()), Some(2));
-        assert_eq!(m.leaf(), Some(&InstancedChildMoniker::try_from("coll:b:2").unwrap()));
+        assert_eq!(m.leaf(), Some(&InstancedChildName::try_from("coll:b:2").unwrap()));
     }
 
     #[test]
@@ -140,43 +140,43 @@ mod tests {
         assert_eq!(None, root.parent());
 
         let m = InstancedMoniker::new(vec![
-            InstancedChildMoniker::try_new("a", None, 1).unwrap(),
-            InstancedChildMoniker::try_new("b", None, 2).unwrap(),
+            InstancedChildName::try_new("a", None, 1).unwrap(),
+            InstancedChildName::try_new("b", None, 2).unwrap(),
         ]);
         assert_eq!("a:1/b:2", format!("{}", m));
         assert_eq!("a:1", format!("{}", m.parent().unwrap()));
         assert_eq!(".", format!("{}", m.parent().unwrap().parent().unwrap()));
         assert_eq!(None, m.parent().unwrap().parent().unwrap().parent());
-        assert_eq!(m.leaf(), Some(&InstancedChildMoniker::try_from("b:2").unwrap()));
+        assert_eq!(m.leaf(), Some(&InstancedChildName::try_from("b:2").unwrap()));
     }
 
     #[test]
     fn instanced_moniker_compare() {
         let a = InstancedMoniker::new(vec![
-            InstancedChildMoniker::try_new("a", None, 1).unwrap(),
-            InstancedChildMoniker::try_new("b", None, 2).unwrap(),
-            InstancedChildMoniker::try_new("c", None, 3).unwrap(),
+            InstancedChildName::try_new("a", None, 1).unwrap(),
+            InstancedChildName::try_new("b", None, 2).unwrap(),
+            InstancedChildName::try_new("c", None, 3).unwrap(),
         ]);
         let a2 = InstancedMoniker::new(vec![
-            InstancedChildMoniker::try_new("a", None, 1).unwrap(),
-            InstancedChildMoniker::try_new("b", None, 3).unwrap(),
-            InstancedChildMoniker::try_new("c", None, 3).unwrap(),
+            InstancedChildName::try_new("a", None, 1).unwrap(),
+            InstancedChildName::try_new("b", None, 3).unwrap(),
+            InstancedChildName::try_new("c", None, 3).unwrap(),
         ]);
         let b = InstancedMoniker::new(vec![
-            InstancedChildMoniker::try_new("a", None, 1).unwrap(),
-            InstancedChildMoniker::try_new("b", None, 2).unwrap(),
-            InstancedChildMoniker::try_new("b", None, 3).unwrap(),
+            InstancedChildName::try_new("a", None, 1).unwrap(),
+            InstancedChildName::try_new("b", None, 2).unwrap(),
+            InstancedChildName::try_new("b", None, 3).unwrap(),
         ]);
         let c = InstancedMoniker::new(vec![
-            InstancedChildMoniker::try_new("a", None, 1).unwrap(),
-            InstancedChildMoniker::try_new("b", None, 2).unwrap(),
-            InstancedChildMoniker::try_new("c", None, 3).unwrap(),
-            InstancedChildMoniker::try_new("d", None, 4).unwrap(),
+            InstancedChildName::try_new("a", None, 1).unwrap(),
+            InstancedChildName::try_new("b", None, 2).unwrap(),
+            InstancedChildName::try_new("c", None, 3).unwrap(),
+            InstancedChildName::try_new("d", None, 4).unwrap(),
         ]);
         let d = InstancedMoniker::new(vec![
-            InstancedChildMoniker::try_new("a", None, 1).unwrap(),
-            InstancedChildMoniker::try_new("b", None, 2).unwrap(),
-            InstancedChildMoniker::try_new("c", None, 3).unwrap(),
+            InstancedChildName::try_new("a", None, 1).unwrap(),
+            InstancedChildName::try_new("b", None, 2).unwrap(),
+            InstancedChildName::try_new("c", None, 3).unwrap(),
         ]);
 
         assert_eq!(Ordering::Less, a.cmp(&a2));
@@ -198,20 +198,20 @@ mod tests {
     #[test]
     fn instanced_monikers_contains_in_realm() {
         let root = InstancedMoniker::root();
-        let a = InstancedMoniker::new(vec![InstancedChildMoniker::try_new("a", None, 1).unwrap()]);
+        let a = InstancedMoniker::new(vec![InstancedChildName::try_new("a", None, 1).unwrap()]);
         let ab = InstancedMoniker::new(vec![
-            InstancedChildMoniker::try_new("a", None, 1).unwrap(),
-            InstancedChildMoniker::try_new("b", None, 2).unwrap(),
+            InstancedChildName::try_new("a", None, 1).unwrap(),
+            InstancedChildName::try_new("b", None, 2).unwrap(),
         ]);
         let abc = InstancedMoniker::new(vec![
-            InstancedChildMoniker::try_new("a", None, 1).unwrap(),
-            InstancedChildMoniker::try_new("b", None, 2).unwrap(),
-            InstancedChildMoniker::try_new("c", None, 3).unwrap(),
+            InstancedChildName::try_new("a", None, 1).unwrap(),
+            InstancedChildName::try_new("b", None, 2).unwrap(),
+            InstancedChildName::try_new("c", None, 3).unwrap(),
         ]);
         let abd = InstancedMoniker::new(vec![
-            InstancedChildMoniker::try_new("a", None, 1).unwrap(),
-            InstancedChildMoniker::try_new("b", None, 2).unwrap(),
-            InstancedChildMoniker::try_new("d", None, 3).unwrap(),
+            InstancedChildName::try_new("a", None, 1).unwrap(),
+            InstancedChildName::try_new("b", None, 2).unwrap(),
+            InstancedChildName::try_new("d", None, 3).unwrap(),
         ]);
 
         assert!(root.contains_in_realm(&root));
@@ -251,8 +251,8 @@ mod tests {
 
         assert_eq!(under_test(".")?, InstancedMoniker::root());
 
-        let a = InstancedChildMoniker::try_new("a", None, 0).unwrap();
-        let bb = InstancedChildMoniker::try_new("b", Some("b"), 0).unwrap();
+        let a = InstancedChildName::try_new("a", None, 0).unwrap();
+        let bb = InstancedChildName::try_new("b", Some("b"), 0).unwrap();
 
         assert_eq!(under_test("a:0")?, InstancedMoniker::new(vec![a.clone()]));
         assert_eq!(under_test("a:0/b:b:0")?, InstancedMoniker::new(vec![a.clone(), bb.clone()]));

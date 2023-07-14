@@ -4,7 +4,7 @@
 
 use {
     crate::{
-        child_moniker::{ChildMoniker, ChildMonikerBase},
+        child_name::{ChildName, ChildNameBase},
         moniker::{Moniker, MonikerBase},
     },
     serde::{
@@ -14,7 +14,7 @@ use {
     std::fmt,
 };
 
-impl Serialize for ChildMoniker {
+impl Serialize for ChildName {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
         S: Serializer,
@@ -23,10 +23,10 @@ impl Serialize for ChildMoniker {
     }
 }
 
-struct ChildMonikerVisitor;
+struct ChildNameVisitor;
 
-impl<'de> Visitor<'de> for ChildMonikerVisitor {
-    type Value = ChildMoniker;
+impl<'de> Visitor<'de> for ChildNameVisitor {
+    type Value = ChildName;
 
     fn expecting(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         formatter.write_str("a child moniker of a component instance")
@@ -36,19 +36,19 @@ impl<'de> Visitor<'de> for ChildMonikerVisitor {
     where
         E: de::Error,
     {
-        match ChildMoniker::parse(value) {
+        match ChildName::parse(value) {
             Ok(moniker) => Ok(moniker),
-            Err(err) => Err(E::custom(format!("Failed to parse ChildMoniker: {}", err))),
+            Err(err) => Err(E::custom(format!("Failed to parse ChildName: {}", err))),
         }
     }
 }
 
-impl<'de> Deserialize<'de> for ChildMoniker {
-    fn deserialize<D>(deserializer: D) -> Result<ChildMoniker, D::Error>
+impl<'de> Deserialize<'de> for ChildName {
+    fn deserialize<D>(deserializer: D) -> Result<ChildName, D::Error>
     where
         D: Deserializer<'de>,
     {
-        deserializer.deserialize_str(ChildMonikerVisitor)
+        deserializer.deserialize_str(ChildNameVisitor)
     }
 }
 

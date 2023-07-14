@@ -13,9 +13,7 @@ use {
         self as component_internal, BuiltinBootResolver, CapabilityPolicyAllowlists,
         DebugRegistrationPolicyAllowlists, LogDestination, RealmBuilderResolverAndRunner,
     },
-    moniker::{
-        ChildMoniker, ChildMonikerBase, ExtendedMoniker, Moniker, MonikerBase, MonikerError,
-    },
+    moniker::{ChildName, ChildNameBase, ExtendedMoniker, Moniker, MonikerBase, MonikerError},
     std::{
         collections::{HashMap, HashSet},
         convert::TryFrom,
@@ -112,9 +110,9 @@ pub struct AllowlistEntry {
 
 #[derive(Debug, PartialEq, Eq, Hash, Clone)]
 pub enum AllowlistMatcher {
-    /// Allow the child with this exact ChildMoniker.
+    /// Allow the child with this exact ChildName.
     /// Examples: "bar", "foo:bar", "baz"
-    Exact(ChildMoniker),
+    Exact(ChildName),
     /// Allow any descendant of this realm.
     /// This is indicated by "**" in a config file.
     AnyDescendant,
@@ -143,7 +141,7 @@ impl AllowlistEntryBuilder {
     }
 
     pub fn exact(mut self, name: &str) -> Self {
-        self.parts.push(AllowlistMatcher::Exact(ChildMoniker::parse(name).unwrap()));
+        self.parts.push(AllowlistMatcher::Exact(ChildName::parse(name).unwrap()));
         self
     }
 
@@ -427,7 +425,7 @@ impl RuntimeConfig {
 #[derive(Debug, Clone, Error, PartialEq, Eq)]
 pub enum AllowlistEntryParseError {
     #[error("Invalid child moniker ({0:?}) in allowlist entry: {1:?}")]
-    InvalidChildMoniker(String, #[source] MonikerError),
+    InvalidChildName(String, #[source] MonikerError),
     #[error("Invalid collection name ({0:?}) in allowlist entry: {1:?}")]
     InvalidCollectionName(String, #[source] ParseError),
     #[error("Allowlist entry ({0:?}) must start with a '/'")]
@@ -488,8 +486,8 @@ fn parse_allowlist_entry(input: &str) -> Result<AllowlistEntry, AllowlistEntryPa
                     })?;
                     AllowlistMatcher::AnyChildInCollection(collection_name)
                 } else {
-                    let child_moniker = ChildMoniker::parse(name).map_err(|e| {
-                        AllowlistEntryParseError::InvalidChildMoniker(name.to_string(), e)
+                    let child_moniker = ChildName::parse(name).map_err(|e| {
+                        AllowlistEntryParseError::InvalidChildName(name.to_string(), e)
                     })?;
                     AllowlistMatcher::Exact(child_moniker)
                 }
@@ -1355,7 +1353,7 @@ mod tests {
         invalid_exact_entry => (
             &Some(vec!["/foo/bar*".into()]),
             AllowlistEntryParseError,
-            AllowlistEntryParseError::InvalidChildMoniker(
+            AllowlistEntryParseError::InvalidChildName(
                 "bar*".into(),
                 MonikerError::InvalidMonikerPart { 0: ParseError::InvalidValue }
             )),

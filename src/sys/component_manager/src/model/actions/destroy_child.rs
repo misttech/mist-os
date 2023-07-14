@@ -11,18 +11,18 @@ use {
     },
     async_trait::async_trait,
     cm_moniker::IncarnationId,
-    moniker::ChildMoniker,
+    moniker::ChildName,
     std::sync::Arc,
 };
 
 /// Completely destroys the given child of a component.
 pub struct DestroyChildAction {
-    moniker: ChildMoniker,
+    moniker: ChildName,
     incarnation: IncarnationId,
 }
 
 impl DestroyChildAction {
-    pub fn new(moniker: ChildMoniker, incarnation: IncarnationId) -> Self {
+    pub fn new(moniker: ChildName, incarnation: IncarnationId) -> Self {
         Self { moniker, incarnation }
     }
 }
@@ -40,7 +40,7 @@ impl Action for DestroyChildAction {
 
 async fn do_destroy_child(
     component: &Arc<ComponentInstance>,
-    moniker: &ChildMoniker,
+    moniker: &ChildName,
     incarnation: IncarnationId,
 ) -> Result<(), DestroyActionError> {
     // The child may not exist or may already be deleted by a previous DeleteChild action.

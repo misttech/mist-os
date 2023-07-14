@@ -378,7 +378,7 @@ impl RunningSuite {
                 .iter()
                 .skip(1)
                 .map(Clone::clone)
-                .collect::<Vec<cm_moniker::InstancedChildMoniker>>();
+                .collect::<Vec<cm_moniker::InstancedChildName>>();
             let instanced_moniker = cm_moniker::InstancedMoniker::new(path);
             let moniker_relative_to_test_root = instanced_moniker.without_instance_ids();
             sender

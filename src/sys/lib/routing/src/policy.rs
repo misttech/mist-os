@@ -12,7 +12,7 @@ use {
         },
     },
     fuchsia_zircon_status as zx,
-    moniker::{ChildMonikerBase, ExtendedMoniker, Moniker, MonikerBase},
+    moniker::{ChildNameBase, ExtendedMoniker, Moniker, MonikerBase},
     std::sync::Arc,
     thiserror::Error,
     tracing::{error, warn},
@@ -382,7 +382,7 @@ mod tests {
             AllowlistEntryBuilder, ChildPolicyAllowlists, JobPolicyAllowlists, SecurityPolicy,
         },
         assert_matches::assert_matches,
-        moniker::{ChildMoniker, Moniker, MonikerBase},
+        moniker::{ChildName, Moniker, MonikerBase},
         std::collections::HashMap,
     };
 
@@ -520,7 +520,7 @@ mod tests {
         assert_vmex_allowed_matches!(policy, allowed2, Ok(()));
         assert_vmex_disallowed!(policy, Moniker::root());
         assert_vmex_disallowed!(policy, allowed1.parent().unwrap());
-        assert_vmex_disallowed!(policy, allowed1.child(ChildMoniker::try_from("baz").unwrap()));
+        assert_vmex_disallowed!(policy, allowed1.child(ChildName::try_from("baz").unwrap()));
     }
 
     #[test]
@@ -566,7 +566,7 @@ mod tests {
         assert_create_raw_processes_disallowed!(policy, allowed1.parent().unwrap());
         assert_create_raw_processes_disallowed!(
             policy,
-            allowed1.child(ChildMoniker::try_from("baz").unwrap())
+            allowed1.child(ChildName::try_from("baz").unwrap())
         );
     }
 
@@ -617,7 +617,7 @@ mod tests {
         assert_critical_allowed_matches!(policy, allowed2, Ok(()));
         assert_critical_disallowed!(policy, Moniker::root());
         assert_critical_disallowed!(policy, allowed1.parent().unwrap());
-        assert_critical_disallowed!(policy, allowed1.child(ChildMoniker::try_from("baz").unwrap()));
+        assert_critical_disallowed!(policy, allowed1.child(ChildName::try_from("baz").unwrap()));
     }
 
     #[test]
@@ -666,6 +666,6 @@ mod tests {
         assert_reboot_allowed_matches!(policy, allowed2, Ok(()));
         assert_reboot_disallowed!(policy, Moniker::root());
         assert_reboot_disallowed!(policy, allowed1.parent().unwrap());
-        assert_reboot_disallowed!(policy, allowed1.child(ChildMoniker::try_from("baz").unwrap()));
+        assert_reboot_disallowed!(policy, allowed1.child(ChildName::try_from("baz").unwrap()));
     }
 }

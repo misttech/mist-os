@@ -3,39 +3,39 @@
 // found in the LICENSE file.
 
 use {
-    moniker::{ChildMoniker, Moniker, MonikerBase},
+    moniker::{ChildName, Moniker, MonikerBase},
     std::{fmt, fmt::Display},
 };
 
 /// A representation of a component's position in the component topology. The last segment of
-/// a component's `NodePath` is its `ChildMoniker` as designated by its parent component,
+/// a component's `NodePath` is its `ChildName` as designated by its parent component,
 /// and the prefix is the parent component's `NodePath`.
 #[derive(Clone, Debug, Default, Eq, Hash, PartialEq)]
-pub struct NodePath(Vec<ChildMoniker>);
+pub struct NodePath(Vec<ChildName>);
 
 impl NodePath {
-    pub fn new(monikers: Vec<ChildMoniker>) -> Self {
+    pub fn new(monikers: Vec<ChildName>) -> Self {
         let mut node_path = NodePath::default();
         node_path.0 = monikers;
         node_path
     }
 
     /// Construct NodePath from string references that correspond to parsable
-    /// `ChildMoniker` instances.
+    /// `ChildName` instances.
     pub fn absolute_from_vec(vec: Vec<&str>) -> Self {
         let moniker: Moniker = vec.try_into().unwrap();
         Self::new(moniker.path().clone())
     }
 
     /// Returns a new `NodePath` which extends `self` by appending `moniker` at the end of the path.
-    pub fn extended(&self, moniker: ChildMoniker) -> Self {
+    pub fn extended(&self, moniker: ChildName) -> Self {
         let mut node_path = NodePath::new(self.0.clone());
         node_path.0.push(moniker);
         node_path
     }
 
     /// Construct string references that correspond to underlying
-    /// `ChildMoniker` instances.
+    /// `ChildName` instances.
     pub fn as_vec(&self) -> Vec<String> {
         self.0.iter().map(|moniker| moniker.to_string()).collect()
     }
@@ -72,11 +72,11 @@ mod tests {
         let empty_node_path = NodePath::default();
         assert_eq!(empty_node_path.to_string(), "/");
 
-        let foo_moniker = ChildMoniker::try_new("foo", None).unwrap();
+        let foo_moniker = ChildName::try_new("foo", None).unwrap();
         let foo_node_path = empty_node_path.extended(foo_moniker);
         assert_eq!(foo_node_path.to_string(), "/foo");
 
-        let bar_moniker = ChildMoniker::try_new("bar", None).unwrap();
+        let bar_moniker = ChildName::try_new("bar", None).unwrap();
         let bar_node_path = foo_node_path.extended(bar_moniker);
         assert_eq!(bar_node_path.to_string(), "/foo/bar");
     }

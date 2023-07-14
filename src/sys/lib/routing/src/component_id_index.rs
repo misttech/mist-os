@@ -118,7 +118,7 @@ impl PartialEq for ComponentIdIndexError {
 pub struct ComponentIdIndex {
     /// Map of a moniker from the index to its instance ID.
     ///
-    /// The moniker does not contain instances, i.e. all of the ChildMonikers in the
+    /// The moniker does not contain instances, i.e. all of the ChildNames in the
     /// path have the (moniker, not index) instance ID set to zero.
     moniker_to_instance_id: HashMap<Moniker, ComponentInstanceId>,
 
@@ -183,7 +183,7 @@ impl ComponentIdIndex {
 #[cfg(test)]
 pub mod tests {
     use super::*;
-    use moniker::{ChildMoniker, MonikerBase};
+    use moniker::{ChildName, MonikerBase};
     use routing_test_helpers::component_id_index::make_index_file;
 
     #[fuchsia::test]
@@ -227,8 +227,8 @@ pub mod tests {
             Some(iid),
             index
                 .look_up_moniker(&Moniker::new(vec![
-                    ChildMoniker::try_new("a", None).unwrap(),
-                    ChildMoniker::try_new("name", Some("coll")).unwrap(),
+                    ChildName::try_new("a", None).unwrap(),
+                    ChildName::try_new("name", Some("coll")).unwrap(),
                 ]))
                 .map(|id| id.to_string())
         );

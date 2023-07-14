@@ -9,11 +9,11 @@ use {
         node_path::NodePath,
     },
     async_trait::async_trait,
-    cm_moniker::{InstancedChildMoniker, InstancedMoniker},
+    cm_moniker::{InstancedChildName, InstancedMoniker},
     cm_rust::{CapabilityDecl, CollectionDecl, ComponentDecl, ExposeDecl, OfferDecl, UseDecl},
     cm_types::Name,
     config_encoder::ConfigFields,
-    moniker::{ChildMoniker, ChildMonikerBase, Moniker, MonikerBase},
+    moniker::{ChildName, ChildNameBase, Moniker, MonikerBase},
     routing::{
         capability_source::{BuiltinCapabilities, NamespaceCapabilities},
         component_id_index::ComponentIdIndex,
@@ -42,7 +42,7 @@ pub struct ComponentInstanceForAnalyzer {
     config: Option<ConfigFields>,
     url: String,
     parent: WeakExtendedInstanceInterface<Self>,
-    children: RwLock<HashMap<ChildMoniker, Arc<Self>>>,
+    children: RwLock<HashMap<ChildName, Arc<Self>>>,
     pub(crate) environment: Arc<EnvironmentForAnalyzer>,
     policy_checker: GlobalPolicyChecker,
     component_id_index: Arc<ComponentIdIndex>,
@@ -102,7 +102,7 @@ impl ComponentInstanceForAnalyzer {
     ) -> Result<Arc<Self>, BuildAnalyzerModelError> {
         let environment = EnvironmentForAnalyzer::new_for_child(&parent, child)?;
         let instanced_moniker = parent.instanced_moniker.child(
-            InstancedChildMoniker::try_new(
+            InstancedChildName::try_new(
                 child.child_moniker.name(),
                 child.child_moniker.collection().map(|c| c.as_str()),
                 0,
@@ -137,7 +137,7 @@ impl ComponentInstanceForAnalyzer {
     }
 
     // Adds a new child to this component instance.
-    pub(crate) fn add_child(&self, child_moniker: ChildMoniker, child: Arc<Self>) {
+    pub(crate) fn add_child(&self, child_moniker: ChildName, child: Arc<Self>) {
         self.children.write().expect("failed to acquire write lock").insert(child_moniker, child);
     }
 
@@ -171,7 +171,7 @@ impl ComponentInstanceInterface for ComponentInstanceForAnalyzer {
         &self.moniker
     }
 
-    fn child_moniker(&self) -> Option<&ChildMoniker> {
+    fn child_moniker(&self) -> Option<&ChildName> {
         self.moniker.leaf()
     }
 
@@ -240,12 +240,12 @@ impl ResolvedInstanceInterface for ComponentInstanceForAnalyzer {
         self.decl.collections.clone()
     }
 
-    fn get_child(&self, moniker: &ChildMoniker) -> Option<Arc<Self>> {
+    fn get_child(&self, moniker: &ChildName) -> Option<Arc<Self>> {
         self.children.read().expect("failed to acquire read lock").get(moniker).map(Arc::clone)
     }
 
     // This is a static model with no notion of a collection.
-    fn children_in_collection(&self, _collection: &Name) -> Vec<(ChildMoniker, Arc<Self>)> {
+    fn children_in_collection(&self, _collection: &Name) -> Vec<(ChildName, Arc<Self>)> {
         vec![]
     }
 

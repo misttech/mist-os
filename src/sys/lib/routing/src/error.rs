@@ -8,7 +8,7 @@ use {
     cm_rust::CapabilityTypeName,
     cm_types::Name,
     fidl_fuchsia_component as fcomponent, fuchsia_zircon_status as zx,
-    moniker::{ChildMoniker, Moniker, MonikerError},
+    moniker::{ChildName, Moniker, MonikerError},
     thiserror::Error,
 };
 
@@ -103,7 +103,7 @@ pub enum RoutingError {
         child_moniker
     )]
     StorageFromChildExposeNotFound {
-        child_moniker: ChildMoniker,
+        child_moniker: ChildName,
         moniker: Moniker,
         capability_id: String,
     },
@@ -129,7 +129,7 @@ pub enum RoutingError {
 
     #[error("`{}` does not have child `#{}`.", moniker, child_moniker)]
     UseFromChildInstanceNotFound {
-        child_moniker: ChildMoniker,
+        child_moniker: ChildName,
         moniker: Moniker,
         capability_id: String,
     },
@@ -163,7 +163,7 @@ pub enum RoutingError {
         child_moniker
     )]
     EnvironmentFromChildExposeNotFound {
-        child_moniker: ChildMoniker,
+        child_moniker: ChildName,
         moniker: Moniker,
         capability_type: String,
         capability_name: Name,
@@ -171,7 +171,7 @@ pub enum RoutingError {
 
     #[error("`{}` does not have child `#{}`.", moniker, child_moniker)]
     EnvironmentFromChildInstanceNotFound {
-        child_moniker: ChildMoniker,
+        child_moniker: ChildName,
         moniker: Moniker,
         capability_name: Name,
         capability_type: String,
@@ -185,7 +185,7 @@ pub enum RoutingError {
 
     #[error("`{}` does not have child `#{}`.", moniker, child_moniker)]
     OfferFromChildInstanceNotFound {
-        child_moniker: ChildMoniker,
+        child_moniker: ChildName,
         moniker: Moniker,
         capability_id: String,
     },
@@ -200,7 +200,7 @@ pub enum RoutingError {
         child_moniker
     )]
     OfferFromChildExposeNotFound {
-        child_moniker: ChildMoniker,
+        child_moniker: ChildName,
         moniker: Moniker,
         capability_id: String,
     },
@@ -230,7 +230,7 @@ pub enum RoutingError {
 
     #[error("`{}` does not have child `#{}`.", moniker, child_moniker)]
     ExposeFromChildInstanceNotFound {
-        child_moniker: ChildMoniker,
+        child_moniker: ChildName,
         moniker: Moniker,
         capability_id: String,
     },
@@ -245,7 +245,7 @@ pub enum RoutingError {
         child_moniker
     )]
     ExposeFromChildExposeNotFound {
-        child_moniker: ChildMoniker,
+        child_moniker: ChildName,
         moniker: Moniker,
         capability_id: String,
     },
@@ -263,11 +263,7 @@ pub enum RoutingError {
         moniker,
         child_moniker
     )]
-    UseFromChildExposeNotFound {
-        child_moniker: ChildMoniker,
-        moniker: Moniker,
-        capability_id: String,
-    },
+    UseFromChildExposeNotFound { child_moniker: ChildName, moniker: Moniker, capability_id: String },
 
     #[error(
         "`{}` was queried in an aggregate for `{}` at `{}` but it does not contain that child.",
@@ -275,7 +271,7 @@ pub enum RoutingError {
         capability,
         moniker
     )]
-    UnexpectedChildInAggregate { child_moniker: ChildMoniker, moniker: Moniker, capability: Name },
+    UnexpectedChildInAggregate { child_moniker: ChildName, moniker: Moniker, capability: Name },
 
     #[error("Routing a capability from an unsupported source type: {}.", source_type)]
     UnsupportedRouteSource { source_type: String },
@@ -321,7 +317,7 @@ impl RoutingError {
     }
 
     pub fn storage_from_child_expose_not_found(
-        child_moniker: &ChildMoniker,
+        child_moniker: &ChildName,
         moniker: &Moniker,
         capability_id: impl Into<String>,
     ) -> Self {
@@ -352,7 +348,7 @@ impl RoutingError {
     }
 
     pub fn use_from_child_instance_not_found(
-        child_moniker: &ChildMoniker,
+        child_moniker: &ChildName,
         moniker: &Moniker,
         capability_id: impl Into<String>,
     ) -> Self {
@@ -384,7 +380,7 @@ impl RoutingError {
     }
 
     pub fn offer_from_child_instance_not_found(
-        child_moniker: &ChildMoniker,
+        child_moniker: &ChildName,
         moniker: &Moniker,
         capability_id: impl Into<String>,
     ) -> Self {
@@ -396,7 +392,7 @@ impl RoutingError {
     }
 
     pub fn offer_from_child_expose_not_found(
-        child_moniker: &ChildMoniker,
+        child_moniker: &ChildName,
         moniker: &Moniker,
         capability_id: impl Into<String>,
     ) -> Self {
@@ -408,7 +404,7 @@ impl RoutingError {
     }
 
     pub fn expose_from_child_instance_not_found(
-        child_moniker: &ChildMoniker,
+        child_moniker: &ChildName,
         moniker: &Moniker,
         capability_id: impl Into<String>,
     ) -> Self {
@@ -420,7 +416,7 @@ impl RoutingError {
     }
 
     pub fn expose_from_child_expose_not_found(
-        child_moniker: &ChildMoniker,
+        child_moniker: &ChildName,
         moniker: &Moniker,
         capability_id: impl Into<String>,
     ) -> Self {

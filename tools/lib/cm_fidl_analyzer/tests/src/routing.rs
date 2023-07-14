@@ -30,7 +30,7 @@ use {
     fidl::prelude::*,
     fidl_fuchsia_component_decl as fdecl, fidl_fuchsia_component_internal as component_internal,
     fidl_fuchsia_io as fio, fidl_fuchsia_sys2 as fsys, fuchsia_zircon_status as zx_status,
-    moniker::{ChildMonikerBase, Moniker, MonikerBase},
+    moniker::{ChildNameBase, Moniker, MonikerBase},
     routing::{
         component_id_index::ComponentIdIndex,
         component_instance::ComponentInstanceInterface,

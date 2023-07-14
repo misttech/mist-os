@@ -26,7 +26,7 @@ use {
     fuchsia_zircon as zx,
     futures::prelude::*,
     lazy_static::lazy_static,
-    moniker::{ChildMoniker, ChildMonikerBase, Moniker},
+    moniker::{ChildName, ChildNameBase, Moniker},
     std::{
         cmp,
         path::PathBuf,
@@ -274,7 +274,7 @@ impl RealmCapabilityHost {
     ) -> Result<(), fcomponent::Error> {
         let component = component.upgrade().map_err(|_| fcomponent::Error::InstanceDied)?;
         child.collection.as_ref().ok_or(fcomponent::Error::InvalidArguments)?;
-        let child_moniker = ChildMoniker::try_new(&child.name, child.collection.as_ref())
+        let child_moniker = ChildName::try_new(&child.name, child.collection.as_ref())
             .map_err(|_| fcomponent::Error::InvalidArguments)?;
         component.remove_dynamic_child(&child_moniker).await.map_err(|error| {
             debug!(%error, ?child, "remove_dynamic_child() failed");
@@ -308,7 +308,7 @@ impl RealmCapabilityHost {
             debug!(%error, moniker=%parent.moniker, "failed to resolve instance");
             fcomponent::Error::InstanceCannotResolve
         })?;
-        let child_moniker = ChildMoniker::try_new(&child.name, child.collection.as_ref())
+        let child_moniker = ChildName::try_new(&child.name, child.collection.as_ref())
             .map_err(|_| fcomponent::Error::InvalidArguments)?;
         Ok(state.get_child(&child_moniker).map(|r| r.clone()))
     }
@@ -566,7 +566,7 @@ mod tests {
 
         // Verify that the component topology matches expectations.
         let actual_children = get_live_children(test.component()).await;
-        let mut expected_children: HashSet<ChildMoniker> = HashSet::new();
+        let mut expected_children: HashSet<ChildName> = HashSet::new();
         expected_children.insert("coll:a".try_into().unwrap());
         expected_children.insert("coll:b".try_into().unwrap());
         expected_children.insert(format!("coll:{}", long_name).as_str().try_into().unwrap());
@@ -1030,7 +1030,7 @@ mod tests {
         assert!(!has_child(test.component(), "coll:a").await);
         {
             let actual_children = get_live_children(test.component()).await;
-            let mut expected_children: HashSet<ChildMoniker> = HashSet::new();
+            let mut expected_children: HashSet<ChildName> = HashSet::new();
             expected_children.insert("coll:b".try_into().unwrap());
             let child_b = get_live_child(test.component(), "coll:b").await;
             assert!(!execution_is_shut_down(&child_b).await);
@@ -1171,7 +1171,7 @@ mod tests {
 
         // Verify that the component topology matches expectations.
         let actual_children = get_live_children(test.component()).await;
-        let expected_children: HashSet<ChildMoniker> = HashSet::new();
+        let expected_children: HashSet<ChildName> = HashSet::new();
         assert_eq!(actual_children, expected_children);
     }
 

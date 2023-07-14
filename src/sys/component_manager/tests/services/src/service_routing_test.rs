@@ -14,7 +14,7 @@ use {
     fidl_fuchsia_io as fio, fidl_fuchsia_sys2 as fsys2,
     fuchsia_component::client,
     fuchsia_component_test::ScopedInstance,
-    moniker::{ChildMoniker, ChildMonikerBase},
+    moniker::{ChildName, ChildNameBase},
     test_case::test_case,
     tracing::*,
 };
@@ -260,7 +260,7 @@ async fn destroy_provider(branch: &ScopedInstance, child_moniker: &str) -> Resul
     let parent_moniker = format!("./{}:{}", BRANCHES_COLLECTION, branch.child_name());
 
     // Destroy the provider child.
-    let child_moniker = ChildMoniker::parse(child_moniker).unwrap();
+    let child_moniker = ChildName::parse(child_moniker).unwrap();
     lifecycle_controller_proxy
         .destroy_instance(
             &parent_moniker,

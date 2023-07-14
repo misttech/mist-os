@@ -16,7 +16,7 @@ use {
     cm_rust::{CapabilityDecl, CollectionDecl, ExposeDecl, OfferDecl, OfferSource, UseDecl},
     cm_types::Name,
     derivative::Derivative,
-    moniker::{ChildMoniker, ExtendedMoniker, Moniker},
+    moniker::{ChildName, ExtendedMoniker, Moniker},
     std::{
         clone::Clone,
         sync::{Arc, Weak},
@@ -35,7 +35,7 @@ pub trait ComponentInstanceInterface: Sized + Send + Sync {
 
     /// Returns this `ComponentInstanceInterface`'s child moniker, if it is
     /// not the root instance.
-    fn child_moniker(&self) -> Option<&ChildMoniker>;
+    fn child_moniker(&self) -> Option<&ChildName>;
 
     /// Returns this `ComponentInstanceInterface`'s instanced absolute moniker.
     fn instanced_moniker(&self) -> &InstancedMoniker;
@@ -96,13 +96,10 @@ pub trait ResolvedInstanceInterface: Send + Sync {
     fn collections(&self) -> Vec<CollectionDecl>;
 
     /// Returns a live child of this instance.
-    fn get_child(&self, moniker: &ChildMoniker) -> Option<Arc<Self::Component>>;
+    fn get_child(&self, moniker: &ChildName) -> Option<Arc<Self::Component>>;
 
     /// Returns a vector of the live children in `collection`.
-    fn children_in_collection(
-        &self,
-        collection: &Name,
-    ) -> Vec<(ChildMoniker, Arc<Self::Component>)>;
+    fn children_in_collection(&self, collection: &Name) -> Vec<(ChildName, Arc<Self::Component>)>;
 
     /// Returns the resolver-ready location of the component, which is either
     /// an absolute component URL or a relative path URL with context.
@@ -126,7 +123,7 @@ pub trait ResolvedInstanceInterfaceExt: ResolvedInstanceInterface {
             | OfferSource::Parent
             | OfferSource::Void => true,
             OfferSource::Child(cm_rust::ChildRef { name, collection }) => {
-                let child_moniker = match ChildMoniker::try_new(
+                let child_moniker = match ChildName::try_new(
                     name.as_str(),
                     collection.as_ref().map(|c| c.as_str()),
                 ) {
@@ -179,14 +176,11 @@ where
         T::Target::collections(&*self)
     }
 
-    fn get_child(&self, moniker: &ChildMoniker) -> Option<Arc<Self::Component>> {
+    fn get_child(&self, moniker: &ChildName) -> Option<Arc<Self::Component>> {
         T::Target::get_child(&*self, moniker)
     }
 
-    fn children_in_collection(
-        &self,
-        collection: &Name,
-    ) -> Vec<(ChildMoniker, Arc<Self::Component>)> {
+    fn children_in_collection(&self, collection: &Name) -> Vec<(ChildName, Arc<Self::Component>)> {
         T::Target::children_in_collection(&*self, collection)
     }
 

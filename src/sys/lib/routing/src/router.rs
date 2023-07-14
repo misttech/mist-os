@@ -41,7 +41,7 @@ use {
     cm_types::Name,
     derivative::Derivative,
     from_enum::FromEnum,
-    moniker::{ChildMoniker, ChildMonikerBase, Moniker},
+    moniker::{ChildName, ChildNameBase, Moniker},
     std::collections::{HashMap, HashSet},
     std::{fmt, slice},
     std::{marker::PhantomData, sync::Arc},
@@ -99,7 +99,7 @@ where
             let child_exposes = find_matching_exposes(use_decl.source_name(), &child_exposes)
                 .ok_or_else(|| {
                     let child_moniker =
-                        child_component.child_moniker().expect("ChildMoniker should exist");
+                        child_component.child_moniker().expect("ChildName should exist");
                     <U as ErrorNotFoundInChild>::error_not_found_in_child(
                         use_target.moniker().clone(),
                         child_moniker.clone(),
@@ -854,7 +854,7 @@ where
                 }
                 ExtendedInstanceInterface::<C>::Component(parent_component) => {
                     let parent_offers = parent_component.lock_resolved_state().await?.offers();
-                    let child_moniker = target.child_moniker().expect("ChildMoniker should exist");
+                    let child_moniker = target.child_moniker().expect("ChildName should exist");
                     let parent_offers =
                         find_matching_offers(use_.source_name(), &child_moniker, &parent_offers)
                             .ok_or_else(|| {
@@ -869,7 +869,7 @@ where
             UseSource::Child(name) => {
                 let moniker = target.moniker();
                 let child_component = {
-                    let child_moniker = ChildMoniker::try_new(name, None)?;
+                    let child_moniker = ChildName::try_new(name, None)?;
                     target.lock_resolved_state().await?.get_child(&child_moniker).ok_or_else(
                         || {
                             RoutingError::use_from_child_instance_not_found(
@@ -983,7 +983,7 @@ where
                 }
                 ExtendedInstanceInterface::<C>::Component(parent_component) => {
                     let parent_offers = parent_component.lock_resolved_state().await?.offers();
-                    let child_moniker = target.child_moniker().expect("ChildMoniker should exist");
+                    let child_moniker = target.child_moniker().expect("ChildName should exist");
                     let parent_offers = find_matching_offers(
                         registration.source_name(),
                         &child_moniker,
@@ -1000,7 +1000,7 @@ where
             },
             RegistrationSource::Child(child) => {
                 let child_component = {
-                    let child_moniker = ChildMoniker::try_new(child, None)?;
+                    let child_moniker = ChildName::try_new(child, None)?;
                     target.lock_resolved_state().await?.get_child(&child_moniker).ok_or_else(
                         || RoutingError::EnvironmentFromChildInstanceNotFound {
                             child_moniker,
@@ -1016,7 +1016,7 @@ where
                     find_matching_exposes(registration.source_name(), &child_exposes).ok_or_else(
                         || {
                             let child_moniker =
-                                child_component.child_moniker().expect("ChildMoniker should exist");
+                                child_component.child_moniker().expect("ChildName should exist");
                             <R as ErrorNotFoundInChild>::error_not_found_in_child(
                                 target.moniker().clone(),
                                 child_moniker.clone(),
@@ -1231,7 +1231,7 @@ where
                     }
                     ExtendedInstanceInterface::<C>::Component(component) => component,
                 };
-                let child_moniker = target.child_moniker().expect("ChildMoniker should exist");
+                let child_moniker = target.child_moniker().expect("ChildName should exist");
                 let parent_offers = parent_component.lock_resolved_state().await?.offers();
                 let parent_offers =
                     find_matching_offers(offer.source_name(), &child_moniker, &parent_offers)
@@ -1266,7 +1266,7 @@ where
     match offer.source() {
         OfferSource::Child(child) => {
             let child_component = {
-                let child_moniker = ChildMoniker::try_new(
+                let child_moniker = ChildName::try_new(
                     child.name.as_str(),
                     child.collection.as_ref().map(|s| s.as_str()),
                 )?;
@@ -1282,7 +1282,7 @@ where
             let child_exposes = find_matching_exposes(offer.source_name(), &child_exposes)
                 .ok_or_else(|| {
                     let child_moniker =
-                        child_component.child_moniker().expect("ChildMoniker should exist");
+                        child_component.child_moniker().expect("ChildName should exist");
                     <O as ErrorNotFoundInChild>::error_not_found_in_child(
                         component.moniker().clone(),
                         child_moniker.clone(),
@@ -1575,7 +1575,7 @@ where
             }
             ExposeSource::Child(child) => {
                 let child_component = {
-                    let child_moniker = ChildMoniker::try_new(child, None)?;
+                    let child_moniker = ChildName::try_new(child, None)?;
                     target.lock_resolved_state().await?.get_child(&child_moniker).ok_or_else(
                         || RoutingError::ExposeFromChildInstanceNotFound {
                             child_moniker,
@@ -1588,7 +1588,7 @@ where
                 let child_exposes = find_matching_exposes(expose.source_name(), &child_exposes)
                     .ok_or_else(|| {
                         let child_moniker =
-                            child_component.child_moniker().expect("ChildMoniker should exist");
+                            child_component.child_moniker().expect("ChildName should exist");
                         <E as ErrorNotFoundInChild>::error_not_found_in_child(
                             target.moniker().clone(),
                             child_moniker.clone(),
@@ -1606,7 +1606,7 @@ where
     }
 }
 
-fn target_matches_moniker(target: &OfferTarget, child_moniker: &ChildMoniker) -> bool {
+fn target_matches_moniker(target: &OfferTarget, child_moniker: &ChildName) -> bool {
     match target {
         OfferTarget::Child(target_ref) => {
             target_ref.name == child_moniker.name()
@@ -1654,7 +1654,7 @@ pub trait CapabilityVisitor {
 
 pub fn find_matching_offers<'a, O>(
     source_name: &Name,
-    child_moniker: &ChildMoniker,
+    child_moniker: &ChildName,
     offers: &'a Vec<OfferDecl>,
 ) -> Option<RouteBundle<O>>
 where
@@ -1708,7 +1708,7 @@ pub trait ErrorNotFoundFromParent {
 pub trait ErrorNotFoundInChild {
     fn error_not_found_in_child(
         decl_site_moniker: Moniker,
-        child_moniker: ChildMoniker,
+        child_moniker: ChildName,
         capability_name: Name,
     ) -> RoutingError;
 }

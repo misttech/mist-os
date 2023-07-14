@@ -18,7 +18,7 @@ use {
     },
     futures::{lock::Mutex, StreamExt},
     measure_tape_for_events::Measurable,
-    moniker::{ChildMonikerBase, ExtendedMoniker, Moniker, MonikerBase},
+    moniker::{ChildNameBase, ExtendedMoniker, Moniker, MonikerBase},
     std::sync::Arc,
     tracing::{error, warn},
 };
@@ -438,7 +438,7 @@ mod tests {
     use crate::model::events::serve::ComponentEventRoute;
     use cm_rust::ChildRef;
     use cm_rust::EventScope;
-    use moniker::ChildMoniker;
+    use moniker::ChildName;
     use moniker::ExtendedMoniker;
     use moniker::Moniker;
     use moniker::MonikerBase;
@@ -449,7 +449,7 @@ mod tests {
     #[test]
     fn test_validate_and_filter_event_at_root() {
         let mut moniker =
-            ExtendedMoniker::ComponentInstance(Moniker::new(vec![ChildMoniker::try_new(
+            ExtendedMoniker::ComponentInstance(Moniker::new(vec![ChildName::try_new(
                 "root",
                 Some("coll"),
             )
@@ -496,9 +496,9 @@ mod tests {
     #[test]
     fn test_validate_and_filter_event_moniker_root() {
         let mut event = ExtendedMoniker::ComponentInstance(Moniker::new(vec![
-            ChildMoniker::try_new("a", None).unwrap(),
-            ChildMoniker::try_new("b", None).unwrap(),
-            ChildMoniker::try_new("c", None).unwrap(),
+            ChildName::try_new("a", None).unwrap(),
+            ChildName::try_new("b", None).unwrap(),
+            ChildName::try_new("c", None).unwrap(),
         ]));
         let route = vec![
             ComponentEventRoute {
@@ -534,10 +534,10 @@ mod tests {
     #[test]
     fn test_validate_and_filter_event_moniker_children_scoped() {
         let mut event = ExtendedMoniker::ComponentInstance(Moniker::new(vec![
-            ChildMoniker::try_new("a", None).unwrap(),
-            ChildMoniker::try_new("b", None).unwrap(),
-            ChildMoniker::try_new("c", None).unwrap(),
-            ChildMoniker::try_new("d", None).unwrap(),
+            ChildName::try_new("a", None).unwrap(),
+            ChildName::try_new("b", None).unwrap(),
+            ChildName::try_new("c", None).unwrap(),
+            ChildName::try_new("d", None).unwrap(),
         ]));
         let route = vec![
             ComponentEventRoute {
@@ -566,10 +566,9 @@ mod tests {
         assert!(super::validate_and_filter_event(&mut event, &route));
         assert_eq!(
             event,
-            ExtendedMoniker::ComponentInstance(Moniker::new(vec![ChildMoniker::try_new(
-                "d", None
-            )
-            .unwrap()]))
+            ExtendedMoniker::ComponentInstance(Moniker::new(vec![
+                ChildName::try_new("d", None).unwrap()
+            ]))
         );
     }
 
@@ -579,10 +578,9 @@ mod tests {
     #[test]
     fn test_validate_and_filter_event_moniker_above_root_rejected() {
         let mut event =
-            ExtendedMoniker::ComponentInstance(Moniker::new(vec![ChildMoniker::try_new(
-                "a", None,
-            )
-            .unwrap()]));
+            ExtendedMoniker::ComponentInstance(Moniker::new(vec![
+                ChildName::try_new("a", None).unwrap()
+            ]));
         let route = vec![
             ComponentEventRoute {
                 component: ChildRef { name: "<root>".into(), collection: None },
@@ -604,10 +602,9 @@ mod tests {
         assert!(!super::validate_and_filter_event(&mut event, &route));
         assert_eq!(
             event,
-            ExtendedMoniker::ComponentInstance(Moniker::new(vec![ChildMoniker::try_new(
-                "a", None
-            )
-            .unwrap()]))
+            ExtendedMoniker::ComponentInstance(Moniker::new(vec![
+                ChildName::try_new("a", None).unwrap()
+            ]))
         );
     }
 
@@ -617,8 +614,8 @@ mod tests {
     #[test]
     fn test_validate_and_filter_event_moniker_ambiguous() {
         let mut event = ExtendedMoniker::ComponentInstance(Moniker::new(vec![
-            ChildMoniker::try_new("f", None).unwrap(),
-            ChildMoniker::try_new("i", None).unwrap(),
+            ChildName::try_new("f", None).unwrap(),
+            ChildName::try_new("i", None).unwrap(),
         ]));
         let route = vec![
             ComponentEventRoute {
@@ -647,8 +644,8 @@ mod tests {
     #[test]
     fn test_validate_and_filter_event_moniker_root_rejected() {
         let mut event = ExtendedMoniker::ComponentInstance(Moniker::new(vec![
-            ChildMoniker::try_new("core", None).unwrap(),
-            ChildMoniker::try_new("feedback", None).unwrap(),
+            ChildName::try_new("core", None).unwrap(),
+            ChildName::try_new("feedback", None).unwrap(),
         ]));
         let route = vec![
             ComponentEventRoute {
@@ -677,11 +674,11 @@ mod tests {
     #[test]
     fn test_validate_child_under_scoped_collection_is_root() {
         let mut event = ExtendedMoniker::ComponentInstance(Moniker::new(vec![
-            ChildMoniker::try_new("core", None).unwrap(),
-            ChildMoniker::try_new("test_manager", None).unwrap(),
-            ChildMoniker::try_new("auto-3fc01a79864c741", Some("tests")).unwrap(),
-            ChildMoniker::try_new("test_wrapper", None).unwrap(),
-            ChildMoniker::try_new("archivist", None).unwrap(),
+            ChildName::try_new("core", None).unwrap(),
+            ChildName::try_new("test_manager", None).unwrap(),
+            ChildName::try_new("auto-3fc01a79864c741", Some("tests")).unwrap(),
+            ChildName::try_new("test_wrapper", None).unwrap(),
+            ChildName::try_new("archivist", None).unwrap(),
         ]));
         let route = vec![
             ComponentEventRoute {

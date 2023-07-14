@@ -25,7 +25,7 @@ use {
     derivative::Derivative,
     from_enum::FromEnum,
     futures::future::BoxFuture,
-    moniker::{ChildMoniker, ChildMonikerBase},
+    moniker::{ChildName, ChildNameBase},
     std::sync::Arc,
 };
 
@@ -80,7 +80,7 @@ where
     ///
     /// In the case of service capabilities, they are *not* instances inside that service, but
     /// rather service capabilities with the same name that are exposed by different children.
-    async fn list_instances(&self) -> Result<Vec<ChildMoniker>, RoutingError> {
+    async fn list_instances(&self) -> Result<Vec<ChildName>, RoutingError> {
         let mut instances = Vec::new();
         let component = self.collection_component.upgrade()?;
         let mut child_components = vec![];
@@ -111,7 +111,7 @@ where
     /// `list_instances`.
     async fn route_instance(
         &self,
-        instance: &ChildMoniker,
+        instance: &ChildName,
     ) -> Result<CapabilitySource<C>, RoutingError> {
         if instance.collection().is_none()
             || !self.collections.contains(instance.collection().unwrap())
@@ -124,7 +124,7 @@ where
         }
 
         let collection_component = self.collection_component.upgrade()?;
-        let (child_moniker, child_component): (ChildMoniker, Arc<C>) = {
+        let (child_moniker, child_component): (ChildName, Arc<C>) = {
             collection_component
                 .lock_resolved_state()
                 .await?

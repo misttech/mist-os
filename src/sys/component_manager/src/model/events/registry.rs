@@ -28,7 +28,7 @@ use {
     cm_types::Name,
     flyweights::FlyStr,
     futures::lock::Mutex,
-    moniker::{ChildMonikerBase, ExtendedMoniker, Moniker, MonikerBase},
+    moniker::{ChildNameBase, ExtendedMoniker, Moniker, MonikerBase},
     std::{
         collections::{HashMap, HashSet},
         sync::{Arc, Weak},
