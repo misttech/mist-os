@@ -10,6 +10,7 @@ load(
 )
 load(
     "@fuchsia_sdk//fuchsia:licenses.bzl",
+    "fuchsia_licenses_collection",
     "fuchsia_licenses_spdx",
 )
 load("@rules_license//rules:license.bzl", "license")
@@ -74,12 +75,17 @@ fuchsia_package(
     ],
 )
 
+fuchsia_licenses_collection(
+    name = "licenses_collection",
+    root_target = ":test_package",
+)
+
 fuchsia_licenses_spdx(
     name = "actual_licenses.spdx.json",
     document_namespace = "https://fuchsia.googlesource.com/sdk-integration/tests/fuchsia/licenses/spdx",
+    licenses = ":licenses_collection",
     licenses_cross_refs_base_url = "https://fuchsia.googlesource.com/sdk-integration/tests/",
     root_package_name = "my_root_package",
-    target = ":test_package",
 )
 
 diff_test(
@@ -87,5 +93,23 @@ diff_test(
     file1 = "expected_licenses.spdx.json",
     # Copied from third_party/sdk-integration/tests/bazel-bin/fuchsia/licenses/spdx/actual_licenses.spdx.json
     file2 = ":actual_licenses.spdx.json",
+    visibility = ["//visibility:public"],
+)
+
+# Same as ":actual_licenses.spdx.json" but uses deprecated "target" field.
+fuchsia_licenses_spdx(
+    name = "actual_licenses_deprecated.spdx.json",
+    document_namespace = "https://fuchsia.googlesource.com/sdk-integration/tests/fuchsia/licenses/spdx",
+    licenses_cross_refs_base_url = "https://fuchsia.googlesource.com/sdk-integration/tests/",
+    root_package_name = "my_root_package",
+    target = ":test_package",
+)
+
+# Same as ":golden_test" but uses ":actual_licenses_deprecated.spdx.json".
+diff_test(
+    name = "deprecated_golden_test",
+    file1 = "expected_licenses.spdx.json",
+    # Copied from third_party/sdk-integration/tests/bazel-bin/fuchsia/licenses/spdx/actual_licenses.spdx.json
+    file2 = ":actual_licenses_deprecated.spdx.json",
     visibility = ["//visibility:public"],
 )

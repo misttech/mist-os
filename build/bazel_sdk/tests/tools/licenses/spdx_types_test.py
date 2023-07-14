@@ -54,8 +54,8 @@ class TestSpdxTypes(unittest.TestCase):
         with self.assertRaises(LicenseException):
             id_replacer.replace_id(old_id="foo", new_id="baz")
 
-        self.assertEquals(id_replacer.get_replaced_id("old"), "new")
-        self.assertEquals(id_replacer.get_replaced_id("foo"), "bar")
+        self.assertEqual(id_replacer.get_replaced_id("old"), "new")
+        self.assertEqual(id_replacer.get_replaced_id("foo"), "bar")
 
         with self.assertRaises(LicenseException):
             id_replacer.get_replaced_id("baz")

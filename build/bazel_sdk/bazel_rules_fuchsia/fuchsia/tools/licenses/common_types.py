@@ -26,6 +26,10 @@ class DictReader:
         self._dict = dictionary
         self._location = location
 
+    def create_from_file(file_path):
+        with open(file_path, "r") as input_file:
+            return DictReader(json.load(input_file), f"{file_path}")
+
     def _key_location(self, key):
         return f"{self._location}.{key}"
 
@@ -133,3 +137,12 @@ class DictReader:
 
         return self.get_or(
             key, expected_type=list, default=[], verify=_verify_string_list)
+
+
+def trim_long_str_list(items: List, max_len: int) -> List:
+    """If items is longer than max_len, will trim it and leave a tombstone message at the end"""
+    l = len(items)
+    if l > max_len:
+        items = items[0:max_len]
+        items.append(f"... ({l - max_len} more items)")
+    return items

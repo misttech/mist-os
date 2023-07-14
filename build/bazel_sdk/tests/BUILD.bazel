@@ -48,6 +48,7 @@ test_suite(
         "//fuchsia/licenses/classification:classification_test",
         "//fuchsia/licenses/notice:notice_test",
         "//fuchsia/licenses/review:review_test",
+        "//fuchsia/licenses/spdx:deprecated_golden_test",
         "//fuchsia/licenses/spdx:golden_test",
         "//fuchsia/licenses/spdx_dedup:golden_test",
         "//tools/licenses:classification_types_test",

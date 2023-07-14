@@ -67,3 +67,11 @@ py_binary(
     python_version = "PY3",
     deps = [":spdx_types"],
 )
+
+py_binary(
+    name = "verify_licenses_collection",
+    srcs = ["verify_licenses_collection.py"],
+    main = "verify_licenses_collection.py",
+    python_version = "PY3",
+    deps = [":common_types"],
+)

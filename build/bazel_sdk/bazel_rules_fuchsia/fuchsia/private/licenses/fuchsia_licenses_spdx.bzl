@@ -9,10 +9,7 @@ load(
     "gather_licenses_info",
     "write_licenses_info",
 )
-load(
-    "@rules_license//rules:providers.bzl",
-    "TransitiveLicensesInfo",
-)
+load("providers.bzl", "LicensesCollectionInfo")
 
 # Debugging verbosity. Set to >0 for debugging
 _VERBOSITY = 0
@@ -24,21 +21,19 @@ def _debug(loglevel, msg):
 def _fuchsia_licenses_spdx_impl(ctx):
     _debug(0, "_fuchsia_licenses_spdx_impl")
 
-    license_infos = []
-    license_files = []
-    if TransitiveLicensesInfo in ctx.attr.target:
-        license_infos = ctx.attr.target[TransitiveLicensesInfo].licenses.to_list()
-    for info in license_infos:
-        license_files.append(info.license_text)
-    _debug(0, "Found %s license infos: %s" % (len(license_infos), license_infos))
-
-    licenses_used_file = ctx.actions.declare_file("%s.licenses_used.json" % ctx.attr.name)
-
-    write_licenses_info(
-        ctx,
-        deps = [ctx.attr.target],
-        json_out = licenses_used_file,
-    )
+    if ctx.attr.target:
+        licenses_collection_file = ctx.actions.declare_file("%s.licenses_collection.json" % ctx.attr.name)
+        license_files = write_licenses_info(
+            ctx,
+            deps = [ctx.attr.target],
+            json_out = licenses_collection_file,
+        )
+    elif ctx.attr.licenses:
+        licenses_collection = ctx.attr.licenses[LicensesCollectionInfo]
+        licenses_collection_file = licenses_collection.json_file
+        license_files = licenses_collection.license_files.to_list()
+    else:
+        fail("Field `target` or field `licenses` must be provided")
 
     spdx_output = ctx.actions.declare_file(ctx.attr.name)
 
@@ -48,12 +43,12 @@ def _fuchsia_licenses_spdx_impl(ctx):
 
     ctx.actions.run(
         progress_message = "Generating SPDX from %s into %s" %
-                           (licenses_used_file.path, spdx_output.path),
-        inputs = [licenses_used_file] + license_files,
+                           (licenses_collection_file.path, spdx_output.path),
+        inputs = [licenses_collection_file] + license_files,
         outputs = [spdx_output],
         executable = ctx.executable._generate_licenses_spdx_tool,
         arguments = [
-            "--licenses_used=%s" % licenses_used_file.path,
+            "--licenses_used=%s" % licenses_collection_file.path,
             "--spdx_output=%s" % spdx_output.path,
             "--root_package_name=%s" % root_package_name,
             "--root_package_homepage=%s" % ctx.attr.root_package_homepage,
@@ -78,9 +73,14 @@ https://github.com/spdx/spdx-spec/blob/master/schemas/spdx-schema.json
     implementation = _fuchsia_licenses_spdx_impl,
     attrs = {
         "target": attr.label(
-            doc = "The target to aggregate the licenses from.",
-            mandatory = True,
+            doc = "The target to aggregate the licenses from. DEPRECATED: Use `licenses` instead",
+            mandatory = False,
             aspects = [gather_licenses_info],
+        ),
+        "licenses": attr.label(
+            doc = "The licenses information. Point to a fuchsia_licenses_collection rule.",
+            mandatory = False,
+            providers = [LicensesCollectionInfo],
         ),
         "root_package_name": attr.string(
             doc = """The name of the SPDX root package.

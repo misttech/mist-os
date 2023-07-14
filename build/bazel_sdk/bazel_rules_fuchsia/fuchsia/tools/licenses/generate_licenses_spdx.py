@@ -30,9 +30,11 @@ def _create_doc_from_licenses_used_json(
 
     _log(f'Reading {licenses_used_path}!')
     licenses_used_json = json.load(open(licenses_used_path, 'r'))
-    assert isinstance(licenses_used_json, list)
-    assert len(licenses_used_json) == 1
-    licenses_used_dict = licenses_used_json[0]
+    if isinstance(licenses_used_json, list):
+        assert len(licenses_used_json) == 1
+        licenses_used_dict = licenses_used_json[0]
+    else:
+        licenses_used_dict = licenses_used_json
     assert isinstance(licenses_used_dict, dict)
     assert 'licenses' in licenses_used_dict
     json_list = licenses_used_dict['licenses']
@@ -40,6 +42,7 @@ def _create_doc_from_licenses_used_json(
     # Sort the list to make the output more deterministic.
     def sort_by(d):
         return d["package_name"]
+
     json_list = sorted(json_list, key=sort_by)
 
     package_id_factory = SpdxPackageIdFactory()
