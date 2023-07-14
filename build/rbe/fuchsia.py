@@ -313,6 +313,7 @@ _SYSROOT_USR_LIB_FILES = (
 # to locate other underlying files needed.
 _SYSROOT_USR_LIB_LINKER_SCRIPTS = (
     'libc.so',
+    'libm.so',
     'libpthread.so',
     'libmvec.so',
 )
