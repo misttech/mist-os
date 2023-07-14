@@ -194,6 +194,13 @@ void async_loop_destroy(async_loop_t* loop) {
 
   async_loop_shutdown(loop);
 
+  ZX_DEBUG_ASSERT(list_is_empty(&loop->wait_list));
+  ZX_DEBUG_ASSERT(list_is_empty(&loop->irq_list));
+  ZX_DEBUG_ASSERT(list_is_empty(&loop->task_list));
+  ZX_DEBUG_ASSERT(list_is_empty(&loop->due_list));
+  ZX_DEBUG_ASSERT(list_is_empty(&loop->thread_list));
+  ZX_DEBUG_ASSERT(list_is_empty(&loop->paged_vmo_list));
+
   zx_handle_close(loop->port);
   zx_handle_close(loop->timer);
   mtx_destroy(&loop->lock);
