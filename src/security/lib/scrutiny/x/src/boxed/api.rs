@@ -3,9 +3,11 @@
 // found in the LICENSE file.
 
 use super::blob::BlobDirectoryError;
+use super::blob::BlobOpenError;
 use dyn_clone::clone_trait_object;
 use dyn_clone::DynClone;
 use std::cmp;
+use std::collections::HashMap;
 use std::fmt;
 use std::fmt::Debug;
 use std::fmt::Display;
@@ -312,7 +314,7 @@ impl Eq for dyn DataSource {}
 
 /// Kinds of artifacts that may constitute a source of truth for a [`Scrutiny`] instance reasoning
 /// about a built Fuchsia system.
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub enum DataSourceKind {
     /// A product bundle directory that contains various artifacts at known paths within the
     /// directory.
@@ -324,6 +326,9 @@ pub enum DataSourceKind {
     BlobfsArchive,
     /// A directory of blob files that are named after their Fuchsia merkle root hashes.
     BlobDirectory,
+    /// A Fuchsia package. See https://fuchsia.dev/fuchsia-src/concepts/packages/package for
+    /// details.
+    Package,
     /// An update package that designates a set of packages that constitute an over-the-air (OTA)
     /// system software update. See https://fuchsia.dev/fuchsia-src/concepts/packages/update_pkg
     /// for details.
@@ -347,7 +352,7 @@ pub enum DataSourceKind {
 
 /// A version identifier associated with an artifact or unit of software used to interpret
 /// artifacts.
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub enum DataSourceVersion {
     /// Either no version information is available, or the information was malformed.
     Unknown,
@@ -372,8 +377,20 @@ pub trait Blob {
 /// An error encountered executing [`Blob::reader_seeker`].
 #[derive(Debug, Error)]
 pub enum BlobError {
+    #[error("error converting path to string: {path}, from source: {data_sources:?}")]
+    Path { path: String, data_sources: Vec<Box<dyn DataSource>> },
     #[error("error reading from blob: {hash}, from directory: {directory}: {io_error_string}")]
-    IoError { hash: Box<dyn Hash>, directory: Box<dyn Path>, io_error_string: String },
+    Io { hash: Box<dyn Hash>, directory: Box<dyn Path>, io_error_string: String },
+    #[error("error opening blob: {error}")]
+    // Note: Blob hash reported by `BlobOpenError`, and omitted here to avoid duplication.
+    Open { error: BlobOpenError },
+    #[error("error reading meta file {meta_file_path:?}={meta_file_hash} from data sources {data_sources:?}: {error}")]
+    Far {
+        meta_file_path: Box<dyn Path>,
+        meta_file_hash: Box<dyn Hash>,
+        data_sources: Vec<Box<dyn DataSource>>,
+        error: fuchsia_archive::Error,
+    },
 }
 
 /// A type that can be reduced to a byte sequence, such as a hash digest.
@@ -487,7 +504,26 @@ pub trait Package {
 
 /// Model of a Fuchsia package's "meta/package" file. See
 /// https://fuchsia.dev/fuchsia-src/concepts/packages/package#structure-of-a-package for details.
-pub trait MetaPackage {}
+pub trait MetaPackage {
+    fn name(&self) -> &fuchsia_url::PackageName;
+
+    fn variant(&self) -> &fuchsia_url::PackageVariant;
+}
+
+impl PartialEq for dyn MetaPackage {
+    fn eq(&self, other: &Self) -> bool {
+        self.name() == other.name() && self.variant() == other.variant()
+    }
+}
+
+impl Eq for dyn MetaPackage {}
+
+// TODO(fxbug.dev/112121): Expose data related to fuchsia_pkg::MetaPackage.
+impl Debug for dyn MetaPackage {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str("MetaPackage")
+    }
+}
 
 // TODO(fxbug.dev/112121): Define API consistent with fuchsia_pkg::MetaContents.
 
@@ -497,6 +533,21 @@ pub trait MetaContents {
     /// Returns an iterator over all path -> content hash mappings stored in this "meta/contents"
     /// file.
     fn contents(&self) -> Box<dyn Iterator<Item = (Box<dyn Path>, Box<dyn Hash>)>>;
+}
+
+impl PartialEq for dyn MetaContents {
+    fn eq(&self, other: &Self) -> bool {
+        self.contents().collect::<HashMap<_, _>>() == other.contents().collect::<HashMap<_, _>>()
+    }
+}
+
+impl Debug for dyn MetaContents {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        for (path, hash) in self.contents() {
+            f.write_fmt(format_args!("{:?} => {:?}\n", path, hash))?;
+        }
+        Ok(())
+    }
 }
 
 /// Model for a package resolution strategy. See
@@ -511,10 +562,12 @@ pub trait PackageResolver {
     fn aliases(&self, hash: Box<dyn Hash>) -> Box<dyn Iterator<Item = PackageResolverUrl>>;
 }
 
-// TODO(fxbug.dev/112121): Define varieties of URL that PackageResolver supports.
-
 /// The variety of URLs that [`PackageResolver`] can resolve to package hashes.
-pub enum PackageResolverUrl {}
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub enum PackageResolverUrl {
+    // TODO(fxbug.dev/112121): Define varieties of URL that PackageResolver supports.
+    Url,
+}
 
 /// Model for a Fuchsia component. Note that this model is of a component as described by a
 /// component manifest, not to be confused with a component _instance_, which is a component
@@ -735,7 +788,6 @@ pub trait ComponentInstanceCapability {
 #[cfg(test)]
 mod tests {
     use super::super::data_source as ds;
-    use super::super::data_source::test as dst;
     use super::DataSource;
     use super::DataSourceKind;
     use super::DataSourceVersion;
@@ -756,7 +808,7 @@ mod tests {
             path: Option<Box<dyn Path>>,
             version: DataSourceVersion,
         ) -> ds::DataSource {
-            ds::DataSource::new(Box::new(dst::DataSourceInfo::new(kind, path, version)))
+            ds::DataSource::new(ds::DataSourceInfo::new(kind, path, version))
         }
 
         fn reference_tree() -> ds::DataSource {

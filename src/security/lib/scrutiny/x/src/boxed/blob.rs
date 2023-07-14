@@ -23,14 +23,17 @@ use thiserror::Error;
 /// Detailed error for `BlobSet::blob()` failure.
 #[derive(Debug, Error)]
 pub enum BlobOpenError {
-    #[error("blob not found: {hash}, in directory: {directory}")]
-    BlobNotFound { hash: Box<dyn api::Hash>, directory: Box<dyn api::Path> },
+    // Note: Some errors that wrap `BlobOpenError` expect it to report the blob hash. If there is
+    // a reason to remove reporting the hash from this type, other error types might require
+    // changes.
+    #[error("blob not found: {hash}, in directory: {directory:?}")]
+    BlobNotFound { hash: Box<dyn api::Hash>, directory: Option<Box<dyn api::Path>> },
     #[error("multiple errors opening blob: {errors:?}")]
     Multiple { errors: Vec<BlobOpenError> },
 }
 
 /// Internal abstraction for a set of blobs.
-pub(crate) trait BlobSet {
+pub(crate) trait BlobSet: DynClone {
     /// Iterate over blobs in this set.
     fn iter(&self) -> Box<dyn Iterator<Item = Box<dyn api::Blob>>>;
 
@@ -40,6 +43,8 @@ pub(crate) trait BlobSet {
     /// Iterate over this blob set's data sources.
     fn data_sources(&self) -> Box<dyn Iterator<Item = Box<dyn api::DataSource>>>;
 }
+
+clone_trait_object!(BlobSet);
 
 impl BlobSet for Box<dyn BlobSet> {
     fn iter(&self) -> Box<dyn Iterator<Item = Box<dyn api::Blob>>> {
@@ -52,53 +57,6 @@ impl BlobSet for Box<dyn BlobSet> {
 
     fn data_sources(&self) -> Box<dyn Iterator<Item = Box<dyn api::DataSource>>> {
         self.as_ref().data_sources()
-    }
-}
-
-mod data_source {
-    use super::super::api;
-    use super::super::data_source;
-    use std::hash;
-
-    /// `api::DataSource` for `super::BlobDirectory` blobs.
-    #[derive(Clone, Debug)]
-    pub(crate) struct BlobDirectory {
-        directory: Box<dyn api::Path>,
-    }
-
-    impl BlobDirectory {
-        pub fn new(directory: Box<dyn api::Path>) -> Self {
-            Self { directory }
-        }
-    }
-
-    impl PartialEq for BlobDirectory {
-        fn eq(&self, other: &Self) -> bool {
-            self.directory.as_ref() == other.directory.as_ref()
-        }
-    }
-
-    impl Eq for BlobDirectory {}
-
-    impl hash::Hash for BlobDirectory {
-        fn hash<H: hash::Hasher>(&self, state: &mut H) {
-            self.directory.as_ref().hash(state)
-        }
-    }
-
-    impl data_source::DataSourceInfo for BlobDirectory {
-        fn kind(&self) -> api::DataSourceKind {
-            api::DataSourceKind::BlobDirectory
-        }
-
-        fn path(&self) -> Option<Box<dyn api::Path>> {
-            Some(self.directory.clone())
-        }
-
-        fn version(&self) -> api::DataSourceVersion {
-            // TODO: Add support for directory-as-blob-archive versioning.
-            api::DataSourceVersion::Unknown
-        }
     }
 }
 
@@ -261,6 +219,47 @@ impl api::Blob for CompositeBlob {
     }
 }
 
+/// An in-memory representation of a blob. Note that this type does not internally verify that the
+/// hash of `bytes` is, indeed, the value `hash`.
+#[derive(Clone)]
+pub(crate) struct UnverifiedMemoryBlob(Rc<UnverifiedMemoryBlobData>);
+
+impl UnverifiedMemoryBlob {
+    /// Constructs a [`UnverifiedMemoryBlob`] associated with the given `data_source`, `hash`, and
+    /// `bytes`.
+    pub fn new(
+        data_sources: impl Iterator<Item = Box<dyn api::DataSource>>,
+        hash: Box<dyn api::Hash>,
+        bytes: Vec<u8>,
+    ) -> Self {
+        Self(Rc::new(UnverifiedMemoryBlobData {
+            data_sources: data_sources.collect::<Vec<_>>(),
+            hash,
+            bytes,
+        }))
+    }
+}
+
+impl api::Blob for UnverifiedMemoryBlob {
+    fn hash(&self) -> Box<dyn api::Hash> {
+        self.0.hash.clone()
+    }
+
+    fn reader_seeker(&self) -> Result<Box<dyn api::ReaderSeeker>, api::BlobError> {
+        Ok(Box::new(io::Cursor::new(self.0.bytes.clone())))
+    }
+
+    fn data_sources(&self) -> Box<dyn Iterator<Item = Box<dyn api::DataSource>>> {
+        Box::new(self.0.data_sources.clone().into_iter())
+    }
+}
+
+struct UnverifiedMemoryBlobData {
+    data_sources: Vec<Box<dyn api::DataSource>>,
+    hash: Box<dyn api::Hash>,
+    bytes: Vec<u8>,
+}
+
 /// Detailed error for parsing a hash digest (hex) string as a path.
 #[derive(Debug, Error)]
 pub enum ParseHashPathError {
@@ -324,7 +323,7 @@ impl api::Blob for FileBlob {
     fn reader_seeker(&self) -> Result<Box<dyn api::ReaderSeeker>, api::BlobError> {
         let hash = format!("{}", self.hash());
         let path = self.blob_set.directory().as_ref().as_ref().join(&hash);
-        Ok(Box::new(fs::File::open(&path).map_err(|error| api::BlobError::IoError {
+        Ok(Box::new(fs::File::open(&path).map_err(|error| api::BlobError::Io {
             hash: self.hash(),
             directory: self.blob_set.directory().clone(),
             io_error_string: format!("{}", error),
@@ -410,8 +409,12 @@ impl BlobDirectory {
             .collect::<Result<Vec<_>, _>>()?;
         blob_ids.sort();
 
-        let data_source =
-            ds::DataSource::new(Box::new(data_source::BlobDirectory::new(directory.clone())));
+        let data_source = ds::DataSource::new(ds::DataSourceInfo::new(
+            api::DataSourceKind::BlobDirectory,
+            Some(directory.clone()),
+            // TODO: Add support for directory-as-blob-archive versioning.
+            api::DataSourceVersion::Unknown,
+        ));
         if let Some(parent_data_source) = parent_data_source.as_mut() {
             parent_data_source.add_child(data_source.clone());
         }
@@ -439,7 +442,7 @@ impl BlobSet for BlobDirectory {
         if self.blob_ids().contains(&hash) {
             Ok(Box::new(FileBlob::new(hash, self.clone())))
         } else {
-            Err(BlobOpenError::BlobNotFound { directory: self.0.directory.clone(), hash })
+            Err(BlobOpenError::BlobNotFound { directory: Some(self.0.directory.clone()), hash })
         }
     }
 
@@ -459,6 +462,77 @@ struct BlobDirectoryData {
 
     /// Data source associated with blob directory.
     data_source: ds::DataSource,
+}
+
+#[cfg(test)]
+pub(crate) mod test {
+    use super::super::api;
+    use super::super::hash::Hash;
+    use super::BlobOpenError;
+    use super::BlobSet;
+    use super::UnverifiedMemoryBlob;
+    use std::collections::HashMap;
+    use std::io;
+    use std::rc::Rc;
+
+    /// An in-memory blob set that computes its own hashes using `super::super::hash::Hash`.
+    #[derive(Clone)]
+    pub struct VerifiedMemoryBlobSet(Rc<VerifiedMemoryBlobSetData>);
+
+    struct VerifiedMemoryBlobSetData {
+        data_sources: Vec<Box<dyn api::DataSource>>,
+        blobs: HashMap<Box<dyn api::Hash>, UnverifiedMemoryBlob>,
+    }
+
+    impl VerifiedMemoryBlobSet {
+        /// Constructs a new [`VerifiedMemoryBlobSet`] that owns its own copy of the blobs
+        /// enumerated by `blobs`.
+        pub fn new<R: io::Read>(
+            data_sources: impl Iterator<Item = Box<dyn api::DataSource>>,
+            blobs: impl Iterator<Item = R>,
+        ) -> Self {
+            let data_sources = data_sources.collect::<Vec<_>>();
+            let blobs = blobs
+                .map(|mut blob| {
+                    let mut bytes = vec![];
+                    blob.read_to_end(&mut bytes).expect("read blob for memory blob set");
+                    let hash: Box<dyn api::Hash> = Box::new(Hash::from_contents(bytes.as_slice()));
+                    let blob = UnverifiedMemoryBlob::new(
+                        data_sources.clone().into_iter(),
+                        hash.clone(),
+                        bytes,
+                    );
+                    (hash, blob)
+                })
+                .collect::<HashMap<_, _>>();
+            Self(Rc::new(VerifiedMemoryBlobSetData { data_sources, blobs }))
+        }
+    }
+
+    impl BlobSet for VerifiedMemoryBlobSet {
+        fn blob(&self, hash: Box<dyn api::Hash>) -> Result<Box<dyn api::Blob>, BlobOpenError> {
+            Ok(self
+                .0
+                .blobs
+                .get(&hash)
+                .map(|blob| {
+                    let blob: Box<dyn api::Blob> = Box::new(blob.clone());
+                    blob
+                })
+                .ok_or_else(|| BlobOpenError::BlobNotFound { hash, directory: None })?)
+        }
+
+        fn data_sources(&self) -> Box<dyn Iterator<Item = Box<dyn api::DataSource>>> {
+            Box::new(self.0.data_sources.clone().into_iter())
+        }
+
+        fn iter(&self) -> Box<dyn Iterator<Item = Box<dyn api::Blob>>> {
+            Box::new(self.0.blobs.clone().into_iter().map(|(_, blob)| {
+                let blob: Box<dyn api::Blob> = Box::new(blob);
+                blob
+            }))
+        }
+    }
 }
 
 #[cfg(test)]
@@ -551,7 +625,7 @@ mod tests {
             blob_set.blob(hash_not_in_set.clone()).err().expect("error from blob-not-found");
         match missing_blob {
             BlobOpenError::BlobNotFound { hash, directory } => {
-                assert_ref_eq!(temp_dir_path, directory);
+                assert_ref_eq!(temp_dir_path, directory.unwrap());
                 assert_ref_eq!(hash_not_in_set, hash);
             }
             BlobOpenError::Multiple { .. } => {
@@ -590,7 +664,7 @@ mod tests {
             blob_set.blob(hash_not_in_set.clone()).err().expect("error from blob-not-found");
         match missing_blob {
             BlobOpenError::BlobNotFound { hash, directory } => {
-                assert_ref_eq!(temp_dir_path, directory);
+                assert_ref_eq!(temp_dir_path, directory.unwrap());
                 assert_ref_eq!(hash_not_in_set, hash);
             }
             BlobOpenError::Multiple { .. } => {

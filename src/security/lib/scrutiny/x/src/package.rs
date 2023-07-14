@@ -366,9 +366,9 @@ impl<
 #[derive(Debug, Error)]
 pub enum ContentBlobError<BlobSourceError: api::Error, BlobError: api::Error> {
     #[error("failed to lookup package content blob: {0:?}")]
-    BlobSourceError(BlobSourceError),
+    BlobSource(BlobSourceError),
     #[error("failed to open package content blob: {0:?}")]
-    BlobError(BlobError),
+    Blob(BlobError),
 }
 
 /// `Blob` implementation that combines `ContentBlobData` and a `BlobSet`.
@@ -404,9 +404,9 @@ impl<
             .0
             .blobs_source
             .blob(self.hash().clone())
-            .map_err(ContentBlobError::BlobSourceError)?
+            .map_err(ContentBlobError::BlobSource)?
             .reader_seeker()
-            .map_err(ContentBlobError::BlobError)
+            .map_err(ContentBlobError::Blob)
     }
 
     fn data_sources(&self) -> Box<dyn Iterator<Item = Self::DataSource>> {
@@ -856,7 +856,7 @@ mod tests {
         let (path, content_blob) = package.content_blobs().next().unwrap();
         assert_eq!(PathBuf::from(content_blob_path_str), path);
         match content_blob.reader_seeker() {
-            Err(BlobError::ContentBlobError(ContentBlobError::BlobSourceError(
+            Err(BlobError::ContentBlobError(ContentBlobError::BlobSource(
                 BlobSetError::BlobNotFound,
             ))) => {}
             Ok(_) => {

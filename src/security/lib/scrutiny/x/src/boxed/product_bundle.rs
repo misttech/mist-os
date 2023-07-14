@@ -44,82 +44,17 @@ pub enum Error {
     MissingUpdatePackage,
 }
 
-mod data_source {
-    use super::super::api;
-    use super::super::data_source::DataSourceInfo;
-
-    #[derive(Clone, Debug, Eq)]
-    pub(crate) struct ProductBundle {
-        directory: Box<dyn api::Path>,
-    }
-
-    impl PartialEq for ProductBundle {
-        fn eq(&self, other: &Self) -> bool {
-            self.directory.eq(&other.directory)
-        }
-    }
-
-    impl ProductBundle {
-        pub fn new(directory: Box<dyn api::Path>) -> Self {
-            Self { directory }
-        }
-    }
-
-    impl DataSourceInfo for ProductBundle {
-        fn kind(&self) -> api::DataSourceKind {
-            api::DataSourceKind::ProductBundle
-        }
-
-        fn path(&self) -> Option<Box<dyn api::Path>> {
-            Some(self.directory.clone())
-        }
-
-        fn version(&self) -> api::DataSourceVersion {
-            // TODO: Add support for exposing the product bundle version.
-            api::DataSourceVersion::Unknown
-        }
-    }
-
-    #[derive(Clone, Debug, Eq)]
-    pub(crate) struct TufRepository {
-        blobs_directory: Box<dyn api::Path>,
-    }
-
-    impl PartialEq for TufRepository {
-        fn eq(&self, other: &Self) -> bool {
-            self.blobs_directory.eq(&other.blobs_directory)
-        }
-    }
-
-    impl TufRepository {
-        pub fn new(blobs_directory: Box<dyn api::Path>) -> Self {
-            Self { blobs_directory }
-        }
-    }
-
-    impl DataSourceInfo for TufRepository {
-        fn kind(&self) -> api::DataSourceKind {
-            api::DataSourceKind::TufRepository
-        }
-
-        fn path(&self) -> Option<Box<dyn api::Path>> {
-            Some(self.blobs_directory.clone())
-        }
-
-        fn version(&self) -> api::DataSourceVersion {
-            // TODO: Add support for exposing the TUF repository version.
-            api::DataSourceVersion::Unknown
-        }
-    }
-}
-
 #[derive(Clone, Debug)]
 pub(crate) struct ProductBundle(Rc<ProductBundleData>);
 
 impl ProductBundle {
     pub fn new(directory: Box<dyn api::Path>) -> Result<Self, Error> {
-        let mut product_bundle_data_source =
-            ds::DataSource::new(Box::new(data_source::ProductBundle::new(directory.clone())));
+        let mut product_bundle_data_source = ds::DataSource::new(ds::DataSourceInfo::new(
+            api::DataSourceKind::ProductBundle,
+            Some(directory.clone()),
+            // TODO: Add support for exposing the product bundle version.
+            api::DataSourceVersion::Unknown,
+        ));
         let utf8_directory = Utf8PathBuf::from_path_buf(directory.as_ref().as_ref().to_path_buf())
             .map_err(|directory| Error::InvalidDirectory { directory })?;
         let product_bundle = sdk::ProductBundle::try_load_from(&utf8_directory)
@@ -141,8 +76,11 @@ impl ProductBundle {
                 let blobs_directory: Box<dyn api::Path> = Box::new(
                     directory.as_ref().as_ref().to_path_buf().join(&repository.blobs_path),
                 );
-                let repository_data_source = ds::DataSource::new(Box::new(
-                    data_source::TufRepository::new(blobs_directory.clone()),
+                let repository_data_source = ds::DataSource::new(ds::DataSourceInfo::new(
+                    api::DataSourceKind::TufRepository,
+                    Some(blobs_directory.clone()),
+                    // TODO: Add support for exposing the TUF repository version.
+                    api::DataSourceVersion::Unknown,
                 ));
                 product_bundle_data_source.add_child(repository_data_source.clone());
                 Repository::new(name, blobs_directory, repository_data_source)

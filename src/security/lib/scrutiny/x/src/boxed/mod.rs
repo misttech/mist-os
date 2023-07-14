@@ -6,6 +6,7 @@ pub(crate) mod api;
 pub(crate) mod blob;
 pub(crate) mod data_source;
 pub(crate) mod hash;
+pub(crate) mod package;
 pub(crate) mod product_bundle;
 pub(crate) mod scrutiny;
 pub(crate) mod zbi;

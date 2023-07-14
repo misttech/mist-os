@@ -6,6 +6,7 @@
 #![allow(dead_code)]
 
 use super::api;
+use super::blob::UnverifiedMemoryBlob;
 use super::data_source as ds;
 use super::hash::Hash;
 use derivative::Derivative;
@@ -16,7 +17,6 @@ use scrutiny_utils::zbi::ZbiType;
 use std::cell::RefCell;
 use std::collections::HashMap;
 use std::fs;
-use std::io::Cursor;
 use std::rc::Rc;
 use thiserror::Error;
 
@@ -28,43 +28,6 @@ pub(crate) enum Error {
     ParseZbi { path: Box<dyn api::Path>, error: anyhow::Error },
     #[error("expected to find exactly 1 bootfs section in zbi, but found {num_bootfs_sections} in zbi at path {path:?}")]
     BootfsSections { path: Box<dyn api::Path>, num_bootfs_sections: usize },
-}
-
-mod data_source {
-    use super::super::api;
-    use super::super::data_source::DataSourceInfo;
-
-    #[derive(Clone, Debug, Eq)]
-    pub(crate) struct Zbi {
-        path: Box<dyn api::Path>,
-    }
-
-    impl Zbi {
-        pub fn new(path: Box<dyn api::Path>) -> Self {
-            Self { path }
-        }
-    }
-
-    impl PartialEq for Zbi {
-        fn eq(&self, other: &Self) -> bool {
-            self.path.as_ref() == other.path.as_ref()
-        }
-    }
-
-    impl DataSourceInfo for Zbi {
-        fn kind(&self) -> api::DataSourceKind {
-            api::DataSourceKind::Zbi
-        }
-
-        fn path(&self) -> Option<Box<dyn api::Path>> {
-            Some(self.path.clone())
-        }
-
-        fn version(&self) -> api::DataSourceVersion {
-            // TODO: Add support for exposing the zbi version.
-            api::DataSourceVersion::Unknown
-        }
-    }
 }
 
 #[derive(Clone, Debug)]
@@ -94,7 +57,12 @@ impl Zbi {
             }
         };
 
-        let data_source = ds::DataSource::new(Box::new(data_source::Zbi::new(path)));
+        let data_source = ds::DataSource::new(ds::DataSourceInfo::new(
+            api::DataSourceKind::Zbi,
+            Some(path),
+            // TODO: Add support for exposing the zbi version.
+            api::DataSourceVersion::Unknown,
+        ));
 
         if let Some(parent_data_source) = parent_data_source.as_mut() {
             parent_data_source.add_child(data_source.clone());
@@ -134,7 +102,7 @@ impl api::Zbi for Zbi {
         Ok(Box::new(bootfs_files.into_iter().map(move |(path, (hash, bytes))| {
             let hash: Box<dyn api::Hash> = Box::new(hash);
             let blob: Box<dyn api::Blob> =
-                Box::new(BootfsBlob { data_source: data_source.clone(), hash, bytes });
+                Box::new(UnverifiedMemoryBlob::new([data_source.clone()].into_iter(), hash, bytes));
             (path, blob)
         })))
     }
@@ -146,24 +114,4 @@ struct ZbiData {
     data_source: Box<dyn api::DataSource>,
     #[derivative(Debug = "ignore")]
     bootfs_reader: Rc<RefCell<BootfsReader>>,
-}
-
-struct BootfsBlob {
-    data_source: Box<dyn api::DataSource>,
-    hash: Box<dyn api::Hash>,
-    bytes: Vec<u8>,
-}
-
-impl api::Blob for BootfsBlob {
-    fn hash(&self) -> Box<dyn api::Hash> {
-        self.hash.clone()
-    }
-
-    fn reader_seeker(&self) -> Result<Box<dyn api::ReaderSeeker>, api::BlobError> {
-        Ok(Box::new(Cursor::new(self.bytes.clone())))
-    }
-
-    fn data_sources(&self) -> Box<dyn Iterator<Item = Box<dyn api::DataSource>>> {
-        Box::new([self.data_source.clone()].into_iter())
-    }
 }
