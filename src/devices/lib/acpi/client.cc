@@ -17,11 +17,9 @@
 
 namespace acpi {
 zx::result<fidl::ClientEnd<fuchsia_hardware_acpi::Device>> Client::Connect(zx_device_t* parent) {
-  zx::result<fidl::ClientEnd<fuchsia_hardware_acpi::Device>> result;
-  if (device_get_fragment_count(parent) == 0) {
-    result =
-        ddk::Device<void>::DdkConnectFidlProtocol<fuchsia_hardware_acpi::Service::Device>(parent);
-  } else {
+  zx::result result =
+      ddk::Device<void>::DdkConnectFidlProtocol<fuchsia_hardware_acpi::Service::Device>(parent);
+  if (result.is_error()) {
     result =
         ddk::Device<void>::DdkConnectFragmentFidlProtocol<fuchsia_hardware_acpi::Service::Device>(
             parent, "acpi");
