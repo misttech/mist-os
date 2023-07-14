@@ -337,7 +337,10 @@
             to: "#starnix_runner",
         },
         {
-            protocol: [ "fuchsia.sysmem.Allocator" ],
+            protocol: [
+                "fuchsia.sysmem.Allocator",
+                "fuchsia.sysmem2.Allocator",
+            ],
             from: "#sysmem_connector",
             to: [
                 "#agis",

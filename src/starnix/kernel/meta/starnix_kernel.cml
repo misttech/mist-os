@@ -54,6 +54,7 @@
                 "fuchsia.posix.socket.Provider",
                 "fuchsia.posix.socket.raw.Provider",
                 "fuchsia.sysmem.Allocator",
+                "fuchsia.sysmem2.Allocator",
                 "fuchsia.tracing.provider.Registry",
                 "fuchsia.ui.composition.Allocator",
                 "fuchsia.ui.composition.Flatland",
