@@ -30,7 +30,7 @@ See the [component manifest reference][cml-reference] for more details.
 ## Monikers {#monikers}
 
 Represented by the minimal sequence of child names encountered when tracing
-downwards to the target delimeted by a `/` (slash).
+downwards to the target delimited by a `/` (slash).
 
 Monikers do not support upward traversal (i.e. `..`) (from child to parent).
 
