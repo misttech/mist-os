@@ -651,27 +651,32 @@ fpromise::promise<void> Device::Remove() {
   fpromise::bridge<void> finished_bridge;
   remove_completers_.push_back(std::move(finished_bridge.completer));
 
-  // If we don't have a controller, return early.
-  // We are probably in a state where we are waiting for the controller to finish being removed.
-  if (!controller_) {
-    if (!pending_removal_) {
-      // Our controller is already gone but we weren't in a removal, so manually remove ourself now.
-      pending_removal_ = true;
-      UnbindAndRelease();
-    }
-    return finished_bridge.consumer.promise();
-  }
+  executor_.schedule_task(WaitForInitToComplete().then(
+      [device = shared_from_this()](fpromise::result<void, zx_status_t>& init) {
+        // If we don't have a controller, return early.
+        // We are probably in a state where we are waiting for the controller to finish being
+        // removed.
+        if (!device->controller_) {
+          if (!device->pending_removal_) {
+            // Our controller is already gone but we weren't in a removal, so manually remove
+            // ourself now.
+            device->pending_removal_ = true;
+            device->UnbindAndRelease();
+          }
+          return;
+        }
 
-  pending_removal_ = true;
-  auto result = controller_->Remove();
-  // If we hit an error calling remove, we should log it.
-  // We don't need to log if the error is that we cannot connect
-  // to the protocol, because that means we are already in the process
-  // of shutting down.
-  if (!result.ok() && !result.is_canceled()) {
-    FDF_LOGL(ERROR, *logger_, "Failed to remove device '%s': %s", Name(),
-             result.FormatDescription().data());
-  }
+        device->pending_removal_ = true;
+        auto result = device->controller_->Remove();
+        // If we hit an error calling remove, we should log it.
+        // We don't need to log if the error is that we cannot connect
+        // to the protocol, because that means we are already in the process
+        // of shutting down.
+        if (!result.ok() && !result.is_canceled()) {
+          FDF_LOGL(ERROR, *device->logger_, "Failed to remove device '%s': %s", device->Name(),
+                   result.FormatDescription().data());
+        }
+      }));
   return finished_bridge.consumer.promise();
 }
 
@@ -682,15 +687,11 @@ void Device::UnbindAndRelease() {
   // We schedule our removal on our parent's executor because we can't be removed
   // while being run in a promise on our own executor.
   parent_.value()->executor_.schedule_task(
-      WaitForInitToComplete()
-          .then([device = shared_from_this()](fpromise::result<void, zx_status_t>& init) {
-            return device->UnbindOp();
-          })
-          .then([device = shared_from_this()](fpromise::result<void>& init) {
-            // Our device should be destructed at the end of this callback when the reference to the
-            // shared pointer is removed.
-            device->parent_.value()->children_.remove(device);
-          }));
+      UnbindOp().then([device = shared_from_this()](fpromise::result<void>& init) {
+        // Our device should be destructed at the end of this callback when the reference to the
+        // shared pointer is removed.
+        device->parent_.value()->children_.remove(device);
+      }));
 }
 
 void Device::InsertOrUpdateProperty(fuchsia_driver_framework::wire::NodePropertyKey key,
