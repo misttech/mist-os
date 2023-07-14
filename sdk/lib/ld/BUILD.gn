@@ -184,16 +184,19 @@ generated_file("ld-startup-test-switches.rsp") {
   data_deps = [ ":ld-startup.basic" ]
 }
 
-source_set("target-unittests") {
+source_set("load-tests") {
+  visibility = [ ":*" ]
   testonly = true
 
   sources = [ "ld-startup-tests.cc" ]
   deps = [
     "//src/lib/elfldltl",
     "//src/lib/elfldltl:elfldltl-testutils",
-    "//src/lib/fxl/test:gtest_main",
-    "//zircon/system/ulib/zx",
+    "//third_party/googletest:gtest",
   ]
+  if (is_fuchsia) {
+    deps += [ "//zircon/system/ulib/zx" ]
+  }
 
   # Bring the ld.so image into the package.
   data_deps = [ ":ld-startup.basic" ]
@@ -212,8 +215,8 @@ test("ld-unittests") {
     "//src/lib/fxl/test:gtest_main",
   ]
 
-  if (!is_host) {
-    deps += [ ":target-unittests" ]
+  if (is_fuchsia) {
+    deps += [ ":load-tests" ]
   }
 }
 
