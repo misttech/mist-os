@@ -509,7 +509,7 @@ impl FsNodeOps for RemoteNode {
         let symlink = node.fs().create_node_with_id(
             Box::new(RemoteSymlink { zxio }),
             attrs.id,
-            FsNodeInfo::new(attrs.id, get_mode(&attrs)?, owner),
+            FsNodeInfo::new(attrs.id, FileMode::IFLNK | FileMode::ALLOW_ALL, owner),
         );
         Ok(symlink)
     }

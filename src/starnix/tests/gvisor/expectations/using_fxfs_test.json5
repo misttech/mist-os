@@ -72,10 +72,6 @@
                 // mount_test - these tests hang
                 "MountTest.UmountNoFollow",
 
-                // open_test - these tests hang
-                "OpenTest.OpenNoFollowSymlink",
-                "OpenTest.SymlinkRecurse",
-
                 // pty_test - flaky
                 // Specifically, the following tests were identified as flaky when running on Fxfs.
                 // Until we can find out why thse tests are flaky, skip all tests that are part of
@@ -104,15 +100,6 @@
                 "StickyTest.StickyBitCapFOWNER",
                 "StickyTest.StickyBitPermDenied",
                 "StickyTest.StickyBitSameUID",
-
-                // symlink_test - gave fatal signals
-                "AbsAndRelTarget/ParamSymlinkTest.OpenLinkNoFollowFails/*",
-                "AbsAndRelTarget/ParamSymlinkTest.OpenLinkExclFails/*",
-                "AbsAndRelTarget/ParamSymlinkTest.CreateExistingParentLink/*",
-                "AbsAndRelTarget/ParamSymlinkTest.CreateExistingSelfLink/*",
-                "AbsAndRelTarget/ParamSymlinkTest.OpenLinkCreatesTarget/*",
-                "AbsAndRelTarget/ParamSymlinkTest.CreatLinkCreatesTarget/*",
-                "SymlinkTest.*",
 
                 // xattr_test - these tests hang
                 "XattrTest.LXattrOnSymlink",
