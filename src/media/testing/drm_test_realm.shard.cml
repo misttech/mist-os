@@ -39,6 +39,7 @@
                 "fuchsia.hwinfo.Board",
                 "fuchsia.hwinfo.Device",
                 "fuchsia.hwinfo.Product",
+                "fuchsia.inspect.InspectSink",
                 "fuchsia.net.http.Loader",
                 "fuchsia.sysmem.Allocator",
             ],
