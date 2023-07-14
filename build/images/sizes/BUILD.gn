@@ -65,10 +65,11 @@ action("elf_sizes.json") {
     files.blobs_json,
     files.extracted_zbi_json,
   ]
-  outputs = [ "$root_build_dir/$target_name" ]
+  _output = "${target_out_dir}/${target_name}"
+  outputs = [ _output ]
   args = [
     "--sizes",
-    rebase_path(outputs[0], root_build_dir),
+    rebase_path(_output, root_build_dir),
     "--blobs",
     rebase_path(files.blobs_json, root_build_dir),
     "--zbi",
@@ -76,4 +77,13 @@ action("elf_sizes.json") {
     "--bootfs-dir",
     rebase_path(files.extracted_zbi_bootfs_dir, root_build_dir),
   ]
+  metadata = {
+    images = [
+      {
+        name = "elf_sizes.json"
+        type = "manifest"
+        path = rebase_path(_output, root_build_dir)
+      },
+    ]
+  }
 }

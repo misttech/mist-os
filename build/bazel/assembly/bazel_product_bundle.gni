@@ -69,8 +69,7 @@ import("//src/sys/pkg/bin/package-tool/package-tool.gni")
 #    The Bazel fuchsia_elf_sizes target for this product bundle's product image.
 #
 #    When set, one extra sub_target is provided to access elf_sizes.json
-#    produced by Bazel. This target will copy elf_sizes.json to root_build_dir
-#    as expected by artifactory [0]:
+#    produced by Bazel.
 #
 #      * ${target_name}_elf_sizes
 #
@@ -306,7 +305,7 @@ template("bazel_product_bundle") {
   }
 
   if (defined(invoker.bazel_elf_sizes_target)) {
-    _elf_sizes_bazel_action_target = "${target_name}_elf_sizes_bazel_action"
+    _elf_sizes_bazel_action_target = "${target_name}_elf_sizes"
     _elf_sizes_ninja_out_path =
         "${_elf_sizes_bazel_action_target}/elf_sizes.json"
     bazel_action(_elf_sizes_bazel_action_target) {
@@ -327,16 +326,15 @@ template("bazel_product_bundle") {
           ninja = _elf_sizes_ninja_out_path
         },
       ]
-    }
-
-    # This copy is necessary because artifactory currently hardcodes this path
-    # for upload: https://cs.opensource.google/fuchsia/fuchsia/+/main:tools/artifactory/cmd/up.go;l=65;drc=bf9ca43004a8073e322e9235c3b7a3e607aa7622
-    copy("${target_name}_elf_sizes") {
-      forward_variables_from(invoker, [ "testonly" ])
-
-      sources = [ "${target_gen_dir}/${_elf_sizes_ninja_out_path}" ]
-      outputs = [ "${root_build_dir}/elf_sizes.json" ]
-      deps = [ ":${_elf_sizes_bazel_action_target}" ]
+      metadata = {
+        images = [
+          {
+            name = "elf_sizes.json"
+            type = "manifest"
+            path = rebase_path(_elf_sizes_ninja_out_path, root_build_dir)
+          },
+        ]
+      }
     }
   }
 

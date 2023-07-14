@@ -61,9 +61,6 @@ const (
 	// A list of all Public Platform Surface Areas.
 	ctsPlasaReportName = "test_coverage_report.plasa.json"
 
-	// The ELF sizes manifest.
-	elfSizesManifestName = "elf_sizes.json"
-
 	// A mapping of fidl mangled names to api functions.
 	fidlMangledToApiMappingManifestName = "ctf_fidl_mangled_to_api_mapping.json"
 )
@@ -107,10 +104,10 @@ Emits a GCS upload manifest for a build with the following structure:
 │   │   │   │   └── <images>
 │   │   │   │   └── transfer.json
 │   │   │   │   └── product_bundle
+│   │   │   │   └── elf_sizes.json
 │   │   │   ├── packages
 │   │   │   │   ├── all_blobs.json
 │   │   │   │   ├── delivery_blob_config.json
-│   │   │   │   ├── elf_sizes.json
 │   │   │   │   ├── repository
 │   │   │   │   │   ├── targets
 │   │   │   │   │   │   └── <package repo target files>
@@ -211,10 +208,6 @@ func (cmd upCommand) execute(ctx context.Context, buildDir string) error {
 		{
 			Source:      deliveryBlobConfigPath,
 			Destination: path.Join(packageNamespaceDir, deliveryBlobConfigName),
-		},
-		{
-			Source:      path.Join(buildDir, elfSizesManifestName),
-			Destination: path.Join(packageNamespaceDir, elfSizesManifestName),
 		},
 		// Used for CTS test coverage.
 		{
