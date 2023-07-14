@@ -10,8 +10,6 @@ import("//build/toolchain/ifs_extract.gni")
 import("//build/toolchain/ifs_shared_library.gni")
 import("//build/toolchain/zircon/user_basic_redirect.gni")
 
-ldso_name = "ld.so.1"
-
 # TODO(fxbug.dev/121817): This will be used for the static library of support
 # code.  It provides access to additional <lib/ld/...> headers for support code
 # that isn't itself part of of the passive ABI.
@@ -43,8 +41,9 @@ library_headers("abi-headers") {
 
 # This is the SONAME reflecting the passive ABI defined here.
 # It has to match what's in ld.ifs and in ld::abi::kSoname (<lib/ld/abi.h>).
+abi_soname = "ld.so.1"
 config("abi-soname") {
-  ldflags = [ "-Wl,-soname=ld.so.1" ]
+  ldflags = [ "-Wl,-soname=$abi_soname" ]
 }
 
 # `verify_ld_abi(ld) {}` defines "$ld.verify-abi" to check that the
@@ -76,7 +75,7 @@ template("verify_ld_abi") {
 # with a SONAME, but loadable_module() does its own variant selection.  Since
 # the stub ld.so is really just a data ABI image, there's no meaningful sense
 # in which it could be in the same variant as its users.
-loadable_module("stub-ld") {
+loadable_module("ld-stub") {
   configs += [
     "//build/config/fuchsia:no_cpp_standard_library",
     "//build/config/zircon:nolibc",
@@ -91,7 +90,7 @@ loadable_module("stub-ld") {
   exclude_toolchain_tags = [ "instrumented" ]
 }
 
-verify_ld_abi("stub-ld") {
+verify_ld_abi("ld-stub") {
 }
 
 source_set("abi") {
@@ -102,20 +101,44 @@ source_set("abi") {
   deps = [ ":headers" ]
 }
 
-ldso_test_loc = "test/${toolchain_variant.libprefix}$ldso_name"
+source_set("bootstrap") {
+  visibility = [ ":*" ]
 
-loadable_module("startup-ld") {
-  sources = [
-    "bootstrap.cc",
-    "standalone-assert.cc",
+  public = [ "bootstrap.h" ]
+  public_deps = [
+    ":headers",
+    "//src/lib/elfldltl",
   ]
+}
 
-  ldflags = [ "-Wl,-soname,$ldso_name" ]
+# This is a proper archive library of the bits from libc and the stubs that can
+# be used in the standalone implementation.  Having the source_set() targets as
+# direct or transitive deps not via a `complete_static_lib=true` archive would
+# eagerly link unused code into the standalone binary and rely on linker GC to
+# remove it, which is suboptimal.
+static_library("standalone") {
+  visibility = [ ":*" ]
+
+  complete_static_lib = true
+
+  sources = [ "standalone-assert.cc" ]
+  deps = [
+    "//zircon/system/ulib/c/string:minimal-str",
+    "//zircon/third_party/ulib/musl/src/exit:abort",
+  ]
+}
+
+shared_library("ld-startup") {
+  output_path = "$root_out_dir/lib$target_name.so"
+
+  configs += [ ":abi-soname" ]
+
+  sources = [ "bootstrap.cc" ]
 
   deps = [
+    ":bootstrap",
+    ":standalone",
     "//src/lib/elfldltl",
-    "//zircon/system/ulib/c/string:mem",
-    "//zircon/third_party/ulib/musl/src/exit:abort",
   ]
 
   if (!is_gcc) {
@@ -125,16 +148,16 @@ loadable_module("startup-ld") {
     # TODO(fxbug.dev/130542): The instrumentation works fine to collect data,
     # but the data needs to be plumbed out somewhere using a custom
     # runtime. For now, the data is just ignored.
-    ldflags += [ "-noprofilelib" ]
+    ldflags = [ "-noprofilelib" ]
   }
 
-  test_libname = "test/${toolchain_variant.libprefix}$ldso_name"
+  test_libname = "test/${toolchain_variant.libprefix}$abi_soname"
 
   metadata = {
     distribution_entries = [
       {
-        destination = "lib/$ldso_test_loc"
-        source = rebase_path("$root_out_dir/startup-ld.so", root_build_dir)
+        destination = "lib/$test_libname"
+        source = rebase_path(output_path, root_build_dir)
         label = get_label_info(target_name, "label_with_toolchain")
       },
     ]
@@ -147,8 +170,8 @@ loadable_module("startup-ld") {
   }
 }
 
-user_basic_redirect("ld.basic") {
-  public_deps = [ ":startup-ld" ]
+user_basic_redirect("ld-startup.basic") {
+  public_deps = [ ":ld-startup" ]
 }
 
 # This collects the -DLD_STARTUP_TEST_LIB=... flag in the response file.
@@ -158,11 +181,12 @@ generated_file("ld-startup-test-switches.rsp") {
   output_conversion = "list lines"
   data_keys = [ "ld_startup_test_switches" ]
   outputs = [ "$target_gen_dir/$target_name" ]
-  data_deps = [ ":ld.basic" ]
+  data_deps = [ ":ld-startup.basic" ]
 }
 
 source_set("target-unittests") {
   testonly = true
+
   sources = [ "ld-startup-tests.cc" ]
   deps = [
     "//src/lib/elfldltl",
@@ -172,7 +196,7 @@ source_set("target-unittests") {
   ]
 
   # Bring the ld.so image into the package.
-  data_deps = [ ":ld.basic" ]
+  data_deps = [ ":ld-startup.basic" ]
 
   # Plumb in the switch via the response file to give the name under lib/ that
   # the test can pass to fuchsia.ldsvc.Loader/LoadObject.
@@ -201,8 +225,8 @@ group("tests") {
   testonly = true
 
   deps = [
+    ":ld-stub.verify-abi",
     ":ld-tests",
     ":ld-unittests($host_toolchain)",
-    ":stub-ld.verify-abi",
   ]
 }

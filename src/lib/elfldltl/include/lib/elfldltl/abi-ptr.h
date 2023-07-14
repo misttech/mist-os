@@ -76,6 +76,13 @@ struct AbiPtr {
 
   constexpr AbiPtr& operator=(const AbiPtr&) = default;
 
+  template <class TT = Traits,
+            typename = decltype(TT::template Get<value_type>(std::declval<StorageType>()))>
+  constexpr AbiPtr& operator=(value_type* ptr) {
+    *this = AbiPtr{ptr};
+    return *this;
+  }
+
   static constexpr AbiPtr FromAddress(Addr address) {
     return AbiPtr{Traits::template FromAddress<Elf, T>(address), std::in_place};
   }
