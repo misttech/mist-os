@@ -539,7 +539,10 @@ impl FileIo for FxDeliveryBlob {
                 inner.buffer = Vec::from(chunk_data);
                 inner.payload_offset = (prev_buff_len - inner.buffer.len()) as u64;
                 inner.payload_persisted = inner.payload_offset;
-                inner.decompressor = Some(ChunkedDecompressor::new(seek_table));
+                inner.decompressor = Some(
+                    ChunkedDecompressor::new(seek_table)
+                        .context("Failed to create decompressor")?,
+                );
             }
 
             // Allocate storage space on the filesystem to write the blob payload.
