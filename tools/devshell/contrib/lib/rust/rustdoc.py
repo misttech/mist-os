@@ -22,7 +22,8 @@ def manifest_path_from_path_or_gn_target(arg):
         return Path(arg)
     else:
         gn_target = rust.GnTarget(arg)
-        gn_target.label_name += ".actual"
+        if not str(gn_target).startswith("//third_party"):
+            gn_target.label_name += ".actual"
         return gn_target.manifest_path()
 
 
@@ -38,11 +39,12 @@ def update_stamp(rust_dir, env, args):
             rust_dir / "cargo", "rustc",
             "--manifest-path=" + str(args.manifest_path),
             "--",
+            "--cap-lints=allow",
             "--emit", "dep-info=/dev/stdout",
         ] + (["--target="+args.target] if args.target else []),
         env=env,
         cwd=ROOT_PATH / "third_party/rust_crates",
-        capture_output=True,
+        stdout=subprocess.PIPE,
         text=True,
         check=True,
     )
