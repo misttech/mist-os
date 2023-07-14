@@ -39,6 +39,7 @@ struct LoopDeviceState {
     block_size: u32,
 
     // See struct loop_info64 for details about these fields.
+    offset: u64,
     size_limit: u64,
     flags: LoopDeviceFlags,
 
@@ -53,6 +54,7 @@ impl Default for LoopDeviceState {
         LoopDeviceState {
             backing_file: Default::default(),
             block_size: MIN_BLOCK_SIZE,
+            offset: Default::default(),
             size_limit: Default::default(),
             flags: Default::default(),
             encrypt_type: Default::default(),
@@ -86,6 +88,7 @@ impl LoopDeviceState {
 
     fn set_info(&mut self, info: &uapi::loop_info64) {
         let encrypt_key_size = info.lo_encrypt_key_size.clamp(0, LO_KEY_SIZE);
+        self.offset = info.lo_offset;
         self.size_limit = info.lo_sizelimit;
         self.flags = LoopDeviceFlags::from_bits_truncate(info.lo_flags);
         self.encrypt_type = info.lo_encrypt_type;
@@ -124,6 +127,10 @@ impl LoopDevice {
     fn is_bound(&self) -> bool {
         self.state.lock().backing_file.is_some()
     }
+
+    fn offset_for_backing_file(&self, offset: usize) -> usize {
+        self.state.lock().offset.saturating_add(offset as u64) as usize
+    }
 }
 
 fn check_block_size(block_size: u32) -> Result<(), Errno> {
@@ -153,7 +160,7 @@ impl FileOps for LoopDeviceFile {
         data: &mut dyn OutputBuffer,
     ) -> Result<usize, Errno> {
         if let Some(backing_file) = self.device.backing_file() {
-            backing_file.read_at(current_task, offset, data)
+            backing_file.read_at(current_task, self.device.offset_for_backing_file(offset), data)
         } else {
             Ok(0)
         }
@@ -167,7 +174,7 @@ impl FileOps for LoopDeviceFile {
         data: &mut dyn InputBuffer,
     ) -> Result<usize, Errno> {
         if let Some(backing_file) = self.device.backing_file() {
-            backing_file.write_at(current_task, offset, data)
+            backing_file.write_at(current_task, self.device.offset_for_backing_file(offset), data)
         } else {
             error!(ENOSPC)
         }
@@ -175,20 +182,19 @@ impl FileOps for LoopDeviceFile {
 
     fn get_vmo(
         &self,
-        file: &FileObject,
+        _file: &FileObject,
         current_task: &CurrentTask,
         requested_length: Option<usize>,
         prot: ProtectionFlags,
     ) -> Result<Arc<Vmo>, Errno> {
         let backing_file = self.device.backing_file().ok_or_else(|| errno!(EBADF))?;
 
-        let configured_offset = { *file.offset.lock() as u64 };
-        let configured_size_limit = {
-            match self.device.state.lock().size_limit {
-                // If the size limit is 0, use all available bytes from the backing file.
-                0 => u64::MAX,
-                n => n,
-            }
+        let state = self.device.state.lock();
+        let configured_offset = state.offset;
+        let configured_size_limit = match state.size_limit {
+            // If the size limit is 0, use all available bytes from the backing file.
+            0 => None,
+            n => Some(n),
         };
 
         let backing_vmo = backing_file.get_vmo(
@@ -196,11 +202,10 @@ impl FileOps for LoopDeviceFile {
             requested_length.map(|l| l + configured_offset as usize),
             prot,
         )?;
+        let backing_vmo_size = backing_vmo.get_size().map_err(|e| errno!(EBADF, e))?;
 
-        let slice_len = backing_vmo
-            .get_size()
-            .map_err(|e| errno!(EBADF, e))?
-            .min(configured_size_limit)
+        let slice_len = backing_vmo_size
+            .min(configured_size_limit.unwrap_or(u64::MAX))
             .min(requested_length.unwrap_or(usize::MAX) as u64);
 
         let vmo_slice = backing_vmo
@@ -272,8 +277,8 @@ impl FileOps for LoopDeviceFile {
                 state.encrypt_type = info.lo_encrypt_type as u32;
                 state.encrypt_key = info.lo_encrypt_key[0..(encrypt_key_size as usize)].to_owned();
                 state.init = info.lo_init;
+                state.offset = info.lo_offset as u64;
                 std::mem::drop(state);
-                *file.offset.lock() = info.lo_offset as i64;
                 Ok(SUCCESS)
             }
             LOOP_GET_STATUS => {
@@ -283,7 +288,6 @@ impl FileOps for LoopDeviceFile {
                     let info = node.info();
                     (info.ino, info.rdev)
                 };
-                let offset = *file.offset.lock();
                 let state = self.device.state.lock();
                 state.check_bound()?;
                 let info = loop_info {
@@ -291,7 +295,7 @@ impl FileOps for LoopDeviceFile {
                     lo_device: node.dev().bits() as __kernel_old_dev_t,
                     lo_inode: ino,
                     lo_rdevice: rdev.bits() as __kernel_old_dev_t,
-                    lo_offset: offset as i32,
+                    lo_offset: state.offset as i32,
                     lo_encrypt_type: state.encrypt_type as i32,
                     lo_flags: state.flags.bits() as i32,
                     lo_init: state.init,
@@ -351,7 +355,6 @@ impl FileOps for LoopDeviceFile {
                 state.block_size = config.block_size;
                 state.set_info(&config.info);
                 std::mem::drop(state);
-                *file.offset.lock() = config.info.lo_offset as i64;
                 Ok(SUCCESS)
             }
             LOOP_SET_STATUS64 => {
@@ -361,7 +364,6 @@ impl FileOps for LoopDeviceFile {
                 state.check_bound()?;
                 state.set_info(&info);
                 std::mem::drop(state);
-                *file.offset.lock() = info.lo_offset as i64;
                 Ok(SUCCESS)
             }
             LOOP_GET_STATUS64 => {
@@ -371,14 +373,13 @@ impl FileOps for LoopDeviceFile {
                     let info = node.info();
                     (info.ino, info.rdev)
                 };
-                let offset = *file.offset.lock();
                 let state = self.device.state.lock();
                 state.check_bound()?;
                 let info = loop_info64 {
                     lo_device: node.dev().bits(),
                     lo_inode: ino,
                     lo_rdevice: rdev.bits(),
-                    lo_offset: offset as u64,
+                    lo_offset: state.offset as u64,
                     lo_sizelimit: state.size_limit,
                     lo_number: self.device.number,
                     lo_encrypt_type: state.encrypt_type,
