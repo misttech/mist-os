@@ -3,9 +3,8 @@
 // found in the LICENSE file.
 
 use {
-    crate::{filesystem::MountedFilesystemInstance, Filesystem},
+    crate::{filesystem::MountedFilesystemInstance, CacheClearableFilesystem, Filesystem},
     async_trait::async_trait,
-    fidl_fuchsia_io::DirectoryProxy,
     futures::lock::Mutex,
     std::{
         path::{Path, PathBuf},
@@ -46,12 +45,7 @@ impl TestFilesystem {
 
 #[async_trait]
 impl Filesystem for TestFilesystem {
-    async fn clear_cache(&mut self) {
-        let mut inner = self.inner.lock().await;
-        inner.clear_cache_count += 1;
-    }
-
-    async fn shutdown(self: Box<Self>) {
+    async fn shutdown(self) {
         let mut inner = self.inner.lock().await;
         inner.fs.take().unwrap().shutdown().await;
     }
@@ -59,9 +53,13 @@ impl Filesystem for TestFilesystem {
     fn benchmark_dir(&self) -> &Path {
         &self.benchmark_dir
     }
+}
 
-    fn exposed_dir(&mut self) -> &DirectoryProxy {
-        unreachable!()
+#[async_trait]
+impl CacheClearableFilesystem for TestFilesystem {
+    async fn clear_cache(&mut self) {
+        let mut inner = self.inner.lock().await;
+        inner.clear_cache_count += 1;
     }
 }
 

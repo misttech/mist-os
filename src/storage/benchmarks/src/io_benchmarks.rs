@@ -3,7 +3,10 @@
 // found in the LICENSE file.
 
 use {
-    crate::{trace_duration, Benchmark, Filesystem, OperationDuration, OperationTimer},
+    crate::{
+        trace_duration, Benchmark, CacheClearableFilesystem, Filesystem, OperationDuration,
+        OperationTimer,
+    },
     async_trait::async_trait,
     rand::{seq::SliceRandom, Rng, SeedableRng},
     rand_xorshift::XorShiftRng,
@@ -31,8 +34,8 @@ impl ReadSequentialCold {
 }
 
 #[async_trait]
-impl Benchmark for ReadSequentialCold {
-    async fn run(&self, fs: &mut dyn Filesystem) -> Vec<OperationDuration> {
+impl<T: CacheClearableFilesystem> Benchmark<T> for ReadSequentialCold {
+    async fn run(&self, fs: &mut T) -> Vec<OperationDuration> {
         trace_duration!(
             "benchmark",
             "ReadSequentialCold",
@@ -72,8 +75,8 @@ impl ReadSequentialWarm {
 }
 
 #[async_trait]
-impl Benchmark for ReadSequentialWarm {
-    async fn run(&self, fs: &mut dyn Filesystem) -> Vec<OperationDuration> {
+impl<T: Filesystem> Benchmark<T> for ReadSequentialWarm {
+    async fn run(&self, fs: &mut T) -> Vec<OperationDuration> {
         trace_duration!(
             "benchmark",
             "ReadSequentialWarm",
@@ -112,8 +115,8 @@ impl ReadRandomCold {
 }
 
 #[async_trait]
-impl Benchmark for ReadRandomCold {
-    async fn run(&self, fs: &mut dyn Filesystem) -> Vec<OperationDuration> {
+impl<T: CacheClearableFilesystem> Benchmark<T> for ReadRandomCold {
+    async fn run(&self, fs: &mut T) -> Vec<OperationDuration> {
         trace_duration!(
             "benchmark",
             "ReadRandomCold",
@@ -154,8 +157,8 @@ impl ReadRandomWarm {
 }
 
 #[async_trait]
-impl Benchmark for ReadRandomWarm {
-    async fn run(&self, fs: &mut dyn Filesystem) -> Vec<OperationDuration> {
+impl<T: Filesystem> Benchmark<T> for ReadRandomWarm {
+    async fn run(&self, fs: &mut T) -> Vec<OperationDuration> {
         trace_duration!(
             "benchmark",
             "ReadRandomWarm",
@@ -193,8 +196,8 @@ impl WriteSequentialCold {
 }
 
 #[async_trait]
-impl Benchmark for WriteSequentialCold {
-    async fn run(&self, fs: &mut dyn Filesystem) -> Vec<OperationDuration> {
+impl<T: Filesystem> Benchmark<T> for WriteSequentialCold {
+    async fn run(&self, fs: &mut T) -> Vec<OperationDuration> {
         trace_duration!(
             "benchmark",
             "WriteSequentialCold",
@@ -226,8 +229,8 @@ impl WriteSequentialWarm {
 }
 
 #[async_trait]
-impl Benchmark for WriteSequentialWarm {
-    async fn run(&self, fs: &mut dyn Filesystem) -> Vec<OperationDuration> {
+impl<T: Filesystem> Benchmark<T> for WriteSequentialWarm {
+    async fn run(&self, fs: &mut T) -> Vec<OperationDuration> {
         trace_duration!(
             "benchmark",
             "WriteSequentialWarm",
@@ -264,8 +267,8 @@ impl WriteRandomCold {
 }
 
 #[async_trait]
-impl Benchmark for WriteRandomCold {
-    async fn run(&self, fs: &mut dyn Filesystem) -> Vec<OperationDuration> {
+impl<T: Filesystem> Benchmark<T> for WriteRandomCold {
+    async fn run(&self, fs: &mut T) -> Vec<OperationDuration> {
         trace_duration!(
             "benchmark",
             "WriteRandomCold",
@@ -298,8 +301,8 @@ impl WriteRandomWarm {
 }
 
 #[async_trait]
-impl Benchmark for WriteRandomWarm {
-    async fn run(&self, fs: &mut dyn Filesystem) -> Vec<OperationDuration> {
+impl<T: Filesystem> Benchmark<T> for WriteRandomWarm {
+    async fn run(&self, fs: &mut T) -> Vec<OperationDuration> {
         trace_duration!(
             "benchmark",
             "WriteRandomWarm",
@@ -336,8 +339,8 @@ impl WriteSequentialFsyncCold {
 }
 
 #[async_trait]
-impl Benchmark for WriteSequentialFsyncCold {
-    async fn run(&self, fs: &mut dyn Filesystem) -> Vec<OperationDuration> {
+impl<T: Filesystem> Benchmark<T> for WriteSequentialFsyncCold {
+    async fn run(&self, fs: &mut T) -> Vec<OperationDuration> {
         trace_duration!(
             "benchmark",
             "WriteSequentialFsyncCold",
@@ -369,8 +372,8 @@ impl WriteSequentialFsyncWarm {
 }
 
 #[async_trait]
-impl Benchmark for WriteSequentialFsyncWarm {
-    async fn run(&self, fs: &mut dyn Filesystem) -> Vec<OperationDuration> {
+impl<T: Filesystem> Benchmark<T> for WriteSequentialFsyncWarm {
+    async fn run(&self, fs: &mut T) -> Vec<OperationDuration> {
         trace_duration!(
             "benchmark",
             "WriteSequentialFsyncWarm",
@@ -526,7 +529,10 @@ mod tests {
     const OP_SIZE: usize = 8;
     const OP_COUNT: usize = 2;
 
-    async fn check_benchmark(benchmark: impl Benchmark, op_count: usize, clear_cache_count: u64) {
+    async fn check_benchmark<T>(benchmark: T, op_count: usize, clear_cache_count: u64)
+    where
+        T: Benchmark<TestFilesystem>,
+    {
         let mut test_fs = Box::new(TestFilesystem::new());
         let results = benchmark.run(test_fs.as_mut()).await;
 

@@ -3,13 +3,9 @@
 // found in the LICENSE file.
 
 use {
+    crate::filesystems::{BlobFilesystem, DeliveryBlob},
     async_trait::async_trait,
-    blob_writer::BlobWriter,
-    delivery_blob::{delivery_blob_path, CompressionMode, Type1Blob},
-    fidl_fuchsia_fxfs::BlobCreatorProxy,
-    fidl_fuchsia_io as fio,
-    fuchsia_component::client::connect_to_protocol_at_dir_svc,
-    fuchsia_merkle::MerkleTree,
+    delivery_blob::CompressionMode,
     fuchsia_zircon as zx,
     futures::stream::{self, StreamExt},
     rand::{
@@ -20,16 +16,13 @@ use {
     rand_xorshift::XorShiftRng,
     std::{
         fs::OpenOptions,
-        io::Write,
         iter::{Iterator, StepBy},
         ops::Range,
         os::unix::io::AsRawFd,
-        path::{Path, PathBuf},
+        path::Path,
         vec::Vec,
     },
-    storage_benchmarks::{
-        trace_duration, Benchmark, Filesystem, OperationDuration, OperationTimer,
-    },
+    storage_benchmarks::{trace_duration, Benchmark, OperationDuration, OperationTimer},
 };
 
 const RNG_SEED: u64 = 0xda782a0c3ce1819a;
@@ -48,17 +41,17 @@ macro_rules! page_in_benchmark {
         }
 
         #[async_trait]
-        impl Benchmark for $benchmark {
-            async fn run(&self, fs: &mut dyn Filesystem) -> Vec<OperationDuration> {
+        impl<T:BlobFilesystem> Benchmark<T> for $benchmark {
+            async fn run(&self, fs: &mut T) -> Vec<OperationDuration> {
                 trace_duration!(
                     "benchmark",
                     stringify!($benchmark),
                     "blob_size" => self.blob_size as u64
                 );
                 let mut rng = XorShiftRng::seed_from_u64(RNG_SEED);
-                let data = $data_gen_fn(self.blob_size, &mut rng);
+                let blob = $data_gen_fn(self.blob_size, &mut rng);
                 let page_iter = $page_iter_gen_fn(self.blob_size, &mut rng);
-                page_in_blob_benchmark(fs, data, page_iter).await
+                page_in_blob_benchmark(fs, blob, page_iter).await
             }
 
             fn name(&self) -> String {
@@ -66,90 +59,6 @@ macro_rules! page_in_benchmark {
             }
         }
     }
-}
-
-macro_rules! write_blobs_benchmark {
-    ($benchmark:ident, $write_blobs_benchmark:ident) => {
-        #[derive(Clone)]
-        pub struct $benchmark {
-            blob_size: usize,
-        }
-
-        impl $benchmark {
-            pub fn new(blob_size: usize) -> Self {
-                Self { blob_size }
-            }
-        }
-
-        #[async_trait]
-        impl Benchmark for $benchmark {
-            async fn run(&self, fs: &mut dyn Filesystem) -> Vec<OperationDuration> {
-                trace_duration!(
-                    "benchmark",
-                    stringify!($benchmark),
-                    "blob_size" => self.blob_size as u64
-                );
-                let mut rng = XorShiftRng::seed_from_u64(RNG_SEED);
-                let mut data = Vec::new();
-                for _n in 1..=5 {
-                    data.push(create_compressible_data(self.blob_size, &mut rng));
-                }
-                $write_blobs_benchmark(fs, data).await
-            }
-
-            fn name(&self) -> String {
-                format!("{}/{}", stringify!($benchmark), self.blob_size)
-            }
-        }
-    };
-}
-
-macro_rules! write_realistic_blobs_benchmark {
-    ($benchmark:ident, $write_blobs_benchmark:ident) => {
-        #[derive(Clone)]
-        pub struct $benchmark {}
-
-        impl $benchmark {
-            pub fn new() -> Self {
-                Self {}
-            }
-        }
-
-        #[async_trait]
-        impl Benchmark for $benchmark {
-            async fn run(&self, fs: &mut dyn Filesystem) -> Vec<OperationDuration> {
-                trace_duration!("benchmark", stringify!($benchmark));
-                let mut rng = XorShiftRng::seed_from_u64(RNG_SEED);
-                let mut data = Vec::new();
-                let sizes = vec![
-                    67 * 1024 * 1024,
-                    33 * 1024 * 1024,
-                    2 * 1024 * 1024,
-                    1024 * 1024,
-                    131072,
-                    65536,
-                    65536,
-                    32768,
-                    16384,
-                    16384,
-                    4096,
-                    4096,
-                    4096,
-                    4096,
-                    4096,
-                    4096,
-                ];
-                for size in sizes {
-                    data.push(create_compressible_data(size, &mut rng));
-                }
-                $write_blobs_benchmark(fs, data).await
-            }
-
-            fn name(&self) -> String {
-                stringify!($benchmark).to_string()
-            }
-        }
-    };
 }
 
 page_in_benchmark!(
@@ -160,16 +69,103 @@ page_in_benchmark!(
 page_in_benchmark!(PageInBlobSequentialCompressed, create_compressible_data, sequential_page_iter);
 page_in_benchmark!(PageInBlobRandomCompressed, create_compressible_data, random_page_iter);
 
-write_blobs_benchmark!(WriteBlobWithFidl, write_blobs_with_fidl_benchmark);
-write_blobs_benchmark!(WriteBlobWithBlobWriter, write_blobs_with_blob_writer_benchmark);
-write_realistic_blobs_benchmark!(
-    WriteRealisticBlobsWithFidl,
-    write_realistic_blobs_with_fidl_benchmark
-);
-write_realistic_blobs_benchmark!(
-    WriteRealisticBlobsWithBlobWriter,
-    write_realistic_blobs_with_blob_writer_benchmark
-);
+#[derive(Clone)]
+pub struct WriteBlob {
+    blob_size: usize,
+}
+
+impl WriteBlob {
+    pub fn new(blob_size: usize) -> Self {
+        Self { blob_size }
+    }
+}
+
+#[async_trait]
+impl<T: BlobFilesystem> Benchmark<T> for WriteBlob {
+    async fn run(&self, fs: &mut T) -> Vec<OperationDuration> {
+        trace_duration!(
+            "benchmark",
+            "WriteBlob",
+            "blob_size" => self.blob_size as u64
+        );
+        const SAMPLES: usize = 5;
+        let mut rng = XorShiftRng::seed_from_u64(RNG_SEED);
+        let mut durations = Vec::with_capacity(SAMPLES);
+        for _ in 0..SAMPLES {
+            let blob = create_compressible_data(self.blob_size, &mut rng);
+            let total_duration = OperationTimer::start();
+            fs.write_blob(&blob).await;
+            durations.push(total_duration.stop());
+        }
+        durations
+    }
+
+    fn name(&self) -> String {
+        format!("WriteBlob/{}", self.blob_size)
+    }
+}
+
+#[derive(Clone)]
+pub struct WriteRealisticBlobs {}
+
+impl WriteRealisticBlobs {
+    pub fn new() -> Self {
+        Self {}
+    }
+}
+
+#[async_trait]
+impl<T: BlobFilesystem> Benchmark<T> for WriteRealisticBlobs {
+    async fn run(&self, fs: &mut T) -> Vec<OperationDuration> {
+        trace_duration!("benchmark", "WriteRealisticBlobs");
+        // Only write 2 blobs at once to match pkg-cache.
+        const CONCURRENT_WRITE_COUNT: usize = 2;
+
+        let mut rng = XorShiftRng::seed_from_u64(RNG_SEED);
+        let sizes = vec![
+            67 * 1024 * 1024,
+            33 * 1024 * 1024,
+            2 * 1024 * 1024,
+            1024 * 1024,
+            131072,
+            65536,
+            65536,
+            32768,
+            16384,
+            16384,
+            4096,
+            4096,
+            4096,
+            4096,
+            4096,
+            4096,
+        ];
+
+        let mut futures = Vec::with_capacity(sizes.len());
+        for size in sizes {
+            let blob = create_compressible_data(size, &mut rng);
+            let fs: &T = fs;
+            futures.push(async move {
+                fs.write_blob(&blob).await;
+            });
+        }
+
+        let fut = stream::iter(futures).for_each_concurrent(
+            CONCURRENT_WRITE_COUNT,
+            |blob_future| async move {
+                blob_future.await;
+            },
+        );
+
+        let timer = OperationTimer::start();
+        fut.await;
+        vec![timer.stop()]
+    }
+
+    fn name(&self) -> String {
+        "WriteRealisticBlobs".to_string()
+    }
+}
 
 struct MappedBlob {
     addr: *mut libc::c_void,
@@ -206,28 +202,16 @@ impl Drop for MappedBlob {
     }
 }
 
-/// Write the blob to the filesystem and return the path to the bob.
-fn write_blob(blob_dir: &Path, data: &[u8]) -> PathBuf {
-    let merkle = MerkleTree::from_reader(data).unwrap().root();
-    let blob_path = blob_dir.join(merkle.to_string());
-
-    let mut file = OpenOptions::new().write(true).create_new(true).open(&blob_path).unwrap();
-    file.set_len(data.len() as u64).unwrap();
-    file.write_all(data).unwrap();
-
-    blob_path
-}
-
 /// Returns completely random data that shouldn't be compressible.
-fn create_incompressible_data(size: usize, rng: &mut XorShiftRng) -> Vec<u8> {
+fn create_incompressible_data(size: usize, rng: &mut XorShiftRng) -> DeliveryBlob {
     let mut data = vec![0; size];
     rng.fill(data.as_mut_slice());
-    data
+    DeliveryBlob::new(data, CompressionMode::Never)
 }
 
 /// Creates runs of the same byte between 2 and 8 bytes long. This should compress to about 40% of
 /// the original size which is typical for large executable blobs.
-fn create_compressible_data(size: usize, rng: &mut XorShiftRng) -> Vec<u8> {
+fn create_compressible_data(size: usize, rng: &mut XorShiftRng) -> DeliveryBlob {
     const RUN_RANGE: Range<usize> = 2..8;
     let mut data = vec![0u8; size];
     let mut rest = data.as_mut_slice();
@@ -238,7 +222,7 @@ fn create_compressible_data(size: usize, rng: &mut XorShiftRng) -> Vec<u8> {
         rest = r;
         l.fill(value);
     }
-    data
+    DeliveryBlob::new(data, CompressionMode::Always)
 }
 
 /// Returns an iterator to the index of the first byte of every page in sequential order.
@@ -275,15 +259,15 @@ fn random_page_iter(blob_size: usize, rng: &mut XorShiftRng) -> impl Iterator<It
 }
 
 async fn page_in_blob_benchmark(
-    fs: &mut dyn Filesystem,
-    data: Vec<u8>,
+    fs: &mut impl BlobFilesystem,
+    blob: DeliveryBlob,
     page_iter: impl Iterator<Item = usize>,
 ) -> Vec<OperationDuration> {
-    let blob_path = {
+    let blob_path = fs.benchmark_dir().join(blob.name.to_string());
+    {
         trace_duration!("benchmark", "write-blob");
-        write_blob(fs.benchmark_dir(), &data)
+        fs.write_blob(&blob).await;
     };
-    std::mem::drop(data);
 
     fs.clear_cache().await;
 
@@ -306,141 +290,15 @@ fn errno_error() -> std::io::Error {
     std::io::Error::last_os_error()
 }
 
-/// Creates, truncates, and writes a new blob using fuchsia.io.
-async fn write_blob_with_fidl(blob_root: &fio::DirectoryProxy, data: &[u8], merkle: &str) {
-    let blob = fuchsia_fs::directory::open_file(
-        blob_root,
-        &delivery_blob_path(merkle),
-        fuchsia_fs::OpenFlags::CREATE | fuchsia_fs::OpenFlags::RIGHT_WRITABLE,
-    )
-    .await
-    .unwrap();
-    let blob_size = data.len();
-    let () = blob.resize(blob_size as u64).await.unwrap().unwrap();
-    let mut written = 0;
-    while written != blob_size {
-        // Don't try to write more than MAX_TRANSFER_SIZE bytes at a time.
-        let bytes_to_write = std::cmp::min(fio::MAX_TRANSFER_SIZE, (blob_size - written) as u64);
-        let bytes_written: u64 =
-            blob.write(&data[written..written + bytes_to_write as usize]).await.unwrap().unwrap();
-        assert_eq!(bytes_written, bytes_to_write);
-        written += bytes_written as usize;
-    }
-}
-
-/// Creates, truncates, and writes a new blob using a BlobWriter.
-async fn write_blob_with_blob_writer(
-    blob_proxy: &BlobCreatorProxy,
-    data: &[u8],
-    merkle: &[u8; 32],
-) {
-    let writer_client_end = blob_proxy
-        .create(merkle, false)
-        .await
-        .expect("transport error on BlobCreator.Create")
-        .expect("failed to create blob");
-    let writer = writer_client_end.into_proxy().unwrap();
-    let mut blob_writer =
-        BlobWriter::create(writer, data.len() as u64).await.expect("failed to create BlobWriter");
-    blob_writer.write(&data).await.unwrap();
-}
-
-async fn write_blobs_with_fidl_benchmark(
-    fs: &mut dyn Filesystem,
-    blobs: Vec<Vec<u8>>,
-) -> Vec<OperationDuration> {
-    let mut durations = Vec::new();
-    let blob_root = fuchsia_fs::directory::open_in_namespace(
-        fs.benchmark_dir().to_str().unwrap(),
-        fuchsia_fs::OpenFlags::RIGHT_WRITABLE | fuchsia_fs::OpenFlags::RIGHT_READABLE,
-    )
-    .unwrap();
-    for blob in blobs {
-        let merkle = MerkleTree::from_reader(blob.as_slice()).unwrap().root();
-        let compressed_data = Type1Blob::generate(&blob, CompressionMode::Always);
-        let total_duration = OperationTimer::start();
-        write_blob_with_fidl(&blob_root, &compressed_data, &merkle.to_string()).await;
-        durations.push(total_duration.stop());
-    }
-    durations
-}
-
-async fn write_blobs_with_blob_writer_benchmark(
-    fs: &mut dyn Filesystem,
-    blobs: Vec<Vec<u8>>,
-) -> Vec<OperationDuration> {
-    let mut durations = Vec::new();
-    let blob_proxy =
-        connect_to_protocol_at_dir_svc::<fidl_fuchsia_fxfs::BlobCreatorMarker>(fs.exposed_dir())
-            .expect("failed to connect to the BlobCreator service");
-    for blob in blobs {
-        let merkle = MerkleTree::from_reader(blob.as_slice()).unwrap().root();
-        let compressed_data = Type1Blob::generate(&blob, CompressionMode::Always);
-        let timer = OperationTimer::start();
-        write_blob_with_blob_writer(&blob_proxy, &compressed_data, &merkle.into()).await;
-        durations.push(timer.stop());
-    }
-    durations
-}
-
-async fn write_realistic_blobs_with_fidl_benchmark(
-    fs: &mut dyn Filesystem,
-    blobs: Vec<Vec<u8>>,
-) -> Vec<OperationDuration> {
-    let mut futures = Vec::new();
-    let blob_root = fuchsia_fs::directory::open_in_namespace(
-        fs.benchmark_dir().to_str().unwrap(),
-        fuchsia_fs::OpenFlags::RIGHT_WRITABLE | fuchsia_fs::OpenFlags::RIGHT_READABLE,
-    )
-    .unwrap();
-    for blob in blobs {
-        let merkle = MerkleTree::from_reader(blob.as_slice()).unwrap().root();
-        let blob_root_clone = std::clone::Clone::clone(&blob_root);
-        let compressed_data = Type1Blob::generate(&blob, CompressionMode::Always);
-        let blob_future = async move {
-            write_blob_with_fidl(&blob_root_clone, &compressed_data, &merkle.to_string()).await;
-        };
-        futures.push(blob_future);
-    }
-    let fut = stream::iter(futures).for_each_concurrent(2, |blob_future| async move {
-        blob_future.await;
-    });
-    let timer = OperationTimer::start();
-    fut.await;
-    vec![timer.stop()]
-}
-
-async fn write_realistic_blobs_with_blob_writer_benchmark(
-    fs: &mut dyn Filesystem,
-    blobs: Vec<Vec<u8>>,
-) -> Vec<OperationDuration> {
-    let mut futures = Vec::new();
-    let blob_proxy =
-        connect_to_protocol_at_dir_svc::<fidl_fuchsia_fxfs::BlobCreatorMarker>(fs.exposed_dir())
-            .expect("failed to connect to the BlobCreator service");
-    for blob in blobs {
-        let merkle = MerkleTree::from_reader(blob.as_slice()).unwrap().root();
-        let blob_proxy_clone = blob_proxy.clone();
-        let compressed_data = Type1Blob::generate(&blob, CompressionMode::Always);
-        let blob_future = async move {
-            write_blob_with_blob_writer(&blob_proxy_clone, &compressed_data, &merkle.into()).await;
-        };
-        futures.push(blob_future);
-    }
-    let fut = stream::iter(futures).for_each_concurrent(2, |blob_future| async move {
-        blob_future.await;
-    });
-    let timer = OperationTimer::start();
-    fut.await;
-    vec![timer.stop()]
-}
-
 #[cfg(test)]
 mod tests {
     use {
         super::*,
-        crate::{block_devices::RamdiskFactory, filesystems::Fxblob},
-        storage_benchmarks::{testing::TestFilesystem, FilesystemConfig},
+        crate::{
+            block_devices::RamdiskFactory,
+            filesystems::{Blobfs, Fxblob},
+        },
+        storage_benchmarks::FilesystemConfig,
     };
     const PAGE_COUNT: usize = 32;
 
@@ -448,30 +306,36 @@ mod tests {
         zx::system_get_page_size() as usize
     }
 
-    async fn check_benchmark(benchmark: impl Benchmark, op_count: usize, clear_cache_count: u64) {
-        let mut test_fs = Box::new(TestFilesystem::new());
-        let results = benchmark.run(test_fs.as_mut()).await;
-
+    async fn check_benchmark<T, U, V>(benchmark: T, filesystem_config: V, op_count: usize)
+    where
+        T: Benchmark<U>,
+        U: BlobFilesystem,
+        V: FilesystemConfig<Filesystem = U>,
+    {
+        let blocks = 200 * 1024 * 1024 / page_size() as u64; // 200MiB
+        let ramdisk_factory = RamdiskFactory::new(page_size() as u64, blocks).await;
+        let mut filesystem = filesystem_config.start_filesystem(&ramdisk_factory).await;
+        let results = benchmark.run(&mut filesystem).await;
         assert_eq!(results.len(), op_count);
-        assert_eq!(test_fs.clear_cache_count().await, clear_cache_count);
-        test_fs.shutdown().await;
-    }
-
-    async fn check_new_write_blobs_benchmark(benchmark: impl Benchmark, op_count: usize) {
-        let ramdisk_factory = RamdiskFactory::new(page_size() as u64, 35000).await;
-        let mut test_fs = Fxblob::new().start_filesystem(&ramdisk_factory).await;
-        let results = benchmark.run(test_fs.as_mut()).await;
-
-        assert_eq!(results.len(), op_count);
-        test_fs.shutdown().await;
+        filesystem.shutdown().await;
     }
 
     #[fuchsia::test]
-    async fn page_in_blob_sequential_compressed_test() {
+    async fn page_in_blob_sequential_compressed_blobfs_test() {
         check_benchmark(
             PageInBlobSequentialCompressed::new(PAGE_COUNT * page_size()),
+            Blobfs,
             PAGE_COUNT,
-            /*clear_cache_count=*/ 1,
+        )
+        .await;
+    }
+
+    #[fuchsia::test]
+    async fn page_in_blob_sequential_compressed_fxblob_test() {
+        check_benchmark(
+            PageInBlobSequentialCompressed::new(PAGE_COUNT * page_size()),
+            Fxblob,
+            PAGE_COUNT,
         )
         .await;
     }
@@ -480,8 +344,8 @@ mod tests {
     async fn page_in_blob_sequential_uncompressed_test() {
         check_benchmark(
             PageInBlobSequentialUncompressed::new(PAGE_COUNT * page_size()),
+            Fxblob,
             PAGE_COUNT,
-            /*clear_cache_count=*/ 1,
         )
         .await;
     }
@@ -490,55 +354,30 @@ mod tests {
     async fn page_in_blob_random_compressed_test() {
         check_benchmark(
             PageInBlobRandomCompressed::new(PAGE_COUNT * page_size()),
+            Fxblob,
             PAGE_COUNT,
-            /*clear_cache_count=*/ 1,
         )
         .await;
     }
 
     #[fuchsia::test]
-    async fn write_small_blob_with_fidl_test() {
-        check_benchmark(
-            WriteBlobWithFidl::new(PAGE_COUNT * page_size()),
-            5,
-            /*clear_cache_count=*/ 0,
-        )
-        .await;
+    async fn write_blob_blobfs_test() {
+        check_benchmark(WriteBlob::new(PAGE_COUNT * page_size()), Blobfs, 5).await;
     }
 
     #[fuchsia::test]
-    async fn write_small_blob_with_blob_writer_test() {
-        check_new_write_blobs_benchmark(WriteBlobWithBlobWriter::new(PAGE_COUNT * page_size()), 5)
-            .await;
+    async fn write_blob_fxblob_test() {
+        check_benchmark(WriteBlob::new(PAGE_COUNT * page_size()), Fxblob, 5).await;
     }
 
     #[fuchsia::test]
-    async fn write_large_blob_with_fidl_test() {
-        check_benchmark(
-            WriteBlobWithFidl::new(PAGE_COUNT * page_size() * 25),
-            5,
-            /*clear_cache_count=*/ 0,
-        )
-        .await;
+    async fn write_realistic_blobs_blobfs_test() {
+        check_benchmark(WriteRealisticBlobs::new(), Blobfs, 1).await;
     }
 
     #[fuchsia::test]
-    async fn write_large_blob_with_blob_writer_test() {
-        check_new_write_blobs_benchmark(
-            WriteBlobWithBlobWriter::new(PAGE_COUNT * page_size() * 25),
-            5,
-        )
-        .await;
-    }
-
-    #[fuchsia::test]
-    async fn write_realistic_blobs_with_fidl_test() {
-        check_benchmark(WriteRealisticBlobsWithFidl::new(), 1, /*clear_cache_count=*/ 0).await;
-    }
-
-    #[fuchsia::test]
-    async fn write_realistic_blobs_with_blob_writer_test() {
-        check_new_write_blobs_benchmark(WriteRealisticBlobsWithBlobWriter::new(), 1).await;
+    async fn write_realistic_blobs_fxblob_test() {
+        check_benchmark(WriteRealisticBlobs::new(), Fxblob, 1).await;
     }
 
     #[fuchsia::test]

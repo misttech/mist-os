@@ -6,23 +6,22 @@ pub mod block_device;
 pub mod directory_benchmarks;
 pub mod filesystem;
 pub mod io_benchmarks;
+pub mod testing;
 #[macro_use]
 mod trace;
-
-pub mod testing;
 
 use {
     async_trait::async_trait,
     fuchsiaperf::FuchsiaPerfBenchmarkResult,
     regex::RegexSet,
     serde_json,
-    std::{io::Write, sync::Arc, time::Instant, vec::Vec},
+    std::{io::Write, time::Instant, vec::Vec},
     tracing::info,
 };
 
 pub use crate::{
     block_device::{BlockDeviceConfig, BlockDeviceFactory},
-    filesystem::{Filesystem, FilesystemConfig},
+    filesystem::{CacheClearableFilesystem, Filesystem, FilesystemConfig},
 };
 
 /// How long a benchmarked operation took to complete.
@@ -48,8 +47,8 @@ impl OperationTimer {
 
 /// A trait representing a single benchmark.
 #[async_trait]
-pub trait Benchmark {
-    async fn run(&self, fs: &mut dyn Filesystem) -> Vec<OperationDuration>;
+pub trait Benchmark<T>: Send + Sync {
+    async fn run(&self, fs: &mut T) -> Vec<OperationDuration>;
     fn name(&self) -> String;
 }
 
@@ -157,17 +156,33 @@ impl BenchmarkResults {
     }
 }
 
-struct BenchmarkConfig {
-    benchmark: Box<dyn Benchmark>,
-    filesystem_config: Arc<dyn FilesystemConfig>,
+#[async_trait]
+trait BenchmarkConfig {
+    async fn run(&self, block_device_factory: &dyn BlockDeviceFactory) -> BenchmarkResults;
+    fn name(&self) -> String;
+    fn matches(&self, filter: &RegexSet) -> bool;
 }
 
-impl BenchmarkConfig {
-    async fn run(&self, block_device_factory: &impl BlockDeviceFactory) -> BenchmarkResults {
+struct BenchmarkConfigImpl<T, U>
+where
+    T: Benchmark<U::Filesystem>,
+    U: FilesystemConfig,
+{
+    benchmark: T,
+    filesystem_config: U,
+}
+
+#[async_trait]
+impl<T, U> BenchmarkConfig for BenchmarkConfigImpl<T, U>
+where
+    T: Benchmark<U::Filesystem>,
+    U: FilesystemConfig,
+{
+    async fn run(&self, block_device_factory: &dyn BlockDeviceFactory) -> BenchmarkResults {
         let mut fs = self.filesystem_config.start_filesystem(block_device_factory).await;
         info!("Running {}", self.name());
         let timer = OperationTimer::start();
-        let durations = self.benchmark.run(fs.as_mut()).await;
+        let durations = self.benchmark.run(&mut fs).await;
         let benchmark_duration = timer.stop();
         info!("Finished {} {}ns", self.name(), format_nanos_with_commas(benchmark_duration.0));
         fs.shutdown().await;
@@ -193,7 +208,7 @@ impl BenchmarkConfig {
 
 /// A collection of benchmarks and the filesystems to run the benchmarks against.
 pub struct BenchmarkSet {
-    benchmarks: Vec<BenchmarkConfig>,
+    benchmarks: Vec<Box<dyn BenchmarkConfig>>,
 }
 
 impl BenchmarkSet {
@@ -201,23 +216,13 @@ impl BenchmarkSet {
         Self { benchmarks: Vec::new() }
     }
 
-    /// Adds a new benchmark with the filesystems that the benchmark should be run against to the
-    /// `BenchmarkSet`.
-    pub fn add_benchmark<
-        'a,
-        B: Benchmark + Clone + 'static,
-        Iter: IntoIterator<Item = &'a Arc<dyn FilesystemConfig>>,
-    >(
-        &mut self,
-        benchmark: B,
-        filesystem_configs: Iter,
-    ) {
-        for filesystem_config in filesystem_configs {
-            self.benchmarks.push(BenchmarkConfig {
-                benchmark: Box::new(benchmark.clone()),
-                filesystem_config: filesystem_config.clone(),
-            });
-        }
+    /// Adds a new benchmark with the filesystem it should be run against to the `BenchmarkSet`.
+    pub fn add_benchmark<T, U>(&mut self, benchmark: T, filesystem_config: U)
+    where
+        T: Benchmark<U::Filesystem> + 'static,
+        U: FilesystemConfig + 'static,
+    {
+        self.benchmarks.push(Box::new(BenchmarkConfigImpl { benchmark, filesystem_config }));
     }
 
     /// Runs all of the added benchmarks against their configured filesystems. The filesystems will
@@ -300,15 +305,39 @@ fn format_nanos_with_commas(nanos: f64) -> String {
     format_u64_with_commas(nanos as u64)
 }
 
+/// Macro to add many benchmark and filesystem pairs to a `BenchmarkSet`.
+///
+/// Expands:
+/// ```
+/// add_benchmarks!(benchmark_set, [benchmark1, benchmark2], [filesystem1, filesystem2]);
+/// ```
+/// Into:
+/// ```
+/// benchmark_set.add_benchmark(benchmark1.clone(), filesystem1.clone());
+/// benchmark_set.add_benchmark(benchmark1.clone(), filesystem2.clone());
+/// benchmark_set.add_benchmark(benchmark2.clone(), filesystem1.clone());
+/// benchmark_set.add_benchmark(benchmark2.clone(), filesystem2.clone());
+/// ```
+#[macro_export]
+macro_rules! add_benchmarks {
+    ($benchmark_set:ident, [$b:expr], [$f:expr]) => {
+        $benchmark_set.add_benchmark($b.clone(), $f.clone());
+    };
+    ($benchmark_set:ident, [$b:expr, $($bs:expr),+ $(,)?], [$($fs:expr),+ $(,)?]) => {
+        add_benchmarks!($benchmark_set, [$b], [$($fs),*]);
+        add_benchmarks!($benchmark_set, [$($bs),*], [$($fs),*]);
+    };
+    ($benchmark_set:ident, [$b:expr], [$f:expr, $($fs:expr),+ $(,)?]) => {
+        add_benchmarks!($benchmark_set, [$b], [$f]);
+        add_benchmarks!($benchmark_set, [$b], [$($fs),*]);
+    };
+}
+
 #[cfg(test)]
 mod tests {
     use {
         super::*,
-        crate::{
-            block_device::PanickingBlockDeviceFactory, filesystem::MountedFilesystem,
-            FilesystemConfig,
-        },
-        fidl_fuchsia_io::DirectoryProxy,
+        crate::{block_device::PanickingBlockDeviceFactory, FilesystemConfig},
     };
 
     fn assert_approximately_eq(a: f64, b: f64) {
@@ -316,58 +345,44 @@ mod tests {
     }
 
     #[derive(Clone)]
-    struct TestBenchmark {
-        name: &'static str,
-    }
+    struct TestBenchmark(&'static str);
 
     #[async_trait]
-    impl Benchmark for TestBenchmark {
-        async fn run(&self, _fs: &mut dyn Filesystem) -> Vec<OperationDuration> {
+    impl<T: Filesystem> Benchmark<T> for TestBenchmark {
+        async fn run(&self, _fs: &mut T) -> Vec<OperationDuration> {
             vec![OperationDuration(1.0), OperationDuration(2.0), OperationDuration(3.0)]
         }
 
         fn name(&self) -> String {
-            self.name.to_owned()
+            self.0.to_owned()
         }
     }
 
-    struct TestFilesystem {
-        name: String,
-    }
-
-    impl TestFilesystem {
-        fn new(name: &str) -> Arc<Self> {
-            Arc::new(Self { name: name.to_owned() })
-        }
-    }
+    #[derive(Clone)]
+    struct TestFilesystem(&'static str);
 
     #[async_trait]
     impl FilesystemConfig for TestFilesystem {
+        type Filesystem = TestFilesystemInstance;
         async fn start_filesystem(
             &self,
             _block_device_factory: &dyn BlockDeviceFactory,
-        ) -> Box<dyn Filesystem> {
-            Box::new(TestFilesystemInstance {})
+        ) -> Self::Filesystem {
+            TestFilesystemInstance
         }
 
         fn name(&self) -> String {
-            self.name.clone()
+            self.0.to_string()
         }
     }
 
-    struct TestFilesystemInstance {}
+    struct TestFilesystemInstance;
 
     #[async_trait]
     impl Filesystem for TestFilesystemInstance {
-        async fn clear_cache(&mut self) {}
-
-        async fn shutdown(self: Box<Self>) {}
+        async fn shutdown(self) {}
 
         fn benchmark_dir(&self) -> &std::path::Path {
-            panic!("not supported");
-        }
-
-        fn exposed_dir(&mut self) -> &DirectoryProxy {
             panic!("not supported");
         }
     }
@@ -376,35 +391,37 @@ mod tests {
     async fn run_benchmark_set() {
         let mut benchmark_set = BenchmarkSet::new();
 
-        let mut filesystems: Vec<Arc<dyn FilesystemConfig>> = vec![TestFilesystem::new("fs1")];
-        benchmark_set.add_benchmark(TestBenchmark { name: "test1" }, &filesystems);
-
-        filesystems.push(TestFilesystem::new("fs2"));
-        benchmark_set.add_benchmark(TestBenchmark { name: "test2" }, &filesystems);
+        let filesystem1 = TestFilesystem("filesystem1");
+        let filesystem2 = TestFilesystem("filesystem2");
+        let benchmark1 = TestBenchmark("benchmark1");
+        let benchmark2 = TestBenchmark("benchmark2");
+        benchmark_set.add_benchmark(benchmark1, filesystem1.clone());
+        benchmark_set.add_benchmark(benchmark2.clone(), filesystem1);
+        benchmark_set.add_benchmark(benchmark2, filesystem2);
 
         let block_device_factory = PanickingBlockDeviceFactory::new();
         let results = benchmark_set.run(&block_device_factory, &RegexSet::empty()).await;
         let results = results.results;
         assert_eq!(results.len(), 3);
 
-        assert_eq!(results[0].benchmark_name, "test1");
-        assert_eq!(results[0].filesystem_name, "fs1");
+        assert_eq!(results[0].benchmark_name, "benchmark1");
+        assert_eq!(results[0].filesystem_name, "filesystem1");
         assert_eq!(results[0].values.len(), 3);
 
-        assert_eq!(results[1].benchmark_name, "test2");
-        assert_eq!(results[1].filesystem_name, "fs1");
+        assert_eq!(results[1].benchmark_name, "benchmark2");
+        assert_eq!(results[1].filesystem_name, "filesystem1");
         assert_eq!(results[1].values.len(), 3);
 
-        assert_eq!(results[2].benchmark_name, "test2");
-        assert_eq!(results[2].filesystem_name, "fs2");
+        assert_eq!(results[2].benchmark_name, "benchmark2");
+        assert_eq!(results[2].filesystem_name, "filesystem2");
         assert_eq!(results[2].values.len(), 3);
     }
 
     #[fuchsia::test]
     fn benchmark_filters() {
-        let config = BenchmarkConfig {
-            benchmark: Box::new(TestBenchmark { name: "read_warm" }),
-            filesystem_config: Arc::new(MountedFilesystem::new("path", "fs-name".into())),
+        let config = BenchmarkConfigImpl {
+            benchmark: TestBenchmark("read_warm"),
+            filesystem_config: TestFilesystem("fs-name"),
         };
         // Accepted patterns.
         assert!(config.matches(&RegexSet::empty()));
@@ -507,5 +524,40 @@ mod tests {
         assert_eq!(format_nanos_with_commas(1_000.0), "1,000");
         assert_eq!(format_nanos_with_commas(999_999.9), "999,999");
         assert_eq!(format_nanos_with_commas(1_000_000.0), "1,000,000");
+    }
+
+    #[fuchsia::test]
+    fn add_benchmarks_test() {
+        let mut benchmark_set = BenchmarkSet::new();
+
+        let filesystem1 = TestFilesystem("filesystem1");
+        let filesystem2 = TestFilesystem("filesystem2");
+        let benchmark1 = TestBenchmark("benchmark1");
+        let benchmark2 = TestBenchmark("benchmark2");
+        add_benchmarks!(benchmark_set, [benchmark1], [filesystem1]);
+        add_benchmarks!(benchmark_set, [benchmark1], [filesystem1, filesystem2]);
+        add_benchmarks!(benchmark_set, [benchmark1, benchmark2], [filesystem1]);
+        add_benchmarks!(benchmark_set, [benchmark1, benchmark2], [filesystem1, filesystem2]);
+        add_benchmarks!(benchmark_set, [benchmark1, benchmark2,], [filesystem1, filesystem2,]);
+        let names: Vec<String> =
+            benchmark_set.benchmarks.iter().map(|config| config.name()).collect();
+        assert_eq!(
+            &names,
+            &[
+                "benchmark1/filesystem1",
+                "benchmark1/filesystem1",
+                "benchmark1/filesystem2",
+                "benchmark1/filesystem1",
+                "benchmark2/filesystem1",
+                "benchmark1/filesystem1",
+                "benchmark1/filesystem2",
+                "benchmark2/filesystem1",
+                "benchmark2/filesystem2",
+                "benchmark1/filesystem1",
+                "benchmark1/filesystem2",
+                "benchmark2/filesystem1",
+                "benchmark2/filesystem2"
+            ]
+        );
     }
 }

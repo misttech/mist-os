@@ -13,7 +13,14 @@ rustc_binary("fuchsia-storage-benchmarks") {
   sources = [
     "src/blob_benchmarks.rs",
     "src/block_devices.rs",
-    "src/filesystems.rs",
+    "src/filesystems/blobfs.rs",
+    "src/filesystems/f2fs.rs",
+    "src/filesystems/fxblob.rs",
+    "src/filesystems/fxfs.rs",
+    "src/filesystems/memfs.rs",
+    "src/filesystems/minfs.rs",
+    "src/filesystems/mod.rs",
+    "src/filesystems/testing.rs",
     "src/main.rs",
   ]
   deps = [

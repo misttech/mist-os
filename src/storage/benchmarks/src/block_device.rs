@@ -15,12 +15,10 @@ pub struct BlockDeviceConfig {
 }
 
 /// A trait representing a block device.
-pub trait BlockDevice: Send {
-    fn as_dir(&self) -> &fio::DirectoryProxy;
+pub trait BlockDevice: Send + Sync {
+    fn dir(&self) -> &fio::DirectoryProxy;
 
-    fn as_controller(&self) -> Option<&ControllerProxy>;
-
-    fn take_controller(&mut self) -> Option<ControllerProxy>;
+    fn controller(&self) -> &ControllerProxy;
 }
 
 /// A trait for constructing block devices.

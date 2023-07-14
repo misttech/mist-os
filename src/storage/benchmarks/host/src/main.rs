@@ -4,8 +4,9 @@
 
 use {
     regex::{Regex, RegexSetBuilder},
-    std::{fs::File, path::PathBuf, sync::Arc, vec::Vec},
+    std::{fs::File, path::PathBuf, vec::Vec},
     storage_benchmarks::{
+        add_benchmarks,
         block_device::PanickingBlockDeviceFactory,
         directory_benchmarks::{
             DirectoryTreeStructure, GitStatus, OpenDeeplyNestedFile, OpenFile, StatPath,
@@ -16,7 +17,7 @@ use {
             ReadRandomWarm, ReadSequentialWarm, WriteRandomCold, WriteRandomWarm,
             WriteSequentialCold, WriteSequentialWarm,
         },
-        BenchmarkSet, FilesystemConfig,
+        BenchmarkSet,
     },
 };
 
@@ -49,20 +50,26 @@ struct Args {
 }
 
 fn build_benchmark_set(fs: MountedFilesystem) -> BenchmarkSet {
-    let filesystems: Vec<Arc<dyn FilesystemConfig>> = vec![Arc::new(fs)];
     const OP_SIZE: usize = 8 * 1024;
     const OP_COUNT: usize = 1024;
 
     let mut benchmark_set = BenchmarkSet::new();
-    benchmark_set.add_benchmark(ReadSequentialWarm::new(OP_SIZE, OP_COUNT), &filesystems);
-    benchmark_set.add_benchmark(ReadRandomWarm::new(OP_SIZE, OP_COUNT), &filesystems);
-    benchmark_set.add_benchmark(WriteSequentialWarm::new(OP_SIZE, OP_COUNT), &filesystems);
-    benchmark_set.add_benchmark(WriteRandomWarm::new(OP_SIZE, OP_COUNT), &filesystems);
-    benchmark_set.add_benchmark(WriteSequentialCold::new(OP_SIZE, OP_COUNT), &filesystems);
-    benchmark_set.add_benchmark(WriteRandomCold::new(OP_SIZE, OP_COUNT), &filesystems);
-    benchmark_set.add_benchmark(StatPath::new(), &filesystems);
-    benchmark_set.add_benchmark(OpenFile::new(), &filesystems);
-    benchmark_set.add_benchmark(OpenDeeplyNestedFile::new(), &filesystems);
+    add_benchmarks!(
+        benchmark_set,
+        [
+            ReadSequentialWarm::new(OP_SIZE, OP_COUNT),
+            ReadRandomWarm::new(OP_SIZE, OP_COUNT),
+            WriteSequentialWarm::new(OP_SIZE, OP_COUNT),
+            WriteRandomWarm::new(OP_SIZE, OP_COUNT),
+            WriteSequentialCold::new(OP_SIZE, OP_COUNT),
+            WriteRandomCold::new(OP_SIZE, OP_COUNT),
+            StatPath::new(),
+            OpenFile::new(),
+            OpenDeeplyNestedFile::new(),
+            GitStatus::new(),
+        ],
+        [fs]
+    );
 
     // Creates a total of 62 directories and 189 files.
     let dts = DirectoryTreeStructure {
@@ -70,8 +77,7 @@ fn build_benchmark_set(fs: MountedFilesystem) -> BenchmarkSet {
         directories_per_directory: 2,
         max_depth: 5,
     };
-    benchmark_set.add_benchmark(WalkDirectoryTreeWarm::new(dts, 20), &filesystems);
-    benchmark_set.add_benchmark(GitStatus::new(), &filesystems);
+    benchmark_set.add_benchmark(WalkDirectoryTreeWarm::new(dts, 20), fs);
 
     benchmark_set
 }

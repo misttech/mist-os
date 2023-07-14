@@ -6,15 +6,15 @@ use {
     crate::{
         blob_benchmarks::{
             PageInBlobRandomCompressed, PageInBlobSequentialCompressed,
-            PageInBlobSequentialUncompressed, WriteBlobWithBlobWriter, WriteBlobWithFidl,
-            WriteRealisticBlobsWithBlobWriter, WriteRealisticBlobsWithFidl,
+            PageInBlobSequentialUncompressed, WriteBlob, WriteRealisticBlobs,
         },
         block_devices::{FvmVolumeFactory, RamdiskFactory},
         filesystems::{Blobfs, F2fs, Fxblob, Fxfs, Memfs, Minfs},
     },
     regex::{Regex, RegexSetBuilder},
-    std::{fs::File, path::PathBuf, sync::Arc, vec::Vec},
+    std::{fs::File, path::PathBuf, vec::Vec},
     storage_benchmarks::{
+        add_benchmarks,
         directory_benchmarks::{
             DirectoryTreeStructure, GitStatus, OpenDeeplyNestedFile, OpenFile, StatPath,
             WalkDirectoryTreeCold, WalkDirectoryTreeWarm,
@@ -24,7 +24,7 @@ use {
             WriteRandomCold, WriteRandomWarm, WriteSequentialCold, WriteSequentialFsyncCold,
             WriteSequentialFsyncWarm, WriteSequentialWarm,
         },
-        BenchmarkSet, FilesystemConfig,
+        BenchmarkSet, Filesystem as _, FilesystemConfig,
     },
 };
 
@@ -65,90 +65,78 @@ struct Args {
     #[argh(switch)]
     load_blobs_for_tracing: bool,
 
-    /// runs the blob benchmarks instead of the regular benchmarks.
+    /// enables blob benchmarks.
     #[argh(switch)]
     blob_benchmarks: bool,
 }
 
-fn build_benchmark_set() -> BenchmarkSet {
-    let filesystems: Vec<Arc<dyn FilesystemConfig>> = vec![
-        Arc::new(Fxfs::new()),
-        Arc::new(F2fs::new()),
-        Arc::new(Memfs::new()),
-        Arc::new(Minfs::new()),
-    ];
+fn add_io_benchmarks(benchmark_set: &mut BenchmarkSet) {
     const OP_SIZE: usize = 8 * 1024;
     const OP_COUNT: usize = 1024;
+    add_benchmarks!(
+        benchmark_set,
+        [
+            ReadSequentialCold::new(OP_SIZE, OP_COUNT),
+            ReadSequentialWarm::new(OP_SIZE, OP_COUNT),
+            ReadRandomCold::new(OP_SIZE, OP_COUNT),
+            ReadRandomWarm::new(OP_SIZE, OP_COUNT),
+            WriteSequentialCold::new(OP_SIZE, OP_COUNT),
+            WriteSequentialWarm::new(OP_SIZE, OP_COUNT),
+            WriteRandomCold::new(OP_SIZE, OP_COUNT),
+            WriteRandomWarm::new(OP_SIZE, OP_COUNT),
+            WriteSequentialFsyncCold::new(OP_SIZE, OP_COUNT),
+            WriteSequentialFsyncWarm::new(OP_SIZE, OP_COUNT),
+        ],
+        [Fxfs, F2fs, Memfs, Minfs]
+    );
+}
 
-    let mut benchmark_set = BenchmarkSet::new();
-    benchmark_set.add_benchmark(ReadSequentialCold::new(OP_SIZE, OP_COUNT), &filesystems);
-    benchmark_set.add_benchmark(ReadSequentialWarm::new(OP_SIZE, OP_COUNT), &filesystems);
-    benchmark_set.add_benchmark(ReadRandomCold::new(OP_SIZE, OP_COUNT), &filesystems);
-    benchmark_set.add_benchmark(ReadRandomWarm::new(OP_SIZE, OP_COUNT), &filesystems);
-    benchmark_set.add_benchmark(WriteSequentialCold::new(OP_SIZE, OP_COUNT), &filesystems);
-    benchmark_set.add_benchmark(WriteSequentialWarm::new(OP_SIZE, OP_COUNT), &filesystems);
-    benchmark_set.add_benchmark(WriteRandomCold::new(OP_SIZE, OP_COUNT), &filesystems);
-    benchmark_set.add_benchmark(WriteRandomWarm::new(OP_SIZE, OP_COUNT), &filesystems);
-    benchmark_set.add_benchmark(WriteSequentialFsyncCold::new(OP_SIZE, OP_COUNT), &filesystems);
-    benchmark_set.add_benchmark(WriteSequentialFsyncWarm::new(OP_SIZE, OP_COUNT), &filesystems);
-    benchmark_set.add_benchmark(StatPath::new(), &filesystems);
-    benchmark_set.add_benchmark(OpenFile::new(), &filesystems);
-    benchmark_set.add_benchmark(OpenDeeplyNestedFile::new(), &filesystems);
-
+fn add_directory_benchmarks(benchmark_set: &mut BenchmarkSet) {
     // Creates a total of 62 directories and 189 files.
     let dts = DirectoryTreeStructure {
         files_per_directory: 3,
         directories_per_directory: 2,
         max_depth: 5,
     };
-    benchmark_set.add_benchmark(WalkDirectoryTreeCold::new(dts, 20), &filesystems);
-    benchmark_set.add_benchmark(WalkDirectoryTreeWarm::new(dts, 20), &filesystems);
-    benchmark_set.add_benchmark(GitStatus::new(), &filesystems);
-
-    benchmark_set
+    add_benchmarks!(
+        benchmark_set,
+        [
+            StatPath::new(),
+            OpenFile::new(),
+            OpenDeeplyNestedFile::new(),
+            WalkDirectoryTreeCold::new(dts, 20),
+            WalkDirectoryTreeWarm::new(dts, 20),
+            GitStatus::new(),
+        ],
+        [Fxfs, F2fs, Memfs, Minfs]
+    );
 }
 
-/// The blob benchmarks are separate from the others to prevent them from running in CQ until fxblob
-/// supports writing compressed blobs.
-fn build_blob_benchmark_set() -> BenchmarkSet {
-    let mut benchmark_set = BenchmarkSet::new();
-    let blob_filesystems: Vec<Arc<dyn FilesystemConfig>> =
-        vec![Arc::new(Blobfs::new()), Arc::new(Fxblob::new())];
-
-    const BLOB_SIZE: usize = 2 * 1024 * 1024; // 2 MiB
-    benchmark_set
-        .add_benchmark(PageInBlobSequentialUncompressed::new(BLOB_SIZE), &blob_filesystems);
-    benchmark_set.add_benchmark(PageInBlobSequentialCompressed::new(BLOB_SIZE), &blob_filesystems);
-    benchmark_set.add_benchmark(PageInBlobRandomCompressed::new(BLOB_SIZE), &blob_filesystems);
-
+fn add_blob_benchmarks(benchmark_set: &mut BenchmarkSet) {
     const SMALL_BLOB_SIZE: usize = 2 * 1024 * 1024; // 2 MiB
     const LARGE_BLOB_SIZE: usize = 25 * 1024 * 1024; // 25 MiB
-    let blobfs: Vec<Arc<dyn FilesystemConfig>> = vec![Arc::new(Blobfs::new())];
-    let fxblob: Vec<Arc<dyn FilesystemConfig>> = vec![Arc::new(Fxblob::new())];
-
-    benchmark_set.add_benchmark(WriteBlobWithFidl::new(SMALL_BLOB_SIZE), &blobfs);
-    benchmark_set.add_benchmark(WriteBlobWithBlobWriter::new(SMALL_BLOB_SIZE), &fxblob);
-
-    benchmark_set.add_benchmark(WriteBlobWithFidl::new(LARGE_BLOB_SIZE), &blobfs);
-    benchmark_set.add_benchmark(WriteBlobWithBlobWriter::new(LARGE_BLOB_SIZE), &fxblob);
-
-    benchmark_set.add_benchmark(WriteRealisticBlobsWithFidl::new(), &blobfs);
-    benchmark_set.add_benchmark(WriteRealisticBlobsWithBlobWriter::new(), &fxblob);
-
-    benchmark_set
+    add_benchmarks!(
+        benchmark_set,
+        [
+            PageInBlobSequentialUncompressed::new(SMALL_BLOB_SIZE),
+            PageInBlobSequentialCompressed::new(SMALL_BLOB_SIZE),
+            PageInBlobRandomCompressed::new(SMALL_BLOB_SIZE),
+            WriteBlob::new(SMALL_BLOB_SIZE),
+            WriteBlob::new(LARGE_BLOB_SIZE),
+            WriteRealisticBlobs::new(),
+        ],
+        [Blobfs, Fxblob]
+    );
 }
 
 async fn load_blobs_for_tracing() {
-    let filesystems: Vec<Arc<dyn FilesystemConfig>> = vec![
-        Arc::new(Fxfs::new()),
-        Arc::new(F2fs::new()),
-        Arc::new(Memfs::new()),
-        Arc::new(Minfs::new()),
-    ];
     let ramdisk_factory = RamdiskFactory::new(4096, 32 * 1024).await;
-    for fs in &filesystems {
-        fs.start_filesystem(&ramdisk_factory).await.shutdown().await;
-    }
+    Fxfs.start_filesystem(&ramdisk_factory).await.shutdown().await;
+    F2fs.start_filesystem(&ramdisk_factory).await.shutdown().await;
+    Memfs.start_filesystem(&ramdisk_factory).await.shutdown().await;
+    Minfs.start_filesystem(&ramdisk_factory).await.shutdown().await;
+    Blobfs.start_filesystem(&ramdisk_factory).await.shutdown().await;
+    Fxblob.start_filesystem(&ramdisk_factory).await.shutdown().await;
 }
 
 #[fuchsia::main(logging_tags = ["storage_benchmarks"])]
@@ -174,9 +162,14 @@ async fn main() {
         tracing::warn!("To run these test locally on an emulator, see the README.md.");
         return;
     }
-    let benchmark_suite =
-        if args.blob_benchmarks { build_blob_benchmark_set() } else { build_benchmark_set() };
-    let results = benchmark_suite.run(fvm_volume_factory.as_ref().unwrap(), &filter).await;
+
+    let mut benchmark_set = BenchmarkSet::new();
+    add_io_benchmarks(&mut benchmark_set);
+    add_directory_benchmarks(&mut benchmark_set);
+    if args.blob_benchmarks {
+        add_blob_benchmarks(&mut benchmark_set);
+    }
+    let results = benchmark_set.run(fvm_volume_factory.as_ref().unwrap(), &filter).await;
 
     results.write_table(std::io::stdout());
     if args.output_csv {

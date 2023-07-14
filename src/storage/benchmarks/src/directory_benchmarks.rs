@@ -3,7 +3,10 @@
 // found in the LICENSE file.
 
 use {
-    crate::{trace_duration, Benchmark, Filesystem, OperationDuration, OperationTimer},
+    crate::{
+        trace_duration, Benchmark, CacheClearableFilesystem, Filesystem, OperationDuration,
+        OperationTimer,
+    },
     async_trait::async_trait,
     std::{
         collections::VecDeque,
@@ -98,8 +101,8 @@ impl WalkDirectoryTreeCold {
 }
 
 #[async_trait]
-impl Benchmark for WalkDirectoryTreeCold {
-    async fn run(&self, fs: &mut dyn Filesystem) -> Vec<OperationDuration> {
+impl<T: CacheClearableFilesystem> Benchmark<T> for WalkDirectoryTreeCold {
+    async fn run(&self, fs: &mut T) -> Vec<OperationDuration> {
         trace_duration!(
             "benchmark",
             "WalkDirectoryTreeCold",
@@ -145,8 +148,8 @@ impl WalkDirectoryTreeWarm {
 }
 
 #[async_trait]
-impl Benchmark for WalkDirectoryTreeWarm {
-    async fn run(&self, fs: &mut dyn Filesystem) -> Vec<OperationDuration> {
+impl<T: Filesystem> Benchmark<T> for WalkDirectoryTreeWarm {
+    async fn run(&self, fs: &mut T) -> Vec<OperationDuration> {
         trace_duration!(
             "benchmark",
             "WalkDirectoryTreeWarm",
@@ -207,8 +210,8 @@ impl StatPath {
 }
 
 #[async_trait]
-impl Benchmark for StatPath {
-    async fn run(&self, fs: &mut dyn Filesystem) -> Vec<OperationDuration> {
+impl<T: Filesystem> Benchmark<T> for StatPath {
+    async fn run(&self, fs: &mut T) -> Vec<OperationDuration> {
         trace_duration!("benchmark", "StatPath");
 
         let root = fs.benchmark_dir().to_path_buf();
@@ -249,8 +252,8 @@ impl OpenFile {
 }
 
 #[async_trait]
-impl Benchmark for OpenFile {
-    async fn run(&self, fs: &mut dyn Filesystem) -> Vec<OperationDuration> {
+impl<T: Filesystem> Benchmark<T> for OpenFile {
+    async fn run(&self, fs: &mut T) -> Vec<OperationDuration> {
         trace_duration!("benchmark", "OpenFile");
 
         let root = fs.benchmark_dir().to_path_buf();
@@ -304,8 +307,8 @@ impl OpenDeeplyNestedFile {
 }
 
 #[async_trait]
-impl Benchmark for OpenDeeplyNestedFile {
-    async fn run(&self, fs: &mut dyn Filesystem) -> Vec<OperationDuration> {
+impl<T: Filesystem> Benchmark<T> for OpenDeeplyNestedFile {
+    async fn run(&self, fs: &mut T) -> Vec<OperationDuration> {
         trace_duration!("benchmark", "OpenDeeplyNestedFile");
 
         let root = fs.benchmark_dir().to_path_buf();
@@ -393,8 +396,8 @@ impl GitStatus {
 }
 
 #[async_trait]
-impl Benchmark for GitStatus {
-    async fn run(&self, fs: &mut dyn Filesystem) -> Vec<OperationDuration> {
+impl<T: Filesystem> Benchmark<T> for GitStatus {
+    async fn run(&self, fs: &mut T) -> Vec<OperationDuration> {
         let root = &fs.benchmark_dir().to_path_buf();
 
         self.dts.create_directory_tree(root.clone());

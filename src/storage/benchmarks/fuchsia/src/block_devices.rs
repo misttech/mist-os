@@ -68,7 +68,7 @@ impl BlockDeviceFactory for RamdiskFactory {
 pub struct Ramdisk {
     _ramdisk: RamdiskClient,
     volume_dir: fio::DirectoryProxy,
-    volume_controller: Option<ControllerProxy>,
+    volume_controller: ControllerProxy,
 }
 
 impl Ramdisk {
@@ -95,21 +95,17 @@ impl Ramdisk {
             connect_to_named_protocol_at_dir_root::<ControllerMarker>(&volume_dir, ".")
                 .expect("failed to connect to the device controller");
 
-        Self { _ramdisk: ramdisk, volume_dir, volume_controller: Some(volume_controller) }
+        Self { _ramdisk: ramdisk, volume_dir, volume_controller: volume_controller }
     }
 }
 
 impl BlockDevice for Ramdisk {
-    fn as_dir(&self) -> &fio::DirectoryProxy {
+    fn dir(&self) -> &fio::DirectoryProxy {
         &self.volume_dir
     }
 
-    fn as_controller(&self) -> Option<&ControllerProxy> {
-        self.volume_controller.as_ref()
-    }
-
-    fn take_controller(&mut self) -> Option<ControllerProxy> {
-        self.volume_controller.take()
+    fn controller(&self) -> &ControllerProxy {
+        &self.volume_controller
     }
 }
 
@@ -268,7 +264,7 @@ impl BlockDeviceFactory for FvmVolumeFactory {
 pub struct FvmVolume {
     volume: VolumeSynchronousProxy,
     volume_dir: fio::DirectoryProxy,
-    volume_controller: Option<ControllerProxy>,
+    volume_controller: ControllerProxy,
 }
 
 impl FvmVolume {
@@ -290,21 +286,17 @@ impl FvmVolume {
             connect_to_named_protocol_at_dir_root::<ControllerMarker>(&volume_dir, ".")
                 .expect("failed to connect to the device controller");
 
-        Self { volume, volume_dir, volume_controller: Some(volume_controller) }
+        Self { volume, volume_dir, volume_controller: volume_controller }
     }
 }
 
 impl BlockDevice for FvmVolume {
-    fn as_dir(&self) -> &fio::DirectoryProxy {
+    fn dir(&self) -> &fio::DirectoryProxy {
         &self.volume_dir
     }
 
-    fn as_controller(&self) -> Option<&ControllerProxy> {
-        self.volume_controller.as_ref()
-    }
-
-    fn take_controller(&mut self) -> Option<ControllerProxy> {
-        self.volume_controller.take()
+    fn controller(&self) -> &ControllerProxy {
+        &self.volume_controller
     }
 }
 
@@ -377,8 +369,8 @@ mod tests {
         let ramdisk = ramdisk_factory
             .create_block_device(&BlockDeviceConfig { use_zxcrypt: true, fvm_volume_size: None })
             .await;
-        let controller = ramdisk.as_controller().expect("invalid device controller");
-        let path = controller
+        let path = ramdisk
+            .controller()
             .get_topological_path()
             .await
             .expect("Failed to get topological path")
@@ -393,8 +385,8 @@ mod tests {
         let ramdisk = ramdisk_factory
             .create_block_device(&BlockDeviceConfig { use_zxcrypt: false, fvm_volume_size: None })
             .await;
-        let controller = ramdisk.as_controller().expect("invalid device controller");
-        let path = controller
+        let path = ramdisk
+            .controller()
             .get_topological_path()
             .await
             .expect("Failed to get topological path")
@@ -413,10 +405,10 @@ mod tests {
         let ramdisk = ramdisk_factory
             .create_block_device(&BlockDeviceConfig { use_zxcrypt: false, fvm_volume_size: None })
             .await;
-        let ramdisk_controller = ramdisk.as_controller().expect("invalid ramdisk controller");
         let (volume, server) =
             fidl::endpoints::create_proxy::<VolumeMarker>().expect("failed to create proxy");
-        let () = ramdisk_controller
+        let () = ramdisk
+            .controller()
             .connect_to_device_fidl(server.into_channel())
             .expect("failed to connect to device fidl");
         let volume_info = volume.get_volume_info().await.unwrap();
@@ -434,10 +426,10 @@ mod tests {
                 fvm_volume_size: Some(RAMDISK_FVM_SLICE_SIZE as u64 * 3),
             })
             .await;
-        let ramdisk_controller = ramdisk.as_controller().expect("invalid ramdisk controller");
         let (volume, server) =
             fidl::endpoints::create_proxy::<VolumeMarker>().expect("failed to create proxy");
-        let () = ramdisk_controller
+        let () = ramdisk
+            .controller()
             .connect_to_device_fidl(server.into_channel())
             .expect("failed to connect to device fidl");
         let volume_info = volume.get_volume_info().await.unwrap();
@@ -598,8 +590,8 @@ mod tests {
             .create_block_device(&BlockDeviceConfig { use_zxcrypt: true, fvm_volume_size: None })
             .await;
 
-        let controller = volume.as_controller().expect("invalid device controller");
-        let path = controller
+        let path = volume
+            .controller()
             .get_topological_path()
             .await
             .expect("Failed to get topological path")
@@ -625,8 +617,8 @@ mod tests {
             .create_block_device(&BlockDeviceConfig { use_zxcrypt: false, fvm_volume_size: None })
             .await;
 
-        let controller = volume.as_controller().expect("invalid device controller");
-        let path = controller
+        let path = volume
+            .controller()
             .get_topological_path()
             .await
             .expect("Failed to get topological path")
