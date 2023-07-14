@@ -79,8 +79,8 @@ zx_library("amlogic") {
     "aml-tdm-in-audio.cc",
     "aml-tdm-out-audio.cc",
     "aml-tdmlb-audio.cc",
-    "s905d2-hiu.c",
-    "s905d2-pll-rates.c",
+    "s905d2-hiu.cc",
+    "s905d2-pll-rates.cc",
   ]
   deps = [
     "//src/lib/ddk",

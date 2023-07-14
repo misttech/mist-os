@@ -4,6 +4,8 @@
 
 #include <zircon/types.h>
 
+#include <iterator>
+
 #include <soc/aml-s905d2/s905d2-hiu.h>
 
 // PLL Rate tables
@@ -83,9 +85,9 @@ size_t s905d2_get_rate_table_count(hhi_plls_t pll_num) {
     case HIFI_PLL:
     case SYS_PLL:
     case SYS1_PLL:
-      return countof(s905d2_hiu_pll_rates);
+      return std::size(s905d2_hiu_pll_rates);
     case PCIE_PLL:
-      return countof(s905d2_pcie_pll_rates);
+      return std::size(s905d2_pcie_pll_rates);
     default:
       return 0;
   }
