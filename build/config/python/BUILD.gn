@@ -5,6 +5,7 @@
 config("include_python") {
   cflags = [
     "-I" + rebase_path(python_include_dir, root_build_dir),
-    "-I" + rebase_path(python_include_dir + "/python3.8", root_build_dir),
+    "-I" + rebase_path("${python_include_dir}/python${python_version}",
+                       root_build_dir),
   ]
 }
