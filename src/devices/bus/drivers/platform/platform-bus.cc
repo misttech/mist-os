@@ -158,6 +158,48 @@ zx::result<ddk::BindRule> ConvertFidlBindRule(const fuchsia_driver_framework::Bi
   return zx::ok(ddk::BindRule(key, condition, values));
 }
 
+zx::result<> AppendParentSpecs(ddk::CompositeNodeSpec& spec,
+                               const std::vector<fuchsia_driver_framework::ParentSpec>& parents) {
+  for (const auto& parent : parents) {
+    if (parent.bind_rules().empty()) {
+      zxlogf(ERROR, "Parent spec bind rules cannot be empty");
+      return zx::error(ZX_ERR_INVALID_ARGS);
+    }
+
+    if (parent.properties().empty()) {
+      zxlogf(ERROR, "Parent spec properties cannot be empty");
+      return zx::error(ZX_ERR_INVALID_ARGS);
+    }
+
+    std::vector<ddk::BindRule> rules;
+    rules.reserve(parent.bind_rules().size());
+    for (const auto& bind_rule : parent.bind_rules()) {
+      auto result = ConvertFidlBindRule(bind_rule);
+      if (result.is_error()) {
+        return zx::error(result.status_value());
+      }
+      rules.push_back(result.value());
+    }
+
+    std::vector<device_bind_prop_t> properties;
+    properties.reserve(parent.properties().size());
+    for (const auto& property : parent.properties()) {
+      auto property_value = ConvertFidlPropertyValue(property.value());
+      if (property_value.is_error()) {
+        zxlogf(ERROR, "Invalid property value");
+        return zx::error(ZX_ERR_INVALID_ARGS);
+      }
+
+      properties.push_back(device_bind_prop_t{
+          .key = ConvertFidlPropertyKey(property.key()),
+          .value = property_value.value(),
+      });
+    }
+    spec.AddParentSpec(rules, properties);
+  }
+  return zx::ok();
+}
+
 }  // anonymous namespace
 
 namespace platform_bus {
@@ -672,46 +714,12 @@ void PlatformBus::AddCompositeNodeSpec(AddCompositeNodeSpecRequestView request, 
   auto composite_node_spec = ddk::CompositeNodeSpec(kPDevBindRules, kPDevProperties);
 
   auto fidl_spec = fidl::ToNatural(request->spec);
-  for (const auto& parent : fidl_spec.parents().value()) {
-    if (parent.bind_rules().empty()) {
-      zxlogf(ERROR, "Parent spec bind rules cannot be empty");
-      completer.buffer(arena).ReplyError(ZX_ERR_INVALID_ARGS);
+  if (fidl_spec.parents().has_value()) {
+    auto result = AppendParentSpecs(composite_node_spec, fidl_spec.parents().value());
+    if (result.is_error()) {
+      completer.buffer(arena).ReplyError(result.status_value());
       return;
     }
-
-    if (parent.properties().empty()) {
-      zxlogf(ERROR, "Parent spec properties cannot be empty");
-      completer.buffer(arena).ReplyError(ZX_ERR_INVALID_ARGS);
-      return;
-    }
-
-    std::vector<ddk::BindRule> rules;
-    rules.reserve(parent.bind_rules().size());
-    for (const auto& bind_rule : parent.bind_rules()) {
-      auto result = ConvertFidlBindRule(bind_rule);
-      if (result.is_error()) {
-        completer.buffer(arena).ReplyError(result.status_value());
-        return;
-      }
-      rules.push_back(result.value());
-    }
-
-    std::vector<device_bind_prop_t> properties;
-    properties.reserve(parent.properties().size());
-    for (const auto& property : parent.properties()) {
-      auto property_value = ConvertFidlPropertyValue(property.value());
-      if (property_value.is_error()) {
-        zxlogf(ERROR, "Invalid property value");
-        completer.buffer(arena).ReplyError(ZX_ERR_INVALID_ARGS);
-        return;
-      }
-
-      properties.push_back(device_bind_prop_t{
-          .key = ConvertFidlPropertyKey(property.key()),
-          .value = property_value.value(),
-      });
-    }
-    composite_node_spec.AddParentSpec(rules, properties);
   }
 
   auto status = DdkAddCompositeNodeSpec(fidl_spec.name()->c_str(), composite_node_spec);
