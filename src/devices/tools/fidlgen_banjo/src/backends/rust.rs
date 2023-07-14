@@ -29,13 +29,7 @@ fn can_derive_partialeq(
     ir: &FidlIr,
 ) -> Result<bool, Error> {
     match ty {
-        Type::Array { ref element_type, ref element_count } => {
-            if element_count.0 <= 32 {
-                can_derive_partialeq(element_type, parents, ir)
-            } else {
-                Ok(false)
-            }
-        }
+        Type::Array { ref element_type, .. } => can_derive_partialeq(element_type, parents, ir),
         Type::Vector { ref element_type, .. } => can_derive_partialeq(element_type, parents, ir),
         Type::Str { .. } => Ok(true),
         Type::Handle { .. } => Ok(true),
