@@ -111,7 +111,7 @@ mod tests {
         };
         let diagnostics =
             DiagnosticsConfig { archivist: Some(ArchivistConfig::Default), ..Default::default() };
-        let mut builder = ConfigurationBuilderImpl::default();
+        let mut builder = ConfigurationBuilderImpl::new(&None);
 
         DiagnosticsSubsystem::define_configuration(&context, &diagnostics, &mut builder).unwrap();
         let config = builder.build();
@@ -167,7 +167,7 @@ mod tests {
             additional_serial_log_components: vec!["/core/foo".to_string()],
             ..DiagnosticsConfig::default()
         };
-        let mut builder = ConfigurationBuilderImpl::default();
+        let mut builder = ConfigurationBuilderImpl::new(&None);
 
         DiagnosticsSubsystem::define_configuration(&context, &diagnostics, &mut builder).unwrap();
         let config = builder.build();
@@ -195,7 +195,7 @@ mod tests {
         };
         let diagnostics =
             DiagnosticsConfig { archivist: Some(ArchivistConfig::LowMem), ..Default::default() };
-        let mut builder = ConfigurationBuilderImpl::default();
+        let mut builder = ConfigurationBuilderImpl::new(&None);
 
         DiagnosticsSubsystem::define_configuration(&context, &diagnostics, &mut builder).unwrap();
         let config = builder.build();
@@ -223,7 +223,7 @@ mod tests {
             board_info: None,
             ..Default::default()
         };
-        let mut builder = ConfigurationBuilderImpl::default();
+        let mut builder = ConfigurationBuilderImpl::new(&None);
 
         DiagnosticsSubsystem::define_configuration(
             &context,
@@ -249,7 +249,7 @@ mod tests {
             board_info: None,
             ..Default::default()
         };
-        let mut builder = ConfigurationBuilderImpl::default();
+        let mut builder = ConfigurationBuilderImpl::new(&None);
 
         DiagnosticsSubsystem::define_configuration(
             &context,

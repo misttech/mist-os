@@ -30,6 +30,7 @@ rustc_library("platform_configuration") {
     "src/subsystems/radar.rs",
     "src/subsystems/rcs.rs",
     "src/subsystems/session.rs",
+    "src/subsystems/setui.rs",
     "src/subsystems/starnix.rs",
     "src/subsystems/storage.rs",
     "src/subsystems/swd.rs",

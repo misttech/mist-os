@@ -1958,6 +1958,42 @@ icu_assembly_input_bundle("intl_services_small") {
   ]
 }
 
+icu_assembly_input_bundle("setui") {
+  icu_base_packages = [ "//src/settings/service:setui_service" ]
+
+  compiled_packages = [
+    {
+      name = "core"
+      component_shards = [
+        {
+          component_name = "core"
+          shards = rebase_path(
+                  [ "//src/settings/service/meta/setui_service.core_shard.cml" ],
+                  root_build_dir)
+        },
+      ]
+    },
+  ]
+}
+
+icu_assembly_input_bundle("setui_with_camera") {
+  icu_base_packages = [ "//src/settings/service:setui_service" ]
+
+  compiled_packages = [
+    {
+      name = "core"
+      component_shards = [
+        {
+          component_name = "core"
+          shards = rebase_path(
+                  [ "//src/settings/service/meta/setui_service_with_camera.core_shard.cml" ],
+                  root_build_dir)
+        },
+      ]
+    },
+  ]
+}
+
 # Legacy fonts setup: fonts sourced from config-data.
 assembly_input_bundle("fonts") {
   base_packages = [ "//src/fonts:pkg" ]

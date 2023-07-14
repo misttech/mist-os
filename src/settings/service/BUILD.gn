@@ -356,7 +356,9 @@ icu_fuchsia_package("setui_service") {
     ":*",
     "//:developer_base_packages",
     "//:legacy_base_packages",
+    "//build/icu:*",
     "//build/images/recovery:*",
+    "//bundles/assembly/*",
     "//src/developer/forensics/feedback/tests/*",
     "//vendor/google/*",
   ]
@@ -368,8 +370,8 @@ icu_fuchsia_package("setui_service") {
 }
 
 # Core shard for products that don't have a camera.
-core_shard("setui_service_core_shard") {
-  visibility = []
+# TODO(fxbug.dev/117974): Make into an empty target on migration.
+group("setui_service_core_shard") {
   visibility = [
     ":*",
     "//build/images/fuchsia:*",
@@ -377,14 +379,30 @@ core_shard("setui_service_core_shard") {
     "//bundles/assembly_input_groups:*",
     "//vendor/google/*",
   ]
+  public_deps = [ ":setui_service_core_shard_migration" ]
+}
+core_shard("setui_service_core_shard_migration") {
+  visibility = []
+  visibility = [ ":*" ]
   shard_file = "meta/setui_service.core_shard.cml"
 }
 
 # Core shard for products that have a camera.
-core_shard("setui_service_with_camera_core_shard") {
+# TODO(fxbug.dev/117974): Make into an empty target on migration.
+group("setui_service_with_camera_core_shard") {
+  visibility = [
+    ":*",
+    "//build/images/fuchsia:*",
+    "//vendor/google/*",
+  ]
+  public_deps = [ ":setui_service_with_camera_core_shard_migration" ]
+}
+
+core_shard("setui_service_with_camera_core_shard_migration") {
   visibility = []
   visibility = [
     ":*",
+    "//build/icu:*",
     "//build/images/fuchsia:*",
     "//vendor/google/*",
   ]

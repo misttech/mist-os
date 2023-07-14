@@ -125,6 +125,16 @@ user_platform_aib_names =
       # Session
       "session_manager",
 
+      # SetUI
+      "setui",
+      "setui.icu_default_${icu_git_info.default}",
+      "setui.icu_latest_${icu_git_info.latest}",
+      "setui.icu_stable_${icu_git_info.stable}",
+      "setui_with_camera",
+      "setui_with_camera.icu_default_${icu_git_info.default}",
+      "setui_with_camera.icu_latest_${icu_git_info.latest}",
+      "setui_with_camera.icu_stable_${icu_git_info.stable}",
+
       # ICU-specific version of intl_services
       "intl_services.icu_default_${icu_git_info.default}",
       "intl_services.icu_latest_${icu_git_info.latest}",

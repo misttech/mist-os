@@ -62,7 +62,7 @@ template("_common") {
     # Fix-up executable naming.
     if (defined(output_name)) {
       output_name =
-          "${output_name}.icu_${icu_flavor.name}_${icu_flavor.commit_id}"
+          "${output_name}_icu_${icu_flavor.name}_${icu_flavor.commit_id}"
     } else {
       output_name = target_name
     }
@@ -97,17 +97,19 @@ template("_common") {
     forward_variables_from(invoker,
                            "*",
                            [
-                             "testonly",
-                             "visibility",
+                             "deps",
                              "icu_deps",
                              "icu_public_deps",
+                             "public_deps",
+                             "testonly",
+                             "visibility",
                            ])
     forward_variables_from(invoker,
                            [
                              "testonly",
                              "visibility",
                            ])
-    source = "$root_out_dir/${output_name}.icu_${icu_flavor.name}_${icu_flavor.commit_id}"
+    source = "$root_out_dir/${output_name}_icu_${icu_flavor.name}_${icu_flavor.commit_id}"
     dest = "bin/${original_output_name}"
     source_deps = [ ":${_shadow}" ]
     if (!defined(deps)) {

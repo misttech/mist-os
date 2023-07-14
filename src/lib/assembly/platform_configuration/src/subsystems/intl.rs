@@ -9,19 +9,19 @@ use assembly_config_schema::platform_config::intl_config::{IntlConfig, Type};
 pub(crate) struct IntlSubsystem;
 impl DefineSubsystemConfiguration<IntlConfig> for IntlSubsystem {
     fn define_configuration(
-        context: &ConfigurationContext<'_>,
+        _: &ConfigurationContext<'_>,
         config: &IntlConfig,
         builder: &mut dyn ConfigurationBuilder,
     ) -> Result<()> {
         match config.config_type {
             Type::Default => {
                 builder
-                    .icu_platform_bundle("intl_services", context.icu_config)
+                    .icu_platform_bundle("intl_services")
                     .context("while configuring the 'Intl' subsystem")?;
             }
             Type::Small => {
                 builder
-                    .icu_platform_bundle("intl_services_small", context.icu_config)
+                    .icu_platform_bundle("intl_services_small")
                     .context("while configuring the 'small Intl' subsystem")?;
             }
             Type::None => { /* Skip the bundle altogether. */ }

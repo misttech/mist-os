@@ -18,6 +18,7 @@ pub mod input_config;
 pub mod intl_config;
 pub mod media_config;
 pub mod session_manager_config;
+pub mod setui_config;
 pub mod starnix_config;
 pub mod storage_config;
 pub mod swd_config;
@@ -133,6 +134,15 @@ pub struct PlatformConfig {
     /// Platform configuration options for internationalization.
     #[serde(default)]
     pub intl: intl_config::IntlConfig,
+
+    /// SetUi configuration.
+    ///
+    /// If not specified, then the legacy configuration is used. If specified,
+    /// and `enabled` is set, then ICU-aware components are used. If specified,
+    /// and `enabled` is `false`, then the default (non-ICU-aware) components
+    /// are used.
+    #[serde(default)]
+    pub setui: setui_config::SetUiConfig,
 
     /// Assembly option triggering the inclusion of test AIBs
     ///

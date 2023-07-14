@@ -98,11 +98,6 @@ pub(crate) struct ConfigurationContext<'a> {
     pub feature_set_level: &'a FeatureSupportLevel,
     pub build_type: &'a BuildType,
     pub board_info: Option<&'a BoardInformation>,
-    /// The desired ICU configuration, used to configure subsystems that are
-    /// ICU-flavor aware.
-    ///
-    /// If not set, the, use the unflavored version of the component.
-    pub icu_config: &'a Option<ICUConfig>,
 }
 
 impl Default for ConfigurationContext<'_> {
@@ -122,7 +117,6 @@ impl Default for ConfigurationContext<'_> {
             feature_set_level: &FeatureSupportLevel::Minimal,
             build_type: &BuildType::User,
             board_info: None,
-            icu_config: &None,
         }
     }
 }
@@ -135,7 +129,7 @@ impl Default for ConfigurationContext<'_> {
 /// Usage:
 /// ```
 /// use crate::subsystems::prelude::*;
-/// let builder = ConfigurationBuilder::default();
+/// let builder = ConfigurationBuilder::new(&None);
 /// builder.platform_bundle("wlan")?;
 ///
 /// // to set a single field on a single component in a package:
@@ -162,7 +156,7 @@ pub(crate) trait ConfigurationBuilder {
     ///
     /// If `icu_config` is `None`, an unflavored version of the bundle is used,
     /// as if [platform_bundle] was called.
-    fn icu_platform_bundle(&mut self, name: &str, icu_config: &Option<ICUConfig>) -> Result<()>;
+    fn icu_platform_bundle(&mut self, name: &str) -> Result<()>;
 
     /// Add configuration for items in bootfs.
     fn bootfs(&mut self) -> &mut dyn BootfsConfigBuilder;
@@ -232,7 +226,7 @@ impl ComponentConfigBuilderExt for &mut dyn ComponentConfigBuilder {
 }
 
 /// The in-progress builder, which hides its state.
-pub(crate) struct ConfigurationBuilderImpl {
+pub(crate) struct ConfigurationBuilderImpl<'a> {
     /// The Assembly Input Bundles to add.
     bundles: BTreeSet<String>,
 
@@ -244,24 +238,31 @@ pub(crate) struct ConfigurationBuilderImpl {
 
     /// The domain config packages to add.
     domain_configs: DomainConfigs,
+
+    /// The desired ICU configuration, used to configure subsystems that are
+    /// ICU-flavor aware.
+    ///
+    /// If not set, use the unflavored version of the component.
+    icu_config: &'a Option<ICUConfig>,
 }
 
-impl Default for ConfigurationBuilderImpl {
-    fn default() -> Self {
+impl<'a> ConfigurationBuilderImpl<'a> {
+    /// Create a new builder. `icu_config` is an optional configuration for the
+    /// ICU library.
+    pub fn new(icu_config: &'a Option<ICUConfig>) -> Self {
         Self {
             bundles: BTreeSet::default(),
             bootfs: BootfsConfig::default(),
             package_configs: PackageConfigs::new("package configs"),
             domain_configs: DomainConfigs::new("domain configs"),
+            icu_config,
         }
     }
-}
 
-impl ConfigurationBuilderImpl {
     /// Convert the builder into the completed configuration that can be used
     /// to create the configured platform itself.
     pub fn build(self) -> CompletedConfiguration {
-        let Self { bundles, bootfs, package_configs, domain_configs } = self;
+        let Self { bundles, bootfs, package_configs, domain_configs, icu_config: _ } = self;
         CompletedConfiguration { bundles, bootfs, package_configs, domain_configs }
     }
 }
@@ -381,7 +382,7 @@ impl<'a> ICUMapExt<'a> for ICUMap {
     }
 }
 
-impl ConfigurationBuilder for ConfigurationBuilderImpl {
+impl ConfigurationBuilder for ConfigurationBuilderImpl<'_> {
     fn platform_bundle(&mut self, name: &str) {
         self.bundles.insert(name.to_string());
     }
@@ -407,8 +408,8 @@ impl ConfigurationBuilder for ConfigurationBuilderImpl {
         })
     }
 
-    fn icu_platform_bundle(&mut self, name: &str, icu_config: &Option<ICUConfig>) -> Result<()> {
-        let bundle_name = match &icu_config {
+    fn icu_platform_bundle(&mut self, name: &str) -> Result<()> {
+        let bundle_name = match &self.icu_config {
             // Use the unflavored platform bundle if icu_config is left unspecified.
             None => name.into(),
             // Use the ICU flavored platform bundle.
@@ -623,7 +624,7 @@ mod tests {
 
     #[test]
     fn test_config_builder() {
-        let mut builder = ConfigurationBuilderImpl::default();
+        let mut builder = ConfigurationBuilderImpl::new(&None);
 
         // using an inner
         fn make_config(builder: &mut dyn ConfigurationBuilder) -> Result<()> {
@@ -762,7 +763,7 @@ mod tests {
 
     #[test]
     fn test_multiple_adds_fail() {
-        let mut builder = ConfigurationBuilderImpl::default();
+        let mut builder = ConfigurationBuilderImpl::new(&None);
 
         assert!(builder.bootfs().component("foo").is_ok());
         assert!(builder.bootfs().component("foo").is_err());
@@ -813,7 +814,7 @@ mod tests {
             }
         }
 
-        let mut builder = ConfigurationBuilderImpl::default();
+        let mut builder = ConfigurationBuilderImpl::new(&None);
 
         builder.bootfs().component("foo").unwrap();
         let result = builder.bootfs().component("foo").context("Configuring Subsystem");
@@ -862,5 +863,12 @@ mod tests {
         assert!(board_info.provides_feature("feature_a"));
         assert!(board_info.provides_feature("feature_b"));
         assert!(!board_info.provides_feature("feature_c"));
+    }
+
+    #[test]
+    fn check_icu_map() {
+        assert!(ICU_CONFIG_INFO.commit_id_for_revision(&Revision::Stable).is_some());
+        assert!(ICU_CONFIG_INFO.commit_id_for_revision(&Revision::Latest).is_some());
+        assert!(ICU_CONFIG_INFO.commit_id_for_revision(&Revision::Default).is_some());
     }
 }

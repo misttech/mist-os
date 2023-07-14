@@ -34,4 +34,21 @@ template("icu_assembly_input_bundle") {
       # Add ICU variations of other parameters if needed.
     }
   }
+
+  # Also produce the unflavored input bundle.
+  assembly_input_bundle("${target_name}") {
+    forward_variables_from(invoker, "*", [ "icu_base_packages" ])
+
+    if (defined(invoker.icu_base_packages)) {
+      if (!defined(base_packages)) {
+        base_packages = []
+      }
+
+      foreach(icu_base_package, invoker.icu_base_packages) {
+        base_packages += [ "${icu_base_package}" ]
+      }
+    }
+
+    # Add ICU variations of other parameters if needed.
+  }
 }

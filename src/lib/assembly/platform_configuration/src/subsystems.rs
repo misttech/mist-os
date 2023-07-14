@@ -37,6 +37,7 @@ mod media;
 mod radar;
 mod rcs;
 mod session;
+mod setui;
 mod starnix;
 mod storage;
 mod swd;
@@ -55,7 +56,8 @@ pub fn define_configuration(
     config: &AssemblyConfig,
     board_info: Option<&BoardInformation>,
 ) -> anyhow::Result<CompletedConfiguration> {
-    let mut builder = ConfigurationBuilderImpl::default();
+    let icu_config = &config.platform.icu;
+    let mut builder = ConfigurationBuilderImpl::new(icu_config);
 
     // The emulator support bundle is always added, even to an empty build.
     builder.platform_bundle("emulator_support");
@@ -67,12 +69,9 @@ pub fn define_configuration(
     if let Some(feature_set_level) = &feature_set_level {
         let build_type = &config.platform.build_type;
 
-        let icu_config = &config.platform.icu;
-
         // Set up the context that's used by each subsystem to get the generally-
         // available platform information.
-        let context =
-            ConfigurationContext { feature_set_level, build_type, board_info, icu_config };
+        let context = ConfigurationContext { feature_set_level, build_type, board_info };
 
         // Call the configuration functions for each subsystem.
         configure_subsystems(&context, config, &mut builder)?;
@@ -283,6 +282,9 @@ fn configure_subsystems(
 
     intl::IntlSubsystem::define_configuration(context, &config.platform.intl, builder)
         .context("Confguring the 'intl' subsystem")?;
+
+    setui::SetUiSubsystem::define_configuration(context, &config.platform.setui, builder)
+        .context("Confguring the 'SetUI' subsystem")?;
 
     Ok(())
 }
