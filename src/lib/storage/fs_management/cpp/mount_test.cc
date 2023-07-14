@@ -57,25 +57,27 @@ void CheckMountedFs(const char* path, const char* fs_name) {
 
 class RamdiskTestFixture : public testing::Test {
  public:
-  explicit RamdiskTestFixture() = default;
-
   void SetUp() override {
     auto ramdisk_or = storage::RamDisk::Create(512, 1 << 16);
     ASSERT_EQ(ramdisk_or.status_value(), ZX_OK);
     ramdisk_ = std::move(*ramdisk_or);
 
-    ASSERT_EQ(Mkfs(ramdisk_path().c_str(), kDiskFormatMinfs, LaunchStdioSync, MkfsOptions()),
-              ZX_OK);
+    auto component = FsComponent::FromDiskFormat(kDiskFormatMinfs);
+    ASSERT_EQ(Mkfs(ramdisk_path().c_str(), component, {}), ZX_OK);
   }
 
   std::string ramdisk_path() const { return ramdisk_.path(); }
   ramdisk_client_t* ramdisk_client() const { return ramdisk_.client(); }
 
+  struct MountResult {
+    FsComponent component;
+    StartedSingleVolumeFilesystem fs;
+    NamespaceBinding binding;
+  };
+
   // Mounts a minfs formatted partition to the desired point.
-  zx::result<std::pair<fs_management::StartedSingleVolumeFilesystem, NamespaceBinding>> MountMinfs(
-      bool read_only) const {
-    MountOptions options;
-    options.readonly = read_only;
+  zx::result<MountResult> MountMinfs(bool read_only) {
+    MountOptions options{.readonly = read_only};
 
     zx_handle_t handle = ramdisk_get_block_interface(ramdisk_client());
     if (handle == ZX_HANDLE_INVALID) {
@@ -87,8 +89,8 @@ class RamdiskTestFixture : public testing::Test {
       return device.take_error();
     }
 
-    auto mounted_filesystem =
-        Mount(std::move(device.value()), kDiskFormatMinfs, options, LaunchStdioAsync);
+    auto component = FsComponent::FromDiskFormat(kDiskFormatMinfs);
+    auto mounted_filesystem = Mount(std::move(device.value()), component, options);
     if (mounted_filesystem.is_error())
       return mounted_filesystem.take_error();
     auto data_root = mounted_filesystem->DataRoot();
@@ -98,11 +100,13 @@ class RamdiskTestFixture : public testing::Test {
     if (binding.is_error())
       return binding.take_error();
     CheckMountedFs(kTestMountPath, "minfs");
-    return zx::ok(std::make_pair(std::move(*mounted_filesystem), std::move(*binding)));
+    return zx::ok(MountResult{.component = std::move(component),
+                              .fs = std::move(*mounted_filesystem),
+                              .binding = std::move(*binding)});
   }
 
   // Formats the ramdisk with minfs, and writes a small file to it.
-  void CreateTestFile(const char* file_name) const {
+  void CreateTestFile(const char* file_name) {
     auto mounted_filesystem_or = MountMinfs(/*read_only=*/false);
     ASSERT_EQ(mounted_filesystem_or.status_value(), ZX_OK);
 
@@ -134,7 +138,8 @@ TEST_F(MountTest, MountFsck) {
   }
 
   // Fsck shouldn't require any user input for a newly mkfs'd filesystem.
-  ASSERT_EQ(Fsck(ramdisk_path(), kDiskFormatMinfs, FsckOptions(), LaunchStdioSync), ZX_OK);
+  auto component = FsComponent::FromDiskFormat(kDiskFormatMinfs);
+  ASSERT_EQ(Fsck(ramdisk_path(), component, FsckOptions()), ZX_OK);
 }
 
 // Tests that setting read-only on the mount options works as expected.
@@ -268,15 +273,16 @@ using PartitionOverFvmWithRamdiskCase = PartitionOverFvmWithRamdiskFixture;
 // Reformat the partition using a number of slices and verify that there are as many slices as
 // originally pre-allocated.
 TEST_F(PartitionOverFvmWithRamdiskCase, MkfsMinfsWithMinFvmSlices) {
-  MkfsOptions options;
   size_t base_slices = 0;
-  ASSERT_EQ(Mkfs(partition_path(), kDiskFormatMinfs, LaunchStdioSync, options), ZX_OK);
+  auto component = fs_management::FsComponent::FromDiskFormat(kDiskFormatMinfs);
+  MkfsOptions options;
+  ASSERT_EQ(Mkfs(partition_path(), component, options), ZX_OK);
   zx::result volume = component::Connect<fuchsia_hardware_block_volume::Volume>(partition_path());
   ASSERT_TRUE(volume.is_ok()) << volume.status_string();
   GetPartitionSliceCount(volume.value(), &base_slices);
   options.fvm_data_slices += 10;
 
-  ASSERT_EQ(Mkfs(partition_path(), kDiskFormatMinfs, LaunchStdioSync, options), ZX_OK);
+  ASSERT_EQ(Mkfs(partition_path(), component, options), ZX_OK);
   size_t allocated_slices = 0;
   GetPartitionSliceCount(volume.value(), &allocated_slices);
   EXPECT_GE(allocated_slices, base_slices + 10);

@@ -40,18 +40,19 @@ void FdioTest::SetUp() {
 
   auto endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
   ASSERT_EQ(endpoints.status_value(), ZX_OK);
-  auto [export_root_client, export_root_server] = *std::move(endpoints);
+  auto [outgoing_dir_client, outgoing_dir_server] = *std::move(endpoints);
 
-  auto runner_or =
-      Runner::Create(loop_.get(), std::move(device), mount_options_, std::move(vmex_resource_));
-  ASSERT_TRUE(runner_or.is_ok());
-  runner_ = std::move(runner_or.value());
-  ASSERT_EQ(
-      runner_->ServeRoot(fidl::ServerEnd<fuchsia_io::Directory>(export_root_server.TakeChannel())),
-      ZX_OK);
+  runner_ = std::make_unique<ComponentRunner>(
+      *loop_, ComponentOptions{.pager_threads = mount_options_.paging_threads});
+  ASSERT_EQ(runner_->ServeRoot(std::move(outgoing_dir_server), {}, {}, std::move(vmex_resource_))
+                .status_value(),
+            ZX_OK);
+
+  ASSERT_EQ(runner_->Configure(std::move(device), mount_options_).status_value(), ZX_OK);
+
   ASSERT_EQ(loop_->StartThread("blobfs test dispatcher"), ZX_OK);
 
-  auto root_client_or = fs_management::FsRootHandle(export_root_client);
+  auto root_client_or = fs_management::FsRootHandle(outgoing_dir_client);
   ASSERT_EQ(root_client_or.status_value(), ZX_OK);
 
   // FDIO serving the root directory.
@@ -59,24 +60,30 @@ void FdioTest::SetUp() {
       fdio_fd_create(root_client_or->TakeChannel().release(), root_fd_.reset_and_get_address()),
       ZX_OK);
   ASSERT_TRUE(root_fd_.is_valid());
-  ASSERT_EQ(fdio_fd_create(export_root_client.TakeChannel().release(),
-                           export_root_fd_.reset_and_get_address()),
+  ASSERT_EQ(fdio_fd_create(outgoing_dir_client.TakeChannel().release(),
+                           outgoing_dir_fd_.reset_and_get_address()),
             ZX_OK);
-  ASSERT_TRUE(export_root_fd_.is_valid());
+  ASSERT_TRUE(outgoing_dir_fd_.is_valid());
 }
 
 void FdioTest::TearDown() {
-  fdio_cpp::UnownedFdioCaller export_root(export_root_fd_);
-  zx::result admin_client = component::ConnectAt<fuchsia_fs::Admin>(export_root.directory());
-  ASSERT_TRUE(admin_client.is_ok()) << admin_client.status_string();
-  fidl::WireResult result = fidl::WireCall(admin_client.value())->Shutdown();
-  ASSERT_TRUE(result.ok()) << result.FormatDescription();
+  fdio_cpp::UnownedFdioCaller outgoing_dir(outgoing_dir_fd_);
+  auto endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
+  ASSERT_EQ(endpoints.status_value(), ZX_OK);
+  ASSERT_EQ(fidl::WireCall(outgoing_dir.directory())
+                ->Open(fuchsia_io::OpenFlags(0), {}, "svc",
+                       fidl::ServerEnd<fuchsia_io::Node>(endpoints->server.TakeChannel()))
+                .status(),
+            ZX_OK);
+  auto admin_client = component::ConnectAt<fuchsia_fs::Admin>(endpoints->client);
+  ASSERT_EQ(admin_client.status_value(), ZX_OK);
+  ASSERT_EQ(fidl::WireCall(*admin_client)->Shutdown().status(), ZX_OK);
 }
 
-zx_handle_t FdioTest::export_root() {
-  zx::channel export_root;
-  fdio_fd_clone(export_root_fd_.get(), export_root.reset_and_get_address());
-  return export_root.release();
+zx_handle_t FdioTest::outgoing_dir() {
+  zx::channel outgoing_dir;
+  fdio_fd_clone(outgoing_dir_fd_.get(), outgoing_dir.reset_and_get_address());
+  return outgoing_dir.release();
 }
 
 fpromise::result<inspect::Hierarchy> FdioTest::TakeSnapshot() {
@@ -86,7 +93,7 @@ fpromise::result<inspect::Hierarchy> FdioTest::TakeSnapshot() {
 
   fuchsia::inspect::TreePtr tree;
   async_dispatcher_t* dispatcher = executor.dispatcher();
-  zx_status_t status = fdio_service_connect_at(export_root(), "diagnostics/fuchsia.inspect.Tree",
+  zx_status_t status = fdio_service_connect_at(outgoing_dir(), "diagnostics/fuchsia.inspect.Tree",
                                                tree.NewRequest(dispatcher).TakeChannel().release());
   if (status != ZX_OK) {
     return fpromise::error();

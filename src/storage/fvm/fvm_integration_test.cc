@@ -77,8 +77,6 @@ using VolumeManagerInfo = fuchsia_hardware_block_volume::wire::VolumeManagerInfo
 
 constexpr char kMountPath[] = "/test/minfs_test_mountpath";
 constexpr char kTestDevPath[] = "/fake/dev";
-constexpr char kTestBlobfsChildName[] = "test-blobfs";
-constexpr char kTestCollectionName[] = "fs-collection";
 
 // Returns the number of usable slices for a standard layout on a given-sized device.
 size_t UsableSlicesCount(size_t disk_size, size_t slice_size) {
@@ -2083,14 +2081,9 @@ void CorruptMountHelper(const fbl::unique_fd& devfs_root, const char* partition_
                         const fs_management::MountOptions& mounting_options,
                         fs_management::DiskFormat disk_format, const size_t* vslice_start,
                         size_t vslice_count) {
+  auto component = fs_management::FsComponent::FromDiskFormat(disk_format);
   // Format the VPart as |disk_format|.
-  fs_management::MkfsOptions mkfs_options{
-      .component_child_name = mounting_options.component_child_name,
-      .component_collection_name = mounting_options.component_collection_name,
-  };
-  ASSERT_EQ(fs_management::Mkfs(partition_path, disk_format, fs_management::LaunchStdioSync,
-                                mkfs_options),
-            ZX_OK);
+  ASSERT_EQ(fs_management::Mkfs(partition_path, component, {}), ZX_OK);
 
   fuchsia_hardware_block_volume::wire::VsliceRange
       initial_ranges[fuchsia_hardware_block_volume::wire::kMaxSliceRequests];
@@ -2148,10 +2141,12 @@ void CorruptMountHelper(const fbl::unique_fd& devfs_root, const char* partition_
     // prevent race conditions with the later mount call.
     zx::result device = partition_caller.take_as<fuchsia_hardware_block::Block>();
     ASSERT_OK(device);
-    ASSERT_NE(fs_management::Mount(std::move(device.value()), disk_format, mounting_options,
-                                   fs_management::LaunchStdioSync)
-                  .status_value(),
-              ZX_OK);
+    ASSERT_NE(
+        fs_management::Mount(std::move(device.value()), component, mounting_options).status_value(),
+        ZX_OK);
+
+    // We can't reuse the component.
+    component = fs_management::FsComponent::FromDiskFormat(disk_format);
   }
 
   {
@@ -2220,10 +2215,9 @@ void CorruptMountHelper(const fbl::unique_fd& devfs_root, const char* partition_
     // Try mount again.
     zx::result device = partition_caller.take_as<fuchsia_hardware_block::Block>();
     ASSERT_OK(device);
-    ASSERT_EQ(fs_management::Mount(std::move(device.value()), disk_format, mounting_options,
-                                   fs_management::LaunchStdioAsync)
-                  .status_value(),
-              ZX_OK);
+    ASSERT_EQ(
+        fs_management::Mount(std::move(device.value()), component, mounting_options).status_value(),
+        ZX_OK);
   }
 
   zx::result vp_fd_or =
@@ -2293,8 +2287,6 @@ TEST_F(FvmTest, TestCorruptMount) {
   };
 
   // Run the test for Blobfs.
-  mounting_options.component_child_name = kTestBlobfsChildName;
-  mounting_options.component_collection_name = kTestCollectionName;
   CorruptMountHelper(devfs_root_fd(), partition_path->c_str(), mounting_options,
                      fs_management::kDiskFormatBlobfs, blobfs_vslice_start, blobfs_vslice_count);
 
@@ -2488,8 +2480,8 @@ TEST_F(FvmTest, TestMounting) {
   // Format the VPart as minfs
   auto partition_path = GetPartitionPath(vp_fd);
   ASSERT_OK(partition_path.status_value());
-  ASSERT_EQ(fs_management::Mkfs(partition_path->c_str(), fs_management::kDiskFormatMinfs,
-                                fs_management::LaunchStdioSync, fs_management::MkfsOptions()),
+  auto component = fs_management::FsComponent::FromDiskFormat(fs_management::kDiskFormatMinfs);
+  ASSERT_EQ(fs_management::Mkfs(partition_path->c_str(), component, fs_management::MkfsOptions()),
             ZX_OK);
 
   fdio_cpp::FdioCaller partition_caller(std::move(vp_fd));
@@ -2499,8 +2491,7 @@ TEST_F(FvmTest, TestMounting) {
   // Mount the VPart
   fs_management::MountOptions mounting_options;
   auto mounted_filesystem =
-      fs_management::Mount(std::move(device.value()), fs_management::kDiskFormatMinfs,
-                           mounting_options, fs_management::LaunchStdioAsync);
+      fs_management::Mount(std::move(device.value()), component, mounting_options);
   ASSERT_EQ(mounted_filesystem.status_value(), ZX_OK);
   auto data = mounted_filesystem->DataRoot();
   ASSERT_EQ(data.status_value(), ZX_OK);
@@ -2557,23 +2548,21 @@ TEST_F(FvmTest, TestMkfs) {
   // Format the VPart as minfs.
   auto partition_path = GetPartitionPath(vp_fd);
   ASSERT_OK(partition_path.status_value());
-  ASSERT_EQ(fs_management::Mkfs(partition_path->c_str(), fs_management::kDiskFormatMinfs,
-                                fs_management::LaunchStdioSync, fs_management::MkfsOptions()),
-            ZX_OK);
+  auto minfs_component =
+      fs_management::FsComponent::FromDiskFormat(fs_management::kDiskFormatMinfs);
+  ASSERT_EQ(
+      fs_management::Mkfs(partition_path->c_str(), minfs_component, fs_management::MkfsOptions()),
+      ZX_OK);
 
   // Format it as MinFS again, even though it is already formatted.
-  ASSERT_EQ(fs_management::Mkfs(partition_path->c_str(), fs_management::kDiskFormatMinfs,
-                                fs_management::LaunchStdioSync, fs_management::MkfsOptions()),
-            ZX_OK);
+  ASSERT_EQ(
+      fs_management::Mkfs(partition_path->c_str(), minfs_component, fs_management::MkfsOptions()),
+      ZX_OK);
 
   // Now try reformatting as blobfs.
-  fs_management::MkfsOptions mkfs_options = fs_management::MkfsOptions{
-      .component_child_name = kTestBlobfsChildName,
-      .component_collection_name = kTestCollectionName,
-  };
-  ASSERT_EQ(fs_management::Mkfs(partition_path->c_str(), fs_management::kDiskFormatBlobfs,
-                                fs_management::LaunchStdioSync, mkfs_options),
-            ZX_OK);
+  auto blobfs_component =
+      fs_management::FsComponent::FromDiskFormat(fs_management::kDiskFormatBlobfs);
+  ASSERT_EQ(fs_management::Mkfs(partition_path->c_str(), blobfs_component, {}), ZX_OK);
 
   // Demonstrate that mounting as minfs will fail, but mounting as blobfs
   // is successful.
@@ -2583,11 +2572,13 @@ TEST_F(FvmTest, TestMkfs) {
     zx::result device = partition_caller.take_as<fuchsia_hardware_block::Block>();
     ASSERT_OK(device);
     fs_management::MountOptions mounting_options;
-    ASSERT_NE(fs_management::Mount(std::move(device.value()), fs_management::kDiskFormatMinfs,
-                                   mounting_options, fs_management::LaunchStdioSync)
+    ASSERT_NE(fs_management::Mount(std::move(device.value()), minfs_component, mounting_options)
                   .status_value(),
               ZX_OK);
   }
+
+  // We can't reuse the component.
+  minfs_component = fs_management::FsComponent::FromDiskFormat(fs_management::kDiskFormatMinfs);
 
   {
     ASSERT_OK(fdio_open_fd(partition_path->c_str(), 0, vp_fd.reset_and_get_address()));
@@ -2595,19 +2586,14 @@ TEST_F(FvmTest, TestMkfs) {
     zx::result device = partition_caller.take_as<fuchsia_hardware_block::Block>();
     ASSERT_OK(device);
 
-    fs_management::MountOptions mounting_options;
-    mounting_options.component_child_name = kTestBlobfsChildName;
-    mounting_options.component_collection_name = kTestCollectionName;
-    ASSERT_EQ(fs_management::Mount(std::move(device.value()), fs_management::kDiskFormatBlobfs,
-                                   mounting_options, fs_management::LaunchStdioAsync)
-                  .status_value(),
+    ASSERT_EQ(fs_management::Mount(std::move(device.value()), blobfs_component, {}).status_value(),
               ZX_OK);
   }
 
   // ... and reformat back to MinFS again.
-  ASSERT_EQ(fs_management::Mkfs(partition_path->c_str(), fs_management::kDiskFormatMinfs,
-                                fs_management::LaunchStdioSync, fs_management::MkfsOptions()),
-            ZX_OK);
+  ASSERT_EQ(
+      fs_management::Mkfs(partition_path->c_str(), minfs_component, fs_management::MkfsOptions()),
+      ZX_OK);
 
   // Mount the VPart.
   ASSERT_OK(fdio_open_fd(partition_path->c_str(), 0, vp_fd.reset_and_get_address()));
@@ -2616,8 +2602,7 @@ TEST_F(FvmTest, TestMkfs) {
   ASSERT_OK(device);
   fs_management::MountOptions mounting_options;
   auto mounted_filesystem =
-      fs_management::Mount(std::move(device.value()), fs_management::kDiskFormatMinfs,
-                           mounting_options, fs_management::LaunchStdioAsync);
+      fs_management::Mount(std::move(device.value()), minfs_component, mounting_options);
   ASSERT_EQ(mounted_filesystem.status_value(), ZX_OK);
   auto data = mounted_filesystem->DataRoot();
   ASSERT_EQ(data.status_value(), ZX_OK);

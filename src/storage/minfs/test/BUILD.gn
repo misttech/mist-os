@@ -227,7 +227,7 @@ fs_test_suite("minfs") {
   deps = [
     ":minfs_fs_test_config",
     ":minfs_validate_fs_test_config",
-    "//src/storage/bin/minfs",
+    "//src/storage/bin/minfs:minfs-test-component",
   ]
   extra_components = [
     ":minfs-component-runner-test",

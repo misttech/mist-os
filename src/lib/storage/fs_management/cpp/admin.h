@@ -10,8 +10,8 @@
 #include <lib/zx/channel.h>
 #include <zircon/types.h>
 
+#include "src/lib/storage/fs_management/cpp/component.h"
 #include "src/lib/storage/fs_management/cpp/format.h"
-#include "src/lib/storage/fs_management/cpp/launch.h"
 #include "src/lib/storage/fs_management/cpp/options.h"
 
 namespace fs_management {
@@ -26,12 +26,10 @@ inline constexpr std::string_view kPathVolume = "/volume";
 inline constexpr std::string_view kPathDevBlock = "/dev/class/block";
 
 // Format the provided device with a requested disk format.
-zx_status_t Mkfs(const char* device_path, DiskFormat df, LaunchCallback cb,
-                 const MkfsOptions& options);
+zx_status_t Mkfs(const char* device_path, FsComponent& component, const MkfsOptions& options);
 
 // Check and repair a device with a requested disk format.
-zx_status_t Fsck(std::string_view device_path, DiskFormat df, const FsckOptions& options,
-                 LaunchCallback cb);
+zx_status_t Fsck(std::string_view device_path, FsComponent& component, const FsckOptions& options);
 
 // Get a connection to the root of the filesystem, given a filesystem outgoing directory.
 zx::result<fidl::ClientEnd<fuchsia_io::Directory>> FsRootHandle(

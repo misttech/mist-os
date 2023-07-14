@@ -8,8 +8,8 @@
 #include <lib/zx/channel.h>
 #include <lib/zx/result.h>
 
+#include "src/lib/storage/fs_management/cpp/component.h"
 #include "src/lib/storage/fs_management/cpp/format.h"
-#include "src/lib/storage/fs_management/cpp/launch.h"
 #include "src/lib/storage/fs_management/cpp/options.h"
 
 namespace fs_management {
@@ -17,7 +17,7 @@ namespace fs_management {
 // Like Mkfs but creates a "default" volume (which will only work on multi-volume filesystems)
 // and will be encrypted using `crypt_client`, if set.
 // This should only be used for testing.
-zx::result<> MkfsWithDefault(const char* device_path, DiskFormat df, LaunchCallback cb,
+zx::result<> MkfsWithDefault(const char* device_path, FsComponent& component,
                              const MkfsOptions& options, zx::channel crypt_client);
 
 }  // namespace fs_management

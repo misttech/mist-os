@@ -58,6 +58,9 @@ StartupService::StartupService(async_dispatcher_t* dispatcher, ConfigureCallback
 
 void StartupService::Start(StartRequestView request, StartCompleter::Sync& completer) {
   completer.Reply([&]() -> zx::result<> {
+    if (!configure_)
+      return zx::error(ZX_ERR_BAD_STATE);
+
     zx::result device = block_client::RemoteBlockDevice::Create(
         fidl::ClientEnd<fuchsia_hardware_block_volume::Volume>(request->device.TakeChannel()));
     if (device.is_error()) {

@@ -20,10 +20,6 @@ executable("minfs") {
   ]
 }
 
-expect_includes("fs_management_shard") {
-  includes = [ "//src/lib/storage/fs_management/client.shard.cml" ]
-}
-
 fuchsia_component("minfs-component") {
   manifest = "meta/minfs.cml"
   component_name = "minfs"
@@ -32,8 +28,8 @@ fuchsia_component("minfs-component") {
 
 group("minfs-test-component") {
   deps = [
-    ":fs_management_shard",
     ":minfs-component",
+    "//src/lib/storage/fs_management:fs_management_shard",
   ]
 }
 

@@ -21,6 +21,9 @@ StartupService::StartupService(async_dispatcher_t* dispatcher, ConfigureCallback
 
 void StartupService::Start(StartRequestView request, StartCompleter::Sync& completer) {
   completer.Reply([&]() -> zx::result<> {
+    if (!configure_)
+      return zx::error(ZX_ERR_BAD_STATE);
+
     auto bc_or = f2fs::CreateBcache(std::move(request->device));
     if (bc_or.is_error()) {
       return bc_or.take_error();

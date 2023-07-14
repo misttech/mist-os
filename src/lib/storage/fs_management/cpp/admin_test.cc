@@ -31,16 +31,10 @@ enum State {
 };
 
 enum class Mode {
-  // Use the old, non-component way of launching.
-  kLegacy,
-
-  // The old, non-component way but read-only.
-  kReadOnly,
-
-  // A statically routed component. If not supported, the old way will be used.
+  // A statically routed component.
   kStatic,
 
-  // A dynamically routed component. If not supported, the old way will be used.
+  // A dynamically routed component.
   kDynamic,
 };
 
@@ -48,103 +42,63 @@ constexpr char kTestFilePath[] = "test_file";
 
 class OutgoingDirectoryFixture : public testing::Test {
  public:
-  explicit OutgoingDirectoryFixture(DiskFormat format, Mode mode) : format_(format) {
-    switch (mode) {
-      case Mode::kLegacy:
-        options_ = MountOptions();
-        break;
-      case Mode::kReadOnly:
-        options_ = MountOptions{
-            .readonly = true,
-            // Remaining options are same as default values.
-        };
-        break;
-      case Mode::kStatic:
-        component_name_ = std::string("static-test-");
-        component_name_.append(DiskFormatString(format));
-        options_ = MountOptions{.component_child_name = component_name_.c_str()};
-        break;
-      case Mode::kDynamic:
-        component_name_ = "dynamic-test-";
-        component_name_.append(DiskFormatString(format));
-        options_ = MountOptions{
-            .component_child_name = component_name_.c_str(),
-            .component_collection_name = "fs-collection",
-        };
-        // We can use the default for blobfs, but other filesystems need to come from our package
-        // (if they run as a component).
-        if (format != kDiskFormatBlobfs && !fs_management::DiskFormatComponentUrl(format).empty()) {
-          std::string url = std::string("#meta/");
-          url.append(DiskFormatString(format));
-          url.append(".cm");
-          options_.component_url = std::move(url);
-        }
-        break;
-    }
-    if (format == kDiskFormatFxfs) {
-      options_.allow_delivery_blobs = true;
-    }
-  }
-
-  void SetUp() override {
-    auto ramdisk_or = storage::RamDisk::Create(512, 1 << 17);
-    ASSERT_EQ(ramdisk_or.status_value(), ZX_OK);
-    ramdisk_ = std::move(*ramdisk_or);
-
-    zx_status_t status;
-    MkfsOptions mkfs_options{
-        .component_child_name = options_.component_child_name,
-        .component_collection_name = options_.component_collection_name,
-        .component_url = options_.component_url,
-    };
-    if (format_ == kDiskFormatFxfs) {
-      auto service = fs_test::GetCryptService();
-      ASSERT_TRUE(service.is_ok());
-      auto status = MkfsWithDefault(ramdisk_.path().c_str(), format_, LaunchStdioSync, mkfs_options,
-                                    *std::move(service));
-      ASSERT_TRUE(status.is_ok()) << status.status_string();
-    } else {
-      ASSERT_EQ(status = Mkfs(ramdisk_.path().c_str(), format_, LaunchStdioSync, mkfs_options),
-                ZX_OK)
-          << zx_status_get_string(status);
-    }
-    state_ = kFormatted;
-
-    FsckOptions fsck_options{
-        .component_child_name = options_.component_child_name,
-        .component_collection_name = options_.component_collection_name,
-        .component_url = options_.component_url,
-    };
-    ASSERT_EQ(status = Fsck(ramdisk_.path().c_str(), format_, fsck_options, LaunchStdioSync), ZX_OK)
-        << zx_status_get_string(status);
-
-    ASSERT_NO_FATAL_FAILURE(StartFilesystem(options_));
-  }
+  explicit OutgoingDirectoryFixture(DiskFormat format, Mode mode) : format_(format), mode_(mode) {}
 
   void TearDown() final { ASSERT_NO_FATAL_FAILURE(StopFilesystem()); }
 
   fidl::ClientEnd<Directory> DataRoot() {
-    ZX_ASSERT(state_ == kStarted);  // Ensure this isn't used after stopping the filesystem.
+    ZX_ASSERT(component_);  // Ensure this isn't used after stopping the filesystem.
     auto data = fs_->DataRoot();
     ZX_ASSERT_MSG(data.is_ok(), "Invalid data root: %s", data.status_string());
     return std::move(*data);
   }
 
   const fidl::ClientEnd<Directory>& ExportRoot() {
-    ZX_ASSERT(state_ == kStarted);  // Ensure this isn't used after stopping the filesystem.
+    ZX_ASSERT(component_);  // Ensure this isn't used after stopping the filesystem.
     return fs_->ExportRoot();
   }
 
  protected:
-  void StartFilesystem(const MountOptions& options) {
-    ASSERT_EQ(state_, kFormatted);
+  void StartFilesystem(MountOptions options) {
+    ASSERT_FALSE(component_);
+
+    switch (mode_) {
+      case Mode::kStatic: {
+        std::string name = "static-test-";
+        name.append(DiskFormatString(format_));
+        component_ = fs_management::FsComponent::StaticChild(name, format_);
+        break;
+      }
+      case Mode::kDynamic:
+        component_ = fs_management::FsComponent::FromDiskFormat(format_);
+    }
+
+    if (!ramdisk_.client()) {
+      auto ramdisk_or = storage::RamDisk::Create(512, 1 << 17);
+      ASSERT_EQ(ramdisk_or.status_value(), ZX_OK);
+      ramdisk_ = std::move(*ramdisk_or);
+
+      zx_status_t status;
+      if (format_ == kDiskFormatFxfs) {
+        zx::result service = fs_test::GetCryptService();
+        ASSERT_TRUE(service.is_ok());
+        zx::result status =
+            MkfsWithDefault(ramdisk_.path().c_str(), *component_, {}, *std::move(service));
+        ASSERT_TRUE(status.is_ok()) << status.status_string();
+      } else {
+        ASSERT_EQ(status = Mkfs(ramdisk_.path().c_str(), *component_, {}), ZX_OK)
+            << zx_status_get_string(status);
+      }
+
+      ASSERT_EQ(status = Fsck(ramdisk_.path().c_str(), *component_, {}), ZX_OK)
+          << zx_status_get_string(status);
+    }
 
     zx::result device = ramdisk_.channel();
     ASSERT_EQ(device.status_value(), ZX_OK);
 
-    MountOptions actual_options = options;
     if (format_ == kDiskFormatFxfs) {
-      actual_options.crypt_client = [] {
+      options.crypt_client = [] {
         if (auto service = fs_test::GetCryptService(); service.is_error()) {
           ADD_FAILURE() << "Unable to get crypt service";
           return zx::channel();
@@ -152,55 +106,42 @@ class OutgoingDirectoryFixture : public testing::Test {
           return *std::move(service);
         }
       };
-      auto fs = MountMultiVolumeWithDefault(std::move(device.value()), format_, actual_options,
-                                            LaunchStdioAsync);
+      options.allow_delivery_blobs = true;
+      auto fs = MountMultiVolumeWithDefault(std::move(device.value()), *component_, options);
       ASSERT_TRUE(fs.is_ok()) << fs.status_string();
       fs_ = std::make_unique<StartedSingleVolumeMultiVolumeFilesystem>(std::move(*fs));
     } else {
-      auto fs = Mount(std::move(device.value()), format_, actual_options, LaunchStdioAsync);
+      auto fs = Mount(std::move(device.value()), *component_, options);
       ASSERT_TRUE(fs.is_ok()) << fs.status_string();
       fs_ = std::make_unique<StartedSingleVolumeFilesystem>(std::move(*fs));
     }
-    state_ = kStarted;
   }
 
   void StopFilesystem() {
-    if (state_ != kStarted) {
+    if (!component_)
       return;
-    }
 
     ASSERT_EQ(fs_->Unmount().status_value(), ZX_OK);
 
-    state_ = kFormatted;
+    fs_.reset();
+    if (mode_ == Mode::kDynamic)
+      component_.reset();
   }
 
  private:
-  State state_ = kFormatted;
   storage::RamDisk ramdisk_;
   DiskFormat format_;
-  MountOptions options_ = {};
+  Mode mode_;
+  std::optional<fs_management::FsComponent> component_;
   std::unique_ptr<SingleVolumeFilesystemInterface> fs_;
-  fidl::WireSyncClient<Directory> export_client_;
-  fidl::WireSyncClient<Directory> data_client_;
-  std::string component_name_;
 };
 
 // Generalized Admin Tests
-
-struct OutgoingDirectoryTestParameters {
-  DiskFormat format;
-  MountOptions options;
-};
 
 std::string PrintTestSuffix(const testing::TestParamInfo<std::tuple<DiskFormat, Mode>> params) {
   std::stringstream out;
   out << DiskFormatString(std::get<0>(params.param));
   switch (std::get<1>(params.param)) {
-    case Mode::kLegacy:
-      break;
-    case Mode::kReadOnly:
-      out << "_readonly";
-      break;
     case Mode::kDynamic:
       out << "_dynamic";
       __FALLTHROUGH;
@@ -220,6 +161,8 @@ class OutgoingDirectoryTest : public OutgoingDirectoryFixture,
 };
 
 TEST_P(OutgoingDirectoryTest, DataRootIsValid) {
+  ASSERT_NO_FATAL_FAILURE(StartFilesystem({}));
+
   std::string_view format_str = DiskFormatString(std::get<0>(GetParam()));
   auto resp = fidl::WireCall(DataRoot())->QueryFilesystem();
   ASSERT_TRUE(resp.ok()) << resp.status_string();
@@ -238,10 +181,10 @@ Combinations TestCombinations() {
     }
   };
 
-  add(kDiskFormatBlobfs, {Mode::kLegacy, Mode::kReadOnly, Mode::kDynamic, Mode::kStatic});
-  add(kDiskFormatMinfs, {Mode::kLegacy, Mode::kReadOnly, Mode::kDynamic, Mode::kStatic});
+  add(kDiskFormatBlobfs, {Mode::kDynamic, Mode::kStatic});
+  add(kDiskFormatMinfs, {Mode::kDynamic, Mode::kStatic});
   add(kDiskFormatFxfs, {Mode::kDynamic, Mode::kStatic});
-  add(kDiskFormatF2fs, {Mode::kLegacy, Mode::kReadOnly, Mode::kDynamic, Mode::kStatic});
+  add(kDiskFormatF2fs, {Mode::kDynamic, Mode::kStatic});
 
   return c;
 }
@@ -254,17 +197,10 @@ INSTANTIATE_TEST_SUITE_P(OutgoingDirectoryTest, OutgoingDirectoryTest,
 // Launches the filesystem and creates a file called kTestFilePath in the data root.
 class OutgoingDirectoryMinfs : public OutgoingDirectoryFixture {
  public:
-  OutgoingDirectoryMinfs() : OutgoingDirectoryFixture(kDiskFormatMinfs, Mode::kLegacy) {}
+  // Some test cases involve remounting, which will not work for Mode::kStatic.
+  OutgoingDirectoryMinfs() : OutgoingDirectoryFixture(kDiskFormatMinfs, Mode::kDynamic) {}
 
-  void SetUp() final {
-    // Make sure we invoke the base fixture's SetUp method before we continue.
-    ASSERT_NO_FATAL_FAILURE(OutgoingDirectoryFixture::SetUp());
-    // Since we initialize the fixture with the default writable options, we should always
-    // be able to create an initial test file.
-    ASSERT_NO_FATAL_FAILURE(WriteTestFile());
-  }
-
- private:
+ protected:
   void WriteTestFile() {
     auto test_file_ends = fidl::CreateEndpoints<fio::File>();
     ASSERT_TRUE(test_file_ends.is_ok()) << test_file_ends.status_string();
@@ -294,9 +230,12 @@ class OutgoingDirectoryMinfs : public OutgoingDirectoryFixture {
 };
 
 TEST_F(OutgoingDirectoryMinfs, CannotWriteToReadOnlyDataRoot) {
-  // restart the filesystem in read-only mode
+  ASSERT_NO_FATAL_FAILURE(StartFilesystem({}));
+  ASSERT_NO_FATAL_FAILURE(WriteTestFile());
+
+  // Restart the filesystem in read-only mode
   ASSERT_NO_FATAL_FAILURE(StopFilesystem());
-  ASSERT_NO_FATAL_FAILURE(StartFilesystem(MountOptions{.readonly = true}));
+  ASSERT_NO_FATAL_FAILURE(StartFilesystem({.readonly = true}));
 
   auto data_root = DataRoot();
 
@@ -339,6 +278,9 @@ TEST_F(OutgoingDirectoryMinfs, CannotWriteToReadOnlyDataRoot) {
 }
 
 TEST_F(OutgoingDirectoryMinfs, CannotWriteToOutgoingDirectory) {
+  ASSERT_NO_FATAL_FAILURE(StartFilesystem({}));
+  ASSERT_NO_FATAL_FAILURE(WriteTestFile());
+
   auto test_file_ends = fidl::CreateEndpoints<fio::File>();
   ASSERT_TRUE(test_file_ends.is_ok()) << test_file_ends.status_string();
   fidl::ServerEnd<fio::Node> test_file_server(test_file_ends->server.TakeChannel());

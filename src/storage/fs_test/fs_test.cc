@@ -38,7 +38,6 @@
 #include "src/lib/storage/fs_management/cpp/admin.h"
 #include "src/lib/storage/fs_management/cpp/format.h"
 #include "src/lib/storage/fs_management/cpp/fvm.h"
-#include "src/lib/storage/fs_management/cpp/launch.h"
 #include "src/lib/storage/fs_management/cpp/mkfs_with_default.h"
 #include "src/lib/storage/fs_management/cpp/mount.h"
 #include "src/storage/blobfs/blob_layout.h"
@@ -267,23 +266,20 @@ zx::result<std::pair<RamDevice, std::string>> CreateRamDevice(
   return zx::ok(std::make_pair(std::move(ram_device), std::move(device_path)));
 }
 
-zx::result<> FsFormat(const std::string& device_path, fs_management::DiskFormat format,
+zx::result<> FsFormat(const std::string& device_path, fs_management::FsComponent& component,
                       const fs_management::MkfsOptions& options, bool create_default_volume) {
   zx::result<> status;
   if (create_default_volume) {
     auto crypt_client = GetCryptService();
     if (crypt_client.is_error())
       return crypt_client.take_error();
-    status =
-        fs_management::MkfsWithDefault(device_path.c_str(), format, fs_management::LaunchStdioSync,
-                                       options, *std::move(crypt_client));
+    status = fs_management::MkfsWithDefault(device_path.c_str(), component, options,
+                                            *std::move(crypt_client));
   } else {
-    status = zx::make_result(
-        fs_management::Mkfs(device_path.c_str(), format, fs_management::LaunchStdioSync, options));
+    status = zx::make_result(fs_management::Mkfs(device_path.c_str(), component, options));
   }
   if (status.is_error()) {
-    std::cout << "Could not format " << fs_management::DiskFormatString(format)
-              << " file system: " << status.status_string() << std::endl;
+    std::cout << "Could not format file system: " << status.status_string() << std::endl;
     return status;
   }
   return zx::ok();
@@ -292,8 +288,7 @@ zx::result<> FsFormat(const std::string& device_path, fs_management::DiskFormat 
 zx::result<std::pair<std::unique_ptr<fs_management::SingleVolumeFilesystemInterface>,
                      fs_management::NamespaceBinding>>
 FsMount(const std::string& device_path, const std::string& mount_path,
-        fs_management::DiskFormat format, const fs_management::MountOptions& options,
-        bool is_multi_volume) {
+        fs_management::FsComponent& component, const fs_management::MountOptions& options) {
   zx::result device = component::Connect<fuchsia_hardware_block::Block>(device_path);
   if (device.is_error()) {
     std::cout << "Could not open device: " << device_path << ": " << device.status_string()
@@ -305,16 +300,14 @@ FsMount(const std::string& device_path, const std::string& mount_path,
   // supported).
   // options.fsck_after_every_transaction = true;
 
-  auto LogMountError = [&format](const auto& error) {
-    std::cout << "Could not mount " << fs_management::DiskFormatString(format)
-              << " file system: " << error.status_string() << std::endl;
+  auto LogMountError = [](const auto& error) {
+    std::cout << "Could not mount file system: " << error.status_string() << std::endl;
   };
 
   std::unique_ptr<fs_management::SingleVolumeFilesystemInterface> fs;
-  if (is_multi_volume) {
-    auto result = fs_management::MountMultiVolumeWithDefault(
-        std::move(device.value()), format, options, fs_management::LaunchStdioAsync,
-        kDefaultVolumeName);
+  if (component.is_multi_volume()) {
+    auto result = fs_management::MountMultiVolumeWithDefault(std::move(device.value()), component,
+                                                             options, kDefaultVolumeName);
     if (result.is_error()) {
       LogMountError(result);
       return result.take_error();
@@ -322,8 +315,7 @@ FsMount(const std::string& device_path, const std::string& mount_path,
     fs = std::make_unique<fs_management::StartedSingleVolumeMultiVolumeFilesystem>(
         std::move(*result));
   } else {
-    auto result = fs_management::Mount(std::move(device.value()), format, options,
-                                       fs_management::LaunchStdioAsync);
+    auto result = fs_management::Mount(std::move(device.value()), component, options);
     if (result.is_error()) {
       LogMountError(result);
       return result.take_error();
@@ -521,26 +513,37 @@ zx::result<> FilesystemInstance::Unmount(const std::string& mount_path) {
 class BlobfsInstance : public FilesystemInstance {
  public:
   BlobfsInstance(RamDevice device, std::string device_path)
-      : device_(std::move(device)), device_path_(std::move(device_path)) {}
+      : device_(std::move(device)),
+        component_(fs_management::FsComponent::FromDiskFormat(fs_management::kDiskFormatBlobfs)),
+        device_path_(std::move(device_path)) {}
 
   zx::result<> Format(const TestFilesystemOptions& options) override {
     fs_management::MkfsOptions mkfs_options;
     mkfs_options.deprecated_padded_blobfs_format =
         options.blob_layout_format == blobfs::BlobLayoutFormat::kDeprecatedPaddedMerkleTreeAtStart;
     mkfs_options.num_inodes = options.num_inodes;
-    return FsFormat(device_path_, fs_management::kDiskFormatBlobfs, mkfs_options,
+    return FsFormat(device_path_, component_, mkfs_options,
                     /*create_default_volume=*/false);
   }
 
   zx::result<> Mount(const std::string& mount_path,
                      const fs_management::MountOptions& options) override {
-    auto res = FsMount(device_path_, mount_path, fs_management::kDiskFormatBlobfs, options,
-                       /*is_multi_volume=*/false);
-    if (res.is_error())
+    auto res = FsMount(device_path_, mount_path, component_, options);
+    if (res.is_error()) {
+      // We can't reuse the component in the face of errors.
+      component_ = fs_management::FsComponent::FromDiskFormat(fs_management::kDiskFormatBlobfs);
       return res.take_error();
+    }
     fs_ = std::move(res->first);
     binding_ = std::move(res->second);
     return zx::ok();
+  }
+
+  zx::result<> Unmount(const std::string& mount_path) override {
+    zx::result result = FilesystemInstance::Unmount(mount_path);
+    // After unmounting, the component cannot be used again, so set up a new component.
+    component_ = fs_management::FsComponent::FromDiskFormat(fs_management::kDiskFormatBlobfs);
+    return result;
   }
 
   zx::result<> Fsck() override {
@@ -550,8 +553,7 @@ class BlobfsInstance : public FilesystemInstance {
         .always_modify = false,
         .force = true,
     };
-    return zx::make_result(fs_management::Fsck(device_path_, fs_management::kDiskFormatBlobfs,
-                                               options, fs_management::LaunchStdioSync));
+    return zx::make_result(fs_management::Fsck(device_path_, component_, options));
   }
 
   zx::result<std::string> DevicePath() const override { return zx::ok(std::string(device_path_)); }
@@ -570,6 +572,7 @@ class BlobfsInstance : public FilesystemInstance {
 
  private:
   RamDevice device_;
+  fs_management::FsComponent component_;
   std::string device_path_;
   std::unique_ptr<fs_management::SingleVolumeFilesystemInterface> fs_;
   fs_management::NamespaceBinding binding_;

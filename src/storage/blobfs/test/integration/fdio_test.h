@@ -15,8 +15,8 @@
 #include "src/lib/storage/block_client/cpp/fake_block_device.h"
 #include "src/storage/blobfs/blob_layout.h"
 #include "src/storage/blobfs/blobfs.h"
+#include "src/storage/blobfs/component_runner.h"
 #include "src/storage/blobfs/mount.h"
-#include "src/storage/blobfs/runner.h"
 
 namespace blobfs {
 
@@ -31,9 +31,9 @@ class FdioTest : public testing::Test {
  protected:
   async::Loop* loop() { return loop_.get(); }
 
-  int export_root_fd() const { return export_root_fd_.get(); }
-  // get a clone of the export root in handle form
-  zx_handle_t export_root();
+  int outgoing_dir_fd() const { return outgoing_dir_fd_.get(); }
+  // get a clone of the outgoing dir in handle form
+  zx_handle_t outgoing_dir();
   int root_fd() const { return root_fd_.get(); }
   block_client::FakeBlockDevice* block_device() { return block_device_; }
 
@@ -67,9 +67,9 @@ class FdioTest : public testing::Test {
 
   MountOptions mount_options_;
   zx::resource vmex_resource_;
-  fbl::unique_fd export_root_fd_;
+  fbl::unique_fd outgoing_dir_fd_;
   fbl::unique_fd root_fd_;
-  std::unique_ptr<Runner> runner_;
+  std::unique_ptr<ComponentRunner> runner_;
 
   std::unique_ptr<async::Loop> loop_;  // Must be destroyed after the runner.
 };

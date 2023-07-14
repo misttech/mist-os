@@ -439,8 +439,7 @@ fuchsia_test_package("blobfs-large-integration-package") {
     ":blobfs-max-reservation-component",
     ":blobfs-no-space-component",
     ":blobfs-use-second-bitmap-component",
-    "//src/storage/bin/blobfs",
-    "//src/storage/blobfs:decompressor-sandbox",
+    "//src/storage/bin/blobfs:blobfs-component",
   ]
 }
 
@@ -470,7 +469,6 @@ fuchsia_test_package("blobfs-integration-package") {
     ":blobfs-verifier-service-component",
     ":executable-mount-component",
     ":external-decompressor-integration",
-    "//src/storage/bin/blobfs",
-    "//src/storage/blobfs:decompressor-sandbox",
+    "//src/storage/bin/blobfs:blobfs-component",
   ]
 }

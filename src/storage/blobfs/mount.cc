@@ -14,25 +14,8 @@
 #include <utility>
 
 #include "src/storage/blobfs/component_runner.h"
-#include "src/storage/blobfs/runner.h"
 
 namespace blobfs {
-
-zx_status_t Mount(std::unique_ptr<BlockDevice> device, const MountOptions& options,
-                  fidl::ServerEnd<fuchsia_io::Directory> root, zx::resource vmex_resource) {
-  async::Loop loop(&kAsyncLoopConfigNoAttachToCurrentThread);
-  trace::TraceProviderWithFdio provider(loop.dispatcher());
-
-  auto runner_or = Runner::Create(&loop, std::move(device), options, std::move(vmex_resource));
-  if (runner_or.is_error())
-    return runner_or.error_value();
-
-  if (zx_status_t status = runner_or.value()->ServeRoot(std::move(root)); status != ZX_OK) {
-    return status;
-  }
-  loop.Run();
-  return ZX_OK;
-}
 
 zx::result<> StartComponent(ComponentOptions options, fidl::ServerEnd<fuchsia_io::Directory> root,
                             fidl::ServerEnd<fuchsia_process_lifecycle::Lifecycle> lifecycle,

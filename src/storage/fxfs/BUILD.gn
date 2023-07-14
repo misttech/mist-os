@@ -251,7 +251,6 @@ fuchsia_shell_package("fxfs-bin") {
 }
 
 fs_test_config("fxfs") {
-  is_component = true
   is_multi_volume = true
 
   # See MAX_FILE_SIZE in filesystem.rs.

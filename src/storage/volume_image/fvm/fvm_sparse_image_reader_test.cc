@@ -142,9 +142,8 @@ TEST(FvmSparseImageReaderTest, PartitionsInImagePassFsck) {
         .always_modify = false,
         .force = true,
     };
-    EXPECT_EQ(fs_management::Fsck(path, fs_management::kDiskFormatMinfs, options,
-                                  fs_management::LaunchStdioSync),
-              ZX_OK);
+    auto component = fs_management::FsComponent::FromDiskFormat(fs_management::kDiskFormatMinfs);
+    EXPECT_EQ(fs_management::Fsck(path, component, options), ZX_OK);
   }
 
   // Attempt to fsck blobfs.
@@ -161,12 +160,9 @@ TEST(FvmSparseImageReaderTest, PartitionsInImagePassFsck) {
         .never_modify = true,
         .always_modify = false,
         .force = true,
-        .component_child_name = "test-blobfs",
-        .component_collection_name = "fs-collection",
     };
-    EXPECT_EQ(fs_management::Fsck(path, fs_management::kDiskFormatBlobfs, options,
-                                  fs_management::LaunchStdioSync),
-              ZX_OK);
+    auto component = fs_management::FsComponent::FromDiskFormat(fs_management::kDiskFormatBlobfs);
+    EXPECT_EQ(fs_management::Fsck(path, component, options), ZX_OK);
   }
 }
 

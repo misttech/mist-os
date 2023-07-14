@@ -48,7 +48,7 @@ struct MountOptions {
   // implementation that will perform an |fdio_service_connect| with the given channel.
   DecompressorCreatorConnector* decompression_connector = nullptr;
 
-  int32_t paging_threads = 2;
+  int paging_threads = 2;
 #ifndef NDEBUG
   bool fsck_at_end_of_every_transaction = false;
 #endif
@@ -58,19 +58,8 @@ struct MountOptions {
   bool allow_delivery_blobs = false;
 };
 
-// Begins serving requests to the filesystem by parsing the on-disk format using |device|.
-//
-// blobfs relies on the zx_vmo_replace_as_executable syscall to be able to serve executable blobs.
-// The caller must either pass a valid Resource handle of kind ZX_RSRC_KIND_SYSTEM with base
-// ZX_RSRC_SYSTEM_VMEX_BASE for |vmex_resource|, or else the mounted filesystem will not support
-// requesting VMOs for blobs with VmoFlags::EXECUTE.
-//
-// This function blocks until the filesystem terminates.
-zx_status_t Mount(std::unique_ptr<BlockDevice> device, const MountOptions& options,
-                  fidl::ServerEnd<fuchsia_io::Directory> root, zx::resource vmex_resource);
-
 struct ComponentOptions {
-  int32_t pager_threads{};
+  int pager_threads = 1;
 };
 
 // Start blobfs as a component. Begin serving requests on the provided |root|. Initially it starts

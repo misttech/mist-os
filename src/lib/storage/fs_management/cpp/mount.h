@@ -17,8 +17,8 @@
 
 #include <fbl/unique_fd.h>
 
+#include "src/lib/storage/fs_management/cpp/component.h"
 #include "src/lib/storage/fs_management/cpp/format.h"
-#include "src/lib/storage/fs_management/cpp/launch.h"
 #include "src/lib/storage/fs_management/cpp/options.h"
 
 namespace fs_management {
@@ -256,26 +256,22 @@ class __EXPORT StartedSingleVolumeMultiVolumeFilesystem : public SingleVolumeFil
 //   device_fd  : the device containing the filesystem.
 //   df         : the format of the filesystem.
 //   options    : mount options.
-//   cb         : a callback used to actually launch the binary (which is only used for native
-//                filesystems). This can be one of the functions declared in launch.h.
 //
 // See //src/storage/docs/launching.md for more information.
 zx::result<StartedSingleVolumeFilesystem> Mount(
-    fidl::ClientEnd<fuchsia_hardware_block::Block> device, DiskFormat df,
-    const MountOptions& options, LaunchCallback cb);
+    fidl::ClientEnd<fuchsia_hardware_block::Block> device, FsComponent& component,
+    const MountOptions& options);
 
 // Mounts a multi-volume filesystem.
 //
 //   device_fd  : the device containing the filesystem.
 //   df         : the format of the filesystem.
 //   options    : mount options.
-//   cb         : a callback used to actually launch the binary (which is only used for native
-//                filesystems). This can be one of the functions declared in launch.h.
 //
 // See //src/storage/docs/launching.md for more information.
 zx::result<StartedMultiVolumeFilesystem> MountMultiVolume(
-    fidl::ClientEnd<fuchsia_hardware_block::Block> device, DiskFormat df,
-    const MountOptions& options, LaunchCallback cb);
+    fidl::ClientEnd<fuchsia_hardware_block::Block> device, FsComponent& component,
+    const MountOptions& options);
 
 // Mounts a multi-volume filesystem using a default singular volume.  Generally this is used for
 // testing and production use should favour |MountMultiVolume|.
@@ -283,14 +279,12 @@ zx::result<StartedMultiVolumeFilesystem> MountMultiVolume(
 //   device_fd   : the device containing the filesystem.
 //   df          : the format of the filesystem.
 //   options     : mount options.
-//   cb          : a callback used to actually launch the binary (which is only used for native
-//                 filesystems). This can be one of the functions declared in launch.h.
 //   volume_name : the volume to open.
 //
 // See //src/storage/docs/launching.md for more information.
 zx::result<StartedSingleVolumeMultiVolumeFilesystem> MountMultiVolumeWithDefault(
-    fidl::ClientEnd<fuchsia_hardware_block::Block> device, DiskFormat df,
-    const MountOptions& options, LaunchCallback cb, const char* volume_name = "default");
+    fidl::ClientEnd<fuchsia_hardware_block::Block> device, FsComponent& component,
+    const MountOptions& options, const char* volume_name = "default");
 
 // Shuts down a filesystem.
 //

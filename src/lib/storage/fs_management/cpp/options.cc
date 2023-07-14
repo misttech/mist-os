@@ -10,39 +10,6 @@
 
 namespace fs_management {
 
-std::vector<std::string> MountOptions::as_argv(const char *binary) const {
-  std::vector<std::string> argv;
-  argv.push_back(binary);
-  if (verbose_mount) {
-    argv.push_back("--verbose");
-  }
-
-  argv.push_back("mount");
-
-  if (readonly) {
-    argv.push_back("--readonly");
-  }
-  if (write_compression_algorithm) {
-    argv.push_back("--compression");
-    argv.push_back(*write_compression_algorithm);
-  }
-  if (write_compression_level >= 0) {
-    argv.push_back("--compression_level");
-    argv.push_back(std::to_string(write_compression_level));
-  }
-  if (cache_eviction_policy) {
-    argv.push_back("--eviction_policy");
-    argv.push_back(*cache_eviction_policy);
-  }
-  if (fsck_after_every_transaction) {
-    argv.push_back("--fsck_after_every_transaction");
-  }
-  if (allow_delivery_blobs) {
-    argv.push_back("--allow_delivery_blobs");
-  }
-  return argv;
-}
-
 zx::result<fuchsia_fs_startup::wire::StartOptions> MountOptions::as_start_options() const {
   fuchsia_fs_startup::wire::StartOptions options;
 
@@ -88,34 +55,6 @@ zx::result<fuchsia_fs_startup::wire::StartOptions> MountOptions::as_start_option
   return zx::ok(options);
 }
 
-std::vector<std::string> MkfsOptions::as_argv(const char *binary) const {
-  std::vector<std::string> argv;
-  argv.push_back(binary);
-
-  if (verbose) {
-    argv.push_back("-v");
-  }
-
-  MkfsOptions default_options;  // Use to get the default value.
-  if (fvm_data_slices > default_options.fvm_data_slices) {
-    argv.push_back("--fvm_data_slices");
-    argv.push_back(std::to_string(fvm_data_slices));
-  }
-
-  if (deprecated_padded_blobfs_format) {
-    argv.push_back("--deprecated_padded_format");
-  }
-
-  if (num_inodes > 0) {
-    argv.push_back("--num_inodes");
-    argv.push_back(std::to_string(num_inodes));
-  }
-
-  argv.push_back("mkfs");
-
-  return argv;
-}
-
 fuchsia_fs_startup::wire::FormatOptions MkfsOptions::as_format_options(
     fidl::AnyArena &arena) const {
   auto builder = fuchsia_fs_startup::wire::FormatOptions::Builder(arena);
@@ -123,33 +62,11 @@ fuchsia_fs_startup::wire::FormatOptions MkfsOptions::as_format_options(
   builder.deprecated_padded_blobfs_format(deprecated_padded_blobfs_format);
   if (num_inodes > 0)
     builder.num_inodes(num_inodes);
+  if (fvm_data_slices > 0)
+    builder.fvm_data_slices(fvm_data_slices);
   if (sectors_per_cluster > 0)
     builder.sectors_per_cluster(sectors_per_cluster);
   return builder.Build();
-}
-
-std::vector<std::string> FsckOptions::as_argv(const char *binary) const {
-  std::vector<std::string> argv;
-  argv.push_back(binary);
-  if (verbose) {
-    argv.push_back("-v");
-  }
-  argv.push_back("fsck");
-
-  return argv;
-}
-
-std::vector<std::string> FsckOptions::append_argv_fat32(std::vector<std::string> &argv) const {
-  if (never_modify) {
-    argv.push_back("-n");
-  } else if (always_modify) {
-    argv.push_back("-y");
-  }
-  if (force) {
-    argv.push_back("-f");
-  }
-
-  return argv;
 }
 
 fuchsia_fs_startup::wire::CheckOptions FsckOptions::as_check_options() const {

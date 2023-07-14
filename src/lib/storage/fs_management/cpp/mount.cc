@@ -50,46 +50,6 @@ namespace {
 
 using Directory = fuchsia_io::Directory;
 
-zx::result<fidl::ClientEnd<Directory>> InitNativeFs(
-    const char* binary, fidl::ClientEnd<fuchsia_hardware_block::Block> device,
-    const MountOptions& options, LaunchCallback cb) {
-  zx_status_t status;
-  auto outgoing_directory_or = fidl::CreateEndpoints<Directory>();
-  if (outgoing_directory_or.is_error())
-    return outgoing_directory_or.take_error();
-  std::vector<std::pair<uint32_t, zx::handle>> handles;
-  handles.emplace_back(FS_HANDLE_BLOCK_DEVICE_ID, device.TakeChannel());
-  handles.emplace_back(PA_DIRECTORY_REQUEST, outgoing_directory_or->server.TakeChannel());
-
-  if (status = cb(options.as_argv(binary), std::move(handles)); status != ZX_OK) {
-    return zx::error(status);
-  }
-
-  auto cleanup = fit::defer([&outgoing_directory_or]() {
-    auto admin_client = component::ConnectAt<fuchsia_fs::Admin>(outgoing_directory_or->client);
-    if (!admin_client.is_ok()) {
-      return;
-    }
-    [[maybe_unused]] auto result = fidl::WireCall(*admin_client)->Shutdown();
-  });
-
-  if (options.wait_until_ready) {
-    // Wait until the filesystem is ready to take incoming requests
-    const fidl::WireResult result = fidl::WireCall(outgoing_directory_or->client)->Query();
-    switch (result.status()) {
-      case ZX_OK:
-        break;
-      case ZX_ERR_PEER_CLOSED:
-        return zx::error(ZX_ERR_BAD_STATE);
-      default:
-        return zx::error(result.status());
-    }
-  }
-
-  cleanup.cancel();
-  return zx::ok(std::move(outgoing_directory_or->client));
-}
-
 zx::result<> StartFsComponent(fidl::UnownedClientEnd<Directory> exposed_dir,
                               fidl::ClientEnd<fuchsia_hardware_block::Block> device,
                               const MountOptions& options) {
@@ -112,30 +72,17 @@ zx::result<> StartFsComponent(fidl::UnownedClientEnd<Directory> exposed_dir,
 }
 
 zx::result<fidl::ClientEnd<Directory>> InitFsComponent(
-    fidl::ClientEnd<fuchsia_hardware_block::Block> device, DiskFormat df,
+    fidl::ClientEnd<fuchsia_hardware_block::Block> device, FsComponent& component,
     const MountOptions& options) {
-  std::string_view url =
-      options.component_url.empty() ? DiskFormatComponentUrl(df) : options.component_url;
-  auto exposed_dir_or =
-      ConnectFsComponent(url, *options.component_child_name, options.component_collection_name);
-  if (exposed_dir_or.is_error())
-    return exposed_dir_or.take_error();
-  zx::result<> start_status = StartFsComponent(*exposed_dir_or, std::move(device), options);
-  if (start_status.is_error()) {
-    if (options.component_collection_name) {
-      // If we hit an error starting, destroy the component instance. It may have been left in a
-      // partially initialized state. We purposely ignore the result of destruction; it probably
-      // won't fail, but if it does there is nothing we can really do, and the start error is
-      // more important.
-      [[maybe_unused]] auto result =
-          DestroyFsComponent(*options.component_child_name, *options.component_collection_name);
-    }
+  auto exposed_dir = component.Connect();
+  if (exposed_dir.is_error())
+    return exposed_dir.take_error();
+  if (zx::result<> start_status = StartFsComponent(*exposed_dir, std::move(device), options);
+      start_status.is_error()) {
     return start_status.take_error();
   }
-  return exposed_dir_or;
+  return exposed_dir;
 }
-
-bool IsMultiVolume(DiskFormat df) { return df == kDiskFormatFxfs; }
 
 std::string StripTrailingSlash(const char* in) {
   if (!in)
@@ -303,45 +250,31 @@ __EXPORT SingleVolumeFilesystemInterface::~SingleVolumeFilesystemInterface() = d
 
 __EXPORT
 zx::result<StartedSingleVolumeFilesystem> Mount(
-    fidl::ClientEnd<fuchsia_hardware_block::Block> device, DiskFormat df,
-    const MountOptions& options, LaunchCallback cb) {
-  if (IsMultiVolume(df)) {
+    fidl::ClientEnd<fuchsia_hardware_block::Block> device, FsComponent& component,
+    const MountOptions& options) {
+  if (component.is_multi_volume()) {
     return zx::error(ZX_ERR_NOT_SUPPORTED);
   }
 
   StartedSingleVolumeFilesystem fs;
-  if (options.component_child_name) {
-    // Componentized filesystem
-    auto exposed_dir = InitFsComponent(std::move(device), df, options);
-    if (exposed_dir.is_error()) {
-      return exposed_dir.take_error();
-    }
-    fs = StartedSingleVolumeFilesystem(std::move(*exposed_dir));
-  } else {
-    // Native filesystem
-    std::string binary = DiskFormatBinaryPath(df);
-    if (binary.empty()) {
-      return zx::error(ZX_ERR_NOT_SUPPORTED);
-    }
-    auto export_root = InitNativeFs(binary.c_str(), std::move(device), options, cb);
-    if (export_root.is_error()) {
-      return export_root.take_error();
-    }
-    fs = StartedSingleVolumeFilesystem(std::move(*export_root));
+
+  auto exposed_dir = InitFsComponent(std::move(device), component, options);
+  if (exposed_dir.is_error()) {
+    return exposed_dir.take_error();
   }
 
-  return zx::ok(std::move(fs));
+  return zx::ok(StartedSingleVolumeFilesystem(std::move(*exposed_dir)));
 }
 
 __EXPORT
 zx::result<StartedMultiVolumeFilesystem> MountMultiVolume(
-    fidl::ClientEnd<fuchsia_hardware_block::Block> device, DiskFormat df,
-    const MountOptions& options, LaunchCallback cb) {
-  if (!IsMultiVolume(df)) {
+    fidl::ClientEnd<fuchsia_hardware_block::Block> device, FsComponent& component,
+    const MountOptions& options) {
+  if (!component.is_multi_volume()) {
     return zx::error(ZX_ERR_NOT_SUPPORTED);
   }
 
-  auto outgoing_dir = InitFsComponent(std::move(device), df, options);
+  auto outgoing_dir = InitFsComponent(std::move(device), component, options);
   if (outgoing_dir.is_error()) {
     return outgoing_dir.take_error();
   }
@@ -350,13 +283,13 @@ zx::result<StartedMultiVolumeFilesystem> MountMultiVolume(
 
 __EXPORT
 zx::result<StartedSingleVolumeMultiVolumeFilesystem> MountMultiVolumeWithDefault(
-    fidl::ClientEnd<fuchsia_hardware_block::Block> device, DiskFormat df,
-    const MountOptions& options, LaunchCallback cb, const char* volume_name) {
-  if (!IsMultiVolume(df)) {
+    fidl::ClientEnd<fuchsia_hardware_block::Block> device, FsComponent& component,
+    const MountOptions& options, const char* volume_name) {
+  if (!component.is_multi_volume()) {
     return zx::error(ZX_ERR_NOT_SUPPORTED);
   }
 
-  auto outgoing_dir_or = InitFsComponent(std::move(device), df, options);
+  auto outgoing_dir_or = InitFsComponent(std::move(device), component, options);
   if (outgoing_dir_or.is_error()) {
     return outgoing_dir_or.take_error();
   }

@@ -148,7 +148,6 @@ static_library("blobfs") {
       "mount.cc",
       "page_loader.cc",
       "page_loader.h",
-      "runner.cc",
       "service/admin.cc",
       "service/admin.h",
       "service/blobfs.cc",

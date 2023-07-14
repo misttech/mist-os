@@ -290,16 +290,10 @@ void CheckPartitionsInRamdisk(const FvmDescriptor& fvm_descriptor) {
         .always_modify = false,
         .force = true,
     };
-    if (partition.volume().name == "blobfs") {
-      fsck_options.component_child_name = "test-blobfs";
-      fsck_options.component_collection_name = "fs-collection";
-    }
-    EXPECT_EQ(
-        fs_management::Fsck(partition_path,
-                            partition.volume().name == "blobfs" ? fs_management::kDiskFormatBlobfs
-                                                                : fs_management::kDiskFormatMinfs,
-                            fsck_options, &fs_management::LaunchStdioSync),
-        ZX_OK);
+    auto component = fs_management::FsComponent::FromDiskFormat(
+        partition.volume().name == "blobfs" ? fs_management::kDiskFormatBlobfs
+                                            : fs_management::kDiskFormatMinfs);
+    EXPECT_EQ(fs_management::Fsck(partition_path, component, fsck_options), ZX_OK);
   }
 }
 

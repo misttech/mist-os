@@ -24,7 +24,6 @@
 #include "src/lib/storage/block_client/cpp/remote_block_device.h"
 #include "src/lib/storage/fs_management/cpp/mount.h"
 #include "src/storage/blobfs/blobfs.h"
-#include "src/storage/blobfs/runner.h"
 #include "src/storage/blobfs/test/blob_utils.h"
 #include "src/storage/blobfs/test/integration/blobfs_fixtures.h"
 #include "src/storage/blobfs/test/integration/fdio_test.h"
@@ -61,18 +60,18 @@ TEST_F(DataMountTest, DataRootCanHaveBlobsCreated) {
 }
 
 TEST_F(OutgoingMountTest, OutgoingDirectoryHasRootDirectoryInIt) {
-  fbl::unique_fd foo_fd(openat(export_root_fd(), kOutgoingDataRoot, O_DIRECTORY));
+  fbl::unique_fd foo_fd(openat(outgoing_dir_fd(), kOutgoingDataRoot, O_DIRECTORY));
   ASSERT_TRUE(foo_fd.is_valid());
 }
 
 TEST_F(OutgoingMountTest, OutgoingDirectoryIsReadOnly) {
-  fbl::unique_fd no_fd(openat(export_root_fd(), kFileName.data(), O_CREAT, S_IRUSR | S_IWUSR));
+  fbl::unique_fd no_fd(openat(outgoing_dir_fd(), kFileName.data(), O_CREAT, S_IRUSR | S_IWUSR));
   ASSERT_FALSE(no_fd.is_valid());
 }
 
 TEST_F(OutgoingMountTest, OutgoingDirectoryDataRootCanHaveBlobsCreated) {
   std::string path = std::string(kOutgoingDataRoot) + "/" + kFileName.data();
-  fbl::unique_fd foo_fd(openat(export_root_fd(), path.c_str(), O_CREAT, S_IRUSR | S_IWUSR));
+  fbl::unique_fd foo_fd(openat(outgoing_dir_fd(), path.c_str(), O_CREAT, S_IRUSR | S_IWUSR));
   ASSERT_TRUE(foo_fd.is_valid());
 }
 

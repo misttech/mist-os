@@ -45,8 +45,8 @@ class MountTestTemplate : public testing::Test {
     ramdisk_ = storage::RamDisk::Create(/*block_size=*/512, /*block_count=*/1 << 16).value();
 
     ramdisk_path_ = ramdisk_->path();
-    ASSERT_EQ(fs_management::Mkfs(ramdisk_path_.c_str(), fs_management::kDiskFormatMinfs,
-                                  fs_management::LaunchStdioSync, fs_management::MkfsOptions()),
+    auto component = fs_management::FsComponent::FromDiskFormat(fs_management::kDiskFormatMinfs);
+    ASSERT_EQ(fs_management::Mkfs(ramdisk_path_.c_str(), component, fs_management::MkfsOptions()),
               0);
 
     zx::result device_channel =

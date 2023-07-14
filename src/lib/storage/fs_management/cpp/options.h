@@ -43,28 +43,6 @@ struct MountOptions {
   // If set, a callable that returns a handle to the crypt client.
   std::function<zx::channel()> crypt_client;
 
-  // If set, and the filesystem type supports it, use the provided child name to connect to an
-  // existing filesystem component instance that implements and is serving the
-  // fuchsia.fs.startup.Startup protocol. Optionally, also define a component_collection_name if
-  // the child component is in a collection.
-  //
-  // See //src/storage/docs/launching.md for more information.
-  std::optional<std::string> component_child_name;
-
-  // If set, and the filesystem type supports it, use the provided collection name to connect to an
-  // existing filesystem component instance that implements and is serving the
-  // fuchsia.fs.startup.Startup protocol. This won't do anything if component_child_name isn't set.
-  //
-  // See //src/storage/docs/launching.md for more information.
-  std::optional<std::string> component_collection_name;
-
-  // If set, use the specified component URL rather than a default.
-  std::string component_url;
-
-  // Generate the argv list for launching a process based on this set of options.
-  __EXPORT
-  std::vector<std::string> as_argv(const char* binary) const;
-
   // Generate a StartOptions fidl struct to pass the a fuchsia.fs.startup.Startup interface based
   // on this set of options.
   __EXPORT
@@ -85,33 +63,6 @@ struct MkfsOptions {
   // for blobfs.
   uint64_t num_inodes = 0;
 
-  // If set, a callable that returns a handle to the crypt client.
-  // NB: This is only used when Mkfs'ing Fxfs in the legacy (non-componentized) way and we should
-  // probably remove this.
-  std::function<zx::channel()> crypt_client;
-
-  // If set, and the filesystem type supports it, use the provided child name to connect to an
-  // existing filesystem component instance that implements and is serving the
-  // fuchsia.fs.startup.Startup protocol. Optionally, also define a component_collection_name if
-  // the child component is in a collection.
-  //
-  // See //src/storage/docs/launching.md for more information.
-  std::optional<std::string> component_child_name;
-
-  // If set, and the filesystem type supports it, use the provided collection name to connect to an
-  // existing filesystem component instance that implements and is serving the
-  // fuchsia.fs.startup.Startup protocol. This won't do anything if component_child_name isn't set.
-  //
-  // See //src/storage/docs/launching.md for more information.
-  std::optional<std::string> component_collection_name;
-
-  // If set, use the specified component URL rather than a default.
-  std::string component_url;
-
-  // Generate the argv list for launching a process based on this set of options.
-  __EXPORT
-  std::vector<std::string> as_argv(const char* binary) const;
-
   // Generate a FormatOptions fidl struct to pass the a fuchsia.fs.startup.Startup interface based
   // on this set of options.
   __EXPORT
@@ -125,28 +76,6 @@ struct FsckOptions {
   bool never_modify = false;   // Fsck still looks for problems, but does not try to resolve them.
   bool always_modify = false;  // Fsck never asks to resolve problems; it will always do it.
   bool force = false;          // Force fsck to check the filesystem integrity, even if "clean".
-
-  // If set, and the filesystem type supports it, use the provided child name to connect to an
-  // existing filesystem component instance that implements and is serving the
-  // fuchsia.fs.startup.Startup protocol. Optionally, also define a component_collection_name if
-  // the child component is in a collection.
-  //
-  // See //src/storage/docs/launching.md for more information.
-  std::optional<std::string> component_child_name;
-
-  // If set, and the filesystem type supports it, use the provided collection name to connect to an
-  // existing filesystem component instance that implements and is serving the
-  // fuchsia.fs.startup.Startup protocol. This won't do anything if component_child_name isn't set.
-  //
-  // See //src/storage/docs/launching.md for more information.
-  std::optional<std::string> component_collection_name;
-
-  // If set, use the specified component URL rather than a default.
-  std::string component_url;
-
-  // Generate the argv list for launching a process based on this set of options.
-  __EXPORT
-  std::vector<std::string> as_argv(const char* binary) const;
 
   // Appends arguments for running the fat32 fsck tool.  These arguments will exclude the binary
   // name and the path of the device.

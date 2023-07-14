@@ -10,6 +10,63 @@
 
 namespace fs_management {
 
+namespace {
+
+constexpr bool IsMultiVolume(DiskFormat df) { return df == kDiskFormatFxfs; }
+
+std::string GenerateUniqueName() {
+  static std::atomic<int> instance = 0;
+  static zx_koid_t our_koid = [] {
+    zx_info_handle_basic_t handle_info = {};
+    size_t actual = 0;
+    ZX_ASSERT(zx::process::self()->get_info(ZX_INFO_HANDLE_BASIC, &handle_info, sizeof(handle_info),
+                                            &actual, nullptr) == ZX_OK &&
+              actual == 1);
+    return handle_info.koid;
+  }();
+  return std::string("fs-") + std::to_string(our_koid) + "." + std::to_string(++instance);
+}
+
+}  // namespace
+
+FsComponent FsComponent::FromDiskFormat(DiskFormat df) {
+  std::string_view url = DiskFormatComponentUrl(df);
+  ZX_ASSERT(!url.empty());
+  return FsComponent(url, GenerateUniqueName(), "fs-collection", IsMultiVolume(df));
+}
+
+FsComponent FsComponent::FromUrl(std::string_view url, bool is_multi_volume) {
+  return FsComponent(url, GenerateUniqueName(), "fs-collection", is_multi_volume);
+}
+
+FsComponent FsComponent::StaticChild(std::string_view child_name, DiskFormat df) {
+  std::string_view url = DiskFormatComponentUrl(df);
+  ZX_ASSERT(!url.empty());
+  return FsComponent(url, child_name, std::nullopt, IsMultiVolume(df));
+}
+
+FsComponent::FsComponent(FsComponent&& other) { *this = std::move(other); }
+
+FsComponent& FsComponent::operator=(FsComponent&& other) {
+  [[maybe_unused]] zx::result result = DestroyChild();
+  url_ = other.url_;
+  child_name_ = other.child_name_;
+  collection_name_ = other.collection_name_;
+  is_multi_volume_ = other.is_multi_volume_;
+  connected_ = other.connected_;
+  other.connected_ = false;
+  return *this;
+}
+
+FsComponent::~FsComponent() { [[maybe_unused]] zx::result result = DestroyChild(); }
+
+zx::result<fidl::ClientEnd<fuchsia_io::Directory>> FsComponent::Connect() {
+  zx::result result = ConnectFsComponent(url_, child_name_, collection_name_);
+  if (result.is_ok())
+    connected_ = true;
+  return result;
+}
+
 zx::result<fidl::ClientEnd<fuchsia_io::Directory>> ConnectFsComponent(
     std::string_view component_url, std::string_view component_child_name,
     std::optional<std::string_view> component_collection_name) {
@@ -70,6 +127,13 @@ zx::result<fidl::ClientEnd<fuchsia_io::Directory>> ConnectFsComponent(
   }
 
   return zx::ok(std::move(client_end));
+}
+
+zx::result<> FsComponent::DestroyChild() {
+  if (!connected_)
+    return zx::ok();
+  connected_ = false;
+  return collection_name_ ? DestroyFsComponent(child_name_, *collection_name_) : zx::ok();
 }
 
 zx::result<> DestroyFsComponent(std::string_view component_child_name,

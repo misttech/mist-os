@@ -2,12 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 {
-    children: [
-        {
-            name: "fatfs",
-            url: "#meta/fatfs.cm",
-        },
-    ],
     offer: [
         {
             protocol: [
@@ -16,7 +10,7 @@
                 "fuchsia.process.Launcher",
             ],
             from: "parent",
-            to: "#fatfs",
+            to: "#fs-collection",
         },
     ],
 }

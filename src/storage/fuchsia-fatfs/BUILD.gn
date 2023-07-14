@@ -158,7 +158,6 @@ fs_test_suite("fatfs") {
   config = {
     disk_format = 4
     is_case_sensitive = false
-    is_component = true
     is_journaled = false
     timestamp_granularity = 2000000000
     supports_hard_links = false

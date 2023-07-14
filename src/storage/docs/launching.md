@@ -54,21 +54,14 @@ The options struct, `fs_management::MountOptions`, contains a union of all possi
 configuration. That is, not all filesystems support all the options. Make sure that the filesystem
 you are launching supports the option you are using, or else it may fail to launch.
 
-If the options provided don't include a `component_child_name`, then fs_management will launch it
-using fdio_spawn_etc as a child process. This is the old way of launching filesystems. It's
-supported by all of our platform filesystems. This approach uses the launch callback provided to
-mount. In general, if you are mounting a filesystem, you should use `LaunchStdioAsync`, and if
-you are using Fsck or Mkfs you should use `LaunchStdioSync`. See
-//src/lib/storage/fs_management/cpp/launch.h for additional callback options.
-
-If only the `component_child_name` is provided, then fs_management will assume the component is a
-static child in the realm. It attempts to connect to it's exposed directory via
-`fuchsia.component.Realm`. This approach doesn't use the launch callback provided to mount.
-
 If both `component_child_name` and `component_collection_name` are provided, then fs_management
 will assume the component is a dynamic child in the realm. It attempts to connect to it's exposed
 directory via `fuchsia.component.Realm`, and if it fails because it can't find a component with the
 given name, it attempts to launch a new instance, using a component url based on the disk format.
+
+If only `component_child_name` is provided, then fs_management will assume the component is a static
+child in the realm. It attempts to connect to it's exposed directory via
+`fuchsia.component.Realm`.
 
 A shard is provided for cml files to include if they plan to launch filesystems as dynamic children
 at `//src/lib/storage/fs_management/client.shard.cml`. The `component_collection_name` using this
@@ -80,7 +73,7 @@ Launching a filesystem using regular processes -
 fbl::unique_fd device_fd(open("/dev/class/block/001", O_RDWR));
 ASSERT_TRUE(device_fd);
 fs_management::MountOptions options;
-auto fs = fs_management::Mount(std::move(device_fd), fs_management::kDiskFormatMinfs, options, fs_management::LaunchStdioAsync);
+auto fs = fs_management::Mount(std::move(device_fd), fs_management::kDiskFormatMinfs, options);
 ASSERT_EQ(fs.status(), ZX_OK);
 auto data = fs->DataRoot();
 ASSERT_EQ(data.status(), ZX_OK);
@@ -98,8 +91,7 @@ fs_management::MountOptions options {
   .component_child_name = "minfs",
   .component_collection_name = "fs-collection",
 };
-// LaunchStdioAsync doesn't matter here
-auto fs = fs_management::Mount(std::move(device_fd), fs_management::kDiskFormatMinfs, options, fs_management::LaunchStdioAsync);
+auto fs = fs_management::Mount(std::move(device_fd), fs_management::kDiskFormatMinfs, options);
 ASSERT_EQ(fs.status(), ZX_OK);
 auto data = fs->DataRoot();
 ASSERT_EQ(data.status(), ZX_OK);

@@ -5,8 +5,10 @@
 #ifndef SRC_STORAGE_BLOBFS_SERVICE_ADMIN_H_
 #define SRC_STORAGE_BLOBFS_SERVICE_ADMIN_H_
 
+#include <fidl/fuchsia.fs/cpp/wire.h>
+
+#include "src/lib/storage/vfs/cpp/fuchsia_vfs.h"
 #include "src/lib/storage/vfs/cpp/service.h"
-#include "src/storage/blobfs/runner.h"
 
 namespace blobfs {
 

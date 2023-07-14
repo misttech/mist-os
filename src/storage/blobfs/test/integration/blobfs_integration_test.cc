@@ -49,7 +49,6 @@
 
 #include "src/lib/digest/digest.h"
 #include "src/lib/storage/block_client/cpp/remote_block_device.h"
-#include "src/lib/storage/fs_management/cpp/launch.h"
 #include "src/lib/storage/fs_management/cpp/mount.h"
 #include "src/storage/blobfs/format.h"
 #include "src/storage/blobfs/test/blob_utils.h"
@@ -1160,13 +1159,7 @@ TEST_F(BlobfsWithFvmTest, CorruptAtMount) {
   ASSERT_GT(len, 0ul);
   ASSERT_NO_FATAL_FAILURE(FvmShrink(fs().DevicePath().value(), offset + len - 1, 1));
 
-  zx::result device = component::Connect<fuchsia_hardware_block::Block>(fs().DevicePath().value());
-  ASSERT_EQ(device.status_value(), ZX_OK);
-
-  ASSERT_NE(fs_management::Mount(std::move(device.value()), fs_management::kDiskFormatBlobfs,
-                                 fs().DefaultMountOptions(), fs_management::LaunchStdioAsync)
-                .status_value(),
-            ZX_OK);
+  ASSERT_NE(fs().Mount().status_value(), ZX_OK);
 
   // Grow slice count with one extra slice.
   ASSERT_NO_FATAL_FAILURE(FvmExtend(fs().DevicePath().value(), offset + len - 1, 2));

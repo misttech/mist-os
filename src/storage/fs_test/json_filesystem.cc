@@ -7,7 +7,6 @@
 #include <lib/component/incoming/cpp/protocol.h>
 #include <zircon/errors.h>
 
-#include "src/lib/storage/fs_management/cpp/launch.h"
 #include "src/lib/storage/fs_management/cpp/mount.h"
 #include "src/storage/fs_test/crypt_service.h"
 #include "src/storage/fs_test/fs_test.h"
@@ -59,43 +58,49 @@ zx::result<std::unique_ptr<JsonFilesystem>> JsonFilesystem::NewFilesystem(
           .timestamp_granularity = zx::nsec(config["timestamp_granularity"].GetInt64()),
           .uses_crypt = ConfigGetOrDefault<bool>(config, "uses_crypt", false),
       },
-      format, sectors_per_cluster, ConfigGetOrDefault<bool>(config, "is_component", false)));
+      format, sectors_per_cluster));
 }
 
 class JsonInstance : public FilesystemInstance {
  public:
+  static fs_management::FsComponent GetComponent(const JsonFilesystem& filesystem) {
+    const std::string& name = filesystem.GetTraits().name;
+    return fs_management::FsComponent::FromUrl("#meta/" + name + ".cm",
+                                               filesystem.GetTraits().is_multi_volume);
+  }
+
   JsonInstance(const JsonFilesystem* filesystem, RamDevice device, std::string device_path)
       : filesystem_(*filesystem),
+        component_(GetComponent(filesystem_)),
         device_(std::move(device)),
         device_path_(std::move(device_path)) {}
 
   zx::result<> Format(const TestFilesystemOptions& options) override {
     fs_management::MkfsOptions mkfs_options;
     mkfs_options.sectors_per_cluster = filesystem_.sectors_per_cluster();
-    if (filesystem_.is_component()) {
-      const std::string& name = filesystem_.GetTraits().name;
-      mkfs_options.component_child_name = name.c_str();
-      mkfs_options.component_url = "#meta/" + name + ".cm";
-    }
-    return FsFormat(device_path_, filesystem_.format(), mkfs_options,
+    return FsFormat(device_path_, component_, mkfs_options,
                     filesystem_.GetTraits().is_multi_volume);
   }
 
   zx::result<> Mount(const std::string& mount_path,
                      const fs_management::MountOptions& options) override {
     fs_management::MountOptions mount_options = options;
-    if (filesystem_.is_component()) {
-      const std::string& name = filesystem_.GetTraits().name;
-      mount_options.component_child_name = name.c_str();
-      mount_options.component_url = "#meta/" + name + ".cm";
-    }
-    auto fs = FsMount(device_path_, mount_path, filesystem_.format(), mount_options,
-                      filesystem_.GetTraits().is_multi_volume);
-    if (fs.is_error())
+    auto fs = FsMount(device_path_, mount_path, component_, mount_options);
+    if (fs.is_error()) {
+      // We can't reuse the component in the face of errors.
+      component_ = GetComponent(filesystem_);
       return fs.take_error();
+    }
     fs_ = std::move(fs->first);
     binding_ = std::move(fs->second);
     return zx::ok();
+  }
+
+  zx::result<> Unmount(const std::string& mount_path) override {
+    zx::result result = FilesystemInstance::Unmount(mount_path);
+    // Most components don't support reuse, so after unmounting, use a new component.
+    component_ = GetComponent(filesystem_);
+    return result;
   }
 
   zx::result<> Fsck() override {
@@ -105,13 +110,8 @@ class JsonInstance : public FilesystemInstance {
         .always_modify = false,
         .force = true,
     };
-    if (filesystem_.is_component()) {
-      const std::string& name = filesystem_.GetTraits().name;
-      options.component_child_name = name.c_str();
-      options.component_url = "#meta/" + name + ".cm";
-    }
-    auto status = zx::make_result(fs_management::Fsck(device_path_.c_str(), filesystem_.format(),
-                                                      options, fs_management::LaunchStdioSync));
+
+    auto status = zx::make_result(fs_management::Fsck(device_path_.c_str(), component_, options));
     if (status.is_error()) {
       return status.take_error();
     }
@@ -123,17 +123,11 @@ class JsonInstance : public FilesystemInstance {
     if (filesystem_.GetTraits().uses_crypt) {
       mount_options.crypt_client = []() { return *GetCryptService(); };
     }
-    if (filesystem_.is_component()) {
-      const std::string& name = filesystem_.GetTraits().name;
-      mount_options.component_child_name = name.c_str();
-      mount_options.component_url = "#meta/" + name;
-    }
     zx::result device = component::Connect<fuchsia_hardware_block::Block>(device_path_);
     if (device.is_error()) {
       return device.take_error();
     }
-    auto fs = fs_management::MountMultiVolume(std::move(device.value()), filesystem_.format(),
-                                              mount_options, fs_management::LaunchStdioAsync);
+    auto fs = fs_management::MountMultiVolume(std::move(device.value()), component_, mount_options);
     if (fs.is_error()) {
       return fs.take_error();
     }
@@ -161,6 +155,7 @@ class JsonInstance : public FilesystemInstance {
 
  private:
   const JsonFilesystem& filesystem_;
+  fs_management::FsComponent component_;
   RamDevice device_;
   std::string device_path_;
   std::unique_ptr<fs_management::SingleVolumeFilesystemInterface> fs_;

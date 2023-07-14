@@ -13,7 +13,6 @@ if (is_fuchsia) {
       "admin.h",
       "format.h",
       "fvm.h",
-      "launch.h",
       "mount.h",
       "options.h",
       "volumes.h",
@@ -26,11 +25,9 @@ if (is_fuchsia) {
       "fsck.cc",
       "fvm.cc",
       "fvm_internal.h",
-      "launch.cc",
       "mkfs.cc",
       "mount.cc",
       "options.cc",
-      "path.cc",
       "volumes.cc",
     ]
     public_deps = [
@@ -73,7 +70,6 @@ if (is_fuchsia) {
     public = [
       "format.h",
       "fvm.h",
-      "launch.h",
     ]
   }
 }

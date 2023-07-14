@@ -16,28 +16,16 @@
 
 namespace fs_management {
 
-zx::result<> MkfsWithDefault(const char* device_path, DiskFormat df, LaunchCallback cb,
+zx::result<> MkfsWithDefault(const char* device_path, FsComponent& component,
                              const MkfsOptions& options, zx::channel crypt_client) {
-  auto status = zx::make_result(Mkfs(device_path, df, cb, options));
+  auto status = zx::make_result(Mkfs(device_path, component, options));
   if (status.is_error())
     return status.take_error();
-
-  MountOptions mount_options = {
-      .component_child_name = options.component_child_name,
-      .component_collection_name = options.component_collection_name,
-      .component_url = options.component_url,
-  };
-
-  if (df == DiskFormat::kDiskFormatFxfs) {
-    mount_options.allow_delivery_blobs = true;
-  }
-
   zx::result device = component::Connect<fuchsia_hardware_block::Block>(device_path);
   if (device.is_error()) {
     return device.take_error();
   }
-  auto fs = MountMultiVolume(std::move(device.value()), df, mount_options,
-                             fs_management::LaunchStdioAsync);
+  auto fs = MountMultiVolume(std::move(device.value()), component, {.allow_delivery_blobs = true});
   if (fs.is_error()) {
     std::cerr << "Could not mount to create default volume: " << fs.status_string() << std::endl;
     return fs.take_error();

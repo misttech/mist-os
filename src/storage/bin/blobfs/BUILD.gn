@@ -49,10 +49,6 @@ fuchsia_component_manifest("blobfs.cml") {
   manifest = "meta/blobfs.cml"
 }
 
-expect_includes("blobfs_fs_management_shard") {
-  includes = [ "//src/lib/storage/fs_management/client.shard.cml" ]
-}
-
 fuchsia_component("component") {
   cm_label = ":blobfs.cml"
   deps = [
@@ -61,7 +57,8 @@ fuchsia_component("component") {
   ]
 }
 
-# Prefer this over the previous target for tests.
+# Prefer this over the previous target for tests because it includes the required fs_management
+# shard.
 group("blobfs-component") {
   visibility += [
     "//src/lib/storage/fs_management/rust:*",
@@ -71,8 +68,8 @@ group("blobfs-component") {
     "//tools/blackout/blobfs-checkerboard:*",
   ]
   deps = [
-    ":blobfs_fs_management_shard",
     ":component",
+    "//src/lib/storage/fs_management:fs_management_shard",
   ]
 }
 

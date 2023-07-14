@@ -32,6 +32,9 @@ void AssertFormatOptionsEqual(const fuchsia_fs_startup::wire::FormatOptions& a,
   ASSERT_EQ(a.has_deprecated_padded_blobfs_format(), b.has_deprecated_padded_blobfs_format());
   if (a.has_deprecated_padded_blobfs_format())
     ASSERT_EQ(a.deprecated_padded_blobfs_format(), b.deprecated_padded_blobfs_format());
+  ASSERT_EQ(a.has_fvm_data_slices(), b.has_fvm_data_slices());
+  if (a.has_fvm_data_slices())
+    ASSERT_EQ(a.fvm_data_slices(), b.fvm_data_slices());
   ASSERT_EQ(a.has_sectors_per_cluster(), b.has_sectors_per_cluster());
   if (a.has_sectors_per_cluster())
     ASSERT_EQ(a.sectors_per_cluster(), b.sectors_per_cluster());
@@ -39,15 +42,12 @@ void AssertFormatOptionsEqual(const fuchsia_fs_startup::wire::FormatOptions& a,
 
 TEST(MountOptionsTest, DefaultOptions) {
   MountOptions options;
-  std::vector<std::string> expected_argv = {kTestBinary, "mount"};
   fuchsia_fs_startup::wire::StartOptions expected_start_options{
       // This is the default, but we explicitly enumerate it here to be clear that it's the default.
       .write_compression_algorithm = fuchsia_fs_startup::wire::CompressionAlgorithm::kZstdChunked,
       .write_compression_level = -1,
       .cache_eviction_policy_override = fuchsia_fs_startup::wire::EvictionPolicyOverride::kNone,
   };
-
-  ASSERT_EQ(options.as_argv(kTestBinary.c_str()), expected_argv);
 
   auto start_options_or = options.as_start_options();
   ASSERT_TRUE(start_options_or.is_ok()) << start_options_or.status_string();
@@ -64,18 +64,6 @@ TEST(MountOptionsTest, AllOptionsSet) {
       .fsck_after_every_transaction = true,
       .allow_delivery_blobs = true,
   };
-  std::vector<std::string> expected_argv = {kTestBinary,
-                                            "--verbose",
-                                            "mount",
-                                            "--readonly",
-                                            "--compression",
-                                            "UNCOMPRESSED",
-                                            "--compression_level",
-                                            "10",
-                                            "--eviction_policy",
-                                            "NEVER_EVICT",
-                                            "--fsck_after_every_transaction",
-                                            "--allow_delivery_blobs"};
   fuchsia_fs_startup::wire::StartOptions expected_start_options{
       .read_only = true,
       .verbose = true,
@@ -85,8 +73,6 @@ TEST(MountOptionsTest, AllOptionsSet) {
           fuchsia_fs_startup::wire::EvictionPolicyOverride::kNeverEvict,
       .allow_delivery_blobs = true,
   };
-
-  ASSERT_EQ(options.as_argv(kTestBinary.c_str()), expected_argv);
 
   auto start_options_or = options.as_start_options();
   ASSERT_TRUE(start_options_or.is_ok()) << start_options_or.status_string();
@@ -98,17 +84,12 @@ TEST(MountOptionsTest, ZstdChunkedEvictImmediately) {
       .write_compression_algorithm = "ZSTD_CHUNKED",
       .cache_eviction_policy = "EVICT_IMMEDIATELY",
   };
-  std::vector<std::string> expected_argv = {kTestBinary,         "mount",
-                                            "--compression",     "ZSTD_CHUNKED",
-                                            "--eviction_policy", "EVICT_IMMEDIATELY"};
   fuchsia_fs_startup::wire::StartOptions expected_start_options{
       .write_compression_algorithm = fuchsia_fs_startup::wire::CompressionAlgorithm::kZstdChunked,
       .write_compression_level = -1,
       .cache_eviction_policy_override =
           fuchsia_fs_startup::wire::EvictionPolicyOverride::kEvictImmediately,
   };
-
-  ASSERT_EQ(options.as_argv(kTestBinary.c_str()), expected_argv);
 
   auto start_options_or = options.as_start_options();
   ASSERT_TRUE(start_options_or.is_ok()) << start_options_or.status_string();
@@ -117,14 +98,13 @@ TEST(MountOptionsTest, ZstdChunkedEvictImmediately) {
 
 TEST(MkfsOptionsTest, DefaultOptions) {
   MkfsOptions options;
-  std::vector<std::string> expected_argv = {kTestBinary, "mkfs"};
   fidl::Arena arena;
   auto expected_format_options = fuchsia_fs_startup::wire::FormatOptions::Builder(arena)
                                      .verbose(false)
                                      .deprecated_padded_blobfs_format(false)
+                                     .fvm_data_slices(1)
                                      .Build();
 
-  ASSERT_EQ(options.as_argv(kTestBinary.c_str()), expected_argv);
   AssertFormatOptionsEqual(options.as_format_options(arena), expected_format_options);
 }
 
@@ -136,63 +116,16 @@ TEST(MkfsOptionsTest, AllOptionsSet) {
       .deprecated_padded_blobfs_format = true,
       .num_inodes = 100,
   };
-  std::vector<std::string> expected_argv = {
-      kTestBinary, "-v",  "--fvm_data_slices", "10", "--deprecated_padded_format", "--num_inodes",
-      "100",       "mkfs"};
   fidl::Arena arena;
   auto expected_format_options = fuchsia_fs_startup::wire::FormatOptions::Builder(arena)
+                                     .fvm_data_slices(10)
                                      .verbose(true)
                                      .deprecated_padded_blobfs_format(true)
                                      .num_inodes(100)
                                      .sectors_per_cluster(2)
                                      .Build();
 
-  ASSERT_EQ(options.as_argv(kTestBinary.c_str()), expected_argv);
   AssertFormatOptionsEqual(options.as_format_options(arena), expected_format_options);
-}
-
-TEST(FsckOptionsTest, DefaultOptions) {
-  FsckOptions options;
-  std::vector<std::string> expected_argv = {kTestBinary, "fsck"};
-  std::vector<std::string> expected_argv_fat32 = {};
-
-  ASSERT_EQ(options.as_argv(kTestBinary.c_str()), expected_argv);
-
-  std::vector<std::string> args;
-  options.append_argv_fat32(args);
-  ASSERT_EQ(args, expected_argv_fat32);
-}
-
-TEST(FsckOptionsTest, VerboseNeverModifyForce) {
-  FsckOptions options{
-      .verbose = true,
-      .never_modify = true,
-      .force = true,
-  };
-  // platform fsck only supports verbose
-  std::vector<std::string> expected_argv = {kTestBinary, "-v", "fsck"};
-  // fat32 fsck doesn't support verbose but does support never/always modify and force
-  std::vector<std::string> expected_argv_fat32 = {"-n", "-f"};
-
-  ASSERT_EQ(options.as_argv(kTestBinary.c_str()), expected_argv);
-  std::vector<std::string> args;
-  options.append_argv_fat32(args);
-  ASSERT_EQ(args, expected_argv_fat32);
-}
-
-TEST(FsckOptionsTest, AlwaysModify) {
-  FsckOptions options{
-      .always_modify = true,
-  };
-  // platform fsck only supports verbose
-  std::vector<std::string> expected_argv = {kTestBinary, "fsck"};
-  // fat32 fsck doesn't support verbose but does support never/always modify and force
-  std::vector<std::string> expected_argv_fat32 = {"-y"};
-
-  ASSERT_EQ(options.as_argv(kTestBinary.c_str()), expected_argv);
-  std::vector<std::string> args;
-  options.append_argv_fat32(args);
-  ASSERT_EQ(args, expected_argv_fat32);
 }
 
 }  // namespace

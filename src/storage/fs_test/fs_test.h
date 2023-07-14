@@ -195,14 +195,13 @@ class FilesystemImplWithDefaultMake : public FilesystemImpl<T> {
 
 // -- Default implementations that use fs-management --
 
-zx::result<> FsFormat(const std::string& device_path, fs_management::DiskFormat format,
+zx::result<> FsFormat(const std::string& device_path, fs_management::FsComponent& component,
                       const fs_management::MkfsOptions& options, bool create_default_volume);
 
 zx::result<std::pair<std::unique_ptr<fs_management::SingleVolumeFilesystemInterface>,
                      fs_management::NamespaceBinding>>
 FsMount(const std::string& device_path, const std::string& mount_path,
-        fs_management::DiskFormat format, const fs_management::MountOptions& mount_options,
-        bool is_multi_volume);
+        fs_management::FsComponent& component, const fs_management::MountOptions& mount_options);
 
 zx::result<std::pair<RamDevice, std::string>> OpenRamDevice(const TestFilesystemOptions& options);
 
