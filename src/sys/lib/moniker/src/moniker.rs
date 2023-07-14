@@ -60,14 +60,13 @@ pub trait MonikerBase: Default + Eq + PartialEq + fmt::Debug + Clone + Hash + fm
 
     fn path_mut(&mut self) -> &mut Vec<Self::Part>;
 
-    /// Indicates whether `other` is contained within the realm specified by
-    /// this MonikerBase.
-    fn contains_in_realm<S: MonikerBase<Part = Self::Part>>(&self, other: &S) -> bool {
-        if other.path().len() < self.path().len() {
+    /// Indicates whether this moniker is prefixed by prefix.
+    fn has_prefix<S: MonikerBase<Part = Self::Part>>(&self, prefix: &S) -> bool {
+        if self.path().len() < prefix.path().len() {
             return false;
         }
 
-        self.path().iter().enumerate().all(|item| *item.1 == other.path()[item.0])
+        prefix.path().iter().enumerate().all(|item| *item.1 == self.path()[item.0])
     }
 
     fn root() -> Self {
@@ -101,7 +100,7 @@ pub trait MonikerBase: Default + Eq + PartialEq + fmt::Debug + Clone + Hash + fm
         parent_scope: &T,
         child: &T,
     ) -> Result<Self, MonikerError> {
-        if !parent_scope.contains_in_realm(child) {
+        if !child.has_prefix(parent_scope) {
             return Err(MonikerError::ParentDoesNotContainChild {
                 parent: parent_scope.to_string(),
                 child: child.to_string(),

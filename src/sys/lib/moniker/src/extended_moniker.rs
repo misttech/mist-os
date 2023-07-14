@@ -38,11 +38,11 @@ impl ExtendedMoniker {
         }
     }
 
-    pub fn contains_in_realm(&self, other: &ExtendedMoniker) -> bool {
+    pub fn has_prefix(&self, other: &Self) -> bool {
         match (self, other) {
-            (Self::ComponentManager, _) => true,
-            (Self::ComponentInstance(_), Self::ComponentManager) => false,
-            (Self::ComponentInstance(a), Self::ComponentInstance(b)) => a.contains_in_realm(b),
+            (_, Self::ComponentManager) => true,
+            (Self::ComponentManager, Self::ComponentInstance(_)) => false,
+            (Self::ComponentInstance(a), Self::ComponentInstance(b)) => a.has_prefix(b),
         }
     }
 
@@ -80,7 +80,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn extended_monikers_parse() {
+    fn parse() {
         assert_eq!(
             ExtendedMoniker::parse_str(EXTENDED_MONIKER_COMPONENT_MANAGER_STR).unwrap(),
             ExtendedMoniker::ComponentManager
@@ -90,6 +90,34 @@ mod tests {
             ExtendedMoniker::ComponentInstance(Moniker::parse_str("/foo/bar").unwrap())
         );
         assert!(ExtendedMoniker::parse_str("").is_err(), "cannot be empty");
+    }
+
+    #[test]
+    fn has_prefix() {
+        let cm = ExtendedMoniker::ComponentManager;
+        let root = ExtendedMoniker::ComponentInstance(Moniker::root());
+        let a = ExtendedMoniker::ComponentInstance(Moniker::parse_str("a").unwrap());
+        let ab = ExtendedMoniker::ComponentInstance(Moniker::parse_str("a/b").unwrap());
+
+        assert!(cm.has_prefix(&cm));
+        assert!(!cm.has_prefix(&root));
+        assert!(!cm.has_prefix(&a));
+        assert!(!cm.has_prefix(&ab));
+
+        assert!(root.has_prefix(&cm));
+        assert!(root.has_prefix(&root));
+        assert!(!root.has_prefix(&a));
+        assert!(!root.has_prefix(&ab));
+
+        assert!(a.has_prefix(&cm));
+        assert!(a.has_prefix(&root));
+        assert!(a.has_prefix(&a));
+        assert!(!a.has_prefix(&ab));
+
+        assert!(ab.has_prefix(&cm));
+        assert!(ab.has_prefix(&root));
+        assert!(ab.has_prefix(&a));
+        assert!(ab.has_prefix(&ab));
     }
 
     #[test]

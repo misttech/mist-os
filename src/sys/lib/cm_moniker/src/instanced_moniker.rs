@@ -196,7 +196,7 @@ mod tests {
     }
 
     #[test]
-    fn instanced_monikers_contains_in_realm() {
+    fn instanced_monikers_has_prefix() {
         let root = InstancedMoniker::root();
         let a = InstancedMoniker::new(vec![InstancedChildName::try_new("a", None, 1).unwrap()]);
         let ab = InstancedMoniker::new(vec![
@@ -214,35 +214,35 @@ mod tests {
             InstancedChildName::try_new("d", None, 3).unwrap(),
         ]);
 
-        assert!(root.contains_in_realm(&root));
-        assert!(root.contains_in_realm(&a));
-        assert!(root.contains_in_realm(&ab));
-        assert!(root.contains_in_realm(&abc));
-        assert!(root.contains_in_realm(&abd));
+        assert!(root.has_prefix(&root));
+        assert!(a.has_prefix(&root));
+        assert!(ab.has_prefix(&root));
+        assert!(abc.has_prefix(&root));
+        assert!(abd.has_prefix(&root));
 
-        assert!(!a.contains_in_realm(&root));
-        assert!(a.contains_in_realm(&a));
-        assert!(a.contains_in_realm(&ab));
-        assert!(a.contains_in_realm(&abc));
-        assert!(a.contains_in_realm(&abd));
+        assert!(!root.has_prefix(&a));
+        assert!(a.has_prefix(&a));
+        assert!(ab.has_prefix(&a));
+        assert!(abc.has_prefix(&a));
+        assert!(abd.has_prefix(&a));
 
-        assert!(!ab.contains_in_realm(&root));
-        assert!(!ab.contains_in_realm(&a));
-        assert!(ab.contains_in_realm(&ab));
-        assert!(ab.contains_in_realm(&abc));
-        assert!(ab.contains_in_realm(&abd));
+        assert!(!root.has_prefix(&ab));
+        assert!(!a.has_prefix(&ab));
+        assert!(ab.has_prefix(&ab));
+        assert!(abc.has_prefix(&ab));
+        assert!(abd.has_prefix(&ab));
 
-        assert!(!abc.contains_in_realm(&root));
-        assert!(abc.contains_in_realm(&abc));
-        assert!(!abc.contains_in_realm(&a));
-        assert!(!abc.contains_in_realm(&ab));
-        assert!(!abc.contains_in_realm(&abd));
+        assert!(!root.has_prefix(&abc));
+        assert!(abc.has_prefix(&abc));
+        assert!(!a.has_prefix(&abc));
+        assert!(!ab.has_prefix(&abc));
+        assert!(!abd.has_prefix(&abc));
 
-        assert!(!abc.contains_in_realm(&abd));
-        assert!(abd.contains_in_realm(&abd));
-        assert!(!abd.contains_in_realm(&a));
-        assert!(!abd.contains_in_realm(&ab));
-        assert!(!abd.contains_in_realm(&abc));
+        assert!(!abd.has_prefix(&abc));
+        assert!(abd.has_prefix(&abd));
+        assert!(!a.has_prefix(&abd));
+        assert!(!ab.has_prefix(&abd));
+        assert!(!abc.has_prefix(&abd));
     }
 
     #[test]

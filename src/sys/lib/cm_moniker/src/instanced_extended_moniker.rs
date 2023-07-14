@@ -40,11 +40,11 @@ impl InstancedExtendedMoniker {
         }
     }
 
-    pub fn contains_in_realm(&self, other: &InstancedExtendedMoniker) -> bool {
+    pub fn has_prefix(&self, other: &InstancedExtendedMoniker) -> bool {
         match (self, other) {
             (Self::ComponentManager, _) => true,
             (Self::ComponentInstance(_), Self::ComponentManager) => false,
-            (Self::ComponentInstance(a), Self::ComponentInstance(b)) => a.contains_in_realm(b),
+            (Self::ComponentInstance(a), Self::ComponentInstance(b)) => a.has_prefix(b),
         }
     }
 }

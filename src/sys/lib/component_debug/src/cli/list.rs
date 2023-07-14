@@ -152,7 +152,7 @@ fn filter_descendants(instances: Vec<Instance>, child_str: String) -> Vec<Instan
             if child.to_string() == child_str {
                 // Get all descendants of this moniker.
                 for possible_child_instance in &instances {
-                    if instance.moniker.contains_in_realm(&possible_child_instance.moniker) {
+                    if possible_child_instance.moniker.has_prefix(&instance.moniker) {
                         descendants.insert(possible_child_instance.moniker.clone());
                     }
                 }
@@ -179,7 +179,7 @@ fn filter_relatives(instances: Vec<Instance>, child_str: String) -> Vec<Instance
 
                 // Get all descendants of this moniker and add them to relatives list.
                 for possible_child_instance in &instances {
-                    if instance.moniker.contains_in_realm(&possible_child_instance.moniker) {
+                    if possible_child_instance.moniker.has_prefix(&instance.moniker) {
                         relatives.insert(possible_child_instance.moniker.clone());
                     }
                 }

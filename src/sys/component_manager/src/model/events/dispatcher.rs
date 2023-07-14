@@ -134,7 +134,7 @@ impl EventDispatcherScope {
             // CapabilityRouted events are never dispatched
             EventPayload::CapabilityRouted { .. } => false,
             _ => {
-                let contained_in_realm = self.moniker.contains_in_realm(&event.target_moniker);
+                let contained_in_realm = event.target_moniker.has_prefix(&self.moniker);
                 let is_component_instance = matches!(
                     &event.target_moniker,
                     ExtendedMoniker::ComponentInstance(instance) if instance.is_root()
