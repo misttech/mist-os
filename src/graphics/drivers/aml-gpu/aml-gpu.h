@@ -55,7 +55,6 @@ typedef struct {
   uint32_t input_freq_map[kClockInputs];
 } aml_gpu_block_t;
 
-typedef struct aml_hiu_dev aml_hiu_dev_t;
 typedef struct aml_pll_dev aml_pll_dev_t;
 namespace aml_gpu {
 class TestAmlGpu;
@@ -112,7 +111,7 @@ class AmlGpu final : public DdkDeviceType,
   zx::resource secure_monitor_;
 
   aml_gpu_block_t* gpu_block_;
-  std::unique_ptr<aml_hiu_dev_t> hiu_dev_;
+  std::optional<fdf::MmioBuffer> hiu_dev_;
   std::unique_ptr<aml_pll_dev_t> gp0_pll_dev_;
   int32_t current_clk_source_ = -1;
   // /dev/diagnostics/class/gpu-thermal/000.inspect

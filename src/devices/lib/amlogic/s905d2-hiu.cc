@@ -9,16 +9,20 @@
 #include <zircon/syscalls.h>
 #include <zircon/types.h>
 
+#include <utility>
+
 #include <soc/aml-s905d2/s905d2-hiu-regs.h>
 #include <soc/aml-s905d2/s905d2-hiu.h>
 #include <soc/aml-s905d2/s905d2-hw.h>
 
-static inline uint32_t hiu_clk_get_reg(aml_hiu_dev_t* dev, uint32_t offset) {
-  return MmioRead32((MMIO_PTR uint32_t*)(dev->regs_vaddr + offset));
+#include "lib/mmio/mmio-view.h"
+
+static inline uint32_t hiu_clk_get_reg(fdf::MmioBuffer* dev, uint32_t offset) {
+  return dev->Read32(offset);
 }
 
-static inline uint32_t hiu_clk_set_reg(aml_hiu_dev_t* dev, uint32_t offset, uint32_t value) {
-  MmioWrite32(value, (MMIO_PTR uint32_t*)(dev->regs_vaddr + offset));
+static inline uint32_t hiu_clk_set_reg(fdf::MmioBuffer* dev, uint32_t offset, uint32_t value) {
+  dev->Write32(value, offset);
   return hiu_clk_get_reg(dev, offset);
 }
 
@@ -40,32 +44,26 @@ static inline uint32_t hiu_get_pll_offs(aml_pll_dev_t* pll_dev) {
   return 0;
 }
 
-zx_status_t s905d2_hiu_init(zx_handle_t root_resource, aml_hiu_dev_t* device) {
-  zx_status_t status;
-
-  status = mmio_buffer_init_physical(&device->mmio, S905D2_HIU_BASE, S905D2_HIU_LENGTH,
-                                     root_resource, ZX_CACHE_POLICY_UNCACHED_DEVICE);
-  if (status != ZX_OK) {
-    zxlogf(ERROR, "%s: mmio_buffer_init_physical failed %d", __func__, status);
-    return status;
+zx_status_t s905d2_hiu_init(zx_handle_t root_resource, fdf::MmioBuffer* device) {
+  zx::result<fdf::MmioBuffer> mmio =
+      fdf::MmioBuffer::Create(S905D2_HIU_BASE, S905D2_HIU_LENGTH, zx::resource(root_resource),
+                              ZX_CACHE_POLICY_UNCACHED_DEVICE);
+  if (mmio.is_error()) {
+    zxlogf(ERROR, "mmio_buffer_init_physical failed %s", mmio.status_string());
+    return mmio.status_value();
   }
-  device->regs_vaddr = static_cast<MMIO_PTR uint8_t*>(device->mmio.vaddr);
 
+  *device = std::move(*mmio);
   return ZX_OK;
 }
 
-zx_status_t s905d2_hiu_init_etc(aml_hiu_dev_t* device, MMIO_PTR uint8_t* hiubase) {
-  memset(device, 0, sizeof(*device));
-
-  device->mmio.vmo = ZX_HANDLE_INVALID;
-
-  device->regs_vaddr = hiubase;
-
+zx_status_t s905d2_hiu_init_etc(fdf::MmioBuffer* device, fdf::MmioView hiubase) {
+  *device = std::move(hiubase);
   return ZX_OK;
 }
 
 static zx_status_t s905d2_pll_init_regs(aml_pll_dev_t* pll_dev) {
-  aml_hiu_dev_t* device = pll_dev->hiu;
+  fdf::MmioBuffer* device = pll_dev->hiu;
 
   if (pll_dev->pll_num == HIFI_PLL) {
     // write config values
@@ -128,7 +126,7 @@ static zx_status_t s905d2_pll_init_regs(aml_pll_dev_t* pll_dev) {
   return ZX_ERR_NOT_SUPPORTED;
 }
 
-void s905d2_pll_init_etc(aml_hiu_dev_t* device, aml_pll_dev_t* pll_dev, hhi_plls_t pll_num) {
+void s905d2_pll_init_etc(fdf::MmioBuffer* device, aml_pll_dev_t* pll_dev, hhi_plls_t pll_num) {
   ZX_DEBUG_ASSERT(device);
   ZX_DEBUG_ASSERT(pll_dev);
 
@@ -144,7 +142,7 @@ void s905d2_pll_init_etc(aml_hiu_dev_t* device, aml_pll_dev_t* pll_dev, hhi_plls
   ZX_DEBUG_ASSERT(pll_dev->rate_count);
 }
 
-zx_status_t s905d2_pll_init(aml_hiu_dev_t* device, aml_pll_dev_t* pll_dev, hhi_plls_t pll_num) {
+zx_status_t s905d2_pll_init(fdf::MmioBuffer* device, aml_pll_dev_t* pll_dev, hhi_plls_t pll_num) {
   ZX_DEBUG_ASSERT(device);
   ZX_DEBUG_ASSERT(pll_dev);
 

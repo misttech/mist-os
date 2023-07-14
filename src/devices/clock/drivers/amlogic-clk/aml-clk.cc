@@ -70,12 +70,12 @@ class MesonRateClock {
 
 class MesonPllClock : public MesonRateClock {
  public:
-  explicit MesonPllClock(const hhi_plls_t pll_num, aml_hiu_dev_t* hiudev)
+  explicit MesonPllClock(const hhi_plls_t pll_num, fdf::MmioBuffer* hiudev)
       : pll_num_(pll_num), hiudev_(hiudev) {}
   explicit MesonPllClock(std::unique_ptr<AmlMesonPllDevice> meson_hiudev)
       : pll_num_(HIU_PLL_COUNT),  // A5 doesn't use it.
         meson_hiudev_(std::move(meson_hiudev)) {}
-  explicit MesonPllClock(MesonPllClock&& other)
+  MesonPllClock(MesonPllClock&& other)
       : pll_num_(other.pll_num_),  // A5 doesn't use it.
         pll_(other.pll_),
         hiudev_(other.hiudev_),
@@ -94,7 +94,7 @@ class MesonPllClock : public MesonRateClock {
  private:
   const hhi_plls_t pll_num_;
   aml_pll_dev_t pll_;
-  aml_hiu_dev_t* hiudev_;
+  fdf::MmioBuffer* hiudev_;
   std::unique_ptr<AmlMesonPllDevice> meson_hiudev_;
 };
 
@@ -1263,10 +1263,10 @@ zx_status_t AmlClock::GetMesonRateClock(const uint32_t clk, MesonRateClock** out
 
 void AmlClock::InitHiu() {
   pllclk_.reserve(pll_count_);
-  s905d2_hiu_init_etc(&hiudev_, static_cast<MMIO_PTR uint8_t*>(hiu_mmio_.get()));
+  s905d2_hiu_init_etc(&*hiudev_, hiu_mmio_.View(0));
   for (unsigned int pllnum = 0; pllnum < pll_count_; pllnum++) {
     const hhi_plls_t pll = static_cast<hhi_plls_t>(pllnum);
-    pllclk_.emplace_back(pll, &hiudev_);
+    pllclk_.emplace_back(pll, &*hiudev_);
     pllclk_[pllnum].Init();
   }
 }

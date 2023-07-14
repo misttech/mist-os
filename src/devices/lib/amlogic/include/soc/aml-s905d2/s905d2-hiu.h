@@ -21,13 +21,8 @@ typedef enum {
   HIU_PLL_COUNT,
 } hhi_plls_t;
 
-typedef struct aml_hiu_dev {
-  mmio_buffer_t mmio;
-  MMIO_PTR uint8_t* regs_vaddr;
-} aml_hiu_dev_t;
-
 typedef struct aml_pll_dev {
-  aml_hiu_dev_t* hiu;                // Pointer to the register control block.
+  fdf::MmioBuffer* hiu;              // Pointer to the register control block.
   const hhi_pll_rate_t* rate_table;  // Pointer to this PLLs rate table.
   uint32_t rate_idx;                 // Index in rate table of current setting.
   uint32_t frequency;                // Current operating frequency.
@@ -40,25 +35,25 @@ __BEGIN_CDECLS
 /*
     Maps the hiu register block (containing all the pll controls).
 */
-zx_status_t s905d2_hiu_init(zx_handle_t root_resource, aml_hiu_dev_t* device);
+zx_status_t s905d2_hiu_init(zx_handle_t root_resource, fdf::MmioBuffer* device);
 
 /*
-    Initializes the aml_hiu_dev_t struct assuming the register block is already
+    Initializes the fdf::MmioBuffer struct assuming the register block is already
     mapped
 */
-zx_status_t s905d2_hiu_init_etc(aml_hiu_dev_t* device, MMIO_PTR uint8_t* hiubase);
+zx_status_t s905d2_hiu_init_etc(fdf::MmioBuffer* device, fdf::MmioView hiubase);
 
 /*
     Initializes the selected pll. This resetting the pll and writing initial
     values to control registers.  When exiting init the PLL will be in a
     halted (de-enabled) state.
 */
-zx_status_t s905d2_pll_init(aml_hiu_dev_t* device, aml_pll_dev_t* pll, hhi_plls_t pll_num);
+zx_status_t s905d2_pll_init(fdf::MmioBuffer* device, aml_pll_dev_t* pll, hhi_plls_t pll_num);
 
 /*
     Sets up the PLLs internal data structures without manipulating the hardware.
 */
-void s905d2_pll_init_etc(aml_hiu_dev_t* device, aml_pll_dev_t* pll_dev, hhi_plls_t pll_num);
+void s905d2_pll_init_etc(fdf::MmioBuffer* device, aml_pll_dev_t* pll_dev, hhi_plls_t pll_num);
 
 /*
     Sets the rate of the selected pll. If the requested frequency is not found

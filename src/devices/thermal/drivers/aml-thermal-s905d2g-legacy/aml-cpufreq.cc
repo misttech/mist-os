@@ -65,7 +65,7 @@ zx_status_t AmlCpuFrequency::Create(
 
   // HIU Init.
   // Please do not use get_root_resource() in new code. See fxbug.dev/31358.
-  status = s905d2_hiu_init(get_root_resource(parent), &hiu_);
+  status = s905d2_hiu_init(get_root_resource(parent), &*hiu_);
   if (status != ZX_OK) {
     zxlogf(ERROR, "aml-cpufreq: hiu_init failed: %d", status);
     return status;
@@ -129,7 +129,7 @@ zx_status_t AmlCpuFrequency::Init() {
   }
 
   // SYS PLL Init.
-  status = s905d2_pll_init(&hiu_, &sys_pll_, SYS_PLL);
+  status = s905d2_pll_init(&*hiu_, &sys_pll_, SYS_PLL);
   if (status != ZX_OK) {
     zxlogf(ERROR, "aml-cpufreq: s905d2_pll_init failed: %d", status);
     return status;
@@ -151,7 +151,7 @@ zx_status_t AmlCpuFrequency::Init() {
 
   if (big_little_) {
     // SYS1 PLL Init.
-    status = s905d2_pll_init(&hiu_, &sys1_pll_, SYS1_PLL);
+    status = s905d2_pll_init(&*hiu_, &sys1_pll_, SYS1_PLL);
     if (status != ZX_OK) {
       zxlogf(ERROR, "aml-cpufreq: s905d2_pll_init failed: %d", status);
       return status;

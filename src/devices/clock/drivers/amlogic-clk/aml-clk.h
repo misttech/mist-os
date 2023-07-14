@@ -131,7 +131,7 @@ class AmlClock : public DeviceType, public ddk::ClockImplProtocol<AmlClock, ddk:
   // Cpu Clocks.
   std::vector<MesonCpuClock> cpu_clks_;
 
-  aml_hiu_dev_t hiudev_;
+  std::optional<fdf::MmioBuffer> hiudev_;
   std::vector<MesonPllClock> pllclk_;
   size_t pll_count_ = HIU_PLL_COUNT;
 

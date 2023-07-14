@@ -25,19 +25,16 @@ class AmlCpuFrequency {
  public:
   DISALLOW_COPY_AND_ASSIGN_ALLOW_MOVE(AmlCpuFrequency);
   AmlCpuFrequency() = default;
-  AmlCpuFrequency(fdf::MmioBuffer hiu_mmio, mmio_buffer_t hiu_internal_mmio,
+  AmlCpuFrequency(fdf::MmioBuffer hiu_mmio, fdf::MmioBuffer hiu_internal_mmio,
                   const fuchsia_hardware_thermal::wire::ThermalDeviceInfo& thermal_config,
                   const aml_thermal_info_t& thermal_info)
       : hiu_mmio_(std::move(hiu_mmio)),
+        hiu_(std::move(hiu_internal_mmio)),
         big_cluster_current_rate_(thermal_info.initial_cluster_frequencies[static_cast<uint32_t>(
             fuchsia_hardware_thermal::wire::PowerDomain::kBigClusterPowerDomain)]),
         little_cluster_current_rate_(thermal_info.initial_cluster_frequencies[static_cast<uint32_t>(
             fuchsia_hardware_thermal::wire::PowerDomain::kLittleClusterPowerDomain)]),
-        big_little_(thermal_config.big_little) {
-    // HIU Init.
-    hiu_.mmio = hiu_internal_mmio;
-    hiu_.regs_vaddr = static_cast<MMIO_PTR uint8_t*>(hiu_.mmio.vaddr);
-  }
+        big_little_(thermal_config.big_little) {}
   ~AmlCpuFrequency() = default;
   zx_status_t SetFrequency(fuchsia_hardware_thermal::wire::PowerDomain power_domain, uint32_t rate);
   zx_status_t Create(zx_device_t* parent,
@@ -58,7 +55,7 @@ class AmlCpuFrequency {
   // MMIOS.
   std::optional<fdf::MmioBuffer> hiu_mmio_;
   // HIU Handle.
-  aml_hiu_dev_t hiu_;
+  std::optional<fdf::MmioBuffer> hiu_;
   // Sys PLL.
   aml_pll_dev_t sys_pll_;
   // Sys1 PLL.

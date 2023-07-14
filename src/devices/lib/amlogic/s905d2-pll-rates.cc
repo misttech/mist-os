@@ -61,7 +61,7 @@ zx_status_t s905d2_pll_fetch_rate(aml_pll_dev_t* pll_dev, uint64_t freq,
       return ZX_OK;
     }
   }
-  *pll_rate = NULL;
+  *pll_rate = nullptr;
   return ZX_ERR_NOT_SUPPORTED;
 }
 
@@ -75,7 +75,7 @@ const hhi_pll_rate_t* s905d2_pll_get_rate_table(hhi_plls_t pll_num) {
     case PCIE_PLL:
       return s905d2_pcie_pll_rates;
     default:
-      return NULL;
+      return nullptr;
   }
 }
 

@@ -10,6 +10,7 @@
 #include <lib/async/default.h>
 #include <lib/async_patterns/testing/cpp/dispatcher_bound.h>
 #include <lib/ddk/device.h>
+#include <lib/mmio/mmio-buffer.h>
 #include <lib/mmio/mmio.h>
 #include <stdint.h>
 #include <zircon/assert.h>
@@ -24,6 +25,8 @@
 #include <fbl/array.h>
 #include <mock-mmio-reg/mock-mmio-reg.h>
 #include <zxtest/zxtest.h>
+
+#include "src/devices/lib/mmio/test-helper.h"
 
 bool operator==(const fuchsia_hardware_pwm::wire::PwmConfig& lhs,
                 const fuchsia_hardware_pwm::wire::PwmConfig& rhs) {
@@ -655,13 +658,13 @@ TEST_F(AmlVoltageRegulatorTest, AstroSetVoltageTest) {
 class FakeAmlCpuFrequency : public AmlCpuFrequency {
  public:
   static std::unique_ptr<FakeAmlCpuFrequency> Create(fdf::MmioBuffer hiu_mmio,
-                                                     mmio_buffer_t mock_hiu_internal_mmio,
+                                                     fdf::MmioBuffer mock_hiu_internal_mmio,
                                                      uint32_t pid) {
     const auto& config = (pid == 4 ? sherlock_thermal_config : astro_thermal_config);
 
     fbl::AllocChecker ac;
     auto test = fbl::make_unique_checked<FakeAmlCpuFrequency>(
-        &ac, std::move(hiu_mmio), mock_hiu_internal_mmio, config, fake_thermal_info);
+        &ac, std::move(hiu_mmio), std::move(mock_hiu_internal_mmio), config, fake_thermal_info);
     if (!ac.check()) {
       return nullptr;
     }
@@ -670,10 +673,11 @@ class FakeAmlCpuFrequency : public AmlCpuFrequency {
     return test;
   }
 
-  FakeAmlCpuFrequency(fdf::MmioBuffer hiu_mmio, mmio_buffer_t hiu_internal_mmio,
+  FakeAmlCpuFrequency(fdf::MmioBuffer hiu_mmio, fdf::MmioBuffer hiu_internal_mmio,
                       const fuchsia_hardware_thermal::wire::ThermalDeviceInfo& thermal_config,
                       const aml_thermal_info_t& thermal_info)
-      : AmlCpuFrequency(std::move(hiu_mmio), hiu_internal_mmio, thermal_config, thermal_info) {}
+      : AmlCpuFrequency(std::move(hiu_mmio), std::move(hiu_internal_mmio), thermal_config,
+                        thermal_info) {}
 };
 
 class AmlCpuFrequencyTest : public zxtest::Test {
@@ -688,16 +692,13 @@ class AmlCpuFrequencyTest : public zxtest::Test {
       return;
     }
 
-    hiu_internal_mmio_ = fbl::Array(new (&ac) uint32_t[kRegSize], kRegSize);
+    hiu_internal_mmio_ = fdf_testing::CreateMmioBuffer(kRegSize * sizeof(uint32_t));
     if (!ac.check()) {
       zxlogf(ERROR, "AmlCpuFrequencyTest::SetUp: hiu_internal_mmio_ alloc failed");
       return;
     }
 
-    mock_hiu_internal_mmio_ = {.vaddr = FakeMmioPtr(hiu_internal_mmio_.get()),
-                               .offset = 0,
-                               .size = kRegSize * sizeof(uint32_t),
-                               .vmo = ZX_HANDLE_INVALID};
+    mock_hiu_internal_mmio_ = hiu_internal_mmio_->View(0);
     InitHiuInternalMmio();
   }
 
@@ -736,13 +737,13 @@ class AmlCpuFrequencyTest : public zxtest::Test {
 
     fdf::MmioBuffer hiu_mmio(mock_hiu_mmio_->GetMmioBuffer());
     cpufreq_scaling_ =
-        FakeAmlCpuFrequency::Create(std::move(hiu_mmio), mock_hiu_internal_mmio_, pid);
+        FakeAmlCpuFrequency::Create(std::move(hiu_mmio), mock_hiu_internal_mmio_->View(0), pid);
     ASSERT_TRUE(cpufreq_scaling_ != nullptr);
   }
 
   void InitHiuInternalMmio() {
-    for (uint32_t i = 0; i < kRegSize; i++) {
-      hiu_internal_mmio_[i] = (1 << 31);
+    for (uint32_t i = 0; i < hiu_internal_mmio_->get_size(); i += sizeof(uint32_t)) {
+      hiu_internal_mmio_->Write32((1 << 31), i);
     }
   }
 
@@ -750,9 +751,9 @@ class AmlCpuFrequencyTest : public zxtest::Test {
   std::unique_ptr<FakeAmlCpuFrequency> cpufreq_scaling_;
 
   // Mmio Regs and Regions
-  fbl::Array<uint32_t> hiu_internal_mmio_;
+  std::optional<fdf::MmioBuffer> hiu_internal_mmio_;
   std::unique_ptr<ddk_mock::MockMmioRegRegion> mock_hiu_mmio_;
-  mmio_buffer_t mock_hiu_internal_mmio_;
+  std::optional<fdf::MmioBuffer> mock_hiu_internal_mmio_;
 };
 
 TEST_F(AmlCpuFrequencyTest, SherlockGetFrequencyTest) {
@@ -896,7 +897,7 @@ class FakeAmlThermal : public AmlThermal {
       fidl::WireSyncClient<fuchsia_hardware_pwm::Pwm> big_cluster_pwm,
       fidl::WireSyncClient<fuchsia_hardware_pwm::Pwm> little_cluster_pwm,
       fdf::MmioBuffer cpufreq_scaling_hiu_mmio,
-      mmio_buffer_t cpufreq_scaling_mock_hiu_internal_mmio, uint32_t pid) {
+      fdf::MmioBuffer cpufreq_scaling_mock_hiu_internal_mmio, uint32_t pid) {
     fbl::AllocChecker ac;
 
     const auto& config = (pid == 4 ? sherlock_thermal_config
@@ -923,8 +924,8 @@ class FakeAmlThermal : public AmlThermal {
 
     // CPU Frequency and Scaling
     auto cpufreq_scaling = fbl::make_unique_checked<AmlCpuFrequency>(
-        &ac, std::move(cpufreq_scaling_hiu_mmio), cpufreq_scaling_mock_hiu_internal_mmio, config,
-        fake_thermal_info);
+        &ac, std::move(cpufreq_scaling_hiu_mmio), std::move(cpufreq_scaling_mock_hiu_internal_mmio),
+        config, fake_thermal_info);
     if (!ac.check()) {
       return nullptr;
     }
@@ -1002,17 +1003,8 @@ class AmlThermalTest : public zxtest::Test {
       zxlogf(ERROR, "AmlThermalTest::SetUp: cpufreq_scaling_mock_hiu_mmio_ alloc failed");
       return;
     }
-    cpufreq_scaling_hiu_internal_mmio_ = fbl::Array(new (&ac) uint32_t[kRegSize], kRegSize);
-    if (!ac.check()) {
-      zxlogf(ERROR, "AmlThermalTest::SetUp: cpufreq_scaling_hiu_internal_mmio_ alloc failed");
-      return;
-    }
-
-    cpufreq_scaling_mock_hiu_internal_mmio_ = {
-        .vaddr = FakeMmioPtr(cpufreq_scaling_hiu_internal_mmio_.get()),
-        .offset = 0,
-        .size = kRegSize * sizeof(uint32_t),
-        .vmo = ZX_HANDLE_INVALID};
+    cpufreq_scaling_hiu_internal_mmio_ = fdf_testing::CreateMmioBuffer(kRegSize * sizeof(uint32_t));
+    cpufreq_scaling_mock_hiu_internal_mmio_ = cpufreq_scaling_hiu_internal_mmio_->View(0);
     InitHiuInternalMmio();
 
     EXPECT_OK(pwm_loop_.StartThread("pwm-servers"));
@@ -1159,13 +1151,13 @@ class AmlThermalTest : public zxtest::Test {
     thermal_device_ = FakeAmlThermal::Create(
         std::move(tsensor_pll_mmio), std::move(tsensor_trim_mmio), std::move(tsensor_hiu_mmio),
         std::move(big_cluster_pwm_client), std::move(little_cluster_pwm_client),
-        std::move(cpufreq_scaling_hiu_mmio), cpufreq_scaling_mock_hiu_internal_mmio_, pid);
+        std::move(cpufreq_scaling_hiu_mmio), cpufreq_scaling_mock_hiu_internal_mmio_->View(0), pid);
     ASSERT_TRUE(thermal_device_ != nullptr);
   }
 
   void InitHiuInternalMmio() {
-    for (uint32_t i = 0; i < kRegSize; i++) {
-      cpufreq_scaling_hiu_internal_mmio_[i] = (1 << 31);
+    for (uint32_t i = 0; i < kRegSize; i += sizeof(uint32_t)) {
+      cpufreq_scaling_hiu_internal_mmio_->Write32((1 << 31), i);
     }
   }
 
@@ -1185,9 +1177,9 @@ class AmlThermalTest : public zxtest::Test {
                                                                          std::in_place};
 
   // CPU Frequency and Scaling
-  fbl::Array<uint32_t> cpufreq_scaling_hiu_internal_mmio_;
+  std::optional<fdf::MmioBuffer> cpufreq_scaling_hiu_internal_mmio_;
   std::unique_ptr<ddk_mock::MockMmioRegRegion> cpufreq_scaling_mock_hiu_mmio_;
-  mmio_buffer_t cpufreq_scaling_mock_hiu_internal_mmio_;
+  std::optional<fdf::MmioBuffer> cpufreq_scaling_mock_hiu_internal_mmio_;
 };
 
 TEST_F(AmlThermalTest, SherlockInitTest) {

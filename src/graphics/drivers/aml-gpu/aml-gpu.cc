@@ -115,18 +115,18 @@ void AmlGpu::UpdateClockProperties() {
 }
 
 zx_status_t AmlGpu::Gp0Init() {
-  hiu_dev_ = std::make_unique<aml_hiu_dev_t>();
+  // hiu_dev_ is now initialized in |s905d2_hiu_init|.
   gp0_pll_dev_ = std::make_unique<aml_pll_dev_t>();
 
   // HIU Init.
   // Please do not use get_root_resource() in new code. See fxbug.dev/31358.
-  zx_status_t status = s905d2_hiu_init(get_root_resource(parent()), hiu_dev_.get());
+  zx_status_t status = s905d2_hiu_init(get_root_resource(parent()), &*hiu_dev_);
   if (status != ZX_OK) {
     zxlogf(ERROR, "aml_gp0_init: hiu_init failed: %d", status);
     return status;
   }
 
-  status = s905d2_pll_init(hiu_dev_.get(), gp0_pll_dev_.get(), GP0_PLL);
+  status = s905d2_pll_init(&*hiu_dev_, gp0_pll_dev_.get(), GP0_PLL);
   if (status != ZX_OK) {
     zxlogf(ERROR, "aml_gp0_init: pll_init failed: %d", status);
     return status;
