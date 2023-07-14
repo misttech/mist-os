@@ -73,11 +73,15 @@ pub fn sys_gettimeofday(
 
 pub fn sys_clock_nanosleep(
     current_task: &mut CurrentTask,
-    which_clock: u32,
+    which_clock: uapi::__kernel_clockid_t,
     flags: u32,
     user_request: UserRef<timespec>,
     user_remaining: UserRef<timespec>,
 ) -> Result<(), Errno> {
+    if which_clock < 0 {
+        return error!(EINVAL);
+    }
+    let which_clock = which_clock as u32;
     let is_absolute = flags == TIMER_ABSTIME;
     // TODO(https://fxrev.dev/117507): For now, Starnix pretends that the monotonic and realtime
     // clocks advance at close to uniform rates and so we can treat relative realtime offsets the
@@ -85,10 +89,15 @@ pub fn sys_clock_nanosleep(
     // if we sleep for too little time.
     // At some point we'll need to monitor changes to the realtime clock proactively and adjust
     // timers accordingly.
-    if which_clock != CLOCK_MONOTONIC && which_clock != CLOCK_REALTIME {
-        not_implemented!("clock_nanosleep, clock {:?}, flags {:?}", which_clock, flags);
-        return error!(EINVAL);
+    match which_clock {
+        CLOCK_REALTIME | CLOCK_MONOTONIC => {}
+        CLOCK_TAI | CLOCK_BOOTTIME | CLOCK_PROCESS_CPUTIME_ID => {
+            not_implemented!("clock_nanosleep, clock {:?}, flags {:?}", which_clock, flags);
+            return error!(EINVAL);
+        }
+        _ => return error!(EOPNOTSUPP),
     }
+
     let request = current_task.read_object(user_request)?;
     log_trace!("clock_nanosleep({}, {}, {:?})", which_clock, flags, request);
 
@@ -193,7 +202,13 @@ pub fn sys_nanosleep(
     user_request: UserRef<timespec>,
     user_remaining: UserRef<timespec>,
 ) -> Result<(), Errno> {
-    sys_clock_nanosleep(current_task, CLOCK_REALTIME, 0, user_request, user_remaining)
+    sys_clock_nanosleep(
+        current_task,
+        CLOCK_REALTIME as uapi::__kernel_clockid_t,
+        0,
+        user_request,
+        user_remaining,
+    )
 }
 
 /// Returns the cpu time for the task with the given `pid`.
