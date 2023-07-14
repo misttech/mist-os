@@ -121,11 +121,13 @@ library_headers("test-headers") {
   headers = [
     "lib/elfldltl/testing/diagnostics.h",
     "lib/elfldltl/testing/get-test-data.h",
+    "lib/elfldltl/testing/loader.h",
     "lib/elfldltl/testing/typed-test.h",
   ]
 
   public_deps = [
     ":elfldltl",
+    "//third_party/googletest:gmock",
     "//third_party/googletest:gtest",
     "//zircon/system/ulib/fbl",
   ]

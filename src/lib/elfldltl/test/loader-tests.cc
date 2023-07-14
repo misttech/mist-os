@@ -5,19 +5,18 @@
 #include <lib/elfldltl/container.h>
 #include <lib/elfldltl/diagnostics.h>
 #include <lib/elfldltl/dynamic.h>
-#include <lib/elfldltl/fd.h>
 #include <lib/elfldltl/link.h>
 #include <lib/elfldltl/load.h>
 #include <lib/elfldltl/mmap-loader.h>
 #include <lib/elfldltl/testing/diagnostics.h>
 #include <lib/elfldltl/testing/get-test-data.h>
+#include <lib/elfldltl/testing/loader.h>
 #include <lib/fit/defer.h>
 #include <sys/mman.h>
 
 #include <filesystem>
 #include <vector>
 
-#include <fbl/unique_fd.h>
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
 
@@ -30,56 +29,6 @@
 
 namespace {
 
-#ifdef __Fuchsia__
-struct LocalVmarLoaderTraits {
-  using Loader = elfldltl::LocalVmarLoader;
-
-  static auto MakeLoader() { return elfldltl::LocalVmarLoader{}; }
-
-  static inline auto TestLibProvider = elfldltl::testing::GetTestLibVmo;
-
-  template <class Diagnostics>
-  static auto MakeFile(zx::unowned_vmo vmo, Diagnostics& diagnostics) {
-    return elfldltl::UnownedVmoFile(vmo->borrow(), diagnostics);
-  }
-
-  static zx::unowned_vmo LoadFileArgument(const zx::vmo& vmo) { return vmo.borrow(); }
-
-  static constexpr bool kHasMemory = true;
-};
-
-struct RemoteVmarLoaderTraits : public LocalVmarLoaderTraits {
-  using Loader = elfldltl::RemoteVmarLoader;
-
-  static auto MakeLoader() { return elfldltl::RemoteVmarLoader{*zx::vmar::root_self()}; }
-
-  static constexpr bool kHasMemory = false;
-};
-#endif
-
-struct MmapLoaderTraits {
-  using Loader = elfldltl::MmapLoader;
-
-  static auto MakeLoader() { return elfldltl::MmapLoader{}; }
-
-  static inline auto TestLibProvider = elfldltl::testing::GetTestLib;
-
-  template <class Diagnostics>
-  static auto MakeFile(int fd, Diagnostics& diagnostics) {
-    return elfldltl::FdFile(fd, diagnostics);
-  }
-
-  static int LoadFileArgument(const fbl::unique_fd& fd) { return fd.get(); }
-
-  static constexpr bool kHasMemory = true;
-};
-
-using LoaderTypes = ::testing::Types<
-#ifdef __Fuchsia__
-    LocalVmarLoaderTraits, RemoteVmarLoaderTraits,
-#endif
-    MmapLoaderTraits>;
-
 struct LoadOptions {
   bool commit = true;
   bool persist_state = false;
@@ -87,8 +36,10 @@ struct LoadOptions {
 };
 
 template <class Traits>
-class ElfldltlLoaderTests : public testing::Test {
+class ElfldltlLoaderTests : public elfldltl::testing::LoadTests<Traits> {
  public:
+  using Base = elfldltl::testing::LoadTests<Traits>;
+
   void TearDown() override {
     // We use the Posix APIs for genericism of the test.
     // The destructors of the various loaders use platform
@@ -99,45 +50,28 @@ class ElfldltlLoaderTests : public testing::Test {
   }
 
   void Load(std::string_view so_path, LoadOptions options = {}) {
-    auto diag = elfldltl::testing::ExpectOkDiagnostics();
-
-    auto lib_file = Traits::TestLibProvider(so_path);
-    if (HasFatalFailure()) {
-      return;
-    }
-
-    auto file = Traits::MakeFile(Traits::LoadFileArgument(lib_file), diag);
-
-    auto headers =
-        elfldltl::LoadHeadersFromFile<Elf>(diag, file, elfldltl::NewArrayFromFile<Phdr>());
-    ASSERT_TRUE(headers);
-    auto& [ehdr, phdrs_result] = *headers;
-
-    ASSERT_TRUE(phdrs_result);
-    cpp20::span<const Phdr> phdrs = phdrs_result.get();
-
-    typename Traits::Loader loader = Traits::MakeLoader();
-
-    ElfLoadInfo load_info;
-    ASSERT_TRUE(elfldltl::DecodePhdrs(diag, phdrs, load_info.GetPhdrObserver(loader.page_size())));
-
-    ASSERT_TRUE(loader.Load(diag, load_info, Traits::LoadFileArgument(lib_file)));
+    std::optional<typename Base::LoadResult> result;
+    Base::Load(so_path, result);
+    ASSERT_TRUE(result);
 
     elfldltl::DirectMemory mem;
     if constexpr (Traits::kHasMemory) {
-      mem.set_base(loader.memory().base());
-      mem.set_image(loader.memory().image());
+      mem.set_base(result->loader.memory().base());
+      mem.set_image(result->loader.memory().image());
     } else {
-      mem.set_base(load_info.vaddr_start());
-      mem.set_image({reinterpret_cast<std::byte*>(load_info.vaddr_start() + loader.load_bias()),
-                     load_info.vaddr_size()});
+      mem.set_base(result->info.vaddr_start());
+      mem.set_image(
+          {reinterpret_cast<std::byte*>(result->info.vaddr_start() + result->loader.load_bias()),
+           result->info.vaddr_size()});
     }
 
-    EXPECT_EQ(mem.base(), load_info.vaddr_start());
-    EXPECT_EQ(mem.image().size_bytes(), load_info.vaddr_size());
+    EXPECT_EQ(mem.base(), result->info.vaddr_start());
+    EXPECT_EQ(mem.image().size_bytes(), result->info.vaddr_size());
     EXPECT_EQ(reinterpret_cast<uintptr_t>(mem.image().data()),
-              load_info.vaddr_start() + loader.load_bias());
+              result->info.vaddr_start() + result->loader.load_bias());
 
+    auto diag = elfldltl::testing::ExpectOkDiagnostics();
+    cpp20::span<const Phdr> phdrs = result->phdrs.get();
     std::optional<Phdr> ph;
     std::optional<Phdr> relro_phdr;
     elfldltl::DecodePhdrs(diag, phdrs, elfldltl::PhdrDynamicObserver<Elf>(ph),
@@ -169,16 +103,16 @@ class ElfldltlLoaderTests : public testing::Test {
       ASSERT_TRUE(elfldltl::RelocateSymbolic(mem, diag, reloc_info, sym_info_, bias, resolve));
     }
 
-    entry_ = mem.GetPointer<std::remove_pointer_t<decltype(entry_)>>(ehdr.entry);
+    entry_ = mem.GetPointer<std::remove_pointer_t<decltype(entry_)>>(result->entry);
     if (options.commit) {
       mem_.set_image(mem.image());
       mem_.set_base(mem.base());
-      std::move(loader).Commit();
+      std::move(result->loader).Commit();
     }
 
     if (options.persist_state) {
-      loader_opt_ = std::move(loader);
-      relro_phdr_ = std::move(relro_phdr);
+      loader_opt_ = std::move(result->loader);
+      relro_phdr_ = relro_phdr;
     }
 
     EXPECT_EQ(mem_.image().empty(), !options.commit);
@@ -238,28 +172,29 @@ class ElfldltlLoaderTests : public testing::Test {
   std::optional<Phdr> relro_phdr_;
 };
 
-TYPED_TEST_SUITE(ElfldltlLoaderTests, LoaderTypes);
+TYPED_TEST_SUITE(ElfldltlLoaderTests, elfldltl::testing::LoaderTypes);
 
 TYPED_TEST(ElfldltlLoaderTests, Basic) {
-  this->Load(kRet24, {.reloc = false});
+  ASSERT_NO_FATAL_FAILURE(this->Load(kRet24, {.reloc = false}));
 
   EXPECT_EQ(this->template entry<decltype(Return24)>()(), 24);
 }
 
 TYPED_TEST(ElfldltlLoaderTests, UnmapCorrectly) {
-  this->Load(kRet24, {.commit = false, .reloc = false});
+  ASSERT_NO_FATAL_FAILURE(this->Load(kRet24, {.commit = false, .reloc = false}));
 
   EXPECT_DEATH(this->template entry<decltype(Return24)>()(), "");
 }
 
 TYPED_TEST(ElfldltlLoaderTests, PersistCorrectly) {
-  this->Load(kRet24, {.commit = false, .persist_state = true, .reloc = false});
+  ASSERT_NO_FATAL_FAILURE(
+      this->Load(kRet24, {.commit = false, .persist_state = true, .reloc = false}));
 
   EXPECT_EQ(this->template entry<decltype(Return24)>()(), 24);
 }
 
 TYPED_TEST(ElfldltlLoaderTests, DataSegments) {
-  this->Load(kNoXSegment);
+  ASSERT_NO_FATAL_FAILURE(this->Load(kNoXSegment));
 
   TestData* data = this->template entry<TestData>();
   EXPECT_EQ(*data->rodata, 5);
@@ -274,7 +209,7 @@ TYPED_TEST(ElfldltlLoaderTests, DataSegments) {
 }
 
 TYPED_TEST(ElfldltlLoaderTests, LargeDataSegment) {
-  this->Load(kNoXSegmentLargeData);
+  ASSERT_NO_FATAL_FAILURE(this->Load(kNoXSegmentLargeData));
 
   TestData* data = this->template entry<TestData>();
   EXPECT_EQ(*data->rodata, 5);
@@ -290,7 +225,7 @@ TYPED_TEST(ElfldltlLoaderTests, LargeDataSegment) {
 }
 
 TYPED_TEST(ElfldltlLoaderTests, LargeBssSegment) {
-  this->Load(kNoXSegmentLargeBss);
+  ASSERT_NO_FATAL_FAILURE(this->Load(kNoXSegmentLargeBss));
 
   TestData* data = this->template entry<TestData>();
   EXPECT_EQ(*data->rodata, 5);
@@ -306,7 +241,7 @@ TYPED_TEST(ElfldltlLoaderTests, LargeBssSegment) {
 }
 
 TYPED_TEST(ElfldltlLoaderTests, ProtectRelroTest) {
-  this->Load(kRelro, {.commit = false, .persist_state = true});
+  ASSERT_NO_FATAL_FAILURE(this->Load(kRelro, {.commit = false, .persist_state = true}));
 
   RelroData* data = this->template entry<RelroData>();
   ASSERT_NE(data, nullptr);
@@ -322,7 +257,7 @@ TYPED_TEST(ElfldltlLoaderTests, ProtectRelroTest) {
 }
 
 TYPED_TEST(ElfldltlLoaderTests, BasicSymbol) {
-  this->Load(kSymbolic);
+  ASSERT_NO_FATAL_FAILURE(this->Load(kSymbolic));
 
   constexpr elfldltl::SymbolName kFoo("foo");
 
@@ -332,7 +267,7 @@ TYPED_TEST(ElfldltlLoaderTests, BasicSymbol) {
 }
 
 TYPED_TEST(ElfldltlLoaderTests, ResolveSymbolic) {
-  this->Load(kSymbolic);
+  ASSERT_NO_FATAL_FAILURE(this->Load(kSymbolic));
 
   EXPECT_EQ(this->template lookup_sym<decltype(NeedsPlt)>("NeedsPlt")(), 2);
   EXPECT_EQ(this->template lookup_sym<decltype(NeedsGot)>("NeedsGot")(), 3);
