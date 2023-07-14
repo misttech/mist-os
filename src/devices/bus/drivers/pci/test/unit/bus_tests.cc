@@ -137,7 +137,7 @@ TEST_F(PciBusTests, Lifecycle) {
 TEST_F(PciBusTests, BdiGetBti) {
   pciroot().ecam().get(pci_bdf_t{}).device.set_vendor_id(8086).set_device_id(8086);
   auto owned_bus = std::make_unique<TestBus>(parent(), pciroot().proto(), pciroot().info(),
-                                             pciroot().ecam().CopyEcam());
+                                             pciroot().ecam().EcamView());
   ASSERT_OK(owned_bus->Initialize());
   auto* bus = owned_bus.release();
   ASSERT_EQ(bus->GetDeviceCount(), 1);
@@ -158,7 +158,7 @@ TEST_F(PciBusTests, BdiGetBti) {
 
 TEST_F(PciBusTests, BdiAllocateMsi) {
   auto owned_bus = std::make_unique<TestBus>(parent(), pciroot().proto(), pciroot().info(),
-                                             pciroot().ecam().CopyEcam());
+                                             pciroot().ecam().EcamView());
   ASSERT_OK(owned_bus->Initialize());
   auto* bus = owned_bus.release();
 
@@ -175,7 +175,7 @@ TEST_F(PciBusTests, BdiAllocateMsi) {
 TEST_F(PciBusTests, BdiLinkUnlinkDevice) {
   pciroot().ecam().get(pci_bdf_t{}).device.set_vendor_id(8086).set_device_id(8086);
   auto owned_bus = std::make_unique<TestBus>(parent(), pciroot().proto(), pciroot().info(),
-                                             pciroot().ecam().CopyEcam());
+                                             pciroot().ecam().EcamView());
   ASSERT_OK(owned_bus->Initialize());
   auto* bus = owned_bus.release();
   ASSERT_EQ(bus->GetDeviceCount(), 1);
@@ -217,7 +217,7 @@ TEST_F(PciBusTests, IrqRoutingEntries) {
                               .pins = {1, 2, 3, 4}});
 
   auto owned_bus = std::make_unique<TestBus>(parent(), pciroot().proto(), pciroot().info(),
-                                             pciroot().ecam().CopyEcam());
+                                             pciroot().ecam().EcamView());
   ASSERT_OK(owned_bus->Initialize());
   auto* bus = owned_bus.release();
   ASSERT_EQ(int_mod, bus->GetSharedIrqCount());
@@ -237,7 +237,7 @@ TEST_F(PciBusTests, LegacyIrqSignalTest) {
   pciroot().ecam().get({0, 0, 0}).device.set_interrupt_pin(0x1);
   pciroot().ecam().get({0, 0, 1}).device.set_interrupt_pin(0x2);
   auto owned_bus = std::make_unique<TestBus>(parent(), pciroot().proto(), pciroot().info(),
-                                             pciroot().ecam().CopyEcam());
+                                             pciroot().ecam().EcamView());
   ASSERT_OK(owned_bus->Initialize());
   auto* bus = owned_bus.release();
   ASSERT_EQ(1, bus->GetSharedIrqCount());
@@ -295,7 +295,7 @@ TEST_F(PciBusTests, LegacyIrqNoAckTest) {
   AddRoutingEntryToBus(/*p_dev=*/std::nullopt, /*p_func=*/std::nullopt, /*dev_id=*/0, /*a=*/vector,
                        /*b=*/0, /*c=*/0, /*d=*/0);
   auto owned_bus = std::make_unique<TestBus>(parent(), pciroot().proto(), pciroot().info(),
-                                             pciroot().ecam().CopyEcam());
+                                             pciroot().ecam().EcamView());
   ASSERT_OK(owned_bus->Initialize());
   auto* bus = owned_bus.release();
   ASSERT_OK(
@@ -355,7 +355,7 @@ TEST_F(PciBusTests, Inspect) {
   AddRoutingEntryToBus(/*p_dev=*/std::nullopt, /*p_func=*/std::nullopt, /*dev_id=*/0, /*a=*/vector,
                        /*b=*/0, /*c=*/0, /*d=*/0);
   auto owned_bus = std::make_unique<TestBus>(parent(), pciroot().proto(), pciroot().info(),
-                                             pciroot().ecam().CopyEcam());
+                                             pciroot().ecam().EcamView());
   ASSERT_OK(owned_bus->Initialize());
   ASSERT_NO_FATAL_FAILURE(owned_bus->ReadInspect(owned_bus->GetInspectVmo()));
 

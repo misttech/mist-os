@@ -245,16 +245,7 @@ class FakeEcam {
     reset();
   }
 
-  fdf::MmioBuffer CopyEcam() {
-    mmio_buffer_t buffer = {
-        .vaddr = mmio_->get(),
-        .offset = mmio_->get_offset(),
-        .size = mmio_->get_size(),
-        .vmo = mmio_->get_vmo()->get(),
-    };
-
-    return fdf::MmioBuffer(buffer);
-  }
+  fdf::MmioView EcamView() { return mmio_->View(0); }
 
   // Provide ways to access individual devices in the ecam by BDF address.
   FakeDeviceConfig& get(uint8_t bus_id, uint8_t dev_id, uint8_t func_id) {
