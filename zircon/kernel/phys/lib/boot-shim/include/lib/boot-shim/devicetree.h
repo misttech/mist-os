@@ -284,11 +284,6 @@ class DevicetreeBootstrapChosenNodeItem : public DevicetreeBootstrapChosenNodeIt
 //
 class DevicetreeMemoryItem : public DevicetreeItemBase<DevicetreeMemoryItem, 1>, public ItemBase {
  public:
-  // Other platforms such as Linux provide a few of preallocated buffers for storing memory ranges,
-  // |kMaxRanges| is a big enough upperbound for the combined number of ranges provided by such
-  // buffers.
-  static constexpr uint32_t kMaxRanges = 512;
-
   // Matcher API.
   static constexpr size_t kMaxScans = 1;
 
@@ -301,6 +296,8 @@ class DevicetreeMemoryItem : public DevicetreeItemBase<DevicetreeMemoryItem, 1>,
   size_t size_bytes() const { return ItemSize(ranges_count_ * sizeof(zbi_mem_range_t)); }
 
   fit::result<DataZbi::Error> AppendItems(DataZbi& zbi) const;
+
+  void InitStorage(cpp20::span<memalloc::Range> storage) { ranges_ = storage; }
 
   template <typename Shim>
   void Init(const Shim& shim) {
@@ -334,7 +331,7 @@ class DevicetreeMemoryItem : public DevicetreeItemBase<DevicetreeMemoryItem, 1>,
   // An empty set of memory ranges indicates an error while parsing the devicetree
   // memory ranges.
   constexpr cpp20::span<const memalloc::Range> memory_ranges() const {
-    if (ranges_count_ <= kMaxRanges) {
+    if (ranges_count_ <= ranges_.size()) {
       return cpp20::span{ranges_.data(), ranges_count_};
     }
     return {};
@@ -348,7 +345,7 @@ class DevicetreeMemoryItem : public DevicetreeItemBase<DevicetreeMemoryItem, 1>,
       if (ranges_count_ == ranges_.size()) {
         OnError("Not enough preallocated ranges.");
       }
-      ranges_count_ = kMaxRanges + 1;
+      ranges_count_ = ranges_.size() + 1;
       return false;
     }
     ranges_[ranges_count_++] = range;
@@ -365,8 +362,8 @@ class DevicetreeMemoryItem : public DevicetreeItemBase<DevicetreeMemoryItem, 1>,
   devicetree::ScanState HandleReservedMemoryNode(const devicetree::NodePath& path,
                                                  const devicetree::PropertyDecoder& decoder);
 
-  std::array<memalloc::Range, kMaxRanges> ranges_;
-  uint32_t ranges_count_ = 0;
+  cpp20::span<memalloc::Range> ranges_;
+  size_t ranges_count_ = 0;
 
   const devicetree::Node* reserved_memory_root_ = nullptr;
 

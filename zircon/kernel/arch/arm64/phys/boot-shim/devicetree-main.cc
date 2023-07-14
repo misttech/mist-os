@@ -8,6 +8,7 @@
 #include <lib/boot-options/boot-options.h>
 #include <lib/boot-shim/devicetree-boot-shim.h>
 #include <lib/boot-shim/devicetree.h>
+#include <lib/memalloc/range.h>
 #include <lib/zbitl/view.h>
 #include <stdint.h>
 #include <stdio.h>
@@ -29,6 +30,8 @@ namespace {
 constexpr const char* kShimName = "devicetree-boot-shim";
 constexpr const char* kBootstrapShimName = "devicetree-bootstrap-boot-shim";
 
+std::array<memalloc::Range, kDevicetreeMaxMemoryRanges> gMemoryStorage;
+
 }  // namespace
 
 void PhysMain(void* flat_devicetree_blob, arch::EarlyTicks ticks) {
@@ -43,9 +46,10 @@ void PhysMain(void* flat_devicetree_blob, arch::EarlyTicks ticks) {
                                 boot_shim::DevicetreeBootstrapChosenNodeItem<>>
       bootstrap_shim(kBootstrapShimName, devicetree::Devicetree(fdt_blob));
 
+  auto& memory_item = bootstrap_shim.Get<boot_shim::DevicetreeMemoryItem>();
+  memory_item.InitStorage(gMemoryStorage);
   bootstrap_shim.Init();
 
-  auto& memory_item = bootstrap_shim.Get<boot_shim::DevicetreeMemoryItem>();
   auto& chosen_item = bootstrap_shim.Get<boot_shim::DevicetreeBootstrapChosenNodeItem<>>();
 
   DevicetreeInitUart(chosen_item, boot_opts);

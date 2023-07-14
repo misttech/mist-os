@@ -74,6 +74,7 @@ if (current_toolchain != default_toolchain) {
       "..:main",
       "..:stdio",
       "..:uart",
+      "../boot-shim:devicetree",
       "//zircon/kernel/lib/arch",
       "//zircon/kernel/lib/boot-options",
       "//zircon/kernel/lib/libc",

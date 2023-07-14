@@ -25,6 +25,14 @@
 #include <phys/allocation.h>
 #include <phys/zbitl-allocation.h>
 
+// Other platforms such as Linux provide a few of preallocated buffers for storing memory ranges,
+// |kMaxRanges| is a big enough upperbound for the combined number of ranges provided by such
+// buffers.
+//
+// This represents a recommended number of entries to be allocated for storing real world memory
+// ranges.
+static inline constexpr size_t kDevicetreeMaxMemoryRanges = 512;
+
 // Initializes the shim's uart from the devicetree bootshim's chosen item properties, such as
 // stdout-path, ramdisk and command line. As a side effect |boot_opts| is initialized with the
 // contents of commandline as well.
@@ -52,13 +60,13 @@ fit::result<std::string_view, zbitl::Image<Allocation>> DevicetreeLoadZbi(
   const auto& chosen_item =
       bootstrap_shim.template Get<boot_shim::DevicetreeBootstrapChosenNodeItem<>>();
   size_t uart_item_size = 0;
-  
+
   chosen_item.uart().Visit([&](const auto& driver) {
     if (std::is_same_v<std::decay_t<decltype(driver.uart().config())>, zbi_dcfg_simple_t>) {
       uart_item_size = zbitl::AlignedItemLength(sizeof(zbi_dcfg_simple_t));
     }
   });
-      
+
   size_t zbi_size =
       input_zbi.size() + bootstrap_shim.size_bytes() + shim.size_bytes() + uart_item_size;
 
@@ -100,21 +108,20 @@ fit::result<std::string_view, zbitl::Image<Allocation>> DevicetreeLoadZbi(
   // shim. The IRQ is not necessary yet for the set of tests we are running.
   if (uart_item_size > 0) {
     const char* error = nullptr;
-    chosen_item.uart().Visit( [&](const auto& driver) {
-          const auto& dcfg = driver.uart();
-          if constexpr (std::is_same_v<zbi_dcfg_simple_t, ktl::decay_t<decltype(dcfg.config())>>) {
-            zbi_header_t header;
-            zbi_dcfg_simple_t payload;
-            header.type = ZBI_TYPE_KERNEL_DRIVER;
-            header.extra = dcfg.extra();
-            dcfg.FillItem(&payload);
+    chosen_item.uart().Visit([&](const auto& driver) {
+      const auto& dcfg = driver.uart();
+      if constexpr (std::is_same_v<zbi_dcfg_simple_t, ktl::decay_t<decltype(dcfg.config())>>) {
+        zbi_header_t header;
+        zbi_dcfg_simple_t payload;
+        header.type = ZBI_TYPE_KERNEL_DRIVER;
+        header.extra = dcfg.extra();
+        dcfg.FillItem(&payload);
 
-            if (new_zbi.Append(header, ktl::as_writable_bytes(ktl::span(&payload, 1))).is_error()) {
-              error = "Failed to append UART item.";
-            }
-          }
+        if (new_zbi.Append(header, ktl::as_writable_bytes(ktl::span(&payload, 1))).is_error()) {
+          error = "Failed to append UART item.";
         }
-    );
+      }
+    });
     if (error != nullptr) {
       return fit::error(error);
     }

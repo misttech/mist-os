@@ -521,11 +521,13 @@ std::optional<LoadedDtb> MemoryItemTest::complex_ldtb_ = std::nullopt;
 
 TEST_F(MemoryItemTest, ParseMemreserves) {
   std::array<std::byte, 256> image_buffer;
+  std::vector<memalloc::Range> storage(5);
   zbitl::Image<cpp20::span<std::byte>> image(image_buffer);
   ASSERT_TRUE(image.clear().is_ok());
 
   auto fdt = memreserve_ldtb();
   boot_shim::DevicetreeBootShim<boot_shim::DevicetreeMemoryItem> shim("test", fdt);
+  shim.Get<boot_shim::DevicetreeMemoryItem>().InitStorage(storage);
 
   shim.Init();
 
@@ -558,11 +560,13 @@ TEST_F(MemoryItemTest, ParseMemreserves) {
 
 TEST_F(MemoryItemTest, ParseMemoryNodes) {
   std::array<std::byte, 256> image_buffer;
+  std::vector<memalloc::Range> storage(5);
   zbitl::Image<cpp20::span<std::byte>> image(image_buffer);
   ASSERT_TRUE(image.clear().is_ok());
 
   auto fdt = memory_ldtb();
   boot_shim::DevicetreeBootShim<boot_shim::DevicetreeMemoryItem> shim("test", fdt);
+  shim.Get<boot_shim::DevicetreeMemoryItem>().InitStorage(storage);
 
   shim.Init();
 
@@ -595,12 +599,13 @@ TEST_F(MemoryItemTest, ParseMemoryNodes) {
 
 TEST_F(MemoryItemTest, ParseReservedMemoryNodes) {
   std::array<std::byte, 256> image_buffer;
+  std::vector<memalloc::Range> storage(3);
   zbitl::Image<cpp20::span<std::byte>> image(image_buffer);
   ASSERT_TRUE(image.clear().is_ok());
 
   auto fdt = reserved_memory_ldtb();
   boot_shim::DevicetreeBootShim<boot_shim::DevicetreeMemoryItem> shim("test", fdt);
-
+  shim.Get<boot_shim::DevicetreeMemoryItem>().InitStorage(storage);
   shim.Init();
 
   auto& mem_item = shim.Get<boot_shim::DevicetreeMemoryItem>();
@@ -624,11 +629,13 @@ TEST_F(MemoryItemTest, ParseReservedMemoryNodes) {
 
 TEST_F(MemoryItemTest, ParseAllAndAppend) {
   std::array<std::byte, 512> image_buffer;
+  std::vector<memalloc::Range> storage(11);
   zbitl::Image<cpp20::span<std::byte>> image(image_buffer);
   ASSERT_TRUE(image.clear().is_ok());
 
   auto fdt = complex_ldtb();
   boot_shim::DevicetreeBootShim<boot_shim::DevicetreeMemoryItem> shim("test", fdt);
+  shim.Get<boot_shim::DevicetreeMemoryItem>().InitStorage(storage);
 
   shim.Init();
 
