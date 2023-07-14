@@ -290,14 +290,10 @@ class FakeDdkOptee : public zxtest::Test {
 };
 
 TEST_F(FakeDdkOptee, PmtUnpinned) {
-  zx_handle_t pmt_handle = optee_->pmt().get();
-  EXPECT_NE(pmt_handle, ZX_HANDLE_INVALID);
-
-  EXPECT_TRUE(fake_object::FakeHandleTable().Get(pmt_handle).is_ok());
-  EXPECT_EQ(ZX_OBJ_TYPE_PMT, fake_object::FakeHandleTable().Get(pmt_handle)->type());
+  EXPECT_TRUE(optee_->pinned_mmio().has_value());
 
   optee_->zxdev()->SuspendNewOp(DEV_POWER_STATE_D3COLD, false, DEVICE_SUSPEND_REASON_REBOOT);
-  EXPECT_FALSE(fake_object::FakeHandleTable().Get(pmt_handle).is_ok());
+  EXPECT_FALSE(optee_->pinned_mmio().has_value());
 }
 
 TEST_F(FakeDdkOptee, RpmbTest) { EXPECT_EQ(optee_->RpmbConnectServer().status_value(), ZX_OK); }

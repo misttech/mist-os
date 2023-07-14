@@ -15,6 +15,7 @@
 #include <lib/fdf/cpp/dispatcher.h>
 #include <lib/fidl/cpp/wire/channel.h>
 #include <lib/fit/function.h>
+#include <lib/mmio/mmio-pinned-buffer.h>
 #include <lib/zircon-internal/thread_annotations.h>
 #include <lib/zx/channel.h>
 #include <lib/zx/resource.h>
@@ -159,7 +160,7 @@ class OpteeController : public OpteeControllerBase,
   const GetOsRevisionResult& os_revision() const { return os_revision_; }
 
   // Should only be used for testing.
-  const zx::pmt& pmt() const { return pmt_; }
+  const std::optional<fdf::MmioPinnedBuffer>& pinned_mmio() const { return pinned_mmio_; }
 
  private:
   static constexpr fuchsia_tee::wire::Uuid kOpteeOsUuid = {
@@ -191,7 +192,7 @@ class OpteeController : public OpteeControllerBase,
   uint32_t secure_world_capabilities_ = 0;
   GetOsRevisionResult os_revision_;
   zx::bti bti_;
-  zx::pmt pmt_;
+  std::optional<fdf::MmioPinnedBuffer> pinned_mmio_;
   std::unique_ptr<SharedMemoryManager> shared_memory_manager_;
 
   component::OutgoingDirectory outgoing_{fdf::Dispatcher::GetCurrent()->async_dispatcher()};

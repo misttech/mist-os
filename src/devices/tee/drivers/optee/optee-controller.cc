@@ -13,6 +13,7 @@
 #include <lib/ddk/platform-defs.h>
 #include <lib/fit/defer.h>
 #include <lib/fit/function.h>
+#include <lib/mmio/mmio-pinned-buffer.h>
 #include <lib/zx/clock.h>
 #include <lib/zx/profile.h>
 #include <lib/zx/thread.h>
@@ -26,10 +27,10 @@
 #include <thread>
 #include <utility>
 
+#include <ddktl/suspend-txn.h>
 #include <fbl/auto_lock.h>
 #include <tee-client-api/tee-client-types.h>
 
-#include "ddktl/suspend-txn.h"
 #include "optee-client.h"
 #include "optee-util.h"
 #include "src/devices/tee/drivers/optee/tee-smc.h"
@@ -287,25 +288,23 @@ zx_status_t OpteeController::InitializeSharedMemory() {
   }
 
   // Map and pin the just the shared memory region of the secure world memory.
-  mmio_buffer_t mmio;
   zx_off_t shared_mem_offset = shared_mem_paddr - mmio_vmo_paddr;
-  status = mmio_buffer_init(&mmio, shared_mem_offset, shared_mem_size, mmio_dev.vmo,
-                            ZX_CACHE_POLICY_CACHED);
-  if (status != ZX_OK) {
-    LOG(ERROR, "unable to map secure world memory");
-    return status;
+  zx::result<fdf::MmioBuffer> mmio = fdf::MmioBuffer::Create(
+      shared_mem_offset, shared_mem_size, zx::vmo(mmio_dev.vmo), ZX_CACHE_POLICY_CACHED);
+  if (mmio.is_error()) {
+    LOG(ERROR, "unable to map secure world memory: %s", mmio.status_string());
+    return mmio.status_value();
   }
 
-  mmio_pinned_buffer_t pinned_mmio;
-  status = mmio_buffer_pin(&mmio, bti_.get(), &pinned_mmio);
-  if (status != ZX_OK) {
-    LOG(ERROR, "unable to pin secure world memory: %d", status);
-    return status;
+  zx::result<fdf::MmioPinnedBuffer> pinned_mmio = mmio->Pin(bti_);
+  if (pinned_mmio.is_error()) {
+    LOG(ERROR, "unable to pin secure world memory: %s", pinned_mmio.status_string());
+    return pinned_mmio.status_value();
   }
 
   // Take ownership of the PMT so that we can explicitly unpin.
-  pmt_ = zx::pmt(pinned_mmio.pmt);
-  status = SharedMemoryManager::Create(fdf::MmioBuffer(mmio), pinned_mmio.paddr,
+  pinned_mmio_ = std::move(*pinned_mmio);
+  status = SharedMemoryManager::Create(std::move(*mmio), pinned_mmio_->get_paddr(),
                                        &shared_memory_manager_);
 
   if (status != ZX_OK) {
@@ -562,8 +561,8 @@ void OpteeController::DdkSuspend(ddk::SuspendTxn txn) {
   loop_.Quit();
   loop_.JoinThreads();
   shared_memory_manager_ = nullptr;
-  zx_status_t status = pmt_.unpin();
-  ZX_DEBUG_ASSERT(status == ZX_OK);
+  pinned_mmio_.reset();  // Resetting the std::optional container will call the MmioPinnedBuffer
+                         // dtor which will call unpin.
   txn.Reply(ZX_OK, txn.requested_state());
 }
 

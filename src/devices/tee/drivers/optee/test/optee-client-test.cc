@@ -61,17 +61,19 @@ class OpteeClientTestBase : public OpteeControllerBase, public zxtest::Test {
 
     fake_bti_create(fake_bti_.reset_and_get_address());
 
-    EXPECT_OK(zx::vmo::create_contiguous(fake_bti_, 0x20000, 0, &fake_vmo_));
+    zx::vmo fake_vmo;
+    size_t size = 0x20000;
+    EXPECT_OK(zx::vmo::create_contiguous(fake_bti_, size, 0, &fake_vmo));
 
-    EXPECT_OK(fake_bti_.pin(ZX_BTI_PERM_READ | ZX_BTI_CONTIGUOUS, fake_vmo_, 0, kSharedMemorySize,
+    EXPECT_OK(fake_bti_.pin(ZX_BTI_PERM_READ | ZX_BTI_CONTIGUOUS, fake_vmo, 0, kSharedMemorySize,
                             &shared_memory_paddr_, 1, &pmt_));
 
-    mmio_buffer_t mmio;
-    EXPECT_OK(
-        mmio_buffer_init(&mmio, 0, kSharedMemorySize, fake_vmo_.get(), ZX_CACHE_POLICY_CACHED));
+    zx::result<fdf::MmioBuffer> mmio =
+        fdf::MmioBuffer::Create(0, size, std::move(fake_vmo), ZX_CACHE_POLICY_CACHED);
+    ASSERT_OK(mmio.status_value());
 
-    shared_memory_vaddr_ = reinterpret_cast<zx_vaddr_t>(mmio.vaddr);
-    EXPECT_OK(SharedMemoryManager::Create(fdf::MmioBuffer(mmio), shared_memory_paddr_,
+    shared_memory_vaddr_ = reinterpret_cast<zx_vaddr_t>(mmio.value().get());
+    EXPECT_OK(SharedMemoryManager::Create(std::move(mmio.value()), shared_memory_paddr_,
                                           &shared_memory_manager_));
   }
 
@@ -124,7 +126,6 @@ class OpteeClientTestBase : public OpteeControllerBase, public zxtest::Test {
   std::unique_ptr<SharedMemoryManager> shared_memory_manager_;
 
   zx::bti fake_bti_;
-  zx::vmo fake_vmo_;
   zx::pmt pmt_;
   zx_paddr_t shared_memory_paddr_;
   zx_vaddr_t shared_memory_vaddr_;
