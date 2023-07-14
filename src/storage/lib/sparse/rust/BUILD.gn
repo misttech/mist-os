@@ -13,6 +13,7 @@ rustc_library("lib") {
   deps = [
     "//third_party/rust_crates:anyhow",
     "//third_party/rust_crates:bincode",
+    "//third_party/rust_crates:byteorder",
     "//third_party/rust_crates:serde",
     "//third_party/rust_crates:static_assertions",
     "//third_party/rust_crates:tempfile",
@@ -25,6 +26,7 @@ rustc_library("lib") {
     "src/builder.rs",
     "src/format.rs",
     "src/lib.rs",
+    "src/reader.rs",
   ]
 }
 

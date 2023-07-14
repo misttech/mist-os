@@ -14,6 +14,8 @@ pub enum DataSource {
     Reader(Box<dyn Reader>, u64),
     /// Skips this many bytes.
     Skip(u64),
+    /// Repeats the given u32, this many times.
+    Fill(u32, u64),
 }
 
 /// Builds sparse image files from a set of input DataSources.
@@ -44,29 +46,32 @@ impl SparseImageBuilder {
 
         let mut num_blocks = 0;
         let num_chunks = self.chunks.len() as u32;
+        let mut current_offset = 0;
         for input_chunk in self.chunks {
             let (chunk, mut source) = match input_chunk {
                 DataSource::Buffer(buf) => {
                     assert!(buf.len() % self.block_size as usize == 0);
                     (
-                        Chunk::Raw { start: 0, size: buf.len() },
-                        Box::new(Cursor::new(buf)) as Box<dyn Reader>,
+                        Chunk::Raw { start: current_offset, size: buf.len() },
+                        Some(Box::new(Cursor::new(buf)) as Box<dyn Reader>),
                     )
                 }
                 DataSource::Reader(reader, size) => {
                     assert!(size % self.block_size as u64 == 0);
-                    (Chunk::Raw { start: 0, size: size as usize }, reader)
+                    (Chunk::Raw { start: current_offset, size: size as usize }, Some(reader))
                 }
                 DataSource::Skip(size) => {
                     assert!(size % self.block_size as u64 == 0);
-                    (
-                        Chunk::DontCare { size: size as usize },
-                        Box::new(Cursor::new(vec![])) as Box<dyn Reader>,
-                    )
+                    (Chunk::DontCare { start: current_offset, size: size as usize }, None)
+                }
+                DataSource::Fill(value, count) => {
+                    let size = count as usize * std::mem::size_of::<u32>();
+                    (Chunk::Fill { start: current_offset, size, value }, None)
                 }
             };
-            chunk.write(&mut source, output)?;
-            num_blocks += chunk.output_blocks(self.block_size as usize);
+            chunk.write(source.as_mut(), output)?;
+            num_blocks += chunk.output_blocks(self.block_size as usize) as u32;
+            current_offset += chunk.output_size() as u64;
         }
 
         output.seek(SeekFrom::Start(0))?;
