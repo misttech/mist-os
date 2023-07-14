@@ -24,6 +24,8 @@
 #include <lib/zbi-format/zbi.h>
 #include <lib/zx/vmo.h>
 #include <sparse_format.h>
+
+#include <numeric>
 // Clean up the unhelpful defines from sparse_format.h
 #undef error
 
@@ -2139,55 +2141,145 @@ TEST_F(PaverServiceLuisTest, WriteOpaqueVolume) {
 
 struct SparseImageResult {
   std::vector<uint8_t> sparse;
-  std::vector<uint8_t> raw_data;
+  std::vector<uint32_t> raw_data;
   // image_length can be > raw_data.size(), simulating an image with sparse padding at the end.
   size_t image_length;
 };
 
+class Chunk {
+ public:
+  enum class ChunkType {
+    kUnknown = 0,
+    kRaw = CHUNK_TYPE_RAW,
+    kFill = CHUNK_TYPE_FILL,
+    kDontCare = CHUNK_TYPE_DONT_CARE,
+    kCrc32 = CHUNK_TYPE_CRC32,
+  };
+
+  constexpr Chunk(ChunkType type, uint32_t payload, size_t output_blocks, size_t block_size)
+      : type_(type),
+        payload_(payload),
+        output_blocks_(output_blocks),
+        block_size_bytes_(block_size) {}
+
+  constexpr chunk_header_t GenerateHeader() const {
+    return chunk_header_t{
+        .chunk_type = static_cast<uint16_t>(type_),
+        .reserved1 = 0,
+        .chunk_sz = static_cast<uint32_t>(output_blocks_),
+        .total_sz = static_cast<uint32_t>(SizeInImage()),
+    };
+  }
+
+  constexpr size_t SizeInImage() const {
+    switch (type_) {
+      case ChunkType::kRaw:
+        return sizeof(chunk_header_t) + output_blocks_ * block_size_bytes_;
+      case ChunkType::kCrc32:
+      case ChunkType::kFill:
+        return sizeof(chunk_header_t) + sizeof(payload_);
+      case ChunkType::kUnknown:
+      case ChunkType::kDontCare:
+        return sizeof(chunk_header_t);
+    }
+  }
+
+  constexpr size_t OutputSize() const {
+    switch (type_) {
+      case ChunkType::kRaw:
+      case ChunkType::kFill:
+      case ChunkType::kDontCare:
+        return output_blocks_ * block_size_bytes_;
+      case ChunkType::kUnknown:
+      case ChunkType::kCrc32:
+        return 0;
+    }
+  }
+
+  constexpr size_t OutputBlocks() const { return output_blocks_; }
+
+  void AppendImageBytes(std::vector<uint8_t>& sparse_image) const {
+    chunk_header_t hdr = GenerateHeader();
+    const uint8_t* hdr_bytes = reinterpret_cast<const uint8_t*>(&hdr);
+    sparse_image.insert(sparse_image.end(), hdr_bytes, hdr_bytes + sizeof(hdr));
+
+    uint32_t tmp = payload_;
+    // Make the payload an ascending counter for the raw case to disambiguate with fill.
+    uint32_t increment = type_ == ChunkType::kRaw ? 1 : 0;
+    for (size_t i = 0; i < (SizeInImage() - sizeof(hdr)) / sizeof(tmp); i++, tmp += increment) {
+      const uint8_t* tmp_bytes = reinterpret_cast<const uint8_t*>(&tmp);
+      sparse_image.insert(sparse_image.end(), tmp_bytes, tmp_bytes + sizeof(tmp));
+    }
+  }
+
+  void AppendExpectedBytes(std::vector<uint32_t>& image) const {
+    // Make the payload an ascending counter for the raw case to disambiguate with fill.
+    uint32_t increment = type_ == ChunkType::kRaw ? 1 : 0;
+    uint32_t tmp = payload_;
+    switch (type_) {
+      case ChunkType::kRaw:
+      case ChunkType::kFill:
+        for (size_t i = 0; i < output_blocks_ * block_size_bytes_ / sizeof(uint32_t);
+             i++, tmp += increment) {
+          image.push_back(tmp);
+        }
+        break;
+      case ChunkType::kDontCare:
+        for (size_t i = 0; i < output_blocks_ * block_size_bytes_ / sizeof(uint32_t); i++) {
+          // A DONT_CARE chunk still has an impact on the output image
+          image.push_back(0);
+        }
+        break;
+      case ChunkType::kUnknown:
+      case ChunkType::kCrc32:
+        break;
+    }
+  }
+
+ private:
+  ChunkType type_;
+  uint32_t payload_;
+  size_t output_blocks_;
+  size_t block_size_bytes_;
+};
+
 SparseImageResult CreateSparseImage() {
   constexpr size_t kBlockSize = 512;
-  constexpr size_t kDataSize = (1024 * 1024) + 512;
-  constexpr size_t kPadSize = 1024 * 1024;
-  constexpr size_t kImageLength = kDataSize + kPadSize;
-  const std::vector<uint8_t> raw(kDataSize, 0x4a);
+  std::vector<uint32_t> raw;
   std::vector<uint8_t> sparse;
 
+  constexpr Chunk chunks[] = {
+      Chunk(Chunk::ChunkType::kRaw, 0x55555555, 1, kBlockSize),
+      Chunk(Chunk::ChunkType::kDontCare, 0, 2, kBlockSize),
+      Chunk(Chunk::ChunkType::kFill, 0xCAFED00D, 3, kBlockSize),
+  };
+  size_t total_blocks =
+      std::reduce(std::cbegin(chunks), std::cend(chunks), 0,
+                  [](size_t sum, const Chunk& c) { return sum + c.OutputBlocks(); });
+  size_t image_length =
+      std::reduce(std::cbegin(chunks), std::cend(chunks), 0,
+                  [](size_t sum, const Chunk& c) { return sum + c.OutputSize(); });
   sparse_header_t header = {
       .magic = SPARSE_HEADER_MAGIC,
       .major_version = 1,
       .file_hdr_sz = sizeof(sparse_header_t),
       .chunk_hdr_sz = sizeof(chunk_header_t),
       .blk_sz = kBlockSize,
-      .total_blks = kDataSize / kBlockSize,
-      .total_chunks = 2,
+      .total_blks = static_cast<uint32_t>(total_blocks),
+      .total_chunks = static_cast<uint32_t>(std::size(chunks)),
       .image_checksum = 0xDEADBEEF  // We don't do crc validation as of 2023-07-05
   };
   const uint8_t* header_bytes = reinterpret_cast<const uint8_t*>(&header);
   sparse.insert(sparse.end(), header_bytes, header_bytes + sizeof(header));
-
-  chunk_header_t hdr1 = {
-      .chunk_type = CHUNK_TYPE_RAW,
-      .reserved1 = 0,
-      .chunk_sz = kDataSize / kBlockSize,
-      .total_sz = sizeof(chunk_header_t) + kDataSize,
-  };
-  const uint8_t* hdr1_bytes = reinterpret_cast<const uint8_t*>(&hdr1);
-  sparse.insert(sparse.end(), hdr1_bytes, hdr1_bytes + sizeof(hdr1));
-  sparse.insert(sparse.end(), raw.cbegin(), raw.cend());
-
-  chunk_header_t hdr2 = {
-      .chunk_type = CHUNK_TYPE_DONT_CARE,
-      .reserved1 = 0,
-      .chunk_sz = kPadSize / kBlockSize,
-      .total_sz = sizeof(chunk_header_t),
-  };
-  const uint8_t* hdr2_bytes = reinterpret_cast<const uint8_t*>(&hdr2);
-  sparse.insert(sparse.end(), hdr2_bytes, hdr2_bytes + sizeof(hdr2));
+  for (const Chunk& chunk : chunks) {
+    chunk.AppendImageBytes(sparse);
+    chunk.AppendExpectedBytes(raw);
+  }
 
   return SparseImageResult{
       .sparse = std::move(sparse),
-      .raw_data = raw,
-      .image_length = kImageLength,
+      .raw_data = std::move(raw),
+      .image_length = image_length,
   };
 }
 
@@ -2240,7 +2332,10 @@ TEST_F(PaverServiceLuisTest, WriteSparseVolume) {
   ASSERT_OK(block_client->Read(block_read_vmo, image.image_length, kFvmBlockStart, 0));
 
   // Verify the written data against the unsparsed payload
-  ASSERT_BYTES_EQ(block_read_vmo_mapper.start(), image.raw_data.data(), image.raw_data.size());
+  cpp20::span<const uint8_t> raw_as_bytes = {
+      reinterpret_cast<const uint8_t*>(image.raw_data.data()),
+      image.raw_data.size() * sizeof(uint32_t)};
+  ASSERT_BYTES_EQ(block_read_vmo_mapper.start(), raw_as_bytes.data(), raw_as_bytes.size());
 }
 
 TEST_F(PaverServiceLuisTest, OneShotRecovery) {

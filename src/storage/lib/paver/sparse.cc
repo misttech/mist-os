@@ -60,14 +60,10 @@ struct SparseIoBuffer {
     if (size % sizeof(payload) != 0) {
       return false;
     }
+
     std::vector<uint32_t> fill(size / sizeof(payload), payload);
-
-    if (!me->Write(0, reinterpret_cast<const uint8_t*>(fill.data()),
-                   fill.size() * sizeof(payload))) {
-      return false;
-    }
-
-    return false;
+    return me->Write(0, reinterpret_cast<const uint8_t*>(fill.data()),
+                     fill.size() * sizeof(payload));
   }
 
   size_t Size() const {
