@@ -40,12 +40,6 @@
                 "MknodTest.MknodAtFIFO",
                 "MknodTest.Socket",
 
-                // open_test
-                "OpenTest.Truncate",
-
-                // read_test
-                "ReadTest.PartialReadSIGSEGV",
-
                 // stat_test
                 "StatTest.FstatatSymlinkDir",
                 "StatTest.FstatatSymlinkDirWithTrailingSlash",

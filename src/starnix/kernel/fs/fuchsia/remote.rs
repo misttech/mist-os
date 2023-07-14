@@ -585,7 +585,7 @@ fn zxio_read_at(zxio: &Zxio, offset: usize, data: &mut dyn OutputBuffer) -> Resu
     let mut bytes = vec![0u8; total];
     let actual =
         zxio.read_at(offset as u64, &mut bytes).map_err(|status| from_status_like_fdio!(status))?;
-    data.write_all(&bytes)?;
+    data.write_all(&bytes[0..actual])?;
     Ok(actual)
 }
 
