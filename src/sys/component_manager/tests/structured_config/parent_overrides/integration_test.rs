@@ -181,10 +181,12 @@ async fn realm_builder_with_override() {
 
 #[fuchsia::test]
 async fn static_child_without_overrides_returns_default() {
-    // TODO(https://fxbug.dev/126578) set a static-child-specific config value here
     let expected_value = "default value";
 
     let reporter = connect_to_protocol::<ReporterMarker>().unwrap();
     let value = reporter.get_parent_provided_config_string().await.unwrap();
     assert_eq!(value, expected_value);
 }
+
+// TODO(fxbug.dev/126578): Add a test similar to the one above with a
+// static-child-specific config value when adding support for this.

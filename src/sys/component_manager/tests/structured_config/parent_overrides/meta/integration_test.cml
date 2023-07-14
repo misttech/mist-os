@@ -16,7 +16,8 @@
             name: "static_config_receiver",
             url: "#meta/config_receiver.cm",
 
-            // TODO(https://fxbug.dev/96254) uncomment
+            // TODO(fxbug.dev/126578) Uncomment when adding a test for
+            // static-child-specific config values.
             // config: {
             //     parent_provided: "non-default value for static child",
             // },
