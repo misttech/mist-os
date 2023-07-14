@@ -8,6 +8,9 @@ config("public_include_dirs") {
 }
 
 source_set("codec_android_pal") {
-  visibility = [ "//src/media/codec/codecs/sw/low_layer/*" ]
+  visibility = [
+    "//src/media/codec/codecs/sw/low_layer:low_layer",
+    "//third_party/android/platform/external/aac:libFraunhoferAAC",
+  ]
   public_configs = [ ":public_include_dirs" ]
 }
