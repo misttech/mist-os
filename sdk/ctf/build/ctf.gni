@@ -23,7 +23,6 @@ import("//sdk/ctf/build/ctf_rustc_library.gni")
 import("//sdk/ctf/build/ctf_rustc_test.gni")
 import("//sdk/ctf/build/ctf_source_set.gni")
 import("//sdk/ctf/build/ctf_test_component.gni")
-import("//sdk/ctf/build/ctf_test_realm.gni")
 import("//sdk/ctf/build/generate_ctf_tests.gni")
 RUST_SUBPACKAGES = [
   "//src/sys/test_runners/lib_loader_cache:lib_loader_runner_cache",

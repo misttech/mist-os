@@ -30,12 +30,6 @@ import("//sdk/ctf/build/internal/ctf.gni")
 #     If set, this test is released in CTF. Defaults to true.
 #     Type: bool
 #
-#   enable_ctf_test_realms (optional)
-#     If set, this test will have access to CTF test realms at runtime.
-#     See //sdk/ctf/test_realm/BUILD.gn for instructions.
-#     Defaults to false.
-#     Type: bool
-#
 #   subpackages (optional)
 #     Subpackages should not be used for the interface under test.
 #     See fuchsia_package() for details.
@@ -46,9 +40,6 @@ template("ctf_fuchsia_test_package") {
   if (!defined(invoker.package_name)) {
     invoker.package_name = target_name
   }
-  if (!defined(invoker.enable_ctf_test_realms)) {
-    invoker.enable_ctf_test_realms = false
-  }
 
   # cts_version is nonempty when building for release.
   # Rename the package when building for release so that when it's downloaded
@@ -58,7 +49,6 @@ template("ctf_fuchsia_test_package") {
     invoker.package_name += "_$cts_version"
   }
 
-  not_needed(invoker, [ "enable_ctf_test_realms" ])
   not_needed(invoker, [ "plasa_element" ])
   not_needed(invoker, [ "release_in_ctf" ])
 
@@ -88,13 +78,6 @@ template("ctf_fuchsia_test_package") {
       subpackages = []
       if (defined(invoker.subpackages)) {
         subpackages = invoker.subpackages
-      }
-
-      # Don't include test realm subpackages if we're building for release,
-      # otherwise the test's deps would be bundled with the test in CIPD.
-      if (cts_version == "" && invoker.enable_ctf_test_realms) {
-        import("//sdk/ctf/build/ctf_test_realms.gni")
-        subpackages += ctf_test_realms
       }
     }
 

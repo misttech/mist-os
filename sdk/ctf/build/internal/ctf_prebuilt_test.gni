@@ -18,12 +18,6 @@ import("//sdk/ctf/build/internal/prebuilt_host_test_manifest.gni")
 #     The absolute path to the extracted CTF release archive.
 #     Type: path
 #
-#   enable_ctf_test_realms (optional)
-#     If set, this test will have access to CTF test realms at runtime.
-#     See //sdk/ctf/test_realm/BUILD.gn for instructions.
-#     Defaults to false.
-#     Type: bool
-#
 #   test (required)
 #     The CTF test manifest entry.
 #     For more info on the manifest entry, see ctf_test_release_archive.gni.
@@ -40,9 +34,6 @@ template("ctf_prebuilt_test") {
   if (!defined(test.log_settings)) {
     test.log_settings = {
     }
-  }
-  if (!defined(test.enable_ctf_test_realms)) {
-    test.enable_ctf_test_realms = false
   }
 
   prebuilt_test_package_target = "${target_name}_prebuilt"
@@ -61,10 +52,6 @@ template("ctf_prebuilt_test") {
   # This wrapper package just provides the test realms in a subpackage.
   fuchsia_package_target = "${target_name}_package"
   fuchsia_package(fuchsia_package_target) {
-    if (test.enable_ctf_test_realms) {
-      import("//sdk/ctf/build/ctf_test_realms.gni")
-      subpackages = ctf_test_realms
-    }
     deps = [ ":$prebuilt_test_package_target" ]
     testonly = true
   }
