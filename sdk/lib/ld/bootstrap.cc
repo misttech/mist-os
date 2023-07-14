@@ -5,6 +5,8 @@
 #include "bootstrap.h"
 
 #include <lib/elfldltl/diagnostics.h>
+#include <lib/zx/channel.h>
+#include <zircon/assert.h>
 #include <zircon/syscalls.h>
 
 namespace ld {
@@ -20,9 +22,14 @@ extern "C" int _start(zx_handle_t handle, void* vdso) {
   CompleteBootstrapModule(vdso_module, page_size);
   CompleteBootstrapModule(self_module, page_size);
 
-  int array[2];
-  zx_channel_read(handle, 0, &array, nullptr, sizeof(array), 0, nullptr, nullptr);
-  return array[0] + array[1];
+  zx::channel bootstrap{handle};
+
+  char buffer[64];
+  uint32_t nbytes, nhandles;
+  zx_status_t status = bootstrap.read(0, buffer, nullptr, sizeof(buffer), 0, &nbytes, &nhandles);
+  ZX_ASSERT(status == ZX_OK);
+  ZX_ASSERT(nhandles == 0);
+  return static_cast<int>(nbytes);
 }
 
 }  // namespace ld
