@@ -8,6 +8,9 @@ import("//build/cpp/verify_public_symbols.gni")
 import("//build/test.gni")
 import("//build/toolchain/ifs_extract.gni")
 import("//build/toolchain/ifs_shared_library.gni")
+import("//build/toolchain/zircon/user_basic_redirect.gni")
+
+ldso_name = "ld.so.1"
 
 # TODO(fxbug.dev/121817): This will be used for the static library of support
 # code.  It provides access to additional <lib/ld/...> headers for support code
@@ -99,12 +102,95 @@ source_set("abi") {
   deps = [ ":headers" ]
 }
 
+ldso_test_loc = "test/${toolchain_variant.libprefix}$ldso_name"
+
+loadable_module("startup-ld") {
+  sources = [
+    "bootstrap.cc",
+    "standalone-assert.cc",
+  ]
+
+  ldflags = [ "-Wl,-soname,$ldso_name" ]
+
+  deps = [
+    "//src/lib/elfldltl",
+    "//zircon/system/ulib/c/string:mem",
+    "//zircon/third_party/ulib/musl/src/exit:abort",
+  ]
+
+  if (!is_gcc) {
+    # The standard profiling runtime can't be used in the minimal standalone
+    # context of ld.so.
+    #
+    # TODO(fxbug.dev/130542): The instrumentation works fine to collect data,
+    # but the data needs to be plumbed out somewhere using a custom
+    # runtime. For now, the data is just ignored.
+    ldflags += [ "-noprofilelib" ]
+  }
+
+  test_libname = "test/${toolchain_variant.libprefix}$ldso_name"
+
+  metadata = {
+    distribution_entries = [
+      {
+        destination = "lib/$ldso_test_loc"
+        source = rebase_path("$root_out_dir/startup-ld.so", root_build_dir)
+        label = get_label_info(target_name, "label_with_toolchain")
+      },
+    ]
+
+    # This is collected by ld-startup-test-switches.rsp, below.  The
+    # user_basic_redirect may wind up in a different variant than the one
+    # requested, if the test's variant isn't available in user.basic, so we
+    # don't know statically which libprefix the test should load from.
+    ld_startup_test_switches = [ "'-DLD_STARTUP_TEST_LIB=\"$test_libname\"'" ]
+  }
+}
+
+user_basic_redirect("ld.basic") {
+  public_deps = [ ":startup-ld" ]
+}
+
+# This collects the -DLD_STARTUP_TEST_LIB=... flag in the response file.
+generated_file("ld-startup-test-switches.rsp") {
+  visibility = [ ":*" ]
+  testonly = true
+  output_conversion = "list lines"
+  data_keys = [ "ld_startup_test_switches" ]
+  outputs = [ "$target_gen_dir/$target_name" ]
+  data_deps = [ ":ld.basic" ]
+}
+
+source_set("target-unittests") {
+  testonly = true
+  sources = [ "ld-startup-tests.cc" ]
+  deps = [
+    "//src/lib/elfldltl",
+    "//src/lib/elfldltl:elfldltl-testutils",
+    "//src/lib/fxl/test:gtest_main",
+    "//zircon/system/ulib/zx",
+  ]
+
+  # Bring the ld.so image into the package.
+  data_deps = [ ":ld.basic" ]
+
+  # Plumb in the switch via the response file to give the name under lib/ that
+  # the test can pass to fuchsia.ldsvc.Loader/LoadObject.
+  deps += [ ":ld-startup-test-switches.rsp" ]
+  inputs = get_target_outputs(":ld-startup-test-switches.rsp")
+  cflags = [ "@" + rebase_path(inputs[0], root_build_dir) ]
+}
+
 test("ld-unittests") {
   sources = [ "abi-tests.cc" ]
   deps = [
     ":headers",
     "//src/lib/fxl/test:gtest_main",
   ]
+
+  if (!is_host) {
+    deps += [ ":target-unittests" ]
+  }
 }
 
 fuchsia_unittest_package("ld-tests") {

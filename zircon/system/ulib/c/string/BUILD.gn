@@ -30,6 +30,7 @@ llvm_libc_group("string") {
 
 llvm_libc_source_set("mem") {
   visibility = [
+    "//sdk/lib/ld/*",
     "//src/lib/elfldltl/*",
     "//zircon/kernel/*",
   ]
