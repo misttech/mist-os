@@ -411,9 +411,7 @@ async fn create_event_fidl_object(event: Event) -> Result<fcomponent::Event, any
     let moniker_string = match (&event.event.target_moniker, &event.scope_moniker) {
         (moniker @ ExtendedMoniker::ComponentManager, _) => moniker.to_string(),
         (ExtendedMoniker::ComponentInstance(target), ExtendedMoniker::ComponentManager) => {
-            Moniker::scope_down(&Moniker::root(), target)
-                .expect("every component can be scoped down from the root")
-                .to_string()
+            target.to_string()
         }
         (ExtendedMoniker::ComponentInstance(target), ExtendedMoniker::ComponentInstance(scope)) => {
             Moniker::scope_down(scope, target)

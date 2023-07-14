@@ -9,7 +9,6 @@ use {
     },
     anyhow::{format_err, Result},
     fidl_fuchsia_sys2 as fsys,
-    moniker::{Moniker, MonikerBase},
 };
 
 pub async fn route_cmd_print<W: std::io::Write>(
@@ -20,10 +19,6 @@ pub async fn route_cmd_print<W: std::io::Write>(
     mut writer: W,
 ) -> Result<()> {
     let moniker = get_cml_moniker_from_query(&target_moniker, &realm_query).await?;
-
-    // Convert the absolute moniker into a relative moniker w.r.t. root.
-    // RouteValidator expects relative monikers only.
-    let moniker = Moniker::scope_down(&Moniker::root(), &moniker).unwrap();
 
     writeln!(writer, "Moniker: {}", &moniker)?;
 
@@ -44,10 +39,6 @@ pub async fn route_cmd_serialized(
     realm_query: fsys::RealmQueryProxy,
 ) -> Result<Vec<RouteReport>> {
     let moniker = get_cml_moniker_from_query(&target_moniker, &realm_query).await?;
-
-    // Convert the absolute moniker into a relative moniker w.r.t. root.
-    // RouteValidator expects relative monikers only.
-    let moniker = Moniker::scope_down(&Moniker::root(), &moniker).unwrap();
     let targets = route_targets_from_filter(filter)?;
     route::route(&route_validator, moniker, targets).await
 }

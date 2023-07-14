@@ -8,7 +8,7 @@ use {
     fidl_fuchsia_component as fcomponent,
     fidl_fuchsia_component_decl::Offer,
     fidl_fuchsia_io as fio, fidl_fuchsia_sys2 as fsys,
-    moniker::{Moniker, MonikerBase},
+    moniker::Moniker,
     thiserror::Error,
 };
 const CAPABILITY_REQUESTED_EVENT: &str = "capability_requested";
@@ -170,7 +170,6 @@ pub async fn parse_provided_realm(
         }
     };
     let moniker = Moniker::try_from(moniker)?;
-    let moniker = Moniker::scope_down(&Moniker::root(), &moniker)?;
 
     component_debug::lifecycle::resolve_instance(&lifecycle_controller, &moniker)
         .await

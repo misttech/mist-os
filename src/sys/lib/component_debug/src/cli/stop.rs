@@ -9,7 +9,6 @@ use {
     },
     anyhow::Result,
     fidl_fuchsia_sys2 as fsys,
-    moniker::{Moniker, MonikerBase},
 };
 
 pub async fn stop_cmd<W: std::io::Write>(
@@ -23,10 +22,6 @@ pub async fn stop_cmd<W: std::io::Write>(
     writeln!(writer, "Moniker: {}", moniker)?;
     writeln!(writer, "Stopping component instance...")?;
 
-    // Convert the absolute moniker into a relative moniker w.r.t. root.
-    // LifecycleController expects relative monikers only.
-    let moniker = Moniker::scope_down(&Moniker::root(), &moniker).unwrap();
-
     stop_instance(&lifecycle_controller, &moniker)
         .await
         .map_err(|e| format_action_error(&moniker, e))?;
@@ -38,8 +33,11 @@ pub async fn stop_cmd<W: std::io::Write>(
 #[cfg(test)]
 mod test {
     use {
-        super::*, crate::test_utils::serve_realm_query_instances,
-        fidl::endpoints::create_proxy_and_stream, futures::TryStreamExt,
+        super::*,
+        crate::test_utils::serve_realm_query_instances,
+        fidl::endpoints::create_proxy_and_stream,
+        futures::TryStreamExt,
+        moniker::{Moniker, MonikerBase},
     };
 
     fn setup_fake_lifecycle_controller(

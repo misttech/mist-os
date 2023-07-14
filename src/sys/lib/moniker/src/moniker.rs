@@ -48,7 +48,7 @@ pub trait MonikerBase: Default + Eq + PartialEq + fmt::Debug + Clone + Hash + fm
         Ok(Self::new(path))
     }
 
-    // Creates an absolute moniker for a descendant of this component instance.
+    /// Creates an absolute moniker for a descendant of this component instance.
     fn descendant<T: MonikerBase<Part = Self::Part>>(&self, descendant: &T) -> Self {
         let mut path = self.path().clone();
         let mut relative_path = descendant.path().clone();

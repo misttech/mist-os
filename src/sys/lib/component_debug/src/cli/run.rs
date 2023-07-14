@@ -126,19 +126,10 @@ pub async fn run_cmd<W: std::io::Write>(
         .collection()
         .ok_or(format_err!("Error: {} does not reference a dynamic instance", moniker))?;
 
-    // Convert the absolute moniker into a relative moniker w.r.t. root.
-    // LifecycleController expects relative monikers only.
-    let parent_relative = Moniker::scope_down(&Moniker::root(), &parent).unwrap();
-
     if recreate {
         // First try to destroy any existing instance at this monker.
-        match destroy_instance_in_collection(
-            &lifecycle_controller,
-            &parent_relative,
-            collection,
-            child_name,
-        )
-        .await
+        match destroy_instance_in_collection(&lifecycle_controller, &parent, collection, child_name)
+            .await
         {
             Ok(()) => {
                 writeln!(writer, "Destroyed existing component instance at {}...", moniker)?;
@@ -170,7 +161,7 @@ pub async fn run_cmd<W: std::io::Write>(
 
     let create_result = create_instance_in_collection(
         &lifecycle_controller,
-        &parent_relative,
+        &parent,
         collection,
         child_name,
         &url,
@@ -189,14 +180,13 @@ pub async fn run_cmd<W: std::io::Write>(
         Ok(()) => {}
     }
 
-    let child_relative = Moniker::scope_down(&Moniker::root(), &moniker).unwrap();
     writeln!(writer, "Resolving component instance...")?;
-    resolve_instance(&lifecycle_controller, &child_relative)
+    resolve_instance(&lifecycle_controller, &moniker)
         .await
         .map_err(|e| format_resolve_error(&moniker, e))?;
 
     writeln!(writer, "Starting component instance...")?;
-    start_instance(&lifecycle_controller, &child_relative)
+    start_instance(&lifecycle_controller, &moniker)
         .await
         .map_err(|e| format_start_error(&moniker, e))?;
 

@@ -21,11 +21,6 @@ async fn get_storage_admin(
     let (storage_admin, server_end) =
         fidl::endpoints::create_proxy::<fsys::StorageAdminMarker>().unwrap();
 
-    // Convert the absolute moniker into a relative moniker w.r.t. root.
-    // LifecycleController expects relative monikers only.
-    let storage_provider_moniker =
-        Moniker::scope_down(&Moniker::root(), &storage_provider_moniker).unwrap();
-
     realm_query
         .connect_to_storage_admin(
             &storage_provider_moniker.to_string(),

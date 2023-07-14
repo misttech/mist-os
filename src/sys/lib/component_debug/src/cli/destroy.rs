@@ -9,7 +9,7 @@ use {
     },
     anyhow::{format_err, Result},
     fidl_fuchsia_sys2 as fsys,
-    moniker::{ChildNameBase, Moniker, MonikerBase},
+    moniker::{ChildNameBase, MonikerBase},
 };
 
 pub async fn destroy_cmd<W: std::io::Write>(
@@ -34,11 +34,7 @@ pub async fn destroy_cmd<W: std::io::Write>(
         .collection()
         .ok_or(format_err!("Error: {} does not reference a dynamic instance", moniker))?;
 
-    // Convert the absolute moniker into a relative moniker w.r.t. root.
-    // LifecycleController expects relative monikers only.
-    let parent_relative = Moniker::scope_down(&Moniker::root(), &parent).unwrap();
-
-    destroy_instance_in_collection(&lifecycle_controller, &parent_relative, collection, child_name)
+    destroy_instance_in_collection(&lifecycle_controller, &parent, collection, child_name)
         .await
         .map_err(|e| format_destroy_error(&moniker, e))?;
 
@@ -49,8 +45,11 @@ pub async fn destroy_cmd<W: std::io::Write>(
 #[cfg(test)]
 mod test {
     use {
-        super::*, crate::test_utils::serve_realm_query_instances,
-        fidl::endpoints::create_proxy_and_stream, futures::TryStreamExt,
+        super::*,
+        crate::test_utils::serve_realm_query_instances,
+        fidl::endpoints::create_proxy_and_stream,
+        futures::TryStreamExt,
+        moniker::{Moniker, MonikerBase},
     };
 
     fn setup_fake_lifecycle_controller(

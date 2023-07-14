@@ -32,13 +32,9 @@ pub async fn create_cmd<W: std::io::Write>(
     writeln!(writer, "Moniker: {}", moniker)?;
     writeln!(writer, "Creating component instance...")?;
 
-    // Convert the absolute moniker into a relative moniker w.r.t. root.
-    // LifecycleController expects relative monikers only.
-    let parent_relative = Moniker::scope_down(&Moniker::root(), &parent).unwrap();
-
     create_instance_in_collection(
         &lifecycle_controller,
-        &parent_relative,
+        &parent,
         collection,
         child_name,
         &url,
