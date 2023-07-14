@@ -32,14 +32,18 @@ class ProcUptimeTest : public ProcTestBase {
     ASSERT_GT(fd, 0);
   }
 
-  std::pair<double, double> Parse(const char* buf) {
+  double Parse(const char* buf) {
     double uptime, idle;
     int s = sscanf(buf, "%lf %lf\n", &uptime, &idle);
     EXPECT_EQ(s, 2);
-    return std::make_pair(uptime, idle);
+
+    // On Linux `idle` value may decrease, i.e. we cannot expect it to
+    // increase with `uptime` (see fxbug.dev/130494). Ignore it.
+
+    return uptime;
   }
 
-  std::pair<double, double> Read() {
+  double Read() {
     char buf[100];
     long r = read(fd, buf, sizeof(buf));
     EXPECT_GT(r, 0);
@@ -60,8 +64,7 @@ TEST_F(ProcUptimeTest, UptimeProgressReopen) {
   sleep(1);
   Open();
   auto v2 = Read();
-  EXPECT_GT(v2.first, v1.first);
-  EXPECT_GT(v2.second, v1.second);
+  EXPECT_GT(v2, v1);
 }
 
 // Verify that the reported value is updated after seeking /proc/uptime to the beginning.
@@ -74,8 +77,7 @@ TEST_F(ProcUptimeTest, UptimeProgressSeek) {
   sleep(1);
   auto v2 = Read();
 
-  EXPECT_GT(v2.first, v1.first);
-  EXPECT_GT(v2.second, v1.second);
+  EXPECT_GT(v2, v1);
 }
 
 // Verify that a valid value is produced even when reading by single char.
@@ -104,11 +106,9 @@ TEST_F(ProcUptimeTest, UptimeByChar) {
 
   auto v3 = Parse(buf.c_str());
 
-  EXPECT_LE(v1.first, v3.first);
-  EXPECT_LE(v1.second, v3.second);
-
-  EXPECT_LE(v3.first, v2.first);
-  EXPECT_LE(v3.second, v2.second);
+  // `v3` should be between `v1` and `v2`.
+  EXPECT_LE(v1, v3);
+  EXPECT_LE(v3, v2);
 }
 
 class ProcSysNetTest : public ProcTestBase,
