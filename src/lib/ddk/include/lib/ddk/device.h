@@ -354,17 +354,6 @@ zx_status_t device_add_metadata(zx_device_t* dev, uint32_t type, const void* dat
 // Returns the number of fragments that can be returned by `device_get_fragments`.
 uint32_t device_get_fragment_count(zx_device_t* dev);
 
-typedef struct composite_device_fragment {
-  char name[32];
-  zx_device_t* device;
-} composite_device_fragment_t;
-
-// Returns a list of all of the fragments of this device, in the order
-// in which they were provided to device_add_composite().  The returned
-// devices must not be used after the composite device is unbound.
-void device_get_fragments(zx_device_t* dev, composite_device_fragment_t* comp_list,
-                          size_t comp_count, size_t* comp_actual);
-
 // Returns the specific protocol from the named fragment, identified by the name
 // provided when it was created via`device_add_composite`. Returns ZX_ERR_NOT_FOUND if
 // no fragment exists.

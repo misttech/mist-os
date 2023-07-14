@@ -113,22 +113,6 @@ __EXPORT uint32_t device_get_fragment_count(zx_device_t* dev) {
   return static_cast<uint32_t>(dev->fragments().size());
 }
 
-__EXPORT void device_get_fragments(zx_device_t* dev, composite_device_fragment_t* comp_list,
-                                   size_t comp_count, size_t* comp_actual) {
-  size_t i = 0;
-  for (auto& fragment : dev->fragments()) {
-    size_t size = sizeof(comp_list[0].name);
-    if (fragment.size() < size) {
-      size = fragment.size();
-    }
-    strncpy(comp_list[i].name, fragment.data(), size);
-    // TODO(fxbug.dev/93678): We currently don't set the device pointer.
-    comp_list[i].device = nullptr;
-    i++;
-  }
-  *comp_actual = i;
-}
-
 __EXPORT zx_status_t device_get_fragment_protocol(zx_device_t* dev, const char* name,
                                                   uint32_t proto_id, void* out) {
   bool has_fragment =

@@ -480,11 +480,6 @@ class Device : public ::ddk::internal::base_device<D, Mixins...> {
 
   uint32_t DdkGetFragmentCount() { return device_get_fragment_count(parent()); }
 
-  void DdkGetFragments(composite_device_fragment_t* comp_list, size_t comp_count,
-                       size_t* comp_actual) {
-    device_get_fragments(parent(), comp_list, comp_count, comp_actual);
-  }
-
   zx_status_t DdkGetFragmentMetadata(const char* name, uint32_t type, void* buf, size_t buf_len,
                                      size_t* actual) {
     // Uses parent() instead of zxdev() as metadata is usually checked

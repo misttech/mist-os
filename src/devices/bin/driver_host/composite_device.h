@@ -38,8 +38,6 @@ class CompositeDevice : public fbl::RefCounted<CompositeDevice> {
 
   uint32_t GetFragmentCount();
 
-  void GetFragments(composite_device_fragment_t* comp_list, size_t comp_count, size_t* comp_actual);
-
   bool GetFragment(const char* name, zx_device_t** out);
 
  private:

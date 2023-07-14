@@ -208,7 +208,6 @@ struct MockDevice : public std::enable_shared_from_this<MockDevice> {
   //  device_get_metadata
   // These calls will be able to target this type of device soon:
   //  device_get_fragment
-  //  device_get_fragments
   //  device_get_fragment_count
   bool IsRootParent() const { return parent_ == nullptr; }
   const char* name() const { return name_.c_str(); }

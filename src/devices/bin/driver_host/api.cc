@@ -456,17 +456,6 @@ __EXPORT uint32_t device_get_fragment_count(zx_device_t* dev) {
   return dev->composite()->GetFragmentCount();
 }
 
-__EXPORT void device_get_fragments(zx_device_t* dev, composite_device_fragment_t* comp_list,
-                                   size_t comp_count, size_t* comp_actual) {
-  DEBUG_ASSERT_VALID_DEVICE(dev);
-  if (!dev->is_composite()) {
-    ZX_DEBUG_ASSERT(comp_actual != nullptr);
-    *comp_actual = 0;
-    return;
-  }
-  return dev->composite()->GetFragments(comp_list, comp_count, comp_actual);
-}
-
 __EXPORT zx_status_t device_get_fragment_protocol(zx_device_t* dev, const char* name,
                                                   uint32_t proto_id, void* out) {
   DEBUG_ASSERT_VALID_DEVICE(dev);

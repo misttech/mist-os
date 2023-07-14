@@ -31,16 +31,6 @@ class CompositeDeviceInstance {
 
   uint32_t GetFragmentCount() { return static_cast<uint32_t>(fragments_.size()); }
 
-  void GetFragments(composite_device_fragment_t* comp_list, size_t comp_count,
-                    size_t* comp_actual) {
-    size_t actual = std::min(comp_count, fragments_.size());
-    for (size_t i = 0; i < actual; ++i) {
-      strncpy(comp_list[i].name, fragments_[i].name.c_str(), 32);
-      comp_list[i].device = fragments_[i].device.get();
-    }
-    *comp_actual = actual;
-  }
-
   bool GetFragment(const char* name, zx_device_t** out) {
     for (auto& fragment : fragments_) {
       if (strncmp(name, fragment.name.c_str(), 32) == 0) {
@@ -117,12 +107,6 @@ CompositeDevice::~CompositeDevice() = default;
 
 uint32_t CompositeDevice::GetFragmentCount() {
   return static_cast<CompositeDeviceInstance*>(device_->ctx())->GetFragmentCount();
-}
-
-void CompositeDevice::GetFragments(composite_device_fragment_t* comp_list, size_t comp_count,
-                                   size_t* comp_actual) {
-  static_cast<CompositeDeviceInstance*>(device_->ctx())
-      ->GetFragments(comp_list, comp_count, comp_actual);
 }
 
 bool CompositeDevice::GetFragment(const char* name, zx_device_t** out) {
