@@ -185,17 +185,16 @@ impl ActiveSetting {
     }
 }
 
-#[derive(Clone)]
 pub struct LightSensorHandler<T> {
-    hanging_get: Rc<RefCell<SensorHangingGet>>,
+    hanging_get: RefCell<SensorHangingGet>,
     calibrator: Option<T>,
-    active_setting: Rc<RefCell<ActiveSettingState>>,
+    active_setting: RefCell<ActiveSettingState>,
     rgbc_to_lux_coefs: Rgbc<f32>,
     si_scaling_factors: Rgbc<f32>,
     vendor_id: u32,
     product_id: u32,
     /// The inventory of this handler's Inspect status.
-    inspect_status: Rc<InputHandlerStatus>,
+    inspect_status: InputHandlerStatus,
 }
 
 enum ActiveSettingState {
@@ -238,22 +237,21 @@ impl<T> LightSensorHandler<T> {
         input_handlers_node: &fuchsia_inspect::Node,
     ) -> Rc<Self> {
         let calibrator = calibrator.into();
-        let hanging_get = Rc::new(RefCell::new(HangingGet::new_unknown_state(Box::new(
+        let hanging_get = RefCell::new(HangingGet::new_unknown_state(Box::new(
             |sensor_data: &LightSensorData, responder: SensorWatchResponder| -> bool {
                 if let Err(e) = responder.send(&FidlLightSensorData::from(*sensor_data)) {
                     tracing::warn!("Failed to send updated data to client: {e:?}",);
                 }
                 true
             },
-        )
-            as NotifyFn)));
+        ) as NotifyFn));
         let active_setting =
-            Rc::new(RefCell::new(ActiveSettingState::Uninitialized(configuration.settings)));
-        let inspect_status = Rc::new(InputHandlerStatus::new(
+            RefCell::new(ActiveSettingState::Uninitialized(configuration.settings));
+        let inspect_status = InputHandlerStatus::new(
             input_handlers_node,
             "light_sensor_handler",
             /* generates_events */ false,
-        ));
+        );
         Rc::new(Self {
             hanging_get,
             calibrator,
