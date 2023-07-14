@@ -229,7 +229,10 @@ pub async fn create_component_from_stream(
                 let request_stream = controller.into_stream()?;
                 let mut config = get_config_from_component_start_info(start_info);
                 let (sender, receiver) = oneshot::channel::<TaskResult>();
-                let container = create_container(&mut config, sender).await?;
+                let container =
+                    create_container(&mut config, sender).await.with_source_context(|| {
+                        format!("creating container \"{}\"", &config.config.name)
+                    })?;
                 let service_config = ContainerServiceConfig { config, request_stream, receiver };
                 return Ok((container, service_config));
             }
@@ -259,22 +262,26 @@ async fn create_container(
         config.kernel_cmdline.as_bytes(),
         &config.features,
         svc_dir,
-    )?;
+    )
+    .with_source_context(|| format!("creating Kernel: {}", &config.name))?;
 
     let node = inspect::component::inspector().root().create_child("container");
     create_container_inspect(kernel.clone(), &node);
 
-    let mut init_task = create_init_task(&kernel, config)?;
-    let fs_context = create_fs_context(&init_task, config, &pkg_dir_proxy)?;
+    let mut init_task = create_init_task(&kernel, config)
+        .with_source_context(|| format!("creating init task: {:?}", &config.init))?;
+    let fs_context = create_fs_context(&init_task, config, &pkg_dir_proxy)
+        .source_context("creating FsContext")?;
     init_task.set_fs(fs_context.clone());
-    kernel.kthreads.init(&kernel, fs_context)?;
+    kernel.kthreads.init(&kernel, fs_context).source_context("initializing kthreads")?;
     let system_task = kernel.kthreads.system_task();
 
-    mount_filesystems(system_task, config, &pkg_dir_proxy)?;
+    mount_filesystems(system_task, config, &pkg_dir_proxy)
+        .source_context("mounting filesystems")?;
 
     // Run all common features that were specified in the .cml.
     run_features(&config.features, &kernel)
-        .map_err(|e| anyhow!("Failed to initialize features: {:?}", e))?;
+        .with_source_context(|| format!("initializing features: {:?}", &config.features))?;
 
     let startup_file_path = if config.startup_file_path.is_empty() {
         None
@@ -292,8 +299,12 @@ async fn create_container(
             .map(|s| to_cstr(s))
             .collect::<Vec<_>>();
 
-    let executable = init_task.open_file(argv[0].as_bytes(), OpenFlags::RDONLY)?;
-    init_task.exec(executable, argv[0].clone(), argv.clone(), vec![])?;
+    let executable = init_task
+        .open_file(argv[0].as_bytes(), OpenFlags::RDONLY)
+        .with_source_context(|| format!("opening init: {:?}", &argv[0]))?;
+    init_task
+        .exec(executable, argv[0].clone(), argv.clone(), vec![])
+        .with_source_context(|| format!("executing init: {:?}", &argv))?;
     execute_task(init_task, move |result| {
         log_info!("Finished running init process: {:?}", result);
         let _ = task_complete.send(result);
@@ -310,7 +321,7 @@ fn create_fs_context(
     config: &ConfigWrapper,
     pkg_dir_proxy: &fio::DirectorySynchronousProxy,
 ) -> Result<Arc<FsContext>, Error> {
-    // The mounts are appplied in the order listed. Mounting will fail if the designated mount
+    // The mounts are applied in the order listed. Mounting will fail if the designated mount
     // point doesn't exist in a previous mount. The root must be first so other mounts can be
     // applied on top of it.
     let mut mounts_iter = config.mounts.iter();
@@ -398,8 +409,14 @@ fn mount_filesystems(
     let _ = mounts_iter.next();
     for mount_spec in mounts_iter {
         let (mount_point, child_fs) =
-            create_filesystem_from_spec(system_task, pkg_dir_proxy, mount_spec)?;
-        let mount_point = system_task.lookup_path_from_root(mount_point)?;
+            create_filesystem_from_spec(system_task, pkg_dir_proxy, mount_spec)
+                .with_source_context(|| {
+                    format!("creating filesystem from spec: {}", &mount_spec)
+                })?;
+        let mount_point =
+            system_task.lookup_path_from_root(mount_point).with_source_context(|| {
+                format!("lookup path from root: {}", String::from_utf8_lossy(mount_point))
+            })?;
         mount_point.mount(child_fs, MountFlags::empty())?;
     }
     Ok(())

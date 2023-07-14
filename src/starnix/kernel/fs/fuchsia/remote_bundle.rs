@@ -45,11 +45,13 @@ impl RemoteBundle {
             .into_channel();
 
         let (metadata_file, server) = zx::Channel::create();
-        fdio::open_at(&root, "metadata.v1", fio::OpenFlags::RIGHT_READABLE, server)?;
-        let mut metadata_file: std::fs::File = fdio::create_fd(metadata_file.into())?;
+        fdio::open_at(&root, "metadata.v1", fio::OpenFlags::RIGHT_READABLE, server)
+            .source_context("open metadata file")?;
+        let mut metadata_file: std::fs::File =
+            fdio::create_fd(metadata_file.into()).source_context("create fd from metadata file")?;
         let mut buf = Vec::new();
-        metadata_file.read_to_end(&mut buf)?;
-        let metadata = Metadata::deserialize(&buf)?;
+        metadata_file.read_to_end(&mut buf).source_context("read metadata file")?;
+        let metadata = Metadata::deserialize(&buf).source_context("deserialize metadata file")?;
 
         // Make sure the root node exists.
         ensure!(

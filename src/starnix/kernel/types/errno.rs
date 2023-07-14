@@ -56,12 +56,20 @@ impl PartialEq<ErrnoCode> for Errno {
 
 impl Eq for Errno {}
 
-impl From<Errno> for anyhow::Error {
-    fn from(e: Errno) -> Self {
-        let code = e.code;
-        e.anyhow.unwrap_or_else(|| anyhow::format_err!("errno {} from unknown location", code))
+impl Display for Errno {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        match &self.anyhow {
+            Some(details) => {
+                write!(f, "errno {}, details: {details}", self.code)
+            }
+            None => {
+                write!(f, "errno {} from unknown location", self.code)
+            }
+        }
     }
 }
+
+impl std::error::Error for Errno {}
 
 impl From<Errno> for zx::Status {
     fn from(e: Errno) -> Self {
@@ -108,6 +116,7 @@ impl Debug for Errno {
 
 #[derive(Debug, Eq, PartialEq, Copy, Clone)]
 pub struct ErrnoCode(u32);
+
 impl ErrnoCode {
     pub fn from_return_value(retval: u64) -> Self {
         let retval = retval as i64;
@@ -538,3 +547,92 @@ pub(crate) use errno_from_code;
 pub(crate) use errno_from_zxio_code;
 pub(crate) use error;
 pub(crate) use from_status_like_fdio;
+
+pub trait SourceContext<T, E> {
+    /// Similar to `with_context` in [`anyhow::Context`], but adds the source location of the
+    /// caller. This is especially useful when generating a message to attach to an error object as
+    /// the context.
+    ///
+    /// Example:
+    ///
+    ///     let mount_point = system_task
+    ///         .lookup_path_from_root(mount_point)
+    ///         .with_source_context(|| {
+    ///             format!("lookup path from root: {}", String::from_utf8_lossy(mount_point))
+    ///         })?;
+    ///
+    /// Results in a context message like:
+    ///
+    ///     Caused by:
+    ///         1: lookup path from root: ..., some_file.rs:12:34
+    ///
+    #[track_caller]
+    fn with_source_context(self, context: impl FnOnce() -> String) -> anyhow::Result<T>;
+
+    /// Similar to `context` in [`anyhow::Context`], but adds the source location of the caller.
+    /// This is especially useful when generating a message to attach to an error object as the
+    /// context.
+    #[track_caller]
+    fn source_context<C>(self, context: C) -> anyhow::Result<T>
+    where
+        C: Display + Send + Sync + 'static;
+}
+
+/// All result objects that support `with_context` will also support `with_source_context`.
+impl<T, E> SourceContext<T, E> for Result<T, E>
+where
+    Result<T, E>: anyhow::Context<T, E>,
+{
+    fn with_source_context(self, context: impl FnOnce() -> String) -> anyhow::Result<T> {
+        use anyhow::Context;
+        let caller = std::panic::Location::caller();
+        self.with_context(move || format!("{}, {}", context(), caller))
+    }
+
+    fn source_context<C>(self, context: C) -> anyhow::Result<T>
+    where
+        C: Display + Send + Sync + 'static,
+    {
+        use anyhow::Context;
+        let caller = std::panic::Location::caller();
+        self.context(format!("{}, {}", context, caller))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::panic::Location;
+
+    #[test]
+    fn with_source_context() {
+        let errno = Errno { code: ENOENT, anyhow: None };
+        let result: Result<(), Errno> = Err(errno);
+        let error = result.with_source_context(|| format!("42")).unwrap_err();
+        let line_after_error = Location::caller();
+        let expected_prefix =
+            format!("42, {}:{}:", line_after_error.file(), line_after_error.line() - 1,);
+        assert!(
+            error.to_string().starts_with(&expected_prefix),
+            "{:?} must start with {:?}",
+            error,
+            expected_prefix
+        );
+    }
+
+    #[test]
+    fn source_context() {
+        let errno = Errno { code: ENOENT, anyhow: None };
+        let result: Result<(), Errno> = Err(errno);
+        let error = result.source_context("42").unwrap_err();
+        let line_after_error = Location::caller();
+        let expected_prefix =
+            format!("42, {}:{}:", line_after_error.file(), line_after_error.line() - 1,);
+        assert!(
+            error.to_string().starts_with(&expected_prefix),
+            "{:?} must start with {:?}",
+            error,
+            expected_prefix
+        );
+    }
+}
