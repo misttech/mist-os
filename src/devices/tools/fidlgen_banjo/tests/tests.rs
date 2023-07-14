@@ -29,7 +29,18 @@ macro_rules! codegen_test {
                 backend.codegen(ir).unwrap();
             }
             let output = String::from_utf8(output).unwrap();
-            assert_eq!(output, expected);
+            assert_eq!(
+                expected, output,
+                "
+================================================================================
+The newly generated output did not match the golden file {}
+To overwrite all golden files with new output, run this command:
+    fx build host_x64/fidlgen_banjo && fx exec $FUCHSIA_DIR/src/devices/tools/fidlgen_banjo/regen_banjo_tests.sh
+The diff below shows golden -> actual
+================================================================================
+",
+                $golden_file
+            );
 
             Ok(())
         }
