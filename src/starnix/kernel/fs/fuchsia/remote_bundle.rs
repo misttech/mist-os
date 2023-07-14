@@ -5,7 +5,7 @@
 use crate::{
     auth::FsCred,
     fs::{
-        fuchsia::{update_into_from_attrs, RemoteFileObject},
+        fuchsia::{update_info_from_attrs, RemoteFileObject},
         *,
     },
     lock::{RwLock, RwLockReadGuard, RwLockWriteGuard},
@@ -131,7 +131,7 @@ impl FsNodeOps for File {
     ) -> Result<RwLockReadGuard<'a, FsNodeInfo>, Errno> {
         let attrs = self.zxio.attr_get().map_err(|status| from_status_like_fdio!(status))?;
         let mut info = info.write();
-        update_into_from_attrs(&mut info, &attrs);
+        update_info_from_attrs(&mut info, &attrs);
         Ok(RwLockWriteGuard::downgrade(info))
     }
 

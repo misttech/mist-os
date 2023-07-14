@@ -177,7 +177,7 @@ pub fn new_remote_file(
     };
     let file_handle = Anon::new_file_extended(kernel, ops, flags, |id| {
         let mut info = FsNodeInfo::new(id, mode, FsCred::root());
-        update_into_from_attrs(&mut info, &attrs);
+        update_info_from_attrs(&mut info, &attrs);
         info
     });
     Ok(file_handle)
@@ -191,7 +191,7 @@ pub fn create_fuchsia_pipe(
     new_remote_file(current_task.kernel(), socket.into(), flags)
 }
 
-pub fn update_into_from_attrs(info: &mut FsNodeInfo, attrs: &zxio_node_attributes_t) {
+pub fn update_info_from_attrs(info: &mut FsNodeInfo, attrs: &zxio_node_attributes_t) {
     /// st_blksize is measured in units of 512 bytes.
     const BYTES_PER_BLOCK: usize = 512;
     // TODO - store these in FsNodeState and convert on fstat
@@ -471,7 +471,7 @@ impl FsNodeOps for RemoteNode {
     ) -> Result<RwLockReadGuard<'a, FsNodeInfo>, Errno> {
         let attrs = self.zxio.attr_get().map_err(|status| from_status_like_fdio!(status))?;
         let mut info = info.write();
-        update_into_from_attrs(&mut info, &attrs);
+        update_info_from_attrs(&mut info, &attrs);
         Ok(RwLockWriteGuard::downgrade(info))
     }
 

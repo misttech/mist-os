@@ -46,17 +46,6 @@
                 // read_test
                 "ReadTest.PartialReadSIGSEGV",
 
-                // sendfile_test
-                "SendFileTest.SendTrivially",
-                "SendFileTest.SendTriviallyWithBothFilesReadWrite",
-                "SendFileTest.SendAndUpdateFileOffset",
-                "SendFileTest.SendAndUpdateFileOffsetFromNonzeroStartingPoint",
-                "SendFileTest.SendTheCorrectNumberOfBytesEvenIfWeTryToSendTooManyBytes",
-                "SendFileTest.SendPipeWouldBlock",
-                "SendFileTest.SendToFullPipeReturnsEAGAIN",
-                "SendFileTest.SendPipeBlocks",
-                "SendFileTest.LargeCount",
-
                 // stat_test
                 "StatTest.FstatatSymlinkDir",
                 "StatTest.FstatatSymlinkDirWithTrailingSlash",

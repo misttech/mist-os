@@ -4,74 +4,17 @@
 
 use crate::{
     fs::{
-        buffers::{InputBuffer, InputBufferCallback},
+        buffers::{VecInputBuffer, VecOutputBuffer},
         pipe::PipeFileObject,
         FdNumber, FileHandle,
     },
     lock::{ordered_lock, MutexGuard},
     logging::{log_warn, not_implemented},
-    mm::{MemoryAccessorExt, ProtectionFlags, PAGE_SIZE},
+    mm::{MemoryAccessorExt, PAGE_SIZE},
     task::CurrentTask,
-    types::{errno, error, off_t, uapi, Errno, OpenFlags, UserAddress, UserRef, MAX_RW_COUNT},
+    types::{error, off_t, uapi, Errno, OpenFlags, UserAddress, UserRef, MAX_RW_COUNT},
 };
-use fuchsia_zircon as zx;
 use std::{cmp::Ordering, sync::Arc, usize};
-
-/// An input buffer that reads from a VMO in PAGE_SIZE segments
-/// Used by the `sendfile` syscall.
-#[derive(Debug)]
-struct SendFileBuffer {
-    vmo: Arc<zx::Vmo>,
-    start_pos: usize,
-    cur_pos: usize,
-    end_pos: usize,
-}
-
-impl InputBuffer for SendFileBuffer {
-    fn peek_each(&mut self, callback: &mut InputBufferCallback<'_>) -> Result<usize, Errno> {
-        let mut peek_pos = self.cur_pos;
-
-        while peek_pos < self.end_pos {
-            let peekable = self.end_pos - peek_pos;
-
-            // Only read at most a page worth of data from the VMO.
-            let segment = std::cmp::min(peekable, *PAGE_SIZE as usize);
-            let data =
-                self.vmo.read_to_vec(peek_pos as u64, segment as u64).map_err(|_| errno!(EIO))?;
-
-            let bytes_peeked = callback(data.as_slice())?;
-            peek_pos += bytes_peeked;
-
-            if bytes_peeked < data.len() {
-                break;
-            }
-        }
-
-        Ok(peek_pos - self.cur_pos)
-    }
-
-    fn available(&self) -> usize {
-        assert!(self.end_pos >= self.cur_pos);
-        self.end_pos - self.cur_pos
-    }
-
-    fn bytes_read(&self) -> usize {
-        assert!(self.cur_pos >= self.start_pos);
-        self.cur_pos - self.start_pos
-    }
-
-    fn drain(&mut self) -> usize {
-        let bytes_swallowed = self.available();
-        self.cur_pos = self.end_pos;
-        bytes_swallowed
-    }
-
-    fn advance(&mut self, length: usize) -> Result<(), Errno> {
-        self.cur_pos += length;
-        assert!(self.end_pos >= self.cur_pos);
-        Ok(())
-    }
-}
 
 pub fn sendfile(
     current_task: &CurrentTask,
@@ -96,6 +39,12 @@ pub fn sendfile(
         return error!(EBADF);
     }
 
+    // We need the in file to be seekable because we use read_at below, but this is also a proxy for
+    // checking that the file supports mmap-like operations.
+    if !in_file.is_seekable() {
+        return error!(EINVAL);
+    }
+
     // out_fd has the O_APPEND flag set.  This is not currently supported by sendfile().
     // See https://man7.org/linux/man-pages/man2/sendfile.2.html#ERRORS
     if out_file.flags().contains(OpenFlags::APPEND) {
@@ -103,31 +52,41 @@ pub fn sendfile(
     }
 
     let count = count as usize;
-    let count = std::cmp::min(count, *MAX_RW_COUNT);
+    let mut count = std::cmp::min(count, *MAX_RW_COUNT);
 
-    // Lock the in_file offset and info for the entire operation.
+    // Lock the in_file offset for the entire operation.
     let mut in_offset = in_file.offset.lock();
-    let info = in_file.node().info();
+    let mut total_written = 0;
 
-    let vmo =
-        in_file.get_vmo(current_task, None, ProtectionFlags::READ).map_err(|_| errno!(EINVAL))?;
-
-    assert!(*in_offset >= 0);
-    let start_pos = *in_offset as usize;
-    let end_pos = std::cmp::min(start_pos + count, info.size);
-
-    if start_pos >= end_pos {
-        return Ok(0);
+    match (|| -> Result<(), Errno> {
+        while count > 0 {
+            let limit = std::cmp::min(*PAGE_SIZE as usize, count);
+            let mut buffer = VecOutputBuffer::new(limit);
+            let read = in_file.read_at(current_task, *in_offset as usize, &mut buffer)?;
+            let mut buffer = Vec::from(buffer);
+            buffer.truncate(read);
+            let written = out_file.write(current_task, &mut VecInputBuffer::from(buffer))?;
+            *in_offset += written as i64;
+            total_written += written;
+            if read < limit || written < read {
+                break;
+            }
+            count -= written;
+        }
+        Ok(())
+    })() {
+        Ok(()) => Ok(total_written),
+        Err(e) => {
+            if total_written > 0 {
+                Ok(total_written)
+            } else {
+                match e.code.error_code() {
+                    uapi::EISDIR => error!(EINVAL),
+                    _ => Err(e),
+                }
+            }
+        }
     }
-
-    let mut buffer = SendFileBuffer { vmo, start_pos, cur_pos: start_pos, end_pos };
-
-    let num_bytes_written = out_file.write(current_task, &mut buffer)?;
-
-    // Increase the in file offset by the number of bytes actually written.
-    *in_offset += num_bytes_written as i64;
-
-    Ok(num_bytes_written)
 }
 
 #[derive(Debug)]

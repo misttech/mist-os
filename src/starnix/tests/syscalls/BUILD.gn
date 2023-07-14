@@ -111,6 +111,7 @@ test("syscalls_test_bin") {
     "read_write_test.cc",
     "restart_read_test.cc",
     "seccomp_test.cc",
+    "sendfile_test.cc",
     "signal_handling_test.cc",
     "socket_test.cc",
     "sw_breakpoint_test.cc",

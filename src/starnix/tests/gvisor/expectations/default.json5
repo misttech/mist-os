@@ -169,7 +169,6 @@
                 "Inotify.Fallocate",
                 "Inotify.IncludeUnlinkedFile",
                 "Inotify.ExcludeUnlinkMultipleChildren",
-                "Inotify.Sendfile",
                 "Inotify.Utimensat",
                 "Inotify.Exec",
 
