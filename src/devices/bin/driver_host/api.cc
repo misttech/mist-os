@@ -448,14 +448,6 @@ __EXPORT void driver_logf_internal(const zx_driver_t* drv, fx_log_severity_t fla
   va_end(args);
 }
 
-__EXPORT uint32_t device_get_fragment_count(zx_device_t* dev) {
-  DEBUG_ASSERT_VALID_DEVICE(dev);
-  if (!dev->is_composite()) {
-    return 0;
-  }
-  return dev->composite()->GetFragmentCount();
-}
-
 __EXPORT zx_status_t device_get_fragment_protocol(zx_device_t* dev, const char* name,
                                                   uint32_t proto_id, void* out) {
   DEBUG_ASSERT_VALID_DEVICE(dev);

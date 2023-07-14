@@ -109,10 +109,6 @@ __EXPORT void driver_logf_internal(const zx_driver_t* drv, fx_log_severity_t sev
   va_end(args);
 }
 
-__EXPORT uint32_t device_get_fragment_count(zx_device_t* dev) {
-  return static_cast<uint32_t>(dev->fragments().size());
-}
-
 __EXPORT zx_status_t device_get_fragment_protocol(zx_device_t* dev, const char* name,
                                                   uint32_t proto_id, void* out) {
   bool has_fragment =

@@ -351,9 +351,6 @@ zx_status_t device_get_metadata_size(zx_device_t* dev, uint32_t type, size_t* ou
 // Adds metadata to a specific device.
 zx_status_t device_add_metadata(zx_device_t* dev, uint32_t type, const void* data, size_t length);
 
-// Returns the number of fragments that can be returned by `device_get_fragments`.
-uint32_t device_get_fragment_count(zx_device_t* dev);
-
 // Returns the specific protocol from the named fragment, identified by the name
 // provided when it was created via`device_add_composite`. Returns ZX_ERR_NOT_FOUND if
 // no fragment exists.

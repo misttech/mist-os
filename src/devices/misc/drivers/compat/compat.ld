@@ -21,7 +21,6 @@
     driver_log_severity_enabled_internal;
     driver_logvf_internal;
     driver_logf_internal;
-    device_get_fragment_count;
     device_get_fragment_protocol;
     device_get_fragment_metadata;
     device_get_variable;

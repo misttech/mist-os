@@ -89,8 +89,6 @@ __EXPORT __WEAK zx_status_t load_firmware_from_driver(zx_driver_t* drv, zx_devic
   return ZX_OK;
 }
 
-__EXPORT uint32_t device_get_fragment_count(zx_device_t* dev) { return 0; }
-
 // Please do not use get_root_resource() in new code. See ZX-1467.
 __EXPORT
 zx_handle_t get_root_resource(zx_device_t* parent) { return ZX_HANDLE_INVALID; }

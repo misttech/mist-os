@@ -29,8 +29,6 @@ class CompositeDeviceInstance {
     return ZX_OK;
   }
 
-  uint32_t GetFragmentCount() { return static_cast<uint32_t>(fragments_.size()); }
-
   bool GetFragment(const char* name, zx_device_t** out) {
     for (auto& fragment : fragments_) {
       if (strncmp(name, fragment.name.c_str(), 32) == 0) {
@@ -104,10 +102,6 @@ zx_status_t InitializeCompositeDevice(const fbl::RefPtr<zx_device>& dev,
 }
 
 CompositeDevice::~CompositeDevice() = default;
-
-uint32_t CompositeDevice::GetFragmentCount() {
-  return static_cast<CompositeDeviceInstance*>(device_->ctx())->GetFragmentCount();
-}
 
 bool CompositeDevice::GetFragment(const char* name, zx_device_t** out) {
   return static_cast<CompositeDeviceInstance*>(device_->ctx())->GetFragment(name, out);
