@@ -5,33 +5,30 @@
 // [START example]
 {
     include: [
-        "//sdk/ctf/meta/rust.shard.cml",
-        "//sdk/ctf/meta/test.shard.cml",
         "inspect/offer.shard.cml",
         "syslog/client.shard.cml",
     ],
     children: [
         {
-            name: "echo_test",
-            url: "#meta/fuchsia.examples.echo_test.cm",
-            environment: "#subpackaged-runner-env",
+            name: "test_suite",
+            url: "fuchsia-examples-cpp-tests#meta/test-suite.cm",
         },
         {
-            name: "test_realm",
-            url: "fuchsia.example_test_realm#meta/default.cm",
+            name: "realm_factory",
+            url: "echo-realm-factory#meta/echo-realm-factory.cm",
         },
     ],
     offer: [
         {
-            protocol: "fuchsia.examples.Echo",
-            from: "#test_realm",
-            to: "#echo_test",
+            protocol: "test.example.RealmFactory",
+            from: "#realm_factory",
+            to: "#test_suite",
         },
     ],
     expose: [
         {
             protocol: "fuchsia.test.Suite",
-            from: "#echo_test",
+            from: "#test_suite",
         },
     ],
 }

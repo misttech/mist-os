@@ -5,25 +5,15 @@
 // [START example]
 {
     include: [
-        "//sdk/ctf/meta/test.shard.cml",
         "inspect/offer.shard.cml",
         "sys/testing/elf_test_runner.shard.cml",
         "syslog/client.shard.cml",
     ],
     program: {
-        binary: "bin/fuchsia.examples.echo_test_main",
+        binary: "bin/ctf_fuchsia_examples_cpp_test",
     },
-    children: [
-        {
-            name: "test_realm",
-            url: "fuchsia.example_test_realm#meta/default.cm",
-        },
-    ],
     use: [
-        {
-            protocol: "fuchsia.examples.Echo",
-            from: "#test_realm",
-        },
+        { protocol: "test.example.RealmFactory" },
     ],
 }
 

@@ -8,31 +8,47 @@ import("//sdk/ctf/build/ctf.gni")
 
 group("tests") {
   testonly = true
-  deps = [ ":fuchsia.examples.echo_test" ]
+  deps = [ ":fuchsia-examples-cpp-tests-package" ]
 }
 
-ctf_executable("test_main") {
-  output_name = "fuchsia.examples.echo_test_main"
+ctf_executable("bin") {
+  output_name = "ctf_fuchsia_examples_cpp_test"
   sources = [ "main.cc" ]
   deps = [
-    "//examples/fidl/fuchsia.examples:fuchsia.examples_cpp",
+    "//examples/fidl/fuchsia.examples:fuchsia.examples_hlcpp",
+    "//sdk/ctf/tests/examples/fidl/fuchsia.examples/testing/fidl:test.example_hlcpp",
     "//sdk/lib/component/incoming/cpp",
+    "//sdk/lib/sys/cpp",
     "//sdk/lib/syslog/cpp:cpp-macros",
+    "//zircon/system/ulib/async-loop:async-loop-cpp",
+    "//zircon/system/ulib/async-loop:async-loop-default",
     "//zircon/system/ulib/zxtest",
   ]
   testonly = true
 }
 
-ctf_fuchsia_component("fuchsia.examples.echo_test_component") {
-  component_name = "fuchsia.examples.echo_test"
-  manifest = "meta/fuchsia.examples.echo_test.cml"
-  deps = [ ":test_main" ]
+ctf_fuchsia_component("test-suite") {
+  manifest = "meta/test-suite.cml"
+  deps = [ ":bin" ]
   testonly = true
 }
 
-ctf_fuchsia_test_package("fuchsia.examples.echo_test") {
-  enable_ctf_test_realms = true
-  package_name = "fuchsia.examples.echo_test"
-  test_components = [ ":fuchsia.examples.echo_test_component" ]
+ctf_fuchsia_package("fuchsia-examples-cpp-tests") {
+  package_name = "fuchsia-examples-cpp-tests"
+  testonly = true
+  deps = [ ":test-suite" ]
+}
+
+fuchsia_test_component("test-root") {
+  manifest = "meta/test-root.cml"
+  test_type = "ctf"
+}
+
+fuchsia_test_package("fuchsia-examples-cpp-tests-package") {
+  test_components = [ ":test-root" ]
+  subpackages = [
+    "//sdk/ctf/tests/examples/fidl/fuchsia.examples/testing/realm-factory:echo-realm-factory",
+    ":fuchsia-examples-cpp-tests",
+  ]
 }
 # [END build]

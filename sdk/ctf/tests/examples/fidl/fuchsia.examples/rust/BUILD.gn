@@ -8,40 +8,50 @@ import("//sdk/ctf/build/ctf.gni")
 
 group("tests") {
   testonly = true
-  deps = [ ":fuchsia.examples.echo_rust_test" ]
+  deps = [ ":fuchsia-examples-rust-tests-package" ]
 }
 
-ctf_rustc_test("test_main") {
+ctf_rustc_test("bin") {
   edition = "2021"
-  output_name = "fuchsia_examples_echo_test_rust_main"
-  source_root = "main.rs"
+  source_root = "src/main.rs"
   sources = [ source_root ]
+  name = "ctf_fuchsia_examples_rust_test"
   deps = [
     "//examples/fidl/fuchsia.examples:fuchsia.examples_rust",
+    "//sdk/ctf/tests/examples/fidl/fuchsia.examples/testing/fidl:test.example_rust",
+    "//src/lib/fidl/rust/fidl",
     "//src/lib/fuchsia",
     "//src/lib/fuchsia-component",
-    "//src/lib/zircon/rust:fuchsia-zircon",
+    "//src/testing/realm_proxy",
     "//third_party/rust_crates:anyhow",
+    "//third_party/rust_crates:tracing",
   ]
 }
 
-ctf_fuchsia_component("fuchsia.examples.echo_test_component") {
-  component_name = "fuchsia.examples.echo_test"
-  manifest = "meta/fuchsia.examples.echo_test.cml"
-  deps = [ ":test_main" ]
+ctf_fuchsia_component("test-suite") {
   testonly = true
+  manifest = "meta/test-suite.cml"
+  deps = [ ":bin" ]
 }
 
-ctf_fuchsia_component("fuchsia.examples.echo_test_root") {
-  component_name = "fuchsia.examples.echo_test_root"
-  manifest = "meta/fuchsia.examples.echo_test_root.cml"
+ctf_fuchsia_package("fuchsia-examples-rust-tests") {
+  package_name = "fuchsia-examples-rust-tests"
+  testonly = true
+  deps = [ ":test-suite" ]
 }
 
-ctf_fuchsia_test_package("fuchsia.examples.echo_rust_test") {
-  enable_ctf_test_realms = true
-  package_name = "fuchsia.examples.echo_rust_test"
-  test_components = [ ":fuchsia.examples.echo_test_root" ]
-  subpackages = RUST_SUBPACKAGES
-  deps = [ ":fuchsia.examples.echo_test_component" ]
+fuchsia_test_component("test-root") {
+  testonly = true
+  manifest = "meta/test-root.cml"
+  test_type = "ctf"
+}
+
+fuchsia_test_package("fuchsia-examples-rust-tests-package") {
+  test_components = [ ":test-root" ]
+  subpackages = [
+    "//sdk/ctf/tests/examples/fidl/fuchsia.examples/testing/realm-factory:echo-realm-factory",
+    ":fuchsia-examples-rust-tests",
+  ]
+  subpackages += RUST_SUBPACKAGES
 }
 # [END build]
