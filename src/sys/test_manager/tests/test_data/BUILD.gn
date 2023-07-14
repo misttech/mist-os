@@ -216,12 +216,6 @@ fuchsia_component("no_suite_service") {
   manifest = "meta/no_suite_service.cml"
 }
 
-fuchsia_component("simple_system_realm_test") {
-  testonly = true
-  deps = [ ":noop_test_bin" ]
-  manifest = "meta/simple_system_realm_test.cml"
-}
-
 fuchsia_component("simple_chromium_realm_test") {
   testonly = true
   deps = [ ":noop_test_bin" ]
@@ -407,7 +401,6 @@ group("test_data") {
     ":run-closes-channel-example",
     ":run-hangs-example",
     ":simple_chromium_realm_test",
-    ":simple_system_realm_test",
     ":test-with-stderr",
     "//examples/components/routing/rust/echo_server:echo_server_cmp",
     "//examples/tests/rust:custom_artifact_user_cmp",
