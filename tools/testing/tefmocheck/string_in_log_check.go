@@ -368,6 +368,8 @@ func fuchsiaLogChecks() []FailureModeCheck {
 // infrastructure host tools.
 func infraToolLogChecks() []FailureModeCheck {
 	return []FailureModeCheck{
+		// For b/291154636
+		&stringInLogCheck{String: "Hardware mismatch! Trying to flash images built for", Type: swarmingOutputType},
 		// For fxbug.dev/47649.
 		&stringInLogCheck{String: "kvm run failed Bad address", Type: swarmingOutputType},
 		// For fxbug.dev/44779.
