@@ -9,7 +9,10 @@ import("//build/python/python_library.gni")
 group("tests") {
   testonly = true
 
-  deps = [ "util:tests" ]
+  deps = [
+    "dataparse:tests",
+    "util:tests",
+  ]
 }
 
 if (is_host) {
@@ -18,7 +21,10 @@ if (is_host) {
     main_source = "main.py"
     output_name = "fxtest_rewrite.pyz"
     sources = []
-    deps = [ "util" ]
+    deps = [
+      "dataparse",
+      "util",
+    ]
   }
 
   # Rename the resulting .pyz for the host tool
