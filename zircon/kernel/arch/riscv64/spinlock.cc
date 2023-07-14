@@ -16,9 +16,9 @@
 // number + 1 for debugging purposes.
 
 void arch_spin_lock(arch_spin_lock_t* lock) TA_NO_THREAD_SAFETY_ANALYSIS {
-  const uint32_t new_value = arch_curr_cpu_num() + 1;
+  const cpu_num_t new_value = arch_curr_cpu_num() + 1;
   for (;;) {
-    uint32_t expected = 0;
+    cpu_num_t expected = 0;
     if (lock->value.compare_exchange_weak(expected, new_value, ktl::memory_order_acquire,
                                           ktl::memory_order_relaxed)) {
       break;
@@ -29,8 +29,8 @@ void arch_spin_lock(arch_spin_lock_t* lock) TA_NO_THREAD_SAFETY_ANALYSIS {
 }
 
 bool arch_spin_trylock(arch_spin_lock_t* lock) TA_NO_THREAD_SAFETY_ANALYSIS {
-  const uint32_t new_value = arch_curr_cpu_num() + 1;
-  uint32_t expected = 0;
+  const cpu_num_t new_value = arch_curr_cpu_num() + 1;
+  cpu_num_t expected = 0;
   if (lock->value.compare_exchange_strong(expected, new_value, ktl::memory_order_acquire,
                                           ktl::memory_order_relaxed)) {
     // success

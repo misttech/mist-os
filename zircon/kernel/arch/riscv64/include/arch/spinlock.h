@@ -17,11 +17,8 @@
   (arch_spin_lock_t) { 0 }
 
 struct TA_CAP("mutex") arch_spin_lock_t {
-  ktl::atomic<uint32_t> value;
+  ktl::atomic<cpu_num_t> value;
 };
-
-// The spinlock holds the current cpu number + 1
-static_assert(sizeof(uint32_t) == sizeof(cpu_num_t));
 
 // Note: trylock operations are not permitted to fail spuriously, even on
 // architectures with weak memory ordering.  If a trylock operation fails, it
@@ -32,7 +29,7 @@ bool arch_spin_trylock(arch_spin_lock_t* lock) TA_TRY_ACQ(false, lock);
 void arch_spin_unlock(arch_spin_lock_t* lock) TA_REL(lock);
 
 inline cpu_num_t arch_spin_lock_holder_cpu(const arch_spin_lock_t* lock) {
-  return static_cast<cpu_num_t>(lock->value.load(ktl::memory_order_relaxed) - 1);
+  return lock->value.load(ktl::memory_order_relaxed) - 1;
 }
 
 inline bool arch_spin_lock_held(const arch_spin_lock_t* lock) {
