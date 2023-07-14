@@ -2220,16 +2220,43 @@ TEST(VmoTestCase, NoWriteResizable) {
 
 TEST(VmoTestCase, OpOutOfBounds) {
   zx::vmo vmo;
-  ASSERT_OK(zx::vmo::create(zx_system_get_page_size(), 0, &vmo));
+  const size_t kVmoSize = zx_system_get_page_size();
+  const size_t kOpSize = 2 * kVmoSize;
+  ASSERT_OK(zx::vmo::create(kVmoSize, 0, &vmo));
 
-  EXPECT_EQ(ZX_ERR_OUT_OF_RANGE,
-            vmo.op_range(ZX_VMO_OP_ZERO, 0, 2 * zx_system_get_page_size(), nullptr, 0));
+  uint32_t ops[] = {ZX_VMO_OP_COMMIT,
+                    ZX_VMO_OP_DECOMMIT,
+                    ZX_VMO_OP_ZERO,
+                    ZX_VMO_OP_CACHE_SYNC,
+                    ZX_VMO_OP_CACHE_INVALIDATE,
+                    ZX_VMO_OP_CACHE_CLEAN,
+                    ZX_VMO_OP_CACHE_CLEAN_INVALIDATE};
+  for (auto op : ops) {
+    EXPECT_EQ(ZX_ERR_OUT_OF_RANGE, vmo.op_range(op, 0, kOpSize, nullptr, 0),
+              "zx_vmo_op_range (op=%u) succeeded\n", op);
+  }
 
-  EXPECT_EQ(ZX_ERR_OUT_OF_RANGE,
-            vmo.op_range(ZX_VMO_OP_COMMIT, 0, 2 * zx_system_get_page_size(), nullptr, 0));
+  vmo.reset();
 
+  // Use a pager-backed VMO for hinting ops.
+  zx::pager pager;
+  ASSERT_OK(zx::pager::create(0, &pager));
+  zx::port port;
+  ASSERT_OK(zx::port::create(0, &port));
+  ASSERT_OK(pager.create_vmo(0, port, 0, kVmoSize, &vmo));
+
+  EXPECT_EQ(ZX_ERR_OUT_OF_RANGE, vmo.op_range(ZX_VMO_OP_DONT_NEED, 0, kOpSize, nullptr, 0));
+  EXPECT_EQ(ZX_ERR_OUT_OF_RANGE, vmo.op_range(ZX_VMO_OP_ALWAYS_NEED, 0, kOpSize, nullptr, 0));
+
+  vmo.reset();
+
+  // Use a discardable VMO for lock/unlock ops.
+  ASSERT_OK(zx::vmo::create(kVmoSize, ZX_VMO_DISCARDABLE, &vmo));
+  zx_vmo_lock_state_t lock_state = {};
   EXPECT_EQ(ZX_ERR_OUT_OF_RANGE,
-            vmo.op_range(ZX_VMO_OP_DECOMMIT, 0, 2 * zx_system_get_page_size(), nullptr, 0));
+            vmo.op_range(ZX_VMO_OP_LOCK, 0, kOpSize, &lock_state, sizeof(lock_state)));
+  EXPECT_EQ(ZX_ERR_OUT_OF_RANGE, vmo.op_range(ZX_VMO_OP_TRY_LOCK, 0, kOpSize, nullptr, 0));
+  EXPECT_EQ(ZX_ERR_OUT_OF_RANGE, vmo.op_range(ZX_VMO_OP_UNLOCK, 0, kOpSize, nullptr, 0));
 }
 
 }  // namespace
