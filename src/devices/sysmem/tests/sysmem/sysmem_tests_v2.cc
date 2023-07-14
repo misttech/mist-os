@@ -5580,3 +5580,20 @@ TEST(Sysmem, ColorSpaceDoNotCare_UnconstrainedColorSpaceRemovesPixelFormatV2) {
     }
   }
 }
+
+TEST(Sysmem, VmoInspectRight) {
+  auto make_collection_result = make_single_participant_collection_v2();
+  ASSERT_TRUE(make_collection_result.is_ok());
+  auto collection = std::move(make_collection_result.value());
+  set_picky_constraints_v2(collection, 64 * 1024);
+  auto wait_result = collection->WaitForAllBuffersAllocated();
+  ASSERT_TRUE(wait_result.is_ok());
+  auto buffer_collection_info = std::move(*wait_result->buffer_collection_info());
+  EXPECT_EQ(1, buffer_collection_info.buffers()->size());
+  auto vmo = std::move(*buffer_collection_info.buffers()->at(0).vmo());
+  zx_info_handle_basic_t basic_info{};
+  zx_status_t status =
+      vmo.get_info(ZX_INFO_HANDLE_BASIC, &basic_info, sizeof(basic_info), nullptr, nullptr);
+  // ZX_RIGHT_INSPECT right allows get_info to work.
+  ASSERT_EQ(ZX_OK, status);
+}

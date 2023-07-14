@@ -34,8 +34,9 @@ namespace {
 // picking up any newly-added rights unintentionally.  This is based on
 // ZX_DEFAULT_VMO_RIGHTS, but with a few rights removed.
 const uint32_t kMaxClientVmoRights =
-    // ZX_RIGHTS_BASIC, except ZX_RIGHT_INSPECT (at least for now).
-    ZX_RIGHT_TRANSFER | ZX_RIGHT_DUPLICATE | ZX_RIGHT_WAIT |
+    // ZX_RIGHTS_BASIC includes ZX_RIGHT_INSPECT which is currently required by
+    // at least starnix when mapping a VMO into a starnix-backed process.
+    ZX_RIGHTS_BASIC |
     // ZX_RIGHTS_IO:
     ZX_RIGHT_READ | ZX_RIGHT_WRITE |
     // ZX_RIGHTS_PROPERTY allows a participant to set ZX_PROP_NAME for easier
