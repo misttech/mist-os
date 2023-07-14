@@ -571,7 +571,6 @@
                 "creat07",
 
                 // Tests reach unexpected Abort
-                "clock_gettime01",
                 "fork14",
                 "getdtablesize01",
                 "gettimeofday02",
