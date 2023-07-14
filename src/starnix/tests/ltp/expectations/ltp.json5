@@ -115,7 +115,6 @@
                 "execveat03",
                 "fallocate02",
                 "fallocate04",
-                "fallocate05",
                 "fanotify01",
                 "fanotify02",
                 "fanotify03",
@@ -288,7 +287,6 @@
                 "mincore03",
                 "mincore04",
                 "mknod07",
-                "mknodat02",
                 "mlock01",
                 "mlock02",
                 "mlock04",
@@ -305,7 +303,6 @@
                 "mmap13",
                 "mmap14",
                 "mmapstress07",
-                "mount01",
                 "mount02",
                 "mount06",
                 "mount_setattr01",
@@ -376,8 +373,6 @@
                 "recvfrom01",
                 "recvmsg01",
                 "remap_file_pages02",
-                "rename11",
-                "renameat01",
                 "renameat201",
                 "renameat202",
                 "request_key01",
@@ -509,9 +504,7 @@
                 "tpci",
                 "uaccess",
                 "umip_basic_test",
-                "umount01",
                 "umount02",
-                "umount03",
                 "umount2_01",
                 "umount2_02",
                 "unshare01",
@@ -532,41 +525,8 @@
 
                 // These tests fail when an init is run in the container to set up /apex.
                 // TODO(https://fxbug.dev/129839) re-enable these tests
-                "chdir01",
-                "close_range01",
-                "fgetxattr01",
-                "fremovexattr01",
-                "fremovexattr02",
-                "fsetxattr01",
-                "fstatfs01",
-                "fstatfs01_64",
-                "fsync01",
-                "ioctl05",
-                "ioctl08",
-                "ioctl_loop03",
                 "ioctl_loop06",
-                "mkdir09",
                 "mmapstress04",
-                "mount04",
-                "rename01",
-                "rename03",
-                "rename04",
-                "rename05",
-                "rename06",
-                "rename07",
-                "rename08",
-                "rename10",
-                "rename12",
-                "rename13",
-                "setxattr01",
-                "statfs01",
-                "statfs01_64",
-                "statvfs01",
-                "utime01",
-                "utime02",
-                "utime03",
-                "utime04",
-                "utime05",
             ],
         },
         {
@@ -590,7 +550,7 @@
                 // TODO(fxbug.dev/128184) Re-enable once flake is resolved.
                 "linkat01",
 
-                   // TODO(fxbug.dev/130549) Re-enable once flake is resolved.
+                // TODO(fxbug.dev/130549) Re-enable once flake is resolved.
                 "prctl09",
 
                 // TODO(fxbug.dev/128583) Re-enable once flake is resolved.
@@ -601,6 +561,9 @@
                 "io_pgetevents01",
                 "select03",
                 "setrlimit02",
+
+                // Causes an OOM when /dev/loop-control is available.
+                "fallocate05",
 
                 // These tests hang
                 "creat07",

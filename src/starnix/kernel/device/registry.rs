@@ -9,7 +9,7 @@ use crate::{
     device::misc::create_misc_device,
     fs::{
         kobject::*,
-        sysfs::{DeviceDirectory, SysFsDirectory},
+        sysfs::{BlockDeviceDirectory, DeviceDirectory, SysFsDirectory},
         FileOps, FsNode,
     },
     lock::{Mutex, RwLock},
@@ -189,6 +189,23 @@ impl DeviceRegistry {
         );
     }
 
+    pub fn add_virtual_block_device(&self, dev_attr: KObjectDeviceAttribute) {
+        self.add_block_device(
+            self.virtual_bus().get_or_create_child(b"block", KType::Class, SysFsDirectory::new),
+            dev_attr,
+        );
+    }
+
+    /// Adds a single block device kobject in the tree.
+    pub fn add_block_device(&self, class: KObjectHandle, dev_attr: KObjectDeviceAttribute) {
+        let ktype =
+            KType::Device { name: Some(dev_attr.device_name), device_type: dev_attr.device_type };
+        self.dispatch_uevent(
+            UEventAction::Add,
+            class.get_or_create_child(&dev_attr.kobject_name, ktype, BlockDeviceDirectory::new),
+        );
+    }
+
     /// Adds a list of device kobjects in the tree.
     pub fn add_devices(&self, class: KObjectHandle, dev_attrs: Vec<KObjectDeviceAttribute>) {
         for attr in dev_attrs {
@@ -220,6 +237,7 @@ impl DeviceRegistry {
                 (b"hwrng", b"hwrng", DeviceType::HW_RANDOM),
                 (b"fuse", b"fuse", DeviceType::FUSE),
                 (b"device-mapper", b"mapper/control", DeviceType::DEVICE_MAPPER),
+                (b"loop-control", b"loop-control", DeviceType::LOOP_CONTROL),
             ]),
         );
 

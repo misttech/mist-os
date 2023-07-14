@@ -16,7 +16,9 @@ pub fn create_misc_device(
     Ok(match id {
         DeviceType::HW_RANDOM => Box::new(DevRandom),
         DeviceType::FUSE => Box::<DevFuse>::default(),
-        DeviceType::LOOP_CONTROL => LoopControlDevice::create_file_ops(current_task.kernel()),
+        DeviceType::LOOP_CONTROL => {
+            Box::new(LoopControlDevice::new(current_task.kernel().loop_device_registry.clone()))
+        }
         _ => return error!(ENODEV),
     })
 }

@@ -196,6 +196,8 @@ impl Kernel {
             Framebuffer::new_with_input(features.iter().find(|f| f.starts_with("aspect_ratio")))
                 .expect("Failed to create framebuffer");
 
+        let device_registry = DeviceRegistry::new_with_common_devices();
+        let loop_device_registry = LoopDeviceRegistry::new(&device_registry);
         Ok(Arc::new(Kernel {
             job,
             kthreads: KernelThreads::default(),
@@ -214,10 +216,10 @@ impl Kernel {
             sys_fs: OnceCell::new(),
             selinux_fs: OnceCell::new(),
             trace_fs: OnceCell::new(),
-            device_registry: DeviceRegistry::new_with_common_devices(),
+            device_registry,
             features: HashSet::from_iter(features.iter().cloned()),
             container_svc,
-            loop_device_registry: Default::default(),
+            loop_device_registry,
             framebuffer,
             input_file,
             binders: Default::default(),
