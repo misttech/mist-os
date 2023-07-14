@@ -142,6 +142,6 @@ fs_test_suite("f2fs") {
 slow_fs_test_suite("f2fs") {
   deps = [
     ":f2fs_fs_test_config",
-    "//src/storage/bin/f2fs",
+    "//src/storage/bin/f2fs:f2fs-component",
   ]
 }
