@@ -68,22 +68,6 @@ out-of-tree.
   driver development is not yet supported. There is ongoing work towards
   demonstrating the first out-of-tree Fuchsia driver.
 
-## Finish the Component Framework migration
-
-The [new Component Framework][cf-intro] (aka CFv2) has full control over the
-sandbox of component instances, and expresses sandboxes in terms of
-[capabilities] that decouple contracts from implementation details.
-
-The legacy Component Framework (`appmgr`) supported sandbox features that
-allowed access to certain global namespaces and would expose components to
-platform implementation details that had no affordances for updatability such
-as versioning or transition support. The new Component Framework either enforces
-[isolation][principles-secure] or forbids access to these namespaces entirely.
-
-The [components v2 migration][cfv2-migration] is an ongoing multi-year effort.
-Currently the team is focused on
-[migrating system components][cfv2-sys-migration].
-
 ## Deprecate unlisted platform ABIs
 
 The fullness of the platform surface should be strictly defined, and expressed
@@ -91,12 +75,6 @@ in terms such as FIDL that afford for updatability via such mechanisms as
 versioning and support for transitions. Currently there exist some aspects of
 the platform surface that don’t meet these requirements.
 
-- [Retrieving build information][build-info] uses a modern FIDL protocol.
-  [Previously][build-info-old] this was done using a now-deprecated `appmgr`
-  sandbox feature, which offered this information to components using raw file
-  access that did not afford for updatability. This is now deprecated, new usage
-  is [discouraged][cfv2-sys-migration-build-info], but there are still a few
-  allowlisted legacy usages remaining.
 - Some out-of-tree component testing frameworks launch
   [test doubles][test-double] for platform components by specifying their
   [`fuchsia-pkg://` launch URLs][package-url]. These URLs don’t have updatability
@@ -205,10 +183,6 @@ even if CTS coverage never reaches 100% of the platform surface.
 [build-info]: /docs/development/build/build_information.md
 [build-info-old]: https://cs.opensource.google/fuchsia/fuchsia/+/1b21e5d7b36df3f5dde647684dd321f1aee21372:docs/development/build/build_information.md
 [capabilities]: /docs/concepts/components/v2/capabilities/README.md
-[cf-intro]: /docs/concepts/components/v2/introduction.md
-[cfv2-migration]: /docs/contribute/open_projects/components/migration.md
-[cfv2-sys-migration]: /docs/development/components/v2/migration/README.md
-[cfv2-sys-migration-build-info]: /docs/development/components/v2/migration/features.md#build-info
 [cpu-trace]: /docs/development/tracing/advanced/recording-a-cpu-performance-trace.md
 [cts]: /docs/development/testing/ctf/overview.md
 [decentralized-product-integration]: /docs/contribute/roadmap/2021/decentralized_product_integration.md
@@ -244,6 +218,5 @@ even if CTS coverage never reaches 100% of the platform surface.
 [topology]: /docs/concepts/components/v2/topology.md
 [tracing]: /docs/concepts/kernel/tracing-system.md
 [trf]: /docs/development/testing/components/test_runner_framework.md
-[principles-secure]: /docs/concepts/principles/secure.md
 [workstation-oot]: /docs/contribute/roadmap/2021/workstation_out_of_tree.md
 [zx-object-get-info]: /docs/reference/syscalls/object_get_info.md

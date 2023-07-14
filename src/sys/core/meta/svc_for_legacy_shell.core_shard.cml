@@ -168,7 +168,7 @@
             from: "#vulkan_loader",
         },
 
-        // Used by Bluetooth shell tools via appmgr.
+        // Used by Bluetooth shell tools.
         {
             protocol: [
                 "fuchsia.bluetooth.bredr.Profile",

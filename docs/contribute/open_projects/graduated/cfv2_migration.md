@@ -7,12 +7,6 @@ runtime environment. The original incarnation of components dates back to the
 inception of the Fuchsia OS and the initial commits in 2016. The framework has
 steadily evolved since then.
 
-## What's been migrated?
-
-Last updated: **June 2022**
-
-Over two thirds of components have been migrated (`.cmx` to `.cml`).
-
 ## Technical background
 
 ### Modern and legacy components
@@ -136,7 +130,7 @@ Component migrations are happening throughout the system. Any component that
 still has at least one `.cmx` file is a migration candidate.
 
 For legacy `sys` realm components you may use the
-[self-service migration guide][migrating-sys-components]. Multiple component
+self-service migration guide. Multiple component
 owners have recently seen success in using this guide, including but not limited
 to:
 
@@ -156,8 +150,7 @@ on the incremental stages, see [terminology](#terminology).
 
 The final step for migrating a component typically involves replacing all `.cmx`
 files with equivalent `.cml` files. For detailed instructions on migrating a
-component and its tests, see the
-[self-service migration guide][migrating-sys-components].
+component and its tests, see the self-service migration guide.
 
 ### Completing a task
 
@@ -196,7 +189,6 @@ Reach out for questions or for status updates:
 [intro]: /docs/concepts/components/v2/introduction.md
 [label-cf-v2-migration]: https://bugs.fuchsia.dev/p/fuchsia/issues/list?q=label%3Acf-v2-migration
 [lib-fuchsia-component]: /src/lib/fuchsia-component/README.md
-[migrating-sys-components]: /docs/development/components/v2/migration/README.md
 [sdk-components]: /sdk/lib/sys/cpp
 [sdk-test-with-environment]: /sdk/lib/sys/cpp/testing/test_with_environment.h
 [glossary.session-component]: /docs/glossary/README.md#session-component

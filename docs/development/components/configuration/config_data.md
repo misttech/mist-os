@@ -28,9 +28,6 @@ config_data("workstation_fonts") {
 
 ## Using `config_data()` in your component
 
-Note: If you are using legacy components,
-see [configuration data][config-migration] in the components migration guide.
-
 Include the following in your component manifest (`.cml`) file:
 
 ```json5
@@ -115,7 +112,6 @@ Due to the above issues, prefer using a different
 [configuration mechanism][config-mechanisms] if possible.
 
 [config-mechanisms]: mechanisms.md
-[config-migration]: /docs/development/components/v2/migration/features.md#config-data
 [icu-data]: /docs/development/internationalization/icu_data.md
 [icu-data-configs]: /src/lib/icu/tzdata/BUILD.gn
 [resource]: /build/dist/resource.gni

@@ -237,7 +237,7 @@ on virtualized targets, and address it to close testing workflow gaps as needed.
 
 - The FFX tool and associated stack.
 - The Fuchsia IDK, and any SDK frontends used by out-of-tree developers.
-- The ongoing [Components v2 migration][cfv2-migration] project as it enables
+- The ongoing {Components v2 migration][cfv2-migration] project as it enables
   out-of-tree component development.
 - Making [RealmBuilder][realm-builder] available out-of-tree.
 - Exposing [RealmBuilder][realm-builder] via the SDK. This includes the
@@ -306,7 +306,7 @@ Since system tests are so uniquely different than component tests, this topic is
 covered in a [separate roadmap document][oot-system-testing].
 
 [botanist]: /tools/botanist/
-[cfv2-migration]: /docs/contribute/open_projects/components/migration.md
+[cfv2-migration]: /docs/contribute/open_projects/graduated/cfv2_migration.md
 [cfv2-roadmap-2020]: /docs/contribute/roadmap/2020/overview.md#components_v2
 [components]: /docs/concepts/components/v2/introduction.md
 [components-build]: /docs/development/components/build.md

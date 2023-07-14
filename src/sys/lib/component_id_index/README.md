@@ -6,9 +6,8 @@ schema.
 
 This library has 2 clients:
 * A build tool which validates and merges component ID index files written in
-  JSON5 into a single index, which is written out into 2 files: a JSON-subset
-  index file, and a FIDL-encoded index file. These indicies are used by `appmgr`
-  and `component_manager`, respectively.
+  JSON5 into a single index, which is written out to a FIDL-encoded index file
+  which is used by `component_manager`.
 * `component_manager` which consumes a single FIDL-encoded component ID index
   file.
 

@@ -180,7 +180,7 @@ impl ComponentFacade {
 
     /// List running components, returns a vector containing component full URL.
     pub async fn list(&self) -> Result<Vec<String>, Error> {
-        info!("List running Component under appmgr in ComponentSearch Facade",);
+        info!("List running Component in ComponentSearch Facade",);
         let query = client::connect_to_protocol::<fsys::RealmQueryMarker>()?;
         let instances = list_cmd_serialized(Some(ListFilter::Running), query).await?;
         let urls: Vec<String> = instances.into_iter().map(|i| i.url).collect();

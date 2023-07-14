@@ -18,7 +18,7 @@ By default, target boots fully. This behavior can be overrided by passing
 in either `--bootloader` or `--recovery` to boot into the bootloader or
 recovery, respectively.
 
-The 'fuchsia.hardware.power.statecontrol.Admin' is exposed via the 'appmgr'
+'fuchsia.hardware.power.statecontrol.Admin' is exposed by the 'power_manager'
 component. To verify that the target exposes this service, `ffx component
 select` or `ffx component knock` can be used.",
     error_code(1, "Timeout while powering off target.")

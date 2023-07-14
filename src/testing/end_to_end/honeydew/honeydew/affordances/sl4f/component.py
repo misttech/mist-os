@@ -54,10 +54,10 @@ class Component(component.Component):
         return list_components_resp.get("result", [])
 
     def search(self, name: str) -> bool:
-        """Searches for a component under appmgr and returns True if found.
+        """Searches for a component under returns True if found.
 
         Args:
-            name: name of the component ending in ".cmx" or ".cm"
+            name: name of the component ending in ".cm"
 
         Returns:
             True if component is found else False.

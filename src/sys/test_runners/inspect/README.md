@@ -41,7 +41,7 @@ program: {
     accessor: "ALL",     // Possible values: ALL, LEGACY, FEEDBACK.
     timeout_seconds: 60, // Timeout for these keys in seconds.
     cases: [
-      "core/appmgr:root:version",  // A string selector ensures that the given property is present at all.
+      "example:root:version",  // A string selector ensures that the given property is present at all.
       "bootstrap/archivist:fuchsia.inspect.Health WHERE [a] a == \"OK\"", // Arbitrary comparisons are supported using Triage format.
     ]
 }

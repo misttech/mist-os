@@ -75,16 +75,9 @@ without communicating with writers.
 
 ### Filesystem Interface
 
-Components by default obtain a reference to their `out/` directory in
-their hub.
-
-*Top-level* nodes are exposed as VmoFiles in the Hub ending in the extension `.inspect`.
-It is customary for components to expose their primary or root tree as
-`out/diagnostics/root.inspect`.
-
-The manager for a component's environment may expose its own information
-about the component to the hub. For instance, appmgr exposes
-`system_objects` for each component.
+*Top-level* nodes are exposed as VmoFiles in a component's outgoing directory
+ending in the extension `.inspect`. It is customary for components to expose
+their primary or root tree as `out/diagnostics/root.inspect`.
 
 ### Language Libraries
 

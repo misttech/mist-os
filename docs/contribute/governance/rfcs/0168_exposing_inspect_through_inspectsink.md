@@ -211,7 +211,7 @@ The implementation of this RFC will be tested in the following ways:
 
 The goal is to make this change under the hood, in the libraries that write inspect. However, If we
 end up requiring code changes when components migrate to v2, we'll reflect those changes in the
-[diagnostics section of the migration guide][migration-diagnostics].
+diagnostics section of the migration guide.
 
 ## Drawbacks, alternatives, and unknowns
 
@@ -234,5 +234,4 @@ N/A
 
 [cts]: /docs/development/testing/ctf/overview.md
 [inspect-discovery]: /docs/reference/diagnostics/inspect/tree.md
-[migration-diagnostics]: /docs/development/components/v2/migration/diagnostics.md
 [tree-llcpp-bug]: https://fxbug.dev/95806

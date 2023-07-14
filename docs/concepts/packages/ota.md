@@ -392,8 +392,8 @@ bar/0 = new-version-hash-bar
 
 `pkgfs` then loads all these packages as base packages. The packages appear in
 `/pkgfs/{packages, versions}`, which indicate that the packages are installed
-or activated. Then, `appmgr` starts which then starts the `pkg-resolver`,
-`pkg-cache`, `netstack`, etc...
+or activated. Then, the system starts the `pkg-resolver`, `pkg-cache`,
+`netstack`, etc...
 
 ### Committing the update {#committing-update}
 

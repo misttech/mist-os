@@ -210,7 +210,7 @@ instructions in this section.
 
     ```rust
     #[ffx_plugin(
-        NameProviderProxy = "core/appmgr:out:fuchsia.device.NameProvider"
+        NameProviderProxy = "bootstrap/device_name_provider:out:fuchsia.device.NameProvider"
     )]
     ```
 
@@ -226,7 +226,7 @@ use {
 };
 
 #[ffx_plugin(
-    NameProviderProxy = "core/appmgr:out:fuchsia.device.NameProvider"
+    NameProviderProxy = "bootstrap/device_name_provider:out:fuchsia.device.NameProvider"
 )]
 pub async fn example(
     name_proxy: NameProviderProxy,

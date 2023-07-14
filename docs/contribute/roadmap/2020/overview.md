@@ -59,9 +59,6 @@ following areas:
     tests to Test Runner Framework.
 -   A subset of components under `sysmgr` that are straightforward to migrate.
 
-For more information, see
-[Components v2 migration](/docs/contribute/open_projects/components/migration.md).
-
 ### Implementing drivers as components
 
 The Driver Framework team is exploring how to use Components v2 to represent

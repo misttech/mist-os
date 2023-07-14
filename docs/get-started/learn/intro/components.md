@@ -49,7 +49,6 @@ You should see output similar to the (truncated) list below:
 /bootstrap/virtual_console
 /core
 /core/activity
-/core/appmgr
 ...
 /core/debug_serial
 /core/detect

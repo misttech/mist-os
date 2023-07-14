@@ -102,15 +102,6 @@ Note: Archivist has limited ability to verify the accuracy of timestamps reporte
 their log records. Efforts are taken to ensure correctness of common libraries in use, but it is
 not possible in today's system to *guarantee* the timestamps in the metadata of logs records.
 
-#### Monikers: v1 vs. v2
-
-Logs from components run by appmgr and Component Manager are identical.
-
-However, there are two systems for [reporting `LogSink` connections][attribution] to Archivist. As a
-result, v1 monikers from appmgr come as a realm path starting from appmgr `app/sys` plus the
-manifest filename, `netstack.cmx` for example. In v2, an explicit component name replaces the
-manifest filename and all realms are included, `core/pkg-resolver` for example.
-
 #### Dropped logs
 
 <!-- TODO(fxbug.dev/65241) link to JSON schema when available -->

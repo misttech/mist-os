@@ -29,7 +29,6 @@ type InstanceIdEntry = table {
 
     2: reserved;
 
-    /// The absolute moniker identifying the component instance. Note that
-    /// appmgr ignores thie field; it is only consumed by component manager.
+    /// The absolute moniker identifying the component instance.
     3: moniker string:fuchsia.component.MAX_MONIKER_LENGTH;
 };

@@ -1,7 +1,6 @@
 # root_ssl_certificates
 
-This directory contains the `root_ssl_certificates` package, which is used by
-`appmgr` to provide the `root-ssl-certificates` sandbox feature.
+This directory contains the `root_ssl_certificates` package.
 
 The certificates file, `third_party/cert.pem`, is updated using the
 `roll_certs.go` script, which pulls from Mozilla's root cert bundle at

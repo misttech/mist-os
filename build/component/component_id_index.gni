@@ -5,12 +5,12 @@
 import("//build/config.gni")
 
 # Define a component ID index which maps monikers (component URL + realm path)
-# to component instance IDs.  appmgr uses this index to key a component's
+# to component instance IDs. component_manager uses this index to key a component's
 # storage directory to its instance ID.
 #
 # There may be multiple component_id_index()s in the build, which are merged
-# into a single index in the build and delivered to appmgr using
-# config_data(for=appmgr).
+# into a single index in the build and delivered to component_manager as a
+# bootfs or package dependency at "config/component_id_index".
 #
 # See //docs/development/components/component_id_index.md for more details on
 # how to define a component ID index.
@@ -108,7 +108,7 @@ template("component_id_index_config") {
     deps = [ ":${component_id_index_merged_inputs}" ]
   }
 
-  # Supply the merged index file to appmgr as config data.
+  # TODO(fxbug.dev/102390): Obsolete, will be removed in a future change.
   config_data("${target_name}-config-data") {
     forward_variables_from(invoker,
                            [

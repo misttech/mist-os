@@ -187,8 +187,7 @@ test framework with a dedicated test runner, and you should add the above depend
 
 Legacy tests are tests that were written before the Test Runner Framework was
 introduced. The legacy test runner offers a simple adapter between the modern
-test framework and legacy tests that were not converted to modern ones. For help
-with migrations see [this guide][sys-migration-guide].
+test framework and legacy tests that were not converted to modern ones.
 **It is not recommended to use the legacy test runner in new tests.**
 
 The legacy test runner detects if a test passed or failed by observing its
@@ -846,7 +845,6 @@ offer: [
 [runners]: /docs/concepts/components/v2/capabilities/runners.md
 [Starnix tests]: /src/sys/testing/meta/starnix-tests.shard.cml
 [subpackages]: /docs/concepts/components/v2/subpackaging.md
-[sys-migration-guide]: /docs/development/components/v2/migration/tests.md
 [System Validation Tests]: /src/testing/system-validation/meta/system_validation_test_realm.shard.cml
 [system-test-realm]: /src/sys/testing/meta/system-tests.shard.cml
 [Test Architecture Tests]: /src/sys/testing/meta/test-arch-tests.shard.cml

@@ -18,10 +18,6 @@ toc:
     path: /docs/contribute/open_projects/build/zx_wrappers_deprecation.md
   - title: "Hermetic actions"
     path: /docs/contribute/open_projects/build/hermetic_actions.md
-- title: "Components projects"
-  section:
-  - title: "Components v2 migration"
-    path: /docs/contribute/open_projects/components/migration.md
 - title: "C++ projects"
   section:
   - title: "Implicit conversions"
@@ -38,6 +34,8 @@ toc:
   section:
   - title: "Overview"
     path: /docs/contribute/open_projects/graduated/README.md
+  - title: "Components v2 migration"
+    path: /docs/contribute/open_projects/graduated/cfv2_migration.md
   - title: "Dismantle the global log severity file"
     path: /docs/contribute/open_projects/graduated/global_severity.md
   - title: "Layer Cake deprecation"

@@ -415,24 +415,6 @@ closed protocol Realm {
         options ChildOptions;
     }) -> () error RealmBuilderError;
 
-    /// Adds a [legacy
-    /// component](https://fuchsia.dev/fuchsia-src/concepts/components/v1) to
-    /// the realm. When the component is launched, RealmBuilder will reach out
-    /// to appmgr to assist with launching the component, and the component will
-    /// be able to utilize all of the features of the legacy component
-    /// framework. Note that _only_ protocol capabilities may be routed to this
-    /// component. Capabilities of any other type (such as a directory) are
-    /// unsupported for legacy components launched by RealmBuilder, and this
-    /// legacy component should instead use the CMX features to access things
-    /// such as storage.
-    ///
-    /// Errors:
-    /// - `CHILD_ALREADY_EXISTS`: this realm already contains a child with the
-    ///   given name.
-    /// - `INVALID_MANIFEST_EXTENSION`: `url` does not end with `.cmx`, and thus
-    ///   should be used with `AddChild` instead of `AddLegacyChild`.
-    /// - `BUILD_ALREADY_CALLED`: The `Builder.Build` function has been called
-    ///   for this realm, and thus this `Realm` channel can no longer be used.
     @available(removed=12)
     strict AddLegacyChild(struct {
         /// The name of the child that is being added.

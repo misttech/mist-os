@@ -449,7 +449,7 @@ component manager exhibits the following behavior:
     error message like:
 
     ```none {:.devsite-disable-click-to-copy}
-    [component_manager] ERROR: Required protocol `fuchsia.appmgr.Startup` was not
+    [component_manager] ERROR: Required protocol `fuchsia.component.CoreBinder` was not
     available for target component `/startup`:
     failed to resolve "fuchsia-pkg://fuchsia.com/your_component#meta/your_component.cm":
     package not found: remote resolver responded with PackageNotFound

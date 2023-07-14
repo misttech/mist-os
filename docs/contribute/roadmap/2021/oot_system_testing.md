@@ -64,7 +64,7 @@ for this document.
 Fuchsia’s component framework offers [extensive testing support][v2-testing]
 with a high degree of isolation between the test environment and the rest of the
 system. Legacy (CFv1) testing is still supported to test legacy components that
-are not yet [migrated][v2-migration] to CFv2. Though the majority of production
+are not yet migrated to CFv2. Though the majority of production
 components are still CFv1, most tests (>70%) use the CFv2 test framework since
 it’s more reliable and offers some new features for developers.
 
@@ -485,5 +485,4 @@ additional justification or otherwise be discouraged by the platform team.
 [sl4f]: /docs/development/drivers/concepts/driver_development/sl4f.md
 [snapshot]: https://fuchsia.dev/reference/tools/fx/cmd/snapshot
 [ssh]: /docs/development/idk/documentation/ssh.md
-[v2-migration]: /docs/contribute/open_projects/components/migration.md
 [v2-testing]: /docs/development/testing/components/README.md

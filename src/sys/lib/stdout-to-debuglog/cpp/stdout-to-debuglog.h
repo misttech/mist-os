@@ -10,10 +10,7 @@
 namespace StdoutToDebuglog {
 
 // Connect the stdout and stderr for this program to the kernel's debuglog. This
-// is used by v2 components launched by the ELF runner, because they don't
-// otherwise have stdout and stderr. The fuchsia.logger.LogSink protocol is also
-// insufficient for some of these components for logging, as we must have logs
-// for many of these components before appmgr can start running v1 components.
+// This is used by some components in early boot that precede the archivist.
 zx_status_t Init();
 
 }  // namespace StdoutToDebuglog

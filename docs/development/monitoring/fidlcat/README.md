@@ -95,27 +95,27 @@ Examples (echo_server is launched by echo_client):
 
 Run and monitor echo_client.
 ```sh
-ffx debug fidl -- run echo_client_cpp.cmx
+ffx debug fidl -- run echo_client_cpp.cm
 ```
 
 Run and monitor echo_client.
 ```sh
-ffx debug fidl --remote-name echo_client -- run echo_client_cpp.cmx
+ffx debug fidl --remote-name echo_client -- run echo_client_cpp.cm
 ```
 
 Run echo_client and monitor echo_server.
 ```sh
-ffx debug fidl --remote-name echo_server -- run echo_client_cpp.cmx
+ffx debug fidl --remote-name echo_server -- run echo_client_cpp.cm
 ```
 
 Run echo_client and monitor echo_client and echo_server.
 ```sh
-ffx debug fidl --remote-name echo -- run echo_client_cpp.cmx
+ffx debug fidl --remote-name echo -- run echo_client_cpp.cm
 ```
 
 Run echo_client and monitor echo_client and echo_server.
 ```sh
-ffx debug fidl --remote-name echo_client --remote-name echo_server -- run echo_client_cpp.cmx
+ffx debug fidl --remote-name echo_client --remote-name echo_server -- run echo_client_cpp.cm
 ```
 
 ### Monitoring a service
@@ -126,7 +126,7 @@ when one of of the "--remote-name" process is launched. Also, fidlcat stops when
 "--remote-name" process stops (even if some "--extra-name" processes are still monitored).
 
 ```sh
-ffx debug fidl --remote-name echo --extra-name appmgr -- run echo_client_cpp.cmx
+ffx debug fidl --remote-name echo --extra-name archivist -- run echo_client_cpp.cm
 ```
 
 ### Input options

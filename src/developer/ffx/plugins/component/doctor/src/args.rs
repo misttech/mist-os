@@ -13,7 +13,7 @@ use ffx_core::ffx_command;
     description = "Perform diagnostic checks on a component at runtime.",
     example = "To run diagnostics:
 
-$ ffx component doctor /core/appmgr
+$ ffx component doctor /core/network/netstack
 
 This will run checks on the capabilities configuration of the component, checking that all of the
 `use` and `expose` capabilities can be routed successfully by the component manager."

@@ -18,7 +18,7 @@
 // delegate the crash analysis to one of two services:
 //
 // - built-in : using system/ulib/inspector
-// - appmgr hosted: via FIDL interface call (fuchsia_exception_Handler).
+// - remotely hosted: via FIDL interface call (fuchsia_exception_Handler).
 //
 // Which one depends if |exception_handler_svc| is a valid channel handle, which
 // svchost sets depending on "use_system".

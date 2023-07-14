@@ -4,8 +4,7 @@
 
 // The `fuchsia.bluetooth.rfcomm.test.RfcommTest` capability is only relevant to test
 // configurations.
-// Because all of `core`'s `use`s are routed to `appmgr` automatically, this shard exposes the
-// `RfcommTest` protocol to the CFv1 world.
+// This shard exposes the `RfcommTest` protocol to the shell via the core proxy.
 {
     use: [
         {

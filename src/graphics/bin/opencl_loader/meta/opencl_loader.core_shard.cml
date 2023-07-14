@@ -10,7 +10,6 @@
         },
     ],
     use: [
-        // For appmgr.
         {
             protocol: "fuchsia.opencl.loader.Loader",
             from: "#opencl_loader",

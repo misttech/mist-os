@@ -197,7 +197,7 @@ The following documentation changes must be made:
 
 -   Add a doc for the `on_terminate` option to parallel
     `critical components`.
--   Update the [migration guide][doc-migration-guide] to explain how to migrate
+-   Update the migration guide to explain how to migrate
     `critical_component`s
 
 ## Drawbacks, alternatives, and unknowns
@@ -490,7 +490,6 @@ revisions for the events API.
 [doc-graceful-reboot]: /docs/concepts/process/why_fuchsia_devices_reboot.md#graceful_reboot
 [doc-main-process-critical]: /docs/concepts/components/v2/elf_runner.md#using_the_elf_runner
 [doc-manifests]: /docs/concepts/components/v2/component_manifests.md
-[doc-migration-guide]: /docs/development/components/v2/migration/README.md
 [gerrit-rfc-component-events]: https://fuchsia-review.googlesource.com/c/fuchsia/+/535692
 [gerrit-system-critical-prototype]: https://fuchsia-review.googlesource.com/c/fuchsia/+/539915
 [git-restricted-features]: https://fuchsia.googlesource.com/fuchsia/+/refs/heads/main/tools/cmc/build/restricted_features

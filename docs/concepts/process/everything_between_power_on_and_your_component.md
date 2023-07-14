@@ -1,5 +1,8 @@
 # Everything between power on and your component
 
+WARN: This document has not been reviewed recently and many details may be
+stale.
+
 This document aims to detail, at a high-level, everything that happens between
 machine power on and software components running on the system.
 
@@ -68,14 +71,14 @@ by this framework is referred to as a [component][glossary.component].
 The components that component manager runs are organized into a tree. There is a
 root component, and it has two children named bootstrap and core. Bootstrap's
 children are the parts of the system needed to get the system functional enough
-to run more complex software like appmgr.
+to run higher-level software that includes the user experience.
 
 The root, bootstrap, and core components are non-executable components, which
 means that they have no program running on the system that corresponds to them.
 They exists solely for organizational purposes.
 
 ![A diagram showing that fshost and driver manager, are children of the
-bootstrap component, appmgr is a child of the core component, and core and
+bootstrap component and core and
 bootstrap are children of the root component](images/v2-topology.png)
 
 ## Initial system components {#v2-components}
@@ -84,7 +87,8 @@ bootstrap are children of the root component](images/v2-topology.png)
 
 There are two important components under bootstrap, fshost and driver manager.
 These two components work together to bring up a functional enough system for
-appmgr, which then starts up all the user-facing software.
+the [session][glossary.session], which then starts up all the user-facing
+software.
 
 #### driver manager
 
@@ -125,18 +129,6 @@ need to be decrypted to be usable. Once fvm and zxcrypt are loaded, fshost will
 find the appropriate block devices and start the [minfs][minfs] and
 [blobfs][blobfs] filesystems, which are needed for a fully functioning system.
 
-#### appmgr
-
-Appmgr runs the legacy component framework. Appmgr is [stored
-in a package][appmgr-pkg], unlike fshost and driver manager, which are stored in
-bootfs, so component manager uses the `/pkgfs` handle from fshost to load
-appmgr.
-
-Appmgr coordinates with component manager to share capabilities between legacy
-components and the rest of the system. Component manager forwards external
-capabilities [to the `sys` realm][appmgr-uses] in appmgr, and services managed by
-sysmgr can be [exposed outside the `sys` realm][appmgr-exposes].
-
 ### Startup sequence
 
 Component manager generally starts components lazily on-demand in response to
@@ -144,30 +136,23 @@ something accessing a capability provided by the component. Components may also
 be marked as "eager", which causes the component to start at the same point its
 parent starts.
 
-TODO(https://fxbug.dev/102390): The below is no longer true as of
-https://cs.opensource.google/fuchsia/fuchsia/+/124f955ae0d1db1c7e991684c7e8a9b4528d6806.
-
-In order to get the system running, appmgr is [marked as an eager
-component][appmgr-is-eager]. Since appmgr is stored in a package this causes
-component manager to attempt to load appmgr, and thus access the `/pkgfs` handle
-from fshost, causing fshost to be started.
-
 Once running, fshost attempts to access the `/dev` handle from driver manager,
 which causes driver manager to start. Together they bring up drivers and
 filesystems, eventually culminating in pkgfs running. At this point fshost
 starts responding to requests on the `/pkgfs` handle, and component manager
-finishes loading appmgr and starts it.
+proceeds to start the rest of userspace.
 
-![A sequence diagram showing that appmgr loading begins due to it being an eager
-component, fshost starting due to the /pkgfs handle, driver manager starting due
-to the /dev handle, block devices appearing, filesystems appearing, and then
-appmgr successfully starting.](images/boot-sequence-diagram.png)
+TODO(https://fxbug.dev/102390): This diagram is no longer accurate as of
+https://cs.opensource.google/fuchsia/fuchsia/+/124f955ae0d1db1c7e991684c7e8a9b4528d6806.
+
+![A sequence diagram showing the startup sequence between fshost and driver
+manager.](images/boot-sequence-diagram.png)
 
 ## Boot complete
 
 At this point, the system is ready to launch additional components through FIDL
 protocols and services, or by directly launching them with services provided by
-appmgr.
+component_manager.
 
 [glossary.bootfs]: /docs/glossary#README.md#bootfs
 [glossary.virtual memory object]: /docs/glossary#README.md#virtual-memory-object
@@ -177,11 +162,8 @@ appmgr.
 [glossary.driver host]: /docs/glossary#README.md#driver-host
 [glossary.fvm]: /docs/glossary#README.md#fuchsia-volume-manager
 [glossary.realm]: /docs/glossary#README.md#realm
+[glossary.session]: /docs/glossary#README.md#session
 [glossary.outgoing-directory]: /docs/glossary/README.md#outgoing-directory
-[appmgr-exposes]: https://cs.opensource.google/fuchsia/fuchsia/+/main:src/sys/appmgr/meta/appmgr.common.cml?l=34-44&drc=1fa739bc41a4be3edbbfbb7ba5b93664a744a84a
-[appmgr-is-eager]: https://cs.opensource.google/fuchsia/fuchsia/+/main:src/sys/root/meta/root.cml?l=14&drc=5a6fe7db58d2869ccfbb22caf53343d40e57c6ba
-[appmgr-pkg]: https://cs.opensource.google/fuchsia/fuchsia/+/main:src/sys/appmgr/BUILD.gn?l=159&drc=5a6fe7db58d2869ccfbb22caf53343d40e57c6ba
-[appmgr-uses]: https://cs.opensource.google/fuchsia/fuchsia/+/main:src/sys/appmgr/meta/appmgr.cml?l=40&drc=7cf46e0c7a8e5e4c78dba846f867ab96bcce5c5b
 [blobfs]: /docs/concepts/filesystems/blobfs.md
 [bootloader-and-kernel]: /docs/concepts/process/userboot.md#boot_loader_and_kernel_startup
 [component-manager]: /docs/concepts/components/v2/introduction.md#component-manager

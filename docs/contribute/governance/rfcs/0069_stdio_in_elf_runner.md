@@ -36,7 +36,7 @@ implicitly granting stdout and/or stderr to all components, we propose adding
 a new flag to the [ELF runner][doc-elf-runner] to favor an explicit opt in.
 
 The Component Framework team is in the midst of a
-[long-running migration][doc-cf-migration] from appmgr
+long-running migration from appmgr
 (Components v1) to [Component Framework][doc-cf-intro] (Components v2). One
 of the major projects of this effort is migrating all of
 the components owned by the Netstack team. stdout/stderr support is a
@@ -239,7 +239,6 @@ a socket, as proposed above, it'll be POSIX compliant "out of the box".
 [component manager]: /docs/concepts/components/v2/component_manager.md
 [debuglog]: /docs/reference/kernel_objects/debuglog.md
 [doc-cf-intro]: /docs/concepts/components/v2/introduction.md
-[doc-cf-migration]: /docs/contribute/open_projects/components/migration.md
 [doc-elf-runner]: /docs/concepts/components/v2/elf_runner.md
 [doc-logs-recording]: /docs/development/diagnostics/logs/recording.md
 [doc-principles-inclusive]: /docs/concepts/principles/inclusive.md

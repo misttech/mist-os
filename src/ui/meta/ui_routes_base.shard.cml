@@ -4,8 +4,7 @@
 
 // This shard is shared across all production UI realms for products with
 // displays. It should contain the routes to #ui that are common to all
-// such products. It should also contain routes from #ui to appmgr to
-// satisfy remaining v1 dependencies.
+// such products.
 {
     use: [
         {

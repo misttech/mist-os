@@ -149,7 +149,7 @@ pub enum HandleType {
     /// Equivalent to PA_LIFECYCLE.
     Lifecycle = 0x3A,
 
-    /// Server endpoint for handling connections to appmgr services.
+    /// Server endpoint for handling connections to a process's outgoing directory.
     ///
     /// Equivalent to PA_DIRECTORY_REQUEST.
     DirectoryRequest = 0x3B,
