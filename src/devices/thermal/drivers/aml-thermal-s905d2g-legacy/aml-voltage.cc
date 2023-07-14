@@ -34,7 +34,7 @@ zx::result<fidl::WireSyncClient<fuchsia_hardware_pwm::Pwm>> CreateAndEnablePwm(z
     zxlogf(ERROR, "fidl::CreateEndpoints failed - status: %s", pwm_endpoints.status_string());
     return zx::error(pwm_endpoints.status_value());
   }
-  zx_status_t status = device_connect_fragment_fidl_protocol2(
+  zx_status_t status = device_connect_fragment_fidl_protocol(
       parent, name, fuchsia_hardware_pwm::Service::Name, fuchsia_hardware_pwm::Service::Pwm::Name,
       pwm_endpoints->server.TakeChannel().release());
   if (status != ZX_OK) {

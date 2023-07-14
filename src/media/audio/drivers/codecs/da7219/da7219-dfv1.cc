@@ -53,7 +53,7 @@ zx_status_t Driver::Bind(void* ctx, zx_device_t* parent) {
     return i2c_endpoints.error_value();
   }
 
-  zx_status_t status = device_connect_fragment_fidl_protocol2(
+  zx_status_t status = device_connect_fragment_fidl_protocol(
       parent, "i2c000", fuchsia_hardware_i2c::Service::Device::ServiceName,
       fuchsia_hardware_i2c::Service::Device::Name, i2c_endpoints->server.TakeChannel().release());
   if (status != ZX_OK) {

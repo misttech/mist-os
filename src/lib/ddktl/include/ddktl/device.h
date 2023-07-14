@@ -541,7 +541,7 @@ class Device : public ::ddk::internal::base_device<D, Mixins...> {
       return endpoints.take_error();
     }
 
-    auto status = device_connect_fragment_fidl_protocol2(
+    auto status = device_connect_fragment_fidl_protocol(
         parent, fragment_name, ServiceMember::ServiceName, ServiceMember::Name,
         endpoints->server.TakeChannel().release());
     if (status != ZX_OK) {

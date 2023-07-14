@@ -179,11 +179,11 @@ __EXPORT zx_status_t device_connect_fidl_protocol2(zx_device_t* device, const ch
   return device->ConnectToFidlProtocol(service_name, protocol_name, zx::channel(request));
 }
 
-__EXPORT zx_status_t device_connect_fragment_fidl_protocol2(zx_device_t* device,
-                                                            const char* fragment_name,
-                                                            const char* service_name,
-                                                            const char* protocol_name,
-                                                            zx_handle_t request) {
+__EXPORT zx_status_t device_connect_fragment_fidl_protocol(zx_device_t* device,
+                                                           const char* fragment_name,
+                                                           const char* service_name,
+                                                           const char* protocol_name,
+                                                           zx_handle_t request) {
   std::lock_guard guard(libdriver_lock);
   if (!device) {
     return ZX_ERR_NOT_SUPPORTED;

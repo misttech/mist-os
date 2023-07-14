@@ -700,7 +700,7 @@ zx_status_t Control::GoldfishControlCreateSyncFence(zx::eventpair event) {
 }
 
 zx_status_t Control::GoldfishControlConnectToPipeDevice(zx::channel channel) {
-  zx_status_t status = device_connect_fragment_fidl_protocol2(
+  zx_status_t status = device_connect_fragment_fidl_protocol(
       parent(), "goldfish-pipe", fuchsia_hardware_goldfish_pipe::Service::Name,
       fuchsia_hardware_goldfish_pipe::Service::Device::Name, channel.release());
   if (status != ZX_OK) {

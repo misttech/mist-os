@@ -916,9 +916,9 @@ zx_status_t AmlogicVideo::InitRegisters(zx_device_t* parent) {
     return endpoints.status_value();
   }
   zx_status_t status =
-      device_connect_fragment_fidl_protocol2(parent, "tee", fuchsia_hardware_tee::Service::Name,
-                                             fuchsia_hardware_tee::Service::DeviceConnector::Name,
-                                             endpoints->server.TakeChannel().release());
+      device_connect_fragment_fidl_protocol(parent, "tee", fuchsia_hardware_tee::Service::Name,
+                                            fuchsia_hardware_tee::Service::DeviceConnector::Name,
+                                            endpoints->server.TakeChannel().release());
   is_tee_available_ = (status == ZX_OK);
 
   if (is_tee_available_) {

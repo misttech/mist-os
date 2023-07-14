@@ -196,7 +196,7 @@ struct MockDevice : public std::enable_shared_from_this<MockDevice> {
   // You can add FIDL service here to your device or your parent device.
   // if you want to add a service to a fragment, add the fragment's name as 'name'.
   // Devices will use `device_connect_fidl_protocol2` or
-  // `device_connect_fragment_fidl_protocol2` to connect to these protocols
+  // `device_connect_fragment_fidl_protocol` to connect to these protocols
   void AddFidlService(const char* service_name, fidl::ClientEnd<fuchsia_io::Directory> ns,
                       const char* name = "");
 
@@ -270,11 +270,11 @@ struct MockDevice : public std::enable_shared_from_this<MockDevice> {
                                     zx::channel request, const char* fragment_name = "");
   friend zx_status_t device_connect_fidl_protocol2(zx_device_t* device, const char* service_name,
                                                    const char* protocol_name, zx_handle_t request);
-  friend zx_status_t device_connect_fragment_fidl_protocol2(zx_device_t* device,
-                                                            const char* fragment_name,
-                                                            const char* service_name,
-                                                            const char* protocol_name,
-                                                            zx_handle_t request);
+  friend zx_status_t device_connect_fragment_fidl_protocol(zx_device_t* device,
+                                                           const char* fragment_name,
+                                                           const char* service_name,
+                                                           const char* protocol_name,
+                                                           zx_handle_t request);
 
   // device_get_metadata calls GetMetadata:
   zx_status_t GetMetadata(uint32_t type, void* buf, size_t buflen, size_t* actual);

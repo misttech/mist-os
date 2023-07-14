@@ -25,7 +25,7 @@
     device_get_fragment_metadata;
     device_get_variable;
     device_connect_fidl_protocol2;
-    device_connect_fragment_fidl_protocol2;
+    device_connect_fragment_fidl_protocol;
     device_connect_runtime_protocol;
     device_connect_fragment_runtime_protocol;
   local:

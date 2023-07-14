@@ -71,7 +71,7 @@ zx_status_t ChromiumosEcLpc::Bind() {
 
   // Set up forwarding of ACPI to our ACPI parent.
   auto provider_handler = [this](fidl::ServerEnd<fuchsia_hardware_acpi::Device> request) {
-    device_connect_fragment_fidl_protocol2(
+    device_connect_fragment_fidl_protocol(
         parent(), "acpi", fuchsia_hardware_acpi::Service::Device::ServiceName,
         fuchsia_hardware_acpi::Service::Device::Name, request.TakeChannel().release());
   };

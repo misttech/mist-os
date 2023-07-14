@@ -152,7 +152,7 @@ class I2cChannel {
           parent, fuchsia_hardware_i2c::Service::Device::ServiceName,
           fuchsia_hardware_i2c::Service::Device::Name, endpoints->server.TakeChannel().release());
     } else {
-      status = device_connect_fragment_fidl_protocol2(
+      status = device_connect_fragment_fidl_protocol(
           parent, fragment_name, fuchsia_hardware_i2c::Service::Device::ServiceName,
           fuchsia_hardware_i2c::Service::Device::Name, endpoints->server.TakeChannel().release());
     }

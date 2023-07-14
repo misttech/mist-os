@@ -439,9 +439,9 @@ zx_status_t device_connect_fidl_protocol2(zx_device_t* device, const char* servi
 //
 // Arguments are otherwise the same as for device_open_fidl_service. The
 // ddktl equivalent is DdkConnectFidlProtocol.
-zx_status_t device_connect_fragment_fidl_protocol2(zx_device_t* device, const char* fragment_name,
-                                                   const char* service_name,
-                                                   const char* protocol_name, zx_handle_t request);
+zx_status_t device_connect_fragment_fidl_protocol(zx_device_t* device, const char* fragment_name,
+                                                  const char* service_name,
+                                                  const char* protocol_name, zx_handle_t request);
 
 // Returns a string containing the variable for the given |name|. If |out| is not large enough,
 // |size_actual| will contain the size of the required buffer. |out| is guaranateed to be null
