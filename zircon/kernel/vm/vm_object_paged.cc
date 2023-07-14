@@ -884,8 +884,7 @@ zx_status_t VmObjectPaged::CommitRangeInternal(uint64_t offset, uint64_t len, bo
     len = end_page - offset;
   }
 
-  // If a pin is requested the entire range must exist and be valid,
-  // otherwise we can commit a partial range.
+  // If a pin is requested the entire range must exist and be valid.
   if (pin) {
     // If pinning we explicitly forbid zero length pins as we cannot guarantee consistent semantics.
     // For example pinning a zero length range outside the range of the VMO is an error, and so
@@ -901,15 +900,14 @@ zx_status_t VmObjectPaged::CommitRangeInternal(uint64_t offset, uint64_t len, bo
       return ZX_ERR_OUT_OF_RANGE;
     }
   } else {
-    uint64_t new_len = len;
-    if (!TrimRange(offset, len, size_locked(), &new_len)) {
+    // verify that the range is within the object
+    if (!InRange(offset, len, size_locked())) {
       return ZX_ERR_OUT_OF_RANGE;
     }
     // was in range, just zero length
-    if (new_len == 0) {
+    if (len == 0) {
       return ZX_OK;
     }
-    len = new_len;
   }
 
   // Tracks the end of the pinned range to unpin in case of failure. The |offset| might lag behind
