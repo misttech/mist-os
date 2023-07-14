@@ -143,6 +143,16 @@ pub trait BootTimeAccessor {
     fn get_boot_timestamp(&self) -> i64;
 }
 
+/// Timestamp filter which is either either monotonic-based or UTC-based.
+#[derive(Clone, Debug)]
+pub struct DeviceOrLocalTimestamp {
+    /// Timestamp in monotonic time
+    pub timestamp: Timestamp,
+    /// True if this filter should be applied to monotonic time,
+    /// false if UTC time.
+    pub is_monotonic: bool,
+}
+
 /// Log formatter options
 #[derive(Clone, Debug)]
 pub struct LogFormatterOptions {
@@ -150,13 +160,23 @@ pub struct LogFormatterOptions {
     pub display: Option<LogTextDisplayOptions>,
     /// If true, highlights spam, if false, filters it out.
     pub highlight_spam: bool,
+    /// Only display logs since the specified time.
+    pub since: Option<DeviceOrLocalTimestamp>,
+    /// Only display logs until the specified time.
+    pub until: Option<DeviceOrLocalTimestamp>,
     /// If true, displays "raw" logs without symbolization.
     pub raw: bool,
 }
 
 impl Default for LogFormatterOptions {
     fn default() -> Self {
-        LogFormatterOptions { display: Some(Default::default()), highlight_spam: false, raw: false }
+        LogFormatterOptions {
+            display: Some(Default::default()),
+            highlight_spam: false,
+            raw: false,
+            since: None,
+            until: None,
+        }
     }
 }
 
@@ -187,12 +207,25 @@ where
     options: LogFormatterOptions,
 }
 
+/// Converts from UTC time to monotonic time.
+fn utc_to_monotonic(boot_ts: i64, utc: i64) -> Timestamp {
+    Timestamp::from(utc - boot_ts)
+}
+
 #[async_trait(?Send)]
 impl<W> LogFormatter for DefaultLogFormatter<W>
 where
     W: Write + ToolIO<OutputItem = LogEntry>,
 {
     async fn push_log(&mut self, log_entry: LogEntry) -> Result<()> {
+        if self.filter_by_timestamp(&log_entry, self.options.since.as_ref(), |a, b| a <= b) {
+            return Ok(());
+        }
+
+        if self.filter_by_timestamp(&log_entry, self.options.until.as_ref(), |a, b| a >= b) {
+            return Ok(());
+        }
+
         let is_spam = self.filters.is_spam(&log_entry);
 
         if (!self.options.highlight_spam && is_spam) || !self.filters.matches(&log_entry) {
@@ -297,6 +330,25 @@ where
 {
     pub fn new(filters: LogFilterCriteria, writer: W, options: LogFormatterOptions) -> Self {
         Self { filters, writer, options }
+    }
+
+    fn filter_by_timestamp(
+        &self,
+        log_entry: &LogEntry,
+        timestamp: Option<&DeviceOrLocalTimestamp>,
+        callback: impl Fn(&Timestamp, &Timestamp) -> bool,
+    ) -> bool {
+        let Some(timestamp) = timestamp else {
+            return false;
+        };
+        if timestamp.is_monotonic {
+            callback(
+                &utc_to_monotonic(self.get_boot_timestamp(), *log_entry.timestamp),
+                &timestamp.timestamp,
+            )
+        } else {
+            callback(&log_entry.timestamp, &timestamp.timestamp)
+        }
     }
 
     // This function's arguments are copied to make lifetimes in push_log easier since borrowing
@@ -493,6 +545,8 @@ mod test {
             severity: Severity::Info,
         })
         .set_message("Hello world!")
+        .set_pid(1)
+        .set_tid(2)
         .build();
         let target_log_1 = LogsDataBuilder::new(diagnostics_data::BuilderArgs {
             moniker: "ffx".into(),
@@ -519,6 +573,184 @@ mod test {
                 LogEntry { data: LogData::TargetLog(target_log_0), timestamp: Timestamp::from(0) },
                 LogEntry { data: LogData::TargetLog(target_log_1), timestamp: Timestamp::from(1) }
             ]
+        );
+    }
+
+    #[fuchsia::test]
+    async fn test_format_timestamp_filter() {
+        // test since and until args for the LogFormatter
+        let symbolizer = NoOpSymbolizer {};
+        let buffers = TestBuffers::default();
+        let stdout = MachineWriter::<LogEntry>::new_test(None, &buffers);
+        let mut formatter = DefaultLogFormatter::new(
+            LogFilterCriteria::default(),
+            stdout,
+            LogFormatterOptions {
+                since: Some(DeviceOrLocalTimestamp {
+                    timestamp: Timestamp::from(1),
+                    is_monotonic: true,
+                }),
+                until: Some(DeviceOrLocalTimestamp {
+                    timestamp: Timestamp::from(3),
+                    is_monotonic: true,
+                }),
+                ..Default::default()
+            },
+        );
+
+        let (sender, receiver) = fuchsia_zircon::Socket::create_stream();
+        let target_log_0 = LogsDataBuilder::new(diagnostics_data::BuilderArgs {
+            moniker: "ffx".into(),
+            timestamp_nanos: Timestamp::from(0),
+            component_url: Some("ffx".into()),
+            severity: Severity::Info,
+        })
+        .set_message("Hello world!")
+        .build();
+        let target_log_1 = LogsDataBuilder::new(diagnostics_data::BuilderArgs {
+            moniker: "ffx".into(),
+            timestamp_nanos: Timestamp::from(1),
+            component_url: Some("ffx".into()),
+            severity: Severity::Info,
+        })
+        .set_message("Hello world 2!")
+        .build();
+        let target_log_2 = LogsDataBuilder::new(diagnostics_data::BuilderArgs {
+            moniker: "ffx".into(),
+            timestamp_nanos: Timestamp::from(2),
+            component_url: Some("ffx".into()),
+            severity: Severity::Info,
+        })
+        .set_pid(1)
+        .set_tid(2)
+        .set_message("Hello world 3!")
+        .build();
+        let target_log_3 = LogsDataBuilder::new(diagnostics_data::BuilderArgs {
+            moniker: "ffx".into(),
+            timestamp_nanos: Timestamp::from(3),
+            component_url: Some("ffx".into()),
+            severity: Severity::Info,
+        })
+        .set_message("Hello world 4!")
+        .set_pid(1)
+        .set_tid(2)
+        .build();
+        sender
+            .write(
+                serde_json::to_string(&vec![
+                    &target_log_0,
+                    &target_log_1,
+                    &target_log_2,
+                    &target_log_3,
+                ])
+                .unwrap()
+                .as_bytes(),
+            )
+            .expect("failed to write target log");
+        drop(sender);
+        dump_logs_from_socket(
+            fuchsia_async::Socket::from_socket(receiver).unwrap(),
+            &mut formatter,
+            &symbolizer,
+        )
+        .await
+        .unwrap();
+        assert_eq!(
+            buffers.stdout.into_string(),
+            "[00000.000000][1][2][ffx] INFO: Hello world 3!\n"
+        );
+    }
+
+    #[fuchsia::test]
+    async fn test_format_timestamp_filter_utc() {
+        // test since and until args for the LogFormatter
+        let symbolizer = NoOpSymbolizer {};
+        let buffers = TestBuffers::default();
+        let stdout = MachineWriter::<LogEntry>::new_test(None, &buffers);
+        let mut formatter = DefaultLogFormatter::new(
+            LogFilterCriteria::default(),
+            stdout,
+            LogFormatterOptions {
+                since: Some(DeviceOrLocalTimestamp {
+                    timestamp: Timestamp::from(1),
+                    is_monotonic: false,
+                }),
+                until: Some(DeviceOrLocalTimestamp {
+                    timestamp: Timestamp::from(3),
+                    is_monotonic: false,
+                }),
+                display: Some(LogTextDisplayOptions {
+                    time_format: LogTimeDisplayFormat::WallTime { tz: Timezone::Utc, offset: 1 },
+                    ..Default::default()
+                }),
+                ..Default::default()
+            },
+        );
+
+        let (sender, receiver) = fuchsia_zircon::Socket::create_stream();
+        let target_log_0 = LogsDataBuilder::new(diagnostics_data::BuilderArgs {
+            moniker: "ffx".into(),
+            timestamp_nanos: Timestamp::from(0),
+            component_url: Some("ffx".into()),
+            severity: Severity::Info,
+        })
+        .set_message("Hello world!")
+        .set_pid(1)
+        .set_tid(2)
+        .build();
+        let target_log_1 = LogsDataBuilder::new(diagnostics_data::BuilderArgs {
+            moniker: "ffx".into(),
+            timestamp_nanos: Timestamp::from(1),
+            component_url: Some("ffx".into()),
+            severity: Severity::Info,
+        })
+        .set_message("Hello world 2!")
+        .set_pid(1)
+        .set_tid(2)
+        .build();
+        let target_log_2 = LogsDataBuilder::new(diagnostics_data::BuilderArgs {
+            moniker: "ffx".into(),
+            timestamp_nanos: Timestamp::from(2),
+            component_url: Some("ffx".into()),
+            severity: Severity::Info,
+        })
+        .set_message("Hello world 3!")
+        .set_pid(1)
+        .set_tid(2)
+        .build();
+        let target_log_3 = LogsDataBuilder::new(diagnostics_data::BuilderArgs {
+            moniker: "ffx".into(),
+            timestamp_nanos: Timestamp::from(3),
+            component_url: Some("ffx".into()),
+            severity: Severity::Info,
+        })
+        .set_message("Hello world 4!")
+        .set_pid(1)
+        .set_tid(2)
+        .build();
+        sender
+            .write(
+                serde_json::to_string(&vec![
+                    &target_log_0,
+                    &target_log_1,
+                    &target_log_2,
+                    &target_log_3,
+                ])
+                .unwrap()
+                .as_bytes(),
+            )
+            .expect("failed to write target log");
+        drop(sender);
+        dump_logs_from_socket(
+            fuchsia_async::Socket::from_socket(receiver).unwrap(),
+            &mut formatter,
+            &symbolizer,
+        )
+        .await
+        .unwrap();
+        assert_eq!(
+            buffers.stdout.into_string(),
+            "[1970-01-01 00:00:00.000][1][2][ffx] INFO: Hello world 2!\n"
         );
     }
 
@@ -732,6 +964,7 @@ mod test {
             display: Some(Default::default()),
             highlight_spam: true,
             raw: false,
+            ..Default::default()
         };
 
         let mut filter = LogFilterCriteria::default();
