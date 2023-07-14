@@ -265,7 +265,7 @@ closed protocol Registry {
     strict WatchDeviceRemoved() -> (table {
         /// The token of the device least-recently removed.
         1: token_id TokenId;
-    }) error RegistrWatchDeviceRemovedyError;
+    }) error RegistryWatchDeviceRemovedError;
 
     /// Request an `Observer` for the specified device.
     strict CreateObserver(resource table {
@@ -282,16 +282,16 @@ closed protocol Registry {
 };
 
 /// Errors returned by `Registry/WatchDevicesAdded`.
-//
-// TODO(fxbug.dev/102626): Remove this enum after implementation, if no error
-// conditions have been identified and no error codes have been added.
-type RegistryWatchDevicesAddedError = flexible enum {};
+type RegistryWatchDevicesAddedError = flexible enum {
+    /// The previous `WatchDevicesAdded` call has not yet completed.
+    WATCH_ALREADY_PENDING = 1;
+};
 
 /// Errors returned by `Registry/WatchDeviceRemoved`.
-//
-// TODO(fxbug.dev/102626): Remove this enum after implementation, if no error
-// conditions have been identified and no error codes have been added.
-type RegistrWatchDeviceRemovedyError = flexible enum {};
+type RegistryWatchDeviceRemovedError = flexible enum {
+    /// The previous `WatchDeviceRemoved` call has not yet completed.
+    WATCH_ALREADY_PENDING = 1;
+};
 
 /// Errors returned by `Registry/CreateObserver`.
 type RegistryCreateObserverError = flexible enum {
@@ -352,27 +352,24 @@ closed protocol Observer {
 };
 
 /// Errors returned by `Observer/WatchGainState`.
-//
-// TODO(fxbug.dev/102626): Remove this enum after implementation, if no error
-// conditions have been identified and no error codes have been added.
 type ObserverWatchGainStateError = flexible enum {
+    /// The previous `WatchGainState` call has not yet completed.
+    WATCH_ALREADY_PENDING = 1;
+
     /// This device has encountered an error and can no longer be observed.
-    DEVICE_ERROR = 1;
+    DEVICE_ERROR = 2;
 };
 
 /// Errors returned by `Observer/WatchPlugState`.
-//
-// TODO(fxbug.dev/102626): Remove this enum after implementation, if no error
-// conditions have been identified and no error codes have been added.
 type ObserverWatchPlugStateError = flexible enum {
+    /// The previous `WatchPlugState` call has not yet completed.
+    WATCH_ALREADY_PENDING = 1;
+
     /// This device has encountered an error and can no longer be observed.
-    DEVICE_ERROR = 1;
+    DEVICE_ERROR = 2;
 };
 
 /// Errors returned by `Observer/GetReferenceClock`.
-//
-// TODO(fxbug.dev/102626): Remove this enum after implementation, if no error
-// conditions have been identified and no error codes have been added.
 type ObserverGetReferenceClockError = flexible enum {
     /// This device has encountered an error and can no longer be observed.
     DEVICE_ERROR = 1;

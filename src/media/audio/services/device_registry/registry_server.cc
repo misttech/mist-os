@@ -17,6 +17,7 @@
 #include <optional>
 #include <vector>
 
+#include "fidl/fuchsia.audio.device/cpp/common_types.h"
 #include "src/media/audio/services/device_registry/audio_device_registry.h"
 #include "src/media/audio/services/device_registry/device.h"
 #include "src/media/audio/services/device_registry/logging.h"
@@ -49,7 +50,9 @@ RegistryServer::~RegistryServer() {
 void RegistryServer::WatchDevicesAdded(WatchDevicesAddedCompleter::Sync& completer) {
   ADR_LOG_OBJECT(kLogRegistryServerMethods);
   if (watch_devices_added_completer_) {
-    completer.Close(ZX_ERR_ALREADY_EXISTS);
+    ADR_WARN_OBJECT() << "previous `WatchDevicesAdded` request has not yet completed";
+    completer.Reply(fit::error<fuchsia_audio_device::RegistryWatchDevicesAddedError>(
+        fuchsia_audio_device::RegistryWatchDevicesAddedError::kWatchAlreadyPending));
     return;
   }
 
@@ -87,7 +90,7 @@ void RegistryServer::ReplyWithAddedDevices() {
   }
 
   auto completer = *std::move(watch_devices_added_completer_);
-  watch_devices_added_completer_ = std::nullopt;
+  watch_devices_added_completer_.reset();
   ADR_LOG_OBJECT(kLogRegistryServerResponses) << "responding to WatchDevicesAdded with "
                                               << devices_added_since_notify_.size() << " devices:";
   for (auto& info : devices_added_since_notify_) {
@@ -102,7 +105,9 @@ void RegistryServer::ReplyWithAddedDevices() {
 void RegistryServer::WatchDeviceRemoved(WatchDeviceRemovedCompleter::Sync& completer) {
   ADR_LOG_OBJECT(kLogRegistryServerMethods);
   if (watch_device_removed_completer_) {
-    completer.Close(ZX_ERR_ALREADY_EXISTS);
+    ADR_WARN_OBJECT() << "previous `WatchDeviceRemoved` request has not yet completed";
+    completer.Reply(fit::error<fuchsia_audio_device::RegistryWatchDeviceRemovedError>(
+        fuchsia_audio_device::RegistryWatchDeviceRemovedError::kWatchAlreadyPending));
     return;
   }
 
@@ -153,7 +158,7 @@ void RegistryServer::ReplyWithNextRemovedDevice() {
   devices_removed_since_notify_.pop();
   ADR_LOG_OBJECT(kLogRegistryServerResponses) << "responding with token_id " << next_removed_id;
   auto completer = *std::move(watch_device_removed_completer_);
-  watch_device_removed_completer_ = std::nullopt;
+  watch_device_removed_completer_.reset();
   completer.Reply(fit::success(
       fuchsia_audio_device::RegistryWatchDeviceRemovedResponse{{.token_id = next_removed_id}}));
 }

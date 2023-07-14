@@ -61,9 +61,10 @@ void ObserverServer::GainStateChanged(const fuchsia_audio_device::GainState& new
   ADR_LOG_OBJECT(kLogObserverServerMethods || kLogNotifyMethods);
 
   if (watch_gain_state_completer_) {
-    updated_gain_state_ = std::nullopt;
+    updated_gain_state_.reset();
+
     auto completer = std::move(*watch_gain_state_completer_);
-    watch_gain_state_completer_ = std::nullopt;
+    watch_gain_state_completer_.reset();
     completer.Reply(fit::success(fuchsia_audio_device::ObserverWatchGainStateResponse{{
         .state = new_gain_state,
     }}));
@@ -80,18 +81,20 @@ void ObserverServer::WatchGainState(WatchGainStateCompleter::Sync& completer) {
         fuchsia_audio_device::ObserverWatchGainStateError::kDeviceError));
     return;
   }
+  if (watch_gain_state_completer_) {
+    ADR_WARN_OBJECT() << "previous `WatchGainState` request has not yet completed";
+    completer.Reply(fit::error<fuchsia_audio_device::ObserverWatchGainStateError>(
+        fuchsia_audio_device::ObserverWatchGainStateError::kWatchAlreadyPending));
+    return;
+  }
 
   if (updated_gain_state_) {
     fuchsia_audio_device::ObserverWatchGainStateResponse response{{
         .state = std::move(*updated_gain_state_),
     }};
-    updated_gain_state_ = std::nullopt;
+    updated_gain_state_.reset();
     completer.Reply(fit::success(std::move(response)));
   } else {
-    if (watch_gain_state_completer_) {
-      ADR_WARN_OBJECT() << "received WatchGainState while already watching!";
-      watch_gain_state_completer_->Close(ZX_ERR_SHOULD_WAIT);
-    }
     watch_gain_state_completer_ = completer.ToAsync();
   }
 }
@@ -108,9 +111,11 @@ void ObserverServer::PlugStateChanged(const fuchsia_audio_device::PlugState& new
 
   if (watch_plug_state_completer_) {
     auto completer = std::move(*watch_plug_state_completer_);
-    completer.Reply(fit::success(std::move(*plug_state_update_)));
-    watch_plug_state_completer_ = std::nullopt;
-    plug_state_update_ = std::nullopt;
+    watch_plug_state_completer_.reset();
+
+    fuchsia_audio_device::ObserverWatchPlugStateResponse response = std::move(*plug_state_update_);
+    plug_state_update_.reset();
+    completer.Reply(fit::success(response));
   }
 }
 
@@ -123,13 +128,16 @@ void ObserverServer::WatchPlugState(WatchPlugStateCompleter::Sync& completer) {
     return;
   }
   if (watch_plug_state_completer_) {
-    ADR_WARN_OBJECT() << "received WatchPlugState while already watching!";
-    watch_plug_state_completer_->Close(ZX_ERR_SHOULD_WAIT);
+    ADR_WARN_OBJECT() << "previous `WatchPlugState` request has not yet completed";
+    completer.Reply(fit::error<fuchsia_audio_device::ObserverWatchPlugStateError>(
+        fuchsia_audio_device::ObserverWatchPlugStateError::kWatchAlreadyPending));
+    return;
   }
 
   if (plug_state_update_) {
-    completer.Reply(fit::success(std::move(*plug_state_update_)));
-    plug_state_update_ = std::nullopt;
+    fuchsia_audio_device::ObserverWatchPlugStateResponse response = std::move(*plug_state_update_);
+    plug_state_update_.reset();
+    completer.Reply(fit::success(response));
   } else {
     watch_plug_state_completer_ = completer.ToAsync();
   }

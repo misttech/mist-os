@@ -5,7 +5,6 @@
 #include "src/media/audio/services/device_registry/observer_server.h"
 
 #include <fidl/fuchsia.audio.device/cpp/fidl.h>
-#include <fidl/fuchsia.audio.device/cpp/natural_types.h>
 #include <fidl/fuchsia.hardware.audio/cpp/fidl.h>
 #include <zircon/errors.h>
 
@@ -18,7 +17,6 @@
 #include "src/media/audio/services/device_registry/testing/fake_audio_driver.h"
 
 namespace media_audio {
-namespace {
 
 using Control = fuchsia_audio_device::Control;
 using Observer = fuchsia_audio_device::Observer;
@@ -540,5 +538,4 @@ TEST_F(ObserverServerTest, ObserverDoesNotDropIfClientControlDrops) {
   EXPECT_FALSE(observer_fidl_error_status_);
 }
 
-}  // namespace
 }  // namespace media_audio

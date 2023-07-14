@@ -15,9 +15,79 @@
 namespace media_audio {
 namespace {
 
-using Registry = fuchsia_audio_device::Registry;
-
 class RegistryServerWarningTest : public AudioDeviceRegistryServerTestBase {};
+
+// A subsequent call to WatchDevicesAdded before the previous one completes should fail.
+TEST_F(RegistryServerWarningTest, WatchDevicesAddedWhileAlreadyWatching) {
+  auto registry = CreateTestRegistryServer();
+  EXPECT_EQ(RegistryServer::count(), 1u);
+
+  // The first `WatchDevicesAdded` call should pend indefinitely (even after the second one fails).
+  registry->client()->WatchDevicesAdded().Then(
+      [](fidl::Result<fuchsia_audio_device::Registry::WatchDevicesAdded>& result) mutable {
+        FAIL() << "Unexpected completion for initial WatchDevicesAdded call";
+      });
+  RunLoopUntilIdle();
+
+  // The second `WatchDevicesAdded` call should fail immediately with domain error
+  // WATCH_ALREADY_PENDING, since the first call has not yet completed.
+  bool received_expected_error_callback = false;
+  registry->client()->WatchDevicesAdded().Then(
+      [&received_expected_error_callback](
+          fidl::Result<fuchsia_audio_device::Registry::WatchDevicesAdded>& result) mutable {
+        received_expected_error_callback =
+            result.is_error() && result.error_value().is_domain_error() &&
+            (result.error_value().domain_error() ==
+             fuchsia_audio_device::RegistryWatchDevicesAddedError::kWatchAlreadyPending);
+
+        ASSERT_TRUE(result.is_error()) << "Unexpected success to second WatchDevicesAdded";
+        ASSERT_TRUE(result.error_value().is_domain_error())
+            << "Unexpected framework error for second WatchDevicesAdded: "
+            << result.error_value().FormatDescription();
+        ASSERT_EQ(result.error_value().domain_error(),
+                  result.error_value().domain_error().kWatchAlreadyPending)
+            << "Unexpected domain error for second WatchDevicesAdded: "
+            << result.error_value().FormatDescription();
+      });
+  RunLoopUntilIdle();
+  EXPECT_TRUE(received_expected_error_callback);
+}
+
+// A subsequent call to WatchDeviceRemoved before the previous one completes should fail.
+TEST_F(RegistryServerWarningTest, WatchDeviceRemovedWhileAlreadyWatching) {
+  auto registry = CreateTestRegistryServer();
+  EXPECT_EQ(RegistryServer::count(), 1u);
+
+  // The first `WatchDeviceRemoved` call should pend indefinitely (even after the second one fails).
+  registry->client()->WatchDeviceRemoved().Then(
+      [](fidl::Result<fuchsia_audio_device::Registry::WatchDeviceRemoved>& result) mutable {
+        FAIL() << "Unexpected completion for initial WatchDeviceRemoved call";
+      });
+  RunLoopUntilIdle();
+
+  // The second `WatchDeviceRemoved` call should fail immediately with domain error
+  // WATCH_ALREADY_PENDING, since the first call has not yet completed.
+  bool received_expected_error_callback = false;
+  registry->client()->WatchDeviceRemoved().Then(
+      [&received_expected_error_callback](
+          fidl::Result<fuchsia_audio_device::Registry::WatchDeviceRemoved>& result) mutable {
+        received_expected_error_callback =
+            result.is_error() && result.error_value().is_domain_error() &&
+            (result.error_value().domain_error() ==
+             fuchsia_audio_device::RegistryWatchDeviceRemovedError::kWatchAlreadyPending);
+
+        ASSERT_TRUE(result.is_error()) << "Unexpected success to second WatchDeviceRemoved";
+        ASSERT_TRUE(result.error_value().is_domain_error())
+            << "Unexpected framework error for second WatchDeviceRemoved: "
+            << result.error_value().FormatDescription();
+        ASSERT_EQ(result.error_value().domain_error(),
+                  result.error_value().domain_error().kWatchAlreadyPending)
+            << "Unexpected domain error for second WatchDeviceRemoved: "
+            << result.error_value().FormatDescription();
+      });
+  RunLoopUntilIdle();
+  EXPECT_TRUE(received_expected_error_callback);
+}
 
 // If the required 'id' field is not set, we should fail.
 TEST_F(RegistryServerWarningTest, CreateObserverMissingToken) {
@@ -35,7 +105,8 @@ TEST_F(RegistryServerWarningTest, CreateObserverMissingToken) {
           .observer_server =
               fidl::ServerEnd<fuchsia_audio_device::Observer>(std::move(observer_server_end)),
       }})
-      .Then([&received_callback](fidl::Result<Registry::CreateObserver>& result) {
+      .Then([&received_callback](
+                fidl::Result<fuchsia_audio_device::Registry::CreateObserver>& result) {
         EXPECT_TRUE(result.is_error() && result.error_value().is_domain_error());
         EXPECT_EQ(result.error_value().domain_error(),
                   fuchsia_audio_device::RegistryCreateObserverError::kInvalidTokenId);
@@ -62,7 +133,8 @@ TEST_F(RegistryServerWarningTest, CreateObserverBadToken) {
           .observer_server =
               fidl::ServerEnd<fuchsia_audio_device::Observer>(std::move(observer_server_end)),
       }})
-      .Then([&received_callback](fidl::Result<Registry::CreateObserver>& result) {
+      .Then([&received_callback](
+                fidl::Result<fuchsia_audio_device::Registry::CreateObserver>& result) {
         EXPECT_TRUE(result.is_error() && result.error_value().is_domain_error());
         EXPECT_EQ(result.error_value().domain_error(),
                   fuchsia_audio_device::RegistryCreateObserverError::kDeviceNotFound);
@@ -86,7 +158,7 @@ TEST_F(RegistryServerWarningTest, CreateObserverMissingObserver) {
 
   std::optional<TokenId> id;
   registry->client()->WatchDevicesAdded().Then(
-      [&id](fidl::Result<Registry::WatchDevicesAdded>& result) mutable {
+      [&id](fidl::Result<fuchsia_audio_device::Registry::WatchDevicesAdded>& result) mutable {
         ASSERT_TRUE(result.is_ok());
         ASSERT_TRUE(result->devices());
         ASSERT_EQ(result->devices()->size(), 1u);
@@ -106,7 +178,8 @@ TEST_F(RegistryServerWarningTest, CreateObserverMissingObserver) {
       ->CreateObserver({{
           .token_id = *id,
       }})
-      .Then([&received_callback](fidl::Result<Registry::CreateObserver>& result) {
+      .Then([&received_callback](
+                fidl::Result<fuchsia_audio_device::Registry::CreateObserver>& result) {
         EXPECT_TRUE(result.is_error() && result.error_value().is_domain_error());
         EXPECT_EQ(result.error_value().domain_error(),
                   fuchsia_audio_device::RegistryCreateObserverError::kInvalidObserver);
@@ -130,7 +203,7 @@ TEST_F(RegistryServerWarningTest, CreateObserverBadObserver) {
 
   std::optional<TokenId> id;
   registry->client()->WatchDevicesAdded().Then(
-      [&id](fidl::Result<Registry::WatchDevicesAdded>& result) mutable {
+      [&id](fidl::Result<fuchsia_audio_device::Registry::WatchDevicesAdded>& result) mutable {
         ASSERT_TRUE(result.is_ok());
         ASSERT_TRUE(result->devices());
         ASSERT_EQ(result->devices()->size(), 1u);
@@ -151,7 +224,8 @@ TEST_F(RegistryServerWarningTest, CreateObserverBadObserver) {
           .token_id = *id,
           .observer_server = fidl::ServerEnd<fuchsia_audio_device::Observer>(zx::channel()),
       }})
-      .Then([&received_callback](fidl::Result<Registry::CreateObserver>& result) {
+      .Then([&received_callback](
+                fidl::Result<fuchsia_audio_device::Registry::CreateObserver>& result) {
         EXPECT_TRUE(result.is_error() && result.error_value().is_framework_error());
         EXPECT_EQ(result.error_value().framework_error().status(), ZX_ERR_INVALID_ARGS);
         received_callback = true;

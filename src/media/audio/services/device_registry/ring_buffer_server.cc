@@ -229,16 +229,16 @@ void RingBufferServer::Stop(StopRequest& request, StopCompleter::Sync& completer
 void RingBufferServer::WatchDelayInfo(WatchDelayInfoCompleter::Sync& completer) {
   ADR_LOG_OBJECT(kLogRingBufferServerMethods);
 
+  if (parent_->ControlledDeviceReceivedError()) {
+    ADR_WARN_OBJECT() << "device has an error";
+    completer.Reply(fit::error(fuchsia_audio_device::RingBufferWatchDelayInfoError::kDeviceError));
+    return;
+  }
+
   if (delay_info_completer_) {
     ADR_WARN_OBJECT() << "previous `WatchDelayInfo` request has not yet completed";
     completer.Reply(
         fit::error(fuchsia_audio_device::RingBufferWatchDelayInfoError::kWatchAlreadyPending));
-    return;
-  }
-
-  if (parent_->ControlledDeviceReceivedError()) {
-    ADR_WARN_OBJECT() << "device has an error";
-    completer.Reply(fit::error(fuchsia_audio_device::RingBufferWatchDelayInfoError::kDeviceError));
     return;
   }
 

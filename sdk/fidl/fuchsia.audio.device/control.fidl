@@ -172,9 +172,6 @@ type ControlSetGainError = flexible enum {
 };
 
 /// Errors returned by `Control/GetCurrentlyPermittedFormats`.
-//
-// TODO(fxbug.dev/102626): Remove this enum after implementation, if no error
-// conditions have been identified and no error codes have been added.
 type ControlGetCurrentlyPermittedFormatsError = flexible enum {
     /// This device has encountered an error and can no longer be queried.
     DEVICE_ERROR = 1;
