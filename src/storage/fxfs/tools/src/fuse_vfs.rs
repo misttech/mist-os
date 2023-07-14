@@ -109,25 +109,19 @@ impl FuseFs {
             None => return Err(FxfsError::NotFound.into()),
         };
         match object_descriptor {
-            ObjectDescriptor::File => {
+            ObjectDescriptor::File | ObjectDescriptor::Symlink => {
                 let replaced_child =
                     replace_child(&mut transaction, None, (&dir, name.osstr_to_str()?)).await?;
                 transaction.commit().await?;
 
-                // If the object is a file without remaining links,
-                // immediately tombstones it in the graveyard.
-                if let ReplacedChild::File(object_id) = replaced_child {
+                // If the object has no remaining links, immediately tombstones it in the graveyard.
+                if let ReplacedChild::Object(object_id) = replaced_child {
                     self.fs.graveyard().tombstone(dir.store().store_object_id(), object_id).await?;
 
                     // Remove object's handle from cache if it exists.
                     self.object_handle_cache.write().await.remove(&object_id);
                 }
 
-                Ok(())
-            }
-            ObjectDescriptor::Symlink => {
-                replace_child(&mut transaction, None, (&dir, name.osstr_to_str()?)).await?;
-                transaction.commit().await?;
                 Ok(())
             }
             _ => Err(FxfsError::NotFile.into()),
@@ -193,7 +187,7 @@ impl FuseFs {
 
             // If the object is a file without remaining links,
             // immediately tombstones it in the graveyard.
-            if let ReplacedChild::File(object_id) = replaced_child {
+            if let ReplacedChild::Object(object_id) = replaced_child {
                 self.fs.graveyard().tombstone(new_dir.store().store_object_id(), object_id).await?;
 
                 // Remove object's handle from cache if it exists.

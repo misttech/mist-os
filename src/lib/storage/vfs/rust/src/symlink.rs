@@ -16,7 +16,7 @@ use {
         ObjectRequest, ProtocolsExt, ToObjectRequest,
     },
     async_trait::async_trait,
-    fidl::endpoints::{ControlHandle as _, RequestStream, ServerEnd},
+    fidl::endpoints::{ControlHandle as _, Responder, ServerEnd},
     fidl_fuchsia_io as fio, fuchsia_zircon as zx,
     futures::StreamExt,
     std::sync::Arc,
@@ -55,17 +55,6 @@ fn null_node_attributes() -> fio::NodeAttributes {
     }
 }
 
-enum HandleRequestError {
-    ShutdownWithEpitaph(zx::Status),
-    Other,
-}
-
-impl<E: std::error::Error> From<E> for HandleRequestError {
-    fn from(_: E) -> HandleRequestError {
-        HandleRequestError::Other
-    }
-}
-
 impl Connection {
     /// Spawns a new task to run the connection.
     pub fn spawn(
@@ -89,10 +78,7 @@ impl Connection {
         if let Ok(mut requests) = object_request.into_request_stream(&connection).await {
             while let Some(Ok(request)) = requests.next().await {
                 let Some(_guard) = connection.scope.try_active_guard() else { break };
-                if let Err(e) = connection.handle_request(request).await {
-                    if let HandleRequestError::ShutdownWithEpitaph(status) = e {
-                        requests.control_handle().shutdown_with_epitaph(status);
-                    }
+                if connection.handle_request(request).await.unwrap_or(true) {
                     break;
                 }
             }
@@ -100,7 +86,7 @@ impl Connection {
     }
 
     // Returns true if the connection should terminate.
-    async fn handle_request(&mut self, req: fio::SymlinkRequest) -> Result<(), HandleRequestError> {
+    async fn handle_request(&mut self, req: fio::SymlinkRequest) -> Result<bool, fidl::Error> {
         match req {
             fio::SymlinkRequest::Clone { flags, object, control_handle: _ } => {
                 self.handle_clone(flags, object);
@@ -116,7 +102,7 @@ impl Connection {
             }
             fio::SymlinkRequest::Close { responder } => {
                 responder.send(Ok(()))?;
-                return Err(HandleRequestError::Other);
+                return Ok(true);
             }
             fio::SymlinkRequest::GetConnectionInfo { responder } => {
                 // TODO(https://fxbug.dev/77623): Restrict GET_ATTRIBUTES.
@@ -156,7 +142,10 @@ impl Connection {
             fio::SymlinkRequest::Describe { responder } => match self.symlink.read_target().await {
                 Ok(target) => responder
                     .send(&fio::SymlinkInfo { target: Some(target), ..Default::default() })?,
-                Err(status) => return Err(HandleRequestError::ShutdownWithEpitaph(status)),
+                Err(status) => {
+                    responder.control_handle().shutdown_with_epitaph(status);
+                    return Ok(true);
+                }
             },
             fio::SymlinkRequest::GetFlags { responder } => {
                 responder.send(zx::Status::NOT_SUPPORTED.into_raw(), fio::OpenFlags::empty())?;
@@ -172,7 +161,7 @@ impl Connection {
                 responder.send(zx::Status::NOT_SUPPORTED.into_raw(), None)?;
             }
         }
-        Ok(())
+        Ok(false)
     }
 
     fn handle_clone(&mut self, flags: fio::OpenFlags, server_end: ServerEnd<fio::NodeMarker>) {

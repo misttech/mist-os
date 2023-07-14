@@ -964,8 +964,10 @@ impl ObjectStore {
         delta: i64,
     ) -> Result<bool, Error> {
         let mut mutation = self.txn_get_object_mutation(transaction, oid).await?;
-        let refs = if let ObjectValue::Object { kind: ObjectKind::File { refs, .. }, .. } =
-            &mut mutation.item.value
+        let refs = if let ObjectValue::Object {
+            kind: ObjectKind::File { refs, .. } | ObjectKind::Symlink { refs, .. },
+            ..
+        } = &mut mutation.item.value
         {
             *refs = refs.checked_add_signed(delta).ok_or(anyhow!("refs underflow/overflow"))?;
             refs

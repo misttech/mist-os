@@ -658,8 +658,9 @@ impl DirectoryIterator<'_, '_> {
 #[derive(Debug)]
 pub enum ReplacedChild {
     None,
-    File(u64),
-    FileWithRemainingLinks(u64),
+    // "Object" can be a file or symbolic link, but not a directory.
+    Object(u64),
+    ObjectWithRemainingLinks(u64),
     Directory(u64),
 }
 
@@ -727,12 +728,12 @@ pub async fn replace_child_with_object<'a, S: HandleOwner>(
 ) -> Result<ReplacedChild, Error> {
     let deleted_id_and_descriptor = dst.0.lookup(dst.1).await?;
     let result = match deleted_id_and_descriptor {
-        Some((old_id, ObjectDescriptor::File)) => {
+        Some((old_id, ObjectDescriptor::File | ObjectDescriptor::Symlink)) => {
             let was_last_ref = dst.0.store().adjust_refs(transaction, old_id, -1).await?;
             if was_last_ref {
-                ReplacedChild::File(old_id)
+                ReplacedChild::Object(old_id)
             } else {
-                ReplacedChild::FileWithRemainingLinks(old_id)
+                ReplacedChild::ObjectWithRemainingLinks(old_id)
             }
         }
         Some((old_id, ObjectDescriptor::Directory)) => {
@@ -752,13 +753,6 @@ pub async fn replace_child_with_object<'a, S: HandleOwner>(
                 // Neither src nor dst exist
                 bail!(FxfsError::NotFound);
             }
-            ReplacedChild::None
-        }
-        Some((old_id, ObjectDescriptor::Symlink)) => {
-            transaction.add(
-                dst.0.store().store_object_id(),
-                Mutation::replace_or_insert_object(ObjectKey::object(old_id), ObjectValue::None),
-            );
             ReplacedChild::None
         }
     };
@@ -923,7 +917,7 @@ mod tests {
             replace_child(&mut transaction, None, (&dir, "foo"))
                 .await
                 .expect("replace_child failed"),
-            ReplacedChild::File(..)
+            ReplacedChild::Object(..)
         );
         transaction.commit().await.expect("commit failed");
 
@@ -985,7 +979,7 @@ mod tests {
             replace_child(&mut transaction, None, (&child, "bar"))
                 .await
                 .expect("replace_child failed"),
-            ReplacedChild::File(..)
+            ReplacedChild::Object(..)
         );
         transaction.commit().await.expect("commit failed");
 
@@ -1043,7 +1037,7 @@ mod tests {
             replace_child(&mut transaction, None, (&dir, "foo"))
                 .await
                 .expect("replace_child failed"),
-            ReplacedChild::File(..)
+            ReplacedChild::Object(..)
         );
         transaction.commit().await.expect("commit failed");
 
@@ -1097,7 +1091,7 @@ mod tests {
                 replace_child(&mut transaction, None, (&dir, "foo"))
                     .await
                     .expect("replace_child failed"),
-                ReplacedChild::File(..)
+                ReplacedChild::Object(..)
             );
             transaction.commit().await.expect("commit failed");
 
@@ -1227,7 +1221,7 @@ mod tests {
             replace_child(&mut transaction, Some((&child_dir1, "foo")), (&child_dir2, "bar"))
                 .await
                 .expect("replace_child failed"),
-            ReplacedChild::File(..)
+            ReplacedChild::Object(..)
         );
         transaction.commit().await.expect("commit failed");
 
@@ -1704,13 +1698,11 @@ mod tests {
             replace_child(&mut transaction, None, (&dir, "foo"))
                 .await
                 .expect("replace_child failed"),
-            ReplacedChild::None
+            ReplacedChild::Object(_)
         );
         transaction.commit().await.expect("commit failed");
 
         assert_eq!(dir.lookup("foo").await.expect("lookup failed"), None);
-        assert!(FxfsError::NotFound
-            .matches(&store.read_symlink(symlink_id).await.expect_err("read_symlink succeeded")));
         fs.close().await.expect("Close failed");
     }
 

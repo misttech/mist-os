@@ -39,12 +39,6 @@
                 // mknod_test
                 "MknodTest.MknodAtFIFO",
                 "MknodTest.Socket",
-
-                // stat_test
-                "StatTest.FstatatSymlinkDir",
-                "StatTest.FstatatSymlinkDirWithTrailingSlash",
-                "StatTest.FstatatSymlinkDirWithTrailingSlashSameInode",
-                "StatTest.LstatSymlinkDir",
             ],
         },
         {

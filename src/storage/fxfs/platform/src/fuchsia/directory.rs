@@ -352,13 +352,13 @@ impl MutableDirectory for FxDirectory {
             .map_err(map_to_status)?
         {
             ReplacedChild::None => return Err(zx::Status::NOT_FOUND),
-            ReplacedChild::FileWithRemainingLinks(..) => {
+            ReplacedChild::ObjectWithRemainingLinks(..) => {
                 transaction
                     .commit_with_callback(|_| self.did_remove(name))
                     .await
                     .map_err(map_to_status)?;
             }
-            ReplacedChild::File(id) => {
+            ReplacedChild::Object(id) => {
                 transaction
                     .commit_with_callback(|_| self.did_remove(name))
                     .await
@@ -378,7 +378,7 @@ impl MutableDirectory for FxDirectory {
                     .await
                     .map_err(map_to_status)?;
             }
-        };
+        }
         Ok(())
     }
 
@@ -481,12 +481,17 @@ impl MutableDirectory for FxDirectory {
 
         if let Some((_, dst_descriptor)) = dst_id_and_descriptor.as_ref() {
             // dst is being overwritten; make sure it's a file iff src is.
-            if dst_descriptor != &moved_descriptor {
-                match dst_descriptor {
-                    ObjectDescriptor::File => return Err(zx::Status::NOT_DIR),
-                    ObjectDescriptor::Directory => return Err(zx::Status::NOT_FILE),
-                    _ => return Err(zx::Status::IO_DATA_INTEGRITY),
-                };
+            match (&moved_descriptor, dst_descriptor) {
+                (ObjectDescriptor::Directory, ObjectDescriptor::Directory) => {}
+                (
+                    ObjectDescriptor::File | ObjectDescriptor::Symlink,
+                    ObjectDescriptor::File | ObjectDescriptor::Symlink,
+                ) => {}
+                (ObjectDescriptor::Directory, _) => return Err(zx::Status::NOT_DIR),
+                (ObjectDescriptor::File | ObjectDescriptor::Symlink, _) => {
+                    return Err(zx::Status::NOT_FILE)
+                }
+                _ => return Err(zx::Status::IO_DATA_INTEGRITY),
             }
         }
 
@@ -522,7 +527,7 @@ impl MutableDirectory for FxDirectory {
 
                 match replace_result {
                     ReplacedChild::None => self.did_add(dst),
-                    ReplacedChild::FileWithRemainingLinks(..) | ReplacedChild::File(_) => {
+                    ReplacedChild::ObjectWithRemainingLinks(..) | ReplacedChild::Object(_) => {
                         self.did_remove(dst);
                         self.did_add(dst);
                     }
@@ -536,7 +541,7 @@ impl MutableDirectory for FxDirectory {
             .await
             .map_err(map_to_status)?;
 
-        if let ReplacedChild::File(id) = replace_result {
+        if let ReplacedChild::Object(id) = replace_result {
             self.volume().maybe_purge_file(id).await.map_err(map_to_status)?;
         }
         Ok(())
@@ -1648,6 +1653,35 @@ mod tests {
             assert_matches!(
                 node_info,
                 fio::SymlinkInfo { target: Some(target), .. } if target == b"target2"
+            );
+
+            // Unlink the second symlink.
+            root.unlink("symlink2", &fio::UnlinkOptions::default())
+                .await
+                .expect("FIDL call failed")
+                .expect("unlnk failed");
+
+            // Rename over the first symlink.
+            open_file_checked(
+                &root,
+                fio::OpenFlags::CREATE
+                    | fio::OpenFlags::RIGHT_READABLE
+                    | fio::OpenFlags::RIGHT_WRITABLE,
+                "target",
+            )
+            .await;
+            let (status, dst_token) = root.get_token().await.expect("FIDL call failed");
+            zx::Status::ok(status).expect("get_token failed");
+            root.rename("target", zx::Event::from(dst_token.unwrap()), "symlink")
+                .await
+                .expect("FIDL call failed")
+                .expect("rename failed");
+
+            let (status, _) = proxy.get_attr().await.expect("FIDL call failed");
+            assert_eq!(zx::Status::from_raw(status), zx::Status::NOT_FOUND);
+            assert_matches!(
+                proxy.describe().await,
+                Err(fidl::Error::ClientChannelClosed { status: zx::Status::NOT_FOUND, .. })
             );
         }
 
