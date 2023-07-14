@@ -229,7 +229,7 @@ pub fn sys_connect(
     let client_socket = client_file.node().socket().ok_or_else(|| errno!(ENOTSOCK))?;
     let address = parse_socket_address(current_task, user_socket_address, address_length)?;
     let peer = match address {
-        SocketAddress::Unspecified => return error!(ECONNREFUSED),
+        SocketAddress::Unspecified => return error!(EAFNOSUPPORT),
         SocketAddress::Unix(ref name) => {
             log_trace!("connect to unix socket named {:?}", String::from_utf8_lossy(name));
             if name.is_empty() {
