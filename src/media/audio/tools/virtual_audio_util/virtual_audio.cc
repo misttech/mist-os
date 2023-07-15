@@ -52,6 +52,7 @@ class VirtualAudioUtil {
     SET_CLOCK_DOMAIN,
     SET_INITIAL_CLOCK_RATE,
     SET_TRANSFER_BYTES,
+    SET_INTERNAL_DELAY,
     SET_EXTERNAL_DELAY,
     SET_RING_BUFFER_RESTRICTIONS,
     SET_GAIN_PROPS,
@@ -81,50 +82,47 @@ class VirtualAudioUtil {
     INVALID,
   };
 
-  static constexpr struct {
-    const char* name;
-    Command cmd;
-  } COMMANDS[] = {
-      {"num-devs", Command::GET_NUM_VIRTUAL_DEVICES},
+  static constexpr char kNumDevsSwitch[] = "num-devs";
 
-      {"dev", Command::SET_DEVICE_NAME},
-      {"mfg", Command::SET_MANUFACTURER},
-      {"prod", Command::SET_PRODUCT_NAME},
-      {"id", Command::SET_UNIQUE_ID},
-      {"add-format", Command::ADD_FORMAT_RANGE},
-      {"clear-format", Command::CLEAR_FORMAT_RANGES},
-      {"domain", Command::SET_CLOCK_DOMAIN},
-      {"initial-rate", Command::SET_INITIAL_CLOCK_RATE},
-      {"transfer", Command::SET_TRANSFER_BYTES},
-      {"delay", Command::SET_EXTERNAL_DELAY},
-      {"rb", Command::SET_RING_BUFFER_RESTRICTIONS},
-      {"gain-props", Command::SET_GAIN_PROPS},
-      {"plug-props", Command::SET_PLUG_PROPS},
-      {"reset", Command::RESET_CONFIG},
+  static constexpr char kDeviceNameSwitch[] = "dev";
+  static constexpr char kManufacturerSwitch[] = "mfg";
+  static constexpr char kProductNameSwitch[] = "prod";
+  static constexpr char kUniqueIdSwitch[] = "id";
+  static constexpr char kAddFormatRangeSwitch[] = "add-format";
+  static constexpr char kClearFormatRangesSwitch[] = "clear-format";
+  static constexpr char kClockDomainSwitch[] = "domain";
+  static constexpr char kInitialRateSwitch[] = "initial-rate";
+  static constexpr char kTransferBytesSwitch[] = "transfer";
+  static constexpr char kInternalDelaySwitch[] = "int-delay";
+  static constexpr char kExternalDelaySwitch[] = "ext-delay";
+  static constexpr char kBufferRestrictionsSwitch[] = "rb";
+  static constexpr char kGainPropsSwitch[] = "gain-props";
+  static constexpr char kPlugPropsSwitch[] = "plug-props";
+  static constexpr char kResetConfigSwitch[] = "reset";
 
-      {"add", Command::ADD_DEVICE},
-      {"remove", Command::REMOVE_DEVICE},
+  static constexpr char kAddDeviceSwitch[] = "add";
+  static constexpr char kRemoveDeviceSwitch[] = "remove";
 
-      {"plug", Command::PLUG},
-      {"unplug", Command::UNPLUG},
-      {"get-gain", Command::GET_GAIN},
-      {"get-format", Command::GET_FORMAT},
-      {"get-rb", Command::RETRIEVE_BUFFER},
-      {"write-rb", Command::WRITE_BUFFER},
-      {"get-pos", Command::GET_POSITION},
-      {"notifs", Command::SET_NOTIFICATION_FREQUENCY},
-      {"rate", Command::ADJUST_CLOCK_RATE},
+  static constexpr char kPlugSwitch[] = "plug";
+  static constexpr char kUnplugSwitch[] = "unplug";
+  static constexpr char kGetGainSwitch[] = "get-gain";
+  static constexpr char kGetFormatSwitch[] = "get-format";
+  static constexpr char kRetrieveBufferSwitch[] = "get-rb";
+  static constexpr char kWriteBufferSwitch[] = "write-rb";
+  static constexpr char kGetPositionSwitch[] = "get-pos";
+  static constexpr char kNotificationFrequencySwitch[] = "notifs";
+  static constexpr char kClockRateSwitch[] = "rate";
 
-      {"in", Command::SET_IN},
-      {"out", Command::SET_OUT},
-      {"stream", Command::SET_STREAM_CONFIG},
-      {"dai", Command::SET_DAI},
-      {"codec", Command::SET_CODEC},
-      {"composite", Command::SET_COMPOSITE},
-      {"wait", Command::WAIT},
-      {"help", Command::HELP},
-      {"?", Command::HELP},
-  };
+  static constexpr char kDirectionInSwitch[] = "in";
+  static constexpr char kDirectionOutSwitch[] = "out";
+  static constexpr char kStreamConfigSwitch[] = "stream";
+  static constexpr char kDaiSwitch[] = "dai";
+  static constexpr char kCodecSwitch[] = "codec";
+  static constexpr char kCompositeSwitch[] = "composite";
+  static constexpr char kWaitSwitch[] = "wait";
+  static constexpr char kHelp1Switch[] = "help";
+  static constexpr char kHelp2Switch[] = "?";
+
   static constexpr char kDefaultDeviceName[] = "Vertex";
   static constexpr char kDefaultManufacturer[] = "Puerile Virtual Functions, Incorporated";
   static constexpr char kDefaultProductName[] = "Virgil, version 1.0";
@@ -137,6 +135,7 @@ class VirtualAudioUtil {
   static constexpr uint8_t kDefaultFormatRangeOption = 0;
 
   static constexpr uint32_t kDefaultTransferBytes = 0x100;
+  static constexpr int64_t kDefaultInternalDelayNsec = zx::msec(0).get();
   static constexpr int64_t kDefaultExternalDelayNsec = zx::msec(1).get();
   static constexpr uint8_t kDefaultRingBufferOption = 0;
 
@@ -146,6 +145,52 @@ class VirtualAudioUtil {
   static constexpr uint8_t kDefaultGainPropsOption = 0;
   static constexpr uint8_t kDefaultPlugPropsOption = 0;
   static constexpr uint32_t kDefaultNotificationFrequency = 4;
+
+  static constexpr struct {
+    const char* name;
+    Command cmd;
+  } COMMANDS[] = {
+      {kNumDevsSwitch, Command::GET_NUM_VIRTUAL_DEVICES},
+
+      {kDeviceNameSwitch, Command::SET_DEVICE_NAME},
+      {kManufacturerSwitch, Command::SET_MANUFACTURER},
+      {kProductNameSwitch, Command::SET_PRODUCT_NAME},
+      {kUniqueIdSwitch, Command::SET_UNIQUE_ID},
+      {kAddFormatRangeSwitch, Command::ADD_FORMAT_RANGE},
+      {kClearFormatRangesSwitch, Command::CLEAR_FORMAT_RANGES},
+      {kClockDomainSwitch, Command::SET_CLOCK_DOMAIN},
+      {kInitialRateSwitch, Command::SET_INITIAL_CLOCK_RATE},
+      {kTransferBytesSwitch, Command::SET_TRANSFER_BYTES},
+      {kInternalDelaySwitch, Command::SET_INTERNAL_DELAY},
+      {kExternalDelaySwitch, Command::SET_EXTERNAL_DELAY},
+      {kBufferRestrictionsSwitch, Command::SET_RING_BUFFER_RESTRICTIONS},
+      {kGainPropsSwitch, Command::SET_GAIN_PROPS},
+      {kPlugPropsSwitch, Command::SET_PLUG_PROPS},
+      {kResetConfigSwitch, Command::RESET_CONFIG},
+
+      {kAddDeviceSwitch, Command::ADD_DEVICE},
+      {kRemoveDeviceSwitch, Command::REMOVE_DEVICE},
+
+      {kPlugSwitch, Command::PLUG},
+      {kUnplugSwitch, Command::UNPLUG},
+      {kGetGainSwitch, Command::GET_GAIN},
+      {kGetFormatSwitch, Command::GET_FORMAT},
+      {kRetrieveBufferSwitch, Command::RETRIEVE_BUFFER},
+      {kWriteBufferSwitch, Command::WRITE_BUFFER},
+      {kGetPositionSwitch, Command::GET_POSITION},
+      {kNotificationFrequencySwitch, Command::SET_NOTIFICATION_FREQUENCY},
+      {kClockRateSwitch, Command::ADJUST_CLOCK_RATE},
+
+      {kDirectionInSwitch, Command::SET_IN},
+      {kDirectionOutSwitch, Command::SET_OUT},
+      {kStreamConfigSwitch, Command::SET_STREAM_CONFIG},
+      {kDaiSwitch, Command::SET_DAI},
+      {kCodecSwitch, Command::SET_CODEC},
+      {kCompositeSwitch, Command::SET_COMPOSITE},
+      {kWaitSwitch, Command::WAIT},
+      {kHelp1Switch, Command::HELP},
+      {kHelp2Switch, Command::HELP},
+  };
 
   static async::Loop* loop_;
   static bool received_callback_;
@@ -180,6 +225,7 @@ class VirtualAudioUtil {
   bool SetClockDomain(const std::string& clock_domain_str);
   bool SetInitialClockRate(const std::string& initial_clock_rate_str);
   bool SetTransferBytes(const std::string& transfer_bytes_str);
+  bool SetInternalDelay(const std::string& delay_str);
   bool SetExternalDelay(const std::string& delay_str);
   bool SetRingBufferRestrictions(const std::string& rb_restr_str);
   bool SetGainProps(const std::string& gain_props_str);
@@ -571,6 +617,9 @@ bool VirtualAudioUtil::ExecuteCommand(Command cmd, const std::string& value) {
     case Command::SET_TRANSFER_BYTES:
       success = SetTransferBytes(value);
       break;
+    case Command::SET_INTERNAL_DELAY:
+      success = SetInternalDelay(value);
+      break;
     case Command::SET_EXTERNAL_DELAY:
       success = SetExternalDelay(value);
       break;
@@ -667,55 +716,84 @@ void VirtualAudioUtil::Usage() {
   printf("\nValid options:\n");
 
   printf("\n  By default, a virtual device of type StreamConfig and direction Output is used\n");
-  printf("  --codec    \t\t  Switch to a Codec configuration with the same direction\n");
-  printf("  --composite\t\t  Switch to a Composite configuration with the same direction\n");
-  printf("  --dai      \t\t  Switch to a Dai configuration with the same direction\n");
-  printf("  --stream   \t\t  Switch to a StreamConfig configuration with the same direction\n");
-  printf("  --in\t\t\t  Switch to an Input configuration (same device type)\n");
-  printf("  --out\t\t\t  Switch to an Output configuration (same device type)\n");
+  printf("  --%s    \t\t  Switch to a Codec configuration with the same direction\n", kCodecSwitch);
+  printf("  --%s\t\t  Switch to a Composite configuration with the same direction\n",
+         kCompositeSwitch);
+  printf("  --%s      \t\t  Switch to a Dai configuration with the same direction\n", kDaiSwitch);
+  printf("  --%s   \t\t  Switch to a StreamConfig configuration with the same direction\n",
+         kStreamConfigSwitch);
+  printf("  --%s\t\t\t  Switch to an Input configuration (same device type)\n", kDirectionInSwitch);
+  printf("  --%s\t\t\t  Switch to an Output configuration (same device type)\n",
+         kDirectionOutSwitch);
 
   printf("\n  The following commands customize a device configuration, before it is added\n");
-  printf("  --dev[=<DEVICE_NAME>]\t  Set the device name\n");
-  printf("  --mfg[=<MANUFACTURER>]  Set the manufacturer name\n");
-  printf("  --prod[=<PRODUCT>]\t  Set the product name\n");
-  printf("  --id[=<UINT128>]\t  Set the unique ID (default 0123456789ABCDEF1122334455667788)\n");
-  printf("  --add-format[=<NUM>]\t  Add format range [0,6] (default 8-44.1 Mono/Stereo 24-32)\n");
-  printf("  --clear-format\t  Clear any format ranges (including the built-in default)\n");
-  printf("  --domain[=<NUM>]\t  Set device clock domain (default 0)\n");
+  printf("  --%s[=<DEVICE_NAME>]\t  Set the device name (default '%s')\n", kDeviceNameSwitch,
+         kDefaultDeviceName);
+  printf("  --%s[=<MANUFACTURER>]  Set the manufacturer name (default '%s')\n", kManufacturerSwitch,
+         kDefaultManufacturer);
+  printf("  --%s[=<PRODUCT>]\t  Set the product name (default '%s')\n", kProductNameSwitch,
+         kDefaultProductName);
   printf(
-      "  --initial-rate[=<NUM>]  Set initial device clock rate in PPM [-1000, 1000] (default 0)\n");
-  printf("  --transfer[=<BYTES>]\t  Set the transfer bytes, in bytes (default 256)\n");
-  printf("  --delay[=<MSEC>]\t  Set external delay (default 1 ms)\n");
-  printf(
-      "  --rb[=<NUM>]\t\t  Set ring-buffer restrictions [0,2] (default 48k-72k frames mod 6k)\n");
-  printf("  --gain-props[=<NUM>]\t  Set gain properties [0,3] (default [-60, 0] -2dB mute)\n");
-  printf("  --plug-props[=<NUM>]\t  Set plug properties [0,5] (default plugged notifiable)\n");
-  printf("  --reset\t\t  Clear any customizations; return this configuration to the default\n");
+      "  --%s[=<UINT128>]\t  Set the unique ID (default %02X%02X%02X%02X%02X%02X%02X%02X%02X%02X%02X%02X%02X%02X%02X%02X)\n",
+      kUniqueIdSwitch, kDefaultUniqueId[0], kDefaultUniqueId[1], kDefaultUniqueId[2],
+      kDefaultUniqueId[3], kDefaultUniqueId[4], kDefaultUniqueId[5], kDefaultUniqueId[6],
+      kDefaultUniqueId[7], kDefaultUniqueId[8], kDefaultUniqueId[9], kDefaultUniqueId[10],
+      kDefaultUniqueId[11], kDefaultUniqueId[12], kDefaultUniqueId[13], kDefaultUniqueId[14],
+      kDefaultUniqueId[15]);
+  printf("  --%s[=<NUM>]\t  Add format range [0,6] (default 8-44.1 Mono/Stereo 24-32)\n",
+         kAddFormatRangeSwitch);
+  printf("  --%s\t  Clear any format ranges (including the built-in default)\n",
+         kClearFormatRangesSwitch);
+  printf("  --%s[=<NUM>]\t  Set device clock domain (default %d)\n", kClockDomainSwitch,
+         kDefaultClockDomain);
+  printf("  --%s[=<NUM>]  Set initial device clock rate in PPM [-1000, 1000] (default %d)\n",
+         kInitialRateSwitch, kDefaultInitialClockRatePpm);
+  printf("  --%s[=<BYTES>]\t  Set the transfer bytes, in bytes (default %u)\n",
+         kTransferBytesSwitch, kDefaultTransferBytes);
 
-  printf("\n  --add\t\t\t  Activate the current configuration (AddDevice)\n");
+  printf("  --%s[=<NSEC>]\t  Set internal delay (default %zd ns)\n", kInternalDelaySwitch,
+         kDefaultInternalDelayNsec);
+  printf("  --%s[=<NSEC>]\t  Set external delay (default %zd ns)\n", kExternalDelaySwitch,
+         kDefaultExternalDelayNsec);
+  printf("  --%s[=<NUM>]\t\t  Set ring-buffer restrictions [0,2] (default 48k-72k frames mod 6k)\n",
+         kBufferRestrictionsSwitch);
+  printf("  --%s[=<NUM>]\t  Set gain properties [0,3] (default [-60, 0] -2dB mute)\n",
+         kGainPropsSwitch);
+  printf("  --%s[=<NUM>]\t  Set plug properties [0,5] (default plugged notifiable)\n",
+         kPlugPropsSwitch);
+  printf("  --%s\t\t  Clear any customizations; return this configuration to the default\n",
+         kResetConfigSwitch);
+
+  printf("\n  --%s\t\t\t  Activate the current configuration (AddDevice)\n", kAddDeviceSwitch);
 
   printf("\n  Subsequent commands require an activated (added) virtual audio device\n");
-  printf("  --get-format\t\t  Retrieve the client-selected ring-buffer format\n");
-  printf("  --get-gain\t\t  Retrieve the current device gain\n");
-  printf("  --get-rb\t\t  Return a mapping of the ring buffer\n");
+  printf("  --%s\t\t  Retrieve the client-selected ring-buffer format\n", kGetFormatSwitch);
+  printf("  --%s\t\t  Retrieve the current device gain\n", kGetGainSwitch);
+  printf("  --%s\t\t  Return a mapping of the ring buffer\n", kRetrieveBufferSwitch);
   printf(
-      "  --write-rb[=<UINT64>]\t  Fill the ring-buffer with this uint64 (in hex, default "
-      "0x22446688AACCEE00)\n");
-  printf("  --get-pos\t\t  Retrieve the current ring-buffer position and corresponding ref time\n");
-  printf("  --notifs[=<FREQ>]\t  Set an alternate notifications-per-ring frequency (default 4).\n");
+      "  --%s[=<UINT64>]\t  Fill the ring-buffer with this uint64 (in hex, default "
+      "0x%zX)\n",
+      kWriteBufferSwitch, kDefaultValueToWrite);
+  printf("  --%s\t\t  Retrieve the current ring-buffer position and corresponding ref time\n",
+         kGetPositionSwitch);
+  printf("  --%s[=<FREQ>]\t  Set an alternate notifications-per-ring frequency (default %u).\n",
+         kNotificationFrequencySwitch, kDefaultNotificationFrequency);
   printf("\t\t\t  (Don't receive the same position notifications sent to the client)\n");
-  printf("  --rate=<DELTA PPM>\t  Adjust the rate of the device clock, in parts-per-million\n");
+  printf("  --%s=<DELTA PPM>\t  Adjust the rate of the device clock, in parts-per-million\n",
+         kClockRateSwitch);
   printf("\t\t\t  This is reflected in position notification delivery timing and timestamps.\n");
-  printf("  --plug\t\t  Change the device's plug-state to Plugged\n");
-  printf("  --unplug\t\t  Change the device's plug-state to Unplugged\n");
+  printf("  --%s\t\t  Change the device's plug-state to Plugged\n", kPlugSwitch);
+  printf("  --%s\t\t  Change the device's plug-state to Unplugged\n", kUnplugSwitch);
 
-  printf("\n  --remove\t\t  Deactivate the current device configuration (RemoveDevice)\n");
+  printf("\n  --%s\t\t  Deactivate the current device configuration (RemoveDevice)\n",
+         kRemoveDeviceSwitch);
 
   printf("\n  The following commands are on the virtualaudio::Control protocol:\n");
-  printf("  --num-devs\t\t  Retrieve the number of currently active virtual audio devices\n");
+  printf("  --%s\t\t  Retrieve the number of currently active virtual audio devices\n",
+         kNumDevsSwitch);
 
-  printf("\n  --wait\t\t  Wait for a key press before executing subsequent commands\n");
-  printf("  --help, --?\t\t  Show this message\n");
+  printf("\n  --%s\t\t  Wait for a key press before executing subsequent commands\n", kWaitSwitch);
+  printf("  --%s, --%s\t\t  Show this message\n", kHelp1Switch, kHelp2Switch);
   printf("\n");
 }
 
@@ -1034,6 +1112,35 @@ bool VirtualAudioUtil::SetTransferBytes(const std::string& transfer_bytes_str) {
       // Set driver transfer bytes for all ring buffers.
       for (auto& i : *composite.mutable_ring_buffers()) {
         i.mutable_ring_buffer()->set_driver_transfer_bytes(driver_transfer_bytes);
+      }
+      return true;
+    }
+    default:
+      return false;
+  }
+}
+
+bool VirtualAudioUtil::SetInternalDelay(const std::string& delay_str) {
+  zx_duration_t internal_delay =
+      delay_str.empty() ? kDefaultInternalDelayNsec : fxl::StringToNumber<zx_duration_t>(delay_str);
+
+  EnsureTypesExist();
+  switch (config()->device_specific().Which()) {
+    case fuchsia::virtualaudio::DeviceSpecific::Tag::kStreamConfig: {
+      auto& stream_config = config()->mutable_device_specific()->stream_config();
+      stream_config.mutable_ring_buffer()->set_internal_delay(internal_delay);
+      return true;
+    }
+    case fuchsia::virtualaudio::DeviceSpecific::Tag::kDai: {
+      auto& dai = config()->mutable_device_specific()->dai();
+      dai.mutable_ring_buffer()->set_internal_delay(internal_delay);
+      return true;
+    }
+    case fuchsia::virtualaudio::DeviceSpecific::Tag::kComposite: {
+      auto& composite = config()->mutable_device_specific()->composite();
+      // For now, set internal delay for all ring buffers.
+      for (auto& i : *composite.mutable_ring_buffers()) {
+        i.mutable_ring_buffer()->set_internal_delay(internal_delay);
       }
       return true;
     }
