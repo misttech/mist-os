@@ -6,6 +6,7 @@ use fidl::endpoints::{create_endpoints, ClientEnd, ProtocolMarker, Proxy};
 use fidl_fuchsia_io as fio;
 use fuchsia_async as fasync;
 use fuchsia_zircon as zx;
+use futures::FutureExt;
 use netlink::{interfaces::InterfacesHandler, Netlink, NETLINK_LOG_TAG};
 use once_cell::sync::OnceCell;
 use std::{
@@ -144,6 +145,9 @@ pub struct Kernel {
 
     /// The implementation of networking-related Netlink protocol families.
     network_netlink: OnceCell<Netlink<NetlinkSenderReceiverProvider>>,
+
+    /// Inspect instrumentation for this kernel instance.
+    inspect_node: fuchsia_inspect::Node,
 }
 
 /// An implementation of [`InterfacesHandler`].
@@ -186,6 +190,7 @@ impl Kernel {
         cmdline: &[u8],
         features: &[String],
         container_svc: Option<fio::DirectoryProxy>,
+        inspect_node: fuchsia_inspect::Node,
     ) -> Result<Arc<Kernel>, zx::Status> {
         let unix_address_maker = Box::new(|x: Vec<u8>| -> SocketAddress { SocketAddress::Unix(x) });
         let vsock_address_maker = Box::new(|x: u32| -> SocketAddress { SocketAddress::Vsock(x) });
@@ -198,7 +203,7 @@ impl Kernel {
 
         let device_registry = DeviceRegistry::new_with_common_devices();
         let loop_device_registry = LoopDeviceRegistry::new(&device_registry);
-        Ok(Arc::new(Kernel {
+        let this = Arc::new(Kernel {
             job,
             kthreads: KernelThreads::default(),
             pids: RwLock::new(PidTable::new()),
@@ -230,7 +235,22 @@ impl Kernel {
             netstack_devices: Arc::default(),
             generic_netlink: OnceCell::new(),
             network_netlink: OnceCell::new(),
-        }))
+            inspect_node,
+        });
+
+        // Make a copy of this Arc for the inspect lazy node to use but don't create an Arc cycle
+        // because the inspect node that owns this reference is owned by the kernel.
+        let kernel = Arc::downgrade(&this);
+        this.inspect_node.record_lazy_child("thread_groups", move || {
+            if let Some(kernel) = kernel.upgrade() {
+                let inspector = kernel.get_thread_groups_inspect();
+                async move { Ok(inspector) }.boxed()
+            } else {
+                async move { Err(anyhow::format_err!("kernel was dropped")) }.boxed()
+            }
+        });
+
+        Ok(this)
     }
 
     /// Opens a device file (driver) identified by `dev`.
@@ -293,5 +313,33 @@ impl Kernel {
 
     pub fn selinux_enabled(&self) -> bool {
         self.features.contains("selinux_enabled")
+    }
+
+    fn get_thread_groups_inspect(&self) -> fuchsia_inspect::Inspector {
+        let inspector = fuchsia_inspect::Inspector::default();
+
+        let thread_groups = inspector.root();
+        for thread_group in self.pids.read().get_thread_groups() {
+            let tg = thread_group.read();
+
+            let tg_node = thread_groups.create_child(format!("{}", thread_group.leader));
+            tg_node.record_int("ppid", tg.get_ppid() as i64);
+            tg_node.record_bool("stopped", tg.stopped);
+
+            let tasks_node = tg_node.create_child("tasks");
+            for task in tg.tasks() {
+                let property = if task.id == thread_group.leader {
+                    "command".to_string()
+                } else {
+                    task.id.to_string()
+                };
+                let command = task.command();
+                tg_node.record_string(property, command.to_str().unwrap_or("{err}"));
+            }
+            tg_node.record(tasks_node);
+            thread_groups.record(tg_node);
+        }
+
+        inspector
     }
 }

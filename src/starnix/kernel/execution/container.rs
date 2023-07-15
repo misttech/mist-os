@@ -257,16 +257,15 @@ async fn create_container(
 
     let pkg_dir_proxy = fio::DirectorySynchronousProxy::new(config.pkg_dir.take().unwrap());
 
+    let node = inspect::component::inspector().root().create_child("container");
     let kernel = Kernel::new(
         config.name.as_bytes(),
         config.kernel_cmdline.as_bytes(),
         &config.features,
         svc_dir,
+        node.create_child("kernel"),
     )
     .with_source_context(|| format!("creating Kernel: {}", &config.name))?;
-
-    let node = inspect::component::inspector().root().create_child("container");
-    create_container_inspect(kernel.clone(), &node);
 
     let mut init_task = create_init_task(&kernel, config)
         .with_source_context(|| format!("creating init task: {:?}", &config.init))?;
@@ -438,46 +437,6 @@ async fn wait_for_init_file(
         }
     }
     Ok(())
-}
-
-/// Creates a lazy node that will contain the Kernel thread groups state.
-fn create_container_inspect(kernel: Arc<Kernel>, parent: &inspect::Node) {
-    parent.record_lazy_child("kernel", move || {
-        let inspector = inspect::Inspector::default();
-        let thread_groups = inspector.root().create_child("thread_groups");
-        for thread_group in kernel.pids.read().get_thread_groups() {
-            let tg = thread_group.read();
-
-            let tg_node = thread_groups.create_child(format!("{}", thread_group.leader));
-            tg_node.record_int("ppid", tg.get_ppid() as i64);
-            tg_node.record_bool("stopped", tg.stopped);
-
-            let tasks_node = tg_node.create_child("tasks");
-            for task in tg.tasks() {
-                if task.id == thread_group.leader {
-                    record_task_command_to_node(&task, "command", &tg_node);
-                    continue;
-                }
-                record_task_command_to_node(&task, format!("{}", task.id), &tasks_node);
-            }
-            tg_node.record(tasks_node);
-            thread_groups.record(tg_node);
-        }
-        inspector.root().record(thread_groups);
-
-        async move { Ok(inspector) }.boxed()
-    });
-}
-
-fn record_task_command_to_node(
-    task: &Arc<Task>,
-    name: impl Into<inspect::StringReference>,
-    node: &inspect::Node,
-) {
-    match task.command().to_str() {
-        Ok(command) => node.record_string(name, command),
-        Err(err) => node.record_string(name, format!("{err}")),
-    }
 }
 
 #[cfg(test)]
