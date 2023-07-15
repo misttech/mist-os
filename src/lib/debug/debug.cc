@@ -28,4 +28,11 @@ void WaitForDebugger(uint32_t seconds) {
   __builtin_debugtrap();
 }
 
+void BreakIntoDebuggerIfAttached() {
+  if (IsDebuggerAttached()) {
+    // This breakpoint is only issued when there's a debugger attached.
+    __builtin_debugtrap();
+  }
+}
+
 }  // namespace debug

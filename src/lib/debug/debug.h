@@ -19,6 +19,9 @@ bool IsDebuggerAttached();
 // still be issued and the process will crash.
 void WaitForDebugger(uint32_t seconds = 60);
 
+// If a debugger is attached, trigger a breakpoint. Do nothing otherwise.
+void BreakIntoDebuggerIfAttached();
+
 }  // namespace debug
 
 #endif  // SRC_LIB_DEBUG_DEBUG_H_

@@ -59,8 +59,9 @@ if (is_host) {
     _is_thinlto =
         select_variant + [ "thinlto" ] - [ "thinlto" ] != select_variant
 
-    build_type = "optimize=$optimize:target_cpu=$target_cpu:is_lto=$_is_lto:" +
-                 "is_thinlto=$_is_thinlto:is_asan=$is_asan"
+    build_type =
+        "optimize=$optimize:target_cpu=$target_cpu:is_lto=$_is_lto:" +
+        "is_thinlto=$_is_thinlto:is_asan=$is_asan:is_coverage=$is_coverage"
 
     defines = [
       "ZXDB_E2E_TESTS_BUILD_TYPE=\"" + build_type + "\"",

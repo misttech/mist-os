@@ -65,7 +65,7 @@ Identifier Function::ComputeIdentifier() const {
 
   // Be careful not to modify the names that already have template parameters present. This likely
   // means that the code was compiled without the simple-template-names flag.
-  if (NameHasTemplate(name)) {
+  if (!NameHasTemplate(name)) {
     AddAllTemplateParametersToName(name, template_params_);
   }
 

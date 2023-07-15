@@ -9,8 +9,11 @@
 
 #include <array>
 #include <iostream>
+#include <numeric>
 #include <sstream>
 #include <vector>
+
+#include "src/lib/debug/debug.h"
 
 // Free standing templatized function.
 template <typename T>
@@ -82,30 +85,24 @@ int main() {
   std::cout << ToString(3.14159) << std::endl;
 
   MyClass<char> myclass('c');
-  myclass.Print();
-
   MyClass<double> mcd(48.3);
-  mcd.Print();
-
   MyClass<int> myi(12);
-  std::cout << myi.Add(6) << std::endl;
-
   MyDoubleTemplate<int, char> my_double_template(5, 'c');
-  my_double_template.Print();
-
   MyDoubleTemplate<double, uint64_t> mdtd64(12.4, 0x43110);
-  mdtd64.Print();
-
   MyTemplateValueClass<5> mtvc;
-  mtvc.Print();
-
   MyTemplateValueClassChar<'f'> mtvcc;
-  mtvcc.Print();
-
   MyStruct<true> foo;
   MyStruct<false> bar;
+
+  debug::BreakIntoDebuggerIfAttached();
+
+  myclass.Print();
+  mcd.Print();
+  std::cout << myi.Add(6) << std::endl;
+  my_double_template.Print();
+  mdtd64.Print();
+  mtvc.Print();
+  mtvcc.Print();
   (void)foo;
   (void)bar;
-
-  return 0;
 }

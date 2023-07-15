@@ -34,7 +34,7 @@ template("inferior") {
     }
   }
 
-  fuchsia_component(target_name) {
+  fuchsia_component(_target_name) {
     manifest = "$target_gen_dir/$_target_manifest.cml"
     deps = [
       ":$_target_bin",
@@ -80,13 +80,19 @@ inferior("async_rust") {
 }
 
 inferior("simplified_templates") {
-  sources = [ "template_types.cc" ]
+  sources = [ "simplified_templates.cc" ]
+  deps = [ "//src/lib/debug" ]
 
   # Never optimize this since we are relying on the variables to be present.
   cflags = [
     "-gsimple-template-names",
     "-fno-inline-functions",
   ]
+}
+
+inferior("template_functions") {
+  sources = [ "template_functions.cc" ]
+  deps = [ "//src/lib/debug" ]
 }
 
 inferior("cpp_functions") {
@@ -142,6 +148,7 @@ fuchsia_package("zxdb_e2e_inferiors") {
     ":rust_functions",
     ":simplified_templates",
     ":step_plt",
+    ":template_functions",
     ":wait_for_debugger",
   ]
 
