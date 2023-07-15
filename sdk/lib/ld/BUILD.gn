@@ -147,6 +147,10 @@ config("standalone.config") {
   }
 }
 
+source_set("posix-header") {
+  public = [ "posix.h" ]
+}
+
 shared_library("ld-startup") {
   configs += [ ":abi-soname" ]
 
@@ -164,7 +168,14 @@ shared_library("ld-startup") {
       "//zircon/system/ulib/zx",
     ]
   } else {
-    sources += [ "posix-startup.cc" ]
+    sources += [
+      "posix-startup.S",
+      "posix-startup.cc",
+    ]
+    deps += [
+      ":posix-header",
+      "//zircon/kernel/lib/arch:headers",
+    ]
   }
 
   if (!is_gcc) {
@@ -219,6 +230,7 @@ source_set("load-tests") {
 
   sources = [ "ld-startup-tests.cc" ]
   deps = [
+    ":posix-header",
     "//src/lib/elfldltl",
     "//src/lib/elfldltl:elfldltl-testutils",
     "//third_party/googletest:gtest",

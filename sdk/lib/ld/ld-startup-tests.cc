@@ -10,16 +10,24 @@
 #include <lib/elfldltl/load.h>
 #include <lib/elfldltl/testing/diagnostics.h>
 #include <lib/elfldltl/testing/loader.h>
+#include <sys/mman.h>
+#include <unistd.h>
 
 #ifdef __Fuchsia__
 #include <lib/zx/channel.h>
 #include <zircon/syscalls.h>
+#else
+#include <sys/auxv.h>
 #endif
 
+#include <initializer_list>
+#include <numeric>
 #include <string_view>
 #include <type_traits>
 
 #include <gtest/gtest.h>
+
+#include "posix.h"
 
 namespace {
 
@@ -76,21 +84,170 @@ class InProcessTestLaunch {
 
 #else  // ! __Fuchsia__
 
+// This is actually defined in assembly code with internal linkage.
+// It simply switches to the new SP and then calls the entry point.
+// When that code returns, this just restores the old SP and also returns.
+extern "C" int CallOnStack(uintptr_t entry, void* sp);
+__asm__(
+    R"""(
+    .pushsection .text.CallOnStack, "ax", %progbits
+    .type CallOnstack, %function
+    CallOnStack:
+      .cfi_startproc
+    )"""
+#if defined(__aarch64__)
+    R"""(
+      stp x29, x30, [sp, #-16]!
+      .cfi_adjust_cfa_offset 16
+      mov x29, sp
+      .cfi_def_cfa_register x29
+      mov sp, x1
+      blr x0
+      mov sp, x29
+      .cfi_def_cfa_register sp
+      ldp x29, x30, [sp], #16
+      .cfi_adjust_cfa_offset -16
+      ret
+    )"""
+#elif defined(__x86_64__)
+    // Note this stores our return address below the SP and then jumps, because
+    // a call would move the SP.  The posix-startup.S entry point code expects
+    // the StartupStack at the SP, not a return address.  Note this saves and
+    // restores %rbx so that the entry point code can clobber it.
+    // TODO(mcgrathr): For now, it then returns at the end, popping the stack.
+    R"""(
+      push %rbp
+      .cfi_adjust_cfa_offset 8
+      mov %rsp, %rbp
+      .cfi_def_cfa_register %rbp
+      .cfi_offset %rbp, -8*2
+      push %rbx
+      .cfi_offset %rbx, -8*3
+      lea 0f(%rip), %rax
+      mov %rsi, %rsp
+      mov %rax, -8(%rsp)
+      jmp *%rdi
+    0:mov %rbp, %rsp
+      .cfi_def_cfa_register %rsp
+      mov -8(%rsp), %rbx
+      .cfi_same_value %rbx
+      pop %rbp
+      .cfi_same_value %rbp
+      .cfi_adjust_cfa_offset -8
+      ret
+    )"""
+#else
+#error "unsupported machine"
+#endif
+    R"""(
+      .cfi_endproc
+    .size CallOnStack, . - CallOnStack
+    .popsection
+    )""");
+
 // On POSIX-like systems this eventually will mean a canonical stack setup.
 // For now, we're just passing the string pointer as is.
 class InProcessTestLaunch {
  public:
-  void Init(std::string_view str) { str_ = str; }
+  void Init(std::string_view str) {
+    ASSERT_NO_FATAL_FAILURE(AllocateStack());
+    ASSERT_NO_FATAL_FAILURE(PopulateStack({str}, {}));
+  }
 
-  int Call(uintptr_t entry) {
-    auto fn = reinterpret_cast<EntryFunction*>(entry);
-    return fn(str_.c_str());
+  int Call(uintptr_t entry) { return CallOnStack(entry, sp_); }
+
+  ~InProcessTestLaunch() {
+    if (stack_) {
+      munmap(stack_, kStackSize * 2);
+    }
   }
 
  private:
-  using EntryFunction = int(const char*);
+  struct AuxvBlock {
+    ld::Auxv vdso = {
+        static_cast<uintptr_t>(ld::AuxvTag::kSysinfoEhdr),
+        getauxval(static_cast<uintptr_t>(ld::AuxvTag::kSysinfoEhdr)),
+    };
+    ld::Auxv pagesz = {
+        static_cast<uintptr_t>(ld::AuxvTag::kPagesz),
+        static_cast<uintptr_t>(sysconf(_SC_PAGE_SIZE)),
+    };
+    ld::Auxv phdr = {static_cast<uintptr_t>(ld::AuxvTag::kPhdr)};
+    ld::Auxv phent = {
+        static_cast<uintptr_t>(ld::AuxvTag::kPhent),
+        sizeof(elfldltl::Elf<>::Phdr),
+    };
+    ld::Auxv phnum = {static_cast<uintptr_t>(ld::AuxvTag::kPhnum)};
+    ld::Auxv entry = {static_cast<uintptr_t>(ld::AuxvTag::kEntry)};
+    const ld::Auxv null = {static_cast<uintptr_t>(ld::AuxvTag::kNull)};
+  };
 
-  std::string str_;
+  static constexpr size_t kStackSize = 64 << 10;
+
+  void AllocateStack() {
+    // Allocate a stack and a guard region below it.
+    void* ptr =
+        mmap(nullptr, kStackSize * 2, PROT_READ | PROT_WRITE, MAP_ANON | MAP_PRIVATE, -1, 0);
+    ASSERT_TRUE(ptr) << "mmap: " << strerror(errno);
+    stack_ = ptr;
+    // Protect the guard region below the stack.
+    EXPECT_EQ(mprotect(stack_, kStackSize, PROT_NONE), 0) << strerror(errno);
+  }
+
+  void PopulateStack(std::initializer_list<std::string_view> argv,
+                     std::initializer_list<std::string_view> envp) {
+    // Figure out the total size of string data to write.
+    constexpr auto string_size = [](size_t total, std::string_view str) {
+      return total + str.size() + 1;
+    };
+    const size_t strings =
+        std::accumulate(argv.begin(), argv.end(),
+                        std::accumulate(envp.begin(), envp.end(), 0, string_size), string_size);
+
+    // Compute the total number of pointers to write.
+    size_t ptrs = argv.size() + 1 + envp.size() + 1;
+
+    // The stack must fit all that plus the auxv block.
+    ASSERT_LT(strings + 15 + (ptrs * sizeof(uintptr_t)) + sizeof(AuxvBlock), kStackSize);
+
+    // Start at the top of the stack, and place the strings.
+    std::byte* sp = static_cast<std::byte*>(stack_) + (kStackSize * 2);
+    sp -= (strings + (ptrs * sizeof(uintptr_t)) + 15) & -size_t{16};
+    cpp20::span string_space{reinterpret_cast<char*>(sp), strings};
+
+    // Next, leave space for the auxv block, which can be filled in later.
+    sp -= sizeof(AuxvBlock);
+    AuxvBlock& auxv = *new (sp) AuxvBlock{};
+
+    // Finally, the argc and pointers form what's seen right at the SP.
+    sp -= (ptrs + 1) * sizeof(uintptr_t);
+    ld::StartupStack* startup = new (sp) ld::StartupStack{.argc = argv.size()};
+    cpp20::span string_ptrs{startup->argv, ptrs};
+
+    // Now copy the strings and write the pointers to them.
+    for (auto list : {argv, envp}) {
+      for (std::string_view str : list) {
+        string_ptrs.front() = string_space.data();
+        string_ptrs = string_ptrs.subspan(1);
+        string_space = string_space.subspan(str.copy(string_space.data(), string_space.size()));
+        string_space.front() = '\0';
+        string_space = string_space.subspan(1);
+      }
+      string_ptrs.front() = nullptr;
+      string_ptrs = string_ptrs.subspan(1);
+    }
+    ASSERT_TRUE(string_ptrs.empty());
+    ASSERT_TRUE(string_space.empty());
+
+    // Fill in other auxv values specific to this test.
+    // TODO(mcgrathr): this is where the loaded executable would be described
+    auxv.entry.back() = 0;
+
+    sp_ = sp;
+  }
+
+  void* stack_ = nullptr;
+  void* sp_ = nullptr;
 };
 
 #endif  // __Fuchsia__
