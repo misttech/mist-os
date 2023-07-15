@@ -8,14 +8,12 @@ group("pye2e") {
   testonly = true
   public_deps = [
     "//src/testing/end_to_end/examples/test_soft_reboot:soft_reboot_test($host_toolchain)",
+    "//src/testing/end_to_end/examples/test_soft_reboot:soft_reboot_test_fc($host_toolchain)",
     "//src/tests/end_to_end/snapshot:snapshot_test($host_toolchain)",
   ]
 }
 
 group("pye2e_fyi") {
   testonly = true
-  public_deps = [
-    ":pye2e",
-    "//src/testing/end_to_end/examples/test_soft_reboot:soft_reboot_test_fc($host_toolchain)",
-  ]
+  public_deps = [ ":pye2e" ]
 }
