@@ -6,7 +6,7 @@ import("../libc.gni")
 
 # GCC complains about using __m128i type in template speciailization
 # because the typedef includes attributes.
-config("no_ignored_attributes") {
+config("Wno-ignored-attributes") {
   cflags = [ "-Wno-ignored-attributes" ]
 }
 
@@ -29,12 +29,6 @@ llvm_libc_group("string") {
 }
 
 llvm_libc_source_set("mem") {
-  visibility = [
-    "//sdk/lib/ld/*",
-    "//src/lib/elfldltl/*",
-    "//zircon/kernel/*",
-  ]
-
   functions = [
     "memccpy",
     "memmem",
@@ -50,7 +44,7 @@ llvm_libc_source_set("mem") {
   ]
 
   if (is_gcc) {
-    configs = [ ":no_ignored_attributes" ]
+    configs = [ ":Wno-ignored-attributes" ]
   }
 }
 
@@ -113,7 +107,7 @@ foreach(funcs,
     configs = [ ":no-builtin-${funcs[0]}" ]
 
     if (is_gcc) {
-      configs += [ ":no_ignored_attributes" ]
+      configs += [ ":Wno-ignored-attributes" ]
     }
 
     # These also need to stick to the basic machine ABI so that dynlink.c can
@@ -148,12 +142,6 @@ foreach(funcs,
 
 # These are the functions that are nonproblematic in any context.
 llvm_libc_source_set("minimal-str") {
-  visibility = [
-    "//sdk/lib/ld/*",
-    "//src/lib/elfldltl/*",
-    "//zircon/kernel/*",
-  ]
-
   functions = [
     "stpcpy",
     "strchrnul",
@@ -182,7 +170,7 @@ llvm_libc_source_set("minimal-str") {
   ]
 
   if (is_gcc) {
-    configs = [ ":no_ignored_attributes" ]
+    configs = [ ":Wno-ignored-attributes" ]
   }
 }
 
@@ -260,6 +248,10 @@ llvm_libc_source_set("compat") {
   ]
 
   deps = [ ":swab" ]
+
+  if (is_gcc) {
+    configs = [ ":Wno-ignored-attributes" ]
+  }
 }
 
 # This lives in libc/src/unistd upstream because it's declared in <unistd.h>
@@ -274,5 +266,8 @@ llvm_libc_source_set("swab") {
 # hidden-visibility symbols and should be safe in any build environment.
 static_library("hermetic") {
   complete_static_lib = true
-  deps = [ ":minimal-str" ]
+  deps = [
+    ":compat",
+    ":minimal-str",
+  ]
 }

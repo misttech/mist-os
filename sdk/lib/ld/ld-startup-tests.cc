@@ -9,13 +9,12 @@
 #include <lib/elfldltl/link.h>
 #include <lib/elfldltl/load.h>
 #include <lib/elfldltl/testing/diagnostics.h>
-#include <lib/elfldltl/testing/get-test-data.h>
 #include <lib/elfldltl/testing/loader.h>
-#include <lib/elfldltl/vmar-loader.h>
-#include <lib/elfldltl/vmo.h>
+
+#ifdef __Fuchsia__
 #include <lib/zx/channel.h>
-#include <lib/zx/vmo.h>
 #include <zircon/syscalls.h>
+#endif
 
 #include <string_view>
 #include <type_traits>
@@ -37,6 +36,11 @@ constexpr std::string_view kLdStartupName = LD_STARTUP_TEST_LIB;
 // The simple first version just takes a single argument string that the
 // dynamic linker will receive.
 
+#ifdef __Fuchsia__
+
+// On Fuchsia this means packing a message on the bootstrap channel.  The entry
+// point receives the bootstrap channel (zx_handle_t) and the base address of
+// the vDSO.
 class InProcessTestLaunch {
  public:
   // The object is default-constructed so Init() can be called inside
@@ -69,6 +73,27 @@ class InProcessTestLaunch {
   // This is the receive end of the channel, transferred to the "new process".
   zx::channel read_bootstrap_;
 };
+
+#else  // ! __Fuchsia__
+
+// On POSIX-like systems this eventually will mean a canonical stack setup.
+// For now, we're just passing the string pointer as is.
+class InProcessTestLaunch {
+ public:
+  void Init(std::string_view str) { str_ = str; }
+
+  int Call(uintptr_t entry) {
+    auto fn = reinterpret_cast<EntryFunction*>(entry);
+    return fn(str_.c_str());
+  }
+
+ private:
+  using EntryFunction = int(const char*);
+
+  std::string str_;
+};
+
+#endif  // __Fuchsia__
 
 template <class LoaderTraits>
 class LdStartupTests : public elfldltl::testing::LoadTests<LoaderTraits> {

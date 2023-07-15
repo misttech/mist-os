@@ -122,9 +122,7 @@ class LoadTests : public ::testing::Test {
     result = std::nullopt;
 
     auto lib = Traits::TestLibProvider(name);
-    if (this->HasFatalFailure()) {
-      return;
-    }
+    ASSERT_FALSE(this->HasFailure());
 
     auto diag = ExpectOkDiagnostics();
     auto file = Traits::MakeFile(Traits::LoadFileArgument(lib), diag);

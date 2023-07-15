@@ -5,7 +5,10 @@
 #include <fcntl.h>
 #include <stdlib.h>
 
+#include <cerrno>
+#include <cstring>
 #include <filesystem>
+#include <string>
 #include <string_view>
 
 #ifdef __APPLE__
@@ -13,6 +16,8 @@
 #endif
 
 #include <lib/elfldltl/testing/get-test-data.h>
+
+#include <gtest/gtest.h>
 
 namespace elfldltl::testing {
 
@@ -38,7 +43,11 @@ std::filesystem::path GetTestDataPath(std::string_view filename) {
 #ifndef __Fuchsia__
 // See get-test-lib.cc for the Fuchsia case; elsewhere this is a normal open.
 fbl::unique_fd GetTestLib(std::string_view libname) {
-  return fbl::unique_fd(open(GetTestDataPath(libname).c_str(), O_RDONLY));
+  std::string path = GetTestDataPath(libname);
+  fbl::unique_fd fd{open(path.c_str(), O_RDONLY)};
+  EXPECT_TRUE(fd) << "elfldltl::testing::GetTestLib(\"" << libname << "\"):" << path << ": "
+                  << strerror(errno);
+  return fd;
 }
 #endif
 

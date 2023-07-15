@@ -10,9 +10,7 @@
 #include <zircon/status.h>
 
 #include <cerrno>
-#include <string_view>
 
-#include <fbl/unique_fd.h>
 #include <gtest/gtest.h>
 
 namespace elfldltl::testing {

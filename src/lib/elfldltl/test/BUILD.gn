@@ -180,7 +180,7 @@ if (is_fuchsia) {
       deps = [
         ":static-pie",
         "//src/zircon/lib/zircon",
-        "//zircon/system/ulib/c/string:mem",
+        "//zircon/system/ulib/c/string:hermetic",
         "//zircon/third_party/ulib/musl/src/exit:abort",
       ]
 

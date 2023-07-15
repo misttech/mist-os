@@ -2,12 +2,12 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include "bootstrap.h"
-
 #include <lib/elfldltl/diagnostics.h>
 #include <lib/zx/channel.h>
 #include <zircon/assert.h>
 #include <zircon/syscalls.h>
+
+#include "bootstrap.h"
 
 namespace ld {
 

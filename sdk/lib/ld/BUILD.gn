@@ -8,7 +8,10 @@ import("//build/cpp/verify_public_symbols.gni")
 import("//build/test.gni")
 import("//build/toolchain/ifs_extract.gni")
 import("//build/toolchain/ifs_shared_library.gni")
+import("//build/toolchain/toolchain_environment.gni")
 import("//build/toolchain/zircon/user_basic_redirect.gni")
+
+is_elf = current_os != "mac" && current_os != "win"
 
 # TODO(fxbug.dev/121817): This will be used for the static library of support
 # code.  It provides access to additional <lib/ld/...> headers for support code
@@ -123,23 +126,46 @@ static_library("standalone") {
 
   sources = [ "standalone-assert.cc" ]
   deps = [
-    "//zircon/system/ulib/c/string:minimal-str",
+    "//zircon/system/public",
+    "//zircon/system/ulib/c/string:hermetic",
     "//zircon/third_party/ulib/musl/src/exit:abort",
   ]
+
+  public_configs = [ ":standalone.config" ]
+}
+
+config("standalone.config") {
+  visibility = [ ":*" ]
+  if (toolchain_environment != "user.basic") {
+    # The user.basic environment doesn't have implicit dependencies or libc.
+    # Other environments like host need the compiler driver's defaults disabled
+    # to build something that doesn't use the system libc.
+    ldflags = [
+      "-nostartfiles",
+      "-nolibc",
+    ]
+  }
 }
 
 shared_library("ld-startup") {
-  output_path = "$root_out_dir/lib$target_name.so"
-
   configs += [ ":abi-soname" ]
 
-  sources = [ "bootstrap.cc" ]
-
+  sources = []
   deps = [
     ":bootstrap",
     ":standalone",
     "//src/lib/elfldltl",
   ]
+
+  if (is_fuchsia) {
+    sources += [ "zircon-startup.cc" ]
+    deps += [
+      "//src/zircon/lib/zircon",
+      "//zircon/system/ulib/zx",
+    ]
+  } else {
+    sources += [ "posix-startup.cc" ]
+  }
 
   if (!is_gcc) {
     # The standard profiling runtime can't be used in the minimal standalone
@@ -151,22 +177,25 @@ shared_library("ld-startup") {
     ldflags = [ "-noprofilelib" ]
   }
 
-  test_libname = "test/${toolchain_variant.libprefix}$abi_soname"
+  if (is_fuchsia) {
+    output_path = "$root_out_dir/lib$target_name.so"
+    test_libname = "test/${toolchain_variant.libprefix}$abi_soname"
 
-  metadata = {
-    distribution_entries = [
-      {
-        destination = "lib/$test_libname"
-        source = rebase_path(output_path, root_build_dir)
-        label = get_label_info(target_name, "label_with_toolchain")
-      },
-    ]
+    metadata = {
+      distribution_entries = [
+        {
+          destination = "lib/$test_libname"
+          source = rebase_path(output_path, root_build_dir)
+          label = get_label_info(target_name, "label_with_toolchain")
+        },
+      ]
 
-    # This is collected by ld-startup-test-switches.rsp, below.  The
-    # user_basic_redirect may wind up in a different variant than the one
-    # requested, if the test's variant isn't available in user.basic, so we
-    # don't know statically which libprefix the test should load from.
-    ld_startup_test_switches = [ "'-DLD_STARTUP_TEST_LIB=\"$test_libname\"'" ]
+      # This is collected by ld-startup-test-switches.rsp, below.  The
+      # user_basic_redirect may wind up in a different variant than the one
+      # requested, if the test's variant isn't available in user.basic, so we
+      # don't know statically which libprefix the test should load from.
+      ld_startup_test_switches = [ "'-DLD_STARTUP_TEST_LIB=\"$test_libname\"'" ]
+    }
   }
 }
 
@@ -198,14 +227,48 @@ source_set("load-tests") {
     deps += [ "//zircon/system/ulib/zx" ]
   }
 
-  # Bring the ld.so image into the package.
-  data_deps = [ ":ld-startup.basic" ]
+  if (is_fuchsia) {
+    # Plumb in the switch via the response file to give the name under lib/
+    # that the test can pass to fuchsia.ldsvc.Loader/LoadObject.
+    deps += [ ":ld-startup-test-switches.rsp" ]
+    inputs = get_target_outputs(":ld-startup-test-switches.rsp")
+    cflags = [ "@" + rebase_path(inputs[0], root_build_dir) ]
+  } else {
+    defines = [ "LD_STARTUP_TEST_LIB=\"libld-startup.so\"" ]
+  }
 
-  # Plumb in the switch via the response file to give the name under lib/ that
-  # the test can pass to fuchsia.ldsvc.Loader/LoadObject.
-  deps += [ ":ld-startup-test-switches.rsp" ]
-  inputs = get_target_outputs(":ld-startup-test-switches.rsp")
-  cflags = [ "@" + rebase_path(inputs[0], root_build_dir) ]
+  data_deps = [ ":load-test-data" ]
+}
+
+if (is_host) {
+  test_shlib_tc = ""
+  test_shlib_out_dir = root_out_dir
+  if (is_linux) {
+    # The linux_$cpu (vs host_$cpu) handles shared libraries.
+    test_shlib_tc = "(//build/toolchain:linux_$current_cpu-shared)"
+    test_shlib_out_dir = get_label_info(":here$test_shlib_tc", "root_out_dir")
+  }
+
+  # For host tests, the test binaries must be packaged in host_test_data() at
+  # the expected path where elfldltl::testing::GetTestLib will find them.
+  host_test_data("load-test-data") {
+    visibility = [ ":*" ]
+
+    deps = []
+    sources = []
+    outputs = [ "$root_out_dir/test_data/elfldltl/{{source_file_part}}" ]
+
+    deps += [ ":ld-startup$test_shlib_tc" ]
+    sources += [ "$test_shlib_out_dir/libld-startup.so" ]
+  }
+} else {
+  # On Fuchsia these are just included in /pkg/lib implicitly by dint
+  # of being in data_deps of the test code.
+  group("load-test-data") {
+    visibility = [ ":*" ]
+    testonly = true
+    deps = [ ":ld-startup.basic" ]
+  }
 }
 
 test("ld-unittests") {
@@ -215,7 +278,7 @@ test("ld-unittests") {
     "//src/lib/fxl/test:gtest_main",
   ]
 
-  if (is_fuchsia) {
+  if (is_elf) {
     deps += [ ":load-tests" ]
   }
 }
