@@ -234,123 +234,6 @@ class FidlcatE2eTests(unittest.TestCase):
             '    value: string = "hello world"\n'
             '  }', fidlcat.stdout)
 
-    def test_with_generate_tests_more_than_one_process(self):
-        with tempfile.TemporaryDirectory() as temp_dir:
-            fidlcat = Fidlcat(
-                '--with=generate-tests=' + temp_dir, '--from',
-                TEST_DATA_DIR + '/echo.pb')
-            fidlcat.wait()
-            self.assertIn(
-                'Error: Cannot generate tests for more than one process.',
-                fidlcat.stdout)
-
-    # To regenerate test data:
-    # $ fx debug fidl --to src/tests/end_to_end/fidlcat/echo_client.pb --remote-component echo_client.cm \
-    #    run fuchsia-pkg://fuchsia.com/echo_realm_placeholder#meta/echo_realm.cm
-    # $ fx debug fidl --with generate-tests=/tmp --from src/tests/end_to_end/fidlcat/echo_client.pb
-    # $ cp /tmp/test_placeholders__echo_0.cc src/tests/end_to_end/fidlcat/goldens/test_placeholders__echo_0.cc.golden
-    def test_with_generate_tests(self):
-        with tempfile.TemporaryDirectory() as temp_dir:
-            fidlcat = Fidlcat(
-                '--with=generate-tests=' + temp_dir, '--from',
-                TEST_DATA_DIR + '/echo_client.pb')
-            self.assertEqual(fidlcat.wait(), 0, fidlcat.get_diagnose_msg())
-            self.maxDiff = None
-            self.assertEqual(
-                fidlcat.stdout, 'Writing tests on disk\n'
-                '  process name: echo_client.cm\n'
-                '  output directory: "{temp_dir}"\n'
-                '127791359 zx_channel_read fuchsia.io/Node1.Clone\n'
-                '... Writing to "{temp_dir}/fuchsia_io__node1_0.cc"\n'
-                '\n'
-                '740159839 zx_channel_write fuchsia.io/Node1.Clone\n'
-                '... Writing to "{temp_dir}/fuchsia_io__node1_1.cc"\n'
-                '\n'
-                '802026935 zx_channel_write test.placeholders/Echo.EchoString\n'
-                '802026935 zx_channel_read test.placeholders/Echo.EchoString\n'
-                '... Writing to "{temp_dir}/test_placeholders__echo_0.cc"\n'
-                '\n'
-                '2781737595 zx_channel_write fuchsia.io/Node1.Clone\n'
-                '... Writing to "{temp_dir}/fuchsia_io__node1_2.cc"\n'
-                '\n'
-                '3158176887 zx_channel_write fuchsia.io/Openable.Open\n'
-                '... Writing to "{temp_dir}/fuchsia_io__openable_0.cc"\n'
-                '\n'.format(temp_dir=temp_dir))
-
-            # Checks that files exist on disk
-            temp = Path(temp_dir)
-            self.assertTrue((temp / 'fuchsia_io__node1_0.cc').exists())
-            self.assertTrue((temp / 'fuchsia_io__node1_1.cc').exists())
-            self.assertTrue((temp / 'test_placeholders__echo_0.cc').exists())
-            self.assertTrue((temp / 'fuchsia_io__node1_2.cc').exists())
-            self.assertTrue((temp / 'fuchsia_io__openable_0.cc').exists())
-
-            # Checks that the generated code is identical to the golden file
-            golden = TEST_DATA_DIR + '/test_placeholders__echo_0.cc.golden'
-            self.assertEqual(
-                (temp / 'test_placeholders__echo_0.cc').read_bytes(),
-                Path(golden).read_bytes())
-
-    def test_with_generate_tests_sync(self):
-        with tempfile.TemporaryDirectory() as temp_dir:
-            fidlcat = Fidlcat(
-                '--with=generate-tests=' + temp_dir, '--from',
-                TEST_DATA_DIR + '/echo_client_sync.pb')
-            self.assertEqual(fidlcat.wait(), 0, fidlcat.get_diagnose_msg())
-
-            self.assertEqual(
-                fidlcat.stdout, 'Writing tests on disk\n'
-                '  process name: echo_client_cpp_synchronous\n'
-                '  output directory: "{temp_dir}"\n'
-                '1662590155 zx_channel_write fuchsia.io/Openable.Open\n'
-                '... Writing to "{temp_dir}/fuchsia_io__openable_0.cc"\n'
-                '\n'
-                '1722359527 zx_channel_write fuchsia.io/Openable.Open\n'
-                '... Writing to "{temp_dir}/fuchsia_io__openable_1.cc"\n'
-                '\n'
-                '1950948475 zx_channel_write fuchsia.sys/Launcher.CreateComponent\n'
-                '... Writing to "{temp_dir}/fuchsia_sys__launcher_0.cc"\n'
-                '\n'
-                '2009669511 zx_channel_call fidl.examples.echo/Echo.EchoString\n'
-                '... Writing to "{temp_dir}/fidl_examples_echo__echo_0.cc"\n'
-                '\n'
-                '2085165403 zx_channel_write fuchsia.io/Openable.Open\n'
-                '... Writing to "{temp_dir}/fuchsia_io__openable_2.cc"\n'
-                '\n'.format(temp_dir=temp_dir))
-
-            # Checks that the generated code is identical to the golden file
-            golden = TEST_DATA_DIR + '/fidl_examples_echo__echo_sync.test.cc.golden'
-            self.assertEqual(
-                Path(temp_dir + '/fidl_examples_echo__echo_0.cc').read_bytes(),
-                Path(golden).read_bytes())
-
-    def test_with_generate_tests_server_crashing(self):
-        with tempfile.TemporaryDirectory() as temp_dir:
-            fidlcat = Fidlcat(
-                '--with=generate-tests=' + temp_dir, '--from',
-                TEST_DATA_DIR + '/echo_sync_crash.pb')
-            self.assertEqual(fidlcat.wait(), 0, fidlcat.get_diagnose_msg())
-
-            self.assertEqual(
-                fidlcat.stdout, 'Writing tests on disk\n'
-                '  process name: echo_client_cpp_synchronous\n'
-                '  output directory: "{temp_dir}"\n'
-                '1150113659 zx_channel_write fuchsia.sys/Launcher.CreateComponent\n'
-                '... Writing to "{temp_dir}/fuchsia_sys__launcher_0.cc"\n'
-                '\n'
-                '2223856655 zx_channel_write fuchsia.io/Openable.Open\n'
-                '... Writing to "{temp_dir}/fuchsia_io__openable_0.cc"\n'
-                '\n'
-                '2224905275 zx_channel_write fuchsia.io/Openable.Open\n'
-                '... Writing to "{temp_dir}/fuchsia_io__openable_1.cc"\n'
-                '\n'
-                '2243779711 zx_channel_write fuchsia.io/Openable.Open\n'
-                '... Writing to "{temp_dir}/fuchsia_io__openable_2.cc"\n'
-                '\n'
-                '2674743383 zx_channel_call (crashed) fidl.examples.echo/Echo.EchoString\n'
-                '... Writing to "{temp_dir}/fidl_examples_echo__echo_0.cc"\n'
-                '\n'.format(temp_dir=temp_dir))
-
     def test_with_summary(self):
         fidlcat = Fidlcat(
             '--with=summary', '--from', TEST_DATA_DIR + '/echo.pb')
@@ -413,12 +296,11 @@ class FidlcatE2eTests(unittest.TestCase):
             '  Channel:4cb5cba3(channel:3)\n'
             '    linked to Channel:4cc5cba7(server:fuchsia-pkg://fuchsia.com/echo_server_cpp#meta/echo_server_cpp.cmx)\n'
             '    created by zx_channel_create\n'
-            '    closed by Channel:4ca5cbab(dir:/svc/fuchsia.sys.Launcher) sending fuchsia.sys/Launcher.CreateComponent\n'
             '\n'
             '  Channel:4ca5cbab(dir:/svc/fuchsia.sys.Launcher)\n'
             '    linked to Channel:4ca5cbaf(channel:5)\n'
             '    created by zx_channel_create\n'
-            '      6857656973.081445 write request  fuchsia.sys/Launcher.CreateComponent\n'
+            '      6857656973.081445 write  ordinal=54e7c1e85c5c5bbf\n'
             '    closed by zx_handle_close\n'
             '\n'
             '  Channel:4ca5cbaf(channel:5)\n'
@@ -429,13 +311,12 @@ class FidlcatE2eTests(unittest.TestCase):
             '  Channel:4c65cbb3(server-control:fuchsia-pkg://fuchsia.com/echo_server_cpp#meta/echo_server_cpp.cmx)\n'
             '    linked to Channel:4c65cbb7(channel:7)\n'
             '    created by zx_channel_create\n'
-            '      6857656977.376411 read  event    fuchsia.sys/ComponentController.OnDirectoryReady\n'
+            '      6857656977.376411 read   ordinal=640d93b6a46c1578\n'
             '    closed by zx_handle_close\n'
             '\n'
             '  Channel:4c65cbb7(channel:7)\n'
             '    linked to Channel:4c65cbb3(server-control:fuchsia-pkg://fuchsia.com/echo_server_cpp#meta/echo_server_cpp.cmx)\n'
             '    created by zx_channel_create\n'
-            '    closed by Channel:4ca5cbab(dir:/svc/fuchsia.sys.Launcher) sending fuchsia.sys/Launcher.CreateComponent\n'
             '\n'
             '  Channel:4c85f443(server:fuchsia-pkg://fuchsia.com/echo_server_cpp#meta/echo_server_cpp.cmx/fidl.examples.echo.Echo)\n'
             '    linked to Channel:4c45cbbb(channel:9)\n'
@@ -553,13 +434,9 @@ class FidlcatE2eTests(unittest.TestCase):
             '      6857656973.081445 write request  fidl.examples.echo/Echo.EchoString(Channel:4c85f443(server:fuchsia-pkg://fuchsia.com/echo_server_cpp#meta/echo_server_cpp.cmx/fidl.examples.echo.Echo))\n'
             '      6857656977.376411 read  response fidl.examples.echo/Echo.EchoString(Channel:4c85f443(server:fuchsia-pkg://fuchsia.com/echo_server_cpp#meta/echo_server_cpp.cmx/fidl.examples.echo.Echo))\n'
             '\n'
-            '  fuchsia.sys/ComponentController: 1 event\n'
-            '    OnDirectoryReady: 1 event\n'
-            '      6857656977.376411 read  event    fuchsia.sys/ComponentController.OnDirectoryReady(Channel:4c65cbb3(server-control:fuchsia-pkg://fuchsia.com/echo_server_cpp#meta/echo_server_cpp.cmx))\n'
-            '\n'
-            '  fuchsia.sys/Launcher: 1 event\n'
-            '    CreateComponent: 1 event\n'
-            '      6857656973.081445 write request  fuchsia.sys/Launcher.CreateComponent(Channel:4ca5cbab(dir:/svc/fuchsia.sys.Launcher))\n'
+            '  unknown interfaces: : 2 events\n'
+            '      6857656977.376411 read   ordinal=640d93b6a46c1578(Channel:4c65cbb3(server-control:fuchsia-pkg://fuchsia.com/echo_server_cpp#meta/echo_server_cpp.cmx))\n'
+            '      6857656973.081445 write  ordinal=54e7c1e85c5c5bbf(Channel:4ca5cbab(dir:/svc/fuchsia.sys.Launcher))\n'
             '\n'
             '--------------------------------------------------------------------------------'
             'echo_server_cpp.cmx 26568: 8 events\n'

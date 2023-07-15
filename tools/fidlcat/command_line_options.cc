@@ -544,10 +544,6 @@ std::string ParseCommandLine(int argc, const char* argv[], CommandLineOptions* o
       display_options->AddExtraGeneration(ExtraGeneration::Kind::kTop, "");
     } else if (extra_generation.find("top=") == 0) {
       display_options->AddExtraGeneration(ExtraGeneration::Kind::kTop, extra_generation.substr(4));
-    } else if (extra_generation == "generate-tests") {
-      display_options->AddExtraGeneration(ExtraGeneration::Kind::kCpp, "");
-    } else if (extra_generation.find("generate-tests=") == 0) {
-      display_options->AddExtraGeneration(ExtraGeneration::Kind::kCpp, extra_generation.substr(15));
     } else if (extra_generation == "group-by-thread") {
       display_options->AddExtraGeneration(ExtraGeneration::Kind::kThreads, "");
     } else if (extra_generation.find("group-by-thread=") == 0) {

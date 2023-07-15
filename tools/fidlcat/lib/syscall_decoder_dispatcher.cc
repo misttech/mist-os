@@ -16,7 +16,6 @@
 #include "src/developer/debug/zxdb/client/process.h"
 #include "src/developer/debug/zxdb/client/thread.h"
 #include "src/lib/fidl_codec/semantic.h"
-#include "tools/fidlcat/lib/code_generator/test_generator.h"
 #include "tools/fidlcat/lib/inference.h"
 #include "tools/fidlcat/lib/interception_workflow.h"
 #include "tools/fidlcat/lib/syscall_decoder.h"
@@ -937,34 +936,25 @@ void SyscallDisplayDispatcher::SessionEnded() {
         case ExtraGeneration::Kind::kThreads:
           DisplayThreads(os_);
           break;
-        case ExtraGeneration::Kind::kCpp:
-          GenerateTests("/tmp/fidlcat-generated-tests/" + std::to_string(std::time(0)));
-          break;
       }
       separator = "\n";
     } else {
-      if (extra_generation.kind == ExtraGeneration::Kind::kCpp) {
-        GenerateTests(extra_generation.path);
+      std::fstream output(extra_generation.path, std::ios::out | std::ios::trunc);
+      if (output.fail()) {
+        FX_LOGS(ERROR) << "Can't open <" << extra_generation.path << "> for writing.";
       } else {
-        std::fstream output(extra_generation.path, std::ios::out | std::ios::trunc);
-        if (output.fail()) {
-          FX_LOGS(ERROR) << "Can't open <" << extra_generation.path << "> for writing.";
-        } else {
-          switch (extra_generation.kind) {
-            case ExtraGeneration::Kind::kSummary:
-              DisplaySummary(output);
-              break;
-            case ExtraGeneration::Kind::kTop: {
-              Top top(this);
-              top.Display(output);
-              break;
-            }
-            case ExtraGeneration::Kind::kThreads:
-              DisplayThreads(output);
-              break;
-            case ExtraGeneration::Kind::kCpp:
-              break;
+        switch (extra_generation.kind) {
+          case ExtraGeneration::Kind::kSummary:
+            DisplaySummary(output);
+            break;
+          case ExtraGeneration::Kind::kTop: {
+            Top top(this);
+            top.Display(output);
+            break;
           }
+          case ExtraGeneration::Kind::kThreads:
+            DisplayThreads(output);
+            break;
         }
       }
     }
@@ -1063,11 +1053,6 @@ void SyscallCompareDispatcher::DisplayOutputEvent(const OutputEvent* output_even
                                output_event->thread()->process()->koid(),
                                output_event->thread()->koid());
   }
-}
-
-void SyscallDisplayDispatcher::GenerateTests(const std::string& output_directory) {
-  auto test_generator = TestGenerator(this, output_directory);
-  test_generator.GenerateTests();
 }
 
 }  // namespace fidlcat

@@ -9,9 +9,6 @@ if (is_host) {
   static_library("host_lib") {
     public = [
       "analytics.h",
-      "code_generator/code_generator.h",
-      "code_generator/cpp_visitor.h",
-      "code_generator/test_generator.h",
       "comparator.h",
       "decoder.h",
       "event.h",
@@ -29,9 +26,6 @@ if (is_host) {
     ]
 
     sources = [
-      "code_generator/code_generator.cc",
-      "code_generator/cpp_visitor.cc",
-      "code_generator/test_generator.cc",
       "comparator.cc",
       "decoder.cc",
       "event.cc",
@@ -75,11 +69,7 @@ if (is_host) {
 
   source_set("host_tests") {
     testonly = true
-    sources = [
-      "code_generator/code_generator_test.cc",
-      "code_generator/cpp_visitor_test.cc",
-      "comparator_test.cc",
-    ]
+    sources = [ "comparator_test.cc" ]
 
     deps = [
       ":host_lib",
