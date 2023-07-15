@@ -3,10 +3,10 @@
 // found in the LICENSE file.
 
 #include <fcntl.h>
+#include <linux/memfd.h>
 #include <sys/mman.h>
 
 #include <gtest/gtest.h>
-#include <linux/memfd.h>
 
 #if !defined(__NR_memfd_create)
 #if defined(__x86_64__)
