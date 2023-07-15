@@ -63,6 +63,7 @@ rustc_library("lib") {
   test_deps = [
     "//sdk/fidl/fuchsia.overnet.protocol:fuchsia.overnet.protocol_rust",
     "//src/developer/ffx/logger/test_utils:lib",
+    "//src/lib/fuchsia",
     "//third_party/rust_crates:assert_matches",
     "//third_party/rust_crates:serial_test",
     "//third_party/rust_crates:tempfile",

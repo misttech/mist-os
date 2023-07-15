@@ -4,9 +4,9 @@
 
 use {
     anyhow::{anyhow, bail, Result},
-    chrono::{Duration, Utc},
+    chrono::Duration,
     command::Command,
-    fuchsia_async::Timer,
+    fuchsia_async::TimeoutExt,
     futures::{
         io::{AsyncRead, AsyncWrite},
         lock::Mutex,
@@ -23,7 +23,6 @@ pub mod reply;
 
 const MAX_PACKET_SIZE: usize = 64;
 const DEFAULT_READ_TIMEOUT_SECS: i64 = 30;
-const READ_INTERVAL_MS: i64 = 100;
 
 lazy_static! {
     static ref SEND_LOCK: Mutex<()> = Mutex::new(());
@@ -77,23 +76,33 @@ async fn read_with_timeout<T: AsyncRead + Unpin>(
     listener: &impl InfoListener,
     timeout: Duration,
 ) -> Result<Reply> {
-    let start = Utc::now();
+    let std_timeout = timeout.to_std().expect("converting chrono Duration to std");
+    let end_time = std::time::Instant::now() + std_timeout;
     loop {
-        match read_from_interface(interface).await {
-            Ok(reply) => match reply {
-                Reply::Info(msg) => listener.on_info(msg)?,
-                _ => return Ok(reply),
-            },
-            Err(err) => {
-                let elapsed_time = Utc::now().signed_duration_since(start);
-                if elapsed_time >= timeout {
-                    tracing::error!(?err, "timed out reading reply");
-                    bail!(SendError::Timeout);
-                } else {
-                    let d = Duration::milliseconds(READ_INTERVAL_MS);
-                    Timer::new(d.to_std()?).await;
+        match read_from_interface(interface)
+            .on_timeout(end_time, || Err(anyhow!(SendError::Timeout)))
+            .await
+        {
+            Ok(Reply::Info(msg)) => listener.on_info(msg)?,
+            // If we get a TIMEDOUT response, keep reading -- that's just the usb_bulk crate
+            // not willing to spend more than 800ms waiting for a result
+            Err(e) => {
+                // if let Some(ioe) = e.downcast_ref::<std::io::Error>() {
+                //     if ioe.kind() == std::io::ErrorKind::TimedOut {
+                //         continue;
+                //     }
+                // }
+                // Unfortunately usb_bulk does not try to interpret the
+                // type of the error, but instead always sets the kind to
+                // ErrorKind::Other.  So we can't check if the kind is
+                // Timeout.  So instead, let's just read the text of
+                // the error, ugh.
+                if e.to_string() == "Read error: -110" {
+                    continue;
                 }
+                bail!(e)
             }
+            other => return other,
         }
     }
 }
