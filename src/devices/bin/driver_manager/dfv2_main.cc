@@ -55,6 +55,8 @@
 // And boot arguments are obtained
 int RunDfv2(driver_manager_config::Config config,
             fidl::WireSyncClient<fuchsia_boot::Arguments> boot_args) {
+  // TODO(fxb/130029): Remove this once we finished debugging the ASAN issue.
+  LOGF(INFO, "Running Driver Framework v2");
   async::Loop loop(&kAsyncLoopConfigNeverAttachToThread);
   auto outgoing = component::OutgoingDirectory(loop.dispatcher());
   InspectManager inspect_manager(loop.dispatcher());
