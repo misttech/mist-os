@@ -13,8 +13,7 @@
     use: [
         {
             protocol: "fuchsia.fuzzer.CoverageDataCollector",
-
-            // TODO(103610): from: "debug",
+            from: "debug",
         },
     ],
 }
