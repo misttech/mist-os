@@ -195,6 +195,10 @@ TEST_F(FlatlandViewRefInstalledIntegrationTest, WaitedOnViewRef_ShouldReturnWhen
   // Create the child view with the viewRef.
   fuc::FlatlandPtr child_session;
   child_session = realm_->component().Connect<fuc::Flatland>();
+  child_session.events().OnError = [](fuc::FlatlandError error) {
+    // Don't be silent about errors.
+    FAIL("Child session failed with: %d", static_cast<int>(error));
+  };
 
   fidl::InterfacePtr<fuc::ParentViewportWatcher> parent_viewport_watcher;
   fuc::ViewBoundProtocols protocols;
