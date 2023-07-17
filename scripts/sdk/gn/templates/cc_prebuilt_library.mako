@@ -6,7 +6,7 @@ fuchsia_sdk_pkg("${data.name}") {
   % if data.is_static:
   static_libs = [ "${data.name}" ]
   % else:
-  shared_libs = [ "${data.name}" ]
+  shared_libs = [ "${data.lib_name}" ]
   % endif
 
   deps = [

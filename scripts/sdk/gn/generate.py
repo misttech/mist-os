@@ -277,6 +277,15 @@ class GNBuilder(Frontend):
                 prebuilt_set.dist_path = binaries['dist_path']
                 self.copy_file(binaries['dist'])
 
+                # For shared libraries:
+                # If there are multiple target_arches this will get the value from
+                # the last one, but that should be ok as these are all the same.
+                # The dist_path looks like 'lib/libfdio.so' so we strip the 'lib/lib'
+                # and '.so' out of it to just have 'fdio'. The fuchsia_sdk_pkg target
+                # where this is consumed will add the path back into this.
+                if not library.is_static:
+                    library.lib_name = prebuilt_set.dist_path[len("lib/lib"):-len(".so")]
+
             if 'debug' in binaries:
                 self.copy_file(binaries['debug'])
 

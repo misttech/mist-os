@@ -42,6 +42,7 @@ class CppPrebuiltLibrary(_CppLibrary):
         self.is_static = False
         self.packaged_files = {}
         self.prebuilts = {}
+        self.lib_name = ""
 
 
 class FidlLibrary(object):
