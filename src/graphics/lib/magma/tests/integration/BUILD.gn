@@ -118,6 +118,9 @@ executable("virtmagma_conformance_tests") {
     "//src/lib/fxl",
     "//third_party/googletest:gtest",
   ]
+
+  # TODO(https://fxbug.dev/116773) remove once these can run with instrumentation
+  exclude_toolchain_tags = [ "instrumented" ]
 }
 
 executable("virtmagma_no_cpp_test") {

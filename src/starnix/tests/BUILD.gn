@@ -12,19 +12,14 @@ group("tests") {
   testonly = true
 
   deps = [
+    ":starnix_magma_tests",
     "android:tests",
     "gvisor:tests",
     "syscalls:tests",
   ]
 
-  # TODO(https://fxbug.dev/116773): Remove !is_asan check when Starnix can run binaries built for
-  # ASAN.
-  if (!is_asan) {
-    if (target_cpu == "x64" && host_os == "linux" && host_cpu == "x64") {
-      deps += [ ":starnix_user_tests" ]
-    }
-
-    deps += [ ":starnix_magma_tests" ]
+  if (target_cpu == "x64" && host_os == "linux" && host_cpu == "x64") {
+    deps += [ ":starnix_user_tests" ]
   }
 }
 
