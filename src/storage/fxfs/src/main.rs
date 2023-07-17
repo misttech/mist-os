@@ -5,7 +5,7 @@
 use {
     anyhow::{format_err, Error},
     argh::FromArgs,
-    fidl_fuchsia_fxfs::CryptProxy,
+    fidl::endpoints::ClientEnd,
     fuchsia_async as fasync,
     fuchsia_component::server::MissingStartupHandle,
     fuchsia_runtime::HandleType,
@@ -67,16 +67,17 @@ struct FsckSubCommand {}
 #[argh(subcommand, name = "component")]
 struct ComponentSubCommand {}
 
-fn get_crypt_client() -> Result<Arc<RemoteCrypt>, Error> {
-    Ok(Arc::new(RemoteCrypt::new(CryptProxy::new(fasync::Channel::from_channel(
-        zx::Channel::from(
+async fn get_crypt_client() -> Result<Arc<RemoteCrypt>, Error> {
+    Ok(Arc::new(
+        RemoteCrypt::new(ClientEnd::new(zx::Channel::from(
             fuchsia_runtime::take_startup_handle(fuchsia_runtime::HandleInfo::new(
                 HandleType::User0,
                 2,
             ))
             .ok_or(format_err!("Missing crypt service"))?,
-        ),
-    )?))))
+        )))
+        .await,
+    ))
 }
 
 #[fasync::run(6)]
@@ -123,7 +124,7 @@ async fn main() -> Result<(), Error> {
         TopLevel { nested: SubCommand::Format(FormatSubCommand { encrypted }), .. } => {
             mkfs_with_default(
                 DeviceHolder::new(BlockDevice::new(Box::new(client), false).await?),
-                if encrypted { Some(get_crypt_client()?) } else { None },
+                if encrypted { Some(get_crypt_client().await?) } else { None },
             )
             .await?;
             Ok(())

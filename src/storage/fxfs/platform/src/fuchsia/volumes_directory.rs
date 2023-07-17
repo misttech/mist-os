@@ -15,7 +15,7 @@ use {
     fidl::endpoints::{DiscoverableProtocolMarker, ServerEnd},
     fidl_fuchsia_fs::{AdminMarker, AdminRequest, AdminRequestStream},
     fidl_fuchsia_fxfs::{
-        BlobCreatorMarker, CheckOptions, CryptProxy, MountOptions, ProjectIdMarker, VolumeRequest,
+        BlobCreatorMarker, CheckOptions, MountOptions, ProjectIdMarker, VolumeRequest,
         VolumeRequestStream,
     },
     fidl_fuchsia_io as fio,
@@ -370,8 +370,11 @@ impl VolumesDirectory {
         mount_options: MountOptions,
     ) -> Result<(), Error> {
         let MountOptions { crypt, as_blob } = mount_options;
-        let crypt = crypt
-            .map(|crypt| Arc::new(RemoteCrypt::new(crypt.into_proxy().unwrap())) as Arc<dyn Crypt>);
+        let crypt = if let Some(crypt) = crypt {
+            Some(Arc::new(RemoteCrypt::new(crypt).await) as Arc<dyn Crypt>)
+        } else {
+            None
+        };
         let volume = self.create_and_mount_volume(&name, crypt, as_blob).await?;
         self.serve_volume(&volume, outgoing_directory, as_blob, as_blob).await
     }
@@ -487,9 +490,7 @@ impl VolumesDirectory {
     ) -> Result<(), Error> {
         let fs = self.root_volume.volume_directory().store().filesystem();
         let crypt = if let Some(crypt) = options.crypt {
-            Some(Arc::new(RemoteCrypt::new(CryptProxy::new(fasync::Channel::from_channel(
-                crypt.into_channel(),
-            )?))) as Arc<dyn Crypt>)
+            Some(Arc::new(RemoteCrypt::new(crypt).await) as Arc<dyn Crypt>)
         } else {
             None
         };
@@ -531,9 +532,7 @@ impl VolumesDirectory {
         );
 
         let crypt = if let Some(crypt) = options.crypt {
-            Some(Arc::new(RemoteCrypt::new(CryptProxy::new(fasync::Channel::from_channel(
-                crypt.into_channel(),
-            )?))) as Arc<dyn Crypt>)
+            Some(Arc::new(RemoteCrypt::new(crypt).await) as Arc<dyn Crypt>)
         } else {
             None
         };
