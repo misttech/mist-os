@@ -30,11 +30,12 @@
 #include <ktl/type_traits.h>
 #include <phys/address-space.h>
 #include <phys/allocation.h>
+#include <phys/boot-options.h>
 #include <phys/boot-shim/devicetree.h>
+#include <phys/main.h>
 #include <phys/stdio.h>
 #include <phys/uart.h>
 
-#include "phys/main.h"
 #include "test-main.h"
 
 namespace {
@@ -79,8 +80,6 @@ void InitMemory(void* dtb) {
 }
 
 void PhysMain(void* flat_devicetree_blob, arch::EarlyTicks ticks) {
-  static uart::all::Driver uart = uart::null::Driver{};
-
   InitStdout();
   ApplyRelocations();
 
@@ -97,29 +96,11 @@ void PhysMain(void* flat_devicetree_blob, arch::EarlyTicks ticks) {
 
   auto& chosen_item = shim.Get<boot_shim::DevicetreeBootstrapChosenNodeItem<>>();
 
-  uart = chosen_item.uart().uart();
-  SetUartConsole(uart);
-
-  // ZBI-provided UART trumps bootloader-provided.
-  std::decay_t<decltype(GetUartDriver())> driver;
-  zbitl::View input_zbi(chosen_item.zbi());
-  for (auto [header, payload] : input_zbi) {
-    if (driver.Match(*header, payload.data())) {
-      uart = driver.uart();
-      SetUartConsole(uart);
-      break;
-    }
-  }
-  input_zbi.ignore_error();
-
-  // Command line trumps everything.
   static BootOptions boot_opts;
-  if (auto cmdline = chosen_item.cmdline()) {
-    boot_opts.serial = uart;
-    boot_opts.SetMany(*cmdline);
-    uart = boot_opts.serial;
-    SetUartConsole(uart);
-  }
+  gBootOptions = &boot_opts;
+  boot_opts.serial = chosen_item.uart().uart();
+  SetBootOptions(boot_opts, chosen_item.zbi(), chosen_item.cmdline().value_or(""));
+  SetUartConsole(boot_opts.serial);
 
   gMemoryRanges =
       cpp20::span<memalloc::Range>(const_cast<memalloc::Range*>(memory_item.memory_ranges().data()),

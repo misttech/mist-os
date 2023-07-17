@@ -83,6 +83,7 @@ if (toolchain_environment == "kernel.phys") {
       "//zircon/kernel/lib/ktl",
       "//zircon/kernel/lib/libc",
       "//zircon/kernel/phys:allocation",
+      "//zircon/kernel/phys:boot-options",
       "//zircon/kernel/phys:stdio",
       "//zircon/kernel/phys:zbitl-allocation",
       "//zircon/kernel/phys:zbitl-allocation",

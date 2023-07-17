@@ -13,29 +13,16 @@
 #include <ktl/type_traits.h>
 #include <phys/address-space.h>
 #include <phys/allocation.h>
+#include <phys/boot-options.h>
 #include <phys/main.h>
 #include <phys/uart.h>
 
 void DevicetreeInitUart(const boot_shim::DevicetreeBootstrapChosenNodeItem<>& chosen_item,
                         BootOptions& boot_opts) {
-  SetUartConsole(chosen_item.uart().uart());
-
   // Overwrite devicetree results with bootloader provided UART driver.
-  ktl::decay_t<decltype(GetUartDriver())> driver;
-  zbitl::View input_zbi(chosen_item.zbi());
-  for (auto [header, payload] : input_zbi) {
-    if (driver.Match(*header, payload.data())) {
-      SetUartConsole(driver.uart());
-      break;
-    }
-  }
-  input_zbi.ignore_error();
-
-  if (auto cmdline = chosen_item.cmdline()) {
-    boot_opts.serial = GetUartDriver().uart();
-    boot_opts.SetMany(*cmdline);
-    SetUartConsole(boot_opts.serial);
-  }
+  boot_opts.serial = chosen_item.uart().uart();
+  SetBootOptions(boot_opts, chosen_item.zbi(), chosen_item.cmdline().value_or(""));
+  SetUartConsole(boot_opts.serial);
 }
 
 void DevicetreeInitMemory(const boot_shim::DevicetreeBootstrapChosenNodeItem<>& chosen_item,
@@ -69,7 +56,5 @@ void DevicetreeInitMemory(const boot_shim::DevicetreeBootstrapChosenNodeItem<>& 
 
   ArchSetUpAddressSpaceEarly();
 
-  if (gBootOptions->phys_verbose) {
-    Allocation::GetPool().PrintMemoryRanges(ProgramName());
-  }
+  Allocation::GetPool().PrintMemoryRanges(ProgramName());
 }

@@ -197,6 +197,7 @@ if (toolchain_environment == "kernel.phys" ||
       "zbi-main.cc",
     ]
     deps = [
+      ":boot-options",
       ":exception",
       ":main",
       ":stdio",
@@ -349,6 +350,22 @@ if (toolchain_environment == "kernel.phys" ||
     deps = [
       ":stdio",
       "//zircon/system/ulib/uart",
+    ]
+  }
+
+  source_set("boot-options") {
+    public = [ "include/phys/boot-options.h" ]
+
+    public_configs = [ ":includes" ]
+
+    sources = [ "boot-options.cc" ]
+
+    public_deps = [ "//zircon/kernel/lib/ktl" ]
+
+    deps = [
+      "//src/lib/zbitl",
+      "//zircon/kernel/lib/boot-options",
+      "//zircon/kernel/lib/libc",
     ]
   }
 
