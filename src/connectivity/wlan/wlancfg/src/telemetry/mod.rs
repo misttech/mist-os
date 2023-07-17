@@ -3128,12 +3128,14 @@ impl StatsLogger {
                     }
                 }
 
-                // Log number of selected networks
-                metric_events.push(MetricEvent {
-                    metric_id: metrics::NUM_NETWORKS_SELECTED_METRIC_ID,
-                    event_codes: vec![],
-                    payload: MetricEventPayload::IntegerValue(selected_count as i64),
-                });
+                if network_selection_type == NetworkSelectionType::Undirected {
+                    // Log number of selected networks if a network was not specified.
+                    metric_events.push(MetricEvent {
+                        metric_id: metrics::NUM_NETWORKS_SELECTED_METRIC_ID,
+                        event_codes: vec![],
+                        payload: MetricEventPayload::IntegerValue(selected_count as i64),
+                    });
+                }
             }
             Ok(0) if network_selection_type == NetworkSelectionType::Undirected => {
                 // No saved neighbor is seen. If "no saved neighbor" flag isn't set, then
