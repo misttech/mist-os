@@ -10,6 +10,7 @@ use {
     },
     async_trait::async_trait,
     fidl::endpoints::create_proxy,
+    fidl_fuchsia_metrics::MetricEventLoggerFactoryMarker,
     fidl_fuchsia_ui_composition as flatland, fidl_fuchsia_ui_pointerinjector as pointerinjector,
     fuchsia_component_test::{Capability, ChildOptions, RealmBuilder, RealmInstance, Ref, Route},
     futures::lock::Mutex,
@@ -38,6 +39,27 @@ impl FlatlandEnvironment {
             .unwrap();
         let scenic =
             builder.add_child("scenic", "#meta/scenic.cm", ChildOptions::new()).await.unwrap();
+
+        let cobalt = builder
+            .add_local_child(
+                "cobalt",
+                move |handles| {
+                    Box::pin(crate::metrics_discarder::serve_metric_event_logger_factory(handles))
+                },
+                ChildOptions::new(),
+            )
+            .await
+            .unwrap();
+
+        builder
+            .add_route(
+                Route::new()
+                    .capability(Capability::protocol::<MetricEventLoggerFactoryMarker>())
+                    .from(&cobalt)
+                    .to(&scenic),
+            )
+            .await
+            .unwrap();
 
         builder
             .add_route(

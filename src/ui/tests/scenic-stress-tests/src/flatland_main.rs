@@ -7,6 +7,7 @@ mod flatland_environment;
 mod flatland_instance;
 mod input_actor;
 mod input_listener;
+mod metrics_discarder;
 mod pointer_state;
 
 use {
