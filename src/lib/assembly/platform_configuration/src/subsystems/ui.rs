@@ -55,7 +55,7 @@ impl DefineSubsystemConfiguration<PlatformUiConfig> for UiSubsystem {
             .field("i_can_haz_flatland", true)?
             .field("enable_allocator_for_flatland", true)?
             .field("pointer_auto_focus", ui_config.pointer_auto_focus)?
-            .field("flatland_enable_display_composition", false)?
+            .field("flatland_enable_display_composition", ui_config.enable_display_composition)?
             .field("i_can_haz_display_id", -1i64)?
             .field("i_can_haz_display_mode", -1i64)?;
 

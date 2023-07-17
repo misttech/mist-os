@@ -26,10 +26,15 @@ pub struct PlatformUiConfig {
     #[serde(default)]
     pub frame_scheduler_min_predicted_frame_duration_in_us: u64,
 
-    // Scenic shifts focus from view to view as the user interacts with the UI.
-    // Set to false for Smart displays, as they use a different programmatic focus change scheme.
+    /// Scenic shifts focus from view to view as the user interacts with the UI.
+    /// Set to false for Smart displays, as they use a different programmatic focus change scheme.
     #[serde(default)]
     pub pointer_auto_focus: bool,
+
+    /// Scenic attempts to delegate composition of client images to the display controller, with
+    /// GPU/Vulkan composition as the fallback. If false, GPU/Vulkan composition is always used.
+    #[serde(default)]
+    pub enable_display_composition: bool,
 }
 
 impl Default for PlatformUiConfig {
@@ -40,6 +45,7 @@ impl Default for PlatformUiConfig {
             sensor_config: Default::default(),
             frame_scheduler_min_predicted_frame_duration_in_us: Default::default(),
             pointer_auto_focus: true,
+            enable_display_composition: false,
         }
     }
 }
