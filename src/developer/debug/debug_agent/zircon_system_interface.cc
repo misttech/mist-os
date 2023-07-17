@@ -52,7 +52,7 @@ std::unique_ptr<JobHandle> ZirconSystemInterface::GetRootJob() const {
 }
 
 std::unique_ptr<BinaryLauncher> ZirconSystemInterface::GetLauncher() const {
-  return std::make_unique<ZirconBinaryLauncher>();
+  return std::make_unique<ZirconBinaryLauncher>(svc_dir_);
 }
 
 ComponentManager& ZirconSystemInterface::GetComponentManager() { return component_manager_; }

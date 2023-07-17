@@ -4,13 +4,13 @@
 
 #include "src/lib/process/process_builder.h"
 
+#include <lib/component/incoming/cpp/protocol.h>
 #include <lib/fdio/directory.h>
 #include <lib/fdio/fd.h>
 #include <lib/fdio/io.h>
 #include <lib/fdio/limits.h>
 #include <lib/fdio/namespace.h>
 #include <lib/fit/defer.h>
-#include <lib/sys/cpp/service_directory.h>
 #include <stdarg.h>
 #include <stdio.h>
 #include <string.h>
@@ -44,29 +44,30 @@ constexpr int kFdioMaxResolveDepth = 256;
 
 }  // namespace
 
-ProcessBuilder::ProcessBuilder(std::shared_ptr<sys::ServiceDirectory> services)
-    : services_(std::move(services)) {
-  zx_status_t status = services_->Connect(launcher_.NewRequest());
-  ZX_ASSERT_MSG(status == ZX_OK, "%s", zx_status_get_string(status));
+ProcessBuilder::ProcessBuilder(fidl::UnownedClientEnd<fuchsia_io::Directory> svc_dir)
+    : svc_dir_(std::move(svc_dir)) {
+  auto result = component::ConnectAt<fuchsia_process::Launcher>(svc_dir_);
+  ZX_ASSERT_MSG(result.is_ok(), "%s", zx_status_get_string(result.error_value()));
+  launcher_.Bind(std::move(*result));
 }
 
-ProcessBuilder::ProcessBuilder(zx::job job, std::shared_ptr<sys::ServiceDirectory> services)
-    : ProcessBuilder(std::move(services)) {
-  launch_info_.job = std::move(job);
+ProcessBuilder::ProcessBuilder(zx::job job, fidl::UnownedClientEnd<fuchsia_io::Directory> svc_dir)
+    : ProcessBuilder(std::move(svc_dir)) {
+  launch_info_.job() = std::move(job);
 }
 
 ProcessBuilder::~ProcessBuilder() = default;
 
 void ProcessBuilder::LoadVMO(zx::vmo executable) {
-  launch_info_.executable = std::move(executable);
+  launch_info_.executable() = std::move(executable);
 }
 
 zx_status_t ProcessBuilder::LoadPath(const std::string& path) {
   fbl::unique_fd fd;
   if (zx_status_t status =
           fdio_open_fd(path.c_str(),
-                       static_cast<uint32_t>(fuchsia::io::OpenFlags::RIGHT_READABLE |
-                                             fuchsia::io::OpenFlags::RIGHT_EXECUTABLE),
+                       static_cast<uint32_t>(fuchsia_io::OpenFlags::kRightReadable |
+                                             fuchsia_io::OpenFlags::kRightExecutable),
                        fd.reset_and_get_address());
       status != ZX_OK) {
     return status;
@@ -78,12 +79,12 @@ zx_status_t ProcessBuilder::LoadPath(const std::string& path) {
     return status;
   }
 
-  ::fidl::InterfaceHandle<::fuchsia::ldsvc::Loader> loader_iface;
+  fidl::ClientEnd<fuchsia_ldsvc::Loader> loader_iface;
 
   // Resolve VMOs containing #!resolve.
-  fuchsia::process::ResolverSyncPtr resolver;  // Lazily bound.
+  fidl::SyncClient<fuchsia_process::Resolver> resolver;  // Lazily bound.
   for (int i = 0; true; i++) {
-    std::array<char, fuchsia::process::MAX_RESOLVE_NAME_SIZE + kFdioResolvePrefixLen> head;
+    std::array<char, fuchsia_process::kMaxResolveNameSize + kFdioResolvePrefixLen> head;
     head.fill(0);
     if (zx_status_t status = executable_vmo.read(head.data(), 0, head.size()); status != ZX_OK) {
       return status;
@@ -97,25 +98,27 @@ zx_status_t ProcessBuilder::LoadPath(const std::string& path) {
     }
 
     // The process name is after the prefix until the first newline.
-    std::string_view name(&head[kFdioResolvePrefixLen], fuchsia::process::MAX_RESOLVE_NAME_SIZE);
+    std::string_view name(&head[kFdioResolvePrefixLen], fuchsia_process::kMaxResolveNameSize);
     if (size_t newline_index = name.rfind('\n'); newline_index != std::string_view::npos) {
       name = name.substr(0, newline_index);
     }
 
     // The resolver will give us a new VMO and loader to use.
     if (!resolver) {
-      if (zx_status_t status = services_->Connect(resolver.NewRequest()); status != ZX_OK) {
-        return status;
+      if (auto res = component::ConnectAt<fuchsia_process::Resolver>(svc_dir_); res.is_ok()) {
+        resolver.Bind(std::move(*res));
+      } else {
+        return res.error_value();
       }
     }
-    zx_status_t resolve_status;
-    if (zx_status_t status = resolver->Resolve(std::string(name.data(), name.size()),
-                                               &resolve_status, &executable_vmo, &loader_iface);
-        status != ZX_OK) {
-      return status;
-    }
-    if (resolve_status != ZX_OK) {
-      return resolve_status;
+    if (auto res = resolver->Resolve(std::string(name.data(), name.size())); res.is_ok()) {
+      if (res->status() != ZX_OK) {
+        return res->status();
+      }
+      executable_vmo = std::move(res->executable());
+      loader_iface = std::move(res->ldsvc());
+    } else {
+      return res.error_value().status();
     }
   }
 
@@ -131,7 +134,7 @@ zx_status_t ProcessBuilder::LoadPath(const std::string& path) {
   AddHandle(PA_LDSVC_LOADER, std::move(loader));
 
   // Save the VMO info. Name it with the file part of the path.
-  launch_info_.executable = std::move(executable_vmo);
+  launch_info_.executable() = std::move(executable_vmo);
   const char* name = path.c_str();
   if (path.length() >= ZX_MAX_NAME_LEN) {
     size_t offset = path.rfind('/');
@@ -139,49 +142,46 @@ zx_status_t ProcessBuilder::LoadPath(const std::string& path) {
       name += offset + 1;
     }
   }
-  return launch_info_.executable.set_property(ZX_PROP_NAME, name, strlen(name));
+  return launch_info_.executable().set_property(ZX_PROP_NAME, name, strlen(name));
 }
 
 zx_status_t ProcessBuilder::AddArgs(const std::vector<std::string>& argv) {
   if (argv.empty()) {
     return ZX_OK;
   }
-  if (launch_info_.name.empty()) {
-    launch_info_.name = argv[0];
+  if (launch_info_.name().empty()) {
+    launch_info_.name() = argv[0];
   }
   std::vector<std::vector<uint8_t>> args;
   args.reserve(argv.size());
   for (const auto& arg : argv) {
     args.emplace_back(arg.begin(), arg.end());
   }
-  return launcher_->AddArgs(std::move(args));
+  if (auto res = launcher_->AddArgs(std::move(args)); res.is_error()) {
+    return res.error_value().status();
+  }
+  return ZX_OK;
 }
 
 void ProcessBuilder::AddHandle(uint32_t id, zx::handle handle) {
-  handles_.push_back(fuchsia::process::HandleInfo{
-      .handle = std::move(handle),
-      .id = id,
-  });
+  handles_.emplace_back(std::move(handle), id);
 }
 
-void ProcessBuilder::AddHandles(std::vector<fuchsia::process::HandleInfo> handles) {
+void ProcessBuilder::AddHandles(std::vector<fuchsia_process::HandleInfo> handles) {
   std::copy(std::make_move_iterator(handles.begin()), std::make_move_iterator(handles.end()),
             std::back_inserter(handles_));
 }
 
 void ProcessBuilder::SetDefaultJob(zx::job job) {
-  handles_.push_back(fuchsia::process::HandleInfo{
-      .handle = std::move(job),
-      .id = PA_JOB_DEFAULT,
-  });
+  handles_.emplace_back(std::move(job), PA_JOB_DEFAULT);
 }
 
-void ProcessBuilder::SetName(std::string name) { launch_info_.name = std::move(name); }
+void ProcessBuilder::SetName(std::string name) { launch_info_.name() = std::move(name); }
 
 zx_status_t ProcessBuilder::CloneJob() {
   zx::job duplicate_job;
-  if (launch_info_.job) {
-    if (zx_status_t status = launch_info_.job.duplicate(ZX_RIGHT_SAME_RIGHTS, &duplicate_job);
+  if (launch_info_.job()) {
+    if (zx_status_t status = launch_info_.job().duplicate(ZX_RIGHT_SAME_RIGHTS, &duplicate_job);
         status != ZX_OK) {
       return status;
     }
@@ -202,14 +202,15 @@ zx_status_t ProcessBuilder::CloneNamespace() {
     return status;
   }
   auto cleanup = fit::defer([flat]() { fdio_ns_free_flat_ns(flat); });
-  std::vector<fuchsia::process::NameInfo> names;
+  std::vector<fuchsia_process::NameInfo> names;
   for (size_t i = 0; i < flat->count; ++i) {
-    names.push_back(fuchsia::process::NameInfo{
-        .path = flat->path[i],
-        .directory = fidl::InterfaceHandle<fuchsia::io::Directory>(zx::channel(flat->handle[i])),
-    });
+    names.emplace_back(flat->path[i],
+                       fidl::ClientEnd<fuchsia_io::Directory>(zx::channel(flat->handle[i])));
   }
-  return launcher_->AddNames(std::move(names));
+  if (auto res = launcher_->AddNames(std::move(names)); res.is_error()) {
+    return res.error_value().status();
+  }
+  return ZX_OK;
 }
 
 void ProcessBuilder::CloneStdio() {
@@ -225,7 +226,10 @@ zx_status_t ProcessBuilder::CloneEnvironment() {
     std::string_view var{environ[i]};
     env.emplace_back(var.begin(), var.end());
   }
-  return launcher_->AddEnvirons(std::move(env));
+  if (auto res = launcher_->AddEnvirons(std::move(env)); res.is_error()) {
+    return res.error_value().status();
+  }
+  return ZX_OK;
 }
 
 zx_status_t ProcessBuilder::CloneAll() {
@@ -248,46 +252,41 @@ zx_status_t ProcessBuilder::CloneFileDescriptor(int local_fd, int target_fd) {
       status != ZX_OK) {
     return status;
   }
-  handles_.push_back(fuchsia::process::HandleInfo{
-      .handle = std::move(fd_handle),
-      .id = PA_HND(PA_FD, target_fd),
-  });
+  handles_.emplace_back(std::move(fd_handle), PA_HND(PA_FD, target_fd));
   return ZX_OK;
 }
 
 zx_status_t ProcessBuilder::Prepare(std::string* error_message) {
-  if (zx_status_t status = launcher_->AddHandles(std::move(handles_)); status != ZX_OK) {
-    return status;
+  if (auto res = launcher_->AddHandles(std::move(handles_)); res.is_error()) {
+    return res.error_value().status();
   }
-  if (!launch_info_.job) {
+  if (!launch_info_.job()) {
     if (zx_status_t status =
-            zx::job::default_job()->duplicate(ZX_RIGHT_SAME_RIGHTS, &launch_info_.job);
+            zx::job::default_job()->duplicate(ZX_RIGHT_SAME_RIGHTS, &launch_info_.job());
         status != ZX_OK) {
       return status;
     }
   }
-  zx_status_t create_status;
-  fuchsia::process::ProcessStartDataPtr data;
-  if (zx_status_t status =
-          launcher_->CreateWithoutStarting(std::move(launch_info_), &create_status, &data);
-      status != ZX_OK) {
-    return status;
+  auto res = launcher_->CreateWithoutStarting(std::move(launch_info_));
+  if (res.is_error()) {
+    return res.error_value().status();
   }
-  if (create_status != ZX_OK) {
-    return create_status;
+  if (res->status() != ZX_OK) {
+    return res->status();
   }
-  if (!data) {
+  if (!res->data()) {
     return ZX_ERR_INVALID_ARGS;
   }
-  data_ = std::move(*data);
+  data_ = std::move(*res->data());
   return ZX_OK;
 }
 
 zx_status_t ProcessBuilder::Start(zx::process* process_out) {
-  zx_status_t status = zx_process_start(data_.process.get(), data_.thread.get(), data_.entry,
-                                        data_.stack, data_.bootstrap.release(), data_.vdso_base);
+  zx_status_t status =
+      zx_process_start(data_.process().get(), data_.thread().get(), data_.entry(), data_.stack(),
+                       data_.bootstrap().release(), data_.vdso_base());
   if (status == ZX_OK && process_out)
-    *process_out = std::move(data_.process);
+    *process_out = std::move(data_.process());
   return status;
 }
 

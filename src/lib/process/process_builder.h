@@ -5,13 +5,12 @@
 #ifndef SRC_LIB_PROCESS_PROCESS_BUILDER_H_
 #define SRC_LIB_PROCESS_PROCESS_BUILDER_H_
 
-#include <fuchsia/process/cpp/fidl.h>
+#include <fidl/fuchsia.io/cpp/fidl.h>
+#include <fidl/fuchsia.process/cpp/fidl.h>
 #include <lib/zx/vmo.h>
 
 #include <string>
 #include <vector>
-
-#include "lib/sys/cpp/service_directory.h"
 
 namespace process {
 
@@ -26,10 +25,10 @@ class ProcessBuilder {
   // Creates a process builder that uses the |fuchsia.process.Launcher| service.
   //
   // The process is created in zx_job_default().
-  explicit ProcessBuilder(std::shared_ptr<sys::ServiceDirectory> services);
+  explicit ProcessBuilder(fidl::UnownedClientEnd<fuchsia_io::Directory> svc_dir);
 
   // Creates a process builder that will build a process in the given |job|.
-  ProcessBuilder(zx::job job, std::shared_ptr<sys::ServiceDirectory> services);
+  ProcessBuilder(zx::job job, fidl::UnownedClientEnd<fuchsia_io::Directory> svc_dir);
   ~ProcessBuilder();
 
   ProcessBuilder(const ProcessBuilder&) = delete;
@@ -55,7 +54,7 @@ class ProcessBuilder {
   // Adds the given handles to the handle list for the process.
   //
   // Safe to call multiple times.
-  void AddHandles(std::vector<fuchsia::process::HandleInfo> handles);
+  void AddHandles(std::vector<fuchsia_process::HandleInfo> handles);
 
   // Provide |job| to the process as PA_JOB_DEFAULT.
   //
@@ -122,14 +121,14 @@ class ProcessBuilder {
   // Information about the process prior to start.
   //
   // Valid only between |Prepare| and |Start|.
-  const fuchsia::process::ProcessStartData& data() const { return data_; }
+  const fuchsia_process::ProcessStartData& data() const { return data_; }
 
  private:
-  std::shared_ptr<sys::ServiceDirectory> services_;
-  fuchsia::process::LauncherSyncPtr launcher_;
-  fuchsia::process::LaunchInfo launch_info_;
-  fuchsia::process::ProcessStartData data_;
-  std::vector<fuchsia::process::HandleInfo> handles_;
+  fidl::UnownedClientEnd<fuchsia_io::Directory> svc_dir_;
+  fidl::SyncClient<fuchsia_process::Launcher> launcher_;
+  fuchsia_process::LaunchInfo launch_info_;
+  fuchsia_process::ProcessStartData data_;
+  std::vector<fuchsia_process::HandleInfo> handles_;
 };
 
 }  // namespace process

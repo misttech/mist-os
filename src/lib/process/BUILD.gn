@@ -14,12 +14,13 @@ sdk_source_set("process") {
   ]
 
   public_deps = [
-    "//sdk/fidl/fuchsia.process:fuchsia.process_hlcpp",
-    "//sdk/lib/sys/cpp",
+    "//sdk/fidl/fuchsia.io:fuchsia.io_cpp",
+    "//sdk/fidl/fuchsia.process:fuchsia.process_cpp",
     "//zircon/system/ulib/zx",
   ]
 
   deps = [
+    "//sdk/lib/component/incoming/cpp",
     "//sdk/lib/fdio",
     "//zircon/system/ulib/fbl",
   ]
@@ -33,7 +34,7 @@ executable("unittests") {
 
   deps = [
     ":process",
-    "//sdk/lib/sys/cpp",
+    "//sdk/lib/component/incoming/cpp",
     "//src/lib/fxl/test:gtest_main",
     "//zircon/system/ulib/fbl",
   ]

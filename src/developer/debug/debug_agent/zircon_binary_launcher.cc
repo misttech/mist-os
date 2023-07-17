@@ -5,9 +5,9 @@
 #include "src/developer/debug/debug_agent/zircon_binary_launcher.h"
 
 #include <inttypes.h>
+#include <lib/component/incoming/cpp/protocol.h>
 #include <lib/fdio/fd.h>
 #include <lib/fdio/io.h>
-#include <lib/sys/cpp/service_directory.h>
 #include <zircon/processargs.h>
 
 #include <utility>
@@ -17,8 +17,8 @@
 
 namespace debug_agent {
 
-ZirconBinaryLauncher::ZirconBinaryLauncher()
-    : builder_(sys::ServiceDirectory::CreateFromNamespace()) {}
+ZirconBinaryLauncher::ZirconBinaryLauncher(fidl::UnownedClientEnd<fuchsia_io::Directory> svc_dir)
+    : builder_(svc_dir) {}
 ZirconBinaryLauncher::~ZirconBinaryLauncher() = default;
 
 debug::Status ZirconBinaryLauncher::Setup(const std::vector<std::string>& argv) {
@@ -52,7 +52,7 @@ debug::Status ZirconBinaryLauncher::Setup(const std::vector<std::string>& argv) 
 
 std::unique_ptr<ProcessHandle> ZirconBinaryLauncher::GetProcess() const {
   zx::process process;
-  builder_.data().process.duplicate(ZX_RIGHT_SAME_RIGHTS, &process);
+  builder_.data().process().duplicate(ZX_RIGHT_SAME_RIGHTS, &process);
   return std::make_unique<ZirconProcessHandle>(std::move(process));
 }
 

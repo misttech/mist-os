@@ -21,7 +21,7 @@ class ProcessHandle;
 // before code starts executing, and expects to own the handle its using.
 class ZirconBinaryLauncher final : public BinaryLauncher {
  public:
-  ZirconBinaryLauncher();
+  explicit ZirconBinaryLauncher(fidl::UnownedClientEnd<fuchsia_io::Directory> svc_dir);
   ~ZirconBinaryLauncher() override;
 
   debug::Status Setup(const std::vector<std::string>& argv) override;
