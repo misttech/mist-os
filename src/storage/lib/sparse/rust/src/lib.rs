@@ -858,7 +858,7 @@ mod test {
         let mut sparse_file = NamedTempFile::new_in(&tmpdir).unwrap().into_file();
         SparseImageBuilder::new()
             .add_chunk(DataSource::Buffer(Box::new([0xffu8; 8192])))
-            .add_chunk(DataSource::Reader(Box::new(file), content_size as u64))
+            .add_chunk(DataSource::Reader(Box::new(file)))
             .add_chunk(DataSource::Fill(0xaaaa_aaaau32, 1024))
             .add_chunk(DataSource::Skip(16384))
             .build(&mut sparse_file)

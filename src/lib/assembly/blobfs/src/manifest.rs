@@ -88,6 +88,11 @@ impl BlobManifest {
         }
         Ok(())
     }
+
+    /// Returns a vector containing the hash and source path for blobs in the manifest.
+    pub fn to_vec(&self) -> Vec<(Hash, PathBuf)> {
+        self.packages.iter().map(|(h, p)| (h.clone(), p.clone())).collect::<Vec<_>>()
+    }
 }
 
 /// Rebase |path| onto |dir| even if |dir| is not in the current working directory.

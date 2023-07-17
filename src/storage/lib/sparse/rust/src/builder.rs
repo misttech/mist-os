@@ -4,14 +4,15 @@
 
 use {
     crate::{format::SPARSE_HEADER_SIZE, Chunk, Reader, SparseHeader, Writer, BLK_SIZE},
-    anyhow::Result,
+    anyhow::{ensure, Result},
     std::io::{Cursor, SeekFrom},
 };
 
 /// Input data for a SparseImageBuilder.
 pub enum DataSource {
     Buffer(Box<[u8]>),
-    Reader(Box<dyn Reader>, u64),
+    /// Read everything from the reader.
+    Reader(Box<dyn Reader>),
     /// Skips this many bytes.
     Skip(u64),
     /// Repeats the given u32, this many times.
@@ -50,22 +51,29 @@ impl SparseImageBuilder {
         for input_chunk in self.chunks {
             let (chunk, mut source) = match input_chunk {
                 DataSource::Buffer(buf) => {
-                    assert!(buf.len() % self.block_size as usize == 0);
+                    ensure!(
+                        buf.len() % self.block_size as usize == 0,
+                        "Invalid buffer length {}",
+                        buf.len()
+                    );
                     (
                         Chunk::Raw { start: current_offset, size: buf.len() },
                         Some(Box::new(Cursor::new(buf)) as Box<dyn Reader>),
                     )
                 }
-                DataSource::Reader(reader, size) => {
-                    assert!(size % self.block_size as u64 == 0);
+                DataSource::Reader(mut reader) => {
+                    let size = reader.seek(SeekFrom::End(0))?;
+                    reader.seek(SeekFrom::Start(0))?;
+                    ensure!(size % self.block_size as u64 == 0, "Invalid Reader length {}", size);
                     (Chunk::Raw { start: current_offset, size: size as usize }, Some(reader))
                 }
                 DataSource::Skip(size) => {
-                    assert!(size % self.block_size as u64 == 0);
+                    ensure!(size % self.block_size as u64 == 0, "Invalid Skip length {}", size);
                     (Chunk::DontCare { start: current_offset, size: size as usize }, None)
                 }
                 DataSource::Fill(value, count) => {
                     let size = count as usize * std::mem::size_of::<u32>();
+                    ensure!(size % self.block_size as usize == 0, "Invalid Fill length {}", size);
                     (Chunk::Fill { start: current_offset, size, value }, None)
                 }
             };

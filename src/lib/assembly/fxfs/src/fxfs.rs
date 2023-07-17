@@ -90,7 +90,7 @@ impl FxfsBuilder {
         fxfs_make_blob_image::make_blob_image(
             output.as_str(),
             sparse_output.as_ref().map(|s| s.as_ref().as_str()),
-            blob_manifest_path.as_str(),
+            self.manifest.to_vec(),
             blobs_json_path.as_str(),
             self.size_bytes,
         )

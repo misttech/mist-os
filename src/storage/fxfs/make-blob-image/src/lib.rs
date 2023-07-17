@@ -21,9 +21,8 @@ use {
     rayon::{prelude::*, ThreadPoolBuilder},
     serde::{Deserialize, Serialize},
     std::{
-        io::{BufRead, BufReader, BufWriter, Read},
-        path::{Path, PathBuf},
-        str::FromStr,
+        io::{BufWriter, Read},
+        path::PathBuf,
         sync::Arc,
     },
     storage_device::{file_backed_device::FileBackedDevice, DeviceHolder},
@@ -57,7 +56,7 @@ type BlobsJsonOutput = Vec<BlobsJsonOutputEntry>;
 pub async fn make_blob_image(
     output_image_path: &str,
     sparse_output_image_path: Option<&str>,
-    manifest_path: &str,
+    blobs: Vec<(Hash, PathBuf)>,
     json_output_path: &str,
     target_size: Option<u64>,
 ) -> Result<(), Error> {
@@ -67,21 +66,20 @@ pub async fn make_blob_image(
         .create(true)
         .truncate(true)
         .open(output_image_path)?;
-    let blobs = parse_manifest(manifest_path).context("Failed to parse manifest")?;
 
-    let size = target_size.unwrap_or_default();
+    let mut target_size = target_size.unwrap_or_default();
 
     const BLOCK_SIZE: u32 = 4096;
-    if size > 0 && size < BLOCK_SIZE as u64 {
-        return Err(anyhow!("Size {} is too small", size));
+    if target_size > 0 && target_size < BLOCK_SIZE as u64 {
+        return Err(anyhow!("Size {} is too small", target_size));
     }
-    if size % BLOCK_SIZE as u64 > 0 {
-        return Err(anyhow!("Invalid size {} is not block-aligned", size));
+    if target_size % BLOCK_SIZE as u64 > 0 {
+        return Err(anyhow!("Invalid size {} is not block-aligned", target_size));
     }
-    let block_count = if size != 0 {
+    let block_count = if target_size != 0 {
         // Truncate the image to the target size now.
-        output_image.set_len(size).context("Failed to resize image")?;
-        size / BLOCK_SIZE as u64
+        output_image.set_len(target_size).context("Failed to resize image")?;
+        target_size / BLOCK_SIZE as u64
     } else {
         // Arbitrarily use 4GiB for the initial block device size, but don't truncate the file yet,
         // so it becomes exactly as large as needed to contain the contents.  We'll truncate it down
@@ -99,10 +97,10 @@ pub async fn make_blob_image(
     let filesystem =
         FxFilesystem::new_empty(device).await.context("Failed to format filesystem")?;
     let blobs_json = install_blobs(filesystem.clone(), "blob", blobs).await.map_err(|e| {
-        if target_size.is_some() && FxfsError::NoSpace.matches(&e) {
+        if target_size != 0 && FxfsError::NoSpace.matches(&e) {
             e.context(format!(
                 "Configured image size {} is too small to fit the base system image.",
-                size
+                target_size
             ))
         } else {
             e
@@ -112,19 +110,25 @@ pub async fn make_blob_image(
         .sync(SyncOptions { flush_device: true, ..Default::default() })
         .await
         .context("Failed to flush")?;
-    let actual_length = filesystem.allocator().maximum_offset();
+    let actual_size = filesystem.allocator().maximum_offset();
     filesystem.close().await?;
 
-    if size == 0 {
-        let output_image =
-            std::fs::OpenOptions::new().read(true).write(true).open(output_image_path)?;
-        let actual_size = output_image.metadata()?.len();
-        output_image.set_len(actual_size * 2).context("Failed to resize image")?;
+    if target_size == 0 {
+        // Apply a default heuristic of 2x the actual image size.  This is necessary to use the
+        // Fxfs image, since if it's completely full it can't be modified.
+        target_size = actual_size * 2;
     }
 
     if let Some(sparse_path) = sparse_output_image_path {
-        create_sparse_image(sparse_path, output_image_path, actual_length, BLOCK_SIZE)
+        create_sparse_image(sparse_path, output_image_path, target_size, BLOCK_SIZE)
             .context("Failed to create sparse image")?;
+    }
+
+    if target_size != actual_size {
+        debug_assert!(target_size > actual_size);
+        let output_image =
+            std::fs::OpenOptions::new().read(true).write(true).open(output_image_path)?;
+        output_image.set_len(target_size).context("Failed to resize image")?;
     }
 
     let mut json_output = BufWriter::new(
@@ -136,36 +140,17 @@ pub async fn make_blob_image(
     Ok(())
 }
 
-fn parse_manifest(manifest_path: &str) -> Result<Vec<(Hash, PathBuf)>, Error> {
-    let manifest_path = Path::new(manifest_path);
-    let dot_dot = Path::new("..");
-    let manifest_base = manifest_path.parent().unwrap_or(&dot_dot);
-
-    let manifest = BufReader::new(std::fs::File::open(manifest_path)?);
-    let mut blobs = vec![];
-    for line in manifest.lines() {
-        let line = line?;
-        let (hash_str, path) = line.split_once('=').ok_or(anyhow!("Expected '='"))?;
-        let hash = Hash::from_str(hash_str).context(format!("Invalid hash {}", hash_str))?;
-        let path = Path::new(path);
-        let path_buf =
-            if path.is_relative() { manifest_base.join(path) } else { PathBuf::from(path) };
-        blobs.push((hash, path_buf));
-    }
-    Ok(blobs)
-}
-
 fn create_sparse_image(
     sparse_output_image_path: &str,
     image_path: &str,
-    actual_length: u64,
+    target_length: u64,
     block_size: u32,
 ) -> Result<(), Error> {
     let image = std::fs::OpenOptions::new()
         .read(true)
         .open(image_path)
         .context(format!("Failed to open {:?}", image_path))?;
-    let full_length = image.metadata()?.len();
+    let actual_length = image.metadata()?.len();
     let mut output = std::fs::OpenOptions::new()
         .read(true)
         .write(true)
@@ -175,8 +160,8 @@ fn create_sparse_image(
         .context(format!("Failed to create {:?}", sparse_output_image_path))?;
     sparse::builder::SparseImageBuilder::new()
         .set_block_size(block_size)
-        .add_chunk(sparse::builder::DataSource::Reader(Box::new(image), actual_length))
-        .add_chunk(sparse::builder::DataSource::Skip(full_length - actual_length))
+        .add_chunk(sparse::builder::DataSource::Reader(Box::new(image)))
+        .add_chunk(sparse::builder::DataSource::Skip(target_length - actual_length))
         .build(&mut output)
 }
 
@@ -368,7 +353,7 @@ fn maybe_compress(
 #[cfg(test)]
 mod tests {
     use {
-        super::{install_blobs, BlobsJsonOutputEntry},
+        super::{make_blob_image, BlobsJsonOutput, BlobsJsonOutputEntry},
         assert_matches::assert_matches,
         fuchsia_async as fasync,
         fuchsia_merkle::MerkleTreeBuilder,
@@ -376,16 +361,19 @@ mod tests {
             filesystem::FxFilesystem,
             object_store::{directory::Directory, volume::root_volume},
         },
-        std::{fs::File, io::Write as _, path::Path, str::from_utf8},
-        storage_device::{fake_device::FakeDevice, DeviceHolder},
+        sparse::reader::SparseReader,
+        std::{
+            fs::File,
+            io::{Seek as _, SeekFrom, Write as _},
+            path::Path,
+            str::from_utf8,
+        },
+        storage_device::{file_backed_device::FileBackedDevice, DeviceHolder},
         tempfile::TempDir,
     };
 
     #[fasync::run(10, test)]
-    async fn make_blob_image() {
-        let device = DeviceHolder::new(FakeDevice::new(16384, 512));
-        let filesystem = FxFilesystem::new_empty(device).await.unwrap();
-
+    async fn test_make_blob_image() {
         let tmp = TempDir::new().unwrap();
         let dir = tmp.path();
         let blobs_in = {
@@ -404,15 +392,34 @@ mod tests {
             ]
         };
 
-        let mut blobs_out = install_blobs(filesystem.clone(), "blob", blobs_in)
-            .await
-            .expect("Failed to install blobs");
-        assert_eq!(blobs_out.len(), 3);
-        blobs_out.sort_by_key(|entry| entry.source_path.clone());
+        let dir = tmp.path();
+        let output_path = dir.join("fxfs.blk");
+        let sparse_path = dir.join("fxfs.sparse.blk");
+        let blobs_json_path = dir.join("blobs.json");
+        make_blob_image(
+            output_path.as_os_str().to_str().unwrap(),
+            Some(sparse_path.as_os_str().to_str().unwrap()),
+            blobs_in,
+            blobs_json_path.as_os_str().to_str().unwrap(),
+            None,
+        )
+        .await
+        .expect("make_blob_image failed");
 
-        assert_eq!(Path::new(blobs_out[0].source_path.as_str()), dir.join("stuff1.txt"));
+        // Check that the blob manifest contains the entries we expect.
+        let mut blobs_json = std::fs::OpenOptions::new()
+            .read(true)
+            .open(blobs_json_path)
+            .expect("Failed to open blob manifest");
+        let mut blobs: BlobsJsonOutput =
+            serde_json::from_reader(&mut blobs_json).expect("Failed to serialize to JSON output");
+
+        assert_eq!(blobs.len(), 3);
+        blobs.sort_by_key(|entry| entry.source_path.clone());
+
+        assert_eq!(Path::new(blobs[0].source_path.as_str()), dir.join("stuff1.txt"));
         assert_matches!(
-            &blobs_out[0],
+            &blobs[0],
             BlobsJsonOutputEntry {
                 merkle,
                 bytes: 18,
@@ -423,9 +430,9 @@ mod tests {
                 ..
             } if merkle == "9a24fe2fb8da617f39d303750bbe23f4e03a8b5f4d52bc90b2e5e9e44daddb3a"
         );
-        assert_eq!(Path::new(blobs_out[1].source_path.as_str()), dir.join("stuff2.txt"));
+        assert_eq!(Path::new(blobs[1].source_path.as_str()), dir.join("stuff2.txt"));
         assert_matches!(
-            &blobs_out[1],
+            &blobs[1],
             BlobsJsonOutputEntry {
                 merkle,
                 bytes: 15,
@@ -436,9 +443,9 @@ mod tests {
                 ..
             } if merkle == "deebe5d5a0a42a51a293b511d0368e6f2b4da522ee0f05c6ae728c77d904f916"
         );
-        assert_eq!(Path::new(blobs_out[2].source_path.as_str()), dir.join("stuff3.txt"));
+        assert_eq!(Path::new(blobs[2].source_path.as_str()), dir.join("stuff3.txt"));
         assert_matches!(
-            &blobs_out[2],
+            &blobs[2],
             BlobsJsonOutputEntry {
                 merkle,
                 bytes: 65537,
@@ -452,29 +459,59 @@ mod tests {
             } if merkle == "1194c76d2d3b61f29df97a85ede7b2fd2b293b452f53072356e3c5c939c8131d"
         );
 
-        // Also verify the files exist in Fxfs.
-        let root_volume = root_volume(filesystem.clone()).await.expect("Opening root volume");
-        let vol = root_volume.volume("blob", None).await.expect("Opening volume");
-        let directory =
-            Directory::open(&vol, vol.root_directory_object_id()).await.expect("Opening root dir");
-        let entries = {
-            let layer_set = directory.store().tree().layer_set();
-            let mut merger = layer_set.merger();
-            let mut iter = directory.iter(&mut merger).await.expect("iter failed");
-            let mut entries = vec![];
-            while let Some((name, _, _)) = iter.get() {
-                entries.push(name.to_string());
-                iter.advance().await.expect("advance failed");
-            }
-            entries
+        let unsparsed_image = {
+            let sparse_image = std::fs::OpenOptions::new().read(true).open(sparse_path).unwrap();
+            let mut reader =
+                SparseReader::new(Box::new(sparse_image)).expect("Failed to parse sparse image");
+
+            let unsparsed_image_path = dir.join("fxfs.unsparsed.blk");
+            let mut unsparsed_image = std::fs::OpenOptions::new()
+                .read(true)
+                .write(true)
+                .create(true)
+                .open(unsparsed_image_path)
+                .unwrap();
+
+            std::io::copy(&mut reader, &mut unsparsed_image).expect("Failed to unsparse");
+            unsparsed_image.seek(SeekFrom::Start(0)).unwrap();
+            unsparsed_image
         };
-        assert_eq!(
-            &entries[..],
-            &[
-                "1194c76d2d3b61f29df97a85ede7b2fd2b293b452f53072356e3c5c939c8131d",
-                "9a24fe2fb8da617f39d303750bbe23f4e03a8b5f4d52bc90b2e5e9e44daddb3a",
-                "deebe5d5a0a42a51a293b511d0368e6f2b4da522ee0f05c6ae728c77d904f916",
-            ]
-        );
+
+        let orig_image = std::fs::OpenOptions::new()
+            .read(true)
+            .open(output_path.clone())
+            .expect("Failed to open image");
+
+        assert_eq!(unsparsed_image.metadata().unwrap().len(), orig_image.metadata().unwrap().len());
+
+        // Verify the images created are valid Fxfs images and contains the blobs we expect.
+        for image in [orig_image, unsparsed_image] {
+            let device = DeviceHolder::new(FileBackedDevice::new(image, 4096));
+            let filesystem = FxFilesystem::open(device).await.unwrap();
+            let root_volume = root_volume(filesystem.clone()).await.expect("Opening root volume");
+            let vol = root_volume.volume("blob", None).await.expect("Opening volume");
+            let directory = Directory::open(&vol, vol.root_directory_object_id())
+                .await
+                .expect("Opening root dir");
+            let entries = {
+                let layer_set = directory.store().tree().layer_set();
+                let mut merger = layer_set.merger();
+                let mut iter = directory.iter(&mut merger).await.expect("iter failed");
+                let mut entries = vec![];
+                while let Some((name, _, _)) = iter.get() {
+                    entries.push(name.to_string());
+                    iter.advance().await.expect("advance failed");
+                }
+                entries
+            };
+            assert_eq!(
+                &entries[..],
+                &[
+                    "1194c76d2d3b61f29df97a85ede7b2fd2b293b452f53072356e3c5c939c8131d",
+                    "9a24fe2fb8da617f39d303750bbe23f4e03a8b5f4d52bc90b2e5e9e44daddb3a",
+                    "deebe5d5a0a42a51a293b511d0368e6f2b4da522ee0f05c6ae728c77d904f916",
+                ]
+            );
+        }
     }
 }
