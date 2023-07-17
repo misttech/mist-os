@@ -2721,9 +2721,14 @@ func (s *datagramSocketImpl) GetError(fidl.Context) (socket.BaseSocketGetErrorRe
 }
 
 func (s *datagramSocketImpl) Shutdown(ctx fidl.Context, how socket.ShutdownMode) (socket.BaseNetworkSocketShutdownResult, error) {
-	switch transport.DatagramEndpointState(s.ep.State()) {
+	switch state := transport.DatagramEndpointState(s.ep.State()); state {
 	case transport.DatagramEndpointStateConnected, transport.DatagramEndpointStateBound:
-		return s.endpointWithSocket.Shutdown(ctx, how)
+		result, err := s.endpointWithSocket.Shutdown(ctx, how)
+
+		if state == transport.DatagramEndpointStateBound && result.Which() != socket.BaseNetworkSocketShutdownResultErr {
+			return socket.BaseNetworkSocketShutdownResultWithErr(tcpipErrorToCode(&tcpip.ErrNotConnected{})), nil
+		}
+		return result, err
 	default:
 		return socket.BaseNetworkSocketShutdownResultWithErr(tcpipErrorToCode(&tcpip.ErrNotConnected{})), nil
 	}
