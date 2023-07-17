@@ -157,7 +157,14 @@
 //sdk/lib/async-loop-testing/cpp:cpp_sdk
 //sdk/lib/component/incoming/cpp:cpp_sdk
 //sdk/lib/component/outgoing/cpp:cpp_sdk
+//sdk/lib/driver/component/cpp:cpp_sdk
 //sdk/lib/driver/devfs/cpp:cpp_sdk
+//sdk/lib/driver/incoming/cpp:cpp_sdk
+//sdk/lib/driver/logging/cpp:cpp_sdk
+//sdk/lib/driver/outgoing/cpp:cpp_sdk
+//sdk/lib/driver/runtime:driver_runtime_cpp_sdk
+//sdk/lib/driver/runtime:driver_runtime_sdk
+//sdk/lib/driver/symbols:symbols_sdk
 //sdk/lib/fdio:fdio_sdk_manifest
 //sdk/lib/fidl/cpp/wire:wire_sdk
 //sdk/lib/fidl/cpp:cpp_base_sdk
@@ -165,6 +172,8 @@
 //sdk/lib/fidl/cpp:cpp_sync_sdk
 //sdk/lib/fidl:fidl_sdk
 //sdk/lib/fidl_base:fidl_base_sdk
+//sdk/lib/fidl_driver:fidl_driver_sdk
+//sdk/lib/fidl_driver:fidl_driver_transport_sdk
 //sdk/lib/fit-promise:fit-promise_sdk
 //sdk/lib/fit:fit_sdk
 //sdk/lib/images/cpp:cpp_sdk
@@ -201,6 +210,7 @@
 //src/developer/ffx/plugins/product:sdk
 //src/developer/ffx/plugins/scrutiny:sdk
 //src/developer/ffx:bin_sdk
+//src/devices/bin/driver_runtime:driver_runtime_sdk_manifest
 //src/lib/fidl/cpp:cpp_base_sdk
 //src/lib/fidl/cpp:cpp_sdk
 //src/lib/fidl/cpp:hlcpp_conversion_sdk

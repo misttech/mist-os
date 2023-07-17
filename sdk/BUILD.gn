@@ -312,10 +312,12 @@ sdk_molecule("core_lib") {
     "//sdk/lib/async-loop-testing/cpp:cpp_sdk",
     "//sdk/lib/component/incoming/cpp:cpp_sdk",
     "//sdk/lib/component/outgoing/cpp:cpp_sdk",
+    "//sdk/lib/driver/component/cpp:cpp_sdk",
     "//sdk/lib/driver/devfs/cpp:cpp_sdk",
     "//sdk/lib/fdio:fdio_sdk",
     "//sdk/lib/fidl/cpp:cpp_sdk",
     "//sdk/lib/fidl/cpp/wire:wire_sdk",
+    "//sdk/lib/fidl_driver:fidl_driver_sdk",
     "//sdk/lib/fit-promise:fit-promise_sdk",
     "//sdk/lib/input_report_reader:input_report_reader_sdk",
     "//sdk/lib/inspect",
@@ -334,6 +336,7 @@ sdk_molecule("core_lib") {
     "//sdk/lib/ui/scenic/cpp:cpp_sdk",
     "//sdk/lib/vfs/cpp:cpp_sdk",
     "//sdk/lib/vulkan",
+    "//src/devices/bin/driver_runtime:driver_runtime_sdk",
     "//src/lib/fidl/cpp:cpp_sdk",
     "//src/lib/fidl/cpp:hlcpp_conversion_sdk",
     "//src/lib/fidl/cpp:natural_ostream_sdk",
@@ -378,6 +381,7 @@ sdk_molecule("core_testing_idk") {
 
   deps = [
     "//sdk/fidl:fidl_testing",
+    "//sdk/lib/driver/testing/cpp:cpp_sdk",
     "//sdk/lib/sys/component/cpp/testing:cpp_library_sdk",
     "//sdk/lib/sys/cpp/testing:cpp_sdk",
     "//sdk/lib/ui/scenic/cpp/testing:testing_sdk",
