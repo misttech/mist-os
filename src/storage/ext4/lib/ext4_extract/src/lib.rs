@@ -2,19 +2,23 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use crate::remote_bundle::{Owner, Writer};
+
 use {
-    anyhow::{Context, Error},
-    ext4_metadata::{ExtendedAttributes, Metadata, ROOT_INODE_NUM},
+    anyhow::{Context, Error, Result},
+    ext4_metadata::{ExtendedAttributes, ROOT_INODE_NUM},
     ext4_read_only::{
         parser::Parser as ExtParser,
         readers::{IoAdapter, Reader},
         structs::{DirEntry2, EntryType},
     },
     sparse::reader::SparseReader,
-    std::collections::HashMap,
+    std::{collections::HashMap, io::Cursor},
 };
 
-const METADATA_PATH: &str = "metadata.v1";
+pub mod remote_bundle;
+
+pub(crate) const METADATA_PATH: &str = "metadata.v1";
 
 /// Extract the files from an ext4 image at `path` and return a map of the destination
 /// to source pairs. Additionally, create a metadata file that provides information
@@ -27,19 +31,15 @@ pub fn ext4_extract(path: &str, out_dir: &str) -> Result<HashMap<String, String>
         Box::new(IoAdapter::new(file)) as Box<dyn Reader>
     };
     let parser = ExtParser::new(reader);
-    let mut metadata = Metadata::new();
 
-    // Insert the root entry.
     let inode = parser.inode(ROOT_INODE_NUM as u32).unwrap();
-    metadata.insert_directory(
+    let mut writer = Writer::new(
+        &out_dir,
         ROOT_INODE_NUM,
         inode.e2di_mode.get(),
-        inode.e2di_uid.get(),
-        inode.e2di_gid.get(),
+        Owner::from_inode(&inode),
         ExtendedAttributes::new(),
-    );
-
-    let mut manifest = HashMap::new();
+    )?;
 
     parser.index(
         parser.root_inode()?,
@@ -54,40 +54,28 @@ pub fn ext4_extract(path: &str, out_dir: &str) -> Result<HashMap<String, String>
             let inode_num = entry.e2d_ino.get();
             let inode = parser.inode(inode_num).unwrap();
             let mode = inode.e2di_mode.get();
-            let uid = inode.e2di_uid.get();
-            let gid = inode.e2di_gid.get();
+            let owner = Owner::from_inode(&inode);
 
             match EntryType::from_u8(entry.e2d_type)? {
                 EntryType::RegularFile => {
                     let data = parser.read_data(inode_num)?;
-                    let blob_path = format!("{out_dir}/{inode_num}");
-                    std::fs::write(&blob_path, data).expect("Unable to write blob");
-                    manifest.insert(format!("{inode_num}"), blob_path);
-                    metadata.insert_file(inode_num as u64, mode, uid, gid, xattr);
+                    let mut cursor = Cursor::new(data);
+                    writer
+                        .add_file(&path, &mut cursor, inode_num as u64, mode, owner, xattr)
+                        .unwrap();
                 }
                 EntryType::SymLink => {
                     let data = parser.read_data(inode_num)?;
-                    let target = String::from_utf8(data).unwrap_or_else(|e| {
-                        panic!(
-                            "Symbolic link at {} has non-utf8 target: {:?}",
-                            path.join("/"),
-                            e.into_bytes()
-                        )
-                    });
-                    metadata.insert_symlink(inode_num as u64, target, mode, uid, gid, xattr);
+                    writer.add_symlink(&path, data, inode_num as u64, mode, owner, xattr).unwrap();
                 }
                 EntryType::Directory => {
-                    metadata.insert_directory(entry.e2d_ino.get() as u64, mode, uid, gid, xattr);
+                    writer.add_directory(&path, inode_num as u64, mode, owner, xattr);
                 }
                 _ => {}
             }
-            metadata.add_child(&path, inode_num as u64);
             Ok(true)
         },
     )?;
 
-    let metadata_path = format!("{out_dir}/{METADATA_PATH}");
-    std::fs::write(&metadata_path, metadata.serialize())?;
-    manifest.insert(METADATA_PATH.to_string(), metadata_path);
-    Ok(manifest)
+    Ok(writer.export()?)
 }

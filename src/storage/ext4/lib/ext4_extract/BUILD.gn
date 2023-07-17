@@ -9,7 +9,10 @@ assert(is_host, "ext4_extract is host-only")
 
 rustc_library("ext4_extract") {
   edition = "2021"
-  sources = [ "src/lib.rs" ]
+  sources = [
+    "src/lib.rs",
+    "src/remote_bundle.rs",
+  ]
   deps = [
     "//src/storage/ext4/lib/metadata",
     "//src/storage/ext4/read-only:ext4-read-only",
