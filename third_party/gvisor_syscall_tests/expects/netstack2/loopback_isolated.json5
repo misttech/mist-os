@@ -25,6 +25,9 @@
                 // https://fxbug.dev/112590
                 "AllFamilies/SocketMultiProtocolInetLoopbackIsolatedTest.V4EphemeralPortReservedReuseAddr/*",
                 "AllFamilies/SocketMultiProtocolInetLoopbackIsolatedTest.V4MappedEphemeralPortReservedReuseAddr/*",
+
+                // https://fxbug.dev/128213
+                "All/SocketInetLoopbackIsolatedTest.TCPConnectionReuseAddrConflicts/*"
             ],
         },
     ],
