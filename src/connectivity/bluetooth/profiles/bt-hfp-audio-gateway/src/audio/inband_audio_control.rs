@@ -7,7 +7,7 @@ use fidl_fuchsia_bluetooth_bredr as bredr;
 use fidl_fuchsia_media as media;
 use fuchsia_async as fasync;
 use fuchsia_audio_codec::{StreamProcessor, StreamProcessorOutputStream};
-use fuchsia_audio_device_output::{driver::SoftPcm, AudioFrameSink, AudioFrameStream};
+use fuchsia_audio_device::{driver::SoftPcm, AudioFrameSink, AudioFrameStream};
 use fuchsia_bluetooth::types::{peer_audio_stream_id, PeerId, Uuid};
 use fuchsia_zircon as zx;
 use futures::{pin_mut, task::Context, AsyncWriteExt, FutureExt, StreamExt};

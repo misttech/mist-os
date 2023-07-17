@@ -5,7 +5,7 @@
 import("//build/components.gni")
 import("//build/rust/rustc_library.gni")
 
-rustc_library("fuchsia-audio-device-output") {
+rustc_library("fuchsia-audio-device") {
   edition = "2021"
   with_unit_tests = true
 
@@ -44,11 +44,11 @@ rustc_library("fuchsia-audio-device-output") {
   configs -= [ "//build/config/rust/lints:allow_unused_results" ]
 }
 
-fuchsia_unittest_package("fuchsia-audio-device-output-tests") {
-  deps = [ ":fuchsia-audio-device-output_test" ]
+fuchsia_unittest_package("fuchsia-audio-device-tests") {
+  deps = [ ":fuchsia-audio-device_test" ]
 }
 
 group("tests") {
   testonly = true
-  deps = [ ":fuchsia-audio-device-output-tests" ]
+  deps = [ ":fuchsia-audio-device-tests" ]
 }

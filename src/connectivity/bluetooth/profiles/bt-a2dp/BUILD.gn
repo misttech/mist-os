@@ -23,7 +23,7 @@ shared_deps = [
   "//src/connectivity/bluetooth/lib/bt-avdtp",
   "//src/connectivity/bluetooth/lib/bt-metrics",
   "//src/connectivity/bluetooth/lib/fuchsia-audio-codec",
-  "//src/connectivity/bluetooth/lib/fuchsia-audio-device-output",
+  "//src/connectivity/bluetooth/lib/fuchsia-audio-device",
   "//src/connectivity/bluetooth/lib/fuchsia-bluetooth",
   "//src/connectivity/bluetooth/lib/profile-client",
   "//src/lib/async-utils",

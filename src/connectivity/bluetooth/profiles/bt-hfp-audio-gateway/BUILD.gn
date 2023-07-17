@@ -27,7 +27,7 @@ rustc_binary("bin") {
     "//src/connectivity/bluetooth/lib/bt-rfcomm",
     "//src/connectivity/bluetooth/lib/fuchsia-audio-codec",
     "//src/connectivity/bluetooth/lib/fuchsia-audio-dai",
-    "//src/connectivity/bluetooth/lib/fuchsia-audio-device-output",
+    "//src/connectivity/bluetooth/lib/fuchsia-audio-device",
     "//src/connectivity/bluetooth/lib/fuchsia-bluetooth",
     "//src/connectivity/bluetooth/lib/profile-client",
     "//src/connectivity/bluetooth/lib/vigil",

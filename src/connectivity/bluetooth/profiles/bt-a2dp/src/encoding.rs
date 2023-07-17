@@ -20,7 +20,7 @@ use tracing::info;
 
 pub struct EncodedStream {
     /// The input media stream
-    source: BoxStream<'static, fuchsia_audio_device_output::Result<Vec<u8>>>,
+    source: BoxStream<'static, fuchsia_audio_device::Result<Vec<u8>>>,
     /// The encoder input.
     encoder: Box<dyn AsyncWrite + Unpin + Send>,
     /// The underlying encoder stream
@@ -43,7 +43,7 @@ impl EncodedStream {
     /// recommended to confirm that the system can encode using `EncodedStream::test()` first.
     pub fn build(
         input_format: PcmFormat,
-        source: BoxStream<'static, fuchsia_audio_device_output::Result<Vec<u8>>>,
+        source: BoxStream<'static, fuchsia_audio_device::Result<Vec<u8>>>,
         config: &a2dp::codec::MediaCodecConfig,
     ) -> Result<Self, Error> {
         let encoder_settings = config.encoder_settings()?;
@@ -76,7 +76,7 @@ impl EncodedStream {
     /// given in the constructor.
     #[cfg(test)]
     fn build_test(
-        source: BoxStream<'static, fuchsia_audio_device_output::Result<Vec<u8>>>,
+        source: BoxStream<'static, fuchsia_audio_device::Result<Vec<u8>>>,
         encoder: Box<dyn AsyncWrite + Unpin + Send>,
         encoded_stream: BoxStream<'static, Result<Vec<u8>, Error>>,
         pcm_bytes_per_encoded_packet: usize,
@@ -177,7 +177,7 @@ struct SilenceStream {
 }
 
 impl futures::Stream for SilenceStream {
-    type Item = fuchsia_audio_device_output::Result<Vec<u8>>;
+    type Item = fuchsia_audio_device::Result<Vec<u8>>;
 
     fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
         let now = zx::Time::get_monotonic();
@@ -239,7 +239,7 @@ mod tests {
     }
 
     impl futures::Stream for CountingStream {
-        type Item = fuchsia_audio_device_output::Result<Vec<u8>>;
+        type Item = fuchsia_audio_device::Result<Vec<u8>>;
 
         fn poll_next(self: Pin<&mut Self>, _cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
             let s = Pin::into_inner(self);

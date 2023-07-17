@@ -12,7 +12,7 @@ use {
 /// Result type alias for brevity.
 pub type Result<T> = result::Result<T, Error>;
 
-/// The Error type of the fuchsia-audio-device-output
+/// The Error type of the fuchsia-audio-device
 #[derive(Error, Debug)]
 pub enum Error {
     /// The value that was received was out of range

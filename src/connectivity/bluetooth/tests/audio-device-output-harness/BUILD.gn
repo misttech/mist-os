@@ -12,7 +12,7 @@ rustc_binary("bin") {
 
   deps = [
     "//sdk/fidl/fuchsia.media:fuchsia.media_rust",
-    "//src/connectivity/bluetooth/lib/fuchsia-audio-device-output",
+    "//src/connectivity/bluetooth/lib/fuchsia-audio-device",
     "//src/lib/fuchsia",
     "//src/lib/fuchsia-async",
     "//src/lib/fuchsia-component",

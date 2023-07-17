@@ -6,7 +6,7 @@ use anyhow::{format_err, Context as _, Error};
 use fidl_fuchsia_bluetooth_bredr as bredr;
 use fidl_fuchsia_media::{AudioDeviceEnumeratorMarker, PcmFormat};
 use fuchsia_async as fasync;
-use fuchsia_audio_device_output::driver::SoftPcm;
+use fuchsia_audio_device::driver::SoftPcm;
 use fuchsia_bluetooth::types::{peer_audio_stream_id, PeerId, Uuid};
 use fuchsia_inspect_derive::Inspect;
 use fuchsia_zircon::{self as zx, DurationNum};
@@ -26,7 +26,7 @@ pub struct SawWaveStream {
 }
 
 impl futures::Stream for SawWaveStream {
-    type Item = fuchsia_audio_device_output::Result<Vec<u8>>;
+    type Item = fuchsia_audio_device::Result<Vec<u8>>;
 
     fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
         let now = zx::Time::get_monotonic();
@@ -87,7 +87,7 @@ impl AudioOutStream {
         peer_id: &PeerId,
         pcm_format: PcmFormat,
         external_delay: zx::Duration,
-    ) -> Result<fuchsia_audio_device_output::AudioFrameStream, Error> {
+    ) -> Result<fuchsia_audio_device::AudioFrameStream, Error> {
         let id = peer_audio_stream_id(*peer_id, AUDIO_SOURCE_UUID);
         let (client, frame_stream) = SoftPcm::create_output(
             &id,
@@ -143,7 +143,7 @@ pub fn build_stream(
     source_type: AudioSourceType,
     delay: std::time::Duration,
     inspect_parent: Option<&fuchsia_inspect::Node>,
-) -> Result<BoxStream<'static, fuchsia_audio_device_output::Result<Vec<u8>>>, Error> {
+) -> Result<BoxStream<'static, fuchsia_audio_device::Result<Vec<u8>>>, Error> {
     Ok(match source_type {
         AudioSourceType::AudioOut => {
             let mut stream = AudioOutStream::new(peer_id, pcm_format, delay.into())?;
