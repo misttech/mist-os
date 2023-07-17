@@ -9,13 +9,6 @@
             environment: "#core-env",
         },
     ],
-    use: [
-        // Route sound player APIs to CFv1 realm.
-        {
-            protocol: "fuchsia.media.sounds.Player",
-            from: "#soundplayer",
-        },
-    ],
     offer: [
         {
             protocol: [ "fuchsia.logger.LogSink" ],

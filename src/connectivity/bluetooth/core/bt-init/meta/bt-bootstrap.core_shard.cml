@@ -2,15 +2,5 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-// The fuchsia.bluetooth.sys.Bootstrap service is not relevant to all configurations, so products
-// that require it should include this shard. This shard exposes the Bootstrap protocol to the
-// shell via the core proxy.
-// TODO(fxbug.dev/1496): Bluetooth owner component should restrict access to Bootstrap API
-{
-    use: [
-        {
-            protocol: "fuchsia.bluetooth.sys.Bootstrap",
-            from: "#bluetooth-core",
-        },
-    ],
-}
+// TODO(fxbug.dev/1496): Delete this core shard
+{}

@@ -62,7 +62,7 @@ legacy_base_package_labels += [
   "//src/camera/drivers/usb_video",
 ]
 
-core_realm_shards += [ "//src/camera:usb_webcam_core_shard" ]
+core_realm_shards += [ "//src/camera:camera_core_shard" ]
 
 base_driver_package_labels += [ "//src/camera/drivers/usb_video" ]
 

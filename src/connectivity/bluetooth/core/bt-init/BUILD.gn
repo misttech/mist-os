@@ -83,19 +83,13 @@ fuchsia_package("bt-init-testonly") {
 
 # The fuchsia.bluetooth.sys.Bootstrap service is not relevant to all configurations, so products
 # that require it should include this shard to expose the protocol to the shell via bt-init.
+# TODO(fxbug.dev/1496): Delete this core shard
 core_shard("bt-bootstrap-core-shard") {
   shard_file = "meta/bt-bootstrap.core_shard.cml"
 }
 
 core_shard("fastpair-core-shard") {
   shard_file = "meta/bt-fastpair.core_shard.cml"
-}
-
-# The fuchsia.bluetooth.rfcomm.test.RfcommTest capability is only relevant to test configurations.
-# Product integrators that require it should include this shard to expose the protocol to the shell
-# via bt-init.
-core_shard("bt-init-testonly-core-shard") {
-  shard_file = "meta/bt-init-testonly.core_shard.cml"
 }
 
 fuchsia_unittest_package("tests") {

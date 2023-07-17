@@ -2,25 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 {
-    use: [
-        {
-            protocol: [
-                "fuchsia.settings.Accessibility",
-                "fuchsia.settings.Audio",
-                "fuchsia.settings.Display",
-                "fuchsia.settings.DoNotDisturb",
-                "fuchsia.settings.FactoryReset",
-                "fuchsia.settings.Input",
-                "fuchsia.settings.Intl",
-                "fuchsia.settings.Keyboard",
-                "fuchsia.settings.Light",
-                "fuchsia.settings.NightMode",
-                "fuchsia.settings.Privacy",
-                "fuchsia.settings.Setup",
-            ],
-            from: "#setui_service",
-        },
-    ],
     offer: [
         {
             storage: "data",

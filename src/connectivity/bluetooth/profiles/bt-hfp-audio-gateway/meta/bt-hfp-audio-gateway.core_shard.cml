@@ -9,12 +9,6 @@
             environment: "#core-env",
         },
     ],
-    use: [
-        {
-            protocol: [ "fuchsia.bluetooth.hfp.Hfp" ],
-            from: "#bt-hfp-audio-gateway",
-        },
-    ],
     offer: [
         {
             protocol: [ "fuchsia.logger.LogSink" ],

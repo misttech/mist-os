@@ -13,4 +13,11 @@
             startup: "eager",
         },
     ],
+    expose: [
+        {
+            protocol: "fuchsia.net.virtualization.Control",
+            from: "void",
+            availability: "optional",
+        },
+    ],
 }

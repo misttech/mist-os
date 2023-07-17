@@ -8,12 +8,6 @@
             url: "fuchsia-pkg://fuchsia.com/memory_sampler#meta/memory_sampler.cm",
         },
     ],
-    use: [
-        {
-            protocol: [ "fuchsia.memory.sampler.Sampler" ],
-            from: "#memory_sampler",
-        },
-    ],
     offer: [
         {
             storage: "cache",

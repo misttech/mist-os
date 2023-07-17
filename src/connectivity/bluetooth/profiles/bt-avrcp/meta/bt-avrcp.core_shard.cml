@@ -9,12 +9,6 @@
             environment: "#core-env",
         },
     ],
-    use: [
-        {
-            protocol: [ "fuchsia.bluetooth.avrcp.PeerManager" ],
-            from: "#bt-avrcp",
-        },
-    ],
     offer: [
         {
             protocol: [ "fuchsia.logger.LogSink" ],

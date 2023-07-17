@@ -15,12 +15,6 @@
             environment: "#core-env",
         },
     ],
-    use: [
-        {
-            protocol: "fuchsia.lowpan.bootstrap.Thread",
-            from: "#lowpan-ot-driver",
-        },
-    ],
     offer: [
         // offers for lowpan-ot-driver
         {

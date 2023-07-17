@@ -20,15 +20,21 @@ source_set("sshd_constants") {
 
 source_set("lib") {
   sources = [ "service.cc" ]
-  public_deps = [
+  deps = [
+    ":sshd_constants",
     "//sdk/fidl/fuchsia.boot:fuchsia.boot_hlcpp",
+    "//sdk/fidl/fuchsia.process:fuchsia.process_hlcpp",
     "//sdk/lib/fdio",
-    "//sdk/lib/sys/cpp",
+    "//sdk/lib/fit",
     "//src/lib/fsl",
     "//src/lib/fxl",
-    "//zircon/system/ulib/async-loop:async-loop-cpp",
-    "//zircon/system/ulib/async-loop:async-loop-default",
     "//zircon/system/ulib/zx",
+  ]
+  public_deps = [
+    "//sdk/fidl/fuchsia.component:fuchsia.component_hlcpp",
+    "//sdk/lib/sys/cpp",
+    "//zircon/system/ulib/async",
+    "//zircon/system/ulib/fbl",
   ]
 }
 
@@ -38,31 +44,44 @@ executable("bin") {
   deps = [
     ":lib",
     "//sdk/lib/fdio",
+    "//sdk/lib/syslog/cpp",
     "//zircon/system/ulib/async-loop:async-loop-cpp",
     "//zircon/system/ulib/async-loop:async-loop-default",
   ]
 }
 
-icu_fuchsia_component("sshd-host-component") {
-  component_name = "sshd-host"
-  manifest = "meta/sshd-host.cml"
+icu_fuchsia_component("sshd-component") {
+  component_name = "sshd"
+  manifest = "meta/sshd.cml"
 
   # Used by programs that need to load ICU locale data, such as tz-util.
   icu_deps = [ "//src/lib/icu:icudtl" ]
 
   deps = [
     # Ensure this isn't included in production
-    ":bin",
     "//build/validate:non_production_tag",
-    "//third_party/openssh-portable:hostkeygen",
     "//third_party/openssh-portable:scp",
     "//third_party/openssh-portable:sftp-server",
     "//third_party/openssh-portable:sshd",
   ]
 }
 
+fuchsia_component("sshd-host-component") {
+  component_name = "sshd-host"
+  manifest = "meta/sshd-host.cml"
+
+  deps = [
+    ":bin",
+
+    # Ensure this isn't included in production
+    "//build/validate:non_production_tag",
+    "//third_party/openssh-portable:hostkeygen",
+  ]
+}
+
 icu_fuchsia_package("sshd-host") {
-  icu_deps = [ ":sshd-host-component" ]
+  icu_deps = [ ":sshd-component" ]
+  deps = [ ":sshd-host-component" ]
 }
 
 config_data_for_assembly("config") {
@@ -77,8 +96,8 @@ executable("test") {
   sources = [ "test.cc" ]
   deps = [
     ":lib",
+    ":sshd_constants",
     "//sdk/fidl/fuchsia.boot:fuchsia.boot_hlcpp",
-    "//sdk/lib/fdio",
     "//sdk/lib/sys/cpp",
     "//sdk/lib/sys/cpp/testing:unit",
     "//src/lib/fxl/test:gtest_main",

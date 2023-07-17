@@ -20,4 +20,13 @@
             url: "fuchsia-pkg://fuchsia.com/bt-fastpair-provider#meta/bt-fastpair-provider.cm",
         },
     ],
+    expose: [
+        // This protocol is only exposed in testonly builds (see `bt-init-testonly`).
+        // Here, it's exposed from void to prevent access from the sshd shell.
+        {
+            protocol: "fuchsia.bluetooth.rfcomm.test.RfcommTest",
+            from: "void",
+            availability: "optional",
+        },
+    ],
 }

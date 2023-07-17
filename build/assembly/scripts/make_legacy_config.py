@@ -41,7 +41,6 @@ def copy_to_assembly_input_bundle(
     shell_commands: Dict[str, List],
     core_realm_shards: List[FilePath],
     core_realm_includes: FileEntryList,
-    core_package_contents: FileEntryList,
     bootfs_files_package: Optional[FilePath],
 ) -> Tuple[AssemblyInputBundle, FilePath, DepSet]:
     """
@@ -95,7 +94,6 @@ def copy_to_assembly_input_bundle(
         # field as it does all the copies.  Not ideal, but it works for now.
         core_package_definition.includes = set(core_realm_includes)
 
-        core_package_definition.contents = set(core_package_contents)
         aib_creator.compiled_packages.append(core_package_definition)
 
         # Pass the rest as compiled_package_shards
@@ -129,8 +127,6 @@ def main():
     parser.add_argument("--core-realm-shards-list", type=argparse.FileType('r'))
     parser.add_argument(
         "--core-realm-includes-list", type=argparse.FileType('r'))
-    parser.add_argument(
-        "--core-package-contents-list", type=argparse.FileType('r'))
     parser.add_argument("--core-package-name", default="core")
     parser.add_argument("--bootfs-files-package", required=True)
     args = parser.parse_args()
@@ -178,7 +174,6 @@ def main():
 
     core_realm_shards: List[FilePath] = []
     core_realm_includes: FileEntryList = []
-    core_package_contents: FileEntryList = []
     if args.core_realm_shards_list:
         for shard in json.load(args.core_realm_shards_list):
             core_realm_shards.append(shard)
@@ -190,10 +185,6 @@ def main():
             core_realm_includes.append(
                 FileEntry(include["source"], include["destination"]))
 
-        for entry in json.load(args.core_package_contents_list):
-            core_package_contents.append(
-                FileEntry(entry["source"], entry["destination"]))
-
     # Create an Assembly Input Bundle from the remaining contents
     (assembly_input_bundle, assembly_config_manifest_path,
      deps) = copy_to_assembly_input_bundle(
@@ -201,7 +192,7 @@ def main():
          base_driver_components_files_list, {
              package: sorted(list(components))
              for (package, components) in shell_commands.items()
-         }, core_realm_shards, core_realm_includes, core_package_contents,
+         }, core_realm_shards, core_realm_includes,
          args.bootfs_files_package)
 
     deps.update(shell_deps)
