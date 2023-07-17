@@ -2,6 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+// See note in //zircon/kernel/lib/crypto/boringssl/BUILD.gn
+#define BORINGSSL_NO_CXX
+
 #include <dirent.h>
 #include <fcntl.h>
 #include <fnmatch.h>
@@ -50,6 +53,8 @@
 #include <fbl/macros.h>
 #include <fbl/unique_fd.h>
 #include <lz4/lz4frame.h>
+#include <openssl/mem.h>
+#include <openssl/sha.h>
 #include <rapidjson/document.h>
 #include <rapidjson/filewritestream.h>
 #include <rapidjson/prettywriter.h>
@@ -931,6 +936,7 @@ class FileContents final {
     std::swap(mapped_size_, other.mapped_size_);
     std::swap(exact_size_, other.exact_size_);
     std::swap(owned_, other.owned_);
+    std::swap(digest_, other.digest_);
     return *this;
   }
 
@@ -997,7 +1003,7 @@ class FileContents final {
     if (!mapped_ || !other.mapped_)
       return false;
 
-    return ::memcmp(mapped_, other.mapped_, exact_size_) == 0;
+    return digest() == other.digest();
   }
 
   static FileContents Read(fbl::unique_fd fd, const std::filesystem::path& file,
@@ -1040,10 +1046,29 @@ class FileContents final {
   }
 
  private:
+  struct Digest : public std::array<uint8_t, SHA256_DIGEST_LENGTH> {
+    Digest() = default;
+    Digest(const void* data, size_t len) {
+      SHA256_CTX ctx;
+      SHA256_Init(&ctx);
+      SHA256_Update(&ctx, data, len);
+      SHA256_Final(&front(), &ctx);
+    }
+  };
+
+  // Compute content digest on demand, since this is an expensive operation.
+  const Digest& digest() const {
+    if (!digest_.get()) {
+      digest_ = std::make_unique<Digest>(mapped_, exact_size_);
+    }
+    return *digest_;
+  }
+
   void* mapped_ = nullptr;
   size_t mapped_size_ = 0;
   size_t exact_size_ = 0;
   bool owned_ = true;
+  mutable std::unique_ptr<Digest> digest_;
 };
 
 // File represents one node in the BOOTFS directory graph.  It holds either a

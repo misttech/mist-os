@@ -12,6 +12,7 @@ zx_host_tool("zbi") {
     "//sdk/lib/stdcompat",
     "//sdk/lib/zbi-format",
     "//src/lib/zbitl",
+    "//third_party/boringssl:crypto-static",
     "//third_party/rapidjson",
     "//third_party/zstd",
     "//zircon/system/ulib/fbl",
