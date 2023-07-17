@@ -113,6 +113,10 @@ pub fn sys_clone(
     )
 }
 
+pub fn sys_fork(current_task: &CurrentTask) -> Result<pid_t, Errno> {
+    do_clone(current_task, &clone_args { exit_signal: uapi::SIGCHLD.into(), ..Default::default() })
+}
+
 // https://pubs.opengroup.org/onlinepubs/9699919799/functions/creat.html
 pub fn sys_creat(
     current_task: &CurrentTask,

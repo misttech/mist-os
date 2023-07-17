@@ -108,6 +108,7 @@ pub fn dispatch_syscall(
         fgetxattr[4],
         flistxattr[3],
         flock[2],
+        #[cfg(target_arch = "x86_64")] fork[0],
         fremovexattr[2],
         fsetxattr[5],
         fstat[2],
