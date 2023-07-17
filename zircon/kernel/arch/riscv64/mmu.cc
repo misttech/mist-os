@@ -119,8 +119,6 @@ constexpr pte_t mmu_flags_to_pte_attr(uint flags, bool global) {
   return attr;
 }
 
-constexpr bool is_pte_valid(pte_t pte) { return pte & RISCV64_PTE_V; }
-
 void update_pte(volatile pte_t* pte, pte_t newval) { *pte = newval; }
 
 int first_used_page_table_entry(const volatile pte_t* page_table) {
@@ -128,7 +126,7 @@ int first_used_page_table_entry(const volatile pte_t* page_table) {
 
   for (int i = 0; i < count; i++) {
     pte_t pte = page_table[i];
-    if (pte & RISCV64_PTE_V) {
+    if (riscv64_pte_is_valid(pte)) {
       return i;
     }
   }
@@ -337,15 +335,15 @@ zx_status_t Riscv64ArchVmAspace::QueryLocked(vaddr_t vaddr, paddr_t* paddr, uint
   while (true) {
     ulong index = vaddr_to_index(vaddr, level);
     const pte_t pte = page_table[index];
-    const paddr_t pte_addr = RISCV64_PTE_PPN(pte);
+    const paddr_t pte_addr = riscv64_pte_pa(pte);
 
     LTRACEF("va %#" PRIxPTR ", index %lu, level %u, pte %#" PRIx64 "\n", vaddr, index, level, pte);
 
-    if (!(pte & RISCV64_PTE_V)) {
+    if (!riscv64_pte_is_valid(pte)) {
       return ZX_ERR_NOT_FOUND;
     }
 
-    if (pte & RISCV64_PTE_PERM_MASK) {
+    if (riscv64_pte_is_leaf(pte)) {
       if (paddr) {
         *paddr = pte_addr + (vaddr & page_mask_per_level(level));
       }
@@ -410,7 +408,7 @@ zx_status_t Riscv64ArchVmAspace::SplitLargePage(vaddr_t vaddr, uint level, vaddr
                                                 volatile pte_t* page_table,
                                                 ConsistencyManager& cm) {
   const pte_t pte = page_table[pt_index];
-  DEBUG_ASSERT(pte & RISCV64_PTE_PERM_MASK);
+  DEBUG_ASSERT(riscv64_pte_is_leaf(pte));
 
   paddr_t paddr;
   zx_status_t ret = AllocPageTable(&paddr);
@@ -423,17 +421,17 @@ zx_status_t Riscv64ArchVmAspace::SplitLargePage(vaddr_t vaddr, uint level, vaddr
   const auto attrs = pte & (RISCV64_PTE_PERM_MASK | RISCV64_PTE_V);
 
   const size_t next_size = page_size_per_level(level - 1);
-  for (uint64_t i = 0, mapped_paddr = RISCV64_PTE_PPN(pte); i < RISCV64_MMU_PT_ENTRIES;
+  for (uint64_t i = 0, mapped_paddr = riscv64_pte_pa(pte); i < RISCV64_MMU_PT_ENTRIES;
        i++, mapped_paddr += next_size) {
     // directly write to the pte, no need to update since this is
     // a completely new table
-    new_page_table[i] = RISCV64_PTE_PPN_TO_PTE(mapped_paddr) | attrs;
+    new_page_table[i] = riscv64_pte_pa_to_pte(mapped_paddr) | attrs;
   }
 
   // Ensure all zeroing becomes visible prior to page table installation.
   wmb();
 
-  update_pte(&page_table[pt_index], RISCV64_PTE_PPN_TO_PTE(paddr) | RISCV64_PTE_V);
+  update_pte(&page_table[pt_index], riscv64_pte_pa_to_pte(paddr) | RISCV64_PTE_V);
   LTRACEF("pte %p[%#" PRIxPTR "] = %#" PRIx64 "\n", page_table, pt_index, page_table[pt_index]);
 
   // no need to update the page table count here since we're replacing a block entry with a table
@@ -483,7 +481,7 @@ ssize_t Riscv64ArchVmAspace::UnmapPageTable(vaddr_t vaddr, vaddr_t vaddr_rel, si
     pte_t pte = page_table[index];
 
     // If the input range partially covers a large page, attempt to split.
-    if (level > 0 && (pte & RISCV64_PTE_V) && (pte & RISCV64_PTE_PERM_MASK) &&
+    if (level > 0 && riscv64_pte_is_valid(pte) && riscv64_pte_is_leaf(pte) &&
         chunk_size != block_size) {
       zx_status_t s = SplitLargePage(vaddr, level, index, page_table, cm);
       // If the split failed then we just fall through and unmap the entire large page.
@@ -495,8 +493,8 @@ ssize_t Riscv64ArchVmAspace::UnmapPageTable(vaddr_t vaddr, vaddr_t vaddr_rel, si
     }
 
     // Check for an inner page table pointer.
-    if (level > 0 && (pte & RISCV64_PTE_V) && !(pte & RISCV64_PTE_PERM_MASK)) {
-      const paddr_t page_table_paddr = RISCV64_PTE_PPN(pte);
+    if (level > 0 && riscv64_pte_is_valid(pte) && !riscv64_pte_is_leaf(pte)) {
+      const paddr_t page_table_paddr = riscv64_pte_pa(pte);
       volatile pte_t* next_page_table =
           static_cast<volatile pte_t*>(paddr_to_physmap(page_table_paddr));
 
@@ -528,10 +526,10 @@ ssize_t Riscv64ArchVmAspace::UnmapPageTable(vaddr_t vaddr, vaddr_t vaddr_rel, si
         cm.FlushEntry(vaddr, false);
         FreePageTable(const_cast<pte_t*>(next_page_table), page_table_paddr, cm);
       }
-    } else if (is_pte_valid(pte)) {
+    } else if (riscv64_pte_is_valid(pte)) {
       // Unmap this leaf page.
       LTRACEF("pte %p[0x%lx] = 0 (was phys %#lx)\n", page_table, index,
-              RISCV64_PTE_PPN(page_table[index]));
+              riscv64_pte_pa(page_table[index]));
       update_pte(&page_table[index], 0);
 
       cm.FlushEntry(vaddr, true);
@@ -587,7 +585,7 @@ ssize_t Riscv64ArchVmAspace::MapPageTable(vaddr_t vaddr_in, vaddr_t vaddr_rel_in
       paddr_t page_table_paddr = 0;
       volatile pte_t* next_page_table = nullptr;
 
-      if (!(pte & RISCV64_PTE_V)) {
+      if (!riscv64_pte_is_valid(pte)) {
         zx_status_t ret = AllocPageTable(&page_table_paddr);
         if (ret) {
           TRACEF("failed to allocate page table\n");
@@ -603,15 +601,15 @@ ssize_t Riscv64ArchVmAspace::MapPageTable(vaddr_t vaddr_in, vaddr_t vaddr_rel_in
         // do this prior to writing the pte we cannot defer it using the consistency manager.
         mb();
 
-        pte = RISCV64_PTE_PPN_TO_PTE(page_table_paddr) | RISCV64_PTE_V;
+        pte = riscv64_pte_pa_to_pte(page_table_paddr) | RISCV64_PTE_V;
         update_pte(&page_table[index], pte);
         // We do not need to sync the walker, despite writing a new entry, as this is a
         // non-terminal entry and so is irrelevant to the walker anyway.
         LTRACEF("pte %p[%#" PRIxPTR "] = %#" PRIx64 " (paddr %#lx)\n", page_table, index, pte,
                 paddr);
         next_page_table = static_cast<volatile pte_t*>(pt_vaddr);
-      } else if (!(pte & RISCV64_PTE_PERM_MASK)) {
-        page_table_paddr = RISCV64_PTE_PPN(pte);
+      } else if (!riscv64_pte_is_leaf(pte)) {
+        page_table_paddr = riscv64_pte_pa(pte);
         LTRACEF("found page table %#" PRIxPTR "\n", page_table_paddr);
         next_page_table = static_cast<volatile pte_t*>(paddr_to_physmap(page_table_paddr));
       } else {
@@ -641,12 +639,12 @@ ssize_t Riscv64ArchVmAspace::MapPageTable(vaddr_t vaddr_in, vaddr_t vaddr_rel_in
       }
       DEBUG_ASSERT(static_cast<size_t>(ret) == chunk_size);
     } else {
-      if (is_pte_valid(pte)) {
+      if (riscv64_pte_is_valid(pte)) {
         LTRACEF("page table entry already in use, index %#" PRIxPTR ", %#" PRIx64 "\n", index, pte);
         return ZX_ERR_ALREADY_EXISTS;
       }
 
-      pte = RISCV64_PTE_PPN_TO_PTE(paddr) | attrs;
+      pte = riscv64_pte_pa_to_pte(paddr) | attrs;
       LTRACEF("pte %p[%#" PRIxPTR "] = %#" PRIx64 "\n", page_table, index, pte);
       page_table[index] = pte;
     }
@@ -686,7 +684,7 @@ zx_status_t Riscv64ArchVmAspace::ProtectPageTable(vaddr_t vaddr_in, vaddr_t vadd
     pte_t pte = page_table[index];
 
     // If the input range partially covers a large page, split the page.
-    if (level > 0 && (pte & RISCV64_PTE_V) && (pte & RISCV64_PTE_PERM_MASK) &&
+    if (level > 0 && riscv64_pte_is_valid(pte) && riscv64_pte_is_leaf(pte) &&
         chunk_size != block_size) {
       zx_status_t s = SplitLargePage(vaddr, level, index, page_table, cm);
       if (unlikely(s != ZX_OK)) {
@@ -695,8 +693,8 @@ zx_status_t Riscv64ArchVmAspace::ProtectPageTable(vaddr_t vaddr_in, vaddr_t vadd
       pte = page_table[index];
     }
 
-    if (level > 0 && (pte & RISCV64_PTE_V) && !(pte & RISCV64_PTE_PERM_MASK)) {
-      const paddr_t page_table_paddr = RISCV64_PTE_PPN(pte);
+    if (level > 0 && riscv64_pte_is_valid(pte) && !riscv64_pte_is_leaf(pte)) {
+      const paddr_t page_table_paddr = riscv64_pte_pa(pte);
       volatile pte_t* next_page_table =
           static_cast<volatile pte_t*>(paddr_to_physmap(page_table_paddr));
 
@@ -706,7 +704,7 @@ zx_status_t Riscv64ArchVmAspace::ProtectPageTable(vaddr_t vaddr_in, vaddr_t vadd
       if (unlikely(status != ZX_OK)) {
         return status;
       }
-    } else if (is_pte_valid(pte)) {
+    } else if (riscv64_pte_is_valid(pte)) {
       pte = (pte & ~RISCV64_PTE_PERM_MASK) | attrs;
       LTRACEF("pte %p[%#" PRIxPTR "] = %#" PRIx64 "\n", page_table, index, pte);
       update_pte(&page_table[index], pte);
@@ -747,13 +745,13 @@ void Riscv64ArchVmAspace::HarvestAccessedPageTable(vaddr_t vaddr, vaddr_t vaddr_
 
     pte_t pte = page_table[index];
 
-    if (level > 0 && (pte & RISCV64_PTE_V) && (pte & RISCV64_PTE_PERM_MASK) &&
+    if (level > 0 && riscv64_pte_is_valid(pte) && riscv64_pte_is_leaf(pte) &&
         chunk_size != block_size) {
       // Ignore large pages, we do not support harvesting accessed bits from them. Having this empty
       // if block simplifies the overall logic.
-    } else if (level > 0 && (pte & RISCV64_PTE_V) && !(pte & RISCV64_PTE_PERM_MASK)) {
+    } else if (level > 0 && riscv64_pte_is_valid(pte) && !riscv64_pte_is_leaf(pte)) {
       // We're at an inner page table pointer node.
-      const paddr_t page_table_paddr = RISCV64_PTE_PPN(pte);
+      const paddr_t page_table_paddr = riscv64_pte_pa(pte);
       volatile pte_t* next_page_table =
           static_cast<volatile pte_t*>(paddr_to_physmap(page_table_paddr));
 
@@ -763,8 +761,8 @@ void Riscv64ArchVmAspace::HarvestAccessedPageTable(vaddr_t vaddr, vaddr_t vaddr_
       // Recurse into the next level
       HarvestAccessedPageTable(vaddr, vaddr_rel, chunk_size, level - 1, non_terminal_action,
                                terminal_action, next_page_table, cm, unmapped_out);
-    } else if (is_pte_valid(pte) && (pte & RISCV64_PTE_A)) {
-      const paddr_t pte_addr = RISCV64_PTE_PPN(pte);
+    } else if (riscv64_pte_is_valid(pte) && (pte & RISCV64_PTE_A)) {
+      const paddr_t pte_addr = riscv64_pte_pa(pte);
       const paddr_t paddr = pte_addr + vaddr_rem;
 
       vm_page_t* page = paddr_to_vm_page(paddr);
@@ -812,16 +810,16 @@ void Riscv64ArchVmAspace::MarkAccessedPageTable(vaddr_t vaddr, vaddr_t vaddr_rel
 
     pte_t pte = page_table[index];
 
-    if (level > 0 && is_pte_valid(pte) && (pte & RISCV64_PTE_PERM_MASK) &&
+    if (level > 0 && riscv64_pte_is_valid(pte) && riscv64_pte_is_leaf(pte) &&
         chunk_size != block_size) {
       // Ignore large pages as we don't support modifying their access flags. Having this empty if
       // block simplifies the overall logic.
-    } else if (level > 0 && (pte & RISCV64_PTE_V) && !(pte & RISCV64_PTE_PERM_MASK)) {
-      const paddr_t page_table_paddr = RISCV64_PTE_PPN(pte);
+    } else if (level > 0 && riscv64_pte_is_valid(pte) && !riscv64_pte_is_leaf(pte)) {
+      const paddr_t page_table_paddr = riscv64_pte_pa(pte);
       volatile pte_t* next_page_table =
           static_cast<volatile pte_t*>(paddr_to_physmap(page_table_paddr));
       MarkAccessedPageTable(vaddr, vaddr_rem, chunk_size, level - 1, next_page_table, cm);
-    } else if (is_pte_valid(pte)) {
+    } else if (riscv64_pte_is_valid(pte)) {
       pte |= RISCV64_PTE_A;
       update_pte(&page_table[index], pte);
     }
@@ -1312,13 +1310,13 @@ void riscv64_mmu_early_init() {
   // top level table. These entries will be copied to all new address spaces, thus ensuring the
   // top level entries are synchronized.
   for (size_t i = RISCV64_MMU_PT_KERNEL_BASE_INDEX; i < RISCV64_MMU_PT_ENTRIES; i++) {
-    if (!is_pte_valid(riscv64_kernel_bootstrap_translation_table[i])) {
+    if (!riscv64_pte_is_valid(riscv64_kernel_bootstrap_translation_table[i])) {
       paddr_t pt_paddr = kernel_virt_to_phys(
           riscv64_kernel_top_level_page_tables[i - RISCV64_MMU_PT_KERNEL_BASE_INDEX]);
 
       LTRACEF("RISCV: MMU allocating top level page table for slot %zu, pa %#lx\n", i, pt_paddr);
 
-      pte_t pte = RISCV64_PTE_PPN_TO_PTE(pt_paddr) | RISCV64_PTE_V;
+      pte_t pte = riscv64_pte_pa_to_pte(pt_paddr) | RISCV64_PTE_V;
       update_pte(&riscv64_kernel_bootstrap_translation_table[i], pte);
     }
   }

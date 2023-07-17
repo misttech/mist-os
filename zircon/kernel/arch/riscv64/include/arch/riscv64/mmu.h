@@ -12,27 +12,21 @@
 #include <arch/defines.h>
 #include <arch/kernel_aspace.h>
 
-// This macros is needed for building the tests.
-#define MMU_LX_X(page_shift, level) ((3 - (level)) * ((page_shift)-3) + 3)
-
 // These macros assume the sv39 virtual memory scheme which maps 39-bit
 // virtual addresses to 56-bit physical addresses.  For details see sections
-// 4.1.12, 4.2, and 4.3 in the RISC-V Privileged Spec.
+// 4.1.11, 4.2, and 4.3 in the RISC-V Privileged Spec.
 //
-// https://github.com/riscv/riscv-isa-manual/releases/download/Ratified-IMFDQC-and-Priv-v1.11/riscv-privileged-20190608.pdf
+// https://github.com/riscv/riscv-isa-manual/releases/download/Priv-v1.12/riscv-privileged-20211203.pdf
+#define RISCV64_MMU_SIZE_SHIFT 39
 
-#define MMU_KERNEL_PAGE_SIZE_SHIFT (PAGE_SIZE_SHIFT)
-#define MMU_USER_PAGE_SIZE_SHIFT 12
-#define MMU_USER_SIZE_SHIFT 39
-
-#define MMU_GUEST_SIZE_SHIFT 36
-#define MMU_GUEST_PAGE_SIZE_SHIFT (USER_PAGE_SIZE_SHIFT)
+// Sv39x4 for hypervisor guest translation
+#define MMU_GUEST_SIZE_SHIFT (RISCV64_MMU_SIZE_SHIFT + 2)
 
 #define RISCV64_MMU_PT_LEVELS 3
 #define RISCV64_MMU_PT_SHIFT 9
-#define RISCV64_MMU_PT_ENTRIES 512  // 1 << PT_SHIFT
+#define RISCV64_MMU_PT_ENTRIES (1u << RISCV64_MMU_PT_SHIFT)  // 512
 #define RISCV64_MMU_PT_KERNEL_BASE_INDEX (RISCV64_MMU_PT_ENTRIES / 2)
-#define RISCV64_MMU_CANONICAL_MASK ((1ul << 48) - 1)
+#define RISCV64_MMU_CANONICAL_MASK ((1ul << RISCV64_MMU_SIZE_SHIFT) - 1)
 #define RISCV64_MMU_PPN_BITS 56
 
 // page table bits
@@ -49,14 +43,6 @@
 #define RISCV64_PTE_PPN_SHIFT (10)
 #define RISCV64_PTE_PPN_MASK \
   (((1ul << (RISCV64_MMU_PPN_BITS - PAGE_SIZE_SHIFT)) - 1) << RISCV64_PTE_PPN_SHIFT)
-
-// riscv PPN is stored shifed over 2 from the natural alignment
-#define RISCV64_PTE_IS_VALID(pte) ((pte)&RISCV64_PTE_V)
-#define RISCV64_PTE_IS_LEAF(pte) ((pte)&RISCV64_PTE_PERM_MASK)
-
-#define RISCV64_PTE_PPN(pte) \
-  (((pte)&RISCV64_PTE_PPN_MASK) << (PAGE_SIZE_SHIFT - RISCV64_PTE_PPN_SHIFT))
-#define RISCV64_PTE_PPN_TO_PTE(paddr) (((paddr) >> PAGE_SIZE_SHIFT) << RISCV64_PTE_PPN_SHIFT)
 
 // SATP register, contains the current mmu mode, address space id, and
 // pointer to root page table
@@ -88,6 +74,19 @@ const uint16_t MMU_RISCV64_MAX_USER_ASID = MMU_RISCV64_GLOBAL_ASID - 1;
 void riscv64_mmu_early_init();
 void riscv64_mmu_early_init_percpu();
 void riscv64_mmu_init();
+
+// Helper routines for various page table entry manipulation
+constexpr bool riscv64_pte_is_valid(pte_t pte) { return pte & RISCV64_PTE_V; }
+constexpr bool riscv64_pte_is_leaf(pte_t pte) { return (pte & RISCV64_PTE_PERM_MASK) != 0; }
+
+// riscv PPN is stored shifted over 2 from the natural alignment
+constexpr paddr_t riscv64_pte_pa(pte_t pte) {
+  return (pte & RISCV64_PTE_PPN_MASK) << (PAGE_SIZE_SHIFT - RISCV64_PTE_PPN_SHIFT);
+}
+
+constexpr pte_t riscv64_pte_pa_to_pte(paddr_t pa) {
+  return (pa >> PAGE_SIZE_SHIFT) << RISCV64_PTE_PPN_SHIFT;
+}
 
 #endif  // __ASSEMBLER__
 

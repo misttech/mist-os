@@ -80,15 +80,15 @@ extern "C" zx_status_t riscv64_boot_map(pte_t* kernel_ptable0, vaddr_t vaddr, pa
   while (len > 0) {
     size_t index0 = vaddr_to_l0_index(vaddr);
     pte_t* kernel_ptable1 = nullptr;
-    if (!RISCV64_PTE_IS_VALID(kernel_ptable0[index0])) {
+    if (!riscv64_pte_is_valid(kernel_ptable0[index0])) {
       // A large page can be used if both the virtual and physical addresses
       // are aligned to the large page size and the remaining amount of memory
       // to map is at least the large page size.
       paddr_t pa = boot_alloc_ptable();
-      kernel_ptable0[index0] = RISCV64_PTE_PPN_TO_PTE(pa) | RISCV64_PTE_V;
+      kernel_ptable0[index0] = riscv64_pte_pa_to_pte(pa) | RISCV64_PTE_V;
       kernel_ptable1 = reinterpret_cast<pte_t*>(pa);
-    } else if (!RISCV64_PTE_IS_LEAF(kernel_ptable0[index0])) {
-      kernel_ptable1 = reinterpret_cast<pte_t*>(RISCV64_PTE_PPN(kernel_ptable0[index0]));
+    } else if (!riscv64_pte_is_leaf(kernel_ptable0[index0])) {
+      kernel_ptable1 = reinterpret_cast<pte_t*>(riscv64_pte_pa(kernel_ptable0[index0]));
     } else {
       return ZX_ERR_BAD_STATE;
     }
@@ -96,7 +96,7 @@ extern "C" zx_status_t riscv64_boot_map(pte_t* kernel_ptable0, vaddr_t vaddr, pa
     // Setup level 1 PTE.
     size_t index1 = vaddr_to_l1_index(vaddr);
     pte_t* kernel_ptable2 = nullptr;
-    if (!RISCV64_PTE_IS_VALID(kernel_ptable1[index1])) {
+    if (!riscv64_pte_is_valid(kernel_ptable1[index1])) {
       // A large page can be used if both the virtual and physical addresses
       // are aligned to the large page size and the remaining amount of memory
       // to map is at least the large page size.
@@ -104,7 +104,7 @@ extern "C" zx_status_t riscv64_boot_map(pte_t* kernel_ptable0, vaddr_t vaddr, pa
                                 ((paddr & l1_large_page_size_mask) == 0) &&
                                 len >= l1_large_page_size;
       if (can_map_large_file) {
-        kernel_ptable1[index1] = RISCV64_PTE_PPN_TO_PTE((paddr & ~l1_large_page_size_mask)) | flags;
+        kernel_ptable1[index1] = riscv64_pte_pa_to_pte((paddr & ~l1_large_page_size_mask)) | flags;
         vaddr += l1_large_page_size;
         paddr += l1_large_page_size;
         len -= l1_large_page_size;
@@ -112,17 +112,17 @@ extern "C" zx_status_t riscv64_boot_map(pte_t* kernel_ptable0, vaddr_t vaddr, pa
       }
 
       paddr_t pa = boot_alloc_ptable();
-      kernel_ptable1[index1] = RISCV64_PTE_PPN_TO_PTE(pa) | RISCV64_PTE_V;
+      kernel_ptable1[index1] = riscv64_pte_pa_to_pte(pa) | RISCV64_PTE_V;
       kernel_ptable2 = reinterpret_cast<pte_t*>(pa);
-    } else if (!RISCV64_PTE_IS_LEAF(kernel_ptable1[index1])) {
-      kernel_ptable2 = reinterpret_cast<pte_t*>(RISCV64_PTE_PPN(kernel_ptable1[index1]));
+    } else if (!riscv64_pte_is_leaf(kernel_ptable1[index1])) {
+      kernel_ptable2 = reinterpret_cast<pte_t*>(riscv64_pte_pa(kernel_ptable1[index1]));
     } else {
       return ZX_ERR_BAD_STATE;
     }
 
     // Setup level 2 PTE (always a leaf).
     size_t index2 = vaddr_to_l2_index(vaddr);
-    kernel_ptable2[index2] = RISCV64_PTE_PPN_TO_PTE(paddr) | flags;
+    kernel_ptable2[index2] = riscv64_pte_pa_to_pte(paddr) | flags;
 
     vaddr += PAGE_SIZE;
     paddr += PAGE_SIZE;

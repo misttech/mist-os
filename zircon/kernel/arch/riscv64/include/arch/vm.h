@@ -12,13 +12,14 @@
 #include <zircon/compiler.h>
 
 #include <arch/kernel_aspace.h>
+#include <arch/riscv64/mmu.h>
 
 constexpr bool is_kernel_address(vaddr_t va) {
   return (va >= (vaddr_t)KERNEL_ASPACE_BASE &&
           va - (vaddr_t)KERNEL_ASPACE_BASE < (vaddr_t)KERNEL_ASPACE_SIZE);
 }
 
-constexpr uint8_t kRiscv64VaddrBits = 39;
+constexpr uint8_t kRiscv64VaddrBits = RISCV64_MMU_SIZE_SHIFT;
 // Canonical addresses (to use an x86 term) are addresses where the top bits
 // from 63 down to (kRiscv64VaddrBits-1) are all either 0 or 1.
 // This means user area is [ 0 ... (1<<(kRiscv64VAddrBits-1)) )
@@ -55,6 +56,10 @@ constexpr bool is_user_accessible_range(vaddr_t va, size_t len) {
 
   return true;
 }
+
+// Assert that user space also lines up with the canonical mask calculation.
+static_assert(is_user_accessible_range(USER_ASPACE_BASE, USER_ASPACE_SIZE));
+static_assert(!is_user_accessible_range(USER_ASPACE_BASE, USER_ASPACE_SIZE + 1));
 
 // Userspace threads can only set an entry point to userspace addresses, or
 // the null pointer (for testing a thread that will always fail).
