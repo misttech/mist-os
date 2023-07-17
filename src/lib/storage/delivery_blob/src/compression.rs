@@ -253,15 +253,25 @@ impl ChunkedArchive {
         let mut chunks: Vec<Result<(usize, Vec<u8>), ChunkedArchiveError>> = vec![];
         data.par_chunks(chunk_size)
             .map(|chunk| {
-                let mut compressor = zstd::bulk::Compressor::new(Self::COMPRESSION_LEVEL)
-                    .map_err(ChunkedArchiveError::DecompressionError)?;
-                compressor
-                    .set_parameter(zstd::zstd_safe::CParameter::ChecksumFlag(true))
-                    .map_err(ChunkedArchiveError::DecompressionError)?;
-                Ok((
-                    chunk.len(),
-                    compressor.compress(chunk).map_err(ChunkedArchiveError::DecompressionError)?,
-                ))
+                // Creating and destroying zstd::bulk::Compressor objects is expensive. A single
+                // `Compressor` is created for each `rayon` thread and is reused across chunks.
+                thread_local! {
+                    static COMPRESSOR: std::cell::RefCell<zstd::bulk::Compressor<'static>> =
+                        std::cell::RefCell::new({
+                            let mut compressor =
+                                zstd::bulk::Compressor::new(ChunkedArchive::COMPRESSION_LEVEL)
+                                    .unwrap();
+                            compressor
+                                .set_parameter(zstd::zstd_safe::CParameter::ChecksumFlag(true))
+                                .unwrap();
+                            compressor
+                        });
+                }
+                let compressed = COMPRESSOR.with(|compressor| {
+                    let mut compressor = compressor.borrow_mut();
+                    compressor.compress(chunk).map_err(ChunkedArchiveError::DecompressionError)
+                })?;
+                Ok((chunk.len(), compressed))
             })
             .collect_into_vec(&mut chunks);
         let chunks: Vec<_> = chunks.into_iter().try_collect()?;
