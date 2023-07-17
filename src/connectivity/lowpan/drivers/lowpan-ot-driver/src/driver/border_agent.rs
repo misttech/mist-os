@@ -181,13 +181,13 @@ fn publish_border_agent_service(
 
     futures::future::try_join(
         publish_init_future.inspect_err(|err| {
-            warn!(
+            error!(
                 tag = "meshcop",
                 "publish_border_agent_service: publish_init_future failed: {:?}", err
             );
         }),
         publish_responder_future.inspect_err(|err| {
-            warn!(
+            error!(
                 tag = "meshcop",
                 "publish_border_agent_service: publish_responder_future failed: {:?}", err
             );
@@ -256,10 +256,21 @@ impl<OT: ot::InstanceInterface, NI, BI> OtDriver<OT, NI, BI> {
         } else {
             debug!(
                 tag = "meshcop",
-                "update_border_agent_service: Updating meshcop dns-sd: port={} txt={:?}", port, txt
+                "update_border_agent_service: Updating meshcop dns-sd: port={} txt=[PII]({:?})",
+                port,
+                txt
             );
 
             *last_txt_entries = txt.clone();
+
+            let original_task = self.border_agent_service.lock().take();
+
+            if let Some(task) = original_task {
+                // We must wait for the original task to fully stop.
+                if let Err(err) = task.cancel().await.transpose() {
+                    warn!(tag="meshcop","update_border_agent_service: Previous publication task ended with an error: {:?}", err);
+                }
+            }
 
             let task = publish_border_agent_service(service_instance_name, txt, port);
 
