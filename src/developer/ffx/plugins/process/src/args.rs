@@ -7,7 +7,7 @@ use ffx_core::ffx_command;
 
 #[ffx_command()]
 #[derive(FromArgs, Debug, PartialEq)]
-#[argh(subcommand, name = "process_explorer", description = "Query processes related information")]
+#[argh(subcommand, name = "process", description = "Query processes related information")]
 pub struct QueryCommand {
     #[argh(subcommand)]
     pub arg: Args,

@@ -9,7 +9,7 @@ mod processes_data;
 mod write_human_readable_output;
 
 use anyhow::Result;
-use ffx_process_explorer_args::{Args, QueryCommand};
+use ffx_process_args::{Args, QueryCommand};
 use fho::{moniker, AvailabilityFlag, FfxMain, FfxTool, MachineWriter, ToolIO};
 use fidl_fuchsia_buildinfo::BuildInfo;
 use fidl_fuchsia_buildinfo::ProviderProxy;
@@ -27,8 +27,8 @@ pub(crate) type Writer = MachineWriter<processed::ProcessesData>;
 
 // TODO(fxbug.dev/107973): The plugin must remain experimental until the FIDL API is strongly typed.
 #[derive(FfxTool)]
-#[check(AvailabilityFlag("ffx_process_explorer"))]
-pub struct ProcessExplorerTool {
+#[check(AvailabilityFlag("ffx_process"))]
+pub struct ProcessTool {
     #[with(moniker("/core/process_explorer"))]
     query_proxy: QueryProxy,
     #[with(moniker("/core/build-info"))]
@@ -37,10 +37,10 @@ pub struct ProcessExplorerTool {
     cmd: QueryCommand,
 }
 
-fho::embedded_plugin!(ProcessExplorerTool);
+fho::embedded_plugin!(ProcessTool);
 
 #[async_trait::async_trait(?Send)]
-impl FfxMain for ProcessExplorerTool {
+impl FfxMain for ProcessTool {
     type Writer = Writer;
 
     async fn main(self, writer: Self::Writer) -> fho::Result<()> {

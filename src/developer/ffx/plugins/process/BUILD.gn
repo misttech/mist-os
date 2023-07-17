@@ -5,8 +5,8 @@
 import("//src/developer/ffx/build/ffx_plugin.gni")
 import("//src/developer/ffx/build/ffx_tool.gni")
 
-ffx_plugin("ffx_process_explorer") {
-  version = "0.2.0"
+ffx_plugin("ffx_process") {
+  version = "0.3.0"
   edition = "2021"
 
   deps = [
@@ -39,11 +39,11 @@ ffx_plugin("ffx_process_explorer") {
   ]
 }
 
-ffx_tool("ffx_process_explorer_tool") {
+ffx_tool("ffx_process_tool") {
   edition = "2021"
-  output_name = "ffx-process_explorer"
+  output_name = "ffx-process"
   deps = [
-    ":ffx_process_explorer",
+    ":ffx_process",
     "//src/developer/ffx/lib/fho:lib",
     "//src/lib/fuchsia-async",
   ]

@@ -5,5 +5,5 @@ use fho::FfxTool;
 
 #[fuchsia_async::run_singlethreaded]
 async fn main() {
-    ffx_process_explorer::ProcessExplorerTool::execute_tool().await
+    ffx_process::ProcessTool::execute_tool().await
 }

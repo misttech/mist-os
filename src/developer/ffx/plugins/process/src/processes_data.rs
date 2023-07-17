@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-//! Processes Explorer related functionality.
+//! Processes related functionality.
 
 /// Types and utilities related to the raw data produced by
 /// `process_explorer`.

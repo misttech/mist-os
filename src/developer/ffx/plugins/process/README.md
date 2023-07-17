@@ -1,4 +1,4 @@
-# ffx process_explorer
+# ffx process
 
 This `ffx` plugin allows retrieving information about Fuchsia processes.
 
@@ -8,26 +8,19 @@ between processes.
 
 ## Run
 
-The plugin needs a support component not included in the build by default. Build
-the Fuchsia image with the following additional package:
+To run the plugin, execute:
 
 ```
-$ fx set [...] --with-base src/developer/process_explorer
-```
-
-Then run the plugin:
-
-```
-ffx process_explorer
+ffx process
 ```
 
 ## Usage example
 
 ```
-$ ffx process_explorer list | grep archivist
+$ ffx process list | grep archivist
   2257   archivist.cm
 
-$ ffx process_explorer filter 2257
+$ ffx process filter 2257
 Total processes found:    1
 
 Process name:             archivist.cm
@@ -63,5 +56,5 @@ $ fx set [...] --with //src/developer/ffx:tests
 Run the unit tests:
 
 ```
-$ fx test ffx_process_explorer_test
+$ fx test ffx_process_test
 ```
