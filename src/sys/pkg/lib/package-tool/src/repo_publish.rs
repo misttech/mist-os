@@ -209,11 +209,9 @@ pub async fn repo_package_manifest_list(
 }
 
 async fn repo_publish_oneshot(cmd: &RepoPublishCommand) -> Result<()> {
-    let mut repo_builder = PmRepository::builder(cmd.repo_path.clone()).copy_mode(cmd.copy_mode);
-
-    if let Some(blob_type) = cmd.delivery_blob_type {
-        repo_builder = repo_builder.delivery_blob_type(Some(blob_type.try_into()?));
-    }
+    let mut repo_builder = PmRepository::builder(cmd.repo_path.clone())
+        .copy_mode(cmd.copy_mode)
+        .delivery_blob_type(Some(cmd.delivery_blob_type.try_into()?));
 
     if let Some(path) = &cmd.blob_repo_dir {
         repo_builder = repo_builder.blob_repo_path(path.clone());
@@ -537,7 +535,7 @@ mod tests {
             clean: false,
             depfile: None,
             copy_mode: CopyMode::Copy,
-            delivery_blob_type: None,
+            delivery_blob_type: 1,
             ignore_missing_packages: false,
             blob_manifest: None,
             blob_repo_dir: None,

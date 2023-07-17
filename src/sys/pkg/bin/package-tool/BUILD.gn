@@ -19,6 +19,9 @@ if (is_host) {
 
     sources = [ "src/main.rs" ]
     configs += [ "//build/config/rust/lints:clippy_warn_all" ]
+
+    # when delivery blobs are enabled, ninja times out on coverage builders
+    exclude_toolchain_tags = [ "coverage" ]
   }
 
   install_host_tools("host") {

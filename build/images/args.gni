@@ -141,12 +141,11 @@ declare_args() {
   # The format blobfs should store blobs in.
   blob_layout_format = "compact"
 
-  # Controls what type of delivery blob blobfs accepts.
+  # Controls what type of delivery blob pkg-resolver fetches and blobfs accepts.
   # Supported types can be found in //src/storage/blobfs/delivery_blob.h
   # Valid values are integers, for example: 1
-  # By default no delivery blobs are accepted.
   # This arg is for local developer only, products should not set this arg.
-  delivery_blob_type = false
+  delivery_blob_type = 1
 
   # Build boot images that prefer Zedboot over local boot (only for EFI).
   always_zedboot = false

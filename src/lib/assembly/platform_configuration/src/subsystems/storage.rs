@@ -27,7 +27,7 @@ impl DefineSubsystemConfiguration<StorageConfig> for StorageSubsystemConfig {
             fshost_config_builder
                 // LINT.IfChange
                 .field("blobfs", true)?
-                .field("blobfs_allow_delivery_blobs", false)?
+                .field("blobfs_allow_delivery_blobs", true)?
                 .field("blobfs_max_bytes", 0)?
                 .field("bootpart", true)?
                 .field("check_filesystems", true)?

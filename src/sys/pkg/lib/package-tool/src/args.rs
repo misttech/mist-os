@@ -166,9 +166,9 @@ pub struct RepoPublishCommand {
     #[argh(option, default = "CopyMode::Copy", from_str_fn(parse_copy_mode))]
     pub copy_mode: CopyMode,
 
-    /// the type of delivery blob to generate (default no delivery blobs are generated)
-    #[argh(option)]
-    pub delivery_blob_type: Option<u32>,
+    /// the type of delivery blob to generate (default: type 1)
+    #[argh(option, default = "1")]
+    pub delivery_blob_type: u32,
 
     /// republish packages on file change
     #[argh(switch)]
