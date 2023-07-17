@@ -571,14 +571,12 @@ zx_status_t FakeDisplay::DisplayControllerImplImportImageForCapture(
   if (wait_response.status() != ZX_OK) {
     return wait_response.status();
   }
-  auto& collection_info = wait_response.buffer_collection_info();
+  fuchsia_sysmem::BufferCollectionInfo2& collection_info = wait_response.buffer_collection_info();
 
-  fbl::Vector<zx::vmo> vmos;
-  for (uint32_t i = 0; i < collection_info.buffer_count(); ++i) {
-    vmos.push_back(std::move(collection_info.buffers()[i].vmo()));
+  if (!collection_info.settings().has_image_format_constraints()) {
+    return ZX_ERR_INVALID_ARGS;
   }
-
-  if (!collection_info.settings().has_image_format_constraints() || index >= vmos.size()) {
+  if (index >= collection_info.buffer_count()) {
     return ZX_ERR_OUT_OF_RANGE;
   }
 
@@ -586,7 +584,7 @@ zx_status_t FakeDisplay::DisplayControllerImplImportImageForCapture(
       collection_info.settings().image_format_constraints().pixel_format().type());
   import_capture->ram_domain = (collection_info.settings().buffer_settings().coherency_domain() ==
                                 fuchsia_sysmem::CoherencyDomain::kRam);
-  import_capture->vmo = std::move(vmos[index]);
+  import_capture->vmo = std::move(collection_info.buffers()[index].vmo());
   *out_capture_handle = reinterpret_cast<uint64_t>(import_capture.get());
   imported_captures_.push_back(std::move(import_capture));
   return ZX_OK;
