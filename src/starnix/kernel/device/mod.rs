@@ -3,12 +3,14 @@
 // found in the LICENSE file.
 
 mod binder;
+mod common;
 mod features;
 mod framebuffer_server;
 mod registry;
 mod remote_binder;
 
 pub use binder::*;
+pub use common::*;
 pub use features::*;
 pub use registry::*;
 

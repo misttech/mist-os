@@ -166,6 +166,7 @@ rustc_binary("starnix_kernel_bin") {
     "collections/mod.rs",
     "collections/range_map.rs",
     "device/binder.rs",
+    "device/common.rs",
     "device/features.rs",
     "device/framebuffer.rs",
     "device/framebuffer_server.rs",

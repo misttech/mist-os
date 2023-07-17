@@ -23,7 +23,7 @@ impl DeviceDirectory {
 
     fn device_type(&self) -> Result<DeviceType, Errno> {
         match self.kobject().ktype() {
-            KType::Device { device_type, .. } => Ok(device_type),
+            KType::Device(device) => Ok(device.device_type),
             _ => error!(ENODEV),
         }
     }

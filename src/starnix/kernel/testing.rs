@@ -8,6 +8,7 @@ use std::{ffi::CString, sync::Arc};
 use zerocopy::AsBytes;
 
 use crate::{
+    device::init_common_devices,
     fs::{
         buffers::{InputBuffer, OutputBuffer},
         fuchsia::RemoteFs,
@@ -60,6 +61,8 @@ fn create_kernel_and_task_with_fs(
     )
     .expect("failed to create first task");
     kernel.kthreads.init(&kernel, fs).expect("failed to initialize kthreads");
+
+    init_common_devices(&kernel);
 
     // Take the lock on thread group and task in the correct order to ensure any wrong ordering
     // will trigger the tracing-mutex at the right call site.

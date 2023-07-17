@@ -3,12 +3,9 @@
 // found in the LICENSE file.
 
 use crate::{
-    device::{binder::create_binders, starnix::create_magma_device},
-    fs::{
-        devtmpfs::dev_tmp_fs,
-        kobject::{KObjectDeviceAttribute, KType},
-        sysfs::SysFsDirectory,
-        SpecialNode,
+    device::{
+        binder::create_binders, framebuffer::fb_device_init, input::input_device_init,
+        starnix::magma_device_init,
     },
     logging::log_warn,
     task::Kernel,
@@ -31,76 +28,11 @@ pub fn run_features(entries: &Vec<String>, kernel: &Arc<Kernel>) -> Result<(), E
             }
             "selinux_enabled" => {}
             "framebuffer" => {
-                // Add framebuffer and input devices in the kobject tree.
-                let graphics_class = kernel.device_registry.virtual_bus().get_or_create_child(
-                    b"graphics",
-                    KType::Class,
-                    SysFsDirectory::new,
-                );
-                kernel.device_registry.add_device(
-                    graphics_class,
-                    KObjectDeviceAttribute::new(b"fb0", b"fb0", DeviceType::FB0),
-                );
-                let input_class = kernel.device_registry.virtual_bus().get_or_create_child(
-                    b"input",
-                    KType::Class,
-                    SysFsDirectory::new,
-                );
-                kernel.device_registry.add_device(
-                    input_class,
-                    KObjectDeviceAttribute::new(
-                        b"event0",
-                        b"input/event0",
-                        DeviceType::new(INPUT_MAJOR, 0),
-                    ),
-                );
-
-                // Register a framebuffer.
-                kernel
-                    .device_registry
-                    .register_chrdev_major(FB_MAJOR, kernel.framebuffer.clone())?;
-
-                // Also register an input device, which can be used to read pointer events
-                // associated with the framebuffer's `View`.
-                //
-                // Note: input requires the `framebuffer` feature, because Starnix cannot receive
-                // input events without a Fuchsia `View`.
-                //
-                // TODO(quiche): When adding support for multiple input devices, ensure
-                // that the appropriate `InputFile` is associated with the appropriate
-                // `INPUT_MINOR`.
-                kernel
-                    .device_registry
-                    .register_chrdev_major(INPUT_MAJOR, kernel.input_file.clone())?;
+                fb_device_init(kernel);
+                input_device_init(kernel);
             }
             "magma" => {
-                let magma_type = DeviceType::new(STARNIX_MAJOR, STARNIX_MINOR_MAGMA);
-                let starnix_class = kernel.device_registry.virtual_bus().get_or_create_child(
-                    b"starnix",
-                    KType::Class,
-                    SysFsDirectory::new,
-                );
-                kernel.device_registry.add_device(
-                    starnix_class,
-                    KObjectDeviceAttribute::new(b"magma0", b"magma0", magma_type),
-                );
-
-                // Register the magma device.
-                kernel.device_registry.register_chrdev(
-                    STARNIX_MAJOR,
-                    STARNIX_MINOR_MAGMA,
-                    1,
-                    create_magma_device,
-                )?;
-
-                // TODO(fxb/119437): Remove after devtmpfs listens to uevent.
-                dev_tmp_fs(kernel).root().add_node_ops_dev(
-                    kernel.kthreads.system_task(),
-                    b"magma0",
-                    mode!(IFCHR, 0o600),
-                    magma_type,
-                    SpecialNode,
-                )?;
+                magma_device_init(kernel);
             }
             "test_data" => {}
             "custom_artifacts" => {}

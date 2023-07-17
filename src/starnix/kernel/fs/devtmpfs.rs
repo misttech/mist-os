@@ -4,7 +4,8 @@
 
 use crate::{
     auth::FsCred,
-    fs::{tmpfs::*, *},
+    device::DeviceMode,
+    fs::{kobject::DeviceMetadata, tmpfs::*, *},
     task::*,
     types::*,
 };
@@ -18,29 +19,6 @@ fn init_devtmpfs(kernel: &Arc<Kernel>) -> FileSystemHandle {
     let fs = TmpFs::new_fs(kernel);
     let root = fs.root();
 
-    // TODO(fxb/119437): Subscribe uevent to create dev nodes.
-    let mkchr = |name, device_type| {
-        root.create_node(
-            kernel.kthreads.system_task(),
-            name,
-            mode!(IFCHR, 0o666),
-            device_type,
-            FsCred::root(),
-        )
-        .unwrap();
-    };
-
-    let mkblk = |name, device_type| {
-        root.create_node(
-            kernel.kthreads.system_task(),
-            name,
-            mode!(IFBLK, 0o666),
-            device_type,
-            FsCred::root(),
-        )
-        .unwrap();
-    };
-
     let mkdir = |name| {
         root.create_node(
             kernel.kthreads.system_task(),
@@ -52,52 +30,54 @@ fn init_devtmpfs(kernel: &Arc<Kernel>) -> FileSystemHandle {
         .unwrap();
     };
 
-    mkchr(b"kmsg", DeviceType::KMSG);
-    mkchr(b"null", DeviceType::NULL);
-    mkchr(b"zero", DeviceType::ZERO);
-    mkchr(b"full", DeviceType::FULL);
-    mkchr(b"random", DeviceType::RANDOM);
-    mkchr(b"urandom", DeviceType::URANDOM);
-    mkchr(b"fuse", DeviceType::FUSE);
-    mkchr(b"loop-control", DeviceType::LOOP_CONTROL);
+    mkdir(b"shm");
+
     root.create_symlink(kernel.kthreads.system_task(), b"fd", b"/proc/self/fd", FsCred::root())
         .unwrap();
 
-    // TODO(fxbug.dev/128697): These devtmpfs entries should be populated automatically by
-    // the loop-control device once devtmpfs is integrated with kobjects.
-    mkblk(b"loop0", DeviceType::new(LOOP_MAJOR, 0));
-    mkblk(b"loop1", DeviceType::new(LOOP_MAJOR, 1));
-    mkblk(b"loop2", DeviceType::new(LOOP_MAJOR, 2));
-    mkblk(b"loop3", DeviceType::new(LOOP_MAJOR, 3));
-    mkblk(b"loop4", DeviceType::new(LOOP_MAJOR, 4));
-    mkblk(b"loop5", DeviceType::new(LOOP_MAJOR, 5));
-    mkblk(b"loop6", DeviceType::new(LOOP_MAJOR, 6));
-    mkblk(b"loop7", DeviceType::new(LOOP_MAJOR, 7));
-    mkblk(b"loop8", DeviceType::new(LOOP_MAJOR, 8));
-    mkblk(b"loop9", DeviceType::new(LOOP_MAJOR, 9));
-    mkblk(b"loop10", DeviceType::new(LOOP_MAJOR, 10));
-    mkblk(b"loop11", DeviceType::new(LOOP_MAJOR, 11));
-    mkblk(b"loop12", DeviceType::new(LOOP_MAJOR, 12));
-    mkblk(b"loop13", DeviceType::new(LOOP_MAJOR, 13));
-    mkblk(b"loop14", DeviceType::new(LOOP_MAJOR, 14));
-    mkblk(b"loop15", DeviceType::new(LOOP_MAJOR, 15));
-    mkblk(b"loop16", DeviceType::new(LOOP_MAJOR, 16));
-    mkblk(b"loop17", DeviceType::new(LOOP_MAJOR, 17));
-    mkblk(b"loop18", DeviceType::new(LOOP_MAJOR, 18));
-    mkblk(b"loop19", DeviceType::new(LOOP_MAJOR, 19));
-    mkblk(b"loop20", DeviceType::new(LOOP_MAJOR, 20));
-    mkblk(b"loop21", DeviceType::new(LOOP_MAJOR, 21));
-    mkblk(b"loop22", DeviceType::new(LOOP_MAJOR, 22));
-    mkblk(b"loop23", DeviceType::new(LOOP_MAJOR, 23));
-
-    mkdir(b"shm");
-
-    // tty related nodes
-    mkdir(b"pts");
-    mkchr(b"tty", DeviceType::TTY);
-    root.create_symlink(kernel.kthreads.system_task(), b"ptmx", b"pts/ptmx", FsCred::root())
-        .unwrap();
-
-    mkchr(b"fb0", DeviceType::FB0);
     fs
+}
+
+pub fn devtmpfs_create_device(
+    kernel: &Arc<Kernel>,
+    device: DeviceMetadata,
+) -> Result<DirEntryHandle, Errno> {
+    let mode = match device.mode {
+        DeviceMode::Char => mode!(IFCHR, 0o666),
+        DeviceMode::Block => mode!(IFBLK, 0o666),
+    };
+    dev_tmp_fs(kernel).root().create_node(
+        kernel.kthreads.system_task(),
+        &device.name,
+        mode,
+        device.device_type,
+        FsCred::root(),
+    )
+}
+
+pub fn devtmpfs_mkdir(kernel: &Arc<Kernel>, name: &FsStr) -> Result<DirEntryHandle, Errno> {
+    dev_tmp_fs(kernel).root().create_node(
+        kernel.kthreads.system_task(),
+        name,
+        mode!(IFDIR, 0o755),
+        DeviceType::NONE,
+        FsCred::root(),
+    )
+}
+
+pub fn devtmpfs_remove_child(kernel: &Arc<Kernel>, name: &FsStr) {
+    dev_tmp_fs(kernel).root().remove_child(name);
+}
+
+pub fn devtmpfs_create_symlink(
+    kernel: &Arc<Kernel>,
+    name: &FsStr,
+    target: &FsStr,
+) -> Result<DirEntryHandle, Errno> {
+    dev_tmp_fs(kernel).root().create_symlink(
+        kernel.kthreads.system_task(),
+        name,
+        target,
+        FsCred::root(),
+    )
 }

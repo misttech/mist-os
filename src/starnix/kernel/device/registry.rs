@@ -4,14 +4,7 @@
 
 use crate::{
     collections::RangeMap,
-    device::loopback::create_loop_device,
-    device::mem::create_mem_device,
-    device::misc::create_misc_device,
-    fs::{
-        kobject::*,
-        sysfs::{BlockDeviceDirectory, DeviceDirectory, SysFsDirectory},
-        FileOps, FsNode,
-    },
+    fs::{kobject::*, sysfs::SysFsDirectory, FileOps, FsNode},
     lock::{Mutex, RwLock},
     logging::log_error,
     task::*,
@@ -159,14 +152,8 @@ struct DeviceRegistryState {
 }
 
 impl DeviceRegistry {
-    /// Creates a `DeviceRegistry` and populates it with common drivers such as /dev/null.
-    pub fn new_with_common_devices() -> Self {
-        let registry = Self::default();
-        registry.register_chrdev_major(MEM_MAJOR, create_mem_device).unwrap();
-        registry.register_chrdev_major(MISC_MAJOR, create_misc_device).unwrap();
-        registry.register_blkdev_major(LOOP_MAJOR, create_loop_device).unwrap();
-        registry.add_common_devices();
-        registry
+    pub fn new() -> Self {
+        Self::default()
     }
 
     /// Returns the root kobject.
@@ -177,78 +164,6 @@ impl DeviceRegistry {
     /// Returns the virtual bus kobject where all virtual and pseudo devices are stored.
     pub fn virtual_bus(&self) -> KObjectHandle {
         self.root_kobject.get_or_create_child(b"virtual", KType::Bus, SysFsDirectory::new)
-    }
-
-    /// Adds a single device kobject in the tree.
-    pub fn add_device(&self, class: KObjectHandle, dev_attr: KObjectDeviceAttribute) {
-        let ktype =
-            KType::Device { name: Some(dev_attr.device_name), device_type: dev_attr.device_type };
-        self.dispatch_uevent(
-            UEventAction::Add,
-            class.get_or_create_child(&dev_attr.kobject_name, ktype, DeviceDirectory::new),
-        );
-    }
-
-    pub fn add_virtual_block_device(&self, dev_attr: KObjectDeviceAttribute) {
-        self.add_block_device(
-            self.virtual_bus().get_or_create_child(b"block", KType::Class, SysFsDirectory::new),
-            dev_attr,
-        );
-    }
-
-    /// Adds a single block device kobject in the tree.
-    pub fn add_block_device(&self, class: KObjectHandle, dev_attr: KObjectDeviceAttribute) {
-        let ktype =
-            KType::Device { name: Some(dev_attr.device_name), device_type: dev_attr.device_type };
-        self.dispatch_uevent(
-            UEventAction::Add,
-            class.get_or_create_child(&dev_attr.kobject_name, ktype, BlockDeviceDirectory::new),
-        );
-    }
-
-    /// Adds a list of device kobjects in the tree.
-    pub fn add_devices(&self, class: KObjectHandle, dev_attrs: Vec<KObjectDeviceAttribute>) {
-        for attr in dev_attrs {
-            self.add_device(class.clone(), attr);
-        }
-    }
-
-    // TODO(fxb/119437): Refactor how to register a device.
-    fn add_common_devices(&self) {
-        let virtual_bus = self.virtual_bus();
-
-        // MEM class.
-        self.add_devices(
-            virtual_bus.get_or_create_child(b"mem", KType::Class, SysFsDirectory::new),
-            KObjectDeviceAttribute::new_from_vec(vec![
-                (b"null", b"null", DeviceType::NULL),
-                (b"zero", b"zero", DeviceType::ZERO),
-                (b"full", b"full", DeviceType::FULL),
-                (b"random", b"random", DeviceType::RANDOM),
-                (b"urandom", b"urandom", DeviceType::URANDOM),
-                (b"kmsg", b"kmsg", DeviceType::KMSG),
-            ]),
-        );
-
-        // MISC class.
-        self.add_devices(
-            virtual_bus.get_or_create_child(b"misc", KType::Class, SysFsDirectory::new),
-            KObjectDeviceAttribute::new_from_vec(vec![
-                (b"hwrng", b"hwrng", DeviceType::HW_RANDOM),
-                (b"fuse", b"fuse", DeviceType::FUSE),
-                (b"device-mapper", b"mapper/control", DeviceType::DEVICE_MAPPER),
-                (b"loop-control", b"loop-control", DeviceType::LOOP_CONTROL),
-            ]),
-        );
-
-        // TTY class.
-        self.add_devices(
-            virtual_bus.get_or_create_child(b"tty", KType::Class, SysFsDirectory::new),
-            KObjectDeviceAttribute::new_from_vec(vec![
-                (b"tty", b"tty", DeviceType::TTY),
-                (b"ptmx", b"ptmx", DeviceType::PTMX),
-            ]),
-        );
     }
 
     pub fn register_chrdev(
@@ -387,7 +302,7 @@ impl DeviceOps for Arc<RwLock<DynRegistry>> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{fs::*, testing::*};
+    use crate::{device::mem::create_mem_device, fs::*, testing::*};
 
     #[::fuchsia::test]
     fn registry_fails_to_add_duplicate_device() {

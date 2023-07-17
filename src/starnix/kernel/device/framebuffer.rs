@@ -4,16 +4,18 @@
 
 use super::framebuffer_server::{spawn_view_provider, FramebufferServer};
 use crate::{
-    device::{input::InputFile, DeviceOps},
+    device::{input::InputFile, DeviceMode, DeviceOps},
     fs::{
         buffers::{InputBuffer, OutputBuffer},
+        kobject::{KObjectDeviceAttribute, KType},
+        sysfs::SysFsDirectory,
         *,
     },
     lock::RwLock,
     logging::*,
     mm::{MemoryAccessorExt, ProtectionFlags},
     syscalls::*,
-    task::CurrentTask,
+    task::{CurrentTask, Kernel},
     types::*,
 };
 
@@ -231,4 +233,19 @@ impl FileOps for Arc<Framebuffer> {
     ) -> Result<Arc<zx::Vmo>, Errno> {
         VmoFileObject::get_vmo(&self.vmo, file, current_task, prot)
     }
+}
+
+pub fn fb_device_init(kernel: &Arc<Kernel>) {
+    kernel
+        .device_registry
+        .register_chrdev_major(FB_MAJOR, kernel.framebuffer.clone())
+        .expect("fb device register failed.");
+
+    let graphics_class = kernel.device_registry.virtual_bus().get_or_create_child(
+        b"graphics",
+        KType::Class,
+        SysFsDirectory::new,
+    );
+    let fb_attr = KObjectDeviceAttribute::new(b"fb0", b"fb0", DeviceType::FB0, DeviceMode::Char);
+    kernel.add_chr_device(graphics_class, fb_attr);
 }

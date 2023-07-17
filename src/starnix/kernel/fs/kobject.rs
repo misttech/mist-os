@@ -9,6 +9,7 @@ use std::{
 };
 
 use crate::{
+    device::DeviceMode,
     fs::{
         buffers::{InputBuffer, OutputBuffer},
         sysfs::SysFsDirectory,
@@ -28,24 +29,42 @@ pub enum KType {
     Class,
     /// A virtual/physical device that is attached to a bus.
     ///
-    /// Contains all information required in the `dev` and `uevent` files.
-    Device {
-        /// Name of the device in /dev.
-        name: Option<FsString>,
-        device_type: DeviceType,
-    },
+    /// Contains all information of a device node.
+    Device(DeviceMetadata),
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct DeviceMetadata {
+    /// Name of the device in /dev.
+    pub name: FsString,
+    pub device_type: DeviceType,
+    pub mode: DeviceMode,
+}
+
+impl DeviceMetadata {
+    pub fn new(name: &FsStr, device_type: DeviceType, mode: DeviceMode) -> Self {
+        Self { name: name.to_vec(), device_type, mode }
+    }
 }
 
 /// Attributes that are used to create a KType::Device kobject.
+#[derive(Clone, Debug)]
 pub struct KObjectDeviceAttribute {
     pub kobject_name: FsString,
-    pub device_name: FsString,
-    pub device_type: DeviceType,
+    pub device: DeviceMetadata,
 }
 
 impl KObjectDeviceAttribute {
-    pub fn new(kobject_name: &FsStr, device_name: &FsStr, device_type: DeviceType) -> Self {
-        Self { kobject_name: kobject_name.to_vec(), device_name: device_name.to_vec(), device_type }
+    pub fn new(
+        kobject_name: &FsStr,
+        device_name: &FsStr,
+        device_type: DeviceType,
+        mode: DeviceMode,
+    ) -> Self {
+        Self {
+            kobject_name: kobject_name.to_vec(),
+            device: DeviceMetadata::new(device_name, device_type, mode),
+        }
     }
 
     /// Create a list of `KObjectDeviceAttribute`s.
@@ -54,11 +73,14 @@ impl KObjectDeviceAttribute {
     /// * `attributes` - A list of tuples that represent the attributes of a kobject device.
     ///                  Each attribute tuple formats as:
     ///                    (kobject_name: &FsStr, device_name: &FsStr, device_type: DeviceType).
-    pub fn new_from_vec(attributes: Vec<(&FsStr, &FsStr, DeviceType)>) -> Vec<Self> {
+    pub fn new_from_vec(
+        attributes: Vec<(&FsStr, &FsStr, DeviceType)>,
+        mode: DeviceMode,
+    ) -> Vec<Self> {
         attributes
             .into_iter()
             .map(|(kobject_name, device_name, device_type)| {
-                KObjectDeviceAttribute::new(kobject_name, device_name, device_type)
+                KObjectDeviceAttribute::new(kobject_name, device_name, device_type, mode)
             })
             .collect()
     }
@@ -252,13 +274,13 @@ impl FileOps for UEventFile {
         data: &mut dyn OutputBuffer,
     ) -> Result<usize, Errno> {
         match self.kobject.ktype() {
-            KType::Device { name: device_name, device_type } => {
-                let mut content =
-                    format!("MAJOR={}\nMINOR={}\n", device_type.major(), device_type.minor(),);
-                if device_name.is_some() {
-                    content +=
-                        &format!("DEVNAME={}\n", String::from_utf8_lossy(&device_name.unwrap()));
-                }
+            KType::Device(device) => {
+                let content = format!(
+                    "MAJOR={}\nMINOR={}\nDEVNAME={}\n",
+                    device.device_type.major(),
+                    device.device_type.minor(),
+                    String::from_utf8_lossy(&device.name),
+                );
                 data.write(content[offset..].as_bytes())
             }
             _ => error!(ENODEV),
@@ -365,7 +387,7 @@ mod tests {
             .get_or_create_child(b"mem", KType::Class, SysFsDirectory::new)
             .get_or_create_child(
                 b"null",
-                KType::Device { name: Some(b"null".to_vec()), device_type: DeviceType::NULL },
+                KType::Device(DeviceMetadata::new(b"null", DeviceType::NULL, DeviceMode::Char)),
                 DeviceDirectory::new,
             );
         assert_eq!(device.path(), b"/virtual/mem/null".to_vec());

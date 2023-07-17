@@ -4,8 +4,11 @@
 
 use crate::{
     auth::FsCred,
+    device::DeviceMode,
     fs::{
         buffers::{InputBuffer, OutputBuffer},
+        kobject::{KObjectDeviceAttribute, KType},
+        sysfs::SysFsDirectory,
         *,
     },
     logging::*,
@@ -246,4 +249,30 @@ pub fn create_mem_device(
         11 => Box::new(DevKmsg),
         _ => return error!(ENODEV),
     })
+}
+
+pub fn mem_device_init(kernel: &Arc<Kernel>) {
+    // Device registry.
+    kernel
+        .device_registry
+        .register_chrdev_major(MEM_MAJOR, create_mem_device)
+        .expect("mem device register failed.");
+
+    let device_attrs = KObjectDeviceAttribute::new_from_vec(
+        vec![
+            (b"null", b"null", DeviceType::NULL),
+            (b"zero", b"zero", DeviceType::ZERO),
+            (b"full", b"full", DeviceType::FULL),
+            (b"random", b"random", DeviceType::RANDOM),
+            (b"urandom", b"urandom", DeviceType::URANDOM),
+            (b"kmsg", b"kmsg", DeviceType::KMSG),
+        ],
+        DeviceMode::Char,
+    );
+    let mem_class = kernel.device_registry.virtual_bus().get_or_create_child(
+        b"mem",
+        KType::Class,
+        SysFsDirectory::new,
+    );
+    kernel.add_chr_devices(mem_class, device_attrs);
 }

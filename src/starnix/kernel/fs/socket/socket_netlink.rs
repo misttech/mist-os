@@ -679,29 +679,27 @@ impl DeviceListener for Arc<Mutex<NetlinkSocketInner>> {
         context: UEventContext,
     ) {
         let message = match kobject.ktype() {
-            KType::Device { name: device_name, device_type } => {
+            KType::Device(device) => {
                 let subsystem = kobject.parent().unwrap().name();
                 // TODO(fxb/127713): Pass the synthetic UUID when available.
                 // Otherwise, default as "0".
-                let mut message = format!(
+                let message = format!(
                     "{action}@/devices{path}\0\
                             ACTION={action}\0\
                             DEVPATH=/devices{path}\0\
+                            DEVNAME={name}\0\
                             SUBSYSTEM={subsystem}\0\
                             SYNTH_UUID=0\0\
                             MAJOR={major}\0\
                             MINOR={minor}\0\
                             SEQNUM={seqnum}\0",
                     path = String::from_utf8_lossy(&kobject.path()),
+                    name = String::from_utf8_lossy(&device.name),
                     subsystem = String::from_utf8_lossy(&subsystem),
-                    major = device_type.major(),
-                    minor = device_type.minor(),
+                    major = device.device_type.major(),
+                    minor = device.device_type.minor(),
                     seqnum = context.seqnum,
                 );
-                if device_name.is_some() {
-                    message +=
-                        &format!("DEVNAME={}\0", String::from_utf8_lossy(&device_name.unwrap()));
-                }
                 message
             }
             _ => {

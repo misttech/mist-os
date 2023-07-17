@@ -21,10 +21,13 @@ use crate::{
         DeviceMode, DeviceRegistry,
     },
     fs::{
+        devtmpfs::devtmpfs_create_device,
+        kobject::*,
         socket::{
             GenericMessage, GenericNetlink, NetlinkSenderReceiverProvider, NetlinkToClientSender,
             SocketAddress,
         },
+        sysfs::{BlockDeviceDirectory, DeviceDirectory, SysFsDirectory},
         FileOps, FileSystemHandle, FsNode,
     },
     lock::RwLock,
@@ -201,8 +204,6 @@ impl Kernel {
             Framebuffer::new_with_input(features.iter().find(|f| f.starts_with("aspect_ratio")))
                 .expect("Failed to create framebuffer");
 
-        let device_registry = DeviceRegistry::new_with_common_devices();
-        let loop_device_registry = LoopDeviceRegistry::new(&device_registry);
         let this = Arc::new(Kernel {
             job,
             kthreads: KernelThreads::default(),
@@ -221,10 +222,10 @@ impl Kernel {
             sys_fs: OnceCell::new(),
             selinux_fs: OnceCell::new(),
             trace_fs: OnceCell::new(),
-            device_registry,
+            device_registry: DeviceRegistry::new(),
             features: HashSet::from_iter(features.iter().cloned()),
             container_svc,
-            loop_device_registry,
+            loop_device_registry: Default::default(),
             framebuffer,
             input_file,
             binders: Default::default(),
@@ -251,6 +252,62 @@ impl Kernel {
         });
 
         Ok(this)
+    }
+
+    /// Add a device in the hierarchy tree.
+    pub fn add_chr_device(
+        self: &Arc<Self>,
+        class: KObjectHandle,
+        dev_attr: KObjectDeviceAttribute,
+    ) {
+        let kobj_device = class.get_or_create_child(
+            &dev_attr.kobject_name,
+            KType::Device(dev_attr.device.clone()),
+            DeviceDirectory::new,
+        );
+        self.device_registry.dispatch_uevent(UEventAction::Add, kobj_device);
+        match devtmpfs_create_device(self, dev_attr.device.clone()) {
+            Ok(_) => (),
+            Err(err) => log_error!(
+                "Cannot add char device {} in devtmpfs ({})",
+                String::from_utf8(dev_attr.device.name).unwrap(),
+                err.code
+            ),
+        };
+    }
+
+    pub fn add_chr_devices(
+        self: &Arc<Self>,
+        class: KObjectHandle,
+        dev_attrs: Vec<KObjectDeviceAttribute>,
+    ) {
+        for attr in dev_attrs {
+            self.add_chr_device(class.clone(), attr);
+        }
+    }
+
+    /// Add a block device in the hierarchy tree.
+    pub fn add_blk_device(self: &Arc<Self>, dev_attr: KObjectDeviceAttribute) {
+        assert!(dev_attr.device.mode == DeviceMode::Block, "{:?} is not a block device.", dev_attr);
+        let block_class = self.device_registry.virtual_bus().get_or_create_child(
+            b"block",
+            KType::Class,
+            SysFsDirectory::new,
+        );
+        let kobj_device = block_class.get_or_create_child(
+            &dev_attr.kobject_name,
+            KType::Device(dev_attr.device.clone()),
+            BlockDeviceDirectory::new,
+        );
+        self.device_registry.dispatch_uevent(UEventAction::Add, kobj_device);
+        match devtmpfs_create_device(self, dev_attr.device.clone()) {
+            Ok(_) => (),
+            Err(err) => log_error!(
+                "Cannot add block device {} in devtmpfs ({})",
+                String::from_utf8(dev_attr.device.name).unwrap(),
+                err.code
+            ),
+        };
     }
 
     /// Opens a device file (driver) identified by `dev`.

@@ -1,9 +1,9 @@
 // Copyright 2023 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
+use super::*;
 
 use crate::{
-    device::registry::DeviceRegistry,
     fs::{
         buffers::{InputBuffer, OutputBuffer},
         kobject::KObjectDeviceAttribute,
@@ -108,20 +108,21 @@ impl LoopDeviceState {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Default)]
 struct LoopDevice {
     number: u32,
     state: Mutex<LoopDeviceState>,
 }
 
 impl LoopDevice {
-    fn new(device_registry: &DeviceRegistry, minor: u32) -> Arc<Self> {
+    fn new(kernel: &Arc<Kernel>, minor: u32) -> Arc<Self> {
         let loop_device_name = format!("loop{minor}");
-        device_registry.add_virtual_block_device(KObjectDeviceAttribute {
-            kobject_name: loop_device_name.clone().into_bytes(),
-            device_name: loop_device_name.into_bytes(),
-            device_type: DeviceType::new(LOOP_MAJOR, minor),
-        });
+        kernel.add_blk_device(KObjectDeviceAttribute::new(
+            loop_device_name.as_bytes(),
+            loop_device_name.as_bytes(),
+            DeviceType::new(LOOP_MAJOR, minor),
+            DeviceMode::Block,
+        ));
         Arc::new(Self { number: minor, state: Default::default() })
     }
 
@@ -405,35 +406,41 @@ impl FileOps for LoopDeviceFile {
     }
 }
 
-#[derive(Debug)]
+pub fn loop_device_init(kernel: &Arc<Kernel>) {
+    // Device registry.
+    kernel
+        .device_registry
+        .register_blkdev_major(LOOP_MAJOR, get_or_create_loop_device)
+        .expect("loop device register failed.");
+
+    // Ensure initial loop devices.
+    kernel.loop_device_registry.ensure_initial_devices(kernel);
+}
+
+#[derive(Debug, Default)]
 pub struct LoopDeviceRegistry {
     devices: Mutex<BTreeMap<u32, Arc<LoopDevice>>>,
 }
 
 impl LoopDeviceRegistry {
-    pub fn new(device_registry: &DeviceRegistry) -> Arc<Self> {
-        let this = Arc::new(Self { devices: Default::default() });
+    /// Ensure initial loop devices.
+    fn ensure_initial_devices(&self, kernel: &Arc<Kernel>) {
         for minor in 0..8 {
-            this.get_or_create(device_registry, minor);
+            self.get_or_create(kernel, minor);
         }
-        this
     }
 
-    fn get_or_create(&self, device_registry: &DeviceRegistry, minor: u32) -> Arc<LoopDevice> {
-        self.devices
-            .lock()
-            .entry(minor)
-            .or_insert_with(|| LoopDevice::new(device_registry, minor))
-            .clone()
+    fn get_or_create(&self, kernel: &Arc<Kernel>, minor: u32) -> Arc<LoopDevice> {
+        self.devices.lock().entry(minor).or_insert_with(|| LoopDevice::new(kernel, minor)).clone()
     }
 
-    fn find(&self, device_registry: &DeviceRegistry) -> Result<u32, Errno> {
+    fn find(&self, kernel: &Arc<Kernel>) -> Result<u32, Errno> {
         let mut devices = self.devices.lock();
         let mut minor = 0;
         loop {
             match devices.entry(minor) {
                 Entry::Vacant(e) => {
-                    e.insert(LoopDevice::new(device_registry, minor));
+                    e.insert(LoopDevice::new(kernel, minor));
                     return Ok(minor);
                 }
                 Entry::Occupied(e) => {
@@ -447,10 +454,10 @@ impl LoopDeviceRegistry {
         }
     }
 
-    fn add(&self, device_registry: &DeviceRegistry, minor: u32) -> Result<(), Errno> {
+    fn add(&self, kernel: &Arc<Kernel>, minor: u32) -> Result<(), Errno> {
         match self.devices.lock().entry(minor) {
             Entry::Vacant(e) => {
-                e.insert(LoopDevice::new(device_registry, minor));
+                e.insert(LoopDevice::new(kernel, minor));
                 Ok(())
             }
             Entry::Occupied(_) => {
@@ -494,12 +501,11 @@ impl FileOps for LoopControlDevice {
         request: u32,
         arg: SyscallArg,
     ) -> Result<SyscallResult, Errno> {
-        let device_registry = &current_task.kernel().device_registry;
         match request {
-            LOOP_CTL_GET_FREE => Ok(self.registry.find(device_registry)?.into()),
+            LOOP_CTL_GET_FREE => Ok(self.registry.find(current_task.kernel())?.into()),
             LOOP_CTL_ADD => {
                 let minor = arg.into();
-                self.registry.add(device_registry, minor)?;
+                self.registry.add(current_task.kernel(), minor)?;
                 Ok(minor.into())
             }
             LOOP_CTL_REMOVE => {
@@ -512,7 +518,7 @@ impl FileOps for LoopControlDevice {
     }
 }
 
-pub fn create_loop_device(
+fn get_or_create_loop_device(
     current_task: &CurrentTask,
     id: DeviceType,
     _node: &FsNode,
@@ -521,7 +527,7 @@ pub fn create_loop_device(
     Ok(current_task
         .kernel()
         .loop_device_registry
-        .get_or_create(&current_task.kernel().device_registry, id.minor())
+        .get_or_create(&current_task.kernel(), id.minor())
         .create_file_ops())
 }
 
@@ -565,9 +571,7 @@ mod tests {
 
         let loop_file = Anon::new_file(
             &current_task,
-            Box::new(LoopDeviceFile {
-                device: LoopDevice::new(&current_task.kernel().device_registry, 0),
-            }),
+            Box::new(LoopDeviceFile { device: Arc::new(LoopDevice::default()) }),
             open_flags,
         );
 

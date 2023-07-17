@@ -6,9 +6,12 @@ use std::sync::{Arc, Weak};
 
 use crate::{
     auth::FsCred,
-    device::{terminal::*, DeviceOps},
+    device::{terminal::*, DeviceMode, DeviceOps},
     fs::{
         buffers::{InputBuffer, OutputBuffer},
+        devtmpfs::{devtmpfs_create_symlink, devtmpfs_mkdir, devtmpfs_remove_child},
+        kobject::{KObjectDeviceAttribute, KType},
+        sysfs::SysFsDirectory,
         *,
     },
     mm::MemoryAccessorExt,
@@ -78,6 +81,25 @@ fn init_devpts(kernel: &Arc<Kernel>, options: FileSystemOptions) -> FileSystemHa
     root.node_id = ROOT_NODE_ID;
     fs.set_root_node(root);
     fs
+}
+
+pub fn tty_device_init(kernel: &Arc<Kernel>) {
+    let tty = KObjectDeviceAttribute::new(b"tty", b"tty", DeviceType::TTY, DeviceMode::Char);
+    let ptmx = KObjectDeviceAttribute::new(b"ptmx", b"ptmx", DeviceType::PTMX, DeviceMode::Char);
+
+    let tty_class = kernel.device_registry.virtual_bus().get_or_create_child(
+        b"tty",
+        KType::Class,
+        SysFsDirectory::new,
+    );
+    kernel.add_chr_device(tty_class.clone(), tty);
+    kernel.add_chr_device(tty_class, ptmx);
+
+    devtmpfs_mkdir(kernel, b"pts").unwrap();
+
+    // Create a symlink from /dev/ptmx to /dev/pts/ptmx for pseudo-tty subsystem.
+    devtmpfs_remove_child(kernel, b"ptmx");
+    devtmpfs_create_symlink(kernel, b"ptmx", b"pts/ptmx").unwrap();
 }
 
 struct DevPtsFs;

@@ -25,7 +25,7 @@ use std::{collections::BTreeMap, ffi::CString, sync::Arc};
 
 use crate::{
     auth::Credentials,
-    device::run_features,
+    device::{init_common_devices, run_features},
     execution::*,
     fs::{layeredfs::LayeredFs, tmpfs::TmpFs, *},
     logging::{log_error, log_info},
@@ -274,6 +274,9 @@ async fn create_container(
     init_task.set_fs(fs_context.clone());
     kernel.kthreads.init(&kernel, fs_context).source_context("initializing kthreads")?;
     let system_task = kernel.kthreads.system_task();
+
+    // Register common devices and add them in sysfs and devtmpfs.
+    init_common_devices(&kernel);
 
     mount_filesystems(system_task, config, &pkg_dir_proxy)
         .source_context("mounting filesystems")?;

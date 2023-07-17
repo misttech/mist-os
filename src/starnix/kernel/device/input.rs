@@ -3,16 +3,18 @@
 // found in the LICENSE file.
 
 use crate::{
-    device::DeviceOps,
+    device::{DeviceMode, DeviceOps},
     fs::{
         buffers::{InputBuffer, OutputBuffer},
+        kobject::{KObjectDeviceAttribute, KType},
+        sysfs::SysFsDirectory,
         *,
     },
     lock::Mutex,
     logging::*,
     mm::MemoryAccessorExt,
     syscalls::*,
-    task::{CurrentTask, EventHandler, WaitCanceler, WaitQueue, Waiter},
+    task::{CurrentTask, EventHandler, Kernel, WaitCanceler, WaitQueue, Waiter},
     types::*,
 };
 
@@ -516,6 +518,35 @@ fn phase_change_from_fidl_phase(fidl_phase: &FidlEventPhase) -> Option<PhaseChan
         // TODO(https://fxbug.dev/124607): Figure out whether this is correct.
         FidlEventPhase::Cancel => None,
     }
+}
+
+pub fn input_device_init(kernel: &Arc<Kernel>) {
+    // Also register an input device, which can be used to read pointer events
+    // associated with the framebuffer's `View`.
+    //
+    // Note: input requires the `framebuffer` feature, because Starnix cannot receive
+    // input events without a Fuchsia `View`.
+    //
+    // TODO(quiche): When adding support for multiple input devices, ensure
+    // that the appropriate `InputFile` is associated with the appropriate
+    // `INPUT_MINOR`.
+    kernel
+        .device_registry
+        .register_chrdev_major(INPUT_MAJOR, kernel.input_file.clone())
+        .expect("input device register failed.");
+
+    let input_class = kernel.device_registry.virtual_bus().get_or_create_child(
+        b"input",
+        KType::Class,
+        SysFsDirectory::new,
+    );
+    let input_attr = KObjectDeviceAttribute::new(
+        b"event0",
+        b"input/event0",
+        DeviceType::new(INPUT_MAJOR, 0),
+        DeviceMode::Char,
+    );
+    kernel.add_chr_device(input_class, input_attr);
 }
 
 #[cfg(test)]
