@@ -11,7 +11,6 @@ use core::{
     num::{NonZeroU16, NonZeroU8},
 };
 
-use assert_matches::assert_matches;
 use derivative::Derivative;
 use either::Either;
 use net_types::{
@@ -597,7 +596,7 @@ pub(crate) fn listen<
         ZonedAddr<A::IpAddr, <SC::IpSocketsCtx<'_> as DeviceIdContext<AnyDevice>>::DeviceId>,
     >,
     local_id: Option<A::LocalIdentifier>,
-) -> Result<S::SocketId, Either<ExpectedUnboundError, LocalAddressError>>
+) -> Result<(), Either<ExpectedUnboundError, LocalAddressError>>
 where
     Bound<S>: Tagged<AddrVec<A>>,
     S::ListenerAddrState:
@@ -627,7 +626,7 @@ fn listen_inner<
     id: S::SocketId,
     addr: Option<ZonedAddr<A::IpAddr, SC::DeviceId>>,
     local_id: Option<A::LocalIdentifier>,
-) -> Result<S::SocketId, Either<ExpectedUnboundError, LocalAddressError>>
+) -> Result<(), Either<ExpectedUnboundError, LocalAddressError>>
 where
     Bound<S>: Tagged<AddrVec<A>>,
     S::ListenerAddrState:
@@ -637,12 +636,12 @@ where
 {
     let Sockets { state, bound } = sockets;
 
-    let unbound_entry = match state.entry(id.get_key_index()) {
+    let mut entry = match state.entry(id.get_key_index()) {
         IdMapEntry::Vacant(_) => panic!("unbound ID {:?} is invalid", id),
         IdMapEntry::Occupied(o) => o,
     };
 
-    let UnboundSocketState { device, sharing, ip_options: _ } = match unbound_entry.get() {
+    let UnboundSocketState { device, sharing, ip_options } = match entry.get() {
         SocketState::Unbound(state) => state,
         SocketState::Bound(_) => return Err(Either::Left(ExpectedUnboundError)),
     };
@@ -695,6 +694,7 @@ where
     };
 
     let sharing = sharing.clone();
+    let ip_options = ip_options.clone();
     match bound.listeners_mut().try_insert(
         ListenerAddr {
             ip: ListenerIpAddr { addr, identifier },
@@ -702,19 +702,17 @@ where
         },
         sharing.into(),
         |addr, sharing| {
-            // Remove the unbound state only after we're sure the
+            // Replace the unbound state only after we're sure the
             // insertion is going to succeed.
-            let UnboundSocketState { device: _, sharing: _, ip_options } = assert_matches!(
-                state.remove(id.get_key_index()), Some(SocketState::Unbound(state)) => state);
-            let index = state.push(SocketState::Bound(BoundSocketState::Listener((
+            *entry.get_mut() = SocketState::Bound(BoundSocketState::Listener((
                 { ListenerState { ip_options } },
                 sharing,
                 addr,
-            ))));
-            index.into()
+            )));
+            id
         },
     ) {
-        Ok(entry) => Ok(entry.id()),
+        Ok(_entry) => Ok(()),
         Err((
             InsertError::ShadowAddrExists
             | InsertError::Exists
@@ -758,7 +756,7 @@ pub(crate) fn connect<
     remote_ip: ZonedAddr<A::IpAddr, <SC::IpSocketsCtx<'_> as DeviceIdContext<AnyDevice>>::DeviceId>,
     remote_id: A::RemoteIdentifier,
     proto: IpProto,
-) -> Result<S::SocketId, ConnectError>
+) -> Result<(), ConnectError>
 where
     Bound<S>: Tagged<AddrVec<A>>,
     S::ConnAddrState: SocketMapAddrStateSpec<Id = S::ConnId, SharingState = S::ConnSharingState>,
@@ -782,18 +780,22 @@ where
             ),
         }
         let Sockets { state, bound } = state;
-        let (local_ip, local_id, sharing, device, bound_map_socket_state) = match state
-            .get(id.get_key_index())
-            .expect("invalid socket ID")
+        let mut entry = match state.entry(id.get_key_index()) {
+            IdMapEntry::Vacant(_) => panic!("socket ID {:?} is invalid", id),
+            IdMapEntry::Occupied(o) => o,
+        };
+
+        let (local_ip, local_id, sharing, device, bound_map_socket_state, ip_options) = match entry
+            .get()
         {
             SocketState::Unbound(state) => {
-                let UnboundSocketState { device, sharing: unbound_sharing, ip_options: _ } = state;
-                (None, None, unbound_sharing.clone().into(), device.as_ref(), None)
+                let UnboundSocketState { device, sharing: unbound_sharing, ip_options } = state;
+                (None, None, unbound_sharing.clone().into(), device.as_ref(), None, ip_options)
             }
             SocketState::Bound(state) => match state {
                 BoundSocketState::Listener(state) => {
                     let (
-                        _,
+                        ListenerState { ip_options },
                         listener_sharing,
                         listener_addr @ ListenerAddr {
                             ip: ListenerIpAddr { addr, identifier },
@@ -810,11 +812,12 @@ where
                             listener_sharing.clone(),
                             id.clone(),
                         )),
+                        ip_options,
                     )
                 }
                 BoundSocketState::Connected(state) => {
                     let (
-                        ConnState { socket: _, clear_device_on_disconnect, shutdown: _ },
+                        ConnState { socket, clear_device_on_disconnect, shutdown: _ },
                         conn_sharing,
                         original_addr @ ConnAddr {
                             ip: ConnIpAddr { local: (ip, identifier), remote: _ },
@@ -831,6 +834,7 @@ where
                             conn_sharing.clone(),
                             id.clone(),
                         )),
+                        socket.options(),
                     )
                 }
             },
@@ -880,29 +884,10 @@ where
             .expect("presence verified earlier")
         };
 
+        let ip_options = ip_options.clone();
         match bound.conns_mut().try_insert(c, sharing, |addr, sharing| {
-            let ip_options = match state.remove(id.get_key_index()).expect("invalid socket ID") {
-                SocketState::Unbound(state) => {
-                    let UnboundSocketState { ip_options, device: _, sharing: _ } = state;
-                    ip_options
-                }
-                SocketState::Bound(state) => match state {
-                    BoundSocketState::Listener(state) => {
-                        let (ListenerState { ip_options }, _sharing, _addr) = state;
-                        ip_options
-                    }
-                    BoundSocketState::Connected(state) => {
-                        let (
-                            ConnState { socket, clear_device_on_disconnect: _, shutdown: _ },
-                            _sharing,
-                            _addr,
-                        ) = state;
-                        socket.into_options()
-                    }
-                },
-            };
             *ip_sock.options_mut() = ip_options;
-            let index = state.push(SocketState::Bound(BoundSocketState::Connected((
+            *entry.get_mut() = SocketState::Bound(BoundSocketState::Connected((
                 ConnState {
                     socket: ip_sock,
                     clear_device_on_disconnect,
@@ -910,10 +895,10 @@ where
                 },
                 sharing,
                 addr,
-            ))));
-            index.into()
+            )));
+            id
         }) {
-            Ok(entry) => Ok(entry.id()),
+            Ok(_entry) => Ok(()),
             Err((
                 InsertError::Exists
                 | InsertError::IndirectConflict
@@ -960,7 +945,7 @@ pub(crate) fn disconnect_connected<
     sync_ctx: &mut SC,
     _ctx: &mut C,
     id: S::SocketId,
-) -> Result<S::SocketId, ExpectedConnError>
+) -> Result<(), ExpectedConnError>
 where
     Bound<S>: Tagged<AddrVec<A>>,
     S::ListenerAddrState:
@@ -970,50 +955,43 @@ where
 {
     sync_ctx.with_sockets_mut(|_sync_ctx, state, _allocator| {
         let Sockets { state, bound } = state;
-        let entry = match state.entry(id.get_key_index()) {
+        let mut entry = match state.entry(id.get_key_index()) {
             IdMapEntry::Vacant(_) => panic!("unbound ID {:?} is invalid", id),
             IdMapEntry::Occupied(o) => o,
         };
-        match entry.get() {
+        let (conn_state, sharing, addr): &mut (_, S::ConnSharingState, _) = match entry.get_mut() {
             SocketState::Unbound(_) | SocketState::Bound(BoundSocketState::Listener(_)) => {
                 return Err(ExpectedConnError)
             }
-            SocketState::Bound(BoundSocketState::Connected(_)) => (),
-        };
-
-        let (conn_state, sharing, addr): (_, S::ConnSharingState, _) = match entry.remove() {
-            SocketState::Unbound(_) | SocketState::Bound(BoundSocketState::Listener(_)) => {
-                unreachable!("already checked the state")
-            }
             SocketState::Bound(BoundSocketState::Connected(state)) => state,
         };
+
         let _bound_addr = bound.conns_mut().remove(&id, &addr).expect("connection not found");
 
         let ConnState { socket, clear_device_on_disconnect, shutdown: _ } = conn_state;
-        let ip_options = socket.into_options();
+        let ip_options = socket.options().clone();
 
         let ConnAddr { ip: ConnIpAddr { local: (local_ip, identifier), remote: _ }, mut device } =
-            addr;
-        if clear_device_on_disconnect {
+            addr.clone();
+        if *clear_device_on_disconnect {
             device = None
         }
 
         let addr = ListenerAddr { ip: ListenerIpAddr { addr: Some(local_ip), identifier }, device };
 
-        let id = bound
+        let _entry = bound
             .listeners_mut()
-            .try_insert(addr, sharing.into(), |addr, sharing| {
-                let index = state.push(SocketState::Bound(BoundSocketState::Listener((
+            .try_insert(addr, sharing.clone().into(), |addr, sharing| {
+                *entry.get_mut() = SocketState::Bound(BoundSocketState::Listener((
                     ListenerState { ip_options },
                     sharing,
                     addr,
-                ))));
-                index.into()
+                )));
+                id
             })
-            .expect("inserting listener for disconnected socket failed")
-            .id();
+            .expect("inserting listener for disconnected socket failed");
 
-        Ok(id)
+        Ok(())
     })
 }
 
@@ -1178,20 +1156,16 @@ pub(crate) fn send_to<
     remote_identifier: A::RemoteIdentifier,
     proto: <A::IpVersion as IpProtoExt>::Proto,
     body: B,
-) -> Result<
-    Option<S::SocketId>,
-    Either<(B, LocalAddressError), (Option<S::SocketId>, SendToError<B, S::Serializer<B>>)>,
->
+) -> Result<(), Either<(B, LocalAddressError), SendToError<B, S::Serializer<B>>>>
 where
     Bound<S>: Tagged<AddrVec<A>>,
     S::UnboundSharingState: Clone + Into<S::ListenerSharingState>,
     S::ListenerSharingState: Default,
 {
     sync_ctx.with_sockets_buf_mut(|sync_ctx, state, _allocator| {
-        let (id, new_id) = match listen_inner(sync_ctx, ctx, state, id.clone(), None, None) {
-            Ok(listen) => (listen.clone(), Some(listen)),
+        match listen_inner(sync_ctx, ctx, state, id.clone(), None, None) {
+            Ok(()) | Err(Either::Left(ExpectedUnboundError)) => (),
             Err(Either::Right(e)) => return Err(Either::Left((body, e))),
-            Err(Either::Left(ExpectedUnboundError)) => (id, None),
         };
 
         // TODO(https://github.com/rust-lang/rust/issues/31436): Replace this
@@ -1259,10 +1233,7 @@ where
                 }
             }
         })();
-        match send_result {
-            Ok(()) => Ok(new_id),
-            Err(e) => Err(Either::Right((new_id, e))),
-        }
+        send_result.map_err(Either::Right)
     })
 }
 
@@ -2209,22 +2180,21 @@ mod test {
         );
         let mut non_sync_ctx = FakeNonSyncCtx::default();
 
-        let unbound = create(&mut sync_ctx);
+        let socket = create(&mut sync_ctx);
         let body = Buf::new(Vec::new(), ..);
 
-        let new_id = send_to(
+        send_to(
             &mut sync_ctx,
             &mut non_sync_ctx,
-            unbound,
+            socket,
             I::FAKE_CONFIG.remote_ip.into(),
             'a',
             IpProto::Udp.into(),
             body,
         )
-        .expect("succeeds")
-        .expect("returns new ID");
+        .expect("succeeds");
         assert_matches!(
-            get_info(&mut sync_ctx, &mut non_sync_ctx, new_id),
+            get_info(&mut sync_ctx, &mut non_sync_ctx, socket),
             SocketInfo::Listener(_)
         );
     }
@@ -2241,27 +2211,23 @@ mod test {
         );
         let mut non_sync_ctx = FakeNonSyncCtx::default();
 
-        let unbound = create(&mut sync_ctx);
+        let socket = create(&mut sync_ctx);
         let body = Buf::new(Vec::new(), ..);
 
-        let new_id = assert_matches!(
+        assert_matches!(
             send_to(
                 &mut sync_ctx,
                 &mut non_sync_ctx,
-                unbound,
+                socket,
                 I::FAKE_CONFIG.remote_ip.into(),
                 'a',
                 IpProto::Udp.into(),
                 body,
             ),
-            Err(Either::Right((
-                // The error includes a new listener ID for the socket.
-                Some(new_id),
-                SendToError::CreateAndSend(_, _)
-            ))) => new_id
+            Err(Either::Right(SendToError::CreateAndSend(_, _)))
         );
         assert_matches!(
-            get_info(&mut sync_ctx, &mut non_sync_ctx, new_id),
+            get_info(&mut sync_ctx, &mut non_sync_ctx, socket),
             SocketInfo::Listener(_)
         );
     }

@@ -232,7 +232,7 @@ pub(crate) trait TransportState<I: Ip>: Transport<I> + Send + Sync + 'static {
         id: &Self::SocketId,
         remote_ip: ZonedAddr<I::Addr, DeviceId<C>>,
         remote_id: Self::RemoteIdentifier,
-    ) -> Result<Self::SocketId, Self::ConnectError>;
+    ) -> Result<(), Self::ConnectError>;
 
     fn bind<C: NonSyncContext>(
         sync_ctx: &SyncCtx<C>,
@@ -240,13 +240,13 @@ pub(crate) trait TransportState<I: Ip>: Transport<I> + Send + Sync + 'static {
         id: &Self::SocketId,
         addr: Option<ZonedAddr<I::Addr, DeviceId<C>>>,
         port: Option<Self::LocalIdentifier>,
-    ) -> Result<Self::SocketId, Self::ListenError>;
+    ) -> Result<(), Self::ListenError>;
 
     fn disconnect<C: NonSyncContext>(
         sync_ctx: &SyncCtx<C>,
         ctx: &mut C,
         id: &Self::SocketId,
-    ) -> Result<Self::SocketId, Self::DisconnectError>;
+    ) -> Result<(), Self::DisconnectError>;
 
     fn shutdown<C: NonSyncContext>(
         sync_ctx: &SyncCtx<C>,
@@ -353,7 +353,7 @@ pub(crate) trait BufferTransportState<I: Ip, B: BufferMut>: TransportState<I> {
         id: &Self::SocketId,
         remote: (ZonedAddr<I::Addr, DeviceId<C>>, Self::RemoteIdentifier),
         body: B,
-    ) -> (Option<Self::SocketId>, Result<(), (B, Self::SendToError)>);
+    ) -> Result<(), (B, Self::SendToError)>;
 }
 
 #[derive(Debug)]
@@ -392,7 +392,7 @@ impl<I: IpExt> TransportState<I> for Udp {
         id: &Self::SocketId,
         remote_ip: ZonedAddr<<I as Ip>::Addr, DeviceId<C>>,
         remote_id: Self::RemoteIdentifier,
-    ) -> Result<Self::SocketId, Self::ConnectError> {
+    ) -> Result<(), Self::ConnectError> {
         udp::connect(sync_ctx, ctx, id, remote_ip, remote_id)
     }
 
@@ -402,7 +402,7 @@ impl<I: IpExt> TransportState<I> for Udp {
         id: &Self::SocketId,
         addr: Option<ZonedAddr<<I as Ip>::Addr, DeviceId<C>>>,
         port: Option<Self::LocalIdentifier>,
-    ) -> Result<Self::SocketId, Self::ListenError> {
+    ) -> Result<(), Self::ListenError> {
         udp::listen_udp(sync_ctx, ctx, id, addr, port)
     }
 
@@ -410,7 +410,7 @@ impl<I: IpExt> TransportState<I> for Udp {
         sync_ctx: &SyncCtx<C>,
         ctx: &mut C,
         id: &Self::SocketId,
-    ) -> Result<Self::SocketId, Self::DisconnectError> {
+    ) -> Result<(), Self::DisconnectError> {
         udp::disconnect_udp_connected(sync_ctx, ctx, id)
     }
 
@@ -560,12 +560,8 @@ impl<I: IpExt + IpSockAddrExt, B: BufferMut> BufferTransportState<I, B> for Udp 
         id: &Self::SocketId,
         (remote_ip, remote_port): (ZonedAddr<<I as Ip>::Addr, DeviceId<C>>, Self::RemoteIdentifier),
         body: B,
-    ) -> (Option<Self::SocketId>, Result<(), (B, Self::SendToError)>) {
-        match udp::send_udp_to(sync_ctx, ctx, id, remote_ip, remote_port, body) {
-            Ok(new_id) => (new_id, Ok(())),
-            Err((body, Either::Left(e))) => (None, Err((body, Either::Left(e)))),
-            Err((body, Either::Right((new_id, e)))) => (new_id, Err((body, Either::Right(e)))),
-        }
+    ) -> Result<(), (B, Self::SendToError)> {
+        udp::send_udp_to(sync_ctx, ctx, id, remote_ip, remote_port, body)
     }
 }
 
@@ -1377,13 +1373,8 @@ where
         // remote address as localhost.
         let remote_addr = remote_addr.unwrap_or(ZonedAddr::Unzoned(I::LOOPBACK_ADDRESS));
 
-        let new_id = T::connect(sync_ctx, non_sync_ctx, id, remote_addr, remote_port)
+        T::connect(sync_ctx, non_sync_ctx, id, remote_addr, remote_port)
             .map_err(IntoErrno::into_errno)?;
-        I::with_collection_mut(non_sync_ctx, |c| {
-            let messages = c.received.remove(id.get_key_index()).expect("had message queue");
-            assert_matches!(c.received.insert(new_id.get_key_index(), messages), None);
-        });
-        *id = new_id;
 
         Ok(())
     }
@@ -1412,16 +1403,7 @@ where
                 .map_err(IntoErrno::into_errno)?;
         let local_port = T::LocalIdentifier::from_u16(port);
 
-        let new_id = T::bind(sync_ctx, non_sync_ctx, id, sockaddr, local_port)
-            .map_err(IntoErrno::into_errno)?;
-        assert_matches!(
-            I::with_collection_mut(non_sync_ctx, |c| {
-                let messages = c.received.remove(id.get_key_index()).expect("has message queue");
-                c.received.insert(new_id.get_key_index(), messages)
-            }),
-            None
-        );
-        *id = new_id;
+        T::bind(sync_ctx, non_sync_ctx, id, sockaddr, local_port).map_err(IntoErrno::into_errno)?;
         Ok(())
     }
 
@@ -1443,12 +1425,7 @@ where
         let mut ctx = ctx.clone();
         let Ctx { sync_ctx, non_sync_ctx } = &mut ctx;
 
-        let new_id = T::disconnect(sync_ctx, non_sync_ctx, id).map_err(IntoErrno::into_errno)?;
-        I::with_collection_mut(non_sync_ctx, |c| {
-            let messages = c.received.remove(id.get_key_index()).expect("has message queue");
-            assert_matches!(c.received.insert(new_id.get_key_index(), messages), None);
-        });
-        *id = new_id;
+        T::disconnect(sync_ctx, non_sync_ctx, id).map_err(IntoErrno::into_errno)?;
         Ok(())
     }
 
@@ -1608,20 +1585,8 @@ where
         let len = data.len() as i64;
         let body = Buf::new(data, ..);
         match remote {
-            Some(remote) => {
-                let (new_id, r) = T::send_to(sync_ctx, non_sync_ctx, id, remote, body);
-                // T::send_to can implicitly bind the socket, in which case the
-                // old ID is no longer valid. Handle the update even if an error
-                // was returned.
-                if let Some(new_id) = new_id {
-                    I::with_collection_mut(non_sync_ctx, |c| {
-                        let messages = c.received.remove(id.get_key_index()).expect("has queue");
-                        assert_matches!(c.received.insert(new_id.get_key_index(), messages), None);
-                    });
-                    *id = new_id;
-                }
-                r.map_err(|(_body, e)| e.into_errno())
-            }
+            Some(remote) => T::send_to(sync_ctx, non_sync_ctx, id, remote, body)
+                .map_err(|(_body, e)| e.into_errno()),
             None => T::send(sync_ctx, non_sync_ctx, id, body).map_err(|(_body, e)| e.into_errno()),
         }
         .map(|()| len)
