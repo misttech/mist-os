@@ -23,9 +23,9 @@ Assumptions:
       appropriate port forwards.
 
 ## Installation
-If you like to try HoneyDew locally in an interpreter, you can follow the
-guide below to install the library in a Python virtual environment where you
-experiment with HD's features in a REPL.
+If you are contributing to HoneyDew or if you like to try HoneyDew locally in a
+python interpreter, you can follow the guide below to [pip] install HoneyDew
+(and all of its dependencies) in a [python virtual environment].
 
 ### Prerequisites
 The Honeydew library depends on some Fuchsia build artifacts that must be built
@@ -57,9 +57,6 @@ After the installation succeeds, follow the script's instruction message to
 start a Python interpreter and import Honeydew.
 
 ### Manual installation
-If you like to try HoneyDew locally, you can [pip] install HoneyDew along with
-all of its dependencies inside a [python virtual environment]
-
 Note - Use `fuchsia-vendored-python` while creating the virtual environment
 as all of the in-tree code is developed using `fuchsia-vendored-python`
 
@@ -92,6 +89,19 @@ as all of the in-tree code is developed using `fuchsia-vendored-python`
 Python 3.8.8+chromium.12 (tags/v3.8.8-dirty:024d8058b0, Feb 19 2021, 16:18:16)
 [GCC 4.8.2 20140120 (Red Hat 4.8.2-15)] on linux
 Type "help", "copyright", "credits" or "license" for more information.
+# Update `sys.path` to include Fuchsia Controller and FIDL IR paths before
+# importing Honeydew.
+>>> import os
+>>> import sys
+>>> import subprocess
+>>> FUCHSIA_ROOT = os.environ.get("FUCHSIA_DIR")
+>>> OUT_DIR = subprocess.check_output( \
+  "echo $(cat \"$FUCHSIA_DIR\"/.fx-build-dir)", \
+  shell=True).strip().decode('utf-8')
+>>> sys.path.append(f"{FUCHSIA_ROOT}/src/developer/ffx/lib/fuchsia-controller/python")
+>>> sys.path.append(f"{FUCHSIA_ROOT}/{OUT_DIR}/host_x64")
+
+# You can now import honeydew
 >>> import honeydew
 ```
 
@@ -106,24 +116,17 @@ To fully uninstall HoneyDew, delete the virtual environment that was crated
 ```
 
 ## Usage
+Before proceeding further, please complete the [Installation](#Installation) and
+activate the python virtual environment created during the installation.
 
 ### Device object creation
-First [build fuchsia] before running these commands.
-
-You can then use `fuchsia-vendored-python` interpreter and play around with
-HoneyDew:
 ```python
-# Update `sys.path` to include HoneyDew's path before importing it
-# Do this step only if you have not pip installed HoneyDew
->>> import os
->>> import sys
->>> FUCHSIA_ROOT = os.environ.get("FUCHSIA_DIR")
->>> HONEYDEW_ROOT = f"{FUCHSIA_ROOT}/src/testing/end_to_end/honeydew"
->>> sys.path.append(HONEYDEW_ROOT)
-
 # Update `sys.path` to include Fuchsia Controller and FIDL IR paths before
 # importing Honeydew.
+>>> import os
+>>> import sys
 >>> import subprocess
+>>> FUCHSIA_ROOT = os.environ.get("FUCHSIA_DIR")
 >>> OUT_DIR = subprocess.check_output( \
   "echo $(cat \"$FUCHSIA_DIR\"/.fx-build-dir)", \
   shell=True).strip().decode('utf-8')
@@ -134,6 +137,7 @@ HoneyDew:
 >>> import logging
 >>> logging.basicConfig(level=logging.INFO)
 
+# You can now import honeydew
 >>> import honeydew
 
 # Setup HoneyDew to run using isolated FFX and collect the logs
@@ -173,7 +177,6 @@ INFO:honeydew.device_classes.fuchsia_device_base:Starting SL4F server on fuchsia
 honeydew.device_classes.generic_fuchsia_device.GenericFuchsiaDevice
 
 >>> fd_remote = honeydew.create_device("fuchsia-d88c-796c-e57e", ssh_private_key=os.environ.get("SSH_PRIVATE_KEY_FILE"), device_ip_port=custom_types.IpPort.parse("[::1]:8022"))
-
 INFO:honeydew:Registered device classes with HoneyDew '{<class 'honeydew.device_classes.fuchsia_device_base.FuchsiaDeviceBase'>, <class 'honeydew.device_classes.x64.X64'>, <class 'honeydew.device_classes.generic_fuchsia_device.GenericFuchsiaDevice'>}'
 INFO:honeydew:Didn't find any matching device class implementation for 'fuchsia-d88c-796c-e57e'. So returning 'GenericFuchsiaDevice'
 INFO:honeydew.transports.ssh:Waiting for fuchsia-d88c-796c-e57e to allow ssh connection...
@@ -214,16 +217,13 @@ INFO:honeydew.transports.sl4f:Starting SL4F server on fuchsia-d88c-796c-e57e...
 ### Access the public methods
 ```python
 >>> emu.reboot()
-INFO:honeydew.device_classes.fuchsia_device_base:Rebooting fuchsia-emulator...
-INFO:honeydew.device_classes.fuchsia_device_base:Waiting for fuchsia-emulator to go offline...
-INFO:honeydew.device_classes.fuchsia_device_base:fuchsia-emulator is offline.
-INFO:honeydew.device_classes.fuchsia_device_base:Waiting for fuchsia-emulator to become pingable...
-INFO:honeydew.device_classes.fuchsia_device_base:fuchsia-emulator now pingable.
-INFO:honeydew.device_classes.fuchsia_device_base:Waiting for fuchsia-emulator to allow ssh connection...
-Warning: Permanently added 'fe80::55da:a912:5df:ee98%qemu' (ED25519) to the list of known hosts.
-INFO:honeydew.device_classes.fuchsia_device_base:fuchsia-emulator is available via ssh.
-INFO:honeydew.device_classes.fuchsia_device_base:Starting SL4F server on fuchsia-emulator...
-WARNING:honeydew.utils.http_utils:Send HTTP request failed with error: '<urlopen error [Errno 111] Connection refused>' on iteration 1/3
+INFO:honeydew.device_classes.base_fuchsia_device:Rebooting fuchsia-emulator...
+INFO:honeydew.device_classes.base_fuchsia_device:Waiting for fuchsia-emulator to go offline...
+INFO:honeydew.device_classes.base_fuchsia_device:fuchsia-emulator is offline.
+INFO:honeydew.device_classes.base_fuchsia_device:Waiting for fuchsia-emulator to go online...
+INFO:honeydew.device_classes.base_fuchsia_device:fuchsia-emulator is online.
+INFO:honeydew.transports.sl4f:Starting SL4F server on fuchsia-emulator...
+
 
 >>> emu.log_message_to_device(message="This is a test INFO message logged by HoneyDew", level=honeydew.custom_types.LEVEL.INFO)
 
@@ -454,4 +454,3 @@ Here are some of the pointers that you can use while contributing to HoneyDew:
 
 [pip]: https://pip.pypa.io/en/stable/getting-started/
 
-[build fuchsia]: https://fuchsia.dev/fuchsia-src/get-started/build_fuchsia

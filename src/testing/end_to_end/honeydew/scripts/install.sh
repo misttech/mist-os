@@ -65,5 +65,5 @@ cd $STARTING_DIR
 echo -e "Installation successful...\n"
 echo "To experiment with Honeydew locally in a Python interpreter, run:"
 echo "$ source $VENV_PATH/bin/activate"
-echo "$ BUILD_DIR=$BUILD_DIR PYTHONPATH=$HD_PYTHONPATH python"
+echo "$ PYTHONPATH=$HD_PYTHONPATH python"
 echo -e ">>> import honeydew\n"
