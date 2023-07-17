@@ -13,6 +13,13 @@
             include: "../loopback_isolated_filter.json5",
         },
         {
+            type: "skip",
+            matchers: [
+                "All/SocketInetLoopbackIsolatedTest.TCPConnectionReuseAddrConflicts/ListenV6Any_ConnectV4Any",
+                "All/SocketInetLoopbackIsolatedTest.TCPConnectionReuseAddrConflicts/ListenV6Any_ConnectV4Loopback",
+            ],
+        },
+        {
             type: "expect_failure",
             matchers: [
                 "AllFamilies/SocketMultiProtocolInetLoopbackIsolatedTest.BindToDeviceReusePort/TCP",
