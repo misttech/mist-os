@@ -372,7 +372,7 @@ TEST_F(BootstrapChosenItemTest, ParseChosen) {
                       .uart_config =
                           {
                               .mmio_phys = 0x9000000,
-                              .irq = 0,
+                              .irq = 33,
                           },
                       .uart_absolute_path = "/some-interrupt-controller/pl011uart@9000000",
                   });
@@ -405,7 +405,7 @@ TEST_F(BootstrapChosenItemTest, ArmQemu) {
                       .uart_config =
                           {
                               .mmio_phys = uart::pl011::kQemuConfig.mmio_phys,
-                              .irq = 0,
+                              .irq = 33,
                           },
                       .uart_absolute_path = "/pl011@9000000",
                   });
@@ -438,7 +438,7 @@ TEST_F(BootstrapChosenItemTest, RiscvQemu) {
                       .uart_config =
                           {
                               .mmio_phys = 0x10000000,
-                              .irq = 0,
+                              .irq = 10,
                           },
                       .uart_absolute_path = "/soc/serial@10000000",
                   });
@@ -469,7 +469,7 @@ TEST_F(BootstrapChosenItemTest, VisionFive2) {
                       .uart_config =
                           {
                               .mmio_phys = 0x10000000,
-                              .irq = 0,
+                              .irq = 32,
                           },
                       .uart_absolute_path = "/soc/serial@10000000",
                   });

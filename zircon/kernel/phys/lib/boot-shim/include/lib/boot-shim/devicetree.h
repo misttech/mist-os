@@ -23,6 +23,7 @@
 #include <stdio.h>
 
 #include <array>
+#include <optional>
 #include <string>
 #include <string_view>
 
@@ -183,20 +184,17 @@ class ArmDevicetreeGicItem
 // This item parses the 'chosen' node, which is a child of the root node('/chosen'). This node
 // contains information about the commandline, ramdisk and UART.
 //
-// * The commandline is contained as part of the string block of the devicetree.
+// * The cmdline is contained as part of the string block of the devicetree.
 //
 // * The ramdisk is represented as a range in memory where the firmware loaded it, usually a ZBI.
 //
 // * The UART on the other hand, is represented as path(which may be aliased). Is the job of this
 //   item to bootstrap the UART, which means determining which driver needs to be used.
 //
-// This item will not decode the interrupt cells, the UART information extracted by this device
-// is incomplete and only useful for non IRQ-driven scenarios.
-//
 // For more details on the chosen node please see:
 //  https://devicetree-specification.readthedocs.io/en/latest/chapter3-devicenodes.html#chosen-node
 class DevicetreeBootstrapChosenNodeItemBase
-    : public DevicetreeItemBase<DevicetreeBootstrapChosenNodeItemBase, 2>,
+    : public DevicetreeItemBase<DevicetreeBootstrapChosenNodeItemBase, 3>,
       public ItemBase {
  public:
   // Matcher API.
@@ -222,14 +220,22 @@ class DevicetreeBootstrapChosenNodeItemBase
   constexpr std::optional<devicetree::ResolvedPath> stdout_path() const { return resolved_stdout_; }
 
  protected:
+  auto& uart_matcher() { return uart_matcher_; }
+
+  auto& uart_emplacer() { return uart_emplacer_; }
+
+ private:
   devicetree::ScanState HandleBootstrapStdout(const devicetree::NodePath& path,
                                               const devicetree::PropertyDecoder& decoder);
+  devicetree::ScanState HandleUartInterruptParent(const devicetree::PropertyDecoder& decoder);
 
   // Path to device node containing the stdout device (uart).
   bool found_chosen_ = false;
   std::string_view stdout_path_;
   std::optional<devicetree::ResolvedPath> resolved_stdout_;
   zbi_dcfg_simple_t uart_dcfg_ = {};
+  std::optional<uint32_t> uart_interrupt_parent_;
+  std::optional<devicetree::PropertyValue> uart_interrupts_;
 
   // Command line provided by the devicetree.
   std::string_view cmdline_;
@@ -237,8 +243,8 @@ class DevicetreeBootstrapChosenNodeItemBase
   zbitl::ByteView zbi_;
 
   // Type erased match.
-  fit::inline_function<bool(const devicetree::PropertyDecoder&)> match_ = nullptr;
-  fit::inline_function<void(const zbi_dcfg_simple_t&)> emplacer_ = nullptr;
+  fit::inline_function<bool(const devicetree::PropertyDecoder&)> uart_matcher_ = nullptr;
+  fit::inline_function<void(const zbi_dcfg_simple_t&)> uart_emplacer_ = nullptr;
 };
 
 template <typename AllUartDrivers = uart::all::Driver>
@@ -247,9 +253,9 @@ class DevicetreeBootstrapChosenNodeItem : public DevicetreeBootstrapChosenNodeIt
   // DevicetreeItem API.
   template <typename T>
   void Init(T& shim) {
-    match_ = [this](const auto& decoder) -> bool {
-      emplacer_ = uart_.MatchDevicetree(decoder);
-      return emplacer_ != nullptr;
+    uart_matcher() = [this](const auto& decoder) -> bool {
+      uart_emplacer() = uart_.MatchDevicetree(decoder);
+      return uart_emplacer() != nullptr;
     };
 
     DevicetreeBootstrapChosenNodeItemBase::Init(shim);
