@@ -16,7 +16,6 @@ use {
 
 mod packages;
 mod validation;
-pub mod versions;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum DirentType {
@@ -94,21 +93,14 @@ async fn read_dirents<'a>(
 ///   ./
 ///     system/
 ///     packages/
-///     versions/
 ///     ctl/
 ///       validation/
 ///         missing
 /// The "system" directory will only be added and served if `system_image.is_some()`.
-// TODO(fxbug.dev/126227) Delete the unused pkgfs/versions parameters two weeks after no longer
-// exposing the directory. Variables kept as unused to make reverting easier.
 pub fn make_dir(
     base_packages: Arc<crate::BasePackages>,
-    _package_index: Arc<async_lock::RwLock<crate::PackageIndex>>,
-    _non_static_allow_list: Arc<system_image::NonStaticAllowList>,
-    _executability_restrictions: system_image::ExecutabilityRestrictions,
     blobfs: blobfs::Client,
     system_image: Option<system_image::SystemImage>,
-    _pkgfs_versions_visibility: versions::Visibility,
 ) -> Result<Arc<dyn DirectoryEntry>, anyhow::Error> {
     let dir = vfs::pseudo_directory! {
         "packages" => Arc::new(packages::PkgfsPackages::new(

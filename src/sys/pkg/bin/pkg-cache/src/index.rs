@@ -12,6 +12,3 @@ pub use package::{
     fulfill_meta_far_blob, load_cache_packages, set_retained_index, CompleteInstallError,
     FulfillMetaFarError, PackageIndex,
 };
-
-#[cfg(test)]
-pub use package::register_dynamic_package;

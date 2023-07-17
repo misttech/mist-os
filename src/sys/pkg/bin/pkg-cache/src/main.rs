@@ -101,14 +101,10 @@ async fn main_inner() -> Result<(), Error> {
     info!("starting package cache service");
     let inspector = finspect::Inspector::default();
 
-    let (use_fxblob, use_system_image, pkgfs_versions_visibility) = {
+    let (use_fxblob, use_system_image) = {
         let config = pkg_cache_config::Config::take_from_startup_handle();
         inspector.root().record_child("config", |config_node| config.record_inspect(config_node));
-        let pkgfs_versions_visibility = match config.pkgfs_versions_base_only {
-            true => compat::pkgfs::versions::Visibility::BaseOnly,
-            false => compat::pkgfs::versions::Visibility::BaseAndDynamic,
-        };
-        (config.use_fxblob, config.use_system_image, pkgfs_versions_visibility)
+        (config.use_fxblob, config.use_system_image)
     };
 
     let mut package_index = PackageIndex::new(inspector.root().create_child("index"));
@@ -198,14 +194,13 @@ async fn main_inner() -> Result<(), Error> {
     let cobalt_fut = Task::spawn(cobalt_fut);
 
     // Use VFS to serve the out dir because ServiceFs does not support OPEN_RIGHT_EXECUTABLE and
-    // pkgfs/{packages|versions|system} require it.
+    // pkgfs/{packages|system} require it.
     let svc_dir = vfs::pseudo_directory! {};
     let cache_inspect_node = inspector.root().create_child("fuchsia.pkg.PackageCache");
     {
         let package_index = Arc::clone(&package_index);
         let blobfs = blobfs.clone();
         let base_packages = Arc::clone(&base_packages);
-        let non_static_allow_list = Arc::clone(&non_static_allow_list);
         let scope = scope.clone();
         let cobalt_sender = cobalt_sender.clone();
         let cache_inspect_id = Arc::new(AtomicU32::new(0));
@@ -266,7 +261,6 @@ async fn main_inner() -> Result<(), Error> {
     {
         let blobfs = blobfs.clone();
         let base_packages = Arc::clone(&base_packages);
-        let package_index = Arc::clone(&package_index);
         let commit_status_provider =
             fuchsia_component::client::connect_to_protocol::<CommitStatusProviderMarker>()
                 .context("while connecting to commit status provider")?;
@@ -295,12 +289,8 @@ async fn main_inner() -> Result<(), Error> {
         "pkgfs" =>
             crate::compat::pkgfs::make_dir(
                 Arc::clone(&base_packages),
-                Arc::clone(&package_index),
-                Arc::clone(&non_static_allow_list),
-                executability_restrictions,
                 blobfs.clone(),
                 system_image,
-                pkgfs_versions_visibility
             )
             .context("serve pkgfs compat directories")?,
         inspect_runtime::DIAGNOSTICS_DIR => inspect_runtime::create_diagnostics_dir(inspector),

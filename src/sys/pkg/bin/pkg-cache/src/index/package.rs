@@ -11,10 +11,7 @@ use {
     fuchsia_hash::Hash,
     fuchsia_inspect as finspect,
     fuchsia_pkg::{PackageName, PackagePath},
-    std::{
-        collections::{HashMap, HashSet},
-        sync::Arc,
-    },
+    std::{collections::HashSet, sync::Arc},
 };
 
 /// The index of packages known to pkg-cache.
@@ -144,11 +141,6 @@ impl PackageIndex {
         self.retained.replace(index);
     }
 
-    /// Returns a snapshot of all active dynamic packages and their hashes.
-    pub fn active_packages(&self) -> HashMap<PackagePath, Hash> {
-        self.dynamic.active_packages()
-    }
-
     /// Returns package name if the package is active.
     pub fn get_name_if_active(&self, hash: &Hash) -> Option<&PackageName> {
         self.dynamic.get_name_if_active(hash)
@@ -200,19 +192,6 @@ pub async fn set_retained_index(
     // Then, atomically, merge in available data from the dynamic/retained indices and swap in
     // the new retained index.
     index.write().await.set_retained_index(new_retained);
-}
-
-#[cfg(test)]
-pub async fn register_dynamic_package(
-    index: &Arc<async_lock::RwLock<PackageIndex>>,
-    path: PackagePath,
-    hash: Hash,
-) {
-    let mut index = index.write().await;
-
-    index.start_install(hash);
-    index.fulfill_meta_far(hash, path, HashSet::new()).unwrap();
-    index.complete_install(hash).unwrap();
 }
 
 #[cfg(test)]

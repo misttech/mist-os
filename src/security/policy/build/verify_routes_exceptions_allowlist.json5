@@ -170,28 +170,6 @@
                 },
                 {
                     using_node: "/bootstrap/pkg-cache",
-                    capability: "pkgfs-versions",
-                    error: {
-                        error: {
-                            analyzer_model_error: {
-                                routing_error: {
-                                    policy_error: {
-                                        capability_use_disallowed: {
-                                            cap: "pkgfs-versions",
-                                            source_moniker: {
-                                                component_instance: "/bootstrap/pkg-cache",
-                                            },
-                                            target_moniker: "/bootstrap/pkg-cache",
-                                        },
-                                    },
-                                },
-                            },
-                        },
-                        message: "security policy disallows \"pkgfs-versions\" from \"/bootstrap/pkg-cache\" being used at \"/bootstrap/pkg-cache\"",
-                    },
-                },
-                {
-                    using_node: "/bootstrap/pkg-cache",
                     capability: "system",
                     error: {
                         error: {

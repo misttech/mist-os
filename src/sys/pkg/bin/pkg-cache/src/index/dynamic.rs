@@ -63,6 +63,7 @@ impl DynamicIndex {
     }
 
     /// Returns a snapshot of all active packages and their hashes.
+    #[cfg(test)]
     pub fn active_packages(&self) -> HashMap<PackagePath, Hash> {
         self.active_packages.clone()
     }

@@ -69,7 +69,6 @@ rustc_library("lib") {
     "src/compat/pkgfs/packages.rs",
     "src/compat/pkgfs/packages/variants.rs",
     "src/compat/pkgfs/validation.rs",
-    "src/compat/pkgfs/versions.rs",
     "src/gc_service.rs",
     "src/index.rs",
     "src/index/dynamic.rs",
@@ -103,7 +102,6 @@ fuchsia_structured_config_rust_lib("config_lib") {
 fuchsia_structured_config_values("config_values_from_gn") {
   cm_label = ":manifest"
   values = {
-    pkgfs_versions_base_only = true
     use_fxblob = false
     use_system_image = true
   }
@@ -112,7 +110,6 @@ fuchsia_structured_config_values("config_values_from_gn") {
 fuchsia_structured_config_values("config_values_from_gn-ignore-system-image") {
   cm_label = ":manifest"
   values = {
-    pkgfs_versions_base_only = true
     use_fxblob = false
     use_system_image = false
   }

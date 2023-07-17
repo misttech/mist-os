@@ -8,9 +8,8 @@ use {
     std::{collections::HashSet, str::FromStr},
 };
 
-/// `NonStaticAllowList` is populated from a list of which dynamic packages are allowed
-/// to appear in `pkgfs/packages` and allowed to expose executable handles to blobs in
-/// `pkgfs/versions`. By default, is located in the `system_image` package at
+/// The list of which non-base packages will have *executable* package directory handles when
+/// executability enforcement is enabled. By default, is located in the `system_image` package at
 /// `data/pkgfs_packages_non_static_packages_allowlist.txt`.
 #[derive(Debug, PartialEq, Eq)]
 pub struct NonStaticAllowList {
