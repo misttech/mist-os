@@ -29,7 +29,7 @@ use net_types::{
     MulticastAddr, SpecifiedAddr, ZonedAddr,
 };
 use netstack3_core::{
-    data_structures::id_map_collection::{IdMapCollection, IdMapCollectionKey},
+    data_structures::id_map::{EntryKey, IdMap},
     device::{DeviceId, WeakDeviceId},
     error::{LocalAddressError, SocketError},
     ip::{icmp, IpExt},
@@ -71,7 +71,7 @@ pub(crate) enum DatagramProtocol {
 /// A minimal abstraction over transport protocols that allows bindings-side state to be stored.
 pub(crate) trait Transport<I>: Debug + Sized + Send + Sync + 'static {
     const PROTOCOL: DatagramProtocol;
-    type SocketId: Debug + Copy + IdMapCollectionKey + Send + Sync;
+    type SocketId: Debug + Copy + EntryKey + Send + Sync;
 }
 
 /// Mapping from socket IDs to their receive queues.
@@ -84,14 +84,10 @@ pub(crate) trait Transport<I>: Debug + Sized + Send + Sync + 'static {
 /// a potential deadlock where Core is waiting for a `MessageQueue` to be
 /// available and some bindings code here holds the `MessageQueue` and
 /// attempts to lock Core state via a `netstack3_core` call.
-pub(crate) struct SocketCollection<I: Ip, T: Transport<I>> {
-    received: IdMapCollection<T::SocketId, Arc<CoreMutex<MessageQueue<AvailableMessage<I, T>>>>>,
-}
-
-impl<I: Ip, T: Transport<I>> Default for SocketCollection<I, T> {
-    fn default() -> Self {
-        Self { received: IdMapCollection::default() }
-    }
+#[derive(Derivative)]
+#[derivative(Default(bound = "I: Ip"))]
+pub(crate) struct SocketCollection<I: Ip, T> {
+    received: IdMap<Arc<CoreMutex<MessageQueue<AvailableMessage<I, T>>>>>,
 }
 
 pub(crate) struct SocketCollectionPair<T>
@@ -588,7 +584,7 @@ impl<I: IpExt, B: BufferMut> udp::BufferNonSyncContext<I, B> for SocketCollectio
         body: &B,
     ) {
         let Self { received } = self;
-        let queue = received.get(&id).unwrap();
+        let queue = received.get(id.get_key_index()).unwrap();
         queue.lock().receive(IntoAvailableMessage(
             src_ip,
             src_port.map_or(0, NonZeroU16::get),
@@ -666,7 +662,9 @@ where
         let messages = Arc::new(CoreMutex::new(MessageQueue::new(local_event)));
 
         assert_matches!(
-            I::with_collection_mut(non_sync_ctx, |c| c.received.insert(&id, messages.clone())),
+            I::with_collection_mut(non_sync_ctx, |c| c
+                .received
+                .insert(id.get_key_index(), messages.clone())),
             None
         );
 
@@ -764,7 +762,8 @@ where
         non_sync_ctx: &mut BindingsNonSyncCtxImpl,
     ) {
         let Self { info: SocketControlInfo { _properties, id }, messages: _, peer_event: _ } = self;
-        let _: Option<_> = I::with_collection_mut(non_sync_ctx, |c| c.received.remove(&id));
+        let _: Option<_> =
+            I::with_collection_mut(non_sync_ctx, |c| c.received.remove(id.get_key_index()));
         let _: T::SocketInfo<_> = T::remove(sync_ctx, non_sync_ctx, id);
     }
 }
@@ -1381,8 +1380,8 @@ where
         let new_id = T::connect(sync_ctx, non_sync_ctx, id, remote_addr, remote_port)
             .map_err(IntoErrno::into_errno)?;
         I::with_collection_mut(non_sync_ctx, |c| {
-            let messages = c.received.remove(id).expect("had message queue");
-            assert_matches!(c.received.insert(&new_id, messages), None);
+            let messages = c.received.remove(id.get_key_index()).expect("had message queue");
+            assert_matches!(c.received.insert(new_id.get_key_index(), messages), None);
         });
         *id = new_id;
 
@@ -1417,8 +1416,8 @@ where
             .map_err(IntoErrno::into_errno)?;
         assert_matches!(
             I::with_collection_mut(non_sync_ctx, |c| {
-                let messages = c.received.remove(&id).expect("has message queue");
-                c.received.insert(&new_id, messages)
+                let messages = c.received.remove(id.get_key_index()).expect("has message queue");
+                c.received.insert(new_id.get_key_index(), messages)
             }),
             None
         );
@@ -1446,8 +1445,8 @@ where
 
         let new_id = T::disconnect(sync_ctx, non_sync_ctx, id).map_err(IntoErrno::into_errno)?;
         I::with_collection_mut(non_sync_ctx, |c| {
-            let messages = c.received.remove(&id).expect("has message queue");
-            assert_matches!(c.received.insert(&new_id, messages), None);
+            let messages = c.received.remove(id.get_key_index()).expect("has message queue");
+            assert_matches!(c.received.insert(new_id.get_key_index(), messages), None);
         });
         *id = new_id;
         Ok(())
@@ -1531,7 +1530,7 @@ where
         } = self;
         let Ctx { sync_ctx, non_sync_ctx } = ctx;
         let front = I::with_collection(non_sync_ctx, |c| {
-            let messages = c.received.get(&id).expect("has queue");
+            let messages = c.received.get(id.get_key_index()).expect("has queue");
             let mut messages = messages.lock();
             if recv_flags.contains(fposix_socket::RecvMsgFlags::PEEK) {
                 messages.peek().cloned()
@@ -1616,8 +1615,8 @@ where
                 // was returned.
                 if let Some(new_id) = new_id {
                     I::with_collection_mut(non_sync_ctx, |c| {
-                        let messages = c.received.remove(&id).expect("has queue");
-                        assert_matches!(c.received.insert(&new_id, messages), None);
+                        let messages = c.received.remove(id.get_key_index()).expect("has queue");
+                        assert_matches!(c.received.insert(new_id.get_key_index(), messages), None);
                     });
                     *id = new_id;
                 }
@@ -2906,7 +2905,7 @@ mod tests {
                     >>::with_collection(non_sync_ctx, |SocketCollection { received }| {
                         // Check the lone socket to see if the packets were
                         // received.
-                        let messages = received.iter().next().unwrap();
+                        let (_index, messages) = received.iter().next().unwrap();
                         has_all_delivered(&messages.lock())
                     })
                 });

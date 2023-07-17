@@ -37,7 +37,7 @@ use crate::{
     algorithm::{PortAlloc, PortAllocImpl, ProtocolFlowId},
     context::{CounterContext, InstantContext, RngContext, TracingContext},
     data_structures::{
-        id_map_collection::IdMapCollectionKey,
+        id_map::EntryKey,
         socketmap::{IterShadows as _, SocketMap, Tagged},
     },
     device::{AnyDevice, DeviceId, DeviceIdContext, Id, WeakDeviceId, WeakId},
@@ -51,14 +51,13 @@ use crate::{
     socket::{
         address::{ConnAddr, ConnIpAddr, IpPortSpec, ListenerAddr, ListenerIpAddr},
         datagram::{
-            self, AddrEntry, ConnState, ConnectError, DatagramBoundId, DatagramFlowId,
-            DatagramSocketSpec, DatagramSocketStateSpec, DatagramStateContext,
-            DatagramStateNonSyncContext, ExpectedConnError, ExpectedUnboundError, FoundSockets,
-            InUseError, ListenerState, LocalIdentifierAllocator,
-            MulticastMembershipInterfaceSelector, SendError as DatagramSendError,
-            SetMulticastMembershipError, Shutdown, ShutdownType, SocketHopLimits,
-            SocketId as DatagramSocketId, SocketInfo as DatagramSocketInfo,
-            SocketState as DatagramSocketState, Sockets as DatagramSockets,
+            self, AddrEntry, ConnState, ConnectError, DatagramFlowId, DatagramSocketSpec,
+            DatagramSocketStateSpec, DatagramStateContext, DatagramStateNonSyncContext,
+            ExpectedConnError, ExpectedUnboundError, FoundSockets, InUseError, ListenerState,
+            LocalIdentifierAllocator, MulticastMembershipInterfaceSelector,
+            SendError as DatagramSendError, SetMulticastMembershipError, Shutdown, ShutdownType,
+            SocketHopLimits, SocketInfo as DatagramSocketInfo, SocketState as DatagramSocketState,
+            Sockets as DatagramSockets,
         },
         AddrVec, Bound, BoundSocketMap, IncompatibleError, InsertError, RemoveResult,
         SocketAddrType, SocketMapAddrStateSpec, SocketMapConflictPolicy, SocketMapStateSpec,
@@ -340,8 +339,8 @@ fn check_posix_sharing<I: IpExt, D: WeakId>(
 }
 
 impl<I: IpExt, D: Id> SocketMapStateSpec for Udp<I, D> {
-    type ListenerId = ListenerId<I>;
-    type ConnId = ConnId<I>;
+    type ListenerId = SocketId<I>;
+    type ConnId = SocketId<I>;
 
     type ListenerState = ListenerState<I::Addr, D>;
     type ConnState = ConnState<I, D>;
@@ -370,7 +369,7 @@ where
 }
 
 impl<I: IpExt, D: WeakId> DatagramSocketStateSpec for Udp<I, D> {
-    type UnboundId = UnboundId<I>;
+    type SocketId = SocketId<I>;
     type UnboundSharingState = Sharing;
 }
 
@@ -391,8 +390,8 @@ impl<I: IpExt, D: WeakId> DatagramSocketSpec<IpPortSpec<I, D>> for Udp<I, D> {
 }
 
 enum LookupResult<I: Ip, D: Id> {
-    Conn(ConnId<I>, ConnAddr<I::Addr, D, NonZeroU16, NonZeroU16>),
-    Listener(ListenerId<I>, ListenerAddr<I::Addr, D, NonZeroU16>),
+    Conn(SocketId<I>, ConnAddr<I::Addr, D, NonZeroU16, NonZeroU16>),
+    Listener(SocketId<I>, ListenerAddr<I::Addr, D, NonZeroU16>),
 }
 
 #[derive(Hash, Copy, Clone)]
@@ -654,8 +653,6 @@ impl<I: Ip + IpExt, D: WeakId> DatagramSockets<IpPortSpec<I, D>, Udp<I, D>> {
         .into_iter()
         .filter(|lookup_result| match lookup_result {
             LookupResult::Conn(id, _) => {
-                let id = DatagramSocketId::Bound(DatagramBoundId::Connection(id.clone()));
-
                 let (
                     ConnState {
                         socket: _,
@@ -775,253 +772,21 @@ impl<A: IpAddress, D> From<NonZeroU16> for ListenerInfo<A, D> {
     }
 }
 
-/// The identifier for an unbound UDP socket.
-///
-/// New UDP sockets are created in an unbound state, and are assigned opaque
-/// identifiers. These identifiers can then be used to connect the socket or
-/// make it a listener.
-#[derive(Copy, Clone, Debug, Eq, PartialEq, Hash, GenericOverIp)]
-pub(crate) struct UnboundId<I: Ip>(usize, IpVersionMarker<I>);
-
-impl<I: Ip> UnboundId<I> {
-    fn new(id: usize) -> UnboundId<I> {
-        UnboundId(id, IpVersionMarker::default())
-    }
-}
-
-impl<I: Ip> From<usize> for UnboundId<I> {
-    fn from(index: usize) -> Self {
-        Self::new(index)
-    }
-}
-
-impl<I: Ip> From<UnboundId<I>> for usize {
-    fn from(UnboundId(index, _): UnboundId<I>) -> usize {
-        index
-    }
-}
-
-impl<I: Ip> IdMapCollectionKey for UnboundId<I> {
-    const VARIANT_COUNT: NonZeroUsize = nonzero!(1usize);
-
-    fn get_variant(&self) -> usize {
-        0
-    }
-
-    fn get_id(&self) -> usize {
-        (*self).into()
-    }
-}
-
-/// The ID identifying a UDP connection.
-///
-/// When a new UDP connection is added, it is given a unique `ConnId`. These
-/// are opaque `usize`s which are intentionally allocated as densely as possible
-/// around 0, making it possible to store any associated data in a `Vec` indexed
-/// by the ID. `ConnId` implements `Into<usize>`.
-#[derive(Copy, Clone, Debug, Eq, PartialEq, Hash, GenericOverIp)]
-pub(crate) struct ConnId<I: Ip>(usize, IpVersionMarker<I>);
-
-impl<I: Ip> ConnId<I> {
-    fn new(id: usize) -> ConnId<I> {
-        ConnId(id, IpVersionMarker::default())
-    }
-}
-
-impl<I: Ip> From<ConnId<I>> for usize {
-    fn from(id: ConnId<I>) -> usize {
-        id.0
-    }
-}
-
-impl<I: Ip> IdMapCollectionKey for ConnId<I> {
-    const VARIANT_COUNT: NonZeroUsize = nonzero!(1usize);
-
-    fn get_variant(&self) -> usize {
-        0
-    }
-
-    fn get_id(&self) -> usize {
-        self.0
-    }
-}
-
-impl<I: Ip> From<usize> for ConnId<I> {
-    fn from(index: usize) -> Self {
-        ConnId::new(index)
-    }
-}
-
-/// The ID identifying a UDP listener.
-///
-/// When a new UDP listener is added, it is given a unique `ListenerId`.
-/// These are opaque `usize`s which are intentionally allocated as densely as
-/// possible around 0, making it possible to store any associated data in a
-/// `Vec` indexed by the ID. The `listener_type` field is used to look at the
-/// correct backing `Vec`: `listeners` or `wildcard_listeners`.
-#[derive(Copy, Clone, Debug, Eq, PartialEq, Hash, GenericOverIp)]
-pub(crate) struct ListenerId<I: Ip> {
-    id: usize,
-    _marker: IpVersionMarker<I>,
-}
-
-impl<I: Ip> ListenerId<I> {
-    fn new(id: usize) -> Self {
-        ListenerId { id, _marker: IpVersionMarker::default() }
-    }
-}
-
-impl<I: Ip> IdMapCollectionKey for ListenerId<I> {
-    const VARIANT_COUNT: NonZeroUsize = nonzero!(1usize);
-    fn get_variant(&self) -> usize {
-        0
-    }
-    fn get_id(&self) -> usize {
-        self.id
-    }
-}
-
-impl<I: Ip> From<ListenerId<I>> for usize {
-    fn from(ListenerId { id, _marker }: ListenerId<I>) -> Self {
-        id
-    }
-}
-
-impl<I: Ip> From<usize> for ListenerId<I> {
-    fn from(index: usize) -> Self {
-        ListenerId::new(index)
-    }
-}
-
-/// A unique identifier for a bound UDP connection or listener.
-///
-/// Contains either a [`ConnId`] or [`ListenerId`] in contexts where either
-/// can be present.
-#[derive(Copy, Clone, Debug, Eq, PartialEq, Hash, GenericOverIp)]
-pub(crate) enum BoundId<I: Ip> {
-    /// A UDP connection.
-    Connected(ConnId<I>),
-    /// A UDP listener.
-    Listening(ListenerId<I>),
-}
-
-impl<I: Ip> From<ConnId<I>> for BoundId<I> {
-    fn from(id: ConnId<I>) -> Self {
-        Self::Connected(id)
-    }
-}
-
-impl<I: Ip> From<ListenerId<I>> for BoundId<I> {
-    fn from(id: ListenerId<I>) -> Self {
-        Self::Listening(id)
-    }
-}
-
-impl<I: Ip + IpExt, D: WeakId> From<BoundId<I>> for DatagramBoundId<Udp<I, D>> {
-    fn from(id: BoundId<I>) -> Self {
-        match id {
-            BoundId::Connected(id) => DatagramBoundId::Connection(id),
-            BoundId::Listening(id) => DatagramBoundId::Listener(id),
-        }
-    }
-}
-
-impl<I: Ip + IpExt, D: WeakId> From<ConnId<I>> for DatagramBoundId<Udp<I, D>> {
-    fn from(id: ConnId<I>) -> Self {
-        DatagramBoundId::Connection(id)
-    }
-}
-
-impl<I: Ip + IpExt, D: WeakId> From<ListenerId<I>> for DatagramBoundId<Udp<I, D>> {
-    fn from(id: ListenerId<I>) -> Self {
-        DatagramBoundId::Listener(id)
-    }
-}
-
 /// A unique identifier for a UDP socket.
 #[derive(Copy, Clone, Debug, Eq, PartialEq, Hash, GenericOverIp)]
 
-pub struct SocketId<I: Ip>(SocketIdInner<I>);
+pub struct SocketId<I: Ip>(usize, IpVersionMarker<I>);
 
-// TODO(https://fxbug.dev/125489): remove this once Bindings isn't doing
-// lookups by socket ID.
-impl<I: Ip> IdMapCollectionKey for SocketId<I> {
-    const VARIANT_COUNT: NonZeroUsize = nonzero!(3usize);
-    fn get_variant(&self) -> usize {
-        let Self(id) = self;
-        match id {
-            SocketIdInner::Unbound(UnboundId(_, _marker)) => 0,
-            SocketIdInner::Bound(BoundId::Listening(ListenerId { id: _, _marker })) => 1,
-            SocketIdInner::Bound(BoundId::Connected(ConnId(_, _marker))) => 2,
-        }
-    }
-
-    fn get_id(&self) -> usize {
-        let Self(id) = self;
-        *match id {
-            SocketIdInner::Unbound(UnboundId(index, _marker)) => index,
-            SocketIdInner::Bound(BoundId::Listening(ListenerId { id, _marker })) => id,
-            SocketIdInner::Bound(BoundId::Connected(ConnId(index, _marker))) => index,
-        }
+impl<I: Ip> From<usize> for SocketId<I> {
+    fn from(value: usize) -> Self {
+        Self(value, IpVersionMarker::default())
     }
 }
 
-#[derive(Copy, Clone, Debug, Eq, PartialEq, Hash, GenericOverIp)]
-enum SocketIdInner<I: Ip> {
-    /// A bound UDP socket ID.
-    Bound(BoundId<I>),
-    /// An unbound UDP socket ID.
-    Unbound(UnboundId<I>),
-}
-
-impl<I: Ip> From<BoundId<I>> for SocketId<I> {
-    fn from(id: BoundId<I>) -> Self {
-        Self(SocketIdInner::Bound(id))
-    }
-}
-
-impl<I: Ip> From<UnboundId<I>> for SocketId<I> {
-    fn from(id: UnboundId<I>) -> Self {
-        Self(SocketIdInner::Unbound(id))
-    }
-}
-
-impl<I: Ip> From<ListenerId<I>> for SocketId<I> {
-    fn from(id: ListenerId<I>) -> Self {
-        Self(SocketIdInner::Bound(id.into()))
-    }
-}
-
-impl<I: Ip> From<ConnId<I>> for SocketId<I> {
-    fn from(id: ConnId<I>) -> Self {
-        Self(SocketIdInner::Bound(id.into()))
-    }
-}
-
-impl<I: IpExt, D: WeakId> From<SocketId<I>> for DatagramSocketId<Udp<I, D>> {
-    fn from(SocketId(id): SocketId<I>) -> Self {
-        match id {
-            SocketIdInner::Unbound(id) => Self::Unbound(id),
-            SocketIdInner::Bound(id) => Self::Bound(id.into()),
-        }
-    }
-}
-
-impl<I: IpExt, D: WeakId> From<crate::socket::SocketId<Udp<I, D>>> for BoundId<I> {
-    fn from(id: crate::socket::SocketId<Udp<I, D>>) -> Self {
-        match id {
-            crate::socket::SocketId::Listener(id) => Self::Listening(id),
-            crate::socket::SocketId::Connection(id) => Self::Connected(id),
-        }
-    }
-}
-
-impl<I: IpExt, D: WeakId> From<DatagramSocketId<Udp<I, D>>> for SocketId<I> {
-    fn from(id: DatagramSocketId<Udp<I, D>>) -> Self {
-        match id {
-            DatagramSocketId::Unbound(id) => Self(SocketIdInner::Unbound(id)),
-            DatagramSocketId::Bound(id) => Self(SocketIdInner::Bound(id.into())),
-        }
+impl<I: Ip> EntryKey for SocketId<I> {
+    fn get_key_index(&self) -> usize {
+        let Self(index, _marker) = self;
+        *index
     }
 }
 
@@ -1171,8 +936,7 @@ impl<I: IpExt, C: StateNonSyncContext<I>, SC: StateContext<I, C>> IpTransportCon
 
             if let Some(id) = receiver {
                 let id = match id {
-                    LookupResult::Listener(id, _) => id.into(),
-                    LookupResult::Conn(id, _) => id.into(),
+                    LookupResult::Listener(id, _) | LookupResult::Conn(id, _) => id,
                 };
                 ctx.receive_icmp_error(id, err);
             } else {
@@ -1235,13 +999,13 @@ impl<
                                 device: _,
                             },
                         ) => ctx.receive_udp(
-                            id.into(),
+                            id,
                             dst_ip.get(),
                             (remote_ip.get(), Some(remote_port)),
                             &buffer,
                         ),
                         LookupResult::Listener(id, _) => {
-                            ctx.receive_udp(id.into(), dst_ip.get(), (src_ip, src_port), &buffer)
+                            ctx.receive_udp(id, dst_ip.get(), (src_ip, src_port), &buffer)
                         }
                     }
                 }
@@ -1375,7 +1139,7 @@ pub(crate) trait SocketHandler<I: IpExt, C>: DeviceIdContext<AnyDevice> {
 
 impl<I: IpExt, C: StateNonSyncContext<I>, SC: StateContext<I, C>> SocketHandler<I, C> for SC {
     fn create_udp(&mut self) -> SocketId<I> {
-        datagram::create(self).into()
+        datagram::create(self)
     }
 
     fn connect(
@@ -1385,8 +1149,7 @@ impl<I: IpExt, C: StateNonSyncContext<I>, SC: StateContext<I, C>> SocketHandler<
         remote_ip: ZonedAddr<<I>::Addr, Self::DeviceId>,
         remote_port: NonZeroU16,
     ) -> Result<SocketId<I>, ConnectError> {
-        datagram::connect(self, ctx, id.into(), remote_ip, remote_port, IpProto::Udp)
-            .map(Into::into)
+        datagram::connect(self, ctx, id, remote_ip, remote_port, IpProto::Udp).map(Into::into)
     }
 
     fn set_device(
@@ -1395,7 +1158,7 @@ impl<I: IpExt, C: StateNonSyncContext<I>, SC: StateContext<I, C>> SocketHandler<
         id: SocketId<I>,
         device_id: Option<&Self::DeviceId>,
     ) -> Result<(), SocketError> {
-        datagram::set_device(self, ctx, id.into(), device_id)
+        datagram::set_device(self, ctx, id, device_id)
     }
 
     fn get_udp_bound_device(&mut self, ctx: &C, id: SocketId<I>) -> Option<Self::WeakDeviceId> {
@@ -1410,7 +1173,7 @@ impl<I: IpExt, C: StateNonSyncContext<I>, SC: StateContext<I, C>> SocketHandler<
     ) -> Result<(), ExpectedUnboundError> {
         datagram::update_sharing(
             self,
-            id.into(),
+            id,
             if reuse_port { Sharing::ReusePort } else { Sharing::Exclusive },
         )
     }
@@ -1479,7 +1242,7 @@ impl<I: IpExt, C: StateNonSyncContext<I>, SC: StateContext<I, C>> SocketHandler<
         ctx: &mut C,
         id: SocketId<I>,
     ) -> Result<SocketId<I>, ExpectedConnError> {
-        datagram::disconnect_connected(self, ctx, id.into()).map(Into::into)
+        datagram::disconnect_connected(self, ctx, id).map(Into::into)
     }
 
     fn shutdown(
@@ -1488,11 +1251,11 @@ impl<I: IpExt, C: StateNonSyncContext<I>, SC: StateContext<I, C>> SocketHandler<
         id: SocketId<I>,
         which: ShutdownType,
     ) -> Result<(), ExpectedConnError> {
-        datagram::shutdown_connected(self, ctx, id.into(), which)
+        datagram::shutdown_connected(self, ctx, id, which)
     }
 
     fn get_shutdown(&mut self, ctx: &C, id: SocketId<I>) -> Option<ShutdownType> {
-        datagram::get_shutdown_connected(self, ctx, id.into())
+        datagram::get_shutdown_connected(self, ctx, id)
     }
 
     fn remove_udp(
@@ -1518,7 +1281,7 @@ impl<I: IpExt, C: StateNonSyncContext<I>, SC: StateContext<I, C>> SocketHandler<
         addr: Option<ZonedAddr<I::Addr, Self::DeviceId>>,
         port: Option<NonZeroU16>,
     ) -> Result<SocketId<I>, Either<ExpectedUnboundError, LocalAddressError>> {
-        datagram::listen(self, ctx, id.into(), addr, port).map(Into::into)
+        datagram::listen(self, ctx, id, addr, port).map(Into::into)
     }
 }
 
@@ -1567,7 +1330,7 @@ impl<
         id: SocketId<I>,
         body: B,
     ) -> Result<(), (B, Either<SendError, ExpectedConnError>)> {
-        datagram::send_conn(self, ctx, id.into(), body).map_err(|send_error| match send_error {
+        datagram::send_conn(self, ctx, id, body).map_err(|send_error| match send_error {
             DatagramSendError::NotConnected(b) => (b, Either::Right(ExpectedConnError)),
             DatagramSendError::NotWriteable(b) => (b, Either::Left(SendError::NotWriteable)),
             DatagramSendError::IpSock(body, err) => {
@@ -1587,7 +1350,7 @@ impl<
         Option<SocketId<I>>,
         (B, Either<LocalAddressError, (Option<SocketId<I>>, SendToError)>),
     > {
-        datagram::send_to(self, ctx, id.into(), remote_ip, remote_port, IpProto::Udp.into(), body)
+        datagram::send_to(self, ctx, id, remote_ip, remote_port, IpProto::Udp.into(), body)
             .map(|id| id.map(Into::into))
             .map_err(|e| match e {
                 Either::Left((body, e)) => (body, Either::Left(e)),
@@ -4380,7 +4143,7 @@ mod tests {
         .expect("connect failed");
         let Sockets { sockets, lazy_port_alloc: _ } = &sync_ctx.outer.sockets;
         let (_state, _tag_state, addr) = assert_matches!(
-            sockets.get_socket_state(&conn.try_into().unwrap()).unwrap(),
+            sockets.get_socket_state(&conn).unwrap(),
             DatagramSocketState::Bound(DatagramBoundSocketState::Connected(state)) => state
         );
 
@@ -4448,25 +4211,25 @@ mod tests {
         .expect("connect failed");
         let Sockets { sockets, lazy_port_alloc: _ } = &sync_ctx.outer.sockets;
         let valid_range = &UdpBoundSocketMap::<I, FakeWeakDeviceId<FakeDeviceId>>::EPHEMERAL_RANGE;
-        let port_a = assert_matches!(sockets.get_socket_state(&conn_a.try_into().unwrap()),
+        let port_a = assert_matches!(sockets.get_socket_state(&conn_a),
             Some(DatagramSocketState::Bound(SocketState::Connected(
                 (_state, _tag_state, ConnAddr{ip: ConnIpAddr{local: (_, local_identifier), ..}, device: _})
             ))) => local_identifier)
         .get();
         assert!(valid_range.contains(&port_a));
-        let port_b = assert_matches!(sockets.get_socket_state(&conn_b.try_into().unwrap()),
+        let port_b = assert_matches!(sockets.get_socket_state(&conn_b),
             Some(DatagramSocketState::Bound(SocketState::Connected(
                 (_state, _tag_state, ConnAddr{ip: ConnIpAddr{local: (_, local_identifier), ..}, device: _})
             ))) => local_identifier)
         .get();
         assert_ne!(port_a, port_b);
-        let port_c = assert_matches!(sockets.get_socket_state(&conn_c.try_into().unwrap()),
+        let port_c = assert_matches!(sockets.get_socket_state(&conn_c),
             Some(DatagramSocketState::Bound(SocketState::Connected(
                 (_state, _tag_state, ConnAddr{ip: ConnIpAddr{local: (_, local_identifier), ..}, device: _})
             ))) => local_identifier)
         .get();
         assert_ne!(port_a, port_c);
-        let port_d = assert_matches!(sockets.get_socket_state(&conn_d.try_into().unwrap()),
+        let port_d = assert_matches!(sockets.get_socket_state(&conn_d),
             Some(DatagramSocketState::Bound(SocketState::Connected(
                 (_state, _tag_state, ConnAddr{ip: ConnIpAddr{local: (_, local_identifier), ..}, device: _})
             ))) => local_identifier)
@@ -4547,14 +4310,14 @@ mod tests {
 
         let Sockets { sockets, lazy_port_alloc: _ } = &sync_ctx.outer.sockets;
         let wildcard_port = assert_matches!(
-            sockets.get_socket_state(&wildcard_list.try_into().unwrap()),
+            sockets.get_socket_state(&wildcard_list),
             Some(DatagramSocketState::Bound(SocketState::Listener((
                 _,
                 _,
                 ListenerAddr{ ip: ListenerIpAddr {identifier, addr: None}, device: None}
             )))) => identifier);
         let specified_port = assert_matches!(
-            sockets.get_socket_state(&specified_list.try_into().unwrap()),
+            sockets.get_socket_state(&specified_list),
             Some(DatagramSocketState::Bound(SocketState::Listener((
                 _,
                 _,
@@ -4599,7 +4362,7 @@ mod tests {
         let Sockets { sockets, lazy_port_alloc: _ } = &sync_ctx.outer.sockets;
         for listener in listeners {
             assert_matches!(
-                sockets.get_socket_state(&listener.try_into().unwrap()),
+                sockets.get_socket_state(&listener),
                 Some(DatagramSocketState::Bound(SocketState::Listener((_, _, addr))))
                 => assert_eq!(addr, &expected_addr));
         }
@@ -4719,7 +4482,7 @@ mod tests {
         // Assert that that connection id was removed from the connections
         // state.
         let Sockets { sockets, lazy_port_alloc: _ } = &sync_ctx.outer.sockets;
-        assert_matches!(sockets.get_socket_state(&conn.try_into().unwrap()), None);
+        assert_matches!(sockets.get_socket_state(&conn), None);
     }
 
     /// Tests [`remove_udp`]
@@ -4745,7 +4508,7 @@ mod tests {
         assert_eq!(info.local_ip.unwrap(), local_ip.map_zone(FakeWeakDeviceId));
         assert_eq!(info.local_port, local_port);
         let Sockets { sockets, lazy_port_alloc: _ } = &sync_ctx.outer.sockets;
-        assert_matches!(sockets.get_socket_state(&list.try_into().unwrap()), None);
+        assert_matches!(sockets.get_socket_state(&list), None);
 
         // Test removing a wildcard listener.
         let unbound = SocketHandler::create_udp(&mut sync_ctx);
@@ -4762,7 +4525,7 @@ mod tests {
         assert_eq!(info.local_ip, None);
         assert_eq!(info.local_port, local_port);
         let Sockets { sockets, lazy_port_alloc: _ } = &sync_ctx.outer.sockets;
-        assert_matches!(sockets.get_socket_state(&list.try_into().unwrap()), None);
+        assert_matches!(sockets.get_socket_state(&list), None);
     }
 
     fn try_join_leave_multicast<I: Ip + TestIpExt>(
@@ -5113,7 +4876,7 @@ where {
     }
 
     #[ip_test]
-    #[should_panic(expected = "unbound")]
+    #[should_panic(expected = "listen again failed")]
     fn test_listen_udp_removes_unbound<I: Ip + TestIpExt>() {
         let UdpFakeDeviceCtx { mut sync_ctx, mut non_sync_ctx } =
             UdpFakeDeviceCtx::with_sync_ctx(UdpFakeDeviceSyncCtx::<I>::default());
@@ -5138,7 +4901,7 @@ where {
             Some(ZonedAddr::Unzoned(local_ip)),
             NonZeroU16::new(200),
         )
-        .expect("listen_udp failed");
+        .expect("listen again failed");
     }
 
     #[ip_test]
@@ -6056,7 +5819,7 @@ where {
             SocketHandler::remove_udp(&mut sync_ctx, &mut non_sync_ctx, unbound);
 
         let Sockets { sockets, lazy_port_alloc: _ } = &sync_ctx.outer.sockets;
-        assert_matches!(sockets.get_socket_state(&unbound.into()), None)
+        assert_matches!(sockets.get_socket_state(&unbound), None)
     }
 
     #[ip_test]
@@ -6473,12 +6236,12 @@ where {
         let mut try_insert = |(index, (addr, options))| match addr {
             AddrVec::Conn(c) => map
                 .conns_mut()
-                .try_insert(c, options, |_addr, _sharing| ConnId::from(index))
+                .try_insert(c, options, |_addr, _sharing| SocketId::from(index))
                 .map(|_| ())
                 .map_err(|(e, _)| e),
             AddrVec::Listen(l) => map
                 .listeners_mut()
-                .try_insert(l, options, |_addr, _sharing| ListenerId::from(index))
+                .try_insert(l, options, |_addr, _sharing| SocketId::from(index))
                 .map(|_| ())
                 .map_err(|(e, _)| e),
         };
@@ -6515,8 +6278,8 @@ where {
         I::IntoIter: ExactSizeIterator,
     {
         enum Socket<A: IpAddress, D, LI, RI> {
-            Listener(ListenerId<A::Version>, ListenerAddr<A, D, LI>),
-            Conn(ConnId<A::Version>, ConnAddr<A, D, LI, RI>),
+            Listener(SocketId<A::Version>, ListenerAddr<A, D, LI>),
+            Conn(SocketId<A::Version>, ConnAddr<A, D, LI, RI>),
         }
         let spec = spec.into_iter();
         let spec_len = spec.len();
@@ -6528,12 +6291,12 @@ where {
                 .map(|(socket_index, (addr, options))| match addr {
                     AddrVec::Conn(c) => map
                         .conns_mut()
-                        .try_insert(c, options, |_addr, _sharing| ConnId::from(socket_index))
+                        .try_insert(c, options, |_addr, _sharing| SocketId::from(socket_index))
                         .map(|entry| Socket::Conn(entry.id().clone(), entry.get_addr().clone()))
                         .expect("insert_failed"),
                     AddrVec::Listen(l) => map
                         .listeners_mut()
-                        .try_insert(l, options, |_addr, _sharing| ListenerId::from(socket_index))
+                        .try_insert(l, options, |_addr, _sharing| SocketId::from(socket_index))
                         .map(|entry| Socket::Listener(entry.id().clone(), entry.get_addr().clone()))
                         .expect("insert_failed"),
                 })

@@ -503,7 +503,6 @@ impl<
         S: SocketMapStateSpec,
     > Sockets<&'a SocketMap<AddrVec<A>, Bound<S>>, SocketType>
 where
-    SocketType::Id: Clone,
     Bound<S>: Tagged<AddrVec<A>>,
     S: SocketMapConflictPolicy<SocketType::Addr, SocketType::SharingState, A>,
 {
