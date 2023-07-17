@@ -59,7 +59,7 @@ impl TryFrom<&LogCommand> for LogFilterCriteria {
             filters: cmd.filter.clone(),
             tags: cmd.tags.clone(),
             excludes: cmd.exclude.clone(),
-            moniker_filters: cmd.moniker.clone(),
+            moniker_filters: if cmd.kernel { vec!["klog".into()] } else { cmd.moniker.clone() },
             exclude_tags: cmd.exclude_tags.clone(),
             pid: cmd.pid.clone(),
             tid: cmd.tid.clone(),
@@ -543,6 +543,35 @@ mod test {
                 severity: diagnostics_data::Severity::Error,
             })
             .set_message("not this message")
+            .build()
+            .into()
+        )));
+    }
+
+    #[fuchsia::test]
+    async fn test_criteria_klog_only() {
+        let cmd = LogCommand { kernel: true, ..empty_dump_command() };
+        let criteria = LogFilterCriteria::try_from(&cmd).unwrap();
+
+        assert!(criteria.matches(&make_log_entry(
+            diagnostics_data::LogsDataBuilder::new(diagnostics_data::BuilderArgs {
+                timestamp_nanos: 0.into(),
+                component_url: Some(String::default()),
+                moniker: "klog".to_string(),
+                severity: diagnostics_data::Severity::Error,
+            })
+            .set_message("included message")
+            .build()
+            .into()
+        )));
+        assert!(!criteria.matches(&make_log_entry(
+            diagnostics_data::LogsDataBuilder::new(diagnostics_data::BuilderArgs {
+                timestamp_nanos: 0.into(),
+                component_url: Some(String::default()),
+                moniker: "other/moniker".to_string(),
+                severity: diagnostics_data::Severity::Error,
+            })
+            .set_message("included message")
             .build()
             .into()
         )));

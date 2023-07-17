@@ -218,7 +218,7 @@ pub struct LogCommand {
     #[argh(option, default = "Severity::Info")]
     pub severity: Severity,
 
-    /// outputs only kernel logs.
+    /// outputs only kernel logs. Overrides any other moniker specified.
     #[argh(switch)]
     pub kernel: bool,
 
