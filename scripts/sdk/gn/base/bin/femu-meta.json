@@ -1,7 +1,6 @@
 {
     "files": [
         "bin/aemu.version",
-        "bin/device_launcher.version",
         "bin/fuchsia-common.sh",
         "bin/grpcwebproxy.version"
     ],

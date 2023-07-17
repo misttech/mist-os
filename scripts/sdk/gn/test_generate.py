@@ -25,7 +25,6 @@ TMP_ARCHIVE_PATH = os.path.join(TMP_ARCH_DIR, 'gn.tar.gz')
 EXPECTED_PREBUILTS = {
     'aemu': 'bid:7927554',
     'grpcwebproxy': 'git_revision:b123456789abcdef0123456789abcdef01234567',
-    'device_launcher': 'g3-revision:vdl_fuchsia_20200819_RC00',
 }
 
 

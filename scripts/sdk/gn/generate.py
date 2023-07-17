@@ -41,7 +41,6 @@ from collections import namedtuple
 EXTRA_PREBUILTS = {
     'fuchsia/third_party/android/aemu/release/${platform}': 'aemu',
     'fuchsia/third_party/grpcwebproxy/${platform}': 'grpcwebproxy',
-    'fuchsia/vdl/${platform}': 'device_launcher',
 }
 
 
