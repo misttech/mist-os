@@ -67,6 +67,9 @@ const TEST_FACET_KEY: &'static str = "fuchsia.test";
 // Facet key for deprecated-allowed-packages.
 const TEST_DEPRECATED_ALLOWED_PACKAGES_FACET_KEY: &'static str = "deprecated-allowed-packages";
 
+// Facet key for type.
+const TEST_TYPE_FACET_KEY: &'static str = "type";
+
 impl<'a> ValidationContext<'a> {
     fn new(
         document: &'a Document,
@@ -248,30 +251,64 @@ impl<'a> ValidationContext<'a> {
         Ok(())
     }
 
+    fn get_test_facet(&self) -> Option<&serde_json::Value> {
+        match &self.document.facets {
+            Some(m) => m.get(TEST_FACET_KEY),
+            None => None,
+        }
+    }
+
     fn validate_facets(&self) -> Result<(), Error> {
+        let test_facet_map = {
+            let test_facet = self.get_test_facet();
+            match &test_facet {
+                None => None,
+                Some(serde_json::Value::Object(m)) => Some(m),
+                Some(facet) => {
+                    return Err(Error::validate(format!(
+                        "'{TEST_FACET_KEY}' is not an object: {facet:?}"
+                    )))
+                }
+            }
+        };
+
+        let restrict_test_type = self.features.has(&Feature::RestrictTestTypeInFacet);
         let enable_allow_non_hermetic_packages =
             self.features.has(&Feature::EnableAllowNonHermeticPackagesFeature);
-        if enable_allow_non_hermetic_packages {
-            let allow_non_hermetic_packages = self.features.has(&Feature::AllowNonHermeticPackages);
-            let deprecated_allowed_packages = match &self.document.facets {
-                Some(m) => {
-                    if let Some(test_facet) = m.get(TEST_FACET_KEY) {
-                        match test_facet {
-                            serde_json::Value::Object(m) => {
-                                m.contains_key(TEST_DEPRECATED_ALLOWED_PACKAGES_FACET_KEY)
-                            }
-                            facet => {
-                                return Err(Error::validate(format!(
-                                    "'{TEST_FACET_KEY}' is not an object: {facet:?}"
-                                )))
-                            }
+
+        if restrict_test_type {
+            let allowed_values = [
+                "cts", "chromium",
+                // TODO(fxbug.dev/129832): Remove starnix once the bug is fixed and fxrev.dev/875198
+                // lands.
+                "starnix",
+            ];
+            let test_type = test_facet_map.map(|m| m.get(TEST_TYPE_FACET_KEY)).flatten();
+            if let Some(test_type) = test_type {
+                match test_type {
+                    serde_json::Value::String(s) => {
+                        if !allowed_values.contains(&s.as_str()) {
+                            return Err(Error::validate(format!(
+                                "'{}' is not a allowed test type. Allowed test types in the the facet: '{}'.
+Refer https://fuchsia.dev/fuchsia-src/development/testing/components/test_runner_framework?hl=en#non-hermetic_tests \
+to run your test in the correct test realm.",
+                                s, allowed_values.join(", ")
+                            )));
                         }
-                    } else {
-                        false
+                    }
+                    facet => {
+                        return Err(Error::validate(format!(
+                            "'{TEST_TYPE_FACET_KEY}' is no a string: {facet:?}"
+                        )))
                     }
                 }
-                None => false,
-            };
+            }
+        }
+
+        if enable_allow_non_hermetic_packages {
+            let allow_non_hermetic_packages = self.features.has(&Feature::AllowNonHermeticPackages);
+            let deprecated_allowed_packages = test_facet_map
+                .map_or(false, |m| m.contains_key(TEST_DEPRECATED_ALLOWED_PACKAGES_FACET_KEY));
             if deprecated_allowed_packages && !allow_non_hermetic_packages {
                 return Err(Error::validate(format!(
                     "restricted_feature '{}' should be present with facet '{}'",
@@ -6523,6 +6560,13 @@ mod tests {
             }),
             Ok(())
         ),
+
+        test_invalid_empty_facets(
+            json!({
+                "facets": ""
+            }),
+            Err(err) if err.to_string().contains("invalid type: string")
+        ),
         test_valid_empty_fuchsia_test_facet(
             json!({
                 "facets": {TEST_FACET_KEY: {}}
@@ -6533,6 +6577,7 @@ mod tests {
         test_valid_allowed_pkg_without_feature(
             json!({
                 "facets": {
+                    TEST_TYPE_FACET_KEY: "some_realm",
                     TEST_FACET_KEY: {
                         TEST_DEPRECATED_ALLOWED_PACKAGES_FACET_KEY: [ "some_pkg" ]
                     }
@@ -6542,7 +6587,45 @@ mod tests {
         ),
     }
 
-    // Tests validate_facets function with the feature disabled.
+    // Tests validate_facets function with the RestrictTestTypeInFacet enabled.
+    test_validate_cml_with_feature! { FeatureSet::from(vec![Feature::RestrictTestTypeInFacet]), {
+        test_valid_empty_facets_with_test_type_feature_enabled(
+            json!({
+                "facets": {}
+            }),
+            Ok(())
+        ),
+        test_valid_empty_fuchsia_test_facet_with_test_type_feature_enabled(
+            json!({
+                "facets": {TEST_FACET_KEY: {}}
+            }),
+            Ok(())
+        ),
+
+        test_invalid_test_type_with_feature_enabled(
+            json!({
+                "facets": {
+                    TEST_FACET_KEY: {
+                        TEST_TYPE_FACET_KEY: "some_realm",
+                    }
+                }
+            }),
+            Err(err) if err.to_string().contains("some_realm")
+        ),
+
+        test_valid_test_type_with_feature_enabled(
+            json!({
+                "facets": {
+                    TEST_FACET_KEY: {
+                        TEST_TYPE_FACET_KEY: "chromium",
+                    }
+                }
+            }),
+            Ok(())
+        ),
+    }}
+
+    // Tests validate_facets function with the EnableAllowNonHermeticPackagesFeature disabled.
     test_validate_cml_with_feature! { FeatureSet::from(vec![Feature::AllowNonHermeticPackages]), {
         test_valid_empty_facets_with_feature_disabled(
             json!({
@@ -6569,7 +6652,7 @@ mod tests {
         ),
     }}
 
-    // Tests validate_facets function with the feature enabled.
+    // Tests validate_facets function with the EnableAllowNonHermeticPackagesFeature enabled.
     test_validate_cml_with_feature! { FeatureSet::from(vec![Feature::EnableAllowNonHermeticPackagesFeature]), {
         test_valid_empty_facets_with_feature_enabled(
             json!({

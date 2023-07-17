@@ -53,6 +53,9 @@ pub enum Feature {
     // Enable AllowNonHermeticPackages feature. This helps us to only enable
     // this in-tree.
     EnableAllowNonHermeticPackagesFeature,
+
+    // Restrict test types in facet. This helps us to only restrict this in-tree.
+    RestrictTestTypeInFacet,
 }
 
 impl FromStr for Feature {
@@ -65,6 +68,7 @@ impl FromStr for Feature {
             "enable_allow_non_hermetic_packages_feature" => {
                 Ok(Feature::EnableAllowNonHermeticPackagesFeature)
             }
+            "restrict_test_type_in_facets" => Ok(Feature::RestrictTestTypeInFacet),
             _ => Err(format!("unrecognized feature \"{}\"", s)),
         }
     }
@@ -79,6 +83,7 @@ impl fmt::Display for Feature {
             Feature::EnableAllowNonHermeticPackagesFeature => {
                 "enable_allow_non_hermetic_packages_feature"
             }
+            Feature::RestrictTestTypeInFacet => "restrict_test_type_in_facets",
         })
     }
 }
@@ -106,6 +111,7 @@ mod tests {
             "enable_allow_non_hermetic_packages_feature",
             Feature::EnableAllowNonHermeticPackagesFeature.to_string()
         );
+        assert_eq!("restrict_test_type_in_facets", Feature::RestrictTestTypeInFacet.to_string());
     }
 
     #[test]
