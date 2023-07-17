@@ -121,7 +121,7 @@ impl Config {
     }
 
     fn default_max_auto_restarts() -> u32 {
-        10
+        20
     }
 
     fn default_log_level() -> tracing::Level {

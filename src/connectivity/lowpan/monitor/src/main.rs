@@ -7,9 +7,9 @@ use {
     fuchsia_async as fasync, tracing,
 };
 
-const MAX_RETRY_COUNT: u32 = 10;
+const MAX_RETRY_COUNT: u32 = 20;
 const RETRY_COUNTER_RESET_PERIOD_MIN: i64 = 5;
-const RETRY_COUNTER_PERIOD_MAX_SEC: i64 = 60;
+const RETRY_COUNTER_PERIOD_MAX_SEC: i64 = 180;
 
 #[fuchsia::main(logging_tags = ["lowpan", "monitor"])]
 async fn main() -> Result<(), Error> {

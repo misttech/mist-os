@@ -61,7 +61,7 @@ mod prelude {
 
 pub type Result<T = (), E = anyhow::Error> = std::result::Result<T, E>;
 
-const MAX_EXPONENTIAL_BACKOFF_DELAY_SEC: i64 = 60;
+const MAX_EXPONENTIAL_BACKOFF_DELAY_SEC: i64 = 180;
 const RESET_EXPONENTIAL_BACKOFF_TIMER_MIN: i64 = 5;
 
 impl Config {
@@ -366,7 +366,7 @@ async fn main() -> Result<(), Error> {
         }
 
         if config.max_auto_restarts <= attempt_count {
-            break ret;
+            panic!("Failed {} attempts to restart OpenThread: {ret:?}", config.max_auto_restarts);
         }
 
         // Implement an exponential backoff for restarts.
