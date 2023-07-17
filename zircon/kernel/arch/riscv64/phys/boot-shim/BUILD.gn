@@ -20,6 +20,24 @@ group("boot-shim") {
   }
 }
 
+phys_executable("linux-riscv64-devicetree-boot-shim") {
+  sources = [ "linux-riscv64-devicetree-main.cc" ]
+
+  deps = [
+    "//zircon/kernel/lib/boot-options",
+    "//zircon/kernel/lib/libc",
+    "//zircon/kernel/phys:allocation",
+    "//zircon/kernel/phys:boot-zbi",
+    "//zircon/kernel/phys:exception",
+    "//zircon/kernel/phys:main",
+    "//zircon/kernel/phys:stdio",
+    "//zircon/kernel/phys:symbolize",
+    "//zircon/kernel/phys:uart",
+    "//zircon/kernel/phys/boot-shim:devicetree",
+    "//zircon/kernel/phys/lib/boot-shim",
+  ]
+}
+
 phys_executable("riscv64-qemu-boot-shim") {
   sources = [ "riscv64-qemu-boot-shim.cc" ]
   deps = [

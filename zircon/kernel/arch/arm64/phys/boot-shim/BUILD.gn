@@ -7,8 +7,8 @@
 import("//zircon/kernel/phys/phys_executable.gni")
 import("//zircon/kernel/phys/qemu.gni")
 
-phys_executable("devicetree-boot-shim") {
-  sources = [ "devicetree-main.cc" ]
+phys_executable("linux-arm64-devicetree-boot-shim") {
+  sources = [ "linux-arm64-devicetree-main.cc" ]
 
   deps = [
     "//zircon/kernel/lib/boot-options",

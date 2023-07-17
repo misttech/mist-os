@@ -6,6 +6,7 @@
 
 import("//build/testing/zbi_test.gni")
 import("//build/zbi/kernel_cmdline.gni")
+import("//zircon/kernel/phys/boot-shim/devicetree.gni")
 import("//zircon/kernel/phys/efi/efi_executable.gni")
 import("//zircon/kernel/phys/phys_executable.gni")
 import("//zircon/kernel/phys/qemu.gni")
@@ -25,7 +26,7 @@ group("boot-shim") {
 template("devicetree_zbi_test") {
   test_target = "devicetree-shim-$target_name"
   zbi_test(test_target) {
-    qemu_kernel = "//zircon/kernel/arch/$current_cpu/phys/boot-shim:devicetree-boot-shim(${phys_toolchain})"
+    qemu_kernel = "//zircon/kernel/arch/$current_cpu/phys/boot-shim:linux-$current_cpu-devicetree-boot-shim(${phys_toolchain})"
     device_types = [ "QEMU" ]
 
     forward_variables_from(invoker, "*")
@@ -35,7 +36,7 @@ template("devicetree_zbi_test") {
   }
 }
 
-if (current_cpu == "arm64") {
+if (have_devicetree) {
   devicetree_zbi_test("phys-unittests") {
     deps =
         [ "//zircon/kernel/phys/test:zbi-phys-unittests.zbi($phys_toolchain)" ]
@@ -137,7 +138,7 @@ group("boot_tests") {
     deps += [ "//zircon/kernel/arch/x86/phys/boot-shim:boot_tests" ]
   }
 
-  if (current_cpu == "arm64") {
+  if (have_devicetree) {
     deps += [
       ":devicetree-shim-memory-test",
       ":devicetree-shim-phys-unittests",
