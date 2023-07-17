@@ -1,0 +1,6 @@
+<!--Folder Listing object with invalid elements-->
+<?xml version = "1.0"?>
+<!DOCTYPE folder-listing SYSTEM "obex-folder-listing.dtd">
+<folder-listing>
+    <random name="System"/>
+</folder-listing>

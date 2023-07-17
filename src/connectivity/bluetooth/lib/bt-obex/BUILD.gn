@@ -54,5 +54,8 @@ fuchsia_unittest_package("bt-obex-tests") {
 
 group("tests") {
   testonly = true
-  deps = [ ":bt-obex-tests" ]
+  deps = [
+    ":bt-obex-tests",
+    "//src/connectivity/bluetooth/lib/bt-obex/objects:bt-obex-objects-tests",
+  ]
 }

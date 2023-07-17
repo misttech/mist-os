@@ -1,0 +1,6 @@
+<!--Folder Listing object with duplicate attributes-->
+<?xml version = "1.0"?>
+<!DOCTYPE folder-listing SYSTEM "obex-folder-listing.dtd">
+<folder-listing>
+    <file name="Jumar.txt" size="6672" size="441">Jumar Handling Guide</file>
+</folder-listing>
