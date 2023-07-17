@@ -823,6 +823,7 @@ impl MainProtocolProxyInterface for MainProtocolProxy {
         > {
             let _response = fidl::client::decode_transaction_body::<
                 fidl_test_protocollayouts_imported::ComposedProtocolTwoWayAnonComposedResponse,
+                0x16afa17ea70d3370,
             >(_buf?)?;
             Ok(_response)
         }
@@ -850,7 +851,7 @@ impl MainProtocolProxyInterface for MainProtocolProxy {
             fidl_test_protocollayouts_imported::ComposedProtocolTwoWayAnonComposedWithErrorResult,
             fidl::Error,
         > {
-            let _response = fidl::client::decode_transaction_body::<fidl::encoding::ResultType<fidl_test_protocollayouts_imported::ComposedProtocolTwoWayAnonComposedWithErrorResponse, u32>>(_buf?)?;
+            let _response = fidl::client::decode_transaction_body::<fidl::encoding::ResultType<fidl_test_protocollayouts_imported::ComposedProtocolTwoWayAnonComposedWithErrorResponse, u32>, 0x2ed33746b7bb119d>(_buf?)?;
             Ok(_response.map(|x| x))
         }
         self.client.send_query_and_decode::<
@@ -886,6 +887,7 @@ impl MainProtocolProxyInterface for MainProtocolProxy {
         ) -> Result<fidl_test_protocollayouts_imported::ImportTablePayload, fidl::Error> {
             let _response = fidl::client::decode_transaction_body::<
                 fidl_test_protocollayouts_imported::ImportTablePayload,
+                0xf67f27cae663810,
             >(_buf?)?;
             Ok(_response)
         }
@@ -918,6 +920,7 @@ impl MainProtocolProxyInterface for MainProtocolProxy {
                     fidl_test_protocollayouts_imported::ImportUnionPayload,
                     u32,
                 >,
+                0x30dac4182813ef7f,
             >(_buf?)?;
             Ok(_response.map(|x| x))
         }
@@ -954,6 +957,7 @@ impl MainProtocolProxyInterface for MainProtocolProxy {
         ) -> Result<fidl_test_protocollayouts_imported::ImportTablePayload, fidl::Error> {
             let _response = fidl::client::decode_transaction_body::<
                 fidl_test_protocollayouts_imported::ImportTablePayload,
+                0x2bf680c8f0d40604,
             >(_buf?)?;
             Ok(_response)
         }
@@ -982,6 +986,7 @@ impl MainProtocolProxyInterface for MainProtocolProxy {
                     fidl_test_protocollayouts_imported::ImportUnionPayload,
                     u32,
                 >,
+                0x432093586084ff0a,
             >(_buf?)?;
             Ok(_response.map(|x| x))
         }
@@ -1009,7 +1014,10 @@ impl MainProtocolProxyInterface for MainProtocolProxy {
         fn _decode(
             mut _buf: Result<fidl::MessageBufEtc, fidl::Error>,
         ) -> Result<LocalTablePayload, fidl::Error> {
-            let _response = fidl::client::decode_transaction_body::<LocalTablePayload>(_buf?)?;
+            let _response = fidl::client::decode_transaction_body::<
+                LocalTablePayload,
+                0x6bbeeb18f39c539b,
+            >(_buf?)?;
             Ok(_response)
         }
         self.client.send_query_and_decode::<LocalUnionPayload, LocalTablePayload>(
@@ -1031,6 +1039,7 @@ impl MainProtocolProxyInterface for MainProtocolProxy {
         ) -> Result<MainProtocolTwoWayLocalWithErrorResult, fidl::Error> {
             let _response = fidl::client::decode_transaction_body::<
                 fidl::encoding::ResultType<LocalUnionPayload, u32>,
+                0x4dd8e7287c4c9b57,
             >(_buf?)?;
             Ok(_response.map(|x| x))
         }
@@ -1062,8 +1071,10 @@ impl MainProtocolProxyInterface for MainProtocolProxy {
         fn _decode(
             mut _buf: Result<fidl::MessageBufEtc, fidl::Error>,
         ) -> Result<MainProtocolTwoWayAnonResponse, fidl::Error> {
-            let _response =
-                fidl::client::decode_transaction_body::<MainProtocolTwoWayAnonResponse>(_buf?)?;
+            let _response = fidl::client::decode_transaction_body::<
+                MainProtocolTwoWayAnonResponse,
+                0x672eb5e71efdabcf,
+            >(_buf?)?;
             Ok(_response)
         }
         self.client
@@ -1086,6 +1097,7 @@ impl MainProtocolProxyInterface for MainProtocolProxy {
         ) -> Result<MainProtocolTwoWayAnonWithErrorResult, fidl::Error> {
             let _response = fidl::client::decode_transaction_body::<
                 fidl::encoding::ResultType<MainProtocolTwoWayAnonWithErrorResponse, u32>,
+                0x6bd5fcf6f7b46df1,
             >(_buf?)?;
             Ok(_response.map(|x| x))
         }
@@ -1422,11 +1434,6 @@ impl futures::Stream for MainProtocolRequestStream {
 
             // A message has been received from the channel
             let (header, _body_bytes) = fidl::encoding::decode_transaction_header(bytes)?;
-            if !header.is_compatible() {
-                return std::task::Poll::Ready(Some(Err(fidl::Error::IncompatibleMagicNumber(
-                    header.magic_number(),
-                ))));
-            }
 
             std::task::Poll::Ready(Some(match header.ordinal() {
                 0x67da05e1ae3f5e1 => {

@@ -727,8 +727,11 @@ impl OverflowingProxyInterface for OverflowingProxy {
         fn _decode(
             mut _buf: Result<fidl::MessageBufEtc, fidl::Error>,
         ) -> Result<Vec<u8>, fidl::Error> {
-            let _response =
-                fidl::client::decode_transaction_body::<BoundedKnownToBeSmall, false>(_buf?)?;
+            let _response = fidl::client::decode_transaction_body::<
+                BoundedKnownToBeSmall,
+                0x5adf4f83d06a28d3,
+                false,
+            >(_buf?)?;
             Ok(_response.bytes)
         }
         self.client.send_query_and_decode::<BoundedKnownToBeSmall, Vec<u8>, false>(
@@ -746,8 +749,11 @@ impl OverflowingProxyInterface for OverflowingProxy {
         fn _decode(
             mut _buf: Result<fidl::MessageBufEtc, fidl::Error>,
         ) -> Result<Vec<u8>, fidl::Error> {
-            let _response =
-                fidl::client::decode_transaction_body::<BoundedMaybeLarge, true>(_buf?)?;
+            let _response = fidl::client::decode_transaction_body::<
+                BoundedMaybeLarge,
+                0x36c5f106da9a80e0,
+                true,
+            >(_buf?)?;
             Ok(_response.bytes)
         }
         self.client.send_query_and_decode::<BoundedMaybeLarge, Vec<u8>, true>(
@@ -766,8 +772,11 @@ impl OverflowingProxyInterface for OverflowingProxy {
         fn _decode(
             mut _buf: Result<fidl::MessageBufEtc, fidl::Error>,
         ) -> Result<SemiBoundedBelievedToBeSmall, fidl::Error> {
-            let _response =
-                fidl::client::decode_transaction_body::<SemiBoundedBelievedToBeSmall, true>(_buf?)?;
+            let _response = fidl::client::decode_transaction_body::<
+                SemiBoundedBelievedToBeSmall,
+                0x3b1167d912bf6bf1,
+                true,
+            >(_buf?)?;
             Ok(_response)
         }
         self.client.send_query_and_decode::<
@@ -790,8 +799,11 @@ impl OverflowingProxyInterface for OverflowingProxy {
         fn _decode(
             mut _buf: Result<fidl::MessageBufEtc, fidl::Error>,
         ) -> Result<SemiBoundedMaybeLarge, fidl::Error> {
-            let _response =
-                fidl::client::decode_transaction_body::<SemiBoundedMaybeLarge, true>(_buf?)?;
+            let _response = fidl::client::decode_transaction_body::<
+                SemiBoundedMaybeLarge,
+                0x1f7994e5062e246f,
+                true,
+            >(_buf?)?;
             Ok(_response)
         }
         self.client.send_query_and_decode::<SemiBoundedMaybeLarge, SemiBoundedMaybeLarge, true>(
@@ -809,8 +821,11 @@ impl OverflowingProxyInterface for OverflowingProxy {
         fn _decode(
             mut _buf: Result<fidl::MessageBufEtc, fidl::Error>,
         ) -> Result<Vec<u8>, fidl::Error> {
-            let _response =
-                fidl::client::decode_transaction_body::<UnboundedMaybeLargeValue, true>(_buf?)?;
+            let _response = fidl::client::decode_transaction_body::<
+                UnboundedMaybeLargeValue,
+                0x2f6e3f3a9bf3e39a,
+                true,
+            >(_buf?)?;
             Ok(_response.bytes)
         }
         self.client.send_query_and_decode::<UnboundedMaybeLargeValue, Vec<u8>, true>(
@@ -829,8 +844,11 @@ impl OverflowingProxyInterface for OverflowingProxy {
         fn _decode(
             mut _buf: Result<fidl::MessageBufEtc, fidl::Error>,
         ) -> Result<[Elements; 64], fidl::Error> {
-            let _response =
-                fidl::client::decode_transaction_body::<UnboundedMaybeLargeResource, true>(_buf?)?;
+            let _response = fidl::client::decode_transaction_body::<
+                UnboundedMaybeLargeResource,
+                0x4c5431cc3af0a62,
+                true,
+            >(_buf?)?;
             Ok(_response.elements)
         }
         self.client.send_query_and_decode::<UnboundedMaybeLargeResource, [Elements; 64], true>(
@@ -969,11 +987,6 @@ impl futures::Stream for OverflowingRequestStream {
 
             // A message has been received from the channel
             let (header, _body_bytes) = fidl::encoding::decode_transaction_header(bytes)?;
-            if !header.is_compatible() {
-                return std::task::Poll::Ready(Some(Err(fidl::Error::IncompatibleMagicNumber(
-                    header.magic_number(),
-                ))));
-            }
 
             std::task::Poll::Ready(Some(match header.ordinal() {
                 0x529aace1a3b3bce4 => {

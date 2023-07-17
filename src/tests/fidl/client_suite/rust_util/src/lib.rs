@@ -11,6 +11,7 @@ pub fn classify_error(error: fidl::Error) -> FidlErrorKind {
         fidl::Error::InvalidBoolean
         | fidl::Error::InvalidHeader
         | fidl::Error::IncompatibleMagicNumber(_)
+        | fidl::Error::InvalidResponseOrdinal { .. }
         | fidl::Error::Invalid
         | fidl::Error::OutOfRange
         | fidl::Error::ExtraBytes
@@ -32,7 +33,7 @@ pub fn classify_error(error: fidl::Error) -> FidlErrorKind {
         | fidl::Error::MissingExpectedHandleRights { .. } => FidlErrorKind::DecodingError,
 
         fidl::Error::UnknownOrdinal { .. }
-        | fidl::Error::InvalidResponseTxid
+        | fidl::Error::InvalidResponseTxid { .. }
         | fidl::Error::UnexpectedSyncResponse => FidlErrorKind::UnexpectedMessage,
 
         fidl::Error::UnsupportedMethod { .. } => FidlErrorKind::UnknownMethod,

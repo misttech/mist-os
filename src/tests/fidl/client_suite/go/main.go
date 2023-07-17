@@ -33,7 +33,7 @@ func classifyErr(err error) clientsuite.FidlErrorKind {
 		}
 	case fidl.ValidationError:
 		switch err.Code() {
-		case fidl.ErrUnexpectedOrdinal:
+		case fidl.ErrUnknownMagic, fidl.ErrUnexpectedOrdinal:
 			return clientsuite.FidlErrorKindDecodingError
 		}
 	}
@@ -52,7 +52,9 @@ func (*runnerImpl) IsTestEnabled(_ fidl.Context, test clientsuite.Test) (bool, e
 	isEnabled := func(test clientsuite.Test) bool {
 		switch test {
 		case clientsuite.TestReceiveEventNoPayload, clientsuite.TestReceiveEventStructPayload,
-			clientsuite.TestReceiveEventTablePayload, clientsuite.TestReceiveEventUnionPayload:
+			clientsuite.TestReceiveEventTablePayload, clientsuite.TestReceiveEventUnionPayload,
+			clientsuite.TestReceiveEventBadMagicNumber, clientsuite.TestReceiveEventUnexpectedTxid,
+			clientsuite.TestReceiveEventUnknownOrdinal:
 			// Go cannot receive events of arbitrary type.
 			return false
 		case clientsuite.TestOneWayStrictSend:
@@ -142,6 +144,12 @@ func (*runnerImpl) IsTestEnabled(_ fidl.Context, test clientsuite.Test) (bool, e
 }
 
 func (*runnerImpl) CheckAlive(_ fidl.Context) error { return nil }
+
+func (*runnerImpl) GetBindingsProperties(_ fidl.Context) (clientsuite.RunnerGetBindingsPropertiesResponse, error) {
+	var properties clientsuite.RunnerGetBindingsPropertiesResponse
+	properties.SetIoStyle(clientsuite.IoStyleSync)
+	return properties, nil
+}
 
 func (*runnerImpl) CallTwoWayNoPayload(ctx fidl.Context, target clientsuite.ClosedTargetWithCtxInterface) (clientsuite.EmptyResultClassification, error) {
 	err := target.TwoWayNoPayload(ctx)

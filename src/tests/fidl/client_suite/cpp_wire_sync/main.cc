@@ -24,9 +24,11 @@ class RunnerServer : public fidl::WireServer<fidl_clientsuite::Runner> {
   void IsTestEnabled(IsTestEnabledRequestView request,
                      IsTestEnabledCompleter::Sync& completer) override {
     switch (request->test) {
-      // TODO(fxbug.dev/116294): Wire Types should reject responses with the
-      // wrong ordinal.
-      case fidl_clientsuite::Test::kTwoWayWrongResponseOrdinal:
+      // TODO(fxbug.dev/116294): Should validate response ordinal matches.
+      case fidl_clientsuite::Test::kReceiveResponseWrongOrdinalKnown:
+      case fidl_clientsuite::Test::kReceiveResponseWrongOrdinalUnknown:
+      // TODO(fxbug.dev/129824): Should validate that event txid is 0.
+      case fidl_clientsuite::Test::kReceiveEventUnexpectedTxid:
         completer.Reply(false);
         return;
       default:
@@ -36,6 +38,13 @@ class RunnerServer : public fidl::WireServer<fidl_clientsuite::Runner> {
   }
 
   void CheckAlive(CheckAliveCompleter::Sync& completer) override { completer.Reply(); }
+
+  void GetBindingsProperties(GetBindingsPropertiesCompleter::Sync& completer) override {
+    fidl::Arena arena;
+    completer.Reply(fidl_clientsuite::wire::BindingsProperties::Builder(arena)
+                        .io_style(fidl_clientsuite::IoStyle::kSync)
+                        .Build());
+  }
 
   void CallTwoWayNoPayload(CallTwoWayNoPayloadRequestView request,
                            CallTwoWayNoPayloadCompleter::Sync& completer) override {

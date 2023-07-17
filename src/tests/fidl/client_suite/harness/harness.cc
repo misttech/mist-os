@@ -50,7 +50,8 @@ void ClientTest::TearDown() {
 
 std::shared_ptr<ClosedTargetEventReporter> ClientTest::ReceiveClosedEvents() {
   auto reporter_endpoints = fidl::CreateEndpoints<fidl_clientsuite::ClosedTargetEventReporter>();
-  EXPECT_TRUE(reporter_endpoints.is_ok()) << reporter_endpoints.status_string();
+  EXPECT_TRUE(reporter_endpoints.is_ok())
+      << "harness failed to create reporter endpoints: " << reporter_endpoints.status_string();
   if (!reporter_endpoints.is_ok()) {
     return nullptr;
   }
@@ -67,7 +68,7 @@ std::shared_ptr<ClosedTargetEventReporter> ClientTest::ReceiveClosedEvents() {
       .target = TakeClosedClient(),
       .reporter = std::move(reporter_endpoints->client),
   }}));
-  EXPECT_TRUE(result.is_ok()) << result.error_value();
+  EXPECT_TRUE(result.is_ok()) << "Runner.ReceiveClosedEvents call failed: " << result.error_value();
   if (!result.is_ok()) {
     return nullptr;
   }
@@ -77,7 +78,8 @@ std::shared_ptr<ClosedTargetEventReporter> ClientTest::ReceiveClosedEvents() {
 
 std::shared_ptr<AjarTargetEventReporter> ClientTest::ReceiveAjarEvents() {
   auto reporter_endpoints = fidl::CreateEndpoints<fidl_clientsuite::AjarTargetEventReporter>();
-  EXPECT_TRUE(reporter_endpoints.is_ok()) << reporter_endpoints.status_string();
+  EXPECT_TRUE(reporter_endpoints.is_ok())
+      << "harness failed to create reporter endpoints: " << reporter_endpoints.status_string();
   if (!reporter_endpoints.is_ok()) {
     return nullptr;
   }
@@ -94,7 +96,7 @@ std::shared_ptr<AjarTargetEventReporter> ClientTest::ReceiveAjarEvents() {
       .target = TakeAjarClient(),
       .reporter = std::move(reporter_endpoints->client),
   }}));
-  EXPECT_TRUE(result.is_ok()) << result.error_value();
+  EXPECT_TRUE(result.is_ok()) << "Runner.ReceiveAjarEvents call failed: " << result.error_value();
   if (!result.is_ok()) {
     return nullptr;
   }
@@ -104,7 +106,8 @@ std::shared_ptr<AjarTargetEventReporter> ClientTest::ReceiveAjarEvents() {
 
 std::shared_ptr<OpenTargetEventReporter> ClientTest::ReceiveOpenEvents() {
   auto reporter_endpoints = fidl::CreateEndpoints<fidl_clientsuite::OpenTargetEventReporter>();
-  EXPECT_TRUE(reporter_endpoints.is_ok()) << reporter_endpoints.status_string();
+  EXPECT_TRUE(reporter_endpoints.is_ok())
+      << "harness failed to create reporter endpoints: " << reporter_endpoints.status_string();
   if (!reporter_endpoints.is_ok()) {
     return nullptr;
   }
@@ -121,11 +124,12 @@ std::shared_ptr<OpenTargetEventReporter> ClientTest::ReceiveOpenEvents() {
       .target = TakeOpenClient(),
       .reporter = std::move(reporter_endpoints->client),
   }}));
-  EXPECT_TRUE(result.is_ok()) << result.error_value();
+  EXPECT_TRUE(result.is_ok()) << "Runner.ReceiveOpenEvents call failed: " << result.error_value();
   if (!result.is_ok()) {
     return nullptr;
   }
 
   return reporter;
 }
+
 }  // namespace client_suite

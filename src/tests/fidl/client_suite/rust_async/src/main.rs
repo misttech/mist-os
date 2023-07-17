@@ -5,10 +5,11 @@
 use {
     fidl::endpoints::Proxy,
     fidl_fidl_clientsuite::{
-        AjarTargetEvent, AjarTargetEventReport, ClosedTargetEvent, ClosedTargetEventReport, Empty,
-        EmptyResultClassification, EmptyResultWithErrorClassification, NonEmptyPayload,
-        NonEmptyResultClassification, NonEmptyResultWithErrorClassification, OpenTargetEvent,
-        OpenTargetEventReport, RunnerRequest, RunnerRequestStream, TableResultClassification, Test,
+        AjarTargetEvent, AjarTargetEventReport, BindingsProperties, ClosedTargetEvent,
+        ClosedTargetEventReport, Empty, EmptyResultClassification,
+        EmptyResultWithErrorClassification, IoStyle, NonEmptyPayload, NonEmptyResultClassification,
+        NonEmptyResultWithErrorClassification, OpenTargetEvent, OpenTargetEventReport,
+        RunnerRequest, RunnerRequestStream, TableResultClassification, Test,
         UnionResultClassification, UnknownEvent, CLIENT_SUITE_VERSION,
     },
     fidl_zx as _, fuchsia_async as fasync,
@@ -18,14 +19,9 @@ use {
 };
 
 const DISABLED_TESTS: &[Test] = &[
-    // TODO(fxbug.dev/114743): Client should reject unexpected replies.
-    Test::UnknownStrictServerInitiatedTwoWay,
-    Test::UnknownFlexibleServerInitiatedTwoWay,
     // TODO(fxbug.dev/99738): Should reject V1 wire format.
     Test::V1TwoWayNoPayload,
     Test::V1TwoWayStructPayload,
-    // TODO(fxbug.dev/116294): Should reject responses with the wrong ordinal.
-    Test::TwoWayWrongResponseOrdinal,
 ];
 
 async fn handle_runner_request(request: RunnerRequest) {
@@ -41,6 +37,11 @@ async fn handle_runner_request(request: RunnerRequest) {
         }
         RunnerRequest::IsTestEnabled { test, responder } => {
             responder.send(!DISABLED_TESTS.contains(&test)).unwrap();
+        }
+        RunnerRequest::GetBindingsProperties { responder } => {
+            responder
+                .send(&BindingsProperties { io_style: Some(IoStyle::Async), ..Default::default() })
+                .unwrap();
         }
 
         // =====================================================================

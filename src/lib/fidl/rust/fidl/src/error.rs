@@ -103,8 +103,11 @@ pub enum Error {
     #[error("A FIDL future was polled after it had already completed.")]
     PollAfterCompletion,
 
-    #[error("Invalid response with txid 0.")]
+    #[error("Received response with unknown txid.")]
     InvalidResponseTxid,
+
+    #[error("Received response with unexpected ordinal.")]
+    InvalidResponseOrdinal,
 
     #[error("Invalid presence indicator.")]
     InvalidPresenceIndicator,

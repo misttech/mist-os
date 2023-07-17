@@ -455,6 +455,7 @@ impl MainProtocolProxyInterface for MainProtocolProxy {
         fn _decode(mut _buf: Result<fidl::MessageBufEtc, fidl::Error>) -> Result<i32, fidl::Error> {
             let _response = fidl::client::decode_transaction_body::<
                 fidl_test_protocolpayloads_imported::ImportStructPayload,
+                0x2348a1331ca4cfb0,
             >(_buf?)?;
             Ok(_response.a)
         }
@@ -485,6 +486,7 @@ impl MainProtocolProxyInterface for MainProtocolProxy {
                     fidl_test_protocolpayloads_imported::ImportStructPayload,
                     u32,
                 >,
+                0x6a9be48b574d1557,
             >(_buf?)?;
             Ok(_response.map(|x| x.a))
         }
@@ -512,7 +514,10 @@ impl MainProtocolProxyInterface for MainProtocolProxy {
         fn _decode(
             mut _buf: Result<fidl::MessageBufEtc, fidl::Error>,
         ) -> Result<(u32, u32), fidl::Error> {
-            let _response = fidl::client::decode_transaction_body::<LocalStructPayload>(_buf?)?;
+            let _response = fidl::client::decode_transaction_body::<
+                LocalStructPayload,
+                0x743776548de3af0f,
+            >(_buf?)?;
             Ok((_response.a, _response.b))
         }
         self.client.send_query_and_decode::<LocalStructPayload, (u32, u32)>(
@@ -535,6 +540,7 @@ impl MainProtocolProxyInterface for MainProtocolProxy {
         ) -> Result<MainProtocolTwoWayLocalWithErrorResult, fidl::Error> {
             let _response = fidl::client::decode_transaction_body::<
                 fidl::encoding::ResultType<LocalStructPayload, u32>,
+                0x2839c029915cb8fc,
             >(_buf?)?;
             Ok(_response.map(|x| (x.a, x.b)))
         }
@@ -560,6 +566,7 @@ impl MainProtocolProxyInterface for MainProtocolProxy {
         fn _decode(mut _buf: Result<fidl::MessageBufEtc, fidl::Error>) -> Result<i32, fidl::Error> {
             let _response = fidl::client::decode_transaction_body::<
                 fidl_test_protocolpayloads_imported::ImportStructPayload,
+                0x20f4a8f65ff69473,
             >(_buf?)?;
             Ok(_response.a)
         }
@@ -583,6 +590,7 @@ impl MainProtocolProxyInterface for MainProtocolProxy {
                     fidl_test_protocolpayloads_imported::ImportStructPayload,
                     u32,
                 >,
+                0x3b7b706d42eb9bbd,
             >(_buf?)?;
             Ok(_response.map(|x| x.a))
         }
@@ -610,8 +618,10 @@ impl MainProtocolProxyInterface for MainProtocolProxy {
         fn _decode(
             mut _buf: Result<fidl::MessageBufEtc, fidl::Error>,
         ) -> Result<(u32, u32), fidl::Error> {
-            let _response =
-                fidl::client::decode_transaction_body::<MainProtocolTwoWayAnonResponse>(_buf?)?;
+            let _response = fidl::client::decode_transaction_body::<
+                MainProtocolTwoWayAnonResponse,
+                0x8bdc969ff7dd759,
+            >(_buf?)?;
             Ok((_response.a, _response.b))
         }
         self.client.send_query_and_decode::<MainProtocolTwoWayAnonRequest, (u32, u32)>(
@@ -634,6 +644,7 @@ impl MainProtocolProxyInterface for MainProtocolProxy {
         ) -> Result<MainProtocolTwoWayAnonWithErrorResult, fidl::Error> {
             let _response = fidl::client::decode_transaction_body::<
                 fidl::encoding::ResultType<MainProtocolTwoWayAnonWithErrorResponse, u32>,
+                0x5862bf8170c87a36,
             >(_buf?)?;
             Ok(_response.map(|x| (x.a, x.b)))
         }
@@ -929,11 +940,6 @@ impl futures::Stream for MainProtocolRequestStream {
 
             // A message has been received from the channel
             let (header, _body_bytes) = fidl::encoding::decode_transaction_header(bytes)?;
-            if !header.is_compatible() {
-                return std::task::Poll::Ready(Some(Err(fidl::Error::IncompatibleMagicNumber(
-                    header.magic_number(),
-                ))));
-            }
 
             std::task::Poll::Ready(Some(match header.ordinal() {
                 0x241e4384443ccb10 => {

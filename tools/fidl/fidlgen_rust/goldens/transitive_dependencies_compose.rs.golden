@@ -123,6 +123,7 @@ impl TopProxyInterface for TopProxy {
         ) -> Result<fidl_test_bottom::Foo, fidl::Error> {
             let _response = fidl::client::decode_transaction_body::<
                 fidl_test_bottom::BottomGetFooResponse,
+                0x245770d9d719c667,
             >(_buf?)?;
             Ok(_response.foo)
         }
@@ -250,11 +251,6 @@ impl futures::Stream for TopRequestStream {
 
             // A message has been received from the channel
             let (header, _body_bytes) = fidl::encoding::decode_transaction_header(bytes)?;
-            if !header.is_compatible() {
-                return std::task::Poll::Ready(Some(Err(fidl::Error::IncompatibleMagicNumber(
-                    header.magic_number(),
-                ))));
-            }
 
             std::task::Poll::Ready(Some(match header.ordinal() {
                 0x245770d9d719c667 => {

@@ -12,7 +12,11 @@ namespace clienttest_util {
 
 inline fidl_clientsuite::FidlErrorKind ClassifyError(const fidl::Status& status) {
   ZX_ASSERT(!status.ok());
-  switch (status.reason()) {
+  auto reason = status.reason();
+  if (reason == fidl::Reason::kCanceledDueToOtherError) {
+    reason = status.underlying_reason().value();
+  }
+  switch (reason) {
     case fidl::Reason::kUnbind:
     case fidl::Reason::kClose:
     case fidl::Reason::kDispatcherError:
@@ -32,7 +36,8 @@ inline fidl_clientsuite::FidlErrorKind ClassifyError(const fidl::Status& status)
       return fidl_clientsuite::FidlErrorKind::kUnknownMethod;
     default:
       auto description = status.FormatDescription();
-      ZX_PANIC("Status had an unspported reason: %s", description.c_str());
+      ZX_PANIC("clienttest_util::ClassifyError is missing a case for this error: %s",
+               description.c_str());
   }
 }
 

@@ -131,7 +131,10 @@ impl SubProxyInterface for SubProxy {
     type FooResponseFut = fidl::client::QueryResponseFut<i64>;
     fn r#foo(&self, mut s: &str) -> Self::FooResponseFut {
         fn _decode(mut _buf: Result<fidl::MessageBufEtc, fidl::Error>) -> Result<i64, fidl::Error> {
-            let _response = fidl::client::decode_transaction_body::<SuperFooResponse>(_buf?)?;
+            let _response = fidl::client::decode_transaction_body::<
+                SuperFooResponse,
+                0x68a61c2a230db8b8,
+            >(_buf?)?;
             Ok(_response.y)
         }
         self.client.send_query_and_decode::<SuperFooRequest, i64>(
@@ -258,11 +261,6 @@ impl futures::Stream for SubRequestStream {
 
             // A message has been received from the channel
             let (header, _body_bytes) = fidl::encoding::decode_transaction_header(bytes)?;
-            if !header.is_compatible() {
-                return std::task::Poll::Ready(Some(Err(fidl::Error::IncompatibleMagicNumber(
-                    header.magic_number(),
-                ))));
-            }
 
             std::task::Poll::Ready(Some(match header.ordinal() {
                 0x68a61c2a230db8b8 => {
@@ -510,7 +508,10 @@ impl Super_ProxyInterface for Super_Proxy {
     type FooResponseFut = fidl::client::QueryResponseFut<i64>;
     fn r#foo(&self, mut s: &str) -> Self::FooResponseFut {
         fn _decode(mut _buf: Result<fidl::MessageBufEtc, fidl::Error>) -> Result<i64, fidl::Error> {
-            let _response = fidl::client::decode_transaction_body::<SuperFooResponse>(_buf?)?;
+            let _response = fidl::client::decode_transaction_body::<
+                SuperFooResponse,
+                0x68a61c2a230db8b8,
+            >(_buf?)?;
             Ok(_response.y)
         }
         self.client.send_query_and_decode::<SuperFooRequest, i64>(
@@ -637,11 +638,6 @@ impl futures::Stream for Super_RequestStream {
 
             // A message has been received from the channel
             let (header, _body_bytes) = fidl::encoding::decode_transaction_header(bytes)?;
-            if !header.is_compatible() {
-                return std::task::Poll::Ready(Some(Err(fidl::Error::IncompatibleMagicNumber(
-                    header.magic_number(),
-                ))));
-            }
 
             std::task::Poll::Ready(Some(match header.ordinal() {
                 0x68a61c2a230db8b8 => {

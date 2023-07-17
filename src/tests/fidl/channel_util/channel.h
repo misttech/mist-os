@@ -30,6 +30,9 @@ using HandleInfos = std::vector<zx_handle_info_t>;
 // value.
 static const zx_txid_t kTxidNotKnown = 0;
 
+// A value to use when constructing a header with an invalid magic number.
+static const uint8_t kBadMagicNumber = 87;
+
 const zx_rights_t kOverflowBufferRights =
     ZX_RIGHT_GET_PROPERTY | ZX_RIGHT_READ | ZX_RIGHT_TRANSFER | ZX_RIGHT_WAIT | ZX_RIGHT_INSPECT;
 

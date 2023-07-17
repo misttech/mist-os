@@ -32,9 +32,9 @@ class RunnerServer : public fidl::Server<fidl_clientsuite::Runner> {
   void IsTestEnabled(IsTestEnabledRequest& request,
                      IsTestEnabledCompleter::Sync& completer) override {
     switch (request.test()) {
-      // TODO(fxbug.dev/116294): Natural Types should reject responses with the
-      // wrong ordinal.
-      case fidl_clientsuite::Test::kTwoWayWrongResponseOrdinal:
+      // TODO(fxbug.dev/116294): Should validate response ordinal matches.
+      case fidl_clientsuite::Test::kReceiveResponseWrongOrdinalKnown:
+      case fidl_clientsuite::Test::kReceiveResponseWrongOrdinalUnknown:
         completer.Reply(false);
         return;
       default:
@@ -44,6 +44,11 @@ class RunnerServer : public fidl::Server<fidl_clientsuite::Runner> {
   }
 
   void CheckAlive(CheckAliveCompleter::Sync& completer) override { completer.Reply(); }
+
+  void GetBindingsProperties(GetBindingsPropertiesCompleter::Sync& completer) override {
+    completer.Reply(
+        fidl_clientsuite::BindingsProperties().io_style(fidl_clientsuite::IoStyle::kAsync));
+  }
 
   void CallTwoWayNoPayload(CallTwoWayNoPayloadRequest& request,
                            CallTwoWayNoPayloadCompleter::Sync& completer) override {

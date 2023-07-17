@@ -16,7 +16,7 @@
 library fidl.clientsuite;
 
 // An incrementing integer used to coordinate breaking changes across repositories.
-const CLIENT_SUITE_VERSION uint64 = 0;
+const CLIENT_SUITE_VERSION uint64 = 1;
 
 // Empty type used for valid but empty union variants.
 type Empty = struct {};
@@ -177,6 +177,14 @@ closed protocol Runner {
 
     // A two-way function to test that the [`Runner`] is still responding.
     strict CheckAlive() -> ();
+
+    // Returns properties of the bindings being tested.
+    strict GetBindingsProperties() -> (@generated_name("BindingsProperties") table {
+        1: io_style strict enum {
+            SYNC = 1;
+            ASYNC = 2;
+        };
+    });
 
     // Calls on the closed protocol.
 
@@ -482,7 +490,13 @@ type Test = flexible enum : uint32 {
     // ////////////////////////////////////////////////////////////////////////
     // message_header_tests.cc
     // ////////////////////////////////////////////////////////////////////////
-    TWO_WAY_WRONG_RESPONSE_ORDINAL = 47;
+    RECEIVE_EVENT_BAD_MAGIC_NUMBER = 60;
+    RECEIVE_EVENT_UNEXPECTED_TXID = 61;
+    RECEIVE_EVENT_UNKNOWN_ORDINAL = 62;
+    RECEIVE_RESPONSE_BAD_MAGIC_NUMBER = 63;
+    RECEIVE_RESPONSE_UNEXPECTED_TXID = 64;
+    RECEIVE_RESPONSE_WRONG_ORDINAL_KNOWN = 65;
+    RECEIVE_RESPONSE_WRONG_ORDINAL_UNKNOWN = 67;
 
     // ////////////////////////////////////////////////////////////////////////
     // coding_tests.cc
@@ -539,5 +553,5 @@ type Test = flexible enum : uint32 {
     UNKNOWN_STRICT_SERVER_INITIATED_TWO_WAY = 36;
     UNKNOWN_FLEXIBLE_SERVER_INITIATED_TWO_WAY = 37;
 
-    // next available: 60
+    // next available: 68
 };

@@ -215,8 +215,10 @@ impl SimpleProtocolProxyInterface for SimpleProtocolProxy {
     type AddResponseFut = fidl::client::QueryResponseFut<i32>;
     fn r#add(&self, mut a: i32, mut b: i32) -> Self::AddResponseFut {
         fn _decode(mut _buf: Result<fidl::MessageBufEtc, fidl::Error>) -> Result<i32, fidl::Error> {
-            let _response =
-                fidl::client::decode_transaction_body::<SimpleProtocolAddResponse>(_buf?)?;
+            let _response = fidl::client::decode_transaction_body::<
+                SimpleProtocolAddResponse,
+                0x7ee19cf19ae30276,
+            >(_buf?)?;
             Ok(_response.sum)
         }
         self.client.send_query_and_decode::<SimpleProtocolAddRequest, i32>(
@@ -344,11 +346,6 @@ impl futures::Stream for SimpleProtocolRequestStream {
 
             // A message has been received from the channel
             let (header, _body_bytes) = fidl::encoding::decode_transaction_header(bytes)?;
-            if !header.is_compatible() {
-                return std::task::Poll::Ready(Some(Err(fidl::Error::IncompatibleMagicNumber(
-                    header.magic_number(),
-                ))));
-            }
 
             std::task::Poll::Ready(Some(match header.ordinal() {
                 0x7ee19cf19ae30276 => {

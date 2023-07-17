@@ -279,6 +279,7 @@ impl ProtocolProxyInterface for ProtocolProxy {
         ) -> Result<FlexibleFoo, fidl::Error> {
             let _response = fidl::client::decode_transaction_body::<
                 ProtocolRequestStrictResponseFlexibleResponse,
+                0x9b8c7d3d118df13,
             >(_buf?)?;
             Ok(_response.f)
         }
@@ -301,6 +302,7 @@ impl ProtocolProxyInterface for ProtocolProxy {
         ) -> Result<StrictFoo, fidl::Error> {
             let _response = fidl::client::decode_transaction_body::<
                 ProtocolRequestFlexibleResponseStrictResponse,
+                0x480c77690533acb7,
             >(_buf?)?;
             Ok(_response.f)
         }
@@ -429,11 +431,6 @@ impl futures::Stream for ProtocolRequestStream {
 
             // A message has been received from the channel
             let (header, _body_bytes) = fidl::encoding::decode_transaction_header(bytes)?;
-            if !header.is_compatible() {
-                return std::task::Poll::Ready(Some(Err(fidl::Error::IncompatibleMagicNumber(
-                    header.magic_number(),
-                ))));
-            }
 
             std::task::Poll::Ready(Some(match header.ordinal() {
                 0x9b8c7d3d118df13 => {

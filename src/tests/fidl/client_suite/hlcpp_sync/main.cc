@@ -35,6 +35,9 @@ class RunnerServer : public fidl::clientsuite::Runner {
       case fidl::clientsuite::Test::RECEIVE_STRICT_EVENT_MISMATCHED_STRICTNESS:
       case fidl::clientsuite::Test::RECEIVE_FLEXIBLE_EVENT:
       case fidl::clientsuite::Test::RECEIVE_FLEXIBLE_EVENT_MISMATCHED_STRICTNESS:
+      case fidl::clientsuite::Test::RECEIVE_EVENT_BAD_MAGIC_NUMBER:
+      case fidl::clientsuite::Test::RECEIVE_EVENT_UNEXPECTED_TXID:
+      case fidl::clientsuite::Test::RECEIVE_EVENT_UNKNOWN_ORDINAL:
       case fidl::clientsuite::Test::UNKNOWN_STRICT_EVENT_OPEN_PROTOCOL:
       case fidl::clientsuite::Test::UNKNOWN_FLEXIBLE_EVENT_OPEN_PROTOCOL:
       case fidl::clientsuite::Test::UNKNOWN_STRICT_EVENT_AJAR_PROTOCOL:
@@ -45,13 +48,16 @@ class RunnerServer : public fidl::clientsuite::Runner {
       case fidl::clientsuite::Test::UNKNOWN_FLEXIBLE_SERVER_INITIATED_TWO_WAY:
       // TODO(fxbug.dev/116294): HLCPP bindings should reject responses with the
       // wrong ordinal.
-      case fidl::clientsuite::Test::TWO_WAY_WRONG_RESPONSE_ORDINAL:
+      case fidl::clientsuite::Test::RECEIVE_RESPONSE_WRONG_ORDINAL_KNOWN:
+      case fidl::clientsuite::Test::RECEIVE_RESPONSE_WRONG_ORDINAL_UNKNOWN:
       // TODO(fxbug.dev/99738): HLCPP bindings should reject V1 wire format.
       case fidl::clientsuite::Test::V1_TWO_WAY_NO_PAYLOAD:
       case fidl::clientsuite::Test::V1_TWO_WAY_STRUCT_PAYLOAD:
       // TODO(fxbug.dev/113160): Peer-closed errors should be
       // hidden from one-way calls.
       case fidl::clientsuite::Test::ONE_WAY_CALL_DO_NOT_REPORT_PEER_CLOSED:
+      // TODO(fxbug.dev/129829): Should validate magic number.
+      case fidl::clientsuite::Test::RECEIVE_RESPONSE_BAD_MAGIC_NUMBER:
         callback(false);
         return;
       default:
@@ -61,6 +67,12 @@ class RunnerServer : public fidl::clientsuite::Runner {
   }
 
   void CheckAlive(CheckAliveCallback callback) override { callback(); }
+
+  void GetBindingsProperties(GetBindingsPropertiesCallback callback) override {
+    fidl::clientsuite::BindingsProperties properties;
+    properties.set_io_style(fidl::clientsuite::IoStyle::SYNC);
+    callback(std::move(properties));
+  }
 
   void CallTwoWayNoPayload(fidl::InterfaceHandle<fidl::clientsuite::ClosedTarget> target,
                            CallTwoWayNoPayloadCallback callback) override {

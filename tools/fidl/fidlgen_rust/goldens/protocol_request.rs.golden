@@ -240,11 +240,6 @@ impl futures::Stream for ChildRequestStream {
 
             // A message has been received from the channel
             let (header, _body_bytes) = fidl::encoding::decode_transaction_header(bytes)?;
-            if !header.is_compatible() {
-                return std::task::Poll::Ready(Some(Err(fidl::Error::IncompatibleMagicNumber(
-                    header.magic_number(),
-                ))));
-            }
 
             std::task::Poll::Ready(Some(match header.ordinal() {
                 _ => Err(fidl::Error::UnknownOrdinal {
@@ -459,7 +454,10 @@ impl ParentProxyInterface for ParentProxy {
         fn _decode(
             mut _buf: Result<fidl::MessageBufEtc, fidl::Error>,
         ) -> Result<fidl::endpoints::ClientEnd<ChildMarker>, fidl::Error> {
-            let _response = fidl::client::decode_transaction_body::<ParentGetChildResponse>(_buf?)?;
+            let _response = fidl::client::decode_transaction_body::<
+                ParentGetChildResponse,
+                0xc3cd963aafc873b,
+            >(_buf?)?;
             Ok(_response.c)
         }
         self.client.send_query_and_decode::<
@@ -479,8 +477,10 @@ impl ParentProxyInterface for ParentProxy {
         fn _decode(
             mut _buf: Result<fidl::MessageBufEtc, fidl::Error>,
         ) -> Result<fidl::endpoints::ServerEnd<ChildMarker>, fidl::Error> {
-            let _response =
-                fidl::client::decode_transaction_body::<ParentGetChildRequestResponse>(_buf?)?;
+            let _response = fidl::client::decode_transaction_body::<
+                ParentGetChildRequestResponse,
+                0xf38d08d64f71c79,
+            >(_buf?)?;
             Ok(_response.r)
         }
         self.client.send_query_and_decode::<
@@ -632,11 +632,6 @@ impl futures::Stream for ParentRequestStream {
 
             // A message has been received from the channel
             let (header, _body_bytes) = fidl::encoding::decode_transaction_header(bytes)?;
-            if !header.is_compatible() {
-                return std::task::Poll::Ready(Some(Err(fidl::Error::IncompatibleMagicNumber(
-                    header.magic_number(),
-                ))));
-            }
 
             std::task::Poll::Ready(Some(match header.ordinal() {
                 0xc3cd963aafc873b => {

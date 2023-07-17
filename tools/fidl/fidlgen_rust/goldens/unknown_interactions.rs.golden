@@ -1716,8 +1716,10 @@ impl UnknownInteractionsAjarProtocolProxyInterface for UnknownInteractionsAjarPr
     type StrictTwoWayResponseFut = fidl::client::QueryResponseFut<()>;
     fn r#strict_two_way(&self) -> Self::StrictTwoWayResponseFut {
         fn _decode(mut _buf: Result<fidl::MessageBufEtc, fidl::Error>) -> Result<(), fidl::Error> {
-            let _response =
-                fidl::client::decode_transaction_body::<fidl::encoding::EmptyPayload>(_buf?)?;
+            let _response = fidl::client::decode_transaction_body::<
+                fidl::encoding::EmptyPayload,
+                0x50e66d328336038,
+            >(_buf?)?;
             Ok(_response)
         }
         self.client.send_query_and_decode::<fidl::encoding::EmptyPayload, ()>(
@@ -1733,6 +1735,7 @@ impl UnknownInteractionsAjarProtocolProxyInterface for UnknownInteractionsAjarPr
         fn _decode(mut _buf: Result<fidl::MessageBufEtc, fidl::Error>) -> Result<i32, fidl::Error> {
             let _response = fidl::client::decode_transaction_body::<
                 UnknownInteractionsAjarProtocolStrictTwoWayFieldsResponse,
+                0x1947e36d61e4493a,
             >(_buf?)?;
             Ok(_response.some_field)
         }
@@ -1752,6 +1755,7 @@ impl UnknownInteractionsAjarProtocolProxyInterface for UnknownInteractionsAjarPr
         ) -> Result<UnknownInteractionsAjarProtocolStrictTwoWayUnionResponse, fidl::Error> {
             let _response = fidl::client::decode_transaction_body::<
                 UnknownInteractionsAjarProtocolStrictTwoWayUnionResponse,
+                0x5177371967e0e6d1,
             >(_buf?)?;
             Ok(_response)
         }
@@ -1774,6 +1778,7 @@ impl UnknownInteractionsAjarProtocolProxyInterface for UnknownInteractionsAjarPr
         ) -> Result<UnknownInteractionsAjarProtocolStrictTwoWayTableResponse, fidl::Error> {
             let _response = fidl::client::decode_transaction_body::<
                 UnknownInteractionsAjarProtocolStrictTwoWayTableResponse,
+                0x6f8f9343b34e2ed4,
             >(_buf?)?;
             Ok(_response)
         }
@@ -1796,6 +1801,7 @@ impl UnknownInteractionsAjarProtocolProxyInterface for UnknownInteractionsAjarPr
         ) -> Result<UnknownInteractionsAjarProtocolStrictTwoWayErrResult, fidl::Error> {
             let _response = fidl::client::decode_transaction_body::<
                 fidl::encoding::ResultType<fidl::encoding::EmptyStruct, i32>,
+                0x5b47637577c69006,
             >(_buf?)?;
             Ok(_response.map(|x| x))
         }
@@ -1822,6 +1828,7 @@ impl UnknownInteractionsAjarProtocolProxyInterface for UnknownInteractionsAjarPr
                     UnknownInteractionsAjarProtocolStrictTwoWayFieldsErrResponse,
                     i32,
                 >,
+                0x844ff7bb3f186d9,
             >(_buf?)?;
             Ok(_response.map(|x| x.some_field))
         }
@@ -1848,6 +1855,7 @@ impl UnknownInteractionsAjarProtocolProxyInterface for UnknownInteractionsAjarPr
                     UnknownInteractionsAjarProtocolStrictTwoWayUnionErrResponse,
                     i32,
                 >,
+                0x2cbfd5a859d4ac95,
             >(_buf?)?;
             Ok(_response.map(|x| x))
         }
@@ -1874,6 +1882,7 @@ impl UnknownInteractionsAjarProtocolProxyInterface for UnknownInteractionsAjarPr
                     UnknownInteractionsAjarProtocolStrictTwoWayTableErrResponse,
                     i32,
                 >,
+                0x30c9e1b3da57dc37,
             >(_buf?)?;
             Ok(_response.map(|x| x))
         }
@@ -2347,11 +2356,6 @@ impl futures::Stream for UnknownInteractionsAjarProtocolRequestStream {
 
             // A message has been received from the channel
             let (header, _body_bytes) = fidl::encoding::decode_transaction_header(bytes)?;
-            if !header.is_compatible() {
-                return std::task::Poll::Ready(Some(Err(fidl::Error::IncompatibleMagicNumber(
-                    header.magic_number(),
-                ))));
-            }
 
             std::task::Poll::Ready(Some(match header.ordinal() {
                 0xd4663d6b2b5048b => {
@@ -3874,8 +3878,10 @@ impl UnknownInteractionsClosedProtocolProxyInterface for UnknownInteractionsClos
     type StrictTwoWayResponseFut = fidl::client::QueryResponseFut<()>;
     fn r#strict_two_way(&self) -> Self::StrictTwoWayResponseFut {
         fn _decode(mut _buf: Result<fidl::MessageBufEtc, fidl::Error>) -> Result<(), fidl::Error> {
-            let _response =
-                fidl::client::decode_transaction_body::<fidl::encoding::EmptyPayload>(_buf?)?;
+            let _response = fidl::client::decode_transaction_body::<
+                fidl::encoding::EmptyPayload,
+                0x5eda305d6b22f1f7,
+            >(_buf?)?;
             Ok(_response)
         }
         self.client.send_query_and_decode::<fidl::encoding::EmptyPayload, ()>(
@@ -3891,6 +3897,7 @@ impl UnknownInteractionsClosedProtocolProxyInterface for UnknownInteractionsClos
         fn _decode(mut _buf: Result<fidl::MessageBufEtc, fidl::Error>) -> Result<i32, fidl::Error> {
             let _response = fidl::client::decode_transaction_body::<
                 UnknownInteractionsClosedProtocolStrictTwoWayFieldsResponse,
+                0x1323afa3e0541253,
             >(_buf?)?;
             Ok(_response.some_field)
         }
@@ -3911,6 +3918,7 @@ impl UnknownInteractionsClosedProtocolProxyInterface for UnknownInteractionsClos
         {
             let _response = fidl::client::decode_transaction_body::<
                 UnknownInteractionsClosedProtocolStrictTwoWayUnionResponse,
+                0x68b32554eb0f6fa7,
             >(_buf?)?;
             Ok(_response)
         }
@@ -3934,6 +3942,7 @@ impl UnknownInteractionsClosedProtocolProxyInterface for UnknownInteractionsClos
         {
             let _response = fidl::client::decode_transaction_body::<
                 UnknownInteractionsClosedProtocolStrictTwoWayTableResponse,
+                0x6e4a94d44b69e785,
             >(_buf?)?;
             Ok(_response)
         }
@@ -3956,6 +3965,7 @@ impl UnknownInteractionsClosedProtocolProxyInterface for UnknownInteractionsClos
         ) -> Result<UnknownInteractionsClosedProtocolStrictTwoWayErrResult, fidl::Error> {
             let _response = fidl::client::decode_transaction_body::<
                 fidl::encoding::ResultType<fidl::encoding::EmptyStruct, i32>,
+                0x4fa35d5433db4d3a,
             >(_buf?)?;
             Ok(_response.map(|x| x))
         }
@@ -3983,6 +3993,7 @@ impl UnknownInteractionsClosedProtocolProxyInterface for UnknownInteractionsClos
                     UnknownInteractionsClosedProtocolStrictTwoWayFieldsErrResponse,
                     i32,
                 >,
+                0xb22aebf23bb58fd,
             >(_buf?)?;
             Ok(_response.map(|x| x.some_field))
         }
@@ -4009,6 +4020,7 @@ impl UnknownInteractionsClosedProtocolProxyInterface for UnknownInteractionsClos
                     UnknownInteractionsClosedProtocolStrictTwoWayUnionErrResponse,
                     i32,
                 >,
+                0xcd65d4d29a43c80,
             >(_buf?)?;
             Ok(_response.map(|x| x))
         }
@@ -4035,6 +4047,7 @@ impl UnknownInteractionsClosedProtocolProxyInterface for UnknownInteractionsClos
                     UnknownInteractionsClosedProtocolStrictTwoWayTableErrResponse,
                     i32,
                 >,
+                0x117dde20b92f7b90,
             >(_buf?)?;
             Ok(_response.map(|x| x))
         }
@@ -4318,11 +4331,6 @@ impl futures::Stream for UnknownInteractionsClosedProtocolRequestStream {
 
             // A message has been received from the channel
             let (header, _body_bytes) = fidl::encoding::decode_transaction_header(bytes)?;
-            if !header.is_compatible() {
-                return std::task::Poll::Ready(Some(Err(fidl::Error::IncompatibleMagicNumber(
-                    header.magic_number(),
-                ))));
-            }
 
             std::task::Poll::Ready(Some(match header.ordinal() {
                 0x59282385962da24 => {
@@ -5928,8 +5936,10 @@ impl UnknownInteractionsProtocolProxyInterface for UnknownInteractionsProtocolPr
     type StrictTwoWayResponseFut = fidl::client::QueryResponseFut<()>;
     fn r#strict_two_way(&self) -> Self::StrictTwoWayResponseFut {
         fn _decode(mut _buf: Result<fidl::MessageBufEtc, fidl::Error>) -> Result<(), fidl::Error> {
-            let _response =
-                fidl::client::decode_transaction_body::<fidl::encoding::EmptyPayload>(_buf?)?;
+            let _response = fidl::client::decode_transaction_body::<
+                fidl::encoding::EmptyPayload,
+                0x734c996b0f37b942,
+            >(_buf?)?;
             Ok(_response)
         }
         self.client.send_query_and_decode::<fidl::encoding::EmptyPayload, ()>(
@@ -5945,6 +5955,7 @@ impl UnknownInteractionsProtocolProxyInterface for UnknownInteractionsProtocolPr
         fn _decode(mut _buf: Result<fidl::MessageBufEtc, fidl::Error>) -> Result<i32, fidl::Error> {
             let _response = fidl::client::decode_transaction_body::<
                 UnknownInteractionsProtocolStrictTwoWayFieldsResponse,
+                0x334f4e7fff460ae3,
             >(_buf?)?;
             Ok(_response.some_field)
         }
@@ -5964,6 +5975,7 @@ impl UnknownInteractionsProtocolProxyInterface for UnknownInteractionsProtocolPr
         ) -> Result<UnknownInteractionsProtocolStrictTwoWayUnionResponse, fidl::Error> {
             let _response = fidl::client::decode_transaction_body::<
                 UnknownInteractionsProtocolStrictTwoWayUnionResponse,
+                0x2212805eca592cad,
             >(_buf?)?;
             Ok(_response)
         }
@@ -5986,6 +5998,7 @@ impl UnknownInteractionsProtocolProxyInterface for UnknownInteractionsProtocolPr
         ) -> Result<UnknownInteractionsProtocolStrictTwoWayTableResponse, fidl::Error> {
             let _response = fidl::client::decode_transaction_body::<
                 UnknownInteractionsProtocolStrictTwoWayTableResponse,
+                0x746ebf8659ff23b7,
             >(_buf?)?;
             Ok(_response)
         }
@@ -6008,6 +6021,7 @@ impl UnknownInteractionsProtocolProxyInterface for UnknownInteractionsProtocolPr
         ) -> Result<UnknownInteractionsProtocolStrictTwoWayErrResult, fidl::Error> {
             let _response = fidl::client::decode_transaction_body::<
                 fidl::encoding::ResultType<fidl::encoding::EmptyStruct, i32>,
+                0x6d1c6002c51bb967,
             >(_buf?)?;
             Ok(_response.map(|x| x))
         }
@@ -6033,6 +6047,7 @@ impl UnknownInteractionsProtocolProxyInterface for UnknownInteractionsProtocolPr
                     UnknownInteractionsProtocolStrictTwoWayFieldsErrResponse,
                     i32,
                 >,
+                0x2182a49480e5bd2b,
             >(_buf?)?;
             Ok(_response.map(|x| x.some_field))
         }
@@ -6058,6 +6073,7 @@ impl UnknownInteractionsProtocolProxyInterface for UnknownInteractionsProtocolPr
                     UnknownInteractionsProtocolStrictTwoWayUnionErrResponse,
                     i32,
                 >,
+                0x453af745d38b20ca,
             >(_buf?)?;
             Ok(_response.map(|x| x))
         }
@@ -6083,6 +6099,7 @@ impl UnknownInteractionsProtocolProxyInterface for UnknownInteractionsProtocolPr
                     UnknownInteractionsProtocolStrictTwoWayTableErrResponse,
                     i32,
                 >,
+                0x4c26c7ab89cb68d8,
             >(_buf?)?;
             Ok(_response.map(|x| x))
         }
@@ -6102,6 +6119,7 @@ impl UnknownInteractionsProtocolProxyInterface for UnknownInteractionsProtocolPr
         fn _decode(mut _buf: Result<fidl::MessageBufEtc, fidl::Error>) -> Result<(), fidl::Error> {
             let _response = fidl::client::decode_transaction_body::<
                 fidl::encoding::FlexibleType<fidl::encoding::EmptyStruct>,
+                0x4a5bb3397008b7c,
             >(_buf?)?
             .into_result::<UnknownInteractionsProtocolMarker>("flexible_two_way")?;
             Ok(_response)
@@ -6121,6 +6139,7 @@ impl UnknownInteractionsProtocolProxyInterface for UnknownInteractionsProtocolPr
                 fidl::encoding::FlexibleType<
                     UnknownInteractionsProtocolFlexibleTwoWayFieldsResponse,
                 >,
+                0x3b13f82f44813a32,
             >(_buf?)?
             .into_result::<UnknownInteractionsProtocolMarker>("flexible_two_way_fields")?;
             Ok(_response.some_field)
@@ -6143,6 +6162,7 @@ impl UnknownInteractionsProtocolProxyInterface for UnknownInteractionsProtocolPr
                 fidl::encoding::FlexibleType<
                     UnknownInteractionsProtocolFlexibleTwoWayUnionResponse,
                 >,
+                0x44301e4e8d514fb6,
             >(_buf?)?
             .into_result::<UnknownInteractionsProtocolMarker>("flexible_two_way_union")?;
             Ok(_response)
@@ -6168,6 +6188,7 @@ impl UnknownInteractionsProtocolProxyInterface for UnknownInteractionsProtocolPr
                 fidl::encoding::FlexibleType<
                     UnknownInteractionsProtocolFlexibleTwoWayTableResponse,
                 >,
+                0x7f492934b6c76187,
             >(_buf?)?
             .into_result::<UnknownInteractionsProtocolMarker>("flexible_two_way_table")?;
             Ok(_response)
@@ -6191,6 +6212,7 @@ impl UnknownInteractionsProtocolProxyInterface for UnknownInteractionsProtocolPr
         ) -> Result<UnknownInteractionsProtocolFlexibleTwoWayErrResult, fidl::Error> {
             let _response = fidl::client::decode_transaction_body::<
                 fidl::encoding::FlexibleResultType<fidl::encoding::EmptyStruct, i32>,
+                0x61240f878cc37c07,
             >(_buf?)?
             .into_result::<UnknownInteractionsProtocolMarker>("flexible_two_way_err")?;
             Ok(_response.map(|x| x))
@@ -6217,6 +6239,7 @@ impl UnknownInteractionsProtocolProxyInterface for UnknownInteractionsProtocolPr
                     UnknownInteractionsProtocolFlexibleTwoWayFieldsErrResponse,
                     i32,
                 >,
+                0xf2b9611a9089b05,
             >(_buf?)?
             .into_result::<UnknownInteractionsProtocolMarker>("flexible_two_way_fields_err")?;
             Ok(_response.map(|x| x.some_field))
@@ -6243,6 +6266,7 @@ impl UnknownInteractionsProtocolProxyInterface for UnknownInteractionsProtocolPr
                     UnknownInteractionsProtocolFlexibleTwoWayUnionErrResponse,
                     i32,
                 >,
+                0x2172940a75f107d7,
             >(_buf?)?
             .into_result::<UnknownInteractionsProtocolMarker>("flexible_two_way_union_err")?;
             Ok(_response.map(|x| x))
@@ -6269,6 +6293,7 @@ impl UnknownInteractionsProtocolProxyInterface for UnknownInteractionsProtocolPr
                     UnknownInteractionsProtocolFlexibleTwoWayTableErrResponse,
                     i32,
                 >,
+                0x6d8aab48e1693bf2,
             >(_buf?)?
             .into_result::<UnknownInteractionsProtocolMarker>("flexible_two_way_table_err")?;
             Ok(_response.map(|x| x))
@@ -6741,11 +6766,6 @@ impl futures::Stream for UnknownInteractionsProtocolRequestStream {
 
             // A message has been received from the channel
             let (header, _body_bytes) = fidl::encoding::decode_transaction_header(bytes)?;
-            if !header.is_compatible() {
-                return std::task::Poll::Ready(Some(Err(fidl::Error::IncompatibleMagicNumber(
-                    header.magic_number(),
-                ))));
-            }
 
             std::task::Poll::Ready(Some(match header.ordinal() {
                 0x4e7273b964d117a6 => {

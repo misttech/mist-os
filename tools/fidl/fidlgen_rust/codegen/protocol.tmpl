@@ -201,7 +201,7 @@ impl {{ $protocol.Name }}ProxyInterface for {{ $protocol.Name }}Proxy {
         {{- end }}
     ) -> Self::{{ $method.CamelName }}ResponseFut {
         fn _decode(mut _buf: Result<fidl::MessageBufEtc, fidl::Error>) -> Result<{{ $method.Response.TupleType }}, fidl::Error> {
-            let _response = fidl::client::decode_transaction_body::<{{ $method.Response.FidlType }}>(_buf?)?
+            let _response = fidl::client::decode_transaction_body::<{{ $method.Response.FidlType }}, {{ $method.Ordinal | printf "%#x" }}>(_buf?)?
             {{- if $method.IsFlexible }}
             .into_result::<{{ $protocol.Name }}Marker>("{{ $method.Name }}")?
             {{- end }};
@@ -410,9 +410,6 @@ impl futures::Stream for {{ $protocol.Name }}RequestStream {
 
             // A message has been received from the channel
             let (header, _body_bytes) = fidl::encoding::decode_transaction_header(bytes)?;
-            if !header.is_compatible() {
-                return std::task::Poll::Ready(Some(Err(fidl::Error::IncompatibleMagicNumber(header.magic_number()))));
-            }
 
             std::task::Poll::Ready(Some(match header.ordinal() {
                 {{- range $method := $protocol.Methods }}

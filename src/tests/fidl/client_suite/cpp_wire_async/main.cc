@@ -13,6 +13,7 @@
 
 #include <iostream>
 
+#include "fidl/fidl.clientsuite/cpp/common_types.h"
 #include "fidl/fidl.clientsuite/cpp/wire_types.h"
 #include "lib/fidl/cpp/wire_natural_conversions.h"
 #include "src/tests/fidl/client_suite/cpp_util/error_util.h"
@@ -28,9 +29,9 @@ class RunnerServer : public fidl::WireServer<fidl_clientsuite::Runner> {
   void IsTestEnabled(IsTestEnabledRequestView request,
                      IsTestEnabledCompleter::Sync& completer) override {
     switch (request->test) {
-      // TODO(fxbug.dev/116294): Wire Types should reject responses with the
-      // wrong ordinal.
-      case fidl_clientsuite::Test::kTwoWayWrongResponseOrdinal:
+      // TODO(fxbug.dev/116294): Should validate response ordinal matches.
+      case fidl_clientsuite::Test::kReceiveResponseWrongOrdinalKnown:
+      case fidl_clientsuite::Test::kReceiveResponseWrongOrdinalUnknown:
         completer.Reply(false);
         return;
       default:
@@ -40,6 +41,13 @@ class RunnerServer : public fidl::WireServer<fidl_clientsuite::Runner> {
   }
 
   void CheckAlive(CheckAliveCompleter::Sync& completer) override { completer.Reply(); }
+
+  void GetBindingsProperties(GetBindingsPropertiesCompleter::Sync& completer) override {
+    fidl::Arena arena;
+    completer.Reply(fidl_clientsuite::wire::BindingsProperties::Builder(arena)
+                        .io_style(fidl_clientsuite::IoStyle::kAsync)
+                        .Build());
+  }
 
   void CallTwoWayNoPayload(CallTwoWayNoPayloadRequestView request,
                            CallTwoWayNoPayloadCompleter::Sync& completer) override {

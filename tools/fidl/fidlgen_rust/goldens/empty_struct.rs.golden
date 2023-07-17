@@ -180,6 +180,7 @@ impl EmptyProtocolProxyInterface for EmptyProtocolProxy {
         ) -> Result<Empty, fidl::Error> {
             let _response = fidl::client::decode_transaction_body::<
                 EmptyProtocolSendAndReceiveResponse,
+                0x76a931254962cea,
             >(_buf?)?;
             Ok(_response.e)
         }
@@ -328,11 +329,6 @@ impl futures::Stream for EmptyProtocolRequestStream {
 
             // A message has been received from the channel
             let (header, _body_bytes) = fidl::encoding::decode_transaction_header(bytes)?;
-            if !header.is_compatible() {
-                return std::task::Poll::Ready(Some(Err(fidl::Error::IncompatibleMagicNumber(
-                    header.magic_number(),
-                ))));
-            }
 
             std::task::Poll::Ready(Some(match header.ordinal() {
                 0x132262fd8b200708 => {

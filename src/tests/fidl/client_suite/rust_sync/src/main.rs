@@ -5,9 +5,9 @@
 use {
     fidl_fidl_clientsuite::{
         AjarTargetEvent, AjarTargetEventReport, AjarTargetEventReporterSynchronousProxy,
-        AjarTargetSynchronousProxy, ClosedTargetEvent, ClosedTargetEventReport,
+        AjarTargetSynchronousProxy, BindingsProperties, ClosedTargetEvent, ClosedTargetEventReport,
         ClosedTargetEventReporterSynchronousProxy, ClosedTargetSynchronousProxy, Empty,
-        EmptyResultClassification, EmptyResultWithErrorClassification, NonEmptyPayload,
+        EmptyResultClassification, EmptyResultWithErrorClassification, IoStyle, NonEmptyPayload,
         NonEmptyResultClassification, NonEmptyResultWithErrorClassification, OpenTargetEvent,
         OpenTargetEventReport, OpenTargetEventReporterSynchronousProxy, OpenTargetSynchronousProxy,
         RunnerRequest, RunnerRequestStream, TableResultClassification, Test,
@@ -25,8 +25,6 @@ const DISABLED_TESTS: &[Test] = &[
     // TODO(fxbug.dev/99738): Should reject V1 wire format.
     Test::V1TwoWayNoPayload,
     Test::V1TwoWayStructPayload,
-    // TODO(fxbug.dev/116294): Should reject responses with the wrong ordinal.
-    Test::TwoWayWrongResponseOrdinal,
 ];
 
 async fn handle_runner_request(request: RunnerRequest) {
@@ -42,6 +40,11 @@ async fn handle_runner_request(request: RunnerRequest) {
         }
         RunnerRequest::IsTestEnabled { test, responder } => {
             responder.send(!DISABLED_TESTS.contains(&test)).unwrap();
+        }
+        RunnerRequest::GetBindingsProperties { responder } => {
+            responder
+                .send(&BindingsProperties { io_style: Some(IoStyle::Sync), ..Default::default() })
+                .unwrap();
         }
 
         // =====================================================================

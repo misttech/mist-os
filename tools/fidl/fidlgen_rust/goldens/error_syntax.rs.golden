@@ -195,7 +195,7 @@ impl ExampleUseOfErrorSyntaxProxyInterface for ExampleUseOfErrorSyntaxProxy {
             fidl_test_errorsyntax_parent::ParentUsesErrorSyntaxComposedCallWhichMayFailResult,
             fidl::Error,
         > {
-            let _response = fidl::client::decode_transaction_body::<fidl::encoding::ResultType<fidl_test_errorsyntax_parent::ParentUsesErrorSyntaxComposedCallWhichMayFailResponse, u32>>(_buf?)?;
+            let _response = fidl::client::decode_transaction_body::<fidl::encoding::ResultType<fidl_test_errorsyntax_parent::ParentUsesErrorSyntaxComposedCallWhichMayFailResponse, u32>, 0x3179cf8f46814221>(_buf?)?;
             Ok(_response.map(|x| x.value))
         }
         self.client.send_query_and_decode::<
@@ -217,6 +217,7 @@ impl ExampleUseOfErrorSyntaxProxyInterface for ExampleUseOfErrorSyntaxProxy {
         ) -> Result<ExampleUseOfErrorSyntaxCallWhichMayFailResult, fidl::Error> {
             let _response = fidl::client::decode_transaction_body::<
                 fidl::encoding::ResultType<ExampleUseOfErrorSyntaxCallWhichMayFailResponse, u32>,
+                0x3424ff83ce3004a2,
             >(_buf?)?;
             Ok(_response.map(|x| x.value))
         }
@@ -348,11 +349,6 @@ impl futures::Stream for ExampleUseOfErrorSyntaxRequestStream {
 
             // A message has been received from the channel
             let (header, _body_bytes) = fidl::encoding::decode_transaction_header(bytes)?;
-            if !header.is_compatible() {
-                return std::task::Poll::Ready(Some(Err(fidl::Error::IncompatibleMagicNumber(
-                    header.magic_number(),
-                ))));
-            }
 
             std::task::Poll::Ready(Some(match header.ordinal() {
                 0x3179cf8f46814221 => {

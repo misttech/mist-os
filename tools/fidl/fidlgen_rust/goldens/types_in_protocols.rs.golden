@@ -2508,7 +2508,8 @@ impl ProtocolProxyInterface for ProtocolProxy {
             (u8, u16, u32, u64, i8, i16, i32, i64, f32, f64, String, Option<String>),
             fidl::Error,
         > {
-            let _response = fidl::client::decode_transaction_body::<Basic>(_buf?)?;
+            let _response =
+                fidl::client::decode_transaction_body::<Basic, 0x205b92db5139c88f>(_buf?)?;
             Ok((
                 _response.uint8,
                 _response.uint16,
@@ -2542,6 +2543,7 @@ impl ProtocolProxyInterface for ProtocolProxy {
         ) -> Result<ProtocolErrorBasicResult, fidl::Error> {
             let _response = fidl::client::decode_transaction_body::<
                 fidl::encoding::ResultType<Basic, u32>,
+                0x459eaa5d11b9ff93,
             >(_buf?)?;
             Ok(_response.map(|x| {
                 (
@@ -2610,7 +2612,8 @@ impl ProtocolProxyInterface for ProtocolProxy {
             (Bits, Enum, Struct, Table, Union, Option<Box<Struct>>, Option<Box<Union>>),
             fidl::Error,
         > {
-            let _response = fidl::client::decode_transaction_body::<Compound>(_buf?)?;
+            let _response =
+                fidl::client::decode_transaction_body::<Compound, 0x79f279c7201da131>(_buf?)?;
             Ok((
                 _response.bits,
                 _response.enum_,
@@ -2639,6 +2642,7 @@ impl ProtocolProxyInterface for ProtocolProxy {
         ) -> Result<ProtocolErrorCompoundResult, fidl::Error> {
             let _response = fidl::client::decode_transaction_body::<
                 fidl::encoding::ResultType<Compound, u32>,
+                0x29817d89a19ec77d,
             >(_buf?)?;
             Ok(_response
                 .map(|x| (x.bits, x.enum_, x.struct_, x.table, x.union, x.opt_struct, x.opt_union)))
@@ -2735,7 +2739,8 @@ impl ProtocolProxyInterface for ProtocolProxy {
             ),
             fidl::Error,
         > {
-            let _response = fidl::client::decode_transaction_body::<ArrayBasic>(_buf?)?;
+            let _response =
+                fidl::client::decode_transaction_body::<ArrayBasic, 0x49ad7a74e28ba114>(_buf?)?;
             Ok((
                 _response.array_uint8,
                 _response.array_uint16,
@@ -2792,6 +2797,7 @@ impl ProtocolProxyInterface for ProtocolProxy {
         ) -> Result<ProtocolErrorArrayBasicResult, fidl::Error> {
             let _response = fidl::client::decode_transaction_body::<
                 fidl::encoding::ResultType<ArrayBasic, u32>,
+                0xf0dbde9626fff79,
             >(_buf?)?;
             Ok(_response.map(|x| {
                 (
@@ -2848,7 +2854,8 @@ impl ProtocolProxyInterface for ProtocolProxy {
             mut _buf: Result<fidl::MessageBufEtc, fidl::Error>,
         ) -> Result<([Bits; 5], [Enum; 5], [Struct; 5], [Table; 5], [Union; 5]), fidl::Error>
         {
-            let _response = fidl::client::decode_transaction_body::<ArrayCompound>(_buf?)?;
+            let _response =
+                fidl::client::decode_transaction_body::<ArrayCompound, 0xbcae616f8e1ea7b>(_buf?)?;
             Ok((
                 _response.array_bits,
                 _response.array_enum,
@@ -2876,6 +2883,7 @@ impl ProtocolProxyInterface for ProtocolProxy {
         ) -> Result<ProtocolErrorArrayCompoundResult, fidl::Error> {
             let _response = fidl::client::decode_transaction_body::<
                 fidl::encoding::ResultType<ArrayCompound, u32>,
+                0x52257f80e29c1a04,
             >(_buf?)?;
             Ok(_response.map(|x| {
                 (x.array_bits, x.array_enum, x.array_struct, x.array_table, x.array_union)
@@ -2975,7 +2983,8 @@ impl ProtocolProxyInterface for ProtocolProxy {
             ),
             fidl::Error,
         > {
-            let _response = fidl::client::decode_transaction_body::<VectorBasic>(_buf?)?;
+            let _response =
+                fidl::client::decode_transaction_body::<VectorBasic, 0x7860cb3ed8362e74>(_buf?)?;
             Ok((
                 _response.vector_uint8,
                 _response.vector_uint16,
@@ -3033,6 +3042,7 @@ impl ProtocolProxyInterface for ProtocolProxy {
         ) -> Result<ProtocolErrorVectorBasicResult, fidl::Error> {
             let _response = fidl::client::decode_transaction_body::<
                 fidl::encoding::ResultType<VectorBasic, u32>,
+                0xc27f841d6313f72,
             >(_buf?)?;
             Ok(_response.map(|x| {
                 (
@@ -3118,7 +3128,8 @@ impl ProtocolProxyInterface for ProtocolProxy {
             ),
             fidl::Error,
         > {
-            let _response = fidl::client::decode_transaction_body::<VectorCompound>(_buf?)?;
+            let _response =
+                fidl::client::decode_transaction_body::<VectorCompound, 0x371140db701b23b4>(_buf?)?;
             Ok((
                 _response.vector_bits,
                 _response.vector_enum,
@@ -3161,6 +3172,7 @@ impl ProtocolProxyInterface for ProtocolProxy {
         ) -> Result<ProtocolErrorVectorCompoundResult, fidl::Error> {
             let _response = fidl::client::decode_transaction_body::<
                 fidl::encoding::ResultType<VectorCompound, u32>,
+                0x760e278628f7a985,
             >(_buf?)?;
             Ok(_response.map(|x| {
                 (
@@ -3223,7 +3235,8 @@ impl ProtocolProxyInterface for ProtocolProxy {
             ),
             fidl::Error,
         > {
-            let _response = fidl::client::decode_transaction_body::<VectorOptional>(_buf?)?;
+            let _response =
+                fidl::client::decode_transaction_body::<VectorOptional, 0xe4b620aaafd73f3>(_buf?)?;
             Ok((
                 _response.opt_vector_uint8,
                 _response.opt_vector_string,
@@ -3252,6 +3265,7 @@ impl ProtocolProxyInterface for ProtocolProxy {
         ) -> Result<ProtocolErrorVectorOptionalResult, fidl::Error> {
             let _response = fidl::client::decode_transaction_body::<
                 fidl::encoding::ResultType<VectorOptional, u32>,
+                0x58e75cf86e2d715e,
             >(_buf?)?;
             Ok(_response.map(|x| {
                 (
@@ -3295,7 +3309,10 @@ impl ProtocolProxyInterface for ProtocolProxy {
         fn _decode(
             mut _buf: Result<fidl::MessageBufEtc, fidl::Error>,
         ) -> Result<(Vec<[u8; 5]>, Vec<Vec<u8>>), fidl::Error> {
-            let _response = fidl::client::decode_transaction_body::<ArrayVectorNested>(_buf?)?;
+            let _response = fidl::client::decode_transaction_body::<
+                ArrayVectorNested,
+                0x4a438ce0948817dc,
+            >(_buf?)?;
             Ok((_response.vector_array_uint8, _response.vector_vector_uint8))
         }
         self.client.send_query_and_decode::<ArrayVectorNested, (Vec<[u8; 5]>, Vec<Vec<u8>>)>(
@@ -3314,6 +3331,7 @@ impl ProtocolProxyInterface for ProtocolProxy {
         ) -> Result<ProtocolErrorArrayVectorNestedResult, fidl::Error> {
             let _response = fidl::client::decode_transaction_body::<
                 fidl::encoding::ResultType<ArrayVectorNested, u32>,
+                0x7e168d89e1dac8a7,
             >(_buf?)?;
             Ok(_response.map(|x| (x.vector_array_uint8, x.vector_vector_uint8)))
         }
@@ -3486,7 +3504,8 @@ impl ProtocolProxyInterface for ProtocolProxy {
             ),
             fidl::Error,
         > {
-            let _response = fidl::client::decode_transaction_body::<Resource>(_buf?)?;
+            let _response =
+                fidl::client::decode_transaction_body::<Resource, 0x1904824a11c6ad5b>(_buf?)?;
             Ok((
                 _response.handle,
                 _response.vmo,
@@ -3588,6 +3607,7 @@ impl ProtocolProxyInterface for ProtocolProxy {
         ) -> Result<ProtocolErrorResourceResult, fidl::Error> {
             let _response = fidl::client::decode_transaction_body::<
                 fidl::encoding::ResultType<Resource, u32>,
+                0x5b28634d603175b6,
             >(_buf?)?;
             Ok(_response.map(|x| {
                 (
@@ -4365,11 +4385,6 @@ impl futures::Stream for ProtocolRequestStream {
 
             // A message has been received from the channel
             let (header, _body_bytes) = fidl::encoding::decode_transaction_header(bytes)?;
-            if !header.is_compatible() {
-                return std::task::Poll::Ready(Some(Err(fidl::Error::IncompatibleMagicNumber(
-                    header.magic_number(),
-                ))));
-            }
 
             std::task::Poll::Ready(Some(match header.ordinal() {
                 0x7c311f0d9e662df9 => {

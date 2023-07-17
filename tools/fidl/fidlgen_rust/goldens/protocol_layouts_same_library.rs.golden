@@ -627,6 +627,7 @@ impl ComposedProtocolProxyInterface for ComposedProtocolProxy {
         ) -> Result<ComposedProtocolTwoWayAnonComposedResponse, fidl::Error> {
             let _response = fidl::client::decode_transaction_body::<
                 ComposedProtocolTwoWayAnonComposedResponse,
+                0x7083713dee9435f4,
             >(_buf?)?;
             Ok(_response)
         }
@@ -655,6 +656,7 @@ impl ComposedProtocolProxyInterface for ComposedProtocolProxy {
                     ComposedProtocolTwoWayAnonComposedWithErrorResponse,
                     u32,
                 >,
+                0x4fd32c5e2ffa6828,
             >(_buf?)?;
             Ok(_response.map(|x| x))
         }
@@ -685,7 +687,8 @@ impl ComposedProtocolProxyInterface for ComposedProtocolProxy {
         fn _decode(
             mut _buf: Result<fidl::MessageBufEtc, fidl::Error>,
         ) -> Result<TablePayload, fidl::Error> {
-            let _response = fidl::client::decode_transaction_body::<TablePayload>(_buf?)?;
+            let _response =
+                fidl::client::decode_transaction_body::<TablePayload, 0x45b4d3d31b374054>(_buf?)?;
             Ok(_response)
         }
         self.client.send_query_and_decode::<UnionPayload, TablePayload>(
@@ -707,6 +710,7 @@ impl ComposedProtocolProxyInterface for ComposedProtocolProxy {
         ) -> Result<ComposedProtocolTwoWayNamedComposedWithErrorResult, fidl::Error> {
             let _response = fidl::client::decode_transaction_body::<
                 fidl::encoding::ResultType<UnionPayload, u32>,
+                0x450531e2d20c52ef,
             >(_buf?)?;
             Ok(_response.map(|x| x))
         }
@@ -917,11 +921,6 @@ impl futures::Stream for ComposedProtocolRequestStream {
 
             // A message has been received from the channel
             let (header, _body_bytes) = fidl::encoding::decode_transaction_header(bytes)?;
-            if !header.is_compatible() {
-                return std::task::Poll::Ready(Some(Err(fidl::Error::IncompatibleMagicNumber(
-                    header.magic_number(),
-                ))));
-            }
 
             std::task::Poll::Ready(Some(match header.ordinal() {
                 0x6e7a205bdad7941f => {
@@ -1945,6 +1944,7 @@ impl MainProtocolProxyInterface for MainProtocolProxy {
         ) -> Result<ComposedProtocolTwoWayAnonComposedResponse, fidl::Error> {
             let _response = fidl::client::decode_transaction_body::<
                 ComposedProtocolTwoWayAnonComposedResponse,
+                0x7083713dee9435f4,
             >(_buf?)?;
             Ok(_response)
         }
@@ -1973,6 +1973,7 @@ impl MainProtocolProxyInterface for MainProtocolProxy {
                     ComposedProtocolTwoWayAnonComposedWithErrorResponse,
                     u32,
                 >,
+                0x4fd32c5e2ffa6828,
             >(_buf?)?;
             Ok(_response.map(|x| x))
         }
@@ -2003,7 +2004,8 @@ impl MainProtocolProxyInterface for MainProtocolProxy {
         fn _decode(
             mut _buf: Result<fidl::MessageBufEtc, fidl::Error>,
         ) -> Result<TablePayload, fidl::Error> {
-            let _response = fidl::client::decode_transaction_body::<TablePayload>(_buf?)?;
+            let _response =
+                fidl::client::decode_transaction_body::<TablePayload, 0x45b4d3d31b374054>(_buf?)?;
             Ok(_response)
         }
         self.client.send_query_and_decode::<UnionPayload, TablePayload>(
@@ -2025,6 +2027,7 @@ impl MainProtocolProxyInterface for MainProtocolProxy {
         ) -> Result<ComposedProtocolTwoWayNamedComposedWithErrorResult, fidl::Error> {
             let _response = fidl::client::decode_transaction_body::<
                 fidl::encoding::ResultType<UnionPayload, u32>,
+                0x450531e2d20c52ef,
             >(_buf?)?;
             Ok(_response.map(|x| x))
         }
@@ -2052,7 +2055,8 @@ impl MainProtocolProxyInterface for MainProtocolProxy {
         fn _decode(
             mut _buf: Result<fidl::MessageBufEtc, fidl::Error>,
         ) -> Result<TablePayload, fidl::Error> {
-            let _response = fidl::client::decode_transaction_body::<TablePayload>(_buf?)?;
+            let _response =
+                fidl::client::decode_transaction_body::<TablePayload, 0x26998b4c1e8a9a57>(_buf?)?;
             Ok(_response)
         }
         self.client.send_query_and_decode::<UnionPayload, TablePayload>(
@@ -2074,6 +2078,7 @@ impl MainProtocolProxyInterface for MainProtocolProxy {
         ) -> Result<MainProtocolTwoWayLocalWithErrorResult, fidl::Error> {
             let _response = fidl::client::decode_transaction_body::<
                 fidl::encoding::ResultType<UnionPayload, u32>,
+                0x4a7bf9ce881afde7,
             >(_buf?)?;
             Ok(_response.map(|x| x))
         }
@@ -2104,8 +2109,10 @@ impl MainProtocolProxyInterface for MainProtocolProxy {
         fn _decode(
             mut _buf: Result<fidl::MessageBufEtc, fidl::Error>,
         ) -> Result<MainProtocolTwoWayAnonResponse, fidl::Error> {
-            let _response =
-                fidl::client::decode_transaction_body::<MainProtocolTwoWayAnonResponse>(_buf?)?;
+            let _response = fidl::client::decode_transaction_body::<
+                MainProtocolTwoWayAnonResponse,
+                0x3fd7ad8e52b07e2e,
+            >(_buf?)?;
             Ok(_response)
         }
         self.client
@@ -2128,6 +2135,7 @@ impl MainProtocolProxyInterface for MainProtocolProxy {
         ) -> Result<MainProtocolTwoWayAnonWithErrorResult, fidl::Error> {
             let _response = fidl::client::decode_transaction_body::<
                 fidl::encoding::ResultType<MainProtocolTwoWayAnonWithErrorResponse, u32>,
+                0x1d33061a424eb245,
             >(_buf?)?;
             Ok(_response.map(|x| x))
         }
@@ -2407,11 +2415,6 @@ impl futures::Stream for MainProtocolRequestStream {
 
             // A message has been received from the channel
             let (header, _body_bytes) = fidl::encoding::decode_transaction_header(bytes)?;
-            if !header.is_compatible() {
-                return std::task::Poll::Ready(Some(Err(fidl::Error::IncompatibleMagicNumber(
-                    header.magic_number(),
-                ))));
-            }
 
             std::task::Poll::Ready(Some(match header.ordinal() {
                 0x6e7a205bdad7941f => {

@@ -1152,6 +1152,7 @@ impl TestProtocolProxyInterface for TestProtocolProxy {
         ) -> Result<StrictBoundedUnion, fidl::Error> {
             let _response = fidl::client::decode_transaction_body::<
                 TestProtocolStrictUnionHenceResponseMayBeStackAllocatedResponse,
+                0x5bfca9479251b9c3,
             >(_buf?)?;
             Ok(_response.xu)
         }
@@ -1173,6 +1174,7 @@ impl TestProtocolProxyInterface for TestProtocolProxy {
         ) -> Result<OlderSimpleUnion, fidl::Error> {
             let _response = fidl::client::decode_transaction_body::<
                 TestProtocolFlexibleUnionHenceResponseMustBeHeapAllocatedResponse,
+                0x694fede3b8829ce2,
             >(_buf?)?;
             Ok(_response.xu)
         }
@@ -1300,11 +1302,6 @@ impl futures::Stream for TestProtocolRequestStream {
 
             // A message has been received from the channel
             let (header, _body_bytes) = fidl::encoding::decode_transaction_header(bytes)?;
-            if !header.is_compatible() {
-                return std::task::Poll::Ready(Some(Err(fidl::Error::IncompatibleMagicNumber(
-                    header.magic_number(),
-                ))));
-            }
 
             std::task::Poll::Ready(Some(match header.ordinal() {
                 0x5bfca9479251b9c3 => {

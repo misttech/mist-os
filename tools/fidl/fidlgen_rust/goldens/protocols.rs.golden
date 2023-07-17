@@ -568,11 +568,6 @@ impl futures::Stream for AnotherDiscoverableProtocolRequestStream {
 
             // A message has been received from the channel
             let (header, _body_bytes) = fidl::encoding::decode_transaction_header(bytes)?;
-            if !header.is_compatible() {
-                return std::task::Poll::Ready(Some(Err(fidl::Error::IncompatibleMagicNumber(
-                    header.magic_number(),
-                ))));
-            }
 
             std::task::Poll::Ready(Some(match header.ordinal() {
                 _ => Err(fidl::Error::UnknownOrdinal {
@@ -789,8 +784,10 @@ impl ChannelProtocolProxyInterface for ChannelProtocolProxy {
     type MethodBResponseFut = fidl::client::QueryResponseFut<i64>;
     fn r#method_b(&self, mut a: i64, mut b: i64) -> Self::MethodBResponseFut {
         fn _decode(mut _buf: Result<fidl::MessageBufEtc, fidl::Error>) -> Result<i64, fidl::Error> {
-            let _response =
-                fidl::client::decode_transaction_body::<ChannelProtocolMethodBResponse>(_buf?)?;
+            let _response = fidl::client::decode_transaction_body::<
+                ChannelProtocolMethodBResponse,
+                0x7b8dd3d6c741c9c6,
+            >(_buf?)?;
             Ok(_response.result)
         }
         self.client.send_query_and_decode::<ChannelProtocolMethodBRequest, i64>(
@@ -804,8 +801,10 @@ impl ChannelProtocolProxyInterface for ChannelProtocolProxy {
     type TakeHandleResponseFut = fidl::client::QueryResponseFut<()>;
     fn r#take_handle(&self, mut h: fidl::Handle) -> Self::TakeHandleResponseFut {
         fn _decode(mut _buf: Result<fidl::MessageBufEtc, fidl::Error>) -> Result<(), fidl::Error> {
-            let _response =
-                fidl::client::decode_transaction_body::<fidl::encoding::EmptyPayload>(_buf?)?;
+            let _response = fidl::client::decode_transaction_body::<
+                fidl::encoding::EmptyPayload,
+                0x836fa31201a0a65,
+            >(_buf?)?;
             Ok(_response)
         }
         self.client.send_query_and_decode::<ChannelProtocolTakeHandleRequest, ()>(
@@ -823,6 +822,7 @@ impl ChannelProtocolProxyInterface for ChannelProtocolProxy {
         ) -> Result<fidl::Socket, fidl::Error> {
             let _response = fidl::client::decode_transaction_body::<
                 ChannelProtocolMutateSocketResponse,
+                0x66dbcccc06f7f14f,
             >(_buf?)?;
             Ok(_response.b)
         }
@@ -972,11 +972,6 @@ impl futures::Stream for ChannelProtocolRequestStream {
 
             // A message has been received from the channel
             let (header, _body_bytes) = fidl::encoding::decode_transaction_header(bytes)?;
-            if !header.is_compatible() {
-                return std::task::Poll::Ready(Some(Err(fidl::Error::IncompatibleMagicNumber(
-                    header.magic_number(),
-                ))));
-            }
 
             std::task::Poll::Ready(Some(match header.ordinal() {
                 0x2bc8d7d32bc66ba2 => {
@@ -1595,11 +1590,6 @@ impl futures::Stream for DiscoverableProtocolRequestStream {
 
             // A message has been received from the channel
             let (header, _body_bytes) = fidl::encoding::decode_transaction_header(bytes)?;
-            if !header.is_compatible() {
-                return std::task::Poll::Ready(Some(Err(fidl::Error::IncompatibleMagicNumber(
-                    header.magic_number(),
-                ))));
-            }
 
             std::task::Poll::Ready(Some(match header.ordinal() {
                 0x2ff5ba3a2bd170eb => {
@@ -1808,6 +1798,7 @@ impl HandleRightsProtocolProxyInterface for HandleRightsProtocolProxy {
         ) -> Result<fidl::Socket, fidl::Error> {
             let _response = fidl::client::decode_transaction_body::<
                 HandleRightsProtocolResponseMethodResponse,
+                0x52a8f194ac143547,
             >(_buf?)?;
             Ok(_response.h)
         }
@@ -1958,11 +1949,6 @@ impl futures::Stream for HandleRightsProtocolRequestStream {
 
             // A message has been received from the channel
             let (header, _body_bytes) = fidl::encoding::decode_transaction_header(bytes)?;
-            if !header.is_compatible() {
-                return std::task::Poll::Ready(Some(Err(fidl::Error::IncompatibleMagicNumber(
-                    header.magic_number(),
-                ))));
-            }
 
             std::task::Poll::Ready(Some(match header.ordinal() {
                 0x10078afd320d2bfd => {
@@ -2432,11 +2418,6 @@ impl futures::Stream for ManyParametersRequestStream {
 
             // A message has been received from the channel
             let (header, _body_bytes) = fidl::encoding::decode_transaction_header(bytes)?;
-            if !header.is_compatible() {
-                return std::task::Poll::Ready(Some(Err(fidl::Error::IncompatibleMagicNumber(
-                    header.magic_number(),
-                ))));
-            }
 
             std::task::Poll::Ready(Some(match header.ordinal() {
                 0x59233bcecd338967 => {
@@ -2687,8 +2668,10 @@ impl MethodWithUnionProxyInterface for MethodWithUnionProxy {
         fn _decode(
             mut _buf: Result<fidl::MessageBufEtc, fidl::Error>,
         ) -> Result<Option<Box<TheUnion>>, fidl::Error> {
-            let _response =
-                fidl::client::decode_transaction_body::<MethodWithUnionUnionMethodResponse>(_buf?)?;
+            let _response = fidl::client::decode_transaction_body::<
+                MethodWithUnionUnionMethodResponse,
+                0x393e7f5b2b821218,
+            >(_buf?)?;
             Ok(_response.u)
         }
         self.client
@@ -2817,11 +2800,6 @@ impl futures::Stream for MethodWithUnionRequestStream {
 
             // A message has been received from the channel
             let (header, _body_bytes) = fidl::encoding::decode_transaction_header(bytes)?;
-            if !header.is_compatible() {
-                return std::task::Poll::Ready(Some(Err(fidl::Error::IncompatibleMagicNumber(
-                    header.magic_number(),
-                ))));
-            }
 
             std::task::Poll::Ready(Some(match header.ordinal() {
                 0x393e7f5b2b821218 => {
@@ -3090,8 +3068,10 @@ impl TransitionalProxyInterface for TransitionalProxy {
     type RequestResponseFut = fidl::client::QueryResponseFut<i64>;
     fn r#request(&self, mut x: i64) -> Self::RequestResponseFut {
         fn _decode(mut _buf: Result<fidl::MessageBufEtc, fidl::Error>) -> Result<i64, fidl::Error> {
-            let _response =
-                fidl::client::decode_transaction_body::<TransitionalRequestResponse>(_buf?)?;
+            let _response = fidl::client::decode_transaction_body::<
+                TransitionalRequestResponse,
+                0x512cc1ba467fef08,
+            >(_buf?)?;
             Ok(_response.y)
         }
         self.client.send_query_and_decode::<TransitionalRequestRequest, i64>(
@@ -3247,11 +3227,6 @@ impl futures::Stream for TransitionalRequestStream {
 
             // A message has been received from the channel
             let (header, _body_bytes) = fidl::encoding::decode_transaction_header(bytes)?;
-            if !header.is_compatible() {
-                return std::task::Poll::Ready(Some(Err(fidl::Error::IncompatibleMagicNumber(
-                    header.magic_number(),
-                ))));
-            }
 
             std::task::Poll::Ready(Some(match header.ordinal() {
                 0x512cc1ba467fef08 => {
@@ -3650,8 +3625,10 @@ impl WithAndWithoutRequestResponseProxyInterface for WithAndWithoutRequestRespon
     type NoRequestEmptyResponseResponseFut = fidl::client::QueryResponseFut<()>;
     fn r#no_request_empty_response(&self) -> Self::NoRequestEmptyResponseResponseFut {
         fn _decode(mut _buf: Result<fidl::MessageBufEtc, fidl::Error>) -> Result<(), fidl::Error> {
-            let _response =
-                fidl::client::decode_transaction_body::<fidl::encoding::EmptyPayload>(_buf?)?;
+            let _response = fidl::client::decode_transaction_body::<
+                fidl::encoding::EmptyPayload,
+                0x16a329d17f458668,
+            >(_buf?)?;
             Ok(_response)
         }
         self.client.send_query_and_decode::<fidl::encoding::EmptyPayload, ()>(
@@ -3669,6 +3646,7 @@ impl WithAndWithoutRequestResponseProxyInterface for WithAndWithoutRequestRespon
         ) -> Result<String, fidl::Error> {
             let _response = fidl::client::decode_transaction_body::<
                 WithAndWithoutRequestResponseNoRequestWithResponseResponse,
+                0x7d6b2fcf0e2a65bd,
             >(_buf?)?;
             Ok(_response.ret)
         }
@@ -3694,8 +3672,10 @@ impl WithAndWithoutRequestResponseProxyInterface for WithAndWithoutRequestRespon
         mut arg: &str,
     ) -> Self::WithRequestEmptyResponseResponseFut {
         fn _decode(mut _buf: Result<fidl::MessageBufEtc, fidl::Error>) -> Result<(), fidl::Error> {
-            let _response =
-                fidl::client::decode_transaction_body::<fidl::encoding::EmptyPayload>(_buf?)?;
+            let _response = fidl::client::decode_transaction_body::<
+                fidl::encoding::EmptyPayload,
+                0x27ee4d2bd405df5f,
+            >(_buf?)?;
             Ok(_response)
         }
         self.client.send_query_and_decode::<
@@ -3719,6 +3699,7 @@ impl WithAndWithoutRequestResponseProxyInterface for WithAndWithoutRequestRespon
         ) -> Result<String, fidl::Error> {
             let _response = fidl::client::decode_transaction_body::<
                 WithAndWithoutRequestResponseWithRequestWithResponseResponse,
+                0x590e91945d58f5b1,
             >(_buf?)?;
             Ok(_response.ret)
         }
@@ -3888,11 +3869,6 @@ impl futures::Stream for WithAndWithoutRequestResponseRequestStream {
 
             // A message has been received from the channel
             let (header, _body_bytes) = fidl::encoding::decode_transaction_header(bytes)?;
-            if !header.is_compatible() {
-                return std::task::Poll::Ready(Some(Err(fidl::Error::IncompatibleMagicNumber(
-                    header.magic_number(),
-                ))));
-            }
 
             std::task::Poll::Ready(Some(match header.ordinal() {
                 0x4b212a6c8c5f7bab => {
@@ -4642,6 +4618,7 @@ impl WithErrorSyntaxProxyInterface for WithErrorSyntaxProxy {
         ) -> Result<WithErrorSyntaxResponseAsStructResult, fidl::Error> {
             let _response = fidl::client::decode_transaction_body::<
                 fidl::encoding::ResultType<WithErrorSyntaxResponseAsStructResponse, u32>,
+                0x3b902a6d8d24693,
             >(_buf?)?;
             Ok(_response.map(|x| (x.a, x.b, x.c)))
         }
@@ -4664,6 +4641,7 @@ impl WithErrorSyntaxProxyInterface for WithErrorSyntaxProxy {
         ) -> Result<WithErrorSyntaxErrorAsPrimitiveResult, fidl::Error> {
             let _response = fidl::client::decode_transaction_body::<
                 fidl::encoding::ResultType<fidl::encoding::EmptyStruct, u32>,
+                0x602fd6bd920135e7,
             >(_buf?)?;
             Ok(_response.map(|x| x))
         }
@@ -4685,6 +4663,7 @@ impl WithErrorSyntaxProxyInterface for WithErrorSyntaxProxy {
         ) -> Result<WithErrorSyntaxErrorAsEnumResult, fidl::Error> {
             let _response = fidl::client::decode_transaction_body::<
                 fidl::encoding::ResultType<fidl::encoding::EmptyStruct, ErrorEnum>,
+                0x4c371e1673212f43,
             >(_buf?)?;
             Ok(_response.map(|x| x))
         }
@@ -4707,6 +4686,7 @@ impl WithErrorSyntaxProxyInterface for WithErrorSyntaxProxy {
         ) -> Result<WithErrorSyntaxHandleInResultResult, fidl::Error> {
             let _response = fidl::client::decode_transaction_body::<
                 fidl::encoding::ResultType<WithErrorSyntaxHandleInResultResponse, u32>,
+                0x13092c5b835b0cbf,
             >(_buf?)?;
             Ok(_response.map(|x| x.h))
         }
@@ -4838,11 +4818,6 @@ impl futures::Stream for WithErrorSyntaxRequestStream {
 
             // A message has been received from the channel
             let (header, _body_bytes) = fidl::encoding::decode_transaction_header(bytes)?;
-            if !header.is_compatible() {
-                return std::task::Poll::Ready(Some(Err(fidl::Error::IncompatibleMagicNumber(
-                    header.magic_number(),
-                ))));
-            }
 
             std::task::Poll::Ready(Some(match header.ordinal() {
                 0x3b902a6d8d24693 => {
@@ -5500,8 +5475,10 @@ impl WithProtocolEndsProxyInterface for WithProtocolEndsProxy {
             mut _buf: Result<fidl::MessageBufEtc, fidl::Error>,
         ) -> Result<Option<fidl::endpoints::ClientEnd<DiscoverableProtocolMarker>>, fidl::Error>
         {
-            let _response =
-                fidl::client::decode_transaction_body::<WithProtocolEndsClientEndsResponse>(_buf?)?;
+            let _response = fidl::client::decode_transaction_body::<
+                WithProtocolEndsClientEndsResponse,
+                0x51780563edb15042,
+            >(_buf?)?;
             Ok(_response.out)
         }
         self.client.send_query_and_decode::<
@@ -5524,8 +5501,10 @@ impl WithProtocolEndsProxyInterface for WithProtocolEndsProxy {
         fn _decode(
             mut _buf: Result<fidl::MessageBufEtc, fidl::Error>,
         ) -> Result<fidl::endpoints::ServerEnd<DiscoverableProtocolMarker>, fidl::Error> {
-            let _response =
-                fidl::client::decode_transaction_body::<WithProtocolEndsServerEndsResponse>(_buf?)?;
+            let _response = fidl::client::decode_transaction_body::<
+                WithProtocolEndsServerEndsResponse,
+                0x70a02c2ba2228a33,
+            >(_buf?)?;
             Ok(_response.out)
         }
         self.client.send_query_and_decode::<
@@ -5549,6 +5528,7 @@ impl WithProtocolEndsProxyInterface for WithProtocolEndsProxy {
         ) -> Result<ProtocolEnds, fidl::Error> {
             let _response = fidl::client::decode_transaction_body::<
                 WithProtocolEndsStructContainingEndsResponse,
+                0x3893f0baad26f5d5,
             >(_buf?)?;
             Ok(_response.out)
         }
@@ -5678,11 +5658,6 @@ impl futures::Stream for WithProtocolEndsRequestStream {
 
             // A message has been received from the channel
             let (header, _body_bytes) = fidl::encoding::decode_transaction_header(bytes)?;
-            if !header.is_compatible() {
-                return std::task::Poll::Ready(Some(Err(fidl::Error::IncompatibleMagicNumber(
-                    header.magic_number(),
-                ))));
-            }
 
             std::task::Poll::Ready(Some(match header.ordinal() {
                 0x51780563edb15042 => {

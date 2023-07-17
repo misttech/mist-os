@@ -49,7 +49,8 @@ inline fidl_serversuite::SendEventError ClassifySendEventError(const fidl::OneWa
       ZX_PANIC("One-Way Status should not have reason kPeerClosedWhileReading");
     default:
       auto description = status.FormatDescription();
-      ZX_PANIC("Status had an unspported reason: %s", description.c_str());
+      ZX_PANIC("servertest_util::ClassifyError is missing a case for this error: %s",
+               description.c_str());
   }
 }
 

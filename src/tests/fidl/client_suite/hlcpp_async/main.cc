@@ -109,7 +109,11 @@ class RunnerServer : public fidl::clientsuite::Runner {
       case fidl::clientsuite::Test::V1_TWO_WAY_STRUCT_PAYLOAD:
       // TODO(fxbug.dev/116294): HLCPP bindings should reject responses with the
       // wrong ordinal.
-      case fidl::clientsuite::Test::TWO_WAY_WRONG_RESPONSE_ORDINAL:
+      case fidl::clientsuite::Test::RECEIVE_RESPONSE_WRONG_ORDINAL_KNOWN:
+      case fidl::clientsuite::Test::RECEIVE_RESPONSE_WRONG_ORDINAL_UNKNOWN:
+      // TODO(fxbug.dev/129829): Should validate magic number.
+      case fidl::clientsuite::Test::RECEIVE_EVENT_BAD_MAGIC_NUMBER:
+      case fidl::clientsuite::Test::RECEIVE_RESPONSE_BAD_MAGIC_NUMBER:
         callback(false);
         return;
       default:
@@ -119,6 +123,12 @@ class RunnerServer : public fidl::clientsuite::Runner {
   }
 
   void CheckAlive(CheckAliveCallback callback) override { callback(); }
+
+  void GetBindingsProperties(GetBindingsPropertiesCallback callback) override {
+    fidl::clientsuite::BindingsProperties properties;
+    properties.set_io_style(fidl::clientsuite::IoStyle::ASYNC);
+    callback(std::move(properties));
+  }
 
   void CallTwoWayNoPayload(fidl::InterfaceHandle<fidl::clientsuite::ClosedTarget> target,
                            CallTwoWayNoPayloadCallback callback) override {

@@ -104,9 +104,11 @@ inline RepeatOp repeat(uint8_t byte) { return RepeatOp(byte); }
 
 inline Bytes padding(size_t count) { return repeat(0).times(count); }
 
-inline Bytes header(zx_txid_t txid, uint64_t ordinal, fidl::MessageDynamicFlags flags) {
+inline Bytes header(zx_txid_t txid, uint64_t ordinal, fidl::MessageDynamicFlags flags,
+                    uint8_t magic_number = kFidlWireFormatMagicNumberInitial) {
   fidl_message_header_t hdr;
   fidl::InitTxnHeader(&hdr, txid, ordinal, flags);
+  hdr.magic_number = magic_number;
   return as_bytes(hdr);
 }
 

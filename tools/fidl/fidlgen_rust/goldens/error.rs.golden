@@ -142,6 +142,7 @@ impl ExampleProxyInterface for ExampleProxy {
         ) -> Result<ExampleFooResult, fidl::Error> {
             let _response = fidl::client::decode_transaction_body::<
                 fidl::encoding::ResultType<ExampleFooResponse, u32>,
+                0xf5f1179dc411e44,
             >(_buf?)?;
             Ok(_response.map(|x| x.y))
         }
@@ -269,11 +270,6 @@ impl futures::Stream for ExampleRequestStream {
 
             // A message has been received from the channel
             let (header, _body_bytes) = fidl::encoding::decode_transaction_header(bytes)?;
-            if !header.is_compatible() {
-                return std::task::Poll::Ready(Some(Err(fidl::Error::IncompatibleMagicNumber(
-                    header.magic_number(),
-                ))));
-            }
 
             std::task::Poll::Ready(Some(match header.ordinal() {
                 0xf5f1179dc411e44 => {

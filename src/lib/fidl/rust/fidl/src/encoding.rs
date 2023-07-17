@@ -2745,6 +2745,15 @@ impl TransactionHeader {
         self.magic_number
     }
 
+    /// Returns an error if this header has an incompatible magic number.
+    #[inline]
+    pub fn validate(&self) -> Result<()> {
+        match self.magic_number {
+            MAGIC_NUMBER_INITIAL => Ok(()),
+            n => Err(Error::IncompatibleMagicNumber(n)),
+        }
+    }
+
     /// Returns the header's migration flags as a `AtRestFlags` value.
     #[inline]
     pub fn at_rest_flags(&self) -> AtRestFlags {
@@ -2781,7 +2790,9 @@ pub fn decode_transaction_header(bytes: &[u8]) -> Result<(TransactionHeader, &[u
     }
     let (header_bytes, body_bytes) = bytes.split_at(header_len);
     let handles = &mut [];
-    Decoder::decode_with_context::<TransactionHeader>(context, header_bytes, handles, &mut header)?;
+    Decoder::decode_with_context::<TransactionHeader>(context, header_bytes, handles, &mut header)
+        .map_err(|_| Error::InvalidHeader)?;
+    header.validate()?;
     Ok((header, body_bytes))
 }
 
@@ -2901,6 +2912,15 @@ impl WireMetadata {
             Context { wire_format_version: WireFormatVersion::V2 }
         } else {
             Context { wire_format_version: WireFormatVersion::V1 }
+        }
+    }
+
+    /// Returns an error if this header has an incompatible magic number.
+    #[inline]
+    fn validate(&self) -> Result<()> {
+        match self.magic_number {
+            MAGIC_NUMBER_INITIAL => Ok(()),
+            n => Err(Error::IncompatibleMagicNumber(n)),
         }
     }
 }
@@ -3061,32 +3081,31 @@ pub fn convert_handle_dispositions_to_infos(
 /// Returns the header and a reference to the tail of the message.
 fn decode_wire_metadata(bytes: &[u8]) -> Result<WireMetadata> {
     let context = Context { wire_format_version: WireFormatVersion::V2 };
-    match bytes.len() {
+    let metadata = match bytes.len() {
         8 => {
             // New 8-byte format.
             let mut header = new_empty!(WireMetadata);
-            Decoder::decode_with_context::<WireMetadata>(context, bytes, &mut [], &mut header)?;
-            Ok(header)
+            Decoder::decode_with_context::<WireMetadata>(context, bytes, &mut [], &mut header)
+                .map_err(|_| Error::InvalidHeader)?;
+            header
         }
         // TODO(fxbug.dev/99738): Remove this.
         16 => {
             // Old 16-byte format that matches TransactionHeader.
             let mut header = new_empty!(TransactionHeader);
-            Decoder::decode_with_context::<TransactionHeader>(
-                context,
-                bytes,
-                &mut [],
-                &mut header,
-            )?;
-            Ok(WireMetadata {
+            Decoder::decode_with_context::<TransactionHeader>(context, bytes, &mut [], &mut header)
+                .map_err(|_| Error::InvalidHeader)?;
+            WireMetadata {
                 disambiguator: 0,
                 magic_number: header.magic_number,
                 at_rest_flags: header.at_rest_flags,
                 reserved: [0; 4],
-            })
+            }
         }
-        _ => Err(Error::InvalidHeader),
-    }
+        _ => return Err(Error::InvalidHeader),
+    };
+    metadata.validate()?;
+    Ok(metadata)
 }
 
 unsafe impl TypeMarker for WireMetadata {
