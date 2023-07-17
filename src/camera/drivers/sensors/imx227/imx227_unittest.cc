@@ -284,8 +284,8 @@ TEST_F(Imx227DeviceTest, ResetCycleOnAndOff) {
   dut().CycleReset();
   std::vector states = mock_gpio_cam_rst_.SyncCall(&fake_gpio::FakeGpio::GetStateLog);
   ASSERT_GE(states.size(), 2);
-  ASSERT_EQ(fake_gpio::WriteState{.value = 1}, states[states.size() - 2]);
-  ASSERT_EQ(fake_gpio::WriteState{.value = 0}, states[states.size() - 1]);
+  ASSERT_EQ(fake_gpio::WriteSubState{.value = 1}, states[states.size() - 2].sub_state);
+  ASSERT_EQ(fake_gpio::WriteSubState{.value = 0}, states[states.size() - 1].sub_state);
 }
 
 TEST_F(Imx227DeviceTest, GetSensorId) {

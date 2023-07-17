@@ -147,8 +147,8 @@ TEST(PwmInitDeviceTest, InitTest) {
   ASSERT_EQ(1, wifi_gpio.SyncCall(&fake_gpio::FakeGpio::GetAltFunction));
   std::vector states = bt_gpio.SyncCall(&fake_gpio::FakeGpio::GetStateLog);
   ASSERT_EQ(2, states.size());
-  ASSERT_EQ(fake_gpio::WriteState{.value = 0}, states[0]);
-  ASSERT_EQ(fake_gpio::WriteState{.value = 1}, states[1]);
+  ASSERT_EQ(fake_gpio::WriteSubState{.value = 0}, states[0].sub_state);
+  ASSERT_EQ(fake_gpio::WriteSubState{.value = 1}, states[1].sub_state);
 
   pwm.SyncCall(&MockPwmServer::VerifyAndClear);
 }

@@ -266,43 +266,47 @@ class GoodixTest : public zxtest::Test {
   void VerifyInitialReset() {
     std::vector reset_states = reset_gpio_.SyncCall(&fake_gpio::FakeGpio::GetStateLog);
     ASSERT_GE(reset_states.size(), 2);
-    ASSERT_EQ(fake_gpio::WriteState{.value = 0}, reset_states[0]);
-    ASSERT_EQ(fake_gpio::WriteState{.value = 1}, reset_states[1]);
+    ASSERT_EQ(fake_gpio::WriteSubState{.value = 0}, reset_states[0].sub_state);
+    ASSERT_EQ(fake_gpio::WriteSubState{.value = 1}, reset_states[1].sub_state);
 
     std::vector intr_states = intr_gpio_.SyncCall(&fake_gpio::FakeGpio::GetStateLog);
     ASSERT_GE(intr_states.size(), 2);
-    ASSERT_EQ(fake_gpio::WriteState{.value = 0}, intr_states[0]);
-    ASSERT_EQ(fake_gpio::ReadState{.flags = fuchsia_hardware_gpio::GpioFlags::kPullUp},
-              intr_states[1]);
+    ASSERT_EQ(fake_gpio::WriteSubState{.value = 0}, intr_states[0].sub_state);
+    ASSERT_EQ(fake_gpio::ReadSubState{.flags = fuchsia_hardware_gpio::GpioFlags::kPullUp},
+              intr_states[1].sub_state);
   }
 
   void VerifyEnteringUpdateMode(size_t reset_state_log_offset, size_t intr_state_log_offset) {
     std::vector reset_states = reset_gpio_.SyncCall(&fake_gpio::FakeGpio::GetStateLog);
     ASSERT_GE(reset_states.size(), reset_state_log_offset + 2);
-    ASSERT_EQ(fake_gpio::WriteState{.value = 0}, reset_states[reset_state_log_offset]);
-    ASSERT_EQ(fake_gpio::WriteState{.value = 1}, reset_states[reset_state_log_offset + 1]);
+    ASSERT_EQ(fake_gpio::WriteSubState{.value = 0}, reset_states[reset_state_log_offset].sub_state);
+    ASSERT_EQ(fake_gpio::WriteSubState{.value = 1},
+              reset_states[reset_state_log_offset + 1].sub_state);
 
     std::vector intr_states = intr_gpio_.SyncCall(&fake_gpio::FakeGpio::GetStateLog);
     ASSERT_GE(intr_states.size(), intr_state_log_offset + 1);
-    ASSERT_EQ(fake_gpio::WriteState{.value = 0}, intr_states[intr_state_log_offset]);
+    ASSERT_EQ(fake_gpio::WriteSubState{.value = 0}, intr_states[intr_state_log_offset].sub_state);
   }
 
   void VerifyLeavingUpdateMode(size_t reset_state_log_offset, size_t intr_state_log_offset) {
     std::vector reset_states = reset_gpio_.SyncCall(&fake_gpio::FakeGpio::GetStateLog);
     ASSERT_GE(reset_states.size(), reset_state_log_offset + 3);
-    ASSERT_EQ(fake_gpio::WriteState{.value = 0}, reset_states[reset_state_log_offset]);
-    ASSERT_EQ(fake_gpio::WriteState{.value = 1}, reset_states[reset_state_log_offset + 1]);
-    ASSERT_EQ(fake_gpio::ReadState{.flags = fuchsia_hardware_gpio::GpioFlags::kPullDown},
-              reset_states[reset_state_log_offset + 2]);
+    ASSERT_EQ(fake_gpio::WriteSubState{.value = 0}, reset_states[reset_state_log_offset].sub_state);
+    ASSERT_EQ(fake_gpio::WriteSubState{.value = 1},
+              reset_states[reset_state_log_offset + 1].sub_state);
+    ASSERT_EQ(fake_gpio::ReadSubState{.flags = fuchsia_hardware_gpio::GpioFlags::kPullDown},
+              reset_states[reset_state_log_offset + 2].sub_state);
 
     std::vector intr_states = intr_gpio_.SyncCall(&fake_gpio::FakeGpio::GetStateLog);
     ASSERT_GE(intr_states.size(), intr_state_log_offset + 4);
-    ASSERT_EQ(fake_gpio::ReadState{.flags = fuchsia_hardware_gpio::GpioFlags::kPullUp},
-              intr_states[intr_state_log_offset]);
-    ASSERT_EQ(fake_gpio::WriteState{.value = 0}, intr_states[intr_state_log_offset + 1]);
-    ASSERT_EQ(fake_gpio::WriteState{.value = 0}, intr_states[intr_state_log_offset + 2]);
-    ASSERT_EQ(fake_gpio::ReadState{.flags = fuchsia_hardware_gpio::GpioFlags::kPullUp},
-              intr_states[intr_state_log_offset + 3]);
+    ASSERT_EQ(fake_gpio::ReadSubState{.flags = fuchsia_hardware_gpio::GpioFlags::kPullUp},
+              intr_states[intr_state_log_offset].sub_state);
+    ASSERT_EQ(fake_gpio::WriteSubState{.value = 0},
+              intr_states[intr_state_log_offset + 1].sub_state);
+    ASSERT_EQ(fake_gpio::WriteSubState{.value = 0},
+              intr_states[intr_state_log_offset + 2].sub_state);
+    ASSERT_EQ(fake_gpio::ReadSubState{.flags = fuchsia_hardware_gpio::GpioFlags::kPullUp},
+              intr_states[intr_state_log_offset + 3].sub_state);
   }
 
   void VerifyUpdateMode(size_t reset_state_log_offset, size_t intr_state_log_offset) {

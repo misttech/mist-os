@@ -38,7 +38,9 @@ class StreamTest : public zxtest::Test {
  public:
   void SetUp() override {
     ASSERT_OK(gpio_loop_.StartThread("gpio"));
-    enable_gpio_.SyncCall(&fake_gpio::FakeGpio::SetCurrentState, fake_gpio::WriteState{.value = 1});
+    enable_gpio_.SyncCall(&fake_gpio::FakeGpio::SetCurrentState,
+                          fake_gpio::State{.polarity = fuchsia_hardware_gpio::GpioPolarity::kHigh,
+                                           .sub_state = fake_gpio::WriteSubState{.value = 1}});
     fake_parent_ = MockDevice::FakeRootParent();
   }
 
@@ -83,7 +85,7 @@ class StreamTest : public zxtest::Test {
   void VerifyGpioAfterCreate() {
     std::vector states = enable_gpio().SyncCall(&fake_gpio::FakeGpio::GetStateLog);
     ASSERT_EQ(1, states.size());
-    ASSERT_EQ(fake_gpio::WriteState{.value = 1}, states[0]);
+    ASSERT_EQ(fake_gpio::WriteSubState{.value = 1}, states[0].sub_state);
   }
 
   async::Loop gpio_loop_{&kAsyncLoopConfigNoAttachToCurrentThread};

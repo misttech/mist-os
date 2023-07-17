@@ -4,24 +4,24 @@
 
 #include "fake-gpio.h"
 
+#include <fidl/fuchsia.hardware.gpio/cpp/common_types.h>
 #include <lib/async/default.h>
 
 #include <variant>
 
 namespace fake_gpio {
 
-bool WriteState::operator==(const WriteState& other) const { return value == other.value; }
+bool WriteSubState::operator==(const WriteSubState& other) const { return value == other.value; }
 
-bool ReadState::operator==(const ReadState& other) const { return flags == other.flags; }
+bool ReadSubState::operator==(const ReadSubState& other) const { return flags == other.flags; }
 
-bool AltFunctionState::operator==(const AltFunctionState& other) const {
+bool AltFunctionSubState::operator==(const AltFunctionSubState& other) const {
   return function == other.function;
 }
 
-zx::result<uint8_t> DefaultReadCallback(FakeGpio& gpio) { return zx::error(ZX_ERR_NOT_SUPPORTED); }
 zx_status_t DefaultWriteCallback(FakeGpio& gpio) { return ZX_OK; }
 
-FakeGpio::FakeGpio() : read_callback_(DefaultReadCallback), write_callback_(DefaultWriteCallback) {
+FakeGpio::FakeGpio() : write_callback_(DefaultWriteCallback) {
   zx::interrupt interrupt;
   ZX_ASSERT(zx::interrupt::create(zx::resource(ZX_HANDLE_INVALID), 0, ZX_INTERRUPT_VIRTUAL,
                                   &interrupt) == ZX_OK);
@@ -41,33 +41,37 @@ void FakeGpio::GetInterrupt(GetInterruptRequestView request,
 
 void FakeGpio::SetAltFunction(SetAltFunctionRequestView request,
                               SetAltFunctionCompleter::Sync& completer) {
-  state_log_.emplace_back(AltFunctionState{.function = request->function});
+  state_log_.emplace_back(State{.polarity = GetCurrentPolarity(),
+                                .sub_state = AltFunctionSubState{.function = request->function}});
   completer.ReplySuccess();
 }
 
 void FakeGpio::ConfigIn(ConfigInRequestView request, ConfigInCompleter::Sync& completer) {
-  if (state_log_.empty() || !std::holds_alternative<ReadState>(state_log_.back())) {
-    state_log_.emplace_back(ReadState{.flags = request->flags});
+  if (state_log_.empty() || !std::holds_alternative<ReadSubState>(state_log_.back().sub_state)) {
+    state_log_.emplace_back(State{.polarity = GetCurrentPolarity(),
+                                  .sub_state = ReadSubState{.flags = request->flags}});
   } else {
-    auto& state = std::get<ReadState>(state_log_.back());
+    auto& state = std::get<ReadSubState>(state_log_.back().sub_state);
     state.flags = request->flags;
   }
   completer.ReplySuccess();
 }
 
 void FakeGpio::ConfigOut(ConfigOutRequestView request, ConfigOutCompleter::Sync& completer) {
-  state_log_.emplace_back(WriteState{.value = request->initial_value});
+  state_log_.emplace_back(State{.polarity = GetCurrentPolarity(),
+                                .sub_state = WriteSubState{.value = request->initial_value}});
   completer.ReplySuccess();
 }
 
 void FakeGpio::Write(WriteRequestView request, WriteCompleter::Sync& completer) {
   // Gpio must be configured to output in order to be written to.
-  if (state_log_.empty() || !std::holds_alternative<WriteState>(state_log_.back())) {
+  if (state_log_.empty() || !std::holds_alternative<WriteSubState>(state_log_.back().sub_state)) {
     completer.ReplyError(ZX_ERR_BAD_STATE);
     return;
   }
 
-  state_log_.emplace_back(WriteState{.value = request->value});
+  state_log_.emplace_back(
+      State{.polarity = GetCurrentPolarity(), .sub_state = WriteSubState{.value = request->value}});
   zx_status_t response = write_callback_(*this);
   if (response == ZX_OK) {
     completer.ReplySuccess();
@@ -77,8 +81,15 @@ void FakeGpio::Write(WriteRequestView request, WriteCompleter::Sync& completer) 
 }
 
 void FakeGpio::Read(ReadCompleter::Sync& completer) {
-  ZX_ASSERT(std::holds_alternative<ReadState>(state_log_.back()));
-  auto response = read_callback_(*this);
+  ZX_ASSERT(std::holds_alternative<ReadSubState>(state_log_.back().sub_state));
+  zx::result<uint8_t> response;
+  if (read_callbacks_.empty()) {
+    ZX_ASSERT(default_read_response_.has_value());
+    response = default_read_response_.value();
+  } else {
+    response = read_callbacks_.front()(*this);
+    read_callbacks_.pop();
+  }
   if (response.is_ok()) {
     completer.ReplySuccess(response.value());
   } else {
@@ -90,28 +101,51 @@ void FakeGpio::ReleaseInterrupt(ReleaseInterruptCompleter::Sync& completer) {
   completer.ReplySuccess();
 }
 
+void FakeGpio::SetPolarity(SetPolarityRequestView request, SetPolarityCompleter::Sync& completer) {
+  auto sub_state = state_log_.empty()
+                       ? ReadSubState{.flags = fuchsia_hardware_gpio::GpioFlags::kNoPull}
+                       : state_log_.back().sub_state;
+  state_log_.emplace_back(State{
+      .polarity = request->polarity,
+      .sub_state = std::move(sub_state),
+  });
+  completer.ReplySuccess();
+}
+
 uint64_t FakeGpio::GetAltFunction() const {
-  const auto& state = std::get<AltFunctionState>(state_log_.back());
+  const auto& state = std::get<AltFunctionSubState>(state_log_.back().sub_state);
   return state.function;
 }
 
 uint8_t FakeGpio::GetWriteValue() const {
   ZX_ASSERT(!state_log_.empty());
-  const auto& state = std::get<WriteState>(state_log_.back());
+  const auto& state = std::get<WriteSubState>(state_log_.back().sub_state);
   return state.value;
 }
 
 fuchsia_hardware_gpio::GpioFlags FakeGpio::GetReadFlags() const {
-  const auto& state = std::get<ReadState>(state_log_.back());
+  const auto& state = std::get<ReadSubState>(state_log_.back().sub_state);
   return state.flags;
+}
+
+fuchsia_hardware_gpio::GpioPolarity FakeGpio::GetPolarity() const {
+  return state_log_.back().polarity;
 }
 
 void FakeGpio::SetInterrupt(zx::result<zx::interrupt> interrupt) {
   interrupt_ = std::move(interrupt);
 }
 
-void FakeGpio::SetReadCallback(ReadCallback read_callback) {
-  read_callback_ = std::move(read_callback);
+void FakeGpio::PushReadCallback(ReadCallback callback) {
+  read_callbacks_.push(std::move(callback));
+}
+
+void FakeGpio::PushReadResponse(zx::result<uint8_t> response) {
+  read_callbacks_.push([response](FakeGpio& gpio) { return response; });
+}
+
+void FakeGpio::SetDefaultReadResponse(std::optional<zx::result<uint8_t>> response) {
+  default_read_response_ = response;
 }
 
 void FakeGpio::SetWriteCallback(WriteCallback write_callback) {
@@ -138,6 +172,13 @@ fuchsia_hardware_gpio::Service::InstanceHandler FakeGpio::CreateInstanceHandler(
   };
 
   return fuchsia_hardware_gpio::Service::InstanceHandler({.device = std::move(device_handler)});
+}
+
+fuchsia_hardware_gpio::GpioPolarity FakeGpio::GetCurrentPolarity() {
+  if (state_log_.empty()) {
+    return fuchsia_hardware_gpio::GpioPolarity::kHigh;
+  }
+  return state_log_.back().polarity;
 }
 
 }  // namespace fake_gpio

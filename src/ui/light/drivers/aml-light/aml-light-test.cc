@@ -168,7 +168,9 @@ TEST_F(AmlLightTest, GetInfoTest1) {
 }
 
 TEST_F(AmlLightTest, GetInfoTest2) {
-  gpio_.SyncCall(&fake_gpio::FakeGpio::SetCurrentState, fake_gpio::WriteState{.value = 0});
+  gpio_.SyncCall(&fake_gpio::FakeGpio::SetCurrentState,
+                 fake_gpio::State{.polarity = fuchsia_hardware_gpio::GpioPolarity::kHigh,
+                                  .sub_state = fake_gpio::WriteSubState{.value = 0}});
   auto gpio_client = gpio_.SyncCall(&fake_gpio::FakeGpio::Connect);
   zx::result light = FakeAmlLight::Create(std::move(gpio_client), std::nullopt);
   ASSERT_OK(light);
@@ -185,7 +187,9 @@ TEST_F(AmlLightTest, GetInfoTest2) {
 }
 
 TEST_F(AmlLightTest, SetValueTest1) {
-  gpio_.SyncCall(&fake_gpio::FakeGpio::SetCurrentState, fake_gpio::WriteState{.value = 0});
+  gpio_.SyncCall(&fake_gpio::FakeGpio::SetCurrentState,
+                 fake_gpio::State{.polarity = fuchsia_hardware_gpio::GpioPolarity::kHigh,
+                                  .sub_state = fake_gpio::WriteSubState{.value = 0}});
   auto gpio_client = gpio_.SyncCall(&fake_gpio::FakeGpio::Connect);
   zx::result light = FakeAmlLight::Create(std::move(gpio_client), std::nullopt);
   ASSERT_OK(light);

@@ -79,7 +79,9 @@ class Tas58xxTest : public inspect::InspectTestHelper, public zxtest::Test {
     mock_i2c_.ExpectWrite({0x67}).ExpectReadStop({0x00}, ZX_OK);  // Check DIE ID, no error now.
 
     auto fault_gpio_client = fault_gpio_.SyncCall(&fake_gpio::FakeGpio::Connect);
-    fault_gpio_.SyncCall(&fake_gpio::FakeGpio::SetCurrentState, fake_gpio::ReadState());
+    fault_gpio_.SyncCall(&fake_gpio::FakeGpio::SetCurrentState,
+                         fake_gpio::State{.polarity = fuchsia_hardware_gpio::GpioPolarity::kHigh,
+                                          .sub_state = fake_gpio::ReadSubState()});
 
     ASSERT_OK(SimpleCodecServer::CreateAndAddToDdk<Tas58xxCodec>(
         fake_parent_.get(), std::move(endpoints->client), std::move(fault_gpio_client)));
@@ -99,8 +101,7 @@ class Tas58xxTest : public inspect::InspectTestHelper, public zxtest::Test {
 
  protected:
   void SetFaultGpioReadResponse(zx::result<uint8_t> response) {
-    fault_gpio_.SyncCall(&fake_gpio::FakeGpio::SetReadCallback,
-                         [response](fake_gpio::FakeGpio& gpio) { return response; });
+    fault_gpio_.SyncCall(&fake_gpio::FakeGpio::PushReadResponse, response);
   }
 
   mock_i2c::MockI2c mock_i2c_;

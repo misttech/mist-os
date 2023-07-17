@@ -323,8 +323,8 @@ class Gt6853Test : public zxtest::Test {
     std::vector interrupt_gpio_states =
         interrupt_gpio().SyncCall(&fake_gpio::FakeGpio::GetStateLog);
     ZX_ASSERT(interrupt_gpio_states.size() == 1);
-    ZX_ASSERT(interrupt_gpio_states[0] ==
-              fake_gpio::ReadState{.flags = fuchsia_hardware_gpio::GpioFlags::kNoPull});
+    ZX_ASSERT(interrupt_gpio_states[0].sub_state ==
+              fake_gpio::ReadSubState{.flags = fuchsia_hardware_gpio::GpioFlags::kNoPull});
 
     return status;
   }
@@ -736,10 +736,10 @@ TEST_F(Gt6853Test, FirmwareDownload) {
 
   std::vector reset_gpio_states = reset_gpio().SyncCall(&fake_gpio::FakeGpio::GetStateLog);
   ASSERT_EQ(4, reset_gpio_states.size());
-  ASSERT_EQ(fake_gpio::WriteState{.value = 0}, reset_gpio_states[0]);
-  ASSERT_EQ(fake_gpio::WriteState{.value = 1}, reset_gpio_states[1]);
-  ASSERT_EQ(fake_gpio::WriteState{.value = 0}, reset_gpio_states[2]);
-  ASSERT_EQ(fake_gpio::WriteState{.value = 1}, reset_gpio_states[3]);
+  ASSERT_EQ(fake_gpio::WriteSubState{.value = 0}, reset_gpio_states[0].sub_state);
+  ASSERT_EQ(fake_gpio::WriteSubState{.value = 1}, reset_gpio_states[1].sub_state);
+  ASSERT_EQ(fake_gpio::WriteSubState{.value = 0}, reset_gpio_states[2].sub_state);
+  ASSERT_EQ(fake_gpio::WriteSubState{.value = 1}, reset_gpio_states[3].sub_state);
   std::vector interrupt_gpio_states = interrupt_gpio().SyncCall(&fake_gpio::FakeGpio::GetStateLog);
 
   std::vector firmware_packets = i2c().SyncCall(&FakeTouchDevice::get_firmware_packets);

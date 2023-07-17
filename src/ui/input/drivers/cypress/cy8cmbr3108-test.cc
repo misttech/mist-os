@@ -90,8 +90,9 @@ class Cy8cmbr3108Test : public zxtest::Test {
     EXPECT_OK(dut_->Init());
     std::vector states = mock_touch_gpio_.SyncCall(&fake_gpio::FakeGpio::GetStateLog);
     EXPECT_EQ(2, states.size());
-    EXPECT_EQ(fake_gpio::AltFunctionState{.function = 0}, states[0]);
-    EXPECT_EQ(fake_gpio::ReadState{.flags = fuchsia_hardware_gpio::GpioFlags::kNoPull}, states[1]);
+    EXPECT_EQ(fake_gpio::AltFunctionSubState{.function = 0}, states[0].sub_state);
+    EXPECT_EQ(fake_gpio::ReadSubState{.flags = fuchsia_hardware_gpio::GpioFlags::kNoPull},
+              states[1].sub_state);
   }
 
   void TearDown() override {

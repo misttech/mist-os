@@ -353,7 +353,7 @@ TEST_F(Vim3PwmBacklightDeviceTest, SetStateNormalizedNoDuplicateConfigs) {
   EXPECT_FALSE(mock_pwm_.SyncCall(&MockPwmServer::IsCalled, std::string("SetConfig")));
   std::vector gpio_states = fake_gpio_.SyncCall(&fake_gpio::FakeGpio::GetStateLog);
   ASSERT_EQ(2, gpio_states.size());
-  ASSERT_EQ(fake_gpio::WriteState{.value = 1}, gpio_states.back());
+  ASSERT_EQ(fake_gpio::WriteSubState{.value = 1}, gpio_states.back().sub_state);
 }
 
 TEST_F(Vim3PwmBacklightDeviceTest, SetStateNormalizedRejectInvalidValue) {
@@ -377,7 +377,7 @@ TEST_F(Vim3PwmBacklightDeviceTest, SetStateNormalizedRejectInvalidValue) {
   EXPECT_FALSE(mock_pwm_.SyncCall(&MockPwmServer::IsCalled, std::string("SetConfig")));
   std::vector gpio_states = fake_gpio_.SyncCall(&fake_gpio::FakeGpio::GetStateLog);
   ASSERT_EQ(1, gpio_states.size());
-  ASSERT_EQ(fake_gpio::WriteState{.value = 1}, gpio_states[0]);
+  ASSERT_EQ(fake_gpio::WriteSubState{.value = 1}, gpio_states[0].sub_state);
 }
 
 TEST_F(Vim3PwmBacklightDeviceTest, SetStateNormalizedBailoutGpioConfig) {
@@ -400,8 +400,8 @@ TEST_F(Vim3PwmBacklightDeviceTest, SetStateNormalizedBailoutGpioConfig) {
 
   std::vector gpio_states = fake_gpio_.SyncCall(&fake_gpio::FakeGpio::GetStateLog);
   ASSERT_EQ(4, gpio_states.size());
-  ASSERT_EQ(fake_gpio::WriteState{.value = 0}, gpio_states[2]);
-  ASSERT_EQ(fake_gpio::WriteState{.value = 1}, gpio_states[3]);
+  ASSERT_EQ(fake_gpio::WriteSubState{.value = 0}, gpio_states[2].sub_state);
+  ASSERT_EQ(fake_gpio::WriteSubState{.value = 1}, gpio_states[3].sub_state);
 
   fidl::WireResult result_get = fidl::WireCall(client())->GetStateNormalized();
   EXPECT_OK(result_get);

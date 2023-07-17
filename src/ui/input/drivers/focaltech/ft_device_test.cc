@@ -211,13 +211,13 @@ class FocaltechTest : public zxtest::Test, public loop_fixture::RealLoop {
   void VerifyGpioInit() {
     std::vector interrupt_states = interrupt_gpio_.GetStateLog();
     ASSERT_GE(interrupt_states.size(), 1);
-    ASSERT_EQ(fake_gpio::ReadState{.flags = fuchsia_hardware_gpio::GpioFlags::kNoPull},
-              interrupt_states[0]);
+    ASSERT_EQ(fake_gpio::ReadSubState{.flags = fuchsia_hardware_gpio::GpioFlags::kNoPull},
+              interrupt_states[0].sub_state);
 
     std::vector reset_states = reset_gpio_.GetStateLog();
     ASSERT_GE(reset_states.size(), 2);
-    ASSERT_EQ(fake_gpio::WriteState{.value = 0}, reset_states[0]);
-    ASSERT_EQ(fake_gpio::WriteState{.value = 1}, reset_states[1]);
+    ASSERT_EQ(fake_gpio::WriteSubState{.value = 0}, reset_states[0].sub_state);
+    ASSERT_EQ(fake_gpio::WriteSubState{.value = 1}, reset_states[1].sub_state);
   }
 
  protected:
