@@ -4,16 +4,14 @@
 
 mod base;
 mod flatland;
-mod gfx;
 
 use {
     crate::{
         base::{MessageInternal, TilesSession},
         flatland::FlatlandTilesSession,
-        gfx::GfxTilesSession,
     },
     anyhow::Error,
-    fidl_fuchsia_element as element, fidl_fuchsia_ui_scenic as ui_scenic, fuchsia_async as fasync,
+    fidl_fuchsia_element as element, fuchsia_async as fasync,
     fuchsia_component::{client::connect_to_protocol, server::ServiceFs, server::ServiceObj},
     futures::{channel::mpsc::UnboundedSender, StreamExt, TryStreamExt},
     tiles_config,
@@ -124,17 +122,9 @@ async fn main() -> Result<(), Error> {
     // we receive confirmation that we are hooked up to the Scene Manager.
     let fs = expose_services()?;
 
-    // Determine whether to use GFX or Flatland and instantiate the appropriate session, which will
-    // connect to the scene owner and attach our tiles view to it.
-    let scenic = connect_to_protocol::<ui_scenic::ScenicMarker>()
-        .expect("failed to connect to fuchsia.ui.scenic.Scenic");
-    let use_flatland =
-        scenic.uses_flatland().await.expect("Failed to get flatland info from Scenic.");
-    let mut tiles_session: Box<dyn TilesSession> = if use_flatland {
-        Box::new(FlatlandTilesSession::new(internal_sender.clone()).await?)
-    } else {
-        Box::new(GfxTilesSession::new(&scenic, internal_sender.clone()).await?)
-    };
+    // Connect to the scene owner and attach our tiles view to it.
+    let mut tiles_session: Box<dyn TilesSession> =
+        Box::new(FlatlandTilesSession::new(internal_sender.clone()).await?);
 
     // Serve the FIDL services on the message loop, proxying them into internal messages.
     run_services(fs, internal_sender.clone());
