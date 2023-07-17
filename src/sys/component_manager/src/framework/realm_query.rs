@@ -280,7 +280,7 @@ pub async fn get_instance(
 ) -> Result<fsys::Instance, fsys::GetInstanceError> {
     // Construct the complete moniker using the scope moniker and the relative moniker string.
     let moniker = Moniker::try_from(moniker_str).map_err(|_| fsys::GetInstanceError::BadMoniker)?;
-    let moniker = scope_moniker.descendant(&moniker);
+    let moniker = scope_moniker.concat(&moniker);
 
     // TODO(https://fxbug.dev/108532): Close the connection if the scope root cannot be found.
     let instance = model.find(&moniker).await.ok_or(fsys::GetInstanceError::InstanceNotFound)?;
@@ -336,7 +336,7 @@ pub async fn get_resolved_declaration(
     // Construct the complete moniker using the scope moniker and the relative moniker string.
     let moniker =
         Moniker::try_from(moniker_str).map_err(|_| fsys::GetDeclarationError::BadMoniker)?;
-    let moniker = scope_moniker.descendant(&moniker);
+    let moniker = scope_moniker.concat(&moniker);
 
     // TODO(https://fxbug.dev/108532): Close the connection if the scope root cannot be found.
     let instance = model.find(&moniker).await.ok_or(fsys::GetDeclarationError::InstanceNotFound)?;
@@ -378,7 +378,7 @@ async fn resolve_declaration(
     // Construct the complete moniker using the scope moniker and the relative moniker string.
     let parent_moniker =
         Moniker::try_from(parent_moniker_str).map_err(|_| fsys::GetDeclarationError::BadMoniker)?;
-    let parent_moniker = scope_moniker.descendant(&parent_moniker);
+    let parent_moniker = scope_moniker.concat(&parent_moniker);
 
     let collection = match child_location {
         fsys::ChildLocation::Collection(coll) => coll.to_owned(),
@@ -455,7 +455,7 @@ pub async fn get_structured_config(
     // Construct the complete moniker using the scope moniker and the relative moniker string.
     let moniker =
         Moniker::try_from(moniker_str).map_err(|_| fsys::GetStructuredConfigError::BadMoniker)?;
-    let moniker = scope_moniker.descendant(&moniker);
+    let moniker = scope_moniker.concat(&moniker);
 
     // TODO(https://fxbug.dev/108532): Close the connection if the scope root cannot be found.
     let instance =
@@ -481,7 +481,7 @@ async fn construct_namespace(
     // Construct the complete moniker using the scope moniker and the relative moniker string.
     let moniker =
         Moniker::try_from(moniker_str).map_err(|_| fsys::ConstructNamespaceError::BadMoniker)?;
-    let moniker = scope_moniker.descendant(&moniker);
+    let moniker = scope_moniker.concat(&moniker);
 
     // TODO(https://fxbug.dev/108532): Close the connection if the scope root cannot be found.
     let instance =
@@ -510,7 +510,7 @@ async fn open(
 ) -> Result<(), fsys::OpenError> {
     // Construct the complete moniker using the scope moniker and the relative moniker string.
     let moniker = Moniker::try_from(moniker_str).map_err(|_| fsys::OpenError::BadMoniker)?;
-    let moniker = scope_moniker.descendant(&moniker);
+    let moniker = scope_moniker.concat(&moniker);
 
     // TODO(https://fxbug.dev/108532): Close the connection if the scope root cannot be found.
     let instance = model.find(&moniker).await.ok_or(fsys::OpenError::InstanceNotFound)?;
@@ -590,7 +590,7 @@ async fn connect_to_storage_admin(
     // Construct the complete moniker using the scope moniker and the relative moniker string.
     let moniker =
         Moniker::try_from(moniker_str).map_err(|_| fsys::ConnectToStorageAdminError::BadMoniker)?;
-    let moniker = scope_moniker.descendant(&moniker);
+    let moniker = scope_moniker.concat(&moniker);
 
     // TODO(https://fxbug.dev/108532): Close the connection if the scope root cannot be found.
     let instance =

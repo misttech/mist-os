@@ -332,7 +332,7 @@ impl StorageAdmin {
                 } => {
                     let instanced_moniker = InstancedMoniker::try_from(relative_moniker.as_str())?;
                     let moniker =
-                        component.moniker().descendant(&instanced_moniker.without_instance_ids());
+                        component.moniker().concat(&instanced_moniker.without_instance_ids());
                     let instance_id =
                         component.component_id_index().look_up_moniker(&moniker).cloned();
 
@@ -354,7 +354,7 @@ impl StorageAdmin {
                         let model = self.model.upgrade().ok_or(fcomponent::Error::Internal)?;
                         let moniker = Moniker::parse_str(&relative_moniker)
                             .map_err(|_| fcomponent::Error::InvalidArguments)?;
-                        let moniker = component.moniker.descendant(&moniker);
+                        let moniker = component.moniker.concat(&moniker);
                         let root_component = model
                             .look_up(&moniker)
                             .await
@@ -419,7 +419,7 @@ impl StorageAdmin {
                         Ok(instanced_moniker) => {
                             let moniker = component
                                 .moniker()
-                                .descendant(&instanced_moniker.without_instance_ids());
+                                .concat(&instanced_moniker.without_instance_ids());
                             let instance_id =
                                 component.component_id_index().look_up_moniker(&moniker).cloned();
                             let res = storage::delete_isolated_storage(

@@ -759,8 +759,7 @@ impl RoutingTestModel for RoutingTest {
                     | fio::OpenFlags::CREATE
                     | fio::OpenFlags::DIRECTORY;
                 let moniker_string = format!("{}", storage_relation);
-                let component_moniker =
-                    moniker.descendant(&storage_relation.without_instance_ids());
+                let component_moniker = moniker.concat(&storage_relation.without_instance_ids());
                 let component_instance_id = self
                     .model
                     .root()

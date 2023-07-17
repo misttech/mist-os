@@ -48,11 +48,11 @@ pub trait MonikerBase: Default + Eq + PartialEq + fmt::Debug + Clone + Hash + fm
         Ok(Self::new(path))
     }
 
-    /// Creates an absolute moniker for a descendant of this component instance.
-    fn descendant<T: MonikerBase<Part = Self::Part>>(&self, descendant: &T) -> Self {
+    /// Concatenates other onto the end of this moniker.
+    fn concat<T: MonikerBase<Part = Self::Part>>(&self, other: &T) -> Self {
         let mut path = self.path().clone();
-        let mut relative_path = descendant.path().clone();
-        path.append(&mut relative_path);
+        let mut other_path = other.path().clone();
+        path.append(&mut other_path);
         Self::new(path)
     }
 
@@ -261,15 +261,15 @@ mod tests {
     }
 
     #[test]
-    fn moniker_descendant() {
+    fn moniker_concat() {
         let scope_root: Moniker = vec!["a:test1", "b:test2"].try_into().unwrap();
 
         let relative: Moniker = vec!["c:test3", "d:test4"].try_into().unwrap();
-        let descendant = scope_root.descendant(&relative);
+        let descendant = scope_root.concat(&relative);
         assert_eq!("a:test1/b:test2/c:test3/d:test4", format!("{}", descendant));
 
         let relative: Moniker = vec![].try_into().unwrap();
-        let descendant = scope_root.descendant(&relative);
+        let descendant = scope_root.concat(&relative);
         assert_eq!("a:test1/b:test2", format!("{}", descendant));
     }
 

@@ -192,7 +192,6 @@ impl TryFrom<fsys::Instance> for Instance {
             .moniker
             .ok_or(ParseError::MissingField { struct_name: "Instance", field_name: "moniker" })?;
         let moniker = Moniker::parse_str(&moniker)?;
-        let moniker = Moniker::root().descendant(&moniker);
         let url = instance
             .url
             .ok_or(ParseError::MissingField { struct_name: "Instance", field_name: "url" })?;

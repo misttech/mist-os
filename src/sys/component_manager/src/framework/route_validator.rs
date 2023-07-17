@@ -86,7 +86,7 @@ impl RouteValidator {
         // Construct the complete moniker using the scope moniker and the relative moniker string.
         let relative_moniker = Moniker::try_from(relative_moniker_str)
             .map_err(|_| fcomponent::Error::InvalidArguments)?;
-        let moniker = scope_moniker.descendant(&relative_moniker);
+        let moniker = scope_moniker.concat(&relative_moniker);
 
         let instance =
             self.model.find(&moniker).await.ok_or(fcomponent::Error::InstanceNotFound)?;
@@ -124,7 +124,7 @@ impl RouteValidator {
         // Construct the complete moniker using the scope moniker and the relative moniker string.
         let relative_moniker = Moniker::try_from(relative_moniker_str)
             .map_err(|_| fsys::RouteValidatorError::InvalidArguments)?;
-        let moniker = scope_moniker.descendant(&relative_moniker);
+        let moniker = scope_moniker.concat(&relative_moniker);
 
         let instance =
             self.model.find(&moniker).await.ok_or(fsys::RouteValidatorError::InstanceNotFound)?;

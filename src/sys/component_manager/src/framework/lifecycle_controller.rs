@@ -327,7 +327,7 @@ impl CapabilityProvider for LifecycleControllerCapabilityProvider {
 /// absolute moniker.
 fn join_monikers(scope_moniker: &Moniker, moniker_str: &str) -> Result<Moniker, MonikerError> {
     let moniker = Moniker::try_from(moniker_str)?;
-    Ok(scope_moniker.descendant(&moniker))
+    Ok(scope_moniker.concat(&moniker))
 }
 
 #[cfg(test)]

@@ -146,7 +146,7 @@ fn add_report(report: RouteReport, table: &mut Table) {
     table.add_row(row!(r->"Result: ", &format!("{} {}", mark, summary)));
     if let Some(source_moniker) = report.source_moniker {
         let source_moniker = match Moniker::parse_str(&source_moniker) {
-            Ok(m) => Moniker::root().descendant(&m).to_string(),
+            Ok(m) => m.to_string(),
             Err(_) => "<invalid moniker>".to_string(),
         };
         table.add_row(row!(r->"Source: ", source_moniker));
