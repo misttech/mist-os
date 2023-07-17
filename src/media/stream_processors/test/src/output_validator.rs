@@ -189,6 +189,7 @@ impl BytesValidator {
             writer.write_all(&packet.data)?;
             hasher.update(&packet.data);
         }
+        writer.flush()?;
 
         let digest = hasher.finish().bytes();
 
