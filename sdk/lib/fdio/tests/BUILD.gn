@@ -126,11 +126,6 @@ test("fdio-test") {
       "//zircon/system/ulib/zx",
     ]
   }
-
-  # TODO(https://fxbug.dev/116773) remove once these can run inside starnix with instrumentation
-  if (host_os == "linux" && host_cpu == "x64") {
-    exclude_toolchain_tags = [ "instrumented" ]
-  }
 }
 
 test("cleanpath-tests") {

@@ -10,7 +10,7 @@ import("//src/starnix/kernel/starnix.gni")
 
 group("tests") {
   testonly = true
-  if (target_cpu == "x64") {
+  if (target_cpu == "x64" && !is_asan) {
     deps = [ ":android" ]
   }
 }

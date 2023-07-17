@@ -57,9 +57,6 @@ executable("virtmagma_image_tests") {
     "//src/lib/fxl/test:gtest_main",
     "//third_party/mesa/include:drm-uapi",
   ]
-
-  # TODO(https://fxbug.dev/116773) remove once these can run with instrumentation
-  exclude_toolchain_tags = [ "instrumented" ]
 }
 
 executable("virtmagma_unit_tests") {
@@ -72,7 +69,4 @@ executable("virtmagma_unit_tests") {
     "//src/graphics/lib/magma/src/libmagma_virt:virtmagma_headers",
     "//src/lib/fxl/test:gtest_main",
   ]
-
-  # TODO(https://fxbug.dev/116773) remove once these can run with instrumentation
-  exclude_toolchain_tags = [ "instrumented" ]
 }
