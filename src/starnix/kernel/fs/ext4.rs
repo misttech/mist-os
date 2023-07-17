@@ -19,7 +19,7 @@ use crate::task::*;
 use crate::types::*;
 
 pub struct ExtFilesystem {
-    parser: ExtParser<VmoReader>,
+    parser: ExtParser,
 }
 
 impl FileSystemOps for Arc<ExtFilesystem> {
@@ -59,7 +59,7 @@ impl ExtFilesystem {
 
         // TODO(https://fxbug.dev/130502) fall back to regular read operations if get_vmo fails
         let vmo = source_device.get_vmo(current_task, None, prot_flags)?;
-        let fs = Arc::new(Self { parser: ExtParser::new(VmoReader::new(vmo)) });
+        let fs = Arc::new(Self { parser: ExtParser::new(Box::new(VmoReader::new(vmo))) });
         let ops = ExtDirectory {
             inner: Arc::new(ExtNode::new(fs.clone(), current_task, ROOT_INODE_NUM)?),
         };

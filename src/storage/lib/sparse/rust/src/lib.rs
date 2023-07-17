@@ -78,6 +78,17 @@ impl<'a> Seek for LimitedReader<'a> {
     }
 }
 
+/// Returns whether the image in `reader` appears to be in the sparse format.
+pub fn is_sparse_image<R: Reader>(reader: &mut R) -> bool {
+    || -> Option<bool> {
+        let header: SparseHeader = deserialize_from(reader).ok()?;
+        let is_sparse = header.magic == format::SPARSE_HEADER_MAGIC;
+        reader.seek(SeekFrom::Start(0)).ok()?;
+        Some(is_sparse)
+    }()
+    .unwrap_or(false)
+}
+
 #[derive(Clone, PartialEq, Debug)]
 enum Chunk {
     /// `Raw` represents a set of blocks to be written to disk as-is.
@@ -341,7 +352,7 @@ fn add_sparse_chunk(r: &mut Vec<Chunk>, chunk: Chunk) -> Result<()> {
 #[tracing::instrument(skip(source, dest))]
 pub fn unsparse<W: Writer, R: Reader>(source: &mut R, dest: &mut W) -> Result<()> {
     let header: SparseHeader = deserialize_from(source).context("Failed to read header")?;
-    ensure!(header.valid(), "Invalid header");
+    ensure!(header.valid(), "Invalid sparse image header {:?}", header);
     let num_chunks = header.total_chunks as usize;
 
     for _ in 0..num_chunks {

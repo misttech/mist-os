@@ -7,9 +7,10 @@ use {
     ext4_metadata::{ExtendedAttributes, Metadata, ROOT_INODE_NUM},
     ext4_read_only::{
         parser::Parser as ExtParser,
-        readers::{AndroidSparseReader, IoAdapter},
+        readers::{IoAdapter, Reader},
         structs::{DirEntry2, EntryType},
     },
+    sparse::reader::SparseReader,
     std::collections::HashMap,
 };
 
@@ -19,8 +20,13 @@ const METADATA_PATH: &str = "metadata.v1";
 /// to source pairs. Additionally, create a metadata file that provides information
 /// necessary for mounting the files from a fuchsia package.
 pub fn ext4_extract(path: &str, out_dir: &str) -> Result<HashMap<String, String>, Error> {
-    let file = std::fs::File::open(path).context(format!("Unable to open `{:?}'", path))?;
-    let parser = ExtParser::new(AndroidSparseReader::new(IoAdapter::new(file))?);
+    let mut file = std::fs::File::open(path).context(format!("Unable to open `{:?}'", path))?;
+    let reader = if sparse::is_sparse_image(&mut file) {
+        Box::new(IoAdapter::new(SparseReader::new(Box::new(file))?)) as Box<dyn Reader>
+    } else {
+        Box::new(IoAdapter::new(file)) as Box<dyn Reader>
+    };
+    let parser = ExtParser::new(reader);
     let mut metadata = Metadata::new();
 
     // Insert the root entry.
@@ -38,7 +44,7 @@ pub fn ext4_extract(path: &str, out_dir: &str) -> Result<HashMap<String, String>
     parser.index(
         parser.root_inode()?,
         vec![],
-        &mut |parser: &ExtParser<_>, path: Vec<&str>, entry: &DirEntry2| {
+        &mut |parser: &ExtParser, path: Vec<&str>, entry: &DirEntry2| {
             let xattr: ExtendedAttributes = parser
                 .inode_xattrs(entry.e2d_ino.get())?
                 .into_iter()

@@ -58,8 +58,8 @@ use {
 // Assuming/ensuring that we are on a 64bit system where u64 == usize.
 assert_eq_size!(u64, usize);
 
-pub struct Parser<T: Reader> {
-    reader: T,
+pub struct Parser {
+    reader: Box<dyn Reader>,
     super_block: OnceCell<SuperBlock>,
 }
 
@@ -72,8 +72,8 @@ pub type XattrMap = BTreeMap<Vec<u8>, Vec<u8>>;
 /// Basic use:
 /// let mut parser = Parser::new(VecReader::new(vec_of_u8));
 /// let tree = parser.build_fuchsia_tree()
-impl<T: 'static + Reader> Parser<T> {
-    pub fn new(reader: T) -> Self {
+impl Parser {
+    pub fn new(reader: Box<dyn Reader>) -> Self {
         Parser { reader, super_block: OnceCell::new() }
     }
 
@@ -461,7 +461,7 @@ impl<T: 'static + Reader> Parser<T> {
         receiver: &mut R,
     ) -> Result<bool, ParsingError>
     where
-        R: FnMut(&Parser<T>, Vec<&str>, &DirEntry2) -> Result<bool, ParsingError>,
+        R: FnMut(&Parser, Vec<&str>, &DirEntry2) -> Result<bool, ParsingError>,
     {
         let entries = self.entries_from_inode(&inode)?;
         for entry in entries {
@@ -681,7 +681,7 @@ mod tests {
     #[fuchsia::test]
     fn list_root_1_file() {
         let data = fs::read("/pkg/data/1file.img").expect("Unable to read file");
-        let parser = Parser::new(VecReader::new(data));
+        let parser = Parser::new(Box::new(VecReader::new(data)));
         assert!(parser.super_block().expect("Super Block").check_magic().is_ok());
         let root_inode = parser.root_inode().expect("Parse INode");
         let entries = parser.entries_from_inode(&root_inode).expect("List entries");
@@ -703,7 +703,7 @@ mod tests {
         "fs with multiple files with multiple extents")]
     fn list_root(ext4_path: &str, mut expected_entries: Vec<&str>) {
         let data = fs::read(ext4_path).expect("Unable to read file");
-        let parser = Parser::new(VecReader::new(data));
+        let parser = Parser::new(Box::new(VecReader::new(data)));
         assert!(parser.super_block().expect("Super Block").check_magic().is_ok());
         let root_inode = parser.root_inode().expect("Parse INode");
         let entries = parser.entries_from_inode(&root_inode).expect("List entries");
@@ -717,7 +717,7 @@ mod tests {
     #[fuchsia::test]
     fn get_from_path() {
         let data = fs::read("/pkg/data/nest.img").expect("Unable to read file");
-        let parser = Parser::new(VecReader::new(data));
+        let parser = Parser::new(Box::new(VecReader::new(data)));
         assert!(parser.super_block().expect("Super Block").check_magic().is_ok());
 
         let entry = parser.entry_at_path(Path::new("/inner")).expect("Entry at path");
@@ -732,7 +732,7 @@ mod tests {
     #[fuchsia::test]
     fn read_data() {
         let data = fs::read("/pkg/data/1file.img").expect("Unable to read file");
-        let parser = Parser::new(VecReader::new(data));
+        let parser = Parser::new(Box::new(VecReader::new(data)));
         assert!(parser.super_block().expect("Super Block").check_magic().is_ok());
 
         let entry = parser.entry_at_path(Path::new("file1")).expect("Entry at path");
@@ -748,14 +748,14 @@ mod tests {
     #[fuchsia::test]
     fn fail_inode_zero() {
         let data = fs::read("/pkg/data/1file.img").expect("Unable to read file");
-        let parser = Parser::new(VecReader::new(data));
+        let parser = Parser::new(Box::new(VecReader::new(data)));
         assert!(parser.inode(0).is_err());
     }
 
     #[fuchsia::test]
     fn index() {
         let data = fs::read("/pkg/data/nest.img").expect("Unable to read file");
-        let parser = Parser::new(VecReader::new(data));
+        let parser = Parser::new(Box::new(VecReader::new(data)));
         assert!(parser.super_block().expect("Super Block").check_magic().is_ok());
 
         let mut count = 0;
@@ -780,7 +780,7 @@ mod tests {
     #[fuchsia::test]
     fn xattr() {
         let data = fs::read("/pkg/data/xattr.img").expect("Unable to read file");
-        let parser = Parser::new(VecReader::new(data));
+        let parser = Parser::new(Box::new(VecReader::new(data)));
         assert!(parser.super_block().expect("Super Block").check_magic().is_ok());
         let root_inode = parser.root_inode().expect("Root inode");
         let mut found_files = HashSet::new();
@@ -877,7 +877,7 @@ mod tests {
         expected_dirs: Vec<&str>,
     ) {
         let data = fs::read(ext4_path).expect("Unable to read file");
-        let parser = Parser::new(VecReader::new(data));
+        let parser = Parser::new(Box::new(VecReader::new(data)));
         assert!(parser.super_block().expect("Super Block").check_magic().is_ok());
 
         let root_inode = parser.root_inode().expect("Root inode");

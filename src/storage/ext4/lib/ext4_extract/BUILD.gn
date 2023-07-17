@@ -13,6 +13,7 @@ rustc_library("ext4_extract") {
   deps = [
     "//src/storage/ext4/lib/metadata",
     "//src/storage/ext4/read-only:ext4-read-only",
+    "//src/storage/lib/sparse/rust:lib",
     "//third_party/rust_crates:anyhow",
   ]
 }

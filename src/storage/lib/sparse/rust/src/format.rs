@@ -37,7 +37,7 @@ const_assert_eq!(SPARSE_HEADER_SIZE, 28);
 impl SparseHeader {
     pub fn new(blk_sz: u32, total_blks: u32, total_chunks: u32) -> SparseHeader {
         SparseHeader {
-            magic: MAGIC,
+            magic: SPARSE_HEADER_MAGIC,
             major_version: MAJOR_VERSION,
             minor_version: MINOR_VERSION,
             file_hdr_sz: std::mem::size_of::<SparseHeader>() as u16,
@@ -50,7 +50,7 @@ impl SparseHeader {
     }
 
     pub fn valid(&self) -> bool {
-        self.magic == MAGIC
+        self.magic == SPARSE_HEADER_MAGIC
             && self.major_version == MAJOR_VERSION
             && self.minor_version == MINOR_VERSION
     }
@@ -88,7 +88,7 @@ impl ChunkHeader {
 }
 
 // Header constants.
-const MAGIC: u32 = 0xED26FF3A;
+pub const SPARSE_HEADER_MAGIC: u32 = 0xED26FF3A;
 /// Maximum Major Version Supported.
 const MAJOR_VERSION: u16 = 0x1;
 // Minimum Minor Version Supported.

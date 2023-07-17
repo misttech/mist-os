@@ -14,7 +14,6 @@ rustc_library("ext4-read-only") {
   edition = "2021"
 
   deps = [
-    "//third_party/rust_crates:anyhow",
     "//third_party/rust_crates:once_cell",
     "//third_party/rust_crates:static_assertions",
     "//third_party/rust_crates:thiserror",
