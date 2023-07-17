@@ -4,7 +4,7 @@
 
 use crate::{
     auth::FsCred,
-    device::DeviceMode,
+    device::{simple_device_ops, DeviceMode, DeviceOps},
     fs::{
         buffers::{InputBuffer, OutputBuffer},
         kobject::{KObjectDeviceAttribute, KType},
@@ -16,10 +16,12 @@ use crate::{
     task::*,
     types::*,
 };
+
 use fuchsia_zircon::{self as zx, cprng_draw};
 use std::sync::Arc;
 
-struct DevNull;
+#[derive(Default)]
+pub struct DevNull;
 
 pub fn new_null_file(kernel: &Arc<Kernel>, flags: OpenFlags) -> FileHandle {
     Anon::new_file_extended(
@@ -78,6 +80,7 @@ impl FileOps for DevNull {
     }
 }
 
+#[derive(Default)]
 struct DevZero;
 impl FileOps for DevZero {
     fileops_impl_seekless!();
@@ -147,6 +150,7 @@ impl FileOps for DevZero {
     }
 }
 
+#[derive(Default)]
 struct DevFull;
 impl FileOps for DevFull {
     fileops_impl_seekless!();
@@ -175,6 +179,7 @@ impl FileOps for DevFull {
     }
 }
 
+#[derive(Default)]
 pub struct DevRandom;
 impl FileOps for DevRandom {
     fileops_impl_seekless!();
@@ -203,6 +208,7 @@ impl FileOps for DevRandom {
     }
 }
 
+#[derive(Default)]
 struct DevKmsg;
 impl FileOps for DevKmsg {
     fileops_impl_seekless!();
@@ -235,44 +241,30 @@ impl FileOps for DevKmsg {
     }
 }
 
-pub fn create_mem_device(
-    _current_task: &CurrentTask,
-    id: DeviceType,
-    _node: &FsNode,
-    _flags: OpenFlags,
-) -> Result<Box<dyn FileOps>, Errno> {
-    Ok(match id.minor() {
-        3 => Box::new(DevNull),
-        5 => Box::new(DevZero),
-        7 => Box::new(DevFull),
-        8 | 9 => Box::new(DevRandom),
-        11 => Box::new(DevKmsg),
-        _ => return error!(ENODEV),
-    })
-}
-
-pub fn mem_device_init(kernel: &Arc<Kernel>) {
-    // Device registry.
-    kernel
-        .device_registry
-        .register_chrdev_major(MEM_MAJOR, create_mem_device)
-        .expect("mem device register failed.");
-
-    let device_attrs = KObjectDeviceAttribute::new_from_vec(
-        vec![
-            (b"null", b"null", DeviceType::NULL),
-            (b"zero", b"zero", DeviceType::ZERO),
-            (b"full", b"full", DeviceType::FULL),
-            (b"random", b"random", DeviceType::RANDOM),
-            (b"urandom", b"urandom", DeviceType::URANDOM),
-            (b"kmsg", b"kmsg", DeviceType::KMSG),
-        ],
-        DeviceMode::Char,
-    );
+fn create_mem_device(
+    kernel: &Arc<Kernel>,
+    name: &FsStr,
+    device_type: DeviceType,
+    device_ops: impl DeviceOps,
+) {
     let mem_class = kernel.device_registry.virtual_bus().get_or_create_child(
         b"mem",
         KType::Class,
         SysFsDirectory::new,
     );
-    kernel.add_chr_devices(mem_class, device_attrs);
+    let device_attr = KObjectDeviceAttribute::new(name, name, device_type, DeviceMode::Char);
+    kernel.add_chr_device(mem_class, device_attr);
+    kernel
+        .device_registry
+        .register_chrdev(MEM_MAJOR, device_type.minor(), 1, device_ops)
+        .expect("mem device register failed.");
+}
+
+pub fn mem_device_init(kernel: &Arc<Kernel>) {
+    create_mem_device(kernel, b"null", DeviceType::NULL, simple_device_ops::<DevNull>);
+    create_mem_device(kernel, b"zero", DeviceType::ZERO, simple_device_ops::<DevZero>);
+    create_mem_device(kernel, b"full", DeviceType::FULL, simple_device_ops::<DevFull>);
+    create_mem_device(kernel, b"random", DeviceType::RANDOM, simple_device_ops::<DevRandom>);
+    create_mem_device(kernel, b"urandom", DeviceType::URANDOM, simple_device_ops::<DevRandom>);
+    create_mem_device(kernel, b"kmsg", DeviceType::KMSG, simple_device_ops::<DevKmsg>);
 }

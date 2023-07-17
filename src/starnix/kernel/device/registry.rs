@@ -76,6 +76,16 @@ where
     }
 }
 
+/// A simple `DeviceOps` function for any device that implements `FileOps + Default`.
+pub fn simple_device_ops<T: Default + FileOps + 'static>(
+    _current_task: &CurrentTask,
+    _id: DeviceType,
+    _node: &FsNode,
+    _flags: OpenFlags,
+) -> Result<Box<dyn FileOps>, Errno> {
+    Ok(Box::new(T::default()))
+}
+
 /// Keys returned by the registration method for `DeviceListener`s that allows to unregister a
 /// listener.
 pub type DeviceListenerKey = u64;
@@ -302,15 +312,19 @@ impl DeviceOps for Arc<RwLock<DynRegistry>> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{device::mem::create_mem_device, fs::*, testing::*};
+    use crate::{device::mem::DevNull, fs::*, testing::*};
 
     #[::fuchsia::test]
     fn registry_fails_to_add_duplicate_device() {
         let registry = DeviceRegistry::default();
-        registry.register_chrdev_major(MEM_MAJOR, create_mem_device).expect("registers once");
-        registry.register_chrdev_major(123, create_mem_device).expect("registers unique");
         registry
-            .register_chrdev_major(MEM_MAJOR, create_mem_device)
+            .register_chrdev_major(MEM_MAJOR, simple_device_ops::<DevNull>)
+            .expect("registers once");
+        registry
+            .register_chrdev_major(123, simple_device_ops::<DevNull>)
+            .expect("registers unique");
+        registry
+            .register_chrdev_major(MEM_MAJOR, simple_device_ops::<DevNull>)
             .expect_err("fail to register duplicate");
     }
 
@@ -319,7 +333,9 @@ mod tests {
         let (_kernel, current_task) = create_kernel_and_task();
 
         let registry = DeviceRegistry::default();
-        registry.register_chrdev_major(MEM_MAJOR, create_mem_device).unwrap();
+        registry
+            .register_chrdev_major(MEM_MAJOR, simple_device_ops::<DevNull>)
+            .expect("registers unique");
 
         let node = FsNode::new_root(PanickingFsNode);
 
