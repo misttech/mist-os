@@ -41,12 +41,19 @@ bringup_base = {
   output_dir = root_build_dir
   generate_fvm = false
 
+  if (custom_signing_script != "") {
+    inputs = custom_signing_script_inputs
+    generate_signed_zbi = true
+  } else if (use_vboot) {
+    inputs = vboot_action.inputs
+    generate_signed_zbi = true
+  }
+
   product_assembly_config_label = ":product_assembly_config"
   use_bringup_platform_bundles_only = true
 
   include_component_id_index = true
   include_shell_commands = false
-  include_config_data = false
 
   cmdline_deps = [ "//build/input:bootfs" ]
 
@@ -85,47 +92,18 @@ bringup_base = {
 assembled_system("bringup_non_fastboot") {
   forward_variables_from(bringup_base, "*")
   assembly_images_config_label = bringup_images_config_label
-  image_name = "bringup"
-  if (custom_signing_script != "") {
-    zbi_signing_script = custom_signing_script
-    zbi_signing_script_deps = [ "//build/images/custom_signing:deps" ]
-    inputs = custom_signing_script_inputs
-  } else if (use_vboot) {
-    zbi_signing_script = vboot_action.script
-    zbi_signing_args = vboot_action.args
-    zbi_signing_script_deps = vboot_action.deps
-    inputs = vboot_action.inputs
-  }
-
   image_metadata_overrides = legacy_bringup_image_metadata_overrides
+  image_name = "bringup"
 }
 
 # Builds a bringup image that we can RAM boot with fastboot boot.
 assembled_system("bringup_fastboot") {
   forward_variables_from(bringup_base, "*")
   assembly_images_config_label = bringup_fastboot_images_config_label
-  zbi_signing_script = "concat_zbi_and_vbmeta.sh"
-  zbi_signing_args = []
-  if (use_vbmeta || use_vboot) {
-    assembly_out_dir = rebase_path(target_out_dir, root_build_dir)
-    zbi_signing_args = [
-      "-v",
-      "${assembly_out_dir}/${target_name}/bringup_fastboot.vbmeta",
-    ]
-  }
-  if (custom_signing_script != "") {
-    rebased_script = rebase_path(custom_signing_script, root_build_dir)
-    zbi_signing_args += [ "-s ${rebased_script}" ]
-    zbi_signing_script_deps = [ "//build/images/custom_signing:deps" ]
-    inputs = custom_signing_script_inputs
-  } else if (use_vboot) {
-    rebased_script = rebase_path(vboot_action.script, root_build_dir)
-    zbi_signing_args += [ "-s ${rebased_script}" ] + vboot_action.args
-    zbi_signing_script_deps = vboot_action.deps
-    inputs = vboot_action.inputs
-  }
-
   image_metadata_overrides = legacy_bringup_fastboot_image_metadata_overrides
+
+  # bringup_fastboot always postprocesses the zbi.
+  generate_signed_zbi = true
 }
 
 group("bringup") {

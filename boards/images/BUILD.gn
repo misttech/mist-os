@@ -176,6 +176,8 @@ generated_images_config("chromebook-x64") {
     compress = false
     truncate_to_length = 17179869184
   }
+
+  deps = vboot_action.deps
 }
 
 generated_images_config("imx8mmevk") {
@@ -220,6 +222,7 @@ generated_images_config("zedboot_chromebook-x64") {
   forward_variables_from(_default_vbmeta, "*")
   zbi.signing_script = vboot_action.script
   zbi.signing_args = vboot_action.args
+  deps = vboot_action.deps
 }
 
 generated_images_config("zedboot_qemu") {
@@ -259,6 +262,7 @@ generated_images_config("bringup_chromebook-x64") {
   forward_variables_from(_default_vbmeta, "*")
   zbi.signing_script = vboot_action.script
   zbi.signing_args = vboot_action.args
+  deps = vboot_action.deps
 }
 
 generated_images_config("bringup_qemu") {
@@ -318,6 +322,7 @@ generated_images_config("bringup_fastboot_chromebook-x64") {
   zbi.signing_args += _bringup_fastboot_vbmeta_args
   zbi.signing_args += [ "-s ${_rebased_script}" ]
   zbi.signing_args += vboot_action.args
+  deps = vboot_action.deps
 }
 
 generated_images_config("bringup_fastboot_qemu") {

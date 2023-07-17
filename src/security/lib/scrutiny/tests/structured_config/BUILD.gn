@@ -113,7 +113,6 @@ if (is_fuchsia) {
     generate_vbmeta = false
 
     assembly_images_config_label = ":images_config"
-    use_explicit_images_config_only = true
     product_assembly_config_label = ":product_assembly_config"
 
     # Needed for scrutiny to find root.cm and other component config.

@@ -70,14 +70,11 @@ assembled_system("zedboot_assembly") {
 
   # zbi arguments
   if (custom_signing_script != "") {
-    zbi_signing_script = custom_signing_script
-    zbi_signing_script_deps = [ "//build/images/custom_signing:deps" ]
     inputs = custom_signing_script_inputs
+    generate_signed_zbi = true
   } else if (use_vboot) {
-    zbi_signing_script = vboot_action.script
-    zbi_signing_args = vboot_action.args
-    zbi_signing_script_deps = vboot_action.deps
     inputs = vboot_action.inputs
+    generate_signed_zbi = true
   }
 
   image_metadata_overrides = legacy_zedboot_image_metadata_overrides

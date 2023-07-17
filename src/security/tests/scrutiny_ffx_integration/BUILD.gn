@@ -55,7 +55,6 @@ if (is_fuchsia) {
     generate_fvm = true
     generate_fvm_fastboot = false
     assembly_images_config_label = ":images_config"
-    use_explicit_images_config_only = true
     product_assembly_config_label = "//build/assembly:default_product_config"
     use_bringup_platform_bundles_only = true
     bootfs_labels = []
@@ -74,7 +73,6 @@ if (is_fuchsia) {
     generate_fvm = true
     generate_fvm_fastboot = false
     assembly_images_config_label = ":images_config_recovery"
-    use_explicit_images_config_only = true
     product_assembly_config_label = "//build/assembly:default_product_config"
     use_bringup_platform_bundles_only = true
     bootfs_labels = []

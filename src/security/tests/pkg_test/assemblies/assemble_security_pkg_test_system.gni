@@ -287,7 +287,6 @@ template("assemble_security_pkg_test_system") {
                              "assembly_fxfs_image_size_bytes",
                            ])
     testonly = true
-    use_explicit_images_config_only = true
     generate_vbmeta = false
     generate_fvm = !use_fxfs_blob
     generate_fvm_fastboot = false
@@ -306,7 +305,6 @@ template("assemble_security_pkg_test_system") {
     # code from the "main" assembly.
     product_assembly_config_label = "//build/assembly:default_product_config"
     use_bringup_platform_bundles_only = true
-    board_name = invoker.board_name
     bootfs_labels = []
     base_packages = packages_for_assembly
   }

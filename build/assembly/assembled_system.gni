@@ -2,21 +2,12 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-import("//build/assembly/compare_json_list.gni")
-import("//build/assembly/generated_images_config.gni")
 import("//build/assembly/hermetic_inputs_for_image_assembly.gni")
 import("//build/assembly/legacy_assembly_input_bundle.gni")
 import("//build/bazel/bazel_inputs.gni")
-import("//bundles/assembly/platform_aibs.gni")
-
-import("//build/drivers/driver_manifest.gni")
-import("//build/images/filesystem_limits.gni")
 import("//build/images/fvm.gni")
-import("//build/info/info.gni")
-import("//build/packages/package_metadata.gni")
-import("//build/testing/verify_files_match.gni")
-import("//build/zbi/zbi.gni")
 import("//build/zircon/tools.gni")
+import("//bundles/assembly/platform_aibs.gni")
 import("//src/developer/ffx/build/ffx_action.gni")
 
 # Assembles a Fuchsia system.
@@ -24,19 +15,7 @@ import("//src/developer/ffx/build/ffx_action.gni")
 # Given base, cache, and universe packages, assembles a Fuchsia system
 # containing those packages.
 #
-# Parameters:
-#
-#   image_name (optional; default: target_name)
-#     [string] The filename to give the ZBIs and VBMetas.
-#
-#   namespace (optional; default: image_name)
-#     [string] A namespace to use for naming all the outputs and generated files.
-#
-#   output_dir (optional; default: target_out_dir)
-#     [string] The output directory into which the final system ZBI is written.
-#
-#   output_name (optional; default: <target_name>.zbi)
-#     [string] The name of the final system ZBI file.
+# Metadata parameters:
 #
 #   generate_image_metadata (optional, default=true)
 #     [boolean] if true, assembled_system() will generate the appropiate image
@@ -59,18 +38,19 @@ import("//src/developer/ffx/build/ffx_action.gni")
 #     [scope] Usual GN meaning, passed to the image assembly target created by
 #     the template.
 #
+#
+# Production code assertions:
+#
 #   testonly (optional)
 #     [bool] Usual GN meanings.
 #
-# Product parameters:
+#   check_production_tag (default: false)
+#      [bool] Whether to check there is no non_production_tag dependencies.
+#
+# Product Assembly parameters:
+#
 #   assembly_images_config_label (required)
 #     [label] A label for the above images config file.
-#
-#   use_explicit_images_config_only (optional; default=false)
-#     [bool] Whether to bother building a GN-generated images config and
-#     comparing against the explicit images config provided by
-#     assembly_images_config_label. This should usually be set to false for
-#     assemblies used in tests.
 #
 #   product_assembly_config_label (required)
 #     [label] A label for the product assembly config, should be a
@@ -85,6 +65,8 @@ import("//src/developer/ffx/build/ffx_action.gni")
 #     [boolean] If true, allow the 'eng' platform bundles to be used by the
 #     assembled system.  (this is only a check made by GN, assembly itself may
 #     still access them)
+#
+# Legacy Bundle parameters:
 #
 #   base_packages (required)
 #     [list of labels] The packages to include in the base package set.
@@ -145,14 +127,6 @@ import("//src/developer/ffx/build/ffx_action.gni")
 #     [bool] Whether to include shell commands. Should be set to false for
 #     build without shell access.
 #
-#   include_config_data (default: true)
-#     [bool] Whether to create a config_data package for the assembly or not.
-#
-#   base_package_name (optional; default: "system_image")
-#     [string] The name to give the base package. For prime builds this
-#     should be "system_image_prime", so that the package does not override the
-#     non-prime package during publishing.
-#
 #   kernel_zbi (optional; default: "//zircon/kernel")
 #     [label] Label of the zircon kernel to use.  This needs to use the `images`
 #     metadata key to provide the `path` and `name` fields (see the
@@ -183,73 +157,53 @@ import("//src/developer/ffx/build/ffx_action.gni")
 #   core_realm_definition [optional]
 #     [label] The GN label of a `core_realm_definition()` template
 #
-# Board parameters:
 #
-#   assembly_blob_layout_format (default: "compact")
-#     [string] The format blobfs should store blobs in. The valid values are "deprecated_padded" and
-#     "compact". The deprecated padded format is supported only for Astro devices and will be
-#     removed in the future (it wastes space).
-#
-#   check_production_tag (default: false)
-#      [bool] Whether to check there is no non_production_tag dependencies.
-#
-# Board: BlobFS parameters
-#
-#   blobfs_minimum_inodes, blobfs_minimum_data_bytes, blobfs_maximum_bytes, blobfs_maximum_contents_size (optional)
-#     [int] Size options for blobfs to pass to the fvm tool.
-#
-# Board: FVM/Fxfs parameters
-#
-#   generate_fvm (optional; default: false)
-#     [bool] Whether to generate a FVM image.
-#
-#   generate_fvm_fastboot (optional; default: false)
-#     [bool] Whether to generate a FVM image for flashing via fastboot.
-#
-#   generate_fxfs (optional; default: false)
-#     [bool] Whether to generate an Fxfs image.  Exclusive with generate_fvm.  EXPERIMENTAL.
+# Image Assembly parameters:
 #
 #   assembly_include_account_in_fvm (optional; default: false)
 #     [bool] Whether to include an account partition in the FVM image.
 #
-#   ramdisk_fvm_in_zbi (optional)
-#     DEPRECTATED, use ramdisk_in_zbi.
-#
 #   ramdisk_in_zbi (optional)
 #     [bool] Whether the FVM or Fxfs image should be embedded into the ZBI as a ramdisk.
 #
-#   assembly_fvm_slice_size (optional; default: 1048576)
-#     [int] The slice size of the FVM.
 #
-#   fvm_truncate_to_length (optional)
-#     [int] The precise size to make the (non-sparse) FVM image. See
-#     documentation of the `--length` parameter of the `fvm` binary host tool
-#     for details.
+# Outputs:
 #
-#   assembly_fxfs_image_size_bytes (optional)
-#     [int] The size of image to generate.  The system contents must fit within this.  If unset, the
-#     image size is unfixed: the generated image will be set to an arbitrary size greater than or
-#     equal to the required size to fit the base system.
+#   These arguments help inform GN what to put in `outputs = []`.
+#   These do not actually cause the images to get generated.
+#   `assembly_images_config_label` is the config that declares what images to
+#   generate.
 #
-# Board: VBMeta arguments
+#   image_name (optional; default: target_name)
+#     [string] The filename to give the ZBIs and VBMetas.
+#
+#   namespace (optional; default: image_name)
+#     [string] A namespace to use for naming all the outputs and generated files.
+#
+#   generate_signed_zbi (optional; default: false)
+#     [bool] Whether a signed zbi will be generated.
 #
 #   generate_vbmeta (optional; default: use_vbmeta)
-#     [bool] Whether to generate a VBMeta image.
+#     [bool] Whether a vbmeta will be generated.
 #
-# Board: ZBI arguments
+#   generate_fvm (optional; default: false)
+#     [bool] Whether a fvm will be generated
 #
-#   zbi_name (optional; default: target_name)
-#     [string] The name to give the ZBI in the out directory.
-#     Typically: fuchsia, recovery, etc.
+#   generate_fvm_fastboot (optional; default: false)
+#     [bool] Whether a fastboot fvm (nand) will be generated.
 #
-#   zbi_signing_script (optional)
-#     [path] Location of script to use to sign the ZBI.
+#   generate_fxfs (optional; default: false)
+#     [bool] Whether a fxfs image will be generated.
+#     Exclusive with generate_fvm and generate_fvm_fastboot. EXPERIMENTAL.
 #
-#   zbi_signing_args (optional)
-#     [list of strings] Arguments to pass to the signing script.
 #
-#   zbi_signing_script_deps (optional)
-#      [list of labels] Dependencies needed by the signing script.
+# Optional copy() for the images:
+#
+#   output_dir (optional; default: target_out_dir)
+#     [string] The output directory into which the final system ZBI is written.
+#
+#   output_name (optional; default: <target_name>.zbi)
+#     [string] The name of the final system ZBI file.
 #
 template("assembled_system") {
   assert(defined(invoker.base_packages), "Need to define base_packages")
@@ -258,6 +212,28 @@ template("assembled_system") {
          "Need to define product_assembly_config_label")
   assert(defined(invoker.assembly_images_config_label),
          "Need to define assembly_images_config_label")
+
+  # These arguments are deprecated and unused.
+  # Remove these from all assembled_system() invocations then remove them from
+  # this list.
+  not_needed(invoker,
+             [
+               "board_name",
+               "ramdisk_fvm_in_zbi",
+               "zbi_name",
+               "zbi_signing_script_deps",
+               "use_explicit_images_config_only",
+               "zbi_signing_args",
+               "zbi_signing_script_deps",
+               "assembly_blob_layout_format",
+               "blobfs_minimum_inodes",
+               "blobfs_minimum_data_bytes",
+               "blobfs_maximum_bytes",
+               "blobfs_maximum_contents_size",
+               "assembly_fvm_slice_size",
+               "fvm_truncate_to_length",
+               "assembly_fxfs_image_size_bytes",
+             ])
 
   generate_fvm = false
   if (defined(invoker.generate_fvm)) {
@@ -280,19 +256,14 @@ template("assembled_system") {
          "Only one of Fxfs and FVM can host blobs")
   _supports_blobs = generate_fvm || generate_fxfs
 
-  # By default, build a GN-generated images config.
-  _use_explicit_images_config_only = false
-  if (defined(invoker.use_explicit_images_config_only) &&
-      invoker.use_explicit_images_config_only) {
-    assert(
-        defined(invoker.assembly_images_config_label),
-        "use_explicit_images_config_only cannot be enabled without an assembly_images_config_label")
-    _use_explicit_images_config_only = true
-  }
-
   generate_image_metadata = true
   if (defined(invoker.generate_image_metadata)) {
     generate_image_metadata = invoker.generate_image_metadata
+  }
+
+  generate_signed_zbi = defined(invoker.zbi_signing_script)
+  if (defined(invoker.generate_signed_zbi)) {
+    generate_signed_zbi = invoker.generate_signed_zbi
   }
 
   forward_variables_from(invoker, [ "image_metadata_overrides" ])
@@ -349,9 +320,6 @@ template("assembled_system") {
   fvm_tool_path = get_label_info(fvm_tool_target, "root_out_dir")
   fvm_tool_path += "/fvm"
 
-  # TODO: This should be removed once all clients are no longer supplying board_name.
-  not_needed(invoker, [ "board_name" ])
-
   image_name = target_name
   if (defined(invoker.image_name)) {
     image_name = invoker.image_name
@@ -360,11 +328,6 @@ template("assembled_system") {
   namespace = image_name
   if (defined(invoker.namespace)) {
     namespace = invoker.namespace
-  }
-
-  base_package_name = "system_image"
-  if (defined(invoker.base_package_name)) {
-    base_package_name = invoker.base_package_name
   }
 
   # Internal labels used for Image Assembly.
@@ -377,8 +340,6 @@ template("assembled_system") {
     fshost = "${legacy_assembly_input_bundle}.fshost"
     fshost_validator = "${namespace}.fshost_validator"
     image_assembly_inputs = "${namespace}.image_assembly_inputs"
-    gn_images_config = "${namespace}.images_config"
-    images_config_matches = "${namespace}.images_config_matches"
     product_assembler = "${namespace}.product_assembler"
     image_assembler = "${namespace}.image_assembler"
     copy_vbmeta = "${namespace}.copy_vbmeta"
@@ -390,13 +351,7 @@ template("assembled_system") {
     assembly_generated_packages = "${namespace}.assembly_generated_packages"
     compare_command_logs = "${namespace}.compare_command_logs"
     compare_images_manifests = "${namespace}.compare_images_manifests"
-
-    # Prefer an explicit images config over a GN-generated one.
-    if (defined(invoker.assembly_images_config_label)) {
-      images_config = invoker.assembly_images_config_label
-    } else {
-      images_config = ":${gn_images_config}"
-    }
+    images_config = invoker.assembly_images_config_label
 
     # *_platform_aib_labels come from //bundles/assembly/platform_aibs.gni
     if (defined(invoker.use_bringup_platform_bundles_only) &&
@@ -433,15 +388,10 @@ template("assembled_system") {
 
     gn_images_config = "$target_out_dir/${namespace}.images_config.json"
 
-    # Prefer an explicit images config over a GN-generated one.
-    if (defined(invoker.assembly_images_config_label)) {
-      images_config =
-          get_label_info(invoker.assembly_images_config_label,
-                         "target_out_dir") + "/" +
-          get_label_info(invoker.assembly_images_config_label, "name") + ".json"
-    } else {
-      images_config = gn_images_config
-    }
+    images_config =
+        get_label_info(invoker.assembly_images_config_label, "target_out_dir") +
+        "/" + get_label_info(invoker.assembly_images_config_label, "name") +
+        ".json"
 
     outdir = "$target_out_dir/$namespace"
     gendir = "$outdir/gen"
@@ -486,18 +436,18 @@ template("assembled_system") {
     blobfs_manifest = "${gendir}/blob.manifest"
     blobs_json = "${gendir}/blobs.json"
     bootfs_packages = "${gendir}/data/bootfs_packages"
-    static_packages = "${gendir}/${base_package_name}/data/static_packages"
-    cache_packages = "${gendir}/${base_package_name}/data/cache_packages.json"
-    base_meta_package = "${gendir}/${base_package_name}/meta/package"
+    static_packages = "${gendir}/system_image/data/static_packages"
+    cache_packages = "${gendir}/system_image/data/cache_packages.json"
+    base_meta_package = "${gendir}/system_image/meta/package"
     base_pkg_abi_revision =
-        "${gendir}/${base_package_name}/meta/fuchsia.abi/abi-revision"
+        "${gendir}/system_image/meta/fuchsia.abi/abi-revision"
     assembly_manifest = "${outdir}/images.json"
     config_data_manifest = "${outdir}/config_data/package_manifest.json"
     image_command_log = "${gendir}/command_log.json"
 
     # Determine which ZBI we are shipping.
     zbi_final = zbi
-    if (defined(invoker.zbi_signing_script)) {
+    if (generate_signed_zbi) {
       zbi_final = zbi_signed
     }
 
@@ -605,143 +555,6 @@ template("assembled_system") {
   # Build the images using the Image Assembler.
   #
 
-  if (!_use_explicit_images_config_only) {
-    generated_images_config(labels.gn_images_config) {
-      forward_variables_from(invoker,
-                             [
-                               "testonly",
-                               "visibility",
-                             ])
-
-      output_path = files.gn_images_config
-      zbi = {
-        name = "${image_name}"
-        compression = zbi_compression
-        if (defined(invoker.zbi_signing_script)) {
-          signing_script = invoker.zbi_signing_script
-          if (defined(invoker.zbi_signing_args)) {
-            signing_args = invoker.zbi_signing_args
-          }
-        }
-      }
-      if (generate_vbmeta) {
-        vbmeta = {
-          key = avb_key
-          key_metadata = avb_atx_metadata
-          if (extra_vbmeta_descriptors != false) {
-            extra_descriptors = extra_vbmeta_descriptors
-          }
-        }
-      }
-      if (generate_fvm) {
-        _slice_size = 1048576
-        _blob_layout_format = "compact"
-        if (defined(invoker.assembly_fvm_slice_size)) {
-          _slice_size = invoker.assembly_fvm_slice_size
-        }
-        if (defined(invoker.assembly_blob_layout_format)) {
-          _blob_layout_format = invoker.assembly_blob_layout_format
-        }
-
-        fvm = {
-          # Parameters
-          slice_size = _slice_size
-          if (defined(invoker.fvm_truncate_to_length)) {
-            truncate_to_length = invoker.fvm_truncate_to_length
-          }
-          if (fvm_max_disk_size != false) {
-            max_disk_size = fvm_max_disk_size
-          }
-
-          # Filesystems
-          blobfs = {
-            layout = _blob_layout_format
-            if (defined(invoker.blobfs_minimum_inodes)) {
-              minimum_inodes = invoker.blobfs_minimum_inodes
-            }
-            if (defined(invoker.blobfs_minimum_data_bytes)) {
-              minimum_data_bytes = invoker.blobfs_minimum_data_bytes
-            }
-            if (defined(invoker.blobfs_maximum_bytes)) {
-              maximum_bytes = invoker.blobfs_maximum_bytes
-            }
-            if (defined(invoker.blobfs_maximum_contents_size)) {
-              maximum_contents_size = invoker.blobfs_maximum_contents_size
-            }
-          }
-          reserved = {
-            slices = fvm_reserved_slices
-          }
-
-          # Optional outputs (emmc and nand)
-          if (fvm_partition != "") {
-            if (fvm_emmc_partition_size != false) {
-              emmc = {
-                # EMMC fvms are by default compressed.
-                compress = fvm_fastboot_compression != "none"
-                truncate_to_length = fvm_emmc_partition_size
-              }
-            } else if (fvm_ftl_nand_block_count != false) {
-              nand = {
-                if (fvm_max_disk_size != false) {
-                  max_disk_size = fvm_max_disk_size
-                }
-
-                # NAND fvms are by default uncompressed.
-                compress = fvm_fastboot_compression != "default"
-                block_count = fvm_ftl_nand_block_count
-                oob_size = fvm_ftl_nand_oob_size
-                page_size = fvm_ftl_nand_page_size
-                pages_per_block = fvm_ftl_nand_pages_per_block
-              }
-            } else {
-              assert(
-                  false,
-                  "|fvm_partition| is specified. But failed to determine the target format.")
-            }
-          }
-        }
-      }
-      if (generate_fxfs) {
-        fxfs = {
-          if (defined(invoker.assembly_fxfs_image_size_bytes)) {
-            size_bytes = invoker.assembly_fxfs_image_size_bytes
-          }
-        }
-      }
-    }
-
-    if (defined(invoker.assembly_images_config_label)) {
-      verify_files_match(labels.images_config_matches) {
-        forward_variables_from(invoker,
-                               [
-                                 "testonly",
-                                 "visibility",
-                               ])
-        deps = [
-          ":${labels.gn_images_config}",
-          labels.images_config,
-        ]
-        first = files.gn_images_config
-        second = files.images_config
-        display_text_diff_on_failure = true
-      }
-    }
-  } else {
-    not_needed(invoker,
-               [
-                 "zbi_signing_args",
-                 "assembly_blob_layout_format",
-                 "blobfs_minimum_inodes",
-                 "blobfs_minimum_data_bytes",
-                 "blobfs_maximum_bytes",
-                 "blobfs_maximum_contents_size",
-                 "assembly_fvm_slice_size",
-                 "fvm_truncate_to_length",
-                 "assembly_fxfs_image_size_bytes",
-               ])
-  }
-
   if (defined(_must_exist)) {
     legacy_assembly_input_bundle(labels.validation_legacy_aib) {
       forward_variables_from(invoker,
@@ -768,7 +581,6 @@ template("assembled_system") {
       bundle_name = "must_exist"
 
       bundles_dir = files.outdir
-      include_config_data = true
       create_package = false
       create_package_archive = false
     }
@@ -966,8 +778,6 @@ template("assembled_system") {
       rebase_path(files.regenerated_image_assembly_config, root_build_dir),
       "--images",
       rebase_path(files.images_config, root_build_dir),
-      "--base-package-name",
-      "$base_package_name",
       "--gendir",
       rebase_path(files.gendir, root_build_dir),
       "--outdir",
@@ -1030,7 +840,7 @@ template("assembled_system") {
       files.assembly_manifest,
     ]
 
-    if (defined(invoker.zbi_signing_script)) {
+    if (generate_signed_zbi) {
       outputs += [ files.zbi_signed ]
     }
 
@@ -1314,7 +1124,7 @@ template("assembled_system") {
       deps = [ ":${labels.image_assembler}" ]
     }
 
-    if (defined(invoker.zbi_signing_script)) {
+    if (generate_signed_zbi) {
       copy(labels.copy_zbi_signed) {
         forward_variables_from(invoker,
                                [
@@ -1350,7 +1160,7 @@ template("assembled_system") {
         ":${labels.copy_zbi_manifest}",
         ":${labels.copy_zbi}",
       ]
-      if (defined(invoker.zbi_signing_script)) {
+      if (generate_signed_zbi) {
         public_deps += [ ":${labels.copy_zbi_signed}" ]
       }
       if (generate_vbmeta) {
@@ -1397,10 +1207,6 @@ template("assembled_system") {
     ]
     if (defined(invoker.output_dir)) {
       public_deps += [ ":${labels.copy_images}" ]
-    }
-    if (defined(invoker.assembly_images_config_label) &&
-        !_use_explicit_images_config_only) {
-      public_deps += [ ":${labels.images_config_matches}" ]
     }
     if (defined(_must_exist)) {
       public_deps += [ ":${labels.validation_legacy_aib}" ]

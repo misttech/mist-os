@@ -46,14 +46,6 @@ if (is_fuchsia) {
     image_name = "fuchsia"
     generate_fvm = !bootfs_only && !fxfs_blob
     generate_fxfs = !bootfs_only && fxfs_blob
-
-    if (generate_fvm) {
-      assembly_fvm_slice_size = fvm_slice_size
-      if (max_blob_contents_size != false) {
-        blobfs_maximum_contents_size = max_blob_contents_size
-      }
-    }
-
     ramdisk_in_zbi = true
 
     assembly_images_config_label = images_config_label
@@ -72,14 +64,11 @@ if (is_fuchsia) {
         [ "//src/sys/component_manager:component_manager_bootfs_config" ]
 
     if (custom_signing_script != "") {
-      zbi_signing_script = custom_signing_script
-      zbi_signing_script_deps = [ "//build/images/custom_signing:deps" ]
       inputs = custom_signing_script_inputs
+      generate_signed_zbi = true
     } else if (use_vboot) {
-      zbi_signing_script = vboot_action.script
-      zbi_signing_args = vboot_action.args
-      zbi_signing_script_deps = vboot_action.deps
       inputs = vboot_action.inputs
+      generate_signed_zbi = true
     }
   }
 
@@ -348,14 +337,6 @@ if (is_fuchsia) {
     core_realm_definition = ":core"
     generate_fvm = !bootfs_only && !fxfs_blob
     generate_fxfs = !bootfs_only && fxfs_blob
-
-    if (generate_fvm) {
-      assembly_fvm_slice_size = fvm_slice_size
-      if (max_blob_contents_size != false) {
-        blobfs_maximum_contents_size = max_blob_contents_size
-      }
-    }
-
     ramdisk_in_zbi = true
 
     include_component_id_index = true
@@ -376,14 +357,11 @@ if (is_fuchsia) {
         [ "//src/sys/component_manager:component_manager_bootfs_config" ]
 
     if (custom_signing_script != "") {
-      zbi_signing_script = custom_signing_script
-      zbi_signing_script_deps = [ "//build/images/custom_signing:deps" ]
       inputs = custom_signing_script_inputs
+      generate_signed_zbi = true
     } else if (use_vboot) {
-      zbi_signing_script = vboot_action.script
-      zbi_signing_args = vboot_action.args
-      zbi_signing_script_deps = vboot_action.deps
       inputs = vboot_action.inputs
+      generate_signed_zbi = true
     }
   }
 

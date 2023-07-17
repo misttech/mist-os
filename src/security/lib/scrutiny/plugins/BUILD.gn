@@ -69,7 +69,6 @@ if (is_fuchsia) {
     ]
 
     assembly_images_config_label = ":images_config"
-    use_explicit_images_config_only = true
     product_assembly_config_label = ":assembly_config"
   }
 

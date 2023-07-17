@@ -78,7 +78,6 @@ template("_cuckoo_kernel_zbi_test") {
     fshost_config = board_fshost_config
     core_realm_definition = "//build/testing:cuckoo-core-realm"
     assembly_images_config_label = images_config_label
-    use_explicit_images_config_only = true
     product_assembly_config_label =
         "//build/testing:cuckoo-product-configuration"
     allow_eng_platform_bundle_use = true
