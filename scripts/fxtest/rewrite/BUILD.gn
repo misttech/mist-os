@@ -4,27 +4,64 @@
 
 import("//build/host.gni")
 import("//build/python/python_binary.gni")
+import("//build/python/python_host_test.gni")
 import("//build/python/python_library.gni")
 
 group("tests") {
   testonly = true
 
   deps = [
+    ":selection_test($host_toolchain)",
+    ":test_list_file_test($host_toolchain)",
+    ":tests_json_file_test($host_toolchain)",
     "dataparse:tests",
     "util:tests",
   ]
 }
 
 if (is_host) {
+  binary_sources = [
+    "selection.py",
+    "test_list_file.py",
+    "tests_json_file.py",
+  ]
+
+  binary_deps = [
+    "dataparse",
+    "util",
+    "//third_party/jellyfish",
+  ]
+
   # Main executable target.
   python_binary("fxtest-rewrite") {
     main_source = "main.py"
     output_name = "fxtest_rewrite.pyz"
-    sources = []
-    deps = [
-      "dataparse",
-      "util",
-    ]
+    sources = binary_sources
+    deps = binary_deps
+  }
+
+  python_host_test("selection_test") {
+    main_source = "tests/selection_test.py"
+    main_callable = "unittest.main"
+    extra_args = [ "-v" ]
+    sources = binary_sources
+    libraries = binary_deps
+  }
+
+  python_host_test("test_list_file_test") {
+    main_source = "tests/test_list_file_test.py"
+    main_callable = "unittest.main"
+    extra_args = [ "-v" ]
+    sources = binary_sources
+    libraries = binary_deps
+  }
+
+  python_host_test("tests_json_file_test") {
+    main_source = "tests/tests_json_file_test.py"
+    main_callable = "unittest.main"
+    extra_args = [ "-v" ]
+    sources = binary_sources
+    libraries = binary_deps
   }
 
   # Rename the resulting .pyz for the host tool
