@@ -157,6 +157,7 @@ shared_library("ld-startup") {
   sources = []
   deps = [
     ":bootstrap",
+    ":diagnostics",
     ":standalone",
     "//src/lib/elfldltl",
   ]
@@ -176,6 +177,9 @@ shared_library("ld-startup") {
       ":posix-header",
       "//zircon/kernel/lib/arch:headers",
     ]
+    if (is_linux) {
+      deps += [ ":linux-syscalls" ]
+    }
   }
 
   if (!is_gcc) {
@@ -208,6 +212,19 @@ shared_library("ld-startup") {
       ld_startup_test_switches = [ "'-DLD_STARTUP_TEST_LIB=\"$test_libname\"'" ]
     }
   }
+}
+
+source_set("diagnostics") {
+  visibility = [ ":*" ]
+  public = [ "diagnostics.h" ]
+  public_deps = [ "//src/lib/elfldltl" ]
+  sources = [ "diagnostics.cc" ]
+}
+
+source_set("linux-syscalls") {
+  visibility = [ ":*" ]
+  sources = [ "linux-syscalls.cc" ]
+  include_dirs = [ "//third_party/linux-syscall-support/src" ]
 }
 
 user_basic_redirect("ld-startup.basic") {

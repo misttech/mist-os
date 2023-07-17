@@ -215,6 +215,8 @@ class Diagnostics {
 
   constexpr Flags& flags() { return flags_; }
 
+  constexpr Report& report() { return report_; }
+
   constexpr unsigned int errors() const { return errors_; }
 
   constexpr unsigned int warnings() const { return warnings_; }

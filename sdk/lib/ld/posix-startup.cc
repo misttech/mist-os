@@ -2,17 +2,20 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include <lib/elfldltl/diagnostics.h>
 #include <lib/elfldltl/memory.h>
 #include <lib/elfldltl/note.h>
 #include <lib/elfldltl/phdr.h>
 #include <lib/elfldltl/symbol.h>
 #include <lib/ld/module.h>
+#include <sys/uio.h>
+#include <unistd.h>
 
+#include <array>
 #include <cassert>
 #include <cstring>
 
 #include "bootstrap.h"
+#include "diagnostics.h"
 #include "posix.h"
 
 namespace ld {
@@ -63,14 +66,14 @@ extern "C" uintptr_t StartLd(StartupStack& stack) {
   std::ignore = phdr;
   std::ignore = phnum;
 
-  // First thing, bootstrap our own dynamic linking against ourselves and
-  // the vDSO.  For this, nothing should go wrong so use a diagnostics
-  // object that crashes the process at the first error.
-  //
-  // TODO(mcgrathr): for now, just trap silently. when we wire up a report
-  // function using syscalls, this can just use that with panic flags so it
-  // writes messages.
-  auto bootstrap_diag = elfldltl::TrapDiagnostics();
+  // First thing, bootstrap our own dynamic linking against ourselves and the
+  // vDSO.  For this, nothing should go wrong so use a diagnostics object that
+  // crashes the process at the first error.  But we can still use direct
+  // system calls to write error messages.
+  auto bootstrap_diag = elfldltl::Diagnostics{
+      MakeDiagnosticsReport(startup),
+      elfldltl::DiagnosticsPanicFlags{},
+  };
 
   abi::Abi<>::Module vdso_module;
   if (vdso) {
@@ -81,7 +84,23 @@ extern "C" uintptr_t StartLd(StartupStack& stack) {
   auto self_module = BootstrapSelfModule(bootstrap_diag, vdso_module);
   CompleteBootstrapModule(self_module, startup.page_size);
 
+  // Now that things are bootstrapped, set up the main diagnostics object.
+  auto diag = MakeDiagnostics(startup);
+
+  // Bail out before handoff if any errors have been detected.
+  CheckErrors(diag);
+
+  diag.report()("Hello world!");
+
   return static_cast<int>(strlen(startup.argv[0]));
+}
+
+void ReportError(StartupData& startup, std::string_view str) {
+  const std::array iov = {
+      iovec{const_cast<char*>(str.data()), str.size()},
+      iovec{const_cast<char*>("\n"), 1},
+  };
+  writev(STDERR_FILENO, iov.data(), iov.size());
 }
 
 }  // namespace ld

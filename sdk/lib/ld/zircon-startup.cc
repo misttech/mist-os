@@ -2,18 +2,23 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include <lib/elfldltl/diagnostics.h>
 #include <lib/zx/channel.h>
 #include <zircon/assert.h>
 #include <zircon/syscalls.h>
 
 #include "bootstrap.h"
+#include "diagnostics.h"
 
 namespace ld {
 
 // TODO(fxbug.dev/130483): _start should normally be `[[noreturn]] void` though for the timebeing
 // it returns an int for easy testing.
 extern "C" int _start(zx_handle_t handle, void* vdso) {
+  // First thing, bootstrap our own dynamic linking against ourselves and the
+  // vDSO.  For this, nothing should go wrong so use a diagnostics object that
+  // crashes the process at the first error.  Before linking against the vDSO
+  // is completed successfully, there's no way to make a system call to get an
+  // error out anyway.
   auto diag = elfldltl::TrapDiagnostics();
   auto vdso_module = BootstrapVdsoModule(diag, vdso);
   auto self_module = BootstrapSelfModule(diag, vdso_module);
