@@ -308,6 +308,16 @@ std::vector<Breakpoint*> System::GetBreakpoints() const {
   return result;
 }
 
+std::vector<Breakpoint*> System::GetInternalBreakpoints() const {
+  std::vector<Breakpoint*> result;
+  result.reserve(breakpoints_.size());
+  for (const auto& pair : breakpoints_) {
+    if (pair.second->is_internal())
+      result.push_back(pair.second.get());
+  }
+  return result;
+}
+
 std::vector<Filter*> System::GetFilters() const {
   std::vector<Filter*> result;
   result.reserve(filters_.size());

@@ -43,6 +43,7 @@ constexpr int kForceTypes = 1;
 constexpr int kVerboseSwitch = 2;
 constexpr int kRawOutput = 3;
 constexpr int kForceRefresh = 4;
+constexpr int kInternalSwitch = 5;
 
 // Sets formatting options commonly used for outputting stack frames for the "frame" noun.
 FormatStackOptions GetFormatStackOptions(const Command& cmd, ConsoleContext* console_context) {
@@ -466,6 +467,11 @@ const char kBreakpointHelp[] =
 
 Options
 
+  --internal
+      Lists the internal breakpoints. These are breakpoints set by the debugger
+      for executing step operations. You can not modify these, this is primarily
+      for debugging the debugger.
+
   -v
   --verbose
       When listing breakpoints, show information on each address that the
@@ -614,6 +620,37 @@ void ListBreakpoints(ConsoleContext* console_context, fxl::RefPtr<CommandContext
   cmd_context->Output(out);
 }
 
+void ListInternalBreakpoints(ConsoleContext* console_context,
+                             fxl::RefPtr<CommandContext>& cmd_context) {
+  std::vector<Breakpoint*> breakpoints =
+      console_context->session()->system().GetInternalBreakpoints();
+  if (breakpoints.empty()) {
+    cmd_context->Output("No internal breakpoints.\n");
+    return;
+  }
+
+  OutputBuffer out;
+
+  for (const Breakpoint* bp : breakpoints) {
+    BreakpointSettings settings = bp->GetSettings();
+    out.Append(FormatInputLocations(settings.locations));
+    out.Append("\n");
+
+    auto matched_locs = bp->GetLocations();
+    for (const auto& loc : matched_locs) {
+      Process* process = loc->GetProcess();
+
+      FormatLocationOptions opts(process->GetTarget());
+      opts.always_show_addresses = true;
+
+      out.Append(" " + GetBullet() + " ");
+      out.Append(FormatLocation(loc->GetLocation(), opts));
+      out.Append("\n");
+    }
+  }
+  cmd_context->Output(out);
+}
+
 // Returns true if breakpoint was specified (and therefore nothing else should be called. If
 // breakpoint is specified but there was an error, *err will be set.
 bool HandleBreakpointNoun(ConsoleContext* console_context, const Command& cmd,
@@ -631,8 +668,12 @@ bool HandleBreakpointNoun(ConsoleContext* console_context, const Command& cmd,
   if (cmd.GetNounIndex(Noun::kBreakpoint) == Command::kNoIndex) {
     // Just "breakpoint", this lists available breakpoints. The verbose switch expands each
     // individual breakpoint location.
-    bool include_locations = cmd.HasSwitch(kVerboseSwitch);
-    ListBreakpoints(console_context, cmd_context, include_locations);
+    if (cmd.HasSwitch(kInternalSwitch)) {
+      ListInternalBreakpoints(console_context, cmd_context);
+    } else {
+      bool include_locations = cmd.HasSwitch(kVerboseSwitch);
+      ListBreakpoints(console_context, cmd_context, include_locations);
+    }
     return true;
   } else if (cmd.GetNounIndex(Noun::kBreakpoint) == Command::kWildcard) {
     // "breakpoint *" doesn't make sense without a verb, which will end up calling the verb
@@ -881,6 +922,7 @@ const std::vector<SwitchRecord>& GetNounSwitches() {
     switches.emplace_back(kForceTypes, false, "types", 't');
     switches.emplace_back(kVerboseSwitch, false, "verbose", 'v');
     switches.emplace_back(kForceRefresh, false, "force", 'f');
+    switches.emplace_back(kInternalSwitch, false, "internal");
   }
   return switches;
 }

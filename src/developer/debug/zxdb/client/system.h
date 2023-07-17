@@ -68,9 +68,10 @@ class System : public ClientObject, public SettingStoreObserver {
   // default Target, which is not initially attached to anything.
   std::vector<Target*> GetTargets() const;
 
-  // Returns all non-internal breakpoints currently in this System instance. The returned pointers
+  // Returns all [non-]internal breakpoints currently in this System instance. The returned pointers
   // are managed by the System object and should not be cached once you return to the message loop.
   std::vector<Breakpoint*> GetBreakpoints() const;
+  std::vector<Breakpoint*> GetInternalBreakpoints() const;
 
   // Returns all filters currently in this System instance. The returned pointers are managed by the
   // System object and should not be cached once you return to the message loop.
