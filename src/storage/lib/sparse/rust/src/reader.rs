@@ -133,7 +133,6 @@ impl Read for SparseReader {
 
 impl Seek for SparseReader {
     fn seek(&mut self, pos: SeekFrom) -> std::io::Result<u64> {
-        let old_offset = self.offset;
         self.offset = match pos {
             SeekFrom::Start(pos) => pos,
             SeekFrom::Current(delta) => self
@@ -145,7 +144,7 @@ impl Seek for SparseReader {
                 .checked_add_signed(delta)
                 .ok_or(std::io::Error::from(std::io::ErrorKind::InvalidInput))?,
         };
-        Ok(old_offset)
+        Ok(self.offset)
     }
 }
 
@@ -175,6 +174,61 @@ mod test {
         let mut unsparsed_bytes = vec![];
         reader.read_to_end(&mut unsparsed_bytes).expect("Failed to read unsparsed image");
         assert_eq!(unsparsed_bytes.len(), 0);
+    }
+
+    #[test]
+    fn seek() {
+        let tmpdir = TempDir::new().unwrap();
+
+        let data = {
+            let mut data = Box::new([0u8; 8192]);
+            let mut i: u8 = 0;
+            for d in data.as_mut() {
+                *d = i;
+                i = i.wrapping_add(1);
+            }
+            data
+        };
+
+        let mut sparse_file = NamedTempFile::new_in(&tmpdir).unwrap().into_file();
+        SparseImageBuilder::new()
+            .add_chunk(DataSource::Buffer(data))
+            .build(&mut sparse_file)
+            .expect("Build sparse image failed");
+        sparse_file.seek(SeekFrom::Start(0)).unwrap();
+        let mut reader =
+            SparseReader::new(Box::new(sparse_file)).expect("Failed to create SparseReader");
+
+        let mut buf = [0u8; 1];
+        assert_eq!(0, reader.seek(SeekFrom::Start(0)).unwrap());
+        assert_eq!(1, reader.read(&mut buf).unwrap());
+        assert_eq!(buf[0], 0u8);
+
+        assert_eq!(100, reader.seek(SeekFrom::Start(100)).unwrap());
+        assert_eq!(1, reader.read(&mut buf).unwrap());
+        assert_eq!(buf[0], 100u8);
+
+        assert_eq!(99, reader.seek(SeekFrom::Current(-2)).unwrap());
+        assert_eq!(1, reader.read(&mut buf).unwrap());
+        assert_eq!(buf[0], 99u8);
+
+        assert_eq!(100, reader.seek(SeekFrom::Current(0)).unwrap());
+        assert_eq!(1, reader.read(&mut buf).unwrap());
+        assert_eq!(buf[0], 100u8);
+
+        assert_eq!(102, reader.seek(SeekFrom::Current(1)).unwrap());
+        assert_eq!(1, reader.read(&mut buf).unwrap());
+        assert_eq!(buf[0], 102u8);
+
+        assert_eq!(8191, reader.seek(SeekFrom::End(-1)).unwrap());
+        assert_eq!(1, reader.read(&mut buf).unwrap());
+        assert_eq!(buf[0], 255u8);
+
+        assert_eq!(8192, reader.seek(SeekFrom::End(0)).unwrap());
+        assert_eq!(0, reader.read(&mut buf).unwrap());
+
+        assert_eq!(8193, reader.seek(SeekFrom::End(1)).unwrap());
+        assert_eq!(0, reader.read(&mut buf).unwrap());
     }
 
     #[test]
