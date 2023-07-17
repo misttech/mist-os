@@ -56,7 +56,11 @@ class SpinelFidlInterface {
    * Used for process a spinel frame event
    *
    */
+#ifdef OPENTHREAD_USE_OLD_SETTING_API
   void Process(const otRadioSpinelContext& aContext);
+#else
+  void Process(const void* aContext);
+#endif
 
   /**
    * This method is called when RCP failure detected and resets internal states of the interface.

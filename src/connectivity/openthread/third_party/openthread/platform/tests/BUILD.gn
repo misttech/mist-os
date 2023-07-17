@@ -51,7 +51,7 @@ executable("unittests-bin") {
   # This allows for compilation work both before and after update
   # of third_party/openthread
   if (openthread_upstream_version ==
-      "74f5ab5c9f434c4ffe44c580be40b7ff14e7f0e9") {
+      "323ffd894ba9dfa6362ed0fa5d8eb9a4f9167d01") {
     defines = [ "OPENTHREAD_USE_OLD_SETTING_API=1" ]
   }
 

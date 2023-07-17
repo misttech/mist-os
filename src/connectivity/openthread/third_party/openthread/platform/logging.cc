@@ -31,7 +31,11 @@
 #include <openthread/platform/logging.h>
 #include <openthread/platform/toolchain.h>
 
-void otPlatLog(otLogLevel log_level, otLogRegion log_region, const char *format, ...) {
+#ifndef OPENTHREAD_USE_OLD_SETTING_API
+extern "C" void otPlatLogLine(otLogLevel log_level, otLogRegion log_region, const char* line);
+#endif
+
+void otPlatLog(otLogLevel log_level, otLogRegion log_region, const char* format, ...) {
   OT_UNUSED_VARIABLE(log_region);
 
   va_list args;

@@ -25,6 +25,7 @@ extern "C" void platformCallbackPostNcpFidlInboundTask(otInstance* a_instance) {
 extern "C" void platformCallbackPostDelayedAlarmTask(otInstance* a_instance, zx_duration_t delay) {}
 extern "C" void otPlatReset(otInstance* a_instance) {}
 
+#ifdef OPENTHREAD_USE_OLD_SETTING_API
 extern "C" void otPlatLogLine(otLogLevel log_level, otLogRegion log_region, const char* line) {
   // Print the string to appropriate FX_LOG
   switch (log_level) {
@@ -51,6 +52,7 @@ extern "C" void otPlatLogLine(otLogLevel log_level, otLogRegion log_region, cons
       break;
   }
 }
+#endif
 
 extern "C" otError otPlatUdpSocket(otUdpSocket* aUdpSocket) { return OT_ERROR_NONE; }
 extern "C" otError otPlatUdpClose(otUdpSocket* aUdpSocket) { return OT_ERROR_NONE; }

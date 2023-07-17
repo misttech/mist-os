@@ -66,7 +66,11 @@ otError SpinelFidlInterface::WaitForFrame(uint64_t aTimeoutUs) {
   return ret_val;
 }
 
+#ifdef OPENTHREAD_USE_OLD_SETTING_API
 void SpinelFidlInterface::Process(const otRadioSpinelContext &aContext) {
+#else
+void SpinelFidlInterface::Process(const void *aContext) {
+#endif
   OT_UNUSED_VARIABLE(aContext);
   uint8_t buffer[SPINEL_FRAME_MAX_SIZE];
   for (;;) {
