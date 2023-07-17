@@ -15,7 +15,7 @@ use crate::{
 
 use std::sync::Arc;
 
-pub fn create_magma_device(
+fn create_magma_device(
     current_task: &CurrentTask,
     id: DeviceType,
     node: &FsNode,
@@ -25,21 +25,19 @@ pub fn create_magma_device(
 }
 
 pub fn magma_device_init(kernel: &Arc<Kernel>) {
-    let magma_type = DeviceType::new(STARNIX_MAJOR, STARNIX_MINOR_MAGMA);
-
     let starnix_class = kernel.device_registry.virtual_bus().get_or_create_child(
         b"starnix",
         KType::Class,
         SysFsDirectory::new,
     );
 
+    let magma_type: DeviceType = kernel
+        .device_registry
+        .register_dyn_chrdev(create_magma_device)
+        .expect("magma device register failed.");
+
     kernel.add_chr_device(
         starnix_class,
         KObjectDeviceAttribute::new(b"magma0", b"magma0", magma_type, DeviceMode::Char),
     );
-
-    kernel
-        .device_registry
-        .register_chrdev(STARNIX_MAJOR, STARNIX_MINOR_MAGMA, 1, create_magma_device)
-        .expect("starnix device register failed.");
 }
