@@ -24,8 +24,15 @@ class MagmaSystemConnection : private MagmaSystemContext::Owner,
                               public msd::PrimaryFidlServer::Delegate,
                               msd::NotificationHandler {
  public:
-  MagmaSystemConnection(std::weak_ptr<MagmaSystemDevice> device,
-                        std::unique_ptr<msd::Connection> msd_connection_t);
+  class Owner {
+   public:
+    virtual msd::Driver* driver() = 0;
+    virtual uint64_t perf_count_access_token_id() const = 0;
+    virtual uint32_t GetDeviceId() = 0;
+  };
+
+  // `owner` must outlive the MagmaSystemConnection.
+  MagmaSystemConnection(Owner* owner, std::unique_ptr<msd::Connection> msd_connection_t);
 
   ~MagmaSystemConnection() override;
 
@@ -117,7 +124,9 @@ class MagmaSystemConnection : private MagmaSystemContext::Owner,
   // the connection thread.
   msd::PerfCountPool* LookupPerfCountPool(uint64_t id);
 
-  std::weak_ptr<MagmaSystemDevice> device_;
+  // The owner (MagmaSystemDevice) will call Shutdown() and join the connection thread before
+  // exiting.
+  Owner* owner_;
   std::unique_ptr<msd::Connection> msd_connection_;
   std::unordered_map<uint32_t, std::unique_ptr<MagmaSystemContext>> context_map_;
   std::unordered_map<uint64_t, BufferReference> buffer_map_;

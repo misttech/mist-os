@@ -92,7 +92,7 @@ void PrimaryFidlServer::SetError(fidl::CompleterBase* completer, magma_status_t 
   }
 }
 
-bool PrimaryFidlServer::Bind(fidl::ServerEnd<fuchsia_gpu_magma::Primary> primary) {
+void PrimaryFidlServer::Bind() {
   fidl::OnUnboundFn<PrimaryFidlServer> unbind_callback =
       [](PrimaryFidlServer* self, fidl::UnbindInfo unbind_info,
          fidl::ServerEnd<fuchsia_gpu_magma::Primary> server_channel) {
@@ -107,25 +107,11 @@ bool PrimaryFidlServer::Bind(fidl::ServerEnd<fuchsia_gpu_magma::Primary> primary
       };
 
   // Note: the async loop should not be started until we assign |server_binding_|.
-  server_binding_ = fidl::BindServer(async_loop()->dispatcher(), std::move(primary), this,
+  server_binding_ = fidl::BindServer(async_loop()->dispatcher(), std::move(primary_), this,
                                      std::move(unbind_callback));
-  return true;
-}
-
-void PrimaryFidlServer::Shutdown() {
-  async::PostTask(async_loop()->dispatcher(), [this]() {
-    if (server_binding_) {
-      server_binding_->Close(ZX_ERR_CANCELED);
-    }
+  if (!server_binding_) {
     async_loop()->Quit();
-  });
-}
-
-bool PrimaryFidlServer::HandleRequest() {
-  zx_status_t status = async_loop_.Run(zx::time::infinite(), true /* once */);
-  if (status != ZX_OK)
-    return false;
-  return true;
+  }
 }
 
 void PrimaryFidlServer::NotificationChannelSend(cpp20::span<uint8_t> data) {
@@ -135,7 +121,7 @@ void PrimaryFidlServer::NotificationChannelSend(cpp20::span<uint8_t> data) {
     MAGMA_DLOG("Failed writing to channel: %s", zx_status_get_string(status));
 }
 void PrimaryFidlServer::ContextKilled() {
-  async::PostTask(async_loop_.dispatcher(),
+  async::PostTask(async_loop()->dispatcher(),
                   [this]() { SetError(nullptr, MAGMA_STATUS_CONTEXT_KILLED); });
 }
 
@@ -521,20 +507,84 @@ void PrimaryFidlServer::ClearPerformanceCounters(
 }
 
 // static
-std::shared_ptr<PrimaryFidlServer> PrimaryFidlServer::Create(
+std::unique_ptr<PrimaryFidlServer> PrimaryFidlServer::Create(
     std::unique_ptr<Delegate> delegate, msd_client_id_t client_id,
     fidl::ServerEnd<fuchsia_gpu_magma::Primary> primary,
     fidl::ServerEnd<fuchsia_gpu_magma::Notification> notification) {
   if (!delegate)
     return MAGMA_DRETP(nullptr, "attempting to create PlatformConnection with null delegate");
 
-  auto connection =
-      std::make_shared<PrimaryFidlServer>(std::move(delegate), client_id, std::move(notification));
-
-  if (!connection->Bind(std::move(primary)))
-    return MAGMA_DRETP(nullptr, "Bind failed");
+  auto connection = std::make_unique<PrimaryFidlServer>(
+      std::move(delegate), client_id, std::move(primary), std::move(notification));
 
   return connection;
+}
+
+void PrimaryFidlServerHolder::Start(std::unique_ptr<PrimaryFidlServer> server,
+                                    ConnectionOwnerDelegate* owner_delegate,
+                                    fit::function<void(const char*)> set_thread_priority) {
+  server_ = std::move(server);
+  loop_thread_ = std::thread([holder = shared_from_this(), owner_delegate,
+                              set_thread_priority = std::move(set_thread_priority)]() mutable {
+    holder->RunLoop(owner_delegate, std::move(set_thread_priority));
+  });
+}
+
+void PrimaryFidlServerHolder::Shutdown() {
+  {
+    std::lock_guard lock(server_lock_);
+    if (server_) {
+      async::PostTask(server_->async_loop_.dispatcher(), [this]() {
+        if (server_->server_binding_) {
+          server_->server_binding_->Close(ZX_ERR_CANCELED);
+        }
+        server_->async_loop_.Quit();
+      });
+    }
+  }
+  loop_thread_.join();
+}
+
+void PrimaryFidlServerHolder::RunLoop(ConnectionOwnerDelegate* owner_delegate,
+                                      fit::function<void(const char*)> set_thread_priority) {
+  pthread_setname_np(pthread_self(),
+                     ("ConnectionThread " + std::to_string(server_->client_id_)).c_str());
+  server_->Bind();
+
+  // Apply the thread role before entering the handler loop.
+  set_thread_priority("fuchsia.graphics.magma.connection");
+
+  while (HandleRequest()) {
+    server_->request_count_ += 1;
+  }
+
+  // Loop has been quit at this point.
+  server_->delegate_->SetNotificationCallback(nullptr);
+  server_->async_loop_.Shutdown();
+
+  {
+    std::lock_guard lock(server_lock_);
+    // the runloop terminates when the remote closes, or an error is experienced
+    // so this is the appropriate time to let the server go out of scope and be destroyed
+    MAGMA_DASSERT(server_.use_count() == 1);
+    server_.reset();
+  }
+
+  if (owner_delegate) {
+    // Must be called after the server_ is destructed, to ensure calls to Shutdown only return after
+    // server_ is destructed.
+    bool need_detach = false;
+    owner_delegate->ConnectionClosed(shared_from_this(), &need_detach);
+    if (need_detach)
+      loop_thread_.detach();
+  }
+}
+
+bool PrimaryFidlServerHolder::HandleRequest() {
+  zx_status_t status = server_->async_loop_.Run(zx::time::infinite(), true /* once */);
+  if (status != ZX_OK)
+    return false;
+  return true;
 }
 
 }  // namespace msd

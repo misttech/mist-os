@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#include <lib/sync/cpp/completion.h>
 #include <poll.h>
 
 #include <chrono>
@@ -54,7 +55,10 @@ class FlowControlChecker {
 
   void Init(std::mutex& mutex) {
     std::unique_lock<std::mutex> lock(mutex);
-    std::tie(messages_consumed_start_, bytes_imported_start_) = connection_->GetFlowControlCounts();
+    auto locked_connection = connection_.lock();
+    ASSERT_TRUE(locked_connection);
+    std::tie(messages_consumed_start_, bytes_imported_start_) =
+        locked_connection->GetFlowControlCounts();
     std::tie(messages_inflight_start_, bytes_inflight_start_) =
         client_connection_->GetFlowControlCounts();
   }
@@ -66,7 +70,10 @@ class FlowControlChecker {
 
   void Check(uint64_t messages, uint64_t bytes, std::mutex& mutex) {
     std::unique_lock<std::mutex> lock(mutex);
-    auto [messages_consumed, bytes_imported] = connection_->GetFlowControlCounts();
+
+    auto locked_connection = connection_.lock();
+    ASSERT_TRUE(locked_connection);
+    auto [messages_consumed, bytes_imported] = locked_connection->GetFlowControlCounts();
     EXPECT_EQ(messages_consumed_start_ + messages, messages_consumed);
     EXPECT_EQ(bytes_imported_start_ + bytes, bytes_imported);
 
@@ -81,7 +88,7 @@ class FlowControlChecker {
     Release();
   }
 
-  std::shared_ptr<msd::PrimaryFidlServer> connection_;
+  std::weak_ptr<msd::PrimaryFidlServer> connection_;
   std::shared_ptr<magma::PlatformConnectionClient> client_connection_;
   bool flow_control_checked_ = false;
   bool flow_control_skipped_ = false;
@@ -118,6 +125,7 @@ struct SharedData {
   // Flow control defaults should avoid tests hitting flow control
   uint64_t max_inflight_messages = 1000u;
   uint64_t max_inflight_bytes = 1000000u;
+  libsync::Completion notification_handler_initialization_complete;
 };
 
 // Most tests here execute the client commands in the test thread context,
@@ -128,20 +136,19 @@ class TestPlatformConnection {
       std::shared_ptr<SharedData> shared_data = std::make_shared<SharedData>());
 
   TestPlatformConnection(std::shared_ptr<magma::PlatformConnectionClient> client_connection,
-                         std::thread ipc_thread, std::shared_ptr<msd::PrimaryFidlServer> connection,
+                         std::shared_ptr<msd::PrimaryFidlServerHolder> server_holder,
                          std::shared_ptr<SharedData> shared_data)
       : client_connection_(client_connection),
-        ipc_thread_(std::move(ipc_thread)),
-        connection_(connection),
-        flow_control_checker_(connection, client_connection),
+        server_holder_(std::move(server_holder)),
+        flow_control_checker_(server_holder_->server_for_test(), client_connection),
         shared_data_(shared_data) {}
 
   ~TestPlatformConnection() {
     flow_control_checker_.Release();
     client_connection_.reset();
-    connection_.reset();
-    if (ipc_thread_.joinable())
-      ipc_thread_.join();
+    if (server_holder_) {
+      server_holder_->Shutdown();
+    }
 
     EXPECT_TRUE(shared_data_->test_complete);
   }
@@ -313,6 +320,7 @@ class TestPlatformConnection {
 
     // Notification requests will be sent when the:PrimaryFidlServer is created, before this test is
     // called.
+    shared_data_->notification_handler_initialization_complete.Wait();
 
     {
       uint8_t buffer_too_small;
@@ -347,9 +355,8 @@ class TestPlatformConnection {
     EXPECT_EQ(0u, out_data_size);
 
     // Shutdown other end of pipe.
-    connection_->Shutdown();
-    connection_.reset();
-    ipc_thread_.join();
+    server_holder_->Shutdown();
+    server_holder_.reset();
     EXPECT_TRUE(shared_data_->got_null_notification);
 
     status = client_connection_->ReadNotificationChannel(&out_data, sizeof(out_data),
@@ -475,13 +482,8 @@ class TestPlatformConnection {
   }
 
  private:
-  static void IpcThreadFunc(std::shared_ptr<msd::PrimaryFidlServer> connection) {
-    msd::PrimaryFidlServer::RunLoop(std::move(connection), [](const char* role_profile) {});
-  }
-
   std::shared_ptr<magma::PlatformConnectionClient> client_connection_;
-  std::thread ipc_thread_;
-  std::shared_ptr<msd::PrimaryFidlServer> connection_;
+  std::shared_ptr<msd::PrimaryFidlServerHolder> server_holder_;
   msd::FlowControlChecker flow_control_checker_;
   std::shared_ptr<SharedData> shared_data_;
 };
@@ -594,6 +596,8 @@ class TestDelegate : public msd::PrimaryFidlServer::Delegate {
     if (shared_data_->notification_handler) {
       shared_data_->notification_handler(handler);
     }
+
+    shared_data_->notification_handler_initialization_complete.Signal();
   }
 
   magma::Status ExecuteImmediateCommands(uint32_t context_id, uint64_t commands_size,
@@ -736,10 +740,11 @@ std::unique_ptr<TestPlatformConnection> TestPlatformConnection::Create(
   if (!client_connection)
     return MAGMA_DRETP(nullptr, "failed to create PlatformConnectionClient");
 
-  auto ipc_thread = std::thread(IpcThreadFunc, connection);
+  auto server_holder = std::make_shared<PrimaryFidlServerHolder>();
+  server_holder->Start(std::move(connection), nullptr, [](const char* role_profile) {});
 
   return std::make_unique<TestPlatformConnection>(std::move(client_connection),
-                                                  std::move(ipc_thread), connection, shared_data);
+                                                  std::move(server_holder), shared_data);
 }
 
 TEST(PlatformConnection, GetError) {

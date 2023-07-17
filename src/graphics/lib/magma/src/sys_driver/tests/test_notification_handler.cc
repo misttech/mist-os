@@ -20,7 +20,12 @@ class TestMsdConnection : public MsdMockConnection {
  public:
   ~TestMsdConnection() override { *connection_torn_down_ = true; }
 
-  void SetNotificationCallback(msd::NotificationHandler* handler) override { handler_ = handler; }
+  void SetNotificationCallback(msd::NotificationHandler* handler) override {
+    handler_ = handler;
+    if (handler) {
+      initialization_completion_->Signal();
+    }
+  }
 
   void SendTask() {
     auto deferred_teardown = fit::defer_callback(
@@ -30,6 +35,7 @@ class TestMsdConnection : public MsdMockConnection {
           completion->Signal();
         });
 
+    initialization_completion_->Wait();
     // The task should either be run or canceled before the msd::Connection is
     // destroyed. In either case, the task's destructor will be run, executing
     // the defer_callback function above.
@@ -40,6 +46,8 @@ class TestMsdConnection : public MsdMockConnection {
   std::shared_ptr<libsync::Completion> completion() { return completion_; }
 
  private:
+  std::shared_ptr<libsync::Completion> initialization_completion_ =
+      std::make_shared<libsync::Completion>();
   msd::NotificationHandler* handler_ = nullptr;
   std::shared_ptr<bool> connection_torn_down_ = std::make_shared<bool>(false);
   std::shared_ptr<libsync::Completion> completion_ = std::make_shared<libsync::Completion>();
@@ -64,15 +72,15 @@ TEST(MagmaNotification, NotAfterShutdown) {
   auto msd_connection = std::make_unique<TestMsdConnection>();
   auto connection_ptr = msd_connection.get();
   auto msd_dev = std::make_unique<TestMsdDevice>(std::move(msd_connection));
-  auto dev = std::shared_ptr<MagmaSystemDevice>(
+  auto dev = std::unique_ptr<MagmaSystemDevice>(
       MagmaSystemDevice::Create(msd_driver.get(), std::move(msd_dev)));
 
   auto endpoints = fidl::CreateEndpoints<fuchsia_gpu_magma::Primary>();
   ASSERT_TRUE(endpoints.is_ok());
   auto notification_endpoints = fidl::CreateEndpoints<fuchsia_gpu_magma::Notification>();
   ASSERT_TRUE(notification_endpoints.is_ok());
-  auto zircon_connection = MagmaSystemDevice::Open(dev, 0, std::move(endpoints->server),
-                                                   std::move(notification_endpoints->server));
+  auto zircon_connection =
+      dev->Open(0, std::move(endpoints->server), std::move(notification_endpoints->server));
 
   dev->StartConnectionThread(std::move(zircon_connection), [](const char* role_profile) {});
   auto completion = connection_ptr->completion();
@@ -89,15 +97,15 @@ TEST(MagmaNotification, NotAfterConnectionTeardown) {
   auto msd_connection = std::make_unique<TestMsdConnection>();
   auto connection_ptr = msd_connection.get();
   auto msd_dev = std::make_unique<TestMsdDevice>(std::move(msd_connection));
-  auto dev = std::shared_ptr<MagmaSystemDevice>(
+  auto dev = std::unique_ptr<MagmaSystemDevice>(
       MagmaSystemDevice::Create(msd_driver.get(), std::move(msd_dev)));
 
   auto endpoints = fidl::CreateEndpoints<fuchsia_gpu_magma::Primary>();
   ASSERT_TRUE(endpoints.is_ok());
   auto notification_endpoints = fidl::CreateEndpoints<fuchsia_gpu_magma::Notification>();
   ASSERT_TRUE(notification_endpoints.is_ok());
-  auto zircon_connection = MagmaSystemDevice::Open(dev, 0, std::move(endpoints->server),
-                                                   std::move(notification_endpoints->server));
+  auto zircon_connection =
+      dev->Open(0, std::move(endpoints->server), std::move(notification_endpoints->server));
 
   dev->StartConnectionThread(std::move(zircon_connection), [](const char* role_profile) {});
   auto completion = connection_ptr->completion();

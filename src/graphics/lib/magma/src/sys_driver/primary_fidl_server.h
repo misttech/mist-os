@@ -7,16 +7,24 @@
 
 #include <fidl/fuchsia.gpu.magma/cpp/wire.h>
 #include <lib/async-loop/cpp/loop.h>
+#include <lib/async-loop/loop.h>
 #include <lib/async/task.h>
 #include <lib/async/time.h>
 #include <lib/async/wait.h>
+#include <lib/fit/function.h>
 #include <lib/stdcompat/optional.h>
 #include <lib/zx/channel.h>
 #include <lib/zx/profile.h>
+#include <zircon/errors.h>
 #include <zircon/status.h>
 
-#include "fidl/fuchsia.gpu.magma/cpp/wire_types.h"
+#include <memory>
+#include <mutex>
+#include <thread>
+#include <utility>
+
 #include "magma_util/dlog.h"
+#include "magma_util/macros.h"
 #include "magma_util/status.h"
 #include "msd.h"
 #include "msd/msd_defs.h"
@@ -39,6 +47,7 @@ class PrimaryFidlServer : public fidl::WireServer<fuchsia_gpu_magma::Primary>,
   static constexpr uint32_t kMaxInflightMessages = 1000;
   static constexpr uint32_t kMaxInflightMemoryMB = 100;
   static constexpr uint32_t kMaxInflightBytes = kMaxInflightMemoryMB * 1024 * 1024;
+
   class Delegate {
    public:
     virtual ~Delegate() {}
@@ -82,48 +91,27 @@ class PrimaryFidlServer : public fidl::WireServer<fuchsia_gpu_magma::Primary>,
                                                    uint64_t counter_count) = 0;
   };
 
-  static std::shared_ptr<PrimaryFidlServer> Create(
+  static std::unique_ptr<PrimaryFidlServer> Create(
       std::unique_ptr<Delegate> delegate, msd_client_id_t client_id,
       fidl::ServerEnd<fuchsia_gpu_magma::Primary> primary,
       fidl::ServerEnd<fuchsia_gpu_magma::Notification> notification);
 
   PrimaryFidlServer(std::unique_ptr<Delegate> delegate, msd_client_id_t client_id,
+                    fidl::ServerEnd<fuchsia_gpu_magma::Primary> primary,
                     fidl::ServerEnd<fuchsia_gpu_magma::Notification> notification)
       : client_id_(client_id),
+        primary_(std::move(primary)),
         delegate_(std::move(delegate)),
         server_notification_endpoint_(notification.TakeChannel()),
         async_loop_(&kAsyncLoopConfigNeverAttachToThread) {
     delegate_->SetNotificationCallback(this);
   }
 
-  ~PrimaryFidlServer() override {
-    delegate_->SetNotificationCallback(nullptr);
-    async_loop_.Shutdown();
-    delegate_.reset();
-  }
+  ~PrimaryFidlServer() override { delegate_.reset(); }
 
-  bool Bind(fidl::ServerEnd<fuchsia_gpu_magma::Primary> primary);
-
-  bool HandleRequest();
-
-  void Shutdown();
+  void Bind();
 
   async::Loop* async_loop() { return &async_loop_; }
-
-  static void RunLoop(std::shared_ptr<msd::PrimaryFidlServer> connection,
-                      fit::function<void(const char*)> set_thread_priority) {
-    pthread_setname_np(pthread_self(),
-                       ("ConnectionThread " + std::to_string(connection->client_id_)).c_str());
-
-    // Apply the thread role before entering the handler loop.
-    set_thread_priority("fuchsia.graphics.magma.connection");
-
-    while (connection->HandleRequest()) {
-      connection->request_count_ += 1;
-    }
-    // the runloop terminates when the remote closes, or an error is experienced
-    // so this is the appropriate time to let the connection go out of scope and be destroyed
-  }
 
   uint64_t get_request_count() { return request_count_; }
 
@@ -131,7 +119,7 @@ class PrimaryFidlServer : public fidl::WireServer<fuchsia_gpu_magma::Primary>,
   void NotificationChannelSend(cpp20::span<uint8_t> data) override;
   void ContextKilled() override;
   void PerformanceCounterReadCompleted(const msd::PerfCounterResult& result) override;
-  async_dispatcher_t* GetAsyncDispatcher() override { return async_loop_.dispatcher(); }
+  async_dispatcher_t* GetAsyncDispatcher() override { return async_loop()->dispatcher(); }
 
  private:
   void ImportObject2(ImportObject2RequestView request,
@@ -192,6 +180,9 @@ class PrimaryFidlServer : public fidl::WireServer<fuchsia_gpu_magma::Primary>,
   msd_client_id_t client_id_;
   std::atomic_uint request_count_{};
 
+  // Only valid up until Bind() is called.
+  fidl::ServerEnd<fuchsia_gpu_magma::Primary> primary_;
+
   // The binding will be valid after a successful |fidl::BindServer| operation,
   // and back to invalid after this class is unbound from the FIDL dispatcher.
   cpp17::optional<fidl::ServerBindingRef<fuchsia_gpu_magma::Primary>> server_binding_;
@@ -207,6 +198,48 @@ class PrimaryFidlServer : public fidl::WireServer<fuchsia_gpu_magma::Primary>,
   uint64_t bytes_imported_ = 0;
 
   friend class FlowControlChecker;
+  friend class PrimaryFidlServerHolder;
+};
+
+// The PrimaryFidlServerHolder enforces these constraints:
+// 1. The PrimaryFidlServer is only accessed on `loop_thread_` (including most setup and all
+// teardown).
+// 2. `server_` is destroyed before `Shutdown()` returns.
+// 3. Teardown happens in this order:
+//    1. SetNotificationCallback(nullptr)
+//    2. async_loop_.Shutdown()
+//    3. MagmaSystemConnection::~MagmaSystemConnection()
+class PrimaryFidlServerHolder : public std::enable_shared_from_this<PrimaryFidlServerHolder> {
+ public:
+  class ConnectionOwnerDelegate {
+   public:
+    // Called on connection thread. Sets `*need_detach_out` if the thread should be detached.
+    virtual void ConnectionClosed(std::shared_ptr<PrimaryFidlServerHolder> server,
+                                  bool* need_detach_out) = 0;
+  };
+
+  PrimaryFidlServerHolder() = default;
+
+  ~PrimaryFidlServerHolder() { MAGMA_DASSERT(!loop_thread_.joinable()); }
+
+  void Start(std::unique_ptr<PrimaryFidlServer> server, ConnectionOwnerDelegate* owner_delegate,
+             fit::function<void(const char*)> set_thread_priority);
+  void Shutdown();
+
+ private:
+  void RunLoop(ConnectionOwnerDelegate* owner_delegate,
+               fit::function<void(const char*)> set_thread_priority);
+  bool HandleRequest();
+  // Should only be used in unit tests. In production, holding onto the FIDL server shared_ptr
+  // increases the risk of lifetime issues.
+  std::shared_ptr<PrimaryFidlServer> server_for_test() { return server_; }
+
+  std::thread loop_thread_;
+  // Must be held when deleting "server_" and when accessing it outside the connection thread.
+  std::mutex server_lock_;
+  std::shared_ptr<PrimaryFidlServer> server_;
+
+  friend class TestPlatformConnection;
 };
 
 }  // namespace msd

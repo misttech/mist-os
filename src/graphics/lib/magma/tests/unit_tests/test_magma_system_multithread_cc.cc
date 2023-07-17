@@ -27,7 +27,7 @@ inline uint64_t page_size() { return sysconf(_SC_PAGESIZE); }
 // may bail out early on some devices.
 class TestMultithread {
  public:
-  TestMultithread(std::unique_ptr<Driver> driver, std::shared_ptr<MagmaSystemDevice> device)
+  TestMultithread(std::unique_ptr<Driver> driver, std::unique_ptr<MagmaSystemDevice> device)
       : driver_(std::move(driver)), device_(std::move(device)) {}
 
   void Test(uint32_t num_threads) {
@@ -49,7 +49,8 @@ class TestMultithread {
   }
 
   void ConnectionThreadLoop(uint32_t num_iterations) {
-    auto connection = std::make_unique<MagmaSystemConnection>(device_, device_->msd_dev()->Open(0));
+    auto connection =
+        std::make_unique<MagmaSystemConnection>(device_.get(), device_->msd_dev()->Open(0));
     ASSERT_NE(connection, nullptr);
 
     uint64_t extra_page_count;
@@ -112,7 +113,7 @@ class TestMultithread {
 
  private:
   std::unique_ptr<msd::Driver> driver_;
-  std::shared_ptr<MagmaSystemDevice> device_;
+  std::unique_ptr<MagmaSystemDevice> device_;
   uint32_t context_id_ = 0;
 };
 
@@ -130,8 +131,7 @@ TEST(MagmaSystem, Multithread) {
   if (vendor_id != 0x8086)
     GTEST_SKIP();
 
-  auto test = std::make_unique<TestMultithread>(
-      std::move(driver), std::shared_ptr<MagmaSystemDevice>(std::move(device)));
+  auto test = std::make_unique<TestMultithread>(std::move(driver), std::move(device));
   ASSERT_TRUE(test);
 
   test->Test(2);

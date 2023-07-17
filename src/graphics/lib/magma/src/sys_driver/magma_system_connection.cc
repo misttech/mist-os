@@ -10,9 +10,9 @@
 #include "magma_util/macros.h"
 
 namespace msd {
-MagmaSystemConnection::MagmaSystemConnection(std::weak_ptr<MagmaSystemDevice> weak_device,
+MagmaSystemConnection::MagmaSystemConnection(Owner* owner,
                                              std::unique_ptr<msd::Connection> msd_connection_t)
-    : device_(weak_device), msd_connection_(std::move(msd_connection_t)) {
+    : owner_(owner), msd_connection_(std::move(msd_connection_t)) {
   MAGMA_DASSERT(msd_connection_);
 }
 
@@ -41,17 +41,9 @@ MagmaSystemConnection::~MagmaSystemConnection() {
   // any time after ConnectionClosed() and we don't want any dangling dependencies.
   semaphore_map_.clear();
   msd_connection_.reset();
-
-  auto device = device_.lock();
-  if (device) {
-    device->ConnectionClosed(std::this_thread::get_id());
-  }
 }
 
-uint32_t MagmaSystemConnection::GetDeviceId() {
-  auto device = device_.lock();
-  return device ? device->GetDeviceId() : 0;
-}
+uint32_t MagmaSystemConnection::GetDeviceId() { return owner_->GetDeviceId(); }
 
 magma::Status MagmaSystemConnection::CreateContext(uint32_t context_id) {
   auto iter = context_map_.find(context_id);
@@ -112,11 +104,7 @@ magma::Status MagmaSystemConnection::ExecuteImmediateCommands(uint32_t context_i
 }
 
 magma::Status MagmaSystemConnection::EnablePerformanceCounterAccess(zx::handle access_token) {
-  auto device = device_.lock();
-  if (!device) {
-    return MAGMA_DRET(MAGMA_STATUS_INTERNAL_ERROR);
-  }
-  uint64_t perf_count_access_token_id = device->perf_count_access_token_id();
+  uint64_t perf_count_access_token_id = owner_->perf_count_access_token_id();
   MAGMA_DASSERT(perf_count_access_token_id);
   if (!access_token) {
     return MAGMA_DRET(MAGMA_STATUS_INVALID_ARGS);
@@ -139,10 +127,6 @@ magma::Status MagmaSystemConnection::EnablePerformanceCounterAccess(zx::handle a
 }
 
 magma::Status MagmaSystemConnection::ImportBuffer(zx::handle handle, uint64_t id) {
-  auto device = device_.lock();
-  if (!device) {
-    return MAGMA_DRET(MAGMA_STATUS_INTERNAL_ERROR);
-  }
   auto buffer = magma::PlatformBuffer::Import(zx::vmo(std::move(handle)));
   if (!buffer)
     return MAGMA_DRET_MSG(MAGMA_STATUS_INVALID_ARGS, "failed to import buffer");
@@ -156,7 +140,7 @@ magma::Status MagmaSystemConnection::ImportBuffer(zx::handle handle, uint64_t id
   }
 
   BufferReference ref;
-  ref.buffer = MagmaSystemBuffer::Create(device->driver(), std::move(buffer));
+  ref.buffer = MagmaSystemBuffer::Create(owner_->driver(), std::move(buffer));
   buffer_map_.insert({id, ref});
 
   return MAGMA_STATUS_OK;
@@ -271,10 +255,6 @@ magma::Status MagmaSystemConnection::ImportObject(zx::handle handle, uint64_t fl
   if (!client_id)
     return MAGMA_DRET_MSG(MAGMA_STATUS_INVALID_ARGS, "client_id must be non zero");
 
-  auto device = device_.lock();
-  if (!device)
-    return MAGMA_DRET_MSG(MAGMA_STATUS_INTERNAL_ERROR, "failed to lock device");
-
   switch (object_type) {
     case fuchsia_gpu_magma::wire::ObjectType::kBuffer:
       return ImportBuffer(std::move(handle), client_id);
@@ -282,7 +262,7 @@ magma::Status MagmaSystemConnection::ImportObject(zx::handle handle, uint64_t fl
     case fuchsia_gpu_magma::wire::ObjectType::kEvent:
     case fuchsia_gpu_magma::wire::ObjectType::kSemaphore: {
       auto semaphore =
-          MagmaSystemSemaphore::Create(device->driver(), std::move(handle), client_id, flags);
+          MagmaSystemSemaphore::Create(owner_->driver(), std::move(handle), client_id, flags);
       if (!semaphore)
         return MAGMA_DRET_MSG(MAGMA_STATUS_INVALID_ARGS, "failed to import semaphore");
 

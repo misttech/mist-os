@@ -9,6 +9,8 @@
 #include <lib/ddk/device.h>
 #include <lib/fit/thread_safety.h>
 
+#include <memory>
+
 #include <ddktl/device.h>
 
 #include "magma_dependency_injection_device.h"
@@ -45,7 +47,7 @@ class MagmaDeviceImpl : public ddk::Messageable<DeviceType>::Mixin<D>,
     ZX_DEBUG_ASSERT(!magma_driver_);
     magma_driver_ = std::move(magma_driver);
   }
-  void set_magma_system_device(std::shared_ptr<MagmaSystemDevice> magma_system_device)
+  void set_magma_system_device(std::unique_ptr<MagmaSystemDevice> magma_system_device)
       FIT_REQUIRES(magma_mutex_) {
     ZX_DEBUG_ASSERT(!magma_system_device_);
     magma_system_device_ = std::move(magma_system_device);
@@ -142,9 +144,9 @@ class MagmaDeviceImpl : public ddk::Messageable<DeviceType>::Mixin<D>,
     if (!CheckSystemDevice(_completer))
       return;
 
-    auto connection = MagmaSystemDevice::Open(magma_system_device_, request->client_id,
-                                              std::move(request->primary_channel),
-                                              std::move(request->notification_channel));
+    auto connection =
+        magma_system_device_->Open(request->client_id, std::move(request->primary_channel),
+                                   std::move(request->notification_channel));
 
     if (!connection) {
       DLOG("MagmaSystemDevice::Open failed");
@@ -212,7 +214,7 @@ class MagmaDeviceImpl : public ddk::Messageable<DeviceType>::Mixin<D>,
  private:
   std::mutex magma_mutex_;
   std::unique_ptr<msd::Driver> magma_driver_ FIT_GUARDED(magma_mutex_);
-  std::shared_ptr<MagmaSystemDevice> magma_system_device_ FIT_GUARDED(magma_mutex_);
+  std::unique_ptr<MagmaSystemDevice> magma_system_device_ FIT_GUARDED(magma_mutex_);
   zx_device_t* zx_device_ = nullptr;
   zx_koid_t perf_counter_koid_ = 0;
   std::optional<MagmaMemoryPressureLevel> last_memory_pressure_level_ FIT_GUARDED(magma_mutex_);

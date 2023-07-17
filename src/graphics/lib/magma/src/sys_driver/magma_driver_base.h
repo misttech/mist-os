@@ -115,7 +115,7 @@ class MagmaDriverBase : public fdf::DriverBase,
     magma_driver_ = std::move(magma_driver);
   }
 
-  void set_magma_system_device(std::shared_ptr<MagmaSystemDevice> magma_system_device)
+  void set_magma_system_device(std::unique_ptr<MagmaSystemDevice> magma_system_device)
       FIT_REQUIRES(magma_mutex_) {
     ZX_DEBUG_ASSERT(!magma_system_device_);
     magma_system_device_ = std::move(magma_system_device);
@@ -168,9 +168,9 @@ class MagmaDriverBase : public fdf::DriverBase,
     if (!CheckSystemDevice(_completer))
       return;
 
-    auto connection = MagmaSystemDevice::Open(magma_system_device_, request->client_id,
-                                              std::move(request->primary_channel),
-                                              std::move(request->notification_channel));
+    auto connection =
+        magma_system_device_->Open(request->client_id, std::move(request->primary_channel),
+                                   std::move(request->notification_channel));
 
     if (!connection) {
       MAGMA_DLOG("MagmaSystemDevice::Open failed");
@@ -318,7 +318,7 @@ class MagmaDriverBase : public fdf::DriverBase,
 
   std::mutex magma_mutex_;
   std::unique_ptr<msd::Driver> magma_driver_ FIT_GUARDED(magma_mutex_);
-  std::shared_ptr<MagmaSystemDevice> magma_system_device_ FIT_GUARDED(magma_mutex_);
+  std::unique_ptr<MagmaSystemDevice> magma_system_device_ FIT_GUARDED(magma_mutex_);
   driver_devfs::Connector<FidlDeviceType> magma_devfs_connector_;
   // Node representing /dev/class/gpu/<id>.
   fidl::WireSyncClient<fuchsia_driver_framework::Node> gpu_node_;

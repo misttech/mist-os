@@ -8,6 +8,7 @@
 
 #include "magma_system_connection.h"
 #include "magma_util/macros.h"
+#include "sys_driver/primary_fidl_server.h"
 
 namespace msd {
 uint32_t MagmaSystemDevice::GetDeviceId() {
@@ -20,61 +21,63 @@ uint32_t MagmaSystemDevice::GetDeviceId() {
   return static_cast<uint32_t>(result);
 }
 
-std::shared_ptr<msd::PrimaryFidlServer> MagmaSystemDevice::Open(
-    std::shared_ptr<MagmaSystemDevice> device, msd_client_id_t client_id,
-    fidl::ServerEnd<fuchsia_gpu_magma::Primary> primary,
+MagmaSystemDevice::~MagmaSystemDevice() {
+  std::unique_lock<std::mutex> lock(connection_list_mutex_);
+  MAGMA_DASSERT(!connection_set_ || connection_set_->empty());
+}
+
+std::unique_ptr<msd::PrimaryFidlServer> MagmaSystemDevice::Open(
+    msd_client_id_t client_id, fidl::ServerEnd<fuchsia_gpu_magma::Primary> primary,
     fidl::ServerEnd<fuchsia_gpu_magma::Notification> notification) {
-  std::unique_ptr<msd::Connection> msd_connection = device->msd_dev()->Open(client_id);
+  std::unique_ptr<msd::Connection> msd_connection = msd_dev()->Open(client_id);
   if (!msd_connection)
     return MAGMA_DRETP(nullptr, "msd_device_open failed");
 
   return msd::PrimaryFidlServer::Create(
-      std::make_unique<MagmaSystemConnection>(std::move(device), std::move(msd_connection)),
-      client_id, std::move(primary), std::move(notification));
+      std::make_unique<MagmaSystemConnection>(this, std::move(msd_connection)), client_id,
+      std::move(primary), std::move(notification));
 }
 
 void MagmaSystemDevice::StartConnectionThread(
-    std::shared_ptr<msd::PrimaryFidlServer> fidl_server,
+    std::unique_ptr<msd::PrimaryFidlServer> fidl_server,
     fit::function<void(const char*)> set_thread_priority) {
-  std::unique_lock<std::mutex> lock(connection_list_mutex_);
+  std::lock_guard<std::mutex> lock(connection_list_mutex_);
+  auto server_holder = std::make_shared<PrimaryFidlServerHolder>();
+  server_holder->Start(std::move(fidl_server), this, std::move(set_thread_priority));
 
-  std::thread thread(msd::PrimaryFidlServer::RunLoop, fidl_server, std::move(set_thread_priority));
-
-  connection_map_->insert(std::pair<std::thread::id, Connection>(
-      thread.get_id(), Connection{std::move(thread), fidl_server}));
+  connection_set_->insert(std::move(server_holder));
 }
 
-void MagmaSystemDevice::ConnectionClosed(std::thread::id thread_id) {
-  std::unique_lock<std::mutex> lock(connection_list_mutex_);
+void MagmaSystemDevice::ConnectionClosed(std::shared_ptr<PrimaryFidlServerHolder> server,
+                                         bool* need_detach_out) {
+  std::lock_guard<std::mutex> lock(connection_list_mutex_);
 
-  if (!connection_map_)
+  // Connection is shutting down, thread will be joined on by MagmaSystemDevice::Shutdown.
+  if (!connection_set_) {
+    *need_detach_out = false;
     return;
-
-  auto iter = connection_map_->find(thread_id);
-  // May not be in the map if no connection thread was started.
-  if (iter != connection_map_->end()) {
-    iter->second.thread.detach();
-    connection_map_->erase(iter);
   }
+
+  auto iter = connection_set_->find(server);
+  // Thread must be in the connection map, since Start was called in the same function that added it
+  // (during a lock).
+  MAGMA_DASSERT(iter != connection_set_->end());
+  connection_set_->erase(iter);
+  *need_detach_out = true;
 }
 
 void MagmaSystemDevice::Shutdown() {
-  std::unique_lock<std::mutex> lock(connection_list_mutex_);
-  auto map = std::move(connection_map_);
-  lock.unlock();
-
-  for (auto& element : *map) {
-    auto locked = element.second.server.lock();
-    if (locked) {
-      locked->Shutdown();
-    }
+  std::unique_ptr<std::unordered_set<std::shared_ptr<PrimaryFidlServerHolder>>> set;
+  {
+    std::lock_guard lock(connection_list_mutex_);
+    set = std::move(connection_set_);
   }
 
   auto start = std::chrono::high_resolution_clock::now();
-
-  for (auto& element : *map) {
-    element.second.thread.join();
+  for (auto& element : *set) {
+    element->Shutdown();
   }
+  // All threads should either be joined at this point, or waiting to detach.
 
   std::chrono::duration<double, std::milli> elapsed =
       std::chrono::high_resolution_clock::now() - start;

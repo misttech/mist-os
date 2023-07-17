@@ -27,14 +27,14 @@ class CommandBufferHelper final : public msd::NotificationHandler {
     auto msd_dev = msd_drv->CreateDevice(GetTestDeviceHandle());
     if (!msd_dev)
       return MAGMA_DRETP(nullptr, "failed to create msd device");
-    auto dev = std::shared_ptr<msd::MagmaSystemDevice>(
+    auto dev = std::unique_ptr<msd::MagmaSystemDevice>(
         msd::MagmaSystemDevice::Create(msd_drv.get(), std::move(msd_dev)));
     uint32_t ctx_id = 0;
     auto msd_connection = dev->msd_dev()->Open(0);
     if (!msd_connection)
       return MAGMA_DRETP(nullptr, "msd_device_open failed");
     auto connection = std::unique_ptr<msd::MagmaSystemConnection>(
-        new msd::MagmaSystemConnection(dev, std::move(msd_connection)));
+        new msd::MagmaSystemConnection(dev.get(), std::move(msd_connection)));
     if (!connection)
       return MAGMA_DRETP(nullptr, "failed to connect to msd device");
     connection->CreateContext(ctx_id);
