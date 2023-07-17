@@ -16,8 +16,9 @@ use assert_matches::assert_matches;
 use fidl::Error::ClientChannelClosed;
 use fidl::{endpoints::ServerEnd, prelude::*};
 use fidl_fuchsia_settings::{DisplayMarker, DisplayProxy, IntlMarker};
+use fuchsia_async::{Task, TestExecutor};
 use fuchsia_zircon::{self as zx, Status};
-use futures::future::BoxFuture;
+use futures::future::{self, BoxFuture};
 use futures::lock::Mutex;
 use std::sync::Arc;
 
@@ -106,34 +107,37 @@ async fn validate_restore_with_storage_controller(
 }
 
 // Makes sure that settings are restored from storage when service comes online.
-#[fuchsia::test(allow_stalls = false)]
-async fn test_display_restore_with_brightness_controller() {
+#[fuchsia::test]
+fn test_display_restore_with_brightness_controller() {
+    let mut exec = TestExecutor::new();
+
     // Ensure auto-brightness value is restored correctly.
     validate_restore_with_brightness_controller(
+        &mut exec,
         0.7,
         AUTO_BRIGHTNESS_LEVEL,
         true,
         true,
         LowLightMode::Enable,
         None,
-    )
-    .await;
+    );
 
     // Ensure manual-brightness value is restored correctly.
     validate_restore_with_brightness_controller(
+        &mut exec,
         0.9,
         AUTO_BRIGHTNESS_LEVEL,
         false,
         true,
         LowLightMode::Disable,
         None,
-    )
-    .await;
+    );
 }
 
 // Float comparisons are checking that set values are the same when retrieved.
 #[allow(clippy::float_cmp)]
-async fn validate_restore_with_brightness_controller(
+fn validate_restore_with_brightness_controller(
+    exec: &mut TestExecutor,
     manual_brightness: f32,
     auto_brightness_value: f32,
     auto_brightness: bool,
@@ -141,40 +145,48 @@ async fn validate_restore_with_brightness_controller(
     low_light_mode: LowLightMode,
     theme: Option<Theme>,
 ) {
-    let service_registry = ServiceRegistry::create();
     let brightness_service_handle = BrightnessService::create();
-    service_registry
-        .lock()
-        .await
-        .register_service(Arc::new(Mutex::new(brightness_service_handle.clone())));
-    let info = DisplayInfo {
-        manual_brightness_value: manual_brightness,
-        auto_brightness_value,
-        auto_brightness,
-        screen_enabled,
-        low_light_mode,
-        theme,
-    };
-    let storage_factory = InMemoryStorageFactory::with_initial_data(&info);
+    let brightness_service_handle_clone = brightness_service_handle.clone();
 
-    assert!(EnvironmentBuilder::new(Arc::new(storage_factory))
-        .service(Box::new(ServiceRegistry::serve(service_registry)))
-        .agents(vec![AgentType::Restore.into()])
-        .fidl_interfaces(&[Interface::Display(display::InterfaceFlags::BASE)])
-        .flags(&[ControllerFlag::ExternalBrightnessControl])
-        .spawn_and_get_protocol_connector(ENV_NAME)
-        .await
-        .is_ok());
+    let _task = Task::local(async move {
+        let service_registry = ServiceRegistry::create();
+        service_registry
+            .lock()
+            .await
+            .register_service(Arc::new(Mutex::new(brightness_service_handle_clone)));
+        let info = DisplayInfo {
+            manual_brightness_value: manual_brightness,
+            auto_brightness_value,
+            auto_brightness,
+            screen_enabled,
+            low_light_mode,
+            theme,
+        };
+        let storage_factory = InMemoryStorageFactory::with_initial_data(&info);
 
-    if auto_brightness {
-        let service_auto_brightness =
-            brightness_service_handle.get_auto_brightness().lock().await.unwrap();
-        assert_eq!(service_auto_brightness, auto_brightness);
-    } else {
-        let service_manual_brightness =
-            brightness_service_handle.get_manual_brightness().lock().await.unwrap();
-        assert_eq!(service_manual_brightness, manual_brightness);
-    }
+        assert!(EnvironmentBuilder::new(Arc::new(storage_factory))
+            .service(Box::new(ServiceRegistry::serve(service_registry)))
+            .agents(vec![AgentType::Restore.into()])
+            .fidl_interfaces(&[Interface::Display(display::InterfaceFlags::BASE)])
+            .flags(&[ControllerFlag::ExternalBrightnessControl])
+            .spawn_and_get_protocol_connector(ENV_NAME)
+            .await
+            .is_ok());
+    });
+
+    let _ = exec.run_until_stalled(&mut future::pending::<()>());
+
+    exec.run_singlethreaded(async {
+        if auto_brightness {
+            let service_auto_brightness =
+                brightness_service_handle.get_auto_brightness().lock().await.unwrap();
+            assert_eq!(service_auto_brightness, auto_brightness);
+        } else {
+            let service_manual_brightness =
+                brightness_service_handle.get_manual_brightness().lock().await.unwrap();
+            assert_eq!(service_manual_brightness, manual_brightness);
+        }
+    });
 }
 
 // Makes sure that a failing display stream doesn't cause a failure for a different interface.
