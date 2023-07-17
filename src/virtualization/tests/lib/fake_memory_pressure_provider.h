@@ -9,17 +9,20 @@
 #include <lib/fidl/cpp/binding_set.h>
 #include <lib/sys/component/cpp/testing/realm_builder.h>
 
-class FakeMemoryPressureProvider : public fuchsia::memorypressure::Provider,
-                                   public component_testing::LocalComponent {
+class FakeMemoryPressureProvider : public fuchsia::memorypressure::Provider {
  public:
   explicit FakeMemoryPressureProvider(async_dispatcher_t* dispatcher) : dispatcher_(dispatcher) {}
 
   void RegisterWatcher(
       ::fidl::InterfaceHandle<::fuchsia::memorypressure::Watcher> watcher) override;
 
-  void Start(std::unique_ptr<component_testing::LocalComponentHandles> handles) override;
-
   void OnLevelChanged(::fuchsia::memorypressure::Level level);
+
+  std::unique_ptr<component_testing::LocalComponentImpl> NewComponent();
+
+  fidl::InterfaceRequestHandler<fuchsia::memorypressure::Provider> GetHandler() {
+    return bindings_.GetHandler(this, dispatcher_);
+  }
 
  private:
   async_dispatcher_t* dispatcher_;

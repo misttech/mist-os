@@ -64,7 +64,8 @@ void GuestInteractionTest::SetUp() {
 
   auto realm_builder = RealmBuilder::Create();
   realm_builder.AddChild(kGuestManagerName, kDebianGuestManagerUrl);
-  realm_builder.AddLocalChild(kFakeNetstackComponentName, &fake_netstack_);
+  realm_builder.AddLocalChild(kFakeNetstackComponentName,
+                              [&]() { return fake_netstack_.NewComponent(); });
 
   realm_builder
       .AddRoute(Route{.capabilities =

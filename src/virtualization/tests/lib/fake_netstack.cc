@@ -19,11 +19,13 @@
 #include <lib/fpromise/promise.h>
 #include <lib/fpromise/scope.h>
 #include <lib/fpromise/single_threaded_executor.h>
+#include <lib/sys/component/cpp/testing/realm_builder_types.h>
 #include <lib/sys/cpp/testing/enclosing_environment.h>
 #include <lib/syslog/cpp/macros.h>
 #include <netinet/if_ether.h>
 #include <netinet/ip.h>
 #include <netinet/udp.h>
+#include <zircon/errors.h>
 #include <zircon/status.h>
 
 #include <future>
@@ -559,9 +561,21 @@ fpromise::promise<std::vector<uint8_t>, zx_status_t> FakeNetstack::ReceivePacket
       .promise();
 }
 
-void FakeNetstack::Start(std::unique_ptr<component_testing::LocalComponentHandles> handles) {
-  // This class contains handles to the component's incoming and outgoing capabilities.
-  handles_ = std::move(handles);
+namespace {
+class FakeNetstackComponent : public component_testing::LocalComponentImpl {
+ public:
+  explicit FakeNetstackComponent(fake_netstack::internal::FakeNetwork* fake_network)
+      : fake_network_(fake_network) {}
 
-  ASSERT_EQ(handles_->outgoing()->AddPublicService(network_->GetHandler()), ZX_OK);
+  void OnStart() override {
+    ASSERT_EQ(outgoing()->AddPublicService(fake_network_->GetHandler()), ZX_OK);
+  }
+
+ private:
+  fake_netstack::internal::FakeNetwork* fake_network_;
+};
+}  // namespace
+
+std::unique_ptr<component_testing::LocalComponentImpl> FakeNetstack::NewComponent() {
+  return std::make_unique<FakeNetstackComponent>(network_.get());
 }

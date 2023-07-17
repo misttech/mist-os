@@ -4,7 +4,24 @@
 
 #include "fake_memory_pressure_provider.h"
 
+#include <lib/sys/component/cpp/testing/realm_builder_types.h>
+#include <zircon/errors.h>
+
 #include <gtest/gtest.h>
+
+namespace {
+class MemoryPressureComponent : public component_testing::LocalComponentImpl {
+ public:
+  explicit MemoryPressureComponent(FakeMemoryPressureProvider& provider) : provider_(provider) {}
+
+  void OnStart() override {
+    ASSERT_EQ(outgoing()->AddPublicService(provider_.GetHandler()), ZX_OK);
+  }
+
+ private:
+  FakeMemoryPressureProvider& provider_;
+};
+}  // namespace
 
 void FakeMemoryPressureProvider::RegisterWatcher(
     ::fidl::InterfaceHandle<::fuchsia::memorypressure::Watcher> watcher) {
@@ -13,11 +30,8 @@ void FakeMemoryPressureProvider::RegisterWatcher(
   watchers_.push_back(std::move(watcher_proxy));
 }
 
-void FakeMemoryPressureProvider::Start(
-    std::unique_ptr<component_testing::LocalComponentHandles> handles) {
-  handles_ = std::move(handles);
-
-  ASSERT_EQ(handles_->outgoing()->AddPublicService(bindings_.GetHandler(this, dispatcher_)), ZX_OK);
+std::unique_ptr<component_testing::LocalComponentImpl> FakeMemoryPressureProvider::NewComponent() {
+  return std::make_unique<MemoryPressureComponent>(*this);
 }
 
 void FakeMemoryPressureProvider::OnLevelChanged(::fuchsia::memorypressure::Level level) {

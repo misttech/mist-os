@@ -252,8 +252,9 @@ void EnclosedGuest::InstallInRealm(component_testing::Realm& realm,
   constexpr auto kFakeMemoryPressureProvider = "fake_memory_pressure_provider";
 
   realm.AddChild(kGuestManagerName, guest_launch_info.url);
-  realm.AddLocalChild(kFakeNetstackComponentName, &fake_netstack_);
-  realm.AddLocalChild(kFakeMemoryPressureProvider, &fake_memory_pressure_provider_);
+  realm.AddLocalChild(kFakeNetstackComponentName, [&]() { return fake_netstack_.NewComponent(); });
+  realm.AddLocalChild(kFakeMemoryPressureProvider,
+                      [&]() { return fake_memory_pressure_provider_.NewComponent(); });
 
   realm
       .AddRoute(Route{.capabilities =

@@ -24,7 +24,7 @@ class FakeNetwork;
 // fake netstack.
 //
 // Thread-safe.
-class FakeNetstack : public component_testing::LocalComponent {
+class FakeNetstack {
  public:
   FakeNetstack();
   ~FakeNetstack();
@@ -42,7 +42,7 @@ class FakeNetstack : public component_testing::LocalComponent {
   fpromise::promise<std::vector<uint8_t>, zx_status_t> ReceivePacket(
       const fuchsia::net::MacAddress& mac_addr);
 
-  void Start(std::unique_ptr<component_testing::LocalComponentHandles> handles) override;
+  std::unique_ptr<component_testing::LocalComponentImpl> NewComponent();
 
  private:
   async::Loop loop_;
