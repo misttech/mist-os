@@ -323,7 +323,8 @@ Node::Node(std::string_view name, std::vector<Node*> parents, NodeManager* node_
       primary_index_(primary_index),
       node_manager_(node_manager),
       dispatcher_(dispatcher),
-      inspect_(std::move(inspect)) {
+      inspect_(std::move(inspect)),
+      weak_ptr_factory_(this) {
   ZX_ASSERT(primary_index_ == 0 || primary_index_ < parents_.size());
   if (auto primary_parent = GetPrimaryParent()) {
     // By default, we set `driver_host_` to match the primary parent's
@@ -340,7 +341,8 @@ Node::Node(std::string_view name, std::vector<Node*> parents, NodeManager* node_
       node_manager_(node_manager),
       dispatcher_(dispatcher),
       driver_host_(driver_host),
-      inspect_(std::move(inspect)) {}
+      inspect_(std::move(inspect)),
+      weak_ptr_factory_(this) {}
 
 zx::result<std::shared_ptr<Node>> Node::CreateCompositeNode(
     std::string_view node_name, std::vector<Node*> parents, std::vector<std::string> parents_names,
@@ -1047,8 +1049,8 @@ void Node::StartDriver(fuchsia_component_runner::wire::ComponentStartInfo start_
   }
   driver_component_.emplace(*this, std::string(url), std::move(controller),
                             std::move(driver_endpoints->client));
-  driver_host_.value()->Start(std::move(endpoints->client), name_, symbols,
-                              start_info, std::move(driver_endpoints->server),
+  driver_host_.value()->Start(std::move(endpoints->client), name_, symbols, start_info,
+                              std::move(driver_endpoints->server),
                               [this, cb = std::move(cb)](zx::result<> result) mutable {
                                 if (result.is_error()) {
                                   driver_component_.reset();
@@ -1063,7 +1065,13 @@ void Node::ScheduleStopComponent() {
                 State2String(node_state_));
   node_state_ = NodeState::kWaitingOnDriverComponent;
   if (!driver_component_) {
-    async::PostTask(dispatcher_, fit::bind_member(this, &Node::FinishRemoval));
+    async::PostTask(dispatcher_, [weak_this = weak_ptr_factory_.GetWeakPtr()] {
+      // Task may outlive `this`, in which case hopefully there is nothing
+      // to do here.
+      if (weak_this.get() != nullptr) {
+        weak_this->FinishRemoval();
+      }
+    });
     return;
   }
   // Send an epitaph to the component manager and close the connection. The

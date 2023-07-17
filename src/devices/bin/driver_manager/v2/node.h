@@ -21,6 +21,7 @@
 #include "src/devices/bin/driver_manager/devfs/devfs.h"
 #include "src/devices/bin/driver_manager/inspect.h"
 #include "src/devices/bin/driver_manager/v2/driver_host.h"
+#include "src/lib/fxl/memory/weak_ptr.h"
 
 namespace dfv2 {
 
@@ -366,6 +367,9 @@ class Node : public fidl::WireServer<fuchsia_driver_framework::NodeController>,
   DevfsDevice devfs_device_;
 
   fidl::ServerBindingGroup<fuchsia_device::Controller> dev_controller_bindings_;
+
+  // Keep last.
+  fxl::WeakPtrFactory<Node> weak_ptr_factory_;
 };
 
 }  // namespace dfv2
