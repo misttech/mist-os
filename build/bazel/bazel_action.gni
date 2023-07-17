@@ -123,6 +123,14 @@ declare_args() {
 #   extra_bazel_args: (optional)
 #     A list extra command line arguments to pass to Bazel.
 #     Type: list of string.
+
+#   use_target_out_dir: (optional, default: false)
+#     Use target_out_dir instead of target_gen_dir when linking/copying Bazel
+#     outputs into Ninja.
+#
+#     NOTE: This arg is here to facilitate a soft transition, this will soon
+#     become the default behavior of the template. i.e. Outputs of bazel_actions
+#     will live in target_out_dir soon. See https://fxbug.dev/125898.
 #
 #   deps:
 #   metadata:
@@ -254,10 +262,17 @@ template("bazel_action") {
     _num_bazel_outputs += 1
   }
 
+  _use_target_out_dir =
+      defined(invoker.use_target_out_dir) && invoker.use_target_out_dir
+
   _ninja_outputs = _ninja_output_list
   _outputs = []
   foreach(path, _ninja_outputs) {
-    _outputs += [ target_gen_dir + "/" + path ]
+    if (_use_target_out_dir) {
+      _outputs += [ target_out_dir + "/" + path ]
+    } else {
+      _outputs += [ target_gen_dir + "/" + path ]
+    }
   }
 
   _bazel_inputs = []
@@ -329,11 +344,19 @@ template("bazel_action") {
           _allow_directory_in_outputs,
           "directory_timestamp_outputs is not useful when there are no directory copies (allow_directory_in_outputs=false)")
       foreach(path, invoker.directory_timestamp_outputs) {
-        outputs += [ target_gen_dir + "/" + path ]
+        if (_use_target_out_dir) {
+          outputs += [ target_out_dir + "/" + path ]
+        } else {
+          outputs += [ target_gen_dir + "/" + path ]
+        }
       }
     }
 
-    _path_mapping = "${target_gen_dir}/${target_name}.path_mapping"
+    if (_use_target_out_dir) {
+      _path_mapping = "${target_out_dir}/${target_name}.path_mapping"
+    } else {
+      _path_mapping = "${target_gen_dir}/${target_name}.path_mapping"
+    }
     outputs += [ _path_mapping ]
 
     args = [

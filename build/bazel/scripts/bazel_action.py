@@ -1150,6 +1150,8 @@ access when it is run.
         if _DEBUG:
             debug('DEPFILE[%s]\n' % depfile_content)
 
+
+        os.makedirs(os.path.dirname(args.depfile), exist_ok=True)
         with open(args.depfile, 'w') as f:
             f.write(depfile_content)
 
