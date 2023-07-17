@@ -25,7 +25,10 @@ use futures::{
     pin_mut, StreamExt as _, TryStreamExt as _,
 };
 
-use net_types::ip::{GenericOverIp, Ip, IpAddress, IpInvariant, IpVersion, Subnet};
+use net_types::{
+    ip::{GenericOverIp, Ip, IpAddress, IpInvariant, IpVersion, Subnet},
+    SpecifiedAddress as _,
+};
 use netlink_packet_core::{NetlinkMessage, NLM_F_MULTIPART};
 use netlink_packet_route::{
     RouteHeader, RouteMessage, RtnlMessage, AF_INET, AF_INET6, RTNLGRP_IPV4_ROUTE,
@@ -429,7 +432,12 @@ impl<
         interfaces_proxy: &fnet_root::InterfacesProxy,
         route_set_proxy: &<I::RouteSetMarker as ProtocolMarker>::Proxy,
         new_route_args: NewRouteArgs<I>,
+        existing_routes: &HashSet<NetlinkRouteMessage>,
     ) -> Result<(), RequestError> {
+        if new_route_matches_existing(&new_route_args, existing_routes) {
+            return Err(RequestError::AlreadyExists);
+        }
+
         let interface_id = match new_route_args {
             NewRouteArgs::Unicast(args) => args.target.outbound_interface,
         };
@@ -499,7 +507,13 @@ impl<
                     }
                 },
                 RouteRequestArgs::New(args) => {
-                    Self::handle_new_route_request(interfaces_proxy, route_set_proxy, args).await
+                    Self::handle_new_route_request(
+                        interfaces_proxy,
+                        route_set_proxy,
+                        args,
+                        route_messages,
+                    )
+                    .await
                 }
             },
         };
@@ -785,6 +799,55 @@ impl<I: Ip> From<NewRouteArgs<I>> for fnet_routes_ext::Route<I> {
     }
 }
 
+// Check if the new route conflicts with an existing route.
+//
+// Note that Linux and Fuchsia differ on what constitutes a conflicting route.
+// Linux is stricter than Fuchsia and requires that all routes have a unique
+// [destination subnet, metric] pair. Here we replicate the check that Linux
+// performs, so that Netlink can reject requests before handing them off to the
+// more flexible Netstack routing APIs.
+fn new_route_matches_existing<I: Ip>(
+    route: &NewRouteArgs<I>,
+    existing_routes: &HashSet<NetlinkRouteMessage>,
+) -> bool {
+    existing_routes.iter().any(|NetlinkRouteMessage(existing_route)| {
+        let UnicastRouteArgs { subnet, target: _, priority } = match route {
+            NewRouteArgs::Unicast(args) => args,
+        };
+        if subnet.prefix() != existing_route.header.destination_prefix_length {
+            return false;
+        }
+        // NB: The `existing_route` was constructed by this module, so the
+        // exact set of NLAs it contains is known.
+        let mut destination_matches = None;
+        let mut metric_matches = None;
+        existing_route.nlas.iter().for_each(|nla| match nla {
+            netlink_packet_route::route::Nla::Destination(dst) => {
+                assert_eq!(
+                    destination_matches, None,
+                    "existing route has multiple `Destination` NLAs"
+                );
+                destination_matches = Some(&dst[..] == subnet.network().bytes());
+            }
+            netlink_packet_route::route::Nla::Priority(metric) => {
+                assert_eq!(metric_matches, None, "existing route has multiple `Metric` NLAs");
+                metric_matches = Some(metric == priority);
+            }
+            // Ignore expected NLAs that are irrelevant to the "matches" check.
+            netlink_packet_route::route::Nla::Oif(_)
+            | netlink_packet_route::route::Nla::Gateway(_) => {}
+            nla => panic!("existing route has unexpected NLA: {:?}", nla),
+        });
+        destination_matches.unwrap_or_else(|| {
+            assert_eq!(
+                existing_route.header.destination_prefix_length, 0,
+                "existing route without `Destination` NLA must be a default route"
+            );
+            !subnet.network().is_specified()
+        }) && metric_matches.expect("existing routes must have a Priority NLA")
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -813,17 +876,26 @@ mod tests {
 
     use crate::messaging::testutil::{FakeSender, SentMessage};
 
-    const TEST_V4_SUBNET: Subnet<Ipv4Addr> = net_subnet_v4!("192.0.2.0/24");
-    const TEST_V4_NEXTHOP: Ipv4Addr = net_ip_v4!("192.0.2.1");
-    const TEST_V4_NEXTHOP2: Ipv4Addr = net_ip_v4!("192.0.2.2");
-    const TEST_V6_SUBNET: Subnet<Ipv6Addr> = net_subnet_v6!("2001:db8::0/32");
-    const TEST_V6_NEXTHOP: Ipv6Addr = net_ip_v6!("2001:db8::1");
-    const TEST_V6_NEXTHOP2: Ipv6Addr = net_ip_v6!("2001:db8::2");
+    const V4_DFLT: Subnet<Ipv4Addr> = net_subnet_v4!("0.0.0.0/0");
+    const V4_SUB1: Subnet<Ipv4Addr> = net_subnet_v4!("192.0.2.0/32");
+    const V4_SUB2: Subnet<Ipv4Addr> = net_subnet_v4!("192.0.2.1/32");
+    const V4_SUB3: Subnet<Ipv4Addr> = net_subnet_v4!("192.0.2.0/24");
+    const V4_NEXTHOP1: Ipv4Addr = net_ip_v4!("192.0.2.1");
+    const V4_NEXTHOP2: Ipv4Addr = net_ip_v4!("192.0.2.2");
 
-    const INTERFACE_ID1: u32 = 1;
-    const INTERFACE_ID2: u32 = 2;
-    const LOWER_METRIC: u32 = 0;
-    const HIGHER_METRIC: u32 = 100;
+    const V6_DFLT: Subnet<Ipv6Addr> = net_subnet_v6!("::/0");
+    const V6_SUB1: Subnet<Ipv6Addr> = net_subnet_v6!("2001:db8::/128");
+    const V6_SUB2: Subnet<Ipv6Addr> = net_subnet_v6!("2001:db8::1/128");
+    const V6_SUB3: Subnet<Ipv6Addr> = net_subnet_v6!("2001:db8::/64");
+    const V6_NEXTHOP1: Ipv6Addr = net_ip_v6!("2001:db8::1");
+    const V6_NEXTHOP2: Ipv6Addr = net_ip_v6!("2001:db8::2");
+
+    const DEV1: u32 = 1;
+    const DEV2: u32 = 2;
+
+    const METRIC1: u32 = 0;
+    const METRIC2: u32 = 100;
+    const METRIC3: u32 = 9999;
     const TEST_SEQUENCE_NUMBER: u32 = 1234;
 
     fn create_installed_route<I: Ip>(
@@ -898,19 +970,19 @@ mod tests {
 
     #[fuchsia::test]
     fn test_handle_route_watcher_event_v4() {
-        handle_route_watcher_event_helper::<Ipv4>(TEST_V4_SUBNET, TEST_V4_NEXTHOP);
+        handle_route_watcher_event_helper::<Ipv4>(V4_SUB1, V4_NEXTHOP1);
     }
 
     #[fuchsia::test]
     fn test_handle_route_watcher_event_v6() {
-        handle_route_watcher_event_helper::<Ipv6>(TEST_V6_SUBNET, TEST_V6_NEXTHOP);
+        handle_route_watcher_event_helper::<Ipv6>(V6_SUB1, V6_NEXTHOP1);
     }
 
     fn handle_route_watcher_event_helper<I: Ip>(subnet: Subnet<I::Addr>, next_hop: I::Addr) {
         let installed_route1: fnet_routes_ext::InstalledRoute<I> =
-            create_installed_route(subnet, next_hop, INTERFACE_ID1.into(), LOWER_METRIC);
+            create_installed_route(subnet, next_hop, DEV1.into(), METRIC1);
         let installed_route2: fnet_routes_ext::InstalledRoute<I> =
-            create_installed_route(subnet, next_hop, INTERFACE_ID2.into(), HIGHER_METRIC);
+            create_installed_route(subnet, next_hop, DEV2.into(), METRIC2);
 
         let add_event1 = fnet_routes_ext::Event::Added(installed_route1);
         let add_event2 = fnet_routes_ext::Event::Added(installed_route2);
@@ -1016,8 +1088,8 @@ mod tests {
         assert_eq!(&wrong_sink.take_messages()[..], &[]);
     }
 
-    #[test_case(TEST_V4_SUBNET, TEST_V4_NEXTHOP)]
-    #[test_case(TEST_V6_SUBNET, TEST_V6_NEXTHOP)]
+    #[test_case(V4_SUB1, V4_NEXTHOP1)]
+    #[test_case(V6_SUB1, V6_NEXTHOP1)]
     #[test_case(net_subnet_v4!("0.0.0.0/0"), net_ip_v4!("0.0.0.1"))]
     #[test_case(net_subnet_v6!("::/0"), net_ip_v6!("::1"))]
     fn test_netlink_route_message_try_from_installed_route<A: IpAddress>(
@@ -1028,11 +1100,10 @@ mod tests {
     }
 
     fn netlink_route_message_conversion_helper<I: Ip>(subnet: Subnet<I::Addr>, next_hop: I::Addr) {
-        let installed_route =
-            create_installed_route::<I>(subnet, next_hop, INTERFACE_ID1.into(), LOWER_METRIC);
+        let installed_route = create_installed_route::<I>(subnet, next_hop, DEV1.into(), METRIC1);
         let prefix_length = subnet.prefix();
         let subnet = if prefix_length > 0 { Some(subnet) } else { None };
-        let nlas = create_nlas::<I>(subnet, Some(next_hop), INTERFACE_ID1, LOWER_METRIC);
+        let nlas = create_nlas::<I>(subnet, Some(next_hop), DEV1, METRIC1);
         let address_family = match I::VERSION {
             IpVersion::V4 => AF_INET,
             IpVersion::V6 => AF_INET6,
@@ -1045,8 +1116,8 @@ mod tests {
         assert_eq!(actual, expected);
     }
 
-    #[test_case(TEST_V4_SUBNET)]
-    #[test_case(TEST_V6_SUBNET)]
+    #[test_case(V4_SUB1)]
+    #[test_case(V6_SUB1)]
     fn test_non_forward_route_conversion<A: IpAddress>(subnet: Subnet<A>) {
         let installed_route = fnet_routes_ext::InstalledRoute::<A::Version> {
             route: fnet_routes_ext::Route {
@@ -1054,13 +1125,11 @@ mod tests {
                 action: fnet_routes_ext::RouteAction::Unknown,
                 properties: fnet_routes_ext::RouteProperties {
                     specified_properties: fnet_routes_ext::SpecifiedRouteProperties {
-                        metric: fnet_routes::SpecifiedMetric::ExplicitMetric(LOWER_METRIC),
+                        metric: fnet_routes::SpecifiedMetric::ExplicitMetric(METRIC1),
                     },
                 },
             },
-            effective_properties: fnet_routes_ext::EffectiveRouteProperties {
-                metric: LOWER_METRIC,
-            },
+            effective_properties: fnet_routes_ext::EffectiveRouteProperties { metric: METRIC1 },
         };
 
         let actual: Result<NetlinkRouteMessage, NetlinkRouteMessageConversionError> =
@@ -1071,12 +1140,8 @@ mod tests {
     #[fuchsia::test]
     fn test_oversized_interface_id_route_conversion() {
         let invalid_interface_id = (u32::MAX as u64) + 1;
-        let installed_route: fnet_routes_ext::InstalledRoute<Ipv4> = create_installed_route(
-            TEST_V4_SUBNET,
-            TEST_V4_NEXTHOP,
-            invalid_interface_id,
-            Default::default(),
-        );
+        let installed_route: fnet_routes_ext::InstalledRoute<Ipv4> =
+            create_installed_route(V4_SUB1, V4_NEXTHOP1, invalid_interface_id, Default::default());
 
         let actual: Result<NetlinkRouteMessage, NetlinkRouteMessageConversionError> =
             installed_route.try_into();
@@ -1104,8 +1169,8 @@ mod tests {
         del_route_message.serialize(&mut buf);
     }
 
-    #[test_case(TEST_V4_SUBNET, TEST_V4_NEXTHOP)]
-    #[test_case(TEST_V6_SUBNET, TEST_V6_NEXTHOP)]
+    #[test_case(V4_SUB1, V4_NEXTHOP1)]
+    #[test_case(V6_SUB1, V6_NEXTHOP1)]
     fn test_new_set_with_existing_routes<A: IpAddress>(subnet: Subnet<A>, next_hop: A) {
         new_set_with_existing_routes_helper::<A::Version>(subnet, next_hop);
     }
@@ -1114,9 +1179,9 @@ mod tests {
         let interface_id = u32::MAX;
 
         let installed_route1: fnet_routes_ext::InstalledRoute<I> =
-            create_installed_route(subnet, next_hop, interface_id as u64, LOWER_METRIC);
+            create_installed_route(subnet, next_hop, interface_id as u64, METRIC1);
         let installed_route2: fnet_routes_ext::InstalledRoute<I> =
-            create_installed_route(subnet, next_hop, (interface_id as u64) + 1, HIGHER_METRIC);
+            create_installed_route(subnet, next_hop, (interface_id as u64) + 1, METRIC2);
         let routes: HashSet<fnet_routes_ext::InstalledRoute<I>> =
             vec![installed_route1, installed_route2].into_iter().collect::<_>();
 
@@ -1125,7 +1190,7 @@ mod tests {
         let actual = new_set_with_existing_routes::<I>(routes);
         assert_eq!(actual.len(), 1);
 
-        let nlas = create_nlas::<I>(Some(subnet), Some(next_hop), interface_id, LOWER_METRIC);
+        let nlas = create_nlas::<I>(Some(subnet), Some(next_hop), interface_id, METRIC1);
         let address_family = match I::VERSION {
             IpVersion::V4 => AF_INET,
             IpVersion::V6 => AF_INET6,
@@ -1284,14 +1349,14 @@ mod tests {
         respond_to_watcher::<I, _>(stream, events).await;
     }
 
-    #[test_case(TEST_V4_SUBNET, TEST_V4_NEXTHOP)]
-    #[test_case(TEST_V6_SUBNET, TEST_V6_NEXTHOP)]
+    #[test_case(V4_SUB1, V4_NEXTHOP1)]
+    #[test_case(V6_SUB1, V6_NEXTHOP1)]
     #[fuchsia::test]
     async fn test_event_loop_event_errors<A: IpAddress>(subnet: Subnet<A>, next_hop: A)
     where
         A::Version: fnet_routes_ext::FidlRouteIpExt + fnet_routes_ext::admin::FidlRouteAdminIpExt,
     {
-        let route = create_installed_route(subnet, next_hop, INTERFACE_ID1.into(), LOWER_METRIC);
+        let route = create_installed_route(subnet, next_hop, DEV1.into(), METRIC1);
 
         event_loop_errors_stream_ended_helper::<A::Version>(route).await;
         event_loop_errors_existing_after_add_helper::<A::Version>(route).await;
@@ -1392,16 +1457,16 @@ mod tests {
             fnet_routes_ext::Event::<A::Version>::Existing(create_installed_route(
                 subnet,
                 next_hop1,
-                INTERFACE_ID1.into(),
-                LOWER_METRIC,
+                DEV1.into(),
+                METRIC1,
             ))
             .try_into()
             .unwrap(),
             fnet_routes_ext::Event::<A::Version>::Existing(create_installed_route(
                 subnet,
                 next_hop2,
-                INTERFACE_ID2.into(),
-                HIGHER_METRIC,
+                DEV2.into(),
+                METRIC2,
             ))
             .try_into()
             .unwrap(),
@@ -1413,6 +1478,7 @@ mod tests {
         subnet: Subnet<A>,
         next_hop: A,
         interface_id: u64,
+        priority: u32,
     ) -> UnicastRouteArgs<A::Version> {
         UnicastRouteArgs {
             subnet,
@@ -1420,7 +1486,7 @@ mod tests {
                 outbound_interface: interface_id,
                 next_hop: SpecifiedAddr::new(next_hop),
             },
-            priority: Default::default(),
+            priority,
         }
     }
 
@@ -1519,8 +1585,8 @@ mod tests {
         TestRequestResult { messages: route_sink.take_messages(), waiter_result }
     }
 
-    #[test_case(TEST_V4_SUBNET, TEST_V4_NEXTHOP, TEST_V4_NEXTHOP2; "v4_route_dump")]
-    #[test_case(TEST_V6_SUBNET, TEST_V6_NEXTHOP, TEST_V6_NEXTHOP2; "v6_route_dump")]
+    #[test_case(V4_SUB1, V4_NEXTHOP1, V4_NEXTHOP2; "v4_route_dump")]
+    #[test_case(V6_SUB1, V6_NEXTHOP1, V6_NEXTHOP2; "v6_route_dump")]
     #[fuchsia::test]
     async fn test_get_route<A: IpAddress>(subnet: Subnet<A>, next_hop1: A, next_hop2: A)
     where
@@ -1579,8 +1645,8 @@ mod tests {
                             create_nlas::<A::Version>(
                                 Some(subnet),
                                 Some(next_hop1),
-                                INTERFACE_ID1,
-                                LOWER_METRIC,
+                                DEV1,
+                                METRIC1,
                             ),
                         )
                         .into_rtnl_new_route(TEST_SEQUENCE_NUMBER, true),
@@ -1592,8 +1658,8 @@ mod tests {
                             create_nlas::<A::Version>(
                                 Some(subnet),
                                 Some(next_hop2),
-                                INTERFACE_ID2,
-                                HIGHER_METRIC,
+                                DEV2,
+                                METRIC2,
                             ),
                         )
                         .into_rtnl_new_route(TEST_SEQUENCE_NUMBER, true),
@@ -1657,6 +1723,21 @@ mod tests {
                             responder
                                 .send(route_set_result)
                                 .expect("failed to respond to `AddRoute`");
+                            let metric = match route
+                                .properties
+                                .specified_properties
+                                .as_ref()
+                                .expect("specified properties should be some")
+                                .metric
+                                .expect("metric_should_be_some")
+                            {
+                                fnet_routes::SpecifiedMetric::ExplicitMetric(metric) => metric,
+                                fnet_routes::SpecifiedMetric::InheritedFromInterface(
+                                    fnet_routes::Empty,
+                                ) => {
+                                    panic!("metric should be explicit")
+                                }
+                            };
                             RouteSetOutputs {
                                 event: match route_set_result {
                                     Ok(true) => Some(
@@ -1665,7 +1746,7 @@ mod tests {
                                                 route: route.try_into().unwrap(),
                                                 effective_properties:
                                                     fnet_routes_ext::EffectiveRouteProperties {
-                                                        metric: Default::default(),
+                                                        metric,
                                                     },
                                             },
                                         )
@@ -1717,6 +1798,21 @@ mod tests {
                             responder
                                 .send(route_set_result)
                                 .expect("failed to respond to `AddRoute`");
+                            let metric = match route
+                                .properties
+                                .specified_properties
+                                .as_ref()
+                                .expect("specified properties should be some")
+                                .metric
+                                .expect("metric_should_be_some")
+                            {
+                                fnet_routes::SpecifiedMetric::ExplicitMetric(metric) => metric,
+                                fnet_routes::SpecifiedMetric::InheritedFromInterface(
+                                    fnet_routes::Empty,
+                                ) => {
+                                    panic!("metric should be explicit")
+                                }
+                            };
                             RouteSetOutputs {
                                 event: match route_set_result {
                                     Ok(true) => Some(
@@ -1725,7 +1821,7 @@ mod tests {
                                                 route: route.try_into().unwrap(),
                                                 effective_properties:
                                                     fnet_routes_ext::EffectiveRouteProperties {
-                                                        metric: Default::default(),
+                                                        metric: metric,
                                                     },
                                             },
                                         )
@@ -1812,7 +1908,7 @@ mod tests {
                                 control,
                                 control_handle: _,
                             } => {
-                                pretty_assertions::assert_eq!(id, INTERFACE_ID1 as u64);
+                                pretty_assertions::assert_eq!(id, DEV1 as u64);
                                 Some(control.into_stream().unwrap())
                             }
                             req => unreachable!("unexpected interfaces request: {req:?}"),
@@ -1837,6 +1933,7 @@ mod tests {
         route_set_results: Vec<RouteSetResult>,
         waiter_result: Result<(), RequestError>,
         subnet: Subnet<A>,
+        metric: u32,
     ) where
         A::Version: fnet_routes_ext::FidlRouteIpExt + fnet_routes_ext::admin::FidlRouteAdminIpExt,
     {
@@ -1847,8 +1944,8 @@ mod tests {
 
         let (next_hop1, next_hop2): (A, A) = A::Version::map_ip(
             (),
-            |()| (TEST_V4_NEXTHOP, TEST_V4_NEXTHOP2),
-            |()| (TEST_V6_NEXTHOP, TEST_V6_NEXTHOP2),
+            |()| (V4_NEXTHOP1, V4_NEXTHOP2),
+            |()| (V6_NEXTHOP1, V6_NEXTHOP2),
         );
 
         // When the waiter result is Ok(()), then we know that the add
@@ -1858,12 +1955,7 @@ mod tests {
                 create_netlink_route_message(
                     address_family.try_into().expect("should fit into u8"),
                     subnet.prefix(),
-                    create_nlas::<A::Version>(
-                        Some(subnet),
-                        Some(next_hop2),
-                        INTERFACE_ID1,
-                        LOWER_METRIC,
-                    ),
+                    create_nlas::<A::Version>(Some(subnet), Some(next_hop2), DEV1, metric),
                 )
                 .into_rtnl_new_route(UNSPECIFIED_SEQUENCE_NUMBER, false),
                 route_group,
@@ -1871,12 +1963,7 @@ mod tests {
             Err(_) => Vec::new(),
         };
 
-        // There are two pre-set routes in `test_route_request`.
-        // * subnet, next_hop1, INTERFACE_ID1
-        // * subnet, next_hop2, INTERFACE_ID2
-        // To add a new route that does not get rejected by the handler due to it
-        // already existing, we use a route that has next_hop2, and INTERFACE_ID1.
-        let unicast_route_args = create_unicast_route_args(subnet, next_hop2, INTERFACE_ID1.into());
+        let unicast_route_args = create_unicast_route_args(subnet, next_hop2, DEV1.into(), metric);
         pretty_assertions::assert_eq!(
             test_route_request(
                 RouteRequestArgs::New(NewRouteArgs::Unicast(unicast_route_args)),
@@ -1887,7 +1974,7 @@ mod tests {
                         } => {
                             let (token, _) = fidl::EventPair::create();
                             let grant = fnet_interfaces_admin::GrantForInterfaceAuthorization {
-                                interface_id: INTERFACE_ID1 as u64,
+                                interface_id: DEV1 as u64,
                                 token,
                             };
                             responder.send(grant).unwrap();
@@ -1911,14 +1998,16 @@ mod tests {
             RouteSetResult::AddResult(Ok(true))
         ],
         Ok(()),
-        TEST_V4_SUBNET;
+        V4_SUB1,
+        METRIC3;
         "v4_success")]
     #[test_case(
         vec![
             RouteSetResult::AddResult(Ok(true))
         ],
         Ok(()),
-        TEST_V6_SUBNET;
+        V6_SUB1,
+        METRIC3;
         "v6_success")]
     #[test_case(
         vec![
@@ -1928,7 +2017,8 @@ mod tests {
             )),
         ],
         Err(RequestError::UnrecognizedInterface),
-        TEST_V4_SUBNET;
+        V4_SUB1,
+        METRIC3;
         "v4_failed_auth")]
     #[test_case(
         vec![
@@ -1938,59 +2028,79 @@ mod tests {
             )),
         ],
         Err(RequestError::UnrecognizedInterface),
-        TEST_V6_SUBNET;
+        V6_SUB1,
+        METRIC3;
         "v6_failed_auth")]
     #[test_case(
         vec![
             RouteSetResult::AddResult(Ok(false))
         ],
         Err(RequestError::AlreadyExists),
-        TEST_V4_SUBNET;
-        "v4_failed_exists")]
+        V4_SUB1,
+        METRIC3;
+        "v4_failed_netstack_reports_exists")]
     #[test_case(
         vec![
             RouteSetResult::AddResult(Ok(false))
         ],
         Err(RequestError::AlreadyExists),
-        TEST_V6_SUBNET;
-        "v6_failed_exists")]
+        V6_SUB1,
+        METRIC3;
+        "v6_failed_netstack_reports_exists")]
+    #[test_case(
+        vec![],
+        Err(RequestError::AlreadyExists),
+        V4_SUB1,
+        METRIC1;
+        "v4_failed_netlink_reports_exists")]
+    #[test_case(
+        vec![],
+        Err(RequestError::AlreadyExists),
+        V6_SUB1,
+        METRIC1;
+        "v6_failed_netlink_reports_exists")]
     #[test_case(
         vec![
             RouteSetResult::AddResult(Err(RouteSetError::InvalidDestinationSubnet))
         ],
         Err(RequestError::InvalidRequest),
-        TEST_V4_SUBNET;
+        V4_SUB1,
+        METRIC3;
         "v4_invalid_dest")]
     #[test_case(
         vec![
             RouteSetResult::AddResult(Err(RouteSetError::InvalidDestinationSubnet))
         ],
         Err(RequestError::InvalidRequest),
-        TEST_V6_SUBNET;
+        V6_SUB1,
+        METRIC3;
         "v6_invalid_dest")]
     #[test_case(
         vec![
             RouteSetResult::AddResult(Err(RouteSetError::InvalidNextHop))
         ],
         Err(RequestError::InvalidRequest),
-        TEST_V4_SUBNET;
+        V4_SUB1,
+        METRIC3;
         "v4_invalid_hop")]
     #[test_case(
         vec![
             RouteSetResult::AddResult(Err(RouteSetError::InvalidNextHop))
         ],
         Err(RequestError::InvalidRequest),
-        TEST_V6_SUBNET;
+        V6_SUB1,
+        METRIC3;
         "v6_invalid_hop")]
     #[fuchsia::test]
     async fn test_new_route<A: IpAddress>(
         route_set_results: Vec<RouteSetResult>,
         waiter_result: Result<(), RequestError>,
         subnet: Subnet<A>,
+        metric: u32,
     ) where
         A::Version: fnet_routes_ext::FidlRouteIpExt + fnet_routes_ext::admin::FidlRouteAdminIpExt,
     {
-        test_new_route_helper(route_set_results, waiter_result, subnet).await;
+        test_new_route_helper(route_set_results, waiter_result, subnet, metric).await;
     }
 
     // Tests RTM_NEWROUTE when two unauthentication events are received - once prior to
@@ -2002,7 +2112,7 @@ mod tests {
             RouteSetResult::AddResult(Err(RouteSetError::Unauthenticated)),
         ],
         Err(RequestError::InvalidRequest),
-        TEST_V4_SUBNET;
+        V4_SUB1;
         "v4_unauthenticated")]
     #[test_case(
         vec![
@@ -2011,7 +2121,7 @@ mod tests {
             RouteSetResult::AddResult(Err(RouteSetError::Unauthenticated)),
         ],
         Err(RequestError::InvalidRequest),
-        TEST_V6_SUBNET;
+        V6_SUB1;
         "v6_unauthenticated")]
     #[should_panic(expected = "received unauthentication error from route set for route")]
     #[fuchsia::test]
@@ -2022,15 +2132,15 @@ mod tests {
     ) where
         A::Version: fnet_routes_ext::FidlRouteIpExt + fnet_routes_ext::admin::FidlRouteAdminIpExt,
     {
-        test_new_route_helper(route_set_results, waiter_result, subnet).await;
+        test_new_route_helper(route_set_results, waiter_result, subnet, METRIC3).await;
     }
 
     /// Tests RTM_NEWROUTE when the interface is removed,
     /// indicated by the closure of the admin Control's server-end.
     /// The specific cause of the interface removal is unimportant
     /// for this test.
-    #[test_case(TEST_V4_SUBNET)]
-    #[test_case(TEST_V6_SUBNET)]
+    #[test_case(V4_SUB1)]
+    #[test_case(V6_SUB1)]
     #[fuchsia::test]
     async fn test_new_route_interface_removed<A: IpAddress>(subnet: Subnet<A>)
     where
@@ -2038,16 +2148,16 @@ mod tests {
     {
         let (next_hop1, next_hop2): (A, A) = A::Version::map_ip(
             (),
-            |()| (TEST_V4_NEXTHOP, TEST_V4_NEXTHOP2),
-            |()| (TEST_V6_NEXTHOP, TEST_V6_NEXTHOP2),
+            |()| (V4_NEXTHOP1, V4_NEXTHOP2),
+            |()| (V6_NEXTHOP1, V6_NEXTHOP2),
         );
 
         // There are two pre-set routes in `test_route_request`.
-        // * subnet, next_hop1, INTERFACE_ID1
-        // * subnet, next_hop2, INTERFACE_ID2
+        // * subnet, next_hop1, DEV1, METRIC1
+        // * subnet, next_hop2, DEV2, METRIC2
         // To add a new route that does not get rejected by the handler due to it
-        // already existing, we use a route that has next_hop2, and INTERFACE_ID1.
-        let unicast_route_args = create_unicast_route_args(subnet, next_hop2, INTERFACE_ID1.into());
+        // already existing, we use a route that has METRIC3
+        let unicast_route_args = create_unicast_route_args(subnet, next_hop1, DEV1.into(), METRIC3);
 
         pretty_assertions::assert_eq!(
             test_request(
@@ -2063,7 +2173,7 @@ mod tests {
                                     control,
                                     control_handle: _,
                                 } => {
-                                    pretty_assertions::assert_eq!(id, INTERFACE_ID1 as u64);
+                                    pretty_assertions::assert_eq!(id, DEV1 as u64);
                                     let control = control.into_stream().unwrap();
                                     let control = control.control_handle();
                                     control.shutdown();
@@ -2084,5 +2194,127 @@ mod tests {
                 waiter_result: Err(RequestError::UnrecognizedInterface),
             },
         )
+    }
+
+    // A flattened view of Route, convenient for holding testdata.
+    struct Route<I: Ip> {
+        subnet: Subnet<I::Addr>,
+        device: u32,
+        nexthop: Option<I::Addr>,
+        metric: u32,
+    }
+
+    #[test_case(
+        Route::<Ipv4>{subnet: V4_SUB1, device: DEV1, nexthop: Some(V4_NEXTHOP1), metric: METRIC1, },
+        Route::<Ipv4>{subnet: V4_SUB1, device: DEV1, nexthop: Some(V4_NEXTHOP1), metric: METRIC1, },
+        true; "all_fields_the_same_v4_should_match")]
+    #[test_case(
+        Route::<Ipv6>{subnet: V6_SUB1, device: DEV1, nexthop: Some(V6_NEXTHOP1), metric: METRIC1, },
+        Route::<Ipv6>{subnet: V6_SUB1, device: DEV1, nexthop: Some(V6_NEXTHOP1), metric: METRIC1, },
+        true; "all_fields_the_same_v6_should_match")]
+    #[test_case(
+        Route::<Ipv4>{subnet: V4_DFLT, device: DEV1, nexthop: Some(V4_NEXTHOP1), metric: METRIC1, },
+        Route::<Ipv4>{subnet: V4_DFLT, device: DEV1, nexthop: Some(V4_NEXTHOP1), metric: METRIC1, },
+        true; "default_route_v4_should_match")]
+    #[test_case(
+        Route::<Ipv6>{subnet: V6_DFLT, device: DEV1, nexthop: Some(V6_NEXTHOP1), metric: METRIC1, },
+        Route::<Ipv6>{subnet: V6_DFLT, device: DEV1, nexthop: Some(V6_NEXTHOP1), metric: METRIC1, },
+        true; "default_route_v6_should_match")]
+    #[test_case(
+        Route::<Ipv4>{subnet: V4_SUB1, device: DEV1, nexthop: Some(V4_NEXTHOP1), metric: METRIC1, },
+        Route::<Ipv4>{subnet: V4_SUB1, device: DEV2, nexthop: Some(V4_NEXTHOP1), metric: METRIC1, },
+        true; "different_device_v4_should_match")]
+    #[test_case(
+        Route::<Ipv6>{subnet: V6_SUB1, device: DEV1, nexthop: Some(V6_NEXTHOP1), metric: METRIC1, },
+        Route::<Ipv6>{subnet: V6_SUB1, device: DEV2, nexthop: Some(V6_NEXTHOP1), metric: METRIC1, },
+        true; "different_device_v6_should_match")]
+    #[test_case(
+        Route::<Ipv4>{subnet: V4_SUB1, device: DEV1, nexthop: Some(V4_NEXTHOP1), metric: METRIC1, },
+        Route::<Ipv4>{subnet: V4_SUB1, device: DEV1, nexthop: Some(V4_NEXTHOP2), metric: METRIC1, },
+        true; "different_nexthop_v4_should_match")]
+    #[test_case(
+        Route::<Ipv6>{subnet: V6_SUB1, device: DEV1, nexthop: Some(V6_NEXTHOP1), metric: METRIC1, },
+        Route::<Ipv6>{subnet: V6_SUB1, device: DEV1, nexthop: Some(V6_NEXTHOP2), metric: METRIC1, },
+        true; "different_nexthop_v6_should_match")]
+    #[test_case(
+        Route::<Ipv4>{subnet: V4_SUB1, device: DEV1, nexthop: Some(V4_NEXTHOP1), metric: METRIC1, },
+        Route::<Ipv4>{subnet: V4_SUB1, device: DEV2, nexthop: Some(V4_NEXTHOP2), metric: METRIC1, },
+        true; "different_device_and_nexthop_v4_should_match")]
+    #[test_case(
+        Route::<Ipv6>{subnet: V6_SUB1, device: DEV1, nexthop: Some(V6_NEXTHOP1), metric: METRIC1, },
+        Route::<Ipv6>{subnet: V6_SUB1, device: DEV2, nexthop: Some(V6_NEXTHOP2), metric: METRIC1, },
+        true; "different_device_and_nexthop_v6_should_match")]
+    #[test_case(
+        Route::<Ipv4>{subnet: V4_SUB1, device: DEV1, nexthop: None, metric: METRIC1, },
+        Route::<Ipv4>{subnet: V4_SUB1, device: DEV1, nexthop: Some(V4_NEXTHOP1), metric: METRIC1, },
+        true; "nexthop_newly_unset_v4_should_match")]
+    #[test_case(
+        Route::<Ipv6>{subnet: V6_SUB1, device: DEV1, nexthop: None, metric: METRIC1, },
+        Route::<Ipv6>{subnet: V6_SUB1, device: DEV1, nexthop: Some(V6_NEXTHOP1), metric: METRIC1, },
+        true; "nexthop_newly_unset_v6_should_match")]
+    #[test_case(
+        Route::<Ipv4>{subnet: V4_SUB1, device: DEV1, nexthop: Some(V4_NEXTHOP1), metric: METRIC1, },
+        Route::<Ipv4>{subnet: V4_SUB1, device: DEV1, nexthop: None, metric: METRIC1, },
+        true; "nexthop_previously_unset_v4_should_match")]
+    #[test_case(
+        Route::<Ipv6>{subnet: V6_SUB1, device: DEV1, nexthop: Some(V6_NEXTHOP1), metric: METRIC1, },
+        Route::<Ipv6>{subnet: V6_SUB1, device: DEV1, nexthop: None, metric: METRIC1, },
+        true; "nexthop_previously_unset_v6_should_match")]
+    #[test_case(
+        Route::<Ipv4>{subnet: V4_SUB1, device: DEV1, nexthop: Some(V4_NEXTHOP1), metric: METRIC1, },
+        Route::<Ipv4>{subnet: V4_SUB1, device: DEV1, nexthop: Some(V4_NEXTHOP1), metric: METRIC2, },
+        false; "different_metric_v4_should_not_match")]
+    #[test_case(
+        Route::<Ipv6>{subnet: V6_SUB1, device: DEV1, nexthop: Some(V6_NEXTHOP1), metric: METRIC1, },
+        Route::<Ipv6>{subnet: V6_SUB1, device: DEV1, nexthop: Some(V6_NEXTHOP1), metric: METRIC2, },
+        false; "different_metric_v6_should_not_match")]
+    #[test_case(
+        Route::<Ipv4>{subnet: V4_SUB1, device: DEV1, nexthop: Some(V4_NEXTHOP1), metric: METRIC1, },
+        Route::<Ipv4>{subnet: V4_SUB2, device: DEV1, nexthop: Some(V4_NEXTHOP1), metric: METRIC1, },
+        false; "different_subnet_v4_should_not_match")]
+    #[test_case(
+        Route::<Ipv6>{subnet: V6_SUB1, device: DEV1, nexthop: Some(V6_NEXTHOP1), metric: METRIC1, },
+        Route::<Ipv6>{subnet: V6_SUB2, device: DEV1, nexthop: Some(V6_NEXTHOP1), metric: METRIC1, },
+        false; "different_subnet_v6_should_not_match")]
+    #[test_case(
+        Route::<Ipv4>{subnet: V4_SUB1, device: DEV1, nexthop: Some(V4_NEXTHOP1), metric: METRIC1, },
+        Route::<Ipv4>{subnet: V4_SUB3, device: DEV1, nexthop: Some(V4_NEXTHOP1), metric: METRIC1, },
+        false; "different_subnet_prefixlen_v4_should_not_match")]
+    #[test_case(
+        Route::<Ipv6>{subnet: V6_SUB1, device: DEV1, nexthop: Some(V6_NEXTHOP1), metric: METRIC1, },
+        Route::<Ipv6>{subnet: V6_SUB3, device: DEV1, nexthop: Some(V6_NEXTHOP1), metric: METRIC1, },
+        false; "different_subnet_prefixlen_v6_should_not_match")]
+    fn test_new_route_matches_existing<I: Ip>(
+        new: Route<I>,
+        existing: Route<I>,
+        expect_match: bool,
+    ) {
+        let new_route_args = {
+            let Route { subnet, device, nexthop, metric } = new;
+            NewRouteArgs::Unicast(UnicastRouteArgs {
+                subnet,
+                target: fnet_routes_ext::RouteTarget::<I> {
+                    outbound_interface: device.into(),
+                    next_hop: nexthop
+                        .map(|a| SpecifiedAddr::new(a).expect("nexthop should be specified")),
+                },
+                priority: metric,
+            })
+        };
+        let existing_routes = {
+            let Route { subnet, device, nexthop, metric } = existing;
+            let address_family = match I::VERSION {
+                IpVersion::V4 => AF_INET,
+                IpVersion::V6 => AF_INET6,
+            };
+            // Don't populate the Destination NLA if this is the default route.
+            let destination = (subnet.prefix() != 0).then_some(subnet);
+            HashSet::from([create_netlink_route_message(
+                address_family as u8,
+                subnet.prefix(),
+                create_nlas::<I>(destination, nexthop, device, metric),
+            )])
+        };
+        assert_eq!(new_route_matches_existing(&new_route_args, &existing_routes), expect_match);
     }
 }
