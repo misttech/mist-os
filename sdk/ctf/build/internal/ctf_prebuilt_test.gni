@@ -114,9 +114,13 @@ template("ctf_prebuilt_tests_from_manifest") {
 
   # Check for typos or stale disabled tests.
   unknown_tests = invoker.disabled_tests - disabled_tests
-  assert(
-      unknown_tests == [],
-      "Could not find CTF test archives with these names in ${invoker.ctf_path}: ${unknown_tests}")
+  if (unknown_tests != []) {
+    label_no_toolchain = get_label_info(":$target_name", "label_no_toolchain")
+    print("Warning: These tests were removed from CTF at ${invoker.ctf_path}.")
+    print("Warning:   $unknown_tests")
+    print("Warning: Please delete the lines `disabled_tests=${unknown_tests}`")
+    print("Warning: from the target at $label_no_toolchain")
+  }
 
   group(target_name) {
     forward_variables_from(invoker, [ "visibility" ])
