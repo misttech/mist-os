@@ -103,7 +103,7 @@ Build boot images that prefer Zedboot over local boot (only for EFI).
 
 **Current value (from the default):** `false`
 
-From //build/images/args.gni:152
+From //build/images/args.gni:151
 
 ### api_compatibility_testing
 
@@ -149,7 +149,7 @@ Used as a parameter to assembled_system().
 
 **Current value (from the default):** `false`
 
-From //build/images/args.gni:180
+From //build/images/args.gni:179
 
 ### authorized_ssh_keys_label
 
@@ -314,7 +314,7 @@ From //build/testing/environments.gni:9
 
 **Current value (from the default):** `false`
 
-From //build/images/args.gni:208
+From //build/images/args.gni:207
 
 ### bazel_product_bundle_prefix
 
@@ -339,7 +339,7 @@ The actual bazel_product_bundle used for Bazel assembly is:
 
 **Current value (from the default):** `false`
 
-From //build/images/args.gni:207
+From //build/images/args.gni:206
 
 ### bazel_quiet
 
@@ -1679,15 +1679,14 @@ From //third_party/pigweed/src/pw_build/defaults.gni:26
 
 ### delivery_blob_type
 
-Controls what type of delivery blob blobfs accepts.
+Controls what type of delivery blob pkg-resolver fetches and blobfs accepts.
 Supported types can be found in //src/storage/blobfs/delivery_blob.h
 Valid values are integers, for example: 1
-By default no delivery blobs are accepted.
 This arg is for local developer only, products should not set this arg.
 
-**Current value (from the default):** `false`
+**Current value (from the default):** `1`
 
-From //build/images/args.gni:149
+From //build/images/args.gni:148
 
 ### deny_warnings
 
@@ -3162,7 +3161,7 @@ useful for including verification and other Bazel assembly specific targets.
 
 **Current value (from the default):** `[]`
 
-From //build/images/args.gni:212
+From //build/images/args.gni:211
 
 ### extra_gn_labels_for_bazel_inputs
 
@@ -4088,7 +4087,7 @@ Include an account partition in the FVM image if set to true.
 
 **Current value (from the default):** `false`
 
-From //build/images/args.gni:158
+From //build/images/args.gni:157
 
 ### include_clippy
 
@@ -4105,7 +4104,7 @@ Include fvm.blob.sparse.blk image into the build if set to true
 
 **Current value (from the default):** `false`
 
-From //build/images/args.gni:155
+From //build/images/args.gni:154
 
 ### include_internal_fonts
 
@@ -4131,7 +4130,7 @@ assembled_system().  See documentation there.
 
 **Current value (from the default):** `false`
 
-From //build/images/args.gni:176
+From //build/images/args.gni:175
 
 ### include_zxdb_large_tests
 
@@ -7109,7 +7108,7 @@ Example value: "//build/images/recovery"
 
 **Current value (from the default):** `"//build/images/zedboot"`
 
-From //build/images/args.gni:167
+From //build/images/args.gni:166
 
 ### recovery_logo_path
 
@@ -8289,7 +8288,7 @@ exactly what you are doing.
 
 **Current value (from the default):** `false`
 
-From //build/images/args.gni:187
+From //build/images/args.gni:186
 
 ### use_blink
 
@@ -8642,7 +8641,7 @@ is meant solely for developer debugging.
 
 **Current value (from the default):** `false`
 
-From //build/images/args.gni:172
+From //build/images/args.gni:171
 
 ### vim3_mcu_fan_default_level
 
