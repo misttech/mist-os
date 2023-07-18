@@ -557,15 +557,9 @@ impl<S: HandleOwner> StoreObjectHandle<S> {
             },
             async {
                 let mut deallocated = 0;
-                let aligned_size = round_up(self.txn_get_size(transaction), block_size)
-                    .ok_or(anyhow!(FxfsError::Inconsistent).context("flush: Bad size"))?;
                 for r in ranges {
-                    // TODO(fxbug.dev/122125): This check might be unnecessary.
-                    if r.start < aligned_size {
-                        deallocated += self
-                            .deallocate_old_extents(transaction, attribute_id, r.clone())
-                            .await?;
-                    }
+                    deallocated +=
+                        self.deallocate_old_extents(transaction, attribute_id, r.clone()).await?;
                 }
                 Result::<_, Error>::Ok(deallocated)
             }
