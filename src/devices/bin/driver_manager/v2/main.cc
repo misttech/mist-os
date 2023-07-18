@@ -2,13 +2,17 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#include "src/devices/bin/driver_manager/main.h"
+
 #include <fidl/fuchsia.boot/cpp/wire.h>
+#include <fidl/fuchsia.device.manager/cpp/fidl.h>
 #include <fidl/fuchsia.driver.index/cpp/wire.h>
 #include <fidl/fuchsia.io/cpp/wire.h>
 #include <fidl/fuchsia.kernel/cpp/wire.h>
 #include <getopt.h>
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async-loop/default.h>
+#include <lib/async/cpp/task.h>
 #include <lib/component/incoming/cpp/protocol.h>
 #include <lib/component/outgoing/cpp/outgoing_directory.h>
 #include <lib/fdio/directory.h>
@@ -34,20 +38,18 @@
 #include <memory>
 
 #include <fbl/string_printf.h>
+#include <fbl/unique_fd.h>
 
-#include "driver_host_loader_service.h"
-#include "fdio.h"
-#include "lib/async/cpp/task.h"
-#include "main.h"
 #include "src/devices/bin/driver_manager/devfs/devfs.h"
 #include "src/devices/bin/driver_manager/device_watcher.h"
+#include "src/devices/bin/driver_manager/driver_host_loader_service.h"
 #include "src/devices/bin/driver_manager/v2/driver_development_service.h"
+#include "src/devices/bin/driver_manager/v2/driver_runner.h"
 #include "src/devices/bin/driver_manager/v2/shutdown_manager.h"
 #include "src/devices/lib/log/log.h"
 #include "src/lib/storage/vfs/cpp/synchronous_vfs.h"
-#include "src/sys/lib/stdout-to-debuglog/cpp/stdout-to-debuglog.h"
-#include "system_instance.h"
-#include "v2/driver_runner.h"
+
+namespace fio = fuchsia_io;
 
 // Before this is run, the following is run:
 // StdoutToDebuglog::Init();

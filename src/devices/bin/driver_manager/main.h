@@ -5,7 +5,9 @@
 #ifndef SRC_DEVICES_BIN_DRIVER_MANAGER_MAIN_H_
 #define SRC_DEVICES_BIN_DRIVER_MANAGER_MAIN_H_
 
-#include "coordinator.h"
+#include <fidl/fuchsia.boot/cpp/wire.h>
+#include <lib/zx/result.h>
+
 #include "src/devices/bin/driver_manager/driver_manager_config.h"
 
 // Get the root job from the root job service.

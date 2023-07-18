@@ -213,9 +213,10 @@ source_set("lib") {
 
 executable("driver_manager") {
   sources = [
-    "dfv2_main.cc",
     "main.cc",
     "main.h",
+    "v1/main.cc",
+    "v2/main.cc",
   ]
 
   deps = [
