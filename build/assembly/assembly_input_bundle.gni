@@ -58,15 +58,6 @@ import("//build/python/python_action.gni")
 #    like:
 #      "no dependency provides the input <package_name>/package_manifest.json"
 #
-#   boot_driver_packages [optional]
-#     [list, GN scopes] A list of GN scopes that hold the driver packages to
-#     include in the bootfs package set. Packages listed here should not be
-#     listed in the bootfs_packages and will be included automatically in
-#     the bootfs package set as driver packages. The scope must have a
-#     `package_target` field pointing to the GN target of the fuchsia_package,
-#     and `driver_components` field containing a list of relative paths to
-#     driver components provided by the package, e.g. "meta/driver.cm"
-#
 #  bootfs_files_labels [optional]
 #    [list, GN labels] A list of GN labels of bootfs_files_for_assembly()
 #    targets to include in bootfs_files provided by this AIB.
@@ -430,11 +421,6 @@ template("assembly_input_bundle") {
     if (defined(invoker.base_driver_packages)) {
       base_drivers = invoker.base_driver_packages
     }
-
-    boot_drivers = []
-    if (defined(invoker.boot_driver_packages)) {
-      boot_drivers = invoker.boot_driver_packages
-    }
   }
 
   # Loop over the above sets of packages
@@ -444,7 +430,6 @@ template("assembly_input_bundle") {
             "cache",
             "base-drivers",
             "bootfs",
-            "boot-drivers",
           ]) {
     _package_target_details = []
     _package_target_details = package_sets[string_replace(set_name, "-", "_")]
@@ -466,7 +451,7 @@ template("assembly_input_bundle") {
             "${_package_out_dir}/${_package_name}/package_manifest.json"
         _manifest_path_rebased = rebase_path(_manifest_path, root_build_dir)
 
-        if (set_name == "base-drivers" || set_name == "boot-drivers") {
+        if (set_name == "base-drivers") {
           assert(defined(details.driver_components),
                  "driver_components must be specified for driver targets")
           _manifest_entries += [

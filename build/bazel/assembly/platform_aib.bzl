@@ -20,10 +20,9 @@ def _platform_aib_impl(ctx):
     base_pkg_list_file = _create_pkg_list_file(ctx, ctx.attr.base_packages, "base")
     cache_pkg_list_file = _create_pkg_list_file(ctx, ctx.attr.cache_packages, "cache")
     base_drivers_pkg_list_file = _create_pkg_list_file(ctx, ctx.attr.base_driver_packages, "base-drivers")
-    boot_drivers_pkg_list_file = _create_pkg_list_file(ctx, ctx.attr.boot_driver_packages, "boot-drivers")
     bootfs_pkg_list_file = _create_pkg_list_file(ctx, ctx.attr.bootfs_packages, "bootfs")
 
-    inputs = [base_pkg_list_file, cache_pkg_list_file, base_drivers_pkg_list_file, boot_drivers_pkg_list_file, bootfs_pkg_list_file]
+    inputs = [base_pkg_list_file, cache_pkg_list_file, base_drivers_pkg_list_file, bootfs_pkg_list_file]
     all_pkgs = ctx.attr.base_packages + ctx.attr.cache_packages + ctx.attr.base_driver_packages + ctx.attr.bootfs_packages
     inputs += [f for pkg in all_pkgs for f in pkg[FuchsiaPackageInfo].files]
     out_dir = ctx.actions.declare_directory(ctx.label.name)
@@ -41,8 +40,6 @@ def _platform_aib_impl(ctx):
             cache_pkg_list_file.path,
             "--base-drivers-pkg-list",
             base_drivers_pkg_list_file.path,
-            "--boot-drivers-pkg-list",
-            boot_drivers_pkg_list_file.path,
             "--bootfs-pkg-list",
             bootfs_pkg_list_file.path,
         ],
@@ -70,11 +67,6 @@ platform_aib = rule(
         ),
         "base_driver_packages": attr.label_list(
             doc = "Fuchsia driver packages to be included in base of this AIB",
-            providers = [FuchsiaPackageInfo],
-            default = [],
-        ),
-        "boot_driver_packages": attr.label_list(
-            doc = "Fuchsia boot driver packages to be included in bootfs of this AIB",
             providers = [FuchsiaPackageInfo],
             default = [],
         ),

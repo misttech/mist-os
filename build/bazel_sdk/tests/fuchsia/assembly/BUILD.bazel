@@ -64,7 +64,7 @@ fuchsia_product_configuration(
     cache_packages = [
         ":prebuilt_ams_light",
     ],
-    base_driver_packages = [
+    driver_packages = [
         ":prebuilt_driver",
     ],
     json_config = {

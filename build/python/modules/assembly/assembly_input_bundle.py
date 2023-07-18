@@ -110,8 +110,6 @@ class AssemblyInputBundle(ImageAssemblyConfig):
                 <package name>
             base_drivers/
                 <package name>
-            boot_drivers/
-                <package name>
             cache/
                 <package name>
             system/
@@ -160,7 +158,6 @@ class AssemblyInputBundle(ImageAssemblyConfig):
             "base": [ "package1", "package2" ],
             "cache": [ "package3", ... ],
             "base_drivers": [ "packageD1", ... ],
-            "boot_drivers": [ "packageD1", ... ],
             "system": [ "packageS1", ... ],
             "bootfs_packages": [ "packageB1", ... ],
             "bootfs_files_package": "packages/bootfs_packages/packageB2",
@@ -223,7 +220,6 @@ class AssemblyInputBundle(ImageAssemblyConfig):
     config_data: ConfigDataEntries = field(default_factory=dict)
     blobs: Set[FilePath] = field(default_factory=set)
     base_drivers: List[DriverDetails] = field(default_factory=list)
-    boot_drivers: List[DriverDetails] = field(default_factory=list)
     shell_commands: Dict[str, List[str]] = field(
         default_factory=functools.partial(defaultdict, list))
     packages_to_compile: List[Union[CompiledPackageMainDefinition,
@@ -392,16 +388,6 @@ class AIBCreator:
         # us to parse GN generated files
         self.provided_base_driver_details: List[dict] = list()
 
-        # Boot driver package manifests
-        self.boot_drivers: Set[FilePath] = set()
-
-        # Boot driver component distribution manifests
-        self.boot_driver_component_files: List[dict] = list()
-
-        # Additional boot drivers directly specified without requiring
-        # us to parse GN generated files
-        self.provided_boot_driver_details: List[dict] = list()
-
         # A set containing all the unique packageUrls seen by the AIBCreator instance
         self.package_urls: Set[str] = set()
 
@@ -459,7 +445,7 @@ class AIBCreator:
         deps.update(cache_deps)
         result.cache.update(cache_pkgs)
 
-        # Copy base driver packages into the base driver list of the assembly bundle
+        # Copy the driver packages into the base driver list of the assembly bundle
         for d in self.provided_base_driver_details:
             if d.package not in self.base_drivers:
                 self.base_drivers.add(d.package)
@@ -471,29 +457,10 @@ class AIBCreator:
          base_driver_deps) = self._copy_packages("base_drivers")
         deps.update(base_driver_deps)
 
-        (base_driver_details, base_driver_deps) = self._get_driver_details(
-            self.base_driver_component_files, self.provided_base_driver_details,
-            base_driver_pkgs)
+        (base_driver_details,
+         base_driver_deps) = self._get_base_driver_details(base_driver_pkgs)
         result.base_drivers.extend(base_driver_details)
         deps.update(base_driver_deps)
-
-        # Copy boot driver packages into the boot driver list of the assembly bundle
-        for d in self.provided_boot_driver_details:
-            if d.package not in self.boot_drivers:
-                self.boot_drivers.add(d.package)
-            else:
-                raise ValueError(
-                    f"Duplicate driver package {d} specified in"
-                    " base drivers list: {self.boot_drivers}")
-        (boot_driver_pkgs, boot_driver_blobs,
-         boot_driver_deps) = self._copy_packages("boot_drivers")
-        deps.update(boot_driver_deps)
-
-        (boot_driver_details, boot_driver_deps) = self._get_driver_details(
-            self.boot_driver_component_files, self.provided_boot_driver_details,
-            boot_driver_pkgs)
-        result.boot_drivers.extend(boot_driver_details)
-        deps.update(boot_driver_deps)
 
         # Copy the manifests for the system package set into the assembly bundle
         (system_pkgs, system_blobs, system_deps) = self._copy_packages("system")
@@ -522,8 +489,7 @@ class AIBCreator:
         # to make invalid merkles).
         all_blobs = {}
         for (merkle, source) in [*base_blobs, *cache_blobs, *base_driver_blobs,
-                                 *boot_driver_blobs, *system_blobs,
-                                 *bootfs_pkg_blobs]:
+                                 *system_blobs, *bootfs_pkg_blobs]:
             all_blobs[merkle] = source
 
         # Copy all the blobs to their dir in the out-of-tree layout
@@ -648,19 +614,17 @@ class AIBCreator:
 
         return (result, assembly_config_path, deps)
 
-    def _get_driver_details(
-            self, driver_component_files: List[dict],
-            provided_driver_details: List[dict],
-            driver_pkgs: Set[FilePath]) -> List[DriverDetails]:
-        """Read the driver package manifests and produce DriverDetails for the AIB config"""
-        driver_details_list: List[DriverDetails] = list()
+    def _get_base_driver_details(
+            self, base_driver_pkgs: Set[FilePath]) -> List[DriverDetails]:
+        """Read the base driver package manifests and produce BaseDriverDetails for the AIB config"""
+        base_driver_details: List[DriverDetails] = list()
 
         # The deps touched by this function.
         deps: DepSet = set()
 
         # Associate the set of base driver component files with their packages
         component_files: Dict[str, List[str]] = dict()
-        for component_manifest in driver_component_files:
+        for component_manifest in self.base_driver_component_files:
             with open(component_manifest["distribution_manifest"],
                       'r') as manifest_file:
                 manifest: List[Dict] = json.load(manifest_file)
@@ -677,7 +641,7 @@ class AIBCreator:
 
         # Include the component lists which were provided directly for
         # packages instead of those which were generated by GN metadata walks
-        for driver_details in provided_driver_details:
+        for driver_details in self.provided_base_driver_details:
             with open(driver_details.package, 'r') as file:
                 try:
                     manifest = json_load(PackageManifest, file)
@@ -690,11 +654,11 @@ class AIBCreator:
                 if component_files.get(package_name):
                     raise ValueError(
                         f"Duplicate package {package_name}"
-                        " specified in driver_packages and"
-                        " provided_driver_details list")
+                        " specified in base_driver_packages and"
+                        " provided_base_driver_details list")
                 component_files[package_name] = driver_details.components
 
-        for package_manifest_path in sorted(driver_pkgs):
+        for package_manifest_path in sorted(base_driver_pkgs):
             with open(os.path.join(self.outdir, package_manifest_path),
                       'r') as file:
                 try:
@@ -705,13 +669,13 @@ class AIBCreator:
                     ) from exc
 
                 package_name = manifest.package.name
-                driver_details_list.append(
+                base_driver_details.append(
                     DriverDetails(
                         package_manifest_path,
                         # Include the driver components specified for this package
                         component_files[package_name]))
 
-        return driver_details_list, deps
+        return base_driver_details, deps
 
     def _copy_packages(
         self,

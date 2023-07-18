@@ -74,9 +74,6 @@ import("//src/developer/ffx/build/ffx_action.gni")
 #   base_driver_packages (optional)
 #     [list of labels] The driver packages to include in the base package set.
 #
-#   boot_driver_packages (optional)
-#     [list of labels] The driver packages to include in the bootfs package set.
-#
 #   cache_packages (optional)
 #     [list of labels] The packages to cache in the images.
 #
@@ -481,7 +478,6 @@ template("assembled_system") {
 
   _base_packages = invoker.base_packages
   _base_driver_packages = []
-  _boot_driver_packages = []
   _cache_packages = []
   _universe_packages = []
   _meta_packages = []
@@ -502,10 +498,6 @@ template("assembled_system") {
   # go directly into bootfs.
   if (defined(invoker.base_driver_packages) && _supports_blobs) {
     _base_driver_packages = invoker.base_driver_packages
-  }
-
-  if (defined(invoker.boot_driver_packages) && _supports_blobs) {
-    _boot_driver_packages = invoker.boot_driver_packages
   }
 
   ramdisk_in_zbi = false
@@ -632,8 +624,6 @@ template("assembled_system") {
     }
 
     base_driver_packages = _base_driver_packages
-    boot_driver_packages = _boot_driver_packages
-
     if (include_shell_commands) {
       shell_command_packages =
           _base_packages + _universe_packages + _cache_packages

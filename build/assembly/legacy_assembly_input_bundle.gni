@@ -53,9 +53,6 @@ import("//src/storage/fshost/generated_fshost_config.gni")
 #   base_driver_packages [optional]
 #     [list of labels] The driver packages to include in the base package set.
 #
-#   boot_driver_packages [optional]
-#     [list of labels] The driver packages to include in the bootfs package set.
-#
 #   core_realm_definition [optional]
 #     [label] The GN label of a `core_realm_definition()` template
 #
@@ -151,11 +148,6 @@ template("legacy_assembly_input_bundle") {
     _base_driver_packages = invoker.base_driver_packages
   }
 
-  _boot_driver_packages = []
-  if (defined(invoker.boot_driver_packages)) {
-    _boot_driver_packages = invoker.boot_driver_packages
-  }
-
   _shell_command_packages = []
   if (defined(invoker.shell_command_packages)) {
     _shell_command_packages = invoker.shell_command_packages
@@ -189,10 +181,6 @@ template("legacy_assembly_input_bundle") {
         "${target_name}.package_manifest_list.base_drivers"
     driver_package_component_files =
         "${target_name}_driver_package_component_files"
-    boot_driver_package_list =
-        "${target_name}.package_manifest_list.boot_drivers"
-    boot_driver_package_component_files =
-        "${target_name}_boot_driver_package_component_files"
     shell_commands_manifest_list = "${target_name}.shell_commands_manifest_list"
     core_realm_shards_list = "${target_name}.core_realm_shards_list"
     core_realm_includes = "${target_name}.core_realm_includes"
@@ -236,10 +224,6 @@ template("legacy_assembly_input_bundle") {
         "${assembly_input_bundle_dir}.package_manifest_list.drivers"
     driver_package_component_files =
         "${target_gen_dir}/${target_name}.driver_package_component_files"
-    boot_driver_package_list =
-        "${assembly_input_bundle_dir}.package_manifest_list.boot_drivers"
-    boot_driver_package_component_files =
-        "${target_gen_dir}/${target_name}.boot_driver_package_component_files"
     shell_command_manifests_list =
         "${assembly_input_bundle_dir}.package_manifest_list.shell_commands"
     core_realm_shards_list =
@@ -270,29 +254,6 @@ template("legacy_assembly_input_bundle") {
     outputs = [ "${files.driver_package_component_files}" ]
     data_keys = [ "driver_package_component_files" ]
     walk_keys = [ "driver_package_component_files_barrier" ]
-    output_conversion = "json"
-  }
-
-  package_manifests_list(labels.boot_driver_package_list) {
-    forward_variables_from(invoker,
-                           [
-                             "testonly",
-                             "visibility",
-                           ])
-    filename = files.boot_driver_package_list
-    deps = _boot_driver_packages
-  }
-
-  generated_file(labels.boot_driver_package_component_files) {
-    forward_variables_from(invoker,
-                           [
-                             "deps",
-                             "testonly",
-                           ])
-    deps = _boot_driver_packages
-    outputs = [ "${files.boot_driver_package_component_files}" ]
-    data_keys = [ "boot_driver_package_component_files" ]
-    walk_keys = [ "boot_driver_package_component_files_barrier" ]
     output_conversion = "json"
   }
 
@@ -576,10 +537,6 @@ template("legacy_assembly_input_bundle") {
       rebase_path(files.driver_package_component_files, root_build_dir),
       "--bootfs-files-package",
       rebase_path(files.bootfs_files_package, root_build_dir),
-      "--boot-driver-packages-list",
-      rebase_path(files.boot_driver_package_list, root_build_dir),
-      "--boot-driver-components-files-list",
-      rebase_path(files.boot_driver_package_component_files, root_build_dir),
     ]
 
     # If packaging or archiving the AIB, write out the fini manifest needed to
@@ -597,14 +554,10 @@ template("legacy_assembly_input_bundle") {
       files.driver_package_component_files,
       files.image_assembly_config,
       files.bootfs_files_package,
-      files.boot_driver_package_list,
-      files.boot_driver_package_component_files,
     ]
 
     deps = [
       ":${labels.base_driver_package_list}",
-      ":${labels.boot_driver_package_component_files}",
-      ":${labels.boot_driver_package_list}",
       ":${labels.bootfs_files_package}",
       ":${labels.driver_package_component_files}",
       ":${labels.image_assembly_config}",
