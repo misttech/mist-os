@@ -7,6 +7,7 @@
 
 #include <lib/fit/function.h>
 #include <lib/inspect/cpp/inspect.h>
+#include <zircon/status.h>
 
 #include <queue>
 #include <unordered_map>
@@ -15,6 +16,7 @@
 #include "src/lib/fxl/macros.h"
 #include "src/ui/scenic/lib/input/gesture_contender.h"
 #include "src/ui/scenic/lib/input/gesture_contender_inspector.h"
+#include "src/ui/scenic/lib/input/internal_pointer_event.h"
 #include "src/ui/scenic/lib/view_tree/snapshot_types.h"
 
 namespace scenic_impl::input {
@@ -54,8 +56,6 @@ class TouchSourceBase : public GestureContender {
   // |respond_| must not destroy the TouchSourceBase object.
   TouchSourceBase(zx_koid_t channel_koid, zx_koid_t view_ref_koid,
                   fit::function<void(StreamId, const std::vector<GestureResponse>&)> respond,
-                  fit::function<void(zx_status_t)> close_channel,
-                  fit::function<void(AugmentedTouchEvent&, const InternalTouchEvent&)> augment,
                   GestureContenderInspector& inspector);
 
   void WatchBase(std::vector<fuchsia::ui::pointer::TouchResponse> responses,
@@ -66,6 +66,14 @@ class TouchSourceBase : public GestureContender {
                           fit::function<void()> callback);
 
   // TODO(fxbug.dev/78951): Implement ANR.
+
+  // Closes the FIDL channel. This triggers the destruction of the TouchSourceBase object through
+  // the error handler set in InputSystem. NOTE: No further method calls or member accesses should
+  // be made after CloseChannel(), since they might be made on a destroyed object.
+  virtual void CloseChannel(zx_status_t epitaph) = 0;
+
+  // Allows subtypes to add augmentations to each event.
+  virtual void Augment(AugmentedTouchEvent&, const InternalTouchEvent&) = 0;
 
  private:
   struct StreamData {
@@ -114,13 +122,6 @@ class TouchSourceBase : public GestureContender {
   std::vector<ReturnTicket> return_tickets_;
 
   const fit::function<void(StreamId, const std::vector<GestureResponse>&)> respond_;
-  // Closes the fidl channel. This triggers the destruction of the TouchSourceBase object through
-  // the error handler set in InputSystem. NOTE: No further method calls or member accesses should
-  // be made after close_channel_(), since they might be made on a destroyed object.
-  const fit::function<void(zx_status_t epitaph)> close_channel_;
-
-  // Used by some subtypes to add augmentations to each event.
-  const fit::function<void(AugmentedTouchEvent&, const InternalTouchEvent&)> augment_;
 
   // Tracks all streams that have had at least one event passed into UpdateStream(), and that
   // haven't either "been won and has ended", or "haven't been lost".

@@ -134,14 +134,10 @@ bool IsHold(fuchsia::ui::pointer::TouchResponseType response) {
 TouchSourceBase::TouchSourceBase(
     zx_koid_t channel_koid, zx_koid_t view_ref_koid,
     fit::function<void(StreamId, const std::vector<GestureResponse>&)> respond,
-    fit::function<void(zx_status_t)> close_channel,
-    fit::function<void(AugmentedTouchEvent&, const InternalTouchEvent&)> augment,
     GestureContenderInspector& inspector)
     : GestureContender(view_ref_koid),
       channel_koid_(channel_koid),
       respond_(std::move(respond)),
-      close_channel_(std::move(close_channel)),
-      augment_(std::move(augment)),
       inspector_(inspector) {}
 
 void TouchSourceBase::UpdateStream(StreamId stream_id, const InternalTouchEvent& event,
@@ -200,7 +196,7 @@ void TouchSourceBase::UpdateStream(StreamId stream_id, const InternalTouchEvent&
       }
     }
 
-    augment_(out_event, event);
+    Augment(out_event, event);
     pending_events_.push({.stream_id = stream_id, .event = std::move(out_event)});
   }
 
@@ -285,7 +281,7 @@ void TouchSourceBase::WatchBase(std::vector<fuchsia::ui::pointer::TouchResponse>
   const zx_status_t error = ValidateResponses(
       responses, return_tickets_, /*have_pending_callback*/ pending_callback_ != nullptr);
   if (error != ZX_OK) {
-    close_channel_(error);
+    CloseChannel(error);
     return;
   }
 
@@ -361,7 +357,7 @@ void TouchSourceBase::UpdateResponseBase(fuchsia::ui::pointer::TouchInteractionI
   TRACE_DURATION("input", "TouchSourceBase::UpdateResponse");
   const zx_status_t error = ValidateUpdateResponse(stream_identifier, response, ongoing_streams_);
   if (error != ZX_OK) {
-    close_channel_(error);
+    CloseChannel(error);
     return;
   }
 

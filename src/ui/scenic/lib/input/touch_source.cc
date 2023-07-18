@@ -14,10 +14,8 @@ TouchSource::TouchSource(zx_koid_t view_ref_koid,
                          fidl::ServerEnd<fuchsia_ui_pointer::TouchSource> touch_source,
                          fit::function<void(StreamId, const std::vector<GestureResponse>&)> respond,
                          fit::function<void()> error_handler, GestureContenderInspector& inspector)
-    : TouchSourceBase(
-          fsl::GetKoid(touch_source.channel().get()), view_ref_koid, std::move(respond),
-          [this](zx_status_t epitaph) { CloseChannel(epitaph); },
-          /*augment*/ [](auto&...) {}, inspector),
+    : TouchSourceBase(fsl::GetKoid(touch_source.channel().get()), view_ref_koid, std::move(respond),
+                      inspector),
       binding_(async_get_default_dispatcher(), std::move(touch_source), this,
                [error_handler = std::move(error_handler)](fidl::UnbindInfo) {
                  // NOTE: Triggers destruction of this object.
@@ -25,5 +23,6 @@ TouchSource::TouchSource(zx_koid_t view_ref_koid,
                }) {}
 
 void TouchSource::CloseChannel(zx_status_t epitaph) { binding_.Close(epitaph); }
+void TouchSource::Augment(AugmentedTouchEvent&, const InternalTouchEvent&) {}
 
 }  // namespace scenic_impl::input

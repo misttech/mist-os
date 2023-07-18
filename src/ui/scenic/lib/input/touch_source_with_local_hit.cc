@@ -19,18 +19,8 @@ TouchSourceWithLocalHit::TouchSourceWithLocalHit(
     fit::function<std::pair<zx_koid_t, std::array<float, 2>>(const InternalTouchEvent&)>
         get_local_hit,
     GestureContenderInspector& inspector)
-    : TouchSourceBase(
-          fsl::GetKoid(request.channel().get()), view_ref_koid, std::move(respond),
-          [this](zx_status_t epitaph) { CloseChannel(epitaph); },
-          /*augment*/
-          [this](AugmentedTouchEvent& out_event, const InternalTouchEvent& in_event) {
-            const auto [view_ref_koid, local_point] = get_local_hit_(in_event);
-            out_event.local_hit = {
-                .local_viewref_koid = view_ref_koid,
-                .local_point = local_point,
-            };
-          },
-          inspector),
+    : TouchSourceBase(fsl::GetKoid(request.channel().get()), view_ref_koid, std::move(respond),
+                      inspector),
       binding_(this, std::move(request)),
       error_handler_(std::move(error_handler)),
       get_local_hit_(std::move(get_local_hit)) {
@@ -65,6 +55,15 @@ void TouchSourceWithLocalHit::CloseChannel(zx_status_t epitaph) {
   binding_.Close(epitaph);
   // NOTE: Triggers destruction of this object.
   error_handler_();
+}
+
+void TouchSourceWithLocalHit::Augment(AugmentedTouchEvent& out_event,
+                                      const InternalTouchEvent& in_event) {
+  const auto [view_ref_koid, local_point] = get_local_hit_(in_event);
+  out_event.local_hit = {
+      .local_viewref_koid = view_ref_koid,
+      .local_point = local_point,
+  };
 }
 
 }  // namespace scenic_impl::input

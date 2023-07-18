@@ -7,8 +7,10 @@
 
 #include <fuchsia/ui/pointer/augment/cpp/fidl.h>
 #include <lib/fidl/cpp/binding.h>
+#include <zircon/status.h>
 
 #include "src/lib/fxl/macros.h"
+#include "src/ui/scenic/lib/input/internal_pointer_event.h"
 #include "src/ui/scenic/lib/input/touch_source_base.h"
 
 namespace scenic_impl::input {
@@ -41,9 +43,12 @@ class TouchSourceWithLocalHit : public TouchSourceBase,
     TouchSourceBase::UpdateResponseBase(stream, std::move(response), std::move(callback));
   }
 
- private:
-  void CloseChannel(zx_status_t epitaph);
+ protected:
+  // |TouchSourceBase|
+  void CloseChannel(zx_status_t epitaph) override;
+  void Augment(AugmentedTouchEvent&, const InternalTouchEvent&) override;
 
+ private:
   fidl::Binding<fuchsia::ui::pointer::augment::TouchSourceWithLocalHit> binding_;
   const fit::function<void()> error_handler_;
   const fit::function<std::pair<zx_koid_t, std::array<float, 2>>(const InternalTouchEvent&)>

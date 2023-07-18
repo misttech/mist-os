@@ -9,8 +9,10 @@
 #include <fidl/fuchsia.ui.pointer/cpp/hlcpp_conversion.h>
 #include <fuchsia/ui/pointer/cpp/fidl.h>
 #include <lib/fidl/cpp/binding.h>
+#include <zircon/status.h>
 
 #include "src/lib/fxl/macros.h"
+#include "src/ui/scenic/lib/input/internal_pointer_event.h"
 #include "src/ui/scenic/lib/input/touch_source_base.h"
 
 namespace scenic_impl::input {
@@ -52,9 +54,12 @@ class TouchSource : public TouchSourceBase, public fidl::Server<fuchsia_ui_point
         [completer = completer.ToAsync()]() mutable { completer.Reply(); });
   }
 
- private:
-  void CloseChannel(zx_status_t epitaph);
+ protected:
+  // |TouchSourceBase|
+  void CloseChannel(zx_status_t epitaph) override;
+  void Augment(AugmentedTouchEvent&, const InternalTouchEvent&) override;
 
+ private:
   fidl::ServerBinding<fuchsia_ui_pointer::TouchSource> binding_;
 };
 
