@@ -90,6 +90,9 @@ class TestSelections:
     # List of match groups with the set of tests selected by that match group.
     group_matches: typing.List[typing.Tuple[MatchGroup, typing.List[str]]]
 
+    # The threshold used to match these tests.
+    threshold: float
+
 
 def select_tests(
     entries: typing.List[Test], selection: typing.List[str]
@@ -119,6 +122,7 @@ def select_tests(
             entries.copy(),
             {test.info.name: 1.0 for test in entries},
             [],
+            THRESHOLD,
         )
 
     match_groups = _parse_selection_command_line(selection)
@@ -309,7 +313,7 @@ def select_tests(
     # Ensure tests match the input ordering for consistency.
     selected_tests = [e for e in entries if e in tests_to_run]
 
-    return TestSelections(selected_tests, dict(best_matches), group_matches)
+    return TestSelections(selected_tests, dict(best_matches), group_matches, THRESHOLD)
 
 
 def _parse_selection_command_line(
