@@ -436,22 +436,20 @@ impl LoopDeviceRegistry {
 
     fn find(&self, kernel: &Arc<Kernel>) -> Result<u32, Errno> {
         let mut devices = self.devices.lock();
-        let mut minor = 0;
-        loop {
+        for minor in 0..u32::MAX {
             match devices.entry(minor) {
                 Entry::Vacant(e) => {
                     e.insert(LoopDevice::new(kernel, minor));
                     return Ok(minor);
                 }
                 Entry::Occupied(e) => {
-                    if e.get().is_bound() {
-                        minor += 1;
-                        continue;
+                    if !e.get().is_bound() {
+                        return Ok(minor);
                     }
-                    return Ok(minor);
                 }
             }
         }
+        Err(errno!(ENODEV))
     }
 
     fn add(&self, kernel: &Arc<Kernel>, minor: u32) -> Result<(), Errno> {
