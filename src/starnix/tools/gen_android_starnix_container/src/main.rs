@@ -2,9 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use std::collections::HashMap;
+
 use anyhow::{Context, Result};
 use argh::FromArgs;
-use camino::Utf8PathBuf;
+use camino::{Utf8Path, Utf8PathBuf};
 use ext4_extract::ext4_extract;
 use fuchsia_pkg::{PackageBuilder, PackageManifest};
 use fuchsia_url::RelativePackageUrl;
@@ -28,6 +30,10 @@ struct Command {
     #[argh(option)]
     system: Utf8PathBuf,
 
+    /// path to an Android vendor partition image.
+    #[argh(option)]
+    vendor: Option<Utf8PathBuf>,
+
     /// path to hal package archive.
     #[argh(option)]
     hal: Vec<Utf8PathBuf>,
@@ -40,6 +46,32 @@ struct Command {
 fn main() -> Result<()> {
     let cmd: Command = argh::from_env();
     generate(cmd)
+}
+
+fn add_ext4_image(
+    name: impl AsRef<Utf8Path>,
+    outdir: impl AsRef<Utf8Path>,
+    image_path: impl AsRef<Utf8Path>,
+    builder: &mut PackageBuilder,
+) -> Result<HashMap<String, String>> {
+    // Put all the system image files into the container.
+    let name = name.as_ref();
+    let outdir = outdir.as_ref();
+    let image_path = image_path.as_ref();
+
+    let image_outdir = outdir.join(name);
+    std::fs::create_dir_all(&image_outdir)
+        .with_context(|| format!("Preparing directory for image files: {}", &image_outdir))?;
+    let image_files = ext4_extract(image_path.as_str(), image_outdir.as_str())
+        .context("Extracting system files")?;
+    for (dst, src) in &image_files {
+        let dst = format!("data/{}/{}", name, dst);
+        builder
+            .add_file_as_blob(dst, &src)
+            .with_context(|| format!("Adding blob from file: {}", &src))?;
+    }
+
+    Ok(image_files)
 }
 
 fn generate(cmd: Command) -> Result<()> {
@@ -81,17 +113,13 @@ fn generate(cmd: Command) -> Result<()> {
     }
 
     // Put all the system image files into the container.
-    let system_outdir = cmd.outdir.join("system");
-    std::fs::create_dir_all(&system_outdir)
-        .with_context(|| format!("Preparing directory for system files: {}", &system_outdir))?;
-    let system_files = ext4_extract(cmd.system.as_str(), system_outdir.as_str())
-        .context("Extracting system files")?;
-    for (dst, src) in &system_files {
-        let dst = format!("data/system/{}", dst);
-        builder
-            .add_file_as_blob(dst, &src)
-            .with_context(|| format!("Adding blob from file: {}", &src))?;
-        inputs_for_depfile.push(src.clone());
+    let system_files = add_ext4_image("system", &cmd.outdir, &cmd.system, &mut builder)?;
+    inputs_for_depfile.extend(system_files.into_values());
+
+    // Combine the vendor image with the system image.
+    if let Some(vendor_path) = cmd.vendor {
+        let vendor_files = add_ext4_image("vendor", &cmd.outdir, &vendor_path, &mut builder)?;
+        inputs_for_depfile.extend(vendor_files.into_values());
     }
 
     // Build the starnix container.
@@ -158,6 +186,7 @@ mod tests {
             outdir: outdir.to_owned(),
             base: base_manifest_path,
             system: Utf8PathBuf::from_str(EXT4_IMAGE_PATH).unwrap(),
+            vendor: Some(Utf8PathBuf::from_str(EXT4_IMAGE_PATH).unwrap()),
             hal: vec![hal_manifest_path],
             depfile: None,
         };
@@ -169,7 +198,7 @@ mod tests {
         let manifest = PackageManifest::try_load_from(manifest_path).unwrap();
         assert_eq!(manifest.name().as_ref(), "test-name");
         let (blobs, subpackages) = manifest.into_blobs_and_subpackages();
-        assert_eq!(blobs.len(), 4);
+        assert_eq!(blobs.len(), 6);
         assert_eq!(subpackages.len(), 1);
         let blob_filenames: Vec<String> = blobs.into_iter().map(|b| b.path).collect();
         let subpackage_names: Vec<String> = subpackages.into_iter().map(|s| s.name).collect();
@@ -180,6 +209,8 @@ mod tests {
                 "data/system/13".to_string(),
                 "data/system/metadata.v1".to_string(),
                 "data/test".to_string(),
+                "data/vendor/13".to_string(),
+                "data/vendor/metadata.v1".to_string(),
             ]
         );
         assert_eq!(subpackage_names, vec!["test-hal".to_string(),]);
@@ -207,6 +238,7 @@ mod tests {
             system: Utf8PathBuf::from_str(EXT4_IMAGE_PATH).unwrap(),
             hal: vec![hal_manifest_path],
             depfile: None,
+            vendor: None,
         };
         generate(cmd).unwrap();
 
