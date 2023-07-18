@@ -13,6 +13,7 @@ group("tests") {
   deps = [
     ":audio_services_device_registry_unittests",
     ":audio_services_device_registry_warning_unittests",
+    "testing",
   ]
 }
 
@@ -165,7 +166,7 @@ source_set("unittest_base") {
 
   public_deps = [
     ":device_registry_lib",
-    "testing",
+    "testing:fakes",
     "//src/lib/fxl/test:gtest_main",
     "//src/lib/testing/loop_fixture",
     "//src/media/audio/lib/clock",
