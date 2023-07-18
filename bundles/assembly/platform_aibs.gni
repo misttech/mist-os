@@ -146,10 +146,8 @@ user_platform_aib_names =
 
       # UI
       "ui",
-      "ui_legacy",
       "ui_user_and_userdebug",
       "ui_package_user_and_userdebug",
-      "ui_legacy_package_user_and_userdebug",
 
       # Drivers
       "radar_proxy_without_injector",
@@ -212,7 +210,6 @@ eng_only_platform_aib_names =
       # UI
       "ui_eng",
       "ui_package_eng",
-      "ui_legacy_package_eng",
 
       # Example AIB
       "example_assembly_bundle",
