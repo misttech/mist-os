@@ -128,7 +128,11 @@ group("fuchsia.vbmeta") {
 group("record_filesystem_sizes") {
   testonly = true
   if (!use_bringup_assembly) {
-    deps = [ "//build/images/sizes:elf_sizes.json" ]
+    if (use_bazel_images_only) {
+      deps = [ "${bazel_product_bundle_target}_elf_sizes" ]
+    } else {
+      deps = [ "//build/images/sizes:elf_sizes.json" ]
+    }
   }
 }
 
@@ -272,12 +276,6 @@ group("default-images") {
         "//build/images/tools:bootserver",
       ]
     }
-
-    if (!bootfs_only) {
-      if (!use_bringup_assembly) {
-        deps += [ ":record_filesystem_sizes" ]
-      }
-    }
   }
 
   if (build_uefi_disk) {
@@ -306,6 +304,12 @@ group("default-images") {
         "size_checker:run_product_size_checker",
         "size_checker:size_report.json",
       ]
+    }
+  }
+
+  if (!bootfs_only) {
+    if (!use_bringup_assembly) {
+      deps += [ ":record_filesystem_sizes" ]
     }
   }
 

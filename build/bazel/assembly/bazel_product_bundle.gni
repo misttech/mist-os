@@ -331,7 +331,8 @@ template("bazel_product_bundle") {
           {
             name = "elf_sizes.json"
             type = "manifest"
-            path = rebase_path(_elf_sizes_ninja_out_path, root_build_dir)
+            path = rebase_path("${target_gen_dir}/${_elf_sizes_ninja_out_path}",
+                               root_build_dir)
           },
         ]
       }
