@@ -17,7 +17,7 @@ use std::{
 
 use crate::{
     device::{
-        framebuffer::Framebuffer, input::InputFile, loopback::LoopDeviceRegistry, BinderDriver,
+        framebuffer::Framebuffer, input::InputFile, loop_device::LoopDeviceRegistry, BinderDriver,
         DeviceMode, DeviceRegistry,
     },
     fs::{

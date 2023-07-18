@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 use crate::{
-    device::{loopback::loop_device_init, mem::mem_device_init, misc::misc_device_init},
+    device::{loop_device::loop_device_init, mem::mem_device_init, misc::misc_device_init},
     fs::devpts::tty_device_init,
     task::Kernel,
 };

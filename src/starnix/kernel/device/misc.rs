@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use crate::{
-    device::{loopback::LoopControlDevice, mem::DevRandom, DeviceMode},
+    device::{loop_device::LoopControlDevice, mem::DevRandom, DeviceMode},
     fs::{
         fuse::DevFuse,
         kobject::{KObjectDeviceAttribute, KType},
