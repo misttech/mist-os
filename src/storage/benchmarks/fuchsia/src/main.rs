@@ -72,9 +72,7 @@ fn add_io_benchmarks(benchmark_set: &mut BenchmarkSet) {
     add_benchmarks!(
         benchmark_set,
         [
-            ReadSequentialCold::new(OP_SIZE, OP_COUNT),
             ReadSequentialWarm::new(OP_SIZE, OP_COUNT),
-            ReadRandomCold::new(OP_SIZE, OP_COUNT),
             ReadRandomWarm::new(OP_SIZE, OP_COUNT),
             WriteSequentialCold::new(OP_SIZE, OP_COUNT),
             WriteSequentialWarm::new(OP_SIZE, OP_COUNT),
@@ -84,6 +82,11 @@ fn add_io_benchmarks(benchmark_set: &mut BenchmarkSet) {
             WriteSequentialFsyncWarm::new(OP_SIZE, OP_COUNT),
         ],
         [Fxfs, F2fs, Memfs, Minfs]
+    );
+    add_benchmarks!(
+        benchmark_set,
+        [ReadSequentialCold::new(OP_SIZE, OP_COUNT), ReadRandomCold::new(OP_SIZE, OP_COUNT),],
+        [Fxfs, F2fs, Minfs]
     );
 }
 
@@ -100,12 +103,12 @@ fn add_directory_benchmarks(benchmark_set: &mut BenchmarkSet) {
             StatPath::new(),
             OpenFile::new(),
             OpenDeeplyNestedFile::new(),
-            WalkDirectoryTreeCold::new(dts, 20),
             WalkDirectoryTreeWarm::new(dts, 20),
             GitStatus::new(),
         ],
         [Fxfs, F2fs, Memfs, Minfs]
     );
+    add_benchmarks!(benchmark_set, [WalkDirectoryTreeCold::new(dts, 20)], [Fxfs, F2fs, Minfs]);
 }
 
 fn add_blob_benchmarks(benchmark_set: &mut BenchmarkSet) {

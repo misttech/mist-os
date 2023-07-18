@@ -18,7 +18,6 @@ fuchsia.storage: PageInBlobSequentialUncompressed/blobfs
 fuchsia.storage: PageInBlobSequentialUncompressed/fxblob
 fuchsia.storage: ReadRandomCold/8192/f2fs
 fuchsia.storage: ReadRandomCold/8192/fxfs
-fuchsia.storage: ReadRandomCold/8192/memfs
 fuchsia.storage: ReadRandomCold/8192/minfs
 fuchsia.storage: ReadRandomWarm/8192/f2fs
 fuchsia.storage: ReadRandomWarm/8192/fxfs
@@ -26,7 +25,6 @@ fuchsia.storage: ReadRandomWarm/8192/memfs
 fuchsia.storage: ReadRandomWarm/8192/minfs
 fuchsia.storage: ReadSequentialCold/8192/f2fs
 fuchsia.storage: ReadSequentialCold/8192/fxfs
-fuchsia.storage: ReadSequentialCold/8192/memfs
 fuchsia.storage: ReadSequentialCold/8192/minfs
 fuchsia.storage: ReadSequentialWarm/8192/f2fs
 fuchsia.storage: ReadSequentialWarm/8192/fxfs
@@ -38,7 +36,6 @@ fuchsia.storage: StatPath/memfs
 fuchsia.storage: StatPath/minfs
 fuchsia.storage: WalkDirectoryTreeCold/Files3/Dirs2/Depth5/f2fs
 fuchsia.storage: WalkDirectoryTreeCold/Files3/Dirs2/Depth5/fxfs
-fuchsia.storage: WalkDirectoryTreeCold/Files3/Dirs2/Depth5/memfs
 fuchsia.storage: WalkDirectoryTreeCold/Files3/Dirs2/Depth5/minfs
 fuchsia.storage: WalkDirectoryTreeWarm/Files3/Dirs2/Depth5/f2fs
 fuchsia.storage: WalkDirectoryTreeWarm/Files3/Dirs2/Depth5/fxfs

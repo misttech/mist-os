@@ -14,9 +14,7 @@ use {
     fuchsia_component::client::{connect_to_childs_protocol, open_childs_exposed_directory},
     fuchsia_zircon as zx,
     std::path::Path,
-    storage_benchmarks::{
-        BlockDeviceFactory, CacheClearableFilesystem, Filesystem, FilesystemConfig,
-    },
+    storage_benchmarks::{BlockDeviceFactory, Filesystem, FilesystemConfig},
 };
 
 /// Config object for starting Memfs instances.
@@ -101,12 +99,6 @@ impl Filesystem for MemfsInstance {
     fn benchmark_dir(&self) -> &Path {
         Path::new(MOUNT_PATH)
     }
-}
-
-// TODO(http://fxbug.dev/130451) Memfs shouldn't implemented CacheClearableFilesystem.
-#[async_trait]
-impl CacheClearableFilesystem for MemfsInstance {
-    async fn clear_cache(&mut self) {}
 }
 
 #[cfg(test)]
