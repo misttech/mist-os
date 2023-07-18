@@ -6,6 +6,7 @@
 #define SRC_LIB_DDKTL_INCLUDE_DDKTL_COMPOSITE_NODE_SPEC_H_
 
 #include <lib/ddk/device.h>
+#include <lib/stdcompat/span.h>
 
 namespace ddk {
 
