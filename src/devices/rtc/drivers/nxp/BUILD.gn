@@ -35,6 +35,11 @@ fuchsia_driver_component("nxp") {
   manifest = "meta/nxp.cml"
 }
 
+fuchsia_driver_package("nxp-pkg") {
+  driver_components = [ ":nxp" ]
+  package_name = "nxp"
+}
+
 group("tests") {
   testonly = true
   deps = [ ":pcf8563_rtc_bind_test" ]
