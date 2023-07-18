@@ -1,0 +1,61 @@
+// Copyright 2022 The Fuchsia Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style license that can be
+// found in the LICENSE file.
+{
+    include: [
+        "//src/graphics/display/bin/coordinator-connector/meta/display_coordinator_connector.shard.cml",
+        "//src/ui/meta/a11y_routes.shard.cml",
+        "//src/ui/meta/scene_manager_routes.shard.cml",
+        "//src/ui/meta/scenic_routes.shard.cml",
+        "//src/ui/meta/text_manager_routes.shard.cml",
+        "//src/ui/meta/virtual_keyboard_manager_routes.shard.cml",
+        "inspect/offer.shard.cml",
+        "syslog/client.shard.cml",
+    ],
+    children: [
+        {
+            name: "display-coordinator-connector",
+            url: "fuchsia-pkg://fuchsia.com/display-coordinator-connector#meta/display-coordinator-connector.cm",
+        },
+    ],
+    offer: [
+        {
+            protocol: [ "fuchsia.media.sounds.Player" ],
+            from: "parent",
+            to: [ "#scene_manager" ],
+        },
+
+        // TODO(fxbug.dev/110642): Remove once gfx is deprecated.
+        {
+            protocol: [ "fuchsia.ui.accessibility.view.Registry" ],
+            from: "#scene_manager",
+            to: [ "#a11y_manager" ],
+        },
+        {
+            protocol: [
+                "fuchsia.factory.MiscFactoryStoreProvider",
+                "fuchsia.settings.Light",
+                "fuchsia.ui.brightness.Control",
+            ],
+            from: "parent",
+            to: [ "#scene_manager" ],
+            availability: "same_as_target",
+        },
+        {
+            protocol: [ "fuchsia.hardware.display.Provider" ],
+            from: "#display-coordinator-connector",
+            to: [ "#scenic" ],
+        },
+        {
+            protocol: [ "fuchsia.ui.composition.internal.DisplayOwnership" ],
+            from: "#scenic",
+            to: [ "#scene_manager" ],
+        },
+    ],
+    expose: [
+        {
+            protocol: "fuchsia.lightsensor.Sensor",
+            from: "#scene_manager",
+        },
+    ],
+}
