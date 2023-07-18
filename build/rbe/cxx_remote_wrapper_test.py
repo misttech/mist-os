@@ -364,7 +364,7 @@ class CxxRemoteActionTests(unittest.TestCase):
                 # create the remote action
                 self.assertEqual(c.prepare(), 0)
 
-            mock_check.asert_called_once()
+            mock_check.assert_called_once()
             self.assertEqual(
                 set(c.remote_action.always_download), set([depfile]))
             self.assertEqual(c.remote_action.remote_working_dir, remote_cwd)
