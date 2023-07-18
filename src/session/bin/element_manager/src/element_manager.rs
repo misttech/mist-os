@@ -137,10 +137,6 @@ pub struct ElementManager {
     /// The component that is running the `ElementManager` must have a collection in its CML file
     /// for each collection listed in `collections_config`.
     collection_config: CollectionConfig,
-
-    /// Returns whether the client should use Flatland to interact with Scenic.
-    /// TODO(fxbug.dev/64206): Remove after Flatland migration is completed.
-    scenic_uses_flatland: bool,
 }
 
 impl ElementManager {
@@ -148,14 +144,8 @@ impl ElementManager {
         realm: fcomponent::RealmProxy,
         graphical_presenter_connector: Option<GraphicalPresenterConnector>,
         collection_config: CollectionConfig,
-        scenic_uses_flatland: bool,
     ) -> ElementManager {
-        ElementManager {
-            realm,
-            graphical_presenter_connector,
-            collection_config,
-            scenic_uses_flatland,
-        }
+        ElementManager { realm, graphical_presenter_connector, collection_config }
     }
 
     /// Launches a component as an element.
@@ -260,42 +250,18 @@ impl ElementManager {
         annotation_controller: Option<ClientEnd<felement::AnnotationControllerMarker>>,
     ) -> Result<(fuiapp::ViewProviderProxy, felement::ViewControllerProxy), Error> {
         let view_provider = element.connect_to_protocol::<fuiapp::ViewProviderMarker>()?;
-        let scenic::ViewRefPair { control_ref, view_ref } = scenic::ViewRefPair::new()?;
-        let view_ref_dup = scenic::duplicate_view_ref(&view_ref)?;
-        let mut view_spec = felement::ViewSpec {
+
+        let link_token_pair = scenic::flatland::ViewCreationTokenPair::new()?;
+        view_provider.create_view2(fuiapp::CreateView2Args {
+            view_creation_token: Some(link_token_pair.view_creation_token),
+            ..Default::default()
+        })?;
+
+        let view_spec = felement::ViewSpec {
             annotations: Some(initial_annotations),
-            view_ref: Some(view_ref_dup),
+            viewport_creation_token: Some(link_token_pair.viewport_creation_token),
             ..Default::default()
         };
-
-        if self.scenic_uses_flatland {
-            let link_token_pair = scenic::flatland::ViewCreationTokenPair::new()?;
-
-            view_provider.create_view2(fuiapp::CreateView2Args {
-                view_creation_token: Some(link_token_pair.view_creation_token),
-                ..Default::default()
-            })?;
-
-            view_spec.viewport_creation_token = Some(link_token_pair.viewport_creation_token);
-
-            // TODO(fxbug.dev/86649): Instead of passing |view_ref_dup| we should let the child send
-            // us the one they minted for Flatland.
-        } else {
-            let token_pair = scenic::ViewTokenPair::new()?;
-
-            // note: this call will never fail since connecting to a service is
-            // always successful and create_view doesn't have a return value.
-            // If there is no view provider, the view_holder_token will be invalidated
-            // and the presenter can choose to close the view controller if it
-            // only wants to allow graphical views.
-            view_provider.create_view_with_view_ref(
-                token_pair.view_token.value,
-                control_ref,
-                view_ref,
-            )?;
-
-            view_spec.view_holder_token = Some(token_pair.view_holder_token);
-        }
 
         let (view_controller_proxy, server_end) =
             fidl::endpoints::create_proxy::<felement::ViewControllerMarker>()?;
@@ -612,7 +578,7 @@ mod tests {
         })
         .unwrap();
 
-        let element_manager = ElementManager::new(realm, None, example_collection_config(), false);
+        let element_manager = ElementManager::new(realm, None, example_collection_config());
 
         let result = element_manager.launch_element(component_url, child_name).await;
         let element = result.unwrap();
@@ -669,7 +635,7 @@ mod tests {
         })
         .unwrap();
 
-        let element_manager = ElementManager::new(realm, None, example_collection_config(), false);
+        let element_manager = ElementManager::new(realm, None, example_collection_config());
 
         let result = element_manager.launch_element(component_url, child_name).await;
         let element = result.unwrap();
@@ -704,7 +670,7 @@ mod tests {
             }
         })
         .unwrap();
-        let element_manager = ElementManager::new(realm, None, example_collection_config(), false);
+        let element_manager = ElementManager::new(realm, None, example_collection_config());
 
         let result = element_manager.launch_element(component_url, "").await;
         assert!(result.is_err());
@@ -741,7 +707,7 @@ mod tests {
             }
         })
         .unwrap();
-        let element_manager = ElementManager::new(realm, None, example_collection_config(), false);
+        let element_manager = ElementManager::new(realm, None, example_collection_config());
 
         let result = element_manager.launch_element(component_url, "").await;
         assert!(result.is_err());
@@ -784,7 +750,7 @@ mod tests {
         })
         .unwrap();
 
-        let element_manager = ElementManager::new(realm, None, example_collection_config(), false);
+        let element_manager = ElementManager::new(realm, None, example_collection_config());
 
         let result = element_manager.launch_element(component_url, "").await;
         assert!(result.is_err());
@@ -824,7 +790,7 @@ mod tests {
             }
         })
         .unwrap();
-        let element_manager = ElementManager::new(realm, None, example_collection_config(), false);
+        let element_manager = ElementManager::new(realm, None, example_collection_config());
 
         let element = element_manager.launch_element(component_url, "").await.unwrap();
         let exposed_dir = element.directory_channel();

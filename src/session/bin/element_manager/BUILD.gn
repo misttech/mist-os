@@ -19,7 +19,6 @@ rustc_binary("element_manager_bin") {
     "//sdk/fidl/fuchsia.element:fuchsia.element_rust",
     "//sdk/fidl/fuchsia.mem:fuchsia.mem_rust",
     "//sdk/fidl/fuchsia.ui.app:fuchsia.ui.app_rust",
-    "//sdk/fidl/fuchsia.ui.scenic:fuchsia.ui.scenic_rust",
     "//src/lib/async-utils",
     "//src/lib/diagnostics/inspect/rust",
     "//src/lib/fdio/rust:fdio",

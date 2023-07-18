@@ -22,7 +22,6 @@ use {
     element_config::Config,
     fidl_connector::ServiceReconnector,
     fidl_fuchsia_component as fcomponent, fidl_fuchsia_element as felement,
-    fidl_fuchsia_ui_scenic::ScenicMarker,
     fuchsia_component::{client::connect_to_protocol, server::ServiceFs},
     futures::StreamExt,
     std::rc::Rc,
@@ -50,13 +49,6 @@ async fn main() -> Result<(), Error> {
     let graphical_presenter =
         Box::new(ServiceReconnector::<felement::GraphicalPresenterMarker>::new());
 
-    // TODO(fxbug.dev/64206): Remove after Flatland migration is completed.
-    let scenic_uses_flatland = fuchsia_component::client::connect_to_protocol::<ScenicMarker>()
-        .expect("Failed to connect to Scenic.")
-        .uses_flatland()
-        .await
-        .expect("Failed to get flatland info.");
-
     let collection_config = CollectionConfig {
         url_to_collection: config
             .url_to_collection
@@ -72,12 +64,8 @@ async fn main() -> Result<(), Error> {
 
     info!("Element collection policy: #{:?}", collection_config);
 
-    let element_manager = Rc::new(ElementManager::new(
-        realm,
-        Some(graphical_presenter),
-        collection_config,
-        scenic_uses_flatland,
-    ));
+    let element_manager =
+        Rc::new(ElementManager::new(realm, Some(graphical_presenter), collection_config));
 
     let mut fs = ServiceFs::new_local();
     fs.dir("svc").add_fidl_service(ExposedServices::Manager);
@@ -217,11 +205,10 @@ mod tests {
             .unwrap();
         let graphical_presenter_connector = Box::new(MockConnector::new(graphical_presenter));
 
-        let element_manager = Box::new(ElementManager::new(
+        let element_manager: Box<ElementManager> = Box::new(ElementManager::new(
             realm,
             Some(graphical_presenter_connector),
             collection_config,
-            false,
         ));
         let manager_proxy = spawn_manager_server(element_manager);
 
