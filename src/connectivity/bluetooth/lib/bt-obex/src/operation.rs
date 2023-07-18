@@ -513,7 +513,7 @@ mod tests {
     #[fuchsia::test]
     fn construct_setpath() {
         // A request with all flags enabled & Name header is valid.
-        let headers = HeaderSet::from_header(Header::Name("foo".into())).unwrap();
+        let headers = HeaderSet::from_header(Header::name("foo")).unwrap();
         let _request = RequestPacket::new_set_path(SetPathFlags::all(), headers.clone())
             .expect("valid set path args");
 
@@ -563,7 +563,7 @@ mod tests {
             0x01, 0x00, 0xb, 0x00, 0x66, 0x00, 0x75, 0x00, 0x6e, 0x00, 0x00, // Name = "fun"
         ];
         let decoded = RequestPacket::decode(&request_buf[..]).expect("valid request");
-        let expected_headers = HeaderSet::from_headers(vec![Header::Name("fun".into())]).unwrap();
+        let expected_headers = HeaderSet::from_headers(vec![Header::name("fun")]).unwrap();
         let expected = RequestPacket::new(OpCode::Disconnect, vec![], expected_headers);
         assert_eq!(decoded, expected);
     }
@@ -634,7 +634,7 @@ mod tests {
 
     #[fuchsia::test]
     fn encode_setpath_request_success() {
-        let headers = HeaderSet::from_headers(vec![Header::Name("bar".into())]).unwrap();
+        let headers = HeaderSet::from_headers(vec![Header::name("bar")]).unwrap();
         let request = RequestPacket::new_set_path(SetPathFlags::all(), headers).unwrap();
         assert_eq!(request.encoded_len(), 16);
         let mut buf = vec![0; request.encoded_len()];
@@ -658,7 +658,7 @@ mod tests {
             0x01, 0x00, 0x09, 0x00, 0x61, 0x00, 0x72, 0x00, 0x00, // Name Header = "ar"
         ];
         let decoded = RequestPacket::decode(&request_buf[..]).expect("valid request");
-        let expected_headers = HeaderSet::from_headers(vec![Header::Name("ar".into())]).unwrap();
+        let expected_headers = HeaderSet::from_headers(vec![Header::name("ar")]).unwrap();
         let expected = RequestPacket::new(OpCode::SetPath, vec![0x02, 0x00], expected_headers);
         assert_eq!(decoded, expected);
     }

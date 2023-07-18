@@ -336,7 +336,10 @@ pub struct UserDefinedHeader {
 #[derive(Clone, Debug, PartialEq)]
 pub enum Header {
     Count(u32),
-    Name(ObexString),
+    /// The Name header can be empty which is a special parameter for the GET and SETPATH
+    /// operations. It is also valid to provide a Name header with an empty OBEX string.
+    /// See OBEX 1.5 Section 2.2.2.
+    Name(Option<ObexString>),
     Type(MimeType),
     /// Number of bytes.
     Length(u32),
@@ -435,7 +438,8 @@ impl Header {
             | SingleResponseModeParameters(_) => 1,
             Count(_) | Length(_) | ConnectionId(_) | CreatorId(_) | Permissions(_)
             | Time4Byte(_) => 4,
-            Name(s) | Description(s) | DestName(s) => s.len(),
+            Name(option_str) => option_str.as_ref().map_or(0, |s| s.len()),
+            Description(s) | DestName(s) => s.len(),
             Target(b)
             | Http(b)
             | Body(b)
@@ -451,6 +455,14 @@ impl Header {
             WanUuid(_) => Uuid::BLUETOOTH_UUID_LENGTH_BYTES,
             User(UserDefinedHeader { value, .. }) => value.len(),
         }
+    }
+
+    pub fn name(s: &str) -> Self {
+        Self::Name(Some(s.into()))
+    }
+
+    pub fn empty_name() -> Self {
+        Self::Name(None)
     }
 }
 
@@ -492,8 +504,8 @@ impl Encodable for Header {
                 // Encode all 4-byte value headers.
                 buf[start_index..start_index + 4].copy_from_slice(&v.to_be_bytes());
             }
-
-            Name(str) | Description(str) | DestName(str) => {
+            Name(None) => {} // An "empty" Name only encodes the HeaderIdentifier & Length (3).
+            Name(Some(str)) | Description(str) | DestName(str) => {
                 // Encode all ObexString Headers.
                 let s = str.to_be_bytes();
                 buf[start_index..start_index + s.len()].copy_from_slice(&s);
@@ -593,7 +605,10 @@ impl Decodable for Header {
             HeaderIdentifier::Count => {
                 Ok(Header::Count(u32::from_be_bytes(data[..].try_into().unwrap())))
             }
-            HeaderIdentifier::Name => Ok(Header::Name(ObexString::try_from(data)?)),
+            HeaderIdentifier::Name => {
+                let name = if data.len() == 0 { None } else { Some(ObexString::try_from(data)?) };
+                Ok(Header::Name(name))
+            }
             HeaderIdentifier::Type => Ok(Header::Type(MimeType::try_from(data)?)),
             HeaderIdentifier::Length => {
                 Ok(Header::Length(u32::from_be_bytes(data[..].try_into().unwrap())))
@@ -860,7 +875,7 @@ mod tests {
             0x4e, 0x00, 0x47, 0x00, 0x2e, 0x00, 0x44, 0x00, 0x4f, 0x00, 0x43, 0x00, 0x00,
         ];
         let result = Header::decode(&name_buf).expect("can decode name header");
-        assert_eq!(result, Header::Name("THING.DOC".into()));
+        assert_eq!(result, Header::name("THING.DOC"));
 
         // Byte Sequence Header
         let object_class_buf = [
@@ -943,6 +958,43 @@ mod tests {
 
         // The timestamp Header should never produce an Error since the timestamp is bounded by
         // u32::MAX, whereas the only potential failure case in NaiveDateTime is i64::MAX.
+    }
+
+    #[fuchsia::test]
+    fn decode_name_header_success() {
+        let empty_name_buf = [
+            0x01, // HI = Name
+            0x00, 0x03, // Total length = 3
+        ];
+        let result = Header::decode(&empty_name_buf).expect("can decode empty name");
+        assert_eq!(result, Header::Name(None));
+
+        let empty_string_name_buf = [
+            0x01, // HI = Name
+            0x00, 0x05, // Total length = 5
+            0x00, 0x00, // Name = "" (null terminated)
+        ];
+        let result = Header::decode(&empty_string_name_buf).expect("can decode empty string name");
+        assert_eq!(result, Header::Name(Some("".into())));
+
+        let name_buf = [
+            0x01, // HI = Name
+            0x00, 0x0b, // Total length = 11
+            0x00, 0x44, 0x00, 0x4f, 0x00, 0x43, 0x00, 0x00, // Name = "DOC" (null terminated)
+        ];
+        let result = Header::decode(&name_buf).expect("can decode empty string name");
+        assert_eq!(result, Header::Name(Some("DOC".into())));
+    }
+
+    #[fuchsia::test]
+    fn decode_invalid_name_header_is_error() {
+        let invalid_name_buf = [
+            0x01, // HI = Name
+            0x00, 0x09, // Total length = 9
+            0x00, 0x44, 0x00, 0x4f, 0x00, 0x43, // Name = "DOC" (missing null terminator)
+        ];
+        let result = Header::decode(&invalid_name_buf);
+        assert_matches!(result, Err(PacketError::Data(_)));
     }
 
     #[fuchsia::test]
@@ -1080,6 +1132,33 @@ mod tests {
             0x00, 0x00, 0x18, 0x0d, 0x00, 0x00, 0x10, 0x00, 0x80, 0x00, 0x00, 0x80, 0x5f, 0x9b,
             0x34, 0xfb, // UUID (stringified) = "0000180d-0000-1000-8000-00805f9b34fb"
         ];
+        assert_eq!(buf, expected_buf);
+    }
+
+    #[fuchsia::test]
+    fn encode_name_header_success() {
+        let empty_name = Header::empty_name();
+        // Total length should be 3 bytes (ID, length). No name.
+        assert_eq!(empty_name.encoded_len(), 3);
+        let mut buf = vec![0; empty_name.encoded_len()];
+        empty_name.encode(&mut buf).expect("can encode");
+        let expected_buf = [0x01, 0x00, 0x03];
+        assert_eq!(buf, expected_buf);
+
+        let empty_string_name = Header::name("");
+        // Total length should be 5 bytes (ID, 2-byte length). Null terminated empty string.
+        assert_eq!(empty_string_name.encoded_len(), 5);
+        let mut buf = vec![0; empty_string_name.encoded_len()];
+        empty_string_name.encode(&mut buf).expect("can encode");
+        let expected_buf = [0x01, 0x00, 0x05, 0x00, 0x00];
+        assert_eq!(buf, expected_buf);
+
+        let normal_string_name = Header::name("f");
+        // Total length should be 7 bytes (ID, 2-byte length). Null terminated "f".
+        assert_eq!(normal_string_name.encoded_len(), 7);
+        let mut buf = vec![0; normal_string_name.encoded_len()];
+        normal_string_name.encode(&mut buf).expect("can encode");
+        let expected_buf = [0x01, 0x00, 0x07, 0x00, 0x66, 0x00, 0x00];
         assert_eq!(buf, expected_buf);
     }
 

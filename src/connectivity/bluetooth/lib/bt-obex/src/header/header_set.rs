@@ -183,7 +183,7 @@ mod tests {
 
     #[fuchsia::test]
     fn try_append_success() {
-        let mut headers1 = HeaderSet::from_header(Header::Name("foo".into())).unwrap();
+        let mut headers1 = HeaderSet::from_header(Header::name("foo")).unwrap();
         let headers2 = HeaderSet::from_header(Header::Description("bar".into())).unwrap();
         let () = headers1.try_append(headers2).expect("valid headers");
         assert!(headers1.contains_header(&HeaderIdentifier::Name));
@@ -192,15 +192,15 @@ mod tests {
 
     #[fuchsia::test]
     fn try_append_error() {
-        let mut headers1 = HeaderSet::from_header(Header::Name("foo".into())).unwrap();
-        let headers2 = HeaderSet::from_header(Header::Name("bar".into())).unwrap();
+        let mut headers1 = HeaderSet::from_header(Header::name("foo")).unwrap();
+        let headers2 = HeaderSet::from_header(Header::name("bar")).unwrap();
         assert_matches!(headers1.try_append(headers2), Err(Error::Duplicate(_)));
     }
 
     #[fuchsia::test]
     fn remove_headers() {
         let mut headers =
-            HeaderSet::from_headers(vec![Header::Count(123), Header::Name("123".into())]).unwrap();
+            HeaderSet::from_headers(vec![Header::Count(123), Header::name("123")]).unwrap();
         assert!(headers.contains_header(&HeaderIdentifier::Count));
         assert!(headers.contains_header(&HeaderIdentifier::Name));
         assert!(headers.remove(&HeaderIdentifier::Count).is_some());

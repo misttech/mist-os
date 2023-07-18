@@ -187,11 +187,9 @@ mod tests {
         let operation = setup_put_operation(&manager);
 
         let payload = vec![5, 6, 7, 8, 9];
-        let headers = HeaderSet::from_headers(vec![
-            Header::Type("file".into()),
-            Header::Name("foobar.txt".into()),
-        ])
-        .unwrap();
+        let headers =
+            HeaderSet::from_headers(vec![Header::Type("file".into()), Header::name("foobar.txt")])
+                .unwrap();
         let put_fut = operation.write_final(&payload[..], headers);
         pin_mut!(put_fut);
         let _ = exec.run_until_stalled(&mut put_fut).expect_pending("waiting for response");
@@ -262,7 +260,7 @@ mod tests {
 
         let headers = HeaderSet::from_headers(vec![
             Header::Description("deleting file".into()),
-            Header::Name("foobar.txt".into()),
+            Header::name("foobar.txt"),
         ])
         .unwrap();
         let put_fut = operation.delete(headers);
@@ -323,7 +321,7 @@ mod tests {
         // informational.
         let body_headers = HeaderSet::from_headers(vec![
             Header::Body(payload.clone()),
-            Header::Name("foobar.txt".into()),
+            Header::name("foobar.txt"),
         ])
         .unwrap();
         let result = operation.write(&payload[..], body_headers.clone()).await;
@@ -332,7 +330,7 @@ mod tests {
         // EndOfBody header is also an Error.
         let eob_headers = HeaderSet::from_headers(vec![
             Header::EndOfBody(payload.clone()),
-            Header::Name("foobar1.txt".into()),
+            Header::name("foobar1.txt"),
         ])
         .unwrap();
         let result = operation.write(&payload[..], eob_headers.clone()).await;
@@ -348,7 +346,7 @@ mod tests {
         let operation = setup_put_operation(&manager);
         let body_headers = HeaderSet::from_headers(vec![
             Header::Body(payload.clone()),
-            Header::Name("foobar.txt".into()),
+            Header::name("foobar.txt"),
         ])
         .unwrap();
         let result = operation.delete(body_headers).await;
@@ -358,7 +356,7 @@ mod tests {
         let operation = setup_put_operation(&manager);
         let eob_headers = HeaderSet::from_headers(vec![
             Header::EndOfBody(payload.clone()),
-            Header::Name("foobar1.txt".into()),
+            Header::name("foobar1.txt"),
         ])
         .unwrap();
         let result = operation.delete(eob_headers).await;

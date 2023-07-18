@@ -397,7 +397,7 @@ mod tests {
         let mut exec = fasync::TestExecutor::new();
         let (mut client, mut remote) = new_obex_client(true);
 
-        let headers = HeaderSet::from_header(Header::Name("myfolder".into())).unwrap();
+        let headers = HeaderSet::from_header(Header::name("myfolder")).unwrap();
         let setpath_fut = client.set_path(SetPathFlags::empty(), headers);
         pin_mut!(setpath_fut);
         exec.run_until_stalled(&mut setpath_fut).expect_pending("waiting for response");
@@ -447,7 +447,7 @@ mod tests {
         }
 
         // Peer rejects SetPath.
-        let headers = HeaderSet::from_header(Header::Name("file".into())).unwrap();
+        let headers = HeaderSet::from_header(Header::name("file")).unwrap();
         let setpath_fut = client.set_path(SetPathFlags::DONT_CREATE, headers);
         pin_mut!(setpath_fut);
         exec.run_until_stalled(&mut setpath_fut).expect_pending("waiting for response");

@@ -234,11 +234,11 @@ mod tests {
         // The initial GET request should succeed and return the set of Headers specified by the
         // peer.
         {
-            let info_headers = HeaderSet::from_header(Header::Name("text".into())).unwrap();
+            let info_headers = HeaderSet::from_header(Header::name("text")).unwrap();
             let info_fut = operation.get_information(info_headers);
             pin_mut!(info_fut);
             exec.run_until_stalled(&mut info_fut).expect_pending("waiting for peer response");
-            let response_headers = HeaderSet::from_header(Header::Name("bar".into())).unwrap();
+            let response_headers = HeaderSet::from_header(Header::name("bar")).unwrap();
             let response = ResponsePacket::new_no_data(ResponseCode::Continue, response_headers);
             let expectation = |request: RequestPacket| {
                 assert_eq!(*request.code(), OpCode::Get);
@@ -299,14 +299,14 @@ mod tests {
     fn get_operation_terminate_success() {
         let mut exec = fasync::TestExecutor::new();
         let (manager, mut remote) = new_manager(/* srm_supported */ false);
-        let initial = HeaderSet::from_header(Header::Name("foo".into())).unwrap();
+        let initial = HeaderSet::from_header(Header::name("foo")).unwrap();
         let mut operation = setup_get_operation(&manager, initial);
 
         // Start the GET operation.
         operation.set_started();
 
         // Terminating early is OK. It should consume the operation and be considered complete.
-        let headers = HeaderSet::from_header(Header::Name("terminated".into())).unwrap();
+        let headers = HeaderSet::from_header(Header::name("terminated")).unwrap();
         let terminate_fut = operation.terminate(headers);
         pin_mut!(terminate_fut);
         let _ =
@@ -324,12 +324,12 @@ mod tests {
         // Making the initial GET request should automatically try to include SRM. Peer responds
         // positively to SRM, so it is enabled hereafter.
         {
-            let info_headers = HeaderSet::from_header(Header::Name("foo".into())).unwrap();
+            let info_headers = HeaderSet::from_header(Header::name("foo")).unwrap();
             let info_fut = operation.get_information(info_headers);
             pin_mut!(info_fut);
             exec.run_until_stalled(&mut info_fut).expect_pending("waiting for peer response");
             let response_headers = HeaderSet::from_headers(vec![
-                Header::Name("bar".into()),
+                Header::name("bar"),
                 SingleResponseMode::Enable.into(),
             ])
             .unwrap();
@@ -428,7 +428,7 @@ mod tests {
     fn get_operation_information_error() {
         let mut exec = fasync::TestExecutor::new();
         let (manager, _remote) = new_manager(/* srm_supported */ false);
-        let initial = HeaderSet::from_header(Header::Name("foo".into())).unwrap();
+        let initial = HeaderSet::from_header(Header::name("foo")).unwrap();
         let mut operation = setup_get_operation(&manager, initial);
 
         // Set started.
@@ -446,7 +446,7 @@ mod tests {
     fn get_operation_data_before_start_is_ok() {
         let mut exec = fasync::TestExecutor::new();
         let (manager, mut remote) = new_manager(/* srm_supported */ false);
-        let initial = HeaderSet::from_header(Header::Name("foo".into())).unwrap();
+        let initial = HeaderSet::from_header(Header::name("foo")).unwrap();
         let operation = setup_get_operation(&manager, initial);
 
         // Trying to get the user data directly is OK.
@@ -516,7 +516,7 @@ mod tests {
     fn get_operation_data_peer_disconnect_is_error() {
         let mut exec = fasync::TestExecutor::new();
         let (manager, remote) = new_manager(/* srm_supported */ false);
-        let initial = HeaderSet::from_header(Header::Name("foo".into())).unwrap();
+        let initial = HeaderSet::from_header(Header::name("foo")).unwrap();
         let mut operation = setup_get_operation(&manager, initial);
         // Bypass initial SRM setup by marking this operation as started.
         operation.set_started();
@@ -533,7 +533,7 @@ mod tests {
     #[fuchsia::test]
     async fn get_operation_terminate_before_start_error() {
         let (manager, _remote) = new_manager(/* srm_supported */ false);
-        let initial = HeaderSet::from_header(Header::Name("bar".into())).unwrap();
+        let initial = HeaderSet::from_header(Header::name("bar")).unwrap();
         let operation = setup_get_operation(&manager, initial);
 
         // The GET operation is not in progress yet so trying to terminate will fail.
@@ -543,7 +543,7 @@ mod tests {
 
     #[fuchsia::test]
     fn handle_get_response_success() {
-        let headers = HeaderSet::from_header(Header::Name("foo".into())).unwrap();
+        let headers = HeaderSet::from_header(Header::name("foo")).unwrap();
         let response = ResponsePacket::new_no_data(ResponseCode::Continue, headers.clone());
         let result = GetOperation::handle_get_response(response).expect("valid response");
         assert_eq!(result, headers);
@@ -551,7 +551,7 @@ mod tests {
 
     #[fuchsia::test]
     fn handle_get_response_error() {
-        let headers = HeaderSet::from_header(Header::Name("foo".into())).unwrap();
+        let headers = HeaderSet::from_header(Header::name("foo")).unwrap();
         // Expect the Continue, not Ok.
         let response1 = ResponsePacket::new_no_data(ResponseCode::Ok, headers.clone());
         assert_matches!(
