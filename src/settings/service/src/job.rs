@@ -302,7 +302,7 @@ enum State {
 
 /// [Info] is used to capture details about a [Job] once it has been accepted by an entity that will
 /// process it. This includes an assigned [Id] and a recording at what time it was accepted.
-pub(self) struct Info {
+struct Info {
     id: Id,
     state: State,
     execution_type: execution::Type,

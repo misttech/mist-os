@@ -4,7 +4,7 @@
 
 use fuchsia_zircon as zx;
 
-pub(self) mod beacon;
+mod beacon;
 
 /// Common message-related definitions.
 pub mod action_fuse;
