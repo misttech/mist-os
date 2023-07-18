@@ -573,7 +573,7 @@ Model _createModelFromJson(Map<String, dynamic> rootObject) {
         }
         final String? name = systemTraceEvent['name'];
         tidToName[tid] = name;
-      } else if (phase == 'k') {
+      } else if (phase == 'k' || phase == 'w') {
         // CPU events are currently ignored.  It would be interesting to support
         // these in the future so we can track CPU durations in addition to wall
         // durations.
