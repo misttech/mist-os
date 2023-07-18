@@ -26,6 +26,12 @@ macro_rules! log_trace {
     };
 }
 
+macro_rules! log_debug {
+    ($($arg:tt)*) => {
+        $crate::logging::log!(level = debug, $($arg)*)
+    };
+}
+
 macro_rules! log_info {
     ($($arg:tt)*) => {
         $crate::logging::log!(level = info, $($arg)*)
@@ -64,6 +70,7 @@ macro_rules! not_implemented_log_once {
 
 // Public re-export of macros allows them to be used like regular rust items.
 pub(crate) use log;
+pub(crate) use log_debug;
 pub(crate) use log_error;
 pub(crate) use log_info;
 pub(crate) use log_trace;
