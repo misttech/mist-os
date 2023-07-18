@@ -165,6 +165,8 @@ impl FsNodeOps for TmpfsDirectory {
         _current_task: &CurrentTask,
         name: &FsStr,
     ) -> Result<FsNodeHandle, Errno> {
+        // Lookups for tmpfs should terminate in the DirEntry layer if they're going to succeed. If
+        // a lookup gets this far we know it was a failure.
         error!(ENOENT, format!("looking for {:?}", String::from_utf8_lossy(name)))
     }
 
