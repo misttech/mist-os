@@ -364,6 +364,10 @@ fn update_vmo_file_size(
     node_info: &mut FsNodeInfo,
     min_size: usize,
 ) -> Result<usize, Errno> {
+    if min_size > MAX_LFS_FILESIZE {
+        return error!(EFBIG);
+    }
+
     let size = round_up_to_system_page_size(min_size)?;
     vmo.set_size(size as u64).map_err(|status| match status {
         zx::Status::NO_MEMORY => errno!(ENOMEM),

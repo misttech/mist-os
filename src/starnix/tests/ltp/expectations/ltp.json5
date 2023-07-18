@@ -115,7 +115,6 @@
                 "epoll_ctl04",
                 "eventfd01",
                 "execveat03",
-                "fallocate02",
                 "fallocate04",
                 "fanotify01",
                 "fanotify02",
