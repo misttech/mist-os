@@ -364,7 +364,9 @@ commitment to Bazel for new repositories is laid out in detail in [RFC-0095] and
 
 Because of the limited number of product builds we support, we will not require
 special product integration repositories for products at this time.  The
-Workstation product will continue to perform assembly in `workstation.git`.
+Workstation product will continue to perform assembly in `workstation.git`
+(**2023Q3 note**: this plan to do assembly in `workstation.git` was deprecated
+by [RFC-0220]).
 
 ## Implementation
 
@@ -433,6 +435,7 @@ and as we encourage more code to be developed outside of `fuchsia.git`.
 [RFC-0139]: /docs/contribute/governance/rfcs/0139_bazel_sdk.md
 [RFC-0148]: /docs/contribute/governance/rfcs/0148_ci_guidelines.md#consider_fast_roll_and_release_cadences
 [RFC-0165]: /docs/contribute/governance/rfcs/0165_sdk_categories.md
+[RFC-0220]: /docs/contribute/governance/rfcs/0220_the_future_of_in_tree_products.md
 
 [fbl]: https://fuchsia.googlesource.com/fuchsia/+/refs/heads/main/zircon/system/ulib/fbl/
 [drivers/wlan/intel/iwlwifi]: https://fuchsia.googlesource.com/drivers/wlan/intel/iwlwifi/
