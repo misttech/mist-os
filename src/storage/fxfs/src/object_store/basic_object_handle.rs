@@ -9,7 +9,7 @@ use {
         object_store::{
             object_record::{ExtendedAttributeValue, ObjectKey, ObjectKeyData, ObjectValue},
             transaction::{LockKey, Mutation, Options},
-            ObjectStore,
+            HandleOwner, ObjectStore,
         },
     },
     anyhow::{anyhow, bail, ensure, Error},
@@ -45,12 +45,12 @@ impl From<fio::SetExtendedAttributeMode> for SetExtendedAttributeMode {
 /// data attribute for files.
 // TODO(sdemos): extend this with extent reading and writing, right now it just handles inline
 // extended attributes.
-pub struct BasicObjectHandle<S: AsRef<ObjectStore> + Send + Sync + 'static> {
+pub struct BasicObjectHandle<S: HandleOwner> {
     owner: Arc<S>,
     object_id: u64,
 }
 
-impl<S: AsRef<ObjectStore> + Send + Sync + 'static> BasicObjectHandle<S> {
+impl<S: HandleOwner> BasicObjectHandle<S> {
     /// Make a new BasicObjectHandle for the object with id [`object_id`] in store [`owner`].
     pub fn new(owner: Arc<S>, object_id: u64) -> Self {
         Self { owner, object_id }

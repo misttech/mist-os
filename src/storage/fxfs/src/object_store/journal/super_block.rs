@@ -41,7 +41,8 @@ use {
             object_record::{ObjectItem, ObjectItemV25, ObjectItemV29, ObjectItemV5},
             transaction::{AssocObj, Options},
             tree::MajorCompactable,
-            HandleOptions, Mutation, ObjectKey, ObjectStore, ObjectValue, StoreObjectHandle,
+            HandleOptions, HandleOwner, Mutation, ObjectKey, ObjectStore, ObjectValue,
+            StoreObjectHandle,
         },
         range::RangeExt,
         serialized_types::{
@@ -299,7 +300,7 @@ async fn read(
 
 /// Write a super-block to the given file handle.
 /// Requires that the filesystem is fully loaded and writable as this may require allocation.
-async fn write<S: AsRef<ObjectStore> + Send + Sync + 'static>(
+async fn write<S: HandleOwner>(
     super_block_header: &SuperBlockHeader,
     items: LayerSet<ObjectKey, ObjectValue>,
     handle: StoreObjectHandle<S>,
@@ -474,9 +475,7 @@ impl SuperBlockHeader {
     /// wipe out any stale super-blocks when rewriting Fxfs.
     /// This isn't a secure shred in any way, it just ensures the super-block is not recognized as a
     /// super-block.
-    pub async fn shred<S: AsRef<ObjectStore> + Send + Sync + 'static>(
-        handle: StoreObjectHandle<S>,
-    ) -> Result<(), Error> {
+    pub async fn shred<S: HandleOwner>(handle: StoreObjectHandle<S>) -> Result<(), Error> {
         let mut buf =
             handle.store().device().allocate_buffer(handle.store().device().block_size() as usize);
         buf.as_mut_slice().fill(0u8);
@@ -546,14 +545,14 @@ impl SuperBlockHeader {
     }
 }
 
-struct SuperBlockWriter<'a, S: AsRef<ObjectStore> + Send + Sync + 'static> {
+struct SuperBlockWriter<'a, S: HandleOwner> {
     handle: StoreObjectHandle<S>,
     writer: JournalWriter,
     next_extent_offset: u64,
     reservation: &'a Reservation,
 }
 
-impl<'a, S: AsRef<ObjectStore> + Send + Sync + 'static> SuperBlockWriter<'a, S> {
+impl<'a, S: HandleOwner> SuperBlockWriter<'a, S> {
     fn new(handle: StoreObjectHandle<S>, reservation: &'a Reservation) -> Self {
         Self {
             handle,

@@ -48,8 +48,8 @@ use {
                 ObjectStoreMutation, Options, Transaction, TxnMutation,
                 TRANSACTION_MAX_JOURNAL_USAGE,
             },
-            HandleOptions, Item, ItemRef, LastObjectId, LockState, NewChildStoreOptions,
-            ObjectStore, StoreObjectHandle, INVALID_OBJECT_ID,
+            HandleOptions, HandleOwner, Item, ItemRef, LastObjectId, LockState,
+            NewChildStoreOptions, ObjectStore, StoreObjectHandle, INVALID_OBJECT_ID,
         },
         range::RangeExt,
         round::{round_div, round_down, round_up},
@@ -316,7 +316,7 @@ pub trait JournalHandle: ReadObjectHandle {
 // Provide a stub implementation for StoreObjectHandle so we can use it in
 // Journal::read_transactions.  Manual extent management is a NOP (which is OK since presumably the
 // StoreObjectHandle already knows where its extents live).
-impl<S: AsRef<ObjectStore> + Send + Sync + 'static> JournalHandle for StoreObjectHandle<S> {
+impl<S: HandleOwner> JournalHandle for StoreObjectHandle<S> {
     fn start_offset(&self) -> Option<u64> {
         None
     }

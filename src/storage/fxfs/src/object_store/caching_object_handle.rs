@@ -22,10 +22,7 @@ use {
     },
     anyhow::{anyhow, Context, Error},
     async_trait::async_trait,
-    std::sync::{
-        atomic::{self},
-        Arc,
-    },
+    std::sync::Arc,
     storage_device::buffer::{Buffer, BufferRef, MutableBufferRef},
 };
 
@@ -90,8 +87,8 @@ impl<S: HandleOwner> CachingObjectHandle<S> {
         let _locks = fs
             .transaction_lock(&[LockKey::cached_write(
                 self.store().store_object_id,
-                self.handle.object_id,
-                self.handle.attribute_id,
+                self.handle.object_id(),
+                self.handle.attribute_id(),
             )])
             .await;
         let extends_file = if let Some(offset) = &offset {
@@ -139,8 +136,8 @@ impl<S: HandleOwner> CachingObjectHandle<S> {
             Some(
                 fs.transaction_lock(&[LockKey::cached_write(
                     store_id,
-                    self.handle.object_id,
-                    self.handle.attribute_id,
+                    self.handle.object_id(),
+                    self.handle.attribute_id(),
                 )])
                 .await,
             )
@@ -161,8 +158,8 @@ impl<S: HandleOwner> CachingObjectHandle<S> {
         let locks = fs
             .transaction_lock(&[LockKey::object_attribute(
                 store_id,
-                self.handle.object_id,
-                self.handle.attribute_id,
+                self.handle.object_id(),
+                self.handle.attribute_id(),
             )])
             .await;
 
@@ -188,11 +185,10 @@ impl<S: HandleOwner> CachingObjectHandle<S> {
             let mut transaction = fs
                 .clone()
                 .new_transaction(
-                    &[LockKey::object(store_id, self.handle.object_id)],
+                    &[LockKey::object(store_id, self.handle.object_id())],
                     Options {
                         borrow_metadata_space: true,
-                        skip_journal_checks: self.handle.options.skip_journal_checks,
-                        ..Default::default()
+                        ..self.handle.default_transaction_options()
                     },
                 )
                 .await?;
@@ -200,8 +196,8 @@ impl<S: HandleOwner> CachingObjectHandle<S> {
                 store
                     .trim_some(
                         &mut transaction,
-                        self.handle.object_id,
-                        self.handle.attribute_id,
+                        self.handle.object_id(),
+                        self.handle.attribute_id(),
                         TrimMode::FromOffset(old_size)
                     )
                     .await?,
@@ -215,21 +211,20 @@ impl<S: HandleOwner> CachingObjectHandle<S> {
         let mut transaction = fs
             .clone()
             .new_transaction(
-                &[LockKey::object(store_id, self.handle.object_id)],
+                &[LockKey::object(store_id, self.handle.object_id())],
                 Options {
                     // If there is no data then the reservation won't have any space for the
                     // transaction. Since it should only be for file size or metadata changes,
                     // we should be able to borrow metadata space.
                     borrow_metadata_space: flushable.data.is_none(),
-                    skip_journal_checks: self.handle.options.skip_journal_checks,
                     allocator_reservation: Some(&reservation),
-                    ..Default::default()
+                    ..self.handle.default_transaction_options()
                 },
             )
             .await?;
 
-        if self.handle.trace.load(atomic::Ordering::Relaxed) {
-            info!(store_id, oid = self.handle.object_id, ?flushable);
+        if self.handle.trace() {
+            info!(store_id, oid = self.handle.object_id(), ?flushable);
         }
 
         if let Some(metadata) = flushable.metadata.as_ref() {
@@ -238,8 +233,8 @@ impl<S: HandleOwner> CachingObjectHandle<S> {
                     store_id,
                     Mutation::replace_or_insert_object(
                         ObjectKey::attribute(
-                            self.handle.object_id,
-                            self.handle.attribute_id,
+                            self.handle.object_id(),
+                            self.handle.attribute_id(),
                             AttributeKey::Attribute,
                         ),
                         ObjectValue::attribute(content_size),
@@ -260,7 +255,7 @@ impl<S: HandleOwner> CachingObjectHandle<S> {
             self.handle
                 .multi_write(
                     &mut transaction,
-                    self.handle.attribute_id,
+                    self.handle.attribute_id(),
                     &data.ranges,
                     data.buffer.as_mut(),
                 )
@@ -317,8 +312,8 @@ impl<S: HandleOwner> CachingObjectHandle<S> {
                     store
                         .trim_some(
                             &mut transaction,
-                            self.handle.object_id,
-                            self.handle.attribute_id,
+                            self.handle.object_id(),
+                            self.handle.attribute_id(),
                             TrimMode::FromOffset(metadata.content_size.unwrap())
                         )
                         .await?,
@@ -363,7 +358,7 @@ impl<S: HandleOwner> ObjectHandle for CachingObjectHandle<S> {
     }
 
     fn object_id(&self) -> u64 {
-        self.handle.object_id
+        self.handle.object_id()
     }
 
     fn allocate_buffer(&self, size: usize) -> Buffer<'_> {
@@ -414,8 +409,8 @@ impl<S: HandleOwner> WriteObjectHandle for CachingObjectHandle<S> {
         let _locks = fs
             .transaction_lock(&[LockKey::cached_write(
                 self.store().store_object_id,
-                self.handle.object_id,
-                self.handle.attribute_id,
+                self.handle.object_id(),
+                self.handle.attribute_id(),
             )])
             .await;
 
@@ -441,8 +436,8 @@ impl<S: HandleOwner> WriteObjectHandle for CachingObjectHandle<S> {
         let _locks = fs
             .transaction_lock(&[LockKey::cached_write(
                 self.store().store_object_id,
-                self.handle.object_id,
-                self.handle.attribute_id,
+                self.handle.object_id(),
+                self.handle.attribute_id(),
             )])
             .await;
         self.cache.update_timestamps(crtime.map(|t| t.into()), mtime.map(|t| t.into()));

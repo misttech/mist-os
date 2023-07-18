@@ -24,7 +24,7 @@ use {
                 self, AssocObj, AssociatedObject, LockKey, Mutation, ObjectStoreMutation, Options,
                 Transaction,
             },
-            HandleOptions, ObjectStore, TrimMode, TrimResult,
+            HandleOptions, HandleOwner, ObjectStore, TrimMode, TrimResult,
         },
         range::RangeExt,
         round::{round_down, round_up},
@@ -50,17 +50,17 @@ use {
     storage_device::buffer::{Buffer, BufferRef, MutableBufferRef},
 };
 
-pub struct StoreObjectHandle<S: AsRef<ObjectStore> + Send + Sync + 'static> {
+pub struct StoreObjectHandle<S: HandleOwner> {
     owner: Arc<S>,
-    pub(super) object_id: u64,
-    pub(super) attribute_id: u64,
-    pub(super) options: HandleOptions,
-    pub(super) trace: AtomicBool,
+    object_id: u64,
+    attribute_id: u64,
+    options: HandleOptions,
+    trace: AtomicBool,
     keys: Option<KeyUnwrapper>,
     content_size: AtomicU64,
 }
 
-impl<S: AsRef<ObjectStore> + Send + Sync + 'static> StoreObjectHandle<S> {
+impl<S: HandleOwner> StoreObjectHandle<S> {
     pub fn new(
         owner: Arc<S>,
         object_id: u64,
@@ -91,6 +91,10 @@ impl<S: AsRef<ObjectStore> + Send + Sync + 'static> StoreObjectHandle<S> {
 
     pub fn store(&self) -> &ObjectStore {
         self.owner.as_ref().as_ref()
+    }
+
+    pub fn trace(&self) -> bool {
+        self.trace.load(atomic::Ordering::Relaxed)
     }
 
     /// Extend the file with the given extent.  The only use case for this right now is for files
@@ -209,7 +213,7 @@ impl<S: AsRef<ObjectStore> + Send + Sync + 'static> StoreObjectHandle<S> {
         device_offset: u64,
         compute_checksum: bool,
     ) -> Result<Checksums, Error> {
-        if self.trace.load(atomic::Ordering::Relaxed) {
+        if self.trace() {
             info!(
                 store_id = self.store().store_object_id(),
                 oid = self.object_id,
@@ -256,7 +260,7 @@ impl<S: AsRef<ObjectStore> + Send + Sync + 'static> StoreObjectHandle<S> {
         let mut iter = merger.seek(Bound::Included(&lower_bound)).await?;
         let allocator = self.store().allocator();
         let mut deallocated = 0;
-        let trace = self.trace.load(atomic::Ordering::Relaxed);
+        let trace = self.trace();
         while let Some(ItemRef {
             key:
                 ObjectKey {
@@ -486,7 +490,7 @@ impl<S: AsRef<ObjectStore> + Send + Sync + 'static> StoreObjectHandle<S> {
 
         let mut allocated = 0;
         let allocator = store.allocator();
-        let trace = self.trace.load(atomic::Ordering::Relaxed);
+        let trace = self.trace();
         let mut writes = FuturesOrdered::new();
         while !buf.is_empty() {
             let device_range = allocator
@@ -1135,6 +1139,12 @@ impl<S: AsRef<ObjectStore> + Send + Sync + 'static> StoreObjectHandle<S> {
         Ok(())
     }
 
+    /// Get the default set of transaction options for this object. This is mostly the overall
+    /// default, modified by any [`HandleOptions`] held by this handle.
+    pub fn default_transaction_options<'b>(&self) -> Options<'b> {
+        Options { skip_journal_checks: self.options.skip_journal_checks, ..Default::default() }
+    }
+
     pub async fn new_transaction<'b>(&self) -> Result<Transaction<'b>, Error> {
         self.new_transaction_with_options(Options {
             skip_journal_checks: self.options.skip_journal_checks,
@@ -1315,7 +1325,7 @@ impl<S: AsRef<ObjectStore> + Send + Sync + 'static> StoreObjectHandle<S> {
     }
 }
 
-impl<S: AsRef<ObjectStore> + Send + Sync + 'static> AssociatedObject for StoreObjectHandle<S> {
+impl<S: HandleOwner> AssociatedObject for StoreObjectHandle<S> {
     fn will_apply_mutation(&self, mutation: &Mutation, _object_id: u64, _manager: &ObjectManager) {
         match mutation {
             Mutation::ObjectStore(ObjectStoreMutation {
@@ -1327,7 +1337,7 @@ impl<S: AsRef<ObjectStore> + Send + Sync + 'static> AssociatedObject for StoreOb
     }
 }
 
-impl<S: AsRef<ObjectStore> + Send + Sync + 'static> ObjectHandle for StoreObjectHandle<S> {
+impl<S: HandleOwner> ObjectHandle for StoreObjectHandle<S> {
     fn set_trace(&self, v: bool) {
         info!(store_id = self.store().store_object_id, oid = self.object_id(), trace = v, "trace");
         self.trace.store(v, atomic::Ordering::Relaxed);
@@ -1351,7 +1361,7 @@ impl<S: AsRef<ObjectStore> + Send + Sync + 'static> ObjectHandle for StoreObject
 }
 
 #[async_trait]
-impl<S: AsRef<ObjectStore> + Send + Sync + 'static> GetProperties for StoreObjectHandle<S> {
+impl<S: HandleOwner> GetProperties for StoreObjectHandle<S> {
     async fn get_properties(&self) -> Result<ObjectProperties, Error> {
         // Take a read guard since we need to return a consistent view of all object properties.
         let fs = self.store().filesystem();
@@ -1383,7 +1393,7 @@ impl<S: AsRef<ObjectStore> + Send + Sync + 'static> GetProperties for StoreObjec
 }
 
 #[async_trait]
-impl<S: AsRef<ObjectStore> + Send + Sync + 'static> ReadObjectHandle for StoreObjectHandle<S> {
+impl<S: HandleOwner> ReadObjectHandle for StoreObjectHandle<S> {
     async fn read(&self, mut offset: u64, mut buf: MutableBufferRef<'_>) -> Result<usize, Error> {
         if buf.len() == 0 {
             return Ok(0);
@@ -1419,7 +1429,7 @@ impl<S: AsRef<ObjectStore> + Send + Sync + 'static> ReadObjectHandle for StoreOb
         let to_do = min(buf.len() as u64, size - offset) as usize;
         buf = buf.subslice_mut(0..to_do);
         let end_align = ((offset + to_do as u64) % block_size) as usize;
-        let trace = self.trace.load(atomic::Ordering::Relaxed);
+        let trace = self.trace();
         let reads = FuturesUnordered::new();
         while let Some(ItemRef {
             key:
@@ -1506,7 +1516,7 @@ impl<S: AsRef<ObjectStore> + Send + Sync + 'static> ReadObjectHandle for StoreOb
 }
 
 #[async_trait]
-impl<S: AsRef<ObjectStore> + Send + Sync + 'static> WriteObjectHandle for StoreObjectHandle<S> {
+impl<S: HandleOwner> WriteObjectHandle for StoreObjectHandle<S> {
     async fn write_or_append(&self, offset: Option<u64>, buf: BufferRef<'_>) -> Result<u64, Error> {
         let offset = offset.unwrap_or(self.get_size());
         let mut transaction = self.new_transaction().await?;
@@ -1545,7 +1555,7 @@ impl<S: AsRef<ObjectStore> + Send + Sync + 'static> WriteObjectHandle for StoreO
 
 /// Like object_handle::Writer, but allows custom transaction options to be set, and makes every
 /// write go directly to the handle in a transaction.
-pub struct DirectWriter<'a, S: AsRef<ObjectStore> + Send + Sync + 'static> {
+pub struct DirectWriter<'a, S: HandleOwner> {
     handle: &'a StoreObjectHandle<S>,
     options: transaction::Options<'a>,
     buffer: Buffer<'a>,
@@ -1555,7 +1565,7 @@ pub struct DirectWriter<'a, S: AsRef<ObjectStore> + Send + Sync + 'static> {
 
 const BUFFER_SIZE: usize = 1_048_576;
 
-impl<S: AsRef<ObjectStore> + Send + Sync + 'static> Drop for DirectWriter<'_, S> {
+impl<S: HandleOwner> Drop for DirectWriter<'_, S> {
     fn drop(&mut self) {
         if self.buf_offset != 0 {
             warn!("DirectWriter: dropping data, did you forget to call complete?");
@@ -1563,7 +1573,7 @@ impl<S: AsRef<ObjectStore> + Send + Sync + 'static> Drop for DirectWriter<'_, S>
     }
 }
 
-impl<'a, S: AsRef<ObjectStore> + Send + Sync + 'static> DirectWriter<'a, S> {
+impl<'a, S: HandleOwner> DirectWriter<'a, S> {
     pub fn new(handle: &'a StoreObjectHandle<S>, options: transaction::Options<'a>) -> Self {
         Self {
             handle,
@@ -1587,7 +1597,7 @@ impl<'a, S: AsRef<ObjectStore> + Send + Sync + 'static> DirectWriter<'a, S> {
 }
 
 #[async_trait]
-impl<'a, S: AsRef<ObjectStore> + Send + Sync + 'static> WriteBytes for DirectWriter<'a, S> {
+impl<'a, S: HandleOwner> WriteBytes for DirectWriter<'a, S> {
     fn handle(&self) -> &dyn WriteObjectHandle {
         self.handle
     }
