@@ -190,16 +190,12 @@ rustc_binary("fxfs") {
   deps = [
     ":lib",
     "//src/lib/diagnostics/log/rust",
-    "//src/lib/fidl/rust/fidl",
     "//src/lib/fuchsia-async",
     "//src/lib/fuchsia-component",
     "//src/lib/fuchsia-runtime",
-    "//src/lib/storage/storage_device",
     "//src/lib/trace/rust:trace-provider",
-    "//src/lib/zircon/rust:fuchsia-zircon",
     "//src/storage/fxfs/platform",
     "//third_party/rust_crates:anyhow",
-    "//third_party/rust_crates:argh",
   ]
   sources = [ "src/main.rs" ]
 
