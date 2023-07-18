@@ -5,15 +5,18 @@
 #include <lib/elfldltl/memory.h>
 #include <lib/elfldltl/note.h>
 #include <lib/elfldltl/phdr.h>
+#include <lib/elfldltl/posix.h>
 #include <lib/elfldltl/symbol.h>
 #include <lib/ld/module.h>
 #include <lib/trivial-allocator/new.h>
 #include <lib/trivial-allocator/posix.h>
+#include <sys/mman.h>
 #include <sys/uio.h>
 #include <unistd.h>
 
 #include <array>
 #include <cassert>
+#include <cerrno>
 #include <cstring>
 
 #include "allocator.h"
@@ -94,6 +97,13 @@ extern "C" uintptr_t StartLd(StartupStack& stack) {
   trivial_allocator::PosixMmap system_page_allocator{startup.page_size};
   auto scratch = MakeScratchAllocator(system_page_allocator);
   auto initial_exec = MakeInitialExecAllocator(system_page_allocator);
+
+  // Now that startup is completed, protect not only the RELRO, but also all
+  // the data and bss.
+  auto [data_start, data_size] = DataBounds(startup.page_size);
+  if (mprotect(reinterpret_cast<void*>(data_start), data_size, PROT_READ) != 0) [[unlikely]] {
+    diag.SystemError("cannot mprotect dynamic linker data pages", elfldltl::PosixError{errno});
+  }
 
   // Bail out before handoff if any errors have been detected.
   CheckErrors(diag);

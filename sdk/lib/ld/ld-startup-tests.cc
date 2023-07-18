@@ -73,19 +73,32 @@ class InProcessTestLaunch {
     zx_vaddr_t test_base;
     ASSERT_EQ(zx::vmar::root_self()->allocate(
                   ZX_VM_CAN_MAP_READ | ZX_VM_CAN_MAP_WRITE | ZX_VM_CAN_MAP_EXECUTE, 0, kVmarSize,
-                  &vmar_, &test_base),
+                  &test_vmar_, &test_base),
               ZX_OK);
 
     ASSERT_NO_FATAL_FAILURE(log_.Init());
     procargs()  //
         .AddInProcessTestHandles()
-        .AddDuplicateHandle(PA_VMAR_ROOT, vmar_.borrow())
+        .AddDuplicateHandle(PA_VMAR_ROOT, test_vmar_.borrow())
         .AddFd(STDERR_FILENO, log_.TakeSocket())
         .SetArgs(args);
   }
 
   // Arguments for calling MakeLoader(const zx::vmar&).
-  auto LoaderArgs() const { return std::forward_as_tuple(vmar_); }
+  auto LoaderArgs() const { return std::forward_as_tuple(test_vmar_); }
+
+  // This is called after the dynamic linker is loaded.
+  template <class Loader>
+  void AfterLoad(Loader&& loader) {
+    // The ends the useful lifetime of the loader object by extracting the VMAR
+    // where it loaded the test image.  This VMAR handle doesn't need to be
+    // saved here, since it's a sub-VMAR of the test_vmar_ that will be
+    // destroyed when this InProcessTestLaunch object dies.
+    zx::vmar load_image_vmar = std::move(loader).Commit();
+
+    // Pass along that handle in the bootstrap message.
+    procargs_.AddHandle(PA_VMAR_LOADED, std::move(load_image_vmar));
+  }
 
   ld::testing::TestProcessArgs& procargs() { return procargs_; }
 
@@ -98,8 +111,8 @@ class InProcessTestLaunch {
   }
 
   ~InProcessTestLaunch() {
-    if (vmar_) {
-      EXPECT_EQ(vmar_.destroy(), ZX_OK);
+    if (test_vmar_) {
+      EXPECT_EQ(test_vmar_.destroy(), ZX_OK);
     }
   }
 
@@ -118,7 +131,7 @@ class InProcessTestLaunch {
 
   ld::testing::TestProcessArgs procargs_;
   ld::testing::TestLogSocket log_;
-  zx::vmar vmar_;
+  zx::vmar test_vmar_;
 };
 
 #else  // ! __Fuchsia__
@@ -204,7 +217,13 @@ class InProcessTestLaunch {
     ASSERT_NO_FATAL_FAILURE(PopulateStack(args, {}));
   }
 
+  // No arguments are needed for MakeLoader().
   constexpr std::tuple<> LoaderArgs() { return {}; }
+
+  // This is called after the dynamic linker has been loaded.  Save the loader
+  // object so it gets destroyed when this InProcessTestLaunch object is
+  // destroyed.  That will clean up the mappings it made.
+  void AfterLoad(elfldltl::MmapLoader loader) { loader_ = std::move(loader); }
 
   int Call(uintptr_t entry) { return CallOnStack(entry, sp_); }
 
@@ -306,6 +325,7 @@ class InProcessTestLaunch {
     sp_ = sp;
   }
 
+  elfldltl::MmapLoader loader_;
   void* stack_ = nullptr;
   void* sp_ = nullptr;
 };
@@ -329,14 +349,13 @@ class LdStartupTests : public elfldltl::testing::LoadTests<LoaderTraits> {
                            std::forward<decltype(args)>(args)...);
         },
         launch.LoaderArgs()));
-    loader_ = std::move(result->loader);
-    entry_ = result->entry + loader_->load_bias();
+    entry_ = result->entry + result->loader.load_bias();
+    ASSERT_NO_FATAL_FAILURE(launch.AfterLoad(std::move(result->loader)));
   }
 
   uintptr_t entry() const { return entry_; }
 
  private:
-  std::optional<Loader> loader_;
   uintptr_t entry_ = 0;
 };
 

@@ -9,10 +9,13 @@
 #include <lib/elfldltl/memory.h>
 #include <lib/elfldltl/note.h>
 #include <lib/elfldltl/phdr.h>
+#include <lib/elfldltl/self.h>
 #include <lib/elfldltl/static-pie-with-vdso.h>
 #include <lib/elfldltl/symbol.h>
 #include <lib/ld/module.h>
 
+#include <cstddef>
+#include <cstdint>
 #include <limits>
 
 namespace ld {
@@ -119,6 +122,34 @@ inline void CompleteBootstrapModule(abi::Abi<>::Module& module, size_t page_size
   module.vaddr_start = module.vaddr_start & -page_size;
   module.vaddr_end = (module.vaddr_end + page_size - 1) & -page_size;
 }
+
+// This determines the whole-page bounds of the RELRO + data + bss segment.
+// (LLD uses a layout with two contiguous segments, but that's equivalent.)
+// After startup, protect all of this rather than just the RELRO region.
+// Use like: `auto [start, size] = DataBounds(page_size);`
+struct DataBounds {
+  DataBounds() = delete;
+
+  explicit DataBounds(size_t page_size)
+      : start(PageRound(kStart, page_size)),      // Page above RO.
+        size(PageRound(kEnd, page_size) - start)  // Page above RW.
+  {}
+
+  uintptr_t start;
+  size_t size;
+
+ private:
+  // These are actually defined implicitly by the linker: _etext is the limit
+  // of the read-only segments (code and/or RODATA), so the data starts on the
+  // next page up; _end is the limit of the bss, which implicitly extends to
+  // the end of that page.
+  [[gnu::visibility("hidden")]] static std::byte kStart[] __asm__("_etext");
+  [[gnu::visibility("hidden")]] static std::byte kEnd[] __asm__("_end");
+
+  static uintptr_t PageRound(void* ptr, size_t page_size) {
+    return (reinterpret_cast<uintptr_t>(ptr) + page_size - 1) & -page_size;
+  }
+};
 
 }  // namespace ld
 

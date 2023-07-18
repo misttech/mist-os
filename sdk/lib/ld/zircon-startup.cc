@@ -78,13 +78,17 @@ extern "C" int _start(zx_handle_t handle, void* vdso) {
     CRASH_WITH_UNIQUE_BACKTRACE();
   }
 
-  zx::vmar loading_vmar;
+  zx::vmar loading_vmar, self_vmar;
   for (uint32_t i = 0; i < procargs_nhandles; ++i) {
     // If not otherwise consumed below, the handle will be closed.
     zx::handle handle{std::exchange(procargs_handles[i], {})};
     switch (procargs_handle_info[i]) {
       case PA_VMAR_ROOT:
         loading_vmar.reset(handle.release());
+        break;
+
+      case PA_VMAR_LOADED:
+        self_vmar.reset(handle.release());
         break;
 
       case PA_HND(PA_FD, STDERR_FILENO):
@@ -134,6 +138,18 @@ extern "C" int _start(zx_handle_t handle, void* vdso) {
   if (status != ZX_OK) {
     diag.SystemError("cannot decode processargs strings", elfldltl::ZirconError{status});
   }
+
+  // Now that startup is completed, protect not only the RELRO, but also all
+  // the data and bss.  Then drop that VMAR handle so the protections cannot be
+  // changed again.
+  auto protect_relro = [page_size, &diag](zx::vmar self) {
+    auto [data_start, data_size] = DataBounds(page_size);
+    zx_status_t status = self.protect(ZX_VM_PERM_READ, data_start, data_size);
+    if (status != ZX_OK) [[unlikely]] {
+      diag.SystemError("cannot protect dynamic linker data pages", elfldltl::ZirconError{status});
+    }
+  };
+  protect_relro(std::move(self_vmar));
 
   // Bail out before handoff if any errors have been detected.
   CheckErrors(diag);
