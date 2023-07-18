@@ -388,6 +388,7 @@
                 // prctl_test
                 "PrctlTest.InvalidPrSetMM",
                 "PrctlTest.PDeathSig",
+                "PrctlTest.OrphansReparentedToSubreaper",
                 "PrctlTest.RootDumpability",
 
                 // priority_test
