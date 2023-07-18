@@ -55,28 +55,6 @@ def _paths(items: Sequence[Any]) -> Sequence[Path]:
     raise TypeError(f"Unhandled sequence type: {t}")
 
 
-class DepfileInputsByLineTests(unittest.TestCase):
-
-    def test_no_phony_deps(self):
-        lines = [
-            'a: b c',
-            'd: e f g',
-        ]
-        self.assertEqual(
-            list(rustc_remote_wrapper.depfile_inputs_by_line(lines)), [])
-
-    def test_phony_deps(self):
-        lines = [
-            'a:',
-            'b: c',
-            'd:',
-            'z: e f g',
-        ]
-        self.assertEqual(
-            list(rustc_remote_wrapper.depfile_inputs_by_line(lines)),
-            _paths(['a', 'd']))
-
-
 class TestAccompanyRlibWithSo(unittest.TestCase):
 
     def test_not_rlib(self):
@@ -121,7 +99,7 @@ class RustRemoteActionPrepareTests(unittest.TestCase):
             yield mock.patch.object(
                 rustc_remote_wrapper,
                 '_readlines_from_file',
-                return_value=depfile_contents)
+                return_value=[line + '\n' for line in depfile_contents])
 
         # check compiler is executable
         yield mock.patch.object(

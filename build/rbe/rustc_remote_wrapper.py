@@ -65,8 +65,7 @@ def remove_suffix(text: str, suffix: str) -> str:
 
 # Defined for convenient mocking.
 def _readlines_from_file(path: Path) -> Sequence[str]:
-    with open(path) as f:
-        return f.readlines()
+    return path.read_text().splitlines(keepends=True)
 
 
 # Defined for convenient mocking.
@@ -106,21 +105,6 @@ def _main_arg_parser() -> argparse.ArgumentParser:
 
 
 _MAIN_ARG_PARSER = _main_arg_parser()
-
-
-def depfile_inputs_by_line(lines: Iterable[str]) -> Iterable[Path]:
-    """Crude parsing to look at the phony deps of a depfile.
-
-    Phony deps look like:
-
-      some_output_file:
-
-    (nothing following the ':')
-    """
-    for line in lines:
-        s_line = line.rstrip()  # remove trailing '\n'
-        if s_line.endswith(':'):
-            yield Path(remove_suffix(s_line, ':'))
 
 
 def relativize_paths(paths: Iterable[Path], start: Path) -> Iterable[Path]:
@@ -463,8 +447,12 @@ class RustRemoteAction(object):
                 f'Error: Local generation of depfile failed (exit={dep_status}): {cmd_str}'
             )
 
-        remote_depfile_inputs = list(
-            depfile_inputs_by_line(_readlines_from_file(local_depfile)))
+        # There is a phony dep for each input that is needed.
+        deps = list(depfile.parse_lines(_readlines_from_file(local_depfile)))
+        target_paths = [dep.target_paths for dep in deps if dep.is_phony]
+        remote_depfile_inputs = [
+            target for paths in target_paths for target in paths
+        ]
         # TODO: if needed, transform the rust std lib paths, depending on
         #   Fuchsia directory layout of Rust prebuilt libs.
         #   See remap_remote_rust_lib() in rustc-remote-wrapper.sh
