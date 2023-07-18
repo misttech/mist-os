@@ -11,6 +11,7 @@
 #include <hwreg/bitfields.h>
 
 #include "src/devices/bus/drivers/pci/common.h"
+#include "src/devices/lib/mmio/test-helper.h"
 
 struct IoBaseAddress {
   uint32_t value;
@@ -231,13 +232,7 @@ class FakeEcam {
         bus_end_(bus_end),
         config_cnt_((bus_end - bus_start + 1) * PCI_MAX_FUNCTIONS_PER_BUS) {
     const size_t bytes = sizeof(FakeDeviceConfig) * config_cnt_;
-
-    zx::vmo vmo;
-    std::optional<fdf::MmioBuffer> mmio;
-    ZX_ASSERT(zx::vmo::create(bytes, 0, &vmo) == ZX_OK);
-    ZX_ASSERT(fdf::MmioBuffer::Create(0, bytes, std::move(vmo), ZX_CACHE_POLICY_UNCACHED_DEVICE,
-                                      &mmio) == ZX_OK);
-    mmio_ = std::move(*mmio);
+    mmio_ = fdf_testing::CreateMmioBuffer(bytes, ZX_CACHE_POLICY_UNCACHED_DEVICE);
     // Most access will be done via config objects using MmioViews, but the pointer is cast here
     // so that we can reach in and fiddle with the raw config as necessary to modify and verify
     // state in tests.

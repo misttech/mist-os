@@ -163,12 +163,11 @@ void Bus::ReadBar(ReadBarRequestView request, ReadBarCompleter::Sync& completer)
 
   size_t size = std::min<uint64_t>(request->size, PciFidl::wire::kReadbarMaxSize);
   size = std::min<uint64_t>(bar->size, size);
-  std::optional<fdf::MmioBuffer> mmio;
-  zx_status_t status = fdf::MmioBuffer::Create(0, bar->size, std::move(result.value()),
-                                               ZX_CACHE_POLICY_UNCACHED_DEVICE, &mmio);
-  if (status != ZX_OK) {
-    zxlogf(DEBUG, "failed to create MmioBuffer: %s", zx_status_get_string(status));
-    completer.ReplyError(result.error_value());
+  zx::result<fdf::MmioBuffer> mmio = fdf::MmioBuffer::Create(
+      0, bar->size, std::move(result.value()), ZX_CACHE_POLICY_UNCACHED_DEVICE);
+  if (mmio.is_error()) {
+    zxlogf(DEBUG, "failed to create MmioBuffer: %s", mmio.status_string());
+    completer.ReplyError(result.status_value());
     return;
   }
 

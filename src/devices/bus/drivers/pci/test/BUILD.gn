@@ -28,6 +28,7 @@ test("pci-unit") {
   deps = [
     "//sdk/lib/inspect/testing/cpp:zxtest",
     "//src/devices/bus/drivers/pci:user_pci",
+    "//src/devices/lib/mmio:test_helper",
     "//src/devices/testing/driver-runtime-main:zxtest",
     "//src/devices/testing/fake-bti",
     "//src/devices/testing/fake-msi",

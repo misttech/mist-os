@@ -13,6 +13,7 @@
 #include <lib/sdio/hw.h>
 #include <lib/sdmmc/hw.h>
 #include <threads.h>
+#include <zircon/types.h>
 
 #include <memory>
 #include <vector>
@@ -21,6 +22,7 @@
 #include <zxtest/zxtest.h>
 
 #include "aml-sdmmc-regs.h"
+#include "src/devices/lib/mmio/test-helper.h"
 #include "src/devices/testing/mock-ddk/mock-device.h"
 
 namespace sdmmc {
@@ -176,13 +178,9 @@ class AmlSdmmcTest : public zxtest::Test {
 
  protected:
   fdf::MmioBuffer CreateMmioBufferAndUpdateView(size_t size) {
-    zx::vmo mmio_vmo;
-    std::optional<fdf::MmioBuffer> mmio;
-    ZX_ASSERT(zx::vmo::create(size, 0, &mmio_vmo) == ZX_OK);
-    ZX_ASSERT(fdf::MmioBuffer::Create(0, size, std::move(mmio_vmo), ZX_CACHE_POLICY_UNCACHED_DEVICE,
-                                      &mmio) == ZX_OK);
-    mmio_.emplace(mmio->View(0));
-    return std::move(*mmio);
+    fdf::MmioBuffer mmio = fdf_testing::CreateMmioBuffer(size, ZX_CACHE_POLICY_UNCACHED_DEVICE);
+    mmio_.emplace(mmio.View(0));
+    return mmio;
   }
 
   static zx_koid_t GetVmoKoid(const zx::vmo& vmo) {

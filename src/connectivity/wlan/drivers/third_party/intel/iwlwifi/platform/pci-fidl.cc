@@ -201,11 +201,13 @@ zx_status_t iwl_pci_map_bar_buffer(struct iwl_pci_fidl* fidl, uint32_t index, ui
     return status;
   }
 
-  status = fdf::MmioBuffer::Create(0, vmo_size, std::move(vmo), cache_policy, &fidl->mmio);
-  if (status != ZX_OK) {
-    return status;
+  zx::result<fdf::MmioBuffer> mmio =
+      fdf::MmioBuffer::Create(0, vmo_size, std::move(vmo), cache_policy);
+  if (mmio.is_error()) {
+    return mmio.error_value();
   }
 
+  fidl->mmio = std::move(mmio.value());
   *buffer = fidl->mmio->get();
   return ZX_OK;
 }

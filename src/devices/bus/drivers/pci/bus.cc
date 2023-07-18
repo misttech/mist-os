@@ -132,16 +132,15 @@ zx::result<fdf::MmioBuffer> Bus::MapEcam(zx::vmo ecam_vmo) {
     return zx::error(status);
   }
 
-  std::optional<fdf::MmioBuffer> ecam = {};
-  status =
-      fdf::MmioBuffer::Create(0, size, std::move(ecam_vmo), ZX_CACHE_POLICY_UNCACHED_DEVICE, &ecam);
-  if (status != ZX_OK) {
-    zxlogf(ERROR, "couldn't map ecam vmo: %d!", status);
-    return zx::error(status);
+  zx::result<fdf::MmioBuffer> result =
+      fdf::MmioBuffer::Create(0, size, std::move(ecam_vmo), ZX_CACHE_POLICY_UNCACHED_DEVICE);
+  if (result.is_error()) {
+    zxlogf(ERROR, "couldn't map ecam vmo: %s!", result.status_string());
+    return result.take_error();
   }
 
-  zxlogf(DEBUG, "ecam for mapped at %p (size: %#zx)", ecam->get(), ecam->get_size());
-  return zx::ok(std::move(*ecam));
+  zxlogf(DEBUG, "ecam for mapped at %p (size: %#zx)", result->get(), result->get_size());
+  return zx::ok(std::move(*result));
 }
 
 zx_status_t Bus::MakeConfig(pci_bdf_t bdf, std::unique_ptr<Config>* out_config) {

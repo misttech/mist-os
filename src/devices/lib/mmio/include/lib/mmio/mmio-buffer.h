@@ -75,16 +75,6 @@ class MmioBuffer {
     return result;
   }
 
-  static zx_status_t Create(zx_off_t offset, size_t size, zx::vmo vmo, uint32_t cache_policy,
-                            std::optional<MmioBuffer>* mmio_buffer) {
-    mmio_buffer_t mmio;
-    zx_status_t status = mmio_buffer_init(&mmio, offset, size, vmo.release(), cache_policy);
-    if (status == ZX_OK) {
-      *mmio_buffer = MmioBuffer(mmio);
-    }
-    return status;
-  }
-
   static zx_status_t Create(zx_paddr_t base, size_t size, const zx::resource& resource,
                             uint32_t cache_policy, std::optional<MmioBuffer>* mmio_buffer) {
     mmio_buffer_t mmio;

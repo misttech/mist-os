@@ -235,10 +235,10 @@ class VirtioTests : public zxtest::Test {
 
     size_t size = 0;
     vmo.get_size(&size);
-    zx_status_t status = fdf::MmioBuffer::Create(
-        0, size, std::move(vmo), ZX_CACHE_POLICY_UNCACHED_DEVICE, &bars_[kLegacyBar]);
-    ZX_ASSERT_MSG(status == ZX_OK, "Mapping BAR %u failed: %s", kLegacyBar,
-                  zx_status_get_string(status));
+    zx::result<fdf::MmioBuffer> result =
+        fdf::MmioBuffer::Create(0, size, std::move(vmo), ZX_CACHE_POLICY_UNCACHED_DEVICE);
+    ZX_ASSERT_MSG(result.is_ok(), "Mapping BAR %u failed: %s", kLegacyBar, result.status_string());
+    bars_[kLegacyBar] = std::move(result.value());
   }
 
   // Even in the fake device we have to deal with registers being in different

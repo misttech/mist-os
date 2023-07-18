@@ -22,6 +22,7 @@
 #include "src/devices/bus/drivers/pci/config.h"
 #include "src/devices/bus/drivers/pci/test/fakes/fake_allocator.h"
 #include "src/devices/bus/drivers/pci/test/fakes/fake_config.h"
+#include "src/devices/lib/mmio/test-helper.h"
 
 namespace pci {
 
@@ -62,9 +63,7 @@ class PciCapabilityTests : public zxtest::Test {
  protected:
   void SetUp() final {
     zx::vmo vmo;
-    ZX_ASSERT(zx::vmo::create(PCI_BASE_CONFIG_SIZE, /*options=*/0, &vmo) == ZX_OK);
-    ZX_ASSERT(fdf::MmioBuffer::Create(0, PCI_BASE_CONFIG_SIZE, std::move(vmo),
-                                      ZX_CACHE_POLICY_UNCACHED, &mmio_) == ZX_OK);
+    mmio_ = fdf_testing::CreateMmioBuffer(PCI_BASE_CONFIG_SIZE, ZX_CACHE_POLICY_UNCACHED);
   }
 
   void TearDown() final { mmio_->reset(); }

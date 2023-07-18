@@ -13,6 +13,7 @@ test("device-protocol-pdev-test") {
     "//sdk/lib/async_patterns/testing/cpp",
     "//src/devices/bus/lib/device-protocol-pdev",
     "//src/devices/bus/testing/fake-pdev",
+    "//src/devices/lib/mmio:test_helper",
     "//src/devices/testing/fake-bti",
     "//src/devices/testing/fake-resource",
     "//zircon/system/ulib/async-default",

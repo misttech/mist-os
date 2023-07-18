@@ -18,6 +18,7 @@
 #include <zxtest/zxtest.h>
 
 #include "src/devices/bus/testing/fake-pdev/fake-pdev.h"
+#include "src/devices/lib/mmio/test-helper.h"
 
 constexpr uint32_t kVid = 1;
 constexpr uint32_t kPid = 1;
@@ -136,12 +137,12 @@ TEST(PDevFidlTest, GetMmioBuffer) {
   zx_info_handle_basic info;
   std::map<uint32_t, fake_pdev::Mmio> mmios;
   {
-    std::optional<fdf::MmioBuffer> mmio;
     zx::vmo vmo;
     ASSERT_OK(zx::vmo::create(kMmioSize, 0, &vmo));
     ASSERT_OK(vmo.get_info(ZX_INFO_HANDLE_BASIC, &info, sizeof(info), nullptr, nullptr));
-    ASSERT_OK(fdf::MmioBuffer::Create(kMmioOffset, kMmioSize, std::move(vmo),
-                                      ZX_CACHE_POLICY_UNCACHED, &mmio));
+    zx::result<fdf::MmioBuffer> mmio =
+        fdf::MmioBuffer::Create(kMmioOffset, kMmioSize, std::move(vmo), ZX_CACHE_POLICY_UNCACHED);
+    ASSERT_OK(mmio.status_value());
     vmo_koid = info.koid;
     mmio_vaddr = mmio->get();
     mmios[kMmioId] = std::move(*mmio);

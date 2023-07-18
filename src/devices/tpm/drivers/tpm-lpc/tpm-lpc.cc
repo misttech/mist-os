@@ -11,6 +11,7 @@
 #include <lib/ddk/device.h>
 #include <lib/ddk/driver.h>
 #include <lib/mmio/mmio-buffer.h>
+#include <lib/zx/result.h>
 
 #include <fbl/auto_lock.h>
 
@@ -24,19 +25,18 @@ zx_status_t TpmLpc::Create(void* ctx, zx_device_t* dev) {
   if (acpi.is_error()) {
     return acpi.error_value();
   }
-  std::optional<fdf::MmioBuffer> mmio;
   auto mmio_result = acpi->borrow()->GetMmio(0);
   if (mmio_result->is_error()) {
     zxlogf(ERROR, "Failed to get MMIO offset from the ACPI.");
     return mmio_result->error_value();
   }
   auto& mmio_value = mmio_result->value()->mmio;
-  zx_status_t status =
+  zx::result<fdf::MmioBuffer> mmio =
       fdf::MmioBuffer::Create(mmio_value.offset, mmio_value.size, std::move(mmio_value.vmo),
-                              ZX_CACHE_POLICY_UNCACHED_DEVICE, &mmio);
-  if (status != ZX_OK) {
+                              ZX_CACHE_POLICY_UNCACHED_DEVICE);
+  if (mmio.is_error()) {
     zxlogf(ERROR, "Failed to map MMIO buffer.");
-    return status;
+    return mmio.status_value();
   }
 
   auto driver = std::make_unique<TpmLpc>(dev, std::move(acpi.value()), *std::move(mmio));

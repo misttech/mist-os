@@ -270,7 +270,12 @@ zx_status_t Pci::MapMmio(uint32_t index, uint32_t cache_policy,
     return status;
   }
 
-  return fdf::MmioBuffer::Create(0, vmo_size, std::move(vmo), cache_policy, mmio);
+  zx::result<fdf::MmioBuffer> result =
+      fdf::MmioBuffer::Create(0, vmo_size, std::move(vmo), cache_policy);
+  if (result.is_ok()) {
+    *mmio = std::move(result.value());
+  }
+  return result.status_value();
 }
 
 zx_status_t Pci::MapMmio(uint32_t index, uint32_t cache_policy, mmio_buffer_t* mmio) const {

@@ -129,8 +129,12 @@ void FakePDevFidl::GetBoardInfo(GetBoardInfoCompleter::Sync& completer) {
 zx_status_t ddk::PDevMakeMmioBufferWeak(const pdev_mmio_t& pdev_mmio,
                                         std::optional<MmioBuffer>* mmio, uint32_t cache_policy) {
   if (pdev_mmio.vmo != ZX_HANDLE_INVALID) {
-    return MmioBuffer::Create(pdev_mmio.offset, pdev_mmio.size, zx::vmo(pdev_mmio.vmo),
-                              cache_policy, mmio);
+    zx::result<MmioBuffer> result =
+        MmioBuffer::Create(pdev_mmio.offset, pdev_mmio.size, zx::vmo(pdev_mmio.vmo), cache_policy);
+    if (result.is_ok()) {
+      mmio->emplace(std::move(result.value()));
+    }
+    return result.status_value();
   }
 
   auto* mmio_buffer = reinterpret_cast<MmioBuffer*>(pdev_mmio.offset);

@@ -148,12 +148,13 @@ zx_status_t PipeDevice::Bind() {
 
   fbl::AutoLock lock(&mmio_lock_);
   auto& mmio = mmio_result->value()->mmio;
-  zx_status_t status = fdf::MmioBuffer::Create(mmio.offset, mmio.size, std::move(mmio.vmo),
-                                               ZX_CACHE_POLICY_UNCACHED_DEVICE, &mmio_);
-  if (status != ZX_OK) {
-    zxlogf(ERROR, "%s: mmiobuffer create failed: %d", kTag, status);
-    return status;
+  zx::result<fdf::MmioBuffer> result = fdf::MmioBuffer::Create(
+      mmio.offset, mmio.size, std::move(mmio.vmo), ZX_CACHE_POLICY_UNCACHED_DEVICE);
+  if (result.is_error()) {
+    zxlogf(ERROR, "%s: mmiobuffer create failed: %s", kTag, result.status_string());
+    return result.status_value();
   }
+  mmio_ = std::move(result.value());
 
   // Check device version.
   mmio_->Write32(PIPE_DRIVER_VERSION, PIPE_V2_REG_VERSION);
@@ -165,8 +166,8 @@ zx_status_t PipeDevice::Bind() {
 
   auto irq = acpi_fidl_.borrow()->MapInterrupt(0);
   if (!irq.ok() || irq->is_error()) {
-    zxlogf(ERROR, "%s: map_interrupt failed: %d", kTag,
-           !irq.ok() ? irq.status() : irq->error_value());
+    zx_status_t status = !irq.ok() ? irq.status() : irq->error_value();
+    zxlogf(ERROR, "%s: map_interrupt failed: %d", kTag, status);
     return status;
   }
   irq_.reset(irq->value()->irq.release());
@@ -180,7 +181,7 @@ zx_status_t PipeDevice::Bind() {
   }
 
   static_assert(sizeof(CommandBuffers) <= PAGE_SIZE, "cmds size");
-  status = io_buffer_.Init(bti_.get(), PAGE_SIZE, IO_BUFFER_RW | IO_BUFFER_CONTIG);
+  zx_status_t status = io_buffer_.Init(bti_.get(), PAGE_SIZE, IO_BUFFER_RW | IO_BUFFER_CONTIG);
   if (status != ZX_OK) {
     zxlogf(ERROR, "%s: io_buffer_init failed: %d", kTag, status);
     return status;

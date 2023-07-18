@@ -104,12 +104,13 @@ zx_status_t AddressSpaceDevice::Bind() {
   ZX_DEBUG_ASSERT(control_bar.result.vmo().is_valid());
 
   fbl::AutoLock lock(&mmio_lock_);
-  status = fdf::MmioBuffer::Create(0, control_bar.size, std::move(control_bar.result.vmo()),
-                                   ZX_CACHE_POLICY_UNCACHED_DEVICE, &mmio_);
-  if (status != ZX_OK) {
-    zxlogf(ERROR, "%s: failed to create MMIO buffer: %d", kTag, status);
-    return status;
+  zx::result<fdf::MmioBuffer> mmio = fdf::MmioBuffer::Create(
+      0, control_bar.size, std::move(control_bar.result.vmo()), ZX_CACHE_POLICY_UNCACHED_DEVICE);
+  if (mmio.is_error()) {
+    zxlogf(ERROR, "%s: failed to create MMIO buffer: %s", kTag, mmio.status_string());
+    return mmio.status_value();
   }
+  mmio_ = std::move(mmio.value());
 
   fuchsia_hardware_pci::wire::Bar area_bar;
   status = pci_.GetBar(arena, PCI_AREA_BAR_ID, &area_bar);

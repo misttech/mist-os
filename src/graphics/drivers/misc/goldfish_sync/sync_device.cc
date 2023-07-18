@@ -94,12 +94,13 @@ zx_status_t SyncDevice::Bind() {
   {
     fbl::AutoLock lock(&mmio_lock_);
     auto& mmio = mmio_result->value()->mmio;
-    zx_status_t status = fdf::MmioBuffer::Create(mmio.offset, mmio.size, std::move(mmio.vmo),
-                                                 ZX_CACHE_POLICY_UNCACHED_DEVICE, &mmio_);
-    if (status != ZX_OK) {
-      zxlogf(ERROR, "mmiobuffer create failed: %s", zx_status_get_string(status));
-      return status;
+    zx::result<fdf::MmioBuffer> result = fdf::MmioBuffer::Create(
+        mmio.offset, mmio.size, std::move(mmio.vmo), ZX_CACHE_POLICY_UNCACHED_DEVICE);
+    if (result.is_error()) {
+      zxlogf(ERROR, "mmiobuffer create failed: %s", result.status_string());
+      return result.status_value();
     }
+    mmio_ = std::move(result.value());
   }
 
   auto result = acpi_fidl_.borrow()->MapInterrupt(0);

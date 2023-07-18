@@ -33,8 +33,12 @@ __WEAK zx_status_t PDev::MapMmio(uint32_t index, std::optional<fdf::MmioBuffer>*
 [[gnu::weak]] zx_status_t PDevMakeMmioBufferWeak(const pdev_mmio_t& pdev_mmio,
                                                  std::optional<fdf::MmioBuffer>* mmio,
                                                  uint32_t cache_policy) {
-  return MmioBuffer::Create(pdev_mmio.offset, pdev_mmio.size, zx::vmo(pdev_mmio.vmo), cache_policy,
-                            mmio);
+  zx::result<fdf::MmioBuffer> result =
+      MmioBuffer::Create(pdev_mmio.offset, pdev_mmio.size, zx::vmo(pdev_mmio.vmo), cache_policy);
+  if (result.is_ok()) {
+    *mmio = std::move(result.value());
+  }
+  return result.status_value();
 }
 
 }  // namespace ddk
