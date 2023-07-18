@@ -193,6 +193,7 @@ template("bazel_product_bundle") {
     command = "build"
     bazel_targets = [ invoker.bazel_product_image_target ]
     bazel_inputs = _aib_bazel_inputs + invoker.bazel_inputs_from_gn
+    use_target_out_dir = true
     allow_directory_in_outputs = true
     copy_outputs = [
       {
@@ -216,6 +217,7 @@ template("bazel_product_bundle") {
       command = "build"
       bazel_targets = [ invoker.bazel_recovery_image_target ]
       bazel_inputs = _aib_bazel_inputs + invoker.bazel_inputs_from_gn
+      use_target_out_dir = true
       allow_directory_in_outputs = true
       copy_outputs = [
         {

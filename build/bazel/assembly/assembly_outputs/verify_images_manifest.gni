@@ -53,7 +53,7 @@ template("verify_images_manifest") {
                            ])
 
     _bazel_assembled_system_out_dir =
-        get_label_info(invoker.bazel_assembled_system_target, "target_gen_dir")
+        get_label_info(invoker.bazel_assembled_system_target, "target_out_dir")
     _bazel_assembled_system_name =
         get_label_info(invoker.bazel_assembled_system_target, "name")
     _bazel_assembled_system_file = "${_bazel_assembled_system_out_dir}/${_bazel_assembled_system_name}/images.json"

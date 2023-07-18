@@ -100,31 +100,30 @@ if (use_bringup_assembly) {
   #####
   # These are lists of the packages in the above groups
 
-  if (use_bazel_images_only) {
-    # TODO(https://fxbug.dev/123120): Figure out how to provide the following
-    # information when only Bazel assembly is used.
-    write_file(files.base_package_names, "")
-    write_file(files.cache_package_names, "")
-    group("base_packages.list") {
+  package_list_from_assembly("base_packages.list") {
+    testonly = true
+    system_label = labels.images
+    if (use_bazel_images_only) {
+      # In Bazel assembly, images.json is produced by the "_create_system"
+      # subtarget.
+      system_label += "_create_system"
     }
-    group("cache_packages.list") {
-    }
-  } else {
-    package_list_from_assembly("base_packages.list") {
-      testonly = true
-      system_label = labels.images
-      package_set = "base"
-      contents = "name"
-      outputs = [ files.base_package_names ]
-    }
+    package_set = "base"
+    contents = "name"
+    outputs = [ files.base_package_names ]
+  }
 
-    package_list_from_assembly("cache_packages.list") {
-      testonly = true
-      system_label = labels.images
-      package_set = "cache"
-      contents = "name"
-      outputs = [ files.cache_package_names ]
+  package_list_from_assembly("cache_packages.list") {
+    testonly = true
+    system_label = labels.images
+    if (use_bazel_images_only) {
+      # In Bazel assembly, images.json is produced by the "_create_system"
+      # subtarget.
+      system_label += "_create_system"
     }
+    package_set = "cache"
+    contents = "name"
+    outputs = [ files.cache_package_names ]
   }
 
   generate_package_metadata("universe_packages.list") {
@@ -184,8 +183,10 @@ if (use_bringup_assembly) {
   }
 
   if (use_bazel_images_only) {
-    # TODO(https://fxbug.dev/123120): Figure out how to provide the following
-    # information when only Bazel assembly is used.
+    # Base and cache package_manifests.list files are intentionally left empty
+    # when Bazel assembly is used. The information here will come from Bazel
+    # assembly (fuchsia_product_bundle) instead. See all_package_manifests.list
+    # below.
     generated_file("base_package_manifests.list") {
       outputs = [ files.base_package_manifests ]
       contents = ""
@@ -258,8 +259,6 @@ if (use_bringup_assembly) {
 
     _manifest_deps = [ ":universe_package_manifests.list" ]
 
-    # TODO(https://fxbug.dev/123120): Figure out how to provide the following
-    # information when only Bazel assembly is used.
     if (use_bazel_images_only) {
       deps += [ labels.bazel_package_manifests_list ]
 
