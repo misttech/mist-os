@@ -47,3 +47,14 @@ impl std::str::FromStr for Format {
         }
     }
 }
+
+impl From<Error> for ffx_command_error::Error {
+    fn from(error: Error) -> Self {
+        use ffx_command_error::Error::*;
+        use Error::*;
+        match error {
+            error @ (Io(_) | Json(_) | Utf8(_)) => Unexpected(error.into()),
+            error @ InvalidFormat(_) => User(error.into()),
+        }
+    }
+}

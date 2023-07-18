@@ -7,13 +7,13 @@ use ffx_config::environment::ExecutableKind;
 use fuchsia_async::TimeoutExt;
 use std::{fs::File, io::Write, process::ExitStatus, str::FromStr, time::Duration};
 
+pub use ffx_command_error::*;
+
 mod describe;
-mod error;
 mod ffx;
 mod metrics;
 mod tools;
 
-pub use error::*;
 pub use ffx::*;
 pub use metrics::*;
 pub use tools::*;

@@ -1,10 +1,8 @@
-// Copyright 2021 The Fuchsia Authors. All rights reserved.
+// Copyright 2023 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use anyhow::Context;
-use errors::{FfxError, IntoExitCode, ResultExt};
-use std::fmt::Display;
+use errors::FfxError;
 
 /// A top level error type for ffx tool results
 #[derive(thiserror::Error, Debug)]
@@ -72,12 +70,6 @@ impl From<FfxError> for Error {
     }
 }
 
-impl From<ffx_writer::Error> for Error {
-    fn from(error: ffx_writer::Error) -> Self {
-        Error::Unexpected(error.into())
-    }
-}
-
 impl Error {
     /// Map an argh early exit to our kind of error
     pub fn from_early_exit(command: &[impl AsRef<str>], early_exit: argh::EarlyExit) -> Self {
@@ -112,96 +104,14 @@ impl Error {
 /// A convenience Result type
 pub type Result<T, E = crate::Error> = core::result::Result<T, E>;
 
-pub trait FfxContext<T, E> {
-    /// Make this error into a BUG check that will display to the user as an error that
-    /// shouldn't happen.
-    fn bug(self) -> Result<T, Error>;
-
-    /// Make this error into a BUG check that will display to the user as an error that
-    /// shouldn't happen, with the added context.
-    fn bug_context<C: Display + Send + Sync + 'static>(self, context: C) -> Result<T, Error>;
-
-    /// Make this error into a BUG check that will display to the user as an error that
-    /// shouldn't happen, with the added context returned by the closure `f`.
-    fn with_bug_context<C: Display + Send + Sync + 'static>(
-        self,
-        f: impl FnOnce() -> C,
-    ) -> Result<T, Error>;
-
-    /// Make this error into a displayed user error, with the added context for display to the user.
-    /// Use this for errors that happen in the normal course of execution, like files not being found.
-    fn user_message<C: Display + Send + Sync + 'static>(self, context: C) -> Result<T, Error>;
-
-    /// Make this error into a displayed user error, with the added context for display to the user.
-    /// Use this for errors that happen in the normal course of execution, like files not being found.
-    fn with_user_message<C: Display + Send + Sync + 'static>(
-        self,
-        f: impl FnOnce() -> C,
-    ) -> Result<T, Error>;
-}
-
-impl<T, E> FfxContext<T, E> for Result<T, E>
-where
-    Self: anyhow::Context<T, E>,
-    E: Into<anyhow::Error>,
-{
-    fn bug(self) -> Result<T, Error> {
-        self.map_err(|e| Error::Unexpected(e.into()))
-    }
-
-    fn bug_context<C: Display + Send + Sync + 'static>(self, context: C) -> Result<T, Error> {
-        self.context(context).map_err(Error::Unexpected)
-    }
-
-    fn with_bug_context<C: Display + Send + Sync + 'static>(
-        self,
-        f: impl FnOnce() -> C,
-    ) -> Result<T, Error> {
-        self.with_context(f).map_err(Error::Unexpected)
-    }
-
-    fn user_message<C: Display + Send + Sync + 'static>(self, context: C) -> Result<T, Error> {
-        self.context(context).map_err(Error::User)
-    }
-
-    fn with_user_message<C: Display + Send + Sync + 'static>(
-        self,
-        f: impl FnOnce() -> C,
-    ) -> Result<T, Error> {
-        self.with_context(f).map_err(Error::User)
-    }
-}
-
-impl ResultExt for Error {
-    fn ffx_error<'a>(&'a self) -> Option<&'a FfxError> {
-        match self {
-            Error::User(err) => err.downcast_ref(),
-            _ => None,
-        }
-    }
-}
-impl IntoExitCode for Error {
-    fn exit_code(&self) -> i32 {
-        use Error::*;
-        match self {
-            Help { code, .. } => *code,
-            Unexpected(err) | User(err) | Config(err) => {
-                err.ffx_error().map(FfxError::exit_code).unwrap_or(1)
-            }
-        }
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::tests::*;
     use anyhow::anyhow;
     use assert_matches::assert_matches;
-    use errors::{ffx_error, ffx_error_with_code};
+    use errors::{ffx_error, ffx_error_with_code, IntoExitCode};
     use std::io::{Cursor, Write};
-
-    const FFX_STR: &str = "I am an ffx error";
-    const ERR_STR: &str = "I am not an ffx error";
 
     #[test]
     fn test_write_result_ffx_error() {
@@ -244,37 +154,6 @@ mod tests {
     }
 
     #[test]
-    fn error_context_helpers() {
-        assert_matches!(
-            anyhow::Result::<()>::Err(anyhow!(ERR_STR)).bug(),
-            Err(Error::Unexpected(_)),
-            "anyhow.bug() should be a bugcheck error"
-        );
-        assert_matches!(
-            anyhow::Result::<()>::Err(anyhow!(ERR_STR)).bug_context("boom"),
-            Err(Error::Unexpected(_)),
-            "anyhow.bug_context() should be a bugcheck error"
-        );
-        assert_matches!(
-            anyhow::Result::<()>::Err(anyhow!(ERR_STR)).with_bug_context(|| "boom"),
-            Err(Error::Unexpected(_)),
-            "anyhow.bug_context() should be a bugcheck error"
-        );
-        assert_matches!(anyhow::Result::<()>::Err(anyhow!(ERR_STR)).bug_context(FfxError::TestingError), Err(Error::Unexpected(_)), "anyhow.bug_context() should create a bugcheck error even if given an ffx error (magic reduction)");
-        assert_matches!(
-            anyhow::Result::<()>::Err(anyhow!(ERR_STR)).user_message("boom"),
-            Err(Error::User(_)),
-            "anyhow.user_message() should be a user error"
-        );
-        assert_matches!(
-            anyhow::Result::<()>::Err(anyhow!(ERR_STR)).with_user_message(|| "boom"),
-            Err(Error::User(_)),
-            "anyhow.with_user_message() should be a user error"
-        );
-        assert_matches!(anyhow::Result::<()>::Err(anyhow!(ERR_STR)).with_user_message(|| FfxError::TestingError).ffx_error(), Some(FfxError::TestingError), "anyhow.with_user_message should be a user error that properly extracts to the ffx error.");
-    }
-
-    #[test]
     fn test_write_result_arbitrary_error() {
         let err = Error::from(anyhow!(ERR_STR));
         let mut cursor = Cursor::new(Vec::new());
@@ -290,5 +169,31 @@ mod tests {
     fn test_result_ext_exit_code_ffx_error() {
         let err = Result::<()>::Err(Error::from(ffx_error_with_code!(42, FFX_STR)));
         assert_eq!(err.exit_code(), 42);
+    }
+
+    #[test]
+    fn test_from_ok_early_exit() {
+        let command = ["testing", "--help"];
+        let output = "stuff!".to_owned();
+        let status = Ok(());
+        let code = 0;
+
+        let early_exit = argh::EarlyExit { output: output.clone(), status };
+        let err = Error::from_early_exit(&command, early_exit);
+        assert_eq!(err.exit_code(), code);
+        assert_matches!(err, Error::Help { command: error_command, output: error_output, code: error_code } if error_command == command && error_output == output && error_code == code);
+    }
+
+    #[test]
+    fn test_from_error_early_exit() {
+        let command = ["testing", "bad", "command"];
+        let output = "stuff!".to_owned();
+        let status = Err(());
+        let code = 1;
+
+        let early_exit = argh::EarlyExit { output: output.clone(), status };
+        let err = Error::from_early_exit(&command, early_exit);
+        assert_eq!(err.exit_code(), code);
+        assert_matches!(err, Error::Config(err) if format!("{err}") == output);
     }
 }
