@@ -898,9 +898,12 @@ bool Client::CheckConfig(fhd::wire::ConfigResult* res,
   const size_t layers_size = std::max(static_cast<size_t>(1), layers_.size());
   const display_config_t* configs[configs_.size()];
   layer_t* layers[layers_size];
-  uint32_t layer_cfg_results[layers_size];
-  uint32_t* display_layer_cfg_results[configs_.size()];
-  memset(layer_cfg_results, 0, layers_size * sizeof(uint32_t));
+
+  // TODO(fxbug.dev/130605): Do not use VLA. We should introduce a limit on
+  // totally supported layers instead.
+  client_composition_opcode_t layer_cfg_results[layers_size];
+  memset(layer_cfg_results, 0, layers_size * sizeof(client_composition_opcode_t));
+  int layer_cfg_results_count = 0;
 
   bool config_fail = false;
   size_t config_idx = 0;
@@ -913,8 +916,7 @@ bool Client::CheckConfig(fhd::wire::ConfigResult* res,
     // Put this display's display_config_t* into the compact array
     configs[config_idx] = &display_config.pending_;
 
-    // Set the index in the primary result array with this display's layer result array
-    display_layer_cfg_results[config_idx++] = layer_cfg_results + layer_idx;
+    ++config_idx;
 
     // Create this display's compact layer_t* array
     display_config.pending_.layer_list = layers + layer_idx;
@@ -933,6 +935,7 @@ bool Client::CheckConfig(fhd::wire::ConfigResult* res,
     // constraints.
     for (auto& layer_node : display_config.pending_layers_) {
       layers[layer_idx++] = &layer_node.layer->pending_layer_;
+      ++layer_cfg_results_count;
 
       bool invalid = false;
       if (layer_node.layer->pending_layer_.type == LAYER_TYPE_PRIMARY) {
@@ -981,9 +984,10 @@ bool Client::CheckConfig(fhd::wire::ConfigResult* res,
     return false;
   }
 
-  size_t layer_cfg_results_count;
+  size_t layer_cfg_results_count_actual;
   uint32_t display_cfg_result = controller_->dc()->CheckConfiguration(
-      configs, config_idx, display_layer_cfg_results, &layer_cfg_results_count);
+      configs, config_idx, layer_cfg_results, layer_cfg_results_count,
+      &layer_cfg_results_count_actual);
 
   if (display_cfg_result != CONFIG_CHECK_RESULT_OK) {
     if (res) {
@@ -995,11 +999,10 @@ bool Client::CheckConfig(fhd::wire::ConfigResult* res,
   }
 
   bool layer_fail = false;
-  for (size_t i = 0; i < config_idx && !layer_fail; i++) {
-    for (unsigned j = 0; j < configs[i]->layer_count && !layer_fail; j++) {
-      if (display_layer_cfg_results[i][j]) {
-        layer_fail = true;
-      }
+  for (size_t i = 0; i < layer_cfg_results_count_actual; i++) {
+    if (layer_cfg_results[i]) {
+      layer_fail = true;
+      break;
     }
   }
 

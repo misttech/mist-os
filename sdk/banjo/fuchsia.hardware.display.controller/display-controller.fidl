@@ -483,10 +483,22 @@ closed protocol DisplayControllerImpl {
     /// display_cfg_result should be set to a CONFIG_DISPLAY_* error if the combination of
     /// display modes is not supported.
     ///
-    /// layer_cfg_result points to an array of arrays. The primary length is display_count, the
-    /// secondary lengths are the corresponding display_cfg's layer_count. If display_cfg_result
-    /// is CONFIG_CHECK_RESULT_OK, any errors in layer configuration should be returned as a CLIENT*
-    /// flag in the corresponding layer_cfg_result entry.
+    /// - response `layer_cfg_result` are per-layer client operations to make
+    /// the layer configuration supported by the display hardware. If the
+    /// `display_cfg_result` is not `CONFIG_CHECK_RESULT_OK`, the values of
+    /// `layer_cfg_result` are undefined and should be ignored by the client.
+    ///
+    ///   `layer_cfg_result` is an array with one element for each layer in
+    ///   each display_config element. The elements map to layers following a
+    ///   DFS traversal of a tree where the first-level children are the
+    ///   `display_config` elements, and the second-level children are each
+    ///   `DisplayConfig`'s layers.
+    ///
+    ///    The element ordering matches flattening the array obtained by mapping
+    ///    each display_config element to its `DisplayConfig.layers` value:
+    ///    [ display 0 layer 0, display 0 layer 1, ...,
+    ///      display 1 layer 0, display 1 layer 1, ...,
+    ///      display (N-1) layer 0, ..., display (N-1) layer (M-1) ].
     ///
     /// The driver must not retain references to the configuration after this function returns.
     /// TODO: Fix me...
@@ -495,7 +507,6 @@ closed protocol DisplayControllerImpl {
         display_config vector<DisplayConfig>:MAX;
     }) -> (struct {
         display_cfg_result ConfigCheckResult;
-        @callee_allocated
         layer_cfg_result vector<ClientCompositionOpcode>:MAX;
     });
 

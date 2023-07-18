@@ -37,6 +37,7 @@
 #include <iterator>
 #include <limits>
 #include <memory>
+#include <numeric>
 #include <utility>
 
 #include <fbl/alloc_checker.h>
@@ -1505,9 +1506,15 @@ void Controller::DoPipeBufferReallocation(
 }
 
 bool Controller::CheckDisplayLimits(cpp20::span<const display_config_t*> banjo_display_configs,
-                                    client_composition_opcode_t** layer_cfg_results) {
+                                    cpp20::span<client_composition_opcode_t> layer_cfg_results) {
+  int layer_cfg_results_offset = 0;
   for (unsigned i = 0; i < banjo_display_configs.size(); i++) {
     const display_config_t* banjo_display_config = banjo_display_configs[i];
+    ZX_DEBUG_ASSERT(layer_cfg_results.size() >=
+                    layer_cfg_results_offset + banjo_display_config->layer_count);
+    cpp20::span<client_composition_opcode_t> current_display_layer_cfg_results =
+        layer_cfg_results.subspan(layer_cfg_results_offset, banjo_display_config->layer_count);
+    layer_cfg_results_offset += banjo_display_config->layer_count;
 
     // The intel display controller doesn't support these flags
     if (banjo_display_config->mode.flags &
@@ -1588,7 +1595,7 @@ bool Controller::CheckDisplayLimits(cpp20::span<const display_config_t*> banjo_d
         GetPostTransformWidth(*banjo_display_config->layer_list[j], &src_width, &src_height);
 
         if (src_height > primary->dest_frame.height || src_width > primary->dest_frame.width) {
-          layer_cfg_results[i][j] |= CLIENT_COMPOSITION_OPCODE_FRAME_SCALE;
+          current_display_layer_cfg_results[j] |= CLIENT_COMPOSITION_OPCODE_FRAME_SCALE;
         }
       }
     }
@@ -1601,8 +1608,13 @@ bool Controller::CheckDisplayLimits(cpp20::span<const display_config_t*> banjo_d
 
 config_check_result_t Controller::DisplayControllerImplCheckConfiguration(
     const display_config_t** banjo_display_configs, size_t display_config_count,
-    client_composition_opcode_t** layer_cfg_result, size_t* layer_cfg_result_count) {
+    client_composition_opcode_t* out_layer_cfg_result_list, size_t layer_cfg_result_count,
+    size_t* out_layer_cfg_result_actual) {
   fbl::AutoLock lock(&display_lock_);
+
+  if (out_layer_cfg_result_actual != nullptr) {
+    *out_layer_cfg_result_actual = 0;
+  }
 
   cpp20::span banjo_display_configs_span(banjo_display_configs, display_config_count);
   if (banjo_display_configs_span.empty()) {
@@ -1616,12 +1628,29 @@ config_check_result_t Controller::DisplayControllerImplCheckConfiguration(
     return CONFIG_CHECK_RESULT_TOO_MANY;
   }
 
-  if (!CheckDisplayLimits(banjo_display_configs_span, layer_cfg_result)) {
+  int total_layer_count = std::accumulate(
+      banjo_display_configs, banjo_display_configs + display_config_count, 0,
+      [](int total, const display_config_t* config) { return total += config->layer_count; });
+  ZX_DEBUG_ASSERT(layer_cfg_result_count >= static_cast<size_t>(total_layer_count));
+  cpp20::span<client_composition_opcode_t> client_composition_opcodes(out_layer_cfg_result_list,
+                                                                      total_layer_count);
+  std::fill(client_composition_opcodes.begin(), client_composition_opcodes.end(), 0);
+  if (out_layer_cfg_result_actual != nullptr) {
+    *out_layer_cfg_result_actual = total_layer_count;
+  }
+
+  if (!CheckDisplayLimits(banjo_display_configs_span, client_composition_opcodes)) {
     return CONFIG_CHECK_RESULT_UNSUPPORTED_MODES;
   }
 
+  int layer_cfg_results_offset = 0;
   for (unsigned i = 0; i < banjo_display_configs_span.size(); i++) {
     const display_config_t* banjo_display_config = banjo_display_configs_span[i];
+    cpp20::span<client_composition_opcode_t> current_display_client_composition_opcodes =
+        client_composition_opcodes.subspan(layer_cfg_results_offset,
+                                           banjo_display_config->layer_count);
+    layer_cfg_results_offset += banjo_display_config->layer_count;
+
     const display::DisplayId display_id = display::ToDisplayId(banjo_display_config->display_id);
     DisplayDevice* display = nullptr;
     for (auto& d : display_devices_) {
@@ -1665,12 +1694,12 @@ config_check_result_t Controller::DisplayControllerImplCheckConfiguration(
             // Linear and x tiled images don't support 90/270 rotation
             if (primary->image.type == IMAGE_TYPE_SIMPLE ||
                 primary->image.type == IMAGE_TYPE_X_TILED) {
-              layer_cfg_result[i][j] |= CLIENT_COMPOSITION_OPCODE_TRANSFORM;
+              current_display_client_composition_opcodes[j] |= CLIENT_COMPOSITION_OPCODE_TRANSFORM;
             }
           } else if (primary->transform_mode != FRAME_TRANSFORM_IDENTITY &&
                      primary->transform_mode != FRAME_TRANSFORM_ROT_180) {
             // Cover unsupported rotations
-            layer_cfg_result[i][j] |= CLIENT_COMPOSITION_OPCODE_TRANSFORM;
+            current_display_client_composition_opcodes[j] |= CLIENT_COMPOSITION_OPCODE_TRANSFORM;
           }
 
           uint32_t src_width, src_height;
@@ -1716,7 +1745,8 @@ config_check_result_t Controller::DisplayControllerImplCheckConfiguration(
                 src_width < registers::PipeScalerControlSkylake::kMinSrcSizePx ||
                 src_height < registers::PipeScalerControlSkylake::kMinSrcSizePx ||
                 max_width < primary->dest_frame.width || max_height < primary->dest_frame.height) {
-              layer_cfg_result[i][j] |= CLIENT_COMPOSITION_OPCODE_FRAME_SCALE;
+              current_display_client_composition_opcodes[j] |=
+                  CLIENT_COMPOSITION_OPCODE_FRAME_SCALE;
             } else {
               total_scalers_needed += scalers_needed;
             }
@@ -1725,11 +1755,11 @@ config_check_result_t Controller::DisplayControllerImplCheckConfiguration(
         }
         case LAYER_TYPE_CURSOR: {
           if (j != banjo_display_config->layer_count - 1) {
-            layer_cfg_result[i][j] |= CLIENT_COMPOSITION_OPCODE_USE_PRIMARY;
+            current_display_client_composition_opcodes[j] |= CLIENT_COMPOSITION_OPCODE_USE_PRIMARY;
           }
           const image_t* image = &banjo_display_config->layer_list[j]->cfg.cursor.image;
           if (image->type != IMAGE_TYPE_SIMPLE) {
-            layer_cfg_result[i][j] |= CLIENT_COMPOSITION_OPCODE_USE_PRIMARY;
+            current_display_client_composition_opcodes[j] |= CLIENT_COMPOSITION_OPCODE_USE_PRIMARY;
           }
           bool found = false;
           for (unsigned x = 0; x < std::size(kCursorInfos) && !found; x++) {
@@ -1737,30 +1767,31 @@ config_check_result_t Controller::DisplayControllerImplCheckConfiguration(
                 image->width == kCursorInfos[x].width && image->height == kCursorInfos[x].height;
           }
           if (!found) {
-            layer_cfg_result[i][j] |= CLIENT_COMPOSITION_OPCODE_USE_PRIMARY;
+            out_layer_cfg_result_list[layer_cfg_results_offset + j] |=
+                CLIENT_COMPOSITION_OPCODE_USE_PRIMARY;
           }
           break;
         }
         case LAYER_TYPE_COLOR: {
           if (j != 0) {
-            layer_cfg_result[i][j] |= CLIENT_COMPOSITION_OPCODE_USE_PRIMARY;
+            current_display_client_composition_opcodes[j] |= CLIENT_COMPOSITION_OPCODE_USE_PRIMARY;
           }
           const auto format = static_cast<fuchsia_images2::wire::PixelFormat>(
               banjo_display_config->layer_list[j]->cfg.color.format);
           if (format != fuchsia_images2::wire::PixelFormat::kBgra32) {
-            layer_cfg_result[i][j] |= CLIENT_COMPOSITION_OPCODE_USE_PRIMARY;
+            current_display_client_composition_opcodes[j] |= CLIENT_COMPOSITION_OPCODE_USE_PRIMARY;
           }
           break;
         }
         default:
-          layer_cfg_result[i][j] |= CLIENT_COMPOSITION_OPCODE_USE_PRIMARY;
+          current_display_client_composition_opcodes[j] |= CLIENT_COMPOSITION_OPCODE_USE_PRIMARY;
       }
     }
 
     if (merge_all) {
-      layer_cfg_result[i][0] = CLIENT_COMPOSITION_OPCODE_MERGE_BASE;
+      current_display_client_composition_opcodes[0] = CLIENT_COMPOSITION_OPCODE_MERGE_BASE;
       for (unsigned j = 1; j < banjo_display_config->layer_count; j++) {
-        layer_cfg_result[i][j] = CLIENT_COMPOSITION_OPCODE_MERGE_SRC;
+        current_display_client_composition_opcodes[j] = CLIENT_COMPOSITION_OPCODE_MERGE_SRC;
       }
     }
   }
@@ -1778,20 +1809,27 @@ config_check_result_t Controller::DisplayControllerImplCheckConfiguration(
       }
       ZX_ASSERT(pipe->in_use());  // If the allocation failed, it should be in use
       display::DisplayId pipe_attached_display_id = pipe->attached_display_id();
+
+      int layer_cfg_results_offset = 0;
       for (unsigned i = 0; i < display_config_count; i++) {
+        cpp20::span<client_composition_opcode_t> current_display_layer_cfg_results =
+            client_composition_opcodes.subspan(layer_cfg_results_offset,
+                                               banjo_display_configs[i]->layer_count);
+        layer_cfg_results_offset += banjo_display_configs[i]->layer_count;
+
         display::DisplayId display_id = display::ToDisplayId(banjo_display_configs[i]->display_id);
         if (display_id != pipe_attached_display_id) {
           continue;
         }
-        layer_cfg_result[i][0] = CLIENT_COMPOSITION_OPCODE_MERGE_BASE;
+
+        current_display_layer_cfg_results[0] = CLIENT_COMPOSITION_OPCODE_MERGE_BASE;
         for (unsigned j = 1; j < banjo_display_configs[i]->layer_count; j++) {
-          layer_cfg_result[i][j] = CLIENT_COMPOSITION_OPCODE_MERGE_SRC;
+          current_display_layer_cfg_results[j] = CLIENT_COMPOSITION_OPCODE_MERGE_SRC;
         }
         break;
       }
     }
   }
-
   return CONFIG_CHECK_RESULT_OK;
 }
 

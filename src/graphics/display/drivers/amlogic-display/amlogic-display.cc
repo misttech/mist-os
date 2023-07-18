@@ -371,7 +371,11 @@ void AmlogicDisplay::DisplayControllerImplReleaseImage(image_t* image) {
 // part of ZX_PROTOCOL_DISPLAY_CONTROLLER_IMPL ops
 config_check_result_t AmlogicDisplay::DisplayControllerImplCheckConfiguration(
     const display_config_t** display_configs, size_t display_count,
-    client_composition_opcode_t** layer_cfg_results, size_t* layer_cfg_result_count) {
+    client_composition_opcode_t* out_layer_cfg_result_list, size_t layer_cfg_result_count,
+    size_t* out_layer_cfg_result_actual) {
+  if (out_layer_cfg_result_actual != nullptr) {
+    *out_layer_cfg_result_actual = 0;
+  }
   if (display_count != 1) {
     ZX_DEBUG_ASSERT(display_count == 0);
     return CONFIG_CHECK_RESULT_OK;
@@ -390,11 +394,21 @@ config_check_result_t AmlogicDisplay::DisplayControllerImplCheckConfiguration(
 
   bool success = true;
 
+  ZX_DEBUG_ASSERT(layer_cfg_result_count >= display_configs[0]->layer_count);
+  cpp20::span<client_composition_opcode_t> client_composition_opcodes(
+      out_layer_cfg_result_list, display_configs[0]->layer_count);
+  std::fill(client_composition_opcodes.begin(), client_composition_opcodes.end(), 0);
+  if (out_layer_cfg_result_actual != nullptr) {
+    *out_layer_cfg_result_actual = client_composition_opcodes.size();
+  }
+
   if (display_configs[0]->layer_count > 1) {
     // We only support 1 layer
     success = false;
   }
 
+  // TODO(fxbug.dev/130593): Move color conversion validation code to a common
+  // library.
   if (success && display_configs[0]->cc_flags) {
     // Make sure cc values are correct
     if (display_configs[0]->cc_flags & COLOR_CONVERSION_PREOFFSET) {
@@ -416,6 +430,9 @@ config_check_result_t AmlogicDisplay::DisplayControllerImplCheckConfiguration(
     const uint32_t height = display_configs[0]->mode.v_addressable;
     // Make sure ther layer configuration is supported
     const primary_layer_t& layer = display_configs[0]->layer_list[0]->cfg.primary;
+    // TODO(fxbug.dev/130594) Instead of using memcmp() to compare the frame
+    // with expected frames, we should use the common type in "api-types-cpp"
+    // which supports comparison opeartors.
     frame_t frame = {
         .x_pos = 0,
         .y_pos = 0,
@@ -425,7 +442,7 @@ config_check_result_t AmlogicDisplay::DisplayControllerImplCheckConfiguration(
 
     if (layer.alpha_mode == ALPHA_PREMULTIPLIED) {
       // we don't support pre-multiplied alpha mode
-      layer_cfg_results[0][0] |= CLIENT_COMPOSITION_OPCODE_ALPHA;
+      client_composition_opcodes[0] |= CLIENT_COMPOSITION_OPCODE_ALPHA;
     }
     success = display_configs[0]->layer_list[0]->type == LAYER_TYPE_PRIMARY &&
               layer.transform_mode == FRAME_TRANSFORM_IDENTITY && layer.image.width == width &&
@@ -434,9 +451,9 @@ config_check_result_t AmlogicDisplay::DisplayControllerImplCheckConfiguration(
               memcmp(&layer.src_frame, &frame, sizeof(frame_t)) == 0;
   }
   if (!success) {
-    layer_cfg_results[0][0] = CLIENT_COMPOSITION_OPCODE_MERGE_BASE;
+    client_composition_opcodes[0] = CLIENT_COMPOSITION_OPCODE_MERGE_BASE;
     for (unsigned i = 1; i < display_configs[0]->layer_count; i++) {
-      layer_cfg_results[0][i] = CLIENT_COMPOSITION_OPCODE_MERGE_SRC;
+      client_composition_opcodes[i] = CLIENT_COMPOSITION_OPCODE_MERGE_SRC;
     }
   }
   return CONFIG_CHECK_RESULT_OK;

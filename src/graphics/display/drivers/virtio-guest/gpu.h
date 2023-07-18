@@ -86,7 +86,8 @@ class GpuDevice : public Device,
 
   config_check_result_t DisplayControllerImplCheckConfiguration(
       const display_config_t** display_configs, size_t display_count,
-      client_composition_opcode_t** layer_cfg_results, size_t* layer_cfg_result_count);
+      client_composition_opcode_t* out_layer_cfg_result_list, size_t layer_cfg_result_count,
+      size_t* out_layer_cfg_result_actual);
 
   void DisplayControllerImplApplyConfiguration(const display_config_t** display_configs,
                                                size_t display_count,

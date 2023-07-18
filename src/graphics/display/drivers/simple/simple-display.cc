@@ -238,12 +238,26 @@ void SimpleDisplay::DisplayControllerImplReleaseImage(image_t* image) {
 
 config_check_result_t SimpleDisplay::DisplayControllerImplCheckConfiguration(
     const display_config_t** display_configs, size_t display_count,
-    client_composition_opcode_t** layer_cfg_results, size_t* layer_cfg_result_count) {
+    client_composition_opcode_t* out_layer_cfg_result_list, size_t layer_cfg_result_count,
+    size_t* out_layer_cfg_result_actual) {
+  if (out_layer_cfg_result_actual != nullptr) {
+    *out_layer_cfg_result_actual = 0;
+  }
+
   if (display_count != 1) {
     ZX_DEBUG_ASSERT(display_count == 0);
     return CONFIG_CHECK_RESULT_OK;
   }
   ZX_DEBUG_ASSERT(display::ToDisplayId(display_configs[0]->display_id) == kDisplayId);
+
+  ZX_DEBUG_ASSERT(layer_cfg_result_count >= display_configs[0]->layer_count);
+  cpp20::span<client_composition_opcode_t> client_composition_opcodes(
+      out_layer_cfg_result_list, display_configs[0]->layer_count);
+  std::fill(client_composition_opcodes.begin(), client_composition_opcodes.end(), 0);
+  if (out_layer_cfg_result_actual != nullptr) {
+    *out_layer_cfg_result_actual = client_composition_opcodes.size();
+  }
+
   bool success;
   if (display_configs[0]->layer_count != 1) {
     success = false;
@@ -263,11 +277,10 @@ config_check_result_t SimpleDisplay::DisplayControllerImplCheckConfiguration(
               display_configs[0]->cc_flags == 0 && layer->alpha_mode == ALPHA_DISABLE;
   }
   if (!success) {
-    layer_cfg_results[0][0] = CLIENT_COMPOSITION_OPCODE_MERGE_BASE;
+    client_composition_opcodes[0] = CLIENT_COMPOSITION_OPCODE_MERGE_BASE;
     for (unsigned i = 1; i < display_configs[0]->layer_count; i++) {
-      layer_cfg_results[0][i] = CLIENT_COMPOSITION_OPCODE_MERGE_SRC;
+      client_composition_opcodes[i] = CLIENT_COMPOSITION_OPCODE_MERGE_SRC;
     }
-    layer_cfg_result_count[0] = display_configs[0]->layer_count;
   }
   return CONFIG_CHECK_RESULT_OK;
 }

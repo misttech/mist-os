@@ -124,11 +124,10 @@ void Controller::PopulateDisplayTimings(const fbl::RefPtr<DisplayInfo>& info) {
     PopulateDisplayMode(*timing, &test_config.mode);
 
     uint32_t display_cfg_result;
-    uint32_t layer_result = 0;
+    client_composition_opcode_t layer_result = 0;
     size_t display_layer_results_count;
-    uint32_t* display_layer_results[] = {&layer_result};
-    display_cfg_result = dc_.CheckConfiguration(test_configs, 1, display_layer_results,
-                                                &display_layer_results_count);
+    display_cfg_result = dc_.CheckConfiguration(
+        test_configs, 1, &layer_result, /*layer_cfg_result_count=*/1, &display_layer_results_count);
     if (display_cfg_result == CONFIG_CHECK_RESULT_OK) {
       fbl::AllocChecker ac;
       info->edid->timings.push_back(*timing, &ac);

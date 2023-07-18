@@ -28,6 +28,7 @@
 #include <algorithm>
 #include <limits>
 #include <memory>
+#include <numeric>
 #include <optional>
 #include <sstream>
 #include <vector>
@@ -483,12 +484,33 @@ void Display::DisplayControllerImplReleaseImage(image_t* image) {
 
 config_check_result_t Display::DisplayControllerImplCheckConfiguration(
     const display_config_t** display_configs, size_t display_count,
-    client_composition_opcode_t** layer_cfg_results, size_t* layer_cfg_result_count) {
+    client_composition_opcode_t* out_layer_cfg_result_list, size_t layer_cfg_result_count,
+    size_t* out_layer_cfg_result_actual) {
+  if (out_layer_cfg_result_actual != nullptr) {
+    *out_layer_cfg_result_actual = 0;
+  }
+
   if (display_count == 0) {
     return CONFIG_CHECK_RESULT_OK;
   }
+
+  int total_layer_count = std::accumulate(
+      display_configs, display_configs + display_count, 0,
+      [](int total, const display_config_t* config) { return total += config->layer_count; });
+  ZX_DEBUG_ASSERT(layer_cfg_result_count >= static_cast<size_t>(total_layer_count));
+  if (out_layer_cfg_result_actual != nullptr) {
+    *out_layer_cfg_result_actual = total_layer_count;
+  }
+  cpp20::span<client_composition_opcode_t> layer_cfg_results(out_layer_cfg_result_list,
+                                                             total_layer_count);
+
+  int layer_cfg_result_offset = 0;
   for (unsigned i = 0; i < display_count; i++) {
     const size_t layer_count = display_configs[i]->layer_count;
+    cpp20::span<client_composition_opcode_t> current_display_client_composition_opcodes =
+        layer_cfg_results.subspan(layer_cfg_result_offset, layer_count);
+    layer_cfg_result_offset += layer_count;
+
     const display::DisplayId display_id = display::ToDisplayId(display_configs[i]->display_id);
     if (layer_count > 0) {
       ZX_DEBUG_ASSERT(devices_.find(display_id) != devices_.end());
@@ -505,8 +527,7 @@ config_check_result_t Display::DisplayControllerImplCheckConfiguration(
       if (display_configs[i]->layer_list[0]->type != LAYER_TYPE_PRIMARY) {
         // We only support PRIMARY layer. Notify client to convert layer to
         // primary type.
-        layer_cfg_results[i][0] |= CLIENT_COMPOSITION_OPCODE_USE_PRIMARY;
-        layer_cfg_result_count[i] = 1;
+        current_display_client_composition_opcodes[0] |= CLIENT_COMPOSITION_OPCODE_USE_PRIMARY;
       } else {
         primary_layer_t* layer = &display_configs[i]->layer_list[0]->cfg.primary;
         // Scaling is allowed if destination frame match display and
@@ -526,37 +547,32 @@ config_check_result_t Display::DisplayControllerImplCheckConfiguration(
         if (memcmp(&layer->dest_frame, &dest_frame, sizeof(frame_t)) != 0) {
           // TODO(fxbug.dev/36222): Need to provide proper flag to indicate driver only
           // accepts full screen dest frame.
-          layer_cfg_results[i][0] |= CLIENT_COMPOSITION_OPCODE_FRAME_SCALE;
+          current_display_client_composition_opcodes[0] |= CLIENT_COMPOSITION_OPCODE_FRAME_SCALE;
         }
         if (memcmp(&layer->src_frame, &src_frame, sizeof(frame_t)) != 0) {
-          layer_cfg_results[i][0] |= CLIENT_COMPOSITION_OPCODE_SRC_FRAME;
+          current_display_client_composition_opcodes[0] |= CLIENT_COMPOSITION_OPCODE_SRC_FRAME;
         }
 
         if (layer->alpha_mode != ALPHA_DISABLE) {
           // Alpha is not supported.
-          layer_cfg_results[i][0] |= CLIENT_COMPOSITION_OPCODE_ALPHA;
+          current_display_client_composition_opcodes[0] |= CLIENT_COMPOSITION_OPCODE_ALPHA;
         }
 
         if (layer->transform_mode != FRAME_TRANSFORM_IDENTITY) {
           // Transformation is not supported.
-          layer_cfg_results[i][0] |= CLIENT_COMPOSITION_OPCODE_TRANSFORM;
-        }
-
-        // Check if any changes to the base layer were required.
-        if (layer_cfg_results[i][0] != 0) {
-          layer_cfg_result_count[i] = 1;
+          current_display_client_composition_opcodes[0] |= CLIENT_COMPOSITION_OPCODE_TRANSFORM;
         }
       }
       // If there is more than one layer, the rest need to be merged into the base layer.
       if (layer_count > 1) {
-        layer_cfg_results[i][0] |= CLIENT_COMPOSITION_OPCODE_MERGE_BASE;
+        current_display_client_composition_opcodes[0] |= CLIENT_COMPOSITION_OPCODE_MERGE_BASE;
         for (unsigned j = 1; j < layer_count; j++) {
-          layer_cfg_results[i][j] |= CLIENT_COMPOSITION_OPCODE_MERGE_SRC;
+          current_display_client_composition_opcodes[j] |= CLIENT_COMPOSITION_OPCODE_MERGE_SRC;
         }
-        layer_cfg_result_count[i] = layer_count;
       }
     }
   }
+
   return CONFIG_CHECK_RESULT_OK;
 }
 
