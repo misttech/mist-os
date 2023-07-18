@@ -120,12 +120,14 @@ fuchsia_test_package("vulkan_loader_tests") {
     ":vulkan_loader_test",
     ":vulkan_loader_unittest",
   ]
+  validate_structured_config = false
   deps = [
     ":manifest-json",
     ":test_realm",
     ":test_vulkan_driver",
     ":vulkan_loader_test_lib_provider",
     ":vulkan_loader_unittest_driver",
+    "..:default_config_values",
     "..:vulkan_loader_cmp",
   ]
   test_specs = {

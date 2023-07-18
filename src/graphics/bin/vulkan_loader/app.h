@@ -15,6 +15,7 @@
 #include <unordered_map>
 
 #include "src/graphics/bin/vulkan_loader/gpu_device.h"
+#include "src/graphics/bin/vulkan_loader/structured_config_lib.h"
 #include "src/lib/fsl/io/device_watcher.h"
 #include "src/lib/fxl/macros.h"
 #include "src/lib/fxl/observer_list.h"
@@ -55,7 +56,8 @@ class LoaderApp {
     FXL_DISALLOW_COPY_ASSIGN_AND_MOVE(PendingActionToken);
   };
 
-  explicit LoaderApp(sys::ComponentContext* context, async_dispatcher_t* dispatcher);
+  explicit LoaderApp(sys::ComponentContext* context, async_dispatcher_t* dispatcher,
+                     structured_config_lib::Config structured_config);
 
   ~LoaderApp();
 
@@ -105,7 +107,7 @@ class LoaderApp {
   async_dispatcher_t* dispatcher_;
   sys::ComponentInspector inspector_;
   inspect::Node devices_node_;
-
+  inspect::Node config_node_;
   inspect::Node icds_node_;
 
   mutable std::mutex pending_action_mutex_;
@@ -133,6 +135,13 @@ class LoaderApp {
   // component's package. Those commands may block because they require the
   // IcdRunner to service them.
   async::Loop fdio_loop_;
+
+  // Read from structured config.  When these are false, the corresponding type of device is never
+  // added to |devices_|.  For device types that we would ordinarily watch for changes in device
+  // availability, we don't bother watching, since we wouldn't add the device to |devices_| anyway.
+  bool allow_magma_icds_ = false;
+  bool allow_goldfish_icd_ = false;
+  bool allow_lavapipe_icd_ = false;
 };
 
 #endif  // SRC_GRAPHICS_BIN_VULKAN_LOADER_APP_H_

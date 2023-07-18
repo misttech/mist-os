@@ -22,6 +22,7 @@
 #include "src/graphics/bin/vulkan_loader/icd_runner.h"
 #include "src/graphics/bin/vulkan_loader/loader.h"
 #include "src/graphics/bin/vulkan_loader/magma_dependency_injection.h"
+#include "src/graphics/bin/vulkan_loader/structured_config_lib.h"
 #include "src/lib/fxl/command_line.h"
 #include "src/lib/fxl/log_settings_command_line.h"
 
@@ -54,8 +55,9 @@ int main(int argc, const char* const* argv) {
   fxl::SetLogSettingsFromCommandLine(fxl::CommandLineFromArgcArgv(argc, argv));
 
   auto context = sys::ComponentContext::CreateAndServeOutgoingDirectory();
+  auto structured_config = structured_config_lib::Config::TakeFromStartupHandle();
 
-  LoaderApp app(context.get(), loop.dispatcher());
+  LoaderApp app(context.get(), loop.dispatcher(), std::move(structured_config));
   zx_status_t status = app.InitDeviceWatcher();
 
   if (status != ZX_OK) {

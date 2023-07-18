@@ -1,0 +1,62 @@
+# Copyright 2023 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+import("//build/components.gni")
+import("//build/dist/packaged_shared_library.gni")
+
+group("lavapipe-vulkan") {  # JJOSH: rename this and whole directory to
+                            # lavapipe-icd?
+  public_deps = [ ":lavapipe_pkg" ]
+}
+
+shared_library("libvulkan_lavapipe") {
+  sources = [ "lavapipe_icd_fake.cc" ]
+  deps = [
+    "//sdk/lib/fdio",
+    "//src/lib/vulkan",
+    "//zircon/system/ulib/zx",
+  ]
+}
+
+packaged_shared_library("packaged_libvulkan_lavapipe") {
+  library = ":libvulkan_lavapipe"
+
+  output_name = ":libvulkan_lavapipe"
+}
+
+resource("vulkan_metadata") {
+  sources = [ "metadata.json" ]
+  outputs = [ "data/metadata.json" ]
+}
+
+icd_name = "libvulkan_lavapipe"
+manifest_filename = "$target_gen_dir/vulkan/icd.d/$icd_name.json"
+
+# api_version must be present but is unused
+icd_data = [
+  "{",
+  "\"file_format_version\": \"1.0.0\",",
+  "\"ICD\": {",
+  "\"library_path\": \"$icd_name.so\",",
+  "\"api_version\": \"1.2.248\"",
+  "}",
+  "}",
+]
+write_file(manifest_filename, icd_data)
+
+resource("vulkan_manifest_json") {
+  sources = [ manifest_filename ]
+  outputs = [ "data/icd.d/$icd_name.json" ]
+}
+
+fuchsia_package_with_single_component("lavapipe_pkg") {
+  package_name = "libvulkan_lavapipe"
+  component_name = "vulkan"
+  deps = [
+    ":libvulkan_lavapipe",
+    ":vulkan_manifest_json",
+    ":vulkan_metadata",
+  ]
+  manifest = "meta/vulkan.cml"
+}

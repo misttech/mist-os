@@ -28,6 +28,7 @@
 #include "src/graphics/bin/vulkan_loader/icd_component.h"
 #include "src/graphics/bin/vulkan_loader/magma_dependency_injection.h"
 #include "src/graphics/bin/vulkan_loader/magma_device.h"
+#include "src/graphics/bin/vulkan_loader/structured_config_lib.h"
 #include "src/lib/json_parser/json_parser.h"
 #include "src/lib/storage/vfs/cpp/pseudo_dir.h"
 #include "src/lib/storage/vfs/cpp/service.h"
@@ -35,7 +36,16 @@
 #include "src/lib/storage/vfs/cpp/vfs_types.h"
 #include "src/lib/testing/loop_fixture/real_loop_fixture.h"
 
-class LoaderUnittest : public gtest::RealLoopFixture {};
+class LoaderUnittest : public gtest::RealLoopFixture {
+ protected:
+  structured_config_lib::Config GetDefaultConfig() {
+    structured_config_lib::Config config;
+    config.allow_goldfish_icd() = true;
+    config.allow_lavapipe_icd() = true;
+    config.allow_magma_icds() = true;
+    return config;
+  }
+};
 
 class FakeMagmaDevice : public fuchsia::gpu::magma::testing::CombinedDevice_TestBase {
  public:
@@ -68,7 +78,7 @@ class FakeMagmaDevice : public fuchsia::gpu::magma::testing::CombinedDevice_Test
 TEST_F(LoaderUnittest, MagmaDevice) {
   inspect::Inspector inspector;
   auto context = sys::ComponentContext::Create();
-  LoaderApp app(context.get(), dispatcher());
+  LoaderApp app(context.get(), dispatcher(), GetDefaultConfig());
 
   vfs::PseudoDir root;
   FakeMagmaDevice magma_device;
@@ -131,7 +141,7 @@ class FakeGoldfishController : public fuchsia::hardware::goldfish::Controller {
 TEST_F(LoaderUnittest, GoldfishDevice) {
   inspect::Inspector inspector;
   auto context = sys::ComponentContext::Create();
-  LoaderApp app(context.get(), dispatcher());
+  LoaderApp app(context.get(), dispatcher(), GetDefaultConfig());
 
   vfs::PseudoDir root;
   FakeGoldfishController goldfish_device;
@@ -166,6 +176,30 @@ TEST_F(LoaderUnittest, GoldfishDevice) {
   vfs_loop.Shutdown();
   EXPECT_EQ(0u, goldfish_device.PipeDeviceBindingsSize());
   EXPECT_EQ(0u, goldfish_device.ControllerBindingsSize());
+}
+
+TEST_F(LoaderUnittest, LavapipeDeviceAllowed) {
+  auto context = sys::ComponentContext::Create();
+  structured_config_lib::Config config;
+  config.allow_goldfish_icd() = false;
+  config.allow_lavapipe_icd() = true;
+  config.allow_magma_icds() = false;
+  LoaderApp app(context.get(), dispatcher(), std::move(config));
+  app.InitDeviceWatcher();
+
+  EXPECT_EQ(1U, app.device_count());
+}
+
+TEST_F(LoaderUnittest, LavapipeDeviceDisallowed) {
+  auto context = sys::ComponentContext::Create();
+  structured_config_lib::Config config;
+  config.allow_goldfish_icd() = false;
+  config.allow_lavapipe_icd() = false;
+  config.allow_magma_icds() = false;
+  LoaderApp app(context.get(), dispatcher(), std::move(config));
+  app.InitDeviceWatcher();
+
+  EXPECT_EQ(0U, app.device_count());
 }
 
 TEST(Icd, BadMetadata) {

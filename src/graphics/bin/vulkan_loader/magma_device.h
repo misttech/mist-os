@@ -17,6 +17,7 @@
 
 class LoaderApp;
 
+// Represents a hardware GPU which is found by enumerating /dev/class/gpu.
 class MagmaDevice : public GpuDevice {
  public:
   static std::unique_ptr<MagmaDevice> Create(LoaderApp* app,

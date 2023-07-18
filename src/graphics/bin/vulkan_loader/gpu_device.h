@@ -13,6 +13,10 @@
 class IcdList;
 class LoaderApp;
 
+// Represents a GPU (hardware or virtual).  It is responsible for generating a list of ICDs which
+// can be used to drive the device.  More precisely, this list consists of connections to components
+// which are each capable of returning a VMO containing an ICD shared library corresponding to the
+// relevant device.
 class GpuDevice {
  public:
   virtual ~GpuDevice() = default;
