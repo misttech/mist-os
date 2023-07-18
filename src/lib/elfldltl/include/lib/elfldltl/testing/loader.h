@@ -11,6 +11,7 @@
 #include <lib/elfldltl/mmap-loader.h>
 
 #include <optional>
+#include <string_view>
 #include <vector>
 
 #include <fbl/unique_fd.h>
@@ -22,6 +23,7 @@
 #ifdef __Fuchsia__
 #include <lib/elfldltl/vmar-loader.h>
 #include <lib/elfldltl/vmo.h>
+#include <lib/zx/vmar.h>
 #endif
 
 #include "get-test-data.h"
@@ -38,7 +40,9 @@ struct LocalVmarLoaderTraits {
   using Loader = elfldltl::LocalVmarLoader;
 
   // This returns a Loader usable for in-process testing.
-  static Loader MakeLoader() { return elfldltl::LocalVmarLoader{}; }
+  static Loader MakeLoader(const zx::vmar& vmar = *zx::vmar::root_self()) {
+    return elfldltl::LocalVmarLoader{vmar};
+  }
 
   // This is a T(std::string_view) function that takes a string name of a test
   // module and returns some move-only type T representing the file's contents.
@@ -66,7 +70,9 @@ struct LocalVmarLoaderTraits {
 struct RemoteVmarLoaderTraits : public LocalVmarLoaderTraits {
   using Loader = elfldltl::RemoteVmarLoader;
 
-  static auto MakeLoader() { return elfldltl::RemoteVmarLoader{*zx::vmar::root_self()}; }
+  static Loader MakeLoader(const zx::vmar& vmar = *zx::vmar::root_self()) {
+    return elfldltl::RemoteVmarLoader{vmar};
+  }
 
   // No Loader::memory() method is available.
   static constexpr bool kHasMemory = false;
@@ -118,7 +124,8 @@ class LoadTests : public ::testing::Test {
     LoadInfo info;
   };
 
-  void Load(std::string_view name, std::optional<LoadResult>& result) {
+  template <typename... LoaderArgs>
+  void Load(std::string_view name, std::optional<LoadResult>& result, LoaderArgs&&... loader_args) {
     result = std::nullopt;
 
     auto lib = Traits::TestLibProvider(name);
@@ -134,7 +141,7 @@ class LoadTests : public ::testing::Test {
 
     ASSERT_TRUE(phdrs_result);
     result = LoadResult{
-        .loader = Traits::MakeLoader(),
+        .loader = Traits::MakeLoader(std::forward<LoaderArgs>(loader_args)...),
         .phdrs = std::move(phdrs_result),
         .entry = ehdr.entry,
     };

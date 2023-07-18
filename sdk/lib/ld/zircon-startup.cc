@@ -4,14 +4,19 @@
 
 #include <lib/elfldltl/zircon.h>
 #include <lib/processargs/processargs.h>
+#include <lib/trivial-allocator/new.h>
+#include <lib/trivial-allocator/zircon.h>
 #include <lib/zircon-internal/unique-backtrace.h>
 #include <lib/zx/channel.h>
 #include <unistd.h>
 #include <zircon/assert.h>
 #include <zircon/syscalls.h>
 
+#include <optional>
+#include <string_view>
 #include <utility>
 
+#include "allocator.h"
 #include "bootstrap.h"
 #include "diagnostics.h"
 #include "zircon.h"
@@ -73,10 +78,15 @@ extern "C" int _start(zx_handle_t handle, void* vdso) {
     CRASH_WITH_UNIQUE_BACKTRACE();
   }
 
+  zx::vmar loading_vmar;
   for (uint32_t i = 0; i < procargs_nhandles; ++i) {
     // If not otherwise consumed below, the handle will be closed.
     zx::handle handle{std::exchange(procargs_handles[i], {})};
     switch (procargs_handle_info[i]) {
+      case PA_VMAR_ROOT:
+        loading_vmar.reset(handle.release());
+        break;
+
       case PA_HND(PA_FD, STDERR_FILENO):
         TakeLogHandle(startup, std::move(handle));
         break;
@@ -86,15 +96,40 @@ extern "C" int _start(zx_handle_t handle, void* vdso) {
   // Now that things are bootstrapped, set up the main diagnostics object.
   auto diag = MakeDiagnostics(startup);
 
+  // Set up the allocators.  These objects hold zx::unowned_vmar copies but do
+  // not own the VMAR handle.
+  trivial_allocator::ZirconVmar system_page_allocator{loading_vmar};
+  auto scratch = MakeScratchAllocator(system_page_allocator);
+  auto initial_exec = MakeInitialExecAllocator(system_page_allocator);
+
+  auto alloc_check = [&diag](fbl::AllocChecker& ac, std::string_view what,
+                             std::optional<size_t> count = std::nullopt) {
+    if (ac.check()) [[likely]] {
+      return;
+    }
+    if (count) {
+      diag.SystemError("cannot allocate", count, what, elfldltl::ZirconError{ZX_ERR_NO_MEMORY});
+    } else {
+      diag.SystemError("cannot allocate", what, elfldltl::ZirconError{ZX_ERR_NO_MEMORY});
+    }
+    __builtin_trap();
+  };
+
   // Fetch the strings.
   //
   // TODO(mcgrathr): In the real production dynamic linker, the only thing it
   // really needs from any of the strings is just to check the environ strings
   // for "LD_DEBUG=...".  That could be done with a simple search without
   // decoding all the strings.
-  char* argv[procargs->args_num + 1];
-  char* envp[procargs->environ_num + 1];
-  char* names[procargs->names_num + 1];
+  auto make_string_array = [&scratch, &alloc_check](size_t count, std::string_view what) -> char** {
+    fbl::AllocChecker ac;
+    char** strings = new (scratch, ac) char*[count];
+    alloc_check(ac, what, count);
+    return strings;
+  };
+  char** argv = make_string_array(procargs->args_num + 1, "argument stringpointers");
+  char** envp = make_string_array(procargs->environ_num + 1, "environment string pointers");
+  char** names = make_string_array(procargs->names_num + 1, "name table string pointers");
   status = processargs_strings(procargs_buffer, procargs_nbytes, argv, envp, names);
   if (status != ZX_OK) {
     diag.SystemError("cannot decode processargs strings", elfldltl::ZirconError{status});

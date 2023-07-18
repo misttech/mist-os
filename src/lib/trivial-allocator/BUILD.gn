@@ -11,6 +11,7 @@ zx_library("trivial-allocator") {
     "lib/trivial-allocator/basic-leaky-allocator.h",
     "lib/trivial-allocator/basic-owning-allocator.h",
     "lib/trivial-allocator/new.h",
+    "lib/trivial-allocator/internal.h",
     "lib/trivial-allocator/page-allocator.h",
     "lib/trivial-allocator/posix.h",
     "lib/trivial-allocator/sealed-page-allocator.h",

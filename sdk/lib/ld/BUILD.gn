@@ -156,6 +156,7 @@ shared_library("ld-startup") {
 
   sources = []
   deps = [
+    ":allocator",
     ":bootstrap",
     ":diagnostics",
     ":standalone",
@@ -221,6 +222,13 @@ source_set("diagnostics") {
   public = [ "diagnostics.h" ]
   public_deps = [ "//src/lib/elfldltl" ]
   sources = [ "diagnostics.cc" ]
+}
+
+source_set("allocator") {
+  visibility = [ ":*" ]
+  public = [ "allocator.h" ]
+  public_deps = [ "//src/lib/trivial-allocator" ]
+  deps = [ "//src/lib/trivial-allocator:stub-delete" ]
 }
 
 source_set("linux-syscalls") {

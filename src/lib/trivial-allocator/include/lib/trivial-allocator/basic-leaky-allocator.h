@@ -14,6 +14,8 @@
 #include <memory>
 #include <type_traits>
 
+#include "internal.h"
+
 namespace trivial_allocator {
 
 // This is the most basic trivial allocator class on which others are built.
@@ -87,7 +89,7 @@ class BasicLeakyAllocator {
 
   [[nodiscard, gnu::malloc, gnu::alloc_size(2), gnu::alloc_align(3)]] constexpr void* allocate(
       size_t size, size_t alignment = __STDCPP_DEFAULT_NEW_ALIGNMENT__) {
-    void* ptr = std::align(alignment, size, frontier_, space_);
+    void* ptr = internal::Align(alignment, size, frontier_, space_);
     if (!ptr) {
       // The pending chunk can't do it.  Get a fresh one.
       size_t chunk_size = size;
@@ -96,7 +98,7 @@ class BasicLeakyAllocator {
         return nullptr;
       }
       void* new_frontier = new_chunk.get();
-      ptr = std::align(alignment, size, new_frontier, chunk_size);
+      ptr = internal::Align(alignment, size, new_frontier, chunk_size);
       if (!ptr) {
         // Ok, it failed to meet the alignment requirement.  Instead, get an
         // overly large chunk to ensure it by wasting space.
@@ -107,7 +109,7 @@ class BasicLeakyAllocator {
           return nullptr;
         }
         new_frontier = new_chunk.get();
-        ptr = std::align(alignment, size, new_frontier, chunk_size);
+        ptr = internal::Align(alignment, size, new_frontier, chunk_size);
         assert(ptr);
       }
 

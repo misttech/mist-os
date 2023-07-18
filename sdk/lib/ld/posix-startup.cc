@@ -7,6 +7,8 @@
 #include <lib/elfldltl/phdr.h>
 #include <lib/elfldltl/symbol.h>
 #include <lib/ld/module.h>
+#include <lib/trivial-allocator/new.h>
+#include <lib/trivial-allocator/posix.h>
 #include <sys/uio.h>
 #include <unistd.h>
 
@@ -14,6 +16,7 @@
 #include <cassert>
 #include <cstring>
 
+#include "allocator.h"
 #include "bootstrap.h"
 #include "diagnostics.h"
 #include "posix.h"
@@ -86,6 +89,11 @@ extern "C" uintptr_t StartLd(StartupStack& stack) {
 
   // Now that things are bootstrapped, set up the main diagnostics object.
   auto diag = MakeDiagnostics(startup);
+
+  // Set up the allocators.
+  trivial_allocator::PosixMmap system_page_allocator{startup.page_size};
+  auto scratch = MakeScratchAllocator(system_page_allocator);
+  auto initial_exec = MakeInitialExecAllocator(system_page_allocator);
 
   // Bail out before handoff if any errors have been detected.
   CheckErrors(diag);

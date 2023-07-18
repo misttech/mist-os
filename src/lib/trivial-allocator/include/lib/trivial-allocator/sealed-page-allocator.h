@@ -105,7 +105,7 @@ class SealedPageAllocator : public PageAllocator<Memory> {
     return reserve_slot.get();
   }
 
-  ReserveArray unsealed_;
+  [[no_unique_address]] ReserveArray unsealed_;
   [[no_unique_address]] ReserveIndex unsealed_idx_{};
 };
 

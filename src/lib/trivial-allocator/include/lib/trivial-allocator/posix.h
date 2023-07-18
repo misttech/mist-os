@@ -9,6 +9,7 @@
 #include <unistd.h>
 
 #include <cassert>
+#include <cstddef>
 #include <utility>
 
 namespace trivial_allocator {
@@ -18,6 +19,13 @@ namespace trivial_allocator {
 class PosixMmap {
  public:
   struct Capability {};
+
+  // It can be constructed with an argument to avoid the sysconf call.
+  constexpr explicit PosixMmap(size_t page_size = sysconf(_SC_PAGE_SIZE)) : page_size_{page_size} {}
+
+  constexpr PosixMmap(const PosixMmap&) = default;
+
+  constexpr PosixMmap& operator=(const PosixMmap&) = default;
 
   [[gnu::const]] size_t page_size() const { return page_size_; }
 
@@ -37,7 +45,7 @@ class PosixMmap {
   }
 
  private:
-  size_t page_size_ = sysconf(_SC_PAGE_SIZE);
+  size_t page_size_;
 };
 
 }  // namespace trivial_allocator

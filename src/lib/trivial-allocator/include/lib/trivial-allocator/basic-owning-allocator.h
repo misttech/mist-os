@@ -14,6 +14,7 @@
 #include <utility>
 
 #include "basic-leaky-allocator.h"
+#include "internal.h"
 
 namespace trivial_allocator {
 
@@ -74,7 +75,7 @@ class OwningAllocateFunction {
       void* ptr =
           static_cast<std::byte*>(allocated.get()) + ((full_size & -kAlign) - sizeof(Owned));
       size_t tail_size = sizeof(Owned);
-      void* aligned = std::align(kAlign, sizeof(Owned), ptr, tail_size);
+      void* aligned = internal::Align(kAlign, sizeof(Owned), ptr, tail_size);
       assert(aligned);
 
       // Chain the new allocation on.

@@ -10,10 +10,12 @@
 #include <lib/elfldltl/load.h>
 #include <lib/elfldltl/testing/diagnostics.h>
 #include <lib/elfldltl/testing/loader.h>
+#include <lib/stdcompat/functional.h>
 #include <unistd.h>
 
 #ifdef __Fuchsia__
 #include <lib/zx/channel.h>
+#include <zircon/processargs.h>
 #include <zircon/syscalls.h>
 #else
 #include <sys/auxv.h>
@@ -23,6 +25,7 @@
 #include <initializer_list>
 #include <numeric>
 #include <string_view>
+#include <tuple>
 #include <type_traits>
 
 #include <gtest/gtest.h>
@@ -58,13 +61,31 @@ class InProcessTestLaunch {
  public:
   static constexpr bool kHasLog = true;
 
+  // The dynamic linker gets loaded into this same test process, but it's given
+  // a sub-VMAR to consider its "root" or allocation range so hopefully it will
+  // confine its pointer references to that part of the address space.  The
+  // dynamic linker doesn't necessarily clean up all its mappings--on success,
+  // it leaves many mappings in place.  Test VMAR is always destroyed when the
+  // InProcessTestLaunch object goes out of scope.
+  static constexpr size_t kVmarSize = 1 << 30;
+
   void Init(std::initializer_list<std::string_view> args) {
+    zx_vaddr_t test_base;
+    ASSERT_EQ(zx::vmar::root_self()->allocate(
+                  ZX_VM_CAN_MAP_READ | ZX_VM_CAN_MAP_WRITE | ZX_VM_CAN_MAP_EXECUTE, 0, kVmarSize,
+                  &vmar_, &test_base),
+              ZX_OK);
+
     ASSERT_NO_FATAL_FAILURE(log_.Init());
     procargs()  //
         .AddInProcessTestHandles()
+        .AddDuplicateHandle(PA_VMAR_ROOT, vmar_.borrow())
         .AddFd(STDERR_FILENO, log_.TakeSocket())
         .SetArgs(args);
   }
+
+  // Arguments for calling MakeLoader(const zx::vmar&).
+  auto LoaderArgs() const { return std::forward_as_tuple(vmar_); }
 
   ld::testing::TestProcessArgs& procargs() { return procargs_; }
 
@@ -74,6 +95,12 @@ class InProcessTestLaunch {
     auto fn = reinterpret_cast<EntryFunction*>(entry);
     zx::channel bootstrap = procargs_.PackBootstrap();
     return fn(bootstrap.release(), GetVdso());
+  }
+
+  ~InProcessTestLaunch() {
+    if (vmar_) {
+      EXPECT_EQ(vmar_.destroy(), ZX_OK);
+    }
   }
 
  private:
@@ -91,6 +118,7 @@ class InProcessTestLaunch {
 
   ld::testing::TestProcessArgs procargs_;
   ld::testing::TestLogSocket log_;
+  zx::vmar vmar_;
 };
 
 #else  // ! __Fuchsia__
@@ -175,6 +203,8 @@ class InProcessTestLaunch {
     ASSERT_NO_FATAL_FAILURE(AllocateStack());
     ASSERT_NO_FATAL_FAILURE(PopulateStack(args, {}));
   }
+
+  constexpr std::tuple<> LoaderArgs() { return {}; }
 
   int Call(uintptr_t entry) { return CallOnStack(entry, sp_); }
 
@@ -289,11 +319,16 @@ class LdStartupTests : public elfldltl::testing::LoadTests<LoaderTraits> {
   using typename Base::Loader;
   using typename Base::LoadResult;
 
-  void SetUp() override { Load(); }
-
-  void Load() {
+  template <class Launch>
+  void Load(Launch&& launch) {
     std::optional<LoadResult> result;
-    ASSERT_NO_FATAL_FAILURE(Base::Load(kLdStartupName, result));
+    ASSERT_NO_FATAL_FAILURE(std::apply(
+        [this, &result](auto&&... args) {
+          this->Base::Load(kLdStartupName, result,
+                           // LoaderArgs() gives args for LoaderTraits::MakeLoader().
+                           std::forward<decltype(args)>(args)...);
+        },
+        launch.LoaderArgs()));
     loader_ = std::move(result->loader);
     entry_ = result->entry + loader_->load_bias();
   }
@@ -305,7 +340,15 @@ class LdStartupTests : public elfldltl::testing::LoadTests<LoaderTraits> {
   uintptr_t entry_ = 0;
 };
 
-TYPED_TEST_SUITE(LdStartupTests, elfldltl::testing::LoaderTypes);
+#ifdef __Fuchsia__
+// Don't test MmapLoaderTraits on Fuchsia since it can't clean up after itself.
+using LoaderTypes = ::testing::Types<elfldltl::testing::LocalVmarLoaderTraits,
+                                     elfldltl::testing::RemoteVmarLoaderTraits>;
+#else
+using LoaderTypes = elfldltl::testing::LoaderTypes;
+#endif
+
+TYPED_TEST_SUITE(LdStartupTests, LoaderTypes);
 
 TYPED_TEST(LdStartupTests, Basic) {
   // The skeletal dynamic linker is hard-coded now to read its argument string
@@ -318,6 +361,8 @@ TYPED_TEST(LdStartupTests, Basic) {
 
   InProcessTestLaunch launch;
   ASSERT_NO_FATAL_FAILURE(launch.Init({kArg1, kArg2}));
+
+  ASSERT_NO_FATAL_FAILURE(this->Load(launch));
 
   EXPECT_EQ(launch.Call(this->entry()), kReturnValue);
 

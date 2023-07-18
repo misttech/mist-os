@@ -138,6 +138,10 @@ class PageAllocator {
   Memory memory_;
 };
 
+// Deduction guide.
+template <class Memory>
+PageAllocator(Memory) -> PageAllocator<std::decay_t<Memory>>;
+
 }  // namespace trivial_allocator
 
 #endif  // SRC_LIB_TRIVIAL_ALLOCATOR_INCLUDE_LIB_TRIVIAL_ALLOCATOR_PAGE_ALLOCATOR_H_
