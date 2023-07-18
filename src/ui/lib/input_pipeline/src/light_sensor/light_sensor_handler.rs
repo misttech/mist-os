@@ -17,7 +17,7 @@ use fidl_fuchsia_lightsensor::{
 };
 use fidl_fuchsia_settings::LightProxy;
 use fidl_fuchsia_ui_brightness::ControlProxy as BrightnessControlProxy;
-use fuchsia_inspect;
+use fuchsia_inspect::{self, NumericProperty};
 use fuchsia_zircon as zx;
 use futures::channel::oneshot;
 use futures::TryStreamExt;
@@ -195,6 +195,17 @@ pub struct LightSensorHandler<T> {
     product_id: u32,
     /// The inventory of this handler's Inspect status.
     inspect_status: InputHandlerStatus,
+
+    // Additional inspect properties specific to LightSensorHandler
+
+    // Number of received events that were discarded because handler could not process
+    // its saturation values. These events are marked as handled in Input Pipeline so
+    // they are ignored by downstream handlers, but are not counted to events_handled_count.
+    // events_received_count >= events_handled_count + events_saturated_count
+    events_saturated_count: fuchsia_inspect::UintProperty,
+    // Number of connected clients subscribed to receive updated sensor readings from
+    // the HangingGet.
+    clients_connected_count: fuchsia_inspect::UintProperty,
 }
 
 enum ActiveSettingState {
@@ -252,6 +263,10 @@ impl<T> LightSensorHandler<T> {
             "light_sensor_handler",
             /* generates_events */ false,
         );
+        let events_saturated_count =
+            inspect_status.inspect_node.create_uint("events_saturated_count", 0);
+        let clients_connected_count =
+            inspect_status.inspect_node.create_uint("clients_connected_count", 0);
         Rc::new(Self {
             hanging_get,
             calibrator,
@@ -261,6 +276,8 @@ impl<T> LightSensorHandler<T> {
             vendor_id: configuration.vendor_id,
             product_id: configuration.product_id,
             inspect_status,
+            events_saturated_count,
+            clients_connected_count,
         })
     }
 
@@ -269,6 +286,7 @@ impl<T> LightSensorHandler<T> {
         mut stream: SensorRequestStream,
     ) -> Result<(), Error> {
         let subscriber = self.hanging_get.borrow_mut().new_subscriber();
+        self.clients_connected_count.add(1);
         while let Some(request) =
             stream.try_next().await.context("Error handling light sensor request stream")?
         {
@@ -280,7 +298,7 @@ impl<T> LightSensorHandler<T> {
                 }
             }
         }
-
+        self.clients_connected_count.subtract(1);
         Ok(())
     }
 
@@ -455,10 +473,8 @@ where
             {
                 Ok(data) => data,
                 Err(SaturatedError::Saturated) => {
-                    // Event is handled but saturated data is not useful for clients. Mark as
-                    // handled but do not publish data.
-                    input_event.handled = Handled::Yes;
-                    self.inspect_status.count_handled_event();
+                    // Saturated data is not useful for clients so we do not publish data.
+                    self.events_saturated_count.add(1);
                     return vec![input_event];
                 }
                 Err(SaturatedError::Anyhow(e)) => {

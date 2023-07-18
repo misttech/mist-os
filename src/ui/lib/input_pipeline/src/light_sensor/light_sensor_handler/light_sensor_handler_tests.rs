@@ -700,12 +700,12 @@ async fn light_sensor_handler_input_event_handler() {
     };
 
     // Trigger the first event. The first event will trigger an override of the settings on the
-    // device, and will not send out any update. It will report that it was handled.
+    // device, and will not send out any update.
     let events = Rc::clone(&handler).handle_input_event(input_event.clone()).await;
 
     assert_eq!(events.len(), 1);
     let event = &events[0];
-    assert_eq!(event.handled, Handled::Yes);
+    assert_eq!(event.handled, Handled::No);
     drop(events);
 
     // Trigger the second event. The data should match what was used in
@@ -783,12 +783,12 @@ async fn light_sensor_handler_subscriber_queue() {
     };
 
     // Trigger the first event. The first event will trigger an override of the settings on the
-    // device, and will not send out any update. It will report that it was handled.
+    // device, and will not send out any update.
     let events = Rc::clone(&handler).handle_input_event(input_event.clone()).await;
 
     assert_eq!(events.len(), 1);
     let event = &events[0];
-    assert_eq!(event.handled, Handled::Yes);
+    assert_eq!(event.handled, Handled::No);
     drop(events);
 
     // Trigger the second event. The data should match what was used in
@@ -822,7 +822,9 @@ fn light_sensor_handler_initialized_with_inspect_node() {
     fuchsia_inspect::assert_data_tree!(inspector, root: {
         input_handlers_node: {
             light_sensor_handler: {
+                clients_connected_count: 0u64,
                 events_received_count: 0u64,
+                events_saturated_count: 0u64,
                 events_handled_count: 0u64,
                 last_received_timestamp_ns: 0u64,
                 "fuchsia.inspect.Health": {
@@ -852,6 +854,21 @@ async fn light_sensor_handler_inspect_counts_events() {
     let handler =
         LightSensorHandler::new(DoublingCalibrator, sensor_configuration, &fake_handlers_node);
 
+    let (sensor_proxy, stream): (SensorProxy, SensorRequestStream) =
+        create_proxy_and_stream::<SensorMarker>().expect("should get proxy and streamns");
+    // Register stream so subscriber is created.
+    let request_task = Task::local({
+        let handler = Rc::clone(&handler);
+        async move {
+            handler.handle_light_sensor_request_stream(stream).await.expect("can register");
+        }
+    });
+
+    // Called so we can initialize ActiveSettingState
+    let _ = Rc::clone(&handler)
+        .get_calibrated_data(Rgbc { red: 1, green: 1, blue: 1, clear: 1 }, device_proxy.clone())
+        .await;
+
     let input_event = InputEvent {
         device_event: InputDeviceEvent::LightSensor(LightSensorEvent {
             device_proxy: device_proxy.clone(),
@@ -867,15 +884,17 @@ async fn light_sensor_handler_inspect_counts_events() {
         handled: Handled::No,
         trace_id: None,
     };
-    let last_event_timestamp: u64 = input_event.clone().event_time.into_nanos().try_into().unwrap();
 
     // Handle an unhandled input event.
     let _ = Rc::clone(&handler).handle_input_event(input_event.clone()).await;
 
+    // Client connected to handler to watch for updated sensor readings
+    let _reading = sensor_proxy.watch().await.expect("watch called");
+
     // Handled event should be ignored.
     let handled_event = InputEvent {
         device_event: InputDeviceEvent::LightSensor(LightSensorEvent {
-            device_proxy,
+            device_proxy: device_proxy.clone(),
             rgbc: Rgbc { red: 1, green: 2, blue: 3, clear: 14747 },
         }),
         device_descriptor: InputDeviceDescriptor::LightSensor(LightSensorDeviceDescriptor {
@@ -890,11 +909,57 @@ async fn light_sensor_handler_inspect_counts_events() {
     };
     let _ = Rc::clone(&handler).handle_input_event(handled_event).await;
 
+    let input_event2 = InputEvent {
+        device_event: InputDeviceEvent::LightSensor(LightSensorEvent {
+            device_proxy: device_proxy.clone(),
+            rgbc: Rgbc { red: 0, green: 10, blue: 0, clear: 14700 },
+        }),
+        device_descriptor: InputDeviceDescriptor::LightSensor(LightSensorDeviceDescriptor {
+            vendor_id: VENDOR_ID,
+            product_id: PRODUCT_ID,
+            device_id: 3,
+            sensor_layout: Rgbc { red: 1, green: 2, blue: 3, clear: 4 },
+        }),
+        event_time: Time::get_monotonic(),
+        handled: Handled::No,
+        trace_id: None,
+    };
+
+    // Handle an unhandled input event.
+    let _ = Rc::clone(&handler).handle_input_event(input_event2.clone()).await;
+
+    // Client makes subsequent call to handler
+    let _reading2 = sensor_proxy.watch().await.expect("watch called");
+
+    let saturated_input_event = InputEvent {
+        device_event: InputDeviceEvent::LightSensor(LightSensorEvent {
+            device_proxy: device_proxy.clone(),
+            rgbc: Rgbc { red: 21067, green: 20395, blue: 20939, clear: 65085 },
+        }),
+        device_descriptor: InputDeviceDescriptor::LightSensor(LightSensorDeviceDescriptor {
+            vendor_id: VENDOR_ID,
+            product_id: PRODUCT_ID,
+            device_id: 3,
+            sensor_layout: Rgbc { red: 1, green: 2, blue: 3, clear: 4 },
+        }),
+        event_time: Time::get_monotonic(),
+        handled: Handled::No,
+        trace_id: None,
+    };
+    let last_event_timestamp: u64 =
+        saturated_input_event.clone().event_time.into_nanos().try_into().unwrap();
+
+    // Handle an unhandled input event with saturated rgbc reading.
+    // Event should be discarded and counted to `events_saturated_count`.
+    let _ = Rc::clone(&handler).handle_input_event(saturated_input_event.clone()).await;
+
     fuchsia_inspect::assert_data_tree!(inspector, root: {
         input_handlers_node: {
             light_sensor_handler: {
-                events_received_count: 1u64,
-                events_handled_count: 1u64,
+                clients_connected_count: 1u64,
+                events_received_count: 3u64,
+                events_saturated_count: 1u64,
+                events_handled_count: 2u64,
                 last_received_timestamp_ns: last_event_timestamp,
                 "fuchsia.inspect.Health": {
                     status: "STARTING_UP",
@@ -902,6 +967,18 @@ async fn light_sensor_handler_inspect_counts_events() {
                     // so we only assert that the property is present.
                     start_timestamp_nanos: fuchsia_inspect::AnyProperty
                 },
+            }
+        }
+    });
+
+    drop(sensor_proxy);
+    request_task.await;
+
+    // Update clients_connected_count once stream is terminated & client stops sending requests.
+    fuchsia_inspect::assert_data_tree!(inspector, root: {
+        input_handlers_node: {
+            light_sensor_handler: contains {
+                clients_connected_count: 0u64,
             }
         }
     });

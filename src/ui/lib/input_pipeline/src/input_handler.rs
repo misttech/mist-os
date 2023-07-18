@@ -115,7 +115,7 @@ where
 
 pub struct InputHandlerStatus {
     /// A node that contains the state below.
-    inspect_node: fuchsia_inspect::Node,
+    pub inspect_node: fuchsia_inspect::Node,
 
     /// The number of unhandled events received by the handler.
     events_received_count: fuchsia_inspect::UintProperty,
