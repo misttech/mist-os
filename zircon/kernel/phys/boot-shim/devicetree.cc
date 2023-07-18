@@ -6,8 +6,14 @@
 
 #include "phys/boot-shim/devicetree.h"
 
+#include <lib/boot-options/boot-options.h>
 #include <lib/boot-shim/devicetree.h>
-#include <lib/uart/all.h>
+#include <lib/devicetree/devicetree.h>
+#include <lib/devicetree/matcher.h>
+#include <lib/memalloc/range.h>
+#include <zircon/assert.h>
+
+#include <array>
 
 #include <ktl/array.h>
 #include <ktl/type_traits.h>
@@ -17,20 +23,21 @@
 #include <phys/main.h>
 #include <phys/uart.h>
 
-void DevicetreeInitUart(const boot_shim::DevicetreeBootstrapChosenNodeItem<>& chosen_item,
-                        BootOptions& boot_opts) {
-  // Overwrite devicetree results with bootloader provided UART driver.
-  boot_opts.serial = chosen_item.uart().uart();
-  SetBootOptions(boot_opts, chosen_item.zbi(), chosen_item.cmdline().value_or(""));
-  SetUartConsole(boot_opts.serial);
-}
+DevicetreeBoot gDevicetreeBoot;
 
-void DevicetreeInitMemory(const boot_shim::DevicetreeBootstrapChosenNodeItem<>& chosen_item,
-                          const boot_shim::DevicetreeMemoryItem& memory_item) {
-  auto zbi = chosen_item.zbi();
+namespace {
+
+// Other platforms such as Linux provide a few of preallocated buffers for storing memory ranges,
+// |kMaxRanges| is a big enough upperbound for the combined number of ranges provided by such
+// buffers.
+//
+// This represents a recommended number of entries to be allocated for storing real world memory
+// ranges.
+constexpr size_t kDevicetreeMaxMemoryRanges = 512;
+
+void DevicetreeInitMemory(zbitl::ByteView zbi, const boot_shim::DevicetreeMemoryMatcher& memory) {
   uint64_t phys_start = reinterpret_cast<uint64_t>(PHYS_LOAD_ADDRESS);
   uint64_t phys_end = reinterpret_cast<uint64_t>(_end);
-
   ktl::array<memalloc::Range, 2> special_ranges = {
       memalloc::Range{
           .addr = phys_start,
@@ -49,12 +56,40 @@ void DevicetreeInitMemory(const boot_shim::DevicetreeBootstrapChosenNodeItem<>& 
     special_ranges_view = special_ranges;
   }
 
-  auto ranges = memory_item.memory_ranges();
+  auto ranges = memory.memory_ranges();
   auto memory_ranges =
       cpp20::span<memalloc::Range>(const_cast<memalloc::Range*>(ranges.data()), ranges.size());
   Allocation::Init(memory_ranges, special_ranges_view);
-
   ArchSetUpAddressSpaceEarly();
 
   Allocation::GetPool().PrintMemoryRanges(ProgramName());
+}
+
+}  // namespace
+
+void InitMemory(void* dtb) {
+  static std::array<memalloc::Range, kDevicetreeMaxMemoryRanges> memory_ranges;
+  devicetree::ByteView fdt_blob(static_cast<const uint8_t*>(dtb),
+                                std::numeric_limits<uintptr_t>::max());
+  devicetree::Devicetree fdt(fdt_blob);
+
+  boot_shim::DevicetreeMemoryMatcher memory("init-memory", stdout, memory_ranges);
+  boot_shim::DevicetreeChosenNodeMatcher<> chosen("init-memory", stdout);
+
+  memory.AppendAdditionalRanges(fdt);
+  ZX_ASSERT(devicetree::Match(fdt, chosen, memory));
+
+  // This instance of |BootOptions| is not meant to be wired anywhere, its sole purpose is to select
+  // the proper uart from the cmdline if its present.
+  static BootOptions boot_options;
+  boot_options.serial = chosen.uart().uart();
+  SetBootOptions(boot_options, {}, chosen.cmdline().value_or(""));
+  SetUartConsole(boot_options.serial);
+  DevicetreeInitMemory(chosen.zbi(), memory);
+
+  gDevicetreeBoot = {
+      .cmdline = chosen.cmdline().value_or(""),
+      .ramdisk = chosen.zbi(),
+      .fdt = fdt,
+  };
 }

@@ -141,7 +141,7 @@ void ArchSetUpIdentityAddressSpace(page_table::AddressSpaceBuilder& builder) {
 }
 
 void ArchSetUpAddressSpaceEarly() {
-  if (!gBootOptions->phys_mmu) {
+  if (gBootOptions && !gBootOptions->phys_mmu) {
     return;
   }
   AllocationMemoryManager manager(Allocation::GetPool());

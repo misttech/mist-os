@@ -7,6 +7,7 @@
 #include <lib/boot-shim/devicetree-boot-shim.h>
 #include <lib/boot-shim/devicetree.h>
 #include <lib/devicetree/devicetree.h>
+#include <lib/devicetree/matcher.h>
 #include <lib/devicetree/testing/loaded-dtb.h>
 #include <lib/fit/defer.h>
 #include <lib/memalloc/range.h>
@@ -265,7 +266,7 @@ TEST_F(ArmDevicetreeGicItemTest, ParseGicV3) {
   ASSERT_TRUE(present, "ZBI Driver for GIC V3 missing.");
 }
 
-class BootstrapChosenItemTest : public TestMixin<ArmDevicetreeTest, RiscvDevicetreeTest> {
+class ChosenNodeMatcherTest : public TestMixin<ArmDevicetreeTest, RiscvDevicetreeTest> {
  public:
   static void SetUpTestSuite() {
     Mixin::SetUpTestSuite();
@@ -285,7 +286,7 @@ class BootstrapChosenItemTest : public TestMixin<ArmDevicetreeTest, RiscvDevicet
   static std::optional<LoadedDtb> chosen_dtb_;
 };
 
-std::optional<LoadedDtb> BootstrapChosenItemTest::chosen_dtb_ = std::nullopt;
+std::optional<LoadedDtb> ChosenNodeMatcherTest::chosen_dtb_ = std::nullopt;
 
 struct ExpectedChosen {
   uintptr_t ramdisk_start;
@@ -301,7 +302,7 @@ using AllUartDrivers =
                  uart::ns8250::Mmio8Driver, uart::ns8250::Mmio32Driver>;
 
 template <typename ChosenItemType>
-void CheckChosenItem(const ChosenItemType& item, const ExpectedChosen& expected) {
+void CheckChosenMatcher(const ChosenItemType& matcher, const ExpectedChosen& expected) {
   std::vector<std::unique_ptr<devicetree::Node>> nodes_in_path;
   size_t current = 0;
   while (current < expected.uart_absolute_path.length()) {
@@ -326,19 +327,19 @@ void CheckChosenItem(const ChosenItemType& item, const ExpectedChosen& expected)
   }
 
   // Cmdline Check.
-  EXPECT_EQ(item.cmdline(), expected.cmdline);
+  EXPECT_EQ(matcher.cmdline(), expected.cmdline);
 
   // Ramdisk captured correctly.
-  auto ramdisk = item.zbi();
+  auto ramdisk = matcher.zbi();
   uintptr_t ramdisk_start = reinterpret_cast<uintptr_t>(ramdisk.data());
   EXPECT_EQ(ramdisk_start, expected.ramdisk_start);
   EXPECT_EQ(ramdisk.size(), expected.ramdisk_end - expected.ramdisk_start);
 
-  ASSERT_TRUE(item.stdout_path());
-  EXPECT_EQ(*item.stdout_path(), expected_uart_path);
+  ASSERT_TRUE(matcher.stdout_path());
+  EXPECT_EQ(*matcher.stdout_path(), expected_uart_path);
 
   // Uart.
-  item.uart().Visit([&](const auto& driver) {
+  matcher.uart().Visit([&](const auto& driver) {
     using config_t = std::decay_t<decltype(driver.uart().config())>;
     if constexpr (std::is_same_v<config_t, zbi_dcfg_simple_t>) {
       auto& uart = driver.uart();
@@ -348,131 +349,105 @@ void CheckChosenItem(const ChosenItemType& item, const ExpectedChosen& expected)
       // The bootstrap phase does not decode interrupt.
       EXPECT_EQ(uart.config().irq, expected.uart_config.irq);
     } else {
-      std::cout << fbl::TypeInfo<decltype(driver)>::Name() << std::endl;
       FAIL("Unexpected driver.");
     }
   });
 }
 
-TEST_F(BootstrapChosenItemTest, ParseChosen) {
+TEST_F(ChosenNodeMatcherTest, ParseChosen) {
   auto fdt = chosen();
-  boot_shim::DevicetreeBootShim<boot_shim::DevicetreeBootstrapChosenNodeItem<AllUartDrivers>> shim(
-      "test", fdt);
+  boot_shim::DevicetreeChosenNodeMatcher<AllUartDrivers> chosen_matcher("test", stdout);
 
-  shim.Init();
+  ASSERT_TRUE(devicetree::Match(fdt, chosen_matcher));
 
-  auto& bootstrap_chosen_item =
-      shim.Get<boot_shim::DevicetreeBootstrapChosenNodeItem<AllUartDrivers>>();
-  CheckChosenItem(bootstrap_chosen_item,
-                  {
-                      .ramdisk_start = 0x48000000,
-                      .ramdisk_end = 0x58000000,
-                      .cmdline = "-foo=bar -bar=baz",
-                      .uart_config_name = uart::pl011::Driver::config_name(),
-                      .uart_config =
-                          {
-                              .mmio_phys = 0x9000000,
-                              .irq = 33,
-                          },
-                      .uart_absolute_path = "/some-interrupt-controller/pl011uart@9000000",
-                  });
+  CheckChosenMatcher(chosen_matcher,
+                     {
+                         .ramdisk_start = 0x48000000,
+                         .ramdisk_end = 0x58000000,
+                         .cmdline = "-foo=bar -bar=baz",
+                         .uart_config_name = uart::pl011::Driver::config_name(),
+                         .uart_config =
+                             {
+                                 .mmio_phys = 0x9000000,
+                                 .irq = 33,
+                             },
+                         .uart_absolute_path = "/some-interrupt-controller/pl011uart@9000000",
+                     });
 }
 
-TEST_F(BootstrapChosenItemTest, ArmQemu) {
+TEST_F(ChosenNodeMatcherTest, ArmQemu) {
   constexpr std::string_view kQemuCmdline =
       "TERM=xterm-256color kernel.entropy-mixin=cd93b8955fc588b1bcde0d691a694b926d53faeca61c386635739b24df717363 kernel.halt-on-panic=true ";
   constexpr uint32_t kQemuRamdiskStart = 0x48000000;
   constexpr uint32_t kQemuRamdiskEnd = 0x499e8458;
 
-  std::array<std::byte, 512> image_buffer;
-  zbitl::Image<cpp20::span<std::byte>> image(image_buffer);
-  ASSERT_TRUE(image.clear().is_ok());
-
   auto fdt = qemu_arm_gic3();
-  boot_shim::DevicetreeBootShim<boot_shim::DevicetreeBootstrapChosenNodeItem<AllUartDrivers>> shim(
-      "test", fdt);
+  boot_shim::DevicetreeChosenNodeMatcher<AllUartDrivers> chosen_matcher("test", stdout);
 
-  shim.Init();
+  ASSERT_TRUE(devicetree::Match(fdt, chosen_matcher));
 
-  auto& bootstrap_chosen_item =
-      shim.Get<boot_shim::DevicetreeBootstrapChosenNodeItem<AllUartDrivers>>();
-  CheckChosenItem(bootstrap_chosen_item,
-                  {
-                      .ramdisk_start = kQemuRamdiskStart,
-                      .ramdisk_end = kQemuRamdiskEnd,
-                      .cmdline = kQemuCmdline,
-                      .uart_config_name = uart::pl011::Driver::config_name(),
-                      .uart_config =
-                          {
-                              .mmio_phys = uart::pl011::kQemuConfig.mmio_phys,
-                              .irq = 33,
-                          },
-                      .uart_absolute_path = "/pl011@9000000",
-                  });
+  CheckChosenMatcher(chosen_matcher, {
+                                         .ramdisk_start = kQemuRamdiskStart,
+                                         .ramdisk_end = kQemuRamdiskEnd,
+                                         .cmdline = kQemuCmdline,
+                                         .uart_config_name = uart::pl011::Driver::config_name(),
+                                         .uart_config =
+                                             {
+                                                 .mmio_phys = uart::pl011::kQemuConfig.mmio_phys,
+                                                 .irq = 33,
+                                             },
+                                         .uart_absolute_path = "/pl011@9000000",
+                                     });
 }
 
-TEST_F(BootstrapChosenItemTest, RiscvQemu) {
+TEST_F(ChosenNodeMatcherTest, RiscvQemu) {
   constexpr std::string_view kQemuCmdline =
       "BOOT_IMAGE=/vmlinuz-5.19.0-1012-generic root=/dev/mapper/ubuntu--vg-ubuntu--lv ro";
   constexpr uint32_t kQemuRamdiskStart = 0xD646A000;
   constexpr uint32_t kQemuRamdiskEnd = 0xDAFEFDB6;
 
-  std::array<std::byte, 1024> image_buffer;
-  zbitl::Image<cpp20::span<std::byte>> image(image_buffer);
-  ASSERT_TRUE(image.clear().is_ok());
-
   auto fdt = qemu_riscv();
-  boot_shim::DevicetreeBootShim<boot_shim::DevicetreeBootstrapChosenNodeItem<AllUartDrivers>> shim(
-      "test", fdt);
+  boot_shim::DevicetreeChosenNodeMatcher<AllUartDrivers> chosen_matcher("test", stdout);
 
-  shim.Init();
+  ASSERT_TRUE(devicetree::Match(fdt, chosen_matcher));
 
-  auto& bootstrap_chosen_item =
-      shim.Get<boot_shim::DevicetreeBootstrapChosenNodeItem<AllUartDrivers>>();
-  CheckChosenItem(bootstrap_chosen_item,
-                  {
-                      .ramdisk_start = kQemuRamdiskStart,
-                      .ramdisk_end = kQemuRamdiskEnd,
-                      .cmdline = kQemuCmdline,
-                      .uart_config_name = uart::ns8250::Mmio8Driver::config_name(),
-                      .uart_config =
-                          {
-                              .mmio_phys = 0x10000000,
-                              .irq = 10,
-                          },
-                      .uart_absolute_path = "/soc/serial@10000000",
-                  });
+  CheckChosenMatcher(chosen_matcher,
+                     {
+                         .ramdisk_start = kQemuRamdiskStart,
+                         .ramdisk_end = kQemuRamdiskEnd,
+                         .cmdline = kQemuCmdline,
+                         .uart_config_name = uart::ns8250::Mmio8Driver::config_name(),
+                         .uart_config =
+                             {
+                                 .mmio_phys = 0x10000000,
+                                 .irq = 10,
+                             },
+                         .uart_absolute_path = "/soc/serial@10000000",
+                     });
 }
 
-TEST_F(BootstrapChosenItemTest, VisionFive2) {
+TEST_F(ChosenNodeMatcherTest, VisionFive2) {
   constexpr std::string_view kCmdline =
       "root=/dev/mmcblk1p4 rw console=tty0 console=ttyS0,115200 earlycon rootwait stmmaceth=chain_mode:1 selinux=0";
 
-  std::array<std::byte, 1024> image_buffer;
-  zbitl::Image<cpp20::span<std::byte>> image(image_buffer);
-  ASSERT_TRUE(image.clear().is_ok());
-
   auto fdt = vision_five_2();
-  boot_shim::DevicetreeBootShim<boot_shim::DevicetreeBootstrapChosenNodeItem<AllUartDrivers>> shim(
-      "test", fdt);
+  boot_shim::DevicetreeChosenNodeMatcher<AllUartDrivers> chosen_matcher("test", stdout);
 
-  shim.Init();
+  ASSERT_TRUE(devicetree::Match(fdt, chosen_matcher));
 
-  auto& bootstrap_chosen_item =
-      shim.Get<boot_shim::DevicetreeBootstrapChosenNodeItem<AllUartDrivers>>();
-  CheckChosenItem(bootstrap_chosen_item,
-                  {
-                      .ramdisk_start = 0x48100000,
-                      .ramdisk_end = 0x48fb3df5,
-                      .cmdline = kCmdline,
-                      .uart_config_name = uart::ns8250::LegacyDw8250Driver::config_name(),
-                      .uart_config =
-                          {
-                              .mmio_phys = 0x10000000,
-                              .irq = 32,
-                          },
-                      .uart_absolute_path = "/soc/serial@10000000",
-                  });
+  CheckChosenMatcher(chosen_matcher,
+                     {
+                         .ramdisk_start = 0x48100000,
+                         .ramdisk_end = 0x48fb3df5,
+                         .cmdline = kCmdline,
+                         .uart_config_name = uart::ns8250::LegacyDw8250Driver::config_name(),
+                         .uart_config =
+                             {
+                                 .mmio_phys = 0x10000000,
+                                 .irq = 32,
+                             },
+                         .uart_absolute_path = "/soc/serial@10000000",
+                     });
 }
 
 class MemoryItemTest : public zxtest::Test {
@@ -520,19 +495,15 @@ std::optional<LoadedDtb> MemoryItemTest::memreserve_ldtb_ = std::nullopt;
 std::optional<LoadedDtb> MemoryItemTest::complex_ldtb_ = std::nullopt;
 
 TEST_F(MemoryItemTest, ParseMemreserves) {
-  std::array<std::byte, 256> image_buffer;
   std::vector<memalloc::Range> storage(5);
-  zbitl::Image<cpp20::span<std::byte>> image(image_buffer);
-  ASSERT_TRUE(image.clear().is_ok());
 
   auto fdt = memreserve_ldtb();
-  boot_shim::DevicetreeBootShim<boot_shim::DevicetreeMemoryItem> shim("test", fdt);
-  shim.Get<boot_shim::DevicetreeMemoryItem>().InitStorage(storage);
+  boot_shim::DevicetreeMemoryMatcher memory_matcher("test", stdout, storage);
 
-  shim.Init();
+  ASSERT_TRUE(memory_matcher.AppendAdditionalRanges(fdt));
+  ASSERT_TRUE(devicetree::Match(fdt, memory_matcher));
 
-  auto& mem_item = shim.Get<boot_shim::DevicetreeMemoryItem>();
-  auto ranges = mem_item.memory_ranges();
+  auto ranges = memory_matcher.memory_ranges();
   ASSERT_EQ(ranges.size(), 5);
 
   // Account for the devicetree in use.
@@ -559,19 +530,14 @@ TEST_F(MemoryItemTest, ParseMemreserves) {
 }
 
 TEST_F(MemoryItemTest, ParseMemoryNodes) {
-  std::array<std::byte, 256> image_buffer;
   std::vector<memalloc::Range> storage(5);
-  zbitl::Image<cpp20::span<std::byte>> image(image_buffer);
-  ASSERT_TRUE(image.clear().is_ok());
 
   auto fdt = memory_ldtb();
-  boot_shim::DevicetreeBootShim<boot_shim::DevicetreeMemoryItem> shim("test", fdt);
-  shim.Get<boot_shim::DevicetreeMemoryItem>().InitStorage(storage);
+  boot_shim::DevicetreeMemoryMatcher memory_matcher("test", stdout, storage);
 
-  shim.Init();
-
-  auto& mem_item = shim.Get<boot_shim::DevicetreeMemoryItem>();
-  auto ranges = mem_item.memory_ranges();
+  ASSERT_TRUE(memory_matcher.AppendAdditionalRanges(fdt));
+  ASSERT_TRUE(devicetree::Match(fdt, memory_matcher));
+  auto ranges = memory_matcher.memory_ranges();
   ASSERT_EQ(ranges.size(), 5);
 
   // Account for the devicetree in use.
@@ -598,18 +564,14 @@ TEST_F(MemoryItemTest, ParseMemoryNodes) {
 }
 
 TEST_F(MemoryItemTest, ParseReservedMemoryNodes) {
-  std::array<std::byte, 256> image_buffer;
   std::vector<memalloc::Range> storage(3);
-  zbitl::Image<cpp20::span<std::byte>> image(image_buffer);
-  ASSERT_TRUE(image.clear().is_ok());
 
   auto fdt = reserved_memory_ldtb();
-  boot_shim::DevicetreeBootShim<boot_shim::DevicetreeMemoryItem> shim("test", fdt);
-  shim.Get<boot_shim::DevicetreeMemoryItem>().InitStorage(storage);
-  shim.Init();
+  boot_shim::DevicetreeMemoryMatcher memory_matcher("test", stdout, storage);
 
-  auto& mem_item = shim.Get<boot_shim::DevicetreeMemoryItem>();
-  auto ranges = mem_item.memory_ranges();
+  ASSERT_TRUE(memory_matcher.AppendAdditionalRanges(fdt));
+  ASSERT_TRUE(devicetree::Match(fdt, memory_matcher));
+  auto ranges = memory_matcher.memory_ranges();
   ASSERT_EQ(ranges.size(), 3);
 
   // Account for the devicetree in use.
@@ -627,20 +589,15 @@ TEST_F(MemoryItemTest, ParseReservedMemoryNodes) {
   EXPECT_EQ(ranges[2].type, memalloc::Type::kReserved);
 }
 
-TEST_F(MemoryItemTest, ParseAllAndAppend) {
-  std::array<std::byte, 512> image_buffer;
+TEST_F(MemoryItemTest, ParseAll) {
   std::vector<memalloc::Range> storage(11);
-  zbitl::Image<cpp20::span<std::byte>> image(image_buffer);
-  ASSERT_TRUE(image.clear().is_ok());
 
   auto fdt = complex_ldtb();
-  boot_shim::DevicetreeBootShim<boot_shim::DevicetreeMemoryItem> shim("test", fdt);
-  shim.Get<boot_shim::DevicetreeMemoryItem>().InitStorage(storage);
+  boot_shim::DevicetreeMemoryMatcher memory_matcher("test", stdout, storage);
 
-  shim.Init();
-
-  auto& mem_item = shim.Get<boot_shim::DevicetreeMemoryItem>();
-  auto ranges = mem_item.memory_ranges();
+  ASSERT_TRUE(memory_matcher.AppendAdditionalRanges(fdt));
+  ASSERT_TRUE(devicetree::Match(fdt, memory_matcher));
+  auto ranges = memory_matcher.memory_ranges();
   ASSERT_EQ(ranges.size(), 11);
 
   // Account for the devicetree in use.
@@ -690,65 +647,6 @@ TEST_F(MemoryItemTest, ParseAllAndAppend) {
   EXPECT_EQ(ranges[10].addr, 0x76000000);
   EXPECT_EQ(ranges[10].size, 0x400000);
   EXPECT_EQ(ranges[10].type, memalloc::Type::kReserved);
-
-  ASSERT_TRUE(shim.AppendItems(image).is_ok());
-
-  bool present = false;
-  auto clear_err = fit::defer([&]() { image.ignore_error(); });
-  for (auto [h, p] : image) {
-    if (h->type == ZBI_TYPE_MEM_CONFIG) {
-      present = true;
-      ASSERT_EQ(p.size(), zbitl::AlignedPayloadLength(11 * sizeof(zbi_mem_range_t)));
-      cpp20::span<zbi_mem_range_t> zbi_ranges(reinterpret_cast<zbi_mem_range_t*>(p.data()), 11);
-      // Each memreserve in order.
-      EXPECT_EQ(zbi_ranges[0].paddr, reinterpret_cast<uintptr_t>(fdt.fdt().data()));
-      EXPECT_EQ(zbi_ranges[0].length, fdt.size_bytes());
-      EXPECT_EQ(zbi_ranges[0].type, ZBI_MEM_TYPE_RAM);
-
-      EXPECT_EQ(zbi_ranges[1].paddr, 0x12340000);
-      EXPECT_EQ(zbi_ranges[1].length, 0x2000);
-      EXPECT_EQ(zbi_ranges[1].type, ZBI_MEM_TYPE_RESERVED);
-
-      EXPECT_EQ(zbi_ranges[2].paddr, 0x56780000);
-      EXPECT_EQ(zbi_ranges[2].length, 0x3000);
-      EXPECT_EQ(zbi_ranges[2].type, ZBI_MEM_TYPE_RESERVED);
-
-      EXPECT_EQ(zbi_ranges[3].paddr, 0x7fffffff12340000);
-      EXPECT_EQ(zbi_ranges[3].length, 0x400000000);
-      EXPECT_EQ(zbi_ranges[3].type, ZBI_MEM_TYPE_RESERVED);
-
-      EXPECT_EQ(zbi_ranges[4].paddr, 0x00ffffff56780000);
-      EXPECT_EQ(zbi_ranges[4].length, 0x500000000);
-      EXPECT_EQ(zbi_ranges[4].type, ZBI_MEM_TYPE_RESERVED);
-
-      // Each memory nodes in order.
-      EXPECT_EQ(zbi_ranges[5].paddr, 0x40000000);
-      EXPECT_EQ(zbi_ranges[5].length, 0x10000000);
-      EXPECT_EQ(zbi_ranges[5].type, ZBI_MEM_TYPE_RAM);
-
-      EXPECT_EQ(zbi_ranges[6].paddr, 0x50000000);
-      EXPECT_EQ(zbi_ranges[6].length, 0x20000000);
-      EXPECT_EQ(zbi_ranges[6].type, ZBI_MEM_TYPE_RAM);
-
-      EXPECT_EQ(zbi_ranges[7].paddr, 0x60000000);
-      EXPECT_EQ(zbi_ranges[7].length, 0x30000000);
-      EXPECT_EQ(zbi_ranges[7].type, ZBI_MEM_TYPE_RAM);
-
-      EXPECT_EQ(zbi_ranges[8].paddr, 0x70000000);
-      EXPECT_EQ(zbi_ranges[8].length, 0x40000000);
-      EXPECT_EQ(zbi_ranges[8].type, ZBI_MEM_TYPE_RAM);
-
-      // Each reserved memory nodes in order.
-      EXPECT_EQ(zbi_ranges[9].paddr, 0x78000000);
-      EXPECT_EQ(zbi_ranges[9].length, 0x800000);
-      EXPECT_EQ(zbi_ranges[9].type, ZBI_MEM_TYPE_RESERVED);
-
-      EXPECT_EQ(zbi_ranges[10].paddr, 0x76000000);
-      EXPECT_EQ(zbi_ranges[10].length, 0x400000);
-      EXPECT_EQ(zbi_ranges[10].type, ZBI_MEM_TYPE_RESERVED);
-    }
-  }
-  ASSERT_TRUE(present);
 }
 
 class RiscvDevicetreeTimerItemTest : public TestMixin<RiscvDevicetreeTest> {

@@ -465,6 +465,8 @@ struct Property {
 class Properties {
  public:
   constexpr Properties() = default;
+  constexpr Properties(const Properties& other) = default;
+  constexpr Properties& operator=(const Properties&) = default;
 
   // Constructed from a byte span beginning just after the first internal::FDT_PROP token
   // in a flattened block of properties (or an otherwise empty one), along with
@@ -523,8 +525,8 @@ class Properties {
   constexpr iterator end() const { return iterator{{property_block_.end(), 0}, string_block_}; }
 
  private:
-  const ByteView property_block_;
-  const std::string_view string_block_;
+  ByteView property_block_;
+  std::string_view string_block_;
 };
 
 class MemoryReservations {
@@ -829,6 +831,8 @@ class Devicetree {
   using PostOrderNodeVisitor = NodeVisitor<void>;
 
  public:
+  explicit Devicetree() = default;
+
   // Consumes a view representing the range of memory the flattened devicetree
   // is expected to take up, its beginning pointing to that of the binary data
   // and its size giving an upper bound on the size that the data is permitted
@@ -838,9 +842,11 @@ class Devicetree {
   // is not known; only up to the size encoded in the devicetree header will
   // be dereferenced.
   explicit Devicetree(ByteView fdt);
-
+  Devicetree(const Devicetree& other) = default;
   explicit Devicetree(cpp20::span<const std::byte> fdt)
       : Devicetree(ByteView{reinterpret_cast<const uint8_t*>(fdt.data()), fdt.size()}) {}
+
+  Devicetree& operator=(const Devicetree& rhs) = default;
 
   ByteView fdt() const { return fdt_; }
 

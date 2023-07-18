@@ -8,8 +8,8 @@
 
 namespace boot_shim {
 
-devicetree::ScanState DevicetreeMemoryItem::OnNode(const devicetree::NodePath& path,
-                                                   const devicetree::PropertyDecoder& decoder) {
+devicetree::ScanState DevicetreeMemoryMatcher::OnNode(const devicetree::NodePath& path,
+                                                      const devicetree::PropertyDecoder& decoder) {
   // root reserved-memory child
   if (reserved_memory_root_ != nullptr) {
     if (!AppendRangesFromReg(decoder, reserved_memory_ranges_, memalloc::Type::kReserved)) {
@@ -38,7 +38,7 @@ devicetree::ScanState DevicetreeMemoryItem::OnNode(const devicetree::NodePath& p
   return devicetree::ScanState::kDoneWithSubtree;
 }
 
-devicetree::ScanState DevicetreeMemoryItem::OnSubtree(const devicetree::NodePath& path) {
+devicetree::ScanState DevicetreeMemoryMatcher::OnSubtree(const devicetree::NodePath& path) {
   if (&path.back() == reserved_memory_root_) {
     reserved_memory_root_ = nullptr;
   }
@@ -46,41 +46,10 @@ devicetree::ScanState DevicetreeMemoryItem::OnSubtree(const devicetree::NodePath
   return devicetree::ScanState::kActive;
 }
 
-fit::result<DevicetreeMemoryItem::DataZbi::Error> DevicetreeMemoryItem::AppendItems(
-    DataZbi& zbi) const {
-  if (ranges_count_ == 0) {
-    return fit::ok();
-  }
-
-  auto result = zbi.Append({
-      .type = ZBI_TYPE_MEM_CONFIG,
-      .length = static_cast<uint32_t>(size_bytes() - sizeof(zbi_header_t)),
-  });
-  if (result.is_error()) {
-    return result.take_error();
-  }
-  auto [header, payload] = **result;
-  for (uint32_t i = 0, j = 0; i < memory_ranges().size(); i++) {
-    const auto& mem_range = memory_ranges()[i];
-
-    zbi_mem_range_t zbi_mem_range = {
-        .paddr = mem_range.addr,
-        .length = mem_range.size,
-        .type = static_cast<uint32_t>(
-            memalloc::IsExtendedType(mem_range.type) ? memalloc::Type::kFreeRam : mem_range.type),
-        .reserved = 0,
-    };
-    memcpy(payload.data() + (i - j) * sizeof(zbi_mem_range_t), &zbi_mem_range,
-           sizeof(zbi_mem_range_t));
-  }
-
-  return fit::ok();
-}
-
 // |path.back()| must be 'memory'
 // Each node may define N ranges in their reg property.
 // Each node may have children defining subregions with special purpose (RESERVED ranges.)/
-devicetree::ScanState DevicetreeMemoryItem::HandleMemoryNode(
+devicetree::ScanState DevicetreeMemoryMatcher::HandleMemoryNode(
     const devicetree::NodePath& path, const devicetree::PropertyDecoder& decoder) {
   ZX_DEBUG_ASSERT(path.back().name() == "memory");
 
@@ -102,7 +71,7 @@ devicetree::ScanState DevicetreeMemoryItem::HandleMemoryNode(
 
 // |path.back()| must be 'reserved-memory'
 // Each child node is a reserved region.
-devicetree::ScanState DevicetreeMemoryItem::HandleReservedMemoryNode(
+devicetree::ScanState DevicetreeMemoryMatcher::HandleReservedMemoryNode(
     const devicetree::NodePath& path, const devicetree::PropertyDecoder& decoder) {
   ZX_DEBUG_ASSERT(path.back() == "reserved-memory");
   ZX_DEBUG_ASSERT(reserved_memory_root_ == nullptr);
@@ -130,7 +99,7 @@ devicetree::ScanState DevicetreeMemoryItem::HandleReservedMemoryNode(
   return devicetree::ScanState::kActive;
 }
 
-bool DevicetreeMemoryItem::AppendRangesFromReg(
+bool DevicetreeMemoryMatcher::AppendRangesFromReg(
     const devicetree::PropertyDecoder& decoder,
     const std::optional<devicetree::RangesProperty>& parent_range, memalloc::Type memrange_type) {
   // Look at the reg property for possible memory banks.

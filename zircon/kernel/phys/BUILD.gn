@@ -342,6 +342,8 @@ if (toolchain_environment == "kernel.phys" ||
     sources = [ "uart.cc" ]
 
     public_deps = [
+      "//src/lib/zbitl",
+      "//zircon/kernel/lib/boot-options",
       "//zircon/kernel/lib/ktl",
       "//zircon/kernel/lib/libc",
       "//zircon/system/ulib/uart",

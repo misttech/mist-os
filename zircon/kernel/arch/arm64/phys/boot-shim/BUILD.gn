@@ -19,6 +19,7 @@ phys_executable("linux-arm64-devicetree-boot-shim") {
     "//zircon/kernel/phys:main",
     "//zircon/kernel/phys:stdio",
     "//zircon/kernel/phys:symbolize",
+    "//zircon/kernel/phys:uart",
     "//zircon/kernel/phys/boot-shim:devicetree",
     "//zircon/kernel/phys/lib/boot-shim",
   ]

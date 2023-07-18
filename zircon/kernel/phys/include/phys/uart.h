@@ -7,7 +7,9 @@
 #ifndef ZIRCON_KERNEL_PHYS_INCLUDE_PHYS_UART_H_
 #define ZIRCON_KERNEL_PHYS_INCLUDE_PHYS_UART_H_
 
+#include <lib/boot-options/boot-options.h>
 #include <lib/uart/all.h>
+#include <lib/zbitl/view.h>
 
 using UartDriver = uart::all::KernelDriver<uart::BasicIoProvider, uart::UnsynchronizedPolicy>;
 

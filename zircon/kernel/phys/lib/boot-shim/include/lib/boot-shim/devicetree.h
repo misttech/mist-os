@@ -14,6 +14,7 @@
 #include <lib/fit/result.h>
 #include <lib/memalloc/range.h>
 #include <lib/stdcompat/array.h>
+#include <lib/stdcompat/span.h>
 #include <lib/uart/all.h>
 #include <lib/zbi-format/driver-config.h>
 #include <lib/zbi-format/memory.h>
@@ -37,6 +38,10 @@ template <typename T, size_t MaxScans>
 class DevicetreeItemBase {
  public:
   static constexpr size_t kMaxScans = MaxScans;
+
+  constexpr DevicetreeItemBase() = default;
+  constexpr DevicetreeItemBase(const char* shim_name, FILE* log)
+      : log_(log), shim_name_(shim_name) {}
 
   devicetree::ScanState OnNode(const devicetree::NodePath&, const devicetree::PropertyDecoder&) {
     static_assert(kMaxScans != MaxScans, "Must implement OnNode.");
@@ -178,10 +183,7 @@ class ArmDevicetreeGicItem
   bool matched_ = false;
 };
 
-// This item does not produce a ZBI Item itself, but becomes a source for other items to produce
-// zbi items themselves.
-//
-// This item parses the 'chosen' node, which is a child of the root node('/chosen'). This node
+// This matcher parses the 'chosen' node, which is a child of the root node('/chosen'). This node
 // contains information about the commandline, ramdisk and UART.
 //
 // * The cmdline is contained as part of the string block of the devicetree.
@@ -189,24 +191,19 @@ class ArmDevicetreeGicItem
 // * The ramdisk is represented as a range in memory where the firmware loaded it, usually a ZBI.
 //
 // * The UART on the other hand, is represented as path(which may be aliased). Is the job of this
-//   item to bootstrap the UART, which means determining which driver needs to be used.
+//   item to bootstrap the UART, which means determining which drItemiver needs to be used.
 //
 // For more details on the chosen node please see:
 //  https://devicetree-specification.readthedocs.io/en/latest/chapter3-devicenodes.html#chosen-node
-class DevicetreeBootstrapChosenNodeItemBase
-    : public DevicetreeItemBase<DevicetreeBootstrapChosenNodeItemBase, 3>,
-      public ItemBase {
+class DevicetreeChosenNodeMatcherBase
+    : public DevicetreeItemBase<DevicetreeChosenNodeMatcherBase, 3> {
  public:
+  DevicetreeChosenNodeMatcherBase(const char* shim_name, FILE* log)
+      : DevicetreeItemBase(shim_name, log) {}
+
   // Matcher API.
   devicetree::ScanState OnNode(const devicetree::NodePath& path,
                                const devicetree::PropertyDecoder& decoder);
-
-  // BootShim Item API.
-  constexpr size_t size_bytes() const { return 0; }
-
-  fit::result<ItemBase::DataZbi::Error> AppendItems(ItemBase::DataZbi& zbi) const {
-    return fit::ok();
-  }
 
   // Accessors
 
@@ -248,17 +245,14 @@ class DevicetreeBootstrapChosenNodeItemBase
 };
 
 template <typename AllUartDrivers = uart::all::Driver>
-class DevicetreeBootstrapChosenNodeItem : public DevicetreeBootstrapChosenNodeItemBase {
+class DevicetreeChosenNodeMatcher : public DevicetreeChosenNodeMatcherBase {
  public:
-  // DevicetreeItem API.
-  template <typename T>
-  void Init(T& shim) {
+  DevicetreeChosenNodeMatcher(const char* shim_name, FILE* log = stdout)
+      : DevicetreeChosenNodeMatcherBase(shim_name, log) {
     uart_matcher() = [this](const auto& decoder) -> bool {
       uart_emplacer() = uart_.MatchDevicetree(decoder);
       return uart_emplacer() != nullptr;
     };
-
-    DevicetreeBootstrapChosenNodeItemBase::Init(shim);
   }
 
   constexpr const auto& uart() const { return uart_; }
@@ -267,8 +261,8 @@ class DevicetreeBootstrapChosenNodeItem : public DevicetreeBootstrapChosenNodeIt
   uart::all::KernelDriver<uart::BasicIoProvider, uart::UnsynchronizedPolicy, AllUartDrivers> uart_;
 };
 
-// Parses 'memory' and 'reserved_memory' device nodes and 'memranges' from the devicetree,
-// and generates a ZBI_TYPE_MEM_CONFIG.
+// This matcher parses 'memory' and 'reserved_memory' device nodes and 'memranges' from the
+// devicetree and makes them available.
 //
 // The memory regions are encoded in three different sources, whose layout and number of ranges
 // pero node may vary.
@@ -288,49 +282,43 @@ class DevicetreeBootstrapChosenNodeItem : public DevicetreeBootstrapChosenNodeIt
 // 'memreserve' :
 // https://devicetree-specification.readthedocs.io/en/latest/chapter5-flattened-format.html#memory-reservation-block
 //
-class DevicetreeMemoryItem : public DevicetreeItemBase<DevicetreeMemoryItem, 1>, public ItemBase {
+class DevicetreeMemoryMatcher : public DevicetreeItemBase<DevicetreeMemoryMatcher, 1> {
  public:
   // Matcher API.
-  static constexpr size_t kMaxScans = 1;
+  constexpr DevicetreeMemoryMatcher(const char* shim_name, FILE* log,
+                                    cpp20::span<memalloc::Range> storage)
+      : DevicetreeItemBase(shim_name, log), ranges_(storage) {}
 
   devicetree::ScanState OnNode(const devicetree::NodePath& path,
                                const devicetree::PropertyDecoder& decoder);
   devicetree::ScanState OnSubtree(const devicetree::NodePath& path);
   devicetree::ScanState OnScan() { return devicetree::ScanState::kDone; }
 
-  // Boot shim item API.
-  size_t size_bytes() const { return ItemSize(ranges_count_ * sizeof(zbi_mem_range_t)); }
-
-  fit::result<DataZbi::Error> AppendItems(DataZbi& zbi) const;
-
-  void InitStorage(cpp20::span<memalloc::Range> storage) { ranges_ = storage; }
-
-  template <typename Shim>
-  void Init(const Shim& shim) {
-    ranges_count_ = 0;
-    DevicetreeItemBase<DevicetreeMemoryItem, 1>::Init(shim);
-
-    devicetree::Devicetree dt = shim.devicetree();
-
+  // Returns true if additional ranges from the devicetree are successfully appended.
+  // The matcher API constitutes only ranges encoded as device nodes within the devicetree.
+  // The additional ranges include those defined as 'memreserve'and the devicetree itself.
+  bool AppendAdditionalRanges(const devicetree::Devicetree& fdt) {
     if (!AppendRange({
-            .addr = reinterpret_cast<uintptr_t>(dt.fdt().data()),
-            .size = dt.size_bytes(),
+            .addr = reinterpret_cast<uintptr_t>(fdt.fdt().data()),
+            .size = fdt.size_bytes(),
             // The original DT Blob is copied into a ZBI ITEM, and the original range is discarded.
             // It is only useful while the ZBI items are generated.
             .type = memalloc::Type::kDevicetreeBlob,
         })) {
-      return;
+      return false;
     }
 
-    for (auto [start, size] : dt.memory_reservations()) {
+    for (auto [start, size] : fdt.memory_reservations()) {
       if (!AppendRange(memalloc::Range{
               .addr = start,
               .size = size,
               .type = memalloc::Type::kReserved,
           })) {
-        return;
+        return false;
       }
     }
+
+    return true;
   }
 
   // Memory Item API for the bootshim to initialize the memory layout.

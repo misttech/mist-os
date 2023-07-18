@@ -9,6 +9,7 @@
 #include <lib/boot-shim/devicetree-boot-shim.h>
 #include <lib/boot-shim/devicetree.h>
 #include <lib/devicetree/devicetree.h>
+#include <lib/devicetree/matcher.h>
 #include <lib/memalloc/pool.h>
 #include <lib/memalloc/range.h>
 #include <lib/uart/all.h>
@@ -21,9 +22,6 @@
 #include <stdlib.h>
 #include <zircon/assert.h>
 
-#include <array>
-
-#include <fbl/alloc_checker.h>
 #include <ktl/array.h>
 #include <ktl/limits.h>
 #include <ktl/span.h>
@@ -38,76 +36,25 @@
 
 #include "test-main.h"
 
-namespace {
-
-cpp20::span<memalloc::Range> gMemoryRanges;
-std::array<memalloc::Range, kDevicetreeMaxMemoryRanges> gMemoryStorage;
-zbitl::ByteView gZbi;
-void* gDevicetreeBlob = nullptr;
-
-}  // namespace
-
-void InitMemory(void* dtb) {
-  ZX_ASSERT(dtb == gDevicetreeBlob);
-  uint64_t phys_start = reinterpret_cast<uint64_t>(PHYS_LOAD_ADDRESS);
-  uint64_t phys_end = reinterpret_cast<uint64_t>(_end);
-
-  ktl::array<memalloc::Range, 2> special_ranges = {
-      memalloc::Range{
-          .addr = phys_start,
-          .size = phys_end - phys_start,
-          .type = memalloc::Type::kPhysKernel,
-      },
-  };
-  cpp20::span<memalloc::Range> special_ranges_view(special_ranges.data(), 1);
-
-  if (!gZbi.empty()) {
-    special_ranges[1] = memalloc::Range{
-        .addr = reinterpret_cast<uint64_t>(gZbi.data()),
-        .size = gZbi.size(),
-        .type = memalloc::Type::kDataZbi,
-    };
-    special_ranges_view = special_ranges;
-  }
-
-  Allocation::Init(gMemoryRanges, special_ranges_view);
-
-  ArchSetUpAddressSpaceEarly();
-
-  if (gBootOptions->phys_verbose) {
-    Allocation::GetPool().PrintMemoryRanges(ProgramName());
-  }
-}
-
 void PhysMain(void* flat_devicetree_blob, arch::EarlyTicks ticks) {
   InitStdout();
   ApplyRelocations();
 
+  // For testing purposes, we explicitly initialize the uart from the
+  // devicetree before anything. There is no harm in reinitializing the
+  // uart later if the test chooses to call InitMemory.
   devicetree::ByteView fdt_blob(static_cast<const uint8_t*>(flat_devicetree_blob),
                                 std::numeric_limits<uintptr_t>::max());
+  devicetree::Devicetree fdt(fdt_blob);
+  boot_shim::DevicetreeChosenNodeMatcher<> chosen("devicetree-test-main", stdout);
+  ZX_ASSERT(devicetree::Match(fdt, chosen));
 
-  boot_shim::DevicetreeBootShim<boot_shim::DevicetreeMemoryItem,
-                                boot_shim::DevicetreeBootstrapChosenNodeItem<>>
-      shim("devicetree-test-main", devicetree::Devicetree(fdt_blob));
+  static BootOptions boot_options;
+  gBootOptions = &boot_options;
 
-  auto& memory_item = shim.Get<boot_shim::DevicetreeMemoryItem>();
-  memory_item.InitStorage(gMemoryStorage);
-  shim.Init();
-
-  auto& chosen_item = shim.Get<boot_shim::DevicetreeBootstrapChosenNodeItem<>>();
-
-  static BootOptions boot_opts;
-  gBootOptions = &boot_opts;
-  boot_opts.serial = chosen_item.uart().uart();
-  SetBootOptions(boot_opts, chosen_item.zbi(), chosen_item.cmdline().value_or(""));
-  SetUartConsole(boot_opts.serial);
-
-  gMemoryRanges =
-      cpp20::span<memalloc::Range>(const_cast<memalloc::Range*>(memory_item.memory_ranges().data()),
-                                   memory_item.memory_ranges().size());
-  gDevicetreeBlob = flat_devicetree_blob;
-  gBootOptions = &boot_opts;
-  gZbi = chosen_item.zbi();
+  boot_options.serial = chosen.uart().uart();
+  SetBootOptions(boot_options, chosen.zbi(), chosen.cmdline().value_or(""));
+  SetUartConsole(boot_options.serial);
 
   ArchSetUp(nullptr);
 

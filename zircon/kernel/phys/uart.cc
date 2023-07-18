@@ -7,6 +7,8 @@
 #include <phys/stdio.h>
 #include <phys/uart.h>
 
+#include "lib/boot-options/boot-options.h"
+
 UartDriver& GetUartDriver() {
   static UartDriver uart;
   return uart;

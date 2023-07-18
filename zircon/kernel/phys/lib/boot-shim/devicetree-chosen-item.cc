@@ -89,7 +89,7 @@ std::optional<uint32_t> ResolveIrq(devicetree::StringList<> compatibles,
 
 }  // namespace
 
-devicetree::ScanState DevicetreeBootstrapChosenNodeItemBase::HandleBootstrapStdout(
+devicetree::ScanState DevicetreeChosenNodeMatcherBase::HandleBootstrapStdout(
     const devicetree::NodePath& path, const devicetree::PropertyDecoder& decoder) {
   auto resolved_path = decoder.ResolvePath(stdout_path_);
   if (resolved_path.is_error()) {
@@ -189,7 +189,7 @@ devicetree::ScanState DevicetreeBootstrapChosenNodeItemBase::HandleBootstrapStdo
   return devicetree::ScanState::kDone;
 }
 
-devicetree::ScanState DevicetreeBootstrapChosenNodeItemBase::OnNode(
+devicetree::ScanState DevicetreeChosenNodeMatcherBase::OnNode(
     const devicetree::NodePath& path, const devicetree::PropertyDecoder& decoder) {
   if (found_chosen_) {
     if (uart_interrupt_parent_) {
@@ -267,7 +267,7 @@ devicetree::ScanState DevicetreeBootstrapChosenNodeItemBase::OnNode(
   return devicetree::ScanState::kActive;
 }
 
-devicetree::ScanState DevicetreeBootstrapChosenNodeItemBase::HandleUartInterruptParent(
+devicetree::ScanState DevicetreeChosenNodeMatcherBase::HandleUartInterruptParent(
     const devicetree::PropertyDecoder& decoder) {
   // We are doing lookup and we need to check if this |decoder| points to the uart interrupt
   // phandle.
