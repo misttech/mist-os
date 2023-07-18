@@ -96,12 +96,15 @@ impl ObjectStore {
         if attributes.project_id != 0 {
             return Err(FxfsError::AlreadyExists.into());
         }
-        let storage_size = match kind {
-            ObjectKind::File { allocated_size, .. } => allocated_size,
-            ObjectKind::Directory { .. } => 0,
-            _ => return Err(FxfsError::Inconsistent.into()),
-        };
-
+        // Make sure the object kind makes sense.
+        match kind {
+            ObjectKind::File { .. } | ObjectKind::Directory { .. } => (),
+            // For now, we don't support attributes on symlink objects, so setting a project id
+            // doesn't make sense.
+            ObjectKind::Symlink { .. } => return Err(FxfsError::NotSupported.into()),
+            ObjectKind::Graveyard => return Err(FxfsError::Inconsistent.into()),
+        }
+        let storage_size = attributes.allocated_size;
         attributes.project_id = project_id;
 
         transaction.add(
@@ -159,14 +162,17 @@ impl ObjectStore {
         if attributes.project_id == 0 {
             return Ok(());
         }
+        // Make sure the object kind makes sense.
+        match kind {
+            ObjectKind::File { .. } | ObjectKind::Directory { .. } => (),
+            // For now, we don't support attributes on symlink objects, so setting a project id
+            // doesn't make sense.
+            ObjectKind::Symlink { .. } => return Err(FxfsError::NotSupported.into()),
+            ObjectKind::Graveyard => return Err(FxfsError::Inconsistent.into()),
+        }
         let old_project_id = attributes.project_id;
         attributes.project_id = 0;
-
-        let storage_size = match kind {
-            ObjectKind::File { allocated_size, .. } => allocated_size,
-            ObjectKind::Directory { .. } => 0,
-            _ => return Err(FxfsError::Inconsistent.into()),
-        };
+        let storage_size = attributes.allocated_size;
         transaction.add(
             self.store_object_id,
             Mutation::replace_or_insert_object(

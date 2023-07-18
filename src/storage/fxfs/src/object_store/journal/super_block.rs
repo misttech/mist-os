@@ -38,7 +38,9 @@ use {
                 writer::JournalWriter,
                 JournalCheckpoint, JournalHandle as _, BLOCK_SIZE,
             },
-            object_record::{ObjectItem, ObjectItemV25, ObjectItemV29, ObjectItemV5},
+            object_record::{
+                ObjectItem, ObjectItemV25, ObjectItemV29, ObjectItemV30, ObjectItemV5,
+            },
             transaction::{AssocObj, Options},
             tree::MajorCompactable,
             HandleOptions, HandleOwner, Mutation, ObjectKey, ObjectStore, ObjectValue,
@@ -214,6 +216,14 @@ pub enum SuperBlockRecord {
 }
 
 #[derive(Debug, Deserialize, Migrate, Serialize, Versioned, TypeFingerprint)]
+pub enum SuperBlockRecordV30 {
+    Extent(Range<u64>),
+    ObjectItem(ObjectItemV30),
+    End,
+}
+
+#[derive(Debug, Deserialize, Migrate, Serialize, Versioned, TypeFingerprint)]
+#[migrate_to_version(SuperBlockRecordV30)]
 pub enum SuperBlockRecordV29 {
     Extent(Range<u64>),
     ObjectItem(ObjectItemV29),

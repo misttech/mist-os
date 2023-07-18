@@ -139,8 +139,8 @@ impl<'a> ScannedStore<'a> {
                         ))?;
                     }
                     ObjectValue::Object {
-                        kind: ObjectKind::File { refs, allocated_size },
-                        attributes: ObjectAttributes { project_id, .. },
+                        kind: ObjectKind::File { refs },
+                        attributes: ObjectAttributes { project_id, allocated_size, .. },
                     } => {
                         if *project_id > 0 {
                             self.used_project_ids.insert(*project_id, key.object_id);

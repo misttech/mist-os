@@ -811,8 +811,8 @@ impl<S: HandleOwner> StoreObjectHandle<S> {
         }
         let mut mutation = self.txn_get_object_mutation(transaction).await?;
         if let ObjectValue::Object {
-            kind: ObjectKind::File { allocated_size, .. },
-            attributes: ObjectAttributes { project_id, .. },
+            attributes: ObjectAttributes { project_id, allocated_size, .. },
+            ..
         } = &mut mutation.item.value
         {
             // The only way for these to fail are if the volume is inconsistent.
@@ -1369,9 +1369,15 @@ impl<S: HandleOwner> GetProperties for StoreObjectHandle<S> {
             .expect("Unable to find object record");
         match item.value {
             ObjectValue::Object {
-                kind: ObjectKind::File { refs, allocated_size, .. },
+                kind: ObjectKind::File { refs, .. },
                 attributes:
-                    ObjectAttributes { creation_time, modification_time, posix_attributes, .. },
+                    ObjectAttributes {
+                        creation_time,
+                        modification_time,
+                        posix_attributes,
+                        allocated_size,
+                        ..
+                    },
             } => Ok(ObjectProperties {
                 refs,
                 allocated_size,

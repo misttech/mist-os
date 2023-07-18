@@ -1418,11 +1418,12 @@ async fn test_file_length_mismatch() {
             Mutation::replace_or_insert_object(
                 ObjectKey::object(handle.object_id()),
                 ObjectValue::Object {
-                    kind: ObjectKind::File { refs: 1, allocated_size: 123 },
+                    kind: ObjectKind::File { refs: 1 },
                     attributes: ObjectAttributes {
                         creation_time: Timestamp::now(),
                         modification_time: Timestamp::now(),
                         project_id: 0,
+                        allocated_size: 123,
                         ..Default::default()
                     },
                 },

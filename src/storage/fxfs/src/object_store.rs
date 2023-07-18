@@ -88,13 +88,14 @@ pub use extent_record::{
     ExtentKey, ExtentValue, BLOB_MERKLE_ATTRIBUTE_ID, DEFAULT_DATA_ATTRIBUTE_ID,
 };
 pub use journal::{
-    JournalRecord, JournalRecordV20, JournalRecordV25, JournalRecordV29, SuperBlockHeader,
-    SuperBlockRecord, SuperBlockRecordV25, SuperBlockRecordV29, SuperBlockRecordV5,
+    JournalRecord, JournalRecordV20, JournalRecordV25, JournalRecordV29, JournalRecordV30,
+    SuperBlockHeader, SuperBlockRecord, SuperBlockRecordV25, SuperBlockRecordV29,
+    SuperBlockRecordV30, SuperBlockRecordV5,
 };
 pub use object_record::{
     AttributeKey, EncryptionKeys, ExtendedAttributeValue, ObjectAttributes, ObjectAttributesV5,
     ObjectKey, ObjectKeyData, ObjectKeyDataV5, ObjectKeyV25, ObjectKeyV5, ObjectKind, ObjectValue,
-    ObjectValueV25, ObjectValueV29, ObjectValueV5, ProjectProperty,
+    ObjectValueV25, ObjectValueV29, ObjectValueV30, ObjectValueV5, ProjectProperty,
 };
 pub use transaction::Mutation;
 
@@ -1217,8 +1218,9 @@ impl ObjectStore {
             );
 
             // Update allocated size.
-            if let ObjectValue::Object { kind: ObjectKind::File { allocated_size, .. }, .. } =
-                &mut mutation.item.value
+            if let ObjectValue::Object {
+                attributes: ObjectAttributes { allocated_size, .. }, ..
+            } = &mut mutation.item.value
             {
                 // The only way for these to fail are if the volume is inconsistent.
                 *allocated_size = allocated_size.checked_sub(deallocated).ok_or_else(|| {

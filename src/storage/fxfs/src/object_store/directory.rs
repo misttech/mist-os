@@ -105,6 +105,7 @@ impl<S: HandleOwner> Directory<S> {
                         modification_time,
                         project_id: 0,
                         posix_attributes,
+                        allocated_size: 0,
                     },
                 },
             ),

@@ -12,8 +12,8 @@ use {
             allocator::{AllocatorItem, Reservation},
             object_manager::{reserved_space_from_journal_usage, ObjectManager},
             object_record::{
-                ObjectItem, ObjectItemV25, ObjectItemV29, ObjectItemV5, ObjectKey, ObjectKeyData,
-                ObjectValue, ProjectProperty,
+                ObjectItem, ObjectItemV25, ObjectItemV29, ObjectItemV30, ObjectItemV5, ObjectKey,
+                ObjectKeyData, ObjectValue, ProjectProperty,
             },
         },
         serialized_types::{migrate_nodefault, migrate_to_version, Migrate, Versioned},
@@ -158,6 +158,19 @@ pub enum Mutation {
 }
 
 #[derive(Debug, Deserialize, Migrate, Serialize, Versioned, TypeFingerprint)]
+pub enum MutationV30 {
+    ObjectStore(ObjectStoreMutationV30),
+    EncryptedObjectStore(Box<[u8]>),
+    Allocator(AllocatorMutation),
+    BeginFlush,
+    EndFlush,
+    DeleteVolume,
+    UpdateBorrowed(u64),
+    UpdateMutationsKey(UpdateMutationsKey),
+}
+
+#[derive(Debug, Deserialize, Migrate, Serialize, Versioned, TypeFingerprint)]
+#[migrate_to_version(MutationV30)]
 pub enum MutationV29 {
     ObjectStore(ObjectStoreMutationV29),
     EncryptedObjectStore(Box<[u8]>),
@@ -239,6 +252,14 @@ pub struct ObjectStoreMutation {
 
 #[derive(Debug, Deserialize, Migrate, Serialize, TypeFingerprint)]
 #[migrate_nodefault]
+pub struct ObjectStoreMutationV30 {
+    item: ObjectItemV30,
+    op: Operation,
+}
+
+#[derive(Debug, Deserialize, Migrate, Serialize, TypeFingerprint)]
+#[migrate_nodefault]
+#[migrate_to_version(ObjectStoreMutationV30)]
 pub struct ObjectStoreMutationV29 {
     item: ObjectItemV29,
     op: Operation,

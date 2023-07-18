@@ -365,8 +365,6 @@ pub enum ObjectKind {
     File {
         /// The number of references to this file.
         refs: u64,
-        /// The number of bytes allocated to all extents across all attributes for this file.
-        allocated_size: u64,
     },
     Directory {
         /// The number of sub-directories in this directory.
@@ -380,6 +378,14 @@ pub enum ObjectKind {
         /// interpret it however they like.
         link: Vec<u8>,
     },
+}
+
+#[derive(Debug, Deserialize, Serialize, TypeFingerprint)]
+pub enum ObjectKindV30 {
+    File { refs: u64, allocated_size: u64 },
+    Directory { sub_dirs: u64 },
+    Graveyard,
+    Symlink { refs: u64, link: Vec<u8> },
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, TypeFingerprint)]
@@ -437,9 +443,20 @@ pub struct ObjectAttributes {
     pub project_id: u64,
     /// Mode, uid, gid, and rdev
     pub posix_attributes: Option<PosixAttributes>,
+    /// The number of bytes allocated to all extents across all attributes for this object.
+    pub allocated_size: u64,
+}
+
+#[derive(Debug, Default, Deserialize, Serialize, TypeFingerprint)]
+pub struct ObjectAttributesV30 {
+    creation_time: Timestamp,
+    modification_time: Timestamp,
+    project_id: u64,
+    posix_attributes: Option<PosixAttributes>,
 }
 
 #[derive(Debug, Default, Deserialize, Migrate, Serialize, TypeFingerprint)]
+#[migrate_to_version(ObjectAttributesV30)]
 pub struct ObjectAttributesV25 {
     creation_time: Timestamp,
     modification_time: Timestamp,
@@ -499,11 +516,88 @@ pub enum ObjectValue {
     ExtendedAttribute(ExtendedAttributeValue),
 }
 
+#[derive(Debug, Deserialize, Serialize, Versioned, TypeFingerprint)]
+pub enum ObjectValueV30 {
+    None,
+    Some,
+    Object { kind: ObjectKindV30, attributes: ObjectAttributesV30 },
+    Keys(EncryptionKeys),
+    Attribute { size: u64 },
+    Extent(ExtentValue),
+    Child { object_id: u64, object_descriptor: ObjectDescriptor },
+    Trim,
+    BytesAndNodes { bytes: i64, nodes: i64 },
+    ExtendedAttribute(ExtendedAttributeValue),
+}
+
+// Manual migration from V30 -> V31 (current). If the ObjectKind is file, move the allocated_size
+// from the kind type to ObjectAttributes. For other kinds the allocated_size is initialized as
+// zero.
+impl From<ObjectValueV30> for ObjectValue {
+    fn from(value: ObjectValueV30) -> Self {
+        match value {
+            ObjectValueV30::Object {
+                kind,
+                attributes:
+                    ObjectAttributesV30 {
+                        creation_time,
+                        modification_time,
+                        project_id,
+                        posix_attributes,
+                    },
+            } => {
+                let (new_kind, allocated_size) = match kind {
+                    // File lost the allocated_size field
+                    ObjectKindV30::File { refs, allocated_size } => {
+                        (ObjectKind::File { refs }, allocated_size)
+                    }
+
+                    // The rest are 1:1 mappings, defaulting to zero allocated_size.
+                    ObjectKindV30::Directory { sub_dirs } => {
+                        (ObjectKind::Directory { sub_dirs }, 0)
+                    }
+                    ObjectKindV30::Symlink { refs, link } => {
+                        (ObjectKind::Symlink { refs, link }, 0)
+                    }
+                    ObjectKindV30::Graveyard => (ObjectKind::Graveyard, 0),
+                };
+
+                ObjectValue::Object {
+                    kind: new_kind,
+                    attributes: ObjectAttributes {
+                        creation_time,
+                        modification_time,
+                        project_id,
+                        posix_attributes,
+                        allocated_size,
+                    },
+                }
+            }
+
+            // The rest are 1:1 mappings
+            ObjectValueV30::None => ObjectValue::None,
+            ObjectValueV30::Some => ObjectValue::Some,
+            ObjectValueV30::Keys(keys) => ObjectValue::Keys(keys),
+            ObjectValueV30::Attribute { size } => ObjectValue::Attribute { size },
+            ObjectValueV30::Extent(extent_value) => ObjectValue::Extent(extent_value),
+            ObjectValueV30::Child { object_id, object_descriptor } => {
+                ObjectValue::Child { object_id, object_descriptor }
+            }
+            ObjectValueV30::Trim => ObjectValue::Trim,
+            ObjectValueV30::BytesAndNodes { bytes, nodes } => {
+                ObjectValue::BytesAndNodes { bytes, nodes }
+            }
+            ObjectValueV30::ExtendedAttribute(v) => ObjectValue::ExtendedAttribute(v),
+        }
+    }
+}
+
 #[derive(Debug, Deserialize, Migrate, Serialize, Versioned, TypeFingerprint)]
+#[migrate_to_version(ObjectValueV30)]
 pub enum ObjectValueV29 {
     None,
     Some,
-    Object { kind: ObjectKind, attributes: ObjectAttributes },
+    Object { kind: ObjectKindV30, attributes: ObjectAttributesV30 },
     Keys(EncryptionKeys),
     Attribute { size: u64 },
     Extent(ExtentValue),
@@ -517,7 +611,7 @@ pub enum ObjectValueV29 {
 pub enum ObjectValueV25 {
     None,
     Some,
-    Object { kind: ObjectKind, attributes: ObjectAttributesV25 },
+    Object { kind: ObjectKindV30, attributes: ObjectAttributesV25 },
     Keys(EncryptionKeys),
     Attribute { size: u64 },
     Extent(ExtentValue),
@@ -531,7 +625,7 @@ pub enum ObjectValueV25 {
 pub enum ObjectValueV5 {
     None,
     Some,
-    Object { kind: ObjectKind, attributes: ObjectAttributesV5 },
+    Object { kind: ObjectKindV30, attributes: ObjectAttributesV5 },
     Keys(EncryptionKeys),
     Attribute { size: u64 },
     Extent(ExtentValue),
@@ -551,12 +645,13 @@ impl ObjectValue {
         posix_attributes: Option<PosixAttributes>,
     ) -> ObjectValue {
         ObjectValue::Object {
-            kind: ObjectKind::File { refs, allocated_size },
+            kind: ObjectKind::File { refs },
             attributes: ObjectAttributes {
                 creation_time,
                 modification_time,
                 project_id,
                 posix_attributes,
+                allocated_size,
             },
         }
     }
@@ -606,6 +701,7 @@ impl ObjectValue {
 }
 
 pub type ObjectItem = Item<ObjectKey, ObjectValue>;
+pub type ObjectItemV30 = Item<ObjectKey, ObjectValueV30>;
 pub type ObjectItemV29 = Item<ObjectKeyV25, ObjectValueV29>;
 pub type ObjectItemV25 = Item<ObjectKeyV25, ObjectValueV25>;
 pub type ObjectItemV5 = Item<ObjectKeyV5, ObjectValueV5>;
