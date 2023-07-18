@@ -6,6 +6,10 @@
 
 ## Summary
 
+**Note:** This RFC has been superseded by [RFC-0220][rfc-0220], which deprecated
+the workstation product. This RFC is preserved for posterity, but we will no
+longer pursue implementation.
+
 The Workstation product, defined as the workstation_session, ermine, terminal
 and simple browser, is currently built and assembled in the Fuchsia source tree.
 There is no clear distinction between Fuchsia as a platform and the workstation
@@ -508,3 +512,5 @@ There are still some unknowns around exactly what we need to upload to the TUF
 repository, the shape of the upload and the format of the metadata that we
 upload with the artifacts. We feel that these specifics will be identified as we
 start working through the process and we will amend this RFC as needed.
+
+[rfc-0220]: /docs/contribute/governance/rfcs/0220_the_future_of_in_tree_products.md
