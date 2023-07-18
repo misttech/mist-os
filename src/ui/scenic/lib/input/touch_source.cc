@@ -5,6 +5,8 @@
 #include "src/ui/scenic/lib/input/touch_source.h"
 
 #include <lib/async/default.h>
+#include <lib/syslog/cpp/macros.h>
+#include <zircon/status.h>
 
 #include "src/lib/fsl/handles/object_info.h"
 
@@ -22,7 +24,11 @@ TouchSource::TouchSource(zx_koid_t view_ref_koid,
                  error_handler();
                }) {}
 
-void TouchSource::CloseChannel(zx_status_t epitaph) { binding_.Close(epitaph); }
+void TouchSource::CloseChannel(zx_status_t epitaph) {
+  FX_LOGS(WARNING) << "Closing TouchSource due to " << zx_status_get_string(epitaph);
+  binding_.Close(epitaph);
+}
+
 void TouchSource::Augment(AugmentedTouchEvent&, const InternalTouchEvent&) {}
 
 }  // namespace scenic_impl::input

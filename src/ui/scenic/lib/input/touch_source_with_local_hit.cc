@@ -5,6 +5,7 @@
 #include "src/ui/scenic/lib/input/touch_source_with_local_hit.h"
 
 #include <lib/syslog/cpp/macros.h>
+#include <zircon/status.h>
 #include <zircon/types.h>
 
 #include "src/lib/fsl/handles/object_info.h"
@@ -52,6 +53,7 @@ void TouchSourceWithLocalHit::Watch(std::vector<fuchsia::ui::pointer::TouchRespo
 }
 
 void TouchSourceWithLocalHit::CloseChannel(zx_status_t epitaph) {
+  FX_LOGS(WARNING) << "Closing TouchSourceWithLocalHit due to " << zx_status_get_string(epitaph);
   binding_.Close(epitaph);
   // NOTE: Triggers destruction of this object.
   error_handler_();
