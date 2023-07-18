@@ -38,6 +38,16 @@ To contribute to the [Fuchsia API Surface][fuchsia-api-surface], do the followin
   For a list of API council members and their areas of focus, see [Membership][membership]
   in the Fuchsia API Council Charter.
 
+## Promoting an API to the `partner` category
+
+For an API to be included in the Fuchsia SDK in the `partner`,
+`partner_internal`, or `public` [SDK category][sdk-category], it must clear two
+hurdles: there must be a ready and willing customer, and the API must have gone
+through [API calibration][calibration].
+
+To request an API Calibration, send an email to api-council@fuchsia.dev,
+indicating the specific library or libraries you'd like to promote.
+
 <!-- Reference links -->
 
 [fuchsia-api-surface]: /docs/glossary/README.md#fuchsia-api-surface
@@ -48,3 +58,5 @@ To contribute to the [Fuchsia API Surface][fuchsia-api-surface], do the followin
 [rfc-process]: /docs/contribute/governance/rfcs/rfc_process.md
 [api-council]: /docs/contribute/governance/api_council.md#area
 [membership]: /docs/contribute/governance/api_council.md#membership
+[sdk-category]: /docs/contribute/sdk/categories.md
+[calibration]: /docs/contribute/governance/api_council.md#calibration
