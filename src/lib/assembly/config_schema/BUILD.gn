@@ -67,6 +67,7 @@ rustc_library("config_schema") {
     "src/platform_config/driver_framework_config.rs",
     "src/platform_config/example_config.rs",
     "src/platform_config/fonts_config.rs",
+    "src/platform_config/forensics_config.rs",
     "src/platform_config/graphics_config.rs",
     "src/platform_config/icu_config.rs",
     "src/platform_config/identity_config.rs",
