@@ -128,20 +128,25 @@ struct RunningThread {
 impl RunningThread {
     fn new(state: Arc<Mutex<DynamicThreadPoolState>>, f: BoxedClosure) -> Self {
         let (sender, receiver) = sync_channel::<BoxedClosure>(0);
-        let thread = Some(std::thread::spawn(move || {
-            while let Ok(f) = receiver.recv() {
-                f();
-                let mut state = state.lock();
-                state.idle_threads += 1;
-                if state.idle_threads > state.max_idle_threads {
-                    // If the number of idle thread is greater than the max, the thread terminates.
-                    // This disconnects the receiver, which will ensure that the thread will be
-                    // joined and remove from the list of available threads the next time the
-                    // pool tries to use it.
-                    return;
-                }
-            }
-        }));
+        let thread = Some(
+            std::thread::Builder::new()
+                .name("kthread-dynamic-worker".to_string())
+                .spawn(move || {
+                    while let Ok(f) = receiver.recv() {
+                        f();
+                        let mut state = state.lock();
+                        state.idle_threads += 1;
+                        if state.idle_threads > state.max_idle_threads {
+                            // If the number of idle thread is greater than the max, the thread terminates.
+                            // This disconnects the receiver, which will ensure that the thread will be
+                            // joined and remove from the list of available threads the next time the
+                            // pool tries to use it.
+                            return;
+                        }
+                    }
+                })
+                .expect("able to create threads"),
+        );
         let result = Self { thread, sender: Some(sender) };
         // The dispatch cannot fail because the thread can only finish after having executed at
         // least one task, and this is the first task ever dispatched to it.
@@ -157,11 +162,16 @@ impl RunningThread {
     fn new_persistent() -> Self {
         // The persistent thread doesn't need to do any rendez-vous when received task.
         let (sender, receiver) = sync_channel::<BoxedClosure>(20);
-        let thread = Some(std::thread::spawn(move || {
-            while let Ok(f) = receiver.recv() {
-                f();
-            }
-        }));
+        let thread = Some(
+            std::thread::Builder::new()
+                .name("kthread-persistent-worker".to_string())
+                .spawn(move || {
+                    while let Ok(f) = receiver.recv() {
+                        f();
+                    }
+                })
+                .expect("able to create threads"),
+        );
         Self { thread, sender: Some(sender) }
     }
 

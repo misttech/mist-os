@@ -110,29 +110,35 @@ fn init_scene(
     //
     // The spawned thread will execute the futures and send results back to this thread via a
     // channel.
-    std::thread::spawn(move || -> Result<(), anyhow::Error> {
-        let mut executor = fasync::LocalExecutor::new();
+    std::thread::Builder::new()
+        .name("kthread-fb-alloc".to_string())
+        .spawn(move || -> Result<(), anyhow::Error> {
+            let mut executor = fasync::LocalExecutor::new();
 
-        let mut buffer_allocator = BufferCollectionAllocator::new(
-            width,
-            height,
-            fidl_fuchsia_sysmem::PixelFormatType::R8G8B8A8,
-            FrameUsage::Cpu,
-            1,
-        )?;
-        buffer_allocator.set_name(100, "Starnix ViewProvider")?;
+            let mut buffer_allocator = BufferCollectionAllocator::new(
+                width,
+                height,
+                fidl_fuchsia_sysmem::PixelFormatType::R8G8B8A8,
+                FrameUsage::Cpu,
+                1,
+            )?;
+            buffer_allocator.set_name(100, "Starnix ViewProvider")?;
 
-        let sysmem_buffer_collection_token =
-            executor.run_singlethreaded(buffer_allocator.duplicate_token())?;
-        // Notify the async code that the sysmem buffer collection token is available.
-        collection_sender.send(sysmem_buffer_collection_token).expect("Failed to send collection");
+            let sysmem_buffer_collection_token =
+                executor.run_singlethreaded(buffer_allocator.duplicate_token())?;
+            // Notify the async code that the sysmem buffer collection token is available.
+            collection_sender
+                .send(sysmem_buffer_collection_token)
+                .expect("Failed to send collection");
 
-        let allocation = executor.run_singlethreaded(buffer_allocator.allocate_buffers(true))?;
-        // Notify the async code that the buffer allocation completed.
-        allocation_sender.send(allocation).expect("Failed to send allocation");
+            let allocation =
+                executor.run_singlethreaded(buffer_allocator.allocate_buffers(true))?;
+            // Notify the async code that the buffer allocation completed.
+            allocation_sender.send(allocation).expect("Failed to send allocation");
 
-        Ok(())
-    });
+            Ok(())
+        })
+        .expect("able to create threads");
 
     // Wait for the async code to generate the buffer collection token.
     let sysmem_buffer_collection_token = collection_receiver
@@ -183,7 +189,7 @@ pub fn spawn_view_provider(
     view_bound_protocols: fuicomposition::ViewBoundProtocols,
     outgoing_dir: fidl::endpoints::ServerEnd<fidl_fuchsia_io::DirectoryMarker>,
 ) {
-    std::thread::spawn(|| {
+    std::thread::Builder::new().name("kthread-view-provider".to_string()).spawn(|| {
         let mut executor = fasync::LocalExecutor::new();
         let mut view_bound_protocols = Some(view_bound_protocols);
         executor.run_singlethreaded(async move {
@@ -233,7 +239,7 @@ pub fn spawn_view_provider(
                 }
             }
         });
-    });
+    }).expect("able to create threads");
 }
 
 /// Starts a flatland presentation loop, using the flatland proxy in `server`.

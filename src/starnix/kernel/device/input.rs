@@ -143,72 +143,76 @@ impl InputFile {
         touch_source_proxy: fuipointer::TouchSourceProxy,
     ) -> std::thread::JoinHandle<()> {
         let slf = self.clone();
-        std::thread::spawn(move || {
-            fasync::LocalExecutor::new().run_singlethreaded(async {
-                let mut previous_event_disposition = vec![];
-                // TODO(https://fxbug.dev/123718): Remove `close_fut`.
-                let mut close_fut = touch_source_proxy.on_closed();
-                loop {
-                    let query_fut = touch_source_proxy.watch(&previous_event_disposition);
-                    let query_res = match future::select(close_fut, query_fut).await {
-                        Either::Left((Ok(Signals::CHANNEL_PEER_CLOSED), _)) => {
-                            log_warn!("TouchSource server closed connection; input is stopped");
-                            break;
-                        }
-                        Either::Left((Ok(signals), _))
-                            if signals
-                                == (Signals::CHANNEL_PEER_CLOSED | Signals::CHANNEL_READABLE) =>
-                        {
-                            log_warn!(
-                                "{} {}",
-                                "TouchSource server closed connection and channel is readable",
-                                "input dropped event(s) and stopped"
-                            );
-                            break;
-                        }
-                        Either::Left((on_closed_res, _)) => {
-                            log_warn!(
+        std::thread::Builder::new()
+            .name("kthread-input-relay".to_string())
+            .spawn(move || {
+                fasync::LocalExecutor::new().run_singlethreaded(async {
+                    let mut previous_event_disposition = vec![];
+                    // TODO(https://fxbug.dev/123718): Remove `close_fut`.
+                    let mut close_fut = touch_source_proxy.on_closed();
+                    loop {
+                        let query_fut = touch_source_proxy.watch(&previous_event_disposition);
+                        let query_res = match future::select(close_fut, query_fut).await {
+                            Either::Left((Ok(Signals::CHANNEL_PEER_CLOSED), _)) => {
+                                log_warn!("TouchSource server closed connection; input is stopped");
+                                break;
+                            }
+                            Either::Left((Ok(signals), _))
+                                if signals
+                                    == (Signals::CHANNEL_PEER_CLOSED
+                                        | Signals::CHANNEL_READABLE) =>
+                            {
+                                log_warn!(
+                                    "{} {}",
+                                    "TouchSource server closed connection and channel is readable",
+                                    "input dropped event(s) and stopped"
+                                );
+                                break;
+                            }
+                            Either::Left((on_closed_res, _)) => {
+                                log_warn!(
                                 "on_closed() resolved with unexpected value {:?}; input is stopped",
                                 on_closed_res
                             );
-                            break;
-                        }
-                        Either::Right((query_res, pending_close_fut)) => {
-                            close_fut = pending_close_fut;
-                            query_res
-                        }
-                    };
-                    match query_res {
-                        Ok(touch_events) => {
-                            previous_event_disposition =
-                                touch_events.iter().map(make_response_for_fidl_event).collect();
-                            let new_events = touch_events
-                                .iter()
-                                .filter_map(parse_fidl_touch_event)
-                                // `flat`: each FIDL event yields a `Vec<uapi::input_event>`,
-                                // but the end result should be a single vector of UAPI events,
-                                // not a `Vec<Vec<uapi::input_event>>`.
-                                .flat_map(make_uapi_events);
-                            let mut inner = slf.inner.lock();
-                            // TODO(https://fxbug.dev/124597): Reading from an `InputFile` should
-                            // not provide access to events that occurred before the file was
-                            // opened.
-                            inner.events.extend(new_events);
-                            // TODO(https://fxbug.dev/124598): Skip notify if `inner.events`
-                            // is empty.
-                            inner.waiters.notify_fd_events(FdEvents::POLLIN);
-                        }
-                        Err(e) => {
-                            log_warn!(
-                                "error {:?} reading from TouchSourceProxy; input is stopped",
-                                e
-                            );
-                            break;
-                        }
-                    };
-                }
+                                break;
+                            }
+                            Either::Right((query_res, pending_close_fut)) => {
+                                close_fut = pending_close_fut;
+                                query_res
+                            }
+                        };
+                        match query_res {
+                            Ok(touch_events) => {
+                                previous_event_disposition =
+                                    touch_events.iter().map(make_response_for_fidl_event).collect();
+                                let new_events = touch_events
+                                    .iter()
+                                    .filter_map(parse_fidl_touch_event)
+                                    // `flat`: each FIDL event yields a `Vec<uapi::input_event>`,
+                                    // but the end result should be a single vector of UAPI events,
+                                    // not a `Vec<Vec<uapi::input_event>>`.
+                                    .flat_map(make_uapi_events);
+                                let mut inner = slf.inner.lock();
+                                // TODO(https://fxbug.dev/124597): Reading from an `InputFile` should
+                                // not provide access to events that occurred before the file was
+                                // opened.
+                                inner.events.extend(new_events);
+                                // TODO(https://fxbug.dev/124598): Skip notify if `inner.events`
+                                // is empty.
+                                inner.waiters.notify_fd_events(FdEvents::POLLIN);
+                            }
+                            Err(e) => {
+                                log_warn!(
+                                    "error {:?} reading from TouchSourceProxy; input is stopped",
+                                    e
+                                );
+                                break;
+                            }
+                        };
+                    }
+                })
             })
-        })
+            .expect("able to create threads")
     }
 }
 

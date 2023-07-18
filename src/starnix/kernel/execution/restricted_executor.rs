@@ -340,21 +340,24 @@ where
 
     // Spawn the process' thread. Note, this closure ends up executing in the process referred to by
     // `process_handle`.
-    let join_handle = std::thread::spawn(move || {
-        let run_result = match run_task(&mut current_task) {
-            Err(error) => {
-                log_warn!("Died unexpectedly from {:?}! treating as SIGKILL", error);
-                let exit_status = ExitStatus::Kill(SignalInfo::default(SIGKILL));
+    let join_handle = std::thread::Builder::new()
+        .name("user-thread".to_string())
+        .spawn(move || {
+            let run_result = match run_task(&mut current_task) {
+                Err(error) => {
+                    log_warn!("Died unexpectedly from {:?}! treating as SIGKILL", error);
+                    let exit_status = ExitStatus::Kill(SignalInfo::default(SIGKILL));
 
-                current_task.write().exit_status = Some(exit_status.clone());
-                Ok(exit_status)
-            }
-            ok => ok,
-        };
+                    current_task.write().exit_status = Some(exit_status.clone());
+                    Ok(exit_status)
+                }
+                ok => ok,
+            };
 
-        current_task.signal_vfork();
-        task_complete(run_result);
-    });
+            current_task.signal_vfork();
+            task_complete(run_result);
+        })
+        .expect("able to spawn threads");
 
     // Set the task's thread handle
     let pthread = join_handle.as_pthread_t();
