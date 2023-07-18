@@ -30,6 +30,7 @@ product_assembly_configuration("terminal") {
 
     ui = {
       enabled = true
+      legacy = true
     }
     fonts = {
       enabled = true

@@ -1655,6 +1655,28 @@ assembly_input_bundle("session_manager") {
   ]
 }
 
+# Legacy Base UI support
+# TODO(fxbug.dev/124273): Delete legacy support once it is consolidated with
+# non-legacy.
+#
+# feature_set_levels: minimal
+# build-types: all
+#
+assembly_input_bundle("ui_legacy") {
+  compiled_packages = [
+    {
+      name = "core"
+      component_shards = [
+        {
+          component_name = "core"
+          shards =
+              rebase_path([ "//src/ui/meta/ui.core_shard.cml" ], root_build_dir)
+        },
+      ]
+    },
+  ]
+}
+
 # UI support
 #
 # feature_set_levels: minimal
@@ -1705,6 +1727,28 @@ assembly_input_bundle("ui_user_and_userdebug") {
     "//src/ui/bin/virtual_keyboard_manager",
     "//src/ui/bin/scene_manager",
   ]
+}
+
+# Legacy UI support for eng build types
+# TODO(fxbug.dev/124273): Delete the legacy support once it is consolidated with
+# non-legacy.
+#
+# feature_set_levels: minimal
+# build-types: eng
+#
+assembly_input_bundle("ui_legacy_package_eng") {
+  cache_packages = [ "//src/ui:ui_package" ]
+}
+
+# Legacy UI support for user and userdebug build types
+# TODO(fxbug.dev/124273): Delete the legacy support once it is consolidated with
+# non-legacy.
+#
+# feature_set_levels: minimal
+# build-types: user, userdebug
+#
+assembly_input_bundle("ui_legacy_package_user_and_userdebug") {
+  base_packages = [ "//src/ui:ui_package" ]
 }
 
 # UI support for eng build types

@@ -83,6 +83,8 @@ USER_PLATFORM_AIB_NAMES_RISCV64 = BOOTSTRAP_USER_PLATFORM_AIB_NAMES + [
     "setui_with_camera.icu_latest_{}".format(icu_flavors.latest_git_commit),
     "setui_with_camera.icu_stable_{}".format(icu_flavors.stable_git_commit),
     "ui",
+    "ui_legacy",
+    "ui_legacy_package_user_and_userdebug",
     "ui_package_user_and_userdebug",
     "ui_user_and_userdebug",
     "wlan_base",
@@ -130,6 +132,7 @@ ENG_PLATFORM_AIB_NAMES_RISCV64 = BOOTSTRAP_ENG_PLATFORM_AIB_NAMES + USERDEBUG_PL
     "system_update_checker",
     "testing_support",
     "ui_eng",
+    "ui_legacy_package_eng",
     "ui_package_eng",
 ]
 ENG_PLATFORM_AIB_NAMES = ENG_PLATFORM_AIB_NAMES_RISCV64 + USER_PLATFORM_AIB_NAMES_EXCLUDED_FROM_RISCV64
