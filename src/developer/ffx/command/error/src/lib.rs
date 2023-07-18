@@ -2,11 +2,18 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#[macro_use]
+pub mod macros;
 mod context;
 mod error;
 
 pub use context::*;
 pub use error::*;
+
+#[doc(hidden)]
+pub mod macro_deps {
+    pub use anyhow;
+}
 
 #[cfg(test)]
 pub mod tests {

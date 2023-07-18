@@ -23,6 +23,7 @@ rustc_library("lib") {
     "src/context.rs",
     "src/error.rs",
     "src/lib.rs",
+    "src/macros.rs",
   ]
 }
 
