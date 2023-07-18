@@ -111,8 +111,8 @@ The policy must include all structured configuration fields that may vary betwee
 builds. Be sure not to skip any of the `<Description>` or `TODO(fxbug.dev/####)` comments outlined
 above.
 
-Fields with values specified in the policy must to have a `mutability` specifier because it would be
-possible for those values to deviate from the one required by the policy.
+Fields with values specified in the policy must not have a `mutability` specifier because it would
+be possible for those values to deviate from the one required by the policy.
 
 #### 4. Check in new component or feature
 
