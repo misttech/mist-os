@@ -17,6 +17,7 @@
 
 #include <zxtest/zxtest.h>
 
+#include "src/ui/scenic/tests/utils/blocking_present.h"
 #include "src/ui/scenic/tests/utils/logging_event_loop.h"
 #include "src/ui/scenic/tests/utils/scenic_realm_builder.h"
 #include "src/ui/scenic/tests/utils/utils.h"
@@ -124,7 +125,7 @@ class FlatlandTouchLocalHitIntegrationTest : public zxtest::Test, public Logging
 
     root_instance_->CreateTransform(kRootTransform);
     root_instance_->SetRootTransform(kRootTransform);
-    BlockingPresent(root_instance_);
+    BlockingPresent(this, root_instance_);
 
     // Get the display's width and height. Since there is no Present in FlatlandDisplay, receiving
     // this callback ensures that all |flatland_display_| calls are processed.
@@ -133,14 +134,6 @@ class FlatlandTouchLocalHitIntegrationTest : public zxtest::Test, public Logging
     RunLoopUntil([&info] { return info.has_value(); });
     display_width_ = static_cast<float>(info->logical_size().width);
     display_height_ = static_cast<float>(info->logical_size().height);
-  }
-
-  void BlockingPresent(FlatlandPtr& flatland) {
-    bool presented = false;
-    flatland.events().OnFramePresented = [&presented](auto) { presented = true; };
-    flatland->Present({});
-    RunLoopUntil([&presented] { return presented; });
-    flatland.events().OnFramePresented = nullptr;
   }
 
   void RegisterInjector(ViewRef context_view_ref, ViewRef target_view_ref) {
@@ -250,7 +243,7 @@ class FlatlandTouchLocalHitIntegrationTest : public zxtest::Test, public Logging
     parent_instance->SetTranslation(viewport_transform_id,
                                     {.x = viewport_spec.x, .y = viewport_spec.y});
 
-    BlockingPresent(parent_instance);
+    BlockingPresent(this, parent_instance);
 
     // Set up the child view along with its TouchSource channel.
     fidl::InterfacePtr<ParentViewportWatcher> parent_viewport_watcher;
@@ -264,7 +257,7 @@ class FlatlandTouchLocalHitIntegrationTest : public zxtest::Test, public Logging
                                 parent_viewport_watcher.NewRequest());
     child_instance->CreateTransform(kRootTransform);
     child_instance->SetRootTransform(kRootTransform);
-    BlockingPresent(child_instance);
+    BlockingPresent(this, child_instance);
 
     return child_view_ref;
   }
@@ -372,9 +365,9 @@ TEST_F(FlatlandTouchLocalHitIntegrationTest, InjectedInput_ShouldBeCorrectlyTran
                             /*viewport_content_id*/ {.value = 3}, view3_instance);
   const auto view3_koid = ExtractKoid(view3_ref);
 
-  BlockingPresent(view1_instance);
-  BlockingPresent(view2_instance);
-  BlockingPresent(view3_instance);
+  BlockingPresent(this, view1_instance);
+  BlockingPresent(this, view2_instance);
+  BlockingPresent(this, view3_instance);
 
   // Upgrade View 1's touch source
   fuchsia::ui::pointer::augment::TouchSourceWithLocalHitPtr touch_source_with_local_hit;

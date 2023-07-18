@@ -15,6 +15,7 @@
 #include <zxtest/zxtest.h>
 
 #include "src/ui/scenic/lib/utils/helpers.h"
+#include "src/ui/scenic/tests/utils/blocking_present.h"
 #include "src/ui/scenic/tests/utils/logging_event_loop.h"
 #include "src/ui/scenic/tests/utils/scenic_realm_builder.h"
 #include "src/ui/scenic/tests/utils/utils.h"
@@ -186,7 +187,7 @@ class FlatlandMouseIntegrationTest : public zxtest::Test, public LoggingEventLoo
 
     root_instance_->CreateTransform(kRootTransform);
     root_instance_->SetRootTransform(kRootTransform);
-    BlockingPresent(root_instance_);
+    BlockingPresent(this, root_instance_);
 
     // Get the display's width and height. Since there is no Present in FlatlandDisplay, receiving
     // this callback ensures that all |flatland_display_| calls are processed.
@@ -195,14 +196,6 @@ class FlatlandMouseIntegrationTest : public zxtest::Test, public LoggingEventLoo
     RunLoopUntil([&info] { return info.has_value(); });
     display_width_ = static_cast<float>(info->logical_size().width);
     display_height_ = static_cast<float>(info->logical_size().height);
-  }
-
-  void BlockingPresent(FlatlandPtr& flatland) {
-    bool presented = false;
-    flatland.events().OnFramePresented = [&presented](auto) { presented = true; };
-    flatland->Present({});
-    RunLoopUntil([&presented] { return presented; });
-    flatland.events().OnFramePresented = nullptr;
   }
 
   void Inject(float x, float y, EventPhase phase, std::vector<uint8_t> pressed_buttons = {},
@@ -350,7 +343,7 @@ class FlatlandMouseIntegrationTest : public zxtest::Test, public LoggingEventLoo
     parent_instance->SetContent(viewport_transform_id, parent_content_id);
     parent_instance->AddChild(parent_of_viewport_transform, viewport_transform_id);
 
-    BlockingPresent(parent_instance);
+    BlockingPresent(this, parent_instance);
 
     // Set up the child view along with its MouseSource and ViewRefFocused channel.
     fidl::InterfacePtr<ParentViewportWatcher> parent_viewport_watcher;
@@ -365,7 +358,7 @@ class FlatlandMouseIntegrationTest : public zxtest::Test, public LoggingEventLoo
                                 parent_viewport_watcher.NewRequest());
     child_instance->CreateTransform(kRootTransform);
     child_instance->SetRootTransform(kRootTransform);
-    BlockingPresent(child_instance);
+    BlockingPresent(this, child_instance);
 
     return child_view_ref;
   }
@@ -428,7 +421,7 @@ TEST_F(FlatlandMouseIntegrationTest, ReleaseTargetView_TriggersChannelClosure) {
   // Break the scene graph relation that the pointerinjector relies on. Observe the channel close
   // (lazily).
   child_instance->ReleaseView();
-  BlockingPresent(child_instance);
+  BlockingPresent(this, child_instance);
 
   // Inject an event to trigger the channel closure.
   Inject(0, 0, EventPhase::ADD, button_vec);
@@ -463,7 +456,7 @@ TEST_F(FlatlandMouseIntegrationTest, DisconnectTargetView_TriggersChannelClosure
   // Break the scene graph relation that the pointerinjector relies on. Observe the channel close
   // (lazily).
   root_instance_->RemoveChild(kRootTransform, {.value = kRootTransform.value + 1});
-  BlockingPresent(root_instance_);
+  BlockingPresent(this, root_instance_);
 
   // Inject an event to trigger the channel closure.
   Inject(0, 0, EventPhase::ADD, button_vec);
@@ -987,8 +980,8 @@ TEST_F(FlatlandMouseIntegrationTest, SimpleHitTest) {
   parent_instance->SetHitRegions(kRootTransform, {{.region = {0, 0, 10, 10}}});
   child_instance->SetHitRegions(kRootTransform, {{.region = {0, 0, 10, 10}}});
 
-  BlockingPresent(child_instance);
-  BlockingPresent(parent_instance);
+  BlockingPresent(this, child_instance);
+  BlockingPresent(this, parent_instance);
 
   // Listen for input events.
   std::vector<MouseEvent> parent_events;
@@ -1064,8 +1057,8 @@ TEST_F(FlatlandMouseIntegrationTest, SandwichTest) {
   parent_instance->SetHitRegions(overlay_transform, {{.region = {0, 0, 5, 5}}});
   child_instance->SetHitRegions(kRootTransform, {{.region = {0, 0, 10, 10}}});
 
-  BlockingPresent(child_instance);
-  BlockingPresent(parent_instance);
+  BlockingPresent(this, child_instance);
+  BlockingPresent(this, parent_instance);
 
   // Listen for input events.
   std::vector<MouseEvent> parent_events;
@@ -1195,9 +1188,9 @@ TEST_F(FlatlandMouseIntegrationTest, PartialScreenViews) {
   context_instance->SetHitRegions(kRootTransform, {{.region = {0, 0, 10, 10}}});
   target_instance->SetHitRegions(kRootTransform, {{.region = {0, 0, 10, 10}}});
 
-  BlockingPresent(parent_instance);
-  BlockingPresent(context_instance);
-  BlockingPresent(target_instance);
+  BlockingPresent(this, parent_instance);
+  BlockingPresent(this, context_instance);
+  BlockingPresent(this, target_instance);
 
   // Listen for input events.
   std::vector<MouseEvent> context_events;
@@ -1325,7 +1318,7 @@ TEST_F(FlatlandMouseIntegrationTest, TargetViewWith_ScaleRotationTranslation) {
   root_instance_->SetScale(kTransformId, {2, 3});
   root_instance_->SetOrientation(kTransformId, Orientation::CCW_270_DEGREES);
   root_instance_->SetTranslation(kTransformId, {1, 0});
-  BlockingPresent(root_instance_);
+  BlockingPresent(this, root_instance_);
 
   // Listen for input events.
   std::vector<MouseEvent> child_events;
@@ -1494,7 +1487,7 @@ TEST_F(FlatlandMouseIntegrationTest, InjectedInput_OnRotatedChild_ShouldHitEdges
   TransformId transform = {.value = kRootTransform.value + 1};
   root_instance_->SetOrientation(transform, Orientation::CCW_270_DEGREES);
   root_instance_->SetTranslation(transform, {5, 0});
-  BlockingPresent(root_instance_);
+  BlockingPresent(this, root_instance_);
 
   // Listen for input events.
   std::vector<MouseEvent> child_events;
@@ -1816,7 +1809,7 @@ TEST_F(FlatlandMouseIntegrationTest, AnonymousSubtree) {
     child_instance->CreateView(std::move(child_token), parent_viewport_watcher.NewRequest());
     child_instance->CreateTransform(kRootTransform);
     child_instance->SetRootTransform(kRootTransform);
-    BlockingPresent(child_instance);
+    BlockingPresent(this, child_instance);
 
     // Attach it to the parent.
     const TransformId viewport_transform_id{.value = 2};
@@ -1829,7 +1822,7 @@ TEST_F(FlatlandMouseIntegrationTest, AnonymousSubtree) {
                                     std::move(properties), child_view_watcher.NewRequest());
     parent_instance->SetContent(viewport_transform_id, parent_content_id);
     parent_instance->AddChild(kRootTransform, viewport_transform_id);
-    BlockingPresent(parent_instance);
+    BlockingPresent(this, parent_instance);
   }
 
   // Create the named grandchild view along with its mouse source and attach it to the child.

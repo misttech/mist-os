@@ -18,6 +18,7 @@
 
 #include <zxtest/zxtest.h>
 
+#include "src/ui/scenic/tests/utils/blocking_present.h"
 #include "src/ui/scenic/tests/utils/logging_event_loop.h"
 #include "src/ui/scenic/tests/utils/scenic_realm_builder.h"
 #include "src/ui/scenic/tests/utils/utils.h"
@@ -129,7 +130,7 @@ class FlatlandTouchIntegrationTest : public zxtest::Test, public LoggingEventLoo
     root_view_ref_ = fidl::Clone(identity.view_ref);
     root_session_->CreateView2(std::move(child_token), std::move(identity), {},
                                parent_viewport_watcher.NewRequest());
-    BlockingPresent(root_session_);
+    BlockingPresent(this, root_session_);
 
     // Get the display's width and height. Since there is no Present in FlatlandDisplay, receiving
     // this callback ensures that all |flatland_display_| calls are processed.
@@ -138,14 +139,6 @@ class FlatlandTouchIntegrationTest : public zxtest::Test, public LoggingEventLoo
     RunLoopUntil([&info] { return info.has_value(); });
     display_width_ = static_cast<float>(info->logical_size().width);
     display_height_ = static_cast<float>(info->logical_size().height);
-  }
-
-  void BlockingPresent(fuchsia::ui::composition::FlatlandPtr& flatland) {
-    bool presented = false;
-    flatland.events().OnFramePresented = [&presented](auto) { presented = true; };
-    flatland->Present({});
-    RunLoopUntil([&presented] { return presented; });
-    flatland.events().OnFramePresented = nullptr;
   }
 
   void InjectNewViewport(Viewport viewport) {
@@ -264,7 +257,7 @@ class FlatlandTouchIntegrationTest : public zxtest::Test, public LoggingEventLoo
                              child_view_watcher.NewRequest());
     flatland->SetContent(transform_id, content_id);
 
-    BlockingPresent(flatland);
+    BlockingPresent(this, flatland);
   }
 
   // Injects |points| and checks that the events received in |view_events| match with an offset.
@@ -353,7 +346,7 @@ TEST_F(FlatlandTouchIntegrationTest, BasicInputTest) {
   const TransformId kTransform{.value = 42};
   child_session->CreateTransform(kTransform);
   child_session->SetRootTransform(kTransform);
-  BlockingPresent(child_session);
+  BlockingPresent(this, child_session);
 
   // Listen for input events.
   std::vector<TouchEvent> child_events;
@@ -414,7 +407,7 @@ TEST_F(FlatlandTouchIntegrationTest, ViewportSmallerThanContextView) {
   const TransformId kTransform{.value = 42};
   child_session->CreateTransform(kTransform);
   child_session->SetRootTransform(kTransform);
-  BlockingPresent(child_session);
+  BlockingPresent(this, child_session);
 
   // Listen for input events.
   std::vector<TouchEvent> child_events;
@@ -486,7 +479,7 @@ TEST_F(FlatlandTouchIntegrationTest, DisconnectTargetView_TriggersChannelClosure
   const TransformId kTransform{.value = 42};
   child_session->CreateTransform(kTransform);
   child_session->SetRootTransform(kTransform);
-  BlockingPresent(child_session);
+  BlockingPresent(this, child_session);
 
   // Listen for input events.
   std::vector<TouchEvent> child_events;
@@ -499,7 +492,7 @@ TEST_F(FlatlandTouchIntegrationTest, DisconnectTargetView_TriggersChannelClosure
   // Break the scene graph relation that the pointerinjector relies on. Observe the channel close
   // (lazily).
   child_session->ReleaseView();
-  BlockingPresent(child_session);
+  BlockingPresent(this, child_session);
 
   // Inject an event to trigger the channel closure.
   Inject(0, 0, fupi_EventPhase::ADD);
@@ -598,13 +591,13 @@ TEST_F(FlatlandTouchIntegrationTest, TargetViewWithScaleRotationTranslation) {
                              parent_viewport_watcher.NewRequest());
   child_session->CreateTransform(kRootTransform);
   child_session->SetRootTransform(kRootTransform);
-  BlockingPresent(child_session);
+  BlockingPresent(this, child_session);
 
   // Scale, rotate, and translate the child_session. Those operations are applied in that order.
   root_session_->SetScale(kTransformId, {2, 3});
   root_session_->SetOrientation(kTransformId, Orientation::CCW_270_DEGREES);
   root_session_->SetTranslation(kTransformId, {1, 0});
-  BlockingPresent(root_session_);
+  BlockingPresent(this, root_session_);
 
   // Listen for input events.
   std::vector<TouchEvent> child_events;
@@ -666,7 +659,7 @@ TEST_F(FlatlandTouchIntegrationTest, InjectedInput_OnRotatedChild_ShouldHitEdges
                              parent_viewport_watcher.NewRequest());
   child_session->CreateTransform(kRootTransform);
   child_session->SetRootTransform(kRootTransform);
-  BlockingPresent(child_session);
+  BlockingPresent(this, child_session);
 
   // Rotate the transform holding the child session and then translate it back into position.
   root_session_->SetOrientation(kTransformId, Orientation::CCW_270_DEGREES);
@@ -685,8 +678,8 @@ TEST_F(FlatlandTouchIntegrationTest, InjectedInput_OnRotatedChild_ShouldHitEdges
                                    std::make_unique<fuchsia::math::Rect>(std::move(rect)));
   }
 
-  BlockingPresent(root_session_);
-  BlockingPresent(child_session);
+  BlockingPresent(this, root_session_);
+  BlockingPresent(this, child_session);
 
   // Listen for input events.
   std::vector<TouchEvent> child_events;
@@ -815,7 +808,7 @@ TEST_F(FlatlandTouchIntegrationTest, PartialScreenOverlappingViews) {
     parent_session->SetRootTransform(kRootTransform);
 
     // The parent's Present call generates a snapshot which includes the ViewRef.
-    BlockingPresent(parent_session);
+    BlockingPresent(this, parent_session);
     RegisterInjector(fidl::Clone(root_view_ref_), fidl::Clone(parent_view_ref),
                      DispatchPolicy::TOP_HIT_AND_ANCESTORS_IN_TARGET);
   }
@@ -916,9 +909,9 @@ TEST_F(FlatlandTouchIntegrationTest, PartialScreenOverlappingViews) {
   parent_session->SetTranslation(kTransformId_B, {view_B_x, view_B_y});
 
   // Commit all changes.
-  BlockingPresent(parent_session);
-  BlockingPresent(child_session_A);
-  BlockingPresent(child_session_B);
+  BlockingPresent(this, parent_session);
+  BlockingPresent(this, child_session_A);
+  BlockingPresent(this, child_session_B);
 
   // Listen for input events.
   std::vector<TouchEvent> child_A_events;
@@ -1130,7 +1123,7 @@ TEST_F(FlatlandTouchIntegrationTest, ChildCreatedUsingCreateView_DoesNotGetInput
     parent_session->SetRootTransform(kRootTransform);
 
     // The parent's Present call generates a snapshot which includes the ViewRef.
-    BlockingPresent(parent_session);
+    BlockingPresent(this, parent_session);
     RegisterInjector(fidl::Clone(root_view_ref_), fidl::Clone(parent_view_ref),
                      DispatchPolicy::TOP_HIT_AND_ANCESTORS_IN_TARGET);
   }
@@ -1149,7 +1142,7 @@ TEST_F(FlatlandTouchIntegrationTest, ChildCreatedUsingCreateView_DoesNotGetInput
     child_session->CreateView(std::move(child_token), parent_viewport_watcher.NewRequest());
 
     // The child's Present call generates a snapshot which will not include a ViewRef.
-    BlockingPresent(child_session);
+    BlockingPresent(this, child_session);
   }
 
   // Listen for input events.
@@ -1216,7 +1209,7 @@ TEST_F(FlatlandTouchIntegrationTest, SetHitRegion_CapturesTouch) {
     parent_session->CreateTransform(kRootTransform);
     parent_session->SetRootTransform(kRootTransform);
 
-    BlockingPresent(parent_session);
+    BlockingPresent(this, parent_session);
     RegisterInjector(fidl::Clone(root_view_ref_), fidl::Clone(parent_view_ref),
                      DispatchPolicy::TOP_HIT_AND_ANCESTORS_IN_TARGET);
   }
@@ -1249,7 +1242,7 @@ TEST_F(FlatlandTouchIntegrationTest, SetHitRegion_CapturesTouch) {
     child_session->CreateTransform(kRootTransform);
     child_session->SetRootTransform(kRootTransform);
 
-    BlockingPresent(child_session);
+    BlockingPresent(this, child_session);
   }
 
   // Finally, parent view adds its hit region on top of the child view.
@@ -1260,7 +1253,7 @@ TEST_F(FlatlandTouchIntegrationTest, SetHitRegion_CapturesTouch) {
         .x = 0, .y = display_height_ / 2, .width = display_width_, .height = display_height_ / 2};
     parent_session->SetHitRegions(kTransformId, {{.region = region}});
     parent_session->AddChild(kRootTransform, kTransformId);
-    BlockingPresent(parent_session);
+    BlockingPresent(this, parent_session);
   }
 
   // Listen for input events.
@@ -1371,7 +1364,7 @@ TEST_F(FlatlandTouchIntegrationTest, InfiniteHitRegion_CapturesTouch) {
     parent_session->CreateTransform(kRootTransform);
     parent_session->SetRootTransform(kRootTransform);
 
-    BlockingPresent(parent_session);
+    BlockingPresent(this, parent_session);
     RegisterInjector(fidl::Clone(root_view_ref_), fidl::Clone(parent_view_ref),
                      DispatchPolicy::TOP_HIT_AND_ANCESTORS_IN_TARGET);
   }
@@ -1404,7 +1397,7 @@ TEST_F(FlatlandTouchIntegrationTest, InfiniteHitRegion_CapturesTouch) {
     child_session->CreateTransform(kRootTransform);
     child_session->SetRootTransform(kRootTransform);
 
-    BlockingPresent(child_session);
+    BlockingPresent(this, child_session);
   }
 
   // Finally, parent view adds its infinite hit region on top of the child view.
@@ -1414,7 +1407,7 @@ TEST_F(FlatlandTouchIntegrationTest, InfiniteHitRegion_CapturesTouch) {
     parent_session->SetInfiniteHitRegion(kTransformId,
                                          fuchsia::ui::composition::HitTestInteraction::DEFAULT);
     parent_session->AddChild(kRootTransform, kTransformId);
-    BlockingPresent(parent_session);
+    BlockingPresent(this, parent_session);
   }
 
   // Listen for input events.
@@ -1473,7 +1466,7 @@ TEST_F(FlatlandTouchIntegrationTest, ExclusiveMode_TargetDisconnectedMidStream_S
   const TransformId kTransform{.value = 42};
   child_session->CreateTransform(kTransform);
   child_session->SetRootTransform(kTransform);
-  BlockingPresent(child_session);
+  BlockingPresent(this, child_session);
 
   // Listen for input events.
   std::vector<TouchEvent> child_events;
@@ -1488,7 +1481,7 @@ TEST_F(FlatlandTouchIntegrationTest, ExclusiveMode_TargetDisconnectedMidStream_S
   RunLoopUntil([&child_events] { return child_events.size() == 2u; });  // Succeeds or times out.
 
   root_session_->RemoveChild(kRootTransform, kTransformId);
-  BlockingPresent(root_session_);
+  BlockingPresent(this, root_session_);
 
   // Next event should deliver a cancel event to the child (and close the injector since it's the
   // target)
@@ -1525,7 +1518,7 @@ TEST_F(FlatlandTouchIntegrationTest, ExclusiveMode_TargetDyingMidStream_ShouldKi
   const TransformId kTransform{.value = 42};
   child_session->CreateTransform(kTransform);
   child_session->SetRootTransform(kTransform);
-  BlockingPresent(child_session);
+  BlockingPresent(this, child_session);
 
   // Listen for input events.
   std::vector<TouchEvent> child_events;
@@ -1545,7 +1538,7 @@ TEST_F(FlatlandTouchIntegrationTest, ExclusiveMode_TargetDyingMidStream_ShouldKi
   RunLoopUntil([&child_session] { return !child_session.is_bound(); });
 
   // TODO(fxbug.dev/110461): Present on the root session to flush the changes.
-  BlockingPresent(root_session_);
+  BlockingPresent(this, root_session_);
 
   // Next event should deliver a cancel event to the child (and close the injector since it's the
   // target)
@@ -1595,7 +1588,7 @@ TEST_F(FlatlandTouchIntegrationTest, HitTested_ViewDisconnectedMidContest_Should
     parent_session->SetRootTransform(kRootTransform);
 
     // The parent's Present call generates a snapshot which includes the ViewRef.
-    BlockingPresent(parent_session);
+    BlockingPresent(this, parent_session);
     RegisterInjector(fidl::Clone(root_view_ref_), fidl::Clone(parent_view_ref),
                      DispatchPolicy::TOP_HIT_AND_ANCESTORS_IN_TARGET);
   }
@@ -1628,9 +1621,9 @@ TEST_F(FlatlandTouchIntegrationTest, HitTested_ViewDisconnectedMidContest_Should
   }
 
   // Commit all changes.
-  BlockingPresent(root_session_);
-  BlockingPresent(parent_session);
-  BlockingPresent(child_session);
+  BlockingPresent(this, root_session_);
+  BlockingPresent(this, parent_session);
+  BlockingPresent(this, child_session);
 
   // Listen for input events.
   std::vector<TouchEvent> parent_events;
@@ -1650,7 +1643,7 @@ TEST_F(FlatlandTouchIntegrationTest, HitTested_ViewDisconnectedMidContest_Should
   // Disconnect |child_session| and observe that it gets a cancellation event, while
   // |parent_session| keeps receiving events and receives a GRANTED interaction result.
   parent_session->RemoveChild(kRootTransform, kTransformId);
-  BlockingPresent(parent_session);
+  BlockingPresent(this, parent_session);
 
   Inject(2, 2, fupi_EventPhase::CHANGE);
   Inject(3, 3, fupi_EventPhase::CHANGE);
@@ -1711,7 +1704,7 @@ TEST_F(FlatlandTouchIntegrationTest, HitTested_ViewDisconnectedAfterWinning_Shou
     parent_session->SetRootTransform(kRootTransform);
 
     // The parent's Present call generates a snapshot which includes the ViewRef.
-    BlockingPresent(parent_session);
+    BlockingPresent(this, parent_session);
     RegisterInjector(fidl::Clone(root_view_ref_), fidl::Clone(parent_view_ref),
                      DispatchPolicy::TOP_HIT_AND_ANCESTORS_IN_TARGET);
   }
@@ -1744,9 +1737,9 @@ TEST_F(FlatlandTouchIntegrationTest, HitTested_ViewDisconnectedAfterWinning_Shou
   }
 
   // Commit all changes.
-  BlockingPresent(root_session_);
-  BlockingPresent(parent_session);
-  BlockingPresent(child_session);
+  BlockingPresent(this, root_session_);
+  BlockingPresent(this, parent_session);
+  BlockingPresent(this, child_session);
 
   // Listen for input events.
   std::vector<TouchEvent> parent_events;
@@ -1768,7 +1761,7 @@ TEST_F(FlatlandTouchIntegrationTest, HitTested_ViewDisconnectedAfterWinning_Shou
 
   // Detach child_session from the scene graph.
   parent_session->RemoveChild(kRootTransform, kTransformId);
-  BlockingPresent(parent_session);
+  BlockingPresent(this, parent_session);
 
   // Next event should deliver CANCEL to Child.
   Inject(5, 5, fupi_EventPhase::CHANGE);
@@ -1840,7 +1833,7 @@ TEST_F(FlatlandTouchIntegrationTest, MagnificationTest) {
                                parent_viewport_watcher.NewRequest());
     child_session->CreateTransform(kRootTransform);
     child_session->SetRootTransform(kRootTransform);
-    BlockingPresent(child_session);
+    BlockingPresent(this, child_session);
 
     ConnectChildView(parent_session, std::move(viewport_creation_token), FullscreenSize(),
                      child_transform, kRootContentId);
@@ -1852,7 +1845,7 @@ TEST_F(FlatlandTouchIntegrationTest, MagnificationTest) {
                 translation_y = static_cast<int32_t>(display_height_) / 2;
   parent_session->SetScale(child_transform, {scale_x, scale_y});
   parent_session->SetTranslation(child_transform, {translation_x, translation_y});
-  BlockingPresent(parent_session);
+  BlockingPresent(this, parent_session);
 
   // Listen for input events.
   std::vector<TouchEvent> child_events;

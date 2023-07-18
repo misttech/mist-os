@@ -15,6 +15,7 @@
 
 #include "src/ui/scenic/lib/allocation/buffer_collection_import_export_tokens.h"
 #include "src/ui/scenic/lib/utils/helpers.h"
+#include "src/ui/scenic/tests/utils/blocking_present.h"
 #include "src/ui/scenic/tests/utils/logging_event_loop.h"
 #include "src/ui/scenic/tests/utils/scenic_realm_builder.h"
 #include "src/ui/scenic/tests/utils/utils.h"
@@ -72,14 +73,6 @@ class ProtectedMemoryIntegrationTest : public LoggingEventLoop, public ::testing
   }
 
  protected:
-  void BlockingPresent(FlatlandPtr& flatland) {
-    bool presented = false;
-    flatland.events().OnFramePresented = [&presented](auto) { presented = true; };
-    flatland->Present({});
-    RunLoopUntil([&presented] { return presented; });
-    flatland.events().OnFramePresented = nullptr;
-  }
-
   void SetConstraintsAndAllocateBuffer(fuchsia::sysmem::BufferCollectionTokenSyncPtr token,
                                        bool use_protected_memory) {
     fuchsia::sysmem::BufferCollectionSyncPtr buffer_collection;
@@ -154,13 +147,13 @@ TEST_F(ProtectedMemoryIntegrationTest, RendersProtectedImage) {
   const ContentId kImageContentId{.value = 1};
   root_flatland_->CreateImage(kImageContentId, std::move(bc_tokens.import_token),
                               /*buffer_collection_index=*/0, std::move(image_properties));
-  BlockingPresent(root_flatland_);
+  BlockingPresent(this, root_flatland_);
 
   // Present the created Image.
   root_flatland_->CreateTransform(kRootTransform);
   root_flatland_->SetRootTransform(kRootTransform);
   root_flatland_->SetContent(kRootTransform, kImageContentId);
-  BlockingPresent(root_flatland_);
+  BlockingPresent(this, root_flatland_);
 
   // Verify that render happened without any errors.
 }
@@ -187,13 +180,13 @@ TEST_F(ProtectedMemoryIntegrationTest, ScreenshotReplacesProtectedImage) {
   const ContentId kImageContentId{.value = 1};
   root_flatland_->CreateImage(kImageContentId, std::move(bc_tokens.import_token),
                               /*buffer_collection_index=*/0, std::move(image_properties));
-  BlockingPresent(root_flatland_);
+  BlockingPresent(this, root_flatland_);
 
   // Present the created Image.
   root_flatland_->CreateTransform(kRootTransform);
   root_flatland_->SetRootTransform(kRootTransform);
   root_flatland_->SetContent(kRootTransform, kImageContentId);
-  BlockingPresent(root_flatland_);
+  BlockingPresent(this, root_flatland_);
 
   // Verify that screenshot works and replaced the content with black.
   auto screenshot = TakeScreenshot(screenshotter_, display_width_, display_height_);

@@ -20,6 +20,7 @@
 
 #include <zxtest/zxtest.h>
 
+#include "src/ui/scenic/tests/utils/blocking_present.h"
 #include "src/ui/scenic/tests/utils/logging_event_loop.h"
 #include "src/ui/scenic/tests/utils/scenic_realm_builder.h"
 #include "src/ui/scenic/tests/utils/utils.h"
@@ -66,16 +67,6 @@ class FlatlandViewIntegrationTest : public zxtest::Test, public LoggingEventLoop
     display_height_ = info->extent_in_px().height;
   }
 
-  // Invokes Flatland.Present() and waits for a response from Scenic that the frame has been
-  // presented.
-  void BlockingPresent(fuc::FlatlandPtr& flatland) {
-    bool presented = false;
-    flatland.events().OnFramePresented = [&presented](auto) { presented = true; };
-    flatland->Present({});
-    RunLoopUntil([&presented] { return presented; });
-    flatland.events().OnFramePresented = nullptr;
-  }
-
   // Create a new transform and viewport, then call |BlockingPresent| to wait for it to take
   // effect. This can be called only once per Flatland instance, because it uses hard-coded IDs for
   // the transform and viewport.
@@ -92,7 +83,7 @@ class FlatlandViewIntegrationTest : public zxtest::Test, public LoggingEventLoop
                              child_view_watcher.NewRequest());
     flatland->SetContent(kTransformId, kContentId);
 
-    BlockingPresent(flatland);
+    BlockingPresent(this, flatland);
   }
 
   fuc::FlatlandPtr MakeFlatland() {
@@ -131,7 +122,7 @@ TEST_F(FlatlandViewIntegrationTest, ParentViewportWatcherUnbindsOnParentDeath) {
     auto identity = scenic::NewViewIdentityOnCreation();
     child->CreateView2(std::move(child_view_token), std::move(identity), {},
                        parent_viewport_watcher.NewRequest());
-    BlockingPresent(child);
+    BlockingPresent(this, child);
   }
 
   // Create the parent view and connect the child view to it.
@@ -149,7 +140,7 @@ TEST_F(FlatlandViewIntegrationTest, ParentViewportWatcherUnbindsOnParentDeath) {
     auto identity = scenic::NewViewIdentityOnCreation();
     parent->CreateView2(std::move(parent_view_token), std::move(identity), {},
                         display_viewport_watcher.NewRequest());
-    BlockingPresent(parent);
+    BlockingPresent(this, parent);
 
     // Connect the child view to the parent view.
     fidl::InterfacePtr<fuc::ChildViewWatcher> child_view_watcher;
@@ -159,7 +150,7 @@ TEST_F(FlatlandViewIntegrationTest, ParentViewportWatcherUnbindsOnParentDeath) {
   }
 
   // The parent instance goes out of scope and dies. Wait for a frame to guarantee parent's death.
-  BlockingPresent(child);
+  BlockingPresent(this, child);
   EXPECT_TRUE(child.is_bound());
 
   // The ParentViewportWatcher unbinds as the parent died.
@@ -205,13 +196,13 @@ TEST_F(FlatlandViewIntegrationTest, ParentViewportWatcherUnbindsOnReleaseView) {
   bool connected = false;
   parent_viewport_watcher->GetLayout([&connected](auto) { connected = true; });
   RunLoopUntil([&connected] { return connected; });
-  BlockingPresent(parent);
+  BlockingPresent(this, parent);
 
   EXPECT_TRUE(parent_viewport_watcher.is_bound());
 
   // Disconnect the parent view from the root.
   parent->ReleaseView();
-  BlockingPresent(parent);
+  BlockingPresent(this, parent);
 
   // The ParentViewportWatcher unbinds as the parent view is now disconnected.
   EXPECT_FALSE(parent_viewport_watcher.is_bound());
@@ -232,7 +223,7 @@ TEST_F(FlatlandViewIntegrationTest, ChildViewWatcherUnbindsOnChildDeath) {
     auto identity = scenic::NewViewIdentityOnCreation();
     parent->CreateView2(std::move(child_view_token), std::move(identity), {},
                         parent_viewport_watcher.NewRequest());
-    BlockingPresent(parent);
+    BlockingPresent(this, parent);
   }
 
   fidl::InterfacePtr<fuc::ChildViewWatcher> child_view_watcher;
@@ -246,7 +237,7 @@ TEST_F(FlatlandViewIntegrationTest, ChildViewWatcherUnbindsOnChildDeath) {
     auto identity = scenic::NewViewIdentityOnCreation();
     child->CreateView2(std::move(child_view_token), std::move(identity), {},
                        parent_viewport_watcher.NewRequest());
-    BlockingPresent(child);
+    BlockingPresent(this, child);
 
     CreateAndSetViewport(parent, std::move(parent_viewport_token), child_view_watcher);
 
@@ -254,7 +245,7 @@ TEST_F(FlatlandViewIntegrationTest, ChildViewWatcherUnbindsOnChildDeath) {
   }
 
   // The child instance dies as it goes out of scope. Wait for a frame to guarantee child's death.
-  BlockingPresent(parent);
+  BlockingPresent(this, parent);
 
   // The ChildViewWatcher unbinds as the child instance died.
   EXPECT_FALSE(child_view_watcher.is_bound());
@@ -275,7 +266,7 @@ TEST_F(FlatlandViewIntegrationTest, ChildViewWatcherUnbindsOnInvalidToken) {
   auto identity = scenic::NewViewIdentityOnCreation();
   parent->CreateView2(std::move(child_view_token), std::move(identity), {},
                       parent_viewport_watcher.NewRequest());
-  BlockingPresent(parent);
+  BlockingPresent(this, parent);
 
   fuv::ViewportCreationToken invalid_token;
   fidl::InterfacePtr<fuc::ChildViewWatcher> child_view_watcher;
@@ -314,7 +305,7 @@ TEST_F(FlatlandViewIntegrationTest, ParentViewportStatusTest) {
     auto identity = scenic::NewViewIdentityOnCreation();
     parent->CreateView2(std::move(child_view_token), std::move(identity), {},
                         parent_viewport_watcher.NewRequest());
-    BlockingPresent(parent);
+    BlockingPresent(this, parent);
   }
 
   fuc::FlatlandPtr child;
@@ -332,7 +323,7 @@ TEST_F(FlatlandViewIntegrationTest, ParentViewportStatusTest) {
     parent_viewport_watcher->GetStatus(
         [&parent_status](auto status) { parent_status = std::move(status); });
 
-    BlockingPresent(child);
+    BlockingPresent(this, child);
 
     fidl::InterfacePtr<fuc::ChildViewWatcher> child_view_watcher;
     CreateAndSetViewport(parent, std::move(parent_viewport_token), child_view_watcher);
@@ -349,7 +340,7 @@ TEST_F(FlatlandViewIntegrationTest, ParentViewportStatusTest) {
   parent_viewport_watcher->GetStatus(
       [&parent_status](auto status) { parent_status = std::move(status); });
 
-  BlockingPresent(parent);
+  BlockingPresent(this, parent);
 
   // The child view gets the |DISCONNECTED_FROM_DISPLAY| signal as it was disconnected from its
   // parent.
@@ -373,7 +364,7 @@ TEST_F(FlatlandViewIntegrationTest, ChildViewStatusTest) {
     auto identity = scenic::NewViewIdentityOnCreation();
     parent->CreateView2(std::move(child_view_token), std::move(identity), {},
                         parent_viewport_watcher.NewRequest());
-    BlockingPresent(parent);
+    BlockingPresent(this, parent);
   }
 
   fuc::FlatlandPtr child;
@@ -394,7 +385,7 @@ TEST_F(FlatlandViewIntegrationTest, ChildViewStatusTest) {
     child_view_watcher->GetStatus(
         [&child_status](auto status) { child_status = std::move(status); });
 
-    BlockingPresent(child);
+    BlockingPresent(this, child);
   }
 
   // The parent instance gets the |CONTENT_HAS_PRESENTED| signal when the child view calls
@@ -416,7 +407,7 @@ TEST_F(FlatlandViewIntegrationTest, GetViewRefTest) {
     auto identity = scenic::NewViewIdentityOnCreation();
     parent->CreateView2(std::move(parent_view_creation_token), std::move(identity), {},
                         parent_viewport_watcher.NewRequest());
-    BlockingPresent(parent);
+    BlockingPresent(this, parent);
   }
 
   fuc::FlatlandPtr child;
@@ -444,7 +435,7 @@ TEST_F(FlatlandViewIntegrationTest, GetViewRefTest) {
     child_view_watcher->GetViewRef(
         [&child_view_ref](auto view_ref) { child_view_ref = std::move(view_ref); });
 
-    BlockingPresent(child);
+    BlockingPresent(this, child);
   }
 
   // The parent instance gets the |CONTENT_HAS_PRESENTED| signal when the child view calls

@@ -25,6 +25,7 @@
 #include "src/ui/scenic/lib/flatland/buffers/util.h"
 #include "src/ui/scenic/lib/screen_capture2/screen_capture2.h"
 #include "src/ui/scenic/lib/utils/helpers.h"
+#include "src/ui/scenic/tests/utils/blocking_present.h"
 #include "src/ui/scenic/tests/utils/logging_event_loop.h"
 #include "src/ui/scenic/tests/utils/scenic_realm_builder.h"
 #include "src/ui/scenic/tests/utils/screen_capture_utils.h"
@@ -95,7 +96,7 @@ class ScreenCapture2IntegrationTest : public LoggingEventLoop, public ::testing:
         num_pixels_ = display_width_ * display_height_;
       });
     }
-    BlockingPresent(root_session_);
+    BlockingPresent(this, root_session_);
 
     // Wait until we get the display size.
     RunLoopUntil([this] { return display_width_ != 0 && display_height_ != 0; });
@@ -112,7 +113,7 @@ class ScreenCapture2IntegrationTest : public LoggingEventLoop, public ::testing:
                                   child_view_watcher2.NewRequest());
     root_session_->SetRootTransform(kRootTransform);
     root_session_->SetContent(kRootTransform, kRootContent);
-    BlockingPresent(root_session_);
+    BlockingPresent(this, root_session_);
 
     // Set up the child view.
     child_session_ = realm_.component().Connect<fuchsia::ui::composition::Flatland>();
@@ -124,7 +125,7 @@ class ScreenCapture2IntegrationTest : public LoggingEventLoop, public ::testing:
                                 parent_viewport_watcher2.NewRequest());
     child_session_->CreateTransform(kChildRootTransform);
     child_session_->SetRootTransform(kChildRootTransform);
-    BlockingPresent(child_session_);
+    BlockingPresent(this, child_session_);
 
     // Create ScreenCapture client.
     screen_capture_ =
@@ -139,14 +140,6 @@ class ScreenCapture2IntegrationTest : public LoggingEventLoop, public ::testing:
     child_session_.events().OnError = [](fuchsia::ui::composition::FlatlandError error) {
       FX_LOGS(ERROR) << "Child session error: " << static_cast<int>(error);
     };
-  }
-
-  void BlockingPresent(fuchsia::ui::composition::FlatlandPtr& flatland) {
-    bool presented = false;
-    flatland.events().OnFramePresented = [&presented](auto) { presented = true; };
-    flatland->Present({});
-    RunLoopUntil([&presented] { return presented; });
-    flatland.events().OnFramePresented = nullptr;
   }
 
   fuchsia::sysmem::BufferCollectionInfo_2 ConfigureScreenCapture(
@@ -224,7 +217,7 @@ TEST_F(ScreenCapture2IntegrationTest, SingleColorCapture) {
   GenerateImageForFlatlandInstance(0, child_session_, kChildRootTransform,
                                    std::move(ref_pair.import_token), {image_width, image_height},
                                    {0, 0}, 2, 2);
-  BlockingPresent(child_session_);
+  BlockingPresent(this, child_session_);
 
   fuchsia::sysmem::BufferCollectionInfo_2 sc_buffer_collection_info = ConfigureScreenCapture(
       utils::CreateDefaultConstraints(/*buffer_count=*/1, image_width, image_height),
@@ -275,7 +268,7 @@ TEST_F(ScreenCapture2IntegrationTest, FilledRectCapture) {
 
   // Attach the transform to the scene
   child_session_->AddChild(kChildRootTransform, kTransformId);
-  BlockingPresent(child_session_);
+  BlockingPresent(this, child_session_);
 
   fuchsia::sysmem::BufferCollectionInfo_2 sc_buffer_collection_info = ConfigureScreenCapture(
       utils::CreateDefaultConstraints(/*buffer_count=*/1, image_width, image_height),
@@ -327,7 +320,7 @@ TEST_F(ScreenCapture2IntegrationTest, OnCpuWorkDoneCapture) {
 
   // Attach the transform to the scene
   child_session_->AddChild(kChildRootTransform, kTransformId);
-  BlockingPresent(child_session_);
+  BlockingPresent(this, child_session_);
 
   fuchsia::sysmem::BufferCollectionInfo_2 sc_buffer_collection_info = ConfigureScreenCapture(
       utils::CreateDefaultConstraints(/*buffer_count=*/1, image_width, image_height),

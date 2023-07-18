@@ -20,8 +20,10 @@
 
 #include <zxtest/zxtest.h>
 
+#include "src/ui/scenic/tests/utils/blocking_present.h"
 #include "src/ui/scenic/tests/utils/logging_event_loop.h"
 #include "src/ui/scenic/tests/utils/scenic_realm_builder.h"
+#include "src/ui/scenic/tests/utils/utils.h"
 
 // This test exercises the fuchsia.ui.views.ViewRefInstalled protocol implemented by Scenic
 // in the context of the Flatland compositor interface.
@@ -73,22 +75,12 @@ class FlatlandViewRefInstalledIntegrationTest : public zxtest::Test, public Logg
       display_width_ = static_cast<uint32_t>(width);
       display_height_ = static_cast<uint32_t>(height);
     });
-    BlockingPresent(root_session_);
+    BlockingPresent(this, root_session_);
 
     view_ref_installed_ptr_ = realm_->component().Connect<fuv::ViewRefInstalled>();
     view_ref_installed_ptr_.set_error_handler([](zx_status_t status) {
       FAIL("Lost connection to ViewRefInstalled: %s", zx_status_get_string(status));
     });
-  }
-
-  // Invokes Flatland.Present() and waits for a response from Scenic that the frame has been
-  // presented.
-  void BlockingPresent(fuc::FlatlandPtr& flatland) {
-    bool presented = false;
-    flatland.events().OnFramePresented = [&presented](auto) { presented = true; };
-    flatland->Present({});
-    RunLoopUntil([&presented] { return presented; });
-    flatland.events().OnFramePresented = nullptr;
   }
 
   // Create a new transform and viewport, then call |BlockingPresent| to wait for it to take
@@ -109,7 +101,7 @@ class FlatlandViewRefInstalledIntegrationTest : public zxtest::Test, public Logg
                              child_view_watcher.NewRequest());
     flatland->SetContent(kTransform, kContent);
 
-    BlockingPresent(flatland);
+    BlockingPresent(this, flatland);
   }
 
   fuc::FlatlandPtr root_session_;
@@ -160,7 +152,7 @@ TEST_F(FlatlandViewRefInstalledIntegrationTest, InstalledViewRef_ShouldReturnImm
   child_session->CreateView2(std::move(child_token), std::move(identity), std::move(protocols),
                              parent_viewport_watcher.NewRequest());
 
-  BlockingPresent(child_session);
+  BlockingPresent(this, child_session);
 
   std::optional<WatchResult> result;
   view_ref_installed_ptr_->Watch(std::move(view_ref_clone), [&result](auto watch_result) {
@@ -208,7 +200,7 @@ TEST_F(FlatlandViewRefInstalledIntegrationTest, WaitedOnViewRef_ShouldReturnWhen
   child_session->CreateView2(std::move(child_token), std::move(identity), std::move(protocols),
                              parent_viewport_watcher.NewRequest());
 
-  BlockingPresent(child_session);
+  BlockingPresent(this, child_session);
 
   // |Watch()| returns as the view ref is now installed.
   RunLoopUntil([&result] { return result.has_value(); });  // Succeeds or times out.
@@ -238,11 +230,11 @@ TEST_F(FlatlandViewRefInstalledIntegrationTest,
   child_session->CreateView2(std::move(child_token), std::move(identity), std::move(protocols),
                              parent_viewport_watcher.NewRequest());
 
-  BlockingPresent(child_session);
+  BlockingPresent(this, child_session);
 
   // Disconnect the child view.
   child_session->SetRootTransform({0});
-  BlockingPresent(child_session);
+  BlockingPresent(this, child_session);
 
   // Watch should still return true, since the view has been previously installed.
   std::optional<WatchResult> result;
@@ -274,11 +266,11 @@ TEST_F(FlatlandViewRefInstalledIntegrationTest, InstalledAndDestroyedViewRef_Sho
   child_session->CreateView2(std::move(child_token), std::move(identity), std::move(protocols),
                              parent_viewport_watcher.NewRequest());
 
-  BlockingPresent(child_session);
+  BlockingPresent(this, child_session);
 
   // Release the child view.
   child_session->ReleaseView();
-  BlockingPresent(child_session);
+  BlockingPresent(this, child_session);
 
   std::optional<WatchResult> result;
   view_ref_installed_ptr_->Watch(std::move(view_ref_clone), [&result](auto watch_result) {
@@ -310,7 +302,7 @@ TEST_F(FlatlandViewRefInstalledIntegrationTest, TransitiveConnection_ShouldRetur
     parent_session->CreateView2(std::move(parent_view_token), std::move(identity),
                                 std::move(protocols), parent_viewport_watcher.NewRequest());
 
-    BlockingPresent(parent_session);
+    BlockingPresent(this, parent_session);
   }
 
   // Create the child view and connect it to the parent view.
@@ -328,7 +320,7 @@ TEST_F(FlatlandViewRefInstalledIntegrationTest, TransitiveConnection_ShouldRetur
     child_session->CreateView2(std::move(child_token), std::move(identity), std::move(protocols),
                                parent_viewport_watcher.NewRequest());
 
-    BlockingPresent(child_session);
+    BlockingPresent(this, child_session);
   }
 
   std::optional<WatchResult> result;

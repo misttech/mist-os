@@ -15,6 +15,7 @@
 
 #include <zxtest/zxtest.h>
 
+#include "src/ui/scenic/tests/utils/blocking_present.h"
 #include "src/ui/scenic/tests/utils/logging_event_loop.h"
 #include "src/ui/scenic/tests/utils/scenic_realm_builder.h"
 #include "src/ui/scenic/tests/utils/utils.h"
@@ -105,7 +106,7 @@ class FlatlandFocusIntegrationTest : public zxtest::Test,
     protocols.set_view_ref_focused(root_focused_.NewRequest());
     root_session_->CreateView2(std::move(child_token), std::move(identity), std::move(protocols),
                                parent_viewport_watcher.NewRequest());
-    BlockingPresent(root_session_);
+    BlockingPresent(this, root_session_);
 
     // Now that the scene exists, wait for a valid focus chain. It should only contain the root
     // view.
@@ -123,14 +124,6 @@ class FlatlandFocusIntegrationTest : public zxtest::Test,
     RunLoopUntil([&root_focused] { return root_focused; });
 
     observed_focus_chains_.clear();
-  }
-
-  void BlockingPresent(fuchsia::ui::composition::FlatlandPtr& flatland) {
-    bool presented = false;
-    flatland.events().OnFramePresented = [&presented](auto) { presented = true; };
-    flatland->Present({});
-    RunLoopUntil([&presented] { return presented; });
-    flatland.events().OnFramePresented = nullptr;
   }
 
   bool RequestFocusChange(fuchsia::ui::views::FocuserPtr& view_focuser_ptr, const ViewRef& target) {
@@ -171,7 +164,7 @@ class FlatlandFocusIntegrationTest : public zxtest::Test,
                                   child_view_watcher.NewRequest());
     root_session_->SetRootTransform(kRootTransform);
     root_session_->SetContent(kRootTransform, kRootContent);
-    BlockingPresent(root_session_);
+    BlockingPresent(this, root_session_);
   }
 
   // |fuchsia::ui::focus::FocusChainListener|
@@ -216,7 +209,7 @@ TEST_F(FlatlandFocusIntegrationTest, RequestValidity_RequestUnconnected_ShouldFa
   auto child_view_ref = fidl::Clone(identity.view_ref);
   child_session->CreateView2(std::move(child_token), std::move(identity), {},
                              parent_viewport_watcher.NewRequest());
-  BlockingPresent(child_session);
+  BlockingPresent(this, child_session);
 
   // Not connected yet, so focus change requests should fail.
   EXPECT_FALSE(RequestFocusChange(root_focuser_, child_view_ref));
@@ -234,7 +227,7 @@ TEST_F(FlatlandFocusIntegrationTest, RequestValidity_RequestConnected_ShouldSucc
   auto child_view_ref = fidl::Clone(identity.view_ref);
   child_session->CreateView2(std::move(child_token), std::move(identity), {},
                              parent_viewport_watcher.NewRequest());
-  BlockingPresent(child_session);
+  BlockingPresent(this, child_session);
 
   // Attach to root.
   AttachToRoot(std::move(parent_token));
@@ -264,7 +257,7 @@ TEST_F(FlatlandFocusIntegrationTest, RequestValidity_SelfRequest_ShouldSucceed) 
   auto child_view_ref = fidl::Clone(identity.view_ref);
   child_session->CreateView2(std::move(child_token), std::move(identity), std::move(protocols),
                              parent_viewport_watcher.NewRequest());
-  BlockingPresent(child_session);
+  BlockingPresent(this, child_session);
 
   // Child is not focused. Trying to move focus at this point should fail.
   EXPECT_FALSE(RequestFocusChange(child_focuser, child_view_ref));
@@ -310,7 +303,7 @@ TEST_F(FlatlandFocusIntegrationTest, FocusRequest_ChildOfAnonymousView_ShouldFai
                                   std::move(properties), child_view_watcher.NewRequest());
     child_session->SetRootTransform(kRootTransform);
     child_session->SetContent(kRootTransform, kRootContent);
-    BlockingPresent(child_session);
+    BlockingPresent(this, child_session);
   }
 
   // Create the named grandchild view.
@@ -322,7 +315,7 @@ TEST_F(FlatlandFocusIntegrationTest, FocusRequest_ChildOfAnonymousView_ShouldFai
     fidl::InterfacePtr<ParentViewportWatcher> parent_viewport_watcher;
     grandchild_session->CreateView2(std::move(grandchild_token), std::move(identity), {},
                                     parent_viewport_watcher.NewRequest());
-    BlockingPresent(grandchild_session);
+    BlockingPresent(this, grandchild_session);
   }
 
   AttachToRoot(std::move(parent_token));
@@ -354,7 +347,7 @@ TEST_F(FlatlandFocusIntegrationTest, AutoFocus_RequestFocus_Interaction) {
     grandchild_view_ref = fidl::Clone(identity.view_ref);
     grandchild_session->CreateView2(std::move(grandchild_token), std::move(identity), {},
                                     fidl::InterfacePtr<ParentViewportWatcher>().NewRequest());
-    BlockingPresent(grandchild_session);
+    BlockingPresent(this, grandchild_session);
   }
 
   // Set up the child view.
@@ -378,7 +371,7 @@ TEST_F(FlatlandFocusIntegrationTest, AutoFocus_RequestFocus_Interaction) {
                                   fidl::InterfacePtr<ChildViewWatcher>().NewRequest());
     child_session->SetRootTransform(kTransform);
     child_session->SetContent(kTransform, kContent);
-    BlockingPresent(child_session);
+    BlockingPresent(this, child_session);
   }
 
   // Attach to root.
@@ -419,7 +412,7 @@ TEST_F(FlatlandFocusIntegrationTest, AutoFocus_SceneUpdate_Interaction) {
     child_view_ref = fidl::Clone(identity.view_ref);
     child_session->CreateView2(std::move(child_token), std::move(identity), {},
                                fidl::InterfacePtr<ParentViewportWatcher>().NewRequest());
-    BlockingPresent(child_session);
+    BlockingPresent(this, child_session);
   }
 
   SetAutoFocus(root_focuser_, child_view_ref);
@@ -438,7 +431,7 @@ TEST_F(FlatlandFocusIntegrationTest, AutoFocus_SceneUpdate_Interaction) {
 
   // Disconnect from root.
   root_session_->SetRootTransform(TransformId{0});
-  BlockingPresent(root_session_);
+  BlockingPresent(this, root_session_);
 
   // Observe focus returning to root.
   RunLoopUntil([this] { return CountReceivedFocusChains() == 2; });
@@ -462,7 +455,7 @@ TEST_F(FlatlandFocusIntegrationTest, ChildView_CreatedBeforeAttachingToRoot_Shou
   auto child_view_ref = fidl::Clone(identity.view_ref);
   child_session->CreateView2(std::move(child_token), std::move(identity), std::move(protocols),
                              parent_viewport_watcher.NewRequest());
-  BlockingPresent(child_session);
+  BlockingPresent(this, child_session);
 
   // Attach to root.
   AttachToRoot(std::move(parent_token));
@@ -482,7 +475,7 @@ TEST_F(FlatlandFocusIntegrationTest, FocusChain_Updated_OnViewDisconnect) {
   auto child_view_ref = fidl::Clone(identity.view_ref);
   child_session->CreateView2(std::move(child_token), std::move(identity), {},
                              parent_viewport_watcher.NewRequest());
-  BlockingPresent(child_session);
+  BlockingPresent(this, child_session);
 
   // Attach to root.
   AttachToRoot(std::move(parent_token));
@@ -496,7 +489,7 @@ TEST_F(FlatlandFocusIntegrationTest, FocusChain_Updated_OnViewDisconnect) {
   // Disconnect the child and watch the focus chain update.
   const ContentId kRootContent{.value = 1};
   root_session_->ReleaseViewport(kRootContent, [](auto) {});
-  BlockingPresent(root_session_);
+  BlockingPresent(this, root_session_);
   RunLoopUntil([this] { return CountReceivedFocusChains() == 2u; });  // Succeeds or times out.
   EXPECT_EQ(LastFocusChain()->focus_chain().size(), 1u);
   EXPECT_VIEW_REF_MATCH(LastFocusChain()->focus_chain()[0], root_view_ref_);
@@ -523,7 +516,7 @@ TEST_F(FlatlandFocusIntegrationTest, ViewRefFocused_HappyCase) {
   auto child_view_ref = fidl::Clone(identity.view_ref);
   child_session->CreateView2(std::move(child_token), std::move(identity), std::move(protocols),
                              parent_viewport_watcher.NewRequest());
-  BlockingPresent(child_session);
+  BlockingPresent(this, child_session);
 
   // Watch for child focused event.
   std::optional<bool> child_focused;
@@ -559,7 +552,7 @@ TEST_F(FlatlandFocusIntegrationTest,
                              parent_viewport_watcher.NewRequest());
 
   // The child's Present call generates a new snapshot that includes the ViewRef.
-  BlockingPresent(child_session);
+  BlockingPresent(this, child_session);
 
   // The parent view creates its Viewport later, and calls Present to commit.
   // The parent/child commit order should not matter.
@@ -591,7 +584,7 @@ TEST_F(FlatlandFocusIntegrationTest,
   // The child_focused_ptr should remain alive, because it is not yet bound.
   AttachToRoot(std::move(parent_token));
 
-  BlockingPresent(child_session);
+  BlockingPresent(this, child_session);
   // The child_focused_ptr should not die.
   RunLoopUntilIdle();
   EXPECT_TRUE(channel_alive);
@@ -617,7 +610,7 @@ TEST_F(FlatlandFocusIntegrationTest, ViewBoundChannels_ShouldSurviveViewDisconne
   fidl::InterfacePtr<ParentViewportWatcher> parent_viewport_watcher;
   child_session->CreateView2(std::move(child_token), scenic::NewViewIdentityOnCreation(),
                              std::move(protocols), parent_viewport_watcher.NewRequest());
-  BlockingPresent(child_session);
+  BlockingPresent(this, child_session);
 
   AttachToRoot(std::move(parent_token));
 
@@ -627,14 +620,14 @@ TEST_F(FlatlandFocusIntegrationTest, ViewBoundChannels_ShouldSurviveViewDisconne
 
   // Disconnect from root and observe channels survive.
   root_session_->SetRootTransform(TransformId{0});
-  BlockingPresent(root_session_);
+  BlockingPresent(this, root_session_);
   RunLoopUntilIdle();
   EXPECT_TRUE(focused_alive);
   EXPECT_TRUE(focuser_alive);
 
   // Reconnect and observe that channels survive.
   root_session_->SetRootTransform(kRootTransform);
-  BlockingPresent(root_session_);
+  BlockingPresent(this, root_session_);
   RunLoopUntilIdle();
   EXPECT_TRUE(focused_alive);
   EXPECT_TRUE(focuser_alive);
@@ -655,7 +648,7 @@ TEST_F(FlatlandFocusIntegrationTest, ViewRefFocusedDisconnectedWhenSessionDies) 
   fidl::InterfacePtr<ParentViewportWatcher> parent_viewport_watcher;
   child_session->CreateView2(std::move(child_token), scenic::NewViewIdentityOnCreation(),
                              std::move(protocols), parent_viewport_watcher.NewRequest());
-  BlockingPresent(child_session);
+  BlockingPresent(this, child_session);
 
   AttachToRoot(std::move(parent_token));
 
@@ -674,7 +667,7 @@ TEST_F(FlatlandFocusIntegrationTest, ViewRefFocusedDisconnectedWhenSessionDies) 
   RunLoopUntil([&child_dead] { return child_dead; });
 
   // Trigger a new snapshot to be published.
-  BlockingPresent(root_session_);
+  BlockingPresent(this, root_session_);
 
   RunLoopUntil([&focused_alive] { return !focused_alive; });  // Succeeds or times out.
   EXPECT_FALSE(focused_alive);
@@ -686,7 +679,7 @@ TEST_F(FlatlandFocusIntegrationTest, ViewRefFocusedDisconnectDoesNotKillSession)
   root_focused_.Unbind();
 
   // Observe that the channel doesn't close after a blocking present.
-  BlockingPresent(root_session_);
+  BlockingPresent(this, root_session_);
 }
 
 #undef EXPECT_VIEW_REF_MATCH

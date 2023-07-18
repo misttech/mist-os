@@ -24,6 +24,7 @@
 #include "src/ui/scenic/lib/flatland/buffers/util.h"
 #include "src/ui/scenic/lib/screen_capture/screen_capture.h"
 #include "src/ui/scenic/lib/utils/helpers.h"
+#include "src/ui/scenic/tests/utils/blocking_present.h"
 #include "src/ui/scenic/tests/utils/logging_event_loop.h"
 #include "src/ui/scenic/tests/utils/scenic_realm_builder.h"
 #include "src/ui/scenic/tests/utils/screen_capture_utils.h"
@@ -98,7 +99,7 @@ class ScreenCaptureIntegrationTest : public LoggingEventLoop, public ::testing::
         num_pixels_ = display_width_ * display_height_;
       });
     }
-    BlockingPresent(root_session_);
+    BlockingPresent(this, root_session_);
 
     // Wait until we get the display size.
     RunLoopUntil([this] { return display_width_ != 0 && display_height_ != 0; });
@@ -115,7 +116,7 @@ class ScreenCaptureIntegrationTest : public LoggingEventLoop, public ::testing::
                                   child_view_watcher2.NewRequest());
     root_session_->SetRootTransform(kRootTransform);
     root_session_->SetContent(kRootTransform, kRootContent);
-    BlockingPresent(root_session_);
+    BlockingPresent(this, root_session_);
 
     // Set up the child view.
     child_session_ = realm_.component().Connect<fuchsia::ui::composition::Flatland>();
@@ -127,23 +128,12 @@ class ScreenCaptureIntegrationTest : public LoggingEventLoop, public ::testing::
                                 parent_viewport_watcher2.NewRequest());
     child_session_->CreateTransform(kChildRootTransform);
     child_session_->SetRootTransform(kChildRootTransform);
-    BlockingPresent(child_session_);
+    BlockingPresent(this, child_session_);
 
     // Create ScreenCapture client.
     screen_capture_ = realm_.component().Connect<fuchsia::ui::composition::ScreenCapture>();
     screen_capture_.set_error_handler(
         [](zx_status_t status) { FAIL() << "Lost connection to ScreenCapture"; });
-  }
-
-  void BlockingPresent(fuchsia::ui::composition::FlatlandPtr& flatland) {
-    bool presented = false;
-    flatland.events().OnFramePresented = [&presented](auto) { presented = true; };
-    bool credit_received = false;
-    flatland.events().OnNextFrameBegin = [&credit_received](auto) { credit_received = true; };
-    flatland->Present({});
-    RunLoopUntil([&presented, &credit_received] { return presented && credit_received; });
-    flatland.events().OnFramePresented = nullptr;
-    flatland.events().OnNextFrameBegin = nullptr;
   }
 
   // This function calls GetNextFrame().
@@ -223,7 +213,7 @@ TEST_F(ScreenCaptureIntegrationTest, SingleColorUnrotatedScreenshot) {
   GenerateImageForFlatlandInstance(0, child_session_, kChildRootTransform,
                                    std::move(ref_pair.import_token), {image_width, image_height},
                                    {0, 0}, 2, 2);
-  BlockingPresent(child_session_);
+  BlockingPresent(this, child_session_);
 
   // The scene graph is now ready for screencapturing!
 
@@ -317,7 +307,7 @@ TEST_F(ScreenCaptureIntegrationTest, MultiColor180DegreeRotationScreenshot) {
                                    std::move(ref_pair.import_token), {image_width, image_height},
                                    {0, 0}, 2, 2);
 
-  BlockingPresent(child_session_);
+  BlockingPresent(this, child_session_);
 
   // The scene graph is now ready for screenshotting!
 
@@ -455,7 +445,7 @@ TEST_F(ScreenCaptureIntegrationTest, MultiColor90DegreeRotationScreenshot) {
   GenerateImageForFlatlandInstance(0, child_session_, kChildRootTransform,
                                    std::move(ref_pair.import_token), {image_width, image_height},
                                    {0, 0}, 2, 2);
-  BlockingPresent(child_session_);
+  BlockingPresent(this, child_session_);
 
   // The scene graph is now ready for screenshotting!
 
@@ -614,7 +604,7 @@ TEST_F(ScreenCaptureIntegrationTest, MultiColor270DegreeRotationScreenshot) {
   GenerateImageForFlatlandInstance(0, child_session_, kChildRootTransform,
                                    std::move(ref_pair.import_token), {image_width, image_height},
                                    {0, 0}, 2, 2);
-  BlockingPresent(child_session_);
+  BlockingPresent(this, child_session_);
 
   // The scene graph is now ready for screenshotting!
 
@@ -713,7 +703,7 @@ TEST_F(ScreenCaptureIntegrationTest, FilledRectScreenshot) {
 
   // Attach the transform to the scene
   child_session_->AddChild(kChildRootTransform, kTransformId);
-  BlockingPresent(child_session_);
+  BlockingPresent(this, child_session_);
 
   // The scene graph is now ready for screencapturing!
 
@@ -784,7 +774,7 @@ TEST_F(ScreenCaptureIntegrationTest, ChangeFilledRectScreenshots) {
 
   // Attach the transform to the scene
   child_session_->AddChild(kChildRootTransform, kTransformId);
-  BlockingPresent(child_session_);
+  BlockingPresent(this, child_session_);
 
   // The scene graph is now ready for screencapturing!
 
@@ -849,7 +839,7 @@ TEST_F(ScreenCaptureIntegrationTest, ChangeFilledRectScreenshots) {
 
   // Attach the transform to the scene
   child_session_->AddChild(kChildRootTransform, kTransformId2);
-  BlockingPresent(child_session_);
+  BlockingPresent(this, child_session_);
 
   // The scene graph is now ready for screencapturing!
 

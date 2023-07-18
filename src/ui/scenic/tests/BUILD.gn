@@ -23,6 +23,8 @@ config("vulkan_no_nodiscard") {
 source_set("common_deps") {
   testonly = true
   sources = [
+    "utils/blocking_present.cc",
+    "utils/blocking_present.h",
     "utils/logging_event_loop.cc",
     "utils/logging_event_loop.h",
     "utils/utils.cc",
@@ -44,6 +46,8 @@ source_set("common_deps") {
 source_set("common_deps_cts") {
   testonly = true
   sources = [
+    "utils/blocking_present.cc",
+    "utils/blocking_present.h",
     "utils/logging_event_loop.cc",
     "utils/logging_event_loop.h",
     "utils/utils.cc",

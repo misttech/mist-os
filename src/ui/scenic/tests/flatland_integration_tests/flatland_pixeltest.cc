@@ -16,6 +16,7 @@
 #include "src/ui/lib/escher/test/common/gtest_escher.h"
 #include "src/ui/scenic/lib/allocation/buffer_collection_import_export_tokens.h"
 #include "src/ui/scenic/lib/utils/helpers.h"
+#include "src/ui/scenic/tests/utils/blocking_present.h"
 #include "src/ui/scenic/tests/utils/logging_event_loop.h"
 #include "src/ui/scenic/tests/utils/scenic_realm_builder.h"
 #include "src/ui/scenic/tests/utils/utils.h"
@@ -162,16 +163,6 @@ class FlatlandPixelTestBase : public LoggingEventLoop, public ::testing::Test {
   }
 
  protected:
-  // Invokes Flatland.Present() and waits for a response from Scenic that the frame has been
-  // presented.
-  void BlockingPresent(fuc::FlatlandPtr& flatland) {
-    bool presented = false;
-    flatland.events().OnFramePresented = [&presented](auto) { presented = true; };
-    flatland->Present({});
-    RunLoopUntil([&presented] { return presented; });
-    flatland.events().OnFramePresented = nullptr;
-  }
-
   fuchsia::sysmem::BufferCollectionInfo_2 SetConstraintsAndAllocateBuffer(
       fuchsia::sysmem::BufferCollectionTokenSyncPtr token,
       fuchsia::sysmem::BufferCollectionConstraints constraints) {
@@ -292,7 +283,7 @@ TEST_P(ParameterizedYUVPixelTest, YUVTest) {
 
   // Present the created Image.
   root_flatland_->SetContent(kRootTransform, kImageContentId);
-  BlockingPresent(root_flatland_);
+  BlockingPresent(this, root_flatland_);
 
   // TODO(fxbug.dev/65765): provide reasoning for why this is the correct expected color.
   const ui_testing::Pixel expected_pixel(255, 85, 249, 255);
@@ -374,7 +365,7 @@ TEST_P(ParameterizedSRGBPixelTest, RGBTest) {
 
   // Present the created Image.
   root_flatland_->SetContent(kRootTransform, kImageContentId);
-  BlockingPresent(root_flatland_);
+  BlockingPresent(this, root_flatland_);
 
   auto screenshot = TakeScreenshot(screenshotter_, display_width_, display_height_);
   auto histogram = screenshot.Histogram();
@@ -649,7 +640,7 @@ TEST_P(ParameterizedFlipAndOrientationTest, FlipAndOrientationRenderTest) {
   }
   root_flatland_->SetTranslation(kRootTransform, translation);
 
-  BlockingPresent(root_flatland_);
+  BlockingPresent(this, root_flatland_);
 
   auto screenshot = TakeScreenshot(screenshotter_, display_width_, display_height_);
 
@@ -706,7 +697,7 @@ TEST_F(FlatlandPixelTestBase, CoordinateViewTest) {
   DrawRectangle(root_flatland_, view_width / 4, view_height / 4, 3 * view_width / 8,
                 3 * view_height / 8, ui_testing::Screenshot::kGreen);
 
-  BlockingPresent(root_flatland_);
+  BlockingPresent(this, root_flatland_);
 
   auto screenshot = TakeScreenshot(screenshotter_, display_width_, display_height_);
 
@@ -763,7 +754,7 @@ TEST_P(ParameterizedOpacityPixelTest, OpacityTest) {
   DrawRectangle(root_flatland_, display_width_, display_height_, 0, 0, foreground_color,
                 fuc::BlendMode::SRC_OVER, GetParam().opacity);
 
-  BlockingPresent(root_flatland_);
+  BlockingPresent(this, root_flatland_);
 
   const auto num_pixels = display_width_ * display_height_;
 
@@ -801,7 +792,7 @@ TEST_F(FlatlandPixelTestBase, ViewBoundClipping) {
   fidl::InterfacePtr<fuc::ParentViewportWatcher> parent_viewport_watcher;
   child->CreateView2(std::move(view_creation_token), scenic::NewViewIdentityOnCreation(), {},
                      parent_viewport_watcher.NewRequest());
-  BlockingPresent(child);
+  BlockingPresent(this, child);
 
   // Connect the child view to the root view.
   const fuc::TransformId viewport_transform = {get_next_resource_id()};
@@ -817,7 +808,7 @@ TEST_F(FlatlandPixelTestBase, ViewBoundClipping) {
                                  child_view_watcher.NewRequest());
   root_flatland_->SetContent(viewport_transform, viewport_content);
   root_flatland_->AddChild(kRootTransform, viewport_transform);
-  BlockingPresent(root_flatland_);
+  BlockingPresent(this, root_flatland_);
 
   parent_viewport_watcher->GetLayout([&child_width, &child_height](auto layout_info) {
     child_width = layout_info.logical_size().width;
@@ -837,7 +828,7 @@ TEST_F(FlatlandPixelTestBase, ViewBoundClipping) {
   // The child view draws a rectangle completely outside its view bounds.
   DrawRectangle(child, 2 * child_width, child_height, display_width_ / 2, display_height_ / 2,
                 ui_testing::Screenshot::kGreen);
-  BlockingPresent(child);
+  BlockingPresent(this, child);
 
   auto screenshot = TakeScreenshot(screenshotter_, display_width_, display_height_);
   EXPECT_EQ(screenshot.GetPixelAt(0, 0), ui_testing::Screenshot::kBlue);
@@ -913,7 +904,7 @@ TEST_F(FlatlandPixelTestBase, TranslateInheritsFromParent) {
   // Add the |kTransformId2| as the child of |kTransformId1| so that its origin is translated to the
   // center of the display.
   root_flatland_->AddChild(kTransformId1, kTransformId2);
-  BlockingPresent(root_flatland_);
+  BlockingPresent(this, root_flatland_);
 
   const ui_testing::Pixel default_color(0, 0, 0, 0);
 
@@ -984,7 +975,7 @@ TEST_F(FlatlandPixelTestBase, ScaleTest) {
 
   // Set a scale factor for 2.
   root_flatland_->SetScale(kRootTransform, {2, 2});
-  BlockingPresent(root_flatland_);
+  BlockingPresent(this, root_flatland_);
 
   const auto num_pixels = display_width_ * display_height_;
   auto screenshot = TakeScreenshot(screenshotter_, display_width_, display_height_);
@@ -1013,7 +1004,7 @@ TEST_F(FlatlandPixelTestBase, ViewportDetach) {
   fidl::InterfacePtr<fuc::ParentViewportWatcher> parent_viewport_watcher;
   child->CreateView2(std::move(view_creation_token), scenic::NewViewIdentityOnCreation(), {},
                      parent_viewport_watcher.NewRequest());
-  BlockingPresent(child);
+  BlockingPresent(this, child);
 
   // Connect the child view to the root view.
   fuc::TransformId viewport_transform = {get_next_resource_id()};
@@ -1027,13 +1018,13 @@ TEST_F(FlatlandPixelTestBase, ViewportDetach) {
   root_flatland_->SetContent(viewport_transform, viewport_content);
   root_flatland_->AddChild(kRootTransform, viewport_transform);
 
-  BlockingPresent(root_flatland_);
+  BlockingPresent(this, root_flatland_);
 
   // Child view draws a solid filled rectangle.
   child->CreateTransform(kRootTransform);
   child->SetRootTransform(kRootTransform);
   DrawRectangle(child, display_width_, display_height_, 0, 0, ui_testing::Screenshot::kBlue);
-  BlockingPresent(child);
+  BlockingPresent(this, child);
 
   const auto num_pixels = display_width_ * display_height_;
   // The screenshot taken should reflect the content drawn by the child view.
@@ -1045,7 +1036,7 @@ TEST_F(FlatlandPixelTestBase, ViewportDetach) {
 
   // Root view releases the viewport.
   root_flatland_->ReleaseViewport(viewport_content, [](auto token) {});
-  BlockingPresent(root_flatland_);
+  BlockingPresent(this, root_flatland_);
 
   // The screenshot taken should not reflect the content drawn by the child view as its viewport was
   // released.
@@ -1067,7 +1058,7 @@ TEST_F(FlatlandPixelTestBase, InsetNotEnforced) {
   fidl::InterfacePtr<fuc::ParentViewportWatcher> parent_viewport_watcher;
   child->CreateView2(std::move(view_creation_token), scenic::NewViewIdentityOnCreation(), {},
                      parent_viewport_watcher.NewRequest());
-  BlockingPresent(child);
+  BlockingPresent(this, child);
 
   // Connect the child view to the root view.
   fuc::TransformId viewport_transform = {get_next_resource_id()};
@@ -1091,13 +1082,13 @@ TEST_F(FlatlandPixelTestBase, InsetNotEnforced) {
   root_flatland_->SetContent(viewport_transform, viewport_content);
   root_flatland_->AddChild(kRootTransform, viewport_transform);
 
-  BlockingPresent(root_flatland_);
+  BlockingPresent(this, root_flatland_);
 
   // Child view draws a solid filled rectangle.
   child->CreateTransform(kRootTransform);
   child->SetRootTransform(kRootTransform);
   DrawRectangle(child, display_width_, display_height_, 0, 0, ui_testing::Screenshot::kBlue);
-  BlockingPresent(child);
+  BlockingPresent(this, child);
 
   // The size of the solid filled rectangle exceeds the child view's bounding box with
   // inset. Since inset properties are only hints, they should not affect the

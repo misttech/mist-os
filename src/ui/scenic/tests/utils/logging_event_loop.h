@@ -32,15 +32,16 @@ class RealLoopWrapper;
 /// class could inherit from `RealLoop`, and `LoggingEventLoop` could instantiate that
 /// class and forward calls to it. But that adds more code without a meaningful benefit.
 class LoggingEventLoop : private loop_fixture::RealLoop {
+ public:
+  void RunLoopUntil(fit::function<bool()> condition,
+                    cpp20::source_location caller = cpp20::source_location::current());
+
  protected:
   LoggingEventLoop();
   ~LoggingEventLoop();
 
   bool RunLoopWithTimeout(zx::duration timeout,
                           cpp20::source_location caller = cpp20::source_location::current());
-
-  void RunLoopUntil(fit::function<bool()> condition,
-                    cpp20::source_location caller = cpp20::source_location::current());
 
   bool RunLoopWithTimeoutOrUntil(fit::function<bool()> condition, zx::duration timeout,
                                  cpp20::source_location caller = cpp20::source_location::current());
