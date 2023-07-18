@@ -1532,7 +1532,7 @@ pub fn sys_timerfd_gettime(
     user_current_value: UserRef<itimerspec>,
 ) -> Result<(), Errno> {
     let file = current_task.files.get(fd)?;
-    let timer_file = file.downcast_file::<TimerFile>().ok_or_else(|| errno!(EBADF))?;
+    let timer_file = file.downcast_file::<TimerFile>().ok_or_else(|| errno!(EINVAL))?;
     let timer_info = timer_file.current_timer_spec();
     log_trace!("timerfd_gettime(fd={:?}, current_value={:?})", fd, timer_info);
     current_task.write_object(user_current_value, &timer_info)?;
@@ -1557,7 +1557,7 @@ pub fn sys_timerfd_settime(
     }
 
     let file = current_task.files.get(fd)?;
-    let timer_file = file.downcast_file::<TimerFile>().ok_or_else(|| errno!(EBADF))?;
+    let timer_file = file.downcast_file::<TimerFile>().ok_or_else(|| errno!(EINVAL))?;
 
     let new_timer_spec = current_task.read_object(user_new_value)?;
     let old_timer_spec = timer_file.set_timer_spec(new_timer_spec, flags)?;

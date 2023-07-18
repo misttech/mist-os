@@ -499,8 +499,6 @@
                 "timer_gettime01",
                 "timer_settime02",
                 "timerfd04",
-                "timerfd_gettime01",
-                "timerfd_settime01",
                 "times01",
                 "times03",
                 "tpci",
