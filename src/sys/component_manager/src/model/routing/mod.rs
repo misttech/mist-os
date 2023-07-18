@@ -23,7 +23,6 @@ use {
         mapper::NoopRouteMapper, router::RouteBundle,
     },
     async_trait::async_trait,
-    cm_moniker::InstancedMoniker,
     cm_rust::{CapabilityTypeName, ExposeDecl, ExposeDeclCommon, UseDecl, UseStorageDecl},
     fidl::epitaph::ChannelEpitaphExt,
     fuchsia_zircon as zx,
@@ -202,11 +201,8 @@ pub(super) async fn route_and_delete_storage(
 
     // As of today, the storage component instance must contain the target. This is because
     // it is impossible to expose storage declarations up.
-    let moniker = InstancedMoniker::scope_down(
-        &backing_dir_info.storage_source_moniker,
-        &target.instanced_moniker(),
-    )
-    .unwrap();
+    let moniker =
+        target.instanced_moniker().strip_prefix(&backing_dir_info.storage_source_moniker).unwrap();
     storage::delete_isolated_storage(
         backing_dir_info,
         target.persistent_storage,

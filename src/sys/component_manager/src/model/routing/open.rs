@@ -24,7 +24,7 @@ use {
         },
     },
     ::routing::{component_instance::ComponentInstanceInterface, path::PathBufExt},
-    cm_moniker::{InstancedExtendedMoniker, InstancedMoniker},
+    cm_moniker::InstancedExtendedMoniker,
     cm_util::channel,
     fidl::endpoints::ServerEnd,
     fidl_fuchsia_io as fio, fuchsia_zircon as zx,
@@ -147,11 +147,8 @@ impl<'a> OpenRequest<'a> {
     ) -> Result<(), ModelError> {
         // As of today, the storage component instance must contain the target. This is because it
         // is impossible to expose storage declarations up.
-        let moniker = InstancedMoniker::scope_down(
-            &source.storage_source_moniker,
-            &target.instanced_moniker(),
-        )
-        .unwrap();
+        let moniker =
+            target.instanced_moniker().strip_prefix(&source.storage_source_moniker).unwrap();
 
         let dir_source = source.storage_provider.clone();
         let storage_dir_proxy = storage::open_isolated_storage(

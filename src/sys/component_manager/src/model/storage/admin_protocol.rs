@@ -795,11 +795,10 @@ impl StorageAdmin {
                     };
 
                 if backing_dir_info == storage_capability_source_info {
-                    let moniker = InstancedMoniker::scope_down(
-                        &backing_dir_info.storage_source_moniker,
-                        &component.instanced_moniker(),
-                    )
-                    .unwrap();
+                    let moniker = component
+                        .instanced_moniker()
+                        .strip_prefix(&backing_dir_info.storage_source_moniker)
+                        .unwrap();
                     storage_users.push(moniker);
                     break;
                 }

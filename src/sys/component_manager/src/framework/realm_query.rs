@@ -670,7 +670,9 @@ async fn get_fidl_instance_and_children(
     scope_moniker: &Moniker,
     instance: &Arc<ComponentInstance>,
 ) -> (fsys::Instance, Vec<Arc<ComponentInstance>>) {
-    let moniker = Moniker::scope_down(scope_moniker, &instance.moniker)
+    let moniker = instance
+        .moniker
+        .strip_prefix(scope_moniker)
         .expect("instance must have been a child of scope root");
     let instance_id = model.component_id_index().look_up_moniker(&instance.moniker).cloned();
 

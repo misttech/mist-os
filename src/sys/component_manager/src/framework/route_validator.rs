@@ -357,7 +357,7 @@ impl RouteValidator {
     fn extended_moniker_to_str(scope_moniker: &Moniker, m: ExtendedMoniker) -> String {
         match m {
             ExtendedMoniker::ComponentManager => m.to_string(),
-            ExtendedMoniker::ComponentInstance(m) => match Moniker::scope_down(scope_moniker, &m) {
+            ExtendedMoniker::ComponentInstance(m) => match m.strip_prefix(scope_moniker) {
                 Ok(r) => r.to_string(),
                 Err(_) => "<above scope>".to_string(),
             },

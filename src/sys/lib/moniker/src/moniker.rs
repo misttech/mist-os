@@ -96,21 +96,22 @@ pub trait MonikerBase: Default + Eq + PartialEq + fmt::Debug + Clone + Hash + fm
         Self::new(path)
     }
 
-    fn scope_down<T: MonikerBase<Part = Self::Part>>(
-        parent_scope: &T,
-        child: &T,
+    /// Strips the moniker parts in prefix from the beginning of this moniker.
+    fn strip_prefix<T: MonikerBase<Part = Self::Part>>(
+        &self,
+        prefix: &T,
     ) -> Result<Self, MonikerError> {
-        if !child.has_prefix(parent_scope) {
-            return Err(MonikerError::ParentDoesNotContainChild {
-                parent: parent_scope.to_string(),
-                child: child.to_string(),
+        if !self.has_prefix(prefix) {
+            return Err(MonikerError::MonikerDoesNotHavePrefix {
+                moniker: self.to_string(),
+                prefix: prefix.to_string(),
             });
         }
 
-        let parent_len = parent_scope.path().len();
-        let mut children = child.path().clone();
-        children.drain(0..parent_len);
-        Ok(Self::new(children))
+        let prefix_len = prefix.path().len();
+        let mut path = self.path().clone();
+        path.drain(0..prefix_len);
+        Ok(Self::new(path))
     }
 
     fn compare(&self, other: &Self) -> cmp::Ordering {

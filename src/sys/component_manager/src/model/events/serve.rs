@@ -414,9 +414,7 @@ async fn create_event_fidl_object(event: Event) -> Result<fcomponent::Event, any
             target.to_string()
         }
         (ExtendedMoniker::ComponentInstance(target), ExtendedMoniker::ComponentInstance(scope)) => {
-            Moniker::scope_down(scope, target)
-                .expect("target must be a child of event scope")
-                .to_string()
+            target.strip_prefix(scope).expect("target must be a child of event scope").to_string()
         }
     };
     let header = fcomponent::EventHeader {
