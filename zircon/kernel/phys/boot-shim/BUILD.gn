@@ -45,6 +45,14 @@ if (have_devicetree) {
   devicetree_zbi_test("memory-test") {
     deps = [ "//zircon/kernel/phys/test:zbi-memory-test.zbi($phys_toolchain)" ]
   }
+
+  devicetree_zbi_test("core-tests") {
+    deps = [ "//zircon/system/utest/core:core-tests.zbi($default_toolchain)" ]
+
+    # TODO(https://fxbug.dev/126120): The Bti.DecommitRace test case takes 15
+    # to 17 minutes on RISC-V, so extend the timeout in that case.
+    timeout = 1800
+  }
 }
 
 zbi_executable("zbi-boot-shim") {
@@ -144,6 +152,11 @@ group("boot_tests") {
       ":devicetree-shim-memory-test",
       ":devicetree-shim-phys-unittests",
     ]
+  }
+
+  # TODO(fxbug.dev/114124): Unlike RISC-V, zircon's ARM64 requires a |ZBI_TYPE_CPU_TOPOLOGY| item.
+  if (current_cpu == "riscv64") {
+    deps += [ ":devicetree-shim-core-tests" ]
   }
 }
 
