@@ -1689,8 +1689,8 @@ assembly_input_bundle("ui") {
       component_shards = [
         {
           component_name = "core"
-          shards = rebase_path([ "//src/ui/meta/ui_minimal.core_shard.cml" ],
-                               root_build_dir)
+          shards =
+              rebase_path([ "//src/ui/meta/ui.core_shard.cml" ], root_build_dir)
         },
       ]
     },
@@ -1757,7 +1757,7 @@ assembly_input_bundle("ui_legacy_package_user_and_userdebug") {
 # build-types: eng
 #
 assembly_input_bundle("ui_package_eng") {
-  cache_packages = [ "//src/ui:ui_minimal_package" ]
+  cache_packages = [ "//src/ui:ui_package" ]
 }
 
 # UI support for user and userdebug build types
@@ -1766,7 +1766,7 @@ assembly_input_bundle("ui_package_eng") {
 # build-types: user, userdebug
 #
 assembly_input_bundle("ui_package_user_and_userdebug") {
-  base_packages = [ "//src/ui:ui_minimal_package" ]
+  base_packages = [ "//src/ui:ui_package" ]
 }
 
 # Fan support
