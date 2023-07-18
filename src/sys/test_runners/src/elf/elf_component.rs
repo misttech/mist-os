@@ -148,9 +148,6 @@ pub struct Component {
     /// Parent job in which all test processes should be executed.
     pub job: zx::Job,
 
-    /// Use direct vDSO for this test.
-    pub use_direct_vdso: bool,
-
     /// Options to create process with.
     pub options: zx::ProcessOptions,
 
@@ -220,7 +217,6 @@ impl Component {
         let program = start_info.program.as_ref().unwrap();
         let environ = runner::get_environ(program)
             .map_err(|e| ComponentError::InvalidArgs(url.clone(), e.into()))?;
-        let use_direct_vdso = runner::get_bool(program, "use_direct_vdso").unwrap_or(false);
         let is_shared_process = runner::get_bool(program, "is_shared_process").unwrap_or(false);
 
         let ns = start_info.ns.ok_or_else(|| ComponentError::MissingNamespace(url.clone()))?;
@@ -258,7 +254,6 @@ impl Component {
                 environ,
                 ns: ns,
                 job: job_default().create_child_job().map_err(ComponentError::CreateJob)?,
-                use_direct_vdso,
                 executable_vmo,
                 lib_loader_cache,
                 options: if is_shared_process {
@@ -309,7 +304,6 @@ impl Component {
             job: args.job,
             lib_loader_cache,
             executable_vmo,
-            use_direct_vdso: false,
             options: args.options,
         })
     }

@@ -71,7 +71,7 @@ use {
     cstr::cstr,
     elf_runner::{
         crash_info::CrashRecords,
-        vdso_vmo::{get_direct_vdso_vmo, get_next_vdso_vmo, get_stable_vdso_vmo, get_vdso_vmo},
+        vdso_vmo::{get_next_vdso_vmo, get_stable_vdso_vmo, get_vdso_vmo},
         ElfRunner,
     },
     fidl::endpoints::{create_proxy, ServerEnd},
@@ -221,7 +221,6 @@ impl BuiltinEnvironmentBuilder {
                 .ingest_bootfs_vmo(&system_resource_handle)?
                 .publish_kernel_vmo(get_stable_vdso_vmo()?)?
                 .publish_kernel_vmo(get_next_vdso_vmo()?)?
-                .publish_kernel_vmo(get_direct_vdso_vmo()?)?
                 .publish_kernel_vmo(get_vdso_vmo(cstr!("vdso/test1"))?)?
                 .publish_kernel_vmo(get_vdso_vmo(cstr!("vdso/test2"))?)?
                 .publish_kernel_vmos(HandleType::KernelFileVmo, 0)?

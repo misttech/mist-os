@@ -64,24 +64,6 @@ class VDsoMutator {
     ASSERT_MSG(status == ZX_OK, "vDSO VMO Write failed: %d", status);
   }
 
-  void PatchVmcall(uint64_t offset) {
-    // Not yet implemented for ARM64.
-#if ARCH_X86
-    uint8_t bytes[sizeof(kSyscallInsn)] = {};
-    const uint64_t syscall_offset = offset - /*`syscall` instruction size*/ 2;
-
-    // Validate the syscall and nop instructions.
-    zx_status_t status = vmo_->Read(bytes, syscall_offset, sizeof(bytes));
-    ASSERT_MSG(status == ZX_OK, "vDSO VMO Read failed: %d", status);
-    ASSERT_MSG(memcmp(kSyscallInsn, bytes, sizeof(bytes)) == 0,
-               "vDSO VMO %#lx does not contain syscall", offset);
-
-    // Then write the vmcall instruction.
-    status = vmo_->Write(kVmcallInsn, syscall_offset, sizeof(kVmcallInsn));
-    ASSERT_MSG(status == ZX_OK, "vDSO VMO Write failed: %d", status);
-#endif
-  }
-
  private:
   struct ElfSym {
     uintptr_t info, value, size;
@@ -92,8 +74,6 @@ class VDsoMutator {
   // user-mode jumps into this code, it gets a trap.
   using Insn = uint8_t;
   static constexpr Insn kTrapFill = 0xf4;  // hlt
-  static constexpr Insn kSyscallInsn[] = {/*syscall*/ 0x0f, 0x05, /*nop*/ 0x90};
-  static constexpr Insn kVmcallInsn[] = {0x0f, 0x01, 0xc1};
 #elif defined(__aarch64__)
   // Fixed-size instructions.  Use 'brk #1' (what __builtin_trap() emits).
   using Insn = uint32_t;
@@ -187,12 +167,6 @@ class VDsoMutator {
 #ifndef HAVE_SYSCALL_CATEGORY_test_category2
 [[maybe_unused]] void block_test_category2_syscalls(VDsoMutator& mutator) {}
 #endif
-
-void PatchVmcall(VDsoMutator& mutator) {
-  for (auto offset : kSysretOffsets) {
-    mutator.PatchVmcall(offset);
-  }
-}
 
 // This is extracted from the vDSO image at build time.
 using VdsoBuildIdNote = ktl::array<uint8_t, VDSO_BUILD_ID_NOTE_SIZE>;
@@ -383,12 +357,6 @@ void VDso::CreateVariant(Variant variant, KernelHandle<VmObjectDispatcher>* vmo_
   switch (variant) {
     case Variant::STABLE:
       name = "vdso/stable";
-      block_next_syscalls(mutator);
-      break;
-
-    case Variant::DIRECT:
-      name = "vdso/direct";
-      PatchVmcall(mutator);
       block_next_syscalls(mutator);
       break;
 

@@ -20,10 +20,6 @@ lazy_static! {
         runtime::take_startup_handle(runtime::HandleInfo::new(runtime::HandleType::VdsoVmo, 0))
             .expect("failed to take next vDSO handle")
     };
-    static ref DIRECT_VDSO: zx::Handle = {
-        runtime::take_startup_handle(runtime::HandleInfo::new(runtime::HandleType::VdsoVmo, 1))
-            .expect("failed to take direct vDSO handle")
-    };
 }
 
 #[async_trait]
@@ -50,20 +46,12 @@ impl ComponentLauncher for ElfComponentLauncher {
         let (client_end, loader) = fidl::endpoints::create_endpoints();
         component.loader_service(loader);
         let executable_vmo = Some(component.executable_vmo()?);
-        let mut handle_infos = vec![fproc::HandleInfo {
+        let handle_infos = vec![fproc::HandleInfo {
             handle: (*NEXT_VDSO)
                 .duplicate_handle(zx::Rights::SAME_RIGHTS)
                 .map_err(launch::LaunchError::DuplicateVdso)?,
             id: runtime::HandleInfo::new(runtime::HandleType::VdsoVmo, 0).as_raw(),
         }];
-        if component.use_direct_vdso {
-            handle_infos.push(fproc::HandleInfo {
-                handle: (*DIRECT_VDSO)
-                    .duplicate_handle(zx::Rights::SAME_RIGHTS)
-                    .map_err(launch::LaunchError::DuplicateVdso)?,
-                id: runtime::HandleInfo::new(runtime::HandleType::VdsoVmo, 1).as_raw(),
-            });
-        }
 
         Ok(launch::launch_process_with_separate_std_handles(launch::LaunchProcessArgs {
             bin_path: &component.binary,

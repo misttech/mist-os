@@ -20,10 +20,7 @@ use {
         runtime_dir::RuntimeDirBuilder,
         stdout::bind_streams_to_syslog,
     },
-    crate::{
-        crash_info::CrashRecords,
-        vdso_vmo::{get_direct_vdso_vmo, get_next_vdso_vmo},
-    },
+    crate::{crash_info::CrashRecords, vdso_vmo::get_next_vdso_vmo},
     ::routing::policy::ScopedPolicyChecker,
     async_trait::async_trait,
     chrono::{DateTime, NaiveDateTime, Utc},
@@ -166,7 +163,6 @@ impl ElfRunner {
         lifecycle_server: Option<zx::Channel>,
         utc_clock: zx::Clock,
         next_vdso: Option<zx::Vmo>,
-        direct_vdso: Option<zx::Vmo>,
         config_vmo: Option<zx::Vmo>,
     ) -> Vec<fproc::HandleInfo> {
         let mut handle_infos = vec![];
@@ -194,13 +190,6 @@ impl ElfRunner {
             handle_infos.push(fproc::HandleInfo {
                 handle: next_vdso.into_handle(),
                 id: HandleInfo::new(HandleType::VdsoVmo, 0).as_raw(),
-            });
-        }
-
-        if let Some(direct_vdso) = direct_vdso {
-            handle_infos.push(fproc::HandleInfo {
-                handle: direct_vdso.into_handle(),
-                id: HandleInfo::new(HandleType::VdsoVmo, 1).as_raw(),
             });
         }
 
@@ -291,12 +280,6 @@ impl ElfRunner {
             .transpose()
             .map_err(StartComponentError::VdsoError)?;
 
-        let direct_vdso = program_config
-            .use_direct_vdso
-            .then(get_direct_vdso_vmo)
-            .transpose()
-            .map_err(StartComponentError::VdsoError)?;
-
         let (lifecycle_client, lifecycle_server) = if program_config.notify_lifecycle_stop {
             // Creating a channel is not expected to fail.
             let (client, server) = fidl::endpoints::create_proxy::<LifecycleMarker>().unwrap();
@@ -350,7 +333,6 @@ impl ElfRunner {
             lifecycle_server,
             utc_clock,
             next_vdso,
-            direct_vdso,
             config_vmo,
         );
 

@@ -10,7 +10,6 @@
         runner: "elf",
         binary: "bin/elf_test_runner",
         use_next_vdso: "true",
-        use_direct_vdso: "true",
         job_policy_create_raw_processes: "true",
         job_policy_ambient_mark_vmo_exec: "true",
     },

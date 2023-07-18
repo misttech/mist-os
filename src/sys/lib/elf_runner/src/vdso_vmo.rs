@@ -48,9 +48,3 @@ pub fn get_stable_vdso_vmo() -> Result<zx::Vmo, VdsoError> {
 pub fn get_next_vdso_vmo() -> Result<zx::Vmo, VdsoError> {
     get_vdso_vmo(cstr!("vdso/next"))
 }
-
-/// Returns an owned VMO handle to the direct vDSO, duplicated from the handle
-/// provided to this process through its processargs bootstrap message.
-pub fn get_direct_vdso_vmo() -> Result<zx::Vmo, VdsoError> {
-    get_vdso_vmo(cstr!("vdso/direct"))
-}

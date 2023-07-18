@@ -16,7 +16,6 @@ const VMEX_KEY: &str = "job_policy_ambient_mark_vmo_exec";
 const STOP_EVENT_KEY: &str = "lifecycle.stop_event";
 const STOP_EVENT_VARIANTS: [&'static str; 2] = ["notify", "ignore"];
 const USE_NEXT_VDSO_KEY: &str = "use_next_vdso";
-const USE_DIRECT_VDSO_KEY: &str = "use_direct_vdso";
 
 /// Target sink for stdout and stderr output streams.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -44,7 +43,6 @@ pub struct ElfProgramConfig {
     pub create_raw_processes: bool,
     pub is_shared_process: bool,
     pub use_next_vdso: bool,
-    pub use_direct_vdso: bool,
     pub stdout_sink: StreamSink,
     pub stderr_sink: StreamSink,
     pub environ: Option<Vec<String>>,
@@ -98,7 +96,6 @@ impl ElfProgramConfig {
             create_raw_processes: runner::get_bool(program, CREATE_RAW_PROCESSES_KEY)?,
             is_shared_process: runner::get_bool(program, SHARED_PROCESS_KEY)?,
             use_next_vdso: runner::get_bool(program, USE_NEXT_VDSO_KEY)?,
-            use_direct_vdso: runner::get_bool(program, USE_DIRECT_VDSO_KEY)?,
             stdout_sink: get_stream_sink(&program, FORWARD_STDOUT_KEY)?,
             stderr_sink: get_stream_sink(&program, FORWARD_STDERR_KEY)?,
             environ: runner::get_environ(&program)?,
@@ -218,8 +215,6 @@ mod tests {
     #[test_case("job_policy_create_raw_processes", new_string("false"), ElfProgramConfig { create_raw_processes: false, ..default_valid_config()} ; "when_create_raw_processes_false")]
     #[test_case("use_next_vdso", new_string("true"), ElfProgramConfig { use_next_vdso: true, ..default_valid_config()} ; "use_next_vdso_true")]
     #[test_case("use_next_vdso", new_string("false"), ElfProgramConfig { use_next_vdso: false, ..default_valid_config()} ; "use_next_vdso_false")]
-    #[test_case("use_direct_vdso", new_string("true"), ElfProgramConfig { use_direct_vdso: true, ..default_valid_config()} ; "use_direct_vdso_true")]
-    #[test_case("use_direct_vdso", new_string("false"), ElfProgramConfig { use_direct_vdso: false, ..default_valid_config()} ; "use_direct_vdso_false")]
     fn test_parse_and_check_with_permissive_policy(
         key: &str,
         value: fdata::DictionaryValue,
@@ -272,7 +267,6 @@ mod tests {
     #[test_case("forward_stdout_to", new_empty_vec() ; "for_stdout")]
     #[test_case("forward_stderr_to", new_empty_vec() ; "for_stderr")]
     #[test_case("use_next_vdso", new_empty_vec() ; "for_use_next_vdso")]
-    #[test_case("use_direct_vdso", new_empty_vec() ; "for_use_direct_vdso")]
     fn test_parse_and_check_with_invalid_type(key: &str, value: fdata::DictionaryValue) {
         // Use a permissive policy because we want to fail *iff* value set for
         // key is invalid.
