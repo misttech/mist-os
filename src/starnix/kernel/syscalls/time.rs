@@ -342,14 +342,15 @@ pub fn sys_timer_getoverrun(
 }
 
 pub fn sys_timer_settime(
-    _current_task: &CurrentTask,
-    _id: uapi::__kernel_timer_t,
-    _flags: i32,
-    _new_value: UserRef<itimerspec>,
-    _old_value: UserRef<itimerspec>,
+    current_task: &CurrentTask,
+    id: uapi::__kernel_timer_t,
+    flags: i32,
+    new_value: UserRef<itimerspec>,
+    old_value: UserRef<itimerspec>,
 ) -> Result<(), Errno> {
     not_implemented!("timer_settime");
-    Ok(())
+    let timers = &current_task.thread_group.read().timers;
+    timers.set_time(id as usize, flags, new_value, old_value)
 }
 
 pub fn sys_getitimer(
