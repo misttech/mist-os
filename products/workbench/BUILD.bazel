@@ -8,6 +8,7 @@ load(
     "PARTITION_TYPE",
     "SLOT",
     "fuchsia_bootloader_partition",
+    "fuchsia_elf_sizes",
     "fuchsia_filesystem_blobfs",
     "fuchsia_filesystem_empty_data",
     "fuchsia_fvm_sparse",
@@ -147,6 +148,16 @@ fuchsia_product_image(
     legacy_aib = "//build/bazel/assembly/assembly_input_bundles:legacy_fuchsia",
     platform_aibs = "//build/bazel/assembly/assembly_input_bundles:platform_eng",
     product_config = ":assembly_config_eng",
+)
+
+fuchsia_elf_sizes(
+    name = "elf_sizes.x64",
+    product_image = ":assembly_eng.x64",
+)
+
+fuchsia_elf_sizes(
+    name = "elf_sizes.vim3",
+    product_image = ":assembly_eng.vim3",
 )
 
 fuchsia_virtual_device(
