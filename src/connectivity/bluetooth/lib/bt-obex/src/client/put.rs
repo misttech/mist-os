@@ -28,6 +28,10 @@ use crate::transport::ObexTransport;
 #[must_use]
 #[derive(Debug)]
 pub struct PutOperation<'a> {
+    /// The initial set of headers used in the PUT operation. This is Some<T> when the operation is
+    /// first initialized, and None after the first `PutOperation::write` call. The operation is
+    /// considered "in progress" when this is None.
+    headers: Option<HeaderSet>,
     /// The L2CAP or RFCOMM connection to the remote peer.
     transport: ObexTransport<'a>,
     /// Whether the operation is in-progress or not - one or more PUT requests have been made.
@@ -38,16 +42,19 @@ pub struct PutOperation<'a> {
 }
 
 impl<'a> PutOperation<'a> {
-    pub fn new(transport: ObexTransport<'a>) -> Self {
+    pub fn new(headers: HeaderSet, transport: ObexTransport<'a>) -> Self {
         let srm = transport.srm_supported().into();
-        Self { transport, is_started: false, srm }
+        Self { headers: Some(headers), transport, is_started: false, srm }
     }
 
     #[cfg(test)]
-    fn new_started(transport: ObexTransport<'a>) -> Self {
-        let mut this = Self::new(transport);
-        this.is_started = true;
-        this
+    fn set_headers(&mut self, headers: HeaderSet) {
+        self.headers = Some(headers);
+    }
+
+    fn set_started(&mut self) {
+        let _ = self.headers.take().unwrap();
+        self.is_started = true;
     }
 
     /// Returns Error if the `headers` contain non-informational OBEX Headers.
@@ -101,16 +108,20 @@ impl<'a> PutOperation<'a> {
     /// non-empty set of headers.
     pub async fn write(&mut self, data: &[u8], mut headers: HeaderSet) -> Result<HeaderSet, Error> {
         Self::validate_headers(&headers)?;
-        // Try to enable SRM if this is the first packet of the operation.
         if !self.is_started {
+            // Grab the initial set of headers to be sent to the peer and combine with any
+            // additional application-specified headers.
+            let initial = self.headers.replace(HeaderSet::new()).unwrap();
+            headers.try_append(initial)?;
+            // Try to enable SRM if this is the first packet of the operation.
             self.try_enable_srm(&mut headers)?;
         }
         headers.add(Header::Body(data.to_vec()))?;
         let response_headers = self.do_put(false, headers).await?;
         if !self.is_started {
             self.check_response_for_srm(&response_headers);
+            self.set_started();
         }
-        self.is_started = true;
         Ok(response_headers)
     }
 
@@ -168,7 +179,7 @@ mod tests {
     use fuchsia_async as fasync;
     use futures::pin_mut;
 
-    use crate::header::{Header, HeaderIdentifier};
+    use crate::header::{ConnectionIdentifier, Header, HeaderIdentifier};
     use crate::operation::ResponsePacket;
     use crate::transport::test_utils::{
         expect_code, expect_request, expect_request_and_reply, new_manager,
@@ -177,7 +188,7 @@ mod tests {
 
     fn setup_put_operation(mgr: &ObexTransportManager) -> PutOperation<'_> {
         let transport = mgr.try_new_operation().expect("can start operation");
-        PutOperation::new(transport)
+        PutOperation::new(HeaderSet::new(), transport)
     }
 
     #[fuchsia::test]
@@ -446,9 +457,8 @@ mod tests {
     fn client_disable_srm_mid_operation_is_ignored() {
         let mut exec = fasync::TestExecutor::new();
         let (manager, mut remote) = new_manager(/* srm_supported */ true);
-        let transport = manager.try_new_operation().expect("can start operation");
-        let mut operation = PutOperation::new_started(transport);
-
+        let mut operation = setup_put_operation(&manager);
+        operation.set_started();
         // SRM is enabled for the duration of the operation.
         assert_eq!(operation.srm, SingleResponseMode::Enable);
 
@@ -539,5 +549,23 @@ mod tests {
         // A response with no SRM header should be treated like a disable request.
         operation.check_response_for_srm(&HeaderSet::new());
         assert_eq!(operation.srm, SingleResponseMode::Disable);
+    }
+
+    #[fuchsia::test]
+    fn put_with_connection_id_already_set_is_error() {
+        let mut exec = fasync::TestExecutor::new();
+        let (manager, _remote) = new_manager(/* srm_supported */ false);
+        // The initial operation contains a ConnectionId header which was negotiated during CONNECT.
+        let mut operation = setup_put_operation(&manager);
+        operation.set_headers(
+            HeaderSet::from_header(Header::ConnectionId(ConnectionIdentifier(5))).unwrap(),
+        );
+
+        let write_headers =
+            HeaderSet::from_header(Header::ConnectionId(ConnectionIdentifier(10))).unwrap();
+        let write_fut = operation.write(&[1, 2, 3], write_headers);
+        pin_mut!(write_fut);
+        let result = exec.run_until_stalled(&mut write_fut).expect("finished with error");
+        assert_matches!(result, Err(Error::Duplicate(_)));
     }
 }

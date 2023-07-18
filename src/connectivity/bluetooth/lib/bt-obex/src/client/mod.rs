@@ -8,7 +8,9 @@ use tracing::{trace, warn};
 pub use crate::client::get::GetOperation;
 pub use crate::client::put::PutOperation;
 use crate::error::Error;
-use crate::header::{Header, HeaderIdentifier, HeaderSet, SingleResponseMode};
+use crate::header::{
+    ConnectionIdentifier, Header, HeaderIdentifier, HeaderSet, SingleResponseMode,
+};
 use crate::operation::{
     OpCode, RequestPacket, ResponseCode, ResponsePacket, SetPathFlags, MAX_PACKET_SIZE,
     MIN_MAX_PACKET_SIZE,
@@ -82,10 +84,13 @@ fn max_packet_size_from_transport(transport_max: usize) -> u16 {
 /// specified in OBEX 1.5.
 #[derive(Debug)]
 pub struct ObexClient {
-    /// Whether the CONNECTED Operation has completed.
+    /// Whether the CONNECT operation has completed.
     connected: bool,
     /// The maximum OBEX packet length for this OBEX session.
     max_packet_size: u16,
+    /// The identifier assigned to this OBEX session, if configured. This is configured during the
+    /// CONNECT operation and is a unique value assigned by the remote OBEX server.
+    connection_id: Option<ConnectionIdentifier>,
     /// Manages the RFCOMM or L2CAP transport and provides a reservation system for starting
     /// new operations.
     transport: ObexTransportManager,
@@ -95,7 +100,7 @@ impl ObexClient {
     pub fn new(channel: Channel, type_: TransportType) -> Self {
         let max_packet_size = max_packet_size_from_transport(channel.max_tx_size());
         let transport = ObexTransportManager::new(channel, type_);
-        Self { connected: false, max_packet_size, transport }
+        Self { connected: false, max_packet_size, connection_id: None, transport }
     }
 
     fn set_connected(&mut self, connected: bool) {
@@ -120,7 +125,15 @@ impl ObexClient {
         let peer_max_packet_size = u16::from_be_bytes(response.data()[2..4].try_into().unwrap());
         self.set_max_packet_size(peer_max_packet_size);
         self.set_connected(true);
-        Ok(response.into())
+
+        // Check to see if the response headers contains a Connection Identifier. If so, this should
+        // be included in all subsequent operations.
+        let headers: HeaderSet = response.into();
+        if let Some(Header::ConnectionId(id)) = headers.get(&HeaderIdentifier::ConnectionId) {
+            trace!(id = ?id, "Found Connection Identifier in CONNECT response");
+            self.connection_id = Some(*id);
+        }
+        Ok(headers)
     }
 
     /// Initiates a CONNECT request to the remote peer.
@@ -148,12 +161,12 @@ impl ObexClient {
     /// Returns the Headers associated with the response on success.
     /// Returns Error if the DISCONNECT operation couldn't be completed or was rejected by the peer.
     /// The OBEX Session with the peer is considered terminated, regardless.
-    pub async fn disconnect(self, headers: HeaderSet) -> Result<HeaderSet, Error> {
+    pub async fn disconnect(self, mut headers: HeaderSet) -> Result<HeaderSet, Error> {
         let opcode = OpCode::Disconnect;
         if !self.connected {
             return Err(Error::operation(opcode, "session not connected"));
         }
-
+        headers.try_add_connection_id(&self.connection_id)?;
         let response = {
             let request = RequestPacket::new_disconnect(headers);
             let mut transport = self.transport.try_new_operation()?;
@@ -174,8 +187,10 @@ impl ObexClient {
             return Err(Error::operation(OpCode::Get, "session not connected"));
         }
 
-        let headers = HeaderSet::new();
-        // TODO(fxbug.dev/128855): Add ConnectionId, if set.
+        let mut headers = HeaderSet::new();
+        headers.try_add_connection_id(&self.connection_id)?;
+
+        // Only one operation can be active at a time.
         let transport = self.transport.try_new_operation()?;
         Ok(GetOperation::new(headers, transport))
     }
@@ -188,9 +203,12 @@ impl ObexClient {
             return Err(Error::operation(OpCode::Put, "session not connected"));
         }
 
+        let mut headers = HeaderSet::new();
+        headers.try_add_connection_id(&self.connection_id)?;
+
         // Only one operation can be active at a time.
         let transport = self.transport.try_new_operation()?;
-        Ok(PutOperation::new(transport))
+        Ok(PutOperation::new(headers, transport))
     }
 
     /// Initializes a SETPATH Operation to set the current folder on the remote OBEX Server.
@@ -200,13 +218,14 @@ impl ObexClient {
     pub async fn set_path(
         &mut self,
         flags: SetPathFlags,
-        headers: HeaderSet,
+        mut headers: HeaderSet,
     ) -> Result<HeaderSet, Error> {
         let opcode = OpCode::SetPath;
         // A SETPATH can only be initiated after the OBEX session is connected.
         if !self.connected {
             return Err(Error::operation(opcode, "session not connected"));
         }
+        headers.try_add_connection_id(&self.connection_id)?;
         let request = RequestPacket::new_set_path(flags, headers)?;
         let response = {
             let mut transport = self.transport.try_new_operation()?;
@@ -236,7 +255,6 @@ mod tests {
     use fuchsia_async as fasync;
     use futures::pin_mut;
 
-    use crate::header::Header;
     use crate::transport::test_utils::{expect_code, expect_request_and_reply};
 
     #[fuchsia::test]
@@ -271,15 +289,17 @@ mod tests {
 
         assert!(!client.connected);
         assert_eq!(client.max_packet_size, Channel::DEFAULT_MAX_TX as u16);
+        assert_eq!(client.connection_id, None);
 
         {
-            let headers = HeaderSet::from_headers(vec![]).unwrap();
-            let connect_fut = client.connect(headers);
+            let connect_fut = client.connect(HeaderSet::new());
             pin_mut!(connect_fut);
             exec.run_until_stalled(&mut connect_fut).expect_pending("waiting for response");
 
             // Expect the Connect request on the remote and reply positively.
-            let response_headers = HeaderSet::from_headers(vec![Header::ConnectionId(1)]).unwrap();
+            let response_headers =
+                HeaderSet::from_headers(vec![Header::ConnectionId(ConnectionIdentifier(1))])
+                    .unwrap();
             let response = ResponsePacket::new(
                 ResponseCode::Ok,
                 vec![0x10, 0x00, 0xff, 0xff], // Version = 1.0, Flags = 0, Max packet = 0xffff
@@ -302,6 +322,7 @@ mod tests {
         // Should be connected with the max packet size specified by the peer.
         assert!(client.connected);
         assert_eq!(client.max_packet_size, 0xffff);
+        assert_eq!(client.connection_id, Some(ConnectionIdentifier(1)));
     }
 
     #[fuchsia::test]

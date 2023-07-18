@@ -16,6 +16,23 @@ mod header_set;
 /// Definition of an OBEX-specific String type used in Headers.
 mod obex_string;
 
+/// Uniquely identifies an OBEX connection between a Client and Server.
+/// Defined in OBEX 1.5 Section 2.2.11.
+#[derive(Copy, Clone, Debug, PartialEq)]
+pub struct ConnectionIdentifier(pub(crate) u32);
+
+impl TryFrom<u32> for ConnectionIdentifier {
+    type Error = PacketError;
+
+    fn try_from(src: u32) -> Result<Self, Self::Error> {
+        // Per OBEX 1.5 Section 2.2.11, 0xffffffff is a reserved ID and considered invalid.
+        if src == u32::MAX {
+            return Err(PacketError::Reserved);
+        }
+        Ok(Self(src))
+    }
+}
+
 /// Specifies the type of action of the Action Operation.
 /// Defined in OBEX 1.5 Section 2.2.20.
 #[derive(Copy, Clone, Debug, PartialEq)]
@@ -355,7 +372,7 @@ pub enum Header {
     Body(Vec<u8>),
     EndOfBody(Vec<u8>),
     Who(Vec<u8>),
-    ConnectionId(u32),
+    ConnectionId(ConnectionIdentifier),
     ApplicationParameters(Vec<u8>),
     AuthenticationChallenge(Vec<u8>),
     AuthenticationResponse(Vec<u8>),
@@ -500,7 +517,11 @@ impl Encodable for Header {
         // Encode the payload.
         use Header::*;
         match &self {
-            Count(v) | Length(v) | ConnectionId(v) | CreatorId(v) | Permissions(v) => {
+            Count(v)
+            | Length(v)
+            | ConnectionId(ConnectionIdentifier(v))
+            | CreatorId(v)
+            | Permissions(v) => {
                 // Encode all 4-byte value headers.
                 buf[start_index..start_index + 4].copy_from_slice(&v.to_be_bytes());
             }
@@ -655,9 +676,9 @@ impl Decodable for Header {
                 out_buf.copy_from_slice(&data[..]);
                 Ok(Header::Who(out_buf))
             }
-            HeaderIdentifier::ConnectionId => {
-                Ok(Header::ConnectionId(u32::from_be_bytes(data[..].try_into().unwrap())))
-            }
+            HeaderIdentifier::ConnectionId => Ok(Header::ConnectionId(
+                ConnectionIdentifier::try_from(u32::from_be_bytes(data[..].try_into().unwrap()))?,
+            )),
             HeaderIdentifier::ApplicationParameters => {
                 out_buf.copy_from_slice(&data[..]);
                 Ok(Header::ApplicationParameters(out_buf))
@@ -900,7 +921,7 @@ mod tests {
             0x00, 0x00, 0x12, 0x34, // 4 byte payload
         ];
         let result = Header::decode(&connection_id_buf).expect("can decode connection id header");
-        assert_eq!(result, Header::ConnectionId(0x1234));
+        assert_eq!(result, Header::ConnectionId(ConnectionIdentifier(0x1234)));
     }
 
     #[fuchsia::test]

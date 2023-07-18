@@ -429,7 +429,7 @@ mod tests {
 
     use assert_matches::assert_matches;
 
-    use crate::header::Header;
+    use crate::header::{ConnectionIdentifier, Header};
 
     #[fuchsia::test]
     fn convert_opcode_success() {
@@ -819,7 +819,8 @@ mod tests {
         ];
         let decoded = ResponsePacket::decode(&connect_response[..], OpCode::Connect)
             .expect("can decode valid response");
-        let expected_headers = HeaderSet::from_headers(vec![Header::ConnectionId(1)]).unwrap();
+        let expected_headers =
+            HeaderSet::from_headers(vec![Header::ConnectionId(ConnectionIdentifier(1))]).unwrap();
         let expected =
             ResponsePacket::new(ResponseCode::Ok, vec![0x10, 0x00, 0x12, 0x34], expected_headers);
         assert_eq!(decoded, expected);

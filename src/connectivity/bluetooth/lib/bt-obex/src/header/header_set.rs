@@ -5,7 +5,7 @@
 use packet_encoding::{Decodable, Encodable};
 
 use crate::error::{Error, PacketError};
-use crate::header::{Header, HeaderIdentifier, SingleResponseMode};
+use crate::header::{ConnectionIdentifier, Header, HeaderIdentifier, SingleResponseMode};
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct HeaderSet {
@@ -128,6 +128,16 @@ impl HeaderSet {
         }
         Ok(local)
     }
+
+    pub fn try_add_connection_id(
+        &mut self,
+        id: &Option<ConnectionIdentifier>,
+    ) -> Result<(), Error> {
+        if let Some(id) = id {
+            self.add(Header::ConnectionId(*id))?;
+        }
+        Ok(())
+    }
 }
 
 impl Encodable for HeaderSet {
@@ -170,7 +180,7 @@ impl Decodable for HeaderSet {
 mod tests {
     use super::*;
 
-    use crate::header::SingleResponseMode;
+    use crate::header::{ConnectionIdentifier, SingleResponseMode};
     use assert_matches::assert_matches;
 
     #[fuchsia::test]
@@ -297,9 +307,32 @@ mod tests {
     }
 
     #[fuchsia::test]
+    fn try_add_connection_id_success() {
+        let mut headers = HeaderSet::new();
+
+        // No ID is a no-op.
+        let () = headers.try_add_connection_id(&None).expect("success");
+        assert!(!headers.contains_header(&HeaderIdentifier::ConnectionId));
+
+        let () = headers.try_add_connection_id(&Some(ConnectionIdentifier(11))).expect("success");
+        assert!(headers.contains_header(&HeaderIdentifier::ConnectionId));
+    }
+
+    #[fuchsia::test]
+    fn try_add_connection_id_error() {
+        // Trying to add the ID to a set that already contains one is an error.
+        let mut headers =
+            HeaderSet::from_header(Header::ConnectionId(ConnectionIdentifier(10))).unwrap();
+        assert_matches!(
+            headers.try_add_connection_id(&Some(ConnectionIdentifier(11))),
+            Err(Error::Duplicate(_))
+        );
+    }
+
+    #[fuchsia::test]
     fn encode_header_set() {
         let headers = HeaderSet::from_headers(vec![
-            Header::ConnectionId(1),
+            Header::ConnectionId(ConnectionIdentifier(1)),
             Header::EndOfBody(vec![1, 2, 3]),
         ])
         .expect("can build header set");
