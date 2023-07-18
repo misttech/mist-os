@@ -822,6 +822,7 @@ foreach(_target_type,
     # it will fail verification against the trace.
     # Actions that are known non-hermetic should set `hermetic_deps = false`.
     hermetic_deps = true
+    hermetic_toolchain = true
     if (defined(invoker.hermetic_deps)) {
       hermetic_deps = invoker.hermetic_deps
       if (!hermetic_deps) {
@@ -829,6 +830,13 @@ foreach(_target_type,
             !defined(invoker.hermetic_inputs_file),
             "hermetic_inputs_file cannot be defined with `hermetic_deps = false'")
       }
+    } else if (string_replace("##${current_toolchain}",
+                              "##//third_party/",
+                              "") != "##${current_toolchain}") {
+      # Disable build-time hermetic checks when running actions that belong to
+      # toolchain() instances defined by //third_party/ build files.
+      hermetic_deps = false
+      hermetic_toolchain = false
     }
 
     should_trace = build_should_trace_actions && hermetic_deps
@@ -1074,13 +1082,15 @@ foreach(_target_type,
           get_path_info(_ignored_prefixes_imports.gcc_tool_dir, "dir"),
         ]
       }
-      if (!hermetic_deps ||
-          (defined(hermetic_action_ignored_prefixes) &&
-           filter_exclude(hermetic_action_ignored_prefixes,
-                          _ignored_prefixes_allowlist) != [])) {
-        deps += [ "//build:non_hermetic_deps" ]
+      if (hermetic_toolchain) {
+        if (!hermetic_deps ||
+            (defined(hermetic_action_ignored_prefixes) &&
+             filter_exclude(hermetic_action_ignored_prefixes,
+                            _ignored_prefixes_allowlist) != [])) {
+          deps += [ "//build:non_hermetic_deps" ]
+        }
       }
-      if (!hermetic_deps) {
+      if (!hermetic_toolchain || !hermetic_deps) {
         # Touching this file will force all non-hermetic actions to rerun.
         # This is useful for ensuring incremental build correctness, even in
         # the presence of non-hermetic actions.
