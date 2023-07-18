@@ -80,7 +80,7 @@ pub const OT_LOG_LEVEL_WARN: u32 = 2;
 pub const OT_LOG_LEVEL_NOTE: u32 = 3;
 pub const OT_LOG_LEVEL_INFO: u32 = 4;
 pub const OT_LOG_LEVEL_DEBG: u32 = 5;
-pub const OPENTHREAD_API_VERSION: u32 = 327;
+pub const OPENTHREAD_API_VERSION: u32 = 335;
 pub const OT_UPTIME_STRING_SIZE: u32 = 24;
 pub const OT_CRYPTO_SHA256_HASH_SIZE: u32 = 32;
 pub const OT_CRYPTO_ECDSA_MAX_DER_SIZE: u32 = 125;
@@ -94,6 +94,8 @@ pub const OT_IP6_PREFIX_SIZE: u32 = 8;
 pub const OT_IP6_PREFIX_BITSIZE: u32 = 64;
 pub const OT_IP6_IID_SIZE: u32 = 8;
 pub const OT_IP6_ADDRESS_SIZE: u32 = 16;
+pub const OT_IP6_HEADER_SIZE: u32 = 40;
+pub const OT_IP6_HEADER_PROTO_OFFSET: u32 = 6;
 pub const OT_IP6_ADDRESS_STRING_SIZE: u32 = 40;
 pub const OT_IP6_SOCK_ADDR_STRING_SIZE: u32 = 48;
 pub const OT_IP6_PREFIX_STRING_SIZE: u32 = 45;
@@ -154,6 +156,7 @@ pub const OT_DNS_MAX_LABEL_SIZE: u32 = 64;
 pub const OT_DNS_TXT_KEY_MIN_LENGTH: u32 = 1;
 pub const OT_DNS_TXT_KEY_MAX_LENGTH: u32 = 9;
 pub const OT_ICMP6_HEADER_DATA_SIZE: u32 = 4;
+pub const OT_ICMP6_ROUTER_ADVERT_MIN_SIZE: u32 = 16;
 pub const OT_MAC_FILTER_FIXED_RSS_DISABLED: u32 = 127;
 pub const OT_MAC_FILTER_ITERATOR_INIT: u32 = 0;
 pub const OT_IP4_ADDRESS_SIZE: u32 = 4;
@@ -257,14 +260,14 @@ pub const OT_ERROR_REJECTED: otError = 37;
 pub const OT_NUM_ERRORS: otError = 38;
 #[doc = " Generic error (should not use)."]
 pub const OT_ERROR_GENERIC: otError = 255;
-#[doc = " This enumeration represents error codes used throughout OpenThread.\n"]
+#[doc = " Represents error codes used throughout OpenThread.\n"]
 pub type otError = ::std::os::raw::c_uint;
 extern "C" {
-    #[doc = " This function converts an otError enum into a string.\n\n @param[in]  aError     An otError enum.\n\n @returns  A string representation of an otError.\n"]
+    #[doc = " Converts an otError enum into a string.\n\n @param[in]  aError     An otError enum.\n\n @returns  A string representation of an otError.\n"]
     pub fn otThreadErrorToString(aError: otError) -> *const ::std::os::raw::c_char;
 }
 pub type va_list = __builtin_va_list;
-#[doc = " This type represents the log level.\n"]
+#[doc = " Represents the log level.\n"]
 pub type otLogLevel = ::std::os::raw::c_int;
 #[doc = "< OpenThread API"]
 pub const OT_LOG_REGION_API: otLogRegion = 1;
@@ -312,23 +315,15 @@ pub const OT_LOG_REGION_BR: otLogRegion = 21;
 pub const OT_LOG_REGION_SRP: otLogRegion = 22;
 #[doc = "< DNS"]
 pub const OT_LOG_REGION_DNS: otLogRegion = 23;
-#[doc = " This enumeration represents log regions.\n\n The support for log region is removed and instead each core module can define its own name to appended to the logs.\n However, the `otLogRegion` enumeration is still defined as before to help with platforms which we may be using it\n in their `otPlatLog()` implementation. The OT core will always emit all logs with `OT_LOG_REGION_CORE`.\n"]
+#[doc = " Represents log regions.\n\n The support for log region is removed and instead each core module can define its own name to appended to the logs.\n However, the `otLogRegion` enumeration is still defined as before to help with platforms which we may be using it\n in their `otPlatLog()` implementation. The OT core will always emit all logs with `OT_LOG_REGION_CORE`.\n"]
 pub type otLogRegion = ::std::os::raw::c_uint;
 extern "C" {
-    #[doc = " This function outputs logs.\n\n Note that the support for log region is removed. The OT core will always emit all logs with `OT_LOG_REGION_CORE`\n as @p aLogRegion.\n\n @param[in]  aLogLevel   The log level.\n @param[in]  aLogRegion  The log region.\n @param[in]  aFormat     A pointer to the format string.\n @param[in]  ...         Arguments for the format specification.\n"]
+    #[doc = " Outputs logs.\n\n Note that the support for log region is removed. The OT core will always emit all logs with `OT_LOG_REGION_CORE`\n as @p aLogRegion.\n\n @param[in]  aLogLevel   The log level.\n @param[in]  aLogRegion  The log region.\n @param[in]  aFormat     A pointer to the format string.\n @param[in]  ...         Arguments for the format specification.\n"]
     pub fn otPlatLog(
         aLogLevel: otLogLevel,
         aLogRegion: otLogRegion,
         aFormat: *const ::std::os::raw::c_char,
         ...
-    );
-}
-extern "C" {
-    #[doc = " This (optional) platform function outputs a prepared log line.\n\n Note that this function is optional and if not provided by platform layer, a default (weak) implementation is\n provided and used by OpenThread core as `otPlatLog(aLogLevel, aLogResion, \"%s\", aLogLine)`.\n\n @param[in]  aLogLevel   The log level.\n @param[in]  aLogRegion  The log region.\n @param[in]  aLogLine    A pointer to a log line string.\n"]
-    pub fn otPlatLogLine(
-        aLogLevel: otLogLevel,
-        aLogRegion: otLogRegion,
-        aLogLine: *const ::std::os::raw::c_char,
     );
 }
 extern "C" {
@@ -341,14 +336,14 @@ pub struct otInstance {
     _unused: [u8; 0],
 }
 extern "C" {
-    #[doc = " This function initializes the OpenThread library.\n\n This function initializes OpenThread and prepares it for subsequent OpenThread API calls. This function must be\n called before any other calls to OpenThread.\n\n This function is available and can only be used when support for multiple OpenThread instances is enabled.\n\n @param[in]     aInstanceBuffer      The buffer for OpenThread to use for allocating the otInstance structure.\n @param[in,out] aInstanceBufferSize  On input, the size of aInstanceBuffer. On output, if not enough space for\n                                     otInstance, the number of bytes required for otInstance.\n\n @returns  A pointer to the new OpenThread instance.\n\n @sa otInstanceFinalize\n"]
+    #[doc = " Initializes the OpenThread library.\n\n Initializes OpenThread and prepares it for subsequent OpenThread API calls. This function must be\n called before any other calls to OpenThread.\n\n Is available and can only be used when support for multiple OpenThread instances is enabled.\n\n @param[in]     aInstanceBuffer      The buffer for OpenThread to use for allocating the otInstance structure.\n @param[in,out] aInstanceBufferSize  On input, the size of aInstanceBuffer. On output, if not enough space for\n                                     otInstance, the number of bytes required for otInstance.\n\n @returns  A pointer to the new OpenThread instance.\n\n @sa otInstanceFinalize\n"]
     pub fn otInstanceInit(
         aInstanceBuffer: *mut ::std::os::raw::c_void,
         aInstanceBufferSize: *mut usize,
     ) -> *mut otInstance;
 }
 extern "C" {
-    #[doc = " This function initializes the static single instance of the OpenThread library.\n\n This function initializes OpenThread and prepares it for subsequent OpenThread API calls. This function must be\n called before any other calls to OpenThread.\n\n This function is available and can only be used when support for multiple OpenThread instances is disabled.\n\n @returns A pointer to the single OpenThread instance.\n"]
+    #[doc = " Initializes the static single instance of the OpenThread library.\n\n Initializes OpenThread and prepares it for subsequent OpenThread API calls. This function must be\n called before any other calls to OpenThread.\n\n Is available and can only be used when support for multiple OpenThread instances is disabled.\n\n @returns A pointer to the single OpenThread instance.\n"]
     pub fn otInstanceInitSingle() -> *mut otInstance;
 }
 extern "C" {
@@ -356,19 +351,19 @@ extern "C" {
     pub fn otInstanceGetId(aInstance: *mut otInstance) -> u32;
 }
 extern "C" {
-    #[doc = " This function indicates whether or not the instance is valid/initialized.\n\n The instance is considered valid if it is acquired and initialized using either `otInstanceInitSingle()` (in single\n instance case) or `otInstanceInit()` (in multi instance case). A subsequent call to `otInstanceFinalize()` causes\n the instance to be considered as uninitialized.\n\n @param[in] aInstance A pointer to an OpenThread instance.\n\n @returns TRUE if the given instance is valid/initialized, FALSE otherwise.\n"]
+    #[doc = " Indicates whether or not the instance is valid/initialized.\n\n The instance is considered valid if it is acquired and initialized using either `otInstanceInitSingle()` (in single\n instance case) or `otInstanceInit()` (in multi instance case). A subsequent call to `otInstanceFinalize()` causes\n the instance to be considered as uninitialized.\n\n @param[in] aInstance A pointer to an OpenThread instance.\n\n @returns TRUE if the given instance is valid/initialized, FALSE otherwise.\n"]
     pub fn otInstanceIsInitialized(aInstance: *mut otInstance) -> bool;
 }
 extern "C" {
-    #[doc = " This function disables the OpenThread library.\n\n Call this function when OpenThread is no longer in use.\n\n @param[in] aInstance A pointer to an OpenThread instance.\n"]
+    #[doc = " Disables the OpenThread library.\n\n Call this function when OpenThread is no longer in use.\n\n @param[in] aInstance A pointer to an OpenThread instance.\n"]
     pub fn otInstanceFinalize(aInstance: *mut otInstance);
 }
 extern "C" {
-    #[doc = " This function returns the current instance uptime (in msec).\n\n This function requires `OPENTHREAD_CONFIG_UPTIME_ENABLE` to be enabled.\n\n The uptime is given as number of milliseconds since OpenThread instance was initialized.\n\n @param[in] aInstance A pointer to an OpenThread instance.\n\n @returns The uptime (number of milliseconds).\n"]
+    #[doc = " Returns the current instance uptime (in msec).\n\n Requires `OPENTHREAD_CONFIG_UPTIME_ENABLE` to be enabled.\n\n The uptime is given as number of milliseconds since OpenThread instance was initialized.\n\n @param[in] aInstance A pointer to an OpenThread instance.\n\n @returns The uptime (number of milliseconds).\n"]
     pub fn otInstanceGetUptime(aInstance: *mut otInstance) -> u64;
 }
 extern "C" {
-    #[doc = " This function returns the current instance uptime as a human-readable string.\n\n This function requires `OPENTHREAD_CONFIG_UPTIME_ENABLE` to be enabled.\n\n The string follows the format \"<hh>:<mm>:<ss>.<mmmm>\" for hours, minutes, seconds and millisecond (if uptime is\n shorter than one day) or \"<dd>d.<hh>:<mm>:<ss>.<mmmm>\" (if longer than a day).\n\n If the resulting string does not fit in @p aBuffer (within its @p aSize characters), the string will be truncated\n but the outputted string is always null-terminated.\n\n @param[in]  aInstance A pointer to an OpenThread instance.\n @param[out] aBuffer   A pointer to a char array to output the string.\n @param[in]  aSize     The size of @p aBuffer (in bytes). Recommended to use `OT_UPTIME_STRING_SIZE`.\n"]
+    #[doc = " Returns the current instance uptime as a human-readable string.\n\n Requires `OPENTHREAD_CONFIG_UPTIME_ENABLE` to be enabled.\n\n The string follows the format \"<hh>:<mm>:<ss>.<mmmm>\" for hours, minutes, seconds and millisecond (if uptime is\n shorter than one day) or \"<dd>d.<hh>:<mm>:<ss>.<mmmm>\" (if longer than a day).\n\n If the resulting string does not fit in @p aBuffer (within its @p aSize characters), the string will be truncated\n but the outputted string is always null-terminated.\n\n @param[in]  aInstance A pointer to an OpenThread instance.\n @param[out] aBuffer   A pointer to a char array to output the string.\n @param[in]  aSize     The size of @p aBuffer (in bytes). Recommended to use `OT_UPTIME_STRING_SIZE`.\n"]
     pub fn otInstanceGetUptimeAsString(
         aInstance: *mut otInstance,
         aBuffer: *mut ::std::os::raw::c_char,
@@ -437,16 +432,16 @@ pub const OT_CHANGED_ACTIVE_DATASET: _bindgen_ty_1 = 268435456;
 pub const OT_CHANGED_PENDING_DATASET: _bindgen_ty_1 = 536870912;
 #[doc = "< The state of NAT64 translator changed"]
 pub const OT_CHANGED_NAT64_TRANSLATOR_STATE: _bindgen_ty_1 = 1073741824;
-#[doc = " This enumeration defines flags that are passed as part of `otStateChangedCallback`.\n"]
+#[doc = " Defines flags that are passed as part of `otStateChangedCallback`.\n"]
 pub type _bindgen_ty_1 = ::std::os::raw::c_uint;
-#[doc = " This type represents a bit-field indicating specific state/configuration that has changed. See `OT_CHANGED_*`\n definitions.\n"]
+#[doc = " Represents a bit-field indicating specific state/configuration that has changed. See `OT_CHANGED_*`\n definitions.\n"]
 pub type otChangedFlags = u32;
-#[doc = " This function pointer is called to notify certain configuration or state changes within OpenThread.\n\n @param[in]  aFlags    A bit-field indicating specific state that has changed.  See `OT_CHANGED_*` definitions.\n @param[in]  aContext  A pointer to application-specific context.\n"]
+#[doc = " Pointer is called to notify certain configuration or state changes within OpenThread.\n\n @param[in]  aFlags    A bit-field indicating specific state that has changed.  See `OT_CHANGED_*` definitions.\n @param[in]  aContext  A pointer to application-specific context.\n"]
 pub type otStateChangedCallback = ::std::option::Option<
     unsafe extern "C" fn(aFlags: otChangedFlags, aContext: *mut ::std::os::raw::c_void),
 >;
 extern "C" {
-    #[doc = " This function registers a callback to indicate when certain configuration or state changes within OpenThread.\n\n @param[in]  aInstance  A pointer to an OpenThread instance.\n @param[in]  aCallback  A pointer to a function that is called with certain configuration or state changes.\n @param[in]  aContext   A pointer to application-specific context.\n\n @retval OT_ERROR_NONE     Added the callback to the list of callbacks.\n @retval OT_ERROR_ALREADY  The callback was already registered.\n @retval OT_ERROR_NO_BUFS  Could not add the callback due to resource constraints.\n"]
+    #[doc = " Registers a callback to indicate when certain configuration or state changes within OpenThread.\n\n @param[in]  aInstance  A pointer to an OpenThread instance.\n @param[in]  aCallback  A pointer to a function that is called with certain configuration or state changes.\n @param[in]  aContext   A pointer to application-specific context.\n\n @retval OT_ERROR_NONE     Added the callback to the list of callbacks.\n @retval OT_ERROR_ALREADY  The callback was already registered.\n @retval OT_ERROR_NO_BUFS  Could not add the callback due to resource constraints.\n"]
     pub fn otSetStateChangedCallback(
         aInstance: *mut otInstance,
         aCallback: otStateChangedCallback,
@@ -454,7 +449,7 @@ extern "C" {
     ) -> otError;
 }
 extern "C" {
-    #[doc = " This function removes a callback to indicate when certain configuration or state changes within OpenThread.\n\n @param[in]  aInstance   A pointer to an OpenThread instance.\n @param[in]  aCallback   A pointer to a function that is called with certain configuration or state changes.\n @param[in]  aContext    A pointer to application-specific context.\n"]
+    #[doc = " Removes a callback to indicate when certain configuration or state changes within OpenThread.\n\n @param[in]  aInstance   A pointer to an OpenThread instance.\n @param[in]  aCallback   A pointer to a function that is called with certain configuration or state changes.\n @param[in]  aContext    A pointer to application-specific context.\n"]
     pub fn otRemoveStateChangeCallback(
         aInstance: *mut otInstance,
         aCallback: otStateChangedCallback,
@@ -462,7 +457,7 @@ extern "C" {
     );
 }
 extern "C" {
-    #[doc = " This method triggers a platform reset.\n\n The reset process ensures that all the OpenThread state/info (stored in volatile memory) is erased. Note that the\n `otPlatformReset` does not erase any persistent state/info saved in non-volatile memory.\n\n @param[in]  aInstance  A pointer to an OpenThread instance.\n"]
+    #[doc = " Triggers a platform reset.\n\n The reset process ensures that all the OpenThread state/info (stored in volatile memory) is erased. Note that the\n `otPlatformReset` does not erase any persistent state/info saved in non-volatile memory.\n\n @param[in]  aInstance  A pointer to an OpenThread instance.\n"]
     pub fn otInstanceReset(aInstance: *mut otInstance);
 }
 extern "C" {
@@ -470,22 +465,22 @@ extern "C" {
     pub fn otInstanceFactoryReset(aInstance: *mut otInstance);
 }
 extern "C" {
-    #[doc = " This method resets the internal states of the OpenThread radio stack.\n\n Callbacks and configurations are preserved.\n\n This API is only available under radio builds (`OPENTHREAD_RADIO = 1`).\n\n @param[in]  aInstance  A pointer to an OpenThread instance.\n"]
+    #[doc = " Resets the internal states of the OpenThread radio stack.\n\n Callbacks and configurations are preserved.\n\n This API is only available under radio builds (`OPENTHREAD_RADIO = 1`).\n\n @param[in]  aInstance  A pointer to an OpenThread instance.\n"]
     pub fn otInstanceResetRadioStack(aInstance: *mut otInstance);
 }
 extern "C" {
-    #[doc = " This function erases all the OpenThread persistent info (network settings) stored on non-volatile memory.\n Erase is successful only if the device is in `disabled` state/role.\n\n @param[in]  aInstance A pointer to an OpenThread instance.\n\n @retval OT_ERROR_NONE           All persistent info/state was erased successfully.\n @retval OT_ERROR_INVALID_STATE  Device is not in `disabled` state/role.\n"]
+    #[doc = " Erases all the OpenThread persistent info (network settings) stored on non-volatile memory.\n Erase is successful only if the device is in `disabled` state/role.\n\n @param[in]  aInstance A pointer to an OpenThread instance.\n\n @retval OT_ERROR_NONE           All persistent info/state was erased successfully.\n @retval OT_ERROR_INVALID_STATE  Device is not in `disabled` state/role.\n"]
     pub fn otInstanceErasePersistentInfo(aInstance: *mut otInstance) -> otError;
 }
 extern "C" {
-    #[doc = " This function gets the OpenThread version string.\n\n @returns A pointer to the OpenThread version.\n"]
+    #[doc = " Gets the OpenThread version string.\n\n @returns A pointer to the OpenThread version.\n"]
     pub fn otGetVersionString() -> *const ::std::os::raw::c_char;
 }
 extern "C" {
-    #[doc = " This function gets the OpenThread radio version string.\n\n @param[in]  aInstance A pointer to an OpenThread instance.\n\n @returns A pointer to the OpenThread radio version.\n"]
+    #[doc = " Gets the OpenThread radio version string.\n\n @param[in]  aInstance A pointer to an OpenThread instance.\n\n @returns A pointer to the OpenThread radio version.\n"]
     pub fn otGetRadioVersionString(aInstance: *mut otInstance) -> *const ::std::os::raw::c_char;
 }
-#[doc = " This structure represents Backbone Router configuration.\n"]
+#[doc = " Represents Backbone Router configuration.\n"]
 #[repr(C)]
 #[derive(Debug, Default, Copy, Clone)]
 pub struct otBackboneRouterConfig {
@@ -499,7 +494,7 @@ pub struct otBackboneRouterConfig {
     pub mSequenceNumber: u8,
 }
 extern "C" {
-    #[doc = " This function gets the Primary Backbone Router information in the Thread Network.\n\n @param[in]   aInstance            A pointer to an OpenThread instance.\n @param[out]  aConfig              A pointer to where to put Primary Backbone Router information.\n\n @retval OT_ERROR_NONE              Successfully got Primary Backbone Router information.\n @retval OT_ERROR_NOT_FOUND         No Primary Backbone Router exists.\n"]
+    #[doc = " Gets the Primary Backbone Router information in the Thread Network.\n\n @param[in]   aInstance            A pointer to an OpenThread instance.\n @param[out]  aConfig              A pointer to where to put Primary Backbone Router information.\n\n @retval OT_ERROR_NONE              Successfully got Primary Backbone Router information.\n @retval OT_ERROR_NOT_FOUND         No Primary Backbone Router exists.\n"]
     pub fn otBackboneRouterGetPrimary(
         aInstance: *mut otInstance,
         aConfig: *mut otBackboneRouterConfig,
@@ -516,9 +511,9 @@ pub const OT_MESSAGE_PRIORITY_LOW: otMessagePriority = 0;
 pub const OT_MESSAGE_PRIORITY_NORMAL: otMessagePriority = 1;
 #[doc = "< High priority level."]
 pub const OT_MESSAGE_PRIORITY_HIGH: otMessagePriority = 2;
-#[doc = " This enumeration defines the OpenThread message priority levels.\n"]
+#[doc = " Defines the OpenThread message priority levels.\n"]
 pub type otMessagePriority = ::std::os::raw::c_uint;
-#[doc = " This structure represents a message settings.\n"]
+#[doc = " Represents a message settings.\n"]
 #[repr(C)]
 #[derive(Debug, Default, Copy, Clone)]
 pub struct otMessageSettings {
@@ -548,15 +543,15 @@ extern "C" {
     pub fn otMessageSetOffset(aMessage: *mut otMessage, aOffset: u16);
 }
 extern "C" {
-    #[doc = " This function indicates whether or not link security is enabled for the message.\n\n @param[in]  aMessage  A pointer to a message buffer.\n\n @retval TRUE   If link security is enabled.\n @retval FALSE  If link security is not enabled.\n"]
+    #[doc = " Indicates whether or not link security is enabled for the message.\n\n @param[in]  aMessage  A pointer to a message buffer.\n\n @retval TRUE   If link security is enabled.\n @retval FALSE  If link security is not enabled.\n"]
     pub fn otMessageIsLinkSecurityEnabled(aMessage: *const otMessage) -> bool;
 }
 extern "C" {
-    #[doc = " This function sets/forces the message to be forwarded using direct transmission.\n Default setting for a new message is `false`.\n\n @param[in]  aMessage  A pointer to a message buffer.\n @param[in]  aEnabled  If `true`, the message is forced to use direct transmission. If `false`, the message follows\n                       the normal procedure.\n"]
+    #[doc = " Sets/forces the message to be forwarded using direct transmission.\n Default setting for a new message is `false`.\n\n @param[in]  aMessage  A pointer to a message buffer.\n @param[in]  aEnabled  If `true`, the message is forced to use direct transmission. If `false`, the message follows\n                       the normal procedure.\n"]
     pub fn otMessageSetDirectTransmission(aMessage: *mut otMessage, aEnabled: bool);
 }
 extern "C" {
-    #[doc = " This function returns the average RSS (received signal strength) associated with the message.\n\n @returns The average RSS value (in dBm) or OT_RADIO_RSSI_INVALID if no average RSS is available.\n"]
+    #[doc = " Returns the average RSS (received signal strength) associated with the message.\n\n @returns The average RSS value (in dBm) or OT_RADIO_RSSI_INVALID if no average RSS is available.\n"]
     pub fn otMessageGetRss(aMessage: *const otMessage) -> i8;
 }
 extern "C" {
@@ -585,7 +580,7 @@ extern "C" {
         aLength: u16,
     ) -> ::std::os::raw::c_int;
 }
-#[doc = " This structure represents an OpenThread message queue."]
+#[doc = " Represents an OpenThread message queue."]
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
 pub struct otMessageQueue {
@@ -601,7 +596,7 @@ impl Default for otMessageQueue {
         }
     }
 }
-#[doc = " This structure represents information about a message queue.\n"]
+#[doc = " Represents information about a message queue.\n"]
 #[repr(C)]
 #[derive(Debug, Default, Copy, Clone)]
 pub struct otMessageQueueInfo {
@@ -612,7 +607,7 @@ pub struct otMessageQueueInfo {
     #[doc = "< Total number of bytes used by all messages in the queue."]
     pub mTotalBytes: u32,
 }
-#[doc = " This structure represents the message buffer information for different queues used by OpenThread stack.\n"]
+#[doc = " Represents the message buffer information for different queues used by OpenThread stack.\n"]
 #[repr(C)]
 #[derive(Debug, Default, Copy, Clone)]
 pub struct otBufferInfo {
@@ -640,27 +635,27 @@ pub struct otBufferInfo {
     pub mApplicationCoapQueue: otMessageQueueInfo,
 }
 extern "C" {
-    #[doc = " Initialize the message queue.\n\n This function MUST be called once and only once for a `otMessageQueue` instance before any other `otMessageQueue`\n functions. The behavior is undefined if other queue APIs are used with an `otMessageQueue` before it being\n initialized or if it is initialized more than once.\n\n @param[in]  aQueue     A pointer to a message queue.\n"]
+    #[doc = " Initialize the message queue.\n\n MUST be called once and only once for a `otMessageQueue` instance before any other `otMessageQueue`\n functions. The behavior is undefined if other queue APIs are used with an `otMessageQueue` before it being\n initialized or if it is initialized more than once.\n\n @param[in]  aQueue     A pointer to a message queue.\n"]
     pub fn otMessageQueueInit(aQueue: *mut otMessageQueue);
 }
 extern "C" {
-    #[doc = " This function adds a message to the end of the given message queue.\n\n @param[in]  aQueue    A pointer to the message queue.\n @param[in]  aMessage  The message to add.\n"]
+    #[doc = " Adds a message to the end of the given message queue.\n\n @param[in]  aQueue    A pointer to the message queue.\n @param[in]  aMessage  The message to add.\n"]
     pub fn otMessageQueueEnqueue(aQueue: *mut otMessageQueue, aMessage: *mut otMessage);
 }
 extern "C" {
-    #[doc = " This function adds a message at the head/front of the given message queue.\n\n @param[in]  aQueue    A pointer to the message queue.\n @param[in]  aMessage  The message to add.\n"]
+    #[doc = " Adds a message at the head/front of the given message queue.\n\n @param[in]  aQueue    A pointer to the message queue.\n @param[in]  aMessage  The message to add.\n"]
     pub fn otMessageQueueEnqueueAtHead(aQueue: *mut otMessageQueue, aMessage: *mut otMessage);
 }
 extern "C" {
-    #[doc = " This function removes a message from the given message queue.\n\n @param[in]  aQueue    A pointer to the message queue.\n @param[in]  aMessage  The message to remove.\n"]
+    #[doc = " Removes a message from the given message queue.\n\n @param[in]  aQueue    A pointer to the message queue.\n @param[in]  aMessage  The message to remove.\n"]
     pub fn otMessageQueueDequeue(aQueue: *mut otMessageQueue, aMessage: *mut otMessage);
 }
 extern "C" {
-    #[doc = " This function returns a pointer to the message at the head of the queue.\n\n @param[in]  aQueue    A pointer to a message queue.\n\n @returns  A pointer to the message at the head of queue or NULL if queue is empty.\n"]
+    #[doc = " Returns a pointer to the message at the head of the queue.\n\n @param[in]  aQueue    A pointer to a message queue.\n\n @returns  A pointer to the message at the head of queue or NULL if queue is empty.\n"]
     pub fn otMessageQueueGetHead(aQueue: *mut otMessageQueue) -> *mut otMessage;
 }
 extern "C" {
-    #[doc = " This function returns a pointer to the next message in the queue by iterating forward (from head to tail).\n\n @param[in]  aQueue    A pointer to a message queue.\n @param[in]  aMessage  A pointer to current message buffer.\n\n @returns  A pointer to the next message in the queue after `aMessage` or NULL if `aMessage is the tail of queue.\n           NULL is returned if `aMessage` is not in the queue `aQueue`.\n"]
+    #[doc = " Returns a pointer to the next message in the queue by iterating forward (from head to tail).\n\n @param[in]  aQueue    A pointer to a message queue.\n @param[in]  aMessage  A pointer to current message buffer.\n\n @returns  A pointer to the next message in the queue after `aMessage` or NULL if `aMessage is the tail of queue.\n           NULL is returned if `aMessage` is not in the queue `aQueue`.\n"]
     pub fn otMessageQueueGetNext(
         aQueue: *mut otMessageQueue,
         aMessage: *const otMessage,
@@ -682,7 +677,7 @@ pub const OT_CRYPTO_KEY_TYPE_AES: otCryptoKeyType = 1;
 pub const OT_CRYPTO_KEY_TYPE_HMAC: otCryptoKeyType = 2;
 #[doc = "< Key Type: ECDSA."]
 pub const OT_CRYPTO_KEY_TYPE_ECDSA: otCryptoKeyType = 3;
-#[doc = " This enumeration defines the key types.\n"]
+#[doc = " Defines the key types.\n"]
 pub type otCryptoKeyType = ::std::os::raw::c_uint;
 #[doc = "< Key Algorithm: Vendor Defined."]
 pub const OT_CRYPTO_KEY_ALG_VENDOR: otCryptoKeyAlgorithm = 0;
@@ -692,7 +687,7 @@ pub const OT_CRYPTO_KEY_ALG_AES_ECB: otCryptoKeyAlgorithm = 1;
 pub const OT_CRYPTO_KEY_ALG_HMAC_SHA_256: otCryptoKeyAlgorithm = 2;
 #[doc = "< Key Algorithm: ECDSA."]
 pub const OT_CRYPTO_KEY_ALG_ECDSA: otCryptoKeyAlgorithm = 3;
-#[doc = " This enumeration defines the key algorithms.\n"]
+#[doc = " Defines the key algorithms.\n"]
 pub type otCryptoKeyAlgorithm = ::std::os::raw::c_uint;
 #[doc = "< Key Usage: Key Usage is empty."]
 pub const OT_CRYPTO_KEY_USAGE_NONE: _bindgen_ty_2 = 0;
@@ -706,17 +701,17 @@ pub const OT_CRYPTO_KEY_USAGE_DECRYPT: _bindgen_ty_2 = 4;
 pub const OT_CRYPTO_KEY_USAGE_SIGN_HASH: _bindgen_ty_2 = 8;
 #[doc = "< Key Usage: Verify Hash."]
 pub const OT_CRYPTO_KEY_USAGE_VERIFY_HASH: _bindgen_ty_2 = 16;
-#[doc = " This enumeration defines the key usage flags.\n"]
+#[doc = " Defines the key usage flags.\n"]
 pub type _bindgen_ty_2 = ::std::os::raw::c_uint;
 #[doc = "< Key Persistence: Key is volatile."]
 pub const OT_CRYPTO_KEY_STORAGE_VOLATILE: otCryptoKeyStorage = 0;
 #[doc = "< Key Persistence: Key is persistent."]
 pub const OT_CRYPTO_KEY_STORAGE_PERSISTENT: otCryptoKeyStorage = 1;
-#[doc = " This enumeration defines the key storage types.\n"]
+#[doc = " Defines the key storage types.\n"]
 pub type otCryptoKeyStorage = ::std::os::raw::c_uint;
 #[doc = " This datatype represents the key reference.\n"]
 pub type otCryptoKeyRef = u32;
-#[doc = " @struct otCryptoKey\n\n This structure represents the Key Material required for Crypto operations.\n"]
+#[doc = " @struct otCryptoKey\n\n Represents the Key Material required for Crypto operations.\n"]
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
 pub struct otCryptoKey {
@@ -736,7 +731,7 @@ impl Default for otCryptoKey {
         }
     }
 }
-#[doc = " @struct otCryptoContext\n\n This structure stores the context object for platform APIs.\n"]
+#[doc = " @struct otCryptoContext\n\n Stores the context object for platform APIs.\n"]
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
 pub struct otCryptoContext {
@@ -754,14 +749,14 @@ impl Default for otCryptoContext {
         }
     }
 }
-#[doc = " @struct otPlatCryptoSha256Hash\n\n This structure represents a SHA-256 hash.\n"]
+#[doc = " @struct otPlatCryptoSha256Hash\n\n Represents a SHA-256 hash.\n"]
 #[repr(C, packed)]
 #[derive(Debug, Default, Copy, Clone)]
 pub struct otPlatCryptoSha256Hash {
     #[doc = "< Hash bytes."]
     pub m8: [u8; 32usize],
 }
-#[doc = " @struct otPlatCryptoEcdsaKeyPair\n\n This structure represents an ECDSA key pair (public and private keys).\n\n The key pair is stored using Distinguished Encoding Rules (DER) format (per RFC 5915).\n"]
+#[doc = " @struct otPlatCryptoEcdsaKeyPair\n\n Represents an ECDSA key pair (public and private keys).\n\n The key pair is stored using Distinguished Encoding Rules (DER) format (per RFC 5915).\n"]
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
 pub struct otPlatCryptoEcdsaKeyPair {
@@ -777,7 +772,7 @@ impl Default for otPlatCryptoEcdsaKeyPair {
         }
     }
 }
-#[doc = " @struct otPlatCryptoEcdsaPublicKey\n\n This struct represents a ECDSA public key.\n\n The public key is stored as a byte sequence representation of an uncompressed curve point (RFC 6605 - sec 4).\n"]
+#[doc = " @struct otPlatCryptoEcdsaPublicKey\n\n Represents a ECDSA public key.\n\n The public key is stored as a byte sequence representation of an uncompressed curve point (RFC 6605 - sec 4).\n"]
 #[repr(C, packed)]
 #[derive(Debug, Copy, Clone)]
 pub struct otPlatCryptoEcdsaPublicKey {
@@ -792,7 +787,7 @@ impl Default for otPlatCryptoEcdsaPublicKey {
         }
     }
 }
-#[doc = " @struct otPlatCryptoEcdsaSignature\n\n This struct represents an ECDSA signature.\n\n The signature is encoded as the concatenated binary representation of two MPIs `r` and `s` which are calculated\n during signing (RFC 6605 - section 4).\n"]
+#[doc = " @struct otPlatCryptoEcdsaSignature\n\n Represents an ECDSA signature.\n\n The signature is encoded as the concatenated binary representation of two MPIs `r` and `s` which are calculated\n during signing (RFC 6605 - section 4).\n"]
 #[repr(C, packed)]
 #[derive(Debug, Copy, Clone)]
 pub struct otPlatCryptoEcdsaSignature {
@@ -973,7 +968,7 @@ extern "C" {
     ) -> otError;
 }
 extern "C" {
-    #[doc = " Calculate the ECDSA signature for a hashed message using the private key from the input context.\n\n This method uses the deterministic digital signature generation procedure from RFC 6979.\n\n @param[in]  aKeyPair           A pointer to an ECDSA key-pair structure where the key-pair is stored.\n @param[in]  aHash              A pointer to a SHA-256 hash structure where the hash value for signature calculation\n                                is stored.\n @param[out] aSignature         A pointer to an ECDSA signature structure to output the calculated signature.\n\n @retval OT_ERROR_NONE          The signature was calculated successfully, @p aSignature was updated.\n @retval OT_ERROR_PARSE         The key-pair DER format could not be parsed (invalid format).\n @retval OT_ERROR_NO_BUFS       Failed to allocate buffer for signature calculation.\n @retval OT_ERROR_INVALID_ARGS  The @p aContext is NULL.\n"]
+    #[doc = " Calculate the ECDSA signature for a hashed message using the private key from the input context.\n\n Uses the deterministic digital signature generation procedure from RFC 6979.\n\n @param[in]  aKeyPair           A pointer to an ECDSA key-pair structure where the key-pair is stored.\n @param[in]  aHash              A pointer to a SHA-256 hash structure where the hash value for signature calculation\n                                is stored.\n @param[out] aSignature         A pointer to an ECDSA signature structure to output the calculated signature.\n\n @retval OT_ERROR_NONE          The signature was calculated successfully, @p aSignature was updated.\n @retval OT_ERROR_PARSE         The key-pair DER format could not be parsed (invalid format).\n @retval OT_ERROR_NO_BUFS       Failed to allocate buffer for signature calculation.\n @retval OT_ERROR_INVALID_ARGS  The @p aContext is NULL.\n"]
     pub fn otPlatCryptoEcdsaSign(
         aKeyPair: *const otPlatCryptoEcdsaKeyPair,
         aHash: *const otPlatCryptoSha256Hash,
@@ -989,7 +984,7 @@ extern "C" {
     ) -> otError;
 }
 extern "C" {
-    #[doc = " Calculate the ECDSA signature for a hashed message using the Key reference passed.\n\n This method uses the deterministic digital signature generation procedure from RFC 6979.\n\n @param[in]  aKeyRef            Key Reference to the slot where the key-pair is stored.\n @param[in]  aHash              A pointer to a SHA-256 hash structure where the hash value for signature calculation\n                                is stored.\n @param[out] aSignature         A pointer to an ECDSA signature structure to output the calculated signature.\n\n @retval OT_ERROR_NONE          The signature was calculated successfully, @p aSignature was updated.\n @retval OT_ERROR_PARSE         The key-pair DER format could not be parsed (invalid format).\n @retval OT_ERROR_NO_BUFS       Failed to allocate buffer for signature calculation.\n @retval OT_ERROR_INVALID_ARGS  The @p aContext is NULL.\n\n @note This API is only used by OT core when `OPENTHREAD_CONFIG_PLATFORM_KEY_REFERENCES_ENABLE` is enabled.\n"]
+    #[doc = " Calculate the ECDSA signature for a hashed message using the Key reference passed.\n\n Uses the deterministic digital signature generation procedure from RFC 6979.\n\n @param[in]  aKeyRef            Key Reference to the slot where the key-pair is stored.\n @param[in]  aHash              A pointer to a SHA-256 hash structure where the hash value for signature calculation\n                                is stored.\n @param[out] aSignature         A pointer to an ECDSA signature structure to output the calculated signature.\n\n @retval OT_ERROR_NONE          The signature was calculated successfully, @p aSignature was updated.\n @retval OT_ERROR_PARSE         The key-pair DER format could not be parsed (invalid format).\n @retval OT_ERROR_NO_BUFS       Failed to allocate buffer for signature calculation.\n @retval OT_ERROR_INVALID_ARGS  The @p aContext is NULL.\n\n @note This API is only used by OT core when `OPENTHREAD_CONFIG_PLATFORM_KEY_REFERENCES_ENABLE` is enabled.\n"]
     pub fn otPlatCryptoEcdsaSignUsingKeyRef(
         aKeyRef: otCryptoKeyRef,
         aHash: *const otPlatCryptoSha256Hash,
@@ -1059,7 +1054,7 @@ pub const OT_RADIO_CHANNEL_PAGE_0_MASK: _bindgen_ty_4 = 1;
 pub const OT_RADIO_CHANNEL_PAGE_2: _bindgen_ty_4 = 2;
 #[doc = "< 915 MHz IEEE 802.15.4-2006"]
 pub const OT_RADIO_CHANNEL_PAGE_2_MASK: _bindgen_ty_4 = 4;
-#[doc = " This enumeration defines the channel page.\n"]
+#[doc = " Defines the channel page.\n"]
 pub type _bindgen_ty_4 = ::std::os::raw::c_uint;
 #[doc = "< 915 MHz IEEE 802.15.4-2006"]
 pub const OT_RADIO_915MHZ_OQPSK_CHANNEL_MIN: _bindgen_ty_5 = 1;
@@ -1073,9 +1068,9 @@ pub const OT_RADIO_2P4GHZ_OQPSK_CHANNEL_MIN: _bindgen_ty_5 = 11;
 pub const OT_RADIO_2P4GHZ_OQPSK_CHANNEL_MAX: _bindgen_ty_5 = 26;
 #[doc = "< 2.4 GHz IEEE 802.15.4-2006"]
 pub const OT_RADIO_2P4GHZ_OQPSK_CHANNEL_MASK: _bindgen_ty_5 = 134215680;
-#[doc = " This enumeration defines the frequency band channel range.\n"]
+#[doc = " Defines the frequency band channel range.\n"]
 pub type _bindgen_ty_5 = ::std::os::raw::c_uint;
-#[doc = " This type represents radio capabilities.\n\n The value is a bit-field indicating the capabilities supported by the radio. See `OT_RADIO_CAPS_*` definitions.\n"]
+#[doc = " Represents radio capabilities.\n\n The value is a bit-field indicating the capabilities supported by the radio. See `OT_RADIO_CAPS_*` definitions.\n"]
 pub type otRadioCaps = u8;
 #[doc = "< Radio supports no capability."]
 pub const OT_RADIO_CAPS_NONE: _bindgen_ty_6 = 0;
@@ -1095,11 +1090,11 @@ pub const OT_RADIO_CAPS_TRANSMIT_SEC: _bindgen_ty_6 = 32;
 pub const OT_RADIO_CAPS_TRANSMIT_TIMING: _bindgen_ty_6 = 64;
 #[doc = "< Radio supports rx at specific time."]
 pub const OT_RADIO_CAPS_RECEIVE_TIMING: _bindgen_ty_6 = 128;
-#[doc = " This enumeration defines constants that are used to indicate different radio capabilities. See `otRadioCaps`.\n"]
+#[doc = " Defines constants that are used to indicate different radio capabilities. See `otRadioCaps`.\n"]
 pub type _bindgen_ty_6 = ::std::os::raw::c_uint;
-#[doc = " This type represents the IEEE 802.15.4 PAN ID.\n"]
+#[doc = " Represents the IEEE 802.15.4 PAN ID.\n"]
 pub type otPanId = u16;
-#[doc = " This type represents the IEEE 802.15.4 Short Address.\n"]
+#[doc = " Represents the IEEE 802.15.4 Short Address.\n"]
 pub type otShortAddress = u16;
 #[doc = "< Size of IE header in bytes."]
 pub const OT_IE_HEADER_SIZE: _bindgen_ty_7 = 2;
@@ -1109,25 +1104,25 @@ pub const OT_CSL_IE_SIZE: _bindgen_ty_7 = 4;
 pub const OT_ACK_IE_MAX_SIZE: _bindgen_ty_7 = 16;
 #[doc = "< Max length of Link Metrics data in Vendor-Specific IE."]
 pub const OT_ENH_PROBING_IE_DATA_MAX_SIZE: _bindgen_ty_7 = 2;
-#[doc = " This enumeration defines constants about size of header IE in ACK.\n"]
+#[doc = " Defines constants about size of header IE in ACK.\n"]
 pub type _bindgen_ty_7 = ::std::os::raw::c_uint;
-#[doc = " @struct otExtAddress\n\n This structure represents the IEEE 802.15.4 Extended Address.\n"]
+#[doc = " @struct otExtAddress\n\n Represents the IEEE 802.15.4 Extended Address.\n"]
 #[repr(C, packed)]
 #[derive(Debug, Default, Copy, Clone)]
 pub struct otExtAddress {
     #[doc = "< IEEE 802.15.4 Extended Address bytes"]
     pub m8: [u8; 8usize],
 }
-#[doc = " @struct otMacKey\n\n This structure represents a MAC Key.\n"]
+#[doc = " @struct otMacKey\n\n Represents a MAC Key.\n"]
 #[repr(C, packed)]
 #[derive(Debug, Default, Copy, Clone)]
 pub struct otMacKey {
     #[doc = "< MAC Key bytes."]
     pub m8: [u8; 16usize],
 }
-#[doc = " This type represents a MAC Key Ref used by PSA.\n"]
+#[doc = " Represents a MAC Key Ref used by PSA.\n"]
 pub type otMacKeyRef = otCryptoKeyRef;
-#[doc = " @struct otMacKeyMaterial\n\n This structure represents a MAC Key.\n"]
+#[doc = " @struct otMacKeyMaterial\n\n Represents a MAC Key.\n"]
 #[repr(C)]
 #[derive(Copy, Clone)]
 pub struct otMacKeyMaterial {
@@ -1163,9 +1158,9 @@ impl Default for otMacKeyMaterial {
 pub const OT_KEY_TYPE_LITERAL_KEY: otRadioKeyType = 0;
 #[doc = "< Use Reference to Key."]
 pub const OT_KEY_TYPE_KEY_REF: otRadioKeyType = 1;
-#[doc = " This enumeration defines constants about key types.\n"]
+#[doc = " Defines constants about key types.\n"]
 pub type otRadioKeyType = ::std::os::raw::c_uint;
-#[doc = " This structure represents the IEEE 802.15.4 Header IE (Information Element) related information of a radio frame."]
+#[doc = " Represents the IEEE 802.15.4 Header IE (Information Element) related information of a radio frame."]
 #[repr(C)]
 #[derive(Debug, Default, Copy, Clone)]
 pub struct otRadioIeInfo {
@@ -1176,7 +1171,7 @@ pub struct otRadioIeInfo {
     #[doc = "< The Time sync sequence."]
     pub mTimeSyncSeq: u8,
 }
-#[doc = " This structure represents an IEEE 802.15.4 radio frame."]
+#[doc = " Represents an IEEE 802.15.4 radio frame."]
 #[repr(C)]
 #[derive(Copy, Clone)]
 pub struct otRadioFrame {
@@ -1397,9 +1392,9 @@ pub const OT_RADIO_STATE_SLEEP: otRadioState = 1;
 pub const OT_RADIO_STATE_RECEIVE: otRadioState = 2;
 pub const OT_RADIO_STATE_TRANSMIT: otRadioState = 3;
 pub const OT_RADIO_STATE_INVALID: otRadioState = 255;
-#[doc = " This structure represents the state of a radio.\n Initially, a radio is in the Disabled state."]
+#[doc = " Represents the state of a radio.\n Initially, a radio is in the Disabled state."]
 pub type otRadioState = ::std::os::raw::c_uint;
-#[doc = " This structure represents radio coexistence metrics."]
+#[doc = " Represents radio coexistence metrics."]
 #[repr(C)]
 #[derive(Debug, Default, Copy, Clone)]
 pub struct otRadioCoexMetrics {
@@ -1442,7 +1437,7 @@ pub struct otRadioCoexMetrics {
     #[doc = "< Stats collection stopped due to saturation."]
     pub mStopped: bool,
 }
-#[doc = " This structure represents what metrics are specified to query.\n"]
+#[doc = " Represents what metrics are specified to query.\n"]
 #[repr(C, packed)]
 #[derive(Debug, Default, Copy, Clone)]
 pub struct otLinkMetrics {
@@ -1608,7 +1603,7 @@ extern "C" {
     pub fn otPlatRadioSetPromiscuous(aInstance: *mut otInstance, aEnable: bool);
 }
 extern "C" {
-    #[doc = " Update MAC keys and key index\n\n This function is used when radio provides OT_RADIO_CAPS_TRANSMIT_SEC capability.\n\n @param[in]   aInstance    A pointer to an OpenThread instance.\n @param[in]   aKeyIdMode   The key ID mode.\n @param[in]   aKeyId       Current MAC key index.\n @param[in]   aPrevKey     A pointer to the previous MAC key.\n @param[in]   aCurrKey     A pointer to the current MAC key.\n @param[in]   aNextKey     A pointer to the next MAC key.\n @param[in]   aKeyType     Key Type used.\n"]
+    #[doc = " Update MAC keys and key index\n\n Is used when radio provides OT_RADIO_CAPS_TRANSMIT_SEC capability.\n\n @param[in]   aInstance    A pointer to an OpenThread instance.\n @param[in]   aKeyIdMode   The key ID mode.\n @param[in]   aKeyId       Current MAC key index.\n @param[in]   aPrevKey     A pointer to the previous MAC key.\n @param[in]   aCurrKey     A pointer to the current MAC key.\n @param[in]   aNextKey     A pointer to the next MAC key.\n @param[in]   aKeyType     Key Type used.\n"]
     pub fn otPlatRadioSetMacKey(
         aInstance: *mut otInstance,
         aKeyIdMode: u8,
@@ -1620,11 +1615,11 @@ extern "C" {
     );
 }
 extern "C" {
-    #[doc = " This method sets the current MAC frame counter value.\n\n This function is used when radio provides `OT_RADIO_CAPS_TRANSMIT_SEC` capability.\n\n @param[in]   aInstance         A pointer to an OpenThread instance.\n @param[in]   aMacFrameCounter  The MAC frame counter value.\n"]
+    #[doc = " Sets the current MAC frame counter value.\n\n Is used when radio provides `OT_RADIO_CAPS_TRANSMIT_SEC` capability.\n\n @param[in]   aInstance         A pointer to an OpenThread instance.\n @param[in]   aMacFrameCounter  The MAC frame counter value.\n"]
     pub fn otPlatRadioSetMacFrameCounter(aInstance: *mut otInstance, aMacFrameCounter: u32);
 }
 extern "C" {
-    #[doc = " This method sets the current MAC frame counter value only if the new given value is larger than the current value.\n\n This function is used when radio provides `OT_RADIO_CAPS_TRANSMIT_SEC` capability.\n\n @param[in]   aInstance         A pointer to an OpenThread instance.\n @param[in]   aMacFrameCounter  The MAC frame counter value.\n"]
+    #[doc = " Sets the current MAC frame counter value only if the new given value is larger than the current value.\n\n Is used when radio provides `OT_RADIO_CAPS_TRANSMIT_SEC` capability.\n\n @param[in]   aInstance         A pointer to an OpenThread instance.\n @param[in]   aMacFrameCounter  The MAC frame counter value.\n"]
     pub fn otPlatRadioSetMacFrameCounterIfLarger(aInstance: *mut otInstance, aMacFrameCounter: u32);
 }
 extern "C" {
@@ -1636,7 +1631,7 @@ extern "C" {
     pub fn otPlatRadioGetBusSpeed(aInstance: *mut otInstance) -> u32;
 }
 extern "C" {
-    #[doc = " Get current state of the radio.\n\n This function is not required by OpenThread. It may be used for debugging and/or application-specific purposes.\n\n @note This function may be not implemented. It does not affect OpenThread.\n\n @param[in] aInstance  The OpenThread instance structure.\n\n @return  Current state of the radio.\n"]
+    #[doc = " Get current state of the radio.\n\n Is not required by OpenThread. It may be used for debugging and/or application-specific purposes.\n\n @note This function may be not implemented. It does not affect OpenThread.\n\n @param[in] aInstance  The OpenThread instance structure.\n\n @return  Current state of the radio.\n"]
     pub fn otPlatRadioGetState(aInstance: *mut otInstance) -> otRadioState;
 }
 extern "C" {
@@ -1677,7 +1672,7 @@ extern "C" {
     );
 }
 extern "C" {
-    #[doc = " The radio driver calls this method to notify OpenThread diagnostics module of a received frame.\n\n This function is used when diagnostics is enabled.\n\n @param[in]  aInstance The OpenThread instance structure.\n @param[in]  aFrame    A pointer to the received frame or NULL if the receive operation failed.\n @param[in]  aError    OT_ERROR_NONE when successfully received a frame,\n                       OT_ERROR_ABORT when reception was aborted and a frame was not received,\n                       OT_ERROR_NO_BUFS when a frame could not be received due to lack of rx buffer space.\n"]
+    #[doc = " The radio driver calls this method to notify OpenThread diagnostics module of a received frame.\n\n Is used when diagnostics is enabled.\n\n @param[in]  aInstance The OpenThread instance structure.\n @param[in]  aFrame    A pointer to the received frame or NULL if the receive operation failed.\n @param[in]  aError    OT_ERROR_NONE when successfully received a frame,\n                       OT_ERROR_ABORT when reception was aborted and a frame was not received,\n                       OT_ERROR_NO_BUFS when a frame could not be received due to lack of rx buffer space.\n"]
     pub fn otPlatDiagRadioReceiveDone(
         aInstance: *mut otInstance,
         aFrame: *mut otRadioFrame,
@@ -1706,7 +1701,7 @@ extern "C" {
     );
 }
 extern "C" {
-    #[doc = " The radio driver calls this method to notify OpenThread diagnostics module that the transmission has completed.\n\n This function is used when diagnostics is enabled.\n\n @param[in]  aInstance      The OpenThread instance structure.\n @param[in]  aFrame         A pointer to the frame that was transmitted.\n @param[in]  aError         OT_ERROR_NONE when the frame was transmitted,\n                            OT_ERROR_CHANNEL_ACCESS_FAILURE tx could not take place due to activity on the channel,\n                            OT_ERROR_ABORT when transmission was aborted for other reasons.\n"]
+    #[doc = " The radio driver calls this method to notify OpenThread diagnostics module that the transmission has completed.\n\n Is used when diagnostics is enabled.\n\n @param[in]  aInstance      The OpenThread instance structure.\n @param[in]  aFrame         A pointer to the frame that was transmitted.\n @param[in]  aError         OT_ERROR_NONE when the frame was transmitted,\n                            OT_ERROR_CHANNEL_ACCESS_FAILURE tx could not take place due to activity on the channel,\n                            OT_ERROR_ABORT when transmission was aborted for other reasons.\n"]
     pub fn otPlatDiagRadioTransmitDone(
         aInstance: *mut otInstance,
         aFrame: *mut otRadioFrame,
@@ -1718,7 +1713,7 @@ extern "C" {
     pub fn otPlatRadioGetRssi(aInstance: *mut otInstance) -> i8;
 }
 extern "C" {
-    #[doc = " Begin the energy scan sequence on the radio.\n\n This function is used when radio provides OT_RADIO_CAPS_ENERGY_SCAN capability.\n\n @param[in] aInstance      The OpenThread instance structure.\n @param[in] aScanChannel   The channel to perform the energy scan on.\n @param[in] aScanDuration  The duration, in milliseconds, for the channel to be scanned.\n\n @retval OT_ERROR_NONE             Successfully started scanning the channel.\n @retval OT_ERROR_BUSY             The radio is performing energy scanning.\n @retval OT_ERROR_NOT_IMPLEMENTED  The radio doesn't support energy scanning.\n"]
+    #[doc = " Begin the energy scan sequence on the radio.\n\n Is used when radio provides OT_RADIO_CAPS_ENERGY_SCAN capability.\n\n @param[in] aInstance      The OpenThread instance structure.\n @param[in] aScanChannel   The channel to perform the energy scan on.\n @param[in] aScanDuration  The duration, in milliseconds, for the channel to be scanned.\n\n @retval OT_ERROR_NONE             Successfully started scanning the channel.\n @retval OT_ERROR_BUSY             The radio is performing energy scanning.\n @retval OT_ERROR_NOT_IMPLEMENTED  The radio doesn't support energy scanning.\n"]
     pub fn otPlatRadioEnergyScan(
         aInstance: *mut otInstance,
         aScanChannel: u8,
@@ -1726,7 +1721,7 @@ extern "C" {
     ) -> otError;
 }
 extern "C" {
-    #[doc = " The radio driver calls this method to notify OpenThread that the energy scan is complete.\n\n This function is used when radio provides OT_RADIO_CAPS_ENERGY_SCAN capability.\n\n @param[in]  aInstance           The OpenThread instance structure.\n @param[in]  aEnergyScanMaxRssi  The maximum RSSI encountered on the scanned channel.\n"]
+    #[doc = " The radio driver calls this method to notify OpenThread that the energy scan is complete.\n\n Is used when radio provides OT_RADIO_CAPS_ENERGY_SCAN capability.\n\n @param[in]  aInstance           The OpenThread instance structure.\n @param[in]  aEnergyScanMaxRssi  The maximum RSSI encountered on the scanned channel.\n"]
     pub fn otPlatRadioEnergyScanDone(aInstance: *mut otInstance, aEnergyScanMaxRssi: i8);
 }
 extern "C" {
@@ -1778,15 +1773,15 @@ extern "C" {
     pub fn otPlatRadioGetPreferredChannelMask(aInstance: *mut otInstance) -> u32;
 }
 extern "C" {
-    #[doc = " Enable the radio coex.\n\n This function is used when feature OPENTHREAD_CONFIG_PLATFORM_RADIO_COEX_ENABLE is enabled.\n\n @param[in] aInstance  The OpenThread instance structure.\n @param[in] aEnabled   TRUE to enable the radio coex, FALSE otherwise.\n\n @retval OT_ERROR_NONE     Successfully enabled.\n @retval OT_ERROR_FAILED   The radio coex could not be enabled.\n"]
+    #[doc = " Enable the radio coex.\n\n Is used when feature OPENTHREAD_CONFIG_PLATFORM_RADIO_COEX_ENABLE is enabled.\n\n @param[in] aInstance  The OpenThread instance structure.\n @param[in] aEnabled   TRUE to enable the radio coex, FALSE otherwise.\n\n @retval OT_ERROR_NONE     Successfully enabled.\n @retval OT_ERROR_FAILED   The radio coex could not be enabled.\n"]
     pub fn otPlatRadioSetCoexEnabled(aInstance: *mut otInstance, aEnabled: bool) -> otError;
 }
 extern "C" {
-    #[doc = " Check whether radio coex is enabled or not.\n\n This function is used when feature OPENTHREAD_CONFIG_PLATFORM_RADIO_COEX_ENABLE is enabled.\n\n @param[in] aInstance  The OpenThread instance structure.\n\n @returns TRUE if the radio coex is enabled, FALSE otherwise.\n"]
+    #[doc = " Check whether radio coex is enabled or not.\n\n Is used when feature OPENTHREAD_CONFIG_PLATFORM_RADIO_COEX_ENABLE is enabled.\n\n @param[in] aInstance  The OpenThread instance structure.\n\n @returns TRUE if the radio coex is enabled, FALSE otherwise.\n"]
     pub fn otPlatRadioIsCoexEnabled(aInstance: *mut otInstance) -> bool;
 }
 extern "C" {
-    #[doc = " Get the radio coexistence metrics.\n\n This function is used when feature OPENTHREAD_CONFIG_PLATFORM_RADIO_COEX_ENABLE is enabled.\n\n @param[in]  aInstance     The OpenThread instance structure.\n @param[out] aCoexMetrics  A pointer to the coexistence metrics structure.\n\n @retval OT_ERROR_NONE          Successfully retrieved the coex metrics.\n @retval OT_ERROR_INVALID_ARGS  @p aCoexMetrics was NULL."]
+    #[doc = " Get the radio coexistence metrics.\n\n Is used when feature OPENTHREAD_CONFIG_PLATFORM_RADIO_COEX_ENABLE is enabled.\n\n @param[in]  aInstance     The OpenThread instance structure.\n @param[out] aCoexMetrics  A pointer to the coexistence metrics structure.\n\n @retval OT_ERROR_NONE          Successfully retrieved the coex metrics.\n @retval OT_ERROR_INVALID_ARGS  @p aCoexMetrics was NULL."]
     pub fn otPlatRadioGetCoexMetrics(
         aInstance: *mut otInstance,
         aCoexMetrics: *mut otRadioCoexMetrics,
@@ -1869,7 +1864,7 @@ extern "C" {
         aRawPowerSettingLength: *mut u16,
     ) -> otError;
 }
-#[doc = " @struct otIp6InterfaceIdentifier\n\n This structure represents the Interface Identifier of an IPv6 address.\n"]
+#[doc = " @struct otIp6InterfaceIdentifier\n\n Represents the Interface Identifier of an IPv6 address.\n"]
 #[repr(C, packed)]
 #[derive(Copy, Clone)]
 pub struct otIp6InterfaceIdentifier {
@@ -1904,14 +1899,14 @@ impl Default for otIp6InterfaceIdentifier {
         }
     }
 }
-#[doc = " @struct otIp6NetworkPrefix\n\n This structure represents the Network Prefix of an IPv6 address (most significant 64 bits of the address).\n"]
+#[doc = " @struct otIp6NetworkPrefix\n\n Represents the Network Prefix of an IPv6 address (most significant 64 bits of the address).\n"]
 #[repr(C, packed)]
 #[derive(Debug, Default, Copy, Clone)]
 pub struct otIp6NetworkPrefix {
     #[doc = "< The Network Prefix."]
     pub m8: [u8; 8usize],
 }
-#[doc = " @struct otIp6AddressComponents\n\n This structure represents the components of an IPv6 address.\n"]
+#[doc = " @struct otIp6AddressComponents\n\n Represents the components of an IPv6 address.\n"]
 #[repr(C, packed)]
 #[derive(Copy, Clone)]
 pub struct otIp6AddressComponents {
@@ -1929,7 +1924,7 @@ impl Default for otIp6AddressComponents {
         }
     }
 }
-#[doc = " @struct otIp6Address\n\n This structure represents an IPv6 address.\n"]
+#[doc = " @struct otIp6Address\n\n Represents an IPv6 address.\n"]
 #[repr(C, packed)]
 #[derive(Copy, Clone)]
 pub struct otIp6Address {
@@ -1966,7 +1961,7 @@ impl Default for otIp6Address {
         }
     }
 }
-#[doc = " This structure represents an IPv6 prefix.\n"]
+#[doc = " Represents an IPv6 prefix.\n"]
 #[repr(C, packed)]
 #[derive(Copy, Clone)]
 pub struct otIp6Prefix {
@@ -1994,7 +1989,7 @@ pub const OT_ADDRESS_ORIGIN_DHCPV6: _bindgen_ty_8 = 2;
 pub const OT_ADDRESS_ORIGIN_MANUAL: _bindgen_ty_8 = 3;
 #[doc = " IPv6 Address origins\n"]
 pub type _bindgen_ty_8 = ::std::os::raw::c_uint;
-#[doc = " This structure represents an IPv6 network interface unicast address.\n"]
+#[doc = " Represents an IPv6 network interface unicast address.\n"]
 #[repr(C)]
 #[derive(Copy, Clone)]
 pub struct otNetifAddress {
@@ -2106,7 +2101,7 @@ impl otNetifAddress {
         __bindgen_bitfield_unit
     }
 }
-#[doc = " This structure represents an IPv6 network interface multicast address.\n"]
+#[doc = " Represents an IPv6 network interface multicast address.\n"]
 #[repr(C)]
 #[derive(Copy, Clone)]
 pub struct otNetifMulticastAddress {
@@ -2124,7 +2119,7 @@ impl Default for otNetifMulticastAddress {
         }
     }
 }
-#[doc = " This structure represents an IPv6 socket address.\n"]
+#[doc = " Represents an IPv6 socket address.\n"]
 #[repr(C)]
 #[derive(Copy, Clone)]
 pub struct otSockAddr {
@@ -2152,7 +2147,7 @@ pub const OT_ECN_CAPABLE_1: _bindgen_ty_9 = 1;
 pub const OT_ECN_MARKED: _bindgen_ty_9 = 3;
 #[doc = " ECN statuses, represented as in the IP header.\n"]
 pub type _bindgen_ty_9 = ::std::os::raw::c_uint;
-#[doc = " This structure represents the local and peer IPv6 socket addresses.\n"]
+#[doc = " Represents the local and peer IPv6 socket addresses.\n"]
 #[repr(C)]
 #[derive(Copy, Clone)]
 pub struct otMessageInfo {
@@ -2342,19 +2337,19 @@ extern "C" {
         aSettings: *const otMessageSettings,
     ) -> *mut otMessage;
 }
-#[doc = " This function pointer is called when an IPv6 datagram is received.\n\n @param[in]  aMessage  A pointer to the message buffer containing the received IPv6 datagram. This function transfers\n                       the ownership of the @p aMessage to the receiver of the callback. The message should be\n                       freed by the receiver of the callback after it is processed (see otMessageFree()).\n @param[in]  aContext  A pointer to application-specific context.\n"]
+#[doc = " Pointer is called when an IPv6 datagram is received.\n\n @param[in]  aMessage  A pointer to the message buffer containing the received IPv6 datagram. This function transfers\n                       the ownership of the @p aMessage to the receiver of the callback. The message should be\n                       freed by the receiver of the callback after it is processed (see otMessageFree()).\n @param[in]  aContext  A pointer to application-specific context.\n"]
 pub type otIp6ReceiveCallback = ::std::option::Option<
     unsafe extern "C" fn(aMessage: *mut otMessage, aContext: *mut ::std::os::raw::c_void),
 >;
 extern "C" {
-    #[doc = " This function registers a callback to provide received IPv6 datagrams.\n\n By default, this callback does not pass Thread control traffic.  See otIp6SetReceiveFilterEnabled() to\n change the Thread control traffic filter setting.\n\n @param[in]  aInstance         A pointer to an OpenThread instance.\n @param[in]  aCallback         A pointer to a function that is called when an IPv6 datagram is received or\n                               NULL to disable the callback.\n @param[in]  aCallbackContext  A pointer to application-specific context.\n\n @sa otIp6IsReceiveFilterEnabled\n @sa otIp6SetReceiveFilterEnabled\n"]
+    #[doc = " Registers a callback to provide received IPv6 datagrams.\n\n By default, this callback does not pass Thread control traffic.  See otIp6SetReceiveFilterEnabled() to\n change the Thread control traffic filter setting.\n\n @param[in]  aInstance         A pointer to an OpenThread instance.\n @param[in]  aCallback         A pointer to a function that is called when an IPv6 datagram is received or\n                               NULL to disable the callback.\n @param[in]  aCallbackContext  A pointer to application-specific context.\n\n @sa otIp6IsReceiveFilterEnabled\n @sa otIp6SetReceiveFilterEnabled\n"]
     pub fn otIp6SetReceiveCallback(
         aInstance: *mut otInstance,
         aCallback: otIp6ReceiveCallback,
         aCallbackContext: *mut ::std::os::raw::c_void,
     );
 }
-#[doc = " @struct otIp6AddressInfo\n\n This structure represents IPv6 address information.\n"]
+#[doc = " @struct otIp6AddressInfo\n\n Represents IPv6 address information.\n"]
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
 pub struct otIp6AddressInfo {
@@ -2412,7 +2407,7 @@ impl otIp6AddressInfo {
         __bindgen_bitfield_unit
     }
 }
-#[doc = " This function pointer is called when an internal IPv6 address is added or removed.\n\n @param[in]   aAddressInfo        A pointer to the IPv6 address information.\n @param[in]   aIsAdded            TRUE if the @p aAddress was added, FALSE if @p aAddress was removed.\n @param[in]   aContext            A pointer to application-specific context.\n"]
+#[doc = " Pointer is called when an internal IPv6 address is added or removed.\n\n @param[in]   aAddressInfo        A pointer to the IPv6 address information.\n @param[in]   aIsAdded            TRUE if the @p aAddress was added, FALSE if @p aAddress was removed.\n @param[in]   aContext            A pointer to application-specific context.\n"]
 pub type otIp6AddressCallback = ::std::option::Option<
     unsafe extern "C" fn(
         aAddressInfo: *const otIp6AddressInfo,
@@ -2421,7 +2416,7 @@ pub type otIp6AddressCallback = ::std::option::Option<
     ),
 >;
 extern "C" {
-    #[doc = " This function registers a callback to notify internal IPv6 address changes.\n\n @param[in]   aInstance           A pointer to an OpenThread instance.\n @param[in]   aCallback           A pointer to a function that is called when an internal IPv6 address is added or\n                                  removed. NULL to disable the callback.\n @param[in]   aCallbackContext    A pointer to application-specific context.\n"]
+    #[doc = " Registers a callback to notify internal IPv6 address changes.\n\n @param[in]   aInstance           A pointer to an OpenThread instance.\n @param[in]   aCallback           A pointer to a function that is called when an internal IPv6 address is added or\n                                  removed. NULL to disable the callback.\n @param[in]   aCallbackContext    A pointer to application-specific context.\n"]
     pub fn otIp6SetAddressCallback(
         aInstance: *mut otInstance,
         aCallback: otIp6AddressCallback,
@@ -2429,31 +2424,31 @@ extern "C" {
     );
 }
 extern "C" {
-    #[doc = " This function indicates whether or not Thread control traffic is filtered out when delivering IPv6 datagrams\n via the callback specified in otIp6SetReceiveCallback().\n\n @param[in]  aInstance A pointer to an OpenThread instance.\n\n @returns  TRUE if Thread control traffic is filtered out, FALSE otherwise.\n\n @sa otIp6SetReceiveCallback\n @sa otIp6SetReceiveFilterEnabled\n"]
+    #[doc = " Indicates whether or not Thread control traffic is filtered out when delivering IPv6 datagrams\n via the callback specified in otIp6SetReceiveCallback().\n\n @param[in]  aInstance A pointer to an OpenThread instance.\n\n @returns  TRUE if Thread control traffic is filtered out, FALSE otherwise.\n\n @sa otIp6SetReceiveCallback\n @sa otIp6SetReceiveFilterEnabled\n"]
     pub fn otIp6IsReceiveFilterEnabled(aInstance: *mut otInstance) -> bool;
 }
 extern "C" {
-    #[doc = " This function sets whether or not Thread control traffic is filtered out when delivering IPv6 datagrams\n via the callback specified in otIp6SetReceiveCallback().\n\n @param[in]  aInstance A pointer to an OpenThread instance.\n @param[in]  aEnabled  TRUE if Thread control traffic is filtered out, FALSE otherwise.\n\n @sa otIp6SetReceiveCallback\n @sa otIsReceiveIp6FilterEnabled\n"]
+    #[doc = " Sets whether or not Thread control traffic is filtered out when delivering IPv6 datagrams\n via the callback specified in otIp6SetReceiveCallback().\n\n @param[in]  aInstance A pointer to an OpenThread instance.\n @param[in]  aEnabled  TRUE if Thread control traffic is filtered out, FALSE otherwise.\n\n @sa otIp6SetReceiveCallback\n @sa otIsReceiveIp6FilterEnabled\n"]
     pub fn otIp6SetReceiveFilterEnabled(aInstance: *mut otInstance, aEnabled: bool);
 }
 extern "C" {
-    #[doc = " This function sends an IPv6 datagram via the Thread interface.\n\n The caller transfers ownership of @p aMessage when making this call. OpenThread will free @p aMessage when\n processing is complete, including when a value other than `OT_ERROR_NONE` is returned.\n\n @param[in]  aInstance A pointer to an OpenThread instance.\n @param[in]  aMessage  A pointer to the message buffer containing the IPv6 datagram.\n\n @retval OT_ERROR_NONE                    Successfully processed the message.\n @retval OT_ERROR_DROP                    Message was well-formed but not fully processed due to packet processing\n rules.\n @retval OT_ERROR_NO_BUFS                 Could not allocate necessary message buffers when processing the datagram.\n @retval OT_ERROR_NO_ROUTE                No route to host.\n @retval OT_ERROR_INVALID_SOURCE_ADDRESS  Source address is invalid, e.g. an anycast address or a multicast address.\n @retval OT_ERROR_PARSE                   Encountered a malformed header when processing the message.\n"]
+    #[doc = " Sends an IPv6 datagram via the Thread interface.\n\n The caller transfers ownership of @p aMessage when making this call. OpenThread will free @p aMessage when\n processing is complete, including when a value other than `OT_ERROR_NONE` is returned.\n\n @param[in]  aInstance A pointer to an OpenThread instance.\n @param[in]  aMessage  A pointer to the message buffer containing the IPv6 datagram.\n\n @retval OT_ERROR_NONE                    Successfully processed the message.\n @retval OT_ERROR_DROP                    Message was well-formed but not fully processed due to packet processing\n rules.\n @retval OT_ERROR_NO_BUFS                 Could not allocate necessary message buffers when processing the datagram.\n @retval OT_ERROR_NO_ROUTE                No route to host.\n @retval OT_ERROR_INVALID_SOURCE_ADDRESS  Source address is invalid, e.g. an anycast address or a multicast address.\n @retval OT_ERROR_PARSE                   Encountered a malformed header when processing the message.\n"]
     pub fn otIp6Send(aInstance: *mut otInstance, aMessage: *mut otMessage) -> otError;
 }
 extern "C" {
-    #[doc = " This function adds a port to the allowed unsecured port list.\n\n @param[in]  aInstance A pointer to an OpenThread instance.\n @param[in]  aPort     The port value.\n\n @retval OT_ERROR_NONE         The port was successfully added to the allowed unsecure port list.\n @retval OT_ERROR_INVALID_ARGS The port is invalid (value 0 is reserved for internal use).\n @retval OT_ERROR_NO_BUFS      The unsecure port list is full.\n"]
+    #[doc = " Adds a port to the allowed unsecured port list.\n\n @param[in]  aInstance A pointer to an OpenThread instance.\n @param[in]  aPort     The port value.\n\n @retval OT_ERROR_NONE         The port was successfully added to the allowed unsecure port list.\n @retval OT_ERROR_INVALID_ARGS The port is invalid (value 0 is reserved for internal use).\n @retval OT_ERROR_NO_BUFS      The unsecure port list is full.\n"]
     pub fn otIp6AddUnsecurePort(aInstance: *mut otInstance, aPort: u16) -> otError;
 }
 extern "C" {
-    #[doc = " This function removes a port from the allowed unsecure port list.\n\n @note This function removes @p aPort by overwriting @p aPort with the element after @p aPort in the internal port\n       list. Be careful when calling otIp6GetUnsecurePorts() followed by otIp6RemoveUnsecurePort() to remove unsecure\n       ports.\n\n @param[in]  aInstance A pointer to an OpenThread instance.\n @param[in]  aPort     The port value.\n\n @retval OT_ERROR_NONE         The port was successfully removed from the allowed unsecure port list.\n @retval OT_ERROR_INVALID_ARGS The port is invalid (value 0 is reserved for internal use).\n @retval OT_ERROR_NOT_FOUND    The port was not found in the unsecure port list.\n"]
+    #[doc = " Removes a port from the allowed unsecure port list.\n\n @note This function removes @p aPort by overwriting @p aPort with the element after @p aPort in the internal port\n       list. Be careful when calling otIp6GetUnsecurePorts() followed by otIp6RemoveUnsecurePort() to remove unsecure\n       ports.\n\n @param[in]  aInstance A pointer to an OpenThread instance.\n @param[in]  aPort     The port value.\n\n @retval OT_ERROR_NONE         The port was successfully removed from the allowed unsecure port list.\n @retval OT_ERROR_INVALID_ARGS The port is invalid (value 0 is reserved for internal use).\n @retval OT_ERROR_NOT_FOUND    The port was not found in the unsecure port list.\n"]
     pub fn otIp6RemoveUnsecurePort(aInstance: *mut otInstance, aPort: u16) -> otError;
 }
 extern "C" {
-    #[doc = " This function removes all ports from the allowed unsecure port list.\n\n @param[in]  aInstance A pointer to an OpenThread instance.\n"]
+    #[doc = " Removes all ports from the allowed unsecure port list.\n\n @param[in]  aInstance A pointer to an OpenThread instance.\n"]
     pub fn otIp6RemoveAllUnsecurePorts(aInstance: *mut otInstance);
 }
 extern "C" {
-    #[doc = " This function returns a pointer to the unsecure port list.\n\n @note Port value 0 is used to indicate an invalid entry.\n\n @param[in]   aInstance    A pointer to an OpenThread instance.\n @param[out]  aNumEntries  The number of entries in the list.\n\n @returns A pointer to the unsecure port list.\n"]
+    #[doc = " Returns a pointer to the unsecure port list.\n\n @note Port value 0 is used to indicate an invalid entry.\n\n @param[in]   aInstance    A pointer to an OpenThread instance.\n @param[out]  aNumEntries  The number of entries in the list.\n\n @returns A pointer to the unsecure port list.\n"]
     pub fn otIp6GetUnsecurePorts(aInstance: *mut otInstance, aNumEntries: *mut u8) -> *const u16;
 }
 extern "C" {
@@ -2465,21 +2460,21 @@ extern "C" {
     pub fn otIp6ArePrefixesEqual(aFirst: *const otIp6Prefix, aSecond: *const otIp6Prefix) -> bool;
 }
 extern "C" {
-    #[doc = " This function converts a human-readable IPv6 address string into a binary representation.\n\n @param[in]   aString   A pointer to a NULL-terminated string.\n @param[out]  aAddress  A pointer to an IPv6 address.\n\n @retval OT_ERROR_NONE   Successfully parsed @p aString and updated @p aAddress.\n @retval OT_ERROR_PARSE  Failed to parse @p aString as an IPv6 address.\n"]
+    #[doc = " Converts a human-readable IPv6 address string into a binary representation.\n\n @param[in]   aString   A pointer to a NULL-terminated string.\n @param[out]  aAddress  A pointer to an IPv6 address.\n\n @retval OT_ERROR_NONE   Successfully parsed @p aString and updated @p aAddress.\n @retval OT_ERROR_PARSE  Failed to parse @p aString as an IPv6 address.\n"]
     pub fn otIp6AddressFromString(
         aString: *const ::std::os::raw::c_char,
         aAddress: *mut otIp6Address,
     ) -> otError;
 }
 extern "C" {
-    #[doc = " This function converts a human-readable IPv6 prefix string into a binary representation.\n\n The @p aString parameter should be a string in the format \"<address>/<plen>\", where `<address>` is an IPv6\n address and `<plen>` is a prefix length.\n\n @param[in]   aString  A pointer to a NULL-terminated string.\n @param[out]  aPrefix  A pointer to an IPv6 prefix.\n\n @retval OT_ERROR_NONE   Successfully parsed the string as an IPv6 prefix and updated @p aPrefix.\n @retval OT_ERROR_PARSE  Failed to parse @p aString as an IPv6 prefix.\n"]
+    #[doc = " Converts a human-readable IPv6 prefix string into a binary representation.\n\n The @p aString parameter should be a string in the format \"<address>/<plen>\", where `<address>` is an IPv6\n address and `<plen>` is a prefix length.\n\n @param[in]   aString  A pointer to a NULL-terminated string.\n @param[out]  aPrefix  A pointer to an IPv6 prefix.\n\n @retval OT_ERROR_NONE   Successfully parsed the string as an IPv6 prefix and updated @p aPrefix.\n @retval OT_ERROR_PARSE  Failed to parse @p aString as an IPv6 prefix.\n"]
     pub fn otIp6PrefixFromString(
         aString: *const ::std::os::raw::c_char,
         aPrefix: *mut otIp6Prefix,
     ) -> otError;
 }
 extern "C" {
-    #[doc = " This function converts a given IPv6 address to a human-readable string.\n\n The IPv6 address string is formatted as 16 hex values separated by ':' (i.e., \"%x:%x:%x:...:%x\").\n\n If the resulting string does not fit in @p aBuffer (within its @p aSize characters), the string will be truncated\n but the outputted string is always null-terminated.\n\n @param[in]  aAddress  A pointer to an IPv6 address (MUST NOT be NULL).\n @param[out] aBuffer   A pointer to a char array to output the string (MUST NOT be NULL).\n @param[in]  aSize     The size of @p aBuffer (in bytes). Recommended to use `OT_IP6_ADDRESS_STRING_SIZE`.\n"]
+    #[doc = " Converts a given IPv6 address to a human-readable string.\n\n The IPv6 address string is formatted as 16 hex values separated by ':' (i.e., \"%x:%x:%x:...:%x\").\n\n If the resulting string does not fit in @p aBuffer (within its @p aSize characters), the string will be truncated\n but the outputted string is always null-terminated.\n\n @param[in]  aAddress  A pointer to an IPv6 address (MUST NOT be NULL).\n @param[out] aBuffer   A pointer to a char array to output the string (MUST NOT be NULL).\n @param[in]  aSize     The size of @p aBuffer (in bytes). Recommended to use `OT_IP6_ADDRESS_STRING_SIZE`.\n"]
     pub fn otIp6AddressToString(
         aAddress: *const otIp6Address,
         aBuffer: *mut ::std::os::raw::c_char,
@@ -2487,7 +2482,7 @@ extern "C" {
     );
 }
 extern "C" {
-    #[doc = " This function converts a given IPv6 socket address to a human-readable string.\n\n The IPv6 socket address string is formatted as [`address`]:`port` where `address` is shown\n as 16 hex values separated by `:` and `port` is the port number in decimal format,\n for example \"[%x:%x:...:%x]:%u\".\n\n If the resulting string does not fit in @p aBuffer (within its @p aSize characters), the string will be truncated\n but the outputted string is always null-terminated.\n\n @param[in]  aSockAddr A pointer to an IPv6 socket address (MUST NOT be NULL).\n @param[out] aBuffer   A pointer to a char array to output the string (MUST NOT be NULL).\n @param[in]  aSize     The size of @p aBuffer (in bytes). Recommended to use `OT_IP6_SOCK_ADDR_STRING_SIZE`.\n"]
+    #[doc = " Converts a given IPv6 socket address to a human-readable string.\n\n The IPv6 socket address string is formatted as [`address`]:`port` where `address` is shown\n as 16 hex values separated by `:` and `port` is the port number in decimal format,\n for example \"[%x:%x:...:%x]:%u\".\n\n If the resulting string does not fit in @p aBuffer (within its @p aSize characters), the string will be truncated\n but the outputted string is always null-terminated.\n\n @param[in]  aSockAddr A pointer to an IPv6 socket address (MUST NOT be NULL).\n @param[out] aBuffer   A pointer to a char array to output the string (MUST NOT be NULL).\n @param[in]  aSize     The size of @p aBuffer (in bytes). Recommended to use `OT_IP6_SOCK_ADDR_STRING_SIZE`.\n"]
     pub fn otIp6SockAddrToString(
         aSockAddr: *const otSockAddr,
         aBuffer: *mut ::std::os::raw::c_char,
@@ -2495,7 +2490,7 @@ extern "C" {
     );
 }
 extern "C" {
-    #[doc = " This function converts a given IPv6 prefix to a human-readable string.\n\n The IPv6 address string is formatted as \"%x:%x:%x:...[::]/plen\".\n\n If the resulting string does not fit in @p aBuffer (within its @p aSize characters), the string will be truncated\n but the outputted string is always null-terminated.\n\n @param[in]  aPrefix   A pointer to an IPv6 prefix (MUST NOT be NULL).\n @param[out] aBuffer   A pointer to a char array to output the string (MUST NOT be NULL).\n @param[in]  aSize     The size of @p aBuffer (in bytes). Recommended to use `OT_IP6_PREFIX_STRING_SIZE`.\n"]
+    #[doc = " Converts a given IPv6 prefix to a human-readable string.\n\n The IPv6 address string is formatted as \"%x:%x:%x:...[::]/plen\".\n\n If the resulting string does not fit in @p aBuffer (within its @p aSize characters), the string will be truncated\n but the outputted string is always null-terminated.\n\n @param[in]  aPrefix   A pointer to an IPv6 prefix (MUST NOT be NULL).\n @param[out] aBuffer   A pointer to a char array to output the string (MUST NOT be NULL).\n @param[in]  aSize     The size of @p aBuffer (in bytes). Recommended to use `OT_IP6_PREFIX_STRING_SIZE`.\n"]
     pub fn otIp6PrefixToString(
         aPrefix: *const otIp6Prefix,
         aBuffer: *mut ::std::os::raw::c_char,
@@ -2503,41 +2498,41 @@ extern "C" {
     );
 }
 extern "C" {
-    #[doc = " This function returns the prefix match length (bits) for two IPv6 addresses.\n\n @param[in]  aFirst   A pointer to the first IPv6 address.\n @param[in]  aSecond  A pointer to the second IPv6 address.\n\n @returns  The prefix match length in bits.\n"]
+    #[doc = " Returns the prefix match length (bits) for two IPv6 addresses.\n\n @param[in]  aFirst   A pointer to the first IPv6 address.\n @param[in]  aSecond  A pointer to the second IPv6 address.\n\n @returns  The prefix match length in bits.\n"]
     pub fn otIp6PrefixMatch(aFirst: *const otIp6Address, aSecond: *const otIp6Address) -> u8;
 }
 extern "C" {
-    #[doc = " This method gets a prefix with @p aLength from @p aAddress.\n\n @param[in]  aAddress   A pointer to an IPv6 address.\n @param[in]  aLength    The length of prefix in bits.\n @param[out] aPrefix    A pointer to output the IPv6 prefix.\n"]
+    #[doc = " Gets a prefix with @p aLength from @p aAddress.\n\n @param[in]  aAddress   A pointer to an IPv6 address.\n @param[in]  aLength    The length of prefix in bits.\n @param[out] aPrefix    A pointer to output the IPv6 prefix.\n"]
     pub fn otIp6GetPrefix(aAddress: *const otIp6Address, aLength: u8, aPrefix: *mut otIp6Prefix);
 }
 extern "C" {
-    #[doc = " This function indicates whether or not a given IPv6 address is the Unspecified Address.\n\n @param[in]  aAddress   A pointer to an IPv6 address.\n\n @retval TRUE   If the IPv6 address is the Unspecified Address.\n @retval FALSE  If the IPv6 address is not the Unspecified Address.\n"]
+    #[doc = " Indicates whether or not a given IPv6 address is the Unspecified Address.\n\n @param[in]  aAddress   A pointer to an IPv6 address.\n\n @retval TRUE   If the IPv6 address is the Unspecified Address.\n @retval FALSE  If the IPv6 address is not the Unspecified Address.\n"]
     pub fn otIp6IsAddressUnspecified(aAddress: *const otIp6Address) -> bool;
 }
 extern "C" {
-    #[doc = " This function perform OpenThread source address selection.\n\n @param[in]      aInstance     A pointer to an OpenThread instance.\n @param[in,out]  aMessageInfo  A pointer to the message information.\n\n @retval  OT_ERROR_NONE       Found a source address and is filled into mSockAddr of @p aMessageInfo.\n @retval  OT_ERROR_NOT_FOUND  No source address was found and @p aMessageInfo is unchanged.\n"]
+    #[doc = " Perform OpenThread source address selection.\n\n @param[in]      aInstance     A pointer to an OpenThread instance.\n @param[in,out]  aMessageInfo  A pointer to the message information.\n\n @retval  OT_ERROR_NONE       Found a source address and is filled into mSockAddr of @p aMessageInfo.\n @retval  OT_ERROR_NOT_FOUND  No source address was found and @p aMessageInfo is unchanged.\n"]
     pub fn otIp6SelectSourceAddress(
         aInstance: *mut otInstance,
         aMessageInfo: *mut otMessageInfo,
     ) -> otError;
 }
 extern "C" {
-    #[doc = " This function indicates whether the SLAAC module is enabled or not.\n\n This function requires the build-time feature `OPENTHREAD_CONFIG_IP6_SLAAC_ENABLE` to be enabled.\n\n @retval TRUE    SLAAC module is enabled.\n @retval FALSE   SLAAC module is disabled.\n"]
+    #[doc = " Indicates whether the SLAAC module is enabled or not.\n\n `OPENTHREAD_CONFIG_IP6_SLAAC_ENABLE` build-time feature must be enabled.\n\n @retval TRUE    SLAAC module is enabled.\n @retval FALSE   SLAAC module is disabled.\n"]
     pub fn otIp6IsSlaacEnabled(aInstance: *mut otInstance) -> bool;
 }
 extern "C" {
-    #[doc = " This function enables/disables the SLAAC module.\n\n This function requires the build-time feature `OPENTHREAD_CONFIG_IP6_SLAAC_ENABLE` to be enabled.\n\n When SLAAC module is enabled, SLAAC addresses (based on on-mesh prefixes in Network Data) are added to the interface.\n When SLAAC module is disabled any previously added SLAAC address is removed.\n\n @param[in] aInstance A pointer to an OpenThread instance.\n @param[in] aEnabled  TRUE to enable, FALSE to disable.\n"]
+    #[doc = " Enables/disables the SLAAC module.\n\n `OPENTHREAD_CONFIG_IP6_SLAAC_ENABLE` build-time feature must be enabled.\n\n When SLAAC module is enabled, SLAAC addresses (based on on-mesh prefixes in Network Data) are added to the interface.\n When SLAAC module is disabled any previously added SLAAC address is removed.\n\n @param[in] aInstance A pointer to an OpenThread instance.\n @param[in] aEnabled  TRUE to enable, FALSE to disable.\n"]
     pub fn otIp6SetSlaacEnabled(aInstance: *mut otInstance, aEnabled: bool);
 }
-#[doc = " This function pointer allows user to filter prefixes and not allow an SLAAC address based on a prefix to be added.\n\n `otIp6SetSlaacPrefixFilter()` can be used to set the filter handler. The filter handler is invoked by SLAAC module\n when it is about to add a SLAAC address based on a prefix. Its boolean return value determines whether the address\n is filtered (not added) or not.\n\n @param[in] aInstance   A pointer to an OpenThread instance.\n @param[in] aPrefix     A pointer to prefix for which SLAAC address is about to be added.\n\n @retval TRUE    Indicates that the SLAAC address based on the prefix should be filtered and NOT added.\n @retval FALSE   Indicates that the SLAAC address based on the prefix should be added.\n"]
+#[doc = " Pointer allows user to filter prefixes and not allow an SLAAC address based on a prefix to be added.\n\n `otIp6SetSlaacPrefixFilter()` can be used to set the filter handler. The filter handler is invoked by SLAAC module\n when it is about to add a SLAAC address based on a prefix. Its boolean return value determines whether the address\n is filtered (not added) or not.\n\n @param[in] aInstance   A pointer to an OpenThread instance.\n @param[in] aPrefix     A pointer to prefix for which SLAAC address is about to be added.\n\n @retval TRUE    Indicates that the SLAAC address based on the prefix should be filtered and NOT added.\n @retval FALSE   Indicates that the SLAAC address based on the prefix should be added.\n"]
 pub type otIp6SlaacPrefixFilter = ::std::option::Option<
     unsafe extern "C" fn(aInstance: *mut otInstance, aPrefix: *const otIp6Prefix) -> bool,
 >;
 extern "C" {
-    #[doc = " This function sets the SLAAC module filter handler.\n\n This function requires the build-time feature `OPENTHREAD_CONFIG_IP6_SLAAC_ENABLE` to be enabled.\n\n The filter handler is called by SLAAC module when it is about to add a SLAAC address based on a prefix to decide\n whether the address should be added or not.\n\n A NULL filter handler disables filtering and allows all SLAAC addresses to be added.\n\n If this function is not called, the default filter used by SLAAC module will be NULL (filtering is disabled).\n\n @param[in] aInstance    A pointer to an OpenThread instance.\n @param[in] aFilter      A pointer to SLAAC prefix filter handler, or NULL to disable filtering.\n"]
+    #[doc = " Sets the SLAAC module filter handler.\n\n `OPENTHREAD_CONFIG_IP6_SLAAC_ENABLE` build-time feature must be enabled.\n\n The filter handler is called by SLAAC module when it is about to add a SLAAC address based on a prefix to decide\n whether the address should be added or not.\n\n A NULL filter handler disables filtering and allows all SLAAC addresses to be added.\n\n If this function is not called, the default filter used by SLAAC module will be NULL (filtering is disabled).\n\n @param[in] aInstance    A pointer to an OpenThread instance.\n @param[in] aFilter      A pointer to SLAAC prefix filter handler, or NULL to disable filtering.\n"]
     pub fn otIp6SetSlaacPrefixFilter(aInstance: *mut otInstance, aFilter: otIp6SlaacPrefixFilter);
 }
-#[doc = " This function pointer is called with results of `otIp6RegisterMulticastListeners`.\n\n @param[in]  aContext  A pointer to the user context.\n @param[in]  aError    OT_ERROR_NONE when successfully sent MLR.req and received MLR.rsp,\n                       OT_ERROR_RESPONSE_TIMEOUT when failed to receive MLR.rsp,\n                       OT_ERROR_PARSE when failed to parse MLR.rsp.\n @param[in]  aMlrStatus         The Multicast Listener Registration status when @p aError is OT_ERROR_NONE.\n @param[in]  aFailedAddresses   A pointer to the failed IPv6 addresses when @p aError is OT_ERROR_NONE.\n @param[in]  aFailedAddressNum  The number of failed IPv6 addresses when @p aError is OT_ERROR_NONE.\n\n @sa otIp6RegisterMulticastListeners\n"]
+#[doc = " Pointer is called with results of `otIp6RegisterMulticastListeners`.\n\n @param[in]  aContext  A pointer to the user context.\n @param[in]  aError    OT_ERROR_NONE when successfully sent MLR.req and received MLR.rsp,\n                       OT_ERROR_RESPONSE_TIMEOUT when failed to receive MLR.rsp,\n                       OT_ERROR_PARSE when failed to parse MLR.rsp.\n @param[in]  aMlrStatus         The Multicast Listener Registration status when @p aError is OT_ERROR_NONE.\n @param[in]  aFailedAddresses   A pointer to the failed IPv6 addresses when @p aError is OT_ERROR_NONE.\n @param[in]  aFailedAddressNum  The number of failed IPv6 addresses when @p aError is OT_ERROR_NONE.\n\n @sa otIp6RegisterMulticastListeners\n"]
 pub type otIp6RegisterMulticastListenersCallback = ::std::option::Option<
     unsafe extern "C" fn(
         aContext: *mut ::std::os::raw::c_void,
@@ -2548,7 +2543,7 @@ pub type otIp6RegisterMulticastListenersCallback = ::std::option::Option<
     ),
 >;
 extern "C" {
-    #[doc = " This function registers Multicast Listeners to Primary Backbone Router.\n\n Note: only available when both `OPENTHREAD_CONFIG_TMF_PROXY_MLR_ENABLE` and\n `OPENTHREAD_CONFIG_COMMISSIONER_ENABLE` are enabled)\n\n @param[in]  aInstance    A pointer to an OpenThread instance.\n @param[in]  aAddresses   A Multicast Address Array to register.\n @param[in]  aAddressNum  The number of Multicast Address to register (0 if @p aAddresses is NULL).\n @param[in]  aTimeout     A pointer to the timeout value (in seconds) to be included in MLR.req. A timeout value of 0\n                          removes the corresponding Multicast Listener. If NULL, MLR.req would have no Timeout Tlv by\n                          default.\n @param[in]  aCallback    A pointer to the callback function.\n @param[in]  aContext     A pointer to the user context.\n\n @retval OT_ERROR_NONE           Successfully sent MLR.req. The @p aCallback will be called iff this method\n                                 returns OT_ERROR_NONE.\n @retval OT_ERROR_BUSY           If a previous registration was ongoing.\n @retval OT_ERROR_INVALID_ARGS   If one or more arguments are invalid.\n @retval OT_ERROR_INVALID_STATE  If the device was not in a valid state to send MLR.req (e.g. Commissioner not\n                                 started, Primary Backbone Router not found).\n @retval OT_ERROR_NO_BUFS        If insufficient message buffers available.\n\n @sa otIp6RegisterMulticastListenersCallback\n"]
+    #[doc = " Registers Multicast Listeners to Primary Backbone Router.\n\n `OPENTHREAD_CONFIG_TMF_PROXY_MLR_ENABLE` and `OPENTHREAD_CONFIG_COMMISSIONER_ENABLE`\n must be enabled.\n\n @param[in]  aInstance    A pointer to an OpenThread instance.\n @param[in]  aAddresses   A Multicast Address Array to register.\n @param[in]  aAddressNum  The number of Multicast Address to register (0 if @p aAddresses is NULL).\n @param[in]  aTimeout     A pointer to the timeout value (in seconds) to be included in MLR.req. A timeout value of 0\n                          removes the corresponding Multicast Listener. If NULL, MLR.req would have no Timeout Tlv by\n                          default.\n @param[in]  aCallback    A pointer to the callback function.\n @param[in]  aContext     A pointer to the user context.\n\n @retval OT_ERROR_NONE           Successfully sent MLR.req. The @p aCallback will be called iff this method\n                                 returns OT_ERROR_NONE.\n @retval OT_ERROR_BUSY           If a previous registration was ongoing.\n @retval OT_ERROR_INVALID_ARGS   If one or more arguments are invalid.\n @retval OT_ERROR_INVALID_STATE  If the device was not in a valid state to send MLR.req (e.g. Commissioner not\n                                 started, Primary Backbone Router not found).\n @retval OT_ERROR_NO_BUFS        If insufficient message buffers available.\n\n @sa otIp6RegisterMulticastListenersCallback\n"]
     pub fn otIp6RegisterMulticastListeners(
         aInstance: *mut otInstance,
         aAddresses: *const otIp6Address,
@@ -2559,17 +2554,17 @@ extern "C" {
     ) -> otError;
 }
 extern "C" {
-    #[doc = " This function sets the Mesh Local IID (for test purpose).\n\n Only available when `OPENTHREAD_CONFIG_REFERENCE_DEVICE_ENABLE` is enabled.\n\n @param[in]   aInstance   A pointer to an OpenThread instance.\n @param[in]   aIid        A pointer to the Mesh Local IID to set.\n\n @retval  OT_ERROR_NONE           Successfully set the Mesh Local IID.\n @retval  OT_ERROR_INVALID_STATE  Thread protocols are enabled.\n"]
+    #[doc = " Sets the Mesh Local IID (for test purpose).\n\n `OPENTHREAD_CONFIG_REFERENCE_DEVICE_ENABLE` must be enabled.\n\n @param[in]   aInstance   A pointer to an OpenThread instance.\n @param[in]   aIid        A pointer to the Mesh Local IID to set.\n\n @retval  OT_ERROR_NONE           Successfully set the Mesh Local IID.\n @retval  OT_ERROR_INVALID_STATE  Thread protocols are enabled.\n"]
     pub fn otIp6SetMeshLocalIid(
         aInstance: *mut otInstance,
         aIid: *const otIp6InterfaceIdentifier,
     ) -> otError;
 }
 extern "C" {
-    #[doc = " This function converts a given IP protocol number to a human-readable string.\n\n @param[in] aIpProto   An IP protocol number (`OT_IP6_PROTO_*` enumeration).\n\n @returns A string representing @p aIpProto.\n"]
+    #[doc = " Converts a given IP protocol number to a human-readable string.\n\n @param[in] aIpProto   An IP protocol number (`OT_IP6_PROTO_*` enumeration).\n\n @returns A string representing @p aIpProto.\n"]
     pub fn otIp6ProtoToString(aIpProto: u8) -> *const ::std::os::raw::c_char;
 }
-#[doc = " This structure represents the counters for packets and bytes.\n"]
+#[doc = " Represents the counters for packets and bytes.\n"]
 #[repr(C)]
 #[derive(Debug, Default, Copy, Clone)]
 pub struct otPacketsAndBytes {
@@ -2578,7 +2573,7 @@ pub struct otPacketsAndBytes {
     #[doc = "< The number of bytes."]
     pub mBytes: u64,
 }
-#[doc = " This structure represents the counters of packets forwarded via Border Routing.\n"]
+#[doc = " Represents the counters of packets forwarded via Border Routing.\n"]
 #[repr(C)]
 #[derive(Debug, Default, Copy, Clone)]
 pub struct otBorderRoutingCounters {
@@ -2604,7 +2599,7 @@ pub struct otBorderRoutingCounters {
     pub mRsTxFailure: u32,
 }
 extern "C" {
-    #[doc = " Gets the Border Routing counters.\n\n This function requires the build-time feature `OPENTHREAD_CONFIG_IP6_BR_COUNTERS_ENABLE` to be enabled.\n\n @param[in]  aInstance  A pointer to an OpenThread instance.\n\n @returns A pointer to the Border Routing counters.\n"]
+    #[doc = " Gets the Border Routing counters.\n\n `OPENTHREAD_CONFIG_IP6_BR_COUNTERS_ENABLE` build-time feature must be enabled.\n\n @param[in]  aInstance  A pointer to an OpenThread instance.\n\n @returns A pointer to the Border Routing counters.\n"]
     pub fn otIp6GetBorderRoutingCounters(
         aInstance: *mut otInstance,
     ) -> *const otBorderRoutingCounters;
@@ -2614,7 +2609,7 @@ extern "C" {
     pub fn otIp6ResetBorderRoutingCounters(aInstance: *mut otInstance);
 }
 pub type otNetworkDataIterator = u32;
-#[doc = " This structure represents a Border Router configuration."]
+#[doc = " Represents a Border Router configuration."]
 #[repr(C)]
 #[repr(align(4))]
 #[derive(Copy, Clone)]
@@ -2803,7 +2798,7 @@ impl otBorderRouterConfig {
         __bindgen_bitfield_unit
     }
 }
-#[doc = " This structure represents 6LoWPAN Context ID information associated with a prefix in Network Data.\n"]
+#[doc = " Represents 6LoWPAN Context ID information associated with a prefix in Network Data.\n"]
 #[repr(C)]
 #[derive(Copy, Clone)]
 pub struct otLowpanContextInfo {
@@ -2823,7 +2818,7 @@ impl Default for otLowpanContextInfo {
         }
     }
 }
-#[doc = " This structure represents an External Route configuration.\n"]
+#[doc = " Represents an External Route configuration.\n"]
 #[repr(C)]
 #[repr(align(4))]
 #[derive(Copy, Clone)]
@@ -2925,7 +2920,7 @@ pub const OT_ROUTE_PREFERENCE_MED: otRoutePreference = 0;
 pub const OT_ROUTE_PREFERENCE_HIGH: otRoutePreference = 1;
 #[doc = " Defines valid values for `mPreference` in `otExternalRouteConfig` and `otBorderRouterConfig`.\n"]
 pub type otRoutePreference = ::std::os::raw::c_int;
-#[doc = " This structure represents a Server configuration.\n"]
+#[doc = " Represents a Server configuration.\n"]
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
 pub struct otServerConfig {
@@ -2969,7 +2964,7 @@ impl otServerConfig {
         __bindgen_bitfield_unit
     }
 }
-#[doc = " This structure represents a Service configuration.\n"]
+#[doc = " Represents a Service configuration.\n"]
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
 pub struct otServiceConfig {
@@ -3110,22 +3105,22 @@ extern "C" {
     pub fn otBackboneRouterRegister(aInstance: *mut otInstance) -> otError;
 }
 extern "C" {
-    #[doc = " This method returns the Backbone Router registration jitter value.\n\n @returns The Backbone Router registration jitter value.\n\n @sa otBackboneRouterSetRegistrationJitter\n"]
+    #[doc = " Returns the Backbone Router registration jitter value.\n\n @returns The Backbone Router registration jitter value.\n\n @sa otBackboneRouterSetRegistrationJitter\n"]
     pub fn otBackboneRouterGetRegistrationJitter(aInstance: *mut otInstance) -> u8;
 }
 extern "C" {
-    #[doc = " This method sets the Backbone Router registration jitter value.\n\n @param[in]  aJitter the Backbone Router registration jitter value to set.\n\n @sa otBackboneRouterGetRegistrationJitter\n"]
+    #[doc = " Sets the Backbone Router registration jitter value.\n\n @param[in]  aJitter the Backbone Router registration jitter value to set.\n\n @sa otBackboneRouterGetRegistrationJitter\n"]
     pub fn otBackboneRouterSetRegistrationJitter(aInstance: *mut otInstance, aJitter: u8);
 }
 extern "C" {
-    #[doc = " This method gets the local Domain Prefix configuration.\n\n @param[in]  aInstance A pointer to an OpenThread instance.\n @param[out] aConfig   A pointer to the Domain Prefix configuration.\n\n @retval OT_ERROR_NONE       Successfully got the Domain Prefix configuration.\n @retval OT_ERROR_NOT_FOUND  No Domain Prefix was configured.\n"]
+    #[doc = " Gets the local Domain Prefix configuration.\n\n @param[in]  aInstance A pointer to an OpenThread instance.\n @param[out] aConfig   A pointer to the Domain Prefix configuration.\n\n @retval OT_ERROR_NONE       Successfully got the Domain Prefix configuration.\n @retval OT_ERROR_NOT_FOUND  No Domain Prefix was configured.\n"]
     pub fn otBackboneRouterGetDomainPrefix(
         aInstance: *mut otInstance,
         aConfig: *mut otBorderRouterConfig,
     ) -> otError;
 }
 extern "C" {
-    #[doc = " This method configures response status for next DUA registration.\n\n Note: available only when `OPENTHREAD_CONFIG_REFERENCE_DEVICE_ENABLE` is enabled.\n       Only used for test and certification.\n\n TODO: (DUA) support coap error code and corresponding process for certification purpose.\n\n @param[in] aInstance A pointer to an OpenThread instance.\n @param[in] aMlIid    A pointer to the Mesh Local IID. If NULL, respond with @p aStatus for any\n                      coming DUA.req, otherwise only respond the one with matching @p aMlIid.\n @param[in] aStatus   The status to respond.\n\n"]
+    #[doc = " Configures response status for next DUA registration.\n\n Note: available only when `OPENTHREAD_CONFIG_REFERENCE_DEVICE_ENABLE` is enabled.\n       Only used for test and certification.\n\n TODO: (DUA) support coap error code and corresponding process for certification purpose.\n\n @param[in] aInstance A pointer to an OpenThread instance.\n @param[in] aMlIid    A pointer to the Mesh Local IID. If NULL, respond with @p aStatus for any\n                      coming DUA.req, otherwise only respond the one with matching @p aMlIid.\n @param[in] aStatus   The status to respond.\n\n"]
     pub fn otBackboneRouterConfigNextDuaRegistrationResponse(
         aInstance: *mut otInstance,
         aMlIid: *const otIp6InterfaceIdentifier,
@@ -3145,7 +3140,7 @@ pub const OT_BACKBONE_ROUTER_MULTICAST_LISTENER_ADDED: otBackboneRouterMulticast
 pub const OT_BACKBONE_ROUTER_MULTICAST_LISTENER_REMOVED: otBackboneRouterMulticastListenerEvent = 1;
 #[doc = " Represents the Multicast Listener events.\n"]
 pub type otBackboneRouterMulticastListenerEvent = ::std::os::raw::c_uint;
-#[doc = " This function pointer is called whenever the Multicast Listeners change.\n\n @param[in] aContext  The user context pointer.\n @param[in] aEvent    The Multicast Listener event.\n @param[in] aAddress  The IPv6 multicast address of the Multicast Listener.\n"]
+#[doc = " Pointer is called whenever the Multicast Listeners change.\n\n @param[in] aContext  The user context pointer.\n @param[in] aEvent    The Multicast Listener event.\n @param[in] aAddress  The IPv6 multicast address of the Multicast Listener.\n"]
 pub type otBackboneRouterMulticastListenerCallback = ::std::option::Option<
     unsafe extern "C" fn(
         aContext: *mut ::std::os::raw::c_void,
@@ -3154,7 +3149,7 @@ pub type otBackboneRouterMulticastListenerCallback = ::std::option::Option<
     ),
 >;
 extern "C" {
-    #[doc = " This method sets the Backbone Router Multicast Listener callback.\n\n @param[in] aInstance  A pointer to an OpenThread instance.\n @param[in] aCallback  A pointer to the Multicast Listener callback.\n @param[in] aContext   A user context pointer.\n"]
+    #[doc = " Sets the Backbone Router Multicast Listener callback.\n\n @param[in] aInstance  A pointer to an OpenThread instance.\n @param[in] aCallback  A pointer to the Multicast Listener callback.\n @param[in] aContext   A user context pointer.\n"]
     pub fn otBackboneRouterSetMulticastListenerCallback(
         aInstance: *mut otInstance,
         aCallback: otBackboneRouterMulticastListenerCallback,
@@ -3174,7 +3169,7 @@ extern "C" {
     ) -> otError;
 }
 pub type otBackboneRouterMulticastListenerIterator = u16;
-#[doc = " This structure represents a Backbone Router Multicast Listener info.\n"]
+#[doc = " Represents a Backbone Router Multicast Listener info.\n"]
 #[repr(C)]
 #[derive(Copy, Clone)]
 pub struct otBackboneRouterMulticastListenerInfo {
@@ -3191,7 +3186,7 @@ impl Default for otBackboneRouterMulticastListenerInfo {
     }
 }
 extern "C" {
-    #[doc = " This function gets the next Multicast Listener info (using an iterator).\n\n @param[in]      aInstance      A pointer to an OpenThread instance.\n @param[in,out]  aIterator      A pointer to the iterator. On success the iterator will be updated to point to next\n                                Multicast Listener. To get the first entry the iterator should be set to\n                                OT_BACKBONE_ROUTER_MULTICAST_LISTENER_ITERATOR_INIT.\n @param[out]     aListenerInfo  A pointer to an `otBackboneRouterMulticastListenerInfo` where information of next\n                                Multicast Listener is placed (on success).\n\n @retval OT_ERROR_NONE       Successfully found the next Multicast Listener info (@p aListenerInfo was successfully\n                             updated).\n @retval OT_ERROR_NOT_FOUND  No subsequent Multicast Listener info was found.\n\n @sa otBackboneRouterMulticastListenerClear\n @sa otBackboneRouterMulticastListenerAdd\n"]
+    #[doc = " Gets the next Multicast Listener info (using an iterator).\n\n @param[in]      aInstance      A pointer to an OpenThread instance.\n @param[in,out]  aIterator      A pointer to the iterator. On success the iterator will be updated to point to next\n                                Multicast Listener. To get the first entry the iterator should be set to\n                                OT_BACKBONE_ROUTER_MULTICAST_LISTENER_ITERATOR_INIT.\n @param[out]     aListenerInfo  A pointer to an `otBackboneRouterMulticastListenerInfo` where information of next\n                                Multicast Listener is placed (on success).\n\n @retval OT_ERROR_NONE       Successfully found the next Multicast Listener info (@p aListenerInfo was successfully\n                             updated).\n @retval OT_ERROR_NOT_FOUND  No subsequent Multicast Listener info was found.\n\n @sa otBackboneRouterMulticastListenerClear\n @sa otBackboneRouterMulticastListenerAdd\n"]
     pub fn otBackboneRouterMulticastListenerGetNext(
         aInstance: *mut otInstance,
         aIterator: *mut otBackboneRouterMulticastListenerIterator,
@@ -3208,7 +3203,7 @@ pub const OT_BACKBONE_ROUTER_NDPROXY_RENEWED: otBackboneRouterNdProxyEvent = 2;
 pub const OT_BACKBONE_ROUTER_NDPROXY_CLEARED: otBackboneRouterNdProxyEvent = 3;
 #[doc = " Represents the ND Proxy events.\n"]
 pub type otBackboneRouterNdProxyEvent = ::std::os::raw::c_uint;
-#[doc = " This function pointer is called whenever the Nd Proxy changed.\n\n @param[in] aContext  The user context pointer.\n @param[in] aEvent    The ND Proxy event.\n @param[in] aDua      The Domain Unicast Address of the ND Proxy, or `nullptr` if @p aEvent is\n                      `OT_BACKBONE_ROUTER_NDPROXY_CLEARED`.\n"]
+#[doc = " Pointer is called whenever the Nd Proxy changed.\n\n @param[in] aContext  The user context pointer.\n @param[in] aEvent    The ND Proxy event.\n @param[in] aDua      The Domain Unicast Address of the ND Proxy, or `nullptr` if @p aEvent is\n                      `OT_BACKBONE_ROUTER_NDPROXY_CLEARED`.\n"]
 pub type otBackboneRouterNdProxyCallback = ::std::option::Option<
     unsafe extern "C" fn(
         aContext: *mut ::std::os::raw::c_void,
@@ -3217,7 +3212,7 @@ pub type otBackboneRouterNdProxyCallback = ::std::option::Option<
     ),
 >;
 extern "C" {
-    #[doc = " This method sets the Backbone Router ND Proxy callback.\n\n @param[in] aInstance  A pointer to an OpenThread instance.\n @param[in] aCallback  A pointer to the ND Proxy callback.\n @param[in] aContext   A user context pointer.\n"]
+    #[doc = " Sets the Backbone Router ND Proxy callback.\n\n @param[in] aInstance  A pointer to an OpenThread instance.\n @param[in] aCallback  A pointer to the ND Proxy callback.\n @param[in] aContext   A user context pointer.\n"]
     pub fn otBackboneRouterSetNdProxyCallback(
         aInstance: *mut otInstance,
         aCallback: otBackboneRouterNdProxyCallback,
@@ -3245,7 +3240,7 @@ impl Default for otBackboneRouterNdProxyInfo {
     }
 }
 extern "C" {
-    #[doc = " This method gets the Backbone Router ND Proxy info.\n\n @param[in]   aInstance     A pointer to an OpenThread instance.\n @param[in]   aDua          The Domain Unicast Address.\n @param[out]  aNdProxyInfo  A pointer to the ND Proxy info.\n\n @retval OT_ERROR_NONE       Successfully got the ND Proxy info.\n @retval OT_ERROR_NOT_FOUND  Failed to find the Domain Unicast Address in the ND Proxy table.\n"]
+    #[doc = " Gets the Backbone Router ND Proxy info.\n\n @param[in]   aInstance     A pointer to an OpenThread instance.\n @param[in]   aDua          The Domain Unicast Address.\n @param[out]  aNdProxyInfo  A pointer to the ND Proxy info.\n\n @retval OT_ERROR_NONE       Successfully got the ND Proxy info.\n @retval OT_ERROR_NOT_FOUND  Failed to find the Domain Unicast Address in the ND Proxy table.\n"]
     pub fn otBackboneRouterGetNdProxyInfo(
         aInstance: *mut otInstance,
         aDua: *const otIp6Address,
@@ -3260,7 +3255,7 @@ pub const OT_BACKBONE_ROUTER_DOMAIN_PREFIX_REMOVED: otBackboneRouterDomainPrefix
 pub const OT_BACKBONE_ROUTER_DOMAIN_PREFIX_CHANGED: otBackboneRouterDomainPrefixEvent = 2;
 #[doc = " Represents the Domain Prefix events.\n"]
 pub type otBackboneRouterDomainPrefixEvent = ::std::os::raw::c_uint;
-#[doc = " This function pointer is called whenever the Domain Prefix changed.\n\n @param[in] aContext       The user context pointer.\n @param[in] aEvent         The Domain Prefix event.\n @param[in] aDomainPrefix  The new Domain Prefix if added or changed, nullptr otherwise.\n"]
+#[doc = " Pointer is called whenever the Domain Prefix changed.\n\n @param[in] aContext       The user context pointer.\n @param[in] aEvent         The Domain Prefix event.\n @param[in] aDomainPrefix  The new Domain Prefix if added or changed, nullptr otherwise.\n"]
 pub type otBackboneRouterDomainPrefixCallback = ::std::option::Option<
     unsafe extern "C" fn(
         aContext: *mut ::std::os::raw::c_void,
@@ -3269,14 +3264,14 @@ pub type otBackboneRouterDomainPrefixCallback = ::std::option::Option<
     ),
 >;
 extern "C" {
-    #[doc = " This method sets the Backbone Router Domain Prefix callback.\n\n @param[in] aInstance  A pointer to an OpenThread instance.\n @param[in] aCallback  A pointer to the Domain Prefix callback.\n @param[in] aContext   A user context pointer.\n"]
+    #[doc = " Sets the Backbone Router Domain Prefix callback.\n\n @param[in] aInstance  A pointer to an OpenThread instance.\n @param[in] aCallback  A pointer to the Domain Prefix callback.\n @param[in] aContext   A user context pointer.\n"]
     pub fn otBackboneRouterSetDomainPrefixCallback(
         aInstance: *mut otInstance,
         aCallback: otBackboneRouterDomainPrefixCallback,
         aContext: *mut ::std::os::raw::c_void,
     );
 }
-#[doc = " @struct otBorderAgentId\n\n This structure represents a Border Agent ID.\n"]
+#[doc = " @struct otBorderAgentId\n\n Represents a Border Agent ID.\n"]
 #[repr(C, packed)]
 #[derive(Debug, Default, Copy, Clone)]
 pub struct otBorderAgentId {
@@ -3288,7 +3283,7 @@ pub const OT_BORDER_AGENT_STATE_STOPPED: otBorderAgentState = 0;
 pub const OT_BORDER_AGENT_STATE_STARTED: otBorderAgentState = 1;
 #[doc = "< Border agent is connected with external commissioner."]
 pub const OT_BORDER_AGENT_STATE_ACTIVE: otBorderAgentState = 2;
-#[doc = " This enumeration defines the Border Agent state.\n"]
+#[doc = " Defines the Border Agent state.\n"]
 pub type otBorderAgentState = ::std::os::raw::c_uint;
 extern "C" {
     #[doc = " Gets the #otBorderAgentState of the Thread Border Agent role.\n\n @param[in]  aInstance  A pointer to an OpenThread instance.\n\n @returns The current #otBorderAgentState of the Border Agent.\n"]
@@ -3298,7 +3293,7 @@ extern "C" {
     #[doc = " Gets the UDP port of the Thread Border Agent service.\n\n @param[in]  aInstance  A pointer to an OpenThread instance.\n\n @returns UDP port of the Border Agent.\n"]
     pub fn otBorderAgentGetUdpPort(aInstance: *mut otInstance) -> u16;
 }
-#[doc = " This structure represents an iterator to iterate through the Border Router's discovered prefix table.\n\n The fields in this type are opaque (intended for use by OpenThread core only) and therefore should not be\n accessed or used by caller.\n\n Before using an iterator, it MUST be initialized using `otBorderRoutingPrefixTableInitIterator()`.\n"]
+#[doc = " Represents an iterator to iterate through the Border Router's discovered prefix table.\n\n The fields in this type are opaque (intended for use by OpenThread core only) and therefore should not be\n accessed or used by caller.\n\n Before using an iterator, it MUST be initialized using `otBorderRoutingPrefixTableInitIterator()`.\n"]
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
 pub struct otBorderRoutingPrefixTableIterator {
@@ -3315,7 +3310,7 @@ impl Default for otBorderRoutingPrefixTableIterator {
         }
     }
 }
-#[doc = " This structure represents an entry from the discovered prefix table.\n\n The entries in the discovered table track the Prefix/Route Info Options in the received Router Advertisement messages\n from other routers on infrastructure link.\n"]
+#[doc = " Represents an entry from the discovered prefix table.\n\n The entries in the discovered table track the Prefix/Route Info Options in the received Router Advertisement messages\n from other routers on infrastructure link.\n"]
 #[repr(C)]
 #[derive(Copy, Clone)]
 pub struct otBorderRoutingPrefixTableEntry {
@@ -3351,10 +3346,18 @@ pub const OT_BORDER_ROUTING_STATE_DISABLED: otBorderRoutingState = 1;
 pub const OT_BORDER_ROUTING_STATE_STOPPED: otBorderRoutingState = 2;
 #[doc = "< Routing Manager is initialized, enabled, and running."]
 pub const OT_BORDER_ROUTING_STATE_RUNNING: otBorderRoutingState = 3;
-#[doc = " This enumeration represents the state of Border Routing Manager.\n"]
+#[doc = " Represents the state of Border Routing Manager.\n"]
 pub type otBorderRoutingState = ::std::os::raw::c_uint;
+#[doc = "< DHCPv6 PD is disabled on the border router."]
+pub const OT_BORDER_ROUTING_DHCP6_PD_STATE_DISABLED: otBorderRoutingDhcp6PdState = 0;
+#[doc = "< DHCPv6 PD in enabled but won't try to request and publish a prefix."]
+pub const OT_BORDER_ROUTING_DHCP6_PD_STATE_STOPPED: otBorderRoutingDhcp6PdState = 1;
+#[doc = "< DHCPv6 PD is enabled and will try to request and publish a prefix."]
+pub const OT_BORDER_ROUTING_DHCP6_PD_STATE_RUNNING: otBorderRoutingDhcp6PdState = 2;
+#[doc = " This enumeration represents the state of DHCPv6 Prefix Delegation State.\n"]
+pub type otBorderRoutingDhcp6PdState = ::std::os::raw::c_uint;
 extern "C" {
-    #[doc = " This method initializes the Border Routing Manager on given infrastructure interface.\n\n @note  This method MUST be called before any other otBorderRouting* APIs.\n\n @param[in]  aInstance          A pointer to an OpenThread instance.\n @param[in]  aInfraIfIndex      The infrastructure interface index.\n @param[in]  aInfraIfIsRunning  A boolean that indicates whether the infrastructure\n                                interface is running.\n\n @retval  OT_ERROR_NONE           Successfully started the Border Routing Manager on given infrastructure.\n @retval  OT_ERROR_INVALID_STATE  The Border Routing Manager has already been initialized.\n @retval  OT_ERROR_INVALID_ARGS   The index of the infrastructure interface is not valid.\n @retval  OT_ERROR_FAILED         Internal failure. Usually due to failure in generating random prefixes.\n\n @sa otPlatInfraIfStateChanged.\n"]
+    #[doc = " Initializes the Border Routing Manager on given infrastructure interface.\n\n @note  This method MUST be called before any other otBorderRouting* APIs.\n\n @param[in]  aInstance          A pointer to an OpenThread instance.\n @param[in]  aInfraIfIndex      The infrastructure interface index.\n @param[in]  aInfraIfIsRunning  A boolean that indicates whether the infrastructure\n                                interface is running.\n\n @retval  OT_ERROR_NONE           Successfully started the Border Routing Manager on given infrastructure.\n @retval  OT_ERROR_INVALID_STATE  The Border Routing Manager has already been initialized.\n @retval  OT_ERROR_INVALID_ARGS   The index of the infrastructure interface is not valid.\n @retval  OT_ERROR_FAILED         Internal failure. Usually due to failure in generating random prefixes.\n\n @sa otPlatInfraIfStateChanged.\n"]
     pub fn otBorderRoutingInit(
         aInstance: *mut otInstance,
         aInfraIfIndex: u32,
@@ -3370,27 +3373,34 @@ extern "C" {
     pub fn otBorderRoutingGetState(aInstance: *mut otInstance) -> otBorderRoutingState;
 }
 extern "C" {
-    #[doc = " This function gets the current preference used when advertising Route Info Options (RIO) in Router Advertisement\n messages sent over the infrastructure link.\n\n The RIO preference is determined as follows:\n\n - If explicitly set by user by calling `otBorderRoutingSetRouteInfoOptionPreference()`, the given preference is\n   used.\n - Otherwise, it is determined based on device's current role: Medium preference when in router/leader role and\n   low preference when in child role.\n\n @returns The current Route Info Option preference.\n"]
+    #[doc = " Gets the current preference used when advertising Route Info Options (RIO) in Router Advertisement\n messages sent over the infrastructure link.\n\n The RIO preference is determined as follows:\n\n - If explicitly set by user by calling `otBorderRoutingSetRouteInfoOptionPreference()`, the given preference is\n   used.\n - Otherwise, it is determined based on device's current role: Medium preference when in router/leader role and\n   low preference when in child role.\n\n @returns The current Route Info Option preference.\n"]
     pub fn otBorderRoutingGetRouteInfoOptionPreference(
         aInstance: *mut otInstance,
     ) -> otRoutePreference;
 }
 extern "C" {
-    #[doc = " This function explicitly sets the preference to use when advertising Route Info Options (RIO) in Router\n Advertisement messages sent over the infrastructure link.\n\n After a call to this function, BR will use the given preference for all its advertised RIOs. The preference can be\n cleared by calling `otBorderRoutingClearRouteInfoOptionPreference()`.\n\n @param[in] aInstance     A pointer to an OpenThread instance.\n @param[in] aPreference   The route preference to use.\n"]
+    #[doc = " Explicitly sets the preference to use when advertising Route Info Options (RIO) in Router\n Advertisement messages sent over the infrastructure link.\n\n After a call to this function, BR will use the given preference for all its advertised RIOs. The preference can be\n cleared by calling `otBorderRoutingClearRouteInfoOptionPreference()`.\n\n @param[in] aInstance     A pointer to an OpenThread instance.\n @param[in] aPreference   The route preference to use.\n"]
     pub fn otBorderRoutingSetRouteInfoOptionPreference(
         aInstance: *mut otInstance,
         aPreference: otRoutePreference,
     );
 }
 extern "C" {
-    #[doc = " This function clears a previously set preference value for advertised Route Info Options.\n\n After a call to this function, BR will use device's role to determine the RIO preference: Medium preference when\n in router/leader role and low preference when in child role.\n\n @param[in] aInstance     A pointer to an OpenThread instance.\n"]
+    #[doc = " Clears a previously set preference value for advertised Route Info Options.\n\n After a call to this function, BR will use device's role to determine the RIO preference: Medium preference when\n in router/leader role and low preference when in child role.\n\n @param[in] aInstance     A pointer to an OpenThread instance.\n"]
     pub fn otBorderRoutingClearRouteInfoOptionPreference(aInstance: *mut otInstance);
 }
 extern "C" {
-    #[doc = " Gets the local Off-Mesh-Routable (OMR) Prefix, for example `fdfc:1ff5:1512:5622::/64`.\n\n An OMR Prefix is a randomly generated 64-bit prefix that's published in the\n Thread network if there isn't already an OMR prefix. This prefix can be reached\n from the local Wi-Fi or Ethernet network.\n\n @param[in]   aInstance  A pointer to an OpenThread instance.\n @param[out]  aPrefix    A pointer to where the prefix will be output to.\n\n @retval  OT_ERROR_INVALID_STATE  The Border Routing Manager is not initialized yet.\n @retval  OT_ERROR_NONE           Successfully retrieved the OMR prefix.\n"]
+    #[doc = " Gets the local Off-Mesh-Routable (OMR) Prefix, for example `fdfc:1ff5:1512:5622::/64`.\n\n An OMR Prefix is a randomly generated 64-bit prefix that's published in the\n Thread network if there isn't already an OMR prefix. This prefix can be reached\n from the local Wi-Fi or Ethernet network.\n\n Note: When DHCPv6 PD is enabled, the border router may publish the prefix from\n DHCPv6 PD.\n\n @param[in]   aInstance  A pointer to an OpenThread instance.\n @param[out]  aPrefix    A pointer to where the prefix will be output to.\n\n @retval  OT_ERROR_INVALID_STATE  The Border Routing Manager is not initialized yet.\n @retval  OT_ERROR_NONE           Successfully retrieved the OMR prefix.\n\n @sa otBorderRoutingGetPdOmrPrefix\n"]
     pub fn otBorderRoutingGetOmrPrefix(
         aInstance: *mut otInstance,
         aPrefix: *mut otIp6Prefix,
+    ) -> otError;
+}
+extern "C" {
+    #[doc = " Gets the DHCPv6 Prefix Delegation (PD) provided off-mesh-routable (OMR) prefix.\n\n Only mPrefix, mValidLifetime and mPreferredLifetime fields are used in the returned prefix info.\n\n `OPENTHREAD_CONFIG_BORDER_ROUTING_DHCP6_PD_ENABLE` must be enabled.\n\n @param[in]   aInstance    A pointer to an OpenThread instance.\n @param[out]  aPrefixInfo  A pointer to where the prefix info will be output to.\n\n @retval  OT_ERROR_NONE           Successfully retrieved the OMR prefix.\n @retval  OT_ERROR_INVALID_STATE  The Border Routing Manager is not initialized yet.\n @retval  OT_ERROR_NOT_FOUND      There are no valid PD prefix on this BR.\n\n @sa otBorderRoutingGetOmrPrefix\n @sa otPlatBorderRoutingProcessIcmp6Ra\n"]
+    pub fn otBorderRoutingGetPdOmrPrefix(
+        aInstance: *mut otInstance,
+        aPrefixInfo: *mut otBorderRoutingPrefixTableEntry,
     ) -> otError;
 }
 extern "C" {
@@ -3431,14 +3441,14 @@ extern "C" {
     ) -> otError;
 }
 extern "C" {
-    #[doc = " This function initializes an `otBorderRoutingPrefixTableIterator`.\n\n An iterator MUST be initialized before it is used.\n\n An iterator can be initialized again to restart from the beginning of the table.\n\n When iterating over entries in the table, to ensure the update times `mMsecSinceLastUpdate` of entries are\n consistent, they are given relative to the time the iterator was initialized.\n\n @param[in]  aInstance  The OpenThread instance.\n @param[out] aIterator  A pointer to the iterator to initialize.\n"]
+    #[doc = " Initializes an `otBorderRoutingPrefixTableIterator`.\n\n An iterator MUST be initialized before it is used.\n\n An iterator can be initialized again to restart from the beginning of the table.\n\n When iterating over entries in the table, to ensure the update times `mMsecSinceLastUpdate` of entries are\n consistent, they are given relative to the time the iterator was initialized.\n\n @param[in]  aInstance  The OpenThread instance.\n @param[out] aIterator  A pointer to the iterator to initialize.\n"]
     pub fn otBorderRoutingPrefixTableInitIterator(
         aInstance: *mut otInstance,
         aIterator: *mut otBorderRoutingPrefixTableIterator,
     );
 }
 extern "C" {
-    #[doc = " This function iterates over the entries in the Border Router's discovered prefix table.\n\n @param[in]     aInstance    The OpenThread instance.\n @param[in,out] aIterator    A pointer to the iterator.\n @param[out]    aEntry       A pointer to the entry to populate.\n\n @retval OT_ERROR_NONE        Iterated to the next entry, @p aEntry and @p aIterator are updated.\n @retval OT_ERROR_NOT_FOUND   No more entries in the table.\n"]
+    #[doc = " Iterates over the entries in the Border Router's discovered prefix table.\n\n @param[in]     aInstance    The OpenThread instance.\n @param[in,out] aIterator    A pointer to the iterator.\n @param[out]    aEntry       A pointer to the entry to populate.\n\n @retval OT_ERROR_NONE        Iterated to the next entry, @p aEntry and @p aIterator are updated.\n @retval OT_ERROR_NOT_FOUND   No more entries in the table.\n"]
     pub fn otBorderRoutingGetNextPrefixTableEntry(
         aInstance: *mut otInstance,
         aIterator: *mut otBorderRoutingPrefixTableIterator,
@@ -3446,7 +3456,11 @@ extern "C" {
     ) -> otError;
 }
 extern "C" {
-    #[doc = " This method provides a full or stable copy of the local Thread Network Data.\n\n @param[in]      aInstance    A pointer to an OpenThread instance.\n @param[in]      aStable      TRUE when copying the stable version, FALSE when copying the full version.\n @param[out]     aData        A pointer to the data buffer.\n @param[in,out]  aDataLength  On entry, size of the data buffer pointed to by @p aData.\n                              On exit, number of copied bytes."]
+    #[doc = " Enables / Disables DHCPv6 Prefix Delegation.\n\n `OPENTHREAD_CONFIG_BORDER_ROUTING_DHCP6_PD_ENABLE` must be enabled.\n\n @param[in] aInstance A pointer to an OpenThread instance.\n @param[in] aEnabled  Whether to accept platform generated RA messages.\n"]
+    pub fn otBorderRoutingDhcp6PdSetEnabled(aInstance: *mut otInstance, aEnabled: bool);
+}
+extern "C" {
+    #[doc = " Provides a full or stable copy of the local Thread Network Data.\n\n @param[in]      aInstance    A pointer to an OpenThread instance.\n @param[in]      aStable      TRUE when copying the stable version, FALSE when copying the full version.\n @param[out]     aData        A pointer to the data buffer.\n @param[in,out]  aDataLength  On entry, size of the data buffer pointed to by @p aData.\n                              On exit, number of copied bytes."]
     pub fn otBorderRouterGetNetData(
         aInstance: *mut otInstance,
         aStable: bool,
@@ -3469,7 +3483,7 @@ extern "C" {
     ) -> otError;
 }
 extern "C" {
-    #[doc = " This function gets the next On Mesh Prefix in the local Network Data.\n\n @param[in]      aInstance  A pointer to an OpenThread instance.\n @param[in,out]  aIterator  A pointer to the Network Data iterator context. To get the first on-mesh entry\nit should be set to OT_NETWORK_DATA_ITERATOR_INIT.\n @param[out]     aConfig    A pointer to the On Mesh Prefix information.\n\n @retval OT_ERROR_NONE       Successfully found the next On Mesh prefix.\n @retval OT_ERROR_NOT_FOUND  No subsequent On Mesh prefix exists in the Thread Network Data.\n"]
+    #[doc = " Gets the next On Mesh Prefix in the local Network Data.\n\n @param[in]      aInstance  A pointer to an OpenThread instance.\n @param[in,out]  aIterator  A pointer to the Network Data iterator context. To get the first on-mesh entry\nit should be set to OT_NETWORK_DATA_ITERATOR_INIT.\n @param[out]     aConfig    A pointer to the On Mesh Prefix information.\n\n @retval OT_ERROR_NONE       Successfully found the next On Mesh prefix.\n @retval OT_ERROR_NOT_FOUND  No subsequent On Mesh prefix exists in the Thread Network Data.\n"]
     pub fn otBorderRouterGetNextOnMeshPrefix(
         aInstance: *mut otInstance,
         aIterator: *mut otNetworkDataIterator,
@@ -3491,7 +3505,7 @@ extern "C" {
     ) -> otError;
 }
 extern "C" {
-    #[doc = " This function gets the next external route in the local Network Data.\n\n @param[in]      aInstance  A pointer to an OpenThread instance.\n @param[in,out]  aIterator  A pointer to the Network Data iterator context. To get the first external route entry\nit should be set to OT_NETWORK_DATA_ITERATOR_INIT.\n @param[out]     aConfig    A pointer to the External Route information.\n\n @retval OT_ERROR_NONE       Successfully found the next External Route.\n @retval OT_ERROR_NOT_FOUND  No subsequent external route entry exists in the Thread Network Data.\n"]
+    #[doc = " Gets the next external route in the local Network Data.\n\n @param[in]      aInstance  A pointer to an OpenThread instance.\n @param[in,out]  aIterator  A pointer to the Network Data iterator context. To get the first external route entry\nit should be set to OT_NETWORK_DATA_ITERATOR_INIT.\n @param[out]     aConfig    A pointer to the External Route information.\n\n @retval OT_ERROR_NONE       Successfully found the next External Route.\n @retval OT_ERROR_NOT_FOUND  No subsequent external route entry exists in the Thread Network Data.\n"]
     pub fn otBorderRouterGetNextRoute(
         aInstance: *mut otInstance,
         aIterator: *mut otNetworkDataIterator,
@@ -3502,16 +3516,27 @@ extern "C" {
     #[doc = " Immediately register the local network data with the Leader.\n\n @param[in]  aInstance A pointer to an OpenThread instance.\n\n @retval OT_ERROR_NONE  Successfully queued a Server Data Request message for delivery.\n\n @sa otBorderRouterAddOnMeshPrefix\n @sa otBorderRouterRemoveOnMeshPrefix\n @sa otBorderRouterAddRoute\n @sa otBorderRouterRemoveRoute"]
     pub fn otBorderRouterRegister(aInstance: *mut otInstance) -> otError;
 }
+#[doc = " Function pointer callback which is invoked when Network Data (local or leader) gets full.\n\n @param[in] aContext A pointer to arbitrary context information.\n"]
+pub type otBorderRouterNetDataFullCallback =
+    ::std::option::Option<unsafe extern "C" fn(aContext: *mut ::std::os::raw::c_void)>;
+extern "C" {
+    #[doc = " Sets the callback to indicate when Network Data gets full.\n\n Requires `OPENTHREAD_CONFIG_BORDER_ROUTER_SIGNAL_NETWORK_DATA_FULL`.\n\n The callback is invoked whenever:\n - The device is acting as a leader and receives a Network Data registration from a Border Router (BR) that it cannot\n   add to Network Data (running out of space).\n - The device is acting as a BR and new entries cannot be added to its local Network Data.\n - The device is acting as a BR and tries to register its local Network Data entries with the leader, but determines\n    that its local entries will not fit.\n\n @param[in]  aInstance    A pointer to an OpenThread instance.\n @param[in]  aCallback    The callback.\n @param[in]  aContext     A pointer to arbitrary context information used with @p aCallback.\n"]
+    pub fn otBorderRouterSetNetDataFullCallback(
+        aInstance: *mut otInstance,
+        aCallback: otBorderRouterNetDataFullCallback,
+        aContext: *mut ::std::os::raw::c_void,
+    );
+}
 extern "C" {
     #[doc = " Requests a Thread network channel change.\n\n The network switches to the given channel after a specified delay (see #otChannelManagerSetDelay()). The channel\n change is performed by updating the Pending Operational Dataset.\n\n A subsequent call will cancel an ongoing previously requested channel change.\n\n @param[in]  aInstance          A pointer to an OpenThread instance.\n @param[in]  aChannel           The new channel for the Thread network.\n"]
     pub fn otChannelManagerRequestChannelChange(aInstance: *mut otInstance, aChannel: u8);
 }
 extern "C" {
-    #[doc = " This function gets the channel from the last successful call to `otChannelManagerRequestChannelChange()`\n\n @returns The last requested channel or zero if there has been no channel change request yet.\n"]
+    #[doc = " Gets the channel from the last successful call to `otChannelManagerRequestChannelChange()`\n\n @returns The last requested channel or zero if there has been no channel change request yet.\n"]
     pub fn otChannelManagerGetRequestedChannel(aInstance: *mut otInstance) -> u8;
 }
 extern "C" {
-    #[doc = " This function gets the delay (in seconds) used by Channel Manager for a channel change.\n\n @param[in]  aInstance          A pointer to an OpenThread instance.\n\n @returns The delay (in seconds) for channel change.\n"]
+    #[doc = " Gets the delay (in seconds) used by Channel Manager for a channel change.\n\n @param[in]  aInstance          A pointer to an OpenThread instance.\n\n @returns The delay (in seconds) for channel change.\n"]
     pub fn otChannelManagerGetDelay(aInstance: *mut otInstance) -> u16;
 }
 extern "C" {
@@ -3519,7 +3544,7 @@ extern "C" {
     pub fn otChannelManagerSetDelay(aInstance: *mut otInstance, aDelay: u16) -> otError;
 }
 extern "C" {
-    #[doc = " This function requests that `ChannelManager` checks and selects a new channel and starts a channel change.\n\n Unlike the `otChannelManagerRequestChannelChange()` where the channel must be given as a parameter, this function\n asks the `ChannelManager` to select a channel by itself (based on collected channel quality info).\n\n Once called, the Channel Manager will perform the following 3 steps:\n\n 1) `ChannelManager` decides if the channel change would be helpful. This check can be skipped if\n    `aSkipQualityCheck` is set to true (forcing a channel selection to happen and skipping the quality check).\n    This step uses the collected link quality metrics on the device (such as CCA failure rate, frame and message\n    error rates per neighbor, etc.) to determine if the current channel quality is at the level that justifies\n    a channel change.\n\n 2) If the first step passes, then `ChannelManager` selects a potentially better channel. It uses the collected\n    channel quality data by `ChannelMonitor` module. The supported and favored channels are used at this step.\n    (see otChannelManagerSetSupportedChannels() and otChannelManagerSetFavoredChannels()).\n\n 3) If the newly selected channel is different from the current channel, `ChannelManager` requests/starts the\n    channel change process (internally invoking a `RequestChannelChange()`).\n\n @param[in] aInstance                A pointer to an OpenThread instance.\n @param[in] aSkipQualityCheck        Indicates whether the quality check (step 1) should be skipped.\n\n @retval OT_ERROR_NONE               Channel selection finished successfully.\n @retval OT_ERROR_NOT_FOUND          Supported channel mask is empty, therefore could not select a channel.\n"]
+    #[doc = " Requests that `ChannelManager` checks and selects a new channel and starts a channel change.\n\n Unlike the `otChannelManagerRequestChannelChange()` where the channel must be given as a parameter, this function\n asks the `ChannelManager` to select a channel by itself (based on collected channel quality info).\n\n Once called, the Channel Manager will perform the following 3 steps:\n\n 1) `ChannelManager` decides if the channel change would be helpful. This check can be skipped if\n    `aSkipQualityCheck` is set to true (forcing a channel selection to happen and skipping the quality check).\n    This step uses the collected link quality metrics on the device (such as CCA failure rate, frame and message\n    error rates per neighbor, etc.) to determine if the current channel quality is at the level that justifies\n    a channel change.\n\n 2) If the first step passes, then `ChannelManager` selects a potentially better channel. It uses the collected\n    channel quality data by `ChannelMonitor` module. The supported and favored channels are used at this step.\n    (see otChannelManagerSetSupportedChannels() and otChannelManagerSetFavoredChannels()).\n\n 3) If the newly selected channel is different from the current channel, `ChannelManager` requests/starts the\n    channel change process (internally invoking a `RequestChannelChange()`).\n\n @param[in] aInstance                A pointer to an OpenThread instance.\n @param[in] aSkipQualityCheck        Indicates whether the quality check (step 1) should be skipped.\n\n @retval OT_ERROR_NONE               Channel selection finished successfully.\n @retval OT_ERROR_NOT_FOUND          Supported channel mask is empty, therefore could not select a channel.\n"]
     pub fn otChannelManagerRequestChannelSelect(
         aInstance: *mut otInstance,
         aSkipQualityCheck: bool,
@@ -3533,7 +3558,7 @@ extern "C" {
     );
 }
 extern "C" {
-    #[doc = " This function indicates whether the auto-channel-selection functionality is enabled or not.\n\n @param[in]  aInstance    A pointer to an OpenThread instance.\n\n @returns TRUE if enabled, FALSE if disabled.\n"]
+    #[doc = " Indicates whether the auto-channel-selection functionality is enabled or not.\n\n @param[in]  aInstance    A pointer to an OpenThread instance.\n\n @returns TRUE if enabled, FALSE if disabled.\n"]
     pub fn otChannelManagerGetAutoChannelSelectionEnabled(aInstance: *mut otInstance) -> bool;
 }
 extern "C" {
@@ -3544,7 +3569,7 @@ extern "C" {
     ) -> otError;
 }
 extern "C" {
-    #[doc = " This function gets the period interval (in seconds) used by auto-channel-selection functionality.\n\n @param[in]  aInstance    A pointer to an OpenThread instance.\n\n @returns The interval in seconds.\n"]
+    #[doc = " Gets the period interval (in seconds) used by auto-channel-selection functionality.\n\n @param[in]  aInstance    A pointer to an OpenThread instance.\n\n @returns The interval in seconds.\n"]
     pub fn otChannelManagerGetAutoChannelSelectionInterval(aInstance: *mut otInstance) -> u32;
 }
 extern "C" {
@@ -3576,7 +3601,7 @@ extern "C" {
     pub fn otChannelMonitorSetEnabled(aInstance: *mut otInstance, aEnabled: bool) -> otError;
 }
 extern "C" {
-    #[doc = " This function indicates whether the Channel Monitoring operation is enabled and running.\n\n @param[in]  aInstance       A pointer to an OpenThread instance.\n\n @returns TRUE if the Channel Monitoring operation is enabled, FALSE otherwise.\n"]
+    #[doc = " Indicates whether the Channel Monitoring operation is enabled and running.\n\n @param[in]  aInstance       A pointer to an OpenThread instance.\n\n @returns TRUE if the Channel Monitoring operation is enabled, FALSE otherwise.\n"]
     pub fn otChannelMonitorIsEnabled(aInstance: *mut otInstance) -> bool;
 }
 extern "C" {
@@ -3623,7 +3648,7 @@ extern "C" {
     #[doc = " Reset the supervision check timeout failure counter to zero.\n"]
     pub fn otChildSupervisionResetCheckFailureCounter(aInstance: *mut otInstance);
 }
-#[doc = " This structure represents a CLI command.\n"]
+#[doc = " Represents a CLI command.\n"]
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
 pub struct otCliCommand {
@@ -3646,7 +3671,7 @@ impl Default for otCliCommand {
         }
     }
 }
-#[doc = " This function pointer is called to notify about Console output.\n\n @param[out] aContext    A user context pointer.\n @param[in]  aFormat     The format string.\n @param[in]  aArguments  The format string arguments.\n\n @returns                Number of bytes written by the callback.\n"]
+#[doc = " Pointer is called to notify about Console output.\n\n @param[out] aContext    A user context pointer.\n @param[in]  aFormat     The format string.\n @param[in]  aArguments  The format string arguments.\n\n @returns                Number of bytes written by the callback.\n"]
 pub type otCliOutputCallback = ::std::option::Option<
     unsafe extern "C" fn(
         aContext: *mut ::std::os::raw::c_void,
@@ -3663,7 +3688,7 @@ extern "C" {
     );
 }
 extern "C" {
-    #[doc = " This method is called to feed in a console input line.\n\n @param[in]  aBuf        A pointer to a null-terminated string.\n"]
+    #[doc = " Is called to feed in a console input line.\n\n @param[in]  aBuf        A pointer to a null-terminated string.\n"]
     pub fn otCliInputLine(aBuf: *mut ::std::os::raw::c_char);
 }
 extern "C" {
@@ -3809,7 +3834,7 @@ pub const OT_COAP_OPTION_PROXY_SCHEME: otCoapOptionType = 39;
 pub const OT_COAP_OPTION_SIZE1: otCoapOptionType = 60;
 #[doc = " CoAP Option Numbers"]
 pub type otCoapOptionType = ::std::os::raw::c_uint;
-#[doc = " This structure represents a CoAP option.\n"]
+#[doc = " Represents a CoAP option.\n"]
 #[repr(C)]
 #[derive(Debug, Default, Copy, Clone)]
 pub struct otCoapOption {
@@ -3818,7 +3843,7 @@ pub struct otCoapOption {
     #[doc = "< Option Length"]
     pub mLength: u16,
 }
-#[doc = " This structure acts as an iterator for CoAP options\n"]
+#[doc = " Acts as an iterator for CoAP options\n"]
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
 pub struct otCoapOptionIterator {
@@ -3903,7 +3928,7 @@ pub const OT_COAP_OPTION_BLOCK_SZX_512: otCoapBlockSzx = 5;
 pub const OT_COAP_OPTION_BLOCK_SZX_1024: otCoapBlockSzx = 6;
 #[doc = " CoAP Block Size Exponents"]
 pub type otCoapBlockSzx = ::std::os::raw::c_uint;
-#[doc = " This function pointer is called when a CoAP response is received or on the request timeout.\n\n @param[in]  aContext      A pointer to application-specific context.\n @param[in]  aMessage      A pointer to the message buffer containing the response. NULL if no response was received.\n @param[in]  aMessageInfo  A pointer to the message info for @p aMessage. NULL if no response was received.\n @param[in]  aResult       A result of the CoAP transaction.\n\n @retval  OT_ERROR_NONE              A response was received successfully.\n @retval  OT_ERROR_ABORT             A CoAP transaction was reset by peer.\n @retval  OT_ERROR_RESPONSE_TIMEOUT  No response or acknowledgment received during timeout period.\n"]
+#[doc = " Pointer is called when a CoAP response is received or on the request timeout.\n\n @param[in]  aContext      A pointer to application-specific context.\n @param[in]  aMessage      A pointer to the message buffer containing the response. NULL if no response was received.\n @param[in]  aMessageInfo  A pointer to the message info for @p aMessage. NULL if no response was received.\n @param[in]  aResult       A result of the CoAP transaction.\n\n @retval  OT_ERROR_NONE              A response was received successfully.\n @retval  OT_ERROR_ABORT             A CoAP transaction was reset by peer.\n @retval  OT_ERROR_RESPONSE_TIMEOUT  No response or acknowledgment received during timeout period.\n"]
 pub type otCoapResponseHandler = ::std::option::Option<
     unsafe extern "C" fn(
         aContext: *mut ::std::os::raw::c_void,
@@ -3912,7 +3937,7 @@ pub type otCoapResponseHandler = ::std::option::Option<
         aResult: otError,
     ),
 >;
-#[doc = " This function pointer is called when a CoAP request with a given Uri-Path is received.\n\n @param[in]  aContext      A pointer to arbitrary context information.\n @param[in]  aMessage      A pointer to the message.\n @param[in]  aMessageInfo  A pointer to the message info for @p aMessage.\n"]
+#[doc = " Pointer is called when a CoAP request with a given Uri-Path is received.\n\n @param[in]  aContext      A pointer to arbitrary context information.\n @param[in]  aMessage      A pointer to the message.\n @param[in]  aMessageInfo  A pointer to the message info for @p aMessage.\n"]
 pub type otCoapRequestHandler = ::std::option::Option<
     unsafe extern "C" fn(
         aContext: *mut ::std::os::raw::c_void,
@@ -3920,7 +3945,7 @@ pub type otCoapRequestHandler = ::std::option::Option<
         aMessageInfo: *const otMessageInfo,
     ),
 >;
-#[doc = " This function pointer is called when a CoAP message with an block-wise transfer option is received.\n\n This function is available when OPENTHREAD_CONFIG_COAP_BLOCKWISE_TRANSFER_ENABLE configuration\n is enabled.\n\n @param[in]  aContext     A pointer to application-specific context.\n @param[in]  aBlock       A pointer to the block segment.\n @param[in]  aPosition    The position of @p aBlock in a sequence in bytes.\n @param[in]  aBlockLength The length of the block segment in bytes.\n @param[in]  aMore        Flag if more block segments are following.\n @param[in]  aTotalLength The total length in bytes of the transferred information (indicated by a Size1 or Size2\n                          option).\n\n @retval  OT_ERROR_NONE               Block segment was stored successfully.\n @retval  OT_ERROR_NO_BUFS            No more memory to store blocks.\n @retval  OT_ERROR_NO_FRAME_RECEIVED  Block segment missing.\n"]
+#[doc = " Pointer is called when a CoAP message with an block-wise transfer option is received.\n\n Is available when OPENTHREAD_CONFIG_COAP_BLOCKWISE_TRANSFER_ENABLE configuration\n is enabled.\n\n @param[in]  aContext     A pointer to application-specific context.\n @param[in]  aBlock       A pointer to the block segment.\n @param[in]  aPosition    The position of @p aBlock in a sequence in bytes.\n @param[in]  aBlockLength The length of the block segment in bytes.\n @param[in]  aMore        Flag if more block segments are following.\n @param[in]  aTotalLength The total length in bytes of the transferred information (indicated by a Size1 or Size2\n                          option).\n\n @retval  OT_ERROR_NONE               Block segment was stored successfully.\n @retval  OT_ERROR_NO_BUFS            No more memory to store blocks.\n @retval  OT_ERROR_NO_FRAME_RECEIVED  Block segment missing.\n"]
 pub type otCoapBlockwiseReceiveHook = ::std::option::Option<
     unsafe extern "C" fn(
         aContext: *mut ::std::os::raw::c_void,
@@ -3931,7 +3956,7 @@ pub type otCoapBlockwiseReceiveHook = ::std::option::Option<
         aTotalLength: u32,
     ) -> otError,
 >;
-#[doc = " This function pointer is called before the next block in a block-wise transfer is sent.\n\n This function is available when OPENTHREAD_CONFIG_COAP_BLOCKWISE_TRANSFER_ENABLE configuration\n is enabled.\n\n @param[in]       aContext     A pointer to application-specific context.\n @param[in,out]   aBlock       A pointer to where the block segment can be written to.\n @param[in]       aPosition    The position in a sequence from which to obtain the block segment.\n @param[in,out]   aBlockLength On entry, the maximum block segment length in bytes.\n @param[out]      aMore        A pointer to the flag if more block segments will follow.\n\n @warning By changing the value of aBlockLength, the block size of the whole exchange is\n          renegotiated. It is recommended to do this after the first block has been received as\n          later changes could cause problems with other CoAP implementations.\n\n @retval  OT_ERROR_NONE           No error occurred.\n @retval  OT_ERROR_INVALID_ARGS   Block at @p aPosition does not exist.\n"]
+#[doc = " Pointer is called before the next block in a block-wise transfer is sent.\n\n Is available when OPENTHREAD_CONFIG_COAP_BLOCKWISE_TRANSFER_ENABLE configuration\n is enabled.\n\n @param[in]       aContext     A pointer to application-specific context.\n @param[in,out]   aBlock       A pointer to where the block segment can be written to.\n @param[in]       aPosition    The position in a sequence from which to obtain the block segment.\n @param[in,out]   aBlockLength On entry, the maximum block segment length in bytes.\n @param[out]      aMore        A pointer to the flag if more block segments will follow.\n\n @warning By changing the value of aBlockLength, the block size of the whole exchange is\n          renegotiated. It is recommended to do this after the first block has been received as\n          later changes could cause problems with other CoAP implementations.\n\n @retval  OT_ERROR_NONE           No error occurred.\n @retval  OT_ERROR_INVALID_ARGS   Block at @p aPosition does not exist.\n"]
 pub type otCoapBlockwiseTransmitHook = ::std::option::Option<
     unsafe extern "C" fn(
         aContext: *mut ::std::os::raw::c_void,
@@ -3941,7 +3966,7 @@ pub type otCoapBlockwiseTransmitHook = ::std::option::Option<
         aMore: *mut bool,
     ) -> otError,
 >;
-#[doc = " This structure represents a CoAP resource.\n"]
+#[doc = " Represents a CoAP resource.\n"]
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
 pub struct otCoapResource {
@@ -3963,7 +3988,7 @@ impl Default for otCoapResource {
         }
     }
 }
-#[doc = " This structure represents a CoAP resource with block-wise transfer.\n"]
+#[doc = " Represents a CoAP resource with block-wise transfer.\n"]
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
 pub struct otCoapBlockwiseResource {
@@ -3989,7 +4014,7 @@ impl Default for otCoapBlockwiseResource {
         }
     }
 }
-#[doc = " This structure represents the CoAP transmission parameters.\n\n @note mAckTimeout * ((2 ** (mMaxRetransmit + 1)) - 1) * (mAckRandomFactorNumerator / mAckRandomFactorDenominator)\n       must not exceed what can be represented by a uint32_t (0xffffffff). This limitation allows OpenThread to\n       avoid 64-bit arithmetic.\n"]
+#[doc = " Represents the CoAP transmission parameters.\n\n @note mAckTimeout * ((2 ** (mMaxRetransmit + 1)) - 1) * (mAckRandomFactorNumerator / mAckRandomFactorDenominator)\n       must not exceed what can be represented by a uint32_t (0xffffffff). This limitation allows OpenThread to\n       avoid 64-bit arithmetic.\n"]
 #[repr(C)]
 #[derive(Debug, Default, Copy, Clone)]
 pub struct otCoapTxParameters {
@@ -4003,11 +4028,11 @@ pub struct otCoapTxParameters {
     pub mMaxRetransmit: u8,
 }
 extern "C" {
-    #[doc = " This function initializes the CoAP header.\n\n @param[in,out] aMessage   A pointer to the CoAP message to initialize.\n @param[in]     aType      CoAP message type.\n @param[in]     aCode      CoAP message code.\n"]
+    #[doc = " Initializes the CoAP header.\n\n @param[in,out] aMessage   A pointer to the CoAP message to initialize.\n @param[in]     aType      CoAP message type.\n @param[in]     aCode      CoAP message code.\n"]
     pub fn otCoapMessageInit(aMessage: *mut otMessage, aType: otCoapType, aCode: otCoapCode);
 }
 extern "C" {
-    #[doc = " This function initializes a response message.\n\n @note Both message ID and token are set according to @p aRequest.\n\n @param[in,out]  aResponse  A pointer to the CoAP response message.\n @param[in]      aRequest   A pointer to the CoAP request message.\n @param[in]      aType      CoAP message type.\n @param[in]      aCode      CoAP message code.\n\n @retval OT_ERROR_NONE     Successfully initialized the response message.\n @retval OT_ERROR_NO_BUFS  Insufficient message buffers available to initialize the response message.\n"]
+    #[doc = " Initializes a response message.\n\n @note Both message ID and token are set according to @p aRequest.\n\n @param[in,out]  aResponse  A pointer to the CoAP response message.\n @param[in]      aRequest   A pointer to the CoAP request message.\n @param[in]      aType      CoAP message type.\n @param[in]      aCode      CoAP message code.\n\n @retval OT_ERROR_NONE     Successfully initialized the response message.\n @retval OT_ERROR_NO_BUFS  Insufficient message buffers available to initialize the response message.\n"]
     pub fn otCoapMessageInitResponse(
         aResponse: *mut otMessage,
         aRequest: *const otMessage,
@@ -4016,7 +4041,7 @@ extern "C" {
     ) -> otError;
 }
 extern "C" {
-    #[doc = " This function sets the Token value and length in a header.\n\n @param[in,out]  aMessage          A pointer to the CoAP message.\n @param[in]      aToken            A pointer to the Token value.\n @param[in]      aTokenLength      The Length of @p aToken.\n\n @retval OT_ERROR_NONE     Successfully set the Token value.\n @retval OT_ERROR_NO_BUFS  Insufficient buffers to set the Token value.\n"]
+    #[doc = " Sets the Token value and length in a header.\n\n @param[in,out]  aMessage          A pointer to the CoAP message.\n @param[in]      aToken            A pointer to the Token value.\n @param[in]      aTokenLength      The Length of @p aToken.\n\n @retval OT_ERROR_NONE     Successfully set the Token value.\n @retval OT_ERROR_NO_BUFS  Insufficient buffers to set the Token value.\n"]
     pub fn otCoapMessageSetToken(
         aMessage: *mut otMessage,
         aToken: *const u8,
@@ -4024,18 +4049,18 @@ extern "C" {
     ) -> otError;
 }
 extern "C" {
-    #[doc = " This function sets the Token length and randomizes its value.\n\n @param[in,out]  aMessage      A pointer to the CoAP message.\n @param[in]      aTokenLength  The Length of a Token to set.\n"]
+    #[doc = " Sets the Token length and randomizes its value.\n\n @param[in,out]  aMessage      A pointer to the CoAP message.\n @param[in]      aTokenLength  The Length of a Token to set.\n"]
     pub fn otCoapMessageGenerateToken(aMessage: *mut otMessage, aTokenLength: u8);
 }
 extern "C" {
-    #[doc = " This function appends the Content Format CoAP option as specified in\n https://tools.ietf.org/html/rfc7252#page-92.  This *must* be called before\n setting otCoapMessageSetPayloadMarker if a payload is to be included in the\n message.\n\n The function is a convenience wrapper around otCoapMessageAppendUintOption,\n and if the desired format type code isn't listed in otCoapOptionContentFormat,\n this base function should be used instead.\n\n @param[in,out]  aMessage          A pointer to the CoAP message.\n @param[in]      aContentFormat    One of the content formats listed in\n                                  otCoapOptionContentFormat above.\n\n @retval OT_ERROR_NONE          Successfully appended the option.\n @retval OT_ERROR_INVALID_ARGS  The option type is not equal or greater than the last option type.\n @retval OT_ERROR_NO_BUFS       The option length exceeds the buffer size.\n"]
+    #[doc = " Appends the Content Format CoAP option as specified in\n https://tools.ietf.org/html/rfc7252#page-92.  This *must* be called before\n setting otCoapMessageSetPayloadMarker if a payload is to be included in the\n message.\n\n The function is a convenience wrapper around otCoapMessageAppendUintOption,\n and if the desired format type code isn't listed in otCoapOptionContentFormat,\n this base function should be used instead.\n\n @param[in,out]  aMessage          A pointer to the CoAP message.\n @param[in]      aContentFormat    One of the content formats listed in\n                                  otCoapOptionContentFormat above.\n\n @retval OT_ERROR_NONE          Successfully appended the option.\n @retval OT_ERROR_INVALID_ARGS  The option type is not equal or greater than the last option type.\n @retval OT_ERROR_NO_BUFS       The option length exceeds the buffer size.\n"]
     pub fn otCoapMessageAppendContentFormatOption(
         aMessage: *mut otMessage,
         aContentFormat: otCoapOptionContentFormat,
     ) -> otError;
 }
 extern "C" {
-    #[doc = " This function appends a CoAP option in a header.\n\n @param[in,out]  aMessage  A pointer to the CoAP message.\n @param[in]      aNumber   The CoAP Option number.\n @param[in]      aLength   The CoAP Option length.\n @param[in]      aValue    A pointer to the CoAP value.\n\n @retval OT_ERROR_NONE          Successfully appended the option.\n @retval OT_ERROR_INVALID_ARGS  The option type is not equal or greater than the last option type.\n @retval OT_ERROR_NO_BUFS       The option length exceeds the buffer size.\n"]
+    #[doc = " Appends a CoAP option in a header.\n\n @param[in,out]  aMessage  A pointer to the CoAP message.\n @param[in]      aNumber   The CoAP Option number.\n @param[in]      aLength   The CoAP Option length.\n @param[in]      aValue    A pointer to the CoAP value.\n\n @retval OT_ERROR_NONE          Successfully appended the option.\n @retval OT_ERROR_INVALID_ARGS  The option type is not equal or greater than the last option type.\n @retval OT_ERROR_NO_BUFS       The option length exceeds the buffer size.\n"]
     pub fn otCoapMessageAppendOption(
         aMessage: *mut otMessage,
         aNumber: u16,
@@ -4044,7 +4069,7 @@ extern "C" {
     ) -> otError;
 }
 extern "C" {
-    #[doc = " This function appends an unsigned integer CoAP option as specified in\n https://tools.ietf.org/html/rfc7252#section-3.2\n\n @param[in,out]  aMessage A pointer to the CoAP message.\n @param[in]      aNumber  The CoAP Option number.\n @param[in]      aValue   The CoAP Option unsigned integer value.\n\n @retval OT_ERROR_NONE          Successfully appended the option.\n @retval OT_ERROR_INVALID_ARGS  The option type is not equal or greater than the last option type.\n @retval OT_ERROR_NO_BUFS       The option length exceeds the buffer size.\n\n @see otCoapMessageGetOptionUintValue"]
+    #[doc = " Appends an unsigned integer CoAP option as specified in\n https://tools.ietf.org/html/rfc7252#section-3.2\n\n @param[in,out]  aMessage A pointer to the CoAP message.\n @param[in]      aNumber  The CoAP Option number.\n @param[in]      aValue   The CoAP Option unsigned integer value.\n\n @retval OT_ERROR_NONE          Successfully appended the option.\n @retval OT_ERROR_INVALID_ARGS  The option type is not equal or greater than the last option type.\n @retval OT_ERROR_NO_BUFS       The option length exceeds the buffer size.\n\n @see otCoapMessageGetOptionUintValue"]
     pub fn otCoapMessageAppendUintOption(
         aMessage: *mut otMessage,
         aNumber: u16,
@@ -4052,22 +4077,22 @@ extern "C" {
     ) -> otError;
 }
 extern "C" {
-    #[doc = " This function appends an Observe option.\n\n @param[in,out]  aMessage  A pointer to the CoAP message.\n @param[in]      aObserve  Observe field value.\n\n @retval OT_ERROR_NONE          Successfully appended the option.\n @retval OT_ERROR_INVALID_ARGS  The option type is not equal or greater than the last option type.\n @retval OT_ERROR_NO_BUFS       The option length exceeds the buffer size.\n"]
+    #[doc = " Appends an Observe option.\n\n @param[in,out]  aMessage  A pointer to the CoAP message.\n @param[in]      aObserve  Observe field value.\n\n @retval OT_ERROR_NONE          Successfully appended the option.\n @retval OT_ERROR_INVALID_ARGS  The option type is not equal or greater than the last option type.\n @retval OT_ERROR_NO_BUFS       The option length exceeds the buffer size.\n"]
     pub fn otCoapMessageAppendObserveOption(aMessage: *mut otMessage, aObserve: u32) -> otError;
 }
 extern "C" {
-    #[doc = " This function appends a Uri-Path option.\n\n @param[in,out]  aMessage  A pointer to the CoAP message.\n @param[in]      aUriPath  A pointer to a NULL-terminated string.\n\n @retval OT_ERROR_NONE          Successfully appended the option.\n @retval OT_ERROR_INVALID_ARGS  The option type is not equal or greater than the last option type.\n @retval OT_ERROR_NO_BUFS       The option length exceeds the buffer size.\n"]
+    #[doc = " Appends a Uri-Path option.\n\n @param[in,out]  aMessage  A pointer to the CoAP message.\n @param[in]      aUriPath  A pointer to a NULL-terminated string.\n\n @retval OT_ERROR_NONE          Successfully appended the option.\n @retval OT_ERROR_INVALID_ARGS  The option type is not equal or greater than the last option type.\n @retval OT_ERROR_NO_BUFS       The option length exceeds the buffer size.\n"]
     pub fn otCoapMessageAppendUriPathOptions(
         aMessage: *mut otMessage,
         aUriPath: *const ::std::os::raw::c_char,
     ) -> otError;
 }
 extern "C" {
-    #[doc = " This function converts a CoAP Block option SZX field to the actual block size\n\n @param[in]     aSize     Block size exponent.\n\n @returns The actual size exponent value.\n"]
+    #[doc = " Converts a CoAP Block option SZX field to the actual block size\n\n @param[in]     aSize     Block size exponent.\n\n @returns The actual size exponent value.\n"]
     pub fn otCoapBlockSizeFromExponent(aSize: otCoapBlockSzx) -> u16;
 }
 extern "C" {
-    #[doc = " This function appends a Block2 option\n\n @param[in,out]  aMessage  A pointer to the CoAP message.\n @param[in]      aNum      Current block number.\n @param[in]      aMore     Boolean to indicate more blocks are to be sent.\n @param[in]      aSize     Block Size Exponent.\n\n @retval OT_ERROR_NONE          Successfully appended the option.\n @retval OT_ERROR_INVALID_ARGS  The option type is not equal or greater than the last option type.\n @retval OT_ERROR_NO_BUFS       The option length exceeds the buffer size.\n"]
+    #[doc = " Appends a Block2 option\n\n @param[in,out]  aMessage  A pointer to the CoAP message.\n @param[in]      aNum      Current block number.\n @param[in]      aMore     Boolean to indicate more blocks are to be sent.\n @param[in]      aSize     Block Size Exponent.\n\n @retval OT_ERROR_NONE          Successfully appended the option.\n @retval OT_ERROR_INVALID_ARGS  The option type is not equal or greater than the last option type.\n @retval OT_ERROR_NO_BUFS       The option length exceeds the buffer size.\n"]
     pub fn otCoapMessageAppendBlock2Option(
         aMessage: *mut otMessage,
         aNum: u32,
@@ -4076,7 +4101,7 @@ extern "C" {
     ) -> otError;
 }
 extern "C" {
-    #[doc = " This function appends a Block1 option\n\n @param[in,out]  aMessage  A pointer to the CoAP message.\n @param[in]      aNum      Current block number.\n @param[in]      aMore     Boolean to indicate more blocks are to be sent.\n @param[in]      aSize     Block Size Exponent.\n\n @retval OT_ERROR_NONE          Successfully appended the option.\n @retval OT_ERROR_INVALID_ARGS  The option type is not equal or greater than the last option type.\n @retval OT_ERROR_NO_BUFS       The option length exceeds the buffer size.\n"]
+    #[doc = " Appends a Block1 option\n\n @param[in,out]  aMessage  A pointer to the CoAP message.\n @param[in]      aNum      Current block number.\n @param[in]      aMore     Boolean to indicate more blocks are to be sent.\n @param[in]      aSize     Block Size Exponent.\n\n @retval OT_ERROR_NONE          Successfully appended the option.\n @retval OT_ERROR_INVALID_ARGS  The option type is not equal or greater than the last option type.\n @retval OT_ERROR_NO_BUFS       The option length exceeds the buffer size.\n"]
     pub fn otCoapMessageAppendBlock1Option(
         aMessage: *mut otMessage,
         aNum: u32,
@@ -4085,111 +4110,111 @@ extern "C" {
     ) -> otError;
 }
 extern "C" {
-    #[doc = " This function appends a Proxy-Uri option.\n\n @param[in,out]  aMessage  A pointer to the CoAP message.\n @param[in]      aUriPath  A pointer to a NULL-terminated string.\n\n @retval OT_ERROR_NONE          Successfully appended the option.\n @retval OT_ERROR_INVALID_ARGS  The option type is not equal or greater than the last option type.\n @retval OT_ERROR_NO_BUFS       The option length exceeds the buffer size.\n"]
+    #[doc = " Appends a Proxy-Uri option.\n\n @param[in,out]  aMessage  A pointer to the CoAP message.\n @param[in]      aUriPath  A pointer to a NULL-terminated string.\n\n @retval OT_ERROR_NONE          Successfully appended the option.\n @retval OT_ERROR_INVALID_ARGS  The option type is not equal or greater than the last option type.\n @retval OT_ERROR_NO_BUFS       The option length exceeds the buffer size.\n"]
     pub fn otCoapMessageAppendProxyUriOption(
         aMessage: *mut otMessage,
         aUriPath: *const ::std::os::raw::c_char,
     ) -> otError;
 }
 extern "C" {
-    #[doc = " This function appends a Max-Age option.\n\n @param[in,out]  aMessage  A pointer to the CoAP message.\n @param[in]      aMaxAge   The Max-Age value.\n\n @retval OT_ERROR_NONE          Successfully appended the option.\n @retval OT_ERROR_INVALID_ARGS  The option type is not equal or greater than the last option type.\n @retval OT_ERROR_NO_BUFS       The option length exceeds the buffer size.\n"]
+    #[doc = " Appends a Max-Age option.\n\n @param[in,out]  aMessage  A pointer to the CoAP message.\n @param[in]      aMaxAge   The Max-Age value.\n\n @retval OT_ERROR_NONE          Successfully appended the option.\n @retval OT_ERROR_INVALID_ARGS  The option type is not equal or greater than the last option type.\n @retval OT_ERROR_NO_BUFS       The option length exceeds the buffer size.\n"]
     pub fn otCoapMessageAppendMaxAgeOption(aMessage: *mut otMessage, aMaxAge: u32) -> otError;
 }
 extern "C" {
-    #[doc = " This function appends a single Uri-Query option.\n\n @param[in,out]  aMessage  A pointer to the CoAP message.\n @param[in]      aUriQuery A pointer to NULL-terminated string, which should contain a single key=value pair.\n\n @retval OT_ERROR_NONE          Successfully appended the option.\n @retval OT_ERROR_INVALID_ARGS  The option type is not equal or greater than the last option type.\n @retval OT_ERROR_NO_BUFS       The option length exceeds the buffer size."]
+    #[doc = " Appends a single Uri-Query option.\n\n @param[in,out]  aMessage  A pointer to the CoAP message.\n @param[in]      aUriQuery A pointer to NULL-terminated string, which should contain a single key=value pair.\n\n @retval OT_ERROR_NONE          Successfully appended the option.\n @retval OT_ERROR_INVALID_ARGS  The option type is not equal or greater than the last option type.\n @retval OT_ERROR_NO_BUFS       The option length exceeds the buffer size."]
     pub fn otCoapMessageAppendUriQueryOption(
         aMessage: *mut otMessage,
         aUriQuery: *const ::std::os::raw::c_char,
     ) -> otError;
 }
 extern "C" {
-    #[doc = " This function adds Payload Marker indicating beginning of the payload to the CoAP header.\n\n @param[in,out]  aMessage  A pointer to the CoAP message.\n\n @retval OT_ERROR_NONE     Payload Marker successfully added.\n @retval OT_ERROR_NO_BUFS  Header Payload Marker exceeds the buffer size.\n"]
+    #[doc = " Adds Payload Marker indicating beginning of the payload to the CoAP header.\n\n @param[in,out]  aMessage  A pointer to the CoAP message.\n\n @retval OT_ERROR_NONE     Payload Marker successfully added.\n @retval OT_ERROR_NO_BUFS  Header Payload Marker exceeds the buffer size.\n"]
     pub fn otCoapMessageSetPayloadMarker(aMessage: *mut otMessage) -> otError;
 }
 extern "C" {
-    #[doc = " This function returns the Type value.\n\n @param[in]  aMessage  A pointer to the CoAP message.\n\n @returns The Type value.\n"]
+    #[doc = " Returns the Type value.\n\n @param[in]  aMessage  A pointer to the CoAP message.\n\n @returns The Type value.\n"]
     pub fn otCoapMessageGetType(aMessage: *const otMessage) -> otCoapType;
 }
 extern "C" {
-    #[doc = " This function returns the Code value.\n\n @param[in]  aMessage  A pointer to the CoAP message.\n\n @returns The Code value.\n"]
+    #[doc = " Returns the Code value.\n\n @param[in]  aMessage  A pointer to the CoAP message.\n\n @returns The Code value.\n"]
     pub fn otCoapMessageGetCode(aMessage: *const otMessage) -> otCoapCode;
 }
 extern "C" {
-    #[doc = " This function sets the Code value.\n\n @param[in,out]  aMessage  A pointer to the CoAP message to initialize.\n @param[in]      aCode     CoAP message code.\n"]
+    #[doc = " Sets the Code value.\n\n @param[in,out]  aMessage  A pointer to the CoAP message to initialize.\n @param[in]      aCode     CoAP message code.\n"]
     pub fn otCoapMessageSetCode(aMessage: *mut otMessage, aCode: otCoapCode);
 }
 extern "C" {
-    #[doc = " This method returns the CoAP Code as human readable string.\n\n @param[in]   aMessage    A pointer to the CoAP message.\n\n @ returns The CoAP Code as string.\n"]
+    #[doc = " Returns the CoAP Code as human readable string.\n\n @param[in]   aMessage    A pointer to the CoAP message.\n\n @ returns The CoAP Code as string.\n"]
     pub fn otCoapMessageCodeToString(aMessage: *const otMessage) -> *const ::std::os::raw::c_char;
 }
 extern "C" {
-    #[doc = " This function returns the Message ID value.\n\n @param[in]  aMessage  A pointer to the CoAP message.\n\n @returns The Message ID value.\n"]
+    #[doc = " Returns the Message ID value.\n\n @param[in]  aMessage  A pointer to the CoAP message.\n\n @returns The Message ID value.\n"]
     pub fn otCoapMessageGetMessageId(aMessage: *const otMessage) -> u16;
 }
 extern "C" {
-    #[doc = " This function returns the Token length.\n\n @param[in]  aMessage  A pointer to the CoAP message.\n\n @returns The Token length.\n"]
+    #[doc = " Returns the Token length.\n\n @param[in]  aMessage  A pointer to the CoAP message.\n\n @returns The Token length.\n"]
     pub fn otCoapMessageGetTokenLength(aMessage: *const otMessage) -> u8;
 }
 extern "C" {
-    #[doc = " This function returns a pointer to the Token value.\n\n @param[in]  aMessage  A pointer to the CoAP message.\n\n @returns A pointer to the Token value.\n"]
+    #[doc = " Returns a pointer to the Token value.\n\n @param[in]  aMessage  A pointer to the CoAP message.\n\n @returns A pointer to the Token value.\n"]
     pub fn otCoapMessageGetToken(aMessage: *const otMessage) -> *const u8;
 }
 extern "C" {
-    #[doc = " This function initialises an iterator for the options in the given message.\n\n @param[in,out]  aIterator A pointer to the CoAP message option iterator.\n @param[in]      aMessage  A pointer to the CoAP message.\n\n @retval  OT_ERROR_NONE   Successfully initialised.\n @retval  OT_ERROR_PARSE  Message state is inconsistent.\n"]
+    #[doc = " Initialises an iterator for the options in the given message.\n\n @param[in,out]  aIterator A pointer to the CoAP message option iterator.\n @param[in]      aMessage  A pointer to the CoAP message.\n\n @retval  OT_ERROR_NONE   Successfully initialised.\n @retval  OT_ERROR_PARSE  Message state is inconsistent.\n"]
     pub fn otCoapOptionIteratorInit(
         aIterator: *mut otCoapOptionIterator,
         aMessage: *const otMessage,
     ) -> otError;
 }
 extern "C" {
-    #[doc = " This function returns a pointer to the first option matching the specified option number.\n\n @param[in]  aIterator A pointer to the CoAP message option iterator.\n @param[in]  aOption   The option number sought.\n\n @returns A pointer to the first matching option. If no matching option is present NULL pointer is returned.\n"]
+    #[doc = " Returns a pointer to the first option matching the specified option number.\n\n @param[in]  aIterator A pointer to the CoAP message option iterator.\n @param[in]  aOption   The option number sought.\n\n @returns A pointer to the first matching option. If no matching option is present NULL pointer is returned.\n"]
     pub fn otCoapOptionIteratorGetFirstOptionMatching(
         aIterator: *mut otCoapOptionIterator,
         aOption: u16,
     ) -> *const otCoapOption;
 }
 extern "C" {
-    #[doc = " This function returns a pointer to the first option.\n\n @param[in,out]  aIterator A pointer to the CoAP message option iterator.\n\n @returns A pointer to the first option. If no option is present NULL pointer is returned.\n"]
+    #[doc = " Returns a pointer to the first option.\n\n @param[in,out]  aIterator A pointer to the CoAP message option iterator.\n\n @returns A pointer to the first option. If no option is present NULL pointer is returned.\n"]
     pub fn otCoapOptionIteratorGetFirstOption(
         aIterator: *mut otCoapOptionIterator,
     ) -> *const otCoapOption;
 }
 extern "C" {
-    #[doc = " This function returns a pointer to the next option matching the specified option number.\n\n @param[in]  aIterator A pointer to the CoAP message option iterator.\n @param[in]  aOption   The option number sought.\n\n @returns A pointer to the next matching option. If no further matching option is present NULL pointer is returned.\n"]
+    #[doc = " Returns a pointer to the next option matching the specified option number.\n\n @param[in]  aIterator A pointer to the CoAP message option iterator.\n @param[in]  aOption   The option number sought.\n\n @returns A pointer to the next matching option. If no further matching option is present NULL pointer is returned.\n"]
     pub fn otCoapOptionIteratorGetNextOptionMatching(
         aIterator: *mut otCoapOptionIterator,
         aOption: u16,
     ) -> *const otCoapOption;
 }
 extern "C" {
-    #[doc = " This function returns a pointer to the next option.\n\n @param[in,out]  aIterator A pointer to the CoAP message option iterator.\n\n @returns A pointer to the next option. If no more options are present NULL pointer is returned.\n"]
+    #[doc = " Returns a pointer to the next option.\n\n @param[in,out]  aIterator A pointer to the CoAP message option iterator.\n\n @returns A pointer to the next option. If no more options are present NULL pointer is returned.\n"]
     pub fn otCoapOptionIteratorGetNextOption(
         aIterator: *mut otCoapOptionIterator,
     ) -> *const otCoapOption;
 }
 extern "C" {
-    #[doc = " This function fills current option value into @p aValue assuming the current value is an unsigned integer encoded\n according to https://tools.ietf.org/html/rfc7252#section-3.2\n\n @param[in,out]   aIterator   A pointer to the CoAP message option iterator.\n @param[out]      aValue      A pointer to an unsigned integer to receive the option value.\n\n @retval  OT_ERROR_NONE       Successfully filled value.\n @retval  OT_ERROR_NOT_FOUND  No current option.\n @retval  OT_ERROR_NO_BUFS    Value is too long to fit in a uint64_t.\n\n @see otCoapMessageAppendUintOption"]
+    #[doc = " Fills current option value into @p aValue assuming the current value is an unsigned integer encoded\n according to https://tools.ietf.org/html/rfc7252#section-3.2\n\n @param[in,out]   aIterator   A pointer to the CoAP message option iterator.\n @param[out]      aValue      A pointer to an unsigned integer to receive the option value.\n\n @retval  OT_ERROR_NONE       Successfully filled value.\n @retval  OT_ERROR_NOT_FOUND  No current option.\n @retval  OT_ERROR_NO_BUFS    Value is too long to fit in a uint64_t.\n\n @see otCoapMessageAppendUintOption"]
     pub fn otCoapOptionIteratorGetOptionUintValue(
         aIterator: *mut otCoapOptionIterator,
         aValue: *mut u64,
     ) -> otError;
 }
 extern "C" {
-    #[doc = " This function fills current option value into @p aValue.\n\n @param[in,out]  aIterator A pointer to the CoAP message option iterator.\n @param[out]     aValue    A pointer to a buffer to receive the option value.\n\n @retval  OT_ERROR_NONE       Successfully filled value.\n @retval  OT_ERROR_NOT_FOUND  No current option.\n"]
+    #[doc = " Fills current option value into @p aValue.\n\n @param[in,out]  aIterator A pointer to the CoAP message option iterator.\n @param[out]     aValue    A pointer to a buffer to receive the option value.\n\n @retval  OT_ERROR_NONE       Successfully filled value.\n @retval  OT_ERROR_NOT_FOUND  No current option.\n"]
     pub fn otCoapOptionIteratorGetOptionValue(
         aIterator: *mut otCoapOptionIterator,
         aValue: *mut ::std::os::raw::c_void,
     ) -> otError;
 }
 extern "C" {
-    #[doc = " This function creates a new CoAP message.\n\n @note If @p aSettings is 'NULL', the link layer security is enabled and the message priority is set to\n OT_MESSAGE_PRIORITY_NORMAL by default.\n\n @param[in]  aInstance  A pointer to an OpenThread instance.\n @param[in]  aSettings  A pointer to the message settings or NULL to set default settings.\n\n @returns A pointer to the message buffer or NULL if no message buffers are available or parameters are invalid.\n"]
+    #[doc = " Creates a new CoAP message.\n\n @note If @p aSettings is 'NULL', the link layer security is enabled and the message priority is set to\n OT_MESSAGE_PRIORITY_NORMAL by default.\n\n @param[in]  aInstance  A pointer to an OpenThread instance.\n @param[in]  aSettings  A pointer to the message settings or NULL to set default settings.\n\n @returns A pointer to the message buffer or NULL if no message buffers are available or parameters are invalid.\n"]
     pub fn otCoapNewMessage(
         aInstance: *mut otInstance,
         aSettings: *const otMessageSettings,
     ) -> *mut otMessage;
 }
 extern "C" {
-    #[doc = " This function sends a CoAP request with custom transmission parameters.\n\n If a response for a request is expected, respective function and context information should be provided.\n If no response is expected, these arguments should be NULL pointers.\n\n @param[in]  aInstance        A pointer to an OpenThread instance.\n @param[in]  aMessage         A pointer to the message to send.\n @param[in]  aMessageInfo     A pointer to the message info associated with @p aMessage.\n @param[in]  aHandler         A function pointer that shall be called on response reception or timeout.\n @param[in]  aContext         A pointer to arbitrary context information. May be NULL if not used.\n @param[in]  aTxParameters    A pointer to transmission parameters for this request. Use NULL for defaults.\n                              Otherwise, parameters given must meet the following conditions:\n                              1. mMaxRetransmit is no more than OT_COAP_MAX_RETRANSMIT.\n                              2. mAckRandomFactorNumerator / mAckRandomFactorDenominator must not be below 1.0.\n                              3. The calculated exchange life time must not overflow uint32_t.\n\n @retval OT_ERROR_INVALID_ARGS    @p aTxParameters is invalid.\n @retval OT_ERROR_NONE            Successfully sent CoAP message.\n @retval OT_ERROR_NO_BUFS         Failed to allocate retransmission data.\n"]
+    #[doc = " Sends a CoAP request with custom transmission parameters.\n\n If a response for a request is expected, respective function and context information should be provided.\n If no response is expected, these arguments should be NULL pointers.\n\n @param[in]  aInstance        A pointer to an OpenThread instance.\n @param[in]  aMessage         A pointer to the message to send.\n @param[in]  aMessageInfo     A pointer to the message info associated with @p aMessage.\n @param[in]  aHandler         A function pointer that shall be called on response reception or timeout.\n @param[in]  aContext         A pointer to arbitrary context information. May be NULL if not used.\n @param[in]  aTxParameters    A pointer to transmission parameters for this request. Use NULL for defaults.\n                              Otherwise, parameters given must meet the following conditions:\n                              1. mMaxRetransmit is no more than OT_COAP_MAX_RETRANSMIT.\n                              2. mAckRandomFactorNumerator / mAckRandomFactorDenominator must not be below 1.0.\n                              3. The calculated exchange life time must not overflow uint32_t.\n\n @retval OT_ERROR_INVALID_ARGS    @p aTxParameters is invalid.\n @retval OT_ERROR_NONE            Successfully sent CoAP message.\n @retval OT_ERROR_NO_BUFS         Failed to allocate retransmission data.\n"]
     pub fn otCoapSendRequestWithParameters(
         aInstance: *mut otInstance,
         aMessage: *mut otMessage,
@@ -4200,7 +4225,7 @@ extern "C" {
     ) -> otError;
 }
 extern "C" {
-    #[doc = " This function sends a CoAP request block-wise with custom transmission parameters.\n\n This function is available when OPENTHREAD_CONFIG_COAP_BLOCKWISE_TRANSFER_ENABLE configuration\n is enabled.\n\n If a response for a request is expected, respective function and context information should be provided.\n If the response is expected to be block-wise, a respective hook function should be provided.\n If no response is expected, these arguments should be NULL pointers.\n\n @param[in]  aInstance        A pointer to an OpenThread instance.\n @param[in]  aMessage         A pointer to the message to send.\n @param[in]  aMessageInfo     A pointer to the message info associated with @p aMessage.\n @param[in]  aHandler         A function pointer that shall be called on response reception or timeout.\n @param[in]  aContext         A pointer to arbitrary context information. May be NULL if not used.\n @param[in]  aTxParameters    A pointer to transmission parameters for this request. Use NULL for defaults.\n @param[in]  aTransmitHook    A pointer to a hook function for outgoing block-wise transfer.\n @param[in]  aReceiveHook     A pointer to a hook function for incoming block-wise transfer.\n\n @retval OT_ERROR_NONE    Successfully sent CoAP message.\n @retval OT_ERROR_NO_BUFS Failed to allocate retransmission data.\n"]
+    #[doc = " Sends a CoAP request block-wise with custom transmission parameters.\n\n Is available when OPENTHREAD_CONFIG_COAP_BLOCKWISE_TRANSFER_ENABLE configuration\n is enabled.\n\n If a response for a request is expected, respective function and context information should be provided.\n If the response is expected to be block-wise, a respective hook function should be provided.\n If no response is expected, these arguments should be NULL pointers.\n\n @param[in]  aInstance        A pointer to an OpenThread instance.\n @param[in]  aMessage         A pointer to the message to send.\n @param[in]  aMessageInfo     A pointer to the message info associated with @p aMessage.\n @param[in]  aHandler         A function pointer that shall be called on response reception or timeout.\n @param[in]  aContext         A pointer to arbitrary context information. May be NULL if not used.\n @param[in]  aTxParameters    A pointer to transmission parameters for this request. Use NULL for defaults.\n @param[in]  aTransmitHook    A pointer to a hook function for outgoing block-wise transfer.\n @param[in]  aReceiveHook     A pointer to a hook function for incoming block-wise transfer.\n\n @retval OT_ERROR_NONE    Successfully sent CoAP message.\n @retval OT_ERROR_NO_BUFS Failed to allocate retransmission data.\n"]
     pub fn otCoapSendRequestBlockWiseWithParameters(
         aInstance: *mut otInstance,
         aMessage: *mut otMessage,
@@ -4213,37 +4238,37 @@ extern "C" {
     ) -> otError;
 }
 extern "C" {
-    #[doc = " This function starts the CoAP server.\n\n @param[in]  aInstance  A pointer to an OpenThread instance.\n @param[in]  aPort      The local UDP port to bind to.\n\n @retval OT_ERROR_NONE    Successfully started the CoAP server.\n @retval OT_ERROR_FAILED  Failed to start the CoAP server.\n"]
+    #[doc = " Starts the CoAP server.\n\n @param[in]  aInstance  A pointer to an OpenThread instance.\n @param[in]  aPort      The local UDP port to bind to.\n\n @retval OT_ERROR_NONE    Successfully started the CoAP server.\n @retval OT_ERROR_FAILED  Failed to start the CoAP server.\n"]
     pub fn otCoapStart(aInstance: *mut otInstance, aPort: u16) -> otError;
 }
 extern "C" {
-    #[doc = " This function stops the CoAP server.\n\n @param[in]  aInstance  A pointer to an OpenThread instance.\n\n @retval OT_ERROR_NONE  Successfully stopped the CoAP server.\n"]
+    #[doc = " Stops the CoAP server.\n\n @param[in]  aInstance  A pointer to an OpenThread instance.\n\n @retval OT_ERROR_NONE  Successfully stopped the CoAP server.\n"]
     pub fn otCoapStop(aInstance: *mut otInstance) -> otError;
 }
 extern "C" {
-    #[doc = " This function adds a resource to the CoAP server.\n\n @param[in]  aInstance  A pointer to an OpenThread instance.\n @param[in]  aResource  A pointer to the resource.\n"]
+    #[doc = " Adds a resource to the CoAP server.\n\n @param[in]  aInstance  A pointer to an OpenThread instance.\n @param[in]  aResource  A pointer to the resource.\n"]
     pub fn otCoapAddResource(aInstance: *mut otInstance, aResource: *mut otCoapResource);
 }
 extern "C" {
-    #[doc = " This function removes a resource from the CoAP server.\n\n @param[in]  aInstance  A pointer to an OpenThread instance.\n @param[in]  aResource  A pointer to the resource.\n"]
+    #[doc = " Removes a resource from the CoAP server.\n\n @param[in]  aInstance  A pointer to an OpenThread instance.\n @param[in]  aResource  A pointer to the resource.\n"]
     pub fn otCoapRemoveResource(aInstance: *mut otInstance, aResource: *mut otCoapResource);
 }
 extern "C" {
-    #[doc = " This function adds a block-wise resource to the CoAP server.\n\n @param[in]  aInstance  A pointer to an OpenThread instance.\n @param[in]  aResource  A pointer to the resource.\n"]
+    #[doc = " Adds a block-wise resource to the CoAP server.\n\n @param[in]  aInstance  A pointer to an OpenThread instance.\n @param[in]  aResource  A pointer to the resource.\n"]
     pub fn otCoapAddBlockWiseResource(
         aInstance: *mut otInstance,
         aResource: *mut otCoapBlockwiseResource,
     );
 }
 extern "C" {
-    #[doc = " This function removes a block-wise resource from the CoAP server.\n\n @param[in]  aInstance  A pointer to an OpenThread instance.\n @param[in]  aResource  A pointer to the resource.\n"]
+    #[doc = " Removes a block-wise resource from the CoAP server.\n\n @param[in]  aInstance  A pointer to an OpenThread instance.\n @param[in]  aResource  A pointer to the resource.\n"]
     pub fn otCoapRemoveBlockWiseResource(
         aInstance: *mut otInstance,
         aResource: *mut otCoapBlockwiseResource,
     );
 }
 extern "C" {
-    #[doc = " This function sets the default handler for unhandled CoAP requests.\n\n @param[in]  aInstance  A pointer to an OpenThread instance.\n @param[in]  aHandler   A function pointer that shall be called when an unhandled request arrives.\n @param[in]  aContext   A pointer to arbitrary context information. May be NULL if not used.\n"]
+    #[doc = " Sets the default handler for unhandled CoAP requests.\n\n @param[in]  aInstance  A pointer to an OpenThread instance.\n @param[in]  aHandler   A function pointer that shall be called when an unhandled request arrives.\n @param[in]  aContext   A pointer to arbitrary context information. May be NULL if not used.\n"]
     pub fn otCoapSetDefaultHandler(
         aInstance: *mut otInstance,
         aHandler: otCoapRequestHandler,
@@ -4251,7 +4276,7 @@ extern "C" {
     );
 }
 extern "C" {
-    #[doc = " This function sends a CoAP response from the server with custom transmission parameters.\n\n @param[in]  aInstance        A pointer to an OpenThread instance.\n @param[in]  aMessage         A pointer to the CoAP response to send.\n @param[in]  aMessageInfo     A pointer to the message info associated with @p aMessage.\n @param[in]  aTxParameters    A pointer to transmission parameters for this response. Use NULL for defaults.\n\n @retval OT_ERROR_NONE     Successfully enqueued the CoAP response message.\n @retval OT_ERROR_NO_BUFS  Insufficient buffers available to send the CoAP response.\n"]
+    #[doc = " Sends a CoAP response from the server with custom transmission parameters.\n\n @param[in]  aInstance        A pointer to an OpenThread instance.\n @param[in]  aMessage         A pointer to the CoAP response to send.\n @param[in]  aMessageInfo     A pointer to the message info associated with @p aMessage.\n @param[in]  aTxParameters    A pointer to transmission parameters for this response. Use NULL for defaults.\n\n @retval OT_ERROR_NONE     Successfully enqueued the CoAP response message.\n @retval OT_ERROR_NO_BUFS  Insufficient buffers available to send the CoAP response.\n"]
     pub fn otCoapSendResponseWithParameters(
         aInstance: *mut otInstance,
         aMessage: *mut otMessage,
@@ -4260,7 +4285,7 @@ extern "C" {
     ) -> otError;
 }
 extern "C" {
-    #[doc = " This function sends a CoAP response block-wise from the server with custom transmission parameters.\n\n This function is available when OPENTHREAD_CONFIG_COAP_BLOCKWISE_TRANSFER_ENABLE configuration\n is enabled.\n\n @param[in]  aInstance        A pointer to an OpenThread instance.\n @param[in]  aMessage         A pointer to the CoAP response to send.\n @param[in]  aMessageInfo     A pointer to the message info associated with @p aMessage.\n @param[in]  aTxParameters    A pointer to transmission parameters for this response. Use NULL for defaults.\n @param[in]  aContext         A pointer to arbitrary context information. May be NULL if not used.\n @param[in]  aTransmitHook    A pointer to a hook function for outgoing block-wise transfer.\n\n @retval OT_ERROR_NONE     Successfully enqueued the CoAP response message.\n @retval OT_ERROR_NO_BUFS  Insufficient buffers available to send the CoAP response.\n"]
+    #[doc = " Sends a CoAP response block-wise from the server with custom transmission parameters.\n\n Is available when OPENTHREAD_CONFIG_COAP_BLOCKWISE_TRANSFER_ENABLE configuration\n is enabled.\n\n @param[in]  aInstance        A pointer to an OpenThread instance.\n @param[in]  aMessage         A pointer to the CoAP response to send.\n @param[in]  aMessageInfo     A pointer to the message info associated with @p aMessage.\n @param[in]  aTxParameters    A pointer to transmission parameters for this response. Use NULL for defaults.\n @param[in]  aContext         A pointer to arbitrary context information. May be NULL if not used.\n @param[in]  aTransmitHook    A pointer to a hook function for outgoing block-wise transfer.\n\n @retval OT_ERROR_NONE     Successfully enqueued the CoAP response message.\n @retval OT_ERROR_NO_BUFS  Insufficient buffers available to send the CoAP response.\n"]
     pub fn otCoapSendResponseBlockWiseWithParameters(
         aInstance: *mut otInstance,
         aMessage: *mut otMessage,
@@ -4270,20 +4295,20 @@ extern "C" {
         aTransmitHook: otCoapBlockwiseTransmitHook,
     ) -> otError;
 }
-#[doc = " This function pointer is called when the DTLS connection state changes.\n\n @param[in]  aConnected  true, if a connection was established, false otherwise.\n @param[in]  aContext    A pointer to arbitrary context information.\n"]
+#[doc = " Pointer is called when the DTLS connection state changes.\n\n @param[in]  aConnected  true, if a connection was established, false otherwise.\n @param[in]  aContext    A pointer to arbitrary context information.\n"]
 pub type otHandleCoapSecureClientConnect = ::std::option::Option<
     unsafe extern "C" fn(aConnected: bool, aContext: *mut ::std::os::raw::c_void),
 >;
 extern "C" {
-    #[doc = " This function starts the CoAP Secure service.\n\n @param[in]  aInstance  A pointer to an OpenThread instance.\n @param[in]  aPort      The local UDP port to bind to.\n\n @retval OT_ERROR_NONE  Successfully started the CoAP Secure server.\n"]
+    #[doc = " Starts the CoAP Secure service.\n\n @param[in]  aInstance  A pointer to an OpenThread instance.\n @param[in]  aPort      The local UDP port to bind to.\n\n @retval OT_ERROR_NONE  Successfully started the CoAP Secure server.\n"]
     pub fn otCoapSecureStart(aInstance: *mut otInstance, aPort: u16) -> otError;
 }
 extern "C" {
-    #[doc = " This function stops the CoAP Secure server.\n\n @param[in]  aInstance  A pointer to an OpenThread instance.\n"]
+    #[doc = " Stops the CoAP Secure server.\n\n @param[in]  aInstance  A pointer to an OpenThread instance.\n"]
     pub fn otCoapSecureStop(aInstance: *mut otInstance);
 }
 extern "C" {
-    #[doc = " This method sets the Pre-Shared Key (PSK) and cipher suite\n DTLS_PSK_WITH_AES_128_CCM_8.\n\n @note This function requires the build-time feature `MBEDTLS_KEY_EXCHANGE_PSK_ENABLED` to be enabled.\n\n @param[in]  aInstance     A pointer to an OpenThread instance.\n @param[in]  aPsk          A pointer to the PSK.\n @param[in]  aPskLength    The PSK length.\n @param[in]  aPskIdentity  The Identity Name for the PSK.\n @param[in]  aPskIdLength  The PSK Identity Length.\n"]
+    #[doc = " Sets the Pre-Shared Key (PSK) and cipher suite\n DTLS_PSK_WITH_AES_128_CCM_8.\n\n @note This function requires the build-time feature `MBEDTLS_KEY_EXCHANGE_PSK_ENABLED` to be enabled.\n\n @param[in]  aInstance     A pointer to an OpenThread instance.\n @param[in]  aPsk          A pointer to the PSK.\n @param[in]  aPskLength    The PSK length.\n @param[in]  aPskIdentity  The Identity Name for the PSK.\n @param[in]  aPskIdLength  The PSK Identity Length.\n"]
     pub fn otCoapSecureSetPsk(
         aInstance: *mut otInstance,
         aPsk: *const u8,
@@ -4293,7 +4318,7 @@ extern "C" {
     );
 }
 extern "C" {
-    #[doc = " This method returns the peer x509 certificate base64 encoded.\n\n @note This function requires the build-time features `MBEDTLS_BASE64_C` and\n       `MBEDTLS_SSL_KEEP_PEER_CERTIFICATE` to be enabled.\n\n @param[in]   aInstance        A pointer to an OpenThread instance.\n @param[out]  aPeerCert        A pointer to the base64 encoded certificate buffer.\n @param[out]  aCertLength      The length of the base64 encoded peer certificate.\n @param[in]   aCertBufferSize  The buffer size of aPeerCert.\n\n @retval OT_ERROR_INVALID_STATE   Not connected yet.\n @retval OT_ERROR_NONE            Successfully get the peer certificate.\n @retval OT_ERROR_NO_BUFS         Can't allocate memory for certificate.\n"]
+    #[doc = " Returns the peer x509 certificate base64 encoded.\n\n @note This function requires the build-time features `MBEDTLS_BASE64_C` and\n       `MBEDTLS_SSL_KEEP_PEER_CERTIFICATE` to be enabled.\n\n @param[in]   aInstance        A pointer to an OpenThread instance.\n @param[out]  aPeerCert        A pointer to the base64 encoded certificate buffer.\n @param[out]  aCertLength      The length of the base64 encoded peer certificate.\n @param[in]   aCertBufferSize  The buffer size of aPeerCert.\n\n @retval OT_ERROR_INVALID_STATE   Not connected yet.\n @retval OT_ERROR_NONE            Successfully get the peer certificate.\n @retval OT_ERROR_NO_BUFS         Can't allocate memory for certificate.\n"]
     pub fn otCoapSecureGetPeerCertificateBase64(
         aInstance: *mut otInstance,
         aPeerCert: *mut ::std::os::raw::c_uchar,
@@ -4302,11 +4327,11 @@ extern "C" {
     ) -> otError;
 }
 extern "C" {
-    #[doc = " This method sets the authentication mode for the coap secure connection.\n\n Disable or enable the verification of peer certificate.\n Must be called before start.\n\n @param[in]   aInstance               A pointer to an OpenThread instance.\n @param[in]   aVerifyPeerCertificate  true, to verify the peer certificate.\n"]
+    #[doc = " Sets the authentication mode for the coap secure connection.\n\n Disable or enable the verification of peer certificate.\n Must be called before start.\n\n @param[in]   aInstance               A pointer to an OpenThread instance.\n @param[in]   aVerifyPeerCertificate  true, to verify the peer certificate.\n"]
     pub fn otCoapSecureSetSslAuthMode(aInstance: *mut otInstance, aVerifyPeerCertificate: bool);
 }
 extern "C" {
-    #[doc = " This method sets the local device's X509 certificate with corresponding private key for\n DTLS session with DTLS_ECDHE_ECDSA_WITH_AES_128_CCM_8.\n\n @note This function requires `MBEDTLS_KEY_EXCHANGE_ECDHE_ECDSA_ENABLED=1`.\n\n @param[in]  aInstance          A pointer to an OpenThread instance.\n @param[in]  aX509Cert          A pointer to the PEM formatted X509 certificate.\n @param[in]  aX509Length        The length of certificate.\n @param[in]  aPrivateKey        A pointer to the PEM formatted private key.\n @param[in]  aPrivateKeyLength  The length of the private key.\n"]
+    #[doc = " Sets the local device's X509 certificate with corresponding private key for\n DTLS session with DTLS_ECDHE_ECDSA_WITH_AES_128_CCM_8.\n\n @note This function requires `MBEDTLS_KEY_EXCHANGE_ECDHE_ECDSA_ENABLED=1`.\n\n @param[in]  aInstance          A pointer to an OpenThread instance.\n @param[in]  aX509Cert          A pointer to the PEM formatted X509 certificate.\n @param[in]  aX509Length        The length of certificate.\n @param[in]  aPrivateKey        A pointer to the PEM formatted private key.\n @param[in]  aPrivateKeyLength  The length of the private key.\n"]
     pub fn otCoapSecureSetCertificate(
         aInstance: *mut otInstance,
         aX509Cert: *const u8,
@@ -4316,7 +4341,7 @@ extern "C" {
     );
 }
 extern "C" {
-    #[doc = " This method sets the trusted top level CAs. It is needed for validating the\n certificate of the peer.\n\n DTLS mode \"ECDHE ECDSA with AES 128 CCM 8\" for Application CoAPS.\n\n @note This function requires `MBEDTLS_KEY_EXCHANGE_ECDHE_ECDSA_ENABLED=1`.\n\n @param[in]  aInstance                A pointer to an OpenThread instance.\n @param[in]  aX509CaCertificateChain  A pointer to the PEM formatted X509 CA chain.\n @param[in]  aX509CaCertChainLength   The length of chain.\n"]
+    #[doc = " Sets the trusted top level CAs. It is needed for validating the\n certificate of the peer.\n\n DTLS mode \"ECDHE ECDSA with AES 128 CCM 8\" for Application CoAPS.\n\n @note This function requires `MBEDTLS_KEY_EXCHANGE_ECDHE_ECDSA_ENABLED=1`.\n\n @param[in]  aInstance                A pointer to an OpenThread instance.\n @param[in]  aX509CaCertificateChain  A pointer to the PEM formatted X509 CA chain.\n @param[in]  aX509CaCertChainLength   The length of chain.\n"]
     pub fn otCoapSecureSetCaCertificateChain(
         aInstance: *mut otInstance,
         aX509CaCertificateChain: *const u8,
@@ -4324,7 +4349,7 @@ extern "C" {
     );
 }
 extern "C" {
-    #[doc = " This method initializes DTLS session with a peer.\n\n @param[in]  aInstance               A pointer to an OpenThread instance.\n @param[in]  aSockAddr               A pointer to the remote socket address.\n @param[in]  aHandler                A pointer to a function that will be called when the DTLS connection\n                                     state changes.\n @param[in]  aContext                A pointer to arbitrary context information.\n\n @retval OT_ERROR_NONE  Successfully started DTLS connection.\n"]
+    #[doc = " Initializes DTLS session with a peer.\n\n @param[in]  aInstance               A pointer to an OpenThread instance.\n @param[in]  aSockAddr               A pointer to the remote socket address.\n @param[in]  aHandler                A pointer to a function that will be called when the DTLS connection\n                                     state changes.\n @param[in]  aContext                A pointer to arbitrary context information.\n\n @retval OT_ERROR_NONE  Successfully started DTLS connection.\n"]
     pub fn otCoapSecureConnect(
         aInstance: *mut otInstance,
         aSockAddr: *const otSockAddr,
@@ -4333,19 +4358,19 @@ extern "C" {
     ) -> otError;
 }
 extern "C" {
-    #[doc = " This method stops the DTLS connection.\n\n @param[in]  aInstance  A pointer to an OpenThread instance.\n"]
+    #[doc = " Stops the DTLS connection.\n\n @param[in]  aInstance  A pointer to an OpenThread instance.\n"]
     pub fn otCoapSecureDisconnect(aInstance: *mut otInstance);
 }
 extern "C" {
-    #[doc = " This method indicates whether or not the DTLS session is connected.\n\n @param[in]  aInstance  A pointer to an OpenThread instance.\n\n @retval TRUE   The DTLS session is connected.\n @retval FALSE  The DTLS session is not connected.\n"]
+    #[doc = " Indicates whether or not the DTLS session is connected.\n\n @param[in]  aInstance  A pointer to an OpenThread instance.\n\n @retval TRUE   The DTLS session is connected.\n @retval FALSE  The DTLS session is not connected.\n"]
     pub fn otCoapSecureIsConnected(aInstance: *mut otInstance) -> bool;
 }
 extern "C" {
-    #[doc = " This method indicates whether or not the DTLS session is active.\n\n @param[in]  aInstance  A pointer to an OpenThread instance.\n\n @retval TRUE  If DTLS session is active.\n @retval FALSE If DTLS session is not active.\n"]
+    #[doc = " Indicates whether or not the DTLS session is active.\n\n @param[in]  aInstance  A pointer to an OpenThread instance.\n\n @retval TRUE  If DTLS session is active.\n @retval FALSE If DTLS session is not active.\n"]
     pub fn otCoapSecureIsConnectionActive(aInstance: *mut otInstance) -> bool;
 }
 extern "C" {
-    #[doc = " This method sends a CoAP request block-wise over secure DTLS connection.\n\n This function is available when OPENTHREAD_CONFIG_COAP_BLOCKWISE_TRANSFER_ENABLE configuration\n is enabled.\n\n If a response for a request is expected, respective function and context information should be provided.\n If no response is expected, these arguments should be NULL pointers.\n If Message Id was not set in the header (equal to 0), this function will assign unique Message Id to the message.\n\n @param[in]  aInstance     A pointer to an OpenThread instance.\n @param[in]  aMessage      A reference to the message to send.\n @param[in]  aHandler      A function pointer that shall be called on response reception or time-out.\n @param[in]  aContext      A pointer to arbitrary context information.\n @param[in]  aTransmitHook A function pointer that is called on Block1 response reception.\n @param[in]  aReceiveHook  A function pointer that is called on Block2 response reception.\n\n @retval OT_ERROR_NONE           Successfully sent CoAP message.\n @retval OT_ERROR_NO_BUFS        Failed to allocate retransmission data.\n @retval OT_ERROR_INVALID_STATE  DTLS connection was not initialized.\n"]
+    #[doc = " Sends a CoAP request block-wise over secure DTLS connection.\n\n Is available when OPENTHREAD_CONFIG_COAP_BLOCKWISE_TRANSFER_ENABLE configuration\n is enabled.\n\n If a response for a request is expected, respective function and context information should be provided.\n If no response is expected, these arguments should be NULL pointers.\n If Message Id was not set in the header (equal to 0), this function will assign unique Message Id to the message.\n\n @param[in]  aInstance     A pointer to an OpenThread instance.\n @param[in]  aMessage      A reference to the message to send.\n @param[in]  aHandler      A function pointer that shall be called on response reception or time-out.\n @param[in]  aContext      A pointer to arbitrary context information.\n @param[in]  aTransmitHook A function pointer that is called on Block1 response reception.\n @param[in]  aReceiveHook  A function pointer that is called on Block2 response reception.\n\n @retval OT_ERROR_NONE           Successfully sent CoAP message.\n @retval OT_ERROR_NO_BUFS        Failed to allocate retransmission data.\n @retval OT_ERROR_INVALID_STATE  DTLS connection was not initialized.\n"]
     pub fn otCoapSecureSendRequestBlockWise(
         aInstance: *mut otInstance,
         aMessage: *mut otMessage,
@@ -4356,7 +4381,7 @@ extern "C" {
     ) -> otError;
 }
 extern "C" {
-    #[doc = " This method sends a CoAP request over secure DTLS connection.\n\n If a response for a request is expected, respective function and context information should be provided.\n If no response is expected, these arguments should be NULL pointers.\n If Message Id was not set in the header (equal to 0), this function will assign unique Message Id to the message.\n\n @param[in]  aInstance     A pointer to an OpenThread instance.\n @param[in]  aMessage      A reference to the message to send.\n @param[in]  aHandler      A function pointer that shall be called on response reception or time-out.\n @param[in]  aContext      A pointer to arbitrary context information.\n\n @retval OT_ERROR_NONE           Successfully sent CoAP message.\n @retval OT_ERROR_NO_BUFS        Failed to allocate retransmission data.\n @retval OT_ERROR_INVALID_STATE  DTLS connection was not initialized.\n"]
+    #[doc = " Sends a CoAP request over secure DTLS connection.\n\n If a response for a request is expected, respective function and context information should be provided.\n If no response is expected, these arguments should be NULL pointers.\n If Message Id was not set in the header (equal to 0), this function will assign unique Message Id to the message.\n\n @param[in]  aInstance     A pointer to an OpenThread instance.\n @param[in]  aMessage      A reference to the message to send.\n @param[in]  aHandler      A function pointer that shall be called on response reception or time-out.\n @param[in]  aContext      A pointer to arbitrary context information.\n\n @retval OT_ERROR_NONE           Successfully sent CoAP message.\n @retval OT_ERROR_NO_BUFS        Failed to allocate retransmission data.\n @retval OT_ERROR_INVALID_STATE  DTLS connection was not initialized.\n"]
     pub fn otCoapSecureSendRequest(
         aInstance: *mut otInstance,
         aMessage: *mut otMessage,
@@ -4365,29 +4390,29 @@ extern "C" {
     ) -> otError;
 }
 extern "C" {
-    #[doc = " This function adds a resource to the CoAP Secure server.\n\n @param[in]  aInstance  A pointer to an OpenThread instance.\n @param[in]  aResource  A pointer to the resource.\n"]
+    #[doc = " Adds a resource to the CoAP Secure server.\n\n @param[in]  aInstance  A pointer to an OpenThread instance.\n @param[in]  aResource  A pointer to the resource.\n"]
     pub fn otCoapSecureAddResource(aInstance: *mut otInstance, aResource: *mut otCoapResource);
 }
 extern "C" {
-    #[doc = " This function removes a resource from the CoAP Secure server.\n\n @param[in]  aInstance  A pointer to an OpenThread instance.\n @param[in]  aResource  A pointer to the resource.\n"]
+    #[doc = " Removes a resource from the CoAP Secure server.\n\n @param[in]  aInstance  A pointer to an OpenThread instance.\n @param[in]  aResource  A pointer to the resource.\n"]
     pub fn otCoapSecureRemoveResource(aInstance: *mut otInstance, aResource: *mut otCoapResource);
 }
 extern "C" {
-    #[doc = " This function adds a block-wise resource to the CoAP Secure server.\n\n @param[in]  aInstance  A pointer to an OpenThread instance.\n @param[in]  aResource  A pointer to the resource.\n"]
+    #[doc = " Adds a block-wise resource to the CoAP Secure server.\n\n @param[in]  aInstance  A pointer to an OpenThread instance.\n @param[in]  aResource  A pointer to the resource.\n"]
     pub fn otCoapSecureAddBlockWiseResource(
         aInstance: *mut otInstance,
         aResource: *mut otCoapBlockwiseResource,
     );
 }
 extern "C" {
-    #[doc = " This function removes a block-wise resource from the CoAP Secure server.\n\n @param[in]  aInstance  A pointer to an OpenThread instance.\n @param[in]  aResource  A pointer to the resource.\n"]
+    #[doc = " Removes a block-wise resource from the CoAP Secure server.\n\n @param[in]  aInstance  A pointer to an OpenThread instance.\n @param[in]  aResource  A pointer to the resource.\n"]
     pub fn otCoapSecureRemoveBlockWiseResource(
         aInstance: *mut otInstance,
         aResource: *mut otCoapBlockwiseResource,
     );
 }
 extern "C" {
-    #[doc = " This function sets the default handler for unhandled CoAP Secure requests.\n\n @param[in]  aInstance  A pointer to an OpenThread instance.\n @param[in]  aHandler   A function pointer that shall be called when an unhandled request arrives.\n @param[in]  aContext   A pointer to arbitrary context information. May be NULL if not used.\n"]
+    #[doc = " Sets the default handler for unhandled CoAP Secure requests.\n\n @param[in]  aInstance  A pointer to an OpenThread instance.\n @param[in]  aHandler   A function pointer that shall be called when an unhandled request arrives.\n @param[in]  aContext   A pointer to arbitrary context information. May be NULL if not used.\n"]
     pub fn otCoapSecureSetDefaultHandler(
         aInstance: *mut otInstance,
         aHandler: otCoapRequestHandler,
@@ -4395,7 +4420,7 @@ extern "C" {
     );
 }
 extern "C" {
-    #[doc = " This method sets the connected callback to indicate, when\n a Client connect to the CoAP Secure server.\n\n @param[in]  aInstance     A pointer to an OpenThread instance.\n @param[in]  aHandler      A pointer to a function that will be called once DTLS connection is established.\n @param[in]  aContext      A pointer to arbitrary context information. May be NULL if not used.\n"]
+    #[doc = " Sets the connected callback to indicate, when\n a Client connect to the CoAP Secure server.\n\n @param[in]  aInstance     A pointer to an OpenThread instance.\n @param[in]  aHandler      A pointer to a function that will be called once DTLS connection is established.\n @param[in]  aContext      A pointer to arbitrary context information. May be NULL if not used.\n"]
     pub fn otCoapSecureSetClientConnectedCallback(
         aInstance: *mut otInstance,
         aHandler: otHandleCoapSecureClientConnect,
@@ -4403,7 +4428,7 @@ extern "C" {
     );
 }
 extern "C" {
-    #[doc = " This function sends a CoAP response block-wise from the CoAP Secure server.\n\n This function is available when OPENTHREAD_CONFIG_COAP_BLOCKWISE_TRANSFER_ENABLE configuration\n is enabled.\n\n @param[in]  aInstance     A pointer to an OpenThread instance.\n @param[in]  aMessage      A pointer to the CoAP response to send.\n @param[in]  aMessageInfo  A pointer to the message info associated with @p aMessage.\n @param[in]  aContext      A pointer to arbitrary context information. May be NULL if not used.\n @param[in]  aTransmitHook A function pointer that is called on Block1 request reception.\n\n @retval OT_ERROR_NONE     Successfully enqueued the CoAP response message.\n @retval OT_ERROR_NO_BUFS  Insufficient buffers available to send the CoAP response.\n"]
+    #[doc = " Sends a CoAP response block-wise from the CoAP Secure server.\n\n Is available when OPENTHREAD_CONFIG_COAP_BLOCKWISE_TRANSFER_ENABLE configuration\n is enabled.\n\n @param[in]  aInstance     A pointer to an OpenThread instance.\n @param[in]  aMessage      A pointer to the CoAP response to send.\n @param[in]  aMessageInfo  A pointer to the message info associated with @p aMessage.\n @param[in]  aContext      A pointer to arbitrary context information. May be NULL if not used.\n @param[in]  aTransmitHook A function pointer that is called on Block1 request reception.\n\n @retval OT_ERROR_NONE     Successfully enqueued the CoAP response message.\n @retval OT_ERROR_NO_BUFS  Insufficient buffers available to send the CoAP response.\n"]
     pub fn otCoapSecureSendResponseBlockWise(
         aInstance: *mut otInstance,
         aMessage: *mut otMessage,
@@ -4413,14 +4438,14 @@ extern "C" {
     ) -> otError;
 }
 extern "C" {
-    #[doc = " This function sends a CoAP response from the CoAP Secure server.\n\n @param[in]  aInstance     A pointer to an OpenThread instance.\n @param[in]  aMessage      A pointer to the CoAP response to send.\n @param[in]  aMessageInfo  A pointer to the message info associated with @p aMessage.\n\n @retval OT_ERROR_NONE     Successfully enqueued the CoAP response message.\n @retval OT_ERROR_NO_BUFS  Insufficient buffers available to send the CoAP response.\n"]
+    #[doc = " Sends a CoAP response from the CoAP Secure server.\n\n @param[in]  aInstance     A pointer to an OpenThread instance.\n @param[in]  aMessage      A pointer to the CoAP response to send.\n @param[in]  aMessageInfo  A pointer to the message info associated with @p aMessage.\n\n @retval OT_ERROR_NONE     Successfully enqueued the CoAP response message.\n @retval OT_ERROR_NO_BUFS  Insufficient buffers available to send the CoAP response.\n"]
     pub fn otCoapSecureSendResponse(
         aInstance: *mut otInstance,
         aMessage: *mut otMessage,
         aMessageInfo: *const otMessageInfo,
     ) -> otError;
 }
-#[doc = " @struct otNetworkKey\n\n This structure represents a Thread Network Key.\n"]
+#[doc = " @struct otNetworkKey\n\n Represents a Thread Network Key.\n"]
 #[repr(C, packed)]
 #[derive(Debug, Default, Copy, Clone)]
 pub struct otNetworkKey {
@@ -4429,23 +4454,23 @@ pub struct otNetworkKey {
 }
 #[doc = " This datatype represents KeyRef to NetworkKey.\n"]
 pub type otNetworkKeyRef = otCryptoKeyRef;
-#[doc = " This structure represents a Network Name.\n\n The `otNetworkName` is a null terminated C string (i.e., `m8` char array MUST end with null char `\\0`).\n"]
+#[doc = " Represents a Network Name.\n\n The `otNetworkName` is a null terminated C string (i.e., `m8` char array MUST end with null char `\\0`).\n"]
 #[repr(C)]
 #[derive(Debug, Default, Copy, Clone)]
 pub struct otNetworkName {
     #[doc = "< Byte values. The `+ 1` is for null char."]
     pub m8: [::std::os::raw::c_char; 17usize],
 }
-#[doc = " This structure represents an Extended PAN ID.\n"]
+#[doc = " Represents an Extended PAN ID.\n"]
 #[repr(C, packed)]
 #[derive(Debug, Default, Copy, Clone)]
 pub struct otExtendedPanId {
     #[doc = "< Byte values"]
     pub m8: [u8; 8usize],
 }
-#[doc = " @struct otIp6NetworkPrefix\n\n This structure represents the Network Prefix of an IPv6 address (most significant 64 bits of the address).\n"]
+#[doc = " @struct otIp6NetworkPrefix\n\n Represents the Network Prefix of an IPv6 address (most significant 64 bits of the address).\n"]
 pub type otMeshLocalPrefix = otIp6NetworkPrefix;
-#[doc = " This structure represents PSKc.\n"]
+#[doc = " Represents PSKc.\n"]
 #[repr(C, packed)]
 #[derive(Debug, Default, Copy, Clone)]
 pub struct otPskc {
@@ -4454,7 +4479,7 @@ pub struct otPskc {
 }
 #[doc = " This datatype represents KeyRef to PSKc.\n"]
 pub type otPskcRef = otCryptoKeyRef;
-#[doc = " This structure represent Security Policy.\n"]
+#[doc = " Represent Security Policy.\n"]
 #[repr(C)]
 #[derive(Debug, Default, Copy, Clone)]
 pub struct otSecurityPolicy {
@@ -4638,9 +4663,9 @@ impl otSecurityPolicy {
         __bindgen_bitfield_unit
     }
 }
-#[doc = " This type represents Channel Mask.\n"]
+#[doc = " Represents Channel Mask.\n"]
 pub type otChannelMask = u32;
-#[doc = " This structure represents presence of different components in Active or Pending Operational Dataset.\n"]
+#[doc = " Represents presence of different components in Active or Pending Operational Dataset.\n"]
 #[repr(C, packed)]
 #[derive(Debug, Default, Copy, Clone)]
 pub struct otOperationalDatasetComponents {
@@ -4852,7 +4877,7 @@ impl otOperationalDatasetComponents {
         __bindgen_bitfield_unit
     }
 }
-#[doc = " This structure represents a Thread Dataset timestamp component.\n"]
+#[doc = " Represents a Thread Dataset timestamp component.\n"]
 #[repr(C)]
 #[derive(Debug, Default, Copy, Clone)]
 pub struct otTimestamp {
@@ -4860,7 +4885,7 @@ pub struct otTimestamp {
     pub mTicks: u16,
     pub mAuthoritative: bool,
 }
-#[doc = " This structure represents an Active or Pending Operational Dataset.\n\n Components in Dataset are optional. `mComponents` structure specifies which components are present in the Dataset.\n"]
+#[doc = " Represents an Active or Pending Operational Dataset.\n\n Components in Dataset are optional. `mComponents` structure specifies which components are present in the Dataset.\n"]
 #[repr(C)]
 #[derive(Debug, Default, Copy, Clone)]
 pub struct otOperationalDataset {
@@ -4891,7 +4916,7 @@ pub struct otOperationalDataset {
     #[doc = "< Specifies which components are set in the Dataset."]
     pub mComponents: otOperationalDatasetComponents,
 }
-#[doc = " This structure represents an Active or Pending Operational Dataset.\n\n The Operational Dataset is TLV encoded as specified by Thread.\n"]
+#[doc = " Represents an Active or Pending Operational Dataset.\n\n The Operational Dataset is TLV encoded as specified by Thread.\n"]
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
 pub struct otOperationalDatasetTlvs {
@@ -4989,14 +5014,14 @@ pub const OT_MESHCOP_TLV_DISCOVERYREQUEST: otMeshcopTlvType = 128;
 pub const OT_MESHCOP_TLV_DISCOVERYRESPONSE: otMeshcopTlvType = 129;
 #[doc = "< meshcop Joiner Advertisement TLV"]
 pub const OT_MESHCOP_TLV_JOINERADVERTISEMENT: otMeshcopTlvType = 241;
-#[doc = " This enumeration represents meshcop TLV types.\n"]
+#[doc = " Represents meshcop TLV types.\n"]
 pub type otMeshcopTlvType = ::std::os::raw::c_uint;
-#[doc = " This function pointer is called when a response to a MGMT_SET request is received or times out.\n\n @param[in]  aResult   A result of the operation.\n @param[in]  aContext  A pointer to application-specific context.\n\n @retval  OT_ERROR_NONE              The request was accepted by the leader.\n @retval  OT_ERROR_REJECTED          The request was rejected by the leader.\n @retval  OT_ERROR_PARSE             An error occurred during parsing the response.\n @retval  OT_ERROR_ABORT             The request was reset by peer.\n @retval  OT_ERROR_RESPONSE_TIMEOUT  No response or acknowledgment received during timeout period.\n"]
+#[doc = " Pointer is called when a response to a MGMT_SET request is received or times out.\n\n @param[in]  aResult   A result of the operation.\n @param[in]  aContext  A pointer to application-specific context.\n\n @retval  OT_ERROR_NONE              The request was accepted by the leader.\n @retval  OT_ERROR_REJECTED          The request was rejected by the leader.\n @retval  OT_ERROR_PARSE             An error occurred during parsing the response.\n @retval  OT_ERROR_ABORT             The request was reset by peer.\n @retval  OT_ERROR_RESPONSE_TIMEOUT  No response or acknowledgment received during timeout period.\n"]
 pub type otDatasetMgmtSetCallback = ::std::option::Option<
     unsafe extern "C" fn(aResult: otError, aContext: *mut ::std::os::raw::c_void),
 >;
 extern "C" {
-    #[doc = " This function indicates whether a valid network is present in the Active Operational Dataset or not.\n\n @param[in]  aInstance A pointer to an OpenThread instance.\n\n @returns TRUE if a valid network is present in the Active Operational Dataset, FALSE otherwise.\n"]
+    #[doc = " Indicates whether a valid network is present in the Active Operational Dataset or not.\n\n @param[in]  aInstance A pointer to an OpenThread instance.\n\n @returns TRUE if a valid network is present in the Active Operational Dataset, FALSE otherwise.\n"]
     pub fn otDatasetIsCommissioned(aInstance: *mut otInstance) -> bool;
 }
 extern "C" {
@@ -5007,7 +5032,7 @@ extern "C" {
     ) -> otError;
 }
 extern "C" {
-    #[doc = " This function gets the Active Operational Dataset.\n\n @param[in]   aInstance A pointer to an OpenThread instance.\n @param[out]  aDataset  A pointer to where the Active Operational Dataset will be placed.\n\n @retval OT_ERROR_NONE          Successfully retrieved the Active Operational Dataset.\n @retval OT_ERROR_NOT_FOUND     No corresponding value in the setting store.\n"]
+    #[doc = " Gets the Active Operational Dataset.\n\n @param[in]   aInstance A pointer to an OpenThread instance.\n @param[out]  aDataset  A pointer to where the Active Operational Dataset will be placed.\n\n @retval OT_ERROR_NONE          Successfully retrieved the Active Operational Dataset.\n @retval OT_ERROR_NOT_FOUND     No corresponding value in the setting store.\n"]
     pub fn otDatasetGetActiveTlvs(
         aInstance: *mut otInstance,
         aDataset: *mut otOperationalDatasetTlvs,
@@ -5021,21 +5046,21 @@ extern "C" {
     ) -> otError;
 }
 extern "C" {
-    #[doc = " This function sets the Active Operational Dataset.\n\n If the dataset does not include an Active Timestamp, the dataset is only partially complete.\n\n If Thread is enabled on a device that has a partially complete Active Dataset, the device will attempt to attach to\n an existing Thread network using any existing information in the dataset. Only the Thread Network Key is needed to\n attach to a network.\n\n If channel is not included in the dataset, the device will send MLE Announce messages across different channels to\n find neighbors on other channels.\n\n If the device successfully attaches to a Thread network, the device will then retrieve the full Active Dataset from\n its Parent. Note that a router-capable device will not transition to the Router or Leader roles until it has a\n complete Active Dataset.\n\n @param[in]  aInstance A pointer to an OpenThread instance.\n @param[in]  aDataset  A pointer to the Active Operational Dataset.\n\n @retval OT_ERROR_NONE             Successfully set the Active Operational Dataset.\n @retval OT_ERROR_NO_BUFS          Insufficient buffer space to set the Active Operational Dataset.\n @retval OT_ERROR_NOT_IMPLEMENTED  The platform does not implement settings functionality.\n"]
+    #[doc = " Sets the Active Operational Dataset.\n\n If the dataset does not include an Active Timestamp, the dataset is only partially complete.\n\n If Thread is enabled on a device that has a partially complete Active Dataset, the device will attempt to attach to\n an existing Thread network using any existing information in the dataset. Only the Thread Network Key is needed to\n attach to a network.\n\n If channel is not included in the dataset, the device will send MLE Announce messages across different channels to\n find neighbors on other channels.\n\n If the device successfully attaches to a Thread network, the device will then retrieve the full Active Dataset from\n its Parent. Note that a router-capable device will not transition to the Router or Leader roles until it has a\n complete Active Dataset.\n\n @param[in]  aInstance A pointer to an OpenThread instance.\n @param[in]  aDataset  A pointer to the Active Operational Dataset.\n\n @retval OT_ERROR_NONE             Successfully set the Active Operational Dataset.\n @retval OT_ERROR_NO_BUFS          Insufficient buffer space to set the Active Operational Dataset.\n @retval OT_ERROR_NOT_IMPLEMENTED  The platform does not implement settings functionality.\n"]
     pub fn otDatasetSetActiveTlvs(
         aInstance: *mut otInstance,
         aDataset: *const otOperationalDatasetTlvs,
     ) -> otError;
 }
 extern "C" {
-    #[doc = " This function gets the Pending Operational Dataset.\n\n @param[in]   aInstance A pointer to an OpenThread instance.\n @param[out]  aDataset  A pointer to where the Pending Operational Dataset will be placed.\n\n @retval OT_ERROR_NONE          Successfully retrieved the Pending Operational Dataset.\n @retval OT_ERROR_NOT_FOUND     No corresponding value in the setting store.\n"]
+    #[doc = " Gets the Pending Operational Dataset.\n\n @param[in]   aInstance A pointer to an OpenThread instance.\n @param[out]  aDataset  A pointer to where the Pending Operational Dataset will be placed.\n\n @retval OT_ERROR_NONE          Successfully retrieved the Pending Operational Dataset.\n @retval OT_ERROR_NOT_FOUND     No corresponding value in the setting store.\n"]
     pub fn otDatasetGetPending(
         aInstance: *mut otInstance,
         aDataset: *mut otOperationalDataset,
     ) -> otError;
 }
 extern "C" {
-    #[doc = " This function gets the Pending Operational Dataset.\n\n @param[in]   aInstance A pointer to an OpenThread instance.\n @param[out]  aDataset  A pointer to where the Pending Operational Dataset will be placed.\n\n @retval OT_ERROR_NONE          Successfully retrieved the Pending Operational Dataset.\n @retval OT_ERROR_NOT_FOUND     No corresponding value in the setting store.\n"]
+    #[doc = " Gets the Pending Operational Dataset.\n\n @param[in]   aInstance A pointer to an OpenThread instance.\n @param[out]  aDataset  A pointer to where the Pending Operational Dataset will be placed.\n\n @retval OT_ERROR_NONE          Successfully retrieved the Pending Operational Dataset.\n @retval OT_ERROR_NOT_FOUND     No corresponding value in the setting store.\n"]
     pub fn otDatasetGetPendingTlvs(
         aInstance: *mut otInstance,
         aDataset: *mut otOperationalDatasetTlvs,
@@ -5049,7 +5074,7 @@ extern "C" {
     ) -> otError;
 }
 extern "C" {
-    #[doc = " This function sets the Pending Operational Dataset.\n\n @param[in]  aInstance A pointer to an OpenThread instance.\n @param[in]  aDataset  A pointer to the Pending Operational Dataset.\n\n @retval OT_ERROR_NONE             Successfully set the Pending Operational Dataset.\n @retval OT_ERROR_NO_BUFS          Insufficient buffer space to set the Pending Operational Dataset.\n @retval OT_ERROR_NOT_IMPLEMENTED  The platform does not implement settings functionality.\n"]
+    #[doc = " Sets the Pending Operational Dataset.\n\n @param[in]  aInstance A pointer to an OpenThread instance.\n @param[in]  aDataset  A pointer to the Pending Operational Dataset.\n\n @retval OT_ERROR_NONE             Successfully set the Pending Operational Dataset.\n @retval OT_ERROR_NO_BUFS          Insufficient buffer space to set the Pending Operational Dataset.\n @retval OT_ERROR_NOT_IMPLEMENTED  The platform does not implement settings functionality.\n"]
     pub fn otDatasetSetPendingTlvs(
         aInstance: *mut otInstance,
         aDataset: *const otOperationalDatasetTlvs,
@@ -5098,7 +5123,7 @@ extern "C" {
     ) -> otError;
 }
 extern "C" {
-    #[doc = " This function generates PSKc from a given pass-phrase, network name, and extended PAN ID.\n\n PSKc is used to establish the Commissioner Session.\n\n @param[in]  aPassPhrase   The commissioning pass-phrase.\n @param[in]  aNetworkName  The network name for PSKc computation.\n @param[in]  aExtPanId     The extended PAN ID for PSKc computation.\n @param[out] aPskc         A pointer to variable to output the generated PSKc.\n\n @retval OT_ERROR_NONE          Successfully generate PSKc.\n @retval OT_ERROR_INVALID_ARGS  If any of the input arguments is invalid.\n"]
+    #[doc = " Generates PSKc from a given pass-phrase, network name, and extended PAN ID.\n\n PSKc is used to establish the Commissioner Session.\n\n @param[in]  aPassPhrase   The commissioning pass-phrase.\n @param[in]  aNetworkName  The network name for PSKc computation.\n @param[in]  aExtPanId     The extended PAN ID for PSKc computation.\n @param[out] aPskc         A pointer to variable to output the generated PSKc.\n\n @retval OT_ERROR_NONE          Successfully generate PSKc.\n @retval OT_ERROR_INVALID_ARGS  If any of the input arguments is invalid.\n"]
     pub fn otDatasetGeneratePskc(
         aPassPhrase: *const ::std::os::raw::c_char,
         aNetworkName: *const otNetworkName,
@@ -5140,9 +5165,9 @@ pub const OT_JOINER_STATE_CONNECT: otJoinerState = 2;
 pub const OT_JOINER_STATE_CONNECTED: otJoinerState = 3;
 pub const OT_JOINER_STATE_ENTRUST: otJoinerState = 4;
 pub const OT_JOINER_STATE_JOINED: otJoinerState = 5;
-#[doc = " This enumeration defines the Joiner State.\n"]
+#[doc = " Defines the Joiner State.\n"]
 pub type otJoinerState = ::std::os::raw::c_uint;
-#[doc = " This structure represents a Joiner Discerner.\n"]
+#[doc = " Represents a Joiner Discerner.\n"]
 #[repr(C)]
 #[derive(Debug, Default, Copy, Clone)]
 pub struct otJoinerDiscerner {
@@ -5151,7 +5176,7 @@ pub struct otJoinerDiscerner {
     #[doc = "< Length (number of bits) - must be non-zero and at most `OT_JOINER_MAX_DISCERNER_LENGTH`."]
     pub mLength: u8,
 }
-#[doc = " This function pointer is called to notify the completion of a join operation.\n\n @param[in]  aError    OT_ERROR_NONE if the join process succeeded.\n                       OT_ERROR_SECURITY if the join process failed due to security credentials.\n                       OT_ERROR_NOT_FOUND if no joinable network was discovered.\n                       OT_ERROR_RESPONSE_TIMEOUT if a response timed out.\n @param[in]  aContext  A pointer to application-specific context.\n"]
+#[doc = " Pointer is called to notify the completion of a join operation.\n\n @param[in]  aError    OT_ERROR_NONE if the join process succeeded.\n                       OT_ERROR_SECURITY if the join process failed due to security credentials.\n                       OT_ERROR_NOT_FOUND if no joinable network was discovered.\n                       OT_ERROR_RESPONSE_TIMEOUT if a response timed out.\n @param[in]  aContext  A pointer to application-specific context.\n"]
 pub type otJoinerCallback = ::std::option::Option<
     unsafe extern "C" fn(aError: otError, aContext: *mut ::std::os::raw::c_void),
 >;
@@ -5193,7 +5218,7 @@ extern "C" {
     pub fn otJoinerGetDiscerner(aInstance: *mut otInstance) -> *const otJoinerDiscerner;
 }
 extern "C" {
-    #[doc = " This function converts a given joiner state enumeration value to a human-readable string.\n\n @param[in] aState   The joiner state.\n\n @returns A human-readable string representation of @p aState.\n"]
+    #[doc = " Converts a given joiner state enumeration value to a human-readable string.\n\n @param[in] aState   The joiner state.\n\n @returns A human-readable string representation of @p aState.\n"]
     pub fn otJoinerStateToString(aState: otJoinerState) -> *const ::std::os::raw::c_char;
 }
 #[doc = "< Commissioner role is disabled."]
@@ -5202,16 +5227,16 @@ pub const OT_COMMISSIONER_STATE_DISABLED: otCommissionerState = 0;
 pub const OT_COMMISSIONER_STATE_PETITION: otCommissionerState = 1;
 #[doc = "< Commissioner role is active."]
 pub const OT_COMMISSIONER_STATE_ACTIVE: otCommissionerState = 2;
-#[doc = " This enumeration defines the Commissioner State.\n"]
+#[doc = " Defines the Commissioner State.\n"]
 pub type otCommissionerState = ::std::os::raw::c_uint;
 pub const OT_COMMISSIONER_JOINER_START: otCommissionerJoinerEvent = 0;
 pub const OT_COMMISSIONER_JOINER_CONNECTED: otCommissionerJoinerEvent = 1;
 pub const OT_COMMISSIONER_JOINER_FINALIZE: otCommissionerJoinerEvent = 2;
 pub const OT_COMMISSIONER_JOINER_END: otCommissionerJoinerEvent = 3;
 pub const OT_COMMISSIONER_JOINER_REMOVED: otCommissionerJoinerEvent = 4;
-#[doc = " This enumeration defines a Joiner Event on the Commissioner.\n"]
+#[doc = " Defines a Joiner Event on the Commissioner.\n"]
 pub type otCommissionerJoinerEvent = ::std::os::raw::c_uint;
-#[doc = " This structure represents the steering data.\n"]
+#[doc = " Represents the steering data.\n"]
 #[repr(C)]
 #[derive(Debug, Default, Copy, Clone)]
 pub struct otSteeringData {
@@ -5220,7 +5245,7 @@ pub struct otSteeringData {
     #[doc = "< Byte values"]
     pub m8: [u8; 16usize],
 }
-#[doc = " This structure represents a Commissioning Dataset.\n"]
+#[doc = " Represents a Commissioning Dataset.\n"]
 #[repr(C)]
 #[derive(Debug, Default, Copy, Clone)]
 pub struct otCommissioningDataset {
@@ -5308,7 +5333,7 @@ impl otCommissioningDataset {
         __bindgen_bitfield_unit
     }
 }
-#[doc = " This structure represents a Joiner PSKd.\n"]
+#[doc = " Represents a Joiner PSKd.\n"]
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
 pub struct otJoinerPskd {
@@ -5330,9 +5355,9 @@ pub const OT_JOINER_INFO_TYPE_ANY: otJoinerInfoType = 0;
 pub const OT_JOINER_INFO_TYPE_EUI64: otJoinerInfoType = 1;
 #[doc = "< Joiner Discerner is specified (`mSharedId.mDiscerner` in `otJoinerInfo`)."]
 pub const OT_JOINER_INFO_TYPE_DISCERNER: otJoinerInfoType = 2;
-#[doc = " This enumeration defines a Joiner Info Type.\n"]
+#[doc = " Defines a Joiner Info Type.\n"]
 pub type otJoinerInfoType = ::std::os::raw::c_uint;
-#[doc = " This structure represents a Joiner Info.\n"]
+#[doc = " Represents a Joiner Info.\n"]
 #[repr(C)]
 #[derive(Copy, Clone)]
 pub struct otJoinerInfo {
@@ -5371,11 +5396,11 @@ impl Default for otJoinerInfo {
         }
     }
 }
-#[doc = " This function pointer is called whenever the commissioner state changes.\n\n @param[in]  aState    The Commissioner state.\n @param[in]  aContext  A pointer to application-specific context.\n"]
+#[doc = " Pointer is called whenever the commissioner state changes.\n\n @param[in]  aState    The Commissioner state.\n @param[in]  aContext  A pointer to application-specific context.\n"]
 pub type otCommissionerStateCallback = ::std::option::Option<
     unsafe extern "C" fn(aState: otCommissionerState, aContext: *mut ::std::os::raw::c_void),
 >;
-#[doc = " This function pointer is called whenever the joiner state changes.\n\n @param[in]  aEvent       The joiner event type.\n @param[in]  aJoinerInfo  A pointer to the Joiner Info.\n @param[in]  aJoinerId    A pointer to the Joiner ID (if not known, it will be NULL).\n @param[in]  aContext     A pointer to application-specific context.\n"]
+#[doc = " Pointer is called whenever the joiner state changes.\n\n @param[in]  aEvent       The joiner event type.\n @param[in]  aJoinerInfo  A pointer to the Joiner Info.\n @param[in]  aJoinerId    A pointer to the Joiner ID (if not known, it will be NULL).\n @param[in]  aContext     A pointer to application-specific context.\n"]
 pub type otCommissionerJoinerCallback = ::std::option::Option<
     unsafe extern "C" fn(
         aEvent: otCommissionerJoinerEvent,
@@ -5385,7 +5410,7 @@ pub type otCommissionerJoinerCallback = ::std::option::Option<
     ),
 >;
 extern "C" {
-    #[doc = " This function enables the Thread Commissioner role.\n\n @param[in]  aInstance         A pointer to an OpenThread instance.\n @param[in]  aStateCallback    A pointer to a function that is called when the commissioner state changes.\n @param[in]  aJoinerCallback   A pointer to a function that is called with a joiner event occurs.\n @param[in]  aCallbackContext  A pointer to application-specific context.\n\n @retval OT_ERROR_NONE           Successfully started the Commissioner service.\n @retval OT_ERROR_ALREADY        Commissioner is already started.\n @retval OT_ERROR_INVALID_STATE  Device is not currently attached to a network.\n"]
+    #[doc = " Enables the Thread Commissioner role.\n\n @param[in]  aInstance         A pointer to an OpenThread instance.\n @param[in]  aStateCallback    A pointer to a function that is called when the commissioner state changes.\n @param[in]  aJoinerCallback   A pointer to a function that is called with a joiner event occurs.\n @param[in]  aCallbackContext  A pointer to application-specific context.\n\n @retval OT_ERROR_NONE           Successfully started the Commissioner service.\n @retval OT_ERROR_ALREADY        Commissioner is already started.\n @retval OT_ERROR_INVALID_STATE  Device is not currently attached to a network.\n"]
     pub fn otCommissionerStart(
         aInstance: *mut otInstance,
         aStateCallback: otCommissionerStateCallback,
@@ -5394,22 +5419,22 @@ extern "C" {
     ) -> otError;
 }
 extern "C" {
-    #[doc = " This function disables the Thread Commissioner role.\n\n @param[in]  aInstance         A pointer to an OpenThread instance.\n\n @retval OT_ERROR_NONE     Successfully stopped the Commissioner service.\n @retval OT_ERROR_ALREADY  Commissioner is already stopped.\n"]
+    #[doc = " Disables the Thread Commissioner role.\n\n @param[in]  aInstance         A pointer to an OpenThread instance.\n\n @retval OT_ERROR_NONE     Successfully stopped the Commissioner service.\n @retval OT_ERROR_ALREADY  Commissioner is already stopped.\n"]
     pub fn otCommissionerStop(aInstance: *mut otInstance) -> otError;
 }
 extern "C" {
-    #[doc = " This function returns the Commissioner Id.\n\n @param[in]  aInstance         A pointer to an OpenThread instance.\n\n @returns The Commissioner Id.\n"]
+    #[doc = " Returns the Commissioner Id.\n\n @param[in]  aInstance         A pointer to an OpenThread instance.\n\n @returns The Commissioner Id.\n"]
     pub fn otCommissionerGetId(aInstance: *mut otInstance) -> *const ::std::os::raw::c_char;
 }
 extern "C" {
-    #[doc = " This function sets the Commissioner Id.\n\n @param[in]  aInstance     A pointer to an OpenThread instance.\n @param[in]  aId           A pointer to a string character array. Must be null terminated.\n\n @retval OT_ERROR_NONE            Successfully set the Commissioner Id.\n @retval OT_ERROR_INVALID_ARGS    Given name is too long.\n @retval OT_ERROR_INVALID_STATE   The commissioner is active and id cannot be changed.\n"]
+    #[doc = " Sets the Commissioner Id.\n\n @param[in]  aInstance     A pointer to an OpenThread instance.\n @param[in]  aId           A pointer to a string character array. Must be null terminated.\n\n @retval OT_ERROR_NONE            Successfully set the Commissioner Id.\n @retval OT_ERROR_INVALID_ARGS    Given name is too long.\n @retval OT_ERROR_INVALID_STATE   The commissioner is active and id cannot be changed.\n"]
     pub fn otCommissionerSetId(
         aInstance: *mut otInstance,
         aId: *const ::std::os::raw::c_char,
     ) -> otError;
 }
 extern "C" {
-    #[doc = " This function adds a Joiner entry.\n\n @param[in]  aInstance          A pointer to an OpenThread instance.\n @param[in]  aEui64             A pointer to the Joiner's IEEE EUI-64 or NULL for any Joiner.\n @param[in]  aPskd              A pointer to the PSKd.\n @param[in]  aTimeout           A time after which a Joiner is automatically removed, in seconds.\n\n @retval OT_ERROR_NONE          Successfully added the Joiner.\n @retval OT_ERROR_NO_BUFS       No buffers available to add the Joiner.\n @retval OT_ERROR_INVALID_ARGS  @p aEui64 or @p aPskd is invalid.\n @retval OT_ERROR_INVALID_STATE The commissioner is not active.\n\n @note Only use this after successfully starting the Commissioner role with otCommissionerStart().\n"]
+    #[doc = " Adds a Joiner entry.\n\n @param[in]  aInstance          A pointer to an OpenThread instance.\n @param[in]  aEui64             A pointer to the Joiner's IEEE EUI-64 or NULL for any Joiner.\n @param[in]  aPskd              A pointer to the PSKd.\n @param[in]  aTimeout           A time after which a Joiner is automatically removed, in seconds.\n\n @retval OT_ERROR_NONE          Successfully added the Joiner.\n @retval OT_ERROR_NO_BUFS       No buffers available to add the Joiner.\n @retval OT_ERROR_INVALID_ARGS  @p aEui64 or @p aPskd is invalid.\n @retval OT_ERROR_INVALID_STATE The commissioner is not active.\n\n @note Only use this after successfully starting the Commissioner role with otCommissionerStart().\n"]
     pub fn otCommissionerAddJoiner(
         aInstance: *mut otInstance,
         aEui64: *const otExtAddress,
@@ -5418,7 +5443,7 @@ extern "C" {
     ) -> otError;
 }
 extern "C" {
-    #[doc = " This function adds a Joiner entry with a given Joiner Discerner value.\n\n @param[in]  aInstance          A pointer to an OpenThread instance.\n @param[in]  aDiscerner         A pointer to the Joiner Discerner.\n @param[in]  aPskd              A pointer to the PSKd.\n @param[in]  aTimeout           A time after which a Joiner is automatically removed, in seconds.\n\n @retval OT_ERROR_NONE          Successfully added the Joiner.\n @retval OT_ERROR_NO_BUFS       No buffers available to add the Joiner.\n @retval OT_ERROR_INVALID_ARGS  @p aDiscerner or @p aPskd is invalid.\n @retval OT_ERROR_INVALID_STATE The commissioner is not active.\n\n @note Only use this after successfully starting the Commissioner role with otCommissionerStart().\n"]
+    #[doc = " Adds a Joiner entry with a given Joiner Discerner value.\n\n @param[in]  aInstance          A pointer to an OpenThread instance.\n @param[in]  aDiscerner         A pointer to the Joiner Discerner.\n @param[in]  aPskd              A pointer to the PSKd.\n @param[in]  aTimeout           A time after which a Joiner is automatically removed, in seconds.\n\n @retval OT_ERROR_NONE          Successfully added the Joiner.\n @retval OT_ERROR_NO_BUFS       No buffers available to add the Joiner.\n @retval OT_ERROR_INVALID_ARGS  @p aDiscerner or @p aPskd is invalid.\n @retval OT_ERROR_INVALID_STATE The commissioner is not active.\n\n @note Only use this after successfully starting the Commissioner role with otCommissionerStart().\n"]
     pub fn otCommissionerAddJoinerWithDiscerner(
         aInstance: *mut otInstance,
         aDiscerner: *const otJoinerDiscerner,
@@ -5427,7 +5452,7 @@ extern "C" {
     ) -> otError;
 }
 extern "C" {
-    #[doc = " This method get joiner info at aIterator position.\n\n @param[in]      aInstance   A pointer to instance.\n @param[in,out]  aIterator   A pointer to the Joiner Info iterator context.\n @param[out]     aJoiner     A reference to Joiner info.\n\n @retval OT_ERROR_NONE       Successfully get the Joiner info.\n @retval OT_ERROR_NOT_FOUND  Not found next Joiner.\n"]
+    #[doc = " Get joiner info at aIterator position.\n\n @param[in]      aInstance   A pointer to instance.\n @param[in,out]  aIterator   A pointer to the Joiner Info iterator context.\n @param[out]     aJoiner     A reference to Joiner info.\n\n @retval OT_ERROR_NONE       Successfully get the Joiner info.\n @retval OT_ERROR_NOT_FOUND  Not found next Joiner.\n"]
     pub fn otCommissionerGetNextJoinerInfo(
         aInstance: *mut otInstance,
         aIterator: *mut u16,
@@ -5435,34 +5460,34 @@ extern "C" {
     ) -> otError;
 }
 extern "C" {
-    #[doc = " This function removes a Joiner entry.\n\n @param[in]  aInstance          A pointer to an OpenThread instance.\n @param[in]  aEui64             A pointer to the Joiner's IEEE EUI-64 or NULL for any Joiner.\n\n @retval OT_ERROR_NONE          Successfully removed the Joiner.\n @retval OT_ERROR_NOT_FOUND     The Joiner specified by @p aEui64 was not found.\n @retval OT_ERROR_INVALID_ARGS  @p aEui64 is invalid.\n @retval OT_ERROR_INVALID_STATE The commissioner is not active.\n\n @note Only use this after successfully starting the Commissioner role with otCommissionerStart().\n"]
+    #[doc = " Removes a Joiner entry.\n\n @param[in]  aInstance          A pointer to an OpenThread instance.\n @param[in]  aEui64             A pointer to the Joiner's IEEE EUI-64 or NULL for any Joiner.\n\n @retval OT_ERROR_NONE          Successfully removed the Joiner.\n @retval OT_ERROR_NOT_FOUND     The Joiner specified by @p aEui64 was not found.\n @retval OT_ERROR_INVALID_ARGS  @p aEui64 is invalid.\n @retval OT_ERROR_INVALID_STATE The commissioner is not active.\n\n @note Only use this after successfully starting the Commissioner role with otCommissionerStart().\n"]
     pub fn otCommissionerRemoveJoiner(
         aInstance: *mut otInstance,
         aEui64: *const otExtAddress,
     ) -> otError;
 }
 extern "C" {
-    #[doc = " This function removes a Joiner entry.\n\n @param[in]  aInstance          A pointer to an OpenThread instance.\n @param[in]  aDiscerner         A pointer to the Joiner Discerner.\n\n @retval OT_ERROR_NONE          Successfully removed the Joiner.\n @retval OT_ERROR_NOT_FOUND     The Joiner specified by @p aEui64 was not found.\n @retval OT_ERROR_INVALID_ARGS  @p aDiscerner is invalid.\n @retval OT_ERROR_INVALID_STATE The commissioner is not active.\n\n @note Only use this after successfully starting the Commissioner role with otCommissionerStart().\n"]
+    #[doc = " Removes a Joiner entry.\n\n @param[in]  aInstance          A pointer to an OpenThread instance.\n @param[in]  aDiscerner         A pointer to the Joiner Discerner.\n\n @retval OT_ERROR_NONE          Successfully removed the Joiner.\n @retval OT_ERROR_NOT_FOUND     The Joiner specified by @p aEui64 was not found.\n @retval OT_ERROR_INVALID_ARGS  @p aDiscerner is invalid.\n @retval OT_ERROR_INVALID_STATE The commissioner is not active.\n\n @note Only use this after successfully starting the Commissioner role with otCommissionerStart().\n"]
     pub fn otCommissionerRemoveJoinerWithDiscerner(
         aInstance: *mut otInstance,
         aDiscerner: *const otJoinerDiscerner,
     ) -> otError;
 }
 extern "C" {
-    #[doc = " This function gets the Provisioning URL.\n\n @param[in]    aInstance       A pointer to an OpenThread instance.\n\n @returns A pointer to the URL string.\n"]
+    #[doc = " Gets the Provisioning URL.\n\n @param[in]    aInstance       A pointer to an OpenThread instance.\n\n @returns A pointer to the URL string.\n"]
     pub fn otCommissionerGetProvisioningUrl(
         aInstance: *mut otInstance,
     ) -> *const ::std::os::raw::c_char;
 }
 extern "C" {
-    #[doc = " This function sets the Provisioning URL.\n\n @param[in]  aInstance             A pointer to an OpenThread instance.\n @param[in]  aProvisioningUrl      A pointer to the Provisioning URL (may be NULL to set as empty string).\n\n @retval OT_ERROR_NONE          Successfully set the Provisioning URL.\n @retval OT_ERROR_INVALID_ARGS  @p aProvisioningUrl is invalid (too long).\n"]
+    #[doc = " Sets the Provisioning URL.\n\n @param[in]  aInstance             A pointer to an OpenThread instance.\n @param[in]  aProvisioningUrl      A pointer to the Provisioning URL (may be NULL to set as empty string).\n\n @retval OT_ERROR_NONE          Successfully set the Provisioning URL.\n @retval OT_ERROR_INVALID_ARGS  @p aProvisioningUrl is invalid (too long).\n"]
     pub fn otCommissionerSetProvisioningUrl(
         aInstance: *mut otInstance,
         aProvisioningUrl: *const ::std::os::raw::c_char,
     ) -> otError;
 }
 extern "C" {
-    #[doc = " This function sends an Announce Begin message.\n\n @param[in]  aInstance             A pointer to an OpenThread instance.\n @param[in]  aChannelMask          The channel mask value.\n @param[in]  aCount                The number of Announcement messages per channel.\n @param[in]  aPeriod               The time between two successive MLE Announce transmissions (in milliseconds).\n @param[in]  aAddress              A pointer to the IPv6 destination.\n\n @retval OT_ERROR_NONE          Successfully enqueued the Announce Begin message.\n @retval OT_ERROR_NO_BUFS       Insufficient buffers to generate an Announce Begin message.\n @retval OT_ERROR_INVALID_STATE The commissioner is not active.\n\n @note Only use this after successfully starting the Commissioner role with otCommissionerStart().\n"]
+    #[doc = " Sends an Announce Begin message.\n\n @param[in]  aInstance             A pointer to an OpenThread instance.\n @param[in]  aChannelMask          The channel mask value.\n @param[in]  aCount                The number of Announcement messages per channel.\n @param[in]  aPeriod               The time between two successive MLE Announce transmissions (in milliseconds).\n @param[in]  aAddress              A pointer to the IPv6 destination.\n\n @retval OT_ERROR_NONE          Successfully enqueued the Announce Begin message.\n @retval OT_ERROR_NO_BUFS       Insufficient buffers to generate an Announce Begin message.\n @retval OT_ERROR_INVALID_STATE The commissioner is not active.\n\n @note Only use this after successfully starting the Commissioner role with otCommissionerStart().\n"]
     pub fn otCommissionerAnnounceBegin(
         aInstance: *mut otInstance,
         aChannelMask: u32,
@@ -5471,7 +5496,7 @@ extern "C" {
         aAddress: *const otIp6Address,
     ) -> otError;
 }
-#[doc = " This function pointer is called when the Commissioner receives an Energy Report.\n\n @param[in]  aChannelMask       The channel mask value.\n @param[in]  aEnergyList        A pointer to the energy measurement list.\n @param[in]  aEnergyListLength  Number of entries in @p aEnergyListLength.\n @param[in]  aContext           A pointer to application-specific context.\n"]
+#[doc = " Pointer is called when the Commissioner receives an Energy Report.\n\n @param[in]  aChannelMask       The channel mask value.\n @param[in]  aEnergyList        A pointer to the energy measurement list.\n @param[in]  aEnergyListLength  Number of entries in @p aEnergyListLength.\n @param[in]  aContext           A pointer to application-specific context.\n"]
 pub type otCommissionerEnergyReportCallback = ::std::option::Option<
     unsafe extern "C" fn(
         aChannelMask: u32,
@@ -5481,7 +5506,7 @@ pub type otCommissionerEnergyReportCallback = ::std::option::Option<
     ),
 >;
 extern "C" {
-    #[doc = " This function sends an Energy Scan Query message.\n\n @param[in]  aInstance             A pointer to an OpenThread instance.\n @param[in]  aChannelMask          The channel mask value.\n @param[in]  aCount                The number of energy measurements per channel.\n @param[in]  aPeriod               The time between energy measurements (milliseconds).\n @param[in]  aScanDuration         The scan duration for each energy measurement (milliseconds).\n @param[in]  aAddress              A pointer to the IPv6 destination.\n @param[in]  aCallback             A pointer to a function called on receiving an Energy Report message.\n @param[in]  aContext              A pointer to application-specific context.\n\n @retval OT_ERROR_NONE          Successfully enqueued the Energy Scan Query message.\n @retval OT_ERROR_NO_BUFS       Insufficient buffers to generate an Energy Scan Query message.\n @retval OT_ERROR_INVALID_STATE The commissioner is not active.\n\n @note Only use this after successfully starting the Commissioner role with otCommissionerStart().\n"]
+    #[doc = " Sends an Energy Scan Query message.\n\n @param[in]  aInstance             A pointer to an OpenThread instance.\n @param[in]  aChannelMask          The channel mask value.\n @param[in]  aCount                The number of energy measurements per channel.\n @param[in]  aPeriod               The time between energy measurements (milliseconds).\n @param[in]  aScanDuration         The scan duration for each energy measurement (milliseconds).\n @param[in]  aAddress              A pointer to the IPv6 destination.\n @param[in]  aCallback             A pointer to a function called on receiving an Energy Report message.\n @param[in]  aContext              A pointer to application-specific context.\n\n @retval OT_ERROR_NONE          Successfully enqueued the Energy Scan Query message.\n @retval OT_ERROR_NO_BUFS       Insufficient buffers to generate an Energy Scan Query message.\n @retval OT_ERROR_INVALID_STATE The commissioner is not active.\n\n @note Only use this after successfully starting the Commissioner role with otCommissionerStart().\n"]
     pub fn otCommissionerEnergyScan(
         aInstance: *mut otInstance,
         aChannelMask: u32,
@@ -5493,12 +5518,12 @@ extern "C" {
         aContext: *mut ::std::os::raw::c_void,
     ) -> otError;
 }
-#[doc = " This function pointer is called when the Commissioner receives a PAN ID Conflict message.\n\n @param[in]  aPanId             The PAN ID value.\n @param[in]  aChannelMask       The channel mask value.\n @param[in]  aContext           A pointer to application-specific context.\n"]
+#[doc = " Pointer is called when the Commissioner receives a PAN ID Conflict message.\n\n @param[in]  aPanId             The PAN ID value.\n @param[in]  aChannelMask       The channel mask value.\n @param[in]  aContext           A pointer to application-specific context.\n"]
 pub type otCommissionerPanIdConflictCallback = ::std::option::Option<
     unsafe extern "C" fn(aPanId: u16, aChannelMask: u32, aContext: *mut ::std::os::raw::c_void),
 >;
 extern "C" {
-    #[doc = " This function sends a PAN ID Query message.\n\n @param[in]  aInstance             A pointer to an OpenThread instance.\n @param[in]  aPanId                The PAN ID to query.\n @param[in]  aChannelMask          The channel mask value.\n @param[in]  aAddress              A pointer to the IPv6 destination.\n @param[in]  aCallback             A pointer to a function called on receiving a PAN ID Conflict message.\n @param[in]  aContext              A pointer to application-specific context.\n\n @retval OT_ERROR_NONE          Successfully enqueued the PAN ID Query message.\n @retval OT_ERROR_NO_BUFS       Insufficient buffers to generate a PAN ID Query message.\n @retval OT_ERROR_INVALID_STATE The commissioner is not active.\n\n @note Only use this after successfully starting the Commissioner role with otCommissionerStart().\n"]
+    #[doc = " Sends a PAN ID Query message.\n\n @param[in]  aInstance             A pointer to an OpenThread instance.\n @param[in]  aPanId                The PAN ID to query.\n @param[in]  aChannelMask          The channel mask value.\n @param[in]  aAddress              A pointer to the IPv6 destination.\n @param[in]  aCallback             A pointer to a function called on receiving a PAN ID Conflict message.\n @param[in]  aContext              A pointer to application-specific context.\n\n @retval OT_ERROR_NONE          Successfully enqueued the PAN ID Query message.\n @retval OT_ERROR_NO_BUFS       Insufficient buffers to generate a PAN ID Query message.\n @retval OT_ERROR_INVALID_STATE The commissioner is not active.\n\n @note Only use this after successfully starting the Commissioner role with otCommissionerStart().\n"]
     pub fn otCommissionerPanIdQuery(
         aInstance: *mut otInstance,
         aPanId: u16,
@@ -5509,7 +5534,7 @@ extern "C" {
     ) -> otError;
 }
 extern "C" {
-    #[doc = " This function sends MGMT_COMMISSIONER_GET.\n\n @param[in]  aInstance  A pointer to an OpenThread instance.\n @param[in]  aTlvs      A pointer to TLVs.\n @param[in]  aLength    The length of TLVs.\n\n @retval OT_ERROR_NONE          Successfully send the meshcop dataset command.\n @retval OT_ERROR_NO_BUFS       Insufficient buffer space to send.\n @retval OT_ERROR_INVALID_STATE The commissioner is not active.\n"]
+    #[doc = " Sends MGMT_COMMISSIONER_GET.\n\n @param[in]  aInstance  A pointer to an OpenThread instance.\n @param[in]  aTlvs      A pointer to TLVs.\n @param[in]  aLength    The length of TLVs.\n\n @retval OT_ERROR_NONE          Successfully send the meshcop dataset command.\n @retval OT_ERROR_NO_BUFS       Insufficient buffer space to send.\n @retval OT_ERROR_INVALID_STATE The commissioner is not active.\n"]
     pub fn otCommissionerSendMgmtGet(
         aInstance: *mut otInstance,
         aTlvs: *const u8,
@@ -5517,7 +5542,7 @@ extern "C" {
     ) -> otError;
 }
 extern "C" {
-    #[doc = " This function sends MGMT_COMMISSIONER_SET.\n\n @param[in]  aInstance  A pointer to an OpenThread instance.\n @param[in]  aDataset   A pointer to commissioning dataset.\n @param[in]  aTlvs      A pointer to TLVs.\n @param[in]  aLength    The length of TLVs.\n\n @retval OT_ERROR_NONE          Successfully send the meshcop dataset command.\n @retval OT_ERROR_NO_BUFS       Insufficient buffer space to send.\n @retval OT_ERROR_INVALID_STATE The commissioner is not active.\n"]
+    #[doc = " Sends MGMT_COMMISSIONER_SET.\n\n @param[in]  aInstance  A pointer to an OpenThread instance.\n @param[in]  aDataset   A pointer to commissioning dataset.\n @param[in]  aTlvs      A pointer to TLVs.\n @param[in]  aLength    The length of TLVs.\n\n @retval OT_ERROR_NONE          Successfully send the meshcop dataset command.\n @retval OT_ERROR_NO_BUFS       Insufficient buffer space to send.\n @retval OT_ERROR_INVALID_STATE The commissioner is not active.\n"]
     pub fn otCommissionerSendMgmtSet(
         aInstance: *mut otInstance,
         aDataset: *const otCommissioningDataset,
@@ -5526,11 +5551,11 @@ extern "C" {
     ) -> otError;
 }
 extern "C" {
-    #[doc = " This function returns the Commissioner Session ID.\n\n @param[in]  aInstance  A pointer to an OpenThread instance.\n\n @returns The current commissioner session id.\n"]
+    #[doc = " Returns the Commissioner Session ID.\n\n @param[in]  aInstance  A pointer to an OpenThread instance.\n\n @returns The current commissioner session id.\n"]
     pub fn otCommissionerGetSessionId(aInstance: *mut otInstance) -> u16;
 }
 extern "C" {
-    #[doc = " This function returns the Commissioner State.\n\n @param[in]  aInstance  A pointer to an OpenThread instance.\n\n @retval OT_COMMISSIONER_STATE_DISABLED  Commissioner disabled.\n @retval OT_COMMISSIONER_STATE_PETITION  Becoming the commissioner.\n @retval OT_COMMISSIONER_STATE_ACTIVE    Commissioner enabled.\n"]
+    #[doc = " Returns the Commissioner State.\n\n @param[in]  aInstance  A pointer to an OpenThread instance.\n\n @retval OT_COMMISSIONER_STATE_DISABLED  Commissioner disabled.\n @retval OT_COMMISSIONER_STATE_PETITION  Becoming the commissioner.\n @retval OT_COMMISSIONER_STATE_ACTIVE    Commissioner enabled.\n"]
     pub fn otCommissionerGetState(aInstance: *mut otInstance) -> otCommissionerState;
 }
 extern "C" {
@@ -5556,7 +5581,7 @@ pub type otDatasetUpdaterCallback = ::std::option::Option<
     unsafe extern "C" fn(aError: otError, aContext: *mut ::std::os::raw::c_void),
 >;
 extern "C" {
-    #[doc = " This function requests an update to Operational Dataset.\n\n Available when `OPENTHREAD_CONFIG_DATASET_UPDATER_ENABLE` is enabled.\n\n @p aDataset should contain the fields to be updated and their new value. It must not contain Active or Pending\n Timestamp fields. The Delay field is optional, if not provided a default value (1000 ms) would be used.\n\n @param[in]  aInstance               A pointer to an OpenThread instance.\n @param[in]  aDataset                A pointer to the Dataset containing the fields to change.\n @param[in]  aCallback               A callback to indicate when Dataset update request finishes.\n @param[in]  aContext                An arbitrary context passed to callback.\n\n @retval OT_ERROR_NONE           Dataset update started successfully (@p aCallback will be invoked on completion).\n @retval OT_ERROR_INVALID_STATE  Device is disabled (MLE is disabled).\n @retval OT_ERROR_INVALID_ARGS   The @p aDataset is not valid (contains Active or Pending Timestamp).\n @retval OT_ERROR_BUSY           Cannot start update, a previous one is ongoing.\n @retval OT_ERROR_NO_BUFS        Could not allocated buffer to save Dataset.\n"]
+    #[doc = " Requests an update to Operational Dataset.\n\n Available when `OPENTHREAD_CONFIG_DATASET_UPDATER_ENABLE` is enabled.\n\n @p aDataset should contain the fields to be updated and their new value. It must not contain Active or Pending\n Timestamp fields. The Delay field is optional, if not provided a default value (1000 ms) would be used.\n\n @param[in]  aInstance               A pointer to an OpenThread instance.\n @param[in]  aDataset                A pointer to the Dataset containing the fields to change.\n @param[in]  aCallback               A callback to indicate when Dataset update request finishes.\n @param[in]  aContext                An arbitrary context passed to callback.\n\n @retval OT_ERROR_NONE           Dataset update started successfully (@p aCallback will be invoked on completion).\n @retval OT_ERROR_INVALID_STATE  Device is disabled (MLE is disabled).\n @retval OT_ERROR_INVALID_ARGS   The @p aDataset is not valid (contains Active or Pending Timestamp).\n @retval OT_ERROR_BUSY           Cannot start update, a previous one is ongoing.\n @retval OT_ERROR_NO_BUFS        Could not allocated buffer to save Dataset.\n"]
     pub fn otDatasetUpdaterRequestUpdate(
         aInstance: *mut otInstance,
         aDataset: *const otOperationalDataset,
@@ -5565,15 +5590,15 @@ extern "C" {
     ) -> otError;
 }
 extern "C" {
-    #[doc = " This function cancels an ongoing (if any) Operational Dataset update request.\n\n Available when `OPENTHREAD_CONFIG_DATASET_UPDATER_ENABLE` is enabled.\n\n @param[in]  aInstance         A pointer to an OpenThread instance.\n"]
+    #[doc = " Cancels an ongoing (if any) Operational Dataset update request.\n\n Available when `OPENTHREAD_CONFIG_DATASET_UPDATER_ENABLE` is enabled.\n\n @param[in]  aInstance         A pointer to an OpenThread instance.\n"]
     pub fn otDatasetUpdaterCancelUpdate(aInstance: *mut otInstance);
 }
 extern "C" {
-    #[doc = " This function indicates whether there is an ongoing Operation Dataset update request.\n\n Available when `OPENTHREAD_CONFIG_DATASET_UPDATER_ENABLE` is enabled.\n\n @param[in]  aInstance         A pointer to an OpenThread instance.\n\n @retval TRUE    There is an ongoing update.\n @retval FALSE   There is no ongoing update.\n"]
+    #[doc = " Indicates whether there is an ongoing Operation Dataset update request.\n\n Available when `OPENTHREAD_CONFIG_DATASET_UPDATER_ENABLE` is enabled.\n\n @param[in]  aInstance         A pointer to an OpenThread instance.\n\n @retval TRUE    There is an ongoing update.\n @retval FALSE   There is no ongoing update.\n"]
     pub fn otDatasetUpdaterIsUpdateOngoing(aInstance: *mut otInstance) -> bool;
 }
 extern "C" {
-    #[doc = " This function processes a factory diagnostics command line.\n\n The output of this function (the content written to @p aOutput) MUST terminate with `\\0` and the `\\0` is within the\n output buffer.\n\n @param[in]   aInstance       A pointer to an OpenThread instance.\n @param[in]   aArgsLength     The number of elements in @p aArgs.\n @param[in]   aArgs           An array of arguments.\n @param[out]  aOutput         The diagnostics execution result.\n @param[in]   aOutputMaxLen   The output buffer size.\n\n @retval  OT_ERROR_INVALID_ARGS       The command is supported but invalid arguments provided.\n @retval  OT_ERROR_NONE               The command is successfully process.\n @retval  OT_ERROR_NOT_IMPLEMENTED    The command is not supported.\n"]
+    #[doc = " Processes a factory diagnostics command line.\n\n The output of this function (the content written to @p aOutput) MUST terminate with `\\0` and the `\\0` is within the\n output buffer.\n\n @param[in]   aInstance       A pointer to an OpenThread instance.\n @param[in]   aArgsLength     The number of elements in @p aArgs.\n @param[in]   aArgs           An array of arguments.\n @param[out]  aOutput         The diagnostics execution result.\n @param[in]   aOutputMaxLen   The output buffer size.\n\n @retval  OT_ERROR_INVALID_ARGS       The command is supported but invalid arguments provided.\n @retval  OT_ERROR_NONE               The command is successfully process.\n @retval  OT_ERROR_NOT_IMPLEMENTED    The command is not supported.\n"]
     pub fn otDiagProcessCmd(
         aInstance: *mut otInstance,
         aArgsLength: u8,
@@ -5583,7 +5608,7 @@ extern "C" {
     ) -> otError;
 }
 extern "C" {
-    #[doc = " This function processes a factory diagnostics command line.\n\n The output of this function (the content written to @p aOutput) MUST terminate with `\\0` and the `\\0` is within the\n output buffer.\n\n @param[in]   aInstance       A pointer to an OpenThread instance.\n @param[in]   aString         A NULL-terminated input string.\n @param[out]  aOutput         The diagnostics execution result.\n @param[in]   aOutputMaxLen   The output buffer size.\n\n @retval  OT_ERROR_NONE               The command is successfully process.\n @retval  OT_ERROR_INVALID_ARGS       The command is supported but invalid arguments provided.\n @retval  OT_ERROR_NOT_IMPLEMENTED    The command is not supported.\n @retval  OT_ERROR_NO_BUFS            The command string is too long.\n"]
+    #[doc = " Processes a factory diagnostics command line.\n\n The output of this function (the content written to @p aOutput) MUST terminate with `\\0` and the `\\0` is within the\n output buffer.\n\n @param[in]   aInstance       A pointer to an OpenThread instance.\n @param[in]   aString         A NULL-terminated input string.\n @param[out]  aOutput         The diagnostics execution result.\n @param[in]   aOutputMaxLen   The output buffer size.\n\n @retval  OT_ERROR_NONE               The command is successfully process.\n @retval  OT_ERROR_INVALID_ARGS       The command is supported but invalid arguments provided.\n @retval  OT_ERROR_NOT_IMPLEMENTED    The command is not supported.\n @retval  OT_ERROR_NO_BUFS            The command string is too long.\n"]
     pub fn otDiagProcessCmdLine(
         aInstance: *mut otInstance,
         aString: *const ::std::os::raw::c_char,
@@ -5592,10 +5617,10 @@ extern "C" {
     ) -> otError;
 }
 extern "C" {
-    #[doc = " This function indicates whether or not the factory diagnostics mode is enabled.\n\n @param[in]  aInstance  A pointer to an OpenThread instance.\n\n @retval TRUE if factory diagnostics mode is enabled\n @retval FALSE if factory diagnostics mode is disabled.\n"]
+    #[doc = " Indicates whether or not the factory diagnostics mode is enabled.\n\n @param[in]  aInstance  A pointer to an OpenThread instance.\n\n @retval TRUE if factory diagnostics mode is enabled\n @retval FALSE if factory diagnostics mode is disabled.\n"]
     pub fn otDiagIsEnabled(aInstance: *mut otInstance) -> bool;
 }
-#[doc = " This structure represents a TXT record entry representing a key/value pair (RFC 6763 - section 6.3).\n\n The string buffers pointed to by `mKey` and `mValue` MUST persist and remain unchanged after an instance of such\n structure is passed to OpenThread (as part of `otSrpClientService` instance).\n\n An array of `otDnsTxtEntry` entries are used in `otSrpClientService` to specify the full TXT record (a list of\n entries).\n"]
+#[doc = " Represents a TXT record entry representing a key/value pair (RFC 6763 - section 6.3).\n\n The string buffers pointed to by `mKey` and `mValue` MUST persist and remain unchanged after an instance of such\n structure is passed to OpenThread (as part of `otSrpClientService` instance).\n\n An array of `otDnsTxtEntry` entries are used in `otSrpClientService` to specify the full TXT record (a list of\n entries).\n"]
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
 pub struct otDnsTxtEntry {
@@ -5615,7 +5640,7 @@ impl Default for otDnsTxtEntry {
         }
     }
 }
-#[doc = " This structure represents an iterator for TXT record entries (key/value pairs).\n\n The data fields in this structure are intended for use by OpenThread core and caller should not read or change them.\n"]
+#[doc = " Represents an iterator for TXT record entries (key/value pairs).\n\n The data fields in this structure are intended for use by OpenThread core and caller should not read or change them.\n"]
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
 pub struct otDnsTxtEntryIterator {
@@ -5633,7 +5658,7 @@ impl Default for otDnsTxtEntryIterator {
     }
 }
 extern "C" {
-    #[doc = " This function initializes a TXT record iterator.\n\n The buffer pointer @p aTxtData and its content MUST persist and remain unchanged while @p aIterator object\n is being used.\n\n @param[in] aIterator       A pointer to the iterator to initialize (MUST NOT be NULL).\n @param[in] aTxtData        A pointer to buffer containing the encoded TXT data.\n @param[in] aTxtDataLength  The length (number of bytes) of @p aTxtData.\n"]
+    #[doc = " Initializes a TXT record iterator.\n\n The buffer pointer @p aTxtData and its content MUST persist and remain unchanged while @p aIterator object\n is being used.\n\n @param[in] aIterator       A pointer to the iterator to initialize (MUST NOT be NULL).\n @param[in] aTxtData        A pointer to buffer containing the encoded TXT data.\n @param[in] aTxtDataLength  The length (number of bytes) of @p aTxtData.\n"]
     pub fn otDnsInitTxtEntryIterator(
         aIterator: *mut otDnsTxtEntryIterator,
         aTxtData: *const u8,
@@ -5641,18 +5666,18 @@ extern "C" {
     );
 }
 extern "C" {
-    #[doc = " This function parses the TXT data from an iterator and gets the next TXT record entry (key/value pair).\n\n The @p aIterator MUST be initialized using `otDnsInitTxtEntryIterator()` before calling this function and the TXT\n data buffer used to initialize the iterator MUST persist and remain unchanged. Otherwise the behavior of this\n function is undefined.\n\n If the parsed key string length is smaller than or equal to `OT_DNS_TXT_KEY_MAX_LENGTH` (recommended max key length)\n the key string is returned in `mKey` in @p aEntry. But if the key is longer, then `mKey` is set to NULL and the\n entire encoded TXT entry string is returned in `mValue` and `mValueLength`.\n\n @param[in]  aIterator   A pointer to the iterator (MUST NOT be NULL).\n @param[out] aEntry      A pointer to a `otDnsTxtEntry` structure to output the parsed/read entry (MUST NOT be NULL).\n\n @retval OT_ERROR_NONE       The next entry was parsed successfully. @p aEntry is updated.\n @retval OT_ERROR_NOT_FOUND  No more entries in the TXT data.\n @retval OT_ERROR_PARSE      The TXT data from @p aIterator is not well-formed.\n"]
+    #[doc = " Parses the TXT data from an iterator and gets the next TXT record entry (key/value pair).\n\n The @p aIterator MUST be initialized using `otDnsInitTxtEntryIterator()` before calling this function and the TXT\n data buffer used to initialize the iterator MUST persist and remain unchanged. Otherwise the behavior of this\n function is undefined.\n\n If the parsed key string length is smaller than or equal to `OT_DNS_TXT_KEY_MAX_LENGTH` (recommended max key length)\n the key string is returned in `mKey` in @p aEntry. But if the key is longer, then `mKey` is set to NULL and the\n entire encoded TXT entry string is returned in `mValue` and `mValueLength`.\n\n @param[in]  aIterator   A pointer to the iterator (MUST NOT be NULL).\n @param[out] aEntry      A pointer to a `otDnsTxtEntry` structure to output the parsed/read entry (MUST NOT be NULL).\n\n @retval OT_ERROR_NONE       The next entry was parsed successfully. @p aEntry is updated.\n @retval OT_ERROR_NOT_FOUND  No more entries in the TXT data.\n @retval OT_ERROR_PARSE      The TXT data from @p aIterator is not well-formed.\n"]
     pub fn otDnsGetNextTxtEntry(
         aIterator: *mut otDnsTxtEntryIterator,
         aEntry: *mut otDnsTxtEntry,
     ) -> otError;
 }
 extern "C" {
-    #[doc = " This function enables/disables the \"DNS name compression\" mode.\n\n By default DNS name compression is enabled. When disabled, DNS names are appended as full and never compressed. This\n is applicable to OpenThread's DNS and SRP client/server modules.\n\n This is intended for testing only and available when `OPENTHREAD_CONFIG_REFERENCE_DEVICE_ENABLE` config is enabled.\n\n Note that in the case `OPENTHREAD_CONFIG_MULTIPLE_INSTANCE_ENABLE` is used, this mode applies to all OpenThread\n instances (i.e., calling this function enables/disables the compression mode on all OpenThread instances).\n\n @param[in] aEnabled   TRUE to enable the \"DNS name compression\" mode, FALSE to disable.\n"]
+    #[doc = " Enables/disables the \"DNS name compression\" mode.\n\n By default DNS name compression is enabled. When disabled, DNS names are appended as full and never compressed. This\n is applicable to OpenThread's DNS and SRP client/server modules.\n\n This is intended for testing only and available when `OPENTHREAD_CONFIG_REFERENCE_DEVICE_ENABLE` config is enabled.\n\n Note that in the case `OPENTHREAD_CONFIG_MULTIPLE_INSTANCE_ENABLE` is used, this mode applies to all OpenThread\n instances (i.e., calling this function enables/disables the compression mode on all OpenThread instances).\n\n @param[in] aEnabled   TRUE to enable the \"DNS name compression\" mode, FALSE to disable.\n"]
     pub fn otDnsSetNameCompressionEnabled(aEnabled: bool);
 }
 extern "C" {
-    #[doc = " This function indicates whether the \"DNS name compression\" mode is enabled or not.\n\n This is intended for testing only and available when `OPENTHREAD_CONFIG_REFERENCE_DEVICE_ENABLE` config is enabled.\n\n @returns TRUE if the \"DNS name compression\" mode is enabled, FALSE otherwise.\n"]
+    #[doc = " Indicates whether the \"DNS name compression\" mode is enabled or not.\n\n This is intended for testing only and available when `OPENTHREAD_CONFIG_REFERENCE_DEVICE_ENABLE` config is enabled.\n\n @returns TRUE if the \"DNS name compression\" mode is enabled, FALSE otherwise.\n"]
     pub fn otDnsIsNameCompressionEnabled() -> bool;
 }
 #[doc = "< Indicates the flag is not specified."]
@@ -5661,7 +5686,7 @@ pub const OT_DNS_FLAG_UNSPECIFIED: otDnsRecursionFlag = 0;
 pub const OT_DNS_FLAG_RECURSION_DESIRED: otDnsRecursionFlag = 1;
 #[doc = "< Indicates DNS name server can not resolve the query recursively."]
 pub const OT_DNS_FLAG_NO_RECURSION: otDnsRecursionFlag = 2;
-#[doc = " This enumeration type represents the \"Recursion Desired\" (RD) flag in an `otDnsQueryConfig`.\n"]
+#[doc = " Type represents the \"Recursion Desired\" (RD) flag in an `otDnsQueryConfig`.\n"]
 pub type otDnsRecursionFlag = ::std::os::raw::c_uint;
 #[doc = "< NAT64 mode is not specified. Use default NAT64 mode."]
 pub const OT_DNS_NAT64_UNSPECIFIED: otDnsNat64Mode = 0;
@@ -5669,7 +5694,7 @@ pub const OT_DNS_NAT64_UNSPECIFIED: otDnsNat64Mode = 0;
 pub const OT_DNS_NAT64_ALLOW: otDnsNat64Mode = 1;
 #[doc = "< Do not allow NAT64 address translation during DNS client address resolution."]
 pub const OT_DNS_NAT64_DISALLOW: otDnsNat64Mode = 2;
-#[doc = " This enumeration type represents the NAT64 mode in an `otDnsQueryConfig`.\n\n The NAT64 mode indicates whether to allow or disallow NAT64 address translation during DNS client address resolution.\n This mode is only used when `OPENTHREAD_CONFIG_DNS_CLIENT_NAT64_ENABLE` is enabled.\n"]
+#[doc = " Type represents the NAT64 mode in an `otDnsQueryConfig`.\n\n The NAT64 mode indicates whether to allow or disallow NAT64 address translation during DNS client address resolution.\n This mode is only used when `OPENTHREAD_CONFIG_DNS_CLIENT_NAT64_ENABLE` is enabled.\n"]
 pub type otDnsNat64Mode = ::std::os::raw::c_uint;
 #[doc = "< Mode is not specified. Use default service mode."]
 pub const OT_DNS_SERVICE_MODE_UNSPECIFIED: otDnsServiceMode = 0;
@@ -5683,16 +5708,16 @@ pub const OT_DNS_SERVICE_MODE_SRV_TXT: otDnsServiceMode = 3;
 pub const OT_DNS_SERVICE_MODE_SRV_TXT_SEPARATE: otDnsServiceMode = 4;
 #[doc = "< Query for TXT/SRV together first, if fails then query separately."]
 pub const OT_DNS_SERVICE_MODE_SRV_TXT_OPTIMIZE: otDnsServiceMode = 5;
-#[doc = " This enumeration type represents the service resolution mode in an `otDnsQueryConfig`.\n\n This is only used during DNS client service resolution `otDnsClientResolveService()`. It determines which\n record types to query.\n"]
+#[doc = " Type represents the service resolution mode in an `otDnsQueryConfig`.\n\n This is only used during DNS client service resolution `otDnsClientResolveService()`. It determines which\n record types to query.\n"]
 pub type otDnsServiceMode = ::std::os::raw::c_uint;
 pub const OT_DNS_TRANSPORT_UNSPECIFIED: otDnsTransportProto = 0;
 #[doc = " DNS transport is unspecified."]
 pub const OT_DNS_TRANSPORT_UDP: otDnsTransportProto = 1;
 #[doc = " DNS query should be sent via UDP."]
 pub const OT_DNS_TRANSPORT_TCP: otDnsTransportProto = 2;
-#[doc = " This enumeration type represents the DNS transport protocol in an `otDnsQueryConfig`.\n\n This `OT_DNS_TRANSPORT_TCP` is only supported when `OPENTHREAD_CONFIG_DNS_CLIENT_OVER_TCP_ENABLE` is enabled.\n"]
+#[doc = " Type represents the DNS transport protocol in an `otDnsQueryConfig`.\n\n This `OT_DNS_TRANSPORT_TCP` is only supported when `OPENTHREAD_CONFIG_DNS_CLIENT_OVER_TCP_ENABLE` is enabled.\n"]
 pub type otDnsTransportProto = ::std::os::raw::c_uint;
-#[doc = " This structure represents a DNS query configuration.\n\n Any of the fields in this structure can be set to zero to indicate that it is not specified. How the unspecified\n fields are treated is determined by the function which uses the instance of `otDnsQueryConfig`.\n"]
+#[doc = " Represents a DNS query configuration.\n\n Any of the fields in this structure can be set to zero to indicate that it is not specified. How the unspecified\n fields are treated is determined by the function which uses the instance of `otDnsQueryConfig`.\n"]
 #[repr(C)]
 #[derive(Copy, Clone)]
 pub struct otDnsQueryConfig {
@@ -5721,11 +5746,11 @@ impl Default for otDnsQueryConfig {
     }
 }
 extern "C" {
-    #[doc = " This function gets the current default query config used by DNS client.\n\n When OpenThread stack starts, the default DNS query config is determined from a set of OT config options such as\n `OPENTHREAD_CONFIG_DNS_CLIENT_DEFAULT_SERVER_IP6_ADDRESS`, `_DEFAULT_SERVER_PORT`, `_DEFAULT_RESPONSE_TIMEOUT`, etc.\n (see `config/dns_client.h` for all related config options).\n\n @param[in]  aInstance        A pointer to an OpenThread instance.\n\n @returns A pointer to the current default config being used by DNS client.\n"]
+    #[doc = " Gets the current default query config used by DNS client.\n\n When OpenThread stack starts, the default DNS query config is determined from a set of OT config options such as\n `OPENTHREAD_CONFIG_DNS_CLIENT_DEFAULT_SERVER_IP6_ADDRESS`, `_DEFAULT_SERVER_PORT`, `_DEFAULT_RESPONSE_TIMEOUT`, etc.\n (see `config/dns_client.h` for all related config options).\n\n @param[in]  aInstance        A pointer to an OpenThread instance.\n\n @returns A pointer to the current default config being used by DNS client.\n"]
     pub fn otDnsClientGetDefaultConfig(aInstance: *mut otInstance) -> *const otDnsQueryConfig;
 }
 extern "C" {
-    #[doc = " This function sets the default query config on DNS client.\n\n @note Any ongoing query will continue to use the config from when it was started. The new default config will be\n used for any future DNS queries.\n\n The @p aConfig can be NULL. In this case the default config will be set to the defaults from OT config options\n `OPENTHREAD_CONFIG_DNS_CLIENT_DEFAULT_{}`. This resets the default query config back to to the config when the\n OpenThread stack starts.\n\n In a non-NULL @p aConfig, caller can choose to leave some of the fields in `otDnsQueryConfig` instance unspecified\n (value zero). The unspecified fields are replaced by the corresponding OT config option definitions\n `OPENTHREAD_CONFIG_DNS_CLIENT_DEFAULT_{}` to form the default query config.\n\n When `OPENTHREAD_CONFIG_DNS_CLIENT_DEFAULT_SERVER_ADDRESS_AUTO_SET_ENABLE` is enabled, the server's IPv6 address in\n the default config is automatically set and updated by DNS client. This is done only when user does not explicitly\n set or specify it. This behavior requires SRP client and its auto-start feature to be enabled. SRP client will then\n monitor the Thread Network Data for DNS/SRP Service entries to select an SRP server. The selected SRP server address\n is also set as the DNS server address in the default config.\n\n @param[in]  aInstance   A pointer to an OpenThread instance.\n @param[in]  aConfig     A pointer to the new query config to use as default.\n"]
+    #[doc = " Sets the default query config on DNS client.\n\n @note Any ongoing query will continue to use the config from when it was started. The new default config will be\n used for any future DNS queries.\n\n The @p aConfig can be NULL. In this case the default config will be set to the defaults from OT config options\n `OPENTHREAD_CONFIG_DNS_CLIENT_DEFAULT_{}`. This resets the default query config back to to the config when the\n OpenThread stack starts.\n\n In a non-NULL @p aConfig, caller can choose to leave some of the fields in `otDnsQueryConfig` instance unspecified\n (value zero). The unspecified fields are replaced by the corresponding OT config option definitions\n `OPENTHREAD_CONFIG_DNS_CLIENT_DEFAULT_{}` to form the default query config.\n\n When `OPENTHREAD_CONFIG_DNS_CLIENT_DEFAULT_SERVER_ADDRESS_AUTO_SET_ENABLE` is enabled, the server's IPv6 address in\n the default config is automatically set and updated by DNS client. This is done only when user does not explicitly\n set or specify it. This behavior requires SRP client and its auto-start feature to be enabled. SRP client will then\n monitor the Thread Network Data for DNS/SRP Service entries to select an SRP server. The selected SRP server address\n is also set as the DNS server address in the default config.\n\n @param[in]  aInstance   A pointer to an OpenThread instance.\n @param[in]  aConfig     A pointer to the new query config to use as default.\n"]
     pub fn otDnsClientSetDefaultConfig(
         aInstance: *mut otInstance,
         aConfig: *const otDnsQueryConfig,
@@ -5736,7 +5761,7 @@ extern "C" {
 pub struct otDnsAddressResponse {
     _unused: [u8; 0],
 }
-#[doc = " This function pointer is called when a DNS response is received for an address resolution query.\n\n Within this callback the user can use `otDnsAddressResponseGet{Item}()` functions along with the @p aResponse\n pointer to get more info about the response.\n\n The @p aResponse pointer can only be used within this callback and after returning from this function it will not\n stay valid, so the user MUST NOT retain the @p aResponse pointer for later use.\n\n @param[in]  aError     The result of the DNS transaction.\n @param[in]  aResponse  A pointer to the response (it is always non-NULL).\n @param[in]  aContext   A pointer to application-specific context.\n\n The @p aError can have the following:\n\n  - OT_ERROR_NONE              A response was received successfully.\n  - OT_ERROR_ABORT             A DNS transaction was aborted by stack.\n  - OT_ERROR_RESPONSE_TIMEOUT  No DNS response has been received within timeout.\n\n If the server rejects the address resolution request the error code from server is mapped as follow:\n\n  - (0)  NOERROR   Success (no error condition)                    -> OT_ERROR_NONE\n  - (1)  FORMERR   Server unable to interpret due to format error  -> OT_ERROR_PARSE\n  - (2)  SERVFAIL  Server encountered an internal failure          -> OT_ERROR_FAILED\n  - (3)  NXDOMAIN  Name that ought to exist, does not exist        -> OT_ERROR_NOT_FOUND\n  - (4)  NOTIMP    Server does not support the query type (OpCode) -> OT_ERROR_NOT_IMPLEMENTED\n  - (5)  REFUSED   Server refused for policy/security reasons      -> OT_ERROR_SECURITY\n  - (6)  YXDOMAIN  Some name that ought not to exist, does exist   -> OT_ERROR_DUPLICATED\n  - (7)  YXRRSET   Some RRset that ought not to exist, does exist  -> OT_ERROR_DUPLICATED\n  - (8)  NXRRSET   Some RRset that ought to exist, does not exist  -> OT_ERROR_NOT_FOUND\n  - (9)  NOTAUTH   Service is not authoritative for zone           -> OT_ERROR_SECURITY\n  - (10) NOTZONE   A name is not in the zone                       -> OT_ERROR_PARSE\n  - (20) BADNAME   Bad name                                        -> OT_ERROR_PARSE\n  - (21) BADALG    Bad algorithm                                   -> OT_ERROR_SECURITY\n  - (22) BADTRUN   Bad truncation                                  -> OT_ERROR_PARSE\n  - Other response codes                                           -> OT_ERROR_FAILED\n"]
+#[doc = " Pointer is called when a DNS response is received for an address resolution query.\n\n Within this callback the user can use `otDnsAddressResponseGet{Item}()` functions along with the @p aResponse\n pointer to get more info about the response.\n\n The @p aResponse pointer can only be used within this callback and after returning from this function it will not\n stay valid, so the user MUST NOT retain the @p aResponse pointer for later use.\n\n @param[in]  aError     The result of the DNS transaction.\n @param[in]  aResponse  A pointer to the response (it is always non-NULL).\n @param[in]  aContext   A pointer to application-specific context.\n\n The @p aError can have the following:\n\n  - OT_ERROR_NONE              A response was received successfully.\n  - OT_ERROR_ABORT             A DNS transaction was aborted by stack.\n  - OT_ERROR_RESPONSE_TIMEOUT  No DNS response has been received within timeout.\n\n If the server rejects the address resolution request the error code from server is mapped as follow:\n\n  - (0)  NOERROR   Success (no error condition)                    -> OT_ERROR_NONE\n  - (1)  FORMERR   Server unable to interpret due to format error  -> OT_ERROR_PARSE\n  - (2)  SERVFAIL  Server encountered an internal failure          -> OT_ERROR_FAILED\n  - (3)  NXDOMAIN  Name that ought to exist, does not exist        -> OT_ERROR_NOT_FOUND\n  - (4)  NOTIMP    Server does not support the query type (OpCode) -> OT_ERROR_NOT_IMPLEMENTED\n  - (5)  REFUSED   Server refused for policy/security reasons      -> OT_ERROR_SECURITY\n  - (6)  YXDOMAIN  Some name that ought not to exist, does exist   -> OT_ERROR_DUPLICATED\n  - (7)  YXRRSET   Some RRset that ought not to exist, does exist  -> OT_ERROR_DUPLICATED\n  - (8)  NXRRSET   Some RRset that ought to exist, does not exist  -> OT_ERROR_NOT_FOUND\n  - (9)  NOTAUTH   Service is not authoritative for zone           -> OT_ERROR_SECURITY\n  - (10) NOTZONE   A name is not in the zone                       -> OT_ERROR_PARSE\n  - (20) BADNAME   Bad name                                        -> OT_ERROR_PARSE\n  - (21) BADALG    Bad algorithm                                   -> OT_ERROR_SECURITY\n  - (22) BADTRUN   Bad truncation                                  -> OT_ERROR_PARSE\n  - Other response codes                                           -> OT_ERROR_FAILED\n"]
 pub type otDnsAddressCallback = ::std::option::Option<
     unsafe extern "C" fn(
         aError: otError,
@@ -5745,7 +5770,7 @@ pub type otDnsAddressCallback = ::std::option::Option<
     ),
 >;
 extern "C" {
-    #[doc = " This function sends an address resolution DNS query for AAAA (IPv6) record(s) for a given host name.\n\n The @p aConfig can be NULL. In this case the default config (from `otDnsClientGetDefaultConfig()`) will be used as\n the config for this query. In a non-NULL @p aConfig, some of the fields can be left unspecified (value zero). The\n unspecified fields are then replaced by the values from the default config.\n\n @param[in]  aInstance        A pointer to an OpenThread instance.\n @param[in]  aHostName        The host name for which to query the address (MUST NOT be NULL).\n @param[in]  aCallback        A function pointer that shall be called on response reception or time-out.\n @param[in]  aContext         A pointer to arbitrary context information.\n @param[in]  aConfig          A pointer to the config to use for this query.\n\n @retval OT_ERROR_NONE          Query sent successfully. @p aCallback will be invoked to report the status.\n @retval OT_ERROR_NO_BUFS       Insufficient buffer to prepare and send query.\n @retval OT_ERROR_INVALID_ARGS  The host name is not valid format.\n @retval OT_ERROR_INVALID_STATE Cannot send query since Thread interface is not up.\n"]
+    #[doc = " Sends an address resolution DNS query for AAAA (IPv6) record(s) for a given host name.\n\n The @p aConfig can be NULL. In this case the default config (from `otDnsClientGetDefaultConfig()`) will be used as\n the config for this query. In a non-NULL @p aConfig, some of the fields can be left unspecified (value zero). The\n unspecified fields are then replaced by the values from the default config.\n\n @param[in]  aInstance        A pointer to an OpenThread instance.\n @param[in]  aHostName        The host name for which to query the address (MUST NOT be NULL).\n @param[in]  aCallback        A function pointer that shall be called on response reception or time-out.\n @param[in]  aContext         A pointer to arbitrary context information.\n @param[in]  aConfig          A pointer to the config to use for this query.\n\n @retval OT_ERROR_NONE          Query sent successfully. @p aCallback will be invoked to report the status.\n @retval OT_ERROR_NO_BUFS       Insufficient buffer to prepare and send query.\n @retval OT_ERROR_INVALID_ARGS  The host name is not valid format.\n @retval OT_ERROR_INVALID_STATE Cannot send query since Thread interface is not up.\n"]
     pub fn otDnsClientResolveAddress(
         aInstance: *mut otInstance,
         aHostName: *const ::std::os::raw::c_char,
@@ -5755,7 +5780,7 @@ extern "C" {
     ) -> otError;
 }
 extern "C" {
-    #[doc = " This function sends an address resolution DNS query for A (IPv4) record(s) for a given host name.\n\n This function requires and is available when `OPENTHREAD_CONFIG_DNS_CLIENT_NAT64_ENABLE` is enabled.\n\n When a successful response is received, the addresses are returned from @p aCallback as NAT64 IPv6 translated\n versions of the IPv4 addresses from the query response.\n\n The @p aConfig can be NULL. In this case the default config (from `otDnsClientGetDefaultConfig()`) will be used as\n the config for this query. In a non-NULL @p aConfig, some of the fields can be left unspecified (value zero). The\n unspecified fields are then replaced by the values from the default config.\n\n @param[in]  aInstance        A pointer to an OpenThread instance.\n @param[in]  aHostName        The host name for which to query the address (MUST NOT be NULL).\n @param[in]  aCallback        A function pointer that shall be called on response reception or time-out.\n @param[in]  aContext         A pointer to arbitrary context information.\n @param[in]  aConfig          A pointer to the config to use for this query.\n\n @retval OT_ERROR_NONE          Query sent successfully. @p aCallback will be invoked to report the status.\n @retval OT_ERROR_NO_BUFS       Insufficient buffer to prepare and send query.\n @retval OT_ERROR_INVALID_ARGS  The host name is not valid format or NAT64 is not enabled in config.\n @retval OT_ERROR_INVALID_STATE Cannot send query since Thread interface is not up.\n"]
+    #[doc = " Sends an address resolution DNS query for A (IPv4) record(s) for a given host name.\n\n Requires and is available when `OPENTHREAD_CONFIG_DNS_CLIENT_NAT64_ENABLE` is enabled.\n\n When a successful response is received, the addresses are returned from @p aCallback as NAT64 IPv6 translated\n versions of the IPv4 addresses from the query response.\n\n The @p aConfig can be NULL. In this case the default config (from `otDnsClientGetDefaultConfig()`) will be used as\n the config for this query. In a non-NULL @p aConfig, some of the fields can be left unspecified (value zero). The\n unspecified fields are then replaced by the values from the default config.\n\n @param[in]  aInstance        A pointer to an OpenThread instance.\n @param[in]  aHostName        The host name for which to query the address (MUST NOT be NULL).\n @param[in]  aCallback        A function pointer that shall be called on response reception or time-out.\n @param[in]  aContext         A pointer to arbitrary context information.\n @param[in]  aConfig          A pointer to the config to use for this query.\n\n @retval OT_ERROR_NONE          Query sent successfully. @p aCallback will be invoked to report the status.\n @retval OT_ERROR_NO_BUFS       Insufficient buffer to prepare and send query.\n @retval OT_ERROR_INVALID_ARGS  The host name is not valid format or NAT64 is not enabled in config.\n @retval OT_ERROR_INVALID_STATE Cannot send query since Thread interface is not up.\n"]
     pub fn otDnsClientResolveIp4Address(
         aInstance: *mut otInstance,
         aHostName: *const ::std::os::raw::c_char,
@@ -5765,7 +5790,7 @@ extern "C" {
     ) -> otError;
 }
 extern "C" {
-    #[doc = " This function gets the full host name associated with an address resolution DNS response.\n\n This function MUST only be used from `otDnsAddressCallback`.\n\n @param[in]  aResponse         A pointer to the response.\n @param[out] aNameBuffer       A buffer to char array to output the full host name (MUST NOT be NULL).\n @param[in]  aNameBufferSize   The size of @p aNameBuffer.\n\n @retval OT_ERROR_NONE     The full host name was read successfully.\n @retval OT_ERROR_NO_BUFS  The name does not fit in @p aNameBuffer.\n"]
+    #[doc = " Gets the full host name associated with an address resolution DNS response.\n\n MUST only be used from `otDnsAddressCallback`.\n\n @param[in]  aResponse         A pointer to the response.\n @param[out] aNameBuffer       A buffer to char array to output the full host name (MUST NOT be NULL).\n @param[in]  aNameBufferSize   The size of @p aNameBuffer.\n\n @retval OT_ERROR_NONE     The full host name was read successfully.\n @retval OT_ERROR_NO_BUFS  The name does not fit in @p aNameBuffer.\n"]
     pub fn otDnsAddressResponseGetHostName(
         aResponse: *const otDnsAddressResponse,
         aNameBuffer: *mut ::std::os::raw::c_char,
@@ -5773,7 +5798,7 @@ extern "C" {
     ) -> otError;
 }
 extern "C" {
-    #[doc = " This function gets an IPv6 address associated with an address resolution DNS response.\n\n This function MUST only be used from `otDnsAddressCallback`.\n\n The response may include multiple IPv6 address records. @p aIndex can be used to iterate through the list of\n addresses. Index zero gets the first address and so on. When we reach end of the list, `OT_ERROR_NOT_FOUND` is\n returned.\n\n @param[in]  aResponse     A pointer to the response.\n @param[in]  aIndex        The address record index to retrieve.\n @param[out] aAddress      A pointer to a IPv6 address to output the address (MUST NOT be NULL).\n @param[out] aTtl          A pointer to an `uint32_t` to output TTL for the address. It can be NULL if caller does not\n                           want to get the TTL.\n\n @retval OT_ERROR_NONE           The address was read successfully.\n @retval OT_ERROR_NOT_FOUND      No address record in @p aResponse at @p aIndex.\n @retval OT_ERROR_PARSE          Could not parse the records in the @p aResponse.\n @retval OT_ERROR_INVALID_STATE  No NAT64 prefix (applicable only when NAT64 is allowed).\n"]
+    #[doc = " Gets an IPv6 address associated with an address resolution DNS response.\n\n MUST only be used from `otDnsAddressCallback`.\n\n The response may include multiple IPv6 address records. @p aIndex can be used to iterate through the list of\n addresses. Index zero gets the first address and so on. When we reach end of the list, `OT_ERROR_NOT_FOUND` is\n returned.\n\n @param[in]  aResponse     A pointer to the response.\n @param[in]  aIndex        The address record index to retrieve.\n @param[out] aAddress      A pointer to a IPv6 address to output the address (MUST NOT be NULL).\n @param[out] aTtl          A pointer to an `uint32_t` to output TTL for the address. It can be NULL if caller does not\n                           want to get the TTL.\n\n @retval OT_ERROR_NONE           The address was read successfully.\n @retval OT_ERROR_NOT_FOUND      No address record in @p aResponse at @p aIndex.\n @retval OT_ERROR_PARSE          Could not parse the records in the @p aResponse.\n @retval OT_ERROR_INVALID_STATE  No NAT64 prefix (applicable only when NAT64 is allowed).\n"]
     pub fn otDnsAddressResponseGetAddress(
         aResponse: *const otDnsAddressResponse,
         aIndex: u16,
@@ -5786,7 +5811,7 @@ extern "C" {
 pub struct otDnsBrowseResponse {
     _unused: [u8; 0],
 }
-#[doc = " This function pointer is called when a DNS response is received for a browse (service instance enumeration) query.\n\n Within this callback the user can use `otDnsBrowseResponseGet{Item}()` functions along with the @p aResponse\n pointer to get more info about the response.\n\n The @p aResponse pointer can only be used within this callback and after returning from this function it will not\n stay valid, so the user MUST NOT retain the @p aResponse pointer for later use.\n\n @param[in]  aError     The result of the DNS transaction.\n @param[in]  aResponse  A pointer to the response (it is always non-NULL).\n @param[in]  aContext   A pointer to application-specific context.\n\n For the full list of possible values for @p aError, please see `otDnsAddressCallback()`.\n"]
+#[doc = " Pointer is called when a DNS response is received for a browse (service instance enumeration) query.\n\n Within this callback the user can use `otDnsBrowseResponseGet{Item}()` functions along with the @p aResponse\n pointer to get more info about the response.\n\n The @p aResponse pointer can only be used within this callback and after returning from this function it will not\n stay valid, so the user MUST NOT retain the @p aResponse pointer for later use.\n\n @param[in]  aError     The result of the DNS transaction.\n @param[in]  aResponse  A pointer to the response (it is always non-NULL).\n @param[in]  aContext   A pointer to application-specific context.\n\n For the full list of possible values for @p aError, please see `otDnsAddressCallback()`.\n"]
 pub type otDnsBrowseCallback = ::std::option::Option<
     unsafe extern "C" fn(
         aError: otError,
@@ -5794,7 +5819,7 @@ pub type otDnsBrowseCallback = ::std::option::Option<
         aContext: *mut ::std::os::raw::c_void,
     ),
 >;
-#[doc = " This structure provides info for a DNS service instance.\n"]
+#[doc = " Provides info for a DNS service instance.\n"]
 #[repr(C)]
 #[derive(Copy, Clone)]
 pub struct otDnsServiceInfo {
@@ -5833,7 +5858,7 @@ impl Default for otDnsServiceInfo {
     }
 }
 extern "C" {
-    #[doc = " This function sends a DNS browse (service instance enumeration) query for a given service name.\n\n This function is available when `OPENTHREAD_CONFIG_DNS_CLIENT_SERVICE_DISCOVERY_ENABLE` is enabled.\n\n The @p aConfig can be NULL. In this case the default config (from `otDnsClientGetDefaultConfig()`) will be used as\n the config for this query. In a non-NULL @p aConfig, some of the fields can be left unspecified (value zero). The\n unspecified fields are then replaced by the values from the default config.\n\n @param[in]  aInstance        A pointer to an OpenThread instance.\n @param[in]  aServiceName     The service name to query for (MUST NOT be NULL).\n @param[in]  aCallback        A function pointer that shall be called on response reception or time-out.\n @param[in]  aContext         A pointer to arbitrary context information.\n @param[in]  aConfig          A pointer to the config to use for this query.\n\n @retval OT_ERROR_NONE        Query sent successfully. @p aCallback will be invoked to report the status.\n @retval OT_ERROR_NO_BUFS     Insufficient buffer to prepare and send query.\n"]
+    #[doc = " Sends a DNS browse (service instance enumeration) query for a given service name.\n\n Is available when `OPENTHREAD_CONFIG_DNS_CLIENT_SERVICE_DISCOVERY_ENABLE` is enabled.\n\n The @p aConfig can be NULL. In this case the default config (from `otDnsClientGetDefaultConfig()`) will be used as\n the config for this query. In a non-NULL @p aConfig, some of the fields can be left unspecified (value zero). The\n unspecified fields are then replaced by the values from the default config.\n\n @param[in]  aInstance        A pointer to an OpenThread instance.\n @param[in]  aServiceName     The service name to query for (MUST NOT be NULL).\n @param[in]  aCallback        A function pointer that shall be called on response reception or time-out.\n @param[in]  aContext         A pointer to arbitrary context information.\n @param[in]  aConfig          A pointer to the config to use for this query.\n\n @retval OT_ERROR_NONE        Query sent successfully. @p aCallback will be invoked to report the status.\n @retval OT_ERROR_NO_BUFS     Insufficient buffer to prepare and send query.\n"]
     pub fn otDnsClientBrowse(
         aInstance: *mut otInstance,
         aServiceName: *const ::std::os::raw::c_char,
@@ -5843,7 +5868,7 @@ extern "C" {
     ) -> otError;
 }
 extern "C" {
-    #[doc = " This function gets the service name associated with a DNS browse (service instance enumeration) response.\n\n This function MUST only be used from `otDnsBrowseCallback`.\n\n @param[in]  aResponse         A pointer to the response.\n @param[out] aNameBuffer       A buffer to char array to output the service name (MUST NOT be NULL).\n @param[in]  aNameBufferSize   The size of @p aNameBuffer.\n\n @retval OT_ERROR_NONE     The service name was read successfully.\n @retval OT_ERROR_NO_BUFS  The name does not fit in @p aNameBuffer.\n"]
+    #[doc = " Gets the service name associated with a DNS browse (service instance enumeration) response.\n\n MUST only be used from `otDnsBrowseCallback`.\n\n @param[in]  aResponse         A pointer to the response.\n @param[out] aNameBuffer       A buffer to char array to output the service name (MUST NOT be NULL).\n @param[in]  aNameBufferSize   The size of @p aNameBuffer.\n\n @retval OT_ERROR_NONE     The service name was read successfully.\n @retval OT_ERROR_NO_BUFS  The name does not fit in @p aNameBuffer.\n"]
     pub fn otDnsBrowseResponseGetServiceName(
         aResponse: *const otDnsBrowseResponse,
         aNameBuffer: *mut ::std::os::raw::c_char,
@@ -5851,7 +5876,7 @@ extern "C" {
     ) -> otError;
 }
 extern "C" {
-    #[doc = " This function gets a service instance associated with a DNS browse (service instance enumeration) response.\n\n This function MUST only be used from `otDnsBrowseCallback`.\n\n The response may include multiple service instance records. @p aIndex can be used to iterate through the list. Index\n zero gives the the first record. When we reach end of the list, `OT_ERROR_NOT_FOUND` is returned.\n\n Note that this function gets the service instance label and not the full service instance name which is of the form\n `<Instance>.<Service>.<Domain>`.\n\n @param[in]  aResponse          A pointer to the response.\n @param[in]  aIndex             The service instance record index to retrieve.\n @param[out] aLabelBuffer       A buffer to char array to output the service instance label (MUST NOT be NULL).\n @param[in]  aLabelBufferSize   The size of @p aLabelBuffer.\n\n @retval OT_ERROR_NONE          The service instance was read successfully.\n @retval OT_ERROR_NO_BUFS       The name does not fit in @p aNameBuffer.\n @retval OT_ERROR_NOT_FOUND     No service instance record in @p aResponse at @p aIndex.\n @retval OT_ERROR_PARSE         Could not parse the records in the @p aResponse.\n"]
+    #[doc = " Gets a service instance associated with a DNS browse (service instance enumeration) response.\n\n MUST only be used from `otDnsBrowseCallback`.\n\n The response may include multiple service instance records. @p aIndex can be used to iterate through the list. Index\n zero gives the the first record. When we reach end of the list, `OT_ERROR_NOT_FOUND` is returned.\n\n Note that this function gets the service instance label and not the full service instance name which is of the form\n `<Instance>.<Service>.<Domain>`.\n\n @param[in]  aResponse          A pointer to the response.\n @param[in]  aIndex             The service instance record index to retrieve.\n @param[out] aLabelBuffer       A buffer to char array to output the service instance label (MUST NOT be NULL).\n @param[in]  aLabelBufferSize   The size of @p aLabelBuffer.\n\n @retval OT_ERROR_NONE          The service instance was read successfully.\n @retval OT_ERROR_NO_BUFS       The name does not fit in @p aNameBuffer.\n @retval OT_ERROR_NOT_FOUND     No service instance record in @p aResponse at @p aIndex.\n @retval OT_ERROR_PARSE         Could not parse the records in the @p aResponse.\n"]
     pub fn otDnsBrowseResponseGetServiceInstance(
         aResponse: *const otDnsBrowseResponse,
         aIndex: u16,
@@ -5860,7 +5885,7 @@ extern "C" {
     ) -> otError;
 }
 extern "C" {
-    #[doc = " This function gets info for a service instance from a DNS browse (service instance enumeration) response.\n\n This function MUST only be used from `otDnsBrowseCallback`.\n\n A browse DNS response can include SRV, TXT, and AAAA records for the service instances that are enumerated. This is\n a SHOULD and not a MUST requirement, and servers/resolvers are not required to provide this. This function attempts\n to retrieve this info for a given service instance when available.\n\n - If no matching SRV record is found in @p aResponse, `OT_ERROR_NOT_FOUND` is returned. In this case, no additional\n   records (no TXT and/or AAAA) are read.\n - If a matching SRV record is found in @p aResponse, @p aServiceInfo is updated and `OT_ERROR_NONE` is returned.\n - If no matching TXT record is found in @p aResponse, `mTxtDataSize` in @p aServiceInfo is set to zero.\n - If TXT data length is greater than `mTxtDataSize`, it is read partially and `mTxtDataTruncated` is set to true.\n - If no matching AAAA record is found in @p aResponse, `mHostAddress is set to all zero or unspecified address.\n - If there are multiple AAAA records for the host name in @p aResponse, `mHostAddress` is set to the first one. The\n   other addresses can be retrieved using `otDnsBrowseResponseGetHostAddress()`.\n\n @param[in]  aResponse          A pointer to the response.\n @param[in]  aInstanceLabel     The service instance label (MUST NOT be NULL).\n @param[out] aServiceInfo       A `ServiceInfo` to output the service instance information (MUST NOT be NULL).\n\n @retval OT_ERROR_NONE          The service instance info was read. @p aServiceInfo is updated.\n @retval OT_ERROR_NOT_FOUND     Could not find a matching SRV record for @p aInstanceLabel.\n @retval OT_ERROR_NO_BUFS       The host name and/or TXT data could not fit in the given buffers.\n @retval OT_ERROR_PARSE         Could not parse the records in the @p aResponse.\n"]
+    #[doc = " Gets info for a service instance from a DNS browse (service instance enumeration) response.\n\n MUST only be used from `otDnsBrowseCallback`.\n\n A browse DNS response can include SRV, TXT, and AAAA records for the service instances that are enumerated. This is\n a SHOULD and not a MUST requirement, and servers/resolvers are not required to provide this. This function attempts\n to retrieve this info for a given service instance when available.\n\n - If no matching SRV record is found in @p aResponse, `OT_ERROR_NOT_FOUND` is returned. In this case, no additional\n   records (no TXT and/or AAAA) are read.\n - If a matching SRV record is found in @p aResponse, @p aServiceInfo is updated and `OT_ERROR_NONE` is returned.\n - If no matching TXT record is found in @p aResponse, `mTxtDataSize` in @p aServiceInfo is set to zero.\n - If TXT data length is greater than `mTxtDataSize`, it is read partially and `mTxtDataTruncated` is set to true.\n - If no matching AAAA record is found in @p aResponse, `mHostAddress is set to all zero or unspecified address.\n - If there are multiple AAAA records for the host name in @p aResponse, `mHostAddress` is set to the first one. The\n   other addresses can be retrieved using `otDnsBrowseResponseGetHostAddress()`.\n\n @param[in]  aResponse          A pointer to the response.\n @param[in]  aInstanceLabel     The service instance label (MUST NOT be NULL).\n @param[out] aServiceInfo       A `ServiceInfo` to output the service instance information (MUST NOT be NULL).\n\n @retval OT_ERROR_NONE          The service instance info was read. @p aServiceInfo is updated.\n @retval OT_ERROR_NOT_FOUND     Could not find a matching SRV record for @p aInstanceLabel.\n @retval OT_ERROR_NO_BUFS       The host name and/or TXT data could not fit in the given buffers.\n @retval OT_ERROR_PARSE         Could not parse the records in the @p aResponse.\n"]
     pub fn otDnsBrowseResponseGetServiceInfo(
         aResponse: *const otDnsBrowseResponse,
         aInstanceLabel: *const ::std::os::raw::c_char,
@@ -5868,7 +5893,7 @@ extern "C" {
     ) -> otError;
 }
 extern "C" {
-    #[doc = " This function gets the host IPv6 address from a DNS browse (service instance enumeration) response.\n\n This function MUST only be used from `otDnsBrowseCallback`.\n\n The response can include zero or more IPv6 address records. @p aIndex can be used to iterate through the list of\n addresses. Index zero gets the first address and so on. When we reach end of the list, `OT_ERROR_NOT_FOUND` is\n returned.\n\n @param[in]  aResponse     A pointer to the response.\n @param[in]  aHostName     The host name to get the address (MUST NOT be NULL).\n @param[in]  aIndex        The address record index to retrieve.\n @param[out] aAddress      A pointer to a IPv6 address to output the address (MUST NOT be NULL).\n @param[out] aTtl          A pointer to an `uint32_t` to output TTL for the address. It can be NULL if caller does\n                           not want to get the TTL.\n\n @retval OT_ERROR_NONE       The address was read successfully.\n @retval OT_ERROR_NOT_FOUND  No address record for @p aHostname in @p aResponse at @p aIndex.\n @retval OT_ERROR_PARSE      Could not parse the records in the @p aResponse.\n"]
+    #[doc = " Gets the host IPv6 address from a DNS browse (service instance enumeration) response.\n\n MUST only be used from `otDnsBrowseCallback`.\n\n The response can include zero or more IPv6 address records. @p aIndex can be used to iterate through the list of\n addresses. Index zero gets the first address and so on. When we reach end of the list, `OT_ERROR_NOT_FOUND` is\n returned.\n\n @param[in]  aResponse     A pointer to the response.\n @param[in]  aHostName     The host name to get the address (MUST NOT be NULL).\n @param[in]  aIndex        The address record index to retrieve.\n @param[out] aAddress      A pointer to a IPv6 address to output the address (MUST NOT be NULL).\n @param[out] aTtl          A pointer to an `uint32_t` to output TTL for the address. It can be NULL if caller does\n                           not want to get the TTL.\n\n @retval OT_ERROR_NONE       The address was read successfully.\n @retval OT_ERROR_NOT_FOUND  No address record for @p aHostname in @p aResponse at @p aIndex.\n @retval OT_ERROR_PARSE      Could not parse the records in the @p aResponse.\n"]
     pub fn otDnsBrowseResponseGetHostAddress(
         aResponse: *const otDnsBrowseResponse,
         aHostName: *const ::std::os::raw::c_char,
@@ -5882,7 +5907,7 @@ extern "C" {
 pub struct otDnsServiceResponse {
     _unused: [u8; 0],
 }
-#[doc = " This function pointer is called when a DNS response is received for a service instance resolution query.\n\n Within this callback the user can use `otDnsServiceResponseGet{Item}()` functions along with the @p aResponse\n pointer to get more info about the response.\n\n The @p aResponse pointer can only be used within this callback and after returning from this function it will not\n stay valid, so the user MUST NOT retain the @p aResponse pointer for later use.\n\n @param[in]  aError     The result of the DNS transaction.\n @param[in]  aResponse  A pointer to the response (it is always non-NULL).\n @param[in]  aContext   A pointer to application-specific context.\n\n For the full list of possible values for @p aError, please see `otDnsAddressCallback()`.\n"]
+#[doc = " Pointer is called when a DNS response is received for a service instance resolution query.\n\n Within this callback the user can use `otDnsServiceResponseGet{Item}()` functions along with the @p aResponse\n pointer to get more info about the response.\n\n The @p aResponse pointer can only be used within this callback and after returning from this function it will not\n stay valid, so the user MUST NOT retain the @p aResponse pointer for later use.\n\n @param[in]  aError     The result of the DNS transaction.\n @param[in]  aResponse  A pointer to the response (it is always non-NULL).\n @param[in]  aContext   A pointer to application-specific context.\n\n For the full list of possible values for @p aError, please see `otDnsAddressCallback()`.\n"]
 pub type otDnsServiceCallback = ::std::option::Option<
     unsafe extern "C" fn(
         aError: otError,
@@ -5891,7 +5916,7 @@ pub type otDnsServiceCallback = ::std::option::Option<
     ),
 >;
 extern "C" {
-    #[doc = " This function starts a DNS service instance resolution for a given service instance.\n\n This function is available when `OPENTHREAD_CONFIG_DNS_CLIENT_SERVICE_DISCOVERY_ENABLE` is enabled.\n\n The @p aConfig can be NULL. In this case the default config (from `otDnsClientGetDefaultConfig()`) will be used as\n the config for this query. In a non-NULL @p aConfig, some of the fields can be left unspecified (value zero). The\n unspecified fields are then replaced by the values from the default config.\n\n The function sends queries for SRV and/or TXT records for the given service instance. The `mServiceMode` field in\n `otDnsQueryConfig` determines which records to query (SRV only, TXT only, or both SRV and TXT) and how to perform\n the query (together in the same message, separately in parallel, or in optimized mode where client will try in the\n same message first and then separately if it fails to get a response).\n\n The SRV record provides information about service port, priority, and weight along with the host name associated\n with the service instance. This function DOES NOT perform address resolution for the host name discovered from SRV\n record. The server/resolver may provide AAAA/A record(s) for the host name in the Additional Data section of the\n response to SRV/TXT query and this information can be retrieved using `otDnsServiceResponseGetServiceInfo()` in\n `otDnsServiceCallback`. Users of this API MUST NOT assume that host address will always be available from\n `otDnsServiceResponseGetServiceInfo()`.\n\n @param[in]  aInstance          A pointer to an OpenThread instance.\n @param[in]  aInstanceLabel     The service instance label.\n @param[in]  aServiceName       The service name (together with @p aInstanceLabel form full instance name).\n @param[in]  aCallback          A function pointer that shall be called on response reception or time-out.\n @param[in]  aContext           A pointer to arbitrary context information.\n @param[in]  aConfig            A pointer to the config to use for this query.\n\n @retval OT_ERROR_NONE          Query sent successfully. @p aCallback will be invoked to report the status.\n @retval OT_ERROR_NO_BUFS       Insufficient buffer to prepare and send query.\n @retval OT_ERROR_INVALID_ARGS  @p aInstanceLabel is NULL.\n"]
+    #[doc = " Starts a DNS service instance resolution for a given service instance.\n\n Is available when `OPENTHREAD_CONFIG_DNS_CLIENT_SERVICE_DISCOVERY_ENABLE` is enabled.\n\n The @p aConfig can be NULL. In this case the default config (from `otDnsClientGetDefaultConfig()`) will be used as\n the config for this query. In a non-NULL @p aConfig, some of the fields can be left unspecified (value zero). The\n unspecified fields are then replaced by the values from the default config.\n\n The function sends queries for SRV and/or TXT records for the given service instance. The `mServiceMode` field in\n `otDnsQueryConfig` determines which records to query (SRV only, TXT only, or both SRV and TXT) and how to perform\n the query (together in the same message, separately in parallel, or in optimized mode where client will try in the\n same message first and then separately if it fails to get a response).\n\n The SRV record provides information about service port, priority, and weight along with the host name associated\n with the service instance. This function DOES NOT perform address resolution for the host name discovered from SRV\n record. The server/resolver may provide AAAA/A record(s) for the host name in the Additional Data section of the\n response to SRV/TXT query and this information can be retrieved using `otDnsServiceResponseGetServiceInfo()` in\n `otDnsServiceCallback`. Users of this API MUST NOT assume that host address will always be available from\n `otDnsServiceResponseGetServiceInfo()`.\n\n @param[in]  aInstance          A pointer to an OpenThread instance.\n @param[in]  aInstanceLabel     The service instance label.\n @param[in]  aServiceName       The service name (together with @p aInstanceLabel form full instance name).\n @param[in]  aCallback          A function pointer that shall be called on response reception or time-out.\n @param[in]  aContext           A pointer to arbitrary context information.\n @param[in]  aConfig            A pointer to the config to use for this query.\n\n @retval OT_ERROR_NONE          Query sent successfully. @p aCallback will be invoked to report the status.\n @retval OT_ERROR_NO_BUFS       Insufficient buffer to prepare and send query.\n @retval OT_ERROR_INVALID_ARGS  @p aInstanceLabel is NULL.\n"]
     pub fn otDnsClientResolveService(
         aInstance: *mut otInstance,
         aInstanceLabel: *const ::std::os::raw::c_char,
@@ -5902,7 +5927,7 @@ extern "C" {
     ) -> otError;
 }
 extern "C" {
-    #[doc = " This function starts a DNS service instance resolution for a given service instance, with a potential follow-up\n address resolution for the host name discovered for the service instance.\n\n This function is available when `OPENTHREAD_CONFIG_DNS_CLIENT_SERVICE_DISCOVERY_ENABLE` is enabled.\n\n The @p aConfig can be NULL. In this case the default config (from `otDnsClientGetDefaultConfig()`) will be used as\n the config for this query. In a non-NULL @p aConfig, some of the fields can be left unspecified (value zero). The\n unspecified fields are then replaced by the values from the default config. This function cannot be used with\n `mServiceMode` in DNS config set to `OT_DNS_SERVICE_MODE_TXT` (i.e., querying for TXT record only) and will return\n `OT_ERROR_INVALID_ARGS`.\n\n This function behaves similarly to `otDnsClientResolveService()` sending queries for SRV and TXT records. However,\n if the server/resolver does not provide AAAA/A records for the host name in the response to SRV query (in the\n Additional Data section), it will perform host name resolution (sending an AAAA query) for the discovered host name\n from the SRV record. The callback @p aCallback is invoked when responses for all queries are received (i.e., both\n service and host address resolutions are finished).\n\n @param[in]  aInstance          A pointer to an OpenThread instance.\n @param[in]  aInstanceLabel     The service instance label.\n @param[in]  aServiceName       The service name (together with @p aInstanceLabel form full instance name).\n @param[in]  aCallback          A function pointer that shall be called on response reception or time-out.\n @param[in]  aContext           A pointer to arbitrary context information.\n @param[in]  aConfig            A pointer to the config to use for this query.\n\n @retval OT_ERROR_NONE          Query sent successfully. @p aCallback will be invoked to report the status.\n @retval OT_ERROR_NO_BUFS       Insufficient buffer to prepare and send query.\n @retval OT_ERROR_INVALID_ARGS  @p aInstanceLabel is NULL, or @p aConfig is invalid.\n"]
+    #[doc = " Starts a DNS service instance resolution for a given service instance, with a potential follow-up\n address resolution for the host name discovered for the service instance.\n\n Is available when `OPENTHREAD_CONFIG_DNS_CLIENT_SERVICE_DISCOVERY_ENABLE` is enabled.\n\n The @p aConfig can be NULL. In this case the default config (from `otDnsClientGetDefaultConfig()`) will be used as\n the config for this query. In a non-NULL @p aConfig, some of the fields can be left unspecified (value zero). The\n unspecified fields are then replaced by the values from the default config. This function cannot be used with\n `mServiceMode` in DNS config set to `OT_DNS_SERVICE_MODE_TXT` (i.e., querying for TXT record only) and will return\n `OT_ERROR_INVALID_ARGS`.\n\n Behaves similarly to `otDnsClientResolveService()` sending queries for SRV and TXT records. However,\n if the server/resolver does not provide AAAA/A records for the host name in the response to SRV query (in the\n Additional Data section), it will perform host name resolution (sending an AAAA query) for the discovered host name\n from the SRV record. The callback @p aCallback is invoked when responses for all queries are received (i.e., both\n service and host address resolutions are finished).\n\n @param[in]  aInstance          A pointer to an OpenThread instance.\n @param[in]  aInstanceLabel     The service instance label.\n @param[in]  aServiceName       The service name (together with @p aInstanceLabel form full instance name).\n @param[in]  aCallback          A function pointer that shall be called on response reception or time-out.\n @param[in]  aContext           A pointer to arbitrary context information.\n @param[in]  aConfig            A pointer to the config to use for this query.\n\n @retval OT_ERROR_NONE          Query sent successfully. @p aCallback will be invoked to report the status.\n @retval OT_ERROR_NO_BUFS       Insufficient buffer to prepare and send query.\n @retval OT_ERROR_INVALID_ARGS  @p aInstanceLabel is NULL, or @p aConfig is invalid.\n"]
     pub fn otDnsClientResolveServiceAndHostAddress(
         aInstance: *mut otInstance,
         aInstanceLabel: *const ::std::os::raw::c_char,
@@ -5913,7 +5938,7 @@ extern "C" {
     ) -> otError;
 }
 extern "C" {
-    #[doc = " This function gets the service instance name associated with a DNS service instance resolution response.\n\n This function MUST only be used from `otDnsServiceCallback`.\n\n @param[in]  aResponse         A pointer to the response.\n @param[out] aLabelBuffer      A buffer to char array to output the service instance label (MUST NOT be NULL).\n @param[in]  aLabelBufferSize  The size of @p aLabelBuffer.\n @param[out] aNameBuffer       A buffer to char array to output the rest of service name (can be NULL if user is\n                               not interested in getting the name.\n @param[in]  aNameBufferSize   The size of @p aNameBuffer.\n\n @retval OT_ERROR_NONE     The service name was read successfully.\n @retval OT_ERROR_NO_BUFS  Either the label or name does not fit in the given buffers.\n"]
+    #[doc = " Gets the service instance name associated with a DNS service instance resolution response.\n\n MUST only be used from `otDnsServiceCallback`.\n\n @param[in]  aResponse         A pointer to the response.\n @param[out] aLabelBuffer      A buffer to char array to output the service instance label (MUST NOT be NULL).\n @param[in]  aLabelBufferSize  The size of @p aLabelBuffer.\n @param[out] aNameBuffer       A buffer to char array to output the rest of service name (can be NULL if user is\n                               not interested in getting the name.\n @param[in]  aNameBufferSize   The size of @p aNameBuffer.\n\n @retval OT_ERROR_NONE     The service name was read successfully.\n @retval OT_ERROR_NO_BUFS  Either the label or name does not fit in the given buffers.\n"]
     pub fn otDnsServiceResponseGetServiceName(
         aResponse: *const otDnsServiceResponse,
         aLabelBuffer: *mut ::std::os::raw::c_char,
@@ -5923,14 +5948,14 @@ extern "C" {
     ) -> otError;
 }
 extern "C" {
-    #[doc = " This function gets info for a service instance from a DNS service instance resolution response.\n\n This function MUST only be used from a `otDnsServiceCallback` triggered from `otDnsClientResolveService()` or\n `otDnsClientResolveServiceAndHostAddress()`.\n\n When this is is used from a `otDnsClientResolveService()` callback, the DNS response from server/resolver may\n include AAAA records in its Additional Data section for the host name associated with the service instance that is\n resolved. This is a SHOULD and not a MUST requirement so servers/resolvers are not required to provide this. This\n function attempts to parse AAAA record(s) if included in the response. If it is not included `mHostAddress` is set\n to all zeros (unspecified address). To also resolve the host address, user can use the DNS client API function\n `otDnsClientResolveServiceAndHostAddress()` which will perform service resolution followed up by a host name\n address resolution query (when AAAA records are not provided by server/resolver in the SRV query response).\n\n - If a matching SRV record is found in @p aResponse, @p aServiceInfo is updated.\n - If no matching SRV record is found, `OT_ERROR_NOT_FOUND` is returned unless the query config for this query\n   used `OT_DNS_SERVICE_MODE_TXT` for `mServiceMode` (meaning the request was only for TXT record). In this case, we\n   still try to parse the SRV record from Additional Data Section of response (in case server provided the info).\n - If no matching TXT record is found in @p aResponse, `mTxtDataSize` in @p aServiceInfo is set to zero.\n - If TXT data length is greater than `mTxtDataSize`, it is read partially and `mTxtDataTruncated` is set to true.\n - If no matching AAAA record is found in @p aResponse, `mHostAddress is set to all zero or unspecified address.\n - If there are multiple AAAA records for the host name in @p aResponse, `mHostAddress` is set to the first one. The\n   other addresses can be retrieved using `otDnsServiceResponseGetHostAddress()`.\n\n @param[in]  aResponse          A pointer to the response.\n @param[out] aServiceInfo       A `ServiceInfo` to output the service instance information (MUST NOT be NULL).\n\n @retval OT_ERROR_NONE          The service instance info was read. @p aServiceInfo is updated.\n @retval OT_ERROR_NOT_FOUND     Could not find a required record in @p aResponse.\n @retval OT_ERROR_NO_BUFS       The host name and/or TXT data could not fit in the given buffers.\n @retval OT_ERROR_PARSE         Could not parse the records in the @p aResponse.\n"]
+    #[doc = " Gets info for a service instance from a DNS service instance resolution response.\n\n MUST only be used from a `otDnsServiceCallback` triggered from `otDnsClientResolveService()` or\n `otDnsClientResolveServiceAndHostAddress()`.\n\n When this is is used from a `otDnsClientResolveService()` callback, the DNS response from server/resolver may\n include AAAA records in its Additional Data section for the host name associated with the service instance that is\n resolved. This is a SHOULD and not a MUST requirement so servers/resolvers are not required to provide this. This\n function attempts to parse AAAA record(s) if included in the response. If it is not included `mHostAddress` is set\n to all zeros (unspecified address). To also resolve the host address, user can use the DNS client API function\n `otDnsClientResolveServiceAndHostAddress()` which will perform service resolution followed up by a host name\n address resolution query (when AAAA records are not provided by server/resolver in the SRV query response).\n\n - If a matching SRV record is found in @p aResponse, @p aServiceInfo is updated.\n - If no matching SRV record is found, `OT_ERROR_NOT_FOUND` is returned unless the query config for this query\n   used `OT_DNS_SERVICE_MODE_TXT` for `mServiceMode` (meaning the request was only for TXT record). In this case, we\n   still try to parse the SRV record from Additional Data Section of response (in case server provided the info).\n - If no matching TXT record is found in @p aResponse, `mTxtDataSize` in @p aServiceInfo is set to zero.\n - If TXT data length is greater than `mTxtDataSize`, it is read partially and `mTxtDataTruncated` is set to true.\n - If no matching AAAA record is found in @p aResponse, `mHostAddress is set to all zero or unspecified address.\n - If there are multiple AAAA records for the host name in @p aResponse, `mHostAddress` is set to the first one. The\n   other addresses can be retrieved using `otDnsServiceResponseGetHostAddress()`.\n\n @param[in]  aResponse          A pointer to the response.\n @param[out] aServiceInfo       A `ServiceInfo` to output the service instance information (MUST NOT be NULL).\n\n @retval OT_ERROR_NONE          The service instance info was read. @p aServiceInfo is updated.\n @retval OT_ERROR_NOT_FOUND     Could not find a required record in @p aResponse.\n @retval OT_ERROR_NO_BUFS       The host name and/or TXT data could not fit in the given buffers.\n @retval OT_ERROR_PARSE         Could not parse the records in the @p aResponse.\n"]
     pub fn otDnsServiceResponseGetServiceInfo(
         aResponse: *const otDnsServiceResponse,
         aServiceInfo: *mut otDnsServiceInfo,
     ) -> otError;
 }
 extern "C" {
-    #[doc = " This function gets the host IPv6 address from a DNS service instance resolution response.\n\n This function MUST only be used from `otDnsServiceCallback`.\n\n The response can include zero or more IPv6 address records. @p aIndex can be used to iterate through the list of\n addresses. Index zero gets the first address and so on. When we reach end of the list, `OT_ERROR_NOT_FOUND` is\n returned.\n\n @param[in]  aResponse     A pointer to the response.\n @param[in]  aHostName     The host name to get the address (MUST NOT be NULL).\n @param[in]  aIndex        The address record index to retrieve.\n @param[out] aAddress      A pointer to a IPv6 address to output the address (MUST NOT be NULL).\n @param[out] aTtl          A pointer to an `uint32_t` to output TTL for the address. It can be NULL if caller does\n                           not want to get the TTL.\n\n @retval OT_ERROR_NONE       The address was read successfully.\n @retval OT_ERROR_NOT_FOUND  No address record for @p aHostname in @p aResponse at @p aIndex.\n @retval OT_ERROR_PARSE      Could not parse the records in the @p aResponse.\n"]
+    #[doc = " Gets the host IPv6 address from a DNS service instance resolution response.\n\n MUST only be used from `otDnsServiceCallback`.\n\n The response can include zero or more IPv6 address records. @p aIndex can be used to iterate through the list of\n addresses. Index zero gets the first address and so on. When we reach end of the list, `OT_ERROR_NOT_FOUND` is\n returned.\n\n @param[in]  aResponse     A pointer to the response.\n @param[in]  aHostName     The host name to get the address (MUST NOT be NULL).\n @param[in]  aIndex        The address record index to retrieve.\n @param[out] aAddress      A pointer to a IPv6 address to output the address (MUST NOT be NULL).\n @param[out] aTtl          A pointer to an `uint32_t` to output TTL for the address. It can be NULL if caller does\n                           not want to get the TTL.\n\n @retval OT_ERROR_NONE       The address was read successfully.\n @retval OT_ERROR_NOT_FOUND  No address record for @p aHostname in @p aResponse at @p aIndex.\n @retval OT_ERROR_PARSE      Could not parse the records in the @p aResponse.\n"]
     pub fn otDnsServiceResponseGetHostAddress(
         aResponse: *const otDnsServiceResponse,
         aHostName: *const ::std::os::raw::c_char,
@@ -5939,14 +5964,14 @@ extern "C" {
         aTtl: *mut u32,
     ) -> otError;
 }
-#[doc = " This function is called when a DNS-SD query subscribes one of:\n      1. a service name.\n      2. a service instance name.\n      3. a host name.\n\n The DNS-SD query implementation is responsible for identifying what @p aFullName is.\n If @p aFullName is a service name or service instance name, the DNS-SD query implementation should discover\n corresponding service instance information and notify the DNS-SD server using\n `otDnssdQueryHandleDiscoveredServiceInstance`.\n If @p aFullName is a host name, the DNS-SD query implementation should\n discover the host information and notify the DNS-SD server using `otDnssdQueryHandleDiscoveredHost`.\n\n @note There can be multiple subscription to the same name. DNS-SD query implementation should record the number of\n active subscriptions and stop notifying when there is no active subscription for @p aFullName.\n\n @param[in] aContext      A pointer to the application-specific context.\n @param[in] aFullName     The null-terminated full service name (e.g. \"_ipps._tcp.default.service.arpa.\"),\n                          or full service instance name (e.g. \"OpenThread._ipps._tcp.default.service.arpa.\"),\n                          or full host name (e.g. \"ot-host.default.service.arpa.\").\n\n @sa otDnssdQueryHandleDiscoveredServiceInstance\n @sa otDnssdQueryHandleDiscoveredHost\n"]
+#[doc = " Is called when a DNS-SD query subscribes one of:\n      1. a service name.\n      2. a service instance name.\n      3. a host name.\n\n The DNS-SD query implementation is responsible for identifying what @p aFullName is.\n If @p aFullName is a service name or service instance name, the DNS-SD query implementation should discover\n corresponding service instance information and notify the DNS-SD server using\n `otDnssdQueryHandleDiscoveredServiceInstance`.\n If @p aFullName is a host name, the DNS-SD query implementation should\n discover the host information and notify the DNS-SD server using `otDnssdQueryHandleDiscoveredHost`.\n\n @note There can be multiple subscription to the same name. DNS-SD query implementation should record the number of\n active subscriptions and stop notifying when there is no active subscription for @p aFullName.\n\n @param[in] aContext      A pointer to the application-specific context.\n @param[in] aFullName     The null-terminated full service name (e.g. \"_ipps._tcp.default.service.arpa.\"),\n                          or full service instance name (e.g. \"OpenThread._ipps._tcp.default.service.arpa.\"),\n                          or full host name (e.g. \"ot-host.default.service.arpa.\").\n\n @sa otDnssdQueryHandleDiscoveredServiceInstance\n @sa otDnssdQueryHandleDiscoveredHost\n"]
 pub type otDnssdQuerySubscribeCallback = ::std::option::Option<
     unsafe extern "C" fn(
         aContext: *mut ::std::os::raw::c_void,
         aFullName: *const ::std::os::raw::c_char,
     ),
 >;
-#[doc = " This function is called when a DNS-SD query unsubscribes one of:\n      1. a service name.\n      2. a service instance name.\n      3. a host name.\n\n The DNS-SD query implementation is responsible for identifying what @p aFullName is.\n\n @note There can be multiple subscription to the same name. DNS-SD query implementation should record the number of\n active subscriptions and stop notifying when there is no active subscription for @p aFullName.\n\n @param[in] aContext      A pointer to the application-specific context.\n @param[in] aFullName     The null-terminated full service name (e.g. \"_ipps._tcp.default.service.arpa.\"), or\n                          full service instance name (e.g. \"OpenThread._ipps._tcp.default.service.arpa.\").\n"]
+#[doc = " Is called when a DNS-SD query unsubscribes one of:\n      1. a service name.\n      2. a service instance name.\n      3. a host name.\n\n The DNS-SD query implementation is responsible for identifying what @p aFullName is.\n\n @note There can be multiple subscription to the same name. DNS-SD query implementation should record the number of\n active subscriptions and stop notifying when there is no active subscription for @p aFullName.\n\n @param[in] aContext      A pointer to the application-specific context.\n @param[in] aFullName     The null-terminated full service name (e.g. \"_ipps._tcp.default.service.arpa.\"), or\n                          full service instance name (e.g. \"OpenThread._ipps._tcp.default.service.arpa.\").\n"]
 pub type otDnssdQueryUnsubscribeCallback = ::std::option::Option<
     unsafe extern "C" fn(
         aContext: *mut ::std::os::raw::c_void,
@@ -5955,7 +5980,7 @@ pub type otDnssdQueryUnsubscribeCallback = ::std::option::Option<
 >;
 #[doc = " This opaque type represents a DNS-SD query.\n"]
 pub type otDnssdQuery = ::std::os::raw::c_void;
-#[doc = " This structure represents information of a discovered service instance for a DNS-SD query.\n"]
+#[doc = " Represents information of a discovered service instance for a DNS-SD query.\n"]
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
 pub struct otDnssdServiceInstanceInfo {
@@ -5989,7 +6014,7 @@ impl Default for otDnssdServiceInstanceInfo {
         }
     }
 }
-#[doc = " This structure represents information of a discovered host for a DNS-SD query.\n"]
+#[doc = " Represents information of a discovered host for a DNS-SD query.\n"]
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
 pub struct otDnssdHostInfo {
@@ -6017,9 +6042,9 @@ pub const OT_DNSSD_QUERY_TYPE_BROWSE: otDnssdQueryType = 1;
 pub const OT_DNSSD_QUERY_TYPE_RESOLVE: otDnssdQueryType = 2;
 #[doc = "< Service type resolve hostname."]
 pub const OT_DNSSD_QUERY_TYPE_RESOLVE_HOST: otDnssdQueryType = 3;
-#[doc = " This enumeration specifies a DNS-SD query type.\n"]
+#[doc = " Specifies a DNS-SD query type.\n"]
 pub type otDnssdQueryType = ::std::os::raw::c_uint;
-#[doc = " This structure contains the counters of DNS-SD server.\n"]
+#[doc = " Contains the counters of DNS-SD server.\n"]
 #[repr(C)]
 #[derive(Debug, Default, Copy, Clone)]
 pub struct otDnssdCounters {
@@ -6039,7 +6064,7 @@ pub struct otDnssdCounters {
     pub mResolvedBySrp: u32,
 }
 extern "C" {
-    #[doc = " This function sets DNS-SD server query callbacks.\n\n The DNS-SD server calls @p aSubscribe to subscribe to a service or service instance to resolve a DNS-SD query and @p\n aUnsubscribe to unsubscribe when the query is resolved or timeout.\n\n @note @p aSubscribe and @p aUnsubscribe must be both set or unset.\n\n @param[in] aInstance     The OpenThread instance structure.\n @param[in] aSubscribe    A pointer to the callback function to subscribe a service or service instance.\n @param[in] aUnsubscribe  A pointer to the callback function to unsubscribe a service or service instance.\n @param[in] aContext      A pointer to the application-specific context.\n"]
+    #[doc = " Sets DNS-SD server query callbacks.\n\n The DNS-SD server calls @p aSubscribe to subscribe to a service or service instance to resolve a DNS-SD query and @p\n aUnsubscribe to unsubscribe when the query is resolved or timeout.\n\n @note @p aSubscribe and @p aUnsubscribe must be both set or unset.\n\n @param[in] aInstance     The OpenThread instance structure.\n @param[in] aSubscribe    A pointer to the callback function to subscribe a service or service instance.\n @param[in] aUnsubscribe  A pointer to the callback function to unsubscribe a service or service instance.\n @param[in] aContext      A pointer to the application-specific context.\n"]
     pub fn otDnssdQuerySetCallbacks(
         aInstance: *mut otInstance,
         aSubscribe: otDnssdQuerySubscribeCallback,
@@ -6048,7 +6073,7 @@ extern "C" {
     );
 }
 extern "C" {
-    #[doc = " This function notifies a discovered service instance.\n\n The external query resolver (e.g. Discovery Proxy) should call this function to notify OpenThread core of the\n subscribed services or service instances.\n\n @note @p aInstanceInfo must not contain unspecified or link-local or loop-back or multicast IP addresses.\n\n @param[in] aInstance         The OpenThread instance structure.\n @param[in] aServiceFullName  The null-terminated full service name.\n @param[in] aInstanceInfo     A pointer to the discovered service instance information.\n"]
+    #[doc = " Notifies a discovered service instance.\n\n The external query resolver (e.g. Discovery Proxy) should call this function to notify OpenThread core of the\n subscribed services or service instances.\n\n @note @p aInstanceInfo must not contain unspecified or link-local or loop-back or multicast IP addresses.\n\n @param[in] aInstance         The OpenThread instance structure.\n @param[in] aServiceFullName  The null-terminated full service name.\n @param[in] aInstanceInfo     A pointer to the discovered service instance information.\n"]
     pub fn otDnssdQueryHandleDiscoveredServiceInstance(
         aInstance: *mut otInstance,
         aServiceFullName: *const ::std::os::raw::c_char,
@@ -6056,7 +6081,7 @@ extern "C" {
     );
 }
 extern "C" {
-    #[doc = " This function notifies a discovered host.\n\n The external query resolver (e.g. Discovery Proxy) should call this function to notify OpenThread core of the\n subscribed hosts.\n\n @note @p aHostInfo must not contain unspecified or link-local or loop-back or multicast IP addresses.\n\n @param[in] aInstance         The OpenThread instance structure.\n @param[in] aHostFullName     The null-terminated full host name.\n @param[in] aHostInfo         A pointer to the discovered service instance information.\n"]
+    #[doc = " Notifies a discovered host.\n\n The external query resolver (e.g. Discovery Proxy) should call this function to notify OpenThread core of the\n subscribed hosts.\n\n @note @p aHostInfo must not contain unspecified or link-local or loop-back or multicast IP addresses.\n\n @param[in] aInstance         The OpenThread instance structure.\n @param[in] aHostFullName     The null-terminated full host name.\n @param[in] aHostInfo         A pointer to the discovered service instance information.\n"]
     pub fn otDnssdQueryHandleDiscoveredHost(
         aInstance: *mut otInstance,
         aHostFullName: *const ::std::os::raw::c_char,
@@ -6064,21 +6089,21 @@ extern "C" {
     );
 }
 extern "C" {
-    #[doc = " This function acquires the next query in the DNS-SD server.\n\n @param[in] aInstance         The OpenThread instance structure.\n @param[in] aQuery            The query pointer. Pass NULL to get the first query.\n\n @returns  A pointer to the query or NULL if no more queries.\n"]
+    #[doc = " Acquires the next query in the DNS-SD server.\n\n @param[in] aInstance         The OpenThread instance structure.\n @param[in] aQuery            The query pointer. Pass NULL to get the first query.\n\n @returns  A pointer to the query or NULL if no more queries.\n"]
     pub fn otDnssdGetNextQuery(
         aInstance: *mut otInstance,
         aQuery: *const otDnssdQuery,
     ) -> *const otDnssdQuery;
 }
 extern "C" {
-    #[doc = " This function acquires the DNS-SD query type and name for a specific query.\n\n @param[in]   aQuery            The query pointer acquired from `otDnssdGetNextQuery`.\n @param[out]  aNameOutput       The name output buffer, which should be `OT_DNS_MAX_NAME_SIZE` bytes long.\n\n @returns The DNS-SD query type.\n"]
+    #[doc = " Acquires the DNS-SD query type and name for a specific query.\n\n @param[in]   aQuery            The query pointer acquired from `otDnssdGetNextQuery`.\n @param[out]  aNameOutput       The name output buffer, which should be `OT_DNS_MAX_NAME_SIZE` bytes long.\n\n @returns The DNS-SD query type.\n"]
     pub fn otDnssdGetQueryTypeAndName(
         aQuery: *const otDnssdQuery,
         aNameOutput: *mut [::std::os::raw::c_char; 255usize],
     ) -> otDnssdQueryType;
 }
 extern "C" {
-    #[doc = " This function returns the counters of the DNS-SD server.\n\n @param[in]  aInstance  The OpenThread instance structure.\n\n @returns  A pointer to the counters of the DNS-SD server.\n"]
+    #[doc = " Returns the counters of the DNS-SD server.\n\n @param[in]  aInstance  The OpenThread instance structure.\n\n @returns  A pointer to the counters of the DNS-SD server.\n"]
     pub fn otDnssdGetCounters(aInstance: *mut otInstance) -> *const otDnssdCounters;
 }
 extern "C" {
@@ -6125,7 +6150,7 @@ pub const OT_ICMP6_CODE_DST_UNREACH_NO_ROUTE: otIcmp6Code = 0;
 pub const OT_ICMP6_CODE_FRAGM_REAS_TIME_EX: otIcmp6Code = 1;
 #[doc = " ICMPv6 Message Codes\n"]
 pub type otIcmp6Code = ::std::os::raw::c_uint;
-#[doc = " @struct otIcmp6Header\n\n This structure represents an ICMPv6 header.\n"]
+#[doc = " @struct otIcmp6Header\n\n Represents an ICMPv6 header.\n"]
 #[repr(C, packed)]
 #[derive(Copy, Clone)]
 pub struct otIcmp6Header {
@@ -6172,7 +6197,7 @@ pub type otIcmp6ReceiveCallback = ::std::option::Option<
         aIcmpHeader: *const otIcmp6Header,
     ),
 >;
-#[doc = " This structure implements ICMPv6 message handler.\n"]
+#[doc = " Implements ICMPv6 message handler.\n"]
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
 pub struct otIcmp6Handler {
@@ -6203,22 +6228,22 @@ pub const OT_ICMP6_ECHO_HANDLER_ALL: otIcmp6EchoMode = 3;
 #[doc = " ICMPv6 Echo Reply Modes\n"]
 pub type otIcmp6EchoMode = ::std::os::raw::c_uint;
 extern "C" {
-    #[doc = " This function indicates whether or not ICMPv6 Echo processing is enabled.\n\n @param[in]  aInstance A pointer to an OpenThread instance.\n\n @retval OT_ICMP6_ECHO_HANDLER_DISABLED        ICMPv6 Echo processing is disabled.\n @retval OT_ICMP6_ECHO_HANDLER_UNICAST_ONLY    ICMPv6 Echo processing enabled for unicast requests only\n @retval OT_ICMP6_ECHO_HANDLER_MULTICAST_ONLY  ICMPv6 Echo processing enabled for multicast requests only\n @retval OT_ICMP6_ECHO_HANDLER_ALL             ICMPv6 Echo processing enabled for unicast and multicast requests\n"]
+    #[doc = " Indicates whether or not ICMPv6 Echo processing is enabled.\n\n @param[in]  aInstance A pointer to an OpenThread instance.\n\n @retval OT_ICMP6_ECHO_HANDLER_DISABLED        ICMPv6 Echo processing is disabled.\n @retval OT_ICMP6_ECHO_HANDLER_UNICAST_ONLY    ICMPv6 Echo processing enabled for unicast requests only\n @retval OT_ICMP6_ECHO_HANDLER_MULTICAST_ONLY  ICMPv6 Echo processing enabled for multicast requests only\n @retval OT_ICMP6_ECHO_HANDLER_ALL             ICMPv6 Echo processing enabled for unicast and multicast requests\n"]
     pub fn otIcmp6GetEchoMode(aInstance: *mut otInstance) -> otIcmp6EchoMode;
 }
 extern "C" {
-    #[doc = " This function sets whether or not ICMPv6 Echo processing is enabled.\n\n @param[in]  aInstance A pointer to an OpenThread instance.\n @param[in]  aMode     The ICMPv6 Echo processing mode.\n"]
+    #[doc = " Sets whether or not ICMPv6 Echo processing is enabled.\n\n @param[in]  aInstance A pointer to an OpenThread instance.\n @param[in]  aMode     The ICMPv6 Echo processing mode.\n"]
     pub fn otIcmp6SetEchoMode(aInstance: *mut otInstance, aMode: otIcmp6EchoMode);
 }
 extern "C" {
-    #[doc = " This function registers a handler to provide received ICMPv6 messages.\n\n @note A handler structure @p aHandler has to be stored in persistent (static) memory.\n       OpenThread does not make a copy of handler structure.\n\n @param[in]  aInstance A pointer to an OpenThread instance.\n @param[in]  aHandler  A pointer to a handler containing callback that is called when\n                       an ICMPv6 message is received.\n"]
+    #[doc = " Registers a handler to provide received ICMPv6 messages.\n\n @note A handler structure @p aHandler has to be stored in persistent (static) memory.\n       OpenThread does not make a copy of handler structure.\n\n @param[in]  aInstance A pointer to an OpenThread instance.\n @param[in]  aHandler  A pointer to a handler containing callback that is called when\n                       an ICMPv6 message is received.\n"]
     pub fn otIcmp6RegisterHandler(
         aInstance: *mut otInstance,
         aHandler: *mut otIcmp6Handler,
     ) -> otError;
 }
 extern "C" {
-    #[doc = " This function sends an ICMPv6 Echo Request via the Thread interface.\n\n @param[in]  aInstance     A pointer to an OpenThread instance.\n @param[in]  aMessage      A pointer to the message buffer containing the ICMPv6 payload.\n @param[in]  aMessageInfo  A reference to message information associated with @p aMessage.\n @param[in]  aIdentifier   An identifier to aid in matching Echo Replies to this Echo Request.\n                           May be zero.\n"]
+    #[doc = " Sends an ICMPv6 Echo Request via the Thread interface.\n\n @param[in]  aInstance     A pointer to an OpenThread instance.\n @param[in]  aMessage      A pointer to the message buffer containing the ICMPv6 payload.\n @param[in]  aMessageInfo  A reference to message information associated with @p aMessage.\n @param[in]  aIdentifier   An identifier to aid in matching Echo Replies to this Echo Request.\n                           May be zero.\n"]
     pub fn otIcmp6SendEchoRequest(
         aInstance: *mut otInstance,
         aMessage: *mut otMessage,
@@ -6226,7 +6251,7 @@ extern "C" {
         aIdentifier: u16,
     ) -> otError;
 }
-#[doc = " This function pointer is called if signal jam detection is enabled and a jam is detected.\n\n @param[in]  aJamState Current jam state (`true` if jam is detected, `false` otherwise).\n @param[in]  aContext  A pointer to application-specific context.\n"]
+#[doc = " Pointer is called if signal jam detection is enabled and a jam is detected.\n\n @param[in]  aJamState Current jam state (`true` if jam is detected, `false` otherwise).\n @param[in]  aContext  A pointer to application-specific context.\n"]
 pub type otJamDetectionCallback = ::std::option::Option<
     unsafe extern "C" fn(aJamState: bool, aContext: *mut ::std::os::raw::c_void),
 >;
@@ -6281,7 +6306,7 @@ extern "C" {
     #[doc = " Get the current history bitmap.\n\n This value provides information about current state of jamming detection\n module for monitoring/debugging purpose. It returns a 64-bit value where\n each bit corresponds to one second interval starting with bit 0 for the\n most recent interval and bit 63 for the oldest intervals (63 sec earlier).\n The bit is set to 1 if the jamming detection module observed/detected\n high signal level during the corresponding one second interval.\n\n @param[in]  aInstance            A pointer to an OpenThread instance.\n\n @returns The current history bitmap.\n"]
     pub fn otJamDetectionGetHistoryBitmap(aInstance: *mut otInstance) -> u64;
 }
-#[doc = " This structure represents link-specific information for messages received from the Thread radio.\n"]
+#[doc = " Represents link-specific information for messages received from the Thread radio.\n"]
 #[repr(C)]
 #[derive(Debug, Default, Copy, Clone)]
 pub struct otThreadLinkInfo {
@@ -6351,7 +6376,7 @@ pub const OT_MAC_FILTER_ADDRESS_MODE_ALLOWLIST: otMacFilterAddressMode = 1;
 pub const OT_MAC_FILTER_ADDRESS_MODE_DENYLIST: otMacFilterAddressMode = 2;
 #[doc = " Defines address mode of the mac filter.\n"]
 pub type otMacFilterAddressMode = ::std::os::raw::c_uint;
-#[doc = " This structure represents a Mac Filter entry.\n"]
+#[doc = " Represents a Mac Filter entry.\n"]
 #[repr(C)]
 #[derive(Debug, Default, Copy, Clone)]
 pub struct otMacFilterEntry {
@@ -6360,7 +6385,7 @@ pub struct otMacFilterEntry {
     #[doc = "< Received signal strength"]
     pub mRssIn: i8,
 }
-#[doc = " This structure represents the MAC layer counters.\n"]
+#[doc = " Represents the MAC layer counters.\n"]
 #[repr(C)]
 #[derive(Debug, Default, Copy, Clone)]
 pub struct otMacCounters {
@@ -6433,7 +6458,7 @@ pub struct otMacCounters {
     #[doc = " The total number of frames dropped due to other error.\n"]
     pub mRxErrOther: u32,
 }
-#[doc = " This structure represents a received IEEE 802.15.4 Beacon.\n"]
+#[doc = " Represents a received IEEE 802.15.4 Beacon.\n"]
 #[repr(C)]
 #[repr(align(4))]
 #[derive(Debug, Default, Copy, Clone)]
@@ -6532,7 +6557,7 @@ impl otActiveScanResult {
         __bindgen_bitfield_unit
     }
 }
-#[doc = " This structure represents an energy scan result.\n"]
+#[doc = " Represents an energy scan result.\n"]
 #[repr(C)]
 #[derive(Debug, Default, Copy, Clone)]
 pub struct otEnergyScanResult {
@@ -6541,12 +6566,12 @@ pub struct otEnergyScanResult {
     #[doc = "< The max RSSI (dBm)"]
     pub mMaxRssi: i8,
 }
-#[doc = " This function pointer is called during an IEEE 802.15.4 Active Scan when an IEEE 802.15.4 Beacon is received or\n the scan completes.\n\n @param[in]  aResult   A valid pointer to the beacon information or NULL when the active scan completes.\n @param[in]  aContext  A pointer to application-specific context.\n"]
+#[doc = " Pointer is called during an IEEE 802.15.4 Active Scan when an IEEE 802.15.4 Beacon is received or\n the scan completes.\n\n @param[in]  aResult   A valid pointer to the beacon information or NULL when the active scan completes.\n @param[in]  aContext  A pointer to application-specific context.\n"]
 pub type otHandleActiveScanResult = ::std::option::Option<
     unsafe extern "C" fn(aResult: *mut otActiveScanResult, aContext: *mut ::std::os::raw::c_void),
 >;
 extern "C" {
-    #[doc = " This function starts an IEEE 802.15.4 Active Scan\n\n @param[in]  aInstance         A pointer to an OpenThread instance.\n @param[in]  aScanChannels     A bit vector indicating which channels to scan (e.g. OT_CHANNEL_11_MASK).\n @param[in]  aScanDuration     The time in milliseconds to spend scanning each channel.\n @param[in]  aCallback         A pointer to a function called on receiving a beacon or scan completes.\n @param[in]  aCallbackContext  A pointer to application-specific context.\n\n @retval OT_ERROR_NONE  Accepted the Active Scan request.\n @retval OT_ERROR_BUSY  Already performing an Active Scan.\n"]
+    #[doc = " Starts an IEEE 802.15.4 Active Scan\n\n @param[in]  aInstance         A pointer to an OpenThread instance.\n @param[in]  aScanChannels     A bit vector indicating which channels to scan (e.g. OT_CHANNEL_11_MASK).\n @param[in]  aScanDuration     The time in milliseconds to spend scanning each channel.\n @param[in]  aCallback         A pointer to a function called on receiving a beacon or scan completes.\n @param[in]  aCallbackContext  A pointer to application-specific context.\n\n @retval OT_ERROR_NONE  Accepted the Active Scan request.\n @retval OT_ERROR_BUSY  Already performing an Active Scan.\n"]
     pub fn otLinkActiveScan(
         aInstance: *mut otInstance,
         aScanChannels: u32,
@@ -6556,15 +6581,15 @@ extern "C" {
     ) -> otError;
 }
 extern "C" {
-    #[doc = " This function indicates whether or not an IEEE 802.15.4 Active Scan is currently in progress.\n\n @param[in] aInstance A pointer to an OpenThread instance.\n\n @returns true if an IEEE 802.15.4 Active Scan is in progress, false otherwise."]
+    #[doc = " Indicates whether or not an IEEE 802.15.4 Active Scan is currently in progress.\n\n @param[in] aInstance A pointer to an OpenThread instance.\n\n @returns true if an IEEE 802.15.4 Active Scan is in progress, false otherwise."]
     pub fn otLinkIsActiveScanInProgress(aInstance: *mut otInstance) -> bool;
 }
-#[doc = " This function pointer is called during an IEEE 802.15.4 Energy Scan when the result for a channel is ready or the\n scan completes.\n\n @param[in]  aResult   A valid pointer to the energy scan result information or NULL when the energy scan completes.\n @param[in]  aContext  A pointer to application-specific context.\n"]
+#[doc = " Pointer is called during an IEEE 802.15.4 Energy Scan when the result for a channel is ready or the\n scan completes.\n\n @param[in]  aResult   A valid pointer to the energy scan result information or NULL when the energy scan completes.\n @param[in]  aContext  A pointer to application-specific context.\n"]
 pub type otHandleEnergyScanResult = ::std::option::Option<
     unsafe extern "C" fn(aResult: *mut otEnergyScanResult, aContext: *mut ::std::os::raw::c_void),
 >;
 extern "C" {
-    #[doc = " This function starts an IEEE 802.15.4 Energy Scan\n\n @param[in]  aInstance         A pointer to an OpenThread instance.\n @param[in]  aScanChannels     A bit vector indicating on which channels to perform energy scan.\n @param[in]  aScanDuration     The time in milliseconds to spend scanning each channel.\n @param[in]  aCallback         A pointer to a function called to pass on scan result on indicate scan completion.\n @param[in]  aCallbackContext  A pointer to application-specific context.\n\n @retval OT_ERROR_NONE  Accepted the Energy Scan request.\n @retval OT_ERROR_BUSY  Could not start the energy scan.\n"]
+    #[doc = " Starts an IEEE 802.15.4 Energy Scan\n\n @param[in]  aInstance         A pointer to an OpenThread instance.\n @param[in]  aScanChannels     A bit vector indicating on which channels to perform energy scan.\n @param[in]  aScanDuration     The time in milliseconds to spend scanning each channel.\n @param[in]  aCallback         A pointer to a function called to pass on scan result on indicate scan completion.\n @param[in]  aCallbackContext  A pointer to application-specific context.\n\n @retval OT_ERROR_NONE  Accepted the Energy Scan request.\n @retval OT_ERROR_BUSY  Could not start the energy scan.\n"]
     pub fn otLinkEnergyScan(
         aInstance: *mut otInstance,
         aScanChannels: u32,
@@ -6574,15 +6599,15 @@ extern "C" {
     ) -> otError;
 }
 extern "C" {
-    #[doc = " This function indicates whether or not an IEEE 802.15.4 Energy Scan is currently in progress.\n\n @param[in] aInstance A pointer to an OpenThread instance.\n\n @returns true if an IEEE 802.15.4 Energy Scan is in progress, false otherwise.\n"]
+    #[doc = " Indicates whether or not an IEEE 802.15.4 Energy Scan is currently in progress.\n\n @param[in] aInstance A pointer to an OpenThread instance.\n\n @returns true if an IEEE 802.15.4 Energy Scan is in progress, false otherwise.\n"]
     pub fn otLinkIsEnergyScanInProgress(aInstance: *mut otInstance) -> bool;
 }
 extern "C" {
-    #[doc = " This function enqueues an IEEE 802.15.4 Data Request message for transmission.\n\n @param[in] aInstance  A pointer to an OpenThread instance.\n\n @retval OT_ERROR_NONE           Successfully enqueued an IEEE 802.15.4 Data Request message.\n @retval OT_ERROR_INVALID_STATE  Device is not in rx-off-when-idle mode.\n @retval OT_ERROR_NO_BUFS        Insufficient message buffers available.\n"]
+    #[doc = " Enqueues an IEEE 802.15.4 Data Request message for transmission.\n\n @param[in] aInstance  A pointer to an OpenThread instance.\n\n @retval OT_ERROR_NONE           Successfully enqueued an IEEE 802.15.4 Data Request message.\n @retval OT_ERROR_INVALID_STATE  Device is not in rx-off-when-idle mode.\n @retval OT_ERROR_NO_BUFS        Insufficient message buffers available.\n"]
     pub fn otLinkSendDataRequest(aInstance: *mut otInstance) -> otError;
 }
 extern "C" {
-    #[doc = " This function indicates whether or not an IEEE 802.15.4 MAC is in the transmit state.\n\n MAC module is in the transmit state during CSMA/CA procedure, CCA, Data, Beacon or Data Request frame transmission\n and receiving an ACK of a transmitted frame. MAC module is not in the transmit state during transmission of an ACK\n frame or a Beacon Request frame.\n\n @param[in] aInstance A pointer to an OpenThread instance.\n\n @returns true if an IEEE 802.15.4 MAC is in the transmit state, false otherwise.\n"]
+    #[doc = " Indicates whether or not an IEEE 802.15.4 MAC is in the transmit state.\n\n MAC module is in the transmit state during CSMA/CA procedure, CCA, Data, Beacon or Data Request frame transmission\n and receiving an ACK of a transmitted frame. MAC module is not in the transmit state during transmission of an ACK\n frame or a Beacon Request frame.\n\n @param[in] aInstance A pointer to an OpenThread instance.\n\n @returns true if an IEEE 802.15.4 MAC is in the transmit state, false otherwise.\n"]
     pub fn otLinkIsInTransmitState(aInstance: *mut otInstance) -> bool;
 }
 extern "C" {
@@ -6590,7 +6615,7 @@ extern "C" {
     pub fn otLinkGetChannel(aInstance: *mut otInstance) -> u8;
 }
 extern "C" {
-    #[doc = " Set the IEEE 802.15.4 channel\n\n This function succeeds only when Thread protocols are disabled.  A successful call to this function invalidates the\n Active and Pending Operational Datasets in non-volatile memory.\n\n @param[in]  aInstance   A pointer to an OpenThread instance.\n @param[in]  aChannel    The IEEE 802.15.4 channel.\n\n @retval  OT_ERROR_NONE           Successfully set the channel.\n @retval  OT_ERROR_INVALID_ARGS   If @p aChannel is not in the range [11, 26] or is not in the supported channel mask.\n @retval  OT_ERROR_INVALID_STATE  Thread protocols are enabled.\n\n @sa otLinkGetChannel\n"]
+    #[doc = " Set the IEEE 802.15.4 channel\n\n Succeeds only when Thread protocols are disabled.  A successful call to this function invalidates the\n Active and Pending Operational Datasets in non-volatile memory.\n\n @param[in]  aInstance   A pointer to an OpenThread instance.\n @param[in]  aChannel    The IEEE 802.15.4 channel.\n\n @retval  OT_ERROR_NONE           Successfully set the channel.\n @retval  OT_ERROR_INVALID_ARGS   If @p aChannel is not in the range [11, 26] or is not in the supported channel mask.\n @retval  OT_ERROR_INVALID_STATE  Thread protocols are enabled.\n\n @sa otLinkGetChannel\n"]
     pub fn otLinkSetChannel(aInstance: *mut otInstance, aChannel: u8) -> otError;
 }
 extern "C" {
@@ -6598,7 +6623,7 @@ extern "C" {
     pub fn otLinkGetSupportedChannelMask(aInstance: *mut otInstance) -> u32;
 }
 extern "C" {
-    #[doc = " Set the supported channel mask of MAC layer.\n\n This function succeeds only when Thread protocols are disabled.\n\n @param[in]  aInstance     A pointer to an OpenThread instance.\n @param[in]  aChannelMask  The supported channel mask (bit 0 or lsb mapping to channel 0, and so on).\n\n @retval  OT_ERROR_NONE           Successfully set the supported channel mask.\n @retval  OT_ERROR_INVALID_STATE  Thread protocols are enabled.\n"]
+    #[doc = " Set the supported channel mask of MAC layer.\n\n Succeeds only when Thread protocols are disabled.\n\n @param[in]  aInstance     A pointer to an OpenThread instance.\n @param[in]  aChannelMask  The supported channel mask (bit 0 or lsb mapping to channel 0, and so on).\n\n @retval  OT_ERROR_NONE           Successfully set the supported channel mask.\n @retval  OT_ERROR_INVALID_STATE  Thread protocols are enabled.\n"]
     pub fn otLinkSetSupportedChannelMask(aInstance: *mut otInstance, aChannelMask: u32) -> otError;
 }
 extern "C" {
@@ -6621,7 +6646,7 @@ extern "C" {
     pub fn otLinkGetPanId(aInstance: *mut otInstance) -> otPanId;
 }
 extern "C" {
-    #[doc = " Set the IEEE 802.15.4 PAN ID.\n\n This function succeeds only when Thread protocols are disabled.  A successful call to this function also invalidates\n the Active and Pending Operational Datasets in non-volatile memory.\n\n @param[in]  aInstance    A pointer to an OpenThread instance.\n @param[in]  aPanId       The IEEE 802.15.4 PAN ID.\n\n @retval OT_ERROR_NONE           Successfully set the PAN ID.\n @retval OT_ERROR_INVALID_ARGS   If aPanId is not in the range [0, 65534].\n @retval OT_ERROR_INVALID_STATE  Thread protocols are enabled.\n\n @sa otLinkGetPanId\n"]
+    #[doc = " Set the IEEE 802.15.4 PAN ID.\n\n Succeeds only when Thread protocols are disabled.  A successful call to this function also invalidates\n the Active and Pending Operational Datasets in non-volatile memory.\n\n @param[in]  aInstance    A pointer to an OpenThread instance.\n @param[in]  aPanId       The IEEE 802.15.4 PAN ID.\n\n @retval OT_ERROR_NONE           Successfully set the PAN ID.\n @retval OT_ERROR_INVALID_ARGS   If aPanId is not in the range [0, 65534].\n @retval OT_ERROR_INVALID_STATE  Thread protocols are enabled.\n\n @sa otLinkGetPanId\n"]
     pub fn otLinkSetPanId(aInstance: *mut otInstance, aPanId: otPanId) -> otError;
 }
 extern "C" {
@@ -6637,49 +6662,49 @@ extern "C" {
     pub fn otLinkGetShortAddress(aInstance: *mut otInstance) -> otShortAddress;
 }
 extern "C" {
-    #[doc = " This method returns the maximum number of frame retries during direct transmission.\n\n @param[in]  aInstance A pointer to an OpenThread instance.\n\n @returns The maximum number of retries during direct transmission.\n"]
+    #[doc = " Returns the maximum number of frame retries during direct transmission.\n\n @param[in]  aInstance A pointer to an OpenThread instance.\n\n @returns The maximum number of retries during direct transmission.\n"]
     pub fn otLinkGetMaxFrameRetriesDirect(aInstance: *mut otInstance) -> u8;
 }
 extern "C" {
-    #[doc = " This method sets the maximum number of frame retries during direct transmission.\n\n @param[in]  aInstance               A pointer to an OpenThread instance.\n @param[in]  aMaxFrameRetriesDirect  The maximum number of retries during direct transmission.\n"]
+    #[doc = " Sets the maximum number of frame retries during direct transmission.\n\n @param[in]  aInstance               A pointer to an OpenThread instance.\n @param[in]  aMaxFrameRetriesDirect  The maximum number of retries during direct transmission.\n"]
     pub fn otLinkSetMaxFrameRetriesDirect(aInstance: *mut otInstance, aMaxFrameRetriesDirect: u8);
 }
 extern "C" {
-    #[doc = " This method returns the maximum number of frame retries during indirect transmission.\n\n @param[in]  aInstance A pointer to an OpenThread instance.\n\n @returns The maximum number of retries during indirect transmission.\n"]
+    #[doc = " Returns the maximum number of frame retries during indirect transmission.\n\n @param[in]  aInstance A pointer to an OpenThread instance.\n\n @returns The maximum number of retries during indirect transmission.\n"]
     pub fn otLinkGetMaxFrameRetriesIndirect(aInstance: *mut otInstance) -> u8;
 }
 extern "C" {
-    #[doc = " This method sets the maximum number of frame retries during indirect transmission.\n\n @param[in]  aInstance                 A pointer to an OpenThread instance.\n @param[in]  aMaxFrameRetriesIndirect  The maximum number of retries during indirect transmission.\n"]
+    #[doc = " Sets the maximum number of frame retries during indirect transmission.\n\n @param[in]  aInstance                 A pointer to an OpenThread instance.\n @param[in]  aMaxFrameRetriesIndirect  The maximum number of retries during indirect transmission.\n"]
     pub fn otLinkSetMaxFrameRetriesIndirect(
         aInstance: *mut otInstance,
         aMaxFrameRetriesIndirect: u8,
     );
 }
 extern "C" {
-    #[doc = " This function gets the address mode of MAC filter.\n\n This function is available when OPENTHREAD_CONFIG_MAC_FILTER_ENABLE configuration is enabled.\n\n @param[in]  aInstance  A pointer to an OpenThread instance.\n\n @returns  the address mode.\n"]
+    #[doc = " Gets the address mode of MAC filter.\n\n Is available when OPENTHREAD_CONFIG_MAC_FILTER_ENABLE configuration is enabled.\n\n @param[in]  aInstance  A pointer to an OpenThread instance.\n\n @returns  the address mode.\n"]
     pub fn otLinkFilterGetAddressMode(aInstance: *mut otInstance) -> otMacFilterAddressMode;
 }
 extern "C" {
-    #[doc = " This function sets the address mode of MAC filter.\n\n This function is available when OPENTHREAD_CONFIG_MAC_FILTER_ENABLE configuration is enabled.\n\n @param[in]  aInstance  A pointer to an OpenThread instance.\n @param[in]  aMode      The address mode to set.\n"]
+    #[doc = " Sets the address mode of MAC filter.\n\n Is available when OPENTHREAD_CONFIG_MAC_FILTER_ENABLE configuration is enabled.\n\n @param[in]  aInstance  A pointer to an OpenThread instance.\n @param[in]  aMode      The address mode to set.\n"]
     pub fn otLinkFilterSetAddressMode(aInstance: *mut otInstance, aMode: otMacFilterAddressMode);
 }
 extern "C" {
-    #[doc = " This method adds an Extended Address to MAC filter.\n\n This function is available when OPENTHREAD_CONFIG_MAC_FILTER_ENABLE configuration is enabled.\n\n @param[in]  aInstance    A pointer to an OpenThread instance.\n @param[in]  aExtAddress  A pointer to the Extended Address (MUST NOT be NULL).\n\n @retval OT_ERROR_NONE           Successfully added @p aExtAddress to MAC filter.\n @retval OT_ERROR_NO_BUFS        No available entry exists.\n"]
+    #[doc = " Adds an Extended Address to MAC filter.\n\n Is available when OPENTHREAD_CONFIG_MAC_FILTER_ENABLE configuration is enabled.\n\n @param[in]  aInstance    A pointer to an OpenThread instance.\n @param[in]  aExtAddress  A pointer to the Extended Address (MUST NOT be NULL).\n\n @retval OT_ERROR_NONE           Successfully added @p aExtAddress to MAC filter.\n @retval OT_ERROR_NO_BUFS        No available entry exists.\n"]
     pub fn otLinkFilterAddAddress(
         aInstance: *mut otInstance,
         aExtAddress: *const otExtAddress,
     ) -> otError;
 }
 extern "C" {
-    #[doc = " This method removes an Extended Address from MAC filter.\n\n This function is available when OPENTHREAD_CONFIG_MAC_FILTER_ENABLE configuration is enabled.\n\n No action is performed if there is no existing entry in Filter matching the given Extended Address.\n\n @param[in]  aInstance    A pointer to an OpenThread instance.\n @param[in]  aExtAddress  A pointer to the Extended Address (MUST NOT be NULL).\n"]
+    #[doc = " Removes an Extended Address from MAC filter.\n\n Is available when OPENTHREAD_CONFIG_MAC_FILTER_ENABLE configuration is enabled.\n\n No action is performed if there is no existing entry in Filter matching the given Extended Address.\n\n @param[in]  aInstance    A pointer to an OpenThread instance.\n @param[in]  aExtAddress  A pointer to the Extended Address (MUST NOT be NULL).\n"]
     pub fn otLinkFilterRemoveAddress(aInstance: *mut otInstance, aExtAddress: *const otExtAddress);
 }
 extern "C" {
-    #[doc = " This method clears all the Extended Addresses from MAC filter.\n\n This function is available when OPENTHREAD_CONFIG_MAC_FILTER_ENABLE configuration is enabled.\n\n @param[in]  aInstance  A pointer to an OpenThread instance.\n"]
+    #[doc = " Clears all the Extended Addresses from MAC filter.\n\n Is available when OPENTHREAD_CONFIG_MAC_FILTER_ENABLE configuration is enabled.\n\n @param[in]  aInstance  A pointer to an OpenThread instance.\n"]
     pub fn otLinkFilterClearAddresses(aInstance: *mut otInstance);
 }
 extern "C" {
-    #[doc = " This method gets an in-use address filter entry.\n\n This function is available when OPENTHREAD_CONFIG_MAC_FILTER_ENABLE configuration is enabled.\n\n @param[in]      aInstance  A pointer to an OpenThread instance.\n @param[in,out]  aIterator  A pointer to the MAC filter iterator context. To get the first in-use address filter\n                            entry, it should be set to OT_MAC_FILTER_ITERATOR_INIT. MUST NOT be NULL.\n @param[out]     aEntry     A pointer to where the information is placed. MUST NOT be NULL.\n\n @retval OT_ERROR_NONE          Successfully retrieved an in-use address filter entry.\n @retval OT_ERROR_NOT_FOUND     No subsequent entry exists.\n"]
+    #[doc = " Gets an in-use address filter entry.\n\n Is available when OPENTHREAD_CONFIG_MAC_FILTER_ENABLE configuration is enabled.\n\n @param[in]      aInstance  A pointer to an OpenThread instance.\n @param[in,out]  aIterator  A pointer to the MAC filter iterator context. To get the first in-use address filter\n                            entry, it should be set to OT_MAC_FILTER_ITERATOR_INIT. MUST NOT be NULL.\n @param[out]     aEntry     A pointer to where the information is placed. MUST NOT be NULL.\n\n @retval OT_ERROR_NONE          Successfully retrieved an in-use address filter entry.\n @retval OT_ERROR_NOT_FOUND     No subsequent entry exists.\n"]
     pub fn otLinkFilterGetNextAddress(
         aInstance: *mut otInstance,
         aIterator: *mut otMacFilterIterator,
@@ -6687,7 +6712,7 @@ extern "C" {
     ) -> otError;
 }
 extern "C" {
-    #[doc = " This method adds a fixed received signal strength (in dBm) entry for the messages from a given Extended Address in\n MAC Filter.\n\n This function is available when OPENTHREAD_CONFIG_MAC_FILTER_ENABLE configuration is enabled.\n\n @param[in]  aInstance    A pointer to an OpenThread instance.\n @param[in]  aExtAddress  A pointer to the IEEE 802.15.4 Extended Address. MUST NOT be NULL.\n @param[in]  aRss         A received signal strength (in dBm).\n\n @retval OT_ERROR_NONE           Successfully added an entry for @p aExtAddress and @p aRss.\n @retval OT_ERROR_NO_BUFS        No available entry exists.\n"]
+    #[doc = " Adds a fixed received signal strength (in dBm) entry for the messages from a given Extended Address in\n MAC Filter.\n\n Is available when OPENTHREAD_CONFIG_MAC_FILTER_ENABLE configuration is enabled.\n\n @param[in]  aInstance    A pointer to an OpenThread instance.\n @param[in]  aExtAddress  A pointer to the IEEE 802.15.4 Extended Address. MUST NOT be NULL.\n @param[in]  aRss         A received signal strength (in dBm).\n\n @retval OT_ERROR_NONE           Successfully added an entry for @p aExtAddress and @p aRss.\n @retval OT_ERROR_NO_BUFS        No available entry exists.\n"]
     pub fn otLinkFilterAddRssIn(
         aInstance: *mut otInstance,
         aExtAddress: *const otExtAddress,
@@ -6695,23 +6720,23 @@ extern "C" {
     ) -> otError;
 }
 extern "C" {
-    #[doc = " This method removes a MAC Filter entry for fixed received signal strength setting for a given Extended Address.\n\n This function is available when OPENTHREAD_CONFIG_MAC_FILTER_ENABLE configuration is enabled.\n\n No action is performed if there is no existing entry in Filter matching the given Extended Address.\n\n @param[in]  aInstance    A pointer to an OpenThread instance.\n @param[in]  aExtAddress  A pointer to the IEEE 802.15.4 Extended Address. MUST NOT be NULL.\n"]
+    #[doc = " Removes a MAC Filter entry for fixed received signal strength setting for a given Extended Address.\n\n Is available when OPENTHREAD_CONFIG_MAC_FILTER_ENABLE configuration is enabled.\n\n No action is performed if there is no existing entry in Filter matching the given Extended Address.\n\n @param[in]  aInstance    A pointer to an OpenThread instance.\n @param[in]  aExtAddress  A pointer to the IEEE 802.15.4 Extended Address. MUST NOT be NULL.\n"]
     pub fn otLinkFilterRemoveRssIn(aInstance: *mut otInstance, aExtAddress: *const otExtAddress);
 }
 extern "C" {
-    #[doc = " This method sets the default received signal strength (in dBm) on MAC Filter.\n\n This function is available when OPENTHREAD_CONFIG_MAC_FILTER_ENABLE configuration is enabled.\n\n The default RSS value is used for all received frames from addresses for which there is no explicit RSS-IN entry\n in the Filter list (added using `otLinkFilterAddRssIn()`).\n\n @param[in]  aInstance    A pointer to an OpenThread instance.\n @param[in]  aRss         The default received signal strength (in dBm) to set.\n"]
+    #[doc = " Sets the default received signal strength (in dBm) on MAC Filter.\n\n Is available when OPENTHREAD_CONFIG_MAC_FILTER_ENABLE configuration is enabled.\n\n The default RSS value is used for all received frames from addresses for which there is no explicit RSS-IN entry\n in the Filter list (added using `otLinkFilterAddRssIn()`).\n\n @param[in]  aInstance    A pointer to an OpenThread instance.\n @param[in]  aRss         The default received signal strength (in dBm) to set.\n"]
     pub fn otLinkFilterSetDefaultRssIn(aInstance: *mut otInstance, aRss: i8);
 }
 extern "C" {
-    #[doc = " This method clears any previously set default received signal strength (in dBm) on MAC Filter.\n\n This function is available when OPENTHREAD_CONFIG_MAC_FILTER_ENABLE configuration is enabled.\n\n @param[in]  aInstance    A pointer to an OpenThread instance.\n"]
+    #[doc = " Clears any previously set default received signal strength (in dBm) on MAC Filter.\n\n Is available when OPENTHREAD_CONFIG_MAC_FILTER_ENABLE configuration is enabled.\n\n @param[in]  aInstance    A pointer to an OpenThread instance.\n"]
     pub fn otLinkFilterClearDefaultRssIn(aInstance: *mut otInstance);
 }
 extern "C" {
-    #[doc = " This method clears all the received signal strength entries (including default RSS-in) on MAC Filter.\n\n This function is available when OPENTHREAD_CONFIG_MAC_FILTER_ENABLE configuration is enabled.\n\n @param[in]  aInstance A pointer to an OpenThread instance.\n"]
+    #[doc = " Clears all the received signal strength entries (including default RSS-in) on MAC Filter.\n\n Is available when OPENTHREAD_CONFIG_MAC_FILTER_ENABLE configuration is enabled.\n\n @param[in]  aInstance A pointer to an OpenThread instance.\n"]
     pub fn otLinkFilterClearAllRssIn(aInstance: *mut otInstance);
 }
 extern "C" {
-    #[doc = " This method gets an in-use RssIn filter entry.\n\n This function is available when OPENTHREAD_CONFIG_MAC_FILTER_ENABLE configuration is enabled.\n\n @param[in]      aInstance  A pointer to an OpenThread instance.\n @param[in,out]  aIterator  A pointer to the MAC filter iterator context. MUST NOT be NULL.\n                            To get the first entry, it should be set to OT_MAC_FILTER_ITERATOR_INIT.\n @param[out]     aEntry     A pointer to where the information is placed. The last entry would have the extended\n                            address as all 0xff to indicate the default received signal strength if it was set.\n@p aEntry MUST NOT be NULL.\n\n @retval OT_ERROR_NONE          Successfully retrieved the next entry.\n @retval OT_ERROR_NOT_FOUND     No subsequent entry exists.\n"]
+    #[doc = " Gets an in-use RssIn filter entry.\n\n Is available when OPENTHREAD_CONFIG_MAC_FILTER_ENABLE configuration is enabled.\n\n @param[in]      aInstance  A pointer to an OpenThread instance.\n @param[in,out]  aIterator  A pointer to the MAC filter iterator context. MUST NOT be NULL.\n                            To get the first entry, it should be set to OT_MAC_FILTER_ITERATOR_INIT.\n @param[out]     aEntry     A pointer to where the information is placed. The last entry would have the extended\n                            address as all 0xff to indicate the default received signal strength if it was set.\n@p aEntry MUST NOT be NULL.\n\n @retval OT_ERROR_NONE          Successfully retrieved the next entry.\n @retval OT_ERROR_NOT_FOUND     No subsequent entry exists.\n"]
     pub fn otLinkFilterGetNextRssIn(
         aInstance: *mut otInstance,
         aIterator: *mut otMacFilterIterator,
@@ -6719,37 +6744,37 @@ extern "C" {
     ) -> otError;
 }
 extern "C" {
-    #[doc = " This function enables/disables IEEE 802.15.4 radio filter mode.\n\n This function is available when OPENTHREAD_CONFIG_MAC_FILTER_ENABLE configuration is enabled.\n\n The radio filter is mainly intended for testing. It can be used to temporarily block all tx/rx on the 802.15.4 radio.\n When radio filter is enabled, radio is put to sleep instead of receive (to ensure device does not receive any frame\n and/or potentially send ack). Also the frame transmission requests return immediately without sending the frame over\n the air (return \"no ack\" error if ack is requested, otherwise return success).\n\n @param[in] aInstance         A pointer to an OpenThread instance.\n @param[in] aFilterEnabled    TRUE to enable radio filter, FALSE to disable\n"]
+    #[doc = " Enables/disables IEEE 802.15.4 radio filter mode.\n\n Is available when OPENTHREAD_CONFIG_MAC_FILTER_ENABLE configuration is enabled.\n\n The radio filter is mainly intended for testing. It can be used to temporarily block all tx/rx on the 802.15.4 radio.\n When radio filter is enabled, radio is put to sleep instead of receive (to ensure device does not receive any frame\n and/or potentially send ack). Also the frame transmission requests return immediately without sending the frame over\n the air (return \"no ack\" error if ack is requested, otherwise return success).\n\n @param[in] aInstance         A pointer to an OpenThread instance.\n @param[in] aFilterEnabled    TRUE to enable radio filter, FALSE to disable\n"]
     pub fn otLinkSetRadioFilterEnabled(aInstance: *mut otInstance, aFilterEnabled: bool);
 }
 extern "C" {
-    #[doc = " This function indicates whether the IEEE 802.15.4 radio filter is enabled or not.\n\n This function is available when OPENTHREAD_CONFIG_MAC_FILTER_ENABLE configuration is enabled.\n\n @retval TRUE   If the radio filter is enabled.\n @retval FALSE  If the radio filter is disabled.\n"]
+    #[doc = " Indicates whether the IEEE 802.15.4 radio filter is enabled or not.\n\n Is available when OPENTHREAD_CONFIG_MAC_FILTER_ENABLE configuration is enabled.\n\n @retval TRUE   If the radio filter is enabled.\n @retval FALSE  If the radio filter is disabled.\n"]
     pub fn otLinkIsRadioFilterEnabled(aInstance: *mut otInstance) -> bool;
 }
 extern "C" {
-    #[doc = " This method converts received signal strength to link quality.\n\n @param[in]  aInstance  A pointer to an OpenThread instance.\n @param[in]  aRss       The received signal strength value to be converted.\n\n @return Link quality value mapping to @p aRss.\n"]
+    #[doc = " Converts received signal strength to link quality.\n\n @param[in]  aInstance  A pointer to an OpenThread instance.\n @param[in]  aRss       The received signal strength value to be converted.\n\n @return Link quality value mapping to @p aRss.\n"]
     pub fn otLinkConvertRssToLinkQuality(aInstance: *mut otInstance, aRss: i8) -> u8;
 }
 extern "C" {
-    #[doc = " This method converts link quality to typical received signal strength.\n\n @param[in]  aInstance     A pointer to an OpenThread instance.\n @param[in]  aLinkQuality  LinkQuality value, should be in range [0,3].\n\n @return Typical platform received signal strength mapping to @p aLinkQuality.\n"]
+    #[doc = " Converts link quality to typical received signal strength.\n\n @param[in]  aInstance     A pointer to an OpenThread instance.\n @param[in]  aLinkQuality  LinkQuality value, should be in range [0,3].\n\n @return Typical platform received signal strength mapping to @p aLinkQuality.\n"]
     pub fn otLinkConvertLinkQualityToRss(aInstance: *mut otInstance, aLinkQuality: u8) -> i8;
 }
 extern "C" {
-    #[doc = " This method gets histogram of retries for a single direct packet until success.\n\n This function is valid when OPENTHREAD_CONFIG_MAC_RETRY_SUCCESS_HISTOGRAM_ENABLE configuration is enabled.\n\n @param[in]   aInstance          A pointer to an OpenThread instance.\n @param[out]  aNumberOfEntries   A pointer to where the size of returned histogram array is placed.\n\n @returns     A pointer to the histogram of retries (in a form of an array).\n              The n-th element indicates that the packet has been sent with n-th retry."]
+    #[doc = " Gets histogram of retries for a single direct packet until success.\n\n Is valid when OPENTHREAD_CONFIG_MAC_RETRY_SUCCESS_HISTOGRAM_ENABLE configuration is enabled.\n\n @param[in]   aInstance          A pointer to an OpenThread instance.\n @param[out]  aNumberOfEntries   A pointer to where the size of returned histogram array is placed.\n\n @returns     A pointer to the histogram of retries (in a form of an array).\n              The n-th element indicates that the packet has been sent with n-th retry."]
     pub fn otLinkGetTxDirectRetrySuccessHistogram(
         aInstance: *mut otInstance,
         aNumberOfEntries: *mut u8,
     ) -> *const u32;
 }
 extern "C" {
-    #[doc = " This method gets histogram of retries for a single indirect packet until success.\n\n This function is valid when OPENTHREAD_CONFIG_MAC_RETRY_SUCCESS_HISTOGRAM_ENABLE configuration is enabled.\n\n @param[in]   aInstance          A pointer to an OpenThread instance.\n @param[out]  aNumberOfEntries   A pointer to where the size of returned histogram array is placed.\n\n @returns     A pointer to the histogram of retries (in a form of an array).\n              The n-th element indicates that the packet has been sent with n-th retry.\n"]
+    #[doc = " Gets histogram of retries for a single indirect packet until success.\n\n Is valid when OPENTHREAD_CONFIG_MAC_RETRY_SUCCESS_HISTOGRAM_ENABLE configuration is enabled.\n\n @param[in]   aInstance          A pointer to an OpenThread instance.\n @param[out]  aNumberOfEntries   A pointer to where the size of returned histogram array is placed.\n\n @returns     A pointer to the histogram of retries (in a form of an array).\n              The n-th element indicates that the packet has been sent with n-th retry.\n"]
     pub fn otLinkGetTxIndirectRetrySuccessHistogram(
         aInstance: *mut otInstance,
         aNumberOfEntries: *mut u8,
     ) -> *const u32;
 }
 extern "C" {
-    #[doc = " This method clears histogram statistics for direct and indirect transmissions.\n\n This function is valid when OPENTHREAD_CONFIG_MAC_RETRY_SUCCESS_HISTOGRAM_ENABLE configuration is enabled.\n\n @param[in]   aInstance          A pointer to an OpenThread instance.\n"]
+    #[doc = " Clears histogram statistics for direct and indirect transmissions.\n\n Is valid when OPENTHREAD_CONFIG_MAC_RETRY_SUCCESS_HISTOGRAM_ENABLE configuration is enabled.\n\n @param[in]   aInstance          A pointer to an OpenThread instance.\n"]
     pub fn otLinkResetTxRetrySuccessHistogram(aInstance: *mut otInstance);
 }
 extern "C" {
@@ -6760,7 +6785,7 @@ extern "C" {
     #[doc = " Resets the MAC layer counters.\n\n @param[in]  aInstance A pointer to an OpenThread instance.\n"]
     pub fn otLinkResetCounters(aInstance: *mut otInstance);
 }
-#[doc = " This function pointer is called when an IEEE 802.15.4 frame is received.\n\n @note This callback is called after FCS processing and @p aFrame may not contain the actual FCS that was received.\n\n @note This callback is called before IEEE 802.15.4 security processing.\n\n @param[in]  aFrame    A pointer to the received IEEE 802.15.4 frame.\n @param[in]  aIsTx     Whether this frame is transmitted, not received.\n @param[in]  aContext  A pointer to application-specific context.\n"]
+#[doc = " Pointer is called when an IEEE 802.15.4 frame is received.\n\n @note This callback is called after FCS processing and @p aFrame may not contain the actual FCS that was received.\n\n @note This callback is called before IEEE 802.15.4 security processing.\n\n @param[in]  aFrame    A pointer to the received IEEE 802.15.4 frame.\n @param[in]  aIsTx     Whether this frame is transmitted, not received.\n @param[in]  aContext  A pointer to application-specific context.\n"]
 pub type otLinkPcapCallback = ::std::option::Option<
     unsafe extern "C" fn(
         aFrame: *const otRadioFrame,
@@ -6769,7 +6794,7 @@ pub type otLinkPcapCallback = ::std::option::Option<
     ),
 >;
 extern "C" {
-    #[doc = " This function registers a callback to provide received raw IEEE 802.15.4 frames.\n\n @param[in]  aInstance         A pointer to an OpenThread instance.\n @param[in]  aPcapCallback     A pointer to a function that is called when receiving an IEEE 802.15.4 link frame or\n                               NULL to disable the callback.\n @param[in]  aCallbackContext  A pointer to application-specific context.\n"]
+    #[doc = " Registers a callback to provide received raw IEEE 802.15.4 frames.\n\n @param[in]  aInstance         A pointer to an OpenThread instance.\n @param[in]  aPcapCallback     A pointer to a function that is called when receiving an IEEE 802.15.4 link frame or\n                               NULL to disable the callback.\n @param[in]  aCallbackContext  A pointer to application-specific context.\n"]
     pub fn otLinkSetPcapCallback(
         aInstance: *mut otInstance,
         aPcapCallback: otLinkPcapCallback,
@@ -6777,15 +6802,15 @@ extern "C" {
     );
 }
 extern "C" {
-    #[doc = " This function indicates whether or not promiscuous mode is enabled at the link layer.\n\n @param[in]  aInstance A pointer to an OpenThread instance.\n\n @retval true   Promiscuous mode is enabled.\n @retval false  Promiscuous mode is not enabled.\n"]
+    #[doc = " Indicates whether or not promiscuous mode is enabled at the link layer.\n\n @param[in]  aInstance A pointer to an OpenThread instance.\n\n @retval true   Promiscuous mode is enabled.\n @retval false  Promiscuous mode is not enabled.\n"]
     pub fn otLinkIsPromiscuous(aInstance: *mut otInstance) -> bool;
 }
 extern "C" {
-    #[doc = " This function enables or disables the link layer promiscuous mode.\n\n @note Promiscuous mode may only be enabled when the Thread interface is disabled.\n\n @param[in]  aInstance     A pointer to an OpenThread instance.\n @param[in]  aPromiscuous  true to enable promiscuous mode, or false otherwise.\n\n @retval OT_ERROR_NONE           Successfully enabled promiscuous mode.\n @retval OT_ERROR_INVALID_STATE  Could not enable promiscuous mode because\n                                 the Thread interface is enabled.\n"]
+    #[doc = " Enables or disables the link layer promiscuous mode.\n\n @note Promiscuous mode may only be enabled when the Thread interface is disabled.\n\n @param[in]  aInstance     A pointer to an OpenThread instance.\n @param[in]  aPromiscuous  true to enable promiscuous mode, or false otherwise.\n\n @retval OT_ERROR_NONE           Successfully enabled promiscuous mode.\n @retval OT_ERROR_INVALID_STATE  Could not enable promiscuous mode because\n                                 the Thread interface is enabled.\n"]
     pub fn otLinkSetPromiscuous(aInstance: *mut otInstance, aPromiscuous: bool) -> otError;
 }
 extern "C" {
-    #[doc = " This function gets the CSL channel.\n\n @param[in]  aInstance      A pointer to an OpenThread instance.\n\n @returns The CSL channel.\n"]
+    #[doc = " Gets the CSL channel.\n\n @param[in]  aInstance      A pointer to an OpenThread instance.\n\n @returns The CSL channel.\n"]
     pub fn otLinkCslGetChannel(aInstance: *mut otInstance) -> u8;
 }
 extern "C" {
@@ -6793,7 +6818,7 @@ extern "C" {
     pub fn otLinkCslSetChannel(aInstance: *mut otInstance, aChannel: u8) -> otError;
 }
 extern "C" {
-    #[doc = " This function gets the CSL period.\n\n @param[in]  aInstance      A pointer to an OpenThread instance.\n\n @returns The CSL period in units of 10 symbols.\n"]
+    #[doc = " Gets the CSL period.\n\n @param[in]  aInstance      A pointer to an OpenThread instance.\n\n @returns The CSL period in units of 10 symbols.\n"]
     pub fn otLinkCslGetPeriod(aInstance: *mut otInstance) -> u16;
 }
 extern "C" {
@@ -6801,7 +6826,7 @@ extern "C" {
     pub fn otLinkCslSetPeriod(aInstance: *mut otInstance, aPeriod: u16) -> otError;
 }
 extern "C" {
-    #[doc = " This function gets the CSL timeout.\n\n @param[in]  aInstance      A pointer to an OpenThread instance.\n\n @returns The CSL timeout in seconds.\n"]
+    #[doc = " Gets the CSL timeout.\n\n @param[in]  aInstance      A pointer to an OpenThread instance.\n\n @returns The CSL timeout in seconds.\n"]
     pub fn otLinkCslGetTimeout(aInstance: *mut otInstance) -> u32;
 }
 extern "C" {
@@ -6809,42 +6834,42 @@ extern "C" {
     pub fn otLinkCslSetTimeout(aInstance: *mut otInstance, aTimeout: u32) -> otError;
 }
 extern "C" {
-    #[doc = " This function returns the current CCA (Clear Channel Assessment) failure rate.\n\n The rate is maintained over a window of (roughly) last `OPENTHREAD_CONFIG_CCA_FAILURE_RATE_AVERAGING_WINDOW`\n frame transmissions.\n\n @returns The CCA failure rate with maximum value `0xffff` corresponding to 100% failure rate.\n"]
+    #[doc = " Returns the current CCA (Clear Channel Assessment) failure rate.\n\n The rate is maintained over a window of (roughly) last `OPENTHREAD_CONFIG_CCA_FAILURE_RATE_AVERAGING_WINDOW`\n frame transmissions.\n\n @returns The CCA failure rate with maximum value `0xffff` corresponding to 100% failure rate.\n"]
     pub fn otLinkGetCcaFailureRate(aInstance: *mut otInstance) -> u16;
 }
 extern "C" {
-    #[doc = " This function enables or disables the link layer.\n\n @note The link layer may only be enabled / disabled when the Thread Interface is disabled.\n\n @param[in]  aInstance     A pointer to an OpenThread instance.\n @param[in]  aEnable       true to enable the link layer, or false otherwise.\n\n @retval OT_ERROR_NONE          Successfully enabled / disabled the link layer.\n @retval OT_ERROR_INVALID_STATE Could not disable the link layer because\n                                the Thread interface is enabled.\n"]
+    #[doc = " Enables or disables the link layer.\n\n @note The link layer may only be enabled / disabled when the Thread Interface is disabled.\n\n @param[in]  aInstance     A pointer to an OpenThread instance.\n @param[in]  aEnable       true to enable the link layer, or false otherwise.\n\n @retval OT_ERROR_NONE          Successfully enabled / disabled the link layer.\n @retval OT_ERROR_INVALID_STATE Could not disable the link layer because\n                                the Thread interface is enabled.\n"]
     pub fn otLinkSetEnabled(aInstance: *mut otInstance, aEnable: bool) -> otError;
 }
 extern "C" {
-    #[doc = " This function indicates whether or not the link layer is enabled.\n\n @param[in]  aInstance A pointer to an OpenThread instance.\n\n @retval true   Link layer is enabled.\n @retval false  Link layer is not enabled.\n"]
+    #[doc = " Indicates whether or not the link layer is enabled.\n\n @param[in]  aInstance A pointer to an OpenThread instance.\n\n @retval true   Link layer is enabled.\n @retval false  Link layer is not enabled.\n"]
     pub fn otLinkIsEnabled(aInstance: *mut otInstance) -> bool;
 }
 extern "C" {
-    #[doc = " This function instructs the device to send an empty IEEE 802.15.4 data frame.\n\n This function is only supported on an Rx-Off-When-Idle device to send an empty data frame to its parent.\n Note: available only when `OPENTHREAD_CONFIG_REFERENCE_DEVICE_ENABLE` is enabled.\n\n @param[in] aInstance  A pointer to an OpenThread instance.\n\n @retval OT_ERROR_NONE           Successfully enqueued an empty message.\n @retval OT_ERROR_INVALID_STATE  Device is not in Rx-Off-When-Idle mode.\n @retval OT_ERROR_NO_BUFS        Insufficient message buffers available.\n"]
+    #[doc = " Instructs the device to send an empty IEEE 802.15.4 data frame.\n\n Is only supported on an Rx-Off-When-Idle device to send an empty data frame to its parent.\n Note: available only when `OPENTHREAD_CONFIG_REFERENCE_DEVICE_ENABLE` is enabled.\n\n @param[in] aInstance  A pointer to an OpenThread instance.\n\n @retval OT_ERROR_NONE           Successfully enqueued an empty message.\n @retval OT_ERROR_INVALID_STATE  Device is not in Rx-Off-When-Idle mode.\n @retval OT_ERROR_NO_BUFS        Insufficient message buffers available.\n"]
     pub fn otLinkSendEmptyData(aInstance: *mut otInstance) -> otError;
 }
-#[doc = " This function pointer on receipt of a IEEE 802.15.4 frame.\n\n @param[in]  aInstance    A pointer to an OpenThread instance.\n @param[in]  aFrame       A pointer to the received frame or NULL if the receive operation was aborted.\n @param[in]  aError       OT_ERROR_NONE when successfully received a frame.\n                          OT_ERROR_ABORT when reception was aborted and a frame was not received.\n"]
+#[doc = " Pointer on receipt of a IEEE 802.15.4 frame.\n\n @param[in]  aInstance    A pointer to an OpenThread instance.\n @param[in]  aFrame       A pointer to the received frame or NULL if the receive operation was aborted.\n @param[in]  aError       OT_ERROR_NONE when successfully received a frame.\n                          OT_ERROR_ABORT when reception was aborted and a frame was not received.\n"]
 pub type otLinkRawReceiveDone = ::std::option::Option<
     unsafe extern "C" fn(aInstance: *mut otInstance, aFrame: *mut otRadioFrame, aError: otError),
 >;
 extern "C" {
-    #[doc = " This function enables/disables the raw link-layer.\n\n @param[in] aInstance     A pointer to an OpenThread instance.\n @param[in] aCallback     A pointer to a function called on receipt of a IEEE 802.15.4 frame. NULL to disable the\n raw-link layer.\n\n @retval OT_ERROR_FAILED          The radio could not be enabled/disabled.\n @retval OT_ERROR_INVALID_STATE   If the OpenThread IPv6 interface is already enabled.\n @retval OT_ERROR_NONE            If the enable state was successfully set.\n"]
+    #[doc = " Enables/disables the raw link-layer.\n\n @param[in] aInstance     A pointer to an OpenThread instance.\n @param[in] aCallback     A pointer to a function called on receipt of a IEEE 802.15.4 frame. NULL to disable the\n raw-link layer.\n\n @retval OT_ERROR_FAILED          The radio could not be enabled/disabled.\n @retval OT_ERROR_INVALID_STATE   If the OpenThread IPv6 interface is already enabled.\n @retval OT_ERROR_NONE            If the enable state was successfully set.\n"]
     pub fn otLinkRawSetReceiveDone(
         aInstance: *mut otInstance,
         aCallback: otLinkRawReceiveDone,
     ) -> otError;
 }
 extern "C" {
-    #[doc = " This function indicates whether or not the raw link-layer is enabled.\n\n @param[in] aInstance     A pointer to an OpenThread instance.\n\n @retval true     The raw link-layer is enabled.\n @retval false    The raw link-layer is disabled.\n"]
+    #[doc = " Indicates whether or not the raw link-layer is enabled.\n\n @param[in] aInstance     A pointer to an OpenThread instance.\n\n @retval true     The raw link-layer is enabled.\n @retval false    The raw link-layer is disabled.\n"]
     pub fn otLinkRawIsEnabled(aInstance: *mut otInstance) -> bool;
 }
 extern "C" {
-    #[doc = " This function gets the status of promiscuous mode.\n\n @param[in] aInstance  A pointer to an OpenThread instance.\n\n @retval true     Promiscuous mode is enabled.\n @retval false    Promiscuous mode is disabled.\n"]
+    #[doc = " Gets the status of promiscuous mode.\n\n @param[in] aInstance  A pointer to an OpenThread instance.\n\n @retval true     Promiscuous mode is enabled.\n @retval false    Promiscuous mode is disabled.\n"]
     pub fn otLinkRawGetPromiscuous(aInstance: *mut otInstance) -> bool;
 }
 extern "C" {
-    #[doc = " This function enables or disables promiscuous mode.\n\n @param[in]  aInstance    A pointer to an OpenThread instance.\n @param[in]  aEnable      A value to enable or disable promiscuous mode.\n\n @retval OT_ERROR_NONE             If successful.\n @retval OT_ERROR_INVALID_STATE    If the raw link-layer isn't enabled.\n"]
+    #[doc = " Enables or disables promiscuous mode.\n\n @param[in]  aInstance    A pointer to an OpenThread instance.\n @param[in]  aEnable      A value to enable or disable promiscuous mode.\n\n @retval OT_ERROR_NONE             If successful.\n @retval OT_ERROR_INVALID_STATE    If the raw link-layer isn't enabled.\n"]
     pub fn otLinkRawSetPromiscuous(aInstance: *mut otInstance, aEnable: bool) -> otError;
 }
 extern "C" {
@@ -6860,10 +6885,10 @@ extern "C" {
     pub fn otLinkRawReceive(aInstance: *mut otInstance) -> otError;
 }
 extern "C" {
-    #[doc = " The radio transitions from Transmit to Receive.\n This method returns a pointer to the transmit buffer.\n\n The caller forms the IEEE 802.15.4 frame in this buffer then calls otLinkRawTransmit()\n to request transmission.\n\n @param[in]  aInstance    A pointer to an OpenThread instance.\n\n @returns A pointer to the transmit buffer or NULL if the raw link-layer isn't enabled.\n"]
+    #[doc = " The radio transitions from Transmit to Receive.\n Returns a pointer to the transmit buffer.\n\n The caller forms the IEEE 802.15.4 frame in this buffer then calls otLinkRawTransmit()\n to request transmission.\n\n @param[in]  aInstance    A pointer to an OpenThread instance.\n\n @returns A pointer to the transmit buffer or NULL if the raw link-layer isn't enabled.\n"]
     pub fn otLinkRawGetTransmitBuffer(aInstance: *mut otInstance) -> *mut otRadioFrame;
 }
-#[doc = " This function pointer on receipt of a IEEE 802.15.4 frame.\n\n @param[in]  aInstance        A pointer to an OpenThread instance.\n @param[in]  aFrame           A pointer to the frame that was transmitted.\n @param[in]  aAckFrame        A pointer to the ACK frame.\n @param[in]  aError           OT_ERROR_NONE when the frame was transmitted.\n                              OT_ERROR_NO_ACK when the frame was transmitted but no ACK was received\n                              OT_ERROR_CHANNEL_ACCESS_FAILURE when the transmission could not take place\ndue to activity on the channel.\n                              OT_ERROR_ABORT when transmission was aborted for other reasons.\n"]
+#[doc = " Pointer on receipt of a IEEE 802.15.4 frame.\n\n @param[in]  aInstance        A pointer to an OpenThread instance.\n @param[in]  aFrame           A pointer to the frame that was transmitted.\n @param[in]  aAckFrame        A pointer to the ACK frame.\n @param[in]  aError           OT_ERROR_NONE when the frame was transmitted.\n                              OT_ERROR_NO_ACK when the frame was transmitted but no ACK was received\n                              OT_ERROR_CHANNEL_ACCESS_FAILURE when the transmission could not take place\ndue to activity on the channel.\n                              OT_ERROR_ABORT when transmission was aborted for other reasons.\n"]
 pub type otLinkRawTransmitDone = ::std::option::Option<
     unsafe extern "C" fn(
         aInstance: *mut otInstance,
@@ -6873,7 +6898,7 @@ pub type otLinkRawTransmitDone = ::std::option::Option<
     ),
 >;
 extern "C" {
-    #[doc = " This method begins the transmit sequence on the radio.\n\n The caller must form the IEEE 802.15.4 frame in the buffer provided by otLinkRawGetTransmitBuffer() before\n requesting transmission.  The channel and transmit power are also included in the otRadioFrame structure.\n\n The transmit sequence consists of:\n 1. Transitioning the radio to Transmit from Receive.\n 2. Transmits the PSDU on the given channel and at the given transmit power.\n\n @param[in]  aInstance    A pointer to an OpenThread instance.\n @param[in]  aCallback    A pointer to a function called on completion of the transmission.\n\n @retval OT_ERROR_NONE          Successfully transitioned to Transmit.\n @retval OT_ERROR_INVALID_STATE The radio was not in the Receive state.\n"]
+    #[doc = " Begins the transmit sequence on the radio.\n\n The caller must form the IEEE 802.15.4 frame in the buffer provided by otLinkRawGetTransmitBuffer() before\n requesting transmission.  The channel and transmit power are also included in the otRadioFrame structure.\n\n The transmit sequence consists of:\n 1. Transitioning the radio to Transmit from Receive.\n 2. Transmits the PSDU on the given channel and at the given transmit power.\n\n @param[in]  aInstance    A pointer to an OpenThread instance.\n @param[in]  aCallback    A pointer to a function called on completion of the transmission.\n\n @retval OT_ERROR_NONE          Successfully transitioned to Transmit.\n @retval OT_ERROR_INVALID_STATE The radio was not in the Receive state.\n"]
     pub fn otLinkRawTransmit(
         aInstance: *mut otInstance,
         aCallback: otLinkRawTransmitDone,
@@ -6887,11 +6912,11 @@ extern "C" {
     #[doc = " Get the radio capabilities.\n\n @param[in]  aInstance    A pointer to an OpenThread instance.\n\n @returns The radio capability bit vector. The stack enables or disables some functions based on this value.\n"]
     pub fn otLinkRawGetCaps(aInstance: *mut otInstance) -> otRadioCaps;
 }
-#[doc = " This function pointer on receipt of a IEEE 802.15.4 frame.\n\n @param[in]  aInstance            A pointer to an OpenThread instance.\n @param[in]  aEnergyScanMaxRssi   The maximum RSSI encountered on the scanned channel.\n"]
+#[doc = " Pointer on receipt of a IEEE 802.15.4 frame.\n\n @param[in]  aInstance            A pointer to an OpenThread instance.\n @param[in]  aEnergyScanMaxRssi   The maximum RSSI encountered on the scanned channel.\n"]
 pub type otLinkRawEnergyScanDone =
     ::std::option::Option<unsafe extern "C" fn(aInstance: *mut otInstance, aEnergyScanMaxRssi: i8)>;
 extern "C" {
-    #[doc = " This method begins the energy scan sequence on the radio.\n\n @param[in]  aInstance        A pointer to an OpenThread instance.\n @param[in]  aScanChannel     The channel to perform the energy scan on.\n @param[in]  aScanDuration    The duration, in milliseconds, for the channel to be scanned.\n @param[in]  aCallback        A pointer to a function called on completion of a scanned channel.\n\n @retval OT_ERROR_NONE             Successfully started scanning the channel.\n @retval OT_ERROR_BUSY             The radio is performing energy scanning.\n @retval OT_ERROR_NOT_IMPLEMENTED  The radio doesn't support energy scanning.\n @retval OT_ERROR_INVALID_STATE    If the raw link-layer isn't enabled.\n"]
+    #[doc = " Begins the energy scan sequence on the radio.\n\n @param[in]  aInstance        A pointer to an OpenThread instance.\n @param[in]  aScanChannel     The channel to perform the energy scan on.\n @param[in]  aScanDuration    The duration, in milliseconds, for the channel to be scanned.\n @param[in]  aCallback        A pointer to a function called on completion of a scanned channel.\n\n @retval OT_ERROR_NONE             Successfully started scanning the channel.\n @retval OT_ERROR_BUSY             The radio is performing energy scanning.\n @retval OT_ERROR_NOT_IMPLEMENTED  The radio doesn't support energy scanning.\n @retval OT_ERROR_INVALID_STATE    If the raw link-layer isn't enabled.\n"]
     pub fn otLinkRawEnergyScan(
         aInstance: *mut otInstance,
         aScanChannel: u8,
@@ -6951,7 +6976,7 @@ extern "C" {
     ) -> otError;
 }
 extern "C" {
-    #[doc = " Sets the current MAC frame counter value.\n\n This function always sets the MAC counter to the new given value @p aMacFrameCounter independent of the current\n value.\n\n @param[in]   aInstance         A pointer to an OpenThread instance.\n @param[in]   aMacFrameCounter  The MAC frame counter value.\n\n @retval OT_ERROR_NONE             If successful.\n @retval OT_ERROR_INVALID_STATE    If the raw link-layer isn't enabled.\n"]
+    #[doc = " Sets the current MAC frame counter value.\n\n Always sets the MAC counter to the new given value @p aMacFrameCounter independent of the current\n value.\n\n @param[in]   aInstance         A pointer to an OpenThread instance.\n @param[in]   aMacFrameCounter  The MAC frame counter value.\n\n @retval OT_ERROR_NONE             If successful.\n @retval OT_ERROR_INVALID_STATE    If the raw link-layer isn't enabled.\n"]
     pub fn otLinkRawSetMacFrameCounter(
         aInstance: *mut otInstance,
         aMacFrameCounter: u32,
@@ -6969,35 +6994,35 @@ extern "C" {
     pub fn otLinkRawGetRadioTime(aInstance: *mut otInstance) -> u64;
 }
 extern "C" {
-    #[doc = " This function returns the current log level.\n\n If dynamic log level feature `OPENTHREAD_CONFIG_LOG_LEVEL_DYNAMIC_ENABLE` is enabled, this function returns the\n currently set dynamic log level. Otherwise, this function returns the build-time configured log level.\n\n @returns The log level.\n"]
+    #[doc = " Returns the current log level.\n\n If dynamic log level feature `OPENTHREAD_CONFIG_LOG_LEVEL_DYNAMIC_ENABLE` is enabled, this function returns the\n currently set dynamic log level. Otherwise, this function returns the build-time configured log level.\n\n @returns The log level.\n"]
     pub fn otLoggingGetLevel() -> otLogLevel;
 }
 extern "C" {
-    #[doc = " This function sets the log level.\n\n @note This function requires `OPENTHREAD_CONFIG_LOG_LEVEL_DYNAMIC_ENABLE=1`.\n\n @param[in]  aLogLevel               The log level.\n\n @retval OT_ERROR_NONE            Successfully updated log level.\n @retval OT_ERROR_INVALID_ARGS    Log level value is invalid.\n"]
+    #[doc = " Sets the log level.\n\n @note This function requires `OPENTHREAD_CONFIG_LOG_LEVEL_DYNAMIC_ENABLE=1`.\n\n @param[in]  aLogLevel               The log level.\n\n @retval OT_ERROR_NONE            Successfully updated log level.\n @retval OT_ERROR_INVALID_ARGS    Log level value is invalid.\n"]
     pub fn otLoggingSetLevel(aLogLevel: otLogLevel) -> otError;
 }
 extern "C" {
-    #[doc = " This function emits a log message at critical log level.\n\n This function is intended for use by platform. If `OPENTHREAD_CONFIG_LOG_PLATFORM` is not set or the current log\n level is below critical, this function does not emit any log message.\n\n @param[in]  aFormat  The format string.\n @param[in]  ...      Arguments for the format specification.\n"]
+    #[doc = " Emits a log message at critical log level.\n\n Is intended for use by platform. If `OPENTHREAD_CONFIG_LOG_PLATFORM` is not set or the current log\n level is below critical, this function does not emit any log message.\n\n @param[in]  aFormat  The format string.\n @param[in]  ...      Arguments for the format specification.\n"]
     pub fn otLogCritPlat(aFormat: *const ::std::os::raw::c_char, ...);
 }
 extern "C" {
-    #[doc = " This function emits a log message at warning log level.\n\n This function is intended for use by platform. If `OPENTHREAD_CONFIG_LOG_PLATFORM` is not set or the current log\n level is below warning, this function does not emit any log message.\n\n @param[in]  aFormat  The format string.\n @param[in]  ...      Arguments for the format specification.\n"]
+    #[doc = " Emits a log message at warning log level.\n\n Is intended for use by platform. If `OPENTHREAD_CONFIG_LOG_PLATFORM` is not set or the current log\n level is below warning, this function does not emit any log message.\n\n @param[in]  aFormat  The format string.\n @param[in]  ...      Arguments for the format specification.\n"]
     pub fn otLogWarnPlat(aFormat: *const ::std::os::raw::c_char, ...);
 }
 extern "C" {
-    #[doc = " This function emits a log message at note log level.\n\n This function is intended for use by platform. If `OPENTHREAD_CONFIG_LOG_PLATFORM` is not set or the current log\n level is below note, this function does not emit any log message.\n\n @param[in]  aFormat  The format string.\n @param[in]  ...      Arguments for the format specification.\n"]
+    #[doc = " Emits a log message at note log level.\n\n Is intended for use by platform. If `OPENTHREAD_CONFIG_LOG_PLATFORM` is not set or the current log\n level is below note, this function does not emit any log message.\n\n @param[in]  aFormat  The format string.\n @param[in]  ...      Arguments for the format specification.\n"]
     pub fn otLogNotePlat(aFormat: *const ::std::os::raw::c_char, ...);
 }
 extern "C" {
-    #[doc = " This function emits a log message at info log level.\n\n This function is intended for use by platform. If `OPENTHREAD_CONFIG_LOG_PLATFORM` is not set or the current log\n level is below info, this function does not emit any log message.\n\n @param[in]  aFormat  The format string.\n @param[in]  ...      Arguments for the format specification.\n"]
+    #[doc = " Emits a log message at info log level.\n\n Is intended for use by platform. If `OPENTHREAD_CONFIG_LOG_PLATFORM` is not set or the current log\n level is below info, this function does not emit any log message.\n\n @param[in]  aFormat  The format string.\n @param[in]  ...      Arguments for the format specification.\n"]
     pub fn otLogInfoPlat(aFormat: *const ::std::os::raw::c_char, ...);
 }
 extern "C" {
-    #[doc = " This function emits a log message at debug log level.\n\n This function is intended for use by platform. If `OPENTHREAD_CONFIG_LOG_PLATFORM` is not set or the current log\n level is below debug, this function does not emit any log message.\n\n @param[in]  aFormat  The format string.\n @param[in]  ...      Arguments for the format specification.\n"]
+    #[doc = " Emits a log message at debug log level.\n\n Is intended for use by platform. If `OPENTHREAD_CONFIG_LOG_PLATFORM` is not set or the current log\n level is below debug, this function does not emit any log message.\n\n @param[in]  aFormat  The format string.\n @param[in]  ...      Arguments for the format specification.\n"]
     pub fn otLogDebgPlat(aFormat: *const ::std::os::raw::c_char, ...);
 }
 extern "C" {
-    #[doc = " This function generates a memory dump at critical log level.\n\n If `OPENTHREAD_CONFIG_LOG_PLATFORM` or `OPENTHREAD_CONFIG_LOG_PKT_DUMP` is not set or the current log level is below\n critical this function does not emit any log message.\n\n @param[in]  aText         A string that is printed before the bytes.\n @param[in]  aData         A pointer to the data buffer.\n @param[in]  aDataLength   Number of bytes in @p aData.\n"]
+    #[doc = " Generates a memory dump at critical log level.\n\n If `OPENTHREAD_CONFIG_LOG_PLATFORM` or `OPENTHREAD_CONFIG_LOG_PKT_DUMP` is not set or the current log level is below\n critical this function does not emit any log message.\n\n @param[in]  aText         A string that is printed before the bytes.\n @param[in]  aData         A pointer to the data buffer.\n @param[in]  aDataLength   Number of bytes in @p aData.\n"]
     pub fn otDumpCritPlat(
         aText: *const ::std::os::raw::c_char,
         aData: *const ::std::os::raw::c_void,
@@ -7005,7 +7030,7 @@ extern "C" {
     );
 }
 extern "C" {
-    #[doc = " This function generates a memory dump at warning log level.\n\n If `OPENTHREAD_CONFIG_LOG_PLATFORM` or `OPENTHREAD_CONFIG_LOG_PKT_DUMP` is not set or the current log level is below\n warning this function does not emit any log message.\n\n @param[in]  aText         A string that is printed before the bytes.\n @param[in]  aData         A pointer to the data buffer.\n @param[in]  aDataLength   Number of bytes in @p aData.\n"]
+    #[doc = " Generates a memory dump at warning log level.\n\n If `OPENTHREAD_CONFIG_LOG_PLATFORM` or `OPENTHREAD_CONFIG_LOG_PKT_DUMP` is not set or the current log level is below\n warning this function does not emit any log message.\n\n @param[in]  aText         A string that is printed before the bytes.\n @param[in]  aData         A pointer to the data buffer.\n @param[in]  aDataLength   Number of bytes in @p aData.\n"]
     pub fn otDumpWarnPlat(
         aText: *const ::std::os::raw::c_char,
         aData: *const ::std::os::raw::c_void,
@@ -7013,7 +7038,7 @@ extern "C" {
     );
 }
 extern "C" {
-    #[doc = " This function generates a memory dump at note log level.\n\n If `OPENTHREAD_CONFIG_LOG_PLATFORM` or `OPENTHREAD_CONFIG_LOG_PKT_DUMP` is not set or the current log level is below\n note this function does not emit any log message.\n\n @param[in]  aText         A string that is printed before the bytes.\n @param[in]  aData         A pointer to the data buffer.\n @param[in]  aDataLength   Number of bytes in @p aData.\n"]
+    #[doc = " Generates a memory dump at note log level.\n\n If `OPENTHREAD_CONFIG_LOG_PLATFORM` or `OPENTHREAD_CONFIG_LOG_PKT_DUMP` is not set or the current log level is below\n note this function does not emit any log message.\n\n @param[in]  aText         A string that is printed before the bytes.\n @param[in]  aData         A pointer to the data buffer.\n @param[in]  aDataLength   Number of bytes in @p aData.\n"]
     pub fn otDumpNotePlat(
         aText: *const ::std::os::raw::c_char,
         aData: *const ::std::os::raw::c_void,
@@ -7021,7 +7046,7 @@ extern "C" {
     );
 }
 extern "C" {
-    #[doc = " This function generates a memory dump at info log level.\n\n If `OPENTHREAD_CONFIG_LOG_PLATFORM` or `OPENTHREAD_CONFIG_LOG_PKT_DUMP` is not set or the current log level is below\n info this function does not emit any log message.\n\n @param[in]  aText         A string that is printed before the bytes.\n @param[in]  aData         A pointer to the data buffer.\n @param[in]  aDataLength   Number of bytes in @p aData.\n"]
+    #[doc = " Generates a memory dump at info log level.\n\n If `OPENTHREAD_CONFIG_LOG_PLATFORM` or `OPENTHREAD_CONFIG_LOG_PKT_DUMP` is not set or the current log level is below\n info this function does not emit any log message.\n\n @param[in]  aText         A string that is printed before the bytes.\n @param[in]  aData         A pointer to the data buffer.\n @param[in]  aDataLength   Number of bytes in @p aData.\n"]
     pub fn otDumpInfoPlat(
         aText: *const ::std::os::raw::c_char,
         aData: *const ::std::os::raw::c_void,
@@ -7029,7 +7054,7 @@ extern "C" {
     );
 }
 extern "C" {
-    #[doc = " This function generates a memory dump at debug log level.\n\n If `OPENTHREAD_CONFIG_LOG_PLATFORM` or `OPENTHREAD_CONFIG_LOG_PKT_DUMP` is not set or the current log level is below\n debug this function does not emit any log message.\n\n @param[in]  aText         A string that is printed before the bytes.\n @param[in]  aData         A pointer to the data buffer.\n @param[in]  aDataLength   Number of bytes in @p aData.\n"]
+    #[doc = " Generates a memory dump at debug log level.\n\n If `OPENTHREAD_CONFIG_LOG_PLATFORM` or `OPENTHREAD_CONFIG_LOG_PKT_DUMP` is not set or the current log level is below\n debug this function does not emit any log message.\n\n @param[in]  aText         A string that is printed before the bytes.\n @param[in]  aData         A pointer to the data buffer.\n @param[in]  aDataLength   Number of bytes in @p aData.\n"]
     pub fn otDumpDebgPlat(
         aText: *const ::std::os::raw::c_char,
         aData: *const ::std::os::raw::c_void,
@@ -7037,17 +7062,17 @@ extern "C" {
     );
 }
 extern "C" {
-    #[doc = " This function emits a log message at a given log level.\n\n This function is intended for use by CLI only. If `OPENTHREAD_CONFIG_LOG_CLI` is not set or the current log\n level is below the given log level, this function does not emit any log message.\n\n @param[in]  aLogLevel The log level.\n @param[in]  aFormat   The format string.\n @param[in]  ...       Arguments for the format specification.\n"]
+    #[doc = " Emits a log message at a given log level.\n\n Is intended for use by CLI only. If `OPENTHREAD_CONFIG_LOG_CLI` is not set or the current log\n level is below the given log level, this function does not emit any log message.\n\n @param[in]  aLogLevel The log level.\n @param[in]  aFormat   The format string.\n @param[in]  ...       Arguments for the format specification.\n"]
     pub fn otLogCli(aLogLevel: otLogLevel, aFormat: *const ::std::os::raw::c_char, ...);
 }
-#[doc = " This type represents information associated with a radio link.\n"]
+#[doc = " Represents information associated with a radio link.\n"]
 #[repr(C)]
 #[derive(Debug, Default, Copy, Clone)]
 pub struct otRadioLinkInfo {
     #[doc = "< Preference level of radio link"]
     pub mPreference: u8,
 }
-#[doc = " This type represents multi radio link information associated with a neighbor.\n"]
+#[doc = " Represents multi radio link information associated with a neighbor.\n"]
 #[repr(C)]
 #[derive(Debug, Default, Copy, Clone)]
 pub struct otMultiRadioNeighborInfo {
@@ -7099,14 +7124,14 @@ impl otMultiRadioNeighborInfo {
     }
 }
 extern "C" {
-    #[doc = " This function gets the multi radio link information associated with a neighbor with a given Extended Address.\n\n This function requires the multi radio link feature to be enabled (please see `config/radio_link.h`).\n\n @param[in]  aInstance      A pointer to an OpenThread instance.\n @param[in]  aExtAddress    The Extended Address of neighbor.\n @param[out] aNeighborInfo  A pointer to `otMultiRadioNeighborInfo` to output the neighbor info (on success).\n\n @retval OT_ERROR_NONE        Neighbor was found and @p aNeighborInfo was updated successfully.\n @retval OT_ERROR_NOT_FOUND   Could not find a neighbor with @p aExtAddress.\n"]
+    #[doc = " Gets the multi radio link information associated with a neighbor with a given Extended Address.\n\n `OPENTHREAD_CONFIG_MULTI_RADIO` must be enabled.\n\n @param[in]  aInstance      A pointer to an OpenThread instance.\n @param[in]  aExtAddress    The Extended Address of neighbor.\n @param[out] aNeighborInfo  A pointer to `otMultiRadioNeighborInfo` to output the neighbor info (on success).\n\n @retval OT_ERROR_NONE        Neighbor was found and @p aNeighborInfo was updated successfully.\n @retval OT_ERROR_NOT_FOUND   Could not find a neighbor with @p aExtAddress.\n"]
     pub fn otMultiRadioGetNeighborInfo(
         aInstance: *mut otInstance,
         aExtAddress: *const otExtAddress,
         aNeighborInfo: *mut otMultiRadioNeighborInfo,
     ) -> otError;
 }
-#[doc = " @struct otIp4Address\n\n This structure represents an IPv4 address.\n"]
+#[doc = " @struct otIp4Address\n\n Represents an IPv4 address.\n"]
 #[repr(C, packed)]
 #[derive(Copy, Clone)]
 pub struct otIp4Address {
@@ -7138,7 +7163,7 @@ impl Default for otIp4Address {
         }
     }
 }
-#[doc = " @struct otIp4Cidr\n\n This structure represents an IPv4 CIDR block.\n"]
+#[doc = " @struct otIp4Cidr\n\n Represents an IPv4 CIDR block.\n"]
 #[repr(C)]
 #[derive(Copy, Clone)]
 pub struct otIp4Cidr {
@@ -7294,14 +7319,14 @@ extern "C" {
     ) -> *mut otMessage;
 }
 extern "C" {
-    #[doc = " Sets the CIDR used when setting the source address of the outgoing translated IPv4 packets.\n\n This function is available only when OPENTHREAD_CONFIG_NAT64_TRANSLATOR_ENABLE is enabled.\n\n @note A valid CIDR must have a non-zero prefix length. The actual addresses pool is limited by the size of the\n mapping pool and the number of addresses available in the CIDR block.\n\n @note This function can be called at any time, but the NAT64 translator will be reset and all existing sessions will\n be expired when updating the configured CIDR.\n\n @param[in] aInstance  A pointer to an OpenThread instance.\n @param[in] aCidr      A pointer to an otIp4Cidr for the IPv4 CIDR block for NAT64.\n\n @retval  OT_ERROR_INVALID_ARGS   The given CIDR is not a valid IPv4 CIDR for NAT64.\n @retval  OT_ERROR_NONE           Successfully set the CIDR for NAT64.\n\n @sa otBorderRouterSend\n @sa otBorderRouterSetReceiveCallback\n"]
+    #[doc = " Sets the CIDR used when setting the source address of the outgoing translated IPv4 packets.\n\n Is available only when OPENTHREAD_CONFIG_NAT64_TRANSLATOR_ENABLE is enabled.\n\n @note A valid CIDR must have a non-zero prefix length. The actual addresses pool is limited by the size of the\n mapping pool and the number of addresses available in the CIDR block.\n\n @note This function can be called at any time, but the NAT64 translator will be reset and all existing sessions will\n be expired when updating the configured CIDR.\n\n @param[in] aInstance  A pointer to an OpenThread instance.\n @param[in] aCidr      A pointer to an otIp4Cidr for the IPv4 CIDR block for NAT64.\n\n @retval  OT_ERROR_INVALID_ARGS   The given CIDR is not a valid IPv4 CIDR for NAT64.\n @retval  OT_ERROR_NONE           Successfully set the CIDR for NAT64.\n\n @sa otBorderRouterSend\n @sa otBorderRouterSetReceiveCallback\n"]
     pub fn otNat64SetIp4Cidr(aInstance: *mut otInstance, aCidr: *const otIp4Cidr) -> otError;
 }
 extern "C" {
     #[doc = " Translates an IPv4 datagram to an IPv6 datagram and sends via the Thread interface.\n\n The caller transfers ownership of @p aMessage when making this call. OpenThread will free @p aMessage when\n processing is complete, including when a value other than `OT_ERROR_NONE` is returned.\n\n @param[in]  aInstance A pointer to an OpenThread instance.\n @param[in]  aMessage  A pointer to the message buffer containing the IPv4 datagram.\n\n @retval OT_ERROR_NONE                    Successfully processed the message.\n @retval OT_ERROR_DROP                    Message was well-formed but not fully processed due to packet processing\n                                          rules.\n @retval OT_ERROR_NO_BUFS                 Could not allocate necessary message buffers when processing the datagram.\n @retval OT_ERROR_NO_ROUTE                No route to host.\n @retval OT_ERROR_INVALID_SOURCE_ADDRESS  Source address is invalid, e.g. an anycast address or a multicast address.\n @retval OT_ERROR_PARSE                   Encountered a malformed header when processing the message.\n"]
     pub fn otNat64Send(aInstance: *mut otInstance, aMessage: *mut otMessage) -> otError;
 }
-#[doc = " This function pointer is called when an IPv4 datagram (translated by NAT64 translator) is received.\n\n @param[in]  aMessage  A pointer to the message buffer containing the received IPv6 datagram. This function transfers\n                       the ownership of the @p aMessage to the receiver of the callback. The message should be\n                       freed by the receiver of the callback after it is processed.\n @param[in]  aContext  A pointer to application-specific context.\n"]
+#[doc = " Pointer is called when an IPv4 datagram (translated by NAT64 translator) is received.\n\n @param[in]  aMessage  A pointer to the message buffer containing the received IPv6 datagram. This function transfers\n                       the ownership of the @p aMessage to the receiver of the callback. The message should be\n                       freed by the receiver of the callback after it is processed.\n @param[in]  aContext  A pointer to application-specific context.\n"]
 pub type otNat64ReceiveIp4Callback = ::std::option::Option<
     unsafe extern "C" fn(aMessage: *mut otMessage, aContext: *mut ::std::os::raw::c_void),
 >;
@@ -7338,7 +7363,7 @@ extern "C" {
     );
 }
 extern "C" {
-    #[doc = " This function converts a human-readable IPv4 CIDR string into a binary representation.\n\n @param[in]   aString   A pointer to a NULL-terminated string.\n @param[out]  aCidr     A pointer to an IPv4 CIDR.\n\n @retval OT_ERROR_NONE          Successfully parsed the string.\n @retval OT_ERROR_INVALID_ARGS  Failed to parse the string.\n"]
+    #[doc = " Converts a human-readable IPv4 CIDR string into a binary representation.\n\n @param[in]   aString   A pointer to a NULL-terminated string.\n @param[out]  aCidr     A pointer to an IPv4 CIDR.\n\n @retval OT_ERROR_NONE          Successfully parsed the string.\n @retval OT_ERROR_INVALID_ARGS  Failed to parse the string.\n"]
     pub fn otIp4CidrFromString(
         aString: *const ::std::os::raw::c_char,
         aCidr: *mut otIp4Cidr,
@@ -7367,16 +7392,16 @@ extern "C" {
         aIp6Address: *mut otIp6Address,
     ) -> otError;
 }
-#[doc = " This function pointer is called to send HDLC encoded NCP data.\n\n @param[in]  aBuf        A pointer to a buffer with an output.\n @param[in]  aBufLength  A length of the output data stored in the buffer.\n\n @returns                Number of bytes processed by the callback.\n"]
+#[doc = " Pointer is called to send HDLC encoded NCP data.\n\n @param[in]  aBuf        A pointer to a buffer with an output.\n @param[in]  aBufLength  A length of the output data stored in the buffer.\n\n @returns                Number of bytes processed by the callback.\n"]
 pub type otNcpHdlcSendCallback = ::std::option::Option<
     unsafe extern "C" fn(aBuf: *const u8, aBufLength: u16) -> ::std::os::raw::c_int,
 >;
 extern "C" {
-    #[doc = " This function is called after NCP send finished.\n"]
+    #[doc = " Is called after NCP send finished.\n"]
     pub fn otNcpHdlcSendDone();
 }
 extern "C" {
-    #[doc = " This function is called after HDLC encoded NCP data received.\n\n @param[in]  aBuf        A pointer to a buffer.\n @param[in]  aBufLength  The length of the data stored in the buffer.\n"]
+    #[doc = " Is called after HDLC encoded NCP data received.\n\n @param[in]  aBuf        A pointer to a buffer.\n @param[in]  aBufLength  The length of the data stored in the buffer.\n"]
     pub fn otNcpHdlcReceive(aBuf: *const u8, aBufLength: u16);
 }
 extern "C" {
@@ -7388,7 +7413,7 @@ extern "C" {
     pub fn otNcpSpiInit(aInstance: *mut otInstance);
 }
 extern "C" {
-    #[doc = " @brief Send data to the host via a specific stream.\n\n This function attempts to send the given data to the host\n using the given aStreamId. This is useful for reporting\n error messages, implementing debug/diagnostic consoles,\n and potentially other types of datastreams.\n\n The write either is accepted in its entirety or rejected.\n Partial writes are not attempted.\n\n @param[in]  aStreamId  A numeric identifier for the stream to write to.\n                        If set to '0', will default to the debug stream.\n @param[in]  aDataPtr   A pointer to the data to send on the stream.\n                        If aDataLen is non-zero, this param MUST NOT be NULL.\n @param[in]  aDataLen   The number of bytes of data from aDataPtr to send.\n\n @retval OT_ERROR_NONE         The data was queued for delivery to the host.\n @retval OT_ERROR_BUSY         There are not enough resources to complete this\n                               request. This is usually a temporary condition.\n @retval OT_ERROR_INVALID_ARGS The given aStreamId was invalid."]
+    #[doc = " @brief Send data to the host via a specific stream.\n\n Attempts to send the given data to the host\n using the given aStreamId. This is useful for reporting\n error messages, implementing debug/diagnostic consoles,\n and potentially other types of datastreams.\n\n The write either is accepted in its entirety or rejected.\n Partial writes are not attempted.\n\n @param[in]  aStreamId  A numeric identifier for the stream to write to.\n                        If set to '0', will default to the debug stream.\n @param[in]  aDataPtr   A pointer to the data to send on the stream.\n                        If aDataLen is non-zero, this param MUST NOT be NULL.\n @param[in]  aDataLen   The number of bytes of data from aDataPtr to send.\n\n @retval OT_ERROR_NONE         The data was queued for delivery to the host.\n @retval OT_ERROR_BUSY         There are not enough resources to complete this\n                               request. This is usually a temporary condition.\n @retval OT_ERROR_INVALID_ARGS The given aStreamId was invalid."]
     pub fn otNcpStreamWrite(
         aStreamId: ::std::os::raw::c_int,
         aDataPtr: *const u8,
@@ -7408,7 +7433,7 @@ extern "C" {
 pub type otNcpDelegateAllowPeekPoke =
     ::std::option::Option<unsafe extern "C" fn(aAddress: u32, aCount: u16) -> bool>;
 extern "C" {
-    #[doc = " This method registers peek/poke delegate functions with NCP module.\n\n The delegate functions are called by NCP module to decide whether to allow peek or poke of a specific memory region.\n If the delegate pointer is set to NULL, it allows peek/poke operation for any address.\n\n @param[in] aAllowPeekDelegate      Delegate function pointer for peek operation.\n @param[in] aAllowPokeDelegate      Delegate function pointer for poke operation.\n"]
+    #[doc = " Registers peek/poke delegate functions with NCP module.\n\n The delegate functions are called by NCP module to decide whether to allow peek or poke of a specific memory region.\n If the delegate pointer is set to NULL, it allows peek/poke operation for any address.\n\n @param[in] aAllowPeekDelegate      Delegate function pointer for peek operation.\n @param[in] aAllowPokeDelegate      Delegate function pointer for poke operation.\n"]
     pub fn otNcpRegisterPeekPokeDelegates(
         aAllowPeekDelegate: otNcpDelegateAllowPeekPoke,
         aAllowPokeDelegate: otNcpDelegateAllowPeekPoke,
@@ -7426,7 +7451,7 @@ pub const OT_DEVICE_ROLE_ROUTER: otDeviceRole = 3;
 pub const OT_DEVICE_ROLE_LEADER: otDeviceRole = 4;
 #[doc = " Represents a Thread device role.\n"]
 pub type otDeviceRole = ::std::os::raw::c_uint;
-#[doc = " This structure represents an MLE Link Mode configuration."]
+#[doc = " Represents an MLE Link Mode configuration."]
 #[repr(C, packed)]
 #[derive(Debug, Default, Copy, Clone)]
 pub struct otLinkModeConfig {
@@ -7489,7 +7514,7 @@ impl otLinkModeConfig {
         __bindgen_bitfield_unit
     }
 }
-#[doc = " This structure holds diagnostic information for a neighboring Thread node\n"]
+#[doc = " Holds diagnostic information for a neighboring Thread node\n"]
 #[repr(C)]
 #[derive(Debug, Default, Copy, Clone)]
 pub struct otNeighborInfo {
@@ -7596,7 +7621,7 @@ impl otNeighborInfo {
     }
 }
 pub type otNeighborInfoIterator = i16;
-#[doc = " This structure represents the Thread Leader Data.\n"]
+#[doc = " Represents the Thread Leader Data.\n"]
 #[repr(C)]
 #[derive(Debug, Default, Copy, Clone)]
 pub struct otLeaderData {
@@ -7611,7 +7636,7 @@ pub struct otLeaderData {
     #[doc = "< Leader Router ID"]
     pub mLeaderRouterId: u8,
 }
-#[doc = " This structure holds diagnostic information for a Thread Router\n"]
+#[doc = " Holds diagnostic information for a Thread Router\n"]
 #[repr(C)]
 #[derive(Debug, Default, Copy, Clone)]
 pub struct otRouterInfo {
@@ -7680,7 +7705,7 @@ impl otRouterInfo {
         __bindgen_bitfield_unit
     }
 }
-#[doc = " This structure represents the IP level counters.\n"]
+#[doc = " Represents the IP level counters.\n"]
 #[repr(C)]
 #[derive(Debug, Default, Copy, Clone)]
 pub struct otIpCounters {
@@ -7693,7 +7718,7 @@ pub struct otIpCounters {
     #[doc = "< The number of IPv6 packets failed to receive."]
     pub mRxFailure: u32,
 }
-#[doc = " This structure represents the Thread MLE counters.\n"]
+#[doc = " Represents the Thread MLE counters.\n"]
 #[repr(C)]
 #[derive(Debug, Default, Copy, Clone)]
 pub struct otMleCounters {
@@ -7728,7 +7753,7 @@ pub struct otMleCounters {
     #[doc = " Number of times device changed its parent.\n\n A parent change can happen if device detaches from its current parent and attaches to a different one, or even\n while device is attached when the periodic parent search feature is enabled  (please see option\n OPENTHREAD_CONFIG_PARENT_SEARCH_ENABLE).\n"]
     pub mParentChanges: u16,
 }
-#[doc = " This structure represents the MLE Parent Response data.\n"]
+#[doc = " Represents the MLE Parent Response data.\n"]
 #[repr(C)]
 #[derive(Debug, Default, Copy, Clone)]
 pub struct otThreadParentResponseInfo {
@@ -7753,19 +7778,19 @@ pub struct otThreadParentResponseInfo {
 pub type otDetachGracefullyCallback =
     ::std::option::Option<unsafe extern "C" fn(aContext: *mut ::std::os::raw::c_void)>;
 extern "C" {
-    #[doc = " This function starts Thread protocol operation.\n\n The interface must be up when calling this function.\n\n Calling this function with @p aEnabled set to FALSE stops any ongoing processes of detaching started by\n otThreadDetachGracefully(). Its callback will be called.\n\n @param[in] aInstance A pointer to an OpenThread instance.\n @param[in] aEnabled  TRUE if Thread is enabled, FALSE otherwise.\n\n @retval OT_ERROR_NONE           Successfully started Thread protocol operation.\n @retval OT_ERROR_INVALID_STATE  The network interface was not not up.\n"]
+    #[doc = " Starts Thread protocol operation.\n\n The interface must be up when calling this function.\n\n Calling this function with @p aEnabled set to FALSE stops any ongoing processes of detaching started by\n otThreadDetachGracefully(). Its callback will be called.\n\n @param[in] aInstance A pointer to an OpenThread instance.\n @param[in] aEnabled  TRUE if Thread is enabled, FALSE otherwise.\n\n @retval OT_ERROR_NONE           Successfully started Thread protocol operation.\n @retval OT_ERROR_INVALID_STATE  The network interface was not not up.\n"]
     pub fn otThreadSetEnabled(aInstance: *mut otInstance, aEnabled: bool) -> otError;
 }
 extern "C" {
-    #[doc = " This function gets the Thread protocol version.\n\n @returns the Thread protocol version.\n"]
+    #[doc = " Gets the Thread protocol version.\n\n @returns the Thread protocol version.\n"]
     pub fn otThreadGetVersion() -> u16;
 }
 extern "C" {
-    #[doc = " This function indicates whether a node is the only router on the network.\n\n @param[in] aInstance A pointer to an OpenThread instance.\n\n @retval TRUE   It is the only router in the network.\n @retval FALSE  It is a child or is not a single router in the network.\n"]
+    #[doc = " Indicates whether a node is the only router on the network.\n\n @param[in] aInstance A pointer to an OpenThread instance.\n\n @retval TRUE   It is the only router in the network.\n @retval FALSE  It is a child or is not a single router in the network.\n"]
     pub fn otThreadIsSingleton(aInstance: *mut otInstance) -> bool;
 }
 extern "C" {
-    #[doc = " This function starts a Thread Discovery scan.\n\n @note A successful call to this function enables the rx-on-when-idle mode for the entire scan procedure.\n\n @param[in]  aInstance              A pointer to an OpenThread instance.\n @param[in]  aScanChannels          A bit vector indicating which channels to scan (e.g. OT_CHANNEL_11_MASK).\n @param[in]  aPanId                 The PAN ID filter (set to Broadcast PAN to disable filter).\n @param[in]  aJoiner                Value of the Joiner Flag in the Discovery Request TLV.\n @param[in]  aEnableEui64Filtering  TRUE to filter responses on EUI-64, FALSE otherwise.\n @param[in]  aCallback              A pointer to a function called on receiving an MLE Discovery Response or\n                                    scan completes.\n @param[in]  aCallbackContext       A pointer to application-specific context.\n\n @retval OT_ERROR_NONE           Successfully started a Thread Discovery Scan.\n @retval OT_ERROR_INVALID_STATE  The IPv6 interface is not enabled (netif is not up).\n @retval OT_ERROR_NO_BUFS        Could not allocate message for Discovery Request.\n @retval OT_ERROR_BUSY           Thread Discovery Scan is already in progress.\n"]
+    #[doc = " Starts a Thread Discovery scan.\n\n @note A successful call to this function enables the rx-on-when-idle mode for the entire scan procedure.\n\n @param[in]  aInstance              A pointer to an OpenThread instance.\n @param[in]  aScanChannels          A bit vector indicating which channels to scan (e.g. OT_CHANNEL_11_MASK).\n @param[in]  aPanId                 The PAN ID filter (set to Broadcast PAN to disable filter).\n @param[in]  aJoiner                Value of the Joiner Flag in the Discovery Request TLV.\n @param[in]  aEnableEui64Filtering  TRUE to filter responses on EUI-64, FALSE otherwise.\n @param[in]  aCallback              A pointer to a function called on receiving an MLE Discovery Response or\n                                    scan completes.\n @param[in]  aCallbackContext       A pointer to application-specific context.\n\n @retval OT_ERROR_NONE           Successfully started a Thread Discovery Scan.\n @retval OT_ERROR_INVALID_STATE  The IPv6 interface is not enabled (netif is not up).\n @retval OT_ERROR_NO_BUFS        Could not allocate message for Discovery Request.\n @retval OT_ERROR_BUSY           Thread Discovery Scan is already in progress.\n"]
     pub fn otThreadDiscover(
         aInstance: *mut otInstance,
         aScanChannels: u32,
@@ -7777,11 +7802,11 @@ extern "C" {
     ) -> otError;
 }
 extern "C" {
-    #[doc = " This function determines if an MLE Thread Discovery is currently in progress.\n\n @param[in] aInstance A pointer to an OpenThread instance.\n"]
+    #[doc = " Determines if an MLE Thread Discovery is currently in progress.\n\n @param[in] aInstance A pointer to an OpenThread instance.\n"]
     pub fn otThreadIsDiscoverInProgress(aInstance: *mut otInstance) -> bool;
 }
 extern "C" {
-    #[doc = " This method sets the Thread Joiner Advertisement when discovering Thread network.\n\n Thread Joiner Advertisement is used to allow a Joiner to advertise its own application-specific information\n (such as Vendor ID, Product ID, Discriminator, etc.) via a newly-proposed Joiner Advertisement TLV,\n and to make this information available to Commissioners or Commissioner Candidates without human interaction.\n\n @param[in]  aInstance        A pointer to an OpenThread instance.\n @param[in]  aOui             The Vendor IEEE OUI value that will be included in the Joiner Advertisement. Only the\n                              least significant 3 bytes will be used, and the most significant byte will be ignored.\n @param[in]  aAdvData         A pointer to the AdvData that will be included in the Joiner Advertisement.\n @param[in]  aAdvDataLength   The length of AdvData in bytes.\n\n @retval OT_ERROR_NONE         Successfully set Joiner Advertisement.\n @retval OT_ERROR_INVALID_ARGS Invalid AdvData.\n"]
+    #[doc = " Sets the Thread Joiner Advertisement when discovering Thread network.\n\n Thread Joiner Advertisement is used to allow a Joiner to advertise its own application-specific information\n (such as Vendor ID, Product ID, Discriminator, etc.) via a newly-proposed Joiner Advertisement TLV,\n and to make this information available to Commissioners or Commissioner Candidates without human interaction.\n\n @param[in]  aInstance        A pointer to an OpenThread instance.\n @param[in]  aOui             The Vendor IEEE OUI value that will be included in the Joiner Advertisement. Only the\n                              least significant 3 bytes will be used, and the most significant byte will be ignored.\n @param[in]  aAdvData         A pointer to the AdvData that will be included in the Joiner Advertisement.\n @param[in]  aAdvDataLength   The length of AdvData in bytes.\n\n @retval OT_ERROR_NONE         Successfully set Joiner Advertisement.\n @retval OT_ERROR_INVALID_ARGS Invalid AdvData.\n"]
     pub fn otThreadSetJoinerAdvertisement(
         aInstance: *mut otInstance,
         aOui: u32,
@@ -7809,7 +7834,7 @@ extern "C" {
     ) -> otError;
 }
 extern "C" {
-    #[doc = " This function returns a pointer to the Leader's RLOC.\n\n @param[in]   aInstance    A pointer to an OpenThread instance.\n @param[out]  aLeaderRloc  A pointer to the Leader's RLOC.\n\n @retval OT_ERROR_NONE          The Leader's RLOC was successfully written to @p aLeaderRloc.\n @retval OT_ERROR_INVALID_ARGS  @p aLeaderRloc was NULL.\n @retval OT_ERROR_DETACHED      Not currently attached to a Thread Partition.\n"]
+    #[doc = " Returns a pointer to the Leader's RLOC.\n\n @param[in]   aInstance    A pointer to an OpenThread instance.\n @param[out]  aLeaderRloc  A pointer to the Leader's RLOC.\n\n @retval OT_ERROR_NONE          The Leader's RLOC was successfully written to @p aLeaderRloc.\n @retval OT_ERROR_INVALID_ARGS  @p aLeaderRloc was NULL.\n @retval OT_ERROR_DETACHED      Not currently attached to a Thread Partition.\n"]
     pub fn otThreadGetLeaderRloc(
         aInstance: *mut otInstance,
         aLeaderRloc: *mut otIp6Address,
@@ -7828,15 +7853,15 @@ extern "C" {
     pub fn otThreadGetNetworkKey(aInstance: *mut otInstance, aNetworkKey: *mut otNetworkKey);
 }
 extern "C" {
-    #[doc = " Get the `otNetworkKeyRef` for Thread Network Key.\n\n This function requires the build-time feature `OPENTHREAD_CONFIG_PLATFORM_KEY_REFERENCES_ENABLE` to be enabled.\n\n @param[in]   aInstance   A pointer to an OpenThread instance.\n\n @returns Reference to the Thread Network Key stored in memory.\n\n @sa otThreadSetNetworkKeyRef\n"]
+    #[doc = " Get the `otNetworkKeyRef` for Thread Network Key.\n\n Requires the build-time feature `OPENTHREAD_CONFIG_PLATFORM_KEY_REFERENCES_ENABLE` to be enabled.\n\n @param[in]   aInstance   A pointer to an OpenThread instance.\n\n @returns Reference to the Thread Network Key stored in memory.\n\n @sa otThreadSetNetworkKeyRef\n"]
     pub fn otThreadGetNetworkKeyRef(aInstance: *mut otInstance) -> otNetworkKeyRef;
 }
 extern "C" {
-    #[doc = " Set the Thread Network Key.\n\n This function succeeds only when Thread protocols are disabled.  A successful\n call to this function invalidates the Active and Pending Operational Datasets in\n non-volatile memory.\n\n @param[in]  aInstance   A pointer to an OpenThread instance.\n @param[in]  aKey        A pointer to a buffer containing the Thread Network Key.\n\n @retval OT_ERROR_NONE            Successfully set the Thread Network Key.\n @retval OT_ERROR_INVALID_STATE   Thread protocols are enabled.\n\n @sa otThreadGetNetworkKey\n"]
+    #[doc = " Set the Thread Network Key.\n\n Succeeds only when Thread protocols are disabled.  A successful\n call to this function invalidates the Active and Pending Operational Datasets in\n non-volatile memory.\n\n @param[in]  aInstance   A pointer to an OpenThread instance.\n @param[in]  aKey        A pointer to a buffer containing the Thread Network Key.\n\n @retval OT_ERROR_NONE            Successfully set the Thread Network Key.\n @retval OT_ERROR_INVALID_STATE   Thread protocols are enabled.\n\n @sa otThreadGetNetworkKey\n"]
     pub fn otThreadSetNetworkKey(aInstance: *mut otInstance, aKey: *const otNetworkKey) -> otError;
 }
 extern "C" {
-    #[doc = " Set the Thread Network Key as a `otNetworkKeyRef`.\n\n This function succeeds only when Thread protocols are disabled.  A successful\n call to this function invalidates the Active and Pending Operational Datasets in\n non-volatile memory.\n\n This function requires the build-time feature `OPENTHREAD_CONFIG_PLATFORM_KEY_REFERENCES_ENABLE` to be enabled.\n\n @param[in]  aInstance   A pointer to an OpenThread instance.\n @param[in]  aKeyRef     Reference to the Thread Network Key.\n\n @retval OT_ERROR_NONE            Successfully set the Thread Network Key.\n @retval OT_ERROR_INVALID_STATE   Thread protocols are enabled.\n\n @sa otThreadGetNetworkKeyRef\n"]
+    #[doc = " Set the Thread Network Key as a `otNetworkKeyRef`.\n\n Succeeds only when Thread protocols are disabled.  A successful\n call to this function invalidates the Active and Pending Operational Datasets in\n non-volatile memory.\n\n Requires the build-time feature `OPENTHREAD_CONFIG_PLATFORM_KEY_REFERENCES_ENABLE` to be enabled.\n\n @param[in]  aInstance   A pointer to an OpenThread instance.\n @param[in]  aKeyRef     Reference to the Thread Network Key.\n\n @retval OT_ERROR_NONE            Successfully set the Thread Network Key.\n @retval OT_ERROR_INVALID_STATE   Thread protocols are enabled.\n\n @sa otThreadGetNetworkKeyRef\n"]
     pub fn otThreadSetNetworkKeyRef(
         aInstance: *mut otInstance,
         aKeyRef: otNetworkKeyRef,
@@ -7851,11 +7876,11 @@ extern "C" {
     pub fn otThreadGetMeshLocalEid(aInstance: *mut otInstance) -> *const otIp6Address;
 }
 extern "C" {
-    #[doc = " This function returns a pointer to the Mesh Local Prefix.\n\n @param[in]  aInstance A pointer to an OpenThread instance.\n\n @returns A pointer to the Mesh Local Prefix.\n"]
+    #[doc = " Returns a pointer to the Mesh Local Prefix.\n\n @param[in]  aInstance A pointer to an OpenThread instance.\n\n @returns A pointer to the Mesh Local Prefix.\n"]
     pub fn otThreadGetMeshLocalPrefix(aInstance: *mut otInstance) -> *const otMeshLocalPrefix;
 }
 extern "C" {
-    #[doc = " This function sets the Mesh Local Prefix.\n\n This function succeeds only when Thread protocols are disabled.  A successful\n call to this function invalidates the Active and Pending Operational Datasets in\n non-volatile memory.\n\n @param[in]  aInstance         A pointer to an OpenThread instance.\n @param[in]  aMeshLocalPrefix  A pointer to the Mesh Local Prefix.\n\n @retval OT_ERROR_NONE           Successfully set the Mesh Local Prefix.\n @retval OT_ERROR_INVALID_STATE  Thread protocols are enabled.\n"]
+    #[doc = " Sets the Mesh Local Prefix.\n\n Succeeds only when Thread protocols are disabled.  A successful\n call to this function invalidates the Active and Pending Operational Datasets in\n non-volatile memory.\n\n @param[in]  aInstance         A pointer to an OpenThread instance.\n @param[in]  aMeshLocalPrefix  A pointer to the Mesh Local Prefix.\n\n @retval OT_ERROR_NONE           Successfully set the Mesh Local Prefix.\n @retval OT_ERROR_INVALID_STATE  Thread protocols are enabled.\n"]
     pub fn otThreadSetMeshLocalPrefix(
         aInstance: *mut otInstance,
         aMeshLocalPrefix: *const otMeshLocalPrefix,
@@ -7878,7 +7903,7 @@ extern "C" {
     ) -> *const otIp6Address;
 }
 extern "C" {
-    #[doc = " This function retrieves the Service ALOC for given Service ID.\n\n @param[in]   aInstance     A pointer to an OpenThread instance.\n @param[in]   aServiceId    Service ID to get ALOC for.\n @param[out]  aServiceAloc  A pointer to output the Service ALOC. MUST NOT BE NULL.\n\n @retval OT_ERROR_NONE      Successfully retrieved the Service ALOC.\n @retval OT_ERROR_DETACHED  The Thread interface is not currently attached to a Thread Partition."]
+    #[doc = " Retrieves the Service ALOC for given Service ID.\n\n @param[in]   aInstance     A pointer to an OpenThread instance.\n @param[in]   aServiceId    Service ID to get ALOC for.\n @param[out]  aServiceAloc  A pointer to output the Service ALOC. MUST NOT BE NULL.\n\n @retval OT_ERROR_NONE      Successfully retrieved the Service ALOC.\n @retval OT_ERROR_DETACHED  The Thread interface is not currently attached to a Thread Partition."]
     pub fn otThreadGetServiceAloc(
         aInstance: *mut otInstance,
         aServiceId: u8,
@@ -7890,7 +7915,7 @@ extern "C" {
     pub fn otThreadGetNetworkName(aInstance: *mut otInstance) -> *const ::std::os::raw::c_char;
 }
 extern "C" {
-    #[doc = " Set the Thread Network Name.\n\n This function succeeds only when Thread protocols are disabled.  A successful\n call to this function invalidates the Active and Pending Operational Datasets in\n non-volatile memory.\n\n @param[in]  aInstance     A pointer to an OpenThread instance.\n @param[in]  aNetworkName  A pointer to the Thread Network Name.\n\n @retval OT_ERROR_NONE           Successfully set the Thread Network Name.\n @retval OT_ERROR_INVALID_STATE  Thread protocols are enabled.\n\n @sa otThreadGetNetworkName\n"]
+    #[doc = " Set the Thread Network Name.\n\n Succeeds only when Thread protocols are disabled.  A successful\n call to this function invalidates the Active and Pending Operational Datasets in\n non-volatile memory.\n\n @param[in]  aInstance     A pointer to an OpenThread instance.\n @param[in]  aNetworkName  A pointer to the Thread Network Name.\n\n @retval OT_ERROR_NONE           Successfully set the Thread Network Name.\n @retval OT_ERROR_INVALID_STATE  Thread protocols are enabled.\n\n @sa otThreadGetNetworkName\n"]
     pub fn otThreadSetNetworkName(
         aInstance: *mut otInstance,
         aNetworkName: *const ::std::os::raw::c_char,
@@ -7945,7 +7970,7 @@ extern "C" {
     pub fn otThreadBecomeChild(aInstance: *mut otInstance) -> otError;
 }
 extern "C" {
-    #[doc = " This function gets the next neighbor information. It is used to go through the entries of\n the neighbor table.\n\n @param[in]      aInstance  A pointer to an OpenThread instance.\n @param[in,out]  aIterator  A pointer to the iterator context. To get the first neighbor entry\nit should be set to OT_NEIGHBOR_INFO_ITERATOR_INIT.\n @param[out]     aInfo      A pointer to the neighbor information.\n\n @retval OT_ERROR_NONE         Successfully found the next neighbor entry in table.\n @retval OT_ERROR_NOT_FOUND     No subsequent neighbor entry exists in the table.\n @retval OT_ERROR_INVALID_ARGS  @p aIterator or @p aInfo was NULL.\n"]
+    #[doc = " Gets the next neighbor information. It is used to go through the entries of\n the neighbor table.\n\n @param[in]      aInstance  A pointer to an OpenThread instance.\n @param[in,out]  aIterator  A pointer to the iterator context. To get the first neighbor entry\nit should be set to OT_NEIGHBOR_INFO_ITERATOR_INIT.\n @param[out]     aInfo      A pointer to the neighbor information.\n\n @retval OT_ERROR_NONE         Successfully found the next neighbor entry in table.\n @retval OT_ERROR_NOT_FOUND     No subsequent neighbor entry exists in the table.\n @retval OT_ERROR_INVALID_ARGS  @p aIterator or @p aInfo was NULL.\n"]
     pub fn otThreadGetNextNeighborInfo(
         aInstance: *mut otInstance,
         aIterator: *mut otNeighborInfoIterator,
@@ -7961,7 +7986,7 @@ extern "C" {
     pub fn otThreadDeviceRoleToString(aRole: otDeviceRole) -> *const ::std::os::raw::c_char;
 }
 extern "C" {
-    #[doc = " This function get the Thread Leader Data.\n\n @param[in]   aInstance    A pointer to an OpenThread instance.\n @param[out]  aLeaderData  A pointer to where the leader data is placed.\n\n @retval OT_ERROR_NONE          Successfully retrieved the leader data.\n @retval OT_ERROR_DETACHED      Not currently attached.\n"]
+    #[doc = " Get the Thread Leader Data.\n\n @param[in]   aInstance    A pointer to an OpenThread instance.\n @param[out]  aLeaderData  A pointer to where the leader data is placed.\n\n @retval OT_ERROR_NONE          Successfully retrieved the leader data.\n @retval OT_ERROR_DETACHED      Not currently attached.\n"]
     pub fn otThreadGetLeaderData(
         aInstance: *mut otInstance,
         aLeaderData: *mut otLeaderData,
@@ -8021,7 +8046,7 @@ extern "C" {
     #[doc = " Resets the Thread MLE counters.\n\n @param[in]  aInstance  A pointer to an OpenThread instance.\n"]
     pub fn otThreadResetMleCounters(aInstance: *mut otInstance);
 }
-#[doc = " This function pointer is called every time an MLE Parent Response message is received.\n\n This is used in `otThreadRegisterParentResponseCallback()`.\n\n @param[in]  aInfo     A pointer to a location on stack holding the stats data.\n @param[in]  aContext  A pointer to callback client-specific context.\n"]
+#[doc = " Pointer is called every time an MLE Parent Response message is received.\n\n This is used in `otThreadRegisterParentResponseCallback()`.\n\n @param[in]  aInfo     A pointer to a location on stack holding the stats data.\n @param[in]  aContext  A pointer to callback client-specific context.\n"]
 pub type otThreadParentResponseCallback = ::std::option::Option<
     unsafe extern "C" fn(
         aInfo: *mut otThreadParentResponseInfo,
@@ -8029,14 +8054,14 @@ pub type otThreadParentResponseCallback = ::std::option::Option<
     ),
 >;
 extern "C" {
-    #[doc = " This function registers a callback to receive MLE Parent Response data.\n\n This function requires `OPENTHREAD_CONFIG_MLE_PARENT_RESPONSE_CALLBACK_API_ENABLE`.\n\n @param[in]  aInstance  A pointer to an OpenThread instance.\n @param[in]  aCallback  A pointer to a function that is called upon receiving an MLE Parent Response message.\n @param[in]  aContext   A pointer to callback client-specific context.\n"]
+    #[doc = " Registers a callback to receive MLE Parent Response data.\n\n Requires `OPENTHREAD_CONFIG_MLE_PARENT_RESPONSE_CALLBACK_API_ENABLE`.\n\n @param[in]  aInstance  A pointer to an OpenThread instance.\n @param[in]  aCallback  A pointer to a function that is called upon receiving an MLE Parent Response message.\n @param[in]  aContext   A pointer to callback client-specific context.\n"]
     pub fn otThreadRegisterParentResponseCallback(
         aInstance: *mut otInstance,
         aCallback: otThreadParentResponseCallback,
         aContext: *mut ::std::os::raw::c_void,
     );
 }
-#[doc = " This structure represents the Thread Discovery Request data.\n"]
+#[doc = " Represents the Thread Discovery Request data.\n"]
 #[repr(C)]
 #[derive(Debug, Default, Copy, Clone)]
 pub struct otThreadDiscoveryRequestInfo {
@@ -8082,7 +8107,7 @@ impl otThreadDiscoveryRequestInfo {
         __bindgen_bitfield_unit
     }
 }
-#[doc = " This function pointer is called every time an MLE Discovery Request message is received.\n\n @param[in]  aInfo     A pointer to the Discovery Request info data.\n @param[in]  aContext  A pointer to callback application-specific context.\n"]
+#[doc = " Pointer is called every time an MLE Discovery Request message is received.\n\n @param[in]  aInfo     A pointer to the Discovery Request info data.\n @param[in]  aContext  A pointer to callback application-specific context.\n"]
 pub type otThreadDiscoveryRequestCallback = ::std::option::Option<
     unsafe extern "C" fn(
         aInfo: *const otThreadDiscoveryRequestInfo,
@@ -8090,14 +8115,14 @@ pub type otThreadDiscoveryRequestCallback = ::std::option::Option<
     ),
 >;
 extern "C" {
-    #[doc = " This function sets a callback to receive MLE Discovery Request data.\n\n @param[in]  aInstance  A pointer to an OpenThread instance.\n @param[in]  aCallback  A pointer to a function that is called upon receiving an MLE Discovery Request message.\n @param[in]  aContext   A pointer to callback application-specific context.\n"]
+    #[doc = " Sets a callback to receive MLE Discovery Request data.\n\n @param[in]  aInstance  A pointer to an OpenThread instance.\n @param[in]  aCallback  A pointer to a function that is called upon receiving an MLE Discovery Request message.\n @param[in]  aContext   A pointer to callback application-specific context.\n"]
     pub fn otThreadSetDiscoveryRequestCallback(
         aInstance: *mut otInstance,
         aCallback: otThreadDiscoveryRequestCallback,
         aContext: *mut ::std::os::raw::c_void,
     );
 }
-#[doc = " This function pointer type defines the callback to notify the outcome of a `otThreadLocateAnycastDestination()`\n request.\n\n @param[in] aContext            A pointer to an arbitrary context (provided when callback is registered).\n @param[in] aError              The error when handling the request. OT_ERROR_NONE indicates success.\n                                OT_ERROR_RESPONSE_TIMEOUT indicates a destination could not be found.\n                                OT_ERROR_ABORT indicates the request was aborted.\n @param[in] aMeshLocalAddress   A pointer to the mesh-local EID of the closest destination of the anycast address\n                                when @p aError is OT_ERROR_NONE, NULL otherwise.\n @param[in] aRloc16             The RLOC16 of the destination if found, otherwise invalid RLOC16 (0xfffe).\n"]
+#[doc = " Pointer type defines the callback to notify the outcome of a `otThreadLocateAnycastDestination()`\n request.\n\n @param[in] aContext            A pointer to an arbitrary context (provided when callback is registered).\n @param[in] aError              The error when handling the request. OT_ERROR_NONE indicates success.\n                                OT_ERROR_RESPONSE_TIMEOUT indicates a destination could not be found.\n                                OT_ERROR_ABORT indicates the request was aborted.\n @param[in] aMeshLocalAddress   A pointer to the mesh-local EID of the closest destination of the anycast address\n                                when @p aError is OT_ERROR_NONE, NULL otherwise.\n @param[in] aRloc16             The RLOC16 of the destination if found, otherwise invalid RLOC16 (0xfffe).\n"]
 pub type otThreadAnycastLocatorCallback = ::std::option::Option<
     unsafe extern "C" fn(
         aContext: *mut ::std::os::raw::c_void,
@@ -8107,7 +8132,7 @@ pub type otThreadAnycastLocatorCallback = ::std::option::Option<
     ),
 >;
 extern "C" {
-    #[doc = " This function requests the closest destination of a given anycast address to be located.\n\n This function is only available when `OPENTHREAD_CONFIG_TMF_ANYCAST_LOCATOR_ENABLE` is enabled.\n\n If a previous request is ongoing, a subsequent call to this function will cancel and replace the earlier request.\n\n @param[in] aInstance         A pointer to an OpenThread instance.\n @param[in] aAnycastAddress   The anycast address to locate. MUST NOT be NULL.\n @param[in] aCallback         The callback function to report the result.\n @param[in] aContext          An arbitrary context used with @p aCallback.\n\n @retval OT_ERROR_NONE          The request started successfully. @p aCallback will be invoked to report the result.\n @retval OT_ERROR_INVALID_ARGS  The @p aAnycastAddress is not a valid anycast address or @p aCallback is NULL.\n @retval OT_ERROR_NO_BUFS       Out of buffer to prepare and send the request message.\n"]
+    #[doc = " Requests the closest destination of a given anycast address to be located.\n\n Is only available when `OPENTHREAD_CONFIG_TMF_ANYCAST_LOCATOR_ENABLE` is enabled.\n\n If a previous request is ongoing, a subsequent call to this function will cancel and replace the earlier request.\n\n @param[in] aInstance         A pointer to an OpenThread instance.\n @param[in] aAnycastAddress   The anycast address to locate. MUST NOT be NULL.\n @param[in] aCallback         The callback function to report the result.\n @param[in] aContext          An arbitrary context used with @p aCallback.\n\n @retval OT_ERROR_NONE          The request started successfully. @p aCallback will be invoked to report the result.\n @retval OT_ERROR_INVALID_ARGS  The @p aAnycastAddress is not a valid anycast address or @p aCallback is NULL.\n @retval OT_ERROR_NO_BUFS       Out of buffer to prepare and send the request message.\n"]
     pub fn otThreadLocateAnycastDestination(
         aInstance: *mut otInstance,
         aAnycastAddress: *const otIp6Address,
@@ -8116,11 +8141,11 @@ extern "C" {
     ) -> otError;
 }
 extern "C" {
-    #[doc = " This function indicates whether an anycast locate request is currently in progress.\n\n This function is only available when `OPENTHREAD_CONFIG_TMF_ANYCAST_LOCATOR_ENABLE` is enabled.\n\n @param[in] aInstance A pointer to an OpenThread instance.\n\n @returns TRUE if an anycast locate request is currently in progress, FALSE otherwise.\n"]
+    #[doc = " Indicates whether an anycast locate request is currently in progress.\n\n Is only available when `OPENTHREAD_CONFIG_TMF_ANYCAST_LOCATOR_ENABLE` is enabled.\n\n @param[in] aInstance A pointer to an OpenThread instance.\n\n @returns TRUE if an anycast locate request is currently in progress, FALSE otherwise.\n"]
     pub fn otThreadIsAnycastLocateInProgress(aInstance: *mut otInstance) -> bool;
 }
 extern "C" {
-    #[doc = " This function sends a Proactive Address Notification (ADDR_NTF.ntf) message.\n\n This function is only available when `OPENTHREAD_CONFIG_REFERENCE_DEVICE_ENABLE` is enabled.\n\n @param[in]  aInstance     A pointer to an OpenThread instance.\n @param[in]  aDestination  The destination to send the ADDR_NTF.ntf message.\n @param[in]  aTarget       The target address of the ADDR_NTF.ntf message.\n @param[in]  aMlIid        The ML-IID of the ADDR_NTF.ntf message.\n"]
+    #[doc = " Sends a Proactive Address Notification (ADDR_NTF.ntf) message.\n\n Is only available when `OPENTHREAD_CONFIG_REFERENCE_DEVICE_ENABLE` is enabled.\n\n @param[in]  aInstance     A pointer to an OpenThread instance.\n @param[in]  aDestination  The destination to send the ADDR_NTF.ntf message.\n @param[in]  aTarget       The target address of the ADDR_NTF.ntf message.\n @param[in]  aMlIid        The ML-IID of the ADDR_NTF.ntf message.\n"]
     pub fn otThreadSendAddressNotification(
         aInstance: *mut otInstance,
         aDestination: *mut otIp6Address,
@@ -8129,7 +8154,7 @@ extern "C" {
     );
 }
 extern "C" {
-    #[doc = " This function sends a Proactive Backbone Notification (PRO_BB.ntf) message on the Backbone link.\n\n This function is only available when `OPENTHREAD_CONFIG_REFERENCE_DEVICE_ENABLE` is enabled.\n\n @param[in]  aInstance                    A pointer to an OpenThread instance.\n @param[in]  aTarget                      The target address of the PRO_BB.ntf message.\n @param[in]  aMlIid                       The ML-IID of the PRO_BB.ntf message.\n @param[in]  aTimeSinceLastTransaction    Time since last transaction (in seconds).\n\n @retval OT_ERROR_NONE           Successfully sent PRO_BB.ntf on backbone link.\n @retval OT_ERROR_NO_BUFS        If insufficient message buffers available.\n"]
+    #[doc = " Sends a Proactive Backbone Notification (PRO_BB.ntf) message on the Backbone link.\n\n Is only available when `OPENTHREAD_CONFIG_REFERENCE_DEVICE_ENABLE` is enabled.\n\n @param[in]  aInstance                    A pointer to an OpenThread instance.\n @param[in]  aTarget                      The target address of the PRO_BB.ntf message.\n @param[in]  aMlIid                       The ML-IID of the PRO_BB.ntf message.\n @param[in]  aTimeSinceLastTransaction    Time since last transaction (in seconds).\n\n @retval OT_ERROR_NONE           Successfully sent PRO_BB.ntf on backbone link.\n @retval OT_ERROR_NO_BUFS        If insufficient message buffers available.\n"]
     pub fn otThreadSendProactiveBackboneNotification(
         aInstance: *mut otInstance,
         aTarget: *mut otIp6Address,
@@ -8138,7 +8163,7 @@ extern "C" {
     ) -> otError;
 }
 extern "C" {
-    #[doc = " This function notifies other nodes in the network (if any) and then stops Thread protocol operation.\n\n It sends an Address Release if it's a router, or sets its child timeout to 0 if it's a child.\n\n @param[in] aInstance A pointer to an OpenThread instance.\n @param[in] aCallback A pointer to a function that is called upon finishing detaching.\n @param[in] aContext  A pointer to callback application-specific context.\n\n @retval OT_ERROR_NONE Successfully started detaching.\n @retval OT_ERROR_BUSY Detaching is already in progress.\n"]
+    #[doc = " Notifies other nodes in the network (if any) and then stops Thread protocol operation.\n\n It sends an Address Release if it's a router, or sets its child timeout to 0 if it's a child.\n\n @param[in] aInstance A pointer to an OpenThread instance.\n @param[in] aCallback A pointer to a function that is called upon finishing detaching.\n @param[in] aContext  A pointer to callback application-specific context.\n\n @retval OT_ERROR_NONE Successfully started detaching.\n @retval OT_ERROR_BUSY Detaching is already in progress.\n"]
     pub fn otThreadDetachGracefully(
         aInstance: *mut otInstance,
         aCallback: otDetachGracefullyCallback,
@@ -8146,7 +8171,7 @@ extern "C" {
     ) -> otError;
 }
 extern "C" {
-    #[doc = " This function converts an `uint32_t` duration (in seconds) to a human-readable string.\n\n This function requires `OPENTHREAD_CONFIG_UPTIME_ENABLE` to be enabled.\n\n The string follows the format \"<hh>:<mm>:<ss>\" for hours, minutes, seconds (if duration is shorter than one day) or\n \"<dd>d.<hh>:<mm>:<ss>\" (if longer than a day).\n\n If the resulting string does not fit in @p aBuffer (within its @p aSize characters), the string will be truncated\n but the outputted string is always null-terminated.\n\n This function is intended for use with `mAge` or `mConnectionTime` in `otNeighborInfo` or `otChildInfo` structures.\n\n @param[in]  aDuration A duration interval in seconds.\n @param[out] aBuffer   A pointer to a char array to output the string.\n @param[in]  aSize     The size of @p aBuffer (in bytes). Recommended to use `OT_DURATION_STRING_SIZE`.\n"]
+    #[doc = " Converts an `uint32_t` duration (in seconds) to a human-readable string.\n\n Requires `OPENTHREAD_CONFIG_UPTIME_ENABLE` to be enabled.\n\n The string follows the format \"<hh>:<mm>:<ss>\" for hours, minutes, seconds (if duration is shorter than one day) or\n \"<dd>d.<hh>:<mm>:<ss>\" (if longer than a day).\n\n If the resulting string does not fit in @p aBuffer (within its @p aSize characters), the string will be truncated\n but the outputted string is always null-terminated.\n\n Is intended for use with `mAge` or `mConnectionTime` in `otNeighborInfo` or `otChildInfo` structures.\n\n @param[in]  aDuration A duration interval in seconds.\n @param[out] aBuffer   A pointer to a char array to output the string.\n @param[in]  aSize     The size of @p aBuffer (in bytes). Recommended to use `OT_DURATION_STRING_SIZE`.\n"]
     pub fn otConvertDurationInSecondsToString(
         aDuration: u32,
         aBuffer: *mut ::std::os::raw::c_char,
@@ -8197,7 +8222,7 @@ pub const OT_NETWORK_DIAGNOSTIC_TLV_VENDOR_SW_VERSION: _bindgen_ty_11 = 27;
 pub const OT_NETWORK_DIAGNOSTIC_TLV_THREAD_STACK_VERSION: _bindgen_ty_11 = 28;
 pub type _bindgen_ty_11 = ::std::os::raw::c_uint;
 pub type otNetworkDiagIterator = u16;
-#[doc = " This structure represents a Network Diagnostic Connectivity value.\n"]
+#[doc = " Represents a Network Diagnostic Connectivity value.\n"]
 #[repr(C)]
 #[derive(Debug, Default, Copy, Clone)]
 pub struct otNetworkDiagConnectivity {
@@ -8220,7 +8245,7 @@ pub struct otNetworkDiagConnectivity {
     #[doc = " The guaranteed queue capacity in number of IPv6 datagrams destined to a given SED. Optional."]
     pub mSedDatagramCount: u8,
 }
-#[doc = " This structure represents a Network Diagnostic Route data.\n"]
+#[doc = " Represents a Network Diagnostic Route data.\n"]
 #[repr(C)]
 #[derive(Debug, Default, Copy, Clone)]
 pub struct otNetworkDiagRouteData {
@@ -8285,7 +8310,7 @@ impl otNetworkDiagRouteData {
         __bindgen_bitfield_unit
     }
 }
-#[doc = " This structure represents a Network Diagnostic Route TLV value.\n"]
+#[doc = " Represents a Network Diagnostic Route TLV value.\n"]
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
 pub struct otNetworkDiagRoute {
@@ -8305,7 +8330,7 @@ impl Default for otNetworkDiagRoute {
         }
     }
 }
-#[doc = " This structure represents a Network Diagnostic Mac Counters value.\n\n See <a href=\"https://www.ietf.org/rfc/rfc2863\">RFC 2863</a> for definitions of member fields.\n"]
+#[doc = " Represents a Network Diagnostic Mac Counters value.\n\n See <a href=\"https://www.ietf.org/rfc/rfc2863\">RFC 2863</a> for definitions of member fields.\n"]
 #[repr(C)]
 #[derive(Debug, Default, Copy, Clone)]
 pub struct otNetworkDiagMacCounters {
@@ -8319,7 +8344,7 @@ pub struct otNetworkDiagMacCounters {
     pub mIfOutBroadcastPkts: u32,
     pub mIfOutDiscards: u32,
 }
-#[doc = " This structure represents a Network Diagnostic Child Table Entry.\n"]
+#[doc = " Represents a Network Diagnostic Child Table Entry.\n"]
 #[repr(C)]
 #[repr(align(2))]
 #[derive(Debug, Default, Copy, Clone)]
@@ -8385,7 +8410,7 @@ impl otNetworkDiagChildEntry {
         __bindgen_bitfield_unit
     }
 }
-#[doc = " This structure represents a Network Diagnostic TLV.\n"]
+#[doc = " Represents a Network Diagnostic TLV.\n"]
 #[repr(C)]
 #[derive(Copy, Clone)]
 pub struct otNetworkDiagTlv {
@@ -8496,14 +8521,14 @@ impl Default for otNetworkDiagTlv {
     }
 }
 extern "C" {
-    #[doc = " This function gets the next Network Diagnostic TLV in the message.\n\n Requires `OPENTHREAD_CONFIG_TMF_NETDIAG_CLIENT_ENABLE`.\n\n @param[in]      aMessage         A pointer to a message.\n @param[in,out]  aIterator        A pointer to the Network Diagnostic iterator context. To get the first\n                                  Network Diagnostic TLV it should be set to OT_NETWORK_DIAGNOSTIC_ITERATOR_INIT.\n @param[out]     aNetworkDiagTlv  A pointer to where the Network Diagnostic TLV information will be placed.\n\n @retval OT_ERROR_NONE       Successfully found the next Network Diagnostic TLV.\n @retval OT_ERROR_NOT_FOUND  No subsequent Network Diagnostic TLV exists in the message.\n @retval OT_ERROR_PARSE      Parsing the next Network Diagnostic failed.\n\n @Note A subsequent call to this function is allowed only when current return value is OT_ERROR_NONE.\n"]
+    #[doc = " Gets the next Network Diagnostic TLV in the message.\n\n Requires `OPENTHREAD_CONFIG_TMF_NETDIAG_CLIENT_ENABLE`.\n\n @param[in]      aMessage         A pointer to a message.\n @param[in,out]  aIterator        A pointer to the Network Diagnostic iterator context. To get the first\n                                  Network Diagnostic TLV it should be set to OT_NETWORK_DIAGNOSTIC_ITERATOR_INIT.\n @param[out]     aNetworkDiagTlv  A pointer to where the Network Diagnostic TLV information will be placed.\n\n @retval OT_ERROR_NONE       Successfully found the next Network Diagnostic TLV.\n @retval OT_ERROR_NOT_FOUND  No subsequent Network Diagnostic TLV exists in the message.\n @retval OT_ERROR_PARSE      Parsing the next Network Diagnostic failed.\n\n @Note A subsequent call to this function is allowed only when current return value is OT_ERROR_NONE.\n"]
     pub fn otThreadGetNextDiagnosticTlv(
         aMessage: *const otMessage,
         aIterator: *mut otNetworkDiagIterator,
         aNetworkDiagTlv: *mut otNetworkDiagTlv,
     ) -> otError;
 }
-#[doc = " This function pointer is called when Network Diagnostic Get response is received.\n\n @param[in]  aError        The error when failed to get the response.\n @param[in]  aMessage      A pointer to the message buffer containing the received Network Diagnostic\n                           Get response payload. Available only when @p aError is `OT_ERROR_NONE`.\n @param[in]  aMessageInfo  A pointer to the message info for @p aMessage. Available only when\n                           @p aError is `OT_ERROR_NONE`.\n @param[in]  aContext      A pointer to application-specific context.\n"]
+#[doc = " Pointer is called when Network Diagnostic Get response is received.\n\n @param[in]  aError        The error when failed to get the response.\n @param[in]  aMessage      A pointer to the message buffer containing the received Network Diagnostic\n                           Get response payload. Available only when @p aError is `OT_ERROR_NONE`.\n @param[in]  aMessageInfo  A pointer to the message info for @p aMessage. Available only when\n                           @p aError is `OT_ERROR_NONE`.\n @param[in]  aContext      A pointer to application-specific context.\n"]
 pub type otReceiveDiagnosticGetCallback = ::std::option::Option<
     unsafe extern "C" fn(
         aError: otError,
@@ -8571,9 +8596,9 @@ pub const OT_NETWORK_TIME_UNSYNCHRONIZED: otNetworkTimeStatus = -1;
 pub const OT_NETWORK_TIME_RESYNC_NEEDED: otNetworkTimeStatus = 0;
 #[doc = "< The device network time is synchronized."]
 pub const OT_NETWORK_TIME_SYNCHRONIZED: otNetworkTimeStatus = 1;
-#[doc = " This enumeration represents OpenThread time synchronization status.\n"]
+#[doc = " Represents OpenThread time synchronization status.\n"]
 pub type otNetworkTimeStatus = ::std::os::raw::c_int;
-#[doc = " This function pointer is called when a network time sync or status change occurs.\n"]
+#[doc = " Pointer is called when a network time sync or status change occurs.\n"]
 pub type otNetworkTimeSyncCallbackFn =
     ::std::option::Option<unsafe extern "C" fn(aCallbackContext: *mut ::std::os::raw::c_void)>;
 extern "C" {
@@ -8584,7 +8609,7 @@ extern "C" {
     ) -> otNetworkTimeStatus;
 }
 extern "C" {
-    #[doc = " Set the time synchronization period.\n\n This function can only be called while Thread protocols are disabled.\n\n @param[in] aInstance         The OpenThread instance structure.\n @param[in] aTimeSyncPeriod   The time synchronization period, in seconds.\n\n @retval OT_ERROR_NONE           Successfully set the time sync period.\n @retval OT_ERROR_INVALID_STATE  Thread protocols are enabled.\n"]
+    #[doc = " Set the time synchronization period.\n\n Can only be called while Thread protocols are disabled.\n\n @param[in] aInstance         The OpenThread instance structure.\n @param[in] aTimeSyncPeriod   The time synchronization period, in seconds.\n\n @retval OT_ERROR_NONE           Successfully set the time sync period.\n @retval OT_ERROR_INVALID_STATE  Thread protocols are enabled.\n"]
     pub fn otNetworkTimeSetSyncPeriod(aInstance: *mut otInstance, aTimeSyncPeriod: u16) -> otError;
 }
 extern "C" {
@@ -8592,7 +8617,7 @@ extern "C" {
     pub fn otNetworkTimeGetSyncPeriod(aInstance: *mut otInstance) -> u16;
 }
 extern "C" {
-    #[doc = " Set the time synchronization XTAL accuracy threshold for Router-Capable device.\n\n This function can only be called while Thread protocols are disabled.\n\n @param[in] aInstance        The OpenThread instance structure.\n @param[in] aXTALThreshold   The XTAL accuracy threshold for Router, in PPM.\n\n @retval OT_ERROR_NONE           Successfully set the time sync period.\n @retval OT_ERROR_INVALID_STATE  Thread protocols are enabled.\n"]
+    #[doc = " Set the time synchronization XTAL accuracy threshold for Router-Capable device.\n\n Can only be called while Thread protocols are disabled.\n\n @param[in] aInstance        The OpenThread instance structure.\n @param[in] aXTALThreshold   The XTAL accuracy threshold for Router, in PPM.\n\n @retval OT_ERROR_NONE           Successfully set the time sync period.\n @retval OT_ERROR_INVALID_STATE  Thread protocols are enabled.\n"]
     pub fn otNetworkTimeSetXtalThreshold(
         aInstance: *mut otInstance,
         aXTALThreshold: u16,
@@ -8610,7 +8635,7 @@ extern "C" {
         aCallbackContext: *mut ::std::os::raw::c_void,
     );
 }
-#[doc = " This structure represents a ping reply.\n"]
+#[doc = " Represents a ping reply.\n"]
 #[repr(C)]
 #[derive(Copy, Clone)]
 pub struct otPingSenderReply {
@@ -8634,7 +8659,7 @@ impl Default for otPingSenderReply {
         }
     }
 }
-#[doc = " This structure represents statistics of a ping request.\n"]
+#[doc = " Represents statistics of a ping request.\n"]
 #[repr(C)]
 #[derive(Debug, Default, Copy, Clone)]
 pub struct otPingSenderStatistics {
@@ -8651,18 +8676,18 @@ pub struct otPingSenderStatistics {
     #[doc = "< Whether this is a multicast ping request."]
     pub mIsMulticast: bool,
 }
-#[doc = " This function pointer type specifies the callback to notify receipt of a ping reply.\n\n @param[in] aReply      A pointer to a `otPingSenderReply` containing info about the received ping reply.\n @param[in] aContext    A pointer to application-specific context.\n"]
+#[doc = " Pointer type specifies the callback to notify receipt of a ping reply.\n\n @param[in] aReply      A pointer to a `otPingSenderReply` containing info about the received ping reply.\n @param[in] aContext    A pointer to application-specific context.\n"]
 pub type otPingSenderReplyCallback = ::std::option::Option<
     unsafe extern "C" fn(aReply: *const otPingSenderReply, aContext: *mut ::std::os::raw::c_void),
 >;
-#[doc = " This function pointer type specifies the callback to report the ping statistics.\n\n @param[in] aStatistics      A pointer to a `otPingSenderStatistics` containing info about the received ping\n                             statistics.\n @param[in] aContext         A pointer to application-specific context.\n"]
+#[doc = " Pointer type specifies the callback to report the ping statistics.\n\n @param[in] aStatistics      A pointer to a `otPingSenderStatistics` containing info about the received ping\n                             statistics.\n @param[in] aContext         A pointer to application-specific context.\n"]
 pub type otPingSenderStatisticsCallback = ::std::option::Option<
     unsafe extern "C" fn(
         aStatistics: *const otPingSenderStatistics,
         aContext: *mut ::std::os::raw::c_void,
     ),
 >;
-#[doc = " This structure represents a ping request configuration.\n"]
+#[doc = " Represents a ping request configuration.\n"]
 #[repr(C)]
 #[derive(Copy, Clone)]
 pub struct otPingSenderConfig {
@@ -8699,14 +8724,14 @@ impl Default for otPingSenderConfig {
     }
 }
 extern "C" {
-    #[doc = " This function starts a ping.\n\n @param[in] aInstance            A pointer to an OpenThread instance.\n @param[in] aConfig              The ping config to use.\n\n @retval OT_ERROR_NONE           The ping started successfully.\n @retval OT_ERROR_BUSY           Could not start since busy with a previous ongoing ping request.\n @retval OT_ERROR_INVALID_ARGS   The @p aConfig contains invalid parameters (e.g., ping interval is too long).\n\n"]
+    #[doc = " Starts a ping.\n\n @param[in] aInstance            A pointer to an OpenThread instance.\n @param[in] aConfig              The ping config to use.\n\n @retval OT_ERROR_NONE           The ping started successfully.\n @retval OT_ERROR_BUSY           Could not start since busy with a previous ongoing ping request.\n @retval OT_ERROR_INVALID_ARGS   The @p aConfig contains invalid parameters (e.g., ping interval is too long).\n\n"]
     pub fn otPingSenderPing(
         aInstance: *mut otInstance,
         aConfig: *const otPingSenderConfig,
     ) -> otError;
 }
 extern "C" {
-    #[doc = " This function stops an ongoing ping.\n\n @param[in] aInstance            A pointer to an OpenThread instance.\n"]
+    #[doc = " Stops an ongoing ping.\n\n @param[in] aInstance            A pointer to an OpenThread instance.\n"]
     pub fn otPingSenderStop(aInstance: *mut otInstance);
 }
 extern "C" {
@@ -8754,15 +8779,15 @@ extern "C" {
     pub fn otPlatDebugUart_vprintf(fmt: *const ::std::os::raw::c_char, ap: *mut __va_list_tag);
 }
 extern "C" {
-    #[doc = " Platform specific write single byte to Debug Uart\n This should not perform CR/LF mapping.\n\n This function MUST be implemented by the platform\n\n @param[in] c   what to transmit"]
+    #[doc = " Platform specific write single byte to Debug Uart\n This should not perform CR/LF mapping.\n\n MUST be implemented by the platform\n\n @param[in] c   what to transmit"]
     pub fn otPlatDebugUart_putchar_raw(c: ::std::os::raw::c_int);
 }
 extern "C" {
-    #[doc = " Poll/test debug uart if a key has been pressed.\n It would be common to a stub function that returns 0.\n\n This function MUST be implemented by the platform\n\n @retval zero - nothing ready\n @retval nonzero - otPlatDebugUart_getc() will succeed."]
+    #[doc = " Poll/test debug uart if a key has been pressed.\n It would be common to a stub function that returns 0.\n\n MUST be implemented by the platform\n\n @retval zero - nothing ready\n @retval nonzero - otPlatDebugUart_getc() will succeed."]
     pub fn otPlatDebugUart_kbhit() -> ::std::os::raw::c_int;
 }
 extern "C" {
-    #[doc = " Poll/Read a byte from the debug uart\n\n This function MUST be implemented by the platform\n\n @retval (negative) no data available, see otPlatDebugUart_kbhit()\n @retval (0x00..0x0ff) data byte value\n"]
+    #[doc = " Poll/Read a byte from the debug uart\n\n MUST be implemented by the platform\n\n @retval (negative) no data available, see otPlatDebugUart_kbhit()\n @retval (0x00..0x0ff) data byte value\n"]
     pub fn otPlatDebugUart_getc() -> ::std::os::raw::c_int;
 }
 extern "C" {
@@ -8789,10 +8814,10 @@ extern "C" {
 pub const OT_GPIO_MODE_INPUT: otGpioMode = 0;
 #[doc = "< Output mode."]
 pub const OT_GPIO_MODE_OUTPUT: otGpioMode = 1;
-#[doc = " This enumeration defines the gpio modes.\n"]
+#[doc = " Defines the gpio modes.\n"]
 pub type otGpioMode = ::std::os::raw::c_uint;
 extern "C" {
-    #[doc = " This function processes a factory diagnostics command line.\n\n The output of this function (the content written to @p aOutput) MUST terminate with `\\0` and the `\\0` is within the\n output buffer.\n\n @param[in]   aInstance       The OpenThread instance for current request.\n @param[in]   aArgsLength     The number of arguments in @p aArgs.\n @param[in]   aArgs           The arguments of diagnostics command line.\n @param[out]  aOutput         The diagnostics execution result.\n @param[in]   aOutputMaxLen   The output buffer size.\n\n @retval  OT_ERROR_INVALID_ARGS       The command is supported but invalid arguments provided.\n @retval  OT_ERROR_NONE               The command is successfully process.\n @retval  OT_ERROR_INVALID_COMMAND    The command is not valid or not supported.\n"]
+    #[doc = " Processes a factory diagnostics command line.\n\n The output of this function (the content written to @p aOutput) MUST terminate with `\\0` and the `\\0` is within the\n output buffer.\n\n @param[in]   aInstance       The OpenThread instance for current request.\n @param[in]   aArgsLength     The number of arguments in @p aArgs.\n @param[in]   aArgs           The arguments of diagnostics command line.\n @param[out]  aOutput         The diagnostics execution result.\n @param[in]   aOutputMaxLen   The output buffer size.\n\n @retval  OT_ERROR_INVALID_ARGS       The command is supported but invalid arguments provided.\n @retval  OT_ERROR_NONE               The command is successfully process.\n @retval  OT_ERROR_INVALID_COMMAND    The command is not valid or not supported.\n"]
     pub fn otPlatDiagProcess(
         aInstance: *mut otInstance,
         aArgsLength: u8,
@@ -8802,23 +8827,23 @@ extern "C" {
     ) -> otError;
 }
 extern "C" {
-    #[doc = " This function enables/disables the factory diagnostics mode.\n\n @param[in]  aMode  TRUE to enable diagnostics mode, FALSE otherwise.\n"]
+    #[doc = " Enables/disables the factory diagnostics mode.\n\n @param[in]  aMode  TRUE to enable diagnostics mode, FALSE otherwise.\n"]
     pub fn otPlatDiagModeSet(aMode: bool);
 }
 extern "C" {
-    #[doc = " This function indicates whether or not factory diagnostics mode is enabled.\n\n @returns TRUE if factory diagnostics mode is enabled, FALSE otherwise.\n"]
+    #[doc = " Indicates whether or not factory diagnostics mode is enabled.\n\n @returns TRUE if factory diagnostics mode is enabled, FALSE otherwise.\n"]
     pub fn otPlatDiagModeGet() -> bool;
 }
 extern "C" {
-    #[doc = " This function sets the channel to use for factory diagnostics.\n\n @param[in]  aChannel  The channel value.\n"]
+    #[doc = " Sets the channel to use for factory diagnostics.\n\n @param[in]  aChannel  The channel value.\n"]
     pub fn otPlatDiagChannelSet(aChannel: u8);
 }
 extern "C" {
-    #[doc = " This function sets the transmit power to use for factory diagnostics.\n\n @param[in]  aTxPower  The transmit power value.\n"]
+    #[doc = " Sets the transmit power to use for factory diagnostics.\n\n @param[in]  aTxPower  The transmit power value.\n"]
     pub fn otPlatDiagTxPowerSet(aTxPower: i8);
 }
 extern "C" {
-    #[doc = " This function processes the received radio frame.\n\n @param[in]   aInstance   The OpenThread instance for current request.\n @param[in]   aFrame      The received radio frame.\n @param[in]   aError      The received radio frame status.\n"]
+    #[doc = " Processes the received radio frame.\n\n @param[in]   aInstance   The OpenThread instance for current request.\n @param[in]   aFrame      The received radio frame.\n @param[in]   aError      The received radio frame status.\n"]
     pub fn otPlatDiagRadioReceived(
         aInstance: *mut otInstance,
         aFrame: *mut otRadioFrame,
@@ -8826,23 +8851,23 @@ extern "C" {
     );
 }
 extern "C" {
-    #[doc = " This function processes the alarm event.\n\n @param[in]   aInstance   The OpenThread instance for current request.\n"]
+    #[doc = " Processes the alarm event.\n\n @param[in]   aInstance   The OpenThread instance for current request.\n"]
     pub fn otPlatDiagAlarmCallback(aInstance: *mut otInstance);
 }
 extern "C" {
-    #[doc = " This function sets the gpio value.\n\n @param[in]  aGpio   The gpio number.\n @param[in]  aValue  true to set the gpio to high level, or false otherwise.\n\n @retval OT_ERROR_NONE             Successfully set the gpio.\n @retval OT_ERROR_FAILED           A platform error occurred while setting the gpio.\n @retval OT_ERROR_INVALID_ARGS     @p aGpio is not supported.\n @retval OT_ERROR_INVALID_STATE    Diagnostic mode was not enabled or @p aGpio is not configured as output.\n @retval OT_ERROR_NOT_IMPLEMENTED  This function is not implemented or configured on the platform.\n"]
+    #[doc = " Sets the gpio value.\n\n @param[in]  aGpio   The gpio number.\n @param[in]  aValue  true to set the gpio to high level, or false otherwise.\n\n @retval OT_ERROR_NONE             Successfully set the gpio.\n @retval OT_ERROR_FAILED           A platform error occurred while setting the gpio.\n @retval OT_ERROR_INVALID_ARGS     @p aGpio is not supported.\n @retval OT_ERROR_INVALID_STATE    Diagnostic mode was not enabled or @p aGpio is not configured as output.\n @retval OT_ERROR_NOT_IMPLEMENTED  This function is not implemented or configured on the platform.\n"]
     pub fn otPlatDiagGpioSet(aGpio: u32, aValue: bool) -> otError;
 }
 extern "C" {
-    #[doc = " This function gets the gpio value.\n\n @param[in]   aGpio   The gpio number.\n @param[out]  aValue  A pointer where to put gpio value.\n\n @retval OT_ERROR_NONE             Successfully got the gpio value.\n @retval OT_ERROR_FAILED           A platform error occurred while getting the gpio value.\n @retval OT_ERROR_INVALID_ARGS     @p aGpio is not supported or @p aValue is NULL.\n @retval OT_ERROR_INVALID_STATE    Diagnostic mode was not enabled or @p aGpio is not configured as input.\n @retval OT_ERROR_NOT_IMPLEMENTED  This function is not implemented or configured on the platform.\n"]
+    #[doc = " Gets the gpio value.\n\n @param[in]   aGpio   The gpio number.\n @param[out]  aValue  A pointer where to put gpio value.\n\n @retval OT_ERROR_NONE             Successfully got the gpio value.\n @retval OT_ERROR_FAILED           A platform error occurred while getting the gpio value.\n @retval OT_ERROR_INVALID_ARGS     @p aGpio is not supported or @p aValue is NULL.\n @retval OT_ERROR_INVALID_STATE    Diagnostic mode was not enabled or @p aGpio is not configured as input.\n @retval OT_ERROR_NOT_IMPLEMENTED  This function is not implemented or configured on the platform.\n"]
     pub fn otPlatDiagGpioGet(aGpio: u32, aValue: *mut bool) -> otError;
 }
 extern "C" {
-    #[doc = " This function sets the gpio mode.\n\n @param[in]   aGpio   The gpio number.\n @param[out]  aMode   The gpio mode.\n\n @retval OT_ERROR_NONE             Successfully set the gpio mode.\n @retval OT_ERROR_FAILED           A platform error occurred while setting the gpio mode.\n @retval OT_ERROR_INVALID_ARGS     @p aGpio or @p aMode is not supported.\n @retval OT_ERROR_INVALID_STATE    Diagnostic mode was not enabled.\n @retval OT_ERROR_NOT_IMPLEMENTED  This function is not implemented or configured on the platform.\n"]
+    #[doc = " Sets the gpio mode.\n\n @param[in]   aGpio   The gpio number.\n @param[out]  aMode   The gpio mode.\n\n @retval OT_ERROR_NONE             Successfully set the gpio mode.\n @retval OT_ERROR_FAILED           A platform error occurred while setting the gpio mode.\n @retval OT_ERROR_INVALID_ARGS     @p aGpio or @p aMode is not supported.\n @retval OT_ERROR_INVALID_STATE    Diagnostic mode was not enabled.\n @retval OT_ERROR_NOT_IMPLEMENTED  This function is not implemented or configured on the platform.\n"]
     pub fn otPlatDiagGpioSetMode(aGpio: u32, aMode: otGpioMode) -> otError;
 }
 extern "C" {
-    #[doc = " This function gets the gpio mode.\n\n @param[in]   aGpio   The gpio number.\n @param[out]  aMode   A pointer where to put gpio mode.\n\n @retval OT_ERROR_NONE             Successfully got the gpio mode.\n @retval OT_ERROR_FAILED           Mode returned by the platform is not implemented in OpenThread or a platform error\n                                   occurred while getting the gpio mode.\n @retval OT_ERROR_INVALID_ARGS     @p aGpio is not supported or @p aMode is NULL.\n @retval OT_ERROR_INVALID_STATE    Diagnostic mode was not enabled.\n @retval OT_ERROR_NOT_IMPLEMENTED  This function is not implemented or configured on the platform.\n"]
+    #[doc = " Gets the gpio mode.\n\n @param[in]   aGpio   The gpio number.\n @param[out]  aMode   A pointer where to put gpio mode.\n\n @retval OT_ERROR_NONE             Successfully got the gpio mode.\n @retval OT_ERROR_FAILED           Mode returned by the platform is not implemented in OpenThread or a platform error\n                                   occurred while getting the gpio mode.\n @retval OT_ERROR_INVALID_ARGS     @p aGpio is not supported or @p aMode is NULL.\n @retval OT_ERROR_INVALID_STATE    Diagnostic mode was not enabled.\n @retval OT_ERROR_NOT_IMPLEMENTED  This function is not implemented or configured on the platform.\n"]
     pub fn otPlatDiagGpioGetMode(aGpio: u32, aMode: *mut otGpioMode) -> otError;
 }
 extern "C" {
@@ -8888,23 +8913,23 @@ extern "C" {
     ) -> otError;
 }
 extern "C" {
-    #[doc = " Fill buffer with entropy.\n\n This function MUST be implemented using a true random number generator (TRNG).\n\n @param[out]  aOutput              A pointer to where the true random values are placed.  Must not be NULL.\n @param[in]   aOutputLength        Size of @p aBuffer.\n\n @retval OT_ERROR_NONE          Successfully filled @p aBuffer with true random values.\n @retval OT_ERROR_FAILED        Failed to fill @p aBuffer with true random values.\n @retval OT_ERROR_INVALID_ARGS  @p aBuffer was set to NULL.\n"]
+    #[doc = " Fill buffer with entropy.\n\n MUST be implemented using a true random number generator (TRNG).\n\n @param[out]  aOutput              A pointer to where the true random values are placed.  Must not be NULL.\n @param[in]   aOutputLength        Size of @p aBuffer.\n\n @retval OT_ERROR_NONE          Successfully filled @p aBuffer with true random values.\n @retval OT_ERROR_FAILED        Failed to fill @p aBuffer with true random values.\n @retval OT_ERROR_INVALID_ARGS  @p aBuffer was set to NULL.\n"]
     pub fn otPlatEntropyGet(aOutput: *mut u8, aOutputLength: u16) -> otError;
 }
 extern "C" {
-    #[doc = " This function initializes the flash driver.\n\n @param[in] aInstance  The OpenThread instance structure.\n"]
+    #[doc = " Initializes the flash driver.\n\n @param[in] aInstance  The OpenThread instance structure.\n"]
     pub fn otPlatFlashInit(aInstance: *mut otInstance);
 }
 extern "C" {
-    #[doc = " This function gets the size of the swap space.\n\n @param[in] aInstance  The OpenThread instance structure.\n\n @returns The size of the swap space in bytes.\n"]
+    #[doc = " Gets the size of the swap space.\n\n @param[in] aInstance  The OpenThread instance structure.\n\n @returns The size of the swap space in bytes.\n"]
     pub fn otPlatFlashGetSwapSize(aInstance: *mut otInstance) -> u32;
 }
 extern "C" {
-    #[doc = " This function erases the swap space indicated by @p aSwapIndex.\n\n @param[in] aInstance   The OpenThread instance structure.\n @param[in] aSwapIndex  A value in [0, 1] that indicates the swap space.\n"]
+    #[doc = " Erases the swap space indicated by @p aSwapIndex.\n\n @param[in] aInstance   The OpenThread instance structure.\n @param[in] aSwapIndex  A value in [0, 1] that indicates the swap space.\n"]
     pub fn otPlatFlashErase(aInstance: *mut otInstance, aSwapIndex: u8);
 }
 extern "C" {
-    #[doc = " This function reads @p aSize bytes into @p aData.\n\n @param[in]  aInstance   The OpenThread instance structure.\n @param[in]  aSwapIndex  A value in [0, 1] that indicates the swap space.\n @param[in]  aOffset     A byte offset within the swap space.\n @param[out] aData       A pointer to the data buffer for reading.\n @param[in]  aSize       Number of bytes to read.\n"]
+    #[doc = " Reads @p aSize bytes into @p aData.\n\n @param[in]  aInstance   The OpenThread instance structure.\n @param[in]  aSwapIndex  A value in [0, 1] that indicates the swap space.\n @param[in]  aOffset     A byte offset within the swap space.\n @param[out] aData       A pointer to the data buffer for reading.\n @param[in]  aSize       Number of bytes to read.\n"]
     pub fn otPlatFlashRead(
         aInstance: *mut otInstance,
         aSwapIndex: u8,
@@ -8914,7 +8939,7 @@ extern "C" {
     );
 }
 extern "C" {
-    #[doc = " This function writes @p aSize bytes from @p aData.\n\n @param[in]  aInstance   The OpenThread instance structure.\n @param[in]  aSwapIndex  A value in [0, 1] that indicates the swap space.\n @param[in]  aOffset     A byte offset within the swap space.\n @param[out] aData       A pointer to the data to write.\n @param[in]  aSize       Number of bytes to write.\n\n"]
+    #[doc = " Writes @p aSize bytes from @p aData.\n\n @param[in]  aInstance   The OpenThread instance structure.\n @param[in]  aSwapIndex  A value in [0, 1] that indicates the swap space.\n @param[in]  aOffset     A byte offset within the swap space.\n @param[out] aData       A pointer to the data to write.\n @param[in]  aSize       Number of bytes to write.\n\n"]
     pub fn otPlatFlashWrite(
         aInstance: *mut otInstance,
         aSwapIndex: u8,
@@ -8924,11 +8949,11 @@ extern "C" {
     );
 }
 extern "C" {
-    #[doc = " This method tells whether an infra interface has the given IPv6 address assigned.\n\n @param[in]  aInfraIfIndex  The index of the infra interface.\n @param[in]  aAddress       The IPv6 address.\n\n @returns  TRUE if the infra interface has given IPv6 address assigned, FALSE otherwise.\n"]
+    #[doc = " Tells whether an infra interface has the given IPv6 address assigned.\n\n @param[in]  aInfraIfIndex  The index of the infra interface.\n @param[in]  aAddress       The IPv6 address.\n\n @returns  TRUE if the infra interface has given IPv6 address assigned, FALSE otherwise.\n"]
     pub fn otPlatInfraIfHasAddress(aInfraIfIndex: u32, aAddress: *const otIp6Address) -> bool;
 }
 extern "C" {
-    #[doc = " This method sends an ICMPv6 Neighbor Discovery message on given infrastructure interface.\n\n See RFC 4861: https://tools.ietf.org/html/rfc4861.\n\n @param[in]  aInfraIfIndex  The index of the infrastructure interface this message is sent to.\n @param[in]  aDestAddress   The destination address this message is sent to.\n @param[in]  aBuffer        The ICMPv6 message buffer. The ICMPv6 checksum is left zero and the\n                            platform should do the checksum calculate.\n @param[in]  aBufferLength  The length of the message buffer.\n\n @note  Per RFC 4861, the implementation should send the message with IPv6 link-local source address\n        of interface @p aInfraIfIndex and IP Hop Limit 255.\n\n @retval OT_ERROR_NONE    Successfully sent the ICMPv6 message.\n @retval OT_ERROR_FAILED  Failed to send the ICMPv6 message.\n"]
+    #[doc = " Sends an ICMPv6 Neighbor Discovery message on given infrastructure interface.\n\n See RFC 4861: https://tools.ietf.org/html/rfc4861.\n\n @param[in]  aInfraIfIndex  The index of the infrastructure interface this message is sent to.\n @param[in]  aDestAddress   The destination address this message is sent to.\n @param[in]  aBuffer        The ICMPv6 message buffer. The ICMPv6 checksum is left zero and the\n                            platform should do the checksum calculate.\n @param[in]  aBufferLength  The length of the message buffer.\n\n @note  Per RFC 4861, the implementation should send the message with IPv6 link-local source address\n        of interface @p aInfraIfIndex and IP Hop Limit 255.\n\n @retval OT_ERROR_NONE    Successfully sent the ICMPv6 message.\n @retval OT_ERROR_FAILED  Failed to send the ICMPv6 message.\n"]
     pub fn otPlatInfraIfSendIcmp6Nd(
         aInfraIfIndex: u32,
         aDestAddress: *const otIp6Address,
@@ -8959,7 +8984,7 @@ extern "C" {
     pub fn otPlatInfraIfDiscoverNat64Prefix(aInfraIfIndex: u32) -> otError;
 }
 extern "C" {
-    #[doc = " The infra interface driver calls this method to notify OpenThread that\n the discovery of NAT64 prefix is done.\n\n This method is expected to be invoked after calling otPlatInfraIfDiscoverNat64Prefix.\n If no NAT64 prefix is discovered, @p aIp6Prefix shall point to an empty prefix with zero length.\n\n @param[in]  aInstance      The OpenThread instance structure.\n @param[in]  aInfraIfIndex  The index of the infrastructure interface on which the NAT64 prefix is discovered.\n @param[in]  aIp6Prefix     A pointer to NAT64 prefix.\n"]
+    #[doc = " The infra interface driver calls this method to notify OpenThread that\n the discovery of NAT64 prefix is done.\n\n Is expected to be invoked after calling otPlatInfraIfDiscoverNat64Prefix.\n If no NAT64 prefix is discovered, @p aIp6Prefix shall point to an empty prefix with zero length.\n\n @param[in]  aInstance      The OpenThread instance structure.\n @param[in]  aInfraIfIndex  The index of the infrastructure interface on which the NAT64 prefix is discovered.\n @param[in]  aIp6Prefix     A pointer to NAT64 prefix.\n"]
     pub fn otPlatInfraIfDiscoverNat64PrefixDone(
         aInstance: *mut otInstance,
         aInfraIfIndex: u32,
@@ -8967,14 +8992,14 @@ extern "C" {
     );
 }
 extern "C" {
-    #[doc = " Dynamically allocates new memory. On platforms that support it, should just redirect to calloc. For\n those that don't support calloc, should support the same functionality:\n\n   \"The calloc() function contiguously allocates enough space for count objects that are size bytes of\n   memory each and returns a pointer to the allocated memory. The allocated memory is filled with bytes\n   of value zero.\"\n\n This function is required for OPENTHREAD_CONFIG_HEAP_EXTERNAL_ENABLE.\n\n @param[in] aNum   The number of blocks to allocate\n @param[in] aSize  The size of each block to allocate\n\n @retval void*  The pointer to the front of the memory allocated\n @retval NULL   Failed to allocate the memory requested."]
+    #[doc = " Dynamically allocates new memory. On platforms that support it, should just redirect to calloc. For\n those that don't support calloc, should support the same functionality:\n\n   \"The calloc() function contiguously allocates enough space for count objects that are size bytes of\n   memory each and returns a pointer to the allocated memory. The allocated memory is filled with bytes\n   of value zero.\"\n\n Is required for OPENTHREAD_CONFIG_HEAP_EXTERNAL_ENABLE.\n\n @param[in] aNum   The number of blocks to allocate\n @param[in] aSize  The size of each block to allocate\n\n @retval void*  The pointer to the front of the memory allocated\n @retval NULL   Failed to allocate the memory requested."]
     pub fn otPlatCAlloc(aNum: usize, aSize: usize) -> *mut ::std::os::raw::c_void;
 }
 extern "C" {
-    #[doc = " Frees memory that was dynamically allocated.\n\n This function is required for OPENTHREAD_CONFIG_HEAP_EXTERNAL_ENABLE.\n\n @param[in] aPtr  A pointer the memory blocks to free. The pointer may be NULL."]
+    #[doc = " Frees memory that was dynamically allocated.\n\n Is required for OPENTHREAD_CONFIG_HEAP_EXTERNAL_ENABLE.\n\n @param[in] aPtr  A pointer the memory blocks to free. The pointer may be NULL."]
     pub fn otPlatFree(aPtr: *mut ::std::os::raw::c_void);
 }
-#[doc = " This struct represents an OpenThread message buffer.\n"]
+#[doc = " Represents an OpenThread message buffer.\n"]
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
 pub struct otMessageBuffer {
@@ -8991,7 +9016,7 @@ impl Default for otMessageBuffer {
     }
 }
 extern "C" {
-    #[doc = " Initialize the platform implemented message pool.\n\n This function is used when `OPENTHREAD_CONFIG_PLATFORM_MESSAGE_MANAGEMENT` is enabled.\n\n @param[in] aInstance            A pointer to the OpenThread instance.\n @param[in] aMinNumFreeBuffers   An uint16 containing the minimum number of free buffers desired by OpenThread.\n @param[in] aBufferSize          The size in bytes of a buffer object.\n"]
+    #[doc = " Initialize the platform implemented message pool.\n\n Is used when `OPENTHREAD_CONFIG_PLATFORM_MESSAGE_MANAGEMENT` is enabled.\n\n @param[in] aInstance            A pointer to the OpenThread instance.\n @param[in] aMinNumFreeBuffers   An uint16 containing the minimum number of free buffers desired by OpenThread.\n @param[in] aBufferSize          The size in bytes of a buffer object.\n"]
     pub fn otPlatMessagePoolInit(
         aInstance: *mut otInstance,
         aMinNumFreeBuffers: u16,
@@ -8999,19 +9024,19 @@ extern "C" {
     );
 }
 extern "C" {
-    #[doc = " Allocate a buffer from the platform managed buffer pool.\n\n This function is used when `OPENTHREAD_CONFIG_PLATFORM_MESSAGE_MANAGEMENT` is enabled.\n\n The returned buffer instance MUST have at least `aBufferSize` bytes (as specified in `otPlatMessagePoolInit()`).\n\n @param[in] aInstance            A pointer to the OpenThread instance.\n\n @returns A pointer to the buffer or NULL if no buffers are available.\n"]
+    #[doc = " Allocate a buffer from the platform managed buffer pool.\n\n Is used when `OPENTHREAD_CONFIG_PLATFORM_MESSAGE_MANAGEMENT` is enabled.\n\n The returned buffer instance MUST have at least `aBufferSize` bytes (as specified in `otPlatMessagePoolInit()`).\n\n @param[in] aInstance            A pointer to the OpenThread instance.\n\n @returns A pointer to the buffer or NULL if no buffers are available.\n"]
     pub fn otPlatMessagePoolNew(aInstance: *mut otInstance) -> *mut otMessageBuffer;
 }
 extern "C" {
-    #[doc = " This function is used to free a buffer back to the platform managed buffer pool.\n\n This function is used when `OPENTHREAD_CONFIG_PLATFORM_MESSAGE_MANAGEMENT` is enabled.\n\n @param[in]  aInstance  A pointer to the OpenThread instance.\n @param[in]  aBuffer    The buffer to free.\n"]
+    #[doc = " Is used to free a buffer back to the platform managed buffer pool.\n\n Is used when `OPENTHREAD_CONFIG_PLATFORM_MESSAGE_MANAGEMENT` is enabled.\n\n @param[in]  aInstance  A pointer to the OpenThread instance.\n @param[in]  aBuffer    The buffer to free.\n"]
     pub fn otPlatMessagePoolFree(aInstance: *mut otInstance, aBuffer: *mut otMessageBuffer);
 }
 extern "C" {
-    #[doc = " Get the number of free buffers.\n\n This function is used when `OPENTHREAD_CONFIG_PLATFORM_MESSAGE_MANAGEMENT` is enabled.\n\n @param[in]  aInstance  A pointer to the OpenThread instance.\n\n @returns The number of buffers currently free and available to OpenThread.\n"]
+    #[doc = " Get the number of free buffers.\n\n Is used when `OPENTHREAD_CONFIG_PLATFORM_MESSAGE_MANAGEMENT` is enabled.\n\n @param[in]  aInstance  A pointer to the OpenThread instance.\n\n @returns The number of buffers currently free and available to OpenThread.\n"]
     pub fn otPlatMessagePoolNumFreeBuffers(aInstance: *mut otInstance) -> u16;
 }
 extern "C" {
-    #[doc = " This function performs a software reset on the platform, if supported.\n\n @param[in] aInstance  The OpenThread instance structure.\n"]
+    #[doc = " Performs a software reset on the platform, if supported.\n\n @param[in] aInstance  The OpenThread instance structure.\n"]
     pub fn otPlatReset(aInstance: *mut otInstance);
 }
 pub const OT_PLAT_RESET_REASON_POWER_ON: otPlatResetReason = 0;
@@ -9027,18 +9052,18 @@ pub const OT_PLAT_RESET_REASON_COUNT: otPlatResetReason = 9;
 #[doc = " Enumeration of possible reset reason codes.\n\n These are in the same order as the Spinel reset reason codes.\n"]
 pub type otPlatResetReason = ::std::os::raw::c_uint;
 extern "C" {
-    #[doc = " This function returns the reason for the last platform reset.\n\n @param[in] aInstance  The OpenThread instance structure.\n"]
+    #[doc = " Returns the reason for the last platform reset.\n\n @param[in] aInstance  The OpenThread instance structure.\n"]
     pub fn otPlatGetResetReason(aInstance: *mut otInstance) -> otPlatResetReason;
 }
 extern "C" {
-    #[doc = " This function provides a platform specific implementation for assert.\n\n @param[in] aFilename    The name of the file where the assert occurred.\n @param[in] aLineNumber  The line number in the file where the assert occurred.\n"]
+    #[doc = " Provides a platform specific implementation for assert.\n\n @param[in] aFilename    The name of the file where the assert occurred.\n @param[in] aLineNumber  The line number in the file where the assert occurred.\n"]
     pub fn otPlatAssertFail(
         aFilename: *const ::std::os::raw::c_char,
         aLineNumber: ::std::os::raw::c_int,
     );
 }
 extern "C" {
-    #[doc = " This function performs a platform specific operation to wake the host MCU.\n This is used only for NCP configurations.\n"]
+    #[doc = " Performs a platform specific operation to wake the host MCU.\n This is used only for NCP configurations.\n"]
     pub fn otPlatWakeHost();
 }
 #[doc = " NCP's MCU stays on and active all the time.\n\n When the NCP's desired power state is set to `ON`, host can send messages to NCP without requiring any \"poke\" or\n external triggers.\n\n @note The `ON` power state only determines the MCU's power mode and is not related to radio's state.\n"]
@@ -9050,18 +9075,18 @@ pub const OT_PLAT_MCU_POWER_STATE_OFF: otPlatMcuPowerState = 2;
 #[doc = " Enumeration of micro-controller's power states.\n\n These values are used for NCP configuration when `OPENTHREAD_CONFIG_NCP_ENABLE_MCU_POWER_STATE_CONTROL` is enabled.\n\n The power state specifies the desired power state of NCP's micro-controller (MCU) when the underlying platform's\n operating system enters idle mode (i.e., all active tasks/events are processed and the MCU can potentially enter a\n energy-saving power state).\n\n The power state primarily determines how the host should interact with the NCP and whether the host needs an\n external trigger (a \"poke\") to NCP before it can communicate with the NCP or not.\n\n After a reset, the MCU power state MUST be `OT_PLAT_POWER_STATE_ON`.\n"]
 pub type otPlatMcuPowerState = ::std::os::raw::c_uint;
 extern "C" {
-    #[doc = " This function sets the desired MCU power state.\n\n This is only applicable and used for NCP configuration when `OPENTHREAD_CONFIG_NCP_ENABLE_MCU_POWER_STATE_CONTROL`\n is enabled.\n\n @param[in] aInstance      A pointer to OpenThread instance.\n @param[in] aState         The new MCU power state.\n\n @retval OT_ERROR_NONE     The power state updated successfully.\n @retval OT_ERROR_FAILED   The given MCU power state is not supported by the platform.\n"]
+    #[doc = " Sets the desired MCU power state.\n\n This is only applicable and used for NCP configuration when `OPENTHREAD_CONFIG_NCP_ENABLE_MCU_POWER_STATE_CONTROL`\n is enabled.\n\n @param[in] aInstance      A pointer to OpenThread instance.\n @param[in] aState         The new MCU power state.\n\n @retval OT_ERROR_NONE     The power state updated successfully.\n @retval OT_ERROR_FAILED   The given MCU power state is not supported by the platform.\n"]
     pub fn otPlatSetMcuPowerState(
         aInstance: *mut otInstance,
         aState: otPlatMcuPowerState,
     ) -> otError;
 }
 extern "C" {
-    #[doc = " This function gets the current desired MCU power state.\n\n This is only applicable and used for NCP configuration when `OPENTHREAD_CONFIG_NCP_ENABLE_MCU_POWER_STATE_CONTROL`\n is enabled.\n\n After a reset, the power state MUST return `OT_PLAT_POWER_STATE_ON`. During operation, power state SHOULD only\n change through an explicit successful call to `otPlatSetMcuPowerState()`.\n\n @param[in] aInstance  A pointer to OpenThread instance.\n\n @returns The current power state.\n"]
+    #[doc = " Gets the current desired MCU power state.\n\n This is only applicable and used for NCP configuration when `OPENTHREAD_CONFIG_NCP_ENABLE_MCU_POWER_STATE_CONTROL`\n is enabled.\n\n After a reset, the power state MUST return `OT_PLAT_POWER_STATE_ON`. During operation, power state SHOULD only\n change through an explicit successful call to `otPlatSetMcuPowerState()`.\n\n @param[in] aInstance  A pointer to OpenThread instance.\n\n @returns The current power state.\n"]
     pub fn otPlatGetMcuPowerState(aInstance: *mut otInstance) -> otPlatMcuPowerState;
 }
 extern "C" {
-    #[doc = " This function exports status information to OTNS.\n\n The status information is represented by a null-terminated string with format recognizable by OTNS.\n Each call to `otPlatOtnsStatus` can send multiple statuses, separated by ';', e.x. \"parid=577fbc37;lrid=5\".\n Each status contains key and value separated by '='.\n Status value can be further separated into multiple fields using ',',\n e.x. \"ping_request=fdde:ad00:beef:0:459e:d7b4:b65e:5480,4,112000\".\n\n New statuses should follow these conventions.\n\n Currently, OTNS only supports virtual time simulation.\n\n @param[in]  aStatus  The status string.\n"]
+    #[doc = " Exports status information to OTNS.\n\n The status information is represented by a null-terminated string with format recognizable by OTNS.\n Each call to `otPlatOtnsStatus` can send multiple statuses, separated by ';', e.x. \"parid=577fbc37;lrid=5\".\n Each status contains key and value separated by '='.\n Status value can be further separated into multiple fields using ',',\n e.x. \"ping_request=fdde:ad00:beef:0:459e:d7b4:b65e:5480,4,112000\".\n\n New statuses should follow these conventions.\n\n Currently, OTNS only supports virtual time simulation.\n\n @param[in]  aStatus  The status string.\n"]
     pub fn otPlatOtnsStatus(aStatus: *const ::std::os::raw::c_char);
 }
 #[doc = "< Active Operational Dataset."]
@@ -9092,10 +9117,10 @@ pub const OT_SETTINGS_KEY_BR_ON_LINK_PREFIXES: _bindgen_ty_12 = 16;
 pub const OT_SETTINGS_KEY_BORDER_AGENT_ID: _bindgen_ty_12 = 17;
 pub const OT_SETTINGS_KEY_VENDOR_RESERVED_MIN: _bindgen_ty_12 = 32768;
 pub const OT_SETTINGS_KEY_VENDOR_RESERVED_MAX: _bindgen_ty_12 = 65535;
-#[doc = " This enumeration defines the keys of settings.\n\n Note: When adding a new settings key, if the settings corresponding to the key contains security sensitive\n       information, the developer MUST add the key to the array `aSensitiveKeys` which is passed in\n       `otPlatSettingsInit()`.\n"]
+#[doc = " Defines the keys of settings.\n\n Note: When adding a new settings key, if the settings corresponding to the key contains security sensitive\n       information, the developer MUST add the key to the array `aSensitiveKeys` which is passed in\n       `otPlatSettingsInit()`.\n"]
 pub type _bindgen_ty_12 = ::std::os::raw::c_uint;
 extern "C" {
-    #[doc = " Performs any initialization for the settings subsystem, if necessary.\n\n This function also sets the sensitive keys that should be stored in the secure area.\n\n Note that the memory pointed by @p aSensitiveKeys MUST not be released before @p aInstance is destroyed.\n\n @param[in]  aInstance             The OpenThread instance structure.\n @param[in]  aSensitiveKeys        A pointer to an array containing the list of sensitive keys. May be NULL only if\n                                   @p aSensitiveKeysLength is 0, which means that there is no sensitive keys.\n @param[in]  aSensitiveKeysLength  The number of entries in the @p aSensitiveKeys array.\n"]
+    #[doc = " Performs any initialization for the settings subsystem, if necessary.\n\n Also sets the sensitive keys that should be stored in the secure area.\n\n Note that the memory pointed by @p aSensitiveKeys MUST not be released before @p aInstance is destroyed.\n\n @param[in]  aInstance             The OpenThread instance structure.\n @param[in]  aSensitiveKeys        A pointer to an array containing the list of sensitive keys. May be NULL only if\n                                   @p aSensitiveKeysLength is 0, which means that there is no sensitive keys.\n @param[in]  aSensitiveKeysLength  The number of entries in the @p aSensitiveKeys array.\n"]
     pub fn otPlatSettingsInit(
         aInstance: *mut otInstance,
         aSensitiveKeys: *const u16,
@@ -9107,7 +9132,7 @@ extern "C" {
     pub fn otPlatSettingsDeinit(aInstance: *mut otInstance);
 }
 extern "C" {
-    #[doc = " Fetches the value of a setting.\n\n This function fetches the value of the setting identified\n by @p aKey and write it to the memory pointed to by aValue.\n It then writes the length to the integer pointed to by\n @p aValueLength. The initial value of @p aValueLength is the\n maximum number of bytes to be written to @p aValue.\n\n This function can be used to check for the existence of\n a key without fetching the value by setting @p aValue and\n @p aValueLength to NULL. You can also check the length of\n the setting without fetching it by setting only aValue\n to NULL.\n\n Note that the underlying storage implementation is not\n required to maintain the order of settings with multiple\n values. The order of such values MAY change after ANY\n write operation to the store.\n\n @param[in]      aInstance     The OpenThread instance structure.\n @param[in]      aKey          The key associated with the requested setting.\n @param[in]      aIndex        The index of the specific item to get.\n @param[out]     aValue        A pointer to where the value of the setting should be written. May be set to NULL if\n                               just testing for the presence or length of a setting.\n @param[in,out]  aValueLength  A pointer to the length of the value. When called, this pointer should point to an\n                               integer containing the maximum value size that can be written to @p aValue. At return,\n                               the actual length of the setting is written. This may be set to NULL if performing\n                               a presence check.\n\n @retval OT_ERROR_NONE             The given setting was found and fetched successfully.\n @retval OT_ERROR_NOT_FOUND        The given setting was not found in the setting store.\n @retval OT_ERROR_NOT_IMPLEMENTED  This function is not implemented on this platform."]
+    #[doc = " Fetches the value of a setting.\n\n Fetches the value of the setting identified\n by @p aKey and write it to the memory pointed to by aValue.\n It then writes the length to the integer pointed to by\n @p aValueLength. The initial value of @p aValueLength is the\n maximum number of bytes to be written to @p aValue.\n\n Can be used to check for the existence of\n a key without fetching the value by setting @p aValue and\n @p aValueLength to NULL. You can also check the length of\n the setting without fetching it by setting only aValue\n to NULL.\n\n Note that the underlying storage implementation is not\n required to maintain the order of settings with multiple\n values. The order of such values MAY change after ANY\n write operation to the store.\n\n @param[in]      aInstance     The OpenThread instance structure.\n @param[in]      aKey          The key associated with the requested setting.\n @param[in]      aIndex        The index of the specific item to get.\n @param[out]     aValue        A pointer to where the value of the setting should be written. May be set to NULL if\n                               just testing for the presence or length of a setting.\n @param[in,out]  aValueLength  A pointer to the length of the value. When called, this pointer should point to an\n                               integer containing the maximum value size that can be written to @p aValue. At return,\n                               the actual length of the setting is written. This may be set to NULL if performing\n                               a presence check.\n\n @retval OT_ERROR_NONE             The given setting was found and fetched successfully.\n @retval OT_ERROR_NOT_FOUND        The given setting was not found in the setting store.\n @retval OT_ERROR_NOT_IMPLEMENTED  This function is not implemented on this platform."]
     pub fn otPlatSettingsGet(
         aInstance: *mut otInstance,
         aKey: u16,
@@ -9117,7 +9142,7 @@ extern "C" {
     ) -> otError;
 }
 extern "C" {
-    #[doc = " Sets or replaces the value of a setting.\n\n This function sets or replaces the value of a setting\n identified by @p aKey.\n\n Calling this function successfully may cause unrelated\n settings with multiple values to be reordered.\n\n OpenThread stack guarantees to use `otPlatSettingsSet()`\n method for a @p aKey that was either previously set using\n `otPlatSettingsSet()` (i.e., contains a single value) or\n is empty and/or fully deleted (contains no value).\n\n Platform layer can rely and use this fact for optimizing\n its implementation.\n\n @param[in]  aInstance     The OpenThread instance structure.\n @param[in]  aKey          The key associated with the setting to change.\n @param[in]  aValue        A pointer to where the new value of the setting should be read from. MUST NOT be NULL if\n                           @p aValueLength is non-zero.\n @param[in]  aValueLength  The length of the data pointed to by aValue. May be zero.\n\n @retval OT_ERROR_NONE             The given setting was changed or staged.\n @retval OT_ERROR_NOT_IMPLEMENTED  This function is not implemented on this platform.\n @retval OT_ERROR_NO_BUFS          No space remaining to store the given setting."]
+    #[doc = " Sets or replaces the value of a setting.\n\n Sets or replaces the value of a setting\n identified by @p aKey.\n\n Calling this function successfully may cause unrelated\n settings with multiple values to be reordered.\n\n OpenThread stack guarantees to use `otPlatSettingsSet()`\n method for a @p aKey that was either previously set using\n `otPlatSettingsSet()` (i.e., contains a single value) or\n is empty and/or fully deleted (contains no value).\n\n Platform layer can rely and use this fact for optimizing\n its implementation.\n\n @param[in]  aInstance     The OpenThread instance structure.\n @param[in]  aKey          The key associated with the setting to change.\n @param[in]  aValue        A pointer to where the new value of the setting should be read from. MUST NOT be NULL if\n                           @p aValueLength is non-zero.\n @param[in]  aValueLength  The length of the data pointed to by aValue. May be zero.\n\n @retval OT_ERROR_NONE             The given setting was changed or staged.\n @retval OT_ERROR_NOT_IMPLEMENTED  This function is not implemented on this platform.\n @retval OT_ERROR_NO_BUFS          No space remaining to store the given setting."]
     pub fn otPlatSettingsSet(
         aInstance: *mut otInstance,
         aKey: u16,
@@ -9126,7 +9151,7 @@ extern "C" {
     ) -> otError;
 }
 extern "C" {
-    #[doc = " Adds a value to a setting.\n\n This function adds the value to a setting\n identified by @p aKey, without replacing any existing\n values.\n\n Note that the underlying implementation is not required\n to maintain the order of the items associated with a\n specific key. The added value may be added to the end,\n the beginning, or even somewhere in the middle. The order\n of any pre-existing values may also change.\n\n Calling this function successfully may cause unrelated\n settings with multiple values to be reordered.\n\n OpenThread stack guarantees to use `otPlatSettingsAdd()`\n method for a @p aKey that was either previously managed by\n `otPlatSettingsAdd()` (i.e., contains one or more items) or\n is empty and/or fully deleted (contains no value).\n\n Platform layer can rely and use this fact for optimizing\n its implementation.\n\n @param[in]  aInstance     The OpenThread instance structure.\n @param[in]  aKey          The key associated with the setting to change.\n @param[in]  aValue        A pointer to where the new value of the setting should be read from. MUST NOT be NULL\n                           if @p aValueLength is non-zero.\n @param[in]  aValueLength  The length of the data pointed to by @p aValue. May be zero.\n\n @retval OT_ERROR_NONE             The given setting was added or staged to be added.\n @retval OT_ERROR_NOT_IMPLEMENTED  This function is not implemented on this platform.\n @retval OT_ERROR_NO_BUFS          No space remaining to store the given setting."]
+    #[doc = " Adds a value to a setting.\n\n Adds the value to a setting\n identified by @p aKey, without replacing any existing\n values.\n\n Note that the underlying implementation is not required\n to maintain the order of the items associated with a\n specific key. The added value may be added to the end,\n the beginning, or even somewhere in the middle. The order\n of any pre-existing values may also change.\n\n Calling this function successfully may cause unrelated\n settings with multiple values to be reordered.\n\n OpenThread stack guarantees to use `otPlatSettingsAdd()`\n method for a @p aKey that was either previously managed by\n `otPlatSettingsAdd()` (i.e., contains one or more items) or\n is empty and/or fully deleted (contains no value).\n\n Platform layer can rely and use this fact for optimizing\n its implementation.\n\n @param[in]  aInstance     The OpenThread instance structure.\n @param[in]  aKey          The key associated with the setting to change.\n @param[in]  aValue        A pointer to where the new value of the setting should be read from. MUST NOT be NULL\n                           if @p aValueLength is non-zero.\n @param[in]  aValueLength  The length of the data pointed to by @p aValue. May be zero.\n\n @retval OT_ERROR_NONE             The given setting was added or staged to be added.\n @retval OT_ERROR_NOT_IMPLEMENTED  This function is not implemented on this platform.\n @retval OT_ERROR_NO_BUFS          No space remaining to store the given setting."]
     pub fn otPlatSettingsAdd(
         aInstance: *mut otInstance,
         aKey: u16,
@@ -9135,7 +9160,7 @@ extern "C" {
     ) -> otError;
 }
 extern "C" {
-    #[doc = " Removes a setting from the setting store.\n\n This function deletes a specific value from the\n setting identified by aKey from the settings store.\n\n Note that the underlying implementation is not required\n to maintain the order of the items associated with a\n specific key.\n\n @param[in] aInstance  The OpenThread instance structure.\n @param[in] aKey       The key associated with the requested setting.\n @param[in] aIndex     The index of the value to be removed. If set to -1, all values for this @p aKey will be\n                       removed.\n\n @retval OT_ERROR_NONE             The given key and index was found and removed successfully.\n @retval OT_ERROR_NOT_FOUND        The given key or index was not found in the setting store.\n @retval OT_ERROR_NOT_IMPLEMENTED  This function is not implemented on this platform."]
+    #[doc = " Removes a setting from the setting store.\n\n Deletes a specific value from the\n setting identified by aKey from the settings store.\n\n Note that the underlying implementation is not required\n to maintain the order of the items associated with a\n specific key.\n\n @param[in] aInstance  The OpenThread instance structure.\n @param[in] aKey       The key associated with the requested setting.\n @param[in] aIndex     The index of the value to be removed. If set to -1, all values for this @p aKey will be\n                       removed.\n\n @retval OT_ERROR_NONE             The given key and index was found and removed successfully.\n @retval OT_ERROR_NOT_FOUND        The given key or index was not found in the setting store.\n @retval OT_ERROR_NOT_IMPLEMENTED  This function is not implemented on this platform."]
     pub fn otPlatSettingsDelete(
         aInstance: *mut otInstance,
         aKey: u16,
@@ -9143,7 +9168,7 @@ extern "C" {
     ) -> otError;
 }
 extern "C" {
-    #[doc = " Removes all settings from the setting store.\n\n This function deletes all settings from the settings\n store, resetting it to its initial factory state.\n\n @param[in] aInstance  The OpenThread instance structure."]
+    #[doc = " Removes all settings from the setting store.\n\n Deletes all settings from the settings\n store, resetting it to its initial factory state.\n\n @param[in] aInstance  The OpenThread instance structure."]
     pub fn otPlatSettingsWipe(aInstance: *mut otInstance);
 }
 #[doc = " Indicates that a SPI transaction has completed with the given length. The data written to the slave has been written\n to the pointer indicated by the `aInputBuf` argument to the previous call to `otPlatSpiSlavePrepareTransaction()`.\n\n Once this function is called, `otPlatSpiSlavePrepareTransaction()` is invalid and must be called again for the next\n transaction to be valid.\n\n Note that this function is always called at the end of a transaction, even if `otPlatSpiSlavePrepareTransaction()`\n has not yet been called. In such cases, `aOutputBufLen` and `aInputBufLen` will be zero.\n\n This callback can be called from ISR context. The return value from this function indicates if any further\n processing is required. If `TRUE` is returned the platform spi-slave driver implementation must invoke the\n transaction process callback (`aProcessCallback` set in `otPlatSpiSlaveEnable()`) which unlike this callback must be\n called from the same OS context that any other OpenThread API/callback is called.\n\n @param[in] aContext           Context pointer passed into `otPlatSpiSlaveEnable()`.\n @param[in] aOutputBuf         Value of `aOutputBuf` from last call to `otPlatSpiSlavePrepareTransaction()`.\n @param[in] aOutputBufLen      Value of `aOutputBufLen` from last call to `otPlatSpiSlavePrepareTransaction()`.\n @param[in] aInputBuf          Value of aInputBuf from last call to `otPlatSpiSlavePrepareTransaction()`.\n @param[in] aInputBufLen       Value of aInputBufLen from last call to `otPlatSpiSlavePrepareTransaction()`\n @param[in] aTransactionLength Length of the completed transaction, in bytes.\n\n @returns  TRUE if after this call returns the platform should invoke the process callback `aProcessCallback`,\n           FALSE if there is nothing to process and no need to invoke the process callback."]
@@ -9173,7 +9198,7 @@ extern "C" {
     pub fn otPlatSpiSlaveDisable();
 }
 extern "C" {
-    #[doc = " Prepare data for the next SPI transaction. Data pointers MUST remain valid until the transaction complete callback\n is called by the SPI slave driver, or until after the next call to `otPlatSpiSlavePrepareTransaction()`.\n\n This function may be called more than once before the SPI master initiates the transaction. Each *successful* call\n to this function will cause the previous values from earlier calls to be discarded.\n\n Not calling this function after a completed transaction is the same as if this function was previously called with\n both buffer lengths set to zero and `aRequestTransactionFlag` set to `false`.\n\n Once `aOutputBufLen` bytes of `aOutputBuf` has been clocked out, the MISO pin shall be set high until the master\n finishes the SPI transaction. This is the functional equivalent of padding the end of `aOutputBuf` with `0xFF` bytes\n out to the length of the transaction.\n\n Once `aInputBufLen` bytes of aInputBuf have been clocked in from MOSI, all subsequent values from the MOSI pin are\n ignored until the SPI master finishes the transaction.\n\n Note that even if `aInputBufLen` or `aOutputBufLen` (or both) are exhausted before the SPI master finishes a\n transaction, the ongoing size of the transaction must still be kept track of to be passed to the transaction\n complete callback. For example, if `aInputBufLen` is equal to 10 and `aOutputBufLen` equal to 20 and the SPI master\n clocks out 30 bytes, the value 30 is passed to the transaction complete callback.\n\n If a `NULL` pointer is passed in as `aOutputBuf` or `aInputBuf` it means that that buffer pointer should not change\n from its previous/current value. In this case, the corresponding length argument should be ignored. For example,\n `otPlatSpiSlavePrepareTransaction(NULL, 0, aInputBuf, aInputLen, false)` changes the input buffer pointer and its\n length but keeps the output buffer pointer same as before.\n\n Any call to this function while a transaction is in progress will cause all of the arguments to be ignored and the\n return value to be `OT_ERROR_BUSY`.\n\n @param[in] aOutputBuf              Data to be written to MISO pin\n @param[in] aOutputBufLen           Size of the output buffer, in bytes\n @param[in] aInputBuf               Data to be read from MOSI pin\n @param[in] aInputBufLen            Size of the input buffer, in bytes\n @param[in] aRequestTransactionFlag Set to true if host interrupt should be set\n\n @retval OT_ERROR_NONE           Transaction was successfully prepared.\n @retval OT_ERROR_BUSY           A transaction is currently in progress.\n @retval OT_ERROR_INVALID_STATE  otPlatSpiSlaveEnable() hasn't been called.\n"]
+    #[doc = " Prepare data for the next SPI transaction. Data pointers MUST remain valid until the transaction complete callback\n is called by the SPI slave driver, or until after the next call to `otPlatSpiSlavePrepareTransaction()`.\n\n May be called more than once before the SPI master initiates the transaction. Each *successful* call\n to this function will cause the previous values from earlier calls to be discarded.\n\n Not calling this function after a completed transaction is the same as if this function was previously called with\n both buffer lengths set to zero and `aRequestTransactionFlag` set to `false`.\n\n Once `aOutputBufLen` bytes of `aOutputBuf` has been clocked out, the MISO pin shall be set high until the master\n finishes the SPI transaction. This is the functional equivalent of padding the end of `aOutputBuf` with `0xFF` bytes\n out to the length of the transaction.\n\n Once `aInputBufLen` bytes of aInputBuf have been clocked in from MOSI, all subsequent values from the MOSI pin are\n ignored until the SPI master finishes the transaction.\n\n Note that even if `aInputBufLen` or `aOutputBufLen` (or both) are exhausted before the SPI master finishes a\n transaction, the ongoing size of the transaction must still be kept track of to be passed to the transaction\n complete callback. For example, if `aInputBufLen` is equal to 10 and `aOutputBufLen` equal to 20 and the SPI master\n clocks out 30 bytes, the value 30 is passed to the transaction complete callback.\n\n If a `NULL` pointer is passed in as `aOutputBuf` or `aInputBuf` it means that that buffer pointer should not change\n from its previous/current value. In this case, the corresponding length argument should be ignored. For example,\n `otPlatSpiSlavePrepareTransaction(NULL, 0, aInputBuf, aInputLen, false)` changes the input buffer pointer and its\n length but keeps the output buffer pointer same as before.\n\n Any call to this function while a transaction is in progress will cause all of the arguments to be ignored and the\n return value to be `OT_ERROR_BUSY`.\n\n @param[in] aOutputBuf              Data to be written to MISO pin\n @param[in] aOutputBufLen           Size of the output buffer, in bytes\n @param[in] aInputBuf               Data to be read from MOSI pin\n @param[in] aInputBufLen            Size of the input buffer, in bytes\n @param[in] aRequestTransactionFlag Set to true if host interrupt should be set\n\n @retval OT_ERROR_NONE           Transaction was successfully prepared.\n @retval OT_ERROR_BUSY           A transaction is currently in progress.\n @retval OT_ERROR_INVALID_STATE  otPlatSpiSlaveEnable() hasn't been called.\n"]
     pub fn otPlatSpiSlavePrepareTransaction(
         aOutputBuf: *mut u8,
         aOutputBufLen: u16,
@@ -9191,14 +9216,14 @@ extern "C" {
     pub fn otPlatTimeGetXtalAccuracy() -> u16;
 }
 extern "C" {
-    #[doc = " This function initializes and enables TREL platform layer.\n\n Upon this call, the platform layer MUST perform the following:\n\n 1) TREL platform layer MUST open a UDP socket to listen for and receive TREL messages from peers. The socket is\n bound to an ephemeral port number chosen by the platform layer. The port number MUST be returned in @p aUdpPort.\n The socket is also bound to network interface(s) on which TREL is to be supported. The socket and the chosen port\n should stay valid while TREL is enabled.\n\n 2) Platform layer MUST initiate an ongoing DNS-SD browse on the service name \"_trel._udp\" within the local browsing\n domain to discover other devices supporting TREL. The ongoing browse will produce two different types of events:\n \"add\" events and \"remove\" events.  When the browse is started, it should produce an \"add\" event for every TREL peer\n currently present on the network.  Whenever a TREL peer goes offline, a \"remove\" event should be produced. \"remove\"\n events are not guaranteed, however. When a TREL service instance is discovered, a new ongoing DNS-SD query for an\n AAAA record should be started on the hostname indicated in the SRV record of the discovered instance. If multiple\n host IPv6 addressees are discovered for a peer, one with highest scope among all addresses MUST be reported (if\n there are multiple address at same scope, one must be selected randomly).\n\n TREL platform MUST signal back the discovered peer info using `otPlatTrelHandleDiscoveredPeerInfo()` callback. This\n callback MUST be invoked when a new peer is discovered, when there is a change in an existing entry (e.g., new\n TXT record or new port number or new IPv6 address), or when the peer is removed.\n\n @param[in]  aInstance  The OpenThread instance.\n @param[out] aUdpPort   A pointer to return the selected port number by platform layer.\n"]
+    #[doc = " Initializes and enables TREL platform layer.\n\n Upon this call, the platform layer MUST perform the following:\n\n 1) TREL platform layer MUST open a UDP socket to listen for and receive TREL messages from peers. The socket is\n bound to an ephemeral port number chosen by the platform layer. The port number MUST be returned in @p aUdpPort.\n The socket is also bound to network interface(s) on which TREL is to be supported. The socket and the chosen port\n should stay valid while TREL is enabled.\n\n 2) Platform layer MUST initiate an ongoing DNS-SD browse on the service name \"_trel._udp\" within the local browsing\n domain to discover other devices supporting TREL. The ongoing browse will produce two different types of events:\n \"add\" events and \"remove\" events.  When the browse is started, it should produce an \"add\" event for every TREL peer\n currently present on the network.  Whenever a TREL peer goes offline, a \"remove\" event should be produced. \"remove\"\n events are not guaranteed, however. When a TREL service instance is discovered, a new ongoing DNS-SD query for an\n AAAA record should be started on the hostname indicated in the SRV record of the discovered instance. If multiple\n host IPv6 addressees are discovered for a peer, one with highest scope among all addresses MUST be reported (if\n there are multiple address at same scope, one must be selected randomly).\n\n TREL platform MUST signal back the discovered peer info using `otPlatTrelHandleDiscoveredPeerInfo()` callback. This\n callback MUST be invoked when a new peer is discovered, when there is a change in an existing entry (e.g., new\n TXT record or new port number or new IPv6 address), or when the peer is removed.\n\n @param[in]  aInstance  The OpenThread instance.\n @param[out] aUdpPort   A pointer to return the selected port number by platform layer.\n"]
     pub fn otPlatTrelEnable(aInstance: *mut otInstance, aUdpPort: *mut u16);
 }
 extern "C" {
-    #[doc = " This function disables TREL platform layer.\n\n After this call, the platform layer MUST stop DNS-SD browse on the service name \"_trel._udp\", stop advertising the\n TREL DNS-SD service (from `otPlatTrelRegisterService()`) and MUST close the UDP socket used to receive TREL messages.\n\n @pram[in]  aInstance  The OpenThread instance.\n"]
+    #[doc = " Disables TREL platform layer.\n\n After this call, the platform layer MUST stop DNS-SD browse on the service name \"_trel._udp\", stop advertising the\n TREL DNS-SD service (from `otPlatTrelRegisterService()`) and MUST close the UDP socket used to receive TREL messages.\n\n @pram[in]  aInstance  The OpenThread instance.\n"]
     pub fn otPlatTrelDisable(aInstance: *mut otInstance);
 }
-#[doc = " This structure represents a TREL peer info discovered using DNS-SD browse on the service name \"_trel._udp\".\n"]
+#[doc = " Represents a TREL peer info discovered using DNS-SD browse on the service name \"_trel._udp\".\n"]
 #[repr(C)]
 #[derive(Copy, Clone)]
 pub struct otPlatTrelPeerInfo {
@@ -9228,7 +9253,7 @@ extern "C" {
     );
 }
 extern "C" {
-    #[doc = " This function registers a new service to be advertised using DNS-SD [RFC6763].\n\n The service name is \"_trel._udp\". The platform should use its own hostname, which when combined with the service\n name and the local DNS-SD domain name will produce the full service instance name, for example\n \"example-host._trel._udp.local.\".\n\n The domain under which the service instance name appears will be 'local' for mDNS, and will be whatever domain is\n used for service registration in the case of a non-mDNS local DNS-SD service.\n\n A subsequent call to this function updates the previous service. It is used to update the TXT record data and/or the\n port number.\n\n The @p aTxtData buffer is not persisted after the return from this function. The platform layer MUST NOT keep the\n pointer and instead copy the content if needed.\n\n @param[in] aInstance   The OpenThread instance.\n @param[in] aPort       The port number to include in the SRV record of the advertised service.\n @param[in] aTxtData    A pointer to the TXT record data (encoded) to be include in the advertised service.\n @param[in] aTxtLength  The length of @p aTxtData (number of bytes).\n\n"]
+    #[doc = " Registers a new service to be advertised using DNS-SD [RFC6763].\n\n The service name is \"_trel._udp\". The platform should use its own hostname, which when combined with the service\n name and the local DNS-SD domain name will produce the full service instance name, for example\n \"example-host._trel._udp.local.\".\n\n The domain under which the service instance name appears will be 'local' for mDNS, and will be whatever domain is\n used for service registration in the case of a non-mDNS local DNS-SD service.\n\n A subsequent call to this function updates the previous service. It is used to update the TXT record data and/or the\n port number.\n\n The @p aTxtData buffer is not persisted after the return from this function. The platform layer MUST NOT keep the\n pointer and instead copy the content if needed.\n\n @param[in] aInstance   The OpenThread instance.\n @param[in] aPort       The port number to include in the SRV record of the advertised service.\n @param[in] aTxtData    A pointer to the TXT record data (encoded) to be include in the advertised service.\n @param[in] aTxtLength  The length of @p aTxtData (number of bytes).\n\n"]
     pub fn otPlatTrelRegisterService(
         aInstance: *mut otInstance,
         aPort: u16,
@@ -9237,7 +9262,7 @@ extern "C" {
     );
 }
 extern "C" {
-    #[doc = " This function requests a TREL UDP packet to be sent to a given destination.\n\n @param[in] aInstance        The OpenThread instance structure.\n @param[in] aUdpPayload      A pointer to UDP payload.\n @param[in] aUdpPayloadLen   The payload length (number of bytes).\n @param[in] aDestSockAddr    The destination socket address.\n"]
+    #[doc = " Requests a TREL UDP packet to be sent to a given destination.\n\n @param[in] aInstance        The OpenThread instance structure.\n @param[in] aUdpPayload      A pointer to UDP payload.\n @param[in] aUdpPayloadLen   The payload length (number of bytes).\n @param[in] aDestSockAddr    The destination socket address.\n"]
     pub fn otPlatTrelSend(
         aInstance: *mut otInstance,
         aUdpPayload: *const u8,
@@ -9246,7 +9271,7 @@ extern "C" {
     );
 }
 extern "C" {
-    #[doc = " This function is a callback from platform to notify of a received TREL UDP packet.\n\n @note The buffer content (up to its specified length) may get changed during processing by OpenThread core (e.g.,\n decrypted in place), so the platform implementation should expect that after returning from this function the\n @p aBuffer content may have been altered.\n\n @param[in] aInstance        The OpenThread instance structure.\n @param[in] aBuffer          A buffer containing the received UDP payload.\n @param[in] aLength          UDP payload length (number of bytes).\n"]
+    #[doc = " Is a callback from platform to notify of a received TREL UDP packet.\n\n @note The buffer content (up to its specified length) may get changed during processing by OpenThread core (e.g.,\n decrypted in place), so the platform implementation should expect that after returning from this function the\n @p aBuffer content may have been altered.\n\n @param[in] aInstance        The OpenThread instance structure.\n @param[in] aBuffer          A buffer containing the received UDP payload.\n @param[in] aLength          UDP payload length (number of bytes).\n"]
     pub fn otPlatTrelHandleReceived(aInstance: *mut otInstance, aBuffer: *mut u8, aLength: u16);
 }
 #[doc = " This callback allows OpenThread to provide specific handlers for certain UDP messages.\n\n @retval  true    The message is handled by this receiver and should not be further processed.\n @retval  false   The message is not handled by this receiver.\n"]
@@ -9257,7 +9282,7 @@ pub type otUdpHandler = ::std::option::Option<
         aMessageInfo: *const otMessageInfo,
     ) -> bool,
 >;
-#[doc = " This structure represents a UDP receiver.\n"]
+#[doc = " Represents a UDP receiver.\n"]
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
 pub struct otUdpReceiver {
@@ -9278,21 +9303,21 @@ impl Default for otUdpReceiver {
     }
 }
 extern "C" {
-    #[doc = " This function adds a UDP receiver.\n\n @param[in]   aInstance       A pointer to an OpenThread instance.\n @param[in]   aUdpReceiver    A pointer to the UDP receiver.\n\n @retval  OT_ERROR_NONE       The receiver is successfully added.\n @retval  OT_ERROR_ALREADY    The UDP receiver was already added.\n"]
+    #[doc = " Adds a UDP receiver.\n\n @param[in]   aInstance       A pointer to an OpenThread instance.\n @param[in]   aUdpReceiver    A pointer to the UDP receiver.\n\n @retval  OT_ERROR_NONE       The receiver is successfully added.\n @retval  OT_ERROR_ALREADY    The UDP receiver was already added.\n"]
     pub fn otUdpAddReceiver(
         aInstance: *mut otInstance,
         aUdpReceiver: *mut otUdpReceiver,
     ) -> otError;
 }
 extern "C" {
-    #[doc = " This function removes a UDP receiver.\n\n @param[in]   aInstance       A pointer to an OpenThread instance.\n @param[in]   aUdpReceiver    A pointer to the UDP receiver.\n\n @retval  OT_ERROR_NONE       The receiver is successfully removed.\n @retval  OT_ERROR_NOT_FOUND  The UDP receiver was not added.\n"]
+    #[doc = " Removes a UDP receiver.\n\n @param[in]   aInstance       A pointer to an OpenThread instance.\n @param[in]   aUdpReceiver    A pointer to the UDP receiver.\n\n @retval  OT_ERROR_NONE       The receiver is successfully removed.\n @retval  OT_ERROR_NOT_FOUND  The UDP receiver was not added.\n"]
     pub fn otUdpRemoveReceiver(
         aInstance: *mut otInstance,
         aUdpReceiver: *mut otUdpReceiver,
     ) -> otError;
 }
 extern "C" {
-    #[doc = " This function sends a UDP message without socket.\n\n @param[in]  aInstance     A pointer to an OpenThread instance.\n @param[in]  aMessage      A pointer to a message without UDP header.\n @param[in]  aMessageInfo  A pointer to a message info associated with @p aMessage.\n\n @retval OT_ERROR_NONE     Successfully enqueued the message into an output interface.\n @retval OT_ERROR_NO_BUFS  Insufficient available buffer to add the IPv6 headers.\n"]
+    #[doc = " Sends a UDP message without socket.\n\n @param[in]  aInstance     A pointer to an OpenThread instance.\n @param[in]  aMessage      A pointer to a message without UDP header.\n @param[in]  aMessageInfo  A pointer to a message info associated with @p aMessage.\n\n @retval OT_ERROR_NONE     Successfully enqueued the message into an output interface.\n @retval OT_ERROR_NO_BUFS  Insufficient available buffer to add the IPv6 headers.\n"]
     pub fn otUdpSendDatagram(
         aInstance: *mut otInstance,
         aMessage: *mut otMessage,
@@ -9307,7 +9332,7 @@ pub type otUdpReceive = ::std::option::Option<
         aMessageInfo: *const otMessageInfo,
     ),
 >;
-#[doc = " This structure represents a UDP socket.\n"]
+#[doc = " Represents a UDP socket.\n"]
 #[repr(C)]
 #[derive(Copy, Clone)]
 pub struct otUdpSocket {
@@ -9339,7 +9364,7 @@ pub const OT_NETIF_UNSPECIFIED: otNetifIdentifier = 0;
 pub const OT_NETIF_THREAD: otNetifIdentifier = 1;
 #[doc = "< The Backbone interface."]
 pub const OT_NETIF_BACKBONE: otNetifIdentifier = 2;
-#[doc = " This enumeration defines the OpenThread network interface identifiers.\n"]
+#[doc = " Defines the OpenThread network interface identifiers.\n"]
 pub type otNetifIdentifier = ::std::os::raw::c_uint;
 extern "C" {
     #[doc = " Allocate a new message buffer for sending a UDP message.\n\n @note If @p aSettings is 'NULL', the link layer security is enabled and the message priority is set to\n OT_MESSAGE_PRIORITY_NORMAL by default.\n\n @param[in]  aInstance  A pointer to an OpenThread instance.\n @param[in]  aSettings  A pointer to the message settings or NULL to use default settings.\n\n @returns A pointer to the message buffer or NULL if no message buffers are available or parameters are invalid.\n\n @sa otMessageFree\n"]
@@ -9392,10 +9417,10 @@ extern "C" {
     ) -> otError;
 }
 extern "C" {
-    #[doc = " This function gets the head of linked list of UDP Sockets.\n\n @param[in]  aInstance  A pointer to an OpenThread instance.\n\n @returns A pointer to the head of UDP Socket linked list.\n"]
+    #[doc = " Gets the head of linked list of UDP Sockets.\n\n @param[in]  aInstance  A pointer to an OpenThread instance.\n\n @returns A pointer to the head of UDP Socket linked list.\n"]
     pub fn otUdpGetSockets(aInstance: *mut otInstance) -> *mut otUdpSocket;
 }
-#[doc = " This function pointer delivers the UDP packet to host and host should send the packet through its own network stack.\n\n @param[in]  aMessage   A pointer to the UDP Message.\n @param[in]  aPeerPort  The destination UDP port.\n @param[in]  aPeerAddr  A pointer to the destination IPv6 address.\n @param[in]  aSockPort  The source UDP port.\n @param[in]  aContext   A pointer to application-specific context.\n"]
+#[doc = " Pointer delivers the UDP packet to host and host should send the packet through its own network stack.\n\n @param[in]  aMessage   A pointer to the UDP Message.\n @param[in]  aPeerPort  The destination UDP port.\n @param[in]  aPeerAddr  A pointer to the destination IPv6 address.\n @param[in]  aSockPort  The source UDP port.\n @param[in]  aContext   A pointer to application-specific context.\n"]
 pub type otUdpForwarder = ::std::option::Option<
     unsafe extern "C" fn(
         aMessage: *mut otMessage,
@@ -9428,30 +9453,30 @@ extern "C" {
     pub fn otUdpIsPortInUse(aInstance: *mut otInstance, port: u16) -> bool;
 }
 extern "C" {
-    #[doc = " This function initializes the UDP socket by platform.\n\n @param[in]   aUdpSocket  A pointer to the UDP socket.\n\n @retval  OT_ERROR_NONE   Successfully initialized UDP socket by platform.\n @retval  OT_ERROR_FAILED Failed to initialize UDP Socket.\n"]
+    #[doc = " Initializes the UDP socket by platform.\n\n @param[in]   aUdpSocket  A pointer to the UDP socket.\n\n @retval  OT_ERROR_NONE   Successfully initialized UDP socket by platform.\n @retval  OT_ERROR_FAILED Failed to initialize UDP Socket.\n"]
     pub fn otPlatUdpSocket(aUdpSocket: *mut otUdpSocket) -> otError;
 }
 extern "C" {
-    #[doc = " This function closes the UDP socket by platform.\n\n @param[in]   aUdpSocket  A pointer to the UDP socket.\n\n @retval  OT_ERROR_NONE   Successfully closed UDP socket by platform.\n @retval  OT_ERROR_FAILED Failed to close UDP Socket.\n"]
+    #[doc = " Closes the UDP socket by platform.\n\n @param[in]   aUdpSocket  A pointer to the UDP socket.\n\n @retval  OT_ERROR_NONE   Successfully closed UDP socket by platform.\n @retval  OT_ERROR_FAILED Failed to close UDP Socket.\n"]
     pub fn otPlatUdpClose(aUdpSocket: *mut otUdpSocket) -> otError;
 }
 extern "C" {
-    #[doc = " This function binds the UDP socket by platform.\n\n @param[in]   aUdpSocket  A pointer to the UDP socket.\n\n @retval  OT_ERROR_NONE   Successfully bound UDP socket by platform.\n @retval  OT_ERROR_FAILED Failed to bind UDP socket.\n"]
+    #[doc = " Binds the UDP socket by platform.\n\n @param[in]   aUdpSocket  A pointer to the UDP socket.\n\n @retval  OT_ERROR_NONE   Successfully bound UDP socket by platform.\n @retval  OT_ERROR_FAILED Failed to bind UDP socket.\n"]
     pub fn otPlatUdpBind(aUdpSocket: *mut otUdpSocket) -> otError;
 }
 extern "C" {
-    #[doc = " This function binds the UDP socket to a platform network interface.\n\n Note: only available when `OPENTHREAD_CONFIG_PLATFORM_UDP_ENABLE` is used.\n\n @param[in]   aUdpSocket          A pointer to the UDP socket.\n @param[in]   aNetifIdentifier    The network interface identifier.\n\n @retval  OT_ERROR_NONE   Successfully bound UDP socket.\n @retval  OT_ERROR_FAILED Failed to bind UDP.\n"]
+    #[doc = " Binds the UDP socket to a platform network interface.\n\n Note: only available when `OPENTHREAD_CONFIG_PLATFORM_UDP_ENABLE` is used.\n\n @param[in]   aUdpSocket          A pointer to the UDP socket.\n @param[in]   aNetifIdentifier    The network interface identifier.\n\n @retval  OT_ERROR_NONE   Successfully bound UDP socket.\n @retval  OT_ERROR_FAILED Failed to bind UDP.\n"]
     pub fn otPlatUdpBindToNetif(
         aUdpSocket: *mut otUdpSocket,
         aNetifIdentifier: otNetifIdentifier,
     ) -> otError;
 }
 extern "C" {
-    #[doc = " This function connects UDP socket by platform.\n\n @param[in]   aUdpSocket  A pointer to the UDP socket.\n\n @retval  OT_ERROR_NONE   Successfully connected by platform.\n @retval  OT_ERROR_FAILED Failed to connect UDP socket.\n"]
+    #[doc = " Connects UDP socket by platform.\n\n @param[in]   aUdpSocket  A pointer to the UDP socket.\n\n @retval  OT_ERROR_NONE   Successfully connected by platform.\n @retval  OT_ERROR_FAILED Failed to connect UDP socket.\n"]
     pub fn otPlatUdpConnect(aUdpSocket: *mut otUdpSocket) -> otError;
 }
 extern "C" {
-    #[doc = " This function sends UDP payload by platform.\n\n @param[in]   aUdpSocket      A pointer to the UDP socket.\n @param[in]   aMessage        A pointer to the message to send.\n @param[in]   aMessageInfo    A pointer to the message info associated with @p aMessage.\n\n @retval  OT_ERROR_NONE   Successfully sent by platform, and @p aMessage is freed.\n @retval  OT_ERROR_FAILED Failed to bind UDP socket.\n"]
+    #[doc = " Sends UDP payload by platform.\n\n @param[in]   aUdpSocket      A pointer to the UDP socket.\n @param[in]   aMessage        A pointer to the message to send.\n @param[in]   aMessageInfo    A pointer to the message info associated with @p aMessage.\n\n @retval  OT_ERROR_NONE   Successfully sent by platform, and @p aMessage is freed.\n @retval  OT_ERROR_FAILED Failed to bind UDP socket.\n"]
     pub fn otPlatUdpSend(
         aUdpSocket: *mut otUdpSocket,
         aMessage: *mut otMessage,
@@ -9459,7 +9484,7 @@ extern "C" {
     ) -> otError;
 }
 extern "C" {
-    #[doc = " This function configures the UDP socket to join a UDP multicast group.\n\n Note: only available when `OPENTHREAD_CONFIG_PLATFORM_UDP_ENABLE` is used.\n\n @param[in]   aUdpSocket          A pointer to the UDP socket.\n @param[in]   aNetifIdentifier    The network interface identifier.\n @param[in]   aAddress            The UDP multicast group address.\n\n @retval  OT_ERROR_NONE   Successfully joined the multicast group.\n @retval  OT_ERROR_FAILED Failed to join the multicast group.\n"]
+    #[doc = " Configures the UDP socket to join a UDP multicast group.\n\n Note: only available when `OPENTHREAD_CONFIG_PLATFORM_UDP_ENABLE` is used.\n\n @param[in]   aUdpSocket          A pointer to the UDP socket.\n @param[in]   aNetifIdentifier    The network interface identifier.\n @param[in]   aAddress            The UDP multicast group address.\n\n @retval  OT_ERROR_NONE   Successfully joined the multicast group.\n @retval  OT_ERROR_FAILED Failed to join the multicast group.\n"]
     pub fn otPlatUdpJoinMulticastGroup(
         aUdpSocket: *mut otUdpSocket,
         aNetifIdentifier: otNetifIdentifier,
@@ -9467,7 +9492,7 @@ extern "C" {
     ) -> otError;
 }
 extern "C" {
-    #[doc = " This function configures the UDP socket to leave a UDP multicast group.\n\n Note: only available when `OPENTHREAD_CONFIG_PLATFORM_UDP_ENABLE` is used.\n\n @param[in]   aUdpSocket          A pointer to the UDP socket.\n @param[in]   aNetifIdentifier    The network interface identifier.\n @param[in]   aAddress            The UDP multicast group address.\n\n @retval  OT_ERROR_NONE   Successfully left the multicast group.\n @retval  OT_ERROR_FAILED Failed to leave the multicast group.\n"]
+    #[doc = " Configures the UDP socket to leave a UDP multicast group.\n\n Note: only available when `OPENTHREAD_CONFIG_PLATFORM_UDP_ENABLE` is used.\n\n @param[in]   aUdpSocket          A pointer to the UDP socket.\n @param[in]   aNetifIdentifier    The network interface identifier.\n @param[in]   aAddress            The UDP multicast group address.\n\n @retval  OT_ERROR_NONE   Successfully left the multicast group.\n @retval  OT_ERROR_FAILED Failed to leave the multicast group.\n"]
     pub fn otPlatUdpLeaveMulticastGroup(
         aUdpSocket: *mut otUdpSocket,
         aNetifIdentifier: otNetifIdentifier,
@@ -9475,39 +9500,39 @@ extern "C" {
     ) -> otError;
 }
 extern "C" {
-    #[doc = " This function generates and returns a random `uint32_t` value.\n\n @returns    A random `uint32_t` value.\n"]
+    #[doc = " Generates and returns a random `uint32_t` value.\n\n @returns    A random `uint32_t` value.\n"]
     pub fn otRandomNonCryptoGetUint32() -> u32;
 }
 extern "C" {
-    #[doc = " This function generates and returns a random byte.\n\n @returns A random `uint8_t` value.\n"]
+    #[doc = " Generates and returns a random byte.\n\n @returns A random `uint8_t` value.\n"]
     pub fn otRandomNonCryptoGetUint8() -> u8;
 }
 extern "C" {
-    #[doc = " This function generates and returns a random `uint16_t` value.\n\n @returns A random `uint16_t` value.\n"]
+    #[doc = " Generates and returns a random `uint16_t` value.\n\n @returns A random `uint16_t` value.\n"]
     pub fn otRandomNonCryptoGetUint16() -> u16;
 }
 extern "C" {
-    #[doc = " This function generates and returns a random `uint8_t` value within a given range `[aMin, aMax)`.\n\n @param[in]  aMin  A minimum value (this value can be included in returned random result).\n @param[in]  aMax  A maximum value (this value is excluded from returned random result).\n\n @returns    A random `uint8_t` value in the given range (i.e., aMin <= random value < aMax)."]
+    #[doc = " Generates and returns a random `uint8_t` value within a given range `[aMin, aMax)`.\n\n @param[in]  aMin  A minimum value (this value can be included in returned random result).\n @param[in]  aMax  A maximum value (this value is excluded from returned random result).\n\n @returns    A random `uint8_t` value in the given range (i.e., aMin <= random value < aMax)."]
     pub fn otRandomNonCryptoGetUint8InRange(aMin: u8, aMax: u8) -> u8;
 }
 extern "C" {
-    #[doc = " This function generates and returns a random `uint16_t` value within a given range `[aMin, aMax)`.\n\n @note The returned random value can include the @p aMin value but excludes the @p aMax.\n\n @param[in]  aMin  A minimum value (this value can be included in returned random result).\n @param[in]  aMax  A maximum value (this value is excluded from returned random result).\n\n @returns    A random `uint16_t` value in the given range (i.e., aMin <= random value < aMax)."]
+    #[doc = " Generates and returns a random `uint16_t` value within a given range `[aMin, aMax)`.\n\n @note The returned random value can include the @p aMin value but excludes the @p aMax.\n\n @param[in]  aMin  A minimum value (this value can be included in returned random result).\n @param[in]  aMax  A maximum value (this value is excluded from returned random result).\n\n @returns    A random `uint16_t` value in the given range (i.e., aMin <= random value < aMax)."]
     pub fn otRandomNonCryptoGetUint16InRange(aMin: u16, aMax: u16) -> u16;
 }
 extern "C" {
-    #[doc = " This function generates and returns a random `uint32_t` value within a given range `[aMin, aMax)`.\n\n @note The returned random value can include the @p aMin value but excludes the @p aMax.\n\n @param[in]  aMin  A minimum value (this value can be included in returned random result).\n @param[in]  aMax  A maximum value (this value is excluded from returned random result).\n\n @returns    A random `uint32_t` value in the given range (i.e., aMin <= random value < aMax).\n"]
+    #[doc = " Generates and returns a random `uint32_t` value within a given range `[aMin, aMax)`.\n\n @note The returned random value can include the @p aMin value but excludes the @p aMax.\n\n @param[in]  aMin  A minimum value (this value can be included in returned random result).\n @param[in]  aMax  A maximum value (this value is excluded from returned random result).\n\n @returns    A random `uint32_t` value in the given range (i.e., aMin <= random value < aMax).\n"]
     pub fn otRandomNonCryptoGetUint32InRange(aMin: u32, aMax: u32) -> u32;
 }
 extern "C" {
-    #[doc = " This function fills a given buffer with random bytes.\n\n @param[out] aBuffer  A pointer to a buffer to fill with the random bytes.\n @param[in]  aSize    Size of buffer (number of bytes to fill).\n"]
+    #[doc = " Fills a given buffer with random bytes.\n\n @param[out] aBuffer  A pointer to a buffer to fill with the random bytes.\n @param[in]  aSize    Size of buffer (number of bytes to fill).\n"]
     pub fn otRandomNonCryptoFillBuffer(aBuffer: *mut u8, aSize: u16);
 }
 extern "C" {
-    #[doc = " This function adds a random jitter within a given range to a given value.\n\n @param[in]  aValue     A value to which the random jitter is added.\n @param[in]  aJitter    Maximum jitter. Random jitter is selected from the range `[-aJitter, aJitter]`.\n\n @returns    The given value with an added random jitter.\n"]
+    #[doc = " Adds a random jitter within a given range to a given value.\n\n @param[in]  aValue     A value to which the random jitter is added.\n @param[in]  aJitter    Maximum jitter. Random jitter is selected from the range `[-aJitter, aJitter]`.\n\n @returns    The given value with an added random jitter.\n"]
     pub fn otRandomNonCryptoAddJitter(aValue: u32, aJitter: u16) -> u32;
 }
 extern "C" {
-    #[doc = " This method provides a full or stable copy of the local Thread Network Data.\n\n @param[in]      aInstance    A pointer to an OpenThread instance.\n @param[in]      aStable      TRUE when copying the stable version, FALSE when copying the full version.\n @param[out]     aData        A pointer to the data buffer.\n @param[in,out]  aDataLength  On entry, size of the data buffer pointed to by @p aData.\n                              On exit, number of copied bytes.\n"]
+    #[doc = " Provides a full or stable copy of the local Thread Network Data.\n\n @param[in]      aInstance    A pointer to an OpenThread instance.\n @param[in]      aStable      TRUE when copying the stable version, FALSE when copying the full version.\n @param[out]     aData        A pointer to the data buffer.\n @param[in,out]  aDataLength  On entry, size of the data buffer pointed to by @p aData.\n                              On exit, number of copied bytes.\n"]
     pub fn otServerGetNetDataLocal(
         aInstance: *mut otInstance,
         aStable: bool,
@@ -9532,7 +9557,7 @@ extern "C" {
     ) -> otError;
 }
 extern "C" {
-    #[doc = " This function gets the next service in the local Network Data.\n\n @param[in]      aInstance  A pointer to an OpenThread instance.\n @param[in,out]  aIterator  A pointer to the Network Data iterator context. To get the first service entry\nit should be set to OT_NETWORK_DATA_ITERATOR_INIT.\n @param[out]     aConfig    A pointer to where the service information will be placed.\n\n @retval OT_ERROR_NONE       Successfully found the next service.\n @retval OT_ERROR_NOT_FOUND  No subsequent service exists in the Thread Network Data.\n"]
+    #[doc = " Gets the next service in the local Network Data.\n\n @param[in]      aInstance  A pointer to an OpenThread instance.\n @param[in,out]  aIterator  A pointer to the Network Data iterator context. To get the first service entry\nit should be set to OT_NETWORK_DATA_ITERATOR_INIT.\n @param[out]     aConfig    A pointer to where the service information will be placed.\n\n @retval OT_ERROR_NONE       Successfully found the next service.\n @retval OT_ERROR_NOT_FOUND  No subsequent service exists in the Thread Network Data.\n"]
     pub fn otServerGetNextService(
         aInstance: *mut otInstance,
         aIterator: *mut otNetworkDataIterator,
@@ -9543,7 +9568,7 @@ extern "C" {
     #[doc = " Immediately register the local network data with the Leader.\n\n @param[in]  aInstance A pointer to an OpenThread instance.\n\n @retval OT_ERROR_NONE  Successfully queued a Server Data Request message for delivery.\n\n @sa otServerAddService\n @sa otServerRemoveService\n"]
     pub fn otServerRegister(aInstance: *mut otInstance) -> otError;
 }
-#[doc = " This structure implements SNTP Query parameters.\n"]
+#[doc = " Implements SNTP Query parameters.\n"]
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
 pub struct otSntpQuery {
@@ -9559,12 +9584,12 @@ impl Default for otSntpQuery {
         }
     }
 }
-#[doc = " This function pointer is called when a SNTP response is received.\n\n @param[in]  aContext   A pointer to application-specific context.\n @param[in]  aTime      Specifies the time at the server when the response left for the client, in UNIX time.\n @param[in]  aResult    A result of the SNTP transaction.\n\n @retval  OT_ERROR_NONE              A response was received successfully and time is provided\n                                     in @p aTime.\n @retval  OT_ERROR_ABORT             A SNTP transaction was aborted by stack.\n @retval  OT_ERROR_BUSY              The Kiss-o'-death packet has been received.\n @retval  OT_ERROR_RESPONSE_TIMEOUT  No SNTP response has been received within timeout.\n @retval  OT_ERROR_FAILED            A response was received but contains incorrect data.\n"]
+#[doc = " Pointer is called when a SNTP response is received.\n\n @param[in]  aContext   A pointer to application-specific context.\n @param[in]  aTime      Specifies the time at the server when the response left for the client, in UNIX time.\n @param[in]  aResult    A result of the SNTP transaction.\n\n @retval  OT_ERROR_NONE              A response was received successfully and time is provided\n                                     in @p aTime.\n @retval  OT_ERROR_ABORT             A SNTP transaction was aborted by stack.\n @retval  OT_ERROR_BUSY              The Kiss-o'-death packet has been received.\n @retval  OT_ERROR_RESPONSE_TIMEOUT  No SNTP response has been received within timeout.\n @retval  OT_ERROR_FAILED            A response was received but contains incorrect data.\n"]
 pub type otSntpResponseHandler = ::std::option::Option<
     unsafe extern "C" fn(aContext: *mut ::std::os::raw::c_void, aTime: u64, aResult: otError),
 >;
 extern "C" {
-    #[doc = " This function sends a SNTP query.\n\n This function is available only if feature `OPENTHREAD_CONFIG_SNTP_CLIENT_ENABLE` is enabled.\n\n @param[in]  aInstance   A pointer to an OpenThread instance.\n @param[in]  aQuery      A pointer to specify SNTP query parameters.\n @param[in]  aHandler    A function pointer that shall be called on response reception or time-out.\n @param[in]  aContext    A pointer to arbitrary context information.\n"]
+    #[doc = " Sends a SNTP query.\n\n Is available only if feature `OPENTHREAD_CONFIG_SNTP_CLIENT_ENABLE` is enabled.\n\n @param[in]  aInstance   A pointer to an OpenThread instance.\n @param[in]  aQuery      A pointer to specify SNTP query parameters.\n @param[in]  aHandler    A function pointer that shall be called on response reception or time-out.\n @param[in]  aContext    A pointer to arbitrary context information.\n"]
     pub fn otSntpClientQuery(
         aInstance: *mut otInstance,
         aQuery: *const otSntpQuery,
@@ -9573,7 +9598,7 @@ extern "C" {
     ) -> otError;
 }
 extern "C" {
-    #[doc = " This function sets the unix era number.\n\n The default value of unix era is set to 0. The subsequent eras start after year 2106.\n\n @param[in]  aInstance   A pointer to an OpenThread instance.\n @param[in]  aUnixEra    Unix era number.\n"]
+    #[doc = " Sets the unix era number.\n\n The default value of unix era is set to 0. The subsequent eras start after year 2106.\n\n @param[in]  aInstance   A pointer to an OpenThread instance.\n @param[in]  aUnixEra    Unix era number.\n"]
     pub fn otSntpClientSetUnixEra(aInstance: *mut otInstance, aUnixEra: u32);
 }
 #[doc = "< Item to be added/registered."]
@@ -9592,9 +9617,9 @@ pub const OT_SRP_CLIENT_ITEM_STATE_REMOVING: otSrpClientItemState = 5;
 pub const OT_SRP_CLIENT_ITEM_STATE_REGISTERED: otSrpClientItemState = 6;
 #[doc = "< Item is removed."]
 pub const OT_SRP_CLIENT_ITEM_STATE_REMOVED: otSrpClientItemState = 7;
-#[doc = " This enumeration specifies an SRP client item (service or host info) state.\n"]
+#[doc = " Specifies an SRP client item (service or host info) state.\n"]
 pub type otSrpClientItemState = ::std::os::raw::c_uint;
-#[doc = " This structure represents an SRP client host info.\n"]
+#[doc = " Represents an SRP client host info.\n"]
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
 pub struct otSrpClientHostInfo {
@@ -9618,7 +9643,7 @@ impl Default for otSrpClientHostInfo {
         }
     }
 }
-#[doc = " This structure represents an SRP client service.\n\n The values in this structure, including the string buffers for the names and the TXT record entries, MUST persist\n and stay constant after an instance of this structure is passed to OpenThread from `otSrpClientAddService()` or\n `otSrpClientRemoveService()`.\n\n The `mState`, `mData`, `mNext` fields are used/managed by OT core only. Their value is ignored when an instance of\n `otSrpClientService` is passed in `otSrpClientAddService()` or `otSrpClientRemoveService()` or other functions. The\n caller does not need to set these fields.\n\n The `mLease` and `mKeyLease` fields specify the desired lease and key lease intervals for this service. Zero value\n indicates that the interval is unspecified and then the default lease or key lease intervals from\n `otSrpClientGetLeaseInterval()` and `otSrpClientGetKeyLeaseInterval()` are used for this service. If the key lease\n interval (whether set explicitly or determined from the default) is shorter than the lease interval for a service,\n SRP client will re-use the lease interval value for key lease interval as well. For example, if in service `mLease`\n is explicitly set to 2 days and `mKeyLease` is set to zero and default key lease is set to 1 day, then when\n registering this service, the requested key lease for this service is also set to 2 days.\n"]
+#[doc = " Represents an SRP client service.\n\n The values in this structure, including the string buffers for the names and the TXT record entries, MUST persist\n and stay constant after an instance of this structure is passed to OpenThread from `otSrpClientAddService()` or\n `otSrpClientRemoveService()`.\n\n The `mState`, `mData`, `mNext` fields are used/managed by OT core only. Their value is ignored when an instance of\n `otSrpClientService` is passed in `otSrpClientAddService()` or `otSrpClientRemoveService()` or other functions. The\n caller does not need to set these fields.\n\n The `mLease` and `mKeyLease` fields specify the desired lease and key lease intervals for this service. Zero value\n indicates that the interval is unspecified and then the default lease or key lease intervals from\n `otSrpClientGetLeaseInterval()` and `otSrpClientGetKeyLeaseInterval()` are used for this service. If the key lease\n interval (whether set explicitly or determined from the default) is shorter than the lease interval for a service,\n SRP client will re-use the lease interval value for key lease interval as well. For example, if in service `mLease`\n is explicitly set to 2 days and `mKeyLease` is set to zero and default key lease is set to 1 day, then when\n registering this service, the requested key lease for this service is also set to 2 days.\n"]
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
 pub struct otSrpClientService {
@@ -9658,7 +9683,7 @@ impl Default for otSrpClientService {
         }
     }
 }
-#[doc = " This function pointer type defines the callback used by SRP client to notify user of changes/events/errors.\n\n This callback is invoked on a successful registration of an update (i.e., add/remove of host-info and/or some\n service(s)) with the SRP server, or if there is a failure or error (e.g., server rejects a update request or client\n times out waiting for response, etc).\n\n In case of a successful reregistration of an update, `aError` parameter would be `OT_ERROR_NONE` and the host info\n and the full list of services is provided as input parameters to the callback. Note that host info and services each\n track its own state in the corresponding `mState` member variable of the related data structure (the state\n indicating whether the host-info/service is registered or removed or still being added/removed, etc).\n\n The list of removed services is passed as its own linked-list `aRemovedServices` in the callback. Note that when the\n callback is invoked, the SRP client (OpenThread implementation) is done with the removed service instances listed in\n `aRemovedServices` and no longer tracks/stores them (i.e., if from the callback we call `otSrpClientGetServices()`\n the removed services will not be present in the returned list). Providing a separate list of removed services in\n the callback helps indicate to user which items are now removed and allow user to re-claim/reuse the instances.\n\n If the server rejects an SRP update request, the DNS response code (RFC 2136) is mapped to the following errors:\n\n  - (0)  NOERROR   Success (no error condition)                    -> OT_ERROR_NONE\n  - (1)  FORMERR   Server unable to interpret due to format error  -> OT_ERROR_PARSE\n  - (2)  SERVFAIL  Server encountered an internal failure          -> OT_ERROR_FAILED\n  - (3)  NXDOMAIN  Name that ought to exist, does not exist        -> OT_ERROR_NOT_FOUND\n  - (4)  NOTIMP    Server does not support the query type (OpCode) -> OT_ERROR_NOT_IMPLEMENTED\n  - (5)  REFUSED   Server refused for policy/security reasons      -> OT_ERROR_SECURITY\n  - (6)  YXDOMAIN  Some name that ought not to exist, does exist   -> OT_ERROR_DUPLICATED\n  - (7)  YXRRSET   Some RRset that ought not to exist, does exist  -> OT_ERROR_DUPLICATED\n  - (8)  NXRRSET   Some RRset that ought to exist, does not exist  -> OT_ERROR_NOT_FOUND\n  - (9)  NOTAUTH   Service is not authoritative for zone           -> OT_ERROR_SECURITY\n  - (10) NOTZONE   A name is not in the zone                       -> OT_ERROR_PARSE\n  - (20) BADNAME   Bad name                                        -> OT_ERROR_PARSE\n  - (21) BADALG    Bad algorithm                                   -> OT_ERROR_SECURITY\n  - (22) BADTRUN   Bad truncation                                  -> OT_ERROR_PARSE\n  - Other response codes                                           -> OT_ERROR_FAILED\n\n The following errors are also possible:\n\n  - OT_ERROR_RESPONSE_TIMEOUT : Timed out waiting for response from server (client would continue to retry).\n  - OT_ERROR_INVALID_ARGS     : The provided service structure is invalid (e.g., bad service name or `otDnsTxtEntry`).\n  - OT_ERROR_NO_BUFS          : Insufficient buffer to prepare or send the update message.\n\n Note that in case of any failure, the client continues the operation, i.e. it prepares and (re)transmits the SRP\n update message to the server, after some wait interval. The retry wait interval starts from the minimum value and\n is increased by the growth factor every failure up to the max value (please see configuration parameter\n `OPENTHREAD_CONFIG_SRP_CLIENT_MIN_RETRY_WAIT_INTERVAL` and the related ones for more details).\n\n @param[in] aError            The error (see above).\n @param[in] aHostInfo         A pointer to host info.\n @param[in] aServices         The head of linked-list containing all services (excluding the ones removed). NULL if\n                              the list is empty.\n @param[in] aRemovedServices  The head of linked-list containing all removed services. NULL if the list is empty.\n @param[in] aContext          A pointer to an arbitrary context (provided when callback was registered).\n"]
+#[doc = " Pointer type defines the callback used by SRP client to notify user of changes/events/errors.\n\n This callback is invoked on a successful registration of an update (i.e., add/remove of host-info and/or some\n service(s)) with the SRP server, or if there is a failure or error (e.g., server rejects a update request or client\n times out waiting for response, etc).\n\n In case of a successful reregistration of an update, `aError` parameter would be `OT_ERROR_NONE` and the host info\n and the full list of services is provided as input parameters to the callback. Note that host info and services each\n track its own state in the corresponding `mState` member variable of the related data structure (the state\n indicating whether the host-info/service is registered or removed or still being added/removed, etc).\n\n The list of removed services is passed as its own linked-list `aRemovedServices` in the callback. Note that when the\n callback is invoked, the SRP client (OpenThread implementation) is done with the removed service instances listed in\n `aRemovedServices` and no longer tracks/stores them (i.e., if from the callback we call `otSrpClientGetServices()`\n the removed services will not be present in the returned list). Providing a separate list of removed services in\n the callback helps indicate to user which items are now removed and allow user to re-claim/reuse the instances.\n\n If the server rejects an SRP update request, the DNS response code (RFC 2136) is mapped to the following errors:\n\n  - (0)  NOERROR   Success (no error condition)                    -> OT_ERROR_NONE\n  - (1)  FORMERR   Server unable to interpret due to format error  -> OT_ERROR_PARSE\n  - (2)  SERVFAIL  Server encountered an internal failure          -> OT_ERROR_FAILED\n  - (3)  NXDOMAIN  Name that ought to exist, does not exist        -> OT_ERROR_NOT_FOUND\n  - (4)  NOTIMP    Server does not support the query type (OpCode) -> OT_ERROR_NOT_IMPLEMENTED\n  - (5)  REFUSED   Server refused for policy/security reasons      -> OT_ERROR_SECURITY\n  - (6)  YXDOMAIN  Some name that ought not to exist, does exist   -> OT_ERROR_DUPLICATED\n  - (7)  YXRRSET   Some RRset that ought not to exist, does exist  -> OT_ERROR_DUPLICATED\n  - (8)  NXRRSET   Some RRset that ought to exist, does not exist  -> OT_ERROR_NOT_FOUND\n  - (9)  NOTAUTH   Service is not authoritative for zone           -> OT_ERROR_SECURITY\n  - (10) NOTZONE   A name is not in the zone                       -> OT_ERROR_PARSE\n  - (20) BADNAME   Bad name                                        -> OT_ERROR_PARSE\n  - (21) BADALG    Bad algorithm                                   -> OT_ERROR_SECURITY\n  - (22) BADTRUN   Bad truncation                                  -> OT_ERROR_PARSE\n  - Other response codes                                           -> OT_ERROR_FAILED\n\n The following errors are also possible:\n\n  - OT_ERROR_RESPONSE_TIMEOUT : Timed out waiting for response from server (client would continue to retry).\n  - OT_ERROR_INVALID_ARGS     : The provided service structure is invalid (e.g., bad service name or `otDnsTxtEntry`).\n  - OT_ERROR_NO_BUFS          : Insufficient buffer to prepare or send the update message.\n\n Note that in case of any failure, the client continues the operation, i.e. it prepares and (re)transmits the SRP\n update message to the server, after some wait interval. The retry wait interval starts from the minimum value and\n is increased by the growth factor every failure up to the max value (please see configuration parameter\n `OPENTHREAD_CONFIG_SRP_CLIENT_MIN_RETRY_WAIT_INTERVAL` and the related ones for more details).\n\n @param[in] aError            The error (see above).\n @param[in] aHostInfo         A pointer to host info.\n @param[in] aServices         The head of linked-list containing all services (excluding the ones removed). NULL if\n                              the list is empty.\n @param[in] aRemovedServices  The head of linked-list containing all removed services. NULL if the list is empty.\n @param[in] aContext          A pointer to an arbitrary context (provided when callback was registered).\n"]
 pub type otSrpClientCallback = ::std::option::Option<
     unsafe extern "C" fn(
         aError: otError,
@@ -9668,31 +9693,31 @@ pub type otSrpClientCallback = ::std::option::Option<
         aContext: *mut ::std::os::raw::c_void,
     ),
 >;
-#[doc = " This function pointer type defines the callback used by SRP client to notify user when it is auto-started or stopped.\n\n This is only used when auto-start feature `OPENTHREAD_CONFIG_SRP_CLIENT_AUTO_START_API_ENABLE` is enabled.\n\n This callback is invoked when auto-start mode is enabled and the SRP client is either automatically started or\n stopped.\n\n @param[in] aServerSockAddr   A non-NULL pointer indicates SRP server was started and pointer will give the\n                              selected server socket address. A NULL pointer indicates SRP server was stopped.\n @param[in] aContext          A pointer to an arbitrary context (provided when callback was registered).\n"]
+#[doc = " Pointer type defines the callback used by SRP client to notify user when it is auto-started or stopped.\n\n This is only used when auto-start feature `OPENTHREAD_CONFIG_SRP_CLIENT_AUTO_START_API_ENABLE` is enabled.\n\n This callback is invoked when auto-start mode is enabled and the SRP client is either automatically started or\n stopped.\n\n @param[in] aServerSockAddr   A non-NULL pointer indicates SRP server was started and pointer will give the\n                              selected server socket address. A NULL pointer indicates SRP server was stopped.\n @param[in] aContext          A pointer to an arbitrary context (provided when callback was registered).\n"]
 pub type otSrpClientAutoStartCallback = ::std::option::Option<
     unsafe extern "C" fn(aServerSockAddr: *const otSockAddr, aContext: *mut ::std::os::raw::c_void),
 >;
 extern "C" {
-    #[doc = " This function starts the SRP client operation.\n\n SRP client will prepare and send \"SRP Update\" message to the SRP server once all the following conditions are met:\n\n  - The SRP client is started - `otSrpClientStart()` is called.\n  - Host name is set - `otSrpClientSetHostName()` is called.\n  - At least one host IPv6 address is set - `otSrpClientSetHostName()` is called.\n  - At least one service is added - `otSrpClientAddService()` is called.\n\n It does not matter in which order these functions are called. When all conditions are met, the SRP client will\n wait for a short delay before preparing an \"SRP Update\" message and sending it to server. This delay allows for user\n to add multiple services and/or IPv6 addresses before the first SRP Update message is sent (ensuring a single SRP\n Update is sent containing all the info). The config `OPENTHREAD_CONFIG_SRP_CLIENT_UPDATE_TX_DELAY` specifies the\n delay interval.\n\n @param[in] aInstance        A pointer to the OpenThread instance.\n @param[in] aServerSockAddr  The socket address (IPv6 address and port number) of the SRP server.\n\n @retval OT_ERROR_NONE       SRP client operation started successfully or it is already running with same server\n                             socket address and callback.\n @retval OT_ERROR_BUSY       SRP client is busy running with a different socket address.\n @retval OT_ERROR_FAILED     Failed to open/connect the client's UDP socket.\n"]
+    #[doc = " Starts the SRP client operation.\n\n SRP client will prepare and send \"SRP Update\" message to the SRP server once all the following conditions are met:\n\n  - The SRP client is started - `otSrpClientStart()` is called.\n  - Host name is set - `otSrpClientSetHostName()` is called.\n  - At least one host IPv6 address is set - `otSrpClientSetHostName()` is called.\n  - At least one service is added - `otSrpClientAddService()` is called.\n\n It does not matter in which order these functions are called. When all conditions are met, the SRP client will\n wait for a short delay before preparing an \"SRP Update\" message and sending it to server. This delay allows for user\n to add multiple services and/or IPv6 addresses before the first SRP Update message is sent (ensuring a single SRP\n Update is sent containing all the info). The config `OPENTHREAD_CONFIG_SRP_CLIENT_UPDATE_TX_DELAY` specifies the\n delay interval.\n\n @param[in] aInstance        A pointer to the OpenThread instance.\n @param[in] aServerSockAddr  The socket address (IPv6 address and port number) of the SRP server.\n\n @retval OT_ERROR_NONE       SRP client operation started successfully or it is already running with same server\n                             socket address and callback.\n @retval OT_ERROR_BUSY       SRP client is busy running with a different socket address.\n @retval OT_ERROR_FAILED     Failed to open/connect the client's UDP socket.\n"]
     pub fn otSrpClientStart(
         aInstance: *mut otInstance,
         aServerSockAddr: *const otSockAddr,
     ) -> otError;
 }
 extern "C" {
-    #[doc = " This function stops the SRP client operation.\n\n This function stops any further interactions with the SRP server. Note that it does not remove or clear host info\n and/or list of services. It marks all services to be added/removed again once the client is (re)started.\n\n @param[in] aInstance       A pointer to the OpenThread instance.\n"]
+    #[doc = " Stops the SRP client operation.\n\n Stops any further interactions with the SRP server. Note that it does not remove or clear host info\n and/or list of services. It marks all services to be added/removed again once the client is (re)started.\n\n @param[in] aInstance       A pointer to the OpenThread instance.\n"]
     pub fn otSrpClientStop(aInstance: *mut otInstance);
 }
 extern "C" {
-    #[doc = " This function indicates whether the SRP client is running or not.\n\n @param[in] aInstance       A pointer to the OpenThread instance.\n\n @returns TRUE if the SRP client is running, FALSE otherwise.\n"]
+    #[doc = " Indicates whether the SRP client is running or not.\n\n @param[in] aInstance       A pointer to the OpenThread instance.\n\n @returns TRUE if the SRP client is running, FALSE otherwise.\n"]
     pub fn otSrpClientIsRunning(aInstance: *mut otInstance) -> bool;
 }
 extern "C" {
-    #[doc = " This function gets the socket address (IPv6 address and port number) of the SRP server which is being used by SRP\n client.\n\n If the client is not running, the address is unspecified (all zero) with zero port number.\n\n @param[in] aInstance       A pointer to the OpenThread instance.\n\n @returns A pointer to the SRP server's socket address (is always non-NULL).\n"]
+    #[doc = " Gets the socket address (IPv6 address and port number) of the SRP server which is being used by SRP\n client.\n\n If the client is not running, the address is unspecified (all zero) with zero port number.\n\n @param[in] aInstance       A pointer to the OpenThread instance.\n\n @returns A pointer to the SRP server's socket address (is always non-NULL).\n"]
     pub fn otSrpClientGetServerAddress(aInstance: *mut otInstance) -> *const otSockAddr;
 }
 extern "C" {
-    #[doc = " This function sets the callback to notify caller of events/changes from SRP client.\n\n The SRP client allows a single callback to be registered. So consecutive calls to this function will overwrite any\n previously set callback functions.\n\n @param[in] aInstance   A pointer to the OpenThread instance.\n @param[in] aCallback   The callback to notify of events and changes. Can be NULL if not needed.\n @param[in] aContext    An arbitrary context used with @p aCallback.\n"]
+    #[doc = " Sets the callback to notify caller of events/changes from SRP client.\n\n The SRP client allows a single callback to be registered. So consecutive calls to this function will overwrite any\n previously set callback functions.\n\n @param[in] aInstance   A pointer to the OpenThread instance.\n @param[in] aCallback   The callback to notify of events and changes. Can be NULL if not needed.\n @param[in] aContext    An arbitrary context used with @p aCallback.\n"]
     pub fn otSrpClientSetCallback(
         aInstance: *mut otInstance,
         aCallback: otSrpClientCallback,
@@ -9700,7 +9725,7 @@ extern "C" {
     );
 }
 extern "C" {
-    #[doc = " This function enables the auto-start mode.\n\n This is only available when auto-start feature `OPENTHREAD_CONFIG_SRP_CLIENT_AUTO_START_API_ENABLE` is enabled.\n\n Config option `OPENTHREAD_CONFIG_SRP_CLIENT_AUTO_START_DEFAULT_MODE` specifies the default auto-start mode (whether\n it is enabled or disabled at the start of OT stack).\n\n When auto-start is enabled, the SRP client will monitor the Thread Network Data to discover SRP servers and select\n the preferred server and automatically start and stop the client when an SRP server is detected.\n\n There are three categories of Network Data entries indicating presence of SRP sever. They are preferred in the\n following order:\n\n   1) Preferred unicast entries where server address is included in the service data. If there are multiple options,\n      the one with numerically lowest IPv6 address is preferred.\n\n   2) Anycast entries each having a seq number. A larger sequence number in the sense specified by Serial Number\n      Arithmetic logic in RFC-1982 is considered more recent and therefore preferred. The largest seq number using\n      serial number arithmetic is preferred if it is well-defined (i.e., the seq number is larger than all other\n      seq numbers). If it is not well-defined, then the numerically largest seq number is preferred.\n\n   3) Unicast entries where the server address info is included in server data. If there are multiple options, the\n      one with numerically lowest IPv6 address is preferred.\n\n When there is a change in the Network Data entries, client will check that the currently selected server is still\n present in the Network Data and is still the preferred one. Otherwise the client will switch to the new preferred\n server or stop if there is none.\n\n When the SRP client is explicitly started through a successful call to `otSrpClientStart()`, the given SRP server\n address in `otSrpClientStart()` will continue to be used regardless of the state of auto-start mode and whether the\n same SRP server address is discovered or not in the Thread Network Data. In this case, only an explicit\n `otSrpClientStop()` call will stop the client.\n\n @param[in] aInstance   A pointer to the OpenThread instance.\n @param[in] aCallback   A callback to notify when client is auto-started/stopped. Can be NULL if not needed.\n @param[in] aContext    A context to be passed when invoking @p aCallback.\n"]
+    #[doc = " Enables the auto-start mode.\n\n This is only available when auto-start feature `OPENTHREAD_CONFIG_SRP_CLIENT_AUTO_START_API_ENABLE` is enabled.\n\n Config option `OPENTHREAD_CONFIG_SRP_CLIENT_AUTO_START_DEFAULT_MODE` specifies the default auto-start mode (whether\n it is enabled or disabled at the start of OT stack).\n\n When auto-start is enabled, the SRP client will monitor the Thread Network Data to discover SRP servers and select\n the preferred server and automatically start and stop the client when an SRP server is detected.\n\n There are three categories of Network Data entries indicating presence of SRP sever. They are preferred in the\n following order:\n\n   1) Preferred unicast entries where server address is included in the service data. If there are multiple options,\n      the one with numerically lowest IPv6 address is preferred.\n\n   2) Anycast entries each having a seq number. A larger sequence number in the sense specified by Serial Number\n      Arithmetic logic in RFC-1982 is considered more recent and therefore preferred. The largest seq number using\n      serial number arithmetic is preferred if it is well-defined (i.e., the seq number is larger than all other\n      seq numbers). If it is not well-defined, then the numerically largest seq number is preferred.\n\n   3) Unicast entries where the server address info is included in server data. If there are multiple options, the\n      one with numerically lowest IPv6 address is preferred.\n\n When there is a change in the Network Data entries, client will check that the currently selected server is still\n present in the Network Data and is still the preferred one. Otherwise the client will switch to the new preferred\n server or stop if there is none.\n\n When the SRP client is explicitly started through a successful call to `otSrpClientStart()`, the given SRP server\n address in `otSrpClientStart()` will continue to be used regardless of the state of auto-start mode and whether the\n same SRP server address is discovered or not in the Thread Network Data. In this case, only an explicit\n `otSrpClientStop()` call will stop the client.\n\n @param[in] aInstance   A pointer to the OpenThread instance.\n @param[in] aCallback   A callback to notify when client is auto-started/stopped. Can be NULL if not needed.\n @param[in] aContext    A context to be passed when invoking @p aCallback.\n"]
     pub fn otSrpClientEnableAutoStartMode(
         aInstance: *mut otInstance,
         aCallback: otSrpClientAutoStartCallback,
@@ -9708,54 +9733,54 @@ extern "C" {
     );
 }
 extern "C" {
-    #[doc = " This function disables the auto-start mode.\n\n This is only available when auto-start feature `OPENTHREAD_CONFIG_SRP_CLIENT_AUTO_START_API_ENABLE` is enabled.\n\n Disabling the auto-start mode will not stop the client if it is already running but the client stops monitoring\n the Thread Network Data to verify that the selected SRP server is still present in it.\n\n Note that a call to `otSrpClientStop()` will also disable the auto-start mode.\n\n @param[in] aInstance   A pointer to the OpenThread instance.\n"]
+    #[doc = " Disables the auto-start mode.\n\n This is only available when auto-start feature `OPENTHREAD_CONFIG_SRP_CLIENT_AUTO_START_API_ENABLE` is enabled.\n\n Disabling the auto-start mode will not stop the client if it is already running but the client stops monitoring\n the Thread Network Data to verify that the selected SRP server is still present in it.\n\n Note that a call to `otSrpClientStop()` will also disable the auto-start mode.\n\n @param[in] aInstance   A pointer to the OpenThread instance.\n"]
     pub fn otSrpClientDisableAutoStartMode(aInstance: *mut otInstance);
 }
 extern "C" {
-    #[doc = " This function indicates the current state of auto-start mode (enabled or disabled).\n\n This is only available when auto-start feature `OPENTHREAD_CONFIG_SRP_CLIENT_AUTO_START_API_ENABLE` is enabled.\n\n @param[in] aInstance   A pointer to the OpenThread instance.\n\n @returns TRUE if the auto-start mode is enabled, FALSE otherwise.\n"]
+    #[doc = " Indicates the current state of auto-start mode (enabled or disabled).\n\n This is only available when auto-start feature `OPENTHREAD_CONFIG_SRP_CLIENT_AUTO_START_API_ENABLE` is enabled.\n\n @param[in] aInstance   A pointer to the OpenThread instance.\n\n @returns TRUE if the auto-start mode is enabled, FALSE otherwise.\n"]
     pub fn otSrpClientIsAutoStartModeEnabled(aInstance: *mut otInstance) -> bool;
 }
 extern "C" {
-    #[doc = " This function gets the TTL value in every record included in SRP update requests.\n\n Note that this is the TTL requested by the SRP client. The server may choose to accept a different TTL.\n\n By default, the TTL will equal the lease interval. Passing 0 or a value larger than the lease interval via\n `otSrpClientSetTtl()` will also cause the TTL to equal the lease interval.\n\n @param[in] aInstance  A pointer to the OpenThread instance.\n\n @returns The TTL (in seconds).\n"]
+    #[doc = " Gets the TTL value in every record included in SRP update requests.\n\n Note that this is the TTL requested by the SRP client. The server may choose to accept a different TTL.\n\n By default, the TTL will equal the lease interval. Passing 0 or a value larger than the lease interval via\n `otSrpClientSetTtl()` will also cause the TTL to equal the lease interval.\n\n @param[in] aInstance  A pointer to the OpenThread instance.\n\n @returns The TTL (in seconds).\n"]
     pub fn otSrpClientGetTtl(aInstance: *mut otInstance) -> u32;
 }
 extern "C" {
-    #[doc = " This function sets the TTL value in every record included in SRP update requests.\n\n Changing the TTL does not impact the TTL of already registered services/host-info.\n It only affects future SRP update messages (i.e., adding new services and/or refreshes of the existing services).\n\n @param[in] aInstance   A pointer to the OpenThread instance.\n @param[in] aTtl        The TTL (in seconds). If value is zero or greater than lease interval, the TTL is set to the\n                        lease interval.\n"]
+    #[doc = " Sets the TTL value in every record included in SRP update requests.\n\n Changing the TTL does not impact the TTL of already registered services/host-info.\n It only affects future SRP update messages (i.e., adding new services and/or refreshes of the existing services).\n\n @param[in] aInstance   A pointer to the OpenThread instance.\n @param[in] aTtl        The TTL (in seconds). If value is zero or greater than lease interval, the TTL is set to the\n                        lease interval.\n"]
     pub fn otSrpClientSetTtl(aInstance: *mut otInstance, aTtl: u32);
 }
 extern "C" {
-    #[doc = " This function gets the default lease interval used in SRP update requests.\n\n The default interval is used only for `otSrpClientService` instances with `mLease` set to zero.\n\n Note that this is the lease duration requested by the SRP client. The server may choose to accept a different lease\n interval.\n\n @param[in] aInstance        A pointer to the OpenThread instance.\n\n @returns The lease interval (in seconds).\n"]
+    #[doc = " Gets the default lease interval used in SRP update requests.\n\n The default interval is used only for `otSrpClientService` instances with `mLease` set to zero.\n\n Note that this is the lease duration requested by the SRP client. The server may choose to accept a different lease\n interval.\n\n @param[in] aInstance        A pointer to the OpenThread instance.\n\n @returns The lease interval (in seconds).\n"]
     pub fn otSrpClientGetLeaseInterval(aInstance: *mut otInstance) -> u32;
 }
 extern "C" {
-    #[doc = " This function sets the default lease interval used in SRP update requests.\n\n The default interval is used only for `otSrpClientService` instances with `mLease` set to zero.\n\n Changing the lease interval does not impact the accepted lease interval of already registered services/host-info.\n It only affects any future SRP update messages (i.e., adding new services and/or refreshes of the existing services).\n\n @param[in] aInstance   A pointer to the OpenThread instance.\n @param[in] aInterval   The lease interval (in seconds). If zero, the default value specified by\n                        `OPENTHREAD_CONFIG_SRP_CLIENT_DEFAULT_LEASE` would be used.\n"]
+    #[doc = " Sets the default lease interval used in SRP update requests.\n\n The default interval is used only for `otSrpClientService` instances with `mLease` set to zero.\n\n Changing the lease interval does not impact the accepted lease interval of already registered services/host-info.\n It only affects any future SRP update messages (i.e., adding new services and/or refreshes of the existing services).\n\n @param[in] aInstance   A pointer to the OpenThread instance.\n @param[in] aInterval   The lease interval (in seconds). If zero, the default value specified by\n                        `OPENTHREAD_CONFIG_SRP_CLIENT_DEFAULT_LEASE` would be used.\n"]
     pub fn otSrpClientSetLeaseInterval(aInstance: *mut otInstance, aInterval: u32);
 }
 extern "C" {
-    #[doc = " This function gets the default key lease interval used in SRP update requests.\n\n The default interval is used only for `otSrpClientService` instances with `mKeyLease` set to zero.\n\n Note that this is the lease duration requested by the SRP client. The server may choose to accept a different lease\n interval.\n\n @param[in] aInstance        A pointer to the OpenThread instance.\n\n @returns The key lease interval (in seconds).\n"]
+    #[doc = " Gets the default key lease interval used in SRP update requests.\n\n The default interval is used only for `otSrpClientService` instances with `mKeyLease` set to zero.\n\n Note that this is the lease duration requested by the SRP client. The server may choose to accept a different lease\n interval.\n\n @param[in] aInstance        A pointer to the OpenThread instance.\n\n @returns The key lease interval (in seconds).\n"]
     pub fn otSrpClientGetKeyLeaseInterval(aInstance: *mut otInstance) -> u32;
 }
 extern "C" {
-    #[doc = " This function sets the default key lease interval used in SRP update requests.\n\n The default interval is used only for `otSrpClientService` instances with `mKeyLease` set to zero.\n\n Changing the lease interval does not impact the accepted lease interval of already registered services/host-info.\n It only affects any future SRP update messages (i.e., adding new services and/or refreshes of existing services).\n\n @param[in] aInstance    A pointer to the OpenThread instance.\n @param[in] aInterval    The key lease interval (in seconds). If zero, the default value specified by\n                         `OPENTHREAD_CONFIG_SRP_CLIENT_DEFAULT_KEY_LEASE` would be used.\n"]
+    #[doc = " Sets the default key lease interval used in SRP update requests.\n\n The default interval is used only for `otSrpClientService` instances with `mKeyLease` set to zero.\n\n Changing the lease interval does not impact the accepted lease interval of already registered services/host-info.\n It only affects any future SRP update messages (i.e., adding new services and/or refreshes of existing services).\n\n @param[in] aInstance    A pointer to the OpenThread instance.\n @param[in] aInterval    The key lease interval (in seconds). If zero, the default value specified by\n                         `OPENTHREAD_CONFIG_SRP_CLIENT_DEFAULT_KEY_LEASE` would be used.\n"]
     pub fn otSrpClientSetKeyLeaseInterval(aInstance: *mut otInstance, aInterval: u32);
 }
 extern "C" {
-    #[doc = " This function gets the host info.\n\n @param[in] aInstance        A pointer to the OpenThread instance.\n\n @returns A pointer to host info structure.\n"]
+    #[doc = " Gets the host info.\n\n @param[in] aInstance        A pointer to the OpenThread instance.\n\n @returns A pointer to host info structure.\n"]
     pub fn otSrpClientGetHostInfo(aInstance: *mut otInstance) -> *const otSrpClientHostInfo;
 }
 extern "C" {
-    #[doc = " This function sets the host name label.\n\n After a successful call to this function, `otSrpClientCallback` will be called to report the status of host info\n registration with SRP server.\n\n The name string buffer pointed to by @p aName MUST persist and stay unchanged after returning from this function.\n OpenThread will keep the pointer to the string.\n\n The host name can be set before client is started or after start but before host info is registered with server\n (host info should be in either `STATE_TO_ADD` or `STATE_REMOVED`).\n\n @param[in] aInstance   A pointer to the OpenThread instance.\n @param[in] aName       A pointer to host name label string (MUST NOT be NULL). Pointer to the string buffer MUST\n                        persist and remain valid and constant after return from this function.\n\n @retval OT_ERROR_NONE            The host name label was set successfully.\n @retval OT_ERROR_INVALID_ARGS    The @p aName is NULL.\n @retval OT_ERROR_INVALID_STATE   The host name is already set and registered with the server.\n"]
+    #[doc = " Sets the host name label.\n\n After a successful call to this function, `otSrpClientCallback` will be called to report the status of host info\n registration with SRP server.\n\n The name string buffer pointed to by @p aName MUST persist and stay unchanged after returning from this function.\n OpenThread will keep the pointer to the string.\n\n The host name can be set before client is started or after start but before host info is registered with server\n (host info should be in either `STATE_TO_ADD` or `STATE_REMOVED`).\n\n @param[in] aInstance   A pointer to the OpenThread instance.\n @param[in] aName       A pointer to host name label string (MUST NOT be NULL). Pointer to the string buffer MUST\n                        persist and remain valid and constant after return from this function.\n\n @retval OT_ERROR_NONE            The host name label was set successfully.\n @retval OT_ERROR_INVALID_ARGS    The @p aName is NULL.\n @retval OT_ERROR_INVALID_STATE   The host name is already set and registered with the server.\n"]
     pub fn otSrpClientSetHostName(
         aInstance: *mut otInstance,
         aName: *const ::std::os::raw::c_char,
     ) -> otError;
 }
 extern "C" {
-    #[doc = " This function enables auto host address mode.\n\n When enabled host IPv6 addresses are automatically set by SRP client using all the unicast addresses on Thread netif\n excluding all link-local and mesh-local addresses. If there is no valid address, then Mesh Local EID address is\n added. The SRP client will automatically re-register when/if addresses on Thread netif are updated (new addresses\n are added or existing addresses are removed).\n\n The auto host address mode can be enabled before start or during operation of SRP client except when the host info\n is being removed (client is busy handling a remove request from an call to `otSrpClientRemoveHostAndServices()` and\n host info still being in  either `STATE_TO_REMOVE` or `STATE_REMOVING` states).\n\n After auto host address mode is enabled, it can be disabled by a call to `otSrpClientSetHostAddresses()` which\n then explicitly sets the host addresses.\n\n @retval OT_ERROR_NONE            Successfully enabled auto host address mode.\n @retval OT_ERROR_INVALID_STATE   Host is being removed and therefore cannot enable auto host address mode.\n"]
+    #[doc = " Enables auto host address mode.\n\n When enabled host IPv6 addresses are automatically set by SRP client using all the unicast addresses on Thread netif\n excluding all link-local and mesh-local addresses. If there is no valid address, then Mesh Local EID address is\n added. The SRP client will automatically re-register when/if addresses on Thread netif are updated (new addresses\n are added or existing addresses are removed).\n\n The auto host address mode can be enabled before start or during operation of SRP client except when the host info\n is being removed (client is busy handling a remove request from an call to `otSrpClientRemoveHostAndServices()` and\n host info still being in  either `STATE_TO_REMOVE` or `STATE_REMOVING` states).\n\n After auto host address mode is enabled, it can be disabled by a call to `otSrpClientSetHostAddresses()` which\n then explicitly sets the host addresses.\n\n @retval OT_ERROR_NONE            Successfully enabled auto host address mode.\n @retval OT_ERROR_INVALID_STATE   Host is being removed and therefore cannot enable auto host address mode.\n"]
     pub fn otSrpClientEnableAutoHostAddress(aInstance: *mut otInstance) -> otError;
 }
 extern "C" {
-    #[doc = " This function sets/updates the list of host IPv6 address.\n\n Host IPv6 addresses can be set/changed before start or during operation of SRP client (e.g. to add/remove or change\n a previously registered host address), except when the host info is being removed (client is busy handling a remove\n request from an earlier call to `otSrpClientRemoveHostAndServices()` and host info still being in  either\n `STATE_TO_REMOVE` or `STATE_REMOVING` states).\n\n The host IPv6 address array pointed to by @p aIp6Addresses MUST persist and remain unchanged after returning from\n this function (with `OT_ERROR_NONE`). OpenThread will save the pointer to the array.\n\n After a successful call to this function, `otSrpClientCallback` will be called to report the status of the address\n registration with SRP server.\n\n Calling this function disables auto host address mode if it was previously enabled from a successful call to\n `otSrpClientEnableAutoHostAddress()`.\n\n @param[in] aInstance           A pointer to the OpenThread instance.\n @param[in] aIp6Addresses       A pointer to the an array containing the host IPv6 addresses.\n @param[in] aNumAddresses       The number of addresses in the @p aIp6Addresses array.\n\n @retval OT_ERROR_NONE            The host IPv6 address list change started successfully. The `otSrpClientCallback`\n                                  will be called to report the status of registering addresses with server.\n @retval OT_ERROR_INVALID_ARGS    The address list is invalid (e.g., must contain at least one address).\n @retval OT_ERROR_INVALID_STATE   Host is being removed and therefore cannot change host address.\n"]
+    #[doc = " Sets/updates the list of host IPv6 address.\n\n Host IPv6 addresses can be set/changed before start or during operation of SRP client (e.g. to add/remove or change\n a previously registered host address), except when the host info is being removed (client is busy handling a remove\n request from an earlier call to `otSrpClientRemoveHostAndServices()` and host info still being in  either\n `STATE_TO_REMOVE` or `STATE_REMOVING` states).\n\n The host IPv6 address array pointed to by @p aIp6Addresses MUST persist and remain unchanged after returning from\n this function (with `OT_ERROR_NONE`). OpenThread will save the pointer to the array.\n\n After a successful call to this function, `otSrpClientCallback` will be called to report the status of the address\n registration with SRP server.\n\n Calling this function disables auto host address mode if it was previously enabled from a successful call to\n `otSrpClientEnableAutoHostAddress()`.\n\n @param[in] aInstance           A pointer to the OpenThread instance.\n @param[in] aIp6Addresses       A pointer to the an array containing the host IPv6 addresses.\n @param[in] aNumAddresses       The number of addresses in the @p aIp6Addresses array.\n\n @retval OT_ERROR_NONE            The host IPv6 address list change started successfully. The `otSrpClientCallback`\n                                  will be called to report the status of registering addresses with server.\n @retval OT_ERROR_INVALID_ARGS    The address list is invalid (e.g., must contain at least one address).\n @retval OT_ERROR_INVALID_STATE   Host is being removed and therefore cannot change host address.\n"]
     pub fn otSrpClientSetHostAddresses(
         aInstance: *mut otInstance,
         aIp6Addresses: *const otIp6Address,
@@ -9763,32 +9788,32 @@ extern "C" {
     ) -> otError;
 }
 extern "C" {
-    #[doc = " This function adds a service to be registered with server.\n\n After a successful call to this function, `otSrpClientCallback` will be called to report the status of the service\n addition/registration with SRP server.\n\n The `otSrpClientService` instance being pointed to by @p aService MUST persist and remain unchanged after returning\n from this function (with `OT_ERROR_NONE`). OpenThread will save the pointer to the service instance.\n\n The `otSrpClientService` instance is not longer tracked by OpenThread and can be reclaimed only when\n\n  -  It is removed explicitly by a call to `otSrpClientRemoveService()` or removed along with other services by a\n     call to `otSrpClientRemoveHostAndServices() and only after the `otSrpClientCallback` is called indicating the\n     service was removed. Or,\n  -  A call to `otSrpClientClearHostAndServices()` which removes the host and all related services immediately.\n\n @param[in] aInstance        A pointer to the OpenThread instance.\n @param[in] aService         A pointer to a `otSrpClientService` instance to add.\n\n @retval OT_ERROR_NONE          The addition of service started successfully. The `otSrpClientCallback` will be\n                                called to report the status.\n @retval OT_ERROR_ALREADY       A service with the same service and instance names is already in the list.\n @retval OT_ERROR_INVALID_ARGS  The service structure is invalid (e.g., bad service name or `otDnsTxtEntry`).\n"]
+    #[doc = " Adds a service to be registered with server.\n\n After a successful call to this function, `otSrpClientCallback` will be called to report the status of the service\n addition/registration with SRP server.\n\n The `otSrpClientService` instance being pointed to by @p aService MUST persist and remain unchanged after returning\n from this function (with `OT_ERROR_NONE`). OpenThread will save the pointer to the service instance.\n\n The `otSrpClientService` instance is not longer tracked by OpenThread and can be reclaimed only when\n\n  -  It is removed explicitly by a call to `otSrpClientRemoveService()` or removed along with other services by a\n     call to `otSrpClientRemoveHostAndServices() and only after the `otSrpClientCallback` is called indicating the\n     service was removed. Or,\n  -  A call to `otSrpClientClearHostAndServices()` which removes the host and all related services immediately.\n\n @param[in] aInstance        A pointer to the OpenThread instance.\n @param[in] aService         A pointer to a `otSrpClientService` instance to add.\n\n @retval OT_ERROR_NONE          The addition of service started successfully. The `otSrpClientCallback` will be\n                                called to report the status.\n @retval OT_ERROR_ALREADY       A service with the same service and instance names is already in the list.\n @retval OT_ERROR_INVALID_ARGS  The service structure is invalid (e.g., bad service name or `otDnsTxtEntry`).\n"]
     pub fn otSrpClientAddService(
         aInstance: *mut otInstance,
         aService: *mut otSrpClientService,
     ) -> otError;
 }
 extern "C" {
-    #[doc = " This function requests a service to be unregistered with server.\n\n After a successful call to this function, `otSrpClientCallback` will be called to report the status of remove\n request with SRP server.\n\n The `otSrpClientService` instance being pointed to by @p aService MUST persist and remain unchanged after returning\n from this function (with `OT_ERROR_NONE`). OpenThread will keep the service instance during the remove process.\n Only after the `otSrpClientCallback` is called indicating the service instance is removed from SRP client\n service list and can be be freed/reused.\n\n @param[in] aInstance        A pointer to the OpenThread instance.\n @param[in] aService         A pointer to a `otSrpClientService` instance to remove.\n\n @retval OT_ERROR_NONE       The removal of service started successfully. The `otSrpClientCallback` will be called to\n                             report the status.\n @retval OT_ERROR_NOT_FOUND  The service could not be found in the list.\n"]
+    #[doc = " Requests a service to be unregistered with server.\n\n After a successful call to this function, `otSrpClientCallback` will be called to report the status of remove\n request with SRP server.\n\n The `otSrpClientService` instance being pointed to by @p aService MUST persist and remain unchanged after returning\n from this function (with `OT_ERROR_NONE`). OpenThread will keep the service instance during the remove process.\n Only after the `otSrpClientCallback` is called indicating the service instance is removed from SRP client\n service list and can be be freed/reused.\n\n @param[in] aInstance        A pointer to the OpenThread instance.\n @param[in] aService         A pointer to a `otSrpClientService` instance to remove.\n\n @retval OT_ERROR_NONE       The removal of service started successfully. The `otSrpClientCallback` will be called to\n                             report the status.\n @retval OT_ERROR_NOT_FOUND  The service could not be found in the list.\n"]
     pub fn otSrpClientRemoveService(
         aInstance: *mut otInstance,
         aService: *mut otSrpClientService,
     ) -> otError;
 }
 extern "C" {
-    #[doc = " This function clears a service, immediately removing it from the client service list.\n\n Unlike `otSrpClientRemoveService()` which sends an update message to the server to remove the service, this function\n clears the service from the client's service list without any interaction with the server. On a successful call to\n this function, the `otSrpClientCallback` will NOT be called and the @p aService entry can be reclaimed and re-used\n by the caller immediately.\n\n This function can be used along with a subsequent call to `otSrpClientAddService()` (potentially reusing the same @p\n aService entry with the same service and instance names) to update some of the parameters in an existing service.\n\n @param[in] aInstance        A pointer to the OpenThread instance.\n @param[in] aService         A pointer to a `otSrpClientService` instance to delete.\n\n @retval OT_ERROR_NONE       The @p aService is deleted successfully. It can be reclaimed and re-used immediately.\n @retval OT_ERROR_NOT_FOUND  The service could not be found in the list.\n"]
+    #[doc = " Clears a service, immediately removing it from the client service list.\n\n Unlike `otSrpClientRemoveService()` which sends an update message to the server to remove the service, this function\n clears the service from the client's service list without any interaction with the server. On a successful call to\n this function, the `otSrpClientCallback` will NOT be called and the @p aService entry can be reclaimed and re-used\n by the caller immediately.\n\n Can be used along with a subsequent call to `otSrpClientAddService()` (potentially reusing the same @p\n aService entry with the same service and instance names) to update some of the parameters in an existing service.\n\n @param[in] aInstance        A pointer to the OpenThread instance.\n @param[in] aService         A pointer to a `otSrpClientService` instance to delete.\n\n @retval OT_ERROR_NONE       The @p aService is deleted successfully. It can be reclaimed and re-used immediately.\n @retval OT_ERROR_NOT_FOUND  The service could not be found in the list.\n"]
     pub fn otSrpClientClearService(
         aInstance: *mut otInstance,
         aService: *mut otSrpClientService,
     ) -> otError;
 }
 extern "C" {
-    #[doc = " This function gets the list of services being managed by client.\n\n @param[in] aInstance        A pointer to the OpenThread instance.\n\n @returns A pointer to the head of linked-list of all services or NULL if the list is empty.\n"]
+    #[doc = " Gets the list of services being managed by client.\n\n @param[in] aInstance        A pointer to the OpenThread instance.\n\n @returns A pointer to the head of linked-list of all services or NULL if the list is empty.\n"]
     pub fn otSrpClientGetServices(aInstance: *mut otInstance) -> *const otSrpClientService;
 }
 extern "C" {
-    #[doc = " This function starts the remove process of the host info and all services.\n\n After returning from this function, `otSrpClientCallback` will be called to report the status of remove request with\n SRP server.\n\n If the host info is to be permanently removed from server, @p aRemoveKeyLease should be set to `true` which removes\n the key lease associated with host on server. Otherwise, the key lease record is kept as before, which ensures\n that the server holds the host name in reserve for when the client is once again able to provide and register its\n service(s).\n\n The @p aSendUnregToServer determines the behavior when the host info is not yet registered with the server. If\n @p aSendUnregToServer is set to `false` (which is the default/expected value) then the SRP client will immediately\n remove the host info and services without sending an update message to server (no need to update the server if\n nothing is yet registered with it). If @p aSendUnregToServer is set to `true` then the SRP client will send an\n update message to the server. Note that if the host info is registered then the value of @p aSendUnregToServer does\n not matter and the SRP client will always send an update message to server requesting removal of all info.\n\n One situation where @p aSendUnregToServer can be useful is on a device reset/reboot, caller may want to remove any\n previously registered services with the server. In this case, caller can `otSrpClientSetHostName()` and then request\n `otSrpClientRemoveHostAndServices()` with `aSendUnregToServer` as `true`.\n\n @param[in] aInstance          A pointer to the OpenThread instance.\n @param[in] aRemoveKeyLease    A boolean indicating whether or not the host key lease should also be removed.\n @param[in] aSendUnregToServer A boolean indicating whether to send update to server when host info is not registered.\n\n @retval OT_ERROR_NONE       The removal of host info and services started successfully. The `otSrpClientCallback`\n                             will be called to report the status.\n @retval OT_ERROR_ALREADY    The host info is already removed.\n"]
+    #[doc = " Starts the remove process of the host info and all services.\n\n After returning from this function, `otSrpClientCallback` will be called to report the status of remove request with\n SRP server.\n\n If the host info is to be permanently removed from server, @p aRemoveKeyLease should be set to `true` which removes\n the key lease associated with host on server. Otherwise, the key lease record is kept as before, which ensures\n that the server holds the host name in reserve for when the client is once again able to provide and register its\n service(s).\n\n The @p aSendUnregToServer determines the behavior when the host info is not yet registered with the server. If\n @p aSendUnregToServer is set to `false` (which is the default/expected value) then the SRP client will immediately\n remove the host info and services without sending an update message to server (no need to update the server if\n nothing is yet registered with it). If @p aSendUnregToServer is set to `true` then the SRP client will send an\n update message to the server. Note that if the host info is registered then the value of @p aSendUnregToServer does\n not matter and the SRP client will always send an update message to server requesting removal of all info.\n\n One situation where @p aSendUnregToServer can be useful is on a device reset/reboot, caller may want to remove any\n previously registered services with the server. In this case, caller can `otSrpClientSetHostName()` and then request\n `otSrpClientRemoveHostAndServices()` with `aSendUnregToServer` as `true`.\n\n @param[in] aInstance          A pointer to the OpenThread instance.\n @param[in] aRemoveKeyLease    A boolean indicating whether or not the host key lease should also be removed.\n @param[in] aSendUnregToServer A boolean indicating whether to send update to server when host info is not registered.\n\n @retval OT_ERROR_NONE       The removal of host info and services started successfully. The `otSrpClientCallback`\n                             will be called to report the status.\n @retval OT_ERROR_ALREADY    The host info is already removed.\n"]
     pub fn otSrpClientRemoveHostAndServices(
         aInstance: *mut otInstance,
         aRemoveKeyLease: bool,
@@ -9796,35 +9821,35 @@ extern "C" {
     ) -> otError;
 }
 extern "C" {
-    #[doc = " This function clears all host info and all the services.\n\n Unlike `otSrpClientRemoveHostAndServices()` which sends an update message to the server to remove all the info, this\n function clears all the info immediately without any interaction with the server.\n\n @param[in] aInstance        A pointer to the OpenThread instance.\n"]
+    #[doc = " Clears all host info and all the services.\n\n Unlike `otSrpClientRemoveHostAndServices()` which sends an update message to the server to remove all the info, this\n function clears all the info immediately without any interaction with the server.\n\n @param[in] aInstance        A pointer to the OpenThread instance.\n"]
     pub fn otSrpClientClearHostAndServices(aInstance: *mut otInstance);
 }
 extern "C" {
-    #[doc = " This function gets the domain name being used by SRP client.\n\n This function requires `OPENTHREAD_CONFIG_SRP_CLIENT_DOMAIN_NAME_API_ENABLE` to be enabled.\n\n If domain name is not set, \"default.service.arpa\" will be used.\n\n @param[in] aInstance        A pointer to the OpenThread instance.\n\n @returns The domain name string.\n"]
+    #[doc = " Gets the domain name being used by SRP client.\n\n Requires `OPENTHREAD_CONFIG_SRP_CLIENT_DOMAIN_NAME_API_ENABLE` to be enabled.\n\n If domain name is not set, \"default.service.arpa\" will be used.\n\n @param[in] aInstance        A pointer to the OpenThread instance.\n\n @returns The domain name string.\n"]
     pub fn otSrpClientGetDomainName(aInstance: *mut otInstance) -> *const ::std::os::raw::c_char;
 }
 extern "C" {
-    #[doc = " This function sets the domain name to be used by SRP client.\n\n This function requires `OPENTHREAD_CONFIG_SRP_CLIENT_DOMAIN_NAME_API_ENABLE` to be enabled.\n\n If not set \"default.service.arpa\" will be used.\n\n The name string buffer pointed to by @p aName MUST persist and stay unchanged after returning from this function.\n OpenThread will keep the pointer to the string.\n\n The domain name can be set before client is started or after start but before host info is registered with server\n (host info should be in either `STATE_TO_ADD` or `STATE_TO_REMOVE`).\n\n @param[in] aInstance     A pointer to the OpenThread instance.\n @param[in] aName         A pointer to the domain name string. If NULL sets it to default \"default.service.arpa\".\n\n @retval OT_ERROR_NONE            The domain name label was set successfully.\n @retval OT_ERROR_INVALID_STATE   The host info is already registered with server.\n"]
+    #[doc = " Sets the domain name to be used by SRP client.\n\n Requires `OPENTHREAD_CONFIG_SRP_CLIENT_DOMAIN_NAME_API_ENABLE` to be enabled.\n\n If not set \"default.service.arpa\" will be used.\n\n The name string buffer pointed to by @p aName MUST persist and stay unchanged after returning from this function.\n OpenThread will keep the pointer to the string.\n\n The domain name can be set before client is started or after start but before host info is registered with server\n (host info should be in either `STATE_TO_ADD` or `STATE_TO_REMOVE`).\n\n @param[in] aInstance     A pointer to the OpenThread instance.\n @param[in] aName         A pointer to the domain name string. If NULL sets it to default \"default.service.arpa\".\n\n @retval OT_ERROR_NONE            The domain name label was set successfully.\n @retval OT_ERROR_INVALID_STATE   The host info is already registered with server.\n"]
     pub fn otSrpClientSetDomainName(
         aInstance: *mut otInstance,
         aName: *const ::std::os::raw::c_char,
     ) -> otError;
 }
 extern "C" {
-    #[doc = " This function converts a `otSrpClientItemState` to a string.\n\n @param[in] aItemState  An item state.\n\n @returns A string representation of @p aItemState.\n"]
+    #[doc = " Converts a `otSrpClientItemState` to a string.\n\n @param[in] aItemState  An item state.\n\n @returns A string representation of @p aItemState.\n"]
     pub fn otSrpClientItemStateToString(
         aItemState: otSrpClientItemState,
     ) -> *const ::std::os::raw::c_char;
 }
 extern "C" {
-    #[doc = " This function enables/disables \"service key record inclusion\" mode.\n\n When enabled, SRP client will include KEY record in Service Description Instructions in the SRP update messages\n that it sends.\n\n This function is available when `OPENTHREAD_CONFIG_REFERENCE_DEVICE_ENABLE` configuration is enabled.\n\n @note KEY record is optional in Service Description Instruction (it is required and always included in the Host\n Description Instruction). The default behavior of SRP client is to not include it. This function is intended to\n override the default behavior for testing only.\n\n @param[in] aInstance  A pointer to the OpenThread instance.\n @param[in] aEnabled   TRUE to enable, FALSE to disable the \"service key record inclusion\" mode.\n"]
+    #[doc = " Enables/disables \"service key record inclusion\" mode.\n\n When enabled, SRP client will include KEY record in Service Description Instructions in the SRP update messages\n that it sends.\n\n Is available when `OPENTHREAD_CONFIG_REFERENCE_DEVICE_ENABLE` configuration is enabled.\n\n @note KEY record is optional in Service Description Instruction (it is required and always included in the Host\n Description Instruction). The default behavior of SRP client is to not include it. This function is intended to\n override the default behavior for testing only.\n\n @param[in] aInstance  A pointer to the OpenThread instance.\n @param[in] aEnabled   TRUE to enable, FALSE to disable the \"service key record inclusion\" mode.\n"]
     pub fn otSrpClientSetServiceKeyRecordEnabled(aInstance: *mut otInstance, aEnabled: bool);
 }
 extern "C" {
-    #[doc = " This method indicates whether the \"service key record inclusion\" mode is enabled or disabled.\n\n This function is available when `OPENTHREAD_CONFIG_REFERENCE_DEVICE_ENABLE` configuration is enabled.\n\n @param[in] aInstance     A pointer to the OpenThread instance.\n\n @returns TRUE if \"service key record inclusion\" mode is enabled, FALSE otherwise.\n"]
+    #[doc = " Indicates whether the \"service key record inclusion\" mode is enabled or disabled.\n\n Is available when `OPENTHREAD_CONFIG_REFERENCE_DEVICE_ENABLE` configuration is enabled.\n\n @param[in] aInstance     A pointer to the OpenThread instance.\n\n @returns TRUE if \"service key record inclusion\" mode is enabled, FALSE otherwise.\n"]
     pub fn otSrpClientIsServiceKeyRecordEnabled(aInstance: *mut otInstance) -> bool;
 }
-#[doc = " This struct represents a SRP client service pool entry.\n"]
+#[doc = " Represents a SRP client service pool entry.\n"]
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
 pub struct otSrpClientBuffersServiceEntry {
@@ -9843,59 +9868,59 @@ impl Default for otSrpClientBuffersServiceEntry {
     }
 }
 extern "C" {
-    #[doc = " This function gets the string buffer to use for SRP client host name.\n\n @param[in]  aInstance  A pointer to the OpenThread instance.\n @param[out] aSize      Pointer to a variable to return the size (number of bytes) of the string buffer (MUST NOT be\n                        NULL).\n\n @returns A pointer to char buffer to use for SRP client host name.\n"]
+    #[doc = " Gets the string buffer to use for SRP client host name.\n\n @param[in]  aInstance  A pointer to the OpenThread instance.\n @param[out] aSize      Pointer to a variable to return the size (number of bytes) of the string buffer (MUST NOT be\n                        NULL).\n\n @returns A pointer to char buffer to use for SRP client host name.\n"]
     pub fn otSrpClientBuffersGetHostNameString(
         aInstance: *mut otInstance,
         aSize: *mut u16,
     ) -> *mut ::std::os::raw::c_char;
 }
 extern "C" {
-    #[doc = " This function gets the array of IPv6 address entries to use as SRP client host address list.\n\n @param[in]  aInstance     A pointer to the OpenThread instance.\n @param[out] aArrayLength  Pointer to a variable to return the array length i.e., number of IPv6 address entries in\n                           the array (MUST NOT be NULL).\n\n @returns A pointer to an array of `otIp6Address` entries (number of entries is returned in @p aArrayLength).\n"]
+    #[doc = " Gets the array of IPv6 address entries to use as SRP client host address list.\n\n @param[in]  aInstance     A pointer to the OpenThread instance.\n @param[out] aArrayLength  Pointer to a variable to return the array length i.e., number of IPv6 address entries in\n                           the array (MUST NOT be NULL).\n\n @returns A pointer to an array of `otIp6Address` entries (number of entries is returned in @p aArrayLength).\n"]
     pub fn otSrpClientBuffersGetHostAddressesArray(
         aInstance: *mut otInstance,
         aArrayLength: *mut u8,
     ) -> *mut otIp6Address;
 }
 extern "C" {
-    #[doc = " This function allocates a new service entry from the pool.\n\n The returned service entry instance will be initialized as follows:\n\n  - `mService.mName` will point to an allocated string buffer which can be retrieved using the function\n    `otSrpClientBuffersGetServiceEntryServiceNameString()`.\n  - `mService.mInstanceName` will point to an allocated string buffer which can be retrieved using the function\n    `otSrpClientBuffersGetServiceEntryInstanceNameString()`.\n  - `mService.mSubTypeLabels` points to an array that is returned from `otSrpClientBuffersGetSubTypeLabelsArray()`.\n  - `mService.mTxtEntries` will point to `mTxtEntry`.\n  - `mService.mNumTxtEntries` will be set to one.\n  - Other `mService` fields (port, priority, weight) are set to zero.\n  - `mTxtEntry.mKey` is set to NULL (value is treated as already encoded).\n  - `mTxtEntry.mValue` will point to an allocated buffer which can be retrieved using the function\n    `otSrpClientBuffersGetServiceEntryTxtBuffer()`.\n  - `mTxtEntry.mValueLength` is set to zero.\n  - All related data/string buffers and arrays are cleared to all zero.\n\n @param[in] aInstance   A pointer to the OpenThread instance.\n\n @returns A pointer to the newly allocated service entry or NULL if not more entry available in the pool.\n"]
+    #[doc = " Allocates a new service entry from the pool.\n\n The returned service entry instance will be initialized as follows:\n\n  - `mService.mName` will point to an allocated string buffer which can be retrieved using the function\n    `otSrpClientBuffersGetServiceEntryServiceNameString()`.\n  - `mService.mInstanceName` will point to an allocated string buffer which can be retrieved using the function\n    `otSrpClientBuffersGetServiceEntryInstanceNameString()`.\n  - `mService.mSubTypeLabels` points to an array that is returned from `otSrpClientBuffersGetSubTypeLabelsArray()`.\n  - `mService.mTxtEntries` will point to `mTxtEntry`.\n  - `mService.mNumTxtEntries` will be set to one.\n  - Other `mService` fields (port, priority, weight) are set to zero.\n  - `mTxtEntry.mKey` is set to NULL (value is treated as already encoded).\n  - `mTxtEntry.mValue` will point to an allocated buffer which can be retrieved using the function\n    `otSrpClientBuffersGetServiceEntryTxtBuffer()`.\n  - `mTxtEntry.mValueLength` is set to zero.\n  - All related data/string buffers and arrays are cleared to all zero.\n\n @param[in] aInstance   A pointer to the OpenThread instance.\n\n @returns A pointer to the newly allocated service entry or NULL if not more entry available in the pool.\n"]
     pub fn otSrpClientBuffersAllocateService(
         aInstance: *mut otInstance,
     ) -> *mut otSrpClientBuffersServiceEntry;
 }
 extern "C" {
-    #[doc = " This function frees a previously allocated service entry.\n\n The @p aService MUST be previously allocated using `otSrpClientBuffersAllocateService()` and not yet freed. Otherwise\n the behavior of this function is undefined.\n\n @param[in] aInstance   A pointer to the OpenThread instance.\n @param[in] aService    A pointer to the service entry to free (MUST NOT be NULL).\n"]
+    #[doc = " Frees a previously allocated service entry.\n\n The @p aService MUST be previously allocated using `otSrpClientBuffersAllocateService()` and not yet freed. Otherwise\n the behavior of this function is undefined.\n\n @param[in] aInstance   A pointer to the OpenThread instance.\n @param[in] aService    A pointer to the service entry to free (MUST NOT be NULL).\n"]
     pub fn otSrpClientBuffersFreeService(
         aInstance: *mut otInstance,
         aService: *mut otSrpClientBuffersServiceEntry,
     );
 }
 extern "C" {
-    #[doc = " This function frees all previously allocated service entries.\n\n @param[in] aInstance   A pointer to the OpenThread instance.\n"]
+    #[doc = " Frees all previously allocated service entries.\n\n @param[in] aInstance   A pointer to the OpenThread instance.\n"]
     pub fn otSrpClientBuffersFreeAllServices(aInstance: *mut otInstance);
 }
 extern "C" {
-    #[doc = " This function gets the string buffer for service name from a service entry.\n\n @param[in]  aEntry   A pointer to a previously allocated service entry (MUST NOT be NULL).\n @param[out] aSize    A pointer to a variable to return the size (number of bytes) of the string buffer (MUST NOT be\n                      NULL).\n\n @returns A pointer to the string buffer.\n"]
+    #[doc = " Gets the string buffer for service name from a service entry.\n\n @param[in]  aEntry   A pointer to a previously allocated service entry (MUST NOT be NULL).\n @param[out] aSize    A pointer to a variable to return the size (number of bytes) of the string buffer (MUST NOT be\n                      NULL).\n\n @returns A pointer to the string buffer.\n"]
     pub fn otSrpClientBuffersGetServiceEntryServiceNameString(
         aEntry: *mut otSrpClientBuffersServiceEntry,
         aSize: *mut u16,
     ) -> *mut ::std::os::raw::c_char;
 }
 extern "C" {
-    #[doc = " This function gets the string buffer for service instance name from a service entry.\n\n @param[in]  aEntry   A pointer to a previously allocated service entry (MUST NOT be NULL).\n @param[out] aSize    A pointer to a variable to return the size (number of bytes) of the string buffer (MUST NOT be\n                      NULL).\n\n @returns A pointer to the string buffer.\n"]
+    #[doc = " Gets the string buffer for service instance name from a service entry.\n\n @param[in]  aEntry   A pointer to a previously allocated service entry (MUST NOT be NULL).\n @param[out] aSize    A pointer to a variable to return the size (number of bytes) of the string buffer (MUST NOT be\n                      NULL).\n\n @returns A pointer to the string buffer.\n"]
     pub fn otSrpClientBuffersGetServiceEntryInstanceNameString(
         aEntry: *mut otSrpClientBuffersServiceEntry,
         aSize: *mut u16,
     ) -> *mut ::std::os::raw::c_char;
 }
 extern "C" {
-    #[doc = " This function gets the buffer for TXT record from a service entry.\n\n @param[in]  aEntry   A pointer to a previously allocated service entry (MUST NOT be NULL).\n @param[out] aSize    A pointer to a variable to return the size (number of bytes) of the buffer (MUST NOT be NULL).\n\n @returns A pointer to the buffer.\n"]
+    #[doc = " Gets the buffer for TXT record from a service entry.\n\n @param[in]  aEntry   A pointer to a previously allocated service entry (MUST NOT be NULL).\n @param[out] aSize    A pointer to a variable to return the size (number of bytes) of the buffer (MUST NOT be NULL).\n\n @returns A pointer to the buffer.\n"]
     pub fn otSrpClientBuffersGetServiceEntryTxtBuffer(
         aEntry: *mut otSrpClientBuffersServiceEntry,
         aSize: *mut u16,
     ) -> *mut u8;
 }
 extern "C" {
-    #[doc = " This function gets the array for service subtype labels from the service entry.\n\n @param[in]  aEntry          A pointer to a previously allocated service entry (MUST NOT be NULL).\n @param[out] aArrayLength    A pointer to a variable to return the array length (MUST NOT be NULL).\n\n @returns A pointer to the array.\n"]
+    #[doc = " Gets the array for service subtype labels from the service entry.\n\n @param[in]  aEntry          A pointer to a previously allocated service entry (MUST NOT be NULL).\n @param[out] aArrayLength    A pointer to a variable to return the array length (MUST NOT be NULL).\n\n @returns A pointer to the array.\n"]
     pub fn otSrpClientBuffersGetSubTypeLabelsArray(
         aEntry: *mut otSrpClientBuffersServiceEntry,
         aArrayLength: *mut u16,
@@ -9941,15 +9966,15 @@ pub const OT_SRP_SERVER_STATE_DISABLED: otSrpServerState = 0;
 pub const OT_SRP_SERVER_STATE_RUNNING: otSrpServerState = 1;
 #[doc = "< The SRP server is enabled but stopped."]
 pub const OT_SRP_SERVER_STATE_STOPPED: otSrpServerState = 2;
-#[doc = " This enumeration represents the state of the SRP server.\n"]
+#[doc = " Represents the state of the SRP server.\n"]
 pub type otSrpServerState = ::std::os::raw::c_uint;
 #[doc = "< Unicast address mode."]
 pub const OT_SRP_SERVER_ADDRESS_MODE_UNICAST: otSrpServerAddressMode = 0;
 #[doc = "< Anycast address mode."]
 pub const OT_SRP_SERVER_ADDRESS_MODE_ANYCAST: otSrpServerAddressMode = 1;
-#[doc = " This enumeration represents the address mode used by the SRP server.\n\n Address mode specifies how the address and port number are determined by the SRP server and how this info is\n published in the Thread Network Data.\n"]
+#[doc = " Represents the address mode used by the SRP server.\n\n Address mode specifies how the address and port number are determined by the SRP server and how this info is\n published in the Thread Network Data.\n"]
 pub type otSrpServerAddressMode = ::std::os::raw::c_uint;
-#[doc = " This structure includes SRP server TTL configurations.\n"]
+#[doc = " Includes SRP server TTL configurations.\n"]
 #[repr(C)]
 #[derive(Debug, Default, Copy, Clone)]
 pub struct otSrpServerTtlConfig {
@@ -9958,7 +9983,7 @@ pub struct otSrpServerTtlConfig {
     #[doc = "< The maximum TTL in seconds."]
     pub mMaxTtl: u32,
 }
-#[doc = " This structure includes SRP server LEASE and KEY-LEASE configurations.\n"]
+#[doc = " Includes SRP server LEASE and KEY-LEASE configurations.\n"]
 #[repr(C)]
 #[derive(Debug, Default, Copy, Clone)]
 pub struct otSrpServerLeaseConfig {
@@ -9971,7 +9996,7 @@ pub struct otSrpServerLeaseConfig {
     #[doc = "< The maximum KEY-LEASE interval in seconds."]
     pub mMaxKeyLease: u32,
 }
-#[doc = " This structure includes SRP server lease information of a host/service.\n"]
+#[doc = " Includes SRP server lease information of a host/service.\n"]
 #[repr(C)]
 #[derive(Debug, Default, Copy, Clone)]
 pub struct otSrpServerLeaseInfo {
@@ -9984,7 +10009,7 @@ pub struct otSrpServerLeaseInfo {
     #[doc = "< The remaining key lease time of a host/service in milliseconds."]
     pub mRemainingKeyLease: u32,
 }
-#[doc = " This structure includes the statistics of SRP server responses.\n"]
+#[doc = " Includes the statistics of SRP server responses.\n"]
 #[repr(C)]
 #[derive(Debug, Default, Copy, Clone)]
 pub struct otSrpServerResponseCounters {
@@ -10002,87 +10027,87 @@ pub struct otSrpServerResponseCounters {
     pub mOther: u32,
 }
 extern "C" {
-    #[doc = " This function returns the domain authorized to the SRP server.\n\n If the domain if not set by SetDomain, \"default.service.arpa.\" will be returned.\n A trailing dot is always appended even if the domain is set without it.\n\n @param[in]  aInstance  A pointer to an OpenThread instance.\n\n @returns A pointer to the dot-joined domain string.\n"]
+    #[doc = " Returns the domain authorized to the SRP server.\n\n If the domain if not set by SetDomain, \"default.service.arpa.\" will be returned.\n A trailing dot is always appended even if the domain is set without it.\n\n @param[in]  aInstance  A pointer to an OpenThread instance.\n\n @returns A pointer to the dot-joined domain string.\n"]
     pub fn otSrpServerGetDomain(aInstance: *mut otInstance) -> *const ::std::os::raw::c_char;
 }
 extern "C" {
-    #[doc = " This function sets the domain on the SRP server.\n\n A trailing dot will be appended to @p aDomain if it is not already there.\n This function should only be called before the SRP server is enabled.\n\n @param[in]  aInstance  A pointer to an OpenThread instance.\n @param[in]  aDomain    The domain to be set. MUST NOT be NULL.\n\n @retval  OT_ERROR_NONE           Successfully set the domain to @p aDomain.\n @retval  OT_ERROR_INVALID_STATE  The SRP server is already enabled and the Domain cannot be changed.\n @retval  OT_ERROR_INVALID_ARGS   The argument @p aDomain is not a valid DNS domain name.\n @retval  OT_ERROR_NO_BUFS        There is no memory to store content of @p aDomain.\n"]
+    #[doc = " Sets the domain on the SRP server.\n\n A trailing dot will be appended to @p aDomain if it is not already there.\n Should only be called before the SRP server is enabled.\n\n @param[in]  aInstance  A pointer to an OpenThread instance.\n @param[in]  aDomain    The domain to be set. MUST NOT be NULL.\n\n @retval  OT_ERROR_NONE           Successfully set the domain to @p aDomain.\n @retval  OT_ERROR_INVALID_STATE  The SRP server is already enabled and the Domain cannot be changed.\n @retval  OT_ERROR_INVALID_ARGS   The argument @p aDomain is not a valid DNS domain name.\n @retval  OT_ERROR_NO_BUFS        There is no memory to store content of @p aDomain.\n"]
     pub fn otSrpServerSetDomain(
         aInstance: *mut otInstance,
         aDomain: *const ::std::os::raw::c_char,
     ) -> otError;
 }
 extern "C" {
-    #[doc = " This function returns the state of the SRP server.\n\n @param[in]  aInstance  A pointer to an OpenThread instance.\n\n @returns The current state of the SRP server.\n"]
+    #[doc = " Returns the state of the SRP server.\n\n @param[in]  aInstance  A pointer to an OpenThread instance.\n\n @returns The current state of the SRP server.\n"]
     pub fn otSrpServerGetState(aInstance: *mut otInstance) -> otSrpServerState;
 }
 extern "C" {
-    #[doc = " This function returns the port the SRP server is listening to.\n\n @param[in]  aInstance  A pointer to an OpenThread instance.\n\n @returns  The port of the SRP server. It returns 0 if the server is not running.\n"]
+    #[doc = " Returns the port the SRP server is listening to.\n\n @param[in]  aInstance  A pointer to an OpenThread instance.\n\n @returns  The port of the SRP server. It returns 0 if the server is not running.\n"]
     pub fn otSrpServerGetPort(aInstance: *mut otInstance) -> u16;
 }
 extern "C" {
-    #[doc = " This function returns the address mode being used by the SRP server.\n\n @param[in] aInstance  A pointer to an OpenThread instance.\n\n @returns The SRP server's address mode.\n"]
+    #[doc = " Returns the address mode being used by the SRP server.\n\n @param[in] aInstance  A pointer to an OpenThread instance.\n\n @returns The SRP server's address mode.\n"]
     pub fn otSrpServerGetAddressMode(aInstance: *mut otInstance) -> otSrpServerAddressMode;
 }
 extern "C" {
-    #[doc = " This function sets the address mode to be used by the SRP server.\n\n @param[in] aInstance  A pointer to an OpenThread instance.\n @param[in] aMode      The address mode to use.\n\n @retval OT_ERROR_NONE           Successfully set the address mode.\n @retval OT_ERROR_INVALID_STATE  The SRP server is enabled and the address mode cannot be changed.\n"]
+    #[doc = " Sets the address mode to be used by the SRP server.\n\n @param[in] aInstance  A pointer to an OpenThread instance.\n @param[in] aMode      The address mode to use.\n\n @retval OT_ERROR_NONE           Successfully set the address mode.\n @retval OT_ERROR_INVALID_STATE  The SRP server is enabled and the address mode cannot be changed.\n"]
     pub fn otSrpServerSetAddressMode(
         aInstance: *mut otInstance,
         aMode: otSrpServerAddressMode,
     ) -> otError;
 }
 extern "C" {
-    #[doc = " This function returns the sequence number used with anycast address mode.\n\n The sequence number is included in \"DNS/SRP Service Anycast Address\" entry published in the Network Data.\n\n @param[in] aInstance  A pointer to an OpenThread instance.\n\n @returns The anycast sequence number.\n"]
+    #[doc = " Returns the sequence number used with anycast address mode.\n\n The sequence number is included in \"DNS/SRP Service Anycast Address\" entry published in the Network Data.\n\n @param[in] aInstance  A pointer to an OpenThread instance.\n\n @returns The anycast sequence number.\n"]
     pub fn otSrpServerGetAnycastModeSequenceNumber(aInstance: *mut otInstance) -> u8;
 }
 extern "C" {
-    #[doc = " This function sets the sequence number used with anycast address mode.\n\n @param[in] aInstance        A pointer to an OpenThread instance.\n @param[in] aSequenceNumber  The sequence number to use.\n\n @retval OT_ERROR_NONE            Successfully set the address mode.\n @retval OT_ERROR_INVALID_STATE   The SRP server is enabled and the sequence number cannot be changed.\n"]
+    #[doc = " Sets the sequence number used with anycast address mode.\n\n @param[in] aInstance        A pointer to an OpenThread instance.\n @param[in] aSequenceNumber  The sequence number to use.\n\n @retval OT_ERROR_NONE            Successfully set the address mode.\n @retval OT_ERROR_INVALID_STATE   The SRP server is enabled and the sequence number cannot be changed.\n"]
     pub fn otSrpServerSetAnycastModeSequenceNumber(
         aInstance: *mut otInstance,
         aSequenceNumber: u8,
     ) -> otError;
 }
 extern "C" {
-    #[doc = " This function enables/disables the SRP server.\n\n On a Border Router, it is recommended to use `otSrpServerSetAutoEnableMode()` instead.\n\n @param[in]  aInstance  A pointer to an OpenThread instance.\n @param[in]  aEnabled   A boolean to enable/disable the SRP server.\n"]
+    #[doc = " Enables/disables the SRP server.\n\n On a Border Router, it is recommended to use `otSrpServerSetAutoEnableMode()` instead.\n\n @param[in]  aInstance  A pointer to an OpenThread instance.\n @param[in]  aEnabled   A boolean to enable/disable the SRP server.\n"]
     pub fn otSrpServerSetEnabled(aInstance: *mut otInstance, aEnabled: bool);
 }
 extern "C" {
-    #[doc = " This function enables/disables the auto-enable mode on SRP server.\n\n This function requires `OPENTHREAD_CONFIG_BORDER_ROUTING_ENABLE` feature.\n\n When this mode is enabled, the Border Routing Manager controls if/when to enable or disable the SRP server.\n SRP sever is auto-enabled if/when Border Routing is started and it is done with the initial prefix and route\n configurations (when the OMR and on-link prefixes are determined, advertised in emitted Router Advertisement message\n on infrastructure side and published in the Thread Network Data). The SRP server is auto-disabled if/when BR is\n stopped (e.g., if the infrastructure network interface is brought down or if BR gets detached).\n\n This mode can be disabled by a `otSrpServerSetAutoEnableMode()` call with @p aEnabled set to `false` or if the SRP\n server is explicitly enabled or disabled by a call to `otSrpServerSetEnabled()` function. Disabling auto-enable mode\n using `otSrpServerSetAutoEnableMode(false)` will not change the current state of SRP sever (e.g., if it is enabled\n it stays enabled).\n\n @param[in] aInstance   A pointer to an OpenThread instance.\n @param[in] aEnabled    A boolean to enable/disable the auto-enable mode.\n"]
+    #[doc = " Enables/disables the auto-enable mode on SRP server.\n\n Requires `OPENTHREAD_CONFIG_BORDER_ROUTING_ENABLE` feature.\n\n When this mode is enabled, the Border Routing Manager controls if/when to enable or disable the SRP server.\n SRP sever is auto-enabled if/when Border Routing is started and it is done with the initial prefix and route\n configurations (when the OMR and on-link prefixes are determined, advertised in emitted Router Advertisement message\n on infrastructure side and published in the Thread Network Data). The SRP server is auto-disabled if/when BR is\n stopped (e.g., if the infrastructure network interface is brought down or if BR gets detached).\n\n This mode can be disabled by a `otSrpServerSetAutoEnableMode()` call with @p aEnabled set to `false` or if the SRP\n server is explicitly enabled or disabled by a call to `otSrpServerSetEnabled()` function. Disabling auto-enable mode\n using `otSrpServerSetAutoEnableMode(false)` will not change the current state of SRP sever (e.g., if it is enabled\n it stays enabled).\n\n @param[in] aInstance   A pointer to an OpenThread instance.\n @param[in] aEnabled    A boolean to enable/disable the auto-enable mode.\n"]
     pub fn otSrpServerSetAutoEnableMode(aInstance: *mut otInstance, aEnabled: bool);
 }
 extern "C" {
-    #[doc = " This function indicates whether the auto-enable mode is enabled or disabled.\n\n This function requires `OPENTHREAD_CONFIG_BORDER_ROUTING_ENABLE` feature.\n\n @param[in]  aInstance  A pointer to an OpenThread instance.\n\n @retval TRUE   The auto-enable mode is enabled.\n @retval FALSE  The auto-enable mode is disabled.\n"]
+    #[doc = " Indicates whether the auto-enable mode is enabled or disabled.\n\n Requires `OPENTHREAD_CONFIG_BORDER_ROUTING_ENABLE` feature.\n\n @param[in]  aInstance  A pointer to an OpenThread instance.\n\n @retval TRUE   The auto-enable mode is enabled.\n @retval FALSE  The auto-enable mode is disabled.\n"]
     pub fn otSrpServerIsAutoEnableMode(aInstance: *mut otInstance) -> bool;
 }
 extern "C" {
-    #[doc = " This function returns SRP server TTL configuration.\n\n @param[in]   aInstance   A pointer to an OpenThread instance.\n @param[out]  aTtlConfig  A pointer to an `otSrpServerTtlConfig` instance.\n"]
+    #[doc = " Returns SRP server TTL configuration.\n\n @param[in]   aInstance   A pointer to an OpenThread instance.\n @param[out]  aTtlConfig  A pointer to an `otSrpServerTtlConfig` instance.\n"]
     pub fn otSrpServerGetTtlConfig(
         aInstance: *mut otInstance,
         aTtlConfig: *mut otSrpServerTtlConfig,
     );
 }
 extern "C" {
-    #[doc = " This function sets SRP server TTL configuration.\n\n The granted TTL will always be no greater than the max lease interval configured via `otSrpServerSetLeaseConfig()`,\n regardless of the minimum and maximum TTL configuration.\n\n @param[in]  aInstance   A pointer to an OpenThread instance.\n @param[in]  aTtlConfig  A pointer to an `otSrpServerTtlConfig` instance.\n\n @retval  OT_ERROR_NONE          Successfully set the TTL configuration.\n @retval  OT_ERROR_INVALID_ARGS  The TTL configuration is not valid.\n"]
+    #[doc = " Sets SRP server TTL configuration.\n\n The granted TTL will always be no greater than the max lease interval configured via `otSrpServerSetLeaseConfig()`,\n regardless of the minimum and maximum TTL configuration.\n\n @param[in]  aInstance   A pointer to an OpenThread instance.\n @param[in]  aTtlConfig  A pointer to an `otSrpServerTtlConfig` instance.\n\n @retval  OT_ERROR_NONE          Successfully set the TTL configuration.\n @retval  OT_ERROR_INVALID_ARGS  The TTL configuration is not valid.\n"]
     pub fn otSrpServerSetTtlConfig(
         aInstance: *mut otInstance,
         aTtlConfig: *const otSrpServerTtlConfig,
     ) -> otError;
 }
 extern "C" {
-    #[doc = " This function returns SRP server LEASE and KEY-LEASE configurations.\n\n @param[in]   aInstance     A pointer to an OpenThread instance.\n @param[out]  aLeaseConfig  A pointer to an `otSrpServerLeaseConfig` instance.\n"]
+    #[doc = " Returns SRP server LEASE and KEY-LEASE configurations.\n\n @param[in]   aInstance     A pointer to an OpenThread instance.\n @param[out]  aLeaseConfig  A pointer to an `otSrpServerLeaseConfig` instance.\n"]
     pub fn otSrpServerGetLeaseConfig(
         aInstance: *mut otInstance,
         aLeaseConfig: *mut otSrpServerLeaseConfig,
     );
 }
 extern "C" {
-    #[doc = " This function sets SRP server LEASE and KEY-LEASE configurations.\n\n When a non-zero LEASE time is requested from a client, the granted value will be\n limited in range [aMinLease, aMaxLease]; and a non-zero KEY-LEASE will be granted\n in range [aMinKeyLease, aMaxKeyLease]. For zero LEASE or KEY-LEASE time, zero will\n be granted.\n\n @param[in]  aInstance     A pointer to an OpenThread instance.\n @param[in]  aLeaseConfig  A pointer to an `otSrpServerLeaseConfig` instance.\n\n @retval  OT_ERROR_NONE          Successfully set the LEASE and KEY-LEASE ranges.\n @retval  OT_ERROR_INVALID_ARGS  The LEASE or KEY-LEASE range is not valid.\n"]
+    #[doc = " Sets SRP server LEASE and KEY-LEASE configurations.\n\n When a non-zero LEASE time is requested from a client, the granted value will be\n limited in range [aMinLease, aMaxLease]; and a non-zero KEY-LEASE will be granted\n in range [aMinKeyLease, aMaxKeyLease]. For zero LEASE or KEY-LEASE time, zero will\n be granted.\n\n @param[in]  aInstance     A pointer to an OpenThread instance.\n @param[in]  aLeaseConfig  A pointer to an `otSrpServerLeaseConfig` instance.\n\n @retval  OT_ERROR_NONE          Successfully set the LEASE and KEY-LEASE ranges.\n @retval  OT_ERROR_INVALID_ARGS  The LEASE or KEY-LEASE range is not valid.\n"]
     pub fn otSrpServerSetLeaseConfig(
         aInstance: *mut otInstance,
         aLeaseConfig: *const otSrpServerLeaseConfig,
     ) -> otError;
 }
-#[doc = " This function handles SRP service updates.\n\n This function is called by the SRP server to notify that a SRP host and possibly SRP services\n are being updated. It is important that the SRP updates are not committed until the handler\n returns the result by calling otSrpServerHandleServiceUpdateResult or times out after @p aTimeout.\n\n A SRP service observer should always call otSrpServerHandleServiceUpdateResult with error code\n OT_ERROR_NONE immediately after receiving the update events.\n\n A more generic handler may perform validations on the SRP host/services and rejects the SRP updates\n if any validation fails. For example, an Advertising Proxy should advertise (or remove) the host and\n services on a multicast-capable link and returns specific error code if any failure occurs.\n\n @param[in]  aId       The service update transaction ID. This ID must be passed back with\n                       `otSrpServerHandleServiceUpdateResult`.\n @param[in]  aHost     A pointer to the otSrpServerHost object which contains the SRP updates. The\n                       handler should publish/un-publish the host and each service points to this\n                       host with below rules:\n                         1. If the host is not deleted (indicated by `otSrpServerHostIsDeleted`),\n                            then it should be published or updated with mDNS. Otherwise, the host\n                            should be un-published (remove AAAA RRs).\n                         2. For each service points to this host, it must be un-published if the host\n                            is to be un-published. Otherwise, the handler should publish or update the\n                            service when it is not deleted (indicated by `otSrpServerServiceIsDeleted`)\n                            and un-publish it when deleted.\n @param[in]  aTimeout  The maximum time in milliseconds for the handler to process the service event.\n @param[in]  aContext  A pointer to application-specific context.\n\n @sa otSrpServerSetServiceUpdateHandler\n @sa otSrpServerHandleServiceUpdateResult\n"]
+#[doc = " Handles SRP service updates.\n\n Is called by the SRP server to notify that a SRP host and possibly SRP services\n are being updated. It is important that the SRP updates are not committed until the handler\n returns the result by calling otSrpServerHandleServiceUpdateResult or times out after @p aTimeout.\n\n A SRP service observer should always call otSrpServerHandleServiceUpdateResult with error code\n OT_ERROR_NONE immediately after receiving the update events.\n\n A more generic handler may perform validations on the SRP host/services and rejects the SRP updates\n if any validation fails. For example, an Advertising Proxy should advertise (or remove) the host and\n services on a multicast-capable link and returns specific error code if any failure occurs.\n\n @param[in]  aId       The service update transaction ID. This ID must be passed back with\n                       `otSrpServerHandleServiceUpdateResult`.\n @param[in]  aHost     A pointer to the otSrpServerHost object which contains the SRP updates. The\n                       handler should publish/un-publish the host and each service points to this\n                       host with below rules:\n                         1. If the host is not deleted (indicated by `otSrpServerHostIsDeleted`),\n                            then it should be published or updated with mDNS. Otherwise, the host\n                            should be un-published (remove AAAA RRs).\n                         2. For each service points to this host, it must be un-published if the host\n                            is to be un-published. Otherwise, the handler should publish or update the\n                            service when it is not deleted (indicated by `otSrpServerServiceIsDeleted`)\n                            and un-publish it when deleted.\n @param[in]  aTimeout  The maximum time in milliseconds for the handler to process the service event.\n @param[in]  aContext  A pointer to application-specific context.\n\n @sa otSrpServerSetServiceUpdateHandler\n @sa otSrpServerHandleServiceUpdateResult\n"]
 pub type otSrpServerServiceUpdateHandler = ::std::option::Option<
     unsafe extern "C" fn(
         aId: otSrpServerServiceUpdateId,
@@ -10092,7 +10117,7 @@ pub type otSrpServerServiceUpdateHandler = ::std::option::Option<
     ),
 >;
 extern "C" {
-    #[doc = " This function sets the SRP service updates handler on SRP server.\n\n @param[in]  aInstance        A pointer to an OpenThread instance.\n @param[in]  aServiceHandler  A pointer to a service handler. Use NULL to remove the handler.\n @param[in]  aContext         A pointer to arbitrary context information.\n                              May be NULL if not used.\n"]
+    #[doc = " Sets the SRP service updates handler on SRP server.\n\n @param[in]  aInstance        A pointer to an OpenThread instance.\n @param[in]  aServiceHandler  A pointer to a service handler. Use NULL to remove the handler.\n @param[in]  aContext         A pointer to arbitrary context information.\n                              May be NULL if not used.\n"]
     pub fn otSrpServerSetServiceUpdateHandler(
         aInstance: *mut otInstance,
         aServiceHandler: otSrpServerServiceUpdateHandler,
@@ -10100,7 +10125,7 @@ extern "C" {
     );
 }
 extern "C" {
-    #[doc = " This function reports the result of processing a SRP update to the SRP server.\n\n The Service Update Handler should call this function to return the result of its\n processing of a SRP update.\n\n @param[in]  aInstance  A pointer to an OpenThread instance.\n @param[in]  aId        The service update transaction ID. This should be the same ID\n                        provided via `otSrpServerServiceUpdateHandler`.\n @param[in]  aError     An error to be returned to the SRP server. Use OT_ERROR_DUPLICATED\n                        to represent DNS name conflicts.\n"]
+    #[doc = " Reports the result of processing a SRP update to the SRP server.\n\n The Service Update Handler should call this function to return the result of its\n processing of a SRP update.\n\n @param[in]  aInstance  A pointer to an OpenThread instance.\n @param[in]  aId        The service update transaction ID. This should be the same ID\n                        provided via `otSrpServerServiceUpdateHandler`.\n @param[in]  aError     An error to be returned to the SRP server. Use OT_ERROR_DUPLICATED\n                        to represent DNS name conflicts.\n"]
     pub fn otSrpServerHandleServiceUpdateResult(
         aInstance: *mut otInstance,
         aId: otSrpServerServiceUpdateId,
@@ -10108,51 +10133,51 @@ extern "C" {
     );
 }
 extern "C" {
-    #[doc = " This function returns the next registered host on the SRP server.\n\n @param[in]  aInstance  A pointer to an OpenThread instance.\n @param[in]  aHost      A pointer to current host; use NULL to get the first host.\n\n @returns  A pointer to the registered host. NULL, if no more hosts can be found.\n"]
+    #[doc = " Returns the next registered host on the SRP server.\n\n @param[in]  aInstance  A pointer to an OpenThread instance.\n @param[in]  aHost      A pointer to current host; use NULL to get the first host.\n\n @returns  A pointer to the registered host. NULL, if no more hosts can be found.\n"]
     pub fn otSrpServerGetNextHost(
         aInstance: *mut otInstance,
         aHost: *const otSrpServerHost,
     ) -> *const otSrpServerHost;
 }
 extern "C" {
-    #[doc = " This function returns the response counters of the SRP server.\n\n @param[in]  aInstance  A pointer to an OpenThread instance.\n\n @returns  A pointer to the response counters of the SRP server.\n"]
+    #[doc = " Returns the response counters of the SRP server.\n\n @param[in]  aInstance  A pointer to an OpenThread instance.\n\n @returns  A pointer to the response counters of the SRP server.\n"]
     pub fn otSrpServerGetResponseCounters(
         aInstance: *mut otInstance,
     ) -> *const otSrpServerResponseCounters;
 }
 extern "C" {
-    #[doc = " This function tells if the SRP service host has been deleted.\n\n A SRP service host can be deleted but retains its name for future uses.\n In this case, the host instance is not removed from the SRP server/registry.\n\n @param[in]  aHost  A pointer to the SRP service host.\n\n @returns  TRUE if the host has been deleted, FALSE if not.\n"]
+    #[doc = " Tells if the SRP service host has been deleted.\n\n A SRP service host can be deleted but retains its name for future uses.\n In this case, the host instance is not removed from the SRP server/registry.\n\n @param[in]  aHost  A pointer to the SRP service host.\n\n @returns  TRUE if the host has been deleted, FALSE if not.\n"]
     pub fn otSrpServerHostIsDeleted(aHost: *const otSrpServerHost) -> bool;
 }
 extern "C" {
-    #[doc = " This function returns the full name of the host.\n\n @param[in]  aHost  A pointer to the SRP service host.\n\n @returns  A pointer to the null-terminated host name string.\n"]
+    #[doc = " Returns the full name of the host.\n\n @param[in]  aHost  A pointer to the SRP service host.\n\n @returns  A pointer to the null-terminated host name string.\n"]
     pub fn otSrpServerHostGetFullName(
         aHost: *const otSrpServerHost,
     ) -> *const ::std::os::raw::c_char;
 }
 extern "C" {
-    #[doc = " This function returns the addresses of given host.\n\n @param[in]   aHost          A pointer to the SRP service host.\n @param[out]  aAddressesNum  A pointer to where we should output the number of the addresses to.\n\n @returns  A pointer to the array of IPv6 Address.\n"]
+    #[doc = " Returns the addresses of given host.\n\n @param[in]   aHost          A pointer to the SRP service host.\n @param[out]  aAddressesNum  A pointer to where we should output the number of the addresses to.\n\n @returns  A pointer to the array of IPv6 Address.\n"]
     pub fn otSrpServerHostGetAddresses(
         aHost: *const otSrpServerHost,
         aAddressesNum: *mut u8,
     ) -> *const otIp6Address;
 }
 extern "C" {
-    #[doc = " This function returns the LEASE and KEY-LEASE information of a given host.\n\n @param[in]   aHost       A pointer to the SRP server host.\n @param[out]  aLeaseInfo  A pointer to where to output the LEASE and KEY-LEASE information.\n"]
+    #[doc = " Returns the LEASE and KEY-LEASE information of a given host.\n\n @param[in]   aHost       A pointer to the SRP server host.\n @param[out]  aLeaseInfo  A pointer to where to output the LEASE and KEY-LEASE information.\n"]
     pub fn otSrpServerHostGetLeaseInfo(
         aHost: *const otSrpServerHost,
         aLeaseInfo: *mut otSrpServerLeaseInfo,
     );
 }
 extern "C" {
-    #[doc = " This function returns the next service (excluding any sub-type services) of given host.\n\n @note This function is being deprecated and will be removed. `otSrpServerHostFindNextService()` can be used\n       instead.\n\n @param[in]  aHost     A pointer to the SRP service host.\n @param[in]  aService  A pointer to current SRP service instance; use NULL to get the first service.\n\n @returns  A pointer to the next service or NULL if there is no more services.\n"]
+    #[doc = " Returns the next service (excluding any sub-type services) of given host.\n\n @note This function is being deprecated and will be removed. `otSrpServerHostFindNextService()` can be used\n       instead.\n\n @param[in]  aHost     A pointer to the SRP service host.\n @param[in]  aService  A pointer to current SRP service instance; use NULL to get the first service.\n\n @returns  A pointer to the next service or NULL if there is no more services.\n"]
     pub fn otSrpServerHostGetNextService(
         aHost: *const otSrpServerHost,
         aService: *const otSrpServerService,
     ) -> *const otSrpServerService;
 }
 extern "C" {
-    #[doc = " This function finds the next matching service on the host.\n\n The combination of flags and service and instance names enables iterating over the full list of services and/or a\n subset of them matching certain conditions, or finding a specific service.\n\n To iterate over all services of a host:\n   service = otSrpServerHostFindNextService(host, service, OT_SRP_SERVER_FLAGS_ANY_SERVICE, NULL, NULL);\n\n To iterate over base services only (exclude sub-types):\n   service = otSrpServerHostFindNextService(host, service, OT_SRP_SERVER_FLAGS_BASE_TYPE_SERVICE_ONLY, NULL, NULL);\n\n To iterate over sub-types of a specific instance name `instanceName`:\n   service = otSrpServerHostFindNextService(host, service, OT_SRP_SERVER_FLAGS_SUB_TYPE_SERVICE_ONLY, NULL,\n                                            instanceName);\n\n To find a specific service with service name `serviceName` and service instance name `instanceName`:\n   service = otSrpServerHostFindNextService(host, NULL, OT_SRP_SERVER_FLAGS_ANY_SERVICE, serviceName, instanceName);\n\n To find the base type service with a given service instance name `instanceName`:\n   service = otSrpServerHostFindNextService(host, NULL, OT_SRP_SERVER_FLAGS_BASE_TYPE_SERVICE_ONLY, NULL,\n                                            instanceName);\n\n @param[in] aHost          A pointer to the SRP service host (MUST NOT be NULL).\n @param[in] aPrevService   A pointer to the previous service or NULL to start from the beginning of the list.\n @param[in] aFlags         Flags indicating which services to include (base/sub-type, active/deleted).\n @param[in] aServiceName   The service name to match. Set to NULL to accept any name.\n @param[in] aInstanceName  The service instance name to match. Set to NULL to accept any name.\n\n @returns  A pointer to the next matching service or NULL if no matching service could be found.\n"]
+    #[doc = " Finds the next matching service on the host.\n\n The combination of flags and service and instance names enables iterating over the full list of services and/or a\n subset of them matching certain conditions, or finding a specific service.\n\n To iterate over all services of a host:\n   service = otSrpServerHostFindNextService(host, service, OT_SRP_SERVER_FLAGS_ANY_SERVICE, NULL, NULL);\n\n To iterate over base services only (exclude sub-types):\n   service = otSrpServerHostFindNextService(host, service, OT_SRP_SERVER_FLAGS_BASE_TYPE_SERVICE_ONLY, NULL, NULL);\n\n To iterate over sub-types of a specific instance name `instanceName`:\n   service = otSrpServerHostFindNextService(host, service, OT_SRP_SERVER_FLAGS_SUB_TYPE_SERVICE_ONLY, NULL,\n                                            instanceName);\n\n To find a specific service with service name `serviceName` and service instance name `instanceName`:\n   service = otSrpServerHostFindNextService(host, NULL, OT_SRP_SERVER_FLAGS_ANY_SERVICE, serviceName, instanceName);\n\n To find the base type service with a given service instance name `instanceName`:\n   service = otSrpServerHostFindNextService(host, NULL, OT_SRP_SERVER_FLAGS_BASE_TYPE_SERVICE_ONLY, NULL,\n                                            instanceName);\n\n @param[in] aHost          A pointer to the SRP service host (MUST NOT be NULL).\n @param[in] aPrevService   A pointer to the previous service or NULL to start from the beginning of the list.\n @param[in] aFlags         Flags indicating which services to include (base/sub-type, active/deleted).\n @param[in] aServiceName   The service name to match. Set to NULL to accept any name.\n @param[in] aInstanceName  The service instance name to match. Set to NULL to accept any name.\n\n @returns  A pointer to the next matching service or NULL if no matching service could be found.\n"]
     pub fn otSrpServerHostFindNextService(
         aHost: *const otSrpServerHost,
         aPrevService: *const otSrpServerService,
@@ -10162,33 +10187,33 @@ extern "C" {
     ) -> *const otSrpServerService;
 }
 extern "C" {
-    #[doc = " This function indicates whether or not the SRP service has been deleted.\n\n A SRP service can be deleted but retains its name for future uses.\n In this case, the service instance is not removed from the SRP server/registry.\n It is guaranteed that all services are deleted if the host is deleted.\n\n @param[in]  aService  A pointer to the SRP service.\n\n @returns  TRUE if the service has been deleted, FALSE if not.\n"]
+    #[doc = " Indicates whether or not the SRP service has been deleted.\n\n A SRP service can be deleted but retains its name for future uses.\n In this case, the service instance is not removed from the SRP server/registry.\n It is guaranteed that all services are deleted if the host is deleted.\n\n @param[in]  aService  A pointer to the SRP service.\n\n @returns  TRUE if the service has been deleted, FALSE if not.\n"]
     pub fn otSrpServerServiceIsDeleted(aService: *const otSrpServerService) -> bool;
 }
 extern "C" {
-    #[doc = " This function indicates whether or not the SRP service is sub-type.\n\n @param[in]  aService  A pointer to the SRP service.\n\n @returns  TRUE if the service is a sub-type, FALSE if not.\n"]
+    #[doc = " Indicates whether or not the SRP service is sub-type.\n\n @param[in]  aService  A pointer to the SRP service.\n\n @returns  TRUE if the service is a sub-type, FALSE if not.\n"]
     pub fn otSrpServerServiceIsSubType(aService: *const otSrpServerService) -> bool;
 }
 extern "C" {
-    #[doc = " This function returns the full service instance name of the service.\n\n @note This function is being deprecated and will be removed. `otSrpServerServiceGetInstanceName()` can be used\n       instead.\n\n @param[in]  aService  A pointer to the SRP service.\n\n @returns  A pointer to the null-terminated service instance name string.\n"]
+    #[doc = " Returns the full service instance name of the service.\n\n @note This function is being deprecated and will be removed. `otSrpServerServiceGetInstanceName()` can be used\n       instead.\n\n @param[in]  aService  A pointer to the SRP service.\n\n @returns  A pointer to the null-terminated service instance name string.\n"]
     pub fn otSrpServerServiceGetFullName(
         aService: *const otSrpServerService,
     ) -> *const ::std::os::raw::c_char;
 }
 extern "C" {
-    #[doc = " This function returns the full service instance name of the service.\n\n @param[in]  aService  A pointer to the SRP service.\n\n @returns  A pointer to the null-terminated service instance name string.\n"]
+    #[doc = " Returns the full service instance name of the service.\n\n @param[in]  aService  A pointer to the SRP service.\n\n @returns  A pointer to the null-terminated service instance name string.\n"]
     pub fn otSrpServerServiceGetInstanceName(
         aService: *const otSrpServerService,
     ) -> *const ::std::os::raw::c_char;
 }
 extern "C" {
-    #[doc = " This function returns the full service name of the service.\n\n @param[in]  aService  A pointer to the SRP service.\n\n @returns  A pointer to the null-terminated service name string.\n"]
+    #[doc = " Returns the full service name of the service.\n\n @param[in]  aService  A pointer to the SRP service.\n\n @returns  A pointer to the null-terminated service name string.\n"]
     pub fn otSrpServerServiceGetServiceName(
         aService: *const otSrpServerService,
     ) -> *const ::std::os::raw::c_char;
 }
 extern "C" {
-    #[doc = " This function gets the sub-type label from service name.\n\n This function is intended to be used when the @p aService is a sub-type, i.e., `otSrpServerServiceIsSubType()` for\n the service returns TRUE. If it is not a sub-type this function returns `OT_ERROR_INVALID_ARGS`.\n\n The full service name for a sub-type service follows \"<sub-label>._sub.<service-labels>.<domain>.\". This function\n copies the `<sub-label>` into the @p aLabel buffer.\n\n The @p aLabel is ensured to always be null-terminated after returning even in case of failure.\n\n @param[in]  aService           A pointer to the SRP service.\n @param[out] aLabel             A pointer to a buffer to copy the sub-type label name into.\n @param[in]  aMaxSize           Maximum size of @p aLabel buffer.\n\n @retval OT_ERROR_NONE          @p aLabel was updated successfully.\n @retval OT_ERROR_NO_BUFS       The sub-type label could not fit in @p aLabel buffer (number of chars from label\n                                that could fit are copied in @p aLabel ensuring it is null-terminated).\n @retval OT_ERROR_INVALID_ARGS  SRP service is not a sub-type.\n"]
+    #[doc = " Gets the sub-type label from service name.\n\n Is intended to be used when the @p aService is a sub-type, i.e., `otSrpServerServiceIsSubType()` for\n the service returns TRUE. If it is not a sub-type this function returns `OT_ERROR_INVALID_ARGS`.\n\n The full service name for a sub-type service follows \"<sub-label>._sub.<service-labels>.<domain>.\". This function\n copies the `<sub-label>` into the @p aLabel buffer.\n\n The @p aLabel is ensured to always be null-terminated after returning even in case of failure.\n\n @param[in]  aService           A pointer to the SRP service.\n @param[out] aLabel             A pointer to a buffer to copy the sub-type label name into.\n @param[in]  aMaxSize           Maximum size of @p aLabel buffer.\n\n @retval OT_ERROR_NONE          @p aLabel was updated successfully.\n @retval OT_ERROR_NO_BUFS       The sub-type label could not fit in @p aLabel buffer (number of chars from label\n                                that could fit are copied in @p aLabel ensuring it is null-terminated).\n @retval OT_ERROR_INVALID_ARGS  SRP service is not a sub-type.\n"]
     pub fn otSrpServerServiceGetServiceSubTypeLabel(
         aService: *const otSrpServerService,
         aLabel: *mut ::std::os::raw::c_char,
@@ -10196,35 +10221,35 @@ extern "C" {
     ) -> otError;
 }
 extern "C" {
-    #[doc = " This function returns the port of the service instance.\n\n @param[in]  aService  A pointer to the SRP service.\n\n @returns  The port of the service.\n"]
+    #[doc = " Returns the port of the service instance.\n\n @param[in]  aService  A pointer to the SRP service.\n\n @returns  The port of the service.\n"]
     pub fn otSrpServerServiceGetPort(aService: *const otSrpServerService) -> u16;
 }
 extern "C" {
-    #[doc = " This function returns the weight of the service instance.\n\n @param[in]  aService  A pointer to the SRP service.\n\n @returns  The weight of the service.\n"]
+    #[doc = " Returns the weight of the service instance.\n\n @param[in]  aService  A pointer to the SRP service.\n\n @returns  The weight of the service.\n"]
     pub fn otSrpServerServiceGetWeight(aService: *const otSrpServerService) -> u16;
 }
 extern "C" {
-    #[doc = " This function returns the priority of the service instance.\n\n @param[in]  aService  A pointer to the SRP service.\n\n @returns  The priority of the service.\n"]
+    #[doc = " Returns the priority of the service instance.\n\n @param[in]  aService  A pointer to the SRP service.\n\n @returns  The priority of the service.\n"]
     pub fn otSrpServerServiceGetPriority(aService: *const otSrpServerService) -> u16;
 }
 extern "C" {
-    #[doc = " This function returns the TTL of the service instance.\n\n @param[in]  aService  A pointer to the SRP service.\n\n @returns  The TTL of the service instance..\n"]
+    #[doc = " Returns the TTL of the service instance.\n\n @param[in]  aService  A pointer to the SRP service.\n\n @returns  The TTL of the service instance..\n"]
     pub fn otSrpServerServiceGetTtl(aService: *const otSrpServerService) -> u32;
 }
 extern "C" {
-    #[doc = " This function returns the TXT record data of the service instance.\n\n @param[in]  aService        A pointer to the SRP service.\n @param[out] aDataLength     A pointer to return the TXT record data length. MUST NOT be NULL.\n\n @returns A pointer to the buffer containing the TXT record data (the TXT data length is returned in @p aDataLength).\n"]
+    #[doc = " Returns the TXT record data of the service instance.\n\n @param[in]  aService        A pointer to the SRP service.\n @param[out] aDataLength     A pointer to return the TXT record data length. MUST NOT be NULL.\n\n @returns A pointer to the buffer containing the TXT record data (the TXT data length is returned in @p aDataLength).\n"]
     pub fn otSrpServerServiceGetTxtData(
         aService: *const otSrpServerService,
         aDataLength: *mut u16,
     ) -> *const u8;
 }
 extern "C" {
-    #[doc = " This function returns the host which the service instance reside on.\n\n @param[in]  aService  A pointer to the SRP service.\n\n @returns  A pointer to the host instance.\n"]
+    #[doc = " Returns the host which the service instance reside on.\n\n @param[in]  aService  A pointer to the SRP service.\n\n @returns  A pointer to the host instance.\n"]
     pub fn otSrpServerServiceGetHost(aService: *const otSrpServerService)
         -> *const otSrpServerHost;
 }
 extern "C" {
-    #[doc = " This function returns the LEASE and KEY-LEASE information of a given service.\n\n @param[in]   aService    A pointer to the SRP server service.\n @param[out]  aLeaseInfo  A pointer to where to output the LEASE and KEY-LEASE information.\n"]
+    #[doc = " Returns the LEASE and KEY-LEASE information of a given service.\n\n @param[in]   aService    A pointer to the SRP server service.\n @param[out]  aLeaseInfo  A pointer to where to output the LEASE and KEY-LEASE information.\n"]
     pub fn otSrpServerServiceGetLeaseInfo(
         aService: *const otSrpServerService,
         aLeaseInfo: *mut otSrpServerLeaseInfo,
@@ -10292,7 +10317,7 @@ pub type otTcpDisconnectedReason = ::std::os::raw::c_uint;
 pub type otTcpDisconnected = ::std::option::Option<
     unsafe extern "C" fn(aEndpoint: *mut otTcpEndpoint, aReason: otTcpDisconnectedReason),
 >;
-#[doc = " This structure represents a TCP endpoint.\n\n An TCP endpoint acts an endpoint of TCP connection. It can be used to\n initiate TCP connections, and, once a TCP connection is established, send\n data to and receive data from the connection peer.\n\n The application should not inspect the fields of this structure directly; it\n should only interact with it via the TCP API functions whose signatures are\n provided in this file.\n"]
+#[doc = " Represents a TCP endpoint.\n\n An TCP endpoint acts an endpoint of TCP connection. It can be used to\n initiate TCP connections, and, once a TCP connection is established, send\n data to and receive data from the connection peer.\n\n The application should not inspect the fields of this structure directly; it\n should only interact with it via the TCP API functions whose signatures are\n provided in this file.\n"]
 #[repr(C)]
 #[derive(Copy, Clone)]
 pub struct otTcpEndpoint {
@@ -10340,7 +10365,7 @@ impl Default for otTcpEndpoint {
         }
     }
 }
-#[doc = " This structure contains arguments to the otTcpEndpointInitialize() function.\n"]
+#[doc = " Contains arguments to the otTcpEndpointInitialize() function.\n"]
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
 pub struct otTcpEndpointInitializeArgs {
@@ -10399,7 +10424,7 @@ extern "C" {
     pub fn otTcpBind(aEndpoint: *mut otTcpEndpoint, aSockName: *const otSockAddr) -> otError;
 }
 pub const OT_TCP_CONNECT_NO_FAST_OPEN: _bindgen_ty_15 = 1;
-#[doc = " This enumeration defines flags passed to otTcpConnect().\n"]
+#[doc = " Defines flags passed to otTcpConnect().\n"]
 pub type _bindgen_ty_15 = ::std::os::raw::c_uint;
 extern "C" {
     #[doc = " Records the remote host and port for this connection.\n\n Caller must wait for `otTcpEstablished` callback indicating that TCP\n connection establishment handshake is done before it can start sending data\n e.g., calling `otTcpSendByReference()`.\n\n The TCP Fast Open is not yet supported and @p aFlags is ignored.\n\n @param[in]  aEndpoint  A pointer to the TCP endpoint structure to connect.\n @param[in]  aSockName  The IP address and port of the host to which to connect.\n @param[in]  aFlags     Flags specifying options for this operation (see enumeration above).\n\n @retval OT_ERROR_NONE    Successfully completed the operation.\n @retval OT_ERROR_FAILED  Failed to complete the operation.\n"]
@@ -10410,7 +10435,7 @@ extern "C" {
     ) -> otError;
 }
 pub const OT_TCP_SEND_MORE_TO_COME: _bindgen_ty_16 = 1;
-#[doc = " This enumeration defines flags passed to @p otTcpSendByReference.\n"]
+#[doc = " Defines flags passed to @p otTcpSendByReference.\n"]
 pub type _bindgen_ty_16 = ::std::os::raw::c_uint;
 extern "C" {
     #[doc = " Adds data referenced by the linked buffer pointed to by @p aBuffer to the\n send buffer.\n\n Upon a successful call to this function, the linked buffer and data it\n references are owned by the TCP stack; they should not be modified by the\n application until a \"send done\" callback returns ownership of those objects\n to the application. It is acceptable to call this function to add another\n linked buffer to the send queue, even if the \"send done\" callback for a\n previous invocation of this function has not yet fired.\n\n Note that @p aBuffer should not be chained; its mNext field should be\n NULL. If additional data will be added right after this call, then the\n OT_TCP_SEND_MORE_TO_COME flag should be used as a hint to the TCP\n implementation.\n\n @param[in]  aEndpoint  A pointer to the TCP endpoint structure representing the TCP endpoint on which to send data.\n @param[in]  aBuffer    A pointer to the linked buffer chain referencing data to add to the send buffer.\n @param[in]  aFlags     Flags specifying options for this operation (see enumeration above).\n\n @retval OT_ERROR_NONE    Successfully added data to the send buffer.\n @retval OT_ERROR_FAILED  Failed to add data to the send buffer.\n"]
@@ -10465,7 +10490,7 @@ pub const OT_TCP_INCOMING_CONNECTION_ACTION_ACCEPT: otTcpIncomingConnectionActio
 pub const OT_TCP_INCOMING_CONNECTION_ACTION_DEFER: otTcpIncomingConnectionAction = 1;
 #[doc = "< Refuse the incoming connection."]
 pub const OT_TCP_INCOMING_CONNECTION_ACTION_REFUSE: otTcpIncomingConnectionAction = 2;
-#[doc = " This enumeration defines incoming connection actions.\n\n This is used in otTcpAcceptReady() callback.\n"]
+#[doc = " Defines incoming connection actions.\n\n This is used in otTcpAcceptReady() callback.\n"]
 pub type otTcpIncomingConnectionAction = ::std::os::raw::c_uint;
 #[doc = " This callback indicates that an incoming connection that matches this TCP\n listener has arrived.\n\n The typical response is for the application to accept the incoming\n connection. It does so by populating @p aAcceptInto with a pointer to the\n otTcpEndpoint into which to accept the incoming connection. This\n otTcpEndpoint must already be initialized using otTcpEndpointInitialize().\n Then, the application returns OT_TCP_INCOMING_CONNECTION_ACTION_ACCEPT.\n\n Alternatively, the application can decline to accept the incoming\n connection. There are two ways for the application to do this. First, if the\n application returns OT_TCP_INCOMING_CONNECTION_ACTION_DEFER, then OpenThread\n silently ignores the connection establishment request; the connection peer\n will likely retransmit the request, at which point the callback will be\n called again. This is valuable if resources are not presently available to\n accept the connection, but they may be available when the connection peer\n retransmits its connection establishment attempt. Second, if the application\n returns OT_TCP_INCOMING_CONNECTION_ACTION_REFUSE, then OpenThread sends a\n \"connection refused\" message to the host that attempted to establish a\n connection. If the application declines the incoming connection, it is not\n required to populate @p aAcceptInto.\n\n @param[in]   aListener    The TCP listener that matches the incoming connection.\n @param[in]   aPeer        The host and port from which the incoming connection originates.\n @param[out]  aAcceptInto  The TCP endpoint into which to accept the incoming connection.\n\n @returns  Description of how to handle the incoming connection.\n"]
 pub type otTcpAcceptReady = ::std::option::Option<
@@ -10483,7 +10508,7 @@ pub type otTcpAcceptDone = ::std::option::Option<
         aPeer: *const otSockAddr,
     ),
 >;
-#[doc = " This structure represents a TCP listener.\n\n A TCP listener is used to listen for and accept incoming TCP connections.\n\n The application should not inspect the fields of this structure directly; it\n should only interact with it via the TCP API functions whose signatures are\n provided in this file.\n"]
+#[doc = " Represents a TCP listener.\n\n A TCP listener is used to listen for and accept incoming TCP connections.\n\n The application should not inspect the fields of this structure directly; it\n should only interact with it via the TCP API functions whose signatures are\n provided in this file.\n"]
 #[repr(C)]
 #[derive(Copy, Clone)]
 pub struct otTcpListener {
@@ -10521,7 +10546,7 @@ impl Default for otTcpListener {
         }
     }
 }
-#[doc = " This structure contains arguments to the otTcpListenerInitialize() function.\n"]
+#[doc = " Contains arguments to the otTcpListenerInitialize() function.\n"]
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
 pub struct otTcpListenerInitializeArgs {
@@ -10569,7 +10594,7 @@ extern "C" {
     #[doc = " Deinitializes this TCP listener.\n\n This means that OpenThread no longer keeps track of this TCP listener and\n deallocates all resources it has internally allocated for this TCP listener.\n The application can reuse the memory backing the TCP listener as it sees\n fit.\n\n If the TCP listener is currently listening, it stops listening.\n\n @param[in]  aListener  A pointer to the TCP listener structure to deinitialize.\n\n @retval OT_ERROR_NONE    Successfully deinitialized the TCP listener.\n @retval OT_ERROR_FAILED  Failed to deinitialize the TCP listener.\n"]
     pub fn otTcpListenerDeinitialize(aListener: *mut otTcpListener) -> otError;
 }
-#[doc = " This structure holds diagnostic information for a Thread Child\n"]
+#[doc = " Holds diagnostic information for a Thread Child\n"]
 #[repr(C)]
 #[derive(Debug, Default, Copy, Clone)]
 pub struct otChildInfo {
@@ -10700,9 +10725,9 @@ pub const OT_CACHE_ENTRY_STATE_CACHED: otCacheEntryState = 0;
 pub const OT_CACHE_ENTRY_STATE_SNOOPED: otCacheEntryState = 1;
 pub const OT_CACHE_ENTRY_STATE_QUERY: otCacheEntryState = 2;
 pub const OT_CACHE_ENTRY_STATE_RETRY_QUERY: otCacheEntryState = 3;
-#[doc = " This enumeration defines the EID cache entry state.\n"]
+#[doc = " Defines the EID cache entry state.\n"]
 pub type otCacheEntryState = ::std::os::raw::c_uint;
-#[doc = " This structure represents an EID cache entry.\n"]
+#[doc = " Represents an EID cache entry.\n"]
 #[repr(C)]
 #[derive(Copy, Clone)]
 pub struct otCacheEntryInfo {
@@ -10772,7 +10797,7 @@ impl otCacheEntryInfo {
         __bindgen_bitfield_unit
     }
 }
-#[doc = " This type represents an iterator used for iterating through the EID cache table entries.\n\n To initialize the iterator and start from the first entry in the cache table, set all its fields in the structure to\n zero (e.g., `memset` the iterator to zero).\n"]
+#[doc = " Represents an iterator used for iterating through the EID cache table entries.\n\n To initialize the iterator and start from the first entry in the cache table, set all its fields in the structure to\n zero (e.g., `memset` the iterator to zero).\n"]
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
 pub struct otCacheEntryIterator {
@@ -10797,11 +10822,11 @@ extern "C" {
     pub fn otThreadSetMaxAllowedChildren(aInstance: *mut otInstance, aMaxChildren: u16) -> otError;
 }
 extern "C" {
-    #[doc = " This method indicates whether or not the device is router-eligible.\n\n @param[in]  aInstance A pointer to an OpenThread instance.\n\n @retval TRUE   If device is router-eligible.\n @retval FALSE  If device is not router-eligible.\n"]
+    #[doc = " Indicates whether or not the device is router-eligible.\n\n @param[in]  aInstance A pointer to an OpenThread instance.\n\n @retval TRUE   If device is router-eligible.\n @retval FALSE  If device is not router-eligible.\n"]
     pub fn otThreadIsRouterEligible(aInstance: *mut otInstance) -> bool;
 }
 extern "C" {
-    #[doc = " This function sets whether or not the device is router-eligible.\n\n If @p aEligible is false and the device is currently operating as a router, this call will cause the device to\n detach and attempt to reattach as a child.\n\n @param[in]  aInstance  A pointer to an OpenThread instance.\n @param[in]  aEligible  TRUE to configure the device as router-eligible, FALSE otherwise.\n\n @retval OT_ERROR_NONE         Successfully set the router-eligible configuration.\n @retval OT_ERROR_NOT_CAPABLE  The device is not capable of becoming a router.\n"]
+    #[doc = " Sets whether or not the device is router-eligible.\n\n If @p aEligible is false and the device is currently operating as a router, this call will cause the device to\n detach and attempt to reattach as a child.\n\n @param[in]  aInstance  A pointer to an OpenThread instance.\n @param[in]  aEligible  TRUE to configure the device as router-eligible, FALSE otherwise.\n\n @retval OT_ERROR_NONE         Successfully set the router-eligible configuration.\n @retval OT_ERROR_NOT_CAPABLE  The device is not capable of becoming a router.\n"]
     pub fn otThreadSetRouterEligible(aInstance: *mut otInstance, aEligible: bool) -> otError;
 }
 extern "C" {
@@ -10816,9 +10841,9 @@ pub const OT_POWER_SUPPLY_EXTERNAL: otPowerSupply = 1;
 pub const OT_POWER_SUPPLY_EXTERNAL_STABLE: otPowerSupply = 2;
 #[doc = "< Potentially unstable ext power (e.g. light bulb powered via a switch)."]
 pub const OT_POWER_SUPPLY_EXTERNAL_UNSTABLE: otPowerSupply = 3;
-#[doc = " This enumeration represents the power supply property on a device.\n\n This is used as a property in `otDeviceProperties` to calculate the leader weight.\n"]
+#[doc = " Represents the power supply property on a device.\n\n This is used as a property in `otDeviceProperties` to calculate the leader weight.\n"]
 pub type otPowerSupply = ::std::os::raw::c_uint;
-#[doc = " This structure represents the device properties which are used for calculating the local leader weight on a\n device.\n\n The parameters are set based on device's capability, whether acting as border router, its power supply config, etc.\n\n `mIsUnstable` indicates operational stability of device and is determined via a vendor specific mechanism. It can\n include the following cases:\n  - Device internally detects that it loses external power supply more often than usual. What is usual is\n    determined by the vendor.\n  - Device internally detects that it reboots more often than usual. What is usual is determined by the vendor.\n"]
+#[doc = " Represents the device properties which are used for calculating the local leader weight on a\n device.\n\n The parameters are set based on device's capability, whether acting as border router, its power supply config, etc.\n\n `mIsUnstable` indicates operational stability of device and is determined via a vendor specific mechanism. It can\n include the following cases:\n  - Device internally detects that it loses external power supply more often than usual. What is usual is\n    determined by the vendor.\n  - Device internally detects that it reboots more often than usual. What is usual is determined by the vendor.\n"]
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
 pub struct otDeviceProperties {
@@ -10895,11 +10920,11 @@ impl otDeviceProperties {
     }
 }
 extern "C" {
-    #[doc = " Get the current device properties.\n\n @returns The device properties `otDeviceProperties`.\n"]
+    #[doc = " Get the current device properties.\n\n Requires `OPENTHREAD_CONFIG_THREAD_VERSION >= OT_THREAD_VERSION_1_3_1`.\n\n @returns The device properties `otDeviceProperties`.\n"]
     pub fn otThreadGetDeviceProperties(aInstance: *mut otInstance) -> *const otDeviceProperties;
 }
 extern "C" {
-    #[doc = " Set the device properties which are then used to determine and set the Leader Weight.\n\n @param[in]  aInstance           A pointer to an OpenThread instance.\n @param[in]  aDeviceProperties   The device properties.\n"]
+    #[doc = " Set the device properties which are then used to determine and set the Leader Weight.\n\n Requires `OPENTHREAD_CONFIG_THREAD_VERSION >= OT_THREAD_VERSION_1_3_1`.\n\n @param[in]  aInstance           A pointer to an OpenThread instance.\n @param[in]  aDeviceProperties   The device properties.\n"]
     pub fn otThreadSetDeviceProperties(
         aInstance: *mut otInstance,
         aDeviceProperties: *const otDeviceProperties,
@@ -10910,7 +10935,7 @@ extern "C" {
     pub fn otThreadGetLocalLeaderWeight(aInstance: *mut otInstance) -> u8;
 }
 extern "C" {
-    #[doc = " Sets the Thread Leader Weight used when operating in the Leader role.\n\n This function directly sets the Leader Weight to the new value, replacing its previous value (which may have been\n determined from the current `otDeviceProperties`).\n\n @param[in]  aInstance A pointer to an OpenThread instance.\n @param[in]  aWeight   The Thread Leader Weight value.\n\n @sa otThreadGetLeaderWeight\n"]
+    #[doc = " Sets the Thread Leader Weight used when operating in the Leader role.\n\n Directly sets the Leader Weight to the new value, replacing its previous value (which may have been\n determined from the current `otDeviceProperties`).\n\n @param[in]  aInstance A pointer to an OpenThread instance.\n @param[in]  aWeight   The Thread Leader Weight value.\n\n @sa otThreadGetLeaderWeight\n"]
     pub fn otThreadSetLocalLeaderWeight(aInstance: *mut otInstance, aWeight: u8);
 }
 extern "C" {
@@ -11013,7 +11038,7 @@ extern "C" {
     ) -> otError;
 }
 extern "C" {
-    #[doc = " This function gets the next IPv6 address (using an iterator) for a given child.\n\n @param[in]      aInstance    A pointer to an OpenThread instance.\n @param[in]      aChildIndex  The child index.\n @param[in,out]  aIterator    A pointer to the iterator. On success the iterator will be updated to point to next\n                              entry in the list. To get the first IPv6 address the iterator should be set to\n                              OT_CHILD_IP6_ADDRESS_ITERATOR_INIT.\n @param[out]     aAddress     A pointer to an IPv6 address where the child's next address is placed (on success).\n\n @retval OT_ERROR_NONE          Successfully found the next IPv6 address (@p aAddress was successfully updated).\n @retval OT_ERROR_NOT_FOUND     The child has no subsequent IPv6 address entry.\n @retval OT_ERROR_INVALID_ARGS  @p aIterator or @p aAddress are NULL, or child at @p aChildIndex is not valid.\n\n @sa otThreadGetChildInfoByIndex\n"]
+    #[doc = " Gets the next IPv6 address (using an iterator) for a given child.\n\n @param[in]      aInstance    A pointer to an OpenThread instance.\n @param[in]      aChildIndex  The child index.\n @param[in,out]  aIterator    A pointer to the iterator. On success the iterator will be updated to point to next\n                              entry in the list. To get the first IPv6 address the iterator should be set to\n                              OT_CHILD_IP6_ADDRESS_ITERATOR_INIT.\n @param[out]     aAddress     A pointer to an IPv6 address where the child's next address is placed (on success).\n\n @retval OT_ERROR_NONE          Successfully found the next IPv6 address (@p aAddress was successfully updated).\n @retval OT_ERROR_NOT_FOUND     The child has no subsequent IPv6 address entry.\n @retval OT_ERROR_INVALID_ARGS  @p aIterator or @p aAddress are NULL, or child at @p aChildIndex is not valid.\n\n @sa otThreadGetChildInfoByIndex\n"]
     pub fn otThreadGetChildNextIp6Address(
         aInstance: *mut otInstance,
         aChildIndex: u16,
@@ -11038,7 +11063,7 @@ extern "C" {
     ) -> otError;
 }
 extern "C" {
-    #[doc = " This function gets the next EID cache entry (using an iterator).\n\n @param[in]     aInstance   A pointer to an OpenThread instance.\n @param[out]    aEntryInfo  A pointer to where the EID cache entry information is placed.\n @param[in,out] aIterator   A pointer to an iterator. It will be updated to point to next entry on success. To get\n                            the first entry, initialize the iterator by setting all its fields to zero\n                            (e.g., `memset` the iterator structure to zero).\n\n @retval OT_ERROR_NONE          Successfully populated @p aEntryInfo for next EID cache entry.\n @retval OT_ERROR_NOT_FOUND     No more entries in the address cache table.\n"]
+    #[doc = " Gets the next EID cache entry (using an iterator).\n\n @param[in]     aInstance   A pointer to an OpenThread instance.\n @param[out]    aEntryInfo  A pointer to where the EID cache entry information is placed.\n @param[in,out] aIterator   A pointer to an iterator. It will be updated to point to next entry on success. To get\n                            the first entry, initialize the iterator by setting all its fields to zero\n                            (e.g., `memset` the iterator structure to zero).\n\n @retval OT_ERROR_NONE          Successfully populated @p aEntryInfo for next EID cache entry.\n @retval OT_ERROR_NOT_FOUND     No more entries in the address cache table.\n"]
     pub fn otThreadGetNextCacheEntry(
         aInstance: *mut otInstance,
         aEntryInfo: *mut otCacheEntryInfo,
@@ -11050,15 +11075,15 @@ extern "C" {
     pub fn otThreadGetPskc(aInstance: *mut otInstance, aPskc: *mut otPskc);
 }
 extern "C" {
-    #[doc = " Get Key Reference to Thread PSKc stored\n\n This function requires the build-time feature `OPENTHREAD_CONFIG_PLATFORM_KEY_REFERENCES_ENABLE` to be enabled.\n\n @param[in]   aInstance   A pointer to an OpenThread instance.\n\n @returns Key Reference to PSKc\n\n @sa otThreadSetPskcRef\n"]
+    #[doc = " Get Key Reference to Thread PSKc stored\n\n Requires the build-time feature `OPENTHREAD_CONFIG_PLATFORM_KEY_REFERENCES_ENABLE` to be enabled.\n\n @param[in]   aInstance   A pointer to an OpenThread instance.\n\n @returns Key Reference to PSKc\n\n @sa otThreadSetPskcRef\n"]
     pub fn otThreadGetPskcRef(aInstance: *mut otInstance) -> otPskcRef;
 }
 extern "C" {
-    #[doc = " Set the Thread PSKc\n\n This function will only succeed when Thread protocols are disabled.  A successful\n call to this function will also invalidate the Active and Pending Operational Datasets in\n non-volatile memory.\n\n @param[in]  aInstance   A pointer to an OpenThread instance.\n @param[in]  aPskc       A pointer to the new Thread PSKc.\n\n @retval OT_ERROR_NONE           Successfully set the Thread PSKc.\n @retval OT_ERROR_INVALID_STATE  Thread protocols are enabled.\n\n @sa otThreadGetPskc\n"]
+    #[doc = " Set the Thread PSKc\n\n Will only succeed when Thread protocols are disabled.  A successful\n call to this function will also invalidate the Active and Pending Operational Datasets in\n non-volatile memory.\n\n @param[in]  aInstance   A pointer to an OpenThread instance.\n @param[in]  aPskc       A pointer to the new Thread PSKc.\n\n @retval OT_ERROR_NONE           Successfully set the Thread PSKc.\n @retval OT_ERROR_INVALID_STATE  Thread protocols are enabled.\n\n @sa otThreadGetPskc\n"]
     pub fn otThreadSetPskc(aInstance: *mut otInstance, aPskc: *const otPskc) -> otError;
 }
 extern "C" {
-    #[doc = " Set the Thread PSKc\n\n This function requires the build-time feature `OPENTHREAD_CONFIG_PLATFORM_KEY_REFERENCES_ENABLE` to be enabled.\n\n This function will only succeed when Thread protocols are disabled.  A successful\n call to this function will also invalidate the Active and Pending Operational Datasets in\n non-volatile memory.\n\n @param[in]  aInstance   A pointer to an OpenThread instance.\n @param[in]  aKeyRef     Key Reference to the new Thread PSKc.\n\n @retval OT_ERROR_NONE           Successfully set the Thread PSKc.\n @retval OT_ERROR_INVALID_STATE  Thread protocols are enabled.\n\n @sa otThreadGetPskcRef\n"]
+    #[doc = " Set the Thread PSKc\n\n Requires the build-time feature `OPENTHREAD_CONFIG_PLATFORM_KEY_REFERENCES_ENABLE` to be enabled.\n\n Will only succeed when Thread protocols are disabled.  A successful\n call to this function will also invalidate the Active and Pending Operational Datasets in\n non-volatile memory.\n\n @param[in]  aInstance   A pointer to an OpenThread instance.\n @param[in]  aKeyRef     Key Reference to the new Thread PSKc.\n\n @retval OT_ERROR_NONE           Successfully set the Thread PSKc.\n @retval OT_ERROR_INVALID_STATE  Thread protocols are enabled.\n\n @sa otThreadGetPskcRef\n"]
     pub fn otThreadSetPskcRef(aInstance: *mut otInstance, aKeyRef: otPskcRef) -> otError;
 }
 extern "C" {
@@ -11090,9 +11115,9 @@ pub const OT_NEIGHBOR_TABLE_EVENT_CHILD_MODE_CHANGED: otNeighborTableEvent = 2;
 pub const OT_NEIGHBOR_TABLE_EVENT_ROUTER_ADDED: otNeighborTableEvent = 3;
 #[doc = "< A router is being removed."]
 pub const OT_NEIGHBOR_TABLE_EVENT_ROUTER_REMOVED: otNeighborTableEvent = 4;
-#[doc = " This enumeration defines the constants used in `otNeighborTableCallback` to indicate changes in neighbor table.\n"]
+#[doc = " Defines the constants used in `otNeighborTableCallback` to indicate changes in neighbor table.\n"]
 pub type otNeighborTableEvent = ::std::os::raw::c_uint;
-#[doc = " This type represent a neighbor table entry info (child or router) and is used as a parameter in the neighbor table\n callback `otNeighborTableCallback`.\n"]
+#[doc = " Represent a neighbor table entry info (child or router) and is used as a parameter in the neighbor table\n callback `otNeighborTableCallback`.\n"]
 #[repr(C)]
 #[derive(Copy, Clone)]
 pub struct otNeighborTableEntryInfo {
@@ -11126,27 +11151,27 @@ impl Default for otNeighborTableEntryInfo {
         }
     }
 }
-#[doc = " This function pointer is called to notify that there is a change in the neighbor table.\n\n @param[in]  aEvent      A event flag.\n @param[in]  aEntryInfo  A pointer to table entry info.\n"]
+#[doc = " Pointer is called to notify that there is a change in the neighbor table.\n\n @param[in]  aEvent      A event flag.\n @param[in]  aEntryInfo  A pointer to table entry info.\n"]
 pub type otNeighborTableCallback = ::std::option::Option<
     unsafe extern "C" fn(aEvent: otNeighborTableEvent, aEntryInfo: *const otNeighborTableEntryInfo),
 >;
 extern "C" {
-    #[doc = " This function registers a neighbor table callback function.\n\n The provided callback (if non-NULL) will be invoked when there is a change in the neighbor table (e.g., a child or a\n router neighbor entry is being added/removed or an existing child's mode is changed).\n\n Subsequent calls to this method will overwrite the previous callback.  Note that this callback in invoked while the\n neighbor/child table is being updated and always before the `otStateChangedCallback`.\n\n @param[in] aInstance  A pointer to an OpenThread instance.\n @param[in] aCallback  A pointer to callback handler function.\n"]
+    #[doc = " Registers a neighbor table callback function.\n\n The provided callback (if non-NULL) will be invoked when there is a change in the neighbor table (e.g., a child or a\n router neighbor entry is being added/removed or an existing child's mode is changed).\n\n Subsequent calls to this method will overwrite the previous callback.  Note that this callback in invoked while the\n neighbor/child table is being updated and always before the `otStateChangedCallback`.\n\n @param[in] aInstance  A pointer to an OpenThread instance.\n @param[in] aCallback  A pointer to callback handler function.\n"]
     pub fn otThreadRegisterNeighborTableCallback(
         aInstance: *mut otInstance,
         aCallback: otNeighborTableCallback,
     );
 }
 extern "C" {
-    #[doc = " This function sets whether the device was commissioned using CCM.\n\n @note This API requires `OPENTHREAD_CONFIG_REFERENCE_DEVICE_ENABLE`, and is only used by Thread Test Harness\n       to indicate whether this device was commissioned using CCM.\n\n @param[in]  aInstance  A pointer to an OpenThread instance.\n @param[in]  aEnabled   TRUE if the device was commissioned using CCM, FALSE otherwise.\n"]
+    #[doc = " Sets whether the device was commissioned using CCM.\n\n @note This API requires `OPENTHREAD_CONFIG_REFERENCE_DEVICE_ENABLE`, and is only used by Thread Test Harness\n       to indicate whether this device was commissioned using CCM.\n\n @param[in]  aInstance  A pointer to an OpenThread instance.\n @param[in]  aEnabled   TRUE if the device was commissioned using CCM, FALSE otherwise.\n"]
     pub fn otThreadSetCcmEnabled(aInstance: *mut otInstance, aEnabled: bool);
 }
 extern "C" {
-    #[doc = " This function sets whether the Security Policy TLV version-threshold for routing (VR field) is enabled.\n\n @note This API requires `OPENTHREAD_CONFIG_REFERENCE_DEVICE_ENABLE`, and is only used by Thread Test Harness\n       to indicate that thread protocol version check VR should be skipped.\n\n @param[in]  aInstance  A pointer to an OpenThread instance.\n @param[in]  aEnabled   TRUE to enable Security Policy TLV version-threshold for routing, FALSE otherwise.\n"]
+    #[doc = " Sets whether the Security Policy TLV version-threshold for routing (VR field) is enabled.\n\n @note This API requires `OPENTHREAD_CONFIG_REFERENCE_DEVICE_ENABLE`, and is only used by Thread Test Harness\n       to indicate that thread protocol version check VR should be skipped.\n\n @param[in]  aInstance  A pointer to an OpenThread instance.\n @param[in]  aEnabled   TRUE to enable Security Policy TLV version-threshold for routing, FALSE otherwise.\n"]
     pub fn otThreadSetThreadVersionCheckEnabled(aInstance: *mut otInstance, aEnabled: bool);
 }
 extern "C" {
-    #[doc = " This function gets the range of router IDs that are allowed to assign to nodes within the thread network.\n\n @note This API requires `OPENTHREAD_CONFIG_REFERENCE_DEVICE_ENABLE`, and is only used for test purpose. All the\n router IDs in the range [aMinRouterId, aMaxRouterId] are allowed.\n\n @param[in]   aInstance     A pointer to an OpenThread instance.\n @param[out]  aMinRouterId  The minimum router ID.\n @param[out]  aMaxRouterId  The maximum router ID.\n\n @sa otThreadSetRouterIdRange\n"]
+    #[doc = " Gets the range of router IDs that are allowed to assign to nodes within the thread network.\n\n @note This API requires `OPENTHREAD_CONFIG_REFERENCE_DEVICE_ENABLE`, and is only used for test purpose. All the\n router IDs in the range [aMinRouterId, aMaxRouterId] are allowed.\n\n @param[in]   aInstance     A pointer to an OpenThread instance.\n @param[out]  aMinRouterId  The minimum router ID.\n @param[out]  aMaxRouterId  The maximum router ID.\n\n @sa otThreadSetRouterIdRange\n"]
     pub fn otThreadGetRouterIdRange(
         aInstance: *mut otInstance,
         aMinRouterId: *mut u8,
@@ -11154,7 +11179,7 @@ extern "C" {
     );
 }
 extern "C" {
-    #[doc = " This function sets the range of router IDs that are allowed to assign to nodes within the thread network.\n\n @note This API requires `OPENTHREAD_CONFIG_REFERENCE_DEVICE_ENABLE`, and is only used for test purpose. All the\n router IDs in the range [aMinRouterId, aMaxRouterId] are allowed.\n\n @param[in]  aInstance     A pointer to an OpenThread instance.\n @param[in]  aMinRouterId  The minimum router ID.\n @param[in]  aMaxRouterId  The maximum router ID.\n\n @retval  OT_ERROR_NONE           Successfully set the range.\n @retval  OT_ERROR_INVALID_ARGS   aMinRouterId > aMaxRouterId, or the range is not covered by [0, 62].\n\n @sa otThreadGetRouterIdRange\n"]
+    #[doc = " Sets the range of router IDs that are allowed to assign to nodes within the thread network.\n\n @note This API requires `OPENTHREAD_CONFIG_REFERENCE_DEVICE_ENABLE`, and is only used for test purpose. All the\n router IDs in the range [aMinRouterId, aMaxRouterId] are allowed.\n\n @param[in]  aInstance     A pointer to an OpenThread instance.\n @param[in]  aMinRouterId  The minimum router ID.\n @param[in]  aMaxRouterId  The maximum router ID.\n\n @retval  OT_ERROR_NONE           Successfully set the range.\n @retval  OT_ERROR_INVALID_ARGS   aMinRouterId > aMaxRouterId, or the range is not covered by [0, 62].\n\n @sa otThreadGetRouterIdRange\n"]
     pub fn otThreadSetRouterIdRange(
         aInstance: *mut otInstance,
         aMinRouterId: u8,
@@ -11162,11 +11187,11 @@ extern "C" {
     ) -> otError;
 }
 extern "C" {
-    #[doc = " This function indicates whether or not a Router ID is currently allocated.\n\n @param[in]  aInstance     A pointer to an OpenThread instance.\n @param[in]  aRouterId     The router ID to check.\n\n @retval TRUE  The @p aRouterId is allocated.\n @retval FALSE The @p aRouterId is not allocated.\n"]
+    #[doc = " Indicates whether or not a Router ID is currently allocated.\n\n @param[in]  aInstance     A pointer to an OpenThread instance.\n @param[in]  aRouterId     The router ID to check.\n\n @retval TRUE  The @p aRouterId is allocated.\n @retval FALSE The @p aRouterId is not allocated.\n"]
     pub fn otThreadIsRouterIdAllocated(aInstance: *mut otInstance, aRouterId: u8) -> bool;
 }
 extern "C" {
-    #[doc = " This function gets the next hop and path cost towards a given RLOC16 destination.\n\n This function can be used with either @p aNextHopRloc16 or @p aPathCost being NULL indicating caller does not want\n to get the value.\n\n @param[in]  aInstance       A pointer to an OpenThread instance.\n @param[in]  aDesRloct16     The RLOC16 of destination.\n @param[out] aNextHopRloc16  A pointer to return RLOC16 of next hop, 0xfffe if no next hop.\n @param[out] aPathCost       A pointer to return path cost towards destination.\n"]
+    #[doc = " Gets the next hop and path cost towards a given RLOC16 destination.\n\n Can be used with either @p aNextHopRloc16 or @p aPathCost being NULL indicating caller does not want\n to get the value.\n\n @param[in]  aInstance       A pointer to an OpenThread instance.\n @param[in]  aDesRloct16     The RLOC16 of destination.\n @param[out] aNextHopRloc16  A pointer to return RLOC16 of next hop, 0xfffe if no next hop.\n @param[out] aPathCost       A pointer to return path cost towards destination.\n"]
     pub fn otThreadGetNextHopAndPathCost(
         aInstance: *mut otInstance,
         aDestRloc16: u16,
@@ -11174,7 +11199,7 @@ extern "C" {
         aPathCost: *mut u8,
     );
 }
-#[doc = " This struct represents a TREL peer.\n"]
+#[doc = " Represents a TREL peer.\n"]
 #[repr(C)]
 #[derive(Copy, Clone)]
 pub struct otTrelPeer {
@@ -11194,33 +11219,33 @@ impl Default for otTrelPeer {
         }
     }
 }
-#[doc = " This type represents an iterator for iterating over TREL peer table entries.\n"]
+#[doc = " Represents an iterator for iterating over TREL peer table entries.\n"]
 pub type otTrelPeerIterator = u16;
 extern "C" {
     #[doc = " Enables or disables TREL operation.\n\n When @p aEnable is true, this function initiates an ongoing DNS-SD browse on the service name \"_trel._udp\" within the\n local browsing domain to discover other devices supporting TREL. Device also registers a new service to be advertised\n using DNS-SD, with the service name is \"_trel._udp\" indicating its support for TREL. Device is then ready to receive\n TREL messages from peers.\n\n When @p aEnable is false, this function stops the DNS-SD browse on the service name \"_trel._udp\", stops advertising\n TREL DNS-SD service, and clears the TREL peer table.\n\n @note By default the OpenThread stack enables the TREL operation on start.\n\n @param[in]  aInstance  A pointer to an OpenThread instance.\n @param[in]  aEnable    A boolean to enable/disable the TREL operation.\n"]
     pub fn otTrelSetEnabled(aInstance: *mut otInstance, aEnable: bool);
 }
 extern "C" {
-    #[doc = " This function indicates whether the TREL operation is enabled.\n\n @param[in] aInstance   The OpenThread instance.\n\n @retval TRUE if the TREL operation is enabled.\n @retval FALSE if the TREL operation is disabled.\n"]
+    #[doc = " Indicates whether the TREL operation is enabled.\n\n @param[in] aInstance   The OpenThread instance.\n\n @retval TRUE if the TREL operation is enabled.\n @retval FALSE if the TREL operation is disabled.\n"]
     pub fn otTrelIsEnabled(aInstance: *mut otInstance) -> bool;
 }
 extern "C" {
-    #[doc = " This function initializes a peer table iterator.\n\n @param[in] aInstance   The OpenThread instance.\n @param[in] aIterator   The iterator to initialize.\n"]
+    #[doc = " Initializes a peer table iterator.\n\n @param[in] aInstance   The OpenThread instance.\n @param[in] aIterator   The iterator to initialize.\n"]
     pub fn otTrelInitPeerIterator(aInstance: *mut otInstance, aIterator: *mut otTrelPeerIterator);
 }
 extern "C" {
-    #[doc = " This function iterates over the peer table entries and get the next entry from the table\n\n @param[in] aInstance   The OpenThread instance.\n @param[in] aIterator   The iterator. MUST be initialized.\n\n @returns A pointer to the next `otTrelPeer` entry or `NULL` if no more entries in the table.\n"]
+    #[doc = " Iterates over the peer table entries and get the next entry from the table\n\n @param[in] aInstance   The OpenThread instance.\n @param[in] aIterator   The iterator. MUST be initialized.\n\n @returns A pointer to the next `otTrelPeer` entry or `NULL` if no more entries in the table.\n"]
     pub fn otTrelGetNextPeer(
         aInstance: *mut otInstance,
         aIterator: *mut otTrelPeerIterator,
     ) -> *const otTrelPeer;
 }
 extern "C" {
-    #[doc = " This function sets the filter mode (enables/disables filtering).\n\n When filter mode is enabled, any rx and tx traffic through TREL interface is silently dropped. This is mainly\n intended for use during testing.\n\n Unlike `otTrel{Enable/Disable}()` which fully starts/stops the TREL operation, when filter mode is enabled the\n TREL interface continues to be enabled.\n\n @param[in] aInstance   The OpenThread instance.\n @param[in] aFiltered   TRUE to enable filter mode, FALSE to disable filter mode.\n"]
+    #[doc = " Sets the filter mode (enables/disables filtering).\n\n When filter mode is enabled, any rx and tx traffic through TREL interface is silently dropped. This is mainly\n intended for use during testing.\n\n Unlike `otTrel{Enable/Disable}()` which fully starts/stops the TREL operation, when filter mode is enabled the\n TREL interface continues to be enabled.\n\n @param[in] aInstance   The OpenThread instance.\n @param[in] aFiltered   TRUE to enable filter mode, FALSE to disable filter mode.\n"]
     pub fn otTrelSetFilterEnabled(aInstance: *mut otInstance, aEnable: bool);
 }
 extern "C" {
-    #[doc = " This function indicates whether or not the filter mode is enabled.\n\n @param[in] aInstance   The OpenThread instance.\n\n @retval TRUE if the TREL filter mode is enabled.\n @retval FALSE if the TREL filter mode is disabled.\n"]
+    #[doc = " Indicates whether or not the filter mode is enabled.\n\n @param[in] aInstance   The OpenThread instance.\n\n @retval TRUE if the TREL filter mode is enabled.\n @retval FALSE if the TREL filter mode is disabled.\n"]
     pub fn otTrelIsFilterEnabled(aInstance: *mut otInstance) -> bool;
 }
 pub type __builtin_va_list = [__va_list_tag; 1usize];
