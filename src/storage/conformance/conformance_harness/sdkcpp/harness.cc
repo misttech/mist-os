@@ -42,14 +42,15 @@ class SdkCppHarness : public fio_test::Io1Harness {
     config.set_supports_get_backing_memory(true);  // vfs::VmoFile
 
     // Unsupported configuration options:
-    config.set_supports_create(false);           // OPEN_FLAG_CREATE is not supported.
-    config.set_supports_rename(false);           // vfs::PseudoDir does not support Rename.
-    config.set_supports_link(false);             // Link is not supported.
-    config.set_supports_set_attr(false);         // SetAttr is not supported.
-    config.set_supports_get_token(false);        // GetToken is unsupported.
-    config.set_conformant_path_handling(false);  // Path handling is currently inconsistent.
-    config.set_supports_unlink(false);           // Unlink is not supported.
-    config.set_supports_get_attributes(false);   // get_attributes is not supported.
+    config.set_supports_create(false);             // OPEN_FLAG_CREATE is not supported.
+    config.set_supports_rename(false);             // vfs::PseudoDir does not support Rename.
+    config.set_supports_link(false);               // Link is not supported.
+    config.set_supports_set_attr(false);           // SetAttr is not supported.
+    config.set_supports_get_token(false);          // GetToken is unsupported.
+    config.set_conformant_path_handling(false);    // Path handling is currently inconsistent.
+    config.set_supports_unlink(false);             // Unlink is not supported.
+    config.set_supports_get_attributes(false);     // get_attributes is not supported.
+    config.set_supports_update_attributes(false);  // update_attributes is not supported.
 
     // TODO(https://fxbug.dev/45287): Support ExecutableFile
     config.set_supports_executable_file(false);

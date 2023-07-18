@@ -138,6 +138,13 @@ impl File for BlockFile {
         Err(zx::Status::NOT_SUPPORTED)
     }
 
+    async fn update_attributes(
+        &self,
+        _attributes: fio::MutableNodeAttributes,
+    ) -> Result<(), zx::Status> {
+        Err(zx::Status::NOT_SUPPORTED)
+    }
+
     async fn sync(&self, _mode: SyncMode) -> Result<(), zx::Status> {
         self.block_client.flush().await.map_err(map_to_status)
     }

@@ -18,7 +18,7 @@ use {
             object_manager::ObjectManager,
             object_record::{
                 AttributeKey, ObjectAttributes, ObjectItem, ObjectKey, ObjectKeyData, ObjectKind,
-                ObjectValue, Timestamp,
+                ObjectValue, PosixAttributes, Timestamp,
             },
             transaction::{
                 self, AssocObj, AssociatedObject, LockKey, Mutation, ObjectStoreMutation, Options,
@@ -32,6 +32,7 @@ use {
     anyhow::{anyhow, bail, ensure, Context, Error},
     async_trait::async_trait,
     async_utils::event::Event,
+    fidl_fuchsia_io as fio,
     futures::{
         stream::{FuturesOrdered, FuturesUnordered},
         try_join, TryStreamExt,
@@ -1133,6 +1134,54 @@ impl<S: HandleOwner> StoreObjectHandle<S> {
         Ok(())
     }
 
+    pub async fn update_attributes<'a>(
+        &'a self,
+        transaction: &mut Transaction<'a>,
+        node_attributes: &fio::MutableNodeAttributes,
+    ) -> Result<(), Error> {
+        let mut mutation = self.txn_get_object_mutation(transaction).await?;
+        if let ObjectValue::Object { ref mut attributes, .. } = mutation.item.value {
+            if let Some(time) = node_attributes.creation_time {
+                attributes.creation_time = Timestamp::from_nanos(time);
+            }
+            if let Some(time) = node_attributes.modification_time {
+                attributes.modification_time = Timestamp::from_nanos(time);
+            }
+            if node_attributes.mode.is_some()
+                || node_attributes.uid.is_some()
+                || node_attributes.gid.is_some()
+                || node_attributes.rdev.is_some()
+            {
+                if let Some(a) = &mut attributes.posix_attributes {
+                    if let Some(mode) = node_attributes.mode {
+                        a.mode = mode;
+                    }
+                    if let Some(uid) = node_attributes.uid {
+                        a.uid = uid;
+                    }
+                    if let Some(gid) = node_attributes.gid {
+                        a.gid = gid;
+                    }
+                    if let Some(rdev) = node_attributes.rdev {
+                        a.rdev = rdev;
+                    }
+                } else {
+                    attributes.posix_attributes = Some(PosixAttributes {
+                        mode: node_attributes.mode.unwrap_or_default(),
+                        uid: node_attributes.uid.unwrap_or_default(),
+                        gid: node_attributes.gid.unwrap_or_default(),
+                        rdev: node_attributes.rdev.unwrap_or_default(),
+                    });
+                }
+            }
+        } else {
+            bail!(anyhow!(FxfsError::Inconsistent)
+                .context("write_posix_attributes: Expected object value"));
+        };
+        transaction.add(self.store().store_object_id(), Mutation::ObjectStore(mutation));
+        Ok(())
+    }
+
     /// Get the default set of transaction options for this object. This is mostly the overall
     /// default, modified by any [`HandleOptions`] held by this handle.
     pub fn default_transaction_options<'b>(&self) -> Options<'b> {
@@ -1724,7 +1773,7 @@ mod tests {
                 store_object_handle::KeyUnwrapper,
                 transaction::{Mutation, Options, TransactionHandler},
                 volume::root_volume,
-                Directory, HandleOptions, LockKey, ObjectStore, StoreObjectHandle,
+                Directory, HandleOptions, LockKey, ObjectStore, PosixAttributes, StoreObjectHandle,
                 TRANSACTION_MUTATION_THRESHOLD,
             },
             round::{round_down, round_up},
@@ -1732,7 +1781,7 @@ mod tests {
         anyhow::{anyhow, Error},
         assert_matches::assert_matches,
         async_trait::async_trait,
-        fuchsia_async as fasync,
+        fidl_fuchsia_io as fio, fuchsia_async as fasync,
         futures::{channel::oneshot::channel, join, FutureExt},
         fxfs_crypto::{
             Crypt, KeyPurpose, UnwrappedKey, WrappedKey, WrappedKeyBytes, WrappedKeys, KEY_SIZE,
@@ -3009,9 +3058,35 @@ mod tests {
         const CRTIME: Timestamp = Timestamp::from_nanos(1234);
         const MTIME: Timestamp = Timestamp::from_nanos(5678);
 
+        // ObjectProperties can be updated through `write_timestamps` and `update_attributes`.
+        // `get_properties` should reflect the latest changes.
         let mut transaction = object.new_transaction().await.expect("new_transaction failed");
         object
             .write_timestamps(&mut transaction, Some(CRTIME), Some(MTIME))
+            .await
+            .expect("update_timestamps failed");
+        object
+            .update_attributes(
+                &mut transaction,
+                &fio::MutableNodeAttributes {
+                    mode: Some(111),
+                    gid: Some(222),
+                    ..Default::default()
+                },
+            )
+            .await
+            .expect("update_timestamps failed");
+        const MTIME_NEW: Timestamp = Timestamp::from_nanos(12345678);
+        object
+            .update_attributes(
+                &mut transaction,
+                &fio::MutableNodeAttributes {
+                    modification_time: Some(MTIME_NEW.as_nanos()),
+                    gid: Some(333),
+                    rdev: Some(444),
+                    ..Default::default()
+                },
+            )
             .await
             .expect("update_timestamps failed");
         transaction.commit().await.expect("commit failed");
@@ -3024,7 +3099,8 @@ mod tests {
                 allocated_size: TEST_OBJECT_ALLOCATED_SIZE,
                 data_attribute_size: TEST_OBJECT_SIZE,
                 creation_time: CRTIME,
-                modification_time: MTIME,
+                modification_time: MTIME_NEW,
+                posix_attributes: Some(PosixAttributes { mode: 111, gid: 333, rdev: 444, .. }),
                 ..
             }
         );

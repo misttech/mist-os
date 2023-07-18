@@ -19,7 +19,8 @@ use {
     async_trait::async_trait,
     fidl::endpoints::ServerEnd,
     fidl_fuchsia_io::{
-        self as fio, FilesystemInfo, NodeAttributeFlags, NodeAttributes, NodeMarker, VmoFlags,
+        self as fio, FilesystemInfo, MutableNodeAttributes, NodeAttributeFlags, NodeAttributes,
+        NodeMarker, VmoFlags,
     },
     fuchsia_component::client::connect_to_protocol,
     fuchsia_merkle::{hash_block, MerkleTree},
@@ -377,6 +378,10 @@ impl File for FxBlob {
         _flags: NodeAttributeFlags,
         _attrs: NodeAttributes,
     ) -> Result<(), Status> {
+        Err(Status::ACCESS_DENIED)
+    }
+
+    async fn update_attributes(&self, _attributes: MutableNodeAttributes) -> Result<(), Status> {
         Err(Status::ACCESS_DENIED)
     }
 

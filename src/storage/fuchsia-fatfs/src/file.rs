@@ -343,6 +343,13 @@ impl VfsFile for FatFile {
         Ok(())
     }
 
+    async fn update_attributes(
+        &self,
+        _attributes: fio::MutableNodeAttributes,
+    ) -> Result<(), Status> {
+        Err(Status::NOT_SUPPORTED)
+    }
+
     async fn get_size(&self) -> Result<u64, Status> {
         let fs_lock = self.filesystem.lock().unwrap();
         let file = self.borrow_file(&fs_lock)?;

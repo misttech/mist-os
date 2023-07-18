@@ -373,6 +373,18 @@ impl File for FxFile {
         Ok(())
     }
 
+    async fn update_attributes(
+        &self,
+        attributes: fio::MutableNodeAttributes,
+    ) -> Result<(), Status> {
+        let empty_attributes = fio::MutableNodeAttributes { ..Default::default() };
+        if attributes == empty_attributes {
+            return Ok(());
+        }
+        self.handle.update_attributes(&attributes).await.map_err(map_to_status)?;
+        Ok(())
+    }
+
     async fn list_extended_attributes(&self) -> Result<Vec<Vec<u8>>, Status> {
         let basic = self.handle.basic_handle();
         basic.list_extended_attributes().await.map_err(map_to_status)

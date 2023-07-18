@@ -291,6 +291,12 @@ impl File for XattrFile {
     ) -> Result<(), Status> {
         unimplemented!()
     }
+    async fn update_attributes(
+        &self,
+        _attributes: fio::MutableNodeAttributes,
+    ) -> Result<(), Status> {
+        unimplemented!()
+    }
     async fn sync(&self, _mode: SyncMode) -> Result<(), Status> {
         Ok(())
     }

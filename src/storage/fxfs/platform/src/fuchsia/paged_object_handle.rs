@@ -10,7 +10,7 @@ use {
         volume::FxVolume,
     },
     anyhow::{ensure, Context, Error},
-    fuchsia_zircon as zx,
+    fidl_fuchsia_io as fio, fuchsia_zircon as zx,
     fxfs::{
         data_buffer::DataBuffer,
         debug_assert_not_too_long,
@@ -762,6 +762,50 @@ impl PagedObjectHandle {
         Ok(())
     }
 
+    pub async fn update_attributes(
+        &self,
+        attributes: &fio::MutableNodeAttributes,
+    ) -> Result<(), Error> {
+        let empty_attributes = fio::MutableNodeAttributes { ..Default::default() };
+        if *attributes == empty_attributes {
+            return Ok(());
+        }
+
+        // A race condition can occur if another flush occurs between now and the end of the
+        // transaction. This lock is to prevent a another flush from occurring during that time.
+        let fs;
+        let _flush_guard;
+        let set_creation_time = attributes.creation_time.is_some();
+        let set_modification_time = attributes.modification_time.is_some();
+        if set_creation_time || set_modification_time {
+            let store = self.handle.store();
+            fs = store.filesystem();
+            let keys = [LockKey::truncate(store.store_object_id(), self.handle.object_id())];
+            _flush_guard = debug_assert_not_too_long!(fs.write_lock(&keys));
+        }
+
+        let mut transaction = self.handle.new_transaction().await?;
+        self.handle
+            .update_attributes(&mut transaction, attributes)
+            .await
+            .context("update_attributes failed")?;
+        transaction.commit().await.context("Failed to commit transaction")?;
+        // Any changes to the dirty timestamps before this transaction are superseded by the values
+        // set in this update.
+        {
+            let mut inner = self.inner.lock().unwrap();
+            if set_creation_time {
+                inner.dirty_crtime = DirtyTimestamp::None;
+            }
+            if set_modification_time {
+                let _ = self.was_file_modified_since_last_call()?;
+                inner.dirty_mtime = DirtyTimestamp::None;
+            }
+        }
+
+        Ok(())
+    }
+
     pub async fn get_properties(&self) -> Result<ObjectProperties, Error> {
         // We must extract informaton from `inner` *before* we try and retrieve the properties from
         // the handle to avoid a window where we might see old properties.  When we flush, we update
@@ -1007,9 +1051,10 @@ mod tests {
         },
         anyhow::{bail, Context},
         fidl::endpoints::{create_proxy, ServerEnd},
-        fidl_fuchsia_io as fio,
+        fidl_fuchsia_io as fio, fuchsia_async as fasync,
         fuchsia_fs::file,
         fuchsia_zircon as zx,
+        futures::join,
         fxfs::{
             filesystem::{FxFilesystemBuilder, OpenFxFilesystem},
             object_store::volume::root_volume,
@@ -1037,6 +1082,54 @@ mod tests {
         attrs
     }
 
+    async fn get_attributes_checked(
+        file: &fio::FileProxy,
+        query: fio::NodeAttributesQuery,
+    ) -> fio::NodeAttributes2 {
+        let (mutable_attributes, immutable_attributes) = file
+            .get_attributes(query)
+            .await
+            .expect("FIDL call failed")
+            .map_err(zx::ok)
+            .expect("get_attributes failed");
+        fio::NodeAttributes2 { mutable_attributes, immutable_attributes }
+    }
+
+    async fn get_attrs_and_attributes_parity_checked(file: &fio::FileProxy) {
+        let attrs = get_attrs_checked(&file).await;
+        let attributes = get_attributes_checked(
+            &file,
+            fio::NodeAttributesQuery::ID
+                | fio::NodeAttributesQuery::CONTENT_SIZE
+                | fio::NodeAttributesQuery::STORAGE_SIZE
+                | fio::NodeAttributesQuery::LINK_COUNT
+                | fio::NodeAttributesQuery::CREATION_TIME
+                | fio::NodeAttributesQuery::MODIFICATION_TIME,
+        )
+        .await;
+        assert_eq!(attrs.id, attributes.immutable_attributes.id.expect("get_attributes failed"));
+        assert_eq!(
+            attrs.content_size,
+            attributes.immutable_attributes.content_size.expect("get_attributes failed")
+        );
+        assert_eq!(
+            attrs.storage_size,
+            attributes.immutable_attributes.storage_size.expect("get_attributes failed")
+        );
+        assert_eq!(
+            attrs.link_count,
+            attributes.immutable_attributes.link_count.expect("get_attributes failed")
+        );
+        assert_eq!(
+            attrs.creation_time,
+            attributes.mutable_attributes.creation_time.expect("get_attributes failed")
+        );
+        assert_eq!(
+            attrs.modification_time,
+            attributes.mutable_attributes.modification_time.expect("get_attributes failed")
+        );
+    }
+
     async fn set_attrs_checked(file: &fio::FileProxy, crtime: Option<u64>, mtime: Option<u64>) {
         let attributes = fio::NodeAttributes {
             mode: 0,
@@ -1058,6 +1151,17 @@ mod tests {
 
         let status = file.set_attr(mask, &attributes).await.expect("FIDL call failed");
         zx::Status::ok(status).expect("set_attr failed");
+    }
+
+    async fn update_attributes_checked(
+        file: &fio::FileProxy,
+        attributes: &fio::MutableNodeAttributes,
+    ) {
+        file.update_attributes(&attributes)
+            .await
+            .expect("FIDL call failed")
+            .map_err(zx::ok)
+            .expect("update_attributes failed");
     }
 
     async fn open_filesystem(
@@ -1729,6 +1833,175 @@ mod tests {
         assert_eq!(attrs.content_size, page_size);
 
         close_file_checked(file).await;
+        fixture.close().await;
+    }
+
+    #[fuchsia::test]
+    async fn test_get_update_attrs_and_attributes_parity() {
+        let fixture = TestFixture::new_unencrypted().await;
+        let root = fixture.root();
+
+        let file = open_file_checked(
+            &root,
+            fio::OpenFlags::CREATE
+                | fio::OpenFlags::RIGHT_READABLE
+                | fio::OpenFlags::RIGHT_WRITABLE
+                | fio::OpenFlags::NOT_DIRECTORY,
+            FILE_NAME,
+        )
+        .await;
+
+        // The attributes value returned from `get_attrs` and `get_attributes` (io2) should
+        // be equivalent
+        get_attrs_and_attributes_parity_checked(&file).await;
+
+        // `set_attrs` and `update_attributes` (io2) both updates the file's attributes
+        let now = Timestamp::now().as_nanos();
+        update_attributes_checked(
+            &file,
+            &fio::MutableNodeAttributes {
+                creation_time: Some(now),
+                modification_time: Some(now),
+                mode: Some(111),
+                gid: Some(222),
+                ..Default::default()
+            },
+        )
+        .await;
+        set_attrs_checked(&file, None, Some(now - ONE_DAY)).await;
+        let updated_attributes = get_attributes_checked(
+            &file,
+            fio::NodeAttributesQuery::CREATION_TIME
+                | fio::NodeAttributesQuery::MODIFICATION_TIME
+                | fio::NodeAttributesQuery::MODE
+                | fio::NodeAttributesQuery::GID,
+        )
+        .await;
+        let mut expected_attributes = fio::NodeAttributes2 {
+            mutable_attributes: fio::MutableNodeAttributes { ..Default::default() },
+            immutable_attributes: fio::ImmutableNodeAttributes { ..Default::default() },
+        };
+        expected_attributes.mutable_attributes.creation_time = Some(now);
+        // modification_time should reflect the latest change
+        expected_attributes.mutable_attributes.modification_time = Some(now - ONE_DAY);
+        expected_attributes.mutable_attributes.mode = Some(111);
+        expected_attributes.mutable_attributes.gid = Some(222);
+        assert_eq!(updated_attributes, expected_attributes);
+        get_attrs_and_attributes_parity_checked(&file).await;
+
+        // Check that updating some of the attributes will not overwrite those that are not updated
+        update_attributes_checked(
+            &file,
+            &fio::MutableNodeAttributes { uid: Some(333), gid: Some(444), ..Default::default() },
+        )
+        .await;
+        let current_attributes = get_attributes_checked(
+            &file,
+            fio::NodeAttributesQuery::CREATION_TIME
+                | fio::NodeAttributesQuery::MODIFICATION_TIME
+                | fio::NodeAttributesQuery::MODE
+                | fio::NodeAttributesQuery::UID
+                | fio::NodeAttributesQuery::GID,
+        )
+        .await;
+        expected_attributes.mutable_attributes.uid = Some(333);
+        expected_attributes.mutable_attributes.gid = Some(444);
+        assert_eq!(current_attributes, expected_attributes);
+        get_attrs_and_attributes_parity_checked(&file).await;
+
+        // The contents of the file hasn't changed, so the flushed attributes should remain the same
+        file.sync().await.unwrap().unwrap();
+        let synced_attributes = get_attributes_checked(
+            &file,
+            fio::NodeAttributesQuery::CREATION_TIME
+                | fio::NodeAttributesQuery::MODIFICATION_TIME
+                | fio::NodeAttributesQuery::MODE
+                | fio::NodeAttributesQuery::UID
+                | fio::NodeAttributesQuery::GID,
+        )
+        .await;
+        assert_eq!(synced_attributes, expected_attributes);
+        get_attrs_and_attributes_parity_checked(&file).await;
+
+        close_file_checked(file).await;
+        fixture.close().await;
+    }
+
+    // `update_attributes` flushes the attributes. We should check for race conditions where another
+    // flush could occur at the same time.
+    #[fuchsia::test(threads = 10)]
+    async fn test_update_attributes_with_race() {
+        let fixture = TestFixture::new_unencrypted().await;
+        for i in 1..100 {
+            let file_name = format!("file {}", i);
+            let file1 = open_file_checked(
+                fixture.root(),
+                fio::OpenFlags::CREATE
+                    | fio::OpenFlags::RIGHT_READABLE
+                    | fio::OpenFlags::RIGHT_WRITABLE
+                    | fio::OpenFlags::NOT_DIRECTORY,
+                &file_name,
+            )
+            .await;
+            let file2 = open_file_checked(
+                fixture.root(),
+                fio::OpenFlags::RIGHT_READABLE
+                    | fio::OpenFlags::RIGHT_WRITABLE
+                    | fio::OpenFlags::NOT_DIRECTORY,
+                &file_name,
+            )
+            .await;
+            join!(
+                fasync::Task::spawn(async move {
+                    file1
+                        .write("foo".as_bytes())
+                        .await
+                        .expect("FIDL call failed")
+                        .map_err(zx::Status::from_raw)
+                        .expect("write failed");
+                    let write_modification_time =
+                        get_attributes_checked(&file1, fio::NodeAttributesQuery::MODIFICATION_TIME)
+                            .await
+                            .mutable_attributes
+                            .modification_time
+                            .expect("get_attributes failed");
+
+                    let now = Timestamp::now().as_nanos();
+                    update_attributes_checked(
+                        &file1,
+                        &fio::MutableNodeAttributes {
+                            modification_time: Some(now),
+                            mode: Some(111),
+                            gid: Some(222),
+                            ..Default::default()
+                        },
+                    )
+                    .await;
+                    fasync::Timer::new(Duration::from_millis(10)).await;
+                    let updated_attributes = get_attributes_checked(
+                        &file1,
+                        fio::NodeAttributesQuery::MODIFICATION_TIME
+                            | fio::NodeAttributesQuery::MODE
+                            | fio::NodeAttributesQuery::GID,
+                    )
+                    .await;
+
+                    assert_ne!(
+                        updated_attributes.mutable_attributes.modification_time.unwrap(),
+                        write_modification_time
+                    );
+                    assert_eq!(updated_attributes.mutable_attributes.modification_time, Some(now));
+                    assert_eq!(updated_attributes.mutable_attributes.mode, Some(111));
+                    assert_eq!(updated_attributes.mutable_attributes.gid, Some(222));
+                }),
+                fasync::Task::spawn(async move {
+                    for _ in 1..50 {
+                        // Flush data
+                        file2.sync().await.unwrap().unwrap();
+                    }
+                })
+            );
+        }
         fixture.close().await;
     }
 }

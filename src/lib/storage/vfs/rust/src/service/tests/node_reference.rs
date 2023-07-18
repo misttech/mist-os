@@ -238,7 +238,7 @@ fn update_attributes_not_supported() {
         |node_proxy| async move {
             let response =
                 node_proxy.update_attributes(&fio::MutableNodeAttributes::default()).await.unwrap();
-            assert_eq!(response, Err(Status::NOT_SUPPORTED.into_raw()));
+            assert_eq!(response, Err(Status::BAD_HANDLE.into_raw()));
         },
     );
 }

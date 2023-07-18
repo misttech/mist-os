@@ -22,8 +22,8 @@ use {
     },
     fidl::endpoints::ServerEnd,
     fidl_fuchsia_io::{
-        self as fio, FilesystemInfo, NodeAttributeFlags, NodeAttributes, NodeAttributes2,
-        NodeAttributesQuery, NodeMarker,
+        self as fio, FilesystemInfo, MutableNodeAttributes, NodeAttributeFlags, NodeAttributes,
+        NodeAttributes2, NodeAttributesQuery, NodeMarker,
     },
     fuchsia_hash::Hash,
     fuchsia_merkle::{MerkleTree, MerkleTreeBuilder},
@@ -389,6 +389,10 @@ impl File for FxDeliveryBlob {
         _flags: NodeAttributeFlags,
         _attrs: NodeAttributes,
     ) -> Result<(), Status> {
+        Err(Status::BAD_STATE)
+    }
+
+    async fn update_attributes(&self, _attributes: MutableNodeAttributes) -> Result<(), Status> {
         Err(Status::BAD_STATE)
     }
 

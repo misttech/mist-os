@@ -347,6 +347,30 @@ impl StarnixNodeConnection {
             Ok(())
         })
     }
+
+    fn update_attributes(&self, attributes: fio::MutableNodeAttributes) -> Result<(), Errno> {
+        self.file.node().update_info(|info| {
+            if let Some(time) = attributes.creation_time {
+                info.time_status_change = zx::Time::from_nanos(time as i64);
+            }
+            if let Some(time) = attributes.modification_time {
+                info.time_modify = zx::Time::from_nanos(time as i64);
+            }
+            if let Some(mode) = attributes.mode {
+                info.mode = FileMode::from_bits(mode);
+            }
+            if let Some(uid) = attributes.uid {
+                info.uid = uid;
+            }
+            if let Some(gid) = attributes.gid {
+                info.gid = gid;
+            }
+            if let Some(rdev) = attributes.rdev {
+                info.rdev = DeviceType::from_bits(rdev);
+            }
+            Ok(())
+        })
+    }
 }
 
 #[async_trait]
@@ -398,6 +422,13 @@ impl directory::entry_container::MutableDirectory for StarnixNodeConnection {
         attributes: fio::NodeAttributes,
     ) -> Result<(), zx::Status> {
         StarnixNodeConnection::set_attrs(self, flags, attributes)?;
+        Ok(())
+    }
+    async fn update_attributes(
+        &self,
+        attributes: fio::MutableNodeAttributes,
+    ) -> Result<(), zx::Status> {
+        StarnixNodeConnection::update_attributes(self, attributes)?;
         Ok(())
     }
     async fn unlink(
@@ -477,6 +508,13 @@ impl file::File for StarnixNodeConnection {
         attributes: fio::NodeAttributes,
     ) -> Result<(), zx::Status> {
         StarnixNodeConnection::set_attrs(self, flags, attributes)?;
+        Ok(())
+    }
+    async fn update_attributes(
+        &self,
+        attributes: fio::MutableNodeAttributes,
+    ) -> Result<(), zx::Status> {
+        StarnixNodeConnection::update_attributes(self, attributes)?;
         Ok(())
     }
     async fn sync(&self, _mode: file::SyncMode) -> Result<(), zx::Status> {

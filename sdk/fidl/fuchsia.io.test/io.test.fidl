@@ -78,6 +78,9 @@ type Io1Config = table {
 
     /// Supports fuchsia.io's get_attributes method.
    14: supports_get_attributes bool;
+
+    /// Supports fuchsia.io's update_attributes method.
+   15: supports_update_attributes bool;
 };
 
 /// Directory entries should support opening with any combination of read/write/execute rights.

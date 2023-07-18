@@ -126,6 +126,8 @@ async fn run(mut stream: Io1HarnessRequestStream) -> Result<(), Error> {
                     supports_link: Some(false), // Link is not supported using a pseudo filesystem.
                     // TODO(fxbug.dev/72801): SetAttr should work, investigate why the test fails.
                     supports_set_attr: Some(false),
+                    // TODO(fxbug.dev/72801): same issue as SetAttr not working.
+                    supports_update_attributes: Some(false),
 
                     ..Default::default()
                 };

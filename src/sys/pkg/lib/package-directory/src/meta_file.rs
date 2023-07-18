@@ -194,6 +194,13 @@ impl<S: crate::NonMetaStorage> vfs::file::File for MetaFile<S> {
         Err(zx::Status::NOT_SUPPORTED)
     }
 
+    async fn update_attributes(
+        &self,
+        _attributes: fio::MutableNodeAttributes,
+    ) -> Result<(), zx::Status> {
+        Err(zx::Status::NOT_SUPPORTED)
+    }
+
     async fn sync(&self, _mode: vfs::file::SyncMode) -> Result<(), zx::Status> {
         Err(zx::Status::NOT_SUPPORTED)
     }

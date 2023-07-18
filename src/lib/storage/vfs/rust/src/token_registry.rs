@@ -358,6 +358,13 @@ mod tests {
                 panic!("Not implemented!")
             }
 
+            async fn update_attributes(
+                &self,
+                _attributes: fio::MutableNodeAttributes,
+            ) -> Result<(), Status> {
+                panic!("Not implemented!")
+            }
+
             async fn sync(&self) -> Result<(), Status> {
                 panic!("Not implemented!");
             }

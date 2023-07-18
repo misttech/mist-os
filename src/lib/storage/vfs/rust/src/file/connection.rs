@@ -533,10 +533,10 @@ impl<T: 'static + File, U: Deref<Target = OpenNode<T>> + DerefMut + IoOpHandler>
                         .map_err(|status| zx::Status::into_raw(*status)),
                 )?;
             }
-            fio::FileRequest::UpdateAttributes { payload: _, responder } => {
+            fio::FileRequest::UpdateAttributes { payload, responder } => {
                 fuchsia_trace::duration!("storage", "File::UpdateAttributes");
-                // TODO(https://fxbug.dev/77623): Handle unimplemented io2 method.
-                responder.send(Err(zx::Status::NOT_SUPPORTED.into_raw()))?;
+                let result = self.handle_update_attributes(payload).await.map_err(|s| s.into_raw());
+                responder.send(result)?;
             }
             fio::FileRequest::ListExtendedAttributes { iterator, control_handle: _ } => {
                 fuchsia_trace::duration!("storage", "File::ListExtendedAttributes");
@@ -734,6 +734,17 @@ impl<T: 'static + File, U: Deref<Target = OpenNode<T>> + DerefMut + IoOpHandler>
         }
     }
 
+    async fn handle_update_attributes(
+        &mut self,
+        attributes: fio::MutableNodeAttributes,
+    ) -> Result<(), zx::Status> {
+        if !self.options.rights.intersects(fio::Operations::UPDATE_ATTRIBUTES) {
+            return Err(zx::Status::BAD_HANDLE);
+        }
+
+        self.file.update_attributes(attributes).await
+    }
+
     async fn handle_truncate(&mut self, length: u64) -> Result<(), zx::Status> {
         if !self.options.rights.intersects(fio::Operations::WRITE_BYTES) {
             return Err(zx::Status::BAD_HANDLE);
@@ -857,6 +868,7 @@ mod tests {
         GetAttrs,
         GetAttributes { query: fio::NodeAttributesQuery },
         SetAttrs { flags: fio::NodeAttributeFlags, attrs: fio::NodeAttributes },
+        UpdateAttributes { attrs: fio::MutableNodeAttributes },
         Close,
         Sync,
     }
@@ -983,6 +995,14 @@ mod tests {
             attrs: fio::NodeAttributes,
         ) -> Result<(), zx::Status> {
             self.handle_operation(FileOperation::SetAttrs { flags, attrs })?;
+            Ok(())
+        }
+
+        async fn update_attributes(
+            &self,
+            attrs: fio::MutableNodeAttributes,
+        ) -> Result<(), zx::Status> {
+            self.handle_operation(FileOperation::UpdateAttributes { attrs })?;
             Ok(())
         }
 
@@ -1587,6 +1607,33 @@ mod tests {
                         | fio::NodeAttributeFlags::MODIFICATION_TIME,
                     attrs: set_attrs
                 },
+            ]
+        );
+    }
+
+    #[fuchsia::test]
+    async fn test_update_attributes() {
+        let env = init_mock_file(Box::new(always_succeed_callback), fio::OpenFlags::RIGHT_WRITABLE);
+        let attributes = fio::MutableNodeAttributes {
+            creation_time: Some(40000),
+            modification_time: Some(100000),
+            mode: Some(1),
+            ..Default::default()
+        };
+        let () = env
+            .proxy
+            .update_attributes(&attributes)
+            .await
+            .unwrap()
+            .map_err(zx::Status::from_raw)
+            .unwrap();
+
+        let events = env.file.operations.lock().unwrap();
+        assert_eq!(
+            *events,
+            vec![
+                FileOperation::Init { options: FileOptions { rights: RIGHTS_W, is_append: false } },
+                FileOperation::UpdateAttributes { attrs: attributes },
             ]
         );
     }

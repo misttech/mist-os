@@ -106,6 +106,10 @@ pub trait MutableDirectory: Directory + Send + Sync {
         attributes: fio::NodeAttributes,
     ) -> Result<(), Status>;
 
+    /// Set the mutable attributes of this directory based on the values in `attributes`.
+    async fn update_attributes(&self, attributes: fio::MutableNodeAttributes)
+        -> Result<(), Status>;
+
     /// Removes an entry from this directory.
     async fn unlink(self: Arc<Self>, name: &str, must_be_directory: bool) -> Result<(), Status>;
 

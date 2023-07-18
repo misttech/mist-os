@@ -135,7 +135,6 @@ impl MutableConnection {
             | fio::DirectoryRequest::Reopen { .. }
             | fio::DirectoryRequest::Rewind { .. }
             | fio::DirectoryRequest::SetFlags { .. }
-            | fio::DirectoryRequest::UpdateAttributes { .. }
             | fio::DirectoryRequest::Watch { .. }) => {
                 return this.as_mut().base.handle_request(request).await;
             }
@@ -180,6 +179,14 @@ impl MutableConnection {
                     this.handle_remove_extended_attribute(name).await.map_err(|s| s.into_raw());
                 responder.send(res)?;
             }
+            fio::DirectoryRequest::UpdateAttributes { payload, responder } => {
+                responder.send(
+                    this.as_mut()
+                        .handle_update_attributes(payload)
+                        .await
+                        .map_err(zx::Status::into_raw),
+                )?;
+            }
         }
         Ok(ConnectionState::Alive)
     }
@@ -196,6 +203,17 @@ impl MutableConnection {
         // TODO(jfsulliv): Consider always permitting attributes to be deferrable. The risk with
         // this is that filesystems would require a background flush of dirty attributes to disk.
         self.base.directory.set_attrs(flags, attributes).await
+    }
+
+    async fn handle_update_attributes(
+        self: Pin<&mut Self>,
+        attributes: fio::MutableNodeAttributes,
+    ) -> Result<(), zx::Status> {
+        if !self.base.options.rights.contains(fio::Operations::UPDATE_ATTRIBUTES) {
+            return Err(zx::Status::BAD_HANDLE);
+        }
+
+        self.base.directory.update_attributes(attributes).await
     }
 
     async fn handle_unlink(
@@ -353,6 +371,7 @@ mod tests {
         Unlink { id: u32, name: String },
         Rename { id: u32, src_name: String, dst_dir: u32, dst_name: String },
         SetAttr { id: u32, flags: fio::NodeAttributeFlags, attrs: fio::NodeAttributes },
+        UpdateAttributes { id: u32, attributes: fio::MutableNodeAttributes },
         Sync,
         Close,
     }
@@ -461,6 +480,14 @@ mod tests {
             attrs: fio::NodeAttributes,
         ) -> Result<(), zx::Status> {
             self.fs.handle_event(MutableDirectoryAction::SetAttr { id: self.id, flags, attrs })
+        }
+
+        async fn update_attributes(
+            &self,
+            attributes: fio::MutableNodeAttributes,
+        ) -> Result<(), zx::Status> {
+            self.fs
+                .handle_event(MutableDirectoryAction::UpdateAttributes { id: self.id, attributes })
         }
 
         async fn sync(&self) -> Result<(), zx::Status> {
@@ -602,6 +629,30 @@ mod tests {
                 attrs
             }]
         );
+    }
+
+    #[fuchsia::test]
+    async fn test_update_attributes() {
+        let events = Events::new();
+        let fs = Arc::new(MockFilesystem::new(&events));
+        let (_dir, proxy) = fs
+            .clone()
+            .make_connection(fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE);
+        let attributes = fio::MutableNodeAttributes {
+            creation_time: Some(30),
+            modification_time: Some(100),
+            mode: Some(200),
+            ..Default::default()
+        };
+        let () = proxy
+            .update_attributes(&attributes)
+            .await
+            .unwrap()
+            .map_err(zx::Status::from_raw)
+            .unwrap();
+
+        let events = events.0.lock().unwrap();
+        assert_eq!(*events, vec![MutableDirectoryAction::UpdateAttributes { id: 0, attributes }]);
     }
 
     #[fuchsia::test]

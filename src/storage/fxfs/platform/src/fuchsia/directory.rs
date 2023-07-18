@@ -396,6 +396,18 @@ impl MutableDirectory for FxDirectory {
             return Ok(());
         }
 
+        self.update_attributes(fio::MutableNodeAttributes {
+            creation_time,
+            modification_time,
+            ..Default::default()
+        })
+        .await
+    }
+
+    async fn update_attributes(
+        &self,
+        attributes: fio::MutableNodeAttributes,
+    ) -> Result<(), zx::Status> {
         let fs = self.store().filesystem();
         let mut transaction = fs
             .clone()
@@ -406,15 +418,7 @@ impl MutableDirectory for FxDirectory {
             .await
             .map_err(map_to_status)?;
         self.directory
-            .update_attributes(
-                &mut transaction,
-                Some(&fio::MutableNodeAttributes {
-                    creation_time,
-                    modification_time,
-                    ..Default::default()
-                }),
-                0,
-            )
+            .update_attributes(&mut transaction, Some(&attributes), 0)
             .await
             .map_err(map_to_status)?;
         transaction.commit().await.map_err(map_to_status)?;

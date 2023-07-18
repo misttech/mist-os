@@ -124,6 +124,10 @@ pub trait File: Node {
         attrs: fio::NodeAttributes,
     ) -> Result<(), Status>;
 
+    /// Set the attributes of this file based on the values in `attributes`.
+    async fn update_attributes(&self, attributes: fio::MutableNodeAttributes)
+        -> Result<(), Status>;
+
     /// List this files extended attributes.
     async fn list_extended_attributes(&self) -> Result<Vec<Vec<u8>>, Status> {
         Err(Status::NOT_SUPPORTED)

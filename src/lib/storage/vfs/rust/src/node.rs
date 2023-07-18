@@ -177,8 +177,7 @@ impl<N: Node> Connection<N> {
                 )?;
             }
             fio::NodeRequest::UpdateAttributes { payload: _, responder } => {
-                // TODO(https://fxbug.dev/77623): Handle unimplemented io2 method.
-                responder.send(Err(ZX_ERR_NOT_SUPPORTED))?;
+                responder.send(Err(ZX_ERR_BAD_HANDLE))?;
             }
             fio::NodeRequest::ListExtendedAttributes { iterator, .. } => {
                 iterator.close_with_epitaph(zx::Status::NOT_SUPPORTED)?;

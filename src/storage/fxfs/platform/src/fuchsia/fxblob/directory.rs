@@ -25,7 +25,8 @@ use {
         CreateBlobError,
     },
     fidl_fuchsia_io::{
-        self as fio, FilesystemInfo, NodeAttributeFlags, NodeAttributes, NodeMarker, WatchMask,
+        self as fio, FilesystemInfo, MutableNodeAttributes, NodeAttributeFlags, NodeAttributes,
+        NodeMarker, WatchMask,
     },
     fuchsia_hash::Hash,
     fuchsia_merkle::{MerkleTree, MerkleTreeBuilder},
@@ -374,6 +375,10 @@ impl MutableDirectory for BlobDirectory {
         attrs: NodeAttributes,
     ) -> Result<(), Status> {
         self.directory.set_attrs(flags, attrs).await
+    }
+
+    async fn update_attributes(&self, attributes: MutableNodeAttributes) -> Result<(), Status> {
+        self.directory.update_attributes(attributes).await
     }
 
     async fn sync(&self) -> Result<(), Status> {

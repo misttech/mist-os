@@ -138,7 +138,6 @@ async fn set_attr_directory_with_insufficient_rights() {
 #[fuchsia::test]
 async fn get_attributes_empty_query() {
     let harness = TestHarness::new().await;
-
     if !harness.config.supports_get_attributes.unwrap_or_default() {
         return;
     }
@@ -184,7 +183,6 @@ async fn get_attributes_empty_query() {
 #[fuchsia::test]
 async fn get_attributes_return_some_value() {
     let harness = TestHarness::new().await;
-
     if !harness.config.supports_get_attributes.unwrap_or_default() {
         return;
     }
@@ -216,9 +214,27 @@ async fn get_attributes_return_some_value() {
 }
 
 #[fuchsia::test]
-async fn get_update_attributes_file() {
+async fn get_attributes_file_unsupported() {
     let harness = TestHarness::new().await;
+    if harness.config.supports_get_attributes.unwrap_or_default() {
+        return;
+    }
 
+    let root = root_directory(vec![file(TEST_FILE, vec![])]);
+    let test_dir = harness.get_directory(root, harness.dir_rights.all());
+    let file_proxy =
+        open_file_with_flags(&test_dir, fio::OpenFlags::RIGHT_WRITABLE, TEST_FILE).await;
+
+    // fuchsia.io/Node.GetAttributes
+    assert_eq!(
+        file_proxy.get_attributes(fio::NodeAttributesQuery::empty()).await.unwrap(),
+        Err(zx::Status::NOT_SUPPORTED.into_raw())
+    );
+}
+
+#[fuchsia::test]
+async fn get_attributes_file() {
+    let harness = TestHarness::new().await;
     if !harness.config.supports_get_attributes.unwrap_or_default() {
         return;
     }
@@ -234,10 +250,24 @@ async fn get_update_attributes_file() {
             fio::NodeAttributesQuery::PROTOCOLS | fio::NodeAttributesQuery::CONTENT_SIZE,
         )
         .await
-        .unwrap()
+        .expect("FIDL call failed")
+        .map_err(zx::Status::from_raw)
         .expect("get_attributes failed");
     assert_eq!(immutable_attributes.protocols.unwrap(), fio::NodeProtocolKinds::FILE);
     assert_eq!(immutable_attributes.content_size.unwrap(), TEST_FILE_CONTENTS.len() as u64);
+}
+
+#[fuchsia::test]
+async fn update_attributes_file_unsupported() {
+    let harness = TestHarness::new().await;
+    if harness.config.supports_update_attributes.unwrap_or_default() {
+        return;
+    }
+
+    let root = root_directory(vec![file(TEST_FILE, vec![])]);
+    let test_dir = harness.get_directory(root, harness.dir_rights.all());
+    let file_proxy =
+        open_file_with_flags(&test_dir, fio::OpenFlags::RIGHT_WRITABLE, TEST_FILE).await;
 
     // fuchsia.io/Node.UpdateAttributes
     assert_eq!(
@@ -247,9 +277,123 @@ async fn get_update_attributes_file() {
 }
 
 #[fuchsia::test]
-async fn get_update_attributes_file_unsupported() {
+async fn update_attributes_file_with_insufficient_rights() {
     let harness = TestHarness::new().await;
+    if !harness.config.supports_update_attributes.unwrap_or_default() {
+        return;
+    }
 
+    let root = root_directory(vec![file(TEST_FILE, TEST_FILE_CONTENTS.to_vec())]);
+    let test_dir = harness.get_directory(root, harness.dir_rights.all());
+    let file_proxy =
+        open_file_with_flags(&test_dir, fio::OpenFlags::RIGHT_READABLE, TEST_FILE).await;
+
+    let status = file_proxy
+        .update_attributes(&fio::MutableNodeAttributes {
+            modification_time: Some(111),
+            ..Default::default()
+        })
+        .await
+        .expect("FIDL call failed")
+        .map_err(zx::Status::from_raw);
+    assert_eq!(status, Err(zx::Status::BAD_HANDLE));
+}
+
+#[fuchsia::test]
+async fn update_attributes_file_with_sufficient_rights() {
+    let harness = TestHarness::new().await;
+    if !harness.config.supports_get_attributes.unwrap_or_default()
+        || !harness.config.supports_update_attributes.unwrap_or_default()
+    {
+        return;
+    }
+
+    let root = root_directory(vec![file(TEST_FILE, TEST_FILE_CONTENTS.to_vec())]);
+    let test_dir = harness.get_directory(root, harness.dir_rights.all());
+    let file_proxy =
+        open_file_with_flags(&test_dir, fio::OpenFlags::RIGHT_WRITABLE, TEST_FILE).await;
+
+    let (mutable_attributes, immutable_attributes) = file_proxy
+        .get_attributes(
+            fio::NodeAttributesQuery::PROTOCOLS
+                | fio::NodeAttributesQuery::CONTENT_SIZE
+                | fio::NodeAttributesQuery::CREATION_TIME,
+        )
+        .await
+        .expect("FIDL call failed")
+        .map_err(zx::Status::from_raw)
+        .expect("get_attributes failed");
+    assert_eq!(immutable_attributes.protocols.unwrap(), fio::NodeProtocolKinds::FILE);
+    assert_eq!(immutable_attributes.content_size.unwrap(), TEST_FILE_CONTENTS.len() as u64);
+
+    let mut expected_attributes = fio::NodeAttributes2 { mutable_attributes, immutable_attributes };
+
+    let _ = file_proxy
+        .update_attributes(&fio::MutableNodeAttributes {
+            modification_time: Some(111),
+            mode: Some(2),
+            uid: Some(3),
+            ..Default::default()
+        })
+        .await
+        .expect("FIDL call failed")
+        .map_err(zx::Status::from_raw)
+        .expect("update_attributes failed");
+
+    let (mutable_attributes, immutable_attributes) = file_proxy
+        .get_attributes(
+            fio::NodeAttributesQuery::PROTOCOLS
+                | fio::NodeAttributesQuery::CONTENT_SIZE
+                | fio::NodeAttributesQuery::CREATION_TIME
+                | fio::NodeAttributesQuery::MODIFICATION_TIME
+                | fio::NodeAttributesQuery::MODE
+                | fio::NodeAttributesQuery::UID,
+        )
+        .await
+        .expect("FIDL call failed")
+        .map_err(zx::Status::from_raw)
+        .expect("get_attributes failed");
+    assert_eq!(expected_attributes.immutable_attributes, immutable_attributes);
+    expected_attributes.mutable_attributes.modification_time = Some(111);
+    expected_attributes.mutable_attributes.mode = Some(2);
+    expected_attributes.mutable_attributes.uid = Some(3);
+    assert_eq!(expected_attributes.mutable_attributes, mutable_attributes);
+
+    // Change another mutable attribute (check that the other attributes remain unchanged)
+    let _ = file_proxy
+        .update_attributes(&fio::MutableNodeAttributes {
+            mode: Some(5),
+            gid: Some(4),
+            ..Default::default()
+        })
+        .await
+        .expect("FIDL call failed")
+        .map_err(zx::Status::from_raw)
+        .expect("update_attributes failed");
+
+    let (mutable_attributes, immutable_attributes) = file_proxy
+        .get_attributes(
+            fio::NodeAttributesQuery::PROTOCOLS
+                | fio::NodeAttributesQuery::CONTENT_SIZE
+                | fio::NodeAttributesQuery::CREATION_TIME
+                | fio::NodeAttributesQuery::MODIFICATION_TIME
+                | fio::NodeAttributesQuery::MODE
+                | fio::NodeAttributesQuery::UID
+                | fio::NodeAttributesQuery::GID,
+        )
+        .await
+        .expect("FIDL call failed")
+        .map_err(zx::Status::from_raw)
+        .expect("get_attributes failed");
+    assert_eq!(expected_attributes.immutable_attributes, immutable_attributes);
+    expected_attributes.mutable_attributes.gid = Some(4);
+    expected_attributes.mutable_attributes.mode = Some(5);
+    assert_eq!(expected_attributes.mutable_attributes, mutable_attributes);
+}
+
+#[fuchsia::test]
+async fn get_attributes_file_node_reference_unsupported() {
+    let harness = TestHarness::new().await;
     if harness.config.supports_get_attributes.unwrap_or_default() {
         return;
     }
@@ -257,25 +401,18 @@ async fn get_update_attributes_file_unsupported() {
     let root = root_directory(vec![file(TEST_FILE, vec![])]);
     let test_dir = harness.get_directory(root, harness.dir_rights.all());
     let file_proxy =
-        open_file_with_flags(&test_dir, fio::OpenFlags::RIGHT_READABLE, TEST_FILE).await;
+        open_file_with_flags(&test_dir, fio::OpenFlags::NODE_REFERENCE, TEST_FILE).await;
 
     // fuchsia.io/Node.GetAttributes
     assert_eq!(
         file_proxy.get_attributes(fio::NodeAttributesQuery::empty()).await.unwrap(),
         Err(zx::Status::NOT_SUPPORTED.into_raw())
     );
-
-    // fuchsia.io/Node.UpdateAttributes
-    assert_eq!(
-        file_proxy.update_attributes(&fio::MutableNodeAttributes::default()).await.unwrap(),
-        Err(zx::Status::NOT_SUPPORTED.into_raw())
-    );
 }
 
 #[fuchsia::test]
-async fn get_update_attributes_file_node_reference() {
+async fn get_attributes_file_node_reference() {
     let harness = TestHarness::new().await;
-
     if !harness.config.supports_get_attributes.unwrap_or_default() {
         return;
     }
@@ -295,19 +432,12 @@ async fn get_update_attributes_file_node_reference() {
         .expect("get_attributes failed");
     assert_eq!(immutable_attributes.protocols.unwrap(), fio::NodeProtocolKinds::FILE);
     assert_eq!(immutable_attributes.content_size.unwrap(), TEST_FILE_CONTENTS.len() as u64);
-
-    // fuchsia.io/Node.UpdateAttributes
-    assert_eq!(
-        file_proxy.update_attributes(&fio::MutableNodeAttributes::default()).await.unwrap(),
-        Err(zx::Status::NOT_SUPPORTED.into_raw())
-    );
 }
 
 #[fuchsia::test]
-async fn get_update_attributes_file_node_reference_unsupported() {
+async fn update_attributes_file_node_reference_not_allowed() {
     let harness = TestHarness::new().await;
-
-    if harness.config.supports_get_attributes.unwrap_or_default() {
+    if !harness.config.supports_get_attributes.unwrap_or_default() {
         return;
     }
 
@@ -316,23 +446,33 @@ async fn get_update_attributes_file_node_reference_unsupported() {
     let file_proxy =
         open_file_with_flags(&test_dir, fio::OpenFlags::NODE_REFERENCE, TEST_FILE).await;
 
-    // fuchsia.io/Node.GetAttributes
-    assert_eq!(
-        file_proxy.get_attributes(fio::NodeAttributesQuery::empty()).await.unwrap(),
-        Err(zx::Status::NOT_SUPPORTED.into_raw())
-    );
-
-    // fuchsia.io/Node.UpdateAttributes
+    // Node references does not support fuchsia.io/Node.UpdateAttributes
     assert_eq!(
         file_proxy.update_attributes(&fio::MutableNodeAttributes::default()).await.unwrap(),
+        Err(zx::Status::BAD_HANDLE.into_raw())
+    );
+}
+
+#[fuchsia::test]
+async fn get_attributes_directory_unsupported() {
+    let harness = TestHarness::new().await;
+    if harness.config.supports_get_attributes.unwrap_or_default() {
+        return;
+    }
+
+    let root = root_directory(vec![directory("dir", vec![])]);
+    let test_dir = harness.get_directory(root, harness.dir_rights.all());
+    let dir_proxy = open_dir_with_flags(&test_dir, fio::OpenFlags::RIGHT_WRITABLE, "dir").await;
+
+    assert_eq!(
+        dir_proxy.get_attributes(fio::NodeAttributesQuery::empty()).await.unwrap(),
         Err(zx::Status::NOT_SUPPORTED.into_raw())
     );
 }
 
 #[fuchsia::test]
-async fn get_update_attributes_directory() {
+async fn get_attributes_directory() {
     let harness = TestHarness::new().await;
-
     if !harness.config.supports_get_attributes.unwrap_or_default() {
         return;
     }
@@ -347,6 +487,18 @@ async fn get_update_attributes_directory() {
         .unwrap()
         .expect("get_attributes failed");
     assert_eq!(immutable_attributes.protocols.unwrap(), fio::NodeProtocolKinds::DIRECTORY);
+}
+
+#[fuchsia::test]
+async fn update_attributes_directory_unsupported() {
+    let harness = TestHarness::new().await;
+    if harness.config.supports_update_attributes.unwrap_or_default() {
+        return;
+    }
+
+    let root = root_directory(vec![directory("dir", vec![])]);
+    let test_dir = harness.get_directory(root, harness.dir_rights.all());
+    let dir_proxy = open_dir_with_flags(&test_dir, fio::OpenFlags::RIGHT_WRITABLE, "dir").await;
 
     // fuchsia.io/Node.UpdateAttributes
     assert_eq!(
@@ -356,10 +508,9 @@ async fn get_update_attributes_directory() {
 }
 
 #[fuchsia::test]
-async fn get_update_attributes_directory_unsupported() {
+async fn update_attributes_directory_with_insufficient_rights() {
     let harness = TestHarness::new().await;
-
-    if harness.config.supports_get_attributes.unwrap_or_default() {
+    if !harness.config.supports_update_attributes.unwrap_or_default() {
         return;
     }
 
@@ -367,23 +518,119 @@ async fn get_update_attributes_directory_unsupported() {
     let test_dir = harness.get_directory(root, harness.dir_rights.all());
     let dir_proxy = open_dir_with_flags(&test_dir, fio::OpenFlags::RIGHT_READABLE, "dir").await;
 
-    // Node attributes that were not requested should return None
+    let status = dir_proxy
+        .update_attributes(&fio::MutableNodeAttributes {
+            modification_time: Some(111),
+            ..Default::default()
+        })
+        .await
+        .expect("FIDL call failed")
+        .map_err(zx::Status::from_raw);
+    assert_eq!(status, Err(zx::Status::BAD_HANDLE));
+}
+
+#[fuchsia::test]
+async fn update_attributes_directory_with_sufficient_rights() {
+    let harness = TestHarness::new().await;
+    if !harness.config.supports_get_attributes.unwrap_or_default()
+        || !harness.config.supports_update_attributes.unwrap_or_default()
+    {
+        return;
+    }
+
+    let root = root_directory(vec![directory("dir", vec![])]);
+    let test_dir = harness.get_directory(root, harness.dir_rights.all());
+    let dir_proxy = open_dir_with_flags(&test_dir, fio::OpenFlags::RIGHT_WRITABLE, "dir").await;
+
+    let (mutable_attributes, immutable_attributes) = dir_proxy
+        .get_attributes(
+            fio::NodeAttributesQuery::PROTOCOLS | fio::NodeAttributesQuery::CREATION_TIME,
+        )
+        .await
+        .unwrap()
+        .expect("get_attributes failed");
+    assert_eq!(immutable_attributes.protocols.unwrap(), fio::NodeProtocolKinds::DIRECTORY);
+
+    let mut expected_attributes = fio::NodeAttributes2 { mutable_attributes, immutable_attributes };
+
+    let _ = dir_proxy
+        .update_attributes(&fio::MutableNodeAttributes {
+            modification_time: Some(111),
+            mode: Some(2),
+            uid: Some(3),
+            ..Default::default()
+        })
+        .await
+        .expect("FIDL call failed")
+        .map_err(zx::Status::from_raw)
+        .expect("update_attributes failed");
+
+    let (mutable_attributes, immutable_attributes) = dir_proxy
+        .get_attributes(
+            fio::NodeAttributesQuery::PROTOCOLS
+                | fio::NodeAttributesQuery::CREATION_TIME
+                | fio::NodeAttributesQuery::MODIFICATION_TIME
+                | fio::NodeAttributesQuery::MODE
+                | fio::NodeAttributesQuery::UID,
+        )
+        .await
+        .expect("FIDL call failed")
+        .map_err(zx::Status::from_raw)
+        .expect("get_attributes failed");
+    assert_eq!(expected_attributes.immutable_attributes, immutable_attributes);
+    expected_attributes.mutable_attributes.modification_time = Some(111);
+    expected_attributes.mutable_attributes.mode = Some(2);
+    expected_attributes.mutable_attributes.uid = Some(3);
+    assert_eq!(expected_attributes.mutable_attributes, mutable_attributes);
+
+    // Change another mutable attribute (check that the other attributes remain unchanged)
+    let _ = dir_proxy
+        .update_attributes(&fio::MutableNodeAttributes { gid: Some(4), ..Default::default() })
+        .await
+        .expect("FIDL call failed")
+        .map_err(zx::Status::from_raw)
+        .expect("update_attributes failed");
+
+    let (mutable_attributes, immutable_attributes) = dir_proxy
+        .get_attributes(
+            fio::NodeAttributesQuery::PROTOCOLS
+                | fio::NodeAttributesQuery::CREATION_TIME
+                | fio::NodeAttributesQuery::MODIFICATION_TIME
+                | fio::NodeAttributesQuery::MODE
+                | fio::NodeAttributesQuery::UID
+                | fio::NodeAttributesQuery::GID,
+        )
+        .await
+        .expect("FIDL call failed")
+        .map_err(zx::Status::from_raw)
+        .expect("get_attributes failed");
+
+    assert_eq!(expected_attributes.immutable_attributes, immutable_attributes);
+    expected_attributes.mutable_attributes.gid = Some(4);
+    assert_eq!(expected_attributes.mutable_attributes, mutable_attributes);
+}
+
+#[fuchsia::test]
+async fn get_attributes_directory_node_reference_unsupported() {
+    let harness = TestHarness::new().await;
+    if harness.config.supports_get_attributes.unwrap_or_default() {
+        return;
+    }
+
+    let root = root_directory(vec![directory("dir", vec![])]);
+    let test_dir = harness.get_directory(root, harness.dir_rights.all());
+    let dir_proxy = open_dir_with_flags(&test_dir, fio::OpenFlags::NODE_REFERENCE, "dir").await;
+
+    // fuchsia.io/Node.GetAttributes
     assert_eq!(
         dir_proxy.get_attributes(fio::NodeAttributesQuery::empty()).await.unwrap(),
-        Err(zx::Status::NOT_SUPPORTED.into_raw())
-    );
-
-    // fuchsia.io/Node.UpdateAttributes
-    assert_eq!(
-        dir_proxy.update_attributes(&fio::MutableNodeAttributes::default()).await.unwrap(),
         Err(zx::Status::NOT_SUPPORTED.into_raw())
     );
 }
 
 #[fuchsia::test]
-async fn get_update_attributes_directory_node_reference() {
+async fn get_attributes_directory_node_reference() {
     let harness = TestHarness::new().await;
-
     if !harness.config.supports_get_attributes.unwrap_or_default() {
         return;
     }
@@ -399,19 +646,12 @@ async fn get_update_attributes_directory_node_reference() {
         .unwrap()
         .expect("get_attributes failed");
     assert_eq!(immutable_attributes.protocols.unwrap(), fio::NodeProtocolKinds::DIRECTORY);
-
-    // fuchsia.io/Node.UpdateAttributes
-    assert_eq!(
-        dir_proxy.update_attributes(&fio::MutableNodeAttributes::default()).await.unwrap(),
-        Err(zx::Status::NOT_SUPPORTED.into_raw())
-    );
 }
 
 #[fuchsia::test]
-async fn get_update_attributes_directory_node_reference_unsupported() {
+async fn update_attributes_directory_node_reference_not_allowed() {
     let harness = TestHarness::new().await;
-
-    if harness.config.supports_get_attributes.unwrap_or_default() {
+    if !harness.config.supports_get_attributes.unwrap_or_default() {
         return;
     }
 
@@ -419,15 +659,9 @@ async fn get_update_attributes_directory_node_reference_unsupported() {
     let test_dir = harness.get_directory(root, harness.dir_rights.all());
     let dir_proxy = open_dir_with_flags(&test_dir, fio::OpenFlags::NODE_REFERENCE, "dir").await;
 
-    // fuchsia.io/Node.GetAttributes
-    assert_eq!(
-        dir_proxy.get_attributes(fio::NodeAttributesQuery::empty()).await.unwrap(),
-        Err(zx::Status::NOT_SUPPORTED.into_raw())
-    );
-
-    // fuchsia.io/Node.UpdateAttributes
+    // Node reference doesn't allow for updating attributes
     assert_eq!(
         dir_proxy.update_attributes(&fio::MutableNodeAttributes::default()).await.unwrap(),
-        Err(zx::Status::NOT_SUPPORTED.into_raw())
+        Err(zx::Status::BAD_HANDLE.into_raw())
     );
 }
