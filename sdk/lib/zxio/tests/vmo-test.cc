@@ -90,7 +90,10 @@ TEST_F(VmoTest, Basic) {
   EXPECT_STREQ("cde", buffer);
   ASSERT_STATUS(ZX_ERR_UNAVAILABLE, zxio_truncate(io, 0u));
   uint32_t flags = 0u;
-  ASSERT_STATUS(ZX_ERR_NOT_SUPPORTED, zxio_flags_get(io, &flags));
+  ASSERT_STATUS(ZX_OK, zxio_flags_get(io, &flags));
+  EXPECT_TRUE((flags & static_cast<uint32_t>(fuchsia_io::wire::OpenFlags::kRightReadable)) != 0);
+  // See also FlagsGet test below for read-only VMO test.
+  EXPECT_TRUE((flags & static_cast<uint32_t>(fuchsia_io::wire::OpenFlags::kRightWritable)) != 0);
   ASSERT_STATUS(ZX_ERR_NOT_SUPPORTED, zxio_flags_set(io, flags));
 
   ASSERT_OK(zxio_write(io, buffer, sizeof(buffer), 0, &actual));
@@ -129,6 +132,33 @@ TEST_F(VmoTest, GetExact) {
   uint64_t size;
   ASSERT_OK(vmo.get_prop_content_size(&size));
   EXPECT_EQ(size, kSize);
+}
+
+TEST_F(VmoTest, FlagsGet) {
+  // RW case
+  uint32_t flags{};
+  ASSERT_STATUS(ZX_OK, zxio_flags_get(io, &flags));
+  EXPECT_TRUE((flags & static_cast<uint32_t>(fuchsia_io::wire::OpenFlags::kRightReadable)) != 0);
+  EXPECT_TRUE((flags & static_cast<uint32_t>(fuchsia_io::wire::OpenFlags::kRightWritable)) != 0);
+
+  // RO case
+  zx::vmo rw_vmo;
+  ASSERT_OK(zx::vmo::create(kSize, 0u, &rw_vmo));
+  zx_info_handle_basic_t info;
+  ASSERT_OK(rw_vmo.get_info(ZX_INFO_HANDLE_BASIC, &info, sizeof(info), nullptr, nullptr));
+  zx::vmo ro_vmo;
+  ASSERT_OK(rw_vmo.duplicate(info.rights & ~ZX_RIGHT_WRITE, &ro_vmo));
+  zx::stream ro_stream;
+  ASSERT_OK(zx::stream::create(ZX_STREAM_MODE_READ, ro_vmo, kInitialSeek, &ro_stream));
+  zxio_storage_t storage_for_ro;
+  ASSERT_OK(zxio_vmo_init(&storage_for_ro, std::move(ro_vmo), std::move(ro_stream)));
+  zxio_t* ro_io = &storage_for_ro.io;
+
+  ASSERT_STATUS(ZX_OK, zxio_flags_get(ro_io, &flags));
+  EXPECT_TRUE((flags & static_cast<uint32_t>(fuchsia_io::wire::OpenFlags::kRightReadable)) != 0);
+  EXPECT_FALSE((flags & static_cast<uint32_t>(fuchsia_io::wire::OpenFlags::kRightWritable)) != 0);
+
+  ASSERT_OK(zxio_close(ro_io, /*should_wait=*/true));
 }
 
 TEST_F(VmoTest, SeekNegativeOverflow) {
