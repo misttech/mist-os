@@ -28,6 +28,7 @@ async fn connect_and_wait_for_failure(supplicant: Supplicant<'_>) {
     )
     .await;
     remove_network(supplicant.controller, &AP_SSID, supplicant.security_type, credential).await;
+    info!("Connection failed as expected. TODO(fxb/130770#c4): remove this logging");
 }
 
 /// Test a client fails to connect to a network if the wrong credential type is

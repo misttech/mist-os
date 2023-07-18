@@ -264,6 +264,7 @@ pub async fn remove_network(
         .await
         .expect("remove_network future failed")
         .expect("client controller failed to remove network");
+    info!("Network removed. TODO(fxb/130770#c4): remove this logging")
 }
 
 pub async fn remove_all_networks(client_controller: &fidl_policy::ClientControllerProxy) {
