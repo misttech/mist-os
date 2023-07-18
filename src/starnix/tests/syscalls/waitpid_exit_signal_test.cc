@@ -2,11 +2,13 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#include <signal.h>
 #include <stdint.h>
 #include <stdlib.h>
 #include <sys/wait.h>
 #include <unistd.h>
 
+#include <atomic>
 #include <vector>
 
 #include <gtest/gtest.h>
@@ -14,18 +16,27 @@
 #include "src/starnix/tests/syscalls/test_helper.h"
 
 namespace {
-std::vector<int> receivedSignals;
 
-void handler(int signum) { receivedSignals.push_back(signum); }
+std::vector<int> receivedSignals;
+std::atomic<int> bad_signal_code;
+
+void handler(int signum, siginfo_t *info, void *ucontext) {
+  if (info->si_code != CLD_EXITED) {
+    bad_signal_code.store(info->si_code);
+    return;
+  }
+
+  receivedSignals.push_back(signum);
+}
 
 // This test_helper::CloneHelper instance must only be used after a clone without 'CLONE_THREAD |
 // CLONE_VM'.
 test_helper::CloneHelper nestedCloneHelper;
 
 void ensureWait(int pid, unsigned int waitFlags) {
-  int actualWaitpid = waitpid(pid, NULL, waitFlags);
+  int actual_waitpid = waitpid(pid, NULL, waitFlags);
   EXPECT_EQ(errno, 0);
-  EXPECT_EQ(pid, actualWaitpid);
+  EXPECT_EQ(pid, actual_waitpid);
 }
 }  // namespace
 
@@ -33,14 +44,23 @@ class WaitpidExitSignalTest : public testing::Test {
  protected:
   void SetUp() override {
     receivedSignals.clear();
+    // Don't want to allocate in the signal handler.
+    receivedSignals.reserve(10);
+    bad_signal_code.store(0);
     errno = 0;
-    signal(SIGUSR1, handler);
-    signal(SIGCHLD, handler);
+    struct sigaction sa;
+    sa.sa_sigaction = handler;
+    sa.sa_flags = SA_SIGINFO | SA_RESTART | SA_NOCLDSTOP;
+
+    sigaction(SIGUSR1, &sa, &old_usr1_act_);
+    sigaction(SIGCHLD, &sa, &old_chld_act_);
   }
   void TearDown() override {
-    signal(SIGUSR1, SIG_DFL);
-    signal(SIGCHLD, SIG_DFL);
+    sigaction(SIGUSR1, &old_usr1_act_, nullptr);
+    sigaction(SIGCHLD, &old_chld_act_, nullptr);
   }
+  struct sigaction old_usr1_act_;
+  struct sigaction old_chld_act_;
 };
 
 /*
@@ -56,6 +76,7 @@ TEST_F(WaitpidExitSignalTest, childProcessSendsDefaultSignalOnTerminationToParen
     ensureWait(pid, __WALL);
     EXPECT_TRUE(receivedSignals.size() == 1);
     EXPECT_EQ(receivedSignals[0], SIGCHLD);
+    EXPECT_EQ(0, bad_signal_code.load());
   });
 
   EXPECT_TRUE(helper.WaitForChildren());
@@ -70,6 +91,7 @@ TEST_F(WaitpidExitSignalTest, childProcessSendsCustomExitSignalOnTerminationToPa
     ensureWait(pid, __WALL);
     EXPECT_TRUE(receivedSignals.size() == 1);
     EXPECT_EQ(receivedSignals[0], SIGUSR1);
+    EXPECT_EQ(0, bad_signal_code.load());
   });
   EXPECT_TRUE(helper.WaitForChildren());
 }
@@ -113,6 +135,7 @@ TEST_F(WaitpidExitSignalTest, childThreadGroupSendsCorrectExitSignalWhenLeaderTe
     ensureWait(pid, __WALL);
     EXPECT_TRUE(receivedSignals.size() == 1);
     EXPECT_EQ(receivedSignals[0], SIGUSR1);
+    EXPECT_EQ(0, bad_signal_code.load());
   });
   EXPECT_TRUE(helper.WaitForChildren());
 }
@@ -126,6 +149,7 @@ TEST_F(WaitpidExitSignalTest, childThreadGroupSendsCorrectExitSignalWhenLeaderTe
     ensureWait(pid, __WALL);
     EXPECT_TRUE(receivedSignals.size() == 1);
     EXPECT_EQ(receivedSignals[0], SIGUSR1);
+    EXPECT_EQ(0, bad_signal_code.load());
   });
   EXPECT_TRUE(helper.WaitForChildren());
 }
