@@ -20,12 +20,14 @@ Attached Process 1 state=Running koid=?? name=hello_starnix component=starnix_ke
 Created Breakpoint 2 @ execute_syscall
 
 [zxdb] c
-🛑 on bp 2 ??execute_syscall??
+🛑 on bp 2
 
 # Zxdb can unwind into restricted stack.
 [zxdb] f
-▶ 0 ??execute_syscall??
-  ?? main() • hello_starnix.cc:10
+# When optimization is on, there might be other inlined frame so we only check
+# the existence of execute_syscall and main function in the backtrace.
+execute_syscall
+main() • hello_starnix.cc
 
 [zxdb] bp rm
 Removed Breakpoint 2 @ execute_syscall

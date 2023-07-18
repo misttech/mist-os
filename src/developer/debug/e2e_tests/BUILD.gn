@@ -73,12 +73,8 @@ if (is_host) {
 
     environments = all_fuchsia_envs
 
-    # TODO(fxbug.dev/108369): Disable this test for sherlock and vim3 because we're seeing higher
-    # flake rates than in any other environments due to the FFX bug.
-    environments -= [
-      sherlock_env,
-      vim3_env,
-    ]
+    # TODO(fxbug.dev/130794): Fix the failures on vim3.
+    environments -= [ vim3_env ]
 
     # TODO(https://fxbug.dev/64897): The arm64 emulator is run from an arm64 host but we only
     # support running tests on x64 hosts.
