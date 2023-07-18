@@ -1331,6 +1331,7 @@ impl fmt::Debug for FileObject {
             .field("fs", &String::from_utf8_lossy(self.fs.name()))
             .field("offset", &self.offset)
             .field("flags", &self.flags)
+            .field("ops_ty", &self.ops().type_name())
             .finish()
     }
 }

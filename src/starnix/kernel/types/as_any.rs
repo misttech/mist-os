@@ -7,6 +7,10 @@ use std::any::Any;
 /// The `AsAny` trait enables callers to downcast a Trait into a concrete implementation, assuming
 /// the trait is `+ AsAny`.
 pub trait AsAny {
+    fn type_name(&self) -> &'static str {
+        std::any::type_name::<Self>()
+    }
+
     fn as_any(&self) -> &dyn Any;
 }
 

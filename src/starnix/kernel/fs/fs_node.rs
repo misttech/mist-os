@@ -81,7 +81,7 @@ pub struct FsNode {
 
 pub type FsNodeHandle = Arc<FsNode>;
 
-#[derive(Default, Clone)]
+#[derive(Debug, Default, Clone)]
 pub struct FsNodeInfo {
     pub ino: ino_t,
     pub mode: FileMode,
@@ -1458,6 +1458,17 @@ impl FsNode {
         mode: FileWriteGuardMode,
     ) -> Result<FileWriteGuard, Errno> {
         self.write_guard_state.lock().create_write_guard(self.clone(), mode)
+    }
+}
+
+impl std::fmt::Debug for FsNode {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("FsNode")
+            .field("fs", &String::from_utf8_lossy(self.fs().name()))
+            .field("node_id", &self.node_id)
+            .field("info", &*self.info())
+            .field("ops_ty", &self.ops().type_name())
+            .finish()
     }
 }
 
