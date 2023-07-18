@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use anyhow::format_err;
 use fuchsia_zircon as zx;
 use thiserror::Error;
 
@@ -15,6 +16,8 @@ pub enum Error {
     Packet(#[from] PacketError),
     #[error("Duplicate add of {:?} to HeaderSet", .0)]
     Duplicate(HeaderIdentifier),
+    #[error("{:?} cannot be added with {:?}", .0, .1)]
+    IncompatibleHeaders(HeaderIdentifier, HeaderIdentifier),
     #[error("Encountered an IO Error: {}", .0)]
     IOError(#[from] zx::Status),
     #[error("Operation is already in progress")]
@@ -50,6 +53,10 @@ impl Error {
 
     pub fn not_implemented(operation: OpCode) -> Self {
         Self::NotImplemented { operation }
+    }
+
+    pub fn other(msg: impl Into<String>) -> Self {
+        Self::Other(format_err!(msg.into()).into())
     }
 }
 

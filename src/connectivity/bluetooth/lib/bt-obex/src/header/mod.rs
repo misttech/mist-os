@@ -182,7 +182,7 @@ decodable_enum! {
 /// upper 2 bits indicate the header encoding and the lower 6 bits indicate the type of the
 /// header.
 /// Defined in OBEX 1.5 Section 2.1.
-#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, PartialOrd, Ord)]
 #[repr(u8)]
 pub enum HeaderIdentifier {
     /// Number of objects.
