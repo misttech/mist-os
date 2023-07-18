@@ -10,6 +10,18 @@
             environment: "#core-env",
         },
     ],
+    use: [
+        {
+            protocol: [ "fuchsia.session.scene.Manager" ],
+            from: "#ui",
+            dependency: "weak_for_migration",
+        },
+        {
+            protocol: [ "fuchsia.lightsensor.Sensor" ],
+            from: "#ui",
+            dependency: "weak_for_migration",
+        },
+    ],
     offer: [
         // Routes to session-manager.
         {

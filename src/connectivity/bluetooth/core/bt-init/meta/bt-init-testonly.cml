@@ -22,7 +22,7 @@
     ],
     expose: [
         {
-            protocol: "fuchsia.bluetooth.rfcomm.test.RfcommTest",
+            protocol: [ "fuchsia.bluetooth.rfcomm.test.RfcommTest" ],
             from: "#bt-rfcomm",
         },
     ],

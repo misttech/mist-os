@@ -1,0 +1,52 @@
+// Copyright 2022 The Fuchsia Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style license that can be
+// found in the LICENSE file.
+
+// TODO(b/236962910) - Must clean this up later.
+//   Temporary core shard designed to accommodate USB webcam's.
+//   This is likely not the final form of capabilities routing for USB webcam's
+//   because the routing structure must support both Sherlock and USB webcam's.
+{
+    children: [
+        {
+            name: "usb_camera_device_watcher",
+            url: "fuchsia-pkg://fuchsia.com/camera_device_watcher#meta/camera_device_watcher.cm",
+            environment: "#core-env",
+        },
+    ],
+    use: [
+        {
+            // Make camera device watcher available to v1 components
+            protocol: "fuchsia.camera3.DeviceWatcher",
+            from: "#usb_camera_device_watcher",
+        },
+    ],
+    offer: [
+        {
+            protocol: [
+                "fuchsia.logger.LogSink",
+                "fuchsia.sysmem.Allocator",
+            ],
+            from: "parent",
+            to: [ "#usb_camera_device_watcher" ],
+        },
+        {
+            protocol: [ "fuchsia.metrics.MetricEventLoggerFactory" ],
+            from: "#cobalt",
+            to: "#usb_camera_device_watcher",
+        },
+        {
+            protocol: [ "fuchsia.ui.policy.DeviceListenerRegistry" ],
+            from: "#ui",
+            to: "#usb_camera_device_watcher",
+            dependency: "weak",
+        },
+        {
+            directory: "dev-class",
+            from: "parent",
+            as: "dev-camera",
+            to: [ "#usb_camera_device_watcher" ],
+            subdir: "camera",
+        },
+    ],
+}

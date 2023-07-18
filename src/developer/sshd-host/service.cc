@@ -5,39 +5,48 @@
 #include "src/developer/sshd-host/service.h"
 
 #include <arpa/inet.h>
+#include <dirent.h>
 #include <errno.h>
 #include <fcntl.h>
 #include <fuchsia/boot/cpp/fidl.h>
-#include <fuchsia/component/cpp/fidl.h>
-#include <fuchsia/process/cpp/fidl.h>
-#include <lib/async/dispatcher.h>
+#include <lib/async-loop/cpp/loop.h>
+#include <lib/async-loop/default.h>
+#include <lib/async/cpp/wait.h>
+#include <lib/async/default.h>
+#include <lib/fdio/directory.h>
 #include <lib/fdio/fd.h>
+#include <lib/fdio/fdio.h>
+#include <lib/fdio/io.h>
+#include <lib/fdio/spawn.h>
 #include <lib/fit/defer.h>
-#include <lib/fit/function.h>
+#include <lib/sys/cpp/component_context.h>
 #include <lib/sys/cpp/service_directory.h>
 #include <lib/syslog/cpp/macros.h>
+#include <lib/zx/job.h>
+#include <lib/zx/process.h>
 #include <netdb.h>
 #include <netinet/in.h>
-#include <poll.h>
 #include <sys/socket.h>
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <zircon/errors.h>
-#include <zircon/processargs.h>
-#include <zircon/types.h>
 
 #include <memory>
 #include <vector>
 
+#include <fbl/string_printf.h>
 #include <fbl/unique_fd.h>
 
-#include "src/developer/sshd-host/constants.h"
+#include "src/lib/fsl/tasks/fd_waiter.h"
+#include "src/lib/fxl/macros.h"
 #include "src/lib/fxl/strings/string_printf.h"
 
-namespace sshd_host {
+const auto kSshdPath = "/pkg/bin/sshd";
+const char* kSshdArgv[] = {kSshdPath, "-ie", "-f", "/config/data/sshd_config", nullptr};
 
+namespace sshd_host {
 zx_status_t provision_authorized_keys_from_bootloader_file(
-    const std::shared_ptr<sys::ServiceDirectory>& service_directory) {
+    std::shared_ptr<sys::ServiceDirectory> service_directory) {
   fuchsia::boot::ItemsSyncPtr boot_items;
   if (zx_status_t status = service_directory->Connect(boot_items.NewRequest()); status != ZX_OK) {
     FX_PLOGS(ERROR, status)
@@ -68,7 +77,8 @@ zx_status_t provision_authorized_keys_from_bootloader_file(
     return status;
   }
 
-  std::unique_ptr buffer = std::make_unique<uint8_t[]>(size);
+  auto buffer = std::make_unique<uint8_t[]>(size);
+
   if (zx_status_t status = vmo.read(buffer.get(), 0, size); status != ZX_OK) {
     FX_PLOGS(ERROR, status) << "Provisioning keys from boot item: failed to read file";
     return status;
@@ -103,13 +113,32 @@ zx_status_t provision_authorized_keys_from_bootloader_file(
   return ZX_OK;
 }
 
+zx_status_t make_child_job(const zx::job& parent, std::string name, zx::job* job) {
+  if (zx_status_t status = zx::job::create(parent, 0, job); status != ZX_OK) {
+    FX_PLOGS(ERROR, status) << "Failed to create child job; parent = " << parent.get();
+    return status;
+  }
+
+  if (zx_status_t status = job->set_property(ZX_PROP_NAME, name.data(), name.size());
+      status != ZX_OK) {
+    FX_PLOGS(ERROR, status) << "Failed to set name of child job; job = " << job->get();
+    return status;
+  }
+  if (zx_status_t status = job->replace(kChildJobRights, job); status != ZX_OK) {
+    FX_PLOGS(ERROR, status) << "Failed to set rights on child job; job = " << job->get();
+    return status;
+  }
+
+  return ZX_OK;
+}
+
 // static
-Service::Socket Service::MakeSocket(async_dispatcher_t* dispatcher, IpVersion ip_version,
-                                    uint16_t port) {
+fbl::unique_fd Service::MakeSocket(IpVersion ip_version, uint16_t port) {
   const int family = static_cast<int>(ip_version);
   fbl::unique_fd sock(socket(family, SOCK_STREAM, IPPROTO_TCP));
   if (!sock.is_valid()) {
-    FX_LOGS(FATAL) << "Failed to create socket: " << strerror(errno);
+    FX_LOGS(ERROR) << "Failed to create socket: " << strerror(errno);
+    exit(1);
   }
   sockaddr_storage addr;
   switch (ip_version) {
@@ -132,46 +161,56 @@ Service::Socket Service::MakeSocket(async_dispatcher_t* dispatcher, IpVersion ip
       break;
   }
   if (bind(sock.get(), reinterpret_cast<const sockaddr*>(&addr), sizeof addr) < 0) {
-    FX_LOGS(FATAL) << "Failed to bind to " << port << ": " << strerror(errno);
+    FX_LOGS(ERROR) << "Failed to bind to " << port << ": " << strerror(errno);
+    exit(1);
   }
 
-  FX_SLOG(INFO, "listen() for inbound SSH connections", KV("port", (int)port));
+  FX_SLOG(INFO, "listen() for inbound SSH connections", "port", (int)port);
   if (listen(sock.get(), 10) < 0) {
-    FX_LOGS(FATAL) << "Failed to listen: " << strerror(errno);
+    FX_LOGS(ERROR) << "Failed to listen: " << strerror(errno);
+    exit(1);
   }
 
-  return Socket{.fd = std::move(sock), .waiter = fsl::FDWaiter(dispatcher)};
+  return sock;
 }
 
-Service::Service(async_dispatcher_t* dispatcher,
-                 std::shared_ptr<sys::ServiceDirectory> service_directory, uint16_t port)
-    : dispatcher_(dispatcher),
-      service_directory_(std::move(service_directory)),
-      port_(port),
-      v4_socket_(MakeSocket(dispatcher_, IpVersion::V4, port_)),
-      v6_socket_(MakeSocket(dispatcher_, IpVersion::V6, port_)) {
+Service::Service(uint16_t port) : port_(port) {
+  v4_socket_.fd = MakeSocket(IpVersion::V4, port_);
+  v6_socket_.fd = MakeSocket(IpVersion::V6, port_);
+
+  std::string job_name = fxl::StringPrintf("tcp:%d", port);
+  if (make_child_job(*zx::job::default_job(), job_name, &job_) != ZX_OK) {
+    exit(1);
+  }
+
   Wait(std::nullopt);
 }
 
-Service::~Service() = default;
+Service::~Service() {
+  for (auto& waiter : process_waiters_) {
+    if (zx_status_t status = zx_task_kill(waiter->object()); status != ZX_OK) {
+      FX_PLOGS(ERROR, status) << "Failed kill child task";
+    }
+    if (zx_status_t status = zx_handle_close(waiter->object()); status != ZX_OK) {
+      FX_PLOGS(ERROR, status) << "Failed close child handle";
+    }
+  }
+}
 
 void Service::Wait(std::optional<IpVersion> ip_version) {
   FX_SLOG(INFO, "Waiting for next connection");
 
   auto do_wait = [this](Service::Socket* sock, IpVersion ip_version) {
     sock->waiter.Wait(
-        [this, sock, ip_version](zx_status_t status, uint32_t /*events*/) {
-          if (status != ZX_OK) {
-            FX_PLOGS(FATAL, status) << "Failed to wait on socket";
-          }
-
+        [this, sock, ip_version](zx_status_t /*success*/, uint32_t /*events*/) {
           struct sockaddr_storage peer_addr {};
           socklen_t peer_addr_len = sizeof(peer_addr);
-          fbl::unique_fd conn(accept(sock->fd.get(), reinterpret_cast<struct sockaddr*>(&peer_addr),
-                                     &peer_addr_len));
-          if (!conn.is_valid()) {
+          int conn = accept(sock->fd.get(), reinterpret_cast<struct sockaddr*>(&peer_addr),
+                            &peer_addr_len);
+          if (conn < 0) {
             if (errno == EPIPE) {
-              FX_LOGS(FATAL) << "The netstack died. Terminating.";
+              FX_LOGS(ERROR) << "The netstack died. Terminating.";
+              exit(1);
             } else {
               FX_LOGS(ERROR) << "Failed to accept: " << strerror(errno);
               // Wait for another connection.
@@ -179,7 +218,6 @@ void Service::Wait(std::optional<IpVersion> ip_version) {
             }
             return;
           }
-
           std::string peer_name = "unknown";
           char host[NI_MAXHOST];
           char port[NI_MAXSERV];
@@ -187,22 +225,13 @@ void Service::Wait(std::optional<IpVersion> ip_version) {
                   getnameinfo(reinterpret_cast<struct sockaddr*>(&peer_addr), peer_addr_len, host,
                               sizeof(host), port, sizeof(port), NI_NUMERICHOST | NI_NUMERICSERV);
               res == 0) {
-            switch (ip_version) {
-              case IpVersion::V4:
-                peer_name = fxl::StringPrintf("%s:%s", host, port);
-                break;
-              case IpVersion::V6:
-                peer_name = fxl::StringPrintf("[%s]:%s", host, port);
-                break;
-            }
+            peer_name = fxl::StringPrintf("%s:%s", host, port);
           } else {
             FX_LOGS(WARNING)
                 << "Error from getnameinfo(.., NI_NUMERICHOST | NI_NUMERICSERV) for peer address: "
                 << gai_strerror(res);
           }
-          FX_SLOG(INFO, "Accepted connection", KV("remote", peer_name.c_str()));
-
-          Launch(std::move(conn));
+          Launch(conn, peer_name);
           Wait(ip_version);
         },
         sock->fd.get(), POLLIN);
@@ -221,116 +250,111 @@ void Service::Wait(std::optional<IpVersion> ip_version) {
   }
 }
 
-void Service::Launch(fbl::unique_fd conn) {
-  std::string child_name = fxl::StringPrintf("sshd-%lu", next_child_num_++);
+void Service::Launch(int conn, const std::string& peer_name) {
+  FX_SLOG(INFO, "accepted connection", "remote", peer_name.c_str());
+  // Create a new job to run the child in.
+  zx::job child_job;
 
-  fuchsia::component::RealmSyncPtr realm;
-  if (zx_status_t status = service_directory_->Connect(realm.NewRequest()); status != ZX_OK) {
-    FX_PLOGS(ERROR, status) << "Failed to connect to realm service";
+  if (make_child_job(job_, peer_name, &child_job) != ZX_OK) {
+    shutdown(conn, SHUT_RDWR);
+    close(conn);
+    FX_LOGS(ERROR) << "Child job creation failed, connection closed";
     return;
   }
 
-  fuchsia::component::ControllerSyncPtr controller;
-  {
-    fuchsia::component::decl::CollectionRef collection{
-        .name = std::string(kShellCollection),
+  fdio_flat_namespace_t* flat_ns = nullptr;
+  if (zx_status_t status = fdio_ns_export_root(&flat_ns); status != ZX_OK) {
+    FX_PLOGS(ERROR, status) << "fdio_ns_export_root failed";
+    return;
+  }
+  auto cleanup = fit::defer([&flat_ns]() { fdio_ns_free_flat_ns(flat_ns); });
+
+  // Room for stdio handles and namespace entries
+  fdio_spawn_action_t actions[3 + flat_ns->count];
+  size_t action = 0;
+
+  // Transfer the socket as stdin and stdout
+  actions[action++] = {.action = FDIO_SPAWN_ACTION_CLONE_FD,
+                       .fd = {.local_fd = conn, .target_fd = STDIN_FILENO}};
+  actions[action++] = {.action = FDIO_SPAWN_ACTION_TRANSFER_FD,
+                       .fd = {.local_fd = conn, .target_fd = STDOUT_FILENO}};
+  actions[action++] =
+      // Clone this process' stderr.
+      {.action = FDIO_SPAWN_ACTION_CLONE_FD,
+       .fd = {.local_fd = STDERR_FILENO, .target_fd = STDERR_FILENO}};
+
+  for (size_t i = 0; i < flat_ns->count; ++i) {
+    const char* path = flat_ns->path[i];
+    if (std::string_view{path} == "/svc") {
+      // Don't forward our /svc to the child
+      continue;
+    }
+    if (std::string_view{path} == "/svc_for_legacy_shell") {
+      path = "/svc";
+    }
+    actions[action++] = {
+        .action = FDIO_SPAWN_ACTION_ADD_NS_ENTRY,
+        .ns =
+            {
+                .prefix = path,
+                .handle = flat_ns->handle[i],
+            },
     };
-    fuchsia::component::decl::Child decl;
-    decl.set_name(child_name);
-    decl.set_url("#meta/sshd.cm");
-    decl.set_startup(fuchsia::component::decl::StartupMode::LAZY);
-
-    fuchsia::component::CreateChildArgs args;
-    args.set_controller(controller.NewRequest());
-
-    fuchsia::component::Realm_CreateChild_Result result;
-    if (zx_status_t status =
-            realm->CreateChild(collection, std::move(decl), std::move(args), &result);
-        status != ZX_OK) {
-      FX_PLOGS(ERROR, status) << "Failed to create sshd child";
-      return;
-    }
-
-    if (result.is_err()) {
-      FX_LOGS(ERROR) << "Failed to create sshd child: " << static_cast<uint32_t>(result.err());
-      return;
-    }
   }
 
-  fuchsia::component::ExecutionControllerPtr& execution_controller = controllers_.emplace_back();
-  auto remove_controller_on_error = fit::defer([this]() { controllers_.pop_back(); });
-
-  fit::callback<void(zx_status_t)> on_stop_cb = [this, ptr = execution_controller.get(),
-                                                 realm = std::move(realm),
-                                                 child_name](zx_status_t status) {
-    if (status != ZX_OK) {
-      FX_PLOGS(WARNING, status) << "sshd component stopped with error";
-    }
-
-    // Remove the controller.
-    auto i = std::find_if(controllers_.begin(), controllers_.end(),
-                          [ptr](const fuchsia::component::ExecutionControllerPtr& controller) {
-                            return controller.get() == ptr;
-                          });
-    if (i != controllers_.end()) {
-      controllers_.erase(i);
-    };
-
-    // Destroy the component.
-    fuchsia::component::decl::ChildRef child_ref = {
-        .name = child_name,
-        .collection = std::string(kShellCollection),
-    };
-    fuchsia::component::Realm_DestroyChild_Result result;
-    if (zx_status_t status = realm->DestroyChild(std::move(child_ref), &result); status != ZX_OK) {
-      FX_PLOGS(ERROR, status) << "Failed to destroy sshd child";
-      return;
-    }
-
-    if (result.is_err()) {
-      FX_LOGS(ERROR) << "Failed to destroy sshd child: " << static_cast<uint32_t>(result.err());
-      return;
-    }
-  };
-
-  execution_controller.events().OnStop =
-      [on_stop_cb = on_stop_cb.share()](fuchsia::component::StoppedPayload payload) mutable {
-        zx_status_t status = ZX_OK;
-        if (payload.has_status()) {
-          status = payload.status();
-        }
-        on_stop_cb(status);
-      };
-  execution_controller.set_error_handler(
-      [on_stop_cb = std::move(on_stop_cb)](zx_status_t status) mutable { on_stop_cb(status); });
-
-  // Pass the connection fd as stdin and stdout handles to the sshd component.
-  fuchsia::component::StartChildArgs start_args;
-  for (int fd : {STDIN_FILENO, STDOUT_FILENO}) {
-    zx::handle conn_handle;
-    if (zx_status_t status = fdio_fd_clone(conn.get(), conn_handle.reset_and_get_address());
-        status != ZX_OK) {
-      FX_PLOGS(ERROR, status) << "Failed to clone connection file descriptor " << conn.get();
-      return;
-    }
-    start_args.mutable_numbered_handles()->push_back(
-        fuchsia::process::HandleInfo{.handle = std::move(conn_handle), .id = PA_HND(PA_FD, fd)});
-  }
-
-  fuchsia::component::Controller_Start_Result result;
-  if (zx_status_t status = controller->Start(std::move(start_args),
-                                             execution_controller.NewRequest(dispatcher_), &result);
+  const uint32_t kSpawnFlags =
+      FDIO_SPAWN_CLONE_JOB | FDIO_SPAWN_DEFAULT_LDSVC | FDIO_SPAWN_CLONE_UTC_CLOCK;
+  zx::process process;
+  char error[FDIO_SPAWN_ERR_MSG_MAX_LENGTH];
+  if (zx_status_t status =
+          fdio_spawn_etc(child_job.get(), kSpawnFlags, kSshdPath, kSshdArgv, nullptr, action,
+                         actions, process.reset_and_get_address(), error);
       status != ZX_OK) {
-    FX_PLOGS(ERROR, status) << "Failed to start sshd child";
+    shutdown(conn, SHUT_RDWR);
+    close(conn);
+    FX_PLOGS(ERROR, status) << "Error from fdio_spawn_etc: " << error;
     return;
   }
 
-  if (result.is_err()) {
-    FX_LOGS(ERROR) << "Failed to start sshd child: " << static_cast<uint32_t>(result.err());
-    return;
-  }
-
-  remove_controller_on_error.cancel();
+  std::unique_ptr<async::Wait> waiter =
+      std::make_unique<async::Wait>(process.get(), ZX_PROCESS_TERMINATED);
+  waiter->set_handler([this, process = std::move(process), job = std::move(child_job)](
+                          async_dispatcher_t*, async::Wait*, zx_status_t /*status*/,
+                          const zx_packet_signal_t* /*signal*/) mutable {
+    ProcessTerminated(std::move(process), std::move(job));
+  });
+  waiter->Begin(async_get_default_dispatcher());
+  process_waiters_.push_back(std::move(waiter));
 }
 
+void Service::ProcessTerminated(zx::process process, zx::job job) {
+  {
+    zx_info_process_t info;
+    if (zx_status_t status =
+            process.get_info(ZX_INFO_PROCESS, &info, sizeof(info), nullptr, nullptr);
+        status != ZX_OK) {
+      FX_PLOGS(ERROR, status) << "Failed to get proces info";
+    }
+    if (info.return_code != 0) {
+      FX_LOGS(WARNING) << "Process finished with nonzero status: " << info.return_code;
+    }
+  }
+
+  // Kill the process and the job.
+  if (zx_status_t status = process.kill(); status != ZX_OK) {
+    FX_PLOGS(ERROR, status) << "Failed to kill child process";
+  }
+  if (zx_status_t status = job.kill(); status != ZX_OK) {
+    FX_PLOGS(ERROR, status) << "Failed to kill child job";
+  }
+
+  // Find the waiter.
+  auto i = std::find_if(
+      process_waiters_.begin(), process_waiters_.end(),
+      [&process](const std::unique_ptr<async::Wait>& w) { return w->object() == process.get(); });
+  // And remove it.
+  if (i != process_waiters_.end()) {
+    process_waiters_.erase(i);
+  }
+}
 }  // namespace sshd_host

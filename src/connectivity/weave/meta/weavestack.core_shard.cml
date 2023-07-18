@@ -9,6 +9,16 @@
             environment: "#core-env",
         },
     ],
+    use: [
+        {
+            protocol: [
+                "fuchsia.weave.Bootstrap",
+                "fuchsia.weave.Stack",
+                "fuchsia.weave.StackProvider",
+            ],
+            from: "#weavestack",
+        },
+    ],
     offer: [
         {
             directory: "config-data",

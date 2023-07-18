@@ -16,6 +16,16 @@
             durability: "transient",
         },
     ],
+    use: [
+        {
+            protocol: [
+                "fuchsia.media.sessions2.ActiveSession",
+                "fuchsia.media.sessions2.Discovery",
+                "fuchsia.media.sessions2.Publisher",
+            ],
+            from: "#mediasession",
+        },
+    ],
     offer: [
         {
             protocol: "fuchsia.logger.LogSink",

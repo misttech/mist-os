@@ -9,6 +9,13 @@
             environment: "#core-env",
         },
     ],
+    use: [
+        // Route sound player APIs to CFv1 realm.
+        {
+            protocol: "fuchsia.virtualization.DebianGuestManager",
+            from: "#debian-guest-manager",
+        },
+    ],
     offer: [
         {
             directory: "dev-class",

@@ -10,6 +10,12 @@
             on_terminate: "reboot",
         },
     ],
+    use: [
+        {
+            protocol: "fuchsia.wlan.device.service.DeviceMonitor",
+            from: "#wlandevicemonitor",
+        },
+    ],
     offer: [
         {
             directory: "dev-class",

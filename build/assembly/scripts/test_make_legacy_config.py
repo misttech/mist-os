@@ -180,6 +180,11 @@ class MakeLegacyConfig(unittest.TestCase):
                         os.path.join(SOURCE_DIR, "src/include.cml"),
                         "src/include.cml")
                 ],
+                core_package_contents=[
+                    FileEntry(
+                        os.path.join(SOURCE_DIR, "some/core/package/file"),
+                        "core/package/file/destination")
+                ],
                 bootfs_files_package=bootfs)
             file_paths = aib.all_file_paths()
 
@@ -214,7 +219,13 @@ class MakeLegacyConfig(unittest.TestCase):
                         components={
                             "core": "compiled_packages/core/core/core.cml"
                         },
-                        contents=set(),
+                        contents=set(
+                            [
+                                FileEntry(
+                                    source=
+                                    "compiled_packages/core/files/core/package/file/destination",
+                                    destination="core/package/file/destination")
+                            ]),
                         includes=set(
                             ["compiled_packages/include/src/include.cml"])),
                     CompiledPackageAdditionalShards(
@@ -319,7 +330,8 @@ class MakeLegacyConfig(unittest.TestCase):
                         'source/bootfs_files_package/another/file',
                         'source/core/core.cml', 'source/core/realm/shard1.cml',
                         'source/core/realm/shard2.cml',
-                        'source/src/include.cml'
+                        'source/src/include.cml',
+                        'source/some/core/package/file'
                     ]))
 
             # Validate that all the files were correctly copied to the
@@ -445,6 +457,11 @@ class MakeLegacyConfig(unittest.TestCase):
                             destination=
                             'outdir/compiled_packages/core/core/shard2.cml'),
                         FileEntry(
+                            source='source/some/core/package/file',
+                            destination=
+                            'outdir/compiled_packages/core/files/core/package/file/destination'
+                        ),
+                        FileEntry(
                             source='source/kernel.bin',
                             destination='outdir/kernel/kernel.bin'),
                         FileEntry(
@@ -486,6 +503,7 @@ class MakeLegacyConfig(unittest.TestCase):
                     'compiled_packages/core/core/core.cml',
                     'compiled_packages/core/core/shard1.cml',
                     'compiled_packages/core/core/shard2.cml',
+                    'compiled_packages/core/files/core/package/file/destination',
                     'compiled_packages/include/src/include.cml',
                     'kernel/kernel.bin',
                     'packages/base/base_a',
@@ -523,7 +541,7 @@ class MakeLegacyConfig(unittest.TestCase):
 
             # Copies legacy config into AIB
             aib, _, _ = make_legacy_config.copy_to_assembly_input_bundle(
-                image_assembly, [], OUTDIR, [], [], dict(), set(), [], None)
+                image_assembly, [], OUTDIR, [], [], dict(), set(), [], [], None)
 
             # Asserts that the duplicate package is present in the base package set after
             # being copied to the AIB
@@ -564,7 +582,7 @@ class MakeLegacyConfig(unittest.TestCase):
                     {make_package_path(duplicate_package)}, list())
                 aib, _, _ = make_legacy_config.copy_to_assembly_input_bundle(
                     image_assembly, [], OUTDIR, [manifest_path], [], dict(),
-                    set(), [], None)
+                    set(), [], [], None)
 
             self.assertNotIn(make_package_path(duplicate_package), aib.base)
             self.assertIn(
@@ -612,5 +630,5 @@ class MakeLegacyConfig(unittest.TestCase):
                 DuplicatePackageException,
                 partial(
                     make_legacy_config.copy_to_assembly_input_bundle,
-                    image_assembly, [], OUTDIR, [], [], dict(), set(), [],
+                    image_assembly, [], OUTDIR, [], [], dict(), set(), [], [],
                     None))

@@ -9,6 +9,12 @@
             environment: "#core-env",
         },
     ],
+    use: [
+        {
+            protocol: "fuchsia.opencl.loader.Loader",
+            from: "#opencl_loader",
+        },
+    ],
     offer: [
         {
             protocol: [ "fuchsia.logger.LogSink" ],

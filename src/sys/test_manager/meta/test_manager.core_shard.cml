@@ -11,6 +11,16 @@
             environment: "#core-env",
         },
     ],
+    use: [
+        // Integrate with run_test_suite
+        {
+            protocol: [
+                "fuchsia.test.manager.Query",
+                "fuchsia.test.manager.RunBuilder",
+            ],
+            from: "#test_manager",
+        },
+    ],
     offer: [
         // Needed by test_manager and/or some test runners
         {

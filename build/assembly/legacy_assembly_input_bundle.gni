@@ -186,6 +186,7 @@ template("legacy_assembly_input_bundle") {
     core_realm_includes = "${target_name}.core_realm_includes"
     core_realm_default_includes = "${target_name}.core_realm_default_includes"
     core_realm_main_cml = "${target_name}.core_realm_main_cml"
+    core_realm_proxy_manifest = "${target_name}.core_realm_proxy_manifest"
     fshost = "${target_name}.fshost"
   }
 
@@ -229,6 +230,8 @@ template("legacy_assembly_input_bundle") {
     core_realm_shards_list =
         "${assembly_input_bundle_dir}.core_realm_shards_list"
     core_realm_includes = "${assembly_input_bundle_dir}.core_realm_includes"
+    core_realm_proxy_manifest =
+        "${assembly_input_bundle_dir}.core_realm_proxy_distribution_manifest"
 
     # The cmc_merge() template this is used with prepends $target_out_dir.
     fshost_merged_cml = "${target_name}/fshost.merged.cml"
@@ -275,6 +278,8 @@ template("legacy_assembly_input_bundle") {
   if (_core_realm_definition != false) {
     # Legacy list of includes used by core realm shards.
     core_shard_includes = [
+      "//src/sys/core/meta/svc_for_legacy_shell.core_shard.cml",
+      "//src/sys/core/meta/core_proxy.core_shard.cml",
       "//src/intl/intl_services/meta/intl.core_shard.base.cml",
       "//src/media/audio/audio_core/meta/audio_core.core_shard.base.cml",
       "//src/settings/service/meta/setui_service_base.core_shard.cml",
@@ -312,6 +317,12 @@ template("legacy_assembly_input_bundle") {
       data_keys = [ "shard_files" ]
       outputs = [ "${files.core_realm_shards_list}" ]
       output_conversion = "json"
+    }
+
+    distribution_manifest(labels.core_realm_proxy_manifest) {
+      forward_variables_from(invoker, [ "testonly" ])
+      deps = [ "//src/sys/core:core_proxy" ]
+      outputs = [ files.core_realm_proxy_manifest ]
     }
 
     # Include files needed by the default core cml in the legacy AIB
@@ -578,14 +589,18 @@ template("legacy_assembly_input_bundle") {
         rebase_path(files.core_realm_shards_list, root_build_dir),
         "--core-realm-includes-list",
         rebase_path(files.core_realm_includes, root_build_dir),
+        "--core-package-contents-list",
+        rebase_path(files.core_realm_proxy_manifest, root_build_dir),
       ]
 
       inputs += [
         files.core_realm_shards_list,
         files.core_realm_includes,
+        files.core_realm_proxy_manifest,
       ]
       deps += [
         ":${labels.core_realm_includes}",
+        ":${labels.core_realm_proxy_manifest}",
         ":${labels.core_realm_shards_list}",
       ]
     }

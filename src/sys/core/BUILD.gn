@@ -4,7 +4,15 @@
 
 import("//build/assembly/bootfs_files_for_assembly.gni")
 import("//build/component/component_id_index.gni")
-import("//build/dist/resource.gni")
+import("//build/components.gni")
+import("//build/rust/rustc_binary.gni")
+import("//build/rust/rustc_test.gni")
+
+group("tests") {
+  testonly = true
+
+  deps = [ ":core_proxy_integration_test" ]
+}
 
 resource("config") {
   visibility = [ ":*" ]
@@ -27,4 +35,51 @@ component_id_index("core_component_id_index") {
 # isolated-persistent-storage, even if they are not in the component ID index.
 component_id_index("component_id_index_no_restrict_storage") {
   source = "component_id_index_no_restrict_storage.json5"
+}
+
+executable("core_proxy") {
+  sources = [ "src/main.cc" ]
+
+  deps = [
+    "//sdk/fidl/fuchsia.io:fuchsia.io_cpp_wire",
+    "//sdk/lib/fdio",
+    "//sdk/lib/syslog/cpp",
+    "//src/lib/storage/vfs/cpp",
+    "//zircon/system/ulib/async-loop:async-loop-cpp",
+    "//zircon/system/ulib/async-loop:async-loop-default",
+    "//zircon/system/ulib/fbl",
+  ]
+}
+
+fuchsia_component("fake_core") {
+  testonly = true
+  manifest = "meta/fake_core.cml"
+
+  # Disable check that requires syslog shard
+  check_includes = false
+  deps = [ ":core_proxy" ]
+}
+
+rustc_test("core_proxy_integration_test_bin") {
+  name = "core_proxy_integration_test"
+  edition = "2021"
+  source_root = "test/integration_test.rs"
+  sources = [ "test/integration_test.rs" ]
+  deps = [
+    "//examples/components/routing/fidl:echo_rust",
+    "//src/lib/fuchsia",
+    "//src/lib/fuchsia-component",
+    "//src/lib/fuchsia-component-test",
+    "//src/lib/fuchsia-fs",
+    "//third_party/rust_crates:tracing",
+  ]
+}
+
+fuchsia_unittest_package("core_proxy_integration_test") {
+  manifest = "meta/core_proxy_integration_test.cml"
+  deps = [
+    ":core_proxy_integration_test_bin",
+    ":fake_core",
+    "//src/sys/component_manager/testing/echo_server",
+  ]
 }

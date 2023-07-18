@@ -5,6 +5,8 @@
 // Realm that acts as a container for general system components.
 {
     include: [
+        // Add capabilities used by legacy sys realm and legacy shells
+        "//src/sys/core/meta/svc_for_legacy_shell.core_shard.cml",
         "inspect/offer.shard.cml",
         "syslog/offer.shard.cml",
     ],

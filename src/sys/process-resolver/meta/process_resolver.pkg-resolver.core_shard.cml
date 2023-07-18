@@ -8,6 +8,12 @@
             url: "fuchsia-pkg://fuchsia.com/process-resolver#meta/process_resolver.cm",
         },
     ],
+    use: [
+        {
+            protocol: "fuchsia.process.Resolver",
+            from: "#process_resolver",
+        },
+    ],
     offer: [
         {
             protocol: "fuchsia.logger.LogSink",

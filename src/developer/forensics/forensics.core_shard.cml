@@ -13,6 +13,25 @@
             startup: "eager",
         },
     ],
+    use: [
+        {
+            protocol: [
+                "fuchsia.feedback.ComponentDataRegister",
+                "fuchsia.feedback.CrashReporter",
+                "fuchsia.feedback.CrashReportingProductRegister",
+                "fuchsia.feedback.DataProvider",
+                "fuchsia.feedback.LastRebootInfoProvider",
+            ],
+            from: "#feedback",
+        },
+        {
+            protocol: [
+                "fuchsia.exception.Handler",
+                "fuchsia.exception.ProcessLimbo",
+            ],
+            from: "#exceptions",
+        },
+    ],
     offer: [
         {
             protocol: [

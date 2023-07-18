@@ -9,6 +9,15 @@
             environment: "#core-env",
         },
     ],
+    use: [
+        {
+            protocol: [
+                "fuchsia.power.battery.BatteryManager",
+                "fuchsia.power.battery.test.BatterySimulator",
+            ],
+            from: "#battery_manager",
+        },
+    ],
     offer: [
         {
             protocol: [ "fuchsia.logger.LogSink" ],

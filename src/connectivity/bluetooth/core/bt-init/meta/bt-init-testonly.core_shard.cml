@@ -1,0 +1,15 @@
+// Copyright 2022 The Fuchsia Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style license that can be
+// found in the LICENSE file.
+
+// The `fuchsia.bluetooth.rfcomm.test.RfcommTest` capability is only relevant to test
+// configurations.
+// This shard exposes the `RfcommTest` protocol to the shell via the core proxy.
+{
+    use: [
+        {
+            protocol: "fuchsia.bluetooth.rfcomm.test.RfcommTest",
+            from: "#bluetooth-core",
+        },
+    ],
+}

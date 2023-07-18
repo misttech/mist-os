@@ -1,0 +1,29 @@
+// Copyright 2021 The Fuchsia Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style license that can be
+// found in the LICENSE file.
+{
+    include: [
+        "//src/sys/core/meta/core_proxy.core_shard.cml",
+        "inspect/offer.shard.cml",
+        "syslog/offer.shard.cml",
+    ],
+    children: [
+        {
+            name: "echo_server",
+            url: "#meta/echo_server.cm",
+        },
+    ],
+    use: [
+        {
+            protocol: "fidl.examples.routing.echo.Echo",
+            from: "#echo_server",
+        },
+    ],
+    expose: [
+        {
+            directory: "svc_for_legacy_shell",
+            from: "self",
+            rights: [ "connect" ],
+        },
+    ],
+}

@@ -21,6 +21,12 @@
             environment: "#core-env",
         },
     ],
+    use: [
+        {
+            protocol: [ "sl4f.Binder" ],
+            from: "#sl4f",
+        },
+    ],
     offer: [
         {
             protocol: [

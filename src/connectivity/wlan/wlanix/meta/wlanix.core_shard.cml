@@ -10,6 +10,12 @@
             environment: "#core-env",
         },
     ],
+    use: [
+        {
+            protocol: [ "fuchsia.wlan.wlanix.Wlanix" ],
+            from: "#wlanix",
+        },
+    ],
     offer: [
         {
             protocol: [ "fuchsia.logger.LogSink" ],

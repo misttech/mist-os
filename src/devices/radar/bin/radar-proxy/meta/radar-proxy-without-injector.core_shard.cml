@@ -8,6 +8,12 @@
             url: "fuchsia-pkg://fuchsia.com/radar-proxy-without-injector#meta/radar-proxy.cm",
         },
     ],
+    use: [
+        {
+            protocol: "fuchsia.hardware.radar.RadarBurstReaderProvider",
+            from: "#radar-proxy",
+        },
+    ],
     offer: [
         {
             directory: "dev-class",

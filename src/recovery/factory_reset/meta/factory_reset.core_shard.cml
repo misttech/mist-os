@@ -8,6 +8,12 @@
             url: "fuchsia-pkg://fuchsia.com/factory_reset#meta/factory_reset.cm",
         },
     ],
+    use: [
+        {
+            protocol: "fuchsia.recovery.FactoryReset",
+            from: "#factory_reset",
+        },
+    ],
     offer: [
         {
             protocol: [

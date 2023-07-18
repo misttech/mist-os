@@ -164,6 +164,12 @@ core_shard("bt-hfp-audio-gateway-core-shard") {
   shard_file = "meta/bt-hfp-audio-gateway.core_shard.cml"
 }
 
+# The core realm shard to be used by product integrators.
+# This shard should be included in testonly configurations that require HFP Audio Gateway support.
+core_shard("testonly-core-shard") {
+  shard_file = "meta/bt-hfp-audio-gateway-testonly.core_shard.cml"
+}
+
 group("bt-hfp-audio-gateway") {
   deps = [ ":bt-hfp-audio-gateway-default" ]
 }

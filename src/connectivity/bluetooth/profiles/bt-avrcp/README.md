@@ -21,11 +21,14 @@ Service.
 Follow the steps for the A2DP sink profile and add this module to your build
 with `--with //src/connectivity/bluetooth/profiles/bt-avrcp` to include AVRCP
 with your build. For product configurations in which AVRCP support is desired, include the
-`bt-avrcp-core-shard`.
+`bt-avrcp-core-shard`. For testonly configurations, include the `bt-avrcp-testonly-core-shard`
+instead.
 
 It's recommended to include the bt-avrcp-controller package to provide a simple
 REPL to send AVRCP commands to peers either by including the bt tools package in
-your build or directly with `--with //src/connectivity/bluetooth/tools/bt-avrcp-controller`.
+your build or directly with `--with
+//src/connectivity/bluetooth/tools/bt-avrcp-controller`. This REPL is only available in testonly
+product configurations.
 
 eg: `fx set core.x64 --with //src/media/bundles:services --with
 //src/connectivity/bluetooth/tools/bt-avrcp-controller --with
