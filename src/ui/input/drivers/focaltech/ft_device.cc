@@ -88,7 +88,7 @@ void FtDevice::FtInputReport::ToFidlInputReport(
 
 FtDevice::FtInputReport FtDevice::ParseReport(const uint8_t* buf) {
   FtInputReport report;
-  const uint8_t contact_count = std::max(buf[0], static_cast<uint8_t>(report.contacts.max_size()));
+  const uint8_t contact_count = std::min(buf[0], static_cast<uint8_t>(report.contacts.max_size()));
   buf += 1;
   report.contact_count = 0;
   for (size_t i = 0; i < contact_count; i++, buf += kFingerRptSize) {

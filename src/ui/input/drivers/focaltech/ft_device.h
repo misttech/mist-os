@@ -123,7 +123,7 @@ class FtDevice : public DeviceType, public ddk::EmptyProtocol<ZX_PROTOCOL_INPUTR
       reported by the device iteself).
   */
   // Number of touch points this device can report simultaneously
-  static constexpr uint32_t kMaxPoints = 5;
+  static constexpr uint32_t kMaxPoints = 10;
   // Size of each individual touch record (note: there are kMaxPoints of
   //  them) on the i2c bus.  This is not the HID report size.
   static constexpr uint32_t kFingerRptSize = 6;

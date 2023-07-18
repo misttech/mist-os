@@ -256,11 +256,11 @@ void VerifyDescriptor(const fuchsia_input_report::wire::DeviceDescriptor& descri
             fuchsia_input_report::wire::TouchType::kTouchscreen);
 
   EXPECT_TRUE(descriptor.touch().input().has_max_contacts());
-  EXPECT_EQ(descriptor.touch().input().max_contacts(), 5);
+  EXPECT_EQ(descriptor.touch().input().max_contacts(), 10);
 
   EXPECT_FALSE(descriptor.touch().input().has_buttons());
   EXPECT_TRUE(descriptor.touch().input().has_contacts());
-  EXPECT_EQ(descriptor.touch().input().contacts().count(), 5);
+  EXPECT_EQ(descriptor.touch().input().contacts().count(), 10);
 
   for (const auto& c : descriptor.touch().input().contacts()) {
     EXPECT_TRUE(c.has_position_x());
@@ -429,6 +429,21 @@ TEST_F(FocaltechTest, Touch) {
       0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
 
       // Contact 4
+      0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+
+      // Contact 5
+      0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+
+      // Contact 6
+      0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+
+      // Contact 7
+      0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+
+      // Contact 8
+      0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+
+      // Contact 9
       0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
   };
   // clang-format on
