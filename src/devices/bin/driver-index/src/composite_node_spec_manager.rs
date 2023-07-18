@@ -7,6 +7,7 @@ use {
     crate::resolved_driver::ResolvedDriver,
     bind::compiler::symbol_table::{get_deprecated_key_identifier, get_deprecated_key_value},
     bind::compiler::Symbol,
+    bind::interpreter::decode_bind_rules::DecodedRules,
     bind::interpreter::match_bind::{match_bind, DeviceProperties, MatchBindData, PropertyKey},
     fidl_fuchsia_driver_development as fdd, fidl_fuchsia_driver_framework as fdf,
     fidl_fuchsia_driver_index as fdi,
@@ -173,6 +174,11 @@ impl CompositeNodeSpecManager {
     }
 
     pub fn new_driver_available(&mut self, resolved_driver: ResolvedDriver) {
+        // Only composite drivers should be matched against composite node specs.
+        if matches!(resolved_driver.bind_rules, DecodedRules::Normal(_)) {
+            return;
+        }
+
         for (name, spec) in self.spec_list.iter_mut() {
             if spec.matched.is_some() {
                 continue;
