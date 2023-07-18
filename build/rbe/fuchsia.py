@@ -320,9 +320,9 @@ _SYSROOT_USR_LIB_LINKER_SCRIPTS = (
 
 
 def c_sysroot_files(
-        sysroot_dir: Path, sysroot_triple: str, with_libgcc: bool,
-        linker_script_expander: Callable[[Path],
-                                         Iterable[Path]]) -> Iterable[Path]:
+    sysroot_dir: Path, sysroot_triple: str, with_libgcc: bool,
+    linker_script_expander: Callable[[Sequence[Path]], Iterable[Path]]
+) -> Iterable[Path]:
     """Expanded list of sysroot files under the Fuchsia build output dir.
 
     TODO: cache this per build to avoid repeating deduction
@@ -331,8 +331,8 @@ def c_sysroot_files(
       sysroot_dir: path to the sysroot, relative to the working dir.
       sysroot_triple: platform-specific subdir of sysroot, based on target.
       with_libgcc: if using `-lgcc`, include additions libgcc support files.
-      linker_script_expander: function that expands a linker script to the set
-        of files referenced by it.
+      linker_script_expander: function that expands linkable inputs to the set
+        of files referenced by it (possibly through linker scripts).
 
     Yields:
       paths to sysroot files needed for remote/sandboxed linking,
@@ -344,10 +344,11 @@ def c_sysroot_files(
         for f in _SYSROOT_USR_LIB_FILES:
             yield sysroot_dir / 'usr/lib' / sysroot_triple / f
 
-        for f in _SYSROOT_USR_LIB_LINKER_SCRIPTS:
-            f_path = sysroot_dir / 'usr/lib' / sysroot_triple / f
-            if f_path.is_file():
-                yield from linker_script_expander(f_path)
+        maybe_scripts = (
+            sysroot_dir / 'usr/lib' / sysroot_triple / f
+            for f in _SYSROOT_USR_LIB_LINKER_SCRIPTS)
+        yield from linker_script_expander(
+            [f_path for f_path in maybe_scripts if f_path.is_file()])
 
         for f in [
                 sysroot_dir / 'usr/lib' / sysroot_triple / 'libmvec.a',
@@ -367,15 +368,15 @@ def c_sysroot_files(
                 sysroot_dir / 'usr/lib' / sysroot_triple / 'libc.a',
             ]
     else:
-        for f in (
+        yield from linker_script_expander(
+            [
                 sysroot_dir / 'lib/libc.so',
                 sysroot_dir / 'lib/libdl.so',
                 sysroot_dir / 'lib/libm.so',
                 sysroot_dir / 'lib/libpthread.so',
                 sysroot_dir / 'lib/librt.so',
                 sysroot_dir / 'lib/Scrt1.o',
-        ):
-            yield from linker_script_expander(f)
+            ])
 
         # Not every sysroot dir has a libzircon.
         libzircon_so = sysroot_dir / 'lib/libzircon.so'
