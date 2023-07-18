@@ -10,7 +10,6 @@
 #include <lib/elfldltl/load.h>
 #include <lib/elfldltl/testing/diagnostics.h>
 #include <lib/elfldltl/testing/loader.h>
-#include <sys/mman.h>
 #include <unistd.h>
 
 #ifdef __Fuchsia__
@@ -18,6 +17,7 @@
 #include <zircon/syscalls.h>
 #else
 #include <sys/auxv.h>
+#include <sys/mman.h>
 #endif
 
 #include <initializer_list>
@@ -27,7 +27,12 @@
 
 #include <gtest/gtest.h>
 
+#ifdef __Fuchsia__
+#include <lib/ld/testing/test-log-socket.h>
+#include <lib/ld/testing/test-processargs.h>
+#else
 #include "posix.h"
+#endif
 
 namespace {
 
@@ -51,18 +56,24 @@ constexpr std::string_view kLdStartupName = LD_STARTUP_TEST_LIB;
 // the vDSO.
 class InProcessTestLaunch {
  public:
-  // The object is default-constructed so Init() can be called inside
-  // ASSERT_NO_FATAL_FAILURE(...).
-  void Init(std::string_view str) {
-    zx::channel write_bootstrap;
-    ASSERT_EQ(zx::channel::create(0, &write_bootstrap, &read_bootstrap_), ZX_OK);
-    ASSERT_EQ(write_bootstrap.write(0, str.data(), static_cast<uint32_t>(str.size()), nullptr, 0),
-              ZX_OK);
+  static constexpr bool kHasLog = true;
+
+  void Init(std::initializer_list<std::string_view> args) {
+    ASSERT_NO_FATAL_FAILURE(log_.Init());
+    procargs()  //
+        .AddInProcessTestHandles()
+        .AddFd(STDERR_FILENO, log_.TakeSocket())
+        .SetArgs(args);
   }
+
+  ld::testing::TestProcessArgs& procargs() { return procargs_; }
+
+  std::string CollectLog() { return std::move(log_).Read(); }
 
   int Call(uintptr_t entry) {
     auto fn = reinterpret_cast<EntryFunction*>(entry);
-    return fn(read_bootstrap_.release(), GetVdso());
+    zx::channel bootstrap = procargs_.PackBootstrap();
+    return fn(bootstrap.release(), GetVdso());
   }
 
  private:
@@ -78,8 +89,8 @@ class InProcessTestLaunch {
     return vdso;
   }
 
-  // This is the receive end of the channel, transferred to the "new process".
-  zx::channel read_bootstrap_;
+  ld::testing::TestProcessArgs procargs_;
+  ld::testing::TestLogSocket log_;
 };
 
 #else  // ! __Fuchsia__
@@ -145,16 +156,29 @@ __asm__(
     .popsection
     )""");
 
-// On POSIX-like systems this eventually will mean a canonical stack setup.
-// For now, we're just passing the string pointer as is.
+// On POSIX-like systems this means a canonical stack setup that transfers
+// arguments, environment, and a set of integer key-value pairs called the
+// auxiliary vector (auxv) that carries values important for bootstrapping.
 class InProcessTestLaunch {
  public:
-  void Init(std::string_view str) {
+  // The loaded code is just writing to STDERR_FILENO in the same process.
+  // There's no way to install e.g. a pipe end as STDERR_FILENO for the loaded
+  // code without also hijacking stderr for the test harness itself, which
+  // seems a bit dodgy even if the original file descriptor were saved and
+  // dup2'd back after the test succeeds.  In the long run, most cases where
+  // the real dynamic linker would emit any diagnostics are when it would then
+  // crash the process, so those cases will only get tested via spawning a new
+  // process, not in-process tests.
+  static constexpr bool kHasLog = false;
+
+  void Init(std::initializer_list<std::string_view> args) {
     ASSERT_NO_FATAL_FAILURE(AllocateStack());
-    ASSERT_NO_FATAL_FAILURE(PopulateStack({str}, {}));
+    ASSERT_NO_FATAL_FAILURE(PopulateStack(args, {}));
   }
 
   int Call(uintptr_t entry) { return CallOnStack(entry, sp_); }
+
+  std::string CollectLog() { return {}; }
 
   ~InProcessTestLaunch() {
     if (stack_) {
@@ -204,23 +228,28 @@ class InProcessTestLaunch {
         std::accumulate(argv.begin(), argv.end(),
                         std::accumulate(envp.begin(), envp.end(), 0, string_size), string_size);
 
-    // Compute the total number of pointers to write.
+    // Compute the total number of pointers to write (after the argc word).
     size_t ptrs = argv.size() + 1 + envp.size() + 1;
 
     // The stack must fit all that plus the auxv block.
-    ASSERT_LT(strings + 15 + (ptrs * sizeof(uintptr_t)) + sizeof(AuxvBlock), kStackSize);
+    ASSERT_LT(strings + 15 + ((1 + ptrs) * sizeof(uintptr_t)) + sizeof(AuxvBlock), kStackSize);
 
     // Start at the top of the stack, and place the strings.
     std::byte* sp = static_cast<std::byte*>(stack_) + (kStackSize * 2);
-    sp -= (strings + (ptrs * sizeof(uintptr_t)) + 15) & -size_t{16};
+    sp -= strings;
     cpp20::span string_space{reinterpret_cast<char*>(sp), strings};
 
+    // Adjust down so everything will be aligned.
+    const size_t strings_and_ptrs = strings + ((1 + ptrs) * sizeof(uintptr_t));
+    sp -= ((strings_and_ptrs + 15) & -size_t{16}) - strings_and_ptrs;
+
     // Next, leave space for the auxv block, which can be filled in later.
+    static_assert(sizeof(AuxvBlock) % 16 == 0);
     sp -= sizeof(AuxvBlock);
     AuxvBlock& auxv = *new (sp) AuxvBlock{};
 
     // Finally, the argc and pointers form what's seen right at the SP.
-    sp -= (ptrs + 1) * sizeof(uintptr_t);
+    sp -= (1 + ptrs) * sizeof(uintptr_t);
     ld::StartupStack* startup = new (sp) ld::StartupStack{.argc = argv.size()};
     cpp20::span string_ptrs{startup->argv, ptrs};
 
@@ -243,6 +272,7 @@ class InProcessTestLaunch {
     // TODO(mcgrathr): this is where the loaded executable would be described
     auxv.entry.back() = 0;
 
+    ASSERT_EQ(reinterpret_cast<uintptr_t>(sp) % 16, 0u);
     sp_ = sp;
   }
 
@@ -280,13 +310,20 @@ TYPED_TEST_SUITE(LdStartupTests, elfldltl::testing::LoaderTypes);
 TYPED_TEST(LdStartupTests, Basic) {
   // The skeletal dynamic linker is hard-coded now to read its argument string
   // and return its length.
-  constexpr std::string_view kArgument = "Lorem ipsum dolor sit amet";
-  constexpr int kReturnValue = static_cast<int>(kArgument.size());
+  constexpr std::string_view kArg1 = "Lorem ipsum dolor sit amet";
+  constexpr std::string_view kArg2 = "consectetur adipiscing elit";
+  const std::string expected_log = std::string(kArg1) + '\n' +  //
+                                   std::string(kArg2) + '\n';
+  constexpr int kReturnValue = static_cast<int>(kArg1.size() + kArg2.size());
 
   InProcessTestLaunch launch;
-  ASSERT_NO_FATAL_FAILURE(launch.Init(kArgument));
+  ASSERT_NO_FATAL_FAILURE(launch.Init({kArg1, kArg2}));
 
   EXPECT_EQ(launch.Call(this->entry()), kReturnValue);
+
+  if constexpr (InProcessTestLaunch::kHasLog) {
+    EXPECT_EQ(launch.CollectLog(), expected_log);
+  }
 }
 
 }  // namespace

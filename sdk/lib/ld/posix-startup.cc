@@ -90,9 +90,13 @@ extern "C" uintptr_t StartLd(StartupStack& stack) {
   // Bail out before handoff if any errors have been detected.
   CheckErrors(diag);
 
-  diag.report()("Hello world!");
+  int result = 0;
+  for (uintptr_t i = 0; i < startup.argc; ++i) {
+    diag.report()(startup.argv[i]);
+    result += static_cast<int>(strlen(startup.argv[i]));
+  }
 
-  return static_cast<int>(strlen(startup.argv[0]));
+  return result;
 }
 
 void ReportError(StartupData& startup, std::string_view str) {

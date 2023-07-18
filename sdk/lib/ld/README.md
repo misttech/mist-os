@@ -8,11 +8,18 @@ means three different things:
  1. The startup dynamic linker.
  2. The quasi-stable layout of the "passive ABI".
  3. A library of reusable code for working with the passive ABI.
+    This includes pieces for client code (such as in a C library)
+    consuming the passive ABI, as well as pieces for implementing
+    dynamic linking itself compatibly with the startup dynamic linker's
+    semantics (such as for out-of-process dynamic linking).  There is also a
+    separate library that assists in writing related [gtest]-based tests.
 
 Only the startup dynamic linker binary is published in the SDK.
 The passive ABI is shared between this binary and other binaries
 included in the SDK (libc, libdl), but is not generally public
 in the SDK.
+
+[gtest]: https://github.com/google/googletest
 
 ## Passive ABI
 
@@ -109,3 +116,11 @@ The "stub" dynamic linker is not really a dynamic linker, but it has the same
 ABI (`DT_SONAME` and symbols) as the startup dynamic linker.  An out-of-process
 dynamic linker uses the stub dynamic linker as the prototype for populating the
 passive ABI when it sets up a dynamic linking domain in another address space.
+
+## Testing Support Library
+
+Header files [`<lib/ld/testing/*.h>`](include/lib/ld/testing) provide
+interfaces in the `ld::testing` C++ namespace.  These are things used in the
+tests for the startup dynamic linker and that can be reused for tests of other
+kinds of dynamic linking implementations, such as out-of-process setups
+intended to be compatible with the passive ABI of the startup dynamic linker.

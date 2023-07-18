@@ -166,6 +166,8 @@ shared_library("ld-startup") {
     sources += [ "zircon-startup.cc" ]
     deps += [
       "//src/zircon/lib/zircon",
+      "//zircon/system/ulib/processargs",
+      "//zircon/system/ulib/zircon-internal",
       "//zircon/system/ulib/zx",
     ]
   } else {
@@ -253,7 +255,10 @@ source_set("load-tests") {
     "//third_party/googletest:gtest",
   ]
   if (is_fuchsia) {
-    deps += [ "//zircon/system/ulib/zx" ]
+    deps += [
+      "testing",
+      "//zircon/system/ulib/zx",
+    ]
   }
 
   if (is_fuchsia) {
