@@ -211,7 +211,7 @@ impl SchedulerPolicy {
 
 pub fn min_priority_for_sched_policy(policy: u32) -> Result<i32, Errno> {
     match policy {
-        SCHED_NORMAL | SCHED_BATCH | SCHED_IDLE => Ok(0),
+        SCHED_NORMAL | SCHED_BATCH | SCHED_IDLE | SCHED_DEADLINE => Ok(0),
         SCHED_FIFO | SCHED_RR => Ok(1),
         _ => error!(EINVAL),
     }
@@ -219,7 +219,7 @@ pub fn min_priority_for_sched_policy(policy: u32) -> Result<i32, Errno> {
 
 pub fn max_priority_for_sched_policy(policy: u32) -> Result<i32, Errno> {
     match policy {
-        SCHED_NORMAL | SCHED_BATCH | SCHED_IDLE => Ok(0),
+        SCHED_NORMAL | SCHED_BATCH | SCHED_IDLE | SCHED_DEADLINE => Ok(0),
         SCHED_FIFO | SCHED_RR => Ok(99),
         _ => error!(EINVAL),
     }

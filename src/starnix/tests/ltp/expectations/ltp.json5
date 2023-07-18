@@ -391,8 +391,6 @@
                 "runpwtests04",
                 "runpwtests06",
                 "sched_cli_serv",
-                "sched_get_priority_max01",
-                "sched_get_priority_min01",
                 "sched_getattr01",
                 "sched_getattr02",
                 "sched_rr_get_interval02",
