@@ -22,9 +22,8 @@ TEST(TimeTest, ClockGetResRealTime) {
 
 TEST(TimeTest, ClockGetResSyscallFail) {
   // Setting clockid to 15 as it will cause an error to be thrown.
-  // 15 isn't the clockid of any of the clocks that the vDSO can use, so the syscall is called.
-  // 15 is an invalid dynamic clockid. The syscall will check if the clockid is valid using the
-  // function is_valid_cpu_clock. Since it isn't valid, the syscall throws an error.
+  // The vDSO will check if the clockid is valid using the function is_valid_cpu_clock.
+  // Since it isn't valid, the vDSO throws an error.
   clockid_t clockid = 15;
   struct timespec tp;
   tp.tv_nsec = 0;

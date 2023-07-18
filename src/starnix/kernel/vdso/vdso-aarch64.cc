@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#include <cerrno>
 #include <cstdint>
 #define EXPORT __attribute__((visibility("default")))
 #define WEAK __attribute__((weak, visibility("default")))
@@ -33,16 +34,24 @@ extern "C" EXPORT int __kernel_clock_gettime(int clock_id, struct timespec* tp) 
   return ret;
 }
 
+bool is_valid_cpu_clock(int clock_id) { return (clock_id & 7) != 7 && (clock_id & 3) < 3; }
+
 extern "C" EXPORT int __kernel_clock_getres(int clock_id, struct timespec* tp) {
+  if (clock_id < 0 && !is_valid_cpu_clock(clock_id)) {
+    return -EINVAL;
+  }
   if (tp == nullptr) {
     return 0;
   }
   switch (clock_id) {
     case CLOCK_REALTIME:
+    case CLOCK_REALTIME_ALARM:
+    case CLOCK_REALTIME_COARSE:
     case CLOCK_MONOTONIC:
     case CLOCK_MONOTONIC_COARSE:
     case CLOCK_MONOTONIC_RAW:
     case CLOCK_BOOTTIME:
+    case CLOCK_BOOTTIME_ALARM:
     case CLOCK_THREAD_CPUTIME_ID:
     case CLOCK_PROCESS_CPUTIME_ID:
       tp->tv_sec = 0;

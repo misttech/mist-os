@@ -38,7 +38,6 @@
                 "cacheflush01",
                 "clock_adjtime01",
                 "clock_adjtime02",
-                "clock_getres01",
                 "clock_gettime03",
 
                 // Failure caused by two skipped assertions:

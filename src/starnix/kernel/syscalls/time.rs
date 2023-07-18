@@ -11,16 +11,22 @@ pub fn sys_clock_getres(
     which_clock: i32,
     tp_addr: UserRef<timespec>,
 ) -> Result<(), Errno> {
+    if which_clock < 0 && !is_valid_cpu_clock(which_clock) {
+        return error!(EINVAL);
+    }
     if tp_addr.is_null() {
         return Ok(());
     }
 
     let tv = match which_clock as u32 {
         CLOCK_REALTIME
+        | CLOCK_REALTIME_ALARM
+        | CLOCK_REALTIME_COARSE
         | CLOCK_MONOTONIC
         | CLOCK_MONOTONIC_COARSE
         | CLOCK_MONOTONIC_RAW
         | CLOCK_BOOTTIME
+        | CLOCK_BOOTTIME_ALARM
         | CLOCK_THREAD_CPUTIME_ID
         | CLOCK_PROCESS_CPUTIME_ID => timespec { tv_sec: 0, tv_nsec: 1 },
         _ => {
