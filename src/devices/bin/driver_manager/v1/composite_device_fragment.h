@@ -10,8 +10,8 @@
 
 #include <fbl/array.h>
 
-#include "src/devices/bin/driver_manager/driver.h"
-#include "src/devices/bin/driver_manager/metadata.h"
+#include "src/devices/bin/driver_manager/v1/driver.h"
+#include "src/devices/bin/driver_manager/v1/metadata.h"
 
 class CompositeDevice;
 class Device;

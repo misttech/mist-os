@@ -2,10 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef SRC_DEVICES_BIN_DRIVER_MANAGER_SUSPEND_MATCHING_TASK_H_
-#define SRC_DEVICES_BIN_DRIVER_MANAGER_SUSPEND_MATCHING_TASK_H_
+#ifndef SRC_DEVICES_BIN_DRIVER_MANAGER_V1_SUSPEND_MATCHING_TASK_H_
+#define SRC_DEVICES_BIN_DRIVER_MANAGER_V1_SUSPEND_MATCHING_TASK_H_
 
-#include "src/devices/bin/driver_manager/device.h"
+#include "src/devices/bin/driver_manager/v1/device.h"
 #include "src/devices/bin/driver_manager/v1/task.h"
 
 // This task walks a given `device` and its children and will suspend any devices
@@ -43,4 +43,4 @@ class SuspendMatchingTask final : public Task {
   uint32_t flags_;
 };
 
-#endif  // SRC_DEVICES_BIN_DRIVER_MANAGER_SUSPEND_MATCHING_TASK_H_
+#endif  // SRC_DEVICES_BIN_DRIVER_MANAGER_V1_SUSPEND_MATCHING_TASK_H_

@@ -8,7 +8,7 @@
 #include <string>
 
 #include "lib/async/dispatcher.h"
-#include "src/devices/bin/driver_manager/driver.h"
+#include "src/devices/bin/driver_manager/v1/driver.h"
 
 struct LoadFirmwareResult {
   zx::vmo vmo;

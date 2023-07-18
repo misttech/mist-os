@@ -6,8 +6,8 @@
 
 #include <zircon/status.h>
 
-#include "src/devices/bin/driver_manager/coordinator.h"
-#include "src/devices/bin/driver_manager/device.h"
+#include "src/devices/bin/driver_manager/v1/coordinator.h"
+#include "src/devices/bin/driver_manager/v1/device.h"
 #include "src/devices/lib/log/log.h"
 
 InitTask::InitTask(fbl::RefPtr<Device> device, Completion completion)

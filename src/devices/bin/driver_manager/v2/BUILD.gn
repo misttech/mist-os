@@ -42,7 +42,6 @@ source_set("driver_runner") {
     "//src/lib/fxl",
     "//src/lib/zbitl",
     "//zircon/system/ulib/async-loop:async-loop-cpp",
-    "//zircon/system/ulib/zircon-internal",
   ]
 
   public_deps = [
@@ -63,6 +62,25 @@ source_set("driver_runner") {
     "//src/devices/bin/driver_manager/devfs",
     "//src/lib/ddk",
     "//src/lib/storage/vfs/cpp",
+    "//zircon/system/ulib/zircon-internal",
+  ]
+}
+
+source_set("driver_development_service") {
+  sources = [
+    "driver_development_service.cc",
+    "driver_development_service.h",
+  ]
+  public_deps = [
+    ":driver_runner",
+    "//sdk/fidl/fuchsia.driver.development:fuchsia.driver.development_cpp",
+    "//sdk/lib/component/outgoing/cpp",
+  ]
+  deps = [
+    "//sdk/fidl/fuchsia.driver.framework:fuchsia.driver.framework_cpp",
+    "//sdk/lib/component/incoming/cpp",
+    "//src/devices/bin/driver_manager/driver_development:lib",
+    "//src/devices/lib/log",
   ]
 }
 

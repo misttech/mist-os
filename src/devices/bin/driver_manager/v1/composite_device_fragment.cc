@@ -8,7 +8,7 @@
 #include <zircon/status.h>
 
 #include "src/devices/bin/driver_manager/binding.h"
-#include "src/devices/bin/driver_manager/coordinator.h"
+#include "src/devices/bin/driver_manager/v1/coordinator.h"
 #include "src/devices/lib/log/log.h"
 
 namespace fdd = fuchsia_driver_development;

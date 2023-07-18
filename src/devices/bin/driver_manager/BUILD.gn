@@ -3,7 +3,6 @@
 # found in the LICENSE file.
 
 import("//build/components.gni")
-import("//build/fuzz.gni")
 import("//build/test.gni")
 
 group("tests") {
@@ -15,6 +14,7 @@ group("tests") {
   if (!is_coverage) {
     deps += [
       ":driver-manager-tests",
+      "v1:driver-manager-v1-tests",
       "v2:driver-runner-tests",
     ]
   }
@@ -47,40 +47,6 @@ source_set("binding") {
   ]
 }
 
-source_set("manifest_parser") {
-  visibility = [ ":*" ]
-  sources = [
-    "manifest_parser.cc",
-    "manifest_parser.h",
-  ]
-  public_deps = [
-    "//sdk/fidl/fuchsia.component.decl:fuchsia.component.decl_cpp",
-    "//sdk/lib/fdio",
-    "//src/devices/lib/log",
-    "//src/lib/pkg_url",
-    "//zircon/system/ulib/zx",
-  ]
-}
-
-source_set("driver") {
-  visibility = [ ":*" ]
-  sources = [
-    "driver.cc",
-    "driver.h",
-  ]
-  public_deps = [
-    "//sdk/fidl/fuchsia.boot:fuchsia.boot_cpp_wire",
-    "//sdk/fidl/fuchsia.driver.index:fuchsia.driver.index_cpp",
-    "//sdk/fidl/fuchsia.io:fuchsia.io_cpp_wire",
-    "//sdk/lib/fdio",
-    "//sdk/lib/fit",
-    "//src/devices/lib/log",
-    "//src/lib/ddk:ddk-deprecated-binding-headers",
-    "//zircon/system/ulib/fbl",
-    "//zircon/system/ulib/zx",
-  ]
-}
-
 source_set("inspect") {
   visibility = [ "*" ]
   sources = [
@@ -97,118 +63,17 @@ source_set("inspect") {
   deps = [ "//sdk/lib/inspect/component/cpp:inspect_component_cpp" ]
 }
 
-# Common source files and dependencies between :coordinator and :test
-source_set("lib") {
+source_set("driver_host_loader_service") {
   visibility = [ ":*" ]
-
   sources = [
-    "base_package_resolver.cc",
-    "base_package_resolver.h",
-    "bind_driver_manager.cc",
-    "bind_driver_manager.h",
-    "constants.h",
-    "coordinator.cc",
-    "coordinator.h",
-    "device.cc",
-    "device.h",
-    "driver_host.cc",
-    "driver_host.h",
     "driver_host_loader_service.cc",
     "driver_host_loader_service.h",
-    "driver_loader.cc",
-    "driver_loader.h",
-    "package_resolver.cc",
-    "system_instance.cc",
-    "system_instance.h",
-    "v1/composite_device.cc",
-    "v1/composite_device.h",
-    "v1/composite_device_fragment.cc",
-    "v1/composite_device_fragment.h",
-    "v1/composite_node_spec_v1.cc",
-    "v1/composite_node_spec_v1.h",
-    "v1/device_manager.cc",
-    "v1/device_manager.h",
-    "v1/driver_development.cc",
-    "v1/driver_development.h",
-    "v1/firmware_loader.cc",
-    "v1/firmware_loader.h",
-    "v1/init_task.cc",
-    "v1/resume_context.h",
-    "v1/resume_task.cc",
-    "v1/suspend_handler.cc",
-    "v1/suspend_handler.h",
-    "v1/suspend_matching_task.cc",
-    "v1/suspend_resume_manager.cc",
-    "v1/suspend_resume_manager.h",
-    "v1/suspend_task.cc",
-    "v1/task.cc",
-    "v1/unbind_task.cc",
-    "v2/driver_development_service.cc",
-    "v2/driver_development_service.h",
   ]
-
-  public_deps = [
-    ":binding",
-    ":driver",
-    ":inspect",
-    ":manifest_parser",
-    "composite_node_spec:lib",
-    "devfs",
-    "driver_development:lib",
-    "v2:driver_runner",
-    "//sdk/fidl/fuchsia.boot:fuchsia.boot_cpp_wire",
-    "//sdk/fidl/fuchsia.component.resolution:fuchsia.component.resolution_cpp_wire",
-    "//sdk/fidl/fuchsia.device.fs:fuchsia.device.fs_cpp_wire",
-    "//sdk/fidl/fuchsia.device.manager:fuchsia.device.manager_cpp",
-    "//sdk/fidl/fuchsia.driver.development:fuchsia.driver.development_cpp_wire",
-    "//sdk/fidl/fuchsia.driver.test.logger:fuchsia.driver.test.logger_cpp_wire",
-    "//sdk/fidl/fuchsia.fshost:fuchsia.fshost_cpp_wire",
-    "//sdk/fidl/fuchsia.hardware.power.statecontrol:fuchsia.hardware.power.statecontrol_cpp_wire",
-    "//sdk/fidl/fuchsia.io:fuchsia.io_cpp_wire",
-    "//sdk/fidl/fuchsia.kernel:fuchsia.kernel_cpp_wire",
-    "//sdk/fidl/fuchsia.ldsvc:fuchsia.ldsvc_cpp_wire",
-    "//sdk/fidl/fuchsia.process.lifecycle:fuchsia.process.lifecycle_cpp_wire",
-    "//sdk/lib/component/incoming/cpp",
-    "//sdk/lib/component/outgoing/cpp",
-    "//sdk/lib/driver/compat/cpp",
-    "//sdk/lib/driver/component/cpp:cpp",
-    "//sdk/lib/fdio",
-    "//sdk/lib/fdio:fdio-spawn-actions",
-    "//sdk/lib/fidl",
-    "//sdk/lib/fidl/cpp",
-    "//sdk/lib/fit",
-    "//sdk/lib/inspect/service/cpp",
-    "//sdk/lib/stdcompat",
-    "//sdk/lib/sys/cpp",
-    "//src/bringup/lib/mexec",
-    "//src/devices/lib/bind:bind-lib",
-    "//src/devices/lib/log",
-    "//src/lib/ddk",
-    "//src/lib/files",
-    "//src/lib/fsl",
-    "//src/lib/fxl",
-    "//src/lib/loader_service",
-    "//src/lib/pkg_url",
-    "//src/lib/storage/vfs/cpp",
-    "//src/zircon/lib/zircon",
-    "//zircon/system/public",
-    "//zircon/system/ulib/async-default",
-    "//zircon/system/ulib/async-loop:async-loop-cpp",
-    "//zircon/system/ulib/async-loop:async-loop-default",
-    "//zircon/system/ulib/fbl",
-    "//zircon/system/ulib/fzl",
-    "//zircon/system/ulib/inspect",
-    "//zircon/system/ulib/inspector",
-    "//zircon/system/ulib/zircon-internal",
-    "//zircon/system/ulib/zx",
-  ]
-
+  public_deps = [ "//src/lib/loader_service" ]
   deps = [
-    "//src/lib/fsl",
-    "//src/lib/zbitl",
+    "//src/devices/lib/log",
+    "//src/lib/files",
   ]
-
-  configs += [ "//build/config:all_source" ]
 }
 
 executable("driver_manager") {
@@ -220,8 +85,11 @@ executable("driver_manager") {
   ]
 
   deps = [
+    ":driver_host_loader_service",
     ":driver_manager_config",
-    ":lib",
+    "v1:coordinator",
+    "v2:driver_development_service",
+    "v2:driver_runner",
     "//src/lib/scheduler/cpp",
     "//src/sys/lib/stdout-to-debuglog/cpp",
   ]
@@ -238,62 +106,30 @@ executable("driver_manager") {
   }
 }
 
-test("driver_manager_test") {
-  sources = [
-    "tests/builtin_devices_test.cc",
-    "tests/composite_device_tests.cc",
-    "tests/composite_node_spec_manager_test.cc",
-    "tests/coordinator_test_utils.cc",
-    "tests/devfs_test.cc",
-    "tests/device_tests.cc",
-    "tests/driver_development_test.cc",
-    "tests/driver_loader_test.cc",
-    "tests/init_tests.cc",
-    "tests/inspect_test.cc",
-    "tests/misc_tests.cc",
-    "tests/multiple_device_test.cc",
-    "tests/multiple_device_test_utils.cc",
-    "tests/resume_tests.cc",
-    "tests/suspend_tests.cc",
-    "tests/system_instance_test.cc",
-    "tests/unbind_tests.cc",
-    "v1/task_test.cc",
-  ]
+test("driver_manager_devfs_test") {
+  sources = [ "tests/devfs_test.cc" ]
 
   deps = [
-    ":lib",
+    "devfs:devfs",
     "//sdk/fidl/fuchsia.io:fuchsia.io_cpp_wire",
     "//sdk/lib/component/outgoing/cpp",
     "//sdk/lib/fdio",
-    "//sdk/lib/inspect/testing/cpp:zxtest",
-    "//src/devices/lib/bind:bind-lib",
     "//src/lib/storage/vfs/cpp:test_support",
     "//zircon/system/ulib/fbl",
-    "//zircon/system/ulib/mock-boot-arguments",
     "//zircon/system/ulib/sync:sync-cpp",
     "//zircon/system/ulib/zxtest",
   ]
 }
 
-fuchsia_unittest_component("driver-manager-test") {
-  manifest = "meta/driver-manager-test.cml"
-  deps = [
-    ":driver_manager_test",
-    "testing:ambient_vmex_test_util",
-    "testing:new_process_test_util",
-    "//src/devices/bin/driver_host",
-    "//src/devices/bus/drivers/platform",
-    "//src/devices/internal/drivers/fragment",
-    "//src/devices/tests/mock-device",
-  ]
-  test_type = "system"
+fuchsia_unittest_component("driver-manager-devfs-test") {
+  deps = [ ":driver_manager_devfs_test" ]
 }
 
 # This is a separate test binary because this test fixture uses gtest, not zxtest
 test("driver_host_loader_service_test") {
   sources = [ "tests/driver_host_loader_service_test.cc" ]
   deps = [
-    ":lib",
+    ":driver_host_loader_service",
     "//src/lib/loader_service:loader_service_test_fixture",
   ]
 }
@@ -304,49 +140,21 @@ fuchsia_unittest_component("driver-host-loader-service-test") {
   test_type = "system"
 }
 
-executable("manifest_parser_test") {
-  testonly = true
-  sources = [ "tests/manifest_parser_test.cc" ]
+test("composite_node_spec_manager_test") {
+  sources = [ "tests/composite_node_spec_manager_test.cc" ]
 
   deps = [
-    ":driver",
-    ":manifest_parser",
+    "composite_node_spec:lib",
+    "v2:driver_runner",
+    "//sdk/fidl/fuchsia.driver.framework:fuchsia.driver.framework_cpp",
+    "//sdk/lib/driver/component/cpp:cpp",
+    "//sdk/lib/fdio",
     "//zircon/system/ulib/zxtest",
   ]
 }
 
-fuchsia_component("manifest-test-driver") {
-  testonly = true
-  component_name = "manifest-test"
-  manifest = "meta/manifest-test-driver.cml"
-}
-
-fuchsia_component("manifest-with-scheduler-role") {
-  testonly = true
-  component_name = "manifest-with-scheduler-role"
-  manifest = "meta/manifest-with-scheduler-role.cml"
-}
-
-fuchsia_component("manifest-missing-driver") {
-  testonly = true
-  component_name = "manifest-missing-driver"
-  manifest = "meta/manifest-missing-driver.cml"
-}
-
-fuchsia_component("manifest-no-services") {
-  testonly = true
-  component_name = "manifest-no-services"
-  manifest = "meta/manifest-no-services.cml"
-}
-
-fuchsia_unittest_component("manifest_parser_test_component") {
-  deps = [
-    ":manifest-missing-driver",
-    ":manifest-no-services",
-    ":manifest-test-driver",
-    ":manifest-with-scheduler-role",
-    ":manifest_parser_test",
-  ]
+fuchsia_unittest_component("composite-node-spec-manager-test") {
+  deps = [ ":composite_node_spec_manager_test" ]
 }
 
 fuchsia_test_package("driver-manager-tests") {
@@ -357,9 +165,9 @@ fuchsia_test_package("driver-manager-tests") {
   }
 
   test_components = [
+    ":composite-node-spec-manager-test",
     ":driver-host-loader-service-test",
-    ":driver-manager-test",
-    ":manifest_parser_test_component",
+    ":driver-manager-devfs-test",
   ]
 }
 

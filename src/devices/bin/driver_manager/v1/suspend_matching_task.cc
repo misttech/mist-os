@@ -4,7 +4,7 @@
 
 #include "src/devices/bin/driver_manager/v1/suspend_matching_task.h"
 
-#include "src/devices/bin/driver_manager/coordinator.h"
+#include "src/devices/bin/driver_manager/v1/coordinator.h"
 #include "src/devices/lib/log/log.h"
 
 SuspendMatchingTask::SuspendMatchingTask(fbl::RefPtr<Device> device, uint32_t flags, Match match,

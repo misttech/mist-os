@@ -7,7 +7,7 @@
 
 #include <fidl/fuchsia.hardware.power.statecontrol/cpp/wire.h>
 
-#include "src/devices/bin/driver_manager/device.h"
+#include "src/devices/bin/driver_manager/v1/device.h"
 #include "src/devices/bin/driver_manager/v1/resume_task.h"
 
 using fuchsia_device_manager::wire::SystemPowerState;

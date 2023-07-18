@@ -8,9 +8,9 @@
 #include <fidl/fuchsia.device.manager/cpp/wire.h>
 #include <fidl/fuchsia.driver.development/cpp/wire.h>
 
-#include "src/devices/bin/driver_manager/device.h"
-#include "src/devices/bin/driver_manager/driver_host.h"
 #include "src/devices/bin/driver_manager/v1/composite_device.h"
+#include "src/devices/bin/driver_manager/v1/device.h"
+#include "src/devices/bin/driver_manager/v1/driver_host.h"
 
 enum class DriverHostCrashPolicy;
 class Coordinator;

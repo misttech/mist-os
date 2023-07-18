@@ -6,7 +6,7 @@
 
 #include <zircon/status.h>
 
-#include "src/devices/bin/driver_manager/coordinator.h"
+#include "src/devices/bin/driver_manager/v1/coordinator.h"
 #include "src/devices/lib/log/log.h"
 
 UnbindTask::UnbindTask(fbl::RefPtr<Device> device, UnbindTaskOpts opts, Completion completion)

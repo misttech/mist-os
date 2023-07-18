@@ -7,6 +7,7 @@
 #include <lib/ddk/driver.h>
 
 #include "src/devices/bin/driver_manager/v1/composite_device.h"
+#include "src/devices/bin/driver_manager/v1/driver_host.h"
 
 namespace fdd = fuchsia_driver_development;
 namespace fdm = fuchsia_device_manager;

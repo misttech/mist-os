@@ -4,7 +4,7 @@
 
 #include "src/devices/bin/driver_manager/v1/suspend_task.h"
 
-#include "src/devices/bin/driver_manager/coordinator.h"
+#include "src/devices/bin/driver_manager/v1/coordinator.h"
 
 namespace {
 

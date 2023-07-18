@@ -8,10 +8,9 @@
 #include <lib/driver/component/cpp/node_add_args.h>
 #include <zircon/status.h>
 
-#include "src/devices/bin/driver_manager/bind_driver_manager.h"
-#include "src/devices/bin/driver_manager/binding.h"
-#include "src/devices/bin/driver_manager/coordinator.h"
-#include "src/devices/bin/driver_manager/driver_host.h"
+#include "src/devices/bin/driver_manager/v1/bind_driver_manager.h"
+#include "src/devices/bin/driver_manager/v1/coordinator.h"
+#include "src/devices/bin/driver_manager/v1/driver_host.h"
 #include "src/devices/lib/log/log.h"
 
 namespace fdd = fuchsia_driver_development;

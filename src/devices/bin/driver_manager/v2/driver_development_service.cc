@@ -13,7 +13,6 @@
 
 #include "src/devices/bin/driver_manager/driver_development/info_iterator.h"
 #include "src/devices/lib/log/log.h"
-#include "src/lib/storage/vfs/cpp/service.h"
 
 namespace fdd = fuchsia_driver_development;
 namespace fdf {

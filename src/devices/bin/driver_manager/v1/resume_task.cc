@@ -6,7 +6,7 @@
 
 #include <zircon/errors.h>
 
-#include "src/devices/bin/driver_manager/coordinator.h"
+#include "src/devices/bin/driver_manager/v1/coordinator.h"
 
 ResumeTask::ResumeTask(fbl::RefPtr<Device> device, uint32_t target_system_state,
                        Completion completion)

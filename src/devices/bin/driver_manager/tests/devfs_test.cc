@@ -17,8 +17,6 @@
 
 namespace {
 
-namespace fio = fuchsia_io;
-
 class Connecter : public fidl::WireServer<fuchsia_device_fs::Connector> {
  public:
  private:

@@ -10,9 +10,11 @@ source_set("lib") {
     "composite_node_spec_manager.cc",
     "composite_node_spec_manager.h",
   ]
-  public_deps = [ "//zircon/system/ulib/fbl" ]
-  deps = [
+  public_deps = [
     "//sdk/fidl/fuchsia.driver.development:fuchsia.driver.development_cpp",
+    "//zircon/system/ulib/fbl",
+  ]
+  deps = [
     "//sdk/fidl/fuchsia.driver.index:fuchsia.driver.index_cpp",
     "//src/devices/lib/log",
   ]

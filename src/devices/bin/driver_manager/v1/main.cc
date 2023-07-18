@@ -33,12 +33,11 @@
 
 #include <fbl/string_printf.h>
 
-#include "src/devices/bin/driver_manager/coordinator.h"
 #include "src/devices/bin/driver_manager/devfs/devfs.h"
 #include "src/devices/bin/driver_manager/device_watcher.h"
 #include "src/devices/bin/driver_manager/driver_host_loader_service.h"
-#include "src/devices/bin/driver_manager/system_instance.h"
-#include "src/devices/bin/driver_manager/v2/driver_development_service.h"
+#include "src/devices/bin/driver_manager/v1/coordinator.h"
+#include "src/devices/bin/driver_manager/v1/system_instance.h"
 #include "src/devices/bin/driver_manager/v2/shutdown_manager.h"
 #include "src/devices/lib/log/log.h"
 #include "src/lib/storage/vfs/cpp/synchronous_vfs.h"
@@ -136,8 +135,6 @@ int RunDfv1(driver_manager_config::Config dm_config,
 
   // Services offered to the rest of the system.
   coordinator.InitOutgoingServices(outgoing);
-
-  std::optional<driver_manager::DriverDevelopmentService> driver_development_service;
 
   fbl::unique_fd lib_fd;
   {

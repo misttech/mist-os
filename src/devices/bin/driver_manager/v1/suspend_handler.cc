@@ -16,8 +16,8 @@
 #include <inspector/inspector.h>
 
 #include "src/bringup/lib/mexec/mexec.h"
-#include "src/devices/bin/driver_manager/coordinator.h"
-#include "src/devices/bin/driver_manager/driver_host.h"
+#include "src/devices/bin/driver_manager/v1/coordinator.h"
+#include "src/devices/bin/driver_manager/v1/driver_host.h"
 #include "src/devices/lib/log/log.h"
 #include "src/lib/fsl/vmo/vector.h"
 
