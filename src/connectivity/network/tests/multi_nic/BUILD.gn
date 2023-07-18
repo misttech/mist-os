@@ -36,24 +36,6 @@ common_deps = [
   ":server",
 ]
 
-fuchsia_test_component_with_expectations("ns2-tests") {
-  expectations = "expects/netstack2.json5"
-  manifest = "meta/netstack2.cml"
-  deps = common_deps + [
-           "//src/connectivity/network/testing/netemul/configurable-netstack",
-           "//src/connectivity/network/testing/netemul/sync-manager",
-         ]
-}
-
-fuchsia_test_component_with_expectations("ns2-tests-with-fast-udp") {
-  expectations = "expects/netstack2.json5"
-  manifest = "meta/netstack2-fast-udp.cml"
-  deps = common_deps + [
-           "//src/connectivity/network/testing/netemul/configurable-netstack:configurable-netstack-fast-udp",
-           "//src/connectivity/network/testing/netemul/sync-manager",
-         ]
-}
-
 fuchsia_test_component_with_expectations("ns3-tests") {
   expectations = "expects/netstack3.json5"
   manifest = "meta/netstack3.cml"
@@ -63,16 +45,44 @@ fuchsia_test_component_with_expectations("ns3-tests") {
          ]
 }
 
-fuchsia_test_package("netstack-multi-nic-tests") {
-  test_components = [
-    ":ns2-tests",
-    ":ns3-tests",
-    ":ns2-tests-with-fast-udp",
-  ]
+fuchsia_test_package("ns3-multi-nic-tests") {
+  test_components = [ ":ns3-tests" ]
   deps = [ "//src/lib/testing/expectation:expectation_comparer" ]
+}
+
+all_test_targets = [ ":ns3-multi-nic-tests" ]
+
+if (target_cpu != "riscv64") {
+  fuchsia_test_component_with_expectations("ns2-tests") {
+    expectations = "expects/netstack2.json5"
+    manifest = "meta/netstack2.cml"
+    deps = common_deps + [
+             "//src/connectivity/network/testing/netemul/configurable-netstack",
+             "//src/connectivity/network/testing/netemul/sync-manager",
+           ]
+  }
+
+  fuchsia_test_component_with_expectations("ns2-tests-with-fast-udp") {
+    expectations = "expects/netstack2.json5"
+    manifest = "meta/netstack2-fast-udp.cml"
+    deps = common_deps + [
+             "//src/connectivity/network/testing/netemul/configurable-netstack:configurable-netstack-fast-udp",
+             "//src/connectivity/network/testing/netemul/sync-manager",
+           ]
+  }
+
+  fuchsia_test_package("ns2-multi-nic-tests") {
+    test_components = [
+      ":ns2-tests",
+      ":ns2-tests-with-fast-udp",
+    ]
+    deps = [ "//src/lib/testing/expectation:expectation_comparer" ]
+  }
+
+  all_test_targets += [ ":ns2-multi-nic-tests" ]
 }
 
 group("tests") {
   testonly = true
-  public_deps = [ ":netstack-multi-nic-tests" ]
+  public_deps = all_test_targets
 }
