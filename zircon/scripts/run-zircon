@@ -10,7 +10,6 @@ function HELP {
     echo "help:"
     echo "-a <arch>            : arm64, riscv64, or x64"
     echo "-c <text>            : append item to kernel commandline"
-    echo "-d                   : run with emulated disk"
     echo "-D <disk file|device>: specify disk file or device path on host"
     echo "--disktype[=<type>]  : should be one of (ahci, virtio, nvme, virtio-scsi, usb), default is ahci"
     echo "--diskfmt[=<format>] : disk format (raw, qcow2, etc), default is raw"
