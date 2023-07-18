@@ -34,6 +34,12 @@ lazy_static::lazy_static! {
     static ref ENV: Mutex<Option<EnvironmentContext>> = Mutex::default();
 }
 
+#[doc(hidden)]
+pub mod macro_deps {
+    pub use anyhow;
+    pub use serde_json;
+}
+
 /// The levels of configuration possible
 // If you edit this enum, make sure to also change the enum counter below to match.
 #[derive(Debug, Eq, PartialEq, Copy, Clone, Hash)]
