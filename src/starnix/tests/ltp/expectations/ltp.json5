@@ -389,7 +389,6 @@
                 "runpwtests03",
                 "runpwtests04",
                 "runpwtests06",
-                "sched_cli_serv",
                 "sched_getattr01",
                 "sched_getattr02",
                 "sched_rr_get_interval02",
