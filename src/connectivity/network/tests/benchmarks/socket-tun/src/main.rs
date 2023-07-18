@@ -44,6 +44,25 @@ impl IpExt for net_types::ip::Ipv6 {
     const DOMAIN: fposix_socket::Domain = fposix_socket::Domain::Ipv6;
 }
 
+fn generate_send_recv_bufs(size: usize) -> (Vec<u8>, Vec<u8>) {
+    (
+        // It may be natural to fill the buffer with a single byte, but a
+        // property of sending such a message is that any permutation of
+        // the bytes look identical, which hides certain TCP bugs where the
+        // bytes sent have been permuted due to wrong sequence numbers, e.g.
+        // https://fxbug.dev/128850.
+        (0u8..=254).cycle().take(size).collect(),
+        // The choice of filling the receive buffer with a non-zero byte
+        // is deliberate: the [zero page scanner] may reclaim large memory
+        // filled with zeroes (note that it is turned off in environments
+        // where the benchmark results are collected, but there is no harm
+        // in doing this to be extra safe).
+        //
+        // [zero page scanner]: https://fuchsia.dev/fuchsia-src/gen/boot-options?hl=en#kernelpage-scannerzero-page-scans-per-seconduint64_t
+        vec![255; size],
+    )
+}
+
 // This type holds unused FIDL proxies so that the underlying object stays
 // alive.
 struct InterfaceFidlProxies {
@@ -197,14 +216,11 @@ async fn bench_tcp<'a, I: IpExt>(
         listen_sock.listen(0).expect("listen");
         let listen_sockaddr = listen_sock.local_addr().expect("local addr");
 
-        if client_sock.send_buffer_size().expect("get send buffer size") < transfer {
-            // Set send buffer to transfer size to ensure we can write
-            // `transfer` bytes before reading it on the other end.
-            client_sock
-                .set_send_buffer_size(transfer)
-                .expect("set send buffer size to transfer size");
-            assert!(client_sock.send_buffer_size().expect("get send buffer size") >= transfer);
-        }
+        // Set send buffer to transfer size to ensure we can write
+        // `transfer` bytes before reading it on the other end.
+        client_sock.set_send_buffer_size(transfer).expect("set send buffer size to transfer size");
+        assert!(client_sock.send_buffer_size().expect("get send buffer size") >= transfer);
+
         // Disable the Nagle algorithm, it introduces artificial
         // latency that defeats this benchmark.
         client_sock.set_nodelay(true).expect("set TCP NODELAY to true");
@@ -217,14 +233,7 @@ async fn bench_tcp<'a, I: IpExt>(
     fuchsia_trace::duration!("tun_socket_benchmarks", "test_group", "label" => &*label);
     let values = (0..iter_count)
         .map(|_| {
-            // The [zero page scanner] may reclaim large memory filled with zeroes, and
-            // even though it is turned off in environments where the benchmark results
-            // are collected, we fill buffers with a non-zero byte just to be extra
-            // safe.
-            //
-            // [zero page scanner]: https://fuchsia.dev/fuchsia-src/gen/boot-options?hl=en#kernelpage-scannerzero-page-scans-per-seconduint64_t
-            let send_buf = vec![0xAA; transfer];
-            let mut recv_buf = vec![0xBB; transfer];
+            let (send_buf, mut recv_buf) = generate_send_recv_bufs(transfer);
 
             fuchsia_trace::duration!("tun_socket_benchmarks", "test_case");
             let now = std::time::Instant::now();
@@ -248,7 +257,9 @@ async fn bench_tcp<'a, I: IpExt>(
                 );
                 transferred += read;
             }
-            now.elapsed().as_nanos() as f64
+            let duration = now.elapsed().as_nanos() as f64;
+            assert_eq!(recv_buf, send_buf);
+            duration
         })
         .collect();
 
@@ -318,29 +329,31 @@ async fn bench_udp<'a, I: IpExt>(
     fuchsia_trace::duration!("tun_socket_benchmarks", "test_group", "label" => &*label);
     let values = (0..iter_count)
         .map(|_| {
-            // Avoid large memory regions with zeroes that can cause the system to
-            // try and reclaim pages from us. For more information see Zircon page
-            // scanner and eviction strategies.
-            let send_buf = vec![0xAA; message_size];
-            let mut recv_buf = vec![0xBB; message_size];
+            // Allocate buffers that can hold the total transfer size so that the
+            // assertion that the bytes transferred are as expected can be done after
+            // the entire transfer has completed and excluded from the benchmark
+            // duration.
+            let (send_buf, mut recv_buf) = generate_send_recv_bufs(message_count * message_size);
 
             fuchsia_trace::duration!("tun_socket_benchmarks", "test_case");
             let now = std::time::Instant::now();
-            for _ in 0..message_count {
+            for message_bytes in send_buf.chunks(message_size) {
                 let wrote = {
                     fuchsia_trace::duration!("tun_socket_benchmarks", "udp_write");
-                    client_sock.write(send_buf.as_ref()).expect("write failed")
+                    client_sock.write(message_bytes.as_ref()).expect("write failed")
                 };
                 assert_eq!(wrote, message_size);
             }
-            for _ in 0..message_count {
+            for recv_bytes in recv_buf.chunks_mut(message_size) {
                 let read = {
                     fuchsia_trace::duration!("tun_socket_benchmarks", "udp_read");
-                    server_sock.read(recv_buf.as_mut()).expect("read failed")
+                    server_sock.read(recv_bytes.as_mut()).expect("read failed")
                 };
                 assert_eq!(read, message_size);
             }
-            now.elapsed().as_nanos() as f64
+            let duration = now.elapsed().as_nanos() as f64;
+            assert_eq!(send_buf, recv_buf);
+            duration
         })
         .collect();
 
