@@ -5,7 +5,7 @@
 use packet_encoding::{Decodable, Encodable};
 
 use crate::error::{Error, PacketError};
-use crate::header::{Header, HeaderIdentifier};
+use crate::header::{Header, HeaderIdentifier, SingleResponseMode};
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct HeaderSet {
@@ -69,6 +69,15 @@ impl HeaderSet {
         Ok(())
     }
 
+    /// Attempts to combine `HeaderSet`s together by modifying the current collection. Returns Ok on
+    /// success, Error otherwise.
+    pub fn try_append(&mut self, other: HeaderSet) -> Result<(), Error> {
+        for (_, header) in other.headers {
+            self.add(header)?;
+        }
+        Ok(())
+    }
+
     /// Removes and returns the payload for the Body Header from the set.
     /// If `final_` is set, then the EndOfBody header payload is returned.
     /// Returns Error if the expected Header is not present in the collection.
@@ -93,6 +102,31 @@ impl HeaderSet {
             return None;
         };
         Some(self.headers.remove(index).1)
+    }
+
+    /// Attempts to add the `SingleResponseMode` Header to the current `HeaderSet`.
+    /// `local` is the supported mode of the local transport.
+    /// Returns the SingleResponseMode value that was added to the set on success, Error if it
+    /// couldn't be added or there was an incompatibility between the current set and `local`
+    /// preferences.
+    pub fn try_add_srm(&mut self, local: SingleResponseMode) -> Result<SingleResponseMode, Error> {
+        // The current set has a preference for SRM. Verify it is compatible with the `local` mode.
+        if let Some(Header::SingleResponseMode(srm)) =
+            self.get(&HeaderIdentifier::SingleResponseMode)
+        {
+            // Current set requests to enable SRM, but it is not supported locally.
+            if *srm == SingleResponseMode::Enable && local != SingleResponseMode::Enable {
+                return Err(Error::SrmNotSupported);
+            }
+            // Otherwise, the mode currently specified in the headers is compatible.
+            return Ok(*srm);
+        }
+
+        // Current set has no preference - default to the `local` preference.
+        if local == SingleResponseMode::Enable {
+            self.add(SingleResponseMode::Enable.into())?;
+        }
+        Ok(local)
     }
 }
 
@@ -148,6 +182,22 @@ mod tests {
     }
 
     #[fuchsia::test]
+    fn try_append_success() {
+        let mut headers1 = HeaderSet::from_header(Header::Name("foo".into())).unwrap();
+        let headers2 = HeaderSet::from_header(Header::Description("bar".into())).unwrap();
+        let () = headers1.try_append(headers2).expect("valid headers");
+        assert!(headers1.contains_header(&HeaderIdentifier::Name));
+        assert!(headers1.contains_header(&HeaderIdentifier::Description));
+    }
+
+    #[fuchsia::test]
+    fn try_append_error() {
+        let mut headers1 = HeaderSet::from_header(Header::Name("foo".into())).unwrap();
+        let headers2 = HeaderSet::from_header(Header::Name("bar".into())).unwrap();
+        assert_matches!(headers1.try_append(headers2), Err(Error::Duplicate(_)));
+    }
+
+    #[fuchsia::test]
     fn remove_headers() {
         let mut headers =
             HeaderSet::from_headers(vec![Header::Count(123), Header::Name("123".into())]).unwrap();
@@ -185,6 +235,65 @@ mod tests {
         // EOB exists, but user wants Body.
         let mut headers = HeaderSet::from_headers(vec![Header::EndOfBody(vec![1])]).unwrap();
         assert_matches!(headers.remove_body(false), Err(Error::Packet(PacketError::Data(_))));
+    }
+
+    #[fuchsia::test]
+    fn try_add_srm_success() {
+        // Trying to add SRM when it is supported locally should add the SRM Header to the
+        // collection.
+        let mut headers = HeaderSet::new();
+        let result = headers.try_add_srm(SingleResponseMode::Enable).expect("can add SRM");
+        assert_eq!(result, SingleResponseMode::Enable);
+        assert_matches!(
+            headers.get(&HeaderIdentifier::SingleResponseMode),
+            Some(Header::SingleResponseMode(SingleResponseMode::Enable))
+        );
+        // Trying to add SRM when it isn't supported locally shouldn't add the SRM to the
+        // collection.
+        let mut headers = HeaderSet::new();
+        let result = headers.try_add_srm(SingleResponseMode::Disable).expect("can add SRM");
+        assert_eq!(result, SingleResponseMode::Disable);
+        assert_matches!(headers.get(&HeaderIdentifier::SingleResponseMode), None);
+        // Trying to add SRM when it is already enabled in the collection and is supported locally
+        // should be a no-op.
+        let mut headers = HeaderSet::from_header(SingleResponseMode::Enable.into()).unwrap();
+        let result = headers.try_add_srm(SingleResponseMode::Enable).expect("can add SRM");
+        assert_eq!(result, SingleResponseMode::Enable);
+        assert_matches!(
+            headers.get(&HeaderIdentifier::SingleResponseMode),
+            Some(Header::SingleResponseMode(SingleResponseMode::Enable))
+        );
+        // Trying to add SRM when it already disabled in the collection and isn't supported locally
+        // should be a no-op.
+        let mut headers = HeaderSet::from_header(SingleResponseMode::Disable.into()).unwrap();
+        let result = headers.try_add_srm(SingleResponseMode::Disable).expect("can add SRM");
+        assert_eq!(result, SingleResponseMode::Disable);
+        assert_matches!(
+            headers.get(&HeaderIdentifier::SingleResponseMode),
+            Some(Header::SingleResponseMode(SingleResponseMode::Disable))
+        );
+        // Trying to add SRM when it already disabled in the collection and is supported locally
+        // should default to disabled.
+        let mut headers = HeaderSet::from_header(SingleResponseMode::Disable.into()).unwrap();
+        let result = headers.try_add_srm(SingleResponseMode::Enable).expect("can add SRM");
+        assert_eq!(result, SingleResponseMode::Disable);
+        assert_matches!(
+            headers.get(&HeaderIdentifier::SingleResponseMode),
+            Some(Header::SingleResponseMode(SingleResponseMode::Disable))
+        );
+    }
+
+    #[fuchsia::test]
+    fn try_add_srm_error() {
+        // Trying to add SRM when it already enabled in the collection and isn't supported locally
+        // is an Error. The collection itself is not modified.
+        let mut headers = HeaderSet::from_header(SingleResponseMode::Enable.into()).unwrap();
+        let result = headers.try_add_srm(SingleResponseMode::Disable);
+        assert_matches!(result, Err(Error::SrmNotSupported));
+        assert_matches!(
+            headers.get(&HeaderIdentifier::SingleResponseMode),
+            Some(Header::SingleResponseMode(SingleResponseMode::Enable))
+        );
     }
 
     #[fuchsia::test]

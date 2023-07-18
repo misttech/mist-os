@@ -65,7 +65,7 @@ impl<'a> PutOperation<'a> {
     /// Returns the peer response headers on success, Error otherwise.
     async fn do_put(&mut self, final_: bool, headers: HeaderSet) -> Result<HeaderSet, Error> {
         // SRM is considered active if this is a subsequent PUT request & the transport supports it.
-        let srm_active = self.is_started && self.srm_mode() == SingleResponseMode::Enable;
+        let srm_active = self.is_started && self.get_srm() == SingleResponseMode::Enable;
         let (opcode, request, expected_response_code) = if final_ {
             (OpCode::PutFinal, RequestPacket::new_put_final(headers), ResponseCode::Ok)
         } else {
@@ -150,7 +150,7 @@ impl<'a> PutOperation<'a> {
 impl SrmOperation for PutOperation<'_> {
     const OPERATION_TYPE: OpCode = OpCode::Put;
 
-    fn srm_mode(&self) -> SingleResponseMode {
+    fn get_srm(&self) -> SingleResponseMode {
         self.srm
     }
 
@@ -454,7 +454,7 @@ mod tests {
         // SRM is enabled for the duration of the operation.
         assert_eq!(operation.srm, SingleResponseMode::Enable);
 
-        // Client tries to disable SRM in a subsequent write attempt. No-op.
+        // Client tries to disable SRM in a subsequent write attempt. Ignored.
         {
             let headers = HeaderSet::from_header(SingleResponseMode::Disable.into()).unwrap();
             let put_fut = operation.write(&[], headers);
@@ -507,7 +507,7 @@ mod tests {
         let mut operation = setup_put_operation(&manager);
         assert_eq!(operation.srm, SingleResponseMode::Disable);
         let mut headers = HeaderSet::from_header(SingleResponseMode::Enable.into()).unwrap();
-        assert_matches!(operation.try_enable_srm(&mut headers), Err(Error::OperationError { .. }));
+        assert_matches!(operation.try_enable_srm(&mut headers), Err(Error::SrmNotSupported));
         assert_eq!(operation.srm, SingleResponseMode::Disable);
     }
 

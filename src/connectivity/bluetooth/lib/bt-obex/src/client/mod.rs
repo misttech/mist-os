@@ -27,7 +27,7 @@ pub(crate) trait SrmOperation {
     const OPERATION_TYPE: OpCode;
 
     /// Returns the current SRM mode.
-    fn srm_mode(&self) -> SingleResponseMode;
+    fn get_srm(&self) -> SingleResponseMode;
 
     /// Sets SRM to the provided `mode`.
     fn set_srm(&mut self, mode: SingleResponseMode);
@@ -36,24 +36,9 @@ pub(crate) trait SrmOperation {
     /// header.
     /// Returns Error if `headers` couldn't be updated with SRM, Ok otherwise.
     fn try_enable_srm(&mut self, headers: &mut HeaderSet) -> Result<(), Error> {
-        if let Some(Header::SingleResponseMode(srm)) =
-            headers.get(&HeaderIdentifier::SingleResponseMode)
-        {
-            // Application requested SRM, but it is not supported by the transport.
-            if *srm == SingleResponseMode::Enable && self.srm_mode() == SingleResponseMode::Disable
-            {
-                return Err(Error::operation(Self::OPERATION_TYPE, "SRM not locally supported"));
-            }
-            // Otherwise, default to what the application prefers.
-            self.set_srm(*srm);
-            return Ok(());
-        }
-        // Application has no preference. Per GOEP Section 4.6, it is recommended to enable
-        // SRM by default if it is supported.
-        if self.srm_mode() == SingleResponseMode::Enable {
-            headers.add(SingleResponseMode::Enable.into())?;
-            trace!(operation = ?Self::OPERATION_TYPE, "Requesting to enable SRM");
-        }
+        let requested_srm = headers.try_add_srm(self.get_srm())?;
+        self.set_srm(requested_srm);
+        trace!(operation = ?Self::OPERATION_TYPE, "Requesting SRM {requested_srm:?}");
         Ok(())
     }
 
@@ -70,8 +55,8 @@ pub(crate) trait SrmOperation {
             SingleResponseMode::Disable
         };
 
-        trace!(current_status = ?self.srm_mode(), operation = ?Self::OPERATION_TYPE, "Peer responded with {srm_response:?}");
-        match (srm_response, self.srm_mode()) {
+        trace!(current_status = ?self.get_srm(), operation = ?Self::OPERATION_TYPE, "Peer responded with {srm_response:?}");
+        match (srm_response, self.get_srm()) {
             (SingleResponseMode::Enable, SingleResponseMode::Disable) => {
                 warn!("SRM stays disabled");
             }
@@ -81,7 +66,7 @@ pub(crate) trait SrmOperation {
             }
             _ => {} // Otherwise, both sides agree on the SRM status.
         }
-        trace!(status = ?self.srm_mode(), operation = ?Self::OPERATION_TYPE, "SRM status");
+        trace!(status = ?self.get_srm(), operation = ?Self::OPERATION_TYPE, "SRM status");
     }
 }
 
@@ -183,13 +168,14 @@ impl ObexClient {
 
     /// Initializes a GET Operation to retrieve data from the remote OBEX Server.
     /// Returns a `GetOperation` on success, Error if the new operation couldn't be started.
-    pub fn get(&mut self, headers: HeaderSet) -> Result<GetOperation<'_>, Error> {
+    pub fn get(&mut self) -> Result<GetOperation<'_>, Error> {
         // A GET can only be initiated after the OBEX session is connected.
         if !self.connected {
             return Err(Error::operation(OpCode::Get, "session not connected"));
         }
 
-        // Only one operation can be active at a time.
+        let headers = HeaderSet::new();
+        // TODO(fxbug.dev/128855): Add ConnectionId, if set.
         let transport = self.transport.try_new_operation()?;
         Ok(GetOperation::new(headers, transport))
     }
@@ -332,8 +318,7 @@ mod tests {
         let _exec = fasync::TestExecutor::new();
         let (mut client, _remote) = new_obex_client(false);
 
-        let headers = HeaderSet::from_header(Header::Name("foo".into())).unwrap();
-        let get_result = client.get(headers);
+        let get_result = client.get();
         assert_matches!(get_result, Err(Error::OperationError { .. }));
     }
 
@@ -343,12 +328,11 @@ mod tests {
         let (mut client, _remote) = new_obex_client(true);
 
         // Creating the first GET operation should succeed.
-        let headers = HeaderSet::from_header(Header::Name("foo".into())).unwrap();
-        let _get_operation1 = client.get(headers.clone()).expect("can initialize first get");
+        let _get_operation1 = client.get().expect("can initialize first get");
 
         // After the first one "completes" (e.g. no longer held), it's okay to initiate a GET.
         drop(_get_operation1);
-        let _get_operation2 = client.get(headers).expect("can initialize second get");
+        let _get_operation2 = client.get().expect("can initialize second get");
     }
 
     #[fuchsia::test]

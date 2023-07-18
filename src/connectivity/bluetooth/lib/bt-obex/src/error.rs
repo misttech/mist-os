@@ -21,6 +21,8 @@ pub enum Error {
     OperationInProgress,
     #[error("Internal error during {:?}: {:?}", .operation, .msg)]
     OperationError { operation: OpCode, msg: String },
+    #[error("Single Response Mode is not supported")]
+    SrmNotSupported,
     #[error("Peer disconnected")]
     PeerDisconnected,
     #[error("Peer rejected {:?} request with Error: {:?}", .operation, .response)]
@@ -29,6 +31,8 @@ pub enum Error {
     PeerResponse { operation: OpCode, msg: String },
     #[error("{:?} is not implemented", .operation)]
     NotImplemented { operation: OpCode },
+    #[error(transparent)]
+    Other(#[from] anyhow::Error),
 }
 
 impl Error {

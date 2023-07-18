@@ -286,8 +286,8 @@ impl RequestPacket {
         Self::new(OpCode::Get, vec![], headers)
     }
 
-    pub fn new_get_final() -> Self {
-        Self::new(OpCode::GetFinal, vec![], HeaderSet::new())
+    pub fn new_get_final(headers: HeaderSet) -> Self {
+        Self::new(OpCode::GetFinal, vec![], headers)
     }
 
     pub fn new_put(headers: HeaderSet) -> Self {
