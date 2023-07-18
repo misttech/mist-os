@@ -41,9 +41,14 @@ def normalize_file_in_config(
             return
 
     if item_name in config_node and config_node[item_name] is not None:
+        # External dependencies can be found by navigating into output_base.
+        item_value = config_node[item_name]
+        if item_value.startswith("external"):
+            item_value = "../output_base/" + item_value
+
         # We've found the item to replace.
         # Rebase the path from the build root.
-        file_path = os.path.join(root_dir, config_node[item_name])
+        file_path = os.path.join(root_dir, item_value)
         # Replace it with the hash of the file.
         config_node[f"{item_name}_sha1"] = file_sha1(file_path)
         config_node.pop(item_name)
