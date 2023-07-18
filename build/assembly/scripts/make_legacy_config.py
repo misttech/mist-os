@@ -38,6 +38,8 @@ def copy_to_assembly_input_bundle(
     outdir: FilePath,
     base_driver_packages_list: List[str],
     base_driver_components_files_list: List[dict],
+    boot_driver_packages_list: List[str],
+    boot_driver_components_files_list: List[dict],
     shell_commands: Dict[str, List],
     core_realm_shards: List[FilePath],
     core_realm_includes: FileEntryList,
@@ -76,6 +78,14 @@ def copy_to_assembly_input_bundle(
             f"Duplicate package specified "
             " in base_driver_packages: {base_driver_packages_list}")
     aib_creator.base_driver_component_files = base_driver_components_files_list
+
+    aib_creator.boot_drivers = set(boot_driver_packages_list)
+    if len(aib_creator.boot_drivers) != len(boot_driver_packages_list):
+        raise ValueError(
+            f"Duplicate package specified "
+            " in boot_driver_packages: {boot_driver_packages_list}")
+    aib_creator.boot_driver_component_files = boot_driver_components_files_list
+
     aib_creator.config_data = config_data_entries
     aib_creator.shell_commands = shell_commands
 
@@ -123,6 +133,10 @@ def main():
     parser.add_argument(
         "--base-driver-components-files-list", type=argparse.FileType('r'))
     parser.add_argument(
+        "--boot-driver-packages-list", type=argparse.FileType('r'))
+    parser.add_argument(
+        "--boot-driver-components-files-list", type=argparse.FileType('r'))
+    parser.add_argument(
         "--shell-commands-packages-list", type=argparse.FileType('r'))
     parser.add_argument("--core-realm-shards-list", type=argparse.FileType('r'))
     parser.add_argument(
@@ -154,6 +168,12 @@ def main():
         base_driver_packages_list = json.load(args.base_driver_packages_list)
         base_driver_components_files_list = json.load(
             args.base_driver_components_files_list)
+
+    boot_driver_packages_list = None
+    if args.boot_driver_packages_list:
+        boot_driver_packages_list = json.load(args.boot_driver_packages_list)
+        boot_driver_components_files_list = json.load(
+            args.boot_driver_components_files_list)
 
     shell_commands = dict()
     shell_deps = set()
@@ -189,11 +209,11 @@ def main():
     (assembly_input_bundle, assembly_config_manifest_path,
      deps) = copy_to_assembly_input_bundle(
          legacy, config_data_entries, args.outdir, base_driver_packages_list,
-         base_driver_components_files_list, {
+         base_driver_components_files_list, boot_driver_packages_list,
+         boot_driver_components_files_list, {
              package: sorted(list(components))
              for (package, components) in shell_commands.items()
-         }, core_realm_shards, core_realm_includes,
-         args.bootfs_files_package)
+         }, core_realm_shards, core_realm_includes, args.bootfs_files_package)
 
     deps.update(shell_deps)
     # Write out a fini manifest of the files that have been copied, to create a
