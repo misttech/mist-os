@@ -592,7 +592,15 @@ fn aliases_to_rules(
     let rules = aliases
         .iter()
         .map(|alias| {
-            Rule::new(alias.to_string(), repo_name.to_string(), "/".to_string(), "/".to_string())
+            let mut split_alias = alias.split("/").collect::<Vec<&str>>();
+            let host_match = split_alias.remove(0);
+            let path_prefix = split_alias.join("/");
+            Rule::new(
+                host_match.to_string(),
+                repo_name.to_string(),
+                format!("/{path_prefix}"),
+                format!("/{path_prefix}"),
+            )
         })
         .collect::<Result<Vec<_>, _>>()
         .map_err(|err| {
@@ -2081,7 +2089,10 @@ mod tests {
             .expect("adding repository to succeed");
     }
 
-    async fn register_target(proxy: &ffx::RepositoryRegistryProxy, target: ffx::RepositoryTarget) {
+    async fn register_targets(
+        proxy: &ffx::RepositoryRegistryProxy,
+        targets: Vec<ffx::RepositoryTarget>,
+    ) {
         // We need to start the server before we can register a repository
         // on a target.
         proxy
@@ -2090,14 +2101,16 @@ mod tests {
             .expect("communicated with proxy")
             .expect("starting the server to succeed");
 
-        proxy
-            .register_target(
-                &target,
-                fidl_fuchsia_developer_ffx::RepositoryRegistrationAliasConflictMode::Replace,
-            )
-            .await
-            .expect("communicated with proxy")
-            .expect("target registration to succeed");
+        for target in targets {
+            proxy
+                .register_target(
+                    &target,
+                    fidl_fuchsia_developer_ffx::RepositoryRegistrationAliasConflictMode::Replace,
+                )
+                .await
+                .expect("communicated with proxy")
+                .expect("target registration to succeed");
+        }
     }
 
     async fn get_repositories(proxy: &ffx::RepositoryRegistryProxy) -> Vec<ffx::RepositoryConfig> {
@@ -2991,7 +3004,7 @@ mod tests {
             ..Default::default()
         };
 
-        register_target(&proxy, target.clone()).await;
+        register_targets(&proxy, vec![target.clone()]).await;
 
         // Registering the target should have set up a repository.
         match test_run_mode {
@@ -3157,7 +3170,7 @@ mod tests {
             ..Default::default()
         };
 
-        register_target(&proxy, target.clone()).await;
+        register_targets(&proxy, vec![target.clone()]).await;
 
         // Registering the target should have set up a repository.
         match test_run_mode {
@@ -3334,7 +3347,7 @@ mod tests {
             ..Default::default()
         };
 
-        register_target(&proxy, target.clone()).await;
+        register_targets(&proxy, vec![target.clone()]).await;
 
         // Registering the target should have set up a repository.
         match test_run_mode {
@@ -3457,6 +3470,242 @@ mod tests {
         });
     }
 
+    async fn check_add_register_with_registration_aliases_path_replacement(
+        test_run_mode: TestRunMode,
+    ) {
+        let overriding_repo_name = "overriding-repo";
+
+        let repo = Rc::new(RefCell::new(Repo {
+            inner: RepoInner::new(),
+            event_handler_provider: TestEventHandlerProvider,
+            registrar: Arc::new(RealRegistrar { ssh_provider: Arc::new(TestSshProvider::new()) }),
+        }));
+        let (fake_repo_manager, fake_repo_manager_closure) = FakeRepositoryManager::new();
+        let (fake_engine, fake_engine_closure) = FakeRewriteEngine::new();
+        let (fake_rcs, fake_rcs_closure) = FakeRcs::new();
+        let device_address = ffx::TargetAddrInfo::IpPort(ffx::TargetIpPort {
+            ip: IpAddress::Ipv4(Ipv4Address { addr: [127, 0, 0, 1] }),
+            scope_id: 0,
+            port: DEVICE_PORT,
+        });
+
+        let daemon = FakeDaemonBuilder::new()
+            .rcs_handler(fake_rcs_closure)
+            .register_instanced_protocol_closure::<RepositoryManagerMarker, _>(
+                fake_repo_manager_closure,
+            )
+            .register_instanced_protocol_closure::<RewriteEngineMarker, _>(fake_engine_closure)
+            .inject_fidl_protocol(Rc::clone(&repo))
+            .target(ffx::TargetInfo {
+                nodename: Some(TARGET_NODENAME.to_string()),
+                ssh_host_address: Some(ffx::SshHostAddrInfo { address: HOST_ADDR.to_string() }),
+                addresses: Some(vec![device_address.clone()]),
+                ssh_address: Some(device_address.clone()),
+                ..Default::default()
+            })
+            .build();
+
+        let proxy = daemon.open_proxy::<ffx::RepositoryRegistryMarker>().await;
+
+        // Make sure there is nothing in the registry.
+        assert_vec_empty!(fake_engine.take_events());
+        assert_vec_empty!(repo.borrow().take_events(PkgctlCommandType::RuleReplace));
+        assert_vec_empty!(get_repositories(&proxy).await);
+        assert_vec_empty!(get_target_registrations(&proxy).await);
+
+        add_repo(&proxy, REPO_NAME).await;
+        add_repo(&proxy, overriding_repo_name).await;
+
+        // We shouldn't have added repositories or rewrite rules to the fuchsia device yet.
+        assert_vec_empty!(fake_repo_manager.take_events());
+        assert_vec_empty!(fake_engine.take_events());
+        assert_vec_empty!(repo.borrow().take_events(PkgctlCommandType::RuleReplace));
+
+        let target = ffx::RepositoryTarget {
+            repo_name: Some(REPO_NAME.to_string()),
+            target_identifier: Some(TARGET_NODENAME.to_string()),
+            storage_type: Some(ffx::RepositoryStorageType::Ephemeral),
+            aliases: Some(vec!["example.com".to_string(), "fuchsia.com".to_string()]),
+            ..Default::default()
+        };
+
+        // For case of "fuchsia.com/specific-package", forward to "overriding_repo" instead.
+        let overriding_target = ffx::RepositoryTarget {
+            repo_name: Some(overriding_repo_name.to_string()),
+            target_identifier: Some(TARGET_NODENAME.to_string()),
+            storage_type: Some(ffx::RepositoryStorageType::Ephemeral),
+            aliases: Some(vec!["fuchsia.com/specific-package".to_string()]),
+            ..Default::default()
+        };
+
+        register_targets(&proxy, vec![target.clone(), overriding_target.clone()]).await;
+
+        // Registering the target and overriding_target should have set up a repository.
+        match test_run_mode {
+            TestRunMode::Fidl => {
+                assert_eq!(
+                    fake_repo_manager.take_events(),
+                    vec![
+                        RepositoryManagerEvent::Add { repo: test_repo_config_fidl(&repo).await },
+                        RepositoryManagerEvent::Add {
+                            repo: test_repo_config_fidl_with_repo_host(
+                                &repo,
+                                None,
+                                overriding_repo_name.into()
+                            )
+                            .await
+                        }
+                    ]
+                );
+
+                // Registering a repository should create a tunnel.
+                assert_eq!(
+                    fake_rcs.take_events(),
+                    vec![RcsEvent::ReverseTcp, RcsEvent::ReverseTcp]
+                );
+
+                // Expect SSH flow untouched.
+                assert_vec_empty!(repo.borrow().take_events(PkgctlCommandType::RepoAdd));
+            }
+            TestRunMode::Ssh => {
+                assert_eq!(
+                    repo.borrow().take_events(PkgctlCommandType::RepoAdd),
+                    vec![
+                        PkgctlCommandEvent {
+                            device_addr: SocketAddr::from_str(DEVICE_ADDR).unwrap(),
+                            args: test_repo_config_ssh(&repo).await
+                        },
+                        PkgctlCommandEvent {
+                            device_addr: SocketAddr::from_str(DEVICE_ADDR).unwrap(),
+                            args: test_repo_config_ssh_with_repo_host(
+                                &repo,
+                                None,
+                                overriding_repo_name.into()
+                            )
+                            .await
+                        },
+                    ]
+                );
+
+                // Registering a repository won't create a tunnel.
+                assert_vec_empty!(fake_rcs.take_events());
+
+                // Expect FIDL flow untouched.
+                assert_vec_empty!(fake_repo_manager.take_events());
+            }
+        }
+
+        // Adding the registration should have set up rewrite rules from the registration
+        // aliases.
+        match test_run_mode {
+            TestRunMode::Fidl => {
+                assert_eq!(
+                    fake_engine.take_events(),
+                    vec![
+                        RewriteEngineEvent::ListDynamic,
+                        RewriteEngineEvent::IteratorNext,
+                        RewriteEngineEvent::ResetAll,
+                        RewriteEngineEvent::EditTransactionAdd {
+                            rule: rule!("example.com" => REPO_NAME, "/" => "/"),
+                        },
+                        RewriteEngineEvent::EditTransactionAdd {
+                            rule: rule!("fuchsia.com" => REPO_NAME, "/" => "/"),
+                        },
+                        RewriteEngineEvent::EditTransactionCommit,
+                        RewriteEngineEvent::ListDynamic,
+                        RewriteEngineEvent::IteratorNext,
+                        RewriteEngineEvent::ResetAll,
+                        RewriteEngineEvent::EditTransactionAdd {
+                            rule: rule!("fuchsia.com" => overriding_repo_name, "/specific-package" => "/specific-package"),
+                        },
+                        RewriteEngineEvent::EditTransactionCommit,
+                    ],
+                );
+
+                // Expect SSH flow untouched.
+                assert_vec_empty!(repo.borrow().take_events(PkgctlCommandType::RuleReplace));
+            }
+            TestRunMode::Ssh => {
+                assert_eq!(
+                    repo.borrow().take_events(PkgctlCommandType::RuleReplace),
+                    vec![
+                        PkgctlCommandEvent {
+                            device_addr: SocketAddr::from_str(DEVICE_ADDR).unwrap(),
+                            args: test_target_alias_ssh(&repo, REPO_NAME, &target).await
+                        },
+                        PkgctlCommandEvent {
+                            device_addr: SocketAddr::from_str(DEVICE_ADDR).unwrap(),
+                            args: test_target_alias_ssh(
+                                &repo,
+                                overriding_repo_name,
+                                &overriding_target
+                            )
+                            .await
+                        },
+                    ]
+                );
+
+                // Expect FIDL flow untouched.
+                assert_vec_empty!(fake_engine.take_events());
+            }
+        }
+
+        // The RepositoryRegistry should remember we set up the registrations.
+        assert_eq!(
+            get_target_registrations(&proxy).await,
+            vec![
+                ffx::RepositoryTarget {
+                    repo_name: Some(overriding_repo_name.to_string()),
+                    target_identifier: Some(TARGET_NODENAME.to_string()),
+                    storage_type: Some(ffx::RepositoryStorageType::Ephemeral),
+                    aliases: Some(vec!["fuchsia.com/specific-package".to_string()]),
+                    ..Default::default()
+                },
+                ffx::RepositoryTarget {
+                    repo_name: Some(REPO_NAME.to_string()),
+                    target_identifier: Some(TARGET_NODENAME.to_string()),
+                    storage_type: Some(ffx::RepositoryStorageType::Ephemeral),
+                    aliases: Some(vec!["example.com".to_string(), "fuchsia.com".to_string()]),
+                    ..Default::default()
+                }
+            ],
+        );
+
+        // We should have saved the registrations to the config.
+        assert_matches!(
+            pkg::config::get_registration(REPO_NAME, TARGET_NODENAME).await,
+            Ok(Some(reg)) if reg == RepositoryTarget {
+                repo_name: "some-repo".to_string(),
+                target_identifier: Some("some-target".to_string()),
+                aliases: Some(BTreeSet::from(["example.com".to_string(), "fuchsia.com".to_string()])),
+                storage_type: Some(RepositoryStorageType::Ephemeral),
+            }
+        );
+        assert_matches!(
+            pkg::config::get_registration(overriding_repo_name, TARGET_NODENAME).await,
+            Ok(Some(reg)) if reg == RepositoryTarget {
+                repo_name: overriding_repo_name.to_string(),
+                target_identifier: Some(TARGET_NODENAME.to_string()),
+                aliases: Some(BTreeSet::from(["fuchsia.com/specific-package".to_string()])),
+                storage_type: Some(RepositoryStorageType::Ephemeral),
+            }
+        );
+    }
+
+    #[test]
+    fn test_add_register_with_registration_aliases_path_replacement_with_fidl() {
+        run_test(TestRunMode::Fidl, async {
+            check_add_register_with_registration_aliases_path_replacement(TestRunMode::Fidl).await
+        });
+    }
+
+    #[test]
+    fn test_add_register_with_registration_aliases_path_replacement_with_ssh() {
+        run_test(TestRunMode::Ssh, async {
+            check_add_register_with_registration_aliases_path_replacement(TestRunMode::Ssh).await
+        });
+    }
+
     #[test]
     fn test_duplicate_registration_aliases_error() {
         run_test(TestRunMode::Fidl, async {
@@ -3494,15 +3743,15 @@ mod tests {
             assert_eq!(fake_repo_manager.take_events(), vec![]);
             assert_eq!(fake_engine.take_events(), vec![]);
 
-            register_target(
+            register_targets(
                 &proxy,
-                ffx::RepositoryTarget {
+                vec![ffx::RepositoryTarget {
                     repo_name: Some(REPO_NAME.to_string()),
                     target_identifier: Some(TARGET_NODENAME.to_string()),
                     storage_type: Some(ffx::RepositoryStorageType::Ephemeral),
                     aliases: Some(vec!["example.com".to_string(), conflicting_alias.clone()]),
                     ..Default::default()
-                },
+                }],
             )
             .await;
 
@@ -3641,15 +3890,15 @@ mod tests {
         assert_vec_empty!(fake_engine.take_events());
         assert_vec_empty!(repo.borrow().take_events(PkgctlCommandType::RuleReplace));
 
-        register_target(
+        register_targets(
             &proxy,
-            ffx::RepositoryTarget {
+            vec![ffx::RepositoryTarget {
                 repo_name: Some(REPO_NAME.to_string()),
                 target_identifier: Some(TARGET_NODENAME.to_string()),
                 storage_type: Some(ffx::RepositoryStorageType::Ephemeral),
                 aliases: None,
                 ..Default::default()
-            },
+            }],
         )
         .await;
 
@@ -3851,15 +4100,15 @@ mod tests {
             let proxy = daemon.open_proxy::<ffx::RepositoryRegistryMarker>().await;
             add_repo(&proxy, REPO_NAME).await;
 
-            register_target(
+            register_targets(
                 &proxy,
-                ffx::RepositoryTarget {
+                vec![ffx::RepositoryTarget {
                     repo_name: Some(REPO_NAME.to_string()),
                     target_identifier: Some(TARGET_NODENAME.to_string()),
                     storage_type: Some(ffx::RepositoryStorageType::Ephemeral),
                     aliases: Some(vec!["example.com".to_string(), "fuchsia.com".to_string()]),
                     ..Default::default()
-                },
+                }],
             )
             .await;
 
@@ -3974,7 +4223,7 @@ mod tests {
             ..Default::default()
         };
 
-        register_target(&proxy, target.clone()).await;
+        register_targets(&proxy, vec![target.clone()]).await;
 
         // Registering the target should have set up a repository.
         match test_run_mode {
@@ -4095,15 +4344,15 @@ mod tests {
         // Make sure the registry doesn't have any registrations.
         assert_vec_empty!(get_target_registrations(&proxy).await);
 
-        register_target(
+        register_targets(
             &proxy,
-            ffx::RepositoryTarget {
+            vec![ffx::RepositoryTarget {
                 repo_name: Some(REPO_NAME.to_string()),
                 target_identifier: Some(TARGET_NODENAME.to_string()),
                 storage_type: Some(ffx::RepositoryStorageType::Ephemeral),
                 aliases: Some(vec![]),
                 ..Default::default()
-            },
+            }],
         )
         .await;
 
@@ -4205,7 +4454,7 @@ mod tests {
             ..Default::default()
         };
 
-        register_target(&proxy, target.clone()).await;
+        register_targets(&proxy, vec![target.clone()]).await;
 
         // Make sure we set up the repository on the device.
         match test_run_mode {
