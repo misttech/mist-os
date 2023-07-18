@@ -75,12 +75,12 @@ if (current_toolchain == default_toolchain) {
               _source_root + "prebuilt/third_party/rust/*/lib/debug/.build-id"
         },
       ]
-      gcs_flat = [
+      debuginfod = [
         {
-          url = "gs://fuchsia-artifacts/debug"
+          url = "gs://fuchsia-artifacts/"
         },
         {
-          url = "gs://fuchsia-public-artifacts-release/debug"
+          url = "gs://fuchsia-public-artifacts-release/"
         },
       ]
     }
@@ -100,12 +100,12 @@ if (current_toolchain == default_toolchain) {
         },
       ]
 
-      gcs_flat = [
+      debuginfod = [
         {
-          url = "gs://fuchsia-artifacts/debug"
+          url = "gs://fuchsia-artifacts/"
         },
         {
-          url = "gs://fuchsia-public-artifacts-release/debug"
+          url = "gs://fuchsia-public-artifacts-release/"
         },
       ]
     }
