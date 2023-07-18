@@ -11,6 +11,6 @@ last_reviewed_date: {
 trackers: {
   monorail: {
     project: "fuchsia"
-    component: "Zircon>drivers"
+    component: "WLAN"
   }
 }
