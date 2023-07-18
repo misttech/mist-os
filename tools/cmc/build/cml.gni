@@ -114,6 +114,10 @@ template("cm") {
     # feature in OOT builds.
     restricted_features += [ "enable_allow_non_hermetic_packages_feature" ]
 
+    # Enable restriction on 'test_type' facet.
+    # Refer https://fuchsia.dev/fuchsia-src/development/testing/components/test_runner_framework?hl=en#non-hermetic_tests
+    restricted_features += [ "restrict_test_type_in_facets" ]
+
     # Opt-in to the requested restricted_features.
     args += [ "--features" ] + restricted_features
 

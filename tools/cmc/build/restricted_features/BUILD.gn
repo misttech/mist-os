@@ -69,3 +69,8 @@ group("allow_non_hermetic_packages") {
 group("enable_allow_non_hermetic_packages_feature") {
   # Available to all components in fuchsia.git
 }
+
+# The allowlist of components that can use the "restrict_test_type_in_facets" feature in CML.
+group("restrict_test_type_in_facets") {
+  # Available to all components in fuchsia.git
+}
