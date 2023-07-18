@@ -1,11 +1,11 @@
 // Copyright 2023 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
-use crate::symbolizer_impl::{is_symbolizer_context_marker, Symbolizer};
 use anyhow::Result;
 use async_trait::async_trait;
 use log_command::log_formatter;
 use log_formatter::{LogData, LogEntry, Symbolize};
+use log_symbolizer::{is_symbolizer_context_marker, Symbolizer};
 use std::fmt::Debug;
 use thiserror::Error;
 
@@ -100,10 +100,10 @@ where
 mod tests {
     use std::{cell::RefCell, rc::Rc};
 
-    use crate::symbolizer_impl::FakeSymbolizerForTest;
     use assert_matches::assert_matches;
     use diagnostics_data::{BuilderArgs, LogsDataBuilder, Severity, Timestamp};
     use futures::StreamExt;
+    use log_symbolizer::FakeSymbolizerForTest;
 
     use super::*;
 

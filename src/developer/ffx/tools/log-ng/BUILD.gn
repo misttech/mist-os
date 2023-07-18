@@ -21,18 +21,14 @@ rustc_library("lib") {
     "//src/developer/ffx/config:lib",
     "//src/developer/ffx/lib/fho:lib",
     "//src/developer/ffx/lib/rcs:lib",
-    "//src/developer/ffx/lib/symbol-index",
     "//src/diagnostics/lib/log-command",
+    "//src/diagnostics/lib/log_symbolizer",
     "//src/lib/diagnostics/data/rust",
     "//src/lib/fidl/rust/fidl",
     "//src/lib/fuchsia-async",
     "//third_party/rust_crates:anyhow",
     "//third_party/rust_crates:async-channel",
-    "//third_party/rust_crates:async-io",
-    "//third_party/rust_crates:async-lock",
     "//third_party/rust_crates:async-trait",
-    "//third_party/rust_crates:futures",
-    "//third_party/rust_crates:futures-lite",
     "//third_party/rust_crates:regex",
     "//third_party/rust_crates:serde",
     "//third_party/rust_crates:thiserror",
@@ -44,7 +40,6 @@ rustc_library("lib") {
     "src/lib.rs",
     "src/spam_filter.rs",
     "src/symbolizer.rs",
-    "src/symbolizer_impl.rs",
     "src/testing_utils.rs",
   ]
 
@@ -62,6 +57,7 @@ rustc_library("lib") {
   ]
 }
 
+# TODO(https://fxbug.dev/883811): Rename directory to match target.
 ffx_tool("ffx_log-ng") {
   edition = "2021"
   output_name = "ffx-log-ng"

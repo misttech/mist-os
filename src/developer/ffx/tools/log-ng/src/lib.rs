@@ -18,14 +18,13 @@ use log_command::{
     },
     LogCommand, LogSubCommand, WatchCommand,
 };
+use log_symbolizer::NoOpSymbolizer;
 use std::io::Write;
 use symbolizer::SymbolizerChannel;
-use symbolizer_impl::NoOpSymbolizer;
 
 mod error;
 pub mod spam_filter;
 mod symbolizer;
-pub mod symbolizer_impl;
 #[cfg(test)]
 mod testing_utils;
 

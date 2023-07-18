@@ -10,6 +10,7 @@ group("tests") {
     "inspect-fetcher:tests",
     "inspect-fidl-load:tests",
     "log-command:tests",
+    "log_symbolizer:tests($host_toolchain)",
     "persistence:tests",
     "sampler-config:tests",
     "triage:tests",

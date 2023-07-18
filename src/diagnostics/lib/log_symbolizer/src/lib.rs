@@ -18,7 +18,8 @@ use std::{
 use symbol_index::ensure_symbol_index_registered;
 
 // TODO(https://fxbug.dev/121413): Remove this.
-pub(crate) struct NoOpSymbolizer {
+/// No-op symbolizer used for testing
+pub struct NoOpSymbolizer {
     _task: Cell<Option<fuchsia_async::Task<Result<(), async_channel::SendError<String>>>>>,
 }
 
@@ -29,7 +30,7 @@ impl std::fmt::Debug for NoOpSymbolizer {
 }
 
 impl NoOpSymbolizer {
-    pub(crate) fn new() -> Self {
+    pub fn new() -> Self {
         Self { _task: Cell::new(None) }
     }
 }
@@ -54,6 +55,7 @@ impl Symbolizer for NoOpSymbolizer {
 
 const BARRIER: &str = "<ffx symbolizer>\n";
 
+/// Returns true if the given string is a context marker.
 pub fn is_symbolizer_context_marker(s: &str) -> bool {
     return s.starts_with("{{{reset}}}")
         || s.starts_with("{{{bt")
@@ -62,8 +64,10 @@ pub fn is_symbolizer_context_marker(s: &str) -> bool {
         || s.starts_with("{{{module");
 }
 
+/// Symbolizer trait used for communicating with a symbolizer
 #[async_trait::async_trait(?Send)]
 pub trait Symbolizer {
+    /// Starts the symbolizer with the provided arguments.
     async fn start(
         &self,
         rx: Receiver<String>,
@@ -76,6 +80,8 @@ struct LogSymbolizerInner {
     child: Child,
     _task: Task<Result<()>>,
 }
+
+/// Real symbolizer implementation
 pub struct LogSymbolizer {
     inner: std::cell::RefCell<Option<LogSymbolizerInner>>,
 }

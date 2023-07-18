@@ -7,11 +7,7 @@ use async_channel::bounded;
 use diagnostics_data::{LogsData, Timestamp};
 use ffx_config::get;
 use ffx_log_data::{EventType, LogData, LogEntry};
-use ffx_log_utils::{
-    run_logging_pipeline,
-    symbolizer::{is_symbolizer_context_marker, LogSymbolizer, Symbolizer},
-    OrderedBatchPipeline,
-};
+use ffx_log_utils::{run_logging_pipeline, OrderedBatchPipeline};
 use fidl::endpoints::DiscoverableProtocolMarker;
 use fidl::endpoints::{create_proxy, ServerEnd};
 use fidl_fuchsia_developer_remotecontrol::{
@@ -21,6 +17,7 @@ use fidl_fuchsia_developer_remotecontrol::{
 use fidl_fuchsia_diagnostics::ClientSelectorConfiguration;
 use fidl_fuchsia_io::OpenFlags;
 use futures::{AsyncReadExt, StreamExt, TryFutureExt};
+use log_symbolizer::{is_symbolizer_context_marker, LogSymbolizer, Symbolizer};
 use serde::{Deserialize, Serialize};
 use std::{convert::TryInto, future::Future, rc::Weak, sync::Arc, time::SystemTime};
 use streamer::GenericDiagnosticsStreamer;
@@ -484,7 +481,6 @@ mod test {
     use ffx_log_test_utils::{
         setup_fake_archive_iterator, ArchiveIteratorParameters, FakeArchiveIteratorResponse,
     };
-    use ffx_log_utils::symbolizer::FakeSymbolizerForTest;
     use fidl::endpoints::RequestStream;
     use fidl_fuchsia_developer_remotecontrol::{
         ArchiveIteratorError, IdentifyHostResponse, RemoteControlMarker, RemoteControlProxy,
@@ -494,6 +490,7 @@ mod test {
     use fidl_fuchsia_overnet_protocol::NodeId;
     use futures::TryStreamExt;
     use hoist::Hoist;
+    use log_symbolizer::FakeSymbolizerForTest;
     use rcs::RcsConnection;
     use std::rc::Rc;
     use streamer::SessionStream;
