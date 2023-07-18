@@ -111,8 +111,6 @@ source_set("lib") {
     "coordinator.h",
     "device.cc",
     "device.h",
-    "device_v2.cc",
-    "device_v2.h",
     "driver_host.cc",
     "driver_host.h",
     "driver_host_loader_service.cc",

@@ -15,6 +15,7 @@
 #include <lib/zx/channel.h>
 #include <lib/zx/event.h>
 
+#include <list>
 #include <memory>
 #include <utility>
 #include <variant>
@@ -28,7 +29,6 @@
 
 #include "src/devices/bin/driver_manager/constants.h"
 #include "src/devices/bin/driver_manager/devfs/devfs.h"
-#include "src/devices/bin/driver_manager/device_v2.h"
 #include "src/devices/bin/driver_manager/inspect.h"
 #include "src/devices/bin/driver_manager/metadata.h"
 #include "src/devices/bin/driver_manager/v1/composite_device.h"
@@ -36,7 +36,6 @@
 #include "src/devices/bin/driver_manager/v1/resume_task.h"
 #include "src/devices/bin/driver_manager/v1/suspend_task.h"
 #include "src/devices/bin/driver_manager/v1/unbind_task.h"
-#include "src/devices/bin/driver_manager/v2/node.h"
 
 namespace fio = fuchsia_io;
 
@@ -85,8 +84,7 @@ struct DeviceAllDevicesListTag {};
 }  // namespace internal
 
 class Device final
-    : public dfv2::NodeManager,
-      public fbl::RefCounted<Device>,
+    : public fbl::RefCounted<Device>,
       public fidl::WireServer<fuchsia_device_manager::Coordinator>,
       public fbl::ContainableBaseClasses<
           fbl::TaggedDoublyLinkedListable<Device*, internal::DeviceChildListTag>,
@@ -322,9 +320,6 @@ class Device final
 
   DevfsDevice devfs;
 
-  std::shared_ptr<dfv2::Node> GetBoundNode();
-  zx::result<std::shared_ptr<dfv2::Node>> CreateDFv2Device();
-
   enum class State {
     kActive,
     /* The driver_host is in the process of running the device init hook.*/
@@ -394,17 +389,6 @@ class Device final
   void ScheduleUnbindChildren(ScheduleUnbindChildrenCompleter::Sync& _completer) override;
   void ConnectFidlProtocol(ConnectFidlProtocolRequestView request,
                            ConnectFidlProtocolCompleter::Sync& completer) override;
-
-  // dfv2::NodeManager
-  void Bind(dfv2::Node& node, std::shared_ptr<dfv2::BindResultTracker> result_tracker) override {}
-  void DestroyDriverComponent(
-      dfv2::Node& node,
-      fit::callback<void(fidl::WireUnownedResult<fuchsia_component::Realm::DestroyChild>& result)>
-          callback) override {}
-
-  zx::result<dfv2::DriverHost*> CreateDriverHost() override {
-    return zx::error(ZX_ERR_NOT_SUPPORTED);
-  }
 
   // This is a template so we can share the same code between a nonconst and
   // const version.
@@ -504,12 +488,6 @@ class Device final
 
   // This lets us check for unexpected removals and is for testing use only.
   size_t num_removal_attempts_ = 0;
-
-  // This is the symbol we got from the driver host for the device's banjo protocol.
-  uint64_t dfv2_device_symbol_ = 0;
-
-  // If this is not null, there is a DFv2 driver bound to this device.
-  std::shared_ptr<dfv2::Device> dfv2_bound_device_;
 
   // If not null, links to the driver which has bound to this device.
   // This is set when the driver is bound in `Coordinator::BindDriverToDevice`.

@@ -24,7 +24,6 @@ group("tests") {
     "runtime-dispatcher:tests",
     "runtime-protocol:tests",
     "services:tests",
-    "v1_lifecycle:tests",
   ]
 }
 
@@ -55,6 +54,5 @@ group("drivers") {
     "runtime-protocol:leaf",
     "runtime-protocol:root",
     "services:root",
-    "v1_lifecycle:drivers",
   ]
 }

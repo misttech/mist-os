@@ -809,10 +809,6 @@ void Device::AddDevice(AddDeviceRequestView request, AddDeviceCompleter::Sync& c
       request->args.has_init, kEnableAlwaysInit, std::move(request->inspect),
       std::move(request->outgoing_dir), &device);
 
-  if (device != nullptr) {
-    device->dfv2_device_symbol_ = request->args.dfv2_device_symbol;
-  }
-
   uint64_t local_id = device != nullptr ? device->local_id() : 0;
   if (status != ZX_OK) {
     completer.ReplyError(status);
@@ -1048,59 +1044,4 @@ void Device::set_bound_driver(const Driver* driver) {
 void Device::clear_bound_driver() {
   flags &= (~DEV_CTX_BOUND);
   bound_driver_ = nullptr;
-}
-
-std::shared_ptr<dfv2::Node> Device::GetBoundNode() {
-  if (!dfv2_bound_device_) {
-    return nullptr;
-  }
-  return dfv2_bound_device_->node();
-}
-
-zx::result<std::shared_ptr<dfv2::Node>> Device::CreateDFv2Device() {
-  if (dfv2_bound_device_) {
-    return zx::error(ZX_ERR_ALREADY_EXISTS);
-  }
-
-  std::string full_path = MakeTopologicalPath();
-  // The topo_path needs to remove the leading "/dev/".
-  auto topo_path = full_path.substr(std::string_view("/dev/").size());
-
-  std::string name = std::to_string(coordinator->GetNextDfv2DeviceId());
-
-  // Create the DeviceServer for the driver.
-  std::optional<compat::ServiceOffersV1> service_offers;
-  if (has_outgoing_directory()) {
-    zx::result outgoing_dir = clone_outgoing_dir();
-    if (outgoing_dir.is_error()) {
-      return outgoing_dir.take_error();
-    }
-    // TODO(fxbug.dev/109809): Connect the FIDL offers here.
-    service_offers.emplace(name, std::move(outgoing_dir.value()), compat::FidlServiceOffers());
-  }
-  auto server = compat::DeviceServer(name, protocol_id_, topo_path, std::move(service_offers));
-
-  // Set the metadata for the DeviceServer.
-  for (auto& metadata : metadata()) {
-    zx_status_t status = server.AddMetadata(metadata.type, metadata.Data(), metadata.length);
-    if (status != ZX_OK) {
-      return zx::error(status);
-    }
-  }
-
-  DeviceInspect inspect = inspect_.CreateChild(name, zx::vmo(), protocol_id_);
-  auto dfv2_device = dfv2::Device::CreateAndServe(
-      topo_path, name, dfv2_device_symbol_, std::move(inspect), coordinator->dispatcher(),
-      &coordinator->outgoing(), std::move(server), this, host().get());
-  if (dfv2_device.is_error()) {
-    return dfv2_device.take_error();
-  }
-  dfv2_bound_device_ = std::move(*dfv2_device);
-  flags |= DEV_CTX_BOUND;
-  DevfsDevice& node_devfs = dfv2_bound_device_->node()->devfs_device();
-  // TODO(https://fxbug.dev/125288): Rework the topology to not need this dfv2 devfs node.
-  devfs.topological_node()->add_child("dfv2", std::nullopt, Devnode::Target(), node_devfs);
-  node_devfs.publish();
-
-  return zx::ok(dfv2_bound_device_->node());
 }

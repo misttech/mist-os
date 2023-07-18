@@ -256,7 +256,6 @@ int RunDfv1(driver_manager_config::Config dm_config,
 
   // Find and load v1 Drivers.
   coordinator.PublishDriverDevelopmentService(outgoing);
-  coordinator.driver_loader().Publish(outgoing);
 
   // V1 Drivers.
   zx_status_t status =

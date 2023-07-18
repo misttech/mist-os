@@ -37,20 +37,6 @@ bool VerifyMatchedCompositeNodeParentInfo(fdi::wire::MatchedCompositeNodeParentI
   return true;
 }
 
-std::string_view ToCollectionName(fuchsia_driver_index::DriverPackageType package) {
-  switch (package) {
-    case fdi::DriverPackageType::kBoot:
-      return "boot-drivers";
-    case fdi::DriverPackageType::kBase:
-      return "pkg-drivers";
-    case fdi::DriverPackageType::kCached:
-    case fdi::DriverPackageType::kUniverse:
-      return "full-pkg-drivers";
-    default:
-      return {};
-  }
-}
-
 }  // namespace
 
 const Driver* DriverLoader::UrlToDriver(const std::string& url) {
@@ -85,70 +71,6 @@ void DriverLoader::WaitForBaseDrivers(fit::callback<void()> callback) {
         include_fallback_drivers_ = true;
         callback();
       });
-}
-
-void DriverLoader::LoadDriverComponent(std::string_view moniker, std::string_view manifest_url,
-                                       fidl::VectorView<fuchsia_component_decl::wire::Offer> offers,
-                                       fuchsia_driver_index::DriverPackageType package_type,
-                                       fit::callback<void(zx::result<DriverComponent>)> callback) {
-  driver_manager::Runner::StartCallback start_cb =
-      [callback = std::move(callback)](
-          zx::result<driver_manager::Runner::StartedComponent> driver_component) mutable {
-        if (driver_component.is_error()) {
-          return callback(driver_component.take_error());
-        }
-
-        std::string compat_path;
-        for (fuchsia_data::DictionaryEntry& entry :
-             driver_component->info.program().value().entries().value()) {
-          if (entry.key() == "compat") {
-            compat_path = entry.value()->str().value();
-            break;
-          }
-        }
-        if (compat_path.empty()) {
-          return callback(zx::ok(DriverComponent{
-              .driver = nullptr,
-              .component = std::move(driver_component.value()),
-          }));
-        }
-
-        std::unique_ptr driver = std::make_unique<Driver>();
-        driver->url = driver_component.value().info.resolved_url().value();
-        fidl::WireSyncClient<fuchsia_io::Directory> package_dir;
-        for (fuchsia_component_runner::ComponentNamespaceEntry& entry :
-             driver_component->info.ns().value()) {
-          if (entry.path() != "/pkg") {
-            continue;
-          }
-          zx::result clone = component::Clone(entry.directory().value());
-          if (clone.is_error()) {
-            return callback(clone.take_error());
-          }
-          package_dir = fidl::WireSyncClient(std::move(clone.value()));
-        }
-        if (!package_dir) {
-          return callback(zx::error(ZX_ERR_INTERNAL));
-        }
-
-        zx::result vmo = load_driver_vmo(package_dir, compat_path);
-        if (vmo.is_error()) {
-          return callback(vmo.take_error());
-        }
-        driver->dso_vmo = std::move(vmo.value());
-
-        if (zx_status_t status = fdio_fd_create(package_dir.TakeClientEnd().TakeChannel().release(),
-                                                driver->package_dir.reset_and_get_address());
-            status != ZX_OK) {
-          return callback(zx::error(status));
-        }
-        return callback(zx::ok(DriverComponent{
-            .driver = std::move(driver),
-            .component = std::move(driver_component.value()),
-        }));
-      };
-  runner_.StartDriverComponent(moniker, manifest_url, ToCollectionName(package_type), offers,
-                               std::move(start_cb));
 }
 
 const Driver* DriverLoader::LoadDriverUrl(const std::string& manifest_url,
