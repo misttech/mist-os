@@ -24,5 +24,6 @@ declare_args() {
 # into the IDK archive.
 idk_target_cpus = [
   "arm64",
+  "riscv64",
   "x64",
 ]

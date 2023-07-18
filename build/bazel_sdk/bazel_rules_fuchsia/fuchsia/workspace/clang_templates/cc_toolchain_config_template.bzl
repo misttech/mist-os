@@ -334,7 +334,7 @@ def _cc_toolchain_config_impl(ctx):
 cc_toolchain_config = rule(
     implementation = _cc_toolchain_config_impl,
     attrs = {
-        "cpu": attr.string(mandatory = True, values = ["aarch64", "x86_64"]),
+        "cpu": attr.string(mandatory = True, values = ["aarch64", "riscv64", "x86_64"]),
     },
     provides = [CcToolchainConfigInfo],
 )

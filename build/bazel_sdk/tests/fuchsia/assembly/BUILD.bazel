@@ -112,6 +112,7 @@ fuchsia_product_configuration_test(
     golden_file = select({
         "@fuchsia_sdk//fuchsia/constraints:cpu_arm64": ":test_data/product_config_golden_file_arm64.json",
         "@fuchsia_sdk//fuchsia/constraints:cpu_x64": ":test_data/product_config_golden_file_x64.json",
+        "@fuchsia_sdk//fuchsia/constraints:cpu_riscv64": ":test_data/product_config_golden_file_riscv64.json",
     }),
     product_config = ":testing_product_config",
     visibility = ["//visibility:public"],

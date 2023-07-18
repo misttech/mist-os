@@ -417,6 +417,7 @@ def _to_fuchsia_cpu_name(cpu_name):
 _FUCHSIA_CPU_CONSTRAINT_MAP = {
     "x64": "@fuchsia_sdk//fuchsia/constraints:cpu_x64",
     "arm64": "@fuchsia_sdk//fuchsia/constraints:cpu_arm64",
+    "riscv64": "@fuchsia_sdk//fuchsia/constraints:cpu_riscv64",
 }
 
 # Maps a variant name to the corresponding config_setting() label in

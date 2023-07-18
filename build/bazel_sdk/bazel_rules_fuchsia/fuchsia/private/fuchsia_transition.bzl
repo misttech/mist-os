@@ -15,6 +15,7 @@ NATIVE_CPU_ALIASES = {
     "aarch64": "aarch64",
     "darwin_arm64": "aarch64",
     "darwin_x86_64": "x86_64",
+    "riscv64": "riscv64",
 }
 
 FUCHSIA_PLATFORMS_MAP = {

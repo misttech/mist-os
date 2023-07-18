@@ -1,0 +1,72 @@
+{
+    "platform": {
+        "build_type": "user",
+        "connectivity": {
+            "wlan": {
+                "legacy_privacy_support": true
+            }
+        },
+        "development_support": {
+            "enabled": true
+        },
+        "diagnostics": {
+            "archivist": "default",
+            "additional_serial_log_components": [
+                "/core/session-manager",
+                "/core/session-manager/session:session"
+            ]
+        },
+        "identity": {
+            "password_pinweaver": "required"
+        },
+        "input": {
+            "supported_input_devices": [
+                "button",
+                "keyboard"
+            ]
+        },
+        "some": {
+            "random": {
+                "path1": true,
+                "int1": 3234234324231434134141234,
+                "string1": "I have a string"
+            }
+        },
+        "another": {
+            "random": {
+                "path1": false,
+                "int": 0,
+                "string2": "false"
+            }
+        }
+    },
+    "product": {
+        "base_drivers": [
+            {
+                "components": [
+                    "meta/backlight_driver.cm"
+                ],
+                "package": "bazel-out/riscv64-fastbuild/bin/fuchsia/assembly/prebuilt_driver_expanded/rebased_package_manifest.json"
+            }
+        ],
+        "packages": {
+            "base": [
+                {
+                    "config_data": [
+                        {
+                            "destination": "config_data.json",
+                            "source": "fuchsia/assembly/test_data/config_data.json"
+                        }
+                    ],
+                    "manifest": "bazel-out/riscv64-fastbuild/bin/fuchsia/assembly/prebuilt_ams_light_expanded/rebased_package_manifest.json"
+                }
+            ],
+            "cache": [
+                {
+                    "manifest": "bazel-out/riscv64-fastbuild/bin/fuchsia/assembly/prebuilt_ams_light_expanded/rebased_package_manifest.json"
+                }
+            ]
+        },
+        "session_url": "fuchsia-pkg://fuchsia.com/tiles-session#meta/tiles-session.cm"
+    }
+}
