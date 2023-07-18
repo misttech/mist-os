@@ -20,22 +20,10 @@ Builds on [bringup](#bringup)
 
 ## Workstation track
 
-### Terminal
+### Terminal (deprecated per [RFC-0220])
 
 A system with a simple graphical user interface with a command-line terminal.
 
 Builds on [core](#core).
 
-### Workstation
-
-A system that software developers can use to get work done.
-
-Builds on [terminal](#terminal).
-
-## Headless track
-
-### Speaker
-
-A system without a graphical user interface.
-
-Builds on [core](#core).
+[RFC-0220]: /docs/contribute/governance/rfcs/0220_the_future_of_in_tree_products.md

@@ -162,7 +162,7 @@ instance with `fx ota`), and metrics reporting (for instance with `fx snapshot`)
 
 Once core builds work, a full system can be integrated by defining a new product configuration. For
 instance for x64 we already define
-[workstation_eng](https://fuchsia.googlesource.com/fuchsia/+/main/products/workstation_eng.gni) which
+[workbench_eng](https://fuchsia.googlesource.com/fuchsia/+/main/products/workbench_eng.gni) which
 includes a web browser and many other features. Similarly new product configurations can be added
 for other architectures, for instance for ARM64 based systems.
 
