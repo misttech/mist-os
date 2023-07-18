@@ -13,11 +13,6 @@ pub struct PlatformUiConfig {
     #[serde(default)]
     pub enabled: bool,
 
-    /// Use the legacy feature set.
-    /// TODO(fxbug.dev/124273): This will be deleted once legacy is removed.
-    #[serde(default)]
-    pub legacy: bool,
-
     /// The sensor config to provide to the input pipeline.
     #[serde(default)]
     pub sensor_config: Option<Utf8PathBuf>,
@@ -41,7 +36,6 @@ impl Default for PlatformUiConfig {
     fn default() -> Self {
         Self {
             enabled: Default::default(),
-            legacy: Default::default(),
             sensor_config: Default::default(),
             frame_scheduler_min_predicted_frame_duration_in_us: Default::default(),
             pointer_auto_focus: true,
