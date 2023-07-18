@@ -25,6 +25,7 @@
 .gdbinit
 .jiri_manifest
 .landmines
+.local
 .packages
 .project
 .pydevproject
@@ -176,3 +177,4 @@ reproxy-gomaip.cache*
 
 # Local test coverage file.
 lcov.info
+.coverage
