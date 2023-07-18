@@ -197,7 +197,7 @@ type ChildLocation = flexible union {
 /// Offers detailed introspection into component instances under a realm.
 @discoverable
 closed protocol RealmQuery {
-    /// Gets an instance identified by its relative moniker.
+    /// Gets an instance identified by its moniker.
     @available(added=11)
     strict GetInstance(struct {
         moniker string:fuchsia.component.MAX_MONIKER_LENGTH;
@@ -205,7 +205,7 @@ closed protocol RealmQuery {
         instance Instance;
     }) error GetInstanceError;
 
-    /// Gets the manifest of an instance identified by its relative moniker.
+    /// Gets the manifest of an instance identified by its moniker.
     ///
     /// The manifest is encoded in its standalone persistable format per RFC-0120 and
     /// is sent across using an iterator. Some manifests are too large to send over a
@@ -243,7 +243,7 @@ closed protocol RealmQuery {
         iterator client_end:ManifestBytesIterator;
     }) error GetDeclarationError;
 
-    /// Gets the structured config of an instance identified by its relative moniker.
+    /// Gets the structured config of an instance identified by its moniker.
     @available(added=13)
     strict GetStructuredConfig(struct {
         moniker string:fuchsia.component.MAX_MONIKER_LENGTH;
@@ -294,7 +294,7 @@ closed protocol RealmQuery {
         server_end server_end:StorageAdmin;
     }) -> () error ConnectToStorageAdminError;
 
-    /// Gets the detailed information of a particular instance identified by its relative moniker.
+    /// Gets the detailed information of a particular instance identified by its moniker.
     /// This response contains handles to resources of the instance. As a result, component manager
     /// pays a non-trivial cost when this method is invoked.
     @available(added=11, deprecated=11, removed=12, note="Use GetInstance instead")

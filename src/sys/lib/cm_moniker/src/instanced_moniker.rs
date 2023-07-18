@@ -12,13 +12,13 @@ use {
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
 
-/// An instanced absolute moniker describes the identity of a component instance in terms of its path
+/// An instanced moniker describes the identity of a component instance in terms of its path
 /// relative to the root of the component instance tree.
 ///
 /// A root moniker is a moniker with an empty path.
 ///
-/// Instanced absolute monikers are only used internally within the component manager.  Externally,
-/// components are referenced by encoded relative moniker so as to minimize the amount of
+/// Instanced monikers are only used internally within the component manager.  Externally,
+/// components are referenced by encoded moniker so as to minimize the amount of
 /// information which is disclosed about the overall structure of the component instance tree.
 ///
 /// Display notation: ".", "name1:1", "name1:1/name2:2", ...

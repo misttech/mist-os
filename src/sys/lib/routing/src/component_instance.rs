@@ -37,10 +37,10 @@ pub trait ComponentInstanceInterface: Sized + Send + Sync {
     /// not the root instance.
     fn child_moniker(&self) -> Option<&ChildName>;
 
-    /// Returns this `ComponentInstanceInterface`'s instanced absolute moniker.
+    /// Returns this `ComponentInstanceInterface`'s instanced moniker
     fn instanced_moniker(&self) -> &InstancedMoniker;
 
-    /// Returns this `ComponentInstanceInterface`'s absolute moniker.
+    /// Returns this `ComponentInstanceInterface`'s moniker.
     fn moniker(&self) -> &Moniker;
 
     /// Returns this `ComponentInstanceInterface`'s component URL.
@@ -194,7 +194,7 @@ where
 }
 
 /// A wrapper for a weak reference to a type implementing `ComponentInstanceInterface`. Provides the
-/// absolute moniker of the component instance, which is useful for error reporting if the original
+/// moniker of the component instance, which is useful for error reporting if the original
 /// component instance has been destroyed.
 #[derive(Derivative)]
 #[derivative(Clone(bound = ""), Default(bound = ""), Debug)]

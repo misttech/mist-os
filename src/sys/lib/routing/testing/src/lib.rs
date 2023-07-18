@@ -142,7 +142,7 @@ pub enum CheckUse {
     },
     Storage {
         path: cm_types::Path,
-        // The relative moniker from the storage declaration to the use declaration. Only
+        // The moniker from the storage declaration to the use declaration. Only
         // used if `expected_res` is Ok.
         storage_relation: Option<InstancedMoniker>,
         // The backing directory for this storage is in component manager's namespace, not the
@@ -152,7 +152,7 @@ pub enum CheckUse {
         expected_res: ExpectedResult,
     },
     StorageAdmin {
-        // The relative moniker from the storage declaration to the use declaration.
+        // The moniker from the storage declaration to the use declaration.
         storage_relation: InstancedMoniker,
         // The backing directory for this storage is in component manager's namespace, not the
         // test's isolated test directory.
@@ -223,7 +223,7 @@ pub trait RoutingTestModel {
     /// Checks using a capability from a component's exposed directory.
     async fn check_use_exposed_dir(&self, moniker: Moniker, check: CheckUse);
 
-    /// Looks up a component instance by its absolute moniker.
+    /// Looks up a component instance by its moniker.
     async fn look_up_instance(&self, moniker: &Moniker) -> Result<Arc<Self::C>, anyhow::Error>;
 
     /// Checks that a use declaration of `path` at `moniker` can be opened with

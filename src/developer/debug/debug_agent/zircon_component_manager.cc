@@ -514,7 +514,6 @@ debug::Status ZirconComponentManager::LaunchComponent(std::string url) {
                          create_res.error_value().FormatDescription());
   }
 
-  // LifecycleController::Start accepts relative monikers.
   fidl::Client<fuchsia_component::Binder> binder_client_end;
   auto start_res =
       lifecycle_controller->StartInstance({moniker, CreateEndpointsAndBind(binder_client_end)});

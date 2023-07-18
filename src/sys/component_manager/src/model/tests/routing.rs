@@ -132,7 +132,7 @@ async fn use_framework_service() {
 
     #[derive(Clone)]
     pub struct MockRealmCapabilityHost {
-        /// List of calls to `OpenExposedDir` with component's relative moniker.
+        /// List of calls to `OpenExposedDir` with component's moniker.
         open_calls: Arc<Mutex<Vec<String>>>,
     }
 
@@ -293,7 +293,7 @@ async fn capability_requested_event_at_parent() {
 
     let event = event_stream.get_next().await.unwrap().into_iter().next().unwrap();
 
-    // 'b' is the target and 'a' is receiving the event so the relative moniker
+    // 'b' is the target and 'a' is receiving the event so the moniker
     // is '/b'.
     assert_matches!(&event,
         fcomponent::Event {

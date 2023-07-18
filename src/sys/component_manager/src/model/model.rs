@@ -75,7 +75,7 @@ impl Model {
         self.context.component_id_index()
     }
 
-    /// Looks up a component by absolute moniker. The component instance in the component will be
+    /// Looks up a component by moniker. The component instance in the component will be
     /// resolved if that has not already happened.
     pub async fn look_up(
         &self,
@@ -96,7 +96,7 @@ impl Model {
         Ok(cur)
     }
 
-    /// Finds a component matching the absolute moniker, if such a component exists.
+    /// Finds a component matching the moniker, if such a component exists.
     /// This function has no side-effects.
     pub async fn find(&self, look_up_moniker: &Moniker) -> Option<Arc<ComponentInstance>> {
         let mut cur = self.root.clone();
@@ -118,7 +118,7 @@ impl Model {
         Some(cur)
     }
 
-    /// Finds a resolved component matching the absolute moniker, if such a component exists.
+    /// Finds a resolved component matching the moniker, if such a component exists.
     /// This function has no side-effects.
     #[cfg(test)]
     pub async fn find_resolved(&self, find_moniker: &Moniker) -> Option<Arc<ComponentInstance>> {

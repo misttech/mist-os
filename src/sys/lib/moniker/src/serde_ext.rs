@@ -67,7 +67,7 @@ impl<'de> Visitor<'de> for MonikerVisitor {
     type Value = Moniker;
 
     fn expecting(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        formatter.write_str("an absolute moniker of a component instance")
+        formatter.write_str("a moniker of a component instance")
     }
 
     fn visit_str<E>(self, value: &str) -> Result<Self::Value, E>

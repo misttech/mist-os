@@ -833,7 +833,7 @@ mod tests {
 
         let out_dir_proxy = collector::find_directory_proxy(path).await.unwrap();
 
-        // The absolute moniker here is made up since the selector is a glob
+        // The moniker here is made up since the selector is a glob
         // selector, so any path would match.
         let component_id = ExtendedMoniker::parse_str("./test_component").unwrap();
         let inspector = Inspector::default();

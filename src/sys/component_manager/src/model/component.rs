@@ -340,9 +340,9 @@ pub struct ComponentInstance {
     pub on_terminate: fdecl::OnTerminate,
     /// The parent instance. Either a component instance or component manager's instance.
     pub parent: WeakExtendedInstance,
-    /// The instanced absolute moniker of this instance.
+    /// The instanced moniker of this instance.
     instanced_moniker: InstancedMoniker,
-    /// The partial absolute moniker of this instance.
+    /// The partial moniker of this instance.
     pub moniker: Moniker,
     /// The hooks scoped to this instance.
     pub hooks: Arc<Hooks>,

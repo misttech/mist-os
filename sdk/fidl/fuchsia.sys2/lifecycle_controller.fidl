@@ -100,7 +100,7 @@ type CreateError = flexible enum {
 /// Mutates the component instance state in a realm.
 @discoverable
 closed protocol LifecycleController {
-    /// Starts the instance identified by the given relative moniker. Relative
+    /// Starts the instance identified by the given moniker. Relative
     /// monikers must start with "./".
     ///
     /// The client can pass in the server end of a channel
@@ -116,7 +116,7 @@ closed protocol LifecycleController {
         binder server_end:fuchsia.component.Binder;
     }) -> () error StartError;
 
-    /// Stops the instance identified by the given relative moniker. Relative
+    /// Stops the instance identified by the given moniker. Relative
     /// monikers must start with "./".
     ///
     /// The function returns once the instance has been stopped.
@@ -125,7 +125,7 @@ closed protocol LifecycleController {
         moniker string:fuchsia.component.MAX_MONIKER_LENGTH;
     }) -> () error StopError;
 
-    /// Resolves the instance identified by the given relative moniker. Relative
+    /// Resolves the instance identified by the given moniker. Relative
     /// monikers must start with "./".
     ///
     /// The function returns once the instance has been resolved.
@@ -134,7 +134,7 @@ closed protocol LifecycleController {
         moniker string:fuchsia.component.MAX_MONIKER_LENGTH;
     }) -> () error ResolveError;
 
-    /// Unresolves the component designated by the provided relative moniker. Relative
+    /// Unresolves the component designated by the provided moniker. Relative
     /// monikers must start with "./".
     ///
     /// The function returns once the instance has been unresolved.
@@ -143,7 +143,7 @@ closed protocol LifecycleController {
         moniker string:fuchsia.component.MAX_MONIKER_LENGTH;
     }) -> () error UnresolveError;
 
-    /// Creates a new child instance identified by the given relative moniker. Relative
+    /// Creates a new child instance identified by the given moniker. Relative
     /// monikers must start with "./".
     ///
     /// The function returns once the child instance has been added to the topology.
@@ -155,7 +155,7 @@ closed protocol LifecycleController {
         args fuchsia.component.CreateChildArgs;
     }) -> () error CreateError;
 
-    /// Destroys the instance identified by the given relative moniker. Relative
+    /// Destroys the instance identified by the given moniker. Relative
     /// monikers must start with "./".
     ///
     /// The function returns once the child instance no longer exists in the topology.
@@ -170,7 +170,7 @@ closed protocol LifecycleController {
     // in an upcoming API release.
     // ---------------------------------------------------------------
 
-    /// Starts the instance identified by the given relative moniker. Relative
+    /// Starts the instance identified by the given moniker. Relative
     /// monikers must start with "./".
     ///
     /// The function returns once the instance has been started.
@@ -181,7 +181,7 @@ closed protocol LifecycleController {
         result StartResult;
     }) error fuchsia.component.Error;
 
-    /// Stops the instance identified by the given relative moniker. Relative
+    /// Stops the instance identified by the given moniker. Relative
     /// monikers must start with "./".
     ///
     /// The function returns once the instance has been stopped.
@@ -194,7 +194,7 @@ closed protocol LifecycleController {
         is_recursive bool;
     }) -> () error fuchsia.component.Error;
 
-    /// Resolves the instance identified by the given relative moniker. Relative
+    /// Resolves the instance identified by the given moniker. Relative
     /// monikers must start with "./".
     ///
     /// The function returns once the instance has been resolved
@@ -203,7 +203,7 @@ closed protocol LifecycleController {
         moniker string:fuchsia.component.MAX_MONIKER_LENGTH;
     }) -> () error fuchsia.component.Error;
 
-    /// Unresolves the component designated by the provided relative moniker. Relative
+    /// Unresolves the component designated by the provided moniker. Relative
     /// monikers must start with "./".
     ///
     /// The function returns once the component successfully unresolves, or the

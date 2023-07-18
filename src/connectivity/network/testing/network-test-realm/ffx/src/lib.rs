@@ -61,7 +61,7 @@ async fn net_test_realm(
     remote_control: fremotecontrol::RemoteControlProxy,
     mut cmd: ntr_args::Command,
 ) -> anyhow::Result<()> {
-    // The tool was called with a selector, make the arg an absolute moniker.
+    // The tool was called with a selector, make the arg an moniker.
     // TODO: remove once all clients of this tool are passing monikers.
     if !cmd.component_moniker.starts_with("/") {
         let moniker = cmd.component_moniker.replace("\\:", ":");

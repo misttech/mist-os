@@ -95,7 +95,7 @@ type StorageId = strict enum {
     STATIC_INSTANCE_ID = 1;
     /// Isolated storage directories are keyed using a component's instance ID
     /// if one is specified in the component ID index. Otherwise, a component's
-    /// relative moniker from the storage capability is used to key its isolated
+    /// moniker from the storage capability is used to key its isolated
     /// storage directory.
     STATIC_INSTANCE_ID_OR_MONIKER = 2;
 };

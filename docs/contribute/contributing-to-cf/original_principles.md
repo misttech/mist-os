@@ -521,7 +521,7 @@ subtree it behaves a lot like a full topology:
 
 #### The vision that wasn't implemented
 
-Some parts of the component framework API use absolute monikers:
+Some parts of the component framework API use monikers:
 
 -   [Security policy allowlists][src-security-policy]
 -   [Storage id index][docs-storage-index]
@@ -733,7 +733,7 @@ not violate [least privilege](#least-privilege),
 ### APIs that expose peer info {#peer-exception}
 
 There are some privileged APIs (e.g. realm-scoped event streams) that expose
-internal information about a component, such as its relative moniker, URL, or
+internal information about a component, such as its moniker, URL, or
 outgoing directory. However, these APIs are locked down and only usable by
 non-production or specially privileged components like `archivist` or
 `debug_data`.

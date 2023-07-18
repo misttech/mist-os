@@ -10,7 +10,7 @@ use {
 };
 
 /// One of:
-/// - An instanced absolute moniker
+/// - An instanced moniker
 /// - A marker representing component manager's realm
 #[derive(Eq, Ord, PartialOrd, PartialEq, Debug, Clone, Hash)]
 pub enum InstancedExtendedMoniker {

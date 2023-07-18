@@ -29,6 +29,6 @@ type InstanceIdEntry = table {
 
     2: reserved;
 
-    /// The absolute moniker identifying the component instance.
+    /// The moniker identifying the component instance.
     3: moniker string:fuchsia.component.MAX_MONIKER_LENGTH;
 };

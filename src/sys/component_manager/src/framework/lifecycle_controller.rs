@@ -323,8 +323,8 @@ impl CapabilityProvider for LifecycleControllerCapabilityProvider {
     }
 }
 
-/// Takes the scoped component's moniker and a relative moniker string and joins them into an
-/// absolute moniker.
+/// Takes the scoped component's moniker and a moniker string and joins them into an
+/// moniker.
 fn join_monikers(scope_moniker: &Moniker, moniker_str: &str) -> Result<Moniker, MonikerError> {
     let moniker = Moniker::try_from(moniker_str)?;
     Ok(scope_moniker.concat(&moniker))

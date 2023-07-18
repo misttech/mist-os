@@ -278,7 +278,7 @@ pub async fn get_instance(
     scope_moniker: &Moniker,
     moniker_str: &str,
 ) -> Result<fsys::Instance, fsys::GetInstanceError> {
-    // Construct the complete moniker using the scope moniker and the relative moniker string.
+    // Construct the complete moniker using the scope moniker and the moniker string.
     let moniker = Moniker::try_from(moniker_str).map_err(|_| fsys::GetInstanceError::BadMoniker)?;
     let moniker = scope_moniker.concat(&moniker);
 
@@ -333,7 +333,7 @@ pub async fn get_resolved_declaration(
     scope_moniker: &Moniker,
     moniker_str: &str,
 ) -> Result<ClientEnd<fsys::ManifestBytesIteratorMarker>, fsys::GetDeclarationError> {
-    // Construct the complete moniker using the scope moniker and the relative moniker string.
+    // Construct the complete moniker using the scope moniker and the moniker string.
     let moniker =
         Moniker::try_from(moniker_str).map_err(|_| fsys::GetDeclarationError::BadMoniker)?;
     let moniker = scope_moniker.concat(&moniker);
@@ -375,7 +375,7 @@ async fn resolve_declaration(
     child_location: &fsys::ChildLocation,
     url: &str,
 ) -> Result<ClientEnd<fsys::ManifestBytesIteratorMarker>, fsys::GetDeclarationError> {
-    // Construct the complete moniker using the scope moniker and the relative moniker string.
+    // Construct the complete moniker using the scope moniker and the moniker string.
     let parent_moniker =
         Moniker::try_from(parent_moniker_str).map_err(|_| fsys::GetDeclarationError::BadMoniker)?;
     let parent_moniker = scope_moniker.concat(&parent_moniker);
@@ -452,7 +452,7 @@ pub async fn get_structured_config(
     scope_moniker: &Moniker,
     moniker_str: &str,
 ) -> Result<fcdecl::ResolvedConfig, fsys::GetStructuredConfigError> {
-    // Construct the complete moniker using the scope moniker and the relative moniker string.
+    // Construct the complete moniker using the scope moniker and the moniker string.
     let moniker =
         Moniker::try_from(moniker_str).map_err(|_| fsys::GetStructuredConfigError::BadMoniker)?;
     let moniker = scope_moniker.concat(&moniker);
@@ -478,7 +478,7 @@ async fn construct_namespace(
     scope_moniker: &Moniker,
     moniker_str: &str,
 ) -> Result<Vec<fcrunner::ComponentNamespaceEntry>, fsys::ConstructNamespaceError> {
-    // Construct the complete moniker using the scope moniker and the relative moniker string.
+    // Construct the complete moniker using the scope moniker and the moniker string.
     let moniker =
         Moniker::try_from(moniker_str).map_err(|_| fsys::ConstructNamespaceError::BadMoniker)?;
     let moniker = scope_moniker.concat(&moniker);
@@ -508,7 +508,7 @@ async fn open(
     path: &str,
     object: ServerEnd<fio::NodeMarker>,
 ) -> Result<(), fsys::OpenError> {
-    // Construct the complete moniker using the scope moniker and the relative moniker string.
+    // Construct the complete moniker using the scope moniker and the moniker string.
     let moniker = Moniker::try_from(moniker_str).map_err(|_| fsys::OpenError::BadMoniker)?;
     let moniker = scope_moniker.concat(&moniker);
 
@@ -587,7 +587,7 @@ async fn connect_to_storage_admin(
     storage_name: String,
     server_end: ServerEnd<fsys::StorageAdminMarker>,
 ) -> Result<(), fsys::ConnectToStorageAdminError> {
-    // Construct the complete moniker using the scope moniker and the relative moniker string.
+    // Construct the complete moniker using the scope moniker and the moniker string.
     let moniker =
         Moniker::try_from(moniker_str).map_err(|_| fsys::ConnectToStorageAdminError::BadMoniker)?;
     let moniker = scope_moniker.concat(&moniker);

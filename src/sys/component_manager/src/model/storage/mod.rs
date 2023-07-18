@@ -303,7 +303,7 @@ pub async fn route_backing_directory(
 
 /// Open the isolated storage sub-directory from the given storage capability source, creating it
 /// if necessary. The storage sub-directory is based on provided instance ID if present, otherwise
-/// it is based on the provided relative moniker.
+/// it is based on the provided moniker.
 pub async fn open_isolated_storage(
     storage_source_info: &BackingDirectoryInfo,
     persistent_storage: bool,

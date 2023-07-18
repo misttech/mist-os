@@ -16,13 +16,12 @@ Capabilities such as [storage][storage-capabilities] and
 system where files belong to a specific component can be stored and accessed. Every Fuchsia
 component has a [namespace][namespace] where a component can access all of its available
 capabilities. A component's [moniker][component-moniker] indicates its position in
-the component topology, which often functions as an identifier for the component and its
-namespace.
+the component topology, which also serves as an identifier of the component on the system.
 
 Therefore, to access files in a component's namespace, you first need to identify the
-[absolute moniker][absolute-moniker] of your target component. For example, the absolute
-moniker of the `stash_secure` component is `/core/stash_secure`. (To discover a component's
-absolute moniker, see the [`ffx component show`][ffx-component-show] command.)
+moniker of your target component. For example, the
+moniker of the `stash_secure` component is `core/stash_secure`. (To discover a component's
+moniker, see the [`ffx component show`][ffx-component-show] command.)
 
 ## Copy a file to and from a component's namespace {:#copy-a-file-to-and-from-a-components-namespace}
 
@@ -54,30 +53,30 @@ Replace the following:
    component's package directory. Optionally, `DIR_TYPE` can be omitted and the
    command will default to the component's namespace.
 
-   For example, `/core/stash_secure::in::/data/examples.txt` means the path
-   `/data/example.txt` in the namespace of the `/core/stash_secure` component.
+   For example, `core/stash_secure::in::/data/examples.txt` means the path
+   `/data/example.txt` in the namespace of the `core/stash_secure` component.
 
 See example commands below:
 
-*  Download the `stash_secure.store` file from the `/core/stash_secure`
+*  Download the `stash_secure.store` file from the `core/stash_secure`
    component to the host machine:
 
    ```none {:.devsite-disable-click-to-copy}
-   $ ffx component copy /core/stash_secure::/data/stash_secure.store ./copy_of_stash_secure.store
+   $ ffx component copy core/stash_secure::/data/stash_secure.store ./copy_of_stash_secure.store
    ```
 
-*  Upload the `example.txt` file from the host machine to the `/core/stash_secure`
+*  Upload the `example.txt` file from the host machine to the `core/stash_secure`
    component:
 
    ```none {:.devsite-disable-click-to-copy}
-   $ ffx component copy ./my_example_dir/example.txt /core/stash_secure::/data/copy_of_example.txt
+   $ ffx component copy ./my_example_dir/example.txt core/stash_secure::/data/copy_of_example.txt
    ```
 
-*  Copy the `stash_secure.store` file from the `/core/stash_secure` component to
-   the `/core/feedback` component:
+*  Copy the `stash_secure.store` file from the `core/stash_secure` component to
+   the `core/feedback` component:
 
    ```none {:.devsite-disable-click-to-copy}
-   $ ffx component copy /core/stash_secure::/data/stash_secure.store /core/feedback::/data/copy_of_stash_secure.store
+   $ ffx component copy core/stash_secure::/data/stash_secure.store core/feedback::/data/copy_of_stash_secure.store
    ```
 
 ## Copy multiple files to and from a component's namespace {:#copy-multiple-files-to-and-from-a-components-namespace}
@@ -90,32 +89,32 @@ using `*` for the paths on the device. A workaround is to wrap the path with `*`
 
 See example commands below:
 
-*  Download all files in the `/data` directory of the `/core/stash_secure`
+*  Download all files in the `/data` directory of the `core/stash_secure`
    component to the host machine:
 
    ```none {:.devsite-disable-click-to-copy}
-   $ ffx component copy /core/stash_secure::/data/* ./my_example_dir/
+   $ ffx component copy core/stash_secure::/data/* ./my_example_dir/
    ```
 
 *  Upload all files in the `./my_example_dir` directory of the host machine to
-   the `/core/stash_secure` component:
+   the `core/stash_secure` component:
 
    ```none {:.devsite-disable-click-to-copy}
-   $ ffx component copy ./my_example_dir/* /core/stash_secure::/data/
+   $ ffx component copy ./my_example_dir/* core/stash_secure::/data/
    ```
 
-*  Copy all files in the `/data` directory of the `/core/stash_secure` component to
-   the `/core/feedback` component:
+*  Copy all files in the `/data` directory of the `core/stash_secure` component to
+   the `core/feedback` component:
 
    ```none {:.devsite-disable-click-to-copy}
-   $ ffx component copy /core/stash_secure::/data/* /core/feedback::/data/
+   $ ffx component copy core/stash_secure::/data/* core/feedback::/data/
    ```
 
-*  Copy all files in the `data` directory of the `/core/feedback/` component and the
-   `example.txt` file on the host machine to the `/core/stash_secure` component:
+*  Copy all files in the `data` directory of the `core/feedback/` component and the
+   `example.txt` file on the host machine to the `core/stash_secure` component:
 
    ``` none {:.devsite-disable-click-to-copy}
-   $ ffx component copy /core/feedback::/data/* ./my_example_dir/example.txt /core/stash_secure::/data/
+   $ ffx component copy core/feedback::/data/* ./my_example_dir/example.txt core/stash_secure::/data/
    ```
 
 ## Appendices
@@ -126,7 +125,7 @@ Some Fuchsia component are allocated per-component *isolated* storage with
 [storage capabilities][storage-capabilities].
 
 Unlike `ffx component copy`, the `ffx component storage` command works exclusively with
-storage capabilities. Instead of an absolute moniker, this command uses a component's
+storage capabilities. Instead of an moniker, this command uses a component's
 [instance ID][component-id-index] as an identifier. By default, the `ffx component storage`
 command interfaces with the storage capability named `data`.
 
@@ -153,11 +152,11 @@ Replace the following:
 
    For example, `c1a6d0aebbf7c092c53e8e696636af8ec0629ff39b7f2e548430b0034d809da4::/examples.txt`
    means that the `example.txt` file is located in the default `/data` directory of the
-   `/core/stash_secure` component.
+   `core/stash_secure` component.
 
 See example commands below:
 
-*  Upload the `example.txt` file from the host machine to the `/core/stash_secure`
+*  Upload the `example.txt` file from the host machine to the `core/stash_secure`
    component:
 
    ```none {:.devsite-disable-click-to-copy}
@@ -229,7 +228,6 @@ $ ffx component storage make-directory c1a6d0aebbf7c092c53e8e696636af8ec0629ff39
 [ffx-component-storage]: https://fuchsia.dev/reference/tools/sdk/ffx#storage
 [ffx-component-show]: ./view-component-information.md#get-detailed-information-from-a-component
 [component-id-index]: /docs/development/components/component_id_index.md
-[absolute-moniker]: /docs/reference/components/moniker.md#absolute
 [namespace]: /docs/concepts/process/namespaces.md
 [zsh]: https://zsh.sourceforge.io/
 [fish]: https://fishshell.com/

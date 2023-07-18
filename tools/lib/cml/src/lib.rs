@@ -2076,7 +2076,7 @@ pub struct Capability {
     ///     the component ID index will not be able to use this storage capability.
     /// - `static_instance_id_or_moniker`: If the component is listed in the
     ///     component ID index, the instance ID is used as the key for a component's
-    ///     storage. Otherwise, the component's relative moniker from the storage
+    ///     storage. Otherwise, the component's moniker from the storage
     ///     capability is used.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub storage_id: Option<StorageId>,

@@ -64,7 +64,7 @@ relative, and child.
 
 See the [monikers documentation][doc-monikers] for more information.
 
-<br>![Diagram of component instance tree with absolute monikers](images/topology_monikers.png)<br>
+<br>![Diagram of component instance tree with monikers](images/topology_monikers.png)<br>
 
 ## Realms {#realms}
 

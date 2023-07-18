@@ -81,12 +81,12 @@ impl RouteValidator {
     async fn validate(
         self: &Arc<Self>,
         scope_moniker: &Moniker,
-        relative_moniker_str: &str,
+        moniker_str: &str,
     ) -> Result<Vec<fsys::RouteReport>, fcomponent::Error> {
-        // Construct the complete moniker using the scope moniker and the relative moniker string.
-        let relative_moniker = Moniker::try_from(relative_moniker_str)
-            .map_err(|_| fcomponent::Error::InvalidArguments)?;
-        let moniker = scope_moniker.concat(&relative_moniker);
+        // Construct the complete moniker using the scope moniker and the moniker string.
+        let moniker =
+            Moniker::try_from(moniker_str).map_err(|_| fcomponent::Error::InvalidArguments)?;
+        let moniker = scope_moniker.concat(&moniker);
 
         let instance =
             self.model.find(&moniker).await.ok_or(fcomponent::Error::InstanceNotFound)?;
@@ -118,13 +118,13 @@ impl RouteValidator {
     async fn route(
         &self,
         scope_moniker: &Moniker,
-        relative_moniker_str: &str,
+        moniker_str: &str,
         targets: Vec<fsys::RouteTarget>,
     ) -> Result<Vec<fsys::RouteReport>, fsys::RouteValidatorError> {
-        // Construct the complete moniker using the scope moniker and the relative moniker string.
-        let relative_moniker = Moniker::try_from(relative_moniker_str)
+        // Construct the complete moniker using the scope moniker and the moniker string.
+        let moniker = Moniker::try_from(moniker_str)
             .map_err(|_| fsys::RouteValidatorError::InvalidArguments)?;
-        let moniker = scope_moniker.concat(&relative_moniker);
+        let moniker = scope_moniker.concat(&moniker);
 
         let instance =
             self.model.find(&moniker).await.ok_or(fsys::RouteValidatorError::InstanceNotFound)?;

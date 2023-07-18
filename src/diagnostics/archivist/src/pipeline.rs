@@ -207,7 +207,7 @@ impl PipelineMutableState {
     pub fn add_inspect_artifacts(&mut self, moniker: &ExtendedMoniker) -> Result<(), Error> {
         // Update the pipeline wrapper to be aware of the new inspect source if there
         // are are static selectors for the pipeline, and some of them are applicable to
-        // the inspect source's relative moniker. Otherwise, ignore.
+        // the inspect source's moniker. Otherwise, ignore.
         if let Some(selectors) = &self.static_selectors {
             let matched_selectors =
                 moniker.match_against_selectors(selectors).map_err(Error::MatchComponentMoniker)?;

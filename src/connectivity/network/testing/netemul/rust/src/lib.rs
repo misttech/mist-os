@@ -278,7 +278,7 @@ impl<'a> TestRealm<'a> {
             .context("connect to protocol")
     }
 
-    /// Gets the relative moniker of the root of the managed realm.
+    /// Gets the moniker of the root of the managed realm.
     pub async fn get_moniker(&self) -> Result<String> {
         self.realm.get_moniker().await.context("failed to call get moniker")
     }

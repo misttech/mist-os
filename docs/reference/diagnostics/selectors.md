@@ -63,7 +63,7 @@ core2/session:foo  // inline comment
 
 ### Syntax {#syntax}
 
-The component selector defines a pattern which describes the relative moniker of one or more
+The component selector defines a pattern which describes the moniker of one or more
 components in the component topology. The component selector is a collection of forward-slash
 (`/`) delimited strings describing the path from a root component to the component of interest.
 

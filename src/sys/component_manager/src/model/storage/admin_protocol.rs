@@ -413,7 +413,10 @@ impl StorageAdmin {
                 } => {
                     let response = match InstancedMoniker::try_from(relative_moniker.as_str()) {
                         Err(error) => {
-                            warn!(?error, "couldn't parse string as relative moniker for storage admin protocol");
+                            warn!(
+                                ?error,
+                                "couldn't parse string as moniker for storage admin protocol"
+                            );
                             Err(fcomponent::Error::InvalidArguments)
                         }
                         Ok(instanced_moniker) => {

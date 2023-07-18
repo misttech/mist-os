@@ -180,9 +180,9 @@ closed protocol Sandbox {
 /// The lifetime of a `ManagedRealm` and all its children are tied to its
 /// channel. Upon closure, all children of the realm will be destroyed.
 closed protocol ManagedRealm {
-    /// Returns the relative moniker of the root of the managed realm.
+    /// Returns the moniker of the root of the managed realm.
     ///
-    /// - response `moniker` the relative moniker of the root of the generated
+    /// - response `moniker` the moniker of the root of the generated
     ///     topology that contains this realm's child components.
     strict GetMoniker() -> (struct {
         moniker string:fuchsia.component.MAX_MONIKER_LENGTH;

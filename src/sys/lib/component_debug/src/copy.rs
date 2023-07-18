@@ -296,7 +296,6 @@ async fn open_component_dir_for_moniker(
     moniker: &str,
     dir_type: &fsys::OpenDirType,
 ) -> Result<fio::DirectoryProxy> {
-    // A relative moniker is required for |fuchsia.sys2/RealmQuery.GetInstance|
     let (dir, server_end) = create_proxy::<fio::DirectoryMarker>()?;
     let server_end = ServerEnd::new(server_end.into_channel());
     let flags = match dir_type {

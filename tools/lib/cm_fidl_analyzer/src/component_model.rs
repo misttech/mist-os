@@ -155,7 +155,7 @@ impl ModelBuilderForAnalyzer {
             let child_moniker_str = child_moniker_str.unwrap();
 
             let moniker: Moniker = Moniker::parse(&moniker_vec)
-                .expect("node path could not be converted back to absolute moniker");
+                .expect("node path could not be converted back to moniker");
             let child_moniker: ChildName = ChildName::parse(child_moniker_str)
                 .expect("node path part could not be converted back to child moniker");
             if child_moniker.collection().is_none() {

@@ -150,8 +150,8 @@ type SecurityPolicy = table {
 
 /// A single entry in an allowlist, expressed in one of three forms:
 ///
-///   1. Exact absolute moniker - Most entries should fall under this case,
-///      where the exact absolute monikers of allowed components are listed.
+///   1. Exact moniker - Most entries should fall under this case,
+///      where the exact monikers of allowed components are listed.
 ///      For example, "/foo/bar".
 ///   2. Realm - Realms can be allowlisted such that any descendant will be
 ///      allowed without being listed explicitly. For example, "/foo/**"
@@ -214,7 +214,7 @@ type AllowlistedResolver = table {};
 /// allowlists.
 type CapabilityAllowlistEntry = table {
     /// The `source_moniker` represents the origin of a capability. The
-    /// `source_moniker` is either an absolute moniker or '<component_manager>'.
+    /// `source_moniker` is either a moniker or '<component_manager>'.
     1: source_moniker string:fuchsia.component.MAX_MONIKER_LENGTH;
 
     /// The source name of this particular capability.
@@ -224,7 +224,7 @@ type CapabilityAllowlistEntry = table {
     /// with any other properties required by a particular capability type.
     3: capability AllowlistedCapability;
 
-    /// The set of components, described by either exact absolute monikers, realm, or collection,
+    /// The set of components, described by either exact monikers, realm, or collection,
     /// that are allowed to use this specific capability.
     4: target_monikers vector<AllowlistEntryMoniker>:MAX_ALLOWLIST_SIZE;
 

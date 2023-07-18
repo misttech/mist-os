@@ -36,7 +36,7 @@ type RouteReport = table {
     /// This field is not present if routing succeeded.
     3: error RouteError;
 
-    /// The absolute moniker of the source component.
+    /// The moniker of the source component.
     @available(added=12)
     4: source_moniker string:MAX;
 
@@ -86,7 +86,7 @@ type RouteValidatorError = flexible enum {
 @discoverable
 closed protocol RouteValidator {
     /// Routes all incoming and exposed capabilities of a component identified by the given
-    /// relative moniker. If the routing failed, an error is returned in the response.
+    /// moniker. If the routing failed, an error is returned in the response.
     /// This function may cause components to be resolved.
     ///
     /// Errors:

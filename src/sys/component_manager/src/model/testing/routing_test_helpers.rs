@@ -698,7 +698,7 @@ impl RoutingTestModel for RoutingTest {
                 if let ExpectedResult::Ok = &expected_res {
                     assert!(
                         storage_relation.is_some(),
-                        "relative moniker required if expected result is ok"
+                        "moniker required if expected result is ok"
                     );
                 }
                 capability_util::write_file_to_storage(&namespace, path, expected_res.clone())

@@ -26,12 +26,12 @@ pub const REMOTE_COMPONENT_STORAGE_PATH_HELP: &'static str = r#"Remote storage p
     To learn about component instance IDs, see https://fuchsia.dev/go/components/instance-id"#;
 
 pub const REMOTE_DIRECTORY_PATH_HELP: &'static str = r#"Remote directory paths must be:
-1)  [absolute moniker]::[path in namespace]
+1)  [moniker]::[path in namespace]
     Example: /foo/bar::/config/data/sample.json
 
-    To learn more about absolute monikers, see https://fuchsia.dev/go/components/moniker#absolute
+    To learn more about monikers, see https://fuchsia.dev/go/components/moniker#absolute
 
-2)  [absolute moniker]::[dir type]::[path] where [dir type] is one of "in", "out", or "pkg", specifying
+2)  [moniker]::[dir type]::[path] where [dir type] is one of "in", "out", or "pkg", specifying
     the component's namespace directory, outgoing directory, or package directory (if packaged).
 "#;
 

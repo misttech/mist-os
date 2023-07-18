@@ -53,7 +53,7 @@ fn get_scope_length(route: &[ComponentEventRoute]) -> usize {
     length
 }
 
-/// Determines if an event from a specified absolute moniker
+/// Determines if an event from a specified moniker
 /// may be routed to a given scope.
 fn is_moniker_valid_within_scope(moniker: &ExtendedMoniker, route: &[ComponentEventRoute]) -> bool {
     match moniker {

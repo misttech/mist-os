@@ -44,7 +44,7 @@ type StringSelector = flexible union {
     2: exact_match string:MAX_STRING_SELECTOR_LENGTH;
 };
 
-/// Specifies a pattern of component relative monikers which
+/// Specifies a pattern of component monikers which
 /// identify components being selected for.
 ///
 /// Component selectors support wildcarding, which will glob a single "level" of a

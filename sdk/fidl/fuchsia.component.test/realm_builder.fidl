@@ -451,7 +451,7 @@ closed protocol Realm {
     /// Adds a component to the realm whose implementation will be provided by
     /// the client. When this component should be started, the runner channel
     /// passed into `Build` will receive a start request for a component whose
-    /// `ProgramDecl` contains the relative moniker from the root of the
+    /// `ProgramDecl` contains the moniker from the root of the
     /// constructed realm for the child that is to be run under the `program`
     /// key `LOCAL_COMPONENT_NAME`.
     ///

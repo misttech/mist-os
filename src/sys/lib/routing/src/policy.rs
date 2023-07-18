@@ -322,7 +322,7 @@ pub struct ScopedPolicyChecker {
     /// The security policy to apply.
     policy: Arc<SecurityPolicy>,
 
-    /// The absolute moniker of the component that policy will be evaluated for.
+    /// The moniker of the component that policy will be evaluated for.
     pub scope: Moniker,
 }
 
