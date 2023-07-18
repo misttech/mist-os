@@ -323,7 +323,7 @@ impl NetifAddress {
             mAddressOrigin: 0,
             _bitfield_align_1: [],
             _bitfield_1: Default::default(),
-            mNext: std::ptr::null_mut() as *mut otNetifAddress,
+            mNext: std::ptr::null_mut(),
         });
         ret.set_valid(true);
         ret.set_preferred(true);
