@@ -6,6 +6,7 @@ use super::blob::BlobDirectoryError;
 use super::blob::BlobOpenError;
 use dyn_clone::clone_trait_object;
 use dyn_clone::DynClone;
+use fuchsia_url::AbsolutePackageUrl;
 use std::cmp;
 use std::collections::HashMap;
 use std::fmt;
@@ -548,6 +549,11 @@ impl Debug for dyn MetaContents {
         }
         Ok(())
     }
+}
+
+pub trait UpdatePackage: Package {
+    /// Returns a borrowed listing of package URLs described by this update package.
+    fn packages(&self) -> &Vec<AbsolutePackageUrl>;
 }
 
 /// Model for a package resolution strategy. See
