@@ -12,8 +12,9 @@
 
 namespace integration_tests {
 
-// Invokes `flatland->Present()` and then uses `loop` to loop until Scenic indicates that
-// the frame has been presented.
+// Invokes `flatland->Present()` and then uses `loop` to loop until
+// 1. Scenic indicates that the frame has been presented.
+// 2. Scenic indicates that the flatland client can begin rendering the next frame.
 void BlockingPresent(LoggingEventLoop* loop, fuchsia::ui::composition::FlatlandPtr& flatland,
                      cpp20::source_location = cpp20::source_location::current());
 
