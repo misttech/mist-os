@@ -21,6 +21,7 @@ test("fastboot-test") {
   sources = [
     "fastboot-test.cc",
     "payload-streamer-test.cc",
+    "rust-test.cc",
   ]
   include_dirs = [
     "..",
@@ -29,6 +30,7 @@ test("fastboot-test") {
   deps = [
     ":utils",
     "..:lib",
+    "../rust:fastboot-c",
     "//sdk/fidl/fuchsia.boot:fuchsia.boot_cpp_wire",
     "//sdk/fidl/fuchsia.fshost:fuchsia.fshost_cpp_wire",
     "//sdk/fidl/fuchsia.fshost:fuchsia.fshost_cpp_wire_testing",

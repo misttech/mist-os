@@ -1,0 +1,20 @@
+# Copyright 2023 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+import("//build/components.gni")
+import("//build/rust/rustc_staticlib.gni")
+
+rustc_staticlib("fastboot-c") {
+  name = "fastboot_c"
+  with_unit_tests = true
+  edition = "2021"
+
+  configs -= [ "//build/config/rust/lints:allow_unused_results" ]
+
+  deps = []
+
+  public = [ "ffi_c/bindings.h" ]
+
+  sources = [ "src/lib.rs" ]
+}
