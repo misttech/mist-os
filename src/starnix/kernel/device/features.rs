@@ -60,7 +60,7 @@ pub fn run_component_features(
                     ..Default::default()
                 };
                 kernel.framebuffer.start_server(view_bound_protocols, outgoing_dir.take().unwrap());
-                kernel.input_file.start_relay(touch_source_proxy);
+                kernel.input_device.start_relay(touch_source_proxy);
             }
             "binder" => {}
             "logd" => {}

@@ -17,8 +17,8 @@ use std::{
 
 use crate::{
     device::{
-        framebuffer::Framebuffer, input::InputFile, loop_device::LoopDeviceRegistry, BinderDriver,
-        DeviceMode, DeviceRegistry,
+        framebuffer::Framebuffer, input::InputDevice, loop_device::LoopDeviceRegistry,
+        BinderDriver, DeviceMode, DeviceRegistry,
     },
     fs::{
         devtmpfs::devtmpfs_create_device,
@@ -111,15 +111,14 @@ pub struct Kernel {
     /// framebuffer will be served as the view of the component.
     pub framebuffer: Arc<Framebuffer>,
 
-    /// An `InputFile` that can read input events from Fuchsia, and offer them to a component running
-    /// under Starnix.
+    /// An `InputDevice` that can be opened to read input events from Fuchsia.
     ///
-    /// If the container specifies the `framebuffer` features, this `InputFile` will be registered
+    /// If the container specifies the `framebuffer` features, this `InputDevice` will be registered
     /// as a device.
     ///
     /// When a component is run in that container, and also specifies the `framebuffer` feature,
     /// Starnix will relay input events from Fuchsia to the component.
-    pub input_file: Arc<InputFile>,
+    pub input_device: Arc<InputDevice>,
 
     /// The binder driver registered for this container, indexed by their device type.
     pub binders: RwLock<BTreeMap<DeviceType, Arc<BinderDriver>>>,
@@ -200,9 +199,9 @@ impl Kernel {
         let job = fuchsia_runtime::job_default().create_child_job()?;
         set_zx_name(&job, name);
 
-        let (framebuffer, input_file) =
-            Framebuffer::new_with_input(features.iter().find(|f| f.starts_with("aspect_ratio")))
-                .expect("Failed to create framebuffer");
+        let framebuffer = Framebuffer::new(features.iter().find(|f| f.starts_with("aspect_ratio")))
+            .expect("Failed to create framebuffer");
+        let input_device = InputDevice::new(framebuffer.clone());
 
         let this = Arc::new(Kernel {
             job,
@@ -227,7 +226,7 @@ impl Kernel {
             container_svc,
             loop_device_registry: Default::default(),
             framebuffer,
-            input_file,
+            input_device,
             binders: Default::default(),
             iptables: RwLock::new(IpTables::new()),
             shared_futexes: Default::default(),

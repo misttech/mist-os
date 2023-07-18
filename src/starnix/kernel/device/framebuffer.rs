@@ -4,7 +4,7 @@
 
 use super::framebuffer_server::{spawn_view_provider, FramebufferServer};
 use crate::{
-    device::{input::InputFile, DeviceMode, DeviceOps},
+    device::{DeviceMode, DeviceOps},
     fs::{
         buffers::{InputBuffer, OutputBuffer},
         kobject::{KObjectDeviceAttribute, KType},
@@ -30,24 +30,19 @@ use zerocopy::AsBytes;
 pub struct Framebuffer {
     vmo: Arc<zx::Vmo>,
     vmo_len: u32,
-    info: RwLock<fb_var_screeninfo>,
+    pub info: RwLock<fb_var_screeninfo>,
     server: Option<Arc<FramebufferServer>>,
 }
 
 impl Framebuffer {
     /// Creates a new `Framebuffer` according to the spec provided in `feature_string`.
     ///
-    /// This also creates an `InputFile` that is set up to detect input within the bounds
-    /// of the framebuffer.
-    ///
     /// For example, `aspect_ratio:1:1` creates a 1:1 aspect ratio framebuffer, scaled to
     /// fit the display.
     ///
     /// If the `feature_string` is empty, or `None`, the framebuffer will be scaled to the
     /// display.
-    pub fn new_with_input(
-        feature_string: Option<&String>,
-    ) -> Result<(Arc<Self>, Arc<InputFile>), Errno> {
+    pub fn new(feature_string: Option<&String>) -> Result<Arc<Self>, Errno> {
         let mut info = fb_var_screeninfo::default();
 
         let display_size =
@@ -71,8 +66,6 @@ impl Framebuffer {
             std::cmp::min(display_size.width / feature_width, display_size.height / feature_height);
         let (width, height) = (feature_width * ratio, feature_height * ratio);
 
-        let input_file = InputFile::new(width, height);
-
         info.xres = width;
         info.yres = height;
         info.xres_virtual = info.xres;
@@ -92,17 +85,14 @@ impl Framebuffer {
                 log_warn!("could not write initial framebuffer: {:?}", err);
             }
 
-            Ok((
-                Arc::new(Self { vmo, vmo_len, server: Some(server), info: RwLock::new(info) }),
-                input_file,
-            ))
+            Ok(Arc::new(Self { vmo, vmo_len, server: Some(server), info: RwLock::new(info) }))
         } else {
             let vmo_len = info.xres * info.yres * (info.bits_per_pixel / 8);
             let vmo = Arc::new(zx::Vmo::create(vmo_len as u64).map_err(|s| match s {
                 zx::Status::NO_MEMORY => errno!(ENOMEM),
                 _ => impossible_error(s),
             })?);
-            Ok((Arc::new(Self { vmo, vmo_len, server: None, info: RwLock::new(info) }), input_file))
+            Ok(Arc::new(Self { vmo, vmo_len, server: None, info: RwLock::new(info) }))
         }
     }
 

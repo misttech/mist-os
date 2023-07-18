@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use crate::{
-    device::{DeviceMode, DeviceOps},
+    device::{framebuffer::Framebuffer, DeviceMode, DeviceOps},
     fs::{
         buffers::{InputBuffer, OutputBuffer},
         kobject::{KObjectDeviceAttribute, KType},
@@ -29,6 +29,46 @@ use fuchsia_zircon as zx;
 use futures::future::{self, Either};
 use std::{collections::VecDeque, sync::Arc};
 use zerocopy::AsBytes as _; // for `as_bytes()`
+
+pub struct InputDevice {
+    // Right now the input device assumes that there is only one input file, and that it represents
+    // a touch input device. This structure will soon change to support multiple input files.
+    input_file: Arc<InputFile>,
+}
+
+impl InputDevice {
+    pub fn new(framebuffer: Arc<Framebuffer>) -> Arc<Self> {
+        let fb_state = framebuffer.info.read();
+        let input_file = InputFile::new(
+            fb_state.xres.try_into().expect("Failed to convert framebuffer width to i32."),
+            fb_state.yres.try_into().expect("Failed to convert framebuffer height to i32."),
+        );
+        std::mem::drop(fb_state);
+        Arc::new(InputDevice { input_file })
+    }
+
+    pub fn start_relay(&self, touch_source_proxy: fuipointer::TouchSourceProxy) {
+        self.input_file.start_relay(touch_source_proxy);
+    }
+}
+
+impl DeviceOps for Arc<InputDevice> {
+    fn open(
+        &self,
+        _current_task: &CurrentTask,
+        dev: DeviceType,
+        _node: &FsNode,
+        _flags: OpenFlags,
+    ) -> Result<Box<dyn FileOps>, Errno> {
+        match dev.minor() {
+            // Because all open input files share the same underlying input file, the clients
+            // may race for events. This does not matter right now, since there is only ever
+            // one client, but eventually each open should get its own sequence of events.
+            TOUCH_INPUT_MINOR => Ok(Box::new(self.input_file.clone())),
+            _ => error!(EINVAL),
+        }
+    }
+}
 
 pub struct InputFile {
     driver_version: u32,
@@ -83,19 +123,10 @@ impl InputFile {
         uapi::input_id { bustype: BUS_VIRTUAL as u16, product: 0, vendor: 0, version: 0 };
 
     /// Creates an `InputFile` instance suitable for emulating a touchscreen.
-    pub fn new(width: u32, height: u32) -> Arc<Self> {
+    fn new(width: i32, height: i32) -> Arc<Self> {
         // Fuchsia scales the position reported by the touch sensor to fit view coordinates.
         // Hence, the range of touch positions is exactly the same as the range of view
         // coordinates.
-        Self::new_with_dimensions(width as u16, height as u16)
-    }
-
-    // Create an `InputFile` with sensor axes having ranges of `(0, x_max)`, and `(0, y_max)`.
-    //
-    // Note: the parameters are u16 instead of something larger because:
-    // * `uapi::maximum` is `i32`, so `u32` would allow out-of-range values.
-    // * `u16` is sufficient for the displays and sensors used in practice.
-    pub fn new_with_dimensions(x_max: u16, y_max: u16) -> Arc<Self> {
         Arc::new(Self {
             driver_version: Self::DRIVER_VERSION,
             input_id: Self::INPUT_ID,
@@ -109,14 +140,14 @@ impl InputFile {
             properties: touch_properties(),
             x_axis_info: uapi::input_absinfo {
                 minimum: 0,
-                maximum: i32::from(x_max),
+                maximum: i32::from(width),
                 // TODO(https://fxbug.dev/124595): `value` field should contain the most recent
                 // X position.
                 ..uapi::input_absinfo::default()
             },
             y_axis_info: uapi::input_absinfo {
                 minimum: 0,
-                maximum: i32::from(y_max),
+                maximum: i32::from(height),
                 // TODO(https://fxbug.dev/124595): `value` field should contain the most recent
                 // Y position.
                 ..uapi::input_absinfo::default()
@@ -138,7 +169,7 @@ impl InputFile {
     /// # Parameters
     /// * `touch_source_proxy`: a connection to the Fuchsia input system, which will provide
     ///   touch events associated with the Fuchsia `View` created by Starnix.
-    pub fn start_relay(
+    fn start_relay(
         self: &Arc<Self>,
         touch_source_proxy: fuipointer::TouchSourceProxy,
     ) -> std::thread::JoinHandle<()> {
@@ -213,18 +244,6 @@ impl InputFile {
                 })
             })
             .expect("able to create threads")
-    }
-}
-
-impl DeviceOps for Arc<InputFile> {
-    fn open(
-        &self,
-        _current_task: &CurrentTask,
-        _dev: DeviceType,
-        _node: &FsNode,
-        _flags: OpenFlags,
-    ) -> Result<Box<dyn FileOps>, Errno> {
-        Ok(Box::new(Arc::clone(self)))
     }
 }
 
@@ -536,7 +555,7 @@ pub fn input_device_init(kernel: &Arc<Kernel>) {
     // `INPUT_MINOR`.
     kernel
         .device_registry
-        .register_chrdev_major(INPUT_MAJOR, kernel.input_file.clone())
+        .register_chrdev_major(INPUT_MAJOR, kernel.input_device.clone())
         .expect("input device register failed.");
 
     let input_class = kernel.device_registry.virtual_bus().get_or_create_child(
@@ -907,9 +926,9 @@ mod test {
     #[test_case((1920, 1080), uapi::EVIOCGABS_X => (0, 1920))]
     #[test_case((1280, 1024), uapi::EVIOCGABS_Y => (0, 1024))]
     #[::fuchsia::test]
-    async fn provides_correct_axis_ranges((x_max, y_max): (u16, u16), ioctl_op: u32) -> (i32, i32) {
+    async fn provides_correct_axis_ranges((x_max, y_max): (i32, i32), ioctl_op: u32) -> (i32, i32) {
         // Set up resources.
-        let input_file = InputFile::new_with_dimensions(x_max, y_max);
+        let input_file = InputFile::new(x_max, y_max);
         let (_kernel, current_task, file_object) = make_kernel_objects(input_file.clone());
         let address = map_memory(
             &current_task,
