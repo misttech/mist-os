@@ -423,6 +423,10 @@ template("product_assembly_configuration") {
         "authorized_ssh_ca_certs_path",
       ]
     },
+    {
+      node_path = "platform.forensics.cobalt"
+      fields = [ "registry" ]
+    },
   ]
 
   # The assembly configuration
@@ -477,7 +481,7 @@ template("product_assembly_configuration") {
           if (defined(_node[_field_name])) {
             _file_path = _node[_field_name]
 
-            # Here the rebased path is converted back in to an abosolute GN
+            # Here the rebased path is converted back in to an absolute GN
             # file label, from the GN root dir `//`:
             #
             # ../../path/to/filename.json
