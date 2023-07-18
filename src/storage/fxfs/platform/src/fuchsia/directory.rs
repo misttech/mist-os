@@ -804,8 +804,8 @@ impl vfs::directory::entry_container::Directory for FxDirectory {
             let entry_type = match object_descriptor {
                 ObjectDescriptor::File => fio::DirentType::File,
                 ObjectDescriptor::Directory => fio::DirentType::Directory,
+                ObjectDescriptor::Symlink => fio::DirentType::Symlink,
                 ObjectDescriptor::Volume => return Err(zx::Status::IO_DATA_INTEGRITY),
-                ObjectDescriptor::Symlink => return Err(zx::Status::IO_DATA_INTEGRITY),
             };
             let info = EntryInfo::new(object_id, entry_type);
             match sink.append(&info, name) {
@@ -1447,6 +1447,13 @@ mod tests {
             .await;
             close_dir_checked(dir).await;
         }
+        {
+            parent
+                .create_symlink("symlink", b"target", None)
+                .await
+                .expect("FIDL call failed")
+                .expect("create_symlink failed");
+        }
 
         let readdir = |dir: Arc<fio::DirectoryProxy>| async move {
             let status = dir.rewind().await.expect("FIDL call failed");
@@ -1469,6 +1476,7 @@ mod tests {
             dirs.iter()
                 .map(|&name| DirEntry { name: name.to_owned(), kind: DirentKind::Directory }),
         );
+        expected_entries.push(DirEntry { name: "symlink".to_owned(), kind: DirentKind::Symlink });
         expected_entries.sort_unstable();
         assert_eq!(expected_entries, readdir(Arc::clone(&parent)).await);
 
