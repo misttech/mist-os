@@ -65,14 +65,15 @@ pub fn sys_sysinfo(current_task: &CurrentTask, info: UserRef<uapi::sysinfo>) -> 
 
 // Used to read a hostname or domainname from task memory
 fn read_name(current_task: &CurrentTask, name: UserCString, len: u64) -> Result<Vec<u8>, Errno> {
+    const MAX_LEN: usize = 64;
     let len = len as usize;
 
-    if len > 65 {
+    if len > MAX_LEN {
         return error!(EINVAL);
     }
 
-    // Read a maximum of 65 characters and mark the null terminator.
-    let mut name = current_task.read_c_string_to_vec(name, 65)?;
+    // Read maximum characters and mark the null terminator.
+    let mut name = current_task.read_c_string_to_vec(name, MAX_LEN)?;
 
     // Syscall may have specified an even smaller length, so trim to the requested length.
     if len < name.len() {
