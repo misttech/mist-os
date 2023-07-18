@@ -153,5 +153,177 @@ A/B.O: ../E/D.C
             depfile.transform_paths(dep_text, lambda s: s.upper()), expected)
 
 
+class ConsumeLineContinuationsTests(unittest.TestCase):
+
+    def test_empty(self):
+        toks = list(depfile.consume_line_continuations([]))
+        self.assertEqual(toks, [])
+
+    def test_continuations(self):
+        toks = list(
+            depfile.consume_line_continuations(
+                [
+                    depfile.Token('target/thing', depfile.TokenType.PATH),
+                    depfile.Token(':', depfile.TokenType.COLON),
+                    depfile.Token(' ', depfile.TokenType.SPACE),
+                    depfile.Token('\\', depfile.TokenType.LINECONTINUE),
+                    depfile.Token('\n', depfile.TokenType.NEWLINE),
+                    depfile.Token(' ', depfile.TokenType.SPACE),
+                    depfile.Token('src/dep1.cc', depfile.TokenType.PATH),
+                    depfile.Token(' ', depfile.TokenType.SPACE),
+                    depfile.Token('src/dep2.cc', depfile.TokenType.PATH),
+                    depfile.Token('\n', depfile.TokenType.NEWLINE),
+                ]))
+        self.assertEqual(
+            toks, [
+                depfile.Token('target/thing', depfile.TokenType.PATH),
+                depfile.Token(':', depfile.TokenType.COLON),
+                depfile.Token(' ', depfile.TokenType.SPACE),
+                depfile.Token(' ', depfile.TokenType.SPACE),
+                depfile.Token('src/dep1.cc', depfile.TokenType.PATH),
+                depfile.Token(' ', depfile.TokenType.SPACE),
+                depfile.Token('src/dep2.cc', depfile.TokenType.PATH),
+                depfile.Token('\n', depfile.TokenType.NEWLINE),
+            ])
+
+
+class ParseOneDepTests(unittest.TestCase):
+
+    def test_empty(self):
+        dep = depfile._parse_one_dep([])
+        self.assertIsNone(dep)
+
+    def test_blank_lines(self):
+        dep = depfile._parse_one_dep(
+            [
+                depfile.Token('\n', depfile.TokenType.NEWLINE),
+                depfile.Token('\n', depfile.TokenType.NEWLINE),
+            ])
+        self.assertIsNone(dep)
+
+    def test_phony(self):
+        dep = depfile._parse_one_dep(
+            iter(
+                [
+                    # spaces have been filtered out
+                    depfile.Token('target/thing', depfile.TokenType.PATH),
+                    depfile.Token(':', depfile.TokenType.COLON),
+                    depfile.Token('\n', depfile.TokenType.NEWLINE),
+                ]))
+        self.assertEqual(dep.target_paths, [Path('target/thing')])
+        self.assertEqual(dep.deps_paths, [])
+
+    def test_dep(self):
+        dep = depfile._parse_one_dep(
+            iter(
+                [
+                    # spaces have been filtered out
+                    depfile.Token('target/thing', depfile.TokenType.PATH),
+                    depfile.Token(':', depfile.TokenType.COLON),
+                    depfile.Token('src/dep1.cc', depfile.TokenType.PATH),
+                    depfile.Token('src/dep2.cc', depfile.TokenType.PATH),
+                    depfile.Token('\n', depfile.TokenType.NEWLINE),
+                ]))
+        self.assertEqual(dep.target_paths, [Path('target/thing')])
+        self.assertEqual(
+            dep.deps_paths,
+            [Path('src/dep1.cc'), Path('src/dep2.cc')])
+
+    def test_dep_with_multiple_targets(self):
+        dep = depfile._parse_one_dep(
+            iter(
+                [
+                    # multiple targets
+                    depfile.Token('target/thing', depfile.TokenType.PATH),
+                    depfile.Token('target/thing.d', depfile.TokenType.PATH),
+                    depfile.Token(':', depfile.TokenType.COLON),
+                    depfile.Token('src/dep.cc', depfile.TokenType.PATH),
+                    depfile.Token('\n', depfile.TokenType.NEWLINE),
+                ]))
+        self.assertEqual(
+            dep.target_paths,
+            [Path('target/thing'), Path('target/thing.d')])
+        self.assertEqual(dep.deps_paths, [Path('src/dep.cc')])
+
+    def test_missing_colon(self):
+        with self.assertRaises(depfile.ParseError):
+            depfile._parse_one_dep(
+                iter(
+                    [
+                        depfile.Token(
+                            'target/incomplete', depfile.TokenType.PATH),
+                    ]))
+
+    def test_unexpected_colon(self):
+        with self.assertRaises(depfile.ParseError):
+            depfile._parse_one_dep(
+                iter([
+                    depfile.Token(':', depfile.TokenType.COLON),
+                ]))
+
+
+class ParseLinesTestes(unittest.TestCase):
+
+    def test_empty(self):
+        deps = list(depfile.parse_lines([]))
+        self.assertEqual(deps, [])
+
+    def test_blank_lines(self):
+        deps = list(depfile.parse_lines(['\n', '\r\n', '\n']))
+        self.assertEqual(deps, [])
+
+    def test_comments(self):
+        deps = list(
+            depfile.parse_lines(
+                [
+                    '# auto-generated, do not edit\n', '\r\n', '#comment\r\n',
+                    '\n'
+                ]))
+        self.assertEqual(deps, [])
+
+    def test_one_dep(self):
+        deps = list(depfile.parse_lines(['a.out: bb.o\n']))
+        self.assertEqual(len(deps), 1)
+        self.assertEqual(deps[0].target_paths, [Path('a.out')])
+        self.assertEqual(deps[0].deps_paths, [Path('bb.o')])
+        self.assertFalse(deps[0].is_phony)
+
+    def test_one_dep_line_continued(self):
+        deps = list(depfile.parse_lines(['a.out: bb.o \\\n', ' cc.o dd.i\n']))
+        self.assertEqual(len(deps), 1)
+        self.assertEqual(deps[0].target_paths, [Path('a.out')])
+        self.assertEqual(
+            deps[0].deps_paths,
+            [Path('bb.o'), Path('cc.o'),
+             Path('dd.i')])
+        self.assertFalse(deps[0].is_phony)
+
+    def test_one_dep_line_continued_with_cr(self):
+        deps = list(
+            depfile.parse_lines(['a.out: \\\r\n', ' \\\r\n', ' cc.o dd.i\n']))
+        self.assertEqual(len(deps), 1)
+        self.assertEqual(deps[0].target_paths, [Path('a.out')])
+        self.assertEqual(deps[0].deps_paths, [Path('cc.o'), Path('dd.i')])
+        self.assertFalse(deps[0].is_phony)
+
+    def test_multiple_deps(self):
+        deps = list(
+            depfile.parse_lines(
+                ['a.out: bb.o\n', 'z.out :\\\n', 'y.h\n', 'p.out : \n']))
+        self.assertEqual(len(deps), 3)
+
+        self.assertEqual(deps[0].target_paths, [Path('a.out')])
+        self.assertEqual(deps[0].deps_paths, [Path('bb.o')])
+        self.assertFalse(deps[0].is_phony)
+
+        self.assertEqual(deps[1].target_paths, [Path('z.out')])
+        self.assertEqual(deps[1].deps_paths, [Path('y.h')])
+        self.assertFalse(deps[1].is_phony)
+
+        self.assertEqual(deps[2].target_paths, [Path('p.out')])
+        self.assertEqual(deps[2].deps_paths, [])
+        self.assertTrue(deps[2].is_phony)
+
+
 if __name__ == '__main__':
     unittest.main()
