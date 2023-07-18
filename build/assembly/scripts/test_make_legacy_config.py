@@ -169,6 +169,8 @@ class MakeLegacyConfig(unittest.TestCase):
                 outdir=OUTDIR,
                 base_driver_packages_list=[driver_manifest_path],
                 base_driver_components_files_list=[driver_component_file],
+                boot_driver_packages_list=[],
+                boot_driver_components_files_list=[],
                 shell_commands=shell_commands_file,
                 core_realm_shards=[
                     os.path.join(SOURCE_DIR, "core/core.cml"),
@@ -541,7 +543,7 @@ class MakeLegacyConfig(unittest.TestCase):
 
             # Copies legacy config into AIB
             aib, _, _ = make_legacy_config.copy_to_assembly_input_bundle(
-                image_assembly, [], OUTDIR, [], [], dict(), set(), [], [], None)
+                image_assembly, [], OUTDIR, [], [], [], [], dict(), set(), [], [], None)
 
             # Asserts that the duplicate package is present in the base package set after
             # being copied to the AIB
@@ -570,18 +572,17 @@ class MakeLegacyConfig(unittest.TestCase):
                 make_image_assembly_path(duplicate_package),
                 image_assembly.base)
 
-            # Replace the AIBCreator._get_base_driver_details function within the
+            # Replace the AIBCreator._get_driver_details function within the
             # context manager with a mock.
-            with mock.patch.object(
-                    make_legacy_config.AIBCreator,
-                    "_get_base_driver_details") as patched_method:
+            with mock.patch.object(make_legacy_config.AIBCreator,
+                                   "_get_driver_details") as patched_method:
                 # This fixed return value should add the contents of the set in the first index
                 # of the tuple to the aib.base_drivers, and remove it from the aib.base package set
                 # when we copy the contents of the image assembly to the AIB
                 patched_method.return_value = (
                     {make_package_path(duplicate_package)}, list())
                 aib, _, _ = make_legacy_config.copy_to_assembly_input_bundle(
-                    image_assembly, [], OUTDIR, [manifest_path], [], dict(),
+                    image_assembly, [], OUTDIR, [manifest_path], [], [], [], dict(),
                     set(), [], [], None)
 
             self.assertNotIn(make_package_path(duplicate_package), aib.base)
@@ -630,5 +631,5 @@ class MakeLegacyConfig(unittest.TestCase):
                 DuplicatePackageException,
                 partial(
                     make_legacy_config.copy_to_assembly_input_bundle,
-                    image_assembly, [], OUTDIR, [], [], dict(), set(), [], [],
+                    image_assembly, [], OUTDIR, [], [], [], [], dict(), set(), [], [],
                     None))

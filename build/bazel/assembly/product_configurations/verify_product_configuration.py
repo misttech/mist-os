@@ -180,8 +180,8 @@ def normalize_product(
 
             packages[pkg_set].sort(key=lambda x: x["name"])
 
-    if "drivers" in product:
-        # TODO(jayzhuang): Normalize `drivers` field when we have product
+    if "base_drivers" in product:
+        # TODO(jayzhuang): Normalize `base_drivers` field when we have product
         # configs with this field set for comparison.
         pass
 

@@ -80,16 +80,17 @@ def _fuchsia_product_configuration_impl(ctx):
     packages["cache"] = cache_pkg_details
     product["packages"] = packages
 
-    driver_details = []
-    for dep in ctx.attr.driver_packages:
-        driver_details.append(
+    base_driver_details = []
+    for dep in ctx.attr.base_driver_packages:
+        base_driver_details.append(
             {
                 "package": dep[FuchsiaPackageInfo].package_manifest.path,
                 "components": dep[FuchsiaPackageInfo].drivers,
             },
         )
         pkg_files.append(dep[FuchsiaPackageInfo].package_manifest)
-    product["base_drivers"] = driver_details
+    product["base_drivers"] = base_driver_details
+
     product_config["product"] = product
 
     product_config_file = ctx.actions.declare_file(ctx.label.name + "_product_config.json")
@@ -128,8 +129,8 @@ _fuchsia_product_configuration = rule(
             ],
             default = [],
         ),
-        "driver_packages": attr.label_list(
-            doc = "Driver packages to include in product.",
+        "base_driver_packages": attr.label_list(
+            doc = "Base-driver packages to include in product.",
             providers = [FuchsiaPackageInfo],
             default = [],
         ),
@@ -185,7 +186,7 @@ def fuchsia_product_configuration(
         json_config = None,
         base_packages = None,
         cache_packages = None,
-        driver_packages = None):
+        base_driver_packages = None):
     """A new implementation of fuchsia_product_configuration that takes raw a json config.
 
     Args:
@@ -207,11 +208,11 @@ def fuchsia_product_configuration(
             ```
 
             All assembly json inputs are supported, except for product.packages
-            and product.base_drivers, which must be specified through the
-            following args.
+            and product.base_drivers, which must be
+            specified through the following args.
         base_packages: Fuchsia packages to be included in base.
         cache_packages: Fuchsia packages to be included in cache.
-        driver_packages: Driver packages to include in product.
+        base_driver_packages: Base driver packages to include in product.
     """
 
     if not json_config:
@@ -252,5 +253,5 @@ def fuchsia_product_configuration(
         raw_config_labels = extracted_raw_config_labels,
         base_packages = base_packages,
         cache_packages = cache_packages,
-        driver_packages = driver_packages,
+        base_driver_packages = base_driver_packages,
     )

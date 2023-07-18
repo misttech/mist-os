@@ -200,6 +200,7 @@ raw_assembly_input_bundle_json = """{
       ]
     }
   ],
+  "boot_drivers": [],
   "shell_commands": {
     "package1": [
       "path/to/binary1",
