@@ -241,13 +241,17 @@ fn random_page_iter(blob_size: usize, rng: &mut XorShiftRng) -> impl Iterator<It
     let distribution = WeightedIndex::new(WEIGHTS).unwrap();
     let page_size = zx::system_get_page_size() as usize;
     let total_pages = (0..blob_size).step_by(page_size).len();
+    // Only access 60% of the pages. Not all pages of an executable are typically accessed near the
+    // start of a process. Accessing every page would favour filesystems with overly aggressive
+    // read-ahead when in practice some of the read-ahead pages won't be used.
+    let pages_to_read = if total_pages < 5 { total_pages } else { total_pages / 5 * 3 };
 
     // Split the pages up into runs.
     let mut taken_pages = 0;
     let mut page_runs: Vec<StepBy<Range<usize>>> = Vec::new();
-    while taken_pages < total_pages {
+    while taken_pages < pages_to_read {
         let index = distribution.sample(rng);
-        let run_length = std::cmp::min(RUN_LENGTHS[index], total_pages - taken_pages);
+        let run_length = std::cmp::min(RUN_LENGTHS[index], pages_to_read - taken_pages);
         let start = taken_pages * page_size;
         let end = (taken_pages + run_length) * page_size;
         taken_pages += run_length;
@@ -274,15 +278,12 @@ async fn page_in_blob_benchmark(
     let mapped_blob = MappedBlob::new(&blob_path);
     let data = mapped_blob.data();
     let mut durations = Vec::new();
-    let mut total = 0;
     for i in page_iter {
         trace_duration!("benchmark", "page_in", "offset" => i as u64);
         let timer = OperationTimer::start();
-        let value = data[i];
+        std::hint::black_box(data[i]);
         durations.push(timer.stop());
-        total += value as u64;
     }
-    assert!(total > 0);
     durations
 }
 
@@ -299,6 +300,7 @@ mod tests {
             filesystems::{Blobfs, Fxblob},
         },
         storage_benchmarks::FilesystemConfig,
+        test_util::assert_lt,
     };
     const PAGE_COUNT: usize = 32;
 
@@ -355,7 +357,7 @@ mod tests {
         check_benchmark(
             PageInBlobRandomCompressed::new(PAGE_COUNT * page_size()),
             Fxblob,
-            PAGE_COUNT,
+            PAGE_COUNT / 5 * 3,
         )
         .await;
     }
@@ -401,9 +403,13 @@ mod tests {
         assert_eq!(random_page_iter(page_size() - 1, &mut rng).max(), Some(0));
         assert_eq!(random_page_iter(page_size(), &mut rng).max(), Some(0));
         assert_eq!(random_page_iter(page_size() + 1, &mut rng).max(), Some(page_size()));
-        assert_eq!(random_page_iter(page_size() * 5, &mut rng).count(), 5);
+        assert_eq!(random_page_iter(page_size() * 4, &mut rng).count(), 4);
+        assert_eq!(random_page_iter(page_size() * 5, &mut rng).count(), 3);
+        assert_eq!(random_page_iter(page_size() * 9, &mut rng).count(), 3);
+        assert_eq!(random_page_iter(page_size() * 10, &mut rng).count(), 6);
 
-        let mut offsets: Vec<usize> = random_page_iter(page_size() * 500, &mut rng).collect();
+        let blob_size = page_size() * 500;
+        let mut offsets: Vec<usize> = random_page_iter(blob_size, &mut rng).collect();
 
         // Make sure that the offsets aren't sorted.
         let mut is_sorted = true;
@@ -415,10 +421,12 @@ mod tests {
         }
         assert!(!is_sorted);
 
-        // Sort the offsets and compare to the sequential offsets to make sure they're all present.
-        let expected_sorted_offsets: Vec<usize> =
-            sequential_page_iter(page_size() * 500, &mut rng).collect();
         offsets.sort();
-        assert_eq!(offsets, expected_sorted_offsets);
+        // Make sure that there are no duplicates.
+        for i in 1..offsets.len() {
+            assert_ne!(offsets[i - 1], offsets[i]);
+        }
+        // Make sure that the largest page offset is part of the blob.
+        assert_lt!(offsets.last().unwrap(), &blob_size);
     }
 }

@@ -64,10 +64,6 @@ struct Args {
     /// from the start of the trace.
     #[argh(switch)]
     load_blobs_for_tracing: bool,
-
-    /// enables blob benchmarks.
-    #[argh(switch)]
-    blob_benchmarks: bool,
 }
 
 fn add_io_benchmarks(benchmark_set: &mut BenchmarkSet) {
@@ -166,9 +162,7 @@ async fn main() {
     let mut benchmark_set = BenchmarkSet::new();
     add_io_benchmarks(&mut benchmark_set);
     add_directory_benchmarks(&mut benchmark_set);
-    if args.blob_benchmarks {
-        add_blob_benchmarks(&mut benchmark_set);
-    }
+    add_blob_benchmarks(&mut benchmark_set);
     let results = benchmark_set.run(fvm_volume_factory.as_ref().unwrap(), &filter).await;
 
     results.write_table(std::io::stdout());

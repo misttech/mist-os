@@ -45,14 +45,22 @@ contains 2 phases:
   All of the `fstatat` calls happen relative to the top level directory.
 * Phase 2: Walking the directory tree in a recursive DFS order to see if any new files were added.
 
-### PageInBlob Benchmarks
+### Blob Benchmarks
 The `PageInBlob` benchmarks measure page fault times for mmap'ed blobs.
 * `PageInBlobSequentialUncompressed` creates an incompressible blob and pages it in by sequentially
-  touching each page.
+  accessing each page.
 * `PageInBlobSequentialCompressed` creates a compressible blob and pages it in by sequentially
-  touching each page.
-* `PageInBlobRandomCompressed` creates a compressible blob and randomly touches pages in a way
-  similar to executing an executable.
+  accessing each page.
+* `PageInBlobRandomCompressed` creates a compressible blob and randomly accesses 60% of the pages in
+  a way similar to executing an executable. Only 60% of pages are accessed to try to mimic an
+  executable starting.
+
+The blob writing benchmarks measure how long it takes to write blobs. This is important for both
+fast updates in production and development workflows.
+* `WriteBlob` writes a single realistically compressible blob to a blob filesystem.
+* `WriteRealisticBlobs` creates several realistically compressible blobs with varying sizes and
+  concurrently writes 2 blobs to a blob filesystem. This ideally mimics how pkg-cache writes blobs.
+  The benchmark measure how long it takes to write all of the blobs.
 
 ## "Cold" Benchmarks
 At the beginning of most benchmarks is a setup phase that creates files within the filesystem.
