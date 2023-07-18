@@ -28,6 +28,9 @@
             directory: "config-data",
             rights: [ "r*" ],
             path: "/config/data",
+
+            // TODO(fxbug.dev/130462): Remove once config-data is not needed.
+            availability: "optional",
         },
     ],
     expose: [

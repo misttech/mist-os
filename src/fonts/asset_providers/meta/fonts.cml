@@ -37,6 +37,15 @@
             to: "#font-server",
             availability: "optional",
         },
+        {
+            directory: "config-data",
+            from: "parent",
+            to: "#font-server",
+            rights: [ "r*" ],
+
+            // TODO(fxbug.dev/130462): Remove once config-data is not needed.
+            availability: "optional",
+        },
 
         // Provide the resource directory from asset provider to font server.
         {
@@ -52,12 +61,6 @@
                 "fuchsia.fonts.Provider",
             ],
             from: "#font-server",
-        },
-        {
-            // Diagnostics.
-            directory: "diagnostics",
-            from: "#font-server",
-            to: "parent",
         },
     ],
 }
