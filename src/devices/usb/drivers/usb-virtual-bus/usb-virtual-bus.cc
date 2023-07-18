@@ -65,7 +65,8 @@ zx_status_t UsbVirtualBus::CreateDevice() {
   }
   zx::result result = outgoing_.AddService<fuchsia_hardware_usb_dci::UsbDciService>(
       fuchsia_hardware_usb_dci::UsbDciService::InstanceHandler({
-          .device = dci_bindings_.CreateHandler(device_.get(), dispatcher_, fidl::kIgnoreBindingClosure),
+          .device =
+              dci_bindings_.CreateHandler(device_.get(), dispatcher_, fidl::kIgnoreBindingClosure),
       }));
   if (result.is_error()) {
     zxlogf(ERROR, "Failed to add service");
@@ -107,7 +108,8 @@ zx_status_t UsbVirtualBus::CreateHost() {
   }
   zx::result result = outgoing_.AddService<fuchsia_hardware_usb_hci::UsbHciService>(
       fuchsia_hardware_usb_hci::UsbHciService::InstanceHandler({
-          .device = hci_bindings_.CreateHandler(host_.get(), dispatcher_, fidl::kIgnoreBindingClosure),
+          .device =
+              hci_bindings_.CreateHandler(host_.get(), dispatcher_, fidl::kIgnoreBindingClosure),
       }));
   if (result.is_error()) {
     zxlogf(ERROR, "Failed to add service");
@@ -174,6 +176,12 @@ int UsbVirtualBus::DeviceThread() {
         if (num_pending_control_reqs_ > 0) {
           complete_unbind_signal_.Wait(&device_lock_);
         }
+
+        al.release();
+        for (auto req = complete_reqs_pending.pop(); req; req = complete_reqs_pending.pop()) {
+          req->Complete(req->request()->response.status, req->request()->response.actual);
+        }
+
         // At this point, all pending control requests have been completed,
         // and any queued requests wil be immediately completed with an error.
         ZX_DEBUG_ASSERT(unbind_txn_.has_value());
@@ -408,6 +416,7 @@ void UsbVirtualBus::UsbDciRequestQueue(usb_request_t* req,
 
   fbl::AutoLock lock(&device_lock_);
   if (unbinding_) {
+    lock.release();
     request.Complete(ZX_ERR_IO_REFUSED, 0);
     return;
   }
@@ -473,6 +482,7 @@ void UsbVirtualBus::UsbHciRequestQueue(usb_request_t* req,
 
   fbl::AutoLock device_lock(&device_lock_);
   if (unbinding_) {
+    device_lock.release();
     request.Complete(ZX_ERR_IO_NOT_PRESENT, 0);
     return;
   }
@@ -480,6 +490,7 @@ void UsbVirtualBus::UsbHciRequestQueue(usb_request_t* req,
   usb_virtual_ep_t* ep = &eps_[index];
 
   if (ep->stalled) {
+    device_lock.release();
     request.Complete(ZX_ERR_IO_REFUSED, 0);
     return;
   }
@@ -557,9 +568,13 @@ size_t UsbVirtualBus::UsbHciGetMaxTransferSize(uint32_t device_id, uint8_t ep_ad
 }
 
 zx_status_t UsbVirtualBus::UsbHciCancelAll(uint32_t device_id, uint8_t ep_address) {
-  fbl::AutoLock lock(&device_lock_);
   uint8_t index = EpAddressToIndex(ep_address);
-  for (auto req = eps_[index].host_reqs.pop(); req; req = eps_[index].host_reqs.pop()) {
+  RequestQueue q;
+  {
+    fbl::AutoLock lock(&device_lock_);
+    q = std::move(eps_[index].host_reqs);
+  }
+  for (auto req = q.pop(); req; req = q.pop()) {
     req->Complete(ZX_ERR_IO, 0);
   }
   return ZX_OK;

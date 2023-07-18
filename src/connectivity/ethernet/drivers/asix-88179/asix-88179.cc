@@ -509,11 +509,11 @@ void Asix88179Ethernet::Shutdown() {
 
   thrd_join(interrupt_thread_, nullptr);
 
-  fbl::AutoLock lock(&lock_);
   usb_.CancelAll(bulk_in_address_);
   usb_.CancelAll(bulk_out_address_);
   usb_.CancelAll(interrupt_address_);
 
+  fbl::AutoLock lock(&lock_);
   ifc_.clear();
 }
 

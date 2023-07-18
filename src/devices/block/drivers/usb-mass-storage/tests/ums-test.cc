@@ -153,6 +153,7 @@ class UmsTest : public zxtest::Test {
 };
 
 TEST_F(UmsTest, ReconnectTest) {
+  GetTestdevPath();
   // Disconnect and re-connect the block device 50 times as a sanity check
   // for race conditions and deadlocks.
   // If the test freezes; or something crashes at this point, it is likely
