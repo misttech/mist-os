@@ -780,7 +780,9 @@ pub mod testutil {
             Id: Debug + Hash + Eq;
     }
 
-    impl<Ctx: AsMut<FakeTimerCtx<Id>>, Id: Clone> FakeTimerCtxExt<Id> for Ctx {
+    // TODO(https://fxbug.dev/130841): hold lock on `FakeTimerCtx` across entire
+    // method to avoid potential race conditions.
+    impl<Id: Clone, Ctx: WithFakeTimerContext<Id>> FakeTimerCtxExt<Id> for Ctx {
         /// Triggers the next timer, if any, by calling `f` on it.
         ///
         /// `trigger_next_timer` triggers the next timer, if any, advances the
@@ -790,8 +792,13 @@ pub mod testutil {
             ctx: C,
             mut f: F,
         ) -> Option<Id> {
-            self.as_mut().timers.pop().map(|InstantAndData(t, id)| {
-                self.as_mut().instant.time = t;
+            self.with_fake_timer_ctx_mut(|timers| {
+                timers.timers.pop().map(|InstantAndData(t, id)| {
+                    timers.instant.time = t;
+                    id
+                })
+            })
+            .map(|id| {
                 f(ctx, self, id.clone());
                 id
             })
@@ -810,21 +817,19 @@ pub mod testutil {
             instant: FakeInstant,
             mut f: F,
         ) -> Vec<Id> {
-            assert!(instant >= self.as_mut().now());
+            assert!(instant >= self.with_fake_timer_ctx(|ctx| ctx.now()));
             let mut timers = Vec::new();
 
-            while self
-                .as_mut()
-                .timers
-                .peek()
-                .map(|InstantAndData(i, _id)| i <= &instant)
-                .unwrap_or(false)
-            {
+            while self.with_fake_timer_ctx_mut(|ctx| {
+                ctx.timers.peek().map(|InstantAndData(i, _id)| i <= &instant).unwrap_or(false)
+            }) {
                 timers.push(self.trigger_next_timer(&mut (), |_: &mut (), s, id| f(s, id)).unwrap())
             }
 
-            assert!(self.as_mut().now() <= instant);
-            self.as_mut().instant.time = instant;
+            self.with_fake_timer_ctx_mut(|ctx| {
+                assert!(ctx.now() <= instant);
+                ctx.instant.time = instant;
+            });
 
             timers
         }
@@ -838,7 +843,7 @@ pub mod testutil {
             duration: Duration,
             f: F,
         ) -> Vec<Id> {
-            let instant = self.as_mut().now().saturating_add(duration);
+            let instant = self.with_fake_timer_ctx(|ctx| ctx.now().saturating_add(duration));
             // We know the call to `self.trigger_timers_until_instant` will not
             // panic because we provide an instant that is greater than or equal
             // to the current time.
@@ -937,7 +942,7 @@ pub mod testutil {
         ) where
             Id: Debug + Hash + Eq,
         {
-            let instant = self.as_mut().now().saturating_add(duration);
+            let instant = self.with_fake_timer_ctx(|ctx| ctx.now().saturating_add(duration));
             self.trigger_timers_until_and_expect_unordered(instant, timers, f);
         }
     }
@@ -1099,12 +1104,12 @@ pub mod testutil {
 
     /// A test helper used to provide an implementation of a non-synchronized
     /// context.
-    pub struct FakeNonSyncCtx<TimerId, Event: Debug, State> {
-        rng: FakeCryptoRng<XorShiftRng>,
-        timers: FakeTimerCtx<TimerId>,
-        events: FakeEventCtx<Event>,
-        frames: FakeFrameCtx<EthernetWeakDeviceId<crate::testutil::FakeNonSyncCtx>>,
-        counters: FakeCounterCtx,
+    pub(crate) struct FakeNonSyncCtx<TimerId, Event: Debug, State> {
+        pub(crate) rng: FakeCryptoRng<XorShiftRng>,
+        pub(crate) timers: FakeTimerCtx<TimerId>,
+        pub(crate) events: FakeEventCtx<Event>,
+        pub(crate) frames: FakeFrameCtx<EthernetWeakDeviceId<crate::testutil::FakeNonSyncCtx>>,
+        pub(crate) counters: FakeCounterCtx,
         state: State,
     }
 
@@ -1149,10 +1154,10 @@ pub mod testutil {
         }
 
         #[cfg(test)]
-        pub(crate) fn frame_ctx(
+        pub(crate) fn frames(
             &self,
-        ) -> &FakeFrameCtx<EthernetWeakDeviceId<crate::testutil::FakeNonSyncCtx>> {
-            &self.frames
+        ) -> &[(EthernetWeakDeviceId<crate::testutil::FakeNonSyncCtx>, Vec<u8>)] {
+            self.frames.frames()
         }
 
         pub(crate) fn frame_ctx_mut(
@@ -1161,7 +1166,6 @@ pub mod testutil {
             &mut self.frames
         }
 
-        #[cfg(test)]
         pub(crate) fn state(&self) -> &State {
             &self.state
         }
@@ -1177,10 +1181,10 @@ pub mod testutil {
     }
 
     impl<TimerId, Event: Debug, State> RngContext for FakeNonSyncCtx<TimerId, Event, State> {
-        type Rng<'a> = &'a mut FakeCryptoRng<XorShiftRng> where Self: 'a;
+        type Rng<'a> = FakeCryptoRng<XorShiftRng> where Self: 'a;
 
         fn rng(&mut self) -> Self::Rng<'_> {
-            &mut self.rng
+            self.rng.clone()
         }
     }
 
@@ -1240,6 +1244,56 @@ pub mod testutil {
         fn duration(&self, _: &'static CStr) {}
     }
 
+    pub(crate) trait WithFakeTimerContext<TimerId> {
+        fn with_fake_timer_ctx<O, F: FnOnce(&FakeTimerCtx<TimerId>) -> O>(&self, f: F) -> O;
+
+        fn with_fake_timer_ctx_mut<O, F: FnOnce(&mut FakeTimerCtx<TimerId>) -> O>(
+            &mut self,
+            f: F,
+        ) -> O;
+    }
+
+    pub(crate) trait WithFakeFrameContext<SendMeta> {
+        fn with_fake_frame_ctx_mut<O, F: FnOnce(&mut FakeFrameCtx<SendMeta>) -> O>(
+            &mut self,
+            f: F,
+        ) -> O;
+    }
+
+    #[cfg(test)]
+    impl<SC, TimerId, Event: Debug, State> WithFakeTimerContext<TimerId>
+        for FakeCtxWithSyncCtx<SC, TimerId, Event, State>
+    {
+        fn with_fake_timer_ctx<O, F: FnOnce(&FakeTimerCtx<TimerId>) -> O>(&self, f: F) -> O {
+            let Self { sync_ctx: _, non_sync_ctx } = self;
+            f(&non_sync_ctx.timers)
+        }
+
+        fn with_fake_timer_ctx_mut<O, F: FnOnce(&mut FakeTimerCtx<TimerId>) -> O>(
+            &mut self,
+            f: F,
+        ) -> O {
+            let Self { sync_ctx: _, non_sync_ctx } = self;
+            f(&mut non_sync_ctx.timers)
+        }
+    }
+
+    #[cfg(test)]
+    impl<TimerId, Event: Debug, State> WithFakeTimerContext<TimerId>
+        for FakeNonSyncCtx<TimerId, Event, State>
+    {
+        fn with_fake_timer_ctx<O, F: FnOnce(&FakeTimerCtx<TimerId>) -> O>(&self, f: F) -> O {
+            f(&self.timers)
+        }
+
+        fn with_fake_timer_ctx_mut<O, F: FnOnce(&mut FakeTimerCtx<TimerId>) -> O>(
+            &mut self,
+            f: F,
+        ) -> O {
+            f(&mut self.timers)
+        }
+    }
+
     #[cfg(test)]
     #[derive(Default)]
     pub(crate) struct FakeCtxWithSyncCtx<SC, TimerId, Event: Debug, NonSyncCtxState> {
@@ -1292,6 +1346,18 @@ pub mod testutil {
     {
         fn as_mut(&mut self) -> &mut FakeFrameCtx<Meta> {
             &mut self.sync_ctx.frames
+        }
+    }
+
+    #[cfg(test)]
+    impl<S, Id, Meta, Event: Debug, DeviceId, NonSyncCtxState> WithFakeFrameContext<Meta>
+        for FakeCtx<S, Id, Meta, Event, DeviceId, NonSyncCtxState>
+    {
+        fn with_fake_frame_ctx_mut<O, F: FnOnce(&mut FakeFrameCtx<Meta>) -> O>(
+            &mut self,
+            f: F,
+        ) -> O {
+            f(&mut self.sync_ctx.frames)
         }
     }
 
@@ -1430,11 +1496,33 @@ pub mod testutil {
     }
 
     #[cfg(test)]
+    impl<S, Meta, DeviceId> WithFakeFrameContext<Meta> for FakeSyncCtx<S, Meta, DeviceId> {
+        fn with_fake_frame_ctx_mut<O, F: FnOnce(&mut FakeFrameCtx<Meta>) -> O>(
+            &mut self,
+            f: F,
+        ) -> O {
+            f(&mut self.frames)
+        }
+    }
+
+    #[cfg(test)]
     impl<Outer, S, Meta, DeviceId> AsMut<FakeFrameCtx<Meta>>
         for WrappedFakeSyncCtx<Outer, S, Meta, DeviceId>
     {
         fn as_mut(&mut self) -> &mut FakeFrameCtx<Meta> {
             &mut self.inner.frames
+        }
+    }
+
+    #[cfg(test)]
+    impl<Outer, S, Meta, DeviceId> WithFakeFrameContext<Meta>
+        for WrappedFakeSyncCtx<Outer, S, Meta, DeviceId>
+    {
+        fn with_fake_frame_ctx_mut<O, F: FnOnce(&mut FakeFrameCtx<Meta>) -> O>(
+            &mut self,
+            f: F,
+        ) -> O {
+            f(&mut self.inner.frames)
         }
     }
 
@@ -1547,9 +1635,8 @@ pub mod testutil {
     where
         CtxId: Eq + Hash + Copy + Debug,
         Ctx: FakeNetworkContext
-            + AsRef<FakeTimerCtx<Ctx::TimerId>>
-            + AsMut<FakeTimerCtx<Ctx::TimerId>>
-            + AsMut<FakeFrameCtx<Ctx::SendMeta>>,
+            + WithFakeTimerContext<Ctx::TimerId>
+            + WithFakeFrameContext<Ctx::SendMeta>,
         Ctx::TimerId: Clone,
         Links: FakeNetworkLinks<Ctx::SendMeta, RecvMeta, CtxId>,
     {
@@ -1578,7 +1665,7 @@ pub mod testutil {
             // timers are installed.
             let latest_time = contexts
                 .iter()
-                .map(|(_, ctx)| ctx.as_ref().instant.time)
+                .map(|(_, ctx)| ctx.with_fake_timer_ctx(|ctx| ctx.instant.time))
                 .max()
                 // If `max` returns `None`, it means that we were called with no
                 // contexts. That's kind of silly, but whatever - arbitrarily
@@ -1586,14 +1673,16 @@ pub mod testutil {
                 .unwrap_or(FakeInstant::default());
 
             assert!(
-                !contexts.iter().any(|(_, ctx)| { !ctx.as_ref().timers.is_empty() }),
+                !contexts
+                    .iter()
+                    .any(|(_, ctx)| { !ctx.with_fake_timer_ctx(|ctx| ctx.timers.is_empty()) }),
                 "can't start network with contexts that already have timers set"
             );
 
             // Synchronize all contexts' current time to the latest time of any
             // of the contexts. See comment above for more details.
             for (_, ctx) in contexts.iter_mut() {
-                AsMut::<FakeTimerCtx<_>>::as_mut(ctx).instant.time = latest_time;
+                ctx.with_fake_timer_ctx_mut(|ctx| ctx.instant.time = latest_time);
             }
 
             Self { contexts, current_time: latest_time, pending_frames: BinaryHeap::new(), links }
@@ -1674,7 +1763,7 @@ pub mod testutil {
             // Move time forward:
             self.current_time = next_step;
             for (_, ctx) in self.contexts.iter_mut() {
-                AsMut::<FakeTimerCtx<_>>::as_mut(ctx).instant.time = next_step;
+                ctx.with_fake_timer_ctx_mut(|ctx| ctx.instant.time = next_step);
             }
 
             // Dispatch all pending frames:
@@ -1700,15 +1789,17 @@ pub mod testutil {
                 // avoid an infinite loop in case handle_timer schedules another
                 // timer for the same or older FakeInstant.
                 let mut timers = Vec::<Ctx::TimerId>::new();
-                while let Some(InstantAndData(t, id)) = ctx.as_ref().timers.peek() {
-                    // TODO(https://github.com/rust-lang/rust/issues/53667):
-                    // Remove this break once let_chains is stable.
-                    if *t > ctx.as_ref().now() {
-                        break;
+                ctx.with_fake_timer_ctx_mut(|ctx| {
+                    while let Some(InstantAndData(t, id)) = ctx.timers.peek() {
+                        // TODO(https://github.com/rust-lang/rust/issues/53667):
+                        // Remove this break once let_chains is stable.
+                        if *t > ctx.now() {
+                            break;
+                        }
+                        timers.push(id.clone());
+                        assert_ne!(ctx.timers.pop(), None);
                     }
-                    timers.push(id.clone());
-                    assert_ne!(AsMut::<FakeTimerCtx<_>>::as_mut(ctx).timers.pop(), None);
-                }
+                });
 
                 for t in timers {
                     handle_timer(ctx, &mut (), t);
@@ -1755,12 +1846,13 @@ pub mod testutil {
                 .contexts
                 .iter_mut()
                 .filter_map(|(n, ctx)| {
-                    let ctx: &mut FakeFrameCtx<_> = ctx.as_mut();
-                    if ctx.frames.is_empty() {
-                        None
-                    } else {
-                        Some((n.clone(), ctx.frames.drain(..).collect()))
-                    }
+                    ctx.with_fake_frame_ctx_mut(|ctx| {
+                        if ctx.frames.is_empty() {
+                            None
+                        } else {
+                            Some((n.clone(), ctx.frames.drain(..).collect()))
+                        }
+                    })
                 })
                 .collect();
 
@@ -1788,9 +1880,11 @@ pub mod testutil {
             let next_timer = self
                 .contexts
                 .iter()
-                .filter_map(|(_, ctx)| match ctx.as_ref().timers.peek() {
-                    Some(tmr) => Some(tmr.0),
-                    None => None,
+                .filter_map(|(_, ctx)| {
+                    ctx.with_fake_timer_ctx(|ctx| match ctx.timers.peek() {
+                        Some(tmr) => Some(tmr.0),
+                        None => None,
+                    })
                 })
                 .min();
             // Get the instant for the next packet.
@@ -1867,7 +1961,7 @@ where
     Event: Debug,
     CtxId: Eq + Hash + Copy + Debug,
     Links: FakeNetworkLinks<<FakeCtxWithSyncCtx<SC, Id, Event, NonSyncCtxState> as FakeNetworkContext>::SendMeta, RecvMeta, CtxId>,
-    FakeCtxWithSyncCtx<SC, Id, Event, NonSyncCtxState>: FakeNetworkContext<TimerId=Id> + AsMut<FakeFrameCtx<<FakeCtxWithSyncCtx<SC, Id, Event, NonSyncCtxState> as FakeNetworkContext>::SendMeta>>
+    FakeCtxWithSyncCtx<SC, Id, Event, NonSyncCtxState>: FakeNetworkContext<TimerId=Id> + WithFakeFrameContext<<FakeCtxWithSyncCtx<SC, Id, Event, NonSyncCtxState> as FakeNetworkContext>::SendMeta>
 {
     pub(crate) fn with_context<
         K: Into<CtxId>,

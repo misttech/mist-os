@@ -3631,7 +3631,7 @@ mod tests {
             testutil::{
                 FakeCtxWithSyncCtx, FakeFrameCtx, FakeInstant, FakeNetwork, FakeNetworkContext,
                 FakeNonSyncCtx, FakeSyncCtx, InstantAndData, PendingFrameData, StepResult,
-                WrappedFakeSyncCtx,
+                WithFakeFrameContext, WrappedFakeSyncCtx,
             },
             InstantContext as _,
         },
@@ -3710,13 +3710,17 @@ mod tests {
     type TcpCtx<I, D> = FakeCtxWithSyncCtx<TcpSyncCtx<I, D>, TimerId, (), NonSyncState>;
 
     impl<I: TcpTestIpExt, D: FakeStrongDeviceId>
-        AsMut<FakeFrameCtx<SendIpPacketMeta<I, D, SpecifiedAddr<<I as Ip>::Addr>>>>
+        WithFakeFrameContext<SendIpPacketMeta<I, D, SpecifiedAddr<<I as Ip>::Addr>>>
         for TcpCtx<I, D>
     {
-        fn as_mut(
+        fn with_fake_frame_ctx_mut<
+            O,
+            F: FnOnce(&mut FakeFrameCtx<SendIpPacketMeta<I, D, SpecifiedAddr<<I as Ip>::Addr>>>) -> O,
+        >(
             &mut self,
-        ) -> &mut FakeFrameCtx<SendIpPacketMeta<I, D, SpecifiedAddr<<I as Ip>::Addr>>> {
-            self.sync_ctx.inner.as_mut()
+            f: F,
+        ) -> O {
+            f(&mut self.sync_ctx.inner.as_mut())
         }
     }
 

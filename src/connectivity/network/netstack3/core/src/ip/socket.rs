@@ -1981,12 +1981,12 @@ mod tests {
         send_to(remote_ip);
         send_to(other_remote_ip);
 
-        let [df_remote, df_other_remote] =
-            assert_matches!(non_sync_ctx.frames_sent(), [df1, df2] => [df1, df2]);
+        let frames = non_sync_ctx.frames_sent();
+        let [df_remote, df_other_remote] = assert_matches!(&frames[..], [df1, df2] => [df1, df2]);
         {
             let (_dev, frame) = df_remote;
             let (_body, _src_mac, _dst_mac, _src_ip, dst_ip, _ip_proto, hop_limit) =
-                parse_ip_packet_in_ethernet_frame::<I>(frame, EthernetFrameLengthCheck::NoCheck)
+                parse_ip_packet_in_ethernet_frame::<I>(&frame, EthernetFrameLengthCheck::NoCheck)
                     .unwrap();
             assert_eq!(dst_ip, remote_ip.get());
             // The `SetHopLimit`-returned value should take precedence.
@@ -1996,7 +1996,7 @@ mod tests {
         {
             let (_dev, frame) = df_other_remote;
             let (_body, _src_mac, _dst_mac, _src_ip, dst_ip, _ip_proto, hop_limit) =
-                parse_ip_packet_in_ethernet_frame::<I>(frame, EthernetFrameLengthCheck::NoCheck)
+                parse_ip_packet_in_ethernet_frame::<I>(&frame, EthernetFrameLengthCheck::NoCheck)
                     .unwrap();
             assert_eq!(dst_ip, other_remote_ip.get());
             // When the options object does not provide a hop limit the default

@@ -6,7 +6,7 @@
 
 #[cfg(test)]
 use alloc::vec;
-use alloc::{borrow::ToOwned, collections::HashMap, vec::Vec};
+use alloc::{borrow::ToOwned, collections::HashMap, sync::Arc, vec::Vec};
 #[cfg(test)]
 use core::time::Duration;
 use core::{
@@ -45,14 +45,14 @@ use tracing_subscriber::{
 };
 
 #[cfg(test)]
-use crate::{
-    context::{testutil::InstantAndData, InstantContext},
-    ip::SendIpPacketMeta,
-};
+use crate::{context::testutil::InstantAndData, ip::SendIpPacketMeta};
 use crate::{
     context::{
-        testutil::{FakeFrameCtx, FakeInstant, FakeNetworkContext, FakeTimerCtx},
-        EventContext, RngContext, TimerContext, TracingContext,
+        testutil::{
+            FakeFrameCtx, FakeInstant, FakeNetworkContext, FakeTimerCtx, WithFakeFrameContext,
+            WithFakeTimerContext,
+        },
+        CounterContext, EventContext, InstantContext, RngContext, TimerContext, TracingContext,
     },
     device::{
         ethernet, loopback::LoopbackDeviceId, DeviceId, DeviceLayerEventDispatcher,
@@ -180,50 +180,192 @@ pub type FakeCtx = Ctx<FakeNonSyncCtx>;
 pub type FakeSyncCtx = SyncCtx<FakeNonSyncCtx>;
 
 /// Test-only implementation of [`crate::NonSyncContext`].
-#[derive(Default)]
+#[derive(Default, Clone)]
 pub struct FakeNonSyncCtx(
-    crate::context::testutil::FakeNonSyncCtx<TimerId<Self>, DispatchedEvent, FakeNonSyncCtxState>,
+    Arc<
+        Mutex<
+            crate::context::testutil::FakeNonSyncCtx<
+                TimerId<Self>,
+                DispatchedEvent,
+                FakeNonSyncCtxState,
+            >,
+        >,
+    >,
 );
 
-impl DerefMut for FakeNonSyncCtx {
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        let Self(this) = self;
-        this
-    }
-}
+/// A wrapper type that makes it easier to implement `Deref` (and optionally
+/// `DerefMut`) for a value that is protected by a lock.
+///
+/// The first field is the type that provides access to the inner value,
+/// probably a lock guard. The second and third fields are functions that, given
+/// the first field, provide shared and mutable access (respectively) to the
+/// inner value.
+struct Wrapper<S, Callback, CallbackMut>(S, Callback, CallbackMut);
 
-impl Deref for FakeNonSyncCtx {
-    type Target = crate::context::testutil::FakeNonSyncCtx<
-        TimerId<Self>,
-        DispatchedEvent,
-        FakeNonSyncCtxState,
-    >;
-
-    fn deref(&self) -> &Self::Target {
-        let Self(this) = self;
-        this
-    }
-}
-
-impl<T> AsRef<T> for FakeNonSyncCtx
-where
-    crate::context::testutil::FakeNonSyncCtx<TimerId<Self>, DispatchedEvent, FakeNonSyncCtxState>:
-        AsRef<T>,
+impl<T: ?Sized, S: Deref, Callback: for<'a> Fn(&'a <S as Deref>::Target) -> &'a T, CallbackMut>
+    Deref for Wrapper<S, Callback, CallbackMut>
 {
-    fn as_ref(&self) -> &T {
-        let Self(this) = self;
-        this.as_ref()
+    type Target = T;
+
+    fn deref(&self) -> &T {
+        let Self(guard, f, _) = self;
+        let target = guard.deref();
+        f(target)
     }
 }
 
-impl<T> AsMut<T> for FakeNonSyncCtx
-where
-    crate::context::testutil::FakeNonSyncCtx<TimerId<Self>, DispatchedEvent, FakeNonSyncCtxState>:
-        AsMut<T>,
+impl<
+        T: ?Sized,
+        S: DerefMut,
+        Callback: for<'a> Fn(&'a <S as Deref>::Target) -> &'a T,
+        CallbackMut: for<'a> Fn(&'a mut <S as Deref>::Target) -> &'a mut T,
+    > DerefMut for Wrapper<S, Callback, CallbackMut>
 {
-    fn as_mut(&mut self) -> &mut T {
+    fn deref_mut(&mut self) -> &mut T {
+        let Self(guard, _, f) = self;
+        let target = guard.deref_mut();
+        f(target)
+    }
+}
+
+impl FakeNonSyncCtx {
+    fn with_inner<
+        F: FnOnce(
+            &crate::context::testutil::FakeNonSyncCtx<
+                TimerId<Self>,
+                DispatchedEvent,
+                FakeNonSyncCtxState,
+            >,
+        ) -> O,
+        O,
+    >(
+        &self,
+        f: F,
+    ) -> O {
         let Self(this) = self;
-        this.as_mut()
+        let locked = this.lock();
+        f(&*locked)
+    }
+
+    fn with_inner_mut<
+        F: FnOnce(
+            &mut crate::context::testutil::FakeNonSyncCtx<
+                TimerId<Self>,
+                DispatchedEvent,
+                FakeNonSyncCtxState,
+            >,
+        ) -> O,
+        O,
+    >(
+        &self,
+        f: F,
+    ) -> O {
+        let Self(this) = self;
+        let mut locked = this.lock();
+        f(&mut *locked)
+    }
+
+    #[cfg(test)]
+    pub(crate) fn timer_ctx(&self) -> impl Deref<Target = FakeTimerCtx<TimerId<Self>>> + '_ {
+        Wrapper(self.0.lock(), crate::context::testutil::FakeNonSyncCtx::timer_ctx, ())
+    }
+
+    #[cfg(test)]
+    pub(crate) fn frames_sent(
+        &self,
+    ) -> impl Deref<Target = [(EthernetWeakDeviceId<FakeNonSyncCtx>, Vec<u8>)]> + '_ {
+        Wrapper(self.0.lock(), crate::context::testutil::FakeNonSyncCtx::frames, ())
+    }
+
+    pub(crate) fn state_mut(&mut self) -> impl DerefMut<Target = FakeNonSyncCtxState> + '_ {
+        Wrapper(
+            self.0.lock(),
+            crate::context::testutil::FakeNonSyncCtx::state,
+            crate::context::testutil::FakeNonSyncCtx::state_mut,
+        )
+    }
+
+    #[cfg(test)]
+    pub(crate) fn take_frames(&mut self) -> Vec<(EthernetWeakDeviceId<FakeNonSyncCtx>, Vec<u8>)> {
+        self.with_inner_mut(|ctx| ctx.frame_ctx_mut().take_frames())
+    }
+
+    #[cfg(test)]
+    pub(crate) fn take_events(&mut self) -> Vec<DispatchedEvent> {
+        self.with_inner_mut(|ctx| ctx.events.take())
+    }
+
+    /// Takes all the received ICMP replies for a given `conn`.
+    #[cfg(test)]
+    pub(crate) fn take_icmp_replies<I: Ip>(&mut self, conn: IcmpConnId<I>) -> Vec<(u16, Vec<u8>)> {
+        I::map_ip::<_, IpInvariant<Option<Vec<_>>>>(
+            (IpInvariant(self), conn),
+            |(IpInvariant(this), conn)| IpInvariant(this.state_mut().icmpv4_replies.remove(&conn)),
+            |(IpInvariant(this), conn)| IpInvariant(this.state_mut().icmpv6_replies.remove(&conn)),
+        )
+        .into_inner()
+        .unwrap_or_else(Vec::default)
+    }
+}
+
+impl WithFakeTimerContext<TimerId<FakeNonSyncCtx>> for FakeCtx {
+    fn with_fake_timer_ctx<O, F: FnOnce(&FakeTimerCtx<TimerId<FakeNonSyncCtx>>) -> O>(
+        &self,
+        f: F,
+    ) -> O {
+        let Self { sync_ctx: _, non_sync_ctx } = self;
+        non_sync_ctx.with_inner(|ctx| f(&ctx.timers))
+    }
+
+    fn with_fake_timer_ctx_mut<O, F: FnOnce(&mut FakeTimerCtx<TimerId<FakeNonSyncCtx>>) -> O>(
+        &mut self,
+        f: F,
+    ) -> O {
+        let Self { sync_ctx: _, non_sync_ctx } = self;
+        non_sync_ctx.with_inner_mut(|ctx| f(&mut ctx.timers))
+    }
+}
+
+impl WithFakeFrameContext<EthernetWeakDeviceId<crate::testutil::FakeNonSyncCtx>> for FakeCtx {
+    fn with_fake_frame_ctx_mut<
+        O,
+        F: FnOnce(&mut FakeFrameCtx<EthernetWeakDeviceId<crate::testutil::FakeNonSyncCtx>>) -> O,
+    >(
+        &mut self,
+        f: F,
+    ) -> O {
+        let Self { sync_ctx: _, non_sync_ctx } = self;
+        non_sync_ctx.with_inner_mut(|ctx| f(&mut ctx.frames))
+    }
+}
+
+impl WithFakeTimerContext<TimerId<FakeNonSyncCtx>> for FakeNonSyncCtx {
+    fn with_fake_timer_ctx<O, F: FnOnce(&FakeTimerCtx<TimerId<FakeNonSyncCtx>>) -> O>(
+        &self,
+        f: F,
+    ) -> O {
+        self.with_inner(|ctx| f(&ctx.timers))
+    }
+
+    fn with_fake_timer_ctx_mut<O, F: FnOnce(&mut FakeTimerCtx<TimerId<FakeNonSyncCtx>>) -> O>(
+        &mut self,
+        f: F,
+    ) -> O {
+        self.with_inner_mut(|ctx| f(&mut ctx.timers))
+    }
+}
+
+impl CounterContext for FakeNonSyncCtx {
+    fn increment_debug_counter(&mut self, key: &'static str) {
+        self.with_inner_mut(|ctx| ctx.increment_debug_counter(key));
+    }
+}
+
+impl InstantContext for FakeNonSyncCtx {
+    type Instant = FakeInstant;
+
+    fn now(&self) -> FakeInstant {
+        self.with_inner(|ctx| ctx.now())
     }
 }
 
@@ -233,32 +375,34 @@ impl TimerContext<TimerId<FakeNonSyncCtx>> for FakeNonSyncCtx {
         time: FakeInstant,
         id: TimerId<FakeNonSyncCtx>,
     ) -> Option<FakeInstant> {
-        let Self(this) = self;
-        this.schedule_timer_instant(time, id)
+        self.with_inner_mut(|ctx| ctx.schedule_timer_instant(time, id))
     }
 
     fn cancel_timer(&mut self, id: TimerId<FakeNonSyncCtx>) -> Option<FakeInstant> {
-        let Self(this) = self;
-        this.cancel_timer(id)
+        self.with_inner_mut(|ctx| ctx.cancel_timer(id))
     }
 
     fn cancel_timers_with<F: FnMut(&TimerId<FakeNonSyncCtx>) -> bool>(&mut self, f: F) {
-        let Self(this) = self;
-        this.cancel_timers_with(f);
+        self.with_inner_mut(|ctx| ctx.cancel_timers_with(f))
     }
 
     fn scheduled_instant(&self, id: TimerId<FakeNonSyncCtx>) -> Option<FakeInstant> {
-        let Self(this) = self;
-        this.scheduled_instant(id)
+        self.with_inner_mut(|ctx| ctx.scheduled_instant(id))
     }
 }
 
 impl RngContext for FakeNonSyncCtx {
-    type Rng<'a> = &'a mut FakeCryptoRng<XorShiftRng> where Self: 'a;
+    type Rng<'a> = FakeCryptoRng<XorShiftRng>;
 
     fn rng(&mut self) -> Self::Rng<'_> {
         let Self(this) = self;
-        this.rng()
+        this.lock().rng()
+    }
+}
+
+impl EventContext<DispatchedEvent> for FakeNonSyncCtx {
+    fn on_event(&mut self, event: DispatchedEvent) {
+        self.with_inner_mut(|ctx| ctx.events.on_event(event))
     }
 }
 
@@ -297,17 +441,6 @@ impl NonSyncContext for FakeNonSyncCtx {
     }
 }
 
-#[cfg(test)]
-impl FakeNonSyncCtx {
-    pub(crate) fn take_frames(&mut self) -> Vec<(EthernetWeakDeviceId<FakeNonSyncCtx>, Vec<u8>)> {
-        self.frame_ctx_mut().take_frames()
-    }
-
-    pub(crate) fn frames_sent(&self) -> &[(EthernetWeakDeviceId<FakeNonSyncCtx>, Vec<u8>)] {
-        self.frame_ctx().frames()
-    }
-}
-
 /// A wrapper which implements `RngCore` and `CryptoRng` for any `RngCore`.
 ///
 /// This is used to satisfy [`EventDispatcher`]'s requirement that the
@@ -317,7 +450,7 @@ impl FakeNonSyncCtx {
 ///
 /// This is obviously insecure. Don't use it except in testing!
 #[derive(Clone, Debug)]
-pub struct FakeCryptoRng<R>(R);
+pub struct FakeCryptoRng<R>(Arc<Mutex<R>>);
 
 impl Default for FakeCryptoRng<XorShiftRng> {
     fn default() -> FakeCryptoRng<XorShiftRng> {
@@ -328,22 +461,27 @@ impl Default for FakeCryptoRng<XorShiftRng> {
 impl FakeCryptoRng<XorShiftRng> {
     /// Creates a new [`FakeCryptoRng<XorShiftRng>`] from a seed.
     pub(crate) fn new_xorshift(seed: u128) -> FakeCryptoRng<XorShiftRng> {
-        FakeCryptoRng(new_rng(seed))
+        Self(Arc::new(Mutex::new(new_rng(seed))))
+    }
+
+    #[cfg(test)]
+    pub(crate) fn deep_clone(&self) -> Self {
+        Self(Arc::new(Mutex::new(self.0.lock().clone())))
     }
 }
 
 impl<R: RngCore> RngCore for FakeCryptoRng<R> {
     fn next_u32(&mut self) -> u32 {
-        self.0.next_u32()
+        self.0.lock().next_u32()
     }
     fn next_u64(&mut self) -> u64 {
-        self.0.next_u64()
+        self.0.lock().next_u64()
     }
     fn fill_bytes(&mut self, dest: &mut [u8]) {
-        self.0.fill_bytes(dest)
+        self.0.lock().fill_bytes(dest)
     }
     fn try_fill_bytes(&mut self, dest: &mut [u8]) -> Result<(), rand::Error> {
-        self.0.try_fill_bytes(dest)
+        self.0.lock().try_fill_bytes(dest)
     }
 }
 
@@ -353,7 +491,7 @@ impl<R: SeedableRng> SeedableRng for FakeCryptoRng<R> {
     type Seed = R::Seed;
 
     fn from_seed(seed: Self::Seed) -> Self {
-        Self(R::from_seed(seed))
+        Self(Arc::new(Mutex::new(R::from_seed(seed))))
     }
 }
 
@@ -441,7 +579,7 @@ pub(crate) fn set_logger_for_test() {
 /// Get the counter value for a `key`.
 #[cfg(test)]
 pub(crate) fn get_counter_val(ctx: &FakeNonSyncCtx, key: &str) -> usize {
-    ctx.counter_ctx().get_counter_val(key)
+    ctx.with_inner(|ctx| ctx.counter_ctx().get_counter_val(key))
 }
 
 /// An extension trait for `Ip` providing test-related functionality.
@@ -805,41 +943,9 @@ pub(crate) fn add_arp_or_ndp_table_entry<A: IpAddress>(
     }
 }
 
-impl AsMut<FakeFrameCtx<EthernetWeakDeviceId<FakeNonSyncCtx>>> for FakeCtx {
-    fn as_mut(&mut self) -> &mut FakeFrameCtx<EthernetWeakDeviceId<FakeNonSyncCtx>> {
-        self.non_sync_ctx.frame_ctx_mut()
-    }
-}
-
-impl AsRef<FakeTimerCtx<TimerId<FakeNonSyncCtx>>> for FakeCtx {
-    fn as_ref(&self) -> &FakeTimerCtx<TimerId<FakeNonSyncCtx>> {
-        self.non_sync_ctx.as_ref()
-    }
-}
-
-impl AsMut<FakeTimerCtx<TimerId<FakeNonSyncCtx>>> for FakeCtx {
-    fn as_mut(&mut self) -> &mut FakeTimerCtx<TimerId<FakeNonSyncCtx>> {
-        self.non_sync_ctx.as_mut()
-    }
-}
-
 impl FakeNetworkContext for FakeCtx {
     type TimerId = TimerId<FakeNonSyncCtx>;
     type SendMeta = EthernetWeakDeviceId<FakeNonSyncCtx>;
-}
-
-impl FakeNonSyncCtx {
-    /// Takes all the received ICMP replies for a given `conn`.
-    #[cfg(test)]
-    pub(crate) fn take_icmp_replies<I: Ip>(&mut self, conn: IcmpConnId<I>) -> Vec<(u16, Vec<u8>)> {
-        I::map_ip::<_, IpInvariant<Option<Vec<_>>>>(
-            (IpInvariant(self), conn),
-            |(IpInvariant(this), conn)| IpInvariant(this.state_mut().icmpv4_replies.remove(&conn)),
-            |(IpInvariant(this), conn)| IpInvariant(this.state_mut().icmpv6_replies.remove(&conn)),
-        )
-        .into_inner()
-        .unwrap_or_else(Vec::default)
-    }
 }
 
 impl<I: IcmpIpExt> udp::NonSyncContext<I> for FakeNonSyncCtx {
@@ -876,8 +982,9 @@ impl<B: BufferMut> BufferIcmpContext<Ipv4, B> for FakeNonSyncCtx {
         seq_num: u16,
         data: B,
     ) {
-        let replies = self.state_mut().icmpv4_replies.entry(conn).or_insert_with(Vec::default);
-        replies.push((seq_num, data.as_ref().to_owned()))
+        let mut state = self.state_mut();
+        let replies = state.icmpv4_replies.entry(conn).or_insert_with(Vec::default);
+        replies.push((seq_num, data.as_ref().to_owned()));
     }
 }
 
@@ -891,7 +998,8 @@ impl<B: BufferMut> BufferIcmpContext<Ipv6, B> for FakeNonSyncCtx {
         seq_num: u16,
         data: B,
     ) {
-        let replies = self.state_mut().icmpv6_replies.entry(conn).or_insert_with(Vec::default);
+        let mut state = self.state_mut();
+        let replies = state.icmpv6_replies.entry(conn).or_insert_with(Vec::default);
         replies.push((seq_num, data.as_ref().to_owned()))
     }
 }
@@ -931,7 +1039,7 @@ impl DeviceLayerEventDispatcher for FakeNonSyncCtx {
         device: &EthernetDeviceId<FakeNonSyncCtx>,
         frame: Buf<Vec<u8>>,
     ) -> Result<(), DeviceSendFrameError<Buf<Vec<u8>>>> {
-        self.frame_ctx_mut().push(device.downgrade(), frame.into_inner());
+        self.with_inner_mut(|ctx| ctx.frame_ctx_mut().push(device.downgrade(), frame.into_inner()));
         Ok(())
     }
 }
@@ -1043,29 +1151,25 @@ impl From<IpLayerEvent<DeviceId<FakeNonSyncCtx>, Ipv6>> for DispatchedEvent {
 
 impl EventContext<IpLayerEvent<DeviceId<FakeNonSyncCtx>, Ipv4>> for FakeNonSyncCtx {
     fn on_event(&mut self, event: IpLayerEvent<DeviceId<FakeNonSyncCtx>, Ipv4>) {
-        let Self(this) = self;
-        this.on_event(DispatchedEvent::from(event))
+        self.on_event(DispatchedEvent::from(event))
     }
 }
 
 impl EventContext<IpLayerEvent<DeviceId<FakeNonSyncCtx>, Ipv6>> for FakeNonSyncCtx {
     fn on_event(&mut self, event: IpLayerEvent<DeviceId<FakeNonSyncCtx>, Ipv6>) {
-        let Self(this) = self;
-        this.on_event(DispatchedEvent::from(event))
+        self.on_event(DispatchedEvent::from(event))
     }
 }
 
 impl EventContext<IpDeviceEvent<DeviceId<FakeNonSyncCtx>, Ipv4, FakeInstant>> for FakeNonSyncCtx {
     fn on_event(&mut self, event: IpDeviceEvent<DeviceId<FakeNonSyncCtx>, Ipv4, FakeInstant>) {
-        let Self(this) = self;
-        this.on_event(DispatchedEvent::from(event))
+        self.on_event(DispatchedEvent::from(event))
     }
 }
 
 impl EventContext<IpDeviceEvent<DeviceId<FakeNonSyncCtx>, Ipv6, FakeInstant>> for FakeNonSyncCtx {
     fn on_event(&mut self, event: IpDeviceEvent<DeviceId<FakeNonSyncCtx>, Ipv6, FakeInstant>) {
-        let Self(this) = self;
-        this.on_event(DispatchedEvent::from(event))
+        self.on_event(DispatchedEvent::from(event))
     }
 }
 

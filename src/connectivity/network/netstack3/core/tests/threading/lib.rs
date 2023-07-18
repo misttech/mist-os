@@ -38,7 +38,6 @@ fn packet_socket_change_device_and_protocol_atomic() {
         let (FakeCtx { sync_ctx, non_sync_ctx }, indexes_to_device_ids) = builder.build();
 
         let sync_ctx = Arc::new(sync_ctx);
-        let non_sync_ctx = Arc::new(Mutex::new(non_sync_ctx));
         let devs = dev_indexes.map(|i| indexes_to_device_ids[i].clone());
         drop(indexes_to_device_ids);
 
@@ -52,7 +51,7 @@ fn packet_socket_change_device_and_protocol_atomic() {
 
         let thread_vars = (sync_ctx.clone(), non_sync_ctx.clone(), devs.clone());
         let deliver = loom::thread::spawn(move || {
-            let (sync_ctx, non_sync_ctx, devs) = thread_vars;
+            let (sync_ctx, mut non_sync_ctx, devs) = thread_vars;
             for (device, ethertype) in [
                 (&devs[0], first_proto.get().into()),
                 (&devs[0], second_proto.get().into()),
@@ -61,7 +60,7 @@ fn packet_socket_change_device_and_protocol_atomic() {
             ] {
                 netstack3_core::device::receive_frame(
                     &*sync_ctx,
-                    &mut non_sync_ctx.lock(),
+                    &mut non_sync_ctx,
                     &device,
                     make_ethernet_frame(ethertype),
                 );

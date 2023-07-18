@@ -1701,18 +1701,21 @@ mod tests {
         // Should route the packet since routing fully enabled (netstack &
         // device).
         receive_ip_packet::<_, _, I>(&sync_ctx, &mut non_sync_ctx, &device, frame_dst, buf.clone());
-        assert_eq!(non_sync_ctx.frames_sent().len(), 1);
-        let (packet_buf, _, _, packet_src_ip, packet_dst_ip, proto, ttl) =
-            parse_ip_packet_in_ethernet_frame::<I>(
-                &non_sync_ctx.frames_sent()[0].1[..],
-                EthernetFrameLengthCheck::NoCheck,
-            )
-            .unwrap();
-        assert_eq!(src_ip.get(), packet_src_ip);
-        assert_eq!(config.remote_ip.get(), packet_dst_ip);
-        assert_eq!(proto, IpProto::Tcp.into());
-        assert_eq!(body, packet_buf);
-        assert_eq!(ttl, 63);
+        {
+            assert_eq!(non_sync_ctx.frames_sent().len(), 1);
+            let frames = non_sync_ctx.frames_sent();
+            let (packet_buf, _, _, packet_src_ip, packet_dst_ip, proto, ttl) =
+                parse_ip_packet_in_ethernet_frame::<I>(
+                    &frames[0].1[..],
+                    EthernetFrameLengthCheck::NoCheck,
+                )
+                .unwrap();
+            assert_eq!(src_ip.get(), packet_src_ip);
+            assert_eq!(config.remote_ip.get(), packet_dst_ip);
+            assert_eq!(proto, IpProto::Tcp.into());
+            assert_eq!(body, packet_buf);
+            assert_eq!(ttl, 63);
+        }
 
         // Test routing a packet to an unknown address.
         let buf_unknown_dest = Buf::new(&mut body[..], ..)

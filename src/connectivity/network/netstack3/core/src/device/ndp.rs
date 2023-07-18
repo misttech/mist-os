@@ -268,7 +268,7 @@ mod tests {
             )
             .unwrap();
 
-            assert_empty(non_sync_ctx.frames_sent());
+            assert_empty(non_sync_ctx.frames_sent().iter());
         });
         net.with_context("local", |Ctx { sync_ctx, non_sync_ctx }| {
             add_ip_addr_subnet(
@@ -279,7 +279,7 @@ mod tests {
             )
             .unwrap();
 
-            assert_empty(non_sync_ctx.frames_sent());
+            assert_empty(non_sync_ctx.frames_sent().iter());
 
             crate::ip::send_ipv6_packet_from_device(
                 &mut Locked::new(&*sync_ctx),
@@ -749,7 +749,7 @@ mod tests {
         let dev_id = eth_dev_id.clone().into();
         crate::device::testutil::enable_device(&sync_ctx, &mut non_sync_ctx, &dev_id);
 
-        assert_empty(non_sync_ctx.frames_sent());
+        assert_empty(non_sync_ctx.frames_sent().iter());
 
         let _: Ipv6DeviceConfigurationUpdate = update_ipv6_configuration(
             sync_ctx,
@@ -865,7 +865,7 @@ mod tests {
         )
         .unwrap();
 
-        assert_empty(non_sync_ctx.frames_sent());
+        assert_empty(non_sync_ctx.frames_sent().iter());
 
         // Add an IP.
         add_ip_addr_subnet(
@@ -1107,8 +1107,9 @@ mod tests {
                 Buf::new(vec![0; 10], ..),
             )
             .unwrap();
+            let frames = ctx.frames_sent();
             let (buf, _, _, _) = parse_ethernet_frame(
-                &ctx.frames_sent()[frame_offset].1[..],
+                &frames[frame_offset].1[..],
                 EthernetFrameLengthCheck::NoCheck,
             )
             .unwrap();
@@ -1263,7 +1264,7 @@ mod tests {
         let Ctx { sync_ctx, mut non_sync_ctx } = crate::testutil::FakeCtx::default();
         let sync_ctx = &sync_ctx;
 
-        assert_empty(non_sync_ctx.frames_sent());
+        assert_empty(non_sync_ctx.frames_sent().iter());
         let eth_device_id = crate::device::add_ethernet_device(
             &sync_ctx,
             fake_config.local_mac,
@@ -1286,7 +1287,7 @@ mod tests {
             },
         )
         .unwrap();
-        assert_empty(non_sync_ctx.frames_sent());
+        assert_empty(non_sync_ctx.frames_sent().iter());
 
         let time = non_sync_ctx.now();
         assert_eq!(
@@ -1363,7 +1364,7 @@ mod tests {
 
         let Ctx { sync_ctx, mut non_sync_ctx } = crate::testutil::FakeCtx::default();
         let sync_ctx = &sync_ctx;
-        assert_empty(non_sync_ctx.frames_sent());
+        assert_empty(non_sync_ctx.frames_sent().iter());
         let eth_device_id = crate::device::add_ethernet_device(
             &sync_ctx,
             fake_config.local_mac,
@@ -1385,7 +1386,7 @@ mod tests {
             },
         )
         .unwrap();
-        assert_empty(non_sync_ctx.frames_sent());
+        assert_empty(non_sync_ctx.frames_sent().iter());
 
         let time = non_sync_ctx.now();
         assert_eq!(
@@ -1407,7 +1408,7 @@ mod tests {
         assert_eq!(non_sync_ctx.frames_sent().len(), 2);
 
         // Each packet would be the same.
-        for f in non_sync_ctx.frames_sent() {
+        for f in non_sync_ctx.frames_sent().iter() {
             let (src_mac, _, src_ip, _, _, message, code) =
                 parse_icmp_packet_in_ip_packet_in_ethernet_frame::<Ipv6, _, RouterSolicitation, _>(
                     &f.1,
@@ -1438,7 +1439,7 @@ mod tests {
         let Ctx { sync_ctx, mut non_sync_ctx } = crate::testutil::FakeCtx::default();
         let sync_ctx = &sync_ctx;
 
-        assert_empty(non_sync_ctx.frames_sent());
+        assert_empty(non_sync_ctx.frames_sent().iter());
         assert_empty(non_sync_ctx.timer_ctx().timers());
 
         let device = crate::device::add_ethernet_device(
@@ -1468,7 +1469,7 @@ mod tests {
             rs_timer_id(device.clone().try_into().expect("expected ethernet ID"));
 
         // Send the first router solicitation.
-        assert_empty(non_sync_ctx.frames_sent());
+        assert_empty(non_sync_ctx.frames_sent().iter());
         non_sync_ctx.timer_ctx().assert_timers_installed([(timer_id.clone(), ..)]);
 
         assert_eq!(
@@ -1542,7 +1543,7 @@ mod tests {
         )
         .into();
         crate::device::testutil::enable_device(&sync_ctx, &mut non_sync_ctx, &device);
-        assert_empty(non_sync_ctx.frames_sent());
+        assert_empty(non_sync_ctx.frames_sent().iter());
         assert_empty(non_sync_ctx.timer_ctx().timers());
 
         // Updating the IP should resolve immediately since DAD is turned off by
@@ -1559,7 +1560,7 @@ mod tests {
             get_address_assigned(&sync_ctx, &device, fake_config.local_ip.try_into().unwrap()),
             Some(true)
         );
-        assert_empty(non_sync_ctx.frames_sent());
+        assert_empty(non_sync_ctx.frames_sent().iter());
         assert_empty(non_sync_ctx.timer_ctx().timers());
 
         // Enable DAD for the device.
@@ -1816,7 +1817,7 @@ mod tests {
     /// `rng` is used to initialize the key that is used to generate new addresses.
     fn enable_temporary_addresses<R: RngCore>(
         config: &mut SlaacConfiguration,
-        rng: &mut R,
+        mut rng: R,
         max_valid_lifetime: NonZeroDuration,
         max_preferred_lifetime: NonZeroDuration,
         max_generation_retries: u8,
@@ -2008,7 +2009,7 @@ mod tests {
             [],
             // Clone the RNG so we can see what the next value (which will be
             // used to generate the temporary address) will be.
-            OpaqueIidNonce::Random(non_sync_ctx.rng().clone().next_u64()),
+            OpaqueIidNonce::Random(non_sync_ctx.rng().deep_clone().next_u64()),
             &slaac_config.temporary_address_configuration.unwrap().secret_key,
         );
         let mut expected_addr = [1, 2, 3, 4, 5, 6, 7, 8, 0, 0, 0, 0, 0, 0, 0, 0];
@@ -2078,7 +2079,7 @@ mod tests {
                 initialize_with_temporary_addresses_enabled();
             let mut sync_ctx = &sync_ctx;
 
-            *non_sync_ctx.rng() = rand::SeedableRng::from_seed(RNG_SEED);
+            *non_sync_ctx.rng().rng() = rand::SeedableRng::from_seed(RNG_SEED);
 
             // Receive an RA and determine what temporary address was assigned, then return it.
             receive_prefix_update(
@@ -2123,7 +2124,7 @@ mod tests {
 
         // Seed the RNG right before the RA is received, just like in our
         // earlier run above.
-        *non_sync_ctx.rng() = rand::SeedableRng::from_seed(RNG_SEED);
+        *non_sync_ctx.rng().rng() = rand::SeedableRng::from_seed(RNG_SEED);
 
         // Receive a new RA with new prefix (autonomous). The system will assign
         // a temporary and static SLAAC address. The first temporary address
@@ -3361,7 +3362,7 @@ mod tests {
             [],
             // Clone the RNG so we can see what the next value (which will be
             // used to generate the temporary address) will be.
-            OpaqueIidNonce::Random(non_sync_ctx.rng().clone().next_u64()),
+            OpaqueIidNonce::Random(non_sync_ctx.rng().deep_clone().next_u64()),
             &secret_key,
         );
         let mut expected_addr = [1, 2, 3, 4, 5, 6, 7, 8, 0, 0, 0, 0, 0, 0, 0, 0];

@@ -2420,7 +2420,7 @@ mod tests {
                 ip_device_id_ctx: Default::default(),
             }));
 
-        let mut dup_rng = non_sync_ctx.rng().clone();
+        let mut dup_rng = non_sync_ctx.rng().deep_clone();
 
         struct AddrProps {
             desync_factor: Duration,
