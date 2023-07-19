@@ -4,8 +4,13 @@
 
 use anyhow::{anyhow, Context as _, Result};
 use async_trait::async_trait;
-use component_debug::{cli::run_cmd, config::resolve_raw_config_overrides};
-use ffx_component::rcs::{connect_to_lifecycle_controller, connect_to_realm_query};
+use component_debug::{
+    cli::doctor::write_result_table, cli::run_cmd, config::resolve_raw_config_overrides,
+    doctor::validate_routes,
+};
+use ffx_component::rcs::{
+    connect_to_lifecycle_controller, connect_to_realm_query, connect_to_route_validator,
+};
 use ffx_component_run_args::RunComponentCommand;
 use ffx_core::macro_deps::errors::FfxError;
 use ffx_log::{error::LogError, log_impl, LogOpts};
@@ -14,6 +19,7 @@ use ffx_log_frontend::RemoteDiagnosticsBridgeProxyWrapper;
 use fho::{daemon_protocol, FfxMain, FfxTool, SimpleWriter};
 use fidl_fuchsia_developer_ffx::TargetCollectionProxy;
 use fidl_fuchsia_developer_remotecontrol as rc;
+use std::io::Write;
 use std::sync::Arc;
 
 async fn cmd_impl(
@@ -50,6 +56,16 @@ async fn cmd_impl(
     )
     .await
     .map_err(|e| FfxError::Error(e, 1))?;
+
+    // Run `doctor` on the new component to expose any routing problems.
+    let route_validator = connect_to_route_validator(&rcs_proxy).await?;
+    let route_report = validate_routes(&route_validator, args.moniker.clone()).await?;
+    // If any of the RouteReport objects indicate an error, output the full report.
+    if route_report.iter().any(|r| r.error_summary.is_some()) {
+        write!(&mut writer, "\n\n")?;
+        writeln!(&mut writer, "WARNING: your component may not run correctly due to some required capabilities not being available:\n")?;
+        write_result_table(&route_report, &mut writer)?;
+    }
 
     if args.follow_logs {
         let log_filter = args.moniker.to_string();

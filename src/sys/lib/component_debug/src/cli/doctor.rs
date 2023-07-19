@@ -21,14 +21,19 @@ pub async fn doctor_cmd_print<W: std::io::Write>(
     writeln!(writer, "Moniker: {}", &moniker)?;
 
     let reports = validate_routes(&route_validator, moniker).await?;
+    write_result_table(&reports, writer)
+}
 
+pub fn write_result_table<W: std::io::Write>(
+    reports: &Vec<RouteReport>,
+    mut writer: W,
+) -> Result<()> {
     let (use_table, expose_table) = create_tables(reports);
     use_table.print(&mut writer)?;
     writeln!(writer, "")?;
 
     expose_table.print(&mut writer)?;
     writeln!(writer, "")?;
-
     Ok(())
 }
 

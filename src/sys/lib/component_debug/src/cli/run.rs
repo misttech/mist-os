@@ -194,7 +194,7 @@ pub async fn run_cmd<W: std::io::Write>(
         stdio.forward().await;
     }
 
-    writeln!(writer, "Ran component instance!")?;
+    writeln!(writer, "Component instance is running!")?;
 
     Ok(())
 }

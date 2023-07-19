@@ -21,7 +21,12 @@ use serde::{Deserialize, Serialize};
 #[derive(Debug)]
 pub struct RouteReport {
     pub decl_type: DeclType,
+
+    /// The name of the capability (for DeclType::Expose), or the path of
+    /// the capability in the namespace (for DeclType::Use).
     pub capability: String,
+
+    /// If Some, indicates a routing error for this route.
     pub error_summary: Option<String>,
 }
 
@@ -55,6 +60,9 @@ impl TryFrom<fsys::DeclType> for DeclType {
     }
 }
 
+/// Returns a list of individual RouteReports for use and expose declarations
+/// for the component. Any individual report with `error_summary` set to Some()
+/// indicates a routing error.
 pub async fn validate_routes(
     route_validator: &fsys::RouteValidatorProxy,
     moniker: Moniker,
@@ -89,7 +97,7 @@ fn format(report: &RouteReport) -> Row {
 }
 
 // Construct the used and exposed capability tables from the given route reports.
-pub fn create_tables(reports: Vec<RouteReport>) -> (Table, Table) {
+pub fn create_tables(reports: &Vec<RouteReport>) -> (Table, Table) {
     let mut use_table = new_table(USE_TITLE);
     let mut expose_table = new_table(EXPOSE_TITLE);
 
