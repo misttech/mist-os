@@ -207,9 +207,6 @@ static void arm64_cpu_early_init() {
 void arch_early_init() {
   // put the cpu in a working state and read the feature flags
   arm64_cpu_early_init();
-
-  // give the mmu code a chance to do some bookkeeping
-  arm64_mmu_early_init();
 }
 
 void arch_prevm_init() {}

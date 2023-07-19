@@ -1040,6 +1040,12 @@ If this is "disabled", the machine may enter an infinite loop on panic.
 
 This enables use of the MMU and caches during the kernel's early boot phase.
 
+### kernel.arm64.enable-asid=\<bool>
+
+**Default:** `true`
+
+This enables use of ASIDs. True by default if the underlying hardware supports 16-bit ASIDs.
+
 
 ## Options available only on riscv64 machines
 

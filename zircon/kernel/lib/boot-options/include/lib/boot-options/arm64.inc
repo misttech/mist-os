@@ -52,3 +52,7 @@ If this is "disabled", the machine may enter an infinite loop on panic.
 DEFINE_OPTION("kernel.arm64.phys.mmu", bool, phys_mmu, {true}, R"""(
 This enables use of the MMU and caches during the kernel's early boot phase.
 )""")
+
+DEFINE_OPTION("kernel.arm64.enable-asid", bool, arm64_enable_asid, {true}, R"""(
+This enables use of ASIDs. True by default if the underlying hardware supports 16-bit ASIDs.
+)""")

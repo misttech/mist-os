@@ -440,6 +440,9 @@ void platform_early_init(void) {
 
   // tell the boot allocator to mark ranges we've reserved as off limits
   boot_reserve_wire();
+
+  // give the mmu code a chance to do some bookkeeping
+  arm64_mmu_early_init();
 }
 
 void platform_prevm_init() {}

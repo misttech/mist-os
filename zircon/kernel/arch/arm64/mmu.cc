@@ -12,6 +12,7 @@
 #include <debug.h>
 #include <inttypes.h>
 #include <lib/arch/intrin.h>
+#include <lib/boot-options/boot-options.h>
 #include <lib/counters.h>
 #include <lib/fit/defer.h>
 #include <lib/heap.h>
@@ -81,6 +82,9 @@ pte_t arm64_kernel_translation_table[MMU_KERNEL_PAGE_TABLE_ENTRIES_TOP] __ALIGNE
     MMU_KERNEL_PAGE_TABLE_ENTRIES_TOP * 8);
 // Physical address of the above table, saved in start.S.
 paddr_t arm64_kernel_translation_table_phys;
+
+// Whether ASID use is enabled.
+bool feat_asid_enabled;
 
 // Global accessor for the kernel page table
 pte_t* arm64_get_kernel_ptable() { return arm64_kernel_translation_table; }
@@ -1692,12 +1696,14 @@ zx_status_t ArmArchVmAspace::Init() {
       top_index_shift_ = MMU_USER_TOP_SHIFT;
       page_size_shift_ = MMU_USER_PAGE_SIZE_SHIFT;
 
-      auto status = asid->Alloc();
-      if (status.is_error()) {
-        printf("ARM: out of ASIDs!\n");
-        return status.status_value();
+      if (feat_asid_enabled) {
+        auto status = asid->Alloc();
+        if (status.is_error()) {
+          printf("ARM: out of ASIDs!\n");
+          return status.status_value();
+        }
+        asid_ = status.value();
       }
-      asid_ = status.value();
     } else if (type_ == ArmAspaceType::kGuest) {
       DEBUG_ASSERT(base_ + size_ <= 1UL << MMU_GUEST_SIZE_SHIFT);
 
@@ -1859,9 +1865,11 @@ zx_status_t ArmArchVmAspace::Destroy() {
 
   // Free any ASID.
   if (type_ == ArmAspaceType::kUser) {
-    auto status = asid->Free(asid_);
-    ASSERT(status.is_ok());
-    asid_ = MMU_ARM64_UNUSED_ASID;
+    if (feat_asid_enabled) {
+      auto status = asid->Free(asid_);
+      ASSERT(status.is_ok());
+      asid_ = MMU_ARM64_UNUSED_ASID;
+    }
   }
 
   // Free the top level page table.
@@ -1882,6 +1890,15 @@ zx_status_t ArmArchVmAspace::Destroy() {
 void ArmArchVmAspace::ContextSwitch(ArmArchVmAspace* old_aspace, ArmArchVmAspace* aspace) {
   uint64_t tcr;
   uint64_t ttbr;
+  // If we're not using ASIDs, we need to trigger a TLB flush here so we don't leak entries across
+  // the context switch. Note that we do not need to perform this flush if we are switching to
+  // the kernel's address space, as those mappings are global and will be unaffected by the flush.
+  if (aspace && !feat_asid_enabled) {
+    // asid_ is always set to MMU_ARM64_UNUSED_ASID when ASID use is disabled, so this will
+    // invalidate all TLB entries except the global ones.
+    DEBUG_ASSERT(aspace->asid_ == MMU_ARM64_UNUSED_ASID);
+    ARM64_TLBI_ASID(aside1, aspace->asid_);
+  }
   if (likely(aspace)) {
     aspace->canary_.Assert();
     DEBUG_ASSERT(aspace->type_ == ArmAspaceType::kUser);
@@ -2014,8 +2031,18 @@ void ArmVmICacheConsistencyManager::Finish() {
 }
 
 void arm64_mmu_early_init() {
-  // after we've probed the feature set, initialize the asid allocator
-  asid.Initialize();
+  // Our current ASID allocation scheme is very naive and allocates a unique ASID to every address
+  // space, which means that there are often not enough ASIDs when the machine uses 8-bit ASIDs.
+  // Therefore, if we detect that we are only given 8-bit ASIDs, disable their use.
+  feat_asid_enabled =
+      gBootOptions->arm64_enable_asid && arm64_asid_width() != arm64_asid_width::ASID_8;
+
+  // After we've probed the feature set and parsed the boot options, initialize the asid allocator.
+  if (feat_asid_enabled) {
+    asid.Initialize();
+  } else {
+    dprintf(INFO, "mmu: not using ASIDs\n");
+  }
 }
 
 uint32_t arch_address_tagging_features() {
