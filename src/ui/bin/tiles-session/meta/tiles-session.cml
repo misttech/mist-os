@@ -69,23 +69,14 @@
         },
         {
             protocol: [
+                "fuchsia.audio.device.ControlCreator",
+                "fuchsia.audio.device.Provider",
+                "fuchsia.audio.device.Registry",
                 "fuchsia.paver.Paver",
                 "fuchsia.power.battery.BatteryManager",
                 "fuchsia.update.CommitStatusProvider",
                 "fuchsia.update.installer.Installer",
                 "fuchsia.wlan.wlanix.Wlanix",
-            ],
-            from: "parent",
-            to: "#elements",
-            availability: "same_as_target",
-        },
-
-        // Originally from core/audio_device_registry
-        {
-            protocol: [
-                "fuchsia.audio.device.ControlCreator",
-                "fuchsia.audio.device.Provider",
-                "fuchsia.audio.device.Registry",
             ],
             from: "parent",
             to: "#elements",
