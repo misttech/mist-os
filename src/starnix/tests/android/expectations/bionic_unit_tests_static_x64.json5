@@ -7,6 +7,13 @@
   actions: [
     {
       include: "bionic_unit_tests_static.json5",
+    },
+    {
+      type: "skip",
+      matchers: [
+        // Test for a RISC-V syscall. Skipped on other architectures.
+        "sys_cachectl.__riscv_flush_icache",
+      ],
     }
   ]
 }
