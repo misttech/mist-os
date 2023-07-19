@@ -13,6 +13,7 @@ from unittest import mock
 from typing import Iterable, Sequence
 
 import linker
+import cl_utils
 
 
 class TryLinkerScriptTextTests(unittest.TestCase):
@@ -460,6 +461,28 @@ class LinkerInvocationResolveTests(unittest.TestCase):
             resolved = link.resolve_lib('zoo')
 
         self.assertEqual(resolved, sysroot / lib)
+
+    def test_expand_using_lld(self):
+        depfile_text = '''/dev/null: \\
+  libfoo.so \\
+  libfoo.so.1
+
+# phony deps (to be ignored)
+libfoo.so:
+
+libfoo.so.1:
+
+'''
+        link = linker.LinkerInvocation()  # not really using parameters
+        with mock.patch.object(
+                cl_utils, 'subprocess_call',
+                return_value=cl_utils.SubprocessResult(
+                    0, stdout=depfile_text.splitlines())) as mock_call:
+            deps = list(
+                link.expand_using_lld(
+                    lld=Path('/opt/bin/ld.lld'), inputs=[Path('libfoo.so')]))
+
+        self.assertEqual(deps, [Path('libfoo.so'), Path('libfoo.so.1')])
 
 
 if __name__ == '__main__':

@@ -728,9 +728,14 @@ class RustRemoteAction(object):
             link = linker.LinkerInvocation(
                 working_dir_abs=self.working_dir, search_paths=search_paths)
 
+            lld = self.host_compiler.parent / 'ld.lld'  # co-located with clang
+
             def linker_script_expander(paths: Sequence[Path]) -> Iterable[Path]:
-                for path in paths:
-                    yield from link.expand_possible_linker_script(path)
+                if lld.exists():
+                    yield from link.expand_using_lld(lld=lld, inputs=paths)
+                else:
+                    for path in paths:
+                        yield from link.expand_possible_linker_script(path)
 
             yield from self.yield_verbose(
                 'C sysroot files',

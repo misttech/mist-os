@@ -28,6 +28,7 @@ rbe_common_py_scripts = [
   "//build/rbe/cl_utils.py",
   "//build/rbe/depfile.py",
   "//build/rbe/fuchsia.py",
+  "//build/rbe/linker.py",
   "//build/rbe/output_leak_scanner.py",
 ]
 

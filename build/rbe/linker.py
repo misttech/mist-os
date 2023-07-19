@@ -10,6 +10,7 @@ https://sourceware.org/binutils/docs-2.40/ld/Simple-Commands.html
 
 import argparse
 import dataclasses
+import depfile
 import enum
 import os
 import re
@@ -456,6 +457,48 @@ class LinkerInvocation(object):
 
         # Otherwise, it is a regular linker binary file.
         # Nothing else to do.
+
+    def expand_using_lld(self, lld: Path,
+                         inputs: Sequence[Path]) -> Iterable[Path]:
+        """Use lld to expand linker inputs, including linker scripts.
+
+        Works like clang-scan-deps, but for linking.
+        This is useful for preparing sets of linker inputs
+        for remote building.
+
+        Args:
+          lld: path to ld.lld binary
+          inputs: linker arguments: -llibs, and other linker input files.
+
+        Yields:
+          linker inputs encountered by lld.
+        """
+        lld_command = [
+            str(lld),
+            '-o',
+            '/dev/null',  # Don't want link output
+            '--dependency-file=/dev/stdout',  # avoid temp file
+        ] + ['--sysroot={self.sysroot}'] if self.sysroot else [] + [
+            '-L{path}' for path in self.search_paths
+        ] + self.l_libs + [str(f) for f in self.direct_files + inputs]
+
+        result = cl_utils.subprocess_call(
+            command=lld_command, cwd=self.working_dir)
+
+        if result.returncode != 0:
+            err_msg = '\n'.join(result.stderr)
+            raise RuntimeError(f'lld command failed: {lld_command}\n{err_msg}')
+
+        # newlines are important separators
+        depfile_lines = [line + '\n' for line in result.stdout]
+        deps = [
+            dep for dep in depfile.parse_lines(depfile_lines)
+            if not dep.is_phony
+        ]
+        assert len(
+            deps
+        ) == 1, f'Expecting only one non-phony dep from lld depfile, but got {len(deps)}'
+        yield from deps[0].deps_paths
 
 
 def try_linker_script_text(path: Path) -> Optional[str]:

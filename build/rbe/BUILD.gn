@@ -37,7 +37,7 @@ if (is_host) {
   _depfile_sources = [ "depfile.py" ]
   _output_leak_scanner_sources =
       [ "output_leak_scanner.py" ] + _fuchsia_sources + _cl_utils_sources
-  _linker_sources = [ "linker.py" ] + _cl_utils_sources
+  _linker_sources = [ "linker.py" ] + _cl_utils_sources + _depfile_sources
   _textpb_sources = [ "textpb.py" ]
 
   _remotetool_sources =

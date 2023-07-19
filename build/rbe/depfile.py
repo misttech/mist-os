@@ -158,7 +158,7 @@ def consume_line_continuations(toks: Iterable[Token]) -> Iterable[Token]:
 class Dep(object):
     targets: Sequence[Token]
     colon: Token
-    deps: Sequence[Token]
+    deps: Sequence[Token] = dataclasses.field(default_factory=list)
 
     @property
     def target_paths(self) -> Sequence[Path]:
@@ -170,7 +170,7 @@ class Dep(object):
 
     @property
     def is_phony(self) -> bool:
-        return self.deps == []
+        return len(self.deps) == 0
 
 
 class _ParserState(enum.Enum):
