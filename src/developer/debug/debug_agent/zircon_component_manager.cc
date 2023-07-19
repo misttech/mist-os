@@ -72,7 +72,12 @@ void ReadElfJobId(fidl::Client<fuchsia_io::Directory> runtime_dir, const std::st
           return;
         }
         if (!res.is_ok()) {
-          LOGS(Error) << "Failed to read elf/job_id for " << moniker << ": " << res.error_value();
+          if (res.error_value().is_framework_error() &&
+              res.error_value().framework_error().is_peer_closed()) {
+            // Runtime directory is not served, mute the log.
+          } else {
+            LOGS(Warn) << "Failed to read elf/job_id for " << moniker << ": " << res.error_value();
+          }
           return cb(ZX_KOID_INVALID);
         }
         std::string job_id_str(reinterpret_cast<const char*>(res->data().data()),
@@ -81,7 +86,7 @@ void ReadElfJobId(fidl::Client<fuchsia_io::Directory> runtime_dir, const std::st
         char* end;
         zx_koid_t job_id = std::strtoull(job_id_str.c_str(), &end, 10);
         if (end != job_id_str.c_str() + job_id_str.size()) {
-          LOGS(Error) << "Invalid elf/job_id for " << moniker << ": " << job_id_str;
+          LOGS(Warn) << "Invalid elf/job_id for " << moniker << ": " << job_id_str;
           return cb(ZX_KOID_INVALID);
         }
         cb(job_id);
