@@ -43,7 +43,9 @@ use {
     },
     test_case::test_case,
     tracing::{debug, info, trace},
-    wlan_common::{assert_variant, random_fidl_bss_description, scan::write_vmo},
+    wlan_common::{
+        assert_variant, random_fidl_bss_description, scan::write_vmo, test_utils::ExpectWithin,
+    },
 };
 
 pub const TEST_CLIENT_IFACE_ID: u16 = 42;
@@ -307,35 +309,23 @@ fn add_phy(exec: &mut TestExecutor, test_values: &mut TestValues) {
     let add_phy_fut = device_monitor::handle_event(&listener, add_phy_event);
     pin_mut!(add_phy_fut);
 
-    const MAX_TRIES: u32 = 5;
-    for i in 0..MAX_TRIES {
-        assert_variant!(exec.run_until_stalled(&mut add_phy_fut), Poll::Pending);
-        match exec
-            .run_until_stalled(&mut test_values.external_interfaces.monitor_service_stream.next())
-        {
-            Poll::Ready(Some(Ok(
-                fidl_fuchsia_wlan_device_service::DeviceMonitorRequest::GetSupportedMacRoles {
-                    phy_id: TEST_PHY_ID,
-                    responder,
-                },
-            ))) => {
-                // Send back a positive acknowledgement.
-                assert!(responder.send(Ok(&[fidl_common::WlanMacRole::Client])).is_ok());
-                break;
-            }
-            Poll::Pending => (),
-            other => {
-                panic!("expect DeviceMonitorRequest::GetSupportedMacRoles, got {:?}", other);
-            }
+    let device_monitor_req = run_while(
+        exec,
+        &mut add_phy_fut,
+        test_values.external_interfaces.monitor_service_stream.next(),
+    );
+    assert_variant!(
+        device_monitor_req,
+        Some(Ok(fidl_fuchsia_wlan_device_service::DeviceMonitorRequest::GetSupportedMacRoles {
+            phy_id: TEST_PHY_ID, responder
+        })) => {
+            // Send back a positive acknowledgement.
+            assert!(responder.send(Ok(&[fidl_common::WlanMacRole::Client])).is_ok());
         }
-
-        if i < MAX_TRIES - 1 {
-            std::thread::sleep(std::time::Duration::from_secs(1));
-        } else {
-            panic!("failed to add PHY");
-        }
-    }
-    assert_variant!(exec.run_until_stalled(&mut add_phy_fut), Poll::Ready(()));
+    );
+    exec.run_singlethreaded(
+        &mut add_phy_fut.expect_within(zx::Duration::from_seconds(5), "future didn't complete"),
+    );
 }
 
 fn security_support_with_wpa3() -> fidl_common::SecuritySupport {
