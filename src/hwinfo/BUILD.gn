@@ -44,10 +44,6 @@ hwinfo_config("default_board_config") {
   config = rebase_path("default_board_config.json")
 }
 
-# TODO(fxbug.dev/122864) Remove transitional labels
-group("default_product_config") {
-}
-
 fuchsia_component_manifest("manifest") {
   component_name = "hwinfo"
   manifest = "meta/hwinfo.cml"
