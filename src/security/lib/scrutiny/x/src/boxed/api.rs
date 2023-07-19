@@ -111,7 +111,7 @@ pub trait System {
     fn zbi(&self) -> Box<dyn Zbi>;
 
     /// Accessor for the system's update package.
-    fn update_package(&self) -> Box<dyn Package>;
+    fn update_package(&self) -> Box<dyn UpdatePackage>;
 
     /// Accessor for the system's kernel command-line flags.
     fn kernel_flags(&self) -> Box<dyn KernelFlags>;
@@ -479,7 +479,7 @@ impl hash::Hash for dyn Hash {
 
 /// Model of a Fuchsia package. See https://fuchsia.dev/fuchsia-src/concepts/packages/package for
 /// details.
-pub trait Package {
+pub trait Package: DynClone {
     /// Get the content-addressed hash of the package's "meta.far" file.
     fn hash(&self) -> Box<dyn Hash>;
 
@@ -500,6 +500,8 @@ pub trait Package {
     /// Constructs iterator over blobs that appear to be component manifests.
     fn components(&self) -> Box<dyn Iterator<Item = (Box<dyn Path>, Box<dyn Component>)>>;
 }
+
+clone_trait_object!(Package);
 
 // TODO(fxbug.dev/112121): Define API consistent with fuchsia_pkg::MetaPackage.
 
@@ -555,6 +557,8 @@ pub trait UpdatePackage: Package {
     /// Returns a borrowed listing of package URLs described by this update package.
     fn packages(&self) -> &Vec<AbsolutePackageUrl>;
 }
+
+clone_trait_object!(UpdatePackage);
 
 /// Model for a package resolution strategy. See
 /// https://fuchsia.dev/fuchsia-src/get-started/learn/intro/packages#hosting_and_serving_packages

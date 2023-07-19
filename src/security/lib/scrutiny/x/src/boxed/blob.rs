@@ -62,11 +62,11 @@ impl BlobSet for Box<dyn BlobSet> {
 
 #[derive(Clone)]
 pub(crate) struct CompositeBlobSet {
-    delegates: Vec<Rc<dyn BlobSet>>,
+    delegates: Vec<Box<dyn BlobSet>>,
 }
 
 impl CompositeBlobSet {
-    pub fn new(delegates: impl Iterator<Item = Rc<dyn BlobSet>>) -> Self {
+    pub fn new(delegates: impl Iterator<Item = Box<dyn BlobSet>>) -> Self {
         Self { delegates: delegates.collect() }
     }
 }
@@ -119,14 +119,14 @@ struct CompositeBlobSetIterator {
     /// Iterator over current delegate's blobs.
     blob_iterator: Box<dyn Iterator<Item = Box<dyn api::Blob>>>,
     /// Iterator over subsequent blob sets that have not yet been visited.
-    blob_set_iterator: Box<dyn DynCloneIterator<Item = Rc<dyn BlobSet>>>,
+    blob_set_iterator: Box<dyn DynCloneIterator<Item = Box<dyn BlobSet>>>,
     /// Set of blobs that have already been observed during iteration.
     visited: HashSet<Box<dyn api::Hash>>,
 }
 
 impl CompositeBlobSetIterator {
     /// Constructs a new iterator that will visit all blobs in any blob set in `blob_set_iterator`.
-    fn new(blob_set_iterator: Box<dyn DynCloneIterator<Item = Rc<dyn BlobSet>>>) -> Self {
+    fn new(blob_set_iterator: Box<dyn DynCloneIterator<Item = Box<dyn BlobSet>>>) -> Self {
         Self { blob_iterator: Box::new(iter::empty()), blob_set_iterator, visited: HashSet::new() }
     }
 
@@ -188,7 +188,7 @@ impl CompositeBlob {
     /// blob (by `hash()`) that are found in `other_blob_sets`.
     pub fn new_with_blob_sets(
         first_blob: Box<dyn api::Blob>,
-        other_blob_sets: impl Iterator<Item = Rc<dyn BlobSet>>,
+        other_blob_sets: impl Iterator<Item = Box<dyn BlobSet>>,
     ) -> Self {
         let mut data_sources: Vec<_> = first_blob.data_sources().collect();
         let hash = first_blob.hash();

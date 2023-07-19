@@ -28,7 +28,9 @@ impl api::Scrutiny for Scrutiny {
     }
 
     fn data_sources(&self) -> Box<dyn Iterator<Item = Box<dyn api::DataSource>>> {
-        Box::new([self.0.product_bundle.data_source().clone()].into_iter())
+        let data_source: Box<dyn api::DataSource> =
+            Box::new(self.0.product_bundle.data_source().clone());
+        Box::new([data_source].into_iter())
     }
 
     fn blobs(

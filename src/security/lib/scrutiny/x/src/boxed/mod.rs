@@ -9,6 +9,7 @@ pub(crate) mod hash;
 pub(crate) mod package;
 pub(crate) mod product_bundle;
 pub(crate) mod scrutiny;
+pub(crate) mod system;
 pub(crate) mod update_package;
 pub(crate) mod zbi;
 

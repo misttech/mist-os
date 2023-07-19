@@ -88,7 +88,7 @@ impl ProductBundle {
             .collect::<Vec<_>>();
         Ok(Self(Rc::new(ProductBundleData {
             directory,
-            data_source: Box::new(product_bundle_data_source),
+            data_source: product_bundle_data_source,
             update_package_hash,
             repositories: repositories.clone(),
             blobs: OnceCell::new(),
@@ -99,7 +99,7 @@ impl ProductBundle {
         &self.0.directory
     }
 
-    pub fn data_source(&self) -> &Box<dyn api::DataSource> {
+    pub fn data_source(&self) -> &ds::DataSource {
         &self.0.data_source
     }
 
@@ -111,11 +111,11 @@ impl ProductBundle {
         &self.0.repositories
     }
 
-    pub fn blob_set(&self) -> Result<Rc<dyn BlobSet>, BlobDirectoryError> {
-        self.0.blobs.get_or_try_init(|| self.init_blobs()).map(Rc::clone)
+    pub fn blob_set(&self) -> Result<Box<dyn BlobSet>, BlobDirectoryError> {
+        self.0.blobs.get_or_try_init(|| self.init_blobs()).map(Clone::clone)
     }
 
-    fn init_blobs(&self) -> Result<Rc<dyn BlobSet>, BlobDirectoryError> {
+    fn init_blobs(&self) -> Result<Box<dyn BlobSet>, BlobDirectoryError> {
         self.0
             .repositories
             .clone()
@@ -123,8 +123,8 @@ impl ProductBundle {
             .map(|repository| repository.blobs())
             .collect::<Result<Vec<_>, _>>()
             .map(|repositories| {
-                let blobs: Rc<dyn BlobSet> =
-                    Rc::new(CompositeBlobSet::new(repositories.into_iter()));
+                let blobs: Box<dyn BlobSet> =
+                    Box::new(CompositeBlobSet::new(repositories.into_iter()));
                 blobs
             })
     }
@@ -135,10 +135,10 @@ impl ProductBundle {
 struct ProductBundleData {
     directory: Box<dyn api::Path>,
     update_package_hash: Box<dyn api::Hash>,
-    data_source: Box<dyn api::DataSource>,
+    data_source: ds::DataSource,
     repositories: Vec<Repository>,
     #[derivative(Debug = "ignore")]
-    blobs: OnceCell<Rc<dyn BlobSet>>,
+    blobs: OnceCell<Box<dyn BlobSet>>,
 }
 
 #[derive(Clone, Debug)]
@@ -153,17 +153,12 @@ impl Repository {
         &self.0.blobs_directory
     }
 
-    pub fn blobs(&self) -> Result<Rc<dyn BlobSet>, BlobDirectoryError> {
-        self.0.blobs.get_or_try_init(|| self.init_blobs()).map(Rc::clone)
+    pub fn blobs(&self) -> Result<Box<dyn BlobSet>, BlobDirectoryError> {
+        self.0.blobs.get_or_try_init(|| self.init_blobs()).map(Clone::clone)
     }
 
-    fn init_blobs(&self) -> Result<Rc<dyn BlobSet>, BlobDirectoryError> {
-        BlobDirectory::new(Some(self.0.data_source.clone()), self.0.blobs_directory.clone()).map(
-            |blobs| {
-                let blobs: Rc<dyn BlobSet> = Rc::new(blobs);
-                blobs
-            },
-        )
+    fn init_blobs(&self) -> Result<Box<dyn BlobSet>, BlobDirectoryError> {
+        BlobDirectory::new(Some(self.0.data_source.clone()), self.0.blobs_directory.clone())
     }
 
     fn new(name: String, blobs_directory: Box<dyn api::Path>, data_source: ds::DataSource) -> Self {
@@ -178,7 +173,7 @@ struct RepositoryData {
     blobs_directory: Box<dyn api::Path>,
     data_source: ds::DataSource,
     #[derivative(Debug = "ignore")]
-    blobs: OnceCell<Rc<dyn BlobSet>>,
+    blobs: OnceCell<Box<dyn BlobSet>>,
 }
 
 #[cfg(test)]

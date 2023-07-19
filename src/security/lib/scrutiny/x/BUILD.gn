@@ -22,6 +22,7 @@ if (is_host) {
       "src/boxed/package.rs",
       "src/boxed/product_bundle.rs",
       "src/boxed/scrutiny.rs",
+      "src/boxed/system.rs",
       "src/boxed/update_package.rs",
       "src/boxed/zbi.rs",
       "src/component.rs",
