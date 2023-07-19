@@ -81,6 +81,13 @@ struct LogSymbolizerInner {
     _task: Task<Result<()>>,
 }
 
+impl std::fmt::Debug for LogSymbolizerInner {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("LogSymbolizerInner").field("child", &self.child).finish()
+    }
+}
+
+#[derive(Debug)]
 /// Real symbolizer implementation
 pub struct LogSymbolizer {
     inner: std::cell::RefCell<Option<LogSymbolizerInner>>,
