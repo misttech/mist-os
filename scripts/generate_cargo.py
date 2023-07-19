@@ -574,6 +574,7 @@ def main():
                 "crate_name": project.targets[t]["crate_name"],
                 "type": project.targets[t]["type"],
                 "cargo_manifest_dir": lookup[t],
+                "crate_root": project.targets[t]["crate_root"],
             } for t in project.rust_targets if t in project.reachable_targets
         ],
         key=lambda t: t["label"])
