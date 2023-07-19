@@ -6,11 +6,17 @@
 #include <lib/stdcompat/span.h>
 #include <zircon/assert.h>
 
-#ifndef HAVE_PROFDATA
+#ifndef HAVE_LLVM_PROFDATA
 #error "build system regression"
 #endif
 
-#if !HAVE_PROFDATA
+// This is defined for a test build.
+#ifdef HAVE_LLVM_PROFDATA_OVERRIDE
+#undef HAVE_LLVM_PROFDATA
+#define HAVE_LLVM_PROFDATA HAVE_LLVM_PROFDATA_OVERRIDE
+#endif
+
+#if !HAVE_LLVM_PROFDATA
 
 // If not compiled with instrumentation at all, then all the link-time
 // references in the real implementation below won't work.  So provide stubs.
@@ -27,7 +33,7 @@ void LlvmProfdata::MergeCounters(cpp20::span<std::byte> data) {}
 
 void LlvmProfdata::UseCounters(cpp20::span<std::byte> data) {}
 
-#else  // HAVE_PROFDATA
+#else  // HAVE_LLVM_PROFDATA
 
 #include <array>
 #include <atomic>
@@ -431,4 +437,4 @@ bool LlvmProfdata::Match(cpp20::span<const std::byte> data) {
          !memcmp(id.data(), build_id_.data(), build_id_.size_bytes());
 }
 
-#endif  // HAVE_PROFDATA
+#endif  // HAVE_LLVM_PROFDATA

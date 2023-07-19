@@ -7,9 +7,9 @@ import("//build/zircon/migrated_targets.gni")
 
 if (toolchain_variant.tags + [ "llvm-profdata" ] - [ "llvm-profdata" ] !=
     toolchain_variant.tags) {
-  have_profdata = 1
+  have_llvm_profdata = 1
 } else {
-  have_profdata = 0
+  have_llvm_profdata = 0
 }
 
 zx_library("llvm-profdata") {
@@ -20,7 +20,7 @@ zx_library("llvm-profdata") {
   deps = []
   public_deps = [ "//sdk/lib/stdcompat" ]
 
-  defines = [ "HAVE_PROFDATA=$have_profdata" ]
+  public_configs = [ ":have_llvm_profdata" ]
 
   if (is_kernel) {
     deps += [
@@ -38,6 +38,11 @@ zx_library("llvm-profdata") {
     configs += _profile_configs
     configs -= _profile_configs
   }
+}
+
+config("have_llvm_profdata") {
+  visibility = [ ":*" ]
+  defines = [ "HAVE_LLVM_PROFDATA=$have_llvm_profdata" ]
 }
 
 if (!is_kernel) {
@@ -138,10 +143,10 @@ if (!is_kernel) {
   # lacks instrumentation itself but has the full runtime support enabled.
   # The coverage-example code's data will be the only instrumentation data it
   # finds.
-  if (have_profdata == 0) {
+  if (have_llvm_profdata == 0) {
     source_set("llvm-profdata-for-test") {
       sources = [ "llvm-profdata.cc" ]
-      defines = [ "HAVE_PROFDATA=1" ]
+      defines = [ "HAVE_LLVM_PROFDATA_OVERRIDE=1" ]
       public_deps = [ ":llvm-profdata" ]
     }
   } else {

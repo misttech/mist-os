@@ -166,6 +166,7 @@ shared_library("ld-startup") {
   if (is_fuchsia) {
     sources += [ "zircon-startup.cc" ]
     deps += [
+      "//src/lib/llvm-profdata",
       "//src/zircon/lib/zircon",
       "//zircon/system/ulib/processargs",
       "//zircon/system/ulib/zircon-internal",
@@ -183,6 +184,9 @@ shared_library("ld-startup") {
     if (is_linux) {
       deps += [ ":linux-syscalls" ]
     }
+
+    # There is no way to get the data out anyway.
+    configs += [ "//build/config:no_profile" ]
   }
 
   if (!is_gcc) {

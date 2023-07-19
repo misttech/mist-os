@@ -3,11 +3,14 @@
 // found in the LICENSE file.
 
 #include <lib/elfldltl/zircon.h>
+#include <lib/llvm-profdata/llvm-profdata.h>
 #include <lib/processargs/processargs.h>
 #include <lib/trivial-allocator/new.h>
 #include <lib/trivial-allocator/zircon.h>
 #include <lib/zircon-internal/unique-backtrace.h>
 #include <lib/zx/channel.h>
+#include <lib/zx/eventpair.h>
+#include <lib/zx/vmo.h>
 #include <unistd.h>
 #include <zircon/assert.h>
 #include <zircon/syscalls.h>
@@ -22,6 +25,7 @@
 #include "zircon.h"
 
 namespace ld {
+namespace {
 
 void TakeLogHandle(StartupData& startup, zx::handle handle) {
   zx_info_handle_basic_t info;
@@ -39,6 +43,72 @@ void TakeLogHandle(StartupData& startup, zx::handle handle) {
       break;
   }
 }
+
+// TODO(fxbug.dev/130542): After LlvmProfdata:UseCounters, functions will load
+// the new value of __llvm_profile_counter_bias and use it. However, functions
+// already in progress will use a cached value from before it changed. This
+// means they'll still be pointing into the data segment and updating the old
+// counters there. So they'd crash with write faults if it were protected.
+// There may be a way to work around this by having uninstrumented functions
+// call instrumented functions such that the tail return path of any frame live
+// across the transition is uninstrumented. Note that each function will
+// resample even if that function is inlined into a caller that itself will
+// still be using the stale pointer. However, in the long run we expect to move
+// from the relocatable-counters design to a new design where the counters are
+// in a separate "bss-like" location that we arrange to be in a separate VMO
+// created by the program loader. If we do that, then this issue won't arise,
+// so we might not get around to making protecting the data compatible with
+// profdata instrumentation before it's moot.
+constexpr bool kProtectData = !HAVE_LLVM_PROFDATA;
+
+zx::eventpair PublishProfdata(Diagnostics& diag, zx::unowned_vmar vmar,
+                              cpp20::span<const std::byte> build_id) {
+#if HAVE_LLVM_PROFDATA
+  auto error = [&diag](zx_status_t status, auto&&... args) -> zx::eventpair {
+    diag.SystemError(std::forward<decltype(args)>(args)..., elfldltl::ZirconError{status});
+    return {};
+  };
+
+  LlvmProfdata profdata;
+  profdata.Init(build_id);
+  const size_t size = profdata.size_bytes();
+  if (size != 0) {
+    // Make a VMO and map it in to hold the profdata.
+    zx::vmo vmo;
+    zx_status_t status = zx::vmo::create(size, 0, &vmo);
+    if (status != ZX_OK) {
+      return error(status, "cannot create llvm-profdata VMO of ", size, " bytes");
+    }
+    uintptr_t ptr;
+    status = vmar->map(ZX_VM_PERM_READ | ZX_VM_PERM_WRITE, 0, vmo, 0, size, &ptr);
+    if (status != ZX_OK) {
+      return error(status, "cannot map llvm-profdata VMO of ", size, " bytes");
+    }
+    cpp20::span vmo_data{reinterpret_cast<std::byte*>(ptr), size};
+
+    // Now fill the VMO and redirect the instrumentation to update its data.
+    cpp20::span counters = profdata.WriteFixedData(vmo_data);
+    profdata.CopyCounters(counters);
+    LlvmProfdata::UseCounters(counters);
+
+    // At this point the instrumentation will no longer touch the data segment.
+
+    zx::eventpair local_token, remote_token;
+    status = zx::eventpair::create(0, &local_token, &remote_token);
+    if (status != ZX_OK) {
+      return error(status, "zx_eventpair_create");
+    }
+
+    // TODO(fxbug.dev/130542): Send the VMO and remote_token in a
+    // fuchsia.debugdata.Publisher/Publish message to ... somewhere.
+
+    return local_token;
+  }
+#endif
+  return {};
+}
+
+}  // namespace
 
 // TODO(fxbug.dev/130483): _start should normally be `[[noreturn]] void` though for the timebeing
 // it returns an int for easy testing.
@@ -139,17 +209,31 @@ extern "C" int _start(zx_handle_t handle, void* vdso) {
     diag.SystemError("cannot decode processargs strings", elfldltl::ZirconError{status});
   }
 
+  // Start publishing profiling data in an instrumented build.  Before this,
+  // the instrumentation is updating counters in the data segment.  After this,
+  // it's updating a VMO mapped elsewhere.  That VMO remains mapped after
+  // startup just to avoid bothering with code to unmap it since that code and
+  // the rest of the return path would have to be uninstrumented.  When the
+  // returned handle is closed by going out of scope at the end of startup,
+  // this will signal the data receiver that the VMO's data is ready.  It's
+  // still possible for either the last bit of instrumented code in the startup
+  // path, or just stray pointer writes in the process after startup will
+  // modify it, but will be ignored or will be tolerable noise in the data.
+  auto profdata = PublishProfdata(diag, loading_vmar.borrow(), self_module.build_id);
+
   // Now that startup is completed, protect not only the RELRO, but also all
   // the data and bss.  Then drop that VMAR handle so the protections cannot be
   // changed again.
-  auto protect_relro = [page_size, &diag](zx::vmar self) {
+  auto protect_data = [page_size, &diag](zx::vmar self) {
     auto [data_start, data_size] = DataBounds(page_size);
     zx_status_t status = self.protect(ZX_VM_PERM_READ, data_start, data_size);
     if (status != ZX_OK) [[unlikely]] {
       diag.SystemError("cannot protect dynamic linker data pages", elfldltl::ZirconError{status});
     }
   };
-  protect_relro(std::move(self_vmar));
+  if constexpr (kProtectData) {
+    protect_data(std::move(self_vmar));
+  }
 
   // Bail out before handoff if any errors have been detected.
   CheckErrors(diag);
