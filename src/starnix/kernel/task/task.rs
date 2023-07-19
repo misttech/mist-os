@@ -20,7 +20,10 @@ use crate::{
     },
     auth::*,
     execution::*,
-    fs::*,
+    fs::{
+        FdFlags, FdNumber, FdTable, FileHandle, FsContext, FsStr, LookupContext, NamespaceNode,
+        SymlinkMode, SymlinkTarget,
+    },
     loader::*,
     lock::{Mutex, RwLock, RwLockReadGuard, RwLockWriteGuard},
     logging::*,

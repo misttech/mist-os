@@ -8,8 +8,8 @@ use crate::{fs::*, task::*, types::*};
 use std::sync::Arc;
 
 /// Returns `kernel`'s procfs instance, initializing it if needed.
-pub fn proc_fs(kernel: Arc<Kernel>, options: FileSystemOptions) -> FileSystemHandle {
-    kernel.proc_fs.get_or_init(|| ProcFs::new_fs(&kernel, options)).clone()
+pub fn proc_fs(kernel: &Arc<Kernel>, options: FileSystemOptions) -> &FileSystemHandle {
+    kernel.proc_fs.get_or_init(|| ProcFs::new_fs(&kernel, options))
 }
 
 /// `ProcFs` is a filesystem that exposes runtime information about a `Kernel` instance.

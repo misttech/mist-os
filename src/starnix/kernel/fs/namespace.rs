@@ -2,13 +2,15 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use super::{
-    devpts::dev_pts_fs, devtmpfs::dev_tmp_fs, proc::proc_fs, sysfs::sys_fs, tmpfs::TmpFs, *,
-};
 use crate::{
     bpf::BpfFs,
     device::BinderFs,
-    fs::{buffers::InputBuffer, ext4::ExtFilesystem, fuse::new_fuse_fs, tracefs::trace_fs},
+    fs::buffers::InputBuffer,
+    fs::{
+        devpts::dev_pts_fs, devtmpfs::dev_tmp_fs, proc::proc_fs, sysfs::sys_fs, tmpfs::TmpFs,
+        tracefs::trace_fs, FileSystemOptions, FsStr,
+    },
+    fs::{ext4::ExtFilesystem, fuse::new_fuse_fs},
     lock::{Mutex, RwLock},
     mutable_state::*,
     selinux::selinux_fs,
@@ -26,6 +28,8 @@ use std::{
         Arc, Weak,
     },
 };
+
+use super::*;
 
 /// A mount namespace.
 ///
@@ -513,45 +517,56 @@ impl fmt::Debug for Mount {
     }
 }
 
-pub fn create_filesystem(
-    current_task: &CurrentTask,
-    fs_type: &FsStr,
-    source: &FsStr,
-    flags: MountFlags,
-    data: &FsStr,
-) -> Result<WhatToMount, Errno> {
-    let kernel = current_task.kernel();
-    let options = FileSystemOptions {
-        source: source.to_vec(),
-        flags: flags & MountFlags::STORED_ON_FILESYSTEM,
-        params: data.to_vec(),
-    };
-    let fs = match fs_type {
-        b"binder" => BinderFs::new_fs(kernel, options)?,
-        b"bpf" => BpfFs::new_fs(kernel, options)?,
-        b"devpts" => dev_pts_fs(kernel, options).clone(),
-        b"devtmpfs" => dev_tmp_fs(kernel).clone(),
-        b"fuse" => new_fuse_fs(current_task, options)?,
-        b"ext4" => ExtFilesystem::new_fs(kernel, current_task, options)?,
-        b"proc" => proc_fs(kernel.clone(), options),
-        b"selinuxfs" => selinux_fs(kernel, options).clone(),
-        b"sysfs" => sys_fs(kernel, options).clone(),
-        b"tmpfs" => TmpFs::new_fs_with_options(kernel, options)?,
-        b"tracefs" => trace_fs(kernel.clone(), options),
-        _ => return error!(ENODEV, String::from_utf8_lossy(fs_type)),
-    };
-
-    if kernel.selinux_enabled() {
-        (|| {
-            let label = match fs_type {
-                b"tmpfs" => b"u:object_r:tmpfs:s0",
-                _ => return,
-            };
-            fs.selinux_context.set(label.to_vec()).unwrap();
-        })();
+impl Kernel {
+    pub fn create_filesystem(
+        self: &Arc<Self>,
+        fs_type: &FsStr,
+        options: FileSystemOptions,
+    ) -> Result<FileSystemHandle, Errno> {
+        Ok(match fs_type {
+            b"binder" => BinderFs::new_fs(self, options)?,
+            b"bpf" => BpfFs::new_fs(self, options)?,
+            b"devpts" => dev_pts_fs(self, options).clone(),
+            b"devtmpfs" => dev_tmp_fs(self).clone(),
+            b"proc" => proc_fs(self, options).clone(),
+            b"selinuxfs" => selinux_fs(self, options).clone(),
+            b"sysfs" => sys_fs(self, options).clone(),
+            b"tmpfs" => {
+                let fs = TmpFs::new_fs_with_options(self, options)?;
+                if self.selinux_enabled() {
+                    let label = b"u:object_r:tmpfs:s0";
+                    fs.selinux_context.set(label.to_vec()).unwrap();
+                }
+                fs
+            }
+            b"tracefs" => trace_fs(self, options).clone(),
+            _ => {
+                return error!(ENODEV, String::from_utf8_lossy(fs_type));
+            }
+        })
     }
+}
 
-    Ok(WhatToMount::Fs(fs))
+impl CurrentTask {
+    pub fn create_filesystem(
+        &self,
+        fs_type: &FsStr,
+        source: &FsStr,
+        flags: MountFlags,
+        data: &FsStr,
+    ) -> Result<FileSystemHandle, Errno> {
+        let kernel = self.kernel();
+        let options = FileSystemOptions {
+            source: source.to_vec(),
+            flags: flags & MountFlags::STORED_ON_FILESYSTEM,
+            params: data.to_vec(),
+        };
+        match fs_type {
+            b"fuse" => new_fuse_fs(self, options),
+            b"ext4" => ExtFilesystem::new_fs(kernel, self, options),
+            _ => self.kernel().create_filesystem(fs_type, options),
+        }
+    }
 }
 
 struct ProcMountsFileSource(Weak<Task>);

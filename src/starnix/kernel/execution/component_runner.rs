@@ -141,9 +141,10 @@ pub async fn start_component(
 
     if let Some(local_mounts) = get_program_strvec(&start_info, "component_mounts") {
         for mount in local_mounts.iter() {
-            let (mount_point, child_fs) = create_filesystem_from_spec(&current_task, &pkg, mount)?;
+            let (mount_point, child_fs) =
+                create_filesystem_from_spec(current_task.kernel(), &pkg, mount)?;
             let mount_point = current_task.lookup_path_from_root(mount_point)?;
-            mount_record.mount(mount_point, child_fs, MountFlags::empty())?;
+            mount_record.mount(mount_point, WhatToMount::Fs(child_fs), MountFlags::empty())?;
         }
     }
 

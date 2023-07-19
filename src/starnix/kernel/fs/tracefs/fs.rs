@@ -9,8 +9,8 @@ use crate::types::*;
 
 use std::sync::Arc;
 
-pub fn trace_fs(kernel: Arc<Kernel>, options: FileSystemOptions) -> FileSystemHandle {
-    kernel.trace_fs.get_or_init(|| TraceFs::new_fs(&kernel, options)).clone()
+pub fn trace_fs(kernel: &Arc<Kernel>, options: FileSystemOptions) -> &FileSystemHandle {
+    kernel.trace_fs.get_or_init(|| TraceFs::new_fs(&kernel, options))
 }
 
 pub struct TraceFs;

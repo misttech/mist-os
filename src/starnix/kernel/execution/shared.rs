@@ -186,11 +186,10 @@ pub fn create_remotefs_filesystem(
 }
 
 pub fn create_filesystem_from_spec<'a>(
-    current_task: &CurrentTask,
+    kernel: &Arc<Kernel>,
     pkg: &fio::DirectorySynchronousProxy,
     spec: &'a str,
-) -> Result<(&'a [u8], WhatToMount), Error> {
-    use WhatToMount::*;
+) -> Result<(&'a [u8], FileSystemHandle), Error> {
     let mut iter = spec.splitn(4, ':');
     let mount_point =
         iter.next().ok_or_else(|| anyhow!("mount point is missing from {:?}", spec))?;
@@ -199,7 +198,13 @@ pub fn create_filesystem_from_spec<'a>(
         Some(src) if !src.is_empty() => src,
         _ => ".",
     };
-    let options = iter.next().unwrap_or("");
+    let params = iter.next().unwrap_or("");
+
+    let options = FileSystemOptions {
+        source: fs_src.as_bytes().to_vec(),
+        flags: MountFlags::empty(),
+        params: params.as_bytes().to_vec(),
+    };
 
     // Default rights for remotefs.
     let rights = fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_EXECUTABLE;
@@ -208,16 +213,9 @@ pub fn create_filesystem_from_spec<'a>(
     // manifest file, for whatever reason. Anything else is passed to create_filesystem, which is
     // common code that also handles the mount() system call.
     let fs = match fs_type {
-        "bind" => Bind(current_task.lookup_path_from_root(fs_src.as_bytes())?),
-        "remote_bundle" => Fs(RemoteBundle::new_fs(current_task.kernel(), pkg, rights, fs_src)?),
-        "remotefs" => Fs(create_remotefs_filesystem(current_task.kernel(), pkg, rights, fs_src)?),
-        _ => create_filesystem(
-            current_task,
-            fs_type.as_bytes(),
-            fs_src.as_bytes(),
-            MountFlags::empty(),
-            options.as_bytes(),
-        )?,
+        "remote_bundle" => RemoteBundle::new_fs(kernel, pkg, rights, fs_src)?,
+        "remotefs" => create_remotefs_filesystem(kernel, pkg, rights, fs_src)?,
+        _ => kernel.create_filesystem(fs_type.as_bytes(), options)?,
     };
     Ok((mount_point.as_bytes(), fs))
 }

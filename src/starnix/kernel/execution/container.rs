@@ -328,18 +328,13 @@ fn create_fs_context(
     // applied on top of it.
     let mut mounts_iter = config.mounts.iter();
     let (root_point, root_fs) = create_filesystem_from_spec(
-        current_task,
+        current_task.kernel(),
         pkg_dir_proxy,
         mounts_iter.next().ok_or_else(|| anyhow!("Mounts list is empty"))?,
     )?;
     if root_point != b"/" {
         anyhow::bail!("First mount in mounts list is not the root");
     }
-    let root_fs = if let WhatToMount::Fs(fs) = root_fs {
-        fs
-    } else {
-        anyhow::bail!("how did a bind mount manage to get created as the root?")
-    };
 
     // Create a layered fs to handle /container and /container/component
     // /container will mount the container pkg
@@ -411,7 +406,7 @@ fn mount_filesystems(
     let _ = mounts_iter.next();
     for mount_spec in mounts_iter {
         let (mount_point, child_fs) =
-            create_filesystem_from_spec(system_task, pkg_dir_proxy, mount_spec)
+            create_filesystem_from_spec(system_task.kernel(), pkg_dir_proxy, mount_spec)
                 .with_source_context(|| {
                     format!("creating filesystem from spec: {}", &mount_spec)
                 })?;
@@ -419,7 +414,7 @@ fn mount_filesystems(
             system_task.lookup_path_from_root(mount_point).with_source_context(|| {
                 format!("lookup path from root: {}", String::from_utf8_lossy(mount_point))
             })?;
-        mount_point.mount(child_fs, MountFlags::empty())?;
+        mount_point.mount(WhatToMount::Fs(child_fs), MountFlags::empty())?;
     }
     Ok(())
 }
