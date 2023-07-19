@@ -4,14 +4,59 @@
 
 import("//build/components.gni")
 import("//build/images/args.gni")
-import("//build/images/fvm.gni")
 
 declare_args() {
+  # If format_minfs_on_corruption is true (the default), fshost formats minfs partition on finding
+  # it corrupted.  Set to false to keep the devices in a corrupted state which might be of help to
+  # debug issues.
+  # Set by products
+  format_minfs_on_corruption = true
+
+  # Set to one of "minfs", "fxfs", "f2fs" (unstable).
+  # If set to anything other than "minfs", any existing minfs partition will be
+  # migrated in-place to the specified format when fshost mounts it.
+  # Set by products
+  data_filesystem_format = "fxfs"
+
+  # The format blobfs should store blobs in.
+  # Set by boards.
+  blob_layout_format = "compact"
+
+  # The size of the FVM partition images "slice size". The FVM slice size is a
+  # minimum size of a particular chunk of a partition that is stored within
+  # FVM. A very small slice size may lead to decreased throughput. A very large
+  # slice size may lead to wasted space. The selected default size of 8mb is
+  # selected for conservation of space, rather than performance.
+  # LINT.IfChange
+  # Set by boards.
+  fvm_slice_size = 8388608
+
+  # LINT.ThenChange(/src/storage/fshost/generated_fshost_config.gni)
+
+  # The following blobfs_* arguments are used to determine the
+  # initial dimensions of the blobfs partition added to a FVM
+  # image. If they are unset, the sizes of the input blobfs image will
+  # determine the dimensions of the respective partition within FVM.
+  #
+  # These dimensions cannot make a partition smaller than the image provided
+  # to the FVM tool; in that case, the partition dimensions would be expanded
+  # to fit the input image.
+  #
+  # There are both board-level overrides and product-level dimensions. The
+  # product-level overrides, if set, will take precedence.
+
+  # minimum_inodes is the number of inodes to reserve for the fs
+  # A value of false does not reserve any additional space than minimum
+  # required for the filesystem.
+  # Set by boards.
+  blobfs_board_minimum_inodes = false
+
   # blobfs_maximum_runtime_bytes is an upper bound on the partition size on the device. Partitions
   # can grow as needed if there are extra slices available in FVM. This limit prevents the blobfs
   # partition from taking too much space away from other uses.
   #
   # Pass the empty string for no limit.
+  # Set by boards.
   blobfs_maximum_runtime_bytes = ""
 
   # minfs_maximum_runtime_bytes is an upper bound on the partition size on the device. Partitions
@@ -19,32 +64,25 @@ declare_args() {
   # partition from taking too much space away from other uses.
   #
   # Pass the empty string for no limit.
+  # Set by boards.
   minfs_maximum_runtime_bytes = ""
 
-  # If format_minfs_on_corruption is true (the default), fshost formats minfs partition on finding
-  # it corrupted.  Set to false to keep the devices in a corrupted state which might be of help to
-  # debug issues.
-  format_minfs_on_corruption = true
-
-  # Set to one of "minfs", "fxfs", "f2fs" (unstable).
-  # If set to anything other than "minfs", any existing minfs partition will be
-  # migrated in-place to the specified format when fshost mounts it.
-  data_filesystem_format = "fxfs"
-
-  # Set to true to enable legacy data partition names.
-  allow_legacy_data_partition_names = false
-
   # Make fshost watch for NAND devices.
+  # Set by boards.
   fshost_watch_for_nand = false
+
+  # Use Fxfs's blob implementation
+  # Changes the flashing logic because the outputs changed.
+  # Toggles a bunch of tests to use fxfs.
+  # Set by boards.
+  fxfs_blob = false
 
   # If true, will enable content-detection for partition format, supporting both
   # minfs and fxfs filesystems. A special "fs_switch" file can be written to the root directory
   # containing the string "minfs", "fxfs" or "toggle" to trigger a migration from the current
   # format to the specified format. (The "toggle" option will migrate back and forth at each boot.)
+  # Set by developers in fx set.
   use_disk_migration = false
-
-  # Use Fxfs's blob implementation
-  fxfs_blob = false
 }
 
 # Generates a structured config value file for fshost.
@@ -104,10 +142,7 @@ template("generated_fshost_config") {
       fvm_slice_size = fvm_slice_size
 
       # Parameters from //build/images/args.gni
-      if (blobfs_product_minimum_inodes != false) {
-        # Product-level overrides take precedence over board-level overrides.
-        blobfs_initial_inodes = blobfs_product_minimum_inodes
-      } else if (blobfs_board_minimum_inodes != false) {
+      if (blobfs_board_minimum_inodes != false) {
         blobfs_initial_inodes = blobfs_board_minimum_inodes
       } else {
         blobfs_initial_inodes = 0
@@ -122,7 +157,6 @@ template("generated_fshost_config") {
       }
 
       # Build args
-      allow_legacy_data_partition_names = allow_legacy_data_partition_names
       data_filesystem_format = data_filesystem_format
       format_data_on_corruption = format_minfs_on_corruption
       nand = fshost_watch_for_nand

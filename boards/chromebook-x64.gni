@@ -106,9 +106,6 @@ active_partition = "d"
 # In this case "emmc" is a misnomer, it really just means "not raw NAND".
 fvm_emmc_partition_size = 17179869184
 
-# Depthcharge does not currently support FVM compression.
-fvm_fastboot_compression = "none"
-
 firmware_prebuilts = [
   {
     type = "ap"

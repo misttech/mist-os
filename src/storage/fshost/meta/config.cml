@@ -35,9 +35,6 @@
             max_size: 64,
         },
 
-        // Allow legacy names for the data partition.
-        allow_legacy_data_partition_names: { type: "bool" },
-
         // Enables NAND devices.
         nand: { type: "bool" },
 

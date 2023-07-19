@@ -85,6 +85,8 @@ generated_images_config("x64") {
   forward_variables_from(_default_fvm_with_size_limits, "*")
 
   fvm.emmc = {
+    # TODO(fxbug.dev/68692): finish implementing decompression in Gigaboot so we
+    # can compress here to speed up FVM transmission.k
     compress = false
     truncate_to_length = 17179869184
   }

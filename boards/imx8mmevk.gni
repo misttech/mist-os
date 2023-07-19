@@ -16,11 +16,6 @@ board_configs += [ "//build/config/arm64:cortex-a53" ]
 # The Zircon Boot Image (ZBI) contains everything needed to boot.
 max_fuchsia_zbi_size = 33554432  # 32 mebibytes (MiB)
 
-# Zedboot is a minimal recovery image that's used to install and boot a full
-# Fuchsia system.
-# https://fuchsia.dev/fuchsia-src/glossary#zedboot
-max_zedboot_zbi_size = 33554432  # 32 MiB
-
 # You'll put kernel command line arguments and driver dependencies here later.
 _common_bootfs_deps = [
   "//src/devices/bin/driver_host2",

@@ -78,6 +78,8 @@ pub enum Image {
     FVMSparse(Utf8PathBuf),
 
     /// Sparse blobfs-only FVM.
+    // TODO(b/291958397): This can be deleted, because blob sparse fvms are no
+    // longer in use.
     FVMSparseBlob(Utf8PathBuf),
 
     /// Fastboot FVM.

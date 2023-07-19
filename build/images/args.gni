@@ -135,12 +135,6 @@ declare_args() {
   # non-production GN labels. Build will fail if such dependency is found.
   check_production_eligibility = false
 
-  # Whether to compress the blobfs image.
-  compress_blobs = true
-
-  # The format blobfs should store blobs in.
-  blob_layout_format = "compact"
-
   # Controls what type of delivery blob pkg-resolver fetches and blobfs accepts.
   # Supported types can be found in //src/storage/blobfs/delivery_blob.h
   # Valid values are integers, for example: 1
@@ -151,10 +145,26 @@ declare_args() {
   always_zedboot = false
 
   # Include fvm.blob.sparse.blk image into the build if set to true
+  # TODO(b/291958397): This can be deleted, because blob sparse fvms are no
+  # longer in use.
   include_fvm_blob_sparse = false
 
   # Include an account partition in the FVM image if set to true.
   include_account_in_fvm = false
+
+  # The size in bytes of the FVM partition on the target eMMC devices.
+  # Specifying this parameter will lead build to generate a fvm.fastboot.blk
+  # suitable for flashing through fastboot for eMMC devices.
+  # Informs GN that a nand-fvm will be outputted.
+  fvm_emmc_partition_size = false
+
+  # Specifying these variables will generate a NAND FVM image suitable for
+  # directly flashing via fastboot. The NAND characteristics are required
+  # in order to properly initialize the FTL metadata in the OOB area.
+  # `fvm_max_disk_size` should also be nonzero or else minfs will not have any
+  # room to initialize on boot.
+  # Informs GN that a nand-fvm will be outputted along with a temporary file.
+  fvm_ftl_nand_block_count = false
 
   # Allows a product to specify the recovery image used in the zirconr slot.
   # Default recovery image is zedboot. Overriding this value will keep zedboot

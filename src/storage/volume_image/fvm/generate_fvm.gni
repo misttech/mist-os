@@ -3,7 +3,6 @@
 # found in the LICENSE file.
 
 import("//build/compiled_action.gni")
-import("//build/images/fvm.gni")
 
 # Build an FVM partition
 #
@@ -53,12 +52,6 @@ template("generate_fvm") {
     if (defined(invoker.with_empty_data) && invoker.with_empty_data) {
       # TODO(fxbug.dev/85165): Remove this flag and pass in an empty file instead.
       args += [ "--with-empty-data" ]
-    }
-    if (fvm_reserved_slices > 0) {
-      args += [
-        "--reserve-slices",
-        "$fvm_reserved_slices",
-      ]
     }
     if (defined(invoker.partitions)) {
       foreach(part, invoker.partitions) {

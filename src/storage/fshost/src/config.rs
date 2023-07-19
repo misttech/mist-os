@@ -7,7 +7,6 @@ use crate::boot_args::BootArgs;
 #[cfg(test)]
 pub fn default_config() -> fshost_config::Config {
     fshost_config::Config {
-        allow_legacy_data_partition_names: false,
         blobfs: true,
         blobfs_allow_delivery_blobs: false,
         blobfs_initial_inodes: 0,

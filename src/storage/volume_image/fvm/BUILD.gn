@@ -3,7 +3,6 @@
 # found in the LICENSE file.
 
 import("//build/components.gni")
-import("//build/images/fvm.gni")
 import("//build/test.gni")
 import("//src/storage/testing/driver_test_realm.gni")
 import("//src/storage/volume_image/fvm/generate_fvm.gni")
@@ -145,9 +144,6 @@ test_fvm_data_partition = {
 test_fvm_blob_partition = {
   type = "blob"
   dep = ":test_blob.blk"
-  minimum_inodes = blobfs_product_minimum_inodes
-  minimum_data_bytes = blobfs_product_minimum_data_bytes
-  maximum_bytes = blobfs_product_maximum_bytes
 }
 
 generate_fvm("test_fvm.sparse.blk") {
@@ -162,14 +158,8 @@ generate_fvm("test_fvm.sparse.blk") {
     "--compress",
     "lz4",
     "--slice",
-    "$fvm_slice_size",
+    "8388608",
   ]
-  if (fvm_max_disk_size != false) {
-    args += [
-      "--max-disk-size",
-      "$fvm_max_disk_size",
-    ]
-  }
 
   partitions = [
     # Place blobfs first, since it is A/B enabled (thus allocates extra slices for B-copies of some

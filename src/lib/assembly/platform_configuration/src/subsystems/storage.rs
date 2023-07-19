@@ -45,7 +45,6 @@ impl DefineSubsystemConfiguration<StorageConfig> for StorageSubsystemConfig {
                 .field("format_data_on_corruption", true)?
                 .field("blobfs_initial_inodes", 0)?
                 .field("blobfs_use_deprecated_padded_format", false)?
-                .field("allow_legacy_data_partition_names", false)?
                 .field("use_disk_migration", false)?
                 .field("nand", false)?
                 .field("fxfs_blob", false)?

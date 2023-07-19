@@ -58,11 +58,8 @@ active_partition = "a"
 fastboot_product = "clover"
 fvm_partition = "fvm"
 
-# total 512M
-fvm_ftl_nand_page_size = 4096
-fvm_ftl_nand_oob_size = 128
-fvm_ftl_nand_pages_per_block = 64
-fvm_ftl_nand_block_count = 1604
+# A non-false value indicates to GN that a nand image will be generated.
+fvm_ftl_nand_block_count = 1
 
 # Supports only physical devices.
 board_is_emu = false
