@@ -96,6 +96,6 @@ impl Manager {
     }
 
     pub async fn shutdown(self) -> Result<(), Error> {
-        Ok(())
+        self.environment.lock().await.shutdown().await
     }
 }

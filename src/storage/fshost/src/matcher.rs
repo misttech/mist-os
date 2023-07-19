@@ -663,6 +663,10 @@ mod tests {
         async fn shred_data(&mut self) -> Result<(), Error> {
             unreachable!();
         }
+
+        async fn shutdown(&mut self) -> Result<(), Error> {
+            unreachable!();
+        }
     }
 
     impl Drop for MockEnv {

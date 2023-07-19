@@ -107,6 +107,9 @@ pub trait Environment: Send + Sync {
     /// Shreds the data volume, triggering a reformat on reboot.
     /// The data volume must be Fxfs-formatted and must be currently serving.
     async fn shred_data(&mut self) -> Result<(), Error>;
+
+    /// Synchronously shut down all associated filesystems.
+    async fn shutdown(&mut self) -> Result<(), Error>;
 }
 
 // Before a filesystem is mounted, we queue requests.
@@ -115,6 +118,7 @@ pub enum Filesystem {
     Serving(ServingSingleVolumeFilesystem),
     ServingMultiVolume(CryptService, ServingMultiVolumeFilesystem, String),
     ServingVolumeInFxblob(Option<CryptService>, String),
+    Shutdown,
 }
 
 impl Filesystem {
@@ -147,6 +151,7 @@ impl Filesystem {
                 .ok_or(anyhow!("data volume {} not found", data_volume_name))?
                 .exposed_dir()
                 .clone(fio::OpenFlags::CLONE_SAME_RIGHTS, server.into_channel().into())?,
+            Filesystem::Shutdown => bail!(anyhow!("filesystem is shutting down")),
         }
         Ok(proxy)
     }
@@ -182,10 +187,11 @@ impl Filesystem {
     }
 
     pub async fn shutdown(
-        self,
+        &mut self,
         serving_fs: Option<&mut ServingMultiVolumeFilesystem>,
     ) -> Result<(), Error> {
-        match self {
+        let old = std::mem::replace(self, Filesystem::Shutdown);
+        match old {
             Filesystem::Queue(_) => Ok(()),
             Filesystem::Serving(fs) => fs.shutdown().await.context("shutdown failed"),
             Filesystem::ServingMultiVolume(_, fs, _) => {
@@ -194,6 +200,7 @@ impl Filesystem {
             Filesystem::ServingVolumeInFxblob(_, volume_name) => {
                 serving_fs.unwrap().shutdown_volume(&volume_name).await.context("shutdown failed")
             }
+            Filesystem::Shutdown => Err(anyhow!("double shutdown!")),
         }
     }
 }
@@ -835,6 +842,23 @@ impl Environment for FshostEnvironment {
             .await?
             .map_err(|e| anyhow!(zx::Status::from_raw(e)))
             .context("Failed to remove keybag")?;
+        Ok(())
+    }
+
+    async fn shutdown(&mut self) -> Result<(), Error> {
+        // If we encounter an error, log it, but continue trying to shut down the remaining
+        // filesystems.
+        self.blobfs.shutdown(self.fxblob.as_mut()).await.unwrap_or_else(|error| {
+            tracing::error!(?error, "failed to shut down blobfs");
+        });
+        self.data.shutdown(self.fxblob.as_mut()).await.unwrap_or_else(|error| {
+            tracing::error!(?error, "failed to shut down data");
+        });
+        if let Some(fxfs) = self.fxblob.take() {
+            fxfs.shutdown().await.unwrap_or_else(|error| {
+                tracing::error!(?error, "failed to shut down fxfs");
+            })
+        }
         Ok(())
     }
 }
