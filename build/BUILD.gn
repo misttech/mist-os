@@ -387,7 +387,6 @@ group("config_data_template_allowlist") {
     "//src/fonts/*",
     "//src/graphics/lib/goldfish-vulkan/gnbuild:goldfish-config",
     "//src/hwinfo:default_board_config",
-    "//src/hwinfo:default_product_config",
     "//src/lib/icu/tzdata:*",
     "//src/media/audio/config:chromebook-config",
     "//src/security/lib/scrutiny/tests/*",

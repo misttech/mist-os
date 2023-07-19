@@ -32,9 +32,6 @@ legacy_base_package_labels += [
 
   # TODO(http://fxb/103965): remove once we have config_data support in assembly_input_bundle()
   "//src/sys/core:core_component_id_index",
-
-  # TODO(http://fxb/103965): remove once we have config_data support in assembly_input_bundle()
-  "//src/hwinfo:default_product_config",
 ]
 
 # Set the SWD policy for core.gni, details can be found in

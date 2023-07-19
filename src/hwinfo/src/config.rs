@@ -17,7 +17,6 @@ use {
 // CONFIG AND FACTORY FILE NAMES
 const PRODUCT_CONFIG_JSON_FILE: &str = "/config/data/product_config.json";
 const BOARD_CONFIG_JSON_FILE: &str = "/config/data/board_config.json";
-const DEFAULT_PRODUCT_CONFIG_JSON_FILE: &str = "/config/data/default_product_config.json";
 const DEFAULT_BOARD_CONFIG_JSON_FILE: &str = "/config/data/default_board_config.json";
 const SERIAL_TXT: &str = "serial.txt";
 const LOCALE_LIST_FILE: &str = "locale_list.txt";
@@ -212,6 +211,13 @@ impl ProductInfo {
         Ok(())
     }
 
+    fn load_from_structured_config(&mut self) {
+        let hwinfo = hwinfo_structured_config::Config::take_from_startup_handle();
+        self.name = Some(hwinfo.product_name);
+        self.model = Some(hwinfo.product_model);
+        self.manufacturer = Some(hwinfo.product_manufacturer);
+    }
+
     async fn load_from_hw_file(
         &mut self,
         path: &str,
@@ -293,10 +299,8 @@ impl ProductInfo {
     pub async fn load(proxy_handle: &MiscFactoryStoreProviderProxy) -> Self {
         let mut product_info = ProductInfo::new();
         if let Err(err) = product_info.load_from_config_data(PRODUCT_CONFIG_JSON_FILE) {
-            tracing::error!("Failed to load product_config.json due to {}", err);
-            if let Err(err) = product_info.load_from_config_data(DEFAULT_PRODUCT_CONFIG_JSON_FILE) {
-                tracing::error!("Failed to load default_product_config.json due to {}", err);
-            }
+            tracing::warn!("Failed to load product_config.json due to {}", err);
+            product_info.load_from_structured_config();
         }
         if let Err(err) = product_info.load_from_hw_file(HW_TXT, proxy_handle).await {
             tracing::error!("Failed to load hw.txt due to {}", err);

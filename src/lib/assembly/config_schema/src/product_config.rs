@@ -23,6 +23,10 @@ pub struct ProductConfig {
     /// Default to the empty string which creates a "paused" config that launches nothing to start.
     #[serde(default)]
     pub session_url: String,
+
+    /// Generic product information.
+    #[serde(default)]
+    pub info: Option<ProductInfoConfig>,
 }
 
 /// Packages provided by the product, to add to the assembled images.
@@ -97,6 +101,18 @@ pub struct ProductConfigData {
 
     /// Path to find the file in the package on the target.
     pub destination: PackageInternalPathBuf,
+}
+
+/// Configuration options for product info.
+#[derive(Clone, Debug, Default, Deserialize, Serialize, PartialEq)]
+#[serde(deny_unknown_fields)]
+pub struct ProductInfoConfig {
+    /// Name of the product.
+    pub name: String,
+    /// Model of the product.
+    pub model: String,
+    /// Manufacturer of the product.
+    pub manufacturer: String,
 }
 
 #[cfg(test)]

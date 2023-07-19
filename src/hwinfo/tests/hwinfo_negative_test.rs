@@ -48,9 +48,9 @@ async fn request_product_info() -> Result<(), Error> {
     assert!(response.language.is_none());
     assert!(response.locale_list.is_none());
     assert!(response.regulatory_domain.is_none());
-    assert!(response.name.is_none());
-    assert!(response.model.is_none());
-    assert!(response.manufacturer.is_none());
+    assert_eq!(response.name.unwrap().to_string(), "test_product_name".to_string());
+    assert_eq!(response.model.unwrap().to_string(), "test_product_model".to_string());
+    assert_eq!(response.manufacturer.unwrap().to_string(), "test_manufacturer".to_string());
     assert!(response.build_date.is_none());
     Ok(())
 }

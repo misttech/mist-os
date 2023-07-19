@@ -2,6 +2,7 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
+import("//build/components/fuchsia_structured_config.gni")
 import("//build/config.gni")
 import("//build/rust/rustc_binary.gni")
 import("//build/rust/rustc_test.gni")
@@ -13,6 +14,7 @@ rustc_binary("hwinfo_bin") {
   edition = "2021"
 
   deps = [
+    ":hwinfo_structured_config",
     "//sdk/fidl/fuchsia.factory:fuchsia.factory_rust",
     "//sdk/fidl/fuchsia.hwinfo:fuchsia.hwinfo_rust",
     "//sdk/fidl/fuchsia.intl:fuchsia.intl_rust",
@@ -42,22 +44,25 @@ hwinfo_config("default_board_config") {
   config = rebase_path("default_board_config.json")
 }
 
-hwinfo_config("default_product_config") {
-  type = "product"
-  config = rebase_path("default_product_config.json")
+# TODO(fxbug.dev/122864) Remove transitional labels
+group("default_product_config") {
+}
+
+fuchsia_component_manifest("manifest") {
+  component_name = "hwinfo"
+  manifest = "meta/hwinfo.cml"
 }
 
 fuchsia_component("hwinfo_component") {
-  component_name = "hwinfo"
-  manifest = "meta/hwinfo.cml"
+  cm_label = ":manifest"
   deps = [ ":hwinfo_bin" ]
 }
 
-fuchsia_package("hwinfo") {
-  deps = [ ":hwinfo_component" ]
+fuchsia_structured_config_rust_lib("hwinfo_structured_config") {
+  cm_label = ":manifest"
 }
 
-fuchsia_package("fake_hwinfo") {
+fuchsia_package("hwinfo") {
   deps = [ ":hwinfo_component" ]
 }
 
@@ -163,12 +168,19 @@ hwinfo_integration_test("hwinfo_positive_tests") {
     ":hwinfo_positive_test",
     ":hwinfo_tests_config",
     ":hwinfo_tests_factory_config",
+    ":hwinfo_tests_product_config",
   ]
 }
 
 hwinfo_integration_test("hwinfo_negative_tests") {
   manifest = "meta/hwinfo_negative_tests.cml"
-  deps = [ ":hwinfo_negative_test" ]
+  deps = [
+    ":hwinfo_negative_test",
+
+    # The component cannot be compiled without the correct structured config
+    # values, therefore we cannot have a missing name, model, or manufacturer.
+    ":hwinfo_tests_product_config",
+  ]
   test_specs = {
     log_settings = {
       max_severity = "ERROR"
@@ -182,6 +194,7 @@ hwinfo_integration_test("hwinfo_retail_tests") {
     ":hwinfo_retail_test",
     ":hwinfo_retail_tests_config",
     ":hwinfo_retail_tests_factory_config",
+    ":hwinfo_tests_product_config",
   ]
 }
 
@@ -191,10 +204,7 @@ resource("hwinfo_tests_factory_config") {
 }
 
 resource("hwinfo_tests_config") {
-  sources = [
-    "testdata/board_config.json",
-    "testdata/product_config.json",
-  ]
+  sources = [ "testdata/board_config.json" ]
   outputs = [ "hwinfo_positive_tests/{{source_file_part}}" ]
 }
 
@@ -205,17 +215,22 @@ resource("hwinfo_retail_tests_factory_config") {
 }
 
 resource("hwinfo_retail_tests_config") {
-  sources = [
-    "testdata/board_config.json",
-    "testdata/product_config.json",
-  ]
+  sources = [ "testdata/board_config.json" ]
   outputs = [ "hwinfo_retail_tests/{{source_file_part}}" ]
+}
+
+fuchsia_structured_config_values("hwinfo_tests_product_config") {
+  cm_label = ":manifest"
+  values = {
+    product_name = "test_product_name"
+    product_model = "test_product_model"
+    product_manufacturer = "test_manufacturer"
+  }
 }
 
 group("tests") {
   testonly = true
   deps = [
-    ":fake_hwinfo",
     ":hwinfo_negative_tests",
     ":hwinfo_positive_tests",
     ":hwinfo_retail_tests",

@@ -40,4 +40,18 @@
             from: "self",
         },
     ],
+    config: {
+        product_name: {
+            type: "string",
+            max_size: 40,
+        },
+        product_model: {
+            type: "string",
+            max_size: 40,
+        },
+        product_manufacturer: {
+            type: "string",
+            max_size: 40,
+        },
+    },
 }

@@ -31,6 +31,7 @@ mod example;
 mod fonts;
 mod forensics;
 mod graphics;
+mod hwinfo;
 mod identity;
 mod input;
 mod intl;
@@ -221,6 +222,9 @@ fn configure_subsystems(
         builder,
     )
     .context("Configuring the 'graphics' subsystem")?;
+
+    hwinfo::HwinfoSubsystem::define_configuration(context, &config.product.info, builder)
+        .context("Configuring the 'hwinfo' subsystem")?;
 
     identity::IdentitySubsystemConfig::define_configuration(
         context,
