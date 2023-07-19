@@ -34,7 +34,7 @@ use {
         log::*,
         object_handle::{ObjectHandle, ObjectProperties, WriteObjectHandle},
         object_store::{
-            directory::{replace_child_with_object, ObjectDescriptor},
+            directory::{replace_child_with_object, ObjectDescriptor, ReplacedChild},
             transaction::{LockKey, Options},
             StoreObjectHandle, Timestamp, BLOB_MERKLE_ATTRIBUTE_ID,
         },
@@ -279,14 +279,21 @@ impl FxDeliveryBlob {
         store.remove_from_graveyard(&mut transaction, object_id);
 
         let name = format!("{}", self.hash);
-        replace_child_with_object(
+        match replace_child_with_object(
             &mut transaction,
             Some((object_id, ObjectDescriptor::File)),
             (dir.directory().directory(), &name),
             0,
             Timestamp::now(),
         )
-        .await?;
+        .await?
+        {
+            ReplacedChild::None => {}
+            _ => {
+                return Err(FxfsError::AlreadyExists)
+                    .with_context(|| format!("Blob {} already exists", self.hash));
+            }
+        }
 
         let parent = self.parent().unwrap();
         transaction.commit_with_callback(|_| parent.did_add(&name)).await?;
@@ -1046,6 +1053,113 @@ mod tests {
                     .expect("transport error on bytes_ready")
                     .expect("failed to write data to vmo");
                 write_offset += len;
+            }
+        }
+        assert_eq!(fixture.read_blob(&format!("{}", hash)).await, data);
+        fixture.close().await;
+    }
+
+    #[fasync::run(10, test)]
+    async fn test_new_rewrite_fails() {
+        let fixture = new_blob_fixture().await;
+
+        let mut data = vec![1; 196608];
+        thread_rng().fill(&mut data[..]);
+
+        let mut builder = MerkleTreeBuilder::new();
+        builder.write(&data);
+        let hash = builder.finish().root();
+        let compressed_data = Type1Blob::generate(&data, CompressionMode::Always);
+
+        {
+            let (blob_volume_outgoing_dir, server_end) =
+                fidl::endpoints::create_proxy::<fio::DirectoryMarker>()
+                    .expect("Create dir proxy to succeed");
+
+            fixture
+                .volumes_directory()
+                .serve_volume(fixture.volume(), server_end, true, true)
+                .await
+                .expect("failed to create_and_serve the blob volume");
+            let blob_proxy =
+                connect_to_protocol_at_dir_svc::<fidl_fuchsia_fxfs::BlobCreatorMarker>(
+                    &blob_volume_outgoing_dir,
+                )
+                .expect("failed to connect to the Blob service");
+
+            let blob_writer_client_end = blob_proxy
+                .create(&hash.into(), false)
+                .await
+                .expect("transport error on create")
+                .expect("failed to create blob");
+
+            let writer = blob_writer_client_end.into_proxy().unwrap();
+            let vmo = writer
+                .get_vmo(compressed_data.len() as u64)
+                .await
+                .expect("transport error on get_vmo")
+                .expect("failed to get vmo");
+
+            let blob_writer_client_end_2 = blob_proxy
+                .create(&hash.into(), false)
+                .await
+                .expect("transport error on create")
+                .expect("failed to create blob");
+
+            let writer_2 = blob_writer_client_end_2.into_proxy().unwrap();
+            let vmo_2 = writer_2
+                .get_vmo(compressed_data.len() as u64)
+                .await
+                .expect("transport error on get_vmo")
+                .expect("failed to get vmo");
+
+            let vmo_size = vmo.get_size().expect("failed to get vmo size");
+            let list_of_writes = generate_list_of_writes(compressed_data.len() as u64);
+            let mut write_offset = 0;
+            for range in &list_of_writes {
+                let len = range.end - range.start;
+                vmo.write(
+                    &compressed_data[range.start as usize..range.end as usize],
+                    write_offset % vmo_size,
+                )
+                .expect("failed to write to vmo");
+                let _ = writer
+                    .bytes_ready(len)
+                    .await
+                    .expect("transport error on bytes_ready")
+                    .expect("failed to write data to vmo");
+                write_offset += len;
+            }
+
+            let mut count = 0;
+            write_offset = 0;
+            for range in &list_of_writes {
+                let len = range.end - range.start;
+                vmo_2
+                    .write(
+                        &compressed_data[range.start as usize..range.end as usize],
+                        write_offset % vmo_size,
+                    )
+                    .expect("failed to write to vmo");
+                if count == list_of_writes.len() - 1 {
+                    assert_eq!(
+                        writer_2
+                            .bytes_ready(len)
+                            .await
+                            .expect("transport error on bytes_ready")
+                            .map_err(Status::from_raw)
+                            .expect_err("write unexpectedly succeeded"),
+                        zx::Status::ALREADY_EXISTS
+                    );
+                } else {
+                    let _ = writer_2
+                        .bytes_ready(len)
+                        .await
+                        .expect("transport error on bytes_ready")
+                        .expect("failed to write data to vmo");
+                }
+                write_offset += len;
+                count += 1;
             }
         }
         assert_eq!(fixture.read_blob(&format!("{}", hash)).await, data);
