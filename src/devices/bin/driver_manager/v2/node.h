@@ -11,6 +11,7 @@
 #include <fidl/fuchsia.driver.framework/cpp/wire.h>
 #include <fidl/fuchsia.driver.host/cpp/wire.h>
 #include <fidl/fuchsia.driver.index/cpp/wire.h>
+#include <lib/async_patterns/cpp/task_scope.h>
 #include <lib/zircon-internal/thread_annotations.h>
 
 #include <list>
@@ -21,7 +22,6 @@
 #include "src/devices/bin/driver_manager/devfs/devfs.h"
 #include "src/devices/bin/driver_manager/inspect.h"
 #include "src/devices/bin/driver_manager/v2/driver_host.h"
-#include "src/lib/fxl/memory/weak_ptr.h"
 
 namespace dfv2 {
 
@@ -368,8 +368,7 @@ class Node : public fidl::WireServer<fuchsia_driver_framework::NodeController>,
 
   fidl::ServerBindingGroup<fuchsia_device::Controller> dev_controller_bindings_;
 
-  // Keep last.
-  fxl::WeakPtrFactory<Node> weak_ptr_factory_;
+  async_patterns::TaskScope tasks_;
 };
 
 }  // namespace dfv2

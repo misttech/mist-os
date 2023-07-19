@@ -324,7 +324,7 @@ Node::Node(std::string_view name, std::vector<Node*> parents, NodeManager* node_
       node_manager_(node_manager),
       dispatcher_(dispatcher),
       inspect_(std::move(inspect)),
-      weak_ptr_factory_(this) {
+      tasks_(dispatcher) {
   ZX_ASSERT(primary_index_ == 0 || primary_index_ < parents_.size());
   if (auto primary_parent = GetPrimaryParent()) {
     // By default, we set `driver_host_` to match the primary parent's
@@ -342,7 +342,7 @@ Node::Node(std::string_view name, std::vector<Node*> parents, NodeManager* node_
       dispatcher_(dispatcher),
       driver_host_(driver_host),
       inspect_(std::move(inspect)),
-      weak_ptr_factory_(this) {}
+      tasks_(dispatcher) {}
 
 zx::result<std::shared_ptr<Node>> Node::CreateCompositeNode(
     std::string_view node_name, std::vector<Node*> parents, std::vector<std::string> parents_names,
@@ -1065,13 +1065,7 @@ void Node::ScheduleStopComponent() {
                 State2String(node_state_));
   node_state_ = NodeState::kWaitingOnDriverComponent;
   if (!driver_component_) {
-    async::PostTask(dispatcher_, [weak_this = weak_ptr_factory_.GetWeakPtr()] {
-      // Task may outlive `this`, in which case hopefully there is nothing
-      // to do here.
-      if (weak_this.get() != nullptr) {
-        weak_this->FinishRemoval();
-      }
-    });
+    tasks_.Post(fit::bind_member(this, &Node::FinishRemoval));
     return;
   }
   // Send an epitaph to the component manager and close the connection. The

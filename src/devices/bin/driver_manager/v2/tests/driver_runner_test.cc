@@ -2447,19 +2447,20 @@ TEST(CompositeServiceOfferTest, WorkingOfferPrimary) {
 }
 
 TEST(NodeTest, ToCollection) {
+  async::Loop loop{&kAsyncLoopConfigNeverAttachToThread};
   InspectManager inspect(nullptr);
   constexpr uint32_t kProtocolId = 0;
 
   constexpr char kParentName[] = "parent";
-  Node parent(kParentName, std::vector<Node*>{}, nullptr, nullptr,
+  Node parent(kParentName, std::vector<Node*>{}, nullptr, loop.dispatcher(),
               inspect.CreateDevice(kParentName, zx::vmo{}, kProtocolId), nullptr);
 
   constexpr char kChild1Name[] = "child1";
-  Node child1(kChild1Name, std::vector<Node*>{&parent}, nullptr, nullptr,
+  Node child1(kChild1Name, std::vector<Node*>{&parent}, nullptr, loop.dispatcher(),
               inspect.CreateDevice(kChild1Name, zx::vmo{}, kProtocolId), nullptr);
 
   constexpr char kChild2Name[] = "child2";
-  Node child2(kChild2Name, std::vector<Node*>{&parent, &child1}, nullptr, nullptr,
+  Node child2(kChild2Name, std::vector<Node*>{&parent, &child1}, nullptr, loop.dispatcher(),
               inspect.CreateDevice(kChild2Name, zx::vmo{}, kProtocolId), nullptr);
 
   // Test parentless
