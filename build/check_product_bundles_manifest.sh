@@ -18,7 +18,7 @@ readonly pb_manifest=$2
 readonly stamp_file=$3
 
 pb_count="$(${jq} '. | length' ${pb_manifest})"
-if [[ "${pb_count}" -ne 1 ]]; then
+if [ "${pb_count}" -ne 1 ]; then
   echo "Expecting exactly 1 product bundle from ${pb_manifest}, got ${pb_count}."
   ${jq} '.' ${pb_manifest}
   exit 1
