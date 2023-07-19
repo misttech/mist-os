@@ -317,27 +317,32 @@ int cmd_read_blk(const char* dev, off_t offset, size_t count) {
     return -1;
   }
 
-  // Using an fd to read from block devices has been broken for a very long time.
-  //
-  // TODO(https://fxbug.dev/129846): Read from the block device without using an fd.
-  fbl::unique_fd fd;
-
-  // read the data
-  std::unique_ptr<uint8_t[]> buf(new uint8_t[count]);
-  if (offset) {
-    off_t rc = lseek(fd.get(), offset, SEEK_SET);
-    if (rc < 0) {
-      fprintf(stderr, "Error %lld seeking to offset %jd\n", rc, static_cast<intmax_t>(offset));
-      return -1;
-    }
+  // Create vmo for reading, and handle clone for passing off.
+  zx::vmo in_vmo;
+  if (zx_status_t status = zx::vmo::create(count, 0u, &in_vmo); status != ZX_OK) {
+    fprintf(stderr, "Failed to create read vmo: %s.\n", zx_status_get_string(status));
+    return -1;
   }
-  ssize_t c = read(fd.get(), buf.get(), count);
-  if (c < 0) {
-    fprintf(stderr, "Error %zd in read()\n", c);
+  zx::vmo out_vmo;
+  if (zx_status_t status = in_vmo.duplicate(ZX_RIGHTS_BASIC, &out_vmo); status != ZX_OK) {
+    fprintf(stderr, "Failed to duplicate vmo handle: %s.\n", zx_status_get_string(status));
+    return -1;
+  }
+  fzl::OwnedVmoMapper mapper;
+  if (zx_status_t status = mapper.Map(std::move(in_vmo), count); status != ZX_OK) {
+    fprintf(stderr, "Failed to map vmo: %s\n", zx_status_get_string(status));
     return -1;
   }
 
-  hexdump8_ex(buf.get(), c, offset);
+  // read the data
+  const fidl::WireResult read_result =
+      fidl::WireCall(block.value())->ReadBlocks(std::move(out_vmo), count, offset, 0);
+  if (!read_result.ok()) {
+    fprintf(stderr, "Error from block device read: %s\n", read_result.FormatDescription().c_str());
+    return -1;
+  }
+
+  hexdump8_ex(mapper.start(), count, offset);
   return 0;
 }
 
