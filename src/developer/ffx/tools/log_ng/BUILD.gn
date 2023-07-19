@@ -8,8 +8,8 @@ import("//src/developer/ffx/build/ffx_tool.gni")
 import("//src/developer/ffx/lib/version/build/ffx_apply_version.gni")
 
 rustc_library("lib") {
-  # This is named as such to avoid a conflict with an existing ffx log-ng command.
-  name = "ffx_tool_log-ng"
+  # This is named as such to avoid a conflict with an existing ffx log_ng command.
+  name = "ffx_tool_log_ng"
   edition = "2021"
   with_unit_tests = true
 
@@ -58,9 +58,9 @@ rustc_library("lib") {
 }
 
 # TODO(https://fxbug.dev/883811): Rename directory to match target.
-ffx_tool("ffx_log-ng") {
+ffx_tool("ffx_log_ng") {
   edition = "2021"
-  output_name = "ffx-log-ng"
+  output_name = "ffx-log_ng"
   deps = [
     ":lib",
     "//src/developer/ffx/lib/fho:lib",
@@ -69,15 +69,15 @@ ffx_tool("ffx_log-ng") {
   sources = [ "src/main.rs" ]
 }
 
-group("log-ng") {
+group("log_ng") {
   public_deps = [
-    ":ffx_log-ng",
-    ":ffx_log-ng_host_tool",
+    ":ffx_log_ng",
+    ":ffx_log_ng_host_tool",
   ]
 }
 
 group("bin") {
-  public_deps = [ ":ffx_log-ng_versioned" ]
+  public_deps = [ ":ffx_log_ng_versioned" ]
 }
 
 group("tests") {
