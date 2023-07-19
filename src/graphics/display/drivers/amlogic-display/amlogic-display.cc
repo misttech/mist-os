@@ -157,7 +157,7 @@ zx_status_t AmlogicDisplay::DisplayInit() {
 // part of ZX_PROTOCOL_DISPLAY_CONTROLLER_IMPL ops
 void AmlogicDisplay::DisplayControllerImplSetDisplayControllerInterface(
     const display_controller_interface_protocol_t* intf) {
-  fbl::AutoLock lock(&display_lock_);
+  fbl::AutoLock lock(&display_mutex_);
   dc_intf_ = ddk::DisplayControllerInterfaceProtocolClient(intf);
 
   if (display_attached_) {
@@ -356,14 +356,14 @@ zx_status_t AmlogicDisplay::DisplayControllerImplImportImage(
   // TODO(fxbug.dev/128653): Using pointers as handles impedes portability of
   // the driver. Do not use pointers as handles.
   image->handle = reinterpret_cast<uint64_t>(import_info.get());
-  fbl::AutoLock lock(&image_lock_);
+  fbl::AutoLock lock(&image_mutex_);
   imported_images_.push_back(std::move(import_info));
   return status;
 }
 
 // part of ZX_PROTOCOL_DISPLAY_CONTROLLER_IMPL ops
 void AmlogicDisplay::DisplayControllerImplReleaseImage(image_t* image) {
-  fbl::AutoLock lock(&image_lock_);
+  fbl::AutoLock lock(&image_mutex_);
   auto info = reinterpret_cast<ImageInfo*>(image->handle);
   imported_images_.erase(*info);
 }
@@ -381,7 +381,7 @@ config_check_result_t AmlogicDisplay::DisplayControllerImplCheckConfiguration(
     return CONFIG_CHECK_RESULT_OK;
   }
 
-  fbl::AutoLock lock(&display_lock_);
+  fbl::AutoLock lock(&display_mutex_);
 
   // no-op, just wait for the client to try a new config
   if (!display_attached_ || display::ToDisplayId(display_configs[0]->display_id) != display_id_) {
@@ -467,7 +467,7 @@ void AmlogicDisplay::DisplayControllerImplApplyConfiguration(
   ZX_DEBUG_ASSERT(banjo_config_stamp);
   const display::ConfigStamp config_stamp = display::ToConfigStamp(*banjo_config_stamp);
 
-  fbl::AutoLock lock(&display_lock_);
+  fbl::AutoLock lock(&display_mutex_);
 
   if (display_count == 1 && display_configs[0]->layer_count) {
     // Setting up OSD may require Vout framebuffer information, which may be
@@ -502,7 +502,7 @@ void AmlogicDisplay::DisplayControllerImplApplyConfiguration(
   } else {
     if (fully_initialized()) {
       {
-        fbl::AutoLock lock2(&capture_lock_);
+        fbl::AutoLock lock2(&capture_mutex_);
         if (current_capture_target_image_ != nullptr) {
           // there's an active capture. stop it before disabling osd
           vpu_->CaptureDone();
@@ -535,7 +535,7 @@ void AmlogicDisplay::DdkSuspend(ddk::SuspendTxn txn) {
     osd_->Disable();
   }
 
-  fbl::AutoLock l(&image_lock_);
+  fbl::AutoLock l(&image_mutex_);
   for (auto& i : imported_images_) {
     if (i.pmt) {
       i.pmt.unpin();
@@ -700,7 +700,7 @@ zx_status_t AmlogicDisplay::DisplayControllerImplSetBufferCollectionConstraints(
 
 zx_status_t AmlogicDisplay::DisplayControllerImplSetDisplayPower(uint64_t display_id,
                                                                  bool power_on) {
-  fbl::AutoLock lock(&display_lock_);
+  fbl::AutoLock lock(&display_mutex_);
   if (display::ToDisplayId(display_id) != display_id_ || !display_attached_) {
     return ZX_ERR_NOT_FOUND;
   }
@@ -712,7 +712,7 @@ zx_status_t AmlogicDisplay::DisplayControllerImplSetDisplayPower(uint64_t displa
 
 zx_status_t AmlogicDisplay::DisplayControllerImplSetDisplayCaptureInterface(
     const display_capture_interface_protocol_t* intf) {
-  fbl::AutoLock lock(&capture_lock_);
+  fbl::AutoLock lock(&capture_mutex_);
   capture_intf_ = ddk::DisplayCaptureInterfaceProtocolClient(intf);
   current_capture_target_image_ = INVALID_ID;
   return ZX_OK;
@@ -734,7 +734,7 @@ zx_status_t AmlogicDisplay::DisplayControllerImplImportImageForCapture(
   if (import_capture == nullptr) {
     return ZX_ERR_NO_MEMORY;
   }
-  fbl::AutoLock lock(&capture_lock_);
+  fbl::AutoLock lock(&capture_mutex_);
   fidl::WireResult check_result = collection->CheckBuffersAllocated();
   // TODO(fxbug.dev/121691): The sysmem FIDL error logging patterns are
   // inconsistent across drivers. The FIDL error handling and logging should be
@@ -814,7 +814,7 @@ zx_status_t AmlogicDisplay::DisplayControllerImplStartCapture(uint64_t capture_h
     return ZX_ERR_SHOULD_WAIT;
   }
 
-  fbl::AutoLock lock(&capture_lock_);
+  fbl::AutoLock lock(&capture_mutex_);
   if (current_capture_target_image_ != INVALID_ID) {
     DISP_ERROR("Cannot start capture while another capture is in progress\n");
     return ZX_ERR_SHOULD_WAIT;
@@ -849,7 +849,7 @@ zx_status_t AmlogicDisplay::DisplayControllerImplStartCapture(uint64_t capture_h
 }
 
 zx_status_t AmlogicDisplay::DisplayControllerImplReleaseCapture(uint64_t capture_handle) {
-  fbl::AutoLock lock(&capture_lock_);
+  fbl::AutoLock lock(&capture_mutex_);
   if (capture_handle == reinterpret_cast<uint64_t>(current_capture_target_image_)) {
     return ZX_ERR_SHOULD_WAIT;
   }
@@ -865,7 +865,7 @@ zx_status_t AmlogicDisplay::DisplayControllerImplReleaseCapture(uint64_t capture
 }
 
 bool AmlogicDisplay::DisplayControllerImplIsCaptureCompleted() {
-  fbl::AutoLock lock(&capture_lock_);
+  fbl::AutoLock lock(&capture_mutex_);
   return (current_capture_target_image_ == nullptr);
 }
 
@@ -883,7 +883,7 @@ int AmlogicDisplay::CaptureThread() {
       continue;
     }
     vpu_->CaptureDone();
-    fbl::AutoLock lock(&capture_lock_);
+    fbl::AutoLock lock(&capture_mutex_);
     if (capture_intf_.is_valid()) {
       capture_intf_.OnCaptureComplete();
     }
@@ -905,7 +905,7 @@ int AmlogicDisplay::VSyncThread() {
     if (fully_initialized()) {
       current_config_stamp = osd_->GetLastConfigStampApplied();
     }
-    fbl::AutoLock lock(&display_lock_);
+    fbl::AutoLock lock(&display_mutex_);
     if (dc_intf_.is_valid() && display_attached_) {
       const config_stamp_t banjo_config_stamp = display::ToBanjoConfigStamp(current_config_stamp);
       dc_intf_.OnDisplayVsync(display::ToBanjoDisplayId(display_id_), timestamp.get(),
@@ -932,7 +932,7 @@ int AmlogicDisplay::HpdThread() {
       continue;
     }
 
-    fbl::AutoLock lock(&display_lock_);
+    fbl::AutoLock lock(&display_mutex_);
 
     bool display_added = false;
     added_display_args_t added_display_args;
@@ -1057,7 +1057,7 @@ zx_status_t AmlogicDisplay::Bind() {
         DISP_INFO("Provided Display Info: %d x %d with panel type %d\n", display_info.width,
                   display_info.height, display_info.panel_type);
         {
-          fbl::AutoLock lock(&display_lock_);
+          fbl::AutoLock lock(&display_mutex_);
           if (zx_status_t status = vout_->InitDsi(parent_, display_info.panel_type,
                                                   display_info.width, display_info.height);
               status != ZX_OK) {

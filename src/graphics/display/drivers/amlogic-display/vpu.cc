@@ -101,7 +101,7 @@ zx_status_t Vpu::Init(ddk::PDevFidl& pdev) {
 
   // VPU object is ready to be used
   initialized_ = true;
-  fbl::AutoLock lock(&capture_lock_);
+  fbl::AutoLock lock(&capture_mutex_);
   capture_state_ = CAPTURE_RESET;
   return ZX_OK;
 }
@@ -380,7 +380,7 @@ void Vpu::AfbcPower(bool power_on) {
 
 zx_status_t Vpu::CaptureInit(uint8_t canvas_idx, uint32_t height, uint32_t stride) {
   ZX_DEBUG_ASSERT(initialized_);
-  fbl::AutoLock lock(&capture_lock_);
+  fbl::AutoLock lock(&capture_mutex_);
   if (capture_state_ == CAPTURE_ACTIVE) {
     DISP_ERROR("Capture in progress\n");
     return ZX_ERR_UNAVAILABLE;
@@ -507,7 +507,7 @@ zx_status_t Vpu::CaptureInit(uint8_t canvas_idx, uint32_t height, uint32_t strid
 
 zx_status_t Vpu::CaptureStart() {
   ZX_DEBUG_ASSERT(initialized_);
-  fbl::AutoLock lock(&capture_lock_);
+  fbl::AutoLock lock(&capture_mutex_);
   if (capture_state_ != CAPTURE_IDLE) {
     DISP_ERROR("Capture state is not idle! (%d)\n", capture_state_);
     return ZX_ERR_BAD_STATE;
@@ -548,7 +548,7 @@ zx_status_t Vpu::CaptureStart() {
 }
 
 zx_status_t Vpu::CaptureDone() {
-  fbl::AutoLock lock(&capture_lock_);
+  fbl::AutoLock lock(&capture_mutex_);
   capture_state_ = CAPTURE_IDLE;
   // pause write output
   VdInWrCtrlReg::Get().ReadFrom(&(*vpu_mmio_)).set_write_ctrl(0).WriteTo(&(*vpu_mmio_));

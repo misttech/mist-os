@@ -126,7 +126,7 @@ class AmlogicDisplay
                                                          uint64_t* out_capture_handle);
   zx_status_t DisplayControllerImplStartCapture(uint64_t capture_handle);
   zx_status_t DisplayControllerImplReleaseCapture(uint64_t capture_handle);
-  bool DisplayControllerImplIsCaptureCompleted() __TA_EXCLUDES(capture_lock_);
+  bool DisplayControllerImplIsCaptureCompleted() __TA_EXCLUDES(capture_mutex_);
 
   zx_status_t DisplayClampRgbImplSetMinimumRgb(uint8_t minimum_rgb);
 
@@ -136,7 +136,7 @@ class AmlogicDisplay
   void DdkRelease();
   zx_status_t DdkGetProtocol(uint32_t proto_id, void* out_protocol);
   void DdkChildPreRelease(void* child_ctx) {
-    fbl::AutoLock lock(&display_lock_);
+    fbl::AutoLock lock(&display_mutex_);
     dc_intf_ = ddk::DisplayControllerInterfaceProtocolClient();
   }
 
@@ -161,7 +161,7 @@ class AmlogicDisplay
   int VSyncThread();
   int CaptureThread();
   int HpdThread();
-  void PopulatePanelType() TA_REQ(display_lock_);
+  void PopulatePanelType() TA_REQ(display_mutex_);
 
   // Sets up the hotlpug display detection hardware interrupts and starts the
   // interrupt handler thread.
@@ -169,12 +169,12 @@ class AmlogicDisplay
 
   // This function enables the display hardware. This function is disruptive and causes
   // unexpected pixels to be visible on the screen.
-  zx_status_t DisplayInit() TA_REQ(display_lock_);
+  zx_status_t DisplayInit() TA_REQ(display_mutex_);
 
   // Power cycle the device and bring up clocks. Only needed when resuming the
   // driver, as the bootloader will initialize the display when the machine is
   // powered on.
-  zx_status_t RestartDisplay() TA_REQ(display_lock_);
+  zx_status_t RestartDisplay() TA_REQ(display_mutex_);
 
   bool fully_initialized() const { return full_init_done_.load(std::memory_order_relaxed); }
   void set_fully_initialized() { full_init_done_.store(true, std::memory_order_release); }
@@ -203,22 +203,22 @@ class AmlogicDisplay
   zx::interrupt vd1_wr_irq_;
 
   // Locks used by the display driver
-  fbl::Mutex display_lock_;  // general display state (i.e. display_id)
-  fbl::Mutex image_lock_;    // used for accessing imported_images_
-  fbl::Mutex capture_lock_;  // general capture state
+  fbl::Mutex display_mutex_;  // general display state (i.e. display_id)
+  fbl::Mutex image_mutex_;    // used for accessing imported_images_
+  fbl::Mutex capture_mutex_;  // general capture state
 
   // Relaxed is safe because full_init_done_ only ever moves from false to true.
   std::atomic<bool> full_init_done_ = false;
 
   // Display controller related data
-  ddk::DisplayControllerInterfaceProtocolClient dc_intf_ TA_GUARDED(display_lock_);
+  ddk::DisplayControllerInterfaceProtocolClient dc_intf_ TA_GUARDED(display_mutex_);
 
   // Display Capture interface protocol
-  ddk::DisplayCaptureInterfaceProtocolClient capture_intf_ TA_GUARDED(capture_lock_);
+  ddk::DisplayCaptureInterfaceProtocolClient capture_intf_ TA_GUARDED(capture_mutex_);
 
   // Points to the next capture target image to capture displayed contents into.
   // Stores nullptr if capture is not going to be performed.
-  ImageInfo* current_capture_target_image_ TA_GUARDED(capture_lock_);
+  ImageInfo* current_capture_target_image_ TA_GUARDED(capture_mutex_);
 
   // The sysmem allocator client used to bind incoming buffer collection tokens.
   fidl::WireSyncClient<fuchsia_sysmem::Allocator> sysmem_allocator_client_;
@@ -229,8 +229,8 @@ class AmlogicDisplay
       buffer_collections_;
 
   // Imported Images
-  fbl::DoublyLinkedList<std::unique_ptr<ImageInfo>> imported_images_ TA_GUARDED(image_lock_);
-  fbl::DoublyLinkedList<std::unique_ptr<ImageInfo>> imported_captures_ TA_GUARDED(capture_lock_);
+  fbl::DoublyLinkedList<std::unique_ptr<ImageInfo>> imported_images_ TA_GUARDED(image_mutex_);
+  fbl::DoublyLinkedList<std::unique_ptr<ImageInfo>> imported_captures_ TA_GUARDED(capture_mutex_);
 
   // Objects: only valid if fully_initialized()
   std::unique_ptr<Vpu> vpu_;
@@ -244,7 +244,7 @@ class AmlogicDisplay
   inspect::Node osd_node_;
 
   display::DisplayId display_id_ = kPanelDisplayId;
-  bool display_attached_ TA_GUARDED(display_lock_) = false;
+  bool display_attached_ TA_GUARDED(display_mutex_) = false;
 
   // Hot Plug Detection
   ddk::GpioProtocolClient hpd_gpio_{};

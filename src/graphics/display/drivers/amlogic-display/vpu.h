@@ -46,7 +46,7 @@ class Vpu {
   void CapturePrintRegisters();
 
   CaptureState GetCaptureState() {
-    fbl::AutoLock lock(&capture_lock_);
+    fbl::AutoLock lock(&capture_mutex_);
     return capture_state_;
   }
 
@@ -64,8 +64,8 @@ class Vpu {
 
   uint32_t first_time_load_ = false;
 
-  fbl::Mutex capture_lock_;
-  CaptureState capture_state_ TA_GUARDED(capture_lock_);
+  fbl::Mutex capture_mutex_;
+  CaptureState capture_state_ TA_GUARDED(capture_mutex_);
 };
 }  // namespace amlogic_display
 
