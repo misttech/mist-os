@@ -109,4 +109,26 @@ void Explorer::WriteJsonProcessesData(zx::socket socket) {
   fsl::BlockingCopyFromString(json_string, socket);
 }
 
+void Explorer::GetTaskInfo(GetTaskInfoRequest& request, GetTaskInfoCompleter::Sync& completer) {
+  // TODO(surajmalhtora): Implement.
+}
+
+void Explorer::GetHandleInfo(GetHandleInfoRequest& request,
+                             GetHandleInfoCompleter::Sync& completer) {
+  completer.Reply(zx::error(ZX_ERR_NOT_SUPPORTED));
+}
+
+void Explorer::GetVmaps(GetVmapsRequest& request, GetVmapsCompleter::Sync& completer) {
+  completer.Reply(zx::error(ZX_ERR_NOT_SUPPORTED));
+}
+
+void Explorer::GetStackTrace(GetStackTraceRequest& request,
+                             GetStackTraceCompleter::Sync& completer) {
+  completer.Reply(zx::error(ZX_ERR_NOT_SUPPORTED));
+}
+
+void Explorer::KillTask(KillTaskRequest& request, KillTaskCompleter::Sync& completer) {
+  completer.Reply(zx::error(ZX_ERR_NOT_SUPPORTED));
+}
+
 }  // namespace process_explorer
