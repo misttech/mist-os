@@ -17,7 +17,7 @@ use {
     fuchsia_inspect::component::inspector,
     fuchsia_trace as trace, fuchsia_trace_provider as trace_provider,
     std::path::PathBuf,
-    tracing::{debug, error, warn},
+    tracing::{debug, error, info, warn},
 };
 
 const FONT_MANIFEST_PATH: &str = "/config/data/all.font_manifest.json";
@@ -119,6 +119,7 @@ fn select_manifests_for_test(
     if manifest_from_config.as_os_str().len() != 0
         && (!check_files || manifest_from_config.is_file())
     {
+        info!("Adding manifest file: {}", &manifest_from_config.display());
         manifest_paths.push(manifest_from_config);
     }
 
