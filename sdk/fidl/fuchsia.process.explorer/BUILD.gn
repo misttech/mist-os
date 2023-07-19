@@ -8,7 +8,10 @@ fidl("fuchsia.process.explorer") {
   # TODO(fxbug.dev/107973): do not upgrade category without making
   # the fuchsia.process.explorer.Query interface strongly typed.
   sdk_category = "internal"
-  sources = [ "process_explorer.fidl" ]
+  sources = [
+    "handles.fidl",
+    "process_explorer.fidl",
+  ]
   public_deps = [ "//zircon/vdso/zx" ]
   enable_hlcpp = true
 }

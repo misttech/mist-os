@@ -32,3 +32,91 @@ closed protocol Query {
         socket zx.Handle:<SOCKET, zx.Rights.WRITE | zx.Rights.WAIT>;
     });
 };
+
+type Task = flexible union {
+    1: job Job;
+    2: process Process;
+    3: thread Thread;
+};
+
+closed protocol TaskIterator {
+    /// Intended to be called in a loop to retrieve all tasks.
+    /// Will return a task with 0 elements to indicate iterator has been exhausted.
+    strict GetTasks() -> (struct {
+        tasks vector<Task>:MAX;
+    }) error zx.Status;
+};
+
+type VmapType = flexible enum {
+    NONE = 0;
+    ASPACE = 1;
+    VMAR = 2;
+    MAPPING = 3;
+};
+
+type Vmap = table {
+    1: name string:zx.MAX_NAME_LEN;
+    2: base_address uint64;
+    3: size uint64;
+    4: depth uint64;
+    5: type VmapType;
+    /// Only set if |type| is `VmapType.MAPPING`.
+    6: mapping Mapping;
+};
+
+type MmuFlags = flexible bits {
+    READ = 0x0001;
+    WRITE = 0x0002;
+    EXECUTE = 0x0004;
+};
+
+type Mapping = table {
+    1: mmu_flags MmuFlags;
+    2: vmo_koid zx.Koid;
+    3: vmo_offset uint64;
+    4: committed_pages uint64;
+};
+
+@discoverable
+closed protocol ProcessExplorer {
+    /// Errors will be propogated via epitaph on TaskIterator.
+    strict GetTaskInfo(resource table {
+        1: iterator server_end:TaskIterator;
+    });
+
+    strict GetHandleInfo(flexible union {
+        /// Must be an exact match.
+        1: process_name string:zx.MAX_NAME_LEN;
+        /// Must be the koid for a process.
+        2: koid zx.Koid;
+    }) -> (struct {
+        handle_info vector<Handle>:MAX;
+    }) error zx.Status;
+
+    strict GetVmaps(flexible union {
+        /// Must be an exact match.
+        1: process_name string:zx.MAX_NAME_LEN;
+        /// Must be the koid for a process.
+        2: koid zx.Koid;
+    }) -> (struct {
+        vmaps vector<Vmap>:MAX;
+    }) error zx.Status;
+
+    strict GetStackTrace(flexible union {
+        /// Must be an exact match.
+        1: process_name string:zx.MAX_NAME_LEN;
+        /// Must be the koid for a process.
+        2: koid zx.Koid;
+    }) -> (struct {
+        stack_trace string:MAX;
+    }) error zx.Status;
+
+    strict KillTask(flexible union {
+        /// Must be an exact match.
+        1: process_name string:zx.MAX_NAME_LEN;
+        /// May be the koid for a process or job.
+        2: koid zx.Koid;
+    }) -> (struct {
+        koid zx.Koid;
+    }) error zx.Status;
+};
