@@ -5,17 +5,12 @@
 //! Test tools for building Fuchsia packages.
 
 use {
-    crate::process::wait_for_process_termination,
     anyhow::{anyhow, format_err, Context as _, Error},
     camino::{Utf8Path, Utf8PathBuf},
-    fdio::SpawnBuilder,
     fidl::endpoints::ServerEnd,
     fidl_fuchsia_io as fio,
     fuchsia_merkle::{Hash, MerkleTree},
-    fuchsia_pkg::{
-        BlobInfo, MetaContents, MetaPackage, MetaSubpackages, PackageManifest,
-        PackageManifestBuilder,
-    },
+    fuchsia_pkg::{MetaContents, MetaSubpackages, PackageManifest},
     fuchsia_url::PackageName,
     fuchsia_zircon::{self as zx, prelude::*, Status},
     futures::{join, prelude::*},
@@ -103,8 +98,8 @@ impl Package {
                 fuchsia_fs::OpenFlags::RIGHT_READABLE,
             )?);
 
-        let meta_package = package_directory.meta_package().await?;
-        let abi_revision = package_directory.abi_revision().await?;
+        let meta_package = package_directory.meta_package().await.context("read meta/package")?;
+        let abi_revision = package_directory.abi_revision().await.context("read abi revision")?;
 
         let mut pkg = PackageBuilder::new(meta_package.name().as_ref()).abi_revision(abi_revision);
 
@@ -122,16 +117,21 @@ impl Package {
         for entry in WalkDir::new(root) {
             let entry = entry?;
             let path = entry.path();
-            if !entry.file_type().is_file() || is_generated_file(path) {
+            if !entry.file_type().is_file() || is_generated_file(&path.strip_prefix(root).unwrap())
+            {
                 continue;
             }
 
             let relative_path = path.strip_prefix(root).unwrap();
-            let f = File::open(path)?;
+            let f = File::open(path).context("open package blob")?;
             pkg = pkg.add_resource_at(relative_path.to_str().unwrap(), f);
         }
 
-        let subpackages = package_directory.meta_subpackages().await?.into_subpackages();
+        let subpackages = package_directory
+            .meta_subpackages()
+            .await
+            .context("read meta subpackages")?
+            .into_subpackages();
         if !subpackages.is_empty() {
             for (name, hash) in subpackages.into_iter() {
                 pkg = pkg.add_subpackage_by_hash(name, hash);
@@ -189,12 +189,7 @@ impl Package {
             .filter(|blob| blob.path != PackageManifest::META_FAR_BLOB_PATH)
             .map(|blob| Blob {
                 merkle: blob.merkle,
-                path: self.artifacts().join(
-                    // fixup source_path to be relative to artifacts by stripping
-                    // "/packages/{name}/" off the front.
-                    &blob.source_path
-                        [("/packages/".len() + self.name().as_ref().len() + "/".len())..],
-                ),
+                path: self.artifacts().join(&blob.source_path),
             })
             .collect::<Vec<_>>();
 
@@ -508,10 +503,15 @@ pub struct PackageBuilder {
     name: PackageName,
     contents: BTreeMap<PathBuf, PackageEntry>,
     abi_revision: Option<AbiRevision>,
-    subpackages: HashMap<fuchsia_url::RelativePackageUrl, Hash>,
+
+    has_subpackages: bool,
     // If None the package has subpackages but this `PackageBuilder` does not have the blobs
     // needed by those subpackages.
     subpackage_blobs: Option<HashMap<Hash, Vec<u8>>>,
+
+    builder: fuchsia_pkg::PackageBuilder,
+    _artifacts_tmp: TempDir,
+    artifacts: Utf8PathBuf,
 }
 
 impl PackageBuilder {
@@ -519,14 +519,33 @@ impl PackageBuilder {
     ///
     /// # Panics
     ///
-    /// Panics if `name` is an invalid package name.
+    /// Panics if either:
+    /// * `name` is an invalid package name.
+    /// * Creating a tempdir fails.
     pub fn new(name: impl Into<String>) -> Self {
+        let name = name.into();
+
+        let artifacts_tmp = tempfile::tempdir().expect("create tempdir for package");
+        let artifacts = Utf8Path::from_path(artifacts_tmp.path())
+            .expect("checking packagedir is UTF-8")
+            .to_path_buf();
+
+        fs::create_dir(artifacts.join("contents")).expect("create /packages/contents");
+
+        let mut builder = fuchsia_pkg::PackageBuilder::new(&name);
+        builder.manifest_path(artifacts.join("manifest.json"));
+        builder.repository("fuchsia.com");
+        builder.manifest_blobs_relative_to(fuchsia_pkg::RelativeTo::File);
+
         Self {
-            name: name.into().try_into().unwrap(),
+            builder,
+            name: name.try_into().unwrap(),
             contents: BTreeMap::new(),
             abi_revision: None,
-            subpackages: HashMap::new(),
+            has_subpackages: false,
             subpackage_blobs: Some(HashMap::new()),
+            _artifacts_tmp: artifacts_tmp,
+            artifacts,
         }
     }
 
@@ -555,6 +574,7 @@ impl PackageBuilder {
     pub fn abi_revision(mut self, abi_revision: AbiRevision) -> Self {
         assert_eq!(self.abi_revision, None);
         self.abi_revision = Some(abi_revision);
+        self.builder.abi_revision(abi_revision.0);
         self
     }
 
@@ -582,41 +602,27 @@ impl PackageBuilder {
         mut contents: impl io::Read,
     ) -> Self {
         let path = path.into();
+        let path_str = path.to_str().unwrap();
         let () = fuchsia_url::validate_resource_path(
             path.to_str().unwrap_or_else(|| panic!("path must be utf8: {path:?}")),
         )
         .unwrap_or_else(|_| panic!("path must be an object relative path expression: {path:?}"));
+
         let mut data = vec![];
         contents.read_to_end(&mut data).unwrap();
 
-        if let Some(parent) = path.parent() {
-            self.make_dirs(parent);
+        if path.starts_with("meta/") {
+            self.builder
+                .add_contents_to_far(&path_str, &data, &self.artifacts.join("contents"))
+                .expect("adding meta blob to succeed");
+        } else {
+            self.builder
+                .add_contents_as_blob(&path_str, &data, &self.artifacts.join("contents"))
+                .expect("adding blob to succeed");
         }
+
         let replaced = self.contents.insert(path.clone(), PackageEntry::File(data));
         assert_eq!(None, replaced, "already contains an entry at {path:?}");
-        self
-    }
-
-    /// Adds the provided `contents` to the package at the given `path`.
-    ///
-    /// Does not check for dir/file collisions.
-    pub fn add_resource_at_ignore_path_collisions(
-        mut self,
-        path: impl Into<PathBuf>,
-        mut contents: impl io::Read,
-    ) -> Self {
-        let path = path.into();
-        let () = fuchsia_url::validate_resource_path(
-            path.to_str().unwrap_or_else(|| panic!("path must be utf8: {path:?}")),
-        )
-        .unwrap_or_else(|_| panic!("path must be an object relative path expression: {path:?}"));
-        let mut data = vec![];
-        contents.read_to_end(&mut data).unwrap();
-
-        if let Some(parent) = path.parent() {
-            self.make_dirs(parent);
-        }
-        self.contents.insert(path.clone(), PackageEntry::File(data));
         self
     }
 
@@ -648,9 +654,12 @@ impl PackageBuilder {
         subpackage: &Package,
     ) -> Self {
         let name = name.try_into().map_err(|_| ()).expect("valid RelativePackageUrl");
-        if self.subpackages.insert(name.clone(), *subpackage.meta_far_merkle_root()).is_some() {
-            panic!("PackageBuilder already has subpackage with name {name}");
-        }
+        let manifest_path = subpackage.artifacts().join("manifest.json").into();
+
+        self.builder
+            .add_subpackage(&name, *subpackage.meta_far_merkle_root(), manifest_path)
+            .unwrap();
+        self.has_subpackages = true;
 
         match (&mut self.subpackage_blobs, &subpackage.subpackage_blobs) {
             (Some(current_blobs), Some(new_blobs)) => {
@@ -681,153 +690,57 @@ impl PackageBuilder {
         hash: Hash,
     ) -> Self {
         let name = name.try_into().map_err(|_| ()).expect("valid RelativePackageUrl");
-        if self.subpackages.insert(name.clone(), hash).is_some() {
-            panic!("PackageBuilder already has subpackage with name {name}");
-        }
+
+        self.builder.add_subpackage(&name, hash, "".into()).unwrap();
+        self.has_subpackages = true;
         self.subpackage_blobs = None;
         self
     }
 
     /// Builds the package.
-    pub async fn build(self) -> Result<Package, Error> {
-        // TODO Consider switching indir/packagedir to be a VFS instead
-
-        let abi_revision = if let Some(abi_revision) = self.abi_revision {
-            abi_revision
-        } else {
-            // If an ABI revision wasn't specified, default to a pinned one so that merkles won't
-            // change when we create a new ABI revision.
-            version_history::VERSION_HISTORY
+    pub async fn build(mut self) -> Result<Package, Error> {
+        // If an ABI revision wasn't specified, default to a pinned one so that merkles won't
+        // change when we create a new ABI revision.
+        if self.abi_revision == None {
+            let abi_revision = version_history::VERSION_HISTORY
                 .iter()
                 .find(|v| v.api_level == 7)
                 .expect("API Level 7 to exist")
-                .abi_revision
-        };
+                .abi_revision;
 
-        // indir contains temporary inputs to package creation
-        let indir = tempfile::tempdir().context("create /in")?;
+            self.builder.abi_revision(abi_revision.0);
+        }
 
-        // packagedir contains outputs from package creation (manifest.json/meta.far) as well as
-        // all blobs contained in the package. Pm will build the package manifest with absolute
-        // source paths to /packages/{self.name}/contents/*.
+        // self.artifacts contains outputs from package creation (manifest.json/meta.far) as well
+        // as all blobs contained in the package.
         //
-        // Sample layout of packagedir:
-        // - {name}/
-        // -   manifest.json
-        // -   meta.far
-        // -   contents/
-        // -     file{N}
+        // Layout of self.artifacts:
+        // - manifest.json
+        // - meta.far
+        // - contents/
+        // -   meta/
+        // -     non-generated meta.far files
+        // -   file/dir{N}
 
-        let packagedir_tmp = tempfile::tempdir().context("create /packages")?;
-        let packagedir = Utf8Path::from_path(packagedir_tmp.path())
-            .context("checking packagedir is UTF-8")?
-            .to_path_buf();
-
-        fs::create_dir(packagedir.join("contents")).context("create /packages/contents")?;
-        let package_mount_path = format!("/packages/{}", &self.name);
-
-        {
-            let mut manifest = File::create(indir.path().join("package.manifest"))?;
-
-            MetaPackage::from_name(self.name.clone())
-                .serialize(File::create(indir.path().join("meta_package"))?)?;
-            writeln!(manifest, "meta/package=/in/meta_package")?;
-
-            if !self.subpackages.is_empty() {
-                let () = fs::create_dir(indir.path().join("subpackages"))
-                    .context("create /in/subpackages")?;
-                let mut entries = vec![];
-                for (name, hash) in &self.subpackages {
-                    let package_dir = indir.path().join(name.as_ref());
-                    fs::create_dir(&package_dir)
-                        .with_context(|| format!("create directory {}", package_dir.display()))?;
-                    let package_manifest_path = package_dir.join("package_manifest.json");
-                    let meta_package = MetaPackage::from_name(name.clone().into());
-                    let builder = PackageManifestBuilder::new(meta_package);
-                    let meta_far = BlobInfo {
-                        source_path: "".into(),
-                        path: "meta/".into(),
-                        merkle: *hash,
-                        size: 0,
-                    };
-                    let manifest = builder.add_blob(meta_far).build();
-                    serde_json::to_writer(File::create(&package_manifest_path)?, &manifest)?;
-                    entries.push(fuchsia_pkg::SubpackagesBuildManifestEntry::new(
-                        fuchsia_pkg::SubpackagesBuildManifestEntryKind::Url(name.clone()),
-                        format!("/in/{}/package_manifest.json", name.as_ref()).into(),
-                    ))
-                }
-                let manifest = fuchsia_pkg::SubpackagesBuildManifest::from(entries);
-                let f = std::io::BufWriter::new(File::create(
-                    indir.path().join("subpackages/manifest"),
-                )?);
-                let () = manifest.serialize(f)?;
-            }
-
-            for (i, (name, contents)) in self.contents.iter().enumerate() {
-                let contents = match contents {
-                    PackageEntry::File(data) => data,
-                    _ => continue,
-                };
-                let path = format!("file{i}");
-                fs::write(packagedir.join("contents").join(&path), contents)?;
-                writeln!(
-                    manifest,
-                    "{}={}/contents/{}",
-                    &name.to_string_lossy(),
-                    package_mount_path,
-                    path
-                )?;
-            }
-        }
-
-        let mut pm = SpawnBuilder::new()
-            .options(fdio::SpawnOptions::CLONE_ALL - fdio::SpawnOptions::CLONE_NAMESPACE)
-            .arg("pm")?
-            .arg("-abi-revision")?
-            .arg(abi_revision.0.to_string())?
-            .arg(format!("-n={}", self.name))?
-            .arg("-m=/in/package.manifest")?
-            .arg("-r=fuchsia.com")?
-            .arg(format!("-o={package_mount_path}"))?;
-
-        if !self.subpackages.is_empty() {
-            pm = pm.arg("-subpackages=/in/subpackages/manifest")?
-        }
-
-        let pm = pm
-            .arg("build")?
-            .arg("-depfile=false")?
-            .arg(format!("-output-package-manifest={}/manifest.json", &package_mount_path))?
-            .add_dir_to_namespace("/in", File::open(indir.path()).context("open /in")?)?
-            .add_dir_to_namespace(
-                package_mount_path,
-                File::open(&packagedir).context("open /packages")?,
-            )?
-            .spawn_from_path("/pkg/bin/pm", &fuchsia_runtime::job_default())
-            .context("spawning pm to build package")?;
-
-        wait_for_process_termination(pm).await.context("waiting for pm to build package")?;
-
-        let manifest = PackageManifest::try_load_from(packagedir.join("manifest.json"))?;
+        let manifest = self.builder.build(&self.artifacts, self.artifacts.join("meta.far"))?;
         let meta_far_merkle =
             manifest.blobs().iter().find(|b| b.path == "meta/").context("finding meta/")?.merkle;
 
-        // clean up after pm
-        fs::remove_file(packagedir.join("meta/fuchsia.abi/abi-revision"))?;
-        fs::remove_dir(packagedir.join("meta/fuchsia.abi"))?;
-        if !self.subpackages.is_empty() {
-            fs::remove_file(packagedir.join("meta/fuchsia.pkg/subpackages"))?;
-            fs::remove_dir(packagedir.join("meta/fuchsia.pkg"))?;
+        // clean up after ourselves
+        fs::remove_file(self.artifacts.join("meta/fuchsia.abi/abi-revision"))?;
+        fs::remove_dir(self.artifacts.join("meta/fuchsia.abi"))?;
+        if self.has_subpackages {
+            fs::remove_file(self.artifacts.join("meta/fuchsia.pkg/subpackages"))?;
+            fs::remove_dir(self.artifacts.join("meta/fuchsia.pkg"))?;
         }
-        fs::remove_file(packagedir.join("meta/contents"))?;
-        fs::remove_dir(packagedir.join("meta"))?;
+        fs::remove_file(self.artifacts.join("meta/package"))?;
+        fs::remove_dir(self.artifacts.join("meta"))?;
 
         Ok(Package {
             name: self.name,
             meta_far_merkle,
-            _artifacts_tmp: packagedir_tmp,
-            artifacts: packagedir,
+            _artifacts_tmp: self._artifacts_tmp,
+            artifacts: self.artifacts,
             subpackage_blobs: self.subpackage_blobs,
         })
     }
@@ -862,10 +775,13 @@ impl PackageDir {
 
 #[cfg(test)]
 mod tests {
-    use {super::*, assert_matches::assert_matches, fuchsia_merkle::MerkleTree, std::io::Read};
+    use {
+        super::*, assert_matches::assert_matches, fuchsia_merkle::MerkleTree,
+        fuchsia_pkg::MetaPackage, std::io::Read,
+    };
 
     #[test]
-    #[should_panic(expected = r#""data" is not a directory"#)]
+    #[should_panic(expected = "adding blob to succeed")]
     fn test_panics_file_with_existing_parent_as_file() {
         let _: Result<(), Error> = {
             PackageBuilder::new("test")
@@ -898,7 +814,7 @@ mod tests {
     }
 
     #[test]
-    #[should_panic(expected = r#"already contains an entry at "data""#)]
+    #[should_panic(expected = "adding blob to succeed")]
     fn test_panics_file_with_existing_dir() {
         let _: Result<(), Error> = {
             PackageBuilder::new("test")
@@ -1045,7 +961,7 @@ mod tests {
 
     #[fuchsia_async::run_singlethreaded(test)]
     async fn test_identity() -> Result<(), Error> {
-        let pkg = Package::identity().await?;
+        let pkg = Package::identity().await.unwrap();
 
         assert_eq!(pkg.meta_far_merkle, MerkleTree::from_reader(pkg.meta_far()?)?.root());
 

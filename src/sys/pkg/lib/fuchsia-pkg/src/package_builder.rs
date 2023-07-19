@@ -308,7 +308,7 @@ impl PackageBuilder {
         package_manifest_path: PathBuf,
     ) -> Result<()> {
         if self.subpackages.contains_key(url) {
-            return Err(anyhow!("dupicate entry for {:?}", url));
+            return Err(anyhow!("duplicate entry for {:?}", url));
         }
         self.subpackages.insert(url.clone(), (package_hash, package_manifest_path));
         Ok(())

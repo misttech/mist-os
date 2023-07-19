@@ -430,6 +430,7 @@ mod tests {
         fuchsia_pkg_testing::{blobfs::Fake as FakeBlobfs, PackageBuilder},
         pretty_assertions::assert_eq,
         std::convert::TryInto as _,
+        std::io::Cursor,
         vfs::{
             directory::{entry::DirectoryEntry, entry_container::Directory},
             node::Node,
@@ -540,15 +541,40 @@ mod tests {
     async fn rejects_meta_file_collisions() {
         let pkg = PackageBuilder::new("base-package-0")
             .add_resource_at("meta/dir/file", "meta-contents0".as_bytes())
-            .add_resource_at_ignore_path_collisions("meta/dir", "meta-contents1".as_bytes())
             .build()
             .await
             .unwrap();
-        let (metafar_blob, _) = pkg.contents();
-        let (blobfs_fake, blobfs_client) = FakeBlobfs::new();
-        blobfs_fake.add_blob(metafar_blob.merkle, metafar_blob.contents);
 
-        match RootDir::new(blobfs_client, metafar_blob.merkle).await {
+        // Manually modify the meta.far to contain a "meta/dir" entry.
+        let (metafar_blob, _) = pkg.contents();
+        let mut metafar =
+            fuchsia_archive::Reader::new(Cursor::new(&metafar_blob.contents)).unwrap();
+        let mut entries = std::collections::BTreeMap::new();
+        let farentries =
+            metafar.list().map(|entry| (entry.path().to_vec(), entry.length())).collect::<Vec<_>>();
+        for (path, length) in farentries {
+            let contents = metafar.read_file(&path).unwrap();
+            entries
+                .insert(path, (length, Box::new(Cursor::new(contents)) as Box<dyn std::io::Read>));
+        }
+        let extra_contents = b"meta-contents1";
+        entries.insert(
+            b"meta/dir".to_vec(),
+            (
+                extra_contents.len() as u64,
+                Box::new(Cursor::new(extra_contents)) as Box<dyn std::io::Read>,
+            ),
+        );
+
+        let mut metafar: Vec<u8> = vec![];
+        let () = fuchsia_archive::write(&mut metafar, entries).unwrap();
+        let merkle = fuchsia_merkle::from_slice(&metafar).root();
+
+        // Verify it fails to load with the expected error.
+        let (blobfs_fake, blobfs_client) = FakeBlobfs::new();
+        blobfs_fake.add_blob(merkle, &metafar);
+
+        match RootDir::new(blobfs_client, merkle).await {
             Ok(_) => panic!("this should not be reached!"),
             Err(Error::FileDirectoryCollision { path }) => {
                 assert_eq!(path, "meta/dir".to_string());
