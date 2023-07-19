@@ -28,7 +28,7 @@ use {
     fuchsia_hash::Hash,
     fuchsia_merkle::{MerkleTree, MerkleTreeBuilder},
     fuchsia_zircon::{self as zx, HandleBased as _, Status},
-    futures::lock::Mutex as AsyncMutex,
+    futures::{lock::Mutex as AsyncMutex, try_join},
     fxfs::{
         errors::FxfsError,
         log::*,
@@ -161,28 +161,37 @@ impl Inner {
         }
         let len =
             if final_write { self.buffer.len() } else { round_down(self.buffer.len(), block_size) };
-        // Move data into transfer buffer, zero pad if required.
+        // Update Merkle tree.
+        let data = &self.buffer.as_slice()[..len];
+        let update_merkle_tree_fut = async {
+            if let Some(ref mut decompressor) = self.decompressor {
+                // Data is compressed, decompress to update Merkle tree.
+                decompressor
+                    .update(data, &mut |chunk_data| self.tree_builder.write(chunk_data))
+                    .context("Failed to decompress archive")?;
+            } else {
+                // Data is uncompressed, use payload to update Merkle tree.
+                self.tree_builder.write(data);
+            }
+            Ok::<(), Error>(())
+        };
+
+        debug_assert!(self.payload_persisted >= self.payload_offset);
+
+        // Copy data into transfer buffer, zero pad if required.
         let aligned_len = round_up(len, block_size).ok_or(FxfsError::OutOfRange)?;
         let mut buffer = handle.allocate_buffer(aligned_len);
         buffer.as_mut_slice()[..len].copy_from_slice(&self.buffer[..len]);
         buffer.as_mut_slice()[len..].fill(0);
-        self.buffer.drain(..len);
-        // Update Merkle tree and overwrite allocated bytes in the object's handle.
-        let data = &buffer.as_slice()[..len];
-        if let Some(ref mut decompressor) = self.decompressor {
-            // Data is compressed, decompress to update Merkle tree.
-            decompressor
-                .update(data, &mut |chunk_data| self.tree_builder.write(chunk_data))
-                .context("Failed to decompress archive")?;
-        } else {
-            // Data is uncompressed, use payload to update Merkle tree.
-            self.tree_builder.write(data);
-        }
+
         // Overwrite allocated bytes in the object's handle.
-        debug_assert!(self.payload_persisted >= self.payload_offset);
-        handle
-            .overwrite(self.payload_persisted - self.payload_offset, buffer.as_mut(), false)
-            .await?;
+        let overwrite_fut =
+            handle.overwrite(self.payload_persisted - self.payload_offset, buffer.as_mut(), false);
+        // NOTE: `overwrite_fut` needs to be polled first to initiate the asynchronous write to the
+        // block device which will then run in parallel with the synchronous
+        // `update_merkle_tree_fut`.
+        try_join!(overwrite_fut, update_merkle_tree_fut)?;
+        self.buffer.drain(..len);
         self.payload_persisted += len as u64;
         Ok(())
     }
