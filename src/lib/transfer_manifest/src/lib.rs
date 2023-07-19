@@ -48,7 +48,7 @@ pub struct TransferEntry {
 
 /// The type of artifacts to transfer, which can indicate to the uploader and
 /// downloader where to place the artifacts.
-#[derive(Clone, Debug, PartialEq, Deserialize, Serialize)]
+#[derive(Clone, Debug, PartialEq, Deserialize, Serialize, Eq, Hash)]
 pub enum ArtifactType {
     /// Fuchsia package blobs.
     #[serde(rename = "blobs")]

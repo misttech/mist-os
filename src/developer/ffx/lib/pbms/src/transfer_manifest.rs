@@ -15,7 +15,6 @@ use {
         client::{Client, ProgressResult, ProgressState},
         gs_url::split_gs_url,
     },
-    ::transfer_manifest::TransferManifest,
     anyhow::{bail, Context, Result},
     futures::{StreamExt as _, TryStreamExt as _},
     std::{
@@ -23,6 +22,7 @@ use {
         path::{Component, Path, PathBuf},
     },
     structured_ui,
+    transfer_manifest::{TransferManifest, TransferManifestV1},
 };
 
 /// Download a set of files referenced in the `transfer_manifest_url`.
@@ -106,7 +106,7 @@ fn safe_join(base: &Path, relative: &Path) -> Result<PathBuf> {
 /// is called.
 async fn transfer_download_v1<F, I>(
     transfer_manifest_url: &url::Url,
-    transfer_manifest: &transfer_manifest::TransferManifestV1,
+    transfer_manifest: &TransferManifestV1,
     local_dir: &Path,
     auth_flow: &AuthFlowChoice,
     progress: &F,
@@ -200,6 +200,43 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
+    use camino::Utf8PathBuf;
+    use std::collections::HashMap;
+    use transfer_manifest::{ArtifactEntry, ArtifactType, TransferEntry};
+
+    /// Helper function to filter the artifacts need to be downloaded.
+    fn transfer_filter(
+        manifest: &TransferManifestV1,
+        rule: &HashMap<(ArtifactType, Utf8PathBuf), Vec<Utf8PathBuf>>,
+    ) -> TransferManifestV1 {
+        let mut transfer_entries = Vec::new();
+        for manifest_transfer_entry in &manifest.entries {
+            let prefixes = rule.get(&(
+                manifest_transfer_entry.artifact_type.clone(),
+                manifest_transfer_entry.local.clone(),
+            ));
+            if prefixes.is_none() {
+                continue;
+            }
+            let mut filtered_artifact_entries = Vec::new();
+            for manifest_artifact_entry in &manifest_transfer_entry.entries {
+                if prefixes
+                    .unwrap()
+                    .iter()
+                    .any(|prefix| manifest_artifact_entry.name.starts_with(prefix))
+                {
+                    filtered_artifact_entries.push(manifest_artifact_entry.clone());
+                }
+            }
+            if filtered_artifact_entries.len() != 0 {
+                transfer_entries.push(TransferEntry {
+                    entries: filtered_artifact_entries,
+                    ..manifest_transfer_entry.clone()
+                });
+            }
+        }
+        TransferManifestV1 { entries: transfer_entries }
+    }
 
     #[test]
     fn test_safe_join() -> Result<()> {
@@ -249,5 +286,159 @@ mod tests {
         assert_cannot_join!("/absolute/path", "a_dir/../..");
 
         Ok(())
+    }
+
+    #[fuchsia_async::run_singlethreaded(test)]
+    async fn test_filter_transfer_manifest_for_repository_artifacts() {
+        let original_manifest = TransferManifestV1 {
+            entries: vec![
+                TransferEntry {
+                    artifact_type: ArtifactType::Blobs,
+                    local: Utf8PathBuf::from("product_bundle/blobs"),
+                    remote: "gs://bucket/a".into(),
+                    entries: vec![
+                        ArtifactEntry {
+                            name: Utf8PathBuf::from(
+                                "002e9903f92959080ee3abf0a1fce9db76fe0c2ea9a89c40813658cf82faa2bc",
+                            ),
+                        },
+                        ArtifactEntry {
+                            name: Utf8PathBuf::from(
+                                "00f8ba8acab8d585c663f4271563e0e2f7e7ee566a68296620be2461eef497b5",
+                            ),
+                        },
+                    ],
+                },
+                TransferEntry {
+                    artifact_type: ArtifactType::Files,
+                    local: Utf8PathBuf::from("product_bundle"),
+                    remote: "gs://bucket/b".into(),
+                    entries: vec![
+                        ArtifactEntry {
+                            name: Utf8PathBuf::from("partitions/gpt.fuchsia.3728.bin"),
+                        },
+                        ArtifactEntry { name: Utf8PathBuf::from("repository/1.root.json") },
+                        ArtifactEntry { name: Utf8PathBuf::from("product_bundle.json") },
+                        ArtifactEntry { name: Utf8PathBuf::from("system_a/fuchsia.vbmeta") },
+                        ArtifactEntry { name: Utf8PathBuf::from("system_a/fuchsia.zbi") },
+                    ],
+                },
+            ],
+        };
+
+        let mut rule = HashMap::new();
+        rule.insert(
+            (ArtifactType::Blobs, Utf8PathBuf::from("product_bundle/blobs")),
+            vec![Utf8PathBuf::from("")],
+        );
+        rule.insert(
+            (ArtifactType::Files, Utf8PathBuf::from("product_bundle")),
+            vec![
+                Utf8PathBuf::from("partitions"),
+                Utf8PathBuf::from("repository"),
+                Utf8PathBuf::from("product_bundle.json"),
+            ],
+        );
+
+        let expected = TransferManifestV1 {
+            entries: vec![
+                TransferEntry {
+                    artifact_type: ArtifactType::Blobs,
+                    local: Utf8PathBuf::from("product_bundle/blobs"),
+                    remote: "gs://bucket/a".into(),
+                    entries: vec![
+                        ArtifactEntry {
+                            name: Utf8PathBuf::from(
+                                "002e9903f92959080ee3abf0a1fce9db76fe0c2ea9a89c40813658cf82faa2bc",
+                            ),
+                        },
+                        ArtifactEntry {
+                            name: Utf8PathBuf::from(
+                                "00f8ba8acab8d585c663f4271563e0e2f7e7ee566a68296620be2461eef497b5",
+                            ),
+                        },
+                    ],
+                },
+                TransferEntry {
+                    artifact_type: ArtifactType::Files,
+                    local: Utf8PathBuf::from("product_bundle"),
+                    remote: "gs://bucket/b".into(),
+                    entries: vec![
+                        ArtifactEntry {
+                            name: Utf8PathBuf::from("partitions/gpt.fuchsia.3728.bin"),
+                        },
+                        ArtifactEntry { name: Utf8PathBuf::from("repository/1.root.json") },
+                        ArtifactEntry { name: Utf8PathBuf::from("product_bundle.json") },
+                    ],
+                },
+            ],
+        };
+        let actual = transfer_filter(&original_manifest, &rule);
+        assert_eq!(expected, actual)
+    }
+
+    #[fuchsia_async::run_singlethreaded(test)]
+    async fn test_filter_transfer_manifest_for_flash_artifacts() {
+        let original_manifest = TransferManifestV1 {
+            entries: vec![
+                TransferEntry {
+                    artifact_type: ArtifactType::Blobs,
+                    local: Utf8PathBuf::from("product_bundle/blobs"),
+                    remote: "gs://bucket/a".into(),
+                    entries: vec![
+                        ArtifactEntry {
+                            name: Utf8PathBuf::from(
+                                "002e9903f92959080ee3abf0a1fce9db76fe0c2ea9a89c40813658cf82faa2bc",
+                            ),
+                        },
+                        ArtifactEntry {
+                            name: Utf8PathBuf::from(
+                                "00f8ba8acab8d585c663f4271563e0e2f7e7ee566a68296620be2461eef497b5",
+                            ),
+                        },
+                    ],
+                },
+                TransferEntry {
+                    artifact_type: ArtifactType::Files,
+                    local: Utf8PathBuf::from("product_bundle"),
+                    remote: "gs://bucket/b".into(),
+                    entries: vec![
+                        ArtifactEntry {
+                            name: Utf8PathBuf::from("partitions/gpt.fuchsia.3728.bin"),
+                        },
+                        ArtifactEntry { name: Utf8PathBuf::from("repository/1.root.json") },
+                        ArtifactEntry { name: Utf8PathBuf::from("product_bundle.json") },
+                        ArtifactEntry { name: Utf8PathBuf::from("system_a/fuchsia.vbmeta") },
+                        ArtifactEntry { name: Utf8PathBuf::from("system_a/fuchsia.zbi") },
+                    ],
+                },
+            ],
+        };
+
+        let mut rule = HashMap::new();
+        rule.insert(
+            (ArtifactType::Files, Utf8PathBuf::from("product_bundle")),
+            vec![
+                Utf8PathBuf::from("partitions"),
+                Utf8PathBuf::from("system_a"),
+                Utf8PathBuf::from("product_bundle.json"),
+            ],
+        );
+
+        let expected = TransferManifestV1 {
+            entries: vec![TransferEntry {
+                artifact_type: ArtifactType::Files,
+                local: Utf8PathBuf::from("product_bundle"),
+                remote: "gs://bucket/b".into(),
+                entries: vec![
+                    ArtifactEntry { name: Utf8PathBuf::from("partitions/gpt.fuchsia.3728.bin") },
+                    ArtifactEntry { name: Utf8PathBuf::from("product_bundle.json") },
+                    ArtifactEntry { name: Utf8PathBuf::from("system_a/fuchsia.vbmeta") },
+                    ArtifactEntry { name: Utf8PathBuf::from("system_a/fuchsia.zbi") },
+                ],
+            }],
+        };
+        let actual = transfer_filter(&original_manifest, &rule);
+        assert_eq!(expected, actual)
     }
 }
