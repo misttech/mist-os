@@ -142,7 +142,7 @@ def FormatConfidenceInterval(value, offset):
 class Stats(object):
 
     def __init__(self, values, unit):
-        self._unit = unit
+        self.unit = unit
         sample_size = len(values)
         mean, stddev = MeanAndStddev(values)
         self._mean = mean
@@ -165,9 +165,9 @@ class Stats(object):
             # does on floats in Python 2.  This gives plenty of precision
             # for practical use while suppressing rounding noise created by
             # various operations.
-            return '%.12g %s' % (self._mean, self._unit)
+            return '%.12g %s' % (self._mean, self.unit)
         return '%s %s' % (
-            FormatConfidenceInterval(self._mean, self._offset), self._unit)
+            FormatConfidenceInterval(self._mean, self._offset), self.unit)
 
     # Returns the relative CI width, which is the width of the confidence
     # interval divided by the mean.
@@ -258,6 +258,22 @@ def FormatUnit(unit_set):
     return UNIT_ABBREVIATIONS.get(unit, unit)
 
 
+# This is the set of unit strings that are accepted by catapult_converter
+# and treated as bigger-is-better by catapult_converter, and that don't
+# have an explicit "_biggerIsBetter" suffix.
+BIGGERISBETTER_UNITS = {
+    'bytes/second',
+    'frames/second',
+}
+
+
+def UnitBiggerIsBetter(unit):
+    # We don't attempt to do any validation of the unit string here.  We
+    # assume that was done at an earlier stage when the test was run and
+    # when it invoked catapult_converter, which validates the unit string.
+    return unit in BIGGERISBETTER_UNITS or unit.endswith('_biggerIsBetter')
+
+
 # Takes a sequence of boot datasets and produces summary statistics.
 # Returns a dict mapping test names to Stats objects.
 def StatsFromBootDatasets(boot_datasets):
@@ -322,6 +338,9 @@ def FormatTable(heading_row, rows, out_fh):
         out_fh.write('\n')
 
 
+DIRECTION_MAP = {0: 'no_sig_diff', -1: 'improved', 1: 'regressed'}
+
+
 def CompareIntervals(stats_before, stats_after):
     assert stats_before is not None or stats_after is not None
     if stats_before is None:
@@ -333,14 +352,23 @@ def CompareIntervals(stats_before, stats_after):
     # Using a ">" comparison rather than ">=" ensures that if the intervals
     # are equal and zero-width, they are treated as "no_sig_diff".
     if stats_after.interval[0] > stats_before.interval[1]:
-        result = 'slower'
+        direction = 1
     elif stats_after.interval[1] < stats_before.interval[0]:
-        result = 'faster'
+        direction = -1
     else:
-        result = 'no_sig_diff'
+        direction = 0
+    # If the units changed, we use the new units to determine whether this
+    # is a bigger-is-better metric or a smaller-is-better metric.  i.e. We
+    # assume that the change was intentional and the new units are more
+    # correct.
+    # TODO: We might want to warn in the cases where units are changed, or
+    # do automatic conversions where possible (such as between milliseconds
+    # and nanoseconds).
+    if UnitBiggerIsBetter(stats_after.unit):
+        direction = -direction
     factor_range = FormatFactorRange(
         stats_before.interval, stats_after.interval)
-    return result, factor_range
+    return DIRECTION_MAP[direction], factor_range
 
 
 def ComparePerf(args, out_fh):
@@ -375,8 +403,8 @@ def ComparePerf(args, out_fh):
     counts = {
         'added': 0,
         'removed': 0,
-        'faster': 0,
-        'slower': 0,
+        'improved': 0,
+        'regressed': 0,
         'no_sig_diff': 0,
         'point_estimate': 0,
     }
@@ -411,8 +439,8 @@ def ComparePerf(args, out_fh):
         FormatCount(
             counts['point_estimate'],
             'cannot be compared because we have point estimates only')
-    FormatCount(counts['faster'], 'got faster')
-    FormatCount(counts['slower'], 'got slower')
+    FormatCount(counts['improved'], 'improved')
+    FormatCount(counts['regressed'], 'regressed')
     FormatCount(counts['added'], 'added')
     FormatCount(counts['removed'], 'removed')
     out_fh.write('\n\n')

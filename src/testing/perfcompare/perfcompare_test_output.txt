@@ -4,8 +4,8 @@
 Summary counts:
   2 test cases in total
   1 test case had no significant difference (no_sig_diff)
-  0 test cases got faster
-  0 test cases got slower
+  0 test cases improved
+  0 test cases regressed
   1 test case added
   0 test cases removed
 
@@ -29,8 +29,8 @@ fuchsia.example: SecondExample        added             -              -        
 Summary counts:
   2 test cases in total
   1 test case had no significant difference (no_sig_diff)
-  1 test case got faster
-  0 test cases got slower
+  1 test case improved
+  0 test cases regressed
   0 test cases added
   0 test cases removed
 
@@ -39,23 +39,48 @@ Results from test cases with differences:
 
 Test case                             Improve/regress?  Factor change  Mean before     Mean after
 ------------------------------------  ----------------  -------------  --------------  --------------
-fuchsia.example: ClockGetTimeExample  faster            0.900-0.967    1492 +/- 26 ns  1392 +/- 26 ns
+fuchsia.example: ClockGetTimeExample  improved          0.900-0.967    1492 +/- 26 ns  1392 +/- 26 ns
 
 
 Results from all test cases:
 
 Test case                             Improve/regress?  Factor change  Mean before     Mean after
 ------------------------------------  ----------------  -------------  --------------  --------------
-fuchsia.example: ClockGetTimeExample  faster            0.900-0.967    1492 +/- 26 ns  1392 +/- 26 ns
+fuchsia.example: ClockGetTimeExample  improved          0.900-0.967    1492 +/- 26 ns  1392 +/- 26 ns
 fuchsia.example: SecondExample        no_sig_diff       0.924-1.083    1975 +/- 78 ns  1975 +/- 78 ns
+
+
+### comparison_improvement_biggerisbetter
+Summary counts:
+  2 test cases in total
+  1 test case had no significant difference (no_sig_diff)
+  1 test case improved
+  0 test cases regressed
+  0 test cases added
+  0 test cases removed
+
+
+Results from test cases with differences:
+
+Test case                             Improve/regress?  Factor change  Mean before               Mean after
+------------------------------------  ----------------  -------------  ------------------------  ------------------------
+fuchsia.example: ClockGetTimeExample  improved          1.034-1.112    1392 +/- 26 bytes/second  1492 +/- 26 bytes/second
+
+
+Results from all test cases:
+
+Test case                             Improve/regress?  Factor change  Mean before               Mean after
+------------------------------------  ----------------  -------------  ------------------------  ------------------------
+fuchsia.example: ClockGetTimeExample  improved          1.034-1.112    1392 +/- 26 bytes/second  1492 +/- 26 bytes/second
+fuchsia.example: SecondExample        no_sig_diff       0.924-1.083    1975 +/- 78 bytes/second  1975 +/- 78 bytes/second
 
 
 ### comparison_improvement_small
 Summary counts:
   2 test cases in total
   2 test cases had no significant difference (no_sig_diff)
-  0 test cases got faster
-  0 test cases got slower
+  0 test cases improved
+  0 test cases regressed
   0 test cases added
   0 test cases removed
 
@@ -72,8 +97,8 @@ fuchsia.example: SecondExample        no_sig_diff       0.924-1.083    1975 +/- 
 Summary counts:
   2 test cases in total
   2 test cases had no significant difference (no_sig_diff)
-  0 test cases got faster
-  0 test cases got slower
+  0 test cases improved
+  0 test cases regressed
   0 test cases added
   0 test cases removed
 
@@ -90,8 +115,8 @@ fuchsia.example: SecondExample        no_sig_diff       0.924-1.083    1975 +/- 
 Summary counts:
   1 test case in total
   1 test case had no significant difference (no_sig_diff)
-  0 test cases got faster
-  0 test cases got slower
+  0 test cases improved
+  0 test cases regressed
   0 test cases added
   0 test cases removed
 
@@ -107,8 +132,8 @@ example_suite: ExampleTest  no_sig_diff       1.000-1.000    200 +/- 0 ns  200 +
 Summary counts:
   2 test cases in total
   1 test case had no significant difference (no_sig_diff)
-  0 test cases got faster
-  1 test case got slower
+  0 test cases improved
+  1 test case regressed
   0 test cases added
   0 test cases removed
 
@@ -117,15 +142,40 @@ Results from test cases with differences:
 
 Test case                             Improve/regress?  Factor change  Mean before     Mean after
 ------------------------------------  ----------------  -------------  --------------  --------------
-fuchsia.example: ClockGetTimeExample  slower            1.031-1.104    1492 +/- 26 ns  1592 +/- 26 ns
+fuchsia.example: ClockGetTimeExample  regressed         1.031-1.104    1492 +/- 26 ns  1592 +/- 26 ns
 
 
 Results from all test cases:
 
 Test case                             Improve/regress?  Factor change  Mean before     Mean after
 ------------------------------------  ----------------  -------------  --------------  --------------
-fuchsia.example: ClockGetTimeExample  slower            1.031-1.104    1492 +/- 26 ns  1592 +/- 26 ns
+fuchsia.example: ClockGetTimeExample  regressed         1.031-1.104    1492 +/- 26 ns  1592 +/- 26 ns
 fuchsia.example: SecondExample        no_sig_diff       0.924-1.083    1975 +/- 78 ns  1975 +/- 78 ns
+
+
+### comparison_regression_biggerisbetter
+Summary counts:
+  2 test cases in total
+  1 test case had no significant difference (no_sig_diff)
+  0 test cases improved
+  1 test case regressed
+  0 test cases added
+  0 test cases removed
+
+
+Results from test cases with differences:
+
+Test case                             Improve/regress?  Factor change  Mean before               Mean after
+------------------------------------  ----------------  -------------  ------------------------  ------------------------
+fuchsia.example: ClockGetTimeExample  regressed         0.900-0.967    1492 +/- 26 bytes/second  1392 +/- 26 bytes/second
+
+
+Results from all test cases:
+
+Test case                             Improve/regress?  Factor change  Mean before               Mean after
+------------------------------------  ----------------  -------------  ------------------------  ------------------------
+fuchsia.example: ClockGetTimeExample  regressed         0.900-0.967    1492 +/- 26 bytes/second  1392 +/- 26 bytes/second
+fuchsia.example: SecondExample        no_sig_diff       0.924-1.083    1975 +/- 78 bytes/second  1975 +/- 78 bytes/second
 
 
 ### display_single_boot_single_dataset
@@ -140,8 +190,8 @@ Summary counts:
   2 test cases in total
   0 test cases had no significant difference (no_sig_diff)
   1 test case cannot be compared because we have point estimates only
-  0 test cases got faster
-  0 test cases got slower
+  0 test cases improved
+  0 test cases regressed
   0 test cases added
   1 test case removed
 
@@ -179,8 +229,8 @@ fuchsia.example: SecondExample        1975 +/- 78 ns  -               1975 +/- 7
 Summary counts:
   2 test cases in total
   1 test case had no significant difference (no_sig_diff)
-  0 test cases got faster
-  0 test cases got slower
+  0 test cases improved
+  0 test cases regressed
   0 test cases added
   1 test case removed
 

@@ -310,7 +310,8 @@ class PerfCompareTest(TempDirTestCase):
             mean=1000,
             stddev=100,
             drop_one=False,
-            single_boot=False):
+            single_boot=False,
+            unit='nanoseconds'):
         results = [('ClockGetTimeExample', GenerateTestData(mean, stddev))]
         if not drop_one:
             results.append(('SecondExample', GenerateTestData(2000, 300)))
@@ -328,7 +329,7 @@ class PerfCompareTest(TempDirTestCase):
                         {
                             'label': test_name,
                             'test_suite': 'fuchsia.example',
-                            'unit': 'nanoseconds',
+                            'unit': unit,
                             'values': SLOW_INITIAL_RUN + values
                         }
                     ])
@@ -347,7 +348,7 @@ class PerfCompareTest(TempDirTestCase):
                             {
                                 'label': test_name,
                                 'test_suite': 'fuchsia.example',
-                                'unit': 'nanoseconds',
+                                'unit': unit,
                                 'values': SLOW_INITIAL_RUN + [value]
                             }
                         ])
@@ -423,6 +424,24 @@ class PerfCompareTest(TempDirTestCase):
         after_dir = self.ExampleDataDir(mean=1450, stddev=100)
         output = self.ComparePerf(before_dir, after_dir)
         GOLDEN.AssertCaseEq('comparison_improvement_small', output)
+
+    # Test a decrease that is a regression (in contrast to the default
+    # where decreases are improvements).
+    def test_comparison_regression_biggerisbetter(self):
+        unit = 'bytes/second'
+        before_dir = self.ExampleDataDir(mean=1500, stddev=100, unit=unit)
+        after_dir = self.ExampleDataDir(mean=1400, stddev=100, unit=unit)
+        output = self.ComparePerf(before_dir, after_dir)
+        GOLDEN.AssertCaseEq('comparison_regression_biggerisbetter', output)
+
+    # Test an increase that is an improvement (in contrast to the default
+    # where increases are regressions).
+    def test_comparison_improvement_biggerisbetter(self):
+        unit = 'bytes/second'
+        before_dir = self.ExampleDataDir(mean=1400, stddev=100, unit=unit)
+        after_dir = self.ExampleDataDir(mean=1500, stddev=100, unit=unit)
+        output = self.ComparePerf(before_dir, after_dir)
+        GOLDEN.AssertCaseEq('comparison_improvement_biggerisbetter', output)
 
     def test_adding_test(self):
         before_dir = self.ExampleDataDir(drop_one=True)
@@ -529,6 +548,14 @@ class PerfCompareTest(TempDirTestCase):
             ['validate_perfcompare', '--group_size=5'] + results_dirs, stdout)
         output = stdout.getvalue()
         GOLDEN.AssertCaseEq('validate_perfcompare', output)
+
+    def test_biggerisbetter_handling(self):
+        self.assertFalse(perfcompare.UnitBiggerIsBetter('ns'))
+        self.assertTrue(perfcompare.UnitBiggerIsBetter('bytes/second'))
+        self.assertTrue(perfcompare.UnitBiggerIsBetter('frames/second'))
+        self.assertTrue(perfcompare.UnitBiggerIsBetter('count_biggerIsBetter'))
+        self.assertFalse(
+            perfcompare.UnitBiggerIsBetter('count_smallerIsBetter'))
 
 
 class RunLocalTest(TempDirTestCase):
