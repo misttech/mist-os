@@ -65,13 +65,27 @@ class Vmo : public fbl::DoublyLinkedListable<std::unique_ptr<Vmo>> {
     return OpRange(ZX_VMO_OP_COMMIT, page_offset, page_count);
   }
 
-  std::unique_ptr<Vmo> Clone() const { return Clone(0, size_); }
+  std::unique_ptr<Vmo> Clone() const {
+    // Hold the lock to read the size_ *and* use it for cloning to prevent a Resize from sneaking
+    // in mid-operation.
+    std::lock_guard guard(mutex_);
+    return CloneLocked(0, size_);
+  }
 
-  std::unique_ptr<Vmo> Clone(uint64_t offset, uint64_t size) const;
+  std::unique_ptr<Vmo> Clone(uint64_t offset, uint64_t size) const {
+    std::lock_guard guard(mutex_);
+    return CloneLocked(offset, size);
+  }
 
   const zx::vmo& vmo() const { return vmo_; }
-  uint64_t size() const { return size_; }
-  uintptr_t base_addr() const { return base_addr_; }
+  uint64_t size() const {
+    std::lock_guard guard(mutex_);
+    return size_;
+  }
+  uintptr_t base_addr() const {
+    std::lock_guard guard(mutex_);
+    return base_addr_;
+  }
   uint64_t key() const {
     std::lock_guard guard(mutex_);
     return key_;
@@ -83,13 +97,16 @@ class Vmo : public fbl::DoublyLinkedListable<std::unique_ptr<Vmo>> {
 
   bool OpRange(uint32_t op, uint64_t page_offset, uint64_t page_count) const;
 
+  std::unique_ptr<Vmo> CloneLocked(uint64_t offset, uint64_t size) const __TA_REQUIRES(&mutex_);
+
+  mutable std::mutex mutex_;
+
   // These are set in the ctor, but can be changed by Vmo::Resize.
-  uint64_t size_;
-  uintptr_t base_addr_;
+  uint64_t size_ __TA_GUARDED(&mutex_);
+  uintptr_t base_addr_ __TA_GUARDED(&mutex_);
 
   // vmo_ and key_ are set in the ctor, but can be changed by UserPager::ReplaceVmo.
   zx::vmo vmo_;
-  mutable std::mutex mutex_;
   // This value is used for both the port packet key and to populate the contents of supplied pages.
   uint64_t key_ __TA_GUARDED(&mutex_);
 };

@@ -24,7 +24,11 @@
 namespace pager_tests {
 
 bool Vmo::CheckVmar(uint64_t offset, uint64_t len, const void* expected) const {
-  ZX_ASSERT((offset + len) <= (size_ / zx_system_get_page_size()));
+  // The size can change once we're inside this function and blocked on a page request for example,
+  // but the specified range should at least initially be within bounds.
+  if ((offset + len) > (size() / zx_system_get_page_size())) {
+    return false;
+  }
 
   len *= zx_system_get_page_size();
   offset *= zx_system_get_page_size();
@@ -39,7 +43,11 @@ bool Vmo::CheckVmar(uint64_t offset, uint64_t len, const void* expected) const {
     // loaded after locking the mutex (see `key()`).  In C++ terms, both the volatile load and
     // `mutex::lock()` are side effects so they may not be reordered relative to one another.  See
     // also fxbug.dev/129315.
-    const volatile auto* base = reinterpret_cast<const volatile uint64_t*>(base_addr_);
+    //
+    // Note that even though both `key()` and `base_addr()` qualify as visible side effects since
+    // they acquire the lock, we still need the volatile to make sure the dereference of `base` is
+    // not reordered w.r.t. `key()`.
+    const volatile auto* base = reinterpret_cast<const volatile uint64_t*>(base_addr());
     uint64_t actual_val = base[i];
 
     uint64_t expected_val = expected ? static_cast<const uint64_t*>(expected)[i] : key() + i;
@@ -89,6 +97,7 @@ bool Vmo::CheckVmo(uint64_t offset, uint64_t len, const void* expected) const {
 }
 
 bool Vmo::Resize(uint64_t new_page_count) {
+  std::lock_guard guard(mutex_);
   const uint64_t new_size = new_page_count * zx_system_get_page_size();
   zx_status_t status = vmo_.set_size(new_size);
   if (status != ZX_OK) {
@@ -116,7 +125,6 @@ bool Vmo::Resize(uint64_t new_page_count) {
         return false;
       }
     }
-
     base_addr_ = addr;
   }
   size_ = new_size;
@@ -139,7 +147,7 @@ void Vmo::GenerateBufferContents(void* dest_buffer, uint64_t page_count,
   }
 }
 
-std::unique_ptr<Vmo> Vmo::Clone(uint64_t offset, uint64_t size) const {
+std::unique_ptr<Vmo> Vmo::CloneLocked(uint64_t offset, uint64_t size) const {
   zx::vmo clone;
   zx_status_t status = vmo_.create_child(
       ZX_VMO_CHILD_SNAPSHOT_AT_LEAST_ON_WRITE | ZX_VMO_CHILD_RESIZABLE, offset, size, &clone);
@@ -156,7 +164,7 @@ std::unique_ptr<Vmo> Vmo::Clone(uint64_t offset, uint64_t size) const {
   }
 
   return std::unique_ptr<Vmo>(
-      new Vmo(std::move(clone), size, addr, key() + (offset / sizeof(uint64_t))));
+      new Vmo(std::move(clone), size, addr, key_ + (offset / sizeof(uint64_t))));
 }
 
 UserPager::UserPager()
