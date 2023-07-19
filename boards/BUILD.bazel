@@ -28,7 +28,6 @@ fuchsia_board_configuration(
     name = "vim3",
     board_name = "vim3",
     provided_features = [
-        "fuchsia::driver_framework_v2_support",
         "fuchsia::fan",
         "fuchsia::usb_peripheral_support",
     ],
