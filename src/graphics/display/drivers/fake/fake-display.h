@@ -31,8 +31,10 @@
 #include <fbl/intrusive_double_list.h>
 #include <fbl/mutex.h>
 
+#include "src/graphics/display/drivers/fake/image-info.h"
 #include "src/graphics/display/lib/api-types-cpp/config-stamp.h"
 #include "src/graphics/display/lib/api-types-cpp/driver-buffer-collection-id.h"
+#include "src/graphics/display/lib/api-types-cpp/driver-capture-image-id.h"
 
 namespace fake_display {
 
@@ -143,12 +145,6 @@ class FakeDisplay : public DeviceType,
   }
 
  private:
-  struct ImageInfo : public fbl::DoublyLinkedListable<std::unique_ptr<ImageInfo>> {
-    char pixel_format;
-    bool ram_domain;
-    zx::vmo vmo;
-  };
-
   enum class BufferCollectionUsage : int32_t;
 
   zx_status_t SetupDisplayInterface();
@@ -210,11 +206,8 @@ class FakeDisplay : public DeviceType,
   mutable fbl::Mutex image_lock_;
 
   // Guards imported capture buffers, capture interface and state.
+  // `capture_lock_` must never be acquired when `image_lock_` is already held.
   mutable fbl::Mutex capture_lock_;
-
-  // Points to the next capture target image to capture displayed contents into.
-  // Stores nullptr if capture is not going to be performed.
-  ImageInfo* current_capture_target_image_ TA_GUARDED(capture_lock_);
 
   // The sysmem allocator client used to bind incoming buffer collection tokens.
   fidl::WireSyncClient<fuchsia_sysmem::Allocator> sysmem_allocator_client_;
@@ -226,11 +219,25 @@ class FakeDisplay : public DeviceType,
 
   // Imported Images
   fbl::DoublyLinkedList<std::unique_ptr<ImageInfo>> imported_images_ TA_GUARDED(image_lock_);
-  fbl::DoublyLinkedList<std::unique_ptr<ImageInfo>> imported_captures_ TA_GUARDED(capture_lock_);
 
   // Points to the current image to be displayed and captured.
   // Stores nullptr if there is no image displaying on the fake display.
   ImageInfo* current_image_to_capture_ TA_GUARDED(image_lock_);
+
+  // Imported capture images, keyed by image ID.
+  CaptureImageInfo::HashTable imported_captures_ TA_GUARDED(capture_lock_);
+
+  // ID of the next capture target image imported to the fake display device
+  // to capture displayed contents into.
+  // Stores `kInvalidDriverCaptureImageId` if capture is not going to be
+  // performed.
+  display::DriverCaptureImageId current_capture_target_image_id_ TA_GUARDED(capture_lock_) =
+      display::kInvalidDriverCaptureImageId;
+
+  // The driver capture image ID for the next image to be imported to the
+  // device.
+  display::DriverCaptureImageId next_imported_driver_capture_image_id_ TA_GUARDED(capture_lock_) =
+      display::DriverCaptureImageId(1);
 
   // The most recently applied config stamp.
   std::atomic<display::ConfigStamp> current_config_stamp_ = display::kInvalidConfigStamp;

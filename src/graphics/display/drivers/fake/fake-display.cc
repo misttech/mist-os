@@ -44,9 +44,11 @@
 #include <fbl/vector.h>
 
 #include "src/graphics/display/drivers/coordinator/preferred-scanout-image-type.h"
+#include "src/graphics/display/drivers/fake/image-info.h"
 #include "src/graphics/display/lib/api-types-cpp/config-stamp.h"
 #include "src/graphics/display/lib/api-types-cpp/display-id.h"
 #include "src/graphics/display/lib/api-types-cpp/driver-buffer-collection-id.h"
+#include "src/graphics/display/lib/api-types-cpp/driver-capture-image-id.h"
 #include "src/lib/fsl/handles/object_info.h"
 #include "src/lib/fxl/strings/string_printf.h"
 
@@ -274,8 +276,8 @@ zx_status_t FakeDisplay::DisplayControllerImplImportImage(
     return ZX_ERR_OUT_OF_RANGE;
   }
 
-  import_info->pixel_format = static_cast<uint32_t>(
-      collection_info.settings().image_format_constraints().pixel_format().type());
+  import_info->pixel_format =
+      collection_info.settings().image_format_constraints().pixel_format().type();
   import_info->ram_domain = (collection_info.settings().buffer_settings().coherency_domain() ==
                              fuchsia_sysmem::CoherencyDomain::kRam);
   import_info->vmo = std::move(vmos[index]);
@@ -407,6 +409,8 @@ fuchsia_sysmem::BufferCollectionConstraints FakeDisplay::CreateBufferCollectionC
       break;
   }
 
+  // TODO(fxbug.dev/128891): In order to support capture, both capture sources
+  // and capture targets must not be in the "inaccessible" coherency domain.
   constraints.has_buffer_memory_constraints() = true;
   SetBufferMemoryConstraints(constraints.buffer_memory_constraints());
 
@@ -529,7 +533,7 @@ zx_status_t FakeDisplay::DisplayControllerImplSetDisplayCaptureInterface(
 
   fbl::AutoLock lock(&capture_lock_);
   capture_interface_client_ = ddk::DisplayCaptureInterfaceProtocolClient(intf);
-  current_capture_target_image_ = nullptr;
+  current_capture_target_image_id_ = display::kInvalidDriverCaptureImageId;
   return ZX_OK;
 }
 
@@ -548,12 +552,6 @@ zx_status_t FakeDisplay::DisplayControllerImplImportImageForCapture(
     return ZX_ERR_NOT_FOUND;
   }
   const fidl::SyncClient<fuchsia_sysmem::BufferCollection>& collection = it->second;
-
-  fbl::AllocChecker alloc_checker;
-  auto import_capture = fbl::make_unique_checked<ImageInfo>(&alloc_checker);
-  if (!alloc_checker.check()) {
-    return ZX_ERR_NO_MEMORY;
-  }
 
   fbl::AutoLock lock(&capture_lock_);
 
@@ -592,13 +590,24 @@ zx_status_t FakeDisplay::DisplayControllerImplImportImageForCapture(
     return ZX_ERR_OUT_OF_RANGE;
   }
 
-  import_capture->pixel_format = static_cast<uint32_t>(
-      collection_info.settings().image_format_constraints().pixel_format().type());
-  import_capture->ram_domain = (collection_info.settings().buffer_settings().coherency_domain() ==
-                                fuchsia_sysmem::CoherencyDomain::kRam);
-  import_capture->vmo = std::move(collection_info.buffers()[index].vmo());
-  *out_capture_handle = reinterpret_cast<uint64_t>(import_capture.get());
-  imported_captures_.push_back(std::move(import_capture));
+  // TODO(fxbug.dev/128891): Capture target images should not be of
+  // "inaccessible" coherency domain. We should add a check here.
+  display::DriverCaptureImageId driver_capture_image_id = next_imported_driver_capture_image_id_++;
+  ImageMetadata capture_image_metadata = {
+      .pixel_format = collection_info.settings().image_format_constraints().pixel_format().type(),
+      .coherency_domain = collection_info.settings().buffer_settings().coherency_domain(),
+  };
+  zx::vmo vmo = std::move(collection_info.buffers()[index].vmo());
+
+  fbl::AllocChecker alloc_checker;
+  auto capture_image_info = fbl::make_unique_checked<CaptureImageInfo>(
+      &alloc_checker, driver_capture_image_id, std::move(capture_image_metadata), std::move(vmo));
+  if (!alloc_checker.check()) {
+    return ZX_ERR_NO_MEMORY;
+  }
+
+  *out_capture_handle = display::ToBanjoDriverCaptureImageId(driver_capture_image_id);
+  imported_captures_.insert(std::move(capture_image_info));
   return ZX_OK;
 }
 
@@ -608,18 +617,19 @@ zx_status_t FakeDisplay::DisplayControllerImplStartCapture(uint64_t capture_hand
   }
 
   fbl::AutoLock lock(&capture_lock_);
-  if (current_capture_target_image_ != nullptr) {
+  if (current_capture_target_image_id_ != display::kInvalidDriverCaptureImageId) {
     return ZX_ERR_SHOULD_WAIT;
   }
 
   // Confirm the handle was previously imported (hence valid)
-  auto info = reinterpret_cast<ImageInfo*>(capture_handle);
-  if (imported_captures_.find_if([info](auto& i) { return i.vmo.get() == info->vmo.get(); }) ==
-      imported_captures_.end()) {
+  display::DriverCaptureImageId driver_capture_image_id =
+      display::ToDriverCaptureImageId(capture_handle);
+  auto it = imported_captures_.find(driver_capture_image_id);
+  if (it == imported_captures_.end()) {
     // invalid handle
     return ZX_ERR_INVALID_ARGS;
   }
-  current_capture_target_image_ = info;
+  current_capture_target_image_id_ = driver_capture_image_id;
 
   return ZX_OK;
 }
@@ -630,15 +640,13 @@ zx_status_t FakeDisplay::DisplayControllerImplReleaseCapture(uint64_t capture_ha
   }
 
   fbl::AutoLock lock(&capture_lock_);
-  if (current_capture_target_image_ != nullptr &&
-      reinterpret_cast<uint64_t>(current_capture_target_image_) == capture_handle) {
+  display::DriverCaptureImageId driver_capture_image_id =
+      display::ToDriverCaptureImageId(capture_handle);
+  if (current_capture_target_image_id_ == driver_capture_image_id) {
     return ZX_ERR_SHOULD_WAIT;
   }
 
-  // Confirm the handle was previously imported (hence valid)
-  auto info = reinterpret_cast<ImageInfo*>(capture_handle);
-  if (imported_captures_.erase_if([info](auto& i) { return i.vmo.get() == info->vmo.get(); }) ==
-      nullptr) {
+  if (imported_captures_.erase(driver_capture_image_id) == nullptr) {
     // invalid handle
     return ZX_ERR_INVALID_ARGS;
   }
@@ -647,7 +655,7 @@ zx_status_t FakeDisplay::DisplayControllerImplReleaseCapture(uint64_t capture_ha
 
 bool FakeDisplay::DisplayControllerImplIsCaptureCompleted() {
   fbl::AutoLock lock(&capture_lock_);
-  return current_capture_target_image_ == nullptr;
+  return current_capture_target_image_id_ == display::kInvalidDriverCaptureImageId;
 }
 
 void FakeDisplay::DdkRelease() {
@@ -710,10 +718,19 @@ int FakeDisplay::CaptureThread() {
       // `imported_captures_` (guarded by `capture_lock_`). So `capture_lock_`
       // must be locked while the capture image is being used.
       fbl::AutoLock capture_lock(&capture_lock_);
-      if (capture_interface_client_.is_valid() && (current_capture_target_image_ != nullptr) &&
+      if (capture_interface_client_.is_valid() &&
+          (current_capture_target_image_id_ != display::kInvalidDriverCaptureImageId) &&
           ++capture_complete_signal_count_ >= kNumOfVsyncsForCapture) {
         {
-          ImageInfo& dst = *current_capture_target_image_;
+          auto dst = imported_captures_.find(current_capture_target_image_id_);
+
+          // `dst` should be always valid.
+          //
+          // The current capture target image is guaranteed to be valid in
+          // `imported_captures_` in StartCapture(), and can only be released
+          // (i.e. removed from `imported_captures_`) after the active capture
+          // is done.
+          ZX_DEBUG_ASSERT(dst.IsValid());
 
           // `current_image_to_capture_` is a pointer to ImageInfo stored in
           // `imported_images_` (guarded by `image_lock_`). So `image_lock_`
@@ -723,9 +740,10 @@ int FakeDisplay::CaptureThread() {
             // We have a valid image being displayed. Let's capture it.
             ImageInfo& src = *current_image_to_capture_;
 
-            if (src.pixel_format != dst.pixel_format) {
-              zxlogf(ERROR, "Trying to capture format=%d as format=%d\n", src.pixel_format,
-                     dst.pixel_format);
+            if (src.pixel_format != dst->metadata().pixel_format) {
+              zxlogf(ERROR, "Trying to capture format=%u as format=%u\n",
+                     static_cast<uint32_t>(src.pixel_format),
+                     static_cast<uint32_t>(dst->metadata().pixel_format));
               continue;
             }
             size_t src_vmo_size;
@@ -736,7 +754,7 @@ int FakeDisplay::CaptureThread() {
               continue;
             }
             size_t dst_vmo_size;
-            status = dst.vmo.get_size(&dst_vmo_size);
+            status = dst->vmo().get_size(&dst_vmo_size);
             if (status != ZX_OK) {
               zxlogf(ERROR, "Failed to get the size of the VMO for the captured image: %s",
                      zx_status_get_string(status));
@@ -758,7 +776,8 @@ int FakeDisplay::CaptureThread() {
             }
 
             fzl::VmoMapper mapped_dst;
-            status = mapped_dst.Map(dst.vmo, 0, dst_vmo_size, ZX_VM_PERM_READ | ZX_VM_PERM_WRITE);
+            status =
+                mapped_dst.Map(dst->vmo(), 0, dst_vmo_size, ZX_VM_PERM_READ | ZX_VM_PERM_WRITE);
             if (status != ZX_OK) {
               zxlogf(ERROR, "Capture thread will exit; failed to map capture image VMO: %s",
                      zx_status_get_string(status));
@@ -769,14 +788,14 @@ int FakeDisplay::CaptureThread() {
                              ZX_CACHE_FLUSH_DATA | ZX_CACHE_FLUSH_INVALIDATE);
             }
             std::memcpy(mapped_dst.start(), mapped_src.start(), dst_vmo_size);
-            if (dst.ram_domain) {
+            if (dst->metadata().coherency_domain == fuchsia_sysmem::wire::CoherencyDomain::kRam) {
               zx_cache_flush(mapped_dst.start(), dst_vmo_size,
                              ZX_CACHE_FLUSH_DATA | ZX_CACHE_FLUSH_INVALIDATE);
             }
           }
         }
         capture_interface_client_.OnCaptureComplete();
-        current_capture_target_image_ = nullptr;
+        current_capture_target_image_id_ = display::kInvalidDriverCaptureImageId;
         capture_complete_signal_count_ = 0;
       }
     }
