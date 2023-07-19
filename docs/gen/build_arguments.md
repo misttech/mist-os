@@ -1281,7 +1281,7 @@ from infra builds, and later inspection.
 
 **Current value (from the default):** `"//out/not-default/comparison-reports"`
 
-From //build/toolchain/rbe.gni:171
+From //build/toolchain/rbe.gni:172
 
 ### compress_blobs
 
@@ -1454,7 +1454,7 @@ One of:
 
 **Current value (from the default):** `"none"`
 
-From //build/toolchain/rbe.gni:166
+From //build/toolchain/rbe.gni:167
 
 ### cxx_rbe_enable
 
@@ -1467,7 +1467,7 @@ From //out/not-default/args.gn:7
 
 **Overridden from the default:** `false`
 
-From //build/toolchain/rbe.gni:124
+From //build/toolchain/rbe.gni:125
 
 **Current value for `target_cpu = "x64"`:** `false`
 
@@ -1475,7 +1475,7 @@ From //out/not-default/args.gn:7
 
 **Overridden from the default:** `false`
 
-From //build/toolchain/rbe.gni:124
+From //build/toolchain/rbe.gni:125
 
 ### cxx_rbe_exec_strategy
 
@@ -1498,7 +1498,7 @@ One of:
 
 **Current value (from the default):** `"remote_local_fallback"`
 
-From //build/toolchain/rbe.gni:142
+From //build/toolchain/rbe.gni:143
 
 ### dart_aot_debug_build_cfg
 
@@ -6075,6 +6075,15 @@ Default gn build virtualenv target.
 
 From //third_party/pigweed/src/pw_build/python_gn_args.gni:23
 
+### pw_build_PYTHON_PIP_DOWNLOAD_ALL_PLATFORMS
+
+Set pw_python_venv.vendor_wheel targets to download Python packages for all
+platform combinations. This takes a significant amount of time.
+
+**Current value (from the default):** `false`
+
+From //third_party/pigweed/src/pw_build/python_gn_args.gni:27
+
 ### pw_build_PYTHON_TEST_COVERAGE
 
 If true, GN will run each Python test using the coverage command. A separate
@@ -7400,7 +7409,7 @@ One of:
 
 **Current value (from the default):** `"none"`
 
-From //build/toolchain/rbe.gni:111
+From //build/toolchain/rbe.gni:112
 
 ### rust_rbe_download_unstripped_binaries
 
@@ -7410,7 +7419,7 @@ that be used to retrieve remote artifacts later using build/rbe/dlwrap.py.
 
 **Current value (from the default):** `true`
 
-From //build/toolchain/rbe.gni:116
+From //build/toolchain/rbe.gni:117
 
 ### rust_rbe_enable
 
@@ -7422,7 +7431,7 @@ From //out/not-default/args.gn:10
 
 **Overridden from the default:** `false`
 
-From //build/toolchain/rbe.gni:67
+From //build/toolchain/rbe.gni:68
 
 **Current value for `target_cpu = "x64"`:** `false`
 
@@ -7430,7 +7439,7 @@ From //out/not-default/args.gn:10
 
 **Overridden from the default:** `false`
 
-From //build/toolchain/rbe.gni:67
+From //build/toolchain/rbe.gni:68
 
 ### rust_rbe_exec_strategy
 
@@ -7453,7 +7462,7 @@ One of:
 
 **Current value (from the default):** `"remote"`
 
-From //build/toolchain/rbe.gni:85
+From //build/toolchain/rbe.gni:86
 
 ### rust_toolchain_triple_suffix
 
