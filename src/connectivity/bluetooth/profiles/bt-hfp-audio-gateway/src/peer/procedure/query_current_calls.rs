@@ -130,8 +130,8 @@ pub fn build_clcc_response(call: Call) -> Option<at::Response> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::peer::calls::{Direction, Number};
     use assert_matches::assert_matches;
+    use bt_hfp::call::{Direction, Number};
 
     #[test]
     fn correct_marker() {

@@ -2,12 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {at_commands as at, core::fmt::Debug, tracing::warn};
-
-use crate::peer::{
-    calls::types::{Call, CallHeld, CallSetup},
-    update::AgUpdate,
+use {
+    at_commands as at, bt_hfp::call::indicators as call_indicators, core::fmt::Debug, tracing::warn,
 };
+
+use crate::peer::update::AgUpdate;
 
 /// This implementation supports the 7 indicators defined in HFP v1.8 Section 4.35.
 /// The indices of these indicators are fixed.
@@ -138,9 +137,9 @@ impl HfIndicators {
 #[derive(Debug, Default, Clone, Copy)]
 pub struct AgIndicators {
     pub service: bool,
-    pub call: Call,
-    pub callsetup: CallSetup,
-    pub callheld: CallHeld,
+    pub call: call_indicators::Call,
+    pub callsetup: call_indicators::CallSetup,
+    pub callheld: call_indicators::CallHeld,
     pub signal: u8,
     pub roam: bool,
     pub battchg: u8,
@@ -156,6 +155,19 @@ pub enum AgIndicator {
     Signal(u8),
     Roam(u8),
     BatteryLevel(u8),
+}
+
+impl AgIndicator {
+    /// Returns a Vec of all updated AG indicators. This vec is ordered by Indicator index.
+    pub fn parse_call_indicators_updates(
+        updates: &call_indicators::CallIndicatorsUpdates,
+    ) -> Vec<Self> {
+        let mut v = vec![];
+        v.extend(updates.call.map(|i| Self::Call(i as u8)));
+        v.extend(updates.callsetup.map(|i| Self::CallSetup(i as u8)));
+        v.extend(updates.callheld.map(|i| Self::CallHeld(i as u8)));
+        v
+    }
 }
 
 impl From<AgIndicator> for at::Response {
@@ -193,20 +205,20 @@ impl From<AgIndicator> for at::Response {
     }
 }
 
-impl From<Call> for AgIndicator {
-    fn from(src: Call) -> Self {
+impl From<call_indicators::Call> for AgIndicator {
+    fn from(src: call_indicators::Call) -> Self {
         Self::Call(src as u8)
     }
 }
 
-impl From<CallSetup> for AgIndicator {
-    fn from(src: CallSetup) -> Self {
+impl From<call_indicators::CallSetup> for AgIndicator {
+    fn from(src: call_indicators::CallSetup) -> Self {
         Self::CallSetup(src as u8)
     }
 }
 
-impl From<CallHeld> for AgIndicator {
-    fn from(src: CallHeld) -> Self {
+impl From<call_indicators::CallHeld> for AgIndicator {
+    fn from(src: call_indicators::CallHeld) -> Self {
         Self::CallHeld(src as u8)
     }
 }
@@ -542,6 +554,33 @@ mod tests {
         assert!(status.indicator_enabled(&AgIndicator::CallHeld(0)));
         assert!(!status.indicator_enabled(&AgIndicator::Roam(0)));
         assert!(!status.indicator_enabled(&AgIndicator::BatteryLevel(0)));
+    }
+
+    #[fuchsia::test]
+    fn call_indicator_updates_to_vec() {
+        let mut updates = call_indicators::CallIndicatorsUpdates::default();
+        assert_eq!(AgIndicator::parse_call_indicators_updates(&updates), vec![]);
+
+        let call = call_indicators::Call::Some;
+        updates.call = Some(call);
+        assert_eq!(
+            AgIndicator::parse_call_indicators_updates(&updates),
+            vec![AgIndicator::Call(call as u8)]
+        );
+
+        let callsetup = call_indicators::CallSetup::Incoming;
+        updates.callsetup = Some(callsetup);
+        let expected = vec![AgIndicator::Call(call as u8), AgIndicator::CallSetup(callsetup as u8)];
+        assert_eq!(AgIndicator::parse_call_indicators_updates(&updates), expected);
+
+        let callheld = call_indicators::CallHeld::Held;
+        updates.callheld = Some(callheld);
+        let expected = vec![
+            AgIndicator::Call(call as u8),
+            AgIndicator::CallSetup(callsetup as u8),
+            AgIndicator::CallHeld(callheld as u8),
+        ];
+        assert_eq!(AgIndicator::parse_call_indicators_updates(&updates), expected);
     }
 
     #[test]

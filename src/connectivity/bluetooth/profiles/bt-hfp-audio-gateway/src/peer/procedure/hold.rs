@@ -4,11 +4,11 @@
 
 use super::{Procedure, ProcedureError, ProcedureMarker, ProcedureRequest};
 
-use crate::peer::{
-    calls::CallIdx, service_level_connection::SlcState, slc_request::SlcRequest, update::AgUpdate,
-};
+use crate::peer::{service_level_connection::SlcState, slc_request::SlcRequest, update::AgUpdate};
+
 use {
     at_commands as at,
+    bt_hfp::call::list::Idx as CallIdx,
     core::convert::{TryFrom, TryInto},
     std::fmt,
     std::slice::Iter,

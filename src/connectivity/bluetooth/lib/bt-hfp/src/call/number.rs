@@ -1,7 +1,9 @@
 // Copyright 2021 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
-use super::types::FidlNumber;
+
+/// The fuchsia.bluetooth.hfp library representation of a Number.
+pub type FidlNumber = String;
 
 /// A phone number.
 #[derive(Debug, Clone, PartialEq, Hash, Default, Eq)]

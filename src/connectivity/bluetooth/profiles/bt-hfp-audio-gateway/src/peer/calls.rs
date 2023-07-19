@@ -3,10 +3,6 @@
 // found in the LICENSE file.
 
 use {
-    super::calls::{
-        call_list::CallList,
-        types::{CallHeld, CallIndicators, CallIndicatorsUpdates},
-    },
     crate::{
         error::{CallError, Error},
         inspect::CallEntryInspect,
@@ -16,8 +12,13 @@ use {
         hanging_get::client::HangingGetStream,
         stream::{StreamItem, StreamMap, StreamWithEpitaph, Tagged, WithEpitaph, WithTag},
     },
+    bt_hfp::call::{
+        indicators::{self, CallIndicators, CallIndicatorsUpdates},
+        list::{Idx as CallIdx, List as CallList},
+        Direction, Number,
+    },
     fidl_fuchsia_bluetooth_hfp::{
-        CallAction as FidlCallAction, CallProxy, NextCall, PeerHandlerProxy, RedialLast,
+        CallAction as FidlCallAction, CallProxy, CallState, NextCall, PeerHandlerProxy, RedialLast,
         TransferActive,
     },
     fuchsia_async as fasync, fuchsia_inspect as inspect,
@@ -31,22 +32,7 @@ use {
     tracing::{debug, info, warn},
 };
 
-pub use {fidl_fuchsia_bluetooth_hfp::CallState, number::Number, types::Direction};
-
-/// Defines the types associated with a phone number.
-pub mod number;
-
-/// Defines the collection used to identify and store calls.
-mod call_list;
-
-/// Defines commonly used types when interacting with a call.
-pub mod types;
-
 mod pending;
-
-/// The index associated with a call, that is guaranteed to be unique for the lifetime of the call,
-/// but will be recycled after the call is released.
-pub type CallIdx = usize;
 
 /// Internal state and resources associated with a single call.
 struct CallEntry {
@@ -672,7 +658,7 @@ impl Calls {
             && call_is_active
             && old_call_held_index != new_call_held_index
         {
-            call_indicators_updates.callheld = Some(CallHeld::HeldAndActive)
+            call_indicators_updates.callheld = Some(indicators::CallHeld::HeldAndActive)
         }
 
         if !call_indicators_updates.is_empty() || report_call_transferred {
@@ -815,10 +801,10 @@ mod tests {
         next_call.state = Some(CallState::IncomingRinging);
         let _ = calls.handle_new_call(next_call).expect("success handling new call");
         let expected = CallIndicators {
-            call: types::Call::None,
-            callsetup: types::CallSetup::Incoming,
+            call: indicators::Call::None,
+            callsetup: indicators::CallSetup::Incoming,
             callwaiting: false,
-            callheld: types::CallHeld::None,
+            callheld: indicators::CallHeld::None,
         };
         assert_eq!(calls.indicators(), expected);
         (calls, peer_stream, call_stream, 1, num)
@@ -1222,7 +1208,7 @@ mod tests {
 
         // Make sure we get an indicator for the swap.
         let held_update = assert_calls_indicators(&mut exec, &mut calls);
-        assert_eq!(held_update.callheld, Some(CallHeld::HeldAndActive));
+        assert_eq!(held_update.callheld, Some(indicators::CallHeld::HeldAndActive));
 
         // Make sure the calls state is both held and active.
         assert!(calls.is_call_active());
@@ -1247,7 +1233,7 @@ mod tests {
 
         let item = assert_calls_indicators(&mut exec, &mut calls);
         let expected = CallIndicatorsUpdates {
-            callsetup: Some(types::CallSetup::Incoming),
+            callsetup: Some(indicators::CallSetup::Incoming),
             ..CallIndicatorsUpdates::default()
         };
         assert_eq!(item, expected);
@@ -1271,7 +1257,7 @@ mod tests {
         // The ready item is OutgoingAlerting even though there is also an IncomingRinging call.
         // This is because the OutgoingAlerting call state was reported last.
         let expected = CallIndicatorsUpdates {
-            callsetup: Some(types::CallSetup::OutgoingAlerting),
+            callsetup: Some(indicators::CallSetup::OutgoingAlerting),
             ..CallIndicatorsUpdates::default()
         };
         assert_eq!(item, expected);
@@ -1285,7 +1271,7 @@ mod tests {
         let item = assert_calls_indicators(&mut exec, &mut calls);
         // Only indicators that have changed are returned.
         let expected = CallIndicatorsUpdates {
-            call: Some(types::Call::Some),
+            call: Some(indicators::Call::Some),
             ..CallIndicatorsUpdates::default()
         };
         assert_eq!(item, expected);
@@ -1297,8 +1283,8 @@ mod tests {
         // Stream has an item ready.
         let item = assert_calls_indicators(&mut exec, &mut calls);
         let expected = CallIndicatorsUpdates {
-            callsetup: Some(types::CallSetup::None),
-            callheld: Some(types::CallHeld::Held),
+            callsetup: Some(indicators::CallSetup::None),
+            callheld: Some(indicators::CallHeld::Held),
             ..CallIndicatorsUpdates::default()
         };
         assert_eq!(item, expected);
@@ -1308,8 +1294,8 @@ mod tests {
         // Stream has an item ready.
         let item = assert_calls_indicators(&mut exec, &mut calls);
         let expected = CallIndicatorsUpdates {
-            call: Some(types::Call::None),
-            callheld: Some(types::CallHeld::None),
+            call: Some(indicators::Call::None),
+            callheld: Some(indicators::CallHeld::None),
             ..CallIndicatorsUpdates::default()
         };
         assert_eq!(item, expected);
@@ -1334,7 +1320,7 @@ mod tests {
 
         let item = assert_calls_indicators(&mut exec, &mut calls);
         let expected = CallIndicatorsUpdates {
-            callsetup: Some(types::CallSetup::Incoming),
+            callsetup: Some(indicators::CallSetup::Incoming),
             ..CallIndicatorsUpdates::default()
         };
         assert_eq!(item, expected);
@@ -1358,7 +1344,7 @@ mod tests {
         // The ready item is OutgoingAlerting even though there is also an IncomingRinging call.
         // This is because the OutgoingAlerting call state was reported last.
         let expected = CallIndicatorsUpdates {
-            call: Some(types::Call::Some),
+            call: Some(indicators::Call::Some),
             ..CallIndicatorsUpdates::default()
         };
         assert_eq!(item, expected);
@@ -1391,8 +1377,8 @@ mod tests {
         let item = assert_calls_indicators(&mut exec, &mut calls);
         // Only indicators that have changed are returned.
         let expected = CallIndicatorsUpdates {
-            callsetup: Some(types::CallSetup::None),
-            callheld: Some(types::CallHeld::HeldAndActive),
+            callsetup: Some(indicators::CallSetup::None),
+            callheld: Some(indicators::CallHeld::HeldAndActive),
             ..CallIndicatorsUpdates::default()
         };
         assert_eq!(item, expected);

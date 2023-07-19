@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use bt_hfp::call::{Direction, Number};
 use fidl_fuchsia_bluetooth_hfp::{CallState, NetworkInformation};
 use fuchsia_async as fasync;
 use fuchsia_bluetooth::types::PeerId;
@@ -11,8 +12,6 @@ use fuchsia_inspect_derive::{AttachError, Inspect};
 use std::collections::VecDeque;
 
 use crate::features::{codecs_to_string, CodecId, HfFeatures};
-use crate::peer::calls::number::Number;
-use crate::peer::calls::types::Direction;
 use crate::peer::service_level_connection::SlcState;
 
 #[derive(Default, Debug)]

@@ -591,7 +591,8 @@ impl PeerTask {
                             self.call_waiting_update(call).await;
                         }
                     }
-                    for status in update.to_vec() {
+                    let statuses = AgIndicator::parse_call_indicators_updates(&update);
+                    for status in statuses {
                         self.phone_status_update(status).await;
                     }
                    // Sync the SCO connection state to the call state.
@@ -887,6 +888,7 @@ mod tests {
         async_test_helpers::run_while,
         async_utils::PollExt,
         at_commands::{self as at, SerDe},
+        bt_hfp::call::Number,
         bt_rfcomm::{profile::build_rfcomm_protocol, ServerChannel},
         core::task::Poll,
         fidl::AsHandleRef,
@@ -912,7 +914,6 @@ mod tests {
         audio::TestAudioControl,
         features::{AgFeatures, HfFeatures},
         peer::{
-            calls::Number,
             indicators::{AgIndicatorsReporting, HfIndicators},
             service_level_connection::{
                 tests::{

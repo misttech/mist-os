@@ -1,41 +1,8 @@
-// Copyright 2021 The Fuchsia Authors. All rights reserved.
+// Copyright 2023 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::peer::indicators::AgIndicator,
-    fidl_fuchsia_bluetooth_hfp::{CallDirection as FidlCallDirection, CallState},
-};
-
-/// The fuchsia.bluetooth.hfp library representation of a Number.
-pub type FidlNumber = String;
-
-/// The direction of call initiation.
-#[derive(Debug, PartialEq, Clone, Copy)]
-pub enum Direction {
-    /// Call originated on this device. This is also known as an Outgoing call.
-    MobileOriginated,
-    /// Call is terminated on this device. This is also known as an Incoming call.
-    MobileTerminated,
-}
-
-impl From<FidlCallDirection> for Direction {
-    fn from(x: FidlCallDirection) -> Self {
-        match x {
-            FidlCallDirection::MobileOriginated => Self::MobileOriginated,
-            FidlCallDirection::MobileTerminated => Self::MobileTerminated,
-        }
-    }
-}
-
-impl From<Direction> for i64 {
-    fn from(x: Direction) -> Self {
-        match x {
-            Direction::MobileOriginated => 0,
-            Direction::MobileTerminated => 1,
-        }
-    }
-}
+use fidl_fuchsia_bluetooth_hfp::CallState;
 
 /// The Call Indicator as specified in HFP v1.8, Section 4.10.1
 #[derive(PartialEq, Clone, Copy, Debug)]
@@ -215,15 +182,6 @@ impl CallIndicatorsUpdates {
             && self.callsetup.is_none()
             && self.callheld.is_none()
             && !self.callwaiting
-    }
-
-    /// Returns a Vec of all updated AG indicators. This vec is ordered by Indicator index.
-    pub fn to_vec(&self) -> Vec<AgIndicator> {
-        let mut v = vec![];
-        v.extend(self.call.map(|i| AgIndicator::Call(i as u8)));
-        v.extend(self.callsetup.map(|i| AgIndicator::CallSetup(i as u8)));
-        v.extend(self.callheld.map(|i| AgIndicator::CallHeld(i as u8)));
-        v
     }
 }
 
@@ -409,29 +367,5 @@ mod tests {
         let mut updates = CallIndicatorsUpdates::default();
         updates.callheld = Some(CallHeld::Held);
         assert!(!updates.is_empty());
-    }
-
-    #[fuchsia::test]
-    fn call_indicator_updates_to_vec() {
-        let mut updates = CallIndicatorsUpdates::default();
-        assert_eq!(updates.to_vec(), vec![]);
-
-        let call = Call::Some;
-        updates.call = Some(call);
-        assert_eq!(updates.to_vec(), vec![AgIndicator::Call(call as u8)]);
-
-        let callsetup = CallSetup::Incoming;
-        updates.callsetup = Some(callsetup);
-        let expected = vec![AgIndicator::Call(call as u8), AgIndicator::CallSetup(callsetup as u8)];
-        assert_eq!(updates.to_vec(), expected);
-
-        let callheld = CallHeld::Held;
-        updates.callheld = Some(callheld);
-        let expected = vec![
-            AgIndicator::Call(call as u8),
-            AgIndicator::CallSetup(callsetup as u8),
-            AgIndicator::CallHeld(callheld as u8),
-        ];
-        assert_eq!(updates.to_vec(), expected);
     }
 }

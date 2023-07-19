@@ -2,8 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::peer::calls::{CallIdx, CallState};
+use bt_hfp::call::list as call_list;
 use fidl_fuchsia_bluetooth_bredr as bredr;
+use fidl_fuchsia_bluetooth_hfp::CallState;
 use {
     async_utils::hanging_get::error::HangingGetServerError, profile_client::Error as ProfileError,
     std::error::Error as StdError, thiserror::Error,
@@ -50,7 +51,7 @@ impl Error {
 #[derive(Debug, PartialEq, Clone, Error)]
 pub enum CallError {
     #[error("Unknown call index {}", .0)]
-    UnknownIndexError(CallIdx),
+    UnknownIndexError(call_list::Idx),
     #[error("No call in states {:?}", .0)]
     None(Vec<CallState>),
 }

@@ -2,7 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 //! Pending call updates
-use super::{CallIdx, CallState};
+use bt_hfp::call::list::Idx as CallIdx;
+use fidl_fuchsia_bluetooth_hfp::CallState;
 use std::collections::hash_map::{Entry, HashMap};
 use std::collections::VecDeque;
 use std::iter::FromIterator;

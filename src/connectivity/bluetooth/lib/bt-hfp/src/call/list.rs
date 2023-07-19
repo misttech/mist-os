@@ -2,7 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use super::CallIdx;
+/// The index associated with a call, that is guaranteed to be unique for the lifetime of the call,
+/// but will be recycled after the call is released.
+pub type Idx = usize;
 
 /// A collection designed for the specific requirements of storing Calls with an associated index.
 ///
@@ -14,20 +16,20 @@ use super::CallIdx;
 ///
 /// Note: "Insert" is a O(n) operation in order to simplify the implementation.
 /// This data structure is best suited towards small n for this reason.
-pub struct CallList<T> {
+pub struct List<T> {
     inner: Vec<Option<T>>,
 }
 
-impl<T> Default for CallList<T> {
+impl<T> Default for List<T> {
     fn default() -> Self {
         Self { inner: Vec::default() }
     }
 }
 
-impl<T> CallList<T> {
+impl<T> List<T> {
     /// Insert a new value into the list, returning an index that is guaranteed to be unique until
     /// the value is removed from the list.
-    pub fn insert(&mut self, value: T) -> CallIdx {
+    pub fn insert(&mut self, value: T) -> Idx {
         let index = if let Some(index) = self.inner.iter_mut().position(|v| v.is_none()) {
             self.inner[index] = Some(value);
             index
@@ -40,7 +42,7 @@ impl<T> CallList<T> {
     }
 
     /// Retrieve a value by index. Returns `None` if the index does not point to a value.
-    pub fn get(&self, index: CallIdx) -> Option<&T> {
+    pub fn get(&self, index: Idx) -> Option<&T> {
         match Self::to_internal_index(index) {
             Some(index) => self.inner.get(index).map(|v| v.as_ref()).unwrap_or(None),
             None => None,
@@ -49,7 +51,7 @@ impl<T> CallList<T> {
 
     /// Retrieve a mutable reference to a value by index. Returns `None` if the index does not point
     /// to a value.
-    pub fn get_mut(&mut self, index: CallIdx) -> Option<&mut T> {
+    pub fn get_mut(&mut self, index: Idx) -> Option<&mut T> {
         match Self::to_internal_index(index) {
             Some(index) => self.inner.get_mut(index).map(|v| v.as_mut()).unwrap_or(None),
             None => None,
@@ -57,7 +59,7 @@ impl<T> CallList<T> {
     }
 
     /// Remove a value by index. Returns `None` if the value did not point to a value.
-    pub fn remove(&mut self, index: CallIdx) -> Option<T> {
+    pub fn remove(&mut self, index: Idx) -> Option<T> {
         match Self::to_internal_index(index) {
             Some(index) => self.inner.get_mut(index).map(|v| v.take()).unwrap_or(None),
             None => None,
@@ -65,27 +67,27 @@ impl<T> CallList<T> {
     }
 
     /// Return an iterator of the calls and associated call indices.
-    pub fn calls(&self) -> impl Iterator<Item = (CallIdx, &T)> + Clone {
+    pub fn calls(&self) -> impl Iterator<Item = (Idx, &T)> + Clone {
         self.inner
             .iter()
             .enumerate()
             .flat_map(|(i, entry)| entry.as_ref().map(|v| (Self::to_call_index(i), v)))
     }
 
-    /// Convert a `CallIdx` to the internal index used to locate a call.
+    /// Convert a `Idx` to the internal index used to locate a call.
     ///
-    /// The CallIdx for a call starts at 1 instead of 0, so the internal index must be decremented
+    /// The Idx for a call starts at 1 instead of 0, so the internal index must be decremented
     /// after being received by the user.
     ///
     /// Returns `None` if `index` is 0 because 0 is an invalid index.
-    fn to_internal_index(index: CallIdx) -> Option<usize> {
+    fn to_internal_index(index: Idx) -> Option<usize> {
         (index != 0).then(|| index - 1)
     }
 
-    /// Convert the internal index for a call to the external `CallIdx`.
-    /// The CallIdx for a call starts at 1 instead of 0, so the internal index must be incremented
+    /// Convert the internal index for a call to the external `Idx`.
+    /// The Idx for a call starts at 1 instead of 0, so the internal index must be incremented
     /// before being returned to the user.
-    fn to_call_index(internal: usize) -> CallIdx {
+    fn to_call_index(internal: usize) -> Idx {
         internal + 1
     }
 }
@@ -96,7 +98,7 @@ mod tests {
 
     #[fuchsia::test]
     fn call_list_insert() {
-        let mut list = CallList::default();
+        let mut list = List::default();
         let i1 = list.insert(1);
         assert_eq!(i1, 1, "The first value must be assigned the number 1");
         let i2 = list.insert(2);
@@ -105,7 +107,7 @@ mod tests {
 
     #[fuchsia::test]
     fn call_list_get() {
-        let mut list = CallList::default();
+        let mut list = List::default();
         let i1 = list.insert(1);
         let i2 = list.insert(2);
         assert_eq!(list.get(0), None);
@@ -116,7 +118,7 @@ mod tests {
 
     #[fuchsia::test]
     fn call_list_get_mut() {
-        let mut list = CallList::default();
+        let mut list = List::default();
         let i1 = list.insert(1);
         let i2 = list.insert(2);
         assert_eq!(list.get_mut(i1), Some(&mut 1));
@@ -126,7 +128,7 @@ mod tests {
 
     #[fuchsia::test]
     fn call_list_remove() {
-        let mut list = CallList::default();
+        let mut list = List::default();
         let i1 = list.insert(1);
         let i2 = list.insert(2);
         let removed = list.remove(i1);
@@ -139,7 +141,7 @@ mod tests {
 
     #[fuchsia::test]
     fn call_list_remove_and_insert_behaves() {
-        let mut list = CallList::default();
+        let mut list = List::default();
         let i1 = list.insert(1);
         let i2 = list.insert(2);
         let i3 = list.insert(3);
@@ -164,7 +166,7 @@ mod tests {
 
     #[fuchsia::test]
     fn call_list_iter_returns_all_valid_values() {
-        let mut list = CallList::default();
+        let mut list = List::default();
         let i1 = list.insert(1);
         let i2 = list.insert(2);
         let i3 = list.insert(3);
