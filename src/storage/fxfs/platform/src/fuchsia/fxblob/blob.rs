@@ -94,6 +94,11 @@ impl FxBlob {
         uncompressed_size: u64,
     ) -> Arc<Self> {
         let buffer = handle.owner().create_data_buffer(handle.object_id(), uncompressed_size);
+        let vmo = buffer.vmo();
+        let trimmed_merkle = &merkle_tree.root().to_string()[0..8];
+        let name = format!("blob-{}", trimmed_merkle);
+        let cstr_name = std::ffi::CString::new(name).unwrap();
+        vmo.set_name(&cstr_name).unwrap();
         let file = Arc::new(Self {
             handle,
             buffer,

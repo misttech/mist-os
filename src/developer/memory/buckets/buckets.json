@@ -36,6 +36,12 @@
         "event_code": 5
     },
     {
+        "name": "Fxblob",
+        "process": "fxfs\\.cm",
+        "vmo": "blob-.*",
+        "event_code": 73
+    },
+    {
         "name": "Storage",
         "process": "fshost\\.cm|fxfs-crypt\\.cm|fxfs\\.cm|memfs\\.cm|decompressor-sandbox\\.cm",
         "vmo": "",
