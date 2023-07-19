@@ -2,10 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use async_channel::{Receiver, Sender};
 use diagnostics_data::LogTextDisplayOptions;
 use error::LogError;
-use fho::{daemon_protocol, AvailabilityFlag, FfxMain, FfxTool, MachineWriter, ToolIO, TryFromEnv};
+use fho::{daemon_protocol, AvailabilityFlag, FfxMain, FfxTool, MachineWriter, ToolIO};
 use fidl::endpoints::create_proxy;
 use fidl_fuchsia_developer_ffx::{TargetCollectionProxy, TargetQuery};
 use fidl_fuchsia_developer_remotecontrol::RemoteControlProxy;
@@ -19,7 +18,7 @@ use log_command::{
     },
     LogCommand, LogSubCommand, WatchCommand,
 };
-use log_symbolizer::{LogSymbolizer, Symbolizer};
+use log_symbolizer::NoOpSymbolizer;
 use std::io::Write;
 use symbolizer::SymbolizerChannel;
 
@@ -32,84 +31,6 @@ mod testing_utils;
 const ARCHIVIST_MONIKER: &str = "/bootstrap/archivist";
 const TIMEOUT: std::time::Duration = std::time::Duration::from_secs(15);
 
-/// Symbolizer implementing Symbolizer + Debug.
-/// See https://github.com/rust-lang/rfcs/issues/2035 for why this is needed.
-trait DebugSymbolizer {
-    fn get_symbolizer(&self) -> &dyn Symbolizer;
-    fn get_debug(&self) -> &dyn std::fmt::Debug;
-}
-
-impl<T> DebugSymbolizer for T
-where
-    T: std::fmt::Debug + Symbolizer,
-{
-    fn get_symbolizer(&self) -> &dyn Symbolizer {
-        self
-    }
-    fn get_debug(&self) -> &dyn std::fmt::Debug {
-        self
-    }
-}
-
-/// Holds a debuggable symbolizer, needed
-/// because we can't impl a foreign trait generically.
-struct DebuggableSymbolizerContainer {
-    inner: Box<dyn DebugSymbolizer>,
-}
-
-impl From<Box<dyn DebugSymbolizer>> for DebuggableSymbolizerContainer {
-    fn from(value: Box<dyn DebugSymbolizer>) -> Self {
-        Self { inner: value }
-    }
-}
-
-impl Symbolizer for DebuggableSymbolizerContainer {
-    fn start<'life0, 'async_trait>(
-        &'life0 self,
-        rx: Receiver<String>,
-        tx: Sender<String>,
-        extra_args: Vec<String>,
-    ) -> core::pin::Pin<Box<dyn core::future::Future<Output = anyhow::Result<()>> + 'async_trait>>
-    where
-        'life0: 'async_trait,
-        Self: 'async_trait,
-    {
-        self.inner.get_symbolizer().start(rx, tx, extra_args)
-    }
-}
-
-impl std::fmt::Debug for DebuggableSymbolizerContainer {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        self.inner.get_debug().fmt(f)
-    }
-}
-
-/// Environment used to inject things for testing
-trait Environment {
-    fn create_symbolizer(&self) -> Box<dyn DebugSymbolizer>;
-}
-
-/// Real (non-test) environment
-struct RealEnvironment;
-
-impl Environment for RealEnvironment {
-    fn create_symbolizer(&self) -> Box<dyn DebugSymbolizer> {
-        Box::new(LogSymbolizer::new())
-    }
-}
-
-impl TryFromEnv for Box<dyn Environment> {
-    fn try_from_env<'life0, 'async_trait>(
-        _env: &'life0 fho::FhoEnvironment,
-    ) -> core::pin::Pin<Box<dyn core::future::Future<Output = fho::Result<Self>> + 'async_trait>>
-    where
-        'life0: 'async_trait,
-        Self: 'async_trait,
-    {
-        Box::pin(futures::future::ready(Ok(Box::new(RealEnvironment) as Box<dyn Environment>)))
-    }
-}
-
 #[derive(FfxTool)]
 #[check(AvailabilityFlag("ffx_log_ng.enabled"))]
 pub struct LogTool {
@@ -118,7 +39,6 @@ pub struct LogTool {
     rcs_proxy: RemoteControlProxy,
     #[command]
     cmd: LogCommand,
-    env: Box<dyn Environment>,
 }
 
 #[async_trait::async_trait(?Send)]
@@ -126,7 +46,7 @@ impl FfxMain for LogTool {
     type Writer = MachineWriter<LogEntry>;
 
     async fn main(self, writer: Self::Writer) -> fho::Result<()> {
-        log_main(writer, self.rcs_proxy, self.target_collection, self.cmd, self.env).await?;
+        log_main(writer, self.rcs_proxy, self.target_collection, self.cmd).await?;
         Ok(())
     }
 }
@@ -137,7 +57,6 @@ async fn log_main(
     rcs_proxy: RemoteControlProxy,
     target_collection_proxy: TargetCollectionProxy,
     cmd: LogCommand,
-    env: Box<dyn Environment>,
 ) -> Result<(), LogError> {
     let is_json = writer.is_machine();
     let node_name = rcs_proxy.identify_host().await??.nodename;
@@ -155,7 +74,6 @@ async fn log_main(
                 ..Default::default()
             },
         ),
-        env,
     )
     .await?;
     Ok(())
@@ -231,7 +149,6 @@ async fn log_loop<W>(
     target_query: TargetQuery,
     cmd: LogCommand,
     mut formatter: impl LogFormatter + BootTimeAccessor + WriterContainer<W>,
-    env: Box<dyn Environment>,
 ) -> Result<(), LogError>
 where
     W: ToolIO<OutputItem = LogEntry> + Write,
@@ -251,8 +168,7 @@ where
         let maybe_err = dump_logs_from_socket(
             connection.log_socket,
             &mut formatter,
-            &SymbolizerChannel::new(DebuggableSymbolizerContainer::from(env.create_symbolizer()))
-                .await?,
+            &SymbolizerChannel::new(NoOpSymbolizer::new()).await?,
         )
         .await;
         if stream_mode == fidl_fuchsia_diagnostics::StreamMode::Snapshot {
@@ -289,12 +205,9 @@ fn get_stream_mode(cmd: LogCommand) -> Result<fidl_fuchsia_diagnostics::StreamMo
 
 #[cfg(test)]
 mod tests {
-    use std::rc::Rc;
-
     use super::*;
     use crate::testing_utils::{
-        handle_rcs_connection, handle_target_collection_connection, Configuration, TaskManager,
-        TestEvent,
+        handle_rcs_connection, handle_target_collection_connection, TaskManager, TestEvent,
     };
     use assert_matches::assert_matches;
     use diagnostics_data::{BuilderArgs, LogsDataBuilder, Severity, Timestamp};
@@ -303,107 +216,7 @@ mod tests {
     use fidl_fuchsia_developer_remotecontrol::RemoteControlMarker;
     use futures::StreamExt;
     use log_command::{log_formatter::LogData, parse_time, DumpCommand};
-    use log_symbolizer::{FakeSymbolizerForTest, NoOpSymbolizer};
     use selectors::parse_log_interest_selector;
-    struct TestEnvironment;
-
-    impl Environment for TestEnvironment {
-        fn create_symbolizer(&self) -> Box<dyn DebugSymbolizer> {
-            Box::new(NoOpSymbolizer::new())
-        }
-    }
-
-    impl TestEnvironment {
-        fn new() -> Box<Self> {
-            Box::new(Self)
-        }
-    }
-
-    struct FakeSymbolizerEnvironment;
-
-    impl FakeSymbolizerEnvironment {
-        fn new() -> Box<Self> {
-            Box::new(Self)
-        }
-    }
-
-    impl Environment for FakeSymbolizerEnvironment {
-        fn create_symbolizer(&self) -> Box<dyn DebugSymbolizer> {
-            Box::new(FakeSymbolizerForTest::new("prefix", vec![]))
-        }
-    }
-
-    #[fuchsia::test]
-    async fn symbolizer_replaces_markers_with_symbolized_logs() {
-        let (rcs_proxy, rcs_server) = create_proxy::<RemoteControlMarker>().unwrap();
-        let (target_collection_proxy, target_collection_server) =
-            create_proxy::<TargetCollectionMarker>().unwrap();
-        let tool = LogTool {
-            cmd: LogCommand {
-                sub_command: Some(LogSubCommand::Dump(DumpCommand {
-                    session: log_command::SessionSpec::Relative(0),
-                })),
-                ..LogCommand::default()
-            },
-            rcs_proxy: rcs_proxy,
-            target_collection: target_collection_proxy,
-            env: FakeSymbolizerEnvironment::new(),
-        };
-        let mut task_manager = TaskManager::new_with_config(Rc::new(Configuration {
-            messages: vec![
-                LogsDataBuilder::new(BuilderArgs {
-                    component_url: Some("ffx".into()),
-                    moniker: "ffx".into(),
-                    severity: Severity::Info,
-                    timestamp_nanos: Timestamp::from(0),
-                })
-                .set_message("{{{reset}}}")
-                .build(),
-                LogsDataBuilder::new(BuilderArgs {
-                    component_url: Some("ffx".into()),
-                    moniker: "ffx".into(),
-                    severity: Severity::Info,
-                    timestamp_nanos: Timestamp::from(0),
-                })
-                .set_message("{{{mmap:something}}")
-                .build(),
-                LogsDataBuilder::new(BuilderArgs {
-                    component_url: Some("ffx".into()),
-                    moniker: "ffx".into(),
-                    severity: Severity::Info,
-                    timestamp_nanos: Timestamp::from(0),
-                })
-                .set_message("not_real")
-                .build(),
-            ],
-            ..Default::default()
-        }));
-        let mut event_stream = task_manager.take_event_stream().unwrap();
-        let scheduler = task_manager.get_scheduler();
-        task_manager.spawn(handle_rcs_connection(rcs_server, scheduler.clone()));
-        task_manager.spawn(handle_target_collection_connection(
-            target_collection_server,
-            scheduler.clone(),
-        ));
-        let test_buffers = TestBuffers::default();
-        let mut main_result = task_manager
-            .spawn_result(tool.main(MachineWriter::<LogEntry>::new_test(None, &test_buffers)));
-        // Run all tasks until exit.
-        task_manager.run().await;
-        // Ensure that main exited successfully.
-        main_result.next().await.unwrap().unwrap();
-
-        assert_eq!(
-            test_buffers.stdout.into_string().split('\n').collect::<Vec<_>>(),
-            vec![
-                "[00000.000000][][][ffx] INFO: prefix{{{reset}}}",
-                "[00000.000000][][][ffx] INFO: prefix{{{mmap:something}}",
-                "[00000.000000][][][ffx] INFO: not_real",
-                ""
-            ]
-        );
-        assert_matches!(event_stream.next().await, Some(TestEvent::LogSettingsConnectionClosed));
-    }
 
     #[fuchsia::test]
     async fn json_logger_test() {
@@ -419,7 +232,6 @@ mod tests {
             },
             rcs_proxy: rcs_proxy,
             target_collection: target_collection_proxy,
-            env: TestEnvironment::new(),
         };
         let task_manager = TaskManager::new();
         let scheduler = task_manager.get_scheduler();
@@ -469,7 +281,6 @@ mod tests {
             },
             rcs_proxy: rcs_proxy,
             target_collection: target_collection_proxy,
-            env: TestEnvironment::new(),
         };
         let task_manager = TaskManager::new();
         let scheduler = task_manager.get_scheduler();
@@ -509,7 +320,6 @@ mod tests {
             },
             rcs_proxy: rcs_proxy,
             target_collection: target_collection_proxy,
-            env: TestEnvironment::new(),
         };
         let mut task_manager = TaskManager::new();
         let mut event_stream = task_manager.take_event_stream().unwrap();
@@ -550,7 +360,6 @@ mod tests {
             },
             rcs_proxy: rcs_proxy,
             target_collection: target_collection_proxy,
-            env: TestEnvironment::new(),
         };
         let mut task_manager = TaskManager::new();
         let mut event_stream = task_manager.take_event_stream().unwrap();
