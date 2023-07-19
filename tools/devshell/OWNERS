@@ -9,11 +9,10 @@ per-file             tests/subcommands/fx_serve_update_test = file: /src/sys/pkg
 per-file             flash,flash-migration,flash-remote                = file: /src/firmware/OWNERS
 per-file             pave,pave-remote,pave-zedboot,pave-zedboot-remote = joshuaseaton@google.com,surajmalhotra@google.com
 
-per-file             args,build,clean,clean-build,gen,get-build-artifacts = file: /build/OWNERS
-per-file             get-build-dir,list-boards,list-build-artifacts       = file: /build/OWNERS
-per-file             list-products,ninjatrace2json,set-build-dir,use      = file: /build/OWNERS
-per-file             list-packages,get-src-dir                            = file: /build/OWNERS
-per-file             get-flash-source                                     = file: /build/OWNERS
+per-file             args,build,clean,clean-build,gen,get-build-artifacts   = file: /build/OWNERS
+per-file             get-build-dir,get-flash-source,get-src-dir,list-boards = file: /build/OWNERS
+per-file             list-build-artifacts,list-products,ninjatrace2json     = file: /build/OWNERS
+per-file             set-build-dir,use                                      = file: /build/OWNERS
 
 per-file             repro = olivernewman@google.com
 
@@ -37,4 +36,3 @@ per-file tests/subcommands/fx_format_code_test = jeremymanson@google.com
 per-file tests/subcommands/fx_setup_go_test =  olivernewman@google.com
 
 per-file doc-checker.fx,mdlint.fx       = file: /tools/doc_checker/OWNERS
-

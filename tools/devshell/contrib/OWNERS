@@ -24,6 +24,7 @@ per-file             goma = file: /build/OWNERS
 per-file iquery=crjohns@google.com
 per-file             is-incremental-publisher-running = file: /src/sys/pkg/OWNERS
 per-file lint=haowei@google.com,phosek@google.com
+per-file list-packages,list_packages.py,list_packages_test.py = file: /src/sys/pkg/OWNERS
 per-file make-integration-patch=thatguy@google.com
 per-file merge-package-config=chaselatta@google.com
 per-file mkinstaller = file: /src/firmware/OWNERS
