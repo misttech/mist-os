@@ -12,28 +12,47 @@ import("//build/bazel/legacy_ninja_build_outputs.gni")
 import("//build/security.gni")
 import("//tools/check-licenses/build/license_data.gni")
 
+declare_args() {
+  # Whether to generate real licenses for
+  # `//build/bazel/licenses:legacy_ninja_build_outputs_licenses_spdx`.
+  # License collection + generation for ninja targets is slow and expensive,
+  # so it is turned off by default, and a placeholder is produced instead.
+  generate_legacy_ninja_build_outputs_licenses_spdx = false
+}
+
 # TODO(fxb/117740): We only need to cover bazel inputs that end up in the product,
 # e.g. not tests or build tools. This can be achieved by adding metadata to
 # the bazel inputs list (i.e. converting it into some dictionary) or by
 # splitting into more granular lists.
 
-group("all_bazel_inputs") {
-  deps = gn_labels_for_bazel_inputs + extra_gn_labels_for_bazel_inputs
-
+_excluded_bazel_inputs = [
   # Remove a potential circular dependency on the spdx bazel_input_resource itself.
-  deps -= [ "//build/bazel/licenses:all_bazel_inputs_licenses_spdx" ]
+  "//build/bazel/licenses:legacy_ninja_build_outputs_licenses_spdx",
 
-  # Remove eng-only AIBs which are testonly.
-  deps -= eng_only_platform_aib_labels
+  # TODO(fxb/130784): Remove once not used downstream.
+  "//build/bazel/licenses:all_bazel_inputs_licenses_spdx",
 
   # See fxb/126949#c15. Zedboot is only used in eng builds and is testonly, so can't
   # be used in license calculations.
-  deps -= [ "//build/images/zedboot:zedboot.bazel_legacy_aib" ]
+  "//build/images/zedboot:zedboot.bazel_legacy_aib",
 
-  if (fuchsia_zbi_testonly) {
-    # Remove fuchsia_zbi_testonly=true targets. See fxb/126949#c18 for why that is ok.
-    deps -= [ "//build/images/fuchsia:fuchsia.bazel_legacy_aib" ]
-  }
+  # Bringup is testonly too.
+  "//build/images/bringup:bringup.bazel_legacy_aib",
+]
+
+_excluded_bazel_inputs += eng_only_platform_aib_labels
+
+if (fuchsia_zbi_testonly) {
+  # Remove fuchsia_zbi_testonly=true targets. See fxb/126949#c18 for why that is ok.
+  _excluded_bazel_inputs +=
+      [ "//build/images/fuchsia:fuchsia.bazel_legacy_aib" ]
+}
+
+group("all_bazel_inputs") {
+  deps = gn_labels_for_bazel_inputs + extra_gn_labels_for_bazel_inputs
+
+  deps += _excluded_bazel_inputs
+  deps -= _excluded_bazel_inputs
 }
 
 # Collects the license data for all GN inputs and makes it available for Bazel
@@ -69,8 +88,32 @@ license_data("licenses_data") {
 #       `rm -rf out/default/obj/build/bazel/licenses/licenses_data/`
 #     * fxbug.dev/117694 workaround: Manually delete cached depenedncy calculation:
 #       `rm out/default/project.json`
+#
+# Deprecated: Use `:legacy_ninja_build_outputs_licenses` instead.
+# TODO(fxb/130784): Remove once not used downstream.
 bazel_input_resource("all_bazel_inputs_licenses_spdx") {
   deps = [ ":licenses_data" ]
   sources = get_target_outputs(":licenses_data_spdx_copy")
   outputs = [ "licenses_data/results.spdx.json" ]
+}
+
+if (generate_legacy_ninja_build_outputs_licenses_spdx) {
+  # (1) license_data dependency above is VERY SLOW.
+  # (2) When developing locally, since license_data may produce inaccurate
+  #     results if you didn't 'fx clean'. If you want to avoid 'fx clean' do:
+  #     * fxbug.dev/84924 workaround: Manually delete the SPDX output :
+  #       `rm -rf out/default/obj/build/bazel/licenses/licenses_data/`
+  #     * fxbug.dev/117694 workaround: Manually delete cached depenedency calculation:
+  #       `rm out/default/project.json`
+  bazel_input_resource("legacy_ninja_build_outputs_licenses_spdx") {
+    deps = [ ":licenses_data" ]
+    sources = get_target_outputs(":licenses_data_spdx_copy")
+    outputs = [ "legacy_ninja_build_outputs_licenses.spdx.json" ]
+  }
+} else {
+  # Use a placeholder instead.
+  bazel_input_resource("legacy_ninja_build_outputs_licenses_spdx") {
+    sources = [ "licenses_placeholder.spdx.json" ]
+    outputs = [ "legacy_ninja_build_outputs_licenses.spdx.json" ]
+  }
 }

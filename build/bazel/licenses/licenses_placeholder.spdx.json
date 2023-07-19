@@ -1,0 +1,34 @@
+{
+    "spdxVersion": "SPDX-2.3",
+    "dataLicense": "CC0-1.0",
+    "SPDXID": "SPDXRef-DOCUMENT",
+    "name": "Fuchsia Bazel Inputs Licenses Placeholder",
+    "documentNamespace": "",
+    "creationInfo": {
+        "creators": [
+            "Organization: Google LLC"
+        ]
+    },
+    "packages": [
+        {
+            "name": "Fuchsia",
+            "SPDXID": "SPDXRef-Package-main",
+            "downloadLocation": "",
+            "licenseConcluded": "License-0"
+        }
+    ],
+    "hasExtractedLicensingInfos": [
+        {
+            "licenseId": "License-0",
+            "extractedText": "This is not a license. This is a placeholder. \nPlease build with gn arg `legacy_ninja_build_outputs_licenses_spdx=true`.",
+            "name": "License Placeholder"
+        }
+    ],
+    "relationships": [
+        {
+            "spdxElementId": "SPDXRef-DOCUMENT",
+            "relatedSpdxElement": "SPDXRef-Package-main",
+            "relationshipType": "DESCRIBES"
+        }
+    ]
+}

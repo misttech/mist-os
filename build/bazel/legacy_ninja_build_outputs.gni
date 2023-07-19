@@ -35,6 +35,7 @@ bazel_inputs_manifest =
 #
 gn_labels_for_bazel_inputs =
     [
+      "//build/bazel/licenses:legacy_ninja_build_outputs_licenses_spdx",
       "//build/bazel/tests/bazel_input_resource_directory:bazel_inputs",
       "//build/bazel/tests/build_action:bazel_inputs",
       "//build/bazel:build_args_bazel_inputs",

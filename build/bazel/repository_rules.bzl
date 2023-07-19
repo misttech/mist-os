@@ -32,8 +32,11 @@ def _ninja_target_from_gn_label(gn_label):
 def _bazel_inputs_repository_impl(repo_ctx):
     build_bazel_content = '''# Auto-generated - do not edit
 
+load("@rules_license//rules:license.bzl", "license")
+
 package(
-    default_visibility = ["//visibility:public"]
+    default_visibility = ["//visibility:public"],
+    default_applicable_licenses = [ ":license" ],
 )
 
 exports_files(
@@ -42,6 +45,12 @@ exports_files(
       exclude=["ninja_output"],
       exclude_directories=0,
     )
+)
+
+license(
+    name = "license",
+    package_name = "Legacy Ninja Build Outputs",
+    license_text = "legacy_ninja_build_outputs_licenses.spdx.json"
 )
 
 '''
