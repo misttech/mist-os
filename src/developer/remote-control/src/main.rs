@@ -17,7 +17,7 @@ use {
     remote_control::RemoteControlService,
     std::rc::Rc,
     std::sync::Arc,
-    tracing::{error, info},
+    tracing::{debug, error, info},
 };
 
 mod args;
@@ -63,7 +63,11 @@ async fn exec_server() -> Result<(), Error> {
                         .map(|(result, ())| result)
                         .await
                         {
-                            error!("Error handling Overnet link: {:?}", e);
+                            if let circuit::Error::ConnectionClosed(msg) = e {
+                                debug!("Overnet link closed: {:?}", msg);
+                            } else {
+                                error!("Error handling Overnet link: {:?}", e);
+                            }
                         }
                     }
                     Err(e) => error!("Could not handle incoming link socket: {:?}", e),
