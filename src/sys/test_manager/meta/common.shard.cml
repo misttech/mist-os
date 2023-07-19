@@ -127,6 +127,8 @@
             environment: "#test-env",
             durability: "transient",
         },
+
+        // TODO(https://fxbug.dev/130867) prefer src/sys/testing/meta/starnix-tests.shard.cml
         {
             name: "starnix-tests",
             environment: "#test-env",
@@ -211,6 +213,7 @@
             directory: "dev-builtin",
             from: "parent",
             to: [
+                // TODO(https://fxbug.dev/130867) prefer src/sys/testing/meta/starnix-tests.shard.cml
                 "#starnix-tests",
                 "#system-tests",
                 "#tests",
@@ -224,11 +227,14 @@
             ],
             from: "parent",
             to: [
+                // TODO(https://fxbug.dev/130867) prefer src/sys/testing/meta/starnix-tests.shard.cml
                 "#starnix-tests",
                 "#system-tests",
                 "#tests",
             ],
         },
+
+        // TODO(https://fxbug.dev/130867) prefer src/sys/testing/meta/starnix-tests.shard.cml
         {
             event_stream: [
                 "capability_requested",
@@ -358,6 +364,8 @@
             from: "parent",
             to: [ "#starnix_test_runners" ],
         },
+
+        // TODO(https://fxbug.dev/130867) prefer src/sys/testing/meta/starnix-tests.shard.cml
         {
             protocol: [
                 "fuchsia.kernel.Stats",
@@ -455,6 +463,7 @@
             from: "self",
             as: "data",
             to: [
+                // TODO(https://fxbug.dev/130867) prefer src/sys/testing/meta/starnix-tests.shard.cml
                 "#starnix-tests",
                 "#system-tests",
                 "#tests",
@@ -503,6 +512,8 @@
             from: "self",
             to: [
                 "#g3_dart_jit_product_runner",
+
+                // TODO(https://fxbug.dev/130867) prefer src/sys/testing/meta/starnix-tests.shard.cml
                 "#starnix-tests",
                 "#starnix_test_runners",
                 "#system-tests",
@@ -513,6 +524,7 @@
             storage: "cache",
             from: "self",
             to: [
+                // TODO(https://fxbug.dev/130867) prefer src/sys/testing/meta/starnix-tests.shard.cml
                 "#starnix-tests",
                 "#system-tests",
                 "#tests",
@@ -583,6 +595,7 @@
             directory: "dev-gpu",
             from: "parent",
             to: [
+                // TODO(https://fxbug.dev/130867) prefer src/sys/testing/meta/starnix-tests.shard.cml
                 "#starnix-tests",
                 "#starnix_test_runners",
                 "#system-tests",
