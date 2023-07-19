@@ -29,6 +29,7 @@ use {
         errors::FxfsError,
         filesystem::{ApplyContext, ApplyMode, Filesystem, SyncOptions},
         log::*,
+        lsm_tree::cache::NullCache,
         object_handle::{ObjectHandle as _, ReadObjectHandle},
         object_store::{
             allocator::{Allocator, SimpleAllocator},
@@ -532,6 +533,7 @@ impl Journal {
             super_block.root_store_object_id,
             filesystem.clone(),
             None,
+            Box::new(NullCache {}),
             None,
             LockState::Unencrypted,
             LastObjectId::default(),
@@ -911,8 +913,12 @@ impl Journal {
             ..self.inner.lock().unwrap().writer.journal_file_checkpoint()
         };
 
-        let root_parent =
-            ObjectStore::new_empty(None, INIT_ROOT_PARENT_STORE_OBJECT_ID, filesystem.clone());
+        let root_parent = ObjectStore::new_empty(
+            None,
+            INIT_ROOT_PARENT_STORE_OBJECT_ID,
+            filesystem.clone(),
+            Box::new(NullCache {}),
+        );
         self.objects.set_root_parent_store(root_parent.clone());
 
         let allocator =
@@ -932,6 +938,7 @@ impl Journal {
             .new_child_store(
                 &mut transaction,
                 NewChildStoreOptions { object_id: INIT_ROOT_STORE_OBJECT_ID, ..Default::default() },
+                Box::new(NullCache {}),
             )
             .await
             .context("new_child_store")?;

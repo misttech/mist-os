@@ -17,7 +17,7 @@ use {
     async_trait::async_trait,
     fprint::TypeFingerprint,
     serde::{Deserialize, Serialize},
-    std::{fmt::Debug, sync::Arc},
+    std::{fmt::Debug, hash::Hash, sync::Arc},
 };
 
 // Force keys to be sorted first by a u64, so that they can be located approximately based on only
@@ -32,6 +32,7 @@ pub trait SortByU64 {
 pub trait Key:
     Clone
     + Debug
+    + Hash
     + OrdUpperBound
     + Send
     + SortByU64
@@ -51,6 +52,7 @@ pub trait RangeKey: Key {
 impl<K> Key for K where
     K: Clone
         + Debug
+        + Hash
         + OrdUpperBound
         + Send
         + SortByU64

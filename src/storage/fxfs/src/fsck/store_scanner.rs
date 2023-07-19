@@ -13,9 +13,9 @@ use {
         object_store::{
             allocator::{self, AllocatorKey, AllocatorValue},
             graveyard::Graveyard,
-            AttributeKey, EncryptionKeys, ExtendedAttributeValue, ExtentKey, ExtentValue,
-            ObjectAttributes, ObjectDescriptor, ObjectKey, ObjectKeyData, ObjectKind, ObjectStore,
-            ObjectValue, ProjectProperty, DEFAULT_DATA_ATTRIBUTE_ID,
+            AttributeKey, ChildValue, EncryptionKeys, ExtendedAttributeValue, ExtentKey,
+            ExtentValue, ObjectAttributes, ObjectDescriptor, ObjectKey, ObjectKeyData, ObjectKind,
+            ObjectStore, ObjectValue, ProjectProperty, DEFAULT_DATA_ATTRIBUTE_ID,
         },
         range::RangeExt,
         round::round_up,
@@ -333,7 +333,7 @@ impl<'a> ScannedStore<'a> {
             }
             ObjectKeyData::Child { name: ref _name } => match value {
                 ObjectValue::None => {}
-                ObjectValue::Child { object_id: child_id, object_descriptor } => {
+                ObjectValue::Child(ChildValue { object_id: child_id, object_descriptor }) => {
                     if *child_id == INVALID_OBJECT_ID {
                         self.fsck.warning(FsckWarning::InvalidObjectIdInStore(
                             self.store_id,
@@ -659,7 +659,7 @@ async fn scan_extents_and_directory_children<'a>(
             }
             ItemRef {
                 key: ObjectKey { object_id, data: ObjectKeyData::Child { .. } },
-                value: ObjectValue::Child { object_id: child_id, object_descriptor },
+                value: ObjectValue::Child(ChildValue { object_id: child_id, object_descriptor }),
                 ..
             } => scanned.process_child(*object_id, *child_id, object_descriptor)?,
             _ => {}

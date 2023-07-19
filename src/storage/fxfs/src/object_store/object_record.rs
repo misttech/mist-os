@@ -14,9 +14,12 @@ use {
     fprint::TypeFingerprint,
     fxfs_crypto::WrappedKeys,
     serde::{Deserialize, Serialize},
-    std::convert::From,
-    std::default::Default,
-    std::time::{Duration, SystemTime, UNIX_EPOCH},
+    std::{
+        convert::From,
+        default::Default,
+        hash::Hash,
+        time::{Duration, SystemTime, UNIX_EPOCH},
+    },
 };
 
 /// ObjectDescriptor is the set of possible records in the object store.
@@ -34,7 +37,9 @@ pub enum ObjectDescriptor {
 }
 
 /// For specifying what property of the project is being addressed.
-#[derive(Clone, Debug, Eq, Ord, PartialEq, PartialOrd, Serialize, Deserialize, TypeFingerprint)]
+#[derive(
+    Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd, Serialize, Deserialize, TypeFingerprint,
+)]
 #[cfg_attr(fuzz, derive(arbitrary::Arbitrary))]
 pub enum ProjectProperty {
     /// The configured limit for the project.
@@ -43,7 +48,9 @@ pub enum ProjectProperty {
     Usage,
 }
 
-#[derive(Clone, Debug, Eq, PartialEq, PartialOrd, Ord, Serialize, Deserialize, TypeFingerprint)]
+#[derive(
+    Clone, Debug, Eq, Hash, PartialEq, PartialOrd, Ord, Serialize, Deserialize, TypeFingerprint,
+)]
 #[cfg_attr(fuzz, derive(arbitrary::Arbitrary))]
 pub enum ObjectKeyData {
     /// A generic, untyped object.  This must come first and sort before all other keys for a given
@@ -87,7 +94,9 @@ pub enum ObjectKeyDataV5 {
     GraveyardEntry { object_id: u64 },
 }
 
-#[derive(Clone, Debug, Eq, Ord, PartialEq, PartialOrd, Serialize, Deserialize, TypeFingerprint)]
+#[derive(
+    Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd, Serialize, Deserialize, TypeFingerprint,
+)]
 #[cfg_attr(fuzz, derive(arbitrary::Arbitrary))]
 pub enum AttributeKey {
     // Order here is important: code expects Attribute to precede Extent.
@@ -97,7 +106,17 @@ pub enum AttributeKey {
 
 /// ObjectKey is a key in the object store.
 #[derive(
-    Clone, Debug, Eq, Ord, PartialEq, PartialOrd, Serialize, Deserialize, TypeFingerprint, Versioned,
+    Clone,
+    Debug,
+    Eq,
+    Ord,
+    Hash,
+    PartialEq,
+    PartialOrd,
+    Serialize,
+    Deserialize,
+    TypeFingerprint,
+    Versioned,
 )]
 #[cfg_attr(fuzz, derive(arbitrary::Arbitrary))]
 pub struct ObjectKey {
@@ -481,6 +500,16 @@ pub enum ExtendedAttributeValue {
     AttributeId(u64),
 }
 
+/// Id and descriptor for a child entry.
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, TypeFingerprint)]
+#[cfg_attr(fuzz, derive(arbitrary::Arbitrary))]
+pub struct ChildValue {
+    /// The ID of the child object.
+    pub object_id: u64,
+    /// Describes the type of the child.
+    pub object_descriptor: ObjectDescriptor,
+}
+
 /// ObjectValue is the value of an item in the object store.
 /// Note that the tree stores deltas on objects, so these values describe deltas. Unless specified
 /// otherwise, a value indicates an insert/replace mutation.
@@ -502,14 +531,13 @@ pub enum ObjectValue {
     Attribute { size: u64 },
     /// An extent associated with an object.
     Extent(ExtentValue),
-    /// A child of an object. |object_id| is the ID of the child, and |object_descriptor| describes
-    /// the child.
-    Child { object_id: u64, object_descriptor: ObjectDescriptor },
+    /// A child of an object.
+    Child(ChildValue),
     /// Graveyard entries can contain these entries which will cause a file that has extents beyond
     /// EOF to be trimmed at mount time.  This is used in cases where shrinking a file can exceed
     /// the bounds of a single transaction.
     Trim,
-    /// Tracking a bytes and nodes pair. Added to support tracking Project ID usage and limits.
+    /// Added to support tracking Project ID usage and limits.
     BytesAndNodes { bytes: i64, nodes: i64 },
     /// A value for an extended attribute. Either inline or a redirection to an attribute with
     /// extents.
@@ -524,7 +552,7 @@ pub enum ObjectValueV30 {
     Keys(EncryptionKeys),
     Attribute { size: u64 },
     Extent(ExtentValue),
-    Child { object_id: u64, object_descriptor: ObjectDescriptor },
+    Child(ChildValue),
     Trim,
     BytesAndNodes { bytes: i64, nodes: i64 },
     ExtendedAttribute(ExtendedAttributeValue),
@@ -580,9 +608,7 @@ impl From<ObjectValueV30> for ObjectValue {
             ObjectValueV30::Keys(keys) => ObjectValue::Keys(keys),
             ObjectValueV30::Attribute { size } => ObjectValue::Attribute { size },
             ObjectValueV30::Extent(extent_value) => ObjectValue::Extent(extent_value),
-            ObjectValueV30::Child { object_id, object_descriptor } => {
-                ObjectValue::Child { object_id, object_descriptor }
-            }
+            ObjectValueV30::Child(child) => ObjectValue::Child(child),
             ObjectValueV30::Trim => ObjectValue::Trim,
             ObjectValueV30::BytesAndNodes { bytes, nodes } => {
                 ObjectValue::BytesAndNodes { bytes, nodes }
@@ -601,7 +627,7 @@ pub enum ObjectValueV29 {
     Keys(EncryptionKeys),
     Attribute { size: u64 },
     Extent(ExtentValue),
-    Child { object_id: u64, object_descriptor: ObjectDescriptor },
+    Child(ChildValue),
     Trim,
     BytesAndNodes { bytes: i64, nodes: i64 },
 }
@@ -615,7 +641,7 @@ pub enum ObjectValueV25 {
     Keys(EncryptionKeys),
     Attribute { size: u64 },
     Extent(ExtentValue),
-    Child { object_id: u64, object_descriptor: ObjectDescriptor },
+    Child(ChildValue),
     Trim,
     BytesAndNodes { bytes: i64, nodes: i64 },
 }
@@ -629,7 +655,7 @@ pub enum ObjectValueV5 {
     Keys(EncryptionKeys),
     Attribute { size: u64 },
     Extent(ExtentValue),
-    Child { object_id: u64, object_descriptor: ObjectDescriptor },
+    Child(ChildValue),
     Trim,
     BytesAndNodes { bytes: i64, nodes: i64 },
 }
@@ -676,7 +702,7 @@ impl ObjectValue {
     }
     /// Creates an ObjectValue for an object child.
     pub fn child(object_id: u64, object_descriptor: ObjectDescriptor) -> ObjectValue {
-        ObjectValue::Child { object_id, object_descriptor }
+        ObjectValue::Child(ChildValue { object_id, object_descriptor })
     }
     /// Creates an ObjectValue for an object symlink.
     pub fn symlink(

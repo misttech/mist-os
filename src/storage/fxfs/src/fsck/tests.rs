@@ -21,9 +21,9 @@ use {
             directory::Directory,
             transaction::{self, LockKey, ObjectStoreMutation, Options},
             volume::root_volume,
-            AttributeKey, EncryptionKeys, ExtentValue, HandleOptions, Mutation, ObjectAttributes,
-            ObjectDescriptor, ObjectKey, ObjectKeyData, ObjectKind, ObjectStore, ObjectValue,
-            StoreInfo, Timestamp,
+            AttributeKey, ChildValue, EncryptionKeys, ExtentValue, HandleOptions, Mutation,
+            ObjectAttributes, ObjectDescriptor, ObjectKey, ObjectKeyData, ObjectKind, ObjectStore,
+            ObjectValue, StoreInfo, Timestamp,
         },
         round::round_down,
         serialized_types::VersionedLatest,
@@ -1106,7 +1106,10 @@ async fn test_children_on_file() {
             store.as_ref(),
             vec![Item::new(
                 ObjectKey::child(object_id, "foo"),
-                ObjectValue::Child { object_id, object_descriptor: ObjectDescriptor::File },
+                ObjectValue::Child(ChildValue {
+                    object_id,
+                    object_descriptor: ObjectDescriptor::File,
+                }),
             )],
         )
         .await;

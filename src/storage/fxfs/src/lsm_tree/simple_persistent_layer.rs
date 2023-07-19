@@ -703,6 +703,7 @@ mod tests {
         fprint::TypeFingerprint,
         std::{
             fmt::Debug,
+            hash::Hash,
             ops::{Bound, Range},
             sync::Arc,
         },
@@ -948,6 +949,7 @@ mod tests {
     #[derive(
         Clone,
         Eq,
+        Hash,
         PartialEq,
         Debug,
         serde::Serialize,

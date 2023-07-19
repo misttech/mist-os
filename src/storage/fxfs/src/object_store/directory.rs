@@ -12,8 +12,8 @@ use {
         object_handle::{ObjectHandle, ObjectProperties, INVALID_OBJECT_ID},
         object_store::{
             object_record::{
-                ObjectAttributes, ObjectItem, ObjectKey, ObjectKeyData, ObjectKind, ObjectValue,
-                PosixAttributes, Timestamp,
+                ChildValue, ObjectAttributes, ObjectItem, ObjectKey, ObjectKeyData, ObjectKind,
+                ObjectValue, PosixAttributes, Timestamp,
             },
             transaction::{LockKey, Mutation, Options, Transaction},
             BasicObjectHandle, HandleOptions, HandleOwner, ObjectStore, SetExtendedAttributeMode,
@@ -212,7 +212,8 @@ impl<S: HandleOwner> Directory<S> {
         match self.store().tree().find(&ObjectKey::child(self.object_id, name)).await? {
             None | Some(ObjectItem { value: ObjectValue::None, .. }) => Ok(None),
             Some(ObjectItem {
-                value: ObjectValue::Child { object_id, object_descriptor }, ..
+                value: ObjectValue::Child(ChildValue { object_id, object_descriptor }),
+                ..
             }) => Ok(Some((object_id, object_descriptor))),
             Some(item) => Err(anyhow!(FxfsError::Inconsistent)
                 .context(format!("Unexpected item in lookup: {:?}", item))),
@@ -631,7 +632,7 @@ impl DirectoryIterator<'_, '_> {
         match self.iter.get() {
             Some(ItemRef {
                 key: ObjectKey { object_id: oid, data: ObjectKeyData::Child { name } },
-                value: ObjectValue::Child { object_id, object_descriptor },
+                value: ObjectValue::Child(ChildValue { object_id, object_descriptor }),
                 ..
             }) if *oid == self.object_id => Some((name, *object_id, object_descriptor)),
             _ => None,

@@ -11,6 +11,7 @@ use {
         filesystem::{ApplyContext, ApplyMode, Filesystem, JournalingObject, SyncOptions},
         log::*,
         lsm_tree::{
+            cache::NullCache,
             layers_from_handles,
             merge::Merger,
             skip_list_layer::SkipListLayer,
@@ -47,6 +48,7 @@ use {
         cmp::min,
         collections::{BTreeMap, HashSet, VecDeque},
         convert::TryInto,
+        hash::Hash,
         marker::PhantomData,
         ops::{Bound, Range},
         sync::{
@@ -315,7 +317,7 @@ pub type Hold<'a> = ReservationImpl<&'a Reservation, Reservation>;
 // Our allocator implementation tracks extents with a reference count.  At time of writing, these
 // reference counts should never exceed 1, but that might change with snapshots and clones.
 
-#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize, TypeFingerprint, Versioned)]
+#[derive(Clone, Debug, Deserialize, Eq, Hash, PartialEq, Serialize, TypeFingerprint, Versioned)]
 #[cfg_attr(fuzz, derive(arbitrary::Arbitrary))]
 pub struct AllocatorKey {
     pub device_range: Range<u64>,
@@ -610,7 +612,7 @@ impl SimpleAllocator {
             device_size: filesystem.device().size(),
             object_id,
             max_extent_size_bytes,
-            tree: LSMTree::new(merge),
+            tree: LSMTree::new(merge, Box::new(NullCache {})),
             reserved_allocations: SkipListLayer::new(1024), // TODO(fxbug.dev/95981): magic numbers
             inner: Mutex::new(Inner {
                 info: AllocatorInfo::default(),
@@ -1721,6 +1723,7 @@ mod tests {
         crate::{
             filesystem::{Filesystem, JournalingObject},
             lsm_tree::{
+                cache::NullCache,
                 skip_list_layer::SkipListLayer,
                 types::{Item, ItemRef, Layer, LayerIterator, MutableLayer},
                 LSMTree,
@@ -1777,7 +1780,7 @@ mod tests {
 
     #[fuchsia::test]
     async fn test_merge_and_coalesce_across_three_layers() {
-        let lsm_tree = LSMTree::new(merge);
+        let lsm_tree = LSMTree::new(merge, Box::new(NullCache {}));
         lsm_tree
             .insert(Item::new(
                 AllocatorKey { device_range: 100..200 },
@@ -1815,7 +1818,7 @@ mod tests {
 
     #[fuchsia::test]
     async fn test_merge_and_coalesce_wont_merge_across_object_id() {
-        let lsm_tree = LSMTree::new(merge);
+        let lsm_tree = LSMTree::new(merge, Box::new(NullCache {}));
         lsm_tree
             .insert(Item::new(
                 AllocatorKey { device_range: 100..200 },
@@ -1896,7 +1899,7 @@ mod tests {
         let fs = FakeFilesystem::new(device);
         let allocator = Arc::new(SimpleAllocator::new(fs.clone(), 1));
         fs.object_manager().set_allocator(allocator.clone());
-        let store = ObjectStore::new_empty(None, 2, fs.clone());
+        let store = ObjectStore::new_empty(None, 2, fs.clone(), Box::new(NullCache {}));
         store.set_graveyard_directory_object_id(store.maybe_get_next_object_id());
         fs.object_manager().set_root_store(store.clone());
         fs.object_manager().init_metadata_reservation().expect("init_metadata_reservation failed");

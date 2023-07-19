@@ -8,7 +8,8 @@ use {
         filesystem::Filesystem,
         object_store::{
             allocator::Allocator, directory::Directory, load_store_info, transaction::Options,
-            transaction::Transaction, LockKey, NewChildStoreOptions, ObjectDescriptor, ObjectStore,
+            transaction::Transaction, tree_cache::TreeCache, LockKey, NewChildStoreOptions,
+            ObjectDescriptor, ObjectStore,
         },
     },
     anyhow::{anyhow, bail, ensure, Context, Error},
@@ -62,7 +63,11 @@ impl RootVolume {
             FxfsError::AlreadyExists
         );
         store = root_store
-            .new_child_store(&mut transaction, NewChildStoreOptions { crypt, ..Default::default() })
+            .new_child_store(
+                &mut transaction,
+                NewChildStoreOptions { crypt, ..Default::default() },
+                Box::new(TreeCache::new()),
+            )
             .await?;
         store.set_trace(self.filesystem.trace());
 

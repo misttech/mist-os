@@ -8,8 +8,11 @@ use {
     crate::lsm_tree::types::{OrdLowerBound, OrdUpperBound},
     fprint::TypeFingerprint,
     serde::{Deserialize, Serialize},
-    std::cmp::{max, min},
-    std::ops::Range,
+    std::{
+        cmp::{max, min},
+        hash::Hash,
+        ops::Range,
+    },
 };
 
 /// The common case for extents which cover the data payload of some object.
@@ -22,7 +25,7 @@ pub const BLOB_MERKLE_ATTRIBUTE_ID: u64 = 1;
 
 /// ExtentKey is a child of ObjectKey for Object attributes that have attached extents
 /// (at time of writing this was only the used for file contents).
-#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize, TypeFingerprint)]
+#[derive(Clone, Debug, Eq, Hash, PartialEq, Serialize, Deserialize, TypeFingerprint)]
 #[cfg_attr(fuzz, derive(arbitrary::Arbitrary))]
 pub struct ExtentKey {
     pub range: Range<u64>,

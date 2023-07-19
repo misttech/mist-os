@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+pub mod cache;
 pub mod merge;
 pub mod simple_persistent_layer;
 pub mod skip_list_layer;
@@ -16,6 +17,7 @@ use {
         trace_duration,
     },
     anyhow::Error,
+    cache::{ObjectCache, ObjectCacheResult},
     simple_persistent_layer::SimplePersistentLayerWriter,
     std::{
         fmt,
@@ -70,11 +72,12 @@ struct Inner<K, V> {
 pub struct LSMTree<K, V> {
     data: RwLock<Inner<K, V>>,
     merge_fn: merge::MergeFn<K, V>,
+    cache: Box<dyn ObjectCache<K, V>>,
 }
 
 impl<'tree, K: MergeableKey, V: Value> LSMTree<K, V> {
     /// Creates a new empty tree.
-    pub fn new(merge_fn: merge::MergeFn<K, V>) -> Self {
+    pub fn new(merge_fn: merge::MergeFn<K, V>, cache: Box<dyn ObjectCache<K, V>>) -> Self {
         LSMTree {
             data: RwLock::new(Inner {
                 mutable_layer: (Arc::new(DropEvent::new()), Self::new_mutable_layer()),
@@ -82,6 +85,7 @@ impl<'tree, K: MergeableKey, V: Value> LSMTree<K, V> {
                 mutation_callback: None,
             }),
             merge_fn,
+            cache,
         }
     }
 
@@ -89,6 +93,7 @@ impl<'tree, K: MergeableKey, V: Value> LSMTree<K, V> {
     pub async fn open(
         merge_fn: merge::MergeFn<K, V>,
         handles: Box<[impl ReadObjectHandle + 'static]>,
+        cache: Box<dyn ObjectCache<K, V>>,
     ) -> Result<Self, Error> {
         Ok(LSMTree {
             data: RwLock::new(Inner {
@@ -97,6 +102,7 @@ impl<'tree, K: MergeableKey, V: Value> LSMTree<K, V> {
                 mutation_callback: None,
             }),
             merge_fn,
+            cache,
         })
     }
 
@@ -206,7 +212,10 @@ impl<'tree, K: MergeableKey, V: Value> LSMTree<K, V> {
             }
             data.mutable_layer.clone()
         };
-        mutable_layer.insert(item).await
+        let key = item.key.clone();
+        mutable_layer.insert(item).await?;
+        self.cache.invalidate(&key);
+        Ok(())
     }
 
     /// Replaces or inserts an item into the mutable layer.
@@ -218,7 +227,9 @@ impl<'tree, K: MergeableKey, V: Value> LSMTree<K, V> {
             }
             data.mutable_layer.clone()
         };
+        let key = item.key.clone();
         mutable_layer.replace_or_insert(item).await;
+        self.cache.invalidate(&key);
     }
 
     /// Merges the given item into the mutable layer.
@@ -238,11 +249,24 @@ impl<'tree, K: MergeableKey, V: Value> LSMTree<K, V> {
     where
         K: Eq,
     {
+        // It is important that the cache lookup is done prior to fetching the layer set as the
+        // placeholder returned acts as a sort of lock for the validity of the item that may be
+        // inserted later via that placeholder.
+        let token = match self.cache.lookup_or_reserve(search_key).await {
+            ObjectCacheResult::Value(value) => {
+                return Ok(Some(Item::new(search_key.clone(), value)))
+            }
+            ObjectCacheResult::Placeholder(token) => Some(token),
+            ObjectCacheResult::NoCache => None,
+        };
         let layer_set = self.layer_set();
         let mut merger = layer_set.merger();
-        let iter = merger.seek(Bound::Included(search_key)).await?;
-        Ok(match iter.get() {
+
+        Ok(match merger.seek(Bound::Included(search_key)).await?.get() {
             Some(ItemRef { key, value, sequence }) if key == search_key => {
+                if let Some(token) = token {
+                    token.complete(Some(value));
+                }
                 Some(Item { key: key.clone(), value: value.clone(), sequence })
             }
             _ => None,
@@ -348,12 +372,14 @@ mod tests {
     use {
         super::LSMTree,
         crate::{
+            drop_event::DropEvent,
             lsm_tree::{
+                cache::{NullCache, ObjectCache, ObjectCachePlaceholder, ObjectCacheResult},
                 layers_from_handles,
                 merge::{MergeLayerIterator, MergeResult},
                 types::{
-                    Item, ItemRef, LayerIterator, LayerIteratorFilter, LayerKey, OrdLowerBound,
-                    OrdUpperBound, SortByU64,
+                    BoxedLayerIterator, Item, ItemRef, Key, Layer, LayerIterator,
+                    LayerIteratorFilter, LayerKey, OrdLowerBound, OrdUpperBound, SortByU64, Value,
                 },
             },
             object_handle::ObjectHandle,
@@ -365,9 +391,15 @@ mod tests {
                 writer::Writer,
             },
         },
+        anyhow::{anyhow, Error},
+        async_trait::async_trait,
         fprint::TypeFingerprint,
         rand::{seq::SliceRandom, thread_rng},
-        std::{ops::Bound, sync::Arc},
+        std::{
+            hash::Hash,
+            ops::Bound,
+            sync::{Arc, Mutex},
+        },
     };
 
     #[derive(
@@ -375,6 +407,7 @@ mod tests {
         Eq,
         PartialEq,
         Debug,
+        Hash,
         serde::Serialize,
         serde::Deserialize,
         TypeFingerprint,
@@ -413,7 +446,7 @@ mod tests {
 
     #[fuchsia::test]
     async fn test_iteration() {
-        let tree = LSMTree::new(emit_left_merge_fn);
+        let tree = LSMTree::new(emit_left_merge_fn, Box::new(NullCache {}));
         let items = [Item::new(TestKey(1..1), 1), Item::new(TestKey(2..2), 2)];
         tree.insert(items[0].clone()).await.expect("insert error");
         tree.insert(items[1].clone()).await.expect("insert error");
@@ -431,7 +464,7 @@ mod tests {
 
     #[fuchsia::test]
     async fn test_compact() {
-        let tree = LSMTree::new(emit_left_merge_fn);
+        let tree = LSMTree::new(emit_left_merge_fn, Box::new(NullCache {}));
         let items = [
             Item::new(TestKey(1..1), 1),
             Item::new(TestKey(2..2), 2),
@@ -458,7 +491,9 @@ mod tests {
             layers_from_handles(Box::new([handle])).await.expect("layers_from_handles failed"),
         );
         let handle = FakeObjectHandle::new(object.clone());
-        let tree = LSMTree::open(emit_left_merge_fn, [handle].into()).await.expect("open failed");
+        let tree = LSMTree::open(emit_left_merge_fn, [handle].into(), Box::new(NullCache {}))
+            .await
+            .expect("open failed");
 
         let layers = tree.layer_set();
         let mut merger = layers.merger();
@@ -479,7 +514,7 @@ mod tests {
             Item::new(TestKey(3..3), 3),
             Item::new(TestKey(4..4), 4),
         ];
-        let tree = LSMTree::new(emit_left_merge_fn);
+        let tree = LSMTree::new(emit_left_merge_fn, Box::new(NullCache {}));
         tree.insert(items[0].clone()).await.expect("insert error");
         tree.insert(items[1].clone()).await.expect("insert error");
         tree.seal().await;
@@ -493,7 +528,7 @@ mod tests {
 
     #[fuchsia::test]
     async fn test_empty_seal() {
-        let tree = LSMTree::new(emit_left_merge_fn);
+        let tree = LSMTree::new(emit_left_merge_fn, Box::new(NullCache {}));
         tree.seal().await;
         let item = Item::new(TestKey(1..1), 1);
         tree.insert(item.clone()).await.expect("insert error");
@@ -523,7 +558,7 @@ mod tests {
             Item::new(TestKey(3..3), 3),
             Item::new(TestKey(4..4), 4),
         ];
-        let tree = LSMTree::new(emit_left_merge_fn);
+        let tree = LSMTree::new(emit_left_merge_fn, Box::new(NullCache {}));
         tree.insert(items[0].clone()).await.expect("insert error");
         tree.insert(items[1].clone()).await.expect("insert error");
         tree.insert(items[2].clone()).await.expect("insert error");
@@ -556,11 +591,11 @@ mod tests {
             Item::new(TestKey(5..5), 5),
             Item::new(TestKey(6..6), 6),
         ];
-        let a = LSMTree::new(emit_left_merge_fn);
+        let a = LSMTree::new(emit_left_merge_fn, Box::new(NullCache {}));
         for item in &items {
             a.insert(item.clone()).await.expect("insert error");
         }
-        let b = LSMTree::new(emit_left_merge_fn);
+        let b = LSMTree::new(emit_left_merge_fn, Box::new(NullCache {}));
         let mut shuffled = items.clone();
         shuffled.shuffle(&mut thread_rng());
         for item in &shuffled {
@@ -582,6 +617,207 @@ mod tests {
         assert!(iter_a.get().is_none());
         assert!(iter_b.get().is_none());
     }
+
+    struct AuditCacheInner<'a, V: Value> {
+        lookups: u64,
+        completions: u64,
+        invalidations: u64,
+        drops: u64,
+        result: Option<ObjectCacheResult<'a, V>>,
+    }
+
+    impl<V: Value> AuditCacheInner<'_, V> {
+        fn stats(&self) -> (u64, u64, u64, u64) {
+            (self.lookups, self.completions, self.invalidations, self.drops)
+        }
+    }
+
+    struct AuditCache<'a, V: Value> {
+        inner: Arc<Mutex<AuditCacheInner<'a, V>>>,
+    }
+
+    impl<V: Value> AuditCache<'_, V> {
+        fn new() -> Self {
+            Self {
+                inner: Arc::new(Mutex::new(AuditCacheInner {
+                    lookups: 0,
+                    completions: 0,
+                    invalidations: 0,
+                    drops: 0,
+                    result: None,
+                })),
+            }
+        }
+    }
+
+    struct AuditPlaceholder<'a, V: Value> {
+        inner: Arc<Mutex<AuditCacheInner<'a, V>>>,
+        completed: Mutex<bool>,
+    }
+
+    impl<V: Value> ObjectCachePlaceholder<V> for AuditPlaceholder<'_, V> {
+        fn complete(self: Box<Self>, _: Option<&V>) {
+            self.inner.lock().unwrap().completions += 1;
+            *self.completed.lock().unwrap() = true;
+        }
+    }
+
+    impl<V: Value> Drop for AuditPlaceholder<'_, V> {
+        fn drop(&mut self) {
+            if !*self.completed.lock().unwrap() {
+                self.inner.lock().unwrap().drops += 1;
+            }
+        }
+    }
+
+    #[async_trait]
+    impl<K: Key + std::cmp::PartialEq, V: Value> ObjectCache<K, V> for AuditCache<'_, V> {
+        async fn lookup_or_reserve(&self, _key: &K) -> ObjectCacheResult<'_, V> {
+            {
+                let mut inner = self.inner.lock().unwrap();
+                inner.lookups += 1;
+                if inner.result.is_some() {
+                    return std::mem::take(&mut inner.result).unwrap();
+                }
+            }
+            ObjectCacheResult::Placeholder(Box::new(AuditPlaceholder {
+                inner: self.inner.clone(),
+                completed: Mutex::new(false),
+            }))
+        }
+
+        fn invalidate(&self, _key: &K) {
+            self.inner.lock().unwrap().invalidations += 1;
+        }
+    }
+
+    #[fuchsia::test]
+    async fn test_cache_handling() {
+        let item = Item::new(TestKey(1..1), 1);
+        let cache = Box::new(AuditCache::new());
+        let inner = cache.inner.clone();
+        let a = LSMTree::new(emit_left_merge_fn, cache);
+
+        // Zero counters.
+        assert_eq!(inner.lock().unwrap().stats(), (0, 0, 0, 0));
+
+        // Look for an item, but don't find it. So no insertion. It is dropped.
+        assert!(a.find(&item.key).await.expect("Failed find").is_none());
+        assert_eq!(inner.lock().unwrap().stats(), (1, 0, 0, 1));
+
+        // Insert attempts to invalidate.
+        let _ = a.insert(item.clone()).await;
+        assert_eq!(inner.lock().unwrap().stats(), (1, 0, 1, 1));
+
+        // Look for item, find it and insert into the cache.
+        assert_eq!(
+            a.find(&item.key).await.expect("Failed find").expect("Item should be found.").value,
+            item.value
+        );
+        assert_eq!(inner.lock().unwrap().stats(), (2, 1, 1, 1));
+
+        // Insert or replace attempts to invalidate as well.
+        a.replace_or_insert(item.clone()).await;
+        assert_eq!(inner.lock().unwrap().stats(), (2, 1, 2, 1));
+    }
+
+    #[fuchsia::test]
+    async fn test_cache_hit() {
+        let item = Item::new(TestKey(1..1), 1);
+        let cache = Box::new(AuditCache::new());
+        let inner = cache.inner.clone();
+        let a = LSMTree::new(emit_left_merge_fn, cache);
+
+        // Zero counters.
+        assert_eq!(inner.lock().unwrap().stats(), (0, 0, 0, 0));
+
+        // Insert attempts to invalidate.
+        let _ = a.insert(item.clone()).await;
+        assert_eq!(inner.lock().unwrap().stats(), (0, 0, 1, 0));
+
+        // Set up the item to find in the cache.
+        inner.lock().unwrap().result = Some(ObjectCacheResult::Value(item.value.clone()));
+
+        // Look for item, find it in cache, so no insert.
+        assert_eq!(
+            a.find(&item.key).await.expect("Failed find").expect("Item should be found.").value,
+            item.value
+        );
+        assert_eq!(inner.lock().unwrap().stats(), (1, 0, 1, 0));
+    }
+
+    #[fuchsia::test]
+    async fn test_cache_says_uncacheable() {
+        let item = Item::new(TestKey(1..1), 1);
+        let cache = Box::new(AuditCache::new());
+        let inner = cache.inner.clone();
+        let a = LSMTree::new(emit_left_merge_fn, cache);
+        let _ = a.insert(item.clone()).await;
+
+        // One invalidation from the insert.
+        assert_eq!(inner.lock().unwrap().stats(), (0, 0, 1, 0));
+
+        // Set up the NoCache response to find in the cache.
+        inner.lock().unwrap().result = Some(ObjectCacheResult::NoCache);
+
+        // Look for item, it is uncacheable, so no insert.
+        assert_eq!(
+            a.find(&item.key).await.expect("Failed find").expect("Should find item").value,
+            item.value
+        );
+        assert_eq!(inner.lock().unwrap().stats(), (1, 0, 1, 0));
+    }
+
+    struct FailLayer {
+        drop_event: Mutex<Option<Arc<DropEvent>>>,
+    }
+
+    impl FailLayer {
+        fn new() -> Self {
+            Self { drop_event: Mutex::new(Some(Arc::new(DropEvent::new()))) }
+        }
+    }
+
+    #[async_trait]
+    impl<K: Key, V: Value> Layer<K, V> for FailLayer {
+        async fn seek(
+            &self,
+            _bound: std::ops::Bound<&K>,
+        ) -> Result<BoxedLayerIterator<'_, K, V>, Error> {
+            Err(anyhow!("Purposely failed seek"))
+        }
+
+        fn lock(&self) -> Option<Arc<DropEvent>> {
+            self.drop_event.lock().unwrap().clone()
+        }
+
+        async fn close(&self) {
+            let listener = match std::mem::replace(&mut (*self.drop_event.lock().unwrap()), None) {
+                Some(drop_event) => drop_event.listen(),
+                None => return,
+            };
+            listener.await;
+        }
+
+        fn get_version(&self) -> Version {
+            LATEST_VERSION
+        }
+    }
+
+    #[fuchsia::test]
+    async fn test_failed_lookup() {
+        let cache = Box::new(AuditCache::new());
+        let inner = cache.inner.clone();
+        let a = LSMTree::new(emit_left_merge_fn, cache);
+        a.set_layers(vec![Arc::new(FailLayer::new())]);
+
+        // Zero counters.
+        assert_eq!(inner.lock().unwrap().stats(), (0, 0, 0, 0));
+
+        // Lookup should fail and drop the placeholder.
+        assert!(a.find(&TestKey(1..1)).await.is_err());
+        assert_eq!(inner.lock().unwrap().stats(), (1, 0, 0, 1));
+    }
 }
 
 #[cfg(fuzz)]
@@ -596,12 +832,14 @@ mod fuzz {
         arbitrary::Arbitrary,
         fprint::TypeFingerprint,
         fuzz::fuzz,
+        std::hash::Hash,
     };
 
     #[derive(
         Arbitrary,
         Clone,
         Eq,
+        Hash,
         PartialEq,
         Debug,
         serde::Serialize,
@@ -648,7 +886,7 @@ mod fuzz {
     #[fuzz]
     fn fuzz_lsm_tree_actions(actions: Vec<FuzzAction>) {
         use {
-            super::LSMTree,
+            super::{cache::NullCache, LSMTree},
             crate::lsm_tree::merge::{MergeLayerIterator, MergeResult},
             futures::executor::block_on,
         };
@@ -660,7 +898,7 @@ mod fuzz {
             MergeResult::EmitLeft
         }
 
-        let tree = LSMTree::new(emit_left_merge_fn);
+        let tree = LSMTree::new(emit_left_merge_fn, Box::new(NullCache {}));
         for action in actions {
             match action {
                 FuzzAction::Insert(item) => {

@@ -19,13 +19,14 @@ mod store_object_handle;
 mod testing;
 pub mod transaction;
 mod tree;
+mod tree_cache;
 pub mod volume;
 pub mod writeback_cache;
 
 pub use basic_object_handle::{BasicObjectHandle, SetExtendedAttributeMode};
 pub use caching_object_handle::CachingObjectHandle;
 pub use directory::Directory;
-pub use object_record::{ObjectDescriptor, PosixAttributes, Timestamp};
+pub use object_record::{ChildValue, ObjectDescriptor, PosixAttributes, Timestamp};
 pub use store_object_handle::{DirectWriter, StoreObjectHandle};
 
 use {
@@ -39,6 +40,7 @@ use {
         },
         log::*,
         lsm_tree::{
+            cache::{NullCache, ObjectCache},
             types::{Item, ItemRef, LayerIterator},
             LSMTree,
         },
@@ -492,6 +494,7 @@ impl ObjectStore {
         store_object_id: u64,
         filesystem: Arc<dyn Filesystem>,
         store_info: Option<StoreInfo>,
+        object_cache: Box<dyn ObjectCache<ObjectKey, ObjectValue>>,
         mutations_cipher: Option<StreamCipher>,
         lock_state: LockState,
         last_object_id: LastObjectId,
@@ -508,7 +511,7 @@ impl ObjectStore {
                 Some(info) => StoreOrReplayInfo::Info(info),
                 None => StoreOrReplayInfo::Replay(ReplayInfo::new()),
             }),
-            tree: LSMTree::new(merge::merge),
+            tree: LSMTree::new(merge::merge, object_cache),
             store_info_handle: OnceCell::new(),
             mutations_cipher: Mutex::new(mutations_cipher),
             lock_state: Mutex::new(lock_state),
@@ -522,12 +525,14 @@ impl ObjectStore {
         parent_store: Option<Arc<ObjectStore>>,
         store_object_id: u64,
         filesystem: Arc<dyn Filesystem>,
+        object_cache: Box<dyn ObjectCache<ObjectKey, ObjectValue>>,
     ) -> Arc<Self> {
         Self::new(
             parent_store,
             store_object_id,
             filesystem,
             Some(StoreInfo::default()),
+            object_cache,
             None,
             LockState::Unencrypted,
             LastObjectId::default(),
@@ -544,7 +549,7 @@ impl ObjectStore {
             block_size,
             filesystem: Weak::<FxFilesystem>::new(),
             store_info: Mutex::new(StoreOrReplayInfo::Info(StoreInfo::default())),
-            tree: LSMTree::new(merge::merge),
+            tree: LSMTree::new(merge::merge, Box::new(NullCache {})),
             store_info_handle: OnceCell::new(),
             mutations_cipher: Mutex::new(None),
             lock_state: Mutex::new(LockState::Unencrypted),
@@ -577,6 +582,7 @@ impl ObjectStore {
         self: &Arc<Self>,
         transaction: &mut Transaction<'_>,
         options: NewChildStoreOptions,
+        object_cache: Box<dyn ObjectCache<ObjectKey, ObjectValue>>,
     ) -> Result<Arc<Self>, Error> {
         let handle = if options.object_id != INVALID_OBJECT_ID {
             ObjectStore::create_object_with_id(
@@ -607,6 +613,7 @@ impl ObjectStore {
                     object_id_key: Some(object_id_wrapped),
                     ..StoreInfo::new_with_guid()
                 }),
+                object_cache,
                 Some(StreamCipher::new(&unwrapped_key, 0)),
                 LockState::Unlocked(crypt),
                 LastObjectId {
@@ -622,6 +629,7 @@ impl ObjectStore {
                 handle.object_id(),
                 filesystem.clone(),
                 Some(StoreInfo::new_with_guid()),
+                object_cache,
                 None,
                 LockState::Unencrypted,
                 LastObjectId::default(),

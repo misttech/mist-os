@@ -663,6 +663,7 @@ mod tests {
         fuchsia_async as fasync,
         futures::{channel::oneshot::channel, future::join_all, join},
         std::{
+            hash::Hash,
             ops::Bound,
             sync::Mutex,
             time::{Duration, Instant},
@@ -672,10 +673,11 @@ mod tests {
     #[derive(
         Clone,
         Eq,
+        Debug,
+        Hash,
         PartialEq,
         PartialOrd,
         Ord,
-        Debug,
         serde::Serialize,
         serde::Deserialize,
         TypeFingerprint,

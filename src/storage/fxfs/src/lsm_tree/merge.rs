@@ -717,12 +717,16 @@ mod tests {
         },
         fprint::TypeFingerprint,
         rand::Rng,
-        std::ops::{Bound, Range},
+        std::{
+            hash::Hash,
+            ops::{Bound, Range},
+        },
     };
 
     #[derive(
         Clone,
         Eq,
+        Hash,
         PartialEq,
         Debug,
         serde::Serialize,
@@ -1280,6 +1284,7 @@ mod tests {
     #[derive(
         Clone,
         Eq,
+        Hash,
         PartialEq,
         Debug,
         serde::Serialize,
@@ -1410,6 +1415,7 @@ mod tests {
     #[derive(
         Clone,
         Eq,
+        Hash,
         PartialEq,
         Debug,
         serde::Serialize,

@@ -16,6 +16,7 @@ use {
             transaction::{
                 AssocObj, AssociatedObject, MetadataReservation, Mutation, Transaction, TxnMutation,
             },
+            tree_cache::TreeCache,
             volume::{list_volumes, VOLUMES_DIRECTORY},
             LastObjectId, LockState, ObjectDescriptor, ObjectStore,
         },
@@ -219,6 +220,7 @@ impl ObjectManager {
                     store_object_id,
                     fs,
                     None,
+                    Box::new(TreeCache::new()),
                     None,
                     LockState::Unknown,
                     LastObjectId::default(),

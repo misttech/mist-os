@@ -165,6 +165,7 @@ mod tests {
     use {
         crate::{
             lsm_tree::{
+                cache::NullCache,
                 types::{Item, ItemRef, LayerIterator},
                 LSMTree,
             },
@@ -184,7 +185,7 @@ mod tests {
         right: (Range<u64>, AllocatorValue),
         expected: &[(Range<u64>, AllocatorValue)],
     ) {
-        let tree = LSMTree::new(merge);
+        let tree = LSMTree::new(merge, Box::new(NullCache {}));
         tree.insert(Item::new(AllocatorKey { device_range: right.0 }, right.1))
             .await
             .expect("insert error");
@@ -347,7 +348,7 @@ mod tests {
         //  3. Dealloc object_id B, Alloc object_id A.
         let key = AllocatorKey { device_range: 0..100 };
         let lower_bound = AllocatorKey::lower_bound_for_merge_into(&key);
-        let tree = LSMTree::new(merge);
+        let tree = LSMTree::new(merge, Box::new(NullCache {}));
         tree.merge_into(
             Item::new(key.clone(), AllocatorValue::Abs { count: 1, owner_object_id: 1 }),
             &lower_bound,
@@ -384,7 +385,7 @@ mod tests {
 
     #[fuchsia::test]
     async fn test_merge_preserves_sequences() {
-        let tree = LSMTree::new(merge);
+        let tree = LSMTree::new(merge, Box::new(NullCache {}));
         // |1-1-1-1|
         tree.insert(Item {
             key: AllocatorKey { device_range: 0..100 },
