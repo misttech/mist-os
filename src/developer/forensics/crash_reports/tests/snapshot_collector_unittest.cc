@@ -240,6 +240,30 @@ TEST_F(SnapshotCollectorTest, Check_GetReportRequestsCombined) {
   EXPECT_NE(snapshot_uuid1.value(), snapshot_uuid2.value());
 }
 
+TEST_F(SnapshotCollectorTest, Check_AsynchronousDataProviderResponse) {
+  auto data_provider_owner =
+      std::make_unique<stubs::DataProviderReturnsOnDemand>(kDefaultAnnotations, kDefaultArchiveKey);
+  auto data_provider = data_provider_owner.get();
+
+  SetUpDataProviderServer(std::move(data_provider_owner));
+  SetUpDefaultSnapshotManager();
+
+  std::optional<Report> report{std::nullopt};
+  ScheduleGetReportAndThen(zx::duration::infinite(), 1,
+                           ([&report](Report& new_report) { report = std::move(new_report); }));
+
+  // SnapshotCollector will request the snapshot after |kWindow|. Run past the shared request window
+  // to test what happens if DataProvider doesn't respond right away.
+  RunLoopFor(kWindow + zx::sec(5));
+
+  ASSERT_FALSE(report.has_value());
+  data_provider->PopSnapshotInternalCallback();
+
+  RunLoopUntilIdle();
+  ASSERT_TRUE(report.has_value());
+  EXPECT_TRUE(GetSnapshotStore()->SnapshotExists(report->SnapshotUuid()));
+}
+
 TEST_F(SnapshotCollectorTest, Check_MultipleSimultaneousRequests) {
   // Setup report store to not have room for more than 1 report.
   report_store_ = std::make_unique<ScopedTestReportStore>(
@@ -281,29 +305,6 @@ TEST_F(SnapshotCollectorTest, Check_MultipleSimultaneousRequests) {
 
   RunLoopUntilIdle();
   ASSERT_TRUE(report2.has_value());
-}
-
-TEST_F(SnapshotCollectorTest, Check_Timeout) {
-  SetUpDefaultDataProviderServer();
-  SetUpDefaultSnapshotManager();
-
-  std::optional<Report> report{std::nullopt};
-  ScheduleGetReportAndThen(zx::sec(0), 0,
-                           ([&report](Report& new_report) { report = std::move(new_report); }));
-
-  // TODO(fxbug.dev/111793): Check annotations to get intended snapshot uuid. Delete unnecessary
-  // SnapshotStore::Size function.
-  ASSERT_EQ(GetSnapshotStore()->Size(), 0u);
-
-  RunLoopFor(kWindow);
-
-  ASSERT_TRUE(report.has_value());
-  auto snapshot = AsMissing(GetSnapshot(report->SnapshotUuid()));
-  EXPECT_THAT(snapshot.PresenceAnnotations(), UnorderedElementsAreArray({
-                                                  Pair(feedback::kDebugSnapshotErrorKey, "timeout"),
-                                                  Pair(feedback::kDebugSnapshotPresentKey, "false"),
-                                              }));
-  EXPECT_EQ(GetSnapshotStore()->Size(), 0u);
 }
 
 TEST_F(SnapshotCollectorTest, Check_Shutdown) {

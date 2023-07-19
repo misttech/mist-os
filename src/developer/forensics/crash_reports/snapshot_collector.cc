@@ -93,8 +93,6 @@ feedback::Annotations SnapshotCollector::GetMissingSnapshotAnnotations(const Sna
     uuid = MakeNewSnapshotRequest(current_time, timeout);
   }
 
-  const zx::time deadline = current_time + timeout;
-
   auto* request = FindSnapshotRequest(uuid);
   FX_CHECK(request);
   request->promise_ids.insert(report_id);
@@ -102,41 +100,35 @@ feedback::Annotations SnapshotCollector::GetMissingSnapshotAnnotations(const Sna
   // The snapshot for |uuid| may not be ready, so the logic for returning |uuid| to the client
   // needs to be wrapped in an asynchronous task that can be re-executed when the conditions for
   // returning a UUID are met, e.g., the snapshot for |uuid| is received from |data_provider_| or
-  // the call to GetSnapshotUuid times out.
-  return ::fpromise::make_promise([this, uuid, deadline, report_id,
-                                   GetReport =
-                                       std::move(GetReport)](::fpromise::context& context) mutable
-                                  -> ::fpromise::result<Report> {
-    auto erase_request_task = fit::defer([this, report_id] { report_results_.erase(report_id); });
+  // the system is shutting down.
+  return ::fpromise::make_promise(
+      [this, uuid, request, report_id, GetReport = std::move(GetReport)](
+          ::fpromise::context& context) mutable -> ::fpromise::result<Report> {
+        auto erase_request_task =
+            fit::defer([this, report_id] { report_results_.erase(report_id); });
 
-    if (shutdown_) {
-      return GetReport(kShutdownSnapshotUuid, GetMissingSnapshotAnnotations(kShutdownSnapshotUuid));
-    }
+        if (shutdown_) {
+          return GetReport(kShutdownSnapshotUuid,
+                           GetMissingSnapshotAnnotations(kShutdownSnapshotUuid));
+        }
 
-    // The snapshot data was deleted before the promise executed. This should only occur if a
-    // snapshot is dropped immediately after it is received because its annotations and archive
-    // are too large and it is one of the oldest in the FIFO.
-    if (snapshot_store_->IsGarbageCollected(uuid)) {
-      return GetReport(kGarbageCollectedSnapshotUuid,
-                       GetMissingSnapshotAnnotations(kGarbageCollectedSnapshotUuid));
-    }
+        // The snapshot data was deleted before the promise executed. This should only occur if a
+        // snapshot is dropped immediately after it is received because its annotations and archive
+        // are too large and it is one of the oldest in the FIFO.
+        if (snapshot_store_->IsGarbageCollected(uuid)) {
+          return GetReport(kGarbageCollectedSnapshotUuid,
+                           GetMissingSnapshotAnnotations(kGarbageCollectedSnapshotUuid));
+        }
 
-    if (report_results_.find(report_id) != report_results_.end()) {
-      return GetReport(report_results_[report_id].uuid, *report_results_[report_id].annotations);
-    }
+        if (report_results_.find(report_id) != report_results_.end()) {
+          return GetReport(report_results_[report_id].uuid,
+                           *report_results_[report_id].annotations);
+        }
 
-    if (clock_->Now() >= deadline) {
-      auto* request = FindSnapshotRequest(uuid);
-      FX_CHECK(request);
-      request->timed_out_reports_.insert(report_id);
-
-      return GetReport(kTimedOutSnapshotUuid, GetMissingSnapshotAnnotations(kTimedOutSnapshotUuid));
-    }
-
-    WaitForSnapshot(uuid, deadline, context.suspend_task());
-    erase_request_task.cancel();
-    return ::fpromise::pending();
-  });
+        request->blocked_promises.push_back(context.suspend_task());
+        erase_request_task.cancel();
+        return ::fpromise::pending();
+      });
 }
 
 void SnapshotCollector::Shutdown() {
@@ -170,38 +162,6 @@ SnapshotUuid SnapshotCollector::MakeNewSnapshotRequest(const zx::time start_time
   return uuid;
 }
 
-void SnapshotCollector::WaitForSnapshot(const SnapshotUuid& uuid, zx::time deadline,
-                                        ::fpromise::suspended_task get_uuid_promise) {
-  auto* request = FindSnapshotRequest(uuid);
-  if (!request) {
-    get_uuid_promise.resume_task();
-    return;
-  }
-
-  request->blocked_promises.push_back(std::move(get_uuid_promise));
-  const size_t idx = request->blocked_promises.size() - 1;
-
-  // Resume |get_uuid_promise| after |deadline| has passed.
-  if (const zx_status_t status = async::PostTaskForTime(
-          dispatcher_,
-          [this, idx, uuid] {
-            if (auto* request = FindSnapshotRequest(uuid); request) {
-              FX_CHECK(idx < request->blocked_promises.size());
-              if (request->blocked_promises[idx]) {
-                request->blocked_promises[idx].resume_task();
-              }
-            }
-          },
-          deadline);
-      status != ZX_OK) {
-    FX_PLOGS(ERROR, status) << "Failed to post async task";
-
-    // Immediately resume the promise if posting the task fails.
-    request->blocked_promises.back().resume_task();
-    request->blocked_promises.pop_back();
-  }
-}
-
 void SnapshotCollector::CompleteWithSnapshot(const SnapshotUuid& uuid,
                                              feedback::Annotations annotations,
                                              fuchsia::feedback::Attachment archive) {
@@ -232,15 +192,10 @@ void SnapshotCollector::CompleteWithSnapshot(const SnapshotUuid& uuid,
         .annotations = shared_annotations,
     };
 
-    if (request->timed_out_reports_.count(id) == 0) {
-      queue_->AddReportUsingSnapshot(uuid, id);
-    }
+    queue_->AddReportUsingSnapshot(uuid, id);
   }
 
-  // Do not add the snapshot to the store if all reports needing this snapshot timed out.
-  if (request->promise_ids.size() != request->timed_out_reports_.size()) {
-    snapshot_store_->AddSnapshot(uuid, std::move(archive));
-  }
+  snapshot_store_->AddSnapshot(uuid, std::move(archive));
 
   snapshot_requests_.erase(std::remove_if(
       snapshot_requests_.begin(), snapshot_requests_.end(),

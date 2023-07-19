@@ -72,9 +72,6 @@ constexpr const char* kGarbageCollectedSnapshotUuid = "garbage collected";
 // A snapshot wasn't able to be persisted before a device shutdown.
 constexpr const char* kNotPersistedSnapshotUuid = "not persisted";
 
-// Snapshot collection terminated prematurely due to time constraints.
-constexpr const char* kTimedOutSnapshotUuid = "timed out";
-
 // Snapshot collection wasn't attempted because the system was in the process of shutting down.
 constexpr const char* kShutdownSnapshotUuid = "shutdown";
 

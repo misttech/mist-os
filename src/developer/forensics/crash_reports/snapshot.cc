@@ -13,8 +13,7 @@ namespace crash_reports {
 
 bool IsSpecialCaseSnapshot(const SnapshotUuid& uuid) {
   return uuid == kNoUuidSnapshotUuid || uuid == kGarbageCollectedSnapshotUuid ||
-         uuid == kShutdownSnapshotUuid || uuid == kTimedOutSnapshotUuid ||
-         uuid == kNotPersistedSnapshotUuid;
+         uuid == kShutdownSnapshotUuid || uuid == kNotPersistedSnapshotUuid;
 }
 
 ManagedSnapshot::Archive::Archive(const fuchsia::feedback::Attachment& attachment)

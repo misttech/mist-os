@@ -123,7 +123,6 @@ class SnapshotStore {
 
   const SpecialCaseSnapshot garbage_collected_snapshot_;
   const SpecialCaseSnapshot not_persisted_snapshot_;
-  const SpecialCaseSnapshot timed_out_snapshot_;
   const SpecialCaseSnapshot shutdown_snapshot_;
   const SpecialCaseSnapshot no_uuid_snapshot_;
 };

@@ -43,10 +43,6 @@ SnapshotStore::SnapshotStore(feedback::AnnotationManager* annotation_manager,
                                   {feedback::kDebugSnapshotErrorKey, "not persisted"},
                                   {feedback::kDebugSnapshotPresentKey, "false"},
                               })),
-      timed_out_snapshot_(kTimedOutSnapshotUuid, feedback::Annotations({
-                                                     {feedback::kDebugSnapshotErrorKey, "timeout"},
-                                                     {feedback::kDebugSnapshotPresentKey, "false"},
-                                                 })),
       shutdown_snapshot_(kShutdownSnapshotUuid,
                          feedback::Annotations({
                              {feedback::kDebugSnapshotErrorKey, "system shutdown"},
@@ -74,10 +70,6 @@ Snapshot SnapshotStore::GetSnapshot(const SnapshotUuid& uuid) {
 
   if (uuid == kNotPersistedSnapshotUuid) {
     return BuildMissing(not_persisted_snapshot_);
-  }
-
-  if (uuid == kTimedOutSnapshotUuid) {
-    return BuildMissing(timed_out_snapshot_);
   }
 
   if (uuid == kShutdownSnapshotUuid) {

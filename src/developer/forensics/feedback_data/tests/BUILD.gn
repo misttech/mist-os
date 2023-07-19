@@ -13,7 +13,11 @@ visibility = [ ":*" ]
 executable("data_provider_unittest_exe") {
   testonly = true
 
-  sources = [ "data_provider_unittest.cc" ]
+  sources = [
+    "data_provider_unittest.cc",
+    "stub_attachment_provider.cc",
+    "stub_attachment_provider.h",
+  ]
 
   deps = [
     "//sdk/fidl/fuchsia.boot:fuchsia.boot_hlcpp",

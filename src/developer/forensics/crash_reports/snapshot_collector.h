@@ -80,9 +80,6 @@ class SnapshotCollector {
     // The actual request that we delay by |shared_request_window_| after the SnapshotRequest is
     // created.
     async::TaskClosure delayed_get_snapshot;
-
-    // ReportIds of reports that timed out while waiting for the snapshot to generate.
-    std::set<ReportId> timed_out_reports_;
   };
 
   struct ReportResults {
@@ -99,10 +96,6 @@ class SnapshotCollector {
 
   // Find the Snapshot{Request,Data} with Uuid |uuid|. If none exists, return nullptr.
   SnapshotRequest* FindSnapshotRequest(const SnapshotUuid& uuid);
-
-  // Resume |get_uuid_promise| when |deadline| expires or request |uuid| completes with a snapshot.
-  void WaitForSnapshot(const SnapshotUuid& uuid, zx::time deadline,
-                       ::fpromise::suspended_task get_uuid_promise);
 
   // Make a call to fuchsia.feedback.DataProvider/GetSnapshot, started at |start_time|, and return
   // the Uuid of its eventual snapshot.

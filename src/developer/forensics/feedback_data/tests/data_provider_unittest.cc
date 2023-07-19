@@ -31,6 +31,7 @@
 #include "src/developer/forensics/feedback/attachments/types.h"
 #include "src/developer/forensics/feedback_data/constants.h"
 #include "src/developer/forensics/feedback_data/metadata.h"
+#include "src/developer/forensics/feedback_data/tests/stub_attachment_provider.h"
 #include "src/developer/forensics/testing/gmatchers.h"
 #include "src/developer/forensics/testing/gpretty_printers.h"
 #include "src/developer/forensics/testing/stubs/cobalt_logger_factory.h"
@@ -153,15 +154,16 @@ class DataProviderTest : public UnitTestFixture {
   void SetUpDataProvider(
       const std::set<std::string>& annotation_allowlist = kDefaultAnnotations,
       const feedback::AttachmentKeys& attachment_allowlist = {},
-      const std::map<std::string, ErrorOr<std::string>>& startup_annotations = {}) {
+      const std::map<std::string, ErrorOr<std::string>>& startup_annotations = {},
+      const std::map<std::string, feedback::AttachmentProvider*>& attachment_providers = {}) {
     std::set<std::string> allowlist;
     for (const auto& [k, v] : startup_annotations) {
       allowlist.insert(k);
     }
     annotation_manager_ =
         std::make_unique<feedback::AnnotationManager>(dispatcher(), allowlist, startup_annotations);
-    attachment_manager_ =
-        std::make_unique<feedback::AttachmentManager>(dispatcher(), attachment_allowlist);
+    attachment_manager_ = std::make_unique<feedback::AttachmentManager>(
+        dispatcher(), attachment_allowlist, attachment_providers);
     data_provider_ = std::make_unique<DataProvider>(
         dispatcher(), services(), &clock_, &redactor_, /*is_first_instance=*/true,
         annotation_allowlist, attachment_allowlist, cobalt_.get(), annotation_manager_.get(),
@@ -558,6 +560,55 @@ TEST_F(DataProviderTest, GetSnapshotUnfilteredAnnotations_ReturnsFilledArchive) 
 
   auto [annotations, archive] = GetSnapshotInternal();
   EXPECT_TRUE(archive.value.size > 0u);
+}
+
+TEST_F(DataProviderTest, GetSnapshot_Timeout) {
+  const std::string kSuccessFile = "success.txt";
+  const std::string kTimeoutFile = "timeout.txt";
+  const std::string kSuccessValue = "success value";
+  const std::string kTimeoutValue = "timeout value";
+
+  StubAttachmentProvider provider_successful(kTimeoutValue);
+  StubAttachmentProvider provider_timeout(kTimeoutValue);
+
+  SetUpDataProvider(kDefaultAnnotations, /*attachment_allowlist=*/
+                    {
+                        kSuccessFile,
+                        kTimeoutFile,
+                    },
+                    /*startup_annotations=*/{},
+                    /*attachment_providers=*/
+                    {
+                        {kSuccessFile, &provider_successful},
+                        {kTimeoutFile, &provider_timeout},
+                    });
+
+  feedback::Annotations annotations;
+  fuchsia::feedback::Attachment archive;
+
+  data_provider_->GetSnapshotInternal(
+      zx::sec(1), [&annotations, &archive](feedback::Annotations result_annotations,
+                                           fuchsia::feedback::Attachment result_archive) {
+        annotations = std::move(result_annotations);
+        archive = std::move(result_archive);
+      });
+
+  provider_successful.CompleteSuccessfully(kSuccessValue);
+  RunLoopFor(zx::sec(5));
+
+  ASSERT_TRUE(archive.value.size > 0u);
+
+  std::map<std::string, std::string> unpacked_attachments;
+  FX_CHECK(Unpack(archive.value, &unpacked_attachments));
+
+  // There should be |kAttachmentMetadata|, |kSuccessFile| and |kTimeoutFile| attachments present in
+  // the snapshot.
+  EXPECT_NE(unpacked_attachments.find(kAttachmentMetadata), unpacked_attachments.end());
+  ASSERT_NE(unpacked_attachments.find(kSuccessFile), unpacked_attachments.end());
+  ASSERT_NE(unpacked_attachments.find(kTimeoutFile), unpacked_attachments.end());
+
+  EXPECT_EQ(unpacked_attachments[kSuccessFile], kSuccessValue);
+  EXPECT_EQ(unpacked_attachments[kTimeoutFile], kTimeoutValue);
 }
 
 }  // namespace

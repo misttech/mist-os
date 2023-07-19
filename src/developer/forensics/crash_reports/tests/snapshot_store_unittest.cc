@@ -244,14 +244,6 @@ TEST_F(SnapshotStoreTest, Check_NotPersisted) {
               }));
 }
 
-TEST_F(SnapshotStoreTest, Check_TimedOut) {
-  auto snapshot = AsMissing(snapshot_store_->GetSnapshot(kTimedOutSnapshotUuid));
-  EXPECT_THAT(snapshot.PresenceAnnotations(), UnorderedElementsAreArray({
-                                                  Pair(feedback::kDebugSnapshotErrorKey, "timeout"),
-                                                  Pair(feedback::kDebugSnapshotPresentKey, "false"),
-                                              }));
-}
-
 TEST_F(SnapshotStoreTest, Check_Shutdown) {
   auto snapshot = AsMissing(snapshot_store_->GetSnapshot(kShutdownSnapshotUuid));
   EXPECT_THAT(snapshot.PresenceAnnotations(),
