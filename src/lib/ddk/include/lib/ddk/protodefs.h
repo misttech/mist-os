@@ -165,7 +165,7 @@ DDK_PROTOCOL_DEF(ADC,                     147, "adc", 0)
 // 148 was dsi
 DDK_PROTOCOL_DEF(BT_VENDOR,               149, "bt-vendor", 0)
 DDK_PROTOCOL_DEF(DSI_BASE,                150, "dsi-base", 0)
-// 151 was power-sensor
+DDK_PROTOCOL_DEF(POWER_SENSOR,            151, "power-sensor", 0)
 DDK_PROTOCOL_DEF(REGISTERS,               152, "registers", 0)
 DDK_PROTOCOL_DEF(DAI,                     153, "dai", 0)
 DDK_PROTOCOL_DEF(GOLDFISH_SYNC,           154, "goldfish-sync", 0)

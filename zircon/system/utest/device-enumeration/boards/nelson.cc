@@ -105,6 +105,8 @@ TEST_F(DeviceEnumerationTest, NelsonTest) {
   };
   ASSERT_NO_FATAL_FAILURE(device_enumeration::WaitForOne(
       cpp20::span(kTouchscreenDevicePaths, std::size(kTouchscreenDevicePaths))));
+
+  ASSERT_NO_FATAL_FAILURE(device_enumeration::WaitForClassDeviceCount("class/power-sensor", 2));
 }
 
 }  // namespace

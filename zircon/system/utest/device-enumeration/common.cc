@@ -11,6 +11,7 @@
 #include <lib/component/incoming/cpp/protocol.h>
 
 #include <iostream>
+#include <map>
 #include <unordered_set>
 
 #include <fbl/string_printf.h>
@@ -64,6 +65,32 @@ void WaitForOne(cpp20::span<const char*> device_paths) {
         std::string("/dev/") + path, 4, [&loop]() { loop.Shutdown(); }, watchers,
         loop.dispatcher());
   }
+
+  loop.Run();
+}
+
+void WaitForClassDeviceCount(const std::string& path_in_devfs, size_t count) {
+  async::Loop loop = async::Loop(&kAsyncLoopConfigNeverAttachToThread);
+
+  async::TaskClosure task([path_in_devfs, &count]() {
+    // stdout doesn't show up in test logs.
+    fprintf(stderr, "still waiting for %zu devices in %s\n", count, path_in_devfs.c_str());
+  });
+
+  ASSERT_OK(task.PostDelayed(loop.dispatcher(), zx::min(1)));
+
+  std::map<std::string, int> devices_found;
+
+  std::unique_ptr watcher = fsl::DeviceWatcher::Create(
+      std::string("/dev/") + path_in_devfs,
+      [&devices_found, &count, &loop](const fidl::ClientEnd<fuchsia_io::Directory>& dir,
+                                      const std::string& name) {
+        devices_found.emplace(name, 0);
+        if (devices_found.size() == count) {
+          loop.Shutdown();
+        }
+      },
+      loop.dispatcher());
 
   loop.Run();
 }
