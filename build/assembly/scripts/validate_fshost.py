@@ -125,7 +125,9 @@ def main():
     if len(diffstr) != 0:
         print(
             "Error: non-empty diff between canonical json"
-            f" representations:\n{diffstr}")
+            f" representations:\n{diffstr}\n\nThe fshost configuration " + \
+             "generated using GN does not match the Assembly-generated " + \
+             "configuration. Please update the product assembly configuration.")
         return 1
 
     return 0

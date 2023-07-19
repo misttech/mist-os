@@ -6,6 +6,7 @@ import("//build/assembly/hermetic_inputs_for_image_assembly.gni")
 import("//build/assembly/legacy_assembly_input_bundle.gni")
 import("//build/bazel/bazel_inputs.gni")
 import("//build/images/fvm.gni")
+import("//build/python/python_action.gni")
 import("//build/zircon/tools.gni")
 import("//bundles/assembly/platform_aibs.gni")
 import("//src/developer/ffx/build/ffx_action.gni")
@@ -761,6 +762,14 @@ template("assembled_system") {
         "--depfile",
         rebase_path(depfile, root_build_dir),
       ]
+      metadata = {
+        # We insert these barriers to prevent the dependencies of these images
+        # from leaking into Bazel assembly, which depends on this check
+        # TODO(b/287558873) Remove once fshost is migrated
+        package_barrier = []
+        config_package_barrier = []
+        distribution_entries_barrier = []
+      }
     }
   }
 
@@ -1200,6 +1209,10 @@ template("assembled_system") {
     dest_dir = rebase_path("${files.outdir}/${labels.bazel_legacy_aib}",
                            root_build_dir)
     deps = [ ":${labels.legacy_assembly_input_bundle}" ]
+    if (use_assembly_fshost) {
+      # TODO(b/287558873) Remove once fshost is migrated
+      deps += [ ":${labels.fshost_validator}" ]
+    }
   }
 
   group(target_name) {
