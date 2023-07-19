@@ -114,8 +114,7 @@ class CustomizableMemoryGuest : public T {
 };
 
 using LinuxCustomizableMemoryGuestTypes =
-    ::testing::Types<CustomizableMemoryGuest<DebianEnclosedGuest>,
-                     CustomizableMemoryGuest<TerminaEnclosedGuest>>;
+    ::testing::Types<CustomizableMemoryGuest<DebianEnclosedGuest>>;
 
 template <class T>
 using CustomizableMemoryLinuxGuestTest = GuestTest<T>;

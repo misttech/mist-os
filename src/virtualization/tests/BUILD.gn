@@ -8,20 +8,6 @@ import("//src/media/audio/audio_core/package.gni")
 import("//src/virtualization/buildtools/linux_paths.gni")
 import("//src/virtualization/buildtools/romfs_image.gni")
 
-config("guest_test_util") {
-  visibility = [ "./*" ]
-  if (is_linux && current_cpu == "arm64") {
-    # On arm, termina_guest is a 64-bit kernel with a 32-bit userspace. If we don't use static
-    # linking those binaries will fail to run there.
-    rustflags = [
-      "-C",
-      "target-feature=+crt-static",
-      "-C",
-      "link-arg=-lgcc",
-    ]
-  }
-}
-
 guest_packages = [
   "//src/virtualization/bin/guest_manager:debian_guest_manager",
   "//src/virtualization/bin/guest_manager:zircon_guest_manager",

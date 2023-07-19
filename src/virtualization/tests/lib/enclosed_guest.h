@@ -299,8 +299,7 @@ class TerminaContainerEnclosedGuest : public TerminaEnclosedGuest {
                       std::string* result, int32_t* return_code) override;
 };
 
-using AllGuestTypes =
-    ::testing::Types<ZirconEnclosedGuest, DebianEnclosedGuest, TerminaEnclosedGuest>;
+using AllGuestTypes = ::testing::Types<ZirconEnclosedGuest, DebianEnclosedGuest>;
 
 class GuestTestNameGenerator {
  public:

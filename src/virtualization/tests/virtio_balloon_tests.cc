@@ -67,7 +67,7 @@ class BalloonGuestTest : public GuestTest<T> {
 };
 
 // Zircon does not yet have a virtio balloon driver.
-using GuestTypes = ::testing::Types<DebianEnclosedGuest, TerminaEnclosedGuest>;
+using GuestTypes = ::testing::Types<DebianEnclosedGuest>;
 TYPED_TEST_SUITE(BalloonGuestTest, GuestTypes, GuestTestNameGenerator);
 
 TYPED_TEST(BalloonGuestTest, InflateDeflate) {
