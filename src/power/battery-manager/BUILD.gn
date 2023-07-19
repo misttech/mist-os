@@ -12,8 +12,8 @@ rustc_binary("bin") {
 
   deps = [
     "//sdk/fidl/fuchsia.hardware.powersource:fuchsia.hardware.powersource_rust",
-    "//sdk/fidl/fuchsia.power.battery:fuchsia.power.battery.test_rust",
     "//sdk/fidl/fuchsia.power.battery:fuchsia.power.battery_rust",
+    "//sdk/fidl/fuchsia.power.battery.test:fuchsia.power.battery.test_rust",
     "//sdk/lib/device-watcher/rust",
     "//src/lib/fidl/rust/fidl",
     "//src/lib/fuchsia",
