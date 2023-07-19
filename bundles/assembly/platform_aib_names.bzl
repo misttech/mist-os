@@ -46,6 +46,7 @@ BRINGUP_PLATFORM_AIB_NAMES = BOOTSTRAP_USER_PLATFORM_AIB_NAMES + BOOTSTRAP_USERD
 USER_PLATFORM_AIB_NAMES_RISCV64 = BOOTSTRAP_USER_PLATFORM_AIB_NAMES + [
     "audio_device_registry",
     "battery_manager",
+    "cobalt_default_registry",
     "common_minimal",
     "core_realm",
     "core_realm_networking",

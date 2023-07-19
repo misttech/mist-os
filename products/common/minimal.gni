@@ -31,9 +31,6 @@ legacy_base_package_labels += [
   "//build/info:build-info",
 
   # TODO(http://fxb/103965): remove once we have config_data support in assembly_input_bundle()
-  "//src/cobalt/bin/app:cobalt_registry",
-
-  # TODO(http://fxb/103965): remove once we have config_data support in assembly_input_bundle()
   "//src/sys/core:core_component_id_index",
 
   # TODO(http://fxb/103965): remove once we have config_data support in assembly_input_bundle()

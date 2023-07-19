@@ -59,7 +59,6 @@ assembly_input_groups("debug") {
     "//src/connectivity/wlan/wlancfg/tool:for_transition",
     "//build/info:build-info",
     "//src/factory/factory_store_providers",
-    "//src/cobalt/bin/app:cobalt_registry",
   ]
   core_realm_shards =
       [ "//src/factory/factory_store_providers:factory_store_providers_shard" ]

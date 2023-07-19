@@ -979,6 +979,26 @@ assembly_input_bundle("minimal_userdebug_and_eng") {
 # (via the `:core_realm` AIB).  Each should list which feature_set_level and
 # build type that it is valid for.
 
+# Cobalt registry that is added by default if the product does not provide one
+#
+# feature_set: minimal
+# build-types: all
+#
+assembly_input_bundle("cobalt_default_registry") {
+  config_data = [
+    {
+      package_name = "cobalt"
+      label = "//src/cobalt/bin/app:global_metrics_registry_gen"
+      files = [
+        {
+          source = "$root_gen_dir/src/cobalt/bin/app/global_metrics_registry.pb"
+          destination = "global_metrics_registry.pb"
+        },
+      ]
+    },
+  ]
+}
+
 # Driver Framework V1 support
 #
 # feature_set_levels: minimal

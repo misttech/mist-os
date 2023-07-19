@@ -157,6 +157,9 @@ user_platform_aib_names =
 
       # Battery
       "battery_manager",
+
+      # Forensics
+      "cobalt_default_registry",
     ]
 
 if (current_cpu != "riscv64") {
