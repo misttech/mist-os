@@ -8,14 +8,8 @@ can access drivers.
 
 Driver Manager is built and run in every product. It is launched on startup.
 
-If you're looking for running an isolated Driver Manager for testing, please see
-[isolated_devmgr](/src/lib/isolated_devmgr/README.md).
-
-## Kernel Commandline Options
-
-The behavior of Driver Manager can also be changed by several kernel commandline options.
-Please look at the list of [kernel commandline options](/docs/reference/kernel/kernel_cmdline.md)
-and look for the options that start with `devmgr.*`
+If you're looking for running a hermetic Driver Manager for testing, please see
+[driver test realm](/docs/development/drivers/testing/driver_test_realm.md).
 
 ## Package Sources
 
