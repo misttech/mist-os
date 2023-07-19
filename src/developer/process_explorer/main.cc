@@ -4,6 +4,7 @@
 
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async-loop/default.h>
+#include <lib/syslog/cpp/macros.h>
 
 #include "src/developer/process_explorer/process_explorer.h"
 #include "src/lib/fxl/command_line.h"
@@ -15,8 +16,13 @@ int main(int argc, char** argv) {
     return 1;
 
   async::Loop loop(&kAsyncLoopConfigAttachToCurrentThread);
-  auto startup_context = sys::ComponentContext::CreateAndServeOutgoingDirectory();
+  component::OutgoingDirectory outgoing(loop.dispatcher());
+  zx::result result = outgoing.ServeFromStartupInfo();
+  if (result.is_error()) {
+    FX_LOGS(ERROR) << "Failed to serve outgoing directory: " << result.status_string();
+    return -1;
+  }
 
-  process_explorer::Explorer app(std::move(startup_context));
+  process_explorer::Explorer app(loop.dispatcher(), outgoing);
   loop.Run();
 }

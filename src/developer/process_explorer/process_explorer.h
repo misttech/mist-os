@@ -6,24 +6,23 @@
 #define SRC_DEVELOPER_PROCESS_EXPLORER_PROCESS_EXPLORER_H_
 
 #include <fidl/fuchsia.process.explorer/cpp/fidl.h>
-#include <fuchsia/process/explorer/cpp/fidl.h>
 #include <lib/async/dispatcher.h>
-#include <lib/fidl/cpp/binding_set.h>
-#include <lib/sys/cpp/component_context.h>
+#include <lib/component/outgoing/cpp/outgoing_directory.h>
 
 #include "src/lib/fxl/command_line.h"
 
 namespace process_explorer {
 
-class Explorer : public fuchsia::process::explorer::Query,
+class Explorer : public fidl::Server<fuchsia_process_explorer::Query>,
                  public fidl::Server<fuchsia_process_explorer::ProcessExplorer> {
  public:
-  Explorer(std::unique_ptr<sys::ComponentContext> context);
+  Explorer(async_dispatcher_t* dispatcher, component::OutgoingDirectory& outgoing);
   ~Explorer() override;
 
   // Writes processes information to |socket| in JSON, in UTF-8.
   // See /src/developer/process_explorer/writer.h for a description of the format of the JSON.
-  void WriteJsonProcessesData(zx::socket socket) override;
+  void WriteJsonProcessesData(WriteJsonProcessesDataRequest& request,
+                              WriteJsonProcessesDataCompleter::Sync& completer) override;
 
   // fuchsia.process.exploxer/ProcessExplorer implementation.
   void GetTaskInfo(GetTaskInfoRequest& request, GetTaskInfoCompleter::Sync& completer) override;
@@ -35,8 +34,8 @@ class Explorer : public fuchsia::process::explorer::Query,
   void KillTask(KillTaskRequest& request, KillTaskCompleter::Sync& completer) override;
 
  private:
-  std::unique_ptr<sys::ComponentContext> component_context_;
-  fidl::BindingSet<fuchsia::process::explorer::Query> bindings_;
+  fidl::ServerBindingGroup<fuchsia_process_explorer::Query> query_bindings_;
+  fidl::ServerBindingGroup<fuchsia_process_explorer::ProcessExplorer> explorer_bindings_;
 };
 
 }  // namespace process_explorer

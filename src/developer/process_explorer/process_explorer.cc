@@ -88,14 +88,21 @@ zx_status_t GetProcessesData(std::vector<Process>* processes_data) {
 
 }  // namespace
 
-Explorer::Explorer(std::unique_ptr<sys::ComponentContext> context)
-    : component_context_(std::move(context)) {
-  component_context_->outgoing()->AddPublicService(bindings_.GetHandler(this));
+Explorer::Explorer(async_dispatcher_t* dispatcher, component::OutgoingDirectory& outgoing) {
+  ZX_ASSERT(outgoing
+                .AddUnmanagedProtocol<fuchsia_process_explorer::Query>(
+                    query_bindings_.CreateHandler(this, dispatcher, fidl::kIgnoreBindingClosure))
+                .is_ok());
+  ZX_ASSERT(outgoing
+                .AddUnmanagedProtocol<fuchsia_process_explorer::ProcessExplorer>(
+                    explorer_bindings_.CreateHandler(this, dispatcher, fidl::kIgnoreBindingClosure))
+                .is_ok());
 }
 
 Explorer::~Explorer() = default;
 
-void Explorer::WriteJsonProcessesData(zx::socket socket) {
+void Explorer::WriteJsonProcessesData(WriteJsonProcessesDataRequest& request,
+                                      WriteJsonProcessesDataCompleter::Sync& completer) {
   std::vector<Process> processes_data;
   if (auto status = GetProcessesData(&processes_data); status != ZX_OK) {
     // Returning immediately. Nothing will have been written on the socket which will let the client
@@ -106,7 +113,7 @@ void Explorer::WriteJsonProcessesData(zx::socket socket) {
   const std::string json_string = WriteProcessesDataAsJson(std::move(processes_data));
 
   // TODO(fxbug.dev/108528): change to asynchronous
-  fsl::BlockingCopyFromString(json_string, socket);
+  fsl::BlockingCopyFromString(json_string, request.socket());
 }
 
 void Explorer::GetTaskInfo(GetTaskInfoRequest& request, GetTaskInfoCompleter::Sync& completer) {
