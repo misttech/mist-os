@@ -17,6 +17,7 @@ if (is_host) {
     sources = [
       "__init__.py",
       "arg_option.py",
+      "command.py",
     ]
   }
 
