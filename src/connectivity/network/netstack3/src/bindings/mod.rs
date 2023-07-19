@@ -73,7 +73,7 @@ use netstack3_core::{
     context::{
         CounterContext, EventContext, InstantContext, RngContext, TimerContext, TracingContext,
     },
-    data_structures::id_map::{EntryKey, IdMap},
+    data_structures::id_map::EntryKey,
     device::{
         loopback::LoopbackDeviceId, update_ipv4_configuration, update_ipv6_configuration, DeviceId,
         DeviceLayerEventDispatcher, DeviceLayerStateTypes, DeviceSendFrameError, EthernetDeviceId,
@@ -176,8 +176,6 @@ pub(crate) struct BindingsNonSyncCtxImplInner {
     timers: timers::TimerDispatcher<TimerId<BindingsNonSyncCtxImpl>>,
     devices: Devices<DeviceId<BindingsNonSyncCtxImpl>>,
     udp_sockets: UdpSockets,
-    tcp_v4_listeners: CoreMutex<IdMap<crate::bindings::socket::stream::ListenerState>>,
-    tcp_v6_listeners: CoreMutex<IdMap<crate::bindings::socket::stream::ListenerState>>,
     route_update_dispatcher: CoreMutex<routes_fidl_worker::RouteUpdateDispatcher>,
 }
 

@@ -40,9 +40,9 @@ use crate::{
         seqnum::UnscaledWindowSize,
         socket::{
             do_send_inner, isn::IsnGenerator, Acceptor, Connection, ConnectionId, HandshakeStatus,
-            Listener, ListenerAddrState, ListenerId, ListenerSharingState, MaybeClosedConnectionId,
-            MaybeListener, MaybeListenerId, NonSyncContext, Sockets, SyncContext,
-            TcpIpTransportContext, TimerId,
+            Listener, ListenerAddrState, ListenerId, ListenerNotifier as _, ListenerSharingState,
+            MaybeClosedConnectionId, MaybeListener, MaybeListenerId, NonSyncContext, Sockets,
+            SyncContext, TcpIpTransportContext, TimerId,
         },
         state::{BufferProvider, Closed, Initial, State, TimeWait},
         BufferSizes, ConnectionError, Control, Mss, SocketOptions,
@@ -411,7 +411,7 @@ where
             conn.acceptor = Some(Acceptor::Ready(listener_id));
             listener_id
         });
-        let Listener { pending, ready, backlog: _, buffer_sizes: _, socket_options: _ } =
+        let Listener { pending, ready, backlog: _, buffer_sizes: _, socket_options: _, notifier } =
             sockets.get_listener_by_id_mut(acceptor_id).expect("orphaned acceptee");
         let pos = pending
             .iter()
@@ -419,7 +419,7 @@ where
             .expect("acceptee is not found in acceptor's pending queue");
         let conn = pending.swap_remove(pos);
         ready.push_back((conn, passive_open));
-        ctx.on_waiting_connections_change(acceptor_id, ready.len());
+        notifier.new_incoming_connections(ready.len());
     }
 
     // We found a valid connection for the segment.
@@ -460,13 +460,14 @@ where
     let ConnIpAddr { local: (local_ip, local_port), remote: (remote_ip, remote_port) } =
         incoming_addrs;
 
-    let Listener { pending, backlog, buffer_sizes, ready, socket_options } = match maybe_listener {
-        MaybeListener::Bound(_bound) => {
-            // If the socket is only bound, but not listening.
-            return ListenerIncomingSegmentDisposition::NoMatchingSocket;
-        }
-        MaybeListener::Listener(listener) => listener,
-    };
+    let Listener { pending, backlog, buffer_sizes, ready, socket_options, notifier: _ } =
+        match maybe_listener {
+            MaybeListener::Bound(_bound) => {
+                // If the socket is only bound, but not listening.
+                return ListenerIncomingSegmentDisposition::NoMatchingSocket;
+            }
+            MaybeListener::Listener(listener) => listener,
+        };
 
     // Note that this checks happens at the very beginning, before we try to
     // reuse the connection in TIME-WAIT, this is because we need to store the

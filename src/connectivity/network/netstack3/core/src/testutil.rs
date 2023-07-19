@@ -67,7 +67,11 @@ use crate::{
     },
     sync::Mutex,
     transport::{
-        tcp::{buffer::RingBuffer, socket::NonSyncContext, BufferSizes},
+        tcp::{
+            buffer::RingBuffer,
+            socket::{ListenerNotifier, NonSyncContext},
+            BufferSizes,
+        },
         udp,
     },
     StackStateBuilder, SyncCtx, TimerId,
@@ -412,6 +416,10 @@ impl TracingContext for FakeNonSyncCtx {
     fn duration(&self, _: &'static CStr) {}
 }
 
+impl ListenerNotifier for () {
+    fn new_incoming_connections(&mut self, _count: usize) {}
+}
+
 impl NonSyncContext for FakeNonSyncCtx {
     type ReceiveBuffer = RingBuffer;
 
@@ -421,12 +429,7 @@ impl NonSyncContext for FakeNonSyncCtx {
 
     type ProvidedBuffers = ();
 
-    fn on_waiting_connections_change<I: Ip>(
-        &mut self,
-        _listener: crate::transport::tcp::socket::ListenerId<I>,
-        _count: usize,
-    ) {
-    }
+    type ListenerNotifier = ();
 
     fn new_passive_open_buffers(
         buffer_sizes: BufferSizes,

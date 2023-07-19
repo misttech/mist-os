@@ -12,7 +12,6 @@ use std::{
     time::Duration,
 };
 
-use assert_matches::assert_matches;
 use explicit::ResultExt as _;
 use fidl::{
     endpoints::{ClientEnd, RequestStream as _},
@@ -46,8 +45,8 @@ use netstack3_core::{
             set_reuseaddr_listener, set_reuseaddr_unbound, set_send_buffer_size,
             set_unbound_device, shutdown_conn, shutdown_listener, with_socket_options,
             with_socket_options_mut, AcceptError, BoundId, BoundInfo, ConnectError, ConnectionId,
-            ConnectionInfo, HandshakeStatus, ListenError, ListenerId, NoConnection,
-            SetReuseAddrError, SocketAddr, UnboundId,
+            ConnectionInfo, HandshakeStatus, ListenError, ListenerId, ListenerNotifier,
+            NoConnection, SetReuseAddrError, SocketAddr, UnboundId,
         },
         state::Takeable,
         BufferSizes, ConnectionError, SocketOptions,
@@ -88,65 +87,6 @@ enum SocketId<I: Ip> {
 #[derive(Debug)]
 pub(crate) struct ListenerState(zx::Socket);
 
-impl BindingsNonSyncCtxImpl {
-    /// Registers a newly created listener with its local zircon socket.
-    ///
-    /// # Panics
-    ///
-    /// Panics if `id` is already registered.
-    fn register_listener<I: Ip>(&self, id: ListenerId<I>, socket: zx::Socket) {
-        let state = ListenerState(socket);
-        match I::VERSION {
-            IpVersion::V4 => {
-                assert_matches!(self.tcp_v4_listeners.lock().insert(id.into(), state), None)
-            }
-            IpVersion::V6 => {
-                assert_matches!(self.tcp_v6_listeners.lock().insert(id.into(), state), None)
-            }
-        }
-    }
-
-    /// Unregisters an existing listener when it is about to be closed.
-    ///
-    /// Returns the zircon socket that used to be registered.
-    ///
-    /// # Panics
-    ///
-    /// Panics if `id` is non-existent.
-    fn unregister_listener<I: Ip>(&self, id: ListenerId<I>) -> zx::Socket {
-        let ListenerState(socket) = match I::VERSION {
-            IpVersion::V4 => {
-                self.tcp_v4_listeners.lock().remove(id.into()).expect("invalid v4 ListenerId")
-            }
-            IpVersion::V6 => {
-                self.tcp_v6_listeners.lock().remove(id.into()).expect("invalid v6 ListenerId")
-            }
-        };
-        socket
-    }
-
-    /// Calls the function with a mutable reference to state for an existing
-    /// listener.
-    ///
-    /// # Panics
-    ///
-    /// Panics if `id` does not correspond to a listener.
-    fn with_listener_mut<I: Ip, O, F: FnOnce(&mut ListenerState) -> O>(
-        &self,
-        id: ListenerId<I>,
-        cb: F,
-    ) -> O {
-        match I::VERSION {
-            IpVersion::V4 => {
-                cb(self.tcp_v4_listeners.lock().get_mut(id.into()).expect("invalid v4 ListenerId"))
-            }
-            IpVersion::V6 => {
-                cb(self.tcp_v6_listeners.lock().get_mut(id.into()).expect("invalid v6 ListenerId"))
-            }
-        }
-    }
-}
-
 /// Local end of a zircon socket pair which will be later provided to state
 /// machine inside Core.
 #[derive(Debug)]
@@ -175,7 +115,8 @@ impl IntoBuffers<ReceiveBufferWithZirconSocket, SendBufferWithZirconSocket>
 impl Takeable for LocalZirconSocketAndNotifier {
     fn take(&mut self) -> Self {
         let Self(socket, notifier) = self;
-        Self(Arc::clone(socket), notifier.clone())
+        let socket = core::mem::replace(socket, Arc::new(zx::Socket::from(zx::Handle::invalid())));
+        Self(socket, notifier.clone())
     }
 }
 
@@ -188,22 +129,30 @@ pub(crate) struct PeerZirconSocketAndWatcher {
     socket: Arc<zx::Socket>,
 }
 
-impl tcp::socket::NonSyncContext for BindingsNonSyncCtxImpl {
-    type ReceiveBuffer = ReceiveBufferWithZirconSocket;
-    type SendBuffer = SendBufferWithZirconSocket;
-    type ReturnedBuffers = PeerZirconSocketAndWatcher;
-    type ProvidedBuffers = LocalZirconSocketAndNotifier;
+#[derive(Debug)]
+pub(crate) struct ZirconSocketListenerNotifier {
+    socket: zx::Socket,
+}
 
-    fn on_waiting_connections_change<I: Ip>(&mut self, listener: ListenerId<I>, count: usize) {
+impl ListenerNotifier for ZirconSocketListenerNotifier {
+    fn new_incoming_connections(&mut self, count: usize) {
+        let Self { socket } = self;
         let (clear, set) = if count == 0 {
             (ZXSIO_SIGNAL_INCOMING, zx::Signals::NONE)
         } else {
             (zx::Signals::NONE, ZXSIO_SIGNAL_INCOMING)
         };
 
-        self.with_listener_mut(listener, |ListenerState(socket)| socket.signal_peer(clear, set))
-            .expect("failed to signal for available connections")
+        socket.signal_peer(clear, set).expect("failed to signal for available connections")
     }
+}
+
+impl tcp::socket::NonSyncContext for BindingsNonSyncCtxImpl {
+    type ReceiveBuffer = ReceiveBufferWithZirconSocket;
+    type SendBuffer = SendBufferWithZirconSocket;
+    type ReturnedBuffers = PeerZirconSocketAndWatcher;
+    type ProvidedBuffers = LocalZirconSocketAndNotifier;
+    type ListenerNotifier = ZirconSocketListenerNotifier;
 
     fn new_passive_open_buffers(
         buffer_sizes: BufferSizes,
@@ -561,8 +510,8 @@ where
                 close_conn::<I, _>(sync_ctx, non_sync_ctx, conn);
             }
             SocketId::Listener(listener) => {
-                let bound = shutdown_listener::<I, _>(sync_ctx, non_sync_ctx, listener);
-                let _: zx::Socket = non_sync_ctx.unregister_listener(listener);
+                let (bound, _): (_, ZirconSocketListenerNotifier) =
+                    shutdown_listener::<I, _>(sync_ctx, non_sync_ctx, listener);
                 remove_bound::<I, _>(sync_ctx, bound)
             }
         }
@@ -783,7 +732,7 @@ where
         match *id {
             SocketId::Bound(bound, ref mut local_socket) => {
                 let mut ctx = ctx.clone();
-                let Ctx { sync_ctx, non_sync_ctx } = &mut ctx;
+                let Ctx { sync_ctx, non_sync_ctx: _ } = &mut ctx;
                 // The POSIX specification for `listen` [1] says
                 //
                 //   If listen() is called with a backlog argument value that is
@@ -809,15 +758,18 @@ where
                     )
                 });
 
-                let listener = listen::<I, _>(sync_ctx, non_sync_ctx, bound, backlog)
-                    .map_err(IntoErrno::into_errno)?;
                 let LocalZirconSocketAndNotifier(local, _) = local_socket.take();
+                assert_eq!(Arc::strong_count(&local), 1);
+                let socket = Arc::try_unwrap(local)
+                    .expect("the local end of the socket should never be shared");
+                let listener = listen::<I, _>(
+                    sync_ctx,
+                    bound,
+                    backlog,
+                    ZirconSocketListenerNotifier { socket },
+                )
+                .map_err(IntoErrno::into_errno)?;
                 *id = SocketId::Listener(listener);
-                non_sync_ctx.register_listener(
-                    listener,
-                    Arc::try_unwrap(local)
-                        .expect("the local end of the socket should never be shared"),
-                );
                 Ok(())
             }
             SocketId::Unbound(_, _) | SocketId::Connection(_) | SocketId::Listener(_) => {
@@ -940,8 +892,8 @@ where
                 if mode.contains(fposix_socket::ShutdownMode::READ) {
                     let mut ctx = ctx.clone();
                     let Ctx { sync_ctx, non_sync_ctx } = &mut ctx;
-                    let bound = shutdown_listener::<I, _>(&sync_ctx, non_sync_ctx, listener);
-                    let local = non_sync_ctx.unregister_listener(listener);
+                    let (bound, ZirconSocketListenerNotifier { socket: local }) =
+                        shutdown_listener::<I, _>(&sync_ctx, non_sync_ctx, listener);
                     *id = SocketId::Bound(
                         bound,
                         LocalZirconSocketAndNotifier(Arc::new(local), NeedsDataNotifier::default()),
@@ -1815,6 +1767,7 @@ where
 
 #[cfg(test)]
 mod tests {
+    use assert_matches::assert_matches;
     use test_case::test_case;
 
     use super::*;
