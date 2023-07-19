@@ -22,10 +22,6 @@ generate_ctf_tests("canary_tests") {
 
 compatibility_test_suite("canary_tests_deprecated_target") {
   path = "//prebuilt/cts/canary/$host_platform/cts"
-  disabled_tests = [
-    # TODO(https://fxbug.dev/116940): Remove this tests's dependency on the experimental //sdk/lib/device_watcher.
-    "fuchsia.driver.test_test",
-  ]
 }
 
 compatibility_test_suite("current_milestone_tests") {
