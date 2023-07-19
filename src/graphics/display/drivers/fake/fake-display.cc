@@ -94,7 +94,7 @@ FakeDisplay::FakeDisplay(zx_device_t* parent, FakeDisplayDeviceConfig device_con
 FakeDisplay::~FakeDisplay() = default;
 
 zx_status_t FakeDisplay::DisplayClampRgbImplSetMinimumRgb(uint8_t minimum_rgb) {
-  fbl::AutoLock lock(&capture_lock_);
+  fbl::AutoLock lock(&capture_mutex_);
 
   clamp_rgb_value_ = minimum_rgb;
   return ZX_OK;
@@ -138,7 +138,7 @@ zx_status_t FakeDisplay::InitSysmemAllocatorClient() {
 
 void FakeDisplay::DisplayControllerImplSetDisplayControllerInterface(
     const display_controller_interface_protocol_t* intf) {
-  fbl::AutoLock interface_lock(&interface_lock_);
+  fbl::AutoLock interface_lock(&interface_mutex_);
   controller_interface_client_ = ddk::DisplayControllerInterfaceProtocolClient(intf);
   added_display_args_t args;
   PopulateAddedDisplayArgs(&args);
@@ -153,7 +153,7 @@ zx_status_t FakeDisplay::ImportVmoImage(image_t* image, zx::vmo vmo, size_t offs
   if (!alloc_checker.check()) {
     return ZX_ERR_NO_MEMORY;
   }
-  fbl::AutoLock lock(&image_lock_);
+  fbl::AutoLock lock(&image_mutex_);
 
   import_info->vmo = std::move(vmo);
   image->handle = reinterpret_cast<uint64_t>(import_info.get());
@@ -233,7 +233,7 @@ zx_status_t FakeDisplay::DisplayControllerImplImportImage(
     return ZX_ERR_NO_MEMORY;
   }
 
-  fbl::AutoLock lock(&image_lock_);
+  fbl::AutoLock lock(&image_mutex_);
   if (!IsAcceptableImageType(image->type)) {
     zxlogf(INFO, "ImportImage() will fail due to invalid Image type %" PRIu32, image->type);
     return ZX_ERR_INVALID_ARGS;
@@ -287,7 +287,7 @@ zx_status_t FakeDisplay::DisplayControllerImplImportImage(
 }
 
 void FakeDisplay::DisplayControllerImplReleaseImage(image_t* image) {
-  fbl::AutoLock lock(&image_lock_);
+  fbl::AutoLock lock(&image_mutex_);
   auto info = reinterpret_cast<ImageInfo*>(image->handle);
   imported_images_.erase(*info);
 }
@@ -346,7 +346,7 @@ void FakeDisplay::DisplayControllerImplApplyConfiguration(
   ZX_DEBUG_ASSERT(display_configs);
   ZX_DEBUG_ASSERT(banjo_config_stamp != nullptr);
   {
-    fbl::AutoLock lock(&image_lock_);
+    fbl::AutoLock lock(&image_mutex_);
     if (display_count == 1 && display_configs[0]->layer_count) {
       // Only support one display.
       current_image_to_capture_ =
@@ -531,7 +531,7 @@ zx_status_t FakeDisplay::DisplayControllerImplSetDisplayCaptureInterface(
     return ZX_ERR_NOT_SUPPORTED;
   }
 
-  fbl::AutoLock lock(&capture_lock_);
+  fbl::AutoLock lock(&capture_mutex_);
   capture_interface_client_ = ddk::DisplayCaptureInterfaceProtocolClient(intf);
   current_capture_target_image_id_ = display::kInvalidDriverCaptureImageId;
   return ZX_OK;
@@ -553,7 +553,7 @@ zx_status_t FakeDisplay::DisplayControllerImplImportImageForCapture(
   }
   const fidl::SyncClient<fuchsia_sysmem::BufferCollection>& collection = it->second;
 
-  fbl::AutoLock lock(&capture_lock_);
+  fbl::AutoLock lock(&capture_mutex_);
 
   fidl::Result check_result = collection->CheckBuffersAllocated();
   // TODO(fxbug.dev/121691): The sysmem FIDL error logging patterns are
@@ -616,7 +616,7 @@ zx_status_t FakeDisplay::DisplayControllerImplStartCapture(uint64_t capture_hand
     return ZX_ERR_NOT_SUPPORTED;
   }
 
-  fbl::AutoLock lock(&capture_lock_);
+  fbl::AutoLock lock(&capture_mutex_);
   if (current_capture_target_image_id_ != display::kInvalidDriverCaptureImageId) {
     return ZX_ERR_SHOULD_WAIT;
   }
@@ -639,7 +639,7 @@ zx_status_t FakeDisplay::DisplayControllerImplReleaseCapture(uint64_t capture_ha
     return ZX_ERR_NOT_SUPPORTED;
   }
 
-  fbl::AutoLock lock(&capture_lock_);
+  fbl::AutoLock lock(&capture_mutex_);
   display::DriverCaptureImageId driver_capture_image_id =
       display::ToDriverCaptureImageId(capture_handle);
   if (current_capture_target_image_id_ == driver_capture_image_id) {
@@ -654,7 +654,7 @@ zx_status_t FakeDisplay::DisplayControllerImplReleaseCapture(uint64_t capture_ha
 }
 
 bool FakeDisplay::DisplayControllerImplIsCaptureCompleted() {
-  fbl::AutoLock lock(&capture_lock_);
+  fbl::AutoLock lock(&capture_mutex_);
   return current_capture_target_image_id_ == display::kInvalidDriverCaptureImageId;
 }
 
@@ -687,9 +687,9 @@ zx_status_t FakeDisplay::DdkGetProtocol(uint32_t proto_id, void* out_protocol) {
 }
 
 zx_status_t FakeDisplay::SetupDisplayInterface() {
-  fbl::AutoLock interface_lock(&interface_lock_);
+  fbl::AutoLock interface_lock(&interface_mutex_);
   {
-    fbl::AutoLock image_lock(&image_lock_);
+    fbl::AutoLock image_lock(&image_mutex_);
     current_image_to_capture_ = nullptr;
   }
 
@@ -715,9 +715,9 @@ int FakeDisplay::CaptureThread() {
     }
     {
       // `current_capture_target_image_` is a pointer to ImageInfo stored in
-      // `imported_captures_` (guarded by `capture_lock_`). So `capture_lock_`
+      // `imported_captures_` (guarded by `capture_mutex_`). So `capture_mutex_`
       // must be locked while the capture image is being used.
-      fbl::AutoLock capture_lock(&capture_lock_);
+      fbl::AutoLock capture_lock(&capture_mutex_);
       if (capture_interface_client_.is_valid() &&
           (current_capture_target_image_id_ != display::kInvalidDriverCaptureImageId) &&
           ++capture_complete_signal_count_ >= kNumOfVsyncsForCapture) {
@@ -733,9 +733,9 @@ int FakeDisplay::CaptureThread() {
           ZX_DEBUG_ASSERT(dst.IsValid());
 
           // `current_image_to_capture_` is a pointer to ImageInfo stored in
-          // `imported_images_` (guarded by `image_lock_`). So `image_lock_`
+          // `imported_images_` (guarded by `image_mutex_`). So `image_mutex_`
           // must be locked while the source image is being used.
-          fbl::AutoLock image_lock(&image_lock_);
+          fbl::AutoLock image_lock(&image_mutex_);
           if (current_image_to_capture_ != nullptr) {
             // We have a valid image being displayed. Let's capture it.
             ImageInfo& src = *current_image_to_capture_;
@@ -815,7 +815,7 @@ int FakeDisplay::VSyncThread() {
 }
 
 void FakeDisplay::SendVsync() {
-  fbl::AutoLock interface_lock(&interface_lock_);
+  fbl::AutoLock interface_lock(&interface_mutex_);
   if (controller_interface_client_.is_valid()) {
     // See the discussion in `DisplayControllerImplApplyConfiguration()` about
     // the reason we use relaxed memory order here.

@@ -105,12 +105,12 @@ class FakeDisplay : public DeviceType,
   zx_status_t DisplayControllerImplImportImageForCapture(uint64_t banjo_driver_buffer_collection_id,
                                                          uint32_t index,
                                                          uint64_t* out_capture_handle)
-      __TA_EXCLUDES(capture_lock_);
+      __TA_EXCLUDES(capture_mutex_);
   zx_status_t DisplayControllerImplStartCapture(uint64_t capture_handle)
-      __TA_EXCLUDES(capture_lock_);
+      __TA_EXCLUDES(capture_mutex_);
   zx_status_t DisplayControllerImplReleaseCapture(uint64_t capture_handle)
-      __TA_EXCLUDES(capture_lock_);
-  bool DisplayControllerImplIsCaptureCompleted() __TA_EXCLUDES(capture_lock_);
+      __TA_EXCLUDES(capture_mutex_);
+  bool DisplayControllerImplIsCaptureCompleted() __TA_EXCLUDES(capture_mutex_);
 
   zx_status_t DisplayClampRgbImplSetMinimumRgb(uint8_t minimum_rgb);
 
@@ -118,7 +118,7 @@ class FakeDisplay : public DeviceType,
   void DdkRelease();
   zx_status_t DdkGetProtocol(uint32_t proto_id, void* out_protocol);
   void DdkChildPreRelease(void* child_ctx) {
-    fbl::AutoLock lock(&interface_lock_);
+    fbl::AutoLock lock(&interface_mutex_);
     controller_interface_client_ = ddk::DisplayControllerInterfaceProtocolClient();
   }
 
@@ -135,12 +135,12 @@ class FakeDisplay : public DeviceType,
   zx_status_t ImportVmoImage(image_t* image, zx::vmo vmo, size_t offset);
 
   size_t TEST_imported_images_count() const {
-    fbl::AutoLock lock(&image_lock_);
+    fbl::AutoLock lock(&image_mutex_);
     return imported_images_.size_slow();
   }
 
   uint8_t GetClampRgbValue() const {
-    fbl::AutoLock lock(&capture_lock_);
+    fbl::AutoLock lock(&capture_mutex_);
     return clamp_rgb_value_;
   }
 
@@ -149,7 +149,7 @@ class FakeDisplay : public DeviceType,
 
   zx_status_t SetupDisplayInterface();
   int VSyncThread();
-  int CaptureThread() __TA_EXCLUDES(capture_lock_, image_lock_);
+  int CaptureThread() __TA_EXCLUDES(capture_mutex_, image_mutex_);
   void PopulateAddedDisplayArgs(added_display_args_t* args);
 
   // Initializes the sysmem Allocator client used to import incoming buffer
@@ -200,14 +200,15 @@ class FakeDisplay : public DeviceType,
   thrd_t capture_thread_;
 
   // Guards display coordinator interface.
-  mutable fbl::Mutex interface_lock_;
+  mutable fbl::Mutex interface_mutex_;
 
   // Guards imported images and references to imported images.
-  mutable fbl::Mutex image_lock_;
+  mutable fbl::Mutex image_mutex_;
 
   // Guards imported capture buffers, capture interface and state.
-  // `capture_lock_` must never be acquired when `image_lock_` is already held.
-  mutable fbl::Mutex capture_lock_;
+  // `capture_mutex_` must never be acquired when `image_mutex_` is already
+  // held.
+  mutable fbl::Mutex capture_mutex_;
 
   // The sysmem allocator client used to bind incoming buffer collection tokens.
   fidl::WireSyncClient<fuchsia_sysmem::Allocator> sysmem_allocator_client_;
@@ -218,25 +219,25 @@ class FakeDisplay : public DeviceType,
       buffer_collections_;
 
   // Imported Images
-  fbl::DoublyLinkedList<std::unique_ptr<ImageInfo>> imported_images_ TA_GUARDED(image_lock_);
+  fbl::DoublyLinkedList<std::unique_ptr<ImageInfo>> imported_images_ TA_GUARDED(image_mutex_);
 
   // Points to the current image to be displayed and captured.
   // Stores nullptr if there is no image displaying on the fake display.
-  ImageInfo* current_image_to_capture_ TA_GUARDED(image_lock_);
+  ImageInfo* current_image_to_capture_ TA_GUARDED(image_mutex_);
 
   // Imported capture images, keyed by image ID.
-  CaptureImageInfo::HashTable imported_captures_ TA_GUARDED(capture_lock_);
+  CaptureImageInfo::HashTable imported_captures_ TA_GUARDED(capture_mutex_);
 
   // ID of the next capture target image imported to the fake display device
   // to capture displayed contents into.
   // Stores `kInvalidDriverCaptureImageId` if capture is not going to be
   // performed.
-  display::DriverCaptureImageId current_capture_target_image_id_ TA_GUARDED(capture_lock_) =
+  display::DriverCaptureImageId current_capture_target_image_id_ TA_GUARDED(capture_mutex_) =
       display::kInvalidDriverCaptureImageId;
 
   // The driver capture image ID for the next image to be imported to the
   // device.
-  display::DriverCaptureImageId next_imported_driver_capture_image_id_ TA_GUARDED(capture_lock_) =
+  display::DriverCaptureImageId next_imported_driver_capture_image_id_ TA_GUARDED(capture_mutex_) =
       display::DriverCaptureImageId(1);
 
   // The most recently applied config stamp.
@@ -244,20 +245,20 @@ class FakeDisplay : public DeviceType,
 
   // Capture complete is signaled at vsync time. This counter introduces a bit of delay
   // for signal capture complete
-  uint64_t capture_complete_signal_count_ TA_GUARDED(capture_lock_) = 0;
+  uint64_t capture_complete_signal_count_ TA_GUARDED(capture_mutex_) = 0;
 
   // Minimum value of RGB channels, via the DisplayClampRgbImpl protocol.
   //
   // This is associated with the display capture lock so we have the option to
   // reflect the clamping when we simulate display capture.
-  uint8_t clamp_rgb_value_ TA_GUARDED(capture_lock_) = 0;
+  uint8_t clamp_rgb_value_ TA_GUARDED(capture_mutex_) = 0;
 
   // Display controller related data
   ddk::DisplayControllerInterfaceProtocolClient controller_interface_client_
-      TA_GUARDED(interface_lock_);
+      TA_GUARDED(interface_mutex_);
 
   // Display Capture interface protocol
-  ddk::DisplayCaptureInterfaceProtocolClient capture_interface_client_ TA_GUARDED(capture_lock_);
+  ddk::DisplayCaptureInterfaceProtocolClient capture_interface_client_ TA_GUARDED(capture_mutex_);
 
   inspect::Inspector inspector_;
 };
