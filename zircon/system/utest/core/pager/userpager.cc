@@ -123,14 +123,15 @@ bool Vmo::Resize(uint64_t new_page_count) {
   return true;
 }
 
-bool Vmo::OpRange(uint32_t op, uint64_t offset, uint64_t len) {
-  return vmo_.op_range(op, offset * zx_system_get_page_size(), len * zx_system_get_page_size(),
-                       nullptr, 0) == ZX_OK;
+bool Vmo::OpRange(uint32_t op, uint64_t page_offset, uint64_t page_count) const {
+  return vmo_.op_range(op, page_offset * zx_system_get_page_size(),
+                       page_count * zx_system_get_page_size(), nullptr, 0) == ZX_OK;
 }
 
-void Vmo::GenerateBufferContents(void* dest_buffer, uint64_t len, uint64_t paged_vmo_offset) {
-  len *= zx_system_get_page_size();
-  paged_vmo_offset *= zx_system_get_page_size();
+void Vmo::GenerateBufferContents(void* dest_buffer, uint64_t page_count,
+                                 uint64_t paged_vmo_page_offset) const {
+  const uint64_t len = page_count * zx_system_get_page_size();
+  const uint64_t paged_vmo_offset = paged_vmo_page_offset * zx_system_get_page_size();
   auto buf = static_cast<uint64_t*>(dest_buffer);
   const uint64_t val = key();
   for (uint64_t idx = 0; idx < len / sizeof(uint64_t); idx++) {
@@ -138,9 +139,7 @@ void Vmo::GenerateBufferContents(void* dest_buffer, uint64_t len, uint64_t paged
   }
 }
 
-std::unique_ptr<Vmo> Vmo::Clone() { return Clone(0, size_); }
-
-std::unique_ptr<Vmo> Vmo::Clone(uint64_t offset, uint64_t size) {
+std::unique_ptr<Vmo> Vmo::Clone(uint64_t offset, uint64_t size) const {
   zx::vmo clone;
   zx_status_t status = vmo_.create_child(
       ZX_VMO_CHILD_SNAPSHOT_AT_LEAST_ON_WRITE | ZX_VMO_CHILD_RESIZABLE, offset, size, &clone);
