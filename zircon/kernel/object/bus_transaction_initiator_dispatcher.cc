@@ -187,7 +187,14 @@ void BusTransactionInitiatorDispatcher::PrintQuarantineWarningLocked(BtiPageLeak
     // to the object which eventually resulted in the leak.
     [[maybe_unused]] zx_status_t status = ProcessDispatcher::GetCurrent()->get_name(proc_name);
     DEBUG_ASSERT(status == ZX_OK);
-    thread_disp->get_name(thread_name);
+    // We could be here in the context of an exiting thread, which is also the last
+    // thread in its process and wants to clean the handle table, thereby calling
+    // BusTransactionInitiatorDispatcher::on_zero_handles(). So only call get_name
+    // if the thread is not dead/dying.
+    if (!thread_disp->IsDyingOrDead()) {
+      status = thread_disp->get_name(thread_name);
+      DEBUG_ASSERT(status == ZX_OK);
+    }
   }
 
   // Fetch the BTI name (if any).

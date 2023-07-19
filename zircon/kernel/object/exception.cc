@@ -284,9 +284,10 @@ zx_status_t dispatch_user_exception(uint exception_type,
   constexpr auto get_name = [](auto* task) -> ktl::array<char, ZX_MAX_NAME_LEN> {
     char name[ZX_MAX_NAME_LEN];
     [[maybe_unused]] zx_status_t status = task->get_name(name);
-    // TODO(rashaeqbal): If |task| is a thread and has exited, get_name will fail. Enable or modify
-    // this assert accordingly.
-    // DEBUG_ASSERT(status == ZX_OK);
+    // get_name cannot fail for a process or for a thread. We are processing an exception on the
+    // current thread, so its state should remain RUNNING until we've decided to kill the thread
+    // below.
+    DEBUG_ASSERT(status == ZX_OK);
     return ktl::to_array(name);
   };
 
