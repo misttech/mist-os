@@ -56,10 +56,11 @@ futexes.
 
 ## Container
 
-The term "container" refers to the [Starnix kernel](#starnix-kernel) bundled with a particular
-system image and configuration. For example, the `bionic` container is a starnix kernel instance
-configured to run binaries using an Android system image (Bionic libc).
-
+A Starnix container is conceptually analogous to a Linux container or a virtual
+machine. It is a combination of a Starnix kernel instance, disk image, and
+flags used to run a collection of Linux processes. For instance, the
+`debian_container` component is a Starnix container that has a small Debian-based
+Linux system.
 
 ## gVisor
 
@@ -130,8 +131,6 @@ the thread is executing code from the [starnix kernel](#starnix-kernel), has
 read/write access to the [starnix address space](#starnix-address-space), and
 can interact directly with [handles](#handle).
 
-Normal mode is currently in the design phase.
-
 ## POSIX Lite
 
 *POSIX Lite* is an implementation of many POSIX interfaces on Fuchsia. POSIX
@@ -150,14 +149,12 @@ without modification.
 ## Restricted mode
 
 *Restricted mode* is a execution mode for a thread that causes
-[system calls](#system-call) issued by the thread to be routed to the
-[normal mode](#normal-mode) rather than handled by the [Zircon](#zircon)
+[system calls](#system-call) and exceptions issued by the thread to be routed
+to [normal mode](#normal-mode) rather than handled by the [Zircon](#zircon)
 kernel itself. When running in restricted mode, the thread is executing code
 from the [Linux binary](#linux-binary), has no access to the
 [starnix address space](#starnix-address-space), and cannot interact directly with
 [handles](#handle).
-
-Restricted mode is currently in the design phase.
 
 ## Starnix
 
@@ -180,15 +177,12 @@ shared Starnix address space lets the starnix kernel examine the
 a new entry in the file descriptor table for the current process that refers
 to the same file object as file descriptor 7 for process 14.
 
-## Starnix manager
+## Starnix runner
 
-The *starnix manager* is a Fuchsia component that provides scaffolding for
-developing starnix. For example, starnix manager provides a `playground`
-collection that developers can use to run and interact with basic components,
-such as `hello_starnix` and `sh`.
-
-As starnix matures, we might remove starnix manager entirely or replace it
-with a dedicated developer component.
+The *starnix runner* is a Fuchsia component that runs starnix
+[containers](#container). This runner is responsible for instantiating a
+[Starnix kernel](#starnix-kernel) to load and execute the container
+component.
 
 ## Starnix kernel
 
