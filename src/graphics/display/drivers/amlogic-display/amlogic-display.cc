@@ -371,10 +371,10 @@ void AmlogicDisplay::DisplayControllerImplReleaseImage(image_t* image) {
 // part of ZX_PROTOCOL_DISPLAY_CONTROLLER_IMPL ops
 config_check_result_t AmlogicDisplay::DisplayControllerImplCheckConfiguration(
     const display_config_t** display_configs, size_t display_count,
-    client_composition_opcode_t* out_layer_cfg_result_list, size_t layer_cfg_result_count,
-    size_t* out_layer_cfg_result_actual) {
-  if (out_layer_cfg_result_actual != nullptr) {
-    *out_layer_cfg_result_actual = 0;
+    client_composition_opcode_t* out_client_composition_opcodes_list,
+    size_t client_composition_opcodes_count, size_t* out_client_composition_opcodes_actual) {
+  if (out_client_composition_opcodes_actual != nullptr) {
+    *out_client_composition_opcodes_actual = 0;
   }
   if (display_count != 1) {
     ZX_DEBUG_ASSERT(display_count == 0);
@@ -394,12 +394,12 @@ config_check_result_t AmlogicDisplay::DisplayControllerImplCheckConfiguration(
 
   bool success = true;
 
-  ZX_DEBUG_ASSERT(layer_cfg_result_count >= display_configs[0]->layer_count);
+  ZX_DEBUG_ASSERT(client_composition_opcodes_count >= display_configs[0]->layer_count);
   cpp20::span<client_composition_opcode_t> client_composition_opcodes(
-      out_layer_cfg_result_list, display_configs[0]->layer_count);
+      out_client_composition_opcodes_list, display_configs[0]->layer_count);
   std::fill(client_composition_opcodes.begin(), client_composition_opcodes.end(), 0);
-  if (out_layer_cfg_result_actual != nullptr) {
-    *out_layer_cfg_result_actual = client_composition_opcodes.size();
+  if (out_client_composition_opcodes_actual != nullptr) {
+    *out_client_composition_opcodes_actual = client_composition_opcodes.size();
   }
 
   if (display_configs[0]->layer_count > 1) {

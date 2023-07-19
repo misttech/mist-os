@@ -901,9 +901,9 @@ bool Client::CheckConfig(fhd::wire::ConfigResult* res,
 
   // TODO(fxbug.dev/130605): Do not use VLA. We should introduce a limit on
   // totally supported layers instead.
-  client_composition_opcode_t layer_cfg_results[layers_size];
-  memset(layer_cfg_results, 0, layers_size * sizeof(client_composition_opcode_t));
-  int layer_cfg_results_count = 0;
+  client_composition_opcode_t client_composition_opcodes[layers_size];
+  memset(client_composition_opcodes, 0, layers_size * sizeof(client_composition_opcode_t));
+  int client_composition_opcodes_count = 0;
 
   bool config_fail = false;
   size_t config_idx = 0;
@@ -935,7 +935,7 @@ bool Client::CheckConfig(fhd::wire::ConfigResult* res,
     // constraints.
     for (auto& layer_node : display_config.pending_layers_) {
       layers[layer_idx++] = &layer_node.layer->pending_layer_;
-      ++layer_cfg_results_count;
+      ++client_composition_opcodes_count;
 
       bool invalid = false;
       if (layer_node.layer->pending_layer_.type == LAYER_TYPE_PRIMARY) {
@@ -984,10 +984,10 @@ bool Client::CheckConfig(fhd::wire::ConfigResult* res,
     return false;
   }
 
-  size_t layer_cfg_results_count_actual;
+  size_t client_composition_opcodes_count_actual;
   uint32_t display_cfg_result = controller_->dc()->CheckConfiguration(
-      configs, config_idx, layer_cfg_results, layer_cfg_results_count,
-      &layer_cfg_results_count_actual);
+      configs, config_idx, client_composition_opcodes, client_composition_opcodes_count,
+      &client_composition_opcodes_count_actual);
 
   if (display_cfg_result != CONFIG_CHECK_RESULT_OK) {
     if (res) {
@@ -999,8 +999,8 @@ bool Client::CheckConfig(fhd::wire::ConfigResult* res,
   }
 
   bool layer_fail = false;
-  for (size_t i = 0; i < layer_cfg_results_count_actual; i++) {
-    if (layer_cfg_results[i]) {
+  for (size_t i = 0; i < client_composition_opcodes_count_actual; i++) {
+    if (client_composition_opcodes[i]) {
       layer_fail = true;
       break;
     }
@@ -1033,7 +1033,7 @@ bool Client::CheckConfig(fhd::wire::ConfigResult* res,
 
     bool seen_base = false;
     for (auto& layer_node : display_config.pending_layers_) {
-      uint32_t err = kAllErrors & layer_cfg_results[layer_idx];
+      uint32_t err = kAllErrors & client_composition_opcodes[layer_idx];
       // Fixup the error flags if the driver impl incorrectly set multiple MERGE_BASEs
       if (err & CLIENT_COMPOSITION_OPCODE_MERGE_BASE) {
         if (seen_base) {

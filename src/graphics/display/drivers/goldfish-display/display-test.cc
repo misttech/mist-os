@@ -90,10 +90,10 @@ void GoldfishDisplayTest::TearDown() {
 
 TEST_F(GoldfishDisplayTest, CheckConfigNoDisplay) {
   // Test No display
-  size_t layer_cfg_results_actual = 0;
+  size_t client_composition_opcodes_actual = 0;
   config_check_result_t res = display_->DisplayControllerImplCheckConfiguration(
       const_cast<const display_config_t**>(configs_ptrs_.data()), 0, results_.data(),
-      results_.size(), &layer_cfg_results_actual);
+      results_.size(), &client_composition_opcodes_actual);
   EXPECT_OK(res);
 }
 

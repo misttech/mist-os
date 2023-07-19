@@ -484,10 +484,10 @@ void Display::DisplayControllerImplReleaseImage(image_t* image) {
 
 config_check_result_t Display::DisplayControllerImplCheckConfiguration(
     const display_config_t** display_configs, size_t display_count,
-    client_composition_opcode_t* out_layer_cfg_result_list, size_t layer_cfg_result_count,
-    size_t* out_layer_cfg_result_actual) {
-  if (out_layer_cfg_result_actual != nullptr) {
-    *out_layer_cfg_result_actual = 0;
+    client_composition_opcode_t* out_client_composition_opcodes_list,
+    size_t client_composition_opcodes_count, size_t* out_client_composition_opcodes_actual) {
+  if (out_client_composition_opcodes_actual != nullptr) {
+    *out_client_composition_opcodes_actual = 0;
   }
 
   if (display_count == 0) {
@@ -497,19 +497,19 @@ config_check_result_t Display::DisplayControllerImplCheckConfiguration(
   int total_layer_count = std::accumulate(
       display_configs, display_configs + display_count, 0,
       [](int total, const display_config_t* config) { return total += config->layer_count; });
-  ZX_DEBUG_ASSERT(layer_cfg_result_count >= static_cast<size_t>(total_layer_count));
-  if (out_layer_cfg_result_actual != nullptr) {
-    *out_layer_cfg_result_actual = total_layer_count;
+  ZX_DEBUG_ASSERT(client_composition_opcodes_count >= static_cast<size_t>(total_layer_count));
+  if (out_client_composition_opcodes_actual != nullptr) {
+    *out_client_composition_opcodes_actual = total_layer_count;
   }
-  cpp20::span<client_composition_opcode_t> layer_cfg_results(out_layer_cfg_result_list,
-                                                             total_layer_count);
+  cpp20::span<client_composition_opcode_t> client_composition_opcodes(
+      out_client_composition_opcodes_list, total_layer_count);
 
-  int layer_cfg_result_offset = 0;
+  int client_composition_opcodes_offset = 0;
   for (unsigned i = 0; i < display_count; i++) {
     const size_t layer_count = display_configs[i]->layer_count;
     cpp20::span<client_composition_opcode_t> current_display_client_composition_opcodes =
-        layer_cfg_results.subspan(layer_cfg_result_offset, layer_count);
-    layer_cfg_result_offset += layer_count;
+        client_composition_opcodes.subspan(client_composition_opcodes_offset, layer_count);
+    client_composition_opcodes_offset += layer_count;
 
     const display::DisplayId display_id = display::ToDisplayId(display_configs[i]->display_id);
     if (layer_count > 0) {

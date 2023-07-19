@@ -707,13 +707,13 @@ TEST_F(FakeDisplayRealSysmemTest, Capture) {
   constexpr size_t kNumDisplays = 1;
   std::array<const display_config_t*, kNumDisplays> display_configs = {&display_config};
 
-  std::array<client_composition_opcode_t, kNumLayers> layer_cfg_results = {0u};
-  size_t layer_cfg_result_count = 0;
+  std::array<client_composition_opcode_t, kNumLayers> client_composition_opcodes = {0u};
+  size_t client_composition_opcodes_count = 0;
 
   // Check and apply the display configuration.
   config_check_result_t config_check_result = display()->DisplayControllerImplCheckConfiguration(
-      display_configs.data(), display_configs.size(), layer_cfg_results.data(),
-      layer_cfg_results.size(), &layer_cfg_result_count);
+      display_configs.data(), display_configs.size(), client_composition_opcodes.data(),
+      client_composition_opcodes.size(), &client_composition_opcodes_count);
   EXPECT_EQ(config_check_result, CONFIG_CHECK_RESULT_OK);
 
   const display::ConfigStamp config_stamp(1);

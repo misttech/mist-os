@@ -1505,16 +1505,18 @@ void Controller::DoPipeBufferReallocation(
   }
 }
 
-bool Controller::CheckDisplayLimits(cpp20::span<const display_config_t*> banjo_display_configs,
-                                    cpp20::span<client_composition_opcode_t> layer_cfg_results) {
-  int layer_cfg_results_offset = 0;
+bool Controller::CheckDisplayLimits(
+    cpp20::span<const display_config_t*> banjo_display_configs,
+    cpp20::span<client_composition_opcode_t> client_composition_opcodes) {
+  int client_composition_opcodes_offset = 0;
   for (unsigned i = 0; i < banjo_display_configs.size(); i++) {
     const display_config_t* banjo_display_config = banjo_display_configs[i];
-    ZX_DEBUG_ASSERT(layer_cfg_results.size() >=
-                    layer_cfg_results_offset + banjo_display_config->layer_count);
-    cpp20::span<client_composition_opcode_t> current_display_layer_cfg_results =
-        layer_cfg_results.subspan(layer_cfg_results_offset, banjo_display_config->layer_count);
-    layer_cfg_results_offset += banjo_display_config->layer_count;
+    ZX_DEBUG_ASSERT(client_composition_opcodes.size() >=
+                    client_composition_opcodes_offset + banjo_display_config->layer_count);
+    cpp20::span<client_composition_opcode_t> current_display_client_composition_opcodes =
+        client_composition_opcodes.subspan(client_composition_opcodes_offset,
+                                           banjo_display_config->layer_count);
+    client_composition_opcodes_offset += banjo_display_config->layer_count;
 
     // The intel display controller doesn't support these flags
     if (banjo_display_config->mode.flags &
@@ -1595,7 +1597,7 @@ bool Controller::CheckDisplayLimits(cpp20::span<const display_config_t*> banjo_d
         GetPostTransformWidth(*banjo_display_config->layer_list[j], &src_width, &src_height);
 
         if (src_height > primary->dest_frame.height || src_width > primary->dest_frame.width) {
-          current_display_layer_cfg_results[j] |= CLIENT_COMPOSITION_OPCODE_FRAME_SCALE;
+          current_display_client_composition_opcodes[j] |= CLIENT_COMPOSITION_OPCODE_FRAME_SCALE;
         }
       }
     }
@@ -1608,12 +1610,12 @@ bool Controller::CheckDisplayLimits(cpp20::span<const display_config_t*> banjo_d
 
 config_check_result_t Controller::DisplayControllerImplCheckConfiguration(
     const display_config_t** banjo_display_configs, size_t display_config_count,
-    client_composition_opcode_t* out_layer_cfg_result_list, size_t layer_cfg_result_count,
-    size_t* out_layer_cfg_result_actual) {
+    client_composition_opcode_t* out_client_composition_opcodes_list,
+    size_t client_composition_opcodes_count, size_t* out_client_composition_opcodes_actual) {
   fbl::AutoLock lock(&display_lock_);
 
-  if (out_layer_cfg_result_actual != nullptr) {
-    *out_layer_cfg_result_actual = 0;
+  if (out_client_composition_opcodes_actual != nullptr) {
+    *out_client_composition_opcodes_actual = 0;
   }
 
   cpp20::span banjo_display_configs_span(banjo_display_configs, display_config_count);
@@ -1631,25 +1633,25 @@ config_check_result_t Controller::DisplayControllerImplCheckConfiguration(
   int total_layer_count = std::accumulate(
       banjo_display_configs, banjo_display_configs + display_config_count, 0,
       [](int total, const display_config_t* config) { return total += config->layer_count; });
-  ZX_DEBUG_ASSERT(layer_cfg_result_count >= static_cast<size_t>(total_layer_count));
-  cpp20::span<client_composition_opcode_t> client_composition_opcodes(out_layer_cfg_result_list,
-                                                                      total_layer_count);
+  ZX_DEBUG_ASSERT(client_composition_opcodes_count >= static_cast<size_t>(total_layer_count));
+  cpp20::span<client_composition_opcode_t> client_composition_opcodes(
+      out_client_composition_opcodes_list, total_layer_count);
   std::fill(client_composition_opcodes.begin(), client_composition_opcodes.end(), 0);
-  if (out_layer_cfg_result_actual != nullptr) {
-    *out_layer_cfg_result_actual = total_layer_count;
+  if (out_client_composition_opcodes_actual != nullptr) {
+    *out_client_composition_opcodes_actual = total_layer_count;
   }
 
   if (!CheckDisplayLimits(banjo_display_configs_span, client_composition_opcodes)) {
     return CONFIG_CHECK_RESULT_UNSUPPORTED_MODES;
   }
 
-  int layer_cfg_results_offset = 0;
+  int client_composition_opcodes_offset = 0;
   for (unsigned i = 0; i < banjo_display_configs_span.size(); i++) {
     const display_config_t* banjo_display_config = banjo_display_configs_span[i];
     cpp20::span<client_composition_opcode_t> current_display_client_composition_opcodes =
-        client_composition_opcodes.subspan(layer_cfg_results_offset,
+        client_composition_opcodes.subspan(client_composition_opcodes_offset,
                                            banjo_display_config->layer_count);
-    layer_cfg_results_offset += banjo_display_config->layer_count;
+    client_composition_opcodes_offset += banjo_display_config->layer_count;
 
     const display::DisplayId display_id = display::ToDisplayId(banjo_display_config->display_id);
     DisplayDevice* display = nullptr;
@@ -1767,7 +1769,7 @@ config_check_result_t Controller::DisplayControllerImplCheckConfiguration(
                 image->width == kCursorInfos[x].width && image->height == kCursorInfos[x].height;
           }
           if (!found) {
-            out_layer_cfg_result_list[layer_cfg_results_offset + j] |=
+            out_client_composition_opcodes_list[client_composition_opcodes_offset + j] |=
                 CLIENT_COMPOSITION_OPCODE_USE_PRIMARY;
           }
           break;
@@ -1810,21 +1812,21 @@ config_check_result_t Controller::DisplayControllerImplCheckConfiguration(
       ZX_ASSERT(pipe->in_use());  // If the allocation failed, it should be in use
       display::DisplayId pipe_attached_display_id = pipe->attached_display_id();
 
-      int layer_cfg_results_offset = 0;
+      int client_composition_opcodes_offset = 0;
       for (unsigned i = 0; i < display_config_count; i++) {
-        cpp20::span<client_composition_opcode_t> current_display_layer_cfg_results =
-            client_composition_opcodes.subspan(layer_cfg_results_offset,
+        cpp20::span<client_composition_opcode_t> current_display_client_composition_opcodes =
+            client_composition_opcodes.subspan(client_composition_opcodes_offset,
                                                banjo_display_configs[i]->layer_count);
-        layer_cfg_results_offset += banjo_display_configs[i]->layer_count;
+        client_composition_opcodes_offset += banjo_display_configs[i]->layer_count;
 
         display::DisplayId display_id = display::ToDisplayId(banjo_display_configs[i]->display_id);
         if (display_id != pipe_attached_display_id) {
           continue;
         }
 
-        current_display_layer_cfg_results[0] = CLIENT_COMPOSITION_OPCODE_MERGE_BASE;
+        current_display_client_composition_opcodes[0] = CLIENT_COMPOSITION_OPCODE_MERGE_BASE;
         for (unsigned j = 1; j < banjo_display_configs[i]->layer_count; j++) {
-          current_display_layer_cfg_results[j] = CLIENT_COMPOSITION_OPCODE_MERGE_SRC;
+          current_display_client_composition_opcodes[j] = CLIENT_COMPOSITION_OPCODE_MERGE_SRC;
         }
         break;
       }

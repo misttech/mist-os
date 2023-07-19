@@ -480,15 +480,17 @@ closed protocol DisplayControllerImpl {
     /// place of another image with a matching configuration. It also cannot depend on the
     /// cursor position, as that can be updated without another call to check_configuration.
     ///
-    /// display_cfg_result should be set to a CONFIG_DISPLAY_* error if the combination of
+    /// `config_check_result` should be set to a CONFIG_DISPLAY_* error if the combination of
     /// display modes is not supported.
     ///
-    /// - response `layer_cfg_result` are per-layer client operations to make
-    /// the layer configuration supported by the display hardware. If the
-    /// `display_cfg_result` is not `CONFIG_CHECK_RESULT_OK`, the values of
-    /// `layer_cfg_result` are undefined and should be ignored by the client.
+    /// - response `client_composition_opcodes` are per-layer client operations
+    /// to make the layer configuration supported by the display hardware. If
+    /// the `config_check_result` is not `CONFIG_CHECK_RESULT_OK`, the values of
+    /// `client_composition_opcodes` are undefined and should be ignored by the
+    /// client.
     ///
-    ///   `layer_cfg_result` is an array with one element for each layer in
+    ///   `client_composition_opcodes` is an array with one element for each
+    ///   layer in
     ///   each display_config element. The elements map to layers following a
     ///   DFS traversal of a tree where the first-level children are the
     ///   `display_config` elements, and the second-level children are each
@@ -506,8 +508,8 @@ closed protocol DisplayControllerImpl {
         @inner_pointer
         display_config vector<DisplayConfig>:MAX;
     }) -> (struct {
-        display_cfg_result ConfigCheckResult;
-        layer_cfg_result vector<ClientCompositionOpcode>:MAX;
+        config_check_result ConfigCheckResult;
+        client_composition_opcodes vector<ClientCompositionOpcode>:MAX;
     });
 
     /// Applies the configuration.
