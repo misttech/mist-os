@@ -3214,7 +3214,7 @@ vendor/acme/proprietary:build_installer with Ninja:
 
 **Current value (from the default):** `[]`
 
-From //build/bazel/legacy_ninja_build_outputs.gni:108
+From //build/bazel/legacy_ninja_build_outputs.gni:109
 
 ### extra_package_labels
 
@@ -3681,6 +3681,17 @@ used for host tools.  If this is "", then a standard prebuilt is used.
 **Current value (from the default):** `""`
 
 From //build/toolchain/zircon/gcc.gni:15
+
+### generate_legacy_ninja_build_outputs_licenses_spdx
+
+Whether to generate real licenses for
+`//build/bazel/licenses:legacy_ninja_build_outputs_licenses_spdx`.
+License collection + generation for ninja targets is slow and expensive,
+so it is turned off by default, and a placeholder is produced instead.
+
+**Current value (from the default):** `false`
+
+From //build/bazel/licenses/BUILD.gn:20
 
 ### generate_plasa_artifacts
 
