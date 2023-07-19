@@ -970,10 +970,10 @@ impl FileObject {
             return error!(EBADF);
         }
         let bytes_read = read()?;
+
         // TODO(steveaustin) - omit updating time_access to allow info to be immutable
         // and thus allow simultaneous reads.
-        self.name.update_atime()?;
-
+        self.update_atime();
         if bytes_read > 0 {
             self.notify(InotifyMask::ACCESS);
         }
@@ -1188,7 +1188,8 @@ impl FileObject {
             result => result,
         }?;
 
-        self.name.update_atime()?;
+        self.update_atime();
+
         Ok(())
     }
 
@@ -1311,6 +1312,12 @@ impl FileObject {
     // Notifies watchers on the current node and its parent about an event.
     pub fn notify(&self, event_mask: InotifyMask) {
         self.name.notify(event_mask)
+    }
+
+    fn update_atime(&self) {
+        if !self.flags().contains(OpenFlags::NOATIME) {
+            self.name.update_atime();
+        }
     }
 }
 

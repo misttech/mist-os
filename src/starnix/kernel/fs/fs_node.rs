@@ -1081,9 +1081,17 @@ impl FsNode {
         } else {
             mode & 0o007
         };
-        if (mode_flags & access.bits()) != access.bits() {
+        if (mode_flags & access.rwx_bits()) != access.rwx_bits() {
             return error!(EACCES);
         }
+
+        if access.contains(Access::NOATIME)
+            && node_uid != creds.euid
+            && !creds.has_capability(CAP_FOWNER)
+        {
+            return error!(EPERM);
+        }
+
         Ok(())
     }
 

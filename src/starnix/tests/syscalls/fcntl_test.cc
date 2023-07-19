@@ -210,4 +210,27 @@ TEST(FcntlTest, FdDup) {
   ASSERT_LT(new_fd, 1000);
 }
 
+TEST(FcntlTest, Noatime) {
+  int fd = OpenTestFile();
+
+  EXPECT_EQ(fcntl(fd, F_SETFL, O_NOATIME), 0);
+}
+
+TEST(FcntlTest, NoatimePermission) {
+  if (getuid() != 0) {
+    GTEST_SKIP() << "Can only be run as root.";
+  }
+
+  int fd = OpenTestFile();
+
+  // Fork to change UID.
+  test_helper::ForkHelper helper;
+  helper.RunInForkedProcess([&] {
+    ASSERT_EQ(setuid(1), 0);
+
+    ASSERT_LT(fcntl(fd, F_SETFL, O_NOATIME), 0);
+    ASSERT_EQ(errno, EPERM);
+  });
+}
+
 }  // namespace

@@ -186,6 +186,14 @@ pub fn sys_fcntl(
             let requested_flags =
                 OpenFlags::from_bits_truncate((arg as u32) & settable_flags.bits());
             let file = current_task.files.get_unless_opath(fd)?;
+
+            // If `NOATIME` flag is being set then check that it's allowed.
+            if requested_flags.contains(OpenFlags::NOATIME)
+                && !file.flags().contains(OpenFlags::NOATIME)
+            {
+                file.name.entry.node.check_access(current_task, Access::NOATIME)?;
+            }
+
             file.update_file_flags(requested_flags, settable_flags);
             Ok(SUCCESS)
         }

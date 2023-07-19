@@ -1184,23 +1184,25 @@ impl NamespaceNode {
         ArcKey::ref_cast(&self.entry)
     }
 
-    pub fn update_atime(&self) -> Result<(), Errno> {
+    pub fn update_atime(&self) {
         // Do not update the atime of this node if it is not mounted
         // or is mounted with the NOATIME flag.
         if let Some(mount) = &self.mount {
             if !mount.flags().contains(MountFlags::NOATIME) {
-                self.entry.node.update_info(|info| {
-                    let now = utc::utc_now();
-                    info.time_access = now;
-                    Ok(())
-                })?;
+                self.entry
+                    .node
+                    .update_info(|info| {
+                        let now = utc::utc_now();
+                        info.time_access = now;
+                        Ok(())
+                    })
+                    .expect("update_info() is not expected to fail");
             }
         }
-        Ok(())
     }
 
     pub fn readlink(&self, current_task: &CurrentTask) -> Result<SymlinkTarget, Errno> {
-        self.update_atime()?;
+        self.update_atime();
         self.entry.node.readlink(current_task)
     }
 

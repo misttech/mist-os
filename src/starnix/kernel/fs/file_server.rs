@@ -571,6 +571,7 @@ impl file::RawFileIoConnection for StarnixNodeConnection {
             .await??;
         Ok(written as u64)
     }
+
     async fn write_at(&self, offset: u64, content: &[u8]) -> Result<u64, zx::Status> {
         let task = self.task.clone();
         let file = self.file.clone();
@@ -586,6 +587,7 @@ impl file::RawFileIoConnection for StarnixNodeConnection {
             .await??;
         Ok(written as u64)
     }
+
     async fn seek(&self, offset: i64, origin: fio::SeekOrigin) -> Result<u64, zx::Status> {
         let target = match origin {
             fio::SeekOrigin::Start => SeekTarget::Set(offset),
@@ -594,10 +596,21 @@ impl file::RawFileIoConnection for StarnixNodeConnection {
         };
         Ok(self.file.seek(&self.task, target)? as u64)
     }
+
     fn update_flags(&self, flags: fio::OpenFlags) -> zx::Status {
-        let settable_flags =
-            OpenFlags::APPEND | OpenFlags::DIRECT | OpenFlags::NOATIME | OpenFlags::NONBLOCK;
-        self.file.update_file_flags(flags.into(), settable_flags);
+        let flags = OpenFlags::from(flags);
+
+        // `fcntl(F_SETFL)` also supports setting `O_NOATIME`, but it's allowed
+        // only when the calling process has the same EUID as the UID of the
+        // file. We don't know caller's EUID here, so we cannot check if
+        // O_NOATIME should be allowed. It's not a problem here because
+        // `fidl::fuchsia::io::OpenFlags` doesn't have an equivalent of
+        // `O_NOATIME`.
+        assert!(!flags.contains(OpenFlags::NOATIME));
+
+        let settable_flags = OpenFlags::APPEND | OpenFlags::DIRECT | OpenFlags::NONBLOCK;
+        self.file.update_file_flags(flags, settable_flags);
+
         zx::Status::OK
     }
 }
