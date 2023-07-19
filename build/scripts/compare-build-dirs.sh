@@ -51,6 +51,13 @@ unexpected_matches=()
 # These files match or differ, but we didn't know what to expect.
 unclassified_diffs=()
 unclassified_matches=()
+# These files were skipped.
+# It might be useful to compare these after ALL
+# other differences have been eliminated.
+skipped_files=()
+# Ignored files are unimportant will never be compared.
+ignored_files=()
+unspecified_files=()
 
 function diff_json() {
   json_format "$1" || { echo "Failed to format $1" ; return 1;}
@@ -102,17 +109,20 @@ function diff_file_relpath() {
 
   # TODO(fangism): Some files are stored as blobs so content differences
   # appear as filename entry differences.  Skip these.  Perhaps silently?
-  if test ! -f "$left"
-  then printf "%s does not exist\n" "$left"
+  # Testing -r also allows for symlinks.
+  test -r "$left" || {
+    printf "%s does not exist\n" "$left"
     return
-  fi
-  if test ! -f "$right"
-  then echo "%s does not exist\n" "$right"
+  }
+  test -r "$right" || {
+    echo "%s does not exist\n" "$right"
     return
-  fi
+  }
+
+  expect=""
 
   # Classify each category of files with expectations in each case below:
-  #   expect={diff,match,unknown,ignore}; diff...
+  #   expect={diff,match,unknown,ignore,skip}; diff...
   # Leave blank for ignored files (not compared).
   # "unknown" means unclassified and could contain a mix of matches/diffs.
   # Goal:
@@ -142,6 +152,7 @@ function diff_file_relpath() {
         efi_x64/obj/zircon/third_party/ulib/cksum/*.c.o) expect=diff ;;
         efi_x64/obj/zircon/*.c.o) expect=unknown ;;
 
+        # See http://fxbug.dev/128466 for aac vs. __TIME__ macros.
         obj/third_party/android/platform/external/aac/*.cpp.o) expect=unknown ;;
         *) expect=match ;;
       esac
@@ -152,7 +163,7 @@ function diff_file_relpath() {
 
     # Ignore .a differences until .o differences have been eliminated.
     # Eventually, use diff_binary.
-    *.a) expect=ignore ;;
+    *.a) expect=skip ;;
 
     # Rust libraries (binary)
     *.rlib)
@@ -162,6 +173,10 @@ function diff_file_relpath() {
       esac
       diff_binary "$left" "$right"
       ;;
+
+    # There may be unexpected rmeta mismatches.
+    # See http//fxbug.dev/129074, https://github.com/rust-lang/rust/issues/113584
+    *.rmeta) expect=match; diff_binary "$left" "$right" ;;
 
     # Generated code
     *.rs)
@@ -173,6 +188,8 @@ function diff_file_relpath() {
       diff_text "$left" "$right"
       ;;
 
+    *.vbmeta) expect=unknown; diff_binary "$left" "$right" ;;
+
     memory_metrics_registry.cb.h)
       expect=diff; diff_text "$left" "$right" ;;  # ordering diff
 
@@ -180,19 +197,24 @@ function diff_file_relpath() {
     # so omit details from the general report, and diff_binary.
     meta.far) expect=unknown; diff_binary "$left" "$right" ;;
     contents) expect=unknown; diff_binary "$left" "$right" ;;
+    all_blobs.json) expect=skip ;;  # too big right now
+
     blobs.json) expect=diff; diff_binary "$left" "$right" ;;
+      # Many of blobs.json do actually match
+
     blob.manifest) expect=diff; diff_binary "$left" "$right" ;;  # many hashes
     blobs.manifest) expect=unknown; diff_binary "$left" "$right" ;;
     package_manifest.json) expect=unknown; diff_binary "$left" "$right" ;;
     targets.json)
       case "$common_path" in
-        gen/gopaths/*) expect=match ;;
+        gen/gopaths/*) expect=match; diff_json "$left" "$right"  ;;
+        amber-files/repository/targets.json) expect=skip ;; # too big right now
+        *.unzipped/*.targets.json) expect=skip ;;  # diffs: sig, expires
         *) expect=diff ;;  # diffs: many hashes
       esac
-      diff_json "$left" "$right"
       ;;
 
-    snapshot.json) expect=diff; diff_json "$left" "$right" ;;  # diffs: sig, expires, version
+    snapshot.json | *.unzipped/*.snapshot.json) expect=skip ;;  # diffs: sig, expires, version (use diff_json)
     timestamp.json)
       case "$common_path" in
         amber-files/repository/timestamp.json) expect=diff ;; # diffs: sig, expires, version
@@ -204,6 +226,10 @@ function diff_file_relpath() {
     recovery-eng_blobs.json) expect=diff; diff_json "$left" "$right" ;;  # diffs: bytes, merkle, size (ordering)
     *.zbi.json) expect=unknown; diff_json "$left" "$right" ;;  # diffs: crc32, size
     update_packages.manifest.json) expect=diff; diff_json "$left" "$right" ;;  # hashes
+
+    images.json) expect=skip ;;  # too many diffs
+
+    compile_commands.json) expect=skip ;;  # too many
 
     # Diff formatted JSON for readability.
     *.json)
@@ -222,21 +248,86 @@ function diff_file_relpath() {
 
     update_packages.manifest) expect=diff; diff_text "$left" "$right" ;;  # hashes
 
+    *.image_assembly_inputs) expect=skip ;;  # too many blob/hash differences
+    *.image_assembler_all_inputs) expect=skip ;;  # too many blob/hash differences
+
+    # Bazel-related outputs
+    java.log)
+      case "$common_path" in
+        gen/build/bazel/*/java.log) expect=ignore ;;  # log with timestamps
+        *) expect=unknown ;;
+      esac
+      ;;
+
+    lock)
+      case "$common_path" in
+        gen/build/bazel/*/lock) expect=ignore ;;  # contains PID
+        *) expect=unknown ;;
+      esac
+      ;;
+
+    command_port)
+      case "$common_path" in
+        gen/build/bazel/*/command_port) expect=ignore ;;  # randomly chosen port
+        *) expect=unknown ;;
+      esac
+      ;;
+
+    server.starttime) expect=ignore ;;  # timestamp
+    server.pid.txt) expect=ignore ;;  # contains PID
+
+    command.log)
+      case "$common_path" in
+        gen/build/bazel/*/command.log) expect=ignore ;;  # subject to build parallelism and completion ordering
+        *) expect=unknown ;;
+      esac
+      ;;
+
+    ffx.log)
+      case "$common_path" in
+        gen/build/bazel/*/cache/logs/ffx.log) expect=ignore ;;  # log with timestamps
+        *) expect=unknown ;;
+      esac
+      ;;
+
+    volatile-status.txt) expect=diff; diff_text "$left" "$right" ;;  # bears timestamp
+
+    test.cache_status)
+      case "$common_path" in
+        bazel-out/*/test.cache_status) expect=diff; diff_binary "$left" "$right" ;;
+        *) expect=unknown ;;
+      esac
+      ;;
+
+    test.log)
+      case "$common_path" in
+        bazel-out/*/test.log) expect=ignore ;;  # reports test time duration
+        *) expect=unknown ;;
+      esac
+      ;;
+
+    test.xml)
+      case "$common_path" in
+        bazel-out/*/test.xml) expect=ignore ;;  # reports test time duration
+        *) expect=unknown ;;
+      esac
+      ;;
+
     # Various binaries.
     *.blk) expect=unknown; diff_binary "$left" "$right" ;;
     *.vboot) expect=unknown; diff_binary "$left" "$right" ;;
     *.zbi) expect=unknown; diff_binary "$left" "$right" ;;
 
-    # Most archives carry timestamp information.
+    # Most archives carry timestamp information of their contents.
     # One way to make this reproducible is to force a magic date/time
     # while archiving, which effectively removes time variance.
-    *.tar | *.tar.gz | *.tgz) expect=unknown; diff_binary "$left" "$right" ;;
+    *.tar | *.tar.gz | *.tgz | *.pyz | *.zip) expect=diff; diff_binary "$left" "$right" ;;
 
     # Ignore ninja logs, as they bear timestamps,
     # and are non-essential build artifacts.
     .ninja.log) expect=ignore ;;
 
-    # Ignore filesystem access trace files.
+    # Ignore filesystem access trace files (fsatrace logs).
     # They may contain nondeterministic paths to /proc/PID
     *_trace.txt) expect=ignore ;;
 
@@ -273,20 +364,23 @@ function diff_file_relpath() {
         *) expect=match; diff_text "$left" "$right" ;;
       esac
   esac
+
   # Record unexpected and unclassified differences/matches.
   diff_status="$?"
   case "$expect" in
     match)
-      test "$diff_status" = 0 || unexpected_diffs=("${unexpected_diffs[@]}" "$common_path") ;;
+      test "$diff_status" = 0 || unexpected_diffs+=("$common_path") ;;
     diff)
-      test "$diff_status" != 0 || unexpected_matches=("${unexpected_matches[@]}" "$common_path") ;;
+      test "$diff_status" != 0 || unexpected_matches+=("$common_path") ;;
     unknown)
       if test "$diff_status" = 0
-      then unclassified_matches=("${unclassified_matches[@]}" "$common_path")
-      else unclassified_diffs=("${unclassified_diffs[@]}" "$common_path")
+      then unclassified_matches+=("$common_path")
+      else unclassified_diffs+=("$common_path")
       fi
       ;;
-    *) ;; # ignore
+    ignore) ignored_files+=("$common_path") ;;
+    skip) skipped_files+=("$common_path") ;;
+    *) unspecified_files+=("$common_path") ;;
   esac
 }
 
@@ -338,6 +432,7 @@ else diff_dir_recursive "$1" "$2" ""
 fi
 
 # Summarize findings:
+echo "======== COMPARISON SUMMARY ========"
 exit_status=0
 
 if test "${#unexpected_diffs[@]}" != 0
@@ -346,38 +441,71 @@ then
   for path in "${unexpected_diffs[@]}"
   do echo "  $path"
   done
+  echo "end of UNEXPECTED DIFFS"
   echo
   exit_status=1
 fi
 
+# Good news: these files matched
 if test "${#unexpected_matches[@]}" != 0
 then
   echo "UNEXPECTED MATCHES: (action: make these expect=match now?)"
   for path in "${unexpected_matches[@]}"
   do echo "  $path"
   done
+  echo "end of UNEXPECTED MATCHES"
   echo
   exit_status=1
 fi
 
+# This group mismatched, but we didn't know what to expect.
 if test "${#unclassified_diffs[@]}" != 0
 then
   echo "UNCLASSIFIED DIFFS: (action: classify them as expect=diff)"
   for path in "${unclassified_diffs[@]}"
   do echo "  $path"
   done
+  echo "end of UNCLASSIFIED DIFFS"
   echo
   # Leave exit status as it were.
 fi
 
+# This group matched, but we didn't know what to expect.
 if test "${#unclassified_matches[@]}" != 0
 then
   echo "UNCLASSIFIED MATCHES: (action: classify them as expect=match)"
   for path in "${unclassified_matches[@]}"
   do echo "  $path"
   done
+  echo "end of UNCLASSIFIED MATCHES"
   echo
   # Leave exit status as it were.
 fi
 
+if test "${#skipped_files[@]}" != 0
+then
+  echo "SKIPPED FILES: (action: compare these after all other differences have been resolved)"
+  for path in "${skipped_files[@]}"
+  do echo "  $path"
+  done
+  echo "end of SKIPPED FILES"
+  echo
+  # Leave exit status as it were.
+fi
+
+# Don't bother reporting "${ignored_files[@]}", the list is long and not useful.
+
+# Make sure all cases are covered.
+if test "${#unspecified_files[@]}" != 0
+then
+  echo "UNSPECIFIED FILES: (action: classify into one of the above categories)"
+  for path in "${unspecified_files[@]}"
+  do echo "  $path"
+  done
+  echo "end of UNSPECIFIED FILES"
+  echo
+  exit_status=1
+fi
+
+echo "Exiting with status $exit_status"
 exit "$exit_status"
