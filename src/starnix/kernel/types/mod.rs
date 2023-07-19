@@ -2,6 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+// The uapi module has the same names as many of the types we define in the modules below that
+// are also glob re-exported.
+#![allow(ambiguous_glob_reexports)]
+
 mod arc_key;
 mod auth;
 mod device_type;

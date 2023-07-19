@@ -6,13 +6,6 @@
 // TODO(fxbug.dev/122028): Remove this allow once the lint is fixed.
 #![allow(unknown_lints, clippy::extra_unused_type_parameters)]
 
-#[macro_use]
-extern crate macro_rules_attribute;
-
-use crate::{
-    execution::{Container, ContainerServiceConfig},
-    logging::*,
-};
 use anyhow::Error;
 use fidl::endpoints::ControlHandle;
 use fidl_fuchsia_component_runner as frunner;
@@ -22,38 +15,11 @@ use fuchsia_async as fasync;
 use fuchsia_component::server::ServiceFs;
 use fuchsia_runtime as fruntime;
 use futures::{StreamExt, TryStreamExt};
-
-#[cfg(target_arch = "x86_64")]
-use fuchsia_inspect as inspect;
-
-#[macro_use]
-mod trace;
-
-mod arch;
-mod auth;
-mod bpf;
-mod collections;
-mod device;
-mod drop_notifier;
-mod dynamic_thread_pool;
-mod execution;
-mod fs;
-mod loader;
-mod lock;
-mod logging;
-mod mm;
-mod mutable_state;
-mod selinux;
-mod signals;
-mod syscalls;
-mod task;
-mod time;
-mod types;
-mod vdso;
-mod vmex_resource;
-
-#[cfg(test)]
-mod testing;
+use starnix::{
+    execution::{Container, ContainerServiceConfig},
+    logging::*,
+    trace::*,
+};
 
 fn maybe_serve_lifecycle() {
     if let Some(lifecycle) =
@@ -108,7 +74,7 @@ async fn build_container(
     stream: frunner::ComponentRunnerRequestStream,
     returned_config: &mut Option<ContainerServiceConfig>,
 ) -> Result<Container, Error> {
-    let (container, config) = execution::create_component_from_stream(stream).await?;
+    let (container, config) = starnix::execution::create_component_from_stream(stream).await?;
     *returned_config = Some(config);
     Ok(container)
 }
@@ -138,7 +104,7 @@ async fn main() -> Result<(), Error> {
 
     #[cfg(target_arch = "x86_64")]
     {
-        inspect::component::inspector().root().record_string(
+        fuchsia_inspect::component::inspector().root().record_string(
             "x86_64_extended_pstate_strategy",
             format!("{:?}", *extended_pstate::x86_64::PREFERRED_STRATEGY),
         );
@@ -151,7 +117,7 @@ async fn main() -> Result<(), Error> {
     // TODO(https://fxbug.dev/93344): Once it's practical to do so we should report a STARTING_UP
     // state in inspect's health node until we are ready to start accepting requests.
     log_debug!("Waiting for UTC clock to start...");
-    time::utc::wait_for_utc_clock_to_start().await;
+    starnix::time::utc::wait_for_utc_clock_to_start().await;
 
     log_debug!("Serving kernel services on outgoing directory handle.");
     fs.take_and_serve_directory_handle()?;
@@ -171,12 +137,12 @@ async fn main() -> Result<(), Error> {
                 }
             }
             KernelServices::ComponentRunner(stream) => {
-                execution::serve_component_runner(stream, container.wait().await)
+                starnix::execution::serve_component_runner(stream, container.wait().await)
                     .await
                     .expect("failed to start component runner");
             }
             KernelServices::ContainerController(stream) => {
-                execution::serve_container_controller(stream, container.wait().await)
+                starnix::execution::serve_container_controller(stream, container.wait().await)
                     .await
                     .expect("failed to start container controller");
             }

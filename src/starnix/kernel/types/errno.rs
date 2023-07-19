@@ -325,6 +325,7 @@ pub const ENOTSUP: ErrnoCode = EOPNOTSUPP;
 /// `errno` returns an `Errno` struct tagged with the current file name and line number.
 ///
 /// Use `error!` instead if you want the `Errno` to be wrapped in an `Err`.
+#[macro_export]
 macro_rules! errno {
     ($err:ident) => {
         crate::types::errno::Errno::new(crate::types::errno::$err, stringify!($err), None)
@@ -342,12 +343,14 @@ macro_rules! errno {
 /// number.
 ///
 /// Use `errno!` instead if you want an unwrapped, but still tagged, `Errno`.
+#[macro_export]
 macro_rules! error {
     ($($args:tt)*) => { Err(crate::types::errno!($($args)*)) };
 }
 
 /// `errno_from_code` returns a `Err` containing an `Errno` struct with the given error code and is
 /// tagged with the current file name and line number.
+#[macro_export]
 macro_rules! errno_from_code {
     ($err:expr) => {{
         let errno = crate::types::errno::ErrnoCode::from_error_code($err);
@@ -357,6 +360,7 @@ macro_rules! errno_from_code {
 
 /// `errno_from_zxio_code` returns an `Errno` struct with the given error code and is
 /// tagged with the current file name and line number.
+#[macro_export]
 macro_rules! errno_from_zxio_code {
     ($err:expr) => {{
         let code = $err.raw();
@@ -368,6 +372,7 @@ macro_rules! errno_from_zxio_code {
 // but this converter is a reasonable first-approximation. The translation matches
 // fdio_status_to_errno. See fxbug.dev/30921 for more context.
 // TODO: Replace clients with more context-specific mappings.
+#[macro_export]
 macro_rules! from_status_like_fdio {
     ($status:ident) => {{
         from_status_like_fdio!($status, "")
@@ -542,11 +547,11 @@ const_assert_eq!(syncio::zxio::ERFKILL, uapi::ERFKILL);
 const_assert_eq!(syncio::zxio::EHWPOISON, uapi::EHWPOISON);
 
 // Public re-export of macros allows them to be used like regular rust items.
-pub(crate) use errno;
-pub(crate) use errno_from_code;
-pub(crate) use errno_from_zxio_code;
-pub(crate) use error;
-pub(crate) use from_status_like_fdio;
+pub use errno;
+pub use errno_from_code;
+pub use errno_from_zxio_code;
+pub use error;
+pub use from_status_like_fdio;
 
 pub trait SourceContext<T, E> {
     /// Similar to `with_context` in [`anyhow::Context`], but adds the source location of the

@@ -10,53 +10,63 @@ use crate::{
     types::{pid_t, Errno},
 };
 
+#[doc(hidden)]
+pub use ::tracing as __tracing;
+
+#[macro_export]
 macro_rules! log {
     (level = $level:ident, $($arg:tt)*) => {{
         if !cfg!(feature = "disable_logging") {
             $crate::logging::with_current_task_info(|_task_info| {
-                tracing::$level!(tag = %_task_info, $($arg)*);
+                $crate::logging::__tracing::$level!(tag = %_task_info, $($arg)*);
             });
         }
     }};
 }
 
+#[macro_export]
 macro_rules! log_trace {
     ($($arg:tt)*) => {
         $crate::logging::log!(level = trace, $($arg)*)
     };
 }
 
+#[macro_export]
 macro_rules! log_debug {
     ($($arg:tt)*) => {
         $crate::logging::log!(level = debug, $($arg)*)
     };
 }
 
+#[macro_export]
 macro_rules! log_info {
     ($($arg:tt)*) => {
         $crate::logging::log!(level = info, $($arg)*)
     };
 }
 
+#[macro_export]
 macro_rules! log_warn {
     ($($arg:tt)*) => {
         $crate::logging::log!(level = warn, $($arg)*)
     };
 }
 
+#[macro_export]
 macro_rules! log_error {
     ($($arg:tt)*) => {
         $crate::logging::log!(level = error, $($arg)*)
     };
 }
 
+#[macro_export]
 macro_rules! not_implemented {
     ($($arg:tt)*) => (
         $crate::logging::log!(level = warn, tag = "not_implemented", $($arg)*)
     )
 }
 
-#[allow(unused)]
+#[macro_export]
 macro_rules! not_implemented_log_once {
     ($($arg:tt)*) => (
         {
@@ -69,15 +79,14 @@ macro_rules! not_implemented_log_once {
 }
 
 // Public re-export of macros allows them to be used like regular rust items.
-pub(crate) use log;
-pub(crate) use log_debug;
-pub(crate) use log_error;
-pub(crate) use log_info;
-pub(crate) use log_trace;
-pub(crate) use log_warn;
-pub(crate) use not_implemented;
-#[allow(unused)]
-pub(crate) use not_implemented_log_once;
+pub use log;
+pub use log_debug;
+pub use log_error;
+pub use log_info;
+pub use log_trace;
+pub use log_warn;
+pub use not_implemented;
+pub use not_implemented_log_once;
 
 // Call this when you get an error that should "never" happen, i.e. if it does that means the
 // kernel was updated to produce some other error after this match was written.
