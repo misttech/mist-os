@@ -22,7 +22,6 @@ async fn start_nested_cm_and_wait_for_clean_stop(root_url: &str, moniker_to_wait
                 .capability(Capability::event_stream("destroyed").with_scope(&root))
                 .capability(Capability::event_stream("directory_ready").with_scope(&root))
                 .capability(Capability::event_stream("capability_requested").with_scope(&root))
-                .capability(Capability::event_stream("resolved").with_scope(&root))
                 .capability(
                     Capability::event_stream("directory_ready").as_("directory_ready_unscoped"),
                 )
@@ -67,7 +66,6 @@ async fn from_framework_should_not_work() {
                 .capability(Capability::event_stream("destroyed").with_scope(&root))
                 .capability(Capability::event_stream("directory_ready").with_scope(&root))
                 .capability(Capability::event_stream("capability_requested").with_scope(&root))
-                .capability(Capability::event_stream("resolved").with_scope(&root))
                 .capability(
                     Capability::event_stream("directory_ready").as_("directory_ready_unscoped"),
                 )
