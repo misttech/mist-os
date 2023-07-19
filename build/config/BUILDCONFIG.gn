@@ -80,14 +80,14 @@ set_default_toolchain(target_toolchain)
 sources_assignment_filter = []
 
 # Variables used to refer to the in-tree python interpreter.
-python_version = "3.8"
-python_exe_src = "//prebuilt/third_party/python3/${host_platform}/bin/python${python_version}"
-python_include_dir = "//prebuilt/third_party/python3/${host_platform}/include"
+python_version = "3.11"
+python_exe_src = "//prebuilt/third_party/python${python_version}/${host_platform}/bin/python${python_version}"
+python_include_dir =
+    "//prebuilt/third_party/python${python_version}/${host_platform}/include"
 
 # Variables used to refer to the in-tree python pip.
-pip_version = "3.8"
-pip_exe_src =
-    "//prebuilt/third_party/python3/${host_platform}/bin/pip${pip_version}"
+pip_version = "3.11"
+pip_exe_src = "//prebuilt/third_party/python${python_version}/${host_platform}/bin/pip${pip_version}"
 
 # These files are needed when enabling 'restat' behavior through this wrapper
 # script.  'restat' preserves old timestamps on unchanged outputs.

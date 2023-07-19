@@ -20,24 +20,21 @@ class CustomTypesTests(unittest.TestCase):
             (
                 "valid_ipv4", "127.0.0.1:8081",
                 custom_types.IpPort(
-                    ip=ipaddress.ip_address("127.0.0.1"), scope=None,
-                    port=8081)),
+                    ip=ipaddress.ip_address("127.0.0.1"), port=8081)),
             (
                 "valid_ipv6", "[::1]:8081",
-                custom_types.IpPort(
-                    ip=ipaddress.ip_address("::1"), scope=None, port=8081)),
+                custom_types.IpPort(ip=ipaddress.ip_address("::1"), port=8081)),
             (
                 "valid_ipv6_scope", "[::1%eth0]:8081",
                 custom_types.IpPort(
-                    ip=ipaddress.ip_address("::1"), scope="eth0", port=8081)),
+                    ip=ipaddress.ip_address("::1%eth0"), port=8081)),
             (
                 "valid_ipv6_scope_digit", "[::1%123]:8081",
                 custom_types.IpPort(
-                    ip=ipaddress.ip_address("::1"), scope="123", port=8081)),
+                    ip=ipaddress.ip_address("::1%123"), port=8081)),
             (
                 "valid_ipv6_no_brackets", "::1:8081",
-                custom_types.IpPort(
-                    ip=ipaddress.ip_address("::1"), scope=None, port=8081)),
+                custom_types.IpPort(ip=ipaddress.ip_address("::1"), port=8081)),
         ])
     def test_parse(self, _, addr: str, expected: custom_types.IpPort) -> None:
         """Test cases for IpPort.parse()."""
@@ -62,17 +59,16 @@ class CustomTypesTests(unittest.TestCase):
             (
                 "valid_ipv4",
                 custom_types.IpPort(
-                    ip=ipaddress.ip_address("127.0.0.1"), scope=None,
+                    ip=ipaddress.ip_address("127.0.0.1"),
                     port=8081), "127.0.0.1:8081"),
             (
                 "valid_ipv6",
-                custom_types.IpPort(
-                    ip=ipaddress.ip_address("::1"), scope=None,
-                    port=8081), "[::1]:8081"),
+                custom_types.IpPort(ip=ipaddress.ip_address("::1"),
+                                    port=8081), "[::1]:8081"),
             (
                 "valid_ipv6_scope",
                 custom_types.IpPort(
-                    ip=ipaddress.ip_address("::1"), scope="eth0",
+                    ip=ipaddress.ip_address("::1%eth0"),
                     port=8081), "[::1%eth0]:8081"),
         ])
     def test_ipport_str(

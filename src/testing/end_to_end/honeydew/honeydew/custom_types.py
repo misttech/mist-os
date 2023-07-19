@@ -27,19 +27,14 @@ class IpPort(NamedTuple):
     Args:
         ip: Ip Address
         port: Port Number
-        scope: Optional IPv6 Scope
     """
     ip: Union[ipaddress.IPv4Address, ipaddress.IPv6Address]
     port: int
-    scope: Optional[str]
 
     def __str__(self) -> str:
         host: str = f"{self.ip}"
         if isinstance(self.ip, ipaddress.IPv6Address):
-            if self.scope:
-                host = f"{host}%{self.scope}"
             host = f"[{host}]"
-
         return f"{host}:{self.port}"
 
     @staticmethod
@@ -73,22 +68,13 @@ class IpPort(NamedTuple):
             port_part: str = arr[1]
             # Remove [] that might be surrounding an IPv6 address
             addr_part = addr_part.replace("[", "").replace("]", "")
-            # TODO: Remove manual scope parsing once Python migrated to > 3.8
-            # In Python 3.8 IpV6 addresses cannot have a scope in them.
-            # If one exists, parse it and store separately
-            scope: Optional[str] = None
-            addr_array: list[str] = addr_part.rsplit("%", 1)
-            if len(addr_array) > 1:
-                scope = addr_array[1]
-            addr: Union[ipaddress.IPv4Address, ipaddress.IPv6Address] = \
-                ipaddress.ip_address(addr_array[0])
             port = int(port_part)
             if port < 1:
                 raise ValueError(
                     f"For IpPort: {target_name}, port number: {port} was " \
                     f"not a positive integer)"
                 )
-            return IpPort(addr, int(port_part), scope)
+            return IpPort(ipaddress.ip_address(addr_part), port)
         except ValueError as e:
             raise e
 
