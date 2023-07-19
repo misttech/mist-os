@@ -2893,6 +2893,7 @@ fn exit_with_fidl_error(cause: fidl::Error) -> ! {
 
 #[cfg(test)]
 mod tests {
+    use fidl_fuchsia_net_dhcpv6_ext as fnet_dhcpv6_ext;
     use fidl_fuchsia_net_ext::FromExt as _;
 
     use assert_matches::assert_matches;
@@ -3097,20 +3098,22 @@ mod tests {
                     request,
                     control_handle: _,
                 } => {
+                    let params: fnet_dhcpv6_ext::NewClientParams = params.try_into()?;
                     assert_eq!(
                         params,
-                        fnet_dhcpv6::NewClientParams {
-                            interface_id: Some(id.get()),
-                            address: Some(sockaddr),
-                            config: Some(fnet_dhcpv6::ClientConfig {
-                                information_config: Some(fnet_dhcpv6::InformationConfig {
-                                    dns_servers: Some(true),
-                                    ..Default::default()
-                                }),
+                        fnet_dhcpv6_ext::NewClientParams {
+                            interface_id: id.get(),
+                            address: sockaddr,
+                            config: fnet_dhcpv6_ext::ClientConfig {
+                                information_config: fnet_dhcpv6_ext::InformationConfig {
+                                    dns_servers: true,
+                                },
                                 prefix_delegation_config,
-                                ..Default::default()
-                            }),
-                            ..Default::default()
+                                non_temporary_address_config: fnet_dhcpv6_ext::AddressConfig {
+                                    address_count: 0,
+                                    preferred_addresses: None,
+                                }
+                            },
                         }
                     );
 
@@ -4150,16 +4153,19 @@ mod tests {
                         std::mem::replace(dhcpv6_client_request_stream, Some(new_stream)).is_none()
                     );
 
+                    let config = fnet_dhcpv6_ext::ClientConfig::try_from(
+                        config.expect("ClientConfig must be present"),
+                    )
+                    .expect("ClientConfig should pass FIDL table validation");
                     assert_eq!(
                         config,
-                        Some(fnet_dhcpv6::ClientConfig {
-                            information_config: Some(fnet_dhcpv6::InformationConfig {
-                                dns_servers: Some(true),
-                                ..Default::default()
-                            }),
+                        fnet_dhcpv6_ext::ClientConfig {
+                            information_config: fnet_dhcpv6_ext::InformationConfig {
+                                dns_servers: true,
+                            },
+                            non_temporary_address_config: Default::default(),
                             prefix_delegation_config: want_pd_config.clone(),
-                            ..Default::default()
-                        })
+                        }
                     );
                     interface_id
                 })

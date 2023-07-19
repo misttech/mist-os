@@ -6,7 +6,177 @@
 
 //! Extension types and helpers for the fuchsia.net.dhcpv6 FIDL library.
 
+use fidl_table_validation::{ValidFidlTable, Validate};
 use futures::{future::Either, FutureExt as _};
+
+/// Parameters to configure a new client.
+///
+/// See [`fidl_fuchsia_net_dhcpv6::NewClientParams`].
+#[derive(ValidFidlTable, Debug, Clone, PartialEq)]
+#[fidl_table_src(fidl_fuchsia_net_dhcpv6::NewClientParams)]
+pub struct NewClientParams {
+    /// The ID of the interface the client will run on.
+    ///
+    /// See [`fidl_fuchsia_net_dhcpv6::NewClientParams::interface_id`].
+    pub interface_id: u64,
+    /// The socket address to use when communicating with servers.
+    ///
+    /// DHCPv6 servers listen for link-local multicasts, so not using a
+    /// link-local address here may cause interoperability issues.
+    ///
+    /// Client creation will fail with `INVALID_ARGS` if:
+    ///
+    /// * a multicast address is provided;
+    /// * or a link-local address is provided, and its zone index
+    ///     doesn't match `interface_id` (Fuchsia has a 1:1 mapping from
+    ///     zone index to interface ID).
+    ///
+    /// Client creation will fail if it fails to bind a socket to this
+    /// address.
+    ///
+    /// See [`fidl_fuchsia_net_dhcpv6::NewClientParams::address`].
+    pub address: fidl_fuchsia_net::Ipv6SocketAddress,
+    /// Configuration for starting the DHCPv6 client.
+    ///
+    /// If the configuration requests both addresses and other
+    /// configuration parameters, all information is requested in the
+    /// same message exchange, running in stateful mode. If only
+    /// configuration parameters are requested (no addresses), the
+    /// client runs in stateless mode, as described in
+    /// [RFC 8415, Section 6.1].
+    ///
+    /// Client creation will fail if `config` is not requesting any
+    /// information (all fields are empty), or if it contains invalid
+    /// fields.
+    ///
+    /// See [`fidl_fuchsia_net_dhcpv6::NewClientParams::config`].
+    ///
+    /// [RFC 8415, Section 6.1]: https://tools.ietf.org/html/rfc8415#section-6.1
+    pub config: ClientConfig,
+}
+
+/// Configuration for what the client should request from DHCPv6 server(s).
+///
+/// See [`fidl_fuchsia_net_dhcpv6::ClientConfig`].
+#[derive(ValidFidlTable, Debug, Clone, PartialEq)]
+#[fidl_table_src(fidl_fuchsia_net_dhcpv6::ClientConfig)]
+pub struct ClientConfig {
+    #[fidl_field_type(default = InformationConfig { dns_servers: false })]
+    /// Configuration for requesting configuration information.
+    ///
+    /// See [`fidl_fuchsia_net_dhcpv6::ClientConfig::information_config`].
+    pub information_config: InformationConfig,
+    #[fidl_field_type(
+        default = AddressConfig { address_count: 0, preferred_addresses: Vec::new() }
+    )]
+    /// Non-temporary address configuration.
+    ///
+    /// Configures the client to negotiate non-temporary
+    /// addresses (IA_NA), as defined in
+    /// [RFC 8415, section 6.2].
+    ///
+    /// See [`fidl_fuchsia_net_dhcpv6::ClientConfig::non_temporary_address_config`].
+    ///
+    /// [RFC 8415, section 6.2]: https://tools.ietf.org/html/rfc8415#section-6.2
+    pub non_temporary_address_config: AddressConfig,
+    #[fidl_field_type(optional)]
+    /// Prefix delegation configuration.
+    ///
+    /// Configures the client to negotiate a delegated prefix
+    /// (IA_PD), as defined in [RFC 8415, section 6.3][RFC 8415 6.3].
+    ///
+    /// Optional. If not set, delegated prefixes will not be
+    /// requested. If invalid, client creation will fail and
+    /// the pipelined channel will be closed.
+    ///
+    /// See [`fidl_fuchsia_net_dhcpv6::ClientConfig::prefix_delegation_config`].
+    ///
+    /// [RFC 8415 6.3]: https://datatracker.ietf.org/doc/html/rfc8415#section-6.3
+    pub prefix_delegation_config: Option<fidl_fuchsia_net_dhcpv6::PrefixDelegationConfig>,
+}
+
+/// Configuration for informational data to request.
+///
+/// See [`fidl_fuchsia_net_dhcpv6::InformationConfig`].
+#[derive(ValidFidlTable, Debug, Clone, PartialEq, Default)]
+#[fidl_table_src(fidl_fuchsia_net_dhcpv6::InformationConfig)]
+pub struct InformationConfig {
+    #[fidl_field_type(default = false)]
+    /// See [`fidl_fuchsia_net_dhcpv6::InformationConfig::dns_servers`].
+    pub dns_servers: bool,
+}
+
+/// [`AddressConfig`] custom validation error.
+#[derive(thiserror::Error, Debug)]
+pub enum AddressConfigCustomValidationError {
+    /// More preferred addresses than address count.
+    #[error("more preferred addresses in {preferred_addresses:?} than count {address_count}")]
+    TooManyPreferredAddresses {
+        /// Address count.
+        address_count: u8,
+        /// Preferred addresses.
+        preferred_addresses: Vec<fidl_fuchsia_net::Ipv6Address>,
+    },
+}
+
+/// Custom [`AddressConfig`] validator.
+pub struct AddressConfigValidator;
+
+impl Validate<AddressConfig> for AddressConfigValidator {
+    type Error = AddressConfigCustomValidationError;
+
+    fn validate(
+        AddressConfig { address_count, preferred_addresses }: &AddressConfig,
+    ) -> Result<(), Self::Error> {
+        match preferred_addresses.as_ref() {
+            Some(preferred_addresses) => {
+                if preferred_addresses.len() > (*address_count).into() {
+                    Err(AddressConfigCustomValidationError::TooManyPreferredAddresses {
+                        address_count: *address_count,
+                        preferred_addresses: preferred_addresses.clone(),
+                    })
+                } else {
+                    Ok(())
+                }
+            }
+            None => Ok(()),
+        }
+    }
+}
+
+/// Configuration for requesting addresses.
+///
+/// See [`fidl_fuchsia_net_dhcpv6::AddressConfig`].
+#[derive(ValidFidlTable, Debug, Clone, PartialEq, Default)]
+#[fidl_table_src(fidl_fuchsia_net_dhcpv6::AddressConfig)]
+#[fidl_table_validator(AddressConfigValidator)]
+pub struct AddressConfig {
+    #[fidl_field_type(default = 0)]
+    /// Number of addresses.
+    ///
+    /// If the value is 0, the client will not negotiate
+    /// non-temporary addresses, i.e. its messages to the
+    /// server will not contain the IA_NA option.
+    ///
+    /// See [`fidl_fuchsia_net_dhcpv6::AddressConfig::address_count`].
+    pub address_count: u8,
+    #[fidl_field_type(optional)]
+    /// Preferred addresses.
+    ///
+    /// The addresses are used as hints by DHCPv6 servers,
+    /// but may be ignored.
+    ///
+    /// The size of `preferred_addresses` must be less than
+    /// or equal to `address_count`, otherwise the
+    /// `AddressConfig` is invalid.
+    ///
+    /// Optional field. If not set, or if
+    /// `preferred_addresses` is empty, no address hints are
+    /// provided.
+    ///
+    /// See [`fidl_fuchsia_net_dhcpv6::AddressConfig::preferred_addresses`].
+    pub preferred_addresses: Option<Vec<fidl_fuchsia_net::Ipv6Address>>,
+}
 
 /// Responses from watch methods on `fuchsia.net.dhcpv6/Client`.
 #[derive(Debug)]
@@ -91,7 +261,42 @@ mod tests {
 
     use assert_matches::assert_matches;
     use futures::{StreamExt as _, TryStreamExt as _};
+    use net_declare::fidl_ip_v6;
     use test_case::test_case;
+
+    #[test_case(fidl_fuchsia_net_dhcpv6::AddressConfig {
+        address_count: Some(0),
+        preferred_addresses: Some(vec![fidl_ip_v6!("2001:db8::1")]),
+        ..Default::default()
+    })]
+    #[test_case(fidl_fuchsia_net_dhcpv6::AddressConfig {
+        address_count: Some(1),
+        preferred_addresses: Some(vec![fidl_ip_v6!("2001:db8::1"), fidl_ip_v6!("2001:db8::2")]),
+        ..Default::default()
+    })]
+    #[fuchsia::test]
+    fn address_config_custom_validation(address_config: fidl_fuchsia_net_dhcpv6::AddressConfig) {
+        let (want_address_count, want_preferred_addresses) = assert_matches!(
+            address_config.clone(),
+            fidl_fuchsia_net_dhcpv6::AddressConfig {
+            address_count: Some(address_count),
+            preferred_addresses: Some(preferred_addresses),
+            ..
+        } => (address_count, preferred_addresses));
+
+        assert_matches!(
+            crate::AddressConfig::try_from(address_config),
+            Err(crate::AddressConfigValidationError::Logical(
+                crate::AddressConfigCustomValidationError::TooManyPreferredAddresses {
+                    address_count,
+                    preferred_addresses,
+                }
+            )) => {
+                assert_eq!(address_count, want_address_count);
+                assert_eq!(preferred_addresses, want_preferred_addresses);
+            }
+        );
+    }
 
     #[derive(Debug, Clone, Copy)]
     enum WatchType {
@@ -171,7 +376,7 @@ mod tests {
     #[test_case(&[WatchType::Address, WatchType::Address]; "address")]
     #[test_case(&[WatchType::DnsServers, WatchType::Address]; "dns_servers_then_address")]
     #[test_case(&[WatchType::Address, WatchType::DnsServers]; "address_then_dns_servers")]
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn watch_stream(watch_types: &[WatchType]) {
         let (client_proxy, mut request_stream) =
             fidl::endpoints::create_proxy_and_stream::<fidl_fuchsia_net_dhcpv6::ClientMarker>()

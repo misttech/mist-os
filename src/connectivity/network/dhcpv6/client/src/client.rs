@@ -7,7 +7,6 @@ use std::{
     collections::{hash_map::DefaultHasher, HashMap, HashSet},
     hash::{Hash, Hasher},
     net::{IpAddr, SocketAddr},
-    num::NonZeroU8,
     ops::Add,
     str::FromStr as _,
     time::Duration,
@@ -16,10 +15,13 @@ use std::{
 use fidl::endpoints::ServerEnd;
 use fidl_fuchsia_net as fnet;
 use fidl_fuchsia_net_dhcpv6::{
-    AddressConfig, ClientConfig, ClientMarker, ClientRequest, ClientRequestStream,
-    ClientWatchAddressResponder, ClientWatchPrefixesResponder, ClientWatchServersResponder, Empty,
-    InformationConfig, Lifetimes, NewClientParams, Prefix, PrefixDelegationConfig,
-    RELAY_AGENT_AND_SERVER_LINK_LOCAL_MULTICAST_ADDRESS, RELAY_AGENT_AND_SERVER_PORT,
+    ClientMarker, ClientRequest, ClientRequestStream, ClientWatchAddressResponder,
+    ClientWatchPrefixesResponder, ClientWatchServersResponder, Empty, Lifetimes, Prefix,
+    PrefixDelegationConfig, RELAY_AGENT_AND_SERVER_LINK_LOCAL_MULTICAST_ADDRESS,
+    RELAY_AGENT_AND_SERVER_PORT,
+};
+use fidl_fuchsia_net_dhcpv6_ext::{
+    AddressConfig, ClientConfig, InformationConfig, NewClientParams,
 };
 use fidl_fuchsia_net_ext as fnet_ext;
 use fidl_fuchsia_net_name as fnet_name;
@@ -161,24 +163,17 @@ impl<'a> AsyncSocket<'a> for fasync::net::UdpSocket {
 }
 
 /// Converts `InformationConfig` to a collection of `v6::OptionCode`.
-fn to_dhcpv6_option_codes(information_config: InformationConfig) -> Vec<v6::OptionCode> {
-    let InformationConfig { dns_servers, .. } = information_config;
-    let mut codes = Vec::new();
-
-    if dns_servers.unwrap_or(false) {
-        let () = codes.push(v6::OptionCode::DnsServers);
-    }
-    codes
+fn to_dhcpv6_option_codes(
+    InformationConfig { dns_servers }: InformationConfig,
+) -> Vec<v6::OptionCode> {
+    dns_servers.then_some(v6::OptionCode::DnsServers).into_iter().collect()
 }
 
 fn to_configured_addresses(
-    address_config: AddressConfig,
+    AddressConfig { address_count, preferred_addresses }: AddressConfig,
 ) -> Result<HashMap<v6::IAID, HashSet<Ipv6Addr>>, ClientError> {
-    let AddressConfig { address_count, preferred_addresses, .. } = address_config;
-    let address_count =
-        address_count.and_then(NonZeroU8::new).ok_or(ClientError::UnsupportedConfigs)?;
     let preferred_addresses = preferred_addresses.unwrap_or(Vec::new());
-    if preferred_addresses.len() > address_count.get().into() {
+    if preferred_addresses.len() > address_count.into() {
         return Err(ClientError::UnsupportedConfigs);
     }
 
@@ -192,7 +187,7 @@ fn to_configured_addresses(
                 .map(|fnet::Ipv6Address { addr, .. }| HashSet::from([Ipv6Addr::from(addr)]))
                 .chain(std::iter::repeat_with(HashSet::new)),
         )
-        .take(address_count.get().into())
+        .take(address_count.into())
         .collect())
 }
 
@@ -204,7 +199,11 @@ const IA_PD_IAID: v6::IAID = v6::IAID::new(0);
 /// Creates a state machine for the input client config.
 fn create_state_machine(
     transaction_id: [u8; 3],
-    config: ClientConfig,
+    ClientConfig {
+        information_config,
+        non_temporary_address_config,
+        prefix_delegation_config,
+    }: ClientConfig,
 ) -> Result<
     (
         dhcpv6_core::client::ClientStateMachine<MonotonicTime, StdRng>,
@@ -212,15 +211,8 @@ fn create_state_machine(
     ),
     ClientError,
 > {
-    let ClientConfig {
-        information_config,
-        non_temporary_address_config,
-        prefix_delegation_config,
-        ..
-    } = config;
-    let information_config = information_config.map(to_dhcpv6_option_codes);
-    let configured_non_temporary_addresses =
-        non_temporary_address_config.map(to_configured_addresses).transpose()?;
+    let information_option_codes = to_dhcpv6_option_codes(information_config);
+    let configured_non_temporary_addresses = to_configured_addresses(non_temporary_address_config)?;
     let configured_delegated_prefixes = prefix_delegation_config
         .map(|prefix_delegation_config| {
             let prefix = match prefix_delegation_config {
@@ -257,27 +249,31 @@ fn create_state_machine(
         .transpose()?;
 
     let now = MonotonicTime::now();
-    match (information_config, configured_non_temporary_addresses, configured_delegated_prefixes) {
-        (None, None, None) => Err(ClientError::UnsupportedConfigs),
-        (Some(information_config), None, None) => {
-            Ok(dhcpv6_core::client::ClientStateMachine::start_stateless(
-                transaction_id,
-                information_config,
-                StdRng::from_entropy(),
-                now,
-            ))
-        }
-        (information_config, configured_non_temporary_addresses, configured_delegated_prefixes) => {
-            Ok(dhcpv6_core::client::ClientStateMachine::start_stateful(
-                transaction_id,
-                v6::duid_uuid(),
-                configured_non_temporary_addresses.unwrap_or_else(Default::default),
-                configured_delegated_prefixes.unwrap_or_else(Default::default),
-                information_config.unwrap_or_else(Default::default),
-                StdRng::from_entropy(),
-                now,
-            ))
-        }
+    match (
+        information_option_codes.is_empty(),
+        configured_non_temporary_addresses.is_empty(),
+        configured_delegated_prefixes,
+    ) {
+        (true, true, None) => Err(ClientError::UnsupportedConfigs),
+        (false, true, None) => Ok(dhcpv6_core::client::ClientStateMachine::start_stateless(
+            transaction_id,
+            information_option_codes,
+            StdRng::from_entropy(),
+            now,
+        )),
+        (
+            _request_information,
+            _configure_non_temporary_addresses,
+            configured_delegated_prefixes,
+        ) => Ok(dhcpv6_core::client::ClientStateMachine::start_stateful(
+            transaction_id,
+            v6::duid_uuid(),
+            configured_non_temporary_addresses,
+            configured_delegated_prefixes.unwrap_or_else(Default::default),
+            information_option_codes,
+            StdRng::from_entropy(),
+            now,
+        )),
     }
 }
 
@@ -699,54 +695,40 @@ fn is_unicast_link_local_strict(addr: &fnet::Ipv6Address) -> bool {
 ///
 /// `request` will be serviced by the client.
 pub(crate) async fn serve_client(
-    params: NewClientParams,
+    NewClientParams { interface_id, address, config }: NewClientParams,
     request: ServerEnd<ClientMarker>,
 ) -> Result<()> {
-    if let NewClientParams {
-        interface_id: Some(interface_id),
-        address: Some(address),
-        config: Some(config),
-        ..
-    } = params
+    if Ipv6Addr::from(address.address.addr).is_multicast()
+        || (is_unicast_link_local_strict(&address.address) && address.zone_index != interface_id)
     {
-        if Ipv6Addr::from(address.address.addr).is_multicast()
-            || (is_unicast_link_local_strict(&address.address)
-                && address.zone_index != interface_id)
-        {
-            return request
-                .close_with_epitaph(zx::Status::INVALID_ARGS)
-                .context("closing request channel with epitaph");
-        }
-
-        let fnet_ext::SocketAddress(addr) = fnet::SocketAddress::Ipv6(address).into();
-        let servers_addr = IpAddr::from_str(RELAY_AGENT_AND_SERVER_LINK_LOCAL_MULTICAST_ADDRESS)
-            .with_context(|| {
-                format!(
-                    "{} should be a valid IPv6 address",
-                    RELAY_AGENT_AND_SERVER_LINK_LOCAL_MULTICAST_ADDRESS,
-                )
-            })?;
-        let mut client = Client::<fasync::net::UdpSocket>::start(
-            dhcpv6_core::client::transaction_id(),
-            config,
-            interface_id,
-            create_socket(addr).await?,
-            SocketAddr::new(servers_addr, RELAY_AGENT_AND_SERVER_PORT),
-            request.into_stream().context("getting new client request stream from channel")?,
-        )
-        .await?;
-        let mut buf = vec![0u8; MAX_UDP_DATAGRAM_SIZE];
-        loop {
-            match client.handle_next_event(&mut buf).await? {
-                Some(()) => (),
-                None => break Ok(()),
-            }
-        }
-    } else {
-        // All param fields are required.
-        request
+        return request
             .close_with_epitaph(zx::Status::INVALID_ARGS)
-            .context("closing request channel with epitaph")
+            .context("closing request channel with epitaph");
+    }
+
+    let fnet_ext::SocketAddress(addr) = fnet::SocketAddress::Ipv6(address).into();
+    let servers_addr = IpAddr::from_str(RELAY_AGENT_AND_SERVER_LINK_LOCAL_MULTICAST_ADDRESS)
+        .with_context(|| {
+            format!(
+                "{} should be a valid IPv6 address",
+                RELAY_AGENT_AND_SERVER_LINK_LOCAL_MULTICAST_ADDRESS,
+            )
+        })?;
+    let mut client = Client::<fasync::net::UdpSocket>::start(
+        dhcpv6_core::client::transaction_id(),
+        config,
+        interface_id,
+        create_socket(addr).await?,
+        SocketAddr::new(servers_addr, RELAY_AGENT_AND_SERVER_PORT),
+        request.into_stream().context("getting new client request stream from channel")?,
+    )
+    .await?;
+    let mut buf = vec![0u8; MAX_UDP_DATAGRAM_SIZE];
+    loop {
+        match client.handle_next_event(&mut buf).await? {
+            Some(()) => (),
+            None => break Ok(()),
+        }
     }
 }
 
@@ -830,21 +812,6 @@ mod tests {
 
     #[fuchsia::test]
     fn test_create_client_with_unsupported_config() {
-        let information_configs = [None];
-
-        let non_temporary_address_configs = [
-            None,
-            // No addresses but provided an address config.
-            Some(AddressConfig { address_count: None, ..Default::default() }),
-            // No addresses but provided an address config.
-            Some(AddressConfig { address_count: Some(0), ..Default::default() }),
-            // preferred addresses > address count.
-            Some(AddressConfig {
-                address_count: Some(1),
-                preferred_addresses: Some(vec![fidl_ip_v6!("ff01::1"), fidl_ip_v6!("ff01::1")]),
-                ..Default::default()
-            }),
-        ];
         let prefix_delegation_configs = [
             None,
             // Prefix length config without a non-zero length.
@@ -857,27 +824,28 @@ mod tests {
             Some(PrefixDelegationConfig::Prefix(fidl_ip_v6_with_prefix!("a::1/64"))),
         ];
 
-        for information_config in information_configs.iter() {
-            for non_temporary_address_config in non_temporary_address_configs.iter() {
-                for prefix_delegation_config in prefix_delegation_configs.iter() {
-                    assert_matches!(
-                        create_state_machine(
-                            [1, 2, 3],
-                            ClientConfig {
-                                information_config: information_config.clone(),
-                                non_temporary_address_config: non_temporary_address_config.clone(),
-                                prefix_delegation_config: prefix_delegation_config.clone(),
-                                ..Default::default()
-                            }
-                        ),
-                        Err(ClientError::UnsupportedConfigs),
-                        "information_config={:?}, non_temporary_address_config={:?}, prefix_delegation_config={:?}",
-                        information_config, non_temporary_address_config, prefix_delegation_config
-                    );
-                }
-            }
+        for prefix_delegation_config in prefix_delegation_configs.iter() {
+            assert_matches!(
+                create_state_machine(
+                    [1, 2, 3],
+                    ClientConfig {
+                        information_config: Default::default(),
+                        non_temporary_address_config: Default::default(),
+                        prefix_delegation_config: prefix_delegation_config.clone(),
+                    }
+                ),
+                Err(ClientError::UnsupportedConfigs),
+                "prefix_delegation_config={:?}",
+                prefix_delegation_config
+            );
         }
     }
+
+    const STATELESS_CLIENT_CONFIG: ClientConfig = ClientConfig {
+        information_config: InformationConfig { dns_servers: true },
+        non_temporary_address_config: AddressConfig { address_count: 0, preferred_addresses: None },
+        prefix_delegation_config: None,
+    };
 
     #[fuchsia::test]
     async fn test_client_stops_on_channel_close() {
@@ -888,13 +856,9 @@ mod tests {
             async { drop(client_proxy) },
             serve_client(
                 NewClientParams {
-                    interface_id: Some(1),
-                    address: Some(fidl_socket_addr_v6!("[::1]:546")),
-                    config: Some(ClientConfig {
-                        information_config: Some(InformationConfig::default()),
-                        ..Default::default()
-                    }),
-                    ..Default::default()
+                    interface_id: 1,
+                    address: fidl_socket_addr_v6!("[::1]:546"),
+                    config: STATELESS_CLIENT_CONFIG,
                 },
                 server_end,
             ),
@@ -945,13 +909,9 @@ mod tests {
             watch(&client_proxy),
             serve_client(
                 NewClientParams {
-                    interface_id: Some(1),
-                    address: Some(fidl_socket_addr_v6!("[::1]:546")),
-                    config: Some(ClientConfig {
-                        information_config: Some(InformationConfig::default()),
-                        ..Default::default()
-                    }),
-                    ..Default::default()
+                    interface_id: 1,
+                    address: fidl_socket_addr_v6!("[::1]:546"),
+                    config: STATELESS_CLIENT_CONFIG,
                 },
                 server_end,
             )
@@ -971,9 +931,8 @@ mod tests {
             .contains("got watch request while the previous one is pending"));
     }
 
-    fn valid_information_configs() -> [Option<InformationConfig>; 1] {
-        [Some(InformationConfig::default())]
-    }
+    const VALID_INFORMATION_CONFIGS: [InformationConfig; 2] =
+        [InformationConfig { dns_servers: false }, InformationConfig { dns_servers: true }];
 
     const VALID_DELEGATED_PREFIX_CONFIGS: [Option<PrefixDelegationConfig>; 4] = [
         Some(PrefixDelegationConfig::Empty(Empty {})),
@@ -983,36 +942,27 @@ mod tests {
     ];
 
     // Can't be a const variable because we allocate a vector.
-    fn get_valid_non_temporary_address_configs() -> [Option<AddressConfig>; 4] {
+    fn get_valid_non_temporary_address_configs() -> [AddressConfig; 5] {
         [
-            Some(AddressConfig {
-                address_count: Some(1),
-                preferred_addresses: None,
-                ..Default::default()
-            }),
-            Some(AddressConfig {
-                address_count: Some(1),
-                preferred_addresses: Some(Vec::new()),
-                ..Default::default()
-            }),
-            Some(AddressConfig {
-                address_count: Some(1),
+            Default::default(),
+            AddressConfig { address_count: 1, preferred_addresses: None },
+            AddressConfig { address_count: 1, preferred_addresses: Some(Vec::new()) },
+            AddressConfig {
+                address_count: 1,
                 preferred_addresses: Some(vec![fidl_ip_v6!("a::1")]),
-                ..Default::default()
-            }),
-            Some(AddressConfig {
-                address_count: Some(2),
+            },
+            AddressConfig {
+                address_count: 2,
                 preferred_addresses: Some(vec![fidl_ip_v6!("a::2")]),
-                ..Default::default()
-            }),
+            },
         ]
     }
 
     #[fuchsia::test]
     fn test_client_starts_with_valid_args() {
-        for information_config in valid_information_configs().iter() {
-            for non_temporary_address_config in get_valid_non_temporary_address_configs().iter() {
-                for prefix_delegation_config in VALID_DELEGATED_PREFIX_CONFIGS.iter() {
+        for information_config in VALID_INFORMATION_CONFIGS {
+            for non_temporary_address_config in get_valid_non_temporary_address_configs() {
+                for prefix_delegation_config in VALID_DELEGATED_PREFIX_CONFIGS {
                     let mut exec = fasync::TestExecutor::new();
 
                     let (client_proxy, server_end) =
@@ -1023,16 +973,14 @@ mod tests {
                             client_proxy.watch_servers(),
                             serve_client(
                                 NewClientParams {
-                                    interface_id: Some(1),
-                                    address: Some(fidl_socket_addr_v6!("[::1]:546")),
-                                    config: Some(ClientConfig {
+                                    interface_id: 1,
+                                    address: fidl_socket_addr_v6!("[::1]:546"),
+                                    config: ClientConfig {
                                         information_config: information_config.clone(),
                                         non_temporary_address_config: non_temporary_address_config
                                             .clone(),
                                         prefix_delegation_config: prefix_delegation_config.clone(),
-                                        ..Default::default()
-                                    }),
-                                    ..Default::default()
+                                    },
                                 },
                                 server_end
                             )
@@ -1052,17 +1000,16 @@ mod tests {
 
     #[fuchsia::test]
     async fn test_client_starts_in_correct_mode() {
-        for information_config in [None].into_iter().chain(valid_information_configs()) {
-            for non_temporary_address_config in
-                [None].into_iter().chain(get_valid_non_temporary_address_configs())
+        for information_config @ InformationConfig { dns_servers } in VALID_INFORMATION_CONFIGS {
+            for non_temporary_address_config @ AddressConfig {
+                address_count,
+                preferred_addresses: _,
+            } in get_valid_non_temporary_address_configs()
             {
-                for prefix_delegation_config in
-                    [None].into_iter().chain(VALID_DELEGATED_PREFIX_CONFIGS)
-                {
-                    let want_msg_type = if non_temporary_address_config.is_none()
-                        && prefix_delegation_config.is_none()
+                for prefix_delegation_config in VALID_DELEGATED_PREFIX_CONFIGS {
+                    let want_msg_type = if address_count == 0 && prefix_delegation_config.is_none()
                     {
-                        if information_config.is_none() {
+                        if !dns_servers {
                             continue;
                         } else {
                             v6::MessageType::InformationRequest
@@ -1087,7 +1034,6 @@ mod tests {
                             information_config: information_config.clone(),
                             non_temporary_address_config: non_temporary_address_config.clone(),
                             prefix_delegation_config: prefix_delegation_config.clone(),
-                            ..Default::default()
                         },
                         1, /* interface ID */
                         client_socket,
@@ -1110,43 +1056,25 @@ mod tests {
     #[fuchsia::test]
     async fn test_client_fails_to_start_with_invalid_args() {
         for params in vec![
-            // Missing required field.
-            NewClientParams {
-                interface_id: Some(1),
-                address: None,
-                config: Some(ClientConfig {
-                    information_config: Some(InformationConfig::default()),
-                    ..Default::default()
-                }),
-                ..Default::default()
-            },
             // Interface ID and zone index mismatch on link-local address.
             NewClientParams {
-                interface_id: Some(2),
-                address: Some(fnet::Ipv6SocketAddress {
+                interface_id: 2,
+                address: fnet::Ipv6SocketAddress {
                     address: fidl_ip_v6!("fe80::1"),
                     port: DEFAULT_CLIENT_PORT,
                     zone_index: 1,
-                }),
-                config: Some(ClientConfig {
-                    information_config: Some(InformationConfig::default()),
-                    ..Default::default()
-                }),
-                ..Default::default()
+                },
+                config: STATELESS_CLIENT_CONFIG,
             },
             // Multicast address is invalid.
             NewClientParams {
-                interface_id: Some(1),
-                address: Some(fnet::Ipv6SocketAddress {
+                interface_id: 1,
+                address: fnet::Ipv6SocketAddress {
                     address: fidl_ip_v6!("ff01::1"),
                     port: DEFAULT_CLIENT_PORT,
                     zone_index: 1,
-                }),
-                config: Some(ClientConfig {
-                    information_config: Some(InformationConfig::default()),
-                    ..Default::default()
-                }),
-                ..Default::default()
+                },
+                config: STATELESS_CLIENT_CONFIG,
             },
         ] {
             let (client_proxy, server_end) =
@@ -1218,10 +1146,7 @@ mod tests {
         let mut client = exec
             .run_singlethreaded(Client::<fasync::net::UdpSocket>::start(
                 transaction_id,
-                ClientConfig {
-                    information_config: Some(InformationConfig::default()),
-                    ..Default::default()
-                },
+                STATELESS_CLIENT_CONFIG,
                 1, /* interface ID */
                 client_socket,
                 server_addr,
@@ -1455,10 +1380,7 @@ mod tests {
         let (server_socket, server_addr) = create_test_socket();
         let mut client = Client::<fasync::net::UdpSocket>::start(
             transaction_id,
-            ClientConfig {
-                information_config: Some(InformationConfig::default()),
-                ..Default::default()
-            },
+            STATELESS_CLIENT_CONFIG,
             1, /* interface ID */
             client_socket,
             server_addr,
@@ -1520,8 +1442,9 @@ mod tests {
         let mut client = Client::<fasync::net::UdpSocket>::start(
             [1, 2, 3],
             ClientConfig {
+                information_config: Default::default(),
+                non_temporary_address_config: Default::default(),
                 prefix_delegation_config: Some(PrefixDelegationConfig::Empty(Empty {})),
-                ..Default::default()
             },
             1, /* interface ID */
             client_socket,
@@ -1770,10 +1693,7 @@ mod tests {
         let (_server_socket, server_addr) = create_test_socket();
         let mut client = Client::<fasync::net::UdpSocket>::start(
             [1, 2, 3], /* transaction ID */
-            ClientConfig {
-                information_config: Some(InformationConfig::default()),
-                ..Default::default()
-            },
+            STATELESS_CLIENT_CONFIG,
             1, /* interface ID */
             client_socket,
             server_addr,
@@ -1855,10 +1775,7 @@ mod tests {
         let (server_socket, server_addr) = create_test_socket();
         let mut client = Client::<fasync::net::UdpSocket>::start(
             [1, 2, 3], /* transaction ID */
-            ClientConfig {
-                information_config: Some(InformationConfig::default()),
-                ..Default::default()
-            },
+            STATELESS_CLIENT_CONFIG,
             1, /* interface ID */
             client_socket,
             server_addr,
@@ -2011,12 +1928,12 @@ mod tests {
         let mut client = Client::<fasync::net::UdpSocket>::start(
             [1, 2, 3], /* transaction ID */
             ClientConfig {
-                non_temporary_address_config: Some(AddressConfig {
-                    address_count: Some(1),
+                information_config: Default::default(),
+                non_temporary_address_config: AddressConfig {
+                    address_count: 1,
                     preferred_addresses: None,
-                    ..Default::default()
-                }),
-                ..Default::default()
+                },
+                prefix_delegation_config: None,
             },
             1, /* interface ID */
             client_socket,
@@ -2050,10 +1967,7 @@ mod tests {
         let (server_socket, server_addr) = create_test_socket();
         let mut client = Client::<fasync::net::UdpSocket>::start(
             [1, 2, 3], /* transaction ID */
-            ClientConfig {
-                information_config: Some(InformationConfig::default()),
-                ..Default::default()
-            },
+            STATELESS_CLIENT_CONFIG,
             1, /* interface ID */
             client_socket,
             server_addr,
@@ -2142,10 +2056,7 @@ mod tests {
 
         let mut client = Client::<StubSocket>::start(
             [1, 2, 3], /* transaction ID */
-            ClientConfig {
-                information_config: Some(InformationConfig::default()),
-                ..Default::default()
-            },
+            STATELESS_CLIENT_CONFIG,
             1, /* interface ID */
             StubSocket {},
             std_socket_addr!("[::1]:0"),

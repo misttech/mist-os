@@ -122,13 +122,17 @@ closed protocol ClientProvider {
                 /// addresses (IA_NA), as defined in
                 /// [RFC 8415, section 6.2](https://tools.ietf.org/html/rfc8415#section-6.2).
                 ///
-                /// If not set, interpreted as empty (non-temporary addresses
-                /// will not be negotiated). If invalid, client creation will
-                /// fail and the pipelined channel will be closed.
+                /// If not set, interpreted as a configuration with an address count
+                /// of 0 (non-temporary addresses will not be negotiated). If invalid,
+                /// client creation will fail and the pipelined channel will be closed.
                 2: non_temporary_address_config @generated_name("AddressConfig") table {
                     /// Number of addresses.
                     ///
-                    /// Required. Must be greater than 0.
+                    /// If the value is 0, the client will not negotiate
+                    /// non-temporary addresses, i.e. its messages to the
+                    /// server will not contain the IA_NA option.
+                    ///
+                    /// Required.
                     1: address_count uint8;
 
                     /// Preferred addresses.

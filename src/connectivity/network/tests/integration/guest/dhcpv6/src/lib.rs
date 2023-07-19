@@ -7,7 +7,8 @@
 use {
     assert_matches::assert_matches,
     fidl_fuchsia_net as fnet, fidl_fuchsia_net_dhcpv6 as fnet_dhcpv6,
-    fidl_fuchsia_net_name as fnet_name, fidl_fuchsia_netemul_network as _,
+    fidl_fuchsia_net_dhcpv6_ext as fnet_dhcpv6_ext, fidl_fuchsia_net_name as fnet_name,
+    fidl_fuchsia_netemul_network as _,
     net_declare::fidl_ip_v6,
     netstack_testing_common::{
         interfaces,
@@ -67,22 +68,20 @@ async fn gets_dns_servers(name: &str) {
         .expect("create fuchsia.net.dhcpv6/Client client and server ends");
     let () = client_provider
         .new_client(
-            &fnet_dhcpv6::NewClientParams {
-                interface_id: Some(iface.id()),
-                address: Some(fnet::Ipv6SocketAddress {
+            &fnet_dhcpv6_ext::NewClientParams {
+                interface_id: iface.id(),
+                address: fnet::Ipv6SocketAddress {
                     address: fnet::Ipv6Address { addr: addr.ipv6_bytes() },
                     port: fnet_dhcpv6::DEFAULT_CLIENT_PORT,
                     zone_index: iface.id(),
-                }),
-                config: Some(fnet_dhcpv6::ClientConfig {
-                    information_config: Some(fnet_dhcpv6::InformationConfig {
-                        dns_servers: Some(true),
-                        ..Default::default()
-                    }),
-                    ..Default::default()
-                }),
-                ..Default::default()
-            },
+                },
+                config: fnet_dhcpv6_ext::ClientConfig {
+                    information_config: fnet_dhcpv6::InformationConfig { dns_servers: true },
+                    non_temporary_address_config: Default::default(),
+                    prefix_delegation_config: None,
+                },
+            }
+            .into(),
             server_end,
         )
         .expect("call fuchsia.net.dhcpv6/ClientProvider.NewClient");
@@ -245,21 +244,20 @@ fn start_dhcpv6_client(
     client_provider: &fnet_dhcpv6::ClientProviderProxy,
     interface_id: u64,
     addr: net_types::ip::Ipv6Addr,
-    client_config: fnet_dhcpv6::ClientConfig,
+    client_config: fnet_dhcpv6_ext::ClientConfig,
 ) -> fnet_dhcpv6::ClientProxy {
     let (dhcpv6_client, server_end) = fidl::endpoints::create_proxy::<fnet_dhcpv6::ClientMarker>()
         .expect("create fuchsia.net.dhcpv6/Client client and server ends");
     let () = client_provider
         .new_client(
-            &fnet_dhcpv6::NewClientParams {
-                interface_id: Some(interface_id),
-                address: Some(fnet::Ipv6SocketAddress {
+            &fnet_dhcpv6_ext::NewClientParams {
+                interface_id: interface_id,
+                address: fnet::Ipv6SocketAddress {
                     address: fnet::Ipv6Address { addr: addr.ipv6_bytes() },
                     port: fnet_dhcpv6::DEFAULT_CLIENT_PORT,
                     zone_index: interface_id,
-                }),
-                config: Some(client_config),
-                ..Default::default()
+                },
+                config: client_config,
             },
             server_end,
         )
@@ -336,11 +334,12 @@ async fn stateful_renew(name: &str) {
         &client_provider,
         iface.id(),
         addr,
-        fnet_dhcpv6::ClientConfig {
+        fnet_dhcpv6_ext::ClientConfig {
             prefix_delegation_config: Some(fnet_dhcpv6::PrefixDelegationConfig::Empty(
                 fnet_dhcpv6::Empty,
             )),
-            ..Default::default()
+            information_config: Default::default(),
+            non_temporary_address_config: Default::default(),
         },
     );
 
@@ -380,11 +379,12 @@ async fn stateful_alternative_server_while_rebinding(name: &str) {
         &client_provider,
         iface.id(),
         addr,
-        fnet_dhcpv6::ClientConfig {
+        fnet_dhcpv6_ext::ClientConfig {
             prefix_delegation_config: Some(fnet_dhcpv6::PrefixDelegationConfig::Empty(
                 fnet_dhcpv6::Empty,
             )),
-            ..Default::default()
+            non_temporary_address_config: Default::default(),
+            information_config: Default::default(),
         },
     );
 
@@ -429,11 +429,12 @@ async fn stateful_client_restart(name: &str, prefix_count: PrefixCount) {
             &client_provider,
             iface.id(),
             addr,
-            fnet_dhcpv6::ClientConfig {
+            fnet_dhcpv6_ext::ClientConfig {
                 prefix_delegation_config: Some(fnet_dhcpv6::PrefixDelegationConfig::Empty(
                     fnet_dhcpv6::Empty,
                 )),
-                ..Default::default()
+                non_temporary_address_config: Default::default(),
+                information_config: Default::default(),
             },
         );
 
@@ -462,11 +463,12 @@ async fn stateful_client_restart(name: &str, prefix_count: PrefixCount) {
             &client_provider,
             iface.id(),
             addr,
-            fnet_dhcpv6::ClientConfig {
+            fnet_dhcpv6_ext::ClientConfig {
                 prefix_delegation_config: Some(fnet_dhcpv6::PrefixDelegationConfig::Empty(
                     fnet_dhcpv6::Empty,
                 )),
-                ..Default::default()
+                non_temporary_address_config: Default::default(),
+                information_config: Default::default(),
             },
         );
 

@@ -3,9 +3,9 @@
 // found in the LICENSE file.
 
 use fidl::endpoints::ServerEnd;
-use fidl_fuchsia_net_dhcpv6::{
-    ClientMarker, ClientProviderRequest, ClientProviderRequestStream, NewClientParams,
-};
+use fidl_fuchsia_net_dhcpv6::{ClientMarker, ClientProviderRequest, ClientProviderRequestStream};
+use fidl_fuchsia_net_dhcpv6_ext::NewClientParams;
+use fuchsia_zircon as zx;
 use futures::{Future, StreamExt as _};
 
 use anyhow::Result;
@@ -23,6 +23,17 @@ pub(crate) async fn run_client_provider<Fut, F>(
         .for_each_concurrent(None, |request| async {
             match request {
                 Ok(ClientProviderRequest::NewClient { params, request, control_handle: _ }) => {
+                    let params: NewClientParams = match params.try_into() {
+                        Ok(params) => params,
+                        Err(e) => {
+                            warn!("NewClientParams validation error: {}", e);
+                            // All param fields are required.
+                            request
+                                .close_with_epitaph(zx::Status::INVALID_ARGS)
+                                .unwrap_or_else(|e| warn!("closing NewClient request channel with epitaph INVALID_ARGS: {}", e));
+                            return;
+                        }
+                    };
                     // `NewClientParams` does not implement `Clone`. It is also non-trivial to pass
                     // a reference of `params` to `serve_client` because that would require adding
                     // lifetimes in quite a few places.
@@ -43,7 +54,8 @@ pub(crate) async fn run_client_provider<Fut, F>(
 #[cfg(test)]
 mod tests {
     use fidl::endpoints::create_endpoints;
-    use fidl_fuchsia_net_dhcpv6::{ClientConfig, ClientProviderMarker};
+    use fidl_fuchsia_net_dhcpv6::ClientProviderMarker;
+    use fidl_fuchsia_net_dhcpv6_ext::{ClientConfig, NewClientParams};
     use fuchsia_async as fasync;
     use futures::join;
 
@@ -84,14 +96,15 @@ mod tests {
                 client_provider_proxy
                     .new_client(
                         &NewClientParams {
-                            interface_id: Some(interface_id),
-                            address: Some(fidl_socket_addr_v6!("[fe01::1:2]:546")),
-                            config: Some(ClientConfig {
-                                information_config: None,
-                                ..Default::default()
-                            }),
-                            ..Default::default()
-                        },
+                            interface_id: interface_id,
+                            address: fidl_socket_addr_v6!("[fe01::1:2]:546"),
+                            config: ClientConfig {
+                                information_config: Default::default(),
+                                non_temporary_address_config: Default::default(),
+                                prefix_delegation_config: None,
+                            },
+                        }
+                        .into(),
                         server_end,
                     )
                     .expect("failed to request new client");

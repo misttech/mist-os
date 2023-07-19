@@ -27,6 +27,7 @@ rustc_library("lib") {
     "//sdk/fidl/fuchsia.net.stack:fuchsia.net.stack_rust",
     "//sdk/fidl/fuchsia.net.virtualization:fuchsia.net.virtualization_rust",
     "//sdk/fidl/fuchsia.process.lifecycle:fuchsia.process.lifecycle_rust",
+    "//src/connectivity/lib/fidl_fuchsia_net_dhcpv6_ext",
     "//src/connectivity/lib/net-declare",
     "//src/connectivity/lib/net-types",
     "//src/connectivity/network/dhcpv4/lib",

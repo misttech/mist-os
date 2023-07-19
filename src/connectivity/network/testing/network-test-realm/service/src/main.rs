@@ -1109,30 +1109,25 @@ impl Controller {
             })?;
         client_provider
             .new_client(
-                &fnet_dhcpv6::NewClientParams {
-                    interface_id: Some(interface_id),
-                    address: Some(fnet::Ipv6SocketAddress {
+                &fnet_dhcpv6_ext::NewClientParams {
+                    interface_id: interface_id,
+                    address: fnet::Ipv6SocketAddress {
                         address: address,
                         port: fnet_dhcpv6::DEFAULT_CLIENT_PORT,
                         zone_index: interface_id,
-                    }),
-                    config: Some(fnet_dhcpv6::ClientConfig {
-                        information_config: (!stateful
-                            || (stateful && request_dns_servers.is_some()))
-                        .then(|| fnet_dhcpv6::InformationConfig {
-                            dns_servers: request_dns_servers,
-                            ..Default::default()
-                        }),
-                        non_temporary_address_config: stateful.then(|| {
-                            fnet_dhcpv6::AddressConfig {
-                                address_count: Some(1),
-                                ..Default::default()
-                            }
-                        }),
-                        ..Default::default()
-                    }),
-                    ..Default::default()
-                },
+                    },
+                    config: fnet_dhcpv6_ext::ClientConfig {
+                        information_config: fnet_dhcpv6_ext::InformationConfig {
+                            dns_servers: (!stateful || (stateful && request_dns_servers.is_some())),
+                        },
+                        non_temporary_address_config: fnet_dhcpv6_ext::AddressConfig {
+                            address_count: if stateful { 1 } else { 0 },
+                            preferred_addresses: None,
+                        },
+                        prefix_delegation_config: None,
+                    },
+                }
+                .into(),
                 client_server_end,
             )
             .map_err(|e| {

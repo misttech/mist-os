@@ -11,6 +11,7 @@ use std::{
 
 use fidl_fuchsia_net as fnet;
 use fidl_fuchsia_net_dhcpv6 as fnet_dhcpv6;
+use fidl_fuchsia_net_dhcpv6_ext as fnet_dhcpv6_ext;
 use fidl_fuchsia_net_name as fnet_name;
 use fuchsia_zircon as zx;
 
@@ -127,18 +128,14 @@ pub(super) fn start_client(
     (impl Stream<Item = Result<Vec<fnet_name::DnsServer_>, fidl::Error>>, PrefixesStream),
     errors::Error,
 > {
-    let params = fnet_dhcpv6::NewClientParams {
-        interface_id: Some(interface_id.get()),
-        address: Some(sockaddr),
-        config: Some(fnet_dhcpv6::ClientConfig {
-            information_config: Some(fnet_dhcpv6::InformationConfig {
-                dns_servers: Some(true),
-                ..Default::default()
-            }),
+    let params = fnet_dhcpv6_ext::NewClientParams {
+        interface_id: interface_id.get(),
+        address: sockaddr,
+        config: fnet_dhcpv6_ext::ClientConfig {
+            information_config: fnet_dhcpv6_ext::InformationConfig { dns_servers: true },
+            non_temporary_address_config: Default::default(),
             prefix_delegation_config,
-            ..Default::default()
-        }),
-        ..Default::default()
+        },
     };
     let (client, server) = fidl::endpoints::create_proxy::<fnet_dhcpv6::ClientMarker>()
         .context("error creating DHCPv6 client fidl endpoints")
@@ -147,7 +144,7 @@ pub(super) fn start_client(
     // Not all environments may have a DHCPv6 client service so we consider this a
     // non-fatal error.
     let () = dhcpv6_client_provider
-        .new_client(&params, server)
+        .new_client(&params.into(), server)
         .context("error creating new DHCPv6 client")
         .map_err(errors::Error::NonFatal)?;
 

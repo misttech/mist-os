@@ -15,6 +15,7 @@ rustc_test("dhcpv6") {
     "//sdk/fidl/fuchsia.net.dhcpv6:fuchsia.net.dhcpv6_rust",
     "//sdk/fidl/fuchsia.net.interfaces:fuchsia.net.interfaces_rust",
     "//sdk/fidl/fuchsia.net.name:fuchsia.net.name_rust",
+    "//src/connectivity/lib/fidl_fuchsia_net_dhcpv6_ext",
     "//src/connectivity/lib/net-declare",
     "//src/connectivity/lib/net-types",
     "//src/connectivity/network/lib/dns_server_watcher",
