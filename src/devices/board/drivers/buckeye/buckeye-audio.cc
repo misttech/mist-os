@@ -97,15 +97,21 @@ static zx_status_t InitAudioTop(zx_device_t* parent) {
   // For some amlogic chips, they has Audio Top Clock Gating Control.
   // This part will affect audio registers access, to avoid bus hang,
   // we need call it before we access the registers.
-  zx_status_t status;
   // Please do not use get_root_resource() in new code. See fxbug.dev/31358.
   zx::unowned_resource resource(get_root_resource(parent));
-  std::optional<fdf::MmioBuffer> buf;
-  status = fdf::MmioBuffer::Create(A5_EE_AUDIO2_BASE_ALIGN, A5_EE_AUDIO2_LENGTH_ALIGN, *resource,
-                                   ZX_CACHE_POLICY_UNCACHED_DEVICE, &buf);
+  zx::vmo vmo;
+  zx_status_t status =
+      zx::vmo::create_physical(*resource, A5_EE_AUDIO2_BASE_ALIGN, A5_EE_AUDIO2_LENGTH_ALIGN, &vmo);
   if (status != ZX_OK) {
-    zxlogf(ERROR, "MmioBuffer::Create failed %s", zx_status_get_string(status));
+    zxlogf(ERROR, "failed to create VMO: %s", zx_status_get_string(status));
     return status;
+  }
+
+  zx::result<fdf::MmioBuffer> buf = fdf::MmioBuffer::Create(
+      0, A5_EE_AUDIO2_LENGTH_ALIGN, std::move(vmo), ZX_CACHE_POLICY_UNCACHED_DEVICE);
+  if (buf.is_error()) {
+    zxlogf(ERROR, "fdf::MmioBuffer::Create() error: %s", buf.status_string());
+    return buf.status_value();
   }
 
   // Audio clock gate

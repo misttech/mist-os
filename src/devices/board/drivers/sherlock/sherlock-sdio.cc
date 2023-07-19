@@ -150,14 +150,19 @@ zx_status_t Sherlock::SdioInit() {
     return status;
   }
 
-  std::optional<fdf::MmioBuffer> buf;
   zx::unowned_resource res(get_root_resource(parent()));
-  status = fdf::MmioBuffer::Create(kGpioBase, kGpioBaseOffset + T931_GPIO_LENGTH, *res,
-                                   ZX_CACHE_POLICY_UNCACHED_DEVICE, &buf);
-
+  zx::vmo vmo;
+  status = zx::vmo::create_physical(*res, kGpioBase, kGpioBaseOffset + T931_GPIO_LENGTH, &vmo);
   if (status != ZX_OK) {
-    zxlogf(ERROR, "%s: fdf::MmioBuffer::Create() error: %d", __func__, status);
+    zxlogf(ERROR, "failed to create VMO: %s", zx_status_get_string(status));
     return status;
+  }
+  zx::result<fdf::MmioBuffer> buf = fdf::MmioBuffer::Create(
+      0, kGpioBaseOffset + T931_GPIO_LENGTH, std::move(vmo), ZX_CACHE_POLICY_UNCACHED_DEVICE);
+
+  if (buf.is_error()) {
+    zxlogf(ERROR, "fdf::MmioBuffer::Create() error: %s", buf.status_string());
+    return buf.status_value();
   }
 
   PadDsReg2A::Get()

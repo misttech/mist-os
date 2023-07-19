@@ -111,12 +111,17 @@ zx_status_t Sherlock::SpiInit() {
   {
     // Please do not use get_root_resource() in new code. See fxbug.dev/31358.
     zx::unowned_resource resource(get_root_resource(parent()));
-    std::optional<fdf::MmioBuffer> buf;
-    zx_status_t status = fdf::MmioBuffer::Create(T931_HIU_BASE, T931_HIU_LENGTH, *resource,
-                                                 ZX_CACHE_POLICY_UNCACHED_DEVICE, &buf);
+    zx::vmo vmo;
+    zx_status_t status = zx::vmo::create_physical(*resource, T931_HIU_BASE, T931_HIU_LENGTH, &vmo);
     if (status != ZX_OK) {
-      zxlogf(ERROR, "%s: MmioBuffer::Create failed %d", __func__, status);
+      zxlogf(ERROR, "failed to create VMO: %s", zx_status_get_string(status));
       return status;
+    }
+    zx::result<fdf::MmioBuffer> buf = fdf::MmioBuffer::Create(0, T931_HIU_LENGTH, std::move(vmo),
+                                                              ZX_CACHE_POLICY_UNCACHED_DEVICE);
+    if (buf.is_error()) {
+      zxlogf(ERROR, "fdf::MmioBuffer::Create() error: %s", buf.status_string());
+      return buf.status_value();
     }
 
     // SPICC0 clock enable (666 MHz)

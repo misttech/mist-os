@@ -158,17 +158,20 @@ zx_status_t Astro::SdEmmcConfigurePortB() {
   gpio_impl_.SetAltFunction(S905D2_GPIOC(4), 0);
   gpio_impl_.SetAltFunction(S905D2_GPIOC(5), 0);
 
-  zx_status_t status;
-  std::optional<fdf::MmioBuffer> gpio_base;
+  size_t aligned_size = ZX_ROUNDUP((S905D2_GPIO_BASE - kGpioBase) + S905D2_GPIO_LENGTH, PAGE_SIZE);
   // Please do not use get_root_resource() in new code. See fxbug.dev/31358.
   zx::unowned_resource resource(get_root_resource(parent()));
-
-  size_t aligned_size = ZX_ROUNDUP((S905D2_GPIO_BASE - kGpioBase) + S905D2_GPIO_LENGTH, PAGE_SIZE);
-
-  status = fdf::MmioBuffer::Create(kGpioBase, aligned_size, *resource,
-                                   ZX_CACHE_POLICY_UNCACHED_DEVICE, &gpio_base);
+  zx::vmo vmo;
+  zx_status_t status = zx::vmo::create_physical(*resource, kGpioBase, aligned_size, &vmo);
   if (status != ZX_OK) {
-    zxlogf(ERROR, "%s: Create(gpio) error: %d", __func__, status);
+    zxlogf(ERROR, "failed to create VMO: %s", zx_status_get_string(status));
+    return status;
+  }
+
+  zx::result<fdf::MmioBuffer> gpio_base =
+      fdf::MmioBuffer::Create(0, aligned_size, std::move(vmo), ZX_CACHE_POLICY_UNCACHED_DEVICE);
+  if (gpio_base.is_error()) {
+    zxlogf(ERROR, "Create(gpio) error: %s", gpio_base.status_string());
   }
 
   // TODO(ravoorir): Figure out if we need gpio protocol ops to modify these
@@ -198,11 +201,15 @@ zx_status_t Astro::SdEmmcConfigurePortB() {
       .WriteTo(&(*gpio_base));
 
   // Configure clock settings
-  std::optional<fdf::MmioBuffer> hiu_base;
-  status = fdf::MmioBuffer::Create(S905D2_HIU_BASE, S905D2_HIU_LENGTH, *resource,
-                                   ZX_CACHE_POLICY_UNCACHED_DEVICE, &hiu_base);
+  status = zx::vmo::create_physical(*resource, S905D2_HIU_BASE, S905D2_HIU_LENGTH, &vmo);
   if (status != ZX_OK) {
-    zxlogf(ERROR, "%s: Create(hiu) error: %d", __func__, status);
+    zxlogf(ERROR, "failed to create VMO: %s", zx_status_get_string(status));
+    return status;
+  }
+  zx::result<fdf::MmioBuffer> hiu_base = fdf::MmioBuffer::Create(
+      0, S905D2_HIU_LENGTH, std::move(vmo), ZX_CACHE_POLICY_UNCACHED_DEVICE);
+  if (hiu_base.is_error()) {
+    zxlogf(ERROR, "Create(hiu) error: %s", hiu_base.status_string());
   }
 
   uint32_t hhi_gclock_val =

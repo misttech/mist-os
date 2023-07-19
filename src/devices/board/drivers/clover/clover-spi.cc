@@ -74,7 +74,6 @@ static constexpr amlogic_spi::amlspi_config_t spi_0_config = {
 };
 
 zx_status_t Clover::SpiInit() {
-  zx_status_t status;
   constexpr uint32_t kSpiccClkValue =
       // src[10:9]:  0 - fclk_div2(768M)-fixed
       // gate  [8]:  1 - enable clk
@@ -83,12 +82,18 @@ zx_status_t Clover::SpiInit() {
   {
     // Please do not use get_root_resource() in new code. See fxbug.dev/31358.
     zx::unowned_resource resource(get_root_resource(parent()));
-    std::optional<fdf::MmioBuffer> buf;
-    status = fdf::MmioBuffer::Create(A1_CLK_BASE_ALIGN, A1_CLK_LENGTH_ALIGN, *resource,
-                                     ZX_CACHE_POLICY_UNCACHED_DEVICE, &buf);
+    zx::vmo vmo;
+    zx_status_t status =
+        zx::vmo::create_physical(*resource, A1_CLK_BASE_ALIGN, A1_CLK_LENGTH_ALIGN, &vmo);
     if (status != ZX_OK) {
-      zxlogf(ERROR, "MmioBuffer::Create failed %s", zx_status_get_string(status));
+      zxlogf(ERROR, "failed to create VMO: %s", zx_status_get_string(status));
       return status;
+    }
+    zx::result<fdf::MmioBuffer> buf = fdf::MmioBuffer::Create(
+        0, A1_CLK_LENGTH_ALIGN, std::move(vmo), ZX_CACHE_POLICY_UNCACHED_DEVICE);
+    if (buf.is_error()) {
+      zxlogf(ERROR, "fdf::MmioBuffer::Create() error: %s", buf.status_string());
+      return buf.status_value();
     }
 
     buf->Write32(kSpiccClkValue, CLKCTRL_SPICC_CLK_CNTL);
