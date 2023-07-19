@@ -10,7 +10,7 @@ import (
 	"net"
 	"testing"
 
-	"go.fuchsia.dev/fuchsia/src/connectivity/network/netstack/routes"
+	"go.fuchsia.dev/fuchsia/src/connectivity/network/netstack/routetypes"
 	"go.fuchsia.dev/fuchsia/src/connectivity/network/netstack/util"
 
 	fnet "fidl/fuchsia/net"
@@ -347,12 +347,12 @@ func TestToInstalledRoute(t *testing.T) {
 
 	tests := []struct {
 		name           string
-		extendedRoute  routes.ExtendedRoute
+		extendedRoute  routetypes.ExtendedRoute
 		installedRoute InstalledRoute
 	}{
 		{
 			name: "IPv4",
-			extendedRoute: routes.ExtendedRoute{
+			extendedRoute: routetypes.ExtendedRoute{
 				Route: tcpip.Route{
 					Destination: makeSubnet(
 						tcpip.AddrFromSlice([]byte(subnetV4Hex)),
@@ -364,7 +364,7 @@ func TestToInstalledRoute(t *testing.T) {
 				MetricTracksInterface: false,
 			},
 			installedRoute: InstalledRoute{
-				Version: routes.IPv4,
+				Version: routetypes.IPv4,
 				V4: fnetRoutes.InstalledRouteV4{
 					RoutePresent: true,
 					Route: fnetRoutes.RouteV4{
@@ -398,7 +398,7 @@ func TestToInstalledRoute(t *testing.T) {
 		},
 		{
 			name: "IPv4 NoGateway",
-			extendedRoute: routes.ExtendedRoute{
+			extendedRoute: routetypes.ExtendedRoute{
 				Route: tcpip.Route{
 					Destination: makeSubnet(
 						tcpip.AddrFromSlice([]byte(subnetV4Hex)),
@@ -409,7 +409,7 @@ func TestToInstalledRoute(t *testing.T) {
 				MetricTracksInterface: false,
 			},
 			installedRoute: InstalledRoute{
-				Version: routes.IPv4,
+				Version: routetypes.IPv4,
 				V4: fnetRoutes.InstalledRouteV4{
 					RoutePresent: true,
 					Route: fnetRoutes.RouteV4{
@@ -441,7 +441,7 @@ func TestToInstalledRoute(t *testing.T) {
 		},
 		{
 			name: "IPv4 Metric Tracks Interface",
-			extendedRoute: routes.ExtendedRoute{
+			extendedRoute: routetypes.ExtendedRoute{
 				Route: tcpip.Route{
 					Destination: makeSubnet(
 						tcpip.AddrFromSlice([]byte(subnetV4Hex)),
@@ -453,7 +453,7 @@ func TestToInstalledRoute(t *testing.T) {
 				MetricTracksInterface: true,
 			},
 			installedRoute: InstalledRoute{
-				Version: routes.IPv4,
+				Version: routetypes.IPv4,
 				V4: fnetRoutes.InstalledRouteV4{
 					RoutePresent: true,
 					Route: fnetRoutes.RouteV4{
@@ -489,7 +489,7 @@ func TestToInstalledRoute(t *testing.T) {
 		},
 		{
 			name: "IPv6",
-			extendedRoute: routes.ExtendedRoute{
+			extendedRoute: routetypes.ExtendedRoute{
 				Route: tcpip.Route{
 					Destination: makeSubnet(
 						tcpip.AddrFromSlice([]byte(subnetV6Hex)),
@@ -501,7 +501,7 @@ func TestToInstalledRoute(t *testing.T) {
 				MetricTracksInterface: false,
 			},
 			installedRoute: InstalledRoute{
-				Version: routes.IPv6,
+				Version: routetypes.IPv6,
 				V6: fnetRoutes.InstalledRouteV6{
 					RoutePresent: true,
 					Route: fnetRoutes.RouteV6{
@@ -535,7 +535,7 @@ func TestToInstalledRoute(t *testing.T) {
 		},
 		{
 			name: "IPv6 No Gateway",
-			extendedRoute: routes.ExtendedRoute{
+			extendedRoute: routetypes.ExtendedRoute{
 				Route: tcpip.Route{
 					Destination: makeSubnet(
 						tcpip.AddrFromSlice([]byte(subnetV6Hex)),
@@ -546,7 +546,7 @@ func TestToInstalledRoute(t *testing.T) {
 				MetricTracksInterface: false,
 			},
 			installedRoute: InstalledRoute{
-				Version: routes.IPv6,
+				Version: routetypes.IPv6,
 				V6: fnetRoutes.InstalledRouteV6{
 					RoutePresent: true,
 					Route: fnetRoutes.RouteV6{
@@ -578,7 +578,7 @@ func TestToInstalledRoute(t *testing.T) {
 		},
 		{
 			name: "IPv6 Metric Tracks Interface",
-			extendedRoute: routes.ExtendedRoute{
+			extendedRoute: routetypes.ExtendedRoute{
 				Route: tcpip.Route{
 					Destination: makeSubnet(
 						tcpip.AddrFromSlice([]byte(subnetV6Hex)),
@@ -590,7 +590,7 @@ func TestToInstalledRoute(t *testing.T) {
 				MetricTracksInterface: true,
 			},
 			installedRoute: InstalledRoute{
-				Version: routes.IPv6,
+				Version: routetypes.IPv6,
 				V6: fnetRoutes.InstalledRouteV6{
 					RoutePresent: true,
 					Route: fnetRoutes.RouteV6{

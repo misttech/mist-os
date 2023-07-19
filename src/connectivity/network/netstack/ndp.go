@@ -11,7 +11,7 @@ import (
 	"fmt"
 	"time"
 
-	"go.fuchsia.dev/fuchsia/src/connectivity/network/netstack/routes"
+	"go.fuchsia.dev/fuchsia/src/connectivity/network/netstack/routetypes"
 	"go.fuchsia.dev/fuchsia/src/connectivity/network/netstack/sync"
 	syslog "go.fuchsia.dev/fuchsia/src/lib/syslog/go"
 
@@ -490,14 +490,14 @@ func (n *ndpDispatcher) handleEvent(event ndpEvent) {
 		rt := tcpip.Route{Destination: event.dest, Gateway: event.router, NIC: event.nicID}
 		_ = syslog.InfoTf(ndpSyslogTagName, "discovered an off-link route to [%s] through [%s] on nicID (%d) with preference=%s: [%s]", event.dest, event.router, event.nicID, event.prf, rt)
 
-		var prf routes.Preference
+		var prf routetypes.Preference
 		switch event.prf {
 		case header.LowRoutePreference:
-			prf = routes.LowPreference
+			prf = routetypes.LowPreference
 		case header.MediumRoutePreference:
-			prf = routes.MediumPreference
+			prf = routetypes.MediumPreference
 		case header.HighRoutePreference:
-			prf = routes.HighPreference
+			prf = routetypes.HighPreference
 		default:
 			panic(fmt.Sprintf("unhandled NDP route preference = %s", event.prf))
 		}

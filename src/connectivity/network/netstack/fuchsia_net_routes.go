@@ -16,6 +16,7 @@ import (
 
 	"go.fuchsia.dev/fuchsia/src/connectivity/network/netstack/fidlconv"
 	"go.fuchsia.dev/fuchsia/src/connectivity/network/netstack/routes"
+	"go.fuchsia.dev/fuchsia/src/connectivity/network/netstack/routetypes"
 	"go.fuchsia.dev/fuchsia/src/connectivity/network/netstack/sync"
 	"go.fuchsia.dev/fuchsia/src/lib/component"
 	syslog "go.fuchsia.dev/fuchsia/src/lib/syslog/go"
@@ -197,11 +198,11 @@ func (r *getWatcherV4Request) serve(
 			eventsChan,
 			// Filter out all Non-IPv4 events.
 			func(e *eventUnion) bool {
-				return e.version == routes.IPv4
+				return e.version == routetypes.IPv4
 			},
 			existingRoutes,
 			eventUnion{
-				version:    routes.IPv4,
+				version:    routetypes.IPv4,
 				ipv4_event: fnetRoutes.EventV4WithIdle(fnetRoutes.Empty{}),
 			},
 		),
@@ -244,11 +245,11 @@ func (r *getWatcherV6Request) serve(
 			eventsChan,
 			// Filter out all Non-IPv6 events.
 			func(e *eventUnion) bool {
-				return e.version == routes.IPv6
+				return e.version == routetypes.IPv6
 			},
 			existingRoutes,
 			eventUnion{
-				version:    routes.IPv6,
+				version:    routetypes.IPv6,
 				ipv6_event: fnetRoutes.EventV6WithIdle(fnetRoutes.Empty{}),
 			},
 		),
@@ -450,9 +451,9 @@ func (w4 *routesWatcherV4Impl) Watch(ctx fidl.Context) ([]fnetRoutes.EventV4, er
 	eventsV4 := make([]fnetRoutes.EventV4, 0, len(events))
 	for _, event := range events {
 		switch event.version {
-		case routes.IPv4:
+		case routetypes.IPv4:
 			eventsV4 = append(eventsV4, event.ipv4_event)
-		case routes.IPv6:
+		case routetypes.IPv6:
 			// Unreachable because of the filter installed by GetWatcherV4.
 			panic(fmt.Sprintf(
 				"Internal Error. %s received an IPv6 event: %s",
@@ -476,14 +477,14 @@ func (w6 *routesWatcherV6Impl) Watch(ctx fidl.Context) ([]fnetRoutes.EventV6, er
 	eventsV6 := make([]fnetRoutes.EventV6, 0, len(events))
 	for _, event := range events {
 		switch event.version {
-		case routes.IPv4:
+		case routetypes.IPv4:
 			// Unreachable because of the filter installed by GetWatcherV4.
 			panic(fmt.Sprintf(
 				"Internal Error. %s received an IPv4 event: %s",
 				watcherV6ProtocolName,
 				intoLogString(event),
 			))
-		case routes.IPv6:
+		case routetypes.IPv6:
 			eventsV6 = append(eventsV6, event.ipv6_event)
 		default:
 			panic(fmt.Sprintf("Event with invalid IP protocol :%d", event.version))
@@ -502,7 +503,7 @@ type fidlRoutesWatcherMetrics struct {
 // eventUnion is a union type abstracting over IPv4 and IPv6 events.
 // ipv4_event will be set iif version == IPv4 (and vice-versa for ipv6_event).
 type eventUnion struct {
-	version    routes.IpProtoTag
+	version    routetypes.IpProtoTag
 	ipv4_event fnetRoutes.EventV4
 	ipv6_event fnetRoutes.EventV6
 }
@@ -574,7 +575,7 @@ func routesWatcherEventLoop(
 				var eventType eventTag
 				// Updates routes based on the received change.
 				switch interrupt.Change {
-				case routes.RouteAdded:
+				case routetypes.RouteAdded:
 					if _, present := currentRoutes[unboxedRoute]; present {
 						panic(fmt.Sprintf(
 							"received duplicate add event for route: %+v",
@@ -583,7 +584,7 @@ func routesWatcherEventLoop(
 					}
 					currentRoutes[unboxedRoute] = struct{}{}
 					eventType = addedEvent
-				case routes.RouteRemoved:
+				case routetypes.RouteRemoved:
 					if _, present := currentRoutes[unboxedRoute]; !present {
 						panic(fmt.Sprintf(
 							"received remove event for non-existent route: %+v",
@@ -644,7 +645,7 @@ const (
 // eventTag.
 func toEvent(eventType eventTag, route fidlconv.InstalledRoute) eventUnion {
 	switch route.Version {
-	case routes.IPv4:
+	case routetypes.IPv4:
 		var event fnetRoutes.EventV4
 		switch eventType {
 		case existingEvent:
@@ -657,10 +658,10 @@ func toEvent(eventType eventTag, route fidlconv.InstalledRoute) eventUnion {
 			panic(fmt.Sprintf("invalid eventTag: %d", eventType))
 		}
 		return eventUnion{
-			version:    routes.IPv4,
+			version:    routetypes.IPv4,
 			ipv4_event: event,
 		}
-	case routes.IPv6:
+	case routetypes.IPv6:
 		var event fnetRoutes.EventV6
 		switch eventType {
 		case existingEvent:
@@ -673,7 +674,7 @@ func toEvent(eventType eventTag, route fidlconv.InstalledRoute) eventUnion {
 			panic(fmt.Sprintf("invalid eventTag: %d", eventType))
 		}
 		return eventUnion{
-			version:    routes.IPv6,
+			version:    routetypes.IPv6,
 			ipv6_event: event,
 		}
 	default:
@@ -769,7 +770,7 @@ func intoLogString(e eventUnion) string {
 		e.version,
 		func() string {
 			switch e.version {
-			case routes.IPv4:
+			case routetypes.IPv4:
 				return fmt.Sprintf("%T{ I_eventV4Tag: %d, %s }",
 					e.ipv4_event, e.ipv4_event.I_eventV4Tag, func() string {
 						switch e.ipv4_event.I_eventV4Tag {
@@ -795,7 +796,7 @@ func intoLogString(e eventUnion) string {
 		}(),
 		func() string {
 			switch e.version {
-			case routes.IPv6:
+			case routetypes.IPv6:
 				return fmt.Sprintf("%T{ I_eventV6Tag: %d, %s }",
 					e.ipv6_event, e.ipv6_event.I_eventV6Tag, func() string {
 						switch e.ipv6_event.I_eventV6Tag {

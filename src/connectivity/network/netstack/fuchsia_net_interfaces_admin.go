@@ -15,7 +15,7 @@ import (
 
 	"go.fuchsia.dev/fuchsia/src/connectivity/network/netstack/fidlconv"
 	"go.fuchsia.dev/fuchsia/src/connectivity/network/netstack/link/netdevice"
-	"go.fuchsia.dev/fuchsia/src/connectivity/network/netstack/routes"
+	"go.fuchsia.dev/fuchsia/src/connectivity/network/netstack/routetypes"
 	"go.fuchsia.dev/fuchsia/src/connectivity/network/netstack/sync"
 	"go.fuchsia.dev/fuchsia/src/lib/component"
 	syslog "go.fuchsia.dev/fuchsia/src/lib/syslog/go"
@@ -413,7 +413,7 @@ func (ci *adminControlImpl) AddAddress(_ fidl.Context, subnet net.Subnet, parame
 		if addSubnetRoute {
 			subnetRoute := addressWithPrefixRoute(ifs.nicid, protocolAddr.AddressWithPrefix)
 			ifs.mu.Lock()
-			addedSubnetRoutes := ifs.addRoutesWithPreferenceLocked([]tcpip.Route{subnetRoute}, routes.MediumPreference, metricNotSet, true /* dynamic */, false /* overwriteIfAlreadyExist */)
+			addedSubnetRoutes := ifs.addRoutesWithPreferenceLocked([]tcpip.Route{subnetRoute}, routetypes.MediumPreference, metricNotSet, true /* dynamic */, false /* overwriteIfAlreadyExist */)
 			ifs.mu.Unlock()
 			return addedSubnetRoutes
 		} else {
@@ -1020,7 +1020,7 @@ func (d *interfacesAdminDeviceControlImpl) CreateInterface(_ fidl.Context, portI
 
 		metric := defaultInterfaceMetric
 		if options.HasMetric() {
-			metric = routes.Metric(options.GetMetric())
+			metric = routetypes.Metric(options.GetMetric())
 		}
 		ifs, err := d.ns.addEndpoint(
 			makeEndpointName(namePrefix, options.GetNameWithDefault("")),

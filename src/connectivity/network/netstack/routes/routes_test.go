@@ -13,6 +13,7 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 	"go.fuchsia.dev/fuchsia/src/connectivity/network/netstack/routes"
+	"go.fuchsia.dev/fuchsia/src/connectivity/network/netstack/routetypes"
 
 	"gvisor.dev/gvisor/pkg/tcpip"
 	"gvisor.dev/gvisor/pkg/tcpip/stack"
@@ -50,12 +51,12 @@ func createRoute(nicid tcpip.NICID, subnet string, gateway string) tcpip.Route {
 	}
 }
 
-func createExtendedRoute(nicid tcpip.NICID, subnet string, gateway string, metric routes.Metric, tracksInterface bool, dynamic bool, enabled bool) routes.ExtendedRoute {
-	return createExtendedRouteWithPrf(nicid, subnet, gateway, routes.MediumPreference, metric, tracksInterface, dynamic, enabled)
+func createExtendedRoute(nicid tcpip.NICID, subnet string, gateway string, metric routetypes.Metric, tracksInterface bool, dynamic bool, enabled bool) routetypes.ExtendedRoute {
+	return createExtendedRouteWithPrf(nicid, subnet, gateway, routetypes.MediumPreference, metric, tracksInterface, dynamic, enabled)
 }
 
-func createExtendedRouteWithPrf(nicid tcpip.NICID, subnet string, gateway string, prf routes.Preference, metric routes.Metric, tracksInterface bool, dynamic bool, enabled bool) routes.ExtendedRoute {
-	return routes.ExtendedRoute{
+func createExtendedRouteWithPrf(nicid tcpip.NICID, subnet string, gateway string, prf routetypes.Preference, metric routetypes.Metric, tracksInterface bool, dynamic bool, enabled bool) routetypes.ExtendedRoute {
+	return routetypes.ExtendedRoute{
 		Route:                 createRoute(nicid, subnet, gateway),
 		Prf:                   prf,
 		Metric:                metric,
@@ -130,14 +131,14 @@ func TestExtendedRouteMatch(t *testing.T) {
 func TestSortingLess(t *testing.T) {
 	for _, tc := range []struct {
 		subnet1 string
-		prf1    routes.Preference
-		metric1 routes.Metric
+		prf1    routetypes.Preference
+		metric1 routetypes.Metric
 		nic1    tcpip.NICID
 		gw1     string
 
 		subnet2 string
-		prf2    routes.Preference
-		metric2 routes.Metric
+		prf2    routetypes.Preference
+		metric2 routetypes.Metric
 		nic2    tcpip.NICID
 		gw2     string
 
@@ -165,21 +166,21 @@ func TestSortingLess(t *testing.T) {
 		{subnet1: "2511:5f32:4:6:124::2:1/128", metric1: 100, nic1: 1, subnet2: "::1/120", metric2: 100, nic2: 2, want: true},
 
 		// on-link wins
-		{subnet1: "100.99.2.0/23", prf1: routes.LowPreference, nic1: 1, gw1: "", subnet2: "101.99.2.0/23", prf2: routes.LowPreference, nic2: 1, gw2: "101.99.2.1", want: true},
-		{subnet1: "100.99.2.0/23", prf1: routes.LowPreference, nic1: 1, gw1: "100.99.2.1", subnet2: "101.99.2.0/23", prf2: routes.LowPreference, nic2: 1, gw2: "", want: false},
+		{subnet1: "100.99.2.0/23", prf1: routetypes.LowPreference, nic1: 1, gw1: "", subnet2: "101.99.2.0/23", prf2: routetypes.LowPreference, nic2: 1, gw2: "101.99.2.1", want: true},
+		{subnet1: "100.99.2.0/23", prf1: routetypes.LowPreference, nic1: 1, gw1: "100.99.2.1", subnet2: "101.99.2.0/23", prf2: routetypes.LowPreference, nic2: 1, gw2: "", want: false},
 		// on-link tie-breaker (both on/off-link), higher-preference wins
-		{subnet1: "100.99.2.0/23", prf1: routes.HighPreference, nic1: 1, gw1: "", subnet2: "101.99.2.0/23", prf2: routes.LowPreference, nic2: 1, gw2: "", want: true},
-		{subnet1: "100.99.2.0/23", prf1: routes.LowPreference, nic1: 1, gw1: "", subnet2: "101.99.2.0/23", prf2: routes.HighPreference, nic2: 1, gw2: "", want: false},
-		{subnet1: "100.99.2.0/23", prf1: routes.HighPreference, nic1: 1, gw1: "100.99.2.1", subnet2: "101.99.2.0/23", prf2: routes.LowPreference, nic2: 1, gw2: "101.99.2.1", want: true},
-		{subnet1: "100.99.2.0/23", prf1: routes.LowPreference, nic1: 1, gw1: "100.99.2.1", subnet2: "101.99.2.0/23", prf2: routes.HighPreference, nic2: 1, gw2: "101.99.2.1", want: false},
+		{subnet1: "100.99.2.0/23", prf1: routetypes.HighPreference, nic1: 1, gw1: "", subnet2: "101.99.2.0/23", prf2: routetypes.LowPreference, nic2: 1, gw2: "", want: true},
+		{subnet1: "100.99.2.0/23", prf1: routetypes.LowPreference, nic1: 1, gw1: "", subnet2: "101.99.2.0/23", prf2: routetypes.HighPreference, nic2: 1, gw2: "", want: false},
+		{subnet1: "100.99.2.0/23", prf1: routetypes.HighPreference, nic1: 1, gw1: "100.99.2.1", subnet2: "101.99.2.0/23", prf2: routetypes.LowPreference, nic2: 1, gw2: "101.99.2.1", want: true},
+		{subnet1: "100.99.2.0/23", prf1: routetypes.LowPreference, nic1: 1, gw1: "100.99.2.1", subnet2: "101.99.2.0/23", prf2: routetypes.HighPreference, nic2: 1, gw2: "101.99.2.1", want: false},
 
 		// higher preference wins
-		{subnet1: "100.99.24.12/32", prf1: routes.HighPreference, metric1: 2, nic1: 1, subnet2: "10.1.21.31/32", prf2: routes.LowPreference, metric2: 1, nic2: 1, want: true},
-		{subnet1: "100.99.24.12/32", prf1: routes.MediumPreference, metric1: 2, nic1: 1, subnet2: "10.1.21.31/32", prf2: routes.LowPreference, metric2: 1, nic2: 2, want: true},
-		{subnet1: "100.99.2.0/23", prf1: routes.HighPreference, metric1: 2, nic1: 3, subnet2: "10.1.22.0/23", prf2: routes.MediumPreference, metric2: 1, nic2: 1, want: true},
-		{subnet1: "100.99.24.12/32", prf1: routes.LowPreference, metric1: 1, nic1: 1, subnet2: "10.1.21.31/32", prf2: routes.HighPreference, metric2: 2, nic2: 1, want: false},
-		{subnet1: "100.99.24.12/32", prf1: routes.LowPreference, metric1: 1, nic1: 1, subnet2: "10.1.21.31/32", prf2: routes.MediumPreference, metric2: 2, nic2: 2, want: false},
-		{subnet1: "100.99.2.0/23", prf1: routes.MediumPreference, metric1: 1, nic1: 3, subnet2: "10.1.22.0/23", prf2: routes.HighPreference, metric2: 2, nic2: 1, want: false},
+		{subnet1: "100.99.24.12/32", prf1: routetypes.HighPreference, metric1: 2, nic1: 1, subnet2: "10.1.21.31/32", prf2: routetypes.LowPreference, metric2: 1, nic2: 1, want: true},
+		{subnet1: "100.99.24.12/32", prf1: routetypes.MediumPreference, metric1: 2, nic1: 1, subnet2: "10.1.21.31/32", prf2: routetypes.LowPreference, metric2: 1, nic2: 2, want: true},
+		{subnet1: "100.99.2.0/23", prf1: routetypes.HighPreference, metric1: 2, nic1: 3, subnet2: "10.1.22.0/23", prf2: routetypes.MediumPreference, metric2: 1, nic2: 1, want: true},
+		{subnet1: "100.99.24.12/32", prf1: routetypes.LowPreference, metric1: 1, nic1: 1, subnet2: "10.1.21.31/32", prf2: routetypes.HighPreference, metric2: 2, nic2: 1, want: false},
+		{subnet1: "100.99.24.12/32", prf1: routetypes.LowPreference, metric1: 1, nic1: 1, subnet2: "10.1.21.31/32", prf2: routetypes.MediumPreference, metric2: 2, nic2: 2, want: false},
+		{subnet1: "100.99.2.0/23", prf1: routetypes.MediumPreference, metric1: 1, nic1: 3, subnet2: "10.1.22.0/23", prf2: routetypes.HighPreference, metric2: 2, nic2: 1, want: false},
 		// lower metric
 		{subnet1: "100.99.24.12/32", metric1: 100, nic1: 1, subnet2: "10.1.21.31/32", metric2: 101, nic2: 1, want: true},
 		{subnet1: "100.99.24.12/32", metric1: 101, nic1: 1, subnet2: "10.1.21.31/32", metric2: 100, nic2: 2, want: false},
@@ -216,7 +217,7 @@ func TestSortingLess(t *testing.T) {
 	}
 }
 
-func isSameRouteTableImpl(rt1, rt2 []routes.ExtendedRoute, checkAttributes bool) bool {
+func isSameRouteTableImpl(rt1, rt2 []routetypes.ExtendedRoute, checkAttributes bool) bool {
 	if len(rt1) != len(rt2) {
 		return false
 	}
@@ -232,11 +233,11 @@ func isSameRouteTableImpl(rt1, rt2 []routes.ExtendedRoute, checkAttributes bool)
 	return true
 }
 
-func isSameRouteTable(rt1, rt2 []routes.ExtendedRoute) bool {
+func isSameRouteTable(rt1, rt2 []routetypes.ExtendedRoute) bool {
 	return isSameRouteTableImpl(rt1, rt2, true /* checkAttributes */)
 }
 
-func isSameRouteTableSkippingAttributes(rt1, rt2 []routes.ExtendedRoute) bool {
+func isSameRouteTableSkippingAttributes(rt1, rt2 []routetypes.ExtendedRoute) bool {
 	return isSameRouteTableImpl(rt1, rt2, false /* checkAttributes */)
 }
 
@@ -313,8 +314,8 @@ func TestAddRoute(t *testing.T) {
 		// 1.test - r0 is more preferred.
 		{
 			var tb routes.RouteTable
-			tb.AddRoute(r0, routes.HighPreference, 100, true, true, true)
-			tb.AddRoute(r1, routes.LowPreference, 100, true, true, true)
+			tb.AddRoute(r0, routetypes.HighPreference, 100, true, true, true)
+			tb.AddRoute(r1, routetypes.LowPreference, 100, true, true, true)
 			tableGot := tb.GetExtendedRouteTable()
 			if got, want := tableGot[0].Route, r0; got != want {
 				t.Errorf("got = %s, want = %s", got, want)
@@ -327,8 +328,8 @@ func TestAddRoute(t *testing.T) {
 		// 2.test - r1 is more preferred.
 		{
 			var tb routes.RouteTable
-			tb.AddRoute(r0, routes.LowPreference, 100, true, true, true)
-			tb.AddRoute(r1, routes.HighPreference, 100, true, true, true)
+			tb.AddRoute(r0, routetypes.LowPreference, 100, true, true, true)
+			tb.AddRoute(r1, routetypes.HighPreference, 100, true, true, true)
 			tableGot := tb.GetExtendedRouteTable()
 			if got, want := tableGot[0].Route, r1; got != want {
 				t.Errorf("got = %s, want = %s", got, want)
@@ -348,8 +349,8 @@ func TestAddRoute(t *testing.T) {
 		// 1.test - r0 gets lower metric.
 		{
 			var tb routes.RouteTable
-			tb.AddRoute(r0, routes.MediumPreference, 100, true, true, true)
-			tb.AddRoute(r1, routes.MediumPreference, 200, true, true, true)
+			tb.AddRoute(r0, routetypes.MediumPreference, 100, true, true, true)
+			tb.AddRoute(r1, routetypes.MediumPreference, 200, true, true, true)
 			tableGot := tb.GetExtendedRouteTable()
 			if got, want := tableGot[0].Route, r0; got != want {
 				t.Errorf("got = %s, want = %s", got, want)
@@ -362,8 +363,8 @@ func TestAddRoute(t *testing.T) {
 		// 2.test - r1 gets lower metric.
 		{
 			var tb routes.RouteTable
-			tb.AddRoute(r0, routes.MediumPreference, 200, true, true, true)
-			tb.AddRoute(r1, routes.MediumPreference, 100, true, true, true)
+			tb.AddRoute(r0, routetypes.MediumPreference, 200, true, true, true)
+			tb.AddRoute(r1, routetypes.MediumPreference, 100, true, true, true)
 			tableGot := tb.GetExtendedRouteTable()
 			if got, want := tableGot[0].Route, r1; got != want {
 				t.Errorf("got = %s, want = %s", got, want)
@@ -426,9 +427,9 @@ func TestDelRouteLockedIfDynamic(t *testing.T) {
 		gotRemovedRoutes := tb.DelRouteIfDynamicLocked(routeToRemove.Route)
 		tb.Unlock()
 
-		wantRemovedRoutes := func() []routes.ExtendedRoute {
+		wantRemovedRoutes := func() []routetypes.ExtendedRoute {
 			if routeToRemove.Dynamic {
-				return []routes.ExtendedRoute{routeToRemove}
+				return []routetypes.ExtendedRoute{routeToRemove}
 			} else {
 				return nil
 			}
@@ -469,7 +470,7 @@ func TestUpdateRoutesByInterface(t *testing.T) {
 			}
 
 			// Down -> 1.Remove dynamic routes.
-			tb.UpdateRoutesByInterface(nicid, routes.ActionDeleteDynamic)
+			tb.UpdateRoutesByInterface(nicid, routetypes.ActionDeleteDynamic)
 
 			// Verify all dynamic routes to this NIC are gone, and static ones are
 			// still enabled.
@@ -487,7 +488,7 @@ func TestUpdateRoutesByInterface(t *testing.T) {
 			}
 
 			// Down -> 2.Disable static ones.
-			tb.UpdateRoutesByInterface(nicid, routes.ActionDisableStatic)
+			tb.UpdateRoutesByInterface(nicid, routetypes.ActionDisableStatic)
 			// Verify all dynamic routes to this NIC are gone, and static ones are
 			// disabled.
 			tableGot = tb.GetExtendedRouteTable()
@@ -504,7 +505,7 @@ func TestUpdateRoutesByInterface(t *testing.T) {
 			}
 
 			// Up -> Re-enable static routes.
-			tb.UpdateRoutesByInterface(nicid, routes.ActionEnableStatic)
+			tb.UpdateRoutesByInterface(nicid, routetypes.ActionEnableStatic)
 
 			// Verify dynamic routes to this NIC are still gone, and static ones are
 			// enabled.
@@ -535,7 +536,7 @@ func TestUpdateRoutesByInterface(t *testing.T) {
 			}
 
 			// Remove all routes to nicid.
-			tb.UpdateRoutesByInterface(nicid, routes.ActionDeleteAll)
+			tb.UpdateRoutesByInterface(nicid, routetypes.ActionDeleteAll)
 
 			// Verify all routes to this NIC are gone.
 			tableGot = tb.GetExtendedRouteTable()
@@ -565,7 +566,7 @@ func TestGetNetstackTable(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			// We have no way to directly disable routes in the route table, but we
 			// can use the Set() command to set a table with pre-disabled routes.
-			testRouteTable := append([]routes.ExtendedRoute(nil), testRouteTable...)
+			testRouteTable := append([]routetypes.ExtendedRoute(nil), testRouteTable...)
 			// Disable a few routes.
 			for _, i := range tc.disabled {
 				testRouteTable[i].Enabled = false

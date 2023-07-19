@@ -23,7 +23,7 @@ import (
 	"go.fuchsia.dev/fuchsia/src/connectivity/network/netstack/fidlconv"
 	"go.fuchsia.dev/fuchsia/src/connectivity/network/netstack/link"
 	"go.fuchsia.dev/fuchsia/src/connectivity/network/netstack/link/netdevice"
-	"go.fuchsia.dev/fuchsia/src/connectivity/network/netstack/routes"
+	"go.fuchsia.dev/fuchsia/src/connectivity/network/netstack/routetypes"
 	"go.fuchsia.dev/fuchsia/src/connectivity/network/netstack/util"
 	"go.fuchsia.dev/fuchsia/src/lib/component"
 	syslog "go.fuchsia.dev/fuchsia/src/lib/syslog/go"
@@ -1046,7 +1046,7 @@ func (impl *socketInfoInspectImpl) GetChild(childName string) inspectInner {
 var _ inspectInner = (*routingTableInspectImpl)(nil)
 
 type routingTableInspectImpl struct {
-	value []routes.ExtendedRoute
+	value []routetypes.ExtendedRoute
 }
 
 func (*routingTableInspectImpl) ReadData() inspect.Object {
@@ -1090,7 +1090,7 @@ var _ inspectInner = (*routeInfoInspectImpl)(nil)
 
 type routeInfoInspectImpl struct {
 	name  string
-	value routes.ExtendedRoute
+	value routetypes.ExtendedRoute
 }
 
 func (impl *routeInfoInspectImpl) ReadData() inspect.Object {

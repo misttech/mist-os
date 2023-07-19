@@ -14,7 +14,7 @@ go_library("fidlconv") {
     "//sdk/fidl/fuchsia.net.multicast.admin:fuchsia.net.multicast.admin_go($go_toolchain)",
     "//sdk/fidl/fuchsia.net.routes:fuchsia.net.routes_go($go_toolchain)",
     "//sdk/fidl/fuchsia.net.stack:fuchsia.net.stack_go($go_toolchain)",
-    "//src/connectivity/network/netstack/routes",
+    "//src/connectivity/network/netstack/routetypes",
     "//src/connectivity/network/netstack/util",
     "//third_party/golibs:gvisor.dev/gvisor",
   ]

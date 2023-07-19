@@ -21,6 +21,7 @@ import (
 	"go.fuchsia.dev/fuchsia/src/connectivity/network/netstack/link"
 	"go.fuchsia.dev/fuchsia/src/connectivity/network/netstack/link/bridge"
 	"go.fuchsia.dev/fuchsia/src/connectivity/network/netstack/routes"
+	"go.fuchsia.dev/fuchsia/src/connectivity/network/netstack/routetypes"
 	"go.fuchsia.dev/fuchsia/src/connectivity/network/netstack/sync"
 	zxtime "go.fuchsia.dev/fuchsia/src/connectivity/network/netstack/time"
 	"go.fuchsia.dev/fuchsia/src/connectivity/network/netstack/tracing/trace"
@@ -42,11 +43,11 @@ import (
 )
 
 const (
-	defaultInterfaceMetric routes.Metric = 100
+	defaultInterfaceMetric routetypes.Metric = 100
 
-	metricNotSet routes.Metric = 0
+	metricNotSet routetypes.Metric = 0
 
-	lowPriorityRoute routes.Metric = 99999
+	lowPriorityRoute routetypes.Metric = 99999
 
 	dhcpAcquisition    = 60 * zxtime.Second
 	dhcpBackoff        = 1 * zxtime.Second
@@ -283,7 +284,7 @@ type ifState struct {
 	}
 
 	// metric is used by default for routes that originate from this NIC.
-	metric routes.Metric
+	metric routetypes.Metric
 
 	adminControls adminControlCollection
 
@@ -378,7 +379,7 @@ func (ns *Netstack) fillRouteNIC(r tcpip.Route) (tcpip.Route, error) {
 }
 
 // AddRoute adds a single route to the route table in a sorted fashion.
-func (ns *Netstack) AddRoute(r tcpip.Route, metric routes.Metric, dynamic bool) error {
+func (ns *Netstack) AddRoute(r tcpip.Route, metric routetypes.Metric, dynamic bool) error {
 	r, err := ns.fillRouteNIC(r)
 	if err != nil {
 		return err
@@ -386,7 +387,7 @@ func (ns *Netstack) AddRoute(r tcpip.Route, metric routes.Metric, dynamic bool) 
 	return ns.AddRoutes(r.NIC, []tcpip.Route{r}, metric, dynamic)
 }
 
-func (ns *Netstack) addRouteWithPreference(r tcpip.Route, prf routes.Preference, metric routes.Metric, dynamic bool) error {
+func (ns *Netstack) addRouteWithPreference(r tcpip.Route, prf routetypes.Preference, metric routetypes.Metric, dynamic bool) error {
 	r, err := ns.fillRouteNIC(r)
 	if err != nil {
 		return err
@@ -399,15 +400,15 @@ func (ns *Netstack) addRouteWithPreference(r tcpip.Route, prf routes.Preference,
 //
 // The routes will be added with the default (medium) medium preference value.
 // All routes in `rs` will have their NICID rewritten to `nicid`.
-func (ns *Netstack) AddRoutes(nicid tcpip.NICID, rs []tcpip.Route, metric routes.Metric, dynamic bool) error {
-	return ns.addRoutesWithPreference(nicid, rs, routes.MediumPreference, metric, dynamic)
+func (ns *Netstack) AddRoutes(nicid tcpip.NICID, rs []tcpip.Route, metric routetypes.Metric, dynamic bool) error {
+	return ns.addRoutesWithPreference(nicid, rs, routetypes.MediumPreference, metric, dynamic)
 }
 
 // addRoutesWithPreference adds routes for the same interface to the route table
 // with a configurable preference value.
 //
 // All routes in `rs` will have their NICID rewritten to `nicid`.
-func (ns *Netstack) addRoutesWithPreference(nicid tcpip.NICID, rs []tcpip.Route, prf routes.Preference, metric routes.Metric, dynamic bool) error {
+func (ns *Netstack) addRoutesWithPreference(nicid tcpip.NICID, rs []tcpip.Route, prf routetypes.Preference, metric routetypes.Metric, dynamic bool) error {
 	nicInfo, ok := ns.stack.NICInfo()[nicid]
 	if !ok {
 		return fmt.Errorf("error getting nicInfo for NIC %d, not in map: %w", nicid, routes.ErrNoSuchNIC)
@@ -422,7 +423,7 @@ func (ns *Netstack) addRoutesWithPreference(nicid tcpip.NICID, rs []tcpip.Route,
 }
 
 // Returns a slice of the routes that were added.
-func (ifs *ifState) addRoutesWithPreferenceLocked(rs []tcpip.Route, prf routes.Preference, metric routes.Metric, dynamic bool, overwriteIfAlreadyExist bool) []tcpip.Route {
+func (ifs *ifState) addRoutesWithPreferenceLocked(rs []tcpip.Route, prf routetypes.Preference, metric routetypes.Metric, dynamic bool, overwriteIfAlreadyExist bool) []tcpip.Route {
 	metricTracksInterface := false
 	if metric == metricNotSet {
 		metricTracksInterface = true
@@ -473,7 +474,7 @@ func (ifs *ifState) addRoutesWithPreferenceLocked(rs []tcpip.Route, prf routes.P
 //
 // The `ifState` of the interface identified by `r.NIC` must be locked for the
 // duration of this function.
-func (ns *Netstack) delRouteLocked(r tcpip.Route) []routes.ExtendedRoute {
+func (ns *Netstack) delRouteLocked(r tcpip.Route) []routetypes.ExtendedRoute {
 	ns.routeTable.Lock()
 	defer ns.routeTable.Unlock()
 
@@ -498,12 +499,12 @@ func (ns *Netstack) delRouteLocked(r tcpip.Route) []routes.ExtendedRoute {
 }
 
 // DelRoute deletes all routes matching r from the route table.
-func (ns *Netstack) DelRoute(r tcpip.Route) []routes.ExtendedRoute {
+func (ns *Netstack) DelRoute(r tcpip.Route) []routetypes.ExtendedRoute {
 	_ = syslog.Infof("deleting route %s", r)
 
 	nicInfoMap := ns.stack.NICInfo()
 
-	delRoute := func(nicInfo stack.NICInfo, r tcpip.Route) []routes.ExtendedRoute {
+	delRoute := func(nicInfo stack.NICInfo, r tcpip.Route) []routetypes.ExtendedRoute {
 		ifs := nicInfo.Context.(*ifState)
 		ifs.mu.Lock()
 		defer ifs.mu.Unlock()
@@ -512,7 +513,7 @@ func (ns *Netstack) DelRoute(r tcpip.Route) []routes.ExtendedRoute {
 	}
 
 	if r.NIC == 0 {
-		var routesDeleted []routes.ExtendedRoute
+		var routesDeleted []routetypes.ExtendedRoute
 		for nicid, nicInfo := range nicInfoMap {
 			r.NIC = nicid
 			routesDeleted = append(routesDeleted, delRoute(nicInfo, r)...)
@@ -528,13 +529,13 @@ func (ns *Netstack) DelRoute(r tcpip.Route) []routes.ExtendedRoute {
 }
 
 // GetExtendedRouteTable returns a copy of the current extended route table.
-func (ns *Netstack) GetExtendedRouteTable() []routes.ExtendedRoute {
+func (ns *Netstack) GetExtendedRouteTable() []routetypes.ExtendedRoute {
 	return ns.routeTable.GetExtendedRouteTable()
 }
 
 // UpdateRoutesByInterface applies update actions to the routes for a
 // given interface.
-func (ns *Netstack) UpdateRoutesByInterfaceLocked(nicid tcpip.NICID, action routes.Action) {
+func (ns *Netstack) UpdateRoutesByInterfaceLocked(nicid tcpip.NICID, action routetypes.Action) {
 	ns.routeTable.Lock()
 	defer ns.routeTable.Unlock()
 
@@ -756,7 +757,7 @@ func (ifs *ifState) dhcpLostLocked(lost tcpip.AddressWithPrefix) {
 	}
 
 	// Remove the dynamic routes for this interface.
-	ifs.ns.UpdateRoutesByInterfaceLocked(ifs.nicid, routes.ActionDeleteDynamic)
+	ifs.ns.UpdateRoutesByInterfaceLocked(ifs.nicid, routetypes.ActionDeleteDynamic)
 }
 
 func (ifs *ifState) dhcpAcquired(ctx context.Context, lost, acquired tcpip.AddressWithPrefix, config dhcp.Config) {
@@ -815,7 +816,7 @@ func (ifs *ifState) dhcpAcquired(ctx context.Context, lost, acquired tcpip.Addre
 				_ = syslog.Infof("adding routes %s with metric=<not-set> dynamic=true", rs)
 
 				ifs.mu.Lock()
-				ifs.addRoutesWithPreferenceLocked(rs, routes.MediumPreference, metricNotSet, true /* dynamic */, true /* overwriteIfAlreadyExist */)
+				ifs.addRoutesWithPreferenceLocked(rs, routetypes.MediumPreference, metricNotSet, true /* dynamic */, true /* overwriteIfAlreadyExist */)
 				ifs.mu.Unlock()
 			}
 		}
@@ -912,11 +913,11 @@ func (ifs *ifState) onDownLocked(name string, closed bool) {
 
 	if closed {
 		// The interface is removed, force all of its routes to be removed.
-		ifs.ns.UpdateRoutesByInterfaceLocked(ifs.nicid, routes.ActionDeleteAll)
+		ifs.ns.UpdateRoutesByInterfaceLocked(ifs.nicid, routetypes.ActionDeleteAll)
 	} else {
 		// The interface is down, disable static routes (dynamic ones are handled
 		// by the cancelled DHCP server).
-		ifs.ns.UpdateRoutesByInterfaceLocked(ifs.nicid, routes.ActionDisableStatic)
+		ifs.ns.UpdateRoutesByInterfaceLocked(ifs.nicid, routetypes.ActionDisableStatic)
 	}
 
 	_ = ifs.ns.delRouteLocked(ipv6LinkLocalOnLinkRoute(ifs.nicid))
@@ -981,7 +982,7 @@ func (ifs *ifState) stateChangeLocked(name string, adminUp, linkOnline bool) boo
 			// broadcasting it to the whole link.
 			ifs.ns.routeTable.AddRoute(
 				tcpip.Route{Destination: util.PointSubnet(header.IPv4Broadcast), NIC: ifs.nicid},
-				routes.MediumPreference,
+				routetypes.MediumPreference,
 				lowPriorityRoute,
 				false, /* metricTracksInterface */
 				true,  /* dynamic */
@@ -989,7 +990,7 @@ func (ifs *ifState) stateChangeLocked(name string, adminUp, linkOnline bool) boo
 			)
 
 			// Re-enable static routes out this interface.
-			ifs.ns.UpdateRoutesByInterfaceLocked(ifs.nicid, routes.ActionEnableStatic)
+			ifs.ns.UpdateRoutesByInterfaceLocked(ifs.nicid, routetypes.ActionEnableStatic)
 			if ifs.mu.dhcp.enabled {
 				ifs.mu.dhcp.cancelLocked()
 				ifs.runDHCPLocked(name)
@@ -1002,7 +1003,7 @@ func (ifs *ifState) stateChangeLocked(name string, adminUp, linkOnline bool) boo
 				// details.
 				ifs.ns.routeTable.AddRoute(
 					ipv6LinkLocalOnLinkRoute(ifs.nicid),
-					routes.MediumPreference,
+					routetypes.MediumPreference,
 					ifs.metric,
 					true, /* metricTracksInterface */
 					staticRouteAvoidingLifeCycleHooks,
@@ -1215,7 +1216,7 @@ func (ns *Netstack) addLoopback() error {
 				NIC:         nicid,
 			},
 		},
-		routes.MediumPreference,
+		routetypes.MediumPreference,
 		metricNotSet, /* use interface metric */
 		false,        /* dynamic */
 		true,         /* overwriteIfAlreadyExist */
@@ -1323,7 +1324,7 @@ func (ns *Netstack) addEndpoint(
 	ep stack.LinkEndpoint,
 	controller link.Controller,
 	observer link.Observer,
-	metric routes.Metric,
+	metric routetypes.Metric,
 	qdisc qdiscConfig,
 ) (*ifState, error) {
 	ifs := &ifState{
@@ -1393,7 +1394,7 @@ func (ns *Netstack) addEndpoint(
 		// consistency between the two stacks.
 		ifs.ns.routeTable.AddRoute(
 			tcpip.Route{Destination: ipv4MulticastSubnet().Subnet(), NIC: ifs.nicid},
-			routes.MediumPreference,
+			routetypes.MediumPreference,
 			ifs.metric,
 			true,  /* metricTracksInterface */
 			false, /* dynamic */
@@ -1401,7 +1402,7 @@ func (ns *Netstack) addEndpoint(
 		)
 		ifs.ns.routeTable.AddRoute(
 			tcpip.Route{Destination: ipv6MulticastSubnet().Subnet(), NIC: ifs.nicid},
-			routes.MediumPreference,
+			routetypes.MediumPreference,
 			ifs.metric,
 			true,  /* metricTracksInterface */
 			false, /* dynamic */

@@ -15,29 +15,13 @@ import (
 
 	syslog "go.fuchsia.dev/fuchsia/src/lib/syslog/go"
 
+	"go.fuchsia.dev/fuchsia/src/connectivity/network/netstack/routetypes"
 	"go.fuchsia.dev/fuchsia/src/connectivity/network/netstack/sync"
 	"go.fuchsia.dev/fuchsia/src/connectivity/network/netstack/util"
 
 	"gvisor.dev/gvisor/pkg/tcpip"
 	"gvisor.dev/gvisor/pkg/tcpip/header"
 	"gvisor.dev/gvisor/pkg/tcpip/stack"
-)
-
-type IpProtoTag uint32
-
-const (
-	_ IpProtoTag = iota
-	IPv4
-	IPv6
-)
-
-type Action uint32
-
-const (
-	ActionDeleteAll Action = iota
-	ActionDeleteDynamic
-	ActionDisableStatic
-	ActionEnableStatic
 )
 
 const tag = "routes"
@@ -47,97 +31,7 @@ var (
 	ErrNoSuchNIC   = errors.New("no such NIC")
 )
 
-// Metric is the metric used for sorting the route table. It acts as a
-// priority with a lower value being better.
-type Metric uint32
-
-// Preference is the preference for a route.
-type Preference int
-
-const (
-	// LowPreference indicates that a route has a low preference.
-	LowPreference Preference = iota
-
-	// MediumPreference indicates that a route has a medium (default)
-	// preference.
-	MediumPreference
-
-	// HighPreference indicates that a route has a high preference.
-	HighPreference
-)
-
-// ExtendedRoute is a single route that contains the standard tcpip.Route plus
-// additional attributes.
-type ExtendedRoute struct {
-	// Route used to build the route table to be fed into the
-	// gvisor.dev/gvisor/pkg lib.
-	Route tcpip.Route
-
-	// Prf is the preference of the route when comparing routes to the same
-	// destination.
-	Prf Preference
-
-	// Metric acts as a tie-breaker when comparing otherwise identical routes.
-	Metric Metric
-
-	// MetricTracksInterface is true when the metric tracks the metric of the
-	// interface for this route. This means when the interface metric changes, so
-	// will this route's metric. If false, the metric is static and only changed
-	// explicitly by API.
-	MetricTracksInterface bool
-
-	// Dynamic marks a route as being obtained via DHCP. Such routes are removed
-	// from the table when the interface goes down, vs. just being disabled.
-	Dynamic bool
-
-	// Enabled marks a route as inactive, i.e., its interface is down and packets
-	// must not use this route.
-	// Disabled routes are omitted when building the route table for the
-	// Netstack lib.
-	// This flag is used with non-dynamic routes (i.e., statically added routes)
-	// to keep them in the table while their interface is down.
-	Enabled bool
-}
-
-type RoutingChangeTag uint32
-
-const (
-	_ RoutingChangeTag = iota
-	RouteAdded
-	RouteRemoved
-)
-
-// A union type abstracting over the possible changes to the routing table.
-type RoutingTableChange struct {
-	Change RoutingChangeTag
-	Route  ExtendedRoute
-}
-
-// Match matches the given address against this route.
-func (er *ExtendedRoute) Match(addr tcpip.Address) bool {
-	return er.Route.Destination.Contains(addr)
-}
-
-func (er *ExtendedRoute) String() string {
-	var out strings.Builder
-	fmt.Fprintf(&out, "%s", er.Route)
-	if er.MetricTracksInterface {
-		fmt.Fprintf(&out, " metric[if] %d", er.Metric)
-	} else {
-		fmt.Fprintf(&out, " metric[static] %d", er.Metric)
-	}
-	if er.Dynamic {
-		fmt.Fprintf(&out, " (dynamic)")
-	} else {
-		fmt.Fprintf(&out, " (static)")
-	}
-	if !er.Enabled {
-		fmt.Fprintf(&out, " (disabled)")
-	}
-	return out.String()
-}
-
-type ExtendedRouteTable []ExtendedRoute
+type ExtendedRouteTable []routetypes.ExtendedRoute
 
 func (rt ExtendedRouteTable) String() string {
 	var out strings.Builder
@@ -147,6 +41,7 @@ func (rt ExtendedRouteTable) String() string {
 	return out.String()
 }
 
+type RoutingTableChange = routetypes.RoutingTableChange
 type SendRoutingTableChangeCb func(RoutingTableChange)
 
 // RoutingChangeSender queues up pending changes to the RouteTable, and
@@ -221,13 +116,13 @@ func (rt *RouteTable) HasDefaultRouteLocked(nicid tcpip.NICID) (bool, bool) {
 }
 
 // For testing.
-func (rt *RouteTable) Set(r []ExtendedRoute) {
+func (rt *RouteTable) Set(r []routetypes.ExtendedRoute) {
 	rt.Lock()
 	defer rt.Unlock()
-	rt.routes = append([]ExtendedRoute(nil), r...)
+	rt.routes = append([]routetypes.ExtendedRoute(nil), r...)
 }
 
-func (rt *RouteTable) AddRouteLocked(route tcpip.Route, prf Preference, metric Metric, tracksInterface bool, dynamic bool, enabled bool, overwriteIfAlreadyExists bool) (newlyAdded bool) {
+func (rt *RouteTable) AddRouteLocked(route tcpip.Route, prf routetypes.Preference, metric routetypes.Metric, tracksInterface bool, dynamic bool, enabled bool, overwriteIfAlreadyExists bool) (newlyAdded bool) {
 	syslog.VLogTf(syslog.DebugVerbosity, tag, "RouteTable:Adding route %s with prf=%d metric=%d, trackIf=%t, dynamic=%t, enabled=%t, overwriteIfAlreadyExists=%t", route, prf, metric, tracksInterface, dynamic, enabled, overwriteIfAlreadyExists)
 
 	newlyAdded = true
@@ -240,7 +135,7 @@ func (rt *RouteTable) AddRouteLocked(route tcpip.Route, prf Preference, metric M
 
 			rt.routes = append(rt.routes[:i], rt.routes[i+1:]...)
 			rt.sender.queueChange(RoutingTableChange{
-				Change: RouteRemoved,
+				Change: routetypes.RouteRemoved,
 				Route:  er,
 			})
 			newlyAdded = false
@@ -248,7 +143,7 @@ func (rt *RouteTable) AddRouteLocked(route tcpip.Route, prf Preference, metric M
 		}
 	}
 
-	newEr := ExtendedRoute{
+	newEr := routetypes.ExtendedRoute{
 		Route:                 route,
 		Prf:                   prf,
 		Metric:                metric,
@@ -273,7 +168,7 @@ func (rt *RouteTable) AddRouteLocked(route tcpip.Route, prf Preference, metric M
 	rt.dumpLocked()
 
 	rt.sender.queueChange(RoutingTableChange{
-		Change: RouteAdded,
+		Change: routetypes.RouteAdded,
 		Route:  newEr,
 	})
 
@@ -283,30 +178,30 @@ func (rt *RouteTable) AddRouteLocked(route tcpip.Route, prf Preference, metric M
 // AddRoute inserts the given route to the table in a sorted fashion. If the
 // route already exists, it simply updates that route's preference, metric,
 // dynamic, and enabled fields.
-func (rt *RouteTable) AddRoute(route tcpip.Route, prf Preference, metric Metric, tracksInterface bool, dynamic bool, enabled bool) {
+func (rt *RouteTable) AddRoute(route tcpip.Route, prf routetypes.Preference, metric routetypes.Metric, tracksInterface bool, dynamic bool, enabled bool) {
 	rt.Lock()
 	defer rt.Unlock()
 
 	rt.AddRouteLocked(route, prf, metric, tracksInterface, dynamic, enabled, true /* overwriteIfAlreadyExists */)
 }
 
-func (rt *RouteTable) DelRouteLocked(route tcpip.Route) []ExtendedRoute {
+func (rt *RouteTable) DelRouteLocked(route tcpip.Route) []routetypes.ExtendedRoute {
 	return rt.delRouteLocked(route, false)
 }
 
-func (rt *RouteTable) DelRouteIfDynamicLocked(route tcpip.Route) []ExtendedRoute {
+func (rt *RouteTable) DelRouteIfDynamicLocked(route tcpip.Route) []routetypes.ExtendedRoute {
 	return rt.delRouteLocked(route, true)
 }
 
-func (rt *RouteTable) delRouteLocked(route tcpip.Route, onlyDeleteIfDynamic bool) []ExtendedRoute {
+func (rt *RouteTable) delRouteLocked(route tcpip.Route, onlyDeleteIfDynamic bool) []routetypes.ExtendedRoute {
 	syslog.VLogTf(syslog.DebugVerbosity, tag, "RouteTable:Deleting route %s", route)
 
-	var routesDeleted []ExtendedRoute
+	var routesDeleted []routetypes.ExtendedRoute
 	oldTable := rt.routes
 	rt.routes = oldTable[:0]
 	if cap(oldTable) > 2*len(oldTable) {
 		// Remove excess route table capacity instead of reusing old capacity.
-		rt.routes = make([]ExtendedRoute, 0, len(oldTable))
+		rt.routes = make([]routetypes.ExtendedRoute, 0, len(oldTable))
 	}
 	for _, er := range oldTable {
 		if er.Route.Destination == route.Destination && er.Route.NIC == route.NIC {
@@ -328,14 +223,14 @@ func (rt *RouteTable) delRouteLocked(route tcpip.Route, onlyDeleteIfDynamic bool
 	// Zero out unused entries in the routes slice so that they can be garbage collected.
 	deadRoutes := rt.routes[len(rt.routes):cap(rt.routes)]
 	for i := range deadRoutes {
-		deadRoutes[i] = ExtendedRoute{}
+		deadRoutes[i] = routetypes.ExtendedRoute{}
 	}
 
 	rt.dumpLocked()
 
 	for _, er := range routesDeleted {
 		rt.sender.queueChange(RoutingTableChange{
-			Change: RouteRemoved,
+			Change: routetypes.RouteRemoved,
 			Route:  er,
 		})
 	}
@@ -344,7 +239,7 @@ func (rt *RouteTable) delRouteLocked(route tcpip.Route, onlyDeleteIfDynamic bool
 }
 
 // DelRoute removes matching routes from the route table, returning them.
-func (rt *RouteTable) DelRoute(route tcpip.Route) []ExtendedRoute {
+func (rt *RouteTable) DelRoute(route tcpip.Route) []routetypes.ExtendedRoute {
 	rt.Lock()
 	defer rt.Unlock()
 
@@ -358,7 +253,7 @@ func (rt *RouteTable) GetExtendedRouteTable() ExtendedRouteTable {
 
 	rt.dumpLocked()
 
-	return append([]ExtendedRoute(nil), rt.routes...)
+	return append([]routetypes.ExtendedRoute(nil), rt.routes...)
 }
 
 // UpdateStack updates stack with the current route table.
@@ -386,37 +281,37 @@ func (rt *RouteTable) UpdateStack(stack *stack.Stack, onUpdateSucceeded func()) 
 	rt.UpdateStackLocked(stack, onUpdateSucceeded)
 }
 
-func (rt *RouteTable) UpdateRoutesByInterfaceLocked(nicid tcpip.NICID, action Action) {
+func (rt *RouteTable) UpdateRoutesByInterfaceLocked(nicid tcpip.NICID, action routetypes.Action) {
 	syslog.VLogTf(syslog.DebugVerbosity, tag, "RouteTable:Update route table for routes to nic-%d with action:%d", nicid, action)
 
 	oldTable := rt.routes
 	rt.routes = oldTable[:0]
 	if cap(oldTable) > 2*len(oldTable) {
 		// Remove excess route table capacity instead of reusing old capacity.
-		rt.routes = make([]ExtendedRoute, 0, len(oldTable))
+		rt.routes = make([]routetypes.ExtendedRoute, 0, len(oldTable))
 	}
 	for _, er := range oldTable {
 		if er.Route.NIC == nicid {
 			switch action {
-			case ActionDeleteAll:
+			case routetypes.ActionDeleteAll:
 				rt.sender.queueChange(RoutingTableChange{
-					Change: RouteRemoved,
+					Change: routetypes.RouteRemoved,
 					Route:  er,
 				})
 				continue // delete
-			case ActionDeleteDynamic:
+			case routetypes.ActionDeleteDynamic:
 				if er.Dynamic {
 					rt.sender.queueChange(RoutingTableChange{
-						Change: RouteRemoved,
+						Change: routetypes.RouteRemoved,
 						Route:  er,
 					})
 					continue // delete
 				}
-			case ActionDisableStatic:
+			case routetypes.ActionDisableStatic:
 				if !er.Dynamic {
 					er.Enabled = false
 				}
-			case ActionEnableStatic:
+			case routetypes.ActionEnableStatic:
 				if !er.Dynamic {
 					er.Enabled = true
 				}
@@ -429,7 +324,7 @@ func (rt *RouteTable) UpdateRoutesByInterfaceLocked(nicid tcpip.NICID, action Ac
 	// Zero out unused entries in the routes slice so that they can be garbage collected.
 	deadRoutes := rt.routes[len(rt.routes):cap(rt.routes)]
 	for i := range deadRoutes {
-		deadRoutes[i] = ExtendedRoute{}
+		deadRoutes[i] = routetypes.ExtendedRoute{}
 	}
 
 	rt.sortRouteTableLocked()
@@ -438,7 +333,7 @@ func (rt *RouteTable) UpdateRoutesByInterfaceLocked(nicid tcpip.NICID, action Ac
 }
 
 // UpdateRoutesByInterface applies an action to the routes pointing to an interface.
-func (rt *RouteTable) UpdateRoutesByInterface(nicid tcpip.NICID, action Action) {
+func (rt *RouteTable) UpdateRoutesByInterface(nicid tcpip.NICID, action routetypes.Action) {
 	rt.Lock()
 	defer rt.Unlock()
 
@@ -471,7 +366,7 @@ func (rt *RouteTable) sortRouteTableLocked() {
 
 // Less compares two routes and returns which one should appear earlier in the
 // route table.
-func Less(ei, ej *ExtendedRoute) bool {
+func Less(ei, ej *routetypes.ExtendedRoute) bool {
 	ri, rj := ei.Route, ej.Route
 	riDest, rjDest := ri.Destination.ID(), rj.Destination.ID()
 

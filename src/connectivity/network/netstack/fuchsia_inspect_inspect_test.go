@@ -19,7 +19,7 @@ import (
 
 	"go.fuchsia.dev/fuchsia/src/connectivity/network/netstack/dhcp"
 	"go.fuchsia.dev/fuchsia/src/connectivity/network/netstack/fidlconv"
-	"go.fuchsia.dev/fuchsia/src/connectivity/network/netstack/routes"
+	"go.fuchsia.dev/fuchsia/src/connectivity/network/netstack/routetypes"
 	"go.fuchsia.dev/fuchsia/src/connectivity/network/netstack/util"
 
 	inspect "fidl/fuchsia/inspect/deprecated"
@@ -976,7 +976,7 @@ func TestInspectGetMissingChild(t *testing.T) {
 
 func TestRoutingTableInspectImpl(t *testing.T) {
 	impl := routingTableInspectImpl{
-		value: []routes.ExtendedRoute{
+		value: []routetypes.ExtendedRoute{
 			{}, {},
 		},
 	}
@@ -1014,12 +1014,12 @@ func TestRoutingTableInspectImpl(t *testing.T) {
 func TestRouteInfoInspectImpl(t *testing.T) {
 	tests := []struct {
 		name       string
-		route      routes.ExtendedRoute
+		route      routetypes.ExtendedRoute
 		properties []inspect.Property
 	}{
 		{
 			name: "IPv4",
-			route: routes.ExtendedRoute{
+			route: routetypes.ExtendedRoute{
 				Route: tcpip.Route{
 					Destination: header.IPv4EmptySubnet,
 					Gateway:     util.Parse("1.2.3.4"),
@@ -1042,7 +1042,7 @@ func TestRouteInfoInspectImpl(t *testing.T) {
 		},
 		{
 			name: "IPv6",
-			route: routes.ExtendedRoute{
+			route: routetypes.ExtendedRoute{
 				Route: tcpip.Route{
 					Destination: header.IPv6EmptySubnet,
 					Gateway:     util.Parse("fe80::1"),

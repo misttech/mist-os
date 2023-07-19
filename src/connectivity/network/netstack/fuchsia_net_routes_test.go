@@ -13,6 +13,7 @@ import (
 	"testing"
 
 	"go.fuchsia.dev/fuchsia/src/connectivity/network/netstack/routes"
+	"go.fuchsia.dev/fuchsia/src/connectivity/network/netstack/routetypes"
 	"go.fuchsia.dev/fuchsia/src/connectivity/network/netstack/util"
 
 	fnetRoutes "fidl/fuchsia/net/routes"
@@ -21,7 +22,7 @@ import (
 )
 
 type watcherHolder struct {
-	version routes.IpProtoTag
+	version routetypes.IpProtoTag
 	v4      *fnetRoutes.WatcherV4WithCtxInterface
 	v6      *fnetRoutes.WatcherV6WithCtxInterface
 }
@@ -29,9 +30,9 @@ type watcherHolder struct {
 func (w watcherHolder) expectPeerClosed(ctx context.Context, t *testing.T) {
 	var err error
 	switch w.version {
-	case routes.IPv4:
+	case routetypes.IPv4:
 		_, err = w.v4.Watch(ctx)
-	case routes.IPv6:
+	case routetypes.IPv6:
 		_, err = w.v6.Watch(ctx)
 	default:
 		t.Fatalf("unsupported IP protocol version: %d", w.version)
@@ -139,7 +140,7 @@ func TestRoutesWatcherSlowClient(t *testing.T) {
 				options: fnetRoutes.WatcherOptionsV4{},
 			},
 			watcher: watcherHolder{
-				version: routes.IPv4,
+				version: routetypes.IPv4,
 				v4:      watcher_v4,
 			},
 		},
@@ -152,7 +153,7 @@ func TestRoutesWatcherSlowClient(t *testing.T) {
 				options: fnetRoutes.WatcherOptionsV6{},
 			},
 			watcher: watcherHolder{
-				version: routes.IPv6,
+				version: routetypes.IPv6,
 				v6:      watcher_v6,
 			},
 		},
@@ -182,7 +183,7 @@ func TestRoutesWatcherSlowClient(t *testing.T) {
 			if err != nil {
 				t.Fatalf("failed to create subnet: %s", err)
 			}
-			route := routes.ExtendedRoute{
+			route := routetypes.ExtendedRoute{
 				Route: tcpip.Route{
 					Destination: subnet,
 				},
@@ -192,9 +193,9 @@ func TestRoutesWatcherSlowClient(t *testing.T) {
 					Route: route,
 				}
 				if i%2 == 0 {
-					change.Change = routes.RouteAdded
+					change.Change = routetypes.RouteAdded
 				} else {
-					change.Change = routes.RouteRemoved
+					change.Change = routetypes.RouteRemoved
 				}
 				interruptChan <- &routingTableChange{change}
 			}

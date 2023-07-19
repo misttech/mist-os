@@ -18,7 +18,7 @@ import (
 	fnetRoutes "fidl/fuchsia/net/routes"
 	"fidl/fuchsia/net/stack"
 
-	"go.fuchsia.dev/fuchsia/src/connectivity/network/netstack/routes"
+	"go.fuchsia.dev/fuchsia/src/connectivity/network/netstack/routetypes"
 	"gvisor.dev/gvisor/pkg/tcpip"
 	"gvisor.dev/gvisor/pkg/tcpip/header"
 	"gvisor.dev/gvisor/pkg/tcpip/network/ipv4"
@@ -321,7 +321,7 @@ func ToAddressRemovalReason(reason tcpipstack.AddressRemovalReason) interfacesad
 
 // A union type, abstracting over `InstalledRouteV4` and `InstalledRouteV6`.
 type InstalledRoute struct {
-	Version routes.IpProtoTag
+	Version routetypes.IpProtoTag
 	V4      fnetRoutes.InstalledRouteV4
 	V6      fnetRoutes.InstalledRouteV6
 }
@@ -329,7 +329,7 @@ type InstalledRoute struct {
 // Converts the given `ExtendedRoute` into an `InstalledRoute`.
 // Panics if the given route is neither IPv4 nor IPv6, or if the route's
 // destination & gateway are different IP versions.
-func ToInstalledRoute(route routes.ExtendedRoute) InstalledRoute {
+func ToInstalledRoute(route routetypes.ExtendedRoute) InstalledRoute {
 	var specifiedMetric fnetRoutes.SpecifiedMetric
 	if route.MetricTracksInterface {
 		specifiedMetric.SetInheritedFromInterface(fnetRoutes.Empty{})
@@ -374,7 +374,7 @@ func ToInstalledRoute(route routes.ExtendedRoute) InstalledRoute {
 		installedRoute.SetRoute(innerRoute)
 		installedRoute.SetEffectiveProperties(effectiveProperties)
 		return InstalledRoute{
-			Version: routes.IPv4,
+			Version: routetypes.IPv4,
 			V4:      installedRoute,
 		}
 	case net.IpAddressIpv6:
@@ -406,7 +406,7 @@ func ToInstalledRoute(route routes.ExtendedRoute) InstalledRoute {
 		installedRoute.SetRoute(innerRoute)
 		installedRoute.SetEffectiveProperties(effectiveProperties)
 		return InstalledRoute{
-			Version: routes.IPv6,
+			Version: routetypes.IPv6,
 			V6:      installedRoute,
 		}
 	default:

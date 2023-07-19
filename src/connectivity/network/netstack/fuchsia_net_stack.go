@@ -15,6 +15,7 @@ import (
 
 	"go.fuchsia.dev/fuchsia/src/connectivity/network/netstack/fidlconv"
 	"go.fuchsia.dev/fuchsia/src/connectivity/network/netstack/routes"
+	"go.fuchsia.dev/fuchsia/src/connectivity/network/netstack/routetypes"
 
 	"fidl/fuchsia/net"
 	"fidl/fuchsia/net/interfaces/admin"
@@ -71,7 +72,7 @@ func (ns *Netstack) addForwardingEntry(entry stack.ForwardingEntry) stack.StackA
 	}
 
 	route := fidlconv.ForwardingEntryToTCPIPRoute(entry)
-	if err := ns.AddRoute(route, routes.Metric(entry.Metric), false /* not dynamic */); err != nil {
+	if err := ns.AddRoute(route, routetypes.Metric(entry.Metric), false /* not dynamic */); err != nil {
 		if errors.Is(err, routes.ErrNoSuchNIC) {
 			result.SetErr(stack.ErrorInvalidArgs)
 		} else {

@@ -29,6 +29,7 @@ import (
 	"go.fuchsia.dev/fuchsia/src/connectivity/network/netstack/dns"
 	"go.fuchsia.dev/fuchsia/src/connectivity/network/netstack/fidlconv"
 	"go.fuchsia.dev/fuchsia/src/connectivity/network/netstack/routes"
+	"go.fuchsia.dev/fuchsia/src/connectivity/network/netstack/routetypes"
 	"go.fuchsia.dev/fuchsia/src/connectivity/network/netstack/sync"
 	"go.fuchsia.dev/fuchsia/src/connectivity/network/netstack/util"
 	"go.fuchsia.dev/fuchsia/src/lib/component"
@@ -108,13 +109,13 @@ func TestDelRouteErrors(t *testing.T) {
 		t.Fatalf("AddRoute(%s, metricNotSet, false): %s", rt, err)
 	}
 	// Deleting a route we added should not result in an error.
-	want := routes.ExtendedRoute{
+	want := routetypes.ExtendedRoute{
 		Route:                 rt,
-		Prf:                   routes.MediumPreference,
+		Prf:                   routetypes.MediumPreference,
 		Metric:                defaultInterfaceMetric,
 		MetricTracksInterface: true,
 	}
-	if diff := cmp.Diff(ns.DelRoute(rt), []routes.ExtendedRoute{want}); diff != "" {
+	if diff := cmp.Diff(ns.DelRoute(rt), []routetypes.ExtendedRoute{want}); diff != "" {
 		t.Fatalf("DelRoute(%s): -got +want %s", rt, diff)
 	}
 	// Deleting a route we just deleted should result in no routes actually deleted.
@@ -1192,7 +1193,7 @@ func TestAddRouteParameterValidation(t *testing.T) {
 	tests := []struct {
 		name    string
 		route   tcpip.Route
-		metric  routes.Metric
+		metric  routetypes.Metric
 		dynamic bool
 		err     error
 	}{
@@ -1203,7 +1204,7 @@ func TestAddRouteParameterValidation(t *testing.T) {
 				Gateway:     testV4Address,
 				NIC:         0,
 			},
-			metric: routes.Metric(0),
+			metric: routetypes.Metric(0),
 			err:    routes.ErrNoSuchNIC,
 		},
 		{
@@ -1213,7 +1214,7 @@ func TestAddRouteParameterValidation(t *testing.T) {
 				Gateway:     testV6Address,
 				NIC:         0,
 			},
-			metric: routes.Metric(0),
+			metric: routetypes.Metric(0),
 			err:    routes.ErrNoSuchNIC,
 		},
 		{
@@ -1274,23 +1275,23 @@ func TestDHCPAcquired(t *testing.T) {
 	}
 
 	// The multicast subnet routes that are implicitly installed on all devices.
-	ipv4MulticastSubnetRoute := routes.ExtendedRoute{
+	ipv4MulticastSubnetRoute := routetypes.ExtendedRoute{
 		Route: tcpip.Route{
 			Destination: ipv4MulticastSubnet().Subnet(),
 			NIC:         ifState.nicid,
 		},
-		Prf:                   routes.MediumPreference,
+		Prf:                   routetypes.MediumPreference,
 		MetricTracksInterface: true,
 		Metric:                defaultInterfaceMetric,
 		Dynamic:               false,
 		Enabled:               true,
 	}
-	ipv6MulticastSubnetRoute := routes.ExtendedRoute{
+	ipv6MulticastSubnetRoute := routetypes.ExtendedRoute{
 		Route: tcpip.Route{
 			Destination: ipv6MulticastSubnet().Subnet(),
 			NIC:         ifState.nicid,
 		},
-		Prf:                   routes.MediumPreference,
+		Prf:                   routetypes.MediumPreference,
 		MetricTracksInterface: true,
 		Metric:                defaultInterfaceMetric,
 		Dynamic:               false,
@@ -1301,7 +1302,7 @@ func TestDHCPAcquired(t *testing.T) {
 		name               string
 		oldAddr, newAddr   tcpip.AddressWithPrefix
 		config             dhcp.Config
-		expectedRouteTable []routes.ExtendedRoute
+		expectedRouteTable []routetypes.ExtendedRoute
 	}{
 		{
 			name:    "subnet mask provided",
@@ -1326,13 +1327,13 @@ func TestDHCPAcquired(t *testing.T) {
 				},
 				LeaseLength: dhcp.Seconds(60),
 			},
-			expectedRouteTable: []routes.ExtendedRoute{
+			expectedRouteTable: []routetypes.ExtendedRoute{
 				{
 					Route: tcpip.Route{
 						Destination: destination1,
 						NIC:         ifState.nicid,
 					},
-					Prf:                   routes.MediumPreference,
+					Prf:                   routetypes.MediumPreference,
 					Metric:                defaultInterfaceMetric,
 					MetricTracksInterface: true,
 					Dynamic:               true,
@@ -1346,7 +1347,7 @@ func TestDHCPAcquired(t *testing.T) {
 						Gateway:     util.Parse("192.168.42.18"),
 						NIC:         ifState.nicid,
 					},
-					Prf:                   routes.MediumPreference,
+					Prf:                   routetypes.MediumPreference,
 					Metric:                defaultInterfaceMetric,
 					MetricTracksInterface: true,
 					Dynamic:               true,
@@ -1358,7 +1359,7 @@ func TestDHCPAcquired(t *testing.T) {
 						Gateway:     util.Parse("192.168.42.19"),
 						NIC:         ifState.nicid,
 					},
-					Prf:                   routes.MediumPreference,
+					Prf:                   routetypes.MediumPreference,
 					Metric:                defaultInterfaceMetric,
 					MetricTracksInterface: true,
 					Dynamic:               true,
@@ -1374,13 +1375,13 @@ func TestDHCPAcquired(t *testing.T) {
 				PrefixLen: prefixLen,
 			},
 			config: dhcp.Config{},
-			expectedRouteTable: []routes.ExtendedRoute{
+			expectedRouteTable: []routetypes.ExtendedRoute{
 				{
 					Route: tcpip.Route{
 						Destination: destination1,
 						NIC:         ifState.nicid,
 					},
-					Prf:                   routes.MediumPreference,
+					Prf:                   routetypes.MediumPreference,
 					Metric:                defaultInterfaceMetric,
 					MetricTracksInterface: true,
 					Dynamic:               true,

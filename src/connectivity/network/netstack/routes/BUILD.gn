@@ -8,6 +8,7 @@ import("//build/go/go_test.gni")
 
 go_library("routes") {
   deps = [
+    "//src/connectivity/network/netstack/routetypes",
     "//src/connectivity/network/netstack/sync",
     "//src/connectivity/network/netstack/util",
     "//src/lib/syslog/go",
