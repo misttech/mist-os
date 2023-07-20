@@ -6,6 +6,15 @@ import("//build/checkout.gni")
 import("//build/config/zircon/levels.gni")
 import("../libc.gni")
 
+group("scudo") {
+  if (!variant_replaces_allocator) {
+    # If we are using a sanitizer that replaces the allocator, do not include
+    # scudo in libc so we can use the sanitizer allocator. Stubs are provided
+    # that replace scudo's definitions.
+    deps = [ ":scudo-allocator" ]
+  }
+}
+
 scudo_common_vars = {
   dir = "//third_party/scudo/src"
   include_dirs = [
@@ -25,7 +34,7 @@ scudo_common_vars = {
   ]
 }
 
-libc_source_set("scudo") {
+libc_source_set("scudo-allocator") {
   forward_variables_from(scudo_common_vars, "*")
 
   sources = [
@@ -254,7 +263,7 @@ libc_test("unittests") {
 
   deps += [
     ":gwp_asan-unittests",
-    ":scudo.testonly",
+    ":scudo-allocator.testonly",
   ]
 
   # The public API tests both assume Scudo's behavior rather than purely kosher
