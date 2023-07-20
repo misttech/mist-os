@@ -7,6 +7,7 @@ import("//build/host.gni")
 import("//build/test.gni")
 import("//build/testing/environments.gni")
 import("//build/testing/host_test_data.gni")
+import("//build/toolchain/rbe.gni")
 import("//build/zircon/c_utils.gni")
 import("//src/developer/ffx/config.gni")
 import("//zircon/system/ulib/c/libc_toolchain.gni")
@@ -125,6 +126,23 @@ if (is_host) {
     # As a workaround, we can tell the copy_unstripped_binaries.py script where the unstripped libc
     # is and the script could create the dependency in its depfile.
     args += [ rebase_path(sysroot_libc_unstripped, root_build_dir) ]
+
+    # When fetching of unstripped binaries is delayed,
+    # use dlwrap to explicitly fetch them just-in-time.
+    if (!rust_rbe_download_unstripped_binaries) {
+      _args = [
+                "--download_list",
+                rebase_path(unstripped_binaries_list_file, root_build_dir),
+                "--",
+                rebase_path(python_exe_src, root_build_dir),
+                "-S",
+                rebase_path(script, root_build_dir),
+              ] + args
+      deps += [ "//build/rbe:dlwrap" ]
+      script = rbe_dlwrap
+      args = []
+      args = _args
+    }
   }
 
   # This action generates a file that contains a list of all unstripped binaries (symbol files)
