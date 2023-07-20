@@ -78,7 +78,6 @@ impl RootDir for BlobDirectory {
         self as Arc<dyn FxNode>
     }
 
-    /// TODO(fxbug.dev/127530): Support delivery blobs ([`FxDeliveryBlob`]) using this protocol.
     async fn handle_blob_requests(self: Arc<Self>, mut requests: BlobCreatorRequestStream) {
         while let Ok(Some(request)) = requests.try_next().await {
             match request {
