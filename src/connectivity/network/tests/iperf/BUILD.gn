@@ -47,14 +47,23 @@ fuchsia_test_component_with_expectations("iperf-test-component") {
   deps = [ ":test" ]
 }
 
+# RISC-V on Fuchsia does not support Golang.
+if (target_cpu != "riscv64") {
+  ns2_package_deps = [ "//src/connectivity/network/netstack:component-debug" ]
+} else {
+  ns2_package_deps = []
+}
+
+package_deps =
+    [
+      ":iperf-component",
+      "//src/bringup/bin/device-name-provider:component",
+      "//src/connectivity/network/netstack3:component-debug",
+      "//src/connectivity/network/testing/netemul/service:netemul-sandbox",
+      "//src/lib/testing/expectation:expectation_comparer",
+    ] + ns2_package_deps
+
 fuchsia_test_package("iperf-test") {
   test_components = [ ":iperf-test-component" ]
-  deps = [
-    ":iperf-component",
-    "//src/bringup/bin/device-name-provider:component",
-    "//src/connectivity/network/netstack:component-debug",
-    "//src/connectivity/network/netstack3:component-debug",
-    "//src/connectivity/network/testing/netemul/service:netemul-sandbox",
-    "//src/lib/testing/expectation:expectation_comparer",
-  ]
+  deps = package_deps
 }
