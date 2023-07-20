@@ -14,7 +14,7 @@ import os
 import cl_utils
 
 from pathlib import Path
-from typing import Dict, Iterable, Optional, Sequence, Tuple
+from typing import AbstractSet, Dict, Iterable, Optional, Sequence, Tuple
 
 _RUSTC_FUSED_FLAGS = {'-C', '-L', '-Z'}
 
@@ -158,12 +158,20 @@ class RustAction(object):
 
     def __init__(self, command: Sequence[str], working_dir: Path = None):
         # keep a copy of the original command
-        self._command = command
+        self._original_command = command
         self._working_dir = (working_dir or Path(os.curdir)).absolute()
-        # analyze command using canonical expanded form
+
+        # expand response files
+        rsp_files = []
+        self._rsp_expanded_command = list(
+            cl_utils.expand_response_files(self.original_command, rsp_files))
+        self._response_files = set(rsp_files)
+
+        # analyze response-file-expanded command using canonical expanded-flag form
         self._attributes, remaining_args = _RUSTC_COMMAND_SCANNER.parse_known_args(
             list(
-                cl_utils.expand_fused_flags(self._command, _RUSTC_FUSED_FLAGS)))
+                cl_utils.expand_fused_flags(
+                    self.rsp_expanded_command, _RUSTC_FUSED_FLAGS)))
         self._compiler = find_compiler_from_command(remaining_args)
         self._env = [
             tok for tok in
@@ -213,9 +221,12 @@ class RustAction(object):
         return self._env
 
     @property
-    def command(self) -> Sequence[str]:
-        """The original command."""
-        return self._command
+    def original_command(self) -> Sequence[str]:
+        return self._original_command
+
+    @property
+    def rsp_expanded_command(self) -> Sequence[str]:
+        return self._rsp_expanded_command
 
     @property
     def working_dir(self) -> Path:
@@ -259,6 +270,10 @@ class RustAction(object):
         return [
             s.file for s in self._direct_inputs if s.type == InputType.SOURCE
         ]
+
+    @property
+    def response_files(self) -> AbstractSet[Path]:
+        return self._response_files
 
     @property
     def emit(self) -> Dict[str, str]:
@@ -404,7 +419,9 @@ class RustAction(object):
             f'--emit=dep-info={depfile_name}', '-Z', 'binary-dep-depinfo'
         ]
         replaced_emit = False
-        for tok in self.command:
+        # Use the response-file-expanded form, in case --emit is inside
+        # a response file.
+        for tok in self.rsp_expanded_command:
             if tok.startswith('--emit'):  # replace the original emit
                 if replaced_emit:
                     pass

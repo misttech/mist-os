@@ -180,6 +180,36 @@ def flatten_comma_list(items: Iterable[str]) -> Iterable[str]:
         yield from item.split(',')
 
 
+def remove_hash_comments(lines: Iterable[str]) -> Iterable[str]:
+    for line in lines:
+        if not line.startswith('#'):
+            yield line
+
+
+def expand_response_files(command: Iterable[str],
+                          rspfiles: Sequence[Path]) -> Iterable[str]:
+    """Expand response files in a command into tokens contained therein.
+
+    Args:
+      command: sequence of command-line tokens, may contain @response_files.
+      rspfiles: (modify-by-reference) list of response files encountered during expansion.
+
+    Yields:
+      tokens, possibly expanded from response files.
+    """
+    for tok in command:
+        if tok.startswith('@'):
+            # remove blanks and comments
+            rspfile = Path(tok[1:])
+            rspfiles.append(rspfile)
+            rsp_lines = rspfile.read_text().splitlines()
+            filtered_lines = remove_hash_comments(
+                line for line in rsp_lines if line)
+            yield from expand_response_files(filtered_lines, rspfiles)
+        else:
+            yield tok
+
+
 def expand_fused_flags(command: Iterable[str],
                        flags: Sequence[str]) -> Iterable[str]:
     """Expand "fused" flags like '-I/foo/bar' into ('-I', '/foo/bar').

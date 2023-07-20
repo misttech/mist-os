@@ -169,6 +169,50 @@ class RustRemoteActionPrepareTests(unittest.TestCase):
             remote_inputs, set([compiler, shlib_rel, source] + deps))
         self.assertEqual(remote_output_files, {rlib})
 
+    def test_prepare_with_response_file(self):
+        exec_root = Path('/home/project')
+        working_dir = exec_root / 'build-here'
+        compiler = Path('../tools/bin/rustc')
+        shlib = Path('tools/lib/librusteze.so')
+        shlib_abs = exec_root / shlib
+        shlib_rel = cl_utils.relpath(shlib_abs, start=working_dir)
+        source = Path('../foo/src/lib.rs')
+        rlib = Path('obj/foo.rlib')
+        deps = [Path('../foo/src/other.rs')]
+        depfile_contents = [str(d) + ':' for d in deps]
+
+        with tempfile.TemporaryDirectory() as td:
+            tdp = Path(td)
+            rsp = tdp / 'foo.rsp'
+            rsp.write_text(
+                '\n'.join(_strs(['# expand these args', source, '-o', rlib])) +
+                '\n')
+            command = _strs(
+                [compiler, f'@{rsp}'])  # pass args through response file
+            r = rustc_remote_wrapper.RustRemoteAction(
+                ['--'] + command,
+                exec_root=exec_root,
+                working_dir=working_dir,
+                auto_reproxy=False,
+            )
+
+        mocks = self.generate_prepare_mocks(
+            depfile_contents=depfile_contents,
+            compiler_shlibs=[shlib_rel],
+        )
+        with contextlib.ExitStack() as stack:
+            for m in mocks:
+                stack.enter_context(m)
+            prepare_status = r.prepare()
+
+        self.assertEqual(prepare_status, 0)  # success
+        a = r.remote_action
+        remote_inputs = set(a.inputs_relative_to_working_dir)
+        remote_output_files = set(a.output_files_relative_to_working_dir)
+        self.assertEqual(
+            remote_inputs, set([compiler, shlib_rel, source, rsp] + deps))
+        self.assertEqual(remote_output_files, {rlib})
+
     def test_prepare_depfile(self):
         exec_root = Path('/home/project')
         working_dir = exec_root / 'build-here'

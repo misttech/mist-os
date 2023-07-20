@@ -356,7 +356,7 @@ class RustRemoteAction(object):
 
     @property
     def original_command(self) -> Sequence[str]:
-        return self._rust_action.command
+        return self._rust_action.original_command
 
     def _replace_with_remote_compiler(self, tok) -> Optional[str]:
         if tok == str(self.host_compiler):
@@ -383,7 +383,11 @@ class RustRemoteAction(object):
             return prefix + normpath
 
     def remote_compile_command(self) -> Iterable[str]:
-        """Transforms a local command into the remotely executed command."""
+        """Transforms a local command into the remotely executed command.
+
+        Note: that response files are preserved, so tokens inside response files
+        cannot be modified.
+        """
         for tok in self.original_command:
             # Apply the first matching transform on each token.
             replacement = self._replace_with_remote_compiler(tok)
@@ -532,6 +536,10 @@ class RustRemoteAction(object):
         """Remote inputs are relative to current working dir."""
         yield self.value_verbose(
             'top source', self._rust_action.direct_sources[0])
+
+        # Pass along response files without altering the original command.
+        yield from self._rust_action.response_files
+
         yield from self._local_depfile_inputs()
 
         yield from self._remote_compiler_inputs()

@@ -241,6 +241,63 @@ class FlattenCommaListTests(unittest.TestCase):
         )
 
 
+class RemoveHashCommentsTests(unittest.TestCase):
+
+    def test_empty_line(self):
+        self.assertEqual(list(cl_utils.remove_hash_comments([''])), [''])
+
+    def test_newline(self):
+        self.assertEqual(list(cl_utils.remove_hash_comments(['\n'])), ['\n'])
+
+    def test_comments(self):
+        self.assertEqual(list(cl_utils.remove_hash_comments(['#'])), [])
+        self.assertEqual(list(cl_utils.remove_hash_comments(['##'])), [])
+        self.assertEqual(list(cl_utils.remove_hash_comments(['# comment'])), [])
+
+    def test_mixed(self):
+        self.assertEqual(
+            list(
+                cl_utils.remove_hash_comments(
+                    ['#!/she/bang', '--foo', '', '# BAR section',
+                     '--bar=baz'])), ['--foo', '', '--bar=baz'])
+
+
+class ExpandResponseFilesTests(unittest.TestCase):
+
+    def test_no_rspfiles(self):
+        command = ['sed', '-e', 's|foo|bar|']
+        rspfiles = []
+        self.assertEqual(
+            list(cl_utils.expand_response_files(command, rspfiles)), command)
+        self.assertEqual(rspfiles, [])
+
+    def test_one_rspfile(self):
+        with tempfile.TemporaryDirectory() as td:
+            tdp = Path(td)
+            rsp = tdp / 'args.rsp'
+            rsp.write_text('12\n\n34\n56\n')
+            command = ['tool.sh', f'@{rsp}', '-o', 'cmd.out']
+            rspfiles = []
+            self.assertEqual(
+                list(cl_utils.expand_response_files(command, rspfiles)),
+                ['tool.sh', '12', '34', '56', '-o', 'cmd.out'])
+            self.assertEqual(rspfiles, [rsp])
+
+    def test_nested_repeated_rspfiles(self):
+        with tempfile.TemporaryDirectory() as td:
+            tdp = Path(td)
+            rsp1 = tdp / 'args1.rsp'
+            rsp2 = tdp / 'args2.rsp'
+            rsp1.write_text(f'@{rsp2}\nand\n@{rsp2}')
+            rsp2.write_text('fee\n#comment\nfigh\n')
+            command = ['tool.sh', f'@{rsp1}']
+            rspfiles = []
+            self.assertEqual(
+                list(cl_utils.expand_response_files(command, rspfiles)),
+                ['tool.sh', 'fee', 'figh', 'and', 'fee', 'figh'])
+            self.assertEqual(set(rspfiles), {rsp1, rsp2})
+
+
 class ExpandFusedFlagsTests(unittest.TestCase):
 
     def test_empty(self):
