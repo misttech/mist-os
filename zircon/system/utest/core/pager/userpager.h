@@ -26,18 +26,27 @@ namespace pager_tests {
 
 class UserPager;
 
-// This class is not entirely thread-safe, however, some operations may be called concurrently.  In
-// particular, calling `CheckVmar` concurrently with `Replace` is safe.
+// This class is thread-safe and operations may be called concurrently, from the main test thread
+// and from additional instances of TestThread that the main thread spawns.
+// Some member functions will serialize behind a mutex, so callers should take care that this is
+// expected behavior. At the time of writing this comment, this was the case.
+//  - Some tests call these functions only from the main test thread, in which case the lock is
+//  essentially a no-op.
+//  - Some tests that spawn TestThread instances are already serialized due to tight
+//  synchronization between blocking on page requests and resolving them.
+//  - Other tests that expect concurrent execution do not care about a particular order in
+//  which threads run, so it does not matter whether they were serialized behind a userspace lock
+//  (this mutex) or a lock in the kernel.
 class Vmo : public fbl::DoublyLinkedListable<std::unique_ptr<Vmo>> {
  public:
   ~Vmo() = default;
 
   static std::unique_ptr<Vmo> Create(zx::vmo vmo, uint64_t size, uint64_t base_addr, uint64_t key) {
+    ZX_ASSERT(size % zx_system_get_page_size() == 0);
     return std::unique_ptr<Vmo>(new Vmo(std::move(vmo), size, base_addr, key));
   }
 
-  // Resizes the vmo. This changes the |Vmo| internal state, so another thread should not be trying
-  // to access it or perform operations on it concurrently.
+  // Resizes the vmo.
   bool Resize(uint64_t new_page_count);
 
   // Generates this vmo contents at the specified offset.
@@ -58,15 +67,11 @@ class Vmo : public fbl::DoublyLinkedListable<std::unique_ptr<Vmo>> {
     // Hold the lock to read the size_ *and* use it for cloning to prevent a Resize from sneaking
     // in mid-operation.
     std::lock_guard guard(mutex_);
-    return CloneLocked(0, size_);
+    return Clone(0, size_);
   }
 
-  std::unique_ptr<Vmo> Clone(uint64_t offset, uint64_t size) const {
-    std::lock_guard guard(mutex_);
-    return CloneLocked(offset, size);
-  }
+  std::unique_ptr<Vmo> Clone(uint64_t offset, uint64_t size) const;
 
-  const zx::vmo& vmo() const { return vmo_; }
   uint64_t size() const {
     std::lock_guard guard(mutex_);
     return size_;
@@ -75,10 +80,8 @@ class Vmo : public fbl::DoublyLinkedListable<std::unique_ptr<Vmo>> {
     std::lock_guard guard(mutex_);
     return base_addr_;
   }
-  uint64_t key() const {
-    std::lock_guard guard(mutex_);
-    return key_;
-  }
+  const zx::vmo& vmo() const { return vmo_; }
+  uint64_t key() const { return key_; }
 
  private:
   Vmo(zx::vmo vmo, uint64_t size, uint64_t base_addr, uint64_t key)
@@ -86,20 +89,25 @@ class Vmo : public fbl::DoublyLinkedListable<std::unique_ptr<Vmo>> {
 
   bool OpRange(uint32_t op, uint64_t page_offset, uint64_t page_count) const;
 
-  std::unique_ptr<Vmo> CloneLocked(uint64_t offset, uint64_t size) const __TA_REQUIRES(&mutex_);
-
+  // Use this mutex to protect state as sparingly as possible; the primary objective of this lock is
+  // to prevent data races.
+  //  - Do not hold it on paths that might block on page requests, because the UserPager might need
+  //  the lock to resolve the page requests too, and we will deadlock.
+  //  - Do not hold it over long critical sections as it might defeat the intended concurrency of
+  //  test threads by serializing on this mutex instead.
   mutable std::mutex mutex_;
 
   // These are set in the ctor, but can be changed by Vmo::Resize.
   uint64_t size_ __TA_GUARDED(&mutex_);
   uintptr_t base_addr_ __TA_GUARDED(&mutex_);
 
-  // vmo_ and key_ are set in the ctor, but can be changed by UserPager::ReplaceVmo.
-  zx::vmo vmo_;
+  // vmo_ and key_ are set in the ctor.
+  const zx::vmo vmo_;
   // This value is used for both the port packet key and to populate the contents of supplied pages.
-  uint64_t key_ __TA_GUARDED(&mutex_);
+  const uint64_t key_;
 };
 
+// This class is not thread-safe and is only expected to be accessed from the main test thread.
 class UserPager {
  public:
   UserPager();

@@ -34,23 +34,10 @@ bool Vmo::CheckVmar(uint64_t offset, uint64_t len, const void* expected) const {
   offset *= zx_system_get_page_size();
 
   for (uint64_t i = offset / sizeof(uint64_t); i < (offset + len) / sizeof(uint64_t); i++) {
-    // The following dereference may block on a pager request.  We've marked this pointer as
-    // volatile to ensure the load is not reordered relative to other "visible side-effects" and to
-    // make sure the compiler knows the value could spontaneously change (e.g. concurrent execution
-    // with `UserPager::ReplaceVmo` which remaps the memory).
-    //
-    // In particular, it's critical that this load occurs before the load of key_ below.  key_ is
-    // loaded after locking the mutex (see `key()`).  In C++ terms, both the volatile load and
-    // `mutex::lock()` are side effects so they may not be reordered relative to one another.  See
-    // also fxbug.dev/129315.
-    //
-    // Note that even though both `key()` and `base_addr()` qualify as visible side effects since
-    // they acquire the lock, we still need the volatile to make sure the dereference of `base` is
-    // not reordered w.r.t. `key()`.
-    const volatile auto* base = reinterpret_cast<const volatile uint64_t*>(base_addr());
+    const auto* base = reinterpret_cast<const uint64_t*>(base_addr());
     uint64_t actual_val = base[i];
 
-    uint64_t expected_val = expected ? static_cast<const uint64_t*>(expected)[i] : key() + i;
+    uint64_t expected_val = expected ? static_cast<const uint64_t*>(expected)[i] : key_ + i;
     if (actual_val != expected_val) {
       printf("mismatch at byte %zu: expected %zx, actual %zx\n", i * sizeof(actual_val),
              expected_val, actual_val);
@@ -88,7 +75,7 @@ bool Vmo::CheckVmo(uint64_t offset, uint64_t len, const void* expected) const {
   for (uint64_t i = 0; i < len / sizeof(uint64_t); i++) {
     auto data_buf = reinterpret_cast<uint64_t*>(buf);
     auto expected_buf = static_cast<const uint64_t*>(expected);
-    if (data_buf[i] != (expected ? expected_buf[i] : key() + (offset / sizeof(uint64_t)) + i)) {
+    if (data_buf[i] != (expected ? expected_buf[i] : key_ + (offset / sizeof(uint64_t)) + i)) {
       return false;
     }
   }
@@ -97,8 +84,12 @@ bool Vmo::CheckVmo(uint64_t offset, uint64_t len, const void* expected) const {
 }
 
 bool Vmo::Resize(uint64_t new_page_count) {
+  // Acquire the lock so that another racing resize does not interfere with our VMO resize and
+  // mapping creation.
   std::lock_guard guard(mutex_);
   const uint64_t new_size = new_page_count * zx_system_get_page_size();
+  // The old and new sizes are both page-aligned, so setting the size cannot block. We won't need to
+  // request a page from the UserPager to zero it partially.
   zx_status_t status = vmo_.set_size(new_size);
   if (status != ZX_OK) {
     fprintf(stderr, "vmo resize failed with %s\n", zx_status_get_string(status));
@@ -141,13 +132,12 @@ void Vmo::GenerateBufferContents(void* dest_buffer, uint64_t page_count,
   const uint64_t len = page_count * zx_system_get_page_size();
   const uint64_t paged_vmo_offset = paged_vmo_page_offset * zx_system_get_page_size();
   auto buf = static_cast<uint64_t*>(dest_buffer);
-  const uint64_t val = key();
   for (uint64_t idx = 0; idx < len / sizeof(uint64_t); idx++) {
-    buf[idx] = val + (paged_vmo_offset / sizeof(uint64_t)) + idx;
+    buf[idx] = key_ + (paged_vmo_offset / sizeof(uint64_t)) + idx;
   }
 }
 
-std::unique_ptr<Vmo> Vmo::CloneLocked(uint64_t offset, uint64_t size) const {
+std::unique_ptr<Vmo> Vmo::Clone(uint64_t offset, uint64_t size) const {
   zx::vmo clone;
   zx_status_t status = vmo_.create_child(
       ZX_VMO_CHILD_SNAPSHOT_AT_LEAST_ON_WRITE | ZX_VMO_CHILD_RESIZABLE, offset, size, &clone);

@@ -471,10 +471,10 @@ TEST(PagerWriteback, NoDirtyRequestsForClones) {
   ASSERT_NOT_NULL(clone);
 
   // Write to the clone.
-  TestThread t1([&vmo = clone->vmo()]() -> bool {
+  TestThread t1([vmo_clone = clone.get()]() -> bool {
     uint8_t data[kNumPages * zx_system_get_page_size()];
     memset(data, 0xc, kNumPages * zx_system_get_page_size());
-    return vmo.write(data, 0, kNumPages * zx_system_get_page_size()) == ZX_OK;
+    return vmo_clone->vmo().write(data, 0, kNumPages * zx_system_get_page_size()) == ZX_OK;
   });
   ASSERT_TRUE(t1.Start());
 
@@ -503,10 +503,10 @@ TEST(PagerWriteback, NoDirtyRequestsForClones) {
   ASSERT_TRUE(check_buffer_data(vmo, 0, kNumPages, expected.data(), true));
 
   // Write to the parent now. This should trigger dirty requests.
-  TestThread t2([&vmo = vmo->vmo()]() -> bool {
+  TestThread t2([vmo]() -> bool {
     uint8_t data[kNumPages * zx_system_get_page_size()];
     memset(data, 0xd, kNumPages * zx_system_get_page_size());
-    return vmo.write(data, 0, kNumPages * zx_system_get_page_size()) == ZX_OK;
+    return vmo->vmo().write(data, 0, kNumPages * zx_system_get_page_size()) == ZX_OK;
   });
   ASSERT_TRUE(t2.Start());
 
@@ -684,9 +684,9 @@ TEST(PagerWriteback, DirtyRequestsRandomOffsets) {
   }
 
   // Now write to the entire range. We should see a combination of read and dirty requests.
-  TestThread t([&vmo = vmo->vmo()]() -> bool {
+  TestThread t([vmo]() -> bool {
     uint8_t data[kNumPages * zx_system_get_page_size()];
-    return vmo.write(data, 0, kNumPages * zx_system_get_page_size()) == ZX_OK;
+    return vmo->vmo().write(data, 0, kNumPages * zx_system_get_page_size()) == ZX_OK;
   });
   ASSERT_TRUE(t.Start());
 
