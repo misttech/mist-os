@@ -417,35 +417,59 @@ TEST(Pager, VmarRemapTest) {
 
   ASSERT_TRUE(pager.Init());
 
-  Vmo* vmo;
+  // Create two pager VMOs. We will switch the VM mapping from one VMO to the other mid-access.
+  Vmo *vmo1, *vmo2;
   constexpr uint32_t kNumPages = 8;
-  ASSERT_TRUE(pager.CreateVmo(kNumPages, &vmo));
+  ASSERT_TRUE(pager.CreateVmo(kNumPages, &vmo1));
+  ASSERT_TRUE(pager.CreateVmo(kNumPages, &vmo2));
+
+  // Create a mapping for vmo1.
+  zx_vaddr_t addr;
+  ASSERT_OK(zx::vmar::root_self()->map(ZX_VM_PERM_READ, 0, vmo1->vmo(), 0,
+                                       kNumPages * zx_system_get_page_size(), &addr));
+  auto unmap = fit::defer(
+      [&]() { zx::vmar::root_self()->unmap(addr, kNumPages * zx_system_get_page_size()); });
 
   std::unique_ptr<TestThread> ts[kNumPages];
-  for (unsigned i = 0; i < kNumPages; i++) {
-    ts[i] =
-        std::make_unique<TestThread>([vmo, i]() -> bool { return check_buffer(vmo, i, 1, true); });
-    ASSERT_TRUE(ts[i]->Start());
+  for (unsigned t = 0; t < kNumPages; t++) {
+    ts[t] = std::make_unique<TestThread>([addr, t, vmo2]() -> bool {
+      uint8_t data[zx_system_get_page_size()];
+      vmo2->GenerateBufferContents(data, 1, t);
+      // Thread |t| accesses page |t|. Each thread will block here and generate a page request. We
+      // will resolve the page request after switching out the mapping to vmo2, so the contents will
+      // match vmo2, not vmo1.
+      return memcmp(data, reinterpret_cast<uint8_t*>(addr + t * zx_system_get_page_size()),
+                    zx_system_get_page_size()) == 0;
+    });
+    ASSERT_TRUE(ts[t]->Start());
   }
-  for (unsigned i = 0; i < kNumPages; i++) {
-    ASSERT_TRUE(ts[i]->WaitForBlocked());
+
+  for (unsigned t = 0; t < kNumPages; t++) {
+    ASSERT_TRUE(ts[t]->WaitForBlocked());
   }
 
-  zx::vmo old_vmo;
-  ASSERT_TRUE(pager.ReplaceVmo(vmo, &old_vmo));
+  // Now that all the threads are blocked, swap out the mapping to point to vmo2.
+  zx_info_vmar_t info;
+  uint64_t a1, a2;
+  ASSERT_OK(zx::vmar::root_self()->get_info(ZX_INFO_VMAR, &info, sizeof(info), &a1, &a2));
+  zx_vaddr_t new_addr;
+  ASSERT_OK(zx::vmar::root_self()->map(ZX_VM_PERM_READ | ZX_VM_SPECIFIC_OVERWRITE, addr - info.base,
+                                       vmo2->vmo(), 0, kNumPages * zx_system_get_page_size(),
+                                       &new_addr));
+  ASSERT_EQ(addr, new_addr);
 
-  zx::vmo tmp;
-  ASSERT_EQ(zx::vmo::create(kNumPages * zx_system_get_page_size(), 0, &tmp), ZX_OK);
-  ASSERT_EQ(tmp.op_range(ZX_VMO_OP_COMMIT, 0, kNumPages * zx_system_get_page_size(), nullptr, 0),
-            ZX_OK);
-  ASSERT_EQ(pager.pager().supply_pages(old_vmo, 0, kNumPages * zx_system_get_page_size(), tmp, 0),
-            ZX_OK);
+  // Supply pages in vmo1. The threads will still remain blocked.
+  ASSERT_TRUE(pager.SupplyPages(vmo1, 0, kNumPages));
+  for (unsigned t = 0; t < kNumPages; t++) {
+    ASSERT_TRUE(ts[t]->WaitForBlocked());
+  }
 
+  // We should see page requests for vmo2.
   for (unsigned i = 0; i < kNumPages; i++) {
     uint64_t offset, length;
-    ASSERT_TRUE(pager.GetPageReadRequest(vmo, ZX_TIME_INFINITE, &offset, &length));
+    ASSERT_TRUE(pager.GetPageReadRequest(vmo2, ZX_TIME_INFINITE, &offset, &length));
     ASSERT_EQ(length, 1);
-    ASSERT_TRUE(pager.SupplyPages(vmo, offset, 1));
+    ASSERT_TRUE(pager.SupplyPages(vmo2, offset, 1));
     ASSERT_TRUE(ts[offset]->Wait());
   }
 }

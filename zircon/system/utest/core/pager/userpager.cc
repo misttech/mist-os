@@ -243,42 +243,6 @@ bool UserPager::UnmapVmo(Vmo* vmo) {
   return true;
 }
 
-bool UserPager::ReplaceVmo(Vmo* vmo, zx::vmo* old_vmo) {
-  if (shutdown_event_) {
-    fprintf(stderr, "creating vmo after starting pager thread\n");
-    return false;
-  }
-
-  zx::vmo new_vmo;
-  zx_status_t status = pager_.create_vmo(0, port_, next_key_, vmo->size(), &new_vmo);
-  if (status != ZX_OK) {
-    fprintf(stderr, "pager create_vmo failed with %s\n", zx_status_get_string(status));
-    return false;
-  }
-
-  zx_info_vmar_t info;
-  uint64_t a1, a2;
-  status = zx::vmar::root_self()->get_info(ZX_INFO_VMAR, &info, sizeof(info), &a1, &a2);
-  if (status != ZX_OK) {
-    fprintf(stderr, "vmar get_info failed with %s\n", zx_status_get_string(status));
-    return false;
-  }
-
-  zx_vaddr_t addr;
-  status = zx::vmar::root_self()->map(ZX_VM_PERM_READ | ZX_VM_PERM_WRITE | ZX_VM_SPECIFIC_OVERWRITE,
-                                      vmo->base_addr() - info.base, new_vmo, 0, vmo->size(), &addr);
-  if (status != ZX_OK) {
-    fprintf(stderr, "vmar map failed with %s\n", zx_status_get_string(status));
-    return false;
-  }
-
-  *old_vmo = vmo->Replace(std::move(new_vmo), next_key_);
-
-  next_key_ += (vmo->size() / sizeof(uint64_t));
-
-  return true;
-}
-
 bool UserPager::DetachVmo(Vmo* vmo) {
   zx_status_t status = pager_.detach_vmo(vmo->vmo());
   if (status != ZX_OK) {
