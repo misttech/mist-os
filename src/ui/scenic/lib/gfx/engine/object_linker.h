@@ -9,6 +9,7 @@
 #include <lib/fit/function.h>
 #include <lib/zx/handle.h>
 #include <lib/zx/object_traits.h>
+#include <zircon/status.h>
 #include <zircon/types.h>
 
 #include <cstdint>
@@ -75,12 +76,34 @@ class ObjectLinkerBase {
 
   // Information for one end of a Link registered with the linker.
   struct Endpoint {
-    zx_koid_t peer_endpoint_id = ZX_KOID_INVALID;
-    Link* link = nullptr;
-    zx::handle token;                                // The token may be released by the link owner.
-    std::unique_ptr<async::Wait> peer_death_waiter;  // Only non-null if the link is unresolved.
+    Endpoint(zx_koid_t peer_endpoint_id, zx::handle token,
+             std::unique_ptr<async::Wait> peer_death_waiter)
+        : peer_endpoint_id(peer_endpoint_id),
+          link(nullptr),
+          token(std::move(token)),
+          peer_death_waiter(std::move(peer_death_waiter)) {}
+
+    Endpoint(Endpoint&&) = default;
+
+    ~Endpoint() {
+      if (!peer_death_waiter) {
+        return;
+      }
+
+      // Cancel the |peer_death_waiter| explicitly, rather than implicitly in the
+      // |async::Wait| dtor, to enable logging of failures.
+      zx_status_t res = peer_death_waiter->Cancel();
+      if (res != ZX_OK) {
+        FX_LOGS(INFO) << "Failed to cancel |peer_death_waiter_|: " << zx_status_get_string(res);
+      }
+    }
 
     bool IsUnresolved() const { return peer_death_waiter != nullptr; }
+
+    zx_koid_t peer_endpoint_id;
+    Link* link;
+    zx::handle token;                                // The token may be released by the link owner.
+    std::unique_ptr<async::Wait> peer_death_waiter;  // Only non-null if the link is unresolved.
   };
 
   ObjectLinkerBase() : weak_ptr_factory_(this) {}
@@ -129,8 +152,8 @@ class ObjectLinkerBase {
   // that are referenced under these data structures. i.e. one thread may run AttemptLinking()
   // while the other invalidates the Link endpoint, which would cause unexpected behavior and
   // dropped link_resolved callback. Therefore, each ObjectLinker method accessing these data
-  // structures and each Link method modifying internals should hold ScopedAccess to make sure calls
-  // are seralized.
+  // structures and each Link method modifying internals should hold ScopedAccess to make sure
+  // calls are serialized.
   class ScopedAccess {
    public:
     ScopedAccess() = default;
@@ -263,8 +286,8 @@ class ObjectLinker : public ObjectLinkerBase,
     void Invalidate(bool on_destruction, bool invalidate_peer) override;
 
     // Enforces serialized access to ObjectLinker and Links created from it. Each method should
-    // acquire this before execution. This is needed because one thread might be modifying internals
-    // of Link while another one accesses the internals.
+    // acquire this before execution. This is needed because one thread might be modifying
+    // internals of Link while another one accesses the internals.
     ScopedAccess GetLinkerScopedAccess() {
       return linker_ ? linker_->GetScopedAccess() : ScopedAccess();
     }
@@ -409,7 +432,8 @@ void ObjectLinker<Export, Import>::Link<is_import>::LinkResolved(
     FX_DCHECK(typed_peer_link->object_.has_value());
     ExecuteOrPostTaskOnDispatcher(
         [link_resolved = link_resolved_, object = typed_peer_link->object_.value()]() mutable {
-          // Doesn't need to be locked because the closure/argument are no longer owned by the Link.
+          // Doesn't need to be locked because the closure/argument are no longer owned by the
+          // Link.
           link_resolved(std::move(object));
         });
   }

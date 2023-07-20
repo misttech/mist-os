@@ -94,11 +94,10 @@ zx_koid_t ObjectLinkerBase::CreateEndpoint(zx::handle token, ErrorReporter* erro
   // Create a new endpoint in an unresolved state.  Full linking cannot occur
   // until Initialize() is called on the endpoint to provide a link object and
   // handler callbacks.
-  Endpoint new_endpoint;
-  new_endpoint.peer_endpoint_id = peer_endpoint_id;
-  new_endpoint.peer_death_waiter = WaitForPeerDeath(token.get(), endpoint_id, is_import);
-  new_endpoint.token = std::move(token);
-  auto emplaced_endpoint = endpoints.emplace(endpoint_id, std::move(new_endpoint));
+  auto raw_token = token.get();  // Read handle before move()-ing into Endpoint.
+  auto emplaced_endpoint =
+      endpoints.emplace(endpoint_id, Endpoint(peer_endpoint_id, std::move(token),
+                                              WaitForPeerDeath(raw_token, endpoint_id, is_import)));
   FX_DCHECK(emplaced_endpoint.second);
 
   return endpoint_id;
@@ -135,6 +134,21 @@ void ObjectLinkerBase::DestroyEndpoint(zx_koid_t endpoint_id, bool is_import, bo
       peer_endpoint.peer_endpoint_id = ZX_KOID_INVALID;
 
       if (peer_endpoint.link) {
+        if (peer_endpoint.peer_death_waiter) {
+          // `peer_endpoint` is still waiting for a link to `endpoint`. This is a problem,
+          // because, when `endpoint` is destroyed:
+          // 1. `endpoint.token` will be destroyed
+          // 2. `endpoint.token` is a `zx::handle` to the channel that
+          // `peer_endpoint.peer_death_waiter`
+          //    uses to detect the disappearance of `endpoint`.
+          // 3. The kernel will then send a `PEER_CLOSED` signal to the peer's end of the channel,
+          //    causing `peer_endpoint.peer_death_waiter` to execute.
+          // 4. There is a race between the execution of `peer_endpoint.peer_death_waiter`, and the
+          //    call to `Invalidate()` below. (The latter will free the memory that the former
+          //    references.)
+          FX_LOGS(ERROR)
+              << "DestroyEndpoint() with |peer_endpoint.link && peer_endpoint.peer_death_waiter|";
+        }
         peer_endpoint.link->Invalidate(/*on_destruction=*/false, /*invalidate_peer=*/true);
       } else {
         // It is safe to skip Invalidate. The peer_endpoint is in the map but its .link field is
@@ -250,27 +264,30 @@ std::unique_ptr<async::Wait> ObjectLinkerBase::WaitForPeerDeath(zx_handle_t endp
 
         // If `this` has been destroyed, there isn't really anything we can do here, so skip
         // entirely.
-        if (weak_this.get() != nullptr) {
-          auto access = weak_this->GetScopedAccess();
-          auto& endpoints = is_import ? weak_this->imports_ : weak_this->exports_;
-          auto endpoint_iter = endpoints.find(endpoint_id);
-          if (endpoint_iter == endpoints.end()) {
-            // Can happen if this callback executes after the async::Wait object
-            // gets destroyed on another (Flatland) thread, and the cancel was lost.
-            return;
-          }
-          Endpoint& endpoint = endpoint_iter->second;
+        if (!weak_this.get()) {
+          FX_LOGS(ERROR) << "ObjectLinkerBase destroyed; skipping Endpoint cleanup";
+          return;
+        }
 
-          // Invalidate the endpoint.  If Initialize() has
-          // already been called on the endpoint, then close
-          // its connection (which will cause it to be
-          // destroyed).  Any future connection attempts will
-          // fail immediately with a link_failed call, due to
-          // peer_endpoint_id being marked as invalid.
-          endpoint.peer_endpoint_id = ZX_KOID_INVALID;
-          if (endpoint.link) {
-            endpoint.link->Invalidate(/*on_destruction=*/false, /*invalidate_peer=*/true);
-          }
+        auto access = weak_this->GetScopedAccess();
+        auto& endpoints = is_import ? weak_this->imports_ : weak_this->exports_;
+        auto endpoint_iter = endpoints.find(endpoint_id);
+        if (endpoint_iter == endpoints.end()) {
+          // Can happen if this callback executes after the async::Wait object
+          // gets destroyed on another (Flatland) thread, and the cancel was lost.
+          return;
+        }
+        Endpoint& endpoint = endpoint_iter->second;
+
+        // Invalidate the endpoint.  If Initialize() has
+        // already been called on the endpoint, then close
+        // its connection (which will cause it to be
+        // destroyed).  Any future connection attempts will
+        // fail immediately with a link_failed call, due to
+        // peer_endpoint_id being marked as invalid.
+        endpoint.peer_endpoint_id = ZX_KOID_INVALID;
+        if (endpoint.link) {
+          endpoint.link->Invalidate(/*on_destruction=*/false, /*invalidate_peer=*/true);
         }
       });
 
