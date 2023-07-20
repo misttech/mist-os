@@ -81,14 +81,6 @@ It will be set below and passed to other toolchains through toolchain_args
 
 From //build/config/BUILDCONFIG.gn:1895
 
-### allow_legacy_data_partition_names
-
-Set to true to enable legacy data partition names.
-
-**Current value (from the default):** `false`
-
-From //src/storage/fshost/generated_fshost_config.gni:35
-
 ### allowed_test_device_types
 
 A list of device types this build is allowed to run tests on.
@@ -103,7 +95,7 @@ Build boot images that prefer Zedboot over local boot (only for EFI).
 
 **Current value (from the default):** `false`
 
-From //build/images/args.gni:151
+From //build/images/args.gni:145
 
 ### api_compatibility_testing
 
@@ -149,7 +141,7 @@ Used as a parameter to assembled_system().
 
 **Current value (from the default):** `false`
 
-From //build/images/args.gni:179
+From //build/images/args.gni:189
 
 ### authorized_ssh_keys_label
 
@@ -314,7 +306,7 @@ From //build/testing/environments.gni:9
 
 **Current value (from the default):** `false`
 
-From //build/images/args.gni:207
+From //build/images/args.gni:217
 
 ### bazel_product_bundle_prefix
 
@@ -339,7 +331,7 @@ The actual bazel_product_bundle used for Bazel assembly is:
 
 **Current value (from the default):** `false`
 
-From //build/images/args.gni:206
+From //build/images/args.gni:216
 
 ### bazel_quiet
 
@@ -363,47 +355,22 @@ From //build/testing/config.gni:11
 ### blob_layout_format
 
 The format blobfs should store blobs in.
+Set by boards.
 
 **Current value (from the default):** `"compact"`
 
-From //build/images/args.gni:142
-
-### blobfs_board_maximum_bytes
-
-In addition to reserving space for inodes and data, fs needs additional
-space for maintaining some internal data structures. So the
-space required to reserve inodes and data may exceed sum of the space
-needed for inodes and data.
-maximum_bytes puts an upper bound on the total bytes reserved for inodes,
-data bytes and reservation for all other internal fs metadata.
-A value of false does not put any upper bound. A filesystem may
-reserve few blocks required for its operations.
-
-**Current value (from the default):** `false`
-
-From //build/images/fvm.gni:75
-
-### blobfs_board_minimum_data_bytes
-
-Number of bytes to reserve for data in the fs. This is in addition
-to what is reserved, if any, for the inodes. Data bytes constitutes
-"usable" space of the fs.
-A value of false does not reserve any additional space than minimum
-required for the filesystem.
-
-**Current value (from the default):** `false`
-
-From //build/images/fvm.gni:64
+From //src/storage/fshost/generated_fshost_config.gni:23
 
 ### blobfs_board_minimum_inodes
 
 minimum_inodes is the number of inodes to reserve for the fs
 A value of false does not reserve any additional space than minimum
 required for the filesystem.
+Set by boards.
 
 **Current value (from the default):** `false`
 
-From //build/images/fvm.gni:56
+From //src/storage/fshost/generated_fshost_config.gni:52
 
 ### blobfs_capacity
 
@@ -417,7 +384,7 @@ From //boards/common/arm64-common.gni:11
 
 **Overridden from the default:** `false`
 
-From //build/images/filesystem_limits.gni:15
+From //build/images/filesystem_limits.gni:17
 
 **Current value for `target_cpu = "x64"`:** `10485760000`
 
@@ -425,7 +392,7 @@ From //boards/x64.gni:17
 
 **Overridden from the default:** `false`
 
-From //build/images/filesystem_limits.gni:15
+From //build/images/filesystem_limits.gni:17
 
 ### blobfs_enable_streaming_writes
 
@@ -443,10 +410,11 @@ can grow as needed if there are extra slices available in FVM. This limit preven
 partition from taking too much space away from other uses.
 
 Pass the empty string for no limit.
+Set by boards.
 
 **Current value (from the default):** `""`
 
-From //src/storage/fshost/generated_fshost_config.gni:15
+From //src/storage/fshost/generated_fshost_config.gni:60
 
 ### blobfs_num_pager_threads
 
@@ -465,24 +433,6 @@ metrics entries.
 **Current value (from the default):** `false`
 
 From //src/storage/blobfs/BUILD.gn:17
-
-### blobfs_product_maximum_bytes
-
-**Current value (from the default):** `false`
-
-From //build/images/fvm.gni:76
-
-### blobfs_product_minimum_data_bytes
-
-**Current value (from the default):** `false`
-
-From //build/images/fvm.gni:65
-
-### blobfs_product_minimum_inodes
-
-**Current value (from the default):** `false`
-
-From //build/images/fvm.gni:57
 
 ### blobfs_size_creep_limit
 
@@ -644,7 +594,7 @@ From //build/board.gni:106
 
 **Current value for `target_cpu = "x64"`:** `true`
 
-From //boards/x64.gni:91
+From //boards/x64.gni:87
 
 **Overridden from the default:** `false`
 
@@ -886,7 +836,7 @@ From //build/board.gni:117
 
 **Current value for `target_cpu = "x64"`:** `"//boards/images:bringup_fastboot_default"`
 
-From //boards/x64.gni:97
+From //boards/x64.gni:93
 
 **Overridden from the default:** `false`
 
@@ -906,7 +856,7 @@ From //build/board.gni:116
 
 **Current value for `target_cpu = "x64"`:** `"//boards/images:bringup_default"`
 
-From //boards/x64.gni:95
+From //boards/x64.gni:91
 
 **Overridden from the default:** `false`
 
@@ -1281,15 +1231,7 @@ from infra builds, and later inspection.
 
 **Current value (from the default):** `"//out/not-default/comparison-reports"`
 
-From //build/toolchain/rbe.gni:172
-
-### compress_blobs
-
-Whether to compress the blobfs image.
-
-**Current value (from the default):** `true`
-
-From //build/images/args.gni:139
+From //build/toolchain/rbe.gni:176
 
 ### config_example_cpp_greeting
 
@@ -1454,7 +1396,7 @@ One of:
 
 **Current value (from the default):** `"none"`
 
-From //build/toolchain/rbe.gni:167
+From //build/toolchain/rbe.gni:171
 
 ### cxx_rbe_enable
 
@@ -1467,7 +1409,7 @@ From //out/not-default/args.gn:7
 
 **Overridden from the default:** `false`
 
-From //build/toolchain/rbe.gni:125
+From //build/toolchain/rbe.gni:129
 
 **Current value for `target_cpu = "x64"`:** `false`
 
@@ -1475,7 +1417,7 @@ From //out/not-default/args.gn:7
 
 **Overridden from the default:** `false`
 
-From //build/toolchain/rbe.gni:125
+From //build/toolchain/rbe.gni:129
 
 ### cxx_rbe_exec_strategy
 
@@ -1498,7 +1440,7 @@ One of:
 
 **Current value (from the default):** `"remote_local_fallback"`
 
-From //build/toolchain/rbe.gni:143
+From //build/toolchain/rbe.gni:147
 
 ### dart_aot_debug_build_cfg
 
@@ -1628,10 +1570,11 @@ From //build/dart/dart_build_config.gni:46
 Set to one of "minfs", "fxfs", "f2fs" (unstable).
 If set to anything other than "minfs", any existing minfs partition will be
 migrated in-place to the specified format when fshost mounts it.
+Set by products
 
 **Current value (from the default):** `"fxfs"`
 
-From //src/storage/fshost/generated_fshost_config.gni:32
+From //src/storage/fshost/generated_fshost_config.gni:19
 
 ### debian_guest_earlycon
 
@@ -1686,7 +1629,7 @@ This arg is for local developer only, products should not set this arg.
 
 **Current value (from the default):** `1`
 
-From //build/images/args.gni:148
+From //build/images/args.gni:142
 
 ### deny_warnings
 
@@ -3161,7 +3104,7 @@ useful for including verification and other Bazel assembly specific targets.
 
 **Current value (from the default):** `[]`
 
-From //build/images/args.gni:211
+From //build/images/args.gni:221
 
 ### extra_gn_labels_for_bazel_inputs
 
@@ -3367,10 +3310,11 @@ From //src/fonts/build/font_args.gni:12
 If format_minfs_on_corruption is true (the default), fshost formats minfs partition on finding
 it corrupted.  Set to false to keep the devices in a corrupted state which might be of help to
 debug issues.
+Set by products
 
 **Current value (from the default):** `true`
 
-From //src/storage/fshost/generated_fshost_config.gni:27
+From //src/storage/fshost/generated_fshost_config.gni:13
 
 ### freeze_api_level
 
@@ -3381,10 +3325,11 @@ From //build/config/fuchsia/platform_version.gni:13
 ### fshost_watch_for_nand
 
 Make fshost watch for NAND devices.
+Set by boards.
 
 **Current value (from the default):** `false`
 
-From //src/storage/fshost/generated_fshost_config.gni:38
+From //src/storage/fshost/generated_fshost_config.gni:72
 
 ### fuchsia_async_trace_level_logging
 
@@ -3563,86 +3508,30 @@ From //zircon/kernel/params.gni:60
 The size in bytes of the FVM partition on the target eMMC devices.
 Specifying this parameter will lead build to generate a fvm.fastboot.blk
 suitable for flashing through fastboot for eMMC devices.
+Informs GN that a nand-fvm will be outputted.
 
 **Current value (from the default):** `false`
 
-From //build/images/fvm.gni:11
-
-### fvm_fastboot_compression
-
-How to compress the FVM image used for fastboot flashing.
-Possible values:
-  * "none": no compression
-  * "default": no compression on NAND, lz4 compression on eMMC.
-  * any other value is passed as the FVM "--compress" arg
-
-**Current value (from the default):** `"default"`
-
-From //build/images/fvm.gni:95
+From //build/images/args.gni:159
 
 ### fvm_ftl_nand_block_count
-
-**Current value (from the default):** `false`
-
-From //build/images/fvm.gni:88
-
-### fvm_ftl_nand_oob_size
-
-**Current value (from the default):** `false`
-
-From //build/images/fvm.gni:86
-
-### fvm_ftl_nand_page_size
 
 Specifying these variables will generate a NAND FVM image suitable for
 directly flashing via fastboot. The NAND characteristics are required
 in order to properly initialize the FTL metadata in the OOB area.
 `fvm_max_disk_size` should also be nonzero or else minfs will not have any
 room to initialize on boot.
+Informs GN that a nand-fvm will be outputted along with a temporary file.
 
 **Current value (from the default):** `false`
 
-From //build/images/fvm.gni:85
-
-### fvm_ftl_nand_pages_per_block
-
-**Current value (from the default):** `false`
-
-From //build/images/fvm.gni:87
-
-### fvm_max_disk_size
-
-The max size of the disk where the FVM is written. This is used for
-preallocating metadata to determine how much the FVM can expand on disk.
-Only applies to sparse FVM images. At sparse image construction time, the
-build fails if the inputs are larger than `fvm_max_disk_size`. At paving
-time, the FVM will be sized to the target's disk size up to
-`fvm_max_disk_size`. If the size of the disk increases after initial paving,
-the FVM will resize up to `fvm_max_disk_size`. During paving, if the target
-FVM has declared a smaller size than `fvm_max_disk_size`, the FVM is
-reinitialized to the larger size.
-The default value is false which sets the max disk size to the size of the disk
-at pave/format time.
-
-**Current value (from the default):** `false`
-
-From //build/images/fvm.gni:24
+From //build/images/args.gni:167
 
 ### fvm_partition
 
 **Current value (from the default):** `""`
 
 From //build/images/args.gni:116
-
-### fvm_reserved_slices
-
-Number of slices reserved by FVM for internal usage. A reservation
-partition will be added to the FVM image, containing this many slices.
-If set to 0, then no reservation partition will be added.
-
-**Current value (from the default):** `0`
-
-From //build/images/fvm.gni:39
 
 ### fvm_slice_size
 
@@ -3652,18 +3541,22 @@ FVM. A very small slice size may lead to decreased throughput. A very large
 slice size may lead to wasted space. The selected default size of 8mb is
 selected for conservation of space, rather than performance.
 LINT.IfChange
+Set by boards.
 
 **Current value (from the default):** `8388608`
 
-From //build/images/fvm.gni:32
+From //src/storage/fshost/generated_fshost_config.gni:32
 
 ### fxfs_blob
 
 Use Fxfs's blob implementation
+Changes the flashing logic because the outputs changed.
+Toggles a bunch of tests to use fxfs.
+Set by boards.
 
 **Current value (from the default):** `false`
 
-From //src/storage/fshost/generated_fshost_config.gni:47
+From //src/storage/fshost/generated_fshost_config.gni:78
 
 ### fxfs_partition
 
@@ -4086,7 +3979,7 @@ From //build/board.gni:110
 
 **Current value for `target_cpu = "x64"`:** `"//boards/images:x64"`
 
-From //boards/x64.gni:93
+From //boards/x64.gni:89
 
 **Overridden from the default:** `false`
 
@@ -4098,7 +3991,7 @@ Include an account partition in the FVM image if set to true.
 
 **Current value (from the default):** `false`
 
-From //build/images/args.gni:157
+From //build/images/args.gni:153
 
 ### include_clippy
 
@@ -4112,10 +4005,12 @@ From //build/rust/config.gni:65
 ### include_fvm_blob_sparse
 
 Include fvm.blob.sparse.blk image into the build if set to true
+TODO(b/291958397): This can be deleted, because blob sparse fvms are no
+longer in use.
 
 **Current value (from the default):** `false`
 
-From //build/images/args.gni:154
+From //build/images/args.gni:150
 
 ### include_internal_fonts
 
@@ -4141,7 +4036,7 @@ assembled_system().  See documentation there.
 
 **Current value (from the default):** `false`
 
-From //build/images/args.gni:175
+From //build/images/args.gni:185
 
 ### include_zxdb_large_tests
 
@@ -4692,7 +4587,7 @@ From //boards/common/arm64-common.gni:13
 
 **Overridden from the default:** `false`
 
-From //build/images/filesystem_limits.gni:10
+From //build/images/filesystem_limits.gni:12
 
 **Current value for `target_cpu = "x64"`:** `5216665600`
 
@@ -4700,44 +4595,13 @@ From //boards/x64.gni:19
 
 **Overridden from the default:** `false`
 
-From //build/images/filesystem_limits.gni:10
-
-### max_blob_image_size
-
-Maximum allowable image_size for /blob in a release mode build.
-Zero means no limit.
-image_size refers to the total image size, including both contents and
-metadata.
-
-**Current value (from the default):** `"0"`
-
-From //build/images/filesystem_limits.gni:21
-
-### max_data_contents_size
-
-Maximum allowable contents_size for /data in a release mode build.
-Zero means no limit.
-contents_size refers to contents stored within the filesystem (regardless
-of how they are stored).
-
-**Current value (from the default):** `"0"`
-
-From //build/images/filesystem_limits.gni:27
-
-### max_data_image_size
-
-Maximum allowable image_size for /data in a release mode build.
-Zero means no limit.
-image_size refers to the total image size, including both contents and
-metadata.
-
-**Current value (from the default):** `"0"`
-
-From //build/images/filesystem_limits.gni:33
+From //build/images/filesystem_limits.gni:12
 
 ### max_fuchsia_zbi_size
 
-Maximum allowable size for fuchsia.zbi
+Maximum allowable size for fuchsia.zbi and zedboot.zbi.
+A number greater than zero informs the rust toolchain to optimize for space.
+TODO(b/291953514): Enforce this by implementing an image size checker.
 
 **Current value for `target_cpu = "arm64"`:** `16777216`
 
@@ -4745,11 +4609,11 @@ From //boards/common/arm64-common.gni:36
 
 **Overridden from the default:** `0`
 
-From //build/images/filesystem_limits.gni:36
+From //build/images/filesystem_limits.gni:22
 
 **Current value (from the default):** `0`
 
-From //build/images/filesystem_limits.gni:36
+From //build/images/filesystem_limits.gni:22
 
 ### max_log_disk_usage
 
@@ -4762,19 +4626,17 @@ From //src/diagnostics/log_listener/BUILD.gn:11
 
 ### max_zedboot_zbi_size
 
-Maximum allowable size for zedboot.zbi
-
 **Current value for `target_cpu = "arm64"`:** `16777216`
 
 From //boards/common/arm64-common.gni:37
 
 **Overridden from the default:** `0`
 
-From //build/images/filesystem_limits.gni:39
+From //build/images/filesystem_limits.gni:23
 
 **Current value (from the default):** `0`
 
-From //build/images/filesystem_limits.gni:39
+From //build/images/filesystem_limits.gni:23
 
 ### mbedtls_config_file
 
@@ -4814,10 +4676,11 @@ can grow as needed if there are extra slices available in FVM. This limit preven
 partition from taking too much space away from other uses.
 
 Pass the empty string for no limit.
+Set by boards.
 
 **Current value (from the default):** `""`
 
-From //src/storage/fshost/generated_fshost_config.gni:22
+From //src/storage/fshost/generated_fshost_config.gni:68
 
 ### mini_chromium_is_chromeos_ash
 
@@ -5556,7 +5419,7 @@ From //build/board.gni:133
 
 **Current value for `target_cpu = "x64"`:** `["//out/not-default/fuchsia.esp.blk"]`
 
-From //boards/x64.gni:99
+From //boards/x64.gni:95
 
 **Overridden from the default:** `[]`
 
@@ -5577,7 +5440,7 @@ From //build/board.gni:132
 
 **Current value for `target_cpu = "x64"`:** `"//boards/partitions:x64"`
 
-From //boards/x64.gni:98
+From //boards/x64.gni:94
 
 **Overridden from the default:** `false`
 
@@ -7128,7 +6991,7 @@ Example value: "//build/images/recovery"
 
 **Current value (from the default):** `"//build/images/zedboot"`
 
-From //build/images/args.gni:166
+From //build/images/args.gni:176
 
 ### recovery_logo_path
 
@@ -7409,17 +7272,19 @@ One of:
 
 **Current value (from the default):** `"none"`
 
-From //build/toolchain/rbe.gni:112
+From //build/toolchain/rbe.gni:114
 
 ### rust_rbe_download_unstripped_binaries
 
 Controls whether or not to download (often large) unstripped Rust
 binaries.  When downloading is disabled, the build produces stubs
 that be used to retrieve remote artifacts later using build/rbe/dlwrap.py.
+TODO(b/284994230): This option is only available to developers,
+and not restricted environments that lack direct network access.
 
 **Current value (from the default):** `true`
 
-From //build/toolchain/rbe.gni:117
+From //build/toolchain/rbe.gni:121
 
 ### rust_rbe_enable
 
@@ -7431,7 +7296,7 @@ From //out/not-default/args.gn:10
 
 **Overridden from the default:** `false`
 
-From //build/toolchain/rbe.gni:68
+From //build/toolchain/rbe.gni:70
 
 **Current value for `target_cpu = "x64"`:** `false`
 
@@ -7439,7 +7304,7 @@ From //out/not-default/args.gn:10
 
 **Overridden from the default:** `false`
 
-From //build/toolchain/rbe.gni:68
+From //build/toolchain/rbe.gni:70
 
 ### rust_rbe_exec_strategy
 
@@ -7462,7 +7327,7 @@ One of:
 
 **Current value (from the default):** `"remote"`
 
-From //build/toolchain/rbe.gni:86
+From //build/toolchain/rbe.gni:88
 
 ### rust_toolchain_triple_suffix
 
@@ -7921,7 +7786,7 @@ Whether or not logging is disabled globally.
 
 **Current value (from the default):** `false`
 
-From //src/starnix/kernel/BUILD.gn:13
+From //src/starnix/kernel/BUILD.gn:14
 
 ### starnix_disable_tracing
 
@@ -7929,7 +7794,7 @@ Whether or not tracing is disabled globally.
 
 **Current value (from the default):** `true`
 
-From //src/starnix/kernel/BUILD.gn:16
+From //src/starnix/kernel/BUILD.gn:17
 
 ### target_cpu
 
@@ -8308,7 +8173,7 @@ exactly what you are doing.
 
 **Current value (from the default):** `false`
 
-From //build/images/args.gni:186
+From //build/images/args.gni:196
 
 ### use_blink
 
@@ -8375,10 +8240,11 @@ If true, will enable content-detection for partition format, supporting both
 minfs and fxfs filesystems. A special "fs_switch" file can be written to the root directory
 containing the string "minfs", "fxfs" or "toggle" to trigger a migration from the current
 format to the specified format. (The "toggle" option will migrate back and forth at each boot.)
+Set by developers in fx set.
 
 **Current value (from the default):** `false`
 
-From //src/storage/fshost/generated_fshost_config.gni:44
+From //src/storage/fshost/generated_fshost_config.gni:85
 
 ### use_driver_framework_v2_default
 
@@ -8661,7 +8527,7 @@ is meant solely for developer debugging.
 
 **Current value (from the default):** `false`
 
-From //build/images/args.gni:171
+From //build/images/args.gni:181
 
 ### vim3_mcu_fan_default_level
 
@@ -8873,7 +8739,7 @@ From //build/board.gni:113
 
 **Current value for `target_cpu = "x64"`:** `"//boards/images:zedboot_default"`
 
-From //boards/x64.gni:94
+From //boards/x64.gni:90
 
 **Overridden from the default:** `false`
 
