@@ -411,6 +411,9 @@ template("legacy_assembly_input_bundle") {
   }
 
   component_id_index_dep = []
+
+  # TODO(fxrev.dev/130900): This dep is no longer needed, but removing it
+  # breaks the build in CQ. Remove it once that's possible.
   component_id_index_config_data_dep = []
   include_component_index = defined(invoker.include_component_id_index) &&
                             invoker.include_component_id_index
@@ -432,11 +435,8 @@ template("legacy_assembly_input_bundle") {
     }
 
     component_id_index_dep = [ ":${target_name}.component_id_index_config" ]
-    component_id_index_config_data_dep =
-        [ ":${target_name}.component_id_index_config-config-data" ]
-  } else {
-    not_needed([ "component_id_index_config_data_dep" ])
   }
+  not_needed([ "component_id_index_config_data_dep" ])
 
   create_package_archive =
       defined(invoker.create_package_archive) && invoker.create_package_archive

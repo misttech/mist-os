@@ -177,9 +177,6 @@ if (is_fuchsia) {
         "//src/cobalt/bin/app:cobalt_registry",
         "//src/cobalt/bin/app:config",
 
-        # Use eng allowlists:
-        "//src/security/policy:appmgr_policy_eng",
-
         # The SWD stack for OTAs.
         "//src/sys/pkg/lib/isolated-swd:isolated-swd-components",
 

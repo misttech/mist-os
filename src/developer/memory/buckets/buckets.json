@@ -102,12 +102,6 @@
         "event_code": 25
     },
     {
-        "name": "AppManager",
-        "process": "appmgr\\.cm",
-        "vmo": "",
-        "event_code": 39
-    },
-    {
         "name": "ComponentManager",
         "process": "bin/bootsvc|bin/component_manager|miscsvc\\.cm|svchost\\.cm|sysmgr\\.cm",
         "vmo": "",

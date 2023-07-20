@@ -13,8 +13,6 @@
 # find . -name "*.gn" | xargs sed -n -e 's|for_pkg = "\([^"]*\)"|"\1",|p' | tr -d " " | sort | uniq
 # (followed by some manual touch-ups)
 config_data_for_pkg_allowlist = [
-  "appmgr",
-  "appmgr_integration_tests",
   "archivist",
   "audio_core",
   "base_unittests",

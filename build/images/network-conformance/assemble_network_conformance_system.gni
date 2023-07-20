@@ -76,7 +76,6 @@ template("assemble_network_conformance_system") {
       "//src/connectivity/network/netcfg:config-default",
       "//src/connectivity/network/net-cli",
       "//src/connectivity/network/testing/network-test-realm/service:network-test-realm",
-      "//src/security/policy:appmgr_policy_eng",
       "//src/security/bin/root_ssl_certificates",
       "//src/sys/full-resolver:full-resolver-pkg",
     ]
