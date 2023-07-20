@@ -3,15 +3,15 @@
 // found in the LICENSE file.
 
 use {
-    crate::input_device,
     crate::input_handler::{InputHandlerStatus, UnhandledInputHandler},
-    crate::keyboard_binding,
+    crate::{input_device, keyboard_binding, metrics},
     anyhow::Error,
     async_trait::async_trait,
     fidl_fuchsia_ui_input3::{self as fidl_ui_input3, LockState, Modifiers},
     fuchsia_component::client::connect_to_protocol,
     fuchsia_inspect, fuchsia_zircon as zx,
     keymaps::{self, LockStateChecker, ModifierChecker},
+    metrics_registry::*,
     std::rc::Rc,
 };
 
@@ -60,6 +60,9 @@ pub struct ImeHandler {
 
     /// The inventory of this handler's Inspect status.
     pub inspect_status: InputHandlerStatus,
+
+    /// The metrics logger.
+    metrics_logger: metrics::MetricsLogger,
 }
 
 #[async_trait(?Send)]
@@ -92,10 +95,13 @@ impl UnhandledInputHandler for ImeHandler {
 #[allow(dead_code)]
 impl ImeHandler {
     /// Creates a new [`ImeHandler`] by connecting out to the key event injector.
-    pub async fn new(input_handlers_node: &fuchsia_inspect::Node) -> Result<Rc<Self>, Error> {
+    pub async fn new(
+        input_handlers_node: &fuchsia_inspect::Node,
+        metrics_logger: metrics::MetricsLogger,
+    ) -> Result<Rc<Self>, Error> {
         let key_event_injector = connect_to_protocol::<fidl_ui_input3::KeyEventInjectorMarker>()?;
 
-        Self::new_handler(key_event_injector, input_handlers_node).await
+        Self::new_handler(key_event_injector, input_handlers_node, metrics_logger).await
     }
 
     /// Creates a new [`ImeHandler`].
@@ -106,13 +112,14 @@ impl ImeHandler {
     async fn new_handler(
         key_event_injector: fidl_ui_input3::KeyEventInjectorProxy,
         input_handlers_node: &fuchsia_inspect::Node,
+        metrics_logger: metrics::MetricsLogger,
     ) -> Result<Rc<Self>, Error> {
         let inspect_status = InputHandlerStatus::new(
             input_handlers_node,
             "ime_handler",
             /* generates_events */ false,
         );
-        let handler = ImeHandler { key_event_injector, inspect_status };
+        let handler = ImeHandler { key_event_injector, inspect_status, metrics_logger };
 
         Ok(Rc::new(handler))
     }
@@ -129,7 +136,10 @@ impl ImeHandler {
             &key_event
         );
         match self.key_event_injector.inject(&key_event).await {
-            Err(err) => tracing::error!("Failed to dispatch key to IME: {:?}", err),
+            Err(err) => self.metrics_logger.log_error(
+                InputPipelineErrorMetricDimensionEvent::ImeFailedToDispatchKeyToIme,
+                std::format!("Failed to dispatch key to IME: {:?}", err),
+            ),
             _ => {}
         };
     }
@@ -312,7 +322,9 @@ mod tests {
         let inspector = fuchsia_inspect::Inspector::default();
         let test_node = inspector.root().create_child("test_node");
         let ime_handler =
-            ImeHandler::new_handler(proxy, &test_node).await.expect("Failed to create ImeHandler.");
+            ImeHandler::new_handler(proxy, &test_node, metrics::MetricsLogger::default())
+                .await
+                .expect("Failed to create ImeHandler.");
 
         let device_descriptor = input_device::InputDeviceDescriptor::Keyboard(
             keyboard_binding::KeyboardDeviceDescriptor {
@@ -350,7 +362,9 @@ mod tests {
         let inspector = fuchsia_inspect::Inspector::default();
         let test_node = inspector.root().create_child("test_node");
         let ime_handler =
-            ImeHandler::new_handler(proxy, &test_node).await.expect("Failed to create ImeHandler.");
+            ImeHandler::new_handler(proxy, &test_node, metrics::MetricsLogger::default())
+                .await
+                .expect("Failed to create ImeHandler.");
 
         let device_descriptor = input_device::InputDeviceDescriptor::Keyboard(
             keyboard_binding::KeyboardDeviceDescriptor {
@@ -387,7 +401,9 @@ mod tests {
         let inspector = fuchsia_inspect::Inspector::default();
         let test_node = inspector.root().create_child("test_node");
         let ime_handler =
-            ImeHandler::new_handler(proxy, &test_node).await.expect("Failed to create ImeHandler.");
+            ImeHandler::new_handler(proxy, &test_node, metrics::MetricsLogger::default())
+                .await
+                .expect("Failed to create ImeHandler.");
 
         let device_descriptor = input_device::InputDeviceDescriptor::Keyboard(
             keyboard_binding::KeyboardDeviceDescriptor {
@@ -478,7 +494,9 @@ mod tests {
         let inspector = fuchsia_inspect::Inspector::default();
         let test_node = inspector.root().create_child("test_node");
         let ime_handler =
-            ImeHandler::new_handler(proxy, &test_node).await.expect("Failed to create ImeHandler.");
+            ImeHandler::new_handler(proxy, &test_node, metrics::MetricsLogger::default())
+                .await
+                .expect("Failed to create ImeHandler.");
 
         let device_descriptor = input_device::InputDeviceDescriptor::Keyboard(
             keyboard_binding::KeyboardDeviceDescriptor {
@@ -562,7 +580,9 @@ mod tests {
         let inspector = fuchsia_inspect::Inspector::default();
         let test_node = inspector.root().create_child("test_node");
         let ime_handler =
-            ImeHandler::new_handler(proxy, &test_node).await.expect("Failed to create ImeHandler.");
+            ImeHandler::new_handler(proxy, &test_node, metrics::MetricsLogger::default())
+                .await
+                .expect("Failed to create ImeHandler.");
 
         let device_descriptor = input_device::InputDeviceDescriptor::Keyboard(
             keyboard_binding::KeyboardDeviceDescriptor {
@@ -643,7 +663,9 @@ mod tests {
         let inspector = fuchsia_inspect::Inspector::default();
         let test_node = inspector.root().create_child("test_node");
         let ime_handler =
-            ImeHandler::new_handler(proxy, &test_node).await.expect("Failed to create ImeHandler.");
+            ImeHandler::new_handler(proxy, &test_node, metrics::MetricsLogger::default())
+                .await
+                .expect("Failed to create ImeHandler.");
 
         let device_descriptor = input_device::InputDeviceDescriptor::Keyboard(
             keyboard_binding::KeyboardDeviceDescriptor {
@@ -685,7 +707,9 @@ mod tests {
         let inspector = fuchsia_inspect::Inspector::default();
         let test_node = inspector.root().create_child("test_node");
         let ime_handler =
-            ImeHandler::new_handler(proxy, &test_node).await.expect("Failed to create ImeHandler.");
+            ImeHandler::new_handler(proxy, &test_node, metrics::MetricsLogger::default())
+                .await
+                .expect("Failed to create ImeHandler.");
 
         let device_descriptor = input_device::InputDeviceDescriptor::Keyboard(
             keyboard_binding::KeyboardDeviceDescriptor {
@@ -762,7 +786,9 @@ mod tests {
         let inspector = fuchsia_inspect::Inspector::default();
         let test_node = inspector.root().create_child("test_node");
         let ime_handler =
-            ImeHandler::new_handler(proxy, &test_node).await.expect("Failed to create ImeHandler.");
+            ImeHandler::new_handler(proxy, &test_node, metrics::MetricsLogger::default())
+                .await
+                .expect("Failed to create ImeHandler.");
 
         let device_descriptor = input_device::InputDeviceDescriptor::Keyboard(
             keyboard_binding::KeyboardDeviceDescriptor {
@@ -820,9 +846,10 @@ mod tests {
         let (proxy, _) = connect_to_key_event_injector();
         let inspector = fuchsia_inspect::Inspector::default();
         let fake_handlers_node = inspector.root().create_child("input_handlers_node");
-        let _handler = ImeHandler::new_handler(proxy, &fake_handlers_node)
-            .await
-            .expect("Failed to create ImeHandler.");
+        let _handler =
+            ImeHandler::new_handler(proxy, &fake_handlers_node, metrics::MetricsLogger::default())
+                .await
+                .expect("Failed to create ImeHandler.");
         fuchsia_inspect::assert_data_tree!(inspector, root: {
             input_handlers_node: {
                 ime_handler: {
@@ -845,9 +872,10 @@ mod tests {
         let (proxy, _) = connect_to_key_event_injector();
         let inspector = fuchsia_inspect::Inspector::default();
         let fake_handlers_node = inspector.root().create_child("input_handlers_node");
-        let ime_handler = ImeHandler::new_handler(proxy, &fake_handlers_node)
-            .await
-            .expect("Failed to create ImeHandler.");
+        let ime_handler =
+            ImeHandler::new_handler(proxy, &fake_handlers_node, metrics::MetricsLogger::default())
+                .await
+                .expect("Failed to create ImeHandler.");
         let device_descriptor = input_device::InputDeviceDescriptor::Keyboard(
             keyboard_binding::KeyboardDeviceDescriptor {
                 keys: vec![fidl_input::Key::A, fidl_input::Key::B],

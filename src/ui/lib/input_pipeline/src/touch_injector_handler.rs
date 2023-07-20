@@ -4,10 +4,9 @@
 
 #![warn(clippy::await_holding_refcell_ref)]
 use {
-    crate::input_device,
     crate::input_handler::{InputHandlerStatus, UnhandledInputHandler},
-    crate::touch_binding,
     crate::utils::{Position, Size},
+    crate::{input_device, metrics, touch_binding},
     anyhow::{Context, Error, Result},
     async_trait::async_trait,
     async_utils::hanging_get::client::HangingGetStream,
@@ -17,12 +16,12 @@ use {
     fuchsia_component::client::connect_to_protocol,
     fuchsia_inspect, fuchsia_zircon as zx,
     futures::stream::StreamExt,
+    metrics_registry::*,
     std::{cell::RefCell, collections::HashMap, option::Option, rc::Rc},
 };
 
 /// An input handler that parses touch events and forwards them to Scenic through the
 /// fidl_fuchsia_pointerinjector protocols.
-#[derive(Debug)]
 pub struct TouchInjectorHandler {
     /// The mutable fields of this handler.
     mutable_state: RefCell<MutableState>,
@@ -48,6 +47,9 @@ pub struct TouchInjectorHandler {
 
     /// The inventory of this handler's Inspect status.
     pub inspect_status: InputHandlerStatus,
+
+    /// The metrics logger.
+    metrics_logger: metrics::MetricsLogger,
 }
 
 #[derive(Debug)]
@@ -81,7 +83,9 @@ impl UnhandledInputHandler for TouchInjectorHandler {
                 fuchsia_trace::flow_end!("input", "report-to-event", trace_id.unwrap_or(0.into()));
                 // Create a new injector if this is the first time seeing device_id.
                 if let Err(e) = self.ensure_injector_registered(&touch_device_descriptor).await {
-                    tracing::error!("{}", e);
+                    self.metrics_logger.log_error(
+                        InputPipelineErrorMetricDimensionEvent::TouchInjectorEnsureInjectorRegisteredFailed,
+                        std::format!("ensure_injector_registered failed: {}", e));
                 }
 
                 // Handle the event.
@@ -89,7 +93,9 @@ impl UnhandledInputHandler for TouchInjectorHandler {
                     .send_event_to_scenic(&touch_event, &touch_device_descriptor, event_time)
                     .await
                 {
-                    tracing::error!("{}", e);
+                    self.metrics_logger.log_error(
+                        InputPipelineErrorMetricDimensionEvent::TouchInjectorSendEventToScenicFailed,
+                        std::format!("send_event_to_scenic failed: {}", e));
                 }
 
                 // Consume the input event.
@@ -116,6 +122,7 @@ impl TouchInjectorHandler {
     pub async fn new(
         display_size: Size,
         input_handlers_node: &fuchsia_inspect::Node,
+        metrics_logger: metrics::MetricsLogger,
     ) -> Result<Rc<Self>, Error> {
         let configuration_proxy = connect_to_protocol::<pointerinjector_config::SetupMarker>()?;
         let injector_registry_proxy = connect_to_protocol::<pointerinjector::RegistryMarker>()?;
@@ -125,6 +132,7 @@ impl TouchInjectorHandler {
             injector_registry_proxy,
             display_size,
             input_handlers_node,
+            metrics_logger,
         )
         .await
     }
@@ -147,6 +155,7 @@ impl TouchInjectorHandler {
         configuration_proxy: pointerinjector_config::SetupProxy,
         display_size: Size,
         input_handlers_node: &fuchsia_inspect::Node,
+        metrics_logger: metrics::MetricsLogger,
     ) -> Result<Rc<Self>, Error> {
         let injector_registry_proxy = connect_to_protocol::<pointerinjector::RegistryMarker>()?;
         Self::new_handler(
@@ -154,6 +163,7 @@ impl TouchInjectorHandler {
             injector_registry_proxy,
             display_size,
             input_handlers_node,
+            metrics_logger,
         )
         .await
     }
@@ -178,6 +188,7 @@ impl TouchInjectorHandler {
         injector_registry_proxy: pointerinjector::RegistryProxy,
         display_size: Size,
         input_handlers_node: &fuchsia_inspect::Node,
+        metrics_logger: metrics::MetricsLogger,
     ) -> Result<Rc<Self>, Error> {
         // Get the context and target views to inject into.
         let (context_view_ref, target_view_ref) = configuration_proxy.get_view_refs().await?;
@@ -195,6 +206,7 @@ impl TouchInjectorHandler {
             injector_registry_proxy,
             configuration_proxy,
             inspect_status,
+            metrics_logger,
         });
 
         Ok(handler)
@@ -419,11 +431,15 @@ impl TouchInjectorHandler {
                     }
                 }
                 Some(Err(e)) => {
-                    tracing::error!("Error while reading viewport update: {}", e);
+                    self.metrics_logger.log_error(
+                        InputPipelineErrorMetricDimensionEvent::TouchInjectorErrorWhileReadingViewportUpdate,
+                        std::format!("Error while reading viewport update: {}", e));
                     return;
                 }
                 None => {
-                    tracing::error!("Viewport update stream terminated unexpectedly");
+                    self.metrics_logger.log_error(
+                        InputPipelineErrorMetricDimensionEvent::TouchInjectorViewportUpdateStreamTerminatedUnexpectedly,
+                        "Viewport update stream terminated unexpectedly");
                     return;
                 }
             }
@@ -569,6 +585,7 @@ mod tests {
             injector_registry_proxy,
             Size { width: DISPLAY_WIDTH, height: DISPLAY_HEIGHT },
             &test_node,
+            metrics::MetricsLogger::default(),
         );
         let config_request_stream_fut =
             handle_configuration_request_stream(&mut configuration_request_stream);
@@ -682,6 +699,7 @@ mod tests {
             injector_registry_proxy,
             Size { width: DISPLAY_WIDTH, height: DISPLAY_HEIGHT },
             &test_node,
+            metrics::MetricsLogger::default(),
         );
         let (touch_handler_res, _) = exec.run_singlethreaded(futures::future::join(
             touch_handler_fut,
@@ -734,6 +752,7 @@ mod tests {
             injector_registry_proxy,
             Size { width: DISPLAY_WIDTH, height: DISPLAY_HEIGHT },
             &test_node,
+            metrics::MetricsLogger::default(),
         );
         let config_request_stream_fut =
             handle_configuration_request_stream(&mut configuration_request_stream);
@@ -837,6 +856,7 @@ mod tests {
             injector_registry_proxy,
             Size { width: DISPLAY_WIDTH, height: DISPLAY_HEIGHT },
             &test_node,
+            metrics::MetricsLogger::default(),
         );
         let config_request_stream_fut =
             handle_configuration_request_stream(&mut configuration_request_stream);
@@ -921,6 +941,7 @@ mod tests {
             configuration_proxy,
             Size { width: DISPLAY_WIDTH, height: DISPLAY_HEIGHT },
             &fake_handlers_node,
+            metrics::MetricsLogger::default(),
         );
         let config_request_stream_fut =
             handle_configuration_request_stream(&mut configuration_request_stream);
@@ -962,6 +983,7 @@ mod tests {
             injector_registry_proxy,
             Size { width: DISPLAY_WIDTH, height: DISPLAY_HEIGHT },
             &fake_handlers_node,
+            metrics::MetricsLogger::default(),
         );
         let config_request_stream_fut =
             handle_configuration_request_stream(&mut configuration_request_stream);

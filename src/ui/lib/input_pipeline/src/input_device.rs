@@ -4,7 +4,7 @@
 
 use {
     crate::{
-        consumer_controls_binding, keyboard_binding, light_sensor_binding, mouse_binding,
+        consumer_controls_binding, keyboard_binding, light_sensor_binding, metrics, mouse_binding,
         touch_binding,
     },
     anyhow::{format_err, Error},
@@ -24,6 +24,7 @@ use {
         channel::mpsc::{UnboundedReceiver, UnboundedSender},
         stream::StreamExt,
     },
+    metrics_registry::*,
     std::path::PathBuf,
 };
 
@@ -267,14 +268,17 @@ pub trait InputDeviceBinding: Send {
 /// - `device_proxy`: The device proxy which is used to get input reports.
 /// - `device_descriptor`: The descriptor of the device bound to `device_proxy`.
 /// - `event_sender`: The channel to send InputEvents to.
+/// - `metrics_logger`: The metrics logger.
 /// - `process_reports`: A function that generates InputEvent(s) from an InputReport and the
 ///                      InputReport that precedes it. Each type of input device defines how it
 ///                      processes InputReports.
+///
 pub fn initialize_report_stream<InputDeviceProcessReportsFn>(
     device_proxy: fidl_input_report::InputDeviceProxy,
     device_descriptor: InputDeviceDescriptor,
     mut event_sender: UnboundedSender<InputEvent>,
     inspect_status: InputDeviceStatus,
+    metrics_logger: metrics::MetricsLogger,
     mut process_reports: InputDeviceProcessReportsFn,
 ) where
     InputDeviceProcessReportsFn: 'static
@@ -285,6 +289,7 @@ pub fn initialize_report_stream<InputDeviceProcessReportsFn>(
             &InputDeviceDescriptor,
             &mut UnboundedSender<InputEvent>,
             &InputDeviceStatus,
+            &metrics::MetricsLogger,
         ) -> (Option<InputReport>, Option<UnboundedReceiver<InputEvent>>),
 {
     fasync::Task::local(async move {
@@ -292,13 +297,19 @@ pub fn initialize_report_stream<InputDeviceProcessReportsFn>(
         let (report_reader, server_end) = match fidl::endpoints::create_proxy() {
             Ok(res) => res,
             Err(e) => {
-                tracing::error!("error creating InputReport proxy: {:?}", &e);
+                metrics_logger.log_error(
+                    InputPipelineErrorMetricDimensionEvent::InputDeviceCreateInputReportProxyFailed,
+                    std::format!("error creating InputReport proxy: {:?}", &e),
+                );
                 return; // TODO(fxbug.dev/54445): signal error
             }
         };
         let result = device_proxy.get_input_reports_reader(server_end);
         if result.is_err() {
-            tracing::error!("error on GetInputReportsReader: {:?}", &result);
+            metrics_logger.log_error(
+                InputPipelineErrorMetricDimensionEvent::InputDeviceGetInputReportsReaderError,
+                std::format!("error on GetInputReportsReader: {:?}", &result),
+            );
             return; // TODO(fxbug.dev/54445): signal error
         }
         let mut report_stream = HangingGetStream::new(
@@ -317,6 +328,7 @@ pub fn initialize_report_stream<InputDeviceProcessReportsFn>(
                             &device_descriptor,
                             &mut event_sender,
                             &inspect_status,
+                            &metrics_logger,
                         );
                         // If a report generates multiple events asynchronously, we send them over a mpsc channel
                         // to inspect_receiver. We update the event count on inspect_status here since we cannot
@@ -375,6 +387,7 @@ pub async fn get_device_binding(
     device_id: u32,
     input_event_sender: UnboundedSender<InputEvent>,
     device_node: fuchsia_inspect::Node,
+    metrics_logger: metrics::MetricsLogger,
 ) -> Result<Box<dyn InputDeviceBinding>, Error> {
     match device_type {
         InputDeviceType::ConsumerControls => {
@@ -383,6 +396,7 @@ pub async fn get_device_binding(
                 device_id,
                 input_event_sender,
                 device_node,
+                metrics_logger,
             )
             .await?;
             Ok(Box::new(binding))
@@ -393,6 +407,7 @@ pub async fn get_device_binding(
                 device_id,
                 input_event_sender,
                 device_node,
+                metrics_logger,
             )
             .await?;
             Ok(Box::new(binding))
@@ -403,6 +418,7 @@ pub async fn get_device_binding(
                 device_id,
                 input_event_sender,
                 device_node,
+                metrics_logger,
             )
             .await?;
             Ok(Box::new(binding))
@@ -413,6 +429,7 @@ pub async fn get_device_binding(
                 device_id,
                 input_event_sender,
                 device_node,
+                metrics_logger,
             )
             .await?;
             Ok(Box::new(binding))
@@ -423,6 +440,7 @@ pub async fn get_device_binding(
                 device_id,
                 input_event_sender,
                 device_node,
+                metrics_logger,
             )
             .await?;
             Ok(Box::new(binding))

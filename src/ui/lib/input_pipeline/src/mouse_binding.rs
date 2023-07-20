@@ -4,6 +4,7 @@
 
 use {
     crate::input_device::{self, Handled, InputDeviceBinding, InputDeviceStatus, InputEvent},
+    crate::metrics,
     crate::mouse_model_database,
     crate::utils::Position,
     anyhow::{format_err, Error},
@@ -13,6 +14,7 @@ use {
     fuchsia_inspect::{health::Reporter, ArrayProperty},
     fuchsia_zircon as zx,
     futures::channel::mpsc::{UnboundedReceiver, UnboundedSender},
+    metrics_registry::*,
     std::collections::HashSet,
     std::iter::FromIterator,
 };
@@ -281,6 +283,7 @@ impl MouseBinding {
     /// - `device_id`: The id of the connected mouse device.
     /// - `input_event_sender`: The channel to send new InputEvents to.
     /// - `device_node`: The inspect node for this device binding
+    /// - `metrics_logger`: The metrics logger.
     ///
     /// # Errors
     /// If there was an error binding to the proxy.
@@ -289,6 +292,7 @@ impl MouseBinding {
         device_id: u32,
         input_event_sender: UnboundedSender<input_device::InputEvent>,
         device_node: fuchsia_inspect::Node,
+        metrics_logger: metrics::MetricsLogger,
     ) -> Result<Self, Error> {
         let (device_binding, mut inspect_status) =
             Self::bind_device(&device_proxy, device_id, input_event_sender, device_node).await?;
@@ -298,6 +302,7 @@ impl MouseBinding {
             device_binding.get_device_descriptor(),
             device_binding.input_event_sender(),
             inspect_status,
+            metrics_logger,
             Self::process_reports,
         );
 
@@ -390,6 +395,7 @@ impl MouseBinding {
         device_descriptor: &input_device::InputDeviceDescriptor,
         input_event_sender: &mut UnboundedSender<input_device::InputEvent>,
         inspect_status: &InputDeviceStatus,
+        metrics_logger: &metrics::MetricsLogger,
     ) -> (Option<InputReport>, Option<UnboundedReceiver<InputEvent>>) {
         inspect_status.count_received_report(&report);
         // Input devices can have multiple types so ensure `report` is a MouseInputReport.
@@ -420,12 +426,16 @@ impl MouseBinding {
             device_descriptor,
             input_event_sender,
             inspect_status,
+            metrics_logger,
         );
 
         let counts_per_mm = match device_descriptor {
             input_device::InputDeviceDescriptor::Mouse(ds) => ds.counts_per_mm,
             _ => {
-                tracing::error!("mouse_binding::process_reports got device_descriptor not mouse");
+                metrics_logger.log_error(
+                    InputPipelineErrorMetricDimensionEvent::MouseDescriptionNotMouse,
+                    "mouse_binding::process_reports got device_descriptor not mouse".to_string(),
+                );
                 mouse_model_database::db::DEFAULT_COUNTS_PER_MM
             }
         };
@@ -459,6 +469,7 @@ impl MouseBinding {
             device_descriptor,
             input_event_sender,
             inspect_status,
+            metrics_logger,
         );
 
         let wheel_delta_v = match mouse_report.scroll_v {
@@ -486,6 +497,7 @@ impl MouseBinding {
             device_descriptor,
             input_event_sender,
             inspect_status,
+            metrics_logger,
         );
 
         // Send an Up event with:
@@ -503,6 +515,7 @@ impl MouseBinding {
             device_descriptor,
             input_event_sender,
             inspect_status,
+            metrics_logger,
         );
 
         (Some(report), None)
@@ -532,6 +545,7 @@ fn send_mouse_event(
     device_descriptor: &input_device::InputDeviceDescriptor,
     sender: &mut UnboundedSender<input_device::InputEvent>,
     inspect_status: &InputDeviceStatus,
+    metrics_logger: &metrics::MetricsLogger,
 ) {
     // Only send Down/Up events when there are buttons affected.
     if (phase == MousePhase::Down || phase == MousePhase::Up) && affected_buttons.is_empty() {
@@ -569,7 +583,12 @@ fn send_mouse_event(
     };
 
     match sender.unbounded_send(event.clone()) {
-        Err(e) => tracing::error!("Failed to send MouseEvent with error: {:?}", e),
+        Err(e) => {
+            metrics_logger.log_error(
+                InputPipelineErrorMetricDimensionEvent::MouseFailedToSendEvent,
+                std::format!("Failed to send MouseEvent with error: {:?}", e),
+            );
+        }
         _ => inspect_status.count_generated_event(event),
     }
 }

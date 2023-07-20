@@ -6,12 +6,14 @@ use super::types::Rgbc;
 use crate::input_device::{
     self, Handled, InputDeviceBinding, InputDeviceDescriptor, InputDeviceStatus, InputEvent,
 };
+use crate::metrics;
 use anyhow::{format_err, Error};
 use async_trait::async_trait;
 use fidl_fuchsia_input_report::{InputDeviceProxy, InputReport, SensorDescriptor, SensorType};
 use fuchsia_inspect::health::Reporter;
 use fuchsia_zircon as zx;
 use futures::channel::mpsc::{UnboundedReceiver, UnboundedSender};
+use metrics_registry::*;
 
 #[derive(Clone, Debug)]
 pub struct LightSensorEvent {
@@ -84,6 +86,7 @@ impl LightSensorBinding {
     /// - `device_id`: The unique identifier of this device.
     /// - `input_event_sender`: The channel to send new InputEvents to.
     /// - `device_node`: The inspect node for this device binding
+    /// - `metrics_logger`: The metrics logger.
     ///
     /// # Errors
     /// If there was an error binding to the proxy.
@@ -92,20 +95,29 @@ impl LightSensorBinding {
         device_id: u32,
         input_event_sender: UnboundedSender<input_device::InputEvent>,
         device_node: fuchsia_inspect::Node,
+        metrics_logger: metrics::MetricsLogger,
     ) -> Result<Self, Error> {
-        let (device_binding, mut inspect_status) =
-            Self::bind_device(&device_proxy, device_id, input_event_sender, device_node).await?;
+        let (device_binding, mut inspect_status) = Self::bind_device(
+            &device_proxy,
+            device_id,
+            input_event_sender,
+            device_node,
+            metrics_logger.clone(),
+        )
+        .await?;
         inspect_status.health_node.set_ok();
         input_device::initialize_report_stream(
             device_proxy.clone(),
             device_binding.get_device_descriptor(),
             device_binding.input_event_sender(),
             inspect_status,
+            metrics_logger,
             move |report,
                   previous_report,
                   device_descriptor,
                   input_event_sender,
-                  inspect_status| {
+                  inspect_status,
+                  metrics_logger| {
                 Self::process_reports(
                     report,
                     previous_report,
@@ -113,6 +125,7 @@ impl LightSensorBinding {
                     input_event_sender,
                     device_proxy.clone(),
                     inspect_status,
+                    metrics_logger,
                 )
             },
         );
@@ -136,6 +149,7 @@ impl LightSensorBinding {
         device_id: u32,
         input_event_sender: UnboundedSender<input_device::InputEvent>,
         device_node: fuchsia_inspect::Node,
+        metrics_logger: metrics::MetricsLogger,
     ) -> Result<(Self, InputDeviceStatus), Error> {
         let mut input_device_status = InputDeviceStatus::new(device_node);
         let descriptor = match device.get_descriptor().await {
@@ -149,7 +163,10 @@ impl LightSensorBinding {
             input_device_status.health_node.set_unhealthy("Empty device_info in descriptor.");
             // Logging in addition to returning an error, as in some test
             // setups the error may never be displayed to the user.
-            tracing::error!("DRIVER BUG: empty device_info for device_id: {}", device_id);
+            metrics_logger.log_error(
+                InputPipelineErrorMetricDimensionEvent::LightEmptyDeviceInfo,
+                std::format!("DRIVER BUG: empty device_info for device_id: {}", device_id),
+            );
             format_err!("empty device info for device_id: {}", device_id)
         })?;
         match descriptor.sensor {
@@ -273,6 +290,7 @@ impl LightSensorBinding {
         input_event_sender: &mut UnboundedSender<input_device::InputEvent>,
         device_proxy: InputDeviceProxy,
         inspect_status: &InputDeviceStatus,
+        metrics_logger: &metrics::MetricsLogger,
     ) -> (Option<InputReport>, Option<UnboundedReceiver<InputEvent>>) {
         inspect_status.count_received_report(&report);
         let light_sensor_descriptor =
@@ -318,7 +336,10 @@ impl LightSensorBinding {
         };
 
         if let Err(e) = input_event_sender.unbounded_send(event.clone()) {
-            tracing::error!("Failed to send LightSensorEvent with error: {e:?}");
+            metrics_logger.log_error(
+                InputPipelineErrorMetricDimensionEvent::LightFailedToSendEvent,
+                std::format!("Failed to send LightSensorEvent with error: {e:?}"),
+            );
         } else {
             inspect_status.count_generated_event(event);
         }

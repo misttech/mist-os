@@ -90,8 +90,12 @@ pub async fn handle_input(
     light_sensor_configuration: Option<LightSensorConfiguration>,
 ) -> Result<InputPipeline, Error> {
     let input_handlers_node = node.create_child("input_handlers");
-    let factory_reset_handler = FactoryResetHandler::new(&input_handlers_node);
-    let media_buttons_handler = MediaButtonsHandler::new(&input_handlers_node);
+    let metrics_logger = metrics::MetricsLogger::new();
+
+    let factory_reset_handler =
+        FactoryResetHandler::new(&input_handlers_node, metrics_logger.clone());
+    let media_buttons_handler =
+        MediaButtonsHandler::new(&input_handlers_node, metrics_logger.clone());
 
     let supported_input_devices =
         input_device::InputDeviceType::list_from_structured_config_list(&supported_input_devices);
@@ -139,8 +143,6 @@ pub async fn handle_input(
     // Create parent node of inspect nodes for device bindings.
     let injected_devices_node = node.create_child("injected_input_devices");
 
-    let metrics_logger = metrics::MetricsLogger::new();
-
     let input_pipeline = InputPipeline::new(
         supported_input_devices.clone(),
         build_input_pipeline_assembly(
@@ -155,10 +157,11 @@ pub async fn handle_input(
             HashSet::from_iter(supported_input_devices.iter()),
             focus_chain_publisher,
             input_handlers_node,
-            metrics_logger,
+            metrics_logger.clone(),
         )
         .await,
         node,
+        metrics_logger.clone(),
     )
     .context("Failed to create InputPipeline.")?;
 
@@ -178,6 +181,7 @@ pub async fn handle_input(
         input_pipeline.input_event_sender().clone(),
         input_pipeline.input_device_bindings().clone(),
         injected_devices_node,
+        metrics_logger.clone(),
     );
     fasync::Task::local(input_device_registry_fut).detach();
 
@@ -222,11 +226,17 @@ async fn add_touchscreen_handler(
     scene_manager: Arc<Mutex<dyn SceneManager>>,
     mut assembly: InputPipelineAssembly,
     input_handlers_node: &inspect::Node,
+    metrics_logger: metrics::MetricsLogger,
 ) -> InputPipelineAssembly {
     let setup_proxy = setup_pointer_injector_config_request_stream(scene_manager.clone());
     let size = scene_manager.lock().await.get_pointerinjection_display_size();
-    let touch_handler =
-        TouchInjectorHandler::new_with_config_proxy(setup_proxy, size, input_handlers_node).await;
+    let touch_handler = TouchInjectorHandler::new_with_config_proxy(
+        setup_proxy,
+        size,
+        input_handlers_node,
+        metrics_logger,
+    )
+    .await;
     match touch_handler {
         Ok(touch_handler) => {
             fasync::Task::local(touch_handler.clone().watch_viewport()).detach();
@@ -245,12 +255,18 @@ async fn add_mouse_handler(
     mut assembly: InputPipelineAssembly,
     sender: futures::channel::mpsc::Sender<CursorMessage>,
     input_handlers_node: &inspect::Node,
+    metrics_logger: metrics::MetricsLogger,
 ) -> InputPipelineAssembly {
     let setup_proxy = setup_pointer_injector_config_request_stream(scene_manager.clone());
     let size = scene_manager.lock().await.get_pointerinjection_display_size();
-    let mouse_handler =
-        MouseInjectorHandler::new_with_config_proxy(setup_proxy, size, sender, input_handlers_node)
-            .await;
+    let mouse_handler = MouseInjectorHandler::new_with_config_proxy(
+        setup_proxy,
+        size,
+        sender,
+        input_handlers_node,
+        metrics_logger,
+    )
+    .await;
     match mouse_handler {
         Ok(mouse_handler) => {
             fasync::Task::local(mouse_handler.clone().watch_viewport()).detach();
@@ -282,12 +298,12 @@ async fn register_keyboard_related_input_handlers(
 
     // Add the text settings handler early in the pipeline to use the
     // keymap settings in the remainder of the pipeline.
-    assembly = add_text_settings_handler(assembly, input_handlers_node);
+    assembly = add_text_settings_handler(assembly, input_handlers_node, metrics_logger.clone());
     assembly = add_keymap_handler(assembly, input_handlers_node);
     assembly = add_key_meaning_modifier_handler(assembly, input_handlers_node);
-    assembly = assembly.add_autorepeater(input_handlers_node, metrics_logger);
+    assembly = assembly.add_autorepeater(input_handlers_node);
     assembly = add_dead_keys_handler(assembly, icu_data_loader, input_handlers_node);
-    assembly = add_ime(assembly, input_handlers_node).await;
+    assembly = add_ime(assembly, input_handlers_node, metrics_logger.clone()).await;
 
     // Forward focus to Text Manager.
     // This requires `fuchsia.ui.focus.FocusChainListenerRegistry`
@@ -302,6 +318,7 @@ async fn register_mouse_related_input_handlers(
     scene_manager: Arc<Mutex<dyn SceneManager>>,
     input_pipeline_node: &inspect::Node,
     input_handlers_node: &inspect::Node,
+    metrics_logger: metrics::MetricsLogger,
 ) -> InputPipelineAssembly {
     let (sender, mut receiver) = futures::channel::mpsc::channel(0);
 
@@ -319,7 +336,8 @@ async fn register_mouse_related_input_handlers(
     // This handler must come before the PointerMotionDisplayScaleHandler.
     // Otherwise the display scale will be applied quadratically in some
     // cases.
-    assembly = add_pointer_sensor_scale_handler(assembly, input_handlers_node);
+    assembly =
+        add_pointer_sensor_scale_handler(assembly, input_handlers_node, metrics_logger.clone());
 
     // Add handler to scale pointer motion on high-DPI displays.
     //
@@ -331,11 +349,22 @@ async fn register_mouse_related_input_handlers(
     //   mouse events should be scaled.
     let pointer_scale =
         scene_manager.lock().await.get_display_metrics().physical_pixel_ratio().max(1.0);
-    assembly = add_pointer_display_scale_handler(assembly, pointer_scale, input_handlers_node);
+    assembly = add_pointer_display_scale_handler(
+        assembly,
+        pointer_scale,
+        input_handlers_node,
+        metrics_logger.clone(),
+    );
 
     if use_flatland {
-        assembly =
-            add_mouse_handler(scene_manager.clone(), assembly, sender, input_handlers_node).await;
+        assembly = add_mouse_handler(
+            scene_manager.clone(),
+            assembly,
+            sender,
+            input_handlers_node,
+            metrics_logger,
+        )
+        .await;
     } else {
         // We don't have mouse support for GFX. But that's okay,
         // because the devices still using GFX don't support mice
@@ -372,7 +401,7 @@ async fn build_input_pipeline_assembly(
     input_handlers_node: inspect::Node,
     metrics_logger: metrics::MetricsLogger,
 ) -> InputPipelineAssembly {
-    let mut assembly = InputPipelineAssembly::new();
+    let mut assembly = InputPipelineAssembly::new(metrics_logger.clone());
     {
         // Keep this handler first because it keeps performance measurement counters
         // for the rest of the pipeline at entry.
@@ -390,7 +419,7 @@ async fn build_input_pipeline_assembly(
                 icu_data_loader,
                 focus_chain_publisher,
                 &input_handlers_node,
-                metrics_logger,
+                metrics_logger.clone(),
             )
             .await;
         }
@@ -417,15 +446,20 @@ async fn build_input_pipeline_assembly(
                 scene_manager.clone(),
                 node,
                 &input_handlers_node,
+                metrics_logger.clone(),
             )
             .await;
         }
 
         if supported_input_devices.contains(&input_device::InputDeviceType::Touch) {
             info!("Registering touchscreen-related input handlers.");
-            assembly =
-                add_touchscreen_handler(scene_manager.clone(), assembly, &input_handlers_node)
-                    .await;
+            assembly = add_touchscreen_handler(
+                scene_manager.clone(),
+                assembly,
+                &input_handlers_node,
+                metrics_logger,
+            )
+            .await;
         }
     }
 
@@ -495,10 +529,11 @@ fn add_inspect_handler(
 fn add_text_settings_handler(
     assembly: InputPipelineAssembly,
     input_handlers_node: &fuchsia_inspect::Node,
+    metrics_logger: metrics::MetricsLogger,
 ) -> InputPipelineAssembly {
     let proxy = connect_to_protocol::<fsettings::KeyboardMarker>()
         .expect("needs a connection to fuchsia.settings.Keyboard");
-    let text_handler = TextSettingsHandler::new(None, None, input_handlers_node);
+    let text_handler = TextSettingsHandler::new(None, None, input_handlers_node, metrics_logger);
     text_handler.clone().serve(proxy);
     assembly.add_handler(text_handler)
 }
@@ -526,8 +561,9 @@ fn add_dead_keys_handler(
 async fn add_ime(
     mut assembly: InputPipelineAssembly,
     input_handlers_node: &inspect::Node,
+    metrics_logger: metrics::MetricsLogger,
 ) -> InputPipelineAssembly {
-    if let Ok(ime_handler) = ImeHandler::new(input_handlers_node).await {
+    if let Ok(ime_handler) = ImeHandler::new(input_handlers_node, metrics_logger).await {
         assembly = assembly.add_handler(ime_handler);
     }
     assembly
@@ -537,10 +573,12 @@ fn add_pointer_display_scale_handler(
     assembly: InputPipelineAssembly,
     scale_factor: f32,
     input_handlers_node: &inspect::Node,
+    metrics_logger: metrics::MetricsLogger,
 ) -> InputPipelineAssembly {
     match input_pipeline::pointer_display_scale_handler::PointerDisplayScaleHandler::new(
         scale_factor,
         input_handlers_node,
+        metrics_logger,
     ) {
         Ok(handler) => assembly.add_handler(handler),
         Err(e) => {
@@ -553,10 +591,12 @@ fn add_pointer_display_scale_handler(
 fn add_pointer_sensor_scale_handler(
     assembly: InputPipelineAssembly,
     input_handlers_node: &inspect::Node,
+    metrics_logger: metrics::MetricsLogger,
 ) -> InputPipelineAssembly {
     assembly.add_handler(
         input_pipeline::pointer_sensor_scale_handler::PointerSensorScaleHandler::new(
             input_handlers_node,
+            metrics_logger,
         ),
     )
 }
@@ -658,6 +698,7 @@ pub async fn handle_input_device_registry_request_streams(
     input_event_sender: futures::channel::mpsc::UnboundedSender<input_device::InputEvent>,
     input_device_bindings: InputDeviceBindingHashMap,
     injected_devices_node: inspect::Node,
+    metrics_logger: metrics::MetricsLogger,
 ) {
     // Use a high value device id to avoid conflicting device ids.
     let mut device_id = u32::MAX;
@@ -666,6 +707,7 @@ pub async fn handle_input_device_registry_request_streams(
         let input_device_types_clone = input_device_types.clone();
         let input_event_sender_clone = input_event_sender.clone();
         let input_device_bindings_clone = input_device_bindings.clone();
+        let metrics_logger_clone = metrics_logger.clone();
 
         // Must clone inspect node since we move it to our async task, but we want to
         // continue to operate on this inspect tree in future iterations of the loop.
@@ -681,6 +723,7 @@ pub async fn handle_input_device_registry_request_streams(
                 &input_device_bindings_clone,
                 device_id,
                 &node_clone,
+                metrics_logger_clone,
             )
             .await
             {

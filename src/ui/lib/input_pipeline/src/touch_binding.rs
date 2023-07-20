@@ -4,6 +4,7 @@
 
 use {
     crate::input_device::{self, Handled, InputDeviceBinding, InputDeviceStatus, InputEvent},
+    crate::metrics,
     crate::mouse_binding,
     crate::utils::{Position, Size},
     anyhow::{format_err, Context, Error},
@@ -15,6 +16,7 @@ use {
     fuchsia_zircon as zx,
     futures::channel::mpsc::{UnboundedReceiver, UnboundedSender},
     maplit::hashmap,
+    metrics_registry::*,
     std::collections::HashMap,
     std::collections::HashSet,
     std::iter::FromIterator,
@@ -299,6 +301,7 @@ impl TouchBinding {
     /// - `device_id`: The id of the connected touch device.
     /// - `input_event_sender`: The channel to send new InputEvents to.
     /// - `device_node`: The inspect node for this device binding
+    /// - `metrics_logger`: The metrics logger.
     ///
     /// # Errors
     /// If there was an error binding to the proxy.
@@ -307,6 +310,7 @@ impl TouchBinding {
         device_id: u32,
         input_event_sender: UnboundedSender<input_device::InputEvent>,
         device_node: fuchsia_inspect::Node,
+        metrics_logger: metrics::MetricsLogger,
     ) -> Result<Self, Error> {
         let (device_binding, mut inspect_status) =
             Self::bind_device(device_proxy.clone(), device_id, input_event_sender, device_node)
@@ -321,6 +325,7 @@ impl TouchBinding {
             device_binding.get_device_descriptor(),
             device_binding.input_event_sender(),
             inspect_status,
+            metrics_logger,
             Self::process_reports,
         );
 
@@ -462,6 +467,7 @@ impl TouchBinding {
         device_descriptor: &input_device::InputDeviceDescriptor,
         input_event_sender: &mut UnboundedSender<InputEvent>,
         inspect_status: &InputDeviceStatus,
+        metrics_logger: &metrics::MetricsLogger,
     ) -> (Option<InputReport>, Option<UnboundedReceiver<InputEvent>>) {
         inspect_status.count_received_report(&report);
         match device_descriptor {
@@ -471,12 +477,14 @@ impl TouchBinding {
                 device_descriptor,
                 input_event_sender,
                 inspect_status,
+                metrics_logger,
             ),
             input_device::InputDeviceDescriptor::Touchpad(_) => process_touchpad_reports(
                 report,
                 device_descriptor,
                 input_event_sender,
                 inspect_status,
+                metrics_logger,
             ),
             _ => (None, None),
         }
@@ -522,6 +530,7 @@ fn process_touch_screen_reports(
     device_descriptor: &input_device::InputDeviceDescriptor,
     input_event_sender: &mut UnboundedSender<InputEvent>,
     inspect_status: &InputDeviceStatus,
+    metrics_logger: &metrics::MetricsLogger,
 ) -> (Option<InputReport>, Option<UnboundedReceiver<InputEvent>>) {
     fuchsia_trace::duration!("input", "touch-binding-process-report");
     fuchsia_trace::flow_end!("input", "input_report", report.trace_id.unwrap_or(0).into());
@@ -590,6 +599,7 @@ fn process_touch_screen_reports(
         input_event_sender,
         trace_id,
         inspect_status,
+        metrics_logger,
     );
 
     (Some(report), None)
@@ -600,6 +610,7 @@ fn process_touchpad_reports(
     device_descriptor: &input_device::InputDeviceDescriptor,
     input_event_sender: &mut UnboundedSender<InputEvent>,
     inspect_status: &InputDeviceStatus,
+    metrics_logger: &metrics::MetricsLogger,
 ) -> (Option<InputReport>, Option<UnboundedReceiver<InputEvent>>) {
     fuchsia_trace::duration!("input", "touch-binding-process-report");
     fuchsia_trace::flow_end!("input", "input_report", report.trace_id.unwrap_or(0).into());
@@ -636,6 +647,7 @@ fn process_touchpad_reports(
         input_event_sender,
         trace_id,
         inspect_status,
+        metrics_logger,
     );
 
     (Some(report), None)
@@ -672,6 +684,7 @@ fn send_touch_screen_event(
     input_event_sender: &mut UnboundedSender<input_device::InputEvent>,
     trace_id: fuchsia_trace::Id,
     inspect_status: &InputDeviceStatus,
+    metrics_logger: &metrics::MetricsLogger,
 ) {
     let event = input_device::InputEvent {
         device_event: input_device::InputDeviceEvent::TouchScreen(TouchScreenEvent {
@@ -685,7 +698,12 @@ fn send_touch_screen_event(
     };
 
     match input_event_sender.unbounded_send(event.clone()) {
-        Err(e) => tracing::error!("Failed to send TouchScreenEvent with error: {:?}", e),
+        Err(e) => {
+            metrics_logger.log_error(
+                InputPipelineErrorMetricDimensionEvent::TouchFailedToSendTouchScreenEvent,
+                std::format!("Failed to send TouchScreenEvent with error: {:?}", e),
+            );
+        }
         _ => inspect_status.count_generated_event(event),
     }
 }
@@ -704,6 +722,7 @@ fn send_touchpad_event(
     input_event_sender: &mut UnboundedSender<input_device::InputEvent>,
     trace_id: fuchsia_trace::Id,
     inspect_status: &InputDeviceStatus,
+    metrics_logger: &metrics::MetricsLogger,
 ) {
     let event = input_device::InputEvent {
         device_event: input_device::InputDeviceEvent::Touchpad(TouchpadEvent {
@@ -717,7 +736,12 @@ fn send_touchpad_event(
     };
 
     match input_event_sender.unbounded_send(event.clone()) {
-        Err(e) => tracing::error!("Failed to send TouchpadEvent with error: {:?}", e),
+        Err(e) => {
+            metrics_logger.log_error(
+                InputPipelineErrorMetricDimensionEvent::TouchFailedToSendTouchpadEvent,
+                std::format!("Failed to send TouchpadEvent with error: {:?}", e),
+            );
+        }
         _ => inspect_status.count_generated_event(event),
     }
 }
@@ -793,6 +817,7 @@ mod tests {
             &descriptor,
             &mut event_sender,
             &inspect_status,
+            &metrics::MetricsLogger::default(),
         );
         assert!(returned_report.is_some());
         assert_eq!(returned_report.unwrap().event_time, Some(report_time));
@@ -1037,6 +1062,7 @@ mod tests {
             &descriptor,
             &mut event_sender,
             &inspect_status,
+            &metrics::MetricsLogger::default(),
         );
         assert_matches!(event_receiver.try_next(), Ok(Some(InputEvent { trace_id: Some(_), .. })));
     }
@@ -1096,7 +1122,15 @@ mod tests {
         // Create a `TouchBinding` to exercise its call to `SetFeatureReport`. But drop
         // the binding immediately, so that `set_feature_report_receiver.collect()`
         // does not hang.
-        TouchBinding::new(input_device_proxy, 0, device_event_sender, test_node).await.unwrap();
+        TouchBinding::new(
+            input_device_proxy,
+            0,
+            device_event_sender,
+            test_node,
+            metrics::MetricsLogger::default(),
+        )
+        .await
+        .unwrap();
         assert_matches!(
             set_feature_report_receiver.collect::<Vec<_>>().await.as_slice(),
             [fidl_input_report::FeatureReport {
@@ -1149,8 +1183,15 @@ mod tests {
         let inspector = fuchsia_inspect::Inspector::default();
         let test_node = inspector.root().create_child("test_node");
 
-        let binding =
-            TouchBinding::new(input_device_proxy, 0, device_event_sender, test_node).await.unwrap();
+        let binding = TouchBinding::new(
+            input_device_proxy,
+            0,
+            device_event_sender,
+            test_node,
+            metrics::MetricsLogger::default(),
+        )
+        .await
+        .unwrap();
         pretty_assertions::assert_eq!(binding.touch_device_type, expect_touch_device_type);
     }
 

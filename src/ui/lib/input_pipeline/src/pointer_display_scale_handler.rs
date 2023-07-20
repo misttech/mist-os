@@ -6,17 +6,20 @@ use {
     crate::{
         input_device,
         input_handler::{InputHandlerStatus, UnhandledInputHandler},
-        mouse_binding,
+        metrics, mouse_binding,
         utils::Position,
     },
     anyhow::{format_err, Error},
     async_trait::async_trait,
+    derivative::Derivative,
     fuchsia_inspect,
+    metrics_registry::*,
     std::{convert::From, rc::Rc},
 };
 
 // TODO(fxbug.dev/91272) Add trackpad support
-#[derive(Debug, PartialEq)]
+#[derive(Derivative)]
+#[derivative(Debug, PartialEq)]
 pub struct PointerDisplayScaleHandler {
     /// The amount by which motion will be scaled up. E.g., a `scale_factor`
     /// of 2 means that all motion will be multiplied by 2.
@@ -24,6 +27,10 @@ pub struct PointerDisplayScaleHandler {
 
     /// The inventory of this handler's Inspect status.
     pub inspect_status: InputHandlerStatus,
+
+    /// The metrics logger.
+    #[derivative(Debug = "ignore", PartialEq = "ignore")]
+    metrics_logger: metrics::MetricsLogger,
 }
 
 #[async_trait(?Send)]
@@ -128,6 +135,7 @@ impl PointerDisplayScaleHandler {
     pub fn new(
         scale_factor: f32,
         input_handlers_node: &fuchsia_inspect::Node,
+        metrics_logger: metrics::MetricsLogger,
     ) -> Result<Rc<Self>, Error> {
         tracing::debug!("scale_factor={}", scale_factor);
         use std::num::FpCategory;
@@ -149,7 +157,7 @@ impl PointerDisplayScaleHandler {
                 } else if scale_factor < 1.0 {
                     Err(format_err!("Down-scaling motion is not supported"))
                 } else {
-                    Ok(Rc::new(Self { scale_factor, inspect_status }))
+                    Ok(Rc::new(Self { scale_factor, inspect_status, metrics_logger }))
                 }
             }
         }
@@ -173,7 +181,10 @@ impl PointerDisplayScaleHandler {
                     None => {
                         // this should never reach as pointer_sensor_scale_handler should
                         // fill this field.
-                        tracing::error!("physical_pixel is none");
+                        self.metrics_logger.log_error(
+                            InputPipelineErrorMetricDimensionEvent::PointerDisplayScaleNoPhysicalPixel,
+                            "physical_pixel is none",
+                        );
                         None
                     }
                     Some(pixel) => Some(self.scale_factor * pixel),
@@ -238,7 +249,7 @@ mod tests {
     fn new(scale_factor: f32) -> Result<Rc<PointerDisplayScaleHandler>, Error> {
         let inspector = fuchsia_inspect::Inspector::default();
         let test_node = inspector.root().create_child("test_node");
-        PointerDisplayScaleHandler::new(scale_factor, &test_node)
+        PointerDisplayScaleHandler::new(scale_factor, &test_node, metrics::MetricsLogger::default())
     }
 
     #[fuchsia::test(allow_stalls = false)]
@@ -246,7 +257,8 @@ mod tests {
         let inspector = fuchsia_inspect::Inspector::default();
         let test_node = inspector.root().create_child("test_node");
         let handler =
-            PointerDisplayScaleHandler::new(2.0, &test_node).expect("failed to make handler");
+            PointerDisplayScaleHandler::new(2.0, &test_node, metrics::MetricsLogger::default())
+                .expect("failed to make handler");
         let input_event = make_unhandled_input_event(mouse_binding::MouseEvent {
             location: mouse_binding::MouseLocation::Relative(mouse_binding::RelativeLocation {
                 millimeters: Position { x: 1.5, y: 4.5 },
@@ -306,7 +318,8 @@ mod tests {
         let inspector = fuchsia_inspect::Inspector::default();
         let test_node = inspector.root().create_child("test_node");
         let handler =
-            PointerDisplayScaleHandler::new(2.0, &test_node).expect("failed to make handler");
+            PointerDisplayScaleHandler::new(2.0, &test_node, metrics::MetricsLogger::default())
+                .expect("failed to make handler");
         let input_event = make_unhandled_input_event(event);
         assert_matches!(
             handler.clone().handle_unhandled_input_event(input_event).await.as_slice(),
@@ -322,7 +335,8 @@ mod tests {
         let inspector = fuchsia_inspect::Inspector::default();
         let test_node = inspector.root().create_child("test_node");
         let handler =
-            PointerDisplayScaleHandler::new(2.0, &test_node).expect("failed to make handler");
+            PointerDisplayScaleHandler::new(2.0, &test_node, metrics::MetricsLogger::default())
+                .expect("failed to make handler");
         let input_event = make_unhandled_input_event(mouse_binding::MouseEvent {
             location: mouse_binding::MouseLocation::Relative(mouse_binding::RelativeLocation {
                 millimeters: Position { x: 1.5 / COUNTS_PER_MM, y: 4.5 / COUNTS_PER_MM },
@@ -352,7 +366,8 @@ mod tests {
         let inspector = fuchsia_inspect::Inspector::default();
         let test_node = inspector.root().create_child("test_node");
         let handler =
-            PointerDisplayScaleHandler::new(2.0, &test_node).expect("failed to make handler");
+            PointerDisplayScaleHandler::new(2.0, &test_node, metrics::MetricsLogger::default())
+                .expect("failed to make handler");
         let input_event = make_unhandled_input_event(mouse_binding::MouseEvent {
             location: mouse_binding::MouseLocation::Relative(mouse_binding::RelativeLocation {
                 millimeters: Position::zero(),
@@ -411,7 +426,8 @@ mod tests {
         let inspector = fuchsia_inspect::Inspector::default();
         let test_node = inspector.root().create_child("test_node");
         let handler =
-            PointerDisplayScaleHandler::new(2.0, &test_node).expect("failed to make handler");
+            PointerDisplayScaleHandler::new(2.0, &test_node, metrics::MetricsLogger::default())
+                .expect("failed to make handler");
         let input_event = make_unhandled_input_event(event);
         assert_matches!(
             handler.clone().handle_unhandled_input_event(input_event).await.as_slice(),
@@ -453,7 +469,8 @@ mod tests {
         let inspector = fuchsia_inspect::Inspector::default();
         let test_node = inspector.root().create_child("test_node");
         let handler =
-            PointerDisplayScaleHandler::new(2.0, &test_node).expect("failed to make handler");
+            PointerDisplayScaleHandler::new(2.0, &test_node, metrics::MetricsLogger::default())
+                .expect("failed to make handler");
         let mut input_event = make_unhandled_input_event(event);
         const EVENT_TIME: zx::Time = zx::Time::from_nanos(42);
         input_event.event_time = EVENT_TIME;
@@ -512,7 +529,8 @@ mod tests {
         let inspector = fuchsia_inspect::Inspector::default();
         let test_node = inspector.root().create_child("test_node");
         let handler =
-            PointerDisplayScaleHandler::new(2.0, &test_node).expect("failed to make handler");
+            PointerDisplayScaleHandler::new(2.0, &test_node, metrics::MetricsLogger::default())
+                .expect("failed to make handler");
         let input_event = make_unhandled_input_event(event);
 
         handler.clone().handle_unhandled_input_event(input_event).await[0].clone()
@@ -552,7 +570,8 @@ mod tests {
         let inspector = fuchsia_inspect::Inspector::default();
         let test_node = inspector.root().create_child("test_node");
         let handler =
-            PointerDisplayScaleHandler::new(2.0, &test_node).expect("failed to make handler");
+            PointerDisplayScaleHandler::new(2.0, &test_node, metrics::MetricsLogger::default())
+                .expect("failed to make handler");
         let input_event = make_unhandled_input_event(mouse_binding::MouseEvent {
             location: mouse_binding::MouseLocation::Relative(mouse_binding::RelativeLocation {
                 millimeters: Position::zero(),
@@ -601,7 +620,11 @@ mod tests {
     fn pointer_display_scale_handler_initialized_with_inspect_node() {
         let inspector = fuchsia_inspect::Inspector::default();
         let fake_handlers_node = inspector.root().create_child("input_handlers_node");
-        let _handler = PointerDisplayScaleHandler::new(1.0, &fake_handlers_node);
+        let _handler = PointerDisplayScaleHandler::new(
+            1.0,
+            &fake_handlers_node,
+            metrics::MetricsLogger::default(),
+        );
         fuchsia_inspect::assert_data_tree!(inspector, root: {
             input_handlers_node: {
                 pointer_display_scale_handler: {
@@ -623,8 +646,12 @@ mod tests {
     async fn pointer_display_scale_handler_inspect_counts_events() {
         let inspector = fuchsia_inspect::Inspector::default();
         let fake_handlers_node = inspector.root().create_child("input_handlers_node");
-        let handler = PointerDisplayScaleHandler::new(1.0, &fake_handlers_node)
-            .expect("failed to make handler");
+        let handler = PointerDisplayScaleHandler::new(
+            1.0,
+            &fake_handlers_node,
+            metrics::MetricsLogger::default(),
+        )
+        .expect("failed to make handler");
 
         let event_time1 = zx::Time::get_monotonic();
         let event_time2 = event_time1.add(fuchsia_zircon::Duration::from_micros(1));

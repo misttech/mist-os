@@ -3,11 +3,13 @@
 // found in the LICENSE file.
 
 use {
+    crate::metrics,
     anyhow::{Context, Error},
     fidl_fuchsia_ui_focus as focus, fidl_fuchsia_ui_keyboard_focus as kbd_focus,
     focus_chain_provider::FocusChainProviderPublisher,
     fuchsia_component::client::connect_to_protocol,
     futures::StreamExt,
+    metrics_registry::*,
 };
 
 /// FocusListener listens to focus change and notify to related input modules.
@@ -20,6 +22,9 @@ pub struct FocusListener {
 
     /// Forwards focus chain updates to downstream watchers.
     focus_chain_publisher: FocusChainProviderPublisher,
+
+    /// The metrics logger.
+    metrics_logger: metrics::MetricsLogger,
 }
 
 impl FocusListener {
@@ -49,7 +54,10 @@ impl FocusListener {
     ///
     /// # Errors
     /// If unable to connect to the text_manager protocol.
-    pub fn new(focus_chain_publisher: FocusChainProviderPublisher) -> Result<Self, Error> {
+    pub fn new(
+        focus_chain_publisher: FocusChainProviderPublisher,
+        metrics_logger: metrics::MetricsLogger,
+    ) -> Result<Self, Error> {
         let text_manager = connect_to_protocol::<kbd_focus::ControllerMarker>()?;
 
         let (focus_chain_listener_client_end, focus_chain_listener) =
@@ -61,7 +69,12 @@ impl FocusListener {
             .register(focus_chain_listener_client_end)
             .context("Failed to register focus chain listener.")?;
 
-        Ok(Self::new_listener(text_manager, focus_chain_listener, focus_chain_publisher))
+        Ok(Self::new_listener(
+            text_manager,
+            focus_chain_listener,
+            focus_chain_publisher,
+            metrics_logger,
+        ))
     }
 
     /// Creates a new focus listener that holds proxy to text manager.
@@ -78,8 +91,9 @@ impl FocusListener {
         text_manager: kbd_focus::ControllerProxy,
         focus_chain_listener: focus::FocusChainListenerRequestStream,
         focus_chain_publisher: FocusChainProviderPublisher,
+        metrics_logger: metrics::MetricsLogger,
     ) -> Self {
-        Self { text_manager, focus_chain_listener, focus_chain_publisher }
+        Self { text_manager, focus_chain_listener, focus_chain_publisher, metrics_logger }
     }
 
     /// Dispatches focus chain updates from `focus_chain_listener` to `text_manager` and any subscribers of `focus_chain_publisher`.
@@ -109,7 +123,10 @@ impl FocusListener {
 
                     responder.send().context("while sending focus chain listener response")?;
                 }
-                Err(e) => tracing::error!("FocusChainListenerRequest has error: {}.", e),
+                Err(e) => self.metrics_logger.log_error(
+                    InputPipelineErrorMetricDimensionEvent::FocusChainListenerRequestError,
+                    std::format!("FocusChainListenerRequest has error: {}.", e),
+                ),
             }
         }
         tracing::warn!("Stopped dispatching focus changes.");
@@ -174,6 +191,7 @@ mod tests {
             focus_proxy,
             focus_chain_listener,
             focus_chain_provider_publisher,
+            metrics::MetricsLogger::default(),
         );
 
         fuchsia_async::Task::local(async move {

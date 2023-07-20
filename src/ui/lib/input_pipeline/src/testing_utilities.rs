@@ -743,7 +743,8 @@ macro_rules! assert_input_report_sequence_generates_events {
                 previous_report,
                 &$device_descriptor,
                 &mut event_sender.clone(),
-                &inspect_status
+                &inspect_status,
+                &metrics::MetricsLogger::default(),
             );
 
             // If a report generates multiple events asynchronously, we send them over a mpsc channel

@@ -4,6 +4,7 @@
 
 use {
     crate::input_device::{self, Handled, InputDeviceBinding, InputDeviceStatus, InputEvent},
+    crate::metrics,
     anyhow::{format_err, Error},
     async_trait::async_trait,
     fidl_fuchsia_input_report::{self as fidl_input_report, ConsumerControlButton},
@@ -11,6 +12,7 @@ use {
     fuchsia_inspect::{health::Reporter, ArrayProperty},
     fuchsia_zircon as zx,
     futures::channel::mpsc::{UnboundedReceiver, UnboundedSender},
+    metrics_registry::*,
 };
 
 /// A [`ConsumerControlsEvent`] represents an event where one or more consumer control buttons
@@ -102,6 +104,7 @@ impl ConsumerControlsBinding {
     /// - `device_id`: The id of the connected device.
     /// - `input_event_sender`: The channel to send new InputEvents to.
     /// - `device_node`: The inspect node for this device binding
+    /// - `metrics_logger`: The metrics logger.
     ///
     /// # Errors
     /// If there was an error binding to the proxy.
@@ -110,6 +113,7 @@ impl ConsumerControlsBinding {
         device_id: u32,
         input_event_sender: UnboundedSender<input_device::InputEvent>,
         device_node: fuchsia_inspect::Node,
+        metrics_logger: metrics::MetricsLogger,
     ) -> Result<Self, Error> {
         let (device_binding, mut inspect_status) =
             Self::bind_device(&device_proxy, device_id, input_event_sender, device_node).await?;
@@ -119,6 +123,7 @@ impl ConsumerControlsBinding {
             device_binding.get_device_descriptor(),
             device_binding.input_event_sender(),
             inspect_status,
+            metrics_logger,
             Self::process_reports,
         );
 
@@ -193,6 +198,8 @@ impl ConsumerControlsBinding {
     ///                    previous report was found.
     /// `device_descriptor`: The descriptor for the input device generating the input reports.
     /// `input_event_sender`: The sender for the device binding's input event stream.
+    /// `metrics_logger`: The metrics logger.
+    ///
     ///
     /// # Returns
     /// An [`InputReport`] which will be passed to the next call to [`process_reports`], as
@@ -206,6 +213,7 @@ impl ConsumerControlsBinding {
         device_descriptor: &input_device::InputDeviceDescriptor,
         input_event_sender: &mut UnboundedSender<input_device::InputEvent>,
         inspect_status: &InputDeviceStatus,
+        metrics_logger: &metrics::MetricsLogger,
     ) -> (Option<InputReport>, Option<UnboundedReceiver<InputEvent>>) {
         inspect_status.count_received_report(&report);
         // Input devices can have multiple types so ensure `report` is a ConsumerControlInputReport.
@@ -226,6 +234,7 @@ impl ConsumerControlsBinding {
             device_descriptor,
             input_event_sender,
             inspect_status,
+            metrics_logger,
         );
 
         (Some(report), None)
@@ -238,11 +247,13 @@ impl ConsumerControlsBinding {
 /// - `pressed_buttons`: The buttons relevant to the event.
 /// - `device_descriptor`: The descriptor for the input device generating the input reports.
 /// - `sender`: The stream to send the InputEvent to.
+/// - `metrics_logger`: The metrics logger.
 fn send_consumer_controls_event(
     pressed_buttons: Vec<ConsumerControlButton>,
     device_descriptor: &input_device::InputDeviceDescriptor,
     sender: &mut UnboundedSender<input_device::InputEvent>,
     inspect_status: &InputDeviceStatus,
+    metrics_logger: &metrics::MetricsLogger,
 ) {
     let event = input_device::InputEvent {
         device_event: input_device::InputDeviceEvent::ConsumerControls(ConsumerControlsEvent::new(
@@ -255,7 +266,10 @@ fn send_consumer_controls_event(
     };
 
     match sender.unbounded_send(event.clone()) {
-        Err(e) => tracing::error!("Failed to send ConsumerControlsEvent with error: {:?}", e),
+        Err(e) => metrics_logger.log_error(
+            InputPipelineErrorMetricDimensionEvent::ConsumerControlsSendEventFailed,
+            std::format!("Failed to send ConsumerControlsEvent with error: {:?}", e),
+        ),
         _ => inspect_status.count_generated_event(event),
     }
 }

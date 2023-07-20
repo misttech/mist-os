@@ -7,11 +7,12 @@ use {
     crate::{
         input_device,
         input_handler::{InputHandlerStatus, UnhandledInputHandler},
-        mouse_binding,
+        metrics, mouse_binding,
         utils::Position,
     },
     async_trait::async_trait,
     fuchsia_inspect, fuchsia_zircon as zx,
+    metrics_registry::*,
     std::{cell::RefCell, convert::From, num::FpCategory, option::Option, rc::Rc},
 };
 
@@ -20,6 +21,9 @@ pub struct PointerSensorScaleHandler {
 
     /// The inventory of this handler's Inspect status.
     pub inspect_status: InputHandlerStatus,
+
+    /// The metrics logger.
+    metrics_logger: metrics::MetricsLogger,
 }
 
 struct MutableState {
@@ -212,7 +216,10 @@ impl PointerSensorScaleHandler {
     /// Creates a new [`PointerSensorScaleHandler`].
     ///
     /// Returns `Rc<Self>`.
-    pub fn new(input_handlers_node: &fuchsia_inspect::Node) -> Rc<Self> {
+    pub fn new(
+        input_handlers_node: &fuchsia_inspect::Node,
+        metrics_logger: metrics::MetricsLogger,
+    ) -> Rc<Self> {
         let inspect_status = InputHandlerStatus::new(
             input_handlers_node,
             "pointer_sensor_scale_handler",
@@ -224,6 +231,7 @@ impl PointerSensorScaleHandler {
                 last_scroll_timestamp: None,
             }),
             inspect_status,
+            metrics_logger,
         })
     }
 
@@ -337,12 +345,14 @@ impl PointerSensorScaleHandler {
                 //
                 // TODO(https://fxbug.dev/98995) Add a triage rule to highlight the
                 // implications of this message.
-                tracing::error!(
-                    "skipped motion; scaled movement of {:?} is infinite or NaN; x is {:?}, and y is {:?}",
-                    scaled_movement_mm,
-                    scaled_movement_mm.x.classify(),
-                    scaled_movement_mm.y.classify(),
-                );
+                self.metrics_logger.log_error(
+                    InputPipelineErrorMetricDimensionEvent::PointerSensorScaleHandlerScaledMotionInvalid,
+                    std::format!(
+                        "skipped motion; scaled movement of {:?} is infinite or NaN; x is {:?}, and y is {:?}",
+                        scaled_movement_mm,
+                        scaled_movement_mm.x.classify(),
+                        scaled_movement_mm.y.classify(),
+                ));
                 Position { x: 0.0, y: 0.0 }
             }
             _ => scaled_movement_mm,
@@ -397,10 +407,12 @@ impl PointerSensorScaleHandler {
                 let scaled_scroll_mm = SCALE_SCROLL * scale_factor * mm;
 
                 if scaled_scroll_mm.is_infinite() || scaled_scroll_mm.is_nan() {
-                    tracing::error!(
-                        "skipped scroll; scaled scroll of {:?} is infinite or NaN.",
-                        scaled_scroll_mm,
-                    );
+                    self.metrics_logger.log_error(
+                        InputPipelineErrorMetricDimensionEvent::PointerSensorScaleHandlerScaledScrollInvalid,
+                        std::format!(
+                            "skipped scroll; scaled scroll of {:?} is infinite or NaN.",
+                            scaled_scroll_mm,
+                    ));
                     return Some(mouse_binding::WheelDelta {
                         raw_data: mouse_binding::RawWheelDelta::Millimeters(mm),
                         physical_pixel: Some(SCALE_SCROLL * mm),
@@ -481,7 +493,8 @@ mod tests {
     fn pointer_sensor_scale_handler_initialized_with_inspect_node() {
         let inspector = fuchsia_inspect::Inspector::default();
         let fake_handlers_node = inspector.root().create_child("input_handlers_node");
-        let _handler = PointerSensorScaleHandler::new(&fake_handlers_node);
+        let _handler =
+            PointerSensorScaleHandler::new(&fake_handlers_node, metrics::MetricsLogger::default());
         fuchsia_inspect::assert_data_tree!(inspector, root: {
             input_handlers_node: {
                 pointer_sensor_scale_handler: {
@@ -503,7 +516,8 @@ mod tests {
     async fn pointer_sensor_scale_handler_inspect_counts_events() {
         let inspector = fuchsia_inspect::Inspector::default();
         let fake_handlers_node = inspector.root().create_child("input_handlers_node");
-        let handler = PointerSensorScaleHandler::new(&fake_handlers_node);
+        let handler =
+            PointerSensorScaleHandler::new(&fake_handlers_node, metrics::MetricsLogger::default());
 
         let event_time1 = zx::Time::get_monotonic();
         let event_time2 = event_time1.add(fuchsia_zircon::Duration::from_micros(1));
@@ -626,7 +640,8 @@ mod tests {
         async fn get_scaled_motion_mm(movement_mm: Position, duration: zx::Duration) -> Position {
             let inspector = fuchsia_inspect::Inspector::default();
             let test_node = inspector.root().create_child("test_node");
-            let handler = PointerSensorScaleHandler::new(&test_node);
+            let handler =
+                PointerSensorScaleHandler::new(&test_node, metrics::MetricsLogger::default());
 
             // Send a don't-care value through to seed the last timestamp.
             let input_event = input_device::UnhandledInputEvent {
@@ -848,7 +863,8 @@ mod tests {
         async fn scaled(event: mouse_binding::MouseEvent) -> (Option<f32>, Option<f32>) {
             let inspector = fuchsia_inspect::Inspector::default();
             let test_node = inspector.root().create_child("test_node");
-            let handler = PointerSensorScaleHandler::new(&test_node);
+            let handler =
+                PointerSensorScaleHandler::new(&test_node, metrics::MetricsLogger::default());
             let unhandled_event = make_unhandled_input_event(event);
 
             let events = handler.clone().handle_unhandled_input_event(unhandled_event).await;
@@ -895,7 +911,8 @@ mod tests {
         ) -> (Option<mouse_binding::WheelDelta>, Option<mouse_binding::WheelDelta>) {
             let inspector = fuchsia_inspect::Inspector::default();
             let test_node = inspector.root().create_child("test_node");
-            let handler = PointerSensorScaleHandler::new(&test_node);
+            let handler =
+                PointerSensorScaleHandler::new(&test_node, metrics::MetricsLogger::default());
 
             // Send a don't-care value through to seed the last timestamp.
             let input_event = input_device::UnhandledInputEvent {
@@ -1200,7 +1217,8 @@ mod tests {
         async fn does_not_consume_event(event: mouse_binding::MouseEvent) {
             let inspector = fuchsia_inspect::Inspector::default();
             let test_node = inspector.root().create_child("test_node");
-            let handler = PointerSensorScaleHandler::new(&test_node);
+            let handler =
+                PointerSensorScaleHandler::new(&test_node, metrics::MetricsLogger::default());
             let input_event = make_unhandled_input_event(event);
             assert_matches!(
                 handler.clone().handle_unhandled_input_event(input_event).await.as_slice(),
@@ -1239,7 +1257,8 @@ mod tests {
         async fn preserves_event_time(event: mouse_binding::MouseEvent) {
             let inspector = fuchsia_inspect::Inspector::default();
             let test_node = inspector.root().create_child("test_node");
-            let handler = PointerSensorScaleHandler::new(&test_node);
+            let handler =
+                PointerSensorScaleHandler::new(&test_node, metrics::MetricsLogger::default());
             let mut input_event = make_unhandled_input_event(event);
             const EVENT_TIME: zx::Time = zx::Time::from_nanos(42);
             input_event.event_time = EVENT_TIME;
@@ -1297,7 +1316,8 @@ mod tests {
         ) -> input_device::InputEvent {
             let inspector = fuchsia_inspect::Inspector::default();
             let test_node = inspector.root().create_child("test_node");
-            let handler = PointerSensorScaleHandler::new(&test_node);
+            let handler =
+                PointerSensorScaleHandler::new(&test_node, metrics::MetricsLogger::default());
             let input_event = make_unhandled_input_event(event);
 
             handler.clone().handle_unhandled_input_event(input_event).await[0].clone()

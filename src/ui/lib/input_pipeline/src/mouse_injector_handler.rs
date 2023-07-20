@@ -5,10 +5,9 @@
 #![warn(clippy::await_holding_refcell_ref)]
 
 use {
-    crate::input_device,
     crate::input_handler::{InputHandler, InputHandlerStatus},
-    crate::mouse_binding,
     crate::utils::{CursorMessage, Position, Size},
+    crate::{input_device, metrics, mouse_binding},
     anyhow::{anyhow, Context, Error, Result},
     async_trait::async_trait,
     async_utils::hanging_get::client::HangingGetStream,
@@ -19,6 +18,7 @@ use {
     fuchsia_component::client::connect_to_protocol,
     fuchsia_inspect, fuchsia_zircon as zx,
     futures::{channel::mpsc::Sender, stream::StreamExt, SinkExt},
+    metrics_registry::*,
     std::iter::FromIterator,
     std::{
         cell::{Ref, RefCell, RefMut},
@@ -63,6 +63,8 @@ pub struct MouseInjectorHandler {
 
     /// The inventory of this handler's Inspect status.
     pub inspect_status: InputHandlerStatus,
+
+    metrics_logger: metrics::MetricsLogger,
 }
 
 struct MutableState {
@@ -101,7 +103,9 @@ impl InputHandler for MouseInjectorHandler {
                 if let Err(e) =
                     self.update_cursor_renderer(mouse_event, &mouse_device_descriptor).await
                 {
-                    tracing::error!("update_cursor_renderer failed: {}", e);
+                    self.metrics_logger.log_error(
+                        InputPipelineErrorMetricDimensionEvent::MouseInjectorUpdateCursorRendererFailed,
+                        std::format!("update_cursor_renderer failed: {}", e));
                 }
 
                 // Create a new injector if this is the first time seeing device_id.
@@ -109,7 +113,9 @@ impl InputHandler for MouseInjectorHandler {
                     .ensure_injector_registered(&mouse_event, &mouse_device_descriptor, event_time)
                     .await
                 {
-                    tracing::error!("ensure_injector_registered failed: {}", e);
+                    self.metrics_logger.log_error(
+                        InputPipelineErrorMetricDimensionEvent::MouseInjectorEnsureInjectorRegisteredFailed,
+                        std::format!("ensure_injector_registered failed: {}", e));
                 }
 
                 // Handle the event.
@@ -117,7 +123,9 @@ impl InputHandler for MouseInjectorHandler {
                     .send_event_to_scenic(&mouse_event, &mouse_device_descriptor, event_time)
                     .await
                 {
-                    tracing::error!("send_event_to_scenic failed: {}", e);
+                    self.metrics_logger.log_error(
+                        InputPipelineErrorMetricDimensionEvent::MouseInjectorSendEventToScenicFailed,
+                        std::format!("send_event_to_scenic failed: {}", e));
                 }
 
                 // Consume the input event.
@@ -147,6 +155,7 @@ impl MouseInjectorHandler {
         display_size: Size,
         cursor_message_sender: Sender<CursorMessage>,
         input_handlers_node: &fuchsia_inspect::Node,
+        metrics_logger: metrics::MetricsLogger,
     ) -> Result<Rc<Self>, Error> {
         let configuration_proxy = connect_to_protocol::<pointerinjector_config::SetupMarker>()?;
         let injector_registry_proxy = connect_to_protocol::<pointerinjector::RegistryMarker>()?;
@@ -157,6 +166,7 @@ impl MouseInjectorHandler {
             display_size,
             cursor_message_sender,
             input_handlers_node,
+            metrics_logger,
         )
         .await
     }
@@ -181,6 +191,7 @@ impl MouseInjectorHandler {
         display_size: Size,
         cursor_message_sender: Sender<CursorMessage>,
         input_handlers_node: &fuchsia_inspect::Node,
+        metrics_logger: metrics::MetricsLogger,
     ) -> Result<Rc<Self>, Error> {
         let injector_registry_proxy = connect_to_protocol::<pointerinjector::RegistryMarker>()?;
         Self::new_handler(
@@ -189,6 +200,7 @@ impl MouseInjectorHandler {
             display_size,
             cursor_message_sender,
             input_handlers_node,
+            metrics_logger,
         )
         .await
     }
@@ -222,6 +234,7 @@ impl MouseInjectorHandler {
         display_size: Size,
         cursor_message_sender: Sender<CursorMessage>,
         input_handlers_node: &fuchsia_inspect::Node,
+        metrics_logger: metrics::MetricsLogger,
     ) -> Result<Rc<Self>, Error> {
         // Get the context and target views to inject into.
         let (context_view_ref, target_view_ref) = configuration_proxy.get_view_refs().await?;
@@ -247,6 +260,7 @@ impl MouseInjectorHandler {
             injector_registry_proxy,
             configuration_proxy,
             inspect_status,
+            metrics_logger,
         });
 
         Ok(handler)
@@ -475,9 +489,9 @@ impl MouseInjectorHandler {
                     Some(mouse_binding::PrecisionScroll::Yes) => Some(true),
                     Some(mouse_binding::PrecisionScroll::No) => Some(false),
                     None => {
-                        tracing::error!(
-                            "mouse wheel event does not have value in is_precision_scroll."
-                        );
+                        self.metrics_logger.log_error(
+                            InputPipelineErrorMetricDimensionEvent::MouseInjectorMissingIsPrecisionScroll,
+                            "mouse wheel event does not have value in is_precision_scroll.");
                         None
                     }
                 },
@@ -521,11 +535,15 @@ impl MouseInjectorHandler {
                     }
                 }
                 Some(Err(e)) => {
-                    tracing::error!("Error while reading viewport update: {}", e);
+                    self.metrics_logger.log_error(
+                        InputPipelineErrorMetricDimensionEvent::MouseInjectorErrorWhileReadingViewportUpdate,
+                        std::format!("Error while reading viewport update: {}", e));
                     return;
                 }
                 None => {
-                    tracing::error!("Viewport update stream terminated unexpectedly");
+                    self.metrics_logger.log_error(
+                        InputPipelineErrorMetricDimensionEvent::MouseInjectorViewportUpdateStreamTerminatedUnexpectedly,
+                        "Viewport update stream terminated unexpectedly");
                     return;
                 }
             }
@@ -728,6 +746,7 @@ mod tests {
             Size { width: DISPLAY_WIDTH_IN_PHYSICAL_PX, height: DISPLAY_HEIGHT_IN_PHYSICAL_PX },
             sender,
             &test_node,
+            metrics::MetricsLogger::default(),
         );
         let config_request_stream_fut =
             handle_configuration_request_stream(&mut configuration_request_stream);
@@ -907,6 +926,7 @@ mod tests {
             Size { width: DISPLAY_WIDTH_IN_PHYSICAL_PX, height: DISPLAY_HEIGHT_IN_PHYSICAL_PX },
             sender,
             &test_node,
+            metrics::MetricsLogger::default(),
         );
         let (mouse_handler_res, _) = futures::join!(mouse_handler_fut, config_request_stream_fut);
         let mouse_handler = mouse_handler_res.expect("Failed to create mouse handler");
@@ -1007,6 +1027,7 @@ mod tests {
             Size { width: DISPLAY_WIDTH_IN_PHYSICAL_PX, height: DISPLAY_HEIGHT_IN_PHYSICAL_PX },
             sender,
             &test_node,
+            metrics::MetricsLogger::default(),
         );
         let (mouse_handler_res, _) = futures::join!(mouse_handler_fut, config_request_stream_fut);
         let mouse_handler = mouse_handler_res.expect("Failed to create mouse handler");
@@ -1147,6 +1168,7 @@ mod tests {
             Size { width: DISPLAY_WIDTH_IN_PHYSICAL_PX, height: DISPLAY_HEIGHT_IN_PHYSICAL_PX },
             sender,
             &test_node,
+            metrics::MetricsLogger::default(),
         );
         let (mouse_handler_res, _) = futures::join!(mouse_handler_fut, config_request_stream_fut);
         let mouse_handler = mouse_handler_res.expect("Failed to create mouse handler");
@@ -1249,6 +1271,7 @@ mod tests {
             Size { width: DISPLAY_WIDTH_IN_PHYSICAL_PX, height: DISPLAY_HEIGHT_IN_PHYSICAL_PX },
             sender,
             &test_node,
+            metrics::MetricsLogger::default(),
         );
         let (mouse_handler_res, _) = futures::join!(mouse_handler_fut, config_request_stream_fut);
         let mouse_handler = mouse_handler_res.expect("Failed to create mouse handler");
@@ -1386,6 +1409,7 @@ mod tests {
             Size { width: DISPLAY_WIDTH_IN_PHYSICAL_PX, height: DISPLAY_HEIGHT_IN_PHYSICAL_PX },
             sender,
             &test_node,
+            metrics::MetricsLogger::default(),
         );
         let (mouse_handler_res, _) = futures::join!(mouse_handler_fut, config_request_stream_fut);
         let mouse_handler = mouse_handler_res.expect("Failed to create mouse handler");
@@ -1592,6 +1616,7 @@ mod tests {
             Size { width: DISPLAY_WIDTH_IN_PHYSICAL_PX, height: DISPLAY_HEIGHT_IN_PHYSICAL_PX },
             sender,
             &test_node,
+            metrics::MetricsLogger::default(),
         );
         let (mouse_handler_res, _) = futures::join!(mouse_handler_fut, config_request_stream_fut);
         let mouse_handler = mouse_handler_res.expect("Failed to create mouse handler");
@@ -1776,6 +1801,7 @@ mod tests {
             Size { width: DISPLAY_WIDTH_IN_PHYSICAL_PX, height: DISPLAY_HEIGHT_IN_PHYSICAL_PX },
             sender,
             &test_node,
+            metrics::MetricsLogger::default(),
         );
         let (mouse_handler_res, _) = futures::join!(mouse_handler_fut, config_request_stream_fut);
         let mouse_handler = mouse_handler_res.expect("Failed to create mouse handler");
@@ -1988,6 +2014,7 @@ mod tests {
             Size { width: DISPLAY_WIDTH_IN_PHYSICAL_PX, height: DISPLAY_HEIGHT_IN_PHYSICAL_PX },
             sender,
             &test_node,
+            metrics::MetricsLogger::default(),
         );
         let (mouse_handler_res, _) = futures::join!(mouse_handler_fut, config_request_stream_fut);
         let mouse_handler = mouse_handler_res.expect("Failed to create mouse handler");
@@ -2055,6 +2082,7 @@ mod tests {
             Size { width: DISPLAY_WIDTH_IN_PHYSICAL_PX, height: DISPLAY_HEIGHT_IN_PHYSICAL_PX },
             sender,
             &test_node,
+            metrics::MetricsLogger::default(),
         );
         let (mouse_handler_res, _) = futures::join!(mouse_handler_fut, config_request_stream_fut);
         let mouse_handler = mouse_handler_res.expect("Failed to create mouse handler");
@@ -2225,6 +2253,7 @@ mod tests {
             Size { width: DISPLAY_WIDTH_IN_PHYSICAL_PX, height: DISPLAY_HEIGHT_IN_PHYSICAL_PX },
             sender,
             &fake_handlers_node,
+            metrics::MetricsLogger::default(),
         );
         let (mouse_handler_res, _) = futures::join!(mouse_handler_fut, config_request_stream_fut);
         let _handler = mouse_handler_res.expect("Failed to create mouse handler");
@@ -2267,6 +2296,7 @@ mod tests {
             Size { width: DISPLAY_WIDTH_IN_PHYSICAL_PX, height: DISPLAY_HEIGHT_IN_PHYSICAL_PX },
             sender,
             &fake_handlers_node,
+            metrics::MetricsLogger::default(),
         );
         let config_request_stream_fut =
             handle_configuration_request_stream(&mut configuration_request_stream);

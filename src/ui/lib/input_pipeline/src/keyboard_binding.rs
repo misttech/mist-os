@@ -5,6 +5,7 @@
 use {
     crate::autorepeater,
     crate::input_device::{self, Handled, InputDeviceBinding, InputDeviceStatus, InputEvent},
+    crate::metrics,
     anyhow::{format_err, Error, Result},
     async_trait::async_trait,
     fidl_fuchsia_input,
@@ -15,6 +16,7 @@ use {
     fuchsia_inspect::health::Reporter,
     fuchsia_zircon as zx,
     futures::channel::mpsc::{UnboundedReceiver, UnboundedSender},
+    metrics_registry::*,
 };
 
 /// A [`KeyboardEvent`] represents an input event from a keyboard device.
@@ -290,6 +292,7 @@ impl KeyboardBinding {
     /// - `device_id`: The unique identifier of this device.
     /// - `input_event_sender`: The channel to send new InputEvents to.
     /// - `device_node`: The inspect node for this device binding
+    /// - `metrics_logger`: The metrics logger.
     ///
     /// # Errors
     /// If there was an error binding to the proxy.
@@ -298,15 +301,23 @@ impl KeyboardBinding {
         device_id: u32,
         input_event_sender: UnboundedSender<input_device::InputEvent>,
         device_node: fuchsia_inspect::Node,
+        metrics_logger: metrics::MetricsLogger,
     ) -> Result<Self, Error> {
-        let (device_binding, mut inspect_status) =
-            Self::bind_device(&device_proxy, input_event_sender, device_id, device_node).await?;
+        let (device_binding, mut inspect_status) = Self::bind_device(
+            &device_proxy,
+            input_event_sender,
+            device_id,
+            device_node,
+            metrics_logger.clone(),
+        )
+        .await?;
         inspect_status.health_node.set_ok();
         input_device::initialize_report_stream(
             device_proxy,
             device_binding.get_device_descriptor(),
             device_binding.input_event_sender(),
             inspect_status,
+            metrics_logger,
             Self::process_reports,
         );
 
@@ -358,6 +369,7 @@ impl KeyboardBinding {
         input_event_sender: UnboundedSender<input_device::InputEvent>,
         device_id: u32,
         device_node: fuchsia_inspect::Node,
+        metrics_logger: metrics::MetricsLogger,
     ) -> Result<(Self, InputDeviceStatus), Error> {
         let mut input_device_status = InputDeviceStatus::new(device_node);
         let descriptor = match device.get_descriptor().await {
@@ -372,7 +384,10 @@ impl KeyboardBinding {
             input_device_status.health_node.set_unhealthy("Empty device_info in descriptor");
             // Logging in addition to returning an error, as in some test
             // setups the error may never be displayed to the user.
-            tracing::error!("DRIVER BUG: empty device_info for device_id: {}", device_id);
+            metrics_logger.log_error(
+                InputPipelineErrorMetricDimensionEvent::KeyboardEmptyDeviceInfo,
+                std::format!("DRIVER BUG: empty device_info for device_id: {}", device_id),
+            );
             format_err!("empty device info for device_id: {}", device_id)
         })?;
         match descriptor.keyboard {
@@ -428,6 +443,7 @@ impl KeyboardBinding {
         device_descriptor: &input_device::InputDeviceDescriptor,
         input_event_sender: &mut UnboundedSender<input_device::InputEvent>,
         inspect_status: &InputDeviceStatus,
+        metrics_logger: &metrics::MetricsLogger,
     ) -> (Option<InputReport>, Option<UnboundedReceiver<InputEvent>>) {
         inspect_status.count_received_report(&report);
         // Input devices can have multiple types so ensure `report` is a KeyboardInputReport.
@@ -447,7 +463,10 @@ impl KeyboardBinding {
                 //
                 // In this case the report is treated as malformed, and the previous report is not
                 // updated.
-                tracing::error!("Failed to parse keyboard keys: {:?}", report);
+                metrics_logger.log_error(
+                    InputPipelineErrorMetricDimensionEvent::KeyboardFailedToParse,
+                    std::format!("Failed to parse keyboard keys: {:?}", report),
+                );
                 inspect_status.count_filtered_report(&report);
                 return (previous_report, None);
             }
@@ -467,6 +486,7 @@ impl KeyboardBinding {
             zx::Time::get_monotonic(),
             input_event_sender.clone(),
             inspect_sender,
+            metrics_logger,
         );
 
         (Some(report), Some(inspect_receiver))
@@ -504,6 +524,7 @@ impl KeyboardBinding {
         event_time: zx::Time,
         input_event_sender: UnboundedSender<input_device::InputEvent>,
         inspect_sender: UnboundedSender<input_device::InputEvent>,
+        metrics_logger: &metrics::MetricsLogger,
     ) {
         // Dispatches all key events individually in a separate task.  This is done in a separate
         // function so that the lifetime of `new_keys` above could be detached from that of the
@@ -514,6 +535,7 @@ impl KeyboardBinding {
             event_time: zx::Time,
             input_event_sender: UnboundedSender<input_device::InputEvent>,
             inspect_sender: UnboundedSender<input_device::InputEvent>,
+            metrics_logger: metrics::MetricsLogger,
         ) {
             fasync::Task::local(async move {
                 let mut event_time = event_time;
@@ -529,12 +551,13 @@ impl KeyboardBinding {
                     };
                     match input_event_sender.unbounded_send(event.clone()) {
                         Err(error) => {
-                            tracing::error!(
-                            "Failed to send KeyboardEvent for key: {:?}, event_type: {:?}: {:?}",
-                            &key,
-                            &event_type,
-                            error
-                        );
+                            metrics_logger.log_error(
+                                InputPipelineErrorMetricDimensionEvent::KeyboardFailedToSendKeyboardEvent,
+                                std::format!(
+                                    "Failed to send KeyboardEvent for key: {:?}, event_type: {:?}: {:?}",
+                                    &key,
+                                    &event_type,
+                                    error));
                         }
                         _ => { let _ = inspect_sender.unbounded_send(event).expect("Failed to count generated KeyboardEvent in Input Pipeline Inspect tree."); },
                     }
@@ -576,6 +599,7 @@ impl KeyboardBinding {
             event_time,
             input_event_sender,
             inspect_sender,
+            metrics_logger.clone(),
         );
     }
 }

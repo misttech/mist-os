@@ -19,6 +19,7 @@ use {
     futures::lock::Mutex,
     futures::{StreamExt, TryStreamExt},
     itertools::Itertools,
+    metrics_registry::*,
     std::collections::HashMap,
     std::path::PathBuf,
     std::rc::Rc,
@@ -57,22 +58,26 @@ pub struct InputPipelineAssembly {
     /// submit all the tasks to an executor to have them start.  Use [components] to
     /// get the tasks.  See [run] for a canned way to start these tasks.
     tasks: Vec<fuchsia_async::Task<()>>,
+
+    /// The metrics logger.
+    metrics_logger: metrics::MetricsLogger,
 }
 
 impl InputPipelineAssembly {
     /// Create a new but empty [InputPipelineAssembly]. Use [add_handler] or similar
     /// to add new handlers to it.
-    pub fn new() -> Self {
+    pub fn new(metrics_logger: metrics::MetricsLogger) -> Self {
         let (sender, receiver) = mpsc::unbounded();
         let tasks = vec![];
-        InputPipelineAssembly { sender, receiver, tasks }
+        InputPipelineAssembly { sender, receiver, tasks, metrics_logger }
     }
 
     /// Adds another [input_handler::InputHandler] into the [InputPipelineAssembly]. The handlers
     /// are invoked in the order they are added, and successive handlers are glued together using
     /// unbounded queues.  Returns `Self` for chaining.
     pub fn add_handler(self, handler: Rc<dyn input_handler::InputHandler>) -> Self {
-        let (sender, mut receiver, mut tasks) = self.into_components();
+        let (sender, mut receiver, mut tasks, metrics_logger) = self.into_components();
+        let metrics_logger_clone = metrics_logger.clone();
         let (next_sender, next_receiver) = mpsc::unbounded();
         let handler_name = handler.get_name();
         tasks.push(fasync::Task::local(async move {
@@ -91,11 +96,12 @@ impl InputPipelineAssembly {
                 };
                 for out_event in out_events.into_iter() {
                     if let Err(e) = next_sender.unbounded_send(out_event) {
-                        tracing::error!(
-                            "could not forward event output from handler: {:?}: {:?}",
-                            handler_name,
-                            &e
-                        );
+                        metrics_logger_clone.log_error(
+                            InputPipelineErrorMetricDimensionEvent::InputPipelineCouldNotForwardEvent,
+                            std::format!(
+                                "could not forward event output from handler: {:?}: {:?}",
+                                handler_name,
+                                e));
                         // This is not a recoverable error, break here.
                         break;
                     }
@@ -104,7 +110,7 @@ impl InputPipelineAssembly {
             panic!("receive loop is not supposed to terminate for handler: {:?}", handler_name);
         }));
         receiver = next_receiver;
-        InputPipelineAssembly { sender, receiver, tasks }
+        InputPipelineAssembly { sender, receiver, tasks, metrics_logger }
     }
 
     /// Adds all handlers into the assembly in the order they appear in `handlers`.
@@ -122,35 +128,43 @@ impl InputPipelineAssembly {
         display_ownership_event: zx::Event,
         input_handlers_node: &fuchsia_inspect::Node,
     ) -> InputPipelineAssembly {
-        let (sender, autorepeat_receiver, mut tasks) = self.into_components();
+        let (sender, autorepeat_receiver, mut tasks, metrics_logger) = self.into_components();
         let (autorepeat_sender, receiver) = mpsc::unbounded();
         let h = DisplayOwnership::new(display_ownership_event, input_handlers_node);
+        let metrics_logger_clone = metrics_logger.clone();
         tasks.push(fasync::Task::local(async move {
             h.handle_input_events(autorepeat_receiver, autorepeat_sender)
                 .await
-                .map_err(|e| tracing::error!("display ownership is not supposed to terminate - this is likely a problem: {:?}", &e)).unwrap();
+                .map_err(|e| {
+                    metrics_logger_clone.log_error(
+                        InputPipelineErrorMetricDimensionEvent::InputPipelineDisplayOwnershipIsNotSupposedToTerminate,
+                        std::format!(
+                            "display ownership is not supposed to terminate - this is likely a problem: {:?}", e));
+                }).unwrap();
         }));
-        InputPipelineAssembly { sender, receiver, tasks }
+        InputPipelineAssembly { sender, receiver, tasks, metrics_logger }
     }
 
     /// Adds the autorepeater into the input pipeline assembly.  The autorepeater
     /// is installed after any handlers that have been already added to the
     /// assembly.
-    pub fn add_autorepeater(
-        self,
-        input_handlers_node: &fuchsia_inspect::Node,
-        metrics_logger: metrics::MetricsLogger,
-    ) -> Self {
-        let (sender, autorepeat_receiver, mut tasks) = self.into_components();
+    pub fn add_autorepeater(self, input_handlers_node: &fuchsia_inspect::Node) -> Self {
+        let (sender, autorepeat_receiver, mut tasks, metrics_logger) = self.into_components();
         let (autorepeat_sender, receiver) = mpsc::unbounded();
-        let a = Autorepeater::new(autorepeat_receiver, input_handlers_node, metrics_logger);
+        let metrics_logger_clone = metrics_logger.clone();
+        let a = Autorepeater::new(autorepeat_receiver, input_handlers_node, metrics_logger.clone());
         tasks.push(fasync::Task::local(async move {
             a.run(autorepeat_sender)
                 .await
-                .map_err(|e| tracing::error!("error while running autorepeater: {:?}", &e))
+                .map_err(|e| {
+                    metrics_logger_clone.log_error(
+                        InputPipelineErrorMetricDimensionEvent::InputPipelineAutorepeatRunningError,
+                        std::format!("error while running autorepeater: {:?}", e),
+                    );
+                })
                 .expect("autorepeater should never error out");
         }));
-        InputPipelineAssembly { sender, receiver, tasks }
+        InputPipelineAssembly { sender, receiver, tasks, metrics_logger }
     }
 
     /// Deconstructs the assembly into constituent components, used when constructing
@@ -164,8 +178,9 @@ impl InputPipelineAssembly {
         UnboundedSender<input_device::InputEvent>,
         UnboundedReceiver<input_device::InputEvent>,
         Vec<fuchsia_async::Task<()>>,
+        metrics::MetricsLogger,
     ) {
-        (self.sender, self.receiver, self.tasks)
+        (self.sender, self.receiver, self.tasks, self.metrics_logger)
     }
 
     /// Adds a focus listener task into the input pipeline assembly.  The focus
@@ -181,14 +196,17 @@ impl InputPipelineAssembly {
     /// * `fuchsia.ui.views.FocusChainListenerRegistry`: to register for updates.
     /// * `fuchsia.ui.keyboard.focus.Controller`: to forward to text_manager.
     pub fn add_focus_listener(self, focus_chain_publisher: FocusChainProviderPublisher) -> Self {
-        let (sender, receiver, mut tasks) = self.into_components();
+        let (sender, receiver, mut tasks, metrics_logger) = self.into_components();
+        let metrics_logger_clone = metrics_logger.clone();
         tasks.push(fasync::Task::local(async move {
-            if let Ok(mut focus_listener) = FocusListener::new(focus_chain_publisher).map_err(|e| {
-                tracing::warn!(
-                    "could not create focus listener, focus will not be dispatched: {:?}",
-                    e
-                )
-            }) {
+            if let Ok(mut focus_listener) =
+                FocusListener::new(focus_chain_publisher, metrics_logger_clone).map_err(|e| {
+                    tracing::warn!(
+                        "could not create focus listener, focus will not be dispatched: {:?}",
+                        e
+                    )
+                })
+            {
                 // This will await indefinitely and process focus messages in a loop, unless there
                 // is a problem.
                 let _result = focus_listener
@@ -204,7 +222,7 @@ impl InputPipelineAssembly {
                     });
             }
         }));
-        InputPipelineAssembly { sender, receiver, tasks }
+        InputPipelineAssembly { sender, receiver, tasks, metrics_logger }
     }
 }
 
@@ -257,6 +275,9 @@ pub struct InputPipeline {
     /// This node is bound to the lifetime of this InputPipeline.
     /// Inspect data will be dumped for this pipeline as long as it exists.
     inspect_node: fuchsia_inspect::Node,
+
+    /// The metrics logger.
+    metrics_logger: metrics::MetricsLogger,
 }
 
 impl InputPipeline {
@@ -267,7 +288,7 @@ impl InputPipeline {
         assembly: InputPipelineAssembly,
         inspect_node: fuchsia_inspect::Node,
     ) -> Self {
-        let (pipeline_sender, receiver, tasks) = assembly.into_components();
+        let (pipeline_sender, receiver, tasks, metrics_logger) = assembly.into_components();
 
         // Add properties to inspect node
         inspect_node.record_string("supported_input_devices", input_device_types.iter().join(", "));
@@ -290,6 +311,7 @@ impl InputPipeline {
             input_device_types,
             input_device_bindings,
             inspect_node,
+            metrics_logger,
         }
     }
 
@@ -320,6 +342,7 @@ impl InputPipeline {
         input_device_types: Vec<input_device::InputDeviceType>,
         assembly: InputPipelineAssembly,
         inspect_node: fuchsia_inspect::Node,
+        metrics_logger: metrics::MetricsLogger,
     ) -> Result<Self, Error> {
         let input_pipeline = Self::new_common(input_device_types, assembly, inspect_node);
         let input_device_types = input_pipeline.input_device_types.clone();
@@ -345,6 +368,7 @@ impl InputPipeline {
                     input_device_bindings,
                     &devices_node,
                     false, /* break_on_idle */
+                    metrics_logger.clone(),
                 )
                 .await
                 .context("failed to watch for devices")
@@ -356,10 +380,12 @@ impl InputPipeline {
                     // This error is usually benign in tests: it means that the setup does not
                     // support dynamic device discovery. Almost no tests support dynamic
                     // device discovery, and they also do not need those.
-                    tracing::error!(
-                        "Input pipeline is unable to watch for new input devices: {:?}",
-                        err
-                    )
+                    metrics_logger.log_error(
+                        InputPipelineErrorMetricDimensionEvent::InputPipelineUnableToWatchForNewInputDevices,
+                        std::format!(
+                            "Input pipeline is unable to watch for new input devices: {:?}",
+                            err
+                        ));
                 }
             }
         })
@@ -386,13 +412,19 @@ impl InputPipeline {
 
     /// Forwards all input events into the input pipeline.
     pub async fn handle_input_events(mut self) {
+        let metrics_logger_clone = self.metrics_logger.clone();
         while let Some(input_event) = self.device_event_receiver.next().await {
             if let Err(e) = self.pipeline_sender.unbounded_send(input_event) {
-                tracing::error!("could not forward event from driver: {:?}", &e);
+                metrics_logger_clone.log_error(
+                    InputPipelineErrorMetricDimensionEvent::InputPipelineCouldNotForwardEventFromDriver,
+                    std::format!("could not forward event from driver: {:?}", &e));
             }
         }
 
-        tracing::error!("Input pipeline stopped handling input events.");
+        metrics_logger_clone.log_error(
+            InputPipelineErrorMetricDimensionEvent::InputPipelineStopHandlingEvents,
+            "Input pipeline stopped handling input events.".to_string(),
+        );
     }
 
     /// Watches the input report directory for new input devices. Creates InputDeviceBindings
@@ -406,6 +438,7 @@ impl InputPipeline {
     /// - `bindings`: Holds all the InputDeviceBindings
     /// - `input_devices_node`: The parent node for all device bindings' inspect nodes.
     /// - `break_on_idle`: If true, stops watching for devices once all existing devices are handled.
+    /// - `metrics_logger`: The metrics logger.
     ///
     /// # Errors
     /// If the input report directory or a file within it cannot be read.
@@ -417,6 +450,7 @@ impl InputPipeline {
         bindings: InputDeviceBindingHashMap,
         input_devices_node: &fuchsia_inspect::Node,
         break_on_idle: bool,
+        metrics_logger: metrics::MetricsLogger,
     ) -> Result<(), Error> {
         // Add non-static properties to inspect node.
         let devices_discovered = input_devices_node.create_uint("devices_discovered", 0);
@@ -443,6 +477,7 @@ impl InputPipeline {
                             filename.parse::<u32>().unwrap_or_default(),
                             input_devices_node,
                             Some(&devices_connected),
+                            metrics_logger.clone(),
                         )
                         .await;
                     }
@@ -481,6 +516,7 @@ impl InputPipeline {
     /// - `bindings`: Holds all the InputDeviceBindings associated with the InputPipeline.
     /// - `device_id`: The device id of the associated bindings.
     /// - `input_devices_node`: The parent node for all injected devices' inspect nodes.
+    /// - `metrics_logger`: The metrics logger.
     pub async fn handle_input_device_registry_request_stream(
         mut stream: fidl_fuchsia_input_injection::InputDeviceRegistryRequestStream,
         device_types: &Vec<input_device::InputDeviceType>,
@@ -488,6 +524,7 @@ impl InputPipeline {
         bindings: &InputDeviceBindingHashMap,
         device_id: u32,
         input_devices_node: &fuchsia_inspect::Node,
+        metrics_logger: metrics::MetricsLogger,
     ) -> Result<(), Error> {
         while let Some(request) = stream
             .try_next()
@@ -511,6 +548,7 @@ impl InputPipeline {
                         device_id,
                         input_devices_node,
                         None,
+                        metrics_logger.clone(),
                     )
                     .await;
                 }
@@ -572,6 +610,7 @@ async fn add_device_bindings(
     device_id: u32,
     input_devices_node: &fuchsia_inspect::Node,
     devices_connected: Option<&fuchsia_inspect::UintProperty>,
+    metrics_logger: metrics::MetricsLogger,
 ) {
     let mut matched_device_types = vec![];
     if let Ok(descriptor) = device_proxy.get_descriptor().await {
@@ -598,7 +637,10 @@ async fn add_device_bindings(
             return;
         }
     } else {
-        tracing::error!("cannot bind device {} without a device descriptor", filename);
+        metrics_logger.clone().log_error(
+            InputPipelineErrorMetricDimensionEvent::InputPipelineNoDeviceDescriptor,
+            std::format!("cannot bind device {} without a device descriptor", filename),
+        );
         return;
     }
 
@@ -641,11 +683,17 @@ async fn add_device_bindings(
             device_id,
             input_event_sender.clone(),
             device_node,
+            metrics_logger.clone(),
         )
         .await
         {
             Ok(binding) => new_bindings.push(binding),
-            Err(e) => tracing::error!("failed to bind {} as {:?}: {}", filename, device_type, e),
+            Err(e) => {
+                metrics_logger.log_error(
+                    InputPipelineErrorMetricDimensionEvent::InputPipelineFailedToBind,
+                    std::format!("failed to bind {} as {:?}: {}", filename, device_type, e),
+                );
+            }
         }
     }
 
@@ -782,8 +830,10 @@ mod tests {
         );
 
         // Build the input pipeline.
-        let (sender, receiver, tasks) =
-            InputPipelineAssembly::new().add_handler(input_handler).into_components();
+        let (sender, receiver, tasks, _) =
+            InputPipelineAssembly::new(metrics::MetricsLogger::default())
+                .add_handler(input_handler)
+                .into_components();
         let inspector = fuchsia_inspect::Inspector::default();
         let test_node = inspector.root().create_child("input_pipeline");
         let input_pipeline = InputPipeline {
@@ -793,6 +843,7 @@ mod tests {
             input_device_types: vec![],
             input_device_bindings: Arc::new(Mutex::new(HashMap::new())),
             inspect_node: test_node,
+            metrics_logger: metrics::MetricsLogger::default(),
         };
         InputPipeline::catch_unhandled(receiver);
         InputPipeline::run(tasks);
@@ -838,10 +889,11 @@ mod tests {
             );
 
         // Build the input pipeline.
-        let (sender, receiver, tasks) = InputPipelineAssembly::new()
-            .add_handler(first_input_handler)
-            .add_handler(second_input_handler)
-            .into_components();
+        let (sender, receiver, tasks, _) =
+            InputPipelineAssembly::new(metrics::MetricsLogger::default())
+                .add_handler(first_input_handler)
+                .add_handler(second_input_handler)
+                .into_components();
         let inspector = fuchsia_inspect::Inspector::default();
         let test_node = inspector.root().create_child("input_pipeline");
         let input_pipeline = InputPipeline {
@@ -851,6 +903,7 @@ mod tests {
             input_device_types: vec![],
             input_device_bindings: Arc::new(Mutex::new(HashMap::new())),
             inspect_node: test_node,
+            metrics_logger: metrics::MetricsLogger::default(),
         };
         InputPipeline::catch_unhandled(receiver);
         InputPipeline::run(tasks);
@@ -944,6 +997,7 @@ mod tests {
             bindings.clone(),
             &input_devices,
             true, /* break_on_idle */
+            metrics::MetricsLogger::default(),
         )
         .await;
 
@@ -1066,6 +1120,7 @@ mod tests {
             bindings.clone(),
             &input_devices,
             true, /* break_on_idle */
+            metrics::MetricsLogger::default(),
         )
         .await;
 
@@ -1140,6 +1195,7 @@ mod tests {
             &bindings_clone,
             0,
             &test_node,
+            metrics::MetricsLogger::default(),
         )
         .await;
 
@@ -1164,8 +1220,14 @@ mod tests {
             observe_fake_events_input_handler::ObserveFakeEventsInputHandler::new(
                 fake_handler_event_sender,
             );
-        let assembly = InputPipelineAssembly::new().add_handler(fake_input_handler);
-        let _test_input_pipeline = InputPipeline::new(device_types, assembly, test_node);
+        let assembly = InputPipelineAssembly::new(metrics::MetricsLogger::default())
+            .add_handler(fake_input_handler);
+        let _test_input_pipeline = InputPipeline::new(
+            device_types,
+            assembly,
+            test_node,
+            metrics::MetricsLogger::default(),
+        );
         fuchsia_inspect::assert_data_tree!(inspector, root: {
             input_pipeline: {
                 supported_input_devices: "Touch, ConsumerControls",

@@ -4,7 +4,7 @@
 
 use {
     crate::input_handler::{InputHandlerStatus, UnhandledInputHandler},
-    crate::{consumer_controls_binding, input_device},
+    crate::{consumer_controls_binding, input_device, metrics},
     anyhow::{Context, Error},
     async_trait::async_trait,
     fidl::endpoints::Proxy,
@@ -12,19 +12,21 @@ use {
     fidl_fuchsia_ui_policy as fidl_ui_policy, fuchsia_async as fasync, fuchsia_inspect,
     fuchsia_zircon::AsHandleRef,
     futures::{channel::mpsc, StreamExt, TryStreamExt},
+    metrics_registry::*,
     std::cell::RefCell,
     std::collections::HashMap,
     std::rc::Rc,
 };
 
 /// A [`MediaButtonsHandler`] tracks MediaButtonListeners and sends media button events to them.
-#[derive(Debug)]
 pub struct MediaButtonsHandler {
     /// The mutable fields of this handler.
     inner: RefCell<MediaButtonsHandlerInner>,
 
     /// The inventory of this handler's Inspect status.
     pub inspect_status: InputHandlerStatus,
+
+    metrics_logger: metrics::MetricsLogger,
 }
 
 #[derive(Debug)]
@@ -75,7 +77,10 @@ impl UnhandledInputHandler for MediaButtonsHandler {
 
 impl MediaButtonsHandler {
     /// Creates a new [`MediaButtonsHandler`] that sends media button events to listeners.
-    pub fn new(input_handlers_node: &fuchsia_inspect::Node) -> Rc<Self> {
+    pub fn new(
+        input_handlers_node: &fuchsia_inspect::Node,
+        metrics_logger: metrics::MetricsLogger,
+    ) -> Rc<Self> {
         let inspect_status =
             InputHandlerStatus::new(input_handlers_node, "media_buttons_handler", false);
         let media_buttons_handler = Self {
@@ -85,6 +90,7 @@ impl MediaButtonsHandler {
                 send_event_task_tracker: LocalTaskTracker::new(),
             }),
             inspect_status,
+            metrics_logger,
         };
         Rc::new(media_buttons_handler)
     }
@@ -132,10 +138,11 @@ impl MediaButtonsHandler {
                                     }
                                 }
                             };
+                            let metrics_logger_clone = self.metrics_logger.clone();
                             self.inner
                                 .borrow()
                                 .send_event_task_tracker
-                                .track(fasync::Task::local(fut));
+                                .track(metrics_logger_clone, fasync::Task::local(fut));
                         }
                     }
                     let _ = responder.send();
@@ -212,7 +219,8 @@ impl MediaButtonsHandler {
                 }
             };
 
-            tracker.track(fasync::Task::local(fut));
+            let metrics_logger_clone = self.metrics_logger.clone();
+            tracker.track(metrics_logger_clone, fasync::Task::local(fut));
         }
     }
 }
@@ -237,13 +245,18 @@ impl LocalTaskTracker {
     }
 
     /// Submits a new task to track.
-    pub fn track(&self, task: fasync::Task<()>) {
+    pub fn track(&self, metrics_logger: metrics::MetricsLogger, task: fasync::Task<()>) {
         match self.sender.unbounded_send(task) {
             Ok(_) => {}
             // `Full` should never happen because this is unbounded.
             // `Disconnected` might happen if the `Service` was dropped. However, it's not clear how
             // to create such a race condition.
-            Err(e) => tracing::error!("Unexpected {e:?} while pushing task"),
+            Err(e) => {
+                metrics_logger.log_error(
+                    InputPipelineErrorMetricDimensionEvent::MediaButtonErrorWhilePushingTask,
+                    std::format!("Unexpected {e:?} while pushing task"),
+                );
+            }
         };
     }
 }
@@ -330,6 +343,7 @@ mod tests {
                 send_event_task_tracker: LocalTaskTracker::new(),
             }),
             inspect_status,
+            metrics_logger: metrics::MetricsLogger::default(),
         });
         let device_listener_proxy =
             spawn_device_listener_registry_server(media_buttons_handler.clone());
@@ -367,7 +381,8 @@ mod tests {
         let event_time = zx::Time::get_monotonic();
         let inspector = fuchsia_inspect::Inspector::default();
         let test_node = inspector.root().create_child("test_node");
-        let media_buttons_handler = MediaButtonsHandler::new(&test_node);
+        let media_buttons_handler =
+            MediaButtonsHandler::new(&test_node, metrics::MetricsLogger::default());
         let device_listener_proxy =
             spawn_device_listener_registry_server(media_buttons_handler.clone());
 
@@ -409,7 +424,8 @@ mod tests {
         let event_time = zx::Time::get_monotonic();
         let inspector = fuchsia_inspect::Inspector::default();
         let test_node = inspector.root().create_child("test_node");
-        let media_buttons_handler = MediaButtonsHandler::new(&test_node);
+        let media_buttons_handler =
+            MediaButtonsHandler::new(&test_node, metrics::MetricsLogger::default());
         let device_listener_proxy =
             spawn_device_listener_registry_server(media_buttons_handler.clone());
 
@@ -456,7 +472,8 @@ mod tests {
         let event_time = zx::Time::get_monotonic();
         let inspector = fuchsia_inspect::Inspector::default();
         let test_node = inspector.root().create_child("test_node");
-        let media_buttons_handler = MediaButtonsHandler::new(&test_node);
+        let media_buttons_handler =
+            MediaButtonsHandler::new(&test_node, metrics::MetricsLogger::default());
         let media_buttons_handler_clone = media_buttons_handler.clone();
 
         let mut task = fasync::Task::local(async move {
@@ -543,7 +560,8 @@ mod tests {
         let event_time = zx::Time::get_monotonic();
         let inspector = fuchsia_inspect::Inspector::default();
         let test_node = inspector.root().create_child("test_node");
-        let media_buttons_handler = MediaButtonsHandler::new(&test_node);
+        let media_buttons_handler =
+            MediaButtonsHandler::new(&test_node, metrics::MetricsLogger::default());
         let device_listener_proxy =
             spawn_device_listener_registry_server(media_buttons_handler.clone());
 
@@ -689,8 +707,8 @@ mod tests {
 
         let mut tracker = LocalTaskTracker::new();
 
-        tracker.track(task_1);
-        tracker.track(task_2);
+        tracker.track(metrics::MetricsLogger::default(), task_1);
+        tracker.track(metrics::MetricsLogger::default(), task_2);
 
         assert_matches!(exec.run_until_stalled(&mut tracker._receiver_task), Poll::Pending);
         assert_eq!(Rc::strong_count(&completed_1), 2);
@@ -720,7 +738,8 @@ mod tests {
     async fn media_buttons_handler_initialized_with_inspect_node() {
         let inspector = fuchsia_inspect::Inspector::default();
         let fake_handlers_node = inspector.root().create_child("input_handlers_node");
-        let _handler = MediaButtonsHandler::new(&fake_handlers_node);
+        let _handler =
+            MediaButtonsHandler::new(&fake_handlers_node, metrics::MetricsLogger::default());
         fuchsia_inspect::assert_data_tree!(inspector, root: {
             input_handlers_node: {
                 media_buttons_handler: {
@@ -742,7 +761,8 @@ mod tests {
     async fn media_buttons_handler_inspect_counts_events() {
         let inspector = fuchsia_inspect::Inspector::default();
         let fake_handlers_node = inspector.root().create_child("input_handlers_node");
-        let media_buttons_handler = MediaButtonsHandler::new(&fake_handlers_node);
+        let media_buttons_handler =
+            MediaButtonsHandler::new(&fake_handlers_node, metrics::MetricsLogger::default());
 
         // Unhandled input event should be counted by inspect.
         let descriptor = testing_utilities::consumer_controls_device_descriptor();

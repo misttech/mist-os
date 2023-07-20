@@ -57,8 +57,8 @@ impl MetricsLogger {
     }
 
     /// Logs an error occurrence metric using the Cobalt logger. Does not block execution.
-    pub fn log_error<E: AsEventCode>(&self, event_code: E, message: String) {
-        tracing::error!("{}", message);
+    pub fn log_error<E: AsEventCode, S: Into<String>>(&self, event_code: E, message: S) {
+        tracing::error!("{}", message.into());
 
         let Some(c) = self.0.clone() else { return };
         let code = event_code.as_event_code();
