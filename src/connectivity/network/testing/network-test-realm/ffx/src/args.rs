@@ -180,6 +180,13 @@ pub enum Dhcpv6ClientSubcommand {
     Stop(Dhcpv6ClientStop),
 }
 
+fn optional_prefix_from_str(s: &str) -> Result<Option<fnet_ext::SubnetV6>, String> {
+    match s {
+        "" => Ok(None),
+        s => s.parse::<fnet_ext::SubnetV6>().map(Some).map_err(|e| format!("{}", e)),
+    }
+}
+
 #[derive(argh::FromArgs, Debug, PartialEq)]
 #[argh(subcommand, name = "start")]
 /// Start a DHCPv6 client.
@@ -192,13 +199,23 @@ pub struct Dhcpv6ClientStart {
     /// the link-local address the DHCPv6 client uses to communicate with servers
     pub address: fnet_ext::Ipv6Address,
 
+    // TODO(https://fxbug.dev/128250): Delete this once the network-conformance
+    // repo has been migrated to --request-non-temporary-address.
     #[argh(option)]
     /// whether the DHCPv6 client should run in stateful or stateless mode
-    pub stateful: bool,
+    pub stateful: Option<bool>,
+
+    #[argh(switch)]
+    /// request non-temporary address from servers
+    pub request_non_temporary_address: bool,
 
     #[argh(switch)]
     /// request DNS servers configuration from servers
     pub request_dns_servers: bool,
+
+    #[argh(option, from_str_fn(optional_prefix_from_str))]
+    /// request prefix delegation from servers
+    pub prefix_delegation_config: Option<Option<fnet_ext::SubnetV6>>,
     // TODO(https://fxbug.dev/48867): Add configuration for Rapid Commit.
     // TODO(https://fxbug.dev/105427): Add configuration for acquiring temporary addresses.
 }

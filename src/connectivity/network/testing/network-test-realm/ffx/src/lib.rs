@@ -164,7 +164,9 @@ async fn handle_command(
                     interface_id,
                     address,
                     stateful,
+                    request_non_temporary_address,
                     request_dns_servers,
+                    prefix_delegation_config,
                 }) => (
                     controller
                         .start_dhcpv6_client(
@@ -180,10 +182,35 @@ async fn handle_command(
                                         dns_servers: request_dns_servers,
                                     },
                                     non_temporary_address_config: fnet_dhcpv6_ext::AddressConfig {
-                                        address_count: if stateful { 1 } else { 0 },
+                                        address_count: if stateful.unwrap_or(false)
+                                            || request_non_temporary_address
+                                        {
+                                            1
+                                        } else {
+                                            0
+                                        },
                                         preferred_addresses: None,
                                     },
-                                    prefix_delegation_config: None,
+                                    prefix_delegation_config: prefix_delegation_config.map(
+                                        |pd_config| match pd_config {
+                                            None => fnet_dhcpv6::PrefixDelegationConfig::Empty(
+                                                fnet_dhcpv6::Empty,
+                                            ),
+                                            Some(fnet_ext::SubnetV6 {
+                                                addr: fnet_ext::Ipv6Address(addr),
+                                                prefix_len,
+                                            }) if addr.is_unspecified() => {
+                                                fnet_dhcpv6::PrefixDelegationConfig::PrefixLength(
+                                                    prefix_len,
+                                                )
+                                            }
+                                            Some(subnet) => {
+                                                fnet_dhcpv6::PrefixDelegationConfig::Prefix(
+                                                    subnet.into(),
+                                                )
+                                            }
+                                        },
+                                    ),
                                 },
                             }
                             .into(),
@@ -233,7 +260,7 @@ mod test {
     use assert_matches::assert_matches;
     use fidl_fuchsia_net as fnet;
     use futures::TryStreamExt as _;
-    use net_declare::{fidl_ip, fidl_mac, std_ip_v6};
+    use net_declare::{fidl_ip, fidl_ip_v6_with_prefix, fidl_mac, std_ip_v6};
 
     const COMPONENT_URL: &'static str =
         "fuchsia-pkg://fuchsia.com/fake-component#meta/fake-component.cm";
@@ -447,13 +474,16 @@ mod test {
     async fn dhcpv6_client_start() {
         const DHCPV6_CLIENT_BIND_ADDR: fnet_ext::Ipv6Address =
             fnet_ext::Ipv6Address(std_ip_v6!("fe80::1"));
+        const PD_HINT: fnet::Ipv6AddressWithPrefix = fidl_ip_v6_with_prefix!("2001:db8::/32");
         net_test_realm_command_test(
             ntr_args::Subcommand::Dhcpv6Client(ntr_args::Dhcpv6Client {
                 subcommand: ntr_args::Dhcpv6ClientSubcommand::Start(ntr_args::Dhcpv6ClientStart {
                     interface_id: INTERFACE_ID,
                     address: DHCPV6_CLIENT_BIND_ADDR,
-                    stateful: true,
+                    stateful: None,
+                    request_non_temporary_address: true,
                     request_dns_servers: true,
+                    prefix_delegation_config: Some(Some(PD_HINT.into())),
                 }),
             }),
             |request| {
@@ -479,7 +509,9 @@ mod test {
                                 address_count: 1,
                                 preferred_addresses: None,
                             },
-                            prefix_delegation_config: None,
+                            prefix_delegation_config: Some(
+                                fnet_dhcpv6::PrefixDelegationConfig::Prefix(PD_HINT)
+                            ),
                         },
                     },
                 );

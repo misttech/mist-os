@@ -11,6 +11,7 @@ if (is_host) {
     "dhcp_client.go",
     "dhcp_server.go",
     "dhcpv6_client.go",
+    "dhcpv6_client_pd.go",
     "icmp.go",
     "icmpv6.go",
     "icmpv6_router.go",

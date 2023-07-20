@@ -2277,11 +2277,22 @@ async fn leave_unjoined_multicast_group(
 }
 
 #[netstack_test]
-#[test_case("stateful_ns2", true, fntr::Netstack::V2; "stateful netstack2")]
-#[test_case("stateless_ns2", false, fntr::Netstack::V2; "stateless netstack2")]
-#[test_case("stateful_ns3", true, fntr::Netstack::V3; "stateful netstack3")]
-#[test_case("stateless_ns3", false, fntr::Netstack::V3; "stateless netstack3")]
-async fn start_dhcpv6_client(name: &str, sub_name: &str, stateful: bool, netstack: fntr::Netstack) {
+#[test_case("na_ns2", true, true, false, fntr::Netstack::V2; "na netstack2")]
+#[test_case("pd_ns2", false, true, false, fntr::Netstack::V2; "pd netstack2")]
+#[test_case("na_pd_ns2", true, true, false, fntr::Netstack::V2; "na pd netstack2")]
+#[test_case("stateless_ns2", false, false, true, fntr::Netstack::V2; "stateless netstack2")]
+#[test_case("na_ns3", true, true, false, fntr::Netstack::V3; "na netstack3")]
+#[test_case("pd_ns3", false, true, false, fntr::Netstack::V3; "pd netstack3")]
+#[test_case("na_pd_ns3", true, true, false, fntr::Netstack::V3; "na pd netstack3")]
+#[test_case("stateless_ns3", false, false, true, fntr::Netstack::V3; "stateless netstack3")]
+async fn start_dhcpv6_client(
+    name: &str,
+    sub_name: &str,
+    request_non_temporary_address: bool,
+    request_prefix_delegation: bool,
+    request_dns_servers: bool,
+    netstack: fntr::Netstack,
+) {
     let sandbox = netemul::TestSandbox::new().expect("failed to create sandbox");
     let network = sandbox.create_network("network").await.expect("failed to create network");
     let fake_ep = network.create_fake_endpoint().expect("failed to create fake endpoint");
@@ -2320,13 +2331,14 @@ async fn start_dhcpv6_client(name: &str, sub_name: &str, stateful: bool, netstac
                 },
                 config: fnet_dhcpv6_ext::ClientConfig {
                     information_config: fnet_dhcpv6_ext::InformationConfig {
-                        dns_servers: !stateful,
+                        dns_servers: request_dns_servers,
                     },
                     non_temporary_address_config: fnet_dhcpv6_ext::AddressConfig {
-                        address_count: if stateful { 1 } else { 0 },
+                        address_count: if request_non_temporary_address { 1 } else { 0 },
                         preferred_addresses: None,
                     },
-                    prefix_delegation_config: None,
+                    prefix_delegation_config: request_prefix_delegation
+                        .then_some(fnet_dhcpv6::PrefixDelegationConfig::Empty(fnet_dhcpv6::Empty)),
                 },
             }
             .into(),
@@ -2335,6 +2347,7 @@ async fn start_dhcpv6_client(name: &str, sub_name: &str, stateful: bool, netstac
         .expect("FIDL error")
         .expect("start DHCPv6 client");
 
+    let stateful = request_non_temporary_address || request_prefix_delegation;
     let want_msg_type = if stateful {
         packet_formats_dhcp::v6::MessageType::Solicit
     } else {
@@ -2344,10 +2357,21 @@ async fn start_dhcpv6_client(name: &str, sub_name: &str, stateful: bool, netstac
         .frame_stream()
         .filter_map(|r| {
             let (data, _dropped) = r.expect("frame stream error");
-            futures::future::ready(
-                packets::parse_dhcpv6(data.as_slice())
-                    .and_then(|msg| (msg.msg_type() == want_msg_type).then_some(())),
-            )
+            futures::future::ready(packets::parse_dhcpv6(data.as_slice()).map(|msg| {
+                assert_eq!(msg.msg_type(), want_msg_type);
+                if stateful {
+                    let found_opts =
+                        msg.options().fold((false, false), |(found_na, found_pd), opt| match opt {
+                            packet_formats_dhcp::v6::ParsedDhcpOption::Iana(_) => (true, found_pd),
+                            packet_formats_dhcp::v6::ParsedDhcpOption::IaPd(_) => (found_na, true),
+                            _ => (found_na, found_pd),
+                        });
+                    assert_eq!(
+                        found_opts,
+                        (request_non_temporary_address, request_prefix_delegation)
+                    );
+                }
+            }))
         })
         .next()
         .await
