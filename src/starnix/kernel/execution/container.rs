@@ -9,6 +9,7 @@ use fidl::{
 };
 use fidl_fuchsia_component as fcomponent;
 use fidl_fuchsia_component_runner as frunner;
+use fidl_fuchsia_element as felement;
 use fidl_fuchsia_io as fio;
 use fidl_fuchsia_starnix_container as fstarcontainer;
 use fuchsia_async as fasync;
@@ -134,7 +135,8 @@ impl Container {
             let mut fs = ServiceFs::new_local();
             fs.dir("svc")
                 .add_fidl_service(ExposedServices::ComponentRunner)
-                .add_fidl_service(ExposedServices::ContainerController);
+                .add_fidl_service(ExposedServices::ContainerController)
+                .add_fidl_service(ExposedServices::GrahicalPresenter);
 
             // Expose the root of the container's filesystem.
             let (fs_root, fs_root_server_end) = fidl::endpoints::create_proxy()?;
@@ -158,6 +160,11 @@ impl Container {
                             .await
                             .expect("failed to start container.")
                     }
+                    ExposedServices::GrahicalPresenter(request_stream) => {
+                        serve_graphical_presenter(request_stream, self)
+                            .await
+                            .expect("failed to start GrahicalPresenter.")
+                    }
                 }
             })
             .await
@@ -178,6 +185,7 @@ impl Container {
 enum ExposedServices {
     ComponentRunner(frunner::ComponentRunnerRequestStream),
     ContainerController(fstarcontainer::ControllerRequestStream),
+    GrahicalPresenter(felement::GraphicalPresenterRequestStream),
 }
 
 type TaskResult = Result<ExitStatus, Error>;

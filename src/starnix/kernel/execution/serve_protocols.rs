@@ -5,6 +5,7 @@
 use anyhow::Error;
 use fidl::endpoints::ServerEnd;
 use fidl_fuchsia_component_runner as frunner;
+use fidl_fuchsia_element as felement;
 use fidl_fuchsia_io as fio;
 use fidl_fuchsia_starnix_container as fstarcontainer;
 use fuchsia_async::{self as fasync, DurationExt};
@@ -212,4 +213,32 @@ fn forward_to_pty(
     });
 
     Ok(())
+}
+
+pub async fn serve_graphical_presenter(
+    request_stream: felement::GraphicalPresenterRequestStream,
+    container: &Container,
+) -> Result<(), Error> {
+    request_stream
+        .try_for_each_concurrent(None, |event| async {
+            match event {
+                felement::GraphicalPresenterRequest::PresentView {
+                    view_spec,
+                    annotation_controller: _,
+                    view_controller_request: _,
+                    responder,
+                } => match view_spec.viewport_creation_token {
+                    Some(token) => {
+                        container.kernel.framebuffer.present_view(token);
+                        let _ = responder.send(Ok(()));
+                    }
+                    None => {
+                        let _ = responder.send(Err(felement::PresentViewError::InvalidArgs));
+                    }
+                },
+            }
+            Ok(())
+        })
+        .await
+        .map_err(Error::from)
 }

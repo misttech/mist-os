@@ -33,11 +33,14 @@ use crate::{logging::log_warn, types::*};
 /// The offset at which the framebuffer will be placed.
 pub const TRANSLATION_X: i32 = 0;
 
-/// The Flatland identifier for the framebuffer image.
-const IMAGE_ID: fuicomposition::ContentId = fuicomposition::ContentId { value: 2 };
-
 /// The Flatland identifier for the transform associated with the framebuffer.
-const TRANSFORM_ID: fuicomposition::TransformId = fuicomposition::TransformId { value: 3 };
+const ROOT_TRANSFORM_ID: fuicomposition::TransformId = fuicomposition::TransformId { value: 1 };
+
+/// The Flatland identifier for the framebuffer image.
+const FB_IMAGE_ID: fuicomposition::ContentId = fuicomposition::ContentId { value: 1 };
+
+/// The Flatland identifier for the viewport.
+const VIEWPORT_ID: fuicomposition::ContentId = fuicomposition::ContentId { value: 2 };
 
 /// The protocols that are exposed by the framebuffer server.
 enum ExposedProtocols {
@@ -73,10 +76,10 @@ impl FramebufferServer {
         connect_channel_to_protocol::<fuicomposition::FlatlandMarker>(server_end)
             .map_err(|_| errno!(ENOENT))?;
         let flatland = fuicomposition::FlatlandSynchronousProxy::new(client_end);
-        flatland.set_debug_name("Starnix").map_err(|_| errno!(EINVAL))?;
+        flatland.set_debug_name("StarnixFrameBufferServer").map_err(|_| errno!(EINVAL))?;
 
         let collection =
-            init_scene(&flatland, &allocator, width, height).map_err(|_| errno!(EINVAL))?;
+            init_fb_scene(&flatland, &allocator, width, height).map_err(|_| errno!(EINVAL))?;
 
         Ok(Self { flatland, collection, image_width: width, image_height: height })
     }
@@ -96,12 +99,19 @@ impl FramebufferServer {
 ///
 /// SAFETY: This function `.expect`'s a lot, because it isn't meant to be used in the long time and
 /// most of the failures would be unexpected and unrecoverable.
-fn init_scene(
+fn init_fb_scene(
     flatland: &fuicomposition::FlatlandSynchronousProxy,
     allocator: &fuicomposition::AllocatorSynchronousProxy,
     width: u32,
     height: u32,
 ) -> Result<fsysmem::BufferCollectionInfo2, anyhow::Error> {
+    flatland
+        .create_transform(&ROOT_TRANSFORM_ID)
+        .map_err(|_| anyhow!("error creating transform"))?;
+    flatland
+        .set_root_transform(&ROOT_TRANSFORM_ID)
+        .map_err(|_| anyhow!("error setting root transform"))?;
+
     let (collection_sender, collection_receiver) = channel();
     let (allocation_sender, allocation_receiver) = channel();
     // This thread is spawned to deal with the mix of asynchronous and synchronous proxies.
@@ -166,18 +176,45 @@ fn init_scene(
         ..Default::default()
     };
     flatland
-        .create_image(&IMAGE_ID, buffer_tokens.import_token, 0, &image_props)
+        .create_image(&FB_IMAGE_ID, buffer_tokens.import_token, 0, &image_props)
         .map_err(|_| anyhow!("FIDL error creating image"))?;
-    flatland.create_transform(&TRANSFORM_ID).map_err(|_| anyhow!("error creating transform"))?;
     flatland
-        .set_root_transform(&TRANSFORM_ID)
-        .map_err(|_| anyhow!("error setting root transform"))?;
-    flatland.set_content(&TRANSFORM_ID, &IMAGE_ID).map_err(|_| anyhow!("error setting content"))?;
+        .set_image_destination_size(&FB_IMAGE_ID, &fmath::SizeU { width, height })
+        .expect("FIDL error resizing image");
     flatland
-        .set_translation(&TRANSFORM_ID, &fmath::Vec_ { x: TRANSLATION_X, y: 0 })
+        .set_content(&ROOT_TRANSFORM_ID, &FB_IMAGE_ID)
+        .map_err(|_| anyhow!("error setting content"))?;
+    flatland
+        .set_translation(&ROOT_TRANSFORM_ID, &fmath::Vec_ { x: TRANSLATION_X, y: 0 })
         .map_err(|_| anyhow!("error setting translation"))?;
 
     Ok(allocation)
+}
+
+/// Initializes a flatland scene where only the child view is presented through
+/// `ViewportCreationToken`.
+pub fn init_viewport_scene(
+    server: Arc<FramebufferServer>,
+    viewport_token: fuiviews::ViewportCreationToken,
+) {
+    // TODO(fxbug.dev/117507) : Handle multiple calls to init_viewport_scene, clean fb resources
+    // and break the present loop if started.
+    let (_, child_view_watcher_request) = create_proxy::<fuicomposition::ChildViewWatcherMarker>()
+        .expect("failed to create child view watcher channel");
+    let viewport_properties = fuicomposition::ViewportProperties {
+        logical_size: Some(fmath::SizeU { width: server.image_width, height: server.image_height }),
+        ..Default::default()
+    };
+    server
+        .flatland
+        .create_viewport(
+            &VIEWPORT_ID,
+            viewport_token,
+            &viewport_properties,
+            child_view_watcher_request,
+        )
+        .expect("failed to create child viewport");
+    server.flatland.set_content(&ROOT_TRANSFORM_ID, &VIEWPORT_ID).expect("error setting content");
 }
 
 /// Spawns a thread to serve a `ViewProvider` in `outgoing_dir`.
@@ -220,14 +257,6 @@ pub fn spawn_view_provider(
                                     parent_viewport_watcher_request,
                                 )
                                 .expect("FIDL error");
-
-                            server
-                                .flatland
-                                .set_image_destination_size(
-                                    &IMAGE_ID,
-                                    &fmath::SizeU { width: server.image_width, height: server.image_height },
-                                )
-                                .expect("fidl error");
 
                             // Now that the view has been created, start presenting.
                             start_presenting(server.clone());
