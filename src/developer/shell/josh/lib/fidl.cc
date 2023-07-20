@@ -133,7 +133,7 @@ JSValue EncodeRequest(JSContext* ctx, JSValueConst this_val, int argc, JSValueCo
   }
   auto ordinal = static_cast<fidl_codec::Ordinal64>(ordinal_signed);
 
-  const std::vector<const fidl_codec::ProtocolMethod*>* methods = loader->GetByOrdinal(ordinal);
+  const std::vector<fidl_codec::ProtocolMethod*>* methods = loader->GetByOrdinal(ordinal);
 
   if (!methods || methods->empty()) {
     return JS_ThrowInternalError(ctx, "Method not found for ordinal %zu", ordinal);
@@ -145,13 +145,13 @@ JSValue EncodeRequest(JSContext* ctx, JSValueConst this_val, int argc, JSValueCo
   }
 
   auto req = method->request();
-  auto ast = ObjectConverter::Convert(ctx, req == nullptr ? nullptr : req->AsStruct(), argv[2]);
-  if (!ast || !ast->AsStructValue()) {
+  auto ast = ObjectConverter::Convert(ctx, req, argv[2]);
+  if (!ast) {
     return JS_EXCEPTION;
   }
 
   auto result = fidl_codec::Encoder::EncodeMessage(txn_id, ordinal, kAtRestFlags, kDynamicFlags,
-                                                   kFidlMagic, *ast->AsStructValue());
+                                                   kFidlMagic, ast.get(), req);
 
   auto bytes = JS_NewArrayBufferCopy(ctx, result.bytes.data(), result.bytes.size());
   auto handles = JS_NewArray(ctx);
@@ -207,11 +207,10 @@ JSValue DecodeResponse(JSContext* ctx, JSValueConst this_val, int argc, JSValueC
   }
 
   auto header = reinterpret_cast<const fidl_message_header_t*>(message_buf);
-  const std::vector<const fidl_codec::ProtocolMethod*>* methods =
-      loader->GetByOrdinal(header->ordinal);
+  const std::vector<fidl_codec::ProtocolMethod*>* methods = loader->GetByOrdinal(header->ordinal);
   // Test method not found, but...
   const fidl_codec::ProtocolMethod* method = (*methods)[0];
-  std::unique_ptr<fidl_codec::PayloadableValue> object;
+  std::unique_ptr<fidl_codec::Value> object;
   std::ostringstream errors;
   if (!fidl_codec::DecodeResponse(method, message_buf, message_len, handle_buf.data(), handles_len,
                                   &object, errors)) {

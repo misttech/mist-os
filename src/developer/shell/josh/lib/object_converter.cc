@@ -25,6 +25,10 @@ void ObjectConverter::VisitType(const fidl_codec::Type* type) {
   JS_ThrowTypeError(ctx_, "Unknown FIDL type '%s'.", type->Name().c_str());
 }
 
+void ObjectConverter::VisitEmptyPayloadType(const fidl_codec::EmptyPayloadType* type) {
+  result_ = std::make_unique<fidl_codec::EmptyPayloadValue>();
+}
+
 void ObjectConverter::VisitTableType(const fidl_codec::TableType* type) {
   if (!JS_IsObject(value_)) {
     JS_ThrowTypeError(ctx_, "Expected object.");

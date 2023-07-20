@@ -14,7 +14,6 @@
 
 #include <rapidjson/document.h>
 
-#include "src/lib/fidl_codec/memory_helpers.h"
 #include "src/lib/fidl_codec/message_decoder.h"
 #include "src/lib/fidl_codec/wire_object.h"
 
@@ -32,12 +31,13 @@ class Uint32Type;
 
 // A FIDL type.  Provides methods for generating instances of this type.
 class Type {
-  friend class ProtocolMethodParameter;
   friend class Library;
 
  public:
   Type() = default;
   virtual ~Type() = default;
+  Type& operator=(const Type& other) = default;
+  Type(const Type& other) = default;
 
   // Returns a detailed representation of the type.
   std::string ToString(bool expand = false) const;
@@ -103,38 +103,34 @@ class Type {
   // |loader| is the set of libraries to use to find types that need to be given
   // by identifier (e.g., "foo.bar/Baz").
   static std::unique_ptr<Type> GetType(LibraryLoader* loader, const rapidjson::Value& type);
-
-  Type& operator=(const Type& other) = default;
-  Type(const Type& other) = default;
 };
 
 // An instance of this class is created when the system can't determine the real
 // class (e.g., in cases of corrupted metadata).
 class InvalidType : public Type {
  public:
-  InvalidType() = default;
-
-  std::string Name() const override;
-
-  size_t InlineSize(WireVersion version) const override;
-
-  bool IsValid() const override;
-
+  std::string Name() const override { return "unknown"; }
+  size_t InlineSize(WireVersion version) const override { return 0; }
+  bool IsValid() const override { return false; }
   std::unique_ptr<Value> Decode(MessageDecoder* decoder, uint64_t offset) const override;
+  void Visit(TypeVisitor* visitor) const override;
+};
 
+// The type of an empty request or response.
+// This has zero size, unlike an empty struct which is a single 0x00 byte.
+class EmptyPayloadType : public Type {
+ public:
+  std::string Name() const override { return "empty-payload"; }
+  size_t InlineSize(WireVersion version) const override { return 0; }
+  std::unique_ptr<Value> Decode(MessageDecoder* decoder, uint64_t offset) const override;
   void Visit(TypeVisitor* visitor) const override;
 };
 
 class BoolType : public Type {
  public:
-  BoolType() = default;
-
   std::string Name() const override { return "bool"; }
-
-  size_t InlineSize(WireVersion version) const override;
-
+  size_t InlineSize(WireVersion version) const override { return 1; }
   std::unique_ptr<Value> Decode(MessageDecoder* decoder, uint64_t offset) const override;
-
   void Visit(TypeVisitor* visitor) const override;
 };
 
@@ -142,12 +138,10 @@ class BoolType : public Type {
 // C++ integral value.
 template <typename T>
 class IntegralType : public Type {
-  static_assert(std::is_integral<T>::value && !std::is_same<T, bool>::value,
+  static_assert(std::is_integral_v<T> && !std::is_same_v<T, bool>,
                 "IntegralType can only be used for integers");
 
  public:
-  IntegralType() = default;
-
   size_t InlineSize(WireVersion version) const override { return sizeof(T); }
 
   std::string CppName() const override { return this->Name() + "_t"; }
@@ -172,7 +166,6 @@ class IntegralType : public Type {
 class Int8Type : public IntegralType<int8_t> {
  public:
   enum class Kind { kChar, kDecimal };
-
   explicit Int8Type(Kind kind = Kind::kDecimal) : kind_(kind) {}
 
   std::string Name() const override;
@@ -186,10 +179,9 @@ class Int8Type : public IntegralType<int8_t> {
 class Int16Type : public IntegralType<int16_t> {
  public:
   enum class Kind { kDecimal };
-
   explicit Int16Type(Kind kind = Kind::kDecimal) : kind_(kind) {}
 
-  std::string Name() const override;
+  std::string Name() const override { return "int16"; }
   void PrettyPrint(const Value* value, PrettyPrinter& printer) const override;
   void Visit(TypeVisitor* visitor) const override;
 
@@ -200,7 +192,6 @@ class Int16Type : public IntegralType<int16_t> {
 class Int32Type : public IntegralType<int32_t> {
  public:
   enum class Kind { kDecimal, kFutex };
-
   explicit Int32Type(Kind kind = Kind::kDecimal) : kind_(kind) {}
 
   std::string Name() const override;
@@ -214,7 +205,6 @@ class Int32Type : public IntegralType<int32_t> {
 class Int64Type : public IntegralType<int64_t> {
  public:
   enum class Kind { kDecimal, kDuration, kTime, kMonotonicTime };
-
   explicit Int64Type(Kind kind = Kind::kDecimal) : kind_(kind) {}
 
   std::string Name() const override;
@@ -228,7 +218,6 @@ class Int64Type : public IntegralType<int64_t> {
 class Uint8Type : public IntegralType<uint8_t> {
  public:
   enum class Kind { kDecimal, kHexaDecimal, kPacketGuestVcpuType };
-
   explicit Uint8Type(Kind kind = Kind::kDecimal) : kind_(kind) {}
 
   std::string Name() const override;
@@ -242,7 +231,6 @@ class Uint8Type : public IntegralType<uint8_t> {
 class Uint16Type : public IntegralType<uint16_t> {
  public:
   enum class Kind { kDecimal, kHexaDecimal, kPacketPageRequestCommand };
-
   explicit Uint16Type(Kind kind = Kind::kDecimal) : kind_(kind) {}
 
   std::string Name() const override;
@@ -317,7 +305,6 @@ class Uint32Type : public IntegralType<uint32_t> {
 class Uint64Type : public IntegralType<uint64_t> {
  public:
   enum class Kind { kDecimal, kHexaDecimal, kVaddr, kSize, kPaddr, kGpAddr, kUintptr, kKoid };
-
   explicit Uint64Type(Kind kind = Kind::kDecimal) : kind_(kind) {}
 
   std::string Name() const override;
@@ -331,12 +318,8 @@ class Uint64Type : public IntegralType<uint64_t> {
 // A type that can be used for having actual and requested values.
 class ActualAndRequestedType : public Type {
  public:
-  ActualAndRequestedType() = default;
-
   size_t InlineSize(WireVersion version) const override { return 2 * sizeof(size_t); }
-
   std::string Name() const override { return "size"; }
-
   std::string CppName() const override { return "size_t"; }
 
   std::unique_ptr<Value> Decode(MessageDecoder* decoder, uint64_t offset) const override {
@@ -352,7 +335,7 @@ class ActualAndRequestedType : public Type {
 // C++ arithmetic value.
 template <typename T>
 class NumericType : public Type {
-  static_assert(std::is_arithmetic<T>::value && !std::is_same<T, bool>::value,
+  static_assert(std::is_arithmetic_v<T> && !std::is_same_v<T, bool>,
                 "NumericType can only be used for numerics");
 
  public:
@@ -369,9 +352,8 @@ class NumericType : public Type {
 
 class Float32Type : public NumericType<float> {
  public:
-  Float32Type() = default;
-  std::string Name() const override;
-  std::string CppName() const override;
+  std::string Name() const override { return "float32"; }
+  std::string CppName() const override { return "float"; }
 
   void PrettyPrint(const Value* value, PrettyPrinter& printer) const override {
     double result;
@@ -387,9 +369,8 @@ class Float32Type : public NumericType<float> {
 
 class Float64Type : public NumericType<double> {
  public:
-  Float64Type() = default;
-  std::string Name() const override;
-  std::string CppName() const override;
+  std::string Name() const override { return "float64"; }
+  std::string CppName() const override { return "double"; }
 
   void PrettyPrint(const Value* value, PrettyPrinter& printer) const override {
     double result;
@@ -405,31 +386,20 @@ class Float64Type : public NumericType<double> {
 
 class StringType : public Type {
  public:
-  StringType() = default;
-
-  std::string Name() const override;
-  std::string CppName() const override;
-
-  size_t InlineSize(WireVersion version) const override;
-
-  bool Nullable() const override;
-
+  std::string Name() const override { return "string"; }
+  std::string CppName() const override { return "std::string"; }
+  size_t InlineSize(WireVersion version) const override { return 16; }
+  bool Nullable() const override { return true; }
   std::unique_ptr<Value> Decode(MessageDecoder* decoder, uint64_t offset) const override;
-
   void Visit(TypeVisitor* visitor) const override;
 };
 
 class HandleType : public Type {
  public:
-  HandleType() = default;
-
-  std::string Name() const override;
-  std::string CppName() const override;
-
-  size_t InlineSize(WireVersion version) const override;
-
+  std::string Name() const override { return "handle"; }
+  std::string CppName() const override { return "zx::handle"; }
+  size_t InlineSize(WireVersion version) const override { return sizeof(zx_handle_t); }
   std::unique_ptr<Value> Decode(MessageDecoder* decoder, uint64_t offset) const override;
-
   void Visit(TypeVisitor* visitor) const override;
 };
 
@@ -441,13 +411,9 @@ class EnumType : public Type {
 
   std::string Name() const override;
   std::string CppName() const override;
-
   size_t InlineSize(WireVersion version) const override;
-
   std::unique_ptr<Value> Decode(MessageDecoder* decoder, uint64_t offset) const override;
-
   void PrettyPrint(const Value* value, PrettyPrinter& printer) const override;
-
   void Visit(TypeVisitor* visitor) const override;
 
  private:
@@ -462,13 +428,9 @@ class BitsType : public Type {
 
   std::string Name() const override;
   std::string CppName() const override;
-
   size_t InlineSize(WireVersion version) const override;
-
   std::unique_ptr<Value> Decode(MessageDecoder* decoder, uint64_t offset) const override;
-
   void PrettyPrint(const Value* value, PrettyPrinter& printer) const override;
-
   void Visit(TypeVisitor* visitor) const override;
 
  private:
@@ -483,14 +445,10 @@ class UnionType : public Type {
   const Union& union_definition() const { return union_definition_; }
 
   const UnionType* AsUnionType() const override { return this; }
-
   std::string Name() const override;
   std::string CppName() const override;
-
   size_t InlineSize(WireVersion version) const override;
-
-  bool Nullable() const override;
-
+  bool Nullable() const override { return nullable_; }
   std::unique_ptr<Value> Decode(MessageDecoder* decoder, uint64_t offset) const override;
 
   void Visit(TypeVisitor* visitor) const override;
@@ -508,16 +466,11 @@ class StructType : public Type {
   const Struct& struct_definition() const { return struct_definition_; }
 
   const StructType* AsStructType() const override { return this; }
-
   std::string Name() const override;
   std::string CppName() const override;
-
   size_t InlineSize(WireVersion version) const override;
-
-  bool Nullable() const override;
-
+  bool Nullable() const override { return nullable_; }
   std::unique_ptr<Value> Decode(MessageDecoder* decoder, uint64_t offset) const override;
-
   void Visit(TypeVisitor* visitor) const override;
 
  private:
@@ -535,10 +488,9 @@ class ElementSequenceType : public Type {
   const Type* component_type() const { return component_type_.get(); }
 
   const Type* GetComponentType() const override;
-
   void Visit(TypeVisitor* visitor) const override;
 
- protected:
+ private:
   std::unique_ptr<Type> component_type_;
 };
 
@@ -550,16 +502,11 @@ class ArrayType : public ElementSequenceType {
   uint32_t count() const { return count_; }
 
   bool IsArray() const override;
-
   std::string Name() const override;
   std::string CppName() const override;
-
   void PrettyPrint(PrettyPrinter& printer) const override;
-
   size_t InlineSize(WireVersion version) const override;
-
   std::unique_ptr<Value> Decode(MessageDecoder* decoder, uint64_t offset) const override;
-
   void Visit(TypeVisitor* visitor) const override;
 
  private:
@@ -573,15 +520,10 @@ class VectorType : public ElementSequenceType {
 
   std::string Name() const override;
   std::string CppName() const override;
-
   void PrettyPrint(PrettyPrinter& printer) const override;
-
-  size_t InlineSize(WireVersion version) const override;
-
-  bool Nullable() const override;
-
+  size_t InlineSize(WireVersion version) const override { return 16; }
+  bool Nullable() const override { return true; }
   std::unique_ptr<Value> Decode(MessageDecoder* decoder, uint64_t offset) const override;
-
   void Visit(TypeVisitor* visitor) const override;
 };
 
@@ -592,14 +534,10 @@ class TableType : public Type {
   const Table& table_definition() const { return table_definition_; }
 
   const TableType* AsTableType() const override { return this; }
-
   std::string Name() const override;
   std::string CppName() const override;
-
-  size_t InlineSize(WireVersion version) const override;
-
+  size_t InlineSize(WireVersion version) const override { return 16; }
   std::unique_ptr<Value> Decode(MessageDecoder* decoder, uint64_t offset) const override;
-
   void Visit(TypeVisitor* visitor) const override;
 
  private:
@@ -608,14 +546,9 @@ class TableType : public Type {
 
 class FidlMessageType : public Type {
  public:
-  FidlMessageType() = default;
-
-  std::string Name() const override;
-
-  size_t InlineSize(WireVersion version) const override;
-
+  std::string Name() const override { return "fidl-message"; }
+  size_t InlineSize(WireVersion version) const override { return 0; }
   std::unique_ptr<Value> Decode(MessageDecoder* decoder, uint64_t offset) const override;
-
   void Visit(TypeVisitor* visitor) const override;
 };
 

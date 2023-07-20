@@ -181,22 +181,20 @@ void Type::PrettyPrint(const Value* value, PrettyPrinter& printer) const {
   printer << Red << "invalid" << ResetColor;
 }
 
-std::string InvalidType::Name() const { return "unknown"; }
-
-size_t InvalidType::InlineSize(WireVersion version) const { return 0; }
-
-bool InvalidType::IsValid() const { return false; }
-
 std::unique_ptr<Value> InvalidType::Decode(MessageDecoder* decoder, uint64_t offset) const {
   return std::make_unique<InvalidValue>();
 }
 
 void InvalidType::Visit(TypeVisitor* visitor) const { visitor->VisitInvalidType(this); }
 
-size_t BoolType::InlineSize(WireVersion version) const { return sizeof(uint8_t); }
+std::unique_ptr<Value> EmptyPayloadType::Decode(MessageDecoder* decoder, uint64_t offset) const {
+  return std::make_unique<EmptyPayloadValue>();
+}
+
+void EmptyPayloadType::Visit(TypeVisitor* visitor) const { visitor->VisitEmptyPayloadType(this); }
 
 std::unique_ptr<Value> BoolType::Decode(MessageDecoder* decoder, uint64_t offset) const {
-  auto byte = decoder->GetAddress(offset, sizeof(uint8_t));
+  auto byte = decoder->GetAddress(offset, 1);
   if (byte == nullptr) {
     return std::make_unique<InvalidValue>();
   }
@@ -234,8 +232,6 @@ void Int8Type::PrettyPrint(const Value* value, PrettyPrinter& printer) const {
 }
 
 void Int8Type::Visit(TypeVisitor* visitor) const { visitor->VisitInt8Type(this); }
-
-std::string Int16Type::Name() const { return "int16"; }
 
 void Int16Type::PrettyPrint(const Value* value, PrettyPrinter& printer) const {
   uint64_t absolute;
@@ -300,7 +296,6 @@ std::string Int64Type::Name() const {
     case Kind::kDuration:
       return "zx.duration";
     case Kind::kTime:
-      return "zx.time";
     case Kind::kMonotonicTime:
       return "zx.time";
   }
@@ -704,27 +699,9 @@ void ActualAndRequestedType::Visit(TypeVisitor* visitor) const {
   visitor->VisitActualAndRequestedType(this);
 }
 
-std::string Float32Type::Name() const { return "float32"; }
-
-std::string Float32Type::CppName() const { return "float"; }
-
 void Float32Type::Visit(TypeVisitor* visitor) const { visitor->VisitFloat32Type(this); }
 
-std::string Float64Type::Name() const { return "float64"; }
-
-std::string Float64Type::CppName() const { return "double"; }
-
 void Float64Type::Visit(TypeVisitor* visitor) const { visitor->VisitFloat64Type(this); }
-
-std::string StringType::Name() const { return "string"; }
-
-std::string StringType::CppName() const { return "std::string"; }
-
-size_t StringType::InlineSize(WireVersion version) const {
-  return sizeof(uint64_t) + sizeof(uint64_t);
-}
-
-bool StringType::Nullable() const { return true; }
 
 std::unique_ptr<Value> StringType::Decode(MessageDecoder* decoder, uint64_t offset) const {
   uint64_t string_length = 0;
@@ -749,12 +726,6 @@ std::unique_ptr<Value> StringType::Decode(MessageDecoder* decoder, uint64_t offs
 }
 
 void StringType::Visit(TypeVisitor* visitor) const { visitor->VisitStringType(this); }
-
-std::string HandleType::Name() const { return "handle"; }
-
-std::string HandleType::CppName() const { return "zx::handle"; }
-
-size_t HandleType::InlineSize(WireVersion version) const { return sizeof(zx_handle_t); }
 
 std::unique_ptr<Value> HandleType::Decode(MessageDecoder* decoder, uint64_t offset) const {
   zx_handle_t handle = FIDL_HANDLE_ABSENT;
@@ -833,8 +804,6 @@ size_t UnionType::InlineSize(WireVersion version) const {
   return 16;
 }
 
-bool UnionType::Nullable() const { return nullable_; }
-
 std::unique_ptr<Value> UnionType::Decode(MessageDecoder* decoder, uint64_t offset) const {
   Ordinal64 ordinal = 0;
   if (decoder->GetValueAt(offset, &ordinal)) {
@@ -871,8 +840,6 @@ size_t StructType::InlineSize(WireVersion version) const {
   return nullable_ ? sizeof(uintptr_t) : struct_definition_.Size(version);
 }
 
-bool StructType::Nullable() const { return nullable_; }
-
 std::unique_ptr<Value> StructType::Decode(MessageDecoder* decoder, uint64_t offset) const {
   if (nullable_) {
     bool is_null;
@@ -908,27 +875,27 @@ void ElementSequenceType::Visit(TypeVisitor* visitor) const {
 bool ArrayType::IsArray() const { return true; }
 
 std::string ArrayType::Name() const {
-  return std::string("array<") + component_type_->Name() + ">";
+  return std::string("array<") + component_type()->Name() + ">";
 }
 
 std::string ArrayType::CppName() const {
-  return std::string("std::array<") + component_type_->CppName() + ", " + std::to_string(count()) +
+  return std::string("std::array<") + component_type()->CppName() + ", " + std::to_string(count()) +
          ">";
 }
 
 void ArrayType::PrettyPrint(PrettyPrinter& printer) const {
-  printer << "array<" << Green << component_type_->Name() << ResetColor << ">";
+  printer << "array<" << Green << component_type()->Name() << ResetColor << ">";
 }
 
 size_t ArrayType::InlineSize(WireVersion version) const {
-  return component_type_->InlineSize(version) * count_;
+  return component_type()->InlineSize(version) * count_;
 }
 
 std::unique_ptr<Value> ArrayType::Decode(MessageDecoder* decoder, uint64_t offset) const {
   auto result = std::make_unique<VectorValue>();
   for (uint64_t i = 0; i < count_; ++i) {
-    result->AddValue(component_type_->Decode(decoder, offset));
-    offset += component_type_->InlineSize(decoder->version());
+    result->AddValue(component_type()->Decode(decoder, offset));
+    offset += component_type()->InlineSize(decoder->version());
   }
   return result;
 }
@@ -936,22 +903,16 @@ std::unique_ptr<Value> ArrayType::Decode(MessageDecoder* decoder, uint64_t offse
 void ArrayType::Visit(TypeVisitor* visitor) const { visitor->VisitArrayType(this); }
 
 std::string VectorType::Name() const {
-  return std::string("vector<") + component_type_->Name() + ">";
+  return std::string("vector<") + component_type()->Name() + ">";
 }
 
 std::string VectorType::CppName() const {
-  return std::string("std::vector<") + component_type_->CppName() + ">";
+  return std::string("std::vector<") + component_type()->CppName() + ">";
 }
 
 void VectorType::PrettyPrint(PrettyPrinter& printer) const {
-  printer << "vector<" << Green << component_type_->Name() << ResetColor << ">";
+  printer << "vector<" << Green << component_type()->Name() << ResetColor << ">";
 }
-
-size_t VectorType::InlineSize(WireVersion version) const {
-  return sizeof(uint64_t) + sizeof(uint64_t);
-}
-
-bool VectorType::Nullable() const { return true; }
 
 std::unique_ptr<Value> VectorType::Decode(MessageDecoder* decoder, uint64_t offset) const {
   uint64_t element_count = 0;
@@ -960,7 +921,7 @@ std::unique_ptr<Value> VectorType::Decode(MessageDecoder* decoder, uint64_t offs
   bool is_null;
   uint64_t nullable_offset;
   if (!decoder->DecodeNullableHeader(
-          offset, element_count * component_type_->InlineSize(decoder->version()), &is_null,
+          offset, element_count * component_type()->InlineSize(decoder->version()), &is_null,
           &nullable_offset)) {
     return std::make_unique<InvalidValue>();
   }
@@ -968,11 +929,11 @@ std::unique_ptr<Value> VectorType::Decode(MessageDecoder* decoder, uint64_t offs
     return std::make_unique<NullValue>();
   }
 
-  size_t component_size = component_type_->InlineSize(decoder->version());
+  size_t component_size = component_type()->InlineSize(decoder->version());
   auto result = std::make_unique<VectorValue>();
   for (uint64_t i = 0;
        (i < element_count) && (nullable_offset + component_size <= decoder->num_bytes()); ++i) {
-    result->AddValue(component_type_->Decode(decoder, nullable_offset));
+    result->AddValue(component_type()->Decode(decoder, nullable_offset));
     nullable_offset += component_size;
   }
   return result;
@@ -983,11 +944,6 @@ void VectorType::Visit(TypeVisitor* visitor) const { visitor->VisitVectorType(th
 std::string TableType::Name() const { return table_definition_.name(); }
 
 std::string TableType::CppName() const { return FidlMethodNameToCpp(table_definition_.name()); }
-
-size_t TableType::InlineSize(WireVersion version) const {
-  // A table is always implemented as a size + a pointer.
-  return 2 * sizeof(uint64_t);
-}
 
 std::unique_ptr<Value> TableType::Decode(MessageDecoder* decoder, uint64_t offset) const {
   uint64_t member_count = 0;
@@ -1022,10 +978,6 @@ std::unique_ptr<Value> TableType::Decode(MessageDecoder* decoder, uint64_t offse
 }
 
 void TableType::Visit(TypeVisitor* visitor) const { visitor->VisitTableType(this); }
-
-std::string FidlMessageType::Name() const { return "fidl-message"; }
-
-size_t FidlMessageType::InlineSize(WireVersion version) const { return 0; }
 
 std::unique_ptr<Value> FidlMessageType::Decode(MessageDecoder* decoder, uint64_t offset) const {
   return nullptr;

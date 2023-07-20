@@ -53,10 +53,10 @@ class NullVisitor : public TypeVisitor {
 
 Encoder::Result Encoder::EncodeMessage(uint32_t tx_id, uint64_t ordinal,
                                        const uint8_t at_rest_flags[2], uint8_t dynamic_flags,
-                                       uint8_t magic, const StructValue& object) {
+                                       uint8_t magic, const Value* object, const Type* type) {
   Encoder encoder(WireVersion::kWireV2);
 
-  size_t object_size = object.struct_definition().Size(encoder.version()) + kTransactionHeaderSize;
+  size_t object_size = type->InlineSize(encoder.version()) + kTransactionHeaderSize;
   encoder.AllocateObject(object_size);
   encoder.WriteValue(tx_id);
   encoder.WriteValue(at_rest_flags[0]);
@@ -65,9 +65,7 @@ Encoder::Result Encoder::EncodeMessage(uint32_t tx_id, uint64_t ordinal,
   encoder.WriteValue(magic);
   encoder.WriteValue(ordinal);
   FX_DCHECK(sizeof(fidl_message_header_t) == encoder.current_offset_);
-
-  // The primary object offsets include the header size, so the offset of the object is zero.
-  encoder.VisitStructValueBody(kTransactionHeaderSize, &object);
+  object->Visit(&encoder, type);
 
   return Result{std::move(encoder.bytes_), std::move(encoder.handles_)};
 }
@@ -118,6 +116,10 @@ void Encoder::VisitStructValueBody(size_t offset, const StructValue* node) {
 
 void Encoder::VisitInvalidValue(const InvalidValue* node, const Type* for_type) {
   FX_LOGS_OR_CAPTURE(FATAL) << "Can't encode invalid data.";
+}
+
+void Encoder::VisitEmptyPayloadValue(const EmptyPayloadValue* node, const Type* for_type) {
+  // Do nothing since empty payload has zero size.
 }
 
 void Encoder::VisitNullValue(const NullValue* node, const Type* for_type) {

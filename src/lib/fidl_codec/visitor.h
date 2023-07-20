@@ -18,6 +18,9 @@ class Visitor {
   virtual void VisitInvalidValue(const InvalidValue* node, const Type* for_type) {
     VisitValue(node, for_type);
   }
+  virtual void VisitEmptyPayloadValue(const EmptyPayloadValue* node, const Type* for_type) {
+    VisitValue(node, for_type);
+  }
   virtual void VisitNullValue(const NullValue* node, const Type* for_type) {
     VisitValue(node, for_type);
   }
@@ -75,6 +78,7 @@ class Visitor {
 
   friend class Value;
   friend class InvalidValue;
+  friend class EmptyPayloadValue;
   friend class NullValue;
   friend class RawValue;
   friend class BoolValue;

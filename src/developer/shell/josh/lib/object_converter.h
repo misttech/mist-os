@@ -13,13 +13,6 @@ namespace shell::fidl {
 // TypeVisitor which converts a quickjs JSValue into a fidl_codec Value.
 class ObjectConverter : public fidl_codec::TypeVisitor {
  public:
-  static std::unique_ptr<fidl_codec::Value> Convert(JSContext* ctx, fidl_codec::Struct* st,
-                                                    const JSValue& value) {
-    ObjectConverter converter(ctx, value);
-    (st != nullptr ? st : &fidl_codec::Struct::Empty)->VisitAsType(&converter);
-    return std::move(converter.result_);
-  }
-
   static std::unique_ptr<fidl_codec::Value> Convert(JSContext* ctx, const fidl_codec::Type* type,
                                                     const JSValue& value) {
     ObjectConverter converter(ctx, value);
@@ -40,6 +33,7 @@ class ObjectConverter : public fidl_codec::TypeVisitor {
 
   // TypeVisitor implementation
   void VisitType(const fidl_codec::Type* type) override;
+  void VisitEmptyPayloadType(const fidl_codec::EmptyPayloadType* type) override;
   void VisitStringType(const fidl_codec::StringType* type) override;
   void VisitBoolType(const fidl_codec::BoolType* type) override;
   void VisitStructType(const fidl_codec::StructType* type) override;

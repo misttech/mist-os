@@ -26,7 +26,6 @@ namespace fidl_codec {
 struct DecodedMessageData;
 class MessageDecoderDispatcher;
 class Struct;
-class PayloadableValue;
 class StructValue;
 class Type;
 class Value;
@@ -48,9 +47,9 @@ class DecodedMessage {
   uint64_t ordinal() const { return ordinal_; }
   zx_status_t epitaph_error() const { return epitaph_error_; }
   const ProtocolMethod* method() const { return method_; }
-  std::unique_ptr<PayloadableValue>& decoded_request() { return decoded_request_; }
+  std::unique_ptr<Value>& decoded_request() { return decoded_request_; }
   std::stringstream& request_error_stream() { return request_error_stream_; }
-  std::unique_ptr<PayloadableValue>& decoded_response() { return decoded_response_; }
+  std::unique_ptr<Value>& decoded_response() { return decoded_response_; }
   std::stringstream& response_error_stream() { return response_error_stream_; }
   Direction direction() const { return direction_; }
   bool is_request() const { return is_request_; }
@@ -68,10 +67,10 @@ class DecodedMessage {
   uint64_t ordinal_ = 0;
   zx_status_t epitaph_error_ = ZX_OK;
   const ProtocolMethod* method_ = nullptr;
-  std::unique_ptr<PayloadableValue> decoded_request_;
+  std::unique_ptr<Value> decoded_request_;
   std::stringstream request_error_stream_;
   bool matched_request_ = false;
-  std::unique_ptr<PayloadableValue> decoded_response_;
+  std::unique_ptr<Value> decoded_response_;
   std::stringstream response_error_stream_;
   bool matched_response_ = false;
   Direction direction_ = Direction::kUnknown;
@@ -195,11 +194,10 @@ class MessageDecoder {
     return *handle_pos_++;
   }
 
-  // Decodes a whole message (request or response) and return a Value.
-  std::unique_ptr<PayloadableValue> DecodeMessage(const Payload* message_format);
-
-  // Decodes a field. Used by envelopes.
-  std::unique_ptr<Value> DecodeValue(const Type* type, bool is_inline);
+  // Decodes a whole message (request or response), skipping over the header.
+  // The |payload_type| must be EmptyPayloadType, StructType, TableType, or UnionType.
+  // Returns an EmptyPayloadValue, StructValue, TableValue, or UnionValue respectively.
+  std::unique_ptr<Value> DecodeMessage(const Type* payload_type);
 
   // Decodes the header for a value which can be null.
   bool DecodeNullableHeader(uint64_t offset, uint64_t size, bool* is_null,
@@ -215,6 +213,9 @@ class MessageDecoder {
   void SkipEnvelope(uint64_t offset);
 
  private:
+  // Decodes a field. Used by envelopes.
+  std::unique_ptr<Value> DecodeValue(const Type* type, bool is_inline);
+
   // The absolute offset in the main buffer.
   const uint64_t absolute_offset_ = 0;
 

@@ -91,7 +91,7 @@ TEST_F(WireParserTest, ParseSingleString) {
 
   fidl_message_header_t header = message.header();
 
-  const std::vector<const ProtocolMethod*>* methods = loader()->GetByOrdinal(header.ordinal);
+  const std::vector<ProtocolMethod*>* methods = loader()->GetByOrdinal(header.ordinal);
   ASSERT_NE(methods, nullptr);
   ASSERT_TRUE(!methods->empty());
   const ProtocolMethod* method = (*methods)[0];
@@ -110,14 +110,14 @@ TEST_F(WireParserTest, ParseSingleString) {
     }
   }
 
-  std::unique_ptr<fidl_codec::PayloadableValue> decoded_request;
+  std::unique_ptr<fidl_codec::Value> decoded_request;
   std::stringstream error_stream;
   fidl_codec::DecodeRequest(method, message.bytes().data(), message.bytes().size(),
                             handle_dispositions, message.handles().size(), &decoded_request,
                             error_stream);
   rapidjson::Document actual;
   if (decoded_request != nullptr) {
-    decoded_request->AsStructValue()->ExtractJson(actual.GetAllocator(), actual);
+    decoded_request->ExtractJson(actual.GetAllocator(), actual);
   }
 
   rapidjson::Document expected;
@@ -153,7 +153,7 @@ TEST_F(WireParserTest, ParseSingleString) {
                                                                                                   \
     fidl_message_header_t header = message.header();                                              \
                                                                                                   \
-    const std::vector<const ProtocolMethod*>* methods = loader()->GetByOrdinal(header.ordinal);   \
+    const std::vector<ProtocolMethod*>* methods = loader()->GetByOrdinal(header.ordinal);         \
     ASSERT_NE(methods, nullptr);                                                                  \
     ASSERT_TRUE(!methods->empty());                                                               \
     const ProtocolMethod* method = (*methods)[0];                                                 \
@@ -180,14 +180,14 @@ TEST_F(WireParserTest, ParseSingleString) {
     MessageDecoder decoder(message.bytes().data(),                                                \
                            (num_bytes == -1) ? message.bytes().size() : num_bytes,                \
                            handle_dispositions, message.handles().size(), error_stream);          \
-    std::unique_ptr<PayloadableValue> object = decoder.DecodeMessage(method->request());          \
+    std::unique_ptr<Value> object = decoder.DecodeMessage(method->request());                     \
     if ((num_bytes == -1) && (patched_offset == -1)) {                                            \
       std::cerr << error_stream.str();                                                            \
       ASSERT_FALSE(decoder.HasError()) << "Could not decode message";                             \
     }                                                                                             \
     rapidjson::Document actual;                                                                   \
     if (object != nullptr) {                                                                      \
-      object->AsStructValue()->ExtractJson(actual.GetAllocator(), actual);                        \
+      object->ExtractJson(actual.GetAllocator(), actual);                                         \
     }                                                                                             \
     rapidjson::StringBuffer actual_string;                                                        \
     rapidjson::Writer<rapidjson::StringBuffer> actual_w(actual_string);                           \
@@ -216,7 +216,7 @@ TEST_F(WireParserTest, ParseSingleString) {
       std::stringstream error_stream;                                                             \
       MessageDecoder decoder(message.bytes().data(), actual, handle_dispositions,                 \
                              message.handles().size(), error_stream);                             \
-      std::unique_ptr<PayloadableValue> object = decoder.DecodeMessage(method->request());        \
+      std::unique_ptr<Value> object = decoder.DecodeMessage(method->request());                   \
       ASSERT_TRUE(decoder.HasError()) << "expect decoder error for buffer size " << actual        \
                                       << " instead of " << message.bytes().actual();              \
     }                                                                                             \
@@ -225,15 +225,15 @@ TEST_F(WireParserTest, ParseSingleString) {
       std::stringstream error_stream;                                                             \
       MessageDecoder decoder(message.bytes().data(), message.bytes().size(), handle_dispositions, \
                              actual, error_stream);                                               \
-      std::unique_ptr<PayloadableValue> object = decoder.DecodeMessage(method->request());        \
+      std::unique_ptr<Value> object = decoder.DecodeMessage(method->request());                   \
       ASSERT_TRUE(decoder.HasError()) << "expect decoder error for handle size " << actual        \
                                       << " instead of " << message.handles().actual();            \
     }                                                                                             \
                                                                                                   \
     if ((num_bytes == -1) && (patched_offset == -1)) {                                            \
-      auto encode_result = Encoder::EncodeMessage(header.txid, header.ordinal,                    \
-                                                  header.at_rest_flags, header.dynamic_flags,     \
-                                                  header.magic_number, *object->AsStructValue()); \
+      auto encode_result = Encoder::EncodeMessage(                                                \
+          header.txid, header.ordinal, header.at_rest_flags, header.dynamic_flags,                \
+          header.magic_number, object.get(), method->request());                                  \
       ASSERT_THAT(encode_result.bytes, ::testing::ElementsAreArray(message.bytes()));             \
       ASSERT_EQ(message.handles().size(), encode_result.handles.size());                          \
                                                                                                   \
@@ -901,6 +901,30 @@ test::fidlcodec::examples::DataElement GetDataElement(int32_t i32, uint8_t u8) {
   return result;
 }
 
+test::fidlcodec::examples::FidlCodecTestProtocolStringIntUnionRequest GetStringIntUnionString(
+    std::string&& s) {
+  test::fidlcodec::examples::FidlCodecTestProtocolStringIntUnionRequest res;
+  res.set_s(s);
+  return res;
+}
+
+test::fidlcodec::examples::FidlCodecTestProtocolStringIntUnionRequest GetStringIntUnionInt(
+    int32_t i) {
+  test::fidlcodec::examples::FidlCodecTestProtocolStringIntUnionRequest res;
+  res.set_i32(i);
+  return res;
+}
+
+test::fidlcodec::examples::FidlCodecTestProtocolStructIntUnionRequest GetStructIntUnionStruct(
+    std::string&& s, int32_t i32) {
+  test::fidlcodec::examples::FidlCodecTestProtocolStructIntUnionRequest res;
+  test::fidlcodec::examples::Structomatic inner;
+  inner.s = s;
+  inner.i32 = i32;
+  res.set_structomatic(inner);
+  return res;
+}
+
 }  // namespace
 
 TEST_DECODE_WIRE(UnionInt, Union, R"({"isu":{"variant_i":"42"}, "i" : "1"})",
@@ -963,6 +987,22 @@ TEST_DECODE_WIRE(
     "  }\n"
     "}",
     GetDataElement(-10, 200))
+
+TEST_DECODE_WIRE(StringIntUnionSettingString, StringIntUnion, R"({"s": "foobar"})",
+                 "{ s: #gre#string#rst# = #red#\"foobar\"#rst# }",
+                 GetStringIntUnionString("foobar"))
+
+TEST_DECODE_WIRE(StringIntUnionSettingInt, StringIntUnion, R"({"i32": "22"})",
+                 "{ i32: #gre#int32#rst# = #blu#22#rst# }", GetStringIntUnionInt(22))
+
+TEST_DECODE_WIRE(StructIntUnion, StructIntUnion, R"({"structomatic": { "s": "foo", "i32": "25" }})",
+                 R"({
+  structomatic: #gre#test.fidlcodec.examples/Structomatic#rst# = {
+    s: #gre#string#rst# = #red#"foo"#rst#
+    i32: #gre#int32#rst# = #blu#25#rst#
+  }
+})",
+                 GetStructIntUnionStruct("foo", 25))
 
 namespace {
 
@@ -1175,6 +1215,18 @@ std::string TablePretty(std::optional<int16_t> first_int16, std::optional<std::s
   return result;
 }
 
+test::fidlcodec::examples::FidlCodecTestProtocolStringIntTableRequest GetStringIntTableRequest(
+    std::optional<std::string> string, std::optional<int32_t> integer) {
+  test::fidlcodec::examples::FidlCodecTestProtocolStringIntTableRequest request;
+  if (string.has_value()) {
+    request.set_s(*string);
+  }
+  if (integer.has_value()) {
+    request.set_i32(*integer);
+  }
+  return request;
+}
+
 TEST_DECODE_WIRE(Table0, Table, R"({"table":{}, "i":"2"})", TablePretty({}, {}, {}, {}, 2),
                  GetTable({}, {}, {}, {}), 2)
 
@@ -1234,6 +1286,15 @@ TEST_DECODE_WIRE(Table7, Table,
                       },
                       "i":"2"})",
                  TablePretty(1, "harpo", "groucho", 42, 2), GetTable(1, "harpo", "groucho", 42), 2)
+
+TEST_DECODE_WIRE(StringIntTableNoInt, StringIntTable, R"({"s": "foober"})",
+                 R"({ s: #gre#string#rst# = #red#"foober"#rst# })",
+                 GetStringIntTableRequest("foober", std::nullopt))
+
+TEST_DECODE_WIRE(
+    StringIntTableAllSet, StringIntTable, R"({"s": "foober", "i32": "5"})",
+    R"({ s: #gre#string#rst# = #red#"foober"#rst#, i32: #gre#int32#rst# = #blu#5#rst# })",
+    GetStringIntTableRequest("foober", 5))
 
 // TODO(fxbug.dev/6274): Add a test that exercises what happens when we encounter an
 // unknown type in a table.
@@ -1663,7 +1724,7 @@ TEST_F(WireParserTest, BadSchemaPrintHex) {
     }
   }
 
-  const std::vector<const ProtocolMethod*>* methods = loader.GetByOrdinal(header.ordinal);
+  const std::vector<ProtocolMethod*>* methods = loader.GetByOrdinal(header.ordinal);
   ASSERT_NE(methods, nullptr);
   ASSERT_TRUE(!methods->empty());
 
@@ -1671,7 +1732,7 @@ TEST_F(WireParserTest, BadSchemaPrintHex) {
   // If this is null, you probably have to update the schema above.
   ASSERT_NE(method, nullptr);
 
-  std::unique_ptr<fidl_codec::PayloadableValue> decoded_request;
+  std::unique_ptr<fidl_codec::Value> decoded_request;
   std::stringstream error_stream;
   bool success = fidl_codec::DecodeRequest(method, message.bytes().data(), message.bytes().size(),
                                            handle_dispositions, message.handles().size(),
@@ -1690,16 +1751,6 @@ TEST_F(WireParserTest, BadSchemaPrintHex) {
       ::testing::IsSubstring,
       "Unknown type for identifier: test.fidlcodec.examples/FidlCodecTestProtocolRequest",
       log_msg.str().c_str());
-  ASSERT_PRED_FORMAT2(::testing::IsSubstring, "Invalid type", log_msg.str().c_str());
-}
-
-// Checks that MessageDecoder::DecodeValue doesn't core dump with a null type.
-TEST_F(WireParserTest, DecodeNullTypeValue) {
-  std::stringstream error_stream;
-  fidl_message_header_t header;
-  MessageDecoder decoder(reinterpret_cast<uint8_t*>(&header), sizeof(header), nullptr, 0,
-                         error_stream);
-  decoder.DecodeValue(nullptr, /*is_inline=*/false);
 }
 
 }  // namespace fidl_codec

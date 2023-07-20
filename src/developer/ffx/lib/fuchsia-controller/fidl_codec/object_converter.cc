@@ -8,8 +8,10 @@
 
 #include <cinttypes>
 
+#include "object.h"
 #include "py_wrapper.h"
 #include "src/developer/ffx/lib/fuchsia-controller/abi/convert.h"
+#include "src/lib/fidl_codec/wire_object.h"
 
 namespace converter {
 
@@ -82,6 +84,14 @@ void ObjectConverter::VisitBoolType(const fidl_codec::BoolType* type) {
     return;
   }
   result_ = std::make_unique<fidl_codec::BoolValue>(obj_ == Py_True ? 1 : 0);
+}
+
+void ObjectConverter::VisitEmptyPayloadType(const fidl_codec::EmptyPayloadType* type) {
+  if (obj_ != Py_None) {
+    PyErr_SetString(PyExc_TypeError, "expected None for empty payload");
+    return;
+  }
+  result_ = std::make_unique<fidl_codec::EmptyPayloadValue>();
 }
 
 void ObjectConverter::VisitStructType(const fidl_codec::StructType* type) {

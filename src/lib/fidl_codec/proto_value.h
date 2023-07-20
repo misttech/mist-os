@@ -7,13 +7,14 @@
 
 #include "src/lib/fidl_codec/proto/value.pb.h"
 #include "src/lib/fidl_codec/visitor.h"
+#include "src/lib/fidl_codec/wire_object.h"
 
 namespace fidl_codec {
 
 // Visitor which convert a fidl_codec value into a protobuf value.
 class ProtoVisitor : public fidl_codec::Visitor {
  public:
-  ProtoVisitor(proto::Value* dst) : dst_(dst) {}
+  explicit ProtoVisitor(proto::Value* dst) : dst_(dst) {}
 
  private:
   void VisitNullValue(const fidl_codec::NullValue* node, const fidl_codec::Type* for_type) override;
@@ -39,8 +40,9 @@ class ProtoVisitor : public fidl_codec::Visitor {
                        const fidl_codec::Type* for_type) override;
   void VisitFidlMessageValue(const fidl_codec::FidlMessageValue* node,
                              const fidl_codec::Type* for_type) override;
+  void VisitEmptyPayloadValue(const fidl_codec::EmptyPayloadValue* node,
+                              const fidl_codec::Type* for_type) override;
 
- private:
   proto::Value* dst_;
 };
 

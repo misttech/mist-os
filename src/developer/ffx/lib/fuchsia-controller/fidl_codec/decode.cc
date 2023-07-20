@@ -66,7 +66,7 @@ PyObject *decode_fidl_message(PyObject *self, PyObject *args, PyObject *kwds,  /
     c_handles[i] = zx_handle_disposition_t{.handle = res};
   }
   auto header = reinterpret_cast<const fidl_message_header_t *>(c_bytes);
-  const std::vector<const fidl_codec::ProtocolMethod *> *methods =
+  const std::vector<fidl_codec::ProtocolMethod *> *methods =
       mod::get_module_state()->loader->GetByOrdinal(header->ordinal);
   if (methods == nullptr || methods->empty()) {
     PyErr_Format(PyExc_LookupError, "Unable to find any methods for method ordinal: %" PRIu64,
@@ -75,7 +75,7 @@ PyObject *decode_fidl_message(PyObject *self, PyObject *args, PyObject *kwds,  /
   }
   // What is the approach here if there's more than one method?
   const fidl_codec::ProtocolMethod *method = (*methods)[0];
-  std::unique_ptr<fidl_codec::PayloadableValue> object;
+  std::unique_ptr<fidl_codec::Value> object;
   std::ostringstream errors;
   bool successful;
   switch (direction) {

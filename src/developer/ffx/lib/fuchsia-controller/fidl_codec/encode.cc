@@ -7,13 +7,12 @@
 #include <iostream>
 #include <string>
 
-#include "ir.h"
-#include "lib/fidl/txn_header.h"
 #include "mod.h"
 #include "object_converter.h"
 #include "py_wrapper.h"
 #include "src/developer/ffx/lib/fuchsia-controller/abi/convert.h"
 #include "src/lib/fidl_codec/encoder.h"
+#include "src/lib/fidl_codec/wire_types.h"
 
 namespace encode {
 
@@ -25,22 +24,16 @@ PyMethodDef encode_fidl_message_py_def = {
     "If the object field is not None, then all parameters are required. "
     "If object is None, other optional parameters will be ignored."};
 
-struct ConversionArgs {
+struct GetPayloadTypeArgs {
   PyObject *obj;
   PyObject *type_name_obj;
   PyObject *library_obj;
 };
 
-std::unique_ptr<fidl_codec::Value> ConvertObject(ConversionArgs args) {
+std::unique_ptr<fidl_codec::Type> GetPayloadType(GetPayloadTypeArgs args) {
   if (args.obj == Py_None) {
-    // Declaring here so as to not make it ambiguous for the compiler
-    // (there's the const argument and the non-const argument).
-    fidl_codec::Struct *st = nullptr;
-    // This can't be set to None, but it can be set to an empty map so as to not encode anything.
-    auto empty_struct = py::Object(PyDict_New());
-    return converter::ObjectConverter::Convert(empty_struct.get(), st);
+    return std::make_unique<fidl_codec::EmptyPayloadType>();
   }
-
   const char *lib_c_str = PyUnicode_AsUTF8(args.library_obj);
   if (lib_c_str == nullptr) {
     return nullptr;
@@ -60,7 +53,7 @@ std::unique_ptr<fidl_codec::Value> ConvertObject(ConversionArgs args) {
     PyErr_Format(PyExc_RuntimeError, "Unrecognized type: '%s'", type_name_c_str);
     return nullptr;
   }
-  return converter::ObjectConverter::Convert(args.obj, type.get());
+  return type;
 }
 
 // NOLINTNEXTLINE: similarly typed parameters are unavoidable in Python.
@@ -96,16 +89,20 @@ PyObject *encode_fidl_message(PyObject *self, PyObject *args, PyObject *kwds) {
     return nullptr;
   }
 
-  auto converted = ConvertObject(ConversionArgs{
+  auto type = GetPayloadType(GetPayloadTypeArgs{
       .obj = obj,
       .type_name_obj = type_name_obj,
       .library_obj = library_obj,
   });
+  if (type == nullptr) {
+    return nullptr;
+  }
+  auto converted = converter::ObjectConverter::Convert(obj, type.get());
   if (converted == nullptr) {
     return nullptr;
   }
   auto msg = fidl_codec::Encoder::EncodeMessage(txid, ordinal, AT_REST_FLAGS, DYNAMIC_FLAGS,
-                                                HEADER_MAGIC, *converted->AsStructValue());
+                                                HEADER_MAGIC, converted.get(), type.get());
   auto res = py::Object(PyTuple_New(2));
   if (res == nullptr) {
     return nullptr;

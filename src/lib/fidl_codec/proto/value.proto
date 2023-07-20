@@ -6,7 +6,9 @@ syntax = "proto3";
 
 package fidl_codec.proto;
 
-// Defines a fidl_codec value.
+// The messages in this package correspond to the C++ types in
+// src/lib/fidl_codec/wire_object.h.
+
 message Value {
   oneof Kind {
     bool null_value = 1;
@@ -22,16 +24,15 @@ message Value {
     Table table_value = 11;
     FidlMessage fidl_message_value = 12;
     ActualAndRequested actual_and_requested_value = 13;
+    EmptyPayload empty_payload_value = 14;
   }
 }
 
-// Defines an integer value.
 message Integer {
   uint64 absolute_value = 1;
   bool negative = 2;
 }
 
-// Defines a handle value.
 message HandleInfo {
   uint32 handle = 1;
   uint32 type = 2;
@@ -39,13 +40,10 @@ message HandleInfo {
   uint32 operation = 4;
 }
 
-// Defines a union value.
 message Union {
   string member = 1;
   Value value = 2;
 }
-
-// Defines a struct field with id
 
 message StructField {
   uint32 id = 1;
@@ -53,31 +51,18 @@ message StructField {
   Value value = 3;
 }
 
-// Defines a struct value.
 message Struct {
   repeated StructField fields = 1;
 }
 
-// Defines a vector value.
 message Vector {
   repeated Value value = 1;
 }
 
-// Defines a table value.
 message Table {
   map<string, Value> members = 1;
 }
 
-// Defines a payloadable value.
-message Payload {
-  oneof Kind {
-    Struct struct_value = 1;
-    Union union_value = 2;
-    Table table_value = 3;
-  }
-}
-
-// Defines a FIDL message value.
 message FidlMessage {
   uint32 txid = 1;
   uint64 ordinal = 2;
@@ -91,15 +76,16 @@ message FidlMessage {
   bytes raw_bytes = 10;
   repeated HandleInfo handle = 11;
   bool has_request = 12;
-  Payload decoded_request = 13;
+  Value decoded_request = 13;
   string request_errors = 14;
   bool has_response = 15;
-  Payload decoded_response = 16;
+  Value decoded_response = 16;
   string response_errors = 17;
 }
 
-// Defines a value which is displayed: actual/requested.
 message ActualAndRequested {
   uint64 actual = 1;
   uint64 requested = 2;
 }
+
+message EmptyPayload {}

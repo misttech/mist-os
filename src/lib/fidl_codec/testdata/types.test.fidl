@@ -73,7 +73,13 @@ closed protocol FidlCodecTestProtocol {
         1: s string:100;
         2: i32 int32;
     });
-
+    strict StructIntUnion(union {
+        1: structomatic struct {
+            s string:100;
+            i32 int32;
+        };
+        2: i32 int32;
+    });
     strict Array1(struct {
         b_1 array<int32, 1>;
     });

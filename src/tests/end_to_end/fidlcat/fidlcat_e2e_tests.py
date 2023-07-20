@@ -6,9 +6,9 @@ import os
 import subprocess
 import sys
 import tempfile
+import textwrap
 from threading import Event, Thread
 import unittest
-from pathlib import Path
 
 TEST_DATA_DIR = 'host_x64/test_data/fidlcat_e2e_tests'  # relative to $PWD
 FIDLCAT_TIMEOUT = 60  # timeout when invoking fidlcat
@@ -240,224 +240,166 @@ class FidlcatE2eTests(unittest.TestCase):
         self.assertEqual(fidlcat.wait(), 0, fidlcat.get_diagnose_msg())
 
         self.assertEqual(
-            fidlcat.stdout,
-            '--------------------------------------------------------------------------------'
-            'echo_client_cpp.cmx 26251: 26 handles\n'
-            '\n'
-            '  Process:4cd5cb37(proc-self)\n'
-            '\n'
-            '  startup Vmar:4cd5cb3b(vmar-root)\n'
-            '\n'
-            '  startup Thread:4cd5cb3f(thread-self)\n'
-            '\n'
-            '  startup Channel:4c25cb57(dir:/pkg)\n'
-            '\n'
-            '  startup Channel:4cb5cb07(dir:/svc)\n'
-            '      6857656973.081445 write request  fuchsia.io/Openable.Open\n'
-            '\n'
-            '  startup Job:4cc5cb17(job-default)\n'
-            '\n'
-            '  startup Channel:4c85cb0f(directory-request:/)\n'
-            '      6857656973.081445 read  request  fuchsia.io/Node1.Clone\n'
-            '      6857656977.376411 read  request  fuchsia.io/Openable.Open\n'
-            '    closed by zx_handle_close\n'
-            '\n'
-            '  startup Socket:4cd5cb23(fd:0)\n'
-            '    closed by zx_handle_close\n'
-            '\n'
-            '  startup Socket:4ce5caab(fd:1)\n'
-            '    closed by zx_handle_close\n'
-            '\n'
-            '  startup Socket:4ce5cab3(fd:2)\n'
-            '    closed by zx_handle_close\n'
-            '\n'
-            '  startup Vmo:4cb5cbd7(vdso-vmo)\n'
-            '\n'
-            '  startup Vmo:4cc5cbdf(stack-vmo)\n'
-            '\n'
-            '  Channel:4cb5cb93(channel:0)\n'
-            '    linked to Channel:4db5cb4f(dir:/svc)\n'
-            '    created by zx_channel_create\n'
-            '    closed by Channel:4cb5cb07(dir:/svc) sending fuchsia.io/Openable.Open\n'
-            '\n'
-            '  Channel:4db5cb4f(dir:/svc)\n'
-            '    linked to Channel:4cb5cb93(channel:0)\n'
-            '    created by zx_channel_create\n'
-            '      6857656973.081445 write request  fuchsia.io/Openable.Open\n'
-            '    closed by zx_handle_close\n'
-            '\n'
-            '  Channel:4cc5cba7(server:fuchsia-pkg://fuchsia.com/echo_server_cpp#meta/echo_server_cpp.cmx)\n'
-            '    linked to Channel:4cb5cba3(channel:3)\n'
-            '    which is  Channel:83cadf63(directory-request:/svc) in process echo_server_cpp.cmx:26568\n'
-            '    created by zx_channel_create\n'
-            '      6857656973.081445 write request  fuchsia.io/Openable.Open\n'
-            '    closed by zx_handle_close\n'
-            '\n'
-            '  Channel:4cb5cba3(channel:3)\n'
-            '    linked to Channel:4cc5cba7(server:fuchsia-pkg://fuchsia.com/echo_server_cpp#meta/echo_server_cpp.cmx)\n'
-            '    created by zx_channel_create\n'
-            '\n'
-            '  Channel:4ca5cbab(dir:/svc/fuchsia.sys.Launcher)\n'
-            '    linked to Channel:4ca5cbaf(channel:5)\n'
-            '    created by zx_channel_create\n'
-            '      6857656973.081445 write  ordinal=54e7c1e85c5c5bbf\n'
-            '    closed by zx_handle_close\n'
-            '\n'
-            '  Channel:4ca5cbaf(channel:5)\n'
-            '    linked to Channel:4ca5cbab(dir:/svc/fuchsia.sys.Launcher)\n'
-            '    created by zx_channel_create\n'
-            '    closed by Channel:4db5cb4f(dir:/svc) sending fuchsia.io/Openable.Open\n'
-            '\n'
-            '  Channel:4c65cbb3(server-control:fuchsia-pkg://fuchsia.com/echo_server_cpp#meta/echo_server_cpp.cmx)\n'
-            '    linked to Channel:4c65cbb7(channel:7)\n'
-            '    created by zx_channel_create\n'
-            '      6857656977.376411 read   ordinal=640d93b6a46c1578\n'
-            '    closed by zx_handle_close\n'
-            '\n'
-            '  Channel:4c65cbb7(channel:7)\n'
-            '    linked to Channel:4c65cbb3(server-control:fuchsia-pkg://fuchsia.com/echo_server_cpp#meta/echo_server_cpp.cmx)\n'
-            '    created by zx_channel_create\n'
-            '\n'
-            '  Channel:4c85f443(server:fuchsia-pkg://fuchsia.com/echo_server_cpp#meta/echo_server_cpp.cmx/fidl.examples.echo.Echo)\n'
-            '    linked to Channel:4c45cbbb(channel:9)\n'
-            '    which is  Channel:833adf7b(directory-request:/svc/fidl.examples.echo.Echo) in process echo_server_cpp.cmx:26568\n'
-            '    created by zx_channel_create\n'
-            '      6857656973.081445 write request  fidl.examples.echo/Echo.EchoString\n'
-            '      6857656977.376411 read  response fidl.examples.echo/Echo.EchoString\n'
-            '    closed by zx_handle_close\n'
-            '\n'
-            '  Channel:4c45cbbb(channel:9)\n'
-            '    linked to Channel:4c85f443(server:fuchsia-pkg://fuchsia.com/echo_server_cpp#meta/echo_server_cpp.cmx/fidl.examples.echo.Echo)\n'
-            '    created by zx_channel_create\n'
-            '    closed by Channel:4cc5cba7(server:fuchsia-pkg://fuchsia.com/echo_server_cpp#meta/echo_server_cpp.cmx) sending fuchsia.io/Openable.Open\n'
-            '\n'
-            '  Channel:4cc5cb2f(directory-request:/)\n'
-            '    created by Channel:4c85cb0f(directory-request:/) receiving fuchsia.io/Node1.Clone\n'
-            '      6857656977.376411 write event    fuchsia.io/Node1.OnOpen\n'
-            '    closed by zx_handle_close\n'
-            '\n'
-            '  Channel:4df5f45f(directory-request:/diagnostics)\n'
-            '    created by Channel:4c85cb0f(directory-request:/) receiving fuchsia.io/Openable.Open\n'
-            '      6857656977.376411 write event    fuchsia.io/Node1.OnOpen\n'
-            '    closed by zx_handle_close\n'
-            '\n'
-            '  Port:4cb5cb8f()\n'
-            '    closed by zx_handle_close\n'
-            '\n'
-            '  Timer:4c85cb8b()\n'
-            '    closed by zx_handle_close\n'
-            '\n'
-            '--------------------------------------------------------------------------------'
-            'echo_server_cpp.cmx 26568: 18 handles\n'
-            '\n'
-            '  Process:839ae00b(proc-self)\n'
-            '\n'
-            '  startup Vmar:839ae00f(vmar-root)\n'
-            '\n'
-            '  startup Thread:839ae013(thread-self)\n'
-            '\n'
-            '  startup Channel:834ae0b7(dir:/pkg)\n'
-            '\n'
-            '  startup Channel:830ae0cb(dir:/svc)\n'
-            '      6857656977.376411 write request  fuchsia.io/Openable.Open\n'
-            '\n'
-            '  startup Job:839ae0df(job-default)\n'
-            '\n'
-            '  startup Channel:839ae0d7(directory-request:/)\n'
-            '      6857656977.376411 read  request  fuchsia.io/Openable.Open\n'
-            '      6857656977.376411 read  request  fuchsia.io/Node1.Clone\n'
-            '      6857656977.376411 read  request  fuchsia.io/Openable.Open\n'
-            '\n'
-            '  startup Socket:839ae0ef(fd:0)\n'
-            '\n'
-            '  startup Log:839ae0f3(fd:1)\n'
-            '\n'
-            '  startup Log:839ae0f7(fd:2)\n'
-            '\n'
-            '  startup Vmo:83bae027(vdso-vmo)\n'
-            '\n'
-            '  startup Vmo:83aae02f(stack-vmo)\n'
-            '\n'
-            '  Channel:83dae053(channel:10)\n'
-            '    linked to Channel:831ae04b(dir:/svc)\n'
-            '    created by zx_channel_create\n'
-            '    closed by Channel:830ae0cb(dir:/svc) sending fuchsia.io/Openable.Open\n'
-            '\n'
-            '  Channel:831ae04b(dir:/svc)\n'
-            '    linked to Channel:83dae053(channel:10)\n'
-            '    created by zx_channel_create\n'
-            '\n'
-            '  Channel:83cadf63(directory-request:/svc)\n'
-            '    linked to Channel:4cc5cba7(server:fuchsia-pkg://fuchsia.com/echo_server_cpp#meta/echo_server_cpp.cmx) in process echo_client_cpp.cmx:26251\n'
-            '    created by Channel:839ae0d7(directory-request:/) receiving fuchsia.io/Openable.Open\n'
-            '      6857656977.376411 read  request  fuchsia.io/Openable.Open\n'
-            '    closed by zx_handle_close\n'
-            '\n'
-            '  Channel:833adf7b(directory-request:/svc/fidl.examples.echo.Echo)\n'
-            '    linked to Channel:4c85f443(server:fuchsia-pkg://fuchsia.com/echo_server_cpp#meta/echo_server_cpp.cmx/fidl.examples.echo.Echo) in process echo_client_cpp.cmx:26251\n'
-            '    created by Channel:83cadf63(directory-request:/svc) receiving fuchsia.io/Openable.Open\n'
-            '      6857656977.376411 read  request  fidl.examples.echo/Echo.EchoString\n'
-            '      6857656977.376411 write response fidl.examples.echo/Echo.EchoString\n'
-            '\n'
-            '  Channel:83aae003(directory-request:/)\n'
-            '    created by Channel:839ae0d7(directory-request:/) receiving fuchsia.io/Node1.Clone\n'
-            '      6857656977.376411 write event    fuchsia.io/Node1.OnOpen\n'
-            '\n'
-            '  Channel:83aae067(directory-request:/diagnostics)\n'
-            '    created by Channel:839ae0d7(directory-request:/) receiving fuchsia.io/Openable.Open\n'
-        )
+            fidlcat.stdout, """\
+--------------------------------------------------------------------------------echo_client.cm 1934080: 19 handles
+
+  Process:eb13d6eb(proc-self)
+
+  startup Thread:72a3d5c3(thread-self)
+
+  startup Vmar:7ab3d41f(vmar-root)
+
+  startup Channel:4eb3d2ab(dir:/svc)
+      21320.052636 write request  fuchsia.io/Openable.Open
+
+  startup Channel:8db3d62f(dir:/pkg)
+
+  startup Channel:2f53d2bb(directory-request:/)
+      21320.389674 read  request  fuchsia.io/Node1.Clone
+    closed by zx_handle_close
+
+  startup Clock:7343d0fb()
+
+  startup Socket:1363d7e7(fd:1)
+    closed by zx_handle_close
+
+  startup Socket:0793d49b(fd:2)
+    closed by zx_handle_close
+
+  startup Job:0673d5f7(job-default)
+
+  startup Vmo:6f43c91b(vdso-vmo)
+
+  startup Vmo:6c83ca87(stack-vmo)
+
+  Port:60a3d6c7(port:0)
+    created by zx_port_create
+    closed by zx_handle_close
+
+  Timer:4863d187(timer:0)
+    created by zx_timer_create
+    closed by zx_handle_close
+
+  Channel:c633d2db(channel:0)
+    linked to Channel:fdd3d09f(channel:1)
+    created by zx_channel_create
+    closed by Channel:4eb3d2ab(dir:/svc) sending fuchsia.io/Openable.Open
+
+  Channel:fdd3d09f(channel:1)
+    linked to Channel:c633d2db(channel:0)
+    created by zx_channel_create
+      21320.136348 write request  fuchsia.io/Openable.Open
+    closed by zx_handle_close
+
+  Channel:7663d53b(channel:2)
+    linked to Channel:7063d25b(channel:3)
+    which is  Channel:60dc2bb3() in process echo_server.cm:1934409
+    created by zx_channel_create
+      21320.157131 write request  test.placeholders/Echo.EchoString
+      21321.018177 read  response test.placeholders/Echo.EchoString
+    closed by zx_handle_close
+
+  Channel:7063d25b(channel:3)
+    linked to Channel:7663d53b(channel:2)
+    created by zx_channel_create
+    closed by Channel:fdd3d09f(channel:1) sending fuchsia.io/Openable.Open
+
+  Channel:31c3d79b()
+    created by Channel:2f53d2bb(directory-request:/) receiving fuchsia.io/Node1.Clone
+    closed by zx_handle_close
+
+--------------------------------------------------------------------------------echo_server.cm 1934409: 18 handles
+
+  Process:e19c2d4f(proc-self)
+
+  startup Thread:4a8c356b(thread-self)
+
+  startup Vmar:da0c2e4b(vmar-root)
+
+  startup Channel:5e0c228f(dir:/svc)
+      21320.611044 write request  fuchsia.io/Openable.Open
+
+  startup Channel:c75c3537(dir:/pkg)
+
+  startup Channel:dedc3503(directory-request:/)
+      21320.679108 read  request  fuchsia.io/Node1.Clone
+      21320.814595 read  request  fuchsia.io/Openable.Open
+
+  startup Clock:8efc2deb()
+
+  startup Socket:dcbc2b1b(fd:1)
+
+  startup Socket:e3dc2843(fd:2)
+
+  startup Job:d73c2ff7(job-default)
+
+  startup Vmo:d10c3563(vdso-vmo)
+
+  startup Vmo:db8c349f(stack-vmo)
+
+  Port:c2cc378f(port:1)
+    created by zx_port_create
+
+  Timer:90bc2937(timer:1)
+    created by zx_timer_create
+
+  Channel:f2ec2f3b(channel:4)
+    linked to Channel:d75c352b(channel:5)
+    created by zx_channel_create
+    closed by Channel:5e0c228f(dir:/svc) sending fuchsia.io/Openable.Open
+
+  Channel:d75c352b(channel:5)
+    linked to Channel:f2ec2f3b(channel:4)
+    created by zx_channel_create
+
+  Channel:aa3c2a07()
+    created by Channel:dedc3503(directory-request:/) receiving fuchsia.io/Node1.Clone
+    closed by zx_handle_close
+
+  Channel:60dc2bb3()
+    linked to Channel:7663d53b(channel:2) in process echo_client.cm:1934080
+    created by Channel:dedc3503(directory-request:/) receiving fuchsia.io/Openable.Open
+      21320.901025 read  request  test.placeholders/Echo.EchoString
+      21320.992007 write response test.placeholders/Echo.EchoString
+    closed by zx_handle_close
+""")
 
     def test_with_top(self):
         fidlcat = Fidlcat('--with=top', '--from', TEST_DATA_DIR + '/echo.pb')
         self.assertEqual(fidlcat.wait(), 0, fidlcat.get_diagnose_msg())
 
         self.assertEqual(
-            fidlcat.stdout,
-            '--------------------------------------------------------------------------------'
-            'echo_client_cpp.cmx 26251: 11 events\n'
-            '  fuchsia.io/Openable: 4 events\n'
-            '    Open: 4 events\n'
-            '      6857656973.081445 write request  fuchsia.io/Openable.Open(Channel:4cb5cb07(dir:/svc))\n'
-            '      6857656973.081445 write request  fuchsia.io/Openable.Open(Channel:4db5cb4f(dir:/svc))\n'
-            '      6857656973.081445 write request  fuchsia.io/Openable.Open(Channel:4cc5cba7(server:fuchsia-pkg://fuchsia.com/echo_server_cpp#meta/echo_server_cpp.cmx))\n'
-            '      6857656977.376411 read  request  fuchsia.io/Openable.Open(Channel:4c85cb0f(directory-request:/))\n'
-            '\n'
-            '  fuchsia.io/Node1: 3 events\n'
-            '    OnOpen: 2 events\n'
-            '      6857656977.376411 write event    fuchsia.io/Node1.OnOpen(Channel:4cc5cb2f(directory-request:/))\n'
-            '      6857656977.376411 write event    fuchsia.io/Node1.OnOpen(Channel:4df5f45f(directory-request:/diagnostics))\n'
-            '    Clone: 1 event\n'
-            '      6857656973.081445 read  request  fuchsia.io/Node1.Clone(Channel:4c85cb0f(directory-request:/))\n'
-            '\n'
-            '  fidl.examples.echo/Echo: 2 events\n'
-            '    EchoString: 2 events\n'
-            '      6857656973.081445 write request  fidl.examples.echo/Echo.EchoString(Channel:4c85f443(server:fuchsia-pkg://fuchsia.com/echo_server_cpp#meta/echo_server_cpp.cmx/fidl.examples.echo.Echo))\n'
-            '      6857656977.376411 read  response fidl.examples.echo/Echo.EchoString(Channel:4c85f443(server:fuchsia-pkg://fuchsia.com/echo_server_cpp#meta/echo_server_cpp.cmx/fidl.examples.echo.Echo))\n'
-            '\n'
-            '  unknown interfaces: : 2 events\n'
-            '      6857656977.376411 read   ordinal=640d93b6a46c1578(Channel:4c65cbb3(server-control:fuchsia-pkg://fuchsia.com/echo_server_cpp#meta/echo_server_cpp.cmx))\n'
-            '      6857656973.081445 write  ordinal=54e7c1e85c5c5bbf(Channel:4ca5cbab(dir:/svc/fuchsia.sys.Launcher))\n'
-            '\n'
-            '--------------------------------------------------------------------------------'
-            'echo_server_cpp.cmx 26568: 8 events\n'
-            '  fuchsia.io/Openable: 4 events\n'
-            '    Open: 4 events\n'
-            '      6857656977.376411 write request  fuchsia.io/Openable.Open(Channel:830ae0cb(dir:/svc))\n'
-            '      6857656977.376411 read  request  fuchsia.io/Openable.Open(Channel:839ae0d7(directory-request:/))\n'
-            '      6857656977.376411 read  request  fuchsia.io/Openable.Open(Channel:83cadf63(directory-request:/svc))\n'
-            '      6857656977.376411 read  request  fuchsia.io/Openable.Open(Channel:839ae0d7(directory-request:/))\n'
-            '\n'
-            '  fidl.examples.echo/Echo: 2 events\n'
-            '    EchoString: 2 events\n'
-            '      6857656977.376411 read  request  fidl.examples.echo/Echo.EchoString(Channel:833adf7b(directory-request:/svc/fidl.examples.echo.Echo))\n'
-            '      6857656977.376411 write response fidl.examples.echo/Echo.EchoString(Channel:833adf7b(directory-request:/svc/fidl.examples.echo.Echo))\n'
-            '\n'
-            '  fuchsia.io/Node1: 2 events\n'
-            '    Clone: 1 event\n'
-            '      6857656977.376411 read  request  fuchsia.io/Node1.Clone(Channel:839ae0d7(directory-request:/))\n'
-            '    OnOpen: 1 event\n'
-            '      6857656977.376411 write event    fuchsia.io/Node1.OnOpen(Channel:83aae003(directory-request:/))\n'
-        )
+            fidlcat.stdout, """\
+--------------------------------------------------------------------------------echo_client.cm 1934080: 5 events
+  fuchsia.io/Openable: 2 events
+    Open: 2 events
+      21320.052636 write request  fuchsia.io/Openable.Open(Channel:4eb3d2ab(dir:/svc))
+      21320.136348 write request  fuchsia.io/Openable.Open(Channel:fdd3d09f(channel:1))
+
+  test.placeholders/Echo: 2 events
+    EchoString: 2 events
+      21320.157131 write request  test.placeholders/Echo.EchoString(Channel:7663d53b(channel:2))
+      21321.018177 read  response test.placeholders/Echo.EchoString(Channel:7663d53b(channel:2))
+
+  fuchsia.io/Node1: 1 event
+    Clone: 1 event
+      21320.389674 read  request  fuchsia.io/Node1.Clone(Channel:2f53d2bb(directory-request:/))
+
+--------------------------------------------------------------------------------echo_server.cm 1934409: 5 events
+  fuchsia.io/Openable: 2 events
+    Open: 2 events
+      21320.611044 write request  fuchsia.io/Openable.Open(Channel:5e0c228f(dir:/svc))
+      21320.814595 read  request  fuchsia.io/Openable.Open(Channel:dedc3503(directory-request:/))
+
+  test.placeholders/Echo: 2 events
+    EchoString: 2 events
+      21320.901025 read  request  test.placeholders/Echo.EchoString(Channel:60dc2bb3())
+      21320.992007 write response test.placeholders/Echo.EchoString(Channel:60dc2bb3())
+
+  fuchsia.io/Node1: 1 event
+    Clone: 1 event
+      21320.679108 read  request  fuchsia.io/Node1.Clone(Channel:dedc3503(directory-request:/))
+""")
 
     def test_with_top_and_unknown_message(self):
         fidlcat = Fidlcat(

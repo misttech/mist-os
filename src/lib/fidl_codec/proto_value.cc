@@ -39,22 +39,6 @@ void EncodeUnion(proto::Union* dst, const fidl_codec::UnionValue* node) {
   node->value()->Visit(&visitor, nullptr);
 }
 
-void EncodePayload(proto::Payload* dst, const fidl_codec::PayloadableValue* node) {
-  const auto struct_value = node->AsStructValue();
-  const auto table_value = node->AsTableValue();
-  const auto union_value = node->AsUnionValue();
-  if (struct_value != nullptr) {
-    return EncodeStruct(dst->mutable_struct_value(), struct_value);
-  }
-  if (table_value != nullptr) {
-    return EncodeTable(dst->mutable_table_value(), table_value);
-  }
-  if (union_value != nullptr) {
-    return EncodeUnion(dst->mutable_union_value(), union_value);
-  }
-  FX_LOGS_OR_CAPTURE(ERROR) << "Invalid payload value kind.";
-}
-
 void ProtoVisitor::VisitNullValue(const fidl_codec::NullValue* node,
                                   const fidl_codec::Type* for_type) {
   dst_->set_null_value(true);
@@ -151,16 +135,21 @@ void ProtoVisitor::VisitFidlMessageValue(const fidl_codec::FidlMessageValue* nod
   }
   if (node->decoded_request() != nullptr) {
     fidl_message->set_has_request(true);
-    EncodePayload(fidl_message->mutable_decoded_request(),
-                  node->decoded_request()->AsPayloadableValue());
+    ProtoVisitor visitor(fidl_message->mutable_decoded_request());
+    node->decoded_request()->Visit(&visitor, nullptr);
   }
   fidl_message->set_request_errors(node->request_errors());
   if (node->decoded_response() != nullptr) {
     fidl_message->set_has_response(true);
-    EncodePayload(fidl_message->mutable_decoded_response(),
-                  node->decoded_response()->AsPayloadableValue());
+    ProtoVisitor visitor(fidl_message->mutable_decoded_response());
+    node->decoded_response()->Visit(&visitor, nullptr);
   }
   fidl_message->set_response_errors(node->response_errors());
+}
+
+void ProtoVisitor::VisitEmptyPayloadValue(const fidl_codec::EmptyPayloadValue* node,
+                                          const fidl_codec::Type* for_type) {
+  (void)dst_->mutable_empty_payload_value();
 }
 
 std::unique_ptr<StructValue> DecodeStruct(LibraryLoader* loader, const proto::Struct& proto_struct,
@@ -230,45 +219,6 @@ std::unique_ptr<UnionValue> DecodeUnion(LibraryLoader* loader, const proto::Unio
     return nullptr;
   }
   return std::make_unique<fidl_codec::UnionValue>(*member, std::move(union_value));
-}
-
-std::unique_ptr<PayloadableValue> DecodePayload(LibraryLoader* loader,
-                                                const proto::Payload& proto_payload,
-                                                const Payload* payload) {
-  if (payload == nullptr) {
-    return std::make_unique<fidl_codec::StructValue>(Struct::Empty);
-  }
-
-  const Type* type = payload->type().get();
-  switch (proto_payload.Kind_case()) {
-    case proto::Payload::kStructValue: {
-      auto struct_type = type->AsStructType();
-      if (struct_type == nullptr) {
-        FX_LOGS_OR_CAPTURE(ERROR) << "Type of struct value should be struct.";
-        return nullptr;
-      }
-      return DecodeStruct(loader, proto_payload.struct_value(), struct_type->struct_definition());
-    }
-    case proto::Payload::kTableValue: {
-      auto table_type = type->AsTableType();
-      if (table_type == nullptr) {
-        FX_LOGS_OR_CAPTURE(ERROR) << "Type of table value should be table.";
-        return nullptr;
-      }
-      return DecodeTable(loader, proto_payload.table_value(), table_type->table_definition());
-    }
-    case proto::Payload::kUnionValue: {
-      auto union_type = type->AsUnionType();
-      if (union_type == nullptr) {
-        FX_LOGS_OR_CAPTURE(ERROR) << "Type of union value should be union.";
-        return nullptr;
-      }
-      return DecodeUnion(loader, proto_payload.union_value(), union_type->union_definition());
-    }
-    default:
-      FX_LOGS_OR_CAPTURE(ERROR) << "Unknown payload kind.";
-      return nullptr;
-  }
 }
 
 std::unique_ptr<Value> DecodeValue(LibraryLoader* loader, const proto::Value& proto_value,
@@ -351,7 +301,7 @@ std::unique_ptr<Value> DecodeValue(LibraryLoader* loader, const proto::Value& pr
       const fidl_codec::ProtocolMethod* method = nullptr;
       // We need to check loader because some tests have a null library loader.
       if (loader != nullptr) {
-        const std::vector<const fidl_codec::ProtocolMethod*>* methods =
+        const std::vector<fidl_codec::ProtocolMethod*>* methods =
             loader->GetByOrdinal(proto_message.ordinal());
         if ((methods != nullptr) && !methods->empty()) {
           method = (*methods)[0];
@@ -380,9 +330,8 @@ std::unique_ptr<Value> DecodeValue(LibraryLoader* loader, const proto::Value& pr
         bool ok = true;
         if (proto_message.has_request()) {
           if (method->has_request()) {
-            Payload* request = method->request();
             message->set_decoded_request(
-                DecodePayload(loader, proto_message.decoded_request(), request));
+                DecodeValue(loader, proto_message.decoded_request(), method->request()));
           } else {
             FX_LOGS_OR_CAPTURE(ERROR)
                 << "Request without request defined in " << method->name() << '.';
@@ -391,9 +340,8 @@ std::unique_ptr<Value> DecodeValue(LibraryLoader* loader, const proto::Value& pr
         }
         if (proto_message.has_response()) {
           if (method->has_response()) {
-            Payload* response = method->response();
             message->set_decoded_response(
-                DecodePayload(loader, proto_message.decoded_response(), response));
+                DecodeValue(loader, proto_message.decoded_response(), method->response()));
           } else {
             FX_LOGS_OR_CAPTURE(ERROR)
                 << "Response without response defined in " << method->name() << '.';
@@ -410,6 +358,8 @@ std::unique_ptr<Value> DecodeValue(LibraryLoader* loader, const proto::Value& pr
       return std::make_unique<fidl_codec::ActualAndRequestedValue>(
           proto_value.actual_and_requested_value().actual(),
           proto_value.actual_and_requested_value().requested());
+    case proto::Value::kEmptyPayloadValue:
+      return std::make_unique<fidl_codec::EmptyPayloadValue>();
     default:
       FX_LOGS_OR_CAPTURE(ERROR) << "Unknown value: " << proto_value.Kind_case();
       return nullptr;

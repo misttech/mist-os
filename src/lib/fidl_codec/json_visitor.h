@@ -28,6 +28,10 @@ class JsonVisitor : public Visitor {
     result_->SetString("(invalid)", *allocator_);
   }
 
+  void VisitEmptyPayloadValue(const EmptyPayloadValue* node, const Type* for_type) override {
+    result_->SetObject();
+  }
+
   void VisitNullValue(const NullValue* node, const Type* for_type) override { result_->SetNull(); }
 
   void VisitStringValue(const StringValue* node, const Type* for_type) override {

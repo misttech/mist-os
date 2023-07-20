@@ -15,7 +15,6 @@
 #include <rapidjson/stringbuffer.h>
 #include <rapidjson/writer.h>
 
-#include "src/lib/fidl_codec/display_handle.h"
 #include "src/lib/fidl_codec/json_visitor.h"
 #include "src/lib/fidl_codec/library_loader.h"
 #include "src/lib/fidl_codec/printer.h"
@@ -24,6 +23,12 @@
 #include "src/lib/fidl_codec/wire_types.h"
 
 namespace fidl_codec {
+
+void Value::ExtractJson(rapidjson::Document::AllocatorType& allocator,
+                        rapidjson::Value& result) const {
+  JsonVisitor visitor(&result, &allocator);
+  Visit(&visitor, nullptr);
+}
 
 std::string DocumentToString(rapidjson::Document* document) {
   rapidjson::StringBuffer output;
@@ -34,6 +39,10 @@ std::string DocumentToString(rapidjson::Document* document) {
 
 void InvalidValue::Visit(Visitor* visitor, const Type* for_type) const {
   visitor->VisitInvalidValue(this, for_type);
+}
+
+void EmptyPayloadValue::Visit(Visitor* visitor, const Type* for_type) const {
+  visitor->VisitEmptyPayloadValue(this, for_type);
 }
 
 void NullValue::Visit(Visitor* visitor, const Type* for_type) const {
@@ -156,13 +165,6 @@ void HandleValue::PrettyPrint(const Type* /*for_type*/, PrettyPrinter& printer) 
 
 void HandleValue::Visit(Visitor* visitor, const Type* for_type) const {
   visitor->VisitHandleValue(this, for_type);
-}
-
-void PayloadableValue::ExtractJson(rapidjson::Document::AllocatorType& allocator,
-                                   rapidjson::Value& result) const {
-  JsonVisitor visitor(&result, &allocator);
-
-  Visit(&visitor, nullptr);
 }
 
 bool UnionValue::NeedsToLoadHandleInfo(int64_t timestamp, zx_koid_t tid,

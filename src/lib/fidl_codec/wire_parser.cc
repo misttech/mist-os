@@ -13,13 +13,13 @@ namespace {
 
 // Takes a Message which holds either a request or a response and extracts a
 // JSON object which represents the message. The format of the message is
-// specified by str.
+// specified by type.
 // Returns true on success, false on failure.
-bool DecodeMessage(const Payload* str, const uint8_t* bytes, size_t num_bytes,
+bool DecodeMessage(const Type* type, const uint8_t* bytes, size_t num_bytes,
                    const zx_handle_disposition_t* handles, size_t num_handles,
-                   std::unique_ptr<PayloadableValue>* decoded_object, std::ostream& error_stream) {
+                   std::unique_ptr<Value>* decoded_object, std::ostream& error_stream) {
   MessageDecoder decoder(bytes, num_bytes, handles, num_handles, error_stream);
-  *decoded_object = decoder.DecodeMessage(str);
+  *decoded_object = decoder.DecodeMessage(type);
   return !decoder.HasError();
 }
 
@@ -27,7 +27,7 @@ bool DecodeMessage(const Payload* str, const uint8_t* bytes, size_t num_bytes,
 
 bool DecodeRequest(const ProtocolMethod* method, const uint8_t* bytes, size_t num_bytes,
                    const zx_handle_disposition_t* handles, size_t num_handles,
-                   std::unique_ptr<PayloadableValue>* decoded_object, std::ostream& error_stream) {
+                   std::unique_ptr<Value>* decoded_object, std::ostream& error_stream) {
   if (!method->has_request()) {
     return false;
   }
@@ -37,7 +37,7 @@ bool DecodeRequest(const ProtocolMethod* method, const uint8_t* bytes, size_t nu
 
 bool DecodeResponse(const ProtocolMethod* method, const uint8_t* bytes, size_t num_bytes,
                     const zx_handle_disposition_t* handles, size_t num_handles,
-                    std::unique_ptr<PayloadableValue>* decoded_object, std::ostream& error_stream) {
+                    std::unique_ptr<Value>* decoded_object, std::ostream& error_stream) {
   if (!method->has_response()) {
     return false;
   }

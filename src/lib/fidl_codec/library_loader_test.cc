@@ -13,6 +13,7 @@
 
 #include "src/lib/fidl_codec/library_loader_test_data.h"
 #include "src/lib/fidl_codec/list_test_data.h"
+#include "src/lib/fidl_codec/wire_types.h"
 
 namespace fidl_codec {
 
@@ -319,7 +320,7 @@ TEST(LibraryLoader, LoadFromOrdinal) {
                                       &found_method);
 
   Ordinal64 correct_ordinal = found_method->ordinal();
-  const std::vector<const ProtocolMethod*>* ordinal_methods = loader.GetByOrdinal(correct_ordinal);
+  const std::vector<ProtocolMethod*>* ordinal_methods = loader.GetByOrdinal(correct_ordinal);
   const ProtocolMethod* ordinal_method = (*ordinal_methods)[0];
   ASSERT_NE(ordinal_method, nullptr);
   ASSERT_EQ(kDesiredProtocolName, ordinal_method->enclosing_protocol().name());
@@ -339,7 +340,7 @@ void OrdinalCompositionBody(LibraryLoader& loader) {
                                       &found_method);
 
   Ordinal64 correct_ordinal = found_method->ordinal();
-  const std::vector<const ProtocolMethod*>* ordinal_methods = loader.GetByOrdinal(correct_ordinal);
+  const std::vector<ProtocolMethod*>* ordinal_methods = loader.GetByOrdinal(correct_ordinal);
   ASSERT_EQ(2UL, ordinal_methods->size());
 
   const ProtocolMethod* ordinal_method_base = (*ordinal_methods)[0];

@@ -6,9 +6,10 @@
 #define SRC_LIB_FIDL_CODEC_WIRE_PARSER_H_
 
 #include <cstdint>
+#include <memory>
 
 #include "src/lib/fidl_codec/library_loader.h"
-#include "src/lib/fidl_codec/wire_types.h"
+#include "src/lib/fidl_codec/wire_object.h"
 
 namespace fidl_codec {
 
@@ -23,7 +24,7 @@ namespace fidl_codec {
 // buffer (where the error occurred) and ends with a new line.
 bool DecodeRequest(const ProtocolMethod* method, const uint8_t* bytes, size_t num_bytes,
                    const zx_handle_disposition_t* handles, size_t num_handles,
-                   std::unique_ptr<PayloadableValue>* decoded_object, std::ostream& error_stream);
+                   std::unique_ptr<Value>* decoded_object, std::ostream& error_stream);
 
 // Given a wire-formatted |message| and a schema for that message represented by
 // |method|,  populates |decoded_object| with an object representing that
@@ -36,7 +37,7 @@ bool DecodeRequest(const ProtocolMethod* method, const uint8_t* bytes, size_t nu
 // buffer (where the error occurred) and ends with a new line.
 bool DecodeResponse(const ProtocolMethod* method, const uint8_t* bytes, size_t num_bytes,
                     const zx_handle_disposition_t* handles, size_t num_handles,
-                    std::unique_ptr<PayloadableValue>* decoded_object, std::ostream& error_stream);
+                    std::unique_ptr<Value>* decoded_object, std::ostream& error_stream);
 
 }  // namespace fidl_codec
 

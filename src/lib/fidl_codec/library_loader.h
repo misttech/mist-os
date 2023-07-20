@@ -5,13 +5,18 @@
 #ifndef SRC_LIB_FIDL_CODEC_LIBRARY_LOADER_H_
 #define SRC_LIB_FIDL_CODEC_LIBRARY_LOADER_H_
 
+#include <zircon/assert.h>
+
 #include <iostream>
 #include <map>
+#include <memory>
 #include <optional>
+#include <string>
 #include <vector>
 
 #include <rapidjson/document.h>
 
+#include "lib/syslog/cpp/macros.h"
 #include "src/lib/fidl_codec/semantic.h"
 
 // This file contains a programmatic representation of a FIDL schema.  A
@@ -28,7 +33,7 @@
 // following, if they have a fidl::Message:
 //
 // fidl_message_header_t header = message.header();
-// const std::vector<const ProtocolMethod*>* methods = loader_->GetByOrdinal(header.ordinal);
+// const std::vector<ProtocolMethod*>* methods = loader_->GetByOrdinal(header.ordinal);
 // rapidjson::Document actual;
 // fidl_codec::RequestToJSON(methods->at(0), message, actual);
 //
@@ -121,8 +126,6 @@ class Enum : public EnumOrBits {
  public:
   friend class Library;
 
-  ~Enum();
-
   // Gets the name of the enum member corresponding to the value pointed to by
   // |bytes| of length |length|.  For example, if we had the following
   // definition:
@@ -146,8 +149,6 @@ class Bits : public EnumOrBits {
  public:
   friend class Library;
 
-  ~Bits();
-
   std::string GetName(uint64_t absolute_value, bool negative) const;
 
  private:
@@ -158,104 +159,10 @@ class Bits : public EnumOrBits {
   }
 };
 
-// An abstract representation of a method parameter. For structs, this enumerates every argument
-// (ie, the "flattened" representation), while for tables and unions this is just a reference to the
-// underlying payload's type (ie, the "unflattened" representation). In the unflattened case, the
-// name of the returned Parameter will always be "payload."
-class Parameter {
- public:
-  Parameter(std::string name, Type* type);
-  ~Parameter();
-
-  const std::string& name() const { return name_; }
-  Type* type() const { return type_; }
-
- private:
-  const std::string name_;
-  Type* type_;
-};
-
-// A base class for "payloadable" type definitions (structs, tables, and unions). Data and
-// capabilities that will be common to all payloadable types are stored on the base class, while
-// type specific information is held by the derived classes.
-class Payloadable {
- public:
-  friend class Library;
-  friend class Payload;
-
-  Payloadable() = default;
-  Payloadable(Library* enclosing_library, const rapidjson::Value* json_definition,
-              std::string name);
-  virtual ~Payloadable();
-
-  Library* enclosing_library() const { return enclosing_library_; }
-  const std::string& name() const { return name_; }
-
-  // Decodes the |Payloadable|-derived class held by this instance. Note that decoding always starts
-  // with an offset of |kTransactionHeaderSize|, since a |Payloadable| always represents the
-  // entirety of the message body, meaning the head has already been skipped over by the decoder.
-  // The |payload_type| argument is passed in by the owning |Payload| wrapper class.
-  virtual std::unique_ptr<PayloadableValue> DecodeAsPayload(
-      const std::unique_ptr<Type>& payload_type, MessageDecoder& decoder) const = 0;
-  virtual std::string ToString(bool expand) const = 0;
-
- protected:
-  // Decode all the values from the JSON definition.
-  virtual void DecodeTypes() = 0;
-  virtual std::unique_ptr<Parameter> FindParameter(std::string_view,
-                                                   const std::unique_ptr<Type>&) = 0;
-
-  Library* enclosing_library_;
-  const rapidjson::Value* json_definition_;
-  std::string name_;
-};
-
-// A wrapper class to hold a |Payloadable|. It stores both the |Payloadable| and its associated
-// type, so that at the MessageDecoder can decode the incoming message's body using a standard
-// |DecodeValue()| call on that body, regardless of its actual type. The |type_| is resolved after
-// the owning |Library| has been loaded in the first |DecodeTypes()| call on this instance.
-class Payload {
- public:
-  friend class Library;
-  friend class ProtocolMethod;
-
-  Payload(Library* enclosing_library, const ProtocolMethod* method,
-          const rapidjson::Value* json_type_definition, Payloadable* payloadable);
-  ~Payload();
-
-  Library* enclosing_library() const { return enclosing_library_; }
-  const ProtocolMethod& enclosing_method() const { return *enclosing_method_; }
-  const std::unique_ptr<Type>& type() const { return type_; }
-
-  Struct* AsStruct();
-  const Struct* AsStruct() const;
-  Table* AsTable();
-  const Table* AsTable() const;
-  Union* AsUnion();
-  const Union* AsUnion() const;
-
-  // Decodes the |Payloadable|-derived class held by this instance. Note that decoding always starts
-  // with an offset of |kTransactionHeaderSize|, since a |Payload| always represents the entirety of
-  // the message body, meaning the head has already been skipped over by the decoder.
-  std::unique_ptr<PayloadableValue> Decode(MessageDecoder& decoder) const;
-  std::unique_ptr<Parameter> FindParameter(std::string_view name);
-  std::string ToString(bool expand = false) const;
-
- private:
-  void DecodeTypes();
-
-  Library* enclosing_library_;
-  const ProtocolMethod* enclosing_method_;
-  const rapidjson::Value* type_definition_;
-  Payloadable* payloadable_;
-  std::unique_ptr<Type> type_;
-};
-
 class UnionMember {
  public:
   UnionMember(const Union& union_definition, Library* enclosing_library,
               const rapidjson::Value* json_definition);
-  ~UnionMember();
 
   const Union& union_definition() const { return union_definition_; }
   bool reserved() const { return reserved_; }
@@ -271,27 +178,27 @@ class UnionMember {
   std::unique_ptr<Type> type_;
 };
 
-class Union final : public Payloadable {
+class Union final {
  public:
   friend class Library;
 
-  ~Union() override;
-
+  Library* enclosing_library() const { return enclosing_library_; }
+  const std::string& name() const { return name_; }
   const std::vector<std::unique_ptr<UnionMember>>& members() const { return members_; }
 
-  std::unique_ptr<PayloadableValue> DecodeAsPayload(const std::unique_ptr<Type>& payload_type,
-                                                    MessageDecoder& decoder) const override;
   const UnionMember* MemberFromOrdinal(Ordinal64 ordinal) const;
   UnionMember* SearchMember(std::string_view name) const;
-  std::string ToString(bool expand) const override;
+  std::string ToString(bool expand) const;
 
  private:
   Union(Library* enclosing_library, const rapidjson::Value* json_definition);
 
   // Decode all the values from the JSON definition.
-  void DecodeTypes() override;
-  std::unique_ptr<Parameter> FindParameter(std::string_view, const std::unique_ptr<Type>&) override;
+  void DecodeTypes();
 
+  Library* enclosing_library_;
+  const rapidjson::Value* json_definition_;
+  std::string name_;
   std::vector<std::unique_ptr<UnionMember>> members_;
 };
 
@@ -300,7 +207,6 @@ class StructMember {
   StructMember(Library* enclosing_library, const rapidjson::Value* json_definition);
   StructMember(std::string_view name, std::unique_ptr<Type> type);
   StructMember(std::string_view name, std::unique_ptr<Type> type, uint8_t id);
-  ~StructMember();
 
   const std::string& name() const { return name_; }
   Type* type() const { return type_.get(); }
@@ -317,35 +223,30 @@ class StructMember {
   uint8_t id_ = 0;
 };
 
-class Struct final : public Payloadable {
+class Struct final {
  public:
   friend class Library;
 
-  static const Struct Empty;
-
-  Struct() = default;
   explicit Struct(std::string_view name);
-  ~Struct() override;
 
+  Library* enclosing_library() const { return enclosing_library_; }
+  const std::string& name() const { return name_; }
   const std::vector<std::unique_ptr<StructMember>>& members() const { return members_; }
 
   void AddMember(std::string_view name, std::unique_ptr<Type> type, uint32_t id = 0);
-  std::unique_ptr<PayloadableValue> DecodeAsPayload(const std::unique_ptr<Type>& payload_type,
-                                                    MessageDecoder& decoder) const override;
   StructMember* SearchMember(std::string_view name, uint32_t id = 0) const;
   uint32_t Size(WireVersion version) const;
-  std::string ToString(bool expand) const override;
-
-  // Wrap this Struct in a non-nullable type and use the given visitor on it.
-  void VisitAsType(TypeVisitor* visitor) const;
+  std::string ToString(bool expand) const;
 
  private:
   Struct(Library* enclosing_library, const rapidjson::Value* json_definition);
 
   // Decode all the values from the JSON definition.
-  void DecodeTypes() override;
-  std::unique_ptr<Parameter> FindParameter(std::string_view, const std::unique_ptr<Type>&) override;
+  void DecodeTypes();
 
+  Library* enclosing_library_;
+  const rapidjson::Value* json_definition_;
+  std::string name_;
   uint32_t size_v1_ = 0;
   uint32_t size_v2_ = 0;
   std::vector<std::unique_ptr<StructMember>> members_;
@@ -354,7 +255,6 @@ class Struct final : public Payloadable {
 class TableMember {
  public:
   TableMember(Library* enclosing_library, const rapidjson::Value* json_definition);
-  ~TableMember();
 
   bool reserved() const { return reserved_; }
   const std::string& name() const { return name_; }
@@ -368,29 +268,27 @@ class TableMember {
   std::unique_ptr<Type> type_;
 };
 
-class Table final : public Payloadable {
+class Table final {
  public:
   friend class Library;
-
-  ~Table() override;
 
   Library* enclosing_library() const { return enclosing_library_; }
   const std::string& name() const { return name_; }
   const std::vector<std::unique_ptr<TableMember>>& members() const { return members_; }
 
-  std::unique_ptr<PayloadableValue> DecodeAsPayload(const std::unique_ptr<Type>& payload_type,
-                                                    MessageDecoder& decoder) const override;
   const TableMember* MemberFromOrdinal(Ordinal64 ordinal) const;
   const TableMember* SearchMember(std::string_view name) const;
-  std::string ToString(bool expand) const override;
+  std::string ToString(bool expand) const;
 
  private:
   Table(Library* enclosing_library, const rapidjson::Value* json_definition);
 
   // Decode all the values from the JSON definition.
-  void DecodeTypes() override;
-  std::unique_ptr<Parameter> FindParameter(std::string_view, const std::unique_ptr<Type>&) override;
+  void DecodeTypes();
 
+  Library* enclosing_library_;
+  const rapidjson::Value* json_definition_;
+  std::string name_;
   std::vector<std::unique_ptr<TableMember>> members_;
 };
 
@@ -406,19 +304,9 @@ class ProtocolMethod {
   Ordinal64 ordinal() const { return ordinal_; }
   bool is_composed() const { return is_composed_; }
   bool has_request() const { return has_request_; }
-  Payload* request() const {
-    if (request_ != nullptr) {
-      request_->DecodeTypes();
-    }
-    return request_.get();
-  }
   bool has_response() const { return has_response_; }
-  Payload* response() const {
-    if (response_ != nullptr) {
-      response_->DecodeTypes();
-    }
-    return response_.get();
-  }
+  const Type* request() const { return request_.get(); }
+  const Type* response() const { return response_.get(); }
 
   semantic::MethodSemantic* semantic() { return semantic_.get(); }
   const semantic::MethodSemantic* semantic() const { return semantic_.get(); }
@@ -434,16 +322,7 @@ class ProtocolMethod {
 
   std::string fully_qualified_name() const;
 
-  void DecodeTypes() {
-    if (request_ != nullptr) {
-      request_->DecodeTypes();
-    }
-    if (response_ != nullptr) {
-      response_->DecodeTypes();
-    }
-  }
-
-  std::unique_ptr<Parameter> FindParameter(std::string_view name) const;
+  void DecodeTypes();
 
   ProtocolMethod(const ProtocolMethod& other) = delete;
   ProtocolMethod& operator=(const ProtocolMethod&) = delete;
@@ -452,15 +331,15 @@ class ProtocolMethod {
   ProtocolMethod(Library* enclosing_library, const Protocol& protocol,
                  const rapidjson::Value* json_definition);
 
-  Library* enclosing_library_;
+  const rapidjson::Value* json_definition_ = nullptr;
   const Protocol* const enclosing_protocol_ = nullptr;
   const std::string name_;
   const Ordinal64 ordinal_ = 0;
   const bool is_composed_ = false;
   bool has_request_ = false;
-  std::unique_ptr<Payload> request_ = nullptr;
+  std::unique_ptr<Type> request_ = nullptr;
   bool has_response_ = false;
-  std::unique_ptr<Payload> response_ = nullptr;
+  std::unique_ptr<Type> response_ = nullptr;
   std::unique_ptr<semantic::MethodSemantic> semantic_;
   std::unique_ptr<semantic::MethodDisplay> short_display_;
 };
@@ -554,14 +433,6 @@ class Library {
   void FieldNotFound(std::string_view container_type, std::string_view container_name,
                      const char* field_name);
 
-  Payloadable* GetPayloadable(const std::string& payload_name) const {
-    auto result = payloadables_.find(payload_name);
-    if (result == payloadables_.end()) {
-      return nullptr;
-    }
-    return result->second.get();
-  }
-
   const Table* GetTable(const std::string& table_name) const {
     auto result = tables_.find(table_name);
     if (result == tables_.end()) {
@@ -585,7 +456,6 @@ class Library {
   std::string name_;
   std::string source_;
   std::vector<std::unique_ptr<Protocol>> protocols_;
-  std::map<std::string, std::unique_ptr<Payloadable>> payloadables_;
   std::map<std::string, std::unique_ptr<Enum>> enums_;
   std::map<std::string, std::unique_ptr<Bits>> bits_;
   std::map<std::string, std::unique_ptr<Union>> unions_;
@@ -624,7 +494,7 @@ class LibraryLoader {
   void AddContent(const std::string& content, LibraryReadError* err, std::string source = "");
 
   // Adds a method ordinal to the ordinal map.
-  void AddMethod(const ProtocolMethod* method);
+  void AddMethod(ProtocolMethod* method);
 
   void ParseBuiltinSemantic();
 
@@ -634,10 +504,14 @@ class LibraryLoader {
   // vector.  Returns |nullptr| if there is no such method.  The returned
   // pointer continues to be owned by the LibraryLoader, and should not be
   // deleted.
-  const std::vector<const ProtocolMethod*>* GetByOrdinal(Ordinal64 ordinal) {
+  const std::vector<ProtocolMethod*>* GetByOrdinal(Ordinal64 ordinal) {
     auto m = ordinal_map_.find(ordinal);
     if (m != ordinal_map_.end()) {
-      return m->second.get();
+      auto methods_for_ordinal = m->second.get();
+      for (auto& method : *methods_for_ordinal) {
+        method->DecodeTypes();
+      }
+      return methods_for_ordinal;
     }
     return nullptr;
   }
@@ -668,7 +542,7 @@ class LibraryLoader {
 
   // Because Delete() above is run whenever a Library is destructed, we want ordinal_map_ to be
   // intact when a Library is destructed.  Therefore, ordinal_map_ has to come first.
-  std::map<Ordinal64, std::unique_ptr<std::vector<const ProtocolMethod*>>> ordinal_map_;
+  std::map<Ordinal64, std::unique_ptr<std::vector<ProtocolMethod*>>> ordinal_map_;
   std::map<std::string, std::unique_ptr<Library>> representations_;
 };
 

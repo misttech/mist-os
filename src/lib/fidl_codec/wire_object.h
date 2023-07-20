@@ -12,6 +12,8 @@
 #include <string_view>
 #include <vector>
 
+#include <rapidjson/document.h>
+
 #include "src/lib/fidl_codec/library_loader.h"
 #include "src/lib/fidl_codec/message_decoder.h"
 
@@ -21,7 +23,6 @@ class ActualAndRequestedValue;
 class FidlMessageValue;
 class HandleValue;
 class StringValue;
-class PayloadableValue;
 class StructValue;
 class TableValue;
 class UnionValue;
@@ -53,8 +54,6 @@ class Value {
   virtual const ActualAndRequestedValue* AsActualAndRequestedValue() const { return nullptr; }
   virtual const StringValue* AsStringValue() const { return nullptr; }
   virtual const HandleValue* AsHandleValue() const { return nullptr; }
-  virtual PayloadableValue* AsPayloadableValue() { return nullptr; }
-  virtual const PayloadableValue* AsPayloadableValue() const { return nullptr; }
   virtual StructValue* AsStructValue() { return nullptr; }
   virtual const StructValue* AsStructValue() const { return nullptr; }
   virtual TableValue* AsTableValue() { return nullptr; }
@@ -86,17 +85,16 @@ class Value {
 
   // Use a visitor on this value;
   virtual void Visit(Visitor* visitor, const Type* for_type) const = 0;
+
+  void ExtractJson(rapidjson::Document::AllocatorType& allocator, rapidjson::Value& result) const;
 };
 
 // An invalid value. This value can't be present in a valid object.
 // It can only be found if we had an error while decoding a message.
 class InvalidValue : public Value {
  public:
-  InvalidValue() = default;
-
   size_t DisplaySize(const Type* for_type, size_t remaining_size) const override {
-    constexpr int kInvalidSize = 7;
-    return kInvalidSize;  // length of "invalid"
+    return strlen("invalid");
   }
 
   void PrettyPrint(const Type* for_type, PrettyPrinter& printer) const override {
@@ -106,16 +104,25 @@ class InvalidValue : public Value {
   void Visit(Visitor* visitor, const Type* for_type) const override;
 };
 
+// An empty request or response.
+// This has zero size, unlike an empty struct which is a single 0x00 byte.
+class EmptyPayloadValue : public Value {
+ public:
+  size_t DisplaySize(const Type* for_type, size_t remaining_size) const override {
+    return strlen("{}");
+  }
+
+  void PrettyPrint(const Type* for_type, PrettyPrinter& printer) const override { printer << "{}"; }
+  void Visit(Visitor* visitor, const Type* for_type) const override;
+};
+
 // A null value.
 class NullValue : public Value {
  public:
-  NullValue() = default;
-
   bool IsNull() const override { return true; }
 
   size_t DisplaySize(const Type* for_type, size_t remaining_size) const override {
-    constexpr int kNullSize = 4;
-    return kNullSize;  // length of "null"
+    return strlen("null");
   }
 
   void PrettyPrint(const Type* for_type, PrettyPrinter& printer) const override {
@@ -133,9 +140,7 @@ class RawValue : public Value {
   const std::vector<uint8_t>& data() const { return data_; }
 
   size_t DisplaySize(const Type* for_type, size_t remaining_size) const override;
-
   void PrettyPrint(const Type* for_type, PrettyPrinter& printer) const override;
-
   void Visit(Visitor* visitor, const Type* for_type) const override;
 
  private:
@@ -150,9 +155,7 @@ class BoolValue : public Value {
   uint8_t value() const { return value_; }
 
   size_t DisplaySize(const Type* for_type, size_t remaining_size) const override;
-
   void PrettyPrint(const Type* for_type, PrettyPrinter& printer) const override;
-
   void Visit(Visitor* visitor, const Type* for_type) const override;
 
  private:
@@ -188,9 +191,7 @@ class IntegerValue : public Value {
   }
 
   size_t DisplaySize(const Type* for_type, size_t remaining_size) const override;
-
   void PrettyPrint(const Type* for_type, PrettyPrinter& printer) const override;
-
   void Visit(Visitor* visitor, const Type* for_type) const override;
 
  private:
@@ -209,9 +210,7 @@ class ActualAndRequestedValue : public Value {
   const ActualAndRequestedValue* AsActualAndRequestedValue() const override { return this; }
 
   size_t DisplaySize(const Type* for_type, size_t remaining_size) const override;
-
   void PrettyPrint(const Type* for_type, PrettyPrinter& printer) const override;
-
   void Visit(Visitor* visitor, const Type* for_type) const override;
 
  private:
@@ -242,9 +241,7 @@ class DoubleValue : public Value {
   }
 
   size_t DisplaySize(const Type* for_type, size_t remaining_size) const override;
-
   void PrettyPrint(const Type* for_type, PrettyPrinter& printer) const override;
-
   void Visit(Visitor* visitor, const Type* for_type) const override;
 
  private:
@@ -259,11 +256,8 @@ class StringValue : public Value {
   const std::string& string() const { return string_; }
 
   const StringValue* AsStringValue() const override { return this; }
-
   size_t DisplaySize(const Type* for_type, size_t remaining_size) const override;
-
   void PrettyPrint(const Type* for_type, PrettyPrinter& printer) const override;
-
   void Visit(Visitor* visitor, const Type* for_type) const override;
 
  private:
@@ -278,35 +272,18 @@ class HandleValue : public Value {
   const zx_handle_disposition_t& handle() const { return handle_; }
 
   const HandleValue* AsHandleValue() const override { return this; }
-
   bool NeedsToLoadHandleInfo(int64_t timestamp, zx_koid_t tid,
                              semantic::HandleSemantic* handle_semantic) const override;
-
   size_t DisplaySize(const Type* for_type, size_t remaining_size) const override;
-
   void PrettyPrint(const Type* for_type, PrettyPrinter& printer) const override;
-
   void Visit(Visitor* visitor, const Type* for_type) const override;
 
  private:
   const zx_handle_disposition_t handle_;
 };
 
-// A PayloadableValue is a Value which MAY be used as a method response/request payload.
-class PayloadableValue : public Value {
- public:
-  explicit PayloadableValue() = default;
-  virtual ~PayloadableValue() = default;
-
-  PayloadableValue* AsPayloadableValue() override { return this; }
-  const PayloadableValue* AsPayloadableValue() const override { return this; }
-
-  // Extract the JSON for this object.
-  void ExtractJson(rapidjson::Document::AllocatorType& allocator, rapidjson::Value& result) const;
-};
-
 // An union.
-class UnionValue : public PayloadableValue {
+class UnionValue : public Value {
  public:
   UnionValue(const UnionMember& member, std::unique_ptr<Value> value)
       : member_(member), value_(std::move(value)) {}
@@ -319,11 +296,8 @@ class UnionValue : public PayloadableValue {
 
   UnionValue* AsUnionValue() override { return this; }
   const UnionValue* AsUnionValue() const override { return this; }
-
   size_t DisplaySize(const Type* for_type, size_t remaining_size) const override;
-
   void PrettyPrint(const Type* for_type, PrettyPrinter& printer) const override;
-
   void Visit(Visitor* visitor, const Type* for_type) const override;
 
  private:
@@ -332,7 +306,7 @@ class UnionValue : public PayloadableValue {
 };
 
 // An instance of a Struct.
-class StructValue : public PayloadableValue {
+class StructValue : public Value {
  public:
   explicit StructValue(const Struct& struct_definition) : struct_definition_(struct_definition) {}
 
@@ -340,7 +314,7 @@ class StructValue : public PayloadableValue {
   const std::map<const StructMember*, std::unique_ptr<Value>>& fields() const { return fields_; }
 
   void AddField(const StructMember* member, std::unique_ptr<Value> value) {
-    fields_.emplace(std::make_pair(member, std::move(value)));
+    fields_.emplace(member, std::move(value));
   }
 
   void inline AddField(std::string_view name, std::unique_ptr<Value> value) {
@@ -356,11 +330,8 @@ class StructValue : public PayloadableValue {
 
   bool NeedsToLoadHandleInfo(int64_t timestamp, zx_koid_t tid,
                              semantic::HandleSemantic* handle_semantic) const override;
-
   size_t DisplaySize(const Type* for_type, size_t remaining_size) const override;
-
   void PrettyPrint(const Type* for_type, PrettyPrinter& printer) const override;
-
   void Visit(Visitor* visitor, const Type* for_type) const override;
 
  private:
@@ -371,8 +342,6 @@ class StructValue : public PayloadableValue {
 // A vector.
 class VectorValue : public Value {
  public:
-  VectorValue() = default;
-
   const std::vector<std::unique_ptr<Value>>& values() const { return values_; }
 
   void AddValue(std::unique_ptr<Value> value) {
@@ -392,14 +361,10 @@ class VectorValue : public Value {
   }
 
   const VectorValue* AsVectorValue() const override { return this; }
-
   bool NeedsToLoadHandleInfo(int64_t timestamp, zx_koid_t tid,
                              semantic::HandleSemantic* handle_semantic) const override;
-
   size_t DisplaySize(const Type* for_type, size_t remaining_size) const override;
-
   void PrettyPrint(const Type* for_type, PrettyPrinter& printer) const override;
-
   void Visit(Visitor* visitor, const Type* for_type) const override;
 
  private:
@@ -409,7 +374,7 @@ class VectorValue : public Value {
 };
 
 // A table.
-class TableValue : public PayloadableValue {
+class TableValue : public Value {
  public:
   explicit TableValue(const Table& table_definition) : table_definition_(table_definition) {}
 
@@ -428,14 +393,10 @@ class TableValue : public PayloadableValue {
 
   TableValue* AsTableValue() override { return this; }
   const TableValue* AsTableValue() const override { return this; }
-
   bool NeedsToLoadHandleInfo(int64_t timestamp, zx_koid_t tid,
                              semantic::HandleSemantic* handle_semantic) const override;
-
   size_t DisplaySize(const Type* for_type, size_t remaining_size) const override;
-
   void PrettyPrint(const Type* for_type, PrettyPrinter& printer) const override;
-
   void Visit(Visitor* visitor, const Type* for_type) const override;
 
  private:
@@ -478,13 +439,13 @@ class FidlMessageValue : public Value {
   const std::vector<uint8_t>& bytes() const { return bytes_; }
   const std::vector<zx_handle_disposition_t>& handles() const { return handles_; }
   void add_handle(const zx_handle_disposition_t& handle) { handles_.emplace_back(handle); }
-  const PayloadableValue* decoded_request() const { return decoded_request_.get(); }
-  void set_decoded_request(std::unique_ptr<PayloadableValue> decoded_request) {
+  const Value* decoded_request() const { return decoded_request_.get(); }
+  void set_decoded_request(std::unique_ptr<Value> decoded_request) {
     decoded_request_ = std::move(decoded_request);
   }
   const std::string& request_errors() const { return request_errors_; }
-  const PayloadableValue* decoded_response() const { return decoded_response_.get(); }
-  void set_decoded_response(std::unique_ptr<PayloadableValue> decoded_response) {
+  const Value* decoded_response() const { return decoded_response_.get(); }
+  void set_decoded_response(std::unique_ptr<Value> decoded_response) {
     decoded_response_ = std::move(decoded_response);
   }
   const std::string& response_errors() const { return response_errors_; }
@@ -494,20 +455,13 @@ class FidlMessageValue : public Value {
   }
 
   const FidlMessageValue* AsFidlMessageValue() const override { return this; }
-
   bool NeedsToLoadHandleInfo(int64_t timestamp, zx_koid_t tid,
                              semantic::HandleSemantic* handle_semantic) const override;
-
   size_t DisplaySize(const Type* for_type, size_t remaining_size) const override;
-
   void PrettyPrint(const Type* for_type, PrettyPrinter& printer) const override;
-
   void PrintMessage(PrettyPrinter& printer) const;
-
   void PrintMessageBody(PrettyPrinter& printer) const;
-
   void DumpMessage(PrettyPrinter& printer) const;
-
   void Visit(Visitor* visitor, const Type* for_type) const override;
 
  private:
@@ -532,13 +486,13 @@ class FidlMessageValue : public Value {
   std::vector<uint8_t> bytes_;
   // All the handles of the message.
   std::vector<zx_handle_disposition_t> handles_;
-  // PayloadableValue of the request we have been able to decode.
-  std::unique_ptr<PayloadableValue> decoded_request_;
+  // Value of the request we have been able to decode.
+  std::unique_ptr<Value> decoded_request_;
   // Errors generated during the decoding of the request. If not empty, decoded_request_ holds only
   // a partial result.
   const std::string request_errors_;
-  // PayloadableValue of the response we have been able to decode.
-  std::unique_ptr<PayloadableValue> decoded_response_;
+  // Value of the response we have been able to decode.
+  std::unique_ptr<Value> decoded_response_;
   // Errors generated during the decoding of the response. If not empty, decoded_response_ holds
   // only a partial result.
   const std::string response_errors_;
