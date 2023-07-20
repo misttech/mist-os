@@ -39,7 +39,7 @@ template("cache_packages_from_product_assembler") {
   }
 
   if (use_bazel_images_only) {
-    _assembly_gen_dir = get_label_info(invoker.assembly_label, "target_gen_dir")
+    _assembly_gen_dir = get_label_info(invoker.assembly_label, "target_out_dir")
     _assembly_manifest = "${_assembly_gen_dir}/${_assembly_target_name}_product_assembly/image_assembly.json"
     _assembly_dep = "${_assembly_dir}:${_assembly_namespace}_product_assembly"
   } else {

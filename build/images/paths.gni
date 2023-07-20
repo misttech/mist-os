@@ -62,7 +62,7 @@ supports_flashing_fxfs =
 files = {
   if (use_bazel_images_only) {
     bazel_target_name = get_label_info(labels.images, "name")
-    images_outdir = get_label_info(labels.images, "target_gen_dir") +
+    images_outdir = get_label_info(labels.images, "target_out_dir") +
                     "/${bazel_target_name}/product_bundle"
     assembly_outdir = images_outdir + "/system_a"
     bazel_package_manifests_list =

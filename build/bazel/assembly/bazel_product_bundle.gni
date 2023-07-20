@@ -263,10 +263,10 @@ template("bazel_product_bundle") {
         product_size_checker_output = [
           {
             visualization =
-                rebase_path("${target_gen_dir}/${_visualization_path}",
+                rebase_path("${target_out_dir}/${_visualization_path}",
                             root_build_dir)
             size_breakdown =
-                rebase_path("${target_gen_dir}/${_size_breakdown_path}",
+                rebase_path("${target_out_dir}/${_size_breakdown_path}",
                             root_build_dir)
           },
         ]
@@ -300,7 +300,7 @@ template("bazel_product_bundle") {
 
       metadata = {
         gerrit_size_reports =
-            [ rebase_path("${target_gen_dir}/${_size_report_path}",
+            [ rebase_path("${target_out_dir}/${_size_report_path}",
                           root_build_dir) ]
       }
     }
@@ -333,7 +333,7 @@ template("bazel_product_bundle") {
           {
             name = "elf_sizes.json"
             type = "manifest"
-            path = rebase_path("${target_gen_dir}/${_elf_sizes_ninja_out_path}",
+            path = rebase_path("${target_out_dir}/${_elf_sizes_ninja_out_path}",
                                root_build_dir)
           },
         ]
@@ -388,9 +388,9 @@ template("bazel_product_bundle") {
     if (use_bazel_images_only) {
       _label_dir = get_label_info(":${target_name}", "dir")
       _full_label = "${_label_dir}:${target_name}($current_toolchain)"
-      _system_a_root = rebase_path(target_gen_dir, root_out_dir) +
+      _system_a_root = rebase_path(target_out_dir, root_out_dir) +
                        "/${files.product_bundle_out_dir}/system_a"
-      _system_r_root = rebase_path(target_gen_dir, root_out_dir) +
+      _system_r_root = rebase_path(target_out_dir, root_out_dir) +
                        "/${files.product_bundle_out_dir}/system_r"
       _recovery_name = get_label_info(recovery_label, "name")
 
@@ -535,12 +535,12 @@ template("bazel_product_bundle") {
           {
             label = get_label_info(":$target_name", "label_with_toolchain")
             path =
-                rebase_path("${target_gen_dir}/${files.product_bundle_out_dir}",
+                rebase_path("${target_out_dir}/${files.product_bundle_out_dir}",
                             root_build_dir)
             name = "${build_info_product}.${build_info_board}"
             product_version = product_version
             transfer_manifest_path =
-                rebase_path("${target_gen_dir}/${files.transfer_json}",
+                rebase_path("${target_out_dir}/${files.transfer_json}",
                             root_build_dir)
             transfer_manifest_url = "file://" + transfer_manifest_path
           },
@@ -556,8 +556,8 @@ template("bazel_product_bundle") {
                              "visibility",
                            ])
     script = "//build/bazel/assembly/transpose_paving_script.py"
-    inputs = [ "${target_gen_dir}/${files.original_paving_script}" ]
-    outputs = [ "${target_gen_dir}/${files.transposed_paving_script}" ]
+    inputs = [ "${target_out_dir}/${files.original_paving_script}" ]
+    outputs = [ "${target_out_dir}/${files.transposed_paving_script}" ]
     args = [
       "--input",
       rebase_path(inputs[0], root_build_dir),
@@ -577,7 +577,7 @@ template("bazel_product_bundle") {
                              "testonly",
                              "visibility",
                            ])
-    product_bundle = "${target_gen_dir}/${files.product_bundle_out_dir}"
+    product_bundle = "${target_out_dir}/${files.product_bundle_out_dir}"
     manifests_dir = "${target_out_dir}/${files.package_manifests_out_dir}"
     deps = [ ":${labels.bazel_product_bundle}" ]
   }
@@ -589,8 +589,8 @@ template("bazel_product_bundle") {
                              "visibility",
                            ])
     product_bundle_target = ":${labels.bazel_product_bundle}"
-    product_bundle_dir = "${target_gen_dir}/${files.product_bundle_out_dir}"
-    output_dir = "${target_gen_dir}/${files.out_dir}"
+    product_bundle_dir = "${target_out_dir}/${files.product_bundle_out_dir}"
+    output_dir = "${target_out_dir}/${files.out_dir}"
   }
 
   # A convenience group for easy `fx build` invocation.

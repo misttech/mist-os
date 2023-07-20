@@ -82,7 +82,7 @@ template("verify_images_configuration") {
 
     inputs = [
       _gn_images_config_file,
-      "${target_gen_dir}/${_bazel_images_config_file}",
+      "${target_out_dir}/${_bazel_images_config_file}",
     ]
     outputs = [ "${target_out_dir}/${target_name}/diff" ]
 

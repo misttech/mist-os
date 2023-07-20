@@ -124,7 +124,7 @@ declare_args() {
 #     A list extra command line arguments to pass to Bazel.
 #     Type: list of string.
 
-#   use_target_out_dir: (optional, default: false)
+#   use_target_out_dir: (optional, default: true)
 #     Use target_out_dir instead of target_gen_dir when linking/copying Bazel
 #     outputs into Ninja.
 #
@@ -262,8 +262,10 @@ template("bazel_action") {
     _num_bazel_outputs += 1
   }
 
-  _use_target_out_dir =
-      defined(invoker.use_target_out_dir) && invoker.use_target_out_dir
+  _use_target_out_dir = true
+  if (defined(invoker.use_target_out_dir)) {
+    _use_target_out_dir = invoker.use_target_out_dir
+  }
 
   _ninja_outputs = _ninja_output_list
   _outputs = []

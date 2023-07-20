@@ -81,7 +81,7 @@ template("verify_verbose_size_report") {
     depfile = "${target_gen_dir}/${target_name}.d"
 
     _bazel_verbose_size_report_file =
-        "${target_gen_dir}/${_bazel_verbose_size_report_output}"
+        "${target_out_dir}/${_bazel_verbose_size_report_output}"
     inputs = [
       _gn_verbose_size_report_file,
       _bazel_verbose_size_report_file,

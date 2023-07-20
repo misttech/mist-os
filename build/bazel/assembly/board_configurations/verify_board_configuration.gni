@@ -35,7 +35,7 @@ template("verify_board_configuration") {
     testonly = true
 
     inputs = [
-      "${target_gen_dir}/${_bazel_board_config_file}",
+      "${target_out_dir}/${_bazel_board_config_file}",
       invoker.golden_json,
     ]
     outputs = [ "${target_out_dir}/${target_name}/diff" ]

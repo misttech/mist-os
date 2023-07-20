@@ -94,7 +94,7 @@ template("bazel_fuchsia_package") {
                              "visibility",
                            ])
     package_name = package_name
-    archive = "$target_gen_dir/$package_name.far"
+    archive = "$target_out_dir/$package_name.far"
     if (!defined(deps)) {
       deps = []
     }

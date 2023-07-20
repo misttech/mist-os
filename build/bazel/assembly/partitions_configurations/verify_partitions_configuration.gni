@@ -81,7 +81,7 @@ template("verify_partitions_configuration") {
 
     inputs = [
       _gn_partitions_config_file,
-      "${target_gen_dir}/${_bazel_partitions_config_file}",
+      "${target_out_dir}/${_bazel_partitions_config_file}",
     ]
     outputs = [ "${target_out_dir}/${target_name}/diff" ]
 

@@ -86,7 +86,7 @@ template("verify_product_configuration") {
 
     inputs = [
       _gn_product_config_file,
-      "${target_gen_dir}/${_bazel_product_config_file}",
+      "${target_out_dir}/${_bazel_product_config_file}",
     ]
     outputs = [ "${target_out_dir}/${target_name}/diff" ]
 
