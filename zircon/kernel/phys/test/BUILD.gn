@@ -288,7 +288,7 @@ if (current_toolchain != default_toolchain) {
 
     # TODO(fxbug.dev/129256): Remove if this doesn't help
     # because that means the timeout is likely not the issue.
-    timeout = 60
+    timeout = 120
   }
 
   zbi_input("decompress-test-data") {
