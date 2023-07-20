@@ -9,14 +9,15 @@
 #include <lib/ddk/metadata.h>
 #include <lib/ddk/platform-defs.h>
 
+#include <bind/fuchsia/amlogic/platform/a5/cpp/bind.h>
+#include <bind/fuchsia/cpp/bind.h>
+#include <bind/fuchsia/hardware/gpio/cpp/bind.h>
 #include <ddk/metadata/buttons.h>
+#include <ddktl/device.h>
 
-#include "buckeye.h"
-#include "src/devices/board/drivers/buckeye/buckeye-buttons-bind.h"
-#include "src/devices/bus/lib/platform-bus-composites/platform-bus-composite.h"
+#include "src/devices/board/drivers/buckeye/buckeye.h"
 
 namespace buckeye {
-namespace fpbus = fuchsia_hardware_platform_bus;
 
 static constexpr buttons_button_config_t buckeye_buttons[] = {
     {BUTTONS_TYPE_DIRECT, BUTTONS_ID_MIC_MUTE, 0, 0, 0},
@@ -26,40 +27,41 @@ static constexpr buttons_gpio_config_t buckeye_gpios[] = {
     {BUTTONS_GPIO_TYPE_POLL, 0, {.poll = {GPIO_NO_PULL, zx::msec(20).get()}}},
 };
 
-static constexpr zx_device_prop_t props[] = {
-    {BIND_PLATFORM_DEV_VID, 0, PDEV_VID_GENERIC},
-    {BIND_PLATFORM_DEV_PID, 0, PDEV_PID_GENERIC},
-    {BIND_PLATFORM_DEV_DID, 0, PDEV_DID_HID_BUTTONS},
-};
-
-static composite_device_desc_t comp_desc = []() {
-  composite_device_desc_t desc = {};
-  desc.props = props;
-  desc.props_count = std::size(props);
-  desc.fragments = buckeye_buttons_fragments;
-  desc.fragments_count = std::size(buckeye_buttons_fragments);
-  desc.primary_fragment = "mic-privacy";
-  desc.spawn_colocated = false;
-  return desc;
-}();
+static const device_metadata_t available_buttons_metadata[] = {
+    {
+        .type = DEVICE_METADATA_BUTTONS_BUTTONS,
+        .data = &buckeye_buttons,
+        .length = sizeof(buckeye_buttons),
+    },
+    {
+        .type = DEVICE_METADATA_BUTTONS_GPIOS,
+        .data = &buckeye_gpios,
+        .length = sizeof(buckeye_gpios),
+    }};
 
 zx_status_t Buckeye::ButtonsInit() {
-  std::vector<device_metadata_t> buttons_metadata;
-  buttons_metadata.emplace_back(device_metadata_t{
-      .type = DEVICE_METADATA_BUTTONS_BUTTONS,
-      .data = reinterpret_cast<const void*>(&buckeye_buttons),
-      .length = sizeof(buckeye_buttons),
-  });
-  buttons_metadata.emplace_back(device_metadata_t{
-      .type = DEVICE_METADATA_BUTTONS_GPIOS,
-      .data = reinterpret_cast<const void*>(&buckeye_gpios),
-      .length = sizeof(buckeye_gpios),
-  });
+  const ddk::BindRule kMicPrivacyRules[] = {
+      ddk::MakeAcceptBindRule(bind_fuchsia::PROTOCOL,
+                              bind_fuchsia_hardware_gpio::BIND_PROTOCOL_DEVICE),
+      ddk::MakeAcceptBindRule(bind_fuchsia::GPIO_PIN,
+                              bind_fuchsia_amlogic_platform_a5::GPIOD_PIN_ID_PIN_3)};
+  const device_bind_prop_t kMicPrivacyProps[] = {
+      ddk::MakeProperty(bind_fuchsia::PROTOCOL, bind_fuchsia_hardware_gpio::BIND_PROTOCOL_DEVICE),
+      ddk::MakeProperty(bind_fuchsia_hardware_gpio::FUNCTION,
+                        bind_fuchsia_hardware_gpio::FUNCTION_MIC_MUTE),
+  };
 
-  comp_desc.metadata_list = buttons_metadata.data();
-  comp_desc.metadata_count = buttons_metadata.size();
+  const ddk::CompositeNodeSpec buttonComposite =
+      ddk::CompositeNodeSpec(kMicPrivacyRules, kMicPrivacyProps)
+          .set_metadata(available_buttons_metadata);
 
-  return DdkAddComposite("buckeye-buttons", &comp_desc);
+  zx_status_t status = DdkAddCompositeNodeSpec("buckeye-buttons", buttonComposite);
+
+  if (status != ZX_OK) {
+    zxlogf(ERROR, "AddCompositeNodeSpec failed: %s", zx_status_get_string(status));
+  }
+
+  return status;
 }
 
 }  // namespace buckeye

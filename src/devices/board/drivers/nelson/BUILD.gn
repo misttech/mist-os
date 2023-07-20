@@ -37,17 +37,6 @@ driver_bind_rules("nelson-bind") {
   ]
 }
 
-driver_bind_rules("nelson_buttons_bind") {
-  rules = "bind/nelson_buttons.bind"
-  header_output = "nelson_buttons_bind.h"
-  bind_output = "nelson_buttons_bind.bc"
-  tests = "bind-tests/nelson_buttons-test.json"
-  deps = [
-    "//src/devices/bind/fuchsia.amlogic.platform.s905d3",
-    "//src/devices/bind/fuchsia.hardware.gpio",
-  ]
-}
-
 driver_bind_rules("nelson_emmc_bind") {
   rules = "bind/nelson_emmc.bind"
   header_output = "nelson_emmc_bind.h"
@@ -319,7 +308,6 @@ fuchsia_driver("nelson-module-driver") {
     ":nelson-bind",
     ":nelson_aml_sdio_bind_header",
     ":nelson_aml_video_bind_header",
-    ":nelson_buttons_bind_header",
     ":nelson_dwc2_bind_header",
     ":nelson_emmc_bind_header",
     ":nelson_ot_radio_bind_header",
@@ -416,7 +404,6 @@ group("tests") {
     ":aml_secure_mem_bind_test",
     ":aml_thermal_pll_bind_test",
     ":gt6853_touch_bind_test",
-    ":nelson-bind_test",
     ":nelson_aml_sdio_bind_test",
     ":nelson_aml_video_bind_test",
     ":nelson_aml_video_bind_test",

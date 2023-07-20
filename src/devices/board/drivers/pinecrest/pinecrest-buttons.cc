@@ -5,10 +5,13 @@
 #include <lib/ddk/metadata.h>
 #include <lib/ddk/platform-defs.h>
 
+#include <bind/fuchsia/cpp/bind.h>
+#include <bind/fuchsia/hardware/gpio/cpp/bind.h>
 #include <ddk/metadata/buttons.h>
+#include <ddktl/device.h>
 
-#include "pinecrest.h"
-#include "src/devices/board/drivers/pinecrest/pinecrest-buttons-bind.h"
+#include "src/devices/board/drivers/pinecrest/pinecrest-gpio.h"
+#include "src/devices/board/drivers/pinecrest/pinecrest.h"
 
 namespace board_pinecrest {
 
@@ -33,30 +36,27 @@ constexpr device_metadata_t available_buttons_metadata[] = {
     }};
 
 zx_status_t Pinecrest::ButtonsInit() {
-  constexpr zx_device_prop_t props[] = {
-      {BIND_PLATFORM_DEV_VID, 0, PDEV_VID_GENERIC},
-      {BIND_PLATFORM_DEV_PID, 0, PDEV_PID_GENERIC},
-      {BIND_PLATFORM_DEV_DID, 0, PDEV_DID_HID_BUTTONS},
+  const ddk::BindRule kMicPrivacyRules[] = {
+      ddk::MakeAcceptBindRule(bind_fuchsia::PROTOCOL,
+                              bind_fuchsia_hardware_gpio::BIND_PROTOCOL_DEVICE),
+      ddk::MakeAcceptBindRule(bind_fuchsia::GPIO_PIN, static_cast<uint32_t>(GPIO_MIC_MUTE_STATUS))};
+  const device_bind_prop_t kMicPrivacyProps[] = {
+      ddk::MakeProperty(bind_fuchsia::PROTOCOL, bind_fuchsia_hardware_gpio::BIND_PROTOCOL_DEVICE),
+      ddk::MakeProperty(bind_fuchsia_hardware_gpio::FUNCTION,
+                        bind_fuchsia_hardware_gpio::FUNCTION_MIC_MUTE),
   };
 
-  const composite_device_desc_t comp_desc = {
-      .props = props,
-      .props_count = std::size(props),
-      .fragments = pinecrest_buttons_fragments,
-      .fragments_count = std::size(pinecrest_buttons_fragments),
-      .primary_fragment = "mic-privacy",
-      .spawn_colocated = false,
-      .metadata_list = available_buttons_metadata,
-      .metadata_count = std::size(available_buttons_metadata),
-  };
+  const ddk::CompositeNodeSpec buttonComposite =
+      ddk::CompositeNodeSpec(kMicPrivacyRules, kMicPrivacyProps)
+          .set_metadata(available_buttons_metadata);
 
-  zx_status_t status = DdkAddComposite("pinecrest-buttons", &comp_desc);
+  zx_status_t status = DdkAddCompositeNodeSpec("pinecrest-buttons", buttonComposite);
+
   if (status != ZX_OK) {
-    zxlogf(ERROR, "CompositeDeviceAdd failed: %s", zx_status_get_string(status));
-    return status;
+    zxlogf(ERROR, "AddCompositeNodeSpec failed: %s", zx_status_get_string(status));
   }
 
-  return ZX_OK;
+  return status;
 }
 
 }  // namespace board_pinecrest

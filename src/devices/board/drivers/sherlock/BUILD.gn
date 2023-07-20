@@ -20,17 +20,6 @@ driver_bind_rules("sherlock-bind") {
   ]
 }
 
-driver_bind_rules("sherlock-buttons-bind") {
-  rules = "bind/sherlock-buttons.bind"
-  header_output = "sherlock-buttons-bind.h"
-  bind_output = "sherlock-buttons-bind.bc"
-  tests = "bind-tests/sherlock-buttons-test.json"
-  deps = [
-    "//src/devices/bind/fuchsia.amlogic.platform.t931",
-    "//src/devices/bind/fuchsia.hardware.gpio",
-  ]
-}
-
 driver_bind_rules("sherlock-pwm-bind") {
   rules = "bind/sherlock-pwm.bind"
   header_output = "sherlock-pwm-bind.h"
@@ -319,7 +308,6 @@ template("sherlock_driver") {
     deps = [
       ":camera-isp-bind_header",
       ":sherlock-aml-usb-phy-v2-bind_header",
-      ":sherlock-buttons-bind_header",
       ":sherlock-dwc2-phy-bind_header",
       ":sherlock-emmc-bind_header",
       ":sherlock-hevc-enc-bind_header",

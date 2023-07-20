@@ -8,65 +8,104 @@
 #include <lib/ddk/metadata.h>
 #include <lib/ddk/platform-defs.h>
 
+#include <bind/fuchsia/amlogic/platform/t931/cpp/bind.h>
+#include <bind/fuchsia/cpp/bind.h>
+#include <bind/fuchsia/hardware/gpio/cpp/bind.h>
 #include <ddk/metadata/buttons.h>
+#include <ddktl/device.h>
 #include <soc/aml-t931/t931-gpio.h>
 #include <soc/aml-t931/t931-hw.h>
 
-#include "sherlock-gpios.h"
-#include "sherlock.h"
-#include "src/devices/board/drivers/sherlock/sherlock-buttons-bind.h"
+#include "src/devices/board/drivers/sherlock/sherlock.h"
 
 namespace sherlock {
 
+// clang-format off
+static const buttons_button_config_t buttons[] = {
+    {BUTTONS_TYPE_DIRECT, BUTTONS_ID_VOLUME_UP, 0, 0, 0},
+    {BUTTONS_TYPE_DIRECT, BUTTONS_ID_VOLUME_DOWN, 1, 0, 0},
+    {BUTTONS_TYPE_DIRECT, BUTTONS_ID_FDR, 2, 0, 0},
+    {BUTTONS_TYPE_DIRECT, BUTTONS_ID_MIC_AND_CAM_MUTE, 3, 0, 0},
+};
+// clang-format on
+
+// No need for internal pull, external pull-ups used.
+static const buttons_gpio_config_t gpios[] = {
+    {BUTTONS_GPIO_TYPE_INTERRUPT, BUTTONS_GPIO_FLAG_INVERTED, {.interrupt = {GPIO_PULL_UP}}},
+    {BUTTONS_GPIO_TYPE_INTERRUPT, BUTTONS_GPIO_FLAG_INVERTED, {.interrupt = {GPIO_PULL_UP}}},
+    {BUTTONS_GPIO_TYPE_INTERRUPT, BUTTONS_GPIO_FLAG_INVERTED, {.interrupt = {GPIO_NO_PULL}}},
+    {BUTTONS_GPIO_TYPE_INTERRUPT, 0, {.interrupt = {GPIO_NO_PULL}}},
+};
+
+static const device_metadata_t available_buttons_metadata[] = {
+    {
+        .type = DEVICE_METADATA_BUTTONS_BUTTONS,
+        .data = &buttons,
+        .length = sizeof(buttons),
+    },
+    {
+        .type = DEVICE_METADATA_BUTTONS_GPIOS,
+        .data = &gpios,
+        .length = sizeof(gpios),
+    },
+};
+
 zx_status_t Sherlock::ButtonsInit() {
-  static constexpr buttons_button_config_t buttons[] = {
-      {BUTTONS_TYPE_DIRECT, BUTTONS_ID_VOLUME_UP, 0, 0, 0},
-      {BUTTONS_TYPE_DIRECT, BUTTONS_ID_VOLUME_DOWN, 1, 0, 0},
-      {BUTTONS_TYPE_DIRECT, BUTTONS_ID_FDR, 2, 0, 0},
-      {BUTTONS_TYPE_DIRECT, BUTTONS_ID_MIC_AND_CAM_MUTE, 3, 0, 0},
+  const ddk::BindRule kVolUpRules[] = {
+      ddk::MakeAcceptBindRule(bind_fuchsia::PROTOCOL,
+                              bind_fuchsia_hardware_gpio::BIND_PROTOCOL_DEVICE),
+      ddk::MakeAcceptBindRule(bind_fuchsia::GPIO_PIN,
+                              bind_fuchsia_amlogic_platform_t931::GPIOZ_PIN_ID_PIN_4)};
+  const device_bind_prop_t kVolUpProps[] = {
+      ddk::MakeProperty(bind_fuchsia::PROTOCOL, bind_fuchsia_hardware_gpio::BIND_PROTOCOL_DEVICE),
+      ddk::MakeProperty(bind_fuchsia_hardware_gpio::FUNCTION,
+                        bind_fuchsia_hardware_gpio::FUNCTION_VOLUME_UP),
   };
 
-  // No need for internal pull, external pull-ups used.
-  static constexpr buttons_gpio_config_t gpios[] = {
-      {BUTTONS_GPIO_TYPE_INTERRUPT, BUTTONS_GPIO_FLAG_INVERTED, {.interrupt = {GPIO_PULL_UP}}},
-      {BUTTONS_GPIO_TYPE_INTERRUPT, BUTTONS_GPIO_FLAG_INVERTED, {.interrupt = {GPIO_PULL_UP}}},
-      {BUTTONS_GPIO_TYPE_INTERRUPT, BUTTONS_GPIO_FLAG_INVERTED, {.interrupt = {GPIO_NO_PULL}}},
-      {BUTTONS_GPIO_TYPE_INTERRUPT, 0, {.interrupt = {GPIO_NO_PULL}}},
+  const ddk::BindRule kVolDownRules[] = {
+      ddk::MakeAcceptBindRule(bind_fuchsia::PROTOCOL,
+                              bind_fuchsia_hardware_gpio::BIND_PROTOCOL_DEVICE),
+      ddk::MakeAcceptBindRule(bind_fuchsia::GPIO_PIN,
+                              bind_fuchsia_amlogic_platform_t931::GPIOZ_PIN_ID_PIN_5)};
+  const device_bind_prop_t kVolDownProps[] = {
+      ddk::MakeProperty(bind_fuchsia::PROTOCOL, bind_fuchsia_hardware_gpio::BIND_PROTOCOL_DEVICE),
+      ddk::MakeProperty(bind_fuchsia_hardware_gpio::FUNCTION,
+                        bind_fuchsia_hardware_gpio::FUNCTION_VOLUME_DOWN),
   };
 
-  const device_metadata_t available_buttons_metadata[] = {
-      {
-          .type = DEVICE_METADATA_BUTTONS_BUTTONS,
-          .data = &buttons,
-          .length = sizeof(buttons),
-      },
-      {
-          .type = DEVICE_METADATA_BUTTONS_GPIOS,
-          .data = &gpios,
-          .length = sizeof(gpios),
-      },
+  const ddk::BindRule kVolBothRules[] = {
+      ddk::MakeAcceptBindRule(bind_fuchsia::PROTOCOL,
+                              bind_fuchsia_hardware_gpio::BIND_PROTOCOL_DEVICE),
+      ddk::MakeAcceptBindRule(bind_fuchsia::GPIO_PIN,
+                              bind_fuchsia_amlogic_platform_t931::GPIOZ_PIN_ID_PIN_13)};
+  const device_bind_prop_t kVolBothProps[] = {
+      ddk::MakeProperty(bind_fuchsia::PROTOCOL, bind_fuchsia_hardware_gpio::BIND_PROTOCOL_DEVICE),
+      ddk::MakeProperty(bind_fuchsia_hardware_gpio::FUNCTION,
+                        bind_fuchsia_hardware_gpio::FUNCTION_VOLUME_BOTH),
   };
 
-  constexpr zx_device_prop_t props[] = {
-      {BIND_PLATFORM_DEV_VID, 0, PDEV_VID_GENERIC},
-      {BIND_PLATFORM_DEV_PID, 0, PDEV_PID_GENERIC},
-      {BIND_PLATFORM_DEV_DID, 0, PDEV_DID_HID_BUTTONS},
+  const ddk::BindRule kMicPrivacyRules[] = {
+      ddk::MakeAcceptBindRule(bind_fuchsia::PROTOCOL,
+                              bind_fuchsia_hardware_gpio::BIND_PROTOCOL_DEVICE),
+      ddk::MakeAcceptBindRule(bind_fuchsia::GPIO_PIN,
+                              bind_fuchsia_amlogic_platform_t931::GPIOH_PIN_ID_PIN_3)};
+  const device_bind_prop_t kMicPrivacyProps[] = {
+      ddk::MakeProperty(bind_fuchsia::PROTOCOL, bind_fuchsia_hardware_gpio::BIND_PROTOCOL_DEVICE),
+      ddk::MakeProperty(bind_fuchsia_hardware_gpio::FUNCTION,
+                        bind_fuchsia_hardware_gpio::FUNCTION_MIC_MUTE),
   };
 
-  const composite_device_desc_t comp_desc = {
-      .props = props,
-      .props_count = std::size(props),
-      .fragments = sherlock_buttons_fragments,
-      .fragments_count = std::size(sherlock_buttons_fragments),
-      .primary_fragment = "volume-up",  // ???
-      .spawn_colocated = false,
-      .metadata_list = available_buttons_metadata,
-      .metadata_count = std::size(available_buttons_metadata),
-  };
+  const ddk::CompositeNodeSpec buttonComposite =
+      ddk::CompositeNodeSpec(kVolUpRules, kVolUpProps)
+          .AddParentSpec(kVolDownRules, kVolDownProps)
+          .AddParentSpec(kVolBothRules, kVolBothProps)
+          .AddParentSpec(kMicPrivacyRules, kMicPrivacyProps)
+          .set_metadata(available_buttons_metadata);
 
-  zx_status_t status = DdkAddComposite("sherlock-buttons", &comp_desc);
+  zx_status_t status = DdkAddCompositeNodeSpec("sherlock-buttons", buttonComposite);
+
   if (status != ZX_OK) {
-    zxlogf(ERROR, "%s: CompositeDeviceAdd failed %d", __func__, status);
+    zxlogf(ERROR, "%s: AddCompositeNodeSpec failed: %s", __func__, zx_status_get_string(status));
     return status;
   }
 

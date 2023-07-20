@@ -11,7 +11,7 @@ TEST_F(DeviceEnumerationTest, NelsonTest) {
       "sys/platform/pt/nelson",
       "sys/platform/05:05:1/aml-gpio",
       "sys/platform/05:05:1:1/aml-gpio",
-      "sys/platform/05:05:1/aml-gpio/gpio-5/nelson-buttons/hid-buttons",
+      "sys/platform/05:05:1/aml-gpio/gpio-2/nelson-buttons/hid-buttons",
       "sys/platform/05:00:3/bluetooth-composite-spec/aml-uart/bt-transport-uart",
       "sys/platform/05:00:3/bluetooth-composite-spec/aml-uart/bt-transport-uart/bt-hci-broadcom",
       "sys/platform/05:00:2/aml-i2c",
@@ -99,7 +99,7 @@ TEST_F(DeviceEnumerationTest, NelsonTest) {
 
   static const char* kTouchscreenDevicePaths[] = {
       // One of these touch devices could be on P0/P1 boards.
-      "sys/platform/05:05:1/aml-gpio/gpio-5/nelson-buttons/hid-buttons/hidbus_function/hid-device/InputReport",
+      "sys/platform/05:05:1/aml-gpio/gpio-2/nelson-buttons/hid-buttons/hidbus_function/hid-device/InputReport",
       // This is the only possible touch device for P2 and beyond.
       "sys/platform/1c:00:1/gt6853-touch/gt6853",
   };

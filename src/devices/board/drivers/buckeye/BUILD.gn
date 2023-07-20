@@ -189,15 +189,6 @@ driver_bind_rules("buckeye-cpu-bind") {
   ]
 }
 
-driver_bind_rules("buckeye-buttons-bind") {
-  rules = "bind/buckeye-buttons.bind"
-  header_output = "buckeye-buttons-bind.h"
-  deps = [
-    "//src/devices/bind/fuchsia.amlogic.platform.a5",
-    "//src/devices/bind/fuchsia.hardware.gpio",
-  ]
-}
-
 fuchsia_driver("buckeye-driver") {
   output_name = "buckeye"
   configs += [
@@ -230,7 +221,6 @@ fuchsia_driver("buckeye-driver") {
   deps = [
     ":audio-tas5707-stereo-bind_header",
     ":buckeye-bind",
-    ":buckeye-buttons-bind_header",
     ":buckeye-cpu-bind_header",
     ":buckeye-emmc-bind_header",
     ":buckeye-power-domain-bind_header",
@@ -258,6 +248,8 @@ fuchsia_driver("buckeye-driver") {
     "//sdk/lib/driver/component/cpp",
     "//src/devices/bind/fuchsia:fuchsia_cpp",
     "//src/devices/bind/fuchsia.amlogic.platform:fuchsia.amlogic.platform_cpp",
+    "//src/devices/bind/fuchsia.amlogic.platform.a5:fuchsia.amlogic.platform.a5_cpp",
+    "//src/devices/bind/fuchsia.hardware.gpio:fuchsia.hardware.gpio_cpp",
     "//src/devices/bind/fuchsia.hardware.registers:fuchsia.hardware.registers_cpp",
     "//src/devices/bus/lib/platform-bus-composites",
     "//src/devices/lib/amlogic",
@@ -273,6 +265,7 @@ fuchsia_driver("buckeye-driver") {
     "//src/devices/usb/lib/usb:peripheral-config",
     "//src/lib/ddk",
     "//src/lib/ddk:ddk-metadata-headers",
+    "//src/lib/ddktl",
     "//zircon/system/ulib/fbl",
     "//zircon/system/ulib/zircon-internal",
   ]

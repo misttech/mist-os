@@ -25,17 +25,6 @@ driver_bind_rules("astro-bind") {
   ]
 }
 
-driver_bind_rules("astro-buttons-bind") {
-  rules = "bind/astro-buttons.bind"
-  header_output = "astro-buttons-bind.h"
-  bind_output = "astro-buttons-bind.bc"
-  tests = "bind-tests/astro-buttons-test.json"
-  deps = [
-    "//src/devices/bind/fuchsia.amlogic.platform.s905d2",
-    "//src/devices/bind/fuchsia.hardware.gpio",
-  ]
-}
-
 driver_bind_rules("astro-cpu-bind") {
   rules = "bind/astro-cpu.bind"
   header_output = "astro-cpu-bind.h"
@@ -228,7 +217,6 @@ fuchsia_driver("astro-driver") {
     ":astro-aml-sdio-bind_header",
     ":astro-aml-usb-phy-v2-bind_header",
     ":astro-bind",
-    ":astro-buttons-bind_header",
     ":astro-cpu-bind_header",
     ":astro-dwc2-phy-bind_header",
     ":astro-pwm-bind_header",
@@ -317,7 +305,6 @@ group("tests") {
     ":astro-aml-sdio-bind_test",
     ":astro-aml-usb-phy-v2-bind_test",
     ":astro-bind_test",
-    ":astro-buttons-bind_test",
     ":astro-cpu-bind_test",
     ":astro-dwc2-phy-bind_test",
     ":astro-pwm-bind_test",

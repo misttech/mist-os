@@ -2,10 +2,26 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-using fuchsia.platform;
+composite hid_buttons;
 
-fuchsia.BIND_COMPOSITE == 1;
-fuchsia.BIND_PLATFORM_DEV_VID == fuchsia.platform.BIND_PLATFORM_DEV_VID.GENERIC;
-fuchsia.BIND_PLATFORM_DEV_PID == fuchsia.platform.BIND_PLATFORM_DEV_PID.GENERIC;
-fuchsia.BIND_PLATFORM_DEV_DID == fuchsia.platform.BIND_PLATFORM_DEV_DID.HID_BUTTONS;
+using fuchsia.hardware.gpio;
 
+primary node "mic-privacy" {
+    fuchsia.BIND_PROTOCOL == fuchsia.hardware.gpio.BIND_PROTOCOL.DEVICE;
+    fuchsia.hardware.gpio.FUNCTION == fuchsia.hardware.gpio.FUNCTION.MIC_MUTE;
+}
+
+optional node "volume-up" {
+    fuchsia.BIND_PROTOCOL == fuchsia.hardware.gpio.BIND_PROTOCOL.DEVICE;
+    fuchsia.hardware.gpio.FUNCTION == fuchsia.hardware.gpio.FUNCTION.VOLUME_UP;
+}
+
+optional node "volume-down" {
+    fuchsia.BIND_PROTOCOL == fuchsia.hardware.gpio.BIND_PROTOCOL.DEVICE;
+    fuchsia.hardware.gpio.FUNCTION == fuchsia.hardware.gpio.FUNCTION.VOLUME_DOWN;
+}
+
+optional node "volume-both" {
+    fuchsia.BIND_PROTOCOL == fuchsia.hardware.gpio.BIND_PROTOCOL.DEVICE;
+    fuchsia.hardware.gpio.FUNCTION == fuchsia.hardware.gpio.FUNCTION.VOLUME_BOTH;
+}

@@ -10,13 +10,15 @@
 #include <lib/ddk/metadata.h>
 #include <lib/ddk/platform-defs.h>
 
+#include <bind/fuchsia/amlogic/platform/s905d2/cpp/bind.h>
+#include <bind/fuchsia/cpp/bind.h>
+#include <bind/fuchsia/hardware/gpio/cpp/bind.h>
 #include <ddk/metadata/buttons.h>
+#include <ddktl/device.h>
 #include <soc/aml-s905d2/s905d2-gpio.h>
 #include <soc/aml-s905d2/s905d2-hw.h>
 
-#include "astro-gpios.h"
-#include "astro.h"
-#include "src/devices/board/drivers/astro/astro-buttons-bind.h"
+#include "src/devices/board/drivers/astro/astro.h"
 
 namespace astro {
 namespace fpbus = fuchsia_hardware_platform_bus;
@@ -50,26 +52,61 @@ static const device_metadata_t available_buttons_metadata[] = {
     }};
 
 zx_status_t Astro::ButtonsInit() {
-  constexpr zx_device_prop_t props[] = {
-      {BIND_PLATFORM_DEV_VID, 0, PDEV_VID_GENERIC},
-      {BIND_PLATFORM_DEV_PID, 0, PDEV_PID_GENERIC},
-      {BIND_PLATFORM_DEV_DID, 0, PDEV_DID_HID_BUTTONS},
+  const ddk::BindRule kVolUpRules[] = {
+      ddk::MakeAcceptBindRule(bind_fuchsia::PROTOCOL,
+                              bind_fuchsia_hardware_gpio::BIND_PROTOCOL_DEVICE),
+      ddk::MakeAcceptBindRule(bind_fuchsia::GPIO_PIN,
+                              bind_fuchsia_amlogic_platform_s905d2::GPIOZ_PIN_ID_PIN_5)};
+  const device_bind_prop_t kVolUpProps[] = {
+      ddk::MakeProperty(bind_fuchsia::PROTOCOL, bind_fuchsia_hardware_gpio::BIND_PROTOCOL_DEVICE),
+      ddk::MakeProperty(bind_fuchsia_hardware_gpio::FUNCTION,
+                        bind_fuchsia_hardware_gpio::FUNCTION_VOLUME_UP),
   };
 
-  const composite_device_desc_t comp_desc = {
-      .props = props,
-      .props_count = std::size(props),
-      .fragments = astro_buttons_fragments,
-      .fragments_count = std::size(astro_buttons_fragments),
-      .primary_fragment = "volume-up",  // ???
-      .spawn_colocated = false,
-      .metadata_list = available_buttons_metadata,
-      .metadata_count = std::size(available_buttons_metadata),
+  const ddk::BindRule kVolDownRules[] = {
+      ddk::MakeAcceptBindRule(bind_fuchsia::PROTOCOL,
+                              bind_fuchsia_hardware_gpio::BIND_PROTOCOL_DEVICE),
+      ddk::MakeAcceptBindRule(bind_fuchsia::GPIO_PIN,
+                              bind_fuchsia_amlogic_platform_s905d2::GPIOZ_PIN_ID_PIN_6)};
+  const device_bind_prop_t kVolDownProps[] = {
+      ddk::MakeProperty(bind_fuchsia::PROTOCOL, bind_fuchsia_hardware_gpio::BIND_PROTOCOL_DEVICE),
+      ddk::MakeProperty(bind_fuchsia_hardware_gpio::FUNCTION,
+                        bind_fuchsia_hardware_gpio::FUNCTION_VOLUME_DOWN),
   };
 
-  zx_status_t status = DdkAddComposite("astro-buttons", &comp_desc);
+  const ddk::BindRule kVolBothRules[] = {
+      ddk::MakeAcceptBindRule(bind_fuchsia::PROTOCOL,
+                              bind_fuchsia_hardware_gpio::BIND_PROTOCOL_DEVICE),
+      ddk::MakeAcceptBindRule(bind_fuchsia::GPIO_PIN,
+                              bind_fuchsia_amlogic_platform_s905d2::GPIOAO_PIN_ID_PIN_10)};
+  const device_bind_prop_t kVolBothProps[] = {
+      ddk::MakeProperty(bind_fuchsia::PROTOCOL, bind_fuchsia_hardware_gpio::BIND_PROTOCOL_DEVICE),
+      ddk::MakeProperty(bind_fuchsia_hardware_gpio::FUNCTION,
+                        bind_fuchsia_hardware_gpio::FUNCTION_VOLUME_BOTH),
+  };
+
+  const ddk::BindRule kMicPrivacyRules[] = {
+      ddk::MakeAcceptBindRule(bind_fuchsia::PROTOCOL,
+                              bind_fuchsia_hardware_gpio::BIND_PROTOCOL_DEVICE),
+      ddk::MakeAcceptBindRule(bind_fuchsia::GPIO_PIN,
+                              bind_fuchsia_amlogic_platform_s905d2::GPIOZ_PIN_ID_PIN_2)};
+  const device_bind_prop_t kMicPrivacyProps[] = {
+      ddk::MakeProperty(bind_fuchsia::PROTOCOL, bind_fuchsia_hardware_gpio::BIND_PROTOCOL_DEVICE),
+      ddk::MakeProperty(bind_fuchsia_hardware_gpio::FUNCTION,
+                        bind_fuchsia_hardware_gpio::FUNCTION_MIC_MUTE),
+  };
+
+  const ddk::CompositeNodeSpec buttonComposite =
+      ddk::CompositeNodeSpec(kVolUpRules, kVolUpProps)
+          .AddParentSpec(kVolDownRules, kVolDownProps)
+          .AddParentSpec(kVolBothRules, kVolBothProps)
+          .AddParentSpec(kMicPrivacyRules, kMicPrivacyProps)
+          .set_metadata(available_buttons_metadata);
+
+  zx_status_t status = DdkAddCompositeNodeSpec("astro-buttons", buttonComposite);
+
   if (status != ZX_OK) {
-    zxlogf(ERROR, "%s: CompositeDeviceAdd failed: %d", __func__, status);
+    zxlogf(ERROR, "%s: AddCompositeNodeSpec failed: %s", __func__, zx_status_get_string(status));
     return status;
   }
 

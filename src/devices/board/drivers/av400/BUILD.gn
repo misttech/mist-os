@@ -256,15 +256,6 @@ driver_bind_rules("av400-cpu-bind") {
   ]
 }
 
-driver_bind_rules("av400-buttons-bind") {
-  rules = "bind/av400-buttons.bind"
-  header_output = "av400-buttons-bind.h"
-  deps = [
-    "//src/devices/bind/fuchsia.amlogic.platform.a5",
-    "//src/devices/bind/fuchsia.hardware.gpio",
-  ]
-}
-
 driver_bind_rules("av400-dsp-bind") {
   rules = "bind/av400-dsp.bind"
   header_output = "av400-dsp-bind.h"
@@ -323,7 +314,6 @@ fuchsia_driver("av400-driver") {
   deps = [
     ":audio-tas5707-stereo-bind_header",
     ":av400-bind",
-    ":av400-buttons-bind_header",
     ":av400-cpu-bind_header",
     ":av400-dsp-bind_header",
     ":av400-emmc-bind_header",
@@ -356,6 +346,8 @@ fuchsia_driver("av400-driver") {
     "//sdk/lib/driver/component/cpp",
     "//src/devices/bind/fuchsia:fuchsia_cpp",
     "//src/devices/bind/fuchsia.amlogic.platform:fuchsia.amlogic.platform_cpp",
+    "//src/devices/bind/fuchsia.amlogic.platform.a5:fuchsia.amlogic.platform.a5_cpp",
+    "//src/devices/bind/fuchsia.hardware.gpio:fuchsia.hardware.gpio_cpp",
     "//src/devices/bind/fuchsia.hardware.registers:fuchsia.hardware.registers_cpp",
     "//src/devices/bus/lib/platform-bus-composites",
     "//src/devices/lib/amlogic",
@@ -371,6 +363,7 @@ fuchsia_driver("av400-driver") {
     "//src/devices/usb/lib/usb:peripheral-config",
     "//src/lib/ddk",
     "//src/lib/ddk:ddk-metadata-headers",
+    "//src/lib/ddktl",
     "//zircon/system/ulib/fbl",
     "//zircon/system/ulib/zircon-internal",
   ]
