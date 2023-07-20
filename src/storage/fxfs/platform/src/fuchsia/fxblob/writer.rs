@@ -667,7 +667,7 @@ mod tests {
         },
         core::ops::Range,
         delivery_blob::{delivery_blob_path, CompressionMode, Type1Blob},
-        fidl_fuchsia_fxfs,
+        fidl_fuchsia_fxfs::CreateBlobError,
         fidl_fuchsia_io::{
             self as fio, NodeAttributeFlags, NodeAttributes, OpenFlags, VmoFlags, MAX_TRANSFER_SIZE,
         },
@@ -1296,6 +1296,67 @@ mod tests {
             }
         }
         assert_eq!(fixture.read_blob(&format!("{}", hash)).await, data);
+        fixture.close().await;
+    }
+
+    #[fasync::run(10, test)]
+    async fn test_new_write_blob_already_exists() {
+        let fixture = new_blob_fixture().await;
+
+        let data = vec![1; 65536];
+
+        let mut builder = MerkleTreeBuilder::new();
+        builder.write(&data);
+        let hash = builder.finish().root();
+        let delivery_data = Type1Blob::generate(&data, CompressionMode::Never);
+
+        {
+            let (blob_volume_outgoing_dir, server_end) =
+                fidl::endpoints::create_proxy::<fio::DirectoryMarker>()
+                    .expect("Create dir proxy to succeed");
+
+            fixture
+                .volumes_directory()
+                .serve_volume(fixture.volume(), server_end, true, true)
+                .await
+                .expect("failed to create_and_serve the blob volume");
+            let blob_proxy =
+                connect_to_protocol_at_dir_svc::<fidl_fuchsia_fxfs::BlobCreatorMarker>(
+                    &blob_volume_outgoing_dir,
+                )
+                .expect("failed to connect to the Blob service");
+
+            let blob_writer_client_end = blob_proxy
+                .create(&hash.into(), false)
+                .await
+                .expect("transport error on create")
+                .expect("failed to create blob");
+
+            let writer = blob_writer_client_end.into_proxy().unwrap();
+            let vmo = writer
+                .get_vmo(delivery_data.len() as u64)
+                .await
+                .expect("transport error on get_vmo")
+                .expect("failed to get vmo");
+
+            vmo.write(&delivery_data, 0).expect("failed to write to vmo");
+            writer
+                .bytes_ready(delivery_data.len() as u64)
+                .await
+                .expect("transport error on bytes_ready")
+                .expect("failed to write data to vmo");
+
+            assert_eq!(fixture.read_blob(&format!("{}", hash)).await, data);
+            assert_eq!(
+                blob_proxy
+                    .create(&hash.into(), false)
+                    .await
+                    .expect("transport error on create")
+                    .expect_err("rewrite succeeded"),
+                CreateBlobError::AlreadyExists
+            );
+        }
+
         fixture.close().await;
     }
 

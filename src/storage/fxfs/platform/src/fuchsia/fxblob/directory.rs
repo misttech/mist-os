@@ -86,7 +86,7 @@ impl RootDir for BlobDirectory {
                     // TODO(fxbug.dev/129357): Figure out how we handle concurrent writes to the
                     // same blob.
                     responder
-                        .send(self.create_blob(&Hash::from(hash)).await.map_err(|error| {
+                        .send(self.create_blob(Hash::from(hash)).await.map_err(|error| {
                             tracing::error!(?error, "blob service: create failed");
                             error
                         }))
@@ -145,11 +145,11 @@ impl BlobDirectory {
 
         match self.directory.directory().lookup(name).await? {
             Some((object_id, object_descriptor)) => {
-                ensure!(!flags.contains(fio::OpenFlags::RIGHT_WRITABLE), FxfsError::AccessDenied);
                 ensure!(
                     !flags.contains(fio::OpenFlags::CREATE | fio::OpenFlags::CREATE_IF_ABSENT),
                     FxfsError::AlreadyExists
                 );
+                ensure!(!flags.contains(fio::OpenFlags::RIGHT_WRITABLE), FxfsError::AccessDenied);
                 match object_descriptor {
                     ObjectDescriptor::File => {
                         ensure!(!flags.contains(fio::OpenFlags::DIRECTORY), FxfsError::NotDir)
@@ -263,22 +263,27 @@ impl BlobDirectory {
 
     async fn create_blob(
         self: &Arc<Self>,
-        hash: &Hash,
+        hash: Hash,
     ) -> Result<ClientEnd<BlobWriterMarker>, CreateBlobError> {
         let flags = fio::OpenFlags::CREATE
+            | fio::OpenFlags::CREATE_IF_ABSENT
             | fio::OpenFlags::RIGHT_WRITABLE
             | fio::OpenFlags::RIGHT_READABLE;
         let path = Path::validate_and_split(delivery_blob_path(hash.to_string())).map_err(|e| {
             tracing::error!("failed to validate path: {:?}", e);
             CreateBlobError::Internal
         })?;
-        let node = self.lookup(flags, path).await.map_err(|e| {
-            tracing::error!("lookup failed: {:?}", e);
-            CreateBlobError::Internal
-        })?;
-        if !node.is::<FxDeliveryBlob>() {
-            return Err(CreateBlobError::AlreadyExists);
-        }
+        let node = match self.lookup(flags, path).await {
+            Ok(node) => node,
+            Err(e) => {
+                if FxfsError::AlreadyExists.matches(&e) {
+                    return Err(CreateBlobError::AlreadyExists);
+                } else {
+                    tracing::error!("lookup failed: {:?}", e);
+                    return Err(CreateBlobError::Internal);
+                }
+            }
+        };
         let blob = node.downcast::<FxDeliveryBlob>().unwrap_or_else(|_| unreachable!());
 
         let (client, server_end) = create_proxy::<BlobWriterMarker>().map_err(|e| {
