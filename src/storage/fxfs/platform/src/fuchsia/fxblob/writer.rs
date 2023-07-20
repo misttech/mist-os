@@ -7,12 +7,8 @@
 
 use {
     crate::fuchsia::{
-        directory::FxDirectory,
-        errors::map_to_status,
-        fxblob::{blob::PURGED, directory::BlobDirectory},
-        node::FxNode,
-        volume::info_to_filesystem_info,
-        volume::FxVolume,
+        directory::FxDirectory, errors::map_to_status, fxblob::directory::BlobDirectory,
+        node::FxNode, volume::info_to_filesystem_info, volume::FxVolume,
     },
     anyhow::{anyhow, Context, Error},
     async_trait::async_trait,
@@ -43,7 +39,7 @@ use {
     },
     lazy_static::lazy_static,
     std::sync::{
-        atomic::{AtomicUsize, Ordering},
+        atomic::{AtomicBool, AtomicUsize, Ordering},
         Arc,
     },
     vfs::{
@@ -80,6 +76,7 @@ pub struct FxDeliveryBlob {
     handle: StoreObjectHandle<FxVolume>,
     parent: Arc<BlobDirectory>,
     open_count: AtomicUsize,
+    is_completed: AtomicBool,
     inner: AsyncMutex<Inner>,
 }
 
@@ -233,6 +230,7 @@ impl FxDeliveryBlob {
             handle,
             parent,
             open_count: AtomicUsize::new(0),
+            is_completed: AtomicBool::new(false),
             inner: Default::default(),
         });
         file
@@ -296,7 +294,12 @@ impl FxDeliveryBlob {
         }
 
         let parent = self.parent().unwrap();
-        transaction.commit_with_callback(|_| parent.did_add(&name)).await?;
+        transaction
+            .commit_with_callback(|_| {
+                self.is_completed.store(true, Ordering::Relaxed);
+                parent.did_add(&name);
+            })
+            .await?;
         Ok(())
     }
 }
@@ -341,14 +344,14 @@ impl FxNode for FxDeliveryBlob {
     }
 
     fn open_count_add_one(&self) {
-        let old = self.open_count.fetch_add(1, Ordering::Relaxed);
-        assert!(old != PURGED && old != PURGED - 1);
+        self.open_count.fetch_add(1, Ordering::Relaxed);
     }
 
     fn open_count_sub_one(self: Arc<Self>) {
         let old = self.open_count.fetch_sub(1, Ordering::Relaxed);
-        assert!(old & !PURGED > 0);
-        if old == PURGED + 1 {
+        assert!(old > 0);
+        let is_completed = self.is_completed.load(Ordering::Relaxed);
+        if old == 1 && !is_completed {
             let store = self.handle.store();
             store
                 .filesystem()
@@ -672,6 +675,7 @@ mod tests {
         fuchsia_component::client::connect_to_protocol_at_dir_svc,
         fuchsia_merkle::{MerkleTree, MerkleTreeBuilder},
         fuchsia_zircon::Status,
+        fxfs::filesystem::Filesystem,
         rand::{thread_rng, Rng},
     };
 
@@ -1163,6 +1167,72 @@ mod tests {
             }
         }
         assert_eq!(fixture.read_blob(&format!("{}", hash)).await, data);
+        fixture.close().await;
+    }
+
+    #[fasync::run(10, test)]
+    async fn test_new_tombstone_dropped_incomplete_delivery_blobs() {
+        let fixture = new_blob_fixture().await;
+        for _ in 0..3 {
+            // `data` is half the size of the test device. If we don't tombstone, we will get
+            // an OUT_OF_SPACE error on the second write.
+            let data = vec![1; 4194304];
+
+            let mut builder = MerkleTreeBuilder::new();
+            builder.write(&data);
+            let hash = builder.finish().root();
+            let compressed_data = Type1Blob::generate(&data, CompressionMode::Never);
+
+            {
+                let (blob_volume_outgoing_dir, server_end) =
+                    fidl::endpoints::create_proxy::<fio::DirectoryMarker>()
+                        .expect("Create dir proxy to succeed");
+
+                fixture
+                    .volumes_directory()
+                    .serve_volume(fixture.volume(), server_end, true, true)
+                    .await
+                    .expect("failed to create_and_serve the blob volume");
+                let blob_proxy = connect_to_protocol_at_dir_svc::<
+                    fidl_fuchsia_fxfs::BlobCreatorMarker,
+                >(&blob_volume_outgoing_dir)
+                .expect("failed to connect to the Blob service");
+
+                let blob_writer_client_end = blob_proxy
+                    .create(&hash.into(), false)
+                    .await
+                    .expect("transport error on create")
+                    .expect("failed to create blob");
+
+                let writer = blob_writer_client_end.into_proxy().unwrap();
+                let vmo = writer
+                    .get_vmo(compressed_data.len() as u64)
+                    .await
+                    .expect("transport error on get_vmo")
+                    .expect("failed to get vmo");
+
+                let vmo_size = vmo.get_size().expect("failed to get vmo size");
+                // Write all but the last byte to avoid completing the blob.
+                let list_of_writes = generate_list_of_writes((compressed_data.len() as u64) - 1);
+                let mut write_offset = 0;
+                for range in list_of_writes {
+                    let len = range.end - range.start;
+                    vmo.write(
+                        &compressed_data[range.start as usize..range.end as usize],
+                        write_offset % vmo_size,
+                    )
+                    .expect("failed to write to vmo");
+                    let _ = writer
+                        .bytes_ready(len)
+                        .await
+                        .expect("transport error on bytes_ready")
+                        .expect("failed to write data to vmo");
+                    write_offset += len;
+                }
+            }
+            fixture.fs().graveyard().flush().await;
+        }
+
         fixture.close().await;
     }
 

@@ -63,7 +63,7 @@ pub const READ_AHEAD_SIZE: u64 = 131_072;
 // When the top bit of the open count is set, it means the file has been deleted and when the count
 // drops to zero, it will be tombstoned.  Once it has dropped to zero, it cannot be opened again
 // (assertions will fire).
-pub const PURGED: usize = 1 << (usize::BITS - 1);
+const PURGED: usize = 1 << (usize::BITS - 1);
 
 static VMEX_RESOURCE: OnceCell<zx::Resource> = OnceCell::new();
 
@@ -119,6 +119,23 @@ impl FxBlob {
         object_request: ObjectRequestRef<'_>,
     ) -> Result<BoxFuture<'static, ()>, zx::Status> {
         object_request.create_connection(scope, this.take(), protocols, StreamIoConnection::create)
+    }
+
+    /// Marks the blob as being purged.  Returns true if there are no open references.
+    pub fn mark_purged(&self) -> bool {
+        let mut old = self.open_count.load(Ordering::Relaxed);
+        loop {
+            assert_eq!(old & PURGED, 0);
+            match self.open_count.compare_exchange_weak(
+                old,
+                old | PURGED,
+                Ordering::Relaxed,
+                Ordering::Relaxed,
+            ) {
+                Ok(_) => return old == 0,
+                Err(x) => old = x,
+            }
+        }
     }
 }
 

@@ -4,7 +4,7 @@
 
 //! This module contains the implementation of FxBlob (Blobfs-on-Fxfs).
 
-mod blob;
+pub mod blob;
 mod directory;
 mod writer;
 

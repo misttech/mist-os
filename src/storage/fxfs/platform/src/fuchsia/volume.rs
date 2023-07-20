@@ -7,6 +7,7 @@ use {
         component::map_to_raw_status,
         directory::FxDirectory,
         file::FxFile,
+        fxblob::blob::FxBlob,
         memory_pressure::{MemoryPressureLevel, MemoryPressureMonitor},
         node::{FxNode, GetResult, NodeCache},
         pager::{Pager, PagerExecutor},
@@ -232,8 +233,13 @@ impl FxVolume {
     /// |object_id|, since before that point, new connections could be established.
     pub(super) async fn maybe_purge_file(&self, object_id: u64) -> Result<(), Error> {
         if let Some(node) = self.cache.get(object_id) {
-            if let Ok(file) = node.into_any().downcast::<FxFile>() {
+            if let Ok(file) = node.clone().into_any().downcast::<FxFile>() {
                 if !file.mark_purged() {
+                    return Ok(());
+                }
+            }
+            if let Ok(blob) = node.into_any().downcast::<FxBlob>() {
+                if !blob.mark_purged() {
                     return Ok(());
                 }
             }
