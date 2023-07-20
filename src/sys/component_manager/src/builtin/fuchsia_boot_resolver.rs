@@ -4,23 +4,30 @@
 
 use {
     crate::{
-        builtin::capability::BuiltinCapability,
-        model::resolver::{self, Resolver},
+        capability::{CapabilityProvider, CapabilitySource},
+        model::{
+            error::{CapabilityProviderError, ModelError},
+            hooks::{Event, EventPayload, EventType, Hook, HooksRegistration},
+            resolver::{self, Resolver},
+        },
     },
     anyhow::{format_err, Error},
     async_trait::async_trait,
-    fidl::endpoints::{ClientEnd, Proxy},
+    cm_task_scope::TaskScope,
+    cm_util::channel,
+    fidl::endpoints::{ClientEnd, Proxy, ServerEnd},
     fidl_fuchsia_component_decl as fdecl, fidl_fuchsia_component_resolution as fresolution,
     fidl_fuchsia_io as fio,
     fuchsia_pkg::PackagePath,
     fuchsia_url::{boot_url::BootUrl, PackageName, PackageVariant},
+    fuchsia_zircon as zx,
     futures::TryStreamExt,
     routing::capability_source::InternalCapability,
     routing::resolving::{ComponentAddress, ResolvedComponent, ResolverError},
     std::convert::TryInto,
-    std::path::Path,
+    std::path::{Path, PathBuf},
     std::str::FromStr,
-    std::sync::Arc,
+    std::sync::{Arc, Weak},
     system_image::{Bootfs, PathHashMapping},
     version_history::AbiRevision,
 };
@@ -207,6 +214,108 @@ impl FuchsiaBootResolver {
             }
         }
     }
+
+    pub fn hooks(self: &Arc<Self>) -> Vec<HooksRegistration> {
+        vec![HooksRegistration::new(
+            "boot_resolver",
+            vec![EventType::CapabilityRouted],
+            Arc::downgrade(self) as Weak<dyn Hook>,
+        )]
+    }
+
+    async fn on_capability_routed_async<'a>(
+        self: Arc<Self>,
+        source: &'a CapabilitySource,
+        capability_provider: Option<Box<dyn CapabilityProvider>>,
+    ) -> Result<Option<Box<dyn CapabilityProvider>>, ModelError> {
+        if self.matches_routed_capability(source) {
+            Ok(Some(Box::new(ComponentResolverCapabilityProvider::new(self.clone()))
+                as Box<dyn CapabilityProvider>))
+        } else {
+            Ok(capability_provider)
+        }
+    }
+
+    fn matches_routed_capability(&self, source: &CapabilitySource) -> bool {
+        match source {
+            CapabilitySource::Builtin {
+                capability: InternalCapability::Resolver(name), ..
+            } => *name == "boot_resolver",
+            CapabilitySource::Builtin {
+                capability: InternalCapability::Protocol(name), ..
+            } => *name == "fuchsia.component.resolution.Resolver",
+            _ => false,
+        }
+    }
+
+    async fn serve(
+        self: Arc<Self>,
+        mut stream: fresolution::ResolverRequestStream,
+    ) -> Result<(), Error> {
+        while let Some(request) = stream.try_next().await? {
+            match request {
+                fresolution::ResolverRequest::Resolve { component_url, responder } => {
+                    responder.send(self.resolve_async(&component_url).await)?;
+                }
+                fresolution::ResolverRequest::ResolveWithContext {
+                    component_url,
+                    context: _,
+                    responder,
+                } => {
+                    // FuchsiaBootResolver ResolveWithContext currently ignores
+                    // context, but should still resolve absolute URLs.
+                    responder.send(self.resolve_async(&component_url).await)?;
+                }
+            }
+        }
+        Ok(())
+    }
+}
+
+#[async_trait]
+impl Hook for FuchsiaBootResolver {
+    async fn on(self: Arc<Self>, event: &Event) -> Result<(), ModelError> {
+        if let EventPayload::CapabilityRouted { source, capability_provider } = &event.payload {
+            let mut capability_provider = capability_provider.lock().await;
+            *capability_provider =
+                self.on_capability_routed_async(&source, capability_provider.take()).await?;
+        };
+        Ok(())
+    }
+}
+struct ComponentResolverCapabilityProvider {
+    component_resolver: Arc<FuchsiaBootResolver>,
+}
+
+impl ComponentResolverCapabilityProvider {
+    pub fn new(component_resolver: Arc<FuchsiaBootResolver>) -> Self {
+        Self { component_resolver }
+    }
+}
+
+#[async_trait]
+impl CapabilityProvider for ComponentResolverCapabilityProvider {
+    async fn open(
+        self: Box<Self>,
+        task_scope: TaskScope,
+        _flags: fio::OpenFlags,
+        _relative_path: PathBuf,
+        server_end: &mut zx::Channel,
+    ) -> Result<(), CapabilityProviderError> {
+        let server_end = channel::take_channel(server_end);
+        let server_end = ServerEnd::<fresolution::ResolverMarker>::new(server_end);
+        let stream: fresolution::ResolverRequestStream =
+            server_end.into_stream().map_err(|_| CapabilityProviderError::StreamCreationError)?;
+        task_scope
+            .add_task(async move {
+                let result = self.component_resolver.serve(stream).await;
+                if let Err(error) = result {
+                    tracing::warn!(%error, "FuchsiaBootResolver::serve failed: {:?}", error);
+                }
+            })
+            .await;
+        Ok(())
+    }
 }
 
 #[derive(Debug)]
@@ -350,42 +459,6 @@ impl Resolver for FuchsiaBootResolver {
     }
 }
 
-#[async_trait]
-impl BuiltinCapability for FuchsiaBootResolver {
-    const NAME: &'static str = "boot_resolver";
-    type Marker = fresolution::ResolverMarker;
-
-    async fn serve(
-        self: Arc<Self>,
-        mut stream: fresolution::ResolverRequestStream,
-    ) -> Result<(), Error> {
-        while let Some(request) = stream.try_next().await? {
-            match request {
-                fresolution::ResolverRequest::Resolve { component_url, responder } => {
-                    responder.send(self.resolve_async(&component_url).await)?;
-                }
-                fresolution::ResolverRequest::ResolveWithContext {
-                    component_url,
-                    context: _,
-                    responder,
-                } => {
-                    // FuchsiaBootResolver ResolveWithContext currently ignores
-                    // context, but should still resolve absolute URLs.
-                    responder.send(self.resolve_async(&component_url).await)?;
-                }
-            }
-        }
-        Ok(())
-    }
-
-    fn matches_routed_capability(&self, capability: &InternalCapability) -> bool {
-        match capability {
-            InternalCapability::Resolver(name) if *name == Self::NAME => true,
-            _ => false,
-        }
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use {
@@ -396,7 +469,7 @@ mod tests {
         ::routing::resolving::ResolvedPackage,
         assert_matches::assert_matches,
         cm_rust::{FidlIntoNative, NativeIntoFidl},
-        fidl::endpoints::{create_proxy, ServerEnd},
+        fidl::endpoints::{create_endpoints, create_proxy, ServerEnd},
         fidl::persist,
         fidl_fuchsia_component_decl as fdecl, fidl_fuchsia_data as fdata,
         fuchsia_async::Task,
@@ -503,6 +576,38 @@ mod tests {
         let err = resolver.resolve(&ComponentAddress::from_absolute_url(url)?).await.unwrap_err();
         assert_matches!(err, ResolverError::PackageNotFound { .. });
         Ok(())
+    }
+
+    #[fuchsia::test]
+    async fn capability_provider_test() {
+        // Create a CapabilityProvider to serve fuchsia boot resolver requests.
+        let root = remote_dir(
+            open_in_namespace(
+                "/pkg",
+                fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_EXECUTABLE,
+            )
+            .unwrap(),
+        );
+        let (_task, bootfs) = serve_vfs_dir(root);
+        let resolver = Arc::new(FuchsiaBootResolver::new_from_directory(bootfs).await.unwrap());
+        let resolver_provider =
+            Box::new(ComponentResolverCapabilityProvider::new(resolver.clone()));
+        let (client_channel, server_channel) = create_endpoints::<fresolution::ResolverMarker>();
+        let task_scope = TaskScope::new();
+        resolver_provider
+            .open(
+                task_scope.clone(),
+                fio::OpenFlags::empty(),
+                PathBuf::new(),
+                &mut server_channel.into_channel(),
+            )
+            .await
+            .expect("failed to open capability");
+        // Create a client-side resolver proxy to submit resolve requests with.
+        let resolver_proxy =
+            client_channel.into_proxy().expect("failed converting endpoint into proxy");
+        // Test that the client resolve request is served by the CapabilityProvider successfully.
+        assert!(resolver_proxy.resolve("fuchsia-boot:///#meta/hello-world-rust.cm").await.is_ok());
     }
 
     #[fuchsia::test]
