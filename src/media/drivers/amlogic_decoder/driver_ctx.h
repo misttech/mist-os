@@ -29,6 +29,7 @@ class DriverCtx {
  public:
   static zx_status_t Init(void** out_ctx);
   static zx_status_t Bind(void* ctx, zx_device_t* parent);
+  static void Release(void* ctx);
 
   DriverCtx();
   ~DriverCtx();

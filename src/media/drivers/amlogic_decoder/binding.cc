@@ -12,8 +12,7 @@ zx_driver_ops_t amlogic_video_driver_ops = {
     .version = DRIVER_OPS_VERSION,
     .init = amlogic_decoder::DriverCtx::Init,
     .bind = amlogic_decoder::DriverCtx::Bind,
-    // .release is not critical for this driver because dedicated devhost
-    // process
+    .release = amlogic_decoder::DriverCtx::Release,
 };
 
 }  // namespace

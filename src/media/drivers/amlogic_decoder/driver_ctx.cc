@@ -56,6 +56,11 @@ zx_status_t DriverCtx::Bind(void* ctx, zx_device_t* parent) {
   return ZX_OK;
 }
 
+void DriverCtx::Release(void* ctx) {
+  auto* driver_ctx = reinterpret_cast<DriverCtx*>(ctx);
+  delete driver_ctx;
+}
+
 DriverCtx::DriverCtx() {
   // We use kAsyncLoopConfigNoAttachToCurrentThread here, because we don't really want
   // to be setting the default async_t for the thread that creates the
