@@ -282,10 +282,19 @@ async fn filter_level(ctx: &EnvironmentContext) -> LevelFilter {
         .get::<String>()
         .await
         .ok()
-        .map(|str| {
-            // Ideally we could log here, but there may be no log sink, so fall back to a default
-            LevelFilter::from_str(&str).unwrap_or(LevelFilter::INFO)
-        })
+        .map(|str|
+            // Ideally we could log here, but there may be no log sink, so print a warning to
+            // stderr and fall back to a 'sensible' default
+            LevelFilter::from_str(&str).unwrap_or_else(|_| {
+                eprintln!("Warning: '{str}' is not a valid log level.\n\
+                    \n\
+                    Supported log levels are 'Off', 'Error', 'Warn', 'Info', 'Debug', and 'Trace'.\n\
+                    \n\
+                    If you didn't pass this log level with `--log-level`, you may need to change your \
+                    configured log level to something valid with `ffx config set log.level`");
+                LevelFilter::INFO
+            })
+        )
         .unwrap_or(LevelFilter::INFO)
 }
 

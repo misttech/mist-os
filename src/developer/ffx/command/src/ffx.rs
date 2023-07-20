@@ -2,10 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::{Error, FfxContext, MetricsSession, Result};
-use anyhow::Context;
+use crate::{user_error, Error, FfxContext, MetricsSession, Result};
 use argh::FromArgs;
-use errors::ffx_error;
+use ffx_command_error::bug;
 use ffx_config::{environment::ExecutableKind, EnvironmentContext, FfxConfigBacked};
 use ffx_daemon_proxy::Injection;
 use ffx_writer::Format;
@@ -47,7 +46,7 @@ impl FfxCommandLine {
     /// be split into multiple commands.
     pub fn new(wrapper_name: Option<&str>, argv: &[impl AsRef<str>]) -> Result<Self> {
         let mut args = argv.iter().map(AsRef::as_ref);
-        let arg0 = args.next().context("No first argument in argument vector").bug()?;
+        let arg0 = args.next().ok_or_else(|| bug!("No first argument in argument vector"))?;
         let args = Vec::from_iter(args);
         let command =
             wrapper_name.map_or_else(|| vec![Self::base_cmd(&arg0)], |s| s.split(" ").collect());
@@ -189,8 +188,8 @@ pub struct Ffx {
     pub timeout: Option<f64>,
 
     #[argh(option, short = 'l', long = "log-level")]
-    #[ffx_config_default(key = "log.level", default = "Debug")]
-    /// sets the log level for ffx output (default = Debug). Other possible values are Info, Error,
+    #[ffx_config_default(key = "log.level", default = "Info")]
+    /// sets the log level for ffx output (default = Info). Other possible values are Info, Error,
     /// Warn, and Trace. Can be persisted via log.level config setting.
     pub log_level: Option<String>,
 
@@ -209,10 +208,7 @@ pub struct Ffx {
 }
 
 impl Ffx {
-    pub fn load_context(
-        &self,
-        exe_kind: ExecutableKind,
-    ) -> Result<EnvironmentContext, anyhow::Error> {
+    pub fn load_context(&self, exe_kind: ExecutableKind) -> Result<EnvironmentContext> {
         // Configuration initialization must happen before ANY calls to the config (or the cache won't
         // properly have the runtime parameters.
         let overrides = self.runtime_config_overrides();
@@ -238,10 +234,10 @@ impl Ffx {
             _ => EnvironmentContext::detect(
                 exe_kind,
                 runtime_args,
-                &std::env::current_dir()?,
+                &std::env::current_dir().bug_context("Failed to get working directory")?,
                 env_path,
             )
-            .map_err(|e| ffx_error!(e).into()),
+            .map_err(|e| user_error!(e)),
         }
     }
 
@@ -260,7 +256,7 @@ impl Ffx {
             hoist_cache_dir,
             router_interval,
         )?)
-        .context("initializing hoist")?;
+        .bug_context("Failed to initialize overnet")?;
         let target = ffx_target::maybe_inline_target(self.target().await?, &env_context).await;
         Ok(Injection::new(env_context, daemon_check, hoist.clone(), self.machine, target))
     }

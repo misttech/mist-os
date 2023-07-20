@@ -2,10 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use errors::{ffx_error, IntoExitCode};
+use errors::IntoExitCode;
 use ffx_config::environment::ExecutableKind;
 use fuchsia_async::TimeoutExt;
-use std::{fs::File, io::Write, process::ExitStatus, str::FromStr, time::Duration};
+use std::{fs::File, io::Write, process::ExitStatus, time::Duration};
 
 pub use ffx_command_error::*;
 
@@ -18,12 +18,11 @@ pub use ffx::*;
 pub use metrics::*;
 pub use tools::*;
 
-fn stamp_file(stamp: &Option<String>) -> anyhow::Result<Option<File>> {
-    if let Some(stamp) = stamp {
-        Ok(Some(File::create(stamp)?))
-    } else {
-        Ok(None)
-    }
+fn stamp_file(stamp: &Option<String>) -> Result<Option<File>> {
+    let Some(stamp) = stamp else { return Ok(None) };
+    File::create(stamp)
+        .with_bug_context(|| format!("Failure creating stamp file '{stamp}'"))
+        .map(Some)
 }
 
 fn write_exit_code<W: Write>(res: &Result<ExitStatus>, out: &mut W) {
@@ -58,6 +57,7 @@ pub async fn run<T: ToolSuite>(exe_kind: ExecutableKind) -> Result<ExitStatus> {
 
     ffx_config::init(&context).await?;
 
+    // Everything that needs to use the config must be after loading the config.
     context.env_file_path().map_err(|e| {
         let output = format!("ffx could not determine the environment configuration path: {}\nEnsure that $HOME is set, or pass the --env option to specify an environment configuration path", e);
         let code = 1;
@@ -72,12 +72,6 @@ pub async fn run<T: ToolSuite>(exe_kind: ExecutableKind) -> Result<ExitStatus> {
     ffx_config::logging::init(&context, log_to_stdio || app.verbose, !log_to_stdio).await?;
     tracing::info!("starting command: {:?}", Vec::from_iter(cmd.all_iter()));
 
-    // Since this is invoking the config, this must be run _after_ ffx_config::init.
-    let log_level = app.log_level().await?;
-    simplelog::LevelFilter::from_str(log_level.as_str()).with_user_message(|| {
-        ffx_error!("'{log_level}' is not a valid log level. Supported log levels are 'Off', 'Error', 'Warn', 'Info', 'Debug', and 'Trace'")
-    })?;
-
     let metrics = MetricsSession::start(&context).await?;
 
     let stamp = stamp_file(&app.stamp)?;
@@ -90,7 +84,7 @@ pub async fn run<T: ToolSuite>(exe_kind: ExecutableKind) -> Result<ExitStatus> {
     // Write to our stamp file if it was requested
     if let Some(mut stamp) = stamp {
         write_exit_code(&res, &mut stamp);
-        stamp.sync_all().bug_context("Syncing exit code stamp write")?;
+        stamp.sync_all().bug_context("Error syncing exit code stamp write")?;
     }
 
     res

@@ -4,8 +4,7 @@
 
 use std::{collections::HashSet, fmt::Write, path::PathBuf, process::ExitStatus};
 
-use crate::{Error, FfxCommandLine, MetricsSession};
-use anyhow::Result;
+use crate::{Error, FfxCommandLine, MetricsSession, Result};
 use async_trait::async_trait;
 use ffx_config::EnvironmentContext;
 

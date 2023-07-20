@@ -21,15 +21,16 @@ rustc_library("lib") {
     "//src/developer/ffx/lib/writer:lib",
     "//src/lib/analytics/rust:lib",
     "//src/lib/fuchsia-async",
-    "//third_party/rust_crates:anyhow",
     "//third_party/rust_crates:argh",
     "//third_party/rust_crates:async-trait",
     "//third_party/rust_crates:itertools",
-    "//third_party/rust_crates:simplelog",
     "//third_party/rust_crates:tracing",
   ]
 
-  test_deps = [ "//third_party/rust_crates:tempfile" ]
+  test_deps = [
+    "//third_party/rust_crates:anyhow",
+    "//third_party/rust_crates:tempfile",
+  ]
 
   sources = [
     "src/describe.rs",
