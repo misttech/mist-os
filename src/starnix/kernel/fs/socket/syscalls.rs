@@ -55,7 +55,7 @@ fn parse_socket_domain(domain: u32) -> Result<SocketDomain, Errno> {
 fn parse_socket_type(domain: SocketDomain, socket_type: u32) -> Result<SocketType, Errno> {
     let socket_type = SocketType::from_raw(socket_type & 0xf).ok_or_else(|| {
         not_implemented!("unsupported socket type 0x{:x}", socket_type);
-        errno!(EPROTONOSUPPORT)
+        errno!(EINVAL)
     })?;
     // For AF_UNIX, SOCK_RAW sockets are treated as if they were SOCK_DGRAM.
     Ok(if domain == SocketDomain::Unix && socket_type == SocketType::Raw {
@@ -782,7 +782,7 @@ mod tests {
                 0,
                 UserRef::new(UserAddress::default())
             ),
-            error!(EPROTONOSUPPORT)
+            error!(EINVAL)
         );
         assert_eq!(
             sys_socketpair(

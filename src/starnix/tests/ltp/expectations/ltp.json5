@@ -450,7 +450,6 @@
                 "sigwaitinfo01",
                 "smt_smp_affinity",
                 "smt_smp_enabled",
-                "socket01",
                 "socketcall01",
                 "socketcall02",
                 "socketcall03",
