@@ -24,6 +24,7 @@ dtb_real = [
 # Synthetic devicetree source files meant for testing, they are not required to reflect any real node.
 dts_synthetic = [
   "synthetic/chosen.dts",
+  "synthetic/chosen_unknown_intc.dts",
   "synthetic/complex_no_properties.dts",
   "synthetic/complex_with_alias.dts",
   "synthetic/complex_with_alias_first.dts",

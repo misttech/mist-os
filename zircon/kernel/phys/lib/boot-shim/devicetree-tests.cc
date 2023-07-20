@@ -18,7 +18,6 @@
 #include <lib/zbitl/item.h>
 
 #include <array>
-#include <iostream>
 #include <memory>
 #include <optional>
 #include <type_traits>
@@ -273,20 +272,28 @@ class ChosenNodeMatcherTest : public TestMixin<ArmDevicetreeTest, RiscvDevicetre
     auto loaded_dtb = LoadDtb("chosen.dtb");
     ASSERT_TRUE(loaded_dtb.is_ok(), "%s", loaded_dtb.error_value().c_str());
     chosen_dtb_ = std::move(loaded_dtb).value();
+
+    loaded_dtb = LoadDtb("chosen_unknown_intc.dtb");
+    ASSERT_TRUE(loaded_dtb.is_ok(), "%s", loaded_dtb.error_value().c_str());
+    chosen_unknown_intc_dtb_ = std::move(loaded_dtb).value();
   }
 
   static void TearDownTestSuite() {
     chosen_dtb_ = std::nullopt;
+    chosen_unknown_intc_dtb_ = std::nullopt;
     Mixin::TearDownTestSuite();
   }
 
   devicetree::Devicetree chosen() { return chosen_dtb_->fdt(); }
+  devicetree::Devicetree chosen_unknown_intc() { return chosen_unknown_intc_dtb_->fdt(); }
 
  private:
   static std::optional<LoadedDtb> chosen_dtb_;
+  static std::optional<LoadedDtb> chosen_unknown_intc_dtb_;
 };
 
 std::optional<LoadedDtb> ChosenNodeMatcherTest::chosen_dtb_ = std::nullopt;
+std::optional<LoadedDtb> ChosenNodeMatcherTest::chosen_unknown_intc_dtb_ = std::nullopt;
 
 struct ExpectedChosen {
   uintptr_t ramdisk_start;
@@ -370,6 +377,26 @@ TEST_F(ChosenNodeMatcherTest, ParseChosen) {
                              {
                                  .mmio_phys = 0x9000000,
                                  .irq = 33,
+                             },
+                         .uart_absolute_path = "/some-interrupt-controller/pl011uart@9000000",
+                     });
+}
+
+TEST_F(ChosenNodeMatcherTest, ParseChosenWithUnknownInterruptController) {
+  auto fdt = chosen_unknown_intc();
+  boot_shim::DevicetreeChosenNodeMatcher<AllUartDrivers> chosen_matcher("test", stdout);
+
+  ASSERT_TRUE(devicetree::Match(fdt, chosen_matcher));
+  CheckChosenMatcher(chosen_matcher,
+                     {
+                         .ramdisk_start = 0x48000000,
+                         .ramdisk_end = 0x58000000,
+                         .cmdline = "-foo=bar -bar=baz",
+                         .uart_config_name = uart::pl011::Driver::config_name(),
+                         .uart_config =
+                             {
+                                 .mmio_phys = 0x9000000,
+                                 .irq = 0,
                              },
                          .uart_absolute_path = "/some-interrupt-controller/pl011uart@9000000",
                      });

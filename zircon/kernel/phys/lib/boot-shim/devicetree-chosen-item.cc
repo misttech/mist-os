@@ -166,8 +166,9 @@ devicetree::ScanState DevicetreeChosenNodeMatcherBase::HandleBootstrapStdout(
         auto irq_num = ResolveIrq(*compatibles->AsStringList(), *uart_interrupts_,
                                   *current->num_interrupt_cells());
         if (!irq_num) {
-          OnError("UART's interrupt property does not meet interrupt-controller's specification.");
-          return devicetree::ScanState::kDone;
+          OnError(
+              "UART's interrupt property does not meet interrupt-controller's specification. IRQ num set to zero.");
+          irq_num = 0;
         }
         uart_dcfg_.irq = *irq_num;
         uart_emplacer_(uart_dcfg_);
@@ -285,8 +286,9 @@ devicetree::ScanState DevicetreeChosenNodeMatcherBase::HandleUartInterruptParent
     auto irq_num =
         ResolveIrq(*compatible->AsStringList(), *uart_interrupts_, *decoder.num_interrupt_cells());
     if (!irq_num) {
-      OnError("UART's interrupt property does not meet interrupt-controller's specification.");
-      return devicetree::ScanState::kDone;
+      OnError(
+          "UART's interrupt property does not meet interrupt-controller's specification. IRQ num set to zero.");
+      irq_num = 0;
     }
     uart_dcfg_.irq = *irq_num;
 
