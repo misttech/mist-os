@@ -244,6 +244,14 @@ mod tests {
     }
 
     #[test]
+    fn test_fidl_ip_v6_v4_mapped() {
+        assert_eq!(
+            fidl::Ipv6Address { addr: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0xFF, 0xFF, 192, 168, 0, 1] },
+            fidl_ip_v6!("::ffff:192.168.0.1")
+        );
+    }
+
+    #[test]
     fn test_fidl_socket_addr() {
         assert_eq!(
             fidl::SocketAddress::Ipv4(fidl::Ipv4SocketAddress {
@@ -379,6 +387,16 @@ mod tests {
             net_types::ip::Ipv6Addr::new([0xFF01, 0, 0, 0, 0, 0, 0, 0x0102]),
             net_ip_v6!("ff01::0102"),
         );
+    }
+
+    #[test]
+    fn test_net_ip_v6_v4_mapped() {
+        assert_eq!(
+            net_types::ip::Ipv6Addr::from_bytes([
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0xFF, 0xFF, 192, 168, 0, 1
+            ]),
+            net_ip_v6!("::ffff:192.168.0.1"),
+        )
     }
 
     #[test]
