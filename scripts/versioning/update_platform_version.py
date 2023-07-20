@@ -120,14 +120,10 @@ def update_version_history(fuchsia_api_level, version_history_path):
                     file=sys.stderr)
                 return False
 
-            # The API compatibility window is currently 2. This is the number
-            # of stable API levels that will be supported in addition to the one in development.
-            # If we change this window, the code will have to change as well.
+            # Transition to an unsupported status will be defined in a future RFC.
             for level, data in versions.items():
                 if data['status'] == 'in-development':
                     data['status'] = 'supported'
-                elif data['status'] == 'supported':
-                    data['status'] = 'unsupported'
 
             abi_revision = generate_random_abi_revision()
             versions[str(fuchsia_api_level)] = {
