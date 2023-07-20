@@ -1366,6 +1366,131 @@ impl<S: HandleOwner> StoreObjectHandle<S> {
         transaction.commit().await?;
         Ok(())
     }
+
+    pub async fn read_from(
+        &self,
+        attribute_id: u64,
+        mut offset: u64,
+        mut buf: MutableBufferRef<'_>,
+    ) -> Result<usize, Error> {
+        if buf.len() == 0 {
+            return Ok(0);
+        }
+        // Whilst the read offset must be aligned to the filesystem block size, the buffer need only
+        // be aligned to the device's block size.
+        let block_size = self.block_size() as u64;
+        let device_block_size = self.store().device.block_size() as u64;
+        assert_eq!(offset % block_size, 0);
+        assert_eq!(buf.range().start as u64 % device_block_size, 0);
+        let fs = self.store().filesystem();
+        let _guard = fs
+            .read_lock(&[LockKey::object_attribute(
+                self.store().store_object_id,
+                self.object_id,
+                attribute_id,
+            )])
+            .await;
+        let size = self.get_size();
+        if offset >= size {
+            return Ok(0);
+        }
+        let tree = &self.store().tree;
+        let layer_set = tree.layer_set();
+        let mut merger = layer_set.merger();
+        let mut iter = merger
+            .seek(Bound::Included(&ObjectKey::extent(
+                self.object_id,
+                attribute_id,
+                offset..offset + 1,
+            )))
+            .await?;
+        let to_do = min(buf.len() as u64, size - offset) as usize;
+        buf = buf.subslice_mut(0..to_do);
+        let end_align = ((offset + to_do as u64) % block_size) as usize;
+        let trace = self.trace();
+        let reads = FuturesUnordered::new();
+        while let Some(ItemRef {
+            key:
+                ObjectKey {
+                    object_id,
+                    data: ObjectKeyData::Attribute(attr_id, AttributeKey::Extent(extent_key)),
+                },
+            value: ObjectValue::Extent(extent_value),
+            ..
+        }) = iter.get()
+        {
+            if *object_id != self.object_id || *attr_id != attribute_id {
+                break;
+            }
+            ensure!(
+                extent_key.range.is_valid() && extent_key.range.is_aligned(block_size),
+                FxfsError::Inconsistent
+            );
+            if extent_key.range.start > offset {
+                // Zero everything up to the start of the extent.
+                let to_zero = min(extent_key.range.start - offset, buf.len() as u64) as usize;
+                for i in &mut buf.as_mut_slice()[..to_zero] {
+                    *i = 0;
+                }
+                buf = buf.subslice_mut(to_zero..);
+                if buf.is_empty() {
+                    break;
+                }
+                offset += to_zero as u64;
+            }
+
+            if let ExtentValue::Some { device_offset, key_id, .. } = extent_value {
+                let mut device_offset = device_offset + (offset - extent_key.range.start);
+
+                let to_copy = min(buf.len() - end_align, (extent_key.range.end - offset) as usize);
+                if to_copy > 0 {
+                    if trace {
+                        info!(
+                            store_id = self.store().store_object_id(),
+                            oid = self.object_id,
+                            device_range = ?(device_offset..device_offset + to_copy as u64),
+                            "R",
+                        );
+                    }
+                    let (head, tail) = buf.split_at_mut(to_copy);
+                    reads.push(self.read_and_decrypt(device_offset, offset, head, *key_id));
+                    buf = tail;
+                    if buf.is_empty() {
+                        break;
+                    }
+                    offset += to_copy as u64;
+                    device_offset += to_copy as u64;
+                }
+
+                // Deal with end alignment by reading the existing contents into an alignment
+                // buffer.
+                if offset < extent_key.range.end && end_align > 0 {
+                    let mut align_buf = self.store().device.allocate_buffer(block_size as usize);
+                    if trace {
+                        info!(
+                            store_id = self.store().store_object_id(),
+                            oid = self.object_id,
+                            device_range = ?(device_offset..device_offset + align_buf.len() as u64),
+                            "RT",
+                        );
+                    }
+                    self.read_and_decrypt(device_offset, offset, align_buf.as_mut(), *key_id)
+                        .await?;
+                    buf.as_mut_slice().copy_from_slice(&align_buf.as_slice()[..end_align]);
+                    buf = buf.subslice_mut(0..0);
+                    break;
+                }
+            } else if extent_key.range.end >= offset + buf.len() as u64 {
+                // Deleted extent covers remainder, so we're done.
+                break;
+            }
+
+            iter.advance().await?;
+        }
+        reads.try_collect().await?;
+        buf.as_mut_slice().fill(0);
+        Ok(to_do)
+    }
 }
 
 impl<S: HandleOwner> AssociatedObject for StoreObjectHandle<S> {
@@ -1443,124 +1568,8 @@ impl<S: HandleOwner> GetProperties for StoreObjectHandle<S> {
 
 #[async_trait]
 impl<S: HandleOwner> ReadObjectHandle for StoreObjectHandle<S> {
-    async fn read(&self, mut offset: u64, mut buf: MutableBufferRef<'_>) -> Result<usize, Error> {
-        if buf.len() == 0 {
-            return Ok(0);
-        }
-        // Whilst the read offset must be aligned to the filesystem block size, the buffer need only
-        // be aligned to the device's block size.
-        let block_size = self.block_size() as u64;
-        let device_block_size = self.store().device.block_size() as u64;
-        assert_eq!(offset % block_size, 0);
-        assert_eq!(buf.range().start as u64 % device_block_size, 0);
-        let fs = self.store().filesystem();
-        let _guard = fs
-            .read_lock(&[LockKey::object_attribute(
-                self.store().store_object_id,
-                self.object_id,
-                self.attribute_id,
-            )])
-            .await;
-        let size = self.get_size();
-        if offset >= size {
-            return Ok(0);
-        }
-        let tree = &self.store().tree;
-        let layer_set = tree.layer_set();
-        let mut merger = layer_set.merger();
-        let mut iter = merger
-            .seek(Bound::Included(&ObjectKey::extent(
-                self.object_id,
-                self.attribute_id,
-                offset..offset + 1,
-            )))
-            .await?;
-        let to_do = min(buf.len() as u64, size - offset) as usize;
-        buf = buf.subslice_mut(0..to_do);
-        let end_align = ((offset + to_do as u64) % block_size) as usize;
-        let trace = self.trace();
-        let reads = FuturesUnordered::new();
-        while let Some(ItemRef {
-            key:
-                ObjectKey {
-                    object_id,
-                    data: ObjectKeyData::Attribute(attribute_id, AttributeKey::Extent(extent_key)),
-                },
-            value: ObjectValue::Extent(extent_value),
-            ..
-        }) = iter.get()
-        {
-            if *object_id != self.object_id || *attribute_id != self.attribute_id {
-                break;
-            }
-            ensure!(
-                extent_key.range.is_valid() && extent_key.range.is_aligned(block_size),
-                FxfsError::Inconsistent
-            );
-            if extent_key.range.start > offset {
-                // Zero everything up to the start of the extent.
-                let to_zero = min(extent_key.range.start - offset, buf.len() as u64) as usize;
-                for i in &mut buf.as_mut_slice()[..to_zero] {
-                    *i = 0;
-                }
-                buf = buf.subslice_mut(to_zero..);
-                if buf.is_empty() {
-                    break;
-                }
-                offset += to_zero as u64;
-            }
-
-            if let ExtentValue::Some { device_offset, key_id, .. } = extent_value {
-                let mut device_offset = device_offset + (offset - extent_key.range.start);
-
-                let to_copy = min(buf.len() - end_align, (extent_key.range.end - offset) as usize);
-                if to_copy > 0 {
-                    if trace {
-                        info!(
-                            store_id = self.store().store_object_id(),
-                            oid = self.object_id,
-                            device_range = ?(device_offset..device_offset + to_copy as u64),
-                            "R",
-                        );
-                    }
-                    let (head, tail) = buf.split_at_mut(to_copy);
-                    reads.push(self.read_and_decrypt(device_offset, offset, head, *key_id));
-                    buf = tail;
-                    if buf.is_empty() {
-                        break;
-                    }
-                    offset += to_copy as u64;
-                    device_offset += to_copy as u64;
-                }
-
-                // Deal with end alignment by reading the existing contents into an alignment
-                // buffer.
-                if offset < extent_key.range.end && end_align > 0 {
-                    let mut align_buf = self.store().device.allocate_buffer(block_size as usize);
-                    if trace {
-                        info!(
-                            store_id = self.store().store_object_id(),
-                            oid = self.object_id,
-                            device_range = ?(device_offset..device_offset + align_buf.len() as u64),
-                            "RT",
-                        );
-                    }
-                    self.read_and_decrypt(device_offset, offset, align_buf.as_mut(), *key_id)
-                        .await?;
-                    buf.as_mut_slice().copy_from_slice(&align_buf.as_slice()[..end_align]);
-                    buf = buf.subslice_mut(0..0);
-                    break;
-                }
-            } else if extent_key.range.end >= offset + buf.len() as u64 {
-                // Deleted extent covers remainder, so we're done.
-                break;
-            }
-
-            iter.advance().await?;
-        }
-        reads.try_collect().await?;
-        buf.as_mut_slice().fill(0);
-        Ok(to_do)
+    async fn read(&self, offset: u64, buf: MutableBufferRef<'_>) -> Result<usize, Error> {
+        self.read_from(self.attribute_id(), offset, buf).await
     }
 }
 
