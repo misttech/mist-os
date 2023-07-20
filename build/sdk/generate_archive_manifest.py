@@ -55,10 +55,20 @@ def main():
         dest = os.path.normpath(dest_path)
         src = os.path.normpath(src_path)
         if dest in all_files:
-            print('Error: multiple entries for %s' % dest)
-            print('  - %s' % all_files[dest])
-            print('  - %s' % src)
-            return 1
+            # `sdk://fuchsia_packages/blobs/` and `sdk://fuchsia_packages/subpackage_manifests/`
+            # directories may contain duplicate files, named as the hash of their
+            # content. File content will match, and no concern on collision.
+            _ignored_prefixes = (
+                "fuchsia_packages/blobs/",
+                "fuchsia_packages/subpackage_manifests/",
+            )
+            if dest.startswith(_ignored_prefixes):
+                pass
+            else:
+                print('Error: multiple entries for %s' % dest)
+                print('  - %s' % all_files[dest])
+                print('  - %s' % src)
+                return 1
         all_files[dest] = src
 
     for atom in [Atom(a) for a in manifest['atoms']]:

@@ -5,9 +5,9 @@
 import("//build/python/python_host_test.gni")
 
 if (is_host) {
-  python_host_test("generate_sdk_package_api_test") {
-    main_source = "generate_sdk_package_api_test.py"
-    sources = [ "generate_sdk_package_api.py" ]
+  python_host_test("generate_sdk_package_content_checklist_test") {
+    main_source = "generate_sdk_package_content_checklist_test.py"
+    sources = [ "generate_sdk_package_content_checklist.py" ]
     libraries = [ "//third_party/parameterized" ]
   }
 }
@@ -35,7 +35,7 @@ group("json_validator") {
 
 group("tests") {
   testonly = true
-  deps = [ ":generate_sdk_package_api_test($host_toolchain)" ]
+  deps = [ ":generate_sdk_package_content_checklist_test($host_toolchain)" ]
 }
 
 #  ________  _________  ________  ________

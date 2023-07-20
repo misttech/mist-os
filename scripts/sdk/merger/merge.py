@@ -52,6 +52,7 @@ import sys
 import tarfile
 import tempfile
 
+from operator import itemgetter
 from functools import total_ordering
 from typing import Any, Dict, Optional, Sequence, Set, Tuple
 
@@ -192,7 +193,7 @@ class ElementMeta(object):
                             arch_files[arch].update(collection)
         elif type == 'fidl_library':
             common_files.update(self._meta['sources'])
-        elif type in ['host_tool', 'companion_host_tool']:
+        elif type in ['host_tool', 'companion_host_tool', 'package']:
             if 'files' in self._meta:
                 common_files.update(self._meta['files'])
             if 'target_files' in self._meta:
@@ -240,6 +241,18 @@ class ElementMeta(object):
         if type in ('cc_prebuilt_library', 'loadable_module'):
             meta = meta_one
             meta['binaries'].update(meta_two['binaries'])
+        elif type == 'package':
+            meta = meta_one
+            meta['package_manifests'] += meta_two['package_manifests']
+            # Remove duplicate items, and sort final result.
+            meta['package_manifests'] = sorted(
+                [
+                    dict(t) for t in
+                    {tuple(d.items()) for d in meta['package_manifests']}
+                ],
+                key=itemgetter(
+                    'api_level', 'target_architecture', 'manifest_file'))
+            meta['target_files'].update(meta_two['target_files'])
         elif type == 'sysroot':
             meta = meta_one
             meta['versions'].update(meta_two['versions'])

@@ -2,7 +2,13 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-# Defines an in-tree package for distribution in the SDK.
+import("//build/config/fuchsia/platform_version.gni")
+import("//build/sdk/sdk_atom.gni")
+import("//tools/check-licenses/build/license_data.gni")
+
+# Defines an in-tree package for distribution in the SDK, landing
+# the end package manifest at
+# `sdk://packages/{arch}/release/${distribution_name}/package_manifest.json`.
 #
 # Example:
 # ```
@@ -13,13 +19,12 @@
 # }
 #
 # sdk_fuchsia_package("my-sdk-package") {
+#   distribution_name = "my-package"
 #   package_label = ":my-package"
 #   category = "public"
-#   api_level = 9
 #   expected_files_exact = [
 #     "relative/path/to/file_a",
 #   ]
-#   removal_api_level = 11
 # }
 # ```
 #
@@ -27,115 +32,243 @@
 #
 #   package_label
 #     The fuchsia_package to distribute. Must point to a fuchsia_package() target, or
-#     one of its wrappers (e.g. fuchsia_test_package())
-#     Type: label
+#     one of its wrappers (e.g. fuchsia_test_package()).
+#     Type: label.
 #
-#   package_name (optional)
-#     Name of the package. This value must be consistent with the fuchsia_package()
-#     definition. Defaults to name specified by package_label.
-#     Type: string
+#   distribution_name
+#     Distribution name of the package. The package manifest will be edited to use this
+#     name.
+#     Type: string.
 #
 #   category
-#     The SDK category for the package. See //build/sdk/sdk_atom.gni for
-#     possible values.
-#     Type: string
+#     The SDK category for the package. Must be either "public" or "partner".
+#     See //build/sdk/sdk_atom.gni for more.
+#     Type: string.
 #
-#   api_level
+#   api_level (optional)
 #     API level at which the package was added to the SDK. API level defined at:
 #     https://fuchsia.dev/fuchsia-src/contribute/governance/rfcs/0002_platform_versioning#sdk
-#     Type: unsigned integer
+#     Default is current development API level.
+#     Type: unsigned integer.
 #
 #   expected_files_exact (optional)
 #     List of paths, relative to the package's root, for all files that
-#     participate in that package's API definition. Their content hash will be
-#     compared to the ones in //sdk/packages/${package_name}.api. All other
-#     files in the package must be listed in expected_files_internal instead.
-#     Type: list of relative package paths
+#     participate in that package's content checklist file. Their content hash will be
+#     compared to the ones in
+#     //sdk/packages/${distribution_name}/${target_cpu}/release/content_checklist.json.
+#     Any paths specified in this list that are not found, or do not have hashes that match
+#     their golden content checklist file equivalent, will cause an error during checklist
+#     file generation.
+#     Type: list of relative package paths.
 #
-#   expected_files_internal (optional)
+#   expected_files_present (optional)
 #     List of paths, relative to the package's root, for all files that
-#     do not participate in that package's API definition. Their content
-#     does not matter for API verification, but these paths must appear in
-#     the golden //sdk/package/${package_name}.api file, and in the same order.
+#     do not participate in that package's content checklist file. Their content
+#     does not matter for verification, but these paths must appear in
+#     the golden
+#     //sdk/packages/${distribution_name}/${target_cpu}/release/content_checklist.json file
+#     and in the same order.
 #     Any paths specified in this list that are not found in the specified
-#     manifest will cause an error during API definition generation.
-#     Type: list of relative package paths
-#
-#   removal_api_level (optional)
-#     [optional] Level at which the package is scheduled for removal from the SDK.
-#     Type: unsigned integer
+#     manifest will cause an error during checklist file generation.
+#     Type: list of relative package paths.
 #
 
 template("sdk_fuchsia_package") {
-  assert(defined(invoker.package_label), "Must define a package to distribute.")
-  if (defined(invoker.package_name)) {
-    package_name = invoker.package_name
-  } else {
-    package_name = get_label_info(invoker.package_label, "name")
-  }
-  assert(defined(invoker.category),
-         "Must define an SDK category for this package.")
-  valid_categories = [
-    "excluded",
-    "experimental",
-    "internal",
-    "cts",
-    "partner_internal",
-    "partner",
-    "public",
-  ]
-  assert(
-      valid_categories + [ invoker.category ] - [ invoker.category ] !=
-          valid_categories,
-      "Unknown SDK category ${invoker.category}, must be one of ${valid_categories}")
-
-  assert(defined(invoker.api_level),
-         "Must define an SDK api level for this package.")
-  if (defined(invoker.expected_files_exact)) {
-    expected_files_exact = invoker.expected_files_exact
-  } else {
-    expected_files_exact = []
-  }
-  if (defined(invoker.expected_files_internal)) {
-    expected_files_internal = invoker.expected_files_internal
-  } else {
-    expected_files_internal = []
-  }
-
-  package_out_dir = get_label_info(invoker.package_label, "target_out_dir") +
-                    "/" + get_label_info(invoker.package_label, "name")
-
-  package_manifest_file = "${package_out_dir}/package_manifest.json"
-  computed_api_file = "${package_out_dir}/sdk/packages/${package_name}.api"
-  golden_api_file = "//sdk/packages/${package_name}.api"
-
-  action(target_name) {
-    script = "//build/packages/generate_sdk_package_api.py"
-
-    inputs = [ package_manifest_file ]
-    outputs = [ computed_api_file ]
-    deps = [ invoker.package_label ]
-
-    args = [
-      "--manifest",
-      rebase_path(package_manifest_file, root_build_dir),
-      "--output",
-      rebase_path(computed_api_file, root_build_dir),
-      "--reference",
-      rebase_path("${golden_api_file}"),
+  if (current_toolchain == target_toolchain) {
+    assert(defined(invoker.package_label),
+           "Must define a package to distribute.")
+    assert(defined(invoker.distribution_name),
+           "Must define a distribution name for this package.")
+    assert(defined(invoker.category),
+           "Must define an SDK category for this package.")
+    valid_categories = [
+      "excluded",
+      "experimental",
+      "internal",
+      "cts",
+      "partner_internal",
+      "partner",
+      "public",
     ]
+    assert(
+        valid_categories + [ invoker.category ] - [ invoker.category ] !=
+            valid_categories,
+        "Invalid SDK category ${invoker.category}, must be one of ${valid_categories}")
 
-    foreach(exact_file, expected_files_exact) {
-      args += [
-        "--expected-files-exact",
-        exact_file,
+    if (defined(invoker.api_level)) {
+      assert(invoker.api_level == platform_version.in_development_api_level,
+             "Only the current development API level is supported.")
+      api_level = invoker.api_level
+    } else {
+      api_level = platform_version.in_development_api_level
+    }
+    if (defined(invoker.expected_files_exact)) {
+      expected_files_exact = invoker.expected_files_exact
+    } else {
+      expected_files_exact = []
+    }
+    if (defined(invoker.expected_files_present)) {
+      expected_files_present = invoker.expected_files_present
+    } else {
+      expected_files_present = []
+    }
+
+    # Label of package to be included in the SDK. Used for tracking `package_manifest.json`
+    _full_package_label =
+        get_label_info(invoker.package_label, "label_no_toolchain")
+    package_manifest_file =
+        get_label_info(_full_package_label, "target_out_dir") + "/" +
+        get_label_info(_full_package_label, "name") + "/package_manifest.json"
+
+    # End output directory, different for each arch and API level.
+    _sdk_package_dir = "${target_out_dir}/sdk_packages/${target_cpu}/release"
+    _distribution_name = invoker.distribution_name
+
+    # Note: Golden file does not support multiple API level currently.
+    golden_content_checklist_file = "//sdk/packages/${_distribution_name}/${target_cpu}/release/content_checklist.json"
+    computed_content_checklist_file =
+        "${_sdk_package_dir}/content_checklist.json"
+    _content_checklist_target = "${target_name}.content_checklist"
+
+    # Generates content checklist file using input package manifest, and runs checks
+    # against golden. See
+    # `//build/packages/generate_sdk_package_content_checklist.py` for more.
+    action(_content_checklist_target) {
+      forward_variables_from(invoker, [ "testonly" ])
+
+      script = "//build/packages/generate_sdk_package_content_checklist.py"
+
+      inputs = [
+        package_manifest_file,
+        "${host_out_dir}/ffx",
+        "${host_out_dir}/far",
+      ]
+      outputs = [ computed_content_checklist_file ]
+      deps = [
+        "//src/developer/ffx/frontends/ffx:ffx_bin($host_toolchain)",
+        "//src/sys/pkg/bin/far:bin($host_toolchain)",
+        _full_package_label,
+      ]
+
+      args = [
+        "--manifest",
+        rebase_path(package_manifest_file, root_build_dir),
+        "--output",
+        rebase_path(computed_content_checklist_file, root_build_dir),
+        "--reference",
+        rebase_path("${golden_content_checklist_file}"),
+        "--ffx-bin",
+        rebase_path("${host_out_dir}/ffx", root_build_dir),
+        "--far-bin",
+        rebase_path("${host_out_dir}/far", root_build_dir),
+      ]
+
+      foreach(exact_file, expected_files_exact) {
+        args += [
+          "--expected-files-exact",
+          exact_file,
+        ]
+      }
+      foreach(present_file, expected_files_present) {
+        args += [
+          "--expected-files-present",
+          present_file,
+        ]
+      }
+    }
+
+    _license_target = "${target_name}.license"
+    _license_output = "${_sdk_package_dir}/license_data"
+    _license_output_spdx_file = "${_license_output}/results.spdx.json"
+    _license_target_spdx = "${_license_target}_spdx_copy"
+
+    # Collects the license data for all GN inputs and makes it available for the SDK
+    license_data(_license_target) {
+      target = _full_package_label
+      out_dir = _license_output
+
+      produce_spdx = true
+      emit_metadata = false
+      run_analysis = false
+    }
+
+    _sdk_package_file_list = "${_sdk_package_dir}/file_list.fini"
+    _sdk_package_metadata = "${_sdk_package_dir}/metadata"
+    _sdk_manifest_target = "${target_name}.sdk_manifest"
+    _sdk_package_depfile = "${target_gen_dir}/${_sdk_manifest_target}.d"
+
+    # Generates SDK primitives, including `file_list`, `metadata`, and
+    # package manifests (both target package and subpackages) with
+    # files structured relative to SDK directories. See
+    # `//build/packages/generate_sdk_package_manifest.py` for more.
+    action(_sdk_manifest_target) {
+      forward_variables_from(invoker, [ "testonly" ])
+
+      script = "//build/packages/generate_sdk_package_manifest.py"
+
+      inputs = [
+        package_manifest_file,
+        computed_content_checklist_file,
+        _license_output_spdx_file,
+      ]
+      outputs = [
+        _sdk_package_file_list,
+        _sdk_package_metadata,
+      ]
+      deps = [
+        ":${_content_checklist_target}",
+        ":${_license_target_spdx}",
+        _full_package_label,
+      ]
+      depfile = _sdk_package_depfile
+
+      args = [
+        "--manifest",
+        rebase_path(package_manifest_file, root_build_dir),
+        "--sdk-package-content-checklist-path",
+        rebase_path(computed_content_checklist_file, root_build_dir),
+        "--output",
+        rebase_path(_sdk_package_dir, root_build_dir),
+        "--api-level",
+        "${api_level}",
+        "--target-cpu",
+        "${target_cpu}",
+        "--depfile",
+        rebase_path(depfile, root_build_dir),
+        "--distribution-name",
+        _distribution_name,
       ]
     }
-    foreach(exact_file, expected_files_internal) {
-      args += [
-        "--expected-files-internal",
-        exact_file,
-      ]
+
+    sdk_atom(target_name) {
+      forward_variables_from(invoker, [ "testonly" ])
+
+      id = "sdk://fuchsia_packages/${_distribution_name}"
+      category = invoker.category
+
+      meta = {
+        schema = "package"
+        dest = "fuchsia_packages/${_distribution_name}/meta.json"
+        source = "${_sdk_package_metadata}"
+      }
+
+      file_list = _sdk_package_file_list
+
+      non_sdk_deps = [ ":${_sdk_manifest_target}" ]
     }
+  } else {
+    # Fuchsia SDK packages should only be built with target_toolchain. However, it
+    # is possible for package targets to be expanded in other toolchains (host,
+    # variant, etc.). In these cases, make sdk_fuchsia_package expand to nothing.
+    group(target_name) {
+      forward_variables_from(invoker,
+                             [
+                               "testonly",
+                               "visibility",
+                             ])
+    }
+
+    # Suppress unused variable warnings.
+    not_needed(invoker, "*")
   }
 }

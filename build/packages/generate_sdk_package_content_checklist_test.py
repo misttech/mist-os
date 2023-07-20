@@ -5,7 +5,7 @@
 
 import unittest
 import tempfile
-import generate_sdk_package_api
+import generate_sdk_package_content_checklist
 import os
 import sys
 import json
@@ -56,7 +56,7 @@ class ConvertTest(unittest.TestCase):
                         ],
                 },
                 expected_files_exact=["meta/", "bin/bar"],
-                expected_files_internal=["my/baz"],
+                expected_files_present=["my/baz"],
                 reference={
                     "version": "1",
                     "content":
@@ -70,7 +70,7 @@ class ConvertTest(unittest.TestCase):
                                         "hash": "111",
                                     },
                                     "bin/baz": {
-                                        "internal": True,
+                                        "present": True,
                                     }
                                 }
                         }
@@ -105,7 +105,7 @@ class ConvertTest(unittest.TestCase):
                         ],
                 },
                 expected_files_exact=["bin/bar"],
-                expected_files_internal=["meta/"],
+                expected_files_present=["meta/"],
                 reference={
                     "version": "1",
                     "content":
@@ -113,7 +113,7 @@ class ConvertTest(unittest.TestCase):
                             "files":
                                 {
                                     "meta/": {
-                                        "internal": True
+                                        "present": True
                                     },
                                     "bin/bar": {
                                         "hash": "INCORRECT_HASH",
@@ -126,18 +126,19 @@ class ConvertTest(unittest.TestCase):
         ])
     def test_run_main(
             self, exit_code, manifest, expected_files_exact,
-            expected_files_internal, reference, warn):
+            expected_files_present, reference, warn):
         with tempfile.TemporaryDirectory() as tmpdir:
             package_manifest_path = os.path.join(
                 tmpdir, "package-manifest.json")
             with open(package_manifest_path, "w") as file:
                 file.write(json.dumps(manifest, indent=2))
 
-            reference_path = os.path.join(tmpdir, "package-golden.api")
+            reference_path = os.path.join(
+                tmpdir, "golden_content_checklist.json")
             with open(reference_path, "w") as file:
                 file.write(json.dumps(reference, indent=2))
 
-            output_path = os.path.join(tmpdir, "package.api")
+            output_path = os.path.join(tmpdir, "content_checklist.json")
             sys.argv = [
                 "", "--manifest", package_manifest_path, "--output",
                 output_path, "--reference", reference_path
@@ -145,11 +146,11 @@ class ConvertTest(unittest.TestCase):
 
             for expected_file in expected_files_exact:
                 sys.argv += ["--expected-files-exact", expected_file]
-            for expected_file in expected_files_internal:
-                sys.argv += ["--expected-files-internal", expected_file]
+            for expected_file in expected_files_present:
+                sys.argv += ["--expected-files-present", expected_file]
 
             if warn:
                 sys.argv += ["--warn"]
 
-            result = generate_sdk_package_api.main()
+            result = generate_sdk_package_content_checklist.main()
             self.assertEqual(exit_code, result)
