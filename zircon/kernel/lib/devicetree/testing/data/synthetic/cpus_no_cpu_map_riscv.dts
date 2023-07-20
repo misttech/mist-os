@@ -5,7 +5,7 @@
 /dts-v1/;
 
 / {
-	cpus {
+    cpus {
 		#address-cells = <0x01>;
 		#size-cells = <0x00>;
 		timebase-frequency = <0x989680>;
@@ -18,7 +18,6 @@
 			compatible = "riscv";
 			riscv,isa = "rv64imafdch_zicsr_zifencei_zihintpause_zba_zbb_zbc_zbs_sstc";
 			mmu-type = "riscv,sv48";
-			capacity-dmips-mhz = <1024>;
 
 			interrupt-controller {
 				#address-cells = <0x01>;
@@ -37,7 +36,6 @@
 			compatible = "riscv";
 			riscv,isa = "rv64imafdch_zicsr_zifencei_zihintpause_zba_zbb_zbc_zbs_sstc";
 			mmu-type = "riscv,sv48";
-			capacity-dmips-mhz = <1000>;
 
 			interrupt-controller {
 				#address-cells = <0x01>;
@@ -56,7 +54,6 @@
 			compatible = "riscv";
 			riscv,isa = "rv64imafdch_zicsr_zifencei_zihintpause_zba_zbb_zbc_zbs_sstc";
 			mmu-type = "riscv,sv48";
-			capacity-dmips-mhz = <511>;
 
 			interrupt-controller {
 				#address-cells = <0x01>;
@@ -75,37 +72,12 @@
 			compatible = "riscv";
 			riscv,isa = "rv64imafdch_zicsr_zifencei_zihintpause_zba_zbb_zbc_zbs_sstc";
 			mmu-type = "riscv,sv48";
-			capacity-dmips-mhz = <507>;
-
 			interrupt-controller {
 				#address-cells = <0x01>;
 				#interrupt-cells = <0x01>;
 				interrupt-controller;
 				compatible = "riscv,cpu-intc";
 				phandle = <0x02>;
-			};
-		};
-
-		cpu-map {
-			socket0 {
-				cluster0 {
-					core0 {
-						cpu = <0x07>;
-					};
-
-					core1 {
-						cpu = <0x05>;
-					};
-				};
-				cluster2 {
-					core0 {
-						cpu = <0x03>;
-					};
-
-					core1 {
-						cpu = <0x01>;
-					};
-				};
 			};
 		};
 	};

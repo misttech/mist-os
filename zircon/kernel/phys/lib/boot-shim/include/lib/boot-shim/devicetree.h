@@ -7,6 +7,7 @@
 #ifndef ZIRCON_KERNEL_PHYS_LIB_BOOT_SHIM_INCLUDE_LIB_BOOT_SHIM_DEVICETREE_H_
 #define ZIRCON_KERNEL_PHYS_LIB_BOOT_SHIM_INCLUDE_LIB_BOOT_SHIM_DEVICETREE_H_
 
+#include <lib/boot-shim/devicetree-boot-shim.h>
 #include <lib/boot-shim/item-base.h>
 #include <lib/devicetree/devicetree.h>
 #include <lib/devicetree/matcher.h>
@@ -14,11 +15,14 @@
 #include <lib/fit/result.h>
 #include <lib/memalloc/range.h>
 #include <lib/stdcompat/array.h>
-#include <lib/stdcompat/span.h>
+#include <lib/stdcompat/source_location.h>
+#include <lib/stdcompat/string_view.h>
 #include <lib/uart/all.h>
+#include <lib/zbi-format/cpu.h>
 #include <lib/zbi-format/driver-config.h>
 #include <lib/zbi-format/memory.h>
 #include <lib/zbi-format/zbi.h>
+#include <lib/zbitl/storage-traits.h>
 #include <stdarg.h>
 #include <stdint.h>
 #include <stdio.h>
@@ -403,6 +407,132 @@ class RiscvDevicetreePlicItem
  private:
   devicetree::ScanState HandlePlicNode(const devicetree::NodePath& path,
                                        const devicetree::PropertyDecoder& decoder);
+};
+
+// Parses '/cpus' node to generate |ZBI_TYPE_CPU_TOPOLOGY| item. This involves both parsing CPU
+// nodes and the '/cpus/cpu-map' node when present. Lack of a 'cpu-map' means all nodes are
+// considered siblings which is reflected with none of them having a parent.
+//
+// A cluster's performance class is the normalized capacity of a cluster based on the maximum
+// capacity of all clusters.
+//
+// cluster-performance-class[i] = cluster-capacity[i] * 255 / max(cluster-capacity[0]....N)
+//
+// When a cluster-capacity is not able to be determined because no property in the node provides
+// this value then all clusters are given a performance class of 1. Its important to realize that
+// the actual value of the performance class is only a representative of the relative difference
+// between difference clusters.
+//
+// See:
+// https://www.kernel.org/doc/Documentation/devicetree/bindings/arm/cpu-capacity.txt
+// https://www.kernel.org/doc/Documentation/devicetree/bindings/cpu/cpu-topology.txt
+class RiscvDevictreeCpuTopologyItem : public DevicetreeItemBase<RiscvDevictreeCpuTopologyItem, 2>,
+                                      ItemBase {
+ public:
+  // Matcher API.
+  devicetree::ScanState OnNode(const devicetree::NodePath& path,
+                               const devicetree::PropertyDecoder& decoder);
+  devicetree::ScanState OnSubtree(const devicetree::NodePath& path);
+
+  size_t size_bytes() const { return ItemSize(node_element_count() * sizeof(zbi_topology_node_t)); }
+  fit::result<DataZbi::Error> AppendItems(DataZbi& zbi) const;
+
+  template <typename Shim>
+  void Init(const Shim& shim) {
+    DevicetreeItemBase<RiscvDevictreeCpuTopologyItem, 2>::Init(shim);
+    allocator_ = &shim.allocator();
+  }
+
+  void set_boot_hart_id(uint32_t hart_id) { boot_hart_id_ = hart_id; }
+
+ private:
+  static constexpr bool IsCpuMapNode(std::string_view node_name, std::string_view prefix) {
+    if (!cpp20::starts_with(node_name, prefix)) {
+      return false;
+    }
+    // Must match prefix[0-9].
+    return node_name.substr(prefix.length()).find_first_not_of("01234567890") ==
+           std::string_view::npos;
+  }
+
+  // Devicetree 'cpu-map' entities.
+  enum class TopologyEntryType {
+    kSocket,
+    kCluster,
+    kCore,
+    kThread,
+  };
+
+  // Generic entry in the devicetree, maintains parent relationship and a view into the properties.
+  struct CpuMapEntry {
+    TopologyEntryType type;
+    uint32_t parent_index;
+    std::optional<uint32_t> cluster_index;
+    std::optional<uint32_t> cpu_phandle;
+    std::optional<uint32_t> cpu_index;
+  };
+
+  // Used for decoding CPU-related properties.
+  struct CpuEntry {
+    std::optional<uint32_t> phandle;
+    devicetree::Properties properties;
+    std::optional<uint32_t> hart_id;
+  };
+
+  // May only be called after |Init| and a full match sequence has been performed.
+  constexpr size_t node_element_count() const { return map_entry_count_; }
+
+  devicetree::ScanState IncreaseEntryNodeCountFirstScan(const devicetree::NodePath& path,
+                                                        const devicetree::PropertyDecoder& decoder);
+  devicetree::ScanState AddEntryNodeSecondScan(const devicetree::NodePath& path,
+                                               const devicetree::PropertyDecoder& decoder);
+  devicetree::ScanState IncreaseCpuNodeCountFirstScan(const devicetree::NodePath& path,
+                                                      const devicetree::PropertyDecoder& decoder);
+  devicetree::ScanState AddCpuNodeSecondScan(const devicetree::NodePath& path,
+                                             const devicetree::PropertyDecoder& decoder);
+
+  // After both |entries_| and |cpus_| have been filled this routine will fill up
+  // the reference from an entry to a 'cpu' node.
+  fit::result<ItemBase::DataZbi::Error> UpdateEntryCpuLinks() const;
+
+  // Recalculates performance class based on CPU capacity related properties.
+  fit::result<ItemBase::DataZbi::Error> CalculateClusterPerformanceClass(
+      cpp20::span<zbi_topology_node_t> nodes) const;
+
+  template <typename T>
+  T* Allocate(size_t count,
+              cpp20::source_location location = cpp20::source_location::current()) const {
+    auto* alloc = static_cast<T*>((*allocator_)(sizeof(T) * count, alignof(T)));
+    if (!alloc) {
+      // Log allocation failure. The effect is that the matcher will keep looking and will fail to
+      // make progress. But the error will be logged.
+      auto* self = const_cast<RiscvDevictreeCpuTopologyItem*>(this);
+      self->OnError("Allocation Failed.");
+      self->Log("at %s:%u\n", location.file_name(), static_cast<unsigned int>(location.line()));
+    }
+    return alloc;
+  }
+
+  // Flattened 'cpu-map'.
+  CpuMapEntry* map_entries_ = nullptr;
+  uint32_t map_entry_index_ = 0;
+  uint32_t map_entry_count_ = 0;
+  bool has_cpu_map_ = false;
+
+  // Used to track parent-child relationships when building the flattened cpu-map.
+  std::optional<uint32_t> current_socket_ = 0;
+  std::optional<uint32_t> current_cluster_ = 0;
+  std::optional<uint32_t> current_core_ = 0;
+
+  CpuEntry* cpu_entries_ = nullptr;
+  uint32_t cpu_entry_count_ = 0;
+  uint32_t cpu_entry_index_ = 0;
+  uint32_t cluster_count_ = 0;
+
+  std::optional<uint32_t> boot_hart_id_ = 0;
+
+  // Allocation is environment specific, so we delegate that to a lambda.
+  mutable const DevicetreeBootShimAllocator* allocator_ = nullptr;
 };
 
 }  // namespace boot_shim

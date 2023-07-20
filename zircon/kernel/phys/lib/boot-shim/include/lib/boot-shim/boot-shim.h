@@ -165,7 +165,9 @@ class BootShim : public BootShimBase {
       result = item.AppendItems(zbi);
       return result.is_error();
     };
-    return AnyItem(append) ? result : fit::ok();
+    auto res = AnyItem(append) ? result : fit::ok();
+
+    return res;
   }
 
   // Get the item object of a particular type (among Items).

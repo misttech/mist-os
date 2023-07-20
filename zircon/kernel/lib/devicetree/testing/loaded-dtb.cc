@@ -10,7 +10,6 @@
 #include <lib/stdcompat/span.h>
 
 #include <filesystem>
-#include <iostream>
 #include <string_view>
 
 #ifndef __Fuchsia__
@@ -52,7 +51,6 @@ std::filesystem::path GetResourcePath() {
 fit::result<std::string, LoadedDtb> LoadDtb(std::string_view dtb_file) {
   std::filesystem::path resource_path = GetResourcePath().append(LIB_DEVICETREE_DATA).string();
   resource_path.append(dtb_file);
-
   FILE* file = fopen(resource_path.c_str(), "r");
   if (!file) {
     std::string err =

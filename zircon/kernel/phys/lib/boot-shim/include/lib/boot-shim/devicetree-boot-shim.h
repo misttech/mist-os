@@ -9,7 +9,9 @@
 
 #include <lib/devicetree/devicetree.h>
 #include <lib/devicetree/matcher.h>
+#include <lib/fit/function.h>
 #include <lib/fit/result.h>
+#include <lib/uart/all.h>
 #include <lib/zbitl/storage-traits.h>
 
 #include <type_traits>
@@ -18,9 +20,16 @@
 #include <fbl/macros.h>
 
 #include "boot-shim.h"
-#include "lib/uart/all.h"
 
 namespace boot_shim {
+
+// Proxy for allocator. This allocator represents the following interface:
+//
+//   void* Allocator(size_t byte_count, size_t alignment);
+//
+// On success returns a non NULL pointer to an aligned memory block of at least |byte_count| bytes.
+// On failure |nullptr| is returned.
+using DevicetreeBootShimAllocator = fit::inline_function<void*(size_t, size_t)>;
 
 // A DevicetreeBootShim represents a collection of items, which look into the devicetree itself
 // to gather information to produce ZBI items.
@@ -57,6 +66,13 @@ class DevicetreeBootShim : public BootShim<Items...> {
 
   const devicetree::Devicetree& devicetree() const { return dt_; }
 
+  const DevicetreeBootShimAllocator& allocator() const {
+    ZX_ASSERT(allocator_);
+    return allocator_;
+  }
+
+  void set_allocator(DevicetreeBootShimAllocator&& allocator) { allocator_ = std::move(allocator); }
+
  private:
   DECLARE_HAS_MEMBER_FN_WITH_SIGNATURE(HasInit, Init, void (C::*)(const DevicetreeBootShim& shim));
 
@@ -64,6 +80,7 @@ class DevicetreeBootShim : public BootShim<Items...> {
   using IsDevicetreeItem = std::conditional_t<HasInit<T>::value && devicetree::kIsMatcher<T>,
                                               std::true_type, std::false_type>;
   devicetree::Devicetree dt_;
+  DevicetreeBootShimAllocator allocator_ = nullptr;
 };
 
 }  // namespace boot_shim

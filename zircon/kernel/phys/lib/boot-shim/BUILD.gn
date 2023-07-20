@@ -61,6 +61,7 @@ zx_library("boot-shim") {
     "devicetree-arm-gic-item.cc",
     "devicetree-arm-psci-item.cc",
     "devicetree-chosen-item.cc",
+    "devicetree-cpu-topology-item.cc",
     "devicetree-memory-item.cc",
     "devicetree-riscv-plic-item.cc",
     "devicetree-riscv-timer-item.cc",

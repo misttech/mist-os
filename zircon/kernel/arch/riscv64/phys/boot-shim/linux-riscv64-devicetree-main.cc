@@ -40,10 +40,17 @@ void PhysMain(void* flat_devicetree_blob, arch::EarlyTicks ticks) {
 
   // Memory has been initialized, we can finish up parsing the rest of the items from the boot shim.
   // The list here is architecture dependant, and should be factored out eventually.
-  boot_shim::DevicetreeBootShim<boot_shim::UartItem<>, boot_shim::PoolMemConfigItem,
-                                boot_shim::RiscvDevicetreePlicItem,
-                                boot_shim::RiscvDevicetreeTimerItem>
+  static boot_shim::DevicetreeBootShim<
+      boot_shim::UartItem<>, boot_shim::PoolMemConfigItem, boot_shim::RiscvDevicetreePlicItem,
+      boot_shim::RiscvDevicetreeTimerItem, boot_shim::RiscvDevictreeCpuTopologyItem>
       shim(kShimName, gDevicetreeBoot.fdt);
+  shim.set_allocator([](size_t size, size_t align) -> void* {
+    if (auto alloc = Allocation::GetPool().Allocate(memalloc::Type::kPhysScratch, size, align);
+        alloc.is_ok()) {
+      return reinterpret_cast<void*>(*alloc);
+    }
+    return nullptr;
+  });
   shim.set_cmdline(gDevicetreeBoot.cmdline);
   shim.Get<boot_shim::UartItem<>>().Init(GetUartDriver().uart());
   shim.Get<boot_shim::PoolMemConfigItem>().Init(Allocation::GetPool());

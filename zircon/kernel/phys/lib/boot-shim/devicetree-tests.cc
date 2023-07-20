@@ -12,17 +12,22 @@
 #include <lib/fit/defer.h>
 #include <lib/memalloc/range.h>
 #include <lib/uart/all.h>
+#include <lib/zbi-format/cpu.h>
 #include <lib/zbi-format/driver-config.h>
+#include <lib/zbi-format/internal/deprecated-cpu.h>
 #include <lib/zbi-format/memory.h>
 #include <lib/zbi-format/zbi.h>
 #include <lib/zbitl/item.h>
 
 #include <array>
+#include <cstdlib>
 #include <memory>
+#include <new>
 #include <optional>
 #include <type_traits>
 
 #include <zxtest/zxtest.h>
+
 namespace {
 
 using devicetree::testing::LoadDtb;
@@ -356,7 +361,7 @@ void CheckChosenMatcher(const ChosenItemType& matcher, const ExpectedChosen& exp
       // The bootstrap phase does not decode interrupt.
       EXPECT_EQ(uart.config().irq, expected.uart_config.irq);
     } else {
-      FAIL("Unexpected driver.");
+      FAIL("Unexpected driver: %s", fbl::TypeInfo<decltype(driver)>::Name());
     }
   });
 }
@@ -482,49 +487,49 @@ class MemoryItemTest : public zxtest::Test {
   static void SetUpTestSuite() {
     auto loaded_dtb = LoadDtb("memory.dtb");
     ASSERT_TRUE(loaded_dtb.is_ok(), "%s", loaded_dtb.error_value().c_str());
-    memory_ldtb_ = std::move(loaded_dtb).value();
+    memory_ = std::move(loaded_dtb).value();
 
     loaded_dtb = LoadDtb("reserved_memory.dtb");
     ASSERT_TRUE(loaded_dtb.is_ok(), "%s", loaded_dtb.error_value().c_str());
-    reserved_memory_ldtb_ = std::move(loaded_dtb).value();
+    reserved_memory_ = std::move(loaded_dtb).value();
 
     loaded_dtb = LoadDtb("memory_reservations.dtb");
     ASSERT_TRUE(loaded_dtb.is_ok(), "%s", loaded_dtb.error_value().c_str());
-    memreserve_ldtb_ = std::move(loaded_dtb).value();
+    memreserve_ = std::move(loaded_dtb).value();
 
     loaded_dtb = LoadDtb("memory_complex.dtb");
     ASSERT_TRUE(loaded_dtb.is_ok(), "%s", loaded_dtb.error_value().c_str());
-    complex_ldtb_ = std::move(loaded_dtb).value();
+    complex_ = std::move(loaded_dtb).value();
   }
 
   static void TearDownTestSuite() {
-    memory_ldtb_ = std::nullopt;
-    reserved_memory_ldtb_ = std::nullopt;
-    memreserve_ldtb_ = std::nullopt;
-    complex_ldtb_ = std::nullopt;
+    memory_ = std::nullopt;
+    reserved_memory_ = std::nullopt;
+    memreserve_ = std::nullopt;
+    complex_ = std::nullopt;
   }
 
-  devicetree::Devicetree memory_ldtb() { return memory_ldtb_->fdt(); }
-  devicetree::Devicetree reserved_memory_ldtb() { return reserved_memory_ldtb_->fdt(); }
-  devicetree::Devicetree memreserve_ldtb() { return memreserve_ldtb_->fdt(); }
-  devicetree::Devicetree complex_ldtb() { return complex_ldtb_->fdt(); }
+  devicetree::Devicetree memory() { return memory_->fdt(); }
+  devicetree::Devicetree reserved_memory() { return reserved_memory_->fdt(); }
+  devicetree::Devicetree memreserve() { return memreserve_->fdt(); }
+  devicetree::Devicetree complex() { return complex_->fdt(); }
 
  private:
-  static std::optional<LoadedDtb> memory_ldtb_;
-  static std::optional<LoadedDtb> reserved_memory_ldtb_;
-  static std::optional<LoadedDtb> memreserve_ldtb_;
-  static std::optional<LoadedDtb> complex_ldtb_;
+  static std::optional<LoadedDtb> memory_;
+  static std::optional<LoadedDtb> reserved_memory_;
+  static std::optional<LoadedDtb> memreserve_;
+  static std::optional<LoadedDtb> complex_;
 };
 
-std::optional<LoadedDtb> MemoryItemTest::memory_ldtb_ = std::nullopt;
-std::optional<LoadedDtb> MemoryItemTest::reserved_memory_ldtb_ = std::nullopt;
-std::optional<LoadedDtb> MemoryItemTest::memreserve_ldtb_ = std::nullopt;
-std::optional<LoadedDtb> MemoryItemTest::complex_ldtb_ = std::nullopt;
+std::optional<LoadedDtb> MemoryItemTest::memory_ = std::nullopt;
+std::optional<LoadedDtb> MemoryItemTest::reserved_memory_ = std::nullopt;
+std::optional<LoadedDtb> MemoryItemTest::memreserve_ = std::nullopt;
+std::optional<LoadedDtb> MemoryItemTest::complex_ = std::nullopt;
 
 TEST_F(MemoryItemTest, ParseMemreserves) {
   std::vector<memalloc::Range> storage(5);
 
-  auto fdt = memreserve_ldtb();
+  auto fdt = memreserve();
   boot_shim::DevicetreeMemoryMatcher memory_matcher("test", stdout, storage);
 
   ASSERT_TRUE(memory_matcher.AppendAdditionalRanges(fdt));
@@ -559,7 +564,7 @@ TEST_F(MemoryItemTest, ParseMemreserves) {
 TEST_F(MemoryItemTest, ParseMemoryNodes) {
   std::vector<memalloc::Range> storage(5);
 
-  auto fdt = memory_ldtb();
+  auto fdt = memory();
   boot_shim::DevicetreeMemoryMatcher memory_matcher("test", stdout, storage);
 
   ASSERT_TRUE(memory_matcher.AppendAdditionalRanges(fdt));
@@ -593,7 +598,7 @@ TEST_F(MemoryItemTest, ParseMemoryNodes) {
 TEST_F(MemoryItemTest, ParseReservedMemoryNodes) {
   std::vector<memalloc::Range> storage(3);
 
-  auto fdt = reserved_memory_ldtb();
+  auto fdt = reserved_memory();
   boot_shim::DevicetreeMemoryMatcher memory_matcher("test", stdout, storage);
 
   ASSERT_TRUE(memory_matcher.AppendAdditionalRanges(fdt));
@@ -619,7 +624,7 @@ TEST_F(MemoryItemTest, ParseReservedMemoryNodes) {
 TEST_F(MemoryItemTest, ParseAll) {
   std::vector<memalloc::Range> storage(11);
 
-  auto fdt = complex_ldtb();
+  auto fdt = complex();
   boot_shim::DevicetreeMemoryMatcher memory_matcher("test", stdout, storage);
 
   ASSERT_TRUE(memory_matcher.AppendAdditionalRanges(fdt));
@@ -770,25 +775,539 @@ TEST_F(RiscvDevicetreeTimerItemTest, VisionFive2) {
   ASSERT_TRUE(present);
 }
 
-TEST_F(RiscvDevicetreeTimerItemTest, SifiveHifiveUnmatached) {
-  std::array<std::byte, 512> image_buffer;
+class RiscvDevictreeCpuTopologyItemTest : public TestMixin<RiscvDevicetreeTest> {
+ public:
+  static void SetUpTestSuite() {
+    TestMixin<RiscvDevicetreeTest>::SetUpTestSuite();
+    auto loaded_dtb = LoadDtb("cpus_riscv.dtb");
+    ASSERT_TRUE(loaded_dtb.is_ok(), "%s", loaded_dtb.error_value().c_str());
+    riscv_cpus_dtb_ = std::move(loaded_dtb).value();
+
+    loaded_dtb = LoadDtb("cpus_no_cpu_map_riscv.dtb");
+    ASSERT_TRUE(loaded_dtb.is_ok(), "%s", loaded_dtb.error_value().c_str());
+    riscv_cpus_no_cpu_map_dtb_ = std::move(loaded_dtb).value();
+  }
+
+  static void TearDownTestSuite() {
+    riscv_cpus_dtb_ = std::nullopt;
+    riscv_cpus_no_cpu_map_dtb_ = std::nullopt;
+    TestMixin<RiscvDevicetreeTest>::TearDownTestSuite();
+  }
+
+  devicetree::Devicetree riscv_cpus() { return riscv_cpus_dtb_->fdt(); }
+  devicetree::Devicetree riscv_cpus_no_cpu_map() { return riscv_cpus_no_cpu_map_dtb_->fdt(); }
+
+ private:
+  static std::optional<LoadedDtb> riscv_cpus_dtb_;
+  static std::optional<LoadedDtb> riscv_cpus_no_cpu_map_dtb_;
+};
+
+std::optional<LoadedDtb> RiscvDevictreeCpuTopologyItemTest::riscv_cpus_dtb_ = std::nullopt;
+std::optional<LoadedDtb> RiscvDevictreeCpuTopologyItemTest::riscv_cpus_no_cpu_map_dtb_ =
+    std::nullopt;
+
+TEST_F(RiscvDevictreeCpuTopologyItemTest, ParseCpuNodes) {
+  std::array<std::byte, 1024> image_buffer;
+  std::vector<void*> allocs;
+  zbitl::Image<cpp20::span<std::byte>> image(image_buffer);
+  ASSERT_TRUE(image.clear().is_ok());
+
+  auto fdt = riscv_cpus();
+  boot_shim::DevicetreeBootShim<boot_shim::RiscvDevictreeCpuTopologyItem> shim("test", fdt);
+  shim.set_allocator([&allocs](size_t size, size_t alignment) -> void* {
+    // Custom aligned_alloc since OS X doesnt support it in some versions.
+    void* alloc = malloc(size + alignment);
+    allocs.push_back(alloc);
+    return reinterpret_cast<void*>((reinterpret_cast<uintptr_t>(alloc) + alignment) &
+                                   ~(alignment - 1));
+  });
+  shim.Get<boot_shim::RiscvDevictreeCpuTopologyItem>().set_boot_hart_id(3);
+
+  auto release_memory = fit::defer([&]() {
+    for (auto* alloc : allocs) {
+      free(alloc);
+    }
+  });
+
+  shim.Init();
+  auto clear_errors = fit::defer([&]() { image.ignore_error(); });
+  ASSERT_TRUE(shim.AppendItems(image).is_ok());
+  bool present = false;
+  for (auto [header, payload] : image) {
+    if (header->type == ZBI_TYPE_CPU_TOPOLOGY) {
+      present = true;
+      cpp20::span<zbi_topology_node_t> nodes(reinterpret_cast<zbi_topology_node_t*>(payload.data()),
+                                             payload.size() / sizeof(zbi_topology_node_t));
+
+      // This is tied to the visit order of the cpu nodes.
+      // 4 cpus, parents, cpu#4 (id = 3) is the one with hart id = 3.
+      ASSERT_EQ(nodes.size(), 7u);
+
+      // socket0
+      EXPECT_EQ(nodes[0].parent_index, ZBI_TOPOLOGY_NO_PARENT);
+      EXPECT_EQ(nodes[0].entity.discriminant, ZBI_TOPOLOGY_ENTITY_SOCKET);
+
+      // cluster0
+      EXPECT_EQ(nodes[1].parent_index, 0);
+      EXPECT_EQ(nodes[1].entity.discriminant, ZBI_TOPOLOGY_ENTITY_CLUSTER);
+      EXPECT_EQ(nodes[1].entity.cluster.performance_class, 0xFF);
+
+      // cpu@0
+      EXPECT_EQ(nodes[2].parent_index, 1);
+      EXPECT_EQ(nodes[2].entity.discriminant, ZBI_TOPOLOGY_ENTITY_PROCESSOR);
+      EXPECT_EQ(nodes[2].entity.processor.flags, 0);
+      EXPECT_EQ(nodes[2].entity.processor.logical_ids[0], 0);
+      EXPECT_EQ(nodes[2].entity.processor.logical_ids[1], 0);
+      EXPECT_EQ(nodes[2].entity.processor.logical_ids[2], 0);
+      EXPECT_EQ(nodes[2].entity.processor.logical_ids[3], 0);
+      EXPECT_EQ(nodes[2].entity.processor.logical_id_count, 1);
+      EXPECT_EQ(nodes[2].entity.processor.architecture_info.discriminant,
+                ZBI_TOPOLOGY_ARCHITECTURE_INFO_RISCV64);
+      EXPECT_EQ(nodes[2].entity.processor.architecture_info.riscv64.hart_id, 0);
+
+      // cpu@1
+      EXPECT_EQ(nodes[3].parent_index, 1);
+      EXPECT_EQ(nodes[3].entity.discriminant, ZBI_TOPOLOGY_ENTITY_PROCESSOR);
+      EXPECT_EQ(nodes[3].entity.processor.flags, 0);
+      EXPECT_EQ(nodes[3].entity.processor.logical_ids[0], 1);
+      EXPECT_EQ(nodes[3].entity.processor.logical_ids[1], 0);
+      EXPECT_EQ(nodes[3].entity.processor.logical_ids[2], 0);
+      EXPECT_EQ(nodes[3].entity.processor.logical_ids[3], 0);
+      EXPECT_EQ(nodes[3].entity.processor.logical_id_count, 1);
+      EXPECT_EQ(nodes[3].entity.processor.architecture_info.discriminant,
+                ZBI_TOPOLOGY_ARCHITECTURE_INFO_RISCV64);
+      EXPECT_EQ(nodes[3].entity.processor.architecture_info.riscv64.hart_id, 1);
+
+      // cluster1
+      EXPECT_EQ(nodes[4].parent_index, 0);
+      EXPECT_EQ(nodes[4].entity.discriminant, ZBI_TOPOLOGY_ENTITY_CLUSTER);
+      EXPECT_EQ(nodes[4].entity.cluster.performance_class, 0x7F);
+
+      // cpu@2
+      EXPECT_EQ(nodes[5].parent_index, 4);
+      EXPECT_EQ(nodes[5].entity.discriminant, ZBI_TOPOLOGY_ENTITY_PROCESSOR);
+      EXPECT_EQ(nodes[5].entity.processor.flags, 0);
+      EXPECT_EQ(nodes[5].entity.processor.logical_ids[0], 2);
+      EXPECT_EQ(nodes[5].entity.processor.logical_ids[1], 0);
+      EXPECT_EQ(nodes[5].entity.processor.logical_ids[2], 0);
+      EXPECT_EQ(nodes[5].entity.processor.logical_ids[3], 0);
+      EXPECT_EQ(nodes[5].entity.processor.logical_id_count, 1);
+      EXPECT_EQ(nodes[5].entity.processor.architecture_info.discriminant,
+                ZBI_TOPOLOGY_ARCHITECTURE_INFO_RISCV64);
+      EXPECT_EQ(nodes[5].entity.processor.architecture_info.riscv64.hart_id, 2);
+
+      // cpu@3
+      EXPECT_EQ(nodes[6].parent_index, 4);
+      EXPECT_EQ(nodes[6].entity.discriminant, ZBI_TOPOLOGY_ENTITY_PROCESSOR);
+      EXPECT_EQ(nodes[6].entity.processor.flags, ZBI_TOPOLOGY_PROCESSOR_FLAGS_PRIMARY);
+      EXPECT_EQ(nodes[6].entity.processor.logical_ids[0], 3);
+      EXPECT_EQ(nodes[6].entity.processor.logical_ids[1], 0);
+      EXPECT_EQ(nodes[6].entity.processor.logical_ids[2], 0);
+      EXPECT_EQ(nodes[6].entity.processor.logical_ids[3], 0);
+      EXPECT_EQ(nodes[6].entity.processor.logical_id_count, 1);
+      EXPECT_EQ(nodes[6].entity.processor.architecture_info.discriminant,
+                ZBI_TOPOLOGY_ARCHITECTURE_INFO_RISCV64);
+      EXPECT_EQ(nodes[6].entity.processor.architecture_info.riscv64.hart_id, 3);
+    }
+  }
+  ASSERT_TRUE(present);
+}
+
+TEST_F(RiscvDevictreeCpuTopologyItemTest, ParseCpuNodesNoCpuMap) {
+  std::array<std::byte, 1024> image_buffer;
+  std::vector<void*> allocs;
+  zbitl::Image<cpp20::span<std::byte>> image(image_buffer);
+  ASSERT_TRUE(image.clear().is_ok());
+
+  auto fdt = riscv_cpus_no_cpu_map();
+  boot_shim::DevicetreeBootShim<boot_shim::RiscvDevictreeCpuTopologyItem> shim("test", fdt);
+  shim.set_allocator([&allocs](size_t size, size_t alignment) -> void* {
+    // Custom aligned_alloc since OS X doesnt support it in some versions.
+    void* alloc = malloc(size + alignment);
+    allocs.push_back(alloc);
+    return reinterpret_cast<void*>((reinterpret_cast<uintptr_t>(alloc) + alignment) &
+                                   ~(alignment - 1));
+  });
+  shim.Get<boot_shim::RiscvDevictreeCpuTopologyItem>().set_boot_hart_id(3);
+
+  auto release_memory = fit::defer([&]() {
+    for (auto* alloc : allocs) {
+      free(alloc);
+    }
+  });
+
+  shim.Init();
+  auto clear_errors = fit::defer([&]() { image.ignore_error(); });
+  ASSERT_TRUE(shim.AppendItems(image).is_ok());
+  bool present = false;
+  for (auto [header, payload] : image) {
+    if (header->type == ZBI_TYPE_CPU_TOPOLOGY) {
+      present = true;
+      cpp20::span<zbi_topology_node_t> nodes(reinterpret_cast<zbi_topology_node_t*>(payload.data()),
+                                             payload.size() / sizeof(zbi_topology_node_t));
+
+      ASSERT_EQ(nodes.size(), 4u);
+
+      // cpu@0
+      EXPECT_EQ(nodes[0].parent_index, ZBI_TOPOLOGY_NO_PARENT);
+      EXPECT_EQ(nodes[0].entity.discriminant, ZBI_TOPOLOGY_ENTITY_PROCESSOR);
+      EXPECT_EQ(nodes[0].entity.processor.flags, 0);
+      EXPECT_EQ(nodes[0].entity.processor.logical_ids[0], 0);
+      EXPECT_EQ(nodes[0].entity.processor.logical_ids[1], 0);
+      EXPECT_EQ(nodes[0].entity.processor.logical_ids[2], 0);
+      EXPECT_EQ(nodes[0].entity.processor.logical_ids[3], 0);
+      EXPECT_EQ(nodes[0].entity.processor.logical_id_count, 1);
+      EXPECT_EQ(nodes[0].entity.processor.architecture_info.discriminant,
+                ZBI_TOPOLOGY_ARCHITECTURE_INFO_RISCV64);
+      EXPECT_EQ(nodes[0].entity.processor.architecture_info.riscv64.hart_id, 0);
+
+      // cpu@1
+      EXPECT_EQ(nodes[1].parent_index, ZBI_TOPOLOGY_NO_PARENT);
+      EXPECT_EQ(nodes[1].entity.discriminant, ZBI_TOPOLOGY_ENTITY_PROCESSOR);
+      EXPECT_EQ(nodes[1].entity.processor.flags, 0);
+      EXPECT_EQ(nodes[1].entity.processor.logical_ids[0], 1);
+      EXPECT_EQ(nodes[1].entity.processor.logical_ids[1], 0);
+      EXPECT_EQ(nodes[1].entity.processor.logical_ids[2], 0);
+      EXPECT_EQ(nodes[1].entity.processor.logical_ids[3], 0);
+      EXPECT_EQ(nodes[1].entity.processor.logical_id_count, 1);
+      EXPECT_EQ(nodes[1].entity.processor.architecture_info.discriminant,
+                ZBI_TOPOLOGY_ARCHITECTURE_INFO_RISCV64);
+      EXPECT_EQ(nodes[1].entity.processor.architecture_info.riscv64.hart_id, 1);
+
+      // cpu@2
+      EXPECT_EQ(nodes[2].parent_index, ZBI_TOPOLOGY_NO_PARENT);
+      EXPECT_EQ(nodes[2].entity.discriminant, ZBI_TOPOLOGY_ENTITY_PROCESSOR);
+      EXPECT_EQ(nodes[2].entity.processor.flags, 0);
+      EXPECT_EQ(nodes[2].entity.processor.logical_ids[0], 2);
+      EXPECT_EQ(nodes[2].entity.processor.logical_ids[1], 0);
+      EXPECT_EQ(nodes[2].entity.processor.logical_ids[2], 0);
+      EXPECT_EQ(nodes[2].entity.processor.logical_ids[3], 0);
+      EXPECT_EQ(nodes[2].entity.processor.logical_id_count, 1);
+      EXPECT_EQ(nodes[2].entity.processor.architecture_info.discriminant,
+                ZBI_TOPOLOGY_ARCHITECTURE_INFO_RISCV64);
+      EXPECT_EQ(nodes[2].entity.processor.architecture_info.riscv64.hart_id, 2);
+
+      // cpu@3
+      EXPECT_EQ(nodes[3].parent_index, ZBI_TOPOLOGY_NO_PARENT);
+      EXPECT_EQ(nodes[3].entity.discriminant, ZBI_TOPOLOGY_ENTITY_PROCESSOR);
+      EXPECT_EQ(nodes[3].entity.processor.flags, ZBI_TOPOLOGY_PROCESSOR_FLAGS_PRIMARY);
+      EXPECT_EQ(nodes[3].entity.processor.logical_ids[0], 3);
+      EXPECT_EQ(nodes[3].entity.processor.logical_ids[1], 0);
+      EXPECT_EQ(nodes[3].entity.processor.logical_ids[2], 0);
+      EXPECT_EQ(nodes[3].entity.processor.logical_ids[3], 0);
+      EXPECT_EQ(nodes[3].entity.processor.logical_id_count, 1);
+      EXPECT_EQ(nodes[3].entity.processor.architecture_info.discriminant,
+                ZBI_TOPOLOGY_ARCHITECTURE_INFO_RISCV64);
+      EXPECT_EQ(nodes[3].entity.processor.architecture_info.riscv64.hart_id, 3);
+    }
+  }
+  ASSERT_TRUE(present);
+}
+
+TEST_F(RiscvDevictreeCpuTopologyItemTest, Qemu) {
+  std::array<std::byte, 1024> image_buffer;
+  std::vector<void*> allocs;
+  zbitl::Image<cpp20::span<std::byte>> image(image_buffer);
+  ASSERT_TRUE(image.clear().is_ok());
+
+  auto fdt = qemu_riscv();
+  boot_shim::DevicetreeBootShim<boot_shim::RiscvDevictreeCpuTopologyItem> shim("test", fdt);
+  shim.set_allocator([&allocs](size_t size, size_t alignment) -> void* {
+    // Custom aligned_alloc since OS X doesnt support it in some versions.
+    void* alloc = malloc(size + alignment);
+    allocs.push_back(alloc);
+    return reinterpret_cast<void*>((reinterpret_cast<uintptr_t>(alloc) + alignment) &
+                                   ~(alignment - 1));
+  });
+  shim.Get<boot_shim::RiscvDevictreeCpuTopologyItem>().set_boot_hart_id(3);
+
+  auto release_memory = fit::defer([&]() {
+    for (auto* alloc : allocs) {
+      free(alloc);
+    }
+  });
+
+  shim.Init();
+  auto clear_errors = fit::defer([&]() { image.ignore_error(); });
+  ASSERT_TRUE(shim.AppendItems(image).is_ok());
+  bool present = false;
+  for (auto [header, payload] : image) {
+    if (header->type == ZBI_TYPE_CPU_TOPOLOGY) {
+      present = true;
+      cpp20::span<zbi_topology_node_t> nodes(reinterpret_cast<zbi_topology_node_t*>(payload.data()),
+                                             payload.size() / sizeof(zbi_topology_node_t));
+
+      ASSERT_EQ(nodes.size(), 5u);
+
+      // cluster0
+      EXPECT_EQ(nodes[0].parent_index, ZBI_TOPOLOGY_NO_PARENT);
+      EXPECT_EQ(nodes[0].entity.discriminant, ZBI_TOPOLOGY_ENTITY_CLUSTER);
+      EXPECT_EQ(nodes[0].entity.cluster.performance_class, 1u);
+
+      // cpu@0
+      EXPECT_EQ(nodes[1].parent_index, 0);
+      EXPECT_EQ(nodes[1].entity.discriminant, ZBI_TOPOLOGY_ENTITY_PROCESSOR);
+      EXPECT_EQ(nodes[1].entity.processor.flags, 0);
+      EXPECT_EQ(nodes[1].entity.processor.logical_ids[0], 0);
+      EXPECT_EQ(nodes[1].entity.processor.logical_ids[1], 0);
+      EXPECT_EQ(nodes[1].entity.processor.logical_ids[2], 0);
+      EXPECT_EQ(nodes[1].entity.processor.logical_ids[3], 0);
+      EXPECT_EQ(nodes[1].entity.processor.logical_id_count, 1);
+      EXPECT_EQ(nodes[1].entity.processor.architecture_info.discriminant,
+                ZBI_TOPOLOGY_ARCHITECTURE_INFO_RISCV64);
+      EXPECT_EQ(nodes[1].entity.processor.architecture_info.riscv64.hart_id, 0);
+
+      // cpu@1
+      EXPECT_EQ(nodes[2].parent_index, 0);
+      EXPECT_EQ(nodes[2].entity.discriminant, ZBI_TOPOLOGY_ENTITY_PROCESSOR);
+      EXPECT_EQ(nodes[2].entity.processor.flags, 0);
+      EXPECT_EQ(nodes[2].entity.processor.logical_ids[0], 1);
+      EXPECT_EQ(nodes[2].entity.processor.logical_ids[1], 0);
+      EXPECT_EQ(nodes[2].entity.processor.logical_ids[2], 0);
+      EXPECT_EQ(nodes[2].entity.processor.logical_ids[3], 0);
+      EXPECT_EQ(nodes[2].entity.processor.logical_id_count, 1);
+      EXPECT_EQ(nodes[2].entity.processor.architecture_info.discriminant,
+                ZBI_TOPOLOGY_ARCHITECTURE_INFO_RISCV64);
+      EXPECT_EQ(nodes[2].entity.processor.architecture_info.riscv64.hart_id, 1);
+
+      // cpu@2
+      EXPECT_EQ(nodes[3].parent_index, 0);
+      EXPECT_EQ(nodes[3].entity.discriminant, ZBI_TOPOLOGY_ENTITY_PROCESSOR);
+      EXPECT_EQ(nodes[3].entity.processor.flags, 0);
+      EXPECT_EQ(nodes[3].entity.processor.logical_ids[0], 2);
+      EXPECT_EQ(nodes[3].entity.processor.logical_ids[1], 0);
+      EXPECT_EQ(nodes[3].entity.processor.logical_ids[2], 0);
+      EXPECT_EQ(nodes[3].entity.processor.logical_ids[3], 0);
+      EXPECT_EQ(nodes[3].entity.processor.logical_id_count, 1);
+      EXPECT_EQ(nodes[3].entity.processor.architecture_info.discriminant,
+                ZBI_TOPOLOGY_ARCHITECTURE_INFO_RISCV64);
+      EXPECT_EQ(nodes[3].entity.processor.architecture_info.riscv64.hart_id, 2);
+
+      // cpu@3
+      EXPECT_EQ(nodes[4].parent_index, 0);
+      EXPECT_EQ(nodes[4].entity.discriminant, ZBI_TOPOLOGY_ENTITY_PROCESSOR);
+      EXPECT_EQ(nodes[4].entity.processor.flags, ZBI_TOPOLOGY_PROCESSOR_FLAGS_PRIMARY);
+      EXPECT_EQ(nodes[4].entity.processor.logical_ids[0], 3);
+      EXPECT_EQ(nodes[4].entity.processor.logical_ids[1], 0);
+      EXPECT_EQ(nodes[4].entity.processor.logical_ids[2], 0);
+      EXPECT_EQ(nodes[4].entity.processor.logical_ids[3], 0);
+      EXPECT_EQ(nodes[4].entity.processor.logical_id_count, 1);
+      EXPECT_EQ(nodes[4].entity.processor.architecture_info.discriminant,
+                ZBI_TOPOLOGY_ARCHITECTURE_INFO_RISCV64);
+      EXPECT_EQ(nodes[4].entity.processor.architecture_info.riscv64.hart_id, 3);
+    }
+  }
+  ASSERT_TRUE(present);
+}
+
+TEST_F(RiscvDevictreeCpuTopologyItemTest, VisionFive2) {
+  std::array<std::byte, 1024> image_buffer;
+  std::vector<void*> allocs;
+  zbitl::Image<cpp20::span<std::byte>> image(image_buffer);
+  ASSERT_TRUE(image.clear().is_ok());
+
+  auto fdt = vision_five_2();
+  boot_shim::DevicetreeBootShim<boot_shim::RiscvDevictreeCpuTopologyItem> shim("test", fdt);
+  shim.set_allocator([&allocs](size_t size, size_t alignment) -> void* {
+    // Custom aligned_alloc since OS X doesnt support it in some versions.
+    void* alloc = malloc(size + alignment);
+    allocs.push_back(alloc);
+    return reinterpret_cast<void*>((reinterpret_cast<uintptr_t>(alloc) + alignment) &
+                                   ~(alignment - 1));
+  });
+  shim.Get<boot_shim::RiscvDevictreeCpuTopologyItem>().set_boot_hart_id(3);
+
+  auto release_memory = fit::defer([&]() {
+    for (auto* alloc : allocs) {
+      free(alloc);
+    }
+  });
+
+  shim.Init();
+  auto clear_errors = fit::defer([&]() { image.ignore_error(); });
+  ASSERT_TRUE(shim.AppendItems(image).is_ok());
+  bool present = false;
+  for (auto [header, payload] : image) {
+    if (header->type == ZBI_TYPE_CPU_TOPOLOGY) {
+      present = true;
+      cpp20::span<zbi_topology_node_t> nodes(reinterpret_cast<zbi_topology_node_t*>(payload.data()),
+                                             payload.size() / sizeof(zbi_topology_node_t));
+
+      ASSERT_EQ(nodes.size(), 5u);
+
+      // cpu@0
+      EXPECT_EQ(nodes[0].parent_index, ZBI_TOPOLOGY_NO_PARENT);
+      EXPECT_EQ(nodes[0].entity.discriminant, ZBI_TOPOLOGY_ENTITY_PROCESSOR);
+      EXPECT_EQ(nodes[0].entity.processor.flags, 0);
+      EXPECT_EQ(nodes[0].entity.processor.logical_ids[0], 0);
+      EXPECT_EQ(nodes[0].entity.processor.logical_ids[1], 0);
+      EXPECT_EQ(nodes[0].entity.processor.logical_ids[2], 0);
+      EXPECT_EQ(nodes[0].entity.processor.logical_ids[3], 0);
+      EXPECT_EQ(nodes[0].entity.processor.logical_id_count, 1);
+      EXPECT_EQ(nodes[0].entity.processor.architecture_info.discriminant,
+                ZBI_TOPOLOGY_ARCHITECTURE_INFO_RISCV64);
+      EXPECT_EQ(nodes[0].entity.processor.architecture_info.riscv64.hart_id, 0);
+
+      // cpu@1
+      EXPECT_EQ(nodes[1].parent_index, ZBI_TOPOLOGY_NO_PARENT);
+      EXPECT_EQ(nodes[1].entity.discriminant, ZBI_TOPOLOGY_ENTITY_PROCESSOR);
+      EXPECT_EQ(nodes[1].entity.processor.flags, 0);
+      EXPECT_EQ(nodes[1].entity.processor.logical_ids[0], 1);
+      EXPECT_EQ(nodes[1].entity.processor.logical_ids[1], 0);
+      EXPECT_EQ(nodes[1].entity.processor.logical_ids[2], 0);
+      EXPECT_EQ(nodes[1].entity.processor.logical_ids[3], 0);
+      EXPECT_EQ(nodes[1].entity.processor.logical_id_count, 1);
+      EXPECT_EQ(nodes[1].entity.processor.architecture_info.discriminant,
+                ZBI_TOPOLOGY_ARCHITECTURE_INFO_RISCV64);
+      EXPECT_EQ(nodes[1].entity.processor.architecture_info.riscv64.hart_id, 1);
+
+      // cpu@2
+      EXPECT_EQ(nodes[2].parent_index, ZBI_TOPOLOGY_NO_PARENT);
+      EXPECT_EQ(nodes[2].entity.discriminant, ZBI_TOPOLOGY_ENTITY_PROCESSOR);
+      EXPECT_EQ(nodes[2].entity.processor.flags, 0);
+      EXPECT_EQ(nodes[2].entity.processor.logical_ids[0], 2);
+      EXPECT_EQ(nodes[2].entity.processor.logical_ids[1], 0);
+      EXPECT_EQ(nodes[2].entity.processor.logical_ids[2], 0);
+      EXPECT_EQ(nodes[2].entity.processor.logical_ids[3], 0);
+      EXPECT_EQ(nodes[2].entity.processor.logical_id_count, 1);
+      EXPECT_EQ(nodes[2].entity.processor.architecture_info.discriminant,
+                ZBI_TOPOLOGY_ARCHITECTURE_INFO_RISCV64);
+      EXPECT_EQ(nodes[2].entity.processor.architecture_info.riscv64.hart_id, 2);
+
+      // cpu@3
+      EXPECT_EQ(nodes[3].parent_index, ZBI_TOPOLOGY_NO_PARENT);
+      EXPECT_EQ(nodes[3].entity.discriminant, ZBI_TOPOLOGY_ENTITY_PROCESSOR);
+      EXPECT_EQ(nodes[3].entity.processor.flags, ZBI_TOPOLOGY_PROCESSOR_FLAGS_PRIMARY);
+      EXPECT_EQ(nodes[3].entity.processor.logical_ids[0], 3);
+      EXPECT_EQ(nodes[3].entity.processor.logical_ids[1], 0);
+      EXPECT_EQ(nodes[3].entity.processor.logical_ids[2], 0);
+      EXPECT_EQ(nodes[3].entity.processor.logical_ids[3], 0);
+      EXPECT_EQ(nodes[3].entity.processor.logical_id_count, 1);
+      EXPECT_EQ(nodes[3].entity.processor.architecture_info.discriminant,
+                ZBI_TOPOLOGY_ARCHITECTURE_INFO_RISCV64);
+      EXPECT_EQ(nodes[3].entity.processor.architecture_info.riscv64.hart_id, 3);
+
+      // cpu@4
+      EXPECT_EQ(nodes[4].parent_index, ZBI_TOPOLOGY_NO_PARENT);
+      EXPECT_EQ(nodes[4].entity.discriminant, ZBI_TOPOLOGY_ENTITY_PROCESSOR);
+      EXPECT_EQ(nodes[4].entity.processor.flags, 0);
+      EXPECT_EQ(nodes[4].entity.processor.logical_ids[0], 4);
+      EXPECT_EQ(nodes[4].entity.processor.logical_ids[1], 0);
+      EXPECT_EQ(nodes[4].entity.processor.logical_ids[2], 0);
+      EXPECT_EQ(nodes[4].entity.processor.logical_ids[3], 0);
+      EXPECT_EQ(nodes[4].entity.processor.logical_id_count, 1);
+      EXPECT_EQ(nodes[4].entity.processor.architecture_info.discriminant,
+                ZBI_TOPOLOGY_ARCHITECTURE_INFO_RISCV64);
+      EXPECT_EQ(nodes[4].entity.processor.architecture_info.riscv64.hart_id, 4);
+    }
+  }
+  ASSERT_TRUE(present);
+}
+
+TEST_F(RiscvDevictreeCpuTopologyItemTest, HifiveSifiveUnmatched) {
+  std::array<std::byte, 1024> image_buffer;
+  std::vector<void*> allocs;
   zbitl::Image<cpp20::span<std::byte>> image(image_buffer);
   ASSERT_TRUE(image.clear().is_ok());
 
   auto fdt = sifive_hifive_unmatched();
-  boot_shim::DevicetreeBootShim<boot_shim::RiscvDevicetreeTimerItem> shim("test", fdt);
-  shim.Init();
-  ASSERT_TRUE(shim.AppendItems(image).is_ok());
+  boot_shim::DevicetreeBootShim<boot_shim::RiscvDevictreeCpuTopologyItem> shim("test", fdt);
+  shim.set_allocator([&allocs](size_t size, size_t alignment) -> void* {
+    // Custom aligned_alloc since OS X doesnt support it in some versions.
+    void* alloc = malloc(size + alignment);
+    allocs.push_back(alloc);
+    return reinterpret_cast<void*>((reinterpret_cast<uintptr_t>(alloc) + alignment) &
+                                   ~(alignment - 1));
+  });
+  shim.Get<boot_shim::RiscvDevictreeCpuTopologyItem>().set_boot_hart_id(2);
 
+  auto release_memory = fit::defer([&]() {
+    for (auto* alloc : allocs) {
+      free(alloc);
+    }
+  });
+
+  shim.Init();
+  auto clear_errors = fit::defer([&]() { image.ignore_error(); });
+  ASSERT_TRUE(shim.AppendItems(image).is_ok());
   bool present = false;
-  auto clear_err = fit::defer([&]() { image.ignore_error(); });
   for (auto [header, payload] : image) {
-    if (header->type == ZBI_TYPE_KERNEL_DRIVER &&
-        header->extra == ZBI_KERNEL_DRIVER_RISCV_GENERIC_TIMER) {
-      EXPECT_GE(payload.size(), sizeof(zbi_dcfg_riscv_generic_timer_driver_t));
-      auto* dcfg = reinterpret_cast<zbi_dcfg_riscv_generic_timer_driver_t*>(payload.data());
-      EXPECT_EQ(dcfg->freq_hz, 0xf4240);
+    if (header->type == ZBI_TYPE_CPU_TOPOLOGY) {
       present = true;
+      cpp20::span<zbi_topology_node_t> nodes(reinterpret_cast<zbi_topology_node_t*>(payload.data()),
+                                             payload.size() / sizeof(zbi_topology_node_t));
+
+      ASSERT_EQ(nodes.size(), 6u);
+
+      // cluster0
+      EXPECT_EQ(nodes[0].parent_index, ZBI_TOPOLOGY_NO_PARENT);
+      EXPECT_EQ(nodes[0].entity.discriminant, ZBI_TOPOLOGY_ENTITY_CLUSTER);
+      EXPECT_EQ(nodes[0].entity.cluster.performance_class, 1);
+
+      // cpu@3
+      EXPECT_EQ(nodes[1].parent_index, 0);
+      EXPECT_EQ(nodes[1].entity.discriminant, ZBI_TOPOLOGY_ENTITY_PROCESSOR);
+      EXPECT_EQ(nodes[1].entity.processor.flags, 0);
+      EXPECT_EQ(nodes[1].entity.processor.logical_ids[0], 0);
+      EXPECT_EQ(nodes[1].entity.processor.logical_ids[1], 0);
+      EXPECT_EQ(nodes[1].entity.processor.logical_ids[2], 0);
+      EXPECT_EQ(nodes[1].entity.processor.logical_ids[3], 0);
+      EXPECT_EQ(nodes[1].entity.processor.logical_id_count, 1);
+      EXPECT_EQ(nodes[1].entity.processor.architecture_info.discriminant,
+                ZBI_TOPOLOGY_ARCHITECTURE_INFO_RISCV64);
+      EXPECT_EQ(nodes[1].entity.processor.architecture_info.riscv64.hart_id, 3);
+
+      // cpu@1
+      EXPECT_EQ(nodes[2].parent_index, 0);
+      EXPECT_EQ(nodes[2].entity.discriminant, ZBI_TOPOLOGY_ENTITY_PROCESSOR);
+      EXPECT_EQ(nodes[2].entity.processor.flags, 0);
+      EXPECT_EQ(nodes[2].entity.processor.logical_ids[0], 1);
+      EXPECT_EQ(nodes[2].entity.processor.logical_ids[1], 0);
+      EXPECT_EQ(nodes[2].entity.processor.logical_ids[2], 0);
+      EXPECT_EQ(nodes[2].entity.processor.logical_ids[3], 0);
+      EXPECT_EQ(nodes[2].entity.processor.logical_id_count, 1);
+      EXPECT_EQ(nodes[2].entity.processor.architecture_info.discriminant,
+                ZBI_TOPOLOGY_ARCHITECTURE_INFO_RISCV64);
+      EXPECT_EQ(nodes[2].entity.processor.architecture_info.riscv64.hart_id, 1);
+
+      // cpu@4
+      EXPECT_EQ(nodes[3].parent_index, 0);
+      EXPECT_EQ(nodes[3].entity.discriminant, ZBI_TOPOLOGY_ENTITY_PROCESSOR);
+      EXPECT_EQ(nodes[3].entity.processor.flags, 0);
+      EXPECT_EQ(nodes[3].entity.processor.logical_ids[0], 2);
+      EXPECT_EQ(nodes[3].entity.processor.logical_ids[1], 0);
+      EXPECT_EQ(nodes[3].entity.processor.logical_ids[2], 0);
+      EXPECT_EQ(nodes[3].entity.processor.logical_ids[3], 0);
+      EXPECT_EQ(nodes[3].entity.processor.logical_id_count, 1);
+      EXPECT_EQ(nodes[3].entity.processor.architecture_info.discriminant,
+                ZBI_TOPOLOGY_ARCHITECTURE_INFO_RISCV64);
+      EXPECT_EQ(nodes[3].entity.processor.architecture_info.riscv64.hart_id, 4);
+
+      // cpu@2
+      EXPECT_EQ(nodes[4].parent_index, 0);
+      EXPECT_EQ(nodes[4].entity.discriminant, ZBI_TOPOLOGY_ENTITY_PROCESSOR);
+      EXPECT_EQ(nodes[4].entity.processor.flags, ZBI_TOPOLOGY_PROCESSOR_FLAGS_PRIMARY);
+      EXPECT_EQ(nodes[4].entity.processor.logical_ids[0], 3);
+      EXPECT_EQ(nodes[4].entity.processor.logical_ids[1], 0);
+      EXPECT_EQ(nodes[4].entity.processor.logical_ids[2], 0);
+      EXPECT_EQ(nodes[4].entity.processor.logical_ids[3], 0);
+      EXPECT_EQ(nodes[4].entity.processor.logical_id_count, 1);
+      EXPECT_EQ(nodes[4].entity.processor.architecture_info.discriminant,
+                ZBI_TOPOLOGY_ARCHITECTURE_INFO_RISCV64);
+      EXPECT_EQ(nodes[4].entity.processor.architecture_info.riscv64.hart_id, 2);
+
+      // cpu@0
+      EXPECT_EQ(nodes[5].parent_index, 0);
+      EXPECT_EQ(nodes[5].entity.discriminant, ZBI_TOPOLOGY_ENTITY_PROCESSOR);
+      EXPECT_EQ(nodes[5].entity.processor.flags, 0);
+      EXPECT_EQ(nodes[5].entity.processor.logical_ids[0], 4);
+      EXPECT_EQ(nodes[5].entity.processor.logical_ids[1], 0);
+      EXPECT_EQ(nodes[5].entity.processor.logical_ids[2], 0);
+      EXPECT_EQ(nodes[5].entity.processor.logical_ids[3], 0);
+      EXPECT_EQ(nodes[5].entity.processor.logical_id_count, 1);
+      EXPECT_EQ(nodes[5].entity.processor.architecture_info.discriminant,
+                ZBI_TOPOLOGY_ARCHITECTURE_INFO_RISCV64);
+      EXPECT_EQ(nodes[5].entity.processor.architecture_info.riscv64.hart_id, 0);
     }
   }
   ASSERT_TRUE(present);
