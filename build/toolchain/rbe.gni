@@ -59,6 +59,8 @@ cxx_rbe_deps = rbe_common_tools + rbe_common_scripts + rbe_common_py_scripts + [
 
 prebuilt_tool_remote_wrapper = "//build/rbe/prebuilt_tool_remote_wrapper.py"
 
+rbe_dlwrap = "//build/rbe/dlwrap.py"
+
 declare_args() {
   #########################
   ### Rust RBE controls ###
@@ -114,6 +116,8 @@ declare_args() {
   # Controls whether or not to download (often large) unstripped Rust
   # binaries.  When downloading is disabled, the build produces stubs
   # that be used to retrieve remote artifacts later using build/rbe/dlwrap.py.
+  # TODO(b/284994230): This option is only available to developers,
+  # and not restricted environments that lack direct network access.
   rust_rbe_download_unstripped_binaries = true
 
   ########################
