@@ -435,7 +435,6 @@
                 "setreuid04_16",
                 "setreuid07_16",
                 "setrlimit01",
-                "setrlimit02",
                 "setrlimit03",
                 "setsockopt01",
                 "setsockopt08",
@@ -551,7 +550,6 @@
                 "cve-2017-17052",
                 "io_pgetevents01",
                 "select03",
-                "setrlimit02",
 
                 // Causes an OOM when /dev/loop-control is available.
                 "fallocate05",
