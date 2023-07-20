@@ -158,6 +158,17 @@ driver_manifest("base-driver-manifest") {
   ]
 }
 
+driver_manifest("boot-driver-manifest") {
+  manifest_name = "driver_index/boot_driver_manifest"
+  install_as_config_resource = true
+  package_url = "fuchsia-boot:///driver-index-unittests"
+  deps = [
+    ":test-bind-component",
+    ":test-bind2-component",
+    ":test-fallback-component",
+  ]
+}
+
 # Run with `fx test driver-index-unittests`.
 fuchsia_unittest_package("driver-index-unittests") {
   manifest = "meta/driver-index-unittests.cml"
@@ -169,6 +180,7 @@ fuchsia_unittest_package("driver-index-unittests") {
   deps = [
     ":base-driver-manifest",
     ":bin_test",
+    ":boot-driver-manifest",
     ":test-bind-component",
     ":test-bind2-component",
     ":test-fallback-component",

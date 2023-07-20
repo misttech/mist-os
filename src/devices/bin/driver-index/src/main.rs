@@ -59,7 +59,7 @@ enum IncomingRequest {
     DriverRegistrarProtocol(fdr::DriverRegistrarRequestStream),
 }
 
-async fn load_boot_drivers(
+async fn load_unpackaged_boot_drivers(
     dir: &fio::DirectoryProxy,
     eager_drivers: &HashSet<url::Url>,
     disabled_drivers: &HashSet<url::Url>,
@@ -68,8 +68,7 @@ async fn load_boot_drivers(
         &dir,
         "meta",
         fio::OpenFlags::RIGHT_READABLE,
-    )
-    .context("boot: Failed to open meta")?;
+    )?;
 
     let entries =
         fuchsia_fs::directory::readdir(&meta).await.context("boot: failed to read meta")?;
@@ -84,15 +83,18 @@ async fn load_boot_drivers(
         let url = url::Url::parse(&url_string)?;
         let driver = load_boot_driver(&dir, url, DriverPackageType::Boot, None).await;
         if let Err(e) = driver {
-            tracing::error!("Failed to load boot driver: {}: {}", url_string, e);
+            tracing::error!("Failed to load unpackaged boot driver: {}: {}", url_string, e);
             continue;
         }
         if let Ok(Some(mut driver)) = driver {
             if disabled_drivers.contains(&driver.component_url) {
-                tracing::info!("Skipping boot driver: {}", driver.component_url.to_string());
+                tracing::info!(
+                    "Skipping unpackaged boot driver: {}",
+                    driver.component_url.to_string()
+                );
                 continue;
             }
-            tracing::info!("Found boot driver: {}", driver.component_url.to_string());
+            tracing::info!("Found unpackaged boot driver: {}", driver.component_url.to_string());
             if eager_drivers.contains(&driver.component_url) {
                 driver.fallback = false;
             }
@@ -100,6 +102,25 @@ async fn load_boot_drivers(
         }
     }
     Ok(drivers)
+}
+
+async fn load_boot_drivers(
+    boot: &fio::DirectoryProxy,
+    resolver: &fresolution::ResolverProxy,
+    eager_drivers: &HashSet<url::Url>,
+    disabled_drivers: &HashSet<url::Url>,
+) -> Result<Vec<ResolvedDriver>, anyhow::Error> {
+    let manifest = fuchsia_fs::directory::open_file_no_describe(
+        &boot,
+        "config/driver_index/boot_driver_manifest",
+        fio::OpenFlags::RIGHT_READABLE,
+    )
+    .context("boot: Failed to open driver_manifest")?;
+    let resolved_drivers = load_drivers(manifest, &resolver, &eager_drivers, &disabled_drivers)
+        .await
+        .context("Error loading boot packages")
+        .map_err(log_error)?;
+    Ok(resolved_drivers)
 }
 
 enum BaseRepo {
@@ -651,6 +672,39 @@ async fn load_drivers(
     Ok(resolved_drivers)
 }
 
+// Merge the two boot driver lists, skipping duplicates that can occur during the
+// soft-transition of boot drivers to packages.
+fn merge_boot_drivers(
+    packaged_boot_drivers: Vec<ResolvedDriver>,
+    unpackaged_boot_drivers: Vec<ResolvedDriver>,
+) -> Result<Vec<ResolvedDriver>, anyhow::Error> {
+    let mut drivers = Vec::new();
+    let mut unpackaged_boot_drivers = unpackaged_boot_drivers
+        .into_iter()
+        .map(|d| (d.component_url.to_string(), d))
+        .collect::<HashMap<String, ResolvedDriver>>();
+    for driver in packaged_boot_drivers {
+        let unpackaged_url = format!(
+            "fuchsia-boot:///#{}",
+            driver
+                .component_url
+                .fragment()
+                .context("Packaged boot driver url is missing fragment")?
+        );
+        // Remove the packaged driver from unpackaged_boot_drivers if present.
+        if unpackaged_boot_drivers.remove(&unpackaged_url).is_some() {
+            tracing::info!(
+                "BootFs file is still generated for packaged driver: {}",
+                driver.component_url
+            );
+        }
+        drivers.push(driver);
+    }
+    // Add the remaining unpackaged drivers to the final drivers list.
+    drivers.extend(unpackaged_boot_drivers.into_values());
+    Ok(drivers)
+}
+
 // NOTE: This tag is load-bearing to make sure that the output
 // shows up in serial.
 #[fuchsia::main(logging_tags = ["driver"])]
@@ -696,10 +750,26 @@ async fn main() -> Result<(), anyhow::Error> {
 
     let boot = fuchsia_fs::directory::open_in_namespace("/boot", fio::OpenFlags::RIGHT_READABLE)
         .context("Failed to open /boot")?;
-    let drivers = load_boot_drivers(&boot, &eager_drivers, &disabled_drivers)
-        .await
-        .context("Failed to load boot drivers")
-        .map_err(log_error)?;
+    let boot_resolver = client::connect_to_protocol_at_path::<fresolution::ResolverMarker>(
+        "/svc/fuchsia.component.resolution.Resolver-boot",
+    )
+    .context("Failed to connect to boot resolver")?;
+
+    let packaged_boot_drivers =
+        load_boot_drivers(&boot, &boot_resolver, &eager_drivers, &disabled_drivers)
+            .await
+            .context("Failed to load boot drivers")
+            .map_err(log_error)?;
+
+    // TODO(fxbug.dev/97517): Resolve unpackaged boot drivers until they have been fully migrated.
+    let unpackaged_boot_drivers =
+        load_unpackaged_boot_drivers(&boot, &eager_drivers, &disabled_drivers)
+            .await
+            .context("Failed to load unpackaged boot drivers")
+            .map_err(log_error)?;
+
+    // Combine packaged and unpackaged drivers into the final drivers list used to load drivers.
+    let drivers = merge_boot_drivers(packaged_boot_drivers, unpackaged_boot_drivers)?;
 
     let mut should_load_base_drivers = true;
 
@@ -1693,19 +1763,54 @@ mod tests {
     }
 
     #[fuchsia::test]
-    async fn test_load_eager_fallback_boot_driver() {
+    async fn test_load_eager_fallback_unpackaged_boot_driver() {
         let eager_driver_component_url =
             url::Url::parse("fuchsia-boot:///#meta/test-fallback-component.cm").unwrap();
 
         let boot = fuchsia_fs::directory::open_in_namespace("/pkg", fio::OpenFlags::RIGHT_READABLE)
             .unwrap();
-        let drivers = load_boot_drivers(
+        let drivers = load_unpackaged_boot_drivers(
             &boot,
             &HashSet::from([eager_driver_component_url.clone()]),
             &HashSet::new(),
         )
         .await
         .unwrap();
+        assert!(
+            !drivers
+                .iter()
+                .find(|driver| driver.component_url == eager_driver_component_url)
+                .expect("Fallback driver did not load")
+                .fallback
+        );
+    }
+    #[fuchsia::test]
+    async fn test_load_eager_fallback_boot_driver() {
+        let eager_driver_component_url = url::Url::parse(
+            "fuchsia-boot:///driver-index-unittests#meta/test-fallback-component.cm",
+        )
+        .unwrap();
+        let (resolver, resolver_stream) =
+            fidl::endpoints::create_proxy_and_stream::<fresolution::ResolverMarker>().unwrap();
+        let eager_drivers = HashSet::from([eager_driver_component_url.clone()]);
+        let disabled_drivers = HashSet::new();
+
+        let boot = fuchsia_fs::directory::open_in_namespace("/pkg", fio::OpenFlags::RIGHT_READABLE)
+            .unwrap();
+
+        let load_boot_drivers_task =
+            load_boot_drivers(&boot, &resolver, &eager_drivers, &disabled_drivers).fuse();
+
+        let resolver_task = run_resolver_server(resolver_stream).fuse();
+        futures::pin_mut!(load_boot_drivers_task, resolver_task);
+        let drivers = futures::select! {
+            result = load_boot_drivers_task => {
+                result.unwrap()
+            },
+            result = resolver_task => {
+                panic!("Resolver task finished: {:?}", result);
+            },
+        };
         assert!(
             !drivers
                 .iter()
@@ -1770,19 +1875,53 @@ mod tests {
     }
 
     #[fuchsia::test]
-    async fn test_dont_load_disabled_fallback_boot_driver() {
+    async fn test_dont_load_disabled_fallback_unpackaged_boot_driver() {
         let disabled_driver_component_url =
             url::Url::parse("fuchsia-boot:///#meta/test-fallback-component.cm").unwrap();
 
         let boot = fuchsia_fs::directory::open_in_namespace("/pkg", fio::OpenFlags::RIGHT_READABLE)
             .unwrap();
-        let drivers = load_boot_drivers(
+        let drivers = load_unpackaged_boot_drivers(
             &boot,
             &HashSet::new(),
             &HashSet::from([disabled_driver_component_url.clone()]),
         )
         .await
         .unwrap();
+        assert!(drivers
+            .iter()
+            .find(|driver| driver.component_url == disabled_driver_component_url)
+            .is_none());
+    }
+
+    #[fuchsia::test]
+    async fn test_dont_load_disabled_fallback_boot_driver() {
+        let disabled_driver_component_url = url::Url::parse(
+            "fuchsia-boot:///driver-index-unittests#meta/test-fallback-component.cm",
+        )
+        .unwrap();
+
+        let (resolver, resolver_stream) =
+            fidl::endpoints::create_proxy_and_stream::<fresolution::ResolverMarker>().unwrap();
+        let eager_drivers = HashSet::new();
+        let disabled_drivers = HashSet::from([disabled_driver_component_url.clone()]);
+
+        let boot = fuchsia_fs::directory::open_in_namespace("/pkg", fio::OpenFlags::RIGHT_READABLE)
+            .unwrap();
+
+        let load_boot_drivers_task =
+            load_boot_drivers(&boot, &resolver, &eager_drivers, &disabled_drivers).fuse();
+
+        let resolver_task = run_resolver_server(resolver_stream).fuse();
+        futures::pin_mut!(load_boot_drivers_task, resolver_task);
+        let drivers = futures::select! {
+            result = load_boot_drivers_task => {
+                result.unwrap()
+            },
+            result = resolver_task => {
+                panic!("Resolver task finished: {:?}", result);
+            },
+        };
         assert!(drivers
             .iter()
             .find(|driver| driver.component_url == disabled_driver_component_url)
@@ -1921,7 +2060,8 @@ mod tests {
     async fn test_boot_drivers() {
         let boot = fuchsia_fs::directory::open_in_namespace("/pkg", fio::OpenFlags::RIGHT_READABLE)
             .unwrap();
-        let drivers = load_boot_drivers(&boot, &HashSet::new(), &HashSet::new()).await.unwrap();
+        let drivers =
+            load_unpackaged_boot_drivers(&boot, &HashSet::new(), &HashSet::new()).await.unwrap();
 
         let (proxy, stream) =
             fidl::endpoints::create_proxy_and_stream::<fdi::DriverIndexMarker>().unwrap();
