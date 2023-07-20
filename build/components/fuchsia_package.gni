@@ -424,13 +424,6 @@ template("fuchsia_package") {
         deps += [ ":$_validate_config_target" ]
       }
 
-      if (defined(invoker.subpackages) ||
-          defined(invoker.renameable_subpackages)) {
-        # If the package has subpackages, make it dep on the visibilty-based
-        # allow-list.
-        deps += [ "//build/packages:allowed_to_use_subpackages" ]
-      }
-
       if (_is_driver_package) {
         metadata = {
           # Allow exclusion of driver packages by assembly
