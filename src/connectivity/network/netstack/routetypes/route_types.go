@@ -80,6 +80,10 @@ type ExtendedRoute struct {
 	// This flag is used with non-dynamic routes (i.e., statically added routes)
 	// to keep them in the table while their interface is down.
 	Enabled bool
+
+	// OwningSets contains references to the route sets that "own" / reference
+	// this route.
+	OwningSets map[*RouteSetId]struct{}
 }
 
 type RoutingChangeTag uint32
@@ -120,4 +124,21 @@ func (er *ExtendedRoute) String() string {
 	return out.String()
 }
 
+func (er *ExtendedRoute) IsMemberOfRouteSet(id *RouteSetId) bool {
+	_, ok := er.OwningSets[id]
+	return ok
+}
+
 type SendRoutingTableChangeCb func(RoutingTableChange)
+
+// RouteSetId as a value means nothing, but pointers to RouteSetId are used as
+// unique identifiers of route sets.
+type RouteSetId struct{}
+
+func (id *RouteSetId) IsGlobal() bool {
+	return id == nil
+}
+
+func GlobalRouteSet() *RouteSetId {
+	return nil
+}

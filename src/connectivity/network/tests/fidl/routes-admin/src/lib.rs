@@ -20,6 +20,7 @@ use fidl_fuchsia_net_routes_ext::{
 use fidl_fuchsia_net_stack as fnet_stack;
 use fuchsia_async::TimeoutExt as _;
 use futures::{future::FutureExt as _, pin_mut};
+use itertools::Itertools as _;
 use net_declare::{fidl_ip_v4, fidl_ip_v4_with_prefix, fidl_ip_v6, fidl_ip_v6_with_prefix};
 use net_types::{
     ip::{Ip, Ipv4, Ipv6},
@@ -563,4 +564,68 @@ async fn system_removes_route_from_route_set<
     .await
     .expect("no FIDL error")
     .expect("remove route"));
+}
+
+// TODO(https://fxbug.dev/130864): This test case doesn't entirely make sense to
+// live here as it does not involve the routes-admin FIDL API, but this is the
+// best place to park it until fuchsia.net.stack.Stack/{Add, Del}ForwardingEntry
+// is removed, as it's part of generally validating the correctness of the
+// changes supporting the routes-admin implementation.
+#[netstack_test]
+async fn root_route_apis_can_remove_loopback_route<
+    I: net_types::ip::Ip + FidlRouteAdminIpExt + FidlRouteIpExt,
+    N: Netstack,
+>(
+    name: &str,
+) {
+    let sandbox = netemul::TestSandbox::new().expect("create sandbox");
+    let TestSetup { realm, network: _network, interface: _interface, set_provider: _, state } =
+        TestSetup::<I>::new::<N>(&sandbox, name).await;
+
+    let routes_stream =
+        fnet_routes_ext::event_stream_from_state::<I>(&state).expect("should succeed");
+    pin_mut!(routes_stream);
+
+    let mut routes = HashSet::new();
+    let loopback_dest = I::map_ip(
+        (),
+        |()| net_declare::net_subnet_v4!("127.0.0.0/8"),
+        |()| net_declare::net_subnet_v6!("::1/128"),
+    );
+
+    let is_loopback_route =
+        |fnet_routes_ext::InstalledRoute {
+             route: fnet_routes_ext::Route { destination, action: _, properties: _ },
+             effective_properties: _,
+         }: &fnet_routes_ext::InstalledRoute<I>| { destination == &loopback_dest };
+
+    // Wait for loopback route to be present.
+    fnet_routes_ext::wait_for_routes::<I, _, _>(&mut routes_stream, &mut routes, |routes| {
+        routes.iter().any(is_loopback_route)
+    })
+    .await
+    .expect("should succeed");
+
+    let loopback_route = routes
+        .iter()
+        .filter(|route| is_loopback_route(*route))
+        .exactly_one()
+        .expect("should have exactly one loopback route");
+
+    // Remove the loopback route.
+    let fuchsia_net_stack = realm
+        .connect_to_protocol::<fnet_stack::StackMarker>()
+        .expect("connect to fuchsia.net.stack.Stack");
+    fuchsia_net_stack
+        .del_forwarding_entry(&loopback_route.route.try_into().expect("convert to ForwardingEntry"))
+        .await
+        .expect("should not have FIDL error")
+        .expect("should succeed");
+
+    // Loopback route should disappear.
+    fnet_routes_ext::wait_for_routes::<I, _, _>(&mut routes_stream, &mut routes, |routes| {
+        !routes.iter().any(is_loopback_route)
+    })
+    .await
+    .expect("should succeed");
 }

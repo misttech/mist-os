@@ -11,7 +11,6 @@ import (
 	"net"
 	"testing"
 
-	"github.com/google/go-cmp/cmp"
 	"go.fuchsia.dev/fuchsia/src/connectivity/network/netstack/routes"
 	"go.fuchsia.dev/fuchsia/src/connectivity/network/netstack/routetypes"
 
@@ -263,7 +262,7 @@ func TestAddRoute(t *testing.T) {
 			tb := routes.RouteTable{}
 			for _, j := range tc.order {
 				r := testRouteTable[j]
-				tb.AddRoute(r.Route, r.Prf, r.Metric, r.MetricTracksInterface, r.Dynamic, r.Enabled)
+				tb.AddRoute(r.Route, r.Prf, r.Metric, r.MetricTracksInterface, r.Dynamic, r.Enabled, routetypes.GlobalRouteSet())
 			}
 			tableWanted := testRouteTable
 			tableGot := tb.GetExtendedRouteTable()
@@ -284,7 +283,7 @@ func TestAddRoute(t *testing.T) {
 		tb.Set(testRouteTable)
 		for i, r := range testRouteTable {
 			r.Dynamic = !r.Dynamic
-			tb.AddRoute(r.Route, r.Prf, r.Metric, r.MetricTracksInterface, r.Dynamic, r.Enabled)
+			tb.AddRoute(r.Route, r.Prf, r.Metric, r.MetricTracksInterface, r.Dynamic, r.Enabled, routetypes.GlobalRouteSet())
 			tableWanted := testRouteTable
 			tableGot := tb.GetExtendedRouteTable()
 			if tableGot[i].Dynamic != r.Dynamic {
@@ -295,7 +294,7 @@ func TestAddRoute(t *testing.T) {
 			}
 
 			r.Enabled = !r.Enabled
-			tb.AddRoute(r.Route, r.Prf, r.Metric, r.MetricTracksInterface, r.Dynamic, r.Enabled)
+			tb.AddRoute(r.Route, r.Prf, r.Metric, r.MetricTracksInterface, r.Dynamic, r.Enabled, routetypes.GlobalRouteSet())
 			tableGot = tb.GetExtendedRouteTable()
 			if tableGot[i].Enabled != r.Enabled {
 				t.Errorf("got tableGot[%d].Enabled = %t, want %t", i, tableGot[i].Enabled, r.Enabled)
@@ -314,8 +313,8 @@ func TestAddRoute(t *testing.T) {
 		// 1.test - r0 is more preferred.
 		{
 			var tb routes.RouteTable
-			tb.AddRoute(r0, routetypes.HighPreference, 100, true, true, true)
-			tb.AddRoute(r1, routetypes.LowPreference, 100, true, true, true)
+			tb.AddRoute(r0, routetypes.HighPreference, 100, true, true, true, routetypes.GlobalRouteSet())
+			tb.AddRoute(r1, routetypes.LowPreference, 100, true, true, true, routetypes.GlobalRouteSet())
 			tableGot := tb.GetExtendedRouteTable()
 			if got, want := tableGot[0].Route, r0; got != want {
 				t.Errorf("got = %s, want = %s", got, want)
@@ -328,8 +327,8 @@ func TestAddRoute(t *testing.T) {
 		// 2.test - r1 is more preferred.
 		{
 			var tb routes.RouteTable
-			tb.AddRoute(r0, routetypes.LowPreference, 100, true, true, true)
-			tb.AddRoute(r1, routetypes.HighPreference, 100, true, true, true)
+			tb.AddRoute(r0, routetypes.LowPreference, 100, true, true, true, routetypes.GlobalRouteSet())
+			tb.AddRoute(r1, routetypes.HighPreference, 100, true, true, true, routetypes.GlobalRouteSet())
 			tableGot := tb.GetExtendedRouteTable()
 			if got, want := tableGot[0].Route, r1; got != want {
 				t.Errorf("got = %s, want = %s", got, want)
@@ -349,8 +348,8 @@ func TestAddRoute(t *testing.T) {
 		// 1.test - r0 gets lower metric.
 		{
 			var tb routes.RouteTable
-			tb.AddRoute(r0, routetypes.MediumPreference, 100, true, true, true)
-			tb.AddRoute(r1, routetypes.MediumPreference, 200, true, true, true)
+			tb.AddRoute(r0, routetypes.MediumPreference, 100, true, true, true, routetypes.GlobalRouteSet())
+			tb.AddRoute(r1, routetypes.MediumPreference, 200, true, true, true, routetypes.GlobalRouteSet())
 			tableGot := tb.GetExtendedRouteTable()
 			if got, want := tableGot[0].Route, r0; got != want {
 				t.Errorf("got = %s, want = %s", got, want)
@@ -363,8 +362,8 @@ func TestAddRoute(t *testing.T) {
 		// 2.test - r1 gets lower metric.
 		{
 			var tb routes.RouteTable
-			tb.AddRoute(r0, routetypes.MediumPreference, 200, true, true, true)
-			tb.AddRoute(r1, routetypes.MediumPreference, 100, true, true, true)
+			tb.AddRoute(r0, routetypes.MediumPreference, 200, true, true, true, routetypes.GlobalRouteSet())
+			tb.AddRoute(r1, routetypes.MediumPreference, 100, true, true, true, routetypes.GlobalRouteSet())
 			tableGot := tb.GetExtendedRouteTable()
 			if got, want := tableGot[0].Route, r1; got != want {
 				t.Errorf("got = %s, want = %s", got, want)
@@ -401,7 +400,7 @@ func TestDelRoute(t *testing.T) {
 				toDel := testRouteTable[d]
 				// Don't assert that a route is actually removed since there are test
 				// cases which remove the same route multiple times.
-				_ = tb.DelRoute(toDel.Route)
+				_ = tb.DelRoute(toDel.Route, routetypes.GlobalRouteSet())
 				validRoutes[d] = false
 			}
 			tableGot := tb.GetExtendedRouteTable()
@@ -415,42 +414,6 @@ func TestDelRoute(t *testing.T) {
 				t.Errorf("got\n%s, want\n%s", tableGot, tableWant)
 			}
 		})
-	}
-}
-
-func TestDelRouteLockedIfDynamic(t *testing.T) {
-	for i := range testRouteTable {
-		tb := routes.RouteTable{}
-		tb.Set(testRouteTable)
-		routeToRemove := testRouteTable[i]
-		tb.Lock()
-		gotRemovedRoutes := tb.DelRouteIfDynamicLocked(routeToRemove.Route)
-		tb.Unlock()
-
-		wantRemovedRoutes := func() []routetypes.ExtendedRoute {
-			if routeToRemove.Dynamic {
-				return []routetypes.ExtendedRoute{routeToRemove}
-			} else {
-				return nil
-			}
-		}()
-
-		tableWant := func() routes.ExtendedRouteTable {
-			if routeToRemove.Dynamic {
-				return append(append(routes.ExtendedRouteTable(nil), testRouteTable[:i]...), testRouteTable[(i+1):]...)
-			} else {
-				return append(routes.ExtendedRouteTable(nil), testRouteTable...)
-			}
-		}()
-
-		if diff := cmp.Diff(gotRemovedRoutes, wantRemovedRoutes); diff != "" {
-			t.Errorf("unexpected difference in removed routes (-got +want): %s", diff)
-		}
-
-		tableGot := tb.GetExtendedRouteTable()
-		if !isSameRouteTable(tableGot, tableWant) {
-			t.Errorf("got\n%s, want\n%s", tableGot, tableWant)
-		}
 	}
 }
 

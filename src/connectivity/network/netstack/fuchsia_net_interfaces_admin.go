@@ -95,10 +95,12 @@ type adminAddressStateProviderImpl struct {
 		// therefore no longer needs to be removed when this protocol terminates.
 		removed bool
 	}
-	// If the `add_subnet_route` field AddressParameters field was set when
-	// this address was added to the stack, then this contains the subnet route
-	// added as a result.
-	addedSubnetRoutes []tcpip.Route
+	// The RouteSetId used to associate this address to any subnet route added
+	// as a result of the add_subnet_route AddressParameters field.
+	subnetRouteSetId routetypes.RouteSetId
+	// The add_subnet_route AddressParameters field from when this address was
+	// added to the stack.
+	addSubnetRoute bool
 }
 
 func (pi *adminAddressStateProviderImpl) UpdateAddressProperties(_ fidl.Context, properties admin.AddressProperties) error {
@@ -340,19 +342,11 @@ func (pi *adminAddressStateProviderImpl) OnRemoved(reason stack.AddressRemovalRe
 		}
 	}
 	pi.cancelServe()
-	pi.cleanUpSubnetRoute()
 }
 
 func (pi *adminAddressStateProviderImpl) cleanUpSubnetRoute() {
-	if len(pi.addedSubnetRoutes) > 0 {
-		pi.ns.routeTable.Lock()
-		defer pi.ns.routeTable.Unlock()
-
-		for _, route := range pi.addedSubnetRoutes {
-			pi.ns.routeTable.DelRouteIfDynamicLocked(route)
-		}
-
-		pi.ns.routeTable.UpdateStackLocked(pi.ns.stack, pi.ns.resetDestinationCache)
+	if pi.addSubnetRoute {
+		pi.ns.DelRouteSet(&pi.subnetRouteSetId)
 	}
 }
 
@@ -409,17 +403,19 @@ func (ci *adminControlImpl) AddAddress(_ fidl.Context, subnet net.Subnet, parame
 	}
 
 	addSubnetRoute := parameters.GetAddSubnetRouteWithDefault(false)
-	impl.addedSubnetRoutes = func() []tcpip.Route {
-		if addSubnetRoute {
-			subnetRoute := addressWithPrefixRoute(ifs.nicid, protocolAddr.AddressWithPrefix)
-			ifs.mu.Lock()
-			addedSubnetRoutes := ifs.addRoutesWithPreferenceLocked([]tcpip.Route{subnetRoute}, routetypes.MediumPreference, metricNotSet, true /* dynamic */, false /* overwriteIfAlreadyExist */)
-			ifs.mu.Unlock()
-			return addedSubnetRoutes
-		} else {
-			return []tcpip.Route{}
-		}
-	}()
+	impl.addSubnetRoute = addSubnetRoute
+	if addSubnetRoute {
+		// We treat every address as being associated with its own route set.
+		// This allows us to close the address's route set when the address is
+		// removed, guaranteeing we clean up the associated subnet route.
+		impl.ns.AddRoute(
+			addressWithPrefixRoute(ifs.nicid, protocolAddr.AddressWithPrefix),
+			metricNotSet,
+			false, /* dynamic */
+			false, /* replaceMatchingGvisorRoutes */
+			&impl.subnetRouteSetId,
+		)
+	}
 
 	go func() {
 		defer cancel()
@@ -449,7 +445,9 @@ func (ci *adminControlImpl) AddAddress(_ fidl.Context, subnet net.Subnet, parame
 			default:
 				panic(fmt.Sprintf("NICID=%d unknown error trying to remove address %s upon channel closure: %s", impl.nicid, addr, status))
 			}
+		}
 
+		if !detached {
 			impl.cleanUpSubnetRoute()
 		}
 	}()

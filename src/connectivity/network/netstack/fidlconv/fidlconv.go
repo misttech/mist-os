@@ -8,6 +8,7 @@ package fidlconv
 
 import (
 	"fmt"
+	stdnet "net"
 	"syscall/zx"
 	"time"
 
@@ -171,6 +172,15 @@ func ToTCPIPAddressWithPrefix(sn net.Subnet) tcpip.AddressWithPrefix {
 
 func ToTCPIPSubnet(sn net.Subnet) tcpip.Subnet {
 	return ToTCPIPAddressWithPrefix(sn).Subnet()
+}
+
+// ToTCPIPSubnetChecked converts the fuchsia.net.Subnet into a tcpip.Subnet,
+// returning an error if the subnet prefix length is invalid or if the subnet
+// address has host bits set.
+func ToTCPIPSubnetChecked(sn net.Subnet) (tcpip.Subnet, error) {
+	ones := sn.PrefixLen
+	addr := ToTCPIPAddress(sn.Addr)
+	return tcpip.NewSubnet(addr, tcpip.MaskFromBytes(stdnet.CIDRMask(int(ones), addr.BitLen())))
 }
 
 func ToTCPIPProtocolAddress(sn net.Subnet) tcpip.ProtocolAddress {

@@ -22,6 +22,7 @@ go_library("fidlconv") {
   sources = [
     "fidlconv.go",
     "fidlconv_test.go",
+    "routes.go",
   ]
 }
 

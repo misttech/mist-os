@@ -122,25 +122,74 @@ func (rt *RouteTable) Set(r []routetypes.ExtendedRoute) {
 	rt.routes = append([]routetypes.ExtendedRoute(nil), r...)
 }
 
-func (rt *RouteTable) AddRouteLocked(route tcpip.Route, prf routetypes.Preference, metric routetypes.Metric, tracksInterface bool, dynamic bool, enabled bool, overwriteIfAlreadyExists bool) (newlyAdded bool) {
-	syslog.VLogTf(syslog.DebugVerbosity, tag, "RouteTable:Adding route %s with prf=%d metric=%d, trackIf=%t, dynamic=%t, enabled=%t, overwriteIfAlreadyExists=%t", route, prf, metric, tracksInterface, dynamic, enabled, overwriteIfAlreadyExists)
+type AddResult struct {
+	NewlyAddedToTable bool
+	NewlyAddedToSet   bool
+}
 
-	newlyAdded = true
-	// First check if the route already exists, and remove it.
-	for i, er := range rt.routes {
-		if er.Route == route {
-			if !overwriteIfAlreadyExists {
-				return false
+func (rt *RouteTable) AddRouteLocked(route tcpip.Route, prf routetypes.Preference, metric routetypes.Metric, tracksInterface, dynamic, enabled, replaceMatchingGvisorRoutes bool, addingSet *routetypes.RouteSetId) AddResult {
+	syslog.VLogTf(syslog.DebugVerbosity, tag, "RouteTable:Adding route %s with prf=%d metric=%d, trackIf=%t, dynamic=%t, enabled=%t, replaceMatchingGvisorRoutes=%t", route, prf, metric, tracksInterface, dynamic, enabled, replaceMatchingGvisorRoutes)
+
+	type foldResult int
+	const (
+		neitherPresentInTableNorInSet foldResult = iota
+		presentInTableButNotInSet
+		presentInTableAndInSet
+	)
+
+	result := foldMapRoutesLocked[foldResult](
+		rt,
+		func(er *routetypes.ExtendedRoute) (bool, foldResult) {
+			if er.Route == route && er.Prf == prf && er.Metric == metric && er.MetricTracksInterface == tracksInterface && er.Dynamic == dynamic && er.Enabled == enabled {
+				// Routes match exactly.
+				if !addingSet.IsGlobal() {
+					if er.IsMemberOfRouteSet(addingSet) {
+						return true, presentInTableAndInSet
+					} else {
+						er.OwningSets[addingSet] = struct{}{}
+						return true, presentInTableButNotInSet
+					}
+				} else {
+					// If the route set is global, then being present in the table is
+					// equivalent to being present in the set.
+					return true, presentInTableAndInSet
+				}
+			} else if er.Route == route && replaceMatchingGvisorRoutes {
+				// Remove the route from the table, because we're going to re-add it.
+				return false, neitherPresentInTableNorInSet
+			} else {
+				// This route is unrelated, so we keep it.
+				return true, neitherPresentInTableNorInSet
 			}
+		},
+		func(a, b foldResult) foldResult {
+			// If either foldResult indicates the route already exists in the table,
+			// keep that one.
+			if a != neitherPresentInTableNorInSet && b != neitherPresentInTableNorInSet {
+				panic(fmt.Sprintf("duplicate routing table entries in %s", rt.routes))
+			}
+			if a != neitherPresentInTableNorInSet {
+				return a
+			}
+			return b
+		},
+		neitherPresentInTableNorInSet,
+	)
 
-			rt.routes = append(rt.routes[:i], rt.routes[i+1:]...)
-			rt.sender.queueChange(RoutingTableChange{
-				Change: routetypes.RouteRemoved,
-				Route:  er,
-			})
-			newlyAdded = false
-			break
+	switch result {
+	case presentInTableButNotInSet:
+		return AddResult{
+			NewlyAddedToTable: false,
+			NewlyAddedToSet:   true,
 		}
+	case presentInTableAndInSet:
+		return AddResult{
+			NewlyAddedToTable: false,
+			NewlyAddedToSet:   false,
+		}
+	case neitherPresentInTableNorInSet:
+	default:
+		panic(fmt.Sprintf("unknown foldResult value: %d", result))
 	}
 
 	newEr := routetypes.ExtendedRoute{
@@ -150,6 +199,9 @@ func (rt *RouteTable) AddRouteLocked(route tcpip.Route, prf routetypes.Preferenc
 		MetricTracksInterface: tracksInterface,
 		Dynamic:               dynamic,
 		Enabled:               enabled,
+		OwningSets: map[*routetypes.RouteSetId]struct{}{
+			addingSet: {},
+		},
 	}
 
 	// Find the target position for the new route in the table so it remains
@@ -172,30 +224,64 @@ func (rt *RouteTable) AddRouteLocked(route tcpip.Route, prf routetypes.Preferenc
 		Route:  newEr,
 	})
 
-	return newlyAdded
+	return AddResult{
+		NewlyAddedToTable: true,
+		NewlyAddedToSet:   true,
+	}
 }
 
 // AddRoute inserts the given route to the table in a sorted fashion. If the
 // route already exists, it simply updates that route's preference, metric,
 // dynamic, and enabled fields.
-func (rt *RouteTable) AddRoute(route tcpip.Route, prf routetypes.Preference, metric routetypes.Metric, tracksInterface bool, dynamic bool, enabled bool) {
+func (rt *RouteTable) AddRoute(route tcpip.Route, prf routetypes.Preference, metric routetypes.Metric, tracksInterface, dynamic, enabled bool, addingSet *routetypes.RouteSetId) AddResult {
 	rt.Lock()
 	defer rt.Unlock()
 
-	rt.AddRouteLocked(route, prf, metric, tracksInterface, dynamic, enabled, true /* overwriteIfAlreadyExists */)
+	return rt.AddRouteLocked(route, prf, metric, tracksInterface, dynamic, enabled, true /* replaceMatchingGvisorRoutes */, addingSet)
 }
 
-func (rt *RouteTable) DelRouteLocked(route tcpip.Route) []routetypes.ExtendedRoute {
-	return rt.delRouteLocked(route, false)
+func (rt *RouteTable) DelRouteLocked(route tcpip.Route, deletingSet *routetypes.RouteSetId) []routetypes.ExtendedRoute {
+	return rt.delRouteLocked(route, deletingSet)
 }
 
-func (rt *RouteTable) DelRouteIfDynamicLocked(route tcpip.Route) []routetypes.ExtendedRoute {
-	return rt.delRouteLocked(route, true)
-}
-
-func (rt *RouteTable) delRouteLocked(route tcpip.Route, onlyDeleteIfDynamic bool) []routetypes.ExtendedRoute {
+func (rt *RouteTable) delRouteLocked(route tcpip.Route, deletingSet *routetypes.RouteSetId) []routetypes.ExtendedRoute {
 	syslog.VLogTf(syslog.DebugVerbosity, tag, "RouteTable:Deleting route %s", route)
 
+	routesDeleted := foldMapRoutesLocked[[]routetypes.ExtendedRoute](
+		rt,
+		func(er *routetypes.ExtendedRoute) (bool, []routetypes.ExtendedRoute) {
+			if er.Route.Destination == route.Destination && er.Route.NIC == route.NIC {
+				deletingSetMatches := !deletingSet.IsGlobal() && er.IsMemberOfRouteSet(deletingSet)
+
+				// Match any route if Gateway is empty.
+				if route.Gateway.Len() == 0 ||
+					er.Route.Gateway == route.Gateway {
+					if deletingSetMatches {
+						delete(er.OwningSets, deletingSet)
+					}
+					if deletingSet.IsGlobal() || deletingSetMatches && len(er.OwningSets) == 0 {
+						return false, []routetypes.ExtendedRoute{*er}
+					}
+				}
+			}
+			return true, nil
+		},
+		func(a, b []routetypes.ExtendedRoute) []routetypes.ExtendedRoute {
+			return append(a, b...)
+		},
+		nil,
+	)
+
+	return routesDeleted
+}
+
+// foldMapRoutesLocked runs f on every route in the RouteTable. If f returns
+// false for a given route, the route is removed; otherwise, the route is
+// preserved (including modifications to the pointed-to route).
+//
+// The second return value of f is aggregated for each route using agg, and
+// foldMapRoutesLocked returns the aggregate value.
+func foldMapRoutesLocked[T any](rt *RouteTable, f func(er *routetypes.ExtendedRoute) (bool, T), agg func(a T, b T) T, init T) T {
 	var routesDeleted []routetypes.ExtendedRoute
 	oldTable := rt.routes
 	rt.routes = oldTable[:0]
@@ -203,21 +289,15 @@ func (rt *RouteTable) delRouteLocked(route tcpip.Route, onlyDeleteIfDynamic bool
 		// Remove excess route table capacity instead of reusing old capacity.
 		rt.routes = make([]routetypes.ExtendedRoute, 0, len(oldTable))
 	}
-	for _, er := range oldTable {
-		if er.Route.Destination == route.Destination && er.Route.NIC == route.NIC {
-			// Match any route if Gateway is empty.
-			if (route.Gateway.Len() == 0 ||
-				er.Route.Gateway == route.Gateway) && (!onlyDeleteIfDynamic || er.Dynamic) {
-				routesDeleted = append(routesDeleted, er)
-				continue
-			}
-		}
-		// Not matched, remains in the route table.
-		rt.routes = append(rt.routes, er)
-	}
 
-	if len(routesDeleted) == 0 {
-		return nil
+	for _, er := range oldTable {
+		keepEr, meta := f(&er)
+		init = agg(meta, init)
+		if keepEr {
+			rt.routes = append(rt.routes, er)
+		} else {
+			routesDeleted = append(routesDeleted, er)
+		}
 	}
 
 	// Zero out unused entries in the routes slice so that they can be garbage collected.
@@ -235,15 +315,97 @@ func (rt *RouteTable) delRouteLocked(route tcpip.Route, onlyDeleteIfDynamic bool
 		})
 	}
 
-	return routesDeleted
+	return init
+}
+
+type DelResult struct {
+	NewlyRemovedFromTable bool
+	NewlyRemovedFromSet   bool
+}
+
+// DelRouteExactMatchLocked deletes a route from the routing table if there is
+// an extended route with the same tcpip.Route, preference, and metric.
+func (rt *RouteTable) DelRouteExactMatchLocked(route tcpip.Route, prf routetypes.Preference, metric routetypes.Metric, tracksInterface bool, set *routetypes.RouteSetId) DelResult {
+	syslog.DebugTf(tag, "RouteTable:Deleting route %s requiring exact match for prf=%d metric=%d tracksInterface=%t", route, prf, metric, tracksInterface)
+
+	delResult := foldMapRoutesLocked[DelResult](
+		rt,
+		func(er *routetypes.ExtendedRoute) (bool, DelResult) {
+			if route == er.Route && prf == er.Prf && (tracksInterface || (metric == er.Metric)) && tracksInterface == er.MetricTracksInterface && er.IsMemberOfRouteSet(set) {
+				delete(er.OwningSets, set)
+				if len(er.OwningSets) == 0 {
+					return false, DelResult{
+						NewlyRemovedFromTable: true,
+						NewlyRemovedFromSet:   true,
+					}
+				} else {
+					return true, DelResult{
+						NewlyRemovedFromTable: false,
+						NewlyRemovedFromSet:   true,
+					}
+				}
+			}
+			return true, DelResult{}
+		},
+		func(a, b DelResult) DelResult {
+			return DelResult{
+				NewlyRemovedFromTable: a.NewlyRemovedFromTable || b.NewlyRemovedFromTable,
+				NewlyRemovedFromSet:   a.NewlyRemovedFromSet || b.NewlyRemovedFromSet,
+			}
+		},
+		DelResult{},
+	)
+
+	if !delResult.NewlyRemovedFromSet {
+		_ = syslog.DebugTf(tag, "did not find exact match for route=%#v prf=%#v metric=%#v tracksInterface=%#v set=%#v; routes: %#v", route, prf, metric, tracksInterface, set, rt)
+	}
+	return delResult
 }
 
 // DelRoute removes matching routes from the route table, returning them.
-func (rt *RouteTable) DelRoute(route tcpip.Route) []routetypes.ExtendedRoute {
+func (rt *RouteTable) DelRoute(route tcpip.Route, deletingSet *routetypes.RouteSetId) []routetypes.ExtendedRoute {
 	rt.Lock()
 	defer rt.Unlock()
 
-	return rt.DelRouteLocked(route)
+	return rt.DelRouteLocked(route, deletingSet)
+}
+
+// DelRouteSet closes a routeSet and returns any routes deleted from the route table as a result.
+func (rt *RouteTable) DelRouteSet(routeSet *routetypes.RouteSetId) []routetypes.ExtendedRoute {
+	rt.Lock()
+	defer rt.Unlock()
+
+	return rt.DelRouteSetLocked(routeSet)
+}
+
+// DelRouteSetLocked closes a routeSet and returns any routes deleted from the route table as a
+// result.
+func (rt *RouteTable) DelRouteSetLocked(routeSet *routetypes.RouteSetId) []routetypes.ExtendedRoute {
+	if routeSet.IsGlobal() {
+		panic("DelRouteSetLocked should only be called for non-global route sets")
+	}
+
+	routesDeleted := foldMapRoutesLocked[[]routetypes.ExtendedRoute](
+		rt,
+		func(er *routetypes.ExtendedRoute) (bool, []routetypes.ExtendedRoute) {
+			if er.IsMemberOfRouteSet(routeSet) {
+				delete(er.OwningSets, routeSet)
+				if len(er.OwningSets) == 0 {
+					return false, []routetypes.ExtendedRoute{*er}
+				}
+			}
+			_ = syslog.DebugTf(tag, "DelRouteSetLocked(%#v) did not delete %s with OwningSets %#v", routeSet, er, er.OwningSets)
+			return true, nil
+		},
+		func(a, b []routetypes.ExtendedRoute) []routetypes.ExtendedRoute {
+			return append(a, b...)
+		},
+		nil,
+	)
+
+	_ = syslog.DebugTf(tag, "DelRouteSetLocked(%#v) deleted %d routes", routeSet, len(routesDeleted))
+
+	return routesDeleted
 }
 
 // GetExtendedRouteTable returns a copy of the current extended route table.

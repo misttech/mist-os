@@ -22,6 +22,7 @@ rustc_test("routes-admin") {
     "//src/lib/network/fidl_fuchsia_net_routes_ext",
     "//third_party/rust_crates:assert_matches",
     "//third_party/rust_crates:futures",
+    "//third_party/rust_crates:itertools",
     "//third_party/rust_crates:test-case",
   ]
   sources = [ "src/lib.rs" ]

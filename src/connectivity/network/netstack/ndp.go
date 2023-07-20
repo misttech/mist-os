@@ -505,7 +505,7 @@ func (n *ndpDispatcher) handleEvent(event ndpEvent) {
 		// rt is added as a 'static' route because Netstack will remove dynamic
 		// routes on DHCPv4 changes. See
 		// staticRouteAvoidingLifeCycleHooks for more details.
-		if err := n.ns.addRouteWithPreference(rt, prf, metricNotSet, staticRouteAvoidingLifeCycleHooks); err != nil {
+		if _, err := n.ns.addRouteWithPreference(rt, prf, metricNotSet, staticRouteAvoidingLifeCycleHooks, true /* replaceMatchingGvisorRoutes */, routetypes.GlobalRouteSet()); err != nil {
 			_ = syslog.ErrorTf(ndpSyslogTagName, "failed to add the route [%s] with preference=%s for the discovered off-link route to [%s] through [%s] on nicID (%d): %s", rt, event.prf, event.dest, event.router, event.nicID, err)
 		}
 
@@ -514,7 +514,7 @@ func (n *ndpDispatcher) handleEvent(event ndpEvent) {
 		_ = syslog.InfoTf(ndpSyslogTagName, "invalidating an off-link route to [%s] through [%s] on nicID (%d), removing the default route to it: [%s]", event.dest, event.router, event.nicID, rt)
 		// If the route does not exist, we do not consider that an error as it
 		// may have been removed by the user.
-		_ = n.ns.DelRoute(rt)
+		_ = n.ns.DelRoute(rt, routetypes.GlobalRouteSet())
 
 	case *ndpDiscoveredPrefixEvent:
 		nicID, prefix := event.nicID, event.prefix
@@ -523,7 +523,7 @@ func (n *ndpDispatcher) handleEvent(event ndpEvent) {
 		// rt is added as a 'static' route because Netstack will remove dynamic
 		// routes on DHCPv4 changes. See
 		// staticRouteAvoidingLifeCycleHooks for more details.
-		if err := n.ns.AddRoute(rt, metricNotSet, staticRouteAvoidingLifeCycleHooks); err != nil {
+		if _, err := n.ns.AddRoute(rt, metricNotSet, staticRouteAvoidingLifeCycleHooks, true /* replaceMatchingGvisorRoutes */, routetypes.GlobalRouteSet()); err != nil {
 			_ = syslog.ErrorTf(ndpSyslogTagName, "failed to add the on-link route [%s] for the discovered on-link prefix (%s) on nicID (%d): %s", rt, prefix, nicID, err)
 		}
 
@@ -533,7 +533,7 @@ func (n *ndpDispatcher) handleEvent(event ndpEvent) {
 		_ = syslog.InfoTf(ndpSyslogTagName, "invalidating an on-link prefix (%s) from nicID (%d), removing the on-link route to it: [%s]", prefix, nicID, rt)
 		// If the route does not exist, we do not consider that an error as it
 		// may have been removed by the user.
-		_ = n.ns.DelRoute(rt)
+		_ = n.ns.DelRoute(rt, routetypes.GlobalRouteSet())
 
 	case *ndpGeneratedAutoGenAddrEvent:
 		nicID, addrWithPrefix := event.nicID, event.addrWithPrefix

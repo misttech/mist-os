@@ -41,6 +41,7 @@ import (
 	"fidl/fuchsia/net/neighbor"
 	"fidl/fuchsia/net/root"
 	fnetRoutes "fidl/fuchsia/net/routes"
+	routesAdmin "fidl/fuchsia/net/routes/admin"
 	"fidl/fuchsia/net/stack"
 	"fidl/fuchsia/posix/socket"
 	packetsocket "fidl/fuchsia/posix/socket/packet"
@@ -642,6 +643,38 @@ func Main() {
 	}
 
 	{
+		stubV4 := routesAdmin.SetProviderV4WithCtxStub{
+			Impl: &routesAdminSetProviderV4Impl{
+				ns: ns,
+			},
+		}
+		stubV6 := routesAdmin.SetProviderV6WithCtxStub{
+			Impl: &routesAdminSetProviderV6Impl{
+				ns: ns,
+			},
+		}
+		componentCtx.OutgoingService.AddService(
+			routesAdmin.SetProviderV4Name,
+			func(ctx context.Context, c zx.Channel) error {
+				go component.Serve(ctx, &stubV4, c, component.ServeOptions{
+					OnError: func(err error) {
+						_ = syslog.ErrorTf(routesAdmin.SetProviderV4Name, "%s", err)
+					},
+				})
+				return nil
+			},
+		)
+		componentCtx.OutgoingService.AddService(
+			routesAdmin.SetProviderV6Name,
+			func(ctx context.Context, c zx.Channel) error {
+				go component.Serve(ctx, &stubV6, c, component.ServeOptions{
+					OnError: func(err error) {
+						_ = syslog.ErrorTf(routesAdmin.SetProviderV6Name, "%s", err)
+					},
+				})
+				return nil
+			},
+		)
 		stub := stack.StackWithCtxStub{Impl: &stackImpl{
 			ns:          ns,
 			dnsWatchers: dnsWatchers,

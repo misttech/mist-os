@@ -7,6 +7,7 @@
 package fidlconv
 
 import (
+	"fmt"
 	"net"
 	"testing"
 
@@ -20,6 +21,7 @@ import (
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
 	"gvisor.dev/gvisor/pkg/tcpip"
+	"gvisor.dev/gvisor/pkg/tcpip/header"
 )
 
 // TODO(tkilbourn): Consider moving more of these tests to "table-driven" tests.
@@ -642,4 +644,86 @@ func TestToInstalledRoute(t *testing.T) {
 		})
 	}
 
+}
+
+func TestToTCPIPSubnetChecked(t *testing.T) {
+	ipv4 := func(a, b, c, d uint8) fnet.IpAddress {
+		return fnet.IpAddressWithIpv4(fnet.Ipv4Address{
+			Addr: [4]uint8{a, b, c, d},
+		})
+	}
+	ipv6 := func(head []uint8, tail []uint8) fnet.IpAddress {
+		addr := fnet.Ipv6Address{}
+		if len(head)+len(tail) > header.IPv6AddressSize {
+			panic(fmt.Sprintf("head %+v and tail %+v are too long to make an IPv6 address", head, tail))
+		}
+		for index, octet := range head {
+			addr.Addr[index] = octet
+		}
+		for indexInTail, octet := range tail {
+			index := indexInTail + header.IPv6AddressSize - len(tail)
+			addr.Addr[index] = octet
+		}
+		return fnet.IpAddressWithIpv6(addr)
+	}
+
+	tests := []struct {
+		name      string
+		addr      fnet.IpAddress
+		prefixLen uint8
+		valid     bool
+	}{
+		{
+			name:      "is valid for IPv4 address with valid prefix length",
+			addr:      ipv4(192, 168, 1, 0),
+			prefixLen: 24,
+			valid:     true,
+		},
+		{
+			name:      "is invalid for IPv4 address with host bits set",
+			addr:      ipv4(192, 168, 1, 1),
+			prefixLen: 24,
+			valid:     false,
+		},
+		{
+			name:      "is invalid for IPv4 address with invalid prefix length",
+			addr:      ipv4(192, 168, 1, 1),
+			prefixLen: 33,
+			valid:     false,
+		},
+		{
+			name:      "is valid for IPv6 address with valid prefix length",
+			addr:      ipv6([]uint8{0xf}, []uint8{0}),
+			prefixLen: 64,
+			valid:     true,
+		},
+		{
+			name:      "is invalid for IPv6 address with host bits set",
+			addr:      ipv6([]uint8{0xf}, []uint8{0x1}),
+			prefixLen: 64,
+			valid:     false,
+		},
+		{
+			name:      "is invalid for IPv6 address with invalid prefix length",
+			addr:      ipv6([]uint8{0xf}, []uint8{0}),
+			prefixLen: 129,
+			valid:     false,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			subnet := fnet.Subnet{
+				Addr:      test.addr,
+				PrefixLen: test.prefixLen,
+			}
+			_, err := ToTCPIPSubnetChecked(subnet)
+			if err != nil && test.valid {
+				t.Errorf("got ToTCPIPSubnetChecked(%#v) = _, %s, want nil", subnet, err)
+			}
+			if err == nil && !test.valid {
+				t.Errorf("got ToTCPIPSubnetChecked(%#v) = _, nil, want non-nil", subnet)
+			}
+		})
+	}
 }

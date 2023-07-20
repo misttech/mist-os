@@ -72,7 +72,7 @@ func (ns *Netstack) addForwardingEntry(entry stack.ForwardingEntry) stack.StackA
 	}
 
 	route := fidlconv.ForwardingEntryToTCPIPRoute(entry)
-	if err := ns.AddRoute(route, routetypes.Metric(entry.Metric), false /* not dynamic */); err != nil {
+	if _, err := ns.AddRoute(route, routetypes.Metric(entry.Metric), false /* not dynamic */, true /* replaceMatchingGvisorRoutes */, routetypes.GlobalRouteSet()); err != nil {
 		if errors.Is(err, routes.ErrNoSuchNIC) {
 			result.SetErr(stack.ErrorInvalidArgs)
 		} else {
@@ -91,7 +91,7 @@ func (ns *Netstack) delForwardingEntry(entry stack.ForwardingEntry) stack.StackD
 	}
 
 	route := fidlconv.ForwardingEntryToTCPIPRoute(entry)
-	if routesDeleted := ns.DelRoute(route); len(routesDeleted) == 0 {
+	if routesDeleted := ns.DelRoute(route, routetypes.GlobalRouteSet()); len(routesDeleted) == 0 {
 		return stack.StackDelForwardingEntryResultWithErr(stack.ErrorNotFound)
 	}
 	return stack.StackDelForwardingEntryResultWithResponse(stack.StackDelForwardingEntryResponse{})

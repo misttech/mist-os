@@ -31,4 +31,10 @@ type RouteSetError = flexible enum {
     /// This route specified a target whose next-hop address is invalid.
     /// Next-hop addresses must be unicast addresses.
     INVALID_NEXT_HOP = 3;
+    /// The route set attempted to add/remove a route with an unsupported
+    /// `RouteAction` variant.
+    UNSUPPORTED_ACTION = 4;
+    /// The route set attempted to add/remove a route that uses an interface
+    /// that was previously authenticated, but no longer exists.
+    PREVIOUSLY_AUTHENTICATED_INTERFACE_NO_LONGER_EXISTS = 5;
 };

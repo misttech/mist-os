@@ -12,11 +12,14 @@
         {
             type: "expect_failure",
             matchers: [
-                // TODO(https://fxbug.dev/129218): Implement fuchsia.net.routes.admin in Netstack2.
-                "*ns2*",
-
                 // TODO(https://fxbug.dev/129219): Implement fuchsia.net.routes.admin in Netstack3.
                 "*ns3*",
+            ],
+        },
+        {
+            type: "expect_pass",
+            matchers: [
+                "root_route_apis_can_remove_loopback_route_v[46]_ns3",
             ],
         },
     ],

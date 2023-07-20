@@ -878,15 +878,39 @@ async fn add_address_and_remove<N: Netstack>(
     .await
     .expect("should succeed");
 
-    // In either case, there should be no route for the subnet after the
-    // address is removed.
-    let routes = ipv4_routing_table(&realm).await;
-    let subnet_route_is_present = routes.iter().any(|route| {
+    // The subnet route should also disappear.
+    let routes_state = realm
+        .connect_to_protocol::<<Ipv4 as fnet_routes_ext::FidlRouteIpExt>::StateMarker>()
+        .expect("connect to routes state");
+    let routes_stream =
+        fnet_routes_ext::event_stream_from_state::<Ipv4>(&routes_state).expect("should succeed");
+    futures::pin_mut!(routes_stream);
+
+    let mut routes =
+        fnet_routes_ext::collect_routes_until_idle::<Ipv4, HashSet<_>>(&mut routes_stream)
+            .await
+            .expect("collect routes should succeed");
+
+    let is_subnet_route = |route: &fnet_routes_ext::InstalledRoute<Ipv4>| {
         <net_types::ip::Subnet<net_types::ip::Ipv4Addr> as IntoExt<fnet::Subnet>>::into_ext(
             route.route.destination,
         ) == subnet
-    });
-    assert_eq!(subnet_route_is_present, false, "found subnet route in {:?}", routes);
+    };
+
+    if !routes.iter().any(|route| is_subnet_route(route)) {
+        // Success, the subnet route is gone.
+        return;
+    }
+
+    // Otherwise, it might just be removed asynchronously, so we should wait a bit.
+    fnet_routes_ext::wait_for_routes::<Ipv4, _, _>(&mut routes_stream, &mut routes, |routes| {
+        !routes.iter().any(is_subnet_route)
+    })
+    .on_timeout(ASYNC_EVENT_POSITIVE_CHECK_TIMEOUT, || {
+        panic!("timed out waiting for subnet route to disappear")
+    })
+    .await
+    .expect("should succeed");
 }
 
 #[netstack_test]

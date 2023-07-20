@@ -16,6 +16,8 @@
         {
             protocol: [
                 "fuchsia.net.multicast.admin.Ipv4RoutingTableController",
+                "fuchsia.net.routes.admin.SetProviderV4",
+                "fuchsia.net.routes.admin.SetProviderV6",
                 "fuchsia.net.stack.Log",
             ],
         },
@@ -35,6 +37,8 @@
         {
             protocol: [
                 "fuchsia.net.multicast.admin.Ipv4RoutingTableController",
+                "fuchsia.net.routes.admin.SetProviderV4",
+                "fuchsia.net.routes.admin.SetProviderV6",
                 "fuchsia.net.stack.Log",
             ],
             from: "self",

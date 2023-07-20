@@ -16,6 +16,7 @@ import (
 
 	"go.fuchsia.dev/fuchsia/src/connectivity/network/netstack/dhcp"
 	"go.fuchsia.dev/fuchsia/src/connectivity/network/netstack/fidlconv"
+	"go.fuchsia.dev/fuchsia/src/connectivity/network/netstack/routetypes"
 	"go.fuchsia.dev/fuchsia/src/connectivity/network/netstack/sync"
 	zxtime "go.fuchsia.dev/fuchsia/src/connectivity/network/netstack/time"
 	"go.fuchsia.dev/fuchsia/src/connectivity/network/netstack/util"
@@ -300,7 +301,7 @@ func TestInterfacesWatcher(t *testing.T) {
 	// Add a default route.
 	blockingWatcher.blockingWatch(t, ch)
 	r := defaultV4Route(ifs.nicid, util.Parse("1.2.3.5"))
-	if err := ns.AddRoute(r, metricNotSet, false); err != nil {
+	if _, err := ns.AddRoute(r, metricNotSet, false, true /* replaceMatchingGvisorRoutes */, routetypes.GlobalRouteSet()); err != nil {
 		t.Fatalf("failed to add default route: %s", err)
 	}
 	defaultIpv4RouteAdded := id
@@ -311,7 +312,7 @@ func TestInterfacesWatcher(t *testing.T) {
 
 	// Remove the default route.
 	blockingWatcher.blockingWatch(t, ch)
-	_ = ns.DelRoute(r)
+	_ = ns.DelRoute(r, routetypes.GlobalRouteSet())
 	defaultIpv4RouteRemoved := id
 	defaultIpv4RouteRemoved.SetHasDefaultIpv4Route(false)
 	if err := verifyWatchResults(interfaces.EventWithChanged(defaultIpv4RouteRemoved)); err != nil {

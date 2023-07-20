@@ -101,11 +101,11 @@ func TestDelRouteErrors(t *testing.T) {
 	}
 
 	// Deleting a route we never added should return no routes deleted.
-	if got := ns.DelRoute(rt); len(got) != 0 {
+	if got := ns.DelRoute(rt, routetypes.GlobalRouteSet()); len(got) != 0 {
 		t.Errorf("DelRoute(%s) = %#v not empty", rt, got)
 	}
 
-	if err := ns.AddRoute(rt, metricNotSet, false); err != nil {
+	if _, err := ns.AddRoute(rt, metricNotSet, false, true /* replaceMatchingGvisorRoutes */, routetypes.GlobalRouteSet()); err != nil {
 		t.Fatalf("AddRoute(%s, metricNotSet, false): %s", rt, err)
 	}
 	// Deleting a route we added should not result in an error.
@@ -115,11 +115,11 @@ func TestDelRouteErrors(t *testing.T) {
 		Metric:                defaultInterfaceMetric,
 		MetricTracksInterface: true,
 	}
-	if diff := cmp.Diff(ns.DelRoute(rt), []routetypes.ExtendedRoute{want}); diff != "" {
+	if diff := cmp.Diff(ns.DelRoute(rt, routetypes.GlobalRouteSet()), []routetypes.ExtendedRoute{want}, extendedRouteTableCmpOptions()); diff != "" {
 		t.Fatalf("DelRoute(%s): -got +want %s", rt, diff)
 	}
 	// Deleting a route we just deleted should result in no routes actually deleted.
-	if got := ns.DelRoute(rt); len(got) != 0 {
+	if got := ns.DelRoute(rt, routetypes.GlobalRouteSet()); len(got) != 0 {
 		t.Errorf("DelRoute(%s) = %#v not empty", rt, got)
 	}
 }
@@ -1170,7 +1170,7 @@ func addAddressAndRoute(t *testing.T, ns *Netstack, ifState *ifState, addr tcpip
 		t.Fatalf("ifState.addAddress(%s, {}): %s", addr.AddressWithPrefix, reason)
 	}
 	route := addressWithPrefixRoute(ifState.nicid, addr.AddressWithPrefix)
-	if err := ns.AddRoute(route, metricNotSet /* dynamic */, false); err != nil {
+	if _, err := ns.AddRoute(route, metricNotSet /* dynamic */, false, true /* replaceMatchingGvisorRoutes */, routetypes.GlobalRouteSet()); err != nil {
 		t.Fatalf("ns.AddRoute(%s, 0, false): %s", route, err)
 	}
 }
@@ -1236,10 +1236,22 @@ func TestAddRouteParameterValidation(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			if err := ns.AddRoute(test.route, test.metric, test.dynamic); !errors.Is(err, test.err) {
+			if _, err := ns.AddRoute(test.route, test.metric, test.dynamic, true /* replaceMatchingGvisorRoutes */, routetypes.GlobalRouteSet()); !errors.Is(err, test.err) {
 				t.Errorf("got ns.AddRoute(...) = %v, want %v", err, test.err)
 			}
 		})
+	}
+}
+
+func extendedRouteTableCmpOptions() cmp.Options {
+	return []cmp.Option{
+		cmp.AllowUnexported(tcpip.Subnet{}),
+		cmp.FilterPath(func(p cmp.Path) bool {
+			if p.Last().String() == "OwningSets" {
+				return false
+			}
+			return true
+		}, cmp.Ignore()),
 	}
 }
 
@@ -1406,7 +1418,7 @@ func TestDHCPAcquired(t *testing.T) {
 				t.Errorf("ifState.mu.dnsServers mismatch (-want +got):\n%s", diff)
 			}
 
-			if diff := cmp.Diff(test.expectedRouteTable, ifState.ns.GetExtendedRouteTable(), cmp.AllowUnexported(tcpip.Subnet{})); diff != "" {
+			if diff := cmp.Diff(test.expectedRouteTable, ifState.ns.GetExtendedRouteTable(), extendedRouteTableCmpOptions()); diff != "" {
 				t.Errorf("GetExtendedRouteTable() mismatch (-want +got):\n%s", diff)
 			}
 
@@ -1439,7 +1451,7 @@ func TestDHCPAcquired(t *testing.T) {
 				t.Errorf("ifState.mu.dnsServers mismatch (-want +got):\n%s", diff)
 			}
 
-			if diff := cmp.Diff(ifState.ns.GetExtendedRouteTable(), originalRouteTable); diff != "" {
+			if diff := cmp.Diff(ifState.ns.GetExtendedRouteTable(), originalRouteTable, extendedRouteTableCmpOptions()); diff != "" {
 				t.Errorf("GetExtendedRouteTable() mismatch (-want +got):\n%s", diff)
 			}
 
