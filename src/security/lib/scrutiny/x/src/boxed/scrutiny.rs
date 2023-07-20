@@ -24,7 +24,7 @@ pub enum Error {
     System(#[from] SystemError),
 }
 
-pub struct Scrutiny(Rc<ScrutinyData>);
+pub(crate) struct Scrutiny(Rc<ScrutinyData>);
 
 impl Scrutiny {
     /// Constructs a [`Scrutiny`] instance backed by build artifacts referenced in a single product

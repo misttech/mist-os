@@ -7,12 +7,14 @@ use anyhow::bail;
 use anyhow::Context as _;
 use anyhow::Result;
 use argh::FromArgs;
+use scrutiny_x::boxed as scrutiny;
 use std::fs::read_dir;
 use std::fs::write;
 use std::fs::File;
 use std::io::Write;
 use std::path::Path;
 use std::path::PathBuf;
+use tracing::debug;
 use tracing::Level;
 use tracing_subscriber::fmt::format::FmtSpan;
 
@@ -58,7 +60,12 @@ fn main() -> Result<()> {
 fn run_smoke_test(args: Args) -> Result<()> {
     let Args { depfile, stamp, product_bundle, .. } = args;
 
-    // Create an instance of `scrutiny_x::boxed::Scrutiny` here and operate on it
+    let product_bundle_path: Box<dyn scrutiny::Path> = Box::new(product_bundle.clone());
+    let scrutiny = scrutiny::scrutiny(product_bundle_path).map_err(|error| anyhow!("{}", error))?;
+
+    output_data_sources(scrutiny.as_ref());
+    output_blobs(scrutiny.as_ref());
+    output_packages(scrutiny.as_ref());
 
     if let (Some(depfile), Some(stamp)) = (depfile, stamp) {
         let depfile = File::create(depfile).context("creating depfile")?;
@@ -68,6 +75,54 @@ fn run_smoke_test(args: Args) -> Result<()> {
     }
 
     Ok(())
+}
+
+#[tracing::instrument(level = "trace", skip_all)]
+fn output_data_sources(scrutiny: &dyn scrutiny::Scrutiny) {
+    for data_source in scrutiny.data_sources() {
+        output_data_source(data_source, String::from(""));
+    }
+}
+
+fn output_data_source(data_source: Box<dyn scrutiny::DataSource>, prefix: String) {
+    debug!("{prefix}Data source: {data_source:?}", prefix = prefix, data_source = data_source);
+    let prefix = if &prefix == "" {
+        "  ↳ ".to_string()
+    } else {
+        let mut new_prefix = "  ".to_string();
+        new_prefix.push_str(&prefix);
+        new_prefix
+    };
+    for child in data_source.children() {
+        output_data_source(child, prefix.clone())
+    }
+}
+
+#[tracing::instrument(level = "trace", skip_all)]
+fn output_blobs(scrutiny: &dyn scrutiny::Scrutiny) {
+    for blob in scrutiny.blobs().expect("scrutiny blobs") {
+        debug!("Blob: {:?}", blob.hash());
+    }
+}
+
+#[tracing::instrument(level = "trace", skip_all)]
+fn output_packages(scrutiny: &dyn scrutiny::Scrutiny) {
+    for package_result in scrutiny.packages() {
+        match package_result {
+            Ok(package) => output_package(package.as_ref()),
+            Err(error) => panic!("package error: {}", error),
+        }
+    }
+}
+
+fn output_package(package: &dyn scrutiny::Package) {
+    debug!("Package: {:?}", package.hash());
+    for (path, meta_blob) in package.meta_blobs() {
+        debug!("  Meta blob at {:?}: {:?}", path.as_ref(), meta_blob.hash());
+    }
+    for (path, content_blob) in package.content_blobs() {
+        debug!("  Content blob at {:?}: {:?}", path.as_ref(), content_blob.hash());
+    }
 }
 
 #[tracing::instrument(level = "trace", skip_all)]

@@ -449,9 +449,9 @@ impl hash::Hash for dyn AsBytes {
 
 /// A content-address of a sequence of bytes. In most production cases, this is a Fuchsia merkle
 /// root; see https://fuchsia.dev/fuchsia-src/concepts/packages/merkleroot for details.
-pub trait Hash: AsBytes + DynClone + Send {}
+pub trait Hash: AsBytes + DynClone + Send + Sync {}
 
-impl<H: AsBytes + DynClone + Send> Hash for H {}
+impl<H: AsBytes + DynClone + Send + Sync> Hash for H {}
 
 clone_trait_object!(Hash);
 
