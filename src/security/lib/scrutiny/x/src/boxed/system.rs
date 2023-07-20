@@ -2,9 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-// TODO(fxbug.dev/111251): Integrate `System` API with `Scrutiny` implementation.
-#![allow(dead_code)]
-
 use super::api;
 use super::blob::BlobDirectoryError;
 use super::product_bundle::ProductBundle;

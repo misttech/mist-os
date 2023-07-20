@@ -4,9 +4,11 @@
 
 use super::blob::BlobDirectoryError;
 use super::blob::BlobOpenError;
+use super::package::Error as PackageError;
 use dyn_clone::clone_trait_object;
 use dyn_clone::DynClone;
 use fuchsia_url::AbsolutePackageUrl;
+use fuchsia_url::UnpinnedAbsolutePackageUrl;
 use std::cmp;
 use std::collections::HashMap;
 use std::fmt;
@@ -72,7 +74,8 @@ pub trait Scrutiny {
     fn blobs(&self) -> Result<Box<dyn Iterator<Item = Box<dyn Blob>>>, ScrutinyBlobsError>;
 
     /// Iterate over all packages from all system data sources.
-    fn packages(&self) -> Box<dyn Iterator<Item = Box<dyn Package>>>;
+    fn packages(&self)
+        -> Box<dyn Iterator<Item = Result<Box<dyn Package>, ScrutinyPackagesError>>>;
 
     /// Iterate over all package resolvers in the system.
     fn package_resolvers(&self) -> Box<dyn Iterator<Item = Box<dyn PackageResolver>>>;
@@ -100,6 +103,16 @@ pub trait Scrutiny {
 pub enum ScrutinyBlobsError {
     #[error("error iterating over blobs in directory: {0}")]
     Directory(#[from] BlobDirectoryError),
+}
+
+#[derive(Debug, Error)]
+pub enum ScrutinyPackagesError {
+    #[error("ambiguous package URL: {0}")]
+    Ambiguous(UnpinnedAbsolutePackageUrl),
+    #[error("failed to locate package blob: {0}")]
+    Locate(#[from] BlobOpenError),
+    #[error("failed to open package: {0}")]
+    Open(#[from] PackageError),
 }
 
 /// High-level metadata about the system inspected by a [`Scrutiny`] instance.
