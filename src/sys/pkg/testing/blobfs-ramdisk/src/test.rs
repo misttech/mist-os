@@ -567,3 +567,27 @@ async fn fxblob_concurrent_creation_succeeds() {
 
     blobfs.stop().await.unwrap();
 }
+
+#[fuchsia_async::run_singlethreaded(test)]
+async fn fxblob_create_already_present_returns_already_exists() {
+    let blobfs = BlobfsRamdisk::builder().fxblob().start().await.unwrap();
+    let creator = blobfs.blob_creator_proxy().unwrap().unwrap();
+
+    let bytes = vec![0u8; 1];
+    let hash = fuchsia_merkle::MerkleTree::from_reader(&bytes[..]).unwrap().root();
+    let compressed = Type1Blob::generate(&bytes, CompressionMode::Never);
+    let compressed_len: u64 = compressed.len().try_into().unwrap();
+
+    let writer0 = creator.create(&hash, false).await.unwrap().unwrap().into_proxy().unwrap();
+    let vmo0 = writer0.get_vmo(compressed_len).await.unwrap().unwrap();
+    let () = vmo0.write(&compressed, 0).unwrap();
+    let () = writer0.bytes_ready(compressed_len).await.unwrap().unwrap();
+    assert_eq!(blobfs.list_blobs().unwrap(), BTreeSet::from([hash]));
+
+    assert_matches!(
+        creator.create(&hash, false).await,
+        Ok(Err(ffxfs::CreateBlobError::AlreadyExists))
+    );
+
+    blobfs.stop().await.unwrap();
+}
