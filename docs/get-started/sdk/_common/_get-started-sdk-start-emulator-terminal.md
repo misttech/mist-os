@@ -15,19 +15,19 @@ The tasks include:
 
 Do the following:
 
-1. Download the latest Fuchsia Workstation prebuilt image for the emulator:
+1. Download the latest Fuchsia workbench prebuilt image for the emulator:
 
    ```posix-terminal
-   tools/ffx product-bundle get workstation_eng.qemu-x64 --force-repo --repository workstation-packages
+   tools/ffx product-bundle get workbench_eng-x64 --force-repo --repository workbench-packages
    ```
 
    This command may take a few minutes to download the image and product
    metadata.
 
    Once the download is finished, the `ffx product-bundle get` command creates a
-   local Fuchsia package repository named `workstation-packages` on your host
+   local Fuchsia package repository named `workbench-packages` on your host
    machine. This package repository hosts additional system packages for this
-   Workstation prebuilt image. Later in step 12 you’ll register this package
+   workbench prebuilt image. Later in step 12 you’ll register this package
    repository to the emulator instance.
 
 1. Stop all running emulator instances:
@@ -41,20 +41,20 @@ Do the following:
    Note: If your Linux machine does not support
    [KVM hardware virtualization](#check-if-your-linux-machine-supports-kvm-virtualization),
    start the emulator with the following command instead:
-   `tools/ffx emu start workstation_eng.qemu-x64 --engine qemu --startup-timeout 720 --accel none --device qemu-x64-emu-min --headless`
+   `tools/ffx emu start workbench_eng-x64 --engine qemu --startup-timeout 720 --accel none --device qemu-x64-emu-min --headless`
 
    ```posix-terminal
-   tools/ffx emu start workstation_eng.qemu-x64 --headless
+   tools/ffx emu start workbench_eng-x64 --headless
    ```
 
-   This command starts a headless emulator instance running the Workstation
+   This command starts a headless emulator instance running the workbench
    prebuilt image.
 
    When the instance is up and running, the command prints output similar to the
    following:
 
    ```none {:.devsite-disable-click-to-copy}
-   $ tools/ffx emu start workstation_eng.qemu-x64 --headless
+   $ tools/ffx emu start workbench_eng-x64 --headless
    ...
    Logging to "/home/alice/.local/share/Fuchsia/ffx/emu/instances/fuchsia-emulator/emulator.log"
    Waiting for Fuchsia to start (up to 60 seconds)...........
@@ -85,7 +85,7 @@ Do the following:
    ```none {:.devsite-disable-click-to-copy}
    $ tools/ffx target list
    NAME                SERIAL       TYPE                        STATE      ADDRS/IP       RCS
-   fuchsia-emulator    <unknown>    workstation_eng.qemu-x64    Product    [10.0.2.15]    Y
+   fuchsia-emulator    <unknown>    workbench_eng-x64    Product    [10.0.2.15]    Y
    ```
 
 1. Set this emulator instance to be the default device:
@@ -131,7 +131,7 @@ Do the following:
        ...
    Build:
        Version: "11.20230109.3.1"
-       Product: "workstation_eng"
+       Product: "workbench_eng"
        Board: "qemu-x64"
        Commit: "2023-01-09T20:03:45+00:00"
    Last Reboot:
@@ -141,7 +141,7 @@ Do the following:
    ```
 
    The example output above shows that the target device is running a
-   `workstation_eng.qemu-x64` prebuilt image.
+   `workbench_eng-x64` prebuilt image.
 
 1. Verify that you can stream the device logs:
 
@@ -191,17 +191,17 @@ Do the following:
    +-----------------------+------+-------------------------------------------------------------------------------------------------+
    | NAME                  | TYPE | EXTRA                                                                                           |
    +=======================+======+=================================================================================================+
-   | workstation-packages* | pm   | /home/alice/.local/share/Fuchsia/ffx/pbms/4751486831982119909/workstation_eng.qemu-x64/packages |
+   | workbench-packages* | pm   | /home/alice/.local/share/Fuchsia/ffx/pbms/4751486831982119909/workbench_eng-x64/packages |
    +-----------------------+------+-------------------------------------------------------------------------------------------------+
    ```
 
-   Notice a package repository named `workstation-packages` is created for the
-   Workstation prebuilt image.
+   Notice a package repository named `workbench-packages` is created for the
+   workbench prebuilt image.
 
-1. Register the `workstation-packages` package repository to the target device:
+1. Register the `workbench-packages` package repository to the target device:
 
    ```posix-terminal
-   tools/ffx target repository register -r workstation-packages --alias fuchsia.com --alias chromium.org
+   tools/ffx target repository register -r workbench-packages --alias fuchsia.com --alias chromium.org
    ```
 
    This command exits silently without output.

@@ -64,7 +64,7 @@ with this:
 First let's configure the build. To do this you need to make a few choices:
 
 * What [product configuration](#key-product-configurations) do you want?
-  (unsure: try `workstation_eng`)
+  (unsure: try `workbench_eng`)
 * What board are you building for? (unsure: try `x64`)
 * What extra [test targets](#key-bundles) do you want? (unsure: try
   `//bundles/tools`, and if you're working on features, you probably want
@@ -74,7 +74,7 @@ Armed with our above choices (if you didn't read above, do so now), you are
 ready to configure your build:
 
 ```posix-terminal
-fx set workstation_eng.x64 --with //bundles/tests
+fx set workbench_eng.x64 --with //bundles/tests
 ```
 
 Once you ran `fx set` in your checkout, there is no need to run it again unless
@@ -93,7 +93,7 @@ graph.
 
 ### What just happened?
 
-* You selected the product `workstation_eng` (run `fx list-products` for a list of
+* You selected the product `workbench_eng` (run `fx list-products` for a list of
   other product configurations).
 * You selected the board `x64`, which supports many typical boards based on the
   `x64` architecture. (Note that `arm64` boards are less interchangeable, and you
@@ -144,7 +144,7 @@ interacting with the board in "universe". The product configurations make
 choices to add more or less software to the base, cache or universe
 package sets based on the definition and feature set of the product they
 represent. A speaker product, for example, adds many audio-media-related
-packages to the base. A workstation product adds a wide range of GUI,
+packages to the base. A workbench product adds a wide range of GUI,
 media and many other packages to the base.
 
 ### Key product configurations {#key-product-configurations}
@@ -166,7 +166,7 @@ important configurations to be familiar with:
   items added to the "universe" dependency set). It is the starting point for
   all higher-level product configurations. It has common network capabilities
   and can update a system over-the-air.
-* `workstation_eng` is a basis for a general purpose development environment, good
+* `workbench_eng` is a basis for a general purpose development environment, good
   for working on UI, media and many other high-level features. This is also
   the best environment for enthusiasts to play with and explore.
 
@@ -341,7 +341,7 @@ using either `fx flash` (arm64) or `fx mkzedboot` (x64), and then executing
 `fx netboot` on the host system.
 
 Note: the `netboot` artifacts are not produced by all builds by default,
-because for larger builds such as the "workstation" product configuration
+because for larger builds such as the "workbench" product configuration
 such builds are extremely large, and producing them many times a day is both
 slow as well as measurably wearing on host disk hardware. The `bringup`
 configuration always prepares `netboot` artifacts. For all other build
@@ -506,16 +506,16 @@ keep several different devices in several build configurations, and could be
 setup as follows:
 
 ```none {:.devsite-disable-click-to-copy}
-$ fx --dir out/workstation set workstation_eng.x64
+$ fx --dir out/workbench set workbench_eng.x64
 $ fx build
-$ fx set-device <workstation-node-name>
+$ fx set-device <workbench-node-name>
 
 $ fx --dir out/core set core.arm64
 $ fx build
 $ fx set-device <core-node-name>
 
-# Start a server for the workstation:
-$ fx --dir=out/workstation serve
+# Start a server for the workbench:
+$ fx --dir=out/workbench serve
 # Set the default build-dir and target device to the arm64 core, and
 # connect to a shell on that device:
 $ fx use out/core

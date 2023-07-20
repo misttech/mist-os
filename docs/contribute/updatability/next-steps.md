@@ -53,9 +53,7 @@ out-of-tree.
   [assembled out-of-tree][decentralized-product-integration]. Specifically, some
   platform components can only receive configuration values in-tree, while the
   [scalable configuration solution][structured-config] is still in the design
-  phase. Once out-of-tree product assembly is possible, this can be demonstrated
-  for instance by
-  [building and assembling the Workstation reference product out-of-tree][workstation-oot].
+  phase.
 - Support for [out-of-tree component testing][oot-component-testing] and
   [out-of-tree system testing][oot-system-testing] is not yet complete. Some
   test runtime features are only available in-tree, and the

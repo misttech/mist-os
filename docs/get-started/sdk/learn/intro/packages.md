@@ -29,20 +29,20 @@ This command prints output similar to the following:
 +--------------------------+------+-----------------------------------------------+
 | NAME                     | TYPE | EXTRA                                         |
 +==========================+======+===============================================+
-| workstation-packages     | pm   | /home/alice/.local/share/Fuchsia/.../packages |
+| minimal-packages     | pm   | /home/alice/.local/share/Fuchsia/.../packages |
 +--------------------------+------+-----------------------------------------------+
 ```
 
-The `workstation-packages` repository is created when you run the
+The `minimal-packages` repository is created when you run the
 `ffx product-bundle get` command (previously in "Get started with the Fuchsia SDK"
 quickstart guide). This repository contains additional system packages for the
-`workstation_eng.qemu-x64` prebuilt image.
+`minimal-x64` prebuilt image.
 
 With the local package server running, you can explore the list of packages that
 are available in the repository:
 
 ```posix-terminal
-ffx repository package list -r workstation-packages
+ffx repository package list -r minimal-packages
 ```
 
 This command prints additional details about each package in the repository,

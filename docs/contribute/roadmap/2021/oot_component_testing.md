@@ -95,10 +95,6 @@ the scope of out-of-tree development & testing targeting Fuchsia. These include:
   robust hardware support on Fuchsia] via
   [driver ABI stability][driver-abi-stability].
 
-- *[Workstation out-of-tree][workstation-out-of-tree]* expects to test
-  components out-of-tree that are written in a variety of languages and on a
-  variety of virtual and physical devices.
-
 - *Support for running existing tests on Fuchsia in [LLVM]{:.external} and
   [Rust]{:.external} projects* will require out-of-tree C++ and Rust testing
   support.
@@ -356,4 +352,3 @@ covered in a [separate roadmap document][oot-system-testing].
 [testwithenvironment]: /sdk/lib/sys/cpp/testing/test_with_environment.h
 [trf]: /docs/development/testing/components/test_runner_framework.md
 [troubleshooting-run-test-component]: /docs/development/testing/components/test_runner_framework.md#troubleshooting
-[workstation-out-of-tree]: /docs/contribute/roadmap/2021/workstation_out_of_tree.md

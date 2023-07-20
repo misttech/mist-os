@@ -30,7 +30,7 @@ Magma client drivers are third party codebases.  Open source client drivers typi
 * src/graphics/lib/magma/tests:l1
 
 ##### Product for L2 testing:
-* workstation_eng
+* workbench_eng
 
 ##### Package for L2 testing:
 * src/experiences/examples/spinning_cube
@@ -70,11 +70,6 @@ This test uses an imagepipe swapchain to pass frames to the system compositor.
 Build with `--with-base //src/graphics/bundles:vulkan --with src/graphics/lib/magma/tests:l1`.
 Test with present direct to display: `run fuchsia-pkg://fuchsia.com/vkcube-on-fb#meta/vkcube-on-fb.cmx --c 500`
 Test with present via Scenic: `ffx session add fuchsia-pkg://fuchsia.com/vkcube-on-scenic#meta/vkcube-on-scenic.cmx`.
-
-#### L2
-
-A full UI 'smoke' test.  Build workstation, launch Chromium and navigate to a
-WebGL demo such as Aquarium.
 
 #### S0
 

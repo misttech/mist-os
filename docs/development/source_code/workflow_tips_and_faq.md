@@ -285,9 +285,9 @@ Note: this answer is subject to change/breakage shortly after authorship.
 Let's assume you want to produce four builds:
 
  * a "bringup" product for x64
- * a "workstation" product for x64
+ * a "minimal" product for x64
  * a "core" product for vim3
- * a "workstation" product for vim3
+ * a "minimal" product for vim3
 
 First, one must build Zircon, as the Zircon build directory is shared across
 Fuchsia build targets. It doesn't matter at this stage which product/board
@@ -302,22 +302,22 @@ $ fx --dir out/bringup.x64 build
 Now you have Zircon built, you can start building several other builds concurrently:
 
 ```shell
-$ fx --dir out/workstation_eng.x64 set workstation_eng.x64
-$ fx --dir out/workstation_eng.x64 build > workstation_eng.x64.build.log &
+$ fx --dir out/minimal.x64 set minimal.x64
+$ fx --dir out/minimal.x64 build > minimal.x64.build.log &
 
 $ fx --dir out/core.vim3 set core.arm64
 $ fx --dir out/core.vim3 build > core.vim3.build.log &
 
-$ fx --dir out/workstation_eng.vim3 set workstation_eng.arm64
-$ fx --dir out/workstation_eng.vim3 build > workstation_eng.vim3.build.log &
+$ fx --dir out/minimal.vim3 set minimal.arm64
+$ fx --dir out/minimal.vim3 build > minimal.vim3.build.log &
 ```
 
 You can reference each of these builds while running `fx` tools by passing
-`--dir` to your fx command, e.g. to run `fx serve` using the vim3 workstation
+`--dir` to your fx command, e.g. to run `fx serve` using the vim3 minimal
 product, you would use:
 
 ```shell
-$ fx --dir out/workstation_eng.vim3 serve
+$ fx --dir out/minimal.vim3 serve
 ```
 
 You can also change which build directory is your current default by using `fx use`:
