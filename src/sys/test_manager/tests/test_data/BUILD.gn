@@ -261,12 +261,6 @@ fuchsia_component("debug_data_test") {
   deps = [ ":debug_data_test_bin" ]
 }
 
-fuchsia_component("debug_data_test_v1") {
-  testonly = true
-  manifest = "meta/debug_data_test.cmx"
-  deps = [ ":debug_data_test_bin" ]
-}
-
 fuchsia_test_package("debug-data-test") {
   test_components = [ ":debug_data_test" ]
 }
@@ -314,27 +308,6 @@ fuchsia_component("debug_data_spam_test") {
   testonly = true
   manifest = "meta/debug_data_spam_test.cml"
   deps = [ ":debug_data_spam_test_bin" ]
-}
-
-rustc_binary("logging-component-bin") {
-  name = "logging_component_bin"
-  source_root = "logging_component.rs"
-  edition = "2021"
-
-  deps = [
-    "//src/lib/fuchsia",
-    "//third_party/rust_crates:tracing",
-  ]
-
-  sources = [ "logging_component.rs" ]
-  configs += [ "//build/config/rust/lints:clippy_warn_all" ]
-}
-
-fuchsia_component("logging-component") {
-  component_name = "logging_component"
-  testonly = true
-  manifest = "meta/logging_component.cmx"
-  deps = [ ":logging-component-bin" ]
 }
 
 rustc_test("nonhermetic_capability_test_bin") {

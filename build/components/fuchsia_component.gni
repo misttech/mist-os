@@ -5,7 +5,6 @@
 import("//build/dist/resource.gni")
 import("//tools/cmc/build/cmc.gni")
 import("//tools/cmc/build/cml.gni")
-import("//tools/cmc/build/cmx.gni")
 
 # Defines a Fuchsia component's manifest.
 # See: https://fuchsia.dev/fuchsia-src/development/components/build
@@ -61,13 +60,10 @@ template("fuchsia_component_manifest") {
     if (manifest_extension == "cml") {
       manifest_processor = "cm"
       manifest_name = "$component_name.cm"
-    } else if (manifest_extension == "cmx") {
-      manifest_processor = "cmx"
-      manifest_name = "$component_name.cmx"
     } else {
       assert(
           false,
-          "Unknown manifest format for \"${invoker.manifest}\", must be \".cml\" or \".cmx\"")
+          "Unknown manifest format for \"${invoker.manifest}\", must be \".cml\"")
     }
 
     manifest_resource_target = "${target_name}_manifest_resource"
