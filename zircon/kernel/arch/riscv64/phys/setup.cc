@@ -6,9 +6,9 @@
 
 #include <lib/arch/riscv64/system.h>
 
+#include <phys/arch/arch-phys-info.h>
 #include <phys/main.h>
 
-#include "arch-phys-info.h"
 #include "riscv64.h"
 
 // The boot_hart_id field is initialized by start.S.

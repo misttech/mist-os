@@ -30,6 +30,7 @@ if (toolchain_environment == "kernel.phys" ||
     ]
     public_deps = [ "//zircon/kernel/phys:main" ]
     deps = [
+      ":arch-phys-info",
       ":arch-phys-info-asm",
       "//zircon/kernel/lib/arch",
       "//zircon/kernel/lib/ktl",
@@ -52,6 +53,7 @@ if (toolchain_environment == "kernel.phys" ||
   source_set("arch-handoff-prep") {
     sources = [ "arch-handoff-prep.cc" ]
     deps = [
+      ":arch-phys-info",
       ":phys",
       "//zircon/kernel/lib/ktl",
       "//zircon/kernel/phys:handoff",
@@ -69,6 +71,7 @@ if (toolchain_environment == "kernel.phys" ||
   source_set("arch-boot-zbi") {
     sources = [ "arch-boot-zbi.cc" ]
     deps = [
+      ":arch-phys-info",
       ":phys",
       "//zircon/kernel/lib/arch",
       "//zircon/kernel/phys:boot-zbi.deps",
@@ -76,9 +79,17 @@ if (toolchain_environment == "kernel.phys" ||
   }
 }
 
+config("includes") {
+  include_dirs = [ "include" ]
+}
+
 source_set("arch-phys-info") {
-  visibility = [ "./*" ]
-  public = [ "arch-phys-info.h" ]
+  visibility = [
+    "./*",
+    "//zircon/kernel/phys/*",
+  ]
+  public = [ "include/phys/arch/arch-phys-info.h" ]
+  public_configs = [ ":includes" ]
 }
 
 hwreg_asm_header("arch-phys-info-asm") {

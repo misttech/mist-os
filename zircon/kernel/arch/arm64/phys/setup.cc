@@ -10,11 +10,11 @@
 #include <lib/zbitl/view.h>
 #include <stdio.h>
 
+#include <phys/arch/arch-phys-info.h>
 #include <phys/exception.h>
 #include <phys/main.h>
 #include <phys/stack.h>
 
-#include "arch-phys-info.h"
 #include "psci.h"
 
 // The regs.h header is really only used by assembly code.

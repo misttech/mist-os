@@ -7,9 +7,9 @@
 #include <lib/arch/zbi-boot.h>
 #include <lib/arch/zbi.h>
 
+#include <phys/arch/arch-phys-info.h>
 #include <phys/boot-zbi.h>
 
-#include "arch-phys-info.h"
 #include "riscv64.h"
 
 void BootZbi::ZbiBoot(arch::ZbiKernelImage* kernel, void* arg) {

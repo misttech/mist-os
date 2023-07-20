@@ -856,7 +856,7 @@ TEST_F(RiscvDevictreeCpuTopologyItemTest, ParseCpuNodes) {
       EXPECT_EQ(nodes[2].parent_index, 1);
       EXPECT_EQ(nodes[2].entity.discriminant, ZBI_TOPOLOGY_ENTITY_PROCESSOR);
       EXPECT_EQ(nodes[2].entity.processor.flags, 0);
-      EXPECT_EQ(nodes[2].entity.processor.logical_ids[0], 0);
+      EXPECT_EQ(nodes[2].entity.processor.logical_ids[0], 3);
       EXPECT_EQ(nodes[2].entity.processor.logical_ids[1], 0);
       EXPECT_EQ(nodes[2].entity.processor.logical_ids[2], 0);
       EXPECT_EQ(nodes[2].entity.processor.logical_ids[3], 0);
@@ -900,7 +900,7 @@ TEST_F(RiscvDevictreeCpuTopologyItemTest, ParseCpuNodes) {
       EXPECT_EQ(nodes[6].parent_index, 4);
       EXPECT_EQ(nodes[6].entity.discriminant, ZBI_TOPOLOGY_ENTITY_PROCESSOR);
       EXPECT_EQ(nodes[6].entity.processor.flags, ZBI_TOPOLOGY_PROCESSOR_FLAGS_PRIMARY);
-      EXPECT_EQ(nodes[6].entity.processor.logical_ids[0], 3);
+      EXPECT_EQ(nodes[6].entity.processor.logical_ids[0], 0);
       EXPECT_EQ(nodes[6].entity.processor.logical_ids[1], 0);
       EXPECT_EQ(nodes[6].entity.processor.logical_ids[2], 0);
       EXPECT_EQ(nodes[6].entity.processor.logical_ids[3], 0);
@@ -952,7 +952,7 @@ TEST_F(RiscvDevictreeCpuTopologyItemTest, ParseCpuNodesNoCpuMap) {
       EXPECT_EQ(nodes[0].parent_index, ZBI_TOPOLOGY_NO_PARENT);
       EXPECT_EQ(nodes[0].entity.discriminant, ZBI_TOPOLOGY_ENTITY_PROCESSOR);
       EXPECT_EQ(nodes[0].entity.processor.flags, 0);
-      EXPECT_EQ(nodes[0].entity.processor.logical_ids[0], 0);
+      EXPECT_EQ(nodes[0].entity.processor.logical_ids[0], 3);
       EXPECT_EQ(nodes[0].entity.processor.logical_ids[1], 0);
       EXPECT_EQ(nodes[0].entity.processor.logical_ids[2], 0);
       EXPECT_EQ(nodes[0].entity.processor.logical_ids[3], 0);
@@ -991,7 +991,7 @@ TEST_F(RiscvDevictreeCpuTopologyItemTest, ParseCpuNodesNoCpuMap) {
       EXPECT_EQ(nodes[3].parent_index, ZBI_TOPOLOGY_NO_PARENT);
       EXPECT_EQ(nodes[3].entity.discriminant, ZBI_TOPOLOGY_ENTITY_PROCESSOR);
       EXPECT_EQ(nodes[3].entity.processor.flags, ZBI_TOPOLOGY_PROCESSOR_FLAGS_PRIMARY);
-      EXPECT_EQ(nodes[3].entity.processor.logical_ids[0], 3);
+      EXPECT_EQ(nodes[3].entity.processor.logical_ids[0], 0);
       EXPECT_EQ(nodes[3].entity.processor.logical_ids[1], 0);
       EXPECT_EQ(nodes[3].entity.processor.logical_ids[2], 0);
       EXPECT_EQ(nodes[3].entity.processor.logical_ids[3], 0);
@@ -1048,7 +1048,7 @@ TEST_F(RiscvDevictreeCpuTopologyItemTest, Qemu) {
       EXPECT_EQ(nodes[1].parent_index, 0);
       EXPECT_EQ(nodes[1].entity.discriminant, ZBI_TOPOLOGY_ENTITY_PROCESSOR);
       EXPECT_EQ(nodes[1].entity.processor.flags, 0);
-      EXPECT_EQ(nodes[1].entity.processor.logical_ids[0], 0);
+      EXPECT_EQ(nodes[1].entity.processor.logical_ids[0], 3);
       EXPECT_EQ(nodes[1].entity.processor.logical_ids[1], 0);
       EXPECT_EQ(nodes[1].entity.processor.logical_ids[2], 0);
       EXPECT_EQ(nodes[1].entity.processor.logical_ids[3], 0);
@@ -1087,7 +1087,7 @@ TEST_F(RiscvDevictreeCpuTopologyItemTest, Qemu) {
       EXPECT_EQ(nodes[4].parent_index, 0);
       EXPECT_EQ(nodes[4].entity.discriminant, ZBI_TOPOLOGY_ENTITY_PROCESSOR);
       EXPECT_EQ(nodes[4].entity.processor.flags, ZBI_TOPOLOGY_PROCESSOR_FLAGS_PRIMARY);
-      EXPECT_EQ(nodes[4].entity.processor.logical_ids[0], 3);
+      EXPECT_EQ(nodes[4].entity.processor.logical_ids[0], 0);
       EXPECT_EQ(nodes[4].entity.processor.logical_ids[1], 0);
       EXPECT_EQ(nodes[4].entity.processor.logical_ids[2], 0);
       EXPECT_EQ(nodes[4].entity.processor.logical_ids[3], 0);
@@ -1139,7 +1139,7 @@ TEST_F(RiscvDevictreeCpuTopologyItemTest, VisionFive2) {
       EXPECT_EQ(nodes[0].parent_index, ZBI_TOPOLOGY_NO_PARENT);
       EXPECT_EQ(nodes[0].entity.discriminant, ZBI_TOPOLOGY_ENTITY_PROCESSOR);
       EXPECT_EQ(nodes[0].entity.processor.flags, 0);
-      EXPECT_EQ(nodes[0].entity.processor.logical_ids[0], 0);
+      EXPECT_EQ(nodes[0].entity.processor.logical_ids[0], 3);
       EXPECT_EQ(nodes[0].entity.processor.logical_ids[1], 0);
       EXPECT_EQ(nodes[0].entity.processor.logical_ids[2], 0);
       EXPECT_EQ(nodes[0].entity.processor.logical_ids[3], 0);
@@ -1178,7 +1178,7 @@ TEST_F(RiscvDevictreeCpuTopologyItemTest, VisionFive2) {
       EXPECT_EQ(nodes[3].parent_index, ZBI_TOPOLOGY_NO_PARENT);
       EXPECT_EQ(nodes[3].entity.discriminant, ZBI_TOPOLOGY_ENTITY_PROCESSOR);
       EXPECT_EQ(nodes[3].entity.processor.flags, ZBI_TOPOLOGY_PROCESSOR_FLAGS_PRIMARY);
-      EXPECT_EQ(nodes[3].entity.processor.logical_ids[0], 3);
+      EXPECT_EQ(nodes[3].entity.processor.logical_ids[0], 0);
       EXPECT_EQ(nodes[3].entity.processor.logical_ids[1], 0);
       EXPECT_EQ(nodes[3].entity.processor.logical_ids[2], 0);
       EXPECT_EQ(nodes[3].entity.processor.logical_ids[3], 0);
@@ -1248,7 +1248,7 @@ TEST_F(RiscvDevictreeCpuTopologyItemTest, HifiveSifiveUnmatched) {
       EXPECT_EQ(nodes[1].parent_index, 0);
       EXPECT_EQ(nodes[1].entity.discriminant, ZBI_TOPOLOGY_ENTITY_PROCESSOR);
       EXPECT_EQ(nodes[1].entity.processor.flags, 0);
-      EXPECT_EQ(nodes[1].entity.processor.logical_ids[0], 0);
+      EXPECT_EQ(nodes[1].entity.processor.logical_ids[0], 3);
       EXPECT_EQ(nodes[1].entity.processor.logical_ids[1], 0);
       EXPECT_EQ(nodes[1].entity.processor.logical_ids[2], 0);
       EXPECT_EQ(nodes[1].entity.processor.logical_ids[3], 0);
@@ -1287,7 +1287,7 @@ TEST_F(RiscvDevictreeCpuTopologyItemTest, HifiveSifiveUnmatched) {
       EXPECT_EQ(nodes[4].parent_index, 0);
       EXPECT_EQ(nodes[4].entity.discriminant, ZBI_TOPOLOGY_ENTITY_PROCESSOR);
       EXPECT_EQ(nodes[4].entity.processor.flags, ZBI_TOPOLOGY_PROCESSOR_FLAGS_PRIMARY);
-      EXPECT_EQ(nodes[4].entity.processor.logical_ids[0], 3);
+      EXPECT_EQ(nodes[4].entity.processor.logical_ids[0], 0);
       EXPECT_EQ(nodes[4].entity.processor.logical_ids[1], 0);
       EXPECT_EQ(nodes[4].entity.processor.logical_ids[2], 0);
       EXPECT_EQ(nodes[4].entity.processor.logical_ids[3], 0);

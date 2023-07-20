@@ -18,13 +18,13 @@
 
 #include <ktl/string_view.h>
 #include <phys/allocation.h>
+#include <phys/arch/arch-phys-info.h>
 #include <phys/boot-shim/devicetree.h>
 #include <phys/boot-zbi.h>
 #include <phys/main.h>
 #include <phys/stdio.h>
 #include <phys/symbolize.h>
 #include <phys/uart.h>
-
 namespace {
 
 constexpr const char* kShimName = "devicetree-boot-shim";
@@ -60,6 +60,10 @@ void PhysMain(void* flat_devicetree_blob, arch::EarlyTicks ticks) {
 
   // Use the generated zbi to do some setup.
   ArchSetUp(nullptr);
+
+  // After gArchPhysinfo is set.
+  shim.Get<boot_shim::RiscvDevictreeCpuTopologyItem>().set_boot_hart_id(
+      gArchPhysInfo->boot_hart_id);
 
   // Finally we can boot into the kernel image.
   BootZbi::InputZbi zbi_view(gDevicetreeBoot.ramdisk);

@@ -10,6 +10,8 @@
 #include <lib/zbi-format/cpu.h>
 #include <zircon/assert.h>
 
+#include <cstdint>
+
 namespace boot_shim {
 
 devicetree::ScanState RiscvDevictreeCpuTopologyItem::OnNode(
@@ -425,8 +427,10 @@ fit::result<ItemBase::DataZbi::Error> RiscvDevictreeCpuTopologyItem::AppendItems
   cpp20::span topology_nodes(reinterpret_cast<zbi_topology_node_t*>(payload.data()),
                              node_element_count());
 
-  uint32_t current_node = 0;
+  size_t current_node = 0;
   uint16_t logical_cpu_id = 0;
+  std::optional<size_t> boot_cpu_node_index;
+  std::optional<size_t> cpu_zero_node_index;
   for (const auto& entry : entries) {
     auto& node = topology_nodes[current_node];
     // Self referencing nodes have no parent.
@@ -450,11 +454,18 @@ fit::result<ItemBase::DataZbi::Error> RiscvDevictreeCpuTopologyItem::AppendItems
         node.entity.discriminant = ZBI_TOPOLOGY_ENTITY_PROCESSOR;
         if (entry.cpu_index && cpus[*entry.cpu_index].hart_id) {
           const auto& cpu = cpus[*entry.cpu_index];
-          node.entity.processor.flags =
-              cpu.hart_id == *boot_hart_id_ ? ZBI_TOPOLOGY_PROCESSOR_FLAGS_PRIMARY : 0;
+          node.entity.processor.flags = 0;
           node.entity.processor.architecture_info.discriminant =
               ZBI_TOPOLOGY_ARCHITECTURE_INFO_RISCV64;
           node.entity.processor.architecture_info.riscv64.hart_id = *cpu.hart_id;
+
+          if (logical_cpu_id == 0) {
+            cpu_zero_node_index = current_node;
+          }
+          if (cpu.hart_id == *boot_hart_id_) {
+            node.entity.processor.flags = ZBI_TOPOLOGY_PROCESSOR_FLAGS_PRIMARY;
+            boot_cpu_node_index = current_node;
+          }
         } else {
           node.entity.processor.flags = 0;
         }
@@ -467,6 +478,11 @@ fit::result<ItemBase::DataZbi::Error> RiscvDevictreeCpuTopologyItem::AppendItems
     };
     current_node++;
   }
+  ZX_ASSERT(boot_cpu_node_index && cpu_zero_node_index);
+  // Kernel expects boot cpu to be zero, so swap the ids.
+  topology_nodes[*cpu_zero_node_index].entity.processor.logical_ids[0] =
+      topology_nodes[*boot_cpu_node_index].entity.processor.logical_ids[0];
+  topology_nodes[*boot_cpu_node_index].entity.processor.logical_ids[0] = 0;
   return CalculateClusterPerformanceClass(topology_nodes);
 }
 

@@ -346,6 +346,10 @@ if (current_toolchain == default_toolchain) {
   }
 }
 
+# Empty target, since there is no header or type required for x86.
+group("arch-phys-info") {
+}
+
 # This is evaluated differently in different environments, so outside the if.
 hwreg_asm_header("phys32-header") {
   output_name = "phys32.h"

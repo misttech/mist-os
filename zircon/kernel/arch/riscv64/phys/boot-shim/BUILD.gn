@@ -27,6 +27,7 @@ phys_executable("linux-riscv64-devicetree-boot-shim") {
     "//zircon/kernel/lib/boot-options",
     "//zircon/kernel/lib/libc",
     "//zircon/kernel/phys:allocation",
+    "//zircon/kernel/phys:arch-phys-info",
     "//zircon/kernel/phys:boot-zbi",
     "//zircon/kernel/phys:exception",
     "//zircon/kernel/phys:main",

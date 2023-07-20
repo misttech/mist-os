@@ -4,8 +4,8 @@
 // license that can be found in the LICENSE file or at
 // https://opensource.org/licenses/MIT
 
-#ifndef ZIRCON_KERNEL_ARCH_ARM64_PHYS_ARCH_PHYS_INFO_H_
-#define ZIRCON_KERNEL_ARCH_ARM64_PHYS_ARCH_PHYS_INFO_H_
+#ifndef ZIRCON_KERNEL_ARCH_ARM64_PHYS_INCLUDE_PHYS_ARCH_ARCH_PHYS_INFO_H_
+#define ZIRCON_KERNEL_ARCH_ARM64_PHYS_INCLUDE_PHYS_ARCH_ARCH_PHYS_INFO_H_
 
 #include <lib/arch/arm64/psci.h>
 
@@ -21,4 +21,4 @@ struct ArchPhysInfo {
   std::array<uint64_t, arch::kArmPsciRegisters> psci_reset_registers;
 };
 
-#endif  // ZIRCON_KERNEL_ARCH_ARM64_PHYS_ARCH_PHYS_INFO_H_
+#endif  // ZIRCON_KERNEL_ARCH_ARM64_PHYS_INCLUDE_PHYS_ARCH_ARCH_PHYS_INFO_H_

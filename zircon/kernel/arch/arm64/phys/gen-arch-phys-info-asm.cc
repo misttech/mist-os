@@ -7,8 +7,7 @@
 #include <stddef.h>
 
 #include <hwreg/asm.h>
-
-#include "arch-phys-info.h"
+#include <phys/arch/arch-phys-info.h>
 
 int main(int argc, char** argv) {
   return hwreg::AsmHeader()  //

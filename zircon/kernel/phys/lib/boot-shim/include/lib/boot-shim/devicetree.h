@@ -443,7 +443,7 @@ class RiscvDevictreeCpuTopologyItem : public DevicetreeItemBase<RiscvDevictreeCp
     allocator_ = &shim.allocator();
   }
 
-  void set_boot_hart_id(uint32_t hart_id) { boot_hart_id_ = hart_id; }
+  void set_boot_hart_id(uint64_t hart_id) { boot_hart_id_ = hart_id; }
 
  private:
   static constexpr bool IsCpuMapNode(std::string_view node_name, std::string_view prefix) {
@@ -529,7 +529,7 @@ class RiscvDevictreeCpuTopologyItem : public DevicetreeItemBase<RiscvDevictreeCp
   uint32_t cpu_entry_index_ = 0;
   uint32_t cluster_count_ = 0;
 
-  std::optional<uint32_t> boot_hart_id_ = 0;
+  std::optional<uint64_t> boot_hart_id_;
 
   // Allocation is environment specific, so we delegate that to a lambda.
   mutable const DevicetreeBootShimAllocator* allocator_ = nullptr;

@@ -13,10 +13,9 @@
 #include <stdint.h>
 #include <zircon/assert.h>
 
+#include <phys/arch/arch-phys-info.h>
 #include <phys/main.h>
 #include <phys/stdio.h>
-
-#include "arch-phys-info.h"
 
 // These are defined in assembly along with ArmPsciReset (see psci.S).  The
 // first argument is the operation and the other arguments vary by operation.

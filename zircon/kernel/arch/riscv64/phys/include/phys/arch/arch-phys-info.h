@@ -4,8 +4,8 @@
 // license that can be found in the LICENSE file or at
 // https://opensource.org/licenses/MIT
 
-#ifndef ZIRCON_KERNEL_ARCH_RISCV64_PHYS_ARCH_PHYS_INFO_H_
-#define ZIRCON_KERNEL_ARCH_RISCV64_PHYS_ARCH_PHYS_INFO_H_
+#ifndef ZIRCON_KERNEL_ARCH_RISCV64_PHYS_INCLUDE_PHYS_ARCH_ARCH_PHYS_INFO_H_
+#define ZIRCON_KERNEL_ARCH_RISCV64_PHYS_INCLUDE_PHYS_ARCH_ARCH_PHYS_INFO_H_
 
 #include <stdint.h>
 
@@ -15,4 +15,4 @@ struct ArchPhysInfo {
   uint64_t boot_hart_id;
 };
 
-#endif  // ZIRCON_KERNEL_ARCH_RISCV64_PHYS_ARCH_PHYS_INFO_H_
+#endif  // ZIRCON_KERNEL_ARCH_RISCV64_PHYS_INCLUDE_PHYS_ARCH_ARCH_PHYS_INFO_H_

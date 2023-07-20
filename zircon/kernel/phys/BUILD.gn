@@ -872,6 +872,10 @@ if (is_kernel) {
     ldflags = [ "-Wl,-e,PhysbootHandoff" ]
     configs = [ ":phys-elf-module.config" ]
   }
+
+  source_set("arch-phys-info") {
+    public_deps = [ "//zircon/kernel/arch/$zircon_cpu/phys:arch-phys-info" ]
+  }
 }
 
 kernel_elf_interp("physboot.interp") {

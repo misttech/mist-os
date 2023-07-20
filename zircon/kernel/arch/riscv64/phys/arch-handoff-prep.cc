@@ -6,9 +6,9 @@
 
 #include <zircon/assert.h>
 
+#include <phys/arch/arch-phys-info.h>
 #include <phys/main.h>
 
-#include "arch-phys-info.h"
 #include "handoff-prep.h"
 
 #include <ktl/enforce.h>
