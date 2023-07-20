@@ -20,15 +20,25 @@ import("//build/compiled_action.gni")
 #   hals (optional; default=[])
 #     [list of labels] Labels of HAL fuchsia packages to add as subpackages.
 #
-#     If a HAL package contains `system/init.rc`, that file will be copied to
-#     `data/init/${hal_package_name}.rc` in the resulting container package.
+#     The resulting container package will also have an ODM filesystem with
+#     configurations for HALs. See /src/starnix/tools/gen_android_starnix_container/README.md
+#     for details.
+#
+#   always_populate_odm (optional; default=false)
+#     [bool] Whether the action always populates the ODM filesystem with
+#     configurations for HALs, or skipping depending on the system image.
+#     TODO(fxbug.dev/129576): Remove after soft-migration.
 #
 template("android_starnix_container") {
   assert(defined(invoker.base), "Need to define base")
   assert(defined(invoker.system), "Need to define system")
 
   compiled_action(target_name) {
-    forward_variables_from(invoker, [ "deps" ])
+    forward_variables_from(invoker,
+                           [
+                             "deps",
+                             "testonly",
+                           ])
     if (!defined(deps)) {
       deps = []
     }
@@ -76,6 +86,12 @@ template("android_starnix_container") {
       ]
       inputs += [ _hal_manifest ]
       deps += [ hal ]
+    }
+
+    if (defined(invoker.always_populate_odm)) {
+      if (invoker.always_populate_odm) {
+        args += [ "--always-populate-odm" ]
+      }
     }
   }
 }
