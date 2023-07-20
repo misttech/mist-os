@@ -7,7 +7,7 @@
 use super::shared::{execute_syscall, process_completed_restricted_exit, TaskInfo};
 use crate::{
     arch::execution::{generate_cfi_directives, restore_cfi_directives},
-    logging::{log_trace, log_warn, set_current_task_info, set_zx_name},
+    logging::{log_warn, set_current_task_info, set_zx_name},
     mm::MemoryManager,
     signals::{deliver_signal, SignalActions, SignalInfo},
     syscalls::decls::SyscallDecl,
@@ -293,7 +293,9 @@ fn run_task(current_task: &mut CurrentTask) -> Result<ExitStatus, Error> {
         {
             let dump_on_exit = current_task.read().dump_on_exit;
             if dump_on_exit {
-                log_trace!("requesting backtrace");
+                // Make diagnostics tooling aware of the crash.
+                current_task.kernel().core_dumps.record_core_dump(&current_task.task);
+
                 // (Re)-generate CFI directives so that stack unwinders will trace into the Linux state.
                 generate_cfi_directives!(state);
                 debug::backtrace_request_current_thread();

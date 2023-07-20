@@ -1,0 +1,74 @@
+// Copyright 2023 The Fuchsia Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style license that can be
+// found in the LICENSE file.
+{
+    include: [
+        "sys/testing/elf_test_runner.shard.cml",
+        "syslog/client.shard.cml",
+    ],
+    program: {
+        binary: "bin/starnix_coredump_test",
+    },
+    children: [
+        {
+            name: "kernel",
+            url: "starnix_kernel#meta/starnix_kernel.cm",
+        },
+        {
+            name: "debian_container",
+            url: "#meta/container.cm",
+            environment: "#starnix_kernel_env",
+        },
+    ],
+    collections: [
+        {
+            name: "coredumps",
+            environment: "#debian_container_env",
+            durability: "transient",
+        },
+    ],
+    use: [
+        {
+            protocol: [ "fuchsia.diagnostics.ArchiveAccessor" ],
+        },
+        {
+            protocol: [ "fuchsia.component.Realm" ],
+            from: "framework",
+        },
+        {
+            event_stream: [
+                "destroyed",
+                "started",
+            ],
+        },
+    ],
+    offer: [
+        {
+            protocol: [ "fuchsia.kernel.VmexResource" ],
+            from: "parent",
+            to: "#kernel",
+        },
+    ],
+    environments: [
+        {
+            name: "starnix_kernel_env",
+            extends: "realm",
+            runners: [
+                {
+                    runner: "starnix",
+                    from: "#kernel",
+                },
+            ],
+        },
+        {
+            name: "debian_container_env",
+            extends: "realm",
+            runners: [
+                {
+                    runner: "starnix_container",
+                    from: "#debian_container",
+                },
+            ],
+        },
+    ],
+}

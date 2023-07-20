@@ -1,0 +1,75 @@
+# Copyright 2023 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+import("//build/components.gni")
+import("//build/rust/rustc_binary.gni")
+import("//src/starnix/kernel/starnix.gni")
+
+group("coredumps") {
+  testonly = true
+
+  deps = [ ":starnix_coredump_diagnostics_test" ]
+}
+
+rustc_binary("bin") {
+  testonly = true
+  edition = "2021"
+  output_name = "starnix_coredump_test"
+  sources = [ "src/main.rs" ]
+  deps = [
+    "//src/lib/diagnostics/reader/rust",
+    "//src/lib/fuchsia",
+    "//src/lib/fuchsia-component-test",
+  ]
+}
+
+fuchsia_test_component("integration_test") {
+  manifest = "meta/integration_test.cml"
+  deps = [ ":bin" ]
+  test_type = "starnix"
+
+  # TODO(https://fxbug.dev/130859) remove once ScopedInstance can be used separately
+  check_includes = false
+}
+
+_bin_name = "generate_linux_coredump"
+if (is_linux) {
+  executable(_bin_name) {
+    testonly = true
+    sources = [ "src/coredump.cc" ]
+
+    # TODO(https://fxbug.dev/116773) enable on asan builders
+    exclude_toolchain_tags = [ "instrumented" ]
+  }
+}
+
+_coredump_bin_label = ":${_bin_name}($target_linux_toolchain)"
+_coredump_out_dir = get_label_info(_coredump_bin_label, "root_out_dir")
+resource("generate_linux_coredump_resource") {
+  testonly = true
+  sources = [ "${_coredump_out_dir}/${_bin_name}" ]
+  outputs = [ "data/tests/${_bin_name}" ]
+  deps = [ _coredump_bin_label ]
+}
+
+fuchsia_component("container") {
+  testonly = true
+  manifest = "//src/starnix/containers/debian/meta/debian_container.cml"
+}
+
+fuchsia_component("coredump") {
+  testonly = true
+  manifest = "meta/coredump.cml"
+  deps = [ ":generate_linux_coredump_resource" ]
+}
+
+fuchsia_test_package("starnix_coredump_diagnostics_test") {
+  test_components = [ ":integration_test" ]
+  deps = [
+    ":container",
+    ":coredump",
+    "//src/starnix/containers/debian:container_resources",
+  ]
+  subpackages = [ "//src/starnix/kernel:starnix_kernel_package" ]
+}

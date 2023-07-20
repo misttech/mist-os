@@ -9,6 +9,7 @@ use once_cell::sync::Lazy;
 use std::{
     collections::HashMap,
     convert::TryInto,
+    ffi::CStr,
     ops::Range,
     sync::{Arc, Weak},
 };
@@ -1292,6 +1293,35 @@ pub trait MemoryAccessorExt: MemoryAccessor {
         }
     }
 
+    /// Read `len` bytes from `start` and parse the region as null-delimited CStrings, for example
+    /// how `argv` is stored.
+    ///
+    /// There can be an arbitrary number of null bytes in between `start` and `end`, but `end` must
+    /// point to a null byte.
+    fn read_nul_delimited_c_string_list(
+        &self,
+        start: UserAddress,
+        len: usize,
+    ) -> Result<Vec<FsString>, Errno> {
+        let buf = self.read_memory_to_vec(start, len)?;
+        let mut buf = &buf[..];
+
+        let mut list = vec![];
+        while !buf.is_empty() {
+            let len_consumed = {
+                let segment = CStr::from_bytes_until_nul(buf).map_err(|e| errno!(EINVAL, e))?;
+
+                // Return the string without the null to match our other APIs, but advance the
+                // "cursor" of the buf variable past the null byte.
+                list.push(segment.to_bytes().to_owned());
+                segment.to_bytes_with_nul().len()
+            };
+            buf = &buf[len_consumed..];
+        }
+
+        Ok(list)
+    }
+
     /// Read up to `buffer.len()` bytes from `string`, stopping at the first discovered null byte
     /// and returning the result as a slice that ends before that null.
     ///
@@ -2548,6 +2578,51 @@ mod tests {
 
         // Expect error if the address is invalid.
         assert_eq!(mm.read_c_string_to_vec(UserCString::default(), max_size), error!(EFAULT));
+    }
+
+    #[::fuchsia::test]
+    async fn can_read_argv_like_regions() {
+        let (_kernel, current_task) = create_kernel_and_task();
+        let mm = &current_task.mm;
+
+        // Map a page.
+        let page_size = *PAGE_SIZE;
+        let addr = map_memory_anywhere(&current_task, page_size);
+        assert!(!addr.is_null());
+
+        // Write an unterminated string.
+        let mut payload = b"first".to_vec();
+        let mut expected_parses = vec![];
+        mm.write_memory(addr, &payload).unwrap();
+
+        // Expect error if the string is not terminated.
+        assert_eq!(mm.read_nul_delimited_c_string_list(addr, payload.len()), error!(EINVAL));
+
+        // Expect success if the string is terminated.
+        expected_parses.push(payload.clone());
+        payload.push(0);
+        mm.write_memory(addr, &payload).unwrap();
+        assert_eq!(
+            mm.read_nul_delimited_c_string_list(addr, payload.len()).unwrap(),
+            expected_parses,
+        );
+
+        // Make sure we can parse multiple strings from the same region.
+        let second = b"second";
+        payload.extend(second);
+        payload.push(0);
+        expected_parses.push(second.to_vec());
+
+        let third = b"third";
+        payload.extend(third);
+        payload.push(0);
+        expected_parses.push(third.to_vec());
+
+        mm.write_memory(addr, &payload).unwrap();
+        assert_eq!(
+            mm.read_nul_delimited_c_string_list(addr, payload.len()).unwrap(),
+            expected_parses,
+        );
     }
 
     #[::fuchsia::test]

@@ -13,6 +13,7 @@ group("tests") {
 
   deps = [
     "android:tests",
+    "diagnostics:tests",
     "gvisor:tests",
     "syscalls:tests",
   ]

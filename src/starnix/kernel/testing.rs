@@ -95,12 +95,18 @@ pub fn create_task(kernel: &Arc<Kernel>, task_name: &str) -> CurrentTask {
     task
 }
 
+/// Maps a region of memory at least `len` bytes long with `PROT_READ | PROT_WRITE`,
+/// `MAP_ANONYMOUS | MAP_PRIVATE`, returning the mapped address.
+pub fn map_memory_anywhere(current_task: &CurrentTask, len: u64) -> UserAddress {
+    map_memory(current_task, UserAddress::NULL, len)
+}
+
 /// Maps a region of memory large enough for the object with `PROT_READ | PROT_WRITE`,
 /// `MAP_ANONYMOUS | MAP_PRIVATE` and writes the object to it, returning the mapped address.
 ///
 /// Useful for syscall in-pointer parameters.
 pub fn map_object_anywhere<T: AsBytes>(current_task: &CurrentTask, object: &T) -> UserAddress {
-    let addr = map_memory(&current_task, 0.into(), std::mem::size_of::<T>() as u64);
+    let addr = map_memory_anywhere(current_task, std::mem::size_of::<T>() as u64);
     current_task.mm.write_object(addr.into(), object).expect("could not write object");
     addr
 }

@@ -20,6 +20,7 @@ use crate::{
         framebuffer::Framebuffer, input::InputDevice, loop_device::LoopDeviceRegistry,
         BinderDriver, DeviceMode, DeviceRegistry,
     },
+    diagnostics::CoreDumpList,
     fs::{
         devtmpfs::devtmpfs_create_device,
         kobject::*,
@@ -150,6 +151,9 @@ pub struct Kernel {
 
     /// Inspect instrumentation for this kernel instance.
     inspect_node: fuchsia_inspect::Node,
+
+    /// Diagnostics information about crashed tasks.
+    pub core_dumps: CoreDumpList,
 }
 
 /// An implementation of [`InterfacesHandler`].
@@ -203,6 +207,8 @@ impl Kernel {
             .expect("Failed to create framebuffer");
         let input_device = InputDevice::new(framebuffer.clone());
 
+        let core_dumps = CoreDumpList::new(inspect_node.create_child("coredumps"));
+
         let this = Arc::new(Kernel {
             job,
             kthreads: KernelThreads::default(),
@@ -236,6 +242,7 @@ impl Kernel {
             generic_netlink: OnceCell::new(),
             network_netlink: OnceCell::new(),
             inspect_node,
+            core_dumps,
         });
 
         // Make a copy of this Arc for the inspect lazy node to use but don't create an Arc cycle

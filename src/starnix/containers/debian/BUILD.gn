@@ -9,6 +9,14 @@ group("debian") {
   deps = [ ":debian_package" ]
 }
 
+group("container_resources") {
+  deps = [
+    ":system_image",
+    "//src/starnix/containers:data_tmp_target",
+    "//src/starnix/containers:default_init",
+  ]
+}
+
 ext4_to_pkg("system_image") {
   if (target_cpu == "x64") {
     input = "//prebuilt/starnix/linux-amd64/amd64_system.img"
@@ -26,10 +34,5 @@ fuchsia_package_with_single_component("debian_package") {
   manifest = "meta/debian_container.cml"
   package_name = "debian"
   component_name = "debian_container"
-
-  deps = [
-    ":system_image",
-    "//src/starnix/containers:data_tmp_target",
-    "//src/starnix/containers:default_init",
-  ]
+  deps = [ ":container_resources" ]
 }

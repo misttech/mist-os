@@ -13,6 +13,7 @@ pub mod auth;
 pub mod bpf;
 pub mod collections;
 pub mod device;
+pub mod diagnostics;
 pub mod drop_notifier;
 pub mod dynamic_thread_pool;
 pub mod execution;

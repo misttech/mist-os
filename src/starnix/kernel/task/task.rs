@@ -21,8 +21,8 @@ use crate::{
     auth::*,
     execution::*,
     fs::{
-        FdFlags, FdNumber, FdTable, FileHandle, FsContext, FsStr, LookupContext, NamespaceNode,
-        SymlinkMode, SymlinkTarget,
+        FdFlags, FdNumber, FdTable, FileHandle, FsContext, FsStr, FsString, LookupContext,
+        NamespaceNode, SymlinkMode, SymlinkTarget,
     },
     loader::*,
     lock::{Mutex, RwLock, RwLockReadGuard, RwLockWriteGuard},
@@ -1035,6 +1035,15 @@ impl Task {
 
     pub fn get_tid(&self) -> pid_t {
         self.id
+    }
+
+    pub fn read_argv(&self) -> Result<Vec<FsString>, Errno> {
+        let (argv_start, argv_end) = {
+            let mm_state = self.mm.state.read();
+            (mm_state.argv_start, mm_state.argv_end)
+        };
+
+        self.mm.read_nul_delimited_c_string_list(argv_start, argv_end - argv_start)
     }
 
     pub fn as_ucred(&self) -> ucred {
