@@ -1082,18 +1082,6 @@ zx_status_t AmlogicDisplay::Bind() {
     return status;
   }
 
-  // Get board info
-  if (zx_status_t status = pdev_.GetBoardInfo(&board_info_); status != ZX_OK) {
-    DISP_ERROR("Could not obtain board info\n");
-    return status;
-  }
-
-  // Get device info
-  if (zx_status_t status = pdev_.GetDeviceInfo(&device_info_); status != ZX_OK) {
-    DISP_ERROR("Could not obtain device_info_\n");
-    return status;
-  }
-
   zx::result sysmem_client =
       ddk::Device<void>::DdkConnectFragmentFidlProtocol<fuchsia_hardware_sysmem::Service::Sysmem>(
           parent_, "sysmem-fidl");

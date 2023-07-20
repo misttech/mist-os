@@ -192,12 +192,6 @@ class AmlogicDisplay
   fidl::WireSyncClient<fuchsia_hardware_amlogiccanvas::Device> canvas_;
   fidl::WireSyncClient<fuchsia_hardware_sysmem::Sysmem> sysmem_;
 
-  // Board Info
-  pdev_board_info_t board_info_;
-
-  // Device info
-  pdev_device_info_t device_info_;
-
   // Interrupts
   zx::interrupt vsync_irq_;
   zx::interrupt vd1_wr_irq_;
