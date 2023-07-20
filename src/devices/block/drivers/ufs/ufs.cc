@@ -811,8 +811,9 @@ zx_status_t Ufs::DisableHostController() {
 }
 
 zx_status_t Ufs::AddDevice() {
-  if (zx_status_t status =
-          DdkAdd(ddk::DeviceAddArgs(kDriverName).set_inspect_vmo(inspector_.DuplicateVmo()));
+  if (zx_status_t status = DdkAdd(ddk::DeviceAddArgs(kDriverName)
+                                      .set_flags(DEVICE_ADD_NON_BINDABLE)
+                                      .set_inspect_vmo(inspector_.DuplicateVmo()));
       status != ZX_OK) {
     zxlogf(ERROR, "Failed to run DdkAdd: %s", zx_status_get_string(status));
     return status;
