@@ -8,30 +8,19 @@ use blocking::Unblock;
 use fho::SimpleWriter;
 use fidl_fuchsia_developer_remotecontrol as rc;
 use fidl_fuchsia_starnix_container as fstarcontainer;
-use futures::{future::FutureExt, pin_mut, select, AsyncReadExt};
-use std::fs::File;
-use std::os::unix::io::FromRawFd;
+use fuchsia_async as fasync;
+use futures::{future::FutureExt, join};
 use termion::raw::IntoRawMode;
 
 use crate::common::*;
 
-async fn serve_console_connection(local_console: fidl::Socket) -> Result<()> {
-    let console = fidl::AsyncSocket::from_socket(local_console)?;
-    let (console_source, mut console_sink) = console.split();
-
-    let stdin = unsafe { File::from_raw_fd(0) };
-    let stdout = unsafe { File::from_raw_fd(1) };
-
-    let stdin = Unblock::new(stdin);
-    let mut stdout = Unblock::new(stdout);
-
-    let copy_futures = futures::future::try_join(
-        futures::io::copy(stdin, &mut console_sink),
-        futures::io::copy(console_source, &mut stdout),
-    );
-
-    copy_futures.await?;
-
+async fn forward_console(console_in: fidl::Socket, console_out: fidl::Socket) -> Result<()> {
+    let rx = fidl::AsyncSocket::from_socket(console_out)?;
+    let mut tx = fidl::AsyncSocket::from_socket(console_in)?;
+    fasync::Task::spawn(async move {
+        let _ = futures::io::copy(Unblock::new(std::io::stdin()), &mut tx).await;
+    });
+    futures::io::copy(rx, &mut Unblock::new(std::io::stdout())).await?;
     Ok(())
 }
 
@@ -50,13 +39,15 @@ async fn run_console(
     argv: Vec<String>,
     env: Vec<String>,
 ) -> Result<u8> {
-    let (local_console, remote_console) = fidl::Socket::create_stream();
+    let (local_console_in, remote_console_in) = fidl::Socket::create_stream();
+    let (local_console_out, remote_console_out) = fidl::Socket::create_stream();
     let binary_path = argv[0].clone();
     let (cols, rows) = termion::terminal_size()?;
     let (x_pixels, y_pixels) = (0, 0); // TODO: Need a newer termion for `terminal_size_pixels()`.
     let exit_future = controller
         .spawn_console(fstarcontainer::ControllerSpawnConsoleRequest {
-            console: Some(remote_console),
+            console_in: Some(remote_console_in),
+            console_out: Some(remote_console_out),
             binary_path: Some(binary_path),
             argv: Some(argv),
             environ: Some(env),
@@ -65,26 +56,16 @@ async fn run_console(
         })
         .fuse();
 
-    let copy_future = serve_console_connection(local_console).fuse();
-
-    pin_mut!(exit_future, copy_future);
+    let forward_future = forward_console(local_console_in, local_console_out);
 
     let raw_mode = std::io::stdout().into_raw_mode().unwrap();
-    loop {
-        select! {
-            exit_code = exit_future => {
-                std::mem::drop(raw_mode);
-                return exit_code?.map_err(|e| {
-                    let status = fidl::Status::from_raw(e);
-                    anyhow!("Failed to spawn console: {}", status)
-                });
-            },
-            copy = copy_future => {
-                copy?;
-                continue;
-            },
-        };
-    }
+    let (_, exit_result) = join!(forward_future, exit_future);
+    std::mem::drop(raw_mode);
+    let exit_code = exit_result?.map_err(|e| {
+        let status = fidl::Status::from_raw(e);
+        anyhow!("Failed to spawn console: {}", status)
+    })?;
+    Ok(exit_code)
 }
 
 #[derive(FromArgs, Debug, PartialEq)]

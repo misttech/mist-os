@@ -79,8 +79,8 @@ pub async fn serve_container_controller(
                     });
                 }
                 fstarcontainer::ControllerRequest::SpawnConsole { payload, responder } => {
-                    if let (Some(console), Some(binary_path)) =
-                        (payload.console, payload.binary_path)
+                    if let (Some(console_in), Some(console_out), Some(binary_path)) =
+                        (payload.console_in, payload.console_out, payload.binary_path)
                     {
                         let binary_path = CString::new(binary_path)?;
                         let argv = payload
@@ -111,9 +111,10 @@ pub async fn serve_container_controller(
                                         _ => responder.send(Err(zx::Status::CANCELED.into_raw())),
                                     };
                                 });
-                                let _ = forward_to_pty(container, console, pty).map_err(|e| {
-                                    log_error!("failed to forward to terminal {:?}", e);
-                                });
+                                let _ = forward_to_pty(container, console_in, console_out, pty)
+                                    .map_err(|e| {
+                                        log_error!("failed to forward to terminal {:?}", e);
+                                    });
                             }
                             Err(errno) => {
                                 log_error!("failed to create task with pty {:?}", errno);
@@ -174,14 +175,16 @@ fn create_task_with_pty(
 
 fn forward_to_pty(
     container: &Container,
-    console: fidl::Socket,
+    console_in: fidl::Socket,
+    console_out: fidl::Socket,
     pty: FileHandle,
 ) -> Result<(), Error> {
     // Matches fuchsia.io.Transfer capacity, somewhat arbitrarily.
     const BUFFER_CAPACITY: usize = 8192;
     let system_task = container.kernel.kthreads.system_task();
 
-    let (mut rx, mut tx) = fuchsia_async::Socket::from_socket(console)?.split();
+    let mut rx = fuchsia_async::Socket::from_socket(console_in)?;
+    let mut tx = fuchsia_async::Socket::from_socket(console_out)?;
     let kernel = &container.kernel;
     let current_task = system_task.clone();
     let pty_sink = pty.clone();

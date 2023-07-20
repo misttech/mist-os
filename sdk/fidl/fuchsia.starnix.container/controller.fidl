@@ -21,11 +21,12 @@ closed protocol Controller {
     });
 
     strict SpawnConsole(resource table {
-        1: console zx.Handle:SOCKET;
-        2: binary_path string:MAX;
-        3: argv vector<string:MAX>:MAX;
-        4: environ vector<string:MAX>:MAX;
-        5: window_size ConsoleWindowSize;
+        1: console_in zx.Handle:SOCKET;
+        2: console_out zx.Handle:SOCKET;
+        3: binary_path string:MAX;
+        4: argv vector<string:MAX>:MAX;
+        5: environ vector<string:MAX>:MAX;
+        6: window_size ConsoleWindowSize;
     }) -> (struct {
         exit_code uint8;
     }) error zx.Status;
