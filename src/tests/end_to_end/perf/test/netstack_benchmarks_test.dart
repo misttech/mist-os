@@ -15,7 +15,7 @@ void main() {
 
   test('socket_benchmarks', () async {
     await runTestComponent(
-        packageName: 'socket-benchmarks-tests',
+        packageName: 'socket-benchmarks-tests-netstack2',
         componentName: 'socket-benchmarks.cm',
         commandArgs: '-p --quiet --out ${PerfTestHelper.componentOutputPath}',
         expectedMetricNamesFile: 'fuchsia.network.socket.loopback.txt');
@@ -23,7 +23,7 @@ void main() {
 
   test('socket_benchmarks_with_fast_udp', () async {
     await runTestComponent(
-        packageName: 'socket-benchmarks-tests',
+        packageName: 'socket-benchmarks-tests-netstack2',
         componentName: 'socket-benchmarks-with-fast-udp.cm',
         commandArgs: '-p --quiet --out ${PerfTestHelper.componentOutputPath}',
         expectedMetricNamesFile: 'fuchsia.network.socket.loopback.fastudp.txt');
@@ -31,7 +31,7 @@ void main() {
 
   test('socket_benchmarks_with_netstack3', () async {
     await runTestComponent(
-        packageName: 'socket-benchmarks-tests',
+        packageName: 'socket-benchmarks-tests-netstack3',
         componentName: 'socket-benchmarks-with-netstack3.cm',
         commandArgs: '-p --quiet --out ${PerfTestHelper.componentOutputPath}',
         expectedMetricNamesFile:
@@ -40,7 +40,7 @@ void main() {
 
   test('socket_benchmarks_with_fake_netstack', () async {
     await runTestComponent(
-        packageName: 'socket-benchmarks-tests',
+        packageName: 'socket-benchmarks-tests-netstack2',
         componentName: 'socket-benchmarks-with-fake-netstack.cm',
         commandArgs: '-p --quiet --out ${PerfTestHelper.componentOutputPath}',
         expectedMetricNamesFile:
@@ -57,7 +57,7 @@ void main() {
 
   test('resource_usage_benchmarks', () async {
     await runTestComponent(
-        packageName: 'resource-usage-benchmarks',
+        packageName: 'resource-usage-benchmarks-netstack2',
         componentName: 'resource-usage-benchmark-netstack2.cm',
         commandArgs: '-p',
         expectedMetricNamesFile: 'fuchsia.netstack.resource_usage.txt');
@@ -65,7 +65,7 @@ void main() {
 
   test('resource_usage_benchmarks_with_netstack3', () async {
     await runTestComponent(
-        packageName: 'resource-usage-benchmarks',
+        packageName: 'resource-usage-benchmarks-netstack3',
         componentName: 'resource-usage-benchmark-netstack3.cm',
         commandArgs: '-p',
         expectedMetricNamesFile:

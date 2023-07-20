@@ -47,22 +47,8 @@ common_deps = [
   ":tun_socket_benchmarks",
   "//src/connectivity/network/testing/netemul/service:netemul-sandbox",
   "//src/connectivity/network/tun/network-tun:component",
+  "//src/sys/stash:stash_secure_v2",
 ]
-
-fuchsia_test_component("tun-socket-benchmarks-ns2") {
-  deps = common_deps + [
-           "//src/connectivity/network/netstack:component",
-           "//src/sys/stash:stash_secure_v2",
-         ]
-  manifest = "meta/tun-socket-benchmarks-ns2.cml"
-}
-
-fuchsia_test_component("tun-socket-benchmarks-ns2-with-tracing") {
-  deps = common_deps +
-         [ "//src/connectivity/network/netstack:component-with-tracing" ]
-  manifest = "meta/tun-socket-benchmarks-ns2-with-tracing.cml"
-  test_type = "system"
-}
 
 netstack3_deps = common_deps + [
                    "//src/connectivity/network/netstack3:component",
@@ -73,32 +59,59 @@ netstack3_deps = common_deps + [
                    "//src/connectivity/network/dhcpv4/client/bindings:component",
                  ]
 
-fuchsia_test_component("tun-socket-benchmarks-ns3") {
+fuchsia_test_component("tun-socket-benchmarks-netstack3") {
   deps = netstack3_deps
   manifest = "meta/tun-socket-benchmarks-ns3.cml"
 }
 
-fuchsia_test_component("tun-socket-benchmarks-ns3-with-tracing") {
+fuchsia_test_component("tun-socket-benchmarks-netstack3-with-tracing") {
   deps = netstack3_deps
   manifest = "meta/tun-socket-benchmarks-ns3-with-tracing.cml"
   test_type = "system"
 }
 
-fuchsia_test_package("tun-socket-benchmarks") {
+fuchsia_test_package("tun-socket-benchmarks-tests-netstack3") {
   test_components = [
-    ":tun-socket-benchmarks-ns2",
-    ":tun-socket-benchmarks-ns2-with-tracing",
-    ":tun-socket-benchmarks-ns3",
-    ":tun-socket-benchmarks-ns3-with-tracing",
+    ":tun-socket-benchmarks-netstack3",
+    ":tun-socket-benchmarks-netstack3-with-tracing",
   ]
 }
 
+# The Go runtime on Fuchsia does not support RISC-V.
+if (target_cpu != "riscv64") {
+  fuchsia_test_component("tun-socket-benchmarks-netstack2") {
+    deps = common_deps + [ "//src/connectivity/network/netstack:component" ]
+    manifest = "meta/tun-socket-benchmarks-ns2.cml"
+  }
+
+  fuchsia_test_component("tun-socket-benchmarks-netstack2-with-tracing") {
+    deps = common_deps +
+           [ "//src/connectivity/network/netstack:component-with-tracing" ]
+    manifest = "meta/tun-socket-benchmarks-ns2-with-tracing.cml"
+    test_type = "system"
+  }
+
+  fuchsia_test_package("tun-socket-benchmarks-tests-netstack2") {
+    test_components = [
+      ":tun-socket-benchmarks-netstack2",
+      ":tun-socket-benchmarks-netstack2-with-tracing",
+    ]
+  }
+
+  ns2_test_targets = [ ":tun-socket-benchmarks-tests-netstack2" ]
+} else {
+  ns2_test_targets = []
+}
+
+all_test_targets =
+    [ ":tun-socket-benchmarks-tests-netstack3" ] + ns2_test_targets
+
 group("benchmarks") {
   testonly = true
-  deps = [ ":tun-socket-benchmarks" ]
+  deps = all_test_targets
 }
 
 group("tests") {
   testonly = true
-  public_deps = [ ":tun-socket-benchmarks" ]
+  public_deps = all_test_targets
 }

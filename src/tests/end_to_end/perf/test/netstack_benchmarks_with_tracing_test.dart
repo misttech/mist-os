@@ -55,31 +55,34 @@ void main() {
 
   test(
       'socket_benchmarks_with_tracing',
-      () => runBenchmarksWithTracing('socket-benchmarks-with-tracing-pkg',
+      () => runBenchmarksWithTracing(
+          'socket-benchmarks-with-tracing-pkg-netstack2',
           'socket-benchmarks-with-tracing'),
       timeout: Timeout.none);
 
   test(
       'socket_benchmarks_with_fast_udp_tracing',
-      () => runBenchmarksWithTracing('socket-benchmarks-with-tracing-pkg',
+      () => runBenchmarksWithTracing(
+          'socket-benchmarks-with-tracing-pkg-netstack2',
           'socket-benchmarks-with-fast-udp-tracing'),
       timeout: Timeout.none);
 
   test(
       'socket_benchmarks_with_netstack3_tracing',
-      () => runBenchmarksWithTracing('socket-benchmarks-with-tracing-pkg',
+      () => runBenchmarksWithTracing(
+          'socket-benchmarks-with-tracing-pkg-netstack3',
           'socket-benchmarks-with-netstack3-tracing'),
       timeout: Timeout.none);
 
   test(
       'tun_socket_benchmarks_with_tracing',
-      () => runBenchmarksWithTracing(
-          'tun-socket-benchmarks', 'tun-socket-benchmarks-ns2-with-tracing'),
+      () => runBenchmarksWithTracing('tun-socket-benchmarks-tests-netstack2',
+          'tun-socket-benchmarks-netstack2-with-tracing'),
       timeout: Timeout.none);
 
   test(
       'tun_socket_benchmarks_with_netstack3_tracing',
-      () => runBenchmarksWithTracing(
-          'tun-socket-benchmarks', 'tun-socket-benchmarks-ns3-with-tracing'),
+      () => runBenchmarksWithTracing('tun-socket-benchmarks-tests-netstack3',
+          'tun-socket-benchmarks-netstack3-with-tracing'),
       timeout: Timeout.none);
 }

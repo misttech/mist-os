@@ -13,17 +13,19 @@ void main() {
 
   test('tun_socket_benchmarks', () async {
     await runTestComponent(
-        packageName: 'tun-socket-benchmarks',
-        componentName: 'tun-socket-benchmarks-ns2.cm',
-        commandArgs: '--output-fuchsiaperf ${PerfTestHelper.componentOutputPath}',
+        packageName: 'tun-socket-benchmarks-tests-netstack2',
+        componentName: 'tun-socket-benchmarks-netstack2.cm',
+        commandArgs:
+            '--output-fuchsiaperf ${PerfTestHelper.componentOutputPath}',
         expectedMetricNamesFile: 'fuchsia.network.socket.tun.txt');
   }, timeout: Timeout.none);
 
   test('tun_socket_benchmarks_with_netstack3', () async {
     await runTestComponent(
-        packageName: 'tun-socket-benchmarks',
-        componentName: 'tun-socket-benchmarks-ns3.cm',
-        commandArgs: '--output-fuchsiaperf ${PerfTestHelper.componentOutputPath}',
+        packageName: 'tun-socket-benchmarks-tests-netstack3',
+        componentName: 'tun-socket-benchmarks-netstack3.cm',
+        commandArgs:
+            '--output-fuchsiaperf ${PerfTestHelper.componentOutputPath}',
         expectedMetricNamesFile: 'fuchsia.network.socket.tun.netstack3.txt');
   }, timeout: Timeout.none);
 }

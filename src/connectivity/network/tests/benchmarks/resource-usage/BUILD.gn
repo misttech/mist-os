@@ -5,11 +5,6 @@
 import("//build/components.gni")
 import("//build/rust/rustc_binary.gni")
 
-group("tests") {
-  testonly = true
-  deps = [ ":resource-usage-benchmarks" ]
-}
-
 rustc_binary("resource_usage_benchmark") {
   testonly = true
   edition = "2021"
@@ -47,33 +42,48 @@ rustc_binary("resource_usage_benchmark") {
   configs -= [ "//build/config/rust/lints:allow_unused_results" ]
 }
 
-fuchsia_test_component("resource-usage-benchmark-netstack2") {
-  manifest = "meta/resource-usage-benchmark-netstack2.cml"
-  deps = [
-    ":resource_usage_benchmark",
-    "//src/connectivity/network/netstack:component",
-    "//src/connectivity/network/testing/netemul/service:netemul-sandbox",
-    "//src/sys/stash:stash_secure_v2",
-  ]
-}
+shared_deps = [ "//src/sys/stash:stash_secure_v2" ]
 
 fuchsia_test_component("resource-usage-benchmark-netstack3") {
   manifest = "meta/resource-usage-benchmark-netstack3.cml"
   deps = [
-    ":resource_usage_benchmark",
+           ":resource_usage_benchmark",
 
-    # TODO(https://fxbug.dev/125773): remove this when the production Netstack3
-    # component no longer brings its own DHCPv4 client, given that it is
-    # otherwise unused in this benchmark.
-    "//src/connectivity/network/dhcpv4/client/bindings:component",
-    "//src/connectivity/network/netstack3:component",
-    "//src/connectivity/network/testing/netemul/service:netemul-sandbox",
-  ]
+           # TODO(https://fxbug.dev/125773): remove this when the production Netstack3
+           # component no longer brings its own DHCPv4 client, given that it is
+           # otherwise unused in this benchmark.
+           "//src/connectivity/network/dhcpv4/client/bindings:component",
+           "//src/connectivity/network/netstack3:component",
+           "//src/connectivity/network/testing/netemul/service:netemul-sandbox",
+         ] + shared_deps
 }
 
-fuchsia_test_package("resource-usage-benchmarks") {
-  test_components = [
-    ":resource-usage-benchmark-netstack2",
-    ":resource-usage-benchmark-netstack3",
-  ]
+fuchsia_test_package("resource-usage-benchmarks-netstack3") {
+  test_components = [ ":resource-usage-benchmark-netstack3" ]
+}
+
+# The Go runtime on Fuchsia does not support RISC-V.
+if (target_cpu != "riscv64") {
+  fuchsia_test_component("resource-usage-benchmark-netstack2") {
+    manifest = "meta/resource-usage-benchmark-netstack2.cml"
+    deps =
+        [
+          ":resource_usage_benchmark",
+          "//src/connectivity/network/netstack:component",
+          "//src/connectivity/network/testing/netemul/service:netemul-sandbox",
+        ] + shared_deps
+  }
+
+  fuchsia_test_package("resource-usage-benchmarks-netstack2") {
+    test_components = [ ":resource-usage-benchmark-netstack2" ]
+  }
+
+  ns2_test_targets = [ ":resource-usage-benchmarks-netstack2" ]
+} else {
+  ns2_test_targets = []
+}
+
+group("tests") {
+  testonly = true
+  deps = [ ":resource-usage-benchmarks-netstack3" ] + ns2_test_targets
 }
