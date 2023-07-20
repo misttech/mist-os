@@ -8,6 +8,7 @@
 #include <lib/ddk/debug.h>
 #include <lib/device-protocol/display-panel.h>
 #include <lib/mipi-dsi/mipi-dsi.h>
+#include <zircon/errors.h>
 
 #include <ddktl/device.h>
 #include <fbl/alloc_checker.h>
@@ -236,13 +237,18 @@ zx_status_t Lcd::Enable() {
   return ZX_OK;
 }
 
-zx::result<Lcd*> Lcd::Create(fbl::AllocChecker* ac, uint32_t panel_type,
-                             cpp20::span<const uint8_t> dsi_on, cpp20::span<const uint8_t> dsi_off,
-                             fit::function<void(bool)> set_signal_power,
-                             ddk::DsiImplProtocolClient dsiimpl, ddk::GpioProtocolClient gpio,
-                             bool already_enabled) {
+// static
+zx::result<std::unique_ptr<Lcd>> Lcd::Create(uint32_t panel_type, cpp20::span<const uint8_t> dsi_on,
+                                             cpp20::span<const uint8_t> dsi_off,
+                                             fit::function<void(bool)> set_signal_power,
+                                             ddk::DsiImplProtocolClient dsiimpl,
+                                             ddk::GpioProtocolClient gpio, bool already_enabled) {
+  fbl::AllocChecker alloc_checker;
   std::unique_ptr<Lcd> lcd =
-      fbl::make_unique_checked<Lcd>(ac, panel_type, std::move(set_signal_power));
+      fbl::make_unique_checked<Lcd>(&alloc_checker, panel_type, std::move(set_signal_power));
+  if (!alloc_checker.check()) {
+    return zx::error(ZX_ERR_NO_MEMORY);
+  }
   lcd->dsi_on_ = dsi_on;
   lcd->dsi_off_ = dsi_off;
   lcd->dsiimpl_ = dsiimpl;
@@ -260,7 +266,7 @@ zx::result<Lcd*> Lcd::Create(fbl::AllocChecker* ac, uint32_t panel_type,
     lcd->Enable();
   }
 
-  return zx::ok(lcd.release());
+  return zx::ok(std::move(lcd));
 }
 
 }  // namespace amlogic_display

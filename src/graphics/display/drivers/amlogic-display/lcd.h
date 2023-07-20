@@ -27,12 +27,10 @@ class Lcd {
   // power the LCD on or probe its panel type for correctness.
   // `set_signal_power(bool on)` will be called when the DSI should be turned on
   // or off.
-  static zx::result<Lcd*> Create(fbl::AllocChecker* ac, uint32_t panel_type,
-                                 cpp20::span<const uint8_t> dsi_on,
-                                 cpp20::span<const uint8_t> dsi_off,
-                                 fit::function<void(bool)> set_signal_power,
-                                 ddk::DsiImplProtocolClient dsiimpl, ddk::GpioProtocolClient gpio,
-                                 bool already_enabled);
+  static zx::result<std::unique_ptr<Lcd>> Create(
+      uint32_t panel_type, cpp20::span<const uint8_t> dsi_on, cpp20::span<const uint8_t> dsi_off,
+      fit::function<void(bool)> set_signal_power, ddk::DsiImplProtocolClient dsiimpl,
+      ddk::GpioProtocolClient gpio, bool already_enabled);
 
   // Turn the panel on
   zx_status_t Enable();
