@@ -234,8 +234,13 @@ TEST(VmoTestCase, MapRead) {
 
   uintptr_t vaddr;
   // Map in the first page
-  EXPECT_OK(zx::vmar::root_self()->map(ZX_VM_PERM_READ | ZX_VM_PERM_WRITE, 0, vmo, 0,
+  ASSERT_OK(zx::vmar::root_self()->map(ZX_VM_PERM_READ | ZX_VM_PERM_WRITE, 0, vmo, 0,
                                        zx_system_get_page_size(), &vaddr));
+
+  auto unmap = fit::defer([&]() {
+    // Cleanup the mapping we created.
+    zx::vmar::root_self()->unmap(vaddr, zx_system_get_page_size());
+  });
 
   // Read from the second page of the vmo to mapping.
   // This should succeed and not deadlock in the kernel.
@@ -268,6 +273,11 @@ TEST(VmoTestCase, ParallelWriteAndDecommit) {
   uintptr_t base;
   ASSERT_OK(
       zx::vmar::root_self()->map(ZX_VM_PERM_READ | ZX_VM_PERM_WRITE, 0, vmo, 0, kVmoSize, &base));
+  auto unmap = fit::defer([&]() {
+    // Cleanup the mapping we created.
+    zx::vmar::root_self()->unmap(base, kVmoSize);
+  });
+
   ASSERT_OK(vmo.op_range(ZX_VMO_OP_DECOMMIT, 0, kVmoSize, nullptr, 0));
 
   constexpr size_t kNumThreads = 2;
@@ -323,10 +333,19 @@ TEST(VmoTestCase, ParallelRead) {
 
   uintptr_t vaddr1, vaddr2;
   // Map the bottom half of both in.
-  EXPECT_OK(zx::vmar::root_self()->map(ZX_VM_PERM_READ | ZX_VM_PERM_WRITE, 0, vmo1, 0,
+  ASSERT_OK(zx::vmar::root_self()->map(ZX_VM_PERM_READ | ZX_VM_PERM_WRITE, 0, vmo1, 0,
                                        zx_system_get_page_size() * (kNumPages / 2), &vaddr1));
-  EXPECT_OK(zx::vmar::root_self()->map(ZX_VM_PERM_READ | ZX_VM_PERM_WRITE, 0, vmo2, 0,
+  auto unmap1 = fit::defer([&]() {
+    // Cleanup the mapping we created.
+    zx::vmar::root_self()->unmap(vaddr1, zx_system_get_page_size() * (kNumPages / 2));
+  });
+
+  ASSERT_OK(zx::vmar::root_self()->map(ZX_VM_PERM_READ | ZX_VM_PERM_WRITE, 0, vmo2, 0,
                                        zx_system_get_page_size() * (kNumPages / 2), &vaddr2));
+  auto unmap2 = fit::defer([&]() {
+    // Cleanup the mapping we created.
+    zx::vmar::root_self()->unmap(vaddr2, zx_system_get_page_size() * (kNumPages / 2));
+  });
 
   // Spin up a thread to read from one of the vmos, whilst we read from the other
   auto vmo_read_closure = [&vmo1, &vaddr2] {
@@ -514,9 +533,13 @@ TEST(VmoTestCase, GrowMappedVmo) {
   uintptr_t mapping_addr;
 
   // create an 8 page mapping backed by this VMO
-  status = zx_vmar_map(zx_vmar_root_self(), ZX_VM_PERM_READ | ZX_VM_PERM_WRITE, 0, vmo.get(), 0,
-                       mapping_size, &mapping_addr);
-  EXPECT_OK(status, "vmar_map");
+  status = zx::vmar::root_self()->map(ZX_VM_PERM_READ | ZX_VM_PERM_WRITE, 0, vmo, 0, mapping_size,
+                                      &mapping_addr);
+  ASSERT_OK(status, "vmar_map");
+  auto unmap = fit::defer([&]() {
+    // Cleanup the mapping we created.
+    zx::vmar::root_self()->unmap(mapping_addr, mapping_size);
+  });
 
   // grow the vmo to cover part of the mapping and a partial page
   vmo_size = zx_system_get_page_size() * 6 + zx_system_get_page_size() / 2;
@@ -1483,11 +1506,20 @@ TEST(VmoTestCase, PhysicalSlice) {
 
   // Map both VMOs in so we can access them.
   uintptr_t parent_vaddr;
-  EXPECT_OK(zx::vmar::root_self()->map(ZX_VM_PERM_READ | ZX_VM_PERM_WRITE, 0, phys.vmo, 0, size,
+  ASSERT_OK(zx::vmar::root_self()->map(ZX_VM_PERM_READ | ZX_VM_PERM_WRITE, 0, phys.vmo, 0, size,
                                        &parent_vaddr));
+  auto unmap_parent = fit::defer([&]() {
+    // Cleanup the mapping we created.
+    zx::vmar::root_self()->unmap(parent_vaddr, size);
+  });
+
   uintptr_t slice_vaddr;
-  EXPECT_OK(zx::vmar::root_self()->map(ZX_VM_PERM_READ | ZX_VM_PERM_WRITE, 0, slice_vmo, 0,
+  ASSERT_OK(zx::vmar::root_self()->map(ZX_VM_PERM_READ | ZX_VM_PERM_WRITE, 0, slice_vmo, 0,
                                        size / 2, &slice_vaddr));
+  auto unmap_slice = fit::defer([&]() {
+    // Cleanup the mapping we created.
+    zx::vmar::root_self()->unmap(slice_vaddr, size / 2);
+  });
 
   // Just do some tests using the first byte of each page
   char *parent_private_test = (char *)parent_vaddr;
