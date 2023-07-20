@@ -10,6 +10,9 @@ use ffx_net_test_realm_args as ntr_args;
 use fho::{AvailabilityFlag, FfxMain, FfxTool, SimpleWriter};
 use fidl_fuchsia_developer_remotecontrol as fremotecontrol;
 use fidl_fuchsia_io as fio;
+use fidl_fuchsia_net as fnet;
+use fidl_fuchsia_net_dhcpv6 as fnet_dhcpv6;
+use fidl_fuchsia_net_dhcpv6_ext as fnet_dhcpv6_ext;
 use fidl_fuchsia_net_ext as fnet_ext;
 use fidl_fuchsia_net_test_realm as fntr;
 use tracing::error;
@@ -164,13 +167,27 @@ async fn handle_command(
                     request_dns_servers,
                 }) => (
                     controller
-                        .start_dhcpv6_client(&fntr::ControllerStartDhcpv6ClientRequest {
-                            interface_id: Some(interface_id),
-                            address: Some(address.into()),
-                            stateful: Some(stateful),
-                            request_dns_servers: Some(request_dns_servers),
-                            ..Default::default()
-                        })
+                        .start_dhcpv6_client(
+                            &fnet_dhcpv6_ext::NewClientParams {
+                                interface_id: interface_id,
+                                address: fnet::Ipv6SocketAddress {
+                                    address: address.into(),
+                                    port: fnet_dhcpv6::DEFAULT_CLIENT_PORT,
+                                    zone_index: interface_id,
+                                },
+                                config: fnet_dhcpv6_ext::ClientConfig {
+                                    information_config: fnet_dhcpv6_ext::InformationConfig {
+                                        dns_servers: request_dns_servers,
+                                    },
+                                    non_temporary_address_config: fnet_dhcpv6_ext::AddressConfig {
+                                        address_count: if stateful { 1 } else { 0 },
+                                        preferred_addresses: None,
+                                    },
+                                    prefix_delegation_config: None,
+                                },
+                            }
+                            .into(),
+                        )
                         .await,
                     "start_dhcpv6_client",
                 ),
@@ -428,29 +445,43 @@ mod test {
 
     #[fuchsia_async::run_singlethreaded(test)]
     async fn dhcpv6_client_start() {
-        const IPV6_ADDRESS: fnet_ext::Ipv6Address = fnet_ext::Ipv6Address(std_ip_v6!("fe80::1"));
+        const DHCPV6_CLIENT_BIND_ADDR: fnet_ext::Ipv6Address =
+            fnet_ext::Ipv6Address(std_ip_v6!("fe80::1"));
         net_test_realm_command_test(
             ntr_args::Subcommand::Dhcpv6Client(ntr_args::Dhcpv6Client {
                 subcommand: ntr_args::Dhcpv6ClientSubcommand::Start(ntr_args::Dhcpv6ClientStart {
                     interface_id: INTERFACE_ID,
-                    address: IPV6_ADDRESS,
+                    address: DHCPV6_CLIENT_BIND_ADDR,
                     stateful: true,
                     request_dns_servers: true,
                 }),
             }),
             |request| {
-                let (request, responder) = request
+                let (params, responder) = request
                     .into_start_dhcpv6_client()
                     .expect("expected request of type StartDhcpv6Client");
-                assert_matches!(
-                    request,
-                    fntr::ControllerStartDhcpv6ClientRequest {
-                        interface_id: Some(interface_id),
-                        address: Some(addr),
-                        stateful: Some(true),
-                        request_dns_servers: Some(true),
-                        ..
-                    } if interface_id == INTERFACE_ID && addr == IPV6_ADDRESS.into()
+                let params: fnet_dhcpv6_ext::NewClientParams =
+                    params.try_into().expect("NewClientParams should pass FIDL table validation");
+                assert_eq!(
+                    params,
+                    fnet_dhcpv6_ext::NewClientParams {
+                        interface_id: INTERFACE_ID,
+                        address: fnet::Ipv6SocketAddress {
+                            address: DHCPV6_CLIENT_BIND_ADDR.into(),
+                            port: fnet_dhcpv6::DEFAULT_CLIENT_PORT,
+                            zone_index: INTERFACE_ID,
+                        },
+                        config: fnet_dhcpv6_ext::ClientConfig {
+                            information_config: fnet_dhcpv6_ext::InformationConfig {
+                                dns_servers: true,
+                            },
+                            non_temporary_address_config: fnet_dhcpv6_ext::AddressConfig {
+                                address_count: 1,
+                                preferred_addresses: None,
+                            },
+                            prefix_delegation_config: None,
+                        },
+                    },
                 );
                 responder.send(Ok(())).expect("failed to send StartDhcpv6Client response");
             },

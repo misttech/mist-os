@@ -8,6 +8,7 @@ fidl("fuchsia.net.test.realm") {
   sources = [ "controller.fidl" ]
   public_deps = [
     "//sdk/fidl/fuchsia.net",
+    "//sdk/fidl/fuchsia.net.dhcpv6",
     "//sdk/fidl/fuchsia.net.interfaces",
     "//sdk/fidl/fuchsia.url",
     "//zircon/vdso/zx",

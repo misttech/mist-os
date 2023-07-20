@@ -12,6 +12,8 @@ use derivative::Derivative;
 use fidl_fuchsia_component as fcomponent;
 use fidl_fuchsia_io as fio;
 use fidl_fuchsia_net as fnet;
+use fidl_fuchsia_net_dhcpv6 as fnet_dhcpv6;
+use fidl_fuchsia_net_dhcpv6_ext as fnet_dhcpv6_ext;
 use fidl_fuchsia_net_ext as fnet_ext;
 use fidl_fuchsia_net_interfaces as fnet_interfaces;
 use fidl_fuchsia_net_interfaces_ext as fnet_interfaces_ext;
@@ -2308,13 +2310,27 @@ async fn start_dhcpv6_client(name: &str, sub_name: &str, stateful: bool, netstac
     .await;
 
     network_test_realm
-        .start_dhcpv6_client(&fntr::ControllerStartDhcpv6ClientRequest {
-            interface_id: Some(interface.id()),
-            address: Some(DEFAULT_IPV6_LINK_LOCAL_SOURCE_ADDR),
-            stateful: Some(stateful),
-            request_dns_servers: Some(false),
-            ..Default::default()
-        })
+        .start_dhcpv6_client(
+            &fnet_dhcpv6_ext::NewClientParams {
+                interface_id: interface.id(),
+                address: fnet::Ipv6SocketAddress {
+                    address: DEFAULT_IPV6_LINK_LOCAL_SOURCE_ADDR,
+                    port: fnet_dhcpv6::DEFAULT_CLIENT_PORT,
+                    zone_index: interface.id(),
+                },
+                config: fnet_dhcpv6_ext::ClientConfig {
+                    information_config: fnet_dhcpv6_ext::InformationConfig {
+                        dns_servers: !stateful,
+                    },
+                    non_temporary_address_config: fnet_dhcpv6_ext::AddressConfig {
+                        address_count: if stateful { 1 } else { 0 },
+                        preferred_addresses: None,
+                    },
+                    prefix_delegation_config: None,
+                },
+            }
+            .into(),
+        )
         .await
         .expect("FIDL error")
         .expect("start DHCPv6 client");

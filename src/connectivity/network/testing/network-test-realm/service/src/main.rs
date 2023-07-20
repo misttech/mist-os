@@ -881,20 +881,8 @@ impl Controller {
                 let result = self.leave_multicast_group(address, interface_id).await;
                 responder.send(result)?;
             }
-            fntr::ControllerRequest::StartDhcpv6Client {
-                payload:
-                    fntr::ControllerStartDhcpv6ClientRequest {
-                        interface_id,
-                        address,
-                        stateful,
-                        request_dns_servers,
-                        ..
-                    },
-                responder,
-            } => {
-                let result = self
-                    .start_dhcpv6_client(interface_id, address, stateful, request_dns_servers)
-                    .await;
+            fntr::ControllerRequest::StartDhcpv6Client { params, responder } => {
+                let result = self.start_dhcpv6_client(params).await;
                 responder.send(result)?;
             }
             fntr::ControllerRequest::StopDhcpv6Client { responder } => {
@@ -1084,14 +1072,14 @@ impl Controller {
 
     async fn start_dhcpv6_client(
         &mut self,
-        interface_id: Option<u64>,
-        address: Option<fnet::Ipv6Address>,
-        stateful: Option<bool>,
-        request_dns_servers: Option<bool>,
+        params @ fnet_dhcpv6::NewClientParams {
+            interface_id,
+            address: _,
+            config: _,
+            ..
+        }: fnet_dhcpv6::NewClientParams,
     ) -> Result<(), fntr::Error> {
         let interface_id = interface_id.ok_or(fntr::Error::InvalidArguments)?;
-        let address = address.ok_or(fntr::Error::InvalidArguments)?;
-        let stateful = stateful.ok_or(fntr::Error::InvalidArguments)?;
         if self.dhcpv6_client_stream_map.contains_key(&interface_id) {
             return Err(fntr::Error::AlreadyExists);
         }
@@ -1107,33 +1095,10 @@ impl Controller {
                 error!("failed to create DHCPv6 Client proxy and server end: {}", e);
                 fntr::Error::Internal
             })?;
-        client_provider
-            .new_client(
-                &fnet_dhcpv6_ext::NewClientParams {
-                    interface_id: interface_id,
-                    address: fnet::Ipv6SocketAddress {
-                        address: address,
-                        port: fnet_dhcpv6::DEFAULT_CLIENT_PORT,
-                        zone_index: interface_id,
-                    },
-                    config: fnet_dhcpv6_ext::ClientConfig {
-                        information_config: fnet_dhcpv6_ext::InformationConfig {
-                            dns_servers: (!stateful || (stateful && request_dns_servers.is_some())),
-                        },
-                        non_temporary_address_config: fnet_dhcpv6_ext::AddressConfig {
-                            address_count: if stateful { 1 } else { 0 },
-                            preferred_addresses: None,
-                        },
-                        prefix_delegation_config: None,
-                    },
-                }
-                .into(),
-                client_server_end,
-            )
-            .map_err(|e| {
-                error!("failed to start DHCPv6 client: {}", e);
-                fntr::Error::Internal
-            })?;
+        client_provider.new_client(&params, client_server_end).map_err(|e| {
+            error!("failed to start DHCPv6 client: {}", e);
+            fntr::Error::Internal
+        })?;
         if let Some(_) = self.dhcpv6_client_stream_map.insert(
             interface_id,
             Box::pin(

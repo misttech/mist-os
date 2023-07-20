@@ -56,6 +56,118 @@ type Prefix = struct {
     };
 };
 
+/// Parameters to start a new DHCPv6 client with.
+type NewClientParams = table {
+    /// The ID of the interface the client will run on.
+    ///
+    /// Required.
+    1: interface_id uint64;
+
+    /// The socket address to use when communicating with servers.
+    ///
+    /// DHCPv6 servers listen for link-local multicasts, so not using a
+    /// link-local address here may cause interoperability issues.
+    ///
+    /// Client creation will fail with `INVALID_ARGS` if:
+    ///
+    /// * a multicast address is provided;
+    /// * or a link-local address is provided, and its zone index
+    ///     doesn't match `interface_id` (Fuchsia has a 1:1 mapping from
+    ///     zone index to interface ID).
+    ///
+    /// Client creation will fail if it fails to bind a socket to this
+    /// address.
+    ///
+    /// Required.
+    2: address fuchsia.net.Ipv6SocketAddress;
+
+    /// Configuration for starting the DHCPv6 client.
+    ///
+    /// If the configuration requests both addresses and other
+    /// configuration parameters, all information is requested in the
+    /// same message exchange, running in stateful mode. If only
+    /// configuration parameters are requested (no addresses), the
+    /// client runs in stateless mode, as described in
+    /// [RFC 8415, Section 6.1](https://tools.ietf.org/html/rfc8415#section-6.1).
+    ///
+    /// Client creation will fail if `config` is not requesting any
+    /// information (all fields are empty), or if it contains invalid
+    /// fields.
+    ///
+    /// Required.
+    3: config @generated_name("ClientConfig") table {
+        /// Configuration for requesting configuration information.
+        ///
+        /// If not set, interpreted as empty (no configuration
+        /// information will be requested).
+        1: information_config @generated_name("InformationConfig") table {
+            /// Request a list of available DNS servers
+            /// [RFC 3646](https://tools.ietf.org/html/rfc3646).
+            ///
+            /// If not set, interpreted as false;
+            1: dns_servers bool;
+        };
+
+        /// Non-temporary address configuration.
+        ///
+        /// Configures the client to negotiate non-temporary
+        /// addresses (IA_NA), as defined in
+        /// [RFC 8415, section 6.2](https://tools.ietf.org/html/rfc8415#section-6.2).
+        ///
+        /// If not set, interpreted as a configuration with an address count
+        /// of 0 (non-temporary addresses will not be negotiated). If invalid,
+        /// client creation will fail and the pipelined channel will be closed.
+        2: non_temporary_address_config @generated_name("AddressConfig") table {
+            /// Number of addresses.
+            ///
+            /// If the value is 0, the client will not negotiate
+            /// non-temporary addresses, i.e. its messages to the
+            /// server will not contain the IA_NA option.
+            ///
+            /// Required.
+            1: address_count uint8;
+
+            /// Preferred addresses.
+            ///
+            /// The addresses are used as hints by DHCPv6 servers,
+            /// but may be ignored.
+            ///
+            /// The size of `preferred_addresses` must be less than
+            /// or equal to `address_count`, otherwise the
+            /// `AddressConfig` is invalid.
+            ///
+            /// Optional field. If not set, or if
+            /// `preferred_addresses` is empty, no address hints are
+            /// provided.
+            2: preferred_addresses vector<fuchsia.net.Ipv6Address>:MAX;
+        };
+
+        /// Prefix delegation configuration.
+        ///
+        /// Configures the client to negotiate a delegated prefix
+        /// (IA_PD), as defined in [RFC 8415, section 6.3][RFC 8415 6.3].
+        ///
+        /// Optional. If not set, delegated prefixes will not be
+        /// requested. If invalid, client creation will fail and
+        /// the pipelined channel will be closed.
+        ///
+        /// [RFC 8415 6.3]: https://datatracker.ietf.org/doc/html/rfc8415#section-6.3
+        3: prefix_delegation_config strict union {
+            /// Request a prefix of any length.
+            1: empty Empty;
+            /// Request a prefix of a specific length.
+            ///
+            /// Must be in the range [1, 128]; otherwise client creation will fail.
+            2: prefix_length uint8;
+            /// Request a specific prefix.
+            ///
+            /// The prefix length must be in the range [1, 128], and the host bits of
+            /// the address must be all zeroes; otherwise client creation will fail.
+            3: prefix fuchsia.net.Ipv6AddressWithPrefix;
+        };
+    };
+};
+
 /// Provides a method to create new clients.
 @discoverable
 closed protocol ClientProvider {
@@ -65,116 +177,7 @@ closed protocol ClientProvider {
     /// + request `request` grants control over the client. Closed with an
     ///     epitaph if the client cannot be created.
     strict NewClient(resource struct {
-        params @generated_name("NewClientParams") table {
-            /// The ID of the interface the client will run on.
-            ///
-            /// Required.
-            1: interface_id uint64;
-
-            /// The socket address to use when communicating with servers.
-            ///
-            /// DHCPv6 servers listen for link-local multicasts, so not using a
-            /// link-local address here may cause interoperability issues.
-            ///
-            /// Client creation will fail with `INVALID_ARGS` if:
-            ///
-            /// * a multicast address is provided;
-            /// * or a link-local address is provided, and its zone index
-            ///     doesn't match `interface_id` (Fuchsia has a 1:1 mapping from
-            ///     zone index to interface ID).
-            ///
-            /// Client creation will fail if it fails to bind a socket to this
-            /// address.
-            ///
-            /// Required.
-            2: address fuchsia.net.Ipv6SocketAddress;
-
-            /// Configuration for starting the DHCPv6 client.
-            ///
-            /// If the configuration requests both addresses and other
-            /// configuration parameters, all information is requested in the
-            /// same message exchange, running in stateful mode. If only
-            /// configuration parameters are requested (no addresses), the
-            /// client runs in stateless mode, as described in
-            /// [RFC 8415, Section 6.1](https://tools.ietf.org/html/rfc8415#section-6.1).
-            ///
-            /// Client creation will fail if `config` is not requesting any
-            /// information (all fields are empty), or if it contains invalid
-            /// fields.
-            ///
-            /// Required.
-            3: config @generated_name("ClientConfig") table {
-                /// Configuration for requesting configuration information.
-                ///
-                /// If not set, interpreted as empty (no configuration
-                /// information will be requested).
-                1: information_config @generated_name("InformationConfig") table {
-                    /// Request a list of available DNS servers
-                    /// [RFC 3646](https://tools.ietf.org/html/rfc3646).
-                    ///
-                    /// If not set, interpreted as false;
-                    1: dns_servers bool;
-                };
-
-                /// Non-temporary address configuration.
-                ///
-                /// Configures the client to negotiate non-temporary
-                /// addresses (IA_NA), as defined in
-                /// [RFC 8415, section 6.2](https://tools.ietf.org/html/rfc8415#section-6.2).
-                ///
-                /// If not set, interpreted as a configuration with an address count
-                /// of 0 (non-temporary addresses will not be negotiated). If invalid,
-                /// client creation will fail and the pipelined channel will be closed.
-                2: non_temporary_address_config @generated_name("AddressConfig") table {
-                    /// Number of addresses.
-                    ///
-                    /// If the value is 0, the client will not negotiate
-                    /// non-temporary addresses, i.e. its messages to the
-                    /// server will not contain the IA_NA option.
-                    ///
-                    /// Required.
-                    1: address_count uint8;
-
-                    /// Preferred addresses.
-                    ///
-                    /// The addresses are used as hints by DHCPv6 servers,
-                    /// but may be ignored.
-                    ///
-                    /// The size of `preferred_addresses` must be less than
-                    /// or equal to `address_count`, otherwise the
-                    /// `AddressConfig` is invalid.
-                    ///
-                    /// Optional field. If not set, or if
-                    /// `preferred_addresses` is empty, no address hints are
-                    /// provided.
-                    2: preferred_addresses vector<fuchsia.net.Ipv6Address>:MAX;
-                };
-
-                /// Prefix delegation configuration.
-                ///
-                /// Configures the client to negotiate a delegated prefix
-                /// (IA_PD), as defined in [RFC 8415, section 6.3][RFC 8415 6.3].
-                ///
-                /// Optional. If not set, delegated prefixes will not be
-                /// requested. If invalid, client creation will fail and
-                /// the pipelined channel will be closed.
-                ///
-                /// [RFC 8415 6.3]: https://datatracker.ietf.org/doc/html/rfc8415#section-6.3
-                3: prefix_delegation_config strict union {
-                    /// Request a prefix of any length.
-                    1: empty Empty;
-                    /// Request a prefix of a specific length.
-                    ///
-                    /// Must be in the range [1, 128]; otherwise client creation will fail.
-                    2: prefix_length uint8;
-                    /// Request a specific prefix.
-                    ///
-                    /// The prefix length must be in the range [1, 128], and the host bits of
-                    /// the address must be all zeroes; otherwise client creation will fail.
-                    3: prefix fuchsia.net.Ipv6AddressWithPrefix;
-                };
-            };
-        };
+        params NewClientParams;
         request server_end:Client;
     });
 };
@@ -323,7 +326,7 @@ closed protocol PrefixControl {
     ///
     /// - response `reason` the reason this prefix acquisition stopped.
     strict -> OnExit(struct {
-        reason @generated_name("PrefixControlExitReason") enum {
+        reason @generated_name("PrefixControlExitReason") flexible enum {
             /// The interface identified is invalid for acquiring a prefix on.
             INVALID_INTERFACE = 1;
             /// The preferred prefix length is invalid.
