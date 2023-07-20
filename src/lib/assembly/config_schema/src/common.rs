@@ -5,6 +5,31 @@
 use camino::Utf8PathBuf;
 use serde::{Deserialize, Serialize};
 
+/// These are the package sets that a package can belong to.
+///
+/// See RFC-0212 "Package Sets" for more information on these:
+/// https://fuchsia.dev/fuchsia-src/contribute/governance/rfcs/0212_package_sets
+///
+/// NOTE: Not all of the sets defined in the RFC are currently supported by this
+/// enum.  They are being added as they are needed by assembly.
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
+#[serde(rename_all = "snake_case")]
+pub enum PackageSet {
+    /// The packages in this set are stored in the pkg-cache, and are not
+    /// garbage collected.  They are always available, and are pinned by merkle
+    /// when the system is assembled.
+    ///
+    /// They cannot be updated without performing an OTA of the system.
+    Base,
+
+    /// The packages in this set are stored in the BootFS in the zbi.  They are
+    /// always available (via `fuchsia-boot:///<name>` pkg urls), and are pinned
+    /// by merkle when the ZBI is created.
+    ///
+    /// They cannot be updated without performing an OTA of the system.
+    BootFS,
+}
+
 /// Details about a package that contains drivers.
 #[derive(Clone, Debug, Default, Deserialize, Serialize, PartialEq)]
 #[serde(deny_unknown_fields)]
@@ -39,17 +64,15 @@ pub(crate) type PackageName = String;
 /// Options for features that may either be forced on, forced off, or allowed
 /// to be either on or off. Features default to disabled.
 #[derive(Debug, Deserialize, Serialize, PartialEq)]
+#[serde(rename_all = "snake_case")]
 #[serde(deny_unknown_fields)]
 #[derive(Default)]
 pub enum FeatureControl {
-    #[serde(rename = "disabled")]
     #[default]
     Disabled,
 
-    #[serde(rename = "allowed")]
     Allowed,
 
-    #[serde(rename = "required")]
     Required,
 }
 

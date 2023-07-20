@@ -858,6 +858,7 @@ mod tests {
         let board_info = BoardInformation {
             name: "sample".to_owned(),
             provided_features: vec!["feature_a".into(), "feature_b".into()],
+            ..Default::default()
         };
 
         assert!(board_info.provides_feature("feature_a"));
