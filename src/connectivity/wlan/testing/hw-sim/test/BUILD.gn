@@ -5,6 +5,19 @@
 import("//build/components.gni")
 import("//build/testing/environments.gni")
 
+fuchsia_component("test-root") {
+  testonly = true
+  manifest = "meta/test-root.cml"
+}
+
+fuchsia_test_package("realm-factory-test") {
+  test_components = [ ":test-root" ]
+  subpackages = [
+    "../testing/realm-factory:realm-factory",
+    "../testing/realm-factory:test-suite",
+  ]
+}
+
 fuchsia_component("scan-contemporary-privacy") {
   testonly = true
   manifest = "meta/scan_contemporary_privacy.cml"
@@ -205,6 +218,7 @@ fuchsia_test_package("wlan-hw-sim-rate-selection-tests") {
 group("wlan-hw-sim-component-tests") {
   testonly = true
   deps = [
+    ":realm-factory-test",
     ":wlan-hw-sim-contemporary-privacy-tests",
     ":wlan-hw-sim-legacy-privacy-tests",
     ":wlan-hw-sim-rate-selection-tests",
