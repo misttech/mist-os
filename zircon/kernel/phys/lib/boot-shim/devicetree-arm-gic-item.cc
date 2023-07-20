@@ -83,6 +83,8 @@ devicetree::ScanState ArmDevicetreeGicItem::HandleGicChildNode(
         if (auto root_address = decoder.TranslateAddress(base_address)) {
           dcfg.use_msi = true;
           dcfg.msi_frame_phys = *root_address;
+        } else {
+          OnError("GIC v2: MSI address translation failed.");
         }
       }
     } else if constexpr (std::is_same_v<dtype, zbi_dcfg_arm_gic_v3_driver_t>) {
@@ -116,10 +118,21 @@ devicetree::ScanState ArmDevicetreeGicItem::HandleGicV3(
   zbi_dcfg_arm_gic_v3_driver_t dcfg{};
 
   if (reg.size() > 1) {
-    dcfg.mmio_phys = *reg[GicV3Regs::kGicd].address();
-    dcfg.gicd_offset = 0;
+    if (auto gicd = decoder.TranslateAddress(*reg[GicV3Regs::kGicd].address())) {
+      dcfg.gicd_offset = 0;
+      dcfg.mmio_phys = *gicd;
+    } else {
+      OnError("GIC v3: GICD address translation failed.");
+      return devicetree::ScanState::kDone;
+    }
 
-    dcfg.gicr_offset = *reg[GicV3Regs::kGicr].address() - dcfg.mmio_phys;
+    if (auto gicr = decoder.TranslateAddress(*reg[GicV3Regs::kGicr].address())) {
+      dcfg.gicr_offset = *gicr - dcfg.mmio_phys;
+    } else {
+      OnError("GIC v3: GICR address translation failed.");
+      return devicetree::ScanState::kDone;
+    }
+
     if (redistributor_stride) {
       if (auto stride = redistributor_stride->AsUint32()) {
         dcfg.gicr_stride = *stride;
@@ -164,15 +177,44 @@ devicetree::ScanState ArmDevicetreeGicItem::HandleGicV2(
   zbi_dcfg_arm_gic_v2_driver_t dcfg{};
 
   if (reg.size() > 1) {
-    dcfg.mmio_phys = *reg[GicV2Regs::kGicd].address();
-    dcfg.gicd_offset = 0;
-    dcfg.gicc_offset = reg[GicV2Regs::kGicc].address().value_or(dcfg.mmio_phys) - dcfg.mmio_phys;
+    if (auto gicd = decoder.TranslateAddress(*reg[GicV2Regs::kGicd].address())) {
+      dcfg.mmio_phys = *gicd;
+      dcfg.gicd_offset = 0;
+    } else {
+      OnError("GIC v2: Failed to translate gicd address.");
+      return devicetree::ScanState::kDone;
+    }
+
+    if (!reg[GicV2Regs::kGicc].address()) {
+      dcfg.gicc_offset = 0;
+    } else if (auto gicr = decoder.TranslateAddress(*reg[GicV2Regs::kGicc].address())) {
+      dcfg.gicc_offset = *gicr - dcfg.mmio_phys;
+    } else {
+      OnError("GIC v2: Failed to translate gicr address.");
+      return devicetree::ScanState::kDone;
+    }
   }
 
   // If there are more than 2, then the virtualization extension is provided.
   if (reg.size() > 2) {
     dcfg.gich_offset = reg[GicV2Regs::kGich].address().value_or(dcfg.mmio_phys) - dcfg.mmio_phys;
-    dcfg.gicv_offset = reg[GicV2Regs::kGicv].address().value_or(dcfg.mmio_phys) - dcfg.mmio_phys;
+    if (!reg[GicV2Regs::kGich].address()) {
+      dcfg.gich_offset = 0;
+    } else if (auto gich = decoder.TranslateAddress(*reg[GicV2Regs::kGich].address())) {
+      dcfg.gich_offset = *gich;
+    } else {
+      OnError("GIC v2: Failed to translate gich address.");
+      return devicetree::ScanState::kDone;
+    }
+
+    if (!reg[GicV2Regs::kGicv].address()) {
+      dcfg.gicv_offset = 0;
+    } else if (auto gicv = decoder.TranslateAddress(*reg[GicV2Regs::kGicv].address())) {
+      dcfg.gicv_offset = *gicv;
+    } else {
+      OnError("GIC v2: Failed to translate gicv address.");
+      return devicetree::ScanState::kDone;
+    }
   }
 
   dcfg.ipi_base = 0;
