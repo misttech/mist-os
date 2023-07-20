@@ -15,6 +15,7 @@
 #include "rapidjson/document.h"
 #include "src/graphics/display/lib/coordinator-getter/client.h"
 #include "src/lib/files/file.h"
+#include "src/lib/fxl/functional/cancelable_callback.h"
 #include "src/ui/lib/escher/vk/pipeline_builder.h"
 #include "src/ui/scenic/lib/display/color_converter.h"
 #include "src/ui/scenic/lib/display/display_power_manager.h"
@@ -113,6 +114,22 @@ constexpr uint32_t kWatchdogTimeoutMs = 45000u;
 constexpr uint32_t kWatchdogWarningIntervalMs = 30000u;
 constexpr uint32_t kWatchdogTimeoutMs = 90000u;
 #endif  // NDEBUG
+
+// Interval at which we log that Scenic is waiting for Vulkan or display.
+static constexpr zx::duration kWaitWarningInterval = zx::sec(5);
+
+void PostDelayedTaskUntilCancelled(fit::closure cb, zx::duration delay, bool first_run = true) {
+  if (!cb)
+    return;
+  if (!first_run)
+    cb();
+  async::PostDelayedTask(
+      async_get_default_dispatcher(),
+      [cb = std::move(cb), delay]() mutable {
+        PostDelayedTaskUntilCancelled(std::move(cb), delay, false);
+      },
+      delay);
+}
 
 }  // namespace
 
@@ -255,12 +272,17 @@ App::App(std::unique_ptr<sys::ComponentContext> app_context, inspect::Node inspe
   scoped_observer_registry_.Publish(app_context_.get());
   focus_manager_.Publish(*app_context_);
 
+  auto vulkan_wait_log = std::make_unique<fxl::CancelableClosure>(
+      [] { FX_LOGS(WARNING) << "SCENIC IS WAITING FOR VULKAN TO BE AVAILABLE..."; });
+  PostDelayedTaskUntilCancelled(vulkan_wait_log->callback(), kWaitWarningInterval);
+
   // Wait for a Vulkan ICD to become advertised before trying to launch escher.
   FX_DCHECK(!device_watcher_);
   device_watcher_ = fsl::DeviceWatcher::Create(
       kDependencyPath,
       [this, vulkan_loader = std::move(vulkan_loader),
-       completer = std::move(escher_bridge.completer)](
+       completer = std::move(escher_bridge.completer),
+       vulkan_wait_log = std::move(vulkan_wait_log)](
           const fidl::ClientEnd<fuchsia_io::Directory>& dir, const std::string& filename) mutable {
         auto escher = gfx::GfxSystem::CreateEscher(app_context_.get());
         if (!escher) {
@@ -275,10 +297,15 @@ App::App(std::unique_ptr<sys::ComponentContext> app_context, inspect::Node inspe
       });
   FX_DCHECK(device_watcher_);
 
+  auto display_wait_log = std::make_unique<fxl::CancelableClosure>(
+      [] { FX_LOGS(WARNING) << "SCENIC IS WAITING FOR DISPLAY TO BE AVAILABLE..."; });
+  PostDelayedTaskUntilCancelled(display_wait_log->callback(), kWaitWarningInterval);
+
   // Instantiate DisplayManager and schedule a task to inject the display coordinator into it, once
   // it becomes available.
   display_manager_.emplace(GetDisplayId(config_values_), GetDisplayMode(config_values_),
-                           [this, completer = std::move(display_bridge.completer)]() mutable {
+                           [this, completer = std::move(display_bridge.completer),
+                            display_wait_log = std::move(display_wait_log)]() mutable {
                              completer.complete_ok(display_manager_->default_display_shared());
                            });
   executor_.schedule_task(dc_handles_promise.then(
