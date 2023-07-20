@@ -108,6 +108,21 @@ template("component_id_index_config") {
     deps = [ ":${component_id_index_merged_inputs}" ]
   }
 
+  # TODO(fxbug.dev/102390): Obsolete, will be removed in a future change.
+  config_data("${target_name}-config-data") {
+    forward_variables_from(invoker,
+                           [
+                             "testonly",
+                             "visibility",
+                             "metadata",
+                           ])
+    for_pkg = "appmgr"
+    sources = [ component_id_index_merged_index_json_path ]
+    outputs = [ "component_id_index" ]
+
+    deps = [ ":${component_id_index_merge}" ]
+  }
+
   # This target produces the component_id_index as a resource pathed under
   # "config/component_id_index".  This resource can be used to place the index
   # in bootfs so that it is available to `component_manager` even before pkgfs

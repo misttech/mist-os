@@ -12,6 +12,7 @@ This directory is split up into:
 
 - `component_manager_policy.json5`: For restricting V2 (.cml) capabilities at
   runtime & compile time.
+- `appmgr/`: For restricting capabilities in V1 (.cmx) at runtime.
 - `build/`: For build time verification configuration such as policy exception,
   verifying goldens & structured configuration.
 - `pkgfs/`: For the set of pkgfs allowlists.
@@ -68,3 +69,27 @@ be used by the `password_authenticator`.
    in the set of target monikers. This documentation will be updated when that
    is no longer a requirement.
 6. Upload your CL and check it in!
+
+## Component V1 (.cmx) Protocol Restriction
+Component Framework V1 is deprecated but we have support for a limited number
+of protocols. Unlike V2 each V1 protocol that is restricted has its own .txt
+file under: `//src/security/policy/appmgr`. Each new protocol that is added
+requires a source code change.
+
+### Adding A New Protocol
+This is a more complex task that requires editing the `appmgr` source code so
+reach out to the security team and we can help you out. This is specifically
+only for protocols being routed to V1 (which is deprecated). Note V1
+allowlists don't support compile time verification only runtime verification.
+
+### Runtime Allowlist Policies
+This directory contains a set of allowlists that are read by the `appmgr` to
+limit which components can access certain services and features at runtime. This
+runtime enforcement enables the appmgr to block the launch of unauthorized
+components from requesting the `RootResource` service or the
+`deprecated_ambient_replace_as_executable` feature.
+
+All allowlists in this directory are postfixed with `_eng` to indicate that
+they are intended for engineering builds. This means they include
+additional components required for debugging and testing that are not allowed
+in a user build.

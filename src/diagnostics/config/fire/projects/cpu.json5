@@ -4,6 +4,7 @@
             metric_id: 1,
             metric_type: "IntHistogram",
             selector: [
+                "core/appmgr:root/cpu_stats/histograms:app\\/sys\\/{MONIKER}",
                 "<component_manager>:root/cpu_stats/histograms:\\/{MONIKER}",
             ],
         },

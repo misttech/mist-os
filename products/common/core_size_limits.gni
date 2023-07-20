@@ -51,8 +51,10 @@ size_checker_input = {
       component = "Component Framework"
       src = [
         # [START_EXCLUDE]
+        "packages/base/appmgr",
         "packages/base/component_index",
         "packages/base/stash",
+        "packages/base/sysmgr",
 
         # [END_EXCLUDE]
 

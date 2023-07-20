@@ -335,7 +335,7 @@ mod tests {
             let noop_proxy = cx
                 .open_target_proxy::<ffx_test::NoopMarker>(
                     None,
-                    "core/test:out:fuchsia.ffx.test.Noop",
+                    "core/appmgr:out:fuchsia.ffx.test.Noop",
                 )
                 .await?;
             noop_proxy.do_noop().await?;
@@ -422,7 +422,7 @@ mod tests {
             let noop_proxy = cx
                 .open_target_proxy::<ffx_test::NoopMarker>(
                     None,
-                    "core/test:out:fuchsia.ffx.test.Noop",
+                    "core/appmgr:out:fuchsia.ffx.test.Noop",
                 )
                 .await?;
             noop_proxy.do_noop().await?;
@@ -441,7 +441,7 @@ mod tests {
             let noop_proxy = cx
                 .open_target_proxy::<ffx_test::NoopMarker>(
                     None,
-                    "core/test:out:fuchsia.ffx.test.Noop",
+                    "core/appmgr:out:fuchsia.ffx.test.Noop",
                 )
                 .await
                 .unwrap();
