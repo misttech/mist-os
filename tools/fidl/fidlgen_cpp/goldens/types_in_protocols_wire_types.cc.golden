@@ -82,13 +82,6 @@ void ::test_typesinprotocols::wire::Resource::_CloseHandles() {
 
 #endif  // __Fuchsia__
 
-#ifdef __Fuchsia__
-void ::test_typesinprotocols::wire::ProtocolErrorResourceTopResponse::_CloseHandles() {
-  result._CloseHandles();
-}
-
-#endif  // __Fuchsia__
-
 auto ::test_typesinprotocols::wire::Union::Which() const -> ::test_typesinprotocols::wire::Union::Tag {
   ZX_ASSERT(!has_invalid_tag());
   switch (ordinal_) {

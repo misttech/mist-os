@@ -119,21 +119,6 @@ struct WireTypeForNaturalType<::test_anonymous::SomeProtocolSomeMethodResponse> 
 };
 
 template <>
-struct WireNaturalConversionTraits<::test_anonymous::wire::SomeProtocolSomeMethodTopResponse, ::test_anonymous::SomeProtocolSomeMethodTopResponse> {
-  static ::test_anonymous::SomeProtocolSomeMethodTopResponse ToNatural(::test_anonymous::wire::SomeProtocolSomeMethodTopResponse src);
-  static ::test_anonymous::wire::SomeProtocolSomeMethodTopResponse ToWire(fidl::AnyArena& arena, ::test_anonymous::SomeProtocolSomeMethodTopResponse src);
-};
-
-template <>
-struct NaturalTypeForWireType<::test_anonymous::wire::SomeProtocolSomeMethodTopResponse> {
-  using type = ::test_anonymous::SomeProtocolSomeMethodTopResponse;
-};
-template <>
-struct WireTypeForNaturalType<::test_anonymous::SomeProtocolSomeMethodTopResponse> {
-  using type = ::test_anonymous::wire::SomeProtocolSomeMethodTopResponse;
-};
-
-template <>
 struct WireNaturalConversionTraits<::test_anonymous::wire::FunctionApplication, ::test_anonymous::FunctionApplication> {
   static ::test_anonymous::FunctionApplication ToNatural(::test_anonymous::wire::FunctionApplication src);
   static ::test_anonymous::wire::FunctionApplication ToWire(fidl::AnyArena& arena, ::test_anonymous::FunctionApplication src);

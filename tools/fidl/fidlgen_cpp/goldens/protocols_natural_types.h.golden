@@ -58,25 +58,13 @@ class WithAndWithoutRequestResponseOnWithResponseRequest;
 class WithErrorSyntaxResponseAsStructResponse;
 
 
-class WithErrorSyntaxResponseAsStructTopResponse;
-
-
 class WithErrorSyntaxErrorAsPrimitiveResponse;
-
-
-class WithErrorSyntaxErrorAsPrimitiveTopResponse;
 
 
 class WithErrorSyntaxErrorAsEnumResponse;
 
 
-class WithErrorSyntaxErrorAsEnumTopResponse;
-
-
 class WithErrorSyntaxHandleInResultResponse;
-
-
-class WithErrorSyntaxHandleInResultTopResponse;
 
 
 class ChannelProtocolMethodARequest;
@@ -844,75 +832,6 @@ class WithErrorSyntaxResponseAsStructResult {
 
 
 
-extern "C" const fidl_type_t test_protocols_WithErrorSyntaxResponseAsStructTopResponseTable;
-
-
-class WithErrorSyntaxResponseAsStructTopResponse {
- private:
-  struct Storage_;
- public:
-  WithErrorSyntaxResponseAsStructTopResponse(Storage_ storage) noexcept;
-    WithErrorSyntaxResponseAsStructTopResponse(::test_protocols::WithErrorSyntaxResponseAsStructResult result) noexcept;
-
-#pragma clang diagnostic push
-#pragma clang diagnostic ignored "-Wdefaulted-function-deleted"
-  // Default constructs a |WithErrorSyntaxResponseAsStructTopResponse| only if all of its members are default constructible.
-  WithErrorSyntaxResponseAsStructTopResponse() = default;
-#pragma clang diagnostic pop
-
-  WithErrorSyntaxResponseAsStructTopResponse(WithErrorSyntaxResponseAsStructTopResponse&&) noexcept = default;
-  WithErrorSyntaxResponseAsStructTopResponse& operator=(WithErrorSyntaxResponseAsStructTopResponse&&) noexcept = default;
-    WithErrorSyntaxResponseAsStructTopResponse(const WithErrorSyntaxResponseAsStructTopResponse& other) noexcept;
-    WithErrorSyntaxResponseAsStructTopResponse& operator=(const WithErrorSyntaxResponseAsStructTopResponse& other) noexcept;
-
-    bool operator==(const WithErrorSyntaxResponseAsStructTopResponse& other) const noexcept {
-      return ::fidl::internal::NaturalStructCodingTraits<::test_protocols::WithErrorSyntaxResponseAsStructTopResponse, 16>::Equal(this, &other);
-    }
-    bool operator!=(const WithErrorSyntaxResponseAsStructTopResponse& other) const noexcept {
-      return !::fidl::internal::NaturalStructCodingTraits<::test_protocols::WithErrorSyntaxResponseAsStructTopResponse, 16>::Equal(this, &other);
-    }
-    
-      const ::test_protocols::WithErrorSyntaxResponseAsStructResult &
-    result() const {
-      return storage_.result;
-    }
-
-    
-    ::test_protocols::WithErrorSyntaxResponseAsStructResult& result() {
-      return storage_.result;
-    }
-
-    // Setter for result.
-    //
-    
-    WithErrorSyntaxResponseAsStructTopResponse& result(::test_protocols::WithErrorSyntaxResponseAsStructResult value);
-
-  WithErrorSyntaxResponseAsStructTopResponse(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag);
-
- private:
-  struct Storage_ final {
-      ::test_protocols::WithErrorSyntaxResponseAsStructResult result;
-  };
-
-  Storage_ storage_;
-    Storage_ CloneStorage_() const;
-
-  friend struct ::fidl::internal::NaturalStructCodingTraits<::test_protocols::WithErrorSyntaxResponseAsStructTopResponse, 16>;
-  friend struct ::fidl::internal::MemberVisitor<::test_protocols::WithErrorSyntaxResponseAsStructTopResponse>;
-  static constexpr auto kMembers = std::make_tuple(::fidl::internal::NaturalStructMember<Storage_, ::test_protocols::WithErrorSyntaxResponseAsStructResult, fidl::internal::NaturalCodingConstraintEmpty>{
-        &Storage_::result, 0
-      });
-  static constexpr auto kPadding = std::make_tuple();
-
-};
-
-
-  
-  
-  
-
-
-
 extern "C" const fidl_type_t test_protocols_WithErrorSyntax_ErrorAsPrimitive_ResponseTable;
 
 
@@ -1110,75 +1029,6 @@ class WithErrorSyntaxErrorAsPrimitiveResult {
 };
 
 
-  
-
-
-
-extern "C" const fidl_type_t test_protocols_WithErrorSyntaxErrorAsPrimitiveTopResponseTable;
-
-
-class WithErrorSyntaxErrorAsPrimitiveTopResponse {
- private:
-  struct Storage_;
- public:
-  WithErrorSyntaxErrorAsPrimitiveTopResponse(Storage_ storage) noexcept;
-    WithErrorSyntaxErrorAsPrimitiveTopResponse(::test_protocols::WithErrorSyntaxErrorAsPrimitiveResult result) noexcept;
-
-#pragma clang diagnostic push
-#pragma clang diagnostic ignored "-Wdefaulted-function-deleted"
-  // Default constructs a |WithErrorSyntaxErrorAsPrimitiveTopResponse| only if all of its members are default constructible.
-  WithErrorSyntaxErrorAsPrimitiveTopResponse() = default;
-#pragma clang diagnostic pop
-
-  WithErrorSyntaxErrorAsPrimitiveTopResponse(WithErrorSyntaxErrorAsPrimitiveTopResponse&&) noexcept = default;
-  WithErrorSyntaxErrorAsPrimitiveTopResponse& operator=(WithErrorSyntaxErrorAsPrimitiveTopResponse&&) noexcept = default;
-    WithErrorSyntaxErrorAsPrimitiveTopResponse(const WithErrorSyntaxErrorAsPrimitiveTopResponse& other) noexcept;
-    WithErrorSyntaxErrorAsPrimitiveTopResponse& operator=(const WithErrorSyntaxErrorAsPrimitiveTopResponse& other) noexcept;
-
-    bool operator==(const WithErrorSyntaxErrorAsPrimitiveTopResponse& other) const noexcept {
-      return ::fidl::internal::NaturalStructCodingTraits<::test_protocols::WithErrorSyntaxErrorAsPrimitiveTopResponse, 16>::Equal(this, &other);
-    }
-    bool operator!=(const WithErrorSyntaxErrorAsPrimitiveTopResponse& other) const noexcept {
-      return !::fidl::internal::NaturalStructCodingTraits<::test_protocols::WithErrorSyntaxErrorAsPrimitiveTopResponse, 16>::Equal(this, &other);
-    }
-    
-      const ::test_protocols::WithErrorSyntaxErrorAsPrimitiveResult &
-    result() const {
-      return storage_.result;
-    }
-
-    
-    ::test_protocols::WithErrorSyntaxErrorAsPrimitiveResult& result() {
-      return storage_.result;
-    }
-
-    // Setter for result.
-    //
-    
-    WithErrorSyntaxErrorAsPrimitiveTopResponse& result(::test_protocols::WithErrorSyntaxErrorAsPrimitiveResult value);
-
-  WithErrorSyntaxErrorAsPrimitiveTopResponse(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag);
-
- private:
-  struct Storage_ final {
-      ::test_protocols::WithErrorSyntaxErrorAsPrimitiveResult result;
-  };
-
-  Storage_ storage_;
-    Storage_ CloneStorage_() const;
-
-  friend struct ::fidl::internal::NaturalStructCodingTraits<::test_protocols::WithErrorSyntaxErrorAsPrimitiveTopResponse, 16>;
-  friend struct ::fidl::internal::MemberVisitor<::test_protocols::WithErrorSyntaxErrorAsPrimitiveTopResponse>;
-  static constexpr auto kMembers = std::make_tuple(::fidl::internal::NaturalStructMember<Storage_, ::test_protocols::WithErrorSyntaxErrorAsPrimitiveResult, fidl::internal::NaturalCodingConstraintEmpty>{
-        &Storage_::result, 0
-      });
-  static constexpr auto kPadding = std::make_tuple();
-
-};
-
-
-  
-  
   
 
 
@@ -1384,75 +1234,6 @@ class WithErrorSyntaxErrorAsEnumResult {
 
 
 
-extern "C" const fidl_type_t test_protocols_WithErrorSyntaxErrorAsEnumTopResponseTable;
-
-
-class WithErrorSyntaxErrorAsEnumTopResponse {
- private:
-  struct Storage_;
- public:
-  WithErrorSyntaxErrorAsEnumTopResponse(Storage_ storage) noexcept;
-    WithErrorSyntaxErrorAsEnumTopResponse(::test_protocols::WithErrorSyntaxErrorAsEnumResult result) noexcept;
-
-#pragma clang diagnostic push
-#pragma clang diagnostic ignored "-Wdefaulted-function-deleted"
-  // Default constructs a |WithErrorSyntaxErrorAsEnumTopResponse| only if all of its members are default constructible.
-  WithErrorSyntaxErrorAsEnumTopResponse() = default;
-#pragma clang diagnostic pop
-
-  WithErrorSyntaxErrorAsEnumTopResponse(WithErrorSyntaxErrorAsEnumTopResponse&&) noexcept = default;
-  WithErrorSyntaxErrorAsEnumTopResponse& operator=(WithErrorSyntaxErrorAsEnumTopResponse&&) noexcept = default;
-    WithErrorSyntaxErrorAsEnumTopResponse(const WithErrorSyntaxErrorAsEnumTopResponse& other) noexcept;
-    WithErrorSyntaxErrorAsEnumTopResponse& operator=(const WithErrorSyntaxErrorAsEnumTopResponse& other) noexcept;
-
-    bool operator==(const WithErrorSyntaxErrorAsEnumTopResponse& other) const noexcept {
-      return ::fidl::internal::NaturalStructCodingTraits<::test_protocols::WithErrorSyntaxErrorAsEnumTopResponse, 16>::Equal(this, &other);
-    }
-    bool operator!=(const WithErrorSyntaxErrorAsEnumTopResponse& other) const noexcept {
-      return !::fidl::internal::NaturalStructCodingTraits<::test_protocols::WithErrorSyntaxErrorAsEnumTopResponse, 16>::Equal(this, &other);
-    }
-    
-      const ::test_protocols::WithErrorSyntaxErrorAsEnumResult &
-    result() const {
-      return storage_.result;
-    }
-
-    
-    ::test_protocols::WithErrorSyntaxErrorAsEnumResult& result() {
-      return storage_.result;
-    }
-
-    // Setter for result.
-    //
-    
-    WithErrorSyntaxErrorAsEnumTopResponse& result(::test_protocols::WithErrorSyntaxErrorAsEnumResult value);
-
-  WithErrorSyntaxErrorAsEnumTopResponse(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag);
-
- private:
-  struct Storage_ final {
-      ::test_protocols::WithErrorSyntaxErrorAsEnumResult result;
-  };
-
-  Storage_ storage_;
-    Storage_ CloneStorage_() const;
-
-  friend struct ::fidl::internal::NaturalStructCodingTraits<::test_protocols::WithErrorSyntaxErrorAsEnumTopResponse, 16>;
-  friend struct ::fidl::internal::MemberVisitor<::test_protocols::WithErrorSyntaxErrorAsEnumTopResponse>;
-  static constexpr auto kMembers = std::make_tuple(::fidl::internal::NaturalStructMember<Storage_, ::test_protocols::WithErrorSyntaxErrorAsEnumResult, fidl::internal::NaturalCodingConstraintEmpty>{
-        &Storage_::result, 0
-      });
-  static constexpr auto kPadding = std::make_tuple();
-
-};
-
-
-  
-  
-  
-
-
-
 #ifdef __Fuchsia__
 
 extern "C" const fidl_type_t test_protocols_WithErrorSyntax_HandleInResult_ResponseTable;
@@ -1634,70 +1415,6 @@ class WithErrorSyntaxHandleInResultResult {
 
 #endif  // __Fuchsia__
 
-  
-
-
-
-#ifdef __Fuchsia__
-
-extern "C" const fidl_type_t test_protocols_WithErrorSyntaxHandleInResultTopResponseTable;
-
-
-class WithErrorSyntaxHandleInResultTopResponse {
- private:
-  struct Storage_;
- public:
-  WithErrorSyntaxHandleInResultTopResponse(Storage_ storage) noexcept;
-    WithErrorSyntaxHandleInResultTopResponse(::test_protocols::WithErrorSyntaxHandleInResultResult result) noexcept;
-
-#pragma clang diagnostic push
-#pragma clang diagnostic ignored "-Wdefaulted-function-deleted"
-  // Default constructs a |WithErrorSyntaxHandleInResultTopResponse| only if all of its members are default constructible.
-  WithErrorSyntaxHandleInResultTopResponse() = default;
-#pragma clang diagnostic pop
-
-  WithErrorSyntaxHandleInResultTopResponse(WithErrorSyntaxHandleInResultTopResponse&&) noexcept = default;
-  WithErrorSyntaxHandleInResultTopResponse& operator=(WithErrorSyntaxHandleInResultTopResponse&&) noexcept = default;
-    
-      const ::test_protocols::WithErrorSyntaxHandleInResultResult &
-    result() const {
-      return storage_.result;
-    }
-
-    
-    ::test_protocols::WithErrorSyntaxHandleInResultResult& result() {
-      return storage_.result;
-    }
-
-    // Setter for result.
-    //
-    
-    WithErrorSyntaxHandleInResultTopResponse& result(::test_protocols::WithErrorSyntaxHandleInResultResult value);
-
-  WithErrorSyntaxHandleInResultTopResponse(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag);
-
- private:
-  struct Storage_ final {
-      ::test_protocols::WithErrorSyntaxHandleInResultResult result;
-  };
-
-  Storage_ storage_;
-
-  friend struct ::fidl::internal::NaturalStructCodingTraits<::test_protocols::WithErrorSyntaxHandleInResultTopResponse, 16>;
-  friend struct ::fidl::internal::MemberVisitor<::test_protocols::WithErrorSyntaxHandleInResultTopResponse>;
-  static constexpr auto kMembers = std::make_tuple(::fidl::internal::NaturalStructMember<Storage_, ::test_protocols::WithErrorSyntaxHandleInResultResult, fidl::internal::NaturalCodingConstraintEmpty>{
-        &Storage_::result, 0
-      });
-  static constexpr auto kPadding = std::make_tuple();
-
-};
-
-
-
-#endif  // __Fuchsia__
-
-  
-  
   
   
   
@@ -4170,32 +3887,6 @@ class MethodWithUnionUnionMethodResponse {
 
   
 
-  inline WithErrorSyntaxResponseAsStructTopResponse::WithErrorSyntaxResponseAsStructTopResponse(Storage_ storage) noexcept : storage_(std::move(storage)) {}
-    inline WithErrorSyntaxResponseAsStructTopResponse::WithErrorSyntaxResponseAsStructTopResponse(::test_protocols::WithErrorSyntaxResponseAsStructResult result) noexcept
-    : storage_({
-      .result = std::move(result)
-    }) {}
-    inline WithErrorSyntaxResponseAsStructTopResponse::WithErrorSyntaxResponseAsStructTopResponse(const ::test_protocols::WithErrorSyntaxResponseAsStructTopResponse& other) noexcept : ::test_protocols::WithErrorSyntaxResponseAsStructTopResponse(other.CloneStorage_()){}
-    inline WithErrorSyntaxResponseAsStructTopResponse& ::test_protocols::WithErrorSyntaxResponseAsStructTopResponse::operator=(const ::test_protocols::WithErrorSyntaxResponseAsStructTopResponse& other) noexcept {
-      storage_ = other.CloneStorage_();
-      return *this;
-    }
-
-  inline WithErrorSyntaxResponseAsStructTopResponse::WithErrorSyntaxResponseAsStructTopResponse(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag) : WithErrorSyntaxResponseAsStructTopResponse(Storage_{
-      .result =::fidl::internal::DefaultConstructPossiblyInvalidObjectTag{},
-  }) {}
-    inline WithErrorSyntaxResponseAsStructTopResponse& WithErrorSyntaxResponseAsStructTopResponse::result(::test_protocols::WithErrorSyntaxResponseAsStructResult value) {
-      storage_.result = std::move(value);
-      return *this;
-    }
-
-  
-  
-  
-  
-
-  
-
   inline WithErrorSyntaxErrorAsPrimitiveResponse::WithErrorSyntaxErrorAsPrimitiveResponse(Storage_ storage) noexcept : storage_(std::move(storage)) {}
     inline WithErrorSyntaxErrorAsPrimitiveResponse::WithErrorSyntaxErrorAsPrimitiveResponse(uint8_t __reserved) noexcept
     : storage_({
@@ -4217,32 +3908,6 @@ class MethodWithUnionUnionMethodResponse {
 
   
   
-  
-  
-  
-  
-
-  
-
-  inline WithErrorSyntaxErrorAsPrimitiveTopResponse::WithErrorSyntaxErrorAsPrimitiveTopResponse(Storage_ storage) noexcept : storage_(std::move(storage)) {}
-    inline WithErrorSyntaxErrorAsPrimitiveTopResponse::WithErrorSyntaxErrorAsPrimitiveTopResponse(::test_protocols::WithErrorSyntaxErrorAsPrimitiveResult result) noexcept
-    : storage_({
-      .result = std::move(result)
-    }) {}
-    inline WithErrorSyntaxErrorAsPrimitiveTopResponse::WithErrorSyntaxErrorAsPrimitiveTopResponse(const ::test_protocols::WithErrorSyntaxErrorAsPrimitiveTopResponse& other) noexcept : ::test_protocols::WithErrorSyntaxErrorAsPrimitiveTopResponse(other.CloneStorage_()){}
-    inline WithErrorSyntaxErrorAsPrimitiveTopResponse& ::test_protocols::WithErrorSyntaxErrorAsPrimitiveTopResponse::operator=(const ::test_protocols::WithErrorSyntaxErrorAsPrimitiveTopResponse& other) noexcept {
-      storage_ = other.CloneStorage_();
-      return *this;
-    }
-
-  inline WithErrorSyntaxErrorAsPrimitiveTopResponse::WithErrorSyntaxErrorAsPrimitiveTopResponse(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag) : WithErrorSyntaxErrorAsPrimitiveTopResponse(Storage_{
-      .result =::fidl::internal::DefaultConstructPossiblyInvalidObjectTag{},
-  }) {}
-    inline WithErrorSyntaxErrorAsPrimitiveTopResponse& WithErrorSyntaxErrorAsPrimitiveTopResponse::result(::test_protocols::WithErrorSyntaxErrorAsPrimitiveResult value) {
-      storage_.result = std::move(value);
-      return *this;
-    }
-
   
   
   
@@ -4277,32 +3942,6 @@ class MethodWithUnionUnionMethodResponse {
   
 
   
-
-  inline WithErrorSyntaxErrorAsEnumTopResponse::WithErrorSyntaxErrorAsEnumTopResponse(Storage_ storage) noexcept : storage_(std::move(storage)) {}
-    inline WithErrorSyntaxErrorAsEnumTopResponse::WithErrorSyntaxErrorAsEnumTopResponse(::test_protocols::WithErrorSyntaxErrorAsEnumResult result) noexcept
-    : storage_({
-      .result = std::move(result)
-    }) {}
-    inline WithErrorSyntaxErrorAsEnumTopResponse::WithErrorSyntaxErrorAsEnumTopResponse(const ::test_protocols::WithErrorSyntaxErrorAsEnumTopResponse& other) noexcept : ::test_protocols::WithErrorSyntaxErrorAsEnumTopResponse(other.CloneStorage_()){}
-    inline WithErrorSyntaxErrorAsEnumTopResponse& ::test_protocols::WithErrorSyntaxErrorAsEnumTopResponse::operator=(const ::test_protocols::WithErrorSyntaxErrorAsEnumTopResponse& other) noexcept {
-      storage_ = other.CloneStorage_();
-      return *this;
-    }
-
-  inline WithErrorSyntaxErrorAsEnumTopResponse::WithErrorSyntaxErrorAsEnumTopResponse(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag) : WithErrorSyntaxErrorAsEnumTopResponse(Storage_{
-      .result =::fidl::internal::DefaultConstructPossiblyInvalidObjectTag{},
-  }) {}
-    inline WithErrorSyntaxErrorAsEnumTopResponse& WithErrorSyntaxErrorAsEnumTopResponse::result(::test_protocols::WithErrorSyntaxErrorAsEnumResult value) {
-      storage_.result = std::move(value);
-      return *this;
-    }
-
-  
-  
-  
-  
-
-  
 #ifdef __Fuchsia__
 
 
@@ -4326,32 +3965,6 @@ class MethodWithUnionUnionMethodResponse {
 
   
   
-  
-  
-  
-
-  
-#ifdef __Fuchsia__
-
-
-  inline WithErrorSyntaxHandleInResultTopResponse::WithErrorSyntaxHandleInResultTopResponse(Storage_ storage) noexcept : storage_(std::move(storage)) {}
-    inline WithErrorSyntaxHandleInResultTopResponse::WithErrorSyntaxHandleInResultTopResponse(::test_protocols::WithErrorSyntaxHandleInResultResult result) noexcept
-    : storage_({
-      .result = std::move(result)
-    }) {}
-
-  inline WithErrorSyntaxHandleInResultTopResponse::WithErrorSyntaxHandleInResultTopResponse(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag) : WithErrorSyntaxHandleInResultTopResponse(Storage_{
-      .result =::fidl::internal::DefaultConstructPossiblyInvalidObjectTag{},
-  }) {}
-    inline WithErrorSyntaxHandleInResultTopResponse& WithErrorSyntaxHandleInResultTopResponse::result(::test_protocols::WithErrorSyntaxHandleInResultResult value) {
-      storage_.result = std::move(value);
-      return *this;
-    }
-
-  
-
-#endif  // __Fuchsia__
-
   
   
   
@@ -5364,32 +4977,6 @@ namespace fidl {
   
   
 
-  extern "C" const fidl_type_t test_protocols_WithErrorSyntaxResponseAsStructTopResponseTable;
-
-  
-  template <>
-  struct IsFidlType<::test_protocols::WithErrorSyntaxResponseAsStructTopResponse> : public std::true_type {};
-
-  template<>
-  struct TypeTraits<::test_protocols::WithErrorSyntaxResponseAsStructTopResponse> {
-    static constexpr uint32_t kMaxNumHandles = 0;
-    static constexpr uint32_t kMaxDepth = 1;
-    static constexpr uint32_t kPrimarySize = 16;
-    static constexpr uint32_t kMaxOutOfLine = 24;
-    static constexpr bool kHasEnvelope = true;
-    static constexpr bool kHasPointer = true;
-  };
-
-  template <>
-  struct IsStruct<::test_protocols::WithErrorSyntaxResponseAsStructTopResponse> : public std::true_type {};
-
-  template <>
-  struct internal::NaturalCodingTraits<::test_protocols::WithErrorSyntaxResponseAsStructTopResponse, ::fidl::internal::NaturalCodingConstraintEmpty> final
-    : public ::fidl::internal::NaturalStructCodingTraits<::test_protocols::WithErrorSyntaxResponseAsStructTopResponse, 16> {};
-
-  
-  
-
   extern "C" const fidl_type_t test_protocols_WithErrorSyntax_ErrorAsPrimitive_ResponseTable;
 
   
@@ -5416,32 +5003,6 @@ namespace fidl {
   
   
 
-  extern "C" const fidl_type_t test_protocols_WithErrorSyntaxErrorAsPrimitiveTopResponseTable;
-
-  
-  template <>
-  struct IsFidlType<::test_protocols::WithErrorSyntaxErrorAsPrimitiveTopResponse> : public std::true_type {};
-
-  template<>
-  struct TypeTraits<::test_protocols::WithErrorSyntaxErrorAsPrimitiveTopResponse> {
-    static constexpr uint32_t kMaxNumHandles = 0;
-    static constexpr uint32_t kMaxDepth = 1;
-    static constexpr uint32_t kPrimarySize = 16;
-    static constexpr uint32_t kMaxOutOfLine = 0;
-    static constexpr bool kHasEnvelope = true;
-    static constexpr bool kHasPointer = true;
-  };
-
-  template <>
-  struct IsStruct<::test_protocols::WithErrorSyntaxErrorAsPrimitiveTopResponse> : public std::true_type {};
-
-  template <>
-  struct internal::NaturalCodingTraits<::test_protocols::WithErrorSyntaxErrorAsPrimitiveTopResponse, ::fidl::internal::NaturalCodingConstraintEmpty> final
-    : public ::fidl::internal::NaturalStructCodingTraits<::test_protocols::WithErrorSyntaxErrorAsPrimitiveTopResponse, 16> {};
-
-  
-  
-
   extern "C" const fidl_type_t test_protocols_WithErrorSyntax_ErrorAsEnum_ResponseTable;
 
   
@@ -5464,32 +5025,6 @@ namespace fidl {
   template <>
   struct internal::NaturalCodingTraits<::test_protocols::WithErrorSyntaxErrorAsEnumResponse, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalEmptyStructCodingTraits<::test_protocols::WithErrorSyntaxErrorAsEnumResponse> {};
-
-  
-  
-
-  extern "C" const fidl_type_t test_protocols_WithErrorSyntaxErrorAsEnumTopResponseTable;
-
-  
-  template <>
-  struct IsFidlType<::test_protocols::WithErrorSyntaxErrorAsEnumTopResponse> : public std::true_type {};
-
-  template<>
-  struct TypeTraits<::test_protocols::WithErrorSyntaxErrorAsEnumTopResponse> {
-    static constexpr uint32_t kMaxNumHandles = 0;
-    static constexpr uint32_t kMaxDepth = 1;
-    static constexpr uint32_t kPrimarySize = 16;
-    static constexpr uint32_t kMaxOutOfLine = 0;
-    static constexpr bool kHasEnvelope = true;
-    static constexpr bool kHasPointer = true;
-  };
-
-  template <>
-  struct IsStruct<::test_protocols::WithErrorSyntaxErrorAsEnumTopResponse> : public std::true_type {};
-
-  template <>
-  struct internal::NaturalCodingTraits<::test_protocols::WithErrorSyntaxErrorAsEnumTopResponse, ::fidl::internal::NaturalCodingConstraintEmpty> final
-    : public ::fidl::internal::NaturalStructCodingTraits<::test_protocols::WithErrorSyntaxErrorAsEnumTopResponse, 16> {};
 
   
   
@@ -5520,39 +5055,6 @@ namespace fidl {
   template <>
   struct internal::NaturalCodingTraits<::test_protocols::WithErrorSyntaxHandleInResultResponse, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalStructCodingTraits<::test_protocols::WithErrorSyntaxHandleInResultResponse, 4> {};
-
-  
-
-#endif  // __Fuchsia__
-
-  
-#ifdef __Fuchsia__
-
-
-  extern "C" const fidl_type_t test_protocols_WithErrorSyntaxHandleInResultTopResponseTable;
-
-  
-  template <>
-  struct IsResource<::test_protocols::WithErrorSyntaxHandleInResultTopResponse> : public std::true_type {};
-  template <>
-  struct IsFidlType<::test_protocols::WithErrorSyntaxHandleInResultTopResponse> : public std::true_type {};
-
-  template<>
-  struct TypeTraits<::test_protocols::WithErrorSyntaxHandleInResultTopResponse> {
-    static constexpr uint32_t kMaxNumHandles = 1;
-    static constexpr uint32_t kMaxDepth = 1;
-    static constexpr uint32_t kPrimarySize = 16;
-    static constexpr uint32_t kMaxOutOfLine = 0;
-    static constexpr bool kHasEnvelope = true;
-    static constexpr bool kHasPointer = true;
-  };
-
-  template <>
-  struct IsStruct<::test_protocols::WithErrorSyntaxHandleInResultTopResponse> : public std::true_type {};
-
-  template <>
-  struct internal::NaturalCodingTraits<::test_protocols::WithErrorSyntaxHandleInResultTopResponse, ::fidl::internal::NaturalCodingConstraintEmpty> final
-    : public ::fidl::internal::NaturalStructCodingTraits<::test_protocols::WithErrorSyntaxHandleInResultTopResponse, 16> {};
 
   
 

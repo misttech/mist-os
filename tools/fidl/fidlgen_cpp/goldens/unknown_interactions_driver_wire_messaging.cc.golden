@@ -86,7 +86,7 @@ constexpr uint64_t kUnknownInteractionsDriverProtocol_StrictTwoWayErr_Ordinal = 
 constexpr ::fidl::MessageDynamicFlags kUnknownInteractionsDriverProtocol_StrictTwoWayErr_DynamicFlags = ::fidl::MessageDynamicFlags::kStrictMethod;
 
 
-extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsDriverProtocolStrictTwoWayErrTopResponseTable;
+extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsDriverProtocol_StrictTwoWayErr_ResultTable;
 
 
 [[maybe_unused]]
@@ -97,7 +97,7 @@ constexpr uint64_t kUnknownInteractionsDriverProtocol_StrictTwoWayFieldsErr_Ordi
 constexpr ::fidl::MessageDynamicFlags kUnknownInteractionsDriverProtocol_StrictTwoWayFieldsErr_DynamicFlags = ::fidl::MessageDynamicFlags::kStrictMethod;
 
 
-extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsDriverProtocolStrictTwoWayFieldsErrTopResponseTable;
+extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsDriverProtocol_StrictTwoWayFieldsErr_ResultTable;
 
 
 [[maybe_unused]]
@@ -108,7 +108,7 @@ constexpr uint64_t kUnknownInteractionsDriverProtocol_StrictTwoWayUnionErr_Ordin
 constexpr ::fidl::MessageDynamicFlags kUnknownInteractionsDriverProtocol_StrictTwoWayUnionErr_DynamicFlags = ::fidl::MessageDynamicFlags::kStrictMethod;
 
 
-extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsDriverProtocolStrictTwoWayUnionErrTopResponseTable;
+extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsDriverProtocol_StrictTwoWayUnionErr_ResultTable;
 
 
 [[maybe_unused]]
@@ -119,7 +119,7 @@ constexpr uint64_t kUnknownInteractionsDriverProtocol_StrictTwoWayTableErr_Ordin
 constexpr ::fidl::MessageDynamicFlags kUnknownInteractionsDriverProtocol_StrictTwoWayTableErr_DynamicFlags = ::fidl::MessageDynamicFlags::kStrictMethod;
 
 
-extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsDriverProtocolStrictTwoWayTableErrTopResponseTable;
+extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsDriverProtocol_StrictTwoWayTableErr_ResultTable;
 
 
 [[maybe_unused]]
@@ -130,7 +130,7 @@ constexpr uint64_t kUnknownInteractionsDriverProtocol_FlexibleTwoWay_Ordinal = 2
 constexpr ::fidl::MessageDynamicFlags kUnknownInteractionsDriverProtocol_FlexibleTwoWay_DynamicFlags = ::fidl::MessageDynamicFlags::kFlexibleMethod;
 
 
-extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsDriverProtocolFlexibleTwoWayTopResponseTable;
+extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsDriverProtocol_FlexibleTwoWay_ResultTable;
 
 
 [[maybe_unused]]
@@ -141,7 +141,7 @@ constexpr uint64_t kUnknownInteractionsDriverProtocol_FlexibleTwoWayFields_Ordin
 constexpr ::fidl::MessageDynamicFlags kUnknownInteractionsDriverProtocol_FlexibleTwoWayFields_DynamicFlags = ::fidl::MessageDynamicFlags::kFlexibleMethod;
 
 
-extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsDriverProtocolFlexibleTwoWayFieldsTopResponseTable;
+extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsDriverProtocol_FlexibleTwoWayFields_ResultTable;
 
 
 [[maybe_unused]]
@@ -152,7 +152,7 @@ constexpr uint64_t kUnknownInteractionsDriverProtocol_FlexibleTwoWayUnion_Ordina
 constexpr ::fidl::MessageDynamicFlags kUnknownInteractionsDriverProtocol_FlexibleTwoWayUnion_DynamicFlags = ::fidl::MessageDynamicFlags::kFlexibleMethod;
 
 
-extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsDriverProtocolFlexibleTwoWayUnionTopResponseTable;
+extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsDriverProtocol_FlexibleTwoWayUnion_ResultTable;
 
 
 [[maybe_unused]]
@@ -163,7 +163,7 @@ constexpr uint64_t kUnknownInteractionsDriverProtocol_FlexibleTwoWayTable_Ordina
 constexpr ::fidl::MessageDynamicFlags kUnknownInteractionsDriverProtocol_FlexibleTwoWayTable_DynamicFlags = ::fidl::MessageDynamicFlags::kFlexibleMethod;
 
 
-extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsDriverProtocolFlexibleTwoWayTableTopResponseTable;
+extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsDriverProtocol_FlexibleTwoWayTable_ResultTable;
 
 
 [[maybe_unused]]
@@ -174,7 +174,7 @@ constexpr uint64_t kUnknownInteractionsDriverProtocol_FlexibleTwoWayErr_Ordinal 
 constexpr ::fidl::MessageDynamicFlags kUnknownInteractionsDriverProtocol_FlexibleTwoWayErr_DynamicFlags = ::fidl::MessageDynamicFlags::kFlexibleMethod;
 
 
-extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsDriverProtocolFlexibleTwoWayErrTopResponseTable;
+extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsDriverProtocol_FlexibleTwoWayErr_ResultTable;
 
 
 [[maybe_unused]]
@@ -185,7 +185,7 @@ constexpr uint64_t kUnknownInteractionsDriverProtocol_FlexibleTwoWayFieldsErr_Or
 constexpr ::fidl::MessageDynamicFlags kUnknownInteractionsDriverProtocol_FlexibleTwoWayFieldsErr_DynamicFlags = ::fidl::MessageDynamicFlags::kFlexibleMethod;
 
 
-extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsDriverProtocolFlexibleTwoWayFieldsErrTopResponseTable;
+extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsDriverProtocol_FlexibleTwoWayFieldsErr_ResultTable;
 
 
 [[maybe_unused]]
@@ -196,7 +196,7 @@ constexpr uint64_t kUnknownInteractionsDriverProtocol_FlexibleTwoWayUnionErr_Ord
 constexpr ::fidl::MessageDynamicFlags kUnknownInteractionsDriverProtocol_FlexibleTwoWayUnionErr_DynamicFlags = ::fidl::MessageDynamicFlags::kFlexibleMethod;
 
 
-extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsDriverProtocolFlexibleTwoWayUnionErrTopResponseTable;
+extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsDriverProtocol_FlexibleTwoWayUnionErr_ResultTable;
 
 
 [[maybe_unused]]
@@ -207,7 +207,7 @@ constexpr uint64_t kUnknownInteractionsDriverProtocol_FlexibleTwoWayTableErr_Ord
 constexpr ::fidl::MessageDynamicFlags kUnknownInteractionsDriverProtocol_FlexibleTwoWayTableErr_DynamicFlags = ::fidl::MessageDynamicFlags::kFlexibleMethod;
 
 
-extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsDriverProtocolFlexibleTwoWayTableErrTopResponseTable;
+extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsDriverProtocol_FlexibleTwoWayTableErr_ResultTable;
 
 #ifdef __Fuchsia__
 }  // namespace test_unknowninteractions
@@ -1729,8 +1729,8 @@ fidl::internal::WireBufferCompleterImpl<::test_unknowninteractions::UnknownInter
 }
 
 void
-fidl::internal::WireBufferCompleterImpl<::test_unknowninteractions::UnknownInteractionsDriverProtocol::StrictTwoWayErr>::MakeReply(::test_unknowninteractions::wire::UnknownInteractionsDriverProtocolStrictTwoWayErrResult result) {
-  ::fidl::internal::TransactionalResponse<::test_unknowninteractions::UnknownInteractionsDriverProtocol::StrictTwoWayErr> _response{ result };
+fidl::internal::WireBufferCompleterImpl<::test_unknowninteractions::UnknownInteractionsDriverProtocol::StrictTwoWayErr>::MakeReply(::test_unknowninteractions::wire::UnknownInteractionsDriverProtocolStrictTwoWayErrResult UnknownInteractionsDriverProtocolStrictTwoWayErrResult) {
+  ::fidl::internal::TransactionalResponse<::test_unknowninteractions::UnknownInteractionsDriverProtocol::StrictTwoWayErr> _response{ UnknownInteractionsDriverProtocolStrictTwoWayErrResult };
   constexpr uint32_t _buffer_size = ::fidl::ServerReplyBufferSizeInChannel<::test_unknowninteractions::UnknownInteractionsDriverProtocol::StrictTwoWayErr>();
   uint8_t* _buffer = static_cast<uint8_t*>(_arena().Allocate(_buffer_size));
   ::fidl::internal::UnownedEncodedMessage<
@@ -1765,8 +1765,8 @@ fidl::internal::WireBufferCompleterImpl<::test_unknowninteractions::UnknownInter
 }
 
 void
-fidl::internal::WireBufferCompleterImpl<::test_unknowninteractions::UnknownInteractionsDriverProtocol::StrictTwoWayFieldsErr>::MakeReply(::test_unknowninteractions::wire::UnknownInteractionsDriverProtocolStrictTwoWayFieldsErrResult result) {
-  ::fidl::internal::TransactionalResponse<::test_unknowninteractions::UnknownInteractionsDriverProtocol::StrictTwoWayFieldsErr> _response{ result };
+fidl::internal::WireBufferCompleterImpl<::test_unknowninteractions::UnknownInteractionsDriverProtocol::StrictTwoWayFieldsErr>::MakeReply(::test_unknowninteractions::wire::UnknownInteractionsDriverProtocolStrictTwoWayFieldsErrResult UnknownInteractionsDriverProtocolStrictTwoWayFieldsErrResult) {
+  ::fidl::internal::TransactionalResponse<::test_unknowninteractions::UnknownInteractionsDriverProtocol::StrictTwoWayFieldsErr> _response{ UnknownInteractionsDriverProtocolStrictTwoWayFieldsErrResult };
   constexpr uint32_t _buffer_size = ::fidl::ServerReplyBufferSizeInChannel<::test_unknowninteractions::UnknownInteractionsDriverProtocol::StrictTwoWayFieldsErr>();
   uint8_t* _buffer = static_cast<uint8_t*>(_arena().Allocate(_buffer_size));
   ::fidl::internal::UnownedEncodedMessage<
@@ -1804,8 +1804,8 @@ fidl::internal::WireBufferCompleterImpl<::test_unknowninteractions::UnknownInter
 }
 
 void
-fidl::internal::WireBufferCompleterImpl<::test_unknowninteractions::UnknownInteractionsDriverProtocol::StrictTwoWayUnionErr>::MakeReply(::test_unknowninteractions::wire::UnknownInteractionsDriverProtocolStrictTwoWayUnionErrResult result) {
-  ::fidl::internal::TransactionalResponse<::test_unknowninteractions::UnknownInteractionsDriverProtocol::StrictTwoWayUnionErr> _response{ result };
+fidl::internal::WireBufferCompleterImpl<::test_unknowninteractions::UnknownInteractionsDriverProtocol::StrictTwoWayUnionErr>::MakeReply(::test_unknowninteractions::wire::UnknownInteractionsDriverProtocolStrictTwoWayUnionErrResult UnknownInteractionsDriverProtocolStrictTwoWayUnionErrResult) {
+  ::fidl::internal::TransactionalResponse<::test_unknowninteractions::UnknownInteractionsDriverProtocol::StrictTwoWayUnionErr> _response{ UnknownInteractionsDriverProtocolStrictTwoWayUnionErrResult };
   constexpr uint32_t _buffer_size = ::fidl::ServerReplyBufferSizeInChannel<::test_unknowninteractions::UnknownInteractionsDriverProtocol::StrictTwoWayUnionErr>();
   uint8_t* _buffer = static_cast<uint8_t*>(_arena().Allocate(_buffer_size));
   ::fidl::internal::UnownedEncodedMessage<
@@ -1841,8 +1841,8 @@ fidl::internal::WireBufferCompleterImpl<::test_unknowninteractions::UnknownInter
 }
 
 void
-fidl::internal::WireBufferCompleterImpl<::test_unknowninteractions::UnknownInteractionsDriverProtocol::StrictTwoWayTableErr>::MakeReply(::test_unknowninteractions::wire::UnknownInteractionsDriverProtocolStrictTwoWayTableErrResult result) {
-  ::fidl::internal::TransactionalResponse<::test_unknowninteractions::UnknownInteractionsDriverProtocol::StrictTwoWayTableErr> _response{ result };
+fidl::internal::WireBufferCompleterImpl<::test_unknowninteractions::UnknownInteractionsDriverProtocol::StrictTwoWayTableErr>::MakeReply(::test_unknowninteractions::wire::UnknownInteractionsDriverProtocolStrictTwoWayTableErrResult UnknownInteractionsDriverProtocolStrictTwoWayTableErrResult) {
+  ::fidl::internal::TransactionalResponse<::test_unknowninteractions::UnknownInteractionsDriverProtocol::StrictTwoWayTableErr> _response{ UnknownInteractionsDriverProtocolStrictTwoWayTableErrResult };
   constexpr uint32_t _buffer_size = ::fidl::ServerReplyBufferSizeInChannel<::test_unknowninteractions::UnknownInteractionsDriverProtocol::StrictTwoWayTableErr>();
   uint8_t* _buffer = static_cast<uint8_t*>(_arena().Allocate(_buffer_size));
   ::fidl::internal::UnownedEncodedMessage<
@@ -1875,8 +1875,8 @@ fidl::internal::WireBufferCompleterImpl<::test_unknowninteractions::UnknownInter
 }
 
 void
-fidl::internal::WireBufferCompleterImpl<::test_unknowninteractions::UnknownInteractionsDriverProtocol::FlexibleTwoWay>::MakeReply(::test_unknowninteractions::wire::UnknownInteractionsDriverProtocolFlexibleTwoWayResult result) {
-  ::fidl::internal::TransactionalResponse<::test_unknowninteractions::UnknownInteractionsDriverProtocol::FlexibleTwoWay> _response{ result };
+fidl::internal::WireBufferCompleterImpl<::test_unknowninteractions::UnknownInteractionsDriverProtocol::FlexibleTwoWay>::MakeReply(::test_unknowninteractions::wire::UnknownInteractionsDriverProtocolFlexibleTwoWayResult UnknownInteractionsDriverProtocolFlexibleTwoWayResult) {
+  ::fidl::internal::TransactionalResponse<::test_unknowninteractions::UnknownInteractionsDriverProtocol::FlexibleTwoWay> _response{ UnknownInteractionsDriverProtocolFlexibleTwoWayResult };
   constexpr uint32_t _buffer_size = ::fidl::ServerReplyBufferSizeInChannel<::test_unknowninteractions::UnknownInteractionsDriverProtocol::FlexibleTwoWay>();
   uint8_t* _buffer = static_cast<uint8_t*>(_arena().Allocate(_buffer_size));
   ::fidl::internal::UnownedEncodedMessage<
@@ -1902,8 +1902,8 @@ return MakeReply(::test_unknowninteractions::wire::UnknownInteractionsDriverProt
 }
 
 void
-fidl::internal::WireBufferCompleterImpl<::test_unknowninteractions::UnknownInteractionsDriverProtocol::FlexibleTwoWayFields>::MakeReply(::test_unknowninteractions::wire::UnknownInteractionsDriverProtocolFlexibleTwoWayFieldsResult result) {
-  ::fidl::internal::TransactionalResponse<::test_unknowninteractions::UnknownInteractionsDriverProtocol::FlexibleTwoWayFields> _response{ result };
+fidl::internal::WireBufferCompleterImpl<::test_unknowninteractions::UnknownInteractionsDriverProtocol::FlexibleTwoWayFields>::MakeReply(::test_unknowninteractions::wire::UnknownInteractionsDriverProtocolFlexibleTwoWayFieldsResult UnknownInteractionsDriverProtocolFlexibleTwoWayFieldsResult) {
+  ::fidl::internal::TransactionalResponse<::test_unknowninteractions::UnknownInteractionsDriverProtocol::FlexibleTwoWayFields> _response{ UnknownInteractionsDriverProtocolFlexibleTwoWayFieldsResult };
   constexpr uint32_t _buffer_size = ::fidl::ServerReplyBufferSizeInChannel<::test_unknowninteractions::UnknownInteractionsDriverProtocol::FlexibleTwoWayFields>();
   uint8_t* _buffer = static_cast<uint8_t*>(_arena().Allocate(_buffer_size));
   ::fidl::internal::UnownedEncodedMessage<
@@ -1927,8 +1927,8 @@ return MakeReply(::test_unknowninteractions::wire::UnknownInteractionsDriverProt
 }
 
 void
-fidl::internal::WireBufferCompleterImpl<::test_unknowninteractions::UnknownInteractionsDriverProtocol::FlexibleTwoWayUnion>::MakeReply(::test_unknowninteractions::wire::UnknownInteractionsDriverProtocolFlexibleTwoWayUnionResult result) {
-  ::fidl::internal::TransactionalResponse<::test_unknowninteractions::UnknownInteractionsDriverProtocol::FlexibleTwoWayUnion> _response{ result };
+fidl::internal::WireBufferCompleterImpl<::test_unknowninteractions::UnknownInteractionsDriverProtocol::FlexibleTwoWayUnion>::MakeReply(::test_unknowninteractions::wire::UnknownInteractionsDriverProtocolFlexibleTwoWayUnionResult UnknownInteractionsDriverProtocolFlexibleTwoWayUnionResult) {
+  ::fidl::internal::TransactionalResponse<::test_unknowninteractions::UnknownInteractionsDriverProtocol::FlexibleTwoWayUnion> _response{ UnknownInteractionsDriverProtocolFlexibleTwoWayUnionResult };
   constexpr uint32_t _buffer_size = ::fidl::ServerReplyBufferSizeInChannel<::test_unknowninteractions::UnknownInteractionsDriverProtocol::FlexibleTwoWayUnion>();
   uint8_t* _buffer = static_cast<uint8_t*>(_arena().Allocate(_buffer_size));
   ::fidl::internal::UnownedEncodedMessage<
@@ -1952,8 +1952,8 @@ return MakeReply(::test_unknowninteractions::wire::UnknownInteractionsDriverProt
 }
 
 void
-fidl::internal::WireBufferCompleterImpl<::test_unknowninteractions::UnknownInteractionsDriverProtocol::FlexibleTwoWayTable>::MakeReply(::test_unknowninteractions::wire::UnknownInteractionsDriverProtocolFlexibleTwoWayTableResult result) {
-  ::fidl::internal::TransactionalResponse<::test_unknowninteractions::UnknownInteractionsDriverProtocol::FlexibleTwoWayTable> _response{ result };
+fidl::internal::WireBufferCompleterImpl<::test_unknowninteractions::UnknownInteractionsDriverProtocol::FlexibleTwoWayTable>::MakeReply(::test_unknowninteractions::wire::UnknownInteractionsDriverProtocolFlexibleTwoWayTableResult UnknownInteractionsDriverProtocolFlexibleTwoWayTableResult) {
+  ::fidl::internal::TransactionalResponse<::test_unknowninteractions::UnknownInteractionsDriverProtocol::FlexibleTwoWayTable> _response{ UnknownInteractionsDriverProtocolFlexibleTwoWayTableResult };
   constexpr uint32_t _buffer_size = ::fidl::ServerReplyBufferSizeInChannel<::test_unknowninteractions::UnknownInteractionsDriverProtocol::FlexibleTwoWayTable>();
   uint8_t* _buffer = static_cast<uint8_t*>(_arena().Allocate(_buffer_size));
   ::fidl::internal::UnownedEncodedMessage<
@@ -1979,8 +1979,8 @@ fidl::internal::WireBufferCompleterImpl<::test_unknowninteractions::UnknownInter
 }
 
 void
-fidl::internal::WireBufferCompleterImpl<::test_unknowninteractions::UnknownInteractionsDriverProtocol::FlexibleTwoWayErr>::MakeReply(::test_unknowninteractions::wire::UnknownInteractionsDriverProtocolFlexibleTwoWayErrResult result) {
-  ::fidl::internal::TransactionalResponse<::test_unknowninteractions::UnknownInteractionsDriverProtocol::FlexibleTwoWayErr> _response{ result };
+fidl::internal::WireBufferCompleterImpl<::test_unknowninteractions::UnknownInteractionsDriverProtocol::FlexibleTwoWayErr>::MakeReply(::test_unknowninteractions::wire::UnknownInteractionsDriverProtocolFlexibleTwoWayErrResult UnknownInteractionsDriverProtocolFlexibleTwoWayErrResult) {
+  ::fidl::internal::TransactionalResponse<::test_unknowninteractions::UnknownInteractionsDriverProtocol::FlexibleTwoWayErr> _response{ UnknownInteractionsDriverProtocolFlexibleTwoWayErrResult };
   constexpr uint32_t _buffer_size = ::fidl::ServerReplyBufferSizeInChannel<::test_unknowninteractions::UnknownInteractionsDriverProtocol::FlexibleTwoWayErr>();
   uint8_t* _buffer = static_cast<uint8_t*>(_arena().Allocate(_buffer_size));
   ::fidl::internal::UnownedEncodedMessage<
@@ -2015,8 +2015,8 @@ fidl::internal::WireBufferCompleterImpl<::test_unknowninteractions::UnknownInter
 }
 
 void
-fidl::internal::WireBufferCompleterImpl<::test_unknowninteractions::UnknownInteractionsDriverProtocol::FlexibleTwoWayFieldsErr>::MakeReply(::test_unknowninteractions::wire::UnknownInteractionsDriverProtocolFlexibleTwoWayFieldsErrResult result) {
-  ::fidl::internal::TransactionalResponse<::test_unknowninteractions::UnknownInteractionsDriverProtocol::FlexibleTwoWayFieldsErr> _response{ result };
+fidl::internal::WireBufferCompleterImpl<::test_unknowninteractions::UnknownInteractionsDriverProtocol::FlexibleTwoWayFieldsErr>::MakeReply(::test_unknowninteractions::wire::UnknownInteractionsDriverProtocolFlexibleTwoWayFieldsErrResult UnknownInteractionsDriverProtocolFlexibleTwoWayFieldsErrResult) {
+  ::fidl::internal::TransactionalResponse<::test_unknowninteractions::UnknownInteractionsDriverProtocol::FlexibleTwoWayFieldsErr> _response{ UnknownInteractionsDriverProtocolFlexibleTwoWayFieldsErrResult };
   constexpr uint32_t _buffer_size = ::fidl::ServerReplyBufferSizeInChannel<::test_unknowninteractions::UnknownInteractionsDriverProtocol::FlexibleTwoWayFieldsErr>();
   uint8_t* _buffer = static_cast<uint8_t*>(_arena().Allocate(_buffer_size));
   ::fidl::internal::UnownedEncodedMessage<
@@ -2054,8 +2054,8 @@ fidl::internal::WireBufferCompleterImpl<::test_unknowninteractions::UnknownInter
 }
 
 void
-fidl::internal::WireBufferCompleterImpl<::test_unknowninteractions::UnknownInteractionsDriverProtocol::FlexibleTwoWayUnionErr>::MakeReply(::test_unknowninteractions::wire::UnknownInteractionsDriverProtocolFlexibleTwoWayUnionErrResult result) {
-  ::fidl::internal::TransactionalResponse<::test_unknowninteractions::UnknownInteractionsDriverProtocol::FlexibleTwoWayUnionErr> _response{ result };
+fidl::internal::WireBufferCompleterImpl<::test_unknowninteractions::UnknownInteractionsDriverProtocol::FlexibleTwoWayUnionErr>::MakeReply(::test_unknowninteractions::wire::UnknownInteractionsDriverProtocolFlexibleTwoWayUnionErrResult UnknownInteractionsDriverProtocolFlexibleTwoWayUnionErrResult) {
+  ::fidl::internal::TransactionalResponse<::test_unknowninteractions::UnknownInteractionsDriverProtocol::FlexibleTwoWayUnionErr> _response{ UnknownInteractionsDriverProtocolFlexibleTwoWayUnionErrResult };
   constexpr uint32_t _buffer_size = ::fidl::ServerReplyBufferSizeInChannel<::test_unknowninteractions::UnknownInteractionsDriverProtocol::FlexibleTwoWayUnionErr>();
   uint8_t* _buffer = static_cast<uint8_t*>(_arena().Allocate(_buffer_size));
   ::fidl::internal::UnownedEncodedMessage<
@@ -2091,8 +2091,8 @@ fidl::internal::WireBufferCompleterImpl<::test_unknowninteractions::UnknownInter
 }
 
 void
-fidl::internal::WireBufferCompleterImpl<::test_unknowninteractions::UnknownInteractionsDriverProtocol::FlexibleTwoWayTableErr>::MakeReply(::test_unknowninteractions::wire::UnknownInteractionsDriverProtocolFlexibleTwoWayTableErrResult result) {
-  ::fidl::internal::TransactionalResponse<::test_unknowninteractions::UnknownInteractionsDriverProtocol::FlexibleTwoWayTableErr> _response{ result };
+fidl::internal::WireBufferCompleterImpl<::test_unknowninteractions::UnknownInteractionsDriverProtocol::FlexibleTwoWayTableErr>::MakeReply(::test_unknowninteractions::wire::UnknownInteractionsDriverProtocolFlexibleTwoWayTableErrResult UnknownInteractionsDriverProtocolFlexibleTwoWayTableErrResult) {
+  ::fidl::internal::TransactionalResponse<::test_unknowninteractions::UnknownInteractionsDriverProtocol::FlexibleTwoWayTableErr> _response{ UnknownInteractionsDriverProtocolFlexibleTwoWayTableErrResult };
   constexpr uint32_t _buffer_size = ::fidl::ServerReplyBufferSizeInChannel<::test_unknowninteractions::UnknownInteractionsDriverProtocol::FlexibleTwoWayTableErr>();
   uint8_t* _buffer = static_cast<uint8_t*>(_arena().Allocate(_buffer_size));
   ::fidl::internal::UnownedEncodedMessage<
@@ -2470,7 +2470,7 @@ constexpr uint64_t kUnknownInteractionsAjarDriverProtocol_StrictTwoWayErr_Ordina
 constexpr ::fidl::MessageDynamicFlags kUnknownInteractionsAjarDriverProtocol_StrictTwoWayErr_DynamicFlags = ::fidl::MessageDynamicFlags::kStrictMethod;
 
 
-extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsAjarDriverProtocolStrictTwoWayErrTopResponseTable;
+extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsAjarDriverProtocol_StrictTwoWayErr_ResultTable;
 
 
 [[maybe_unused]]
@@ -2481,7 +2481,7 @@ constexpr uint64_t kUnknownInteractionsAjarDriverProtocol_StrictTwoWayFieldsErr_
 constexpr ::fidl::MessageDynamicFlags kUnknownInteractionsAjarDriverProtocol_StrictTwoWayFieldsErr_DynamicFlags = ::fidl::MessageDynamicFlags::kStrictMethod;
 
 
-extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsAjarDriverProtocolStrictTwoWayFieldsErrTopResponseTable;
+extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsAjarDriverProtocol_StrictTwoWayFieldsErr_ResultTable;
 
 
 [[maybe_unused]]
@@ -2492,7 +2492,7 @@ constexpr uint64_t kUnknownInteractionsAjarDriverProtocol_StrictTwoWayUnionErr_O
 constexpr ::fidl::MessageDynamicFlags kUnknownInteractionsAjarDriverProtocol_StrictTwoWayUnionErr_DynamicFlags = ::fidl::MessageDynamicFlags::kStrictMethod;
 
 
-extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsAjarDriverProtocolStrictTwoWayUnionErrTopResponseTable;
+extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsAjarDriverProtocol_StrictTwoWayUnionErr_ResultTable;
 
 
 [[maybe_unused]]
@@ -2503,7 +2503,7 @@ constexpr uint64_t kUnknownInteractionsAjarDriverProtocol_StrictTwoWayTableErr_O
 constexpr ::fidl::MessageDynamicFlags kUnknownInteractionsAjarDriverProtocol_StrictTwoWayTableErr_DynamicFlags = ::fidl::MessageDynamicFlags::kStrictMethod;
 
 
-extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsAjarDriverProtocolStrictTwoWayTableErrTopResponseTable;
+extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsAjarDriverProtocol_StrictTwoWayTableErr_ResultTable;
 
 #ifdef __Fuchsia__
 }  // namespace test_unknowninteractions
@@ -3431,8 +3431,8 @@ fidl::internal::WireBufferCompleterImpl<::test_unknowninteractions::UnknownInter
 }
 
 void
-fidl::internal::WireBufferCompleterImpl<::test_unknowninteractions::UnknownInteractionsAjarDriverProtocol::StrictTwoWayErr>::MakeReply(::test_unknowninteractions::wire::UnknownInteractionsAjarDriverProtocolStrictTwoWayErrResult result) {
-  ::fidl::internal::TransactionalResponse<::test_unknowninteractions::UnknownInteractionsAjarDriverProtocol::StrictTwoWayErr> _response{ result };
+fidl::internal::WireBufferCompleterImpl<::test_unknowninteractions::UnknownInteractionsAjarDriverProtocol::StrictTwoWayErr>::MakeReply(::test_unknowninteractions::wire::UnknownInteractionsAjarDriverProtocolStrictTwoWayErrResult UnknownInteractionsAjarDriverProtocolStrictTwoWayErrResult) {
+  ::fidl::internal::TransactionalResponse<::test_unknowninteractions::UnknownInteractionsAjarDriverProtocol::StrictTwoWayErr> _response{ UnknownInteractionsAjarDriverProtocolStrictTwoWayErrResult };
   constexpr uint32_t _buffer_size = ::fidl::ServerReplyBufferSizeInChannel<::test_unknowninteractions::UnknownInteractionsAjarDriverProtocol::StrictTwoWayErr>();
   uint8_t* _buffer = static_cast<uint8_t*>(_arena().Allocate(_buffer_size));
   ::fidl::internal::UnownedEncodedMessage<
@@ -3467,8 +3467,8 @@ fidl::internal::WireBufferCompleterImpl<::test_unknowninteractions::UnknownInter
 }
 
 void
-fidl::internal::WireBufferCompleterImpl<::test_unknowninteractions::UnknownInteractionsAjarDriverProtocol::StrictTwoWayFieldsErr>::MakeReply(::test_unknowninteractions::wire::UnknownInteractionsAjarDriverProtocolStrictTwoWayFieldsErrResult result) {
-  ::fidl::internal::TransactionalResponse<::test_unknowninteractions::UnknownInteractionsAjarDriverProtocol::StrictTwoWayFieldsErr> _response{ result };
+fidl::internal::WireBufferCompleterImpl<::test_unknowninteractions::UnknownInteractionsAjarDriverProtocol::StrictTwoWayFieldsErr>::MakeReply(::test_unknowninteractions::wire::UnknownInteractionsAjarDriverProtocolStrictTwoWayFieldsErrResult UnknownInteractionsAjarDriverProtocolStrictTwoWayFieldsErrResult) {
+  ::fidl::internal::TransactionalResponse<::test_unknowninteractions::UnknownInteractionsAjarDriverProtocol::StrictTwoWayFieldsErr> _response{ UnknownInteractionsAjarDriverProtocolStrictTwoWayFieldsErrResult };
   constexpr uint32_t _buffer_size = ::fidl::ServerReplyBufferSizeInChannel<::test_unknowninteractions::UnknownInteractionsAjarDriverProtocol::StrictTwoWayFieldsErr>();
   uint8_t* _buffer = static_cast<uint8_t*>(_arena().Allocate(_buffer_size));
   ::fidl::internal::UnownedEncodedMessage<
@@ -3506,8 +3506,8 @@ fidl::internal::WireBufferCompleterImpl<::test_unknowninteractions::UnknownInter
 }
 
 void
-fidl::internal::WireBufferCompleterImpl<::test_unknowninteractions::UnknownInteractionsAjarDriverProtocol::StrictTwoWayUnionErr>::MakeReply(::test_unknowninteractions::wire::UnknownInteractionsAjarDriverProtocolStrictTwoWayUnionErrResult result) {
-  ::fidl::internal::TransactionalResponse<::test_unknowninteractions::UnknownInteractionsAjarDriverProtocol::StrictTwoWayUnionErr> _response{ result };
+fidl::internal::WireBufferCompleterImpl<::test_unknowninteractions::UnknownInteractionsAjarDriverProtocol::StrictTwoWayUnionErr>::MakeReply(::test_unknowninteractions::wire::UnknownInteractionsAjarDriverProtocolStrictTwoWayUnionErrResult UnknownInteractionsAjarDriverProtocolStrictTwoWayUnionErrResult) {
+  ::fidl::internal::TransactionalResponse<::test_unknowninteractions::UnknownInteractionsAjarDriverProtocol::StrictTwoWayUnionErr> _response{ UnknownInteractionsAjarDriverProtocolStrictTwoWayUnionErrResult };
   constexpr uint32_t _buffer_size = ::fidl::ServerReplyBufferSizeInChannel<::test_unknowninteractions::UnknownInteractionsAjarDriverProtocol::StrictTwoWayUnionErr>();
   uint8_t* _buffer = static_cast<uint8_t*>(_arena().Allocate(_buffer_size));
   ::fidl::internal::UnownedEncodedMessage<
@@ -3543,8 +3543,8 @@ fidl::internal::WireBufferCompleterImpl<::test_unknowninteractions::UnknownInter
 }
 
 void
-fidl::internal::WireBufferCompleterImpl<::test_unknowninteractions::UnknownInteractionsAjarDriverProtocol::StrictTwoWayTableErr>::MakeReply(::test_unknowninteractions::wire::UnknownInteractionsAjarDriverProtocolStrictTwoWayTableErrResult result) {
-  ::fidl::internal::TransactionalResponse<::test_unknowninteractions::UnknownInteractionsAjarDriverProtocol::StrictTwoWayTableErr> _response{ result };
+fidl::internal::WireBufferCompleterImpl<::test_unknowninteractions::UnknownInteractionsAjarDriverProtocol::StrictTwoWayTableErr>::MakeReply(::test_unknowninteractions::wire::UnknownInteractionsAjarDriverProtocolStrictTwoWayTableErrResult UnknownInteractionsAjarDriverProtocolStrictTwoWayTableErrResult) {
+  ::fidl::internal::TransactionalResponse<::test_unknowninteractions::UnknownInteractionsAjarDriverProtocol::StrictTwoWayTableErr> _response{ UnknownInteractionsAjarDriverProtocolStrictTwoWayTableErrResult };
   constexpr uint32_t _buffer_size = ::fidl::ServerReplyBufferSizeInChannel<::test_unknowninteractions::UnknownInteractionsAjarDriverProtocol::StrictTwoWayTableErr>();
   uint8_t* _buffer = static_cast<uint8_t*>(_arena().Allocate(_buffer_size));
   ::fidl::internal::UnownedEncodedMessage<
@@ -3786,7 +3786,7 @@ constexpr uint64_t kUnknownInteractionsClosedDriverProtocol_StrictTwoWayErr_Ordi
 constexpr ::fidl::MessageDynamicFlags kUnknownInteractionsClosedDriverProtocol_StrictTwoWayErr_DynamicFlags = ::fidl::MessageDynamicFlags::kStrictMethod;
 
 
-extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsClosedDriverProtocolStrictTwoWayErrTopResponseTable;
+extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsClosedDriverProtocol_StrictTwoWayErr_ResultTable;
 
 
 [[maybe_unused]]
@@ -3797,7 +3797,7 @@ constexpr uint64_t kUnknownInteractionsClosedDriverProtocol_StrictTwoWayFieldsEr
 constexpr ::fidl::MessageDynamicFlags kUnknownInteractionsClosedDriverProtocol_StrictTwoWayFieldsErr_DynamicFlags = ::fidl::MessageDynamicFlags::kStrictMethod;
 
 
-extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsClosedDriverProtocolStrictTwoWayFieldsErrTopResponseTable;
+extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsClosedDriverProtocol_StrictTwoWayFieldsErr_ResultTable;
 
 
 [[maybe_unused]]
@@ -3808,7 +3808,7 @@ constexpr uint64_t kUnknownInteractionsClosedDriverProtocol_StrictTwoWayUnionErr
 constexpr ::fidl::MessageDynamicFlags kUnknownInteractionsClosedDriverProtocol_StrictTwoWayUnionErr_DynamicFlags = ::fidl::MessageDynamicFlags::kStrictMethod;
 
 
-extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsClosedDriverProtocolStrictTwoWayUnionErrTopResponseTable;
+extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsClosedDriverProtocol_StrictTwoWayUnionErr_ResultTable;
 
 
 [[maybe_unused]]
@@ -3819,7 +3819,7 @@ constexpr uint64_t kUnknownInteractionsClosedDriverProtocol_StrictTwoWayTableErr
 constexpr ::fidl::MessageDynamicFlags kUnknownInteractionsClosedDriverProtocol_StrictTwoWayTableErr_DynamicFlags = ::fidl::MessageDynamicFlags::kStrictMethod;
 
 
-extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsClosedDriverProtocolStrictTwoWayTableErrTopResponseTable;
+extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsClosedDriverProtocol_StrictTwoWayTableErr_ResultTable;
 
 #ifdef __Fuchsia__
 }  // namespace test_unknowninteractions
@@ -4638,8 +4638,8 @@ fidl::internal::WireBufferCompleterImpl<::test_unknowninteractions::UnknownInter
 }
 
 void
-fidl::internal::WireBufferCompleterImpl<::test_unknowninteractions::UnknownInteractionsClosedDriverProtocol::StrictTwoWayErr>::MakeReply(::test_unknowninteractions::wire::UnknownInteractionsClosedDriverProtocolStrictTwoWayErrResult result) {
-  ::fidl::internal::TransactionalResponse<::test_unknowninteractions::UnknownInteractionsClosedDriverProtocol::StrictTwoWayErr> _response{ result };
+fidl::internal::WireBufferCompleterImpl<::test_unknowninteractions::UnknownInteractionsClosedDriverProtocol::StrictTwoWayErr>::MakeReply(::test_unknowninteractions::wire::UnknownInteractionsClosedDriverProtocolStrictTwoWayErrResult UnknownInteractionsClosedDriverProtocolStrictTwoWayErrResult) {
+  ::fidl::internal::TransactionalResponse<::test_unknowninteractions::UnknownInteractionsClosedDriverProtocol::StrictTwoWayErr> _response{ UnknownInteractionsClosedDriverProtocolStrictTwoWayErrResult };
   constexpr uint32_t _buffer_size = ::fidl::ServerReplyBufferSizeInChannel<::test_unknowninteractions::UnknownInteractionsClosedDriverProtocol::StrictTwoWayErr>();
   uint8_t* _buffer = static_cast<uint8_t*>(_arena().Allocate(_buffer_size));
   ::fidl::internal::UnownedEncodedMessage<
@@ -4674,8 +4674,8 @@ fidl::internal::WireBufferCompleterImpl<::test_unknowninteractions::UnknownInter
 }
 
 void
-fidl::internal::WireBufferCompleterImpl<::test_unknowninteractions::UnknownInteractionsClosedDriverProtocol::StrictTwoWayFieldsErr>::MakeReply(::test_unknowninteractions::wire::UnknownInteractionsClosedDriverProtocolStrictTwoWayFieldsErrResult result) {
-  ::fidl::internal::TransactionalResponse<::test_unknowninteractions::UnknownInteractionsClosedDriverProtocol::StrictTwoWayFieldsErr> _response{ result };
+fidl::internal::WireBufferCompleterImpl<::test_unknowninteractions::UnknownInteractionsClosedDriverProtocol::StrictTwoWayFieldsErr>::MakeReply(::test_unknowninteractions::wire::UnknownInteractionsClosedDriverProtocolStrictTwoWayFieldsErrResult UnknownInteractionsClosedDriverProtocolStrictTwoWayFieldsErrResult) {
+  ::fidl::internal::TransactionalResponse<::test_unknowninteractions::UnknownInteractionsClosedDriverProtocol::StrictTwoWayFieldsErr> _response{ UnknownInteractionsClosedDriverProtocolStrictTwoWayFieldsErrResult };
   constexpr uint32_t _buffer_size = ::fidl::ServerReplyBufferSizeInChannel<::test_unknowninteractions::UnknownInteractionsClosedDriverProtocol::StrictTwoWayFieldsErr>();
   uint8_t* _buffer = static_cast<uint8_t*>(_arena().Allocate(_buffer_size));
   ::fidl::internal::UnownedEncodedMessage<
@@ -4713,8 +4713,8 @@ fidl::internal::WireBufferCompleterImpl<::test_unknowninteractions::UnknownInter
 }
 
 void
-fidl::internal::WireBufferCompleterImpl<::test_unknowninteractions::UnknownInteractionsClosedDriverProtocol::StrictTwoWayUnionErr>::MakeReply(::test_unknowninteractions::wire::UnknownInteractionsClosedDriverProtocolStrictTwoWayUnionErrResult result) {
-  ::fidl::internal::TransactionalResponse<::test_unknowninteractions::UnknownInteractionsClosedDriverProtocol::StrictTwoWayUnionErr> _response{ result };
+fidl::internal::WireBufferCompleterImpl<::test_unknowninteractions::UnknownInteractionsClosedDriverProtocol::StrictTwoWayUnionErr>::MakeReply(::test_unknowninteractions::wire::UnknownInteractionsClosedDriverProtocolStrictTwoWayUnionErrResult UnknownInteractionsClosedDriverProtocolStrictTwoWayUnionErrResult) {
+  ::fidl::internal::TransactionalResponse<::test_unknowninteractions::UnknownInteractionsClosedDriverProtocol::StrictTwoWayUnionErr> _response{ UnknownInteractionsClosedDriverProtocolStrictTwoWayUnionErrResult };
   constexpr uint32_t _buffer_size = ::fidl::ServerReplyBufferSizeInChannel<::test_unknowninteractions::UnknownInteractionsClosedDriverProtocol::StrictTwoWayUnionErr>();
   uint8_t* _buffer = static_cast<uint8_t*>(_arena().Allocate(_buffer_size));
   ::fidl::internal::UnownedEncodedMessage<
@@ -4750,8 +4750,8 @@ fidl::internal::WireBufferCompleterImpl<::test_unknowninteractions::UnknownInter
 }
 
 void
-fidl::internal::WireBufferCompleterImpl<::test_unknowninteractions::UnknownInteractionsClosedDriverProtocol::StrictTwoWayTableErr>::MakeReply(::test_unknowninteractions::wire::UnknownInteractionsClosedDriverProtocolStrictTwoWayTableErrResult result) {
-  ::fidl::internal::TransactionalResponse<::test_unknowninteractions::UnknownInteractionsClosedDriverProtocol::StrictTwoWayTableErr> _response{ result };
+fidl::internal::WireBufferCompleterImpl<::test_unknowninteractions::UnknownInteractionsClosedDriverProtocol::StrictTwoWayTableErr>::MakeReply(::test_unknowninteractions::wire::UnknownInteractionsClosedDriverProtocolStrictTwoWayTableErrResult UnknownInteractionsClosedDriverProtocolStrictTwoWayTableErrResult) {
+  ::fidl::internal::TransactionalResponse<::test_unknowninteractions::UnknownInteractionsClosedDriverProtocol::StrictTwoWayTableErr> _response{ UnknownInteractionsClosedDriverProtocolStrictTwoWayTableErrResult };
   constexpr uint32_t _buffer_size = ::fidl::ServerReplyBufferSizeInChannel<::test_unknowninteractions::UnknownInteractionsClosedDriverProtocol::StrictTwoWayTableErr>();
   uint8_t* _buffer = static_cast<uint8_t*>(_arena().Allocate(_buffer_size));
   ::fidl::internal::UnownedEncodedMessage<

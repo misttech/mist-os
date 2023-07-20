@@ -405,7 +405,7 @@ impl<'a, W: io::Write> CppBackend<'a, W> {
                 })
                 .flat_map(|methods| {
                     // Find all handle in/out params in each method.
-                    methods.iter().flat_map(|method| {
+                    methods.iter().filter(|m| doesnt_use_error_syntax(m, ir)).flat_map(|method| {
                         method
                             .request_parameters(ir)
                             .as_ref()

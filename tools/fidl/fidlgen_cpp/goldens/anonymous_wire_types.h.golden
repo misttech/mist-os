@@ -50,8 +50,6 @@ struct SomeProtocolSomeMethodRequest;
 
 struct SomeProtocolSomeMethodResponse;
 
-struct SomeProtocolSomeMethodTopResponse;
-
 class FunctionApplication;
 
 class TableMember;
@@ -931,14 +929,6 @@ struct SomeProtocolSomeMethodRequest {
   ::test_anonymous::wire::TableMember table_member = {};
 };
 
-extern "C" const fidl_type_t test_anonymous_SomeProtocolSomeMethodTopResponseTable;
-
-struct SomeProtocolSomeMethodTopResponse {
-  using Result = test_anonymous::wire::SomeProtocolSomeMethodResult;
-
-  ::test_anonymous::wire::SomeProtocolSomeMethodResult result = {};
-};
-
 }  // namespace wire
 }  // namespace test_anonymous
 namespace fidl {
@@ -1184,52 +1174,6 @@ struct ::fidl::internal::WireCodingTraits<::test_anonymous::wire::SomeProtocolSo
       internal::WireDecoder* decoder, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth) {
     if constexpr (!Base::are_members_memcpy_compatible) {
       internal::WireCodingTraits<::test_anonymous::wire::BitsMember, fidl::internal::WireCodingConstraintEmpty, IsRecursive>::Decode(
-          decoder, position + 0, recursion_depth);
-    }
-  }
-};
-
-template <>
-struct TypeTraits<::test_anonymous::wire::SomeProtocolSomeMethodTopResponse> {
-  static constexpr uint32_t kMaxNumHandles = 0;
-  static constexpr uint32_t kMaxDepth = 1;
-  static constexpr uint32_t kPrimarySize = 16;
-  static constexpr uint32_t kPrimarySizeV1 = 24;
-  [[maybe_unused]] static constexpr uint32_t kMaxOutOfLine = 0;
-  static constexpr uint32_t kMaxOutOfLineV1 = 8;
-  static constexpr bool kHasFlexibleEnvelope = false;
-  static constexpr bool kHasEnvelope = true;
-  static constexpr bool kHasPointer = true;
-};
-
-template <>
-struct IsFidlType<::test_anonymous::wire::SomeProtocolSomeMethodTopResponse> : public std::true_type {};
-template <>
-struct IsStruct<::test_anonymous::wire::SomeProtocolSomeMethodTopResponse> : public std::true_type {};
-static_assert(std::is_standard_layout_v<::test_anonymous::wire::SomeProtocolSomeMethodTopResponse>);
-static_assert(offsetof(::test_anonymous::wire::SomeProtocolSomeMethodTopResponse, result) == 0);
-static_assert(sizeof(::test_anonymous::wire::SomeProtocolSomeMethodTopResponse) == TypeTraits<::test_anonymous::wire::SomeProtocolSomeMethodTopResponse>::kPrimarySize);
-
-template <bool IsRecursive>
-struct ::fidl::internal::WireCodingTraits<::test_anonymous::wire::SomeProtocolSomeMethodTopResponse, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive> {
-  static constexpr size_t inline_size = 16;
-  static constexpr auto kMembers = std::make_tuple(::fidl::internal::WireStructMemberCodingInfo<::test_anonymous::wire::SomeProtocolSomeMethodResult, fidl::internal::WireCodingConstraintUnion<false>, IsRecursive>());
-  static constexpr bool kHasPadding = false;
-  using Base = WireStructCodingTraitsBase<::test_anonymous::wire::SomeProtocolSomeMethodTopResponse, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive>;
-  static constexpr bool is_memcpy_compatible = Base::is_memcpy_compatible;
-
-  static void Encode(
-      internal::WireEncoder* encoder, ::test_anonymous::wire::SomeProtocolSomeMethodTopResponse* value, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth) {
-    if constexpr (is_memcpy_compatible) {
-      memcpy(position.As<void>(), value, sizeof(::test_anonymous::wire::SomeProtocolSomeMethodTopResponse));
-    } else {
-      internal::WireCodingTraits<::test_anonymous::wire::SomeProtocolSomeMethodResult, fidl::internal::WireCodingConstraintUnion<false>, IsRecursive>::Encode(encoder, &value->result, position + 0, recursion_depth);
-    }
-  }
-  static void Decode(
-      internal::WireDecoder* decoder, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth) {
-    if constexpr (!Base::are_members_memcpy_compatible) {
-      internal::WireCodingTraits<::test_anonymous::wire::SomeProtocolSomeMethodResult, fidl::internal::WireCodingConstraintUnion<false>, IsRecursive>::Decode(
           decoder, position + 0, recursion_depth);
     }
   }

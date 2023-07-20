@@ -32,8 +32,6 @@ class ExampleUseOfErrorSyntaxCallWhichMayFailRequest;
 
 class ExampleUseOfErrorSyntaxCallWhichMayFailResponse;
 
-class ExampleUseOfErrorSyntaxCallWhichMayFailTopResponse;
-
 class ExampleUseOfErrorSyntaxCallWhichMayFailResult;
 
 extern "C" const fidl_type_t test_errorsyntax_ExampleUseOfErrorSyntaxCallWhichMayFailRequestTable;
@@ -277,65 +275,6 @@ class ExampleUseOfErrorSyntaxCallWhichMayFailResult {
   }
 };
 
-extern "C" const fidl_type_t test_errorsyntax_ExampleUseOfErrorSyntaxCallWhichMayFailTopResponseTable;
-
-class ExampleUseOfErrorSyntaxCallWhichMayFailTopResponse {
- private:
-  struct Storage_;
-
- public:
-  ExampleUseOfErrorSyntaxCallWhichMayFailTopResponse(Storage_ storage) noexcept;
-  ExampleUseOfErrorSyntaxCallWhichMayFailTopResponse(::test_errorsyntax::ExampleUseOfErrorSyntaxCallWhichMayFailResult result) noexcept;
-
-#pragma clang diagnostic push
-#pragma clang diagnostic ignored "-Wdefaulted-function-deleted"
-  // Default constructs a |ExampleUseOfErrorSyntaxCallWhichMayFailTopResponse| only if all of its members are default constructible.
-  ExampleUseOfErrorSyntaxCallWhichMayFailTopResponse() = default;
-#pragma clang diagnostic pop
-
-  ExampleUseOfErrorSyntaxCallWhichMayFailTopResponse(ExampleUseOfErrorSyntaxCallWhichMayFailTopResponse&&) noexcept = default;
-  ExampleUseOfErrorSyntaxCallWhichMayFailTopResponse& operator=(ExampleUseOfErrorSyntaxCallWhichMayFailTopResponse&&) noexcept = default;
-  ExampleUseOfErrorSyntaxCallWhichMayFailTopResponse(const ExampleUseOfErrorSyntaxCallWhichMayFailTopResponse& other) noexcept;
-  ExampleUseOfErrorSyntaxCallWhichMayFailTopResponse& operator=(const ExampleUseOfErrorSyntaxCallWhichMayFailTopResponse& other) noexcept;
-
-  bool operator==(const ExampleUseOfErrorSyntaxCallWhichMayFailTopResponse& other) const noexcept {
-    return ::fidl::internal::NaturalStructCodingTraits<::test_errorsyntax::ExampleUseOfErrorSyntaxCallWhichMayFailTopResponse, 16>::Equal(this, &other);
-  }
-  bool operator!=(const ExampleUseOfErrorSyntaxCallWhichMayFailTopResponse& other) const noexcept {
-    return !::fidl::internal::NaturalStructCodingTraits<::test_errorsyntax::ExampleUseOfErrorSyntaxCallWhichMayFailTopResponse, 16>::Equal(this, &other);
-  }
-
-  const ::test_errorsyntax::ExampleUseOfErrorSyntaxCallWhichMayFailResult&
-  result() const {
-    return storage_.result;
-  }
-
-  ::test_errorsyntax::ExampleUseOfErrorSyntaxCallWhichMayFailResult& result() {
-    return storage_.result;
-  }
-
-  // Setter for result.
-  //
-
-  ExampleUseOfErrorSyntaxCallWhichMayFailTopResponse& result(::test_errorsyntax::ExampleUseOfErrorSyntaxCallWhichMayFailResult value);
-
-  ExampleUseOfErrorSyntaxCallWhichMayFailTopResponse(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag);
-
- private:
-  struct Storage_ final {
-    ::test_errorsyntax::ExampleUseOfErrorSyntaxCallWhichMayFailResult result;
-  };
-
-  Storage_ storage_;
-  Storage_ CloneStorage_() const;
-
-  friend struct ::fidl::internal::NaturalStructCodingTraits<::test_errorsyntax::ExampleUseOfErrorSyntaxCallWhichMayFailTopResponse, 16>;
-  friend struct ::fidl::internal::MemberVisitor<::test_errorsyntax::ExampleUseOfErrorSyntaxCallWhichMayFailTopResponse>;
-  static constexpr auto kMembers = std::make_tuple(::fidl::internal::NaturalStructMember<Storage_, ::test_errorsyntax::ExampleUseOfErrorSyntaxCallWhichMayFailResult, fidl::internal::NaturalCodingConstraintEmpty>{
-      &Storage_::result, 0});
-  static constexpr auto kPadding = std::make_tuple();
-};
-
 inline ExampleUseOfErrorSyntaxCallWhichMayFailRequest::ExampleUseOfErrorSyntaxCallWhichMayFailRequest(Storage_ storage) noexcept : storage_(std::move(storage)) {}
 inline ExampleUseOfErrorSyntaxCallWhichMayFailRequest::ExampleUseOfErrorSyntaxCallWhichMayFailRequest(::std::string s) noexcept
     : storage_({.s = std::move(s)}) {}
@@ -367,23 +306,6 @@ inline ExampleUseOfErrorSyntaxCallWhichMayFailResponse::ExampleUseOfErrorSyntaxC
                                                                                                                                                                       }) {}
 inline ExampleUseOfErrorSyntaxCallWhichMayFailResponse& ExampleUseOfErrorSyntaxCallWhichMayFailResponse::value(int64_t value) {
   storage_.value = std::move(value);
-  return *this;
-}
-
-inline ExampleUseOfErrorSyntaxCallWhichMayFailTopResponse::ExampleUseOfErrorSyntaxCallWhichMayFailTopResponse(Storage_ storage) noexcept : storage_(std::move(storage)) {}
-inline ExampleUseOfErrorSyntaxCallWhichMayFailTopResponse::ExampleUseOfErrorSyntaxCallWhichMayFailTopResponse(::test_errorsyntax::ExampleUseOfErrorSyntaxCallWhichMayFailResult result) noexcept
-    : storage_({.result = std::move(result)}) {}
-inline ExampleUseOfErrorSyntaxCallWhichMayFailTopResponse::ExampleUseOfErrorSyntaxCallWhichMayFailTopResponse(const ::test_errorsyntax::ExampleUseOfErrorSyntaxCallWhichMayFailTopResponse& other) noexcept : ::test_errorsyntax::ExampleUseOfErrorSyntaxCallWhichMayFailTopResponse(other.CloneStorage_()) {}
-inline ExampleUseOfErrorSyntaxCallWhichMayFailTopResponse& ::test_errorsyntax::ExampleUseOfErrorSyntaxCallWhichMayFailTopResponse::operator=(const ::test_errorsyntax::ExampleUseOfErrorSyntaxCallWhichMayFailTopResponse& other) noexcept {
-  storage_ = other.CloneStorage_();
-  return *this;
-}
-
-inline ExampleUseOfErrorSyntaxCallWhichMayFailTopResponse::ExampleUseOfErrorSyntaxCallWhichMayFailTopResponse(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag) : ExampleUseOfErrorSyntaxCallWhichMayFailTopResponse(Storage_{
-                                                                                                                                                                                .result = ::fidl::internal::DefaultConstructPossiblyInvalidObjectTag{},
-                                                                                                                                                                            }) {}
-inline ExampleUseOfErrorSyntaxCallWhichMayFailTopResponse& ExampleUseOfErrorSyntaxCallWhichMayFailTopResponse::result(::test_errorsyntax::ExampleUseOfErrorSyntaxCallWhichMayFailResult value) {
-  storage_.result = std::move(value);
   return *this;
 }
 
@@ -433,28 +355,6 @@ struct IsStruct<::test_errorsyntax::ExampleUseOfErrorSyntaxCallWhichMayFailRespo
 template <>
 struct internal::NaturalCodingTraits<::test_errorsyntax::ExampleUseOfErrorSyntaxCallWhichMayFailResponse, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalStructCodingTraits<::test_errorsyntax::ExampleUseOfErrorSyntaxCallWhichMayFailResponse, 8> {};
-
-extern "C" const fidl_type_t test_errorsyntax_ExampleUseOfErrorSyntaxCallWhichMayFailTopResponseTable;
-
-template <>
-struct IsFidlType<::test_errorsyntax::ExampleUseOfErrorSyntaxCallWhichMayFailTopResponse> : public std::true_type {};
-
-template <>
-struct TypeTraits<::test_errorsyntax::ExampleUseOfErrorSyntaxCallWhichMayFailTopResponse> {
-  static constexpr uint32_t kMaxNumHandles = 0;
-  static constexpr uint32_t kMaxDepth = 1;
-  static constexpr uint32_t kPrimarySize = 16;
-  static constexpr uint32_t kMaxOutOfLine = 8;
-  static constexpr bool kHasEnvelope = true;
-  static constexpr bool kHasPointer = true;
-};
-
-template <>
-struct IsStruct<::test_errorsyntax::ExampleUseOfErrorSyntaxCallWhichMayFailTopResponse> : public std::true_type {};
-
-template <>
-struct internal::NaturalCodingTraits<::test_errorsyntax::ExampleUseOfErrorSyntaxCallWhichMayFailTopResponse, ::fidl::internal::NaturalCodingConstraintEmpty> final
-    : public ::fidl::internal::NaturalStructCodingTraits<::test_errorsyntax::ExampleUseOfErrorSyntaxCallWhichMayFailTopResponse, 16> {};
 
 extern "C" const fidl_type_t test_errorsyntax_ExampleUseOfErrorSyntax_CallWhichMayFail_ResultTable;
 

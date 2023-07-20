@@ -27,14 +27,6 @@ std::ostream& fidl::ostream::Formatter<::test_error::ExampleFooResponse>::Format
   os << "}";
   return os;
 }
-std::ostream& fidl::ostream::Formatter<::test_error::ExampleFooTopResponse>::Format(std::ostream& os, const ::test_error::ExampleFooTopResponse& value) {
-  os << "test_error::ExampleFooTopResponse";
-  os << "{ ";
-  os << "result";
-  os << " = " << fidl::ostream::Formatted<::test_error::ExampleFooResult>(value.result()) << ", ";
-  os << "}";
-  return os;
-}
 std::ostream& fidl::ostream::Formatter<::test_error::ExampleFooResult>::Format(std::ostream& os, const ::test_error::ExampleFooResult& value) {
   os << "test_error::ExampleFooResult::";
   switch (value.Which()) {
@@ -62,10 +54,6 @@ std::ostream& operator<<(std::ostream& os, const ::test_error::ExampleFooRespons
 
 std::ostream& operator<<(std::ostream& os, const ::test_error::ExampleFooResult& value) {
   return fidl::ostream::Formatter<::test_error::ExampleFooResult>::Format(os, value);
-}
-
-std::ostream& operator<<(std::ostream& os, const ::test_error::ExampleFooTopResponse& value) {
-  return fidl::ostream::Formatter<::test_error::ExampleFooTopResponse>::Format(os, value);
 }
 
 #pragma clang diagnostic pop

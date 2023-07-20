@@ -30,7 +30,7 @@ template <>
 struct ::fidl::internal::NaturalMethodTypes<::test_errorsyntax::ExampleUseOfErrorSyntax::ComposedCallWhichMayFail> {
   using Request = ::test_errorsyntax_parent::ParentUsesErrorSyntaxComposedCallWhichMayFailRequest;
 
-  using Response = ::test_errorsyntax_parent::ParentUsesErrorSyntaxComposedCallWhichMayFailTopResponse;
+  using Response = ::test_errorsyntax_parent::ParentUsesErrorSyntaxComposedCallWhichMayFailResult;
 
   using Completer = fidl::Completer<::fidl::internal::NaturalCompleterBase<::test_errorsyntax::ExampleUseOfErrorSyntax::ComposedCallWhichMayFail>>;
   using ResultCallback =
@@ -41,7 +41,7 @@ template <>
 struct ::fidl::internal::NaturalMethodTypes<::test_errorsyntax::ExampleUseOfErrorSyntax::CallWhichMayFail> {
   using Request = ::test_errorsyntax::ExampleUseOfErrorSyntaxCallWhichMayFailRequest;
 
-  using Response = ::test_errorsyntax::ExampleUseOfErrorSyntaxCallWhichMayFailTopResponse;
+  using Response = ::test_errorsyntax::ExampleUseOfErrorSyntaxCallWhichMayFailResult;
 
   using Completer = fidl::Completer<::fidl::internal::NaturalCompleterBase<::test_errorsyntax::ExampleUseOfErrorSyntax::CallWhichMayFail>>;
   using ResultCallback =
@@ -50,11 +50,11 @@ struct ::fidl::internal::NaturalMethodTypes<::test_errorsyntax::ExampleUseOfErro
 namespace test_errorsyntax {
 __LOCAL extern "C" const fidl_type_t test_errorsyntax_parent_ParentUsesErrorSyntaxComposedCallWhichMayFailRequestTable;
 
-__LOCAL extern "C" const fidl_type_t test_errorsyntax_parent_ParentUsesErrorSyntaxComposedCallWhichMayFailTopResponseTable;
+__LOCAL extern "C" const fidl_type_t test_errorsyntax_parent_ParentUsesErrorSyntax_ComposedCallWhichMayFail_ResultTable;
 
 __LOCAL extern "C" const fidl_type_t test_errorsyntax_ExampleUseOfErrorSyntaxCallWhichMayFailRequestTable;
 
-__LOCAL extern "C" const fidl_type_t test_errorsyntax_ExampleUseOfErrorSyntaxCallWhichMayFailTopResponseTable;
+__LOCAL extern "C" const fidl_type_t test_errorsyntax_ExampleUseOfErrorSyntax_CallWhichMayFail_ResultTable;
 
 #ifdef __Fuchsia__
 }  // namespace test_errorsyntax
@@ -68,14 +68,14 @@ class ::fidl::Response<::test_errorsyntax::ExampleUseOfErrorSyntax::ComposedCall
 };
 template <>
 class ::fidl::internal::ResponseMessageConverter<::test_errorsyntax::ExampleUseOfErrorSyntax::ComposedCallWhichMayFail> {
-  using DomainObject = ::test_errorsyntax_parent::ParentUsesErrorSyntaxComposedCallWhichMayFailTopResponse;
+  using DomainObject = ::test_errorsyntax_parent::ParentUsesErrorSyntaxComposedCallWhichMayFailResult;
 
  public:
   static DomainObject IntoDomainObject(const ::fidl::Response<::test_errorsyntax::ExampleUseOfErrorSyntax::ComposedCallWhichMayFail>& m) {
     if (m.is_error()) {
-      return DomainObject{{.result = ::test_errorsyntax_parent::ParentUsesErrorSyntaxComposedCallWhichMayFailResult::WithErr(m.error_value())}};
+      return DomainObject::WithErr(m.error_value());
     } else {
-      return DomainObject{{.result = ::test_errorsyntax_parent::ParentUsesErrorSyntaxComposedCallWhichMayFailResult::WithResponse(std::move(m.value()))}};
+      return DomainObject::WithResponse(std::move(m.value()));
     }
   }
 };
@@ -100,14 +100,14 @@ class ::fidl::Response<::test_errorsyntax::ExampleUseOfErrorSyntax::CallWhichMay
 };
 template <>
 class ::fidl::internal::ResponseMessageConverter<::test_errorsyntax::ExampleUseOfErrorSyntax::CallWhichMayFail> {
-  using DomainObject = ::test_errorsyntax::ExampleUseOfErrorSyntaxCallWhichMayFailTopResponse;
+  using DomainObject = ::test_errorsyntax::ExampleUseOfErrorSyntaxCallWhichMayFailResult;
 
  public:
   static DomainObject IntoDomainObject(const ::fidl::Response<::test_errorsyntax::ExampleUseOfErrorSyntax::CallWhichMayFail>& m) {
     if (m.is_error()) {
-      return DomainObject{{.result = ::test_errorsyntax::ExampleUseOfErrorSyntaxCallWhichMayFailResult::WithErr(m.error_value())}};
+      return DomainObject::WithErr(m.error_value());
     } else {
-      return DomainObject{{.result = ::test_errorsyntax::ExampleUseOfErrorSyntaxCallWhichMayFailResult::WithResponse(std::move(m.value()))}};
+      return DomainObject::WithResponse(std::move(m.value()));
     }
   }
 };

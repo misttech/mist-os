@@ -34,7 +34,7 @@
 <table>
     <tr><th>Name</th><th>Type</th></tr>
         <tr>
-            <td><code>result</code></td>
+            <td><code>payload</code></td>
             <td>
                 <code><a class='link' href='#Example_foo_Result'>Example_foo_Result</a></code>
             </td>

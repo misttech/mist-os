@@ -92,16 +92,6 @@ struct HLCPPToNaturalTraits<::test::error::Example_foo_Response> {
   static inline ::test_error::ExampleFooResponse Convert(::test::error::Example_foo_Response&&);
 };
 template <>
-struct NaturalToHLCPPTraits<::test_error::ExampleFooTopResponse> {
-  using HLCPPType = ::test::error::ExampleFooTopResponse;
-  static inline ::test::error::ExampleFooTopResponse Convert(::test_error::ExampleFooTopResponse&&);
-};
-template <>
-struct HLCPPToNaturalTraits<::test::error::ExampleFooTopResponse> {
-  using NaturalType = ::test_error::ExampleFooTopResponse;
-  static inline ::test_error::ExampleFooTopResponse Convert(::test::error::ExampleFooTopResponse&&);
-};
-template <>
 struct NaturalToHLCPPTraits<::test_error::ExampleFooResult> {
   using HLCPPType = ::test::error::Example_foo_Result;
   static inline ::test::error::Example_foo_Result Convert(::test_error::ExampleFooResult&&);
@@ -132,17 +122,6 @@ struct HLCPPToNaturalTraits<::test::error::Example_foo_Result> {
 ::test_error::ExampleFooResponse HLCPPToNaturalTraits<::test::error::Example_foo_Response>::Convert(::test::error::Example_foo_Response&& value) {
   return ::test_error::ExampleFooResponse{{
       .y = ::fidl::HLCPPToNatural(std::move(value.y)),
-  }};
-}
-::test::error::ExampleFooTopResponse NaturalToHLCPPTraits<::test_error::ExampleFooTopResponse>::Convert(::test_error::ExampleFooTopResponse&& value) {
-  ::test::error::ExampleFooTopResponse hlcpp;
-  hlcpp.result = ::fidl::NaturalToHLCPP(std::move(value.result()));
-  return hlcpp;
-}
-
-::test_error::ExampleFooTopResponse HLCPPToNaturalTraits<::test::error::ExampleFooTopResponse>::Convert(::test::error::ExampleFooTopResponse&& value) {
-  return ::test_error::ExampleFooTopResponse{{
-      .result = ::fidl::HLCPPToNatural(std::move(value.result)),
   }};
 }
 

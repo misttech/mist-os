@@ -49,13 +49,12 @@ pub fn get_declarations<'b>(ir: &'b FidlIr) -> Result<Vec<Decl<'b>>, Error> {
                         e.name == *ident,
                         e.is_anonymous(),
                         ir.is_type_used_for_message_body(ident),
-                        e.naming_context.iter().find(|n| *n == "result").is_some()
+                        e.name.0.ends_with("_Response")
                             && ir.name
                                 == fidl::LibraryIdentifier("fuchsia.wlan.softmac".to_string()),
                     ) {
                         (false, _, _, _) => None,
-                        (_, true, Ok(true), false) => None,
-                        (_, _, Err(err), _) => Some(Err(err)),
+                        (_, true, true, false) => None,
                         (_, _, _, _) => Some(Ok(e)),
                     }
                 })?;
@@ -81,8 +80,7 @@ pub fn get_declarations<'b>(ir: &'b FidlIr) -> Result<Vec<Decl<'b>>, Error> {
                         ir.name == fidl::LibraryIdentifier("fuchsia.wlan.softmac".to_string()),
                     ) {
                         (false, _, _, _) => None,
-                        (_, true, Ok(true), false) => None,
-                        (_, _, Err(err), _) => Some(Err(err)),
+                        (_, true, true, false) => None,
                         (_, _, _, _) => Some(Ok(e)),
                     }
                 })?;
@@ -627,30 +625,12 @@ pub fn get_out_params(
 }
 
 pub fn doesnt_use_error_syntax(m: &Method, ir: &FidlIr) -> bool {
-    ir.name == LibraryIdentifier("fuchsia.wlan.softmac".to_string())
-        || m.response_parameters(ir).unwrap().as_ref().map_or(true, |response| {
-            !response.iter().any(|param| {
-                if let Type::Identifier { ref identifier, .. } = param._type {
-                    let is_message_body = match ir.is_type_used_for_message_body(identifier) {
-                        Ok(true) => true,
-                        _ => false,
-                    };
-                    let is_anonymous_union = ir
-                        .union_declarations
-                        .iter()
-                        .find(|e| e.name == *identifier && e.is_anonymous())
-                        .is_some();
-                    let is_anonymous_struct = ir
-                        .struct_declarations
-                        .iter()
-                        .find(|e| e.name == *identifier && e.is_anonymous())
-                        .is_some();
-                    is_message_body && (is_anonymous_struct || is_anonymous_union)
-                } else {
-                    false
-                }
-            })
-        })
+    // TODO(fxbug.dev/120909): Remove softmac specific hack. It is necessary to avoid
+    // migrating a lot of wlan specific drivers.
+    if ir.name == LibraryIdentifier("fuchsia.wlan.softmac".to_string()) {
+        return true;
+    }
+    !m.has_result_union()
 }
 
 #[cfg(test)]

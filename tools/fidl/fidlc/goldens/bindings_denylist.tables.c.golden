@@ -17,8 +17,7 @@ __LOCAL extern const struct FidlCodedStruct test_bindingsdenylist_ShouldNeverApp
 __LOCAL extern const struct FidlCodedStruct test_bindingsdenylist_Allowed_Denied_ResponseTable;
 __LOCAL extern const struct FidlCodedUnion test_bindingsdenylist_Allowed_Denied_ResultTable;
 __LOCAL extern const struct FidlCodedUnion test_bindingsdenylist_Allowed_Denied_ResultNullableRefTable;
-__LOCAL extern const struct FidlCodedStruct test_bindingsdenylist_AllowedDeniedTopResponseTable;
-__LOCAL extern const struct FidlCodedStruct test_bindingsdenylist_AllowedDeniedResponseMessageTable;
+__LOCAL extern const struct FidlCodedUnion test_bindingsdenylist_AllowedDeniedResponseMessageTable;
 __LOCAL extern const struct FidlCodedUnion test_bindingsdenylist_ShouldNeverAppearInAnyBinding3Table;
 __LOCAL extern const struct FidlCodedUnion test_bindingsdenylist_ShouldNeverAppearInAnyBinding3NullableRefTable;
 __LOCAL extern const struct FidlCodedTable test_bindingsdenylist_ShouldNeverAppearInAnyBinding2Table;
@@ -37,27 +36,21 @@ __LOCAL extern const struct FidlCodedStruct test_bindingsdenylist_ImportsSameNam
 __LOCAL extern const struct FidlCodedStruct test_bindingsdenylist_DenyEachBinding_OnlyDenySyzkaller_ResponseTable;
 __LOCAL extern const struct FidlCodedUnion test_bindingsdenylist_DenyEachBinding_OnlyDenySyzkaller_ResultTable;
 __LOCAL extern const struct FidlCodedUnion test_bindingsdenylist_DenyEachBinding_OnlyDenySyzkaller_ResultNullableRefTable;
-__LOCAL extern const struct FidlCodedStruct test_bindingsdenylist_DenyEachBindingOnlyDenySyzkallerTopResponseTable;
 __LOCAL extern const struct FidlCodedStruct test_bindingsdenylist_DenyEachBinding_OnlyDenyRust_ResponseTable;
 __LOCAL extern const struct FidlCodedUnion test_bindingsdenylist_DenyEachBinding_OnlyDenyRust_ResultTable;
 __LOCAL extern const struct FidlCodedUnion test_bindingsdenylist_DenyEachBinding_OnlyDenyRust_ResultNullableRefTable;
-__LOCAL extern const struct FidlCodedStruct test_bindingsdenylist_DenyEachBindingOnlyDenyRustTopResponseTable;
 __LOCAL extern const struct FidlCodedStruct test_bindingsdenylist_DenyEachBinding_OnlyDenyLibfuzzer_ResponseTable;
 __LOCAL extern const struct FidlCodedUnion test_bindingsdenylist_DenyEachBinding_OnlyDenyLibfuzzer_ResultTable;
 __LOCAL extern const struct FidlCodedUnion test_bindingsdenylist_DenyEachBinding_OnlyDenyLibfuzzer_ResultNullableRefTable;
-__LOCAL extern const struct FidlCodedStruct test_bindingsdenylist_DenyEachBindingOnlyDenyLibfuzzerTopResponseTable;
 __LOCAL extern const struct FidlCodedStruct test_bindingsdenylist_DenyEachBinding_OnlyDenyGo_ResponseTable;
 __LOCAL extern const struct FidlCodedUnion test_bindingsdenylist_DenyEachBinding_OnlyDenyGo_ResultTable;
 __LOCAL extern const struct FidlCodedUnion test_bindingsdenylist_DenyEachBinding_OnlyDenyGo_ResultNullableRefTable;
-__LOCAL extern const struct FidlCodedStruct test_bindingsdenylist_DenyEachBindingOnlyDenyGoTopResponseTable;
 __LOCAL extern const struct FidlCodedStruct test_bindingsdenylist_DenyEachBinding_OnlyDenyDart_ResponseTable;
 __LOCAL extern const struct FidlCodedUnion test_bindingsdenylist_DenyEachBinding_OnlyDenyDart_ResultTable;
 __LOCAL extern const struct FidlCodedUnion test_bindingsdenylist_DenyEachBinding_OnlyDenyDart_ResultNullableRefTable;
-__LOCAL extern const struct FidlCodedStruct test_bindingsdenylist_DenyEachBindingOnlyDenyDartTopResponseTable;
 __LOCAL extern const struct FidlCodedStruct test_bindingsdenylist_DenyEachBinding_OnlyDenyCpp_ResponseTable;
 __LOCAL extern const struct FidlCodedUnion test_bindingsdenylist_DenyEachBinding_OnlyDenyCpp_ResultTable;
 __LOCAL extern const struct FidlCodedUnion test_bindingsdenylist_DenyEachBinding_OnlyDenyCpp_ResultNullableRefTable;
-__LOCAL extern const struct FidlCodedStruct test_bindingsdenylist_DenyEachBindingOnlyDenyCppTopResponseTable;
 __LOCAL extern const struct FidlCodedStruct test_bindingsdenylist_DenyEachBindingOnlyDenySyzkallerRequestTable;
 __LOCAL extern const struct FidlCodedStruct test_bindingsdenylist_DenyEachBindingOnlyDenyRustRequestTable;
 __LOCAL extern const struct FidlCodedStruct test_bindingsdenylist_DenyEachBindingOnlyDenyLibfuzzerRequestTable;
@@ -65,17 +58,17 @@ __LOCAL extern const struct FidlCodedStruct test_bindingsdenylist_DenyEachBindin
 __LOCAL extern const struct FidlCodedStruct test_bindingsdenylist_DenyEachBindingOnlyDenyDartRequestTable;
 __LOCAL extern const struct FidlCodedStruct test_bindingsdenylist_DenyEachBindingOnlyDenyCppRequestTable;
 __LOCAL extern const struct FidlCodedStruct test_bindingsdenylist_DenyEachBindingOnlyDenyCppRequestMessageTable;
-__LOCAL extern const struct FidlCodedStruct test_bindingsdenylist_DenyEachBindingOnlyDenyCppResponseMessageTable;
+__LOCAL extern const struct FidlCodedUnion test_bindingsdenylist_DenyEachBindingOnlyDenyCppResponseMessageTable;
 __LOCAL extern const struct FidlCodedStruct test_bindingsdenylist_DenyEachBindingOnlyDenyDartRequestMessageTable;
-__LOCAL extern const struct FidlCodedStruct test_bindingsdenylist_DenyEachBindingOnlyDenyDartResponseMessageTable;
+__LOCAL extern const struct FidlCodedUnion test_bindingsdenylist_DenyEachBindingOnlyDenyDartResponseMessageTable;
 __LOCAL extern const struct FidlCodedStruct test_bindingsdenylist_DenyEachBindingOnlyDenyGoRequestMessageTable;
-__LOCAL extern const struct FidlCodedStruct test_bindingsdenylist_DenyEachBindingOnlyDenyGoResponseMessageTable;
+__LOCAL extern const struct FidlCodedUnion test_bindingsdenylist_DenyEachBindingOnlyDenyGoResponseMessageTable;
 __LOCAL extern const struct FidlCodedStruct test_bindingsdenylist_DenyEachBindingOnlyDenyLibfuzzerRequestMessageTable;
-__LOCAL extern const struct FidlCodedStruct test_bindingsdenylist_DenyEachBindingOnlyDenyLibfuzzerResponseMessageTable;
+__LOCAL extern const struct FidlCodedUnion test_bindingsdenylist_DenyEachBindingOnlyDenyLibfuzzerResponseMessageTable;
 __LOCAL extern const struct FidlCodedStruct test_bindingsdenylist_DenyEachBindingOnlyDenyRustRequestMessageTable;
-__LOCAL extern const struct FidlCodedStruct test_bindingsdenylist_DenyEachBindingOnlyDenyRustResponseMessageTable;
+__LOCAL extern const struct FidlCodedUnion test_bindingsdenylist_DenyEachBindingOnlyDenyRustResponseMessageTable;
 __LOCAL extern const struct FidlCodedStruct test_bindingsdenylist_DenyEachBindingOnlyDenySyzkallerRequestMessageTable;
-__LOCAL extern const struct FidlCodedStruct test_bindingsdenylist_DenyEachBindingOnlyDenySyzkallerResponseMessageTable;
+__LOCAL extern const struct FidlCodedUnion test_bindingsdenylist_DenyEachBindingOnlyDenySyzkallerResponseMessageTable;
 
 
 
@@ -141,16 +134,11 @@ static const struct FidlUnionField Fields54test_bindingsdenylist_Allowed_Denied_
     /*FidlUnionField*/{.type=(fidl_type_t*)(&fidl_internal_kUint32Table)}
 };
 const struct FidlCodedUnion test_bindingsdenylist_Allowed_Denied_ResultNullableRefTable = {.tag=kFidlTypeUnion, .field_count=2u, .fields=Fields54test_bindingsdenylist_Allowed_Denied_ResultNullableRef, .nullable=kFidlNullability_Nullable, .name="test.bindingsdenylist/Allowed_Denied_Result", .strictness=kFidlStrictness_Strict, .is_resource=kFidlIsResource_NotResource};
-static const struct FidlStructElement Fields46test_bindingsdenylist_AllowedDeniedTopResponse[] = {
-    /*FidlStructPadding*/{.field=/*FidlStructField*/{.header=/*FidlStructElementHeader*/{.element_type=kFidlStructElementType_Field, .is_resource=kFidlIsResource_NotResource},.offset_v2=0u, .field_type=(fidl_type_t*)(&test_bindingsdenylist_Allowed_Denied_ResultTable)}}
+static const struct FidlUnionField Fields50test_bindingsdenylist_AllowedDeniedResponseMessage[] = {
+    /*FidlUnionField*/{.type=(fidl_type_t*)(&test_bindingsdenylist_Allowed_Denied_ResponseTable)},
+    /*FidlUnionField*/{.type=(fidl_type_t*)(&fidl_internal_kUint32Table)}
 };
-const struct FidlCodedStruct test_bindingsdenylist_AllowedDeniedTopResponseTable = {.tag=kFidlTypeStruct, .contains_envelope=kFidlContainsEnvelope_ContainsEnvelope, .is_empty=kFidlEmpty_IsNotEmpty, .elements=Fields46test_bindingsdenylist_AllowedDeniedTopResponse, .element_count=1u, .size_v2=16u, .name="test.bindingsdenylist/AllowedDeniedTopResponse"};
-
-static const struct FidlStructElement Fields50test_bindingsdenylist_AllowedDeniedResponseMessage[] = {
-    /*FidlStructPadding*/{.field=/*FidlStructField*/{.header=/*FidlStructElementHeader*/{.element_type=kFidlStructElementType_Field, .is_resource=kFidlIsResource_NotResource},.offset_v2=0u, .field_type=(fidl_type_t*)(&test_bindingsdenylist_Allowed_Denied_ResultTable)}}
-};
-const struct FidlCodedStruct test_bindingsdenylist_AllowedDeniedResponseMessageTable = {.tag=kFidlTypeStruct, .contains_envelope=kFidlContainsEnvelope_ContainsEnvelope, .is_empty=kFidlEmpty_IsNotEmpty, .elements=Fields50test_bindingsdenylist_AllowedDeniedResponseMessage, .element_count=1u, .size_v2=16u, .name="test.bindingsdenylist/AllowedDeniedResponseMessage"};
-
+const struct FidlCodedUnion test_bindingsdenylist_AllowedDeniedResponseMessageTable = {.tag=kFidlTypeUnion, .field_count=2u, .fields=Fields50test_bindingsdenylist_AllowedDeniedResponseMessage, .nullable=kFidlNullability_Nonnullable, .name="test.bindingsdenylist/AllowedDeniedResponseMessage", .strictness=kFidlStrictness_Strict, .is_resource=kFidlIsResource_NotResource};
 static const struct FidlUnionField Fields52test_bindingsdenylist_ShouldNeverAppearInAnyBinding3[] = {
     /*FidlUnionField*/{.type=(fidl_type_t*)(&fidl_internal_kBoolTable)}
 };
@@ -237,11 +225,6 @@ static const struct FidlUnionField Fields73test_bindingsdenylist_DenyEachBinding
     /*FidlUnionField*/{.type=(fidl_type_t*)(&fidl_internal_kUint32Table)}
 };
 const struct FidlCodedUnion test_bindingsdenylist_DenyEachBinding_OnlyDenySyzkaller_ResultNullableRefTable = {.tag=kFidlTypeUnion, .field_count=2u, .fields=Fields73test_bindingsdenylist_DenyEachBinding_OnlyDenySyzkaller_ResultNullableRef, .nullable=kFidlNullability_Nullable, .name="test.bindingsdenylist/DenyEachBinding_OnlyDenySyzkaller_Result", .strictness=kFidlStrictness_Strict, .is_resource=kFidlIsResource_NotResource};
-static const struct FidlStructElement Fields65test_bindingsdenylist_DenyEachBindingOnlyDenySyzkallerTopResponse[] = {
-    /*FidlStructPadding*/{.field=/*FidlStructField*/{.header=/*FidlStructElementHeader*/{.element_type=kFidlStructElementType_Field, .is_resource=kFidlIsResource_NotResource},.offset_v2=0u, .field_type=(fidl_type_t*)(&test_bindingsdenylist_DenyEachBinding_OnlyDenySyzkaller_ResultTable)}}
-};
-const struct FidlCodedStruct test_bindingsdenylist_DenyEachBindingOnlyDenySyzkallerTopResponseTable = {.tag=kFidlTypeStruct, .contains_envelope=kFidlContainsEnvelope_ContainsEnvelope, .is_empty=kFidlEmpty_IsNotEmpty, .elements=Fields65test_bindingsdenylist_DenyEachBindingOnlyDenySyzkallerTopResponse, .element_count=1u, .size_v2=16u, .name="test.bindingsdenylist/DenyEachBindingOnlyDenySyzkallerTopResponse"};
-
 const struct FidlCodedStruct test_bindingsdenylist_DenyEachBinding_OnlyDenyRust_ResponseTable = {.tag=kFidlTypeStruct, .contains_envelope=kFidlContainsEnvelope_DoesNotContainEnvelope, .is_empty=kFidlEmpty_IsNotEmpty, .elements=NULL, .element_count=0u, .size_v2=4u, .name="test.bindingsdenylist/DenyEachBinding_OnlyDenyRust_Response"};
 
 static const struct FidlUnionField Fields57test_bindingsdenylist_DenyEachBinding_OnlyDenyRust_Result[] = {
@@ -254,11 +237,6 @@ static const struct FidlUnionField Fields68test_bindingsdenylist_DenyEachBinding
     /*FidlUnionField*/{.type=(fidl_type_t*)(&fidl_internal_kUint32Table)}
 };
 const struct FidlCodedUnion test_bindingsdenylist_DenyEachBinding_OnlyDenyRust_ResultNullableRefTable = {.tag=kFidlTypeUnion, .field_count=2u, .fields=Fields68test_bindingsdenylist_DenyEachBinding_OnlyDenyRust_ResultNullableRef, .nullable=kFidlNullability_Nullable, .name="test.bindingsdenylist/DenyEachBinding_OnlyDenyRust_Result", .strictness=kFidlStrictness_Strict, .is_resource=kFidlIsResource_NotResource};
-static const struct FidlStructElement Fields60test_bindingsdenylist_DenyEachBindingOnlyDenyRustTopResponse[] = {
-    /*FidlStructPadding*/{.field=/*FidlStructField*/{.header=/*FidlStructElementHeader*/{.element_type=kFidlStructElementType_Field, .is_resource=kFidlIsResource_NotResource},.offset_v2=0u, .field_type=(fidl_type_t*)(&test_bindingsdenylist_DenyEachBinding_OnlyDenyRust_ResultTable)}}
-};
-const struct FidlCodedStruct test_bindingsdenylist_DenyEachBindingOnlyDenyRustTopResponseTable = {.tag=kFidlTypeStruct, .contains_envelope=kFidlContainsEnvelope_ContainsEnvelope, .is_empty=kFidlEmpty_IsNotEmpty, .elements=Fields60test_bindingsdenylist_DenyEachBindingOnlyDenyRustTopResponse, .element_count=1u, .size_v2=16u, .name="test.bindingsdenylist/DenyEachBindingOnlyDenyRustTopResponse"};
-
 const struct FidlCodedStruct test_bindingsdenylist_DenyEachBinding_OnlyDenyLibfuzzer_ResponseTable = {.tag=kFidlTypeStruct, .contains_envelope=kFidlContainsEnvelope_DoesNotContainEnvelope, .is_empty=kFidlEmpty_IsNotEmpty, .elements=NULL, .element_count=0u, .size_v2=4u, .name="test.bindingsdenylist/DenyEachBinding_OnlyDenyLibfuzzer_Response"};
 
 static const struct FidlUnionField Fields62test_bindingsdenylist_DenyEachBinding_OnlyDenyLibfuzzer_Result[] = {
@@ -271,11 +249,6 @@ static const struct FidlUnionField Fields73test_bindingsdenylist_DenyEachBinding
     /*FidlUnionField*/{.type=(fidl_type_t*)(&fidl_internal_kUint32Table)}
 };
 const struct FidlCodedUnion test_bindingsdenylist_DenyEachBinding_OnlyDenyLibfuzzer_ResultNullableRefTable = {.tag=kFidlTypeUnion, .field_count=2u, .fields=Fields73test_bindingsdenylist_DenyEachBinding_OnlyDenyLibfuzzer_ResultNullableRef, .nullable=kFidlNullability_Nullable, .name="test.bindingsdenylist/DenyEachBinding_OnlyDenyLibfuzzer_Result", .strictness=kFidlStrictness_Strict, .is_resource=kFidlIsResource_NotResource};
-static const struct FidlStructElement Fields65test_bindingsdenylist_DenyEachBindingOnlyDenyLibfuzzerTopResponse[] = {
-    /*FidlStructPadding*/{.field=/*FidlStructField*/{.header=/*FidlStructElementHeader*/{.element_type=kFidlStructElementType_Field, .is_resource=kFidlIsResource_NotResource},.offset_v2=0u, .field_type=(fidl_type_t*)(&test_bindingsdenylist_DenyEachBinding_OnlyDenyLibfuzzer_ResultTable)}}
-};
-const struct FidlCodedStruct test_bindingsdenylist_DenyEachBindingOnlyDenyLibfuzzerTopResponseTable = {.tag=kFidlTypeStruct, .contains_envelope=kFidlContainsEnvelope_ContainsEnvelope, .is_empty=kFidlEmpty_IsNotEmpty, .elements=Fields65test_bindingsdenylist_DenyEachBindingOnlyDenyLibfuzzerTopResponse, .element_count=1u, .size_v2=16u, .name="test.bindingsdenylist/DenyEachBindingOnlyDenyLibfuzzerTopResponse"};
-
 const struct FidlCodedStruct test_bindingsdenylist_DenyEachBinding_OnlyDenyGo_ResponseTable = {.tag=kFidlTypeStruct, .contains_envelope=kFidlContainsEnvelope_DoesNotContainEnvelope, .is_empty=kFidlEmpty_IsNotEmpty, .elements=NULL, .element_count=0u, .size_v2=4u, .name="test.bindingsdenylist/DenyEachBinding_OnlyDenyGo_Response"};
 
 static const struct FidlUnionField Fields55test_bindingsdenylist_DenyEachBinding_OnlyDenyGo_Result[] = {
@@ -288,11 +261,6 @@ static const struct FidlUnionField Fields66test_bindingsdenylist_DenyEachBinding
     /*FidlUnionField*/{.type=(fidl_type_t*)(&fidl_internal_kUint32Table)}
 };
 const struct FidlCodedUnion test_bindingsdenylist_DenyEachBinding_OnlyDenyGo_ResultNullableRefTable = {.tag=kFidlTypeUnion, .field_count=2u, .fields=Fields66test_bindingsdenylist_DenyEachBinding_OnlyDenyGo_ResultNullableRef, .nullable=kFidlNullability_Nullable, .name="test.bindingsdenylist/DenyEachBinding_OnlyDenyGo_Result", .strictness=kFidlStrictness_Strict, .is_resource=kFidlIsResource_NotResource};
-static const struct FidlStructElement Fields58test_bindingsdenylist_DenyEachBindingOnlyDenyGoTopResponse[] = {
-    /*FidlStructPadding*/{.field=/*FidlStructField*/{.header=/*FidlStructElementHeader*/{.element_type=kFidlStructElementType_Field, .is_resource=kFidlIsResource_NotResource},.offset_v2=0u, .field_type=(fidl_type_t*)(&test_bindingsdenylist_DenyEachBinding_OnlyDenyGo_ResultTable)}}
-};
-const struct FidlCodedStruct test_bindingsdenylist_DenyEachBindingOnlyDenyGoTopResponseTable = {.tag=kFidlTypeStruct, .contains_envelope=kFidlContainsEnvelope_ContainsEnvelope, .is_empty=kFidlEmpty_IsNotEmpty, .elements=Fields58test_bindingsdenylist_DenyEachBindingOnlyDenyGoTopResponse, .element_count=1u, .size_v2=16u, .name="test.bindingsdenylist/DenyEachBindingOnlyDenyGoTopResponse"};
-
 const struct FidlCodedStruct test_bindingsdenylist_DenyEachBinding_OnlyDenyDart_ResponseTable = {.tag=kFidlTypeStruct, .contains_envelope=kFidlContainsEnvelope_DoesNotContainEnvelope, .is_empty=kFidlEmpty_IsNotEmpty, .elements=NULL, .element_count=0u, .size_v2=4u, .name="test.bindingsdenylist/DenyEachBinding_OnlyDenyDart_Response"};
 
 static const struct FidlUnionField Fields57test_bindingsdenylist_DenyEachBinding_OnlyDenyDart_Result[] = {
@@ -305,11 +273,6 @@ static const struct FidlUnionField Fields68test_bindingsdenylist_DenyEachBinding
     /*FidlUnionField*/{.type=(fidl_type_t*)(&fidl_internal_kUint32Table)}
 };
 const struct FidlCodedUnion test_bindingsdenylist_DenyEachBinding_OnlyDenyDart_ResultNullableRefTable = {.tag=kFidlTypeUnion, .field_count=2u, .fields=Fields68test_bindingsdenylist_DenyEachBinding_OnlyDenyDart_ResultNullableRef, .nullable=kFidlNullability_Nullable, .name="test.bindingsdenylist/DenyEachBinding_OnlyDenyDart_Result", .strictness=kFidlStrictness_Strict, .is_resource=kFidlIsResource_NotResource};
-static const struct FidlStructElement Fields60test_bindingsdenylist_DenyEachBindingOnlyDenyDartTopResponse[] = {
-    /*FidlStructPadding*/{.field=/*FidlStructField*/{.header=/*FidlStructElementHeader*/{.element_type=kFidlStructElementType_Field, .is_resource=kFidlIsResource_NotResource},.offset_v2=0u, .field_type=(fidl_type_t*)(&test_bindingsdenylist_DenyEachBinding_OnlyDenyDart_ResultTable)}}
-};
-const struct FidlCodedStruct test_bindingsdenylist_DenyEachBindingOnlyDenyDartTopResponseTable = {.tag=kFidlTypeStruct, .contains_envelope=kFidlContainsEnvelope_ContainsEnvelope, .is_empty=kFidlEmpty_IsNotEmpty, .elements=Fields60test_bindingsdenylist_DenyEachBindingOnlyDenyDartTopResponse, .element_count=1u, .size_v2=16u, .name="test.bindingsdenylist/DenyEachBindingOnlyDenyDartTopResponse"};
-
 const struct FidlCodedStruct test_bindingsdenylist_DenyEachBinding_OnlyDenyCpp_ResponseTable = {.tag=kFidlTypeStruct, .contains_envelope=kFidlContainsEnvelope_DoesNotContainEnvelope, .is_empty=kFidlEmpty_IsNotEmpty, .elements=NULL, .element_count=0u, .size_v2=4u, .name="test.bindingsdenylist/DenyEachBinding_OnlyDenyCpp_Response"};
 
 static const struct FidlUnionField Fields56test_bindingsdenylist_DenyEachBinding_OnlyDenyCpp_Result[] = {
@@ -322,11 +285,6 @@ static const struct FidlUnionField Fields67test_bindingsdenylist_DenyEachBinding
     /*FidlUnionField*/{.type=(fidl_type_t*)(&fidl_internal_kUint32Table)}
 };
 const struct FidlCodedUnion test_bindingsdenylist_DenyEachBinding_OnlyDenyCpp_ResultNullableRefTable = {.tag=kFidlTypeUnion, .field_count=2u, .fields=Fields67test_bindingsdenylist_DenyEachBinding_OnlyDenyCpp_ResultNullableRef, .nullable=kFidlNullability_Nullable, .name="test.bindingsdenylist/DenyEachBinding_OnlyDenyCpp_Result", .strictness=kFidlStrictness_Strict, .is_resource=kFidlIsResource_NotResource};
-static const struct FidlStructElement Fields59test_bindingsdenylist_DenyEachBindingOnlyDenyCppTopResponse[] = {
-    /*FidlStructPadding*/{.field=/*FidlStructField*/{.header=/*FidlStructElementHeader*/{.element_type=kFidlStructElementType_Field, .is_resource=kFidlIsResource_NotResource},.offset_v2=0u, .field_type=(fidl_type_t*)(&test_bindingsdenylist_DenyEachBinding_OnlyDenyCpp_ResultTable)}}
-};
-const struct FidlCodedStruct test_bindingsdenylist_DenyEachBindingOnlyDenyCppTopResponseTable = {.tag=kFidlTypeStruct, .contains_envelope=kFidlContainsEnvelope_ContainsEnvelope, .is_empty=kFidlEmpty_IsNotEmpty, .elements=Fields59test_bindingsdenylist_DenyEachBindingOnlyDenyCppTopResponse, .element_count=1u, .size_v2=16u, .name="test.bindingsdenylist/DenyEachBindingOnlyDenyCppTopResponse"};
-
 static const struct FidlStructElement Fields61test_bindingsdenylist_DenyEachBindingOnlyDenySyzkallerRequest[] = {
     /*FidlStructPadding*/{.field=/*FidlStructField*/{.header=/*FidlStructElementHeader*/{.element_type=kFidlStructElementType_Field, .is_resource=kFidlIsResource_NotResource},.offset_v2=0u, .field_type=(fidl_type_t*)(&fidl_internal_kBoolTable)}}
 };
@@ -362,58 +320,58 @@ static const struct FidlStructElement Fields62test_bindingsdenylist_DenyEachBind
 };
 const struct FidlCodedStruct test_bindingsdenylist_DenyEachBindingOnlyDenyCppRequestMessageTable = {.tag=kFidlTypeStruct, .contains_envelope=kFidlContainsEnvelope_DoesNotContainEnvelope, .is_empty=kFidlEmpty_IsNotEmpty, .elements=Fields62test_bindingsdenylist_DenyEachBindingOnlyDenyCppRequestMessage, .element_count=1u, .size_v2=1u, .name="test.bindingsdenylist/DenyEachBindingOnlyDenyCppRequestMessage"};
 
-static const struct FidlStructElement Fields63test_bindingsdenylist_DenyEachBindingOnlyDenyCppResponseMessage[] = {
-    /*FidlStructPadding*/{.field=/*FidlStructField*/{.header=/*FidlStructElementHeader*/{.element_type=kFidlStructElementType_Field, .is_resource=kFidlIsResource_NotResource},.offset_v2=0u, .field_type=(fidl_type_t*)(&test_bindingsdenylist_DenyEachBinding_OnlyDenyCpp_ResultTable)}}
+static const struct FidlUnionField Fields63test_bindingsdenylist_DenyEachBindingOnlyDenyCppResponseMessage[] = {
+    /*FidlUnionField*/{.type=(fidl_type_t*)(&test_bindingsdenylist_DenyEachBinding_OnlyDenyCpp_ResponseTable)},
+    /*FidlUnionField*/{.type=(fidl_type_t*)(&fidl_internal_kUint32Table)}
 };
-const struct FidlCodedStruct test_bindingsdenylist_DenyEachBindingOnlyDenyCppResponseMessageTable = {.tag=kFidlTypeStruct, .contains_envelope=kFidlContainsEnvelope_ContainsEnvelope, .is_empty=kFidlEmpty_IsNotEmpty, .elements=Fields63test_bindingsdenylist_DenyEachBindingOnlyDenyCppResponseMessage, .element_count=1u, .size_v2=16u, .name="test.bindingsdenylist/DenyEachBindingOnlyDenyCppResponseMessage"};
-
+const struct FidlCodedUnion test_bindingsdenylist_DenyEachBindingOnlyDenyCppResponseMessageTable = {.tag=kFidlTypeUnion, .field_count=2u, .fields=Fields63test_bindingsdenylist_DenyEachBindingOnlyDenyCppResponseMessage, .nullable=kFidlNullability_Nonnullable, .name="test.bindingsdenylist/DenyEachBindingOnlyDenyCppResponseMessage", .strictness=kFidlStrictness_Strict, .is_resource=kFidlIsResource_NotResource};
 static const struct FidlStructElement Fields63test_bindingsdenylist_DenyEachBindingOnlyDenyDartRequestMessage[] = {
     /*FidlStructPadding*/{.field=/*FidlStructField*/{.header=/*FidlStructElementHeader*/{.element_type=kFidlStructElementType_Field, .is_resource=kFidlIsResource_NotResource},.offset_v2=0u, .field_type=(fidl_type_t*)(&fidl_internal_kBoolTable)}}
 };
 const struct FidlCodedStruct test_bindingsdenylist_DenyEachBindingOnlyDenyDartRequestMessageTable = {.tag=kFidlTypeStruct, .contains_envelope=kFidlContainsEnvelope_DoesNotContainEnvelope, .is_empty=kFidlEmpty_IsNotEmpty, .elements=Fields63test_bindingsdenylist_DenyEachBindingOnlyDenyDartRequestMessage, .element_count=1u, .size_v2=1u, .name="test.bindingsdenylist/DenyEachBindingOnlyDenyDartRequestMessage"};
 
-static const struct FidlStructElement Fields64test_bindingsdenylist_DenyEachBindingOnlyDenyDartResponseMessage[] = {
-    /*FidlStructPadding*/{.field=/*FidlStructField*/{.header=/*FidlStructElementHeader*/{.element_type=kFidlStructElementType_Field, .is_resource=kFidlIsResource_NotResource},.offset_v2=0u, .field_type=(fidl_type_t*)(&test_bindingsdenylist_DenyEachBinding_OnlyDenyDart_ResultTable)}}
+static const struct FidlUnionField Fields64test_bindingsdenylist_DenyEachBindingOnlyDenyDartResponseMessage[] = {
+    /*FidlUnionField*/{.type=(fidl_type_t*)(&test_bindingsdenylist_DenyEachBinding_OnlyDenyDart_ResponseTable)},
+    /*FidlUnionField*/{.type=(fidl_type_t*)(&fidl_internal_kUint32Table)}
 };
-const struct FidlCodedStruct test_bindingsdenylist_DenyEachBindingOnlyDenyDartResponseMessageTable = {.tag=kFidlTypeStruct, .contains_envelope=kFidlContainsEnvelope_ContainsEnvelope, .is_empty=kFidlEmpty_IsNotEmpty, .elements=Fields64test_bindingsdenylist_DenyEachBindingOnlyDenyDartResponseMessage, .element_count=1u, .size_v2=16u, .name="test.bindingsdenylist/DenyEachBindingOnlyDenyDartResponseMessage"};
-
+const struct FidlCodedUnion test_bindingsdenylist_DenyEachBindingOnlyDenyDartResponseMessageTable = {.tag=kFidlTypeUnion, .field_count=2u, .fields=Fields64test_bindingsdenylist_DenyEachBindingOnlyDenyDartResponseMessage, .nullable=kFidlNullability_Nonnullable, .name="test.bindingsdenylist/DenyEachBindingOnlyDenyDartResponseMessage", .strictness=kFidlStrictness_Strict, .is_resource=kFidlIsResource_NotResource};
 static const struct FidlStructElement Fields61test_bindingsdenylist_DenyEachBindingOnlyDenyGoRequestMessage[] = {
     /*FidlStructPadding*/{.field=/*FidlStructField*/{.header=/*FidlStructElementHeader*/{.element_type=kFidlStructElementType_Field, .is_resource=kFidlIsResource_NotResource},.offset_v2=0u, .field_type=(fidl_type_t*)(&fidl_internal_kBoolTable)}}
 };
 const struct FidlCodedStruct test_bindingsdenylist_DenyEachBindingOnlyDenyGoRequestMessageTable = {.tag=kFidlTypeStruct, .contains_envelope=kFidlContainsEnvelope_DoesNotContainEnvelope, .is_empty=kFidlEmpty_IsNotEmpty, .elements=Fields61test_bindingsdenylist_DenyEachBindingOnlyDenyGoRequestMessage, .element_count=1u, .size_v2=1u, .name="test.bindingsdenylist/DenyEachBindingOnlyDenyGoRequestMessage"};
 
-static const struct FidlStructElement Fields62test_bindingsdenylist_DenyEachBindingOnlyDenyGoResponseMessage[] = {
-    /*FidlStructPadding*/{.field=/*FidlStructField*/{.header=/*FidlStructElementHeader*/{.element_type=kFidlStructElementType_Field, .is_resource=kFidlIsResource_NotResource},.offset_v2=0u, .field_type=(fidl_type_t*)(&test_bindingsdenylist_DenyEachBinding_OnlyDenyGo_ResultTable)}}
+static const struct FidlUnionField Fields62test_bindingsdenylist_DenyEachBindingOnlyDenyGoResponseMessage[] = {
+    /*FidlUnionField*/{.type=(fidl_type_t*)(&test_bindingsdenylist_DenyEachBinding_OnlyDenyGo_ResponseTable)},
+    /*FidlUnionField*/{.type=(fidl_type_t*)(&fidl_internal_kUint32Table)}
 };
-const struct FidlCodedStruct test_bindingsdenylist_DenyEachBindingOnlyDenyGoResponseMessageTable = {.tag=kFidlTypeStruct, .contains_envelope=kFidlContainsEnvelope_ContainsEnvelope, .is_empty=kFidlEmpty_IsNotEmpty, .elements=Fields62test_bindingsdenylist_DenyEachBindingOnlyDenyGoResponseMessage, .element_count=1u, .size_v2=16u, .name="test.bindingsdenylist/DenyEachBindingOnlyDenyGoResponseMessage"};
-
+const struct FidlCodedUnion test_bindingsdenylist_DenyEachBindingOnlyDenyGoResponseMessageTable = {.tag=kFidlTypeUnion, .field_count=2u, .fields=Fields62test_bindingsdenylist_DenyEachBindingOnlyDenyGoResponseMessage, .nullable=kFidlNullability_Nonnullable, .name="test.bindingsdenylist/DenyEachBindingOnlyDenyGoResponseMessage", .strictness=kFidlStrictness_Strict, .is_resource=kFidlIsResource_NotResource};
 static const struct FidlStructElement Fields68test_bindingsdenylist_DenyEachBindingOnlyDenyLibfuzzerRequestMessage[] = {
     /*FidlStructPadding*/{.field=/*FidlStructField*/{.header=/*FidlStructElementHeader*/{.element_type=kFidlStructElementType_Field, .is_resource=kFidlIsResource_NotResource},.offset_v2=0u, .field_type=(fidl_type_t*)(&fidl_internal_kBoolTable)}}
 };
 const struct FidlCodedStruct test_bindingsdenylist_DenyEachBindingOnlyDenyLibfuzzerRequestMessageTable = {.tag=kFidlTypeStruct, .contains_envelope=kFidlContainsEnvelope_DoesNotContainEnvelope, .is_empty=kFidlEmpty_IsNotEmpty, .elements=Fields68test_bindingsdenylist_DenyEachBindingOnlyDenyLibfuzzerRequestMessage, .element_count=1u, .size_v2=1u, .name="test.bindingsdenylist/DenyEachBindingOnlyDenyLibfuzzerRequestMessage"};
 
-static const struct FidlStructElement Fields69test_bindingsdenylist_DenyEachBindingOnlyDenyLibfuzzerResponseMessage[] = {
-    /*FidlStructPadding*/{.field=/*FidlStructField*/{.header=/*FidlStructElementHeader*/{.element_type=kFidlStructElementType_Field, .is_resource=kFidlIsResource_NotResource},.offset_v2=0u, .field_type=(fidl_type_t*)(&test_bindingsdenylist_DenyEachBinding_OnlyDenyLibfuzzer_ResultTable)}}
+static const struct FidlUnionField Fields69test_bindingsdenylist_DenyEachBindingOnlyDenyLibfuzzerResponseMessage[] = {
+    /*FidlUnionField*/{.type=(fidl_type_t*)(&test_bindingsdenylist_DenyEachBinding_OnlyDenyLibfuzzer_ResponseTable)},
+    /*FidlUnionField*/{.type=(fidl_type_t*)(&fidl_internal_kUint32Table)}
 };
-const struct FidlCodedStruct test_bindingsdenylist_DenyEachBindingOnlyDenyLibfuzzerResponseMessageTable = {.tag=kFidlTypeStruct, .contains_envelope=kFidlContainsEnvelope_ContainsEnvelope, .is_empty=kFidlEmpty_IsNotEmpty, .elements=Fields69test_bindingsdenylist_DenyEachBindingOnlyDenyLibfuzzerResponseMessage, .element_count=1u, .size_v2=16u, .name="test.bindingsdenylist/DenyEachBindingOnlyDenyLibfuzzerResponseMessage"};
-
+const struct FidlCodedUnion test_bindingsdenylist_DenyEachBindingOnlyDenyLibfuzzerResponseMessageTable = {.tag=kFidlTypeUnion, .field_count=2u, .fields=Fields69test_bindingsdenylist_DenyEachBindingOnlyDenyLibfuzzerResponseMessage, .nullable=kFidlNullability_Nonnullable, .name="test.bindingsdenylist/DenyEachBindingOnlyDenyLibfuzzerResponseMessage", .strictness=kFidlStrictness_Strict, .is_resource=kFidlIsResource_NotResource};
 static const struct FidlStructElement Fields63test_bindingsdenylist_DenyEachBindingOnlyDenyRustRequestMessage[] = {
     /*FidlStructPadding*/{.field=/*FidlStructField*/{.header=/*FidlStructElementHeader*/{.element_type=kFidlStructElementType_Field, .is_resource=kFidlIsResource_NotResource},.offset_v2=0u, .field_type=(fidl_type_t*)(&fidl_internal_kBoolTable)}}
 };
 const struct FidlCodedStruct test_bindingsdenylist_DenyEachBindingOnlyDenyRustRequestMessageTable = {.tag=kFidlTypeStruct, .contains_envelope=kFidlContainsEnvelope_DoesNotContainEnvelope, .is_empty=kFidlEmpty_IsNotEmpty, .elements=Fields63test_bindingsdenylist_DenyEachBindingOnlyDenyRustRequestMessage, .element_count=1u, .size_v2=1u, .name="test.bindingsdenylist/DenyEachBindingOnlyDenyRustRequestMessage"};
 
-static const struct FidlStructElement Fields64test_bindingsdenylist_DenyEachBindingOnlyDenyRustResponseMessage[] = {
-    /*FidlStructPadding*/{.field=/*FidlStructField*/{.header=/*FidlStructElementHeader*/{.element_type=kFidlStructElementType_Field, .is_resource=kFidlIsResource_NotResource},.offset_v2=0u, .field_type=(fidl_type_t*)(&test_bindingsdenylist_DenyEachBinding_OnlyDenyRust_ResultTable)}}
+static const struct FidlUnionField Fields64test_bindingsdenylist_DenyEachBindingOnlyDenyRustResponseMessage[] = {
+    /*FidlUnionField*/{.type=(fidl_type_t*)(&test_bindingsdenylist_DenyEachBinding_OnlyDenyRust_ResponseTable)},
+    /*FidlUnionField*/{.type=(fidl_type_t*)(&fidl_internal_kUint32Table)}
 };
-const struct FidlCodedStruct test_bindingsdenylist_DenyEachBindingOnlyDenyRustResponseMessageTable = {.tag=kFidlTypeStruct, .contains_envelope=kFidlContainsEnvelope_ContainsEnvelope, .is_empty=kFidlEmpty_IsNotEmpty, .elements=Fields64test_bindingsdenylist_DenyEachBindingOnlyDenyRustResponseMessage, .element_count=1u, .size_v2=16u, .name="test.bindingsdenylist/DenyEachBindingOnlyDenyRustResponseMessage"};
-
+const struct FidlCodedUnion test_bindingsdenylist_DenyEachBindingOnlyDenyRustResponseMessageTable = {.tag=kFidlTypeUnion, .field_count=2u, .fields=Fields64test_bindingsdenylist_DenyEachBindingOnlyDenyRustResponseMessage, .nullable=kFidlNullability_Nonnullable, .name="test.bindingsdenylist/DenyEachBindingOnlyDenyRustResponseMessage", .strictness=kFidlStrictness_Strict, .is_resource=kFidlIsResource_NotResource};
 static const struct FidlStructElement Fields68test_bindingsdenylist_DenyEachBindingOnlyDenySyzkallerRequestMessage[] = {
     /*FidlStructPadding*/{.field=/*FidlStructField*/{.header=/*FidlStructElementHeader*/{.element_type=kFidlStructElementType_Field, .is_resource=kFidlIsResource_NotResource},.offset_v2=0u, .field_type=(fidl_type_t*)(&fidl_internal_kBoolTable)}}
 };
 const struct FidlCodedStruct test_bindingsdenylist_DenyEachBindingOnlyDenySyzkallerRequestMessageTable = {.tag=kFidlTypeStruct, .contains_envelope=kFidlContainsEnvelope_DoesNotContainEnvelope, .is_empty=kFidlEmpty_IsNotEmpty, .elements=Fields68test_bindingsdenylist_DenyEachBindingOnlyDenySyzkallerRequestMessage, .element_count=1u, .size_v2=1u, .name="test.bindingsdenylist/DenyEachBindingOnlyDenySyzkallerRequestMessage"};
 
-static const struct FidlStructElement Fields69test_bindingsdenylist_DenyEachBindingOnlyDenySyzkallerResponseMessage[] = {
-    /*FidlStructPadding*/{.field=/*FidlStructField*/{.header=/*FidlStructElementHeader*/{.element_type=kFidlStructElementType_Field, .is_resource=kFidlIsResource_NotResource},.offset_v2=0u, .field_type=(fidl_type_t*)(&test_bindingsdenylist_DenyEachBinding_OnlyDenySyzkaller_ResultTable)}}
+static const struct FidlUnionField Fields69test_bindingsdenylist_DenyEachBindingOnlyDenySyzkallerResponseMessage[] = {
+    /*FidlUnionField*/{.type=(fidl_type_t*)(&test_bindingsdenylist_DenyEachBinding_OnlyDenySyzkaller_ResponseTable)},
+    /*FidlUnionField*/{.type=(fidl_type_t*)(&fidl_internal_kUint32Table)}
 };
-const struct FidlCodedStruct test_bindingsdenylist_DenyEachBindingOnlyDenySyzkallerResponseMessageTable = {.tag=kFidlTypeStruct, .contains_envelope=kFidlContainsEnvelope_ContainsEnvelope, .is_empty=kFidlEmpty_IsNotEmpty, .elements=Fields69test_bindingsdenylist_DenyEachBindingOnlyDenySyzkallerResponseMessage, .element_count=1u, .size_v2=16u, .name="test.bindingsdenylist/DenyEachBindingOnlyDenySyzkallerResponseMessage"};
-
+const struct FidlCodedUnion test_bindingsdenylist_DenyEachBindingOnlyDenySyzkallerResponseMessageTable = {.tag=kFidlTypeUnion, .field_count=2u, .fields=Fields69test_bindingsdenylist_DenyEachBindingOnlyDenySyzkallerResponseMessage, .nullable=kFidlNullability_Nonnullable, .name="test.bindingsdenylist/DenyEachBindingOnlyDenySyzkallerResponseMessage", .strictness=kFidlStrictness_Strict, .is_resource=kFidlIsResource_NotResource};

@@ -640,7 +640,7 @@
 <table>
     <tr><th>Name</th><th>Type</th></tr>
         <tr>
-            <td><code>result</code></td>
+            <td><code>payload</code></td>
             <td>
                 <code><a class='link' href='#WithErrorSyntax_ErrorAsEnum_Result'>WithErrorSyntax_ErrorAsEnum_Result</a></code>
             </td>
@@ -662,7 +662,7 @@
 <table>
     <tr><th>Name</th><th>Type</th></tr>
         <tr>
-            <td><code>result</code></td>
+            <td><code>payload</code></td>
             <td>
                 <code><a class='link' href='#WithErrorSyntax_ErrorAsPrimitive_Result'>WithErrorSyntax_ErrorAsPrimitive_Result</a></code>
             </td>
@@ -684,7 +684,7 @@
 <table>
     <tr><th>Name</th><th>Type</th></tr>
         <tr>
-            <td><code>result</code></td>
+            <td><code>payload</code></td>
             <td>
                 <code><a class='link' href='#WithErrorSyntax_HandleInResult_Result'>WithErrorSyntax_HandleInResult_Result</a></code>
             </td>
@@ -706,7 +706,7 @@
 <table>
     <tr><th>Name</th><th>Type</th></tr>
         <tr>
-            <td><code>result</code></td>
+            <td><code>payload</code></td>
             <td>
                 <code><a class='link' href='#WithErrorSyntax_ResponseAsStruct_Result'>WithErrorSyntax_ResponseAsStruct_Result</a></code>
             </td>

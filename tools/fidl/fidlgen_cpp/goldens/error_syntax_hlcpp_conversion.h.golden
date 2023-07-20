@@ -93,16 +93,6 @@ struct HLCPPToNaturalTraits<::test::errorsyntax::ExampleUseOfErrorSyntax_CallWhi
   static inline ::test_errorsyntax::ExampleUseOfErrorSyntaxCallWhichMayFailResponse Convert(::test::errorsyntax::ExampleUseOfErrorSyntax_CallWhichMayFail_Response&&);
 };
 template <>
-struct NaturalToHLCPPTraits<::test_errorsyntax::ExampleUseOfErrorSyntaxCallWhichMayFailTopResponse> {
-  using HLCPPType = ::test::errorsyntax::ExampleUseOfErrorSyntaxCallWhichMayFailTopResponse;
-  static inline ::test::errorsyntax::ExampleUseOfErrorSyntaxCallWhichMayFailTopResponse Convert(::test_errorsyntax::ExampleUseOfErrorSyntaxCallWhichMayFailTopResponse&&);
-};
-template <>
-struct HLCPPToNaturalTraits<::test::errorsyntax::ExampleUseOfErrorSyntaxCallWhichMayFailTopResponse> {
-  using NaturalType = ::test_errorsyntax::ExampleUseOfErrorSyntaxCallWhichMayFailTopResponse;
-  static inline ::test_errorsyntax::ExampleUseOfErrorSyntaxCallWhichMayFailTopResponse Convert(::test::errorsyntax::ExampleUseOfErrorSyntaxCallWhichMayFailTopResponse&&);
-};
-template <>
 struct NaturalToHLCPPTraits<::test_errorsyntax::ExampleUseOfErrorSyntaxCallWhichMayFailResult> {
   using HLCPPType = ::test::errorsyntax::ExampleUseOfErrorSyntax_CallWhichMayFail_Result;
   static inline ::test::errorsyntax::ExampleUseOfErrorSyntax_CallWhichMayFail_Result Convert(::test_errorsyntax::ExampleUseOfErrorSyntaxCallWhichMayFailResult&&);
@@ -133,17 +123,6 @@ struct HLCPPToNaturalTraits<::test::errorsyntax::ExampleUseOfErrorSyntax_CallWhi
 ::test_errorsyntax::ExampleUseOfErrorSyntaxCallWhichMayFailResponse HLCPPToNaturalTraits<::test::errorsyntax::ExampleUseOfErrorSyntax_CallWhichMayFail_Response>::Convert(::test::errorsyntax::ExampleUseOfErrorSyntax_CallWhichMayFail_Response&& value) {
   return ::test_errorsyntax::ExampleUseOfErrorSyntaxCallWhichMayFailResponse{{
       .value = ::fidl::HLCPPToNatural(std::move(value.value)),
-  }};
-}
-::test::errorsyntax::ExampleUseOfErrorSyntaxCallWhichMayFailTopResponse NaturalToHLCPPTraits<::test_errorsyntax::ExampleUseOfErrorSyntaxCallWhichMayFailTopResponse>::Convert(::test_errorsyntax::ExampleUseOfErrorSyntaxCallWhichMayFailTopResponse&& value) {
-  ::test::errorsyntax::ExampleUseOfErrorSyntaxCallWhichMayFailTopResponse hlcpp;
-  hlcpp.result = ::fidl::NaturalToHLCPP(std::move(value.result()));
-  return hlcpp;
-}
-
-::test_errorsyntax::ExampleUseOfErrorSyntaxCallWhichMayFailTopResponse HLCPPToNaturalTraits<::test::errorsyntax::ExampleUseOfErrorSyntaxCallWhichMayFailTopResponse>::Convert(::test::errorsyntax::ExampleUseOfErrorSyntaxCallWhichMayFailTopResponse&& value) {
-  return ::test_errorsyntax::ExampleUseOfErrorSyntaxCallWhichMayFailTopResponse{{
-      .result = ::fidl::HLCPPToNatural(std::move(value.result)),
   }};
 }
 

@@ -114,17 +114,6 @@ func (msg *denyEachBindingWithCtxOnlyDenyCppRequest) Marshaler() _bindings.Marsh
 	return _mdenyEachBindingWithCtxOnlyDenyCppRequest
 }
 
-type denyEachBindingWithCtxOnlyDenyCppResponse struct {
-	_      struct{}                         `fidl:"s" fidl_size_v2:"16" fidl_alignment_v2:"8"`
-	Result DenyEachBindingOnlyDenyCppResult `fidl_offset_v2:"0"`
-}
-
-var _mdenyEachBindingWithCtxOnlyDenyCppResponse = _bindings.CreateLazyMarshaler(denyEachBindingWithCtxOnlyDenyCppResponse{})
-
-func (msg *denyEachBindingWithCtxOnlyDenyCppResponse) Marshaler() _bindings.Marshaler {
-	return _mdenyEachBindingWithCtxOnlyDenyCppResponse
-}
-
 type denyEachBindingWithCtxOnlyDenyDartRequest struct {
 	_ struct{} `fidl:"s" fidl_size_v2:"1" fidl_alignment_v2:"1"`
 	A bool     `fidl_offset_v2:"0"`
@@ -134,17 +123,6 @@ var _mdenyEachBindingWithCtxOnlyDenyDartRequest = _bindings.CreateLazyMarshaler(
 
 func (msg *denyEachBindingWithCtxOnlyDenyDartRequest) Marshaler() _bindings.Marshaler {
 	return _mdenyEachBindingWithCtxOnlyDenyDartRequest
-}
-
-type denyEachBindingWithCtxOnlyDenyDartResponse struct {
-	_      struct{}                          `fidl:"s" fidl_size_v2:"16" fidl_alignment_v2:"8"`
-	Result DenyEachBindingOnlyDenyDartResult `fidl_offset_v2:"0"`
-}
-
-var _mdenyEachBindingWithCtxOnlyDenyDartResponse = _bindings.CreateLazyMarshaler(denyEachBindingWithCtxOnlyDenyDartResponse{})
-
-func (msg *denyEachBindingWithCtxOnlyDenyDartResponse) Marshaler() _bindings.Marshaler {
-	return _mdenyEachBindingWithCtxOnlyDenyDartResponse
 }
 
 type denyEachBindingWithCtxOnlyDenyLibfuzzerRequest struct {
@@ -158,17 +136,6 @@ func (msg *denyEachBindingWithCtxOnlyDenyLibfuzzerRequest) Marshaler() _bindings
 	return _mdenyEachBindingWithCtxOnlyDenyLibfuzzerRequest
 }
 
-type denyEachBindingWithCtxOnlyDenyLibfuzzerResponse struct {
-	_      struct{}                               `fidl:"s" fidl_size_v2:"16" fidl_alignment_v2:"8"`
-	Result DenyEachBindingOnlyDenyLibfuzzerResult `fidl_offset_v2:"0"`
-}
-
-var _mdenyEachBindingWithCtxOnlyDenyLibfuzzerResponse = _bindings.CreateLazyMarshaler(denyEachBindingWithCtxOnlyDenyLibfuzzerResponse{})
-
-func (msg *denyEachBindingWithCtxOnlyDenyLibfuzzerResponse) Marshaler() _bindings.Marshaler {
-	return _mdenyEachBindingWithCtxOnlyDenyLibfuzzerResponse
-}
-
 type denyEachBindingWithCtxOnlyDenyRustRequest struct {
 	_ struct{} `fidl:"s" fidl_size_v2:"1" fidl_alignment_v2:"1"`
 	A bool     `fidl_offset_v2:"0"`
@@ -180,17 +147,6 @@ func (msg *denyEachBindingWithCtxOnlyDenyRustRequest) Marshaler() _bindings.Mars
 	return _mdenyEachBindingWithCtxOnlyDenyRustRequest
 }
 
-type denyEachBindingWithCtxOnlyDenyRustResponse struct {
-	_      struct{}                          `fidl:"s" fidl_size_v2:"16" fidl_alignment_v2:"8"`
-	Result DenyEachBindingOnlyDenyRustResult `fidl_offset_v2:"0"`
-}
-
-var _mdenyEachBindingWithCtxOnlyDenyRustResponse = _bindings.CreateLazyMarshaler(denyEachBindingWithCtxOnlyDenyRustResponse{})
-
-func (msg *denyEachBindingWithCtxOnlyDenyRustResponse) Marshaler() _bindings.Marshaler {
-	return _mdenyEachBindingWithCtxOnlyDenyRustResponse
-}
-
 type denyEachBindingWithCtxOnlyDenySyzkallerRequest struct {
 	_ struct{} `fidl:"s" fidl_size_v2:"1" fidl_alignment_v2:"1"`
 	A bool     `fidl_offset_v2:"0"`
@@ -200,17 +156,6 @@ var _mdenyEachBindingWithCtxOnlyDenySyzkallerRequest = _bindings.CreateLazyMarsh
 
 func (msg *denyEachBindingWithCtxOnlyDenySyzkallerRequest) Marshaler() _bindings.Marshaler {
 	return _mdenyEachBindingWithCtxOnlyDenySyzkallerRequest
-}
-
-type denyEachBindingWithCtxOnlyDenySyzkallerResponse struct {
-	_      struct{}                               `fidl:"s" fidl_size_v2:"16" fidl_alignment_v2:"8"`
-	Result DenyEachBindingOnlyDenySyzkallerResult `fidl_offset_v2:"0"`
-}
-
-var _mdenyEachBindingWithCtxOnlyDenySyzkallerResponse = _bindings.CreateLazyMarshaler(denyEachBindingWithCtxOnlyDenySyzkallerResponse{})
-
-func (msg *denyEachBindingWithCtxOnlyDenySyzkallerResponse) Marshaler() _bindings.Marshaler {
-	return _mdenyEachBindingWithCtxOnlyDenySyzkallerResponse
 }
 
 type I_denyEachBindingOnlyDenyCppResultTag uint64
@@ -563,37 +508,37 @@ type DenyEachBindingWithCtxInterface _bindings.ChannelProxy
 
 func (p *DenyEachBindingWithCtxInterface) OnlyDenyCpp(ctx_ _bindings.Context, a bool) (DenyEachBindingOnlyDenyCppResult, error) {
 	req_ := &denyEachBindingWithCtxOnlyDenyCppRequest{A: a}
-	resp_ := &denyEachBindingWithCtxOnlyDenyCppResponse{}
+	resp_ := &DenyEachBindingOnlyDenyCppResult{}
 	err_ := ((*_bindings.ChannelProxy)(p)).Call(DenyEachBindingOnlyDenyCppOrdinal, req_, resp_)
-	return (*resp_).Result, err_
+	return (*resp_), err_
 }
 
 func (p *DenyEachBindingWithCtxInterface) OnlyDenyDart(ctx_ _bindings.Context, a bool) (DenyEachBindingOnlyDenyDartResult, error) {
 	req_ := &denyEachBindingWithCtxOnlyDenyDartRequest{A: a}
-	resp_ := &denyEachBindingWithCtxOnlyDenyDartResponse{}
+	resp_ := &DenyEachBindingOnlyDenyDartResult{}
 	err_ := ((*_bindings.ChannelProxy)(p)).Call(DenyEachBindingOnlyDenyDartOrdinal, req_, resp_)
-	return (*resp_).Result, err_
+	return (*resp_), err_
 }
 
 func (p *DenyEachBindingWithCtxInterface) OnlyDenyLibfuzzer(ctx_ _bindings.Context, a bool) (DenyEachBindingOnlyDenyLibfuzzerResult, error) {
 	req_ := &denyEachBindingWithCtxOnlyDenyLibfuzzerRequest{A: a}
-	resp_ := &denyEachBindingWithCtxOnlyDenyLibfuzzerResponse{}
+	resp_ := &DenyEachBindingOnlyDenyLibfuzzerResult{}
 	err_ := ((*_bindings.ChannelProxy)(p)).Call(DenyEachBindingOnlyDenyLibfuzzerOrdinal, req_, resp_)
-	return (*resp_).Result, err_
+	return (*resp_), err_
 }
 
 func (p *DenyEachBindingWithCtxInterface) OnlyDenyRust(ctx_ _bindings.Context, a bool) (DenyEachBindingOnlyDenyRustResult, error) {
 	req_ := &denyEachBindingWithCtxOnlyDenyRustRequest{A: a}
-	resp_ := &denyEachBindingWithCtxOnlyDenyRustResponse{}
+	resp_ := &DenyEachBindingOnlyDenyRustResult{}
 	err_ := ((*_bindings.ChannelProxy)(p)).Call(DenyEachBindingOnlyDenyRustOrdinal, req_, resp_)
-	return (*resp_).Result, err_
+	return (*resp_), err_
 }
 
 func (p *DenyEachBindingWithCtxInterface) OnlyDenySyzkaller(ctx_ _bindings.Context, a bool) (DenyEachBindingOnlyDenySyzkallerResult, error) {
 	req_ := &denyEachBindingWithCtxOnlyDenySyzkallerRequest{A: a}
-	resp_ := &denyEachBindingWithCtxOnlyDenySyzkallerResponse{}
+	resp_ := &DenyEachBindingOnlyDenySyzkallerResult{}
 	err_ := ((*_bindings.ChannelProxy)(p)).Call(DenyEachBindingOnlyDenySyzkallerOrdinal, req_, resp_)
-	return (*resp_).Result, err_
+	return (*resp_), err_
 }
 
 type DenyEachBindingWithCtx interface {
@@ -628,8 +573,8 @@ func (s_ *DenyEachBindingWithCtxStub) Dispatch(args_ _bindings.DispatchArgs) (_b
 		if err_ := _bindings.Unmarshal(marshalerCtx, args_.Bytes, args_.HandleInfos, in_); err_ != nil {
 			return nil, false, err_
 		}
-		result, err_ := s_.Impl.OnlyDenyCpp(args_.Ctx, (*in_).A)
-		out_ := &denyEachBindingWithCtxOnlyDenyCppResponse{Result: result}
+		payload, err_ := s_.Impl.OnlyDenyCpp(args_.Ctx, (*in_).A)
+		out_ := &payload
 		return out_, true, err_
 	case DenyEachBindingOnlyDenyDartOrdinal:
 		in_ := &denyEachBindingWithCtxOnlyDenyDartRequest{}
@@ -640,8 +585,8 @@ func (s_ *DenyEachBindingWithCtxStub) Dispatch(args_ _bindings.DispatchArgs) (_b
 		if err_ := _bindings.Unmarshal(marshalerCtx, args_.Bytes, args_.HandleInfos, in_); err_ != nil {
 			return nil, false, err_
 		}
-		result, err_ := s_.Impl.OnlyDenyDart(args_.Ctx, (*in_).A)
-		out_ := &denyEachBindingWithCtxOnlyDenyDartResponse{Result: result}
+		payload, err_ := s_.Impl.OnlyDenyDart(args_.Ctx, (*in_).A)
+		out_ := &payload
 		return out_, true, err_
 	case DenyEachBindingOnlyDenyLibfuzzerOrdinal:
 		in_ := &denyEachBindingWithCtxOnlyDenyLibfuzzerRequest{}
@@ -652,8 +597,8 @@ func (s_ *DenyEachBindingWithCtxStub) Dispatch(args_ _bindings.DispatchArgs) (_b
 		if err_ := _bindings.Unmarshal(marshalerCtx, args_.Bytes, args_.HandleInfos, in_); err_ != nil {
 			return nil, false, err_
 		}
-		result, err_ := s_.Impl.OnlyDenyLibfuzzer(args_.Ctx, (*in_).A)
-		out_ := &denyEachBindingWithCtxOnlyDenyLibfuzzerResponse{Result: result}
+		payload, err_ := s_.Impl.OnlyDenyLibfuzzer(args_.Ctx, (*in_).A)
+		out_ := &payload
 		return out_, true, err_
 	case DenyEachBindingOnlyDenyRustOrdinal:
 		in_ := &denyEachBindingWithCtxOnlyDenyRustRequest{}
@@ -664,8 +609,8 @@ func (s_ *DenyEachBindingWithCtxStub) Dispatch(args_ _bindings.DispatchArgs) (_b
 		if err_ := _bindings.Unmarshal(marshalerCtx, args_.Bytes, args_.HandleInfos, in_); err_ != nil {
 			return nil, false, err_
 		}
-		result, err_ := s_.Impl.OnlyDenyRust(args_.Ctx, (*in_).A)
-		out_ := &denyEachBindingWithCtxOnlyDenyRustResponse{Result: result}
+		payload, err_ := s_.Impl.OnlyDenyRust(args_.Ctx, (*in_).A)
+		out_ := &payload
 		return out_, true, err_
 	case DenyEachBindingOnlyDenySyzkallerOrdinal:
 		in_ := &denyEachBindingWithCtxOnlyDenySyzkallerRequest{}
@@ -676,8 +621,8 @@ func (s_ *DenyEachBindingWithCtxStub) Dispatch(args_ _bindings.DispatchArgs) (_b
 		if err_ := _bindings.Unmarshal(marshalerCtx, args_.Bytes, args_.HandleInfos, in_); err_ != nil {
 			return nil, false, err_
 		}
-		result, err_ := s_.Impl.OnlyDenySyzkaller(args_.Ctx, (*in_).A)
-		out_ := &denyEachBindingWithCtxOnlyDenySyzkallerResponse{Result: result}
+		payload, err_ := s_.Impl.OnlyDenySyzkaller(args_.Ctx, (*in_).A)
+		out_ := &payload
 		return out_, true, err_
 	}
 	return nil, false, _bindings.ErrUnknownOrdinal

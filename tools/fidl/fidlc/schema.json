@@ -877,11 +877,11 @@
                 },
                 "maybe_response_payload": {
                     "$ref": "#/definitions/identifier-type",
-                    "description": "Optional response type. This is the wire form of the response, so if error syntax is used, this is a struct wrapping the result union."
+                    "description": "Optional response type. This is the wire form of the response, so if error syntax is used, this is the result union."
                 },
                 "maybe_response_result_type": {
                     "$ref": "#/definitions/type",
-                    "description": "Type of the result union (only present if has_error is true or strict is false)"
+                    "description": "(DEPRECATED: Use maybe_response_payload instead.) Type of the result union (only present if has_error is true or strict is false)"
                 },
                 "maybe_response_success_type": {
                     "$ref": "#/definitions/type",

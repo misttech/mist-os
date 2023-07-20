@@ -769,7 +769,7 @@ void fidl::internal::NaturalCompleterBase<::test_unknowninteractions::UnknownInt
   fdf::Arena _arena('FIDL');
   ::fidl::internal::OutgoingTransportContext _context =
     ::fidl::internal::OutgoingTransportContext::Create<::fidl::internal::DriverTransport>(_arena.get());
-  _encoder.EncodeBody(::test_unknowninteractions::UnknownInteractionsDriverProtocolFlexibleTwoWayTopResponse { { .result = ::test_unknowninteractions::UnknownInteractionsDriverProtocolFlexibleTwoWayResult::WithResponse({}) } });
+  _encoder.EncodeBody(::test_unknowninteractions::UnknownInteractionsDriverProtocolFlexibleTwoWayResult::WithResponse({}));
   ::fidl::OutgoingMessage _msg = _encoder.GetMessage();
   ::fidl::OutgoingMessage _arena_msg = ::fdf::internal::MoveToArena(_msg, _arena);
   SendReply(&_arena_msg, std::move(_context));

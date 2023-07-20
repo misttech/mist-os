@@ -1268,7 +1268,7 @@ func (c *compiler) compileResponse(m fidlgen.Method) Payload {
 		// Empty payload, e.g. the response of `Foo() -> ();` or `-> Foo();`.
 		return emptyPayload("fidl::encoding::EmptyPayload")
 	}
-	if m.ResultType == nil {
+	if !m.HasResultUnion() {
 		// Plain payload with no flexible/error result union.
 		return c.payloadForType(c.compileType(*m.ResponsePayload))
 	}
@@ -1305,7 +1305,7 @@ func (c *compiler) compileResponse(m fidlgen.Method) Payload {
 		p.ConvertToFields = inner.ConvertToFields
 	} else {
 		paramName := "result"
-		p.TupleType = c.compileCamelCompoundIdentifier(m.ResultType.Identifier)
+		p.TupleType = c.compileCamelCompoundIdentifier(m.ResponsePayload.Identifier)
 		p.TupleTypeAliasRhs = fmt.Sprintf("Result<%s, %s>", inner.TupleType, errType.Owned)
 		okParamType := "()"
 		if len(inner.Parameters) > 0 {

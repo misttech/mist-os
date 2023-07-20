@@ -168,7 +168,7 @@
           "has_response": true,
           "maybe_response_payload": {
             "kind": "identifier",
-            "identifier": "test.protocollayoutssamelibrary/ComposedProtocolTwoWayAnonComposedWithErrorTopResponse",
+            "identifier": "test.protocollayoutssamelibrary/ComposedProtocol_TwoWayAnonComposedWithError_Result",
             "nullable": false,
             "type_shape_v1": {
               "inline_size": 24,
@@ -322,7 +322,7 @@
           "has_response": true,
           "maybe_response_payload": {
             "kind": "identifier",
-            "identifier": "test.protocollayoutssamelibrary/ComposedProtocolOnAnonComposedWithErrorRequest",
+            "identifier": "test.protocollayoutssamelibrary/ComposedProtocol_OnAnonComposedWithError_Result",
             "nullable": false,
             "type_shape_v1": {
               "inline_size": 24,
@@ -566,7 +566,7 @@
           "has_response": true,
           "maybe_response_payload": {
             "kind": "identifier",
-            "identifier": "test.protocollayoutssamelibrary/ComposedProtocolTwoWayNamedComposedWithErrorTopResponse",
+            "identifier": "test.protocollayoutssamelibrary/ComposedProtocol_TwoWayNamedComposedWithError_Result",
             "nullable": false,
             "type_shape_v1": {
               "inline_size": 24,
@@ -720,7 +720,7 @@
           "has_response": true,
           "maybe_response_payload": {
             "kind": "identifier",
-            "identifier": "test.protocollayoutssamelibrary/ComposedProtocolOnNamedComposedWithErrorRequest",
+            "identifier": "test.protocollayoutssamelibrary/ComposedProtocol_OnNamedComposedWithError_Result",
             "nullable": false,
             "type_shape_v1": {
               "inline_size": 24,
@@ -987,7 +987,7 @@
           "has_response": true,
           "maybe_response_payload": {
             "kind": "identifier",
-            "identifier": "test.protocollayoutssamelibrary/ComposedProtocolTwoWayAnonComposedWithErrorTopResponse",
+            "identifier": "test.protocollayoutssamelibrary/ComposedProtocol_TwoWayAnonComposedWithError_Result",
             "nullable": false,
             "type_shape_v1": {
               "inline_size": 24,
@@ -1141,7 +1141,7 @@
           "has_response": true,
           "maybe_response_payload": {
             "kind": "identifier",
-            "identifier": "test.protocollayoutssamelibrary/ComposedProtocolOnAnonComposedWithErrorRequest",
+            "identifier": "test.protocollayoutssamelibrary/ComposedProtocol_OnAnonComposedWithError_Result",
             "nullable": false,
             "type_shape_v1": {
               "inline_size": 24,
@@ -1385,7 +1385,7 @@
           "has_response": true,
           "maybe_response_payload": {
             "kind": "identifier",
-            "identifier": "test.protocollayoutssamelibrary/ComposedProtocolTwoWayNamedComposedWithErrorTopResponse",
+            "identifier": "test.protocollayoutssamelibrary/ComposedProtocol_TwoWayNamedComposedWithError_Result",
             "nullable": false,
             "type_shape_v1": {
               "inline_size": 24,
@@ -1539,7 +1539,7 @@
           "has_response": true,
           "maybe_response_payload": {
             "kind": "identifier",
-            "identifier": "test.protocollayoutssamelibrary/ComposedProtocolOnNamedComposedWithErrorRequest",
+            "identifier": "test.protocollayoutssamelibrary/ComposedProtocol_OnNamedComposedWithError_Result",
             "nullable": false,
             "type_shape_v1": {
               "inline_size": 24,
@@ -1783,7 +1783,7 @@
           "has_response": true,
           "maybe_response_payload": {
             "kind": "identifier",
-            "identifier": "test.protocollayoutssamelibrary/MainProtocolTwoWayLocalWithErrorTopResponse",
+            "identifier": "test.protocollayoutssamelibrary/MainProtocol_TwoWayLocalWithError_Result",
             "nullable": false,
             "type_shape_v1": {
               "inline_size": 24,
@@ -1937,7 +1937,7 @@
           "has_response": true,
           "maybe_response_payload": {
             "kind": "identifier",
-            "identifier": "test.protocollayoutssamelibrary/MainProtocolOnLocalWithErrorRequest",
+            "identifier": "test.protocollayoutssamelibrary/MainProtocol_OnLocalWithError_Result",
             "nullable": false,
             "type_shape_v1": {
               "inline_size": 24,
@@ -2181,7 +2181,7 @@
           "has_response": true,
           "maybe_response_payload": {
             "kind": "identifier",
-            "identifier": "test.protocollayoutssamelibrary/MainProtocolTwoWayAnonWithErrorTopResponse",
+            "identifier": "test.protocollayoutssamelibrary/MainProtocol_TwoWayAnonWithError_Result",
             "nullable": false,
             "type_shape_v1": {
               "inline_size": 24,
@@ -2335,7 +2335,7 @@
           "has_response": true,
           "maybe_response_payload": {
             "kind": "identifier",
-            "identifier": "test.protocollayoutssamelibrary/MainProtocolOnAnonWithErrorRequest",
+            "identifier": "test.protocollayoutssamelibrary/MainProtocol_OnAnonWithError_Result",
             "nullable": false,
             "type_shape_v1": {
               "inline_size": 24,
@@ -2439,640 +2439,7 @@
     }
   ],
   "service_declarations": [],
-  "struct_declarations": [
-    {
-      "name": "test.protocollayoutssamelibrary/ComposedProtocolOnAnonComposedWithErrorRequest",
-      "naming_context": [
-        "ComposedProtocol",
-        "OnAnonComposedWithError",
-        "Request"
-      ],
-      "location": {
-        "filename": "../../tools/fidl/fidlc/testdata/protocol_layouts_same_library/example.test.fidl",
-        "line": 28,
-        "column": 38,
-        "length": 36
-      },
-      "members": [
-        {
-          "type": {
-            "kind": "identifier",
-            "identifier": "test.protocollayoutssamelibrary/ComposedProtocol_OnAnonComposedWithError_Result",
-            "nullable": false,
-            "type_shape_v1": {
-              "inline_size": 24,
-              "alignment": 8,
-              "depth": 3,
-              "max_handles": 0,
-              "max_out_of_line": 40,
-              "has_padding": true,
-              "has_envelope": true,
-              "has_flexible_envelope": true
-            },
-            "type_shape_v2": {
-              "inline_size": 16,
-              "alignment": 8,
-              "depth": 3,
-              "max_handles": 0,
-              "max_out_of_line": 24,
-              "has_padding": true,
-              "has_envelope": true,
-              "has_flexible_envelope": true
-            }
-          },
-          "name": "result",
-          "location": {
-            "filename": "generated",
-            "line": 6,
-            "column": 1,
-            "length": 6
-          },
-          "field_shape_v1": {
-            "offset": 0,
-            "padding": 0
-          },
-          "field_shape_v2": {
-            "offset": 0,
-            "padding": 0
-          }
-        }
-      ],
-      "resource": false,
-      "type_shape_v1": {
-        "inline_size": 24,
-        "alignment": 8,
-        "depth": 3,
-        "max_handles": 0,
-        "max_out_of_line": 40,
-        "has_padding": true,
-        "has_envelope": true,
-        "has_flexible_envelope": true
-      },
-      "type_shape_v2": {
-        "inline_size": 16,
-        "alignment": 8,
-        "depth": 3,
-        "max_handles": 0,
-        "max_out_of_line": 24,
-        "has_padding": true,
-        "has_envelope": true,
-        "has_flexible_envelope": true
-      }
-    },
-    {
-      "name": "test.protocollayoutssamelibrary/ComposedProtocolOnNamedComposedWithErrorRequest",
-      "naming_context": [
-        "ComposedProtocol",
-        "OnNamedComposedWithError",
-        "Request"
-      ],
-      "location": {
-        "filename": "../../tools/fidl/fidlc/testdata/protocol_layouts_same_library/example.test.fidl",
-        "line": 36,
-        "column": 39,
-        "length": 14
-      },
-      "members": [
-        {
-          "type": {
-            "kind": "identifier",
-            "identifier": "test.protocollayoutssamelibrary/ComposedProtocol_OnNamedComposedWithError_Result",
-            "nullable": false,
-            "type_shape_v1": {
-              "inline_size": 24,
-              "alignment": 8,
-              "depth": 3,
-              "max_handles": 0,
-              "max_out_of_line": 40,
-              "has_padding": true,
-              "has_envelope": true,
-              "has_flexible_envelope": true
-            },
-            "type_shape_v2": {
-              "inline_size": 16,
-              "alignment": 8,
-              "depth": 3,
-              "max_handles": 0,
-              "max_out_of_line": 24,
-              "has_padding": true,
-              "has_envelope": true,
-              "has_flexible_envelope": true
-            }
-          },
-          "name": "result",
-          "location": {
-            "filename": "generated",
-            "line": 16,
-            "column": 1,
-            "length": 6
-          },
-          "field_shape_v1": {
-            "offset": 0,
-            "padding": 0
-          },
-          "field_shape_v2": {
-            "offset": 0,
-            "padding": 0
-          }
-        }
-      ],
-      "resource": false,
-      "type_shape_v1": {
-        "inline_size": 24,
-        "alignment": 8,
-        "depth": 3,
-        "max_handles": 0,
-        "max_out_of_line": 40,
-        "has_padding": true,
-        "has_envelope": true,
-        "has_flexible_envelope": true
-      },
-      "type_shape_v2": {
-        "inline_size": 16,
-        "alignment": 8,
-        "depth": 3,
-        "max_handles": 0,
-        "max_out_of_line": 24,
-        "has_padding": true,
-        "has_envelope": true,
-        "has_flexible_envelope": true
-      }
-    },
-    {
-      "name": "test.protocollayoutssamelibrary/ComposedProtocolTwoWayAnonComposedWithErrorTopResponse",
-      "naming_context": [
-        "ComposedProtocol",
-        "TwoWayAnonComposedWithError",
-        "Response"
-      ],
-      "location": {
-        "filename": "../../tools/fidl/fidlc/testdata/protocol_layouts_same_library/example.test.fidl",
-        "line": 22,
-        "column": 11,
-        "length": 41
-      },
-      "members": [
-        {
-          "type": {
-            "kind": "identifier",
-            "identifier": "test.protocollayoutssamelibrary/ComposedProtocol_TwoWayAnonComposedWithError_Result",
-            "nullable": false,
-            "type_shape_v1": {
-              "inline_size": 24,
-              "alignment": 8,
-              "depth": 2,
-              "max_handles": 0,
-              "max_out_of_line": 32,
-              "has_padding": true,
-              "has_envelope": true,
-              "has_flexible_envelope": false
-            },
-            "type_shape_v2": {
-              "inline_size": 16,
-              "alignment": 8,
-              "depth": 2,
-              "max_handles": 0,
-              "max_out_of_line": 16,
-              "has_padding": true,
-              "has_envelope": true,
-              "has_flexible_envelope": false
-            }
-          },
-          "name": "result",
-          "location": {
-            "filename": "generated",
-            "line": 1,
-            "column": 1,
-            "length": 6
-          },
-          "field_shape_v1": {
-            "offset": 0,
-            "padding": 0
-          },
-          "field_shape_v2": {
-            "offset": 0,
-            "padding": 0
-          }
-        }
-      ],
-      "resource": false,
-      "type_shape_v1": {
-        "inline_size": 24,
-        "alignment": 8,
-        "depth": 2,
-        "max_handles": 0,
-        "max_out_of_line": 32,
-        "has_padding": true,
-        "has_envelope": true,
-        "has_flexible_envelope": false
-      },
-      "type_shape_v2": {
-        "inline_size": 16,
-        "alignment": 8,
-        "depth": 2,
-        "max_handles": 0,
-        "max_out_of_line": 16,
-        "has_padding": true,
-        "has_envelope": true,
-        "has_flexible_envelope": false
-      }
-    },
-    {
-      "name": "test.protocollayoutssamelibrary/ComposedProtocolTwoWayNamedComposedWithErrorTopResponse",
-      "naming_context": [
-        "ComposedProtocol",
-        "TwoWayNamedComposedWithError",
-        "Response"
-      ],
-      "location": {
-        "filename": "../../tools/fidl/fidlc/testdata/protocol_layouts_same_library/example.test.fidl",
-        "line": 34,
-        "column": 58,
-        "length": 14
-      },
-      "members": [
-        {
-          "type": {
-            "kind": "identifier",
-            "identifier": "test.protocollayoutssamelibrary/ComposedProtocol_TwoWayNamedComposedWithError_Result",
-            "nullable": false,
-            "type_shape_v1": {
-              "inline_size": 24,
-              "alignment": 8,
-              "depth": 2,
-              "max_handles": 0,
-              "max_out_of_line": 32,
-              "has_padding": true,
-              "has_envelope": true,
-              "has_flexible_envelope": false
-            },
-            "type_shape_v2": {
-              "inline_size": 16,
-              "alignment": 8,
-              "depth": 2,
-              "max_handles": 0,
-              "max_out_of_line": 16,
-              "has_padding": true,
-              "has_envelope": true,
-              "has_flexible_envelope": false
-            }
-          },
-          "name": "result",
-          "location": {
-            "filename": "generated",
-            "line": 11,
-            "column": 1,
-            "length": 6
-          },
-          "field_shape_v1": {
-            "offset": 0,
-            "padding": 0
-          },
-          "field_shape_v2": {
-            "offset": 0,
-            "padding": 0
-          }
-        }
-      ],
-      "resource": false,
-      "type_shape_v1": {
-        "inline_size": 24,
-        "alignment": 8,
-        "depth": 2,
-        "max_handles": 0,
-        "max_out_of_line": 32,
-        "has_padding": true,
-        "has_envelope": true,
-        "has_flexible_envelope": false
-      },
-      "type_shape_v2": {
-        "inline_size": 16,
-        "alignment": 8,
-        "depth": 2,
-        "max_handles": 0,
-        "max_out_of_line": 16,
-        "has_padding": true,
-        "has_envelope": true,
-        "has_flexible_envelope": false
-      }
-    },
-    {
-      "name": "test.protocollayoutssamelibrary/MainProtocolOnAnonWithErrorRequest",
-      "naming_context": [
-        "MainProtocol",
-        "OnAnonWithError",
-        "Request"
-      ],
-      "location": {
-        "filename": "../../tools/fidl/fidlc/testdata/protocol_layouts_same_library/example.test.fidl",
-        "line": 68,
-        "column": 30,
-        "length": 36
-      },
-      "members": [
-        {
-          "type": {
-            "kind": "identifier",
-            "identifier": "test.protocollayoutssamelibrary/MainProtocol_OnAnonWithError_Result",
-            "nullable": false,
-            "type_shape_v1": {
-              "inline_size": 24,
-              "alignment": 8,
-              "depth": 3,
-              "max_handles": 0,
-              "max_out_of_line": 40,
-              "has_padding": true,
-              "has_envelope": true,
-              "has_flexible_envelope": true
-            },
-            "type_shape_v2": {
-              "inline_size": 16,
-              "alignment": 8,
-              "depth": 3,
-              "max_handles": 0,
-              "max_out_of_line": 24,
-              "has_padding": true,
-              "has_envelope": true,
-              "has_flexible_envelope": true
-            }
-          },
-          "name": "result",
-          "location": {
-            "filename": "generated",
-            "line": 36,
-            "column": 1,
-            "length": 6
-          },
-          "field_shape_v1": {
-            "offset": 0,
-            "padding": 0
-          },
-          "field_shape_v2": {
-            "offset": 0,
-            "padding": 0
-          }
-        }
-      ],
-      "resource": false,
-      "type_shape_v1": {
-        "inline_size": 24,
-        "alignment": 8,
-        "depth": 3,
-        "max_handles": 0,
-        "max_out_of_line": 40,
-        "has_padding": true,
-        "has_envelope": true,
-        "has_flexible_envelope": true
-      },
-      "type_shape_v2": {
-        "inline_size": 16,
-        "alignment": 8,
-        "depth": 3,
-        "max_handles": 0,
-        "max_out_of_line": 24,
-        "has_padding": true,
-        "has_envelope": true,
-        "has_flexible_envelope": true
-      }
-    },
-    {
-      "name": "test.protocollayoutssamelibrary/MainProtocolOnLocalWithErrorRequest",
-      "naming_context": [
-        "MainProtocol",
-        "OnLocalWithError",
-        "Request"
-      ],
-      "location": {
-        "filename": "../../tools/fidl/fidlc/testdata/protocol_layouts_same_library/example.test.fidl",
-        "line": 49,
-        "column": 31,
-        "length": 14
-      },
-      "members": [
-        {
-          "type": {
-            "kind": "identifier",
-            "identifier": "test.protocollayoutssamelibrary/MainProtocol_OnLocalWithError_Result",
-            "nullable": false,
-            "type_shape_v1": {
-              "inline_size": 24,
-              "alignment": 8,
-              "depth": 3,
-              "max_handles": 0,
-              "max_out_of_line": 40,
-              "has_padding": true,
-              "has_envelope": true,
-              "has_flexible_envelope": true
-            },
-            "type_shape_v2": {
-              "inline_size": 16,
-              "alignment": 8,
-              "depth": 3,
-              "max_handles": 0,
-              "max_out_of_line": 24,
-              "has_padding": true,
-              "has_envelope": true,
-              "has_flexible_envelope": true
-            }
-          },
-          "name": "result",
-          "location": {
-            "filename": "generated",
-            "line": 26,
-            "column": 1,
-            "length": 6
-          },
-          "field_shape_v1": {
-            "offset": 0,
-            "padding": 0
-          },
-          "field_shape_v2": {
-            "offset": 0,
-            "padding": 0
-          }
-        }
-      ],
-      "resource": false,
-      "type_shape_v1": {
-        "inline_size": 24,
-        "alignment": 8,
-        "depth": 3,
-        "max_handles": 0,
-        "max_out_of_line": 40,
-        "has_padding": true,
-        "has_envelope": true,
-        "has_flexible_envelope": true
-      },
-      "type_shape_v2": {
-        "inline_size": 16,
-        "alignment": 8,
-        "depth": 3,
-        "max_handles": 0,
-        "max_out_of_line": 24,
-        "has_padding": true,
-        "has_envelope": true,
-        "has_flexible_envelope": true
-      }
-    },
-    {
-      "name": "test.protocollayoutssamelibrary/MainProtocolTwoWayAnonWithErrorTopResponse",
-      "naming_context": [
-        "MainProtocol",
-        "TwoWayAnonWithError",
-        "Response"
-      ],
-      "location": {
-        "filename": "../../tools/fidl/fidlc/testdata/protocol_layouts_same_library/example.test.fidl",
-        "line": 62,
-        "column": 11,
-        "length": 43
-      },
-      "members": [
-        {
-          "type": {
-            "kind": "identifier",
-            "identifier": "test.protocollayoutssamelibrary/MainProtocol_TwoWayAnonWithError_Result",
-            "nullable": false,
-            "type_shape_v1": {
-              "inline_size": 24,
-              "alignment": 8,
-              "depth": 2,
-              "max_handles": 0,
-              "max_out_of_line": 32,
-              "has_padding": true,
-              "has_envelope": true,
-              "has_flexible_envelope": true
-            },
-            "type_shape_v2": {
-              "inline_size": 16,
-              "alignment": 8,
-              "depth": 2,
-              "max_handles": 0,
-              "max_out_of_line": 16,
-              "has_padding": true,
-              "has_envelope": true,
-              "has_flexible_envelope": true
-            }
-          },
-          "name": "result",
-          "location": {
-            "filename": "generated",
-            "line": 31,
-            "column": 1,
-            "length": 6
-          },
-          "field_shape_v1": {
-            "offset": 0,
-            "padding": 0
-          },
-          "field_shape_v2": {
-            "offset": 0,
-            "padding": 0
-          }
-        }
-      ],
-      "resource": false,
-      "type_shape_v1": {
-        "inline_size": 24,
-        "alignment": 8,
-        "depth": 2,
-        "max_handles": 0,
-        "max_out_of_line": 32,
-        "has_padding": true,
-        "has_envelope": true,
-        "has_flexible_envelope": true
-      },
-      "type_shape_v2": {
-        "inline_size": 16,
-        "alignment": 8,
-        "depth": 2,
-        "max_handles": 0,
-        "max_out_of_line": 16,
-        "has_padding": true,
-        "has_envelope": true,
-        "has_flexible_envelope": true
-      }
-    },
-    {
-      "name": "test.protocollayoutssamelibrary/MainProtocolTwoWayLocalWithErrorTopResponse",
-      "naming_context": [
-        "MainProtocol",
-        "TwoWayLocalWithError",
-        "Response"
-      ],
-      "location": {
-        "filename": "../../tools/fidl/fidlc/testdata/protocol_layouts_same_library/example.test.fidl",
-        "line": 47,
-        "column": 50,
-        "length": 14
-      },
-      "members": [
-        {
-          "type": {
-            "kind": "identifier",
-            "identifier": "test.protocollayoutssamelibrary/MainProtocol_TwoWayLocalWithError_Result",
-            "nullable": false,
-            "type_shape_v1": {
-              "inline_size": 24,
-              "alignment": 8,
-              "depth": 2,
-              "max_handles": 0,
-              "max_out_of_line": 32,
-              "has_padding": true,
-              "has_envelope": true,
-              "has_flexible_envelope": false
-            },
-            "type_shape_v2": {
-              "inline_size": 16,
-              "alignment": 8,
-              "depth": 2,
-              "max_handles": 0,
-              "max_out_of_line": 16,
-              "has_padding": true,
-              "has_envelope": true,
-              "has_flexible_envelope": false
-            }
-          },
-          "name": "result",
-          "location": {
-            "filename": "generated",
-            "line": 21,
-            "column": 1,
-            "length": 6
-          },
-          "field_shape_v1": {
-            "offset": 0,
-            "padding": 0
-          },
-          "field_shape_v2": {
-            "offset": 0,
-            "padding": 0
-          }
-        }
-      ],
-      "resource": false,
-      "type_shape_v1": {
-        "inline_size": 24,
-        "alignment": 8,
-        "depth": 2,
-        "max_handles": 0,
-        "max_out_of_line": 32,
-        "has_padding": true,
-        "has_envelope": true,
-        "has_flexible_envelope": false
-      },
-      "type_shape_v2": {
-        "inline_size": 16,
-        "alignment": 8,
-        "depth": 2,
-        "max_handles": 0,
-        "max_out_of_line": 16,
-        "has_padding": true,
-        "has_envelope": true,
-        "has_flexible_envelope": false
-      }
-    }
-  ],
+  "struct_declarations": [],
   "external_struct_declarations": [],
   "table_declarations": [
     {
@@ -3300,7 +2667,6 @@
         "ComposedProtocol",
         "OnAnonComposedWithError",
         "Request",
-        "result",
         "response"
       ],
       "location": {
@@ -3594,7 +2960,6 @@
         "MainProtocol",
         "OnAnonWithError",
         "Request",
-        "result",
         "response"
       ],
       "location": {
@@ -3887,8 +3252,7 @@
       "naming_context": [
         "ComposedProtocol",
         "OnAnonComposedWithError",
-        "Request",
-        "result"
+        "Request"
       ],
       "location": {
         "filename": "../../tools/fidl/fidlc/testdata/protocol_layouts_same_library/example.test.fidl",
@@ -3934,7 +3298,7 @@
           },
           "location": {
             "filename": "generated",
-            "line": 7,
+            "line": 5,
             "column": 1,
             "length": 8
           }
@@ -3969,7 +3333,7 @@
           },
           "location": {
             "filename": "generated",
-            "line": 8,
+            "line": 6,
             "column": 1,
             "length": 3
           }
@@ -4003,8 +3367,7 @@
       "naming_context": [
         "ComposedProtocol",
         "OnNamedComposedWithError",
-        "Request",
-        "result"
+        "Request"
       ],
       "location": {
         "filename": "../../tools/fidl/fidlc/testdata/protocol_layouts_same_library/example.test.fidl",
@@ -4050,7 +3413,7 @@
           },
           "location": {
             "filename": "generated",
-            "line": 17,
+            "line": 13,
             "column": 1,
             "length": 8
           }
@@ -4085,7 +3448,7 @@
           },
           "location": {
             "filename": "generated",
-            "line": 18,
+            "line": 14,
             "column": 1,
             "length": 3
           }
@@ -4120,7 +3483,6 @@
         "ComposedProtocol",
         "TwoWayAnonComposedWithError",
         "Response",
-        "result",
         "response"
       ],
       "location": {
@@ -4194,8 +3556,7 @@
       "naming_context": [
         "ComposedProtocol",
         "TwoWayAnonComposedWithError",
-        "Response",
-        "result"
+        "Response"
       ],
       "location": {
         "filename": "../../tools/fidl/fidlc/testdata/protocol_layouts_same_library/example.test.fidl",
@@ -4241,7 +3602,7 @@
           },
           "location": {
             "filename": "generated",
-            "line": 2,
+            "line": 1,
             "column": 1,
             "length": 8
           }
@@ -4276,7 +3637,7 @@
           },
           "location": {
             "filename": "generated",
-            "line": 3,
+            "line": 2,
             "column": 1,
             "length": 3
           }
@@ -4310,8 +3671,7 @@
       "naming_context": [
         "ComposedProtocol",
         "TwoWayNamedComposedWithError",
-        "Response",
-        "result"
+        "Response"
       ],
       "location": {
         "filename": "../../tools/fidl/fidlc/testdata/protocol_layouts_same_library/example.test.fidl",
@@ -4357,7 +3717,7 @@
           },
           "location": {
             "filename": "generated",
-            "line": 12,
+            "line": 9,
             "column": 1,
             "length": 8
           }
@@ -4392,7 +3752,7 @@
           },
           "location": {
             "filename": "generated",
-            "line": 13,
+            "line": 10,
             "column": 1,
             "length": 3
           }
@@ -4572,8 +3932,7 @@
       "naming_context": [
         "MainProtocol",
         "OnAnonWithError",
-        "Request",
-        "result"
+        "Request"
       ],
       "location": {
         "filename": "../../tools/fidl/fidlc/testdata/protocol_layouts_same_library/example.test.fidl",
@@ -4619,7 +3978,7 @@
           },
           "location": {
             "filename": "generated",
-            "line": 37,
+            "line": 29,
             "column": 1,
             "length": 8
           }
@@ -4654,7 +4013,7 @@
           },
           "location": {
             "filename": "generated",
-            "line": 38,
+            "line": 30,
             "column": 1,
             "length": 3
           }
@@ -4688,8 +4047,7 @@
       "naming_context": [
         "MainProtocol",
         "OnLocalWithError",
-        "Request",
-        "result"
+        "Request"
       ],
       "location": {
         "filename": "../../tools/fidl/fidlc/testdata/protocol_layouts_same_library/example.test.fidl",
@@ -4735,7 +4093,7 @@
           },
           "location": {
             "filename": "generated",
-            "line": 27,
+            "line": 21,
             "column": 1,
             "length": 8
           }
@@ -4770,7 +4128,7 @@
           },
           "location": {
             "filename": "generated",
-            "line": 28,
+            "line": 22,
             "column": 1,
             "length": 3
           }
@@ -4805,7 +4163,6 @@
         "MainProtocol",
         "TwoWayAnonWithError",
         "Response",
-        "result",
         "response"
       ],
       "location": {
@@ -4879,8 +4236,7 @@
       "naming_context": [
         "MainProtocol",
         "TwoWayAnonWithError",
-        "Response",
-        "result"
+        "Response"
       ],
       "location": {
         "filename": "../../tools/fidl/fidlc/testdata/protocol_layouts_same_library/example.test.fidl",
@@ -4926,7 +4282,7 @@
           },
           "location": {
             "filename": "generated",
-            "line": 32,
+            "line": 25,
             "column": 1,
             "length": 8
           }
@@ -4961,7 +4317,7 @@
           },
           "location": {
             "filename": "generated",
-            "line": 33,
+            "line": 26,
             "column": 1,
             "length": 3
           }
@@ -4995,8 +4351,7 @@
       "naming_context": [
         "MainProtocol",
         "TwoWayLocalWithError",
-        "Response",
-        "result"
+        "Response"
       ],
       "location": {
         "filename": "../../tools/fidl/fidlc/testdata/protocol_layouts_same_library/example.test.fidl",
@@ -5042,7 +4397,7 @@
           },
           "location": {
             "filename": "generated",
-            "line": 22,
+            "line": 17,
             "column": 1,
             "length": 8
           }
@@ -5077,7 +4432,7 @@
           },
           "location": {
             "filename": "generated",
-            "line": 23,
+            "line": 18,
             "column": 1,
             "length": 3
           }
@@ -5183,20 +4538,14 @@
   "declaration_order": [
     "test.protocollayoutssamelibrary/UnionPayload",
     "test.protocollayoutssamelibrary/MainProtocol_TwoWayLocalWithError_Result",
-    "test.protocollayoutssamelibrary/MainProtocolTwoWayLocalWithErrorTopResponse",
     "test.protocollayoutssamelibrary/ComposedProtocol_TwoWayNamedComposedWithError_Result",
-    "test.protocollayoutssamelibrary/ComposedProtocolTwoWayNamedComposedWithErrorTopResponse",
     "test.protocollayoutssamelibrary/TablePayload",
     "test.protocollayoutssamelibrary/MainProtocol_OnLocalWithError_Result",
-    "test.protocollayoutssamelibrary/MainProtocolOnLocalWithErrorRequest",
     "test.protocollayoutssamelibrary/ComposedProtocol_OnNamedComposedWithError_Result",
-    "test.protocollayoutssamelibrary/ComposedProtocolOnNamedComposedWithErrorRequest",
     "test.protocollayoutssamelibrary/MainProtocol_TwoWayAnonWithError_Response",
     "test.protocollayoutssamelibrary/MainProtocol_TwoWayAnonWithError_Result",
-    "test.protocollayoutssamelibrary/MainProtocolTwoWayAnonWithErrorTopResponse",
     "test.protocollayoutssamelibrary/MainProtocol_OnAnonWithError_Response",
     "test.protocollayoutssamelibrary/MainProtocol_OnAnonWithError_Result",
-    "test.protocollayoutssamelibrary/MainProtocolOnAnonWithErrorRequest",
     "test.protocollayoutssamelibrary/MainProtocolTwoWayAnonWithErrorRequest",
     "test.protocollayoutssamelibrary/MainProtocolTwoWayAnonResponse",
     "test.protocollayoutssamelibrary/MainProtocolTwoWayAnonRequest",
@@ -5204,10 +4553,8 @@
     "test.protocollayoutssamelibrary/MainProtocolOnAnonRequest",
     "test.protocollayoutssamelibrary/ComposedProtocol_TwoWayAnonComposedWithError_Response",
     "test.protocollayoutssamelibrary/ComposedProtocol_TwoWayAnonComposedWithError_Result",
-    "test.protocollayoutssamelibrary/ComposedProtocolTwoWayAnonComposedWithErrorTopResponse",
     "test.protocollayoutssamelibrary/ComposedProtocol_OnAnonComposedWithError_Response",
     "test.protocollayoutssamelibrary/ComposedProtocol_OnAnonComposedWithError_Result",
-    "test.protocollayoutssamelibrary/ComposedProtocolOnAnonComposedWithErrorRequest",
     "test.protocollayoutssamelibrary/ComposedProtocolTwoWayAnonComposedWithErrorRequest",
     "test.protocollayoutssamelibrary/ComposedProtocolTwoWayAnonComposedResponse",
     "test.protocollayoutssamelibrary/ComposedProtocolTwoWayAnonComposedRequest",
@@ -5219,14 +4566,6 @@
   "declarations": {
     "test.protocollayoutssamelibrary/ComposedProtocol": "protocol",
     "test.protocollayoutssamelibrary/MainProtocol": "protocol",
-    "test.protocollayoutssamelibrary/ComposedProtocolOnAnonComposedWithErrorRequest": "struct",
-    "test.protocollayoutssamelibrary/ComposedProtocolOnNamedComposedWithErrorRequest": "struct",
-    "test.protocollayoutssamelibrary/ComposedProtocolTwoWayAnonComposedWithErrorTopResponse": "struct",
-    "test.protocollayoutssamelibrary/ComposedProtocolTwoWayNamedComposedWithErrorTopResponse": "struct",
-    "test.protocollayoutssamelibrary/MainProtocolOnAnonWithErrorRequest": "struct",
-    "test.protocollayoutssamelibrary/MainProtocolOnLocalWithErrorRequest": "struct",
-    "test.protocollayoutssamelibrary/MainProtocolTwoWayAnonWithErrorTopResponse": "struct",
-    "test.protocollayoutssamelibrary/MainProtocolTwoWayLocalWithErrorTopResponse": "struct",
     "test.protocollayoutssamelibrary/ComposedProtocolOneWayAnonComposedRequest": "table",
     "test.protocollayoutssamelibrary/ComposedProtocolTwoWayAnonComposedResponse": "table",
     "test.protocollayoutssamelibrary/ComposedProtocolTwoWayAnonComposedWithErrorRequest": "table",

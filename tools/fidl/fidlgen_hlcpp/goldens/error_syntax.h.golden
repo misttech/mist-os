@@ -24,8 +24,6 @@ class ExampleUseOfErrorSyntax_CallWhichMayFail_Response;
 
 class ExampleUseOfErrorSyntax_CallWhichMayFail_Result;
 
-class ExampleUseOfErrorSyntaxCallWhichMayFailTopResponse;
-
 #ifdef __Fuchsia__
 
 class ExampleUseOfErrorSyntax;
@@ -190,27 +188,6 @@ inline zx_status_t Clone(const ::test::errorsyntax::ExampleUseOfErrorSyntax_Call
 
 using ExampleUseOfErrorSyntax_CallWhichMayFail_ResultPtr = ::std::unique_ptr<ExampleUseOfErrorSyntax_CallWhichMayFail_Result>;
 
-class ExampleUseOfErrorSyntaxCallWhichMayFailTopResponse final {
- public:
-  static const fidl_type_t* FidlType;
-
-  ::test::errorsyntax::ExampleUseOfErrorSyntax_CallWhichMayFail_Result result;
-
-  static inline ::std::unique_ptr<ExampleUseOfErrorSyntaxCallWhichMayFailTopResponse> New() { return ::std::make_unique<ExampleUseOfErrorSyntaxCallWhichMayFailTopResponse>(); }
-
-  void Encode(::fidl::Encoder* _encoder, size_t _offset,
-              cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt);
-  static void Decode(::fidl::Decoder* _decoder, ExampleUseOfErrorSyntaxCallWhichMayFailTopResponse* value, size_t _offset);
-  zx_status_t Clone(ExampleUseOfErrorSyntaxCallWhichMayFailTopResponse* result) const;
-};
-
-inline zx_status_t Clone(const ::test::errorsyntax::ExampleUseOfErrorSyntaxCallWhichMayFailTopResponse& _value,
-                         ::test::errorsyntax::ExampleUseOfErrorSyntaxCallWhichMayFailTopResponse* _result) {
-  return _value.Clone(_result);
-}
-
-using ExampleUseOfErrorSyntaxCallWhichMayFailTopResponsePtr = ::std::unique_ptr<ExampleUseOfErrorSyntaxCallWhichMayFailTopResponse>;
-
 #ifdef __Fuchsia__
 
 namespace _internal {
@@ -236,23 +213,23 @@ class ExampleUseOfErrorSyntax_RequestEncoder {
   }
 };
 namespace _internal {
-__LOCAL extern "C" const fidl_type_t test_errorsyntax_parent_ParentUsesErrorSyntaxComposedCallWhichMayFailTopResponseTable;
+__LOCAL extern "C" const fidl_type_t test_errorsyntax_parent_ParentUsesErrorSyntax_ComposedCallWhichMayFail_ResultTable;
 
-__LOCAL extern "C" const fidl_type_t test_errorsyntax_ExampleUseOfErrorSyntaxCallWhichMayFailTopResponseTable;
+__LOCAL extern "C" const fidl_type_t test_errorsyntax_ExampleUseOfErrorSyntax_CallWhichMayFail_ResultTable;
 
 }  // namespace _internal
 
 class ExampleUseOfErrorSyntax_ResponseEncoder {
  public:
-  static ::fidl::HLCPPOutgoingMessage ComposedCallWhichMayFail(::fidl::MessageEncoder* _encoder, ::test::errorsyntax::parent::ParentUsesErrorSyntax_ComposedCallWhichMayFail_Result* result) {
+  static ::fidl::HLCPPOutgoingMessage ComposedCallWhichMayFail(::fidl::MessageEncoder* _encoder, ::test::errorsyntax::parent::ParentUsesErrorSyntax_ComposedCallWhichMayFail_Result* ParentUsesErrorSyntax_ComposedCallWhichMayFail_Result) {
     _encoder->Alloc(16);
-    ::fidl::Encode(_encoder, result, 0 + sizeof(fidl_message_header_t));
+    ::fidl::Encode(_encoder, ParentUsesErrorSyntax_ComposedCallWhichMayFail_Result, 0 + sizeof(fidl_message_header_t));
 
     return _encoder->GetMessage();
   }
-  static ::fidl::HLCPPOutgoingMessage CallWhichMayFail(::fidl::MessageEncoder* _encoder, ::test::errorsyntax::ExampleUseOfErrorSyntax_CallWhichMayFail_Result* result) {
+  static ::fidl::HLCPPOutgoingMessage CallWhichMayFail(::fidl::MessageEncoder* _encoder, ::test::errorsyntax::ExampleUseOfErrorSyntax_CallWhichMayFail_Result* ExampleUseOfErrorSyntax_CallWhichMayFail_Result) {
     _encoder->Alloc(16);
-    ::fidl::Encode(_encoder, result, 0 + sizeof(fidl_message_header_t));
+    ::fidl::Encode(_encoder, ExampleUseOfErrorSyntax_CallWhichMayFail_Result, 0 + sizeof(fidl_message_header_t));
 
     return _encoder->GetMessage();
   }
@@ -368,31 +345,6 @@ struct Equality<::test::errorsyntax::ExampleUseOfErrorSyntax_CallWhichMayFail_Re
     }
   }
 };
-template <>
-struct CodingTraits<::test::errorsyntax::ExampleUseOfErrorSyntaxCallWhichMayFailTopResponse>
-    : public EncodableCodingTraits<::test::errorsyntax::ExampleUseOfErrorSyntaxCallWhichMayFailTopResponse, 16> {};
-
-template <>
-struct HasPadding<::test::errorsyntax::ExampleUseOfErrorSyntaxCallWhichMayFailTopResponse> : public std::true_type {};
-
-template <>
-struct IsMemcpyCompatible<::test::errorsyntax::ExampleUseOfErrorSyntaxCallWhichMayFailTopResponse> : public internal::BoolConstant<
-                                                                                                         !HasPadding<::test::errorsyntax::ExampleUseOfErrorSyntaxCallWhichMayFailTopResponse>::value && IsMemcpyCompatible<::test::errorsyntax::ExampleUseOfErrorSyntax_CallWhichMayFail_Result>::value> {};
-
-inline zx_status_t Clone(const ::test::errorsyntax::ExampleUseOfErrorSyntaxCallWhichMayFailTopResponse& value,
-                         ::test::errorsyntax::ExampleUseOfErrorSyntaxCallWhichMayFailTopResponse* result) {
-  return ::test::errorsyntax::Clone(value, result);
-}
-
-template <>
-struct Equality<::test::errorsyntax::ExampleUseOfErrorSyntaxCallWhichMayFailTopResponse> {
-  bool operator()(const ::test::errorsyntax::ExampleUseOfErrorSyntaxCallWhichMayFailTopResponse& _lhs, const ::test::errorsyntax::ExampleUseOfErrorSyntaxCallWhichMayFailTopResponse& _rhs) const {
-    if (!::fidl::Equals(_lhs.result, _rhs.result)) {
-      return false;
-    }
-    return true;
-  }
-};
 
 //
 // Proxies and stubs declarations
@@ -457,8 +409,8 @@ class ExampleUseOfErrorSyntax_ResponseDecoder {
   ExampleUseOfErrorSyntax_ResponseDecoder() = default;
   virtual ~ExampleUseOfErrorSyntax_ResponseDecoder() = default;
   static const fidl_type_t* GetType(uint64_t ordinal);
-  virtual void ComposedCallWhichMayFail(::test::errorsyntax::parent::ParentUsesErrorSyntax_ComposedCallWhichMayFail_Result result) = 0;
-  virtual void CallWhichMayFail(::test::errorsyntax::ExampleUseOfErrorSyntax_CallWhichMayFail_Result result) = 0;
+  virtual void ComposedCallWhichMayFail(::test::errorsyntax::parent::ParentUsesErrorSyntax_ComposedCallWhichMayFail_Result ParentUsesErrorSyntax_ComposedCallWhichMayFail_Result) = 0;
+  virtual void CallWhichMayFail(::test::errorsyntax::ExampleUseOfErrorSyntax_CallWhichMayFail_Result ExampleUseOfErrorSyntax_CallWhichMayFail_Result) = 0;
 };
 
 class ExampleUseOfErrorSyntax_EventSender {
@@ -470,8 +422,8 @@ class ExampleUseOfErrorSyntax_Sync {
  public:
   using Proxy_ = ::test::errorsyntax::ExampleUseOfErrorSyntax_SyncProxy;
   virtual ~ExampleUseOfErrorSyntax_Sync();
-  virtual zx_status_t ComposedCallWhichMayFail(::std::string s, ::test::errorsyntax::parent::ParentUsesErrorSyntax_ComposedCallWhichMayFail_Result* out_result) = 0;
-  virtual zx_status_t CallWhichMayFail(::std::string s, ::test::errorsyntax::ExampleUseOfErrorSyntax_CallWhichMayFail_Result* out_result) = 0;
+  virtual zx_status_t ComposedCallWhichMayFail(::std::string s, ::test::errorsyntax::parent::ParentUsesErrorSyntax_ComposedCallWhichMayFail_Result* out_ParentUsesErrorSyntax_ComposedCallWhichMayFail_Result) = 0;
+  virtual zx_status_t CallWhichMayFail(::std::string s, ::test::errorsyntax::ExampleUseOfErrorSyntax_CallWhichMayFail_Result* out_ExampleUseOfErrorSyntax_CallWhichMayFail_Result) = 0;
 };
 
 class ExampleUseOfErrorSyntax_Proxy final : public ::fidl::internal::Proxy, public ExampleUseOfErrorSyntax {
@@ -510,9 +462,9 @@ class ExampleUseOfErrorSyntax_SyncProxy : public ::test::errorsyntax::ExampleUse
   explicit ExampleUseOfErrorSyntax_SyncProxy(::zx::channel channel);
   ~ExampleUseOfErrorSyntax_SyncProxy() override;
   // cts-coverage-fidl-name:test.errorsyntax/ExampleUseOfErrorSyntax.ComposedCallWhichMayFail
-  zx_status_t ComposedCallWhichMayFail(::std::string s, ::test::errorsyntax::parent::ParentUsesErrorSyntax_ComposedCallWhichMayFail_Result* out_result) override;
+  zx_status_t ComposedCallWhichMayFail(::std::string s, ::test::errorsyntax::parent::ParentUsesErrorSyntax_ComposedCallWhichMayFail_Result* out_ParentUsesErrorSyntax_ComposedCallWhichMayFail_Result) override;
   // cts-coverage-fidl-name:test.errorsyntax/ExampleUseOfErrorSyntax.CallWhichMayFail
-  zx_status_t CallWhichMayFail(::std::string s, ::test::errorsyntax::ExampleUseOfErrorSyntax_CallWhichMayFail_Result* out_result) override;
+  zx_status_t CallWhichMayFail(::std::string s, ::test::errorsyntax::ExampleUseOfErrorSyntax_CallWhichMayFail_Result* out_ExampleUseOfErrorSyntax_CallWhichMayFail_Result) override;
 
  private:
   ::fidl::internal::SynchronousProxy proxy_;

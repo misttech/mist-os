@@ -27,14 +27,6 @@ std::ostream& fidl::ostream::Formatter<::test_errorsyntax::ExampleUseOfErrorSynt
   os << "}";
   return os;
 }
-std::ostream& fidl::ostream::Formatter<::test_errorsyntax::ExampleUseOfErrorSyntaxCallWhichMayFailTopResponse>::Format(std::ostream& os, const ::test_errorsyntax::ExampleUseOfErrorSyntaxCallWhichMayFailTopResponse& value) {
-  os << "test_errorsyntax::ExampleUseOfErrorSyntaxCallWhichMayFailTopResponse";
-  os << "{ ";
-  os << "result";
-  os << " = " << fidl::ostream::Formatted<::test_errorsyntax::ExampleUseOfErrorSyntaxCallWhichMayFailResult>(value.result()) << ", ";
-  os << "}";
-  return os;
-}
 std::ostream& fidl::ostream::Formatter<::test_errorsyntax::ExampleUseOfErrorSyntaxCallWhichMayFailResult>::Format(std::ostream& os, const ::test_errorsyntax::ExampleUseOfErrorSyntaxCallWhichMayFailResult& value) {
   os << "test_errorsyntax::ExampleUseOfErrorSyntaxCallWhichMayFailResult::";
   switch (value.Which()) {
@@ -62,10 +54,6 @@ std::ostream& operator<<(std::ostream& os, const ::test_errorsyntax::ExampleUseO
 
 std::ostream& operator<<(std::ostream& os, const ::test_errorsyntax::ExampleUseOfErrorSyntaxCallWhichMayFailResult& value) {
   return fidl::ostream::Formatter<::test_errorsyntax::ExampleUseOfErrorSyntaxCallWhichMayFailResult>::Format(os, value);
-}
-
-std::ostream& operator<<(std::ostream& os, const ::test_errorsyntax::ExampleUseOfErrorSyntaxCallWhichMayFailTopResponse& value) {
-  return fidl::ostream::Formatter<::test_errorsyntax::ExampleUseOfErrorSyntaxCallWhichMayFailTopResponse>::Format(os, value);
 }
 
 #pragma clang diagnostic pop

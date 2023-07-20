@@ -34,10 +34,6 @@ struct fidl::ostream::Formatter<::test_bindingsdenylist::DenyEachBindingOnlyDeny
   static std::ostream& Format(std::ostream& os, const ::test_bindingsdenylist::DenyEachBindingOnlyDenyDartResult& value);
 };
 template <>
-struct fidl::ostream::Formatter<::test_bindingsdenylist::DenyEachBindingOnlyDenyDartTopResponse> {
-  static std::ostream& Format(std::ostream& os, const ::test_bindingsdenylist::DenyEachBindingOnlyDenyDartTopResponse& value);
-};
-template <>
 struct fidl::ostream::Formatter<::test_bindingsdenylist::DenyEachBindingOnlyDenyGoRequest> {
   static std::ostream& Format(std::ostream& os, const ::test_bindingsdenylist::DenyEachBindingOnlyDenyGoRequest& value);
 };
@@ -48,10 +44,6 @@ struct fidl::ostream::Formatter<::test_bindingsdenylist::DenyEachBindingOnlyDeny
 template <>
 struct fidl::ostream::Formatter<::test_bindingsdenylist::DenyEachBindingOnlyDenyGoResult> {
   static std::ostream& Format(std::ostream& os, const ::test_bindingsdenylist::DenyEachBindingOnlyDenyGoResult& value);
-};
-template <>
-struct fidl::ostream::Formatter<::test_bindingsdenylist::DenyEachBindingOnlyDenyGoTopResponse> {
-  static std::ostream& Format(std::ostream& os, const ::test_bindingsdenylist::DenyEachBindingOnlyDenyGoTopResponse& value);
 };
 template <>
 struct fidl::ostream::Formatter<::test_bindingsdenylist::DenyEachBindingOnlyDenyLibfuzzerRequest> {
@@ -66,10 +58,6 @@ struct fidl::ostream::Formatter<::test_bindingsdenylist::DenyEachBindingOnlyDeny
   static std::ostream& Format(std::ostream& os, const ::test_bindingsdenylist::DenyEachBindingOnlyDenyLibfuzzerResult& value);
 };
 template <>
-struct fidl::ostream::Formatter<::test_bindingsdenylist::DenyEachBindingOnlyDenyLibfuzzerTopResponse> {
-  static std::ostream& Format(std::ostream& os, const ::test_bindingsdenylist::DenyEachBindingOnlyDenyLibfuzzerTopResponse& value);
-};
-template <>
 struct fidl::ostream::Formatter<::test_bindingsdenylist::DenyEachBindingOnlyDenyRustRequest> {
   static std::ostream& Format(std::ostream& os, const ::test_bindingsdenylist::DenyEachBindingOnlyDenyRustRequest& value);
 };
@@ -82,10 +70,6 @@ struct fidl::ostream::Formatter<::test_bindingsdenylist::DenyEachBindingOnlyDeny
   static std::ostream& Format(std::ostream& os, const ::test_bindingsdenylist::DenyEachBindingOnlyDenyRustResult& value);
 };
 template <>
-struct fidl::ostream::Formatter<::test_bindingsdenylist::DenyEachBindingOnlyDenyRustTopResponse> {
-  static std::ostream& Format(std::ostream& os, const ::test_bindingsdenylist::DenyEachBindingOnlyDenyRustTopResponse& value);
-};
-template <>
 struct fidl::ostream::Formatter<::test_bindingsdenylist::DenyEachBindingOnlyDenySyzkallerRequest> {
   static std::ostream& Format(std::ostream& os, const ::test_bindingsdenylist::DenyEachBindingOnlyDenySyzkallerRequest& value);
 };
@@ -96,10 +80,6 @@ struct fidl::ostream::Formatter<::test_bindingsdenylist::DenyEachBindingOnlyDeny
 template <>
 struct fidl::ostream::Formatter<::test_bindingsdenylist::DenyEachBindingOnlyDenySyzkallerResult> {
   static std::ostream& Format(std::ostream& os, const ::test_bindingsdenylist::DenyEachBindingOnlyDenySyzkallerResult& value);
-};
-template <>
-struct fidl::ostream::Formatter<::test_bindingsdenylist::DenyEachBindingOnlyDenySyzkallerTopResponse> {
-  static std::ostream& Format(std::ostream& os, const ::test_bindingsdenylist::DenyEachBindingOnlyDenySyzkallerTopResponse& value);
 };
 template <>
 struct fidl::ostream::Formatter<::test_bindingsdenylist::MemberOnlyAppearsInImportingLibrary> {
@@ -120,15 +100,11 @@ std::ostream& operator<<(std::ostream& os, const ::test_bindingsdenylist::DenyEa
 
 std::ostream& operator<<(std::ostream& os, const ::test_bindingsdenylist::DenyEachBindingOnlyDenyDartResult& value);
 
-std::ostream& operator<<(std::ostream& os, const ::test_bindingsdenylist::DenyEachBindingOnlyDenyDartTopResponse& value);
-
 std::ostream& operator<<(std::ostream& os, const ::test_bindingsdenylist::DenyEachBindingOnlyDenyGoRequest& value);
 
 std::ostream& operator<<(std::ostream& os, const ::test_bindingsdenylist::DenyEachBindingOnlyDenyGoResponse& value);
 
 std::ostream& operator<<(std::ostream& os, const ::test_bindingsdenylist::DenyEachBindingOnlyDenyGoResult& value);
-
-std::ostream& operator<<(std::ostream& os, const ::test_bindingsdenylist::DenyEachBindingOnlyDenyGoTopResponse& value);
 
 std::ostream& operator<<(std::ostream& os, const ::test_bindingsdenylist::DenyEachBindingOnlyDenyLibfuzzerRequest& value);
 
@@ -136,23 +112,17 @@ std::ostream& operator<<(std::ostream& os, const ::test_bindingsdenylist::DenyEa
 
 std::ostream& operator<<(std::ostream& os, const ::test_bindingsdenylist::DenyEachBindingOnlyDenyLibfuzzerResult& value);
 
-std::ostream& operator<<(std::ostream& os, const ::test_bindingsdenylist::DenyEachBindingOnlyDenyLibfuzzerTopResponse& value);
-
 std::ostream& operator<<(std::ostream& os, const ::test_bindingsdenylist::DenyEachBindingOnlyDenyRustRequest& value);
 
 std::ostream& operator<<(std::ostream& os, const ::test_bindingsdenylist::DenyEachBindingOnlyDenyRustResponse& value);
 
 std::ostream& operator<<(std::ostream& os, const ::test_bindingsdenylist::DenyEachBindingOnlyDenyRustResult& value);
 
-std::ostream& operator<<(std::ostream& os, const ::test_bindingsdenylist::DenyEachBindingOnlyDenyRustTopResponse& value);
-
 std::ostream& operator<<(std::ostream& os, const ::test_bindingsdenylist::DenyEachBindingOnlyDenySyzkallerRequest& value);
 
 std::ostream& operator<<(std::ostream& os, const ::test_bindingsdenylist::DenyEachBindingOnlyDenySyzkallerResponse& value);
 
 std::ostream& operator<<(std::ostream& os, const ::test_bindingsdenylist::DenyEachBindingOnlyDenySyzkallerResult& value);
-
-std::ostream& operator<<(std::ostream& os, const ::test_bindingsdenylist::DenyEachBindingOnlyDenySyzkallerTopResponse& value);
 
 std::ostream& operator<<(std::ostream& os, const ::test_bindingsdenylist::MemberOnlyAppearsInImportingLibrary& value);
 

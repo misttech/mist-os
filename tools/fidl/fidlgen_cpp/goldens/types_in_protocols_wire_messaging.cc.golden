@@ -51,7 +51,7 @@ constexpr uint64_t kProtocol_ErrorBasic_Ordinal = 5016634351643393939lu;
 constexpr ::fidl::MessageDynamicFlags kProtocol_ErrorBasic_DynamicFlags = ::fidl::MessageDynamicFlags::kStrictMethod;
 
 
-extern "C" const fidl_type_t test_typesinprotocols_ProtocolErrorBasicTopResponseTable;
+extern "C" const fidl_type_t test_typesinprotocols_Protocol_ErrorBasic_ResultTable;
 
 
 [[maybe_unused]]
@@ -98,7 +98,7 @@ constexpr uint64_t kProtocol_ErrorCompound_Ordinal = 2990809657626249085lu;
 constexpr ::fidl::MessageDynamicFlags kProtocol_ErrorCompound_DynamicFlags = ::fidl::MessageDynamicFlags::kStrictMethod;
 
 
-extern "C" const fidl_type_t test_typesinprotocols_ProtocolErrorCompoundTopResponseTable;
+extern "C" const fidl_type_t test_typesinprotocols_Protocol_ErrorCompound_ResultTable;
 
 
 [[maybe_unused]]
@@ -145,7 +145,7 @@ constexpr uint64_t kProtocol_ErrorArrayBasic_Ordinal = 1084731895342694265lu;
 constexpr ::fidl::MessageDynamicFlags kProtocol_ErrorArrayBasic_DynamicFlags = ::fidl::MessageDynamicFlags::kStrictMethod;
 
 
-extern "C" const fidl_type_t test_typesinprotocols_ProtocolErrorArrayBasicTopResponseTable;
+extern "C" const fidl_type_t test_typesinprotocols_Protocol_ErrorArrayBasic_ResultTable;
 
 
 [[maybe_unused]]
@@ -192,7 +192,7 @@ constexpr uint64_t kProtocol_ErrorArrayCompound_Ordinal = 5919277476782807556lu;
 constexpr ::fidl::MessageDynamicFlags kProtocol_ErrorArrayCompound_DynamicFlags = ::fidl::MessageDynamicFlags::kStrictMethod;
 
 
-extern "C" const fidl_type_t test_typesinprotocols_ProtocolErrorArrayCompoundTopResponseTable;
+extern "C" const fidl_type_t test_typesinprotocols_Protocol_ErrorArrayCompound_ResultTable;
 
 
 [[maybe_unused]]
@@ -239,7 +239,7 @@ constexpr uint64_t kProtocol_ErrorVectorBasic_Ordinal = 875941614196965234lu;
 constexpr ::fidl::MessageDynamicFlags kProtocol_ErrorVectorBasic_DynamicFlags = ::fidl::MessageDynamicFlags::kStrictMethod;
 
 
-extern "C" const fidl_type_t test_typesinprotocols_ProtocolErrorVectorBasicTopResponseTable;
+extern "C" const fidl_type_t test_typesinprotocols_Protocol_ErrorVectorBasic_ResultTable;
 
 
 [[maybe_unused]]
@@ -286,7 +286,7 @@ constexpr uint64_t kProtocol_ErrorVectorCompound_Ordinal = 8506780203315865989lu
 constexpr ::fidl::MessageDynamicFlags kProtocol_ErrorVectorCompound_DynamicFlags = ::fidl::MessageDynamicFlags::kStrictMethod;
 
 
-extern "C" const fidl_type_t test_typesinprotocols_ProtocolErrorVectorCompoundTopResponseTable;
+extern "C" const fidl_type_t test_typesinprotocols_Protocol_ErrorVectorCompound_ResultTable;
 
 
 [[maybe_unused]]
@@ -333,7 +333,7 @@ constexpr uint64_t kProtocol_ErrorVectorOptional_Ordinal = 6406191217027936606lu
 constexpr ::fidl::MessageDynamicFlags kProtocol_ErrorVectorOptional_DynamicFlags = ::fidl::MessageDynamicFlags::kStrictMethod;
 
 
-extern "C" const fidl_type_t test_typesinprotocols_ProtocolErrorVectorOptionalTopResponseTable;
+extern "C" const fidl_type_t test_typesinprotocols_Protocol_ErrorVectorOptional_ResultTable;
 
 
 [[maybe_unused]]
@@ -380,7 +380,7 @@ constexpr uint64_t kProtocol_ErrorArrayVectorNested_Ordinal = 908560492160580215
 constexpr ::fidl::MessageDynamicFlags kProtocol_ErrorArrayVectorNested_DynamicFlags = ::fidl::MessageDynamicFlags::kStrictMethod;
 
 
-extern "C" const fidl_type_t test_typesinprotocols_ProtocolErrorArrayVectorNestedTopResponseTable;
+extern "C" const fidl_type_t test_typesinprotocols_Protocol_ErrorArrayVectorNested_ResultTable;
 
 
 [[maybe_unused]]
@@ -427,7 +427,7 @@ constexpr uint64_t kProtocol_ErrorResource_Ordinal = 6568609240497354166lu;
 constexpr ::fidl::MessageDynamicFlags kProtocol_ErrorResource_DynamicFlags = ::fidl::MessageDynamicFlags::kStrictMethod;
 
 
-extern "C" const fidl_type_t test_typesinprotocols_ProtocolErrorResourceTopResponseTable;
+extern "C" const fidl_type_t test_typesinprotocols_Protocol_ErrorResource_ResultTable;
 
 
 [[maybe_unused]]
@@ -3192,8 +3192,8 @@ fidl::internal::WireCompleterImpl<::test_typesinprotocols::Protocol::ErrorBasic>
 }
 
 void
-fidl::internal::WireCompleterImpl<::test_typesinprotocols::Protocol::ErrorBasic>::MakeReply(::test_typesinprotocols::wire::ProtocolErrorBasicResult result) {
-  ::fidl::internal::TransactionalResponse<::test_typesinprotocols::Protocol::ErrorBasic> _response{ result };
+fidl::internal::WireCompleterImpl<::test_typesinprotocols::Protocol::ErrorBasic>::MakeReply(::test_typesinprotocols::wire::ProtocolErrorBasicResult ProtocolErrorBasicResult) {
+  ::fidl::internal::TransactionalResponse<::test_typesinprotocols::Protocol::ErrorBasic> _response{ ProtocolErrorBasicResult };
   FIDL_INTERNAL_DISABLE_AUTO_VAR_INIT
   ::fidl::internal::OwnedEncodedMessage<
       ::fidl::internal::TransactionalResponse<::test_typesinprotocols::Protocol::ErrorBasic>, ::fidl::internal::ChannelTransport> _response_message{
@@ -3235,8 +3235,8 @@ fidl::internal::WireBufferCompleterImpl<::test_typesinprotocols::Protocol::Error
 }
 
 void
-fidl::internal::WireBufferCompleterImpl<::test_typesinprotocols::Protocol::ErrorBasic>::MakeReply(::test_typesinprotocols::wire::ProtocolErrorBasicResult result) {
-  ::fidl::internal::TransactionalResponse<::test_typesinprotocols::Protocol::ErrorBasic> _response{ result };
+fidl::internal::WireBufferCompleterImpl<::test_typesinprotocols::Protocol::ErrorBasic>::MakeReply(::test_typesinprotocols::wire::ProtocolErrorBasicResult ProtocolErrorBasicResult) {
+  ::fidl::internal::TransactionalResponse<::test_typesinprotocols::Protocol::ErrorBasic> _response{ ProtocolErrorBasicResult };
   constexpr uint32_t _buffer_size = ::fidl::ServerReplyBufferSizeInChannel<::test_typesinprotocols::Protocol::ErrorBasic>();
   ::fit::result<::fidl::Error, ::fidl::BufferSpan> _allocation =
       _allocator().TryAllocate(_buffer_size);
@@ -3332,8 +3332,8 @@ fidl::internal::WireCompleterImpl<::test_typesinprotocols::Protocol::ErrorCompou
 }
 
 void
-fidl::internal::WireCompleterImpl<::test_typesinprotocols::Protocol::ErrorCompound>::MakeReply(::test_typesinprotocols::wire::ProtocolErrorCompoundResult result) {
-  ::fidl::internal::TransactionalResponse<::test_typesinprotocols::Protocol::ErrorCompound> _response{ result };
+fidl::internal::WireCompleterImpl<::test_typesinprotocols::Protocol::ErrorCompound>::MakeReply(::test_typesinprotocols::wire::ProtocolErrorCompoundResult ProtocolErrorCompoundResult) {
+  ::fidl::internal::TransactionalResponse<::test_typesinprotocols::Protocol::ErrorCompound> _response{ ProtocolErrorCompoundResult };
   FIDL_INTERNAL_DISABLE_AUTO_VAR_INIT
   ::fidl::internal::OwnedEncodedMessage<
       ::fidl::internal::TransactionalResponse<::test_typesinprotocols::Protocol::ErrorCompound>, ::fidl::internal::ChannelTransport> _response_message{
@@ -3370,8 +3370,8 @@ fidl::internal::WireBufferCompleterImpl<::test_typesinprotocols::Protocol::Error
 }
 
 void
-fidl::internal::WireBufferCompleterImpl<::test_typesinprotocols::Protocol::ErrorCompound>::MakeReply(::test_typesinprotocols::wire::ProtocolErrorCompoundResult result) {
-  ::fidl::internal::TransactionalResponse<::test_typesinprotocols::Protocol::ErrorCompound> _response{ result };
+fidl::internal::WireBufferCompleterImpl<::test_typesinprotocols::Protocol::ErrorCompound>::MakeReply(::test_typesinprotocols::wire::ProtocolErrorCompoundResult ProtocolErrorCompoundResult) {
+  ::fidl::internal::TransactionalResponse<::test_typesinprotocols::Protocol::ErrorCompound> _response{ ProtocolErrorCompoundResult };
   constexpr uint32_t _buffer_size = ::fidl::ServerReplyBufferSizeInChannel<::test_typesinprotocols::Protocol::ErrorCompound>();
   ::fit::result<::fidl::Error, ::fidl::BufferSpan> _allocation =
       _allocator().TryAllocate(_buffer_size);
@@ -3462,8 +3462,8 @@ fidl::internal::WireCompleterImpl<::test_typesinprotocols::Protocol::ErrorArrayB
 }
 
 void
-fidl::internal::WireCompleterImpl<::test_typesinprotocols::Protocol::ErrorArrayBasic>::MakeReply(::test_typesinprotocols::wire::ProtocolErrorArrayBasicResult result) {
-  ::fidl::internal::TransactionalResponse<::test_typesinprotocols::Protocol::ErrorArrayBasic> _response{ result };
+fidl::internal::WireCompleterImpl<::test_typesinprotocols::Protocol::ErrorArrayBasic>::MakeReply(::test_typesinprotocols::wire::ProtocolErrorArrayBasicResult ProtocolErrorArrayBasicResult) {
+  ::fidl::internal::TransactionalResponse<::test_typesinprotocols::Protocol::ErrorArrayBasic> _response{ ProtocolErrorArrayBasicResult };
   FIDL_INTERNAL_DISABLE_AUTO_VAR_INIT
   ::fidl::internal::OwnedEncodedMessage<
       ::fidl::internal::TransactionalResponse<::test_typesinprotocols::Protocol::ErrorArrayBasic>, ::fidl::internal::ChannelTransport> _response_message{
@@ -3505,8 +3505,8 @@ fidl::internal::WireBufferCompleterImpl<::test_typesinprotocols::Protocol::Error
 }
 
 void
-fidl::internal::WireBufferCompleterImpl<::test_typesinprotocols::Protocol::ErrorArrayBasic>::MakeReply(::test_typesinprotocols::wire::ProtocolErrorArrayBasicResult result) {
-  ::fidl::internal::TransactionalResponse<::test_typesinprotocols::Protocol::ErrorArrayBasic> _response{ result };
+fidl::internal::WireBufferCompleterImpl<::test_typesinprotocols::Protocol::ErrorArrayBasic>::MakeReply(::test_typesinprotocols::wire::ProtocolErrorArrayBasicResult ProtocolErrorArrayBasicResult) {
+  ::fidl::internal::TransactionalResponse<::test_typesinprotocols::Protocol::ErrorArrayBasic> _response{ ProtocolErrorArrayBasicResult };
   constexpr uint32_t _buffer_size = ::fidl::ServerReplyBufferSizeInChannel<::test_typesinprotocols::Protocol::ErrorArrayBasic>();
   ::fit::result<::fidl::Error, ::fidl::BufferSpan> _allocation =
       _allocator().TryAllocate(_buffer_size);
@@ -3602,8 +3602,8 @@ fidl::internal::WireCompleterImpl<::test_typesinprotocols::Protocol::ErrorArrayC
 }
 
 void
-fidl::internal::WireCompleterImpl<::test_typesinprotocols::Protocol::ErrorArrayCompound>::MakeReply(::test_typesinprotocols::wire::ProtocolErrorArrayCompoundResult result) {
-  ::fidl::internal::TransactionalResponse<::test_typesinprotocols::Protocol::ErrorArrayCompound> _response{ result };
+fidl::internal::WireCompleterImpl<::test_typesinprotocols::Protocol::ErrorArrayCompound>::MakeReply(::test_typesinprotocols::wire::ProtocolErrorArrayCompoundResult ProtocolErrorArrayCompoundResult) {
+  ::fidl::internal::TransactionalResponse<::test_typesinprotocols::Protocol::ErrorArrayCompound> _response{ ProtocolErrorArrayCompoundResult };
   FIDL_INTERNAL_DISABLE_AUTO_VAR_INIT
   ::fidl::internal::OwnedEncodedMessage<
       ::fidl::internal::TransactionalResponse<::test_typesinprotocols::Protocol::ErrorArrayCompound>, ::fidl::internal::ChannelTransport> _response_message{
@@ -3640,8 +3640,8 @@ fidl::internal::WireBufferCompleterImpl<::test_typesinprotocols::Protocol::Error
 }
 
 void
-fidl::internal::WireBufferCompleterImpl<::test_typesinprotocols::Protocol::ErrorArrayCompound>::MakeReply(::test_typesinprotocols::wire::ProtocolErrorArrayCompoundResult result) {
-  ::fidl::internal::TransactionalResponse<::test_typesinprotocols::Protocol::ErrorArrayCompound> _response{ result };
+fidl::internal::WireBufferCompleterImpl<::test_typesinprotocols::Protocol::ErrorArrayCompound>::MakeReply(::test_typesinprotocols::wire::ProtocolErrorArrayCompoundResult ProtocolErrorArrayCompoundResult) {
+  ::fidl::internal::TransactionalResponse<::test_typesinprotocols::Protocol::ErrorArrayCompound> _response{ ProtocolErrorArrayCompoundResult };
   constexpr uint32_t _buffer_size = ::fidl::ServerReplyBufferSizeInChannel<::test_typesinprotocols::Protocol::ErrorArrayCompound>();
   ::fit::result<::fidl::Error, ::fidl::BufferSpan> _allocation =
       _allocator().TryAllocate(_buffer_size);
@@ -3732,8 +3732,8 @@ fidl::internal::WireCompleterImpl<::test_typesinprotocols::Protocol::ErrorVector
 }
 
 void
-fidl::internal::WireCompleterImpl<::test_typesinprotocols::Protocol::ErrorVectorBasic>::MakeReply(::test_typesinprotocols::wire::ProtocolErrorVectorBasicResult result) {
-  ::fidl::internal::TransactionalResponse<::test_typesinprotocols::Protocol::ErrorVectorBasic> _response{ result };
+fidl::internal::WireCompleterImpl<::test_typesinprotocols::Protocol::ErrorVectorBasic>::MakeReply(::test_typesinprotocols::wire::ProtocolErrorVectorBasicResult ProtocolErrorVectorBasicResult) {
+  ::fidl::internal::TransactionalResponse<::test_typesinprotocols::Protocol::ErrorVectorBasic> _response{ ProtocolErrorVectorBasicResult };
   FIDL_INTERNAL_DISABLE_AUTO_VAR_INIT
   ::fidl::internal::OwnedEncodedMessage<
       ::fidl::internal::TransactionalResponse<::test_typesinprotocols::Protocol::ErrorVectorBasic>, ::fidl::internal::ChannelTransport> _response_message{
@@ -3775,8 +3775,8 @@ fidl::internal::WireBufferCompleterImpl<::test_typesinprotocols::Protocol::Error
 }
 
 void
-fidl::internal::WireBufferCompleterImpl<::test_typesinprotocols::Protocol::ErrorVectorBasic>::MakeReply(::test_typesinprotocols::wire::ProtocolErrorVectorBasicResult result) {
-  ::fidl::internal::TransactionalResponse<::test_typesinprotocols::Protocol::ErrorVectorBasic> _response{ result };
+fidl::internal::WireBufferCompleterImpl<::test_typesinprotocols::Protocol::ErrorVectorBasic>::MakeReply(::test_typesinprotocols::wire::ProtocolErrorVectorBasicResult ProtocolErrorVectorBasicResult) {
+  ::fidl::internal::TransactionalResponse<::test_typesinprotocols::Protocol::ErrorVectorBasic> _response{ ProtocolErrorVectorBasicResult };
   constexpr uint32_t _buffer_size = ::fidl::ServerReplyBufferSizeInChannel<::test_typesinprotocols::Protocol::ErrorVectorBasic>();
   ::fit::result<::fidl::Error, ::fidl::BufferSpan> _allocation =
       _allocator().TryAllocate(_buffer_size);
@@ -3872,8 +3872,8 @@ fidl::internal::WireCompleterImpl<::test_typesinprotocols::Protocol::ErrorVector
 }
 
 void
-fidl::internal::WireCompleterImpl<::test_typesinprotocols::Protocol::ErrorVectorCompound>::MakeReply(::test_typesinprotocols::wire::ProtocolErrorVectorCompoundResult result) {
-  ::fidl::internal::TransactionalResponse<::test_typesinprotocols::Protocol::ErrorVectorCompound> _response{ result };
+fidl::internal::WireCompleterImpl<::test_typesinprotocols::Protocol::ErrorVectorCompound>::MakeReply(::test_typesinprotocols::wire::ProtocolErrorVectorCompoundResult ProtocolErrorVectorCompoundResult) {
+  ::fidl::internal::TransactionalResponse<::test_typesinprotocols::Protocol::ErrorVectorCompound> _response{ ProtocolErrorVectorCompoundResult };
   FIDL_INTERNAL_DISABLE_AUTO_VAR_INIT
   ::fidl::internal::OwnedEncodedMessage<
       ::fidl::internal::TransactionalResponse<::test_typesinprotocols::Protocol::ErrorVectorCompound>, ::fidl::internal::ChannelTransport> _response_message{
@@ -3910,8 +3910,8 @@ fidl::internal::WireBufferCompleterImpl<::test_typesinprotocols::Protocol::Error
 }
 
 void
-fidl::internal::WireBufferCompleterImpl<::test_typesinprotocols::Protocol::ErrorVectorCompound>::MakeReply(::test_typesinprotocols::wire::ProtocolErrorVectorCompoundResult result) {
-  ::fidl::internal::TransactionalResponse<::test_typesinprotocols::Protocol::ErrorVectorCompound> _response{ result };
+fidl::internal::WireBufferCompleterImpl<::test_typesinprotocols::Protocol::ErrorVectorCompound>::MakeReply(::test_typesinprotocols::wire::ProtocolErrorVectorCompoundResult ProtocolErrorVectorCompoundResult) {
+  ::fidl::internal::TransactionalResponse<::test_typesinprotocols::Protocol::ErrorVectorCompound> _response{ ProtocolErrorVectorCompoundResult };
   constexpr uint32_t _buffer_size = ::fidl::ServerReplyBufferSizeInChannel<::test_typesinprotocols::Protocol::ErrorVectorCompound>();
   ::fit::result<::fidl::Error, ::fidl::BufferSpan> _allocation =
       _allocator().TryAllocate(_buffer_size);
@@ -4002,8 +4002,8 @@ fidl::internal::WireCompleterImpl<::test_typesinprotocols::Protocol::ErrorVector
 }
 
 void
-fidl::internal::WireCompleterImpl<::test_typesinprotocols::Protocol::ErrorVectorOptional>::MakeReply(::test_typesinprotocols::wire::ProtocolErrorVectorOptionalResult result) {
-  ::fidl::internal::TransactionalResponse<::test_typesinprotocols::Protocol::ErrorVectorOptional> _response{ result };
+fidl::internal::WireCompleterImpl<::test_typesinprotocols::Protocol::ErrorVectorOptional>::MakeReply(::test_typesinprotocols::wire::ProtocolErrorVectorOptionalResult ProtocolErrorVectorOptionalResult) {
+  ::fidl::internal::TransactionalResponse<::test_typesinprotocols::Protocol::ErrorVectorOptional> _response{ ProtocolErrorVectorOptionalResult };
   FIDL_INTERNAL_DISABLE_AUTO_VAR_INIT
   ::fidl::internal::OwnedEncodedMessage<
       ::fidl::internal::TransactionalResponse<::test_typesinprotocols::Protocol::ErrorVectorOptional>, ::fidl::internal::ChannelTransport> _response_message{
@@ -4037,8 +4037,8 @@ fidl::internal::WireBufferCompleterImpl<::test_typesinprotocols::Protocol::Error
 }
 
 void
-fidl::internal::WireBufferCompleterImpl<::test_typesinprotocols::Protocol::ErrorVectorOptional>::MakeReply(::test_typesinprotocols::wire::ProtocolErrorVectorOptionalResult result) {
-  ::fidl::internal::TransactionalResponse<::test_typesinprotocols::Protocol::ErrorVectorOptional> _response{ result };
+fidl::internal::WireBufferCompleterImpl<::test_typesinprotocols::Protocol::ErrorVectorOptional>::MakeReply(::test_typesinprotocols::wire::ProtocolErrorVectorOptionalResult ProtocolErrorVectorOptionalResult) {
+  ::fidl::internal::TransactionalResponse<::test_typesinprotocols::Protocol::ErrorVectorOptional> _response{ ProtocolErrorVectorOptionalResult };
   constexpr uint32_t _buffer_size = ::fidl::ServerReplyBufferSizeInChannel<::test_typesinprotocols::Protocol::ErrorVectorOptional>();
   ::fit::result<::fidl::Error, ::fidl::BufferSpan> _allocation =
       _allocator().TryAllocate(_buffer_size);
@@ -4126,8 +4126,8 @@ fidl::internal::WireCompleterImpl<::test_typesinprotocols::Protocol::ErrorArrayV
 }
 
 void
-fidl::internal::WireCompleterImpl<::test_typesinprotocols::Protocol::ErrorArrayVectorNested>::MakeReply(::test_typesinprotocols::wire::ProtocolErrorArrayVectorNestedResult result) {
-  ::fidl::internal::TransactionalResponse<::test_typesinprotocols::Protocol::ErrorArrayVectorNested> _response{ result };
+fidl::internal::WireCompleterImpl<::test_typesinprotocols::Protocol::ErrorArrayVectorNested>::MakeReply(::test_typesinprotocols::wire::ProtocolErrorArrayVectorNestedResult ProtocolErrorArrayVectorNestedResult) {
+  ::fidl::internal::TransactionalResponse<::test_typesinprotocols::Protocol::ErrorArrayVectorNested> _response{ ProtocolErrorArrayVectorNestedResult };
   FIDL_INTERNAL_DISABLE_AUTO_VAR_INIT
   ::fidl::internal::OwnedEncodedMessage<
       ::fidl::internal::TransactionalResponse<::test_typesinprotocols::Protocol::ErrorArrayVectorNested>, ::fidl::internal::ChannelTransport> _response_message{
@@ -4161,8 +4161,8 @@ fidl::internal::WireBufferCompleterImpl<::test_typesinprotocols::Protocol::Error
 }
 
 void
-fidl::internal::WireBufferCompleterImpl<::test_typesinprotocols::Protocol::ErrorArrayVectorNested>::MakeReply(::test_typesinprotocols::wire::ProtocolErrorArrayVectorNestedResult result) {
-  ::fidl::internal::TransactionalResponse<::test_typesinprotocols::Protocol::ErrorArrayVectorNested> _response{ result };
+fidl::internal::WireBufferCompleterImpl<::test_typesinprotocols::Protocol::ErrorArrayVectorNested>::MakeReply(::test_typesinprotocols::wire::ProtocolErrorArrayVectorNestedResult ProtocolErrorArrayVectorNestedResult) {
+  ::fidl::internal::TransactionalResponse<::test_typesinprotocols::Protocol::ErrorArrayVectorNested> _response{ ProtocolErrorArrayVectorNestedResult };
   constexpr uint32_t _buffer_size = ::fidl::ServerReplyBufferSizeInChannel<::test_typesinprotocols::Protocol::ErrorArrayVectorNested>();
   ::fit::result<::fidl::Error, ::fidl::BufferSpan> _allocation =
       _allocator().TryAllocate(_buffer_size);
@@ -4250,8 +4250,8 @@ fidl::internal::WireCompleterImpl<::test_typesinprotocols::Protocol::ErrorResour
 }
 
 void
-fidl::internal::WireCompleterImpl<::test_typesinprotocols::Protocol::ErrorResource>::MakeReply(::test_typesinprotocols::wire::ProtocolErrorResourceResult result) {
-  ::fidl::internal::TransactionalResponse<::test_typesinprotocols::Protocol::ErrorResource> _response{ std::move(result) };
+fidl::internal::WireCompleterImpl<::test_typesinprotocols::Protocol::ErrorResource>::MakeReply(::test_typesinprotocols::wire::ProtocolErrorResourceResult ProtocolErrorResourceResult) {
+  ::fidl::internal::TransactionalResponse<::test_typesinprotocols::Protocol::ErrorResource> _response{ std::move(ProtocolErrorResourceResult) };
   FIDL_INTERNAL_DISABLE_AUTO_VAR_INIT
   ::fidl::internal::OwnedEncodedMessage<
       ::fidl::internal::TransactionalResponse<::test_typesinprotocols::Protocol::ErrorResource>, ::fidl::internal::ChannelTransport> _response_message{
@@ -4308,8 +4308,8 @@ fidl::internal::WireBufferCompleterImpl<::test_typesinprotocols::Protocol::Error
 }
 
 void
-fidl::internal::WireBufferCompleterImpl<::test_typesinprotocols::Protocol::ErrorResource>::MakeReply(::test_typesinprotocols::wire::ProtocolErrorResourceResult result) {
-  ::fidl::internal::TransactionalResponse<::test_typesinprotocols::Protocol::ErrorResource> _response{ std::move(result) };
+fidl::internal::WireBufferCompleterImpl<::test_typesinprotocols::Protocol::ErrorResource>::MakeReply(::test_typesinprotocols::wire::ProtocolErrorResourceResult ProtocolErrorResourceResult) {
+  ::fidl::internal::TransactionalResponse<::test_typesinprotocols::Protocol::ErrorResource> _response{ std::move(ProtocolErrorResourceResult) };
   constexpr uint32_t _buffer_size = ::fidl::ServerReplyBufferSizeInChannel<::test_typesinprotocols::Protocol::ErrorResource>();
   ::fit::result<::fidl::Error, ::fidl::BufferSpan> _allocation =
       _allocator().TryAllocate(_buffer_size);

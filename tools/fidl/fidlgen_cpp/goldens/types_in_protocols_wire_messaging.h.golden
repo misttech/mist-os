@@ -42,7 +42,7 @@ __LOCAL extern "C" const fidl_type_t test_typesinprotocols_BasicTable;
     
     
     
-__LOCAL extern "C" const fidl_type_t test_typesinprotocols_ProtocolErrorBasicTopResponseTable;
+__LOCAL extern "C" const fidl_type_t test_typesinprotocols_Protocol_ErrorBasic_ResultTable;
     
     
     
@@ -52,7 +52,7 @@ __LOCAL extern "C" const fidl_type_t test_typesinprotocols_CompoundTable;
     
     
     
-__LOCAL extern "C" const fidl_type_t test_typesinprotocols_ProtocolErrorCompoundTopResponseTable;
+__LOCAL extern "C" const fidl_type_t test_typesinprotocols_Protocol_ErrorCompound_ResultTable;
     
     
     
@@ -62,7 +62,7 @@ __LOCAL extern "C" const fidl_type_t test_typesinprotocols_ArrayBasicTable;
     
     
     
-__LOCAL extern "C" const fidl_type_t test_typesinprotocols_ProtocolErrorArrayBasicTopResponseTable;
+__LOCAL extern "C" const fidl_type_t test_typesinprotocols_Protocol_ErrorArrayBasic_ResultTable;
     
     
     
@@ -72,7 +72,7 @@ __LOCAL extern "C" const fidl_type_t test_typesinprotocols_ArrayCompoundTable;
     
     
     
-__LOCAL extern "C" const fidl_type_t test_typesinprotocols_ProtocolErrorArrayCompoundTopResponseTable;
+__LOCAL extern "C" const fidl_type_t test_typesinprotocols_Protocol_ErrorArrayCompound_ResultTable;
     
     
     
@@ -82,7 +82,7 @@ __LOCAL extern "C" const fidl_type_t test_typesinprotocols_VectorBasicTable;
     
     
     
-__LOCAL extern "C" const fidl_type_t test_typesinprotocols_ProtocolErrorVectorBasicTopResponseTable;
+__LOCAL extern "C" const fidl_type_t test_typesinprotocols_Protocol_ErrorVectorBasic_ResultTable;
     
     
     
@@ -92,7 +92,7 @@ __LOCAL extern "C" const fidl_type_t test_typesinprotocols_VectorCompoundTable;
     
     
     
-__LOCAL extern "C" const fidl_type_t test_typesinprotocols_ProtocolErrorVectorCompoundTopResponseTable;
+__LOCAL extern "C" const fidl_type_t test_typesinprotocols_Protocol_ErrorVectorCompound_ResultTable;
     
     
     
@@ -102,7 +102,7 @@ __LOCAL extern "C" const fidl_type_t test_typesinprotocols_VectorOptionalTable;
     
     
     
-__LOCAL extern "C" const fidl_type_t test_typesinprotocols_ProtocolErrorVectorOptionalTopResponseTable;
+__LOCAL extern "C" const fidl_type_t test_typesinprotocols_Protocol_ErrorVectorOptional_ResultTable;
     
     
     
@@ -112,7 +112,7 @@ __LOCAL extern "C" const fidl_type_t test_typesinprotocols_ArrayVectorNestedTabl
     
     
     
-__LOCAL extern "C" const fidl_type_t test_typesinprotocols_ProtocolErrorArrayVectorNestedTopResponseTable;
+__LOCAL extern "C" const fidl_type_t test_typesinprotocols_Protocol_ErrorArrayVectorNested_ResultTable;
     
     
     
@@ -122,7 +122,7 @@ __LOCAL extern "C" const fidl_type_t test_typesinprotocols_ResourceTable;
     
     
     
-__LOCAL extern "C" const fidl_type_t test_typesinprotocols_ProtocolErrorResourceTopResponseTable;
+__LOCAL extern "C" const fidl_type_t test_typesinprotocols_Protocol_ErrorResource_ResultTable;
     
     
 }  // namespace test_typesinprotocols
@@ -293,7 +293,7 @@ struct ::fidl::internal::WireMethodTypes<::test_typesinprotocols::Protocol::TwoW
 template<>
 struct ::fidl::internal::WireMethodTypes<::test_typesinprotocols::Protocol::ErrorBasic> {
     static constexpr bool HasRequestPayload = false;
-      using Response = ::test_typesinprotocols::wire::ProtocolErrorBasicTopResponse;
+      using Response = ::test_typesinprotocols::wire::ProtocolErrorBasicResult;
   using DomainError = uint32_t;
     
       using Completer = fidl::Completer<::fidl::internal::WireCompleterBase<::test_typesinprotocols::Protocol::ErrorBasic>>;
@@ -392,7 +392,7 @@ struct ::fidl::internal::WireMethodTypes<::test_typesinprotocols::Protocol::TwoW
 template<>
 struct ::fidl::internal::WireMethodTypes<::test_typesinprotocols::Protocol::ErrorCompound> {
     static constexpr bool HasRequestPayload = false;
-      using Response = ::test_typesinprotocols::wire::ProtocolErrorCompoundTopResponse;
+      using Response = ::test_typesinprotocols::wire::ProtocolErrorCompoundResult;
   using DomainError = uint32_t;
     
       using Completer = fidl::Completer<::fidl::internal::WireCompleterBase<::test_typesinprotocols::Protocol::ErrorCompound>>;
@@ -491,7 +491,7 @@ struct ::fidl::internal::WireMethodTypes<::test_typesinprotocols::Protocol::TwoW
 template<>
 struct ::fidl::internal::WireMethodTypes<::test_typesinprotocols::Protocol::ErrorArrayBasic> {
     static constexpr bool HasRequestPayload = false;
-      using Response = ::test_typesinprotocols::wire::ProtocolErrorArrayBasicTopResponse;
+      using Response = ::test_typesinprotocols::wire::ProtocolErrorArrayBasicResult;
   using DomainError = uint32_t;
     
       using Completer = fidl::Completer<::fidl::internal::WireCompleterBase<::test_typesinprotocols::Protocol::ErrorArrayBasic>>;
@@ -590,7 +590,7 @@ struct ::fidl::internal::WireMethodTypes<::test_typesinprotocols::Protocol::TwoW
 template<>
 struct ::fidl::internal::WireMethodTypes<::test_typesinprotocols::Protocol::ErrorArrayCompound> {
     static constexpr bool HasRequestPayload = false;
-      using Response = ::test_typesinprotocols::wire::ProtocolErrorArrayCompoundTopResponse;
+      using Response = ::test_typesinprotocols::wire::ProtocolErrorArrayCompoundResult;
   using DomainError = uint32_t;
     
       using Completer = fidl::Completer<::fidl::internal::WireCompleterBase<::test_typesinprotocols::Protocol::ErrorArrayCompound>>;
@@ -689,7 +689,7 @@ struct ::fidl::internal::WireMethodTypes<::test_typesinprotocols::Protocol::TwoW
 template<>
 struct ::fidl::internal::WireMethodTypes<::test_typesinprotocols::Protocol::ErrorVectorBasic> {
     static constexpr bool HasRequestPayload = false;
-      using Response = ::test_typesinprotocols::wire::ProtocolErrorVectorBasicTopResponse;
+      using Response = ::test_typesinprotocols::wire::ProtocolErrorVectorBasicResult;
   using DomainError = uint32_t;
     
       using Completer = fidl::Completer<::fidl::internal::WireCompleterBase<::test_typesinprotocols::Protocol::ErrorVectorBasic>>;
@@ -788,7 +788,7 @@ struct ::fidl::internal::WireMethodTypes<::test_typesinprotocols::Protocol::TwoW
 template<>
 struct ::fidl::internal::WireMethodTypes<::test_typesinprotocols::Protocol::ErrorVectorCompound> {
     static constexpr bool HasRequestPayload = false;
-      using Response = ::test_typesinprotocols::wire::ProtocolErrorVectorCompoundTopResponse;
+      using Response = ::test_typesinprotocols::wire::ProtocolErrorVectorCompoundResult;
   using DomainError = uint32_t;
     
       using Completer = fidl::Completer<::fidl::internal::WireCompleterBase<::test_typesinprotocols::Protocol::ErrorVectorCompound>>;
@@ -887,7 +887,7 @@ struct ::fidl::internal::WireMethodTypes<::test_typesinprotocols::Protocol::TwoW
 template<>
 struct ::fidl::internal::WireMethodTypes<::test_typesinprotocols::Protocol::ErrorVectorOptional> {
     static constexpr bool HasRequestPayload = false;
-      using Response = ::test_typesinprotocols::wire::ProtocolErrorVectorOptionalTopResponse;
+      using Response = ::test_typesinprotocols::wire::ProtocolErrorVectorOptionalResult;
   using DomainError = uint32_t;
     
       using Completer = fidl::Completer<::fidl::internal::WireCompleterBase<::test_typesinprotocols::Protocol::ErrorVectorOptional>>;
@@ -986,7 +986,7 @@ struct ::fidl::internal::WireMethodTypes<::test_typesinprotocols::Protocol::TwoW
 template<>
 struct ::fidl::internal::WireMethodTypes<::test_typesinprotocols::Protocol::ErrorArrayVectorNested> {
     static constexpr bool HasRequestPayload = false;
-      using Response = ::test_typesinprotocols::wire::ProtocolErrorArrayVectorNestedTopResponse;
+      using Response = ::test_typesinprotocols::wire::ProtocolErrorArrayVectorNestedResult;
   using DomainError = uint32_t;
     
       using Completer = fidl::Completer<::fidl::internal::WireCompleterBase<::test_typesinprotocols::Protocol::ErrorArrayVectorNested>>;
@@ -1085,7 +1085,7 @@ struct ::fidl::internal::WireMethodTypes<::test_typesinprotocols::Protocol::TwoW
 template<>
 struct ::fidl::internal::WireMethodTypes<::test_typesinprotocols::Protocol::ErrorResource> {
     static constexpr bool HasRequestPayload = false;
-      using Response = ::test_typesinprotocols::wire::ProtocolErrorResourceTopResponse;
+      using Response = ::test_typesinprotocols::wire::ProtocolErrorResourceResult;
   using DomainError = uint32_t;
     
       using Completer = fidl::Completer<::fidl::internal::WireCompleterBase<::test_typesinprotocols::Protocol::ErrorResource>>;
@@ -1334,12 +1334,10 @@ struct ::fidl::internal::WireCodingTraits<::fidl::internal::TransactionalRequest
 
 
 template<>
-struct ::fidl::WireResponse<::test_typesinprotocols::Protocol::ErrorBasic> final : public ::test_typesinprotocols::wire::ProtocolErrorBasicTopResponse {
-  using Result = test_typesinprotocols::wire::ProtocolErrorBasicResult;
+struct ::fidl::WireResponse<::test_typesinprotocols::Protocol::ErrorBasic> final : public ::test_typesinprotocols::wire::ProtocolErrorBasicResult {
 
   
-  explicit WireResponse(::test_typesinprotocols::wire::ProtocolErrorBasicTopResponse base) : ::test_typesinprotocols::wire::ProtocolErrorBasicTopResponse(std::move(base)) {}
-  explicit WireResponse(::test_typesinprotocols::wire::ProtocolErrorBasicResult result) : ::test_typesinprotocols::wire::ProtocolErrorBasicTopResponse{ .result = std::move(result)}{}
+  explicit WireResponse(::test_typesinprotocols::wire::ProtocolErrorBasicResult ProtocolErrorBasicResult) : ::test_typesinprotocols::wire::ProtocolErrorBasicResult(ProtocolErrorBasicResult){}
   WireResponse() = default;
 };
 
@@ -1351,12 +1349,12 @@ struct ::fidl::internal::WireCodingTraits<::fidl::WireResponse<::test_typesinpro
 
   static void Encode(
     internal::WireEncoder* encoder, ::fidl::WireResponse<::test_typesinprotocols::Protocol::ErrorBasic>* value, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth) {
-    fidl::internal::WireCodingTraits<::test_typesinprotocols::wire::ProtocolErrorBasicTopResponse, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive>::Encode(
+    fidl::internal::WireCodingTraits<::test_typesinprotocols::wire::ProtocolErrorBasicResult, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive>::Encode(
       encoder, value, position, recursion_depth);
   }
   static void Decode(
     internal::WireDecoder* decoder, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth) {
-    fidl::internal::WireCodingTraits<::test_typesinprotocols::wire::ProtocolErrorBasicTopResponse, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive>::Decode(
+    fidl::internal::WireCodingTraits<::test_typesinprotocols::wire::ProtocolErrorBasicResult, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive>::Decode(
       decoder, position, recursion_depth);
   }
 };
@@ -1367,8 +1365,8 @@ struct ::fidl::internal::TransactionalResponse<::test_typesinprotocols::Protocol
   fidl_message_header_t header;
   
   ::fidl::WireResponse<::test_typesinprotocols::Protocol::ErrorBasic> body;
-  explicit TransactionalResponse(::test_typesinprotocols::wire::ProtocolErrorBasicResult result)
-  : body(::fidl::WireResponse<::test_typesinprotocols::Protocol::ErrorBasic>(result)) {
+  explicit TransactionalResponse(::test_typesinprotocols::wire::ProtocolErrorBasicResult ProtocolErrorBasicResult)
+  : body(::fidl::WireResponse<::test_typesinprotocols::Protocol::ErrorBasic>(ProtocolErrorBasicResult)) {
     _InitHeader();
   }
   TransactionalResponse() {
@@ -1612,12 +1610,10 @@ struct ::fidl::internal::WireCodingTraits<::fidl::internal::TransactionalRequest
 
 
 template<>
-struct ::fidl::WireResponse<::test_typesinprotocols::Protocol::ErrorCompound> final : public ::test_typesinprotocols::wire::ProtocolErrorCompoundTopResponse {
-  using Result = test_typesinprotocols::wire::ProtocolErrorCompoundResult;
+struct ::fidl::WireResponse<::test_typesinprotocols::Protocol::ErrorCompound> final : public ::test_typesinprotocols::wire::ProtocolErrorCompoundResult {
 
   
-  explicit WireResponse(::test_typesinprotocols::wire::ProtocolErrorCompoundTopResponse base) : ::test_typesinprotocols::wire::ProtocolErrorCompoundTopResponse(std::move(base)) {}
-  explicit WireResponse(::test_typesinprotocols::wire::ProtocolErrorCompoundResult result) : ::test_typesinprotocols::wire::ProtocolErrorCompoundTopResponse{ .result = std::move(result)}{}
+  explicit WireResponse(::test_typesinprotocols::wire::ProtocolErrorCompoundResult ProtocolErrorCompoundResult) : ::test_typesinprotocols::wire::ProtocolErrorCompoundResult(ProtocolErrorCompoundResult){}
   WireResponse() = default;
 };
 
@@ -1629,12 +1625,12 @@ struct ::fidl::internal::WireCodingTraits<::fidl::WireResponse<::test_typesinpro
 
   static void Encode(
     internal::WireEncoder* encoder, ::fidl::WireResponse<::test_typesinprotocols::Protocol::ErrorCompound>* value, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth) {
-    fidl::internal::WireCodingTraits<::test_typesinprotocols::wire::ProtocolErrorCompoundTopResponse, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive>::Encode(
+    fidl::internal::WireCodingTraits<::test_typesinprotocols::wire::ProtocolErrorCompoundResult, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive>::Encode(
       encoder, value, position, recursion_depth);
   }
   static void Decode(
     internal::WireDecoder* decoder, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth) {
-    fidl::internal::WireCodingTraits<::test_typesinprotocols::wire::ProtocolErrorCompoundTopResponse, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive>::Decode(
+    fidl::internal::WireCodingTraits<::test_typesinprotocols::wire::ProtocolErrorCompoundResult, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive>::Decode(
       decoder, position, recursion_depth);
   }
 };
@@ -1645,8 +1641,8 @@ struct ::fidl::internal::TransactionalResponse<::test_typesinprotocols::Protocol
   fidl_message_header_t header;
   
   ::fidl::WireResponse<::test_typesinprotocols::Protocol::ErrorCompound> body;
-  explicit TransactionalResponse(::test_typesinprotocols::wire::ProtocolErrorCompoundResult result)
-  : body(::fidl::WireResponse<::test_typesinprotocols::Protocol::ErrorCompound>(result)) {
+  explicit TransactionalResponse(::test_typesinprotocols::wire::ProtocolErrorCompoundResult ProtocolErrorCompoundResult)
+  : body(::fidl::WireResponse<::test_typesinprotocols::Protocol::ErrorCompound>(ProtocolErrorCompoundResult)) {
     _InitHeader();
   }
   TransactionalResponse() {
@@ -1890,12 +1886,10 @@ struct ::fidl::internal::WireCodingTraits<::fidl::internal::TransactionalRequest
 
 
 template<>
-struct ::fidl::WireResponse<::test_typesinprotocols::Protocol::ErrorArrayBasic> final : public ::test_typesinprotocols::wire::ProtocolErrorArrayBasicTopResponse {
-  using Result = test_typesinprotocols::wire::ProtocolErrorArrayBasicResult;
+struct ::fidl::WireResponse<::test_typesinprotocols::Protocol::ErrorArrayBasic> final : public ::test_typesinprotocols::wire::ProtocolErrorArrayBasicResult {
 
   
-  explicit WireResponse(::test_typesinprotocols::wire::ProtocolErrorArrayBasicTopResponse base) : ::test_typesinprotocols::wire::ProtocolErrorArrayBasicTopResponse(std::move(base)) {}
-  explicit WireResponse(::test_typesinprotocols::wire::ProtocolErrorArrayBasicResult result) : ::test_typesinprotocols::wire::ProtocolErrorArrayBasicTopResponse{ .result = std::move(result)}{}
+  explicit WireResponse(::test_typesinprotocols::wire::ProtocolErrorArrayBasicResult ProtocolErrorArrayBasicResult) : ::test_typesinprotocols::wire::ProtocolErrorArrayBasicResult(ProtocolErrorArrayBasicResult){}
   WireResponse() = default;
 };
 
@@ -1907,12 +1901,12 @@ struct ::fidl::internal::WireCodingTraits<::fidl::WireResponse<::test_typesinpro
 
   static void Encode(
     internal::WireEncoder* encoder, ::fidl::WireResponse<::test_typesinprotocols::Protocol::ErrorArrayBasic>* value, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth) {
-    fidl::internal::WireCodingTraits<::test_typesinprotocols::wire::ProtocolErrorArrayBasicTopResponse, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive>::Encode(
+    fidl::internal::WireCodingTraits<::test_typesinprotocols::wire::ProtocolErrorArrayBasicResult, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive>::Encode(
       encoder, value, position, recursion_depth);
   }
   static void Decode(
     internal::WireDecoder* decoder, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth) {
-    fidl::internal::WireCodingTraits<::test_typesinprotocols::wire::ProtocolErrorArrayBasicTopResponse, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive>::Decode(
+    fidl::internal::WireCodingTraits<::test_typesinprotocols::wire::ProtocolErrorArrayBasicResult, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive>::Decode(
       decoder, position, recursion_depth);
   }
 };
@@ -1923,8 +1917,8 @@ struct ::fidl::internal::TransactionalResponse<::test_typesinprotocols::Protocol
   fidl_message_header_t header;
   
   ::fidl::WireResponse<::test_typesinprotocols::Protocol::ErrorArrayBasic> body;
-  explicit TransactionalResponse(::test_typesinprotocols::wire::ProtocolErrorArrayBasicResult result)
-  : body(::fidl::WireResponse<::test_typesinprotocols::Protocol::ErrorArrayBasic>(result)) {
+  explicit TransactionalResponse(::test_typesinprotocols::wire::ProtocolErrorArrayBasicResult ProtocolErrorArrayBasicResult)
+  : body(::fidl::WireResponse<::test_typesinprotocols::Protocol::ErrorArrayBasic>(ProtocolErrorArrayBasicResult)) {
     _InitHeader();
   }
   TransactionalResponse() {
@@ -2168,12 +2162,10 @@ struct ::fidl::internal::WireCodingTraits<::fidl::internal::TransactionalRequest
 
 
 template<>
-struct ::fidl::WireResponse<::test_typesinprotocols::Protocol::ErrorArrayCompound> final : public ::test_typesinprotocols::wire::ProtocolErrorArrayCompoundTopResponse {
-  using Result = test_typesinprotocols::wire::ProtocolErrorArrayCompoundResult;
+struct ::fidl::WireResponse<::test_typesinprotocols::Protocol::ErrorArrayCompound> final : public ::test_typesinprotocols::wire::ProtocolErrorArrayCompoundResult {
 
   
-  explicit WireResponse(::test_typesinprotocols::wire::ProtocolErrorArrayCompoundTopResponse base) : ::test_typesinprotocols::wire::ProtocolErrorArrayCompoundTopResponse(std::move(base)) {}
-  explicit WireResponse(::test_typesinprotocols::wire::ProtocolErrorArrayCompoundResult result) : ::test_typesinprotocols::wire::ProtocolErrorArrayCompoundTopResponse{ .result = std::move(result)}{}
+  explicit WireResponse(::test_typesinprotocols::wire::ProtocolErrorArrayCompoundResult ProtocolErrorArrayCompoundResult) : ::test_typesinprotocols::wire::ProtocolErrorArrayCompoundResult(ProtocolErrorArrayCompoundResult){}
   WireResponse() = default;
 };
 
@@ -2185,12 +2177,12 @@ struct ::fidl::internal::WireCodingTraits<::fidl::WireResponse<::test_typesinpro
 
   static void Encode(
     internal::WireEncoder* encoder, ::fidl::WireResponse<::test_typesinprotocols::Protocol::ErrorArrayCompound>* value, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth) {
-    fidl::internal::WireCodingTraits<::test_typesinprotocols::wire::ProtocolErrorArrayCompoundTopResponse, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive>::Encode(
+    fidl::internal::WireCodingTraits<::test_typesinprotocols::wire::ProtocolErrorArrayCompoundResult, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive>::Encode(
       encoder, value, position, recursion_depth);
   }
   static void Decode(
     internal::WireDecoder* decoder, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth) {
-    fidl::internal::WireCodingTraits<::test_typesinprotocols::wire::ProtocolErrorArrayCompoundTopResponse, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive>::Decode(
+    fidl::internal::WireCodingTraits<::test_typesinprotocols::wire::ProtocolErrorArrayCompoundResult, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive>::Decode(
       decoder, position, recursion_depth);
   }
 };
@@ -2201,8 +2193,8 @@ struct ::fidl::internal::TransactionalResponse<::test_typesinprotocols::Protocol
   fidl_message_header_t header;
   
   ::fidl::WireResponse<::test_typesinprotocols::Protocol::ErrorArrayCompound> body;
-  explicit TransactionalResponse(::test_typesinprotocols::wire::ProtocolErrorArrayCompoundResult result)
-  : body(::fidl::WireResponse<::test_typesinprotocols::Protocol::ErrorArrayCompound>(result)) {
+  explicit TransactionalResponse(::test_typesinprotocols::wire::ProtocolErrorArrayCompoundResult ProtocolErrorArrayCompoundResult)
+  : body(::fidl::WireResponse<::test_typesinprotocols::Protocol::ErrorArrayCompound>(ProtocolErrorArrayCompoundResult)) {
     _InitHeader();
   }
   TransactionalResponse() {
@@ -2446,12 +2438,10 @@ struct ::fidl::internal::WireCodingTraits<::fidl::internal::TransactionalRequest
 
 
 template<>
-struct ::fidl::WireResponse<::test_typesinprotocols::Protocol::ErrorVectorBasic> final : public ::test_typesinprotocols::wire::ProtocolErrorVectorBasicTopResponse {
-  using Result = test_typesinprotocols::wire::ProtocolErrorVectorBasicResult;
+struct ::fidl::WireResponse<::test_typesinprotocols::Protocol::ErrorVectorBasic> final : public ::test_typesinprotocols::wire::ProtocolErrorVectorBasicResult {
 
   
-  explicit WireResponse(::test_typesinprotocols::wire::ProtocolErrorVectorBasicTopResponse base) : ::test_typesinprotocols::wire::ProtocolErrorVectorBasicTopResponse(std::move(base)) {}
-  explicit WireResponse(::test_typesinprotocols::wire::ProtocolErrorVectorBasicResult result) : ::test_typesinprotocols::wire::ProtocolErrorVectorBasicTopResponse{ .result = std::move(result)}{}
+  explicit WireResponse(::test_typesinprotocols::wire::ProtocolErrorVectorBasicResult ProtocolErrorVectorBasicResult) : ::test_typesinprotocols::wire::ProtocolErrorVectorBasicResult(ProtocolErrorVectorBasicResult){}
   WireResponse() = default;
 };
 
@@ -2463,12 +2453,12 @@ struct ::fidl::internal::WireCodingTraits<::fidl::WireResponse<::test_typesinpro
 
   static void Encode(
     internal::WireEncoder* encoder, ::fidl::WireResponse<::test_typesinprotocols::Protocol::ErrorVectorBasic>* value, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth) {
-    fidl::internal::WireCodingTraits<::test_typesinprotocols::wire::ProtocolErrorVectorBasicTopResponse, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive>::Encode(
+    fidl::internal::WireCodingTraits<::test_typesinprotocols::wire::ProtocolErrorVectorBasicResult, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive>::Encode(
       encoder, value, position, recursion_depth);
   }
   static void Decode(
     internal::WireDecoder* decoder, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth) {
-    fidl::internal::WireCodingTraits<::test_typesinprotocols::wire::ProtocolErrorVectorBasicTopResponse, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive>::Decode(
+    fidl::internal::WireCodingTraits<::test_typesinprotocols::wire::ProtocolErrorVectorBasicResult, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive>::Decode(
       decoder, position, recursion_depth);
   }
 };
@@ -2479,8 +2469,8 @@ struct ::fidl::internal::TransactionalResponse<::test_typesinprotocols::Protocol
   fidl_message_header_t header;
   
   ::fidl::WireResponse<::test_typesinprotocols::Protocol::ErrorVectorBasic> body;
-  explicit TransactionalResponse(::test_typesinprotocols::wire::ProtocolErrorVectorBasicResult result)
-  : body(::fidl::WireResponse<::test_typesinprotocols::Protocol::ErrorVectorBasic>(result)) {
+  explicit TransactionalResponse(::test_typesinprotocols::wire::ProtocolErrorVectorBasicResult ProtocolErrorVectorBasicResult)
+  : body(::fidl::WireResponse<::test_typesinprotocols::Protocol::ErrorVectorBasic>(ProtocolErrorVectorBasicResult)) {
     _InitHeader();
   }
   TransactionalResponse() {
@@ -2724,12 +2714,10 @@ struct ::fidl::internal::WireCodingTraits<::fidl::internal::TransactionalRequest
 
 
 template<>
-struct ::fidl::WireResponse<::test_typesinprotocols::Protocol::ErrorVectorCompound> final : public ::test_typesinprotocols::wire::ProtocolErrorVectorCompoundTopResponse {
-  using Result = test_typesinprotocols::wire::ProtocolErrorVectorCompoundResult;
+struct ::fidl::WireResponse<::test_typesinprotocols::Protocol::ErrorVectorCompound> final : public ::test_typesinprotocols::wire::ProtocolErrorVectorCompoundResult {
 
   
-  explicit WireResponse(::test_typesinprotocols::wire::ProtocolErrorVectorCompoundTopResponse base) : ::test_typesinprotocols::wire::ProtocolErrorVectorCompoundTopResponse(std::move(base)) {}
-  explicit WireResponse(::test_typesinprotocols::wire::ProtocolErrorVectorCompoundResult result) : ::test_typesinprotocols::wire::ProtocolErrorVectorCompoundTopResponse{ .result = std::move(result)}{}
+  explicit WireResponse(::test_typesinprotocols::wire::ProtocolErrorVectorCompoundResult ProtocolErrorVectorCompoundResult) : ::test_typesinprotocols::wire::ProtocolErrorVectorCompoundResult(ProtocolErrorVectorCompoundResult){}
   WireResponse() = default;
 };
 
@@ -2741,12 +2729,12 @@ struct ::fidl::internal::WireCodingTraits<::fidl::WireResponse<::test_typesinpro
 
   static void Encode(
     internal::WireEncoder* encoder, ::fidl::WireResponse<::test_typesinprotocols::Protocol::ErrorVectorCompound>* value, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth) {
-    fidl::internal::WireCodingTraits<::test_typesinprotocols::wire::ProtocolErrorVectorCompoundTopResponse, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive>::Encode(
+    fidl::internal::WireCodingTraits<::test_typesinprotocols::wire::ProtocolErrorVectorCompoundResult, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive>::Encode(
       encoder, value, position, recursion_depth);
   }
   static void Decode(
     internal::WireDecoder* decoder, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth) {
-    fidl::internal::WireCodingTraits<::test_typesinprotocols::wire::ProtocolErrorVectorCompoundTopResponse, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive>::Decode(
+    fidl::internal::WireCodingTraits<::test_typesinprotocols::wire::ProtocolErrorVectorCompoundResult, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive>::Decode(
       decoder, position, recursion_depth);
   }
 };
@@ -2757,8 +2745,8 @@ struct ::fidl::internal::TransactionalResponse<::test_typesinprotocols::Protocol
   fidl_message_header_t header;
   
   ::fidl::WireResponse<::test_typesinprotocols::Protocol::ErrorVectorCompound> body;
-  explicit TransactionalResponse(::test_typesinprotocols::wire::ProtocolErrorVectorCompoundResult result)
-  : body(::fidl::WireResponse<::test_typesinprotocols::Protocol::ErrorVectorCompound>(result)) {
+  explicit TransactionalResponse(::test_typesinprotocols::wire::ProtocolErrorVectorCompoundResult ProtocolErrorVectorCompoundResult)
+  : body(::fidl::WireResponse<::test_typesinprotocols::Protocol::ErrorVectorCompound>(ProtocolErrorVectorCompoundResult)) {
     _InitHeader();
   }
   TransactionalResponse() {
@@ -3002,12 +2990,10 @@ struct ::fidl::internal::WireCodingTraits<::fidl::internal::TransactionalRequest
 
 
 template<>
-struct ::fidl::WireResponse<::test_typesinprotocols::Protocol::ErrorVectorOptional> final : public ::test_typesinprotocols::wire::ProtocolErrorVectorOptionalTopResponse {
-  using Result = test_typesinprotocols::wire::ProtocolErrorVectorOptionalResult;
+struct ::fidl::WireResponse<::test_typesinprotocols::Protocol::ErrorVectorOptional> final : public ::test_typesinprotocols::wire::ProtocolErrorVectorOptionalResult {
 
   
-  explicit WireResponse(::test_typesinprotocols::wire::ProtocolErrorVectorOptionalTopResponse base) : ::test_typesinprotocols::wire::ProtocolErrorVectorOptionalTopResponse(std::move(base)) {}
-  explicit WireResponse(::test_typesinprotocols::wire::ProtocolErrorVectorOptionalResult result) : ::test_typesinprotocols::wire::ProtocolErrorVectorOptionalTopResponse{ .result = std::move(result)}{}
+  explicit WireResponse(::test_typesinprotocols::wire::ProtocolErrorVectorOptionalResult ProtocolErrorVectorOptionalResult) : ::test_typesinprotocols::wire::ProtocolErrorVectorOptionalResult(ProtocolErrorVectorOptionalResult){}
   WireResponse() = default;
 };
 
@@ -3019,12 +3005,12 @@ struct ::fidl::internal::WireCodingTraits<::fidl::WireResponse<::test_typesinpro
 
   static void Encode(
     internal::WireEncoder* encoder, ::fidl::WireResponse<::test_typesinprotocols::Protocol::ErrorVectorOptional>* value, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth) {
-    fidl::internal::WireCodingTraits<::test_typesinprotocols::wire::ProtocolErrorVectorOptionalTopResponse, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive>::Encode(
+    fidl::internal::WireCodingTraits<::test_typesinprotocols::wire::ProtocolErrorVectorOptionalResult, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive>::Encode(
       encoder, value, position, recursion_depth);
   }
   static void Decode(
     internal::WireDecoder* decoder, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth) {
-    fidl::internal::WireCodingTraits<::test_typesinprotocols::wire::ProtocolErrorVectorOptionalTopResponse, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive>::Decode(
+    fidl::internal::WireCodingTraits<::test_typesinprotocols::wire::ProtocolErrorVectorOptionalResult, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive>::Decode(
       decoder, position, recursion_depth);
   }
 };
@@ -3035,8 +3021,8 @@ struct ::fidl::internal::TransactionalResponse<::test_typesinprotocols::Protocol
   fidl_message_header_t header;
   
   ::fidl::WireResponse<::test_typesinprotocols::Protocol::ErrorVectorOptional> body;
-  explicit TransactionalResponse(::test_typesinprotocols::wire::ProtocolErrorVectorOptionalResult result)
-  : body(::fidl::WireResponse<::test_typesinprotocols::Protocol::ErrorVectorOptional>(result)) {
+  explicit TransactionalResponse(::test_typesinprotocols::wire::ProtocolErrorVectorOptionalResult ProtocolErrorVectorOptionalResult)
+  : body(::fidl::WireResponse<::test_typesinprotocols::Protocol::ErrorVectorOptional>(ProtocolErrorVectorOptionalResult)) {
     _InitHeader();
   }
   TransactionalResponse() {
@@ -3280,12 +3266,10 @@ struct ::fidl::internal::WireCodingTraits<::fidl::internal::TransactionalRequest
 
 
 template<>
-struct ::fidl::WireResponse<::test_typesinprotocols::Protocol::ErrorArrayVectorNested> final : public ::test_typesinprotocols::wire::ProtocolErrorArrayVectorNestedTopResponse {
-  using Result = test_typesinprotocols::wire::ProtocolErrorArrayVectorNestedResult;
+struct ::fidl::WireResponse<::test_typesinprotocols::Protocol::ErrorArrayVectorNested> final : public ::test_typesinprotocols::wire::ProtocolErrorArrayVectorNestedResult {
 
   
-  explicit WireResponse(::test_typesinprotocols::wire::ProtocolErrorArrayVectorNestedTopResponse base) : ::test_typesinprotocols::wire::ProtocolErrorArrayVectorNestedTopResponse(std::move(base)) {}
-  explicit WireResponse(::test_typesinprotocols::wire::ProtocolErrorArrayVectorNestedResult result) : ::test_typesinprotocols::wire::ProtocolErrorArrayVectorNestedTopResponse{ .result = std::move(result)}{}
+  explicit WireResponse(::test_typesinprotocols::wire::ProtocolErrorArrayVectorNestedResult ProtocolErrorArrayVectorNestedResult) : ::test_typesinprotocols::wire::ProtocolErrorArrayVectorNestedResult(ProtocolErrorArrayVectorNestedResult){}
   WireResponse() = default;
 };
 
@@ -3297,12 +3281,12 @@ struct ::fidl::internal::WireCodingTraits<::fidl::WireResponse<::test_typesinpro
 
   static void Encode(
     internal::WireEncoder* encoder, ::fidl::WireResponse<::test_typesinprotocols::Protocol::ErrorArrayVectorNested>* value, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth) {
-    fidl::internal::WireCodingTraits<::test_typesinprotocols::wire::ProtocolErrorArrayVectorNestedTopResponse, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive>::Encode(
+    fidl::internal::WireCodingTraits<::test_typesinprotocols::wire::ProtocolErrorArrayVectorNestedResult, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive>::Encode(
       encoder, value, position, recursion_depth);
   }
   static void Decode(
     internal::WireDecoder* decoder, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth) {
-    fidl::internal::WireCodingTraits<::test_typesinprotocols::wire::ProtocolErrorArrayVectorNestedTopResponse, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive>::Decode(
+    fidl::internal::WireCodingTraits<::test_typesinprotocols::wire::ProtocolErrorArrayVectorNestedResult, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive>::Decode(
       decoder, position, recursion_depth);
   }
 };
@@ -3313,8 +3297,8 @@ struct ::fidl::internal::TransactionalResponse<::test_typesinprotocols::Protocol
   fidl_message_header_t header;
   
   ::fidl::WireResponse<::test_typesinprotocols::Protocol::ErrorArrayVectorNested> body;
-  explicit TransactionalResponse(::test_typesinprotocols::wire::ProtocolErrorArrayVectorNestedResult result)
-  : body(::fidl::WireResponse<::test_typesinprotocols::Protocol::ErrorArrayVectorNested>(result)) {
+  explicit TransactionalResponse(::test_typesinprotocols::wire::ProtocolErrorArrayVectorNestedResult ProtocolErrorArrayVectorNestedResult)
+  : body(::fidl::WireResponse<::test_typesinprotocols::Protocol::ErrorArrayVectorNested>(ProtocolErrorArrayVectorNestedResult)) {
     _InitHeader();
   }
   TransactionalResponse() {
@@ -3574,12 +3558,10 @@ struct ::fidl::internal::WireCodingTraits<::fidl::internal::TransactionalRequest
 #ifdef __Fuchsia__
 
 template<>
-struct ::fidl::WireResponse<::test_typesinprotocols::Protocol::ErrorResource> final : public ::test_typesinprotocols::wire::ProtocolErrorResourceTopResponse {
-  using Result = test_typesinprotocols::wire::ProtocolErrorResourceResult;
+struct ::fidl::WireResponse<::test_typesinprotocols::Protocol::ErrorResource> final : public ::test_typesinprotocols::wire::ProtocolErrorResourceResult {
 
   
-  explicit WireResponse(::test_typesinprotocols::wire::ProtocolErrorResourceTopResponse base) : ::test_typesinprotocols::wire::ProtocolErrorResourceTopResponse(std::move(base)) {}
-  explicit WireResponse(::test_typesinprotocols::wire::ProtocolErrorResourceResult result) : ::test_typesinprotocols::wire::ProtocolErrorResourceTopResponse{ .result = std::move(result)}{}
+  explicit WireResponse(::test_typesinprotocols::wire::ProtocolErrorResourceResult ProtocolErrorResourceResult) : ::test_typesinprotocols::wire::ProtocolErrorResourceResult(std::move(ProtocolErrorResourceResult)){}
   WireResponse() = default;
 };
 
@@ -3591,12 +3573,12 @@ struct ::fidl::internal::WireCodingTraits<::fidl::WireResponse<::test_typesinpro
 
   static void Encode(
     internal::WireEncoder* encoder, ::fidl::WireResponse<::test_typesinprotocols::Protocol::ErrorResource>* value, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth) {
-    fidl::internal::WireCodingTraits<::test_typesinprotocols::wire::ProtocolErrorResourceTopResponse, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive>::Encode(
+    fidl::internal::WireCodingTraits<::test_typesinprotocols::wire::ProtocolErrorResourceResult, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive>::Encode(
       encoder, value, position, recursion_depth);
   }
   static void Decode(
     internal::WireDecoder* decoder, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth) {
-    fidl::internal::WireCodingTraits<::test_typesinprotocols::wire::ProtocolErrorResourceTopResponse, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive>::Decode(
+    fidl::internal::WireCodingTraits<::test_typesinprotocols::wire::ProtocolErrorResourceResult, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive>::Decode(
       decoder, position, recursion_depth);
   }
 };
@@ -3607,8 +3589,8 @@ struct ::fidl::internal::TransactionalResponse<::test_typesinprotocols::Protocol
   fidl_message_header_t header;
   
   ::fidl::WireResponse<::test_typesinprotocols::Protocol::ErrorResource> body;
-  explicit TransactionalResponse(::test_typesinprotocols::wire::ProtocolErrorResourceResult result)
-  : body(::fidl::WireResponse<::test_typesinprotocols::Protocol::ErrorResource>(std::move(result))) {
+  explicit TransactionalResponse(::test_typesinprotocols::wire::ProtocolErrorResourceResult ProtocolErrorResourceResult)
+  : body(::fidl::WireResponse<::test_typesinprotocols::Protocol::ErrorResource>(std::move(ProtocolErrorResourceResult))) {
     _InitHeader();
   }
   TransactionalResponse() {
@@ -3885,7 +3867,7 @@ struct IsFidlType<::fidl::WireResponse<::test_typesinprotocols::Protocol::ErrorB
 template <>
 struct TypeTraits<::fidl::internal::TransactionalResponse<::test_typesinprotocols::Protocol::ErrorBasic>> {
   static constexpr const fidl_type_t* kType =
-    &::test_typesinprotocols::test_typesinprotocols_ProtocolErrorBasicTopResponseTable;
+    &::test_typesinprotocols::test_typesinprotocols_Protocol_ErrorBasic_ResultTable;
   static constexpr bool kHasServerToClientBody = true;
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 2;
@@ -3907,7 +3889,7 @@ static_assert(offsetof(::fidl::internal::TransactionalResponse<::test_typesinpro
 template <>
 struct TypeTraits<::fidl::WireResponse<::test_typesinprotocols::Protocol::ErrorBasic>> {
   static constexpr const fidl_type_t* kType =
-    &::test_typesinprotocols::test_typesinprotocols_ProtocolErrorBasicTopResponseTable;
+    &::test_typesinprotocols::test_typesinprotocols_Protocol_ErrorBasic_ResultTable;
   static constexpr bool kHasServerToClientBody = true;
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 2;
@@ -3923,7 +3905,6 @@ struct TypeTraits<::fidl::WireResponse<::test_typesinprotocols::Protocol::ErrorB
 };
 static_assert(sizeof(::fidl::WireResponse<::test_typesinprotocols::Protocol::ErrorBasic>)
     == TypeTraits<::fidl::WireResponse<::test_typesinprotocols::Protocol::ErrorBasic>>::kPrimarySize);
-static_assert(offsetof(::fidl::WireResponse<::test_typesinprotocols::Protocol::ErrorBasic>, result) == 0);
 #ifdef __Fuchsia__
 template <>
 struct IsFidlType<::fidl::internal::TransactionalEvent<::test_typesinprotocols::Protocol::EventBasic>> : public std::true_type {};
@@ -4134,7 +4115,7 @@ struct IsFidlType<::fidl::WireResponse<::test_typesinprotocols::Protocol::ErrorC
 template <>
 struct TypeTraits<::fidl::internal::TransactionalResponse<::test_typesinprotocols::Protocol::ErrorCompound>> {
   static constexpr const fidl_type_t* kType =
-    &::test_typesinprotocols::test_typesinprotocols_ProtocolErrorCompoundTopResponseTable;
+    &::test_typesinprotocols::test_typesinprotocols_Protocol_ErrorCompound_ResultTable;
   static constexpr bool kHasServerToClientBody = true;
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 2;
@@ -4156,7 +4137,7 @@ static_assert(offsetof(::fidl::internal::TransactionalResponse<::test_typesinpro
 template <>
 struct TypeTraits<::fidl::WireResponse<::test_typesinprotocols::Protocol::ErrorCompound>> {
   static constexpr const fidl_type_t* kType =
-    &::test_typesinprotocols::test_typesinprotocols_ProtocolErrorCompoundTopResponseTable;
+    &::test_typesinprotocols::test_typesinprotocols_Protocol_ErrorCompound_ResultTable;
   static constexpr bool kHasServerToClientBody = true;
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 2;
@@ -4172,7 +4153,6 @@ struct TypeTraits<::fidl::WireResponse<::test_typesinprotocols::Protocol::ErrorC
 };
 static_assert(sizeof(::fidl::WireResponse<::test_typesinprotocols::Protocol::ErrorCompound>)
     == TypeTraits<::fidl::WireResponse<::test_typesinprotocols::Protocol::ErrorCompound>>::kPrimarySize);
-static_assert(offsetof(::fidl::WireResponse<::test_typesinprotocols::Protocol::ErrorCompound>, result) == 0);
 #ifdef __Fuchsia__
 template <>
 struct IsFidlType<::fidl::internal::TransactionalEvent<::test_typesinprotocols::Protocol::EventCompound>> : public std::true_type {};
@@ -4398,7 +4378,7 @@ struct IsFidlType<::fidl::WireResponse<::test_typesinprotocols::Protocol::ErrorA
 template <>
 struct TypeTraits<::fidl::internal::TransactionalResponse<::test_typesinprotocols::Protocol::ErrorArrayBasic>> {
   static constexpr const fidl_type_t* kType =
-    &::test_typesinprotocols::test_typesinprotocols_ProtocolErrorArrayBasicTopResponseTable;
+    &::test_typesinprotocols::test_typesinprotocols_Protocol_ErrorArrayBasic_ResultTable;
   static constexpr bool kHasServerToClientBody = true;
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 2;
@@ -4420,7 +4400,7 @@ static_assert(offsetof(::fidl::internal::TransactionalResponse<::test_typesinpro
 template <>
 struct TypeTraits<::fidl::WireResponse<::test_typesinprotocols::Protocol::ErrorArrayBasic>> {
   static constexpr const fidl_type_t* kType =
-    &::test_typesinprotocols::test_typesinprotocols_ProtocolErrorArrayBasicTopResponseTable;
+    &::test_typesinprotocols::test_typesinprotocols_Protocol_ErrorArrayBasic_ResultTable;
   static constexpr bool kHasServerToClientBody = true;
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 2;
@@ -4436,7 +4416,6 @@ struct TypeTraits<::fidl::WireResponse<::test_typesinprotocols::Protocol::ErrorA
 };
 static_assert(sizeof(::fidl::WireResponse<::test_typesinprotocols::Protocol::ErrorArrayBasic>)
     == TypeTraits<::fidl::WireResponse<::test_typesinprotocols::Protocol::ErrorArrayBasic>>::kPrimarySize);
-static_assert(offsetof(::fidl::WireResponse<::test_typesinprotocols::Protocol::ErrorArrayBasic>, result) == 0);
 #ifdef __Fuchsia__
 template <>
 struct IsFidlType<::fidl::internal::TransactionalEvent<::test_typesinprotocols::Protocol::EventArrayBasic>> : public std::true_type {};
@@ -4647,7 +4626,7 @@ struct IsFidlType<::fidl::WireResponse<::test_typesinprotocols::Protocol::ErrorA
 template <>
 struct TypeTraits<::fidl::internal::TransactionalResponse<::test_typesinprotocols::Protocol::ErrorArrayCompound>> {
   static constexpr const fidl_type_t* kType =
-    &::test_typesinprotocols::test_typesinprotocols_ProtocolErrorArrayCompoundTopResponseTable;
+    &::test_typesinprotocols::test_typesinprotocols_Protocol_ErrorArrayCompound_ResultTable;
   static constexpr bool kHasServerToClientBody = true;
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 2;
@@ -4669,7 +4648,7 @@ static_assert(offsetof(::fidl::internal::TransactionalResponse<::test_typesinpro
 template <>
 struct TypeTraits<::fidl::WireResponse<::test_typesinprotocols::Protocol::ErrorArrayCompound>> {
   static constexpr const fidl_type_t* kType =
-    &::test_typesinprotocols::test_typesinprotocols_ProtocolErrorArrayCompoundTopResponseTable;
+    &::test_typesinprotocols::test_typesinprotocols_Protocol_ErrorArrayCompound_ResultTable;
   static constexpr bool kHasServerToClientBody = true;
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 2;
@@ -4685,7 +4664,6 @@ struct TypeTraits<::fidl::WireResponse<::test_typesinprotocols::Protocol::ErrorA
 };
 static_assert(sizeof(::fidl::WireResponse<::test_typesinprotocols::Protocol::ErrorArrayCompound>)
     == TypeTraits<::fidl::WireResponse<::test_typesinprotocols::Protocol::ErrorArrayCompound>>::kPrimarySize);
-static_assert(offsetof(::fidl::WireResponse<::test_typesinprotocols::Protocol::ErrorArrayCompound>, result) == 0);
 #ifdef __Fuchsia__
 template <>
 struct IsFidlType<::fidl::internal::TransactionalEvent<::test_typesinprotocols::Protocol::EventArrayCompound>> : public std::true_type {};
@@ -4911,7 +4889,7 @@ struct IsFidlType<::fidl::WireResponse<::test_typesinprotocols::Protocol::ErrorV
 template <>
 struct TypeTraits<::fidl::internal::TransactionalResponse<::test_typesinprotocols::Protocol::ErrorVectorBasic>> {
   static constexpr const fidl_type_t* kType =
-    &::test_typesinprotocols::test_typesinprotocols_ProtocolErrorVectorBasicTopResponseTable;
+    &::test_typesinprotocols::test_typesinprotocols_Protocol_ErrorVectorBasic_ResultTable;
   static constexpr bool kHasServerToClientBody = true;
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 3;
@@ -4933,7 +4911,7 @@ static_assert(offsetof(::fidl::internal::TransactionalResponse<::test_typesinpro
 template <>
 struct TypeTraits<::fidl::WireResponse<::test_typesinprotocols::Protocol::ErrorVectorBasic>> {
   static constexpr const fidl_type_t* kType =
-    &::test_typesinprotocols::test_typesinprotocols_ProtocolErrorVectorBasicTopResponseTable;
+    &::test_typesinprotocols::test_typesinprotocols_Protocol_ErrorVectorBasic_ResultTable;
   static constexpr bool kHasServerToClientBody = true;
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 3;
@@ -4949,7 +4927,6 @@ struct TypeTraits<::fidl::WireResponse<::test_typesinprotocols::Protocol::ErrorV
 };
 static_assert(sizeof(::fidl::WireResponse<::test_typesinprotocols::Protocol::ErrorVectorBasic>)
     == TypeTraits<::fidl::WireResponse<::test_typesinprotocols::Protocol::ErrorVectorBasic>>::kPrimarySize);
-static_assert(offsetof(::fidl::WireResponse<::test_typesinprotocols::Protocol::ErrorVectorBasic>, result) == 0);
 #ifdef __Fuchsia__
 template <>
 struct IsFidlType<::fidl::internal::TransactionalEvent<::test_typesinprotocols::Protocol::EventVectorBasic>> : public std::true_type {};
@@ -5160,7 +5137,7 @@ struct IsFidlType<::fidl::WireResponse<::test_typesinprotocols::Protocol::ErrorV
 template <>
 struct TypeTraits<::fidl::internal::TransactionalResponse<::test_typesinprotocols::Protocol::ErrorVectorCompound>> {
   static constexpr const fidl_type_t* kType =
-    &::test_typesinprotocols::test_typesinprotocols_ProtocolErrorVectorCompoundTopResponseTable;
+    &::test_typesinprotocols::test_typesinprotocols_Protocol_ErrorVectorCompound_ResultTable;
   static constexpr bool kHasServerToClientBody = true;
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 3;
@@ -5182,7 +5159,7 @@ static_assert(offsetof(::fidl::internal::TransactionalResponse<::test_typesinpro
 template <>
 struct TypeTraits<::fidl::WireResponse<::test_typesinprotocols::Protocol::ErrorVectorCompound>> {
   static constexpr const fidl_type_t* kType =
-    &::test_typesinprotocols::test_typesinprotocols_ProtocolErrorVectorCompoundTopResponseTable;
+    &::test_typesinprotocols::test_typesinprotocols_Protocol_ErrorVectorCompound_ResultTable;
   static constexpr bool kHasServerToClientBody = true;
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 3;
@@ -5198,7 +5175,6 @@ struct TypeTraits<::fidl::WireResponse<::test_typesinprotocols::Protocol::ErrorV
 };
 static_assert(sizeof(::fidl::WireResponse<::test_typesinprotocols::Protocol::ErrorVectorCompound>)
     == TypeTraits<::fidl::WireResponse<::test_typesinprotocols::Protocol::ErrorVectorCompound>>::kPrimarySize);
-static_assert(offsetof(::fidl::WireResponse<::test_typesinprotocols::Protocol::ErrorVectorCompound>, result) == 0);
 #ifdef __Fuchsia__
 template <>
 struct IsFidlType<::fidl::internal::TransactionalEvent<::test_typesinprotocols::Protocol::EventVectorCompound>> : public std::true_type {};
@@ -5400,7 +5376,7 @@ struct IsFidlType<::fidl::WireResponse<::test_typesinprotocols::Protocol::ErrorV
 template <>
 struct TypeTraits<::fidl::internal::TransactionalResponse<::test_typesinprotocols::Protocol::ErrorVectorOptional>> {
   static constexpr const fidl_type_t* kType =
-    &::test_typesinprotocols::test_typesinprotocols_ProtocolErrorVectorOptionalTopResponseTable;
+    &::test_typesinprotocols::test_typesinprotocols_Protocol_ErrorVectorOptional_ResultTable;
   static constexpr bool kHasServerToClientBody = true;
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 3;
@@ -5422,7 +5398,7 @@ static_assert(offsetof(::fidl::internal::TransactionalResponse<::test_typesinpro
 template <>
 struct TypeTraits<::fidl::WireResponse<::test_typesinprotocols::Protocol::ErrorVectorOptional>> {
   static constexpr const fidl_type_t* kType =
-    &::test_typesinprotocols::test_typesinprotocols_ProtocolErrorVectorOptionalTopResponseTable;
+    &::test_typesinprotocols::test_typesinprotocols_Protocol_ErrorVectorOptional_ResultTable;
   static constexpr bool kHasServerToClientBody = true;
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 3;
@@ -5438,7 +5414,6 @@ struct TypeTraits<::fidl::WireResponse<::test_typesinprotocols::Protocol::ErrorV
 };
 static_assert(sizeof(::fidl::WireResponse<::test_typesinprotocols::Protocol::ErrorVectorOptional>)
     == TypeTraits<::fidl::WireResponse<::test_typesinprotocols::Protocol::ErrorVectorOptional>>::kPrimarySize);
-static_assert(offsetof(::fidl::WireResponse<::test_typesinprotocols::Protocol::ErrorVectorOptional>, result) == 0);
 #ifdef __Fuchsia__
 template <>
 struct IsFidlType<::fidl::internal::TransactionalEvent<::test_typesinprotocols::Protocol::EventVectorOptional>> : public std::true_type {};
@@ -5640,7 +5615,7 @@ struct IsFidlType<::fidl::WireResponse<::test_typesinprotocols::Protocol::ErrorA
 template <>
 struct TypeTraits<::fidl::internal::TransactionalResponse<::test_typesinprotocols::Protocol::ErrorArrayVectorNested>> {
   static constexpr const fidl_type_t* kType =
-    &::test_typesinprotocols::test_typesinprotocols_ProtocolErrorArrayVectorNestedTopResponseTable;
+    &::test_typesinprotocols::test_typesinprotocols_Protocol_ErrorArrayVectorNested_ResultTable;
   static constexpr bool kHasServerToClientBody = true;
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 3;
@@ -5662,7 +5637,7 @@ static_assert(offsetof(::fidl::internal::TransactionalResponse<::test_typesinpro
 template <>
 struct TypeTraits<::fidl::WireResponse<::test_typesinprotocols::Protocol::ErrorArrayVectorNested>> {
   static constexpr const fidl_type_t* kType =
-    &::test_typesinprotocols::test_typesinprotocols_ProtocolErrorArrayVectorNestedTopResponseTable;
+    &::test_typesinprotocols::test_typesinprotocols_Protocol_ErrorArrayVectorNested_ResultTable;
   static constexpr bool kHasServerToClientBody = true;
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 3;
@@ -5678,7 +5653,6 @@ struct TypeTraits<::fidl::WireResponse<::test_typesinprotocols::Protocol::ErrorA
 };
 static_assert(sizeof(::fidl::WireResponse<::test_typesinprotocols::Protocol::ErrorArrayVectorNested>)
     == TypeTraits<::fidl::WireResponse<::test_typesinprotocols::Protocol::ErrorArrayVectorNested>>::kPrimarySize);
-static_assert(offsetof(::fidl::WireResponse<::test_typesinprotocols::Protocol::ErrorArrayVectorNested>, result) == 0);
 #ifdef __Fuchsia__
 template <>
 struct IsFidlType<::fidl::internal::TransactionalEvent<::test_typesinprotocols::Protocol::EventArrayVectorNested>> : public std::true_type {};
@@ -5966,7 +5940,7 @@ struct IsResource<::fidl::WireResponse<::test_typesinprotocols::Protocol::ErrorR
 template <>
 struct TypeTraits<::fidl::internal::TransactionalResponse<::test_typesinprotocols::Protocol::ErrorResource>> {
   static constexpr const fidl_type_t* kType =
-    &::test_typesinprotocols::test_typesinprotocols_ProtocolErrorResourceTopResponseTable;
+    &::test_typesinprotocols::test_typesinprotocols_Protocol_ErrorResource_ResultTable;
   static constexpr bool kHasServerToClientBody = true;
   static constexpr uint32_t kMaxNumHandles = 4294967295;
   static constexpr uint32_t kMaxDepth = 3;
@@ -5988,7 +5962,7 @@ static_assert(offsetof(::fidl::internal::TransactionalResponse<::test_typesinpro
 template <>
 struct TypeTraits<::fidl::WireResponse<::test_typesinprotocols::Protocol::ErrorResource>> {
   static constexpr const fidl_type_t* kType =
-    &::test_typesinprotocols::test_typesinprotocols_ProtocolErrorResourceTopResponseTable;
+    &::test_typesinprotocols::test_typesinprotocols_Protocol_ErrorResource_ResultTable;
   static constexpr bool kHasServerToClientBody = true;
   static constexpr uint32_t kMaxNumHandles = 4294967295;
   static constexpr uint32_t kMaxDepth = 3;
@@ -6004,7 +5978,6 @@ struct TypeTraits<::fidl::WireResponse<::test_typesinprotocols::Protocol::ErrorR
 };
 static_assert(sizeof(::fidl::WireResponse<::test_typesinprotocols::Protocol::ErrorResource>)
     == TypeTraits<::fidl::WireResponse<::test_typesinprotocols::Protocol::ErrorResource>>::kPrimarySize);
-static_assert(offsetof(::fidl::WireResponse<::test_typesinprotocols::Protocol::ErrorResource>, result) == 0);
 
 #endif  // __Fuchsia__
 
@@ -8225,7 +8198,7 @@ class ::fidl::internal::WireCompleterImpl<::test_typesinprotocols::Protocol::Err
   void ReplyError(uint32_t error);
 
  private:
-  void MakeReply(::test_typesinprotocols::wire::ProtocolErrorBasicResult result);
+  void MakeReply(::test_typesinprotocols::wire::ProtocolErrorBasicResult ProtocolErrorBasicResult);
 };
 
 template <>
@@ -8238,7 +8211,7 @@ class ::fidl::internal::WireBufferCompleterImpl<::test_typesinprotocols::Protoco
   void ReplyError(uint32_t error);
 
  private:
-  void MakeReply(::test_typesinprotocols::wire::ProtocolErrorBasicResult result);
+  void MakeReply(::test_typesinprotocols::wire::ProtocolErrorBasicResult ProtocolErrorBasicResult);
 };
 
 template<>
@@ -8305,7 +8278,7 @@ class ::fidl::internal::WireCompleterImpl<::test_typesinprotocols::Protocol::Err
   void ReplyError(uint32_t error);
 
  private:
-  void MakeReply(::test_typesinprotocols::wire::ProtocolErrorCompoundResult result);
+  void MakeReply(::test_typesinprotocols::wire::ProtocolErrorCompoundResult ProtocolErrorCompoundResult);
 };
 
 template <>
@@ -8318,7 +8291,7 @@ class ::fidl::internal::WireBufferCompleterImpl<::test_typesinprotocols::Protoco
   void ReplyError(uint32_t error);
 
  private:
-  void MakeReply(::test_typesinprotocols::wire::ProtocolErrorCompoundResult result);
+  void MakeReply(::test_typesinprotocols::wire::ProtocolErrorCompoundResult ProtocolErrorCompoundResult);
 };
 
 template<>
@@ -8385,7 +8358,7 @@ class ::fidl::internal::WireCompleterImpl<::test_typesinprotocols::Protocol::Err
   void ReplyError(uint32_t error);
 
  private:
-  void MakeReply(::test_typesinprotocols::wire::ProtocolErrorArrayBasicResult result);
+  void MakeReply(::test_typesinprotocols::wire::ProtocolErrorArrayBasicResult ProtocolErrorArrayBasicResult);
 };
 
 template <>
@@ -8398,7 +8371,7 @@ class ::fidl::internal::WireBufferCompleterImpl<::test_typesinprotocols::Protoco
   void ReplyError(uint32_t error);
 
  private:
-  void MakeReply(::test_typesinprotocols::wire::ProtocolErrorArrayBasicResult result);
+  void MakeReply(::test_typesinprotocols::wire::ProtocolErrorArrayBasicResult ProtocolErrorArrayBasicResult);
 };
 
 template<>
@@ -8465,7 +8438,7 @@ class ::fidl::internal::WireCompleterImpl<::test_typesinprotocols::Protocol::Err
   void ReplyError(uint32_t error);
 
  private:
-  void MakeReply(::test_typesinprotocols::wire::ProtocolErrorArrayCompoundResult result);
+  void MakeReply(::test_typesinprotocols::wire::ProtocolErrorArrayCompoundResult ProtocolErrorArrayCompoundResult);
 };
 
 template <>
@@ -8478,7 +8451,7 @@ class ::fidl::internal::WireBufferCompleterImpl<::test_typesinprotocols::Protoco
   void ReplyError(uint32_t error);
 
  private:
-  void MakeReply(::test_typesinprotocols::wire::ProtocolErrorArrayCompoundResult result);
+  void MakeReply(::test_typesinprotocols::wire::ProtocolErrorArrayCompoundResult ProtocolErrorArrayCompoundResult);
 };
 
 template<>
@@ -8545,7 +8518,7 @@ class ::fidl::internal::WireCompleterImpl<::test_typesinprotocols::Protocol::Err
   void ReplyError(uint32_t error);
 
  private:
-  void MakeReply(::test_typesinprotocols::wire::ProtocolErrorVectorBasicResult result);
+  void MakeReply(::test_typesinprotocols::wire::ProtocolErrorVectorBasicResult ProtocolErrorVectorBasicResult);
 };
 
 template <>
@@ -8558,7 +8531,7 @@ class ::fidl::internal::WireBufferCompleterImpl<::test_typesinprotocols::Protoco
   void ReplyError(uint32_t error);
 
  private:
-  void MakeReply(::test_typesinprotocols::wire::ProtocolErrorVectorBasicResult result);
+  void MakeReply(::test_typesinprotocols::wire::ProtocolErrorVectorBasicResult ProtocolErrorVectorBasicResult);
 };
 
 template<>
@@ -8625,7 +8598,7 @@ class ::fidl::internal::WireCompleterImpl<::test_typesinprotocols::Protocol::Err
   void ReplyError(uint32_t error);
 
  private:
-  void MakeReply(::test_typesinprotocols::wire::ProtocolErrorVectorCompoundResult result);
+  void MakeReply(::test_typesinprotocols::wire::ProtocolErrorVectorCompoundResult ProtocolErrorVectorCompoundResult);
 };
 
 template <>
@@ -8638,7 +8611,7 @@ class ::fidl::internal::WireBufferCompleterImpl<::test_typesinprotocols::Protoco
   void ReplyError(uint32_t error);
 
  private:
-  void MakeReply(::test_typesinprotocols::wire::ProtocolErrorVectorCompoundResult result);
+  void MakeReply(::test_typesinprotocols::wire::ProtocolErrorVectorCompoundResult ProtocolErrorVectorCompoundResult);
 };
 
 template<>
@@ -8705,7 +8678,7 @@ class ::fidl::internal::WireCompleterImpl<::test_typesinprotocols::Protocol::Err
   void ReplyError(uint32_t error);
 
  private:
-  void MakeReply(::test_typesinprotocols::wire::ProtocolErrorVectorOptionalResult result);
+  void MakeReply(::test_typesinprotocols::wire::ProtocolErrorVectorOptionalResult ProtocolErrorVectorOptionalResult);
 };
 
 template <>
@@ -8718,7 +8691,7 @@ class ::fidl::internal::WireBufferCompleterImpl<::test_typesinprotocols::Protoco
   void ReplyError(uint32_t error);
 
  private:
-  void MakeReply(::test_typesinprotocols::wire::ProtocolErrorVectorOptionalResult result);
+  void MakeReply(::test_typesinprotocols::wire::ProtocolErrorVectorOptionalResult ProtocolErrorVectorOptionalResult);
 };
 
 template<>
@@ -8785,7 +8758,7 @@ class ::fidl::internal::WireCompleterImpl<::test_typesinprotocols::Protocol::Err
   void ReplyError(uint32_t error);
 
  private:
-  void MakeReply(::test_typesinprotocols::wire::ProtocolErrorArrayVectorNestedResult result);
+  void MakeReply(::test_typesinprotocols::wire::ProtocolErrorArrayVectorNestedResult ProtocolErrorArrayVectorNestedResult);
 };
 
 template <>
@@ -8798,7 +8771,7 @@ class ::fidl::internal::WireBufferCompleterImpl<::test_typesinprotocols::Protoco
   void ReplyError(uint32_t error);
 
  private:
-  void MakeReply(::test_typesinprotocols::wire::ProtocolErrorArrayVectorNestedResult result);
+  void MakeReply(::test_typesinprotocols::wire::ProtocolErrorArrayVectorNestedResult ProtocolErrorArrayVectorNestedResult);
 };
 
 template<>
@@ -8865,7 +8838,7 @@ class ::fidl::internal::WireCompleterImpl<::test_typesinprotocols::Protocol::Err
   void ReplyError(uint32_t error);
 
  private:
-  void MakeReply(::test_typesinprotocols::wire::ProtocolErrorResourceResult result);
+  void MakeReply(::test_typesinprotocols::wire::ProtocolErrorResourceResult ProtocolErrorResourceResult);
 };
 
 template <>
@@ -8878,7 +8851,7 @@ class ::fidl::internal::WireBufferCompleterImpl<::test_typesinprotocols::Protoco
   void ReplyError(uint32_t error);
 
  private:
-  void MakeReply(::test_typesinprotocols::wire::ProtocolErrorResourceResult result);
+  void MakeReply(::test_typesinprotocols::wire::ProtocolErrorResourceResult ProtocolErrorResourceResult);
 };
 
 template<>

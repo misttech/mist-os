@@ -275,15 +275,9 @@ class EmptyStructResponseTransformer final : public fix::CompiledTransformer {
     }
 
     ZX_ASSERT(compiled.maybe_response->type->kind == flat::Type::Kind::kIdentifier);
-    auto wrapper_id = static_cast<const flat::IdentifierType*>(compiled.maybe_response->type);
-    ZX_ASSERT(wrapper_id->type_decl->kind == flat::Decl::Kind::kStruct);
-    auto wrapper_struct = static_cast<const flat::Struct*>(wrapper_id->type_decl);
-    ZX_ASSERT(!wrapper_struct->members.empty());
-
-    const auto* result_union_id =
-        static_cast<const flat::IdentifierType*>(wrapper_struct->members[0].type_ctor->type);
+    auto result_union_id = static_cast<const flat::IdentifierType*>(compiled.maybe_response->type);
     ZX_ASSERT(result_union_id->type_decl->kind == flat::Decl::Kind::kUnion);
-    const auto* result_union = static_cast<const flat::Union*>(result_union_id->type_decl);
+    auto result_union = static_cast<const flat::Union*>(result_union_id->type_decl);
     ZX_ASSERT(!result_union->members.empty());
     ZX_ASSERT(result_union->members[0].maybe_used);
 

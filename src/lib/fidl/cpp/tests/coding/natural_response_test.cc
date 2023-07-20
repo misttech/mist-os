@@ -117,9 +117,9 @@ TEST(NaturalResponseWithHandle, Encode) {
   };
 
   // Set up an object.
-  test_types::MsgWrapperTestXUnionResponse response{{
-      .result = ::test_types::TestXUnion::WithH(std::move(event)),
-  }};
+  test_types::MsgWrapperTestXUnionResponse response{
+      test_types::TestXUnion::WithH(std::move(event)),
+  };
 
   // Perform encoding.
   fidl::OwnedEncodeResult result = fidl::StandaloneEncode(std::move(response));

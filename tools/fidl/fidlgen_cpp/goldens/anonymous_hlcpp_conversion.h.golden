@@ -129,16 +129,6 @@ struct HLCPPToNaturalTraits<::test::anonymous::SomeProtocol_SomeMethod_Response>
   static inline ::test_anonymous::SomeProtocolSomeMethodResponse Convert(::test::anonymous::SomeProtocol_SomeMethod_Response&&);
 };
 template <>
-struct NaturalToHLCPPTraits<::test_anonymous::SomeProtocolSomeMethodTopResponse> {
-  using HLCPPType = ::test::anonymous::SomeProtocolSomeMethodTopResponse;
-  static inline ::test::anonymous::SomeProtocolSomeMethodTopResponse Convert(::test_anonymous::SomeProtocolSomeMethodTopResponse&&);
-};
-template <>
-struct HLCPPToNaturalTraits<::test::anonymous::SomeProtocolSomeMethodTopResponse> {
-  using NaturalType = ::test_anonymous::SomeProtocolSomeMethodTopResponse;
-  static inline ::test_anonymous::SomeProtocolSomeMethodTopResponse Convert(::test::anonymous::SomeProtocolSomeMethodTopResponse&&);
-};
-template <>
 struct NaturalToHLCPPTraits<::test_anonymous::FunctionApplication> {
   using HLCPPType = ::test::anonymous::FunctionApplication;
   static inline ::test::anonymous::FunctionApplication Convert(::test_anonymous::FunctionApplication&&);
@@ -237,17 +227,6 @@ struct HLCPPToNaturalTraits<::test::anonymous::SomeProtocol_SomeMethod_Result> {
 ::test_anonymous::SomeProtocolSomeMethodResponse HLCPPToNaturalTraits<::test::anonymous::SomeProtocol_SomeMethod_Response>::Convert(::test::anonymous::SomeProtocol_SomeMethod_Response&& value) {
   return ::test_anonymous::SomeProtocolSomeMethodResponse{{
       .bits_member = ::fidl::HLCPPToNatural(std::move(value.bits_member)),
-  }};
-}
-::test::anonymous::SomeProtocolSomeMethodTopResponse NaturalToHLCPPTraits<::test_anonymous::SomeProtocolSomeMethodTopResponse>::Convert(::test_anonymous::SomeProtocolSomeMethodTopResponse&& value) {
-  ::test::anonymous::SomeProtocolSomeMethodTopResponse hlcpp;
-  hlcpp.result = ::fidl::NaturalToHLCPP(std::move(value.result()));
-  return hlcpp;
-}
-
-::test_anonymous::SomeProtocolSomeMethodTopResponse HLCPPToNaturalTraits<::test::anonymous::SomeProtocolSomeMethodTopResponse>::Convert(::test::anonymous::SomeProtocolSomeMethodTopResponse&& value) {
-  return ::test_anonymous::SomeProtocolSomeMethodTopResponse{{
-      .result = ::fidl::HLCPPToNatural(std::move(value.result)),
   }};
 }
 ::test::anonymous::FunctionApplication NaturalToHLCPPTraits<::test_anonymous::FunctionApplication>::Convert(::test_anonymous::FunctionApplication&& value) {

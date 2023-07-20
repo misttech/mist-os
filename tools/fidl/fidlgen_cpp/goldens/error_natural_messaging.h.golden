@@ -29,7 +29,7 @@ template <>
 struct ::fidl::internal::NaturalMethodTypes<::test_error::Example::Foo> {
   using Request = ::test_error::ExampleFooRequest;
 
-  using Response = ::test_error::ExampleFooTopResponse;
+  using Response = ::test_error::ExampleFooResult;
 
   using Completer = fidl::Completer<::fidl::internal::NaturalCompleterBase<::test_error::Example::Foo>>;
   using ResultCallback =
@@ -38,7 +38,7 @@ struct ::fidl::internal::NaturalMethodTypes<::test_error::Example::Foo> {
 namespace test_error {
 __LOCAL extern "C" const fidl_type_t test_error_ExampleFooRequestTable;
 
-__LOCAL extern "C" const fidl_type_t test_error_ExampleFooTopResponseTable;
+__LOCAL extern "C" const fidl_type_t test_error_Example_foo_ResultTable;
 
 #ifdef __Fuchsia__
 }  // namespace test_error
@@ -52,14 +52,14 @@ class ::fidl::Response<::test_error::Example::Foo> final : public ::fit::result<
 };
 template <>
 class ::fidl::internal::ResponseMessageConverter<::test_error::Example::Foo> {
-  using DomainObject = ::test_error::ExampleFooTopResponse;
+  using DomainObject = ::test_error::ExampleFooResult;
 
  public:
   static DomainObject IntoDomainObject(const ::fidl::Response<::test_error::Example::Foo>& m) {
     if (m.is_error()) {
-      return DomainObject{{.result = ::test_error::ExampleFooResult::WithErr(m.error_value())}};
+      return DomainObject::WithErr(m.error_value());
     } else {
-      return DomainObject{{.result = ::test_error::ExampleFooResult::WithResponse(std::move(m.value()))}};
+      return DomainObject::WithResponse(std::move(m.value()));
     }
   }
 };

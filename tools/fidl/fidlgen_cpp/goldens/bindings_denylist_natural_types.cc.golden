@@ -21,11 +21,6 @@
       ::fidl::internal::NaturalClone(storage_.b)};
 }
 
-::test_bindingsdenylist::DenyEachBindingOnlyDenyDartTopResponse::Storage_ test_bindingsdenylist::DenyEachBindingOnlyDenyDartTopResponse::CloneStorage_() const {
-  return Storage_{
-      ::fidl::internal::NaturalClone(storage_.result)};
-}
-
 ::test_bindingsdenylist::DenyEachBindingOnlyDenyGoRequest::Storage_ test_bindingsdenylist::DenyEachBindingOnlyDenyGoRequest::CloneStorage_() const {
   return Storage_{
       ::fidl::internal::NaturalClone(storage_.a)};
@@ -34,11 +29,6 @@
 ::test_bindingsdenylist::DenyEachBindingOnlyDenyGoResponse::Storage_ test_bindingsdenylist::DenyEachBindingOnlyDenyGoResponse::CloneStorage_() const {
   return Storage_{
       ::fidl::internal::NaturalClone(storage_.b)};
-}
-
-::test_bindingsdenylist::DenyEachBindingOnlyDenyGoTopResponse::Storage_ test_bindingsdenylist::DenyEachBindingOnlyDenyGoTopResponse::CloneStorage_() const {
-  return Storage_{
-      ::fidl::internal::NaturalClone(storage_.result)};
 }
 
 ::test_bindingsdenylist::DenyEachBindingOnlyDenyLibfuzzerRequest::Storage_ test_bindingsdenylist::DenyEachBindingOnlyDenyLibfuzzerRequest::CloneStorage_() const {
@@ -51,11 +41,6 @@
       ::fidl::internal::NaturalClone(storage_.b)};
 }
 
-::test_bindingsdenylist::DenyEachBindingOnlyDenyLibfuzzerTopResponse::Storage_ test_bindingsdenylist::DenyEachBindingOnlyDenyLibfuzzerTopResponse::CloneStorage_() const {
-  return Storage_{
-      ::fidl::internal::NaturalClone(storage_.result)};
-}
-
 ::test_bindingsdenylist::DenyEachBindingOnlyDenyRustRequest::Storage_ test_bindingsdenylist::DenyEachBindingOnlyDenyRustRequest::CloneStorage_() const {
   return Storage_{
       ::fidl::internal::NaturalClone(storage_.a)};
@@ -66,11 +51,6 @@
       ::fidl::internal::NaturalClone(storage_.b)};
 }
 
-::test_bindingsdenylist::DenyEachBindingOnlyDenyRustTopResponse::Storage_ test_bindingsdenylist::DenyEachBindingOnlyDenyRustTopResponse::CloneStorage_() const {
-  return Storage_{
-      ::fidl::internal::NaturalClone(storage_.result)};
-}
-
 ::test_bindingsdenylist::DenyEachBindingOnlyDenySyzkallerRequest::Storage_ test_bindingsdenylist::DenyEachBindingOnlyDenySyzkallerRequest::CloneStorage_() const {
   return Storage_{
       ::fidl::internal::NaturalClone(storage_.a)};
@@ -79,11 +59,6 @@
 ::test_bindingsdenylist::DenyEachBindingOnlyDenySyzkallerResponse::Storage_ test_bindingsdenylist::DenyEachBindingOnlyDenySyzkallerResponse::CloneStorage_() const {
   return Storage_{
       ::fidl::internal::NaturalClone(storage_.b)};
-}
-
-::test_bindingsdenylist::DenyEachBindingOnlyDenySyzkallerTopResponse::Storage_ test_bindingsdenylist::DenyEachBindingOnlyDenySyzkallerTopResponse::CloneStorage_() const {
-  return Storage_{
-      ::fidl::internal::NaturalClone(storage_.result)};
 }
 
 ::test_bindingsdenylist::MemberOnlyAppearsInImportingLibrary::Storage_ test_bindingsdenylist::MemberOnlyAppearsInImportingLibrary::CloneStorage_() const {

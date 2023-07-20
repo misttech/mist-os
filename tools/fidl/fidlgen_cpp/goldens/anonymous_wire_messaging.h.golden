@@ -32,7 +32,7 @@ class SomeProtocol;
 
 __LOCAL extern "C" const fidl_type_t test_anonymous_SomeProtocolSomeMethodRequestTable;
 
-__LOCAL extern "C" const fidl_type_t test_anonymous_SomeProtocolSomeMethodTopResponseTable;
+__LOCAL extern "C" const fidl_type_t test_anonymous_SomeProtocol_SomeMethod_ResultTable;
 }  // namespace test_anonymous
 
 template <>
@@ -46,7 +46,7 @@ template <>
 struct ::fidl::internal::WireMethodTypes<::test_anonymous::SomeProtocol::SomeMethod> {
   static constexpr bool HasRequestPayload = true;
   using Request = ::test_anonymous::wire::SomeProtocolSomeMethodRequest;
-  using Response = ::test_anonymous::wire::SomeProtocolSomeMethodTopResponse;
+  using Response = ::test_anonymous::wire::SomeProtocolSomeMethodResult;
   using DomainError = ::test_anonymous::wire::SomeProtocolSomeMethodError;
 
   using Completer = fidl::Completer<::fidl::internal::WireCompleterBase<::test_anonymous::SomeProtocol::SomeMethod>>;
@@ -136,11 +136,8 @@ struct ::fidl::internal::WireCodingTraits<::fidl::internal::TransactionalRequest
 #endif  // __Fuchsia__
 
 template <>
-struct ::fidl::WireResponse<::test_anonymous::SomeProtocol::SomeMethod> final : public ::test_anonymous::wire::SomeProtocolSomeMethodTopResponse {
-  using Result = test_anonymous::wire::SomeProtocolSomeMethodResult;
-
-  explicit WireResponse(::test_anonymous::wire::SomeProtocolSomeMethodTopResponse base) : ::test_anonymous::wire::SomeProtocolSomeMethodTopResponse(std::move(base)) {}
-  explicit WireResponse(::test_anonymous::wire::SomeProtocolSomeMethodResult result) : ::test_anonymous::wire::SomeProtocolSomeMethodTopResponse{.result = std::move(result)} {}
+struct ::fidl::WireResponse<::test_anonymous::SomeProtocol::SomeMethod> final : public ::test_anonymous::wire::SomeProtocolSomeMethodResult {
+  explicit WireResponse(::test_anonymous::wire::SomeProtocolSomeMethodResult SomeProtocolSomeMethodResult) : ::test_anonymous::wire::SomeProtocolSomeMethodResult(SomeProtocolSomeMethodResult) {}
   WireResponse() = default;
 };
 
@@ -151,12 +148,12 @@ struct ::fidl::internal::WireCodingTraits<::fidl::WireResponse<::test_anonymous:
 
   static void Encode(
       internal::WireEncoder* encoder, ::fidl::WireResponse<::test_anonymous::SomeProtocol::SomeMethod>* value, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth) {
-    fidl::internal::WireCodingTraits<::test_anonymous::wire::SomeProtocolSomeMethodTopResponse, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive>::Encode(
+    fidl::internal::WireCodingTraits<::test_anonymous::wire::SomeProtocolSomeMethodResult, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive>::Encode(
         encoder, value, position, recursion_depth);
   }
   static void Decode(
       internal::WireDecoder* decoder, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth) {
-    fidl::internal::WireCodingTraits<::test_anonymous::wire::SomeProtocolSomeMethodTopResponse, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive>::Decode(
+    fidl::internal::WireCodingTraits<::test_anonymous::wire::SomeProtocolSomeMethodResult, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive>::Decode(
         decoder, position, recursion_depth);
   }
 };
@@ -167,8 +164,8 @@ struct ::fidl::internal::TransactionalResponse<::test_anonymous::SomeProtocol::S
   fidl_message_header_t header;
 
   ::fidl::WireResponse<::test_anonymous::SomeProtocol::SomeMethod> body;
-  explicit TransactionalResponse(::test_anonymous::wire::SomeProtocolSomeMethodResult result)
-      : body(::fidl::WireResponse<::test_anonymous::SomeProtocol::SomeMethod>(result)) {
+  explicit TransactionalResponse(::test_anonymous::wire::SomeProtocolSomeMethodResult SomeProtocolSomeMethodResult)
+      : body(::fidl::WireResponse<::test_anonymous::SomeProtocol::SomeMethod>(SomeProtocolSomeMethodResult)) {
     _InitHeader();
   }
   TransactionalResponse() {
@@ -240,7 +237,7 @@ struct IsFidlType<::fidl::WireResponse<::test_anonymous::SomeProtocol::SomeMetho
 template <>
 struct TypeTraits<::fidl::internal::TransactionalResponse<::test_anonymous::SomeProtocol::SomeMethod>> {
   static constexpr const fidl_type_t* kType =
-      &::test_anonymous::test_anonymous_SomeProtocolSomeMethodTopResponseTable;
+      &::test_anonymous::test_anonymous_SomeProtocol_SomeMethod_ResultTable;
   static constexpr bool kHasServerToClientBody = true;
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 1;
@@ -261,7 +258,7 @@ static_assert(offsetof(::fidl::internal::TransactionalResponse<::test_anonymous:
 template <>
 struct TypeTraits<::fidl::WireResponse<::test_anonymous::SomeProtocol::SomeMethod>> {
   static constexpr const fidl_type_t* kType =
-      &::test_anonymous::test_anonymous_SomeProtocolSomeMethodTopResponseTable;
+      &::test_anonymous::test_anonymous_SomeProtocol_SomeMethod_ResultTable;
   static constexpr bool kHasServerToClientBody = true;
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 1;
@@ -276,7 +273,6 @@ struct TypeTraits<::fidl::WireResponse<::test_anonymous::SomeProtocol::SomeMetho
       ::fidl::internal::TransactionalMessageKind::kResponse;
 };
 static_assert(sizeof(::fidl::WireResponse<::test_anonymous::SomeProtocol::SomeMethod>) == TypeTraits<::fidl::WireResponse<::test_anonymous::SomeProtocol::SomeMethod>>::kPrimarySize);
-static_assert(offsetof(::fidl::WireResponse<::test_anonymous::SomeProtocol::SomeMethod>, result) == 0);
 #ifdef __Fuchsia__
 }  // namespace fidl
 
@@ -446,7 +442,7 @@ class ::fidl::internal::WireCompleterImpl<::test_anonymous::SomeProtocol::SomeMe
   void ReplyError(::test_anonymous::wire::SomeProtocolSomeMethodError error);
 
  private:
-  void MakeReply(::test_anonymous::wire::SomeProtocolSomeMethodResult result);
+  void MakeReply(::test_anonymous::wire::SomeProtocolSomeMethodResult SomeProtocolSomeMethodResult);
 };
 
 template <>
@@ -459,7 +455,7 @@ class ::fidl::internal::WireBufferCompleterImpl<::test_anonymous::SomeProtocol::
   void ReplyError(::test_anonymous::wire::SomeProtocolSomeMethodError error);
 
  private:
-  void MakeReply(::test_anonymous::wire::SomeProtocolSomeMethodResult result);
+  void MakeReply(::test_anonymous::wire::SomeProtocolSomeMethodResult SomeProtocolSomeMethodResult);
 };
 
 template <>

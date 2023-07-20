@@ -69,11 +69,6 @@ class NamingContext : public std::enable_shared_from_this<NamingContext> {
     return Push(method_name, Kind::kMethodResponse);
   }
 
-  std::shared_ptr<NamingContext> EnterResult(SourceSpan method_name) {
-    ZX_ASSERT_MSG(kind_ == Kind::kDecl, "result must follow protocol");
-    return Push(method_name, Kind::kMethodResult);
-  }
-
   std::shared_ptr<NamingContext> EnterMember(SourceSpan member_name) {
     return Push(member_name, Kind::kLayoutMember);
   }
@@ -126,7 +121,6 @@ class NamingContext : public std::enable_shared_from_this<NamingContext> {
     kLayoutMember,
     kMethodRequest,
     kMethodResponse,
-    kMethodResult,
   };
 
   NamingContext(SourceSpan name, Kind kind, std::shared_ptr<NamingContext> parent)

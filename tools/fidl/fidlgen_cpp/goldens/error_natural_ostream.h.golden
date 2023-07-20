@@ -28,10 +28,6 @@ template <>
 struct fidl::ostream::Formatter<::test_error::ExampleFooResult> {
   static std::ostream& Format(std::ostream& os, const ::test_error::ExampleFooResult& value);
 };
-template <>
-struct fidl::ostream::Formatter<::test_error::ExampleFooTopResponse> {
-  static std::ostream& Format(std::ostream& os, const ::test_error::ExampleFooTopResponse& value);
-};
 
 namespace test_error {
 
@@ -40,8 +36,6 @@ std::ostream& operator<<(std::ostream& os, const ::test_error::ExampleFooRequest
 std::ostream& operator<<(std::ostream& os, const ::test_error::ExampleFooResponse& value);
 
 std::ostream& operator<<(std::ostream& os, const ::test_error::ExampleFooResult& value);
-
-std::ostream& operator<<(std::ostream& os, const ::test_error::ExampleFooTopResponse& value);
 
 }  // namespace test_error
 

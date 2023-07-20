@@ -247,72 +247,62 @@ struct WireTypeForNaturalType<fidl::Box<NaturalType>,
   using type = fidl::WireOptional<typename WireTypeForNaturalType<NaturalType>::type>;
 };
 
-template <typename WireTopResponseType, typename NaturalErrorType, typename NaturalValueType>
-struct WireNaturalConversionTraits<WireTopResponseType,
+template <typename WireResultType, typename NaturalErrorType, typename NaturalValueType>
+struct WireNaturalConversionTraits<WireResultType,
                                    fit::result<NaturalErrorType, NaturalValueType>> {
-  static fit::result<NaturalErrorType, NaturalValueType> ToNatural(WireTopResponseType src) {
-    if (src.result.is_err()) {
-      using WireErrorType = std::remove_reference_t<decltype(src.result.err())>;
+  static fit::result<NaturalErrorType, NaturalValueType> ToNatural(WireResultType src) {
+    if (src.is_err()) {
+      using WireErrorType = std::remove_reference_t<decltype(src.err())>;
       return fit::error<NaturalErrorType>(
           WireNaturalConversionTraits<WireErrorType, NaturalErrorType>::ToNatural(
-              std::move(src.result.err())));
+              std::move(src.err())));
     }
-    using WireValueType = std::remove_reference_t<decltype(src.result.response())>;
+    using WireValueType = std::remove_reference_t<decltype(src.response())>;
     return fit::ok<NaturalValueType>(
         WireNaturalConversionTraits<WireValueType, NaturalValueType>::ToNatural(
-            std::move(src.result.response())));
+            std::move(src.response())));
   }
-  static WireTopResponseType ToWire(fidl::AnyArena& arena,
-                                    fit::result<NaturalErrorType, NaturalValueType> src) {
+  static WireResultType ToWire(fidl::AnyArena& arena,
+                               fit::result<NaturalErrorType, NaturalValueType> src) {
     if (src.is_error()) {
-      return WireTopResponseType{
-          .result = WireTopResponseType::Result::WithErr(
-              WireNaturalConversionTraits<typename WireTypeForNaturalType<NaturalErrorType>::type,
-                                          NaturalErrorType>::ToWire(arena,
-                                                                    std::move(src.error_value()))),
-      };
+      return WireResultType::WithErr(
+          WireNaturalConversionTraits<typename WireTypeForNaturalType<NaturalErrorType>::type,
+                                      NaturalErrorType>::ToWire(arena,
+                                                                std::move(src.error_value())));
     }
     if constexpr (sizeof(typename WireTypeForNaturalType<NaturalValueType>::type) <=
                   FIDL_ENVELOPE_INLINING_SIZE_THRESHOLD) {
-      return WireTopResponseType{
-          .result = WireTopResponseType::Result::WithResponse(
-              WireNaturalConversionTraits<typename WireTypeForNaturalType<NaturalValueType>::type,
-                                          NaturalValueType>::ToWire(arena, std::move(src.value()))),
-      };
+      return WireResultType::WithResponse(
+          WireNaturalConversionTraits<typename WireTypeForNaturalType<NaturalValueType>::type,
+                                      NaturalValueType>::ToWire(arena, std::move(src.value())));
     } else {
-      return WireTopResponseType{
-          .result = WireTopResponseType::Result::WithResponse(
-              arena,
-              WireNaturalConversionTraits<typename WireTypeForNaturalType<NaturalValueType>::type,
-                                          NaturalValueType>::ToWire(arena, std::move(src.value()))),
-      };
+      return WireResultType::WithResponse(
+          arena,
+          WireNaturalConversionTraits<typename WireTypeForNaturalType<NaturalValueType>::type,
+                                      NaturalValueType>::ToWire(arena, std::move(src.value())));
     }
   }
 };
 
-template <typename WireTopResponseType, typename NaturalErrorType>
-struct WireNaturalConversionTraits<WireTopResponseType, fit::result<NaturalErrorType>> {
-  static fit::result<NaturalErrorType> ToNatural(WireTopResponseType src) {
-    if (src.result.is_err()) {
-      using WireErrorType = std::remove_reference_t<decltype(src.result.err())>;
+template <typename WireResultType, typename NaturalErrorType>
+struct WireNaturalConversionTraits<WireResultType, fit::result<NaturalErrorType>> {
+  static fit::result<NaturalErrorType> ToNatural(WireResultType src) {
+    if (src.is_err()) {
+      using WireErrorType = std::remove_reference_t<decltype(src.err())>;
       return fit::error<NaturalErrorType>(
           WireNaturalConversionTraits<WireErrorType, NaturalErrorType>::ToNatural(
-              std::move(src.result.err())));
+              std::move(src.err())));
     }
     return fit::ok();
   }
-  static WireTopResponseType ToWire(fidl::AnyArena& arena, fit::result<NaturalErrorType> src) {
+  static WireResultType ToWire(fidl::AnyArena& arena, fit::result<NaturalErrorType> src) {
     if (src.is_error()) {
-      return WireTopResponseType{
-          .result = WireTopResponseType::Result::WithErr(
-              WireNaturalConversionTraits<typename WireTypeForNaturalType<NaturalErrorType>::type,
-                                          NaturalErrorType>::ToWire(arena,
-                                                                    std::move(src.error_value()))),
-      };
+      return WireResultType::WithErr(
+          WireNaturalConversionTraits<typename WireTypeForNaturalType<NaturalErrorType>::type,
+                                      NaturalErrorType>::ToWire(arena,
+                                                                std::move(src.error_value())));
     }
-    return WireTopResponseType{
-        .result = WireTopResponseType::Result::WithResponse({}),
-    };
+    return WireResultType::WithResponse({});
   }
 };
 

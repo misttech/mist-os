@@ -132,7 +132,7 @@ void {{ .NaturalCompleterBase.NoLeading }}::Reply({{ .NaturalResponseArg "respon
   _encoder.EncodeBody(
       {{ .NaturalResponseConverter }}::IntoDomainObject({{ .Response.Forward "response" }}));
     {{- else }}
-  _encoder.EncodeBody({{ .ResponsePayload }} { { .result = {{ .Result.ResultDecl }}::WithResponse({}) } });
+  _encoder.EncodeBody({{ .Result.ResultDecl }}::WithResponse({}));
     {{- end }}
   {{- end }}
   ::fidl::OutgoingMessage _msg = _encoder.GetMessage();

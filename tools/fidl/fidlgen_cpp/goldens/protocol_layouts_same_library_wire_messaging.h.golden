@@ -49,13 +49,13 @@ __LOCAL extern "C" const fidl_type_t test_protocollayoutssamelibrary_ComposedPro
     
 __LOCAL extern "C" const fidl_type_t test_protocollayoutssamelibrary_ComposedProtocolTwoWayAnonComposedWithErrorRequestTable;
     
-__LOCAL extern "C" const fidl_type_t test_protocollayoutssamelibrary_ComposedProtocolTwoWayAnonComposedWithErrorTopResponseTable;
+__LOCAL extern "C" const fidl_type_t test_protocollayoutssamelibrary_ComposedProtocol_TwoWayAnonComposedWithError_ResultTable;
     
     
 __LOCAL extern "C" const fidl_type_t test_protocollayoutssamelibrary_ComposedProtocolOnAnonComposedRequestTable;
     
     
-__LOCAL extern "C" const fidl_type_t test_protocollayoutssamelibrary_ComposedProtocolOnAnonComposedWithErrorRequestTable;
+__LOCAL extern "C" const fidl_type_t test_protocollayoutssamelibrary_ComposedProtocol_OnAnonComposedWithError_ResultTable;
     
 __LOCAL extern "C" const fidl_type_t test_protocollayoutssamelibrary_TablePayloadTable;
     
@@ -64,12 +64,12 @@ __LOCAL extern "C" const fidl_type_t test_protocollayoutssamelibrary_UnionPayloa
     
     
     
-__LOCAL extern "C" const fidl_type_t test_protocollayoutssamelibrary_ComposedProtocolTwoWayNamedComposedWithErrorTopResponseTable;
+__LOCAL extern "C" const fidl_type_t test_protocollayoutssamelibrary_ComposedProtocol_TwoWayNamedComposedWithError_ResultTable;
     
     
     
     
-__LOCAL extern "C" const fidl_type_t test_protocollayoutssamelibrary_ComposedProtocolOnNamedComposedWithErrorRequestTable;
+__LOCAL extern "C" const fidl_type_t test_protocollayoutssamelibrary_ComposedProtocol_OnNamedComposedWithError_ResultTable;
 }  // namespace test_protocollayoutssamelibrary
 
 template<>
@@ -161,7 +161,7 @@ template<>
 struct ::fidl::internal::WireMethodTypes<::test_protocollayoutssamelibrary::ComposedProtocol::TwoWayAnonComposedWithError> {
     static constexpr bool HasRequestPayload = true;
       using Request = ::test_protocollayoutssamelibrary::wire::ComposedProtocolTwoWayAnonComposedWithErrorRequest;
-      using Response = ::test_protocollayoutssamelibrary::wire::ComposedProtocolTwoWayAnonComposedWithErrorTopResponse;
+      using Response = ::test_protocollayoutssamelibrary::wire::ComposedProtocolTwoWayAnonComposedWithErrorResult;
   using DomainError = uint32_t;
     
       using Completer = fidl::Completer<::fidl::internal::WireCompleterBase<::test_protocollayoutssamelibrary::ComposedProtocol::TwoWayAnonComposedWithError>>;
@@ -211,7 +211,7 @@ template<>
 struct ::fidl::internal::WireMethodTypes<::test_protocollayoutssamelibrary::ComposedProtocol::OnAnonComposedWithError> {
     
     static constexpr bool HasRequestPayload = true;
-      using Request = ::test_protocollayoutssamelibrary::wire::ComposedProtocolOnAnonComposedWithErrorRequest;
+      using Request = ::test_protocollayoutssamelibrary::wire::ComposedProtocolOnAnonComposedWithErrorResult;
   using DomainError = uint32_t;
 };
 
@@ -279,7 +279,7 @@ template<>
 struct ::fidl::internal::WireMethodTypes<::test_protocollayoutssamelibrary::ComposedProtocol::TwoWayNamedComposedWithError> {
     static constexpr bool HasRequestPayload = true;
       using Request = ::test_protocollayoutssamelibrary::wire::TablePayload;
-      using Response = ::test_protocollayoutssamelibrary::wire::ComposedProtocolTwoWayNamedComposedWithErrorTopResponse;
+      using Response = ::test_protocollayoutssamelibrary::wire::ComposedProtocolTwoWayNamedComposedWithErrorResult;
   using DomainError = uint32_t;
     
       using Completer = fidl::Completer<::fidl::internal::WireCompleterBase<::test_protocollayoutssamelibrary::ComposedProtocol::TwoWayNamedComposedWithError>>;
@@ -329,7 +329,7 @@ template<>
 struct ::fidl::internal::WireMethodTypes<::test_protocollayoutssamelibrary::ComposedProtocol::OnNamedComposedWithError> {
     
     static constexpr bool HasRequestPayload = true;
-      using Request = ::test_protocollayoutssamelibrary::wire::ComposedProtocolOnNamedComposedWithErrorRequest;
+      using Request = ::test_protocollayoutssamelibrary::wire::ComposedProtocolOnNamedComposedWithErrorResult;
   using DomainError = uint32_t;
 };
 
@@ -554,12 +554,10 @@ struct ::fidl::internal::WireCodingTraits<::fidl::internal::TransactionalRequest
 
 
 template<>
-struct ::fidl::WireResponse<::test_protocollayoutssamelibrary::ComposedProtocol::TwoWayAnonComposedWithError> final : public ::test_protocollayoutssamelibrary::wire::ComposedProtocolTwoWayAnonComposedWithErrorTopResponse {
-  using Result = test_protocollayoutssamelibrary::wire::ComposedProtocolTwoWayAnonComposedWithErrorResult;
+struct ::fidl::WireResponse<::test_protocollayoutssamelibrary::ComposedProtocol::TwoWayAnonComposedWithError> final : public ::test_protocollayoutssamelibrary::wire::ComposedProtocolTwoWayAnonComposedWithErrorResult {
 
   
-  explicit WireResponse(::test_protocollayoutssamelibrary::wire::ComposedProtocolTwoWayAnonComposedWithErrorTopResponse base) : ::test_protocollayoutssamelibrary::wire::ComposedProtocolTwoWayAnonComposedWithErrorTopResponse(std::move(base)) {}
-  explicit WireResponse(::test_protocollayoutssamelibrary::wire::ComposedProtocolTwoWayAnonComposedWithErrorResult result) : ::test_protocollayoutssamelibrary::wire::ComposedProtocolTwoWayAnonComposedWithErrorTopResponse{ .result = std::move(result)}{}
+  explicit WireResponse(::test_protocollayoutssamelibrary::wire::ComposedProtocolTwoWayAnonComposedWithErrorResult ComposedProtocolTwoWayAnonComposedWithErrorResult) : ::test_protocollayoutssamelibrary::wire::ComposedProtocolTwoWayAnonComposedWithErrorResult(ComposedProtocolTwoWayAnonComposedWithErrorResult){}
   WireResponse() = default;
 };
 
@@ -571,12 +569,12 @@ struct ::fidl::internal::WireCodingTraits<::fidl::WireResponse<::test_protocolla
 
   static void Encode(
     internal::WireEncoder* encoder, ::fidl::WireResponse<::test_protocollayoutssamelibrary::ComposedProtocol::TwoWayAnonComposedWithError>* value, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth) {
-    fidl::internal::WireCodingTraits<::test_protocollayoutssamelibrary::wire::ComposedProtocolTwoWayAnonComposedWithErrorTopResponse, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive>::Encode(
+    fidl::internal::WireCodingTraits<::test_protocollayoutssamelibrary::wire::ComposedProtocolTwoWayAnonComposedWithErrorResult, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive>::Encode(
       encoder, value, position, recursion_depth);
   }
   static void Decode(
     internal::WireDecoder* decoder, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth) {
-    fidl::internal::WireCodingTraits<::test_protocollayoutssamelibrary::wire::ComposedProtocolTwoWayAnonComposedWithErrorTopResponse, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive>::Decode(
+    fidl::internal::WireCodingTraits<::test_protocollayoutssamelibrary::wire::ComposedProtocolTwoWayAnonComposedWithErrorResult, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive>::Decode(
       decoder, position, recursion_depth);
   }
 };
@@ -587,8 +585,8 @@ struct ::fidl::internal::TransactionalResponse<::test_protocollayoutssamelibrary
   fidl_message_header_t header;
   
   ::fidl::WireResponse<::test_protocollayoutssamelibrary::ComposedProtocol::TwoWayAnonComposedWithError> body;
-  explicit TransactionalResponse(::test_protocollayoutssamelibrary::wire::ComposedProtocolTwoWayAnonComposedWithErrorResult result)
-  : body(::fidl::WireResponse<::test_protocollayoutssamelibrary::ComposedProtocol::TwoWayAnonComposedWithError>(result)) {
+  explicit TransactionalResponse(::test_protocollayoutssamelibrary::wire::ComposedProtocolTwoWayAnonComposedWithErrorResult ComposedProtocolTwoWayAnonComposedWithErrorResult)
+  : body(::fidl::WireResponse<::test_protocollayoutssamelibrary::ComposedProtocol::TwoWayAnonComposedWithError>(ComposedProtocolTwoWayAnonComposedWithErrorResult)) {
     _InitHeader();
   }
   TransactionalResponse() {
@@ -668,8 +666,8 @@ struct ::fidl::internal::TransactionalEvent<::test_protocollayoutssamelibrary::C
   
     ::fidl::WireEvent<::test_protocollayoutssamelibrary::ComposedProtocol::OnAnonComposedWithError> body;
 
-    explicit TransactionalEvent(::test_protocollayoutssamelibrary::wire::ComposedProtocolOnAnonComposedWithErrorResult result)
-    : body{ result } {
+    explicit TransactionalEvent(::test_protocollayoutssamelibrary::wire::ComposedProtocolOnAnonComposedWithErrorResult ComposedProtocolOnAnonComposedWithErrorResult)
+    : body{ ComposedProtocolOnAnonComposedWithErrorResult } {
       _InitHeader();
     }
 
@@ -883,12 +881,10 @@ struct ::fidl::internal::WireCodingTraits<::fidl::internal::TransactionalRequest
 
 
 template<>
-struct ::fidl::WireResponse<::test_protocollayoutssamelibrary::ComposedProtocol::TwoWayNamedComposedWithError> final : public ::test_protocollayoutssamelibrary::wire::ComposedProtocolTwoWayNamedComposedWithErrorTopResponse {
-  using Result = test_protocollayoutssamelibrary::wire::ComposedProtocolTwoWayNamedComposedWithErrorResult;
+struct ::fidl::WireResponse<::test_protocollayoutssamelibrary::ComposedProtocol::TwoWayNamedComposedWithError> final : public ::test_protocollayoutssamelibrary::wire::ComposedProtocolTwoWayNamedComposedWithErrorResult {
 
   
-  explicit WireResponse(::test_protocollayoutssamelibrary::wire::ComposedProtocolTwoWayNamedComposedWithErrorTopResponse base) : ::test_protocollayoutssamelibrary::wire::ComposedProtocolTwoWayNamedComposedWithErrorTopResponse(std::move(base)) {}
-  explicit WireResponse(::test_protocollayoutssamelibrary::wire::ComposedProtocolTwoWayNamedComposedWithErrorResult result) : ::test_protocollayoutssamelibrary::wire::ComposedProtocolTwoWayNamedComposedWithErrorTopResponse{ .result = std::move(result)}{}
+  explicit WireResponse(::test_protocollayoutssamelibrary::wire::ComposedProtocolTwoWayNamedComposedWithErrorResult ComposedProtocolTwoWayNamedComposedWithErrorResult) : ::test_protocollayoutssamelibrary::wire::ComposedProtocolTwoWayNamedComposedWithErrorResult(ComposedProtocolTwoWayNamedComposedWithErrorResult){}
   WireResponse() = default;
 };
 
@@ -900,12 +896,12 @@ struct ::fidl::internal::WireCodingTraits<::fidl::WireResponse<::test_protocolla
 
   static void Encode(
     internal::WireEncoder* encoder, ::fidl::WireResponse<::test_protocollayoutssamelibrary::ComposedProtocol::TwoWayNamedComposedWithError>* value, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth) {
-    fidl::internal::WireCodingTraits<::test_protocollayoutssamelibrary::wire::ComposedProtocolTwoWayNamedComposedWithErrorTopResponse, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive>::Encode(
+    fidl::internal::WireCodingTraits<::test_protocollayoutssamelibrary::wire::ComposedProtocolTwoWayNamedComposedWithErrorResult, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive>::Encode(
       encoder, value, position, recursion_depth);
   }
   static void Decode(
     internal::WireDecoder* decoder, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth) {
-    fidl::internal::WireCodingTraits<::test_protocollayoutssamelibrary::wire::ComposedProtocolTwoWayNamedComposedWithErrorTopResponse, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive>::Decode(
+    fidl::internal::WireCodingTraits<::test_protocollayoutssamelibrary::wire::ComposedProtocolTwoWayNamedComposedWithErrorResult, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive>::Decode(
       decoder, position, recursion_depth);
   }
 };
@@ -916,8 +912,8 @@ struct ::fidl::internal::TransactionalResponse<::test_protocollayoutssamelibrary
   fidl_message_header_t header;
   
   ::fidl::WireResponse<::test_protocollayoutssamelibrary::ComposedProtocol::TwoWayNamedComposedWithError> body;
-  explicit TransactionalResponse(::test_protocollayoutssamelibrary::wire::ComposedProtocolTwoWayNamedComposedWithErrorResult result)
-  : body(::fidl::WireResponse<::test_protocollayoutssamelibrary::ComposedProtocol::TwoWayNamedComposedWithError>(result)) {
+  explicit TransactionalResponse(::test_protocollayoutssamelibrary::wire::ComposedProtocolTwoWayNamedComposedWithErrorResult ComposedProtocolTwoWayNamedComposedWithErrorResult)
+  : body(::fidl::WireResponse<::test_protocollayoutssamelibrary::ComposedProtocol::TwoWayNamedComposedWithError>(ComposedProtocolTwoWayNamedComposedWithErrorResult)) {
     _InitHeader();
   }
   TransactionalResponse() {
@@ -997,8 +993,8 @@ struct ::fidl::internal::TransactionalEvent<::test_protocollayoutssamelibrary::C
   
     ::fidl::WireEvent<::test_protocollayoutssamelibrary::ComposedProtocol::OnNamedComposedWithError> body;
 
-    explicit TransactionalEvent(::test_protocollayoutssamelibrary::wire::ComposedProtocolOnNamedComposedWithErrorResult result)
-    : body{ result } {
+    explicit TransactionalEvent(::test_protocollayoutssamelibrary::wire::ComposedProtocolOnNamedComposedWithErrorResult ComposedProtocolOnNamedComposedWithErrorResult)
+    : body{ ComposedProtocolOnNamedComposedWithErrorResult } {
       _InitHeader();
     }
 
@@ -1195,7 +1191,7 @@ struct IsFidlType<::fidl::WireResponse<::test_protocollayoutssamelibrary::Compos
 template <>
 struct TypeTraits<::fidl::internal::TransactionalResponse<::test_protocollayoutssamelibrary::ComposedProtocol::TwoWayAnonComposedWithError>> {
   static constexpr const fidl_type_t* kType =
-    &::test_protocollayoutssamelibrary::test_protocollayoutssamelibrary_ComposedProtocolTwoWayAnonComposedWithErrorTopResponseTable;
+    &::test_protocollayoutssamelibrary::test_protocollayoutssamelibrary_ComposedProtocol_TwoWayAnonComposedWithError_ResultTable;
   static constexpr bool kHasServerToClientBody = true;
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 2;
@@ -1217,7 +1213,7 @@ static_assert(offsetof(::fidl::internal::TransactionalResponse<::test_protocolla
 template <>
 struct TypeTraits<::fidl::WireResponse<::test_protocollayoutssamelibrary::ComposedProtocol::TwoWayAnonComposedWithError>> {
   static constexpr const fidl_type_t* kType =
-    &::test_protocollayoutssamelibrary::test_protocollayoutssamelibrary_ComposedProtocolTwoWayAnonComposedWithErrorTopResponseTable;
+    &::test_protocollayoutssamelibrary::test_protocollayoutssamelibrary_ComposedProtocol_TwoWayAnonComposedWithError_ResultTable;
   static constexpr bool kHasServerToClientBody = true;
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 2;
@@ -1233,7 +1229,6 @@ struct TypeTraits<::fidl::WireResponse<::test_protocollayoutssamelibrary::Compos
 };
 static_assert(sizeof(::fidl::WireResponse<::test_protocollayoutssamelibrary::ComposedProtocol::TwoWayAnonComposedWithError>)
     == TypeTraits<::fidl::WireResponse<::test_protocollayoutssamelibrary::ComposedProtocol::TwoWayAnonComposedWithError>>::kPrimarySize);
-static_assert(offsetof(::fidl::WireResponse<::test_protocollayoutssamelibrary::ComposedProtocol::TwoWayAnonComposedWithError>, result) == 0);
 #ifdef __Fuchsia__
 template <>
 struct IsFidlType<::fidl::internal::TransactionalEvent<::test_protocollayoutssamelibrary::ComposedProtocol::OnAnonComposed>> : public std::true_type {};
@@ -1275,7 +1270,7 @@ struct IsFidlTransactionalMessage<::fidl::internal::TransactionalEvent<::test_pr
 template <>
 struct TypeTraits<::fidl::internal::TransactionalEvent<::test_protocollayoutssamelibrary::ComposedProtocol::OnAnonComposedWithError>> {
   static constexpr const fidl_type_t* kType =
-    &::test_protocollayoutssamelibrary::test_protocollayoutssamelibrary_ComposedProtocolOnAnonComposedWithErrorRequestTable;
+    &::test_protocollayoutssamelibrary::test_protocollayoutssamelibrary_ComposedProtocol_OnAnonComposedWithError_ResultTable;
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 3;
   static constexpr uint32_t kPrimarySize = FIDL_ALIGN(16 + sizeof(fidl_message_header_t));
@@ -1457,7 +1452,7 @@ struct IsFidlType<::fidl::WireResponse<::test_protocollayoutssamelibrary::Compos
 template <>
 struct TypeTraits<::fidl::internal::TransactionalResponse<::test_protocollayoutssamelibrary::ComposedProtocol::TwoWayNamedComposedWithError>> {
   static constexpr const fidl_type_t* kType =
-    &::test_protocollayoutssamelibrary::test_protocollayoutssamelibrary_ComposedProtocolTwoWayNamedComposedWithErrorTopResponseTable;
+    &::test_protocollayoutssamelibrary::test_protocollayoutssamelibrary_ComposedProtocol_TwoWayNamedComposedWithError_ResultTable;
   static constexpr bool kHasServerToClientBody = true;
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 2;
@@ -1479,7 +1474,7 @@ static_assert(offsetof(::fidl::internal::TransactionalResponse<::test_protocolla
 template <>
 struct TypeTraits<::fidl::WireResponse<::test_protocollayoutssamelibrary::ComposedProtocol::TwoWayNamedComposedWithError>> {
   static constexpr const fidl_type_t* kType =
-    &::test_protocollayoutssamelibrary::test_protocollayoutssamelibrary_ComposedProtocolTwoWayNamedComposedWithErrorTopResponseTable;
+    &::test_protocollayoutssamelibrary::test_protocollayoutssamelibrary_ComposedProtocol_TwoWayNamedComposedWithError_ResultTable;
   static constexpr bool kHasServerToClientBody = true;
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 2;
@@ -1495,7 +1490,6 @@ struct TypeTraits<::fidl::WireResponse<::test_protocollayoutssamelibrary::Compos
 };
 static_assert(sizeof(::fidl::WireResponse<::test_protocollayoutssamelibrary::ComposedProtocol::TwoWayNamedComposedWithError>)
     == TypeTraits<::fidl::WireResponse<::test_protocollayoutssamelibrary::ComposedProtocol::TwoWayNamedComposedWithError>>::kPrimarySize);
-static_assert(offsetof(::fidl::WireResponse<::test_protocollayoutssamelibrary::ComposedProtocol::TwoWayNamedComposedWithError>, result) == 0);
 #ifdef __Fuchsia__
 template <>
 struct IsFidlType<::fidl::internal::TransactionalEvent<::test_protocollayoutssamelibrary::ComposedProtocol::OnNamedComposed>> : public std::true_type {};
@@ -1537,7 +1531,7 @@ struct IsFidlTransactionalMessage<::fidl::internal::TransactionalEvent<::test_pr
 template <>
 struct TypeTraits<::fidl::internal::TransactionalEvent<::test_protocollayoutssamelibrary::ComposedProtocol::OnNamedComposedWithError>> {
   static constexpr const fidl_type_t* kType =
-    &::test_protocollayoutssamelibrary::test_protocollayoutssamelibrary_ComposedProtocolOnNamedComposedWithErrorRequestTable;
+    &::test_protocollayoutssamelibrary::test_protocollayoutssamelibrary_ComposedProtocol_OnNamedComposedWithError_ResultTable;
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 3;
   static constexpr uint32_t kPrimarySize = FIDL_ALIGN(16 + sizeof(fidl_message_header_t));
@@ -2157,7 +2151,7 @@ class ::fidl::internal::WireCompleterImpl<::test_protocollayoutssamelibrary::Com
   void ReplyError(uint32_t error);
 
  private:
-  void MakeReply(::test_protocollayoutssamelibrary::wire::ComposedProtocolTwoWayAnonComposedWithErrorResult result);
+  void MakeReply(::test_protocollayoutssamelibrary::wire::ComposedProtocolTwoWayAnonComposedWithErrorResult ComposedProtocolTwoWayAnonComposedWithErrorResult);
 };
 
 template <>
@@ -2170,7 +2164,7 @@ class ::fidl::internal::WireBufferCompleterImpl<::test_protocollayoutssamelibrar
   void ReplyError(uint32_t error);
 
  private:
-  void MakeReply(::test_protocollayoutssamelibrary::wire::ComposedProtocolTwoWayAnonComposedWithErrorResult result);
+  void MakeReply(::test_protocollayoutssamelibrary::wire::ComposedProtocolTwoWayAnonComposedWithErrorResult ComposedProtocolTwoWayAnonComposedWithErrorResult);
 };
 
 template<>
@@ -2237,7 +2231,7 @@ class ::fidl::internal::WireCompleterImpl<::test_protocollayoutssamelibrary::Com
   void ReplyError(uint32_t error);
 
  private:
-  void MakeReply(::test_protocollayoutssamelibrary::wire::ComposedProtocolTwoWayNamedComposedWithErrorResult result);
+  void MakeReply(::test_protocollayoutssamelibrary::wire::ComposedProtocolTwoWayNamedComposedWithErrorResult ComposedProtocolTwoWayNamedComposedWithErrorResult);
 };
 
 template <>
@@ -2250,7 +2244,7 @@ class ::fidl::internal::WireBufferCompleterImpl<::test_protocollayoutssamelibrar
   void ReplyError(uint32_t error);
 
  private:
-  void MakeReply(::test_protocollayoutssamelibrary::wire::ComposedProtocolTwoWayNamedComposedWithErrorResult result);
+  void MakeReply(::test_protocollayoutssamelibrary::wire::ComposedProtocolTwoWayNamedComposedWithErrorResult ComposedProtocolTwoWayNamedComposedWithErrorResult);
 };
 
 template<>
@@ -2382,12 +2376,12 @@ class ::fidl::WireServer<::test_protocollayoutssamelibrary::ComposedProtocol> : 
     
     }  // namespace fidl
 namespace test_protocollayoutssamelibrary {
-__LOCAL extern "C" const fidl_type_t test_protocollayoutssamelibrary_MainProtocolTwoWayLocalWithErrorTopResponseTable;
+__LOCAL extern "C" const fidl_type_t test_protocollayoutssamelibrary_MainProtocol_TwoWayLocalWithError_ResultTable;
     
     
     
     
-__LOCAL extern "C" const fidl_type_t test_protocollayoutssamelibrary_MainProtocolOnLocalWithErrorRequestTable;
+__LOCAL extern "C" const fidl_type_t test_protocollayoutssamelibrary_MainProtocol_OnLocalWithError_ResultTable;
     
 __LOCAL extern "C" const fidl_type_t test_protocollayoutssamelibrary_MainProtocolOneWayAnonRequestTable;
     
@@ -2398,13 +2392,13 @@ __LOCAL extern "C" const fidl_type_t test_protocollayoutssamelibrary_MainProtoco
     
 __LOCAL extern "C" const fidl_type_t test_protocollayoutssamelibrary_MainProtocolTwoWayAnonWithErrorRequestTable;
     
-__LOCAL extern "C" const fidl_type_t test_protocollayoutssamelibrary_MainProtocolTwoWayAnonWithErrorTopResponseTable;
+__LOCAL extern "C" const fidl_type_t test_protocollayoutssamelibrary_MainProtocol_TwoWayAnonWithError_ResultTable;
     
     
 __LOCAL extern "C" const fidl_type_t test_protocollayoutssamelibrary_MainProtocolOnAnonRequestTable;
     
     
-__LOCAL extern "C" const fidl_type_t test_protocollayoutssamelibrary_MainProtocolOnAnonWithErrorRequestTable;
+__LOCAL extern "C" const fidl_type_t test_protocollayoutssamelibrary_MainProtocol_OnAnonWithError_ResultTable;
 }  // namespace test_protocollayoutssamelibrary
 
 template<>
@@ -2526,7 +2520,7 @@ template<>
 struct ::fidl::internal::WireMethodTypes<::test_protocollayoutssamelibrary::MainProtocol::TwoWayAnonComposedWithError> {
     static constexpr bool HasRequestPayload = true;
       using Request = ::test_protocollayoutssamelibrary::wire::ComposedProtocolTwoWayAnonComposedWithErrorRequest;
-      using Response = ::test_protocollayoutssamelibrary::wire::ComposedProtocolTwoWayAnonComposedWithErrorTopResponse;
+      using Response = ::test_protocollayoutssamelibrary::wire::ComposedProtocolTwoWayAnonComposedWithErrorResult;
   using DomainError = uint32_t;
     
       using Completer = fidl::Completer<::fidl::internal::WireCompleterBase<::test_protocollayoutssamelibrary::MainProtocol::TwoWayAnonComposedWithError>>;
@@ -2576,7 +2570,7 @@ template<>
 struct ::fidl::internal::WireMethodTypes<::test_protocollayoutssamelibrary::MainProtocol::OnAnonComposedWithError> {
     
     static constexpr bool HasRequestPayload = true;
-      using Request = ::test_protocollayoutssamelibrary::wire::ComposedProtocolOnAnonComposedWithErrorRequest;
+      using Request = ::test_protocollayoutssamelibrary::wire::ComposedProtocolOnAnonComposedWithErrorResult;
   using DomainError = uint32_t;
 };
 
@@ -2644,7 +2638,7 @@ template<>
 struct ::fidl::internal::WireMethodTypes<::test_protocollayoutssamelibrary::MainProtocol::TwoWayNamedComposedWithError> {
     static constexpr bool HasRequestPayload = true;
       using Request = ::test_protocollayoutssamelibrary::wire::TablePayload;
-      using Response = ::test_protocollayoutssamelibrary::wire::ComposedProtocolTwoWayNamedComposedWithErrorTopResponse;
+      using Response = ::test_protocollayoutssamelibrary::wire::ComposedProtocolTwoWayNamedComposedWithErrorResult;
   using DomainError = uint32_t;
     
       using Completer = fidl::Completer<::fidl::internal::WireCompleterBase<::test_protocollayoutssamelibrary::MainProtocol::TwoWayNamedComposedWithError>>;
@@ -2694,7 +2688,7 @@ template<>
 struct ::fidl::internal::WireMethodTypes<::test_protocollayoutssamelibrary::MainProtocol::OnNamedComposedWithError> {
     
     static constexpr bool HasRequestPayload = true;
-      using Request = ::test_protocollayoutssamelibrary::wire::ComposedProtocolOnNamedComposedWithErrorRequest;
+      using Request = ::test_protocollayoutssamelibrary::wire::ComposedProtocolOnNamedComposedWithErrorResult;
   using DomainError = uint32_t;
 };
 
@@ -2762,7 +2756,7 @@ template<>
 struct ::fidl::internal::WireMethodTypes<::test_protocollayoutssamelibrary::MainProtocol::TwoWayLocalWithError> {
     static constexpr bool HasRequestPayload = true;
       using Request = ::test_protocollayoutssamelibrary::wire::TablePayload;
-      using Response = ::test_protocollayoutssamelibrary::wire::MainProtocolTwoWayLocalWithErrorTopResponse;
+      using Response = ::test_protocollayoutssamelibrary::wire::MainProtocolTwoWayLocalWithErrorResult;
   using DomainError = uint32_t;
     
       using Completer = fidl::Completer<::fidl::internal::WireCompleterBase<::test_protocollayoutssamelibrary::MainProtocol::TwoWayLocalWithError>>;
@@ -2812,7 +2806,7 @@ template<>
 struct ::fidl::internal::WireMethodTypes<::test_protocollayoutssamelibrary::MainProtocol::OnLocalWithError> {
     
     static constexpr bool HasRequestPayload = true;
-      using Request = ::test_protocollayoutssamelibrary::wire::MainProtocolOnLocalWithErrorRequest;
+      using Request = ::test_protocollayoutssamelibrary::wire::MainProtocolOnLocalWithErrorResult;
   using DomainError = uint32_t;
 };
 
@@ -2880,7 +2874,7 @@ template<>
 struct ::fidl::internal::WireMethodTypes<::test_protocollayoutssamelibrary::MainProtocol::TwoWayAnonWithError> {
     static constexpr bool HasRequestPayload = true;
       using Request = ::test_protocollayoutssamelibrary::wire::MainProtocolTwoWayAnonWithErrorRequest;
-      using Response = ::test_protocollayoutssamelibrary::wire::MainProtocolTwoWayAnonWithErrorTopResponse;
+      using Response = ::test_protocollayoutssamelibrary::wire::MainProtocolTwoWayAnonWithErrorResult;
   using DomainError = uint32_t;
     
       using Completer = fidl::Completer<::fidl::internal::WireCompleterBase<::test_protocollayoutssamelibrary::MainProtocol::TwoWayAnonWithError>>;
@@ -2930,7 +2924,7 @@ template<>
 struct ::fidl::internal::WireMethodTypes<::test_protocollayoutssamelibrary::MainProtocol::OnAnonWithError> {
     
     static constexpr bool HasRequestPayload = true;
-      using Request = ::test_protocollayoutssamelibrary::wire::MainProtocolOnAnonWithErrorRequest;
+      using Request = ::test_protocollayoutssamelibrary::wire::MainProtocolOnAnonWithErrorResult;
   using DomainError = uint32_t;
 };
 
@@ -3155,12 +3149,10 @@ struct ::fidl::internal::WireCodingTraits<::fidl::internal::TransactionalRequest
 
 
 template<>
-struct ::fidl::WireResponse<::test_protocollayoutssamelibrary::MainProtocol::TwoWayAnonComposedWithError> final : public ::test_protocollayoutssamelibrary::wire::ComposedProtocolTwoWayAnonComposedWithErrorTopResponse {
-  using Result = test_protocollayoutssamelibrary::wire::ComposedProtocolTwoWayAnonComposedWithErrorResult;
+struct ::fidl::WireResponse<::test_protocollayoutssamelibrary::MainProtocol::TwoWayAnonComposedWithError> final : public ::test_protocollayoutssamelibrary::wire::ComposedProtocolTwoWayAnonComposedWithErrorResult {
 
   
-  explicit WireResponse(::test_protocollayoutssamelibrary::wire::ComposedProtocolTwoWayAnonComposedWithErrorTopResponse base) : ::test_protocollayoutssamelibrary::wire::ComposedProtocolTwoWayAnonComposedWithErrorTopResponse(std::move(base)) {}
-  explicit WireResponse(::test_protocollayoutssamelibrary::wire::ComposedProtocolTwoWayAnonComposedWithErrorResult result) : ::test_protocollayoutssamelibrary::wire::ComposedProtocolTwoWayAnonComposedWithErrorTopResponse{ .result = std::move(result)}{}
+  explicit WireResponse(::test_protocollayoutssamelibrary::wire::ComposedProtocolTwoWayAnonComposedWithErrorResult ComposedProtocolTwoWayAnonComposedWithErrorResult) : ::test_protocollayoutssamelibrary::wire::ComposedProtocolTwoWayAnonComposedWithErrorResult(ComposedProtocolTwoWayAnonComposedWithErrorResult){}
   WireResponse() = default;
 };
 
@@ -3172,12 +3164,12 @@ struct ::fidl::internal::WireCodingTraits<::fidl::WireResponse<::test_protocolla
 
   static void Encode(
     internal::WireEncoder* encoder, ::fidl::WireResponse<::test_protocollayoutssamelibrary::MainProtocol::TwoWayAnonComposedWithError>* value, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth) {
-    fidl::internal::WireCodingTraits<::test_protocollayoutssamelibrary::wire::ComposedProtocolTwoWayAnonComposedWithErrorTopResponse, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive>::Encode(
+    fidl::internal::WireCodingTraits<::test_protocollayoutssamelibrary::wire::ComposedProtocolTwoWayAnonComposedWithErrorResult, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive>::Encode(
       encoder, value, position, recursion_depth);
   }
   static void Decode(
     internal::WireDecoder* decoder, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth) {
-    fidl::internal::WireCodingTraits<::test_protocollayoutssamelibrary::wire::ComposedProtocolTwoWayAnonComposedWithErrorTopResponse, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive>::Decode(
+    fidl::internal::WireCodingTraits<::test_protocollayoutssamelibrary::wire::ComposedProtocolTwoWayAnonComposedWithErrorResult, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive>::Decode(
       decoder, position, recursion_depth);
   }
 };
@@ -3188,8 +3180,8 @@ struct ::fidl::internal::TransactionalResponse<::test_protocollayoutssamelibrary
   fidl_message_header_t header;
   
   ::fidl::WireResponse<::test_protocollayoutssamelibrary::MainProtocol::TwoWayAnonComposedWithError> body;
-  explicit TransactionalResponse(::test_protocollayoutssamelibrary::wire::ComposedProtocolTwoWayAnonComposedWithErrorResult result)
-  : body(::fidl::WireResponse<::test_protocollayoutssamelibrary::MainProtocol::TwoWayAnonComposedWithError>(result)) {
+  explicit TransactionalResponse(::test_protocollayoutssamelibrary::wire::ComposedProtocolTwoWayAnonComposedWithErrorResult ComposedProtocolTwoWayAnonComposedWithErrorResult)
+  : body(::fidl::WireResponse<::test_protocollayoutssamelibrary::MainProtocol::TwoWayAnonComposedWithError>(ComposedProtocolTwoWayAnonComposedWithErrorResult)) {
     _InitHeader();
   }
   TransactionalResponse() {
@@ -3269,8 +3261,8 @@ struct ::fidl::internal::TransactionalEvent<::test_protocollayoutssamelibrary::M
   
     ::fidl::WireEvent<::test_protocollayoutssamelibrary::MainProtocol::OnAnonComposedWithError> body;
 
-    explicit TransactionalEvent(::test_protocollayoutssamelibrary::wire::ComposedProtocolOnAnonComposedWithErrorResult result)
-    : body{ result } {
+    explicit TransactionalEvent(::test_protocollayoutssamelibrary::wire::ComposedProtocolOnAnonComposedWithErrorResult ComposedProtocolOnAnonComposedWithErrorResult)
+    : body{ ComposedProtocolOnAnonComposedWithErrorResult } {
       _InitHeader();
     }
 
@@ -3484,12 +3476,10 @@ struct ::fidl::internal::WireCodingTraits<::fidl::internal::TransactionalRequest
 
 
 template<>
-struct ::fidl::WireResponse<::test_protocollayoutssamelibrary::MainProtocol::TwoWayNamedComposedWithError> final : public ::test_protocollayoutssamelibrary::wire::ComposedProtocolTwoWayNamedComposedWithErrorTopResponse {
-  using Result = test_protocollayoutssamelibrary::wire::ComposedProtocolTwoWayNamedComposedWithErrorResult;
+struct ::fidl::WireResponse<::test_protocollayoutssamelibrary::MainProtocol::TwoWayNamedComposedWithError> final : public ::test_protocollayoutssamelibrary::wire::ComposedProtocolTwoWayNamedComposedWithErrorResult {
 
   
-  explicit WireResponse(::test_protocollayoutssamelibrary::wire::ComposedProtocolTwoWayNamedComposedWithErrorTopResponse base) : ::test_protocollayoutssamelibrary::wire::ComposedProtocolTwoWayNamedComposedWithErrorTopResponse(std::move(base)) {}
-  explicit WireResponse(::test_protocollayoutssamelibrary::wire::ComposedProtocolTwoWayNamedComposedWithErrorResult result) : ::test_protocollayoutssamelibrary::wire::ComposedProtocolTwoWayNamedComposedWithErrorTopResponse{ .result = std::move(result)}{}
+  explicit WireResponse(::test_protocollayoutssamelibrary::wire::ComposedProtocolTwoWayNamedComposedWithErrorResult ComposedProtocolTwoWayNamedComposedWithErrorResult) : ::test_protocollayoutssamelibrary::wire::ComposedProtocolTwoWayNamedComposedWithErrorResult(ComposedProtocolTwoWayNamedComposedWithErrorResult){}
   WireResponse() = default;
 };
 
@@ -3501,12 +3491,12 @@ struct ::fidl::internal::WireCodingTraits<::fidl::WireResponse<::test_protocolla
 
   static void Encode(
     internal::WireEncoder* encoder, ::fidl::WireResponse<::test_protocollayoutssamelibrary::MainProtocol::TwoWayNamedComposedWithError>* value, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth) {
-    fidl::internal::WireCodingTraits<::test_protocollayoutssamelibrary::wire::ComposedProtocolTwoWayNamedComposedWithErrorTopResponse, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive>::Encode(
+    fidl::internal::WireCodingTraits<::test_protocollayoutssamelibrary::wire::ComposedProtocolTwoWayNamedComposedWithErrorResult, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive>::Encode(
       encoder, value, position, recursion_depth);
   }
   static void Decode(
     internal::WireDecoder* decoder, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth) {
-    fidl::internal::WireCodingTraits<::test_protocollayoutssamelibrary::wire::ComposedProtocolTwoWayNamedComposedWithErrorTopResponse, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive>::Decode(
+    fidl::internal::WireCodingTraits<::test_protocollayoutssamelibrary::wire::ComposedProtocolTwoWayNamedComposedWithErrorResult, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive>::Decode(
       decoder, position, recursion_depth);
   }
 };
@@ -3517,8 +3507,8 @@ struct ::fidl::internal::TransactionalResponse<::test_protocollayoutssamelibrary
   fidl_message_header_t header;
   
   ::fidl::WireResponse<::test_protocollayoutssamelibrary::MainProtocol::TwoWayNamedComposedWithError> body;
-  explicit TransactionalResponse(::test_protocollayoutssamelibrary::wire::ComposedProtocolTwoWayNamedComposedWithErrorResult result)
-  : body(::fidl::WireResponse<::test_protocollayoutssamelibrary::MainProtocol::TwoWayNamedComposedWithError>(result)) {
+  explicit TransactionalResponse(::test_protocollayoutssamelibrary::wire::ComposedProtocolTwoWayNamedComposedWithErrorResult ComposedProtocolTwoWayNamedComposedWithErrorResult)
+  : body(::fidl::WireResponse<::test_protocollayoutssamelibrary::MainProtocol::TwoWayNamedComposedWithError>(ComposedProtocolTwoWayNamedComposedWithErrorResult)) {
     _InitHeader();
   }
   TransactionalResponse() {
@@ -3598,8 +3588,8 @@ struct ::fidl::internal::TransactionalEvent<::test_protocollayoutssamelibrary::M
   
     ::fidl::WireEvent<::test_protocollayoutssamelibrary::MainProtocol::OnNamedComposedWithError> body;
 
-    explicit TransactionalEvent(::test_protocollayoutssamelibrary::wire::ComposedProtocolOnNamedComposedWithErrorResult result)
-    : body{ result } {
+    explicit TransactionalEvent(::test_protocollayoutssamelibrary::wire::ComposedProtocolOnNamedComposedWithErrorResult ComposedProtocolOnNamedComposedWithErrorResult)
+    : body{ ComposedProtocolOnNamedComposedWithErrorResult } {
       _InitHeader();
     }
 
@@ -3813,12 +3803,10 @@ struct ::fidl::internal::WireCodingTraits<::fidl::internal::TransactionalRequest
 
 
 template<>
-struct ::fidl::WireResponse<::test_protocollayoutssamelibrary::MainProtocol::TwoWayLocalWithError> final : public ::test_protocollayoutssamelibrary::wire::MainProtocolTwoWayLocalWithErrorTopResponse {
-  using Result = test_protocollayoutssamelibrary::wire::MainProtocolTwoWayLocalWithErrorResult;
+struct ::fidl::WireResponse<::test_protocollayoutssamelibrary::MainProtocol::TwoWayLocalWithError> final : public ::test_protocollayoutssamelibrary::wire::MainProtocolTwoWayLocalWithErrorResult {
 
   
-  explicit WireResponse(::test_protocollayoutssamelibrary::wire::MainProtocolTwoWayLocalWithErrorTopResponse base) : ::test_protocollayoutssamelibrary::wire::MainProtocolTwoWayLocalWithErrorTopResponse(std::move(base)) {}
-  explicit WireResponse(::test_protocollayoutssamelibrary::wire::MainProtocolTwoWayLocalWithErrorResult result) : ::test_protocollayoutssamelibrary::wire::MainProtocolTwoWayLocalWithErrorTopResponse{ .result = std::move(result)}{}
+  explicit WireResponse(::test_protocollayoutssamelibrary::wire::MainProtocolTwoWayLocalWithErrorResult MainProtocolTwoWayLocalWithErrorResult) : ::test_protocollayoutssamelibrary::wire::MainProtocolTwoWayLocalWithErrorResult(MainProtocolTwoWayLocalWithErrorResult){}
   WireResponse() = default;
 };
 
@@ -3830,12 +3818,12 @@ struct ::fidl::internal::WireCodingTraits<::fidl::WireResponse<::test_protocolla
 
   static void Encode(
     internal::WireEncoder* encoder, ::fidl::WireResponse<::test_protocollayoutssamelibrary::MainProtocol::TwoWayLocalWithError>* value, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth) {
-    fidl::internal::WireCodingTraits<::test_protocollayoutssamelibrary::wire::MainProtocolTwoWayLocalWithErrorTopResponse, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive>::Encode(
+    fidl::internal::WireCodingTraits<::test_protocollayoutssamelibrary::wire::MainProtocolTwoWayLocalWithErrorResult, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive>::Encode(
       encoder, value, position, recursion_depth);
   }
   static void Decode(
     internal::WireDecoder* decoder, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth) {
-    fidl::internal::WireCodingTraits<::test_protocollayoutssamelibrary::wire::MainProtocolTwoWayLocalWithErrorTopResponse, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive>::Decode(
+    fidl::internal::WireCodingTraits<::test_protocollayoutssamelibrary::wire::MainProtocolTwoWayLocalWithErrorResult, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive>::Decode(
       decoder, position, recursion_depth);
   }
 };
@@ -3846,8 +3834,8 @@ struct ::fidl::internal::TransactionalResponse<::test_protocollayoutssamelibrary
   fidl_message_header_t header;
   
   ::fidl::WireResponse<::test_protocollayoutssamelibrary::MainProtocol::TwoWayLocalWithError> body;
-  explicit TransactionalResponse(::test_protocollayoutssamelibrary::wire::MainProtocolTwoWayLocalWithErrorResult result)
-  : body(::fidl::WireResponse<::test_protocollayoutssamelibrary::MainProtocol::TwoWayLocalWithError>(result)) {
+  explicit TransactionalResponse(::test_protocollayoutssamelibrary::wire::MainProtocolTwoWayLocalWithErrorResult MainProtocolTwoWayLocalWithErrorResult)
+  : body(::fidl::WireResponse<::test_protocollayoutssamelibrary::MainProtocol::TwoWayLocalWithError>(MainProtocolTwoWayLocalWithErrorResult)) {
     _InitHeader();
   }
   TransactionalResponse() {
@@ -3927,8 +3915,8 @@ struct ::fidl::internal::TransactionalEvent<::test_protocollayoutssamelibrary::M
   
     ::fidl::WireEvent<::test_protocollayoutssamelibrary::MainProtocol::OnLocalWithError> body;
 
-    explicit TransactionalEvent(::test_protocollayoutssamelibrary::wire::MainProtocolOnLocalWithErrorResult result)
-    : body{ result } {
+    explicit TransactionalEvent(::test_protocollayoutssamelibrary::wire::MainProtocolOnLocalWithErrorResult MainProtocolOnLocalWithErrorResult)
+    : body{ MainProtocolOnLocalWithErrorResult } {
       _InitHeader();
     }
 
@@ -4142,12 +4130,10 @@ struct ::fidl::internal::WireCodingTraits<::fidl::internal::TransactionalRequest
 
 
 template<>
-struct ::fidl::WireResponse<::test_protocollayoutssamelibrary::MainProtocol::TwoWayAnonWithError> final : public ::test_protocollayoutssamelibrary::wire::MainProtocolTwoWayAnonWithErrorTopResponse {
-  using Result = test_protocollayoutssamelibrary::wire::MainProtocolTwoWayAnonWithErrorResult;
+struct ::fidl::WireResponse<::test_protocollayoutssamelibrary::MainProtocol::TwoWayAnonWithError> final : public ::test_protocollayoutssamelibrary::wire::MainProtocolTwoWayAnonWithErrorResult {
 
   
-  explicit WireResponse(::test_protocollayoutssamelibrary::wire::MainProtocolTwoWayAnonWithErrorTopResponse base) : ::test_protocollayoutssamelibrary::wire::MainProtocolTwoWayAnonWithErrorTopResponse(std::move(base)) {}
-  explicit WireResponse(::test_protocollayoutssamelibrary::wire::MainProtocolTwoWayAnonWithErrorResult result) : ::test_protocollayoutssamelibrary::wire::MainProtocolTwoWayAnonWithErrorTopResponse{ .result = std::move(result)}{}
+  explicit WireResponse(::test_protocollayoutssamelibrary::wire::MainProtocolTwoWayAnonWithErrorResult MainProtocolTwoWayAnonWithErrorResult) : ::test_protocollayoutssamelibrary::wire::MainProtocolTwoWayAnonWithErrorResult(MainProtocolTwoWayAnonWithErrorResult){}
   WireResponse() = default;
 };
 
@@ -4159,12 +4145,12 @@ struct ::fidl::internal::WireCodingTraits<::fidl::WireResponse<::test_protocolla
 
   static void Encode(
     internal::WireEncoder* encoder, ::fidl::WireResponse<::test_protocollayoutssamelibrary::MainProtocol::TwoWayAnonWithError>* value, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth) {
-    fidl::internal::WireCodingTraits<::test_protocollayoutssamelibrary::wire::MainProtocolTwoWayAnonWithErrorTopResponse, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive>::Encode(
+    fidl::internal::WireCodingTraits<::test_protocollayoutssamelibrary::wire::MainProtocolTwoWayAnonWithErrorResult, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive>::Encode(
       encoder, value, position, recursion_depth);
   }
   static void Decode(
     internal::WireDecoder* decoder, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth) {
-    fidl::internal::WireCodingTraits<::test_protocollayoutssamelibrary::wire::MainProtocolTwoWayAnonWithErrorTopResponse, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive>::Decode(
+    fidl::internal::WireCodingTraits<::test_protocollayoutssamelibrary::wire::MainProtocolTwoWayAnonWithErrorResult, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive>::Decode(
       decoder, position, recursion_depth);
   }
 };
@@ -4175,8 +4161,8 @@ struct ::fidl::internal::TransactionalResponse<::test_protocollayoutssamelibrary
   fidl_message_header_t header;
   
   ::fidl::WireResponse<::test_protocollayoutssamelibrary::MainProtocol::TwoWayAnonWithError> body;
-  explicit TransactionalResponse(::test_protocollayoutssamelibrary::wire::MainProtocolTwoWayAnonWithErrorResult result)
-  : body(::fidl::WireResponse<::test_protocollayoutssamelibrary::MainProtocol::TwoWayAnonWithError>(result)) {
+  explicit TransactionalResponse(::test_protocollayoutssamelibrary::wire::MainProtocolTwoWayAnonWithErrorResult MainProtocolTwoWayAnonWithErrorResult)
+  : body(::fidl::WireResponse<::test_protocollayoutssamelibrary::MainProtocol::TwoWayAnonWithError>(MainProtocolTwoWayAnonWithErrorResult)) {
     _InitHeader();
   }
   TransactionalResponse() {
@@ -4256,8 +4242,8 @@ struct ::fidl::internal::TransactionalEvent<::test_protocollayoutssamelibrary::M
   
     ::fidl::WireEvent<::test_protocollayoutssamelibrary::MainProtocol::OnAnonWithError> body;
 
-    explicit TransactionalEvent(::test_protocollayoutssamelibrary::wire::MainProtocolOnAnonWithErrorResult result)
-    : body{ result } {
+    explicit TransactionalEvent(::test_protocollayoutssamelibrary::wire::MainProtocolOnAnonWithErrorResult MainProtocolOnAnonWithErrorResult)
+    : body{ MainProtocolOnAnonWithErrorResult } {
       _InitHeader();
     }
 
@@ -4454,7 +4440,7 @@ struct IsFidlType<::fidl::WireResponse<::test_protocollayoutssamelibrary::MainPr
 template <>
 struct TypeTraits<::fidl::internal::TransactionalResponse<::test_protocollayoutssamelibrary::MainProtocol::TwoWayAnonComposedWithError>> {
   static constexpr const fidl_type_t* kType =
-    &::test_protocollayoutssamelibrary::test_protocollayoutssamelibrary_ComposedProtocolTwoWayAnonComposedWithErrorTopResponseTable;
+    &::test_protocollayoutssamelibrary::test_protocollayoutssamelibrary_ComposedProtocol_TwoWayAnonComposedWithError_ResultTable;
   static constexpr bool kHasServerToClientBody = true;
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 2;
@@ -4476,7 +4462,7 @@ static_assert(offsetof(::fidl::internal::TransactionalResponse<::test_protocolla
 template <>
 struct TypeTraits<::fidl::WireResponse<::test_protocollayoutssamelibrary::MainProtocol::TwoWayAnonComposedWithError>> {
   static constexpr const fidl_type_t* kType =
-    &::test_protocollayoutssamelibrary::test_protocollayoutssamelibrary_ComposedProtocolTwoWayAnonComposedWithErrorTopResponseTable;
+    &::test_protocollayoutssamelibrary::test_protocollayoutssamelibrary_ComposedProtocol_TwoWayAnonComposedWithError_ResultTable;
   static constexpr bool kHasServerToClientBody = true;
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 2;
@@ -4492,7 +4478,6 @@ struct TypeTraits<::fidl::WireResponse<::test_protocollayoutssamelibrary::MainPr
 };
 static_assert(sizeof(::fidl::WireResponse<::test_protocollayoutssamelibrary::MainProtocol::TwoWayAnonComposedWithError>)
     == TypeTraits<::fidl::WireResponse<::test_protocollayoutssamelibrary::MainProtocol::TwoWayAnonComposedWithError>>::kPrimarySize);
-static_assert(offsetof(::fidl::WireResponse<::test_protocollayoutssamelibrary::MainProtocol::TwoWayAnonComposedWithError>, result) == 0);
 #ifdef __Fuchsia__
 template <>
 struct IsFidlType<::fidl::internal::TransactionalEvent<::test_protocollayoutssamelibrary::MainProtocol::OnAnonComposed>> : public std::true_type {};
@@ -4534,7 +4519,7 @@ struct IsFidlTransactionalMessage<::fidl::internal::TransactionalEvent<::test_pr
 template <>
 struct TypeTraits<::fidl::internal::TransactionalEvent<::test_protocollayoutssamelibrary::MainProtocol::OnAnonComposedWithError>> {
   static constexpr const fidl_type_t* kType =
-    &::test_protocollayoutssamelibrary::test_protocollayoutssamelibrary_ComposedProtocolOnAnonComposedWithErrorRequestTable;
+    &::test_protocollayoutssamelibrary::test_protocollayoutssamelibrary_ComposedProtocol_OnAnonComposedWithError_ResultTable;
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 3;
   static constexpr uint32_t kPrimarySize = FIDL_ALIGN(16 + sizeof(fidl_message_header_t));
@@ -4716,7 +4701,7 @@ struct IsFidlType<::fidl::WireResponse<::test_protocollayoutssamelibrary::MainPr
 template <>
 struct TypeTraits<::fidl::internal::TransactionalResponse<::test_protocollayoutssamelibrary::MainProtocol::TwoWayNamedComposedWithError>> {
   static constexpr const fidl_type_t* kType =
-    &::test_protocollayoutssamelibrary::test_protocollayoutssamelibrary_ComposedProtocolTwoWayNamedComposedWithErrorTopResponseTable;
+    &::test_protocollayoutssamelibrary::test_protocollayoutssamelibrary_ComposedProtocol_TwoWayNamedComposedWithError_ResultTable;
   static constexpr bool kHasServerToClientBody = true;
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 2;
@@ -4738,7 +4723,7 @@ static_assert(offsetof(::fidl::internal::TransactionalResponse<::test_protocolla
 template <>
 struct TypeTraits<::fidl::WireResponse<::test_protocollayoutssamelibrary::MainProtocol::TwoWayNamedComposedWithError>> {
   static constexpr const fidl_type_t* kType =
-    &::test_protocollayoutssamelibrary::test_protocollayoutssamelibrary_ComposedProtocolTwoWayNamedComposedWithErrorTopResponseTable;
+    &::test_protocollayoutssamelibrary::test_protocollayoutssamelibrary_ComposedProtocol_TwoWayNamedComposedWithError_ResultTable;
   static constexpr bool kHasServerToClientBody = true;
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 2;
@@ -4754,7 +4739,6 @@ struct TypeTraits<::fidl::WireResponse<::test_protocollayoutssamelibrary::MainPr
 };
 static_assert(sizeof(::fidl::WireResponse<::test_protocollayoutssamelibrary::MainProtocol::TwoWayNamedComposedWithError>)
     == TypeTraits<::fidl::WireResponse<::test_protocollayoutssamelibrary::MainProtocol::TwoWayNamedComposedWithError>>::kPrimarySize);
-static_assert(offsetof(::fidl::WireResponse<::test_protocollayoutssamelibrary::MainProtocol::TwoWayNamedComposedWithError>, result) == 0);
 #ifdef __Fuchsia__
 template <>
 struct IsFidlType<::fidl::internal::TransactionalEvent<::test_protocollayoutssamelibrary::MainProtocol::OnNamedComposed>> : public std::true_type {};
@@ -4796,7 +4780,7 @@ struct IsFidlTransactionalMessage<::fidl::internal::TransactionalEvent<::test_pr
 template <>
 struct TypeTraits<::fidl::internal::TransactionalEvent<::test_protocollayoutssamelibrary::MainProtocol::OnNamedComposedWithError>> {
   static constexpr const fidl_type_t* kType =
-    &::test_protocollayoutssamelibrary::test_protocollayoutssamelibrary_ComposedProtocolOnNamedComposedWithErrorRequestTable;
+    &::test_protocollayoutssamelibrary::test_protocollayoutssamelibrary_ComposedProtocol_OnNamedComposedWithError_ResultTable;
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 3;
   static constexpr uint32_t kPrimarySize = FIDL_ALIGN(16 + sizeof(fidl_message_header_t));
@@ -4978,7 +4962,7 @@ struct IsFidlType<::fidl::WireResponse<::test_protocollayoutssamelibrary::MainPr
 template <>
 struct TypeTraits<::fidl::internal::TransactionalResponse<::test_protocollayoutssamelibrary::MainProtocol::TwoWayLocalWithError>> {
   static constexpr const fidl_type_t* kType =
-    &::test_protocollayoutssamelibrary::test_protocollayoutssamelibrary_MainProtocolTwoWayLocalWithErrorTopResponseTable;
+    &::test_protocollayoutssamelibrary::test_protocollayoutssamelibrary_MainProtocol_TwoWayLocalWithError_ResultTable;
   static constexpr bool kHasServerToClientBody = true;
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 2;
@@ -5000,7 +4984,7 @@ static_assert(offsetof(::fidl::internal::TransactionalResponse<::test_protocolla
 template <>
 struct TypeTraits<::fidl::WireResponse<::test_protocollayoutssamelibrary::MainProtocol::TwoWayLocalWithError>> {
   static constexpr const fidl_type_t* kType =
-    &::test_protocollayoutssamelibrary::test_protocollayoutssamelibrary_MainProtocolTwoWayLocalWithErrorTopResponseTable;
+    &::test_protocollayoutssamelibrary::test_protocollayoutssamelibrary_MainProtocol_TwoWayLocalWithError_ResultTable;
   static constexpr bool kHasServerToClientBody = true;
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 2;
@@ -5016,7 +5000,6 @@ struct TypeTraits<::fidl::WireResponse<::test_protocollayoutssamelibrary::MainPr
 };
 static_assert(sizeof(::fidl::WireResponse<::test_protocollayoutssamelibrary::MainProtocol::TwoWayLocalWithError>)
     == TypeTraits<::fidl::WireResponse<::test_protocollayoutssamelibrary::MainProtocol::TwoWayLocalWithError>>::kPrimarySize);
-static_assert(offsetof(::fidl::WireResponse<::test_protocollayoutssamelibrary::MainProtocol::TwoWayLocalWithError>, result) == 0);
 #ifdef __Fuchsia__
 template <>
 struct IsFidlType<::fidl::internal::TransactionalEvent<::test_protocollayoutssamelibrary::MainProtocol::OnLocal>> : public std::true_type {};
@@ -5058,7 +5041,7 @@ struct IsFidlTransactionalMessage<::fidl::internal::TransactionalEvent<::test_pr
 template <>
 struct TypeTraits<::fidl::internal::TransactionalEvent<::test_protocollayoutssamelibrary::MainProtocol::OnLocalWithError>> {
   static constexpr const fidl_type_t* kType =
-    &::test_protocollayoutssamelibrary::test_protocollayoutssamelibrary_MainProtocolOnLocalWithErrorRequestTable;
+    &::test_protocollayoutssamelibrary::test_protocollayoutssamelibrary_MainProtocol_OnLocalWithError_ResultTable;
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 3;
   static constexpr uint32_t kPrimarySize = FIDL_ALIGN(16 + sizeof(fidl_message_header_t));
@@ -5240,7 +5223,7 @@ struct IsFidlType<::fidl::WireResponse<::test_protocollayoutssamelibrary::MainPr
 template <>
 struct TypeTraits<::fidl::internal::TransactionalResponse<::test_protocollayoutssamelibrary::MainProtocol::TwoWayAnonWithError>> {
   static constexpr const fidl_type_t* kType =
-    &::test_protocollayoutssamelibrary::test_protocollayoutssamelibrary_MainProtocolTwoWayAnonWithErrorTopResponseTable;
+    &::test_protocollayoutssamelibrary::test_protocollayoutssamelibrary_MainProtocol_TwoWayAnonWithError_ResultTable;
   static constexpr bool kHasServerToClientBody = true;
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 2;
@@ -5262,7 +5245,7 @@ static_assert(offsetof(::fidl::internal::TransactionalResponse<::test_protocolla
 template <>
 struct TypeTraits<::fidl::WireResponse<::test_protocollayoutssamelibrary::MainProtocol::TwoWayAnonWithError>> {
   static constexpr const fidl_type_t* kType =
-    &::test_protocollayoutssamelibrary::test_protocollayoutssamelibrary_MainProtocolTwoWayAnonWithErrorTopResponseTable;
+    &::test_protocollayoutssamelibrary::test_protocollayoutssamelibrary_MainProtocol_TwoWayAnonWithError_ResultTable;
   static constexpr bool kHasServerToClientBody = true;
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 2;
@@ -5278,7 +5261,6 @@ struct TypeTraits<::fidl::WireResponse<::test_protocollayoutssamelibrary::MainPr
 };
 static_assert(sizeof(::fidl::WireResponse<::test_protocollayoutssamelibrary::MainProtocol::TwoWayAnonWithError>)
     == TypeTraits<::fidl::WireResponse<::test_protocollayoutssamelibrary::MainProtocol::TwoWayAnonWithError>>::kPrimarySize);
-static_assert(offsetof(::fidl::WireResponse<::test_protocollayoutssamelibrary::MainProtocol::TwoWayAnonWithError>, result) == 0);
 #ifdef __Fuchsia__
 template <>
 struct IsFidlType<::fidl::internal::TransactionalEvent<::test_protocollayoutssamelibrary::MainProtocol::OnAnon>> : public std::true_type {};
@@ -5320,7 +5302,7 @@ struct IsFidlTransactionalMessage<::fidl::internal::TransactionalEvent<::test_pr
 template <>
 struct TypeTraits<::fidl::internal::TransactionalEvent<::test_protocollayoutssamelibrary::MainProtocol::OnAnonWithError>> {
   static constexpr const fidl_type_t* kType =
-    &::test_protocollayoutssamelibrary::test_protocollayoutssamelibrary_MainProtocolOnAnonWithErrorRequestTable;
+    &::test_protocollayoutssamelibrary::test_protocollayoutssamelibrary_MainProtocol_OnAnonWithError_ResultTable;
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 3;
   static constexpr uint32_t kPrimarySize = FIDL_ALIGN(16 + sizeof(fidl_message_header_t));
@@ -6398,7 +6380,7 @@ class ::fidl::internal::WireCompleterImpl<::test_protocollayoutssamelibrary::Mai
   void ReplyError(uint32_t error);
 
  private:
-  void MakeReply(::test_protocollayoutssamelibrary::wire::ComposedProtocolTwoWayAnonComposedWithErrorResult result);
+  void MakeReply(::test_protocollayoutssamelibrary::wire::ComposedProtocolTwoWayAnonComposedWithErrorResult ComposedProtocolTwoWayAnonComposedWithErrorResult);
 };
 
 template <>
@@ -6411,7 +6393,7 @@ class ::fidl::internal::WireBufferCompleterImpl<::test_protocollayoutssamelibrar
   void ReplyError(uint32_t error);
 
  private:
-  void MakeReply(::test_protocollayoutssamelibrary::wire::ComposedProtocolTwoWayAnonComposedWithErrorResult result);
+  void MakeReply(::test_protocollayoutssamelibrary::wire::ComposedProtocolTwoWayAnonComposedWithErrorResult ComposedProtocolTwoWayAnonComposedWithErrorResult);
 };
 
 template<>
@@ -6478,7 +6460,7 @@ class ::fidl::internal::WireCompleterImpl<::test_protocollayoutssamelibrary::Mai
   void ReplyError(uint32_t error);
 
  private:
-  void MakeReply(::test_protocollayoutssamelibrary::wire::ComposedProtocolTwoWayNamedComposedWithErrorResult result);
+  void MakeReply(::test_protocollayoutssamelibrary::wire::ComposedProtocolTwoWayNamedComposedWithErrorResult ComposedProtocolTwoWayNamedComposedWithErrorResult);
 };
 
 template <>
@@ -6491,7 +6473,7 @@ class ::fidl::internal::WireBufferCompleterImpl<::test_protocollayoutssamelibrar
   void ReplyError(uint32_t error);
 
  private:
-  void MakeReply(::test_protocollayoutssamelibrary::wire::ComposedProtocolTwoWayNamedComposedWithErrorResult result);
+  void MakeReply(::test_protocollayoutssamelibrary::wire::ComposedProtocolTwoWayNamedComposedWithErrorResult ComposedProtocolTwoWayNamedComposedWithErrorResult);
 };
 
 template<>
@@ -6558,7 +6540,7 @@ class ::fidl::internal::WireCompleterImpl<::test_protocollayoutssamelibrary::Mai
   void ReplyError(uint32_t error);
 
  private:
-  void MakeReply(::test_protocollayoutssamelibrary::wire::MainProtocolTwoWayLocalWithErrorResult result);
+  void MakeReply(::test_protocollayoutssamelibrary::wire::MainProtocolTwoWayLocalWithErrorResult MainProtocolTwoWayLocalWithErrorResult);
 };
 
 template <>
@@ -6571,7 +6553,7 @@ class ::fidl::internal::WireBufferCompleterImpl<::test_protocollayoutssamelibrar
   void ReplyError(uint32_t error);
 
  private:
-  void MakeReply(::test_protocollayoutssamelibrary::wire::MainProtocolTwoWayLocalWithErrorResult result);
+  void MakeReply(::test_protocollayoutssamelibrary::wire::MainProtocolTwoWayLocalWithErrorResult MainProtocolTwoWayLocalWithErrorResult);
 };
 
 template<>
@@ -6638,7 +6620,7 @@ class ::fidl::internal::WireCompleterImpl<::test_protocollayoutssamelibrary::Mai
   void ReplyError(uint32_t error);
 
  private:
-  void MakeReply(::test_protocollayoutssamelibrary::wire::MainProtocolTwoWayAnonWithErrorResult result);
+  void MakeReply(::test_protocollayoutssamelibrary::wire::MainProtocolTwoWayAnonWithErrorResult MainProtocolTwoWayAnonWithErrorResult);
 };
 
 template <>
@@ -6651,7 +6633,7 @@ class ::fidl::internal::WireBufferCompleterImpl<::test_protocollayoutssamelibrar
   void ReplyError(uint32_t error);
 
  private:
-  void MakeReply(::test_protocollayoutssamelibrary::wire::MainProtocolTwoWayAnonWithErrorResult result);
+  void MakeReply(::test_protocollayoutssamelibrary::wire::MainProtocolTwoWayAnonWithErrorResult MainProtocolTwoWayAnonWithErrorResult);
 };
 
 template<>
@@ -6903,13 +6885,13 @@ class ::fidl::internal::WireWeakEventSender<::test_protocollayoutssamelibrary::C
     fidl::OneWayStatus OnAnonComposed(::test_protocollayoutssamelibrary::wire::ComposedProtocolOnAnonComposedRequest ComposedProtocolOnAnonComposedRequest);
 
 
-    fidl::OneWayStatus OnAnonComposedWithError(::test_protocollayoutssamelibrary::wire::ComposedProtocolOnAnonComposedWithErrorResult result);
+    fidl::OneWayStatus OnAnonComposedWithError(::test_protocollayoutssamelibrary::wire::ComposedProtocolOnAnonComposedWithErrorResult ComposedProtocolOnAnonComposedWithErrorResult);
 
 
     fidl::OneWayStatus OnNamedComposed(::test_protocollayoutssamelibrary::wire::UnionPayload UnionPayload);
 
 
-    fidl::OneWayStatus OnNamedComposedWithError(::test_protocollayoutssamelibrary::wire::ComposedProtocolOnNamedComposedWithErrorResult result);
+    fidl::OneWayStatus OnNamedComposedWithError(::test_protocollayoutssamelibrary::wire::ComposedProtocolOnNamedComposedWithErrorResult ComposedProtocolOnNamedComposedWithErrorResult);
 
 
 };
@@ -6922,13 +6904,13 @@ class ::fidl::internal::WireWeakBufferEventSender<::test_protocollayoutssamelibr
     fidl::OneWayStatus OnAnonComposed(::test_protocollayoutssamelibrary::wire::ComposedProtocolOnAnonComposedRequest ComposedProtocolOnAnonComposedRequest);
 
 
-    fidl::OneWayStatus OnAnonComposedWithError(::test_protocollayoutssamelibrary::wire::ComposedProtocolOnAnonComposedWithErrorResult result);
+    fidl::OneWayStatus OnAnonComposedWithError(::test_protocollayoutssamelibrary::wire::ComposedProtocolOnAnonComposedWithErrorResult ComposedProtocolOnAnonComposedWithErrorResult);
 
 
     fidl::OneWayStatus OnNamedComposed(::test_protocollayoutssamelibrary::wire::UnionPayload UnionPayload);
 
 
-    fidl::OneWayStatus OnNamedComposedWithError(::test_protocollayoutssamelibrary::wire::ComposedProtocolOnNamedComposedWithErrorResult result);
+    fidl::OneWayStatus OnNamedComposedWithError(::test_protocollayoutssamelibrary::wire::ComposedProtocolOnNamedComposedWithErrorResult ComposedProtocolOnNamedComposedWithErrorResult);
 
 
 };
@@ -6942,13 +6924,13 @@ class ::fidl::internal::WireEventSender<::test_protocollayoutssamelibrary::Compo
     fidl::OneWayStatus OnAnonComposed(::test_protocollayoutssamelibrary::wire::ComposedProtocolOnAnonComposedRequest ComposedProtocolOnAnonComposedRequest);
 
 
-    fidl::OneWayStatus OnAnonComposedWithError(::test_protocollayoutssamelibrary::wire::ComposedProtocolOnAnonComposedWithErrorResult result);
+    fidl::OneWayStatus OnAnonComposedWithError(::test_protocollayoutssamelibrary::wire::ComposedProtocolOnAnonComposedWithErrorResult ComposedProtocolOnAnonComposedWithErrorResult);
 
 
     fidl::OneWayStatus OnNamedComposed(::test_protocollayoutssamelibrary::wire::UnionPayload UnionPayload);
 
 
-    fidl::OneWayStatus OnNamedComposedWithError(::test_protocollayoutssamelibrary::wire::ComposedProtocolOnNamedComposedWithErrorResult result);
+    fidl::OneWayStatus OnNamedComposedWithError(::test_protocollayoutssamelibrary::wire::ComposedProtocolOnNamedComposedWithErrorResult ComposedProtocolOnNamedComposedWithErrorResult);
 
 
 };
@@ -6962,13 +6944,13 @@ class ::fidl::internal::WireBufferEventSender<::test_protocollayoutssamelibrary:
     fidl::OneWayStatus OnAnonComposed(::test_protocollayoutssamelibrary::wire::ComposedProtocolOnAnonComposedRequest ComposedProtocolOnAnonComposedRequest);
 
 
-    fidl::OneWayStatus OnAnonComposedWithError(::test_protocollayoutssamelibrary::wire::ComposedProtocolOnAnonComposedWithErrorResult result);
+    fidl::OneWayStatus OnAnonComposedWithError(::test_protocollayoutssamelibrary::wire::ComposedProtocolOnAnonComposedWithErrorResult ComposedProtocolOnAnonComposedWithErrorResult);
 
 
     fidl::OneWayStatus OnNamedComposed(::test_protocollayoutssamelibrary::wire::UnionPayload UnionPayload);
 
 
-    fidl::OneWayStatus OnNamedComposedWithError(::test_protocollayoutssamelibrary::wire::ComposedProtocolOnNamedComposedWithErrorResult result);
+    fidl::OneWayStatus OnNamedComposedWithError(::test_protocollayoutssamelibrary::wire::ComposedProtocolOnNamedComposedWithErrorResult ComposedProtocolOnNamedComposedWithErrorResult);
 
 
 };
@@ -7123,25 +7105,25 @@ class ::fidl::internal::WireWeakEventSender<::test_protocollayoutssamelibrary::M
     fidl::OneWayStatus OnAnonComposed(::test_protocollayoutssamelibrary::wire::ComposedProtocolOnAnonComposedRequest ComposedProtocolOnAnonComposedRequest);
 
 
-    fidl::OneWayStatus OnAnonComposedWithError(::test_protocollayoutssamelibrary::wire::ComposedProtocolOnAnonComposedWithErrorResult result);
+    fidl::OneWayStatus OnAnonComposedWithError(::test_protocollayoutssamelibrary::wire::ComposedProtocolOnAnonComposedWithErrorResult ComposedProtocolOnAnonComposedWithErrorResult);
 
 
     fidl::OneWayStatus OnNamedComposed(::test_protocollayoutssamelibrary::wire::UnionPayload UnionPayload);
 
 
-    fidl::OneWayStatus OnNamedComposedWithError(::test_protocollayoutssamelibrary::wire::ComposedProtocolOnNamedComposedWithErrorResult result);
+    fidl::OneWayStatus OnNamedComposedWithError(::test_protocollayoutssamelibrary::wire::ComposedProtocolOnNamedComposedWithErrorResult ComposedProtocolOnNamedComposedWithErrorResult);
 
 
     fidl::OneWayStatus OnLocal(::test_protocollayoutssamelibrary::wire::UnionPayload UnionPayload);
 
 
-    fidl::OneWayStatus OnLocalWithError(::test_protocollayoutssamelibrary::wire::MainProtocolOnLocalWithErrorResult result);
+    fidl::OneWayStatus OnLocalWithError(::test_protocollayoutssamelibrary::wire::MainProtocolOnLocalWithErrorResult MainProtocolOnLocalWithErrorResult);
 
 
     fidl::OneWayStatus OnAnon(::test_protocollayoutssamelibrary::wire::MainProtocolOnAnonRequest MainProtocolOnAnonRequest);
 
 
-    fidl::OneWayStatus OnAnonWithError(::test_protocollayoutssamelibrary::wire::MainProtocolOnAnonWithErrorResult result);
+    fidl::OneWayStatus OnAnonWithError(::test_protocollayoutssamelibrary::wire::MainProtocolOnAnonWithErrorResult MainProtocolOnAnonWithErrorResult);
 
 
 };
@@ -7154,25 +7136,25 @@ class ::fidl::internal::WireWeakBufferEventSender<::test_protocollayoutssamelibr
     fidl::OneWayStatus OnAnonComposed(::test_protocollayoutssamelibrary::wire::ComposedProtocolOnAnonComposedRequest ComposedProtocolOnAnonComposedRequest);
 
 
-    fidl::OneWayStatus OnAnonComposedWithError(::test_protocollayoutssamelibrary::wire::ComposedProtocolOnAnonComposedWithErrorResult result);
+    fidl::OneWayStatus OnAnonComposedWithError(::test_protocollayoutssamelibrary::wire::ComposedProtocolOnAnonComposedWithErrorResult ComposedProtocolOnAnonComposedWithErrorResult);
 
 
     fidl::OneWayStatus OnNamedComposed(::test_protocollayoutssamelibrary::wire::UnionPayload UnionPayload);
 
 
-    fidl::OneWayStatus OnNamedComposedWithError(::test_protocollayoutssamelibrary::wire::ComposedProtocolOnNamedComposedWithErrorResult result);
+    fidl::OneWayStatus OnNamedComposedWithError(::test_protocollayoutssamelibrary::wire::ComposedProtocolOnNamedComposedWithErrorResult ComposedProtocolOnNamedComposedWithErrorResult);
 
 
     fidl::OneWayStatus OnLocal(::test_protocollayoutssamelibrary::wire::UnionPayload UnionPayload);
 
 
-    fidl::OneWayStatus OnLocalWithError(::test_protocollayoutssamelibrary::wire::MainProtocolOnLocalWithErrorResult result);
+    fidl::OneWayStatus OnLocalWithError(::test_protocollayoutssamelibrary::wire::MainProtocolOnLocalWithErrorResult MainProtocolOnLocalWithErrorResult);
 
 
     fidl::OneWayStatus OnAnon(::test_protocollayoutssamelibrary::wire::MainProtocolOnAnonRequest MainProtocolOnAnonRequest);
 
 
-    fidl::OneWayStatus OnAnonWithError(::test_protocollayoutssamelibrary::wire::MainProtocolOnAnonWithErrorResult result);
+    fidl::OneWayStatus OnAnonWithError(::test_protocollayoutssamelibrary::wire::MainProtocolOnAnonWithErrorResult MainProtocolOnAnonWithErrorResult);
 
 
 };
@@ -7186,25 +7168,25 @@ class ::fidl::internal::WireEventSender<::test_protocollayoutssamelibrary::MainP
     fidl::OneWayStatus OnAnonComposed(::test_protocollayoutssamelibrary::wire::ComposedProtocolOnAnonComposedRequest ComposedProtocolOnAnonComposedRequest);
 
 
-    fidl::OneWayStatus OnAnonComposedWithError(::test_protocollayoutssamelibrary::wire::ComposedProtocolOnAnonComposedWithErrorResult result);
+    fidl::OneWayStatus OnAnonComposedWithError(::test_protocollayoutssamelibrary::wire::ComposedProtocolOnAnonComposedWithErrorResult ComposedProtocolOnAnonComposedWithErrorResult);
 
 
     fidl::OneWayStatus OnNamedComposed(::test_protocollayoutssamelibrary::wire::UnionPayload UnionPayload);
 
 
-    fidl::OneWayStatus OnNamedComposedWithError(::test_protocollayoutssamelibrary::wire::ComposedProtocolOnNamedComposedWithErrorResult result);
+    fidl::OneWayStatus OnNamedComposedWithError(::test_protocollayoutssamelibrary::wire::ComposedProtocolOnNamedComposedWithErrorResult ComposedProtocolOnNamedComposedWithErrorResult);
 
 
     fidl::OneWayStatus OnLocal(::test_protocollayoutssamelibrary::wire::UnionPayload UnionPayload);
 
 
-    fidl::OneWayStatus OnLocalWithError(::test_protocollayoutssamelibrary::wire::MainProtocolOnLocalWithErrorResult result);
+    fidl::OneWayStatus OnLocalWithError(::test_protocollayoutssamelibrary::wire::MainProtocolOnLocalWithErrorResult MainProtocolOnLocalWithErrorResult);
 
 
     fidl::OneWayStatus OnAnon(::test_protocollayoutssamelibrary::wire::MainProtocolOnAnonRequest MainProtocolOnAnonRequest);
 
 
-    fidl::OneWayStatus OnAnonWithError(::test_protocollayoutssamelibrary::wire::MainProtocolOnAnonWithErrorResult result);
+    fidl::OneWayStatus OnAnonWithError(::test_protocollayoutssamelibrary::wire::MainProtocolOnAnonWithErrorResult MainProtocolOnAnonWithErrorResult);
 
 
 };
@@ -7218,25 +7200,25 @@ class ::fidl::internal::WireBufferEventSender<::test_protocollayoutssamelibrary:
     fidl::OneWayStatus OnAnonComposed(::test_protocollayoutssamelibrary::wire::ComposedProtocolOnAnonComposedRequest ComposedProtocolOnAnonComposedRequest);
 
 
-    fidl::OneWayStatus OnAnonComposedWithError(::test_protocollayoutssamelibrary::wire::ComposedProtocolOnAnonComposedWithErrorResult result);
+    fidl::OneWayStatus OnAnonComposedWithError(::test_protocollayoutssamelibrary::wire::ComposedProtocolOnAnonComposedWithErrorResult ComposedProtocolOnAnonComposedWithErrorResult);
 
 
     fidl::OneWayStatus OnNamedComposed(::test_protocollayoutssamelibrary::wire::UnionPayload UnionPayload);
 
 
-    fidl::OneWayStatus OnNamedComposedWithError(::test_protocollayoutssamelibrary::wire::ComposedProtocolOnNamedComposedWithErrorResult result);
+    fidl::OneWayStatus OnNamedComposedWithError(::test_protocollayoutssamelibrary::wire::ComposedProtocolOnNamedComposedWithErrorResult ComposedProtocolOnNamedComposedWithErrorResult);
 
 
     fidl::OneWayStatus OnLocal(::test_protocollayoutssamelibrary::wire::UnionPayload UnionPayload);
 
 
-    fidl::OneWayStatus OnLocalWithError(::test_protocollayoutssamelibrary::wire::MainProtocolOnLocalWithErrorResult result);
+    fidl::OneWayStatus OnLocalWithError(::test_protocollayoutssamelibrary::wire::MainProtocolOnLocalWithErrorResult MainProtocolOnLocalWithErrorResult);
 
 
     fidl::OneWayStatus OnAnon(::test_protocollayoutssamelibrary::wire::MainProtocolOnAnonRequest MainProtocolOnAnonRequest);
 
 
-    fidl::OneWayStatus OnAnonWithError(::test_protocollayoutssamelibrary::wire::MainProtocolOnAnonWithErrorResult result);
+    fidl::OneWayStatus OnAnonWithError(::test_protocollayoutssamelibrary::wire::MainProtocolOnAnonWithErrorResult MainProtocolOnAnonWithErrorResult);
 
 
 };

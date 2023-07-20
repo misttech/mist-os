@@ -16,7 +16,7 @@
 
 namespace fuzzing {
 
-inline constexpr ::std::array<::fidl::fuzzing::DecoderEncoderForType, 254>
+inline constexpr ::std::array<::fidl::fuzzing::DecoderEncoderForType, 134>
     test_unknowninteractions_decoder_encoders = {
         ::fidl::fuzzing::DecoderEncoderForType{
             .fidl_type_name = "::test_unknowninteractions::wire::UnknownInteractionsProtocolStrictTwoWayFieldsResponse",
@@ -55,18 +55,6 @@ inline constexpr ::std::array<::fidl::fuzzing::DecoderEncoderForType, 254>
             .decoder_encoder = ::fidl::fuzzing::DecoderEncoderImpl<::test_unknowninteractions::wire::UnknownInteractionsProtocolStrictTwoWayErrResponse, true>,
         },
         ::fidl::fuzzing::DecoderEncoderForType{
-            .fidl_type_name = "::test_unknowninteractions::wire::UnknownInteractionsProtocolStrictTwoWayErrTopResponse",
-            .has_flexible_envelope = false,
-            .treat_bytes_as_transactional_message = false,
-            .decoder_encoder = ::fidl::fuzzing::DecoderEncoderImpl<::test_unknowninteractions::wire::UnknownInteractionsProtocolStrictTwoWayErrTopResponse, false>,
-        },
-        ::fidl::fuzzing::DecoderEncoderForType{
-            .fidl_type_name = "A transactional message using ::test_unknowninteractions::wire::UnknownInteractionsProtocolStrictTwoWayErrTopResponse as the body",
-            .has_flexible_envelope = false,
-            .treat_bytes_as_transactional_message = true,
-            .decoder_encoder = ::fidl::fuzzing::DecoderEncoderImpl<::test_unknowninteractions::wire::UnknownInteractionsProtocolStrictTwoWayErrTopResponse, true>,
-        },
-        ::fidl::fuzzing::DecoderEncoderForType{
             .fidl_type_name = "::test_unknowninteractions::wire::UnknownInteractionsProtocolStrictTwoWayFieldsErrResponse",
             .has_flexible_envelope = false,
             .treat_bytes_as_transactional_message = false,
@@ -77,30 +65,6 @@ inline constexpr ::std::array<::fidl::fuzzing::DecoderEncoderForType, 254>
             .has_flexible_envelope = false,
             .treat_bytes_as_transactional_message = true,
             .decoder_encoder = ::fidl::fuzzing::DecoderEncoderImpl<::test_unknowninteractions::wire::UnknownInteractionsProtocolStrictTwoWayFieldsErrResponse, true>,
-        },
-        ::fidl::fuzzing::DecoderEncoderForType{
-            .fidl_type_name = "::test_unknowninteractions::wire::UnknownInteractionsProtocolStrictTwoWayFieldsErrTopResponse",
-            .has_flexible_envelope = false,
-            .treat_bytes_as_transactional_message = false,
-            .decoder_encoder = ::fidl::fuzzing::DecoderEncoderImpl<::test_unknowninteractions::wire::UnknownInteractionsProtocolStrictTwoWayFieldsErrTopResponse, false>,
-        },
-        ::fidl::fuzzing::DecoderEncoderForType{
-            .fidl_type_name = "A transactional message using ::test_unknowninteractions::wire::UnknownInteractionsProtocolStrictTwoWayFieldsErrTopResponse as the body",
-            .has_flexible_envelope = false,
-            .treat_bytes_as_transactional_message = true,
-            .decoder_encoder = ::fidl::fuzzing::DecoderEncoderImpl<::test_unknowninteractions::wire::UnknownInteractionsProtocolStrictTwoWayFieldsErrTopResponse, true>,
-        },
-        ::fidl::fuzzing::DecoderEncoderForType{
-            .fidl_type_name = "::test_unknowninteractions::wire::UnknownInteractionsProtocolStrictTwoWayUnionErrTopResponse",
-            .has_flexible_envelope = true,
-            .treat_bytes_as_transactional_message = false,
-            .decoder_encoder = ::fidl::fuzzing::DecoderEncoderImpl<::test_unknowninteractions::wire::UnknownInteractionsProtocolStrictTwoWayUnionErrTopResponse, false>,
-        },
-        ::fidl::fuzzing::DecoderEncoderForType{
-            .fidl_type_name = "A transactional message using ::test_unknowninteractions::wire::UnknownInteractionsProtocolStrictTwoWayUnionErrTopResponse as the body",
-            .has_flexible_envelope = true,
-            .treat_bytes_as_transactional_message = true,
-            .decoder_encoder = ::fidl::fuzzing::DecoderEncoderImpl<::test_unknowninteractions::wire::UnknownInteractionsProtocolStrictTwoWayUnionErrTopResponse, true>,
         },
         ::fidl::fuzzing::DecoderEncoderForType{
             .fidl_type_name = "::test_unknowninteractions::wire::UnknownInteractionsProtocolStrictTwoWayTableErrResponse",
@@ -115,18 +79,6 @@ inline constexpr ::std::array<::fidl::fuzzing::DecoderEncoderForType, 254>
             .decoder_encoder = ::fidl::fuzzing::DecoderEncoderImpl<::test_unknowninteractions::wire::UnknownInteractionsProtocolStrictTwoWayTableErrResponse, true>,
         },
         ::fidl::fuzzing::DecoderEncoderForType{
-            .fidl_type_name = "::test_unknowninteractions::wire::UnknownInteractionsProtocolStrictTwoWayTableErrTopResponse",
-            .has_flexible_envelope = true,
-            .treat_bytes_as_transactional_message = false,
-            .decoder_encoder = ::fidl::fuzzing::DecoderEncoderImpl<::test_unknowninteractions::wire::UnknownInteractionsProtocolStrictTwoWayTableErrTopResponse, false>,
-        },
-        ::fidl::fuzzing::DecoderEncoderForType{
-            .fidl_type_name = "A transactional message using ::test_unknowninteractions::wire::UnknownInteractionsProtocolStrictTwoWayTableErrTopResponse as the body",
-            .has_flexible_envelope = true,
-            .treat_bytes_as_transactional_message = true,
-            .decoder_encoder = ::fidl::fuzzing::DecoderEncoderImpl<::test_unknowninteractions::wire::UnknownInteractionsProtocolStrictTwoWayTableErrTopResponse, true>,
-        },
-        ::fidl::fuzzing::DecoderEncoderForType{
             .fidl_type_name = "::test_unknowninteractions::wire::UnknownInteractionsProtocolFlexibleTwoWayResponse",
             .has_flexible_envelope = false,
             .treat_bytes_as_transactional_message = false,
@@ -137,18 +89,6 @@ inline constexpr ::std::array<::fidl::fuzzing::DecoderEncoderForType, 254>
             .has_flexible_envelope = false,
             .treat_bytes_as_transactional_message = true,
             .decoder_encoder = ::fidl::fuzzing::DecoderEncoderImpl<::test_unknowninteractions::wire::UnknownInteractionsProtocolFlexibleTwoWayResponse, true>,
-        },
-        ::fidl::fuzzing::DecoderEncoderForType{
-            .fidl_type_name = "::test_unknowninteractions::wire::UnknownInteractionsProtocolFlexibleTwoWayTopResponse",
-            .has_flexible_envelope = false,
-            .treat_bytes_as_transactional_message = false,
-            .decoder_encoder = ::fidl::fuzzing::DecoderEncoderImpl<::test_unknowninteractions::wire::UnknownInteractionsProtocolFlexibleTwoWayTopResponse, false>,
-        },
-        ::fidl::fuzzing::DecoderEncoderForType{
-            .fidl_type_name = "A transactional message using ::test_unknowninteractions::wire::UnknownInteractionsProtocolFlexibleTwoWayTopResponse as the body",
-            .has_flexible_envelope = false,
-            .treat_bytes_as_transactional_message = true,
-            .decoder_encoder = ::fidl::fuzzing::DecoderEncoderImpl<::test_unknowninteractions::wire::UnknownInteractionsProtocolFlexibleTwoWayTopResponse, true>,
         },
         ::fidl::fuzzing::DecoderEncoderForType{
             .fidl_type_name = "::test_unknowninteractions::wire::UnknownInteractionsProtocolFlexibleTwoWayFieldsResponse",
@@ -163,30 +103,6 @@ inline constexpr ::std::array<::fidl::fuzzing::DecoderEncoderForType, 254>
             .decoder_encoder = ::fidl::fuzzing::DecoderEncoderImpl<::test_unknowninteractions::wire::UnknownInteractionsProtocolFlexibleTwoWayFieldsResponse, true>,
         },
         ::fidl::fuzzing::DecoderEncoderForType{
-            .fidl_type_name = "::test_unknowninteractions::wire::UnknownInteractionsProtocolFlexibleTwoWayFieldsTopResponse",
-            .has_flexible_envelope = false,
-            .treat_bytes_as_transactional_message = false,
-            .decoder_encoder = ::fidl::fuzzing::DecoderEncoderImpl<::test_unknowninteractions::wire::UnknownInteractionsProtocolFlexibleTwoWayFieldsTopResponse, false>,
-        },
-        ::fidl::fuzzing::DecoderEncoderForType{
-            .fidl_type_name = "A transactional message using ::test_unknowninteractions::wire::UnknownInteractionsProtocolFlexibleTwoWayFieldsTopResponse as the body",
-            .has_flexible_envelope = false,
-            .treat_bytes_as_transactional_message = true,
-            .decoder_encoder = ::fidl::fuzzing::DecoderEncoderImpl<::test_unknowninteractions::wire::UnknownInteractionsProtocolFlexibleTwoWayFieldsTopResponse, true>,
-        },
-        ::fidl::fuzzing::DecoderEncoderForType{
-            .fidl_type_name = "::test_unknowninteractions::wire::UnknownInteractionsProtocolFlexibleTwoWayUnionTopResponse",
-            .has_flexible_envelope = true,
-            .treat_bytes_as_transactional_message = false,
-            .decoder_encoder = ::fidl::fuzzing::DecoderEncoderImpl<::test_unknowninteractions::wire::UnknownInteractionsProtocolFlexibleTwoWayUnionTopResponse, false>,
-        },
-        ::fidl::fuzzing::DecoderEncoderForType{
-            .fidl_type_name = "A transactional message using ::test_unknowninteractions::wire::UnknownInteractionsProtocolFlexibleTwoWayUnionTopResponse as the body",
-            .has_flexible_envelope = true,
-            .treat_bytes_as_transactional_message = true,
-            .decoder_encoder = ::fidl::fuzzing::DecoderEncoderImpl<::test_unknowninteractions::wire::UnknownInteractionsProtocolFlexibleTwoWayUnionTopResponse, true>,
-        },
-        ::fidl::fuzzing::DecoderEncoderForType{
             .fidl_type_name = "::test_unknowninteractions::wire::UnknownInteractionsProtocolFlexibleTwoWayTableResponse",
             .has_flexible_envelope = true,
             .treat_bytes_as_transactional_message = false,
@@ -197,18 +113,6 @@ inline constexpr ::std::array<::fidl::fuzzing::DecoderEncoderForType, 254>
             .has_flexible_envelope = true,
             .treat_bytes_as_transactional_message = true,
             .decoder_encoder = ::fidl::fuzzing::DecoderEncoderImpl<::test_unknowninteractions::wire::UnknownInteractionsProtocolFlexibleTwoWayTableResponse, true>,
-        },
-        ::fidl::fuzzing::DecoderEncoderForType{
-            .fidl_type_name = "::test_unknowninteractions::wire::UnknownInteractionsProtocolFlexibleTwoWayTableTopResponse",
-            .has_flexible_envelope = true,
-            .treat_bytes_as_transactional_message = false,
-            .decoder_encoder = ::fidl::fuzzing::DecoderEncoderImpl<::test_unknowninteractions::wire::UnknownInteractionsProtocolFlexibleTwoWayTableTopResponse, false>,
-        },
-        ::fidl::fuzzing::DecoderEncoderForType{
-            .fidl_type_name = "A transactional message using ::test_unknowninteractions::wire::UnknownInteractionsProtocolFlexibleTwoWayTableTopResponse as the body",
-            .has_flexible_envelope = true,
-            .treat_bytes_as_transactional_message = true,
-            .decoder_encoder = ::fidl::fuzzing::DecoderEncoderImpl<::test_unknowninteractions::wire::UnknownInteractionsProtocolFlexibleTwoWayTableTopResponse, true>,
         },
         ::fidl::fuzzing::DecoderEncoderForType{
             .fidl_type_name = "::test_unknowninteractions::wire::UnknownInteractionsProtocolFlexibleTwoWayErrResponse",
@@ -223,18 +127,6 @@ inline constexpr ::std::array<::fidl::fuzzing::DecoderEncoderForType, 254>
             .decoder_encoder = ::fidl::fuzzing::DecoderEncoderImpl<::test_unknowninteractions::wire::UnknownInteractionsProtocolFlexibleTwoWayErrResponse, true>,
         },
         ::fidl::fuzzing::DecoderEncoderForType{
-            .fidl_type_name = "::test_unknowninteractions::wire::UnknownInteractionsProtocolFlexibleTwoWayErrTopResponse",
-            .has_flexible_envelope = false,
-            .treat_bytes_as_transactional_message = false,
-            .decoder_encoder = ::fidl::fuzzing::DecoderEncoderImpl<::test_unknowninteractions::wire::UnknownInteractionsProtocolFlexibleTwoWayErrTopResponse, false>,
-        },
-        ::fidl::fuzzing::DecoderEncoderForType{
-            .fidl_type_name = "A transactional message using ::test_unknowninteractions::wire::UnknownInteractionsProtocolFlexibleTwoWayErrTopResponse as the body",
-            .has_flexible_envelope = false,
-            .treat_bytes_as_transactional_message = true,
-            .decoder_encoder = ::fidl::fuzzing::DecoderEncoderImpl<::test_unknowninteractions::wire::UnknownInteractionsProtocolFlexibleTwoWayErrTopResponse, true>,
-        },
-        ::fidl::fuzzing::DecoderEncoderForType{
             .fidl_type_name = "::test_unknowninteractions::wire::UnknownInteractionsProtocolFlexibleTwoWayFieldsErrResponse",
             .has_flexible_envelope = false,
             .treat_bytes_as_transactional_message = false,
@@ -247,30 +139,6 @@ inline constexpr ::std::array<::fidl::fuzzing::DecoderEncoderForType, 254>
             .decoder_encoder = ::fidl::fuzzing::DecoderEncoderImpl<::test_unknowninteractions::wire::UnknownInteractionsProtocolFlexibleTwoWayFieldsErrResponse, true>,
         },
         ::fidl::fuzzing::DecoderEncoderForType{
-            .fidl_type_name = "::test_unknowninteractions::wire::UnknownInteractionsProtocolFlexibleTwoWayFieldsErrTopResponse",
-            .has_flexible_envelope = false,
-            .treat_bytes_as_transactional_message = false,
-            .decoder_encoder = ::fidl::fuzzing::DecoderEncoderImpl<::test_unknowninteractions::wire::UnknownInteractionsProtocolFlexibleTwoWayFieldsErrTopResponse, false>,
-        },
-        ::fidl::fuzzing::DecoderEncoderForType{
-            .fidl_type_name = "A transactional message using ::test_unknowninteractions::wire::UnknownInteractionsProtocolFlexibleTwoWayFieldsErrTopResponse as the body",
-            .has_flexible_envelope = false,
-            .treat_bytes_as_transactional_message = true,
-            .decoder_encoder = ::fidl::fuzzing::DecoderEncoderImpl<::test_unknowninteractions::wire::UnknownInteractionsProtocolFlexibleTwoWayFieldsErrTopResponse, true>,
-        },
-        ::fidl::fuzzing::DecoderEncoderForType{
-            .fidl_type_name = "::test_unknowninteractions::wire::UnknownInteractionsProtocolFlexibleTwoWayUnionErrTopResponse",
-            .has_flexible_envelope = true,
-            .treat_bytes_as_transactional_message = false,
-            .decoder_encoder = ::fidl::fuzzing::DecoderEncoderImpl<::test_unknowninteractions::wire::UnknownInteractionsProtocolFlexibleTwoWayUnionErrTopResponse, false>,
-        },
-        ::fidl::fuzzing::DecoderEncoderForType{
-            .fidl_type_name = "A transactional message using ::test_unknowninteractions::wire::UnknownInteractionsProtocolFlexibleTwoWayUnionErrTopResponse as the body",
-            .has_flexible_envelope = true,
-            .treat_bytes_as_transactional_message = true,
-            .decoder_encoder = ::fidl::fuzzing::DecoderEncoderImpl<::test_unknowninteractions::wire::UnknownInteractionsProtocolFlexibleTwoWayUnionErrTopResponse, true>,
-        },
-        ::fidl::fuzzing::DecoderEncoderForType{
             .fidl_type_name = "::test_unknowninteractions::wire::UnknownInteractionsProtocolFlexibleTwoWayTableErrResponse",
             .has_flexible_envelope = true,
             .treat_bytes_as_transactional_message = false,
@@ -281,18 +149,6 @@ inline constexpr ::std::array<::fidl::fuzzing::DecoderEncoderForType, 254>
             .has_flexible_envelope = true,
             .treat_bytes_as_transactional_message = true,
             .decoder_encoder = ::fidl::fuzzing::DecoderEncoderImpl<::test_unknowninteractions::wire::UnknownInteractionsProtocolFlexibleTwoWayTableErrResponse, true>,
-        },
-        ::fidl::fuzzing::DecoderEncoderForType{
-            .fidl_type_name = "::test_unknowninteractions::wire::UnknownInteractionsProtocolFlexibleTwoWayTableErrTopResponse",
-            .has_flexible_envelope = true,
-            .treat_bytes_as_transactional_message = false,
-            .decoder_encoder = ::fidl::fuzzing::DecoderEncoderImpl<::test_unknowninteractions::wire::UnknownInteractionsProtocolFlexibleTwoWayTableErrTopResponse, false>,
-        },
-        ::fidl::fuzzing::DecoderEncoderForType{
-            .fidl_type_name = "A transactional message using ::test_unknowninteractions::wire::UnknownInteractionsProtocolFlexibleTwoWayTableErrTopResponse as the body",
-            .has_flexible_envelope = true,
-            .treat_bytes_as_transactional_message = true,
-            .decoder_encoder = ::fidl::fuzzing::DecoderEncoderImpl<::test_unknowninteractions::wire::UnknownInteractionsProtocolFlexibleTwoWayTableErrTopResponse, true>,
         },
         ::fidl::fuzzing::DecoderEncoderForType{
             .fidl_type_name = "::test_unknowninteractions::wire::UnknownInteractionsProtocolStrictEventFieldsRequest",
@@ -331,18 +187,6 @@ inline constexpr ::std::array<::fidl::fuzzing::DecoderEncoderForType, 254>
             .decoder_encoder = ::fidl::fuzzing::DecoderEncoderImpl<::test_unknowninteractions::wire::UnknownInteractionsProtocolStrictEventErrResponse, true>,
         },
         ::fidl::fuzzing::DecoderEncoderForType{
-            .fidl_type_name = "::test_unknowninteractions::wire::UnknownInteractionsProtocolStrictEventErrRequest",
-            .has_flexible_envelope = false,
-            .treat_bytes_as_transactional_message = false,
-            .decoder_encoder = ::fidl::fuzzing::DecoderEncoderImpl<::test_unknowninteractions::wire::UnknownInteractionsProtocolStrictEventErrRequest, false>,
-        },
-        ::fidl::fuzzing::DecoderEncoderForType{
-            .fidl_type_name = "A transactional message using ::test_unknowninteractions::wire::UnknownInteractionsProtocolStrictEventErrRequest as the body",
-            .has_flexible_envelope = false,
-            .treat_bytes_as_transactional_message = true,
-            .decoder_encoder = ::fidl::fuzzing::DecoderEncoderImpl<::test_unknowninteractions::wire::UnknownInteractionsProtocolStrictEventErrRequest, true>,
-        },
-        ::fidl::fuzzing::DecoderEncoderForType{
             .fidl_type_name = "::test_unknowninteractions::wire::UnknownInteractionsProtocolStrictEventFieldsErrResponse",
             .has_flexible_envelope = false,
             .treat_bytes_as_transactional_message = false,
@@ -355,30 +199,6 @@ inline constexpr ::std::array<::fidl::fuzzing::DecoderEncoderForType, 254>
             .decoder_encoder = ::fidl::fuzzing::DecoderEncoderImpl<::test_unknowninteractions::wire::UnknownInteractionsProtocolStrictEventFieldsErrResponse, true>,
         },
         ::fidl::fuzzing::DecoderEncoderForType{
-            .fidl_type_name = "::test_unknowninteractions::wire::UnknownInteractionsProtocolStrictEventFieldsErrRequest",
-            .has_flexible_envelope = false,
-            .treat_bytes_as_transactional_message = false,
-            .decoder_encoder = ::fidl::fuzzing::DecoderEncoderImpl<::test_unknowninteractions::wire::UnknownInteractionsProtocolStrictEventFieldsErrRequest, false>,
-        },
-        ::fidl::fuzzing::DecoderEncoderForType{
-            .fidl_type_name = "A transactional message using ::test_unknowninteractions::wire::UnknownInteractionsProtocolStrictEventFieldsErrRequest as the body",
-            .has_flexible_envelope = false,
-            .treat_bytes_as_transactional_message = true,
-            .decoder_encoder = ::fidl::fuzzing::DecoderEncoderImpl<::test_unknowninteractions::wire::UnknownInteractionsProtocolStrictEventFieldsErrRequest, true>,
-        },
-        ::fidl::fuzzing::DecoderEncoderForType{
-            .fidl_type_name = "::test_unknowninteractions::wire::UnknownInteractionsProtocolStrictEventUnionErrRequest",
-            .has_flexible_envelope = true,
-            .treat_bytes_as_transactional_message = false,
-            .decoder_encoder = ::fidl::fuzzing::DecoderEncoderImpl<::test_unknowninteractions::wire::UnknownInteractionsProtocolStrictEventUnionErrRequest, false>,
-        },
-        ::fidl::fuzzing::DecoderEncoderForType{
-            .fidl_type_name = "A transactional message using ::test_unknowninteractions::wire::UnknownInteractionsProtocolStrictEventUnionErrRequest as the body",
-            .has_flexible_envelope = true,
-            .treat_bytes_as_transactional_message = true,
-            .decoder_encoder = ::fidl::fuzzing::DecoderEncoderImpl<::test_unknowninteractions::wire::UnknownInteractionsProtocolStrictEventUnionErrRequest, true>,
-        },
-        ::fidl::fuzzing::DecoderEncoderForType{
             .fidl_type_name = "::test_unknowninteractions::wire::UnknownInteractionsProtocolStrictEventTableErrResponse",
             .has_flexible_envelope = true,
             .treat_bytes_as_transactional_message = false,
@@ -389,18 +209,6 @@ inline constexpr ::std::array<::fidl::fuzzing::DecoderEncoderForType, 254>
             .has_flexible_envelope = true,
             .treat_bytes_as_transactional_message = true,
             .decoder_encoder = ::fidl::fuzzing::DecoderEncoderImpl<::test_unknowninteractions::wire::UnknownInteractionsProtocolStrictEventTableErrResponse, true>,
-        },
-        ::fidl::fuzzing::DecoderEncoderForType{
-            .fidl_type_name = "::test_unknowninteractions::wire::UnknownInteractionsProtocolStrictEventTableErrRequest",
-            .has_flexible_envelope = true,
-            .treat_bytes_as_transactional_message = false,
-            .decoder_encoder = ::fidl::fuzzing::DecoderEncoderImpl<::test_unknowninteractions::wire::UnknownInteractionsProtocolStrictEventTableErrRequest, false>,
-        },
-        ::fidl::fuzzing::DecoderEncoderForType{
-            .fidl_type_name = "A transactional message using ::test_unknowninteractions::wire::UnknownInteractionsProtocolStrictEventTableErrRequest as the body",
-            .has_flexible_envelope = true,
-            .treat_bytes_as_transactional_message = true,
-            .decoder_encoder = ::fidl::fuzzing::DecoderEncoderImpl<::test_unknowninteractions::wire::UnknownInteractionsProtocolStrictEventTableErrRequest, true>,
         },
         ::fidl::fuzzing::DecoderEncoderForType{
             .fidl_type_name = "::test_unknowninteractions::wire::UnknownInteractionsProtocolFlexibleEventFieldsRequest",
@@ -439,18 +247,6 @@ inline constexpr ::std::array<::fidl::fuzzing::DecoderEncoderForType, 254>
             .decoder_encoder = ::fidl::fuzzing::DecoderEncoderImpl<::test_unknowninteractions::wire::UnknownInteractionsProtocolFlexibleEventErrResponse, true>,
         },
         ::fidl::fuzzing::DecoderEncoderForType{
-            .fidl_type_name = "::test_unknowninteractions::wire::UnknownInteractionsProtocolFlexibleEventErrRequest",
-            .has_flexible_envelope = false,
-            .treat_bytes_as_transactional_message = false,
-            .decoder_encoder = ::fidl::fuzzing::DecoderEncoderImpl<::test_unknowninteractions::wire::UnknownInteractionsProtocolFlexibleEventErrRequest, false>,
-        },
-        ::fidl::fuzzing::DecoderEncoderForType{
-            .fidl_type_name = "A transactional message using ::test_unknowninteractions::wire::UnknownInteractionsProtocolFlexibleEventErrRequest as the body",
-            .has_flexible_envelope = false,
-            .treat_bytes_as_transactional_message = true,
-            .decoder_encoder = ::fidl::fuzzing::DecoderEncoderImpl<::test_unknowninteractions::wire::UnknownInteractionsProtocolFlexibleEventErrRequest, true>,
-        },
-        ::fidl::fuzzing::DecoderEncoderForType{
             .fidl_type_name = "::test_unknowninteractions::wire::UnknownInteractionsProtocolFlexibleEventFieldsErrResponse",
             .has_flexible_envelope = false,
             .treat_bytes_as_transactional_message = false,
@@ -463,30 +259,6 @@ inline constexpr ::std::array<::fidl::fuzzing::DecoderEncoderForType, 254>
             .decoder_encoder = ::fidl::fuzzing::DecoderEncoderImpl<::test_unknowninteractions::wire::UnknownInteractionsProtocolFlexibleEventFieldsErrResponse, true>,
         },
         ::fidl::fuzzing::DecoderEncoderForType{
-            .fidl_type_name = "::test_unknowninteractions::wire::UnknownInteractionsProtocolFlexibleEventFieldsErrRequest",
-            .has_flexible_envelope = false,
-            .treat_bytes_as_transactional_message = false,
-            .decoder_encoder = ::fidl::fuzzing::DecoderEncoderImpl<::test_unknowninteractions::wire::UnknownInteractionsProtocolFlexibleEventFieldsErrRequest, false>,
-        },
-        ::fidl::fuzzing::DecoderEncoderForType{
-            .fidl_type_name = "A transactional message using ::test_unknowninteractions::wire::UnknownInteractionsProtocolFlexibleEventFieldsErrRequest as the body",
-            .has_flexible_envelope = false,
-            .treat_bytes_as_transactional_message = true,
-            .decoder_encoder = ::fidl::fuzzing::DecoderEncoderImpl<::test_unknowninteractions::wire::UnknownInteractionsProtocolFlexibleEventFieldsErrRequest, true>,
-        },
-        ::fidl::fuzzing::DecoderEncoderForType{
-            .fidl_type_name = "::test_unknowninteractions::wire::UnknownInteractionsProtocolFlexibleEventUnionErrRequest",
-            .has_flexible_envelope = true,
-            .treat_bytes_as_transactional_message = false,
-            .decoder_encoder = ::fidl::fuzzing::DecoderEncoderImpl<::test_unknowninteractions::wire::UnknownInteractionsProtocolFlexibleEventUnionErrRequest, false>,
-        },
-        ::fidl::fuzzing::DecoderEncoderForType{
-            .fidl_type_name = "A transactional message using ::test_unknowninteractions::wire::UnknownInteractionsProtocolFlexibleEventUnionErrRequest as the body",
-            .has_flexible_envelope = true,
-            .treat_bytes_as_transactional_message = true,
-            .decoder_encoder = ::fidl::fuzzing::DecoderEncoderImpl<::test_unknowninteractions::wire::UnknownInteractionsProtocolFlexibleEventUnionErrRequest, true>,
-        },
-        ::fidl::fuzzing::DecoderEncoderForType{
             .fidl_type_name = "::test_unknowninteractions::wire::UnknownInteractionsProtocolFlexibleEventTableErrResponse",
             .has_flexible_envelope = true,
             .treat_bytes_as_transactional_message = false,
@@ -497,18 +269,6 @@ inline constexpr ::std::array<::fidl::fuzzing::DecoderEncoderForType, 254>
             .has_flexible_envelope = true,
             .treat_bytes_as_transactional_message = true,
             .decoder_encoder = ::fidl::fuzzing::DecoderEncoderImpl<::test_unknowninteractions::wire::UnknownInteractionsProtocolFlexibleEventTableErrResponse, true>,
-        },
-        ::fidl::fuzzing::DecoderEncoderForType{
-            .fidl_type_name = "::test_unknowninteractions::wire::UnknownInteractionsProtocolFlexibleEventTableErrRequest",
-            .has_flexible_envelope = true,
-            .treat_bytes_as_transactional_message = false,
-            .decoder_encoder = ::fidl::fuzzing::DecoderEncoderImpl<::test_unknowninteractions::wire::UnknownInteractionsProtocolFlexibleEventTableErrRequest, false>,
-        },
-        ::fidl::fuzzing::DecoderEncoderForType{
-            .fidl_type_name = "A transactional message using ::test_unknowninteractions::wire::UnknownInteractionsProtocolFlexibleEventTableErrRequest as the body",
-            .has_flexible_envelope = true,
-            .treat_bytes_as_transactional_message = true,
-            .decoder_encoder = ::fidl::fuzzing::DecoderEncoderImpl<::test_unknowninteractions::wire::UnknownInteractionsProtocolFlexibleEventTableErrRequest, true>,
         },
         ::fidl::fuzzing::DecoderEncoderForType{
             .fidl_type_name = "::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolStrictTwoWayFieldsResponse",
@@ -547,18 +307,6 @@ inline constexpr ::std::array<::fidl::fuzzing::DecoderEncoderForType, 254>
             .decoder_encoder = ::fidl::fuzzing::DecoderEncoderImpl<::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolStrictTwoWayErrResponse, true>,
         },
         ::fidl::fuzzing::DecoderEncoderForType{
-            .fidl_type_name = "::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolStrictTwoWayErrTopResponse",
-            .has_flexible_envelope = false,
-            .treat_bytes_as_transactional_message = false,
-            .decoder_encoder = ::fidl::fuzzing::DecoderEncoderImpl<::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolStrictTwoWayErrTopResponse, false>,
-        },
-        ::fidl::fuzzing::DecoderEncoderForType{
-            .fidl_type_name = "A transactional message using ::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolStrictTwoWayErrTopResponse as the body",
-            .has_flexible_envelope = false,
-            .treat_bytes_as_transactional_message = true,
-            .decoder_encoder = ::fidl::fuzzing::DecoderEncoderImpl<::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolStrictTwoWayErrTopResponse, true>,
-        },
-        ::fidl::fuzzing::DecoderEncoderForType{
             .fidl_type_name = "::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolStrictTwoWayFieldsErrResponse",
             .has_flexible_envelope = false,
             .treat_bytes_as_transactional_message = false,
@@ -571,30 +319,6 @@ inline constexpr ::std::array<::fidl::fuzzing::DecoderEncoderForType, 254>
             .decoder_encoder = ::fidl::fuzzing::DecoderEncoderImpl<::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolStrictTwoWayFieldsErrResponse, true>,
         },
         ::fidl::fuzzing::DecoderEncoderForType{
-            .fidl_type_name = "::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolStrictTwoWayFieldsErrTopResponse",
-            .has_flexible_envelope = false,
-            .treat_bytes_as_transactional_message = false,
-            .decoder_encoder = ::fidl::fuzzing::DecoderEncoderImpl<::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolStrictTwoWayFieldsErrTopResponse, false>,
-        },
-        ::fidl::fuzzing::DecoderEncoderForType{
-            .fidl_type_name = "A transactional message using ::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolStrictTwoWayFieldsErrTopResponse as the body",
-            .has_flexible_envelope = false,
-            .treat_bytes_as_transactional_message = true,
-            .decoder_encoder = ::fidl::fuzzing::DecoderEncoderImpl<::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolStrictTwoWayFieldsErrTopResponse, true>,
-        },
-        ::fidl::fuzzing::DecoderEncoderForType{
-            .fidl_type_name = "::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolStrictTwoWayUnionErrTopResponse",
-            .has_flexible_envelope = true,
-            .treat_bytes_as_transactional_message = false,
-            .decoder_encoder = ::fidl::fuzzing::DecoderEncoderImpl<::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolStrictTwoWayUnionErrTopResponse, false>,
-        },
-        ::fidl::fuzzing::DecoderEncoderForType{
-            .fidl_type_name = "A transactional message using ::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolStrictTwoWayUnionErrTopResponse as the body",
-            .has_flexible_envelope = true,
-            .treat_bytes_as_transactional_message = true,
-            .decoder_encoder = ::fidl::fuzzing::DecoderEncoderImpl<::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolStrictTwoWayUnionErrTopResponse, true>,
-        },
-        ::fidl::fuzzing::DecoderEncoderForType{
             .fidl_type_name = "::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolStrictTwoWayTableErrResponse",
             .has_flexible_envelope = true,
             .treat_bytes_as_transactional_message = false,
@@ -605,18 +329,6 @@ inline constexpr ::std::array<::fidl::fuzzing::DecoderEncoderForType, 254>
             .has_flexible_envelope = true,
             .treat_bytes_as_transactional_message = true,
             .decoder_encoder = ::fidl::fuzzing::DecoderEncoderImpl<::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolStrictTwoWayTableErrResponse, true>,
-        },
-        ::fidl::fuzzing::DecoderEncoderForType{
-            .fidl_type_name = "::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolStrictTwoWayTableErrTopResponse",
-            .has_flexible_envelope = true,
-            .treat_bytes_as_transactional_message = false,
-            .decoder_encoder = ::fidl::fuzzing::DecoderEncoderImpl<::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolStrictTwoWayTableErrTopResponse, false>,
-        },
-        ::fidl::fuzzing::DecoderEncoderForType{
-            .fidl_type_name = "A transactional message using ::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolStrictTwoWayTableErrTopResponse as the body",
-            .has_flexible_envelope = true,
-            .treat_bytes_as_transactional_message = true,
-            .decoder_encoder = ::fidl::fuzzing::DecoderEncoderImpl<::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolStrictTwoWayTableErrTopResponse, true>,
         },
         ::fidl::fuzzing::DecoderEncoderForType{
             .fidl_type_name = "::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolStrictEventFieldsRequest",
@@ -655,18 +367,6 @@ inline constexpr ::std::array<::fidl::fuzzing::DecoderEncoderForType, 254>
             .decoder_encoder = ::fidl::fuzzing::DecoderEncoderImpl<::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolStrictEventErrResponse, true>,
         },
         ::fidl::fuzzing::DecoderEncoderForType{
-            .fidl_type_name = "::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolStrictEventErrRequest",
-            .has_flexible_envelope = false,
-            .treat_bytes_as_transactional_message = false,
-            .decoder_encoder = ::fidl::fuzzing::DecoderEncoderImpl<::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolStrictEventErrRequest, false>,
-        },
-        ::fidl::fuzzing::DecoderEncoderForType{
-            .fidl_type_name = "A transactional message using ::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolStrictEventErrRequest as the body",
-            .has_flexible_envelope = false,
-            .treat_bytes_as_transactional_message = true,
-            .decoder_encoder = ::fidl::fuzzing::DecoderEncoderImpl<::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolStrictEventErrRequest, true>,
-        },
-        ::fidl::fuzzing::DecoderEncoderForType{
             .fidl_type_name = "::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolStrictEventFieldsErrResponse",
             .has_flexible_envelope = false,
             .treat_bytes_as_transactional_message = false,
@@ -679,30 +379,6 @@ inline constexpr ::std::array<::fidl::fuzzing::DecoderEncoderForType, 254>
             .decoder_encoder = ::fidl::fuzzing::DecoderEncoderImpl<::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolStrictEventFieldsErrResponse, true>,
         },
         ::fidl::fuzzing::DecoderEncoderForType{
-            .fidl_type_name = "::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolStrictEventFieldsErrRequest",
-            .has_flexible_envelope = false,
-            .treat_bytes_as_transactional_message = false,
-            .decoder_encoder = ::fidl::fuzzing::DecoderEncoderImpl<::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolStrictEventFieldsErrRequest, false>,
-        },
-        ::fidl::fuzzing::DecoderEncoderForType{
-            .fidl_type_name = "A transactional message using ::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolStrictEventFieldsErrRequest as the body",
-            .has_flexible_envelope = false,
-            .treat_bytes_as_transactional_message = true,
-            .decoder_encoder = ::fidl::fuzzing::DecoderEncoderImpl<::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolStrictEventFieldsErrRequest, true>,
-        },
-        ::fidl::fuzzing::DecoderEncoderForType{
-            .fidl_type_name = "::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolStrictEventUnionErrRequest",
-            .has_flexible_envelope = true,
-            .treat_bytes_as_transactional_message = false,
-            .decoder_encoder = ::fidl::fuzzing::DecoderEncoderImpl<::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolStrictEventUnionErrRequest, false>,
-        },
-        ::fidl::fuzzing::DecoderEncoderForType{
-            .fidl_type_name = "A transactional message using ::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolStrictEventUnionErrRequest as the body",
-            .has_flexible_envelope = true,
-            .treat_bytes_as_transactional_message = true,
-            .decoder_encoder = ::fidl::fuzzing::DecoderEncoderImpl<::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolStrictEventUnionErrRequest, true>,
-        },
-        ::fidl::fuzzing::DecoderEncoderForType{
             .fidl_type_name = "::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolStrictEventTableErrResponse",
             .has_flexible_envelope = true,
             .treat_bytes_as_transactional_message = false,
@@ -713,18 +389,6 @@ inline constexpr ::std::array<::fidl::fuzzing::DecoderEncoderForType, 254>
             .has_flexible_envelope = true,
             .treat_bytes_as_transactional_message = true,
             .decoder_encoder = ::fidl::fuzzing::DecoderEncoderImpl<::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolStrictEventTableErrResponse, true>,
-        },
-        ::fidl::fuzzing::DecoderEncoderForType{
-            .fidl_type_name = "::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolStrictEventTableErrRequest",
-            .has_flexible_envelope = true,
-            .treat_bytes_as_transactional_message = false,
-            .decoder_encoder = ::fidl::fuzzing::DecoderEncoderImpl<::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolStrictEventTableErrRequest, false>,
-        },
-        ::fidl::fuzzing::DecoderEncoderForType{
-            .fidl_type_name = "A transactional message using ::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolStrictEventTableErrRequest as the body",
-            .has_flexible_envelope = true,
-            .treat_bytes_as_transactional_message = true,
-            .decoder_encoder = ::fidl::fuzzing::DecoderEncoderImpl<::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolStrictEventTableErrRequest, true>,
         },
         ::fidl::fuzzing::DecoderEncoderForType{
             .fidl_type_name = "::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolFlexibleEventFieldsRequest",
@@ -763,18 +427,6 @@ inline constexpr ::std::array<::fidl::fuzzing::DecoderEncoderForType, 254>
             .decoder_encoder = ::fidl::fuzzing::DecoderEncoderImpl<::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolFlexibleEventErrResponse, true>,
         },
         ::fidl::fuzzing::DecoderEncoderForType{
-            .fidl_type_name = "::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolFlexibleEventErrRequest",
-            .has_flexible_envelope = false,
-            .treat_bytes_as_transactional_message = false,
-            .decoder_encoder = ::fidl::fuzzing::DecoderEncoderImpl<::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolFlexibleEventErrRequest, false>,
-        },
-        ::fidl::fuzzing::DecoderEncoderForType{
-            .fidl_type_name = "A transactional message using ::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolFlexibleEventErrRequest as the body",
-            .has_flexible_envelope = false,
-            .treat_bytes_as_transactional_message = true,
-            .decoder_encoder = ::fidl::fuzzing::DecoderEncoderImpl<::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolFlexibleEventErrRequest, true>,
-        },
-        ::fidl::fuzzing::DecoderEncoderForType{
             .fidl_type_name = "::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolFlexibleEventFieldsErrResponse",
             .has_flexible_envelope = false,
             .treat_bytes_as_transactional_message = false,
@@ -787,30 +439,6 @@ inline constexpr ::std::array<::fidl::fuzzing::DecoderEncoderForType, 254>
             .decoder_encoder = ::fidl::fuzzing::DecoderEncoderImpl<::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolFlexibleEventFieldsErrResponse, true>,
         },
         ::fidl::fuzzing::DecoderEncoderForType{
-            .fidl_type_name = "::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolFlexibleEventFieldsErrRequest",
-            .has_flexible_envelope = false,
-            .treat_bytes_as_transactional_message = false,
-            .decoder_encoder = ::fidl::fuzzing::DecoderEncoderImpl<::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolFlexibleEventFieldsErrRequest, false>,
-        },
-        ::fidl::fuzzing::DecoderEncoderForType{
-            .fidl_type_name = "A transactional message using ::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolFlexibleEventFieldsErrRequest as the body",
-            .has_flexible_envelope = false,
-            .treat_bytes_as_transactional_message = true,
-            .decoder_encoder = ::fidl::fuzzing::DecoderEncoderImpl<::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolFlexibleEventFieldsErrRequest, true>,
-        },
-        ::fidl::fuzzing::DecoderEncoderForType{
-            .fidl_type_name = "::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolFlexibleEventUnionErrRequest",
-            .has_flexible_envelope = true,
-            .treat_bytes_as_transactional_message = false,
-            .decoder_encoder = ::fidl::fuzzing::DecoderEncoderImpl<::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolFlexibleEventUnionErrRequest, false>,
-        },
-        ::fidl::fuzzing::DecoderEncoderForType{
-            .fidl_type_name = "A transactional message using ::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolFlexibleEventUnionErrRequest as the body",
-            .has_flexible_envelope = true,
-            .treat_bytes_as_transactional_message = true,
-            .decoder_encoder = ::fidl::fuzzing::DecoderEncoderImpl<::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolFlexibleEventUnionErrRequest, true>,
-        },
-        ::fidl::fuzzing::DecoderEncoderForType{
             .fidl_type_name = "::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolFlexibleEventTableErrResponse",
             .has_flexible_envelope = true,
             .treat_bytes_as_transactional_message = false,
@@ -821,18 +449,6 @@ inline constexpr ::std::array<::fidl::fuzzing::DecoderEncoderForType, 254>
             .has_flexible_envelope = true,
             .treat_bytes_as_transactional_message = true,
             .decoder_encoder = ::fidl::fuzzing::DecoderEncoderImpl<::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolFlexibleEventTableErrResponse, true>,
-        },
-        ::fidl::fuzzing::DecoderEncoderForType{
-            .fidl_type_name = "::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolFlexibleEventTableErrRequest",
-            .has_flexible_envelope = true,
-            .treat_bytes_as_transactional_message = false,
-            .decoder_encoder = ::fidl::fuzzing::DecoderEncoderImpl<::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolFlexibleEventTableErrRequest, false>,
-        },
-        ::fidl::fuzzing::DecoderEncoderForType{
-            .fidl_type_name = "A transactional message using ::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolFlexibleEventTableErrRequest as the body",
-            .has_flexible_envelope = true,
-            .treat_bytes_as_transactional_message = true,
-            .decoder_encoder = ::fidl::fuzzing::DecoderEncoderImpl<::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolFlexibleEventTableErrRequest, true>,
         },
         ::fidl::fuzzing::DecoderEncoderForType{
             .fidl_type_name = "::test_unknowninteractions::wire::UnknownInteractionsClosedProtocolStrictTwoWayFieldsResponse",
@@ -871,18 +487,6 @@ inline constexpr ::std::array<::fidl::fuzzing::DecoderEncoderForType, 254>
             .decoder_encoder = ::fidl::fuzzing::DecoderEncoderImpl<::test_unknowninteractions::wire::UnknownInteractionsClosedProtocolStrictTwoWayErrResponse, true>,
         },
         ::fidl::fuzzing::DecoderEncoderForType{
-            .fidl_type_name = "::test_unknowninteractions::wire::UnknownInteractionsClosedProtocolStrictTwoWayErrTopResponse",
-            .has_flexible_envelope = false,
-            .treat_bytes_as_transactional_message = false,
-            .decoder_encoder = ::fidl::fuzzing::DecoderEncoderImpl<::test_unknowninteractions::wire::UnknownInteractionsClosedProtocolStrictTwoWayErrTopResponse, false>,
-        },
-        ::fidl::fuzzing::DecoderEncoderForType{
-            .fidl_type_name = "A transactional message using ::test_unknowninteractions::wire::UnknownInteractionsClosedProtocolStrictTwoWayErrTopResponse as the body",
-            .has_flexible_envelope = false,
-            .treat_bytes_as_transactional_message = true,
-            .decoder_encoder = ::fidl::fuzzing::DecoderEncoderImpl<::test_unknowninteractions::wire::UnknownInteractionsClosedProtocolStrictTwoWayErrTopResponse, true>,
-        },
-        ::fidl::fuzzing::DecoderEncoderForType{
             .fidl_type_name = "::test_unknowninteractions::wire::UnknownInteractionsClosedProtocolStrictTwoWayFieldsErrResponse",
             .has_flexible_envelope = false,
             .treat_bytes_as_transactional_message = false,
@@ -895,30 +499,6 @@ inline constexpr ::std::array<::fidl::fuzzing::DecoderEncoderForType, 254>
             .decoder_encoder = ::fidl::fuzzing::DecoderEncoderImpl<::test_unknowninteractions::wire::UnknownInteractionsClosedProtocolStrictTwoWayFieldsErrResponse, true>,
         },
         ::fidl::fuzzing::DecoderEncoderForType{
-            .fidl_type_name = "::test_unknowninteractions::wire::UnknownInteractionsClosedProtocolStrictTwoWayFieldsErrTopResponse",
-            .has_flexible_envelope = false,
-            .treat_bytes_as_transactional_message = false,
-            .decoder_encoder = ::fidl::fuzzing::DecoderEncoderImpl<::test_unknowninteractions::wire::UnknownInteractionsClosedProtocolStrictTwoWayFieldsErrTopResponse, false>,
-        },
-        ::fidl::fuzzing::DecoderEncoderForType{
-            .fidl_type_name = "A transactional message using ::test_unknowninteractions::wire::UnknownInteractionsClosedProtocolStrictTwoWayFieldsErrTopResponse as the body",
-            .has_flexible_envelope = false,
-            .treat_bytes_as_transactional_message = true,
-            .decoder_encoder = ::fidl::fuzzing::DecoderEncoderImpl<::test_unknowninteractions::wire::UnknownInteractionsClosedProtocolStrictTwoWayFieldsErrTopResponse, true>,
-        },
-        ::fidl::fuzzing::DecoderEncoderForType{
-            .fidl_type_name = "::test_unknowninteractions::wire::UnknownInteractionsClosedProtocolStrictTwoWayUnionErrTopResponse",
-            .has_flexible_envelope = true,
-            .treat_bytes_as_transactional_message = false,
-            .decoder_encoder = ::fidl::fuzzing::DecoderEncoderImpl<::test_unknowninteractions::wire::UnknownInteractionsClosedProtocolStrictTwoWayUnionErrTopResponse, false>,
-        },
-        ::fidl::fuzzing::DecoderEncoderForType{
-            .fidl_type_name = "A transactional message using ::test_unknowninteractions::wire::UnknownInteractionsClosedProtocolStrictTwoWayUnionErrTopResponse as the body",
-            .has_flexible_envelope = true,
-            .treat_bytes_as_transactional_message = true,
-            .decoder_encoder = ::fidl::fuzzing::DecoderEncoderImpl<::test_unknowninteractions::wire::UnknownInteractionsClosedProtocolStrictTwoWayUnionErrTopResponse, true>,
-        },
-        ::fidl::fuzzing::DecoderEncoderForType{
             .fidl_type_name = "::test_unknowninteractions::wire::UnknownInteractionsClosedProtocolStrictTwoWayTableErrResponse",
             .has_flexible_envelope = true,
             .treat_bytes_as_transactional_message = false,
@@ -929,18 +509,6 @@ inline constexpr ::std::array<::fidl::fuzzing::DecoderEncoderForType, 254>
             .has_flexible_envelope = true,
             .treat_bytes_as_transactional_message = true,
             .decoder_encoder = ::fidl::fuzzing::DecoderEncoderImpl<::test_unknowninteractions::wire::UnknownInteractionsClosedProtocolStrictTwoWayTableErrResponse, true>,
-        },
-        ::fidl::fuzzing::DecoderEncoderForType{
-            .fidl_type_name = "::test_unknowninteractions::wire::UnknownInteractionsClosedProtocolStrictTwoWayTableErrTopResponse",
-            .has_flexible_envelope = true,
-            .treat_bytes_as_transactional_message = false,
-            .decoder_encoder = ::fidl::fuzzing::DecoderEncoderImpl<::test_unknowninteractions::wire::UnknownInteractionsClosedProtocolStrictTwoWayTableErrTopResponse, false>,
-        },
-        ::fidl::fuzzing::DecoderEncoderForType{
-            .fidl_type_name = "A transactional message using ::test_unknowninteractions::wire::UnknownInteractionsClosedProtocolStrictTwoWayTableErrTopResponse as the body",
-            .has_flexible_envelope = true,
-            .treat_bytes_as_transactional_message = true,
-            .decoder_encoder = ::fidl::fuzzing::DecoderEncoderImpl<::test_unknowninteractions::wire::UnknownInteractionsClosedProtocolStrictTwoWayTableErrTopResponse, true>,
         },
         ::fidl::fuzzing::DecoderEncoderForType{
             .fidl_type_name = "::test_unknowninteractions::wire::UnknownInteractionsClosedProtocolStrictEventFieldsRequest",
@@ -979,18 +547,6 @@ inline constexpr ::std::array<::fidl::fuzzing::DecoderEncoderForType, 254>
             .decoder_encoder = ::fidl::fuzzing::DecoderEncoderImpl<::test_unknowninteractions::wire::UnknownInteractionsClosedProtocolStrictEventErrResponse, true>,
         },
         ::fidl::fuzzing::DecoderEncoderForType{
-            .fidl_type_name = "::test_unknowninteractions::wire::UnknownInteractionsClosedProtocolStrictEventErrRequest",
-            .has_flexible_envelope = false,
-            .treat_bytes_as_transactional_message = false,
-            .decoder_encoder = ::fidl::fuzzing::DecoderEncoderImpl<::test_unknowninteractions::wire::UnknownInteractionsClosedProtocolStrictEventErrRequest, false>,
-        },
-        ::fidl::fuzzing::DecoderEncoderForType{
-            .fidl_type_name = "A transactional message using ::test_unknowninteractions::wire::UnknownInteractionsClosedProtocolStrictEventErrRequest as the body",
-            .has_flexible_envelope = false,
-            .treat_bytes_as_transactional_message = true,
-            .decoder_encoder = ::fidl::fuzzing::DecoderEncoderImpl<::test_unknowninteractions::wire::UnknownInteractionsClosedProtocolStrictEventErrRequest, true>,
-        },
-        ::fidl::fuzzing::DecoderEncoderForType{
             .fidl_type_name = "::test_unknowninteractions::wire::UnknownInteractionsClosedProtocolStrictEventFieldsErrResponse",
             .has_flexible_envelope = false,
             .treat_bytes_as_transactional_message = false,
@@ -1003,30 +559,6 @@ inline constexpr ::std::array<::fidl::fuzzing::DecoderEncoderForType, 254>
             .decoder_encoder = ::fidl::fuzzing::DecoderEncoderImpl<::test_unknowninteractions::wire::UnknownInteractionsClosedProtocolStrictEventFieldsErrResponse, true>,
         },
         ::fidl::fuzzing::DecoderEncoderForType{
-            .fidl_type_name = "::test_unknowninteractions::wire::UnknownInteractionsClosedProtocolStrictEventFieldsErrRequest",
-            .has_flexible_envelope = false,
-            .treat_bytes_as_transactional_message = false,
-            .decoder_encoder = ::fidl::fuzzing::DecoderEncoderImpl<::test_unknowninteractions::wire::UnknownInteractionsClosedProtocolStrictEventFieldsErrRequest, false>,
-        },
-        ::fidl::fuzzing::DecoderEncoderForType{
-            .fidl_type_name = "A transactional message using ::test_unknowninteractions::wire::UnknownInteractionsClosedProtocolStrictEventFieldsErrRequest as the body",
-            .has_flexible_envelope = false,
-            .treat_bytes_as_transactional_message = true,
-            .decoder_encoder = ::fidl::fuzzing::DecoderEncoderImpl<::test_unknowninteractions::wire::UnknownInteractionsClosedProtocolStrictEventFieldsErrRequest, true>,
-        },
-        ::fidl::fuzzing::DecoderEncoderForType{
-            .fidl_type_name = "::test_unknowninteractions::wire::UnknownInteractionsClosedProtocolStrictEventUnionErrRequest",
-            .has_flexible_envelope = true,
-            .treat_bytes_as_transactional_message = false,
-            .decoder_encoder = ::fidl::fuzzing::DecoderEncoderImpl<::test_unknowninteractions::wire::UnknownInteractionsClosedProtocolStrictEventUnionErrRequest, false>,
-        },
-        ::fidl::fuzzing::DecoderEncoderForType{
-            .fidl_type_name = "A transactional message using ::test_unknowninteractions::wire::UnknownInteractionsClosedProtocolStrictEventUnionErrRequest as the body",
-            .has_flexible_envelope = true,
-            .treat_bytes_as_transactional_message = true,
-            .decoder_encoder = ::fidl::fuzzing::DecoderEncoderImpl<::test_unknowninteractions::wire::UnknownInteractionsClosedProtocolStrictEventUnionErrRequest, true>,
-        },
-        ::fidl::fuzzing::DecoderEncoderForType{
             .fidl_type_name = "::test_unknowninteractions::wire::UnknownInteractionsClosedProtocolStrictEventTableErrResponse",
             .has_flexible_envelope = true,
             .treat_bytes_as_transactional_message = false,
@@ -1037,18 +569,6 @@ inline constexpr ::std::array<::fidl::fuzzing::DecoderEncoderForType, 254>
             .has_flexible_envelope = true,
             .treat_bytes_as_transactional_message = true,
             .decoder_encoder = ::fidl::fuzzing::DecoderEncoderImpl<::test_unknowninteractions::wire::UnknownInteractionsClosedProtocolStrictEventTableErrResponse, true>,
-        },
-        ::fidl::fuzzing::DecoderEncoderForType{
-            .fidl_type_name = "::test_unknowninteractions::wire::UnknownInteractionsClosedProtocolStrictEventTableErrRequest",
-            .has_flexible_envelope = true,
-            .treat_bytes_as_transactional_message = false,
-            .decoder_encoder = ::fidl::fuzzing::DecoderEncoderImpl<::test_unknowninteractions::wire::UnknownInteractionsClosedProtocolStrictEventTableErrRequest, false>,
-        },
-        ::fidl::fuzzing::DecoderEncoderForType{
-            .fidl_type_name = "A transactional message using ::test_unknowninteractions::wire::UnknownInteractionsClosedProtocolStrictEventTableErrRequest as the body",
-            .has_flexible_envelope = true,
-            .treat_bytes_as_transactional_message = true,
-            .decoder_encoder = ::fidl::fuzzing::DecoderEncoderImpl<::test_unknowninteractions::wire::UnknownInteractionsClosedProtocolStrictEventTableErrRequest, true>,
         },
         ::fidl::fuzzing::DecoderEncoderForType{
             .fidl_type_name = "::test_unknowninteractions::wire::UnknownInteractionsDriverProtocolStrictTwoWayFieldsResponse",
@@ -1087,18 +607,6 @@ inline constexpr ::std::array<::fidl::fuzzing::DecoderEncoderForType, 254>
             .decoder_encoder = ::fidl::fuzzing::DecoderEncoderImpl<::test_unknowninteractions::wire::UnknownInteractionsDriverProtocolStrictTwoWayErrResponse, true>,
         },
         ::fidl::fuzzing::DecoderEncoderForType{
-            .fidl_type_name = "::test_unknowninteractions::wire::UnknownInteractionsDriverProtocolStrictTwoWayErrTopResponse",
-            .has_flexible_envelope = false,
-            .treat_bytes_as_transactional_message = false,
-            .decoder_encoder = ::fidl::fuzzing::DecoderEncoderImpl<::test_unknowninteractions::wire::UnknownInteractionsDriverProtocolStrictTwoWayErrTopResponse, false>,
-        },
-        ::fidl::fuzzing::DecoderEncoderForType{
-            .fidl_type_name = "A transactional message using ::test_unknowninteractions::wire::UnknownInteractionsDriverProtocolStrictTwoWayErrTopResponse as the body",
-            .has_flexible_envelope = false,
-            .treat_bytes_as_transactional_message = true,
-            .decoder_encoder = ::fidl::fuzzing::DecoderEncoderImpl<::test_unknowninteractions::wire::UnknownInteractionsDriverProtocolStrictTwoWayErrTopResponse, true>,
-        },
-        ::fidl::fuzzing::DecoderEncoderForType{
             .fidl_type_name = "::test_unknowninteractions::wire::UnknownInteractionsDriverProtocolStrictTwoWayFieldsErrResponse",
             .has_flexible_envelope = false,
             .treat_bytes_as_transactional_message = false,
@@ -1109,30 +617,6 @@ inline constexpr ::std::array<::fidl::fuzzing::DecoderEncoderForType, 254>
             .has_flexible_envelope = false,
             .treat_bytes_as_transactional_message = true,
             .decoder_encoder = ::fidl::fuzzing::DecoderEncoderImpl<::test_unknowninteractions::wire::UnknownInteractionsDriverProtocolStrictTwoWayFieldsErrResponse, true>,
-        },
-        ::fidl::fuzzing::DecoderEncoderForType{
-            .fidl_type_name = "::test_unknowninteractions::wire::UnknownInteractionsDriverProtocolStrictTwoWayFieldsErrTopResponse",
-            .has_flexible_envelope = false,
-            .treat_bytes_as_transactional_message = false,
-            .decoder_encoder = ::fidl::fuzzing::DecoderEncoderImpl<::test_unknowninteractions::wire::UnknownInteractionsDriverProtocolStrictTwoWayFieldsErrTopResponse, false>,
-        },
-        ::fidl::fuzzing::DecoderEncoderForType{
-            .fidl_type_name = "A transactional message using ::test_unknowninteractions::wire::UnknownInteractionsDriverProtocolStrictTwoWayFieldsErrTopResponse as the body",
-            .has_flexible_envelope = false,
-            .treat_bytes_as_transactional_message = true,
-            .decoder_encoder = ::fidl::fuzzing::DecoderEncoderImpl<::test_unknowninteractions::wire::UnknownInteractionsDriverProtocolStrictTwoWayFieldsErrTopResponse, true>,
-        },
-        ::fidl::fuzzing::DecoderEncoderForType{
-            .fidl_type_name = "::test_unknowninteractions::wire::UnknownInteractionsDriverProtocolStrictTwoWayUnionErrTopResponse",
-            .has_flexible_envelope = true,
-            .treat_bytes_as_transactional_message = false,
-            .decoder_encoder = ::fidl::fuzzing::DecoderEncoderImpl<::test_unknowninteractions::wire::UnknownInteractionsDriverProtocolStrictTwoWayUnionErrTopResponse, false>,
-        },
-        ::fidl::fuzzing::DecoderEncoderForType{
-            .fidl_type_name = "A transactional message using ::test_unknowninteractions::wire::UnknownInteractionsDriverProtocolStrictTwoWayUnionErrTopResponse as the body",
-            .has_flexible_envelope = true,
-            .treat_bytes_as_transactional_message = true,
-            .decoder_encoder = ::fidl::fuzzing::DecoderEncoderImpl<::test_unknowninteractions::wire::UnknownInteractionsDriverProtocolStrictTwoWayUnionErrTopResponse, true>,
         },
         ::fidl::fuzzing::DecoderEncoderForType{
             .fidl_type_name = "::test_unknowninteractions::wire::UnknownInteractionsDriverProtocolStrictTwoWayTableErrResponse",
@@ -1147,18 +631,6 @@ inline constexpr ::std::array<::fidl::fuzzing::DecoderEncoderForType, 254>
             .decoder_encoder = ::fidl::fuzzing::DecoderEncoderImpl<::test_unknowninteractions::wire::UnknownInteractionsDriverProtocolStrictTwoWayTableErrResponse, true>,
         },
         ::fidl::fuzzing::DecoderEncoderForType{
-            .fidl_type_name = "::test_unknowninteractions::wire::UnknownInteractionsDriverProtocolStrictTwoWayTableErrTopResponse",
-            .has_flexible_envelope = true,
-            .treat_bytes_as_transactional_message = false,
-            .decoder_encoder = ::fidl::fuzzing::DecoderEncoderImpl<::test_unknowninteractions::wire::UnknownInteractionsDriverProtocolStrictTwoWayTableErrTopResponse, false>,
-        },
-        ::fidl::fuzzing::DecoderEncoderForType{
-            .fidl_type_name = "A transactional message using ::test_unknowninteractions::wire::UnknownInteractionsDriverProtocolStrictTwoWayTableErrTopResponse as the body",
-            .has_flexible_envelope = true,
-            .treat_bytes_as_transactional_message = true,
-            .decoder_encoder = ::fidl::fuzzing::DecoderEncoderImpl<::test_unknowninteractions::wire::UnknownInteractionsDriverProtocolStrictTwoWayTableErrTopResponse, true>,
-        },
-        ::fidl::fuzzing::DecoderEncoderForType{
             .fidl_type_name = "::test_unknowninteractions::wire::UnknownInteractionsDriverProtocolFlexibleTwoWayResponse",
             .has_flexible_envelope = false,
             .treat_bytes_as_transactional_message = false,
@@ -1169,18 +641,6 @@ inline constexpr ::std::array<::fidl::fuzzing::DecoderEncoderForType, 254>
             .has_flexible_envelope = false,
             .treat_bytes_as_transactional_message = true,
             .decoder_encoder = ::fidl::fuzzing::DecoderEncoderImpl<::test_unknowninteractions::wire::UnknownInteractionsDriverProtocolFlexibleTwoWayResponse, true>,
-        },
-        ::fidl::fuzzing::DecoderEncoderForType{
-            .fidl_type_name = "::test_unknowninteractions::wire::UnknownInteractionsDriverProtocolFlexibleTwoWayTopResponse",
-            .has_flexible_envelope = false,
-            .treat_bytes_as_transactional_message = false,
-            .decoder_encoder = ::fidl::fuzzing::DecoderEncoderImpl<::test_unknowninteractions::wire::UnknownInteractionsDriverProtocolFlexibleTwoWayTopResponse, false>,
-        },
-        ::fidl::fuzzing::DecoderEncoderForType{
-            .fidl_type_name = "A transactional message using ::test_unknowninteractions::wire::UnknownInteractionsDriverProtocolFlexibleTwoWayTopResponse as the body",
-            .has_flexible_envelope = false,
-            .treat_bytes_as_transactional_message = true,
-            .decoder_encoder = ::fidl::fuzzing::DecoderEncoderImpl<::test_unknowninteractions::wire::UnknownInteractionsDriverProtocolFlexibleTwoWayTopResponse, true>,
         },
         ::fidl::fuzzing::DecoderEncoderForType{
             .fidl_type_name = "::test_unknowninteractions::wire::UnknownInteractionsDriverProtocolFlexibleTwoWayFieldsResponse",
@@ -1195,30 +655,6 @@ inline constexpr ::std::array<::fidl::fuzzing::DecoderEncoderForType, 254>
             .decoder_encoder = ::fidl::fuzzing::DecoderEncoderImpl<::test_unknowninteractions::wire::UnknownInteractionsDriverProtocolFlexibleTwoWayFieldsResponse, true>,
         },
         ::fidl::fuzzing::DecoderEncoderForType{
-            .fidl_type_name = "::test_unknowninteractions::wire::UnknownInteractionsDriverProtocolFlexibleTwoWayFieldsTopResponse",
-            .has_flexible_envelope = false,
-            .treat_bytes_as_transactional_message = false,
-            .decoder_encoder = ::fidl::fuzzing::DecoderEncoderImpl<::test_unknowninteractions::wire::UnknownInteractionsDriverProtocolFlexibleTwoWayFieldsTopResponse, false>,
-        },
-        ::fidl::fuzzing::DecoderEncoderForType{
-            .fidl_type_name = "A transactional message using ::test_unknowninteractions::wire::UnknownInteractionsDriverProtocolFlexibleTwoWayFieldsTopResponse as the body",
-            .has_flexible_envelope = false,
-            .treat_bytes_as_transactional_message = true,
-            .decoder_encoder = ::fidl::fuzzing::DecoderEncoderImpl<::test_unknowninteractions::wire::UnknownInteractionsDriverProtocolFlexibleTwoWayFieldsTopResponse, true>,
-        },
-        ::fidl::fuzzing::DecoderEncoderForType{
-            .fidl_type_name = "::test_unknowninteractions::wire::UnknownInteractionsDriverProtocolFlexibleTwoWayUnionTopResponse",
-            .has_flexible_envelope = true,
-            .treat_bytes_as_transactional_message = false,
-            .decoder_encoder = ::fidl::fuzzing::DecoderEncoderImpl<::test_unknowninteractions::wire::UnknownInteractionsDriverProtocolFlexibleTwoWayUnionTopResponse, false>,
-        },
-        ::fidl::fuzzing::DecoderEncoderForType{
-            .fidl_type_name = "A transactional message using ::test_unknowninteractions::wire::UnknownInteractionsDriverProtocolFlexibleTwoWayUnionTopResponse as the body",
-            .has_flexible_envelope = true,
-            .treat_bytes_as_transactional_message = true,
-            .decoder_encoder = ::fidl::fuzzing::DecoderEncoderImpl<::test_unknowninteractions::wire::UnknownInteractionsDriverProtocolFlexibleTwoWayUnionTopResponse, true>,
-        },
-        ::fidl::fuzzing::DecoderEncoderForType{
             .fidl_type_name = "::test_unknowninteractions::wire::UnknownInteractionsDriverProtocolFlexibleTwoWayTableResponse",
             .has_flexible_envelope = true,
             .treat_bytes_as_transactional_message = false,
@@ -1229,18 +665,6 @@ inline constexpr ::std::array<::fidl::fuzzing::DecoderEncoderForType, 254>
             .has_flexible_envelope = true,
             .treat_bytes_as_transactional_message = true,
             .decoder_encoder = ::fidl::fuzzing::DecoderEncoderImpl<::test_unknowninteractions::wire::UnknownInteractionsDriverProtocolFlexibleTwoWayTableResponse, true>,
-        },
-        ::fidl::fuzzing::DecoderEncoderForType{
-            .fidl_type_name = "::test_unknowninteractions::wire::UnknownInteractionsDriverProtocolFlexibleTwoWayTableTopResponse",
-            .has_flexible_envelope = true,
-            .treat_bytes_as_transactional_message = false,
-            .decoder_encoder = ::fidl::fuzzing::DecoderEncoderImpl<::test_unknowninteractions::wire::UnknownInteractionsDriverProtocolFlexibleTwoWayTableTopResponse, false>,
-        },
-        ::fidl::fuzzing::DecoderEncoderForType{
-            .fidl_type_name = "A transactional message using ::test_unknowninteractions::wire::UnknownInteractionsDriverProtocolFlexibleTwoWayTableTopResponse as the body",
-            .has_flexible_envelope = true,
-            .treat_bytes_as_transactional_message = true,
-            .decoder_encoder = ::fidl::fuzzing::DecoderEncoderImpl<::test_unknowninteractions::wire::UnknownInteractionsDriverProtocolFlexibleTwoWayTableTopResponse, true>,
         },
         ::fidl::fuzzing::DecoderEncoderForType{
             .fidl_type_name = "::test_unknowninteractions::wire::UnknownInteractionsDriverProtocolFlexibleTwoWayErrResponse",
@@ -1255,18 +679,6 @@ inline constexpr ::std::array<::fidl::fuzzing::DecoderEncoderForType, 254>
             .decoder_encoder = ::fidl::fuzzing::DecoderEncoderImpl<::test_unknowninteractions::wire::UnknownInteractionsDriverProtocolFlexibleTwoWayErrResponse, true>,
         },
         ::fidl::fuzzing::DecoderEncoderForType{
-            .fidl_type_name = "::test_unknowninteractions::wire::UnknownInteractionsDriverProtocolFlexibleTwoWayErrTopResponse",
-            .has_flexible_envelope = false,
-            .treat_bytes_as_transactional_message = false,
-            .decoder_encoder = ::fidl::fuzzing::DecoderEncoderImpl<::test_unknowninteractions::wire::UnknownInteractionsDriverProtocolFlexibleTwoWayErrTopResponse, false>,
-        },
-        ::fidl::fuzzing::DecoderEncoderForType{
-            .fidl_type_name = "A transactional message using ::test_unknowninteractions::wire::UnknownInteractionsDriverProtocolFlexibleTwoWayErrTopResponse as the body",
-            .has_flexible_envelope = false,
-            .treat_bytes_as_transactional_message = true,
-            .decoder_encoder = ::fidl::fuzzing::DecoderEncoderImpl<::test_unknowninteractions::wire::UnknownInteractionsDriverProtocolFlexibleTwoWayErrTopResponse, true>,
-        },
-        ::fidl::fuzzing::DecoderEncoderForType{
             .fidl_type_name = "::test_unknowninteractions::wire::UnknownInteractionsDriverProtocolFlexibleTwoWayFieldsErrResponse",
             .has_flexible_envelope = false,
             .treat_bytes_as_transactional_message = false,
@@ -1279,30 +691,6 @@ inline constexpr ::std::array<::fidl::fuzzing::DecoderEncoderForType, 254>
             .decoder_encoder = ::fidl::fuzzing::DecoderEncoderImpl<::test_unknowninteractions::wire::UnknownInteractionsDriverProtocolFlexibleTwoWayFieldsErrResponse, true>,
         },
         ::fidl::fuzzing::DecoderEncoderForType{
-            .fidl_type_name = "::test_unknowninteractions::wire::UnknownInteractionsDriverProtocolFlexibleTwoWayFieldsErrTopResponse",
-            .has_flexible_envelope = false,
-            .treat_bytes_as_transactional_message = false,
-            .decoder_encoder = ::fidl::fuzzing::DecoderEncoderImpl<::test_unknowninteractions::wire::UnknownInteractionsDriverProtocolFlexibleTwoWayFieldsErrTopResponse, false>,
-        },
-        ::fidl::fuzzing::DecoderEncoderForType{
-            .fidl_type_name = "A transactional message using ::test_unknowninteractions::wire::UnknownInteractionsDriverProtocolFlexibleTwoWayFieldsErrTopResponse as the body",
-            .has_flexible_envelope = false,
-            .treat_bytes_as_transactional_message = true,
-            .decoder_encoder = ::fidl::fuzzing::DecoderEncoderImpl<::test_unknowninteractions::wire::UnknownInteractionsDriverProtocolFlexibleTwoWayFieldsErrTopResponse, true>,
-        },
-        ::fidl::fuzzing::DecoderEncoderForType{
-            .fidl_type_name = "::test_unknowninteractions::wire::UnknownInteractionsDriverProtocolFlexibleTwoWayUnionErrTopResponse",
-            .has_flexible_envelope = true,
-            .treat_bytes_as_transactional_message = false,
-            .decoder_encoder = ::fidl::fuzzing::DecoderEncoderImpl<::test_unknowninteractions::wire::UnknownInteractionsDriverProtocolFlexibleTwoWayUnionErrTopResponse, false>,
-        },
-        ::fidl::fuzzing::DecoderEncoderForType{
-            .fidl_type_name = "A transactional message using ::test_unknowninteractions::wire::UnknownInteractionsDriverProtocolFlexibleTwoWayUnionErrTopResponse as the body",
-            .has_flexible_envelope = true,
-            .treat_bytes_as_transactional_message = true,
-            .decoder_encoder = ::fidl::fuzzing::DecoderEncoderImpl<::test_unknowninteractions::wire::UnknownInteractionsDriverProtocolFlexibleTwoWayUnionErrTopResponse, true>,
-        },
-        ::fidl::fuzzing::DecoderEncoderForType{
             .fidl_type_name = "::test_unknowninteractions::wire::UnknownInteractionsDriverProtocolFlexibleTwoWayTableErrResponse",
             .has_flexible_envelope = true,
             .treat_bytes_as_transactional_message = false,
@@ -1313,18 +701,6 @@ inline constexpr ::std::array<::fidl::fuzzing::DecoderEncoderForType, 254>
             .has_flexible_envelope = true,
             .treat_bytes_as_transactional_message = true,
             .decoder_encoder = ::fidl::fuzzing::DecoderEncoderImpl<::test_unknowninteractions::wire::UnknownInteractionsDriverProtocolFlexibleTwoWayTableErrResponse, true>,
-        },
-        ::fidl::fuzzing::DecoderEncoderForType{
-            .fidl_type_name = "::test_unknowninteractions::wire::UnknownInteractionsDriverProtocolFlexibleTwoWayTableErrTopResponse",
-            .has_flexible_envelope = true,
-            .treat_bytes_as_transactional_message = false,
-            .decoder_encoder = ::fidl::fuzzing::DecoderEncoderImpl<::test_unknowninteractions::wire::UnknownInteractionsDriverProtocolFlexibleTwoWayTableErrTopResponse, false>,
-        },
-        ::fidl::fuzzing::DecoderEncoderForType{
-            .fidl_type_name = "A transactional message using ::test_unknowninteractions::wire::UnknownInteractionsDriverProtocolFlexibleTwoWayTableErrTopResponse as the body",
-            .has_flexible_envelope = true,
-            .treat_bytes_as_transactional_message = true,
-            .decoder_encoder = ::fidl::fuzzing::DecoderEncoderImpl<::test_unknowninteractions::wire::UnknownInteractionsDriverProtocolFlexibleTwoWayTableErrTopResponse, true>,
         },
         ::fidl::fuzzing::DecoderEncoderForType{
             .fidl_type_name = "::test_unknowninteractions::wire::UnknownInteractionsAjarDriverProtocolStrictTwoWayFieldsResponse",
@@ -1363,18 +739,6 @@ inline constexpr ::std::array<::fidl::fuzzing::DecoderEncoderForType, 254>
             .decoder_encoder = ::fidl::fuzzing::DecoderEncoderImpl<::test_unknowninteractions::wire::UnknownInteractionsAjarDriverProtocolStrictTwoWayErrResponse, true>,
         },
         ::fidl::fuzzing::DecoderEncoderForType{
-            .fidl_type_name = "::test_unknowninteractions::wire::UnknownInteractionsAjarDriverProtocolStrictTwoWayErrTopResponse",
-            .has_flexible_envelope = false,
-            .treat_bytes_as_transactional_message = false,
-            .decoder_encoder = ::fidl::fuzzing::DecoderEncoderImpl<::test_unknowninteractions::wire::UnknownInteractionsAjarDriverProtocolStrictTwoWayErrTopResponse, false>,
-        },
-        ::fidl::fuzzing::DecoderEncoderForType{
-            .fidl_type_name = "A transactional message using ::test_unknowninteractions::wire::UnknownInteractionsAjarDriverProtocolStrictTwoWayErrTopResponse as the body",
-            .has_flexible_envelope = false,
-            .treat_bytes_as_transactional_message = true,
-            .decoder_encoder = ::fidl::fuzzing::DecoderEncoderImpl<::test_unknowninteractions::wire::UnknownInteractionsAjarDriverProtocolStrictTwoWayErrTopResponse, true>,
-        },
-        ::fidl::fuzzing::DecoderEncoderForType{
             .fidl_type_name = "::test_unknowninteractions::wire::UnknownInteractionsAjarDriverProtocolStrictTwoWayFieldsErrResponse",
             .has_flexible_envelope = false,
             .treat_bytes_as_transactional_message = false,
@@ -1387,30 +751,6 @@ inline constexpr ::std::array<::fidl::fuzzing::DecoderEncoderForType, 254>
             .decoder_encoder = ::fidl::fuzzing::DecoderEncoderImpl<::test_unknowninteractions::wire::UnknownInteractionsAjarDriverProtocolStrictTwoWayFieldsErrResponse, true>,
         },
         ::fidl::fuzzing::DecoderEncoderForType{
-            .fidl_type_name = "::test_unknowninteractions::wire::UnknownInteractionsAjarDriverProtocolStrictTwoWayFieldsErrTopResponse",
-            .has_flexible_envelope = false,
-            .treat_bytes_as_transactional_message = false,
-            .decoder_encoder = ::fidl::fuzzing::DecoderEncoderImpl<::test_unknowninteractions::wire::UnknownInteractionsAjarDriverProtocolStrictTwoWayFieldsErrTopResponse, false>,
-        },
-        ::fidl::fuzzing::DecoderEncoderForType{
-            .fidl_type_name = "A transactional message using ::test_unknowninteractions::wire::UnknownInteractionsAjarDriverProtocolStrictTwoWayFieldsErrTopResponse as the body",
-            .has_flexible_envelope = false,
-            .treat_bytes_as_transactional_message = true,
-            .decoder_encoder = ::fidl::fuzzing::DecoderEncoderImpl<::test_unknowninteractions::wire::UnknownInteractionsAjarDriverProtocolStrictTwoWayFieldsErrTopResponse, true>,
-        },
-        ::fidl::fuzzing::DecoderEncoderForType{
-            .fidl_type_name = "::test_unknowninteractions::wire::UnknownInteractionsAjarDriverProtocolStrictTwoWayUnionErrTopResponse",
-            .has_flexible_envelope = true,
-            .treat_bytes_as_transactional_message = false,
-            .decoder_encoder = ::fidl::fuzzing::DecoderEncoderImpl<::test_unknowninteractions::wire::UnknownInteractionsAjarDriverProtocolStrictTwoWayUnionErrTopResponse, false>,
-        },
-        ::fidl::fuzzing::DecoderEncoderForType{
-            .fidl_type_name = "A transactional message using ::test_unknowninteractions::wire::UnknownInteractionsAjarDriverProtocolStrictTwoWayUnionErrTopResponse as the body",
-            .has_flexible_envelope = true,
-            .treat_bytes_as_transactional_message = true,
-            .decoder_encoder = ::fidl::fuzzing::DecoderEncoderImpl<::test_unknowninteractions::wire::UnknownInteractionsAjarDriverProtocolStrictTwoWayUnionErrTopResponse, true>,
-        },
-        ::fidl::fuzzing::DecoderEncoderForType{
             .fidl_type_name = "::test_unknowninteractions::wire::UnknownInteractionsAjarDriverProtocolStrictTwoWayTableErrResponse",
             .has_flexible_envelope = true,
             .treat_bytes_as_transactional_message = false,
@@ -1421,18 +761,6 @@ inline constexpr ::std::array<::fidl::fuzzing::DecoderEncoderForType, 254>
             .has_flexible_envelope = true,
             .treat_bytes_as_transactional_message = true,
             .decoder_encoder = ::fidl::fuzzing::DecoderEncoderImpl<::test_unknowninteractions::wire::UnknownInteractionsAjarDriverProtocolStrictTwoWayTableErrResponse, true>,
-        },
-        ::fidl::fuzzing::DecoderEncoderForType{
-            .fidl_type_name = "::test_unknowninteractions::wire::UnknownInteractionsAjarDriverProtocolStrictTwoWayTableErrTopResponse",
-            .has_flexible_envelope = true,
-            .treat_bytes_as_transactional_message = false,
-            .decoder_encoder = ::fidl::fuzzing::DecoderEncoderImpl<::test_unknowninteractions::wire::UnknownInteractionsAjarDriverProtocolStrictTwoWayTableErrTopResponse, false>,
-        },
-        ::fidl::fuzzing::DecoderEncoderForType{
-            .fidl_type_name = "A transactional message using ::test_unknowninteractions::wire::UnknownInteractionsAjarDriverProtocolStrictTwoWayTableErrTopResponse as the body",
-            .has_flexible_envelope = true,
-            .treat_bytes_as_transactional_message = true,
-            .decoder_encoder = ::fidl::fuzzing::DecoderEncoderImpl<::test_unknowninteractions::wire::UnknownInteractionsAjarDriverProtocolStrictTwoWayTableErrTopResponse, true>,
         },
         ::fidl::fuzzing::DecoderEncoderForType{
             .fidl_type_name = "::test_unknowninteractions::wire::UnknownInteractionsClosedDriverProtocolStrictTwoWayFieldsResponse",
@@ -1471,18 +799,6 @@ inline constexpr ::std::array<::fidl::fuzzing::DecoderEncoderForType, 254>
             .decoder_encoder = ::fidl::fuzzing::DecoderEncoderImpl<::test_unknowninteractions::wire::UnknownInteractionsClosedDriverProtocolStrictTwoWayErrResponse, true>,
         },
         ::fidl::fuzzing::DecoderEncoderForType{
-            .fidl_type_name = "::test_unknowninteractions::wire::UnknownInteractionsClosedDriverProtocolStrictTwoWayErrTopResponse",
-            .has_flexible_envelope = false,
-            .treat_bytes_as_transactional_message = false,
-            .decoder_encoder = ::fidl::fuzzing::DecoderEncoderImpl<::test_unknowninteractions::wire::UnknownInteractionsClosedDriverProtocolStrictTwoWayErrTopResponse, false>,
-        },
-        ::fidl::fuzzing::DecoderEncoderForType{
-            .fidl_type_name = "A transactional message using ::test_unknowninteractions::wire::UnknownInteractionsClosedDriverProtocolStrictTwoWayErrTopResponse as the body",
-            .has_flexible_envelope = false,
-            .treat_bytes_as_transactional_message = true,
-            .decoder_encoder = ::fidl::fuzzing::DecoderEncoderImpl<::test_unknowninteractions::wire::UnknownInteractionsClosedDriverProtocolStrictTwoWayErrTopResponse, true>,
-        },
-        ::fidl::fuzzing::DecoderEncoderForType{
             .fidl_type_name = "::test_unknowninteractions::wire::UnknownInteractionsClosedDriverProtocolStrictTwoWayFieldsErrResponse",
             .has_flexible_envelope = false,
             .treat_bytes_as_transactional_message = false,
@@ -1495,30 +811,6 @@ inline constexpr ::std::array<::fidl::fuzzing::DecoderEncoderForType, 254>
             .decoder_encoder = ::fidl::fuzzing::DecoderEncoderImpl<::test_unknowninteractions::wire::UnknownInteractionsClosedDriverProtocolStrictTwoWayFieldsErrResponse, true>,
         },
         ::fidl::fuzzing::DecoderEncoderForType{
-            .fidl_type_name = "::test_unknowninteractions::wire::UnknownInteractionsClosedDriverProtocolStrictTwoWayFieldsErrTopResponse",
-            .has_flexible_envelope = false,
-            .treat_bytes_as_transactional_message = false,
-            .decoder_encoder = ::fidl::fuzzing::DecoderEncoderImpl<::test_unknowninteractions::wire::UnknownInteractionsClosedDriverProtocolStrictTwoWayFieldsErrTopResponse, false>,
-        },
-        ::fidl::fuzzing::DecoderEncoderForType{
-            .fidl_type_name = "A transactional message using ::test_unknowninteractions::wire::UnknownInteractionsClosedDriverProtocolStrictTwoWayFieldsErrTopResponse as the body",
-            .has_flexible_envelope = false,
-            .treat_bytes_as_transactional_message = true,
-            .decoder_encoder = ::fidl::fuzzing::DecoderEncoderImpl<::test_unknowninteractions::wire::UnknownInteractionsClosedDriverProtocolStrictTwoWayFieldsErrTopResponse, true>,
-        },
-        ::fidl::fuzzing::DecoderEncoderForType{
-            .fidl_type_name = "::test_unknowninteractions::wire::UnknownInteractionsClosedDriverProtocolStrictTwoWayUnionErrTopResponse",
-            .has_flexible_envelope = true,
-            .treat_bytes_as_transactional_message = false,
-            .decoder_encoder = ::fidl::fuzzing::DecoderEncoderImpl<::test_unknowninteractions::wire::UnknownInteractionsClosedDriverProtocolStrictTwoWayUnionErrTopResponse, false>,
-        },
-        ::fidl::fuzzing::DecoderEncoderForType{
-            .fidl_type_name = "A transactional message using ::test_unknowninteractions::wire::UnknownInteractionsClosedDriverProtocolStrictTwoWayUnionErrTopResponse as the body",
-            .has_flexible_envelope = true,
-            .treat_bytes_as_transactional_message = true,
-            .decoder_encoder = ::fidl::fuzzing::DecoderEncoderImpl<::test_unknowninteractions::wire::UnknownInteractionsClosedDriverProtocolStrictTwoWayUnionErrTopResponse, true>,
-        },
-        ::fidl::fuzzing::DecoderEncoderForType{
             .fidl_type_name = "::test_unknowninteractions::wire::UnknownInteractionsClosedDriverProtocolStrictTwoWayTableErrResponse",
             .has_flexible_envelope = true,
             .treat_bytes_as_transactional_message = false,
@@ -1529,18 +821,6 @@ inline constexpr ::std::array<::fidl::fuzzing::DecoderEncoderForType, 254>
             .has_flexible_envelope = true,
             .treat_bytes_as_transactional_message = true,
             .decoder_encoder = ::fidl::fuzzing::DecoderEncoderImpl<::test_unknowninteractions::wire::UnknownInteractionsClosedDriverProtocolStrictTwoWayTableErrResponse, true>,
-        },
-        ::fidl::fuzzing::DecoderEncoderForType{
-            .fidl_type_name = "::test_unknowninteractions::wire::UnknownInteractionsClosedDriverProtocolStrictTwoWayTableErrTopResponse",
-            .has_flexible_envelope = true,
-            .treat_bytes_as_transactional_message = false,
-            .decoder_encoder = ::fidl::fuzzing::DecoderEncoderImpl<::test_unknowninteractions::wire::UnknownInteractionsClosedDriverProtocolStrictTwoWayTableErrTopResponse, false>,
-        },
-        ::fidl::fuzzing::DecoderEncoderForType{
-            .fidl_type_name = "A transactional message using ::test_unknowninteractions::wire::UnknownInteractionsClosedDriverProtocolStrictTwoWayTableErrTopResponse as the body",
-            .has_flexible_envelope = true,
-            .treat_bytes_as_transactional_message = true,
-            .decoder_encoder = ::fidl::fuzzing::DecoderEncoderImpl<::test_unknowninteractions::wire::UnknownInteractionsClosedDriverProtocolStrictTwoWayTableErrTopResponse, true>,
         },
 };
 

@@ -11,54 +11,6 @@
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wshadow"
 
-std::ostream& fidl::ostream::Formatter<::test_protocollayouts::MainProtocolTwoWayImportWithErrorTopResponse>::Format(std::ostream& os, const ::test_protocollayouts::MainProtocolTwoWayImportWithErrorTopResponse& value) {
-  os << "test_protocollayouts::MainProtocolTwoWayImportWithErrorTopResponse";
-  os << "{ ";
-  os << "result";
-  os << " = " << fidl::ostream::Formatted<::test_protocollayouts::MainProtocolTwoWayImportWithErrorResult>(value.result()) << ", ";
-  os << "}";
-  return os;
-}
-std::ostream& fidl::ostream::Formatter<::test_protocollayouts::MainProtocolOnImportWithErrorRequest>::Format(std::ostream& os, const ::test_protocollayouts::MainProtocolOnImportWithErrorRequest& value) {
-  os << "test_protocollayouts::MainProtocolOnImportWithErrorRequest";
-  os << "{ ";
-  os << "result";
-  os << " = " << fidl::ostream::Formatted<::test_protocollayouts::MainProtocolOnImportWithErrorResult>(value.result()) << ", ";
-  os << "}";
-  return os;
-}
-std::ostream& fidl::ostream::Formatter<::test_protocollayouts::MainProtocolTwoWayLocalWithErrorTopResponse>::Format(std::ostream& os, const ::test_protocollayouts::MainProtocolTwoWayLocalWithErrorTopResponse& value) {
-  os << "test_protocollayouts::MainProtocolTwoWayLocalWithErrorTopResponse";
-  os << "{ ";
-  os << "result";
-  os << " = " << fidl::ostream::Formatted<::test_protocollayouts::MainProtocolTwoWayLocalWithErrorResult>(value.result()) << ", ";
-  os << "}";
-  return os;
-}
-std::ostream& fidl::ostream::Formatter<::test_protocollayouts::MainProtocolOnLocalWithErrorRequest>::Format(std::ostream& os, const ::test_protocollayouts::MainProtocolOnLocalWithErrorRequest& value) {
-  os << "test_protocollayouts::MainProtocolOnLocalWithErrorRequest";
-  os << "{ ";
-  os << "result";
-  os << " = " << fidl::ostream::Formatted<::test_protocollayouts::MainProtocolOnLocalWithErrorResult>(value.result()) << ", ";
-  os << "}";
-  return os;
-}
-std::ostream& fidl::ostream::Formatter<::test_protocollayouts::MainProtocolTwoWayAnonWithErrorTopResponse>::Format(std::ostream& os, const ::test_protocollayouts::MainProtocolTwoWayAnonWithErrorTopResponse& value) {
-  os << "test_protocollayouts::MainProtocolTwoWayAnonWithErrorTopResponse";
-  os << "{ ";
-  os << "result";
-  os << " = " << fidl::ostream::Formatted<::test_protocollayouts::MainProtocolTwoWayAnonWithErrorResult>(value.result()) << ", ";
-  os << "}";
-  return os;
-}
-std::ostream& fidl::ostream::Formatter<::test_protocollayouts::MainProtocolOnAnonWithErrorRequest>::Format(std::ostream& os, const ::test_protocollayouts::MainProtocolOnAnonWithErrorRequest& value) {
-  os << "test_protocollayouts::MainProtocolOnAnonWithErrorRequest";
-  os << "{ ";
-  os << "result";
-  os << " = " << fidl::ostream::Formatted<::test_protocollayouts::MainProtocolOnAnonWithErrorResult>(value.result()) << ", ";
-  os << "}";
-  return os;
-}
 std::ostream& fidl::ostream::Formatter<::test_protocollayouts::LocalTablePayload>::Format(std::ostream& os, const ::test_protocollayouts::LocalTablePayload& value) {
   os << "test_protocollayouts::LocalTablePayload";
   os << "{ ";
@@ -252,32 +204,16 @@ std::ostream& operator<<(std::ostream& os, const ::test_protocollayouts::MainPro
   return fidl::ostream::Formatter<::test_protocollayouts::MainProtocolTwoWayImportWithErrorResult>::Format(os, value);
 }
 
-std::ostream& operator<<(std::ostream& os, const ::test_protocollayouts::MainProtocolTwoWayImportWithErrorTopResponse& value) {
-  return fidl::ostream::Formatter<::test_protocollayouts::MainProtocolTwoWayImportWithErrorTopResponse>::Format(os, value);
-}
-
 std::ostream& operator<<(std::ostream& os, const ::test_protocollayouts::MainProtocolOnImportWithErrorResult& value) {
   return fidl::ostream::Formatter<::test_protocollayouts::MainProtocolOnImportWithErrorResult>::Format(os, value);
-}
-
-std::ostream& operator<<(std::ostream& os, const ::test_protocollayouts::MainProtocolOnImportWithErrorRequest& value) {
-  return fidl::ostream::Formatter<::test_protocollayouts::MainProtocolOnImportWithErrorRequest>::Format(os, value);
 }
 
 std::ostream& operator<<(std::ostream& os, const ::test_protocollayouts::MainProtocolTwoWayLocalWithErrorResult& value) {
   return fidl::ostream::Formatter<::test_protocollayouts::MainProtocolTwoWayLocalWithErrorResult>::Format(os, value);
 }
 
-std::ostream& operator<<(std::ostream& os, const ::test_protocollayouts::MainProtocolTwoWayLocalWithErrorTopResponse& value) {
-  return fidl::ostream::Formatter<::test_protocollayouts::MainProtocolTwoWayLocalWithErrorTopResponse>::Format(os, value);
-}
-
 std::ostream& operator<<(std::ostream& os, const ::test_protocollayouts::MainProtocolOnLocalWithErrorResult& value) {
   return fidl::ostream::Formatter<::test_protocollayouts::MainProtocolOnLocalWithErrorResult>::Format(os, value);
-}
-
-std::ostream& operator<<(std::ostream& os, const ::test_protocollayouts::MainProtocolOnLocalWithErrorRequest& value) {
-  return fidl::ostream::Formatter<::test_protocollayouts::MainProtocolOnLocalWithErrorRequest>::Format(os, value);
 }
 
 std::ostream& operator<<(std::ostream& os, const ::test_protocollayouts::MainProtocolOneWayAnonRequest& value) {
@@ -304,10 +240,6 @@ std::ostream& operator<<(std::ostream& os, const ::test_protocollayouts::MainPro
   return fidl::ostream::Formatter<::test_protocollayouts::MainProtocolTwoWayAnonWithErrorResult>::Format(os, value);
 }
 
-std::ostream& operator<<(std::ostream& os, const ::test_protocollayouts::MainProtocolTwoWayAnonWithErrorTopResponse& value) {
-  return fidl::ostream::Formatter<::test_protocollayouts::MainProtocolTwoWayAnonWithErrorTopResponse>::Format(os, value);
-}
-
 std::ostream& operator<<(std::ostream& os, const ::test_protocollayouts::MainProtocolOnAnonRequest& value) {
   return fidl::ostream::Formatter<::test_protocollayouts::MainProtocolOnAnonRequest>::Format(os, value);
 }
@@ -318,10 +250,6 @@ std::ostream& operator<<(std::ostream& os, const ::test_protocollayouts::MainPro
 
 std::ostream& operator<<(std::ostream& os, const ::test_protocollayouts::MainProtocolOnAnonWithErrorResult& value) {
   return fidl::ostream::Formatter<::test_protocollayouts::MainProtocolOnAnonWithErrorResult>::Format(os, value);
-}
-
-std::ostream& operator<<(std::ostream& os, const ::test_protocollayouts::MainProtocolOnAnonWithErrorRequest& value) {
-  return fidl::ostream::Formatter<::test_protocollayouts::MainProtocolOnAnonWithErrorRequest>::Format(os, value);
 }
 
 #pragma clang diagnostic pop

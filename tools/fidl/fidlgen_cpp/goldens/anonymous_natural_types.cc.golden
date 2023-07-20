@@ -34,11 +34,6 @@
       ::fidl::internal::NaturalClone(storage_.bits_member)};
 }
 
-::test_anonymous::SomeProtocolSomeMethodTopResponse::Storage_ test_anonymous::SomeProtocolSomeMethodTopResponse::CloneStorage_() const {
-  return Storage_{
-      ::fidl::internal::NaturalClone(storage_.result)};
-}
-
 ::test_anonymous::FunctionApplication::Storage_ test_anonymous::FunctionApplication::CloneStorage_() const {
   return Storage_{
       ::fidl::internal::NaturalClone(storage_.func),

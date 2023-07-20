@@ -98,19 +98,14 @@ TEST(SyncClientErrorTest, DecodeErrorWithErrorSyntax) {
     uint32_t actual;
     endpoints->server.channel().read(0, &request, nullptr, sizeof(request), 0, &actual, nullptr);
     ASSERT_EQ(sizeof(request), actual);
-    fidl::internal::TransactionalResponse<test_error_methods::ErrorMethods::ManyArgsCustomError>
-        message;
-
-    // Zero the message body, to prevent hitting the "non-zero padding bytes" error, which is
-    // checked before the "not valid enum member" error we're interested in
-    memset(&message, 0, sizeof(message));
 
     // Send the number 42 as |MyError|, which will fail validation at the sync client when it
     // receives the message.
+    fidl::internal::TransactionalResponse<test_error_methods::ErrorMethods::ManyArgsCustomError>
+        message(test_error_methods::wire::ErrorMethodsManyArgsCustomErrorResult::WithErr(
+            static_cast<test_error_methods::MyError>(42)));
     fidl::InitTxnHeader(&message.header, request.header.txid, request.header.ordinal,
                         fidl::MessageDynamicFlags::kStrictMethod);
-    message.body.result = test_error_methods::wire::ErrorMethodsManyArgsCustomErrorResult::WithErr(
-        static_cast<test_error_methods::MyError>(42));
     ASSERT_OK(endpoints->server.channel().write(0, reinterpret_cast<void*>(&message),
                                                 sizeof(message), nullptr, 0));
   }};

@@ -4,6 +4,8 @@
 
 #include "src/lib/fidl_codec/library_loader.h"
 
+#include <zircon/assert.h>
+
 #include <fstream>
 #include <ios>
 #include <set>

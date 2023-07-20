@@ -68,10 +68,6 @@ template <>
 struct fidl::ostream::Formatter<::test_anonymous::SomeProtocolSomeMethodResult> {
   static std::ostream& Format(std::ostream& os, const ::test_anonymous::SomeProtocolSomeMethodResult& value);
 };
-template <>
-struct fidl::ostream::Formatter<::test_anonymous::SomeProtocolSomeMethodTopResponse> {
-  static std::ostream& Format(std::ostream& os, const ::test_anonymous::SomeProtocolSomeMethodTopResponse& value);
-};
 
 namespace test_anonymous {
 
@@ -100,8 +96,6 @@ std::ostream& operator<<(std::ostream& os, const ::test_anonymous::SomeProtocolS
 std::ostream& operator<<(std::ostream& os, const ::test_anonymous::SomeProtocolSomeMethodError& value);
 
 std::ostream& operator<<(std::ostream& os, const ::test_anonymous::SomeProtocolSomeMethodResult& value);
-
-std::ostream& operator<<(std::ostream& os, const ::test_anonymous::SomeProtocolSomeMethodTopResponse& value);
 
 }  // namespace test_anonymous
 

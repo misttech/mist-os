@@ -13,7 +13,7 @@ protocol MyProtocol {
         in uint8;
     }) -> (struct {
         out int8;
-    }) error uint32;
+    }) error flexible enum {};
     -> MyEvent(struct {
         out int8;
     });
@@ -23,6 +23,8 @@ type MyAnonymousReferences = struct {
     a MyProtocolMyInfallibleRequest;
     b MyProtocolMyInfallibleResponse;
     c MyProtocolMyFallibleRequest;
-    d MyProtocolMyFallibleTopResponse;
-    e MyProtocolMyEventRequest;
+    d MyProtocol_MyFallible_Result;
+    e MyProtocol_MyFallible_Response;
+    f MyProtocol_MyFallible_Error;
+    g MyProtocolMyEventRequest;
 };

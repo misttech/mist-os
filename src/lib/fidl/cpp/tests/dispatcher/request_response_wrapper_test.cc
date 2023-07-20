@@ -37,8 +37,7 @@ TEST(Response, DefaultConstructionErrorSyntax) {
 
 TEST(Response, FromPayloadErrorSyntaxSuccess) {
   test_types::FooResponse res{{.bar = 42}};
-  test_types::ErrorSyntaxFooPayloadTopResponse domain_object{
-      {.result = test_types::ErrorSyntaxFooPayloadResult::WithResponse(std::move(res))}};
+  auto domain_object = test_types::ErrorSyntaxFooPayloadResult::WithResponse(std::move(res));
   fidl::Result<test_types::ErrorSyntax::FooPayload> result =
       fidl::internal::ConvertResponseDomainObjectToResult<test_types::ErrorSyntax::FooPayload>(
           domain_object);
@@ -47,8 +46,7 @@ TEST(Response, FromPayloadErrorSyntaxSuccess) {
 }
 
 TEST(Response, FromPayloadErrorSyntaxError) {
-  test_types::ErrorSyntaxFooPayloadTopResponse domain_object{
-      {.result = test_types::ErrorSyntaxFooPayloadResult::WithErr(42)}};
+  auto domain_object = test_types::ErrorSyntaxFooPayloadResult::WithErr(42);
   fidl::Result<test_types::ErrorSyntax::FooPayload> result =
       fidl::internal::ConvertResponseDomainObjectToResult<test_types::ErrorSyntax::FooPayload>(
           domain_object);
@@ -58,8 +56,7 @@ TEST(Response, FromPayloadErrorSyntaxError) {
 }
 
 TEST(Response, FromPayloadErrorSyntaxEmptyStructSuccess) {
-  test_types::ErrorSyntaxEmptyPayloadTopResponse domain_object{
-      {.result = test_types::ErrorSyntaxEmptyPayloadResult::WithResponse({})}};
+  auto domain_object = test_types::ErrorSyntaxEmptyPayloadResult::WithResponse({});
   fidl::Result<test_types::ErrorSyntax::EmptyPayload> result =
       fidl::internal::ConvertResponseDomainObjectToResult<test_types::ErrorSyntax::EmptyPayload>(
           domain_object);
@@ -67,8 +64,7 @@ TEST(Response, FromPayloadErrorSyntaxEmptyStructSuccess) {
 }
 
 TEST(Response, FromPayloadErrorSyntaxEmptyStructError) {
-  test_types::ErrorSyntaxEmptyPayloadTopResponse domain_object{
-      {.result = test_types::ErrorSyntaxEmptyPayloadResult::WithErr(42)}};
+  auto domain_object = test_types::ErrorSyntaxEmptyPayloadResult::WithErr(42);
   fidl::Result<test_types::ErrorSyntax::EmptyPayload> result =
       fidl::internal::ConvertResponseDomainObjectToResult<test_types::ErrorSyntax::EmptyPayload>(
           domain_object);
@@ -135,15 +131,15 @@ TEST(Event, DefaultConstructionErrorSyntax) {
 }
 
 TEST(Event, InheritFromDomainObjectErrorSyntax) {
-  static_assert(cpp17::is_base_of_v<test_types::ErrorSyntaxEventFooPayloadRequest,
+  static_assert(cpp17::is_base_of_v<test_types::ErrorSyntaxEventFooPayloadResult,
                                     fidl::Event<test_types::ErrorSyntax::EventFooPayload>>);
-  static_assert(sizeof(test_types::ErrorSyntaxEventFooPayloadRequest) ==
+  static_assert(sizeof(test_types::ErrorSyntaxEventFooPayloadResult) ==
                     sizeof(fidl::Event<test_types::ErrorSyntax::EventFooPayload>),
                 "Message wrapper must not add any state");
 
-  static_assert(cpp17::is_base_of_v<test_types::ErrorSyntaxEventEmptyPayloadRequest,
+  static_assert(cpp17::is_base_of_v<test_types::ErrorSyntaxEventEmptyPayloadResult,
                                     fidl::Event<test_types::ErrorSyntax::EventEmptyPayload>>);
-  static_assert(sizeof(test_types::ErrorSyntaxEventEmptyPayloadRequest) ==
+  static_assert(sizeof(test_types::ErrorSyntaxEventEmptyPayloadResult) ==
                     sizeof(fidl::Event<test_types::ErrorSyntax::EventEmptyPayload>),
                 "Message wrapper must not add any state");
 }

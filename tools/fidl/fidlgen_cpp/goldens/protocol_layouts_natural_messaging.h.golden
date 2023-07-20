@@ -48,7 +48,7 @@ template <>
 struct ::fidl::internal::NaturalMethodTypes<::test_protocollayouts::MainProtocol::TwoWayAnonComposedWithError> {
   using Request = ::test_protocollayouts_imported::ComposedProtocolTwoWayAnonComposedWithErrorRequest;
 
-  using Response = ::test_protocollayouts_imported::ComposedProtocolTwoWayAnonComposedWithErrorTopResponse;
+  using Response = ::test_protocollayouts_imported::ComposedProtocolTwoWayAnonComposedWithErrorResult;
 
   using Completer = fidl::Completer<::fidl::internal::NaturalCompleterBase<::test_protocollayouts::MainProtocol::TwoWayAnonComposedWithError>>;
   using ResultCallback =
@@ -62,7 +62,7 @@ struct ::fidl::internal::NaturalMethodTypes<::test_protocollayouts::MainProtocol
 
 template <>
 struct ::fidl::internal::NaturalMethodTypes<::test_protocollayouts::MainProtocol::OnAnonComposedWithError> {
-  using Request = ::test_protocollayouts_imported::ComposedProtocolOnAnonComposedWithErrorRequest;
+  using Request = ::test_protocollayouts_imported::ComposedProtocolOnAnonComposedWithErrorResult;
 };
 
 template <>
@@ -87,7 +87,7 @@ template <>
 struct ::fidl::internal::NaturalMethodTypes<::test_protocollayouts::MainProtocol::TwoWayNamedComposedWithError> {
   using Request = ::test_protocollayouts_imported::ImportTablePayload;
 
-  using Response = ::test_protocollayouts_imported::ComposedProtocolTwoWayNamedComposedWithErrorTopResponse;
+  using Response = ::test_protocollayouts_imported::ComposedProtocolTwoWayNamedComposedWithErrorResult;
 
   using Completer = fidl::Completer<::fidl::internal::NaturalCompleterBase<::test_protocollayouts::MainProtocol::TwoWayNamedComposedWithError>>;
   using ResultCallback =
@@ -101,7 +101,7 @@ struct ::fidl::internal::NaturalMethodTypes<::test_protocollayouts::MainProtocol
 
 template <>
 struct ::fidl::internal::NaturalMethodTypes<::test_protocollayouts::MainProtocol::OnNamedComposedWithError> {
-  using Request = ::test_protocollayouts_imported::ComposedProtocolOnNamedComposedWithErrorRequest;
+  using Request = ::test_protocollayouts_imported::ComposedProtocolOnNamedComposedWithErrorResult;
 };
 
 template <>
@@ -126,7 +126,7 @@ template <>
 struct ::fidl::internal::NaturalMethodTypes<::test_protocollayouts::MainProtocol::TwoWayImportWithError> {
   using Request = ::test_protocollayouts_imported::ImportTablePayload;
 
-  using Response = ::test_protocollayouts::MainProtocolTwoWayImportWithErrorTopResponse;
+  using Response = ::test_protocollayouts::MainProtocolTwoWayImportWithErrorResult;
 
   using Completer = fidl::Completer<::fidl::internal::NaturalCompleterBase<::test_protocollayouts::MainProtocol::TwoWayImportWithError>>;
   using ResultCallback =
@@ -140,7 +140,7 @@ struct ::fidl::internal::NaturalMethodTypes<::test_protocollayouts::MainProtocol
 
 template <>
 struct ::fidl::internal::NaturalMethodTypes<::test_protocollayouts::MainProtocol::OnImportWithError> {
-  using Request = ::test_protocollayouts::MainProtocolOnImportWithErrorRequest;
+  using Request = ::test_protocollayouts::MainProtocolOnImportWithErrorResult;
 };
 
 template <>
@@ -165,7 +165,7 @@ template <>
 struct ::fidl::internal::NaturalMethodTypes<::test_protocollayouts::MainProtocol::TwoWayLocalWithError> {
   using Request = ::test_protocollayouts::LocalTablePayload;
 
-  using Response = ::test_protocollayouts::MainProtocolTwoWayLocalWithErrorTopResponse;
+  using Response = ::test_protocollayouts::MainProtocolTwoWayLocalWithErrorResult;
 
   using Completer = fidl::Completer<::fidl::internal::NaturalCompleterBase<::test_protocollayouts::MainProtocol::TwoWayLocalWithError>>;
   using ResultCallback =
@@ -179,7 +179,7 @@ struct ::fidl::internal::NaturalMethodTypes<::test_protocollayouts::MainProtocol
 
 template <>
 struct ::fidl::internal::NaturalMethodTypes<::test_protocollayouts::MainProtocol::OnLocalWithError> {
-  using Request = ::test_protocollayouts::MainProtocolOnLocalWithErrorRequest;
+  using Request = ::test_protocollayouts::MainProtocolOnLocalWithErrorResult;
 };
 
 template <>
@@ -204,7 +204,7 @@ template <>
 struct ::fidl::internal::NaturalMethodTypes<::test_protocollayouts::MainProtocol::TwoWayAnonWithError> {
   using Request = ::test_protocollayouts::MainProtocolTwoWayAnonWithErrorRequest;
 
-  using Response = ::test_protocollayouts::MainProtocolTwoWayAnonWithErrorTopResponse;
+  using Response = ::test_protocollayouts::MainProtocolTwoWayAnonWithErrorResult;
 
   using Completer = fidl::Completer<::fidl::internal::NaturalCompleterBase<::test_protocollayouts::MainProtocol::TwoWayAnonWithError>>;
   using ResultCallback =
@@ -218,7 +218,7 @@ struct ::fidl::internal::NaturalMethodTypes<::test_protocollayouts::MainProtocol
 
 template <>
 struct ::fidl::internal::NaturalMethodTypes<::test_protocollayouts::MainProtocol::OnAnonWithError> {
-  using Request = ::test_protocollayouts::MainProtocolOnAnonWithErrorRequest;
+  using Request = ::test_protocollayouts::MainProtocolOnAnonWithErrorResult;
 };
 namespace test_protocollayouts {
 __LOCAL extern "C" const fidl_type_t test_protocollayouts_imported_ComposedProtocolOneWayAnonComposedRequestTable;
@@ -229,31 +229,31 @@ __LOCAL extern "C" const fidl_type_t test_protocollayouts_imported_ComposedProto
 
 __LOCAL extern "C" const fidl_type_t test_protocollayouts_imported_ComposedProtocolTwoWayAnonComposedWithErrorRequestTable;
 
-__LOCAL extern "C" const fidl_type_t test_protocollayouts_imported_ComposedProtocolTwoWayAnonComposedWithErrorTopResponseTable;
+__LOCAL extern "C" const fidl_type_t test_protocollayouts_imported_ComposedProtocol_TwoWayAnonComposedWithError_ResultTable;
 
 __LOCAL extern "C" const fidl_type_t test_protocollayouts_imported_ComposedProtocolOnAnonComposedRequestTable;
 
-__LOCAL extern "C" const fidl_type_t test_protocollayouts_imported_ComposedProtocolOnAnonComposedWithErrorRequestTable;
+__LOCAL extern "C" const fidl_type_t test_protocollayouts_imported_ComposedProtocol_OnAnonComposedWithError_ResultTable;
 
 __LOCAL extern "C" const fidl_type_t test_protocollayouts_imported_ImportTablePayloadTable;
 
 __LOCAL extern "C" const fidl_type_t test_protocollayouts_imported_ImportUnionPayloadTable;
 
-__LOCAL extern "C" const fidl_type_t test_protocollayouts_imported_ComposedProtocolTwoWayNamedComposedWithErrorTopResponseTable;
+__LOCAL extern "C" const fidl_type_t test_protocollayouts_imported_ComposedProtocol_TwoWayNamedComposedWithError_ResultTable;
 
-__LOCAL extern "C" const fidl_type_t test_protocollayouts_imported_ComposedProtocolOnNamedComposedWithErrorRequestTable;
+__LOCAL extern "C" const fidl_type_t test_protocollayouts_imported_ComposedProtocol_OnNamedComposedWithError_ResultTable;
 
-__LOCAL extern "C" const fidl_type_t test_protocollayouts_MainProtocolTwoWayImportWithErrorTopResponseTable;
+__LOCAL extern "C" const fidl_type_t test_protocollayouts_MainProtocol_TwoWayImportWithError_ResultTable;
 
-__LOCAL extern "C" const fidl_type_t test_protocollayouts_MainProtocolOnImportWithErrorRequestTable;
+__LOCAL extern "C" const fidl_type_t test_protocollayouts_MainProtocol_OnImportWithError_ResultTable;
 
 __LOCAL extern "C" const fidl_type_t test_protocollayouts_LocalTablePayloadTable;
 
 __LOCAL extern "C" const fidl_type_t test_protocollayouts_LocalUnionPayloadTable;
 
-__LOCAL extern "C" const fidl_type_t test_protocollayouts_MainProtocolTwoWayLocalWithErrorTopResponseTable;
+__LOCAL extern "C" const fidl_type_t test_protocollayouts_MainProtocol_TwoWayLocalWithError_ResultTable;
 
-__LOCAL extern "C" const fidl_type_t test_protocollayouts_MainProtocolOnLocalWithErrorRequestTable;
+__LOCAL extern "C" const fidl_type_t test_protocollayouts_MainProtocol_OnLocalWithError_ResultTable;
 
 __LOCAL extern "C" const fidl_type_t test_protocollayouts_MainProtocolOneWayAnonRequestTable;
 
@@ -263,11 +263,11 @@ __LOCAL extern "C" const fidl_type_t test_protocollayouts_MainProtocolTwoWayAnon
 
 __LOCAL extern "C" const fidl_type_t test_protocollayouts_MainProtocolTwoWayAnonWithErrorRequestTable;
 
-__LOCAL extern "C" const fidl_type_t test_protocollayouts_MainProtocolTwoWayAnonWithErrorTopResponseTable;
+__LOCAL extern "C" const fidl_type_t test_protocollayouts_MainProtocol_TwoWayAnonWithError_ResultTable;
 
 __LOCAL extern "C" const fidl_type_t test_protocollayouts_MainProtocolOnAnonRequestTable;
 
-__LOCAL extern "C" const fidl_type_t test_protocollayouts_MainProtocolOnAnonWithErrorRequestTable;
+__LOCAL extern "C" const fidl_type_t test_protocollayouts_MainProtocol_OnAnonWithError_ResultTable;
 
 #ifdef __Fuchsia__
 }  // namespace test_protocollayouts
@@ -299,14 +299,14 @@ class ::fidl::Response<::test_protocollayouts::MainProtocol::TwoWayAnonComposedW
 };
 template <>
 class ::fidl::internal::ResponseMessageConverter<::test_protocollayouts::MainProtocol::TwoWayAnonComposedWithError> {
-  using DomainObject = ::test_protocollayouts_imported::ComposedProtocolTwoWayAnonComposedWithErrorTopResponse;
+  using DomainObject = ::test_protocollayouts_imported::ComposedProtocolTwoWayAnonComposedWithErrorResult;
 
  public:
   static DomainObject IntoDomainObject(const ::fidl::Response<::test_protocollayouts::MainProtocol::TwoWayAnonComposedWithError>& m) {
     if (m.is_error()) {
-      return DomainObject{{.result = ::test_protocollayouts_imported::ComposedProtocolTwoWayAnonComposedWithErrorResult::WithErr(m.error_value())}};
+      return DomainObject::WithErr(m.error_value());
     } else {
-      return DomainObject{{.result = ::test_protocollayouts_imported::ComposedProtocolTwoWayAnonComposedWithErrorResult::WithResponse(std::move(m.value()))}};
+      return DomainObject::WithResponse(std::move(m.value()));
     }
   }
 };
@@ -345,14 +345,14 @@ class ::fidl::Response<::test_protocollayouts::MainProtocol::TwoWayNamedComposed
 };
 template <>
 class ::fidl::internal::ResponseMessageConverter<::test_protocollayouts::MainProtocol::TwoWayNamedComposedWithError> {
-  using DomainObject = ::test_protocollayouts_imported::ComposedProtocolTwoWayNamedComposedWithErrorTopResponse;
+  using DomainObject = ::test_protocollayouts_imported::ComposedProtocolTwoWayNamedComposedWithErrorResult;
 
  public:
   static DomainObject IntoDomainObject(const ::fidl::Response<::test_protocollayouts::MainProtocol::TwoWayNamedComposedWithError>& m) {
     if (m.is_error()) {
-      return DomainObject{{.result = ::test_protocollayouts_imported::ComposedProtocolTwoWayNamedComposedWithErrorResult::WithErr(m.error_value())}};
+      return DomainObject::WithErr(m.error_value());
     } else {
-      return DomainObject{{.result = ::test_protocollayouts_imported::ComposedProtocolTwoWayNamedComposedWithErrorResult::WithResponse(std::move(m.value()))}};
+      return DomainObject::WithResponse(std::move(m.value()));
     }
   }
 };
@@ -391,14 +391,14 @@ class ::fidl::Response<::test_protocollayouts::MainProtocol::TwoWayImportWithErr
 };
 template <>
 class ::fidl::internal::ResponseMessageConverter<::test_protocollayouts::MainProtocol::TwoWayImportWithError> {
-  using DomainObject = ::test_protocollayouts::MainProtocolTwoWayImportWithErrorTopResponse;
+  using DomainObject = ::test_protocollayouts::MainProtocolTwoWayImportWithErrorResult;
 
  public:
   static DomainObject IntoDomainObject(const ::fidl::Response<::test_protocollayouts::MainProtocol::TwoWayImportWithError>& m) {
     if (m.is_error()) {
-      return DomainObject{{.result = ::test_protocollayouts::MainProtocolTwoWayImportWithErrorResult::WithErr(m.error_value())}};
+      return DomainObject::WithErr(m.error_value());
     } else {
-      return DomainObject{{.result = ::test_protocollayouts::MainProtocolTwoWayImportWithErrorResult::WithResponse(std::move(m.value()))}};
+      return DomainObject::WithResponse(std::move(m.value()));
     }
   }
 };
@@ -437,14 +437,14 @@ class ::fidl::Response<::test_protocollayouts::MainProtocol::TwoWayLocalWithErro
 };
 template <>
 class ::fidl::internal::ResponseMessageConverter<::test_protocollayouts::MainProtocol::TwoWayLocalWithError> {
-  using DomainObject = ::test_protocollayouts::MainProtocolTwoWayLocalWithErrorTopResponse;
+  using DomainObject = ::test_protocollayouts::MainProtocolTwoWayLocalWithErrorResult;
 
  public:
   static DomainObject IntoDomainObject(const ::fidl::Response<::test_protocollayouts::MainProtocol::TwoWayLocalWithError>& m) {
     if (m.is_error()) {
-      return DomainObject{{.result = ::test_protocollayouts::MainProtocolTwoWayLocalWithErrorResult::WithErr(m.error_value())}};
+      return DomainObject::WithErr(m.error_value());
     } else {
-      return DomainObject{{.result = ::test_protocollayouts::MainProtocolTwoWayLocalWithErrorResult::WithResponse(std::move(m.value()))}};
+      return DomainObject::WithResponse(std::move(m.value()));
     }
   }
 };
@@ -483,14 +483,14 @@ class ::fidl::Response<::test_protocollayouts::MainProtocol::TwoWayAnonWithError
 };
 template <>
 class ::fidl::internal::ResponseMessageConverter<::test_protocollayouts::MainProtocol::TwoWayAnonWithError> {
-  using DomainObject = ::test_protocollayouts::MainProtocolTwoWayAnonWithErrorTopResponse;
+  using DomainObject = ::test_protocollayouts::MainProtocolTwoWayAnonWithErrorResult;
 
  public:
   static DomainObject IntoDomainObject(const ::fidl::Response<::test_protocollayouts::MainProtocol::TwoWayAnonWithError>& m) {
     if (m.is_error()) {
-      return DomainObject{{.result = ::test_protocollayouts::MainProtocolTwoWayAnonWithErrorResult::WithErr(m.error_value())}};
+      return DomainObject::WithErr(m.error_value());
     } else {
-      return DomainObject{{.result = ::test_protocollayouts::MainProtocolTwoWayAnonWithErrorResult::WithResponse(std::move(m.value()))}};
+      return DomainObject::WithResponse(std::move(m.value()));
     }
   }
 };
@@ -658,23 +658,23 @@ class ::fidl::internal::NaturalWeakEventSender<::test_protocollayouts::MainProto
 
   ::fit::result<::fidl::OneWayError> OnAnonComposed(const ::test_protocollayouts_imported::ComposedProtocolOnAnonComposedRequest& payload);
 
-  ::fit::result<::fidl::OneWayError> OnAnonComposedWithError(const ::test_protocollayouts_imported::ComposedProtocolOnAnonComposedWithErrorRequest& payload);
+  ::fit::result<::fidl::OneWayError> OnAnonComposedWithError(const ::test_protocollayouts_imported::ComposedProtocolOnAnonComposedWithErrorResult& payload);
 
   ::fit::result<::fidl::OneWayError> OnNamedComposed(const ::test_protocollayouts_imported::ImportUnionPayload& payload);
 
-  ::fit::result<::fidl::OneWayError> OnNamedComposedWithError(const ::test_protocollayouts_imported::ComposedProtocolOnNamedComposedWithErrorRequest& payload);
+  ::fit::result<::fidl::OneWayError> OnNamedComposedWithError(const ::test_protocollayouts_imported::ComposedProtocolOnNamedComposedWithErrorResult& payload);
 
   ::fit::result<::fidl::OneWayError> OnImport(const ::test_protocollayouts_imported::ImportUnionPayload& payload);
 
-  ::fit::result<::fidl::OneWayError> OnImportWithError(const ::test_protocollayouts::MainProtocolOnImportWithErrorRequest& payload);
+  ::fit::result<::fidl::OneWayError> OnImportWithError(const ::test_protocollayouts::MainProtocolOnImportWithErrorResult& payload);
 
   ::fit::result<::fidl::OneWayError> OnLocal(const ::test_protocollayouts::LocalUnionPayload& payload);
 
-  ::fit::result<::fidl::OneWayError> OnLocalWithError(const ::test_protocollayouts::MainProtocolOnLocalWithErrorRequest& payload);
+  ::fit::result<::fidl::OneWayError> OnLocalWithError(const ::test_protocollayouts::MainProtocolOnLocalWithErrorResult& payload);
 
   ::fit::result<::fidl::OneWayError> OnAnon(const ::test_protocollayouts::MainProtocolOnAnonRequest& payload);
 
-  ::fit::result<::fidl::OneWayError> OnAnonWithError(const ::test_protocollayouts::MainProtocolOnAnonWithErrorRequest& payload);
+  ::fit::result<::fidl::OneWayError> OnAnonWithError(const ::test_protocollayouts::MainProtocolOnAnonWithErrorResult& payload);
 };
 
 template <>
@@ -685,23 +685,23 @@ class ::fidl::internal::NaturalEventSender<::test_protocollayouts::MainProtocol>
 
   ::fit::result<::fidl::OneWayError> OnAnonComposed(const ::test_protocollayouts_imported::ComposedProtocolOnAnonComposedRequest& payload);
 
-  ::fit::result<::fidl::OneWayError> OnAnonComposedWithError(const ::test_protocollayouts_imported::ComposedProtocolOnAnonComposedWithErrorRequest& payload);
+  ::fit::result<::fidl::OneWayError> OnAnonComposedWithError(const ::test_protocollayouts_imported::ComposedProtocolOnAnonComposedWithErrorResult& payload);
 
   ::fit::result<::fidl::OneWayError> OnNamedComposed(const ::test_protocollayouts_imported::ImportUnionPayload& payload);
 
-  ::fit::result<::fidl::OneWayError> OnNamedComposedWithError(const ::test_protocollayouts_imported::ComposedProtocolOnNamedComposedWithErrorRequest& payload);
+  ::fit::result<::fidl::OneWayError> OnNamedComposedWithError(const ::test_protocollayouts_imported::ComposedProtocolOnNamedComposedWithErrorResult& payload);
 
   ::fit::result<::fidl::OneWayError> OnImport(const ::test_protocollayouts_imported::ImportUnionPayload& payload);
 
-  ::fit::result<::fidl::OneWayError> OnImportWithError(const ::test_protocollayouts::MainProtocolOnImportWithErrorRequest& payload);
+  ::fit::result<::fidl::OneWayError> OnImportWithError(const ::test_protocollayouts::MainProtocolOnImportWithErrorResult& payload);
 
   ::fit::result<::fidl::OneWayError> OnLocal(const ::test_protocollayouts::LocalUnionPayload& payload);
 
-  ::fit::result<::fidl::OneWayError> OnLocalWithError(const ::test_protocollayouts::MainProtocolOnLocalWithErrorRequest& payload);
+  ::fit::result<::fidl::OneWayError> OnLocalWithError(const ::test_protocollayouts::MainProtocolOnLocalWithErrorResult& payload);
 
   ::fit::result<::fidl::OneWayError> OnAnon(const ::test_protocollayouts::MainProtocolOnAnonRequest& payload);
 
-  ::fit::result<::fidl::OneWayError> OnAnonWithError(const ::test_protocollayouts::MainProtocolOnAnonWithErrorRequest& payload);
+  ::fit::result<::fidl::OneWayError> OnAnonWithError(const ::test_protocollayouts::MainProtocolOnAnonWithErrorResult& payload);
 };
 
 #endif  // __Fuchsia__

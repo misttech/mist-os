@@ -40,36 +40,6 @@ struct WireTypeForNaturalType<::test_protocolpayloads::LocalStructPayload> {
 };
 
 template <>
-struct WireNaturalConversionTraits<::test_protocolpayloads::wire::MainProtocolTwoWayLocalWithErrorTopResponse, ::test_protocolpayloads::MainProtocolTwoWayLocalWithErrorTopResponse> {
-  static ::test_protocolpayloads::MainProtocolTwoWayLocalWithErrorTopResponse ToNatural(::test_protocolpayloads::wire::MainProtocolTwoWayLocalWithErrorTopResponse src);
-  static ::test_protocolpayloads::wire::MainProtocolTwoWayLocalWithErrorTopResponse ToWire(fidl::AnyArena& arena, ::test_protocolpayloads::MainProtocolTwoWayLocalWithErrorTopResponse src);
-};
-
-template <>
-struct NaturalTypeForWireType<::test_protocolpayloads::wire::MainProtocolTwoWayLocalWithErrorTopResponse> {
-  using type = ::test_protocolpayloads::MainProtocolTwoWayLocalWithErrorTopResponse;
-};
-template <>
-struct WireTypeForNaturalType<::test_protocolpayloads::MainProtocolTwoWayLocalWithErrorTopResponse> {
-  using type = ::test_protocolpayloads::wire::MainProtocolTwoWayLocalWithErrorTopResponse;
-};
-
-template <>
-struct WireNaturalConversionTraits<::test_protocolpayloads::wire::MainProtocolOnLocalWithErrorRequest, ::test_protocolpayloads::MainProtocolOnLocalWithErrorRequest> {
-  static ::test_protocolpayloads::MainProtocolOnLocalWithErrorRequest ToNatural(::test_protocolpayloads::wire::MainProtocolOnLocalWithErrorRequest src);
-  static ::test_protocolpayloads::wire::MainProtocolOnLocalWithErrorRequest ToWire(fidl::AnyArena& arena, ::test_protocolpayloads::MainProtocolOnLocalWithErrorRequest src);
-};
-
-template <>
-struct NaturalTypeForWireType<::test_protocolpayloads::wire::MainProtocolOnLocalWithErrorRequest> {
-  using type = ::test_protocolpayloads::MainProtocolOnLocalWithErrorRequest;
-};
-template <>
-struct WireTypeForNaturalType<::test_protocolpayloads::MainProtocolOnLocalWithErrorRequest> {
-  using type = ::test_protocolpayloads::wire::MainProtocolOnLocalWithErrorRequest;
-};
-
-template <>
 struct WireNaturalConversionTraits<::test_protocolpayloads::wire::MainProtocolOneWayAnonRequest, ::test_protocolpayloads::MainProtocolOneWayAnonRequest> {
   static ::test_protocolpayloads::MainProtocolOneWayAnonRequest ToNatural(::test_protocolpayloads::wire::MainProtocolOneWayAnonRequest src);
   static ::test_protocolpayloads::wire::MainProtocolOneWayAnonRequest ToWire(fidl::AnyArena& arena, ::test_protocolpayloads::MainProtocolOneWayAnonRequest src);
@@ -145,21 +115,6 @@ struct WireTypeForNaturalType<::test_protocolpayloads::MainProtocolTwoWayAnonWit
 };
 
 template <>
-struct WireNaturalConversionTraits<::test_protocolpayloads::wire::MainProtocolTwoWayAnonWithErrorTopResponse, ::test_protocolpayloads::MainProtocolTwoWayAnonWithErrorTopResponse> {
-  static ::test_protocolpayloads::MainProtocolTwoWayAnonWithErrorTopResponse ToNatural(::test_protocolpayloads::wire::MainProtocolTwoWayAnonWithErrorTopResponse src);
-  static ::test_protocolpayloads::wire::MainProtocolTwoWayAnonWithErrorTopResponse ToWire(fidl::AnyArena& arena, ::test_protocolpayloads::MainProtocolTwoWayAnonWithErrorTopResponse src);
-};
-
-template <>
-struct NaturalTypeForWireType<::test_protocolpayloads::wire::MainProtocolTwoWayAnonWithErrorTopResponse> {
-  using type = ::test_protocolpayloads::MainProtocolTwoWayAnonWithErrorTopResponse;
-};
-template <>
-struct WireTypeForNaturalType<::test_protocolpayloads::MainProtocolTwoWayAnonWithErrorTopResponse> {
-  using type = ::test_protocolpayloads::wire::MainProtocolTwoWayAnonWithErrorTopResponse;
-};
-
-template <>
 struct WireNaturalConversionTraits<::test_protocolpayloads::wire::MainProtocolOnAnonRequest, ::test_protocolpayloads::MainProtocolOnAnonRequest> {
   static ::test_protocolpayloads::MainProtocolOnAnonRequest ToNatural(::test_protocolpayloads::wire::MainProtocolOnAnonRequest src);
   static ::test_protocolpayloads::wire::MainProtocolOnAnonRequest ToWire(fidl::AnyArena& arena, ::test_protocolpayloads::MainProtocolOnAnonRequest src);
@@ -187,51 +142,6 @@ struct NaturalTypeForWireType<::test_protocolpayloads::wire::MainProtocolOnAnonW
 template <>
 struct WireTypeForNaturalType<::test_protocolpayloads::MainProtocolOnAnonWithErrorResponse> {
   using type = ::test_protocolpayloads::wire::MainProtocolOnAnonWithErrorResponse;
-};
-
-template <>
-struct WireNaturalConversionTraits<::test_protocolpayloads::wire::MainProtocolOnAnonWithErrorRequest, ::test_protocolpayloads::MainProtocolOnAnonWithErrorRequest> {
-  static ::test_protocolpayloads::MainProtocolOnAnonWithErrorRequest ToNatural(::test_protocolpayloads::wire::MainProtocolOnAnonWithErrorRequest src);
-  static ::test_protocolpayloads::wire::MainProtocolOnAnonWithErrorRequest ToWire(fidl::AnyArena& arena, ::test_protocolpayloads::MainProtocolOnAnonWithErrorRequest src);
-};
-
-template <>
-struct NaturalTypeForWireType<::test_protocolpayloads::wire::MainProtocolOnAnonWithErrorRequest> {
-  using type = ::test_protocolpayloads::MainProtocolOnAnonWithErrorRequest;
-};
-template <>
-struct WireTypeForNaturalType<::test_protocolpayloads::MainProtocolOnAnonWithErrorRequest> {
-  using type = ::test_protocolpayloads::wire::MainProtocolOnAnonWithErrorRequest;
-};
-
-template <>
-struct WireNaturalConversionTraits<::test_protocolpayloads::wire::MainProtocolTwoWayImportWithErrorTopResponse, ::test_protocolpayloads::MainProtocolTwoWayImportWithErrorTopResponse> {
-  static ::test_protocolpayloads::MainProtocolTwoWayImportWithErrorTopResponse ToNatural(::test_protocolpayloads::wire::MainProtocolTwoWayImportWithErrorTopResponse src);
-  static ::test_protocolpayloads::wire::MainProtocolTwoWayImportWithErrorTopResponse ToWire(fidl::AnyArena& arena, ::test_protocolpayloads::MainProtocolTwoWayImportWithErrorTopResponse src);
-};
-
-template <>
-struct NaturalTypeForWireType<::test_protocolpayloads::wire::MainProtocolTwoWayImportWithErrorTopResponse> {
-  using type = ::test_protocolpayloads::MainProtocolTwoWayImportWithErrorTopResponse;
-};
-template <>
-struct WireTypeForNaturalType<::test_protocolpayloads::MainProtocolTwoWayImportWithErrorTopResponse> {
-  using type = ::test_protocolpayloads::wire::MainProtocolTwoWayImportWithErrorTopResponse;
-};
-
-template <>
-struct WireNaturalConversionTraits<::test_protocolpayloads::wire::MainProtocolOnImportWithErrorRequest, ::test_protocolpayloads::MainProtocolOnImportWithErrorRequest> {
-  static ::test_protocolpayloads::MainProtocolOnImportWithErrorRequest ToNatural(::test_protocolpayloads::wire::MainProtocolOnImportWithErrorRequest src);
-  static ::test_protocolpayloads::wire::MainProtocolOnImportWithErrorRequest ToWire(fidl::AnyArena& arena, ::test_protocolpayloads::MainProtocolOnImportWithErrorRequest src);
-};
-
-template <>
-struct NaturalTypeForWireType<::test_protocolpayloads::wire::MainProtocolOnImportWithErrorRequest> {
-  using type = ::test_protocolpayloads::MainProtocolOnImportWithErrorRequest;
-};
-template <>
-struct WireTypeForNaturalType<::test_protocolpayloads::MainProtocolOnImportWithErrorRequest> {
-  using type = ::test_protocolpayloads::wire::MainProtocolOnImportWithErrorRequest;
 };
 
 template <>

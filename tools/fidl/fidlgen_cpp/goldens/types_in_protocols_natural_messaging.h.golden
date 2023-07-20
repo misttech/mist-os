@@ -45,7 +45,7 @@ struct ::fidl::internal::NaturalMethodTypes<::test_typesinprotocols::Protocol::T
 
 template <>
 struct ::fidl::internal::NaturalMethodTypes<::test_typesinprotocols::Protocol::ErrorBasic> {
-  using Response = ::test_typesinprotocols::ProtocolErrorBasicTopResponse;
+  using Response = ::test_typesinprotocols::ProtocolErrorBasicResult;
 
   using Completer = fidl::Completer<::fidl::internal::NaturalCompleterBase<::test_typesinprotocols::Protocol::ErrorBasic>>;
   using ResultCallback =
@@ -77,7 +77,7 @@ struct ::fidl::internal::NaturalMethodTypes<::test_typesinprotocols::Protocol::T
 
 template <>
 struct ::fidl::internal::NaturalMethodTypes<::test_typesinprotocols::Protocol::ErrorCompound> {
-  using Response = ::test_typesinprotocols::ProtocolErrorCompoundTopResponse;
+  using Response = ::test_typesinprotocols::ProtocolErrorCompoundResult;
 
   using Completer = fidl::Completer<::fidl::internal::NaturalCompleterBase<::test_typesinprotocols::Protocol::ErrorCompound>>;
   using ResultCallback =
@@ -109,7 +109,7 @@ struct ::fidl::internal::NaturalMethodTypes<::test_typesinprotocols::Protocol::T
 
 template <>
 struct ::fidl::internal::NaturalMethodTypes<::test_typesinprotocols::Protocol::ErrorArrayBasic> {
-  using Response = ::test_typesinprotocols::ProtocolErrorArrayBasicTopResponse;
+  using Response = ::test_typesinprotocols::ProtocolErrorArrayBasicResult;
 
   using Completer = fidl::Completer<::fidl::internal::NaturalCompleterBase<::test_typesinprotocols::Protocol::ErrorArrayBasic>>;
   using ResultCallback =
@@ -141,7 +141,7 @@ struct ::fidl::internal::NaturalMethodTypes<::test_typesinprotocols::Protocol::T
 
 template <>
 struct ::fidl::internal::NaturalMethodTypes<::test_typesinprotocols::Protocol::ErrorArrayCompound> {
-  using Response = ::test_typesinprotocols::ProtocolErrorArrayCompoundTopResponse;
+  using Response = ::test_typesinprotocols::ProtocolErrorArrayCompoundResult;
 
   using Completer = fidl::Completer<::fidl::internal::NaturalCompleterBase<::test_typesinprotocols::Protocol::ErrorArrayCompound>>;
   using ResultCallback =
@@ -173,7 +173,7 @@ struct ::fidl::internal::NaturalMethodTypes<::test_typesinprotocols::Protocol::T
 
 template <>
 struct ::fidl::internal::NaturalMethodTypes<::test_typesinprotocols::Protocol::ErrorVectorBasic> {
-  using Response = ::test_typesinprotocols::ProtocolErrorVectorBasicTopResponse;
+  using Response = ::test_typesinprotocols::ProtocolErrorVectorBasicResult;
 
   using Completer = fidl::Completer<::fidl::internal::NaturalCompleterBase<::test_typesinprotocols::Protocol::ErrorVectorBasic>>;
   using ResultCallback =
@@ -205,7 +205,7 @@ struct ::fidl::internal::NaturalMethodTypes<::test_typesinprotocols::Protocol::T
 
 template <>
 struct ::fidl::internal::NaturalMethodTypes<::test_typesinprotocols::Protocol::ErrorVectorCompound> {
-  using Response = ::test_typesinprotocols::ProtocolErrorVectorCompoundTopResponse;
+  using Response = ::test_typesinprotocols::ProtocolErrorVectorCompoundResult;
 
   using Completer = fidl::Completer<::fidl::internal::NaturalCompleterBase<::test_typesinprotocols::Protocol::ErrorVectorCompound>>;
   using ResultCallback =
@@ -237,7 +237,7 @@ struct ::fidl::internal::NaturalMethodTypes<::test_typesinprotocols::Protocol::T
 
 template <>
 struct ::fidl::internal::NaturalMethodTypes<::test_typesinprotocols::Protocol::ErrorVectorOptional> {
-  using Response = ::test_typesinprotocols::ProtocolErrorVectorOptionalTopResponse;
+  using Response = ::test_typesinprotocols::ProtocolErrorVectorOptionalResult;
 
   using Completer = fidl::Completer<::fidl::internal::NaturalCompleterBase<::test_typesinprotocols::Protocol::ErrorVectorOptional>>;
   using ResultCallback =
@@ -269,7 +269,7 @@ struct ::fidl::internal::NaturalMethodTypes<::test_typesinprotocols::Protocol::T
 
 template <>
 struct ::fidl::internal::NaturalMethodTypes<::test_typesinprotocols::Protocol::ErrorArrayVectorNested> {
-  using Response = ::test_typesinprotocols::ProtocolErrorArrayVectorNestedTopResponse;
+  using Response = ::test_typesinprotocols::ProtocolErrorArrayVectorNestedResult;
 
   using Completer = fidl::Completer<::fidl::internal::NaturalCompleterBase<::test_typesinprotocols::Protocol::ErrorArrayVectorNested>>;
   using ResultCallback =
@@ -301,7 +301,7 @@ struct ::fidl::internal::NaturalMethodTypes<::test_typesinprotocols::Protocol::T
 
 template <>
 struct ::fidl::internal::NaturalMethodTypes<::test_typesinprotocols::Protocol::ErrorResource> {
-  using Response = ::test_typesinprotocols::ProtocolErrorResourceTopResponse;
+  using Response = ::test_typesinprotocols::ProtocolErrorResourceResult;
 
   using Completer = fidl::Completer<::fidl::internal::NaturalCompleterBase<::test_typesinprotocols::Protocol::ErrorResource>>;
   using ResultCallback =
@@ -315,39 +315,39 @@ struct ::fidl::internal::NaturalMethodTypes<::test_typesinprotocols::Protocol::E
 namespace test_typesinprotocols {
 __LOCAL extern "C" const fidl_type_t test_typesinprotocols_BasicTable;
 
-__LOCAL extern "C" const fidl_type_t test_typesinprotocols_ProtocolErrorBasicTopResponseTable;
+__LOCAL extern "C" const fidl_type_t test_typesinprotocols_Protocol_ErrorBasic_ResultTable;
 
 __LOCAL extern "C" const fidl_type_t test_typesinprotocols_CompoundTable;
 
-__LOCAL extern "C" const fidl_type_t test_typesinprotocols_ProtocolErrorCompoundTopResponseTable;
+__LOCAL extern "C" const fidl_type_t test_typesinprotocols_Protocol_ErrorCompound_ResultTable;
 
 __LOCAL extern "C" const fidl_type_t test_typesinprotocols_ArrayBasicTable;
 
-__LOCAL extern "C" const fidl_type_t test_typesinprotocols_ProtocolErrorArrayBasicTopResponseTable;
+__LOCAL extern "C" const fidl_type_t test_typesinprotocols_Protocol_ErrorArrayBasic_ResultTable;
 
 __LOCAL extern "C" const fidl_type_t test_typesinprotocols_ArrayCompoundTable;
 
-__LOCAL extern "C" const fidl_type_t test_typesinprotocols_ProtocolErrorArrayCompoundTopResponseTable;
+__LOCAL extern "C" const fidl_type_t test_typesinprotocols_Protocol_ErrorArrayCompound_ResultTable;
 
 __LOCAL extern "C" const fidl_type_t test_typesinprotocols_VectorBasicTable;
 
-__LOCAL extern "C" const fidl_type_t test_typesinprotocols_ProtocolErrorVectorBasicTopResponseTable;
+__LOCAL extern "C" const fidl_type_t test_typesinprotocols_Protocol_ErrorVectorBasic_ResultTable;
 
 __LOCAL extern "C" const fidl_type_t test_typesinprotocols_VectorCompoundTable;
 
-__LOCAL extern "C" const fidl_type_t test_typesinprotocols_ProtocolErrorVectorCompoundTopResponseTable;
+__LOCAL extern "C" const fidl_type_t test_typesinprotocols_Protocol_ErrorVectorCompound_ResultTable;
 
 __LOCAL extern "C" const fidl_type_t test_typesinprotocols_VectorOptionalTable;
 
-__LOCAL extern "C" const fidl_type_t test_typesinprotocols_ProtocolErrorVectorOptionalTopResponseTable;
+__LOCAL extern "C" const fidl_type_t test_typesinprotocols_Protocol_ErrorVectorOptional_ResultTable;
 
 __LOCAL extern "C" const fidl_type_t test_typesinprotocols_ArrayVectorNestedTable;
 
-__LOCAL extern "C" const fidl_type_t test_typesinprotocols_ProtocolErrorArrayVectorNestedTopResponseTable;
+__LOCAL extern "C" const fidl_type_t test_typesinprotocols_Protocol_ErrorArrayVectorNested_ResultTable;
 
 __LOCAL extern "C" const fidl_type_t test_typesinprotocols_ResourceTable;
 
-__LOCAL extern "C" const fidl_type_t test_typesinprotocols_ProtocolErrorResourceTopResponseTable;
+__LOCAL extern "C" const fidl_type_t test_typesinprotocols_Protocol_ErrorResource_ResultTable;
 
 #ifdef __Fuchsia__
 }  // namespace test_typesinprotocols
@@ -379,14 +379,14 @@ class ::fidl::Response<::test_typesinprotocols::Protocol::ErrorBasic> final : pu
 };
 template <>
 class ::fidl::internal::ResponseMessageConverter<::test_typesinprotocols::Protocol::ErrorBasic> {
-  using DomainObject = ::test_typesinprotocols::ProtocolErrorBasicTopResponse;
+  using DomainObject = ::test_typesinprotocols::ProtocolErrorBasicResult;
 
  public:
   static DomainObject IntoDomainObject(const ::fidl::Response<::test_typesinprotocols::Protocol::ErrorBasic>& m) {
     if (m.is_error()) {
-      return DomainObject{{.result = ::test_typesinprotocols::ProtocolErrorBasicResult::WithErr(m.error_value())}};
+      return DomainObject::WithErr(m.error_value());
     } else {
-      return DomainObject{{.result = ::test_typesinprotocols::ProtocolErrorBasicResult::WithResponse(std::move(m.value()))}};
+      return DomainObject::WithResponse(std::move(m.value()));
     }
   }
 };
@@ -425,14 +425,14 @@ class ::fidl::Response<::test_typesinprotocols::Protocol::ErrorCompound> final :
 };
 template <>
 class ::fidl::internal::ResponseMessageConverter<::test_typesinprotocols::Protocol::ErrorCompound> {
-  using DomainObject = ::test_typesinprotocols::ProtocolErrorCompoundTopResponse;
+  using DomainObject = ::test_typesinprotocols::ProtocolErrorCompoundResult;
 
  public:
   static DomainObject IntoDomainObject(const ::fidl::Response<::test_typesinprotocols::Protocol::ErrorCompound>& m) {
     if (m.is_error()) {
-      return DomainObject{{.result = ::test_typesinprotocols::ProtocolErrorCompoundResult::WithErr(m.error_value())}};
+      return DomainObject::WithErr(m.error_value());
     } else {
-      return DomainObject{{.result = ::test_typesinprotocols::ProtocolErrorCompoundResult::WithResponse(std::move(m.value()))}};
+      return DomainObject::WithResponse(std::move(m.value()));
     }
   }
 };
@@ -471,14 +471,14 @@ class ::fidl::Response<::test_typesinprotocols::Protocol::ErrorArrayBasic> final
 };
 template <>
 class ::fidl::internal::ResponseMessageConverter<::test_typesinprotocols::Protocol::ErrorArrayBasic> {
-  using DomainObject = ::test_typesinprotocols::ProtocolErrorArrayBasicTopResponse;
+  using DomainObject = ::test_typesinprotocols::ProtocolErrorArrayBasicResult;
 
  public:
   static DomainObject IntoDomainObject(const ::fidl::Response<::test_typesinprotocols::Protocol::ErrorArrayBasic>& m) {
     if (m.is_error()) {
-      return DomainObject{{.result = ::test_typesinprotocols::ProtocolErrorArrayBasicResult::WithErr(m.error_value())}};
+      return DomainObject::WithErr(m.error_value());
     } else {
-      return DomainObject{{.result = ::test_typesinprotocols::ProtocolErrorArrayBasicResult::WithResponse(std::move(m.value()))}};
+      return DomainObject::WithResponse(std::move(m.value()));
     }
   }
 };
@@ -517,14 +517,14 @@ class ::fidl::Response<::test_typesinprotocols::Protocol::ErrorArrayCompound> fi
 };
 template <>
 class ::fidl::internal::ResponseMessageConverter<::test_typesinprotocols::Protocol::ErrorArrayCompound> {
-  using DomainObject = ::test_typesinprotocols::ProtocolErrorArrayCompoundTopResponse;
+  using DomainObject = ::test_typesinprotocols::ProtocolErrorArrayCompoundResult;
 
  public:
   static DomainObject IntoDomainObject(const ::fidl::Response<::test_typesinprotocols::Protocol::ErrorArrayCompound>& m) {
     if (m.is_error()) {
-      return DomainObject{{.result = ::test_typesinprotocols::ProtocolErrorArrayCompoundResult::WithErr(m.error_value())}};
+      return DomainObject::WithErr(m.error_value());
     } else {
-      return DomainObject{{.result = ::test_typesinprotocols::ProtocolErrorArrayCompoundResult::WithResponse(std::move(m.value()))}};
+      return DomainObject::WithResponse(std::move(m.value()));
     }
   }
 };
@@ -563,14 +563,14 @@ class ::fidl::Response<::test_typesinprotocols::Protocol::ErrorVectorBasic> fina
 };
 template <>
 class ::fidl::internal::ResponseMessageConverter<::test_typesinprotocols::Protocol::ErrorVectorBasic> {
-  using DomainObject = ::test_typesinprotocols::ProtocolErrorVectorBasicTopResponse;
+  using DomainObject = ::test_typesinprotocols::ProtocolErrorVectorBasicResult;
 
  public:
   static DomainObject IntoDomainObject(const ::fidl::Response<::test_typesinprotocols::Protocol::ErrorVectorBasic>& m) {
     if (m.is_error()) {
-      return DomainObject{{.result = ::test_typesinprotocols::ProtocolErrorVectorBasicResult::WithErr(m.error_value())}};
+      return DomainObject::WithErr(m.error_value());
     } else {
-      return DomainObject{{.result = ::test_typesinprotocols::ProtocolErrorVectorBasicResult::WithResponse(std::move(m.value()))}};
+      return DomainObject::WithResponse(std::move(m.value()));
     }
   }
 };
@@ -609,14 +609,14 @@ class ::fidl::Response<::test_typesinprotocols::Protocol::ErrorVectorCompound> f
 };
 template <>
 class ::fidl::internal::ResponseMessageConverter<::test_typesinprotocols::Protocol::ErrorVectorCompound> {
-  using DomainObject = ::test_typesinprotocols::ProtocolErrorVectorCompoundTopResponse;
+  using DomainObject = ::test_typesinprotocols::ProtocolErrorVectorCompoundResult;
 
  public:
   static DomainObject IntoDomainObject(const ::fidl::Response<::test_typesinprotocols::Protocol::ErrorVectorCompound>& m) {
     if (m.is_error()) {
-      return DomainObject{{.result = ::test_typesinprotocols::ProtocolErrorVectorCompoundResult::WithErr(m.error_value())}};
+      return DomainObject::WithErr(m.error_value());
     } else {
-      return DomainObject{{.result = ::test_typesinprotocols::ProtocolErrorVectorCompoundResult::WithResponse(std::move(m.value()))}};
+      return DomainObject::WithResponse(std::move(m.value()));
     }
   }
 };
@@ -655,14 +655,14 @@ class ::fidl::Response<::test_typesinprotocols::Protocol::ErrorVectorOptional> f
 };
 template <>
 class ::fidl::internal::ResponseMessageConverter<::test_typesinprotocols::Protocol::ErrorVectorOptional> {
-  using DomainObject = ::test_typesinprotocols::ProtocolErrorVectorOptionalTopResponse;
+  using DomainObject = ::test_typesinprotocols::ProtocolErrorVectorOptionalResult;
 
  public:
   static DomainObject IntoDomainObject(const ::fidl::Response<::test_typesinprotocols::Protocol::ErrorVectorOptional>& m) {
     if (m.is_error()) {
-      return DomainObject{{.result = ::test_typesinprotocols::ProtocolErrorVectorOptionalResult::WithErr(m.error_value())}};
+      return DomainObject::WithErr(m.error_value());
     } else {
-      return DomainObject{{.result = ::test_typesinprotocols::ProtocolErrorVectorOptionalResult::WithResponse(std::move(m.value()))}};
+      return DomainObject::WithResponse(std::move(m.value()));
     }
   }
 };
@@ -701,14 +701,14 @@ class ::fidl::Response<::test_typesinprotocols::Protocol::ErrorArrayVectorNested
 };
 template <>
 class ::fidl::internal::ResponseMessageConverter<::test_typesinprotocols::Protocol::ErrorArrayVectorNested> {
-  using DomainObject = ::test_typesinprotocols::ProtocolErrorArrayVectorNestedTopResponse;
+  using DomainObject = ::test_typesinprotocols::ProtocolErrorArrayVectorNestedResult;
 
  public:
   static DomainObject IntoDomainObject(const ::fidl::Response<::test_typesinprotocols::Protocol::ErrorArrayVectorNested>& m) {
     if (m.is_error()) {
-      return DomainObject{{.result = ::test_typesinprotocols::ProtocolErrorArrayVectorNestedResult::WithErr(m.error_value())}};
+      return DomainObject::WithErr(m.error_value());
     } else {
-      return DomainObject{{.result = ::test_typesinprotocols::ProtocolErrorArrayVectorNestedResult::WithResponse(std::move(m.value()))}};
+      return DomainObject::WithResponse(std::move(m.value()));
     }
   }
 };
@@ -747,14 +747,14 @@ class ::fidl::Response<::test_typesinprotocols::Protocol::ErrorResource> final :
 };
 template <>
 class ::fidl::internal::ResponseMessageConverter<::test_typesinprotocols::Protocol::ErrorResource> {
-  using DomainObject = ::test_typesinprotocols::ProtocolErrorResourceTopResponse;
+  using DomainObject = ::test_typesinprotocols::ProtocolErrorResourceResult;
 
  public:
   static DomainObject IntoDomainObject(::fidl::Response<::test_typesinprotocols::Protocol::ErrorResource> m) {
     if (m.is_error()) {
-      return DomainObject{{.result = ::test_typesinprotocols::ProtocolErrorResourceResult::WithErr(m.error_value())}};
+      return DomainObject::WithErr(m.error_value());
     } else {
-      return DomainObject{{.result = ::test_typesinprotocols::ProtocolErrorResourceResult::WithResponse(std::move(m.value()))}};
+      return DomainObject::WithResponse(std::move(m.value()));
     }
   }
 };

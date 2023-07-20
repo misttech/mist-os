@@ -108,10 +108,8 @@ protocol Foo {
   ASSERT_NOT_NULL(foo);
 
   auto id = static_cast<const fidl::flat::IdentifierType*>(foo->methods[0].maybe_response->type);
-  auto response_type = static_cast<const fidl::flat::Struct*>(id->type_decl);
-  auto result_type = response_type->members[0].type_ctor->type;
-  auto* result_union = library.LookupUnion(std::string(result_type->name.decl_name()));
-  auto* success_type = result_union->members[0].maybe_used->type_ctor->type;
+  auto result_union = static_cast<const fidl::flat::Union*>(id->type_decl);
+  auto success_type = result_union->members[0].maybe_used->type_ctor->type;
   EXPECT_EQ(success_type->name.decl_name(), "Good");
 }
 
@@ -129,10 +127,8 @@ protocol Foo {
   ASSERT_NOT_NULL(foo);
 
   auto id = static_cast<const fidl::flat::IdentifierType*>(foo->methods[0].maybe_response->type);
-  auto response_type = static_cast<const fidl::flat::Struct*>(id->type_decl);
-  auto result_type = response_type->members[0].type_ctor->type;
-  auto* result_union = library.LookupUnion(std::string(result_type->name.decl_name()));
-  auto* error_type = result_union->members[1].maybe_used->type_ctor->type;
+  auto result_union = static_cast<const fidl::flat::Union*>(id->type_decl);
+  auto error_type = result_union->members[1].maybe_used->type_ctor->type;
   EXPECT_EQ(error_type->name.decl_name(), "Good");
 }
 

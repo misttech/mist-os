@@ -15,7 +15,7 @@
 
 namespace fuzzing {
 
-inline constexpr ::std::array<::fidl::fuzzing::DecoderEncoderForType, 6>
+inline constexpr ::std::array<::fidl::fuzzing::DecoderEncoderForType, 4>
     test_errorsyntax_decoder_encoders = {
         ::fidl::fuzzing::DecoderEncoderForType{
             .fidl_type_name = "::test_errorsyntax::wire::ExampleUseOfErrorSyntaxCallWhichMayFailRequest",
@@ -40,18 +40,6 @@ inline constexpr ::std::array<::fidl::fuzzing::DecoderEncoderForType, 6>
             .has_flexible_envelope = false,
             .treat_bytes_as_transactional_message = true,
             .decoder_encoder = ::fidl::fuzzing::DecoderEncoderImpl<::test_errorsyntax::wire::ExampleUseOfErrorSyntaxCallWhichMayFailResponse, true>,
-        },
-        ::fidl::fuzzing::DecoderEncoderForType{
-            .fidl_type_name = "::test_errorsyntax::wire::ExampleUseOfErrorSyntaxCallWhichMayFailTopResponse",
-            .has_flexible_envelope = false,
-            .treat_bytes_as_transactional_message = false,
-            .decoder_encoder = ::fidl::fuzzing::DecoderEncoderImpl<::test_errorsyntax::wire::ExampleUseOfErrorSyntaxCallWhichMayFailTopResponse, false>,
-        },
-        ::fidl::fuzzing::DecoderEncoderForType{
-            .fidl_type_name = "A transactional message using ::test_errorsyntax::wire::ExampleUseOfErrorSyntaxCallWhichMayFailTopResponse as the body",
-            .has_flexible_envelope = false,
-            .treat_bytes_as_transactional_message = true,
-            .decoder_encoder = ::fidl::fuzzing::DecoderEncoderImpl<::test_errorsyntax::wire::ExampleUseOfErrorSyntaxCallWhichMayFailTopResponse, true>,
         },
 };
 

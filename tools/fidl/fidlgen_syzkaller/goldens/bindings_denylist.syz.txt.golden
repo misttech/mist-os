@@ -143,11 +143,9 @@ test_bindingsdenylist_DenyEachBindingOnlyDenyCppRequestHandles {
 } [packed]
 test_bindingsdenylist_DenyEachBindingOnlyDenyCppResponse {
     hdr fidl_message_header[2957648440141224850]
-    resultInLine test_bindingsdenylist_DenyEachBinding_OnlyDenyCpp_ResultInLine
-    resultOutOfLine test_bindingsdenylist_DenyEachBinding_OnlyDenyCpp_ResultOutOfLine
 } [packed]
 test_bindingsdenylist_DenyEachBindingOnlyDenyCppResponseHandles {
-    result test_bindingsdenylist_DenyEachBinding_OnlyDenyCpp_ResultHandles
+    void void
 } [packed]
 test_bindingsdenylist_DenyEachBindingOnlyDenyDartRequest {
     hdr fidl_message_header[8446571910689294295]
@@ -158,11 +156,9 @@ test_bindingsdenylist_DenyEachBindingOnlyDenyDartRequestHandles {
 } [packed]
 test_bindingsdenylist_DenyEachBindingOnlyDenyDartResponse {
     hdr fidl_message_header[8446571910689294295]
-    resultInLine test_bindingsdenylist_DenyEachBinding_OnlyDenyDart_ResultInLine
-    resultOutOfLine test_bindingsdenylist_DenyEachBinding_OnlyDenyDart_ResultOutOfLine
 } [packed]
 test_bindingsdenylist_DenyEachBindingOnlyDenyDartResponseHandles {
-    result test_bindingsdenylist_DenyEachBinding_OnlyDenyDart_ResultHandles
+    void void
 } [packed]
 test_bindingsdenylist_DenyEachBindingOnlyDenyGoRequest {
     hdr fidl_message_header[7311125300308839833]
@@ -173,11 +169,9 @@ test_bindingsdenylist_DenyEachBindingOnlyDenyGoRequestHandles {
 } [packed]
 test_bindingsdenylist_DenyEachBindingOnlyDenyGoResponse {
     hdr fidl_message_header[7311125300308839833]
-    resultInLine test_bindingsdenylist_DenyEachBinding_OnlyDenyGo_ResultInLine
-    resultOutOfLine test_bindingsdenylist_DenyEachBinding_OnlyDenyGo_ResultOutOfLine
 } [packed]
 test_bindingsdenylist_DenyEachBindingOnlyDenyGoResponseHandles {
-    result test_bindingsdenylist_DenyEachBinding_OnlyDenyGo_ResultHandles
+    void void
 } [packed]
 test_bindingsdenylist_DenyEachBindingOnlyDenyLibfuzzerRequest {
     hdr fidl_message_header[2184115815603862302]
@@ -188,11 +182,9 @@ test_bindingsdenylist_DenyEachBindingOnlyDenyLibfuzzerRequestHandles {
 } [packed]
 test_bindingsdenylist_DenyEachBindingOnlyDenyLibfuzzerResponse {
     hdr fidl_message_header[2184115815603862302]
-    resultInLine test_bindingsdenylist_DenyEachBinding_OnlyDenyLibfuzzer_ResultInLine
-    resultOutOfLine test_bindingsdenylist_DenyEachBinding_OnlyDenyLibfuzzer_ResultOutOfLine
 } [packed]
 test_bindingsdenylist_DenyEachBindingOnlyDenyLibfuzzerResponseHandles {
-    result test_bindingsdenylist_DenyEachBinding_OnlyDenyLibfuzzer_ResultHandles
+    void void
 } [packed]
 test_bindingsdenylist_DenyEachBindingOnlyDenyRustRequest {
     hdr fidl_message_header[3719805222870932662]
@@ -203,11 +195,9 @@ test_bindingsdenylist_DenyEachBindingOnlyDenyRustRequestHandles {
 } [packed]
 test_bindingsdenylist_DenyEachBindingOnlyDenyRustResponse {
     hdr fidl_message_header[3719805222870932662]
-    resultInLine test_bindingsdenylist_DenyEachBinding_OnlyDenyRust_ResultInLine
-    resultOutOfLine test_bindingsdenylist_DenyEachBinding_OnlyDenyRust_ResultOutOfLine
 } [packed]
 test_bindingsdenylist_DenyEachBindingOnlyDenyRustResponseHandles {
-    result test_bindingsdenylist_DenyEachBinding_OnlyDenyRust_ResultHandles
+    void void
 } [packed]
 
 resource zx_chan_test_bindingsdenylist_DenyEachBinding_client[zx_chan]

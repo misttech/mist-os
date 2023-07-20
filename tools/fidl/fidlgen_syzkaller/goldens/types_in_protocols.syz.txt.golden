@@ -430,11 +430,9 @@ test_typesinprotocols_ProtocolErrorBasicRequestHandles {
 } [packed]
 test_typesinprotocols_ProtocolErrorBasicResponse {
     hdr fidl_message_header[5016634351643393939]
-    resultInLine test_typesinprotocols_Protocol_ErrorBasic_ResultInLine
-    resultOutOfLine test_typesinprotocols_Protocol_ErrorBasic_ResultOutOfLine
 } [packed]
 test_typesinprotocols_ProtocolErrorBasicResponseHandles {
-    result test_typesinprotocols_Protocol_ErrorBasic_ResultHandles
+    void void
 } [packed]
 test_typesinprotocols_ProtocolEventBasicEvent {
     hdr fidl_message_header[5892309624949902400]
@@ -512,11 +510,9 @@ test_typesinprotocols_ProtocolErrorCompoundRequestHandles {
 } [packed]
 test_typesinprotocols_ProtocolErrorCompoundResponse {
     hdr fidl_message_header[2990809657626249085]
-    resultInLine test_typesinprotocols_Protocol_ErrorCompound_ResultInLine
-    resultOutOfLine test_typesinprotocols_Protocol_ErrorCompound_ResultOutOfLine
 } [packed]
 test_typesinprotocols_ProtocolErrorCompoundResponseHandles {
-    result test_typesinprotocols_Protocol_ErrorCompound_ResultHandles
+    void void
 } [packed]
 test_typesinprotocols_ProtocolEventCompoundEvent {
     hdr fidl_message_header[7024581948727571669]
@@ -602,11 +598,9 @@ test_typesinprotocols_ProtocolErrorArrayBasicRequestHandles {
 } [packed]
 test_typesinprotocols_ProtocolErrorArrayBasicResponse {
     hdr fidl_message_header[1084731895342694265]
-    resultInLine test_typesinprotocols_Protocol_ErrorArrayBasic_ResultInLine
-    resultOutOfLine test_typesinprotocols_Protocol_ErrorArrayBasic_ResultOutOfLine
 } [packed]
 test_typesinprotocols_ProtocolErrorArrayBasicResponseHandles {
-    result test_typesinprotocols_Protocol_ErrorArrayBasic_ResultHandles
+    void void
 } [packed]
 test_typesinprotocols_ProtocolEventArrayBasicEvent {
     hdr fidl_message_header[5888282827283820590]
@@ -684,11 +678,9 @@ test_typesinprotocols_ProtocolErrorArrayCompoundRequestHandles {
 } [packed]
 test_typesinprotocols_ProtocolErrorArrayCompoundResponse {
     hdr fidl_message_header[5919277476782807556]
-    resultInLine test_typesinprotocols_Protocol_ErrorArrayCompound_ResultInLine
-    resultOutOfLine test_typesinprotocols_Protocol_ErrorArrayCompound_ResultOutOfLine
 } [packed]
 test_typesinprotocols_ProtocolErrorArrayCompoundResponseHandles {
-    result test_typesinprotocols_Protocol_ErrorArrayCompound_ResultHandles
+    void void
 } [packed]
 test_typesinprotocols_ProtocolEventArrayCompoundEvent {
     hdr fidl_message_header[2189769767733851157]
@@ -804,11 +796,9 @@ test_typesinprotocols_ProtocolErrorVectorBasicRequestHandles {
 } [packed]
 test_typesinprotocols_ProtocolErrorVectorBasicResponse {
     hdr fidl_message_header[875941614196965234]
-    resultInLine test_typesinprotocols_Protocol_ErrorVectorBasic_ResultInLine
-    resultOutOfLine test_typesinprotocols_Protocol_ErrorVectorBasic_ResultOutOfLine
 } [packed]
 test_typesinprotocols_ProtocolErrorVectorBasicResponseHandles {
-    result test_typesinprotocols_Protocol_ErrorVectorBasic_ResultHandles
+    void void
 } [packed]
 test_typesinprotocols_ProtocolEventVectorBasicEvent {
     hdr fidl_message_header[4583890770109526006]
@@ -911,11 +901,9 @@ test_typesinprotocols_ProtocolErrorVectorCompoundRequestHandles {
 } [packed]
 test_typesinprotocols_ProtocolErrorVectorCompoundResponse {
     hdr fidl_message_header[8506780203315865989]
-    resultInLine test_typesinprotocols_Protocol_ErrorVectorCompound_ResultInLine
-    resultOutOfLine test_typesinprotocols_Protocol_ErrorVectorCompound_ResultOutOfLine
 } [packed]
 test_typesinprotocols_ProtocolErrorVectorCompoundResponseHandles {
-    result test_typesinprotocols_Protocol_ErrorVectorCompound_ResultHandles
+    void void
 } [packed]
 test_typesinprotocols_ProtocolEventVectorCompoundEvent {
     hdr fidl_message_header[6026375226599919603]
@@ -991,11 +979,9 @@ test_typesinprotocols_ProtocolErrorVectorOptionalRequestHandles {
 } [packed]
 test_typesinprotocols_ProtocolErrorVectorOptionalResponse {
     hdr fidl_message_header[6406191217027936606]
-    resultInLine test_typesinprotocols_Protocol_ErrorVectorOptional_ResultInLine
-    resultOutOfLine test_typesinprotocols_Protocol_ErrorVectorOptional_ResultOutOfLine
 } [packed]
 test_typesinprotocols_ProtocolErrorVectorOptionalResponseHandles {
-    result test_typesinprotocols_Protocol_ErrorVectorOptional_ResultHandles
+    void void
 } [packed]
 test_typesinprotocols_ProtocolEventVectorOptionalEvent {
     hdr fidl_message_header[1684763340073130077]
@@ -1059,11 +1045,9 @@ test_typesinprotocols_ProtocolErrorArrayVectorNestedRequestHandles {
 } [packed]
 test_typesinprotocols_ProtocolErrorArrayVectorNestedResponse {
     hdr fidl_message_header[9085604921605802151]
-    resultInLine test_typesinprotocols_Protocol_ErrorArrayVectorNested_ResultInLine
-    resultOutOfLine test_typesinprotocols_Protocol_ErrorArrayVectorNested_ResultOutOfLine
 } [packed]
 test_typesinprotocols_ProtocolErrorArrayVectorNestedResponseHandles {
-    result test_typesinprotocols_Protocol_ErrorArrayVectorNested_ResultHandles
+    void void
 } [packed]
 test_typesinprotocols_ProtocolEventArrayVectorNestedEvent {
     hdr fidl_message_header[1228201560727880574]
@@ -1272,11 +1256,9 @@ test_typesinprotocols_ProtocolErrorResourceRequestHandles {
 } [packed]
 test_typesinprotocols_ProtocolErrorResourceResponse {
     hdr fidl_message_header[6568609240497354166]
-    resultInLine test_typesinprotocols_Protocol_ErrorResource_ResultInLine
-    resultOutOfLine test_typesinprotocols_Protocol_ErrorResource_ResultOutOfLine
 } [packed]
 test_typesinprotocols_ProtocolErrorResourceResponseHandles {
-    result test_typesinprotocols_Protocol_ErrorResource_ResultHandles
+    void void
 } [packed]
 test_typesinprotocols_ProtocolEventResourceEvent {
     hdr fidl_message_header[5745997765922613643]

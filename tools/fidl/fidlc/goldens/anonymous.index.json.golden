@@ -376,22 +376,6 @@
     },
     {
       "is_anonymous": true,
-      "identifier": "test.anonymous/SomeProtocolSomeMethodTopResponse",
-      "members": [
-        {
-          "name": "result",
-          "location": {
-            "is_virtual": true
-          },
-          "type": {
-            "kind": "identifier",
-            "is_anonymous": true
-          }
-        }
-      ]
-    },
-    {
-      "is_anonymous": true,
       "identifier": "test.anonymous/SomeProtocol_SomeMethod_Response",
       "members": [
         {

@@ -310,8 +310,6 @@ inline zx_status_t Clone(::test::anonymous::SomeProtocol_SomeMethod_Error value,
 
 class SomeProtocol_SomeMethod_Result;
 
-class SomeProtocolSomeMethodTopResponse;
-
 #ifdef __Fuchsia__
 
 class SomeProtocol;
@@ -950,27 +948,6 @@ inline zx_status_t Clone(const ::test::anonymous::SomeProtocol_SomeMethod_Result
 
 using SomeProtocol_SomeMethod_ResultPtr = ::std::unique_ptr<SomeProtocol_SomeMethod_Result>;
 
-class SomeProtocolSomeMethodTopResponse final {
- public:
-  static const fidl_type_t* FidlType;
-
-  ::test::anonymous::SomeProtocol_SomeMethod_Result result;
-
-  static inline ::std::unique_ptr<SomeProtocolSomeMethodTopResponse> New() { return ::std::make_unique<SomeProtocolSomeMethodTopResponse>(); }
-
-  void Encode(::fidl::Encoder* _encoder, size_t _offset,
-              cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt);
-  static void Decode(::fidl::Decoder* _decoder, SomeProtocolSomeMethodTopResponse* value, size_t _offset);
-  zx_status_t Clone(SomeProtocolSomeMethodTopResponse* result) const;
-};
-
-inline zx_status_t Clone(const ::test::anonymous::SomeProtocolSomeMethodTopResponse& _value,
-                         ::test::anonymous::SomeProtocolSomeMethodTopResponse* _result) {
-  return _value.Clone(_result);
-}
-
-using SomeProtocolSomeMethodTopResponsePtr = ::std::unique_ptr<SomeProtocolSomeMethodTopResponse>;
-
 #ifdef __Fuchsia__
 
 namespace _internal {
@@ -990,15 +967,15 @@ class SomeProtocol_RequestEncoder {
   }
 };
 namespace _internal {
-__LOCAL extern "C" const fidl_type_t test_anonymous_SomeProtocolSomeMethodTopResponseTable;
+__LOCAL extern "C" const fidl_type_t test_anonymous_SomeProtocol_SomeMethod_ResultTable;
 
 }  // namespace _internal
 
 class SomeProtocol_ResponseEncoder {
  public:
-  static ::fidl::HLCPPOutgoingMessage SomeMethod(::fidl::MessageEncoder* _encoder, ::test::anonymous::SomeProtocol_SomeMethod_Result* result) {
+  static ::fidl::HLCPPOutgoingMessage SomeMethod(::fidl::MessageEncoder* _encoder, ::test::anonymous::SomeProtocol_SomeMethod_Result* SomeProtocol_SomeMethod_Result) {
     _encoder->Alloc(16);
-    ::fidl::Encode(_encoder, result, 0 + sizeof(fidl_message_header_t));
+    ::fidl::Encode(_encoder, SomeProtocol_SomeMethod_Result, 0 + sizeof(fidl_message_header_t));
 
     return _encoder->GetMessage();
   }
@@ -1462,31 +1439,6 @@ struct Equality<::test::anonymous::SomeProtocol_SomeMethod_Result> {
     }
   }
 };
-template <>
-struct CodingTraits<::test::anonymous::SomeProtocolSomeMethodTopResponse>
-    : public EncodableCodingTraits<::test::anonymous::SomeProtocolSomeMethodTopResponse, 16> {};
-
-template <>
-struct HasPadding<::test::anonymous::SomeProtocolSomeMethodTopResponse> : public std::true_type {};
-
-template <>
-struct IsMemcpyCompatible<::test::anonymous::SomeProtocolSomeMethodTopResponse> : public internal::BoolConstant<
-                                                                                      !HasPadding<::test::anonymous::SomeProtocolSomeMethodTopResponse>::value && IsMemcpyCompatible<::test::anonymous::SomeProtocol_SomeMethod_Result>::value> {};
-
-inline zx_status_t Clone(const ::test::anonymous::SomeProtocolSomeMethodTopResponse& value,
-                         ::test::anonymous::SomeProtocolSomeMethodTopResponse* result) {
-  return ::test::anonymous::Clone(value, result);
-}
-
-template <>
-struct Equality<::test::anonymous::SomeProtocolSomeMethodTopResponse> {
-  bool operator()(const ::test::anonymous::SomeProtocolSomeMethodTopResponse& _lhs, const ::test::anonymous::SomeProtocolSomeMethodTopResponse& _rhs) const {
-    if (!::fidl::Equals(_lhs.result, _rhs.result)) {
-      return false;
-    }
-    return true;
-  }
-};
 
 //
 // Proxies and stubs declarations
@@ -1542,7 +1494,7 @@ class SomeProtocol_ResponseDecoder {
   SomeProtocol_ResponseDecoder() = default;
   virtual ~SomeProtocol_ResponseDecoder() = default;
   static const fidl_type_t* GetType(uint64_t ordinal);
-  virtual void SomeMethod(::test::anonymous::SomeProtocol_SomeMethod_Result result) = 0;
+  virtual void SomeMethod(::test::anonymous::SomeProtocol_SomeMethod_Result SomeProtocol_SomeMethod_Result) = 0;
 };
 
 class SomeProtocol_EventSender {
@@ -1554,7 +1506,7 @@ class SomeProtocol_Sync {
  public:
   using Proxy_ = ::test::anonymous::SomeProtocol_SyncProxy;
   virtual ~SomeProtocol_Sync();
-  virtual zx_status_t SomeMethod(::test::anonymous::UnionMember union_member, ::test::anonymous::TableMember table_member, ::test::anonymous::SomeProtocol_SomeMethod_Result* out_result) = 0;
+  virtual zx_status_t SomeMethod(::test::anonymous::UnionMember union_member, ::test::anonymous::TableMember table_member, ::test::anonymous::SomeProtocol_SomeMethod_Result* out_SomeProtocol_SomeMethod_Result) = 0;
 };
 
 class SomeProtocol_Proxy final : public ::fidl::internal::Proxy, public SomeProtocol {
@@ -1591,7 +1543,7 @@ class SomeProtocol_SyncProxy : public ::test::anonymous::SomeProtocol_Sync {
   explicit SomeProtocol_SyncProxy(::zx::channel channel);
   ~SomeProtocol_SyncProxy() override;
   // cts-coverage-fidl-name:test.anonymous/SomeProtocol.SomeMethod
-  zx_status_t SomeMethod(::test::anonymous::UnionMember union_member, ::test::anonymous::TableMember table_member, ::test::anonymous::SomeProtocol_SomeMethod_Result* out_result) override;
+  zx_status_t SomeMethod(::test::anonymous::UnionMember union_member, ::test::anonymous::TableMember table_member, ::test::anonymous::SomeProtocol_SomeMethod_Result* out_SomeProtocol_SomeMethod_Result) override;
 
  private:
   ::fidl::internal::SynchronousProxy proxy_;

@@ -83,30 +83,12 @@ namespace internal {
   };
 }
 
-::test_protocols::WithErrorSyntaxResponseAsStructTopResponse WireNaturalConversionTraits<::test_protocols::wire::WithErrorSyntaxResponseAsStructTopResponse, ::test_protocols::WithErrorSyntaxResponseAsStructTopResponse>::ToNatural(::test_protocols::wire::WithErrorSyntaxResponseAsStructTopResponse src) {
-  return ::test_protocols::WithErrorSyntaxResponseAsStructTopResponse(WireNaturalConversionTraits<::test_protocols::wire::WithErrorSyntaxResponseAsStructResult, ::test_protocols::WithErrorSyntaxResponseAsStructResult>::ToNatural(std::move(src.result)));
-}
-::test_protocols::wire::WithErrorSyntaxResponseAsStructTopResponse WireNaturalConversionTraits<::test_protocols::wire::WithErrorSyntaxResponseAsStructTopResponse, ::test_protocols::WithErrorSyntaxResponseAsStructTopResponse>::ToWire(fidl::AnyArena& arena, ::test_protocols::WithErrorSyntaxResponseAsStructTopResponse src) {
-  return ::test_protocols::wire::WithErrorSyntaxResponseAsStructTopResponse{
-      .result = WireNaturalConversionTraits<::test_protocols::wire::WithErrorSyntaxResponseAsStructResult, ::test_protocols::WithErrorSyntaxResponseAsStructResult>::ToWire(arena, std::move(src.result())),
-  };
-}
-
 ::test_protocols::WithErrorSyntaxErrorAsPrimitiveResponse WireNaturalConversionTraits<::test_protocols::wire::WithErrorSyntaxErrorAsPrimitiveResponse, ::test_protocols::WithErrorSyntaxErrorAsPrimitiveResponse>::ToNatural(::test_protocols::wire::WithErrorSyntaxErrorAsPrimitiveResponse src) {
   return ::test_protocols::WithErrorSyntaxErrorAsPrimitiveResponse(WireNaturalConversionTraits<uint8_t, uint8_t>::ToNatural(std::move(src.__reserved)));
 }
 ::test_protocols::wire::WithErrorSyntaxErrorAsPrimitiveResponse WireNaturalConversionTraits<::test_protocols::wire::WithErrorSyntaxErrorAsPrimitiveResponse, ::test_protocols::WithErrorSyntaxErrorAsPrimitiveResponse>::ToWire(fidl::AnyArena& arena, ::test_protocols::WithErrorSyntaxErrorAsPrimitiveResponse src) {
   return ::test_protocols::wire::WithErrorSyntaxErrorAsPrimitiveResponse{
       .__reserved = WireNaturalConversionTraits<uint8_t, uint8_t>::ToWire(arena, std::move(src.__reserved())),
-  };
-}
-
-::test_protocols::WithErrorSyntaxErrorAsPrimitiveTopResponse WireNaturalConversionTraits<::test_protocols::wire::WithErrorSyntaxErrorAsPrimitiveTopResponse, ::test_protocols::WithErrorSyntaxErrorAsPrimitiveTopResponse>::ToNatural(::test_protocols::wire::WithErrorSyntaxErrorAsPrimitiveTopResponse src) {
-  return ::test_protocols::WithErrorSyntaxErrorAsPrimitiveTopResponse(WireNaturalConversionTraits<::test_protocols::wire::WithErrorSyntaxErrorAsPrimitiveResult, ::test_protocols::WithErrorSyntaxErrorAsPrimitiveResult>::ToNatural(std::move(src.result)));
-}
-::test_protocols::wire::WithErrorSyntaxErrorAsPrimitiveTopResponse WireNaturalConversionTraits<::test_protocols::wire::WithErrorSyntaxErrorAsPrimitiveTopResponse, ::test_protocols::WithErrorSyntaxErrorAsPrimitiveTopResponse>::ToWire(fidl::AnyArena& arena, ::test_protocols::WithErrorSyntaxErrorAsPrimitiveTopResponse src) {
-  return ::test_protocols::wire::WithErrorSyntaxErrorAsPrimitiveTopResponse{
-      .result = WireNaturalConversionTraits<::test_protocols::wire::WithErrorSyntaxErrorAsPrimitiveResult, ::test_protocols::WithErrorSyntaxErrorAsPrimitiveResult>::ToWire(arena, std::move(src.result())),
   };
 }
 
@@ -119,15 +101,6 @@ namespace internal {
   };
 }
 
-::test_protocols::WithErrorSyntaxErrorAsEnumTopResponse WireNaturalConversionTraits<::test_protocols::wire::WithErrorSyntaxErrorAsEnumTopResponse, ::test_protocols::WithErrorSyntaxErrorAsEnumTopResponse>::ToNatural(::test_protocols::wire::WithErrorSyntaxErrorAsEnumTopResponse src) {
-  return ::test_protocols::WithErrorSyntaxErrorAsEnumTopResponse(WireNaturalConversionTraits<::test_protocols::wire::WithErrorSyntaxErrorAsEnumResult, ::test_protocols::WithErrorSyntaxErrorAsEnumResult>::ToNatural(std::move(src.result)));
-}
-::test_protocols::wire::WithErrorSyntaxErrorAsEnumTopResponse WireNaturalConversionTraits<::test_protocols::wire::WithErrorSyntaxErrorAsEnumTopResponse, ::test_protocols::WithErrorSyntaxErrorAsEnumTopResponse>::ToWire(fidl::AnyArena& arena, ::test_protocols::WithErrorSyntaxErrorAsEnumTopResponse src) {
-  return ::test_protocols::wire::WithErrorSyntaxErrorAsEnumTopResponse{
-      .result = WireNaturalConversionTraits<::test_protocols::wire::WithErrorSyntaxErrorAsEnumResult, ::test_protocols::WithErrorSyntaxErrorAsEnumResult>::ToWire(arena, std::move(src.result())),
-  };
-}
-
 #ifdef __Fuchsia__
 
 ::test_protocols::WithErrorSyntaxHandleInResultResponse WireNaturalConversionTraits<::test_protocols::wire::WithErrorSyntaxHandleInResultResponse, ::test_protocols::WithErrorSyntaxHandleInResultResponse>::ToNatural(::test_protocols::wire::WithErrorSyntaxHandleInResultResponse src) {
@@ -136,19 +109,6 @@ namespace internal {
 ::test_protocols::wire::WithErrorSyntaxHandleInResultResponse WireNaturalConversionTraits<::test_protocols::wire::WithErrorSyntaxHandleInResultResponse, ::test_protocols::WithErrorSyntaxHandleInResultResponse>::ToWire(fidl::AnyArena& arena, ::test_protocols::WithErrorSyntaxHandleInResultResponse src) {
   return ::test_protocols::wire::WithErrorSyntaxHandleInResultResponse{
       .h = WireNaturalConversionTraits<::zx::handle, ::zx::handle>::ToWire(arena, std::move(src.h())),
-  };
-}
-
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
-
-::test_protocols::WithErrorSyntaxHandleInResultTopResponse WireNaturalConversionTraits<::test_protocols::wire::WithErrorSyntaxHandleInResultTopResponse, ::test_protocols::WithErrorSyntaxHandleInResultTopResponse>::ToNatural(::test_protocols::wire::WithErrorSyntaxHandleInResultTopResponse src) {
-  return ::test_protocols::WithErrorSyntaxHandleInResultTopResponse(WireNaturalConversionTraits<::test_protocols::wire::WithErrorSyntaxHandleInResultResult, ::test_protocols::WithErrorSyntaxHandleInResultResult>::ToNatural(std::move(src.result)));
-}
-::test_protocols::wire::WithErrorSyntaxHandleInResultTopResponse WireNaturalConversionTraits<::test_protocols::wire::WithErrorSyntaxHandleInResultTopResponse, ::test_protocols::WithErrorSyntaxHandleInResultTopResponse>::ToWire(fidl::AnyArena& arena, ::test_protocols::WithErrorSyntaxHandleInResultTopResponse src) {
-  return ::test_protocols::wire::WithErrorSyntaxHandleInResultTopResponse{
-      .result = WireNaturalConversionTraits<::test_protocols::wire::WithErrorSyntaxHandleInResultResult, ::test_protocols::WithErrorSyntaxHandleInResultResult>::ToWire(arena, std::move(src.result())),
   };
 }
 
@@ -635,38 +595,38 @@ namespace internal {
 
 ::fidl::Response<::test_protocols::WithErrorSyntax::ResponseAsStruct> WireNaturalConversionTraits<::fidl::WireResponse<::test_protocols::WithErrorSyntax::ResponseAsStruct>, ::fidl::Response<::test_protocols::WithErrorSyntax::ResponseAsStruct>>::ToNatural(::fidl::WireResponse<::test_protocols::WithErrorSyntax::ResponseAsStruct> src) {
   return ::fidl::Response<::test_protocols::WithErrorSyntax::ResponseAsStruct>(
-      WireNaturalConversionTraits<::test_protocols::wire::WithErrorSyntaxResponseAsStructTopResponse, ::fit::result<uint32_t, ::test_protocols::WithErrorSyntaxResponseAsStructResponse>>::ToNatural(std::move(src)));
+      WireNaturalConversionTraits<::test_protocols::wire::WithErrorSyntaxResponseAsStructResult, ::fit::result<uint32_t, ::test_protocols::WithErrorSyntaxResponseAsStructResponse>>::ToNatural(std::move(src)));
 }
 ::fidl::WireResponse<::test_protocols::WithErrorSyntax::ResponseAsStruct> WireNaturalConversionTraits<::fidl::WireResponse<::test_protocols::WithErrorSyntax::ResponseAsStruct>, ::fidl::Response<::test_protocols::WithErrorSyntax::ResponseAsStruct>>::ToWire(fidl::AnyArena& arena, ::fidl::Response<::test_protocols::WithErrorSyntax::ResponseAsStruct> src) {
   return ::fidl::WireResponse<::test_protocols::WithErrorSyntax::ResponseAsStruct>(
-      WireNaturalConversionTraits<::test_protocols::wire::WithErrorSyntaxResponseAsStructTopResponse, ::fit::result<uint32_t, ::test_protocols::WithErrorSyntaxResponseAsStructResponse>>::ToWire(arena, std::move(src)));
+      WireNaturalConversionTraits<::test_protocols::wire::WithErrorSyntaxResponseAsStructResult, ::fit::result<uint32_t, ::test_protocols::WithErrorSyntaxResponseAsStructResponse>>::ToWire(arena, std::move(src)));
 }
 
 ::fidl::Response<::test_protocols::WithErrorSyntax::ErrorAsPrimitive> WireNaturalConversionTraits<::fidl::WireResponse<::test_protocols::WithErrorSyntax::ErrorAsPrimitive>, ::fidl::Response<::test_protocols::WithErrorSyntax::ErrorAsPrimitive>>::ToNatural(::fidl::WireResponse<::test_protocols::WithErrorSyntax::ErrorAsPrimitive> src) {
   return ::fidl::Response<::test_protocols::WithErrorSyntax::ErrorAsPrimitive>(
-      WireNaturalConversionTraits<::test_protocols::wire::WithErrorSyntaxErrorAsPrimitiveTopResponse, ::fit::result<uint32_t>>::ToNatural(std::move(src)));
+      WireNaturalConversionTraits<::test_protocols::wire::WithErrorSyntaxErrorAsPrimitiveResult, ::fit::result<uint32_t>>::ToNatural(std::move(src)));
 }
 ::fidl::WireResponse<::test_protocols::WithErrorSyntax::ErrorAsPrimitive> WireNaturalConversionTraits<::fidl::WireResponse<::test_protocols::WithErrorSyntax::ErrorAsPrimitive>, ::fidl::Response<::test_protocols::WithErrorSyntax::ErrorAsPrimitive>>::ToWire(fidl::AnyArena& arena, ::fidl::Response<::test_protocols::WithErrorSyntax::ErrorAsPrimitive> src) {
   return ::fidl::WireResponse<::test_protocols::WithErrorSyntax::ErrorAsPrimitive>(
-      WireNaturalConversionTraits<::test_protocols::wire::WithErrorSyntaxErrorAsPrimitiveTopResponse, ::fit::result<uint32_t>>::ToWire(arena, std::move(src)));
+      WireNaturalConversionTraits<::test_protocols::wire::WithErrorSyntaxErrorAsPrimitiveResult, ::fit::result<uint32_t>>::ToWire(arena, std::move(src)));
 }
 
 ::fidl::Response<::test_protocols::WithErrorSyntax::ErrorAsEnum> WireNaturalConversionTraits<::fidl::WireResponse<::test_protocols::WithErrorSyntax::ErrorAsEnum>, ::fidl::Response<::test_protocols::WithErrorSyntax::ErrorAsEnum>>::ToNatural(::fidl::WireResponse<::test_protocols::WithErrorSyntax::ErrorAsEnum> src) {
   return ::fidl::Response<::test_protocols::WithErrorSyntax::ErrorAsEnum>(
-      WireNaturalConversionTraits<::test_protocols::wire::WithErrorSyntaxErrorAsEnumTopResponse, ::fit::result<::test_protocols::ErrorEnum>>::ToNatural(std::move(src)));
+      WireNaturalConversionTraits<::test_protocols::wire::WithErrorSyntaxErrorAsEnumResult, ::fit::result<::test_protocols::ErrorEnum>>::ToNatural(std::move(src)));
 }
 ::fidl::WireResponse<::test_protocols::WithErrorSyntax::ErrorAsEnum> WireNaturalConversionTraits<::fidl::WireResponse<::test_protocols::WithErrorSyntax::ErrorAsEnum>, ::fidl::Response<::test_protocols::WithErrorSyntax::ErrorAsEnum>>::ToWire(fidl::AnyArena& arena, ::fidl::Response<::test_protocols::WithErrorSyntax::ErrorAsEnum> src) {
   return ::fidl::WireResponse<::test_protocols::WithErrorSyntax::ErrorAsEnum>(
-      WireNaturalConversionTraits<::test_protocols::wire::WithErrorSyntaxErrorAsEnumTopResponse, ::fit::result<::test_protocols::ErrorEnum>>::ToWire(arena, std::move(src)));
+      WireNaturalConversionTraits<::test_protocols::wire::WithErrorSyntaxErrorAsEnumResult, ::fit::result<::test_protocols::ErrorEnum>>::ToWire(arena, std::move(src)));
 }
 
 ::fidl::Response<::test_protocols::WithErrorSyntax::HandleInResult> WireNaturalConversionTraits<::fidl::WireResponse<::test_protocols::WithErrorSyntax::HandleInResult>, ::fidl::Response<::test_protocols::WithErrorSyntax::HandleInResult>>::ToNatural(::fidl::WireResponse<::test_protocols::WithErrorSyntax::HandleInResult> src) {
   return ::fidl::Response<::test_protocols::WithErrorSyntax::HandleInResult>(
-      WireNaturalConversionTraits<::test_protocols::wire::WithErrorSyntaxHandleInResultTopResponse, ::fit::result<uint32_t, ::test_protocols::WithErrorSyntaxHandleInResultResponse>>::ToNatural(std::move(src)));
+      WireNaturalConversionTraits<::test_protocols::wire::WithErrorSyntaxHandleInResultResult, ::fit::result<uint32_t, ::test_protocols::WithErrorSyntaxHandleInResultResponse>>::ToNatural(std::move(src)));
 }
 ::fidl::WireResponse<::test_protocols::WithErrorSyntax::HandleInResult> WireNaturalConversionTraits<::fidl::WireResponse<::test_protocols::WithErrorSyntax::HandleInResult>, ::fidl::Response<::test_protocols::WithErrorSyntax::HandleInResult>>::ToWire(fidl::AnyArena& arena, ::fidl::Response<::test_protocols::WithErrorSyntax::HandleInResult> src) {
   return ::fidl::WireResponse<::test_protocols::WithErrorSyntax::HandleInResult>(
-      WireNaturalConversionTraits<::test_protocols::wire::WithErrorSyntaxHandleInResultTopResponse, ::fit::result<uint32_t, ::test_protocols::WithErrorSyntaxHandleInResultResponse>>::ToWire(arena, std::move(src)));
+      WireNaturalConversionTraits<::test_protocols::wire::WithErrorSyntaxHandleInResultResult, ::fit::result<uint32_t, ::test_protocols::WithErrorSyntaxHandleInResultResponse>>::ToWire(arena, std::move(src)));
 }
 
 ::fidl::Response<::test_protocols::ChannelProtocol::MethodB> WireNaturalConversionTraits<::fidl::WireResponse<::test_protocols::ChannelProtocol::MethodB>, ::fidl::Response<::test_protocols::ChannelProtocol::MethodB>>::ToNatural(::fidl::WireResponse<::test_protocols::ChannelProtocol::MethodB> src) {

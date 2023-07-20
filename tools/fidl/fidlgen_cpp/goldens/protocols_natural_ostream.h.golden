@@ -53,20 +53,12 @@ struct fidl::ostream::Formatter<::test_protocols::WithErrorSyntaxResponseAsStruc
   static std::ostream& Format(std::ostream& os, const ::test_protocols::WithErrorSyntaxResponseAsStructResult& value);
 };
 template <>
-struct fidl::ostream::Formatter<::test_protocols::WithErrorSyntaxResponseAsStructTopResponse> {
-  static std::ostream& Format(std::ostream& os, const ::test_protocols::WithErrorSyntaxResponseAsStructTopResponse& value);
-};
-template <>
 struct fidl::ostream::Formatter<::test_protocols::WithErrorSyntaxErrorAsPrimitiveResponse> {
   static std::ostream& Format(std::ostream& os, const ::test_protocols::WithErrorSyntaxErrorAsPrimitiveResponse& value);
 };
 template <>
 struct fidl::ostream::Formatter<::test_protocols::WithErrorSyntaxErrorAsPrimitiveResult> {
   static std::ostream& Format(std::ostream& os, const ::test_protocols::WithErrorSyntaxErrorAsPrimitiveResult& value);
-};
-template <>
-struct fidl::ostream::Formatter<::test_protocols::WithErrorSyntaxErrorAsPrimitiveTopResponse> {
-  static std::ostream& Format(std::ostream& os, const ::test_protocols::WithErrorSyntaxErrorAsPrimitiveTopResponse& value);
 };
 template <>
 struct fidl::ostream::Formatter<::test_protocols::WithErrorSyntaxErrorAsEnumResponse> {
@@ -77,20 +69,12 @@ struct fidl::ostream::Formatter<::test_protocols::WithErrorSyntaxErrorAsEnumResu
   static std::ostream& Format(std::ostream& os, const ::test_protocols::WithErrorSyntaxErrorAsEnumResult& value);
 };
 template <>
-struct fidl::ostream::Formatter<::test_protocols::WithErrorSyntaxErrorAsEnumTopResponse> {
-  static std::ostream& Format(std::ostream& os, const ::test_protocols::WithErrorSyntaxErrorAsEnumTopResponse& value);
-};
-template <>
 struct fidl::ostream::Formatter<::test_protocols::WithErrorSyntaxHandleInResultResponse> {
   static std::ostream& Format(std::ostream& os, const ::test_protocols::WithErrorSyntaxHandleInResultResponse& value);
 };
 template <>
 struct fidl::ostream::Formatter<::test_protocols::WithErrorSyntaxHandleInResultResult> {
   static std::ostream& Format(std::ostream& os, const ::test_protocols::WithErrorSyntaxHandleInResultResult& value);
-};
-template <>
-struct fidl::ostream::Formatter<::test_protocols::WithErrorSyntaxHandleInResultTopResponse> {
-  static std::ostream& Format(std::ostream& os, const ::test_protocols::WithErrorSyntaxHandleInResultTopResponse& value);
 };
 template <>
 struct fidl::ostream::Formatter<::test_protocols::ChannelProtocolMethodARequest> {
@@ -221,25 +205,17 @@ std::ostream& operator<<(std::ostream& os, const ::test_protocols::WithErrorSynt
 
 std::ostream& operator<<(std::ostream& os, const ::test_protocols::WithErrorSyntaxResponseAsStructResult& value);
 
-std::ostream& operator<<(std::ostream& os, const ::test_protocols::WithErrorSyntaxResponseAsStructTopResponse& value);
-
 std::ostream& operator<<(std::ostream& os, const ::test_protocols::WithErrorSyntaxErrorAsPrimitiveResponse& value);
 
 std::ostream& operator<<(std::ostream& os, const ::test_protocols::WithErrorSyntaxErrorAsPrimitiveResult& value);
-
-std::ostream& operator<<(std::ostream& os, const ::test_protocols::WithErrorSyntaxErrorAsPrimitiveTopResponse& value);
 
 std::ostream& operator<<(std::ostream& os, const ::test_protocols::WithErrorSyntaxErrorAsEnumResponse& value);
 
 std::ostream& operator<<(std::ostream& os, const ::test_protocols::WithErrorSyntaxErrorAsEnumResult& value);
 
-std::ostream& operator<<(std::ostream& os, const ::test_protocols::WithErrorSyntaxErrorAsEnumTopResponse& value);
-
 std::ostream& operator<<(std::ostream& os, const ::test_protocols::WithErrorSyntaxHandleInResultResponse& value);
 
 std::ostream& operator<<(std::ostream& os, const ::test_protocols::WithErrorSyntaxHandleInResultResult& value);
-
-std::ostream& operator<<(std::ostream& os, const ::test_protocols::WithErrorSyntaxHandleInResultTopResponse& value);
 
 std::ostream& operator<<(std::ostream& os, const ::test_protocols::ChannelProtocolMethodARequest& value);
 

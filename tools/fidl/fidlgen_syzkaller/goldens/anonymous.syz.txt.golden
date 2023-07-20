@@ -85,11 +85,9 @@ test_anonymous_SomeProtocolSomeMethodRequestHandles {
 } [packed]
 test_anonymous_SomeProtocolSomeMethodResponse {
     hdr fidl_message_header[2515914517457749720]
-    resultInLine test_anonymous_SomeProtocol_SomeMethod_ResultInLine
-    resultOutOfLine test_anonymous_SomeProtocol_SomeMethod_ResultOutOfLine
 } [packed]
 test_anonymous_SomeProtocolSomeMethodResponseHandles {
-    result test_anonymous_SomeProtocol_SomeMethod_ResultHandles
+    void void
 } [packed]
 
 resource zx_chan_test_anonymous_SomeProtocol_client[zx_chan]

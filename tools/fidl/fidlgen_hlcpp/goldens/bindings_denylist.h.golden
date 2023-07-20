@@ -43,15 +43,11 @@ class DenyEachBinding_OnlyDenyDart_Response;
 
 class DenyEachBinding_OnlyDenyDart_Result;
 
-class DenyEachBindingOnlyDenyDartTopResponse;
-
 class DenyEachBindingOnlyDenyGoRequest;
 
 class DenyEachBinding_OnlyDenyGo_Response;
 
 class DenyEachBinding_OnlyDenyGo_Result;
-
-class DenyEachBindingOnlyDenyGoTopResponse;
 
 class DenyEachBindingOnlyDenyLibfuzzerRequest;
 
@@ -59,23 +55,17 @@ class DenyEachBinding_OnlyDenyLibfuzzer_Response;
 
 class DenyEachBinding_OnlyDenyLibfuzzer_Result;
 
-class DenyEachBindingOnlyDenyLibfuzzerTopResponse;
-
 class DenyEachBindingOnlyDenyRustRequest;
 
 class DenyEachBinding_OnlyDenyRust_Response;
 
 class DenyEachBinding_OnlyDenyRust_Result;
 
-class DenyEachBindingOnlyDenyRustTopResponse;
-
 class DenyEachBindingOnlyDenySyzkallerRequest;
 
 class DenyEachBinding_OnlyDenySyzkaller_Response;
 
 class DenyEachBinding_OnlyDenySyzkaller_Result;
-
-class DenyEachBindingOnlyDenySyzkallerTopResponse;
 
 #ifdef __Fuchsia__
 
@@ -285,27 +275,6 @@ inline zx_status_t Clone(const ::test::bindingsdenylist::DenyEachBinding_OnlyDen
 
 using DenyEachBinding_OnlyDenyDart_ResultPtr = ::std::unique_ptr<DenyEachBinding_OnlyDenyDart_Result>;
 
-class DenyEachBindingOnlyDenyDartTopResponse final {
- public:
-  static const fidl_type_t* FidlType;
-
-  ::test::bindingsdenylist::DenyEachBinding_OnlyDenyDart_Result result;
-
-  static inline ::std::unique_ptr<DenyEachBindingOnlyDenyDartTopResponse> New() { return ::std::make_unique<DenyEachBindingOnlyDenyDartTopResponse>(); }
-
-  void Encode(::fidl::Encoder* _encoder, size_t _offset,
-              cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt);
-  static void Decode(::fidl::Decoder* _decoder, DenyEachBindingOnlyDenyDartTopResponse* value, size_t _offset);
-  zx_status_t Clone(DenyEachBindingOnlyDenyDartTopResponse* result) const;
-};
-
-inline zx_status_t Clone(const ::test::bindingsdenylist::DenyEachBindingOnlyDenyDartTopResponse& _value,
-                         ::test::bindingsdenylist::DenyEachBindingOnlyDenyDartTopResponse* _result) {
-  return _value.Clone(_result);
-}
-
-using DenyEachBindingOnlyDenyDartTopResponsePtr = ::std::unique_ptr<DenyEachBindingOnlyDenyDartTopResponse>;
-
 class DenyEachBindingOnlyDenyGoRequest final {
  public:
   static const fidl_type_t* FidlType;
@@ -462,27 +431,6 @@ inline zx_status_t Clone(const ::test::bindingsdenylist::DenyEachBinding_OnlyDen
 }
 
 using DenyEachBinding_OnlyDenyGo_ResultPtr = ::std::unique_ptr<DenyEachBinding_OnlyDenyGo_Result>;
-
-class DenyEachBindingOnlyDenyGoTopResponse final {
- public:
-  static const fidl_type_t* FidlType;
-
-  ::test::bindingsdenylist::DenyEachBinding_OnlyDenyGo_Result result;
-
-  static inline ::std::unique_ptr<DenyEachBindingOnlyDenyGoTopResponse> New() { return ::std::make_unique<DenyEachBindingOnlyDenyGoTopResponse>(); }
-
-  void Encode(::fidl::Encoder* _encoder, size_t _offset,
-              cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt);
-  static void Decode(::fidl::Decoder* _decoder, DenyEachBindingOnlyDenyGoTopResponse* value, size_t _offset);
-  zx_status_t Clone(DenyEachBindingOnlyDenyGoTopResponse* result) const;
-};
-
-inline zx_status_t Clone(const ::test::bindingsdenylist::DenyEachBindingOnlyDenyGoTopResponse& _value,
-                         ::test::bindingsdenylist::DenyEachBindingOnlyDenyGoTopResponse* _result) {
-  return _value.Clone(_result);
-}
-
-using DenyEachBindingOnlyDenyGoTopResponsePtr = ::std::unique_ptr<DenyEachBindingOnlyDenyGoTopResponse>;
 
 class DenyEachBindingOnlyDenyLibfuzzerRequest final {
  public:
@@ -641,27 +589,6 @@ inline zx_status_t Clone(const ::test::bindingsdenylist::DenyEachBinding_OnlyDen
 
 using DenyEachBinding_OnlyDenyLibfuzzer_ResultPtr = ::std::unique_ptr<DenyEachBinding_OnlyDenyLibfuzzer_Result>;
 
-class DenyEachBindingOnlyDenyLibfuzzerTopResponse final {
- public:
-  static const fidl_type_t* FidlType;
-
-  ::test::bindingsdenylist::DenyEachBinding_OnlyDenyLibfuzzer_Result result;
-
-  static inline ::std::unique_ptr<DenyEachBindingOnlyDenyLibfuzzerTopResponse> New() { return ::std::make_unique<DenyEachBindingOnlyDenyLibfuzzerTopResponse>(); }
-
-  void Encode(::fidl::Encoder* _encoder, size_t _offset,
-              cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt);
-  static void Decode(::fidl::Decoder* _decoder, DenyEachBindingOnlyDenyLibfuzzerTopResponse* value, size_t _offset);
-  zx_status_t Clone(DenyEachBindingOnlyDenyLibfuzzerTopResponse* result) const;
-};
-
-inline zx_status_t Clone(const ::test::bindingsdenylist::DenyEachBindingOnlyDenyLibfuzzerTopResponse& _value,
-                         ::test::bindingsdenylist::DenyEachBindingOnlyDenyLibfuzzerTopResponse* _result) {
-  return _value.Clone(_result);
-}
-
-using DenyEachBindingOnlyDenyLibfuzzerTopResponsePtr = ::std::unique_ptr<DenyEachBindingOnlyDenyLibfuzzerTopResponse>;
-
 class DenyEachBindingOnlyDenyRustRequest final {
  public:
   static const fidl_type_t* FidlType;
@@ -818,27 +745,6 @@ inline zx_status_t Clone(const ::test::bindingsdenylist::DenyEachBinding_OnlyDen
 }
 
 using DenyEachBinding_OnlyDenyRust_ResultPtr = ::std::unique_ptr<DenyEachBinding_OnlyDenyRust_Result>;
-
-class DenyEachBindingOnlyDenyRustTopResponse final {
- public:
-  static const fidl_type_t* FidlType;
-
-  ::test::bindingsdenylist::DenyEachBinding_OnlyDenyRust_Result result;
-
-  static inline ::std::unique_ptr<DenyEachBindingOnlyDenyRustTopResponse> New() { return ::std::make_unique<DenyEachBindingOnlyDenyRustTopResponse>(); }
-
-  void Encode(::fidl::Encoder* _encoder, size_t _offset,
-              cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt);
-  static void Decode(::fidl::Decoder* _decoder, DenyEachBindingOnlyDenyRustTopResponse* value, size_t _offset);
-  zx_status_t Clone(DenyEachBindingOnlyDenyRustTopResponse* result) const;
-};
-
-inline zx_status_t Clone(const ::test::bindingsdenylist::DenyEachBindingOnlyDenyRustTopResponse& _value,
-                         ::test::bindingsdenylist::DenyEachBindingOnlyDenyRustTopResponse* _result) {
-  return _value.Clone(_result);
-}
-
-using DenyEachBindingOnlyDenyRustTopResponsePtr = ::std::unique_ptr<DenyEachBindingOnlyDenyRustTopResponse>;
 
 class DenyEachBindingOnlyDenySyzkallerRequest final {
  public:
@@ -997,27 +903,6 @@ inline zx_status_t Clone(const ::test::bindingsdenylist::DenyEachBinding_OnlyDen
 
 using DenyEachBinding_OnlyDenySyzkaller_ResultPtr = ::std::unique_ptr<DenyEachBinding_OnlyDenySyzkaller_Result>;
 
-class DenyEachBindingOnlyDenySyzkallerTopResponse final {
- public:
-  static const fidl_type_t* FidlType;
-
-  ::test::bindingsdenylist::DenyEachBinding_OnlyDenySyzkaller_Result result;
-
-  static inline ::std::unique_ptr<DenyEachBindingOnlyDenySyzkallerTopResponse> New() { return ::std::make_unique<DenyEachBindingOnlyDenySyzkallerTopResponse>(); }
-
-  void Encode(::fidl::Encoder* _encoder, size_t _offset,
-              cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt);
-  static void Decode(::fidl::Decoder* _decoder, DenyEachBindingOnlyDenySyzkallerTopResponse* value, size_t _offset);
-  zx_status_t Clone(DenyEachBindingOnlyDenySyzkallerTopResponse* result) const;
-};
-
-inline zx_status_t Clone(const ::test::bindingsdenylist::DenyEachBindingOnlyDenySyzkallerTopResponse& _value,
-                         ::test::bindingsdenylist::DenyEachBindingOnlyDenySyzkallerTopResponse* _result) {
-  return _value.Clone(_result);
-}
-
-using DenyEachBindingOnlyDenySyzkallerTopResponsePtr = ::std::unique_ptr<DenyEachBindingOnlyDenySyzkallerTopResponse>;
-
 #ifdef __Fuchsia__
 
 namespace _internal {
@@ -1067,47 +952,47 @@ class DenyEachBinding_RequestEncoder {
   }
 };
 namespace _internal {
-__LOCAL extern "C" const fidl_type_t test_bindingsdenylist_DenyEachBindingOnlyDenyDartTopResponseTable;
+__LOCAL extern "C" const fidl_type_t test_bindingsdenylist_DenyEachBinding_OnlyDenyDart_ResultTable;
 
-__LOCAL extern "C" const fidl_type_t test_bindingsdenylist_DenyEachBindingOnlyDenyGoTopResponseTable;
+__LOCAL extern "C" const fidl_type_t test_bindingsdenylist_DenyEachBinding_OnlyDenyGo_ResultTable;
 
-__LOCAL extern "C" const fidl_type_t test_bindingsdenylist_DenyEachBindingOnlyDenyLibfuzzerTopResponseTable;
+__LOCAL extern "C" const fidl_type_t test_bindingsdenylist_DenyEachBinding_OnlyDenyLibfuzzer_ResultTable;
 
-__LOCAL extern "C" const fidl_type_t test_bindingsdenylist_DenyEachBindingOnlyDenyRustTopResponseTable;
+__LOCAL extern "C" const fidl_type_t test_bindingsdenylist_DenyEachBinding_OnlyDenyRust_ResultTable;
 
-__LOCAL extern "C" const fidl_type_t test_bindingsdenylist_DenyEachBindingOnlyDenySyzkallerTopResponseTable;
+__LOCAL extern "C" const fidl_type_t test_bindingsdenylist_DenyEachBinding_OnlyDenySyzkaller_ResultTable;
 
 }  // namespace _internal
 
 class DenyEachBinding_ResponseEncoder {
  public:
-  static ::fidl::HLCPPOutgoingMessage OnlyDenyDart(::fidl::MessageEncoder* _encoder, ::test::bindingsdenylist::DenyEachBinding_OnlyDenyDart_Result* result) {
+  static ::fidl::HLCPPOutgoingMessage OnlyDenyDart(::fidl::MessageEncoder* _encoder, ::test::bindingsdenylist::DenyEachBinding_OnlyDenyDart_Result* DenyEachBinding_OnlyDenyDart_Result) {
     _encoder->Alloc(16);
-    ::fidl::Encode(_encoder, result, 0 + sizeof(fidl_message_header_t));
+    ::fidl::Encode(_encoder, DenyEachBinding_OnlyDenyDart_Result, 0 + sizeof(fidl_message_header_t));
 
     return _encoder->GetMessage();
   }
-  static ::fidl::HLCPPOutgoingMessage OnlyDenyGo(::fidl::MessageEncoder* _encoder, ::test::bindingsdenylist::DenyEachBinding_OnlyDenyGo_Result* result) {
+  static ::fidl::HLCPPOutgoingMessage OnlyDenyGo(::fidl::MessageEncoder* _encoder, ::test::bindingsdenylist::DenyEachBinding_OnlyDenyGo_Result* DenyEachBinding_OnlyDenyGo_Result) {
     _encoder->Alloc(16);
-    ::fidl::Encode(_encoder, result, 0 + sizeof(fidl_message_header_t));
+    ::fidl::Encode(_encoder, DenyEachBinding_OnlyDenyGo_Result, 0 + sizeof(fidl_message_header_t));
 
     return _encoder->GetMessage();
   }
-  static ::fidl::HLCPPOutgoingMessage OnlyDenyLibfuzzer(::fidl::MessageEncoder* _encoder, ::test::bindingsdenylist::DenyEachBinding_OnlyDenyLibfuzzer_Result* result) {
+  static ::fidl::HLCPPOutgoingMessage OnlyDenyLibfuzzer(::fidl::MessageEncoder* _encoder, ::test::bindingsdenylist::DenyEachBinding_OnlyDenyLibfuzzer_Result* DenyEachBinding_OnlyDenyLibfuzzer_Result) {
     _encoder->Alloc(16);
-    ::fidl::Encode(_encoder, result, 0 + sizeof(fidl_message_header_t));
+    ::fidl::Encode(_encoder, DenyEachBinding_OnlyDenyLibfuzzer_Result, 0 + sizeof(fidl_message_header_t));
 
     return _encoder->GetMessage();
   }
-  static ::fidl::HLCPPOutgoingMessage OnlyDenyRust(::fidl::MessageEncoder* _encoder, ::test::bindingsdenylist::DenyEachBinding_OnlyDenyRust_Result* result) {
+  static ::fidl::HLCPPOutgoingMessage OnlyDenyRust(::fidl::MessageEncoder* _encoder, ::test::bindingsdenylist::DenyEachBinding_OnlyDenyRust_Result* DenyEachBinding_OnlyDenyRust_Result) {
     _encoder->Alloc(16);
-    ::fidl::Encode(_encoder, result, 0 + sizeof(fidl_message_header_t));
+    ::fidl::Encode(_encoder, DenyEachBinding_OnlyDenyRust_Result, 0 + sizeof(fidl_message_header_t));
 
     return _encoder->GetMessage();
   }
-  static ::fidl::HLCPPOutgoingMessage OnlyDenySyzkaller(::fidl::MessageEncoder* _encoder, ::test::bindingsdenylist::DenyEachBinding_OnlyDenySyzkaller_Result* result) {
+  static ::fidl::HLCPPOutgoingMessage OnlyDenySyzkaller(::fidl::MessageEncoder* _encoder, ::test::bindingsdenylist::DenyEachBinding_OnlyDenySyzkaller_Result* DenyEachBinding_OnlyDenySyzkaller_Result) {
     _encoder->Alloc(16);
-    ::fidl::Encode(_encoder, result, 0 + sizeof(fidl_message_header_t));
+    ::fidl::Encode(_encoder, DenyEachBinding_OnlyDenySyzkaller_Result, 0 + sizeof(fidl_message_header_t));
 
     return _encoder->GetMessage();
   }
@@ -1293,31 +1178,6 @@ struct Equality<::test::bindingsdenylist::DenyEachBinding_OnlyDenyDart_Result> {
   }
 };
 template <>
-struct CodingTraits<::test::bindingsdenylist::DenyEachBindingOnlyDenyDartTopResponse>
-    : public EncodableCodingTraits<::test::bindingsdenylist::DenyEachBindingOnlyDenyDartTopResponse, 16> {};
-
-template <>
-struct HasPadding<::test::bindingsdenylist::DenyEachBindingOnlyDenyDartTopResponse> : public std::true_type {};
-
-template <>
-struct IsMemcpyCompatible<::test::bindingsdenylist::DenyEachBindingOnlyDenyDartTopResponse> : public internal::BoolConstant<
-                                                                                                  !HasPadding<::test::bindingsdenylist::DenyEachBindingOnlyDenyDartTopResponse>::value && IsMemcpyCompatible<::test::bindingsdenylist::DenyEachBinding_OnlyDenyDart_Result>::value> {};
-
-inline zx_status_t Clone(const ::test::bindingsdenylist::DenyEachBindingOnlyDenyDartTopResponse& value,
-                         ::test::bindingsdenylist::DenyEachBindingOnlyDenyDartTopResponse* result) {
-  return ::test::bindingsdenylist::Clone(value, result);
-}
-
-template <>
-struct Equality<::test::bindingsdenylist::DenyEachBindingOnlyDenyDartTopResponse> {
-  bool operator()(const ::test::bindingsdenylist::DenyEachBindingOnlyDenyDartTopResponse& _lhs, const ::test::bindingsdenylist::DenyEachBindingOnlyDenyDartTopResponse& _rhs) const {
-    if (!::fidl::Equals(_lhs.result, _rhs.result)) {
-      return false;
-    }
-    return true;
-  }
-};
-template <>
 struct CodingTraits<::test::bindingsdenylist::DenyEachBindingOnlyDenyGoRequest>
     : public EncodableCodingTraits<::test::bindingsdenylist::DenyEachBindingOnlyDenyGoRequest, 1> {};
 
@@ -1416,31 +1276,6 @@ struct Equality<::test::bindingsdenylist::DenyEachBinding_OnlyDenyGo_Result> {
       default:
         return false;
     }
-  }
-};
-template <>
-struct CodingTraits<::test::bindingsdenylist::DenyEachBindingOnlyDenyGoTopResponse>
-    : public EncodableCodingTraits<::test::bindingsdenylist::DenyEachBindingOnlyDenyGoTopResponse, 16> {};
-
-template <>
-struct HasPadding<::test::bindingsdenylist::DenyEachBindingOnlyDenyGoTopResponse> : public std::true_type {};
-
-template <>
-struct IsMemcpyCompatible<::test::bindingsdenylist::DenyEachBindingOnlyDenyGoTopResponse> : public internal::BoolConstant<
-                                                                                                !HasPadding<::test::bindingsdenylist::DenyEachBindingOnlyDenyGoTopResponse>::value && IsMemcpyCompatible<::test::bindingsdenylist::DenyEachBinding_OnlyDenyGo_Result>::value> {};
-
-inline zx_status_t Clone(const ::test::bindingsdenylist::DenyEachBindingOnlyDenyGoTopResponse& value,
-                         ::test::bindingsdenylist::DenyEachBindingOnlyDenyGoTopResponse* result) {
-  return ::test::bindingsdenylist::Clone(value, result);
-}
-
-template <>
-struct Equality<::test::bindingsdenylist::DenyEachBindingOnlyDenyGoTopResponse> {
-  bool operator()(const ::test::bindingsdenylist::DenyEachBindingOnlyDenyGoTopResponse& _lhs, const ::test::bindingsdenylist::DenyEachBindingOnlyDenyGoTopResponse& _rhs) const {
-    if (!::fidl::Equals(_lhs.result, _rhs.result)) {
-      return false;
-    }
-    return true;
   }
 };
 template <>
@@ -1545,31 +1380,6 @@ struct Equality<::test::bindingsdenylist::DenyEachBinding_OnlyDenyLibfuzzer_Resu
   }
 };
 template <>
-struct CodingTraits<::test::bindingsdenylist::DenyEachBindingOnlyDenyLibfuzzerTopResponse>
-    : public EncodableCodingTraits<::test::bindingsdenylist::DenyEachBindingOnlyDenyLibfuzzerTopResponse, 16> {};
-
-template <>
-struct HasPadding<::test::bindingsdenylist::DenyEachBindingOnlyDenyLibfuzzerTopResponse> : public std::true_type {};
-
-template <>
-struct IsMemcpyCompatible<::test::bindingsdenylist::DenyEachBindingOnlyDenyLibfuzzerTopResponse> : public internal::BoolConstant<
-                                                                                                       !HasPadding<::test::bindingsdenylist::DenyEachBindingOnlyDenyLibfuzzerTopResponse>::value && IsMemcpyCompatible<::test::bindingsdenylist::DenyEachBinding_OnlyDenyLibfuzzer_Result>::value> {};
-
-inline zx_status_t Clone(const ::test::bindingsdenylist::DenyEachBindingOnlyDenyLibfuzzerTopResponse& value,
-                         ::test::bindingsdenylist::DenyEachBindingOnlyDenyLibfuzzerTopResponse* result) {
-  return ::test::bindingsdenylist::Clone(value, result);
-}
-
-template <>
-struct Equality<::test::bindingsdenylist::DenyEachBindingOnlyDenyLibfuzzerTopResponse> {
-  bool operator()(const ::test::bindingsdenylist::DenyEachBindingOnlyDenyLibfuzzerTopResponse& _lhs, const ::test::bindingsdenylist::DenyEachBindingOnlyDenyLibfuzzerTopResponse& _rhs) const {
-    if (!::fidl::Equals(_lhs.result, _rhs.result)) {
-      return false;
-    }
-    return true;
-  }
-};
-template <>
 struct CodingTraits<::test::bindingsdenylist::DenyEachBindingOnlyDenyRustRequest>
     : public EncodableCodingTraits<::test::bindingsdenylist::DenyEachBindingOnlyDenyRustRequest, 1> {};
 
@@ -1671,31 +1481,6 @@ struct Equality<::test::bindingsdenylist::DenyEachBinding_OnlyDenyRust_Result> {
   }
 };
 template <>
-struct CodingTraits<::test::bindingsdenylist::DenyEachBindingOnlyDenyRustTopResponse>
-    : public EncodableCodingTraits<::test::bindingsdenylist::DenyEachBindingOnlyDenyRustTopResponse, 16> {};
-
-template <>
-struct HasPadding<::test::bindingsdenylist::DenyEachBindingOnlyDenyRustTopResponse> : public std::true_type {};
-
-template <>
-struct IsMemcpyCompatible<::test::bindingsdenylist::DenyEachBindingOnlyDenyRustTopResponse> : public internal::BoolConstant<
-                                                                                                  !HasPadding<::test::bindingsdenylist::DenyEachBindingOnlyDenyRustTopResponse>::value && IsMemcpyCompatible<::test::bindingsdenylist::DenyEachBinding_OnlyDenyRust_Result>::value> {};
-
-inline zx_status_t Clone(const ::test::bindingsdenylist::DenyEachBindingOnlyDenyRustTopResponse& value,
-                         ::test::bindingsdenylist::DenyEachBindingOnlyDenyRustTopResponse* result) {
-  return ::test::bindingsdenylist::Clone(value, result);
-}
-
-template <>
-struct Equality<::test::bindingsdenylist::DenyEachBindingOnlyDenyRustTopResponse> {
-  bool operator()(const ::test::bindingsdenylist::DenyEachBindingOnlyDenyRustTopResponse& _lhs, const ::test::bindingsdenylist::DenyEachBindingOnlyDenyRustTopResponse& _rhs) const {
-    if (!::fidl::Equals(_lhs.result, _rhs.result)) {
-      return false;
-    }
-    return true;
-  }
-};
-template <>
 struct CodingTraits<::test::bindingsdenylist::DenyEachBindingOnlyDenySyzkallerRequest>
     : public EncodableCodingTraits<::test::bindingsdenylist::DenyEachBindingOnlyDenySyzkallerRequest, 1> {};
 
@@ -1794,31 +1579,6 @@ struct Equality<::test::bindingsdenylist::DenyEachBinding_OnlyDenySyzkaller_Resu
       default:
         return false;
     }
-  }
-};
-template <>
-struct CodingTraits<::test::bindingsdenylist::DenyEachBindingOnlyDenySyzkallerTopResponse>
-    : public EncodableCodingTraits<::test::bindingsdenylist::DenyEachBindingOnlyDenySyzkallerTopResponse, 16> {};
-
-template <>
-struct HasPadding<::test::bindingsdenylist::DenyEachBindingOnlyDenySyzkallerTopResponse> : public std::true_type {};
-
-template <>
-struct IsMemcpyCompatible<::test::bindingsdenylist::DenyEachBindingOnlyDenySyzkallerTopResponse> : public internal::BoolConstant<
-                                                                                                       !HasPadding<::test::bindingsdenylist::DenyEachBindingOnlyDenySyzkallerTopResponse>::value && IsMemcpyCompatible<::test::bindingsdenylist::DenyEachBinding_OnlyDenySyzkaller_Result>::value> {};
-
-inline zx_status_t Clone(const ::test::bindingsdenylist::DenyEachBindingOnlyDenySyzkallerTopResponse& value,
-                         ::test::bindingsdenylist::DenyEachBindingOnlyDenySyzkallerTopResponse* result) {
-  return ::test::bindingsdenylist::Clone(value, result);
-}
-
-template <>
-struct Equality<::test::bindingsdenylist::DenyEachBindingOnlyDenySyzkallerTopResponse> {
-  bool operator()(const ::test::bindingsdenylist::DenyEachBindingOnlyDenySyzkallerTopResponse& _lhs, const ::test::bindingsdenylist::DenyEachBindingOnlyDenySyzkallerTopResponse& _rhs) const {
-    if (!::fidl::Equals(_lhs.result, _rhs.result)) {
-      return false;
-    }
-    return true;
   }
 };
 template <>
@@ -2198,11 +1958,11 @@ class DenyEachBinding_ResponseDecoder {
   DenyEachBinding_ResponseDecoder() = default;
   virtual ~DenyEachBinding_ResponseDecoder() = default;
   static const fidl_type_t* GetType(uint64_t ordinal);
-  virtual void OnlyDenyDart(::test::bindingsdenylist::DenyEachBinding_OnlyDenyDart_Result result) = 0;
-  virtual void OnlyDenyGo(::test::bindingsdenylist::DenyEachBinding_OnlyDenyGo_Result result) = 0;
-  virtual void OnlyDenyLibfuzzer(::test::bindingsdenylist::DenyEachBinding_OnlyDenyLibfuzzer_Result result) = 0;
-  virtual void OnlyDenyRust(::test::bindingsdenylist::DenyEachBinding_OnlyDenyRust_Result result) = 0;
-  virtual void OnlyDenySyzkaller(::test::bindingsdenylist::DenyEachBinding_OnlyDenySyzkaller_Result result) = 0;
+  virtual void OnlyDenyDart(::test::bindingsdenylist::DenyEachBinding_OnlyDenyDart_Result DenyEachBinding_OnlyDenyDart_Result) = 0;
+  virtual void OnlyDenyGo(::test::bindingsdenylist::DenyEachBinding_OnlyDenyGo_Result DenyEachBinding_OnlyDenyGo_Result) = 0;
+  virtual void OnlyDenyLibfuzzer(::test::bindingsdenylist::DenyEachBinding_OnlyDenyLibfuzzer_Result DenyEachBinding_OnlyDenyLibfuzzer_Result) = 0;
+  virtual void OnlyDenyRust(::test::bindingsdenylist::DenyEachBinding_OnlyDenyRust_Result DenyEachBinding_OnlyDenyRust_Result) = 0;
+  virtual void OnlyDenySyzkaller(::test::bindingsdenylist::DenyEachBinding_OnlyDenySyzkaller_Result DenyEachBinding_OnlyDenySyzkaller_Result) = 0;
 };
 
 class DenyEachBinding_EventSender {
@@ -2214,11 +1974,11 @@ class DenyEachBinding_Sync {
  public:
   using Proxy_ = ::test::bindingsdenylist::DenyEachBinding_SyncProxy;
   virtual ~DenyEachBinding_Sync();
-  virtual zx_status_t OnlyDenyDart(bool a, ::test::bindingsdenylist::DenyEachBinding_OnlyDenyDart_Result* out_result) = 0;
-  virtual zx_status_t OnlyDenyGo(bool a, ::test::bindingsdenylist::DenyEachBinding_OnlyDenyGo_Result* out_result) = 0;
-  virtual zx_status_t OnlyDenyLibfuzzer(bool a, ::test::bindingsdenylist::DenyEachBinding_OnlyDenyLibfuzzer_Result* out_result) = 0;
-  virtual zx_status_t OnlyDenyRust(bool a, ::test::bindingsdenylist::DenyEachBinding_OnlyDenyRust_Result* out_result) = 0;
-  virtual zx_status_t OnlyDenySyzkaller(bool a, ::test::bindingsdenylist::DenyEachBinding_OnlyDenySyzkaller_Result* out_result) = 0;
+  virtual zx_status_t OnlyDenyDart(bool a, ::test::bindingsdenylist::DenyEachBinding_OnlyDenyDart_Result* out_DenyEachBinding_OnlyDenyDart_Result) = 0;
+  virtual zx_status_t OnlyDenyGo(bool a, ::test::bindingsdenylist::DenyEachBinding_OnlyDenyGo_Result* out_DenyEachBinding_OnlyDenyGo_Result) = 0;
+  virtual zx_status_t OnlyDenyLibfuzzer(bool a, ::test::bindingsdenylist::DenyEachBinding_OnlyDenyLibfuzzer_Result* out_DenyEachBinding_OnlyDenyLibfuzzer_Result) = 0;
+  virtual zx_status_t OnlyDenyRust(bool a, ::test::bindingsdenylist::DenyEachBinding_OnlyDenyRust_Result* out_DenyEachBinding_OnlyDenyRust_Result) = 0;
+  virtual zx_status_t OnlyDenySyzkaller(bool a, ::test::bindingsdenylist::DenyEachBinding_OnlyDenySyzkaller_Result* out_DenyEachBinding_OnlyDenySyzkaller_Result) = 0;
 };
 
 class DenyEachBinding_Proxy final : public ::fidl::internal::Proxy, public DenyEachBinding {
@@ -2263,15 +2023,15 @@ class DenyEachBinding_SyncProxy : public ::test::bindingsdenylist::DenyEachBindi
   explicit DenyEachBinding_SyncProxy(::zx::channel channel);
   ~DenyEachBinding_SyncProxy() override;
   // cts-coverage-fidl-name:test.bindingsdenylist/DenyEachBinding.OnlyDenyDart
-  zx_status_t OnlyDenyDart(bool a, ::test::bindingsdenylist::DenyEachBinding_OnlyDenyDart_Result* out_result) override;
+  zx_status_t OnlyDenyDart(bool a, ::test::bindingsdenylist::DenyEachBinding_OnlyDenyDart_Result* out_DenyEachBinding_OnlyDenyDart_Result) override;
   // cts-coverage-fidl-name:test.bindingsdenylist/DenyEachBinding.OnlyDenyGo
-  zx_status_t OnlyDenyGo(bool a, ::test::bindingsdenylist::DenyEachBinding_OnlyDenyGo_Result* out_result) override;
+  zx_status_t OnlyDenyGo(bool a, ::test::bindingsdenylist::DenyEachBinding_OnlyDenyGo_Result* out_DenyEachBinding_OnlyDenyGo_Result) override;
   // cts-coverage-fidl-name:test.bindingsdenylist/DenyEachBinding.OnlyDenyLibfuzzer
-  zx_status_t OnlyDenyLibfuzzer(bool a, ::test::bindingsdenylist::DenyEachBinding_OnlyDenyLibfuzzer_Result* out_result) override;
+  zx_status_t OnlyDenyLibfuzzer(bool a, ::test::bindingsdenylist::DenyEachBinding_OnlyDenyLibfuzzer_Result* out_DenyEachBinding_OnlyDenyLibfuzzer_Result) override;
   // cts-coverage-fidl-name:test.bindingsdenylist/DenyEachBinding.OnlyDenyRust
-  zx_status_t OnlyDenyRust(bool a, ::test::bindingsdenylist::DenyEachBinding_OnlyDenyRust_Result* out_result) override;
+  zx_status_t OnlyDenyRust(bool a, ::test::bindingsdenylist::DenyEachBinding_OnlyDenyRust_Result* out_DenyEachBinding_OnlyDenyRust_Result) override;
   // cts-coverage-fidl-name:test.bindingsdenylist/DenyEachBinding.OnlyDenySyzkaller
-  zx_status_t OnlyDenySyzkaller(bool a, ::test::bindingsdenylist::DenyEachBinding_OnlyDenySyzkaller_Result* out_result) override;
+  zx_status_t OnlyDenySyzkaller(bool a, ::test::bindingsdenylist::DenyEachBinding_OnlyDenySyzkaller_Result* out_DenyEachBinding_OnlyDenySyzkaller_Result) override;
 
  private:
   ::fidl::internal::SynchronousProxy proxy_;

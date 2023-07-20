@@ -40,7 +40,7 @@
 <table>
     <tr><th>Name</th><th>Type</th></tr>
         <tr>
-            <td><code>result</code></td>
+            <td><code>payload</code></td>
             <td>
                 <code><a class='link' href='#SomeProtocol_SomeMethod_Result'>SomeProtocol_SomeMethod_Result</a></code>
             </td>

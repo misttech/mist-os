@@ -11,70 +11,6 @@
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wshadow"
 
-std::ostream& fidl::ostream::Formatter<::test_protocollayoutssamelibrary::ComposedProtocolTwoWayAnonComposedWithErrorTopResponse>::Format(std::ostream& os, const ::test_protocollayoutssamelibrary::ComposedProtocolTwoWayAnonComposedWithErrorTopResponse& value) {
-  os << "test_protocollayoutssamelibrary::ComposedProtocolTwoWayAnonComposedWithErrorTopResponse";
-  os << "{ ";
-  os << "result";
-  os << " = " << fidl::ostream::Formatted<::test_protocollayoutssamelibrary::ComposedProtocolTwoWayAnonComposedWithErrorResult>(value.result()) << ", ";
-  os << "}";
-  return os;
-}
-std::ostream& fidl::ostream::Formatter<::test_protocollayoutssamelibrary::ComposedProtocolOnAnonComposedWithErrorRequest>::Format(std::ostream& os, const ::test_protocollayoutssamelibrary::ComposedProtocolOnAnonComposedWithErrorRequest& value) {
-  os << "test_protocollayoutssamelibrary::ComposedProtocolOnAnonComposedWithErrorRequest";
-  os << "{ ";
-  os << "result";
-  os << " = " << fidl::ostream::Formatted<::test_protocollayoutssamelibrary::ComposedProtocolOnAnonComposedWithErrorResult>(value.result()) << ", ";
-  os << "}";
-  return os;
-}
-std::ostream& fidl::ostream::Formatter<::test_protocollayoutssamelibrary::ComposedProtocolTwoWayNamedComposedWithErrorTopResponse>::Format(std::ostream& os, const ::test_protocollayoutssamelibrary::ComposedProtocolTwoWayNamedComposedWithErrorTopResponse& value) {
-  os << "test_protocollayoutssamelibrary::ComposedProtocolTwoWayNamedComposedWithErrorTopResponse";
-  os << "{ ";
-  os << "result";
-  os << " = " << fidl::ostream::Formatted<::test_protocollayoutssamelibrary::ComposedProtocolTwoWayNamedComposedWithErrorResult>(value.result()) << ", ";
-  os << "}";
-  return os;
-}
-std::ostream& fidl::ostream::Formatter<::test_protocollayoutssamelibrary::ComposedProtocolOnNamedComposedWithErrorRequest>::Format(std::ostream& os, const ::test_protocollayoutssamelibrary::ComposedProtocolOnNamedComposedWithErrorRequest& value) {
-  os << "test_protocollayoutssamelibrary::ComposedProtocolOnNamedComposedWithErrorRequest";
-  os << "{ ";
-  os << "result";
-  os << " = " << fidl::ostream::Formatted<::test_protocollayoutssamelibrary::ComposedProtocolOnNamedComposedWithErrorResult>(value.result()) << ", ";
-  os << "}";
-  return os;
-}
-std::ostream& fidl::ostream::Formatter<::test_protocollayoutssamelibrary::MainProtocolTwoWayLocalWithErrorTopResponse>::Format(std::ostream& os, const ::test_protocollayoutssamelibrary::MainProtocolTwoWayLocalWithErrorTopResponse& value) {
-  os << "test_protocollayoutssamelibrary::MainProtocolTwoWayLocalWithErrorTopResponse";
-  os << "{ ";
-  os << "result";
-  os << " = " << fidl::ostream::Formatted<::test_protocollayoutssamelibrary::MainProtocolTwoWayLocalWithErrorResult>(value.result()) << ", ";
-  os << "}";
-  return os;
-}
-std::ostream& fidl::ostream::Formatter<::test_protocollayoutssamelibrary::MainProtocolOnLocalWithErrorRequest>::Format(std::ostream& os, const ::test_protocollayoutssamelibrary::MainProtocolOnLocalWithErrorRequest& value) {
-  os << "test_protocollayoutssamelibrary::MainProtocolOnLocalWithErrorRequest";
-  os << "{ ";
-  os << "result";
-  os << " = " << fidl::ostream::Formatted<::test_protocollayoutssamelibrary::MainProtocolOnLocalWithErrorResult>(value.result()) << ", ";
-  os << "}";
-  return os;
-}
-std::ostream& fidl::ostream::Formatter<::test_protocollayoutssamelibrary::MainProtocolTwoWayAnonWithErrorTopResponse>::Format(std::ostream& os, const ::test_protocollayoutssamelibrary::MainProtocolTwoWayAnonWithErrorTopResponse& value) {
-  os << "test_protocollayoutssamelibrary::MainProtocolTwoWayAnonWithErrorTopResponse";
-  os << "{ ";
-  os << "result";
-  os << " = " << fidl::ostream::Formatted<::test_protocollayoutssamelibrary::MainProtocolTwoWayAnonWithErrorResult>(value.result()) << ", ";
-  os << "}";
-  return os;
-}
-std::ostream& fidl::ostream::Formatter<::test_protocollayoutssamelibrary::MainProtocolOnAnonWithErrorRequest>::Format(std::ostream& os, const ::test_protocollayoutssamelibrary::MainProtocolOnAnonWithErrorRequest& value) {
-  os << "test_protocollayoutssamelibrary::MainProtocolOnAnonWithErrorRequest";
-  os << "{ ";
-  os << "result";
-  os << " = " << fidl::ostream::Formatted<::test_protocollayoutssamelibrary::MainProtocolOnAnonWithErrorResult>(value.result()) << ", ";
-  os << "}";
-  return os;
-}
 std::ostream& fidl::ostream::Formatter<::test_protocollayoutssamelibrary::TablePayload>::Format(std::ostream& os, const ::test_protocollayoutssamelibrary::TablePayload& value) {
   os << "test_protocollayoutssamelibrary::TablePayload";
   os << "{ ";
@@ -389,10 +325,6 @@ std::ostream& operator<<(std::ostream& os, const ::test_protocollayoutssamelibra
   return fidl::ostream::Formatter<::test_protocollayoutssamelibrary::ComposedProtocolTwoWayAnonComposedWithErrorResult>::Format(os, value);
 }
 
-std::ostream& operator<<(std::ostream& os, const ::test_protocollayoutssamelibrary::ComposedProtocolTwoWayAnonComposedWithErrorTopResponse& value) {
-  return fidl::ostream::Formatter<::test_protocollayoutssamelibrary::ComposedProtocolTwoWayAnonComposedWithErrorTopResponse>::Format(os, value);
-}
-
 std::ostream& operator<<(std::ostream& os, const ::test_protocollayoutssamelibrary::ComposedProtocolOnAnonComposedRequest& value) {
   return fidl::ostream::Formatter<::test_protocollayoutssamelibrary::ComposedProtocolOnAnonComposedRequest>::Format(os, value);
 }
@@ -405,40 +337,20 @@ std::ostream& operator<<(std::ostream& os, const ::test_protocollayoutssamelibra
   return fidl::ostream::Formatter<::test_protocollayoutssamelibrary::ComposedProtocolOnAnonComposedWithErrorResult>::Format(os, value);
 }
 
-std::ostream& operator<<(std::ostream& os, const ::test_protocollayoutssamelibrary::ComposedProtocolOnAnonComposedWithErrorRequest& value) {
-  return fidl::ostream::Formatter<::test_protocollayoutssamelibrary::ComposedProtocolOnAnonComposedWithErrorRequest>::Format(os, value);
-}
-
 std::ostream& operator<<(std::ostream& os, const ::test_protocollayoutssamelibrary::ComposedProtocolTwoWayNamedComposedWithErrorResult& value) {
   return fidl::ostream::Formatter<::test_protocollayoutssamelibrary::ComposedProtocolTwoWayNamedComposedWithErrorResult>::Format(os, value);
-}
-
-std::ostream& operator<<(std::ostream& os, const ::test_protocollayoutssamelibrary::ComposedProtocolTwoWayNamedComposedWithErrorTopResponse& value) {
-  return fidl::ostream::Formatter<::test_protocollayoutssamelibrary::ComposedProtocolTwoWayNamedComposedWithErrorTopResponse>::Format(os, value);
 }
 
 std::ostream& operator<<(std::ostream& os, const ::test_protocollayoutssamelibrary::ComposedProtocolOnNamedComposedWithErrorResult& value) {
   return fidl::ostream::Formatter<::test_protocollayoutssamelibrary::ComposedProtocolOnNamedComposedWithErrorResult>::Format(os, value);
 }
 
-std::ostream& operator<<(std::ostream& os, const ::test_protocollayoutssamelibrary::ComposedProtocolOnNamedComposedWithErrorRequest& value) {
-  return fidl::ostream::Formatter<::test_protocollayoutssamelibrary::ComposedProtocolOnNamedComposedWithErrorRequest>::Format(os, value);
-}
-
 std::ostream& operator<<(std::ostream& os, const ::test_protocollayoutssamelibrary::MainProtocolTwoWayLocalWithErrorResult& value) {
   return fidl::ostream::Formatter<::test_protocollayoutssamelibrary::MainProtocolTwoWayLocalWithErrorResult>::Format(os, value);
 }
 
-std::ostream& operator<<(std::ostream& os, const ::test_protocollayoutssamelibrary::MainProtocolTwoWayLocalWithErrorTopResponse& value) {
-  return fidl::ostream::Formatter<::test_protocollayoutssamelibrary::MainProtocolTwoWayLocalWithErrorTopResponse>::Format(os, value);
-}
-
 std::ostream& operator<<(std::ostream& os, const ::test_protocollayoutssamelibrary::MainProtocolOnLocalWithErrorResult& value) {
   return fidl::ostream::Formatter<::test_protocollayoutssamelibrary::MainProtocolOnLocalWithErrorResult>::Format(os, value);
-}
-
-std::ostream& operator<<(std::ostream& os, const ::test_protocollayoutssamelibrary::MainProtocolOnLocalWithErrorRequest& value) {
-  return fidl::ostream::Formatter<::test_protocollayoutssamelibrary::MainProtocolOnLocalWithErrorRequest>::Format(os, value);
 }
 
 std::ostream& operator<<(std::ostream& os, const ::test_protocollayoutssamelibrary::MainProtocolOneWayAnonRequest& value) {
@@ -465,10 +377,6 @@ std::ostream& operator<<(std::ostream& os, const ::test_protocollayoutssamelibra
   return fidl::ostream::Formatter<::test_protocollayoutssamelibrary::MainProtocolTwoWayAnonWithErrorResult>::Format(os, value);
 }
 
-std::ostream& operator<<(std::ostream& os, const ::test_protocollayoutssamelibrary::MainProtocolTwoWayAnonWithErrorTopResponse& value) {
-  return fidl::ostream::Formatter<::test_protocollayoutssamelibrary::MainProtocolTwoWayAnonWithErrorTopResponse>::Format(os, value);
-}
-
 std::ostream& operator<<(std::ostream& os, const ::test_protocollayoutssamelibrary::MainProtocolOnAnonRequest& value) {
   return fidl::ostream::Formatter<::test_protocollayoutssamelibrary::MainProtocolOnAnonRequest>::Format(os, value);
 }
@@ -479,10 +387,6 @@ std::ostream& operator<<(std::ostream& os, const ::test_protocollayoutssamelibra
 
 std::ostream& operator<<(std::ostream& os, const ::test_protocollayoutssamelibrary::MainProtocolOnAnonWithErrorResult& value) {
   return fidl::ostream::Formatter<::test_protocollayoutssamelibrary::MainProtocolOnAnonWithErrorResult>::Format(os, value);
-}
-
-std::ostream& operator<<(std::ostream& os, const ::test_protocollayoutssamelibrary::MainProtocolOnAnonWithErrorRequest& value) {
-  return fidl::ostream::Formatter<::test_protocollayoutssamelibrary::MainProtocolOnAnonWithErrorRequest>::Format(os, value);
 }
 
 #pragma clang diagnostic pop

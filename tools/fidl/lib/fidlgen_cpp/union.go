@@ -150,7 +150,7 @@ func (c *compiler) compileUnion(val fidlgen.Union) *Union {
 func (c *compiler) compileResult(p Payloader, m *fidlgen.Method) *Result {
 	valueType := c.compileType(*m.ValueType)
 	result := Result{
-		ResultDecl:        c.compileNameVariants(m.ResultType.Identifier),
+		ResultDecl:        c.compileNameVariants(m.ResponsePayload.Identifier),
 		ValueTypeDecl:     valueType.nameVariants,
 		Value:             valueType,
 		HasError:          m.HasError,
@@ -192,7 +192,7 @@ func (c *compiler) compileResult(p Payloader, m *fidlgen.Method) *Result {
 		result.ValueDecl = result.ValueTupleDecl
 	}
 
-	c.resultForUnion[m.ResultType.Identifier] = &result
+	c.resultForUnion[m.ResponsePayload.Identifier] = &result
 
 	return &result
 }

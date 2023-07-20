@@ -15,7 +15,6 @@
         "SomeProtocol",
         "SomeMethod",
         "Response",
-        "result",
         "response",
         "bits_member"
       ],
@@ -250,7 +249,6 @@
         "SomeProtocol",
         "SomeMethod",
         "Response",
-        "result",
         "err"
       ],
       "location": {
@@ -356,7 +354,7 @@
           "has_response": true,
           "maybe_response_payload": {
             "kind": "identifier",
-            "identifier": "test.anonymous/SomeProtocolSomeMethodTopResponse",
+            "identifier": "test.anonymous/SomeProtocol_SomeMethod_Result",
             "nullable": false,
             "type_shape_v1": {
               "inline_size": 24,
@@ -791,91 +789,11 @@
       }
     },
     {
-      "name": "test.anonymous/SomeProtocolSomeMethodTopResponse",
-      "naming_context": [
-        "SomeProtocol",
-        "SomeMethod",
-        "Response"
-      ],
-      "location": {
-        "filename": "../../tools/fidl/fidlc/testdata/anonymous.test.fidl",
-        "line": 37,
-        "column": 11,
-        "length": 110
-      },
-      "members": [
-        {
-          "type": {
-            "kind": "identifier",
-            "identifier": "test.anonymous/SomeProtocol_SomeMethod_Result",
-            "nullable": false,
-            "type_shape_v1": {
-              "inline_size": 24,
-              "alignment": 8,
-              "depth": 1,
-              "max_handles": 0,
-              "max_out_of_line": 8,
-              "has_padding": true,
-              "has_envelope": true,
-              "has_flexible_envelope": false
-            },
-            "type_shape_v2": {
-              "inline_size": 16,
-              "alignment": 8,
-              "depth": 1,
-              "max_handles": 0,
-              "max_out_of_line": 0,
-              "has_padding": true,
-              "has_envelope": true,
-              "has_flexible_envelope": false
-            }
-          },
-          "name": "result",
-          "location": {
-            "filename": "generated",
-            "line": 1,
-            "column": 1,
-            "length": 6
-          },
-          "field_shape_v1": {
-            "offset": 0,
-            "padding": 0
-          },
-          "field_shape_v2": {
-            "offset": 0,
-            "padding": 0
-          }
-        }
-      ],
-      "resource": false,
-      "type_shape_v1": {
-        "inline_size": 24,
-        "alignment": 8,
-        "depth": 1,
-        "max_handles": 0,
-        "max_out_of_line": 8,
-        "has_padding": true,
-        "has_envelope": true,
-        "has_flexible_envelope": false
-      },
-      "type_shape_v2": {
-        "inline_size": 16,
-        "alignment": 8,
-        "depth": 1,
-        "max_handles": 0,
-        "max_out_of_line": 0,
-        "has_padding": true,
-        "has_envelope": true,
-        "has_flexible_envelope": false
-      }
-    },
-    {
       "name": "test.anonymous/SomeProtocol_SomeMethod_Response",
       "naming_context": [
         "SomeProtocol",
         "SomeMethod",
         "Response",
-        "result",
         "response"
       ],
       "location": {
@@ -1485,8 +1403,7 @@
       "naming_context": [
         "SomeProtocol",
         "SomeMethod",
-        "Response",
-        "result"
+        "Response"
       ],
       "location": {
         "filename": "../../tools/fidl/fidlc/testdata/anonymous.test.fidl",
@@ -1532,7 +1449,7 @@
           },
           "location": {
             "filename": "generated",
-            "line": 2,
+            "line": 1,
             "column": 1,
             "length": 8
           }
@@ -1568,7 +1485,7 @@
           },
           "location": {
             "filename": "generated",
-            "line": 3,
+            "line": 2,
             "column": 1,
             "length": 3
           }
@@ -1698,7 +1615,6 @@
     "test.anonymous/BitsMember",
     "test.anonymous/SomeProtocol_SomeMethod_Response",
     "test.anonymous/SomeProtocol_SomeMethod_Result",
-    "test.anonymous/SomeProtocolSomeMethodTopResponse",
     "test.anonymous/SomeProtocol"
   ],
   "declarations": {
@@ -1709,7 +1625,6 @@
     "test.anonymous/SomeProtocol": "protocol",
     "test.anonymous/OverrideTest": "struct",
     "test.anonymous/SomeProtocolSomeMethodRequest": "struct",
-    "test.anonymous/SomeProtocolSomeMethodTopResponse": "struct",
     "test.anonymous/SomeProtocol_SomeMethod_Response": "struct",
     "test.anonymous/TableData": "struct",
     "test.anonymous/FunctionApplication": "table",

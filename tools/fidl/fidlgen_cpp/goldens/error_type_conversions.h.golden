@@ -55,21 +55,6 @@ struct WireTypeForNaturalType<::test_error::ExampleFooResponse> {
 };
 
 template <>
-struct WireNaturalConversionTraits<::test_error::wire::ExampleFooTopResponse, ::test_error::ExampleFooTopResponse> {
-  static ::test_error::ExampleFooTopResponse ToNatural(::test_error::wire::ExampleFooTopResponse src);
-  static ::test_error::wire::ExampleFooTopResponse ToWire(fidl::AnyArena& arena, ::test_error::ExampleFooTopResponse src);
-};
-
-template <>
-struct NaturalTypeForWireType<::test_error::wire::ExampleFooTopResponse> {
-  using type = ::test_error::ExampleFooTopResponse;
-};
-template <>
-struct WireTypeForNaturalType<::test_error::ExampleFooTopResponse> {
-  using type = ::test_error::wire::ExampleFooTopResponse;
-};
-
-template <>
 struct WireNaturalConversionTraits<::test_error::wire::ExampleFooResult, ::test_error::ExampleFooResult> {
   static ::test_error::ExampleFooResult ToNatural(::test_error::wire::ExampleFooResult src);
   static ::test_error::wire::ExampleFooResult ToWire(fidl::AnyArena& arena, ::test_error::ExampleFooResult src);

@@ -1191,16 +1191,8 @@ open protocol Example {
 
   ASSERT_EQ(response->type->kind, fidl::flat::Type::Kind::kIdentifier);
   auto id = static_cast<const fidl::flat::IdentifierType*>(response->type);
-  ASSERT_EQ(id->type_decl->kind, fidl::flat::Decl::Kind::kStruct);
-  auto as_struct = static_cast<const fidl::flat::Struct*>(id->type_decl);
-  ASSERT_EQ(as_struct->members.size(), 1);
-
-  auto response_member = &as_struct->members.at(0);
-  ASSERT_EQ(response_member->type_ctor->type->kind, fidl::flat::Type::Kind::kIdentifier);
-  auto result_identifier =
-      static_cast<const fidl::flat::IdentifierType*>(response_member->type_ctor->type);
-  const fidl::flat::Union* result_union =
-      library.LookupUnion(std::string(result_identifier->name.decl_name()));
+  ASSERT_EQ(id->type_decl->kind, fidl::flat::Decl::Kind::kUnion);
+  auto result_union = static_cast<const fidl::flat::Union*>(id->type_decl);
   ASSERT_NOT_NULL(result_union);
   ASSERT_NOT_NULL(result_union->attributes);
   ASSERT_NOT_NULL(result_union->attributes->Get("result"));
@@ -1246,16 +1238,8 @@ open protocol Example {
 
   ASSERT_EQ(response->type->kind, fidl::flat::Type::Kind::kIdentifier);
   auto id = static_cast<const fidl::flat::IdentifierType*>(response->type);
-  ASSERT_EQ(id->type_decl->kind, fidl::flat::Decl::Kind::kStruct);
-  auto as_struct = static_cast<const fidl::flat::Struct*>(id->type_decl);
-  ASSERT_EQ(as_struct->members.size(), 1);
-
-  auto response_member = &as_struct->members.at(0);
-  ASSERT_EQ(response_member->type_ctor->type->kind, fidl::flat::Type::Kind::kIdentifier);
-  auto result_identifier =
-      static_cast<const fidl::flat::IdentifierType*>(response_member->type_ctor->type);
-  const fidl::flat::Union* result_union =
-      library.LookupUnion(std::string(result_identifier->name.decl_name()));
+  ASSERT_EQ(id->type_decl->kind, fidl::flat::Decl::Kind::kUnion);
+  auto result_union = static_cast<const fidl::flat::Union*>(id->type_decl);
   ASSERT_NOT_NULL(result_union);
   ASSERT_NOT_NULL(result_union->attributes);
   ASSERT_NOT_NULL(result_union->attributes->Get("result"));

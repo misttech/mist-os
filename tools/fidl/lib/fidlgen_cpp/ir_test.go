@@ -100,14 +100,6 @@ func TestAnonymousLayoutAliases(t *testing.T) {
 		};
 		`,
 			expected: map[namingContextKey][]ScopedLayout{
-				"MyMethodResponse (with header)": {{
-					scopedName:    stringNamePart("Result"),
-					flattenedName: makeTestName("MyProtocolMyMethodResult"),
-				}},
-				"MyProtocolMyMethodTopResponse": {{
-					scopedName:    stringNamePart("Result"),
-					flattenedName: makeTestName("MyProtocolMyMethodResult"),
-				}},
 				"MyProtocolMyMethodResult": {
 					{
 						scopedName:    stringNamePart("Err"),

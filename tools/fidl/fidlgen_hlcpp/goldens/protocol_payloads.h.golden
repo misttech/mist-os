@@ -22,11 +22,7 @@ class LocalStructPayload;
 
 class MainProtocol_TwoWayLocalWithError_Result;
 
-class MainProtocolTwoWayLocalWithErrorTopResponse;
-
 class MainProtocol_OnLocalWithError_Result;
-
-class MainProtocolOnLocalWithErrorRequest;
 
 class MainProtocolOneWayAnonRequest;
 
@@ -40,23 +36,15 @@ class MainProtocol_TwoWayAnonWithError_Response;
 
 class MainProtocol_TwoWayAnonWithError_Result;
 
-class MainProtocolTwoWayAnonWithErrorTopResponse;
-
 class MainProtocolOnAnonRequest;
 
 class MainProtocol_OnAnonWithError_Response;
 
 class MainProtocol_OnAnonWithError_Result;
 
-class MainProtocolOnAnonWithErrorRequest;
-
 class MainProtocol_TwoWayImportWithError_Result;
 
-class MainProtocolTwoWayImportWithErrorTopResponse;
-
 class MainProtocol_OnImportWithError_Result;
-
-class MainProtocolOnImportWithErrorRequest;
 
 #ifdef __Fuchsia__
 
@@ -200,27 +188,6 @@ inline zx_status_t Clone(const ::test::protocolpayloads::MainProtocol_TwoWayLoca
 
 using MainProtocol_TwoWayLocalWithError_ResultPtr = ::std::unique_ptr<MainProtocol_TwoWayLocalWithError_Result>;
 
-class MainProtocolTwoWayLocalWithErrorTopResponse final {
- public:
-  static const fidl_type_t* FidlType;
-
-  ::test::protocolpayloads::MainProtocol_TwoWayLocalWithError_Result result;
-
-  static inline ::std::unique_ptr<MainProtocolTwoWayLocalWithErrorTopResponse> New() { return ::std::make_unique<MainProtocolTwoWayLocalWithErrorTopResponse>(); }
-
-  void Encode(::fidl::Encoder* _encoder, size_t _offset,
-              cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt);
-  static void Decode(::fidl::Decoder* _decoder, MainProtocolTwoWayLocalWithErrorTopResponse* value, size_t _offset);
-  zx_status_t Clone(MainProtocolTwoWayLocalWithErrorTopResponse* result) const;
-};
-
-inline zx_status_t Clone(const ::test::protocolpayloads::MainProtocolTwoWayLocalWithErrorTopResponse& _value,
-                         ::test::protocolpayloads::MainProtocolTwoWayLocalWithErrorTopResponse* _result) {
-  return _value.Clone(_result);
-}
-
-using MainProtocolTwoWayLocalWithErrorTopResponsePtr = ::std::unique_ptr<MainProtocolTwoWayLocalWithErrorTopResponse>;
-
 class MainProtocol_OnLocalWithError_Result final {
  public:
   static const fidl_type_t* FidlType;
@@ -325,27 +292,6 @@ inline zx_status_t Clone(const ::test::protocolpayloads::MainProtocol_OnLocalWit
 }
 
 using MainProtocol_OnLocalWithError_ResultPtr = ::std::unique_ptr<MainProtocol_OnLocalWithError_Result>;
-
-class MainProtocolOnLocalWithErrorRequest final {
- public:
-  static const fidl_type_t* FidlType;
-
-  ::test::protocolpayloads::MainProtocol_OnLocalWithError_Result result;
-
-  static inline ::std::unique_ptr<MainProtocolOnLocalWithErrorRequest> New() { return ::std::make_unique<MainProtocolOnLocalWithErrorRequest>(); }
-
-  void Encode(::fidl::Encoder* _encoder, size_t _offset,
-              cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt);
-  static void Decode(::fidl::Decoder* _decoder, MainProtocolOnLocalWithErrorRequest* value, size_t _offset);
-  zx_status_t Clone(MainProtocolOnLocalWithErrorRequest* result) const;
-};
-
-inline zx_status_t Clone(const ::test::protocolpayloads::MainProtocolOnLocalWithErrorRequest& _value,
-                         ::test::protocolpayloads::MainProtocolOnLocalWithErrorRequest* _result) {
-  return _value.Clone(_result);
-}
-
-using MainProtocolOnLocalWithErrorRequestPtr = ::std::unique_ptr<MainProtocolOnLocalWithErrorRequest>;
 
 class MainProtocolOneWayAnonRequest final {
  public:
@@ -574,27 +520,6 @@ inline zx_status_t Clone(const ::test::protocolpayloads::MainProtocol_TwoWayAnon
 
 using MainProtocol_TwoWayAnonWithError_ResultPtr = ::std::unique_ptr<MainProtocol_TwoWayAnonWithError_Result>;
 
-class MainProtocolTwoWayAnonWithErrorTopResponse final {
- public:
-  static const fidl_type_t* FidlType;
-
-  ::test::protocolpayloads::MainProtocol_TwoWayAnonWithError_Result result;
-
-  static inline ::std::unique_ptr<MainProtocolTwoWayAnonWithErrorTopResponse> New() { return ::std::make_unique<MainProtocolTwoWayAnonWithErrorTopResponse>(); }
-
-  void Encode(::fidl::Encoder* _encoder, size_t _offset,
-              cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt);
-  static void Decode(::fidl::Decoder* _decoder, MainProtocolTwoWayAnonWithErrorTopResponse* value, size_t _offset);
-  zx_status_t Clone(MainProtocolTwoWayAnonWithErrorTopResponse* result) const;
-};
-
-inline zx_status_t Clone(const ::test::protocolpayloads::MainProtocolTwoWayAnonWithErrorTopResponse& _value,
-                         ::test::protocolpayloads::MainProtocolTwoWayAnonWithErrorTopResponse* _result) {
-  return _value.Clone(_result);
-}
-
-using MainProtocolTwoWayAnonWithErrorTopResponsePtr = ::std::unique_ptr<MainProtocolTwoWayAnonWithErrorTopResponse>;
-
 class MainProtocolOnAnonRequest final {
  public:
   static const fidl_type_t* FidlType;
@@ -753,27 +678,6 @@ inline zx_status_t Clone(const ::test::protocolpayloads::MainProtocol_OnAnonWith
 
 using MainProtocol_OnAnonWithError_ResultPtr = ::std::unique_ptr<MainProtocol_OnAnonWithError_Result>;
 
-class MainProtocolOnAnonWithErrorRequest final {
- public:
-  static const fidl_type_t* FidlType;
-
-  ::test::protocolpayloads::MainProtocol_OnAnonWithError_Result result;
-
-  static inline ::std::unique_ptr<MainProtocolOnAnonWithErrorRequest> New() { return ::std::make_unique<MainProtocolOnAnonWithErrorRequest>(); }
-
-  void Encode(::fidl::Encoder* _encoder, size_t _offset,
-              cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt);
-  static void Decode(::fidl::Decoder* _decoder, MainProtocolOnAnonWithErrorRequest* value, size_t _offset);
-  zx_status_t Clone(MainProtocolOnAnonWithErrorRequest* result) const;
-};
-
-inline zx_status_t Clone(const ::test::protocolpayloads::MainProtocolOnAnonWithErrorRequest& _value,
-                         ::test::protocolpayloads::MainProtocolOnAnonWithErrorRequest* _result) {
-  return _value.Clone(_result);
-}
-
-using MainProtocolOnAnonWithErrorRequestPtr = ::std::unique_ptr<MainProtocolOnAnonWithErrorRequest>;
-
 class MainProtocol_TwoWayImportWithError_Result final {
  public:
   static const fidl_type_t* FidlType;
@@ -861,27 +765,6 @@ inline zx_status_t Clone(const ::test::protocolpayloads::MainProtocol_TwoWayImpo
 
 using MainProtocol_TwoWayImportWithError_ResultPtr = ::std::unique_ptr<MainProtocol_TwoWayImportWithError_Result>;
 
-class MainProtocolTwoWayImportWithErrorTopResponse final {
- public:
-  static const fidl_type_t* FidlType;
-
-  ::test::protocolpayloads::MainProtocol_TwoWayImportWithError_Result result;
-
-  static inline ::std::unique_ptr<MainProtocolTwoWayImportWithErrorTopResponse> New() { return ::std::make_unique<MainProtocolTwoWayImportWithErrorTopResponse>(); }
-
-  void Encode(::fidl::Encoder* _encoder, size_t _offset,
-              cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt);
-  static void Decode(::fidl::Decoder* _decoder, MainProtocolTwoWayImportWithErrorTopResponse* value, size_t _offset);
-  zx_status_t Clone(MainProtocolTwoWayImportWithErrorTopResponse* result) const;
-};
-
-inline zx_status_t Clone(const ::test::protocolpayloads::MainProtocolTwoWayImportWithErrorTopResponse& _value,
-                         ::test::protocolpayloads::MainProtocolTwoWayImportWithErrorTopResponse* _result) {
-  return _value.Clone(_result);
-}
-
-using MainProtocolTwoWayImportWithErrorTopResponsePtr = ::std::unique_ptr<MainProtocolTwoWayImportWithErrorTopResponse>;
-
 class MainProtocol_OnImportWithError_Result final {
  public:
   static const fidl_type_t* FidlType;
@@ -968,27 +851,6 @@ inline zx_status_t Clone(const ::test::protocolpayloads::MainProtocol_OnImportWi
 }
 
 using MainProtocol_OnImportWithError_ResultPtr = ::std::unique_ptr<MainProtocol_OnImportWithError_Result>;
-
-class MainProtocolOnImportWithErrorRequest final {
- public:
-  static const fidl_type_t* FidlType;
-
-  ::test::protocolpayloads::MainProtocol_OnImportWithError_Result result;
-
-  static inline ::std::unique_ptr<MainProtocolOnImportWithErrorRequest> New() { return ::std::make_unique<MainProtocolOnImportWithErrorRequest>(); }
-
-  void Encode(::fidl::Encoder* _encoder, size_t _offset,
-              cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt);
-  static void Decode(::fidl::Decoder* _decoder, MainProtocolOnImportWithErrorRequest* value, size_t _offset);
-  zx_status_t Clone(MainProtocolOnImportWithErrorRequest* result) const;
-};
-
-inline zx_status_t Clone(const ::test::protocolpayloads::MainProtocolOnImportWithErrorRequest& _value,
-                         ::test::protocolpayloads::MainProtocolOnImportWithErrorRequest* _result) {
-  return _value.Clone(_result);
-}
-
-using MainProtocolOnImportWithErrorRequestPtr = ::std::unique_ptr<MainProtocolOnImportWithErrorRequest>;
 
 #ifdef __Fuchsia__
 
@@ -1094,25 +956,25 @@ class MainProtocol_RequestEncoder {
 };
 
 namespace _internal {
-__LOCAL extern "C" const fidl_type_t test_protocolpayloads_imported_ComposedProtocolTwoWayComposedWithErrorTopResponseTable;
+__LOCAL extern "C" const fidl_type_t test_protocolpayloads_imported_ComposedProtocol_TwoWayComposedWithError_ResultTable;
 
-__LOCAL extern "C" const fidl_type_t test_protocolpayloads_imported_ComposedProtocolOnComposedWithErrorRequestTable;
+__LOCAL extern "C" const fidl_type_t test_protocolpayloads_imported_ComposedProtocol_OnComposedWithError_ResultTable;
 
-__LOCAL extern "C" const fidl_type_t test_protocolpayloads_MainProtocolTwoWayLocalWithErrorTopResponseTable;
+__LOCAL extern "C" const fidl_type_t test_protocolpayloads_MainProtocol_TwoWayLocalWithError_ResultTable;
 
-__LOCAL extern "C" const fidl_type_t test_protocolpayloads_MainProtocolOnLocalWithErrorRequestTable;
+__LOCAL extern "C" const fidl_type_t test_protocolpayloads_MainProtocol_OnLocalWithError_ResultTable;
 
-__LOCAL extern "C" const fidl_type_t test_protocolpayloads_MainProtocolTwoWayImportWithErrorTopResponseTable;
+__LOCAL extern "C" const fidl_type_t test_protocolpayloads_MainProtocol_TwoWayImportWithError_ResultTable;
 
-__LOCAL extern "C" const fidl_type_t test_protocolpayloads_MainProtocolOnImportWithErrorRequestTable;
+__LOCAL extern "C" const fidl_type_t test_protocolpayloads_MainProtocol_OnImportWithError_ResultTable;
 
 __LOCAL extern "C" const fidl_type_t test_protocolpayloads_MainProtocolTwoWayAnonResponseTable;
 
-__LOCAL extern "C" const fidl_type_t test_protocolpayloads_MainProtocolTwoWayAnonWithErrorTopResponseTable;
+__LOCAL extern "C" const fidl_type_t test_protocolpayloads_MainProtocol_TwoWayAnonWithError_ResultTable;
 
 __LOCAL extern "C" const fidl_type_t test_protocolpayloads_MainProtocolOnAnonRequestTable;
 
-__LOCAL extern "C" const fidl_type_t test_protocolpayloads_MainProtocolOnAnonWithErrorRequestTable;
+__LOCAL extern "C" const fidl_type_t test_protocolpayloads_MainProtocol_OnAnonWithError_ResultTable;
 
 }  // namespace _internal
 
@@ -1124,9 +986,9 @@ class MainProtocol_ResponseEncoder {
 
     return _encoder->GetMessage();
   }
-  static ::fidl::HLCPPOutgoingMessage TwoWayComposedWithError(::fidl::MessageEncoder* _encoder, ::test::protocolpayloads::imported::ComposedProtocol_TwoWayComposedWithError_Result* result) {
+  static ::fidl::HLCPPOutgoingMessage TwoWayComposedWithError(::fidl::MessageEncoder* _encoder, ::test::protocolpayloads::imported::ComposedProtocol_TwoWayComposedWithError_Result* ComposedProtocol_TwoWayComposedWithError_Result) {
     _encoder->Alloc(16);
-    ::fidl::Encode(_encoder, result, 0 + sizeof(fidl_message_header_t));
+    ::fidl::Encode(_encoder, ComposedProtocol_TwoWayComposedWithError_Result, 0 + sizeof(fidl_message_header_t));
 
     return _encoder->GetMessage();
   }
@@ -1136,9 +998,9 @@ class MainProtocol_ResponseEncoder {
 
     return _encoder->GetMessage();
   }
-  static ::fidl::HLCPPOutgoingMessage OnComposedWithError(::fidl::MessageEncoder* _encoder, ::test::protocolpayloads::imported::ComposedProtocol_OnComposedWithError_Result* result) {
+  static ::fidl::HLCPPOutgoingMessage OnComposedWithError(::fidl::MessageEncoder* _encoder, ::test::protocolpayloads::imported::ComposedProtocol_OnComposedWithError_Result* ComposedProtocol_OnComposedWithError_Result) {
     _encoder->Alloc(16);
-    ::fidl::Encode(_encoder, result, 0 + sizeof(fidl_message_header_t));
+    ::fidl::Encode(_encoder, ComposedProtocol_OnComposedWithError_Result, 0 + sizeof(fidl_message_header_t));
 
     return _encoder->GetMessage();
   }
@@ -1150,9 +1012,9 @@ class MainProtocol_ResponseEncoder {
 
     return _encoder->GetMessage();
   }
-  static ::fidl::HLCPPOutgoingMessage TwoWayLocalWithError(::fidl::MessageEncoder* _encoder, ::test::protocolpayloads::MainProtocol_TwoWayLocalWithError_Result* result) {
+  static ::fidl::HLCPPOutgoingMessage TwoWayLocalWithError(::fidl::MessageEncoder* _encoder, ::test::protocolpayloads::MainProtocol_TwoWayLocalWithError_Result* MainProtocol_TwoWayLocalWithError_Result) {
     _encoder->Alloc(16);
-    ::fidl::Encode(_encoder, result, 0 + sizeof(fidl_message_header_t));
+    ::fidl::Encode(_encoder, MainProtocol_TwoWayLocalWithError_Result, 0 + sizeof(fidl_message_header_t));
 
     return _encoder->GetMessage();
   }
@@ -1164,9 +1026,9 @@ class MainProtocol_ResponseEncoder {
 
     return _encoder->GetMessage();
   }
-  static ::fidl::HLCPPOutgoingMessage OnLocalWithError(::fidl::MessageEncoder* _encoder, ::test::protocolpayloads::MainProtocol_OnLocalWithError_Result* result) {
+  static ::fidl::HLCPPOutgoingMessage OnLocalWithError(::fidl::MessageEncoder* _encoder, ::test::protocolpayloads::MainProtocol_OnLocalWithError_Result* MainProtocol_OnLocalWithError_Result) {
     _encoder->Alloc(16);
-    ::fidl::Encode(_encoder, result, 0 + sizeof(fidl_message_header_t));
+    ::fidl::Encode(_encoder, MainProtocol_OnLocalWithError_Result, 0 + sizeof(fidl_message_header_t));
 
     return _encoder->GetMessage();
   }
@@ -1176,9 +1038,9 @@ class MainProtocol_ResponseEncoder {
 
     return _encoder->GetMessage();
   }
-  static ::fidl::HLCPPOutgoingMessage TwoWayImportWithError(::fidl::MessageEncoder* _encoder, ::test::protocolpayloads::MainProtocol_TwoWayImportWithError_Result* result) {
+  static ::fidl::HLCPPOutgoingMessage TwoWayImportWithError(::fidl::MessageEncoder* _encoder, ::test::protocolpayloads::MainProtocol_TwoWayImportWithError_Result* MainProtocol_TwoWayImportWithError_Result) {
     _encoder->Alloc(16);
-    ::fidl::Encode(_encoder, result, 0 + sizeof(fidl_message_header_t));
+    ::fidl::Encode(_encoder, MainProtocol_TwoWayImportWithError_Result, 0 + sizeof(fidl_message_header_t));
 
     return _encoder->GetMessage();
   }
@@ -1188,9 +1050,9 @@ class MainProtocol_ResponseEncoder {
 
     return _encoder->GetMessage();
   }
-  static ::fidl::HLCPPOutgoingMessage OnImportWithError(::fidl::MessageEncoder* _encoder, ::test::protocolpayloads::MainProtocol_OnImportWithError_Result* result) {
+  static ::fidl::HLCPPOutgoingMessage OnImportWithError(::fidl::MessageEncoder* _encoder, ::test::protocolpayloads::MainProtocol_OnImportWithError_Result* MainProtocol_OnImportWithError_Result) {
     _encoder->Alloc(16);
-    ::fidl::Encode(_encoder, result, 0 + sizeof(fidl_message_header_t));
+    ::fidl::Encode(_encoder, MainProtocol_OnImportWithError_Result, 0 + sizeof(fidl_message_header_t));
 
     return _encoder->GetMessage();
   }
@@ -1202,9 +1064,9 @@ class MainProtocol_ResponseEncoder {
 
     return _encoder->GetMessage();
   }
-  static ::fidl::HLCPPOutgoingMessage TwoWayAnonWithError(::fidl::MessageEncoder* _encoder, ::test::protocolpayloads::MainProtocol_TwoWayAnonWithError_Result* result) {
+  static ::fidl::HLCPPOutgoingMessage TwoWayAnonWithError(::fidl::MessageEncoder* _encoder, ::test::protocolpayloads::MainProtocol_TwoWayAnonWithError_Result* MainProtocol_TwoWayAnonWithError_Result) {
     _encoder->Alloc(16);
-    ::fidl::Encode(_encoder, result, 0 + sizeof(fidl_message_header_t));
+    ::fidl::Encode(_encoder, MainProtocol_TwoWayAnonWithError_Result, 0 + sizeof(fidl_message_header_t));
 
     return _encoder->GetMessage();
   }
@@ -1216,9 +1078,9 @@ class MainProtocol_ResponseEncoder {
 
     return _encoder->GetMessage();
   }
-  static ::fidl::HLCPPOutgoingMessage OnAnonWithError(::fidl::MessageEncoder* _encoder, ::test::protocolpayloads::MainProtocol_OnAnonWithError_Result* result) {
+  static ::fidl::HLCPPOutgoingMessage OnAnonWithError(::fidl::MessageEncoder* _encoder, ::test::protocolpayloads::MainProtocol_OnAnonWithError_Result* MainProtocol_OnAnonWithError_Result) {
     _encoder->Alloc(16);
-    ::fidl::Encode(_encoder, result, 0 + sizeof(fidl_message_header_t));
+    ::fidl::Encode(_encoder, MainProtocol_OnAnonWithError_Result, 0 + sizeof(fidl_message_header_t));
 
     return _encoder->GetMessage();
   }
@@ -1313,31 +1175,6 @@ struct Equality<::test::protocolpayloads::MainProtocol_TwoWayLocalWithError_Resu
   }
 };
 template <>
-struct CodingTraits<::test::protocolpayloads::MainProtocolTwoWayLocalWithErrorTopResponse>
-    : public EncodableCodingTraits<::test::protocolpayloads::MainProtocolTwoWayLocalWithErrorTopResponse, 16> {};
-
-template <>
-struct HasPadding<::test::protocolpayloads::MainProtocolTwoWayLocalWithErrorTopResponse> : public std::true_type {};
-
-template <>
-struct IsMemcpyCompatible<::test::protocolpayloads::MainProtocolTwoWayLocalWithErrorTopResponse> : public internal::BoolConstant<
-                                                                                                       !HasPadding<::test::protocolpayloads::MainProtocolTwoWayLocalWithErrorTopResponse>::value && IsMemcpyCompatible<::test::protocolpayloads::MainProtocol_TwoWayLocalWithError_Result>::value> {};
-
-inline zx_status_t Clone(const ::test::protocolpayloads::MainProtocolTwoWayLocalWithErrorTopResponse& value,
-                         ::test::protocolpayloads::MainProtocolTwoWayLocalWithErrorTopResponse* result) {
-  return ::test::protocolpayloads::Clone(value, result);
-}
-
-template <>
-struct Equality<::test::protocolpayloads::MainProtocolTwoWayLocalWithErrorTopResponse> {
-  bool operator()(const ::test::protocolpayloads::MainProtocolTwoWayLocalWithErrorTopResponse& _lhs, const ::test::protocolpayloads::MainProtocolTwoWayLocalWithErrorTopResponse& _rhs) const {
-    if (!::fidl::Equals(_lhs.result, _rhs.result)) {
-      return false;
-    }
-    return true;
-  }
-};
-template <>
 struct IsFidlXUnion<::test::protocolpayloads::MainProtocol_OnLocalWithError_Result> : public std::true_type {};
 
 template <>
@@ -1392,31 +1229,6 @@ struct Equality<::test::protocolpayloads::MainProtocol_OnLocalWithError_Result> 
       default:
         return false;
     }
-  }
-};
-template <>
-struct CodingTraits<::test::protocolpayloads::MainProtocolOnLocalWithErrorRequest>
-    : public EncodableCodingTraits<::test::protocolpayloads::MainProtocolOnLocalWithErrorRequest, 16> {};
-
-template <>
-struct HasPadding<::test::protocolpayloads::MainProtocolOnLocalWithErrorRequest> : public std::true_type {};
-
-template <>
-struct IsMemcpyCompatible<::test::protocolpayloads::MainProtocolOnLocalWithErrorRequest> : public internal::BoolConstant<
-                                                                                               !HasPadding<::test::protocolpayloads::MainProtocolOnLocalWithErrorRequest>::value && IsMemcpyCompatible<::test::protocolpayloads::MainProtocol_OnLocalWithError_Result>::value> {};
-
-inline zx_status_t Clone(const ::test::protocolpayloads::MainProtocolOnLocalWithErrorRequest& value,
-                         ::test::protocolpayloads::MainProtocolOnLocalWithErrorRequest* result) {
-  return ::test::protocolpayloads::Clone(value, result);
-}
-
-template <>
-struct Equality<::test::protocolpayloads::MainProtocolOnLocalWithErrorRequest> {
-  bool operator()(const ::test::protocolpayloads::MainProtocolOnLocalWithErrorRequest& _lhs, const ::test::protocolpayloads::MainProtocolOnLocalWithErrorRequest& _rhs) const {
-    if (!::fidl::Equals(_lhs.result, _rhs.result)) {
-      return false;
-    }
-    return true;
   }
 };
 template <>
@@ -1602,31 +1414,6 @@ struct Equality<::test::protocolpayloads::MainProtocol_TwoWayAnonWithError_Resul
   }
 };
 template <>
-struct CodingTraits<::test::protocolpayloads::MainProtocolTwoWayAnonWithErrorTopResponse>
-    : public EncodableCodingTraits<::test::protocolpayloads::MainProtocolTwoWayAnonWithErrorTopResponse, 16> {};
-
-template <>
-struct HasPadding<::test::protocolpayloads::MainProtocolTwoWayAnonWithErrorTopResponse> : public std::true_type {};
-
-template <>
-struct IsMemcpyCompatible<::test::protocolpayloads::MainProtocolTwoWayAnonWithErrorTopResponse> : public internal::BoolConstant<
-                                                                                                      !HasPadding<::test::protocolpayloads::MainProtocolTwoWayAnonWithErrorTopResponse>::value && IsMemcpyCompatible<::test::protocolpayloads::MainProtocol_TwoWayAnonWithError_Result>::value> {};
-
-inline zx_status_t Clone(const ::test::protocolpayloads::MainProtocolTwoWayAnonWithErrorTopResponse& value,
-                         ::test::protocolpayloads::MainProtocolTwoWayAnonWithErrorTopResponse* result) {
-  return ::test::protocolpayloads::Clone(value, result);
-}
-
-template <>
-struct Equality<::test::protocolpayloads::MainProtocolTwoWayAnonWithErrorTopResponse> {
-  bool operator()(const ::test::protocolpayloads::MainProtocolTwoWayAnonWithErrorTopResponse& _lhs, const ::test::protocolpayloads::MainProtocolTwoWayAnonWithErrorTopResponse& _rhs) const {
-    if (!::fidl::Equals(_lhs.result, _rhs.result)) {
-      return false;
-    }
-    return true;
-  }
-};
-template <>
 struct CodingTraits<::test::protocolpayloads::MainProtocolOnAnonRequest>
     : public EncodableCodingTraits<::test::protocolpayloads::MainProtocolOnAnonRequest, 8> {};
 
@@ -1734,31 +1521,6 @@ struct Equality<::test::protocolpayloads::MainProtocol_OnAnonWithError_Result> {
   }
 };
 template <>
-struct CodingTraits<::test::protocolpayloads::MainProtocolOnAnonWithErrorRequest>
-    : public EncodableCodingTraits<::test::protocolpayloads::MainProtocolOnAnonWithErrorRequest, 16> {};
-
-template <>
-struct HasPadding<::test::protocolpayloads::MainProtocolOnAnonWithErrorRequest> : public std::true_type {};
-
-template <>
-struct IsMemcpyCompatible<::test::protocolpayloads::MainProtocolOnAnonWithErrorRequest> : public internal::BoolConstant<
-                                                                                              !HasPadding<::test::protocolpayloads::MainProtocolOnAnonWithErrorRequest>::value && IsMemcpyCompatible<::test::protocolpayloads::MainProtocol_OnAnonWithError_Result>::value> {};
-
-inline zx_status_t Clone(const ::test::protocolpayloads::MainProtocolOnAnonWithErrorRequest& value,
-                         ::test::protocolpayloads::MainProtocolOnAnonWithErrorRequest* result) {
-  return ::test::protocolpayloads::Clone(value, result);
-}
-
-template <>
-struct Equality<::test::protocolpayloads::MainProtocolOnAnonWithErrorRequest> {
-  bool operator()(const ::test::protocolpayloads::MainProtocolOnAnonWithErrorRequest& _lhs, const ::test::protocolpayloads::MainProtocolOnAnonWithErrorRequest& _rhs) const {
-    if (!::fidl::Equals(_lhs.result, _rhs.result)) {
-      return false;
-    }
-    return true;
-  }
-};
-template <>
 struct IsFidlXUnion<::test::protocolpayloads::MainProtocol_TwoWayImportWithError_Result> : public std::true_type {};
 
 template <>
@@ -1816,31 +1578,6 @@ struct Equality<::test::protocolpayloads::MainProtocol_TwoWayImportWithError_Res
   }
 };
 template <>
-struct CodingTraits<::test::protocolpayloads::MainProtocolTwoWayImportWithErrorTopResponse>
-    : public EncodableCodingTraits<::test::protocolpayloads::MainProtocolTwoWayImportWithErrorTopResponse, 16> {};
-
-template <>
-struct HasPadding<::test::protocolpayloads::MainProtocolTwoWayImportWithErrorTopResponse> : public std::true_type {};
-
-template <>
-struct IsMemcpyCompatible<::test::protocolpayloads::MainProtocolTwoWayImportWithErrorTopResponse> : public internal::BoolConstant<
-                                                                                                        !HasPadding<::test::protocolpayloads::MainProtocolTwoWayImportWithErrorTopResponse>::value && IsMemcpyCompatible<::test::protocolpayloads::MainProtocol_TwoWayImportWithError_Result>::value> {};
-
-inline zx_status_t Clone(const ::test::protocolpayloads::MainProtocolTwoWayImportWithErrorTopResponse& value,
-                         ::test::protocolpayloads::MainProtocolTwoWayImportWithErrorTopResponse* result) {
-  return ::test::protocolpayloads::Clone(value, result);
-}
-
-template <>
-struct Equality<::test::protocolpayloads::MainProtocolTwoWayImportWithErrorTopResponse> {
-  bool operator()(const ::test::protocolpayloads::MainProtocolTwoWayImportWithErrorTopResponse& _lhs, const ::test::protocolpayloads::MainProtocolTwoWayImportWithErrorTopResponse& _rhs) const {
-    if (!::fidl::Equals(_lhs.result, _rhs.result)) {
-      return false;
-    }
-    return true;
-  }
-};
-template <>
 struct IsFidlXUnion<::test::protocolpayloads::MainProtocol_OnImportWithError_Result> : public std::true_type {};
 
 template <>
@@ -1895,31 +1632,6 @@ struct Equality<::test::protocolpayloads::MainProtocol_OnImportWithError_Result>
       default:
         return false;
     }
-  }
-};
-template <>
-struct CodingTraits<::test::protocolpayloads::MainProtocolOnImportWithErrorRequest>
-    : public EncodableCodingTraits<::test::protocolpayloads::MainProtocolOnImportWithErrorRequest, 16> {};
-
-template <>
-struct HasPadding<::test::protocolpayloads::MainProtocolOnImportWithErrorRequest> : public std::true_type {};
-
-template <>
-struct IsMemcpyCompatible<::test::protocolpayloads::MainProtocolOnImportWithErrorRequest> : public internal::BoolConstant<
-                                                                                                !HasPadding<::test::protocolpayloads::MainProtocolOnImportWithErrorRequest>::value && IsMemcpyCompatible<::test::protocolpayloads::MainProtocol_OnImportWithError_Result>::value> {};
-
-inline zx_status_t Clone(const ::test::protocolpayloads::MainProtocolOnImportWithErrorRequest& value,
-                         ::test::protocolpayloads::MainProtocolOnImportWithErrorRequest* result) {
-  return ::test::protocolpayloads::Clone(value, result);
-}
-
-template <>
-struct Equality<::test::protocolpayloads::MainProtocolOnImportWithErrorRequest> {
-  bool operator()(const ::test::protocolpayloads::MainProtocolOnImportWithErrorRequest& _lhs, const ::test::protocolpayloads::MainProtocolOnImportWithErrorRequest& _rhs) const {
-    if (!::fidl::Equals(_lhs.result, _rhs.result)) {
-      return false;
-    }
-    return true;
   }
 };
 
@@ -2117,34 +1829,34 @@ class MainProtocol_ResponseDecoder {
   virtual ~MainProtocol_ResponseDecoder() = default;
   static const fidl_type_t* GetType(uint64_t ordinal);
   virtual void TwoWayComposed(int32_t a) = 0;
-  virtual void TwoWayComposedWithError(::test::protocolpayloads::imported::ComposedProtocol_TwoWayComposedWithError_Result result) = 0;
+  virtual void TwoWayComposedWithError(::test::protocolpayloads::imported::ComposedProtocol_TwoWayComposedWithError_Result ComposedProtocol_TwoWayComposedWithError_Result) = 0;
   virtual void OnComposed(int32_t a) = 0;
-  virtual void OnComposedWithError(::test::protocolpayloads::imported::ComposedProtocol_OnComposedWithError_Result result) = 0;
+  virtual void OnComposedWithError(::test::protocolpayloads::imported::ComposedProtocol_OnComposedWithError_Result ComposedProtocol_OnComposedWithError_Result) = 0;
   virtual void TwoWayLocal(uint32_t a, uint32_t b) = 0;
-  virtual void TwoWayLocalWithError(::test::protocolpayloads::MainProtocol_TwoWayLocalWithError_Result result) = 0;
+  virtual void TwoWayLocalWithError(::test::protocolpayloads::MainProtocol_TwoWayLocalWithError_Result MainProtocol_TwoWayLocalWithError_Result) = 0;
   virtual void OnLocal(uint32_t a, uint32_t b) = 0;
-  virtual void OnLocalWithError(::test::protocolpayloads::MainProtocol_OnLocalWithError_Result result) = 0;
+  virtual void OnLocalWithError(::test::protocolpayloads::MainProtocol_OnLocalWithError_Result MainProtocol_OnLocalWithError_Result) = 0;
   virtual void TwoWayImport(int32_t a) = 0;
-  virtual void TwoWayImportWithError(::test::protocolpayloads::MainProtocol_TwoWayImportWithError_Result result) = 0;
+  virtual void TwoWayImportWithError(::test::protocolpayloads::MainProtocol_TwoWayImportWithError_Result MainProtocol_TwoWayImportWithError_Result) = 0;
   virtual void OnImport(int32_t a) = 0;
-  virtual void OnImportWithError(::test::protocolpayloads::MainProtocol_OnImportWithError_Result result) = 0;
+  virtual void OnImportWithError(::test::protocolpayloads::MainProtocol_OnImportWithError_Result MainProtocol_OnImportWithError_Result) = 0;
   virtual void TwoWayAnon(uint32_t a, uint32_t b) = 0;
-  virtual void TwoWayAnonWithError(::test::protocolpayloads::MainProtocol_TwoWayAnonWithError_Result result) = 0;
+  virtual void TwoWayAnonWithError(::test::protocolpayloads::MainProtocol_TwoWayAnonWithError_Result MainProtocol_TwoWayAnonWithError_Result) = 0;
   virtual void OnAnon(uint32_t a, uint32_t b) = 0;
-  virtual void OnAnonWithError(::test::protocolpayloads::MainProtocol_OnAnonWithError_Result result) = 0;
+  virtual void OnAnonWithError(::test::protocolpayloads::MainProtocol_OnAnonWithError_Result MainProtocol_OnAnonWithError_Result) = 0;
 };
 
 class MainProtocol_EventSender {
  public:
   virtual ~MainProtocol_EventSender();
   virtual void OnComposed(int32_t a) = 0;
-  virtual void OnComposedWithError(::test::protocolpayloads::imported::ComposedProtocol_OnComposedWithError_Result result) = 0;
+  virtual void OnComposedWithError(::test::protocolpayloads::imported::ComposedProtocol_OnComposedWithError_Result ComposedProtocol_OnComposedWithError_Result) = 0;
   virtual void OnLocal(uint32_t a, uint32_t b) = 0;
-  virtual void OnLocalWithError(::test::protocolpayloads::MainProtocol_OnLocalWithError_Result result) = 0;
+  virtual void OnLocalWithError(::test::protocolpayloads::MainProtocol_OnLocalWithError_Result MainProtocol_OnLocalWithError_Result) = 0;
   virtual void OnImport(int32_t a) = 0;
-  virtual void OnImportWithError(::test::protocolpayloads::MainProtocol_OnImportWithError_Result result) = 0;
+  virtual void OnImportWithError(::test::protocolpayloads::MainProtocol_OnImportWithError_Result MainProtocol_OnImportWithError_Result) = 0;
   virtual void OnAnon(uint32_t a, uint32_t b) = 0;
-  virtual void OnAnonWithError(::test::protocolpayloads::MainProtocol_OnAnonWithError_Result result) = 0;
+  virtual void OnAnonWithError(::test::protocolpayloads::MainProtocol_OnAnonWithError_Result MainProtocol_OnAnonWithError_Result) = 0;
 };
 
 class MainProtocol_Sync {
@@ -2153,16 +1865,16 @@ class MainProtocol_Sync {
   virtual ~MainProtocol_Sync();
   virtual zx_status_t OneWayComposed(int32_t a) = 0;
   virtual zx_status_t TwoWayComposed(int32_t a, int32_t* out_a) = 0;
-  virtual zx_status_t TwoWayComposedWithError(int32_t a, ::test::protocolpayloads::imported::ComposedProtocol_TwoWayComposedWithError_Result* out_result) = 0;
+  virtual zx_status_t TwoWayComposedWithError(int32_t a, ::test::protocolpayloads::imported::ComposedProtocol_TwoWayComposedWithError_Result* out_ComposedProtocol_TwoWayComposedWithError_Result) = 0;
   virtual zx_status_t OneWayLocal(uint32_t a, uint32_t b) = 0;
   virtual zx_status_t TwoWayLocal(uint32_t a, uint32_t b, uint32_t* out_a, uint32_t* out_b) = 0;
-  virtual zx_status_t TwoWayLocalWithError(uint32_t a, uint32_t b, ::test::protocolpayloads::MainProtocol_TwoWayLocalWithError_Result* out_result) = 0;
+  virtual zx_status_t TwoWayLocalWithError(uint32_t a, uint32_t b, ::test::protocolpayloads::MainProtocol_TwoWayLocalWithError_Result* out_MainProtocol_TwoWayLocalWithError_Result) = 0;
   virtual zx_status_t OneWayImport(int32_t a) = 0;
   virtual zx_status_t TwoWayImport(int32_t a, int32_t* out_a) = 0;
-  virtual zx_status_t TwoWayImportWithError(int32_t a, ::test::protocolpayloads::MainProtocol_TwoWayImportWithError_Result* out_result) = 0;
+  virtual zx_status_t TwoWayImportWithError(int32_t a, ::test::protocolpayloads::MainProtocol_TwoWayImportWithError_Result* out_MainProtocol_TwoWayImportWithError_Result) = 0;
   virtual zx_status_t OneWayAnon(uint32_t a, uint32_t b) = 0;
   virtual zx_status_t TwoWayAnon(uint32_t a, uint32_t b, uint32_t* out_a, uint32_t* out_b) = 0;
-  virtual zx_status_t TwoWayAnonWithError(uint32_t a, uint32_t b, ::test::protocolpayloads::MainProtocol_TwoWayAnonWithError_Result* out_result) = 0;
+  virtual zx_status_t TwoWayAnonWithError(uint32_t a, uint32_t b, ::test::protocolpayloads::MainProtocol_TwoWayAnonWithError_Result* out_MainProtocol_TwoWayAnonWithError_Result) = 0;
 };
 
 class MainProtocol_Proxy final : public ::fidl::internal::Proxy, public MainProtocol {
@@ -2220,13 +1932,13 @@ class MainProtocol_Stub final : public ::fidl::internal::Stub, public ::test::pr
   zx_status_t Dispatch_(::fidl::HLCPPIncomingMessage message,
                         ::fidl::internal::PendingResponse response) override;
   void OnComposed(int32_t a) override;
-  void OnComposedWithError(::test::protocolpayloads::imported::ComposedProtocol_OnComposedWithError_Result result) override;
+  void OnComposedWithError(::test::protocolpayloads::imported::ComposedProtocol_OnComposedWithError_Result ComposedProtocol_OnComposedWithError_Result) override;
   void OnLocal(uint32_t a, uint32_t b) override;
-  void OnLocalWithError(::test::protocolpayloads::MainProtocol_OnLocalWithError_Result result) override;
+  void OnLocalWithError(::test::protocolpayloads::MainProtocol_OnLocalWithError_Result MainProtocol_OnLocalWithError_Result) override;
   void OnImport(int32_t a) override;
-  void OnImportWithError(::test::protocolpayloads::MainProtocol_OnImportWithError_Result result) override;
+  void OnImportWithError(::test::protocolpayloads::MainProtocol_OnImportWithError_Result MainProtocol_OnImportWithError_Result) override;
   void OnAnon(uint32_t a, uint32_t b) override;
-  void OnAnonWithError(::test::protocolpayloads::MainProtocol_OnAnonWithError_Result result) override;
+  void OnAnonWithError(::test::protocolpayloads::MainProtocol_OnAnonWithError_Result MainProtocol_OnAnonWithError_Result) override;
 
  private:
   ::test::protocolpayloads::MainProtocol_Stub::MainProtocol_clazz* impl_;
@@ -2241,25 +1953,25 @@ class MainProtocol_SyncProxy : public ::test::protocolpayloads::MainProtocol_Syn
   // cts-coverage-fidl-name:test.protocolpayloads/MainProtocol.TwoWayComposed
   zx_status_t TwoWayComposed(int32_t a, int32_t* out_a) override;
   // cts-coverage-fidl-name:test.protocolpayloads/MainProtocol.TwoWayComposedWithError
-  zx_status_t TwoWayComposedWithError(int32_t a, ::test::protocolpayloads::imported::ComposedProtocol_TwoWayComposedWithError_Result* out_result) override;
+  zx_status_t TwoWayComposedWithError(int32_t a, ::test::protocolpayloads::imported::ComposedProtocol_TwoWayComposedWithError_Result* out_ComposedProtocol_TwoWayComposedWithError_Result) override;
   // cts-coverage-fidl-name:test.protocolpayloads/MainProtocol.OneWayLocal
   zx_status_t OneWayLocal(uint32_t a, uint32_t b) override;
   // cts-coverage-fidl-name:test.protocolpayloads/MainProtocol.TwoWayLocal
   zx_status_t TwoWayLocal(uint32_t a, uint32_t b, uint32_t* out_a, uint32_t* out_b) override;
   // cts-coverage-fidl-name:test.protocolpayloads/MainProtocol.TwoWayLocalWithError
-  zx_status_t TwoWayLocalWithError(uint32_t a, uint32_t b, ::test::protocolpayloads::MainProtocol_TwoWayLocalWithError_Result* out_result) override;
+  zx_status_t TwoWayLocalWithError(uint32_t a, uint32_t b, ::test::protocolpayloads::MainProtocol_TwoWayLocalWithError_Result* out_MainProtocol_TwoWayLocalWithError_Result) override;
   // cts-coverage-fidl-name:test.protocolpayloads/MainProtocol.OneWayImport
   zx_status_t OneWayImport(int32_t a) override;
   // cts-coverage-fidl-name:test.protocolpayloads/MainProtocol.TwoWayImport
   zx_status_t TwoWayImport(int32_t a, int32_t* out_a) override;
   // cts-coverage-fidl-name:test.protocolpayloads/MainProtocol.TwoWayImportWithError
-  zx_status_t TwoWayImportWithError(int32_t a, ::test::protocolpayloads::MainProtocol_TwoWayImportWithError_Result* out_result) override;
+  zx_status_t TwoWayImportWithError(int32_t a, ::test::protocolpayloads::MainProtocol_TwoWayImportWithError_Result* out_MainProtocol_TwoWayImportWithError_Result) override;
   // cts-coverage-fidl-name:test.protocolpayloads/MainProtocol.OneWayAnon
   zx_status_t OneWayAnon(uint32_t a, uint32_t b) override;
   // cts-coverage-fidl-name:test.protocolpayloads/MainProtocol.TwoWayAnon
   zx_status_t TwoWayAnon(uint32_t a, uint32_t b, uint32_t* out_a, uint32_t* out_b) override;
   // cts-coverage-fidl-name:test.protocolpayloads/MainProtocol.TwoWayAnonWithError
-  zx_status_t TwoWayAnonWithError(uint32_t a, uint32_t b, ::test::protocolpayloads::MainProtocol_TwoWayAnonWithError_Result* out_result) override;
+  zx_status_t TwoWayAnonWithError(uint32_t a, uint32_t b, ::test::protocolpayloads::MainProtocol_TwoWayAnonWithError_Result* out_MainProtocol_TwoWayAnonWithError_Result) override;
 
  private:
   ::fidl::internal::SynchronousProxy proxy_;

@@ -19,13 +19,6 @@ void ::test_protocols::wire::WithErrorSyntaxHandleInResultResponse::_CloseHandle
 #endif  // __Fuchsia__
 
 #ifdef __Fuchsia__
-void ::test_protocols::wire::WithErrorSyntaxHandleInResultTopResponse::_CloseHandles() {
-  result._CloseHandles();
-}
-
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
 void ::test_protocols::wire::ChannelProtocolTakeHandleRequest::_CloseHandles() {
   h.reset();
 }

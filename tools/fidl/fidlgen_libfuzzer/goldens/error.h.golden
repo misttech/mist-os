@@ -22,7 +22,6 @@ namespace fuzzing {
 using ExampleFooRequest = ::test::error::ExampleFooRequest;
 using Example_foo_Response = ::test::error::Example_foo_Response;
 using Example_foo_Result = ::test::error::Example_foo_Result;
-using ExampleFooTopResponse = ::test::error::ExampleFooTopResponse;
 
 template <>
 struct MinSize<ExampleFooRequest> {
@@ -90,24 +89,6 @@ struct Allocate<Example_foo_Result> {
       }
     }
 
-    return out;
-  }
-};
-template <>
-struct MinSize<ExampleFooTopResponse> {
-  operator size_t() {
-    return MinSize<::test::error::Example_foo_Result>();
-  }
-};
-template <>
-struct Allocate<ExampleFooTopResponse> {
-  ExampleFooTopResponse operator()(FuzzInput* src, size_t* size) {
-    ZX_ASSERT(*size >= MinSize<ExampleFooTopResponse>());
-    ExampleFooTopResponse out;
-    const size_t slack_per_member = (*size - MinSize<ExampleFooTopResponse>()) / 1;
-    size_t out_size;
-    out_size = MinSize<::test::error::Example_foo_Result>() + slack_per_member;
-    out.result = Allocate<::test::error::Example_foo_Result>{}(src, &out_size);
     return out;
   }
 };

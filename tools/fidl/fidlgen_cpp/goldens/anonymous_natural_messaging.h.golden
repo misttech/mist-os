@@ -29,7 +29,7 @@ template <>
 struct ::fidl::internal::NaturalMethodTypes<::test_anonymous::SomeProtocol::SomeMethod> {
   using Request = ::test_anonymous::SomeProtocolSomeMethodRequest;
 
-  using Response = ::test_anonymous::SomeProtocolSomeMethodTopResponse;
+  using Response = ::test_anonymous::SomeProtocolSomeMethodResult;
 
   using Completer = fidl::Completer<::fidl::internal::NaturalCompleterBase<::test_anonymous::SomeProtocol::SomeMethod>>;
   using ResultCallback =
@@ -38,7 +38,7 @@ struct ::fidl::internal::NaturalMethodTypes<::test_anonymous::SomeProtocol::Some
 namespace test_anonymous {
 __LOCAL extern "C" const fidl_type_t test_anonymous_SomeProtocolSomeMethodRequestTable;
 
-__LOCAL extern "C" const fidl_type_t test_anonymous_SomeProtocolSomeMethodTopResponseTable;
+__LOCAL extern "C" const fidl_type_t test_anonymous_SomeProtocol_SomeMethod_ResultTable;
 
 #ifdef __Fuchsia__
 }  // namespace test_anonymous
@@ -52,14 +52,14 @@ class ::fidl::Response<::test_anonymous::SomeProtocol::SomeMethod> final : publi
 };
 template <>
 class ::fidl::internal::ResponseMessageConverter<::test_anonymous::SomeProtocol::SomeMethod> {
-  using DomainObject = ::test_anonymous::SomeProtocolSomeMethodTopResponse;
+  using DomainObject = ::test_anonymous::SomeProtocolSomeMethodResult;
 
  public:
   static DomainObject IntoDomainObject(const ::fidl::Response<::test_anonymous::SomeProtocol::SomeMethod>& m) {
     if (m.is_error()) {
-      return DomainObject{{.result = ::test_anonymous::SomeProtocolSomeMethodResult::WithErr(m.error_value())}};
+      return DomainObject::WithErr(m.error_value());
     } else {
-      return DomainObject{{.result = ::test_anonymous::SomeProtocolSomeMethodResult::WithResponse(std::move(m.value()))}};
+      return DomainObject::WithResponse(std::move(m.value()));
     }
   }
 };

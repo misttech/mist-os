@@ -41,7 +41,6 @@ test_errorsyntax_ExampleUseOfErrorSyntaxComposedCallWhichMayFailRequestHandles {
 } [packed]
 test_errorsyntax_ExampleUseOfErrorSyntaxComposedCallWhichMayFailResponse {
     hdr fidl_message_header[3565108794310607393]
-    resultInLine test_errorsyntax_parent_ParentUsesErrorSyntax_ComposedCallWhichMayFail_ResultInLine
 } [packed]
 test_errorsyntax_ExampleUseOfErrorSyntaxComposedCallWhichMayFailResponseHandles {
     void void
@@ -56,11 +55,9 @@ test_errorsyntax_ExampleUseOfErrorSyntaxCallWhichMayFailRequestHandles {
 } [packed]
 test_errorsyntax_ExampleUseOfErrorSyntaxCallWhichMayFailResponse {
     hdr fidl_message_header[3757408930698888354]
-    resultInLine test_errorsyntax_ExampleUseOfErrorSyntax_CallWhichMayFail_ResultInLine
-    resultOutOfLine test_errorsyntax_ExampleUseOfErrorSyntax_CallWhichMayFail_ResultOutOfLine
 } [packed]
 test_errorsyntax_ExampleUseOfErrorSyntaxCallWhichMayFailResponseHandles {
-    result test_errorsyntax_ExampleUseOfErrorSyntax_CallWhichMayFail_ResultHandles
+    void void
 } [packed]
 
 resource zx_chan_test_errorsyntax_ExampleUseOfErrorSyntax_client[zx_chan]

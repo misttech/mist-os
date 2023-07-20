@@ -1143,14 +1143,8 @@ void CompileStep::CompileProtocol(Protocol* protocol_declaration) {
           auto decl = static_cast<const flat::IdentifierType*>(type)->type_decl;
           CompileDecl(decl);
           if (method.HasResultUnion()) {
-            ZX_ASSERT(decl->kind == Decl::Kind::kStruct);
-            auto response_struct = static_cast<const flat::Struct*>(decl);
-            const auto* result_union_type = static_cast<const flat::IdentifierType*>(
-                response_struct->members[0].type_ctor->type);
-
-            ZX_ASSERT(result_union_type->type_decl->kind == Decl::Kind::kUnion);
-            const auto* result_union =
-                static_cast<const flat::Union*>(result_union_type->type_decl);
+            ZX_ASSERT(decl->kind == Decl::Kind::kUnion);
+            const auto* result_union = static_cast<const flat::Union*>(decl);
             ZX_ASSERT(!result_union->members.empty());
             ZX_ASSERT(result_union->members[0].maybe_used);
             const auto* success_variant_type = result_union->members[0].maybe_used->type_ctor->type;

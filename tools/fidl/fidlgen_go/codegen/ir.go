@@ -530,22 +530,16 @@ var _ = []payloader{
 
 // Method represents a method of a FIDL protocol in terms of golang structures.
 type Method struct {
-	fidlgen.Attributes
+	fidlgen.Method
 
-	Ordinal     uint64
-	OrdinalName string
-
-	// Name is the name of the Method, including the protocol name as a prefix.
+	// Name of the method.
 	Name string
 
-	// HasRequest is true if this method has a request
-	HasRequest bool
+	// Name for the top-level ordinal constant.
+	OrdinalName string
 
 	// Request represents a golang interface exposing the request parameters.
 	Request payloader
-
-	// HasResponse is true if this method has a response
-	HasResponse bool
 
 	// Response represents an optional golang interface exposing the response parameters.
 	Response payloader
@@ -1170,15 +1164,12 @@ func (c *compiler) compileTable(val fidlgen.Table) Table {
 func (c *compiler) compileMethod(protocolName fidlgen.EncodedCompoundIdentifier, val fidlgen.Method) Method {
 	methodName := c.compileIdentifier(val.Name, true, "")
 	r := Method{
-		Attributes:      val.Attributes,
+		Method:          val,
 		Name:            methodName,
-		Ordinal:         val.Ordinal,
 		OrdinalName:     c.compileCompoundIdentifier(protocolName, true, methodName+"Ordinal"),
 		EventExpectName: "Expect" + methodName,
 		IsEvent:         !val.HasRequest && val.HasResponse,
 		IsTransitional:  val.IsTransitional(),
-		HasRequest:      val.HasRequest,
-		HasResponse:     val.HasResponse,
 	}
 	if val.HasRequest && val.RequestPayload != nil {
 		layout, ok := c.messageBodyLayouts[val.RequestPayload.Identifier]
@@ -1204,7 +1195,11 @@ func (c *compiler) compileMethod(protocolName fidlgen.EncodedCompoundIdentifier,
 		// identical in all but name. We create can a clone here if needed, to
 		// ensure that each generated payload name is specific to the owning
 		// protocol.
-		r.Response = layout.cloneAndRenameIfAnonymous(c, protocolName, methodName+"Response")
+		if val.HasResultUnion() {
+			r.Response = layout
+		} else {
+			r.Response = layout.cloneAndRenameIfAnonymous(c, protocolName, methodName+"Response")
+		}
 	}
 	return r
 }
@@ -1387,7 +1382,8 @@ func Compile(fidlData fidlgen.Root) Root {
 					panic("payload must be an anonymous struct, table, or union")
 				}
 			}
-			if method.Response != nil && method.Response.isAnonymousPayload() {
+			if method.Response != nil && method.Response.isAnonymousPayload() &&
+				!(method.IsComposed && method.HasResultUnion()) {
 				switch payload := method.Response.(type) {
 				case *Struct:
 					r.Structs = append(r.Structs, *payload)

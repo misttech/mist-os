@@ -2673,38 +2673,6 @@
   "structs": [
     {
       "is_anonymous": true,
-      "identifier": "test.unknowninteractions/UnknownInteractionsAjarDriverProtocolStrictTwoWayErrTopResponse",
-      "members": [
-        {
-          "name": "result",
-          "location": {
-            "is_virtual": true
-          },
-          "type": {
-            "kind": "identifier",
-            "is_anonymous": true
-          }
-        }
-      ]
-    },
-    {
-      "is_anonymous": true,
-      "identifier": "test.unknowninteractions/UnknownInteractionsAjarDriverProtocolStrictTwoWayFieldsErrTopResponse",
-      "members": [
-        {
-          "name": "result",
-          "location": {
-            "is_virtual": true
-          },
-          "type": {
-            "kind": "identifier",
-            "is_anonymous": true
-          }
-        }
-      ]
-    },
-    {
-      "is_anonymous": true,
       "identifier": "test.unknowninteractions/UnknownInteractionsAjarDriverProtocolStrictTwoWayFieldsResponse",
       "members": [
         {
@@ -2718,38 +2686,6 @@
           },
           "type": {
             "kind": "primitive"
-          }
-        }
-      ]
-    },
-    {
-      "is_anonymous": true,
-      "identifier": "test.unknowninteractions/UnknownInteractionsAjarDriverProtocolStrictTwoWayTableErrTopResponse",
-      "members": [
-        {
-          "name": "result",
-          "location": {
-            "is_virtual": true
-          },
-          "type": {
-            "kind": "identifier",
-            "is_anonymous": true
-          }
-        }
-      ]
-    },
-    {
-      "is_anonymous": true,
-      "identifier": "test.unknowninteractions/UnknownInteractionsAjarDriverProtocolStrictTwoWayUnionErrTopResponse",
-      "members": [
-        {
-          "name": "result",
-          "location": {
-            "is_virtual": true
-          },
-          "type": {
-            "kind": "identifier",
-            "is_anonymous": true
           }
         }
       ]
@@ -2780,38 +2716,6 @@
     },
     {
       "is_anonymous": true,
-      "identifier": "test.unknowninteractions/UnknownInteractionsAjarProtocolFlexibleEventErrRequest",
-      "members": [
-        {
-          "name": "result",
-          "location": {
-            "is_virtual": true
-          },
-          "type": {
-            "kind": "identifier",
-            "is_anonymous": true
-          }
-        }
-      ]
-    },
-    {
-      "is_anonymous": true,
-      "identifier": "test.unknowninteractions/UnknownInteractionsAjarProtocolFlexibleEventFieldsErrRequest",
-      "members": [
-        {
-          "name": "result",
-          "location": {
-            "is_virtual": true
-          },
-          "type": {
-            "kind": "identifier",
-            "is_anonymous": true
-          }
-        }
-      ]
-    },
-    {
-      "is_anonymous": true,
       "identifier": "test.unknowninteractions/UnknownInteractionsAjarProtocolFlexibleEventFieldsRequest",
       "members": [
         {
@@ -2825,70 +2729,6 @@
           },
           "type": {
             "kind": "primitive"
-          }
-        }
-      ]
-    },
-    {
-      "is_anonymous": true,
-      "identifier": "test.unknowninteractions/UnknownInteractionsAjarProtocolFlexibleEventTableErrRequest",
-      "members": [
-        {
-          "name": "result",
-          "location": {
-            "is_virtual": true
-          },
-          "type": {
-            "kind": "identifier",
-            "is_anonymous": true
-          }
-        }
-      ]
-    },
-    {
-      "is_anonymous": true,
-      "identifier": "test.unknowninteractions/UnknownInteractionsAjarProtocolFlexibleEventUnionErrRequest",
-      "members": [
-        {
-          "name": "result",
-          "location": {
-            "is_virtual": true
-          },
-          "type": {
-            "kind": "identifier",
-            "is_anonymous": true
-          }
-        }
-      ]
-    },
-    {
-      "is_anonymous": true,
-      "identifier": "test.unknowninteractions/UnknownInteractionsAjarProtocolStrictEventErrRequest",
-      "members": [
-        {
-          "name": "result",
-          "location": {
-            "is_virtual": true
-          },
-          "type": {
-            "kind": "identifier",
-            "is_anonymous": true
-          }
-        }
-      ]
-    },
-    {
-      "is_anonymous": true,
-      "identifier": "test.unknowninteractions/UnknownInteractionsAjarProtocolStrictEventFieldsErrRequest",
-      "members": [
-        {
-          "name": "result",
-          "location": {
-            "is_virtual": true
-          },
-          "type": {
-            "kind": "identifier",
-            "is_anonymous": true
           }
         }
       ]
@@ -2914,70 +2754,6 @@
     },
     {
       "is_anonymous": true,
-      "identifier": "test.unknowninteractions/UnknownInteractionsAjarProtocolStrictEventTableErrRequest",
-      "members": [
-        {
-          "name": "result",
-          "location": {
-            "is_virtual": true
-          },
-          "type": {
-            "kind": "identifier",
-            "is_anonymous": true
-          }
-        }
-      ]
-    },
-    {
-      "is_anonymous": true,
-      "identifier": "test.unknowninteractions/UnknownInteractionsAjarProtocolStrictEventUnionErrRequest",
-      "members": [
-        {
-          "name": "result",
-          "location": {
-            "is_virtual": true
-          },
-          "type": {
-            "kind": "identifier",
-            "is_anonymous": true
-          }
-        }
-      ]
-    },
-    {
-      "is_anonymous": true,
-      "identifier": "test.unknowninteractions/UnknownInteractionsAjarProtocolStrictTwoWayErrTopResponse",
-      "members": [
-        {
-          "name": "result",
-          "location": {
-            "is_virtual": true
-          },
-          "type": {
-            "kind": "identifier",
-            "is_anonymous": true
-          }
-        }
-      ]
-    },
-    {
-      "is_anonymous": true,
-      "identifier": "test.unknowninteractions/UnknownInteractionsAjarProtocolStrictTwoWayFieldsErrTopResponse",
-      "members": [
-        {
-          "name": "result",
-          "location": {
-            "is_virtual": true
-          },
-          "type": {
-            "kind": "identifier",
-            "is_anonymous": true
-          }
-        }
-      ]
-    },
-    {
-      "is_anonymous": true,
       "identifier": "test.unknowninteractions/UnknownInteractionsAjarProtocolStrictTwoWayFieldsResponse",
       "members": [
         {
@@ -2991,38 +2767,6 @@
           },
           "type": {
             "kind": "primitive"
-          }
-        }
-      ]
-    },
-    {
-      "is_anonymous": true,
-      "identifier": "test.unknowninteractions/UnknownInteractionsAjarProtocolStrictTwoWayTableErrTopResponse",
-      "members": [
-        {
-          "name": "result",
-          "location": {
-            "is_virtual": true
-          },
-          "type": {
-            "kind": "identifier",
-            "is_anonymous": true
-          }
-        }
-      ]
-    },
-    {
-      "is_anonymous": true,
-      "identifier": "test.unknowninteractions/UnknownInteractionsAjarProtocolStrictTwoWayUnionErrTopResponse",
-      "members": [
-        {
-          "name": "result",
-          "location": {
-            "is_virtual": true
-          },
-          "type": {
-            "kind": "identifier",
-            "is_anonymous": true
           }
         }
       ]
@@ -3101,38 +2845,6 @@
     },
     {
       "is_anonymous": true,
-      "identifier": "test.unknowninteractions/UnknownInteractionsClosedDriverProtocolStrictTwoWayErrTopResponse",
-      "members": [
-        {
-          "name": "result",
-          "location": {
-            "is_virtual": true
-          },
-          "type": {
-            "kind": "identifier",
-            "is_anonymous": true
-          }
-        }
-      ]
-    },
-    {
-      "is_anonymous": true,
-      "identifier": "test.unknowninteractions/UnknownInteractionsClosedDriverProtocolStrictTwoWayFieldsErrTopResponse",
-      "members": [
-        {
-          "name": "result",
-          "location": {
-            "is_virtual": true
-          },
-          "type": {
-            "kind": "identifier",
-            "is_anonymous": true
-          }
-        }
-      ]
-    },
-    {
-      "is_anonymous": true,
       "identifier": "test.unknowninteractions/UnknownInteractionsClosedDriverProtocolStrictTwoWayFieldsResponse",
       "members": [
         {
@@ -3146,38 +2858,6 @@
           },
           "type": {
             "kind": "primitive"
-          }
-        }
-      ]
-    },
-    {
-      "is_anonymous": true,
-      "identifier": "test.unknowninteractions/UnknownInteractionsClosedDriverProtocolStrictTwoWayTableErrTopResponse",
-      "members": [
-        {
-          "name": "result",
-          "location": {
-            "is_virtual": true
-          },
-          "type": {
-            "kind": "identifier",
-            "is_anonymous": true
-          }
-        }
-      ]
-    },
-    {
-      "is_anonymous": true,
-      "identifier": "test.unknowninteractions/UnknownInteractionsClosedDriverProtocolStrictTwoWayUnionErrTopResponse",
-      "members": [
-        {
-          "name": "result",
-          "location": {
-            "is_virtual": true
-          },
-          "type": {
-            "kind": "identifier",
-            "is_anonymous": true
           }
         }
       ]
@@ -3208,38 +2888,6 @@
     },
     {
       "is_anonymous": true,
-      "identifier": "test.unknowninteractions/UnknownInteractionsClosedProtocolStrictEventErrRequest",
-      "members": [
-        {
-          "name": "result",
-          "location": {
-            "is_virtual": true
-          },
-          "type": {
-            "kind": "identifier",
-            "is_anonymous": true
-          }
-        }
-      ]
-    },
-    {
-      "is_anonymous": true,
-      "identifier": "test.unknowninteractions/UnknownInteractionsClosedProtocolStrictEventFieldsErrRequest",
-      "members": [
-        {
-          "name": "result",
-          "location": {
-            "is_virtual": true
-          },
-          "type": {
-            "kind": "identifier",
-            "is_anonymous": true
-          }
-        }
-      ]
-    },
-    {
-      "is_anonymous": true,
       "identifier": "test.unknowninteractions/UnknownInteractionsClosedProtocolStrictEventFieldsRequest",
       "members": [
         {
@@ -3259,70 +2907,6 @@
     },
     {
       "is_anonymous": true,
-      "identifier": "test.unknowninteractions/UnknownInteractionsClosedProtocolStrictEventTableErrRequest",
-      "members": [
-        {
-          "name": "result",
-          "location": {
-            "is_virtual": true
-          },
-          "type": {
-            "kind": "identifier",
-            "is_anonymous": true
-          }
-        }
-      ]
-    },
-    {
-      "is_anonymous": true,
-      "identifier": "test.unknowninteractions/UnknownInteractionsClosedProtocolStrictEventUnionErrRequest",
-      "members": [
-        {
-          "name": "result",
-          "location": {
-            "is_virtual": true
-          },
-          "type": {
-            "kind": "identifier",
-            "is_anonymous": true
-          }
-        }
-      ]
-    },
-    {
-      "is_anonymous": true,
-      "identifier": "test.unknowninteractions/UnknownInteractionsClosedProtocolStrictTwoWayErrTopResponse",
-      "members": [
-        {
-          "name": "result",
-          "location": {
-            "is_virtual": true
-          },
-          "type": {
-            "kind": "identifier",
-            "is_anonymous": true
-          }
-        }
-      ]
-    },
-    {
-      "is_anonymous": true,
-      "identifier": "test.unknowninteractions/UnknownInteractionsClosedProtocolStrictTwoWayFieldsErrTopResponse",
-      "members": [
-        {
-          "name": "result",
-          "location": {
-            "is_virtual": true
-          },
-          "type": {
-            "kind": "identifier",
-            "is_anonymous": true
-          }
-        }
-      ]
-    },
-    {
-      "is_anonymous": true,
       "identifier": "test.unknowninteractions/UnknownInteractionsClosedProtocolStrictTwoWayFieldsResponse",
       "members": [
         {
@@ -3336,38 +2920,6 @@
           },
           "type": {
             "kind": "primitive"
-          }
-        }
-      ]
-    },
-    {
-      "is_anonymous": true,
-      "identifier": "test.unknowninteractions/UnknownInteractionsClosedProtocolStrictTwoWayTableErrTopResponse",
-      "members": [
-        {
-          "name": "result",
-          "location": {
-            "is_virtual": true
-          },
-          "type": {
-            "kind": "identifier",
-            "is_anonymous": true
-          }
-        }
-      ]
-    },
-    {
-      "is_anonymous": true,
-      "identifier": "test.unknowninteractions/UnknownInteractionsClosedProtocolStrictTwoWayUnionErrTopResponse",
-      "members": [
-        {
-          "name": "result",
-          "location": {
-            "is_virtual": true
-          },
-          "type": {
-            "kind": "identifier",
-            "is_anonymous": true
           }
         }
       ]
@@ -3422,166 +2974,6 @@
     },
     {
       "is_anonymous": true,
-      "identifier": "test.unknowninteractions/UnknownInteractionsDriverProtocolFlexibleTwoWayErrTopResponse",
-      "members": [
-        {
-          "name": "result",
-          "location": {
-            "is_virtual": true
-          },
-          "type": {
-            "kind": "identifier",
-            "is_anonymous": true
-          }
-        }
-      ]
-    },
-    {
-      "is_anonymous": true,
-      "identifier": "test.unknowninteractions/UnknownInteractionsDriverProtocolFlexibleTwoWayFieldsErrTopResponse",
-      "members": [
-        {
-          "name": "result",
-          "location": {
-            "is_virtual": true
-          },
-          "type": {
-            "kind": "identifier",
-            "is_anonymous": true
-          }
-        }
-      ]
-    },
-    {
-      "is_anonymous": true,
-      "identifier": "test.unknowninteractions/UnknownInteractionsDriverProtocolFlexibleTwoWayFieldsTopResponse",
-      "members": [
-        {
-          "name": "result",
-          "location": {
-            "is_virtual": true
-          },
-          "type": {
-            "kind": "identifier",
-            "is_anonymous": true
-          }
-        }
-      ]
-    },
-    {
-      "is_anonymous": true,
-      "identifier": "test.unknowninteractions/UnknownInteractionsDriverProtocolFlexibleTwoWayTableErrTopResponse",
-      "members": [
-        {
-          "name": "result",
-          "location": {
-            "is_virtual": true
-          },
-          "type": {
-            "kind": "identifier",
-            "is_anonymous": true
-          }
-        }
-      ]
-    },
-    {
-      "is_anonymous": true,
-      "identifier": "test.unknowninteractions/UnknownInteractionsDriverProtocolFlexibleTwoWayTableTopResponse",
-      "members": [
-        {
-          "name": "result",
-          "location": {
-            "is_virtual": true
-          },
-          "type": {
-            "kind": "identifier",
-            "is_anonymous": true
-          }
-        }
-      ]
-    },
-    {
-      "is_anonymous": true,
-      "identifier": "test.unknowninteractions/UnknownInteractionsDriverProtocolFlexibleTwoWayTopResponse",
-      "members": [
-        {
-          "name": "result",
-          "location": {
-            "is_virtual": true
-          },
-          "type": {
-            "kind": "identifier",
-            "is_anonymous": true
-          }
-        }
-      ]
-    },
-    {
-      "is_anonymous": true,
-      "identifier": "test.unknowninteractions/UnknownInteractionsDriverProtocolFlexibleTwoWayUnionErrTopResponse",
-      "members": [
-        {
-          "name": "result",
-          "location": {
-            "is_virtual": true
-          },
-          "type": {
-            "kind": "identifier",
-            "is_anonymous": true
-          }
-        }
-      ]
-    },
-    {
-      "is_anonymous": true,
-      "identifier": "test.unknowninteractions/UnknownInteractionsDriverProtocolFlexibleTwoWayUnionTopResponse",
-      "members": [
-        {
-          "name": "result",
-          "location": {
-            "is_virtual": true
-          },
-          "type": {
-            "kind": "identifier",
-            "is_anonymous": true
-          }
-        }
-      ]
-    },
-    {
-      "is_anonymous": true,
-      "identifier": "test.unknowninteractions/UnknownInteractionsDriverProtocolStrictTwoWayErrTopResponse",
-      "members": [
-        {
-          "name": "result",
-          "location": {
-            "is_virtual": true
-          },
-          "type": {
-            "kind": "identifier",
-            "is_anonymous": true
-          }
-        }
-      ]
-    },
-    {
-      "is_anonymous": true,
-      "identifier": "test.unknowninteractions/UnknownInteractionsDriverProtocolStrictTwoWayFieldsErrTopResponse",
-      "members": [
-        {
-          "name": "result",
-          "location": {
-            "is_virtual": true
-          },
-          "type": {
-            "kind": "identifier",
-            "is_anonymous": true
-          }
-        }
-      ]
-    },
-    {
-      "is_anonymous": true,
       "identifier": "test.unknowninteractions/UnknownInteractionsDriverProtocolStrictTwoWayFieldsResponse",
       "members": [
         {
@@ -3595,38 +2987,6 @@
           },
           "type": {
             "kind": "primitive"
-          }
-        }
-      ]
-    },
-    {
-      "is_anonymous": true,
-      "identifier": "test.unknowninteractions/UnknownInteractionsDriverProtocolStrictTwoWayTableErrTopResponse",
-      "members": [
-        {
-          "name": "result",
-          "location": {
-            "is_virtual": true
-          },
-          "type": {
-            "kind": "identifier",
-            "is_anonymous": true
-          }
-        }
-      ]
-    },
-    {
-      "is_anonymous": true,
-      "identifier": "test.unknowninteractions/UnknownInteractionsDriverProtocolStrictTwoWayUnionErrTopResponse",
-      "members": [
-        {
-          "name": "result",
-          "location": {
-            "is_virtual": true
-          },
-          "type": {
-            "kind": "identifier",
-            "is_anonymous": true
           }
         }
       ]
@@ -3705,38 +3065,6 @@
     },
     {
       "is_anonymous": true,
-      "identifier": "test.unknowninteractions/UnknownInteractionsProtocolFlexibleEventErrRequest",
-      "members": [
-        {
-          "name": "result",
-          "location": {
-            "is_virtual": true
-          },
-          "type": {
-            "kind": "identifier",
-            "is_anonymous": true
-          }
-        }
-      ]
-    },
-    {
-      "is_anonymous": true,
-      "identifier": "test.unknowninteractions/UnknownInteractionsProtocolFlexibleEventFieldsErrRequest",
-      "members": [
-        {
-          "name": "result",
-          "location": {
-            "is_virtual": true
-          },
-          "type": {
-            "kind": "identifier",
-            "is_anonymous": true
-          }
-        }
-      ]
-    },
-    {
-      "is_anonymous": true,
       "identifier": "test.unknowninteractions/UnknownInteractionsProtocolFlexibleEventFieldsRequest",
       "members": [
         {
@@ -3750,198 +3078,6 @@
           },
           "type": {
             "kind": "primitive"
-          }
-        }
-      ]
-    },
-    {
-      "is_anonymous": true,
-      "identifier": "test.unknowninteractions/UnknownInteractionsProtocolFlexibleEventTableErrRequest",
-      "members": [
-        {
-          "name": "result",
-          "location": {
-            "is_virtual": true
-          },
-          "type": {
-            "kind": "identifier",
-            "is_anonymous": true
-          }
-        }
-      ]
-    },
-    {
-      "is_anonymous": true,
-      "identifier": "test.unknowninteractions/UnknownInteractionsProtocolFlexibleEventUnionErrRequest",
-      "members": [
-        {
-          "name": "result",
-          "location": {
-            "is_virtual": true
-          },
-          "type": {
-            "kind": "identifier",
-            "is_anonymous": true
-          }
-        }
-      ]
-    },
-    {
-      "is_anonymous": true,
-      "identifier": "test.unknowninteractions/UnknownInteractionsProtocolFlexibleTwoWayErrTopResponse",
-      "members": [
-        {
-          "name": "result",
-          "location": {
-            "is_virtual": true
-          },
-          "type": {
-            "kind": "identifier",
-            "is_anonymous": true
-          }
-        }
-      ]
-    },
-    {
-      "is_anonymous": true,
-      "identifier": "test.unknowninteractions/UnknownInteractionsProtocolFlexibleTwoWayFieldsErrTopResponse",
-      "members": [
-        {
-          "name": "result",
-          "location": {
-            "is_virtual": true
-          },
-          "type": {
-            "kind": "identifier",
-            "is_anonymous": true
-          }
-        }
-      ]
-    },
-    {
-      "is_anonymous": true,
-      "identifier": "test.unknowninteractions/UnknownInteractionsProtocolFlexibleTwoWayFieldsTopResponse",
-      "members": [
-        {
-          "name": "result",
-          "location": {
-            "is_virtual": true
-          },
-          "type": {
-            "kind": "identifier",
-            "is_anonymous": true
-          }
-        }
-      ]
-    },
-    {
-      "is_anonymous": true,
-      "identifier": "test.unknowninteractions/UnknownInteractionsProtocolFlexibleTwoWayTableErrTopResponse",
-      "members": [
-        {
-          "name": "result",
-          "location": {
-            "is_virtual": true
-          },
-          "type": {
-            "kind": "identifier",
-            "is_anonymous": true
-          }
-        }
-      ]
-    },
-    {
-      "is_anonymous": true,
-      "identifier": "test.unknowninteractions/UnknownInteractionsProtocolFlexibleTwoWayTableTopResponse",
-      "members": [
-        {
-          "name": "result",
-          "location": {
-            "is_virtual": true
-          },
-          "type": {
-            "kind": "identifier",
-            "is_anonymous": true
-          }
-        }
-      ]
-    },
-    {
-      "is_anonymous": true,
-      "identifier": "test.unknowninteractions/UnknownInteractionsProtocolFlexibleTwoWayTopResponse",
-      "members": [
-        {
-          "name": "result",
-          "location": {
-            "is_virtual": true
-          },
-          "type": {
-            "kind": "identifier",
-            "is_anonymous": true
-          }
-        }
-      ]
-    },
-    {
-      "is_anonymous": true,
-      "identifier": "test.unknowninteractions/UnknownInteractionsProtocolFlexibleTwoWayUnionErrTopResponse",
-      "members": [
-        {
-          "name": "result",
-          "location": {
-            "is_virtual": true
-          },
-          "type": {
-            "kind": "identifier",
-            "is_anonymous": true
-          }
-        }
-      ]
-    },
-    {
-      "is_anonymous": true,
-      "identifier": "test.unknowninteractions/UnknownInteractionsProtocolFlexibleTwoWayUnionTopResponse",
-      "members": [
-        {
-          "name": "result",
-          "location": {
-            "is_virtual": true
-          },
-          "type": {
-            "kind": "identifier",
-            "is_anonymous": true
-          }
-        }
-      ]
-    },
-    {
-      "is_anonymous": true,
-      "identifier": "test.unknowninteractions/UnknownInteractionsProtocolStrictEventErrRequest",
-      "members": [
-        {
-          "name": "result",
-          "location": {
-            "is_virtual": true
-          },
-          "type": {
-            "kind": "identifier",
-            "is_anonymous": true
-          }
-        }
-      ]
-    },
-    {
-      "is_anonymous": true,
-      "identifier": "test.unknowninteractions/UnknownInteractionsProtocolStrictEventFieldsErrRequest",
-      "members": [
-        {
-          "name": "result",
-          "location": {
-            "is_virtual": true
-          },
-          "type": {
-            "kind": "identifier",
-            "is_anonymous": true
           }
         }
       ]
@@ -3967,70 +3103,6 @@
     },
     {
       "is_anonymous": true,
-      "identifier": "test.unknowninteractions/UnknownInteractionsProtocolStrictEventTableErrRequest",
-      "members": [
-        {
-          "name": "result",
-          "location": {
-            "is_virtual": true
-          },
-          "type": {
-            "kind": "identifier",
-            "is_anonymous": true
-          }
-        }
-      ]
-    },
-    {
-      "is_anonymous": true,
-      "identifier": "test.unknowninteractions/UnknownInteractionsProtocolStrictEventUnionErrRequest",
-      "members": [
-        {
-          "name": "result",
-          "location": {
-            "is_virtual": true
-          },
-          "type": {
-            "kind": "identifier",
-            "is_anonymous": true
-          }
-        }
-      ]
-    },
-    {
-      "is_anonymous": true,
-      "identifier": "test.unknowninteractions/UnknownInteractionsProtocolStrictTwoWayErrTopResponse",
-      "members": [
-        {
-          "name": "result",
-          "location": {
-            "is_virtual": true
-          },
-          "type": {
-            "kind": "identifier",
-            "is_anonymous": true
-          }
-        }
-      ]
-    },
-    {
-      "is_anonymous": true,
-      "identifier": "test.unknowninteractions/UnknownInteractionsProtocolStrictTwoWayFieldsErrTopResponse",
-      "members": [
-        {
-          "name": "result",
-          "location": {
-            "is_virtual": true
-          },
-          "type": {
-            "kind": "identifier",
-            "is_anonymous": true
-          }
-        }
-      ]
-    },
-    {
-      "is_anonymous": true,
       "identifier": "test.unknowninteractions/UnknownInteractionsProtocolStrictTwoWayFieldsResponse",
       "members": [
         {
@@ -4044,38 +3116,6 @@
           },
           "type": {
             "kind": "primitive"
-          }
-        }
-      ]
-    },
-    {
-      "is_anonymous": true,
-      "identifier": "test.unknowninteractions/UnknownInteractionsProtocolStrictTwoWayTableErrTopResponse",
-      "members": [
-        {
-          "name": "result",
-          "location": {
-            "is_virtual": true
-          },
-          "type": {
-            "kind": "identifier",
-            "is_anonymous": true
-          }
-        }
-      ]
-    },
-    {
-      "is_anonymous": true,
-      "identifier": "test.unknowninteractions/UnknownInteractionsProtocolStrictTwoWayUnionErrTopResponse",
-      "members": [
-        {
-          "name": "result",
-          "location": {
-            "is_virtual": true
-          },
-          "type": {
-            "kind": "identifier",
-            "is_anonymous": true
           }
         }
       ]

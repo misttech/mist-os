@@ -30,32 +30,16 @@ struct fidl::ostream::Formatter<::test_protocollayouts::MainProtocolTwoWayImport
   static std::ostream& Format(std::ostream& os, const ::test_protocollayouts::MainProtocolTwoWayImportWithErrorResult& value);
 };
 template <>
-struct fidl::ostream::Formatter<::test_protocollayouts::MainProtocolTwoWayImportWithErrorTopResponse> {
-  static std::ostream& Format(std::ostream& os, const ::test_protocollayouts::MainProtocolTwoWayImportWithErrorTopResponse& value);
-};
-template <>
 struct fidl::ostream::Formatter<::test_protocollayouts::MainProtocolOnImportWithErrorResult> {
   static std::ostream& Format(std::ostream& os, const ::test_protocollayouts::MainProtocolOnImportWithErrorResult& value);
-};
-template <>
-struct fidl::ostream::Formatter<::test_protocollayouts::MainProtocolOnImportWithErrorRequest> {
-  static std::ostream& Format(std::ostream& os, const ::test_protocollayouts::MainProtocolOnImportWithErrorRequest& value);
 };
 template <>
 struct fidl::ostream::Formatter<::test_protocollayouts::MainProtocolTwoWayLocalWithErrorResult> {
   static std::ostream& Format(std::ostream& os, const ::test_protocollayouts::MainProtocolTwoWayLocalWithErrorResult& value);
 };
 template <>
-struct fidl::ostream::Formatter<::test_protocollayouts::MainProtocolTwoWayLocalWithErrorTopResponse> {
-  static std::ostream& Format(std::ostream& os, const ::test_protocollayouts::MainProtocolTwoWayLocalWithErrorTopResponse& value);
-};
-template <>
 struct fidl::ostream::Formatter<::test_protocollayouts::MainProtocolOnLocalWithErrorResult> {
   static std::ostream& Format(std::ostream& os, const ::test_protocollayouts::MainProtocolOnLocalWithErrorResult& value);
-};
-template <>
-struct fidl::ostream::Formatter<::test_protocollayouts::MainProtocolOnLocalWithErrorRequest> {
-  static std::ostream& Format(std::ostream& os, const ::test_protocollayouts::MainProtocolOnLocalWithErrorRequest& value);
 };
 template <>
 struct fidl::ostream::Formatter<::test_protocollayouts::MainProtocolOneWayAnonRequest> {
@@ -82,10 +66,6 @@ struct fidl::ostream::Formatter<::test_protocollayouts::MainProtocolTwoWayAnonWi
   static std::ostream& Format(std::ostream& os, const ::test_protocollayouts::MainProtocolTwoWayAnonWithErrorResult& value);
 };
 template <>
-struct fidl::ostream::Formatter<::test_protocollayouts::MainProtocolTwoWayAnonWithErrorTopResponse> {
-  static std::ostream& Format(std::ostream& os, const ::test_protocollayouts::MainProtocolTwoWayAnonWithErrorTopResponse& value);
-};
-template <>
 struct fidl::ostream::Formatter<::test_protocollayouts::MainProtocolOnAnonRequest> {
   static std::ostream& Format(std::ostream& os, const ::test_protocollayouts::MainProtocolOnAnonRequest& value);
 };
@@ -97,10 +77,6 @@ template <>
 struct fidl::ostream::Formatter<::test_protocollayouts::MainProtocolOnAnonWithErrorResult> {
   static std::ostream& Format(std::ostream& os, const ::test_protocollayouts::MainProtocolOnAnonWithErrorResult& value);
 };
-template <>
-struct fidl::ostream::Formatter<::test_protocollayouts::MainProtocolOnAnonWithErrorRequest> {
-  static std::ostream& Format(std::ostream& os, const ::test_protocollayouts::MainProtocolOnAnonWithErrorRequest& value);
-};
 
 namespace test_protocollayouts {
 
@@ -110,19 +86,11 @@ std::ostream& operator<<(std::ostream& os, const ::test_protocollayouts::LocalUn
 
 std::ostream& operator<<(std::ostream& os, const ::test_protocollayouts::MainProtocolTwoWayImportWithErrorResult& value);
 
-std::ostream& operator<<(std::ostream& os, const ::test_protocollayouts::MainProtocolTwoWayImportWithErrorTopResponse& value);
-
 std::ostream& operator<<(std::ostream& os, const ::test_protocollayouts::MainProtocolOnImportWithErrorResult& value);
-
-std::ostream& operator<<(std::ostream& os, const ::test_protocollayouts::MainProtocolOnImportWithErrorRequest& value);
 
 std::ostream& operator<<(std::ostream& os, const ::test_protocollayouts::MainProtocolTwoWayLocalWithErrorResult& value);
 
-std::ostream& operator<<(std::ostream& os, const ::test_protocollayouts::MainProtocolTwoWayLocalWithErrorTopResponse& value);
-
 std::ostream& operator<<(std::ostream& os, const ::test_protocollayouts::MainProtocolOnLocalWithErrorResult& value);
-
-std::ostream& operator<<(std::ostream& os, const ::test_protocollayouts::MainProtocolOnLocalWithErrorRequest& value);
 
 std::ostream& operator<<(std::ostream& os, const ::test_protocollayouts::MainProtocolOneWayAnonRequest& value);
 
@@ -136,15 +104,11 @@ std::ostream& operator<<(std::ostream& os, const ::test_protocollayouts::MainPro
 
 std::ostream& operator<<(std::ostream& os, const ::test_protocollayouts::MainProtocolTwoWayAnonWithErrorResult& value);
 
-std::ostream& operator<<(std::ostream& os, const ::test_protocollayouts::MainProtocolTwoWayAnonWithErrorTopResponse& value);
-
 std::ostream& operator<<(std::ostream& os, const ::test_protocollayouts::MainProtocolOnAnonRequest& value);
 
 std::ostream& operator<<(std::ostream& os, const ::test_protocollayouts::MainProtocolOnAnonWithErrorResponse& value);
 
 std::ostream& operator<<(std::ostream& os, const ::test_protocollayouts::MainProtocolOnAnonWithErrorResult& value);
-
-std::ostream& operator<<(std::ostream& os, const ::test_protocollayouts::MainProtocolOnAnonWithErrorRequest& value);
 
 }  // namespace test_protocollayouts
 

@@ -30,10 +30,6 @@ namespace test_protocolpayloads {
 
 class LocalStructPayload;
 
-class MainProtocolTwoWayLocalWithErrorTopResponse;
-
-class MainProtocolOnLocalWithErrorRequest;
-
 class MainProtocolOneWayAnonRequest;
 
 class MainProtocolTwoWayAnonRequest;
@@ -44,17 +40,9 @@ class MainProtocolTwoWayAnonWithErrorRequest;
 
 class MainProtocolTwoWayAnonWithErrorResponse;
 
-class MainProtocolTwoWayAnonWithErrorTopResponse;
-
 class MainProtocolOnAnonRequest;
 
 class MainProtocolOnAnonWithErrorResponse;
-
-class MainProtocolOnAnonWithErrorRequest;
-
-class MainProtocolTwoWayImportWithErrorTopResponse;
-
-class MainProtocolOnImportWithErrorRequest;
 
 class MainProtocolTwoWayLocalWithErrorResult;
 
@@ -266,65 +254,6 @@ class MainProtocolTwoWayLocalWithErrorResult {
   }
 };
 
-extern "C" const fidl_type_t test_protocolpayloads_MainProtocolTwoWayLocalWithErrorTopResponseTable;
-
-class MainProtocolTwoWayLocalWithErrorTopResponse {
- private:
-  struct Storage_;
-
- public:
-  MainProtocolTwoWayLocalWithErrorTopResponse(Storage_ storage) noexcept;
-  MainProtocolTwoWayLocalWithErrorTopResponse(::test_protocolpayloads::MainProtocolTwoWayLocalWithErrorResult result) noexcept;
-
-#pragma clang diagnostic push
-#pragma clang diagnostic ignored "-Wdefaulted-function-deleted"
-  // Default constructs a |MainProtocolTwoWayLocalWithErrorTopResponse| only if all of its members are default constructible.
-  MainProtocolTwoWayLocalWithErrorTopResponse() = default;
-#pragma clang diagnostic pop
-
-  MainProtocolTwoWayLocalWithErrorTopResponse(MainProtocolTwoWayLocalWithErrorTopResponse&&) noexcept = default;
-  MainProtocolTwoWayLocalWithErrorTopResponse& operator=(MainProtocolTwoWayLocalWithErrorTopResponse&&) noexcept = default;
-  MainProtocolTwoWayLocalWithErrorTopResponse(const MainProtocolTwoWayLocalWithErrorTopResponse& other) noexcept;
-  MainProtocolTwoWayLocalWithErrorTopResponse& operator=(const MainProtocolTwoWayLocalWithErrorTopResponse& other) noexcept;
-
-  bool operator==(const MainProtocolTwoWayLocalWithErrorTopResponse& other) const noexcept {
-    return ::fidl::internal::NaturalStructCodingTraits<::test_protocolpayloads::MainProtocolTwoWayLocalWithErrorTopResponse, 16>::Equal(this, &other);
-  }
-  bool operator!=(const MainProtocolTwoWayLocalWithErrorTopResponse& other) const noexcept {
-    return !::fidl::internal::NaturalStructCodingTraits<::test_protocolpayloads::MainProtocolTwoWayLocalWithErrorTopResponse, 16>::Equal(this, &other);
-  }
-
-  const ::test_protocolpayloads::MainProtocolTwoWayLocalWithErrorResult&
-  result() const {
-    return storage_.result;
-  }
-
-  ::test_protocolpayloads::MainProtocolTwoWayLocalWithErrorResult& result() {
-    return storage_.result;
-  }
-
-  // Setter for result.
-  //
-
-  MainProtocolTwoWayLocalWithErrorTopResponse& result(::test_protocolpayloads::MainProtocolTwoWayLocalWithErrorResult value);
-
-  MainProtocolTwoWayLocalWithErrorTopResponse(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag);
-
- private:
-  struct Storage_ final {
-    ::test_protocolpayloads::MainProtocolTwoWayLocalWithErrorResult result;
-  };
-
-  Storage_ storage_;
-  Storage_ CloneStorage_() const;
-
-  friend struct ::fidl::internal::NaturalStructCodingTraits<::test_protocolpayloads::MainProtocolTwoWayLocalWithErrorTopResponse, 16>;
-  friend struct ::fidl::internal::MemberVisitor<::test_protocolpayloads::MainProtocolTwoWayLocalWithErrorTopResponse>;
-  static constexpr auto kMembers = std::make_tuple(::fidl::internal::NaturalStructMember<Storage_, ::test_protocolpayloads::MainProtocolTwoWayLocalWithErrorResult, fidl::internal::NaturalCodingConstraintEmpty>{
-      &Storage_::result, 0});
-  static constexpr auto kPadding = std::make_tuple();
-};
-
 extern "C" const fidl_type_t test_protocolpayloads_MainProtocol_OnLocalWithError_ResultTable;
 
 class MainProtocolOnLocalWithErrorResult {
@@ -446,65 +375,6 @@ class MainProtocolOnLocalWithErrorResult {
         return std::nullopt;
     }
   }
-};
-
-extern "C" const fidl_type_t test_protocolpayloads_MainProtocolOnLocalWithErrorRequestTable;
-
-class MainProtocolOnLocalWithErrorRequest {
- private:
-  struct Storage_;
-
- public:
-  MainProtocolOnLocalWithErrorRequest(Storage_ storage) noexcept;
-  MainProtocolOnLocalWithErrorRequest(::test_protocolpayloads::MainProtocolOnLocalWithErrorResult result) noexcept;
-
-#pragma clang diagnostic push
-#pragma clang diagnostic ignored "-Wdefaulted-function-deleted"
-  // Default constructs a |MainProtocolOnLocalWithErrorRequest| only if all of its members are default constructible.
-  MainProtocolOnLocalWithErrorRequest() = default;
-#pragma clang diagnostic pop
-
-  MainProtocolOnLocalWithErrorRequest(MainProtocolOnLocalWithErrorRequest&&) noexcept = default;
-  MainProtocolOnLocalWithErrorRequest& operator=(MainProtocolOnLocalWithErrorRequest&&) noexcept = default;
-  MainProtocolOnLocalWithErrorRequest(const MainProtocolOnLocalWithErrorRequest& other) noexcept;
-  MainProtocolOnLocalWithErrorRequest& operator=(const MainProtocolOnLocalWithErrorRequest& other) noexcept;
-
-  bool operator==(const MainProtocolOnLocalWithErrorRequest& other) const noexcept {
-    return ::fidl::internal::NaturalStructCodingTraits<::test_protocolpayloads::MainProtocolOnLocalWithErrorRequest, 16>::Equal(this, &other);
-  }
-  bool operator!=(const MainProtocolOnLocalWithErrorRequest& other) const noexcept {
-    return !::fidl::internal::NaturalStructCodingTraits<::test_protocolpayloads::MainProtocolOnLocalWithErrorRequest, 16>::Equal(this, &other);
-  }
-
-  const ::test_protocolpayloads::MainProtocolOnLocalWithErrorResult&
-  result() const {
-    return storage_.result;
-  }
-
-  ::test_protocolpayloads::MainProtocolOnLocalWithErrorResult& result() {
-    return storage_.result;
-  }
-
-  // Setter for result.
-  //
-
-  MainProtocolOnLocalWithErrorRequest& result(::test_protocolpayloads::MainProtocolOnLocalWithErrorResult value);
-
-  MainProtocolOnLocalWithErrorRequest(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag);
-
- private:
-  struct Storage_ final {
-    ::test_protocolpayloads::MainProtocolOnLocalWithErrorResult result;
-  };
-
-  Storage_ storage_;
-  Storage_ CloneStorage_() const;
-
-  friend struct ::fidl::internal::NaturalStructCodingTraits<::test_protocolpayloads::MainProtocolOnLocalWithErrorRequest, 16>;
-  friend struct ::fidl::internal::MemberVisitor<::test_protocolpayloads::MainProtocolOnLocalWithErrorRequest>;
-  static constexpr auto kMembers = std::make_tuple(::fidl::internal::NaturalStructMember<Storage_, ::test_protocolpayloads::MainProtocolOnLocalWithErrorResult, fidl::internal::NaturalCodingConstraintEmpty>{
-      &Storage_::result, 0});
-  static constexpr auto kPadding = std::make_tuple();
 };
 
 extern "C" const fidl_type_t test_protocolpayloads_MainProtocolOneWayAnonRequestTable;
@@ -1005,65 +875,6 @@ class MainProtocolTwoWayAnonWithErrorResult {
   }
 };
 
-extern "C" const fidl_type_t test_protocolpayloads_MainProtocolTwoWayAnonWithErrorTopResponseTable;
-
-class MainProtocolTwoWayAnonWithErrorTopResponse {
- private:
-  struct Storage_;
-
- public:
-  MainProtocolTwoWayAnonWithErrorTopResponse(Storage_ storage) noexcept;
-  MainProtocolTwoWayAnonWithErrorTopResponse(::test_protocolpayloads::MainProtocolTwoWayAnonWithErrorResult result) noexcept;
-
-#pragma clang diagnostic push
-#pragma clang diagnostic ignored "-Wdefaulted-function-deleted"
-  // Default constructs a |MainProtocolTwoWayAnonWithErrorTopResponse| only if all of its members are default constructible.
-  MainProtocolTwoWayAnonWithErrorTopResponse() = default;
-#pragma clang diagnostic pop
-
-  MainProtocolTwoWayAnonWithErrorTopResponse(MainProtocolTwoWayAnonWithErrorTopResponse&&) noexcept = default;
-  MainProtocolTwoWayAnonWithErrorTopResponse& operator=(MainProtocolTwoWayAnonWithErrorTopResponse&&) noexcept = default;
-  MainProtocolTwoWayAnonWithErrorTopResponse(const MainProtocolTwoWayAnonWithErrorTopResponse& other) noexcept;
-  MainProtocolTwoWayAnonWithErrorTopResponse& operator=(const MainProtocolTwoWayAnonWithErrorTopResponse& other) noexcept;
-
-  bool operator==(const MainProtocolTwoWayAnonWithErrorTopResponse& other) const noexcept {
-    return ::fidl::internal::NaturalStructCodingTraits<::test_protocolpayloads::MainProtocolTwoWayAnonWithErrorTopResponse, 16>::Equal(this, &other);
-  }
-  bool operator!=(const MainProtocolTwoWayAnonWithErrorTopResponse& other) const noexcept {
-    return !::fidl::internal::NaturalStructCodingTraits<::test_protocolpayloads::MainProtocolTwoWayAnonWithErrorTopResponse, 16>::Equal(this, &other);
-  }
-
-  const ::test_protocolpayloads::MainProtocolTwoWayAnonWithErrorResult&
-  result() const {
-    return storage_.result;
-  }
-
-  ::test_protocolpayloads::MainProtocolTwoWayAnonWithErrorResult& result() {
-    return storage_.result;
-  }
-
-  // Setter for result.
-  //
-
-  MainProtocolTwoWayAnonWithErrorTopResponse& result(::test_protocolpayloads::MainProtocolTwoWayAnonWithErrorResult value);
-
-  MainProtocolTwoWayAnonWithErrorTopResponse(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag);
-
- private:
-  struct Storage_ final {
-    ::test_protocolpayloads::MainProtocolTwoWayAnonWithErrorResult result;
-  };
-
-  Storage_ storage_;
-  Storage_ CloneStorage_() const;
-
-  friend struct ::fidl::internal::NaturalStructCodingTraits<::test_protocolpayloads::MainProtocolTwoWayAnonWithErrorTopResponse, 16>;
-  friend struct ::fidl::internal::MemberVisitor<::test_protocolpayloads::MainProtocolTwoWayAnonWithErrorTopResponse>;
-  static constexpr auto kMembers = std::make_tuple(::fidl::internal::NaturalStructMember<Storage_, ::test_protocolpayloads::MainProtocolTwoWayAnonWithErrorResult, fidl::internal::NaturalCodingConstraintEmpty>{
-      &Storage_::result, 0});
-  static constexpr auto kPadding = std::make_tuple();
-};
-
 extern "C" const fidl_type_t test_protocolpayloads_MainProtocolOnAnonRequestTable;
 
 class MainProtocolOnAnonRequest {
@@ -1337,65 +1148,6 @@ class MainProtocolOnAnonWithErrorResult {
   }
 };
 
-extern "C" const fidl_type_t test_protocolpayloads_MainProtocolOnAnonWithErrorRequestTable;
-
-class MainProtocolOnAnonWithErrorRequest {
- private:
-  struct Storage_;
-
- public:
-  MainProtocolOnAnonWithErrorRequest(Storage_ storage) noexcept;
-  MainProtocolOnAnonWithErrorRequest(::test_protocolpayloads::MainProtocolOnAnonWithErrorResult result) noexcept;
-
-#pragma clang diagnostic push
-#pragma clang diagnostic ignored "-Wdefaulted-function-deleted"
-  // Default constructs a |MainProtocolOnAnonWithErrorRequest| only if all of its members are default constructible.
-  MainProtocolOnAnonWithErrorRequest() = default;
-#pragma clang diagnostic pop
-
-  MainProtocolOnAnonWithErrorRequest(MainProtocolOnAnonWithErrorRequest&&) noexcept = default;
-  MainProtocolOnAnonWithErrorRequest& operator=(MainProtocolOnAnonWithErrorRequest&&) noexcept = default;
-  MainProtocolOnAnonWithErrorRequest(const MainProtocolOnAnonWithErrorRequest& other) noexcept;
-  MainProtocolOnAnonWithErrorRequest& operator=(const MainProtocolOnAnonWithErrorRequest& other) noexcept;
-
-  bool operator==(const MainProtocolOnAnonWithErrorRequest& other) const noexcept {
-    return ::fidl::internal::NaturalStructCodingTraits<::test_protocolpayloads::MainProtocolOnAnonWithErrorRequest, 16>::Equal(this, &other);
-  }
-  bool operator!=(const MainProtocolOnAnonWithErrorRequest& other) const noexcept {
-    return !::fidl::internal::NaturalStructCodingTraits<::test_protocolpayloads::MainProtocolOnAnonWithErrorRequest, 16>::Equal(this, &other);
-  }
-
-  const ::test_protocolpayloads::MainProtocolOnAnonWithErrorResult&
-  result() const {
-    return storage_.result;
-  }
-
-  ::test_protocolpayloads::MainProtocolOnAnonWithErrorResult& result() {
-    return storage_.result;
-  }
-
-  // Setter for result.
-  //
-
-  MainProtocolOnAnonWithErrorRequest& result(::test_protocolpayloads::MainProtocolOnAnonWithErrorResult value);
-
-  MainProtocolOnAnonWithErrorRequest(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag);
-
- private:
-  struct Storage_ final {
-    ::test_protocolpayloads::MainProtocolOnAnonWithErrorResult result;
-  };
-
-  Storage_ storage_;
-  Storage_ CloneStorage_() const;
-
-  friend struct ::fidl::internal::NaturalStructCodingTraits<::test_protocolpayloads::MainProtocolOnAnonWithErrorRequest, 16>;
-  friend struct ::fidl::internal::MemberVisitor<::test_protocolpayloads::MainProtocolOnAnonWithErrorRequest>;
-  static constexpr auto kMembers = std::make_tuple(::fidl::internal::NaturalStructMember<Storage_, ::test_protocolpayloads::MainProtocolOnAnonWithErrorResult, fidl::internal::NaturalCodingConstraintEmpty>{
-      &Storage_::result, 0});
-  static constexpr auto kPadding = std::make_tuple();
-};
-
 extern "C" const fidl_type_t test_protocolpayloads_MainProtocol_TwoWayImportWithError_ResultTable;
 
 class MainProtocolTwoWayImportWithErrorResult {
@@ -1517,65 +1269,6 @@ class MainProtocolTwoWayImportWithErrorResult {
         return std::nullopt;
     }
   }
-};
-
-extern "C" const fidl_type_t test_protocolpayloads_MainProtocolTwoWayImportWithErrorTopResponseTable;
-
-class MainProtocolTwoWayImportWithErrorTopResponse {
- private:
-  struct Storage_;
-
- public:
-  MainProtocolTwoWayImportWithErrorTopResponse(Storage_ storage) noexcept;
-  MainProtocolTwoWayImportWithErrorTopResponse(::test_protocolpayloads::MainProtocolTwoWayImportWithErrorResult result) noexcept;
-
-#pragma clang diagnostic push
-#pragma clang diagnostic ignored "-Wdefaulted-function-deleted"
-  // Default constructs a |MainProtocolTwoWayImportWithErrorTopResponse| only if all of its members are default constructible.
-  MainProtocolTwoWayImportWithErrorTopResponse() = default;
-#pragma clang diagnostic pop
-
-  MainProtocolTwoWayImportWithErrorTopResponse(MainProtocolTwoWayImportWithErrorTopResponse&&) noexcept = default;
-  MainProtocolTwoWayImportWithErrorTopResponse& operator=(MainProtocolTwoWayImportWithErrorTopResponse&&) noexcept = default;
-  MainProtocolTwoWayImportWithErrorTopResponse(const MainProtocolTwoWayImportWithErrorTopResponse& other) noexcept;
-  MainProtocolTwoWayImportWithErrorTopResponse& operator=(const MainProtocolTwoWayImportWithErrorTopResponse& other) noexcept;
-
-  bool operator==(const MainProtocolTwoWayImportWithErrorTopResponse& other) const noexcept {
-    return ::fidl::internal::NaturalStructCodingTraits<::test_protocolpayloads::MainProtocolTwoWayImportWithErrorTopResponse, 16>::Equal(this, &other);
-  }
-  bool operator!=(const MainProtocolTwoWayImportWithErrorTopResponse& other) const noexcept {
-    return !::fidl::internal::NaturalStructCodingTraits<::test_protocolpayloads::MainProtocolTwoWayImportWithErrorTopResponse, 16>::Equal(this, &other);
-  }
-
-  const ::test_protocolpayloads::MainProtocolTwoWayImportWithErrorResult&
-  result() const {
-    return storage_.result;
-  }
-
-  ::test_protocolpayloads::MainProtocolTwoWayImportWithErrorResult& result() {
-    return storage_.result;
-  }
-
-  // Setter for result.
-  //
-
-  MainProtocolTwoWayImportWithErrorTopResponse& result(::test_protocolpayloads::MainProtocolTwoWayImportWithErrorResult value);
-
-  MainProtocolTwoWayImportWithErrorTopResponse(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag);
-
- private:
-  struct Storage_ final {
-    ::test_protocolpayloads::MainProtocolTwoWayImportWithErrorResult result;
-  };
-
-  Storage_ storage_;
-  Storage_ CloneStorage_() const;
-
-  friend struct ::fidl::internal::NaturalStructCodingTraits<::test_protocolpayloads::MainProtocolTwoWayImportWithErrorTopResponse, 16>;
-  friend struct ::fidl::internal::MemberVisitor<::test_protocolpayloads::MainProtocolTwoWayImportWithErrorTopResponse>;
-  static constexpr auto kMembers = std::make_tuple(::fidl::internal::NaturalStructMember<Storage_, ::test_protocolpayloads::MainProtocolTwoWayImportWithErrorResult, fidl::internal::NaturalCodingConstraintEmpty>{
-      &Storage_::result, 0});
-  static constexpr auto kPadding = std::make_tuple();
 };
 
 extern "C" const fidl_type_t test_protocolpayloads_MainProtocol_OnImportWithError_ResultTable;
@@ -1701,65 +1394,6 @@ class MainProtocolOnImportWithErrorResult {
   }
 };
 
-extern "C" const fidl_type_t test_protocolpayloads_MainProtocolOnImportWithErrorRequestTable;
-
-class MainProtocolOnImportWithErrorRequest {
- private:
-  struct Storage_;
-
- public:
-  MainProtocolOnImportWithErrorRequest(Storage_ storage) noexcept;
-  MainProtocolOnImportWithErrorRequest(::test_protocolpayloads::MainProtocolOnImportWithErrorResult result) noexcept;
-
-#pragma clang diagnostic push
-#pragma clang diagnostic ignored "-Wdefaulted-function-deleted"
-  // Default constructs a |MainProtocolOnImportWithErrorRequest| only if all of its members are default constructible.
-  MainProtocolOnImportWithErrorRequest() = default;
-#pragma clang diagnostic pop
-
-  MainProtocolOnImportWithErrorRequest(MainProtocolOnImportWithErrorRequest&&) noexcept = default;
-  MainProtocolOnImportWithErrorRequest& operator=(MainProtocolOnImportWithErrorRequest&&) noexcept = default;
-  MainProtocolOnImportWithErrorRequest(const MainProtocolOnImportWithErrorRequest& other) noexcept;
-  MainProtocolOnImportWithErrorRequest& operator=(const MainProtocolOnImportWithErrorRequest& other) noexcept;
-
-  bool operator==(const MainProtocolOnImportWithErrorRequest& other) const noexcept {
-    return ::fidl::internal::NaturalStructCodingTraits<::test_protocolpayloads::MainProtocolOnImportWithErrorRequest, 16>::Equal(this, &other);
-  }
-  bool operator!=(const MainProtocolOnImportWithErrorRequest& other) const noexcept {
-    return !::fidl::internal::NaturalStructCodingTraits<::test_protocolpayloads::MainProtocolOnImportWithErrorRequest, 16>::Equal(this, &other);
-  }
-
-  const ::test_protocolpayloads::MainProtocolOnImportWithErrorResult&
-  result() const {
-    return storage_.result;
-  }
-
-  ::test_protocolpayloads::MainProtocolOnImportWithErrorResult& result() {
-    return storage_.result;
-  }
-
-  // Setter for result.
-  //
-
-  MainProtocolOnImportWithErrorRequest& result(::test_protocolpayloads::MainProtocolOnImportWithErrorResult value);
-
-  MainProtocolOnImportWithErrorRequest(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag);
-
- private:
-  struct Storage_ final {
-    ::test_protocolpayloads::MainProtocolOnImportWithErrorResult result;
-  };
-
-  Storage_ storage_;
-  Storage_ CloneStorage_() const;
-
-  friend struct ::fidl::internal::NaturalStructCodingTraits<::test_protocolpayloads::MainProtocolOnImportWithErrorRequest, 16>;
-  friend struct ::fidl::internal::MemberVisitor<::test_protocolpayloads::MainProtocolOnImportWithErrorRequest>;
-  static constexpr auto kMembers = std::make_tuple(::fidl::internal::NaturalStructMember<Storage_, ::test_protocolpayloads::MainProtocolOnImportWithErrorResult, fidl::internal::NaturalCodingConstraintEmpty>{
-      &Storage_::result, 0});
-  static constexpr auto kPadding = std::make_tuple();
-};
-
 inline LocalStructPayload::LocalStructPayload(Storage_ storage) noexcept : storage_(std::move(storage)) {}
 inline LocalStructPayload::LocalStructPayload(uint32_t a, uint32_t b) noexcept
     : storage_({.a = std::move(a),
@@ -1780,40 +1414,6 @@ inline LocalStructPayload& LocalStructPayload::a(uint32_t value) {
 }
 inline LocalStructPayload& LocalStructPayload::b(uint32_t value) {
   storage_.b = std::move(value);
-  return *this;
-}
-
-inline MainProtocolTwoWayLocalWithErrorTopResponse::MainProtocolTwoWayLocalWithErrorTopResponse(Storage_ storage) noexcept : storage_(std::move(storage)) {}
-inline MainProtocolTwoWayLocalWithErrorTopResponse::MainProtocolTwoWayLocalWithErrorTopResponse(::test_protocolpayloads::MainProtocolTwoWayLocalWithErrorResult result) noexcept
-    : storage_({.result = std::move(result)}) {}
-inline MainProtocolTwoWayLocalWithErrorTopResponse::MainProtocolTwoWayLocalWithErrorTopResponse(const ::test_protocolpayloads::MainProtocolTwoWayLocalWithErrorTopResponse& other) noexcept : ::test_protocolpayloads::MainProtocolTwoWayLocalWithErrorTopResponse(other.CloneStorage_()) {}
-inline MainProtocolTwoWayLocalWithErrorTopResponse& ::test_protocolpayloads::MainProtocolTwoWayLocalWithErrorTopResponse::operator=(const ::test_protocolpayloads::MainProtocolTwoWayLocalWithErrorTopResponse& other) noexcept {
-  storage_ = other.CloneStorage_();
-  return *this;
-}
-
-inline MainProtocolTwoWayLocalWithErrorTopResponse::MainProtocolTwoWayLocalWithErrorTopResponse(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag) : MainProtocolTwoWayLocalWithErrorTopResponse(Storage_{
-                                                                                                                                                                  .result = ::fidl::internal::DefaultConstructPossiblyInvalidObjectTag{},
-                                                                                                                                                              }) {}
-inline MainProtocolTwoWayLocalWithErrorTopResponse& MainProtocolTwoWayLocalWithErrorTopResponse::result(::test_protocolpayloads::MainProtocolTwoWayLocalWithErrorResult value) {
-  storage_.result = std::move(value);
-  return *this;
-}
-
-inline MainProtocolOnLocalWithErrorRequest::MainProtocolOnLocalWithErrorRequest(Storage_ storage) noexcept : storage_(std::move(storage)) {}
-inline MainProtocolOnLocalWithErrorRequest::MainProtocolOnLocalWithErrorRequest(::test_protocolpayloads::MainProtocolOnLocalWithErrorResult result) noexcept
-    : storage_({.result = std::move(result)}) {}
-inline MainProtocolOnLocalWithErrorRequest::MainProtocolOnLocalWithErrorRequest(const ::test_protocolpayloads::MainProtocolOnLocalWithErrorRequest& other) noexcept : ::test_protocolpayloads::MainProtocolOnLocalWithErrorRequest(other.CloneStorage_()) {}
-inline MainProtocolOnLocalWithErrorRequest& ::test_protocolpayloads::MainProtocolOnLocalWithErrorRequest::operator=(const ::test_protocolpayloads::MainProtocolOnLocalWithErrorRequest& other) noexcept {
-  storage_ = other.CloneStorage_();
-  return *this;
-}
-
-inline MainProtocolOnLocalWithErrorRequest::MainProtocolOnLocalWithErrorRequest(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag) : MainProtocolOnLocalWithErrorRequest(Storage_{
-                                                                                                                                                  .result = ::fidl::internal::DefaultConstructPossiblyInvalidObjectTag{},
-                                                                                                                                              }) {}
-inline MainProtocolOnLocalWithErrorRequest& MainProtocolOnLocalWithErrorRequest::result(::test_protocolpayloads::MainProtocolOnLocalWithErrorResult value) {
-  storage_.result = std::move(value);
   return *this;
 }
 
@@ -1932,23 +1532,6 @@ inline MainProtocolTwoWayAnonWithErrorResponse& MainProtocolTwoWayAnonWithErrorR
   return *this;
 }
 
-inline MainProtocolTwoWayAnonWithErrorTopResponse::MainProtocolTwoWayAnonWithErrorTopResponse(Storage_ storage) noexcept : storage_(std::move(storage)) {}
-inline MainProtocolTwoWayAnonWithErrorTopResponse::MainProtocolTwoWayAnonWithErrorTopResponse(::test_protocolpayloads::MainProtocolTwoWayAnonWithErrorResult result) noexcept
-    : storage_({.result = std::move(result)}) {}
-inline MainProtocolTwoWayAnonWithErrorTopResponse::MainProtocolTwoWayAnonWithErrorTopResponse(const ::test_protocolpayloads::MainProtocolTwoWayAnonWithErrorTopResponse& other) noexcept : ::test_protocolpayloads::MainProtocolTwoWayAnonWithErrorTopResponse(other.CloneStorage_()) {}
-inline MainProtocolTwoWayAnonWithErrorTopResponse& ::test_protocolpayloads::MainProtocolTwoWayAnonWithErrorTopResponse::operator=(const ::test_protocolpayloads::MainProtocolTwoWayAnonWithErrorTopResponse& other) noexcept {
-  storage_ = other.CloneStorage_();
-  return *this;
-}
-
-inline MainProtocolTwoWayAnonWithErrorTopResponse::MainProtocolTwoWayAnonWithErrorTopResponse(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag) : MainProtocolTwoWayAnonWithErrorTopResponse(Storage_{
-                                                                                                                                                                .result = ::fidl::internal::DefaultConstructPossiblyInvalidObjectTag{},
-                                                                                                                                                            }) {}
-inline MainProtocolTwoWayAnonWithErrorTopResponse& MainProtocolTwoWayAnonWithErrorTopResponse::result(::test_protocolpayloads::MainProtocolTwoWayAnonWithErrorResult value) {
-  storage_.result = std::move(value);
-  return *this;
-}
-
 inline MainProtocolOnAnonRequest::MainProtocolOnAnonRequest(Storage_ storage) noexcept : storage_(std::move(storage)) {}
 inline MainProtocolOnAnonRequest::MainProtocolOnAnonRequest(uint32_t a, uint32_t b) noexcept
     : storage_({.a = std::move(a),
@@ -1995,57 +1578,6 @@ inline MainProtocolOnAnonWithErrorResponse& MainProtocolOnAnonWithErrorResponse:
   return *this;
 }
 
-inline MainProtocolOnAnonWithErrorRequest::MainProtocolOnAnonWithErrorRequest(Storage_ storage) noexcept : storage_(std::move(storage)) {}
-inline MainProtocolOnAnonWithErrorRequest::MainProtocolOnAnonWithErrorRequest(::test_protocolpayloads::MainProtocolOnAnonWithErrorResult result) noexcept
-    : storage_({.result = std::move(result)}) {}
-inline MainProtocolOnAnonWithErrorRequest::MainProtocolOnAnonWithErrorRequest(const ::test_protocolpayloads::MainProtocolOnAnonWithErrorRequest& other) noexcept : ::test_protocolpayloads::MainProtocolOnAnonWithErrorRequest(other.CloneStorage_()) {}
-inline MainProtocolOnAnonWithErrorRequest& ::test_protocolpayloads::MainProtocolOnAnonWithErrorRequest::operator=(const ::test_protocolpayloads::MainProtocolOnAnonWithErrorRequest& other) noexcept {
-  storage_ = other.CloneStorage_();
-  return *this;
-}
-
-inline MainProtocolOnAnonWithErrorRequest::MainProtocolOnAnonWithErrorRequest(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag) : MainProtocolOnAnonWithErrorRequest(Storage_{
-                                                                                                                                                .result = ::fidl::internal::DefaultConstructPossiblyInvalidObjectTag{},
-                                                                                                                                            }) {}
-inline MainProtocolOnAnonWithErrorRequest& MainProtocolOnAnonWithErrorRequest::result(::test_protocolpayloads::MainProtocolOnAnonWithErrorResult value) {
-  storage_.result = std::move(value);
-  return *this;
-}
-
-inline MainProtocolTwoWayImportWithErrorTopResponse::MainProtocolTwoWayImportWithErrorTopResponse(Storage_ storage) noexcept : storage_(std::move(storage)) {}
-inline MainProtocolTwoWayImportWithErrorTopResponse::MainProtocolTwoWayImportWithErrorTopResponse(::test_protocolpayloads::MainProtocolTwoWayImportWithErrorResult result) noexcept
-    : storage_({.result = std::move(result)}) {}
-inline MainProtocolTwoWayImportWithErrorTopResponse::MainProtocolTwoWayImportWithErrorTopResponse(const ::test_protocolpayloads::MainProtocolTwoWayImportWithErrorTopResponse& other) noexcept : ::test_protocolpayloads::MainProtocolTwoWayImportWithErrorTopResponse(other.CloneStorage_()) {}
-inline MainProtocolTwoWayImportWithErrorTopResponse& ::test_protocolpayloads::MainProtocolTwoWayImportWithErrorTopResponse::operator=(const ::test_protocolpayloads::MainProtocolTwoWayImportWithErrorTopResponse& other) noexcept {
-  storage_ = other.CloneStorage_();
-  return *this;
-}
-
-inline MainProtocolTwoWayImportWithErrorTopResponse::MainProtocolTwoWayImportWithErrorTopResponse(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag) : MainProtocolTwoWayImportWithErrorTopResponse(Storage_{
-                                                                                                                                                                    .result = ::fidl::internal::DefaultConstructPossiblyInvalidObjectTag{},
-                                                                                                                                                                }) {}
-inline MainProtocolTwoWayImportWithErrorTopResponse& MainProtocolTwoWayImportWithErrorTopResponse::result(::test_protocolpayloads::MainProtocolTwoWayImportWithErrorResult value) {
-  storage_.result = std::move(value);
-  return *this;
-}
-
-inline MainProtocolOnImportWithErrorRequest::MainProtocolOnImportWithErrorRequest(Storage_ storage) noexcept : storage_(std::move(storage)) {}
-inline MainProtocolOnImportWithErrorRequest::MainProtocolOnImportWithErrorRequest(::test_protocolpayloads::MainProtocolOnImportWithErrorResult result) noexcept
-    : storage_({.result = std::move(result)}) {}
-inline MainProtocolOnImportWithErrorRequest::MainProtocolOnImportWithErrorRequest(const ::test_protocolpayloads::MainProtocolOnImportWithErrorRequest& other) noexcept : ::test_protocolpayloads::MainProtocolOnImportWithErrorRequest(other.CloneStorage_()) {}
-inline MainProtocolOnImportWithErrorRequest& ::test_protocolpayloads::MainProtocolOnImportWithErrorRequest::operator=(const ::test_protocolpayloads::MainProtocolOnImportWithErrorRequest& other) noexcept {
-  storage_ = other.CloneStorage_();
-  return *this;
-}
-
-inline MainProtocolOnImportWithErrorRequest::MainProtocolOnImportWithErrorRequest(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag) : MainProtocolOnImportWithErrorRequest(Storage_{
-                                                                                                                                                    .result = ::fidl::internal::DefaultConstructPossiblyInvalidObjectTag{},
-                                                                                                                                                }) {}
-inline MainProtocolOnImportWithErrorRequest& MainProtocolOnImportWithErrorRequest::result(::test_protocolpayloads::MainProtocolOnImportWithErrorResult value) {
-  storage_.result = std::move(value);
-  return *this;
-}
-
 }  // namespace test_protocolpayloads
 namespace fidl {
 
@@ -2070,50 +1602,6 @@ struct IsStruct<::test_protocolpayloads::LocalStructPayload> : public std::true_
 template <>
 struct internal::NaturalCodingTraits<::test_protocolpayloads::LocalStructPayload, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalStructCodingTraits<::test_protocolpayloads::LocalStructPayload, 8> {};
-
-extern "C" const fidl_type_t test_protocolpayloads_MainProtocolTwoWayLocalWithErrorTopResponseTable;
-
-template <>
-struct IsFidlType<::test_protocolpayloads::MainProtocolTwoWayLocalWithErrorTopResponse> : public std::true_type {};
-
-template <>
-struct TypeTraits<::test_protocolpayloads::MainProtocolTwoWayLocalWithErrorTopResponse> {
-  static constexpr uint32_t kMaxNumHandles = 0;
-  static constexpr uint32_t kMaxDepth = 1;
-  static constexpr uint32_t kPrimarySize = 16;
-  static constexpr uint32_t kMaxOutOfLine = 8;
-  static constexpr bool kHasEnvelope = true;
-  static constexpr bool kHasPointer = true;
-};
-
-template <>
-struct IsStruct<::test_protocolpayloads::MainProtocolTwoWayLocalWithErrorTopResponse> : public std::true_type {};
-
-template <>
-struct internal::NaturalCodingTraits<::test_protocolpayloads::MainProtocolTwoWayLocalWithErrorTopResponse, ::fidl::internal::NaturalCodingConstraintEmpty> final
-    : public ::fidl::internal::NaturalStructCodingTraits<::test_protocolpayloads::MainProtocolTwoWayLocalWithErrorTopResponse, 16> {};
-
-extern "C" const fidl_type_t test_protocolpayloads_MainProtocolOnLocalWithErrorRequestTable;
-
-template <>
-struct IsFidlType<::test_protocolpayloads::MainProtocolOnLocalWithErrorRequest> : public std::true_type {};
-
-template <>
-struct TypeTraits<::test_protocolpayloads::MainProtocolOnLocalWithErrorRequest> {
-  static constexpr uint32_t kMaxNumHandles = 0;
-  static constexpr uint32_t kMaxDepth = 1;
-  static constexpr uint32_t kPrimarySize = 16;
-  static constexpr uint32_t kMaxOutOfLine = 8;
-  static constexpr bool kHasEnvelope = true;
-  static constexpr bool kHasPointer = true;
-};
-
-template <>
-struct IsStruct<::test_protocolpayloads::MainProtocolOnLocalWithErrorRequest> : public std::true_type {};
-
-template <>
-struct internal::NaturalCodingTraits<::test_protocolpayloads::MainProtocolOnLocalWithErrorRequest, ::fidl::internal::NaturalCodingConstraintEmpty> final
-    : public ::fidl::internal::NaturalStructCodingTraits<::test_protocolpayloads::MainProtocolOnLocalWithErrorRequest, 16> {};
 
 extern "C" const fidl_type_t test_protocolpayloads_MainProtocolOneWayAnonRequestTable;
 
@@ -2225,28 +1713,6 @@ template <>
 struct internal::NaturalCodingTraits<::test_protocolpayloads::MainProtocolTwoWayAnonWithErrorResponse, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalStructCodingTraits<::test_protocolpayloads::MainProtocolTwoWayAnonWithErrorResponse, 8> {};
 
-extern "C" const fidl_type_t test_protocolpayloads_MainProtocolTwoWayAnonWithErrorTopResponseTable;
-
-template <>
-struct IsFidlType<::test_protocolpayloads::MainProtocolTwoWayAnonWithErrorTopResponse> : public std::true_type {};
-
-template <>
-struct TypeTraits<::test_protocolpayloads::MainProtocolTwoWayAnonWithErrorTopResponse> {
-  static constexpr uint32_t kMaxNumHandles = 0;
-  static constexpr uint32_t kMaxDepth = 1;
-  static constexpr uint32_t kPrimarySize = 16;
-  static constexpr uint32_t kMaxOutOfLine = 8;
-  static constexpr bool kHasEnvelope = true;
-  static constexpr bool kHasPointer = true;
-};
-
-template <>
-struct IsStruct<::test_protocolpayloads::MainProtocolTwoWayAnonWithErrorTopResponse> : public std::true_type {};
-
-template <>
-struct internal::NaturalCodingTraits<::test_protocolpayloads::MainProtocolTwoWayAnonWithErrorTopResponse, ::fidl::internal::NaturalCodingConstraintEmpty> final
-    : public ::fidl::internal::NaturalStructCodingTraits<::test_protocolpayloads::MainProtocolTwoWayAnonWithErrorTopResponse, 16> {};
-
 extern "C" const fidl_type_t test_protocolpayloads_MainProtocolOnAnonRequestTable;
 
 template <>
@@ -2290,72 +1756,6 @@ struct IsStruct<::test_protocolpayloads::MainProtocolOnAnonWithErrorResponse> : 
 template <>
 struct internal::NaturalCodingTraits<::test_protocolpayloads::MainProtocolOnAnonWithErrorResponse, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalStructCodingTraits<::test_protocolpayloads::MainProtocolOnAnonWithErrorResponse, 8> {};
-
-extern "C" const fidl_type_t test_protocolpayloads_MainProtocolOnAnonWithErrorRequestTable;
-
-template <>
-struct IsFidlType<::test_protocolpayloads::MainProtocolOnAnonWithErrorRequest> : public std::true_type {};
-
-template <>
-struct TypeTraits<::test_protocolpayloads::MainProtocolOnAnonWithErrorRequest> {
-  static constexpr uint32_t kMaxNumHandles = 0;
-  static constexpr uint32_t kMaxDepth = 1;
-  static constexpr uint32_t kPrimarySize = 16;
-  static constexpr uint32_t kMaxOutOfLine = 8;
-  static constexpr bool kHasEnvelope = true;
-  static constexpr bool kHasPointer = true;
-};
-
-template <>
-struct IsStruct<::test_protocolpayloads::MainProtocolOnAnonWithErrorRequest> : public std::true_type {};
-
-template <>
-struct internal::NaturalCodingTraits<::test_protocolpayloads::MainProtocolOnAnonWithErrorRequest, ::fidl::internal::NaturalCodingConstraintEmpty> final
-    : public ::fidl::internal::NaturalStructCodingTraits<::test_protocolpayloads::MainProtocolOnAnonWithErrorRequest, 16> {};
-
-extern "C" const fidl_type_t test_protocolpayloads_MainProtocolTwoWayImportWithErrorTopResponseTable;
-
-template <>
-struct IsFidlType<::test_protocolpayloads::MainProtocolTwoWayImportWithErrorTopResponse> : public std::true_type {};
-
-template <>
-struct TypeTraits<::test_protocolpayloads::MainProtocolTwoWayImportWithErrorTopResponse> {
-  static constexpr uint32_t kMaxNumHandles = 0;
-  static constexpr uint32_t kMaxDepth = 1;
-  static constexpr uint32_t kPrimarySize = 16;
-  static constexpr uint32_t kMaxOutOfLine = 0;
-  static constexpr bool kHasEnvelope = true;
-  static constexpr bool kHasPointer = true;
-};
-
-template <>
-struct IsStruct<::test_protocolpayloads::MainProtocolTwoWayImportWithErrorTopResponse> : public std::true_type {};
-
-template <>
-struct internal::NaturalCodingTraits<::test_protocolpayloads::MainProtocolTwoWayImportWithErrorTopResponse, ::fidl::internal::NaturalCodingConstraintEmpty> final
-    : public ::fidl::internal::NaturalStructCodingTraits<::test_protocolpayloads::MainProtocolTwoWayImportWithErrorTopResponse, 16> {};
-
-extern "C" const fidl_type_t test_protocolpayloads_MainProtocolOnImportWithErrorRequestTable;
-
-template <>
-struct IsFidlType<::test_protocolpayloads::MainProtocolOnImportWithErrorRequest> : public std::true_type {};
-
-template <>
-struct TypeTraits<::test_protocolpayloads::MainProtocolOnImportWithErrorRequest> {
-  static constexpr uint32_t kMaxNumHandles = 0;
-  static constexpr uint32_t kMaxDepth = 1;
-  static constexpr uint32_t kPrimarySize = 16;
-  static constexpr uint32_t kMaxOutOfLine = 0;
-  static constexpr bool kHasEnvelope = true;
-  static constexpr bool kHasPointer = true;
-};
-
-template <>
-struct IsStruct<::test_protocolpayloads::MainProtocolOnImportWithErrorRequest> : public std::true_type {};
-
-template <>
-struct internal::NaturalCodingTraits<::test_protocolpayloads::MainProtocolOnImportWithErrorRequest, ::fidl::internal::NaturalCodingConstraintEmpty> final
-    : public ::fidl::internal::NaturalStructCodingTraits<::test_protocolpayloads::MainProtocolOnImportWithErrorRequest, 16> {};
 
 extern "C" const fidl_type_t test_protocolpayloads_MainProtocol_TwoWayLocalWithError_ResultTable;
 

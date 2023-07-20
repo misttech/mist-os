@@ -1165,34 +1165,6 @@ void ComposedProtocol_TwoWayAnonComposedWithError_Result::EnsureStorageInitializ
 }
 
 
-extern "C" const fidl_type_t test_protocollayoutssamelibrary_ComposedProtocolTwoWayAnonComposedWithErrorTopResponseTable;
-const fidl_type_t* ComposedProtocolTwoWayAnonComposedWithErrorTopResponse::FidlType = &test_protocollayoutssamelibrary_ComposedProtocolTwoWayAnonComposedWithErrorTopResponseTable;
-
-void ComposedProtocolTwoWayAnonComposedWithErrorTopResponse::Encode(::fidl::Encoder* _encoder, size_t _offset,
-                         cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
-  if (::fidl::IsMemcpyCompatible<ComposedProtocolTwoWayAnonComposedWithErrorTopResponse>::value) {
-    memcpy(_encoder->template GetPtr<ComposedProtocolTwoWayAnonComposedWithErrorTopResponse>(_offset), this, sizeof(ComposedProtocolTwoWayAnonComposedWithErrorTopResponse));
-  } else {::fidl::Encode(_encoder, &result, _offset + 0);
-    
-  }
-}
-
-void ComposedProtocolTwoWayAnonComposedWithErrorTopResponse::Decode(::fidl::Decoder* _decoder, ComposedProtocolTwoWayAnonComposedWithErrorTopResponse* _value, size_t _offset) {
-  if (::fidl::IsMemcpyCompatible<ComposedProtocolTwoWayAnonComposedWithErrorTopResponse>::value) {
-    memcpy(_value, _decoder->template GetPtr<ComposedProtocolTwoWayAnonComposedWithErrorTopResponse>(_offset), sizeof(ComposedProtocolTwoWayAnonComposedWithErrorTopResponse));
-  } else {
-    ::fidl::Decode(_decoder, &_value->result, _offset + 0);
-  }
-}
-
-zx_status_t ComposedProtocolTwoWayAnonComposedWithErrorTopResponse::Clone(ComposedProtocolTwoWayAnonComposedWithErrorTopResponse* _result) const {
-  zx_status_t _status = ::fidl::Clone(result, &_result->result);
-  if (_status != ZX_OK)
-    return _status;
-  return ZX_OK;
-}
-
-
 extern "C" const fidl_type_t test_protocollayoutssamelibrary_ComposedProtocolOnAnonComposedRequestTable;
 const fidl_type_t* ComposedProtocolOnAnonComposedRequest::FidlType = &test_protocollayoutssamelibrary_ComposedProtocolOnAnonComposedRequestTable;
 
@@ -1671,34 +1643,6 @@ void ComposedProtocol_OnAnonComposedWithError_Result::EnsureStorageInitialized(:
 }
 
 
-extern "C" const fidl_type_t test_protocollayoutssamelibrary_ComposedProtocolOnAnonComposedWithErrorRequestTable;
-const fidl_type_t* ComposedProtocolOnAnonComposedWithErrorRequest::FidlType = &test_protocollayoutssamelibrary_ComposedProtocolOnAnonComposedWithErrorRequestTable;
-
-void ComposedProtocolOnAnonComposedWithErrorRequest::Encode(::fidl::Encoder* _encoder, size_t _offset,
-                         cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
-  if (::fidl::IsMemcpyCompatible<ComposedProtocolOnAnonComposedWithErrorRequest>::value) {
-    memcpy(_encoder->template GetPtr<ComposedProtocolOnAnonComposedWithErrorRequest>(_offset), this, sizeof(ComposedProtocolOnAnonComposedWithErrorRequest));
-  } else {::fidl::Encode(_encoder, &result, _offset + 0);
-    
-  }
-}
-
-void ComposedProtocolOnAnonComposedWithErrorRequest::Decode(::fidl::Decoder* _decoder, ComposedProtocolOnAnonComposedWithErrorRequest* _value, size_t _offset) {
-  if (::fidl::IsMemcpyCompatible<ComposedProtocolOnAnonComposedWithErrorRequest>::value) {
-    memcpy(_value, _decoder->template GetPtr<ComposedProtocolOnAnonComposedWithErrorRequest>(_offset), sizeof(ComposedProtocolOnAnonComposedWithErrorRequest));
-  } else {
-    ::fidl::Decode(_decoder, &_value->result, _offset + 0);
-  }
-}
-
-zx_status_t ComposedProtocolOnAnonComposedWithErrorRequest::Clone(ComposedProtocolOnAnonComposedWithErrorRequest* _result) const {
-  zx_status_t _status = ::fidl::Clone(result, &_result->result);
-  if (_status != ZX_OK)
-    return _status;
-  return ZX_OK;
-}
-
-
 extern "C" const fidl_type_t test_protocollayoutssamelibrary_ComposedProtocol_TwoWayNamedComposedWithError_ResultTable;
 const fidl_type_t* ComposedProtocol_TwoWayNamedComposedWithError_Result::FidlType = &test_protocollayoutssamelibrary_ComposedProtocol_TwoWayNamedComposedWithError_ResultTable;
 
@@ -1901,34 +1845,6 @@ void ComposedProtocol_TwoWayNamedComposedWithError_Result::EnsureStorageInitiali
         break;
     }
   }
-}
-
-
-extern "C" const fidl_type_t test_protocollayoutssamelibrary_ComposedProtocolTwoWayNamedComposedWithErrorTopResponseTable;
-const fidl_type_t* ComposedProtocolTwoWayNamedComposedWithErrorTopResponse::FidlType = &test_protocollayoutssamelibrary_ComposedProtocolTwoWayNamedComposedWithErrorTopResponseTable;
-
-void ComposedProtocolTwoWayNamedComposedWithErrorTopResponse::Encode(::fidl::Encoder* _encoder, size_t _offset,
-                         cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
-  if (::fidl::IsMemcpyCompatible<ComposedProtocolTwoWayNamedComposedWithErrorTopResponse>::value) {
-    memcpy(_encoder->template GetPtr<ComposedProtocolTwoWayNamedComposedWithErrorTopResponse>(_offset), this, sizeof(ComposedProtocolTwoWayNamedComposedWithErrorTopResponse));
-  } else {::fidl::Encode(_encoder, &result, _offset + 0);
-    
-  }
-}
-
-void ComposedProtocolTwoWayNamedComposedWithErrorTopResponse::Decode(::fidl::Decoder* _decoder, ComposedProtocolTwoWayNamedComposedWithErrorTopResponse* _value, size_t _offset) {
-  if (::fidl::IsMemcpyCompatible<ComposedProtocolTwoWayNamedComposedWithErrorTopResponse>::value) {
-    memcpy(_value, _decoder->template GetPtr<ComposedProtocolTwoWayNamedComposedWithErrorTopResponse>(_offset), sizeof(ComposedProtocolTwoWayNamedComposedWithErrorTopResponse));
-  } else {
-    ::fidl::Decode(_decoder, &_value->result, _offset + 0);
-  }
-}
-
-zx_status_t ComposedProtocolTwoWayNamedComposedWithErrorTopResponse::Clone(ComposedProtocolTwoWayNamedComposedWithErrorTopResponse* _result) const {
-  zx_status_t _status = ::fidl::Clone(result, &_result->result);
-  if (_status != ZX_OK)
-    return _status;
-  return ZX_OK;
 }
 
 
@@ -2137,34 +2053,6 @@ void ComposedProtocol_OnNamedComposedWithError_Result::EnsureStorageInitialized(
 }
 
 
-extern "C" const fidl_type_t test_protocollayoutssamelibrary_ComposedProtocolOnNamedComposedWithErrorRequestTable;
-const fidl_type_t* ComposedProtocolOnNamedComposedWithErrorRequest::FidlType = &test_protocollayoutssamelibrary_ComposedProtocolOnNamedComposedWithErrorRequestTable;
-
-void ComposedProtocolOnNamedComposedWithErrorRequest::Encode(::fidl::Encoder* _encoder, size_t _offset,
-                         cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
-  if (::fidl::IsMemcpyCompatible<ComposedProtocolOnNamedComposedWithErrorRequest>::value) {
-    memcpy(_encoder->template GetPtr<ComposedProtocolOnNamedComposedWithErrorRequest>(_offset), this, sizeof(ComposedProtocolOnNamedComposedWithErrorRequest));
-  } else {::fidl::Encode(_encoder, &result, _offset + 0);
-    
-  }
-}
-
-void ComposedProtocolOnNamedComposedWithErrorRequest::Decode(::fidl::Decoder* _decoder, ComposedProtocolOnNamedComposedWithErrorRequest* _value, size_t _offset) {
-  if (::fidl::IsMemcpyCompatible<ComposedProtocolOnNamedComposedWithErrorRequest>::value) {
-    memcpy(_value, _decoder->template GetPtr<ComposedProtocolOnNamedComposedWithErrorRequest>(_offset), sizeof(ComposedProtocolOnNamedComposedWithErrorRequest));
-  } else {
-    ::fidl::Decode(_decoder, &_value->result, _offset + 0);
-  }
-}
-
-zx_status_t ComposedProtocolOnNamedComposedWithErrorRequest::Clone(ComposedProtocolOnNamedComposedWithErrorRequest* _result) const {
-  zx_status_t _status = ::fidl::Clone(result, &_result->result);
-  if (_status != ZX_OK)
-    return _status;
-  return ZX_OK;
-}
-
-
 extern "C" const fidl_type_t test_protocollayoutssamelibrary_MainProtocol_TwoWayLocalWithError_ResultTable;
 const fidl_type_t* MainProtocol_TwoWayLocalWithError_Result::FidlType = &test_protocollayoutssamelibrary_MainProtocol_TwoWayLocalWithError_ResultTable;
 
@@ -2370,34 +2258,6 @@ void MainProtocol_TwoWayLocalWithError_Result::EnsureStorageInitialized(::fidl_x
 }
 
 
-extern "C" const fidl_type_t test_protocollayoutssamelibrary_MainProtocolTwoWayLocalWithErrorTopResponseTable;
-const fidl_type_t* MainProtocolTwoWayLocalWithErrorTopResponse::FidlType = &test_protocollayoutssamelibrary_MainProtocolTwoWayLocalWithErrorTopResponseTable;
-
-void MainProtocolTwoWayLocalWithErrorTopResponse::Encode(::fidl::Encoder* _encoder, size_t _offset,
-                         cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
-  if (::fidl::IsMemcpyCompatible<MainProtocolTwoWayLocalWithErrorTopResponse>::value) {
-    memcpy(_encoder->template GetPtr<MainProtocolTwoWayLocalWithErrorTopResponse>(_offset), this, sizeof(MainProtocolTwoWayLocalWithErrorTopResponse));
-  } else {::fidl::Encode(_encoder, &result, _offset + 0);
-    
-  }
-}
-
-void MainProtocolTwoWayLocalWithErrorTopResponse::Decode(::fidl::Decoder* _decoder, MainProtocolTwoWayLocalWithErrorTopResponse* _value, size_t _offset) {
-  if (::fidl::IsMemcpyCompatible<MainProtocolTwoWayLocalWithErrorTopResponse>::value) {
-    memcpy(_value, _decoder->template GetPtr<MainProtocolTwoWayLocalWithErrorTopResponse>(_offset), sizeof(MainProtocolTwoWayLocalWithErrorTopResponse));
-  } else {
-    ::fidl::Decode(_decoder, &_value->result, _offset + 0);
-  }
-}
-
-zx_status_t MainProtocolTwoWayLocalWithErrorTopResponse::Clone(MainProtocolTwoWayLocalWithErrorTopResponse* _result) const {
-  zx_status_t _status = ::fidl::Clone(result, &_result->result);
-  if (_status != ZX_OK)
-    return _status;
-  return ZX_OK;
-}
-
-
 extern "C" const fidl_type_t test_protocollayoutssamelibrary_MainProtocol_OnLocalWithError_ResultTable;
 const fidl_type_t* MainProtocol_OnLocalWithError_Result::FidlType = &test_protocollayoutssamelibrary_MainProtocol_OnLocalWithError_ResultTable;
 
@@ -2600,34 +2460,6 @@ void MainProtocol_OnLocalWithError_Result::EnsureStorageInitialized(::fidl_xunio
         break;
     }
   }
-}
-
-
-extern "C" const fidl_type_t test_protocollayoutssamelibrary_MainProtocolOnLocalWithErrorRequestTable;
-const fidl_type_t* MainProtocolOnLocalWithErrorRequest::FidlType = &test_protocollayoutssamelibrary_MainProtocolOnLocalWithErrorRequestTable;
-
-void MainProtocolOnLocalWithErrorRequest::Encode(::fidl::Encoder* _encoder, size_t _offset,
-                         cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
-  if (::fidl::IsMemcpyCompatible<MainProtocolOnLocalWithErrorRequest>::value) {
-    memcpy(_encoder->template GetPtr<MainProtocolOnLocalWithErrorRequest>(_offset), this, sizeof(MainProtocolOnLocalWithErrorRequest));
-  } else {::fidl::Encode(_encoder, &result, _offset + 0);
-    
-  }
-}
-
-void MainProtocolOnLocalWithErrorRequest::Decode(::fidl::Decoder* _decoder, MainProtocolOnLocalWithErrorRequest* _value, size_t _offset) {
-  if (::fidl::IsMemcpyCompatible<MainProtocolOnLocalWithErrorRequest>::value) {
-    memcpy(_value, _decoder->template GetPtr<MainProtocolOnLocalWithErrorRequest>(_offset), sizeof(MainProtocolOnLocalWithErrorRequest));
-  } else {
-    ::fidl::Decode(_decoder, &_value->result, _offset + 0);
-  }
-}
-
-zx_status_t MainProtocolOnLocalWithErrorRequest::Clone(MainProtocolOnLocalWithErrorRequest* _result) const {
-  zx_status_t _status = ::fidl::Clone(result, &_result->result);
-  if (_status != ZX_OK)
-    return _status;
-  return ZX_OK;
 }
 
 
@@ -3562,34 +3394,6 @@ void MainProtocol_TwoWayAnonWithError_Result::EnsureStorageInitialized(::fidl_xu
 }
 
 
-extern "C" const fidl_type_t test_protocollayoutssamelibrary_MainProtocolTwoWayAnonWithErrorTopResponseTable;
-const fidl_type_t* MainProtocolTwoWayAnonWithErrorTopResponse::FidlType = &test_protocollayoutssamelibrary_MainProtocolTwoWayAnonWithErrorTopResponseTable;
-
-void MainProtocolTwoWayAnonWithErrorTopResponse::Encode(::fidl::Encoder* _encoder, size_t _offset,
-                         cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
-  if (::fidl::IsMemcpyCompatible<MainProtocolTwoWayAnonWithErrorTopResponse>::value) {
-    memcpy(_encoder->template GetPtr<MainProtocolTwoWayAnonWithErrorTopResponse>(_offset), this, sizeof(MainProtocolTwoWayAnonWithErrorTopResponse));
-  } else {::fidl::Encode(_encoder, &result, _offset + 0);
-    
-  }
-}
-
-void MainProtocolTwoWayAnonWithErrorTopResponse::Decode(::fidl::Decoder* _decoder, MainProtocolTwoWayAnonWithErrorTopResponse* _value, size_t _offset) {
-  if (::fidl::IsMemcpyCompatible<MainProtocolTwoWayAnonWithErrorTopResponse>::value) {
-    memcpy(_value, _decoder->template GetPtr<MainProtocolTwoWayAnonWithErrorTopResponse>(_offset), sizeof(MainProtocolTwoWayAnonWithErrorTopResponse));
-  } else {
-    ::fidl::Decode(_decoder, &_value->result, _offset + 0);
-  }
-}
-
-zx_status_t MainProtocolTwoWayAnonWithErrorTopResponse::Clone(MainProtocolTwoWayAnonWithErrorTopResponse* _result) const {
-  zx_status_t _status = ::fidl::Clone(result, &_result->result);
-  if (_status != ZX_OK)
-    return _status;
-  return ZX_OK;
-}
-
-
 extern "C" const fidl_type_t test_protocollayoutssamelibrary_MainProtocolOnAnonRequestTable;
 const fidl_type_t* MainProtocolOnAnonRequest::FidlType = &test_protocollayoutssamelibrary_MainProtocolOnAnonRequestTable;
 
@@ -4095,34 +3899,6 @@ void MainProtocol_OnAnonWithError_Result::EnsureStorageInitialized(::fidl_xunion
   }
 }
 
-
-extern "C" const fidl_type_t test_protocollayoutssamelibrary_MainProtocolOnAnonWithErrorRequestTable;
-const fidl_type_t* MainProtocolOnAnonWithErrorRequest::FidlType = &test_protocollayoutssamelibrary_MainProtocolOnAnonWithErrorRequestTable;
-
-void MainProtocolOnAnonWithErrorRequest::Encode(::fidl::Encoder* _encoder, size_t _offset,
-                         cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
-  if (::fidl::IsMemcpyCompatible<MainProtocolOnAnonWithErrorRequest>::value) {
-    memcpy(_encoder->template GetPtr<MainProtocolOnAnonWithErrorRequest>(_offset), this, sizeof(MainProtocolOnAnonWithErrorRequest));
-  } else {::fidl::Encode(_encoder, &result, _offset + 0);
-    
-  }
-}
-
-void MainProtocolOnAnonWithErrorRequest::Decode(::fidl::Decoder* _decoder, MainProtocolOnAnonWithErrorRequest* _value, size_t _offset) {
-  if (::fidl::IsMemcpyCompatible<MainProtocolOnAnonWithErrorRequest>::value) {
-    memcpy(_value, _decoder->template GetPtr<MainProtocolOnAnonWithErrorRequest>(_offset), sizeof(MainProtocolOnAnonWithErrorRequest));
-  } else {
-    ::fidl::Decode(_decoder, &_value->result, _offset + 0);
-  }
-}
-
-zx_status_t MainProtocolOnAnonWithErrorRequest::Clone(MainProtocolOnAnonWithErrorRequest* _result) const {
-  zx_status_t _status = ::fidl::Clone(result, &_result->result);
-  if (_status != ZX_OK)
-    return _status;
-  return ZX_OK;
-}
-
 //
 // Proxies and stubs definitions
 //
@@ -4138,13 +3914,13 @@ __LOCAL extern "C" const fidl_type_t test_protocollayoutssamelibrary_ComposedPro
   
 __LOCAL extern "C" const fidl_type_t test_protocollayoutssamelibrary_ComposedProtocolTwoWayAnonComposedWithErrorRequestTable;
   
-__LOCAL extern "C" const fidl_type_t test_protocollayoutssamelibrary_ComposedProtocolTwoWayAnonComposedWithErrorTopResponseTable;
+__LOCAL extern "C" const fidl_type_t test_protocollayoutssamelibrary_ComposedProtocol_TwoWayAnonComposedWithError_ResultTable;
   
   
 __LOCAL extern "C" const fidl_type_t test_protocollayoutssamelibrary_ComposedProtocolOnAnonComposedRequestTable;
   
   
-__LOCAL extern "C" const fidl_type_t test_protocollayoutssamelibrary_ComposedProtocolOnAnonComposedWithErrorRequestTable;
+__LOCAL extern "C" const fidl_type_t test_protocollayoutssamelibrary_ComposedProtocol_OnAnonComposedWithError_ResultTable;
   
 __LOCAL extern "C" const fidl_type_t test_protocollayoutssamelibrary_TablePayloadTable;
   
@@ -4153,12 +3929,12 @@ __LOCAL extern "C" const fidl_type_t test_protocollayoutssamelibrary_UnionPayloa
   
   
   
-__LOCAL extern "C" const fidl_type_t test_protocollayoutssamelibrary_ComposedProtocolTwoWayNamedComposedWithErrorTopResponseTable;
+__LOCAL extern "C" const fidl_type_t test_protocollayoutssamelibrary_ComposedProtocol_TwoWayNamedComposedWithError_ResultTable;
   
   
   
   
-__LOCAL extern "C" const fidl_type_t test_protocollayoutssamelibrary_ComposedProtocolOnNamedComposedWithErrorRequestTable;
+__LOCAL extern "C" const fidl_type_t test_protocollayoutssamelibrary_ComposedProtocol_OnNamedComposedWithError_ResultTable;
 
 }  // namespace _internal
 
@@ -4207,25 +3983,25 @@ const fidl_type_t* ComposedProtocol_ResponseDecoder::GetType(uint64_t ordinal) {
       return &::test::protocollayoutssamelibrary::_internal::test_protocollayoutssamelibrary_ComposedProtocolTwoWayAnonComposedResponseTable;
         ;
     case ::test::protocollayoutssamelibrary::internal::kComposedProtocol_TwoWayAnonComposedWithError_Ordinal:
-      return &::test::protocollayoutssamelibrary::_internal::test_protocollayoutssamelibrary_ComposedProtocolTwoWayAnonComposedWithErrorTopResponseTable;
+      return &::test::protocollayoutssamelibrary::_internal::test_protocollayoutssamelibrary_ComposedProtocol_TwoWayAnonComposedWithError_ResultTable;
         ;
     case ::test::protocollayoutssamelibrary::internal::kComposedProtocol_OnAnonComposed_Ordinal:
       return &::test::protocollayoutssamelibrary::_internal::test_protocollayoutssamelibrary_ComposedProtocolOnAnonComposedRequestTable;
         ;
     case ::test::protocollayoutssamelibrary::internal::kComposedProtocol_OnAnonComposedWithError_Ordinal:
-      return &::test::protocollayoutssamelibrary::_internal::test_protocollayoutssamelibrary_ComposedProtocolOnAnonComposedWithErrorRequestTable;
+      return &::test::protocollayoutssamelibrary::_internal::test_protocollayoutssamelibrary_ComposedProtocol_OnAnonComposedWithError_ResultTable;
         ;
     case ::test::protocollayoutssamelibrary::internal::kComposedProtocol_TwoWayNamedComposed_Ordinal:
       return &::test::protocollayoutssamelibrary::_internal::test_protocollayoutssamelibrary_TablePayloadTable;
         ;
     case ::test::protocollayoutssamelibrary::internal::kComposedProtocol_TwoWayNamedComposedWithError_Ordinal:
-      return &::test::protocollayoutssamelibrary::_internal::test_protocollayoutssamelibrary_ComposedProtocolTwoWayNamedComposedWithErrorTopResponseTable;
+      return &::test::protocollayoutssamelibrary::_internal::test_protocollayoutssamelibrary_ComposedProtocol_TwoWayNamedComposedWithError_ResultTable;
         ;
     case ::test::protocollayoutssamelibrary::internal::kComposedProtocol_OnNamedComposed_Ordinal:
       return &::test::protocollayoutssamelibrary::_internal::test_protocollayoutssamelibrary_UnionPayloadTable;
         ;
     case ::test::protocollayoutssamelibrary::internal::kComposedProtocol_OnNamedComposedWithError_Ordinal:
-      return &::test::protocollayoutssamelibrary::_internal::test_protocollayoutssamelibrary_ComposedProtocolOnNamedComposedWithErrorRequestTable;
+      return &::test::protocollayoutssamelibrary::_internal::test_protocollayoutssamelibrary_ComposedProtocol_OnNamedComposedWithError_ResultTable;
         ;
     default:
       return nullptr;
@@ -4267,9 +4043,9 @@ zx_status_t ComposedProtocol_Proxy::Dispatch_(::fidl::HLCPPIncomingMessage messa
         break;
       }
       const char* error_msg = nullptr;
-      status = message.Decode(&::test::protocollayoutssamelibrary::_internal::test_protocollayoutssamelibrary_ComposedProtocolOnAnonComposedWithErrorRequestTable, &error_msg);
+      status = message.Decode(&::test::protocollayoutssamelibrary::_internal::test_protocollayoutssamelibrary_ComposedProtocol_OnAnonComposedWithError_ResultTable, &error_msg);
       if (status != ZX_OK) {
-        FIDL_REPORT_DECODING_ERROR(message, &::test::protocollayoutssamelibrary::_internal::test_protocollayoutssamelibrary_ComposedProtocolOnAnonComposedWithErrorRequestTable, error_msg);
+        FIDL_REPORT_DECODING_ERROR(message, &::test::protocollayoutssamelibrary::_internal::test_protocollayoutssamelibrary_ComposedProtocol_OnAnonComposedWithError_ResultTable, error_msg);
         break;
       }
       ::fidl::Decoder decoder(std::move(message));
@@ -4297,9 +4073,9 @@ zx_status_t ComposedProtocol_Proxy::Dispatch_(::fidl::HLCPPIncomingMessage messa
         break;
       }
       const char* error_msg = nullptr;
-      status = message.Decode(&::test::protocollayoutssamelibrary::_internal::test_protocollayoutssamelibrary_ComposedProtocolOnNamedComposedWithErrorRequestTable, &error_msg);
+      status = message.Decode(&::test::protocollayoutssamelibrary::_internal::test_protocollayoutssamelibrary_ComposedProtocol_OnNamedComposedWithError_ResultTable, &error_msg);
       if (status != ZX_OK) {
-        FIDL_REPORT_DECODING_ERROR(message, &::test::protocollayoutssamelibrary::_internal::test_protocollayoutssamelibrary_ComposedProtocolOnNamedComposedWithErrorRequestTable, error_msg);
+        FIDL_REPORT_DECODING_ERROR(message, &::test::protocollayoutssamelibrary::_internal::test_protocollayoutssamelibrary_ComposedProtocol_OnNamedComposedWithError_ResultTable, error_msg);
         break;
       }
       ::fidl::Decoder decoder(std::move(message));
@@ -4351,7 +4127,7 @@ ComposedProtocol_TwoWayAnonComposedWithError_ResponseHandler(ComposedProtocol::T
         ::fidl::Decoder decoder(std::move(message));
         callback_(::fidl::DecodeAs<::test::protocollayoutssamelibrary::ComposedProtocol_TwoWayAnonComposedWithError_Result>(&decoder, 0 + sizeof(fidl_message_header_t)));
         return ZX_OK;
-      }, &::test::protocollayoutssamelibrary::_internal::test_protocollayoutssamelibrary_ComposedProtocolTwoWayAnonComposedWithErrorTopResponseTable);
+      }, &::test::protocollayoutssamelibrary::_internal::test_protocollayoutssamelibrary_ComposedProtocol_TwoWayAnonComposedWithError_ResultTable);
 }
 
 }  // namespace
@@ -4396,7 +4172,7 @@ ComposedProtocol_TwoWayNamedComposedWithError_ResponseHandler(ComposedProtocol::
         ::fidl::Decoder decoder(std::move(message));
         callback_(::fidl::DecodeAs<::test::protocollayoutssamelibrary::ComposedProtocol_TwoWayNamedComposedWithError_Result>(&decoder, 0 + sizeof(fidl_message_header_t)));
         return ZX_OK;
-      }, &::test::protocollayoutssamelibrary::_internal::test_protocollayoutssamelibrary_ComposedProtocolTwoWayNamedComposedWithErrorTopResponseTable);
+      }, &::test::protocollayoutssamelibrary::_internal::test_protocollayoutssamelibrary_ComposedProtocol_TwoWayNamedComposedWithError_ResultTable);
 }
 
 }  // namespace
@@ -4434,10 +4210,10 @@ class ComposedProtocol_TwoWayAnonComposedWithError_Responder final {
   ComposedProtocol_TwoWayAnonComposedWithError_Responder(::fidl::internal::PendingResponse response)
       : response_(std::move(response)) {}
 
-  void operator()(::test::protocollayoutssamelibrary::ComposedProtocol_TwoWayAnonComposedWithError_Result result) {
+  void operator()(::test::protocollayoutssamelibrary::ComposedProtocol_TwoWayAnonComposedWithError_Result ComposedProtocol_TwoWayAnonComposedWithError_Result) {
     ::fidl::MessageEncoder _encoder(::test::protocollayoutssamelibrary::internal::kComposedProtocol_TwoWayAnonComposedWithError_Ordinal, ::test::protocollayoutssamelibrary::internal::kComposedProtocol_TwoWayAnonComposedWithError_DynamicFlags);
-    const fidl_type_t* resp_type =&::test::protocollayoutssamelibrary::_internal::test_protocollayoutssamelibrary_ComposedProtocolTwoWayAnonComposedWithErrorTopResponseTable;
-    response_.Send(resp_type, ::test::protocollayoutssamelibrary::ComposedProtocol_ResponseEncoder::TwoWayAnonComposedWithError(&_encoder, &result));
+    const fidl_type_t* resp_type =&::test::protocollayoutssamelibrary::_internal::test_protocollayoutssamelibrary_ComposedProtocol_TwoWayAnonComposedWithError_ResultTable;
+    response_.Send(resp_type, ::test::protocollayoutssamelibrary::ComposedProtocol_ResponseEncoder::TwoWayAnonComposedWithError(&_encoder, &ComposedProtocol_TwoWayAnonComposedWithError_Result));
   }
 
  private:
@@ -4464,10 +4240,10 @@ class ComposedProtocol_TwoWayNamedComposedWithError_Responder final {
   ComposedProtocol_TwoWayNamedComposedWithError_Responder(::fidl::internal::PendingResponse response)
       : response_(std::move(response)) {}
 
-  void operator()(::test::protocollayoutssamelibrary::ComposedProtocol_TwoWayNamedComposedWithError_Result result) {
+  void operator()(::test::protocollayoutssamelibrary::ComposedProtocol_TwoWayNamedComposedWithError_Result ComposedProtocol_TwoWayNamedComposedWithError_Result) {
     ::fidl::MessageEncoder _encoder(::test::protocollayoutssamelibrary::internal::kComposedProtocol_TwoWayNamedComposedWithError_Ordinal, ::test::protocollayoutssamelibrary::internal::kComposedProtocol_TwoWayNamedComposedWithError_DynamicFlags);
-    const fidl_type_t* resp_type =&::test::protocollayoutssamelibrary::_internal::test_protocollayoutssamelibrary_ComposedProtocolTwoWayNamedComposedWithErrorTopResponseTable;
-    response_.Send(resp_type, ::test::protocollayoutssamelibrary::ComposedProtocol_ResponseEncoder::TwoWayNamedComposedWithError(&_encoder, &result));
+    const fidl_type_t* resp_type =&::test::protocollayoutssamelibrary::_internal::test_protocollayoutssamelibrary_ComposedProtocol_TwoWayNamedComposedWithError_ResultTable;
+    response_.Send(resp_type, ::test::protocollayoutssamelibrary::ComposedProtocol_ResponseEncoder::TwoWayNamedComposedWithError(&_encoder, &ComposedProtocol_TwoWayNamedComposedWithError_Result));
   }
 
  private:
@@ -4558,17 +4334,17 @@ void ComposedProtocol_Stub::OnAnonComposed(::test::protocollayoutssamelibrary::C
   ::fidl::MessageEncoder _encoder(::test::protocollayoutssamelibrary::internal::kComposedProtocol_OnAnonComposed_Ordinal, ::test::protocollayoutssamelibrary::internal::kComposedProtocol_OnAnonComposed_DynamicFlags);
   const fidl_type_t* resp_type =&::test::protocollayoutssamelibrary::_internal::test_protocollayoutssamelibrary_ComposedProtocolOnAnonComposedRequestTable;sender_()->Send(resp_type, ::test::protocollayoutssamelibrary::ComposedProtocol_ResponseEncoder::OnAnonComposed(&_encoder, &ComposedProtocolOnAnonComposedRequest));
 }
-void ComposedProtocol_Stub::OnAnonComposedWithError(::test::protocollayoutssamelibrary::ComposedProtocol_OnAnonComposedWithError_Result result) {
+void ComposedProtocol_Stub::OnAnonComposedWithError(::test::protocollayoutssamelibrary::ComposedProtocol_OnAnonComposedWithError_Result ComposedProtocol_OnAnonComposedWithError_Result) {
   ::fidl::MessageEncoder _encoder(::test::protocollayoutssamelibrary::internal::kComposedProtocol_OnAnonComposedWithError_Ordinal, ::test::protocollayoutssamelibrary::internal::kComposedProtocol_OnAnonComposedWithError_DynamicFlags);
-  const fidl_type_t* resp_type =&::test::protocollayoutssamelibrary::_internal::test_protocollayoutssamelibrary_ComposedProtocolOnAnonComposedWithErrorRequestTable;sender_()->Send(resp_type, ::test::protocollayoutssamelibrary::ComposedProtocol_ResponseEncoder::OnAnonComposedWithError(&_encoder, &result));
+  const fidl_type_t* resp_type =&::test::protocollayoutssamelibrary::_internal::test_protocollayoutssamelibrary_ComposedProtocol_OnAnonComposedWithError_ResultTable;sender_()->Send(resp_type, ::test::protocollayoutssamelibrary::ComposedProtocol_ResponseEncoder::OnAnonComposedWithError(&_encoder, &ComposedProtocol_OnAnonComposedWithError_Result));
 }
 void ComposedProtocol_Stub::OnNamedComposed(::test::protocollayoutssamelibrary::UnionPayload UnionPayload) {
   ::fidl::MessageEncoder _encoder(::test::protocollayoutssamelibrary::internal::kComposedProtocol_OnNamedComposed_Ordinal, ::test::protocollayoutssamelibrary::internal::kComposedProtocol_OnNamedComposed_DynamicFlags);
   const fidl_type_t* resp_type =&::test::protocollayoutssamelibrary::_internal::test_protocollayoutssamelibrary_UnionPayloadTable;sender_()->Send(resp_type, ::test::protocollayoutssamelibrary::ComposedProtocol_ResponseEncoder::OnNamedComposed(&_encoder, &UnionPayload));
 }
-void ComposedProtocol_Stub::OnNamedComposedWithError(::test::protocollayoutssamelibrary::ComposedProtocol_OnNamedComposedWithError_Result result) {
+void ComposedProtocol_Stub::OnNamedComposedWithError(::test::protocollayoutssamelibrary::ComposedProtocol_OnNamedComposedWithError_Result ComposedProtocol_OnNamedComposedWithError_Result) {
   ::fidl::MessageEncoder _encoder(::test::protocollayoutssamelibrary::internal::kComposedProtocol_OnNamedComposedWithError_Ordinal, ::test::protocollayoutssamelibrary::internal::kComposedProtocol_OnNamedComposedWithError_DynamicFlags);
-  const fidl_type_t* resp_type =&::test::protocollayoutssamelibrary::_internal::test_protocollayoutssamelibrary_ComposedProtocolOnNamedComposedWithErrorRequestTable;sender_()->Send(resp_type, ::test::protocollayoutssamelibrary::ComposedProtocol_ResponseEncoder::OnNamedComposedWithError(&_encoder, &result));
+  const fidl_type_t* resp_type =&::test::protocollayoutssamelibrary::_internal::test_protocollayoutssamelibrary_ComposedProtocol_OnNamedComposedWithError_ResultTable;sender_()->Send(resp_type, ::test::protocollayoutssamelibrary::ComposedProtocol_ResponseEncoder::OnNamedComposedWithError(&_encoder, &ComposedProtocol_OnNamedComposedWithError_Result));
 }
 
 ComposedProtocol_SyncProxy::ComposedProtocol_SyncProxy(::zx::channel channel)
@@ -4596,17 +4372,17 @@ zx_status_t ComposedProtocol_SyncProxy::TwoWayAnonComposed(::test::protocollayou
   return ZX_OK;
 }
 
-zx_status_t ComposedProtocol_SyncProxy::TwoWayAnonComposedWithError(::test::protocollayoutssamelibrary::ComposedProtocolTwoWayAnonComposedWithErrorRequest ComposedProtocolTwoWayAnonComposedWithErrorRequest, ::test::protocollayoutssamelibrary::ComposedProtocol_TwoWayAnonComposedWithError_Result* out_result) {
+zx_status_t ComposedProtocol_SyncProxy::TwoWayAnonComposedWithError(::test::protocollayoutssamelibrary::ComposedProtocolTwoWayAnonComposedWithErrorRequest ComposedProtocolTwoWayAnonComposedWithErrorRequest, ::test::protocollayoutssamelibrary::ComposedProtocol_TwoWayAnonComposedWithError_Result* out_ComposedProtocol_TwoWayAnonComposedWithError_Result) {
   ::fidl::MessageEncoder _encoder(::test::protocollayoutssamelibrary::internal::kComposedProtocol_TwoWayAnonComposedWithError_Ordinal, ::test::protocollayoutssamelibrary::internal::kComposedProtocol_TwoWayAnonComposedWithError_DynamicFlags);
   ::fidl::IncomingMessageBuffer buffer_;
   ::fidl::HLCPPIncomingMessage response_ = buffer_.CreateEmptyIncomingMessage();
   const fidl_type_t* req_type =&::test::protocollayoutssamelibrary::_internal::test_protocollayoutssamelibrary_ComposedProtocolTwoWayAnonComposedWithErrorRequestTable;
-  const fidl_type_t* resp_type =&::test::protocollayoutssamelibrary::_internal::test_protocollayoutssamelibrary_ComposedProtocolTwoWayAnonComposedWithErrorTopResponseTable;
+  const fidl_type_t* resp_type =&::test::protocollayoutssamelibrary::_internal::test_protocollayoutssamelibrary_ComposedProtocol_TwoWayAnonComposedWithError_ResultTable;
   zx_status_t status_ = proxy_.Call(req_type, resp_type, ::test::protocollayoutssamelibrary::ComposedProtocol_RequestEncoder::TwoWayAnonComposedWithError(&_encoder, &ComposedProtocolTwoWayAnonComposedWithErrorRequest), &response_);
   if (status_ != ZX_OK)
     return status_;
   ::fidl::Decoder decoder_(std::move(response_));
-  *out_result = ::fidl::DecodeAs<::test::protocollayoutssamelibrary::ComposedProtocol_TwoWayAnonComposedWithError_Result>(&decoder_, 0 + sizeof(fidl_message_header_t));
+  *out_ComposedProtocol_TwoWayAnonComposedWithError_Result = ::fidl::DecodeAs<::test::protocollayoutssamelibrary::ComposedProtocol_TwoWayAnonComposedWithError_Result>(&decoder_, 0 + sizeof(fidl_message_header_t));
   return ZX_OK;
 }
 
@@ -4630,17 +4406,17 @@ zx_status_t ComposedProtocol_SyncProxy::TwoWayNamedComposed(::test::protocollayo
   return ZX_OK;
 }
 
-zx_status_t ComposedProtocol_SyncProxy::TwoWayNamedComposedWithError(::test::protocollayoutssamelibrary::TablePayload TablePayload, ::test::protocollayoutssamelibrary::ComposedProtocol_TwoWayNamedComposedWithError_Result* out_result) {
+zx_status_t ComposedProtocol_SyncProxy::TwoWayNamedComposedWithError(::test::protocollayoutssamelibrary::TablePayload TablePayload, ::test::protocollayoutssamelibrary::ComposedProtocol_TwoWayNamedComposedWithError_Result* out_ComposedProtocol_TwoWayNamedComposedWithError_Result) {
   ::fidl::MessageEncoder _encoder(::test::protocollayoutssamelibrary::internal::kComposedProtocol_TwoWayNamedComposedWithError_Ordinal, ::test::protocollayoutssamelibrary::internal::kComposedProtocol_TwoWayNamedComposedWithError_DynamicFlags);
   ::fidl::IncomingMessageBuffer buffer_;
   ::fidl::HLCPPIncomingMessage response_ = buffer_.CreateEmptyIncomingMessage();
   const fidl_type_t* req_type =&::test::protocollayoutssamelibrary::_internal::test_protocollayoutssamelibrary_TablePayloadTable;
-  const fidl_type_t* resp_type =&::test::protocollayoutssamelibrary::_internal::test_protocollayoutssamelibrary_ComposedProtocolTwoWayNamedComposedWithErrorTopResponseTable;
+  const fidl_type_t* resp_type =&::test::protocollayoutssamelibrary::_internal::test_protocollayoutssamelibrary_ComposedProtocol_TwoWayNamedComposedWithError_ResultTable;
   zx_status_t status_ = proxy_.Call(req_type, resp_type, ::test::protocollayoutssamelibrary::ComposedProtocol_RequestEncoder::TwoWayNamedComposedWithError(&_encoder, &TablePayload), &response_);
   if (status_ != ZX_OK)
     return status_;
   ::fidl::Decoder decoder_(std::move(response_));
-  *out_result = ::fidl::DecodeAs<::test::protocollayoutssamelibrary::ComposedProtocol_TwoWayNamedComposedWithError_Result>(&decoder_, 0 + sizeof(fidl_message_header_t));
+  *out_ComposedProtocol_TwoWayNamedComposedWithError_Result = ::fidl::DecodeAs<::test::protocollayoutssamelibrary::ComposedProtocol_TwoWayNamedComposedWithError_Result>(&decoder_, 0 + sizeof(fidl_message_header_t));
   return ZX_OK;
 }
 
@@ -4674,12 +4450,12 @@ zx_status_t ComposedProtocol_SyncProxy::TwoWayNamedComposedWithError(::test::pro
   
   
   namespace _internal {
-__LOCAL extern "C" const fidl_type_t test_protocollayoutssamelibrary_MainProtocolTwoWayLocalWithErrorTopResponseTable;
+__LOCAL extern "C" const fidl_type_t test_protocollayoutssamelibrary_MainProtocol_TwoWayLocalWithError_ResultTable;
   
   
   
   
-__LOCAL extern "C" const fidl_type_t test_protocollayoutssamelibrary_MainProtocolOnLocalWithErrorRequestTable;
+__LOCAL extern "C" const fidl_type_t test_protocollayoutssamelibrary_MainProtocol_OnLocalWithError_ResultTable;
   
 __LOCAL extern "C" const fidl_type_t test_protocollayoutssamelibrary_MainProtocolOneWayAnonRequestTable;
   
@@ -4690,13 +4466,13 @@ __LOCAL extern "C" const fidl_type_t test_protocollayoutssamelibrary_MainProtoco
   
 __LOCAL extern "C" const fidl_type_t test_protocollayoutssamelibrary_MainProtocolTwoWayAnonWithErrorRequestTable;
   
-__LOCAL extern "C" const fidl_type_t test_protocollayoutssamelibrary_MainProtocolTwoWayAnonWithErrorTopResponseTable;
+__LOCAL extern "C" const fidl_type_t test_protocollayoutssamelibrary_MainProtocol_TwoWayAnonWithError_ResultTable;
   
   
 __LOCAL extern "C" const fidl_type_t test_protocollayoutssamelibrary_MainProtocolOnAnonRequestTable;
   
   
-__LOCAL extern "C" const fidl_type_t test_protocollayoutssamelibrary_MainProtocolOnAnonWithErrorRequestTable;
+__LOCAL extern "C" const fidl_type_t test_protocollayoutssamelibrary_MainProtocol_OnAnonWithError_ResultTable;
 
 }  // namespace _internal
 
@@ -4773,49 +4549,49 @@ const fidl_type_t* MainProtocol_ResponseDecoder::GetType(uint64_t ordinal) {
       return &::test::protocollayoutssamelibrary::_internal::test_protocollayoutssamelibrary_ComposedProtocolTwoWayAnonComposedResponseTable;
         ;
     case ::test::protocollayoutssamelibrary::internal::kMainProtocol_TwoWayAnonComposedWithError_Ordinal:
-      return &::test::protocollayoutssamelibrary::_internal::test_protocollayoutssamelibrary_ComposedProtocolTwoWayAnonComposedWithErrorTopResponseTable;
+      return &::test::protocollayoutssamelibrary::_internal::test_protocollayoutssamelibrary_ComposedProtocol_TwoWayAnonComposedWithError_ResultTable;
         ;
     case ::test::protocollayoutssamelibrary::internal::kMainProtocol_OnAnonComposed_Ordinal:
       return &::test::protocollayoutssamelibrary::_internal::test_protocollayoutssamelibrary_ComposedProtocolOnAnonComposedRequestTable;
         ;
     case ::test::protocollayoutssamelibrary::internal::kMainProtocol_OnAnonComposedWithError_Ordinal:
-      return &::test::protocollayoutssamelibrary::_internal::test_protocollayoutssamelibrary_ComposedProtocolOnAnonComposedWithErrorRequestTable;
+      return &::test::protocollayoutssamelibrary::_internal::test_protocollayoutssamelibrary_ComposedProtocol_OnAnonComposedWithError_ResultTable;
         ;
     case ::test::protocollayoutssamelibrary::internal::kMainProtocol_TwoWayNamedComposed_Ordinal:
       return &::test::protocollayoutssamelibrary::_internal::test_protocollayoutssamelibrary_TablePayloadTable;
         ;
     case ::test::protocollayoutssamelibrary::internal::kMainProtocol_TwoWayNamedComposedWithError_Ordinal:
-      return &::test::protocollayoutssamelibrary::_internal::test_protocollayoutssamelibrary_ComposedProtocolTwoWayNamedComposedWithErrorTopResponseTable;
+      return &::test::protocollayoutssamelibrary::_internal::test_protocollayoutssamelibrary_ComposedProtocol_TwoWayNamedComposedWithError_ResultTable;
         ;
     case ::test::protocollayoutssamelibrary::internal::kMainProtocol_OnNamedComposed_Ordinal:
       return &::test::protocollayoutssamelibrary::_internal::test_protocollayoutssamelibrary_UnionPayloadTable;
         ;
     case ::test::protocollayoutssamelibrary::internal::kMainProtocol_OnNamedComposedWithError_Ordinal:
-      return &::test::protocollayoutssamelibrary::_internal::test_protocollayoutssamelibrary_ComposedProtocolOnNamedComposedWithErrorRequestTable;
+      return &::test::protocollayoutssamelibrary::_internal::test_protocollayoutssamelibrary_ComposedProtocol_OnNamedComposedWithError_ResultTable;
         ;
     case ::test::protocollayoutssamelibrary::internal::kMainProtocol_TwoWayLocal_Ordinal:
       return &::test::protocollayoutssamelibrary::_internal::test_protocollayoutssamelibrary_TablePayloadTable;
         ;
     case ::test::protocollayoutssamelibrary::internal::kMainProtocol_TwoWayLocalWithError_Ordinal:
-      return &::test::protocollayoutssamelibrary::_internal::test_protocollayoutssamelibrary_MainProtocolTwoWayLocalWithErrorTopResponseTable;
+      return &::test::protocollayoutssamelibrary::_internal::test_protocollayoutssamelibrary_MainProtocol_TwoWayLocalWithError_ResultTable;
         ;
     case ::test::protocollayoutssamelibrary::internal::kMainProtocol_OnLocal_Ordinal:
       return &::test::protocollayoutssamelibrary::_internal::test_protocollayoutssamelibrary_UnionPayloadTable;
         ;
     case ::test::protocollayoutssamelibrary::internal::kMainProtocol_OnLocalWithError_Ordinal:
-      return &::test::protocollayoutssamelibrary::_internal::test_protocollayoutssamelibrary_MainProtocolOnLocalWithErrorRequestTable;
+      return &::test::protocollayoutssamelibrary::_internal::test_protocollayoutssamelibrary_MainProtocol_OnLocalWithError_ResultTable;
         ;
     case ::test::protocollayoutssamelibrary::internal::kMainProtocol_TwoWayAnon_Ordinal:
       return &::test::protocollayoutssamelibrary::_internal::test_protocollayoutssamelibrary_MainProtocolTwoWayAnonResponseTable;
         ;
     case ::test::protocollayoutssamelibrary::internal::kMainProtocol_TwoWayAnonWithError_Ordinal:
-      return &::test::protocollayoutssamelibrary::_internal::test_protocollayoutssamelibrary_MainProtocolTwoWayAnonWithErrorTopResponseTable;
+      return &::test::protocollayoutssamelibrary::_internal::test_protocollayoutssamelibrary_MainProtocol_TwoWayAnonWithError_ResultTable;
         ;
     case ::test::protocollayoutssamelibrary::internal::kMainProtocol_OnAnon_Ordinal:
       return &::test::protocollayoutssamelibrary::_internal::test_protocollayoutssamelibrary_MainProtocolOnAnonRequestTable;
         ;
     case ::test::protocollayoutssamelibrary::internal::kMainProtocol_OnAnonWithError_Ordinal:
-      return &::test::protocollayoutssamelibrary::_internal::test_protocollayoutssamelibrary_MainProtocolOnAnonWithErrorRequestTable;
+      return &::test::protocollayoutssamelibrary::_internal::test_protocollayoutssamelibrary_MainProtocol_OnAnonWithError_ResultTable;
         ;
     default:
       return nullptr;
@@ -4857,9 +4633,9 @@ zx_status_t MainProtocol_Proxy::Dispatch_(::fidl::HLCPPIncomingMessage message) 
         break;
       }
       const char* error_msg = nullptr;
-      status = message.Decode(&::test::protocollayoutssamelibrary::_internal::test_protocollayoutssamelibrary_ComposedProtocolOnAnonComposedWithErrorRequestTable, &error_msg);
+      status = message.Decode(&::test::protocollayoutssamelibrary::_internal::test_protocollayoutssamelibrary_ComposedProtocol_OnAnonComposedWithError_ResultTable, &error_msg);
       if (status != ZX_OK) {
-        FIDL_REPORT_DECODING_ERROR(message, &::test::protocollayoutssamelibrary::_internal::test_protocollayoutssamelibrary_ComposedProtocolOnAnonComposedWithErrorRequestTable, error_msg);
+        FIDL_REPORT_DECODING_ERROR(message, &::test::protocollayoutssamelibrary::_internal::test_protocollayoutssamelibrary_ComposedProtocol_OnAnonComposedWithError_ResultTable, error_msg);
         break;
       }
       ::fidl::Decoder decoder(std::move(message));
@@ -4887,9 +4663,9 @@ zx_status_t MainProtocol_Proxy::Dispatch_(::fidl::HLCPPIncomingMessage message) 
         break;
       }
       const char* error_msg = nullptr;
-      status = message.Decode(&::test::protocollayoutssamelibrary::_internal::test_protocollayoutssamelibrary_ComposedProtocolOnNamedComposedWithErrorRequestTable, &error_msg);
+      status = message.Decode(&::test::protocollayoutssamelibrary::_internal::test_protocollayoutssamelibrary_ComposedProtocol_OnNamedComposedWithError_ResultTable, &error_msg);
       if (status != ZX_OK) {
-        FIDL_REPORT_DECODING_ERROR(message, &::test::protocollayoutssamelibrary::_internal::test_protocollayoutssamelibrary_ComposedProtocolOnNamedComposedWithErrorRequestTable, error_msg);
+        FIDL_REPORT_DECODING_ERROR(message, &::test::protocollayoutssamelibrary::_internal::test_protocollayoutssamelibrary_ComposedProtocol_OnNamedComposedWithError_ResultTable, error_msg);
         break;
       }
       ::fidl::Decoder decoder(std::move(message));
@@ -4917,9 +4693,9 @@ zx_status_t MainProtocol_Proxy::Dispatch_(::fidl::HLCPPIncomingMessage message) 
         break;
       }
       const char* error_msg = nullptr;
-      status = message.Decode(&::test::protocollayoutssamelibrary::_internal::test_protocollayoutssamelibrary_MainProtocolOnLocalWithErrorRequestTable, &error_msg);
+      status = message.Decode(&::test::protocollayoutssamelibrary::_internal::test_protocollayoutssamelibrary_MainProtocol_OnLocalWithError_ResultTable, &error_msg);
       if (status != ZX_OK) {
-        FIDL_REPORT_DECODING_ERROR(message, &::test::protocollayoutssamelibrary::_internal::test_protocollayoutssamelibrary_MainProtocolOnLocalWithErrorRequestTable, error_msg);
+        FIDL_REPORT_DECODING_ERROR(message, &::test::protocollayoutssamelibrary::_internal::test_protocollayoutssamelibrary_MainProtocol_OnLocalWithError_ResultTable, error_msg);
         break;
       }
       ::fidl::Decoder decoder(std::move(message));
@@ -4947,9 +4723,9 @@ zx_status_t MainProtocol_Proxy::Dispatch_(::fidl::HLCPPIncomingMessage message) 
         break;
       }
       const char* error_msg = nullptr;
-      status = message.Decode(&::test::protocollayoutssamelibrary::_internal::test_protocollayoutssamelibrary_MainProtocolOnAnonWithErrorRequestTable, &error_msg);
+      status = message.Decode(&::test::protocollayoutssamelibrary::_internal::test_protocollayoutssamelibrary_MainProtocol_OnAnonWithError_ResultTable, &error_msg);
       if (status != ZX_OK) {
-        FIDL_REPORT_DECODING_ERROR(message, &::test::protocollayoutssamelibrary::_internal::test_protocollayoutssamelibrary_MainProtocolOnAnonWithErrorRequestTable, error_msg);
+        FIDL_REPORT_DECODING_ERROR(message, &::test::protocollayoutssamelibrary::_internal::test_protocollayoutssamelibrary_MainProtocol_OnAnonWithError_ResultTable, error_msg);
         break;
       }
       ::fidl::Decoder decoder(std::move(message));
@@ -5001,7 +4777,7 @@ MainProtocol_TwoWayAnonComposedWithError_ResponseHandler(MainProtocol::TwoWayAno
         ::fidl::Decoder decoder(std::move(message));
         callback_(::fidl::DecodeAs<::test::protocollayoutssamelibrary::ComposedProtocol_TwoWayAnonComposedWithError_Result>(&decoder, 0 + sizeof(fidl_message_header_t)));
         return ZX_OK;
-      }, &::test::protocollayoutssamelibrary::_internal::test_protocollayoutssamelibrary_ComposedProtocolTwoWayAnonComposedWithErrorTopResponseTable);
+      }, &::test::protocollayoutssamelibrary::_internal::test_protocollayoutssamelibrary_ComposedProtocol_TwoWayAnonComposedWithError_ResultTable);
 }
 
 }  // namespace
@@ -5046,7 +4822,7 @@ MainProtocol_TwoWayNamedComposedWithError_ResponseHandler(MainProtocol::TwoWayNa
         ::fidl::Decoder decoder(std::move(message));
         callback_(::fidl::DecodeAs<::test::protocollayoutssamelibrary::ComposedProtocol_TwoWayNamedComposedWithError_Result>(&decoder, 0 + sizeof(fidl_message_header_t)));
         return ZX_OK;
-      }, &::test::protocollayoutssamelibrary::_internal::test_protocollayoutssamelibrary_ComposedProtocolTwoWayNamedComposedWithErrorTopResponseTable);
+      }, &::test::protocollayoutssamelibrary::_internal::test_protocollayoutssamelibrary_ComposedProtocol_TwoWayNamedComposedWithError_ResultTable);
 }
 
 }  // namespace
@@ -5091,7 +4867,7 @@ MainProtocol_TwoWayLocalWithError_ResponseHandler(MainProtocol::TwoWayLocalWithE
         ::fidl::Decoder decoder(std::move(message));
         callback_(::fidl::DecodeAs<::test::protocollayoutssamelibrary::MainProtocol_TwoWayLocalWithError_Result>(&decoder, 0 + sizeof(fidl_message_header_t)));
         return ZX_OK;
-      }, &::test::protocollayoutssamelibrary::_internal::test_protocollayoutssamelibrary_MainProtocolTwoWayLocalWithErrorTopResponseTable);
+      }, &::test::protocollayoutssamelibrary::_internal::test_protocollayoutssamelibrary_MainProtocol_TwoWayLocalWithError_ResultTable);
 }
 
 }  // namespace
@@ -5136,7 +4912,7 @@ MainProtocol_TwoWayAnonWithError_ResponseHandler(MainProtocol::TwoWayAnonWithErr
         ::fidl::Decoder decoder(std::move(message));
         callback_(::fidl::DecodeAs<::test::protocollayoutssamelibrary::MainProtocol_TwoWayAnonWithError_Result>(&decoder, 0 + sizeof(fidl_message_header_t)));
         return ZX_OK;
-      }, &::test::protocollayoutssamelibrary::_internal::test_protocollayoutssamelibrary_MainProtocolTwoWayAnonWithErrorTopResponseTable);
+      }, &::test::protocollayoutssamelibrary::_internal::test_protocollayoutssamelibrary_MainProtocol_TwoWayAnonWithError_ResultTable);
 }
 
 }  // namespace
@@ -5174,10 +4950,10 @@ class MainProtocol_TwoWayAnonComposedWithError_Responder final {
   MainProtocol_TwoWayAnonComposedWithError_Responder(::fidl::internal::PendingResponse response)
       : response_(std::move(response)) {}
 
-  void operator()(::test::protocollayoutssamelibrary::ComposedProtocol_TwoWayAnonComposedWithError_Result result) {
+  void operator()(::test::protocollayoutssamelibrary::ComposedProtocol_TwoWayAnonComposedWithError_Result ComposedProtocol_TwoWayAnonComposedWithError_Result) {
     ::fidl::MessageEncoder _encoder(::test::protocollayoutssamelibrary::internal::kMainProtocol_TwoWayAnonComposedWithError_Ordinal, ::test::protocollayoutssamelibrary::internal::kMainProtocol_TwoWayAnonComposedWithError_DynamicFlags);
-    const fidl_type_t* resp_type =&::test::protocollayoutssamelibrary::_internal::test_protocollayoutssamelibrary_ComposedProtocolTwoWayAnonComposedWithErrorTopResponseTable;
-    response_.Send(resp_type, ::test::protocollayoutssamelibrary::MainProtocol_ResponseEncoder::TwoWayAnonComposedWithError(&_encoder, &result));
+    const fidl_type_t* resp_type =&::test::protocollayoutssamelibrary::_internal::test_protocollayoutssamelibrary_ComposedProtocol_TwoWayAnonComposedWithError_ResultTable;
+    response_.Send(resp_type, ::test::protocollayoutssamelibrary::MainProtocol_ResponseEncoder::TwoWayAnonComposedWithError(&_encoder, &ComposedProtocol_TwoWayAnonComposedWithError_Result));
   }
 
  private:
@@ -5204,10 +4980,10 @@ class MainProtocol_TwoWayNamedComposedWithError_Responder final {
   MainProtocol_TwoWayNamedComposedWithError_Responder(::fidl::internal::PendingResponse response)
       : response_(std::move(response)) {}
 
-  void operator()(::test::protocollayoutssamelibrary::ComposedProtocol_TwoWayNamedComposedWithError_Result result) {
+  void operator()(::test::protocollayoutssamelibrary::ComposedProtocol_TwoWayNamedComposedWithError_Result ComposedProtocol_TwoWayNamedComposedWithError_Result) {
     ::fidl::MessageEncoder _encoder(::test::protocollayoutssamelibrary::internal::kMainProtocol_TwoWayNamedComposedWithError_Ordinal, ::test::protocollayoutssamelibrary::internal::kMainProtocol_TwoWayNamedComposedWithError_DynamicFlags);
-    const fidl_type_t* resp_type =&::test::protocollayoutssamelibrary::_internal::test_protocollayoutssamelibrary_ComposedProtocolTwoWayNamedComposedWithErrorTopResponseTable;
-    response_.Send(resp_type, ::test::protocollayoutssamelibrary::MainProtocol_ResponseEncoder::TwoWayNamedComposedWithError(&_encoder, &result));
+    const fidl_type_t* resp_type =&::test::protocollayoutssamelibrary::_internal::test_protocollayoutssamelibrary_ComposedProtocol_TwoWayNamedComposedWithError_ResultTable;
+    response_.Send(resp_type, ::test::protocollayoutssamelibrary::MainProtocol_ResponseEncoder::TwoWayNamedComposedWithError(&_encoder, &ComposedProtocol_TwoWayNamedComposedWithError_Result));
   }
 
  private:
@@ -5234,10 +5010,10 @@ class MainProtocol_TwoWayLocalWithError_Responder final {
   MainProtocol_TwoWayLocalWithError_Responder(::fidl::internal::PendingResponse response)
       : response_(std::move(response)) {}
 
-  void operator()(::test::protocollayoutssamelibrary::MainProtocol_TwoWayLocalWithError_Result result) {
+  void operator()(::test::protocollayoutssamelibrary::MainProtocol_TwoWayLocalWithError_Result MainProtocol_TwoWayLocalWithError_Result) {
     ::fidl::MessageEncoder _encoder(::test::protocollayoutssamelibrary::internal::kMainProtocol_TwoWayLocalWithError_Ordinal, ::test::protocollayoutssamelibrary::internal::kMainProtocol_TwoWayLocalWithError_DynamicFlags);
-    const fidl_type_t* resp_type =&::test::protocollayoutssamelibrary::_internal::test_protocollayoutssamelibrary_MainProtocolTwoWayLocalWithErrorTopResponseTable;
-    response_.Send(resp_type, ::test::protocollayoutssamelibrary::MainProtocol_ResponseEncoder::TwoWayLocalWithError(&_encoder, &result));
+    const fidl_type_t* resp_type =&::test::protocollayoutssamelibrary::_internal::test_protocollayoutssamelibrary_MainProtocol_TwoWayLocalWithError_ResultTable;
+    response_.Send(resp_type, ::test::protocollayoutssamelibrary::MainProtocol_ResponseEncoder::TwoWayLocalWithError(&_encoder, &MainProtocol_TwoWayLocalWithError_Result));
   }
 
  private:
@@ -5264,10 +5040,10 @@ class MainProtocol_TwoWayAnonWithError_Responder final {
   MainProtocol_TwoWayAnonWithError_Responder(::fidl::internal::PendingResponse response)
       : response_(std::move(response)) {}
 
-  void operator()(::test::protocollayoutssamelibrary::MainProtocol_TwoWayAnonWithError_Result result) {
+  void operator()(::test::protocollayoutssamelibrary::MainProtocol_TwoWayAnonWithError_Result MainProtocol_TwoWayAnonWithError_Result) {
     ::fidl::MessageEncoder _encoder(::test::protocollayoutssamelibrary::internal::kMainProtocol_TwoWayAnonWithError_Ordinal, ::test::protocollayoutssamelibrary::internal::kMainProtocol_TwoWayAnonWithError_DynamicFlags);
-    const fidl_type_t* resp_type =&::test::protocollayoutssamelibrary::_internal::test_protocollayoutssamelibrary_MainProtocolTwoWayAnonWithErrorTopResponseTable;
-    response_.Send(resp_type, ::test::protocollayoutssamelibrary::MainProtocol_ResponseEncoder::TwoWayAnonWithError(&_encoder, &result));
+    const fidl_type_t* resp_type =&::test::protocollayoutssamelibrary::_internal::test_protocollayoutssamelibrary_MainProtocol_TwoWayAnonWithError_ResultTable;
+    response_.Send(resp_type, ::test::protocollayoutssamelibrary::MainProtocol_ResponseEncoder::TwoWayAnonWithError(&_encoder, &MainProtocol_TwoWayAnonWithError_Result));
   }
 
  private:
@@ -5394,33 +5170,33 @@ void MainProtocol_Stub::OnAnonComposed(::test::protocollayoutssamelibrary::Compo
   ::fidl::MessageEncoder _encoder(::test::protocollayoutssamelibrary::internal::kMainProtocol_OnAnonComposed_Ordinal, ::test::protocollayoutssamelibrary::internal::kMainProtocol_OnAnonComposed_DynamicFlags);
   const fidl_type_t* resp_type =&::test::protocollayoutssamelibrary::_internal::test_protocollayoutssamelibrary_ComposedProtocolOnAnonComposedRequestTable;sender_()->Send(resp_type, ::test::protocollayoutssamelibrary::MainProtocol_ResponseEncoder::OnAnonComposed(&_encoder, &ComposedProtocolOnAnonComposedRequest));
 }
-void MainProtocol_Stub::OnAnonComposedWithError(::test::protocollayoutssamelibrary::ComposedProtocol_OnAnonComposedWithError_Result result) {
+void MainProtocol_Stub::OnAnonComposedWithError(::test::protocollayoutssamelibrary::ComposedProtocol_OnAnonComposedWithError_Result ComposedProtocol_OnAnonComposedWithError_Result) {
   ::fidl::MessageEncoder _encoder(::test::protocollayoutssamelibrary::internal::kMainProtocol_OnAnonComposedWithError_Ordinal, ::test::protocollayoutssamelibrary::internal::kMainProtocol_OnAnonComposedWithError_DynamicFlags);
-  const fidl_type_t* resp_type =&::test::protocollayoutssamelibrary::_internal::test_protocollayoutssamelibrary_ComposedProtocolOnAnonComposedWithErrorRequestTable;sender_()->Send(resp_type, ::test::protocollayoutssamelibrary::MainProtocol_ResponseEncoder::OnAnonComposedWithError(&_encoder, &result));
+  const fidl_type_t* resp_type =&::test::protocollayoutssamelibrary::_internal::test_protocollayoutssamelibrary_ComposedProtocol_OnAnonComposedWithError_ResultTable;sender_()->Send(resp_type, ::test::protocollayoutssamelibrary::MainProtocol_ResponseEncoder::OnAnonComposedWithError(&_encoder, &ComposedProtocol_OnAnonComposedWithError_Result));
 }
 void MainProtocol_Stub::OnNamedComposed(::test::protocollayoutssamelibrary::UnionPayload UnionPayload) {
   ::fidl::MessageEncoder _encoder(::test::protocollayoutssamelibrary::internal::kMainProtocol_OnNamedComposed_Ordinal, ::test::protocollayoutssamelibrary::internal::kMainProtocol_OnNamedComposed_DynamicFlags);
   const fidl_type_t* resp_type =&::test::protocollayoutssamelibrary::_internal::test_protocollayoutssamelibrary_UnionPayloadTable;sender_()->Send(resp_type, ::test::protocollayoutssamelibrary::MainProtocol_ResponseEncoder::OnNamedComposed(&_encoder, &UnionPayload));
 }
-void MainProtocol_Stub::OnNamedComposedWithError(::test::protocollayoutssamelibrary::ComposedProtocol_OnNamedComposedWithError_Result result) {
+void MainProtocol_Stub::OnNamedComposedWithError(::test::protocollayoutssamelibrary::ComposedProtocol_OnNamedComposedWithError_Result ComposedProtocol_OnNamedComposedWithError_Result) {
   ::fidl::MessageEncoder _encoder(::test::protocollayoutssamelibrary::internal::kMainProtocol_OnNamedComposedWithError_Ordinal, ::test::protocollayoutssamelibrary::internal::kMainProtocol_OnNamedComposedWithError_DynamicFlags);
-  const fidl_type_t* resp_type =&::test::protocollayoutssamelibrary::_internal::test_protocollayoutssamelibrary_ComposedProtocolOnNamedComposedWithErrorRequestTable;sender_()->Send(resp_type, ::test::protocollayoutssamelibrary::MainProtocol_ResponseEncoder::OnNamedComposedWithError(&_encoder, &result));
+  const fidl_type_t* resp_type =&::test::protocollayoutssamelibrary::_internal::test_protocollayoutssamelibrary_ComposedProtocol_OnNamedComposedWithError_ResultTable;sender_()->Send(resp_type, ::test::protocollayoutssamelibrary::MainProtocol_ResponseEncoder::OnNamedComposedWithError(&_encoder, &ComposedProtocol_OnNamedComposedWithError_Result));
 }
 void MainProtocol_Stub::OnLocal(::test::protocollayoutssamelibrary::UnionPayload UnionPayload) {
   ::fidl::MessageEncoder _encoder(::test::protocollayoutssamelibrary::internal::kMainProtocol_OnLocal_Ordinal, ::test::protocollayoutssamelibrary::internal::kMainProtocol_OnLocal_DynamicFlags);
   const fidl_type_t* resp_type =&::test::protocollayoutssamelibrary::_internal::test_protocollayoutssamelibrary_UnionPayloadTable;sender_()->Send(resp_type, ::test::protocollayoutssamelibrary::MainProtocol_ResponseEncoder::OnLocal(&_encoder, &UnionPayload));
 }
-void MainProtocol_Stub::OnLocalWithError(::test::protocollayoutssamelibrary::MainProtocol_OnLocalWithError_Result result) {
+void MainProtocol_Stub::OnLocalWithError(::test::protocollayoutssamelibrary::MainProtocol_OnLocalWithError_Result MainProtocol_OnLocalWithError_Result) {
   ::fidl::MessageEncoder _encoder(::test::protocollayoutssamelibrary::internal::kMainProtocol_OnLocalWithError_Ordinal, ::test::protocollayoutssamelibrary::internal::kMainProtocol_OnLocalWithError_DynamicFlags);
-  const fidl_type_t* resp_type =&::test::protocollayoutssamelibrary::_internal::test_protocollayoutssamelibrary_MainProtocolOnLocalWithErrorRequestTable;sender_()->Send(resp_type, ::test::protocollayoutssamelibrary::MainProtocol_ResponseEncoder::OnLocalWithError(&_encoder, &result));
+  const fidl_type_t* resp_type =&::test::protocollayoutssamelibrary::_internal::test_protocollayoutssamelibrary_MainProtocol_OnLocalWithError_ResultTable;sender_()->Send(resp_type, ::test::protocollayoutssamelibrary::MainProtocol_ResponseEncoder::OnLocalWithError(&_encoder, &MainProtocol_OnLocalWithError_Result));
 }
 void MainProtocol_Stub::OnAnon(::test::protocollayoutssamelibrary::MainProtocolOnAnonRequest MainProtocolOnAnonRequest) {
   ::fidl::MessageEncoder _encoder(::test::protocollayoutssamelibrary::internal::kMainProtocol_OnAnon_Ordinal, ::test::protocollayoutssamelibrary::internal::kMainProtocol_OnAnon_DynamicFlags);
   const fidl_type_t* resp_type =&::test::protocollayoutssamelibrary::_internal::test_protocollayoutssamelibrary_MainProtocolOnAnonRequestTable;sender_()->Send(resp_type, ::test::protocollayoutssamelibrary::MainProtocol_ResponseEncoder::OnAnon(&_encoder, &MainProtocolOnAnonRequest));
 }
-void MainProtocol_Stub::OnAnonWithError(::test::protocollayoutssamelibrary::MainProtocol_OnAnonWithError_Result result) {
+void MainProtocol_Stub::OnAnonWithError(::test::protocollayoutssamelibrary::MainProtocol_OnAnonWithError_Result MainProtocol_OnAnonWithError_Result) {
   ::fidl::MessageEncoder _encoder(::test::protocollayoutssamelibrary::internal::kMainProtocol_OnAnonWithError_Ordinal, ::test::protocollayoutssamelibrary::internal::kMainProtocol_OnAnonWithError_DynamicFlags);
-  const fidl_type_t* resp_type =&::test::protocollayoutssamelibrary::_internal::test_protocollayoutssamelibrary_MainProtocolOnAnonWithErrorRequestTable;sender_()->Send(resp_type, ::test::protocollayoutssamelibrary::MainProtocol_ResponseEncoder::OnAnonWithError(&_encoder, &result));
+  const fidl_type_t* resp_type =&::test::protocollayoutssamelibrary::_internal::test_protocollayoutssamelibrary_MainProtocol_OnAnonWithError_ResultTable;sender_()->Send(resp_type, ::test::protocollayoutssamelibrary::MainProtocol_ResponseEncoder::OnAnonWithError(&_encoder, &MainProtocol_OnAnonWithError_Result));
 }
 
 MainProtocol_SyncProxy::MainProtocol_SyncProxy(::zx::channel channel)
@@ -5448,17 +5224,17 @@ zx_status_t MainProtocol_SyncProxy::TwoWayAnonComposed(::test::protocollayoutssa
   return ZX_OK;
 }
 
-zx_status_t MainProtocol_SyncProxy::TwoWayAnonComposedWithError(::test::protocollayoutssamelibrary::ComposedProtocolTwoWayAnonComposedWithErrorRequest ComposedProtocolTwoWayAnonComposedWithErrorRequest, ::test::protocollayoutssamelibrary::ComposedProtocol_TwoWayAnonComposedWithError_Result* out_result) {
+zx_status_t MainProtocol_SyncProxy::TwoWayAnonComposedWithError(::test::protocollayoutssamelibrary::ComposedProtocolTwoWayAnonComposedWithErrorRequest ComposedProtocolTwoWayAnonComposedWithErrorRequest, ::test::protocollayoutssamelibrary::ComposedProtocol_TwoWayAnonComposedWithError_Result* out_ComposedProtocol_TwoWayAnonComposedWithError_Result) {
   ::fidl::MessageEncoder _encoder(::test::protocollayoutssamelibrary::internal::kMainProtocol_TwoWayAnonComposedWithError_Ordinal, ::test::protocollayoutssamelibrary::internal::kMainProtocol_TwoWayAnonComposedWithError_DynamicFlags);
   ::fidl::IncomingMessageBuffer buffer_;
   ::fidl::HLCPPIncomingMessage response_ = buffer_.CreateEmptyIncomingMessage();
   const fidl_type_t* req_type =&::test::protocollayoutssamelibrary::_internal::test_protocollayoutssamelibrary_ComposedProtocolTwoWayAnonComposedWithErrorRequestTable;
-  const fidl_type_t* resp_type =&::test::protocollayoutssamelibrary::_internal::test_protocollayoutssamelibrary_ComposedProtocolTwoWayAnonComposedWithErrorTopResponseTable;
+  const fidl_type_t* resp_type =&::test::protocollayoutssamelibrary::_internal::test_protocollayoutssamelibrary_ComposedProtocol_TwoWayAnonComposedWithError_ResultTable;
   zx_status_t status_ = proxy_.Call(req_type, resp_type, ::test::protocollayoutssamelibrary::MainProtocol_RequestEncoder::TwoWayAnonComposedWithError(&_encoder, &ComposedProtocolTwoWayAnonComposedWithErrorRequest), &response_);
   if (status_ != ZX_OK)
     return status_;
   ::fidl::Decoder decoder_(std::move(response_));
-  *out_result = ::fidl::DecodeAs<::test::protocollayoutssamelibrary::ComposedProtocol_TwoWayAnonComposedWithError_Result>(&decoder_, 0 + sizeof(fidl_message_header_t));
+  *out_ComposedProtocol_TwoWayAnonComposedWithError_Result = ::fidl::DecodeAs<::test::protocollayoutssamelibrary::ComposedProtocol_TwoWayAnonComposedWithError_Result>(&decoder_, 0 + sizeof(fidl_message_header_t));
   return ZX_OK;
 }
 
@@ -5482,17 +5258,17 @@ zx_status_t MainProtocol_SyncProxy::TwoWayNamedComposed(::test::protocollayoutss
   return ZX_OK;
 }
 
-zx_status_t MainProtocol_SyncProxy::TwoWayNamedComposedWithError(::test::protocollayoutssamelibrary::TablePayload TablePayload, ::test::protocollayoutssamelibrary::ComposedProtocol_TwoWayNamedComposedWithError_Result* out_result) {
+zx_status_t MainProtocol_SyncProxy::TwoWayNamedComposedWithError(::test::protocollayoutssamelibrary::TablePayload TablePayload, ::test::protocollayoutssamelibrary::ComposedProtocol_TwoWayNamedComposedWithError_Result* out_ComposedProtocol_TwoWayNamedComposedWithError_Result) {
   ::fidl::MessageEncoder _encoder(::test::protocollayoutssamelibrary::internal::kMainProtocol_TwoWayNamedComposedWithError_Ordinal, ::test::protocollayoutssamelibrary::internal::kMainProtocol_TwoWayNamedComposedWithError_DynamicFlags);
   ::fidl::IncomingMessageBuffer buffer_;
   ::fidl::HLCPPIncomingMessage response_ = buffer_.CreateEmptyIncomingMessage();
   const fidl_type_t* req_type =&::test::protocollayoutssamelibrary::_internal::test_protocollayoutssamelibrary_TablePayloadTable;
-  const fidl_type_t* resp_type =&::test::protocollayoutssamelibrary::_internal::test_protocollayoutssamelibrary_ComposedProtocolTwoWayNamedComposedWithErrorTopResponseTable;
+  const fidl_type_t* resp_type =&::test::protocollayoutssamelibrary::_internal::test_protocollayoutssamelibrary_ComposedProtocol_TwoWayNamedComposedWithError_ResultTable;
   zx_status_t status_ = proxy_.Call(req_type, resp_type, ::test::protocollayoutssamelibrary::MainProtocol_RequestEncoder::TwoWayNamedComposedWithError(&_encoder, &TablePayload), &response_);
   if (status_ != ZX_OK)
     return status_;
   ::fidl::Decoder decoder_(std::move(response_));
-  *out_result = ::fidl::DecodeAs<::test::protocollayoutssamelibrary::ComposedProtocol_TwoWayNamedComposedWithError_Result>(&decoder_, 0 + sizeof(fidl_message_header_t));
+  *out_ComposedProtocol_TwoWayNamedComposedWithError_Result = ::fidl::DecodeAs<::test::protocollayoutssamelibrary::ComposedProtocol_TwoWayNamedComposedWithError_Result>(&decoder_, 0 + sizeof(fidl_message_header_t));
   return ZX_OK;
 }
 
@@ -5516,17 +5292,17 @@ zx_status_t MainProtocol_SyncProxy::TwoWayLocal(::test::protocollayoutssamelibra
   return ZX_OK;
 }
 
-zx_status_t MainProtocol_SyncProxy::TwoWayLocalWithError(::test::protocollayoutssamelibrary::TablePayload TablePayload, ::test::protocollayoutssamelibrary::MainProtocol_TwoWayLocalWithError_Result* out_result) {
+zx_status_t MainProtocol_SyncProxy::TwoWayLocalWithError(::test::protocollayoutssamelibrary::TablePayload TablePayload, ::test::protocollayoutssamelibrary::MainProtocol_TwoWayLocalWithError_Result* out_MainProtocol_TwoWayLocalWithError_Result) {
   ::fidl::MessageEncoder _encoder(::test::protocollayoutssamelibrary::internal::kMainProtocol_TwoWayLocalWithError_Ordinal, ::test::protocollayoutssamelibrary::internal::kMainProtocol_TwoWayLocalWithError_DynamicFlags);
   ::fidl::IncomingMessageBuffer buffer_;
   ::fidl::HLCPPIncomingMessage response_ = buffer_.CreateEmptyIncomingMessage();
   const fidl_type_t* req_type =&::test::protocollayoutssamelibrary::_internal::test_protocollayoutssamelibrary_TablePayloadTable;
-  const fidl_type_t* resp_type =&::test::protocollayoutssamelibrary::_internal::test_protocollayoutssamelibrary_MainProtocolTwoWayLocalWithErrorTopResponseTable;
+  const fidl_type_t* resp_type =&::test::protocollayoutssamelibrary::_internal::test_protocollayoutssamelibrary_MainProtocol_TwoWayLocalWithError_ResultTable;
   zx_status_t status_ = proxy_.Call(req_type, resp_type, ::test::protocollayoutssamelibrary::MainProtocol_RequestEncoder::TwoWayLocalWithError(&_encoder, &TablePayload), &response_);
   if (status_ != ZX_OK)
     return status_;
   ::fidl::Decoder decoder_(std::move(response_));
-  *out_result = ::fidl::DecodeAs<::test::protocollayoutssamelibrary::MainProtocol_TwoWayLocalWithError_Result>(&decoder_, 0 + sizeof(fidl_message_header_t));
+  *out_MainProtocol_TwoWayLocalWithError_Result = ::fidl::DecodeAs<::test::protocollayoutssamelibrary::MainProtocol_TwoWayLocalWithError_Result>(&decoder_, 0 + sizeof(fidl_message_header_t));
   return ZX_OK;
 }
 
@@ -5550,17 +5326,17 @@ zx_status_t MainProtocol_SyncProxy::TwoWayAnon(::test::protocollayoutssamelibrar
   return ZX_OK;
 }
 
-zx_status_t MainProtocol_SyncProxy::TwoWayAnonWithError(::test::protocollayoutssamelibrary::MainProtocolTwoWayAnonWithErrorRequest MainProtocolTwoWayAnonWithErrorRequest, ::test::protocollayoutssamelibrary::MainProtocol_TwoWayAnonWithError_Result* out_result) {
+zx_status_t MainProtocol_SyncProxy::TwoWayAnonWithError(::test::protocollayoutssamelibrary::MainProtocolTwoWayAnonWithErrorRequest MainProtocolTwoWayAnonWithErrorRequest, ::test::protocollayoutssamelibrary::MainProtocol_TwoWayAnonWithError_Result* out_MainProtocol_TwoWayAnonWithError_Result) {
   ::fidl::MessageEncoder _encoder(::test::protocollayoutssamelibrary::internal::kMainProtocol_TwoWayAnonWithError_Ordinal, ::test::protocollayoutssamelibrary::internal::kMainProtocol_TwoWayAnonWithError_DynamicFlags);
   ::fidl::IncomingMessageBuffer buffer_;
   ::fidl::HLCPPIncomingMessage response_ = buffer_.CreateEmptyIncomingMessage();
   const fidl_type_t* req_type =&::test::protocollayoutssamelibrary::_internal::test_protocollayoutssamelibrary_MainProtocolTwoWayAnonWithErrorRequestTable;
-  const fidl_type_t* resp_type =&::test::protocollayoutssamelibrary::_internal::test_protocollayoutssamelibrary_MainProtocolTwoWayAnonWithErrorTopResponseTable;
+  const fidl_type_t* resp_type =&::test::protocollayoutssamelibrary::_internal::test_protocollayoutssamelibrary_MainProtocol_TwoWayAnonWithError_ResultTable;
   zx_status_t status_ = proxy_.Call(req_type, resp_type, ::test::protocollayoutssamelibrary::MainProtocol_RequestEncoder::TwoWayAnonWithError(&_encoder, &MainProtocolTwoWayAnonWithErrorRequest), &response_);
   if (status_ != ZX_OK)
     return status_;
   ::fidl::Decoder decoder_(std::move(response_));
-  *out_result = ::fidl::DecodeAs<::test::protocollayoutssamelibrary::MainProtocol_TwoWayAnonWithError_Result>(&decoder_, 0 + sizeof(fidl_message_header_t));
+  *out_MainProtocol_TwoWayAnonWithError_Result = ::fidl::DecodeAs<::test::protocollayoutssamelibrary::MainProtocol_TwoWayAnonWithError_Result>(&decoder_, 0 + sizeof(fidl_message_header_t));
   return ZX_OK;
 }
 

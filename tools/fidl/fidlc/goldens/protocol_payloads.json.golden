@@ -14,14 +14,6 @@
         "test.protocolpayloads.imported/ComposedProtocol": {
           "kind": "protocol"
         },
-        "test.protocolpayloads.imported/ComposedProtocolOnComposedWithErrorRequest": {
-          "kind": "struct",
-          "resource": false
-        },
-        "test.protocolpayloads.imported/ComposedProtocolTwoWayComposedWithErrorTopResponse": {
-          "kind": "struct",
-          "resource": false
-        },
         "test.protocolpayloads.imported/ImportStructPayload": {
           "kind": "struct",
           "resource": false
@@ -207,7 +199,7 @@
           "has_response": true,
           "maybe_response_payload": {
             "kind": "identifier",
-            "identifier": "test.protocolpayloads.imported/ComposedProtocolTwoWayComposedWithErrorTopResponse",
+            "identifier": "test.protocolpayloads.imported/ComposedProtocol_TwoWayComposedWithError_Result",
             "nullable": false,
             "type_shape_v1": {
               "inline_size": 24,
@@ -361,7 +353,7 @@
           "has_response": true,
           "maybe_response_payload": {
             "kind": "identifier",
-            "identifier": "test.protocolpayloads.imported/ComposedProtocolOnComposedWithErrorRequest",
+            "identifier": "test.protocolpayloads.imported/ComposedProtocol_OnComposedWithError_Result",
             "nullable": false,
             "type_shape_v1": {
               "inline_size": 24,
@@ -605,7 +597,7 @@
           "has_response": true,
           "maybe_response_payload": {
             "kind": "identifier",
-            "identifier": "test.protocolpayloads/MainProtocolTwoWayLocalWithErrorTopResponse",
+            "identifier": "test.protocolpayloads/MainProtocol_TwoWayLocalWithError_Result",
             "nullable": false,
             "type_shape_v1": {
               "inline_size": 24,
@@ -759,7 +751,7 @@
           "has_response": true,
           "maybe_response_payload": {
             "kind": "identifier",
-            "identifier": "test.protocolpayloads/MainProtocolOnLocalWithErrorRequest",
+            "identifier": "test.protocolpayloads/MainProtocol_OnLocalWithError_Result",
             "nullable": false,
             "type_shape_v1": {
               "inline_size": 24,
@@ -1003,7 +995,7 @@
           "has_response": true,
           "maybe_response_payload": {
             "kind": "identifier",
-            "identifier": "test.protocolpayloads/MainProtocolTwoWayImportWithErrorTopResponse",
+            "identifier": "test.protocolpayloads/MainProtocol_TwoWayImportWithError_Result",
             "nullable": false,
             "type_shape_v1": {
               "inline_size": 24,
@@ -1157,7 +1149,7 @@
           "has_response": true,
           "maybe_response_payload": {
             "kind": "identifier",
-            "identifier": "test.protocolpayloads/MainProtocolOnImportWithErrorRequest",
+            "identifier": "test.protocolpayloads/MainProtocol_OnImportWithError_Result",
             "nullable": false,
             "type_shape_v1": {
               "inline_size": 24,
@@ -1401,7 +1393,7 @@
           "has_response": true,
           "maybe_response_payload": {
             "kind": "identifier",
-            "identifier": "test.protocolpayloads/MainProtocolTwoWayAnonWithErrorTopResponse",
+            "identifier": "test.protocolpayloads/MainProtocol_TwoWayAnonWithError_Result",
             "nullable": false,
             "type_shape_v1": {
               "inline_size": 24,
@@ -1555,7 +1547,7 @@
           "has_response": true,
           "maybe_response_payload": {
             "kind": "identifier",
-            "identifier": "test.protocolpayloads/MainProtocolOnAnonWithErrorRequest",
+            "identifier": "test.protocolpayloads/MainProtocol_OnAnonWithError_Result",
             "nullable": false,
             "type_shape_v1": {
               "inline_size": 24,
@@ -1893,243 +1885,6 @@
         "max_out_of_line": 0,
         "has_padding": false,
         "has_envelope": false,
-        "has_flexible_envelope": false
-      }
-    },
-    {
-      "name": "test.protocolpayloads/MainProtocolOnAnonWithErrorRequest",
-      "naming_context": [
-        "MainProtocol",
-        "OnAnonWithError",
-        "Request"
-      ],
-      "location": {
-        "filename": "../../tools/fidl/fidlc/testdata/protocol_payloads/example.test.fidl",
-        "line": 52,
-        "column": 30,
-        "length": 52
-      },
-      "members": [
-        {
-          "type": {
-            "kind": "identifier",
-            "identifier": "test.protocolpayloads/MainProtocol_OnAnonWithError_Result",
-            "nullable": false,
-            "type_shape_v1": {
-              "inline_size": 24,
-              "alignment": 8,
-              "depth": 1,
-              "max_handles": 0,
-              "max_out_of_line": 8,
-              "has_padding": true,
-              "has_envelope": true,
-              "has_flexible_envelope": false
-            },
-            "type_shape_v2": {
-              "inline_size": 16,
-              "alignment": 8,
-              "depth": 1,
-              "max_handles": 0,
-              "max_out_of_line": 8,
-              "has_padding": true,
-              "has_envelope": true,
-              "has_flexible_envelope": false
-            }
-          },
-          "name": "result",
-          "location": {
-            "filename": "generated",
-            "line": 36,
-            "column": 1,
-            "length": 6
-          },
-          "field_shape_v1": {
-            "offset": 0,
-            "padding": 0
-          },
-          "field_shape_v2": {
-            "offset": 0,
-            "padding": 0
-          }
-        }
-      ],
-      "resource": false,
-      "type_shape_v1": {
-        "inline_size": 24,
-        "alignment": 8,
-        "depth": 1,
-        "max_handles": 0,
-        "max_out_of_line": 8,
-        "has_padding": true,
-        "has_envelope": true,
-        "has_flexible_envelope": false
-      },
-      "type_shape_v2": {
-        "inline_size": 16,
-        "alignment": 8,
-        "depth": 1,
-        "max_handles": 0,
-        "max_out_of_line": 8,
-        "has_padding": true,
-        "has_envelope": true,
-        "has_flexible_envelope": false
-      }
-    },
-    {
-      "name": "test.protocolpayloads/MainProtocolOnImportWithErrorRequest",
-      "naming_context": [
-        "MainProtocol",
-        "OnImportWithError",
-        "Request"
-      ],
-      "location": {
-        "filename": "../../tools/fidl/fidlc/testdata/protocol_payloads/example.test.fidl",
-        "line": 26,
-        "column": 32,
-        "length": 25
-      },
-      "members": [
-        {
-          "type": {
-            "kind": "identifier",
-            "identifier": "test.protocolpayloads/MainProtocol_OnImportWithError_Result",
-            "nullable": false,
-            "type_shape_v1": {
-              "inline_size": 24,
-              "alignment": 8,
-              "depth": 1,
-              "max_handles": 0,
-              "max_out_of_line": 8,
-              "has_padding": true,
-              "has_envelope": true,
-              "has_flexible_envelope": false
-            },
-            "type_shape_v2": {
-              "inline_size": 16,
-              "alignment": 8,
-              "depth": 1,
-              "max_handles": 0,
-              "max_out_of_line": 0,
-              "has_padding": true,
-              "has_envelope": true,
-              "has_flexible_envelope": false
-            }
-          },
-          "name": "result",
-          "location": {
-            "filename": "generated",
-            "line": 26,
-            "column": 1,
-            "length": 6
-          },
-          "field_shape_v1": {
-            "offset": 0,
-            "padding": 0
-          },
-          "field_shape_v2": {
-            "offset": 0,
-            "padding": 0
-          }
-        }
-      ],
-      "resource": false,
-      "type_shape_v1": {
-        "inline_size": 24,
-        "alignment": 8,
-        "depth": 1,
-        "max_handles": 0,
-        "max_out_of_line": 8,
-        "has_padding": true,
-        "has_envelope": true,
-        "has_flexible_envelope": false
-      },
-      "type_shape_v2": {
-        "inline_size": 16,
-        "alignment": 8,
-        "depth": 1,
-        "max_handles": 0,
-        "max_out_of_line": 0,
-        "has_padding": true,
-        "has_envelope": true,
-        "has_flexible_envelope": false
-      }
-    },
-    {
-      "name": "test.protocolpayloads/MainProtocolOnLocalWithErrorRequest",
-      "naming_context": [
-        "MainProtocol",
-        "OnLocalWithError",
-        "Request"
-      ],
-      "location": {
-        "filename": "../../tools/fidl/fidlc/testdata/protocol_payloads/example.test.fidl",
-        "line": 19,
-        "column": 31,
-        "length": 20
-      },
-      "members": [
-        {
-          "type": {
-            "kind": "identifier",
-            "identifier": "test.protocolpayloads/MainProtocol_OnLocalWithError_Result",
-            "nullable": false,
-            "type_shape_v1": {
-              "inline_size": 24,
-              "alignment": 8,
-              "depth": 1,
-              "max_handles": 0,
-              "max_out_of_line": 8,
-              "has_padding": true,
-              "has_envelope": true,
-              "has_flexible_envelope": false
-            },
-            "type_shape_v2": {
-              "inline_size": 16,
-              "alignment": 8,
-              "depth": 1,
-              "max_handles": 0,
-              "max_out_of_line": 8,
-              "has_padding": true,
-              "has_envelope": true,
-              "has_flexible_envelope": false
-            }
-          },
-          "name": "result",
-          "location": {
-            "filename": "generated",
-            "line": 16,
-            "column": 1,
-            "length": 6
-          },
-          "field_shape_v1": {
-            "offset": 0,
-            "padding": 0
-          },
-          "field_shape_v2": {
-            "offset": 0,
-            "padding": 0
-          }
-        }
-      ],
-      "resource": false,
-      "type_shape_v1": {
-        "inline_size": 24,
-        "alignment": 8,
-        "depth": 1,
-        "max_handles": 0,
-        "max_out_of_line": 8,
-        "has_padding": true,
-        "has_envelope": true,
-        "has_flexible_envelope": false
-      },
-      "type_shape_v2": {
-        "inline_size": 16,
-        "alignment": 8,
-        "depth": 1,
-        "max_handles": 0,
-        "max_out_of_line": 8,
-        "has_padding": true,
-        "has_envelope": true,
         "has_flexible_envelope": false
       }
     },
@@ -2610,249 +2365,11 @@
       }
     },
     {
-      "name": "test.protocolpayloads/MainProtocolTwoWayAnonWithErrorTopResponse",
-      "naming_context": [
-        "MainProtocol",
-        "TwoWayAnonWithError",
-        "Response"
-      ],
-      "location": {
-        "filename": "../../tools/fidl/fidlc/testdata/protocol_payloads/example.test.fidl",
-        "line": 44,
-        "column": 11,
-        "length": 52
-      },
-      "members": [
-        {
-          "type": {
-            "kind": "identifier",
-            "identifier": "test.protocolpayloads/MainProtocol_TwoWayAnonWithError_Result",
-            "nullable": false,
-            "type_shape_v1": {
-              "inline_size": 24,
-              "alignment": 8,
-              "depth": 1,
-              "max_handles": 0,
-              "max_out_of_line": 8,
-              "has_padding": true,
-              "has_envelope": true,
-              "has_flexible_envelope": false
-            },
-            "type_shape_v2": {
-              "inline_size": 16,
-              "alignment": 8,
-              "depth": 1,
-              "max_handles": 0,
-              "max_out_of_line": 8,
-              "has_padding": true,
-              "has_envelope": true,
-              "has_flexible_envelope": false
-            }
-          },
-          "name": "result",
-          "location": {
-            "filename": "generated",
-            "line": 31,
-            "column": 1,
-            "length": 6
-          },
-          "field_shape_v1": {
-            "offset": 0,
-            "padding": 0
-          },
-          "field_shape_v2": {
-            "offset": 0,
-            "padding": 0
-          }
-        }
-      ],
-      "resource": false,
-      "type_shape_v1": {
-        "inline_size": 24,
-        "alignment": 8,
-        "depth": 1,
-        "max_handles": 0,
-        "max_out_of_line": 8,
-        "has_padding": true,
-        "has_envelope": true,
-        "has_flexible_envelope": false
-      },
-      "type_shape_v2": {
-        "inline_size": 16,
-        "alignment": 8,
-        "depth": 1,
-        "max_handles": 0,
-        "max_out_of_line": 8,
-        "has_padding": true,
-        "has_envelope": true,
-        "has_flexible_envelope": false
-      }
-    },
-    {
-      "name": "test.protocolpayloads/MainProtocolTwoWayImportWithErrorTopResponse",
-      "naming_context": [
-        "MainProtocol",
-        "TwoWayImportWithError",
-        "Response"
-      ],
-      "location": {
-        "filename": "../../tools/fidl/fidlc/testdata/protocol_payloads/example.test.fidl",
-        "line": 24,
-        "column": 62,
-        "length": 25
-      },
-      "members": [
-        {
-          "type": {
-            "kind": "identifier",
-            "identifier": "test.protocolpayloads/MainProtocol_TwoWayImportWithError_Result",
-            "nullable": false,
-            "type_shape_v1": {
-              "inline_size": 24,
-              "alignment": 8,
-              "depth": 1,
-              "max_handles": 0,
-              "max_out_of_line": 8,
-              "has_padding": true,
-              "has_envelope": true,
-              "has_flexible_envelope": false
-            },
-            "type_shape_v2": {
-              "inline_size": 16,
-              "alignment": 8,
-              "depth": 1,
-              "max_handles": 0,
-              "max_out_of_line": 0,
-              "has_padding": true,
-              "has_envelope": true,
-              "has_flexible_envelope": false
-            }
-          },
-          "name": "result",
-          "location": {
-            "filename": "generated",
-            "line": 21,
-            "column": 1,
-            "length": 6
-          },
-          "field_shape_v1": {
-            "offset": 0,
-            "padding": 0
-          },
-          "field_shape_v2": {
-            "offset": 0,
-            "padding": 0
-          }
-        }
-      ],
-      "resource": false,
-      "type_shape_v1": {
-        "inline_size": 24,
-        "alignment": 8,
-        "depth": 1,
-        "max_handles": 0,
-        "max_out_of_line": 8,
-        "has_padding": true,
-        "has_envelope": true,
-        "has_flexible_envelope": false
-      },
-      "type_shape_v2": {
-        "inline_size": 16,
-        "alignment": 8,
-        "depth": 1,
-        "max_handles": 0,
-        "max_out_of_line": 0,
-        "has_padding": true,
-        "has_envelope": true,
-        "has_flexible_envelope": false
-      }
-    },
-    {
-      "name": "test.protocolpayloads/MainProtocolTwoWayLocalWithErrorTopResponse",
-      "naming_context": [
-        "MainProtocol",
-        "TwoWayLocalWithError",
-        "Response"
-      ],
-      "location": {
-        "filename": "../../tools/fidl/fidlc/testdata/protocol_payloads/example.test.fidl",
-        "line": 17,
-        "column": 56,
-        "length": 20
-      },
-      "members": [
-        {
-          "type": {
-            "kind": "identifier",
-            "identifier": "test.protocolpayloads/MainProtocol_TwoWayLocalWithError_Result",
-            "nullable": false,
-            "type_shape_v1": {
-              "inline_size": 24,
-              "alignment": 8,
-              "depth": 1,
-              "max_handles": 0,
-              "max_out_of_line": 8,
-              "has_padding": true,
-              "has_envelope": true,
-              "has_flexible_envelope": false
-            },
-            "type_shape_v2": {
-              "inline_size": 16,
-              "alignment": 8,
-              "depth": 1,
-              "max_handles": 0,
-              "max_out_of_line": 8,
-              "has_padding": true,
-              "has_envelope": true,
-              "has_flexible_envelope": false
-            }
-          },
-          "name": "result",
-          "location": {
-            "filename": "generated",
-            "line": 11,
-            "column": 1,
-            "length": 6
-          },
-          "field_shape_v1": {
-            "offset": 0,
-            "padding": 0
-          },
-          "field_shape_v2": {
-            "offset": 0,
-            "padding": 0
-          }
-        }
-      ],
-      "resource": false,
-      "type_shape_v1": {
-        "inline_size": 24,
-        "alignment": 8,
-        "depth": 1,
-        "max_handles": 0,
-        "max_out_of_line": 8,
-        "has_padding": true,
-        "has_envelope": true,
-        "has_flexible_envelope": false
-      },
-      "type_shape_v2": {
-        "inline_size": 16,
-        "alignment": 8,
-        "depth": 1,
-        "max_handles": 0,
-        "max_out_of_line": 8,
-        "has_padding": true,
-        "has_envelope": true,
-        "has_flexible_envelope": false
-      }
-    },
-    {
       "name": "test.protocolpayloads/MainProtocol_OnAnonWithError_Response",
       "naming_context": [
         "MainProtocol",
         "OnAnonWithError",
         "Request",
-        "result",
         "response"
       ],
       "location": {
@@ -2973,7 +2490,6 @@
         "MainProtocol",
         "TwoWayAnonWithError",
         "Response",
-        "result",
         "response"
       ],
       "location": {
@@ -3091,164 +2607,6 @@
   ],
   "external_struct_declarations": [
     {
-      "name": "test.protocolpayloads.imported/ComposedProtocolOnComposedWithErrorRequest",
-      "naming_context": [
-        "ComposedProtocol",
-        "OnComposedWithError",
-        "Request"
-      ],
-      "location": {
-        "filename": "../../tools/fidl/fidlc/testdata/protocol_payloads/imported.test.fidl",
-        "line": 12,
-        "column": 34,
-        "length": 21
-      },
-      "members": [
-        {
-          "type": {
-            "kind": "identifier",
-            "identifier": "test.protocolpayloads.imported/ComposedProtocol_OnComposedWithError_Result",
-            "nullable": false,
-            "type_shape_v1": {
-              "inline_size": 24,
-              "alignment": 8,
-              "depth": 1,
-              "max_handles": 0,
-              "max_out_of_line": 8,
-              "has_padding": true,
-              "has_envelope": true,
-              "has_flexible_envelope": false
-            },
-            "type_shape_v2": {
-              "inline_size": 16,
-              "alignment": 8,
-              "depth": 1,
-              "max_handles": 0,
-              "max_out_of_line": 0,
-              "has_padding": true,
-              "has_envelope": true,
-              "has_flexible_envelope": false
-            }
-          },
-          "name": "result",
-          "location": {
-            "filename": "generated",
-            "line": 6,
-            "column": 1,
-            "length": 6
-          },
-          "field_shape_v1": {
-            "offset": 0,
-            "padding": 0
-          },
-          "field_shape_v2": {
-            "offset": 0,
-            "padding": 0
-          }
-        }
-      ],
-      "resource": false,
-      "type_shape_v1": {
-        "inline_size": 24,
-        "alignment": 8,
-        "depth": 1,
-        "max_handles": 0,
-        "max_out_of_line": 8,
-        "has_padding": true,
-        "has_envelope": true,
-        "has_flexible_envelope": false
-      },
-      "type_shape_v2": {
-        "inline_size": 16,
-        "alignment": 8,
-        "depth": 1,
-        "max_handles": 0,
-        "max_out_of_line": 0,
-        "has_padding": true,
-        "has_envelope": true,
-        "has_flexible_envelope": false
-      }
-    },
-    {
-      "name": "test.protocolpayloads.imported/ComposedProtocolTwoWayComposedWithErrorTopResponse",
-      "naming_context": [
-        "ComposedProtocol",
-        "TwoWayComposedWithError",
-        "Response"
-      ],
-      "location": {
-        "filename": "../../tools/fidl/fidlc/testdata/protocol_payloads/imported.test.fidl",
-        "line": 10,
-        "column": 60,
-        "length": 21
-      },
-      "members": [
-        {
-          "type": {
-            "kind": "identifier",
-            "identifier": "test.protocolpayloads.imported/ComposedProtocol_TwoWayComposedWithError_Result",
-            "nullable": false,
-            "type_shape_v1": {
-              "inline_size": 24,
-              "alignment": 8,
-              "depth": 1,
-              "max_handles": 0,
-              "max_out_of_line": 8,
-              "has_padding": true,
-              "has_envelope": true,
-              "has_flexible_envelope": false
-            },
-            "type_shape_v2": {
-              "inline_size": 16,
-              "alignment": 8,
-              "depth": 1,
-              "max_handles": 0,
-              "max_out_of_line": 0,
-              "has_padding": true,
-              "has_envelope": true,
-              "has_flexible_envelope": false
-            }
-          },
-          "name": "result",
-          "location": {
-            "filename": "generated",
-            "line": 1,
-            "column": 1,
-            "length": 6
-          },
-          "field_shape_v1": {
-            "offset": 0,
-            "padding": 0
-          },
-          "field_shape_v2": {
-            "offset": 0,
-            "padding": 0
-          }
-        }
-      ],
-      "resource": false,
-      "type_shape_v1": {
-        "inline_size": 24,
-        "alignment": 8,
-        "depth": 1,
-        "max_handles": 0,
-        "max_out_of_line": 8,
-        "has_padding": true,
-        "has_envelope": true,
-        "has_flexible_envelope": false
-      },
-      "type_shape_v2": {
-        "inline_size": 16,
-        "alignment": 8,
-        "depth": 1,
-        "max_handles": 0,
-        "max_out_of_line": 0,
-        "has_padding": true,
-        "has_envelope": true,
-        "has_flexible_envelope": false
-      }
-    },
-    {
       "name": "test.protocolpayloads.imported/ImportStructPayload",
       "naming_context": [
         "ImportStructPayload"
@@ -3332,8 +2690,7 @@
       "naming_context": [
         "MainProtocol",
         "OnAnonWithError",
-        "Request",
-        "result"
+        "Request"
       ],
       "location": {
         "filename": "../../tools/fidl/fidlc/testdata/protocol_payloads/example.test.fidl",
@@ -3379,7 +2736,7 @@
           },
           "location": {
             "filename": "generated",
-            "line": 37,
+            "line": 29,
             "column": 1,
             "length": 8
           }
@@ -3414,7 +2771,7 @@
           },
           "location": {
             "filename": "generated",
-            "line": 38,
+            "line": 30,
             "column": 1,
             "length": 3
           }
@@ -3448,8 +2805,7 @@
       "naming_context": [
         "MainProtocol",
         "OnImportWithError",
-        "Request",
-        "result"
+        "Request"
       ],
       "location": {
         "filename": "../../tools/fidl/fidlc/testdata/protocol_payloads/example.test.fidl",
@@ -3495,7 +2851,7 @@
           },
           "location": {
             "filename": "generated",
-            "line": 27,
+            "line": 21,
             "column": 1,
             "length": 8
           }
@@ -3530,7 +2886,7 @@
           },
           "location": {
             "filename": "generated",
-            "line": 28,
+            "line": 22,
             "column": 1,
             "length": 3
           }
@@ -3564,8 +2920,7 @@
       "naming_context": [
         "MainProtocol",
         "OnLocalWithError",
-        "Request",
-        "result"
+        "Request"
       ],
       "location": {
         "filename": "../../tools/fidl/fidlc/testdata/protocol_payloads/example.test.fidl",
@@ -3600,6 +2955,236 @@
             },
             "type_shape_v2": {
               "inline_size": 8,
+              "alignment": 4,
+              "depth": 0,
+              "max_handles": 0,
+              "max_out_of_line": 0,
+              "has_padding": false,
+              "has_envelope": false,
+              "has_flexible_envelope": false
+            }
+          },
+          "location": {
+            "filename": "generated",
+            "line": 13,
+            "column": 1,
+            "length": 8
+          }
+        },
+        {
+          "ordinal": 2,
+          "reserved": false,
+          "name": "err",
+          "type": {
+            "kind": "primitive",
+            "subtype": "uint32",
+            "type_shape_v1": {
+              "inline_size": 4,
+              "alignment": 4,
+              "depth": 0,
+              "max_handles": 0,
+              "max_out_of_line": 0,
+              "has_padding": false,
+              "has_envelope": false,
+              "has_flexible_envelope": false
+            },
+            "type_shape_v2": {
+              "inline_size": 4,
+              "alignment": 4,
+              "depth": 0,
+              "max_handles": 0,
+              "max_out_of_line": 0,
+              "has_padding": false,
+              "has_envelope": false,
+              "has_flexible_envelope": false
+            }
+          },
+          "location": {
+            "filename": "generated",
+            "line": 14,
+            "column": 1,
+            "length": 3
+          }
+        }
+      ],
+      "strict": true,
+      "resource": false,
+      "type_shape_v1": {
+        "inline_size": 24,
+        "alignment": 8,
+        "depth": 1,
+        "max_handles": 0,
+        "max_out_of_line": 8,
+        "has_padding": true,
+        "has_envelope": true,
+        "has_flexible_envelope": false
+      },
+      "type_shape_v2": {
+        "inline_size": 16,
+        "alignment": 8,
+        "depth": 1,
+        "max_handles": 0,
+        "max_out_of_line": 8,
+        "has_padding": true,
+        "has_envelope": true,
+        "has_flexible_envelope": false
+      }
+    },
+    {
+      "name": "test.protocolpayloads/MainProtocol_TwoWayAnonWithError_Result",
+      "naming_context": [
+        "MainProtocol",
+        "TwoWayAnonWithError",
+        "Response"
+      ],
+      "location": {
+        "filename": "../../tools/fidl/fidlc/testdata/protocol_payloads/example.test.fidl",
+        "line": 44,
+        "column": 11,
+        "length": 52
+      },
+      "maybe_attributes": [
+        {
+          "name": "result",
+          "arguments": []
+        }
+      ],
+      "members": [
+        {
+          "ordinal": 1,
+          "reserved": false,
+          "name": "response",
+          "type": {
+            "kind": "identifier",
+            "identifier": "test.protocolpayloads/MainProtocol_TwoWayAnonWithError_Response",
+            "nullable": false,
+            "type_shape_v1": {
+              "inline_size": 8,
+              "alignment": 4,
+              "depth": 0,
+              "max_handles": 0,
+              "max_out_of_line": 0,
+              "has_padding": false,
+              "has_envelope": false,
+              "has_flexible_envelope": false
+            },
+            "type_shape_v2": {
+              "inline_size": 8,
+              "alignment": 4,
+              "depth": 0,
+              "max_handles": 0,
+              "max_out_of_line": 0,
+              "has_padding": false,
+              "has_envelope": false,
+              "has_flexible_envelope": false
+            }
+          },
+          "location": {
+            "filename": "generated",
+            "line": 25,
+            "column": 1,
+            "length": 8
+          }
+        },
+        {
+          "ordinal": 2,
+          "reserved": false,
+          "name": "err",
+          "type": {
+            "kind": "primitive",
+            "subtype": "uint32",
+            "type_shape_v1": {
+              "inline_size": 4,
+              "alignment": 4,
+              "depth": 0,
+              "max_handles": 0,
+              "max_out_of_line": 0,
+              "has_padding": false,
+              "has_envelope": false,
+              "has_flexible_envelope": false
+            },
+            "type_shape_v2": {
+              "inline_size": 4,
+              "alignment": 4,
+              "depth": 0,
+              "max_handles": 0,
+              "max_out_of_line": 0,
+              "has_padding": false,
+              "has_envelope": false,
+              "has_flexible_envelope": false
+            }
+          },
+          "location": {
+            "filename": "generated",
+            "line": 26,
+            "column": 1,
+            "length": 3
+          }
+        }
+      ],
+      "strict": true,
+      "resource": false,
+      "type_shape_v1": {
+        "inline_size": 24,
+        "alignment": 8,
+        "depth": 1,
+        "max_handles": 0,
+        "max_out_of_line": 8,
+        "has_padding": true,
+        "has_envelope": true,
+        "has_flexible_envelope": false
+      },
+      "type_shape_v2": {
+        "inline_size": 16,
+        "alignment": 8,
+        "depth": 1,
+        "max_handles": 0,
+        "max_out_of_line": 8,
+        "has_padding": true,
+        "has_envelope": true,
+        "has_flexible_envelope": false
+      }
+    },
+    {
+      "name": "test.protocolpayloads/MainProtocol_TwoWayImportWithError_Result",
+      "naming_context": [
+        "MainProtocol",
+        "TwoWayImportWithError",
+        "Response"
+      ],
+      "location": {
+        "filename": "../../tools/fidl/fidlc/testdata/protocol_payloads/example.test.fidl",
+        "line": 24,
+        "column": 62,
+        "length": 25
+      },
+      "maybe_attributes": [
+        {
+          "name": "result",
+          "arguments": []
+        }
+      ],
+      "members": [
+        {
+          "ordinal": 1,
+          "reserved": false,
+          "name": "response",
+          "type": {
+            "kind": "identifier",
+            "identifier": "test.protocolpayloads.imported/ImportStructPayload",
+            "nullable": false,
+            "type_shape_v1": {
+              "inline_size": 4,
+              "alignment": 4,
+              "depth": 0,
+              "max_handles": 0,
+              "max_out_of_line": 0,
+              "has_padding": false,
+              "has_envelope": false,
+              "has_flexible_envelope": false
+            },
+            "type_shape_v2": {
+              "inline_size": 4,
               "alignment": 4,
               "depth": 0,
               "max_handles": 0,
@@ -3669,238 +3254,6 @@
         "alignment": 8,
         "depth": 1,
         "max_handles": 0,
-        "max_out_of_line": 8,
-        "has_padding": true,
-        "has_envelope": true,
-        "has_flexible_envelope": false
-      }
-    },
-    {
-      "name": "test.protocolpayloads/MainProtocol_TwoWayAnonWithError_Result",
-      "naming_context": [
-        "MainProtocol",
-        "TwoWayAnonWithError",
-        "Response",
-        "result"
-      ],
-      "location": {
-        "filename": "../../tools/fidl/fidlc/testdata/protocol_payloads/example.test.fidl",
-        "line": 44,
-        "column": 11,
-        "length": 52
-      },
-      "maybe_attributes": [
-        {
-          "name": "result",
-          "arguments": []
-        }
-      ],
-      "members": [
-        {
-          "ordinal": 1,
-          "reserved": false,
-          "name": "response",
-          "type": {
-            "kind": "identifier",
-            "identifier": "test.protocolpayloads/MainProtocol_TwoWayAnonWithError_Response",
-            "nullable": false,
-            "type_shape_v1": {
-              "inline_size": 8,
-              "alignment": 4,
-              "depth": 0,
-              "max_handles": 0,
-              "max_out_of_line": 0,
-              "has_padding": false,
-              "has_envelope": false,
-              "has_flexible_envelope": false
-            },
-            "type_shape_v2": {
-              "inline_size": 8,
-              "alignment": 4,
-              "depth": 0,
-              "max_handles": 0,
-              "max_out_of_line": 0,
-              "has_padding": false,
-              "has_envelope": false,
-              "has_flexible_envelope": false
-            }
-          },
-          "location": {
-            "filename": "generated",
-            "line": 32,
-            "column": 1,
-            "length": 8
-          }
-        },
-        {
-          "ordinal": 2,
-          "reserved": false,
-          "name": "err",
-          "type": {
-            "kind": "primitive",
-            "subtype": "uint32",
-            "type_shape_v1": {
-              "inline_size": 4,
-              "alignment": 4,
-              "depth": 0,
-              "max_handles": 0,
-              "max_out_of_line": 0,
-              "has_padding": false,
-              "has_envelope": false,
-              "has_flexible_envelope": false
-            },
-            "type_shape_v2": {
-              "inline_size": 4,
-              "alignment": 4,
-              "depth": 0,
-              "max_handles": 0,
-              "max_out_of_line": 0,
-              "has_padding": false,
-              "has_envelope": false,
-              "has_flexible_envelope": false
-            }
-          },
-          "location": {
-            "filename": "generated",
-            "line": 33,
-            "column": 1,
-            "length": 3
-          }
-        }
-      ],
-      "strict": true,
-      "resource": false,
-      "type_shape_v1": {
-        "inline_size": 24,
-        "alignment": 8,
-        "depth": 1,
-        "max_handles": 0,
-        "max_out_of_line": 8,
-        "has_padding": true,
-        "has_envelope": true,
-        "has_flexible_envelope": false
-      },
-      "type_shape_v2": {
-        "inline_size": 16,
-        "alignment": 8,
-        "depth": 1,
-        "max_handles": 0,
-        "max_out_of_line": 8,
-        "has_padding": true,
-        "has_envelope": true,
-        "has_flexible_envelope": false
-      }
-    },
-    {
-      "name": "test.protocolpayloads/MainProtocol_TwoWayImportWithError_Result",
-      "naming_context": [
-        "MainProtocol",
-        "TwoWayImportWithError",
-        "Response",
-        "result"
-      ],
-      "location": {
-        "filename": "../../tools/fidl/fidlc/testdata/protocol_payloads/example.test.fidl",
-        "line": 24,
-        "column": 62,
-        "length": 25
-      },
-      "maybe_attributes": [
-        {
-          "name": "result",
-          "arguments": []
-        }
-      ],
-      "members": [
-        {
-          "ordinal": 1,
-          "reserved": false,
-          "name": "response",
-          "type": {
-            "kind": "identifier",
-            "identifier": "test.protocolpayloads.imported/ImportStructPayload",
-            "nullable": false,
-            "type_shape_v1": {
-              "inline_size": 4,
-              "alignment": 4,
-              "depth": 0,
-              "max_handles": 0,
-              "max_out_of_line": 0,
-              "has_padding": false,
-              "has_envelope": false,
-              "has_flexible_envelope": false
-            },
-            "type_shape_v2": {
-              "inline_size": 4,
-              "alignment": 4,
-              "depth": 0,
-              "max_handles": 0,
-              "max_out_of_line": 0,
-              "has_padding": false,
-              "has_envelope": false,
-              "has_flexible_envelope": false
-            }
-          },
-          "location": {
-            "filename": "generated",
-            "line": 22,
-            "column": 1,
-            "length": 8
-          }
-        },
-        {
-          "ordinal": 2,
-          "reserved": false,
-          "name": "err",
-          "type": {
-            "kind": "primitive",
-            "subtype": "uint32",
-            "type_shape_v1": {
-              "inline_size": 4,
-              "alignment": 4,
-              "depth": 0,
-              "max_handles": 0,
-              "max_out_of_line": 0,
-              "has_padding": false,
-              "has_envelope": false,
-              "has_flexible_envelope": false
-            },
-            "type_shape_v2": {
-              "inline_size": 4,
-              "alignment": 4,
-              "depth": 0,
-              "max_handles": 0,
-              "max_out_of_line": 0,
-              "has_padding": false,
-              "has_envelope": false,
-              "has_flexible_envelope": false
-            }
-          },
-          "location": {
-            "filename": "generated",
-            "line": 23,
-            "column": 1,
-            "length": 3
-          }
-        }
-      ],
-      "strict": true,
-      "resource": false,
-      "type_shape_v1": {
-        "inline_size": 24,
-        "alignment": 8,
-        "depth": 1,
-        "max_handles": 0,
-        "max_out_of_line": 8,
-        "has_padding": true,
-        "has_envelope": true,
-        "has_flexible_envelope": false
-      },
-      "type_shape_v2": {
-        "inline_size": 16,
-        "alignment": 8,
-        "depth": 1,
-        "max_handles": 0,
         "max_out_of_line": 0,
         "has_padding": true,
         "has_envelope": true,
@@ -3912,8 +3265,7 @@
       "naming_context": [
         "MainProtocol",
         "TwoWayLocalWithError",
-        "Response",
-        "result"
+        "Response"
       ],
       "location": {
         "filename": "../../tools/fidl/fidlc/testdata/protocol_payloads/example.test.fidl",
@@ -3959,7 +3311,7 @@
           },
           "location": {
             "filename": "generated",
-            "line": 12,
+            "line": 9,
             "column": 1,
             "length": 8
           }
@@ -3994,7 +3346,7 @@
           },
           "location": {
             "filename": "generated",
-            "line": 13,
+            "line": 10,
             "column": 1,
             "length": 3
           }
@@ -4028,15 +3380,11 @@
   "new_type_declarations": [],
   "declaration_order": [
     "test.protocolpayloads/MainProtocol_TwoWayImportWithError_Result",
-    "test.protocolpayloads/MainProtocolTwoWayImportWithErrorTopResponse",
     "test.protocolpayloads/MainProtocol_TwoWayAnonWithError_Response",
     "test.protocolpayloads/MainProtocol_TwoWayAnonWithError_Result",
-    "test.protocolpayloads/MainProtocolTwoWayAnonWithErrorTopResponse",
     "test.protocolpayloads/MainProtocol_OnImportWithError_Result",
-    "test.protocolpayloads/MainProtocolOnImportWithErrorRequest",
     "test.protocolpayloads/MainProtocol_OnAnonWithError_Response",
     "test.protocolpayloads/MainProtocol_OnAnonWithError_Result",
-    "test.protocolpayloads/MainProtocolOnAnonWithErrorRequest",
     "test.protocolpayloads/MainProtocolTwoWayAnonWithErrorRequest",
     "test.protocolpayloads/MainProtocolTwoWayAnonResponse",
     "test.protocolpayloads/MainProtocolTwoWayAnonRequest",
@@ -4044,25 +3392,17 @@
     "test.protocolpayloads/MainProtocolOnAnonRequest",
     "test.protocolpayloads/LocalStructPayload",
     "test.protocolpayloads/MainProtocol_TwoWayLocalWithError_Result",
-    "test.protocolpayloads/MainProtocolTwoWayLocalWithErrorTopResponse",
     "test.protocolpayloads/MainProtocol_OnLocalWithError_Result",
-    "test.protocolpayloads/MainProtocolOnLocalWithErrorRequest",
     "test.protocolpayloads/MainProtocol"
   ],
   "declarations": {
     "test.protocolpayloads/MainProtocol": "protocol",
     "test.protocolpayloads/LocalStructPayload": "struct",
     "test.protocolpayloads/MainProtocolOnAnonRequest": "struct",
-    "test.protocolpayloads/MainProtocolOnAnonWithErrorRequest": "struct",
-    "test.protocolpayloads/MainProtocolOnImportWithErrorRequest": "struct",
-    "test.protocolpayloads/MainProtocolOnLocalWithErrorRequest": "struct",
     "test.protocolpayloads/MainProtocolOneWayAnonRequest": "struct",
     "test.protocolpayloads/MainProtocolTwoWayAnonRequest": "struct",
     "test.protocolpayloads/MainProtocolTwoWayAnonResponse": "struct",
     "test.protocolpayloads/MainProtocolTwoWayAnonWithErrorRequest": "struct",
-    "test.protocolpayloads/MainProtocolTwoWayAnonWithErrorTopResponse": "struct",
-    "test.protocolpayloads/MainProtocolTwoWayImportWithErrorTopResponse": "struct",
-    "test.protocolpayloads/MainProtocolTwoWayLocalWithErrorTopResponse": "struct",
     "test.protocolpayloads/MainProtocol_OnAnonWithError_Response": "struct",
     "test.protocolpayloads/MainProtocol_TwoWayAnonWithError_Response": "struct",
     "test.protocolpayloads/MainProtocol_OnAnonWithError_Result": "union",

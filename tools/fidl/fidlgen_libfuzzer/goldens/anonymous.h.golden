@@ -32,7 +32,6 @@ using BitsMember = ::test::anonymous::BitsMember;
 using SomeProtocol_SomeMethod_Response = ::test::anonymous::SomeProtocol_SomeMethod_Response;
 using SomeProtocol_SomeMethod_Error = ::test::anonymous::SomeProtocol_SomeMethod_Error;
 using SomeProtocol_SomeMethod_Result = ::test::anonymous::SomeProtocol_SomeMethod_Result;
-using SomeProtocolSomeMethodTopResponse = ::test::anonymous::SomeProtocolSomeMethodTopResponse;
 
 template <>
 struct MinSize<Op> {
@@ -323,24 +322,6 @@ struct Allocate<SomeProtocol_SomeMethod_Result> {
       }
     }
 
-    return out;
-  }
-};
-template <>
-struct MinSize<SomeProtocolSomeMethodTopResponse> {
-  operator size_t() {
-    return MinSize<::test::anonymous::SomeProtocol_SomeMethod_Result>();
-  }
-};
-template <>
-struct Allocate<SomeProtocolSomeMethodTopResponse> {
-  SomeProtocolSomeMethodTopResponse operator()(FuzzInput* src, size_t* size) {
-    ZX_ASSERT(*size >= MinSize<SomeProtocolSomeMethodTopResponse>());
-    SomeProtocolSomeMethodTopResponse out;
-    const size_t slack_per_member = (*size - MinSize<SomeProtocolSomeMethodTopResponse>()) / 1;
-    size_t out_size;
-    out_size = MinSize<::test::anonymous::SomeProtocol_SomeMethod_Result>() + slack_per_member;
-    out.result = Allocate<::test::anonymous::SomeProtocol_SomeMethod_Result>{}(src, &out_size);
     return out;
   }
 };

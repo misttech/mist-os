@@ -21,7 +21,7 @@ namespace test_anonymous {
 
 extern "C" const fidl_type_t test_anonymous_SomeProtocolSomeMethodRequestTable;
 
-extern "C" const fidl_type_t test_anonymous_SomeProtocolSomeMethodTopResponseTable;
+extern "C" const fidl_type_t test_anonymous_SomeProtocol_SomeMethod_ResultTable;
 #ifdef __Fuchsia__
 }  // namespace test_anonymous
 
@@ -172,8 +172,8 @@ void fidl::internal::WireCompleterImpl<::test_anonymous::SomeProtocol::SomeMetho
   return ReplyError(std::move(result.error_value()));
 }
 
-void fidl::internal::WireCompleterImpl<::test_anonymous::SomeProtocol::SomeMethod>::MakeReply(::test_anonymous::wire::SomeProtocolSomeMethodResult result) {
-  ::fidl::internal::TransactionalResponse<::test_anonymous::SomeProtocol::SomeMethod> _response{result};
+void fidl::internal::WireCompleterImpl<::test_anonymous::SomeProtocol::SomeMethod>::MakeReply(::test_anonymous::wire::SomeProtocolSomeMethodResult SomeProtocolSomeMethodResult) {
+  ::fidl::internal::TransactionalResponse<::test_anonymous::SomeProtocol::SomeMethod> _response{SomeProtocolSomeMethodResult};
   FIDL_INTERNAL_DISABLE_AUTO_VAR_INIT
   ::fidl::internal::OwnedEncodedMessage<
       ::fidl::internal::TransactionalResponse<::test_anonymous::SomeProtocol::SomeMethod>, ::fidl::internal::ChannelTransport>
@@ -200,8 +200,8 @@ void fidl::internal::WireBufferCompleterImpl<::test_anonymous::SomeProtocol::Som
   return ReplyError(std::move(result.error_value()));
 }
 
-void fidl::internal::WireBufferCompleterImpl<::test_anonymous::SomeProtocol::SomeMethod>::MakeReply(::test_anonymous::wire::SomeProtocolSomeMethodResult result) {
-  ::fidl::internal::TransactionalResponse<::test_anonymous::SomeProtocol::SomeMethod> _response{result};
+void fidl::internal::WireBufferCompleterImpl<::test_anonymous::SomeProtocol::SomeMethod>::MakeReply(::test_anonymous::wire::SomeProtocolSomeMethodResult SomeProtocolSomeMethodResult) {
+  ::fidl::internal::TransactionalResponse<::test_anonymous::SomeProtocol::SomeMethod> _response{SomeProtocolSomeMethodResult};
   constexpr uint32_t _buffer_size = ::fidl::ServerReplyBufferSizeInChannel<::test_anonymous::SomeProtocol::SomeMethod>();
   ::fit::result<::fidl::Error, ::fidl::BufferSpan> _allocation =
       _allocator().TryAllocate(_buffer_size);

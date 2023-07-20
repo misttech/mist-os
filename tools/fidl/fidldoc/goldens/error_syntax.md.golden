@@ -34,7 +34,7 @@
 <table>
     <tr><th>Name</th><th>Type</th></tr>
         <tr>
-            <td><code>result</code></td>
+            <td><code>payload</code></td>
             <td>
                 <code><a class='link' href='#ExampleUseOfErrorSyntax_CallWhichMayFail_Result'>ExampleUseOfErrorSyntax_CallWhichMayFail_Result</a></code>
             </td>
@@ -64,7 +64,7 @@
 <table>
     <tr><th>Name</th><th>Type</th></tr>
         <tr>
-            <td><code>result</code></td>
+            <td><code>payload</code></td>
             <td>
                 <code><a class='link' href='../test.errorsyntax.parent/'>test.errorsyntax.parent</a>/<a class='link' href='../test.errorsyntax.parent/#ParentUsesErrorSyntax_ComposedCallWhichMayFail_Result'>ParentUsesErrorSyntax_ComposedCallWhichMayFail_Result</a></code>
             </td>

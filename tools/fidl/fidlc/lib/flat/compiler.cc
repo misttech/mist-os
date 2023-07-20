@@ -209,15 +209,10 @@ static std::vector<const flat::Struct*> ExternalStructs(
           external_structs.insert(as_struct);
         }
 
-        // This struct is actually wrapping an error union, so check to see if the success variant
-        // struct should be exported as well.
+        // Include the success variant of a result union, if it's an external struct.
         if (method->has_error) {
-          auto response_struct = static_cast<const flat::Struct*>(id->type_decl);
-          const auto* result_union_type =
-              static_cast<const flat::IdentifierType*>(response_struct->members[0].type_ctor->type);
-
-          ZX_ASSERT(result_union_type->type_decl->kind == flat::Decl::Kind::kUnion);
-          const auto* result_union = static_cast<const flat::Union*>(result_union_type->type_decl);
+          ZX_ASSERT(id->type_decl->kind == Decl::Kind::kUnion);
+          const auto* result_union = static_cast<const flat::Union*>(id->type_decl);
           const auto* success_variant_type = static_cast<const flat::IdentifierType*>(
               result_union->members[0].maybe_used->type_ctor->type);
           if (success_variant_type->type_decl->kind != flat::Decl::Kind::kStruct) {
@@ -298,10 +293,8 @@ class CalcDependencies {
           if (method->HasResultUnion()) {
             auto response_id =
                 static_cast<const flat::IdentifierType*>(method->maybe_response->type);
-            auto response_struct = static_cast<const flat::Struct*>(response_id->type_decl);
-            auto result_union_type = response_struct->members[0].type_ctor->type;
-            auto result_union = static_cast<const flat::Union*>(
-                static_cast<const flat::IdentifierType*>(result_union_type)->type_decl);
+            ZX_ASSERT(response_id->type_decl->kind == Decl::Kind::kUnion);
+            auto result_union = static_cast<const flat::Union*>(response_id->type_decl);
             for (const auto& member : result_union->members) {
               if (auto used = member.maybe_used.get()) {
                 VisitTypeConstructorAndStructFields(used->type_ctor.get());

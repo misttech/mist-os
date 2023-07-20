@@ -606,16 +606,6 @@ struct HLCPPToNaturalTraits<::test::protocols::WithErrorSyntax_ResponseAsStruct_
   static inline ::test_protocols::WithErrorSyntaxResponseAsStructResponse Convert(::test::protocols::WithErrorSyntax_ResponseAsStruct_Response&&);
 };
 template <>
-struct NaturalToHLCPPTraits<::test_protocols::WithErrorSyntaxResponseAsStructTopResponse> {
-  using HLCPPType = ::test::protocols::WithErrorSyntaxResponseAsStructTopResponse;
-  static inline ::test::protocols::WithErrorSyntaxResponseAsStructTopResponse Convert(::test_protocols::WithErrorSyntaxResponseAsStructTopResponse&&);
-};
-template <>
-struct HLCPPToNaturalTraits<::test::protocols::WithErrorSyntaxResponseAsStructTopResponse> {
-  using NaturalType = ::test_protocols::WithErrorSyntaxResponseAsStructTopResponse;
-  static inline ::test_protocols::WithErrorSyntaxResponseAsStructTopResponse Convert(::test::protocols::WithErrorSyntaxResponseAsStructTopResponse&&);
-};
-template <>
 struct NaturalToHLCPPTraits<::test_protocols::WithErrorSyntaxErrorAsPrimitiveResponse> {
   using HLCPPType = ::test::protocols::WithErrorSyntax_ErrorAsPrimitive_Response;
   static inline ::test::protocols::WithErrorSyntax_ErrorAsPrimitive_Response Convert(::test_protocols::WithErrorSyntaxErrorAsPrimitiveResponse&&);
@@ -624,16 +614,6 @@ template <>
 struct HLCPPToNaturalTraits<::test::protocols::WithErrorSyntax_ErrorAsPrimitive_Response> {
   using NaturalType = ::test_protocols::WithErrorSyntaxErrorAsPrimitiveResponse;
   static inline ::test_protocols::WithErrorSyntaxErrorAsPrimitiveResponse Convert(::test::protocols::WithErrorSyntax_ErrorAsPrimitive_Response&&);
-};
-template <>
-struct NaturalToHLCPPTraits<::test_protocols::WithErrorSyntaxErrorAsPrimitiveTopResponse> {
-  using HLCPPType = ::test::protocols::WithErrorSyntaxErrorAsPrimitiveTopResponse;
-  static inline ::test::protocols::WithErrorSyntaxErrorAsPrimitiveTopResponse Convert(::test_protocols::WithErrorSyntaxErrorAsPrimitiveTopResponse&&);
-};
-template <>
-struct HLCPPToNaturalTraits<::test::protocols::WithErrorSyntaxErrorAsPrimitiveTopResponse> {
-  using NaturalType = ::test_protocols::WithErrorSyntaxErrorAsPrimitiveTopResponse;
-  static inline ::test_protocols::WithErrorSyntaxErrorAsPrimitiveTopResponse Convert(::test::protocols::WithErrorSyntaxErrorAsPrimitiveTopResponse&&);
 };
 template <>
 struct NaturalToHLCPPTraits<::test_protocols::WithErrorSyntaxErrorAsEnumResponse> {
@@ -646,16 +626,6 @@ struct HLCPPToNaturalTraits<::test::protocols::WithErrorSyntax_ErrorAsEnum_Respo
   static inline ::test_protocols::WithErrorSyntaxErrorAsEnumResponse Convert(::test::protocols::WithErrorSyntax_ErrorAsEnum_Response&&);
 };
 template <>
-struct NaturalToHLCPPTraits<::test_protocols::WithErrorSyntaxErrorAsEnumTopResponse> {
-  using HLCPPType = ::test::protocols::WithErrorSyntaxErrorAsEnumTopResponse;
-  static inline ::test::protocols::WithErrorSyntaxErrorAsEnumTopResponse Convert(::test_protocols::WithErrorSyntaxErrorAsEnumTopResponse&&);
-};
-template <>
-struct HLCPPToNaturalTraits<::test::protocols::WithErrorSyntaxErrorAsEnumTopResponse> {
-  using NaturalType = ::test_protocols::WithErrorSyntaxErrorAsEnumTopResponse;
-  static inline ::test_protocols::WithErrorSyntaxErrorAsEnumTopResponse Convert(::test::protocols::WithErrorSyntaxErrorAsEnumTopResponse&&);
-};
-template <>
 struct NaturalToHLCPPTraits<::test_protocols::WithErrorSyntaxHandleInResultResponse> {
   using HLCPPType = ::test::protocols::WithErrorSyntax_HandleInResult_Response;
   static inline ::test::protocols::WithErrorSyntax_HandleInResult_Response Convert(::test_protocols::WithErrorSyntaxHandleInResultResponse&&);
@@ -664,16 +634,6 @@ template <>
 struct HLCPPToNaturalTraits<::test::protocols::WithErrorSyntax_HandleInResult_Response> {
   using NaturalType = ::test_protocols::WithErrorSyntaxHandleInResultResponse;
   static inline ::test_protocols::WithErrorSyntaxHandleInResultResponse Convert(::test::protocols::WithErrorSyntax_HandleInResult_Response&&);
-};
-template <>
-struct NaturalToHLCPPTraits<::test_protocols::WithErrorSyntaxHandleInResultTopResponse> {
-  using HLCPPType = ::test::protocols::WithErrorSyntaxHandleInResultTopResponse;
-  static inline ::test::protocols::WithErrorSyntaxHandleInResultTopResponse Convert(::test_protocols::WithErrorSyntaxHandleInResultTopResponse&&);
-};
-template <>
-struct HLCPPToNaturalTraits<::test::protocols::WithErrorSyntaxHandleInResultTopResponse> {
-  using NaturalType = ::test_protocols::WithErrorSyntaxHandleInResultTopResponse;
-  static inline ::test_protocols::WithErrorSyntaxHandleInResultTopResponse Convert(::test::protocols::WithErrorSyntaxHandleInResultTopResponse&&);
 };
 template <>
 struct NaturalToHLCPPTraits<::test_protocols::ChannelProtocolMethodARequest> {
@@ -1067,17 +1027,6 @@ struct HLCPPToNaturalTraits<::test::protocols::TheUnion> {
       .c = ::fidl::HLCPPToNatural(std::move(value.c)),
   }};
 }
-::test::protocols::WithErrorSyntaxResponseAsStructTopResponse NaturalToHLCPPTraits<::test_protocols::WithErrorSyntaxResponseAsStructTopResponse>::Convert(::test_protocols::WithErrorSyntaxResponseAsStructTopResponse&& value) {
-  ::test::protocols::WithErrorSyntaxResponseAsStructTopResponse hlcpp;
-  hlcpp.result = ::fidl::NaturalToHLCPP(std::move(value.result()));
-  return hlcpp;
-}
-
-::test_protocols::WithErrorSyntaxResponseAsStructTopResponse HLCPPToNaturalTraits<::test::protocols::WithErrorSyntaxResponseAsStructTopResponse>::Convert(::test::protocols::WithErrorSyntaxResponseAsStructTopResponse&& value) {
-  return ::test_protocols::WithErrorSyntaxResponseAsStructTopResponse{{
-      .result = ::fidl::HLCPPToNatural(std::move(value.result)),
-  }};
-}
 ::test::protocols::WithErrorSyntax_ErrorAsPrimitive_Response NaturalToHLCPPTraits<::test_protocols::WithErrorSyntaxErrorAsPrimitiveResponse>::Convert(::test_protocols::WithErrorSyntaxErrorAsPrimitiveResponse&& value) {
   ::test::protocols::WithErrorSyntax_ErrorAsPrimitive_Response hlcpp;
   hlcpp.__reserved = ::fidl::NaturalToHLCPP(std::move(value.__reserved()));
@@ -1087,17 +1036,6 @@ struct HLCPPToNaturalTraits<::test::protocols::TheUnion> {
 ::test_protocols::WithErrorSyntaxErrorAsPrimitiveResponse HLCPPToNaturalTraits<::test::protocols::WithErrorSyntax_ErrorAsPrimitive_Response>::Convert(::test::protocols::WithErrorSyntax_ErrorAsPrimitive_Response&& value) {
   return ::test_protocols::WithErrorSyntaxErrorAsPrimitiveResponse{{
       .__reserved = ::fidl::HLCPPToNatural(std::move(value.__reserved)),
-  }};
-}
-::test::protocols::WithErrorSyntaxErrorAsPrimitiveTopResponse NaturalToHLCPPTraits<::test_protocols::WithErrorSyntaxErrorAsPrimitiveTopResponse>::Convert(::test_protocols::WithErrorSyntaxErrorAsPrimitiveTopResponse&& value) {
-  ::test::protocols::WithErrorSyntaxErrorAsPrimitiveTopResponse hlcpp;
-  hlcpp.result = ::fidl::NaturalToHLCPP(std::move(value.result()));
-  return hlcpp;
-}
-
-::test_protocols::WithErrorSyntaxErrorAsPrimitiveTopResponse HLCPPToNaturalTraits<::test::protocols::WithErrorSyntaxErrorAsPrimitiveTopResponse>::Convert(::test::protocols::WithErrorSyntaxErrorAsPrimitiveTopResponse&& value) {
-  return ::test_protocols::WithErrorSyntaxErrorAsPrimitiveTopResponse{{
-      .result = ::fidl::HLCPPToNatural(std::move(value.result)),
   }};
 }
 ::test::protocols::WithErrorSyntax_ErrorAsEnum_Response NaturalToHLCPPTraits<::test_protocols::WithErrorSyntaxErrorAsEnumResponse>::Convert(::test_protocols::WithErrorSyntaxErrorAsEnumResponse&& value) {
@@ -1111,17 +1049,6 @@ struct HLCPPToNaturalTraits<::test::protocols::TheUnion> {
       .__reserved = ::fidl::HLCPPToNatural(std::move(value.__reserved)),
   }};
 }
-::test::protocols::WithErrorSyntaxErrorAsEnumTopResponse NaturalToHLCPPTraits<::test_protocols::WithErrorSyntaxErrorAsEnumTopResponse>::Convert(::test_protocols::WithErrorSyntaxErrorAsEnumTopResponse&& value) {
-  ::test::protocols::WithErrorSyntaxErrorAsEnumTopResponse hlcpp;
-  hlcpp.result = ::fidl::NaturalToHLCPP(std::move(value.result()));
-  return hlcpp;
-}
-
-::test_protocols::WithErrorSyntaxErrorAsEnumTopResponse HLCPPToNaturalTraits<::test::protocols::WithErrorSyntaxErrorAsEnumTopResponse>::Convert(::test::protocols::WithErrorSyntaxErrorAsEnumTopResponse&& value) {
-  return ::test_protocols::WithErrorSyntaxErrorAsEnumTopResponse{{
-      .result = ::fidl::HLCPPToNatural(std::move(value.result)),
-  }};
-}
 ::test::protocols::WithErrorSyntax_HandleInResult_Response NaturalToHLCPPTraits<::test_protocols::WithErrorSyntaxHandleInResultResponse>::Convert(::test_protocols::WithErrorSyntaxHandleInResultResponse&& value) {
   ::test::protocols::WithErrorSyntax_HandleInResult_Response hlcpp;
   hlcpp.h = ::fidl::NaturalToHLCPP(std::move(value.h()));
@@ -1131,17 +1058,6 @@ struct HLCPPToNaturalTraits<::test::protocols::TheUnion> {
 ::test_protocols::WithErrorSyntaxHandleInResultResponse HLCPPToNaturalTraits<::test::protocols::WithErrorSyntax_HandleInResult_Response>::Convert(::test::protocols::WithErrorSyntax_HandleInResult_Response&& value) {
   return ::test_protocols::WithErrorSyntaxHandleInResultResponse{{
       .h = ::fidl::HLCPPToNatural(std::move(value.h)),
-  }};
-}
-::test::protocols::WithErrorSyntaxHandleInResultTopResponse NaturalToHLCPPTraits<::test_protocols::WithErrorSyntaxHandleInResultTopResponse>::Convert(::test_protocols::WithErrorSyntaxHandleInResultTopResponse&& value) {
-  ::test::protocols::WithErrorSyntaxHandleInResultTopResponse hlcpp;
-  hlcpp.result = ::fidl::NaturalToHLCPP(std::move(value.result()));
-  return hlcpp;
-}
-
-::test_protocols::WithErrorSyntaxHandleInResultTopResponse HLCPPToNaturalTraits<::test::protocols::WithErrorSyntaxHandleInResultTopResponse>::Convert(::test::protocols::WithErrorSyntaxHandleInResultTopResponse&& value) {
-  return ::test_protocols::WithErrorSyntaxHandleInResultTopResponse{{
-      .result = ::fidl::HLCPPToNatural(std::move(value.result)),
   }};
 }
 ::test::protocols::ChannelProtocolMethodARequest NaturalToHLCPPTraits<::test_protocols::ChannelProtocolMethodARequest>::Convert(::test_protocols::ChannelProtocolMethodARequest&& value) {

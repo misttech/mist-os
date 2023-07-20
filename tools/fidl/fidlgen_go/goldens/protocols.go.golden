@@ -404,50 +404,6 @@ func (msg *withAndWithoutRequestResponseWithCtxOnWithResponseResponse) Marshaler
 	return _mwithAndWithoutRequestResponseWithCtxOnWithResponseResponse
 }
 
-type withErrorSyntaxWithCtxResponseAsStructResponse struct {
-	_      struct{}                              `fidl:"s" fidl_size_v2:"16" fidl_alignment_v2:"8"`
-	Result WithErrorSyntaxResponseAsStructResult `fidl_offset_v2:"0"`
-}
-
-var _mwithErrorSyntaxWithCtxResponseAsStructResponse = _bindings.CreateLazyMarshaler(withErrorSyntaxWithCtxResponseAsStructResponse{})
-
-func (msg *withErrorSyntaxWithCtxResponseAsStructResponse) Marshaler() _bindings.Marshaler {
-	return _mwithErrorSyntaxWithCtxResponseAsStructResponse
-}
-
-type withErrorSyntaxWithCtxErrorAsPrimitiveResponse struct {
-	_      struct{}                              `fidl:"s" fidl_size_v2:"16" fidl_alignment_v2:"8"`
-	Result WithErrorSyntaxErrorAsPrimitiveResult `fidl_offset_v2:"0"`
-}
-
-var _mwithErrorSyntaxWithCtxErrorAsPrimitiveResponse = _bindings.CreateLazyMarshaler(withErrorSyntaxWithCtxErrorAsPrimitiveResponse{})
-
-func (msg *withErrorSyntaxWithCtxErrorAsPrimitiveResponse) Marshaler() _bindings.Marshaler {
-	return _mwithErrorSyntaxWithCtxErrorAsPrimitiveResponse
-}
-
-type withErrorSyntaxWithCtxErrorAsEnumResponse struct {
-	_      struct{}                         `fidl:"s" fidl_size_v2:"16" fidl_alignment_v2:"8"`
-	Result WithErrorSyntaxErrorAsEnumResult `fidl_offset_v2:"0"`
-}
-
-var _mwithErrorSyntaxWithCtxErrorAsEnumResponse = _bindings.CreateLazyMarshaler(withErrorSyntaxWithCtxErrorAsEnumResponse{})
-
-func (msg *withErrorSyntaxWithCtxErrorAsEnumResponse) Marshaler() _bindings.Marshaler {
-	return _mwithErrorSyntaxWithCtxErrorAsEnumResponse
-}
-
-type withErrorSyntaxWithCtxHandleInResultResponse struct {
-	_      struct{}                            `fidl:"s" fidl_size_v2:"16" fidl_alignment_v2:"8"`
-	Result WithErrorSyntaxHandleInResultResult `fidl_offset_v2:"0"`
-}
-
-var _mwithErrorSyntaxWithCtxHandleInResultResponse = _bindings.CreateLazyMarshaler(withErrorSyntaxWithCtxHandleInResultResponse{})
-
-func (msg *withErrorSyntaxWithCtxHandleInResultResponse) Marshaler() _bindings.Marshaler {
-	return _mwithErrorSyntaxWithCtxHandleInResultResponse
-}
-
 type withProtocolEndsWithCtxClientEndsRequest struct {
 	_  struct{}                             `fidl:"s" fidl_size_v2:"4" fidl_alignment_v2:"4"`
 	In DiscoverableProtocolWithCtxInterface `fidl_offset_v2:"0" fidl_handle_subtype:"4"`
@@ -572,64 +528,64 @@ func (_m *TheUnion) GetUnknownData() _bindings.UnknownData {
 	return _m.I_unknownData.(_bindings.UnknownData)
 }
 
-type I_withErrorSyntaxErrorAsEnumResultTag uint64
+type I_withErrorSyntaxResponseAsStructResultTag uint64
 
 const (
-	WithErrorSyntaxErrorAsEnumResultResponse = 1 // 0x00000001
-	WithErrorSyntaxErrorAsEnumResultErr      = 2 // 0x00000002
+	WithErrorSyntaxResponseAsStructResultResponse = 1 // 0x00000001
+	WithErrorSyntaxResponseAsStructResultErr      = 2 // 0x00000002
 )
 
-type WithErrorSyntaxErrorAsEnumResult struct {
-	I_withErrorSyntaxErrorAsEnumResultTag `fidl:"x!" fidl_size_v2:"16" fidl_alignment_v2:"8" fidl_resource:"false"`
-	Response                              WithErrorSyntaxErrorAsEnumResponse `fidl_ordinal:"1"`
-	Err                                   ErrorEnum                          `fidl_ordinal:"2"`
+type WithErrorSyntaxResponseAsStructResult struct {
+	I_withErrorSyntaxResponseAsStructResultTag `fidl:"x!" fidl_size_v2:"16" fidl_alignment_v2:"8" fidl_resource:"false"`
+	Response                                   WithErrorSyntaxResponseAsStructResponse `fidl_ordinal:"1"`
+	Err                                        uint32                                  `fidl_ordinal:"2"`
 }
 
-var _mWithErrorSyntaxErrorAsEnumResult = _bindings.CreateLazyMarshaler(WithErrorSyntaxErrorAsEnumResult{})
+var _mWithErrorSyntaxResponseAsStructResult = _bindings.CreateLazyMarshaler(WithErrorSyntaxResponseAsStructResult{})
 
-func (msg *WithErrorSyntaxErrorAsEnumResult) Marshaler() _bindings.Marshaler {
-	return _mWithErrorSyntaxErrorAsEnumResult
+func (msg *WithErrorSyntaxResponseAsStructResult) Marshaler() _bindings.Marshaler {
+	return _mWithErrorSyntaxResponseAsStructResult
 }
 
-func (_m *WithErrorSyntaxErrorAsEnumResult) reset() {
-	switch _m.I_withErrorSyntaxErrorAsEnumResultTag {
+func (_m *WithErrorSyntaxResponseAsStructResult) reset() {
+	switch _m.I_withErrorSyntaxResponseAsStructResultTag {
 	case 1:
-		var _zeroed WithErrorSyntaxErrorAsEnumResponse
+		var _zeroed WithErrorSyntaxResponseAsStructResponse
 		_m.Response = _zeroed
 	case 2:
-		var _zeroed ErrorEnum
+		var _zeroed uint32
 		_m.Err = _zeroed
 	}
 }
 
-func (_m *WithErrorSyntaxErrorAsEnumResult) Which() I_withErrorSyntaxErrorAsEnumResultTag {
-	return _m.I_withErrorSyntaxErrorAsEnumResultTag
+func (_m *WithErrorSyntaxResponseAsStructResult) Which() I_withErrorSyntaxResponseAsStructResultTag {
+	return _m.I_withErrorSyntaxResponseAsStructResultTag
 }
 
-func (_m *WithErrorSyntaxErrorAsEnumResult) Ordinal() uint64 {
-	return uint64(_m.I_withErrorSyntaxErrorAsEnumResultTag)
+func (_m *WithErrorSyntaxResponseAsStructResult) Ordinal() uint64 {
+	return uint64(_m.I_withErrorSyntaxResponseAsStructResultTag)
 }
 
-func (_m *WithErrorSyntaxErrorAsEnumResult) SetResponse(response WithErrorSyntaxErrorAsEnumResponse) {
+func (_m *WithErrorSyntaxResponseAsStructResult) SetResponse(response WithErrorSyntaxResponseAsStructResponse) {
 	_m.reset()
-	_m.I_withErrorSyntaxErrorAsEnumResultTag = WithErrorSyntaxErrorAsEnumResultResponse
+	_m.I_withErrorSyntaxResponseAsStructResultTag = WithErrorSyntaxResponseAsStructResultResponse
 	_m.Response = response
 }
 
-func WithErrorSyntaxErrorAsEnumResultWithResponse(response WithErrorSyntaxErrorAsEnumResponse) WithErrorSyntaxErrorAsEnumResult {
-	var _u WithErrorSyntaxErrorAsEnumResult
+func WithErrorSyntaxResponseAsStructResultWithResponse(response WithErrorSyntaxResponseAsStructResponse) WithErrorSyntaxResponseAsStructResult {
+	var _u WithErrorSyntaxResponseAsStructResult
 	_u.SetResponse(response)
 	return _u
 }
 
-func (_m *WithErrorSyntaxErrorAsEnumResult) SetErr(err ErrorEnum) {
+func (_m *WithErrorSyntaxResponseAsStructResult) SetErr(err uint32) {
 	_m.reset()
-	_m.I_withErrorSyntaxErrorAsEnumResultTag = WithErrorSyntaxErrorAsEnumResultErr
+	_m.I_withErrorSyntaxResponseAsStructResultTag = WithErrorSyntaxResponseAsStructResultErr
 	_m.Err = err
 }
 
-func WithErrorSyntaxErrorAsEnumResultWithErr(err ErrorEnum) WithErrorSyntaxErrorAsEnumResult {
-	var _u WithErrorSyntaxErrorAsEnumResult
+func WithErrorSyntaxResponseAsStructResultWithErr(err uint32) WithErrorSyntaxResponseAsStructResult {
+	var _u WithErrorSyntaxResponseAsStructResult
 	_u.SetErr(err)
 	return _u
 }
@@ -696,6 +652,68 @@ func WithErrorSyntaxErrorAsPrimitiveResultWithErr(err uint32) WithErrorSyntaxErr
 	return _u
 }
 
+type I_withErrorSyntaxErrorAsEnumResultTag uint64
+
+const (
+	WithErrorSyntaxErrorAsEnumResultResponse = 1 // 0x00000001
+	WithErrorSyntaxErrorAsEnumResultErr      = 2 // 0x00000002
+)
+
+type WithErrorSyntaxErrorAsEnumResult struct {
+	I_withErrorSyntaxErrorAsEnumResultTag `fidl:"x!" fidl_size_v2:"16" fidl_alignment_v2:"8" fidl_resource:"false"`
+	Response                              WithErrorSyntaxErrorAsEnumResponse `fidl_ordinal:"1"`
+	Err                                   ErrorEnum                          `fidl_ordinal:"2"`
+}
+
+var _mWithErrorSyntaxErrorAsEnumResult = _bindings.CreateLazyMarshaler(WithErrorSyntaxErrorAsEnumResult{})
+
+func (msg *WithErrorSyntaxErrorAsEnumResult) Marshaler() _bindings.Marshaler {
+	return _mWithErrorSyntaxErrorAsEnumResult
+}
+
+func (_m *WithErrorSyntaxErrorAsEnumResult) reset() {
+	switch _m.I_withErrorSyntaxErrorAsEnumResultTag {
+	case 1:
+		var _zeroed WithErrorSyntaxErrorAsEnumResponse
+		_m.Response = _zeroed
+	case 2:
+		var _zeroed ErrorEnum
+		_m.Err = _zeroed
+	}
+}
+
+func (_m *WithErrorSyntaxErrorAsEnumResult) Which() I_withErrorSyntaxErrorAsEnumResultTag {
+	return _m.I_withErrorSyntaxErrorAsEnumResultTag
+}
+
+func (_m *WithErrorSyntaxErrorAsEnumResult) Ordinal() uint64 {
+	return uint64(_m.I_withErrorSyntaxErrorAsEnumResultTag)
+}
+
+func (_m *WithErrorSyntaxErrorAsEnumResult) SetResponse(response WithErrorSyntaxErrorAsEnumResponse) {
+	_m.reset()
+	_m.I_withErrorSyntaxErrorAsEnumResultTag = WithErrorSyntaxErrorAsEnumResultResponse
+	_m.Response = response
+}
+
+func WithErrorSyntaxErrorAsEnumResultWithResponse(response WithErrorSyntaxErrorAsEnumResponse) WithErrorSyntaxErrorAsEnumResult {
+	var _u WithErrorSyntaxErrorAsEnumResult
+	_u.SetResponse(response)
+	return _u
+}
+
+func (_m *WithErrorSyntaxErrorAsEnumResult) SetErr(err ErrorEnum) {
+	_m.reset()
+	_m.I_withErrorSyntaxErrorAsEnumResultTag = WithErrorSyntaxErrorAsEnumResultErr
+	_m.Err = err
+}
+
+func WithErrorSyntaxErrorAsEnumResultWithErr(err ErrorEnum) WithErrorSyntaxErrorAsEnumResult {
+	var _u WithErrorSyntaxErrorAsEnumResult
+	_u.SetErr(err)
+	return _u
+}
+
 type I_withErrorSyntaxHandleInResultResultTag uint64
 
 const (
@@ -754,68 +772,6 @@ func (_m *WithErrorSyntaxHandleInResultResult) SetErr(err uint32) {
 
 func WithErrorSyntaxHandleInResultResultWithErr(err uint32) WithErrorSyntaxHandleInResultResult {
 	var _u WithErrorSyntaxHandleInResultResult
-	_u.SetErr(err)
-	return _u
-}
-
-type I_withErrorSyntaxResponseAsStructResultTag uint64
-
-const (
-	WithErrorSyntaxResponseAsStructResultResponse = 1 // 0x00000001
-	WithErrorSyntaxResponseAsStructResultErr      = 2 // 0x00000002
-)
-
-type WithErrorSyntaxResponseAsStructResult struct {
-	I_withErrorSyntaxResponseAsStructResultTag `fidl:"x!" fidl_size_v2:"16" fidl_alignment_v2:"8" fidl_resource:"false"`
-	Response                                   WithErrorSyntaxResponseAsStructResponse `fidl_ordinal:"1"`
-	Err                                        uint32                                  `fidl_ordinal:"2"`
-}
-
-var _mWithErrorSyntaxResponseAsStructResult = _bindings.CreateLazyMarshaler(WithErrorSyntaxResponseAsStructResult{})
-
-func (msg *WithErrorSyntaxResponseAsStructResult) Marshaler() _bindings.Marshaler {
-	return _mWithErrorSyntaxResponseAsStructResult
-}
-
-func (_m *WithErrorSyntaxResponseAsStructResult) reset() {
-	switch _m.I_withErrorSyntaxResponseAsStructResultTag {
-	case 1:
-		var _zeroed WithErrorSyntaxResponseAsStructResponse
-		_m.Response = _zeroed
-	case 2:
-		var _zeroed uint32
-		_m.Err = _zeroed
-	}
-}
-
-func (_m *WithErrorSyntaxResponseAsStructResult) Which() I_withErrorSyntaxResponseAsStructResultTag {
-	return _m.I_withErrorSyntaxResponseAsStructResultTag
-}
-
-func (_m *WithErrorSyntaxResponseAsStructResult) Ordinal() uint64 {
-	return uint64(_m.I_withErrorSyntaxResponseAsStructResultTag)
-}
-
-func (_m *WithErrorSyntaxResponseAsStructResult) SetResponse(response WithErrorSyntaxResponseAsStructResponse) {
-	_m.reset()
-	_m.I_withErrorSyntaxResponseAsStructResultTag = WithErrorSyntaxResponseAsStructResultResponse
-	_m.Response = response
-}
-
-func WithErrorSyntaxResponseAsStructResultWithResponse(response WithErrorSyntaxResponseAsStructResponse) WithErrorSyntaxResponseAsStructResult {
-	var _u WithErrorSyntaxResponseAsStructResult
-	_u.SetResponse(response)
-	return _u
-}
-
-func (_m *WithErrorSyntaxResponseAsStructResult) SetErr(err uint32) {
-	_m.reset()
-	_m.I_withErrorSyntaxResponseAsStructResultTag = WithErrorSyntaxResponseAsStructResultErr
-	_m.Err = err
-}
-
-func WithErrorSyntaxResponseAsStructResultWithErr(err uint32) WithErrorSyntaxResponseAsStructResult {
-	var _u WithErrorSyntaxResponseAsStructResult
 	_u.SetErr(err)
 	return _u
 }
@@ -1456,30 +1412,30 @@ type WithErrorSyntaxWithCtxInterface _bindings.ChannelProxy
 
 func (p *WithErrorSyntaxWithCtxInterface) ResponseAsStruct(ctx_ _bindings.Context) (WithErrorSyntaxResponseAsStructResult, error) {
 	var req_ _bindings.Message
-	resp_ := &withErrorSyntaxWithCtxResponseAsStructResponse{}
+	resp_ := &WithErrorSyntaxResponseAsStructResult{}
 	err_ := ((*_bindings.ChannelProxy)(p)).Call(WithErrorSyntaxResponseAsStructOrdinal, req_, resp_)
-	return (*resp_).Result, err_
+	return (*resp_), err_
 }
 
 func (p *WithErrorSyntaxWithCtxInterface) ErrorAsPrimitive(ctx_ _bindings.Context) (WithErrorSyntaxErrorAsPrimitiveResult, error) {
 	var req_ _bindings.Message
-	resp_ := &withErrorSyntaxWithCtxErrorAsPrimitiveResponse{}
+	resp_ := &WithErrorSyntaxErrorAsPrimitiveResult{}
 	err_ := ((*_bindings.ChannelProxy)(p)).Call(WithErrorSyntaxErrorAsPrimitiveOrdinal, req_, resp_)
-	return (*resp_).Result, err_
+	return (*resp_), err_
 }
 
 func (p *WithErrorSyntaxWithCtxInterface) ErrorAsEnum(ctx_ _bindings.Context) (WithErrorSyntaxErrorAsEnumResult, error) {
 	var req_ _bindings.Message
-	resp_ := &withErrorSyntaxWithCtxErrorAsEnumResponse{}
+	resp_ := &WithErrorSyntaxErrorAsEnumResult{}
 	err_ := ((*_bindings.ChannelProxy)(p)).Call(WithErrorSyntaxErrorAsEnumOrdinal, req_, resp_)
-	return (*resp_).Result, err_
+	return (*resp_), err_
 }
 
 func (p *WithErrorSyntaxWithCtxInterface) HandleInResult(ctx_ _bindings.Context) (WithErrorSyntaxHandleInResultResult, error) {
 	var req_ _bindings.Message
-	resp_ := &withErrorSyntaxWithCtxHandleInResultResponse{}
+	resp_ := &WithErrorSyntaxHandleInResultResult{}
 	err_ := ((*_bindings.ChannelProxy)(p)).Call(WithErrorSyntaxHandleInResultOrdinal, req_, resp_)
-	return (*resp_).Result, err_
+	return (*resp_), err_
 }
 
 type WithErrorSyntaxWithCtx interface {
@@ -1505,20 +1461,20 @@ type WithErrorSyntaxWithCtxStub struct {
 func (s_ *WithErrorSyntaxWithCtxStub) Dispatch(args_ _bindings.DispatchArgs) (_bindings.Message, bool, error) {
 	switch args_.Ordinal {
 	case WithErrorSyntaxResponseAsStructOrdinal:
-		result, err_ := s_.Impl.ResponseAsStruct(args_.Ctx)
-		out_ := &withErrorSyntaxWithCtxResponseAsStructResponse{Result: result}
+		payload, err_ := s_.Impl.ResponseAsStruct(args_.Ctx)
+		out_ := &payload
 		return out_, true, err_
 	case WithErrorSyntaxErrorAsPrimitiveOrdinal:
-		result, err_ := s_.Impl.ErrorAsPrimitive(args_.Ctx)
-		out_ := &withErrorSyntaxWithCtxErrorAsPrimitiveResponse{Result: result}
+		payload, err_ := s_.Impl.ErrorAsPrimitive(args_.Ctx)
+		out_ := &payload
 		return out_, true, err_
 	case WithErrorSyntaxErrorAsEnumOrdinal:
-		result, err_ := s_.Impl.ErrorAsEnum(args_.Ctx)
-		out_ := &withErrorSyntaxWithCtxErrorAsEnumResponse{Result: result}
+		payload, err_ := s_.Impl.ErrorAsEnum(args_.Ctx)
+		out_ := &payload
 		return out_, true, err_
 	case WithErrorSyntaxHandleInResultOrdinal:
-		result, err_ := s_.Impl.HandleInResult(args_.Ctx)
-		out_ := &withErrorSyntaxWithCtxHandleInResultResponse{Result: result}
+		payload, err_ := s_.Impl.HandleInResult(args_.Ctx)
+		out_ := &payload
 		return out_, true, err_
 	}
 	return nil, false, _bindings.ErrUnknownOrdinal

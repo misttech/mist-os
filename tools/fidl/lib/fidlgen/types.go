@@ -1414,7 +1414,7 @@ type Method struct {
 
 	// Computed ordinal to use to identify the method on the wire.
 	Ordinal uint64 `json:"ordinal"`
-	// Whether the method is marked as strict (other wise flexible).
+	// Whether the method is marked as strict (otherwise flexible).
 	//
 	// While unknown interactions are experimental, a not-set strictness should
 	// be treated as strict. After unknown interactions are released this field
@@ -1441,23 +1441,15 @@ type Method struct {
 	// payload.
 	HasResponse bool `json:"has_response"`
 	// The full response payload, as it appears on the wire. If flexible or
-	// error syntax are used, this is a struct with a single field containing
-	// the ResultType. Otherwise, it is the same as the return value of the
-	// method.
+	// error syntax are used, this is the compiler-generated result union.
 	ResponsePayload *Type `json:"maybe_response_payload,omitempty"`
 	// Whether the method uses the "error" syntax. If true, ResponsePayload will
-	// be a single-element struct wrapping the result union, and response will
-	// be further broken down in the ResultType, ValueType, and ErrorType
-	// fields.
+	// be the result union, and ValueType and ErrorType will be set.
 	HasError bool `json:"has_error"`
-	// If flexible or error syntax are used, this is the type of the result
-	// union containing the ValueType and (if error syntax) ErrorType.
-	ResultType *Type `json:"maybe_response_result_type,omitempty"`
-	// If flexible or error syntax are used, this is the type of the success
-	// variant of the ResultType union, which is the same as the return value.
+	// If flexible or error syntax are used, this is the success variant of the
+	// result union.
 	ValueType *Type `json:"maybe_response_success_type,omitempty"`
-	// If error syntax is used, this is the type of the error variant of the
-	// ResultType union.
+	// If error syntax is used, this is error variant of the result union.
 	ErrorType *Type `json:"maybe_response_err_type,omitempty"`
 }
 
@@ -1505,6 +1497,12 @@ func (m *Method) HasRequestPayload() bool {
 
 func (m *Method) HasResponsePayload() bool {
 	return m.ResponsePayload != nil
+}
+
+// HasResultUnion returns true if the method has a result union response, i.e.
+// the method is two-way and it is flexible or uses error syntax.
+func (m *Method) HasResultUnion() bool {
+	return m.ValueType != nil
 }
 
 // HasTransportError returns true if the method uses a result union with
@@ -1886,7 +1884,7 @@ func (r *Root) payloadTypeNames() EncodedCompoundIdentifierSet {
 				ptn[method.RequestPayload.Identifier] = struct{}{}
 			}
 			if method.ResponsePayload != nil {
-				if method.HasError || method.HasTransportError() {
+				if method.HasResultUnion() {
 					ptn[method.ValueType.Identifier] = struct{}{}
 				} else {
 					ptn[method.ResponsePayload.Identifier] = struct{}{}

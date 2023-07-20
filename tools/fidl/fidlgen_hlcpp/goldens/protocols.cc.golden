@@ -430,34 +430,6 @@ void WithErrorSyntax_ResponseAsStruct_Result::EnsureStorageInitialized(::fidl_xu
 }
 
 
-extern "C" const fidl_type_t test_protocols_WithErrorSyntaxResponseAsStructTopResponseTable;
-const fidl_type_t* WithErrorSyntaxResponseAsStructTopResponse::FidlType = &test_protocols_WithErrorSyntaxResponseAsStructTopResponseTable;
-
-void WithErrorSyntaxResponseAsStructTopResponse::Encode(::fidl::Encoder* _encoder, size_t _offset,
-                         cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
-  if (::fidl::IsMemcpyCompatible<WithErrorSyntaxResponseAsStructTopResponse>::value) {
-    memcpy(_encoder->template GetPtr<WithErrorSyntaxResponseAsStructTopResponse>(_offset), this, sizeof(WithErrorSyntaxResponseAsStructTopResponse));
-  } else {::fidl::Encode(_encoder, &result, _offset + 0);
-    
-  }
-}
-
-void WithErrorSyntaxResponseAsStructTopResponse::Decode(::fidl::Decoder* _decoder, WithErrorSyntaxResponseAsStructTopResponse* _value, size_t _offset) {
-  if (::fidl::IsMemcpyCompatible<WithErrorSyntaxResponseAsStructTopResponse>::value) {
-    memcpy(_value, _decoder->template GetPtr<WithErrorSyntaxResponseAsStructTopResponse>(_offset), sizeof(WithErrorSyntaxResponseAsStructTopResponse));
-  } else {
-    ::fidl::Decode(_decoder, &_value->result, _offset + 0);
-  }
-}
-
-zx_status_t WithErrorSyntaxResponseAsStructTopResponse::Clone(WithErrorSyntaxResponseAsStructTopResponse* _result) const {
-  zx_status_t _status = ::fidl::Clone(result, &_result->result);
-  if (_status != ZX_OK)
-    return _status;
-  return ZX_OK;
-}
-
-
 extern "C" const fidl_type_t test_protocols_WithErrorSyntax_ErrorAsPrimitive_ResponseTable;
 const fidl_type_t* WithErrorSyntax_ErrorAsPrimitive_Response::FidlType = &test_protocols_WithErrorSyntax_ErrorAsPrimitive_ResponseTable;
 
@@ -688,34 +660,6 @@ void WithErrorSyntax_ErrorAsPrimitive_Result::EnsureStorageInitialized(::fidl_xu
         break;
     }
   }
-}
-
-
-extern "C" const fidl_type_t test_protocols_WithErrorSyntaxErrorAsPrimitiveTopResponseTable;
-const fidl_type_t* WithErrorSyntaxErrorAsPrimitiveTopResponse::FidlType = &test_protocols_WithErrorSyntaxErrorAsPrimitiveTopResponseTable;
-
-void WithErrorSyntaxErrorAsPrimitiveTopResponse::Encode(::fidl::Encoder* _encoder, size_t _offset,
-                         cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
-  if (::fidl::IsMemcpyCompatible<WithErrorSyntaxErrorAsPrimitiveTopResponse>::value) {
-    memcpy(_encoder->template GetPtr<WithErrorSyntaxErrorAsPrimitiveTopResponse>(_offset), this, sizeof(WithErrorSyntaxErrorAsPrimitiveTopResponse));
-  } else {::fidl::Encode(_encoder, &result, _offset + 0);
-    
-  }
-}
-
-void WithErrorSyntaxErrorAsPrimitiveTopResponse::Decode(::fidl::Decoder* _decoder, WithErrorSyntaxErrorAsPrimitiveTopResponse* _value, size_t _offset) {
-  if (::fidl::IsMemcpyCompatible<WithErrorSyntaxErrorAsPrimitiveTopResponse>::value) {
-    memcpy(_value, _decoder->template GetPtr<WithErrorSyntaxErrorAsPrimitiveTopResponse>(_offset), sizeof(WithErrorSyntaxErrorAsPrimitiveTopResponse));
-  } else {
-    ::fidl::Decode(_decoder, &_value->result, _offset + 0);
-  }
-}
-
-zx_status_t WithErrorSyntaxErrorAsPrimitiveTopResponse::Clone(WithErrorSyntaxErrorAsPrimitiveTopResponse* _result) const {
-  zx_status_t _status = ::fidl::Clone(result, &_result->result);
-  if (_status != ZX_OK)
-    return _status;
-  return ZX_OK;
 }
 
 
@@ -954,34 +898,6 @@ void WithErrorSyntax_ErrorAsEnum_Result::EnsureStorageInitialized(::fidl_xunion_
         break;
     }
   }
-}
-
-
-extern "C" const fidl_type_t test_protocols_WithErrorSyntaxErrorAsEnumTopResponseTable;
-const fidl_type_t* WithErrorSyntaxErrorAsEnumTopResponse::FidlType = &test_protocols_WithErrorSyntaxErrorAsEnumTopResponseTable;
-
-void WithErrorSyntaxErrorAsEnumTopResponse::Encode(::fidl::Encoder* _encoder, size_t _offset,
-                         cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
-  if (::fidl::IsMemcpyCompatible<WithErrorSyntaxErrorAsEnumTopResponse>::value) {
-    memcpy(_encoder->template GetPtr<WithErrorSyntaxErrorAsEnumTopResponse>(_offset), this, sizeof(WithErrorSyntaxErrorAsEnumTopResponse));
-  } else {::fidl::Encode(_encoder, &result, _offset + 0);
-    
-  }
-}
-
-void WithErrorSyntaxErrorAsEnumTopResponse::Decode(::fidl::Decoder* _decoder, WithErrorSyntaxErrorAsEnumTopResponse* _value, size_t _offset) {
-  if (::fidl::IsMemcpyCompatible<WithErrorSyntaxErrorAsEnumTopResponse>::value) {
-    memcpy(_value, _decoder->template GetPtr<WithErrorSyntaxErrorAsEnumTopResponse>(_offset), sizeof(WithErrorSyntaxErrorAsEnumTopResponse));
-  } else {
-    ::fidl::Decode(_decoder, &_value->result, _offset + 0);
-  }
-}
-
-zx_status_t WithErrorSyntaxErrorAsEnumTopResponse::Clone(WithErrorSyntaxErrorAsEnumTopResponse* _result) const {
-  zx_status_t _status = ::fidl::Clone(result, &_result->result);
-  if (_status != ZX_OK)
-    return _status;
-  return ZX_OK;
 }
 
 
@@ -1226,39 +1142,6 @@ void WithErrorSyntax_HandleInResult_Result::EnsureStorageInitialized(::fidl_xuni
         break;
     }
   }
-}
-
-#endif  // __Fuchsia__
-
-
-
-#ifdef __Fuchsia__
-
-extern "C" const fidl_type_t test_protocols_WithErrorSyntaxHandleInResultTopResponseTable;
-const fidl_type_t* WithErrorSyntaxHandleInResultTopResponse::FidlType = &test_protocols_WithErrorSyntaxHandleInResultTopResponseTable;
-
-void WithErrorSyntaxHandleInResultTopResponse::Encode(::fidl::Encoder* _encoder, size_t _offset,
-                         cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
-  if (::fidl::IsMemcpyCompatible<WithErrorSyntaxHandleInResultTopResponse>::value) {
-    memcpy(_encoder->template GetPtr<WithErrorSyntaxHandleInResultTopResponse>(_offset), this, sizeof(WithErrorSyntaxHandleInResultTopResponse));
-  } else {::fidl::Encode(_encoder, &result, _offset + 0);
-    
-  }
-}
-
-void WithErrorSyntaxHandleInResultTopResponse::Decode(::fidl::Decoder* _decoder, WithErrorSyntaxHandleInResultTopResponse* _value, size_t _offset) {
-  if (::fidl::IsMemcpyCompatible<WithErrorSyntaxHandleInResultTopResponse>::value) {
-    memcpy(_value, _decoder->template GetPtr<WithErrorSyntaxHandleInResultTopResponse>(_offset), sizeof(WithErrorSyntaxHandleInResultTopResponse));
-  } else {
-    ::fidl::Decode(_decoder, &_value->result, _offset + 0);
-  }
-}
-
-zx_status_t WithErrorSyntaxHandleInResultTopResponse::Clone(WithErrorSyntaxHandleInResultTopResponse* _result) const {
-  zx_status_t _status = ::fidl::Clone(result, &_result->result);
-  if (_status != ZX_OK)
-    return _status;
-  return ZX_OK;
 }
 
 #endif  // __Fuchsia__
@@ -2862,16 +2745,16 @@ zx_status_t WithAndWithoutRequestResponse_SyncProxy::WithRequestWithResponse(::s
 
   
   namespace _internal {
-__LOCAL extern "C" const fidl_type_t test_protocols_WithErrorSyntaxResponseAsStructTopResponseTable;
+__LOCAL extern "C" const fidl_type_t test_protocols_WithErrorSyntax_ResponseAsStruct_ResultTable;
   
   
-__LOCAL extern "C" const fidl_type_t test_protocols_WithErrorSyntaxErrorAsPrimitiveTopResponseTable;
+__LOCAL extern "C" const fidl_type_t test_protocols_WithErrorSyntax_ErrorAsPrimitive_ResultTable;
   
   
-__LOCAL extern "C" const fidl_type_t test_protocols_WithErrorSyntaxErrorAsEnumTopResponseTable;
+__LOCAL extern "C" const fidl_type_t test_protocols_WithErrorSyntax_ErrorAsEnum_ResultTable;
   
   
-__LOCAL extern "C" const fidl_type_t test_protocols_WithErrorSyntaxHandleInResultTopResponseTable;
+__LOCAL extern "C" const fidl_type_t test_protocols_WithErrorSyntax_HandleInResult_ResultTable;
 
 }  // namespace _internal
 
@@ -2909,16 +2792,16 @@ const fidl_type_t* ::test::protocols::WithErrorSyntax_RequestDecoder::GetType(ui
 const fidl_type_t* WithErrorSyntax_ResponseDecoder::GetType(uint64_t ordinal) {
   switch (ordinal) {
     case ::test::protocols::internal::kWithErrorSyntax_ResponseAsStruct_Ordinal:
-      return &::test::protocols::_internal::test_protocols_WithErrorSyntaxResponseAsStructTopResponseTable;
+      return &::test::protocols::_internal::test_protocols_WithErrorSyntax_ResponseAsStruct_ResultTable;
         ;
     case ::test::protocols::internal::kWithErrorSyntax_ErrorAsPrimitive_Ordinal:
-      return &::test::protocols::_internal::test_protocols_WithErrorSyntaxErrorAsPrimitiveTopResponseTable;
+      return &::test::protocols::_internal::test_protocols_WithErrorSyntax_ErrorAsPrimitive_ResultTable;
         ;
     case ::test::protocols::internal::kWithErrorSyntax_ErrorAsEnum_Ordinal:
-      return &::test::protocols::_internal::test_protocols_WithErrorSyntaxErrorAsEnumTopResponseTable;
+      return &::test::protocols::_internal::test_protocols_WithErrorSyntax_ErrorAsEnum_ResultTable;
         ;
     case ::test::protocols::internal::kWithErrorSyntax_HandleInResult_Ordinal:
-      return &::test::protocols::_internal::test_protocols_WithErrorSyntaxHandleInResultTopResponseTable;
+      return &::test::protocols::_internal::test_protocols_WithErrorSyntax_HandleInResult_ResultTable;
         ;
     default:
       return nullptr;
@@ -2959,7 +2842,7 @@ WithErrorSyntax_ResponseAsStruct_ResponseHandler(WithErrorSyntax::ResponseAsStru
         ::fidl::Decoder decoder(std::move(message));
         callback_(::fidl::DecodeAs<::test::protocols::WithErrorSyntax_ResponseAsStruct_Result>(&decoder, 0 + sizeof(fidl_message_header_t)));
         return ZX_OK;
-      }, &::test::protocols::_internal::test_protocols_WithErrorSyntaxResponseAsStructTopResponseTable);
+      }, &::test::protocols::_internal::test_protocols_WithErrorSyntax_ResponseAsStruct_ResultTable);
 }
 
 }  // namespace
@@ -2979,7 +2862,7 @@ WithErrorSyntax_ErrorAsPrimitive_ResponseHandler(WithErrorSyntax::ErrorAsPrimiti
         ::fidl::Decoder decoder(std::move(message));
         callback_(::fidl::DecodeAs<::test::protocols::WithErrorSyntax_ErrorAsPrimitive_Result>(&decoder, 0 + sizeof(fidl_message_header_t)));
         return ZX_OK;
-      }, &::test::protocols::_internal::test_protocols_WithErrorSyntaxErrorAsPrimitiveTopResponseTable);
+      }, &::test::protocols::_internal::test_protocols_WithErrorSyntax_ErrorAsPrimitive_ResultTable);
 }
 
 }  // namespace
@@ -2999,7 +2882,7 @@ WithErrorSyntax_ErrorAsEnum_ResponseHandler(WithErrorSyntax::ErrorAsEnumCallback
         ::fidl::Decoder decoder(std::move(message));
         callback_(::fidl::DecodeAs<::test::protocols::WithErrorSyntax_ErrorAsEnum_Result>(&decoder, 0 + sizeof(fidl_message_header_t)));
         return ZX_OK;
-      }, &::test::protocols::_internal::test_protocols_WithErrorSyntaxErrorAsEnumTopResponseTable);
+      }, &::test::protocols::_internal::test_protocols_WithErrorSyntax_ErrorAsEnum_ResultTable);
 }
 
 }  // namespace
@@ -3019,7 +2902,7 @@ WithErrorSyntax_HandleInResult_ResponseHandler(WithErrorSyntax::HandleInResultCa
         ::fidl::Decoder decoder(std::move(message));
         callback_(::fidl::DecodeAs<::test::protocols::WithErrorSyntax_HandleInResult_Result>(&decoder, 0 + sizeof(fidl_message_header_t)));
         return ZX_OK;
-      }, &::test::protocols::_internal::test_protocols_WithErrorSyntaxHandleInResultTopResponseTable);
+      }, &::test::protocols::_internal::test_protocols_WithErrorSyntax_HandleInResult_ResultTable);
 }
 
 }  // namespace
@@ -3042,10 +2925,10 @@ class WithErrorSyntax_ResponseAsStruct_Responder final {
   WithErrorSyntax_ResponseAsStruct_Responder(::fidl::internal::PendingResponse response)
       : response_(std::move(response)) {}
 
-  void operator()(::test::protocols::WithErrorSyntax_ResponseAsStruct_Result result) {
+  void operator()(::test::protocols::WithErrorSyntax_ResponseAsStruct_Result WithErrorSyntax_ResponseAsStruct_Result) {
     ::fidl::MessageEncoder _encoder(::test::protocols::internal::kWithErrorSyntax_ResponseAsStruct_Ordinal, ::test::protocols::internal::kWithErrorSyntax_ResponseAsStruct_DynamicFlags);
-    const fidl_type_t* resp_type =&::test::protocols::_internal::test_protocols_WithErrorSyntaxResponseAsStructTopResponseTable;
-    response_.Send(resp_type, ::test::protocols::WithErrorSyntax_ResponseEncoder::ResponseAsStruct(&_encoder, &result));
+    const fidl_type_t* resp_type =&::test::protocols::_internal::test_protocols_WithErrorSyntax_ResponseAsStruct_ResultTable;
+    response_.Send(resp_type, ::test::protocols::WithErrorSyntax_ResponseEncoder::ResponseAsStruct(&_encoder, &WithErrorSyntax_ResponseAsStruct_Result));
   }
 
  private:
@@ -3057,10 +2940,10 @@ class WithErrorSyntax_ErrorAsPrimitive_Responder final {
   WithErrorSyntax_ErrorAsPrimitive_Responder(::fidl::internal::PendingResponse response)
       : response_(std::move(response)) {}
 
-  void operator()(::test::protocols::WithErrorSyntax_ErrorAsPrimitive_Result result) {
+  void operator()(::test::protocols::WithErrorSyntax_ErrorAsPrimitive_Result WithErrorSyntax_ErrorAsPrimitive_Result) {
     ::fidl::MessageEncoder _encoder(::test::protocols::internal::kWithErrorSyntax_ErrorAsPrimitive_Ordinal, ::test::protocols::internal::kWithErrorSyntax_ErrorAsPrimitive_DynamicFlags);
-    const fidl_type_t* resp_type =&::test::protocols::_internal::test_protocols_WithErrorSyntaxErrorAsPrimitiveTopResponseTable;
-    response_.Send(resp_type, ::test::protocols::WithErrorSyntax_ResponseEncoder::ErrorAsPrimitive(&_encoder, &result));
+    const fidl_type_t* resp_type =&::test::protocols::_internal::test_protocols_WithErrorSyntax_ErrorAsPrimitive_ResultTable;
+    response_.Send(resp_type, ::test::protocols::WithErrorSyntax_ResponseEncoder::ErrorAsPrimitive(&_encoder, &WithErrorSyntax_ErrorAsPrimitive_Result));
   }
 
  private:
@@ -3072,10 +2955,10 @@ class WithErrorSyntax_ErrorAsEnum_Responder final {
   WithErrorSyntax_ErrorAsEnum_Responder(::fidl::internal::PendingResponse response)
       : response_(std::move(response)) {}
 
-  void operator()(::test::protocols::WithErrorSyntax_ErrorAsEnum_Result result) {
+  void operator()(::test::protocols::WithErrorSyntax_ErrorAsEnum_Result WithErrorSyntax_ErrorAsEnum_Result) {
     ::fidl::MessageEncoder _encoder(::test::protocols::internal::kWithErrorSyntax_ErrorAsEnum_Ordinal, ::test::protocols::internal::kWithErrorSyntax_ErrorAsEnum_DynamicFlags);
-    const fidl_type_t* resp_type =&::test::protocols::_internal::test_protocols_WithErrorSyntaxErrorAsEnumTopResponseTable;
-    response_.Send(resp_type, ::test::protocols::WithErrorSyntax_ResponseEncoder::ErrorAsEnum(&_encoder, &result));
+    const fidl_type_t* resp_type =&::test::protocols::_internal::test_protocols_WithErrorSyntax_ErrorAsEnum_ResultTable;
+    response_.Send(resp_type, ::test::protocols::WithErrorSyntax_ResponseEncoder::ErrorAsEnum(&_encoder, &WithErrorSyntax_ErrorAsEnum_Result));
   }
 
  private:
@@ -3087,10 +2970,10 @@ class WithErrorSyntax_HandleInResult_Responder final {
   WithErrorSyntax_HandleInResult_Responder(::fidl::internal::PendingResponse response)
       : response_(std::move(response)) {}
 
-  void operator()(::test::protocols::WithErrorSyntax_HandleInResult_Result result) {
+  void operator()(::test::protocols::WithErrorSyntax_HandleInResult_Result WithErrorSyntax_HandleInResult_Result) {
     ::fidl::MessageEncoder _encoder(::test::protocols::internal::kWithErrorSyntax_HandleInResult_Ordinal, ::test::protocols::internal::kWithErrorSyntax_HandleInResult_DynamicFlags);
-    const fidl_type_t* resp_type =&::test::protocols::_internal::test_protocols_WithErrorSyntaxHandleInResultTopResponseTable;
-    response_.Send(resp_type, ::test::protocols::WithErrorSyntax_ResponseEncoder::HandleInResult(&_encoder, &result));
+    const fidl_type_t* resp_type =&::test::protocols::_internal::test_protocols_WithErrorSyntax_HandleInResult_ResultTable;
+    response_.Send(resp_type, ::test::protocols::WithErrorSyntax_ResponseEncoder::HandleInResult(&_encoder, &WithErrorSyntax_HandleInResult_Result));
   }
 
  private:
@@ -3167,59 +3050,59 @@ WithErrorSyntax_SyncProxy::WithErrorSyntax_SyncProxy(::zx::channel channel)
 
 WithErrorSyntax_SyncProxy::~WithErrorSyntax_SyncProxy() = default;
 
-zx_status_t WithErrorSyntax_SyncProxy::ResponseAsStruct(::test::protocols::WithErrorSyntax_ResponseAsStruct_Result* out_result) {
+zx_status_t WithErrorSyntax_SyncProxy::ResponseAsStruct(::test::protocols::WithErrorSyntax_ResponseAsStruct_Result* out_WithErrorSyntax_ResponseAsStruct_Result) {
   ::fidl::MessageEncoder _encoder(::test::protocols::internal::kWithErrorSyntax_ResponseAsStruct_Ordinal, ::test::protocols::internal::kWithErrorSyntax_ResponseAsStruct_DynamicFlags);
   ::fidl::IncomingMessageBuffer buffer_;
   ::fidl::HLCPPIncomingMessage response_ = buffer_.CreateEmptyIncomingMessage();
   const fidl_type_t* req_type =nullptr;
-  const fidl_type_t* resp_type =&::test::protocols::_internal::test_protocols_WithErrorSyntaxResponseAsStructTopResponseTable;
+  const fidl_type_t* resp_type =&::test::protocols::_internal::test_protocols_WithErrorSyntax_ResponseAsStruct_ResultTable;
   zx_status_t status_ = proxy_.Call(req_type, resp_type, ::test::protocols::WithErrorSyntax_RequestEncoder::ResponseAsStruct(&_encoder), &response_);
   if (status_ != ZX_OK)
     return status_;
   ::fidl::Decoder decoder_(std::move(response_));
-  *out_result = ::fidl::DecodeAs<::test::protocols::WithErrorSyntax_ResponseAsStruct_Result>(&decoder_, 0 + sizeof(fidl_message_header_t));
+  *out_WithErrorSyntax_ResponseAsStruct_Result = ::fidl::DecodeAs<::test::protocols::WithErrorSyntax_ResponseAsStruct_Result>(&decoder_, 0 + sizeof(fidl_message_header_t));
   return ZX_OK;
 }
 
-zx_status_t WithErrorSyntax_SyncProxy::ErrorAsPrimitive(::test::protocols::WithErrorSyntax_ErrorAsPrimitive_Result* out_result) {
+zx_status_t WithErrorSyntax_SyncProxy::ErrorAsPrimitive(::test::protocols::WithErrorSyntax_ErrorAsPrimitive_Result* out_WithErrorSyntax_ErrorAsPrimitive_Result) {
   ::fidl::MessageEncoder _encoder(::test::protocols::internal::kWithErrorSyntax_ErrorAsPrimitive_Ordinal, ::test::protocols::internal::kWithErrorSyntax_ErrorAsPrimitive_DynamicFlags);
   ::fidl::IncomingMessageBuffer buffer_;
   ::fidl::HLCPPIncomingMessage response_ = buffer_.CreateEmptyIncomingMessage();
   const fidl_type_t* req_type =nullptr;
-  const fidl_type_t* resp_type =&::test::protocols::_internal::test_protocols_WithErrorSyntaxErrorAsPrimitiveTopResponseTable;
+  const fidl_type_t* resp_type =&::test::protocols::_internal::test_protocols_WithErrorSyntax_ErrorAsPrimitive_ResultTable;
   zx_status_t status_ = proxy_.Call(req_type, resp_type, ::test::protocols::WithErrorSyntax_RequestEncoder::ErrorAsPrimitive(&_encoder), &response_);
   if (status_ != ZX_OK)
     return status_;
   ::fidl::Decoder decoder_(std::move(response_));
-  *out_result = ::fidl::DecodeAs<::test::protocols::WithErrorSyntax_ErrorAsPrimitive_Result>(&decoder_, 0 + sizeof(fidl_message_header_t));
+  *out_WithErrorSyntax_ErrorAsPrimitive_Result = ::fidl::DecodeAs<::test::protocols::WithErrorSyntax_ErrorAsPrimitive_Result>(&decoder_, 0 + sizeof(fidl_message_header_t));
   return ZX_OK;
 }
 
-zx_status_t WithErrorSyntax_SyncProxy::ErrorAsEnum(::test::protocols::WithErrorSyntax_ErrorAsEnum_Result* out_result) {
+zx_status_t WithErrorSyntax_SyncProxy::ErrorAsEnum(::test::protocols::WithErrorSyntax_ErrorAsEnum_Result* out_WithErrorSyntax_ErrorAsEnum_Result) {
   ::fidl::MessageEncoder _encoder(::test::protocols::internal::kWithErrorSyntax_ErrorAsEnum_Ordinal, ::test::protocols::internal::kWithErrorSyntax_ErrorAsEnum_DynamicFlags);
   ::fidl::IncomingMessageBuffer buffer_;
   ::fidl::HLCPPIncomingMessage response_ = buffer_.CreateEmptyIncomingMessage();
   const fidl_type_t* req_type =nullptr;
-  const fidl_type_t* resp_type =&::test::protocols::_internal::test_protocols_WithErrorSyntaxErrorAsEnumTopResponseTable;
+  const fidl_type_t* resp_type =&::test::protocols::_internal::test_protocols_WithErrorSyntax_ErrorAsEnum_ResultTable;
   zx_status_t status_ = proxy_.Call(req_type, resp_type, ::test::protocols::WithErrorSyntax_RequestEncoder::ErrorAsEnum(&_encoder), &response_);
   if (status_ != ZX_OK)
     return status_;
   ::fidl::Decoder decoder_(std::move(response_));
-  *out_result = ::fidl::DecodeAs<::test::protocols::WithErrorSyntax_ErrorAsEnum_Result>(&decoder_, 0 + sizeof(fidl_message_header_t));
+  *out_WithErrorSyntax_ErrorAsEnum_Result = ::fidl::DecodeAs<::test::protocols::WithErrorSyntax_ErrorAsEnum_Result>(&decoder_, 0 + sizeof(fidl_message_header_t));
   return ZX_OK;
 }
 
-zx_status_t WithErrorSyntax_SyncProxy::HandleInResult(::test::protocols::WithErrorSyntax_HandleInResult_Result* out_result) {
+zx_status_t WithErrorSyntax_SyncProxy::HandleInResult(::test::protocols::WithErrorSyntax_HandleInResult_Result* out_WithErrorSyntax_HandleInResult_Result) {
   ::fidl::MessageEncoder _encoder(::test::protocols::internal::kWithErrorSyntax_HandleInResult_Ordinal, ::test::protocols::internal::kWithErrorSyntax_HandleInResult_DynamicFlags);
   ::fidl::IncomingMessageBuffer buffer_;
   ::fidl::HLCPPIncomingMessage response_ = buffer_.CreateEmptyIncomingMessage();
   const fidl_type_t* req_type =nullptr;
-  const fidl_type_t* resp_type =&::test::protocols::_internal::test_protocols_WithErrorSyntaxHandleInResultTopResponseTable;
+  const fidl_type_t* resp_type =&::test::protocols::_internal::test_protocols_WithErrorSyntax_HandleInResult_ResultTable;
   zx_status_t status_ = proxy_.Call(req_type, resp_type, ::test::protocols::WithErrorSyntax_RequestEncoder::HandleInResult(&_encoder), &response_);
   if (status_ != ZX_OK)
     return status_;
   ::fidl::Decoder decoder_(std::move(response_));
-  *out_result = ::fidl::DecodeAs<::test::protocols::WithErrorSyntax_HandleInResult_Result>(&decoder_, 0 + sizeof(fidl_message_header_t));
+  *out_WithErrorSyntax_HandleInResult_Result = ::fidl::DecodeAs<::test::protocols::WithErrorSyntax_HandleInResult_Result>(&decoder_, 0 + sizeof(fidl_message_header_t));
   return ZX_OK;
 }
 

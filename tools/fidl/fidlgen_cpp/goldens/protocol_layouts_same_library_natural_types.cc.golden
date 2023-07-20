@@ -11,46 +11,6 @@
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wshadow"
 
-::test_protocollayoutssamelibrary::ComposedProtocolTwoWayAnonComposedWithErrorTopResponse::Storage_ test_protocollayoutssamelibrary::ComposedProtocolTwoWayAnonComposedWithErrorTopResponse::CloneStorage_() const {
-  return Storage_{
-      ::fidl::internal::NaturalClone(storage_.result)};
-}
-
-::test_protocollayoutssamelibrary::ComposedProtocolOnAnonComposedWithErrorRequest::Storage_ test_protocollayoutssamelibrary::ComposedProtocolOnAnonComposedWithErrorRequest::CloneStorage_() const {
-  return Storage_{
-      ::fidl::internal::NaturalClone(storage_.result)};
-}
-
-::test_protocollayoutssamelibrary::ComposedProtocolTwoWayNamedComposedWithErrorTopResponse::Storage_ test_protocollayoutssamelibrary::ComposedProtocolTwoWayNamedComposedWithErrorTopResponse::CloneStorage_() const {
-  return Storage_{
-      ::fidl::internal::NaturalClone(storage_.result)};
-}
-
-::test_protocollayoutssamelibrary::ComposedProtocolOnNamedComposedWithErrorRequest::Storage_ test_protocollayoutssamelibrary::ComposedProtocolOnNamedComposedWithErrorRequest::CloneStorage_() const {
-  return Storage_{
-      ::fidl::internal::NaturalClone(storage_.result)};
-}
-
-::test_protocollayoutssamelibrary::MainProtocolTwoWayLocalWithErrorTopResponse::Storage_ test_protocollayoutssamelibrary::MainProtocolTwoWayLocalWithErrorTopResponse::CloneStorage_() const {
-  return Storage_{
-      ::fidl::internal::NaturalClone(storage_.result)};
-}
-
-::test_protocollayoutssamelibrary::MainProtocolOnLocalWithErrorRequest::Storage_ test_protocollayoutssamelibrary::MainProtocolOnLocalWithErrorRequest::CloneStorage_() const {
-  return Storage_{
-      ::fidl::internal::NaturalClone(storage_.result)};
-}
-
-::test_protocollayoutssamelibrary::MainProtocolTwoWayAnonWithErrorTopResponse::Storage_ test_protocollayoutssamelibrary::MainProtocolTwoWayAnonWithErrorTopResponse::CloneStorage_() const {
-  return Storage_{
-      ::fidl::internal::NaturalClone(storage_.result)};
-}
-
-::test_protocollayoutssamelibrary::MainProtocolOnAnonWithErrorRequest::Storage_ test_protocollayoutssamelibrary::MainProtocolOnAnonWithErrorRequest::CloneStorage_() const {
-  return Storage_{
-      ::fidl::internal::NaturalClone(storage_.result)};
-}
-
 ::test_protocollayoutssamelibrary::TablePayload::Storage_ test_protocollayoutssamelibrary::TablePayload::CloneStorage_() const {
   return Storage_{
       ::fidl::internal::NaturalClone(storage_.a)};

@@ -70,16 +70,10 @@ class WithErrorSyntax_ResponseAsStruct_Response;
 class WithErrorSyntax_ResponseAsStruct_Result;
 
 
-class WithErrorSyntaxResponseAsStructTopResponse;
-
-
 class WithErrorSyntax_ErrorAsPrimitive_Response;
 
 
 class WithErrorSyntax_ErrorAsPrimitive_Result;
-
-
-class WithErrorSyntaxErrorAsPrimitiveTopResponse;
 
 
 class WithErrorSyntax_ErrorAsEnum_Response;
@@ -88,16 +82,10 @@ class WithErrorSyntax_ErrorAsEnum_Response;
 class WithErrorSyntax_ErrorAsEnum_Result;
 
 
-class WithErrorSyntaxErrorAsEnumTopResponse;
-
-
 class WithErrorSyntax_HandleInResult_Response;
 
 
 class WithErrorSyntax_HandleInResult_Result;
-
-
-class WithErrorSyntaxHandleInResultTopResponse;
 
 
 #ifdef __Fuchsia__
@@ -653,29 +641,6 @@ using WithErrorSyntax_ResponseAsStruct_ResultPtr = ::std::unique_ptr<WithErrorSy
 
 
 
-class WithErrorSyntaxResponseAsStructTopResponse final {
- public:
-  static const fidl_type_t* FidlType;
-  
-  ::test::protocols::WithErrorSyntax_ResponseAsStruct_Result result;
-
-  static inline ::std::unique_ptr<WithErrorSyntaxResponseAsStructTopResponse> New() { return ::std::make_unique<WithErrorSyntaxResponseAsStructTopResponse>(); }
-
-  void Encode(::fidl::Encoder* _encoder, size_t _offset,
-               cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt);
-  static void Decode(::fidl::Decoder* _decoder, WithErrorSyntaxResponseAsStructTopResponse* value, size_t _offset);
-  zx_status_t Clone(WithErrorSyntaxResponseAsStructTopResponse* result) const;
-};
-
-inline zx_status_t Clone(const ::test::protocols::WithErrorSyntaxResponseAsStructTopResponse& _value,
-                         ::test::protocols::WithErrorSyntaxResponseAsStructTopResponse* _result) {
-  return _value.Clone(_result);
-}
-
-using WithErrorSyntaxResponseAsStructTopResponsePtr = ::std::unique_ptr<WithErrorSyntaxResponseAsStructTopResponse>;
-
-
-
 class WithErrorSyntax_ErrorAsPrimitive_Response final {
  public:
   static const fidl_type_t* FidlType;
@@ -818,29 +783,6 @@ using WithErrorSyntax_ErrorAsPrimitive_ResultPtr = ::std::unique_ptr<WithErrorSy
 
 
 
-class WithErrorSyntaxErrorAsPrimitiveTopResponse final {
- public:
-  static const fidl_type_t* FidlType;
-  
-  ::test::protocols::WithErrorSyntax_ErrorAsPrimitive_Result result;
-
-  static inline ::std::unique_ptr<WithErrorSyntaxErrorAsPrimitiveTopResponse> New() { return ::std::make_unique<WithErrorSyntaxErrorAsPrimitiveTopResponse>(); }
-
-  void Encode(::fidl::Encoder* _encoder, size_t _offset,
-               cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt);
-  static void Decode(::fidl::Decoder* _decoder, WithErrorSyntaxErrorAsPrimitiveTopResponse* value, size_t _offset);
-  zx_status_t Clone(WithErrorSyntaxErrorAsPrimitiveTopResponse* result) const;
-};
-
-inline zx_status_t Clone(const ::test::protocols::WithErrorSyntaxErrorAsPrimitiveTopResponse& _value,
-                         ::test::protocols::WithErrorSyntaxErrorAsPrimitiveTopResponse* _result) {
-  return _value.Clone(_result);
-}
-
-using WithErrorSyntaxErrorAsPrimitiveTopResponsePtr = ::std::unique_ptr<WithErrorSyntaxErrorAsPrimitiveTopResponse>;
-
-
-
 class WithErrorSyntax_ErrorAsEnum_Response final {
  public:
   static const fidl_type_t* FidlType;
@@ -980,29 +922,6 @@ inline zx_status_t Clone(const ::test::protocols::WithErrorSyntax_ErrorAsEnum_Re
 }
 
 using WithErrorSyntax_ErrorAsEnum_ResultPtr = ::std::unique_ptr<WithErrorSyntax_ErrorAsEnum_Result>;
-
-
-
-class WithErrorSyntaxErrorAsEnumTopResponse final {
- public:
-  static const fidl_type_t* FidlType;
-  
-  ::test::protocols::WithErrorSyntax_ErrorAsEnum_Result result;
-
-  static inline ::std::unique_ptr<WithErrorSyntaxErrorAsEnumTopResponse> New() { return ::std::make_unique<WithErrorSyntaxErrorAsEnumTopResponse>(); }
-
-  void Encode(::fidl::Encoder* _encoder, size_t _offset,
-               cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt);
-  static void Decode(::fidl::Decoder* _decoder, WithErrorSyntaxErrorAsEnumTopResponse* value, size_t _offset);
-  zx_status_t Clone(WithErrorSyntaxErrorAsEnumTopResponse* result) const;
-};
-
-inline zx_status_t Clone(const ::test::protocols::WithErrorSyntaxErrorAsEnumTopResponse& _value,
-                         ::test::protocols::WithErrorSyntaxErrorAsEnumTopResponse* _result) {
-  return _value.Clone(_result);
-}
-
-using WithErrorSyntaxErrorAsEnumTopResponsePtr = ::std::unique_ptr<WithErrorSyntaxErrorAsEnumTopResponse>;
 
 
 
@@ -1159,34 +1078,6 @@ using WithErrorSyntax_HandleInResult_ResultPtr = ::std::unique_ptr<WithErrorSynt
 
 
 
-
-#ifdef __Fuchsia__
-
-class WithErrorSyntaxHandleInResultTopResponse final {
- public:
-  static const fidl_type_t* FidlType;
-  
-  ::test::protocols::WithErrorSyntax_HandleInResult_Result result;
-
-  static inline ::std::unique_ptr<WithErrorSyntaxHandleInResultTopResponse> New() { return ::std::make_unique<WithErrorSyntaxHandleInResultTopResponse>(); }
-
-  void Encode(::fidl::Encoder* _encoder, size_t _offset,
-               cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt);
-  static void Decode(::fidl::Decoder* _decoder, WithErrorSyntaxHandleInResultTopResponse* value, size_t _offset);
-  zx_status_t Clone(WithErrorSyntaxHandleInResultTopResponse* result) const;
-};
-
-inline zx_status_t Clone(const ::test::protocols::WithErrorSyntaxHandleInResultTopResponse& _value,
-                         ::test::protocols::WithErrorSyntaxHandleInResultTopResponse* _result) {
-  return _value.Clone(_result);
-}
-
-using WithErrorSyntaxHandleInResultTopResponsePtr = ::std::unique_ptr<WithErrorSyntaxHandleInResultTopResponse>;
-
-#endif  // __Fuchsia__
-
-
-
 #ifdef __Fuchsia__
 
   
@@ -1216,42 +1107,42 @@ class WithErrorSyntax_RequestEncoder {
   }
 };
   namespace _internal {
-__LOCAL extern "C" const fidl_type_t test_protocols_WithErrorSyntaxResponseAsStructTopResponseTable;
+__LOCAL extern "C" const fidl_type_t test_protocols_WithErrorSyntax_ResponseAsStruct_ResultTable;
   
-__LOCAL extern "C" const fidl_type_t test_protocols_WithErrorSyntaxErrorAsPrimitiveTopResponseTable;
+__LOCAL extern "C" const fidl_type_t test_protocols_WithErrorSyntax_ErrorAsPrimitive_ResultTable;
   
-__LOCAL extern "C" const fidl_type_t test_protocols_WithErrorSyntaxErrorAsEnumTopResponseTable;
+__LOCAL extern "C" const fidl_type_t test_protocols_WithErrorSyntax_ErrorAsEnum_ResultTable;
   
-__LOCAL extern "C" const fidl_type_t test_protocols_WithErrorSyntaxHandleInResultTopResponseTable;
+__LOCAL extern "C" const fidl_type_t test_protocols_WithErrorSyntax_HandleInResult_ResultTable;
 
 }  // namespace _internal
 
 class WithErrorSyntax_ResponseEncoder {
  public:
-  static ::fidl::HLCPPOutgoingMessage ResponseAsStruct(::fidl::MessageEncoder* _encoder, ::test::protocols::WithErrorSyntax_ResponseAsStruct_Result* result) {
+  static ::fidl::HLCPPOutgoingMessage ResponseAsStruct(::fidl::MessageEncoder* _encoder, ::test::protocols::WithErrorSyntax_ResponseAsStruct_Result* WithErrorSyntax_ResponseAsStruct_Result) {
     _encoder->Alloc(16);
-    ::fidl::Encode(_encoder, result, 0 + sizeof(fidl_message_header_t));
+    ::fidl::Encode(_encoder, WithErrorSyntax_ResponseAsStruct_Result, 0 + sizeof(fidl_message_header_t));
     
 
     return _encoder->GetMessage();
   }
-  static ::fidl::HLCPPOutgoingMessage ErrorAsPrimitive(::fidl::MessageEncoder* _encoder, ::test::protocols::WithErrorSyntax_ErrorAsPrimitive_Result* result) {
+  static ::fidl::HLCPPOutgoingMessage ErrorAsPrimitive(::fidl::MessageEncoder* _encoder, ::test::protocols::WithErrorSyntax_ErrorAsPrimitive_Result* WithErrorSyntax_ErrorAsPrimitive_Result) {
     _encoder->Alloc(16);
-    ::fidl::Encode(_encoder, result, 0 + sizeof(fidl_message_header_t));
+    ::fidl::Encode(_encoder, WithErrorSyntax_ErrorAsPrimitive_Result, 0 + sizeof(fidl_message_header_t));
     
 
     return _encoder->GetMessage();
   }
-  static ::fidl::HLCPPOutgoingMessage ErrorAsEnum(::fidl::MessageEncoder* _encoder, ::test::protocols::WithErrorSyntax_ErrorAsEnum_Result* result) {
+  static ::fidl::HLCPPOutgoingMessage ErrorAsEnum(::fidl::MessageEncoder* _encoder, ::test::protocols::WithErrorSyntax_ErrorAsEnum_Result* WithErrorSyntax_ErrorAsEnum_Result) {
     _encoder->Alloc(16);
-    ::fidl::Encode(_encoder, result, 0 + sizeof(fidl_message_header_t));
+    ::fidl::Encode(_encoder, WithErrorSyntax_ErrorAsEnum_Result, 0 + sizeof(fidl_message_header_t));
     
 
     return _encoder->GetMessage();
   }
-  static ::fidl::HLCPPOutgoingMessage HandleInResult(::fidl::MessageEncoder* _encoder, ::test::protocols::WithErrorSyntax_HandleInResult_Result* result) {
+  static ::fidl::HLCPPOutgoingMessage HandleInResult(::fidl::MessageEncoder* _encoder, ::test::protocols::WithErrorSyntax_HandleInResult_Result* WithErrorSyntax_HandleInResult_Result) {
     _encoder->Alloc(16);
-    ::fidl::Encode(_encoder, result, 0 + sizeof(fidl_message_header_t));
+    ::fidl::Encode(_encoder, WithErrorSyntax_HandleInResult_Result, 0 + sizeof(fidl_message_header_t));
     
 
     return _encoder->GetMessage();
@@ -2819,36 +2710,6 @@ struct Equality<::test::protocols::WithErrorSyntax_ResponseAsStruct_Result> {
     }
 };
 template <>
-struct CodingTraits<::test::protocols::WithErrorSyntaxResponseAsStructTopResponse>
-    : public EncodableCodingTraits<::test::protocols::WithErrorSyntaxResponseAsStructTopResponse, 16> {};
-
-
-template<>
-struct HasPadding<::test::protocols::WithErrorSyntaxResponseAsStructTopResponse> : public std::true_type {};
-
-
-
-template<>
-struct IsMemcpyCompatible<::test::protocols::WithErrorSyntaxResponseAsStructTopResponse> : public internal::BoolConstant<
-    !HasPadding<::test::protocols::WithErrorSyntaxResponseAsStructTopResponse>::value
-    && IsMemcpyCompatible<::test::protocols::WithErrorSyntax_ResponseAsStruct_Result>::value> {};
-
-
-inline zx_status_t Clone(const ::test::protocols::WithErrorSyntaxResponseAsStructTopResponse& value,
-                         ::test::protocols::WithErrorSyntaxResponseAsStructTopResponse* result) {
-  return ::test::protocols::Clone(value, result);
-}
-
-template<>
-struct Equality<::test::protocols::WithErrorSyntaxResponseAsStructTopResponse> {
-  bool operator()(const ::test::protocols::WithErrorSyntaxResponseAsStructTopResponse& _lhs, const ::test::protocols::WithErrorSyntaxResponseAsStructTopResponse& _rhs) const {
-    if (!::fidl::Equals(_lhs.result, _rhs.result)) {
-      return false;
-    }
-    return true;
-  }
-};
-template <>
 struct CodingTraits<::test::protocols::WithErrorSyntax_ErrorAsPrimitive_Response>
     : public EncodableCodingTraits<::test::protocols::WithErrorSyntax_ErrorAsPrimitive_Response, 1> {};
 
@@ -2933,36 +2794,6 @@ struct Equality<::test::protocols::WithErrorSyntax_ErrorAsPrimitive_Result> {
     }
 };
 template <>
-struct CodingTraits<::test::protocols::WithErrorSyntaxErrorAsPrimitiveTopResponse>
-    : public EncodableCodingTraits<::test::protocols::WithErrorSyntaxErrorAsPrimitiveTopResponse, 16> {};
-
-
-template<>
-struct HasPadding<::test::protocols::WithErrorSyntaxErrorAsPrimitiveTopResponse> : public std::true_type {};
-
-
-
-template<>
-struct IsMemcpyCompatible<::test::protocols::WithErrorSyntaxErrorAsPrimitiveTopResponse> : public internal::BoolConstant<
-    !HasPadding<::test::protocols::WithErrorSyntaxErrorAsPrimitiveTopResponse>::value
-    && IsMemcpyCompatible<::test::protocols::WithErrorSyntax_ErrorAsPrimitive_Result>::value> {};
-
-
-inline zx_status_t Clone(const ::test::protocols::WithErrorSyntaxErrorAsPrimitiveTopResponse& value,
-                         ::test::protocols::WithErrorSyntaxErrorAsPrimitiveTopResponse* result) {
-  return ::test::protocols::Clone(value, result);
-}
-
-template<>
-struct Equality<::test::protocols::WithErrorSyntaxErrorAsPrimitiveTopResponse> {
-  bool operator()(const ::test::protocols::WithErrorSyntaxErrorAsPrimitiveTopResponse& _lhs, const ::test::protocols::WithErrorSyntaxErrorAsPrimitiveTopResponse& _rhs) const {
-    if (!::fidl::Equals(_lhs.result, _rhs.result)) {
-      return false;
-    }
-    return true;
-  }
-};
-template <>
 struct CodingTraits<::test::protocols::WithErrorSyntax_ErrorAsEnum_Response>
     : public EncodableCodingTraits<::test::protocols::WithErrorSyntax_ErrorAsEnum_Response, 1> {};
 
@@ -3045,36 +2876,6 @@ struct Equality<::test::protocols::WithErrorSyntax_ErrorAsEnum_Result> {
         return false;
       }
     }
-};
-template <>
-struct CodingTraits<::test::protocols::WithErrorSyntaxErrorAsEnumTopResponse>
-    : public EncodableCodingTraits<::test::protocols::WithErrorSyntaxErrorAsEnumTopResponse, 16> {};
-
-
-template<>
-struct HasPadding<::test::protocols::WithErrorSyntaxErrorAsEnumTopResponse> : public std::true_type {};
-
-
-
-template<>
-struct IsMemcpyCompatible<::test::protocols::WithErrorSyntaxErrorAsEnumTopResponse> : public internal::BoolConstant<
-    !HasPadding<::test::protocols::WithErrorSyntaxErrorAsEnumTopResponse>::value
-    && IsMemcpyCompatible<::test::protocols::WithErrorSyntax_ErrorAsEnum_Result>::value> {};
-
-
-inline zx_status_t Clone(const ::test::protocols::WithErrorSyntaxErrorAsEnumTopResponse& value,
-                         ::test::protocols::WithErrorSyntaxErrorAsEnumTopResponse* result) {
-  return ::test::protocols::Clone(value, result);
-}
-
-template<>
-struct Equality<::test::protocols::WithErrorSyntaxErrorAsEnumTopResponse> {
-  bool operator()(const ::test::protocols::WithErrorSyntaxErrorAsEnumTopResponse& _lhs, const ::test::protocols::WithErrorSyntaxErrorAsEnumTopResponse& _rhs) const {
-    if (!::fidl::Equals(_lhs.result, _rhs.result)) {
-      return false;
-    }
-    return true;
-  }
 };
 #ifdef __Fuchsia__
 
@@ -3166,41 +2967,6 @@ struct Equality<::test::protocols::WithErrorSyntax_HandleInResult_Result> {
         return false;
       }
     }
-};
-
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
-
-template <>
-struct CodingTraits<::test::protocols::WithErrorSyntaxHandleInResultTopResponse>
-    : public EncodableCodingTraits<::test::protocols::WithErrorSyntaxHandleInResultTopResponse, 16> {};
-
-
-template<>
-struct HasPadding<::test::protocols::WithErrorSyntaxHandleInResultTopResponse> : public std::true_type {};
-
-
-
-template<>
-struct IsMemcpyCompatible<::test::protocols::WithErrorSyntaxHandleInResultTopResponse> : public internal::BoolConstant<
-    !HasPadding<::test::protocols::WithErrorSyntaxHandleInResultTopResponse>::value
-    && IsMemcpyCompatible<::test::protocols::WithErrorSyntax_HandleInResult_Result>::value> {};
-
-
-inline zx_status_t Clone(const ::test::protocols::WithErrorSyntaxHandleInResultTopResponse& value,
-                         ::test::protocols::WithErrorSyntaxHandleInResultTopResponse* result) {
-  return ::test::protocols::Clone(value, result);
-}
-
-template<>
-struct Equality<::test::protocols::WithErrorSyntaxHandleInResultTopResponse> {
-  bool operator()(const ::test::protocols::WithErrorSyntaxHandleInResultTopResponse& _lhs, const ::test::protocols::WithErrorSyntaxHandleInResultTopResponse& _rhs) const {
-    if (!::fidl::Equals(_lhs.result, _rhs.result)) {
-      return false;
-    }
-    return true;
-  }
 };
 
 #endif  // __Fuchsia__
@@ -4580,10 +4346,10 @@ class WithErrorSyntax_ResponseDecoder {
   WithErrorSyntax_ResponseDecoder() = default;
   virtual ~WithErrorSyntax_ResponseDecoder() = default;
   static const fidl_type_t* GetType(uint64_t ordinal);
-  virtual void ResponseAsStruct(::test::protocols::WithErrorSyntax_ResponseAsStruct_Result result) = 0;
-  virtual void ErrorAsPrimitive(::test::protocols::WithErrorSyntax_ErrorAsPrimitive_Result result) = 0;
-  virtual void ErrorAsEnum(::test::protocols::WithErrorSyntax_ErrorAsEnum_Result result) = 0;
-  virtual void HandleInResult(::test::protocols::WithErrorSyntax_HandleInResult_Result result) = 0;
+  virtual void ResponseAsStruct(::test::protocols::WithErrorSyntax_ResponseAsStruct_Result WithErrorSyntax_ResponseAsStruct_Result) = 0;
+  virtual void ErrorAsPrimitive(::test::protocols::WithErrorSyntax_ErrorAsPrimitive_Result WithErrorSyntax_ErrorAsPrimitive_Result) = 0;
+  virtual void ErrorAsEnum(::test::protocols::WithErrorSyntax_ErrorAsEnum_Result WithErrorSyntax_ErrorAsEnum_Result) = 0;
+  virtual void HandleInResult(::test::protocols::WithErrorSyntax_HandleInResult_Result WithErrorSyntax_HandleInResult_Result) = 0;
 };
 
 class WithErrorSyntax_EventSender {
@@ -4595,10 +4361,10 @@ class WithErrorSyntax_Sync {
  public:
   using Proxy_ = ::test::protocols::WithErrorSyntax_SyncProxy;
   virtual ~WithErrorSyntax_Sync();
-  virtual zx_status_t ResponseAsStruct(::test::protocols::WithErrorSyntax_ResponseAsStruct_Result* out_result) = 0;
-  virtual zx_status_t ErrorAsPrimitive(::test::protocols::WithErrorSyntax_ErrorAsPrimitive_Result* out_result) = 0;
-  virtual zx_status_t ErrorAsEnum(::test::protocols::WithErrorSyntax_ErrorAsEnum_Result* out_result) = 0;
-  virtual zx_status_t HandleInResult(::test::protocols::WithErrorSyntax_HandleInResult_Result* out_result) = 0;
+  virtual zx_status_t ResponseAsStruct(::test::protocols::WithErrorSyntax_ResponseAsStruct_Result* out_WithErrorSyntax_ResponseAsStruct_Result) = 0;
+  virtual zx_status_t ErrorAsPrimitive(::test::protocols::WithErrorSyntax_ErrorAsPrimitive_Result* out_WithErrorSyntax_ErrorAsPrimitive_Result) = 0;
+  virtual zx_status_t ErrorAsEnum(::test::protocols::WithErrorSyntax_ErrorAsEnum_Result* out_WithErrorSyntax_ErrorAsEnum_Result) = 0;
+  virtual zx_status_t HandleInResult(::test::protocols::WithErrorSyntax_HandleInResult_Result* out_WithErrorSyntax_HandleInResult_Result) = 0;
 };
 
 class WithErrorSyntax_Proxy final : public ::fidl::internal::Proxy, public WithErrorSyntax {
@@ -4644,13 +4410,13 @@ class WithErrorSyntax_SyncProxy : public ::test::protocols::WithErrorSyntax_Sync
   explicit WithErrorSyntax_SyncProxy(::zx::channel channel);
   ~WithErrorSyntax_SyncProxy() override;
   // cts-coverage-fidl-name:test.protocols/WithErrorSyntax.ResponseAsStruct
-  zx_status_t ResponseAsStruct(::test::protocols::WithErrorSyntax_ResponseAsStruct_Result* out_result) override;
+  zx_status_t ResponseAsStruct(::test::protocols::WithErrorSyntax_ResponseAsStruct_Result* out_WithErrorSyntax_ResponseAsStruct_Result) override;
   // cts-coverage-fidl-name:test.protocols/WithErrorSyntax.ErrorAsPrimitive
-  zx_status_t ErrorAsPrimitive(::test::protocols::WithErrorSyntax_ErrorAsPrimitive_Result* out_result) override;
+  zx_status_t ErrorAsPrimitive(::test::protocols::WithErrorSyntax_ErrorAsPrimitive_Result* out_WithErrorSyntax_ErrorAsPrimitive_Result) override;
   // cts-coverage-fidl-name:test.protocols/WithErrorSyntax.ErrorAsEnum
-  zx_status_t ErrorAsEnum(::test::protocols::WithErrorSyntax_ErrorAsEnum_Result* out_result) override;
+  zx_status_t ErrorAsEnum(::test::protocols::WithErrorSyntax_ErrorAsEnum_Result* out_WithErrorSyntax_ErrorAsEnum_Result) override;
   // cts-coverage-fidl-name:test.protocols/WithErrorSyntax.HandleInResult
-  zx_status_t HandleInResult(::test::protocols::WithErrorSyntax_HandleInResult_Result* out_result) override;
+  zx_status_t HandleInResult(::test::protocols::WithErrorSyntax_HandleInResult_Result* out_WithErrorSyntax_HandleInResult_Result) override;
 
   private:
   ::fidl::internal::SynchronousProxy proxy_;

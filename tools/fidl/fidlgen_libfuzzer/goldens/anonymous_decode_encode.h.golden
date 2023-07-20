@@ -15,7 +15,7 @@
 
 namespace fuzzing {
 
-inline constexpr ::std::array<::fidl::fuzzing::DecoderEncoderForType, 14>
+inline constexpr ::std::array<::fidl::fuzzing::DecoderEncoderForType, 12>
     test_anonymous_decoder_encoders = {
         ::fidl::fuzzing::DecoderEncoderForType{
             .fidl_type_name = "::test_anonymous::wire::OverrideTest",
@@ -88,18 +88,6 @@ inline constexpr ::std::array<::fidl::fuzzing::DecoderEncoderForType, 14>
             .has_flexible_envelope = false,
             .treat_bytes_as_transactional_message = true,
             .decoder_encoder = ::fidl::fuzzing::DecoderEncoderImpl<::test_anonymous::wire::SomeProtocolSomeMethodResponse, true>,
-        },
-        ::fidl::fuzzing::DecoderEncoderForType{
-            .fidl_type_name = "::test_anonymous::wire::SomeProtocolSomeMethodTopResponse",
-            .has_flexible_envelope = false,
-            .treat_bytes_as_transactional_message = false,
-            .decoder_encoder = ::fidl::fuzzing::DecoderEncoderImpl<::test_anonymous::wire::SomeProtocolSomeMethodTopResponse, false>,
-        },
-        ::fidl::fuzzing::DecoderEncoderForType{
-            .fidl_type_name = "A transactional message using ::test_anonymous::wire::SomeProtocolSomeMethodTopResponse as the body",
-            .has_flexible_envelope = false,
-            .treat_bytes_as_transactional_message = true,
-            .decoder_encoder = ::fidl::fuzzing::DecoderEncoderImpl<::test_anonymous::wire::SomeProtocolSomeMethodTopResponse, true>,
         },
 };
 

@@ -23,8 +23,6 @@ class Example_foo_Response;
 
 class Example_foo_Result;
 
-class ExampleFooTopResponse;
-
 #ifdef __Fuchsia__
 
 class Example;
@@ -189,27 +187,6 @@ inline zx_status_t Clone(const ::test::error::Example_foo_Result& value,
 
 using Example_foo_ResultPtr = ::std::unique_ptr<Example_foo_Result>;
 
-class ExampleFooTopResponse final {
- public:
-  static const fidl_type_t* FidlType;
-
-  ::test::error::Example_foo_Result result;
-
-  static inline ::std::unique_ptr<ExampleFooTopResponse> New() { return ::std::make_unique<ExampleFooTopResponse>(); }
-
-  void Encode(::fidl::Encoder* _encoder, size_t _offset,
-              cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt);
-  static void Decode(::fidl::Decoder* _decoder, ExampleFooTopResponse* value, size_t _offset);
-  zx_status_t Clone(ExampleFooTopResponse* result) const;
-};
-
-inline zx_status_t Clone(const ::test::error::ExampleFooTopResponse& _value,
-                         ::test::error::ExampleFooTopResponse* _result) {
-  return _value.Clone(_result);
-}
-
-using ExampleFooTopResponsePtr = ::std::unique_ptr<ExampleFooTopResponse>;
-
 #ifdef __Fuchsia__
 
 namespace _internal {
@@ -227,15 +204,15 @@ class Example_RequestEncoder {
   }
 };
 namespace _internal {
-__LOCAL extern "C" const fidl_type_t test_error_ExampleFooTopResponseTable;
+__LOCAL extern "C" const fidl_type_t test_error_Example_foo_ResultTable;
 
 }  // namespace _internal
 
 class Example_ResponseEncoder {
  public:
-  static ::fidl::HLCPPOutgoingMessage foo(::fidl::MessageEncoder* _encoder, ::test::error::Example_foo_Result* result) {
+  static ::fidl::HLCPPOutgoingMessage foo(::fidl::MessageEncoder* _encoder, ::test::error::Example_foo_Result* Example_foo_Result) {
     _encoder->Alloc(16);
-    ::fidl::Encode(_encoder, result, 0 + sizeof(fidl_message_header_t));
+    ::fidl::Encode(_encoder, Example_foo_Result, 0 + sizeof(fidl_message_header_t));
 
     return _encoder->GetMessage();
   }
@@ -351,31 +328,6 @@ struct Equality<::test::error::Example_foo_Result> {
     }
   }
 };
-template <>
-struct CodingTraits<::test::error::ExampleFooTopResponse>
-    : public EncodableCodingTraits<::test::error::ExampleFooTopResponse, 16> {};
-
-template <>
-struct HasPadding<::test::error::ExampleFooTopResponse> : public std::true_type {};
-
-template <>
-struct IsMemcpyCompatible<::test::error::ExampleFooTopResponse> : public internal::BoolConstant<
-                                                                      !HasPadding<::test::error::ExampleFooTopResponse>::value && IsMemcpyCompatible<::test::error::Example_foo_Result>::value> {};
-
-inline zx_status_t Clone(const ::test::error::ExampleFooTopResponse& value,
-                         ::test::error::ExampleFooTopResponse* result) {
-  return ::test::error::Clone(value, result);
-}
-
-template <>
-struct Equality<::test::error::ExampleFooTopResponse> {
-  bool operator()(const ::test::error::ExampleFooTopResponse& _lhs, const ::test::error::ExampleFooTopResponse& _rhs) const {
-    if (!::fidl::Equals(_lhs.result, _rhs.result)) {
-      return false;
-    }
-    return true;
-  }
-};
 
 //
 // Proxies and stubs declarations
@@ -431,7 +383,7 @@ class Example_ResponseDecoder {
   Example_ResponseDecoder() = default;
   virtual ~Example_ResponseDecoder() = default;
   static const fidl_type_t* GetType(uint64_t ordinal);
-  virtual void foo(::test::error::Example_foo_Result result) = 0;
+  virtual void foo(::test::error::Example_foo_Result Example_foo_Result) = 0;
 };
 
 class Example_EventSender {
@@ -443,7 +395,7 @@ class Example_Sync {
  public:
   using Proxy_ = ::test::error::Example_SyncProxy;
   virtual ~Example_Sync();
-  virtual zx_status_t foo(::std::string s, ::test::error::Example_foo_Result* out_result) = 0;
+  virtual zx_status_t foo(::std::string s, ::test::error::Example_foo_Result* out_Example_foo_Result) = 0;
 };
 
 class Example_Proxy final : public ::fidl::internal::Proxy, public Example {
@@ -480,7 +432,7 @@ class Example_SyncProxy : public ::test::error::Example_Sync {
   explicit Example_SyncProxy(::zx::channel channel);
   ~Example_SyncProxy() override;
   // cts-coverage-fidl-name:test.error/Example.foo
-  zx_status_t foo(::std::string s, ::test::error::Example_foo_Result* out_result) override;
+  zx_status_t foo(::std::string s, ::test::error::Example_foo_Result* out_Example_foo_Result) override;
 
  private:
   ::fidl::internal::SynchronousProxy proxy_;

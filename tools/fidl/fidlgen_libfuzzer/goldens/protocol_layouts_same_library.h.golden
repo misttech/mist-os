@@ -27,30 +27,22 @@ using ComposedProtocolTwoWayAnonComposedResponse = ::test::protocollayoutssameli
 using ComposedProtocolTwoWayAnonComposedWithErrorRequest = ::test::protocollayoutssamelibrary::ComposedProtocolTwoWayAnonComposedWithErrorRequest;
 using ComposedProtocol_TwoWayAnonComposedWithError_Response = ::test::protocollayoutssamelibrary::ComposedProtocol_TwoWayAnonComposedWithError_Response;
 using ComposedProtocol_TwoWayAnonComposedWithError_Result = ::test::protocollayoutssamelibrary::ComposedProtocol_TwoWayAnonComposedWithError_Result;
-using ComposedProtocolTwoWayAnonComposedWithErrorTopResponse = ::test::protocollayoutssamelibrary::ComposedProtocolTwoWayAnonComposedWithErrorTopResponse;
 using ComposedProtocolOnAnonComposedRequest = ::test::protocollayoutssamelibrary::ComposedProtocolOnAnonComposedRequest;
 using ComposedProtocol_OnAnonComposedWithError_Response = ::test::protocollayoutssamelibrary::ComposedProtocol_OnAnonComposedWithError_Response;
 using ComposedProtocol_OnAnonComposedWithError_Result = ::test::protocollayoutssamelibrary::ComposedProtocol_OnAnonComposedWithError_Result;
-using ComposedProtocolOnAnonComposedWithErrorRequest = ::test::protocollayoutssamelibrary::ComposedProtocolOnAnonComposedWithErrorRequest;
 using ComposedProtocol_TwoWayNamedComposedWithError_Result = ::test::protocollayoutssamelibrary::ComposedProtocol_TwoWayNamedComposedWithError_Result;
-using ComposedProtocolTwoWayNamedComposedWithErrorTopResponse = ::test::protocollayoutssamelibrary::ComposedProtocolTwoWayNamedComposedWithErrorTopResponse;
 using ComposedProtocol_OnNamedComposedWithError_Result = ::test::protocollayoutssamelibrary::ComposedProtocol_OnNamedComposedWithError_Result;
-using ComposedProtocolOnNamedComposedWithErrorRequest = ::test::protocollayoutssamelibrary::ComposedProtocolOnNamedComposedWithErrorRequest;
 using MainProtocol_TwoWayLocalWithError_Result = ::test::protocollayoutssamelibrary::MainProtocol_TwoWayLocalWithError_Result;
-using MainProtocolTwoWayLocalWithErrorTopResponse = ::test::protocollayoutssamelibrary::MainProtocolTwoWayLocalWithErrorTopResponse;
 using MainProtocol_OnLocalWithError_Result = ::test::protocollayoutssamelibrary::MainProtocol_OnLocalWithError_Result;
-using MainProtocolOnLocalWithErrorRequest = ::test::protocollayoutssamelibrary::MainProtocolOnLocalWithErrorRequest;
 using MainProtocolOneWayAnonRequest = ::test::protocollayoutssamelibrary::MainProtocolOneWayAnonRequest;
 using MainProtocolTwoWayAnonRequest = ::test::protocollayoutssamelibrary::MainProtocolTwoWayAnonRequest;
 using MainProtocolTwoWayAnonResponse = ::test::protocollayoutssamelibrary::MainProtocolTwoWayAnonResponse;
 using MainProtocolTwoWayAnonWithErrorRequest = ::test::protocollayoutssamelibrary::MainProtocolTwoWayAnonWithErrorRequest;
 using MainProtocol_TwoWayAnonWithError_Response = ::test::protocollayoutssamelibrary::MainProtocol_TwoWayAnonWithError_Response;
 using MainProtocol_TwoWayAnonWithError_Result = ::test::protocollayoutssamelibrary::MainProtocol_TwoWayAnonWithError_Result;
-using MainProtocolTwoWayAnonWithErrorTopResponse = ::test::protocollayoutssamelibrary::MainProtocolTwoWayAnonWithErrorTopResponse;
 using MainProtocolOnAnonRequest = ::test::protocollayoutssamelibrary::MainProtocolOnAnonRequest;
 using MainProtocol_OnAnonWithError_Response = ::test::protocollayoutssamelibrary::MainProtocol_OnAnonWithError_Response;
 using MainProtocol_OnAnonWithError_Result = ::test::protocollayoutssamelibrary::MainProtocol_OnAnonWithError_Result;
-using MainProtocolOnAnonWithErrorRequest = ::test::protocollayoutssamelibrary::MainProtocolOnAnonWithErrorRequest;
 
 template <>
 struct MinSize<TablePayload> {
@@ -245,24 +237,6 @@ struct Allocate<ComposedProtocol_TwoWayAnonComposedWithError_Result> {
   }
 };
 template <>
-struct MinSize<ComposedProtocolTwoWayAnonComposedWithErrorTopResponse> {
-  operator size_t() {
-    return MinSize<::test::protocollayoutssamelibrary::ComposedProtocol_TwoWayAnonComposedWithError_Result>();
-  }
-};
-template <>
-struct Allocate<ComposedProtocolTwoWayAnonComposedWithErrorTopResponse> {
-  ComposedProtocolTwoWayAnonComposedWithErrorTopResponse operator()(FuzzInput* src, size_t* size) {
-    ZX_ASSERT(*size >= MinSize<ComposedProtocolTwoWayAnonComposedWithErrorTopResponse>());
-    ComposedProtocolTwoWayAnonComposedWithErrorTopResponse out;
-    const size_t slack_per_member = (*size - MinSize<ComposedProtocolTwoWayAnonComposedWithErrorTopResponse>()) / 1;
-    size_t out_size;
-    out_size = MinSize<::test::protocollayoutssamelibrary::ComposedProtocol_TwoWayAnonComposedWithError_Result>() + slack_per_member;
-    out.result = Allocate<::test::protocollayoutssamelibrary::ComposedProtocol_TwoWayAnonComposedWithError_Result>{}(src, &out_size);
-    return out;
-  }
-};
-template <>
 struct MinSize<ComposedProtocolOnAnonComposedRequest> {
   operator size_t() {
     size_t sizes[] = {0, MinSize<bool>()};
@@ -343,24 +317,6 @@ struct Allocate<ComposedProtocol_OnAnonComposedWithError_Result> {
   }
 };
 template <>
-struct MinSize<ComposedProtocolOnAnonComposedWithErrorRequest> {
-  operator size_t() {
-    return MinSize<::test::protocollayoutssamelibrary::ComposedProtocol_OnAnonComposedWithError_Result>();
-  }
-};
-template <>
-struct Allocate<ComposedProtocolOnAnonComposedWithErrorRequest> {
-  ComposedProtocolOnAnonComposedWithErrorRequest operator()(FuzzInput* src, size_t* size) {
-    ZX_ASSERT(*size >= MinSize<ComposedProtocolOnAnonComposedWithErrorRequest>());
-    ComposedProtocolOnAnonComposedWithErrorRequest out;
-    const size_t slack_per_member = (*size - MinSize<ComposedProtocolOnAnonComposedWithErrorRequest>()) / 1;
-    size_t out_size;
-    out_size = MinSize<::test::protocollayoutssamelibrary::ComposedProtocol_OnAnonComposedWithError_Result>() + slack_per_member;
-    out.result = Allocate<::test::protocollayoutssamelibrary::ComposedProtocol_OnAnonComposedWithError_Result>{}(src, &out_size);
-    return out;
-  }
-};
-template <>
 struct MinSize<ComposedProtocol_TwoWayNamedComposedWithError_Result> {
   operator size_t() {
     size_t sizes[] = {0, MinSize<::test::protocollayoutssamelibrary::UnionPayload>(), MinSize<uint32_t>()};
@@ -390,24 +346,6 @@ struct Allocate<ComposedProtocol_TwoWayNamedComposedWithError_Result> {
       }
     }
 
-    return out;
-  }
-};
-template <>
-struct MinSize<ComposedProtocolTwoWayNamedComposedWithErrorTopResponse> {
-  operator size_t() {
-    return MinSize<::test::protocollayoutssamelibrary::ComposedProtocol_TwoWayNamedComposedWithError_Result>();
-  }
-};
-template <>
-struct Allocate<ComposedProtocolTwoWayNamedComposedWithErrorTopResponse> {
-  ComposedProtocolTwoWayNamedComposedWithErrorTopResponse operator()(FuzzInput* src, size_t* size) {
-    ZX_ASSERT(*size >= MinSize<ComposedProtocolTwoWayNamedComposedWithErrorTopResponse>());
-    ComposedProtocolTwoWayNamedComposedWithErrorTopResponse out;
-    const size_t slack_per_member = (*size - MinSize<ComposedProtocolTwoWayNamedComposedWithErrorTopResponse>()) / 1;
-    size_t out_size;
-    out_size = MinSize<::test::protocollayoutssamelibrary::ComposedProtocol_TwoWayNamedComposedWithError_Result>() + slack_per_member;
-    out.result = Allocate<::test::protocollayoutssamelibrary::ComposedProtocol_TwoWayNamedComposedWithError_Result>{}(src, &out_size);
     return out;
   }
 };
@@ -445,24 +383,6 @@ struct Allocate<ComposedProtocol_OnNamedComposedWithError_Result> {
   }
 };
 template <>
-struct MinSize<ComposedProtocolOnNamedComposedWithErrorRequest> {
-  operator size_t() {
-    return MinSize<::test::protocollayoutssamelibrary::ComposedProtocol_OnNamedComposedWithError_Result>();
-  }
-};
-template <>
-struct Allocate<ComposedProtocolOnNamedComposedWithErrorRequest> {
-  ComposedProtocolOnNamedComposedWithErrorRequest operator()(FuzzInput* src, size_t* size) {
-    ZX_ASSERT(*size >= MinSize<ComposedProtocolOnNamedComposedWithErrorRequest>());
-    ComposedProtocolOnNamedComposedWithErrorRequest out;
-    const size_t slack_per_member = (*size - MinSize<ComposedProtocolOnNamedComposedWithErrorRequest>()) / 1;
-    size_t out_size;
-    out_size = MinSize<::test::protocollayoutssamelibrary::ComposedProtocol_OnNamedComposedWithError_Result>() + slack_per_member;
-    out.result = Allocate<::test::protocollayoutssamelibrary::ComposedProtocol_OnNamedComposedWithError_Result>{}(src, &out_size);
-    return out;
-  }
-};
-template <>
 struct MinSize<MainProtocol_TwoWayLocalWithError_Result> {
   operator size_t() {
     size_t sizes[] = {0, MinSize<::test::protocollayoutssamelibrary::UnionPayload>(), MinSize<uint32_t>()};
@@ -496,24 +416,6 @@ struct Allocate<MainProtocol_TwoWayLocalWithError_Result> {
   }
 };
 template <>
-struct MinSize<MainProtocolTwoWayLocalWithErrorTopResponse> {
-  operator size_t() {
-    return MinSize<::test::protocollayoutssamelibrary::MainProtocol_TwoWayLocalWithError_Result>();
-  }
-};
-template <>
-struct Allocate<MainProtocolTwoWayLocalWithErrorTopResponse> {
-  MainProtocolTwoWayLocalWithErrorTopResponse operator()(FuzzInput* src, size_t* size) {
-    ZX_ASSERT(*size >= MinSize<MainProtocolTwoWayLocalWithErrorTopResponse>());
-    MainProtocolTwoWayLocalWithErrorTopResponse out;
-    const size_t slack_per_member = (*size - MinSize<MainProtocolTwoWayLocalWithErrorTopResponse>()) / 1;
-    size_t out_size;
-    out_size = MinSize<::test::protocollayoutssamelibrary::MainProtocol_TwoWayLocalWithError_Result>() + slack_per_member;
-    out.result = Allocate<::test::protocollayoutssamelibrary::MainProtocol_TwoWayLocalWithError_Result>{}(src, &out_size);
-    return out;
-  }
-};
-template <>
 struct MinSize<MainProtocol_OnLocalWithError_Result> {
   operator size_t() {
     size_t sizes[] = {0, MinSize<::test::protocollayoutssamelibrary::TablePayload>(), MinSize<uint32_t>()};
@@ -543,24 +445,6 @@ struct Allocate<MainProtocol_OnLocalWithError_Result> {
       }
     }
 
-    return out;
-  }
-};
-template <>
-struct MinSize<MainProtocolOnLocalWithErrorRequest> {
-  operator size_t() {
-    return MinSize<::test::protocollayoutssamelibrary::MainProtocol_OnLocalWithError_Result>();
-  }
-};
-template <>
-struct Allocate<MainProtocolOnLocalWithErrorRequest> {
-  MainProtocolOnLocalWithErrorRequest operator()(FuzzInput* src, size_t* size) {
-    ZX_ASSERT(*size >= MinSize<MainProtocolOnLocalWithErrorRequest>());
-    MainProtocolOnLocalWithErrorRequest out;
-    const size_t slack_per_member = (*size - MinSize<MainProtocolOnLocalWithErrorRequest>()) / 1;
-    size_t out_size;
-    out_size = MinSize<::test::protocollayoutssamelibrary::MainProtocol_OnLocalWithError_Result>() + slack_per_member;
-    out.result = Allocate<::test::protocollayoutssamelibrary::MainProtocol_OnLocalWithError_Result>{}(src, &out_size);
     return out;
   }
 };
@@ -710,24 +594,6 @@ struct Allocate<MainProtocol_TwoWayAnonWithError_Result> {
   }
 };
 template <>
-struct MinSize<MainProtocolTwoWayAnonWithErrorTopResponse> {
-  operator size_t() {
-    return MinSize<::test::protocollayoutssamelibrary::MainProtocol_TwoWayAnonWithError_Result>();
-  }
-};
-template <>
-struct Allocate<MainProtocolTwoWayAnonWithErrorTopResponse> {
-  MainProtocolTwoWayAnonWithErrorTopResponse operator()(FuzzInput* src, size_t* size) {
-    ZX_ASSERT(*size >= MinSize<MainProtocolTwoWayAnonWithErrorTopResponse>());
-    MainProtocolTwoWayAnonWithErrorTopResponse out;
-    const size_t slack_per_member = (*size - MinSize<MainProtocolTwoWayAnonWithErrorTopResponse>()) / 1;
-    size_t out_size;
-    out_size = MinSize<::test::protocollayoutssamelibrary::MainProtocol_TwoWayAnonWithError_Result>() + slack_per_member;
-    out.result = Allocate<::test::protocollayoutssamelibrary::MainProtocol_TwoWayAnonWithError_Result>{}(src, &out_size);
-    return out;
-  }
-};
-template <>
 struct MinSize<MainProtocolOnAnonRequest> {
   operator size_t() {
     size_t sizes[] = {0, MinSize<bool>()};
@@ -804,24 +670,6 @@ struct Allocate<MainProtocol_OnAnonWithError_Result> {
       }
     }
 
-    return out;
-  }
-};
-template <>
-struct MinSize<MainProtocolOnAnonWithErrorRequest> {
-  operator size_t() {
-    return MinSize<::test::protocollayoutssamelibrary::MainProtocol_OnAnonWithError_Result>();
-  }
-};
-template <>
-struct Allocate<MainProtocolOnAnonWithErrorRequest> {
-  MainProtocolOnAnonWithErrorRequest operator()(FuzzInput* src, size_t* size) {
-    ZX_ASSERT(*size >= MinSize<MainProtocolOnAnonWithErrorRequest>());
-    MainProtocolOnAnonWithErrorRequest out;
-    const size_t slack_per_member = (*size - MinSize<MainProtocolOnAnonWithErrorRequest>()) / 1;
-    size_t out_size;
-    out_size = MinSize<::test::protocollayoutssamelibrary::MainProtocol_OnAnonWithError_Result>() + slack_per_member;
-    out.result = Allocate<::test::protocollayoutssamelibrary::MainProtocol_OnAnonWithError_Result>{}(src, &out_size);
     return out;
   }
 };

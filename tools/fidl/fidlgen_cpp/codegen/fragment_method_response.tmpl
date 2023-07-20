@@ -157,19 +157,19 @@ class {{ .NaturalResponseConverter }} {
   static DomainObject IntoDomainObject({{ .NaturalResponseArg "m" }}) {
     {{ if .Result.HasError -}}
     if (m.is_error()) {
-      return DomainObject{ { .result = {{ .Result.ResultDecl }}::WithErr(m.error_value()) } };
+      return DomainObject::WithErr(m.error_value());
     } else {
       {{- if .Result.ValueParameters }}
-        return DomainObject{ { .result = {{ .Result.ResultDecl }}::WithResponse(std::move(m.value())) } };
+        return DomainObject::WithResponse(std::move(m.value()));
       {{- else }}
-        return DomainObject{ { .result = {{ .Result.ResultDecl }}::WithResponse({}) } };
+        return DomainObject::WithResponse({});
       {{- end }}
     }
     {{- else -}}
     {{- if .Result.ValueParameters }}
-      return DomainObject{ { .result = {{ .Result.ResultDecl }}::WithResponse(std::move(m)) } };
+      return DomainObject::WithResponse(std::move(m));
     {{- else }}
-      return DomainObject{ { .result = {{ .Result.ResultDecl }}::WithResponse({}) } };
+      return DomainObject::WithResponse({});
     {{- end }}
     {{- end }}
   }

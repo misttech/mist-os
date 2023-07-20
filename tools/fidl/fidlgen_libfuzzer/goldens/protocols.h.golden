@@ -28,16 +28,12 @@ using WithAndWithoutRequestResponseOnWithResponseRequest = ::test::protocols::Wi
 using ErrorEnum = ::test::protocols::ErrorEnum;
 using WithErrorSyntax_ResponseAsStruct_Response = ::test::protocols::WithErrorSyntax_ResponseAsStruct_Response;
 using WithErrorSyntax_ResponseAsStruct_Result = ::test::protocols::WithErrorSyntax_ResponseAsStruct_Result;
-using WithErrorSyntaxResponseAsStructTopResponse = ::test::protocols::WithErrorSyntaxResponseAsStructTopResponse;
 using WithErrorSyntax_ErrorAsPrimitive_Response = ::test::protocols::WithErrorSyntax_ErrorAsPrimitive_Response;
 using WithErrorSyntax_ErrorAsPrimitive_Result = ::test::protocols::WithErrorSyntax_ErrorAsPrimitive_Result;
-using WithErrorSyntaxErrorAsPrimitiveTopResponse = ::test::protocols::WithErrorSyntaxErrorAsPrimitiveTopResponse;
 using WithErrorSyntax_ErrorAsEnum_Response = ::test::protocols::WithErrorSyntax_ErrorAsEnum_Response;
 using WithErrorSyntax_ErrorAsEnum_Result = ::test::protocols::WithErrorSyntax_ErrorAsEnum_Result;
-using WithErrorSyntaxErrorAsEnumTopResponse = ::test::protocols::WithErrorSyntaxErrorAsEnumTopResponse;
 using WithErrorSyntax_HandleInResult_Response = ::test::protocols::WithErrorSyntax_HandleInResult_Response;
 using WithErrorSyntax_HandleInResult_Result = ::test::protocols::WithErrorSyntax_HandleInResult_Result;
-using WithErrorSyntaxHandleInResultTopResponse = ::test::protocols::WithErrorSyntaxHandleInResultTopResponse;
 using ChannelProtocolMethodARequest = ::test::protocols::ChannelProtocolMethodARequest;
 using ChannelProtocolEventARequest = ::test::protocols::ChannelProtocolEventARequest;
 using ChannelProtocolMethodBRequest = ::test::protocols::ChannelProtocolMethodBRequest;
@@ -255,24 +251,6 @@ struct Allocate<WithErrorSyntax_ResponseAsStruct_Result> {
   }
 };
 template <>
-struct MinSize<WithErrorSyntaxResponseAsStructTopResponse> {
-  operator size_t() {
-    return MinSize<::test::protocols::WithErrorSyntax_ResponseAsStruct_Result>();
-  }
-};
-template <>
-struct Allocate<WithErrorSyntaxResponseAsStructTopResponse> {
-  WithErrorSyntaxResponseAsStructTopResponse operator()(FuzzInput* src, size_t* size) {
-    ZX_ASSERT(*size >= MinSize<WithErrorSyntaxResponseAsStructTopResponse>());
-    WithErrorSyntaxResponseAsStructTopResponse out;
-    const size_t slack_per_member = (*size - MinSize<WithErrorSyntaxResponseAsStructTopResponse>()) / 1;
-    size_t out_size;
-    out_size = MinSize<::test::protocols::WithErrorSyntax_ResponseAsStruct_Result>() + slack_per_member;
-    out.result = Allocate<::test::protocols::WithErrorSyntax_ResponseAsStruct_Result>{}(src, &out_size);
-    return out;
-  }
-};
-template <>
 struct MinSize<WithErrorSyntax_ErrorAsPrimitive_Response> {
   operator size_t() {
     return MinSize<uint8_t>();
@@ -320,24 +298,6 @@ struct Allocate<WithErrorSyntax_ErrorAsPrimitive_Result> {
       }
     }
 
-    return out;
-  }
-};
-template <>
-struct MinSize<WithErrorSyntaxErrorAsPrimitiveTopResponse> {
-  operator size_t() {
-    return MinSize<::test::protocols::WithErrorSyntax_ErrorAsPrimitive_Result>();
-  }
-};
-template <>
-struct Allocate<WithErrorSyntaxErrorAsPrimitiveTopResponse> {
-  WithErrorSyntaxErrorAsPrimitiveTopResponse operator()(FuzzInput* src, size_t* size) {
-    ZX_ASSERT(*size >= MinSize<WithErrorSyntaxErrorAsPrimitiveTopResponse>());
-    WithErrorSyntaxErrorAsPrimitiveTopResponse out;
-    const size_t slack_per_member = (*size - MinSize<WithErrorSyntaxErrorAsPrimitiveTopResponse>()) / 1;
-    size_t out_size;
-    out_size = MinSize<::test::protocols::WithErrorSyntax_ErrorAsPrimitive_Result>() + slack_per_member;
-    out.result = Allocate<::test::protocols::WithErrorSyntax_ErrorAsPrimitive_Result>{}(src, &out_size);
     return out;
   }
 };
@@ -393,24 +353,6 @@ struct Allocate<WithErrorSyntax_ErrorAsEnum_Result> {
   }
 };
 template <>
-struct MinSize<WithErrorSyntaxErrorAsEnumTopResponse> {
-  operator size_t() {
-    return MinSize<::test::protocols::WithErrorSyntax_ErrorAsEnum_Result>();
-  }
-};
-template <>
-struct Allocate<WithErrorSyntaxErrorAsEnumTopResponse> {
-  WithErrorSyntaxErrorAsEnumTopResponse operator()(FuzzInput* src, size_t* size) {
-    ZX_ASSERT(*size >= MinSize<WithErrorSyntaxErrorAsEnumTopResponse>());
-    WithErrorSyntaxErrorAsEnumTopResponse out;
-    const size_t slack_per_member = (*size - MinSize<WithErrorSyntaxErrorAsEnumTopResponse>()) / 1;
-    size_t out_size;
-    out_size = MinSize<::test::protocols::WithErrorSyntax_ErrorAsEnum_Result>() + slack_per_member;
-    out.result = Allocate<::test::protocols::WithErrorSyntax_ErrorAsEnum_Result>{}(src, &out_size);
-    return out;
-  }
-};
-template <>
 struct MinSize<WithErrorSyntax_HandleInResult_Response> {
   operator size_t() {
     return MinSize<::zx::handle>();
@@ -458,24 +400,6 @@ struct Allocate<WithErrorSyntax_HandleInResult_Result> {
       }
     }
 
-    return out;
-  }
-};
-template <>
-struct MinSize<WithErrorSyntaxHandleInResultTopResponse> {
-  operator size_t() {
-    return MinSize<::test::protocols::WithErrorSyntax_HandleInResult_Result>();
-  }
-};
-template <>
-struct Allocate<WithErrorSyntaxHandleInResultTopResponse> {
-  WithErrorSyntaxHandleInResultTopResponse operator()(FuzzInput* src, size_t* size) {
-    ZX_ASSERT(*size >= MinSize<WithErrorSyntaxHandleInResultTopResponse>());
-    WithErrorSyntaxHandleInResultTopResponse out;
-    const size_t slack_per_member = (*size - MinSize<WithErrorSyntaxHandleInResultTopResponse>()) / 1;
-    size_t out_size;
-    out_size = MinSize<::test::protocols::WithErrorSyntax_HandleInResult_Result>() + slack_per_member;
-    out.result = Allocate<::test::protocols::WithErrorSyntax_HandleInResult_Result>{}(src, &out_size);
     return out;
   }
 };

@@ -45,16 +45,6 @@
       }
     },
     {
-      "identifier": "test.errorsyntax.parent/ParentUsesErrorSyntaxComposedCallWhichMayFailTopResponse",
-      "location": {
-        "is_virtual": false,
-        "file": "../../tools/fidl/fidlc/testdata/error_syntax/parent.test.fidl",
-        "data": "(struct {\n        value int64;\n    })",
-        "start_offset": 312,
-        "end_offset": 349
-      }
-    },
-    {
       "identifier": "test.errorsyntax.parent/ParentUsesErrorSyntax_ComposedCallWhichMayFail_Response",
       "location": {
         "is_virtual": false,
@@ -132,22 +122,6 @@
           },
           "type": {
             "kind": "string"
-          }
-        }
-      ]
-    },
-    {
-      "is_anonymous": true,
-      "identifier": "test.errorsyntax/ExampleUseOfErrorSyntaxCallWhichMayFailTopResponse",
-      "members": [
-        {
-          "name": "result",
-          "location": {
-            "is_virtual": true
-          },
-          "type": {
-            "kind": "identifier",
-            "is_anonymous": true
           }
         }
       ]

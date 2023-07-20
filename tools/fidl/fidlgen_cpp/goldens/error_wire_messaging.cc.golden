@@ -21,7 +21,7 @@ namespace test_error {
 
 extern "C" const fidl_type_t test_error_ExampleFooRequestTable;
 
-extern "C" const fidl_type_t test_error_ExampleFooTopResponseTable;
+extern "C" const fidl_type_t test_error_Example_foo_ResultTable;
 #ifdef __Fuchsia__
 }  // namespace test_error
 
@@ -172,8 +172,8 @@ void fidl::internal::WireCompleterImpl<::test_error::Example::Foo>::Reply(::fit:
   return ReplyError(std::move(result.error_value()));
 }
 
-void fidl::internal::WireCompleterImpl<::test_error::Example::Foo>::MakeReply(::test_error::wire::ExampleFooResult result) {
-  ::fidl::internal::TransactionalResponse<::test_error::Example::Foo> _response{result};
+void fidl::internal::WireCompleterImpl<::test_error::Example::Foo>::MakeReply(::test_error::wire::ExampleFooResult ExampleFooResult) {
+  ::fidl::internal::TransactionalResponse<::test_error::Example::Foo> _response{ExampleFooResult};
   FIDL_INTERNAL_DISABLE_AUTO_VAR_INIT
   ::fidl::internal::OwnedEncodedMessage<
       ::fidl::internal::TransactionalResponse<::test_error::Example::Foo>, ::fidl::internal::ChannelTransport>
@@ -200,8 +200,8 @@ void fidl::internal::WireBufferCompleterImpl<::test_error::Example::Foo>::Reply(
   return ReplyError(std::move(result.error_value()));
 }
 
-void fidl::internal::WireBufferCompleterImpl<::test_error::Example::Foo>::MakeReply(::test_error::wire::ExampleFooResult result) {
-  ::fidl::internal::TransactionalResponse<::test_error::Example::Foo> _response{result};
+void fidl::internal::WireBufferCompleterImpl<::test_error::Example::Foo>::MakeReply(::test_error::wire::ExampleFooResult ExampleFooResult) {
+  ::fidl::internal::TransactionalResponse<::test_error::Example::Foo> _response{ExampleFooResult};
   constexpr uint32_t _buffer_size = ::fidl::ServerReplyBufferSizeInChannel<::test_error::Example::Foo>();
   ::fit::result<::fidl::Error, ::fidl::BufferSpan> _allocation =
       _allocator().TryAllocate(_buffer_size);

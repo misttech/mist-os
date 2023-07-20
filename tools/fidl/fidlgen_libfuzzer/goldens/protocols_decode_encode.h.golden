@@ -15,7 +15,7 @@
 
 namespace fuzzing {
 
-inline constexpr ::std::array<::fidl::fuzzing::DecoderEncoderForType, 80>
+inline constexpr ::std::array<::fidl::fuzzing::DecoderEncoderForType, 72>
     test_protocols_decoder_encoders = {
         ::fidl::fuzzing::DecoderEncoderForType{
             .fidl_type_name = "::test_protocols::wire::WithAndWithoutRequestResponseNoRequestWithResponseResponse",
@@ -102,18 +102,6 @@ inline constexpr ::std::array<::fidl::fuzzing::DecoderEncoderForType, 80>
             .decoder_encoder = ::fidl::fuzzing::DecoderEncoderImpl<::test_protocols::wire::WithErrorSyntaxResponseAsStructResponse, true>,
         },
         ::fidl::fuzzing::DecoderEncoderForType{
-            .fidl_type_name = "::test_protocols::wire::WithErrorSyntaxResponseAsStructTopResponse",
-            .has_flexible_envelope = false,
-            .treat_bytes_as_transactional_message = false,
-            .decoder_encoder = ::fidl::fuzzing::DecoderEncoderImpl<::test_protocols::wire::WithErrorSyntaxResponseAsStructTopResponse, false>,
-        },
-        ::fidl::fuzzing::DecoderEncoderForType{
-            .fidl_type_name = "A transactional message using ::test_protocols::wire::WithErrorSyntaxResponseAsStructTopResponse as the body",
-            .has_flexible_envelope = false,
-            .treat_bytes_as_transactional_message = true,
-            .decoder_encoder = ::fidl::fuzzing::DecoderEncoderImpl<::test_protocols::wire::WithErrorSyntaxResponseAsStructTopResponse, true>,
-        },
-        ::fidl::fuzzing::DecoderEncoderForType{
             .fidl_type_name = "::test_protocols::wire::WithErrorSyntaxErrorAsPrimitiveResponse",
             .has_flexible_envelope = false,
             .treat_bytes_as_transactional_message = false,
@@ -124,18 +112,6 @@ inline constexpr ::std::array<::fidl::fuzzing::DecoderEncoderForType, 80>
             .has_flexible_envelope = false,
             .treat_bytes_as_transactional_message = true,
             .decoder_encoder = ::fidl::fuzzing::DecoderEncoderImpl<::test_protocols::wire::WithErrorSyntaxErrorAsPrimitiveResponse, true>,
-        },
-        ::fidl::fuzzing::DecoderEncoderForType{
-            .fidl_type_name = "::test_protocols::wire::WithErrorSyntaxErrorAsPrimitiveTopResponse",
-            .has_flexible_envelope = false,
-            .treat_bytes_as_transactional_message = false,
-            .decoder_encoder = ::fidl::fuzzing::DecoderEncoderImpl<::test_protocols::wire::WithErrorSyntaxErrorAsPrimitiveTopResponse, false>,
-        },
-        ::fidl::fuzzing::DecoderEncoderForType{
-            .fidl_type_name = "A transactional message using ::test_protocols::wire::WithErrorSyntaxErrorAsPrimitiveTopResponse as the body",
-            .has_flexible_envelope = false,
-            .treat_bytes_as_transactional_message = true,
-            .decoder_encoder = ::fidl::fuzzing::DecoderEncoderImpl<::test_protocols::wire::WithErrorSyntaxErrorAsPrimitiveTopResponse, true>,
         },
         ::fidl::fuzzing::DecoderEncoderForType{
             .fidl_type_name = "::test_protocols::wire::WithErrorSyntaxErrorAsEnumResponse",
@@ -150,18 +126,6 @@ inline constexpr ::std::array<::fidl::fuzzing::DecoderEncoderForType, 80>
             .decoder_encoder = ::fidl::fuzzing::DecoderEncoderImpl<::test_protocols::wire::WithErrorSyntaxErrorAsEnumResponse, true>,
         },
         ::fidl::fuzzing::DecoderEncoderForType{
-            .fidl_type_name = "::test_protocols::wire::WithErrorSyntaxErrorAsEnumTopResponse",
-            .has_flexible_envelope = false,
-            .treat_bytes_as_transactional_message = false,
-            .decoder_encoder = ::fidl::fuzzing::DecoderEncoderImpl<::test_protocols::wire::WithErrorSyntaxErrorAsEnumTopResponse, false>,
-        },
-        ::fidl::fuzzing::DecoderEncoderForType{
-            .fidl_type_name = "A transactional message using ::test_protocols::wire::WithErrorSyntaxErrorAsEnumTopResponse as the body",
-            .has_flexible_envelope = false,
-            .treat_bytes_as_transactional_message = true,
-            .decoder_encoder = ::fidl::fuzzing::DecoderEncoderImpl<::test_protocols::wire::WithErrorSyntaxErrorAsEnumTopResponse, true>,
-        },
-        ::fidl::fuzzing::DecoderEncoderForType{
             .fidl_type_name = "::test_protocols::wire::WithErrorSyntaxHandleInResultResponse",
             .has_flexible_envelope = false,
             .treat_bytes_as_transactional_message = false,
@@ -172,18 +136,6 @@ inline constexpr ::std::array<::fidl::fuzzing::DecoderEncoderForType, 80>
             .has_flexible_envelope = false,
             .treat_bytes_as_transactional_message = true,
             .decoder_encoder = ::fidl::fuzzing::DecoderEncoderImpl<::test_protocols::wire::WithErrorSyntaxHandleInResultResponse, true>,
-        },
-        ::fidl::fuzzing::DecoderEncoderForType{
-            .fidl_type_name = "::test_protocols::wire::WithErrorSyntaxHandleInResultTopResponse",
-            .has_flexible_envelope = false,
-            .treat_bytes_as_transactional_message = false,
-            .decoder_encoder = ::fidl::fuzzing::DecoderEncoderImpl<::test_protocols::wire::WithErrorSyntaxHandleInResultTopResponse, false>,
-        },
-        ::fidl::fuzzing::DecoderEncoderForType{
-            .fidl_type_name = "A transactional message using ::test_protocols::wire::WithErrorSyntaxHandleInResultTopResponse as the body",
-            .has_flexible_envelope = false,
-            .treat_bytes_as_transactional_message = true,
-            .decoder_encoder = ::fidl::fuzzing::DecoderEncoderImpl<::test_protocols::wire::WithErrorSyntaxHandleInResultTopResponse, true>,
         },
         ::fidl::fuzzing::DecoderEncoderForType{
             .fidl_type_name = "::test_protocols::wire::ChannelProtocolMethodARequest",

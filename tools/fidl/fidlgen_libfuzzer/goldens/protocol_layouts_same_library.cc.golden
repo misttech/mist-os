@@ -168,7 +168,7 @@ extern "C" int LLVMFuzzerTestOneInput(const uint8_t* data_, size_t size_) {
       ::test::protocollayoutssamelibrary::ComposedProtocolTwoWayAnonComposedWithErrorRequest ComposedProtocolTwoWayAnonComposedWithErrorRequest = Allocate< ::test::protocollayoutssamelibrary::ComposedProtocolTwoWayAnonComposedWithErrorRequest>{}(&src_, &param_size_);
 
       xprintf("Invoking method test_protocollayoutssamelibrary_ComposedProtocol.TwoWayAnonComposedWithError\n");
-      protocol_->TwoWayAnonComposedWithError(std::move(ComposedProtocolTwoWayAnonComposedWithErrorRequest), [signaller = fuzzer_.NewCallbackSignaller()](::test::protocollayoutssamelibrary::ComposedProtocol_TwoWayAnonComposedWithError_Result result) {
+      protocol_->TwoWayAnonComposedWithError(std::move(ComposedProtocolTwoWayAnonComposedWithErrorRequest), [signaller = fuzzer_.NewCallbackSignaller()](::test::protocollayoutssamelibrary::ComposedProtocol_TwoWayAnonComposedWithError_Result ComposedProtocol_TwoWayAnonComposedWithError_Result) {
         xprintf("Invoked test_protocollayoutssamelibrary_ComposedProtocol.TwoWayAnonComposedWithError\n");
         zx_status_t status_ = signaller.SignalCallback();
         if (status_ != ZX_OK) {
@@ -264,7 +264,7 @@ extern "C" int LLVMFuzzerTestOneInput(const uint8_t* data_, size_t size_) {
       ::test::protocollayoutssamelibrary::TablePayload TablePayload = Allocate< ::test::protocollayoutssamelibrary::TablePayload>{}(&src_, &param_size_);
 
       xprintf("Invoking method test_protocollayoutssamelibrary_ComposedProtocol.TwoWayNamedComposedWithError\n");
-      protocol_->TwoWayNamedComposedWithError(std::move(TablePayload), [signaller = fuzzer_.NewCallbackSignaller()](::test::protocollayoutssamelibrary::ComposedProtocol_TwoWayNamedComposedWithError_Result result) {
+      protocol_->TwoWayNamedComposedWithError(std::move(TablePayload), [signaller = fuzzer_.NewCallbackSignaller()](::test::protocollayoutssamelibrary::ComposedProtocol_TwoWayNamedComposedWithError_Result ComposedProtocol_TwoWayNamedComposedWithError_Result) {
         xprintf("Invoked test_protocollayoutssamelibrary_ComposedProtocol.TwoWayNamedComposedWithError\n");
         zx_status_t status_ = signaller.SignalCallback();
         if (status_ != ZX_OK) {
@@ -400,7 +400,7 @@ extern "C" int LLVMFuzzerTestOneInput(const uint8_t* data_, size_t size_) {
       ::test::protocollayoutssamelibrary::ComposedProtocolTwoWayAnonComposedWithErrorRequest ComposedProtocolTwoWayAnonComposedWithErrorRequest = Allocate< ::test::protocollayoutssamelibrary::ComposedProtocolTwoWayAnonComposedWithErrorRequest>{}(&src_, &param_size_);
 
       xprintf("Invoking method test_protocollayoutssamelibrary_MainProtocol.TwoWayAnonComposedWithError\n");
-      protocol_->TwoWayAnonComposedWithError(std::move(ComposedProtocolTwoWayAnonComposedWithErrorRequest), [signaller = fuzzer_.NewCallbackSignaller()](::test::protocollayoutssamelibrary::ComposedProtocol_TwoWayAnonComposedWithError_Result result) {
+      protocol_->TwoWayAnonComposedWithError(std::move(ComposedProtocolTwoWayAnonComposedWithErrorRequest), [signaller = fuzzer_.NewCallbackSignaller()](::test::protocollayoutssamelibrary::ComposedProtocol_TwoWayAnonComposedWithError_Result ComposedProtocol_TwoWayAnonComposedWithError_Result) {
         xprintf("Invoked test_protocollayoutssamelibrary_MainProtocol.TwoWayAnonComposedWithError\n");
         zx_status_t status_ = signaller.SignalCallback();
         if (status_ != ZX_OK) {
@@ -496,7 +496,7 @@ extern "C" int LLVMFuzzerTestOneInput(const uint8_t* data_, size_t size_) {
       ::test::protocollayoutssamelibrary::TablePayload TablePayload = Allocate< ::test::protocollayoutssamelibrary::TablePayload>{}(&src_, &param_size_);
 
       xprintf("Invoking method test_protocollayoutssamelibrary_MainProtocol.TwoWayNamedComposedWithError\n");
-      protocol_->TwoWayNamedComposedWithError(std::move(TablePayload), [signaller = fuzzer_.NewCallbackSignaller()](::test::protocollayoutssamelibrary::ComposedProtocol_TwoWayNamedComposedWithError_Result result) {
+      protocol_->TwoWayNamedComposedWithError(std::move(TablePayload), [signaller = fuzzer_.NewCallbackSignaller()](::test::protocollayoutssamelibrary::ComposedProtocol_TwoWayNamedComposedWithError_Result ComposedProtocol_TwoWayNamedComposedWithError_Result) {
         xprintf("Invoked test_protocollayoutssamelibrary_MainProtocol.TwoWayNamedComposedWithError\n");
         zx_status_t status_ = signaller.SignalCallback();
         if (status_ != ZX_OK) {
@@ -592,7 +592,7 @@ extern "C" int LLVMFuzzerTestOneInput(const uint8_t* data_, size_t size_) {
       ::test::protocollayoutssamelibrary::TablePayload TablePayload = Allocate< ::test::protocollayoutssamelibrary::TablePayload>{}(&src_, &param_size_);
 
       xprintf("Invoking method test_protocollayoutssamelibrary_MainProtocol.TwoWayLocalWithError\n");
-      protocol_->TwoWayLocalWithError(std::move(TablePayload), [signaller = fuzzer_.NewCallbackSignaller()](::test::protocollayoutssamelibrary::MainProtocol_TwoWayLocalWithError_Result result) {
+      protocol_->TwoWayLocalWithError(std::move(TablePayload), [signaller = fuzzer_.NewCallbackSignaller()](::test::protocollayoutssamelibrary::MainProtocol_TwoWayLocalWithError_Result MainProtocol_TwoWayLocalWithError_Result) {
         xprintf("Invoked test_protocollayoutssamelibrary_MainProtocol.TwoWayLocalWithError\n");
         zx_status_t status_ = signaller.SignalCallback();
         if (status_ != ZX_OK) {
@@ -688,7 +688,7 @@ extern "C" int LLVMFuzzerTestOneInput(const uint8_t* data_, size_t size_) {
       ::test::protocollayoutssamelibrary::MainProtocolTwoWayAnonWithErrorRequest MainProtocolTwoWayAnonWithErrorRequest = Allocate< ::test::protocollayoutssamelibrary::MainProtocolTwoWayAnonWithErrorRequest>{}(&src_, &param_size_);
 
       xprintf("Invoking method test_protocollayoutssamelibrary_MainProtocol.TwoWayAnonWithError\n");
-      protocol_->TwoWayAnonWithError(std::move(MainProtocolTwoWayAnonWithErrorRequest), [signaller = fuzzer_.NewCallbackSignaller()](::test::protocollayoutssamelibrary::MainProtocol_TwoWayAnonWithError_Result result) {
+      protocol_->TwoWayAnonWithError(std::move(MainProtocolTwoWayAnonWithErrorRequest), [signaller = fuzzer_.NewCallbackSignaller()](::test::protocollayoutssamelibrary::MainProtocol_TwoWayAnonWithError_Result MainProtocol_TwoWayAnonWithError_Result) {
         xprintf("Invoked test_protocollayoutssamelibrary_MainProtocol.TwoWayAnonWithError\n");
         zx_status_t status_ = signaller.SignalCallback();
         if (status_ != ZX_OK) {

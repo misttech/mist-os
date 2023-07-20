@@ -26,7 +26,7 @@
 <table>
     <tr><th>Name</th><th>Type</th></tr>
         <tr>
-            <td><code>result</code></td>
+            <td><code>payload</code></td>
             <td>
                 <code><a class='link' href='#Allowed_Denied_Result'>Allowed_Denied_Result</a></code>
             </td>
@@ -98,7 +98,7 @@
 <table>
     <tr><th>Name</th><th>Type</th></tr>
         <tr>
-            <td><code>result</code></td>
+            <td><code>payload</code></td>
             <td>
                 <code><a class='link' href='#DenyEachBinding_OnlyDenyCpp_Result'>DenyEachBinding_OnlyDenyCpp_Result</a></code>
             </td>
@@ -128,7 +128,7 @@
 <table>
     <tr><th>Name</th><th>Type</th></tr>
         <tr>
-            <td><code>result</code></td>
+            <td><code>payload</code></td>
             <td>
                 <code><a class='link' href='#DenyEachBinding_OnlyDenyDart_Result'>DenyEachBinding_OnlyDenyDart_Result</a></code>
             </td>
@@ -158,7 +158,7 @@
 <table>
     <tr><th>Name</th><th>Type</th></tr>
         <tr>
-            <td><code>result</code></td>
+            <td><code>payload</code></td>
             <td>
                 <code><a class='link' href='#DenyEachBinding_OnlyDenyGo_Result'>DenyEachBinding_OnlyDenyGo_Result</a></code>
             </td>
@@ -188,7 +188,7 @@
 <table>
     <tr><th>Name</th><th>Type</th></tr>
         <tr>
-            <td><code>result</code></td>
+            <td><code>payload</code></td>
             <td>
                 <code><a class='link' href='#DenyEachBinding_OnlyDenyLibfuzzer_Result'>DenyEachBinding_OnlyDenyLibfuzzer_Result</a></code>
             </td>
@@ -218,7 +218,7 @@
 <table>
     <tr><th>Name</th><th>Type</th></tr>
         <tr>
-            <td><code>result</code></td>
+            <td><code>payload</code></td>
             <td>
                 <code><a class='link' href='#DenyEachBinding_OnlyDenyRust_Result'>DenyEachBinding_OnlyDenyRust_Result</a></code>
             </td>
@@ -248,7 +248,7 @@
 <table>
     <tr><th>Name</th><th>Type</th></tr>
         <tr>
-            <td><code>result</code></td>
+            <td><code>payload</code></td>
             <td>
                 <code><a class='link' href='#DenyEachBinding_OnlyDenySyzkaller_Result'>DenyEachBinding_OnlyDenySyzkaller_Result</a></code>
             </td>

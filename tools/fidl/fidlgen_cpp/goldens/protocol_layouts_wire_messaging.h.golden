@@ -46,13 +46,13 @@ __LOCAL extern "C" const fidl_type_t test_protocollayouts_imported_ComposedProto
     
 __LOCAL extern "C" const fidl_type_t test_protocollayouts_imported_ComposedProtocolTwoWayAnonComposedWithErrorRequestTable;
     
-__LOCAL extern "C" const fidl_type_t test_protocollayouts_imported_ComposedProtocolTwoWayAnonComposedWithErrorTopResponseTable;
+__LOCAL extern "C" const fidl_type_t test_protocollayouts_imported_ComposedProtocol_TwoWayAnonComposedWithError_ResultTable;
     
     
 __LOCAL extern "C" const fidl_type_t test_protocollayouts_imported_ComposedProtocolOnAnonComposedRequestTable;
     
     
-__LOCAL extern "C" const fidl_type_t test_protocollayouts_imported_ComposedProtocolOnAnonComposedWithErrorRequestTable;
+__LOCAL extern "C" const fidl_type_t test_protocollayouts_imported_ComposedProtocol_OnAnonComposedWithError_ResultTable;
     
 __LOCAL extern "C" const fidl_type_t test_protocollayouts_imported_ImportTablePayloadTable;
     
@@ -61,24 +61,24 @@ __LOCAL extern "C" const fidl_type_t test_protocollayouts_imported_ImportUnionPa
     
     
     
-__LOCAL extern "C" const fidl_type_t test_protocollayouts_imported_ComposedProtocolTwoWayNamedComposedWithErrorTopResponseTable;
+__LOCAL extern "C" const fidl_type_t test_protocollayouts_imported_ComposedProtocol_TwoWayNamedComposedWithError_ResultTable;
     
     
     
     
-__LOCAL extern "C" const fidl_type_t test_protocollayouts_imported_ComposedProtocolOnNamedComposedWithErrorRequestTable;
+__LOCAL extern "C" const fidl_type_t test_protocollayouts_imported_ComposedProtocol_OnNamedComposedWithError_ResultTable;
     
     
     
     
     
     
-__LOCAL extern "C" const fidl_type_t test_protocollayouts_MainProtocolTwoWayImportWithErrorTopResponseTable;
+__LOCAL extern "C" const fidl_type_t test_protocollayouts_MainProtocol_TwoWayImportWithError_ResultTable;
     
     
     
     
-__LOCAL extern "C" const fidl_type_t test_protocollayouts_MainProtocolOnImportWithErrorRequestTable;
+__LOCAL extern "C" const fidl_type_t test_protocollayouts_MainProtocol_OnImportWithError_ResultTable;
     
 __LOCAL extern "C" const fidl_type_t test_protocollayouts_LocalTablePayloadTable;
     
@@ -87,12 +87,12 @@ __LOCAL extern "C" const fidl_type_t test_protocollayouts_LocalUnionPayloadTable
     
     
     
-__LOCAL extern "C" const fidl_type_t test_protocollayouts_MainProtocolTwoWayLocalWithErrorTopResponseTable;
+__LOCAL extern "C" const fidl_type_t test_protocollayouts_MainProtocol_TwoWayLocalWithError_ResultTable;
     
     
     
     
-__LOCAL extern "C" const fidl_type_t test_protocollayouts_MainProtocolOnLocalWithErrorRequestTable;
+__LOCAL extern "C" const fidl_type_t test_protocollayouts_MainProtocol_OnLocalWithError_ResultTable;
     
 __LOCAL extern "C" const fidl_type_t test_protocollayouts_MainProtocolOneWayAnonRequestTable;
     
@@ -103,13 +103,13 @@ __LOCAL extern "C" const fidl_type_t test_protocollayouts_MainProtocolTwoWayAnon
     
 __LOCAL extern "C" const fidl_type_t test_protocollayouts_MainProtocolTwoWayAnonWithErrorRequestTable;
     
-__LOCAL extern "C" const fidl_type_t test_protocollayouts_MainProtocolTwoWayAnonWithErrorTopResponseTable;
+__LOCAL extern "C" const fidl_type_t test_protocollayouts_MainProtocol_TwoWayAnonWithError_ResultTable;
     
     
 __LOCAL extern "C" const fidl_type_t test_protocollayouts_MainProtocolOnAnonRequestTable;
     
     
-__LOCAL extern "C" const fidl_type_t test_protocollayouts_MainProtocolOnAnonWithErrorRequestTable;
+__LOCAL extern "C" const fidl_type_t test_protocollayouts_MainProtocol_OnAnonWithError_ResultTable;
 }  // namespace test_protocollayouts
 
 template<>
@@ -246,7 +246,7 @@ template<>
 struct ::fidl::internal::WireMethodTypes<::test_protocollayouts::MainProtocol::TwoWayAnonComposedWithError> {
     static constexpr bool HasRequestPayload = true;
       using Request = ::test_protocollayouts_imported::wire::ComposedProtocolTwoWayAnonComposedWithErrorRequest;
-      using Response = ::test_protocollayouts_imported::wire::ComposedProtocolTwoWayAnonComposedWithErrorTopResponse;
+      using Response = ::test_protocollayouts_imported::wire::ComposedProtocolTwoWayAnonComposedWithErrorResult;
   using DomainError = uint32_t;
     
       using Completer = fidl::Completer<::fidl::internal::WireCompleterBase<::test_protocollayouts::MainProtocol::TwoWayAnonComposedWithError>>;
@@ -296,7 +296,7 @@ template<>
 struct ::fidl::internal::WireMethodTypes<::test_protocollayouts::MainProtocol::OnAnonComposedWithError> {
     
     static constexpr bool HasRequestPayload = true;
-      using Request = ::test_protocollayouts_imported::wire::ComposedProtocolOnAnonComposedWithErrorRequest;
+      using Request = ::test_protocollayouts_imported::wire::ComposedProtocolOnAnonComposedWithErrorResult;
   using DomainError = uint32_t;
 };
 
@@ -364,7 +364,7 @@ template<>
 struct ::fidl::internal::WireMethodTypes<::test_protocollayouts::MainProtocol::TwoWayNamedComposedWithError> {
     static constexpr bool HasRequestPayload = true;
       using Request = ::test_protocollayouts_imported::wire::ImportTablePayload;
-      using Response = ::test_protocollayouts_imported::wire::ComposedProtocolTwoWayNamedComposedWithErrorTopResponse;
+      using Response = ::test_protocollayouts_imported::wire::ComposedProtocolTwoWayNamedComposedWithErrorResult;
   using DomainError = uint32_t;
     
       using Completer = fidl::Completer<::fidl::internal::WireCompleterBase<::test_protocollayouts::MainProtocol::TwoWayNamedComposedWithError>>;
@@ -414,7 +414,7 @@ template<>
 struct ::fidl::internal::WireMethodTypes<::test_protocollayouts::MainProtocol::OnNamedComposedWithError> {
     
     static constexpr bool HasRequestPayload = true;
-      using Request = ::test_protocollayouts_imported::wire::ComposedProtocolOnNamedComposedWithErrorRequest;
+      using Request = ::test_protocollayouts_imported::wire::ComposedProtocolOnNamedComposedWithErrorResult;
   using DomainError = uint32_t;
 };
 
@@ -482,7 +482,7 @@ template<>
 struct ::fidl::internal::WireMethodTypes<::test_protocollayouts::MainProtocol::TwoWayImportWithError> {
     static constexpr bool HasRequestPayload = true;
       using Request = ::test_protocollayouts_imported::wire::ImportTablePayload;
-      using Response = ::test_protocollayouts::wire::MainProtocolTwoWayImportWithErrorTopResponse;
+      using Response = ::test_protocollayouts::wire::MainProtocolTwoWayImportWithErrorResult;
   using DomainError = uint32_t;
     
       using Completer = fidl::Completer<::fidl::internal::WireCompleterBase<::test_protocollayouts::MainProtocol::TwoWayImportWithError>>;
@@ -532,7 +532,7 @@ template<>
 struct ::fidl::internal::WireMethodTypes<::test_protocollayouts::MainProtocol::OnImportWithError> {
     
     static constexpr bool HasRequestPayload = true;
-      using Request = ::test_protocollayouts::wire::MainProtocolOnImportWithErrorRequest;
+      using Request = ::test_protocollayouts::wire::MainProtocolOnImportWithErrorResult;
   using DomainError = uint32_t;
 };
 
@@ -600,7 +600,7 @@ template<>
 struct ::fidl::internal::WireMethodTypes<::test_protocollayouts::MainProtocol::TwoWayLocalWithError> {
     static constexpr bool HasRequestPayload = true;
       using Request = ::test_protocollayouts::wire::LocalTablePayload;
-      using Response = ::test_protocollayouts::wire::MainProtocolTwoWayLocalWithErrorTopResponse;
+      using Response = ::test_protocollayouts::wire::MainProtocolTwoWayLocalWithErrorResult;
   using DomainError = uint32_t;
     
       using Completer = fidl::Completer<::fidl::internal::WireCompleterBase<::test_protocollayouts::MainProtocol::TwoWayLocalWithError>>;
@@ -650,7 +650,7 @@ template<>
 struct ::fidl::internal::WireMethodTypes<::test_protocollayouts::MainProtocol::OnLocalWithError> {
     
     static constexpr bool HasRequestPayload = true;
-      using Request = ::test_protocollayouts::wire::MainProtocolOnLocalWithErrorRequest;
+      using Request = ::test_protocollayouts::wire::MainProtocolOnLocalWithErrorResult;
   using DomainError = uint32_t;
 };
 
@@ -718,7 +718,7 @@ template<>
 struct ::fidl::internal::WireMethodTypes<::test_protocollayouts::MainProtocol::TwoWayAnonWithError> {
     static constexpr bool HasRequestPayload = true;
       using Request = ::test_protocollayouts::wire::MainProtocolTwoWayAnonWithErrorRequest;
-      using Response = ::test_protocollayouts::wire::MainProtocolTwoWayAnonWithErrorTopResponse;
+      using Response = ::test_protocollayouts::wire::MainProtocolTwoWayAnonWithErrorResult;
   using DomainError = uint32_t;
     
       using Completer = fidl::Completer<::fidl::internal::WireCompleterBase<::test_protocollayouts::MainProtocol::TwoWayAnonWithError>>;
@@ -768,7 +768,7 @@ template<>
 struct ::fidl::internal::WireMethodTypes<::test_protocollayouts::MainProtocol::OnAnonWithError> {
     
     static constexpr bool HasRequestPayload = true;
-      using Request = ::test_protocollayouts::wire::MainProtocolOnAnonWithErrorRequest;
+      using Request = ::test_protocollayouts::wire::MainProtocolOnAnonWithErrorResult;
   using DomainError = uint32_t;
 };
 
@@ -993,11 +993,10 @@ struct ::fidl::internal::WireCodingTraits<::fidl::internal::TransactionalRequest
 
 
 template<>
-struct ::fidl::WireResponse<::test_protocollayouts::MainProtocol::TwoWayAnonComposedWithError> final : public ::test_protocollayouts_imported::wire::ComposedProtocolTwoWayAnonComposedWithErrorTopResponse {
+struct ::fidl::WireResponse<::test_protocollayouts::MainProtocol::TwoWayAnonComposedWithError> final : public ::test_protocollayouts_imported::wire::ComposedProtocolTwoWayAnonComposedWithErrorResult {
 
   
-  explicit WireResponse(::test_protocollayouts_imported::wire::ComposedProtocolTwoWayAnonComposedWithErrorTopResponse base) : ::test_protocollayouts_imported::wire::ComposedProtocolTwoWayAnonComposedWithErrorTopResponse(std::move(base)) {}
-  explicit WireResponse(::test_protocollayouts_imported::wire::ComposedProtocolTwoWayAnonComposedWithErrorResult result) : ::test_protocollayouts_imported::wire::ComposedProtocolTwoWayAnonComposedWithErrorTopResponse{ .result = std::move(result)}{}
+  explicit WireResponse(::test_protocollayouts_imported::wire::ComposedProtocolTwoWayAnonComposedWithErrorResult ComposedProtocolTwoWayAnonComposedWithErrorResult) : ::test_protocollayouts_imported::wire::ComposedProtocolTwoWayAnonComposedWithErrorResult(ComposedProtocolTwoWayAnonComposedWithErrorResult){}
   WireResponse() = default;
 };
 
@@ -1009,12 +1008,12 @@ struct ::fidl::internal::WireCodingTraits<::fidl::WireResponse<::test_protocolla
 
   static void Encode(
     internal::WireEncoder* encoder, ::fidl::WireResponse<::test_protocollayouts::MainProtocol::TwoWayAnonComposedWithError>* value, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth) {
-    fidl::internal::WireCodingTraits<::test_protocollayouts_imported::wire::ComposedProtocolTwoWayAnonComposedWithErrorTopResponse, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive>::Encode(
+    fidl::internal::WireCodingTraits<::test_protocollayouts_imported::wire::ComposedProtocolTwoWayAnonComposedWithErrorResult, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive>::Encode(
       encoder, value, position, recursion_depth);
   }
   static void Decode(
     internal::WireDecoder* decoder, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth) {
-    fidl::internal::WireCodingTraits<::test_protocollayouts_imported::wire::ComposedProtocolTwoWayAnonComposedWithErrorTopResponse, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive>::Decode(
+    fidl::internal::WireCodingTraits<::test_protocollayouts_imported::wire::ComposedProtocolTwoWayAnonComposedWithErrorResult, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive>::Decode(
       decoder, position, recursion_depth);
   }
 };
@@ -1025,8 +1024,8 @@ struct ::fidl::internal::TransactionalResponse<::test_protocollayouts::MainProto
   fidl_message_header_t header;
   
   ::fidl::WireResponse<::test_protocollayouts::MainProtocol::TwoWayAnonComposedWithError> body;
-  explicit TransactionalResponse(::test_protocollayouts_imported::wire::ComposedProtocolTwoWayAnonComposedWithErrorResult result)
-  : body(::fidl::WireResponse<::test_protocollayouts::MainProtocol::TwoWayAnonComposedWithError>(result)) {
+  explicit TransactionalResponse(::test_protocollayouts_imported::wire::ComposedProtocolTwoWayAnonComposedWithErrorResult ComposedProtocolTwoWayAnonComposedWithErrorResult)
+  : body(::fidl::WireResponse<::test_protocollayouts::MainProtocol::TwoWayAnonComposedWithError>(ComposedProtocolTwoWayAnonComposedWithErrorResult)) {
     _InitHeader();
   }
   TransactionalResponse() {
@@ -1106,8 +1105,8 @@ struct ::fidl::internal::TransactionalEvent<::test_protocollayouts::MainProtocol
   
     ::fidl::WireEvent<::test_protocollayouts::MainProtocol::OnAnonComposedWithError> body;
 
-    explicit TransactionalEvent(::test_protocollayouts_imported::wire::ComposedProtocolOnAnonComposedWithErrorResult result)
-    : body{ result } {
+    explicit TransactionalEvent(::test_protocollayouts_imported::wire::ComposedProtocolOnAnonComposedWithErrorResult ComposedProtocolOnAnonComposedWithErrorResult)
+    : body{ ComposedProtocolOnAnonComposedWithErrorResult } {
       _InitHeader();
     }
 
@@ -1321,11 +1320,10 @@ struct ::fidl::internal::WireCodingTraits<::fidl::internal::TransactionalRequest
 
 
 template<>
-struct ::fidl::WireResponse<::test_protocollayouts::MainProtocol::TwoWayNamedComposedWithError> final : public ::test_protocollayouts_imported::wire::ComposedProtocolTwoWayNamedComposedWithErrorTopResponse {
+struct ::fidl::WireResponse<::test_protocollayouts::MainProtocol::TwoWayNamedComposedWithError> final : public ::test_protocollayouts_imported::wire::ComposedProtocolTwoWayNamedComposedWithErrorResult {
 
   
-  explicit WireResponse(::test_protocollayouts_imported::wire::ComposedProtocolTwoWayNamedComposedWithErrorTopResponse base) : ::test_protocollayouts_imported::wire::ComposedProtocolTwoWayNamedComposedWithErrorTopResponse(std::move(base)) {}
-  explicit WireResponse(::test_protocollayouts_imported::wire::ComposedProtocolTwoWayNamedComposedWithErrorResult result) : ::test_protocollayouts_imported::wire::ComposedProtocolTwoWayNamedComposedWithErrorTopResponse{ .result = std::move(result)}{}
+  explicit WireResponse(::test_protocollayouts_imported::wire::ComposedProtocolTwoWayNamedComposedWithErrorResult ComposedProtocolTwoWayNamedComposedWithErrorResult) : ::test_protocollayouts_imported::wire::ComposedProtocolTwoWayNamedComposedWithErrorResult(ComposedProtocolTwoWayNamedComposedWithErrorResult){}
   WireResponse() = default;
 };
 
@@ -1337,12 +1335,12 @@ struct ::fidl::internal::WireCodingTraits<::fidl::WireResponse<::test_protocolla
 
   static void Encode(
     internal::WireEncoder* encoder, ::fidl::WireResponse<::test_protocollayouts::MainProtocol::TwoWayNamedComposedWithError>* value, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth) {
-    fidl::internal::WireCodingTraits<::test_protocollayouts_imported::wire::ComposedProtocolTwoWayNamedComposedWithErrorTopResponse, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive>::Encode(
+    fidl::internal::WireCodingTraits<::test_protocollayouts_imported::wire::ComposedProtocolTwoWayNamedComposedWithErrorResult, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive>::Encode(
       encoder, value, position, recursion_depth);
   }
   static void Decode(
     internal::WireDecoder* decoder, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth) {
-    fidl::internal::WireCodingTraits<::test_protocollayouts_imported::wire::ComposedProtocolTwoWayNamedComposedWithErrorTopResponse, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive>::Decode(
+    fidl::internal::WireCodingTraits<::test_protocollayouts_imported::wire::ComposedProtocolTwoWayNamedComposedWithErrorResult, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive>::Decode(
       decoder, position, recursion_depth);
   }
 };
@@ -1353,8 +1351,8 @@ struct ::fidl::internal::TransactionalResponse<::test_protocollayouts::MainProto
   fidl_message_header_t header;
   
   ::fidl::WireResponse<::test_protocollayouts::MainProtocol::TwoWayNamedComposedWithError> body;
-  explicit TransactionalResponse(::test_protocollayouts_imported::wire::ComposedProtocolTwoWayNamedComposedWithErrorResult result)
-  : body(::fidl::WireResponse<::test_protocollayouts::MainProtocol::TwoWayNamedComposedWithError>(result)) {
+  explicit TransactionalResponse(::test_protocollayouts_imported::wire::ComposedProtocolTwoWayNamedComposedWithErrorResult ComposedProtocolTwoWayNamedComposedWithErrorResult)
+  : body(::fidl::WireResponse<::test_protocollayouts::MainProtocol::TwoWayNamedComposedWithError>(ComposedProtocolTwoWayNamedComposedWithErrorResult)) {
     _InitHeader();
   }
   TransactionalResponse() {
@@ -1434,8 +1432,8 @@ struct ::fidl::internal::TransactionalEvent<::test_protocollayouts::MainProtocol
   
     ::fidl::WireEvent<::test_protocollayouts::MainProtocol::OnNamedComposedWithError> body;
 
-    explicit TransactionalEvent(::test_protocollayouts_imported::wire::ComposedProtocolOnNamedComposedWithErrorResult result)
-    : body{ result } {
+    explicit TransactionalEvent(::test_protocollayouts_imported::wire::ComposedProtocolOnNamedComposedWithErrorResult ComposedProtocolOnNamedComposedWithErrorResult)
+    : body{ ComposedProtocolOnNamedComposedWithErrorResult } {
       _InitHeader();
     }
 
@@ -1649,12 +1647,10 @@ struct ::fidl::internal::WireCodingTraits<::fidl::internal::TransactionalRequest
 
 
 template<>
-struct ::fidl::WireResponse<::test_protocollayouts::MainProtocol::TwoWayImportWithError> final : public ::test_protocollayouts::wire::MainProtocolTwoWayImportWithErrorTopResponse {
-  using Result = test_protocollayouts::wire::MainProtocolTwoWayImportWithErrorResult;
+struct ::fidl::WireResponse<::test_protocollayouts::MainProtocol::TwoWayImportWithError> final : public ::test_protocollayouts::wire::MainProtocolTwoWayImportWithErrorResult {
 
   
-  explicit WireResponse(::test_protocollayouts::wire::MainProtocolTwoWayImportWithErrorTopResponse base) : ::test_protocollayouts::wire::MainProtocolTwoWayImportWithErrorTopResponse(std::move(base)) {}
-  explicit WireResponse(::test_protocollayouts::wire::MainProtocolTwoWayImportWithErrorResult result) : ::test_protocollayouts::wire::MainProtocolTwoWayImportWithErrorTopResponse{ .result = std::move(result)}{}
+  explicit WireResponse(::test_protocollayouts::wire::MainProtocolTwoWayImportWithErrorResult MainProtocolTwoWayImportWithErrorResult) : ::test_protocollayouts::wire::MainProtocolTwoWayImportWithErrorResult(MainProtocolTwoWayImportWithErrorResult){}
   WireResponse() = default;
 };
 
@@ -1666,12 +1662,12 @@ struct ::fidl::internal::WireCodingTraits<::fidl::WireResponse<::test_protocolla
 
   static void Encode(
     internal::WireEncoder* encoder, ::fidl::WireResponse<::test_protocollayouts::MainProtocol::TwoWayImportWithError>* value, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth) {
-    fidl::internal::WireCodingTraits<::test_protocollayouts::wire::MainProtocolTwoWayImportWithErrorTopResponse, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive>::Encode(
+    fidl::internal::WireCodingTraits<::test_protocollayouts::wire::MainProtocolTwoWayImportWithErrorResult, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive>::Encode(
       encoder, value, position, recursion_depth);
   }
   static void Decode(
     internal::WireDecoder* decoder, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth) {
-    fidl::internal::WireCodingTraits<::test_protocollayouts::wire::MainProtocolTwoWayImportWithErrorTopResponse, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive>::Decode(
+    fidl::internal::WireCodingTraits<::test_protocollayouts::wire::MainProtocolTwoWayImportWithErrorResult, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive>::Decode(
       decoder, position, recursion_depth);
   }
 };
@@ -1682,8 +1678,8 @@ struct ::fidl::internal::TransactionalResponse<::test_protocollayouts::MainProto
   fidl_message_header_t header;
   
   ::fidl::WireResponse<::test_protocollayouts::MainProtocol::TwoWayImportWithError> body;
-  explicit TransactionalResponse(::test_protocollayouts::wire::MainProtocolTwoWayImportWithErrorResult result)
-  : body(::fidl::WireResponse<::test_protocollayouts::MainProtocol::TwoWayImportWithError>(result)) {
+  explicit TransactionalResponse(::test_protocollayouts::wire::MainProtocolTwoWayImportWithErrorResult MainProtocolTwoWayImportWithErrorResult)
+  : body(::fidl::WireResponse<::test_protocollayouts::MainProtocol::TwoWayImportWithError>(MainProtocolTwoWayImportWithErrorResult)) {
     _InitHeader();
   }
   TransactionalResponse() {
@@ -1763,8 +1759,8 @@ struct ::fidl::internal::TransactionalEvent<::test_protocollayouts::MainProtocol
   
     ::fidl::WireEvent<::test_protocollayouts::MainProtocol::OnImportWithError> body;
 
-    explicit TransactionalEvent(::test_protocollayouts::wire::MainProtocolOnImportWithErrorResult result)
-    : body{ result } {
+    explicit TransactionalEvent(::test_protocollayouts::wire::MainProtocolOnImportWithErrorResult MainProtocolOnImportWithErrorResult)
+    : body{ MainProtocolOnImportWithErrorResult } {
       _InitHeader();
     }
 
@@ -1978,12 +1974,10 @@ struct ::fidl::internal::WireCodingTraits<::fidl::internal::TransactionalRequest
 
 
 template<>
-struct ::fidl::WireResponse<::test_protocollayouts::MainProtocol::TwoWayLocalWithError> final : public ::test_protocollayouts::wire::MainProtocolTwoWayLocalWithErrorTopResponse {
-  using Result = test_protocollayouts::wire::MainProtocolTwoWayLocalWithErrorResult;
+struct ::fidl::WireResponse<::test_protocollayouts::MainProtocol::TwoWayLocalWithError> final : public ::test_protocollayouts::wire::MainProtocolTwoWayLocalWithErrorResult {
 
   
-  explicit WireResponse(::test_protocollayouts::wire::MainProtocolTwoWayLocalWithErrorTopResponse base) : ::test_protocollayouts::wire::MainProtocolTwoWayLocalWithErrorTopResponse(std::move(base)) {}
-  explicit WireResponse(::test_protocollayouts::wire::MainProtocolTwoWayLocalWithErrorResult result) : ::test_protocollayouts::wire::MainProtocolTwoWayLocalWithErrorTopResponse{ .result = std::move(result)}{}
+  explicit WireResponse(::test_protocollayouts::wire::MainProtocolTwoWayLocalWithErrorResult MainProtocolTwoWayLocalWithErrorResult) : ::test_protocollayouts::wire::MainProtocolTwoWayLocalWithErrorResult(MainProtocolTwoWayLocalWithErrorResult){}
   WireResponse() = default;
 };
 
@@ -1995,12 +1989,12 @@ struct ::fidl::internal::WireCodingTraits<::fidl::WireResponse<::test_protocolla
 
   static void Encode(
     internal::WireEncoder* encoder, ::fidl::WireResponse<::test_protocollayouts::MainProtocol::TwoWayLocalWithError>* value, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth) {
-    fidl::internal::WireCodingTraits<::test_protocollayouts::wire::MainProtocolTwoWayLocalWithErrorTopResponse, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive>::Encode(
+    fidl::internal::WireCodingTraits<::test_protocollayouts::wire::MainProtocolTwoWayLocalWithErrorResult, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive>::Encode(
       encoder, value, position, recursion_depth);
   }
   static void Decode(
     internal::WireDecoder* decoder, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth) {
-    fidl::internal::WireCodingTraits<::test_protocollayouts::wire::MainProtocolTwoWayLocalWithErrorTopResponse, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive>::Decode(
+    fidl::internal::WireCodingTraits<::test_protocollayouts::wire::MainProtocolTwoWayLocalWithErrorResult, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive>::Decode(
       decoder, position, recursion_depth);
   }
 };
@@ -2011,8 +2005,8 @@ struct ::fidl::internal::TransactionalResponse<::test_protocollayouts::MainProto
   fidl_message_header_t header;
   
   ::fidl::WireResponse<::test_protocollayouts::MainProtocol::TwoWayLocalWithError> body;
-  explicit TransactionalResponse(::test_protocollayouts::wire::MainProtocolTwoWayLocalWithErrorResult result)
-  : body(::fidl::WireResponse<::test_protocollayouts::MainProtocol::TwoWayLocalWithError>(result)) {
+  explicit TransactionalResponse(::test_protocollayouts::wire::MainProtocolTwoWayLocalWithErrorResult MainProtocolTwoWayLocalWithErrorResult)
+  : body(::fidl::WireResponse<::test_protocollayouts::MainProtocol::TwoWayLocalWithError>(MainProtocolTwoWayLocalWithErrorResult)) {
     _InitHeader();
   }
   TransactionalResponse() {
@@ -2092,8 +2086,8 @@ struct ::fidl::internal::TransactionalEvent<::test_protocollayouts::MainProtocol
   
     ::fidl::WireEvent<::test_protocollayouts::MainProtocol::OnLocalWithError> body;
 
-    explicit TransactionalEvent(::test_protocollayouts::wire::MainProtocolOnLocalWithErrorResult result)
-    : body{ result } {
+    explicit TransactionalEvent(::test_protocollayouts::wire::MainProtocolOnLocalWithErrorResult MainProtocolOnLocalWithErrorResult)
+    : body{ MainProtocolOnLocalWithErrorResult } {
       _InitHeader();
     }
 
@@ -2307,12 +2301,10 @@ struct ::fidl::internal::WireCodingTraits<::fidl::internal::TransactionalRequest
 
 
 template<>
-struct ::fidl::WireResponse<::test_protocollayouts::MainProtocol::TwoWayAnonWithError> final : public ::test_protocollayouts::wire::MainProtocolTwoWayAnonWithErrorTopResponse {
-  using Result = test_protocollayouts::wire::MainProtocolTwoWayAnonWithErrorResult;
+struct ::fidl::WireResponse<::test_protocollayouts::MainProtocol::TwoWayAnonWithError> final : public ::test_protocollayouts::wire::MainProtocolTwoWayAnonWithErrorResult {
 
   
-  explicit WireResponse(::test_protocollayouts::wire::MainProtocolTwoWayAnonWithErrorTopResponse base) : ::test_protocollayouts::wire::MainProtocolTwoWayAnonWithErrorTopResponse(std::move(base)) {}
-  explicit WireResponse(::test_protocollayouts::wire::MainProtocolTwoWayAnonWithErrorResult result) : ::test_protocollayouts::wire::MainProtocolTwoWayAnonWithErrorTopResponse{ .result = std::move(result)}{}
+  explicit WireResponse(::test_protocollayouts::wire::MainProtocolTwoWayAnonWithErrorResult MainProtocolTwoWayAnonWithErrorResult) : ::test_protocollayouts::wire::MainProtocolTwoWayAnonWithErrorResult(MainProtocolTwoWayAnonWithErrorResult){}
   WireResponse() = default;
 };
 
@@ -2324,12 +2316,12 @@ struct ::fidl::internal::WireCodingTraits<::fidl::WireResponse<::test_protocolla
 
   static void Encode(
     internal::WireEncoder* encoder, ::fidl::WireResponse<::test_protocollayouts::MainProtocol::TwoWayAnonWithError>* value, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth) {
-    fidl::internal::WireCodingTraits<::test_protocollayouts::wire::MainProtocolTwoWayAnonWithErrorTopResponse, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive>::Encode(
+    fidl::internal::WireCodingTraits<::test_protocollayouts::wire::MainProtocolTwoWayAnonWithErrorResult, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive>::Encode(
       encoder, value, position, recursion_depth);
   }
   static void Decode(
     internal::WireDecoder* decoder, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth) {
-    fidl::internal::WireCodingTraits<::test_protocollayouts::wire::MainProtocolTwoWayAnonWithErrorTopResponse, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive>::Decode(
+    fidl::internal::WireCodingTraits<::test_protocollayouts::wire::MainProtocolTwoWayAnonWithErrorResult, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive>::Decode(
       decoder, position, recursion_depth);
   }
 };
@@ -2340,8 +2332,8 @@ struct ::fidl::internal::TransactionalResponse<::test_protocollayouts::MainProto
   fidl_message_header_t header;
   
   ::fidl::WireResponse<::test_protocollayouts::MainProtocol::TwoWayAnonWithError> body;
-  explicit TransactionalResponse(::test_protocollayouts::wire::MainProtocolTwoWayAnonWithErrorResult result)
-  : body(::fidl::WireResponse<::test_protocollayouts::MainProtocol::TwoWayAnonWithError>(result)) {
+  explicit TransactionalResponse(::test_protocollayouts::wire::MainProtocolTwoWayAnonWithErrorResult MainProtocolTwoWayAnonWithErrorResult)
+  : body(::fidl::WireResponse<::test_protocollayouts::MainProtocol::TwoWayAnonWithError>(MainProtocolTwoWayAnonWithErrorResult)) {
     _InitHeader();
   }
   TransactionalResponse() {
@@ -2421,8 +2413,8 @@ struct ::fidl::internal::TransactionalEvent<::test_protocollayouts::MainProtocol
   
     ::fidl::WireEvent<::test_protocollayouts::MainProtocol::OnAnonWithError> body;
 
-    explicit TransactionalEvent(::test_protocollayouts::wire::MainProtocolOnAnonWithErrorResult result)
-    : body{ result } {
+    explicit TransactionalEvent(::test_protocollayouts::wire::MainProtocolOnAnonWithErrorResult MainProtocolOnAnonWithErrorResult)
+    : body{ MainProtocolOnAnonWithErrorResult } {
       _InitHeader();
     }
 
@@ -2619,7 +2611,7 @@ struct IsFidlType<::fidl::WireResponse<::test_protocollayouts::MainProtocol::Two
 template <>
 struct TypeTraits<::fidl::internal::TransactionalResponse<::test_protocollayouts::MainProtocol::TwoWayAnonComposedWithError>> {
   static constexpr const fidl_type_t* kType =
-    &::test_protocollayouts::test_protocollayouts_imported_ComposedProtocolTwoWayAnonComposedWithErrorTopResponseTable;
+    &::test_protocollayouts::test_protocollayouts_imported_ComposedProtocol_TwoWayAnonComposedWithError_ResultTable;
   static constexpr bool kHasServerToClientBody = true;
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 2;
@@ -2641,7 +2633,7 @@ static_assert(offsetof(::fidl::internal::TransactionalResponse<::test_protocolla
 template <>
 struct TypeTraits<::fidl::WireResponse<::test_protocollayouts::MainProtocol::TwoWayAnonComposedWithError>> {
   static constexpr const fidl_type_t* kType =
-    &::test_protocollayouts::test_protocollayouts_imported_ComposedProtocolTwoWayAnonComposedWithErrorTopResponseTable;
+    &::test_protocollayouts::test_protocollayouts_imported_ComposedProtocol_TwoWayAnonComposedWithError_ResultTable;
   static constexpr bool kHasServerToClientBody = true;
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 2;
@@ -2657,7 +2649,6 @@ struct TypeTraits<::fidl::WireResponse<::test_protocollayouts::MainProtocol::Two
 };
 static_assert(sizeof(::fidl::WireResponse<::test_protocollayouts::MainProtocol::TwoWayAnonComposedWithError>)
     == TypeTraits<::fidl::WireResponse<::test_protocollayouts::MainProtocol::TwoWayAnonComposedWithError>>::kPrimarySize);
-static_assert(offsetof(::fidl::WireResponse<::test_protocollayouts::MainProtocol::TwoWayAnonComposedWithError>, result) == 0);
 #ifdef __Fuchsia__
 template <>
 struct IsFidlType<::fidl::internal::TransactionalEvent<::test_protocollayouts::MainProtocol::OnAnonComposed>> : public std::true_type {};
@@ -2699,7 +2690,7 @@ struct IsFidlTransactionalMessage<::fidl::internal::TransactionalEvent<::test_pr
 template <>
 struct TypeTraits<::fidl::internal::TransactionalEvent<::test_protocollayouts::MainProtocol::OnAnonComposedWithError>> {
   static constexpr const fidl_type_t* kType =
-    &::test_protocollayouts::test_protocollayouts_imported_ComposedProtocolOnAnonComposedWithErrorRequestTable;
+    &::test_protocollayouts::test_protocollayouts_imported_ComposedProtocol_OnAnonComposedWithError_ResultTable;
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 3;
   static constexpr uint32_t kPrimarySize = FIDL_ALIGN(16 + sizeof(fidl_message_header_t));
@@ -2881,7 +2872,7 @@ struct IsFidlType<::fidl::WireResponse<::test_protocollayouts::MainProtocol::Two
 template <>
 struct TypeTraits<::fidl::internal::TransactionalResponse<::test_protocollayouts::MainProtocol::TwoWayNamedComposedWithError>> {
   static constexpr const fidl_type_t* kType =
-    &::test_protocollayouts::test_protocollayouts_imported_ComposedProtocolTwoWayNamedComposedWithErrorTopResponseTable;
+    &::test_protocollayouts::test_protocollayouts_imported_ComposedProtocol_TwoWayNamedComposedWithError_ResultTable;
   static constexpr bool kHasServerToClientBody = true;
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 2;
@@ -2903,7 +2894,7 @@ static_assert(offsetof(::fidl::internal::TransactionalResponse<::test_protocolla
 template <>
 struct TypeTraits<::fidl::WireResponse<::test_protocollayouts::MainProtocol::TwoWayNamedComposedWithError>> {
   static constexpr const fidl_type_t* kType =
-    &::test_protocollayouts::test_protocollayouts_imported_ComposedProtocolTwoWayNamedComposedWithErrorTopResponseTable;
+    &::test_protocollayouts::test_protocollayouts_imported_ComposedProtocol_TwoWayNamedComposedWithError_ResultTable;
   static constexpr bool kHasServerToClientBody = true;
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 2;
@@ -2919,7 +2910,6 @@ struct TypeTraits<::fidl::WireResponse<::test_protocollayouts::MainProtocol::Two
 };
 static_assert(sizeof(::fidl::WireResponse<::test_protocollayouts::MainProtocol::TwoWayNamedComposedWithError>)
     == TypeTraits<::fidl::WireResponse<::test_protocollayouts::MainProtocol::TwoWayNamedComposedWithError>>::kPrimarySize);
-static_assert(offsetof(::fidl::WireResponse<::test_protocollayouts::MainProtocol::TwoWayNamedComposedWithError>, result) == 0);
 #ifdef __Fuchsia__
 template <>
 struct IsFidlType<::fidl::internal::TransactionalEvent<::test_protocollayouts::MainProtocol::OnNamedComposed>> : public std::true_type {};
@@ -2961,7 +2951,7 @@ struct IsFidlTransactionalMessage<::fidl::internal::TransactionalEvent<::test_pr
 template <>
 struct TypeTraits<::fidl::internal::TransactionalEvent<::test_protocollayouts::MainProtocol::OnNamedComposedWithError>> {
   static constexpr const fidl_type_t* kType =
-    &::test_protocollayouts::test_protocollayouts_imported_ComposedProtocolOnNamedComposedWithErrorRequestTable;
+    &::test_protocollayouts::test_protocollayouts_imported_ComposedProtocol_OnNamedComposedWithError_ResultTable;
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 3;
   static constexpr uint32_t kPrimarySize = FIDL_ALIGN(16 + sizeof(fidl_message_header_t));
@@ -3143,7 +3133,7 @@ struct IsFidlType<::fidl::WireResponse<::test_protocollayouts::MainProtocol::Two
 template <>
 struct TypeTraits<::fidl::internal::TransactionalResponse<::test_protocollayouts::MainProtocol::TwoWayImportWithError>> {
   static constexpr const fidl_type_t* kType =
-    &::test_protocollayouts::test_protocollayouts_MainProtocolTwoWayImportWithErrorTopResponseTable;
+    &::test_protocollayouts::test_protocollayouts_MainProtocol_TwoWayImportWithError_ResultTable;
   static constexpr bool kHasServerToClientBody = true;
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 2;
@@ -3165,7 +3155,7 @@ static_assert(offsetof(::fidl::internal::TransactionalResponse<::test_protocolla
 template <>
 struct TypeTraits<::fidl::WireResponse<::test_protocollayouts::MainProtocol::TwoWayImportWithError>> {
   static constexpr const fidl_type_t* kType =
-    &::test_protocollayouts::test_protocollayouts_MainProtocolTwoWayImportWithErrorTopResponseTable;
+    &::test_protocollayouts::test_protocollayouts_MainProtocol_TwoWayImportWithError_ResultTable;
   static constexpr bool kHasServerToClientBody = true;
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 2;
@@ -3181,7 +3171,6 @@ struct TypeTraits<::fidl::WireResponse<::test_protocollayouts::MainProtocol::Two
 };
 static_assert(sizeof(::fidl::WireResponse<::test_protocollayouts::MainProtocol::TwoWayImportWithError>)
     == TypeTraits<::fidl::WireResponse<::test_protocollayouts::MainProtocol::TwoWayImportWithError>>::kPrimarySize);
-static_assert(offsetof(::fidl::WireResponse<::test_protocollayouts::MainProtocol::TwoWayImportWithError>, result) == 0);
 #ifdef __Fuchsia__
 template <>
 struct IsFidlType<::fidl::internal::TransactionalEvent<::test_protocollayouts::MainProtocol::OnImport>> : public std::true_type {};
@@ -3223,7 +3212,7 @@ struct IsFidlTransactionalMessage<::fidl::internal::TransactionalEvent<::test_pr
 template <>
 struct TypeTraits<::fidl::internal::TransactionalEvent<::test_protocollayouts::MainProtocol::OnImportWithError>> {
   static constexpr const fidl_type_t* kType =
-    &::test_protocollayouts::test_protocollayouts_MainProtocolOnImportWithErrorRequestTable;
+    &::test_protocollayouts::test_protocollayouts_MainProtocol_OnImportWithError_ResultTable;
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 3;
   static constexpr uint32_t kPrimarySize = FIDL_ALIGN(16 + sizeof(fidl_message_header_t));
@@ -3405,7 +3394,7 @@ struct IsFidlType<::fidl::WireResponse<::test_protocollayouts::MainProtocol::Two
 template <>
 struct TypeTraits<::fidl::internal::TransactionalResponse<::test_protocollayouts::MainProtocol::TwoWayLocalWithError>> {
   static constexpr const fidl_type_t* kType =
-    &::test_protocollayouts::test_protocollayouts_MainProtocolTwoWayLocalWithErrorTopResponseTable;
+    &::test_protocollayouts::test_protocollayouts_MainProtocol_TwoWayLocalWithError_ResultTable;
   static constexpr bool kHasServerToClientBody = true;
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 2;
@@ -3427,7 +3416,7 @@ static_assert(offsetof(::fidl::internal::TransactionalResponse<::test_protocolla
 template <>
 struct TypeTraits<::fidl::WireResponse<::test_protocollayouts::MainProtocol::TwoWayLocalWithError>> {
   static constexpr const fidl_type_t* kType =
-    &::test_protocollayouts::test_protocollayouts_MainProtocolTwoWayLocalWithErrorTopResponseTable;
+    &::test_protocollayouts::test_protocollayouts_MainProtocol_TwoWayLocalWithError_ResultTable;
   static constexpr bool kHasServerToClientBody = true;
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 2;
@@ -3443,7 +3432,6 @@ struct TypeTraits<::fidl::WireResponse<::test_protocollayouts::MainProtocol::Two
 };
 static_assert(sizeof(::fidl::WireResponse<::test_protocollayouts::MainProtocol::TwoWayLocalWithError>)
     == TypeTraits<::fidl::WireResponse<::test_protocollayouts::MainProtocol::TwoWayLocalWithError>>::kPrimarySize);
-static_assert(offsetof(::fidl::WireResponse<::test_protocollayouts::MainProtocol::TwoWayLocalWithError>, result) == 0);
 #ifdef __Fuchsia__
 template <>
 struct IsFidlType<::fidl::internal::TransactionalEvent<::test_protocollayouts::MainProtocol::OnLocal>> : public std::true_type {};
@@ -3485,7 +3473,7 @@ struct IsFidlTransactionalMessage<::fidl::internal::TransactionalEvent<::test_pr
 template <>
 struct TypeTraits<::fidl::internal::TransactionalEvent<::test_protocollayouts::MainProtocol::OnLocalWithError>> {
   static constexpr const fidl_type_t* kType =
-    &::test_protocollayouts::test_protocollayouts_MainProtocolOnLocalWithErrorRequestTable;
+    &::test_protocollayouts::test_protocollayouts_MainProtocol_OnLocalWithError_ResultTable;
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 3;
   static constexpr uint32_t kPrimarySize = FIDL_ALIGN(16 + sizeof(fidl_message_header_t));
@@ -3667,7 +3655,7 @@ struct IsFidlType<::fidl::WireResponse<::test_protocollayouts::MainProtocol::Two
 template <>
 struct TypeTraits<::fidl::internal::TransactionalResponse<::test_protocollayouts::MainProtocol::TwoWayAnonWithError>> {
   static constexpr const fidl_type_t* kType =
-    &::test_protocollayouts::test_protocollayouts_MainProtocolTwoWayAnonWithErrorTopResponseTable;
+    &::test_protocollayouts::test_protocollayouts_MainProtocol_TwoWayAnonWithError_ResultTable;
   static constexpr bool kHasServerToClientBody = true;
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 2;
@@ -3689,7 +3677,7 @@ static_assert(offsetof(::fidl::internal::TransactionalResponse<::test_protocolla
 template <>
 struct TypeTraits<::fidl::WireResponse<::test_protocollayouts::MainProtocol::TwoWayAnonWithError>> {
   static constexpr const fidl_type_t* kType =
-    &::test_protocollayouts::test_protocollayouts_MainProtocolTwoWayAnonWithErrorTopResponseTable;
+    &::test_protocollayouts::test_protocollayouts_MainProtocol_TwoWayAnonWithError_ResultTable;
   static constexpr bool kHasServerToClientBody = true;
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 2;
@@ -3705,7 +3693,6 @@ struct TypeTraits<::fidl::WireResponse<::test_protocollayouts::MainProtocol::Two
 };
 static_assert(sizeof(::fidl::WireResponse<::test_protocollayouts::MainProtocol::TwoWayAnonWithError>)
     == TypeTraits<::fidl::WireResponse<::test_protocollayouts::MainProtocol::TwoWayAnonWithError>>::kPrimarySize);
-static_assert(offsetof(::fidl::WireResponse<::test_protocollayouts::MainProtocol::TwoWayAnonWithError>, result) == 0);
 #ifdef __Fuchsia__
 template <>
 struct IsFidlType<::fidl::internal::TransactionalEvent<::test_protocollayouts::MainProtocol::OnAnon>> : public std::true_type {};
@@ -3747,7 +3734,7 @@ struct IsFidlTransactionalMessage<::fidl::internal::TransactionalEvent<::test_pr
 template <>
 struct TypeTraits<::fidl::internal::TransactionalEvent<::test_protocollayouts::MainProtocol::OnAnonWithError>> {
   static constexpr const fidl_type_t* kType =
-    &::test_protocollayouts::test_protocollayouts_MainProtocolOnAnonWithErrorRequestTable;
+    &::test_protocollayouts::test_protocollayouts_MainProtocol_OnAnonWithError_ResultTable;
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 3;
   static constexpr uint32_t kPrimarySize = FIDL_ALIGN(16 + sizeof(fidl_message_header_t));
@@ -5054,7 +5041,7 @@ class ::fidl::internal::WireCompleterImpl<::test_protocollayouts::MainProtocol::
   void ReplyError(uint32_t error);
 
  private:
-  void MakeReply(::test_protocollayouts_imported::wire::ComposedProtocolTwoWayAnonComposedWithErrorResult result);
+  void MakeReply(::test_protocollayouts_imported::wire::ComposedProtocolTwoWayAnonComposedWithErrorResult ComposedProtocolTwoWayAnonComposedWithErrorResult);
 };
 
 template <>
@@ -5067,7 +5054,7 @@ class ::fidl::internal::WireBufferCompleterImpl<::test_protocollayouts::MainProt
   void ReplyError(uint32_t error);
 
  private:
-  void MakeReply(::test_protocollayouts_imported::wire::ComposedProtocolTwoWayAnonComposedWithErrorResult result);
+  void MakeReply(::test_protocollayouts_imported::wire::ComposedProtocolTwoWayAnonComposedWithErrorResult ComposedProtocolTwoWayAnonComposedWithErrorResult);
 };
 
 template<>
@@ -5134,7 +5121,7 @@ class ::fidl::internal::WireCompleterImpl<::test_protocollayouts::MainProtocol::
   void ReplyError(uint32_t error);
 
  private:
-  void MakeReply(::test_protocollayouts_imported::wire::ComposedProtocolTwoWayNamedComposedWithErrorResult result);
+  void MakeReply(::test_protocollayouts_imported::wire::ComposedProtocolTwoWayNamedComposedWithErrorResult ComposedProtocolTwoWayNamedComposedWithErrorResult);
 };
 
 template <>
@@ -5147,7 +5134,7 @@ class ::fidl::internal::WireBufferCompleterImpl<::test_protocollayouts::MainProt
   void ReplyError(uint32_t error);
 
  private:
-  void MakeReply(::test_protocollayouts_imported::wire::ComposedProtocolTwoWayNamedComposedWithErrorResult result);
+  void MakeReply(::test_protocollayouts_imported::wire::ComposedProtocolTwoWayNamedComposedWithErrorResult ComposedProtocolTwoWayNamedComposedWithErrorResult);
 };
 
 template<>
@@ -5214,7 +5201,7 @@ class ::fidl::internal::WireCompleterImpl<::test_protocollayouts::MainProtocol::
   void ReplyError(uint32_t error);
 
  private:
-  void MakeReply(::test_protocollayouts::wire::MainProtocolTwoWayImportWithErrorResult result);
+  void MakeReply(::test_protocollayouts::wire::MainProtocolTwoWayImportWithErrorResult MainProtocolTwoWayImportWithErrorResult);
 };
 
 template <>
@@ -5227,7 +5214,7 @@ class ::fidl::internal::WireBufferCompleterImpl<::test_protocollayouts::MainProt
   void ReplyError(uint32_t error);
 
  private:
-  void MakeReply(::test_protocollayouts::wire::MainProtocolTwoWayImportWithErrorResult result);
+  void MakeReply(::test_protocollayouts::wire::MainProtocolTwoWayImportWithErrorResult MainProtocolTwoWayImportWithErrorResult);
 };
 
 template<>
@@ -5294,7 +5281,7 @@ class ::fidl::internal::WireCompleterImpl<::test_protocollayouts::MainProtocol::
   void ReplyError(uint32_t error);
 
  private:
-  void MakeReply(::test_protocollayouts::wire::MainProtocolTwoWayLocalWithErrorResult result);
+  void MakeReply(::test_protocollayouts::wire::MainProtocolTwoWayLocalWithErrorResult MainProtocolTwoWayLocalWithErrorResult);
 };
 
 template <>
@@ -5307,7 +5294,7 @@ class ::fidl::internal::WireBufferCompleterImpl<::test_protocollayouts::MainProt
   void ReplyError(uint32_t error);
 
  private:
-  void MakeReply(::test_protocollayouts::wire::MainProtocolTwoWayLocalWithErrorResult result);
+  void MakeReply(::test_protocollayouts::wire::MainProtocolTwoWayLocalWithErrorResult MainProtocolTwoWayLocalWithErrorResult);
 };
 
 template<>
@@ -5374,7 +5361,7 @@ class ::fidl::internal::WireCompleterImpl<::test_protocollayouts::MainProtocol::
   void ReplyError(uint32_t error);
 
  private:
-  void MakeReply(::test_protocollayouts::wire::MainProtocolTwoWayAnonWithErrorResult result);
+  void MakeReply(::test_protocollayouts::wire::MainProtocolTwoWayAnonWithErrorResult MainProtocolTwoWayAnonWithErrorResult);
 };
 
 template <>
@@ -5387,7 +5374,7 @@ class ::fidl::internal::WireBufferCompleterImpl<::test_protocollayouts::MainProt
   void ReplyError(uint32_t error);
 
  private:
-  void MakeReply(::test_protocollayouts::wire::MainProtocolTwoWayAnonWithErrorResult result);
+  void MakeReply(::test_protocollayouts::wire::MainProtocolTwoWayAnonWithErrorResult MainProtocolTwoWayAnonWithErrorResult);
 };
 
 template<>
@@ -5738,31 +5725,31 @@ class ::fidl::internal::WireWeakEventSender<::test_protocollayouts::MainProtocol
     fidl::OneWayStatus OnAnonComposed(::test_protocollayouts_imported::wire::ComposedProtocolOnAnonComposedRequest ComposedProtocolOnAnonComposedRequest);
 
 
-    fidl::OneWayStatus OnAnonComposedWithError(::test_protocollayouts_imported::wire::ComposedProtocolOnAnonComposedWithErrorResult result);
+    fidl::OneWayStatus OnAnonComposedWithError(::test_protocollayouts_imported::wire::ComposedProtocolOnAnonComposedWithErrorResult ComposedProtocolOnAnonComposedWithErrorResult);
 
 
     fidl::OneWayStatus OnNamedComposed(::test_protocollayouts_imported::wire::ImportUnionPayload ImportUnionPayload);
 
 
-    fidl::OneWayStatus OnNamedComposedWithError(::test_protocollayouts_imported::wire::ComposedProtocolOnNamedComposedWithErrorResult result);
+    fidl::OneWayStatus OnNamedComposedWithError(::test_protocollayouts_imported::wire::ComposedProtocolOnNamedComposedWithErrorResult ComposedProtocolOnNamedComposedWithErrorResult);
 
 
     fidl::OneWayStatus OnImport(::test_protocollayouts_imported::wire::ImportUnionPayload ImportUnionPayload);
 
 
-    fidl::OneWayStatus OnImportWithError(::test_protocollayouts::wire::MainProtocolOnImportWithErrorResult result);
+    fidl::OneWayStatus OnImportWithError(::test_protocollayouts::wire::MainProtocolOnImportWithErrorResult MainProtocolOnImportWithErrorResult);
 
 
     fidl::OneWayStatus OnLocal(::test_protocollayouts::wire::LocalUnionPayload LocalUnionPayload);
 
 
-    fidl::OneWayStatus OnLocalWithError(::test_protocollayouts::wire::MainProtocolOnLocalWithErrorResult result);
+    fidl::OneWayStatus OnLocalWithError(::test_protocollayouts::wire::MainProtocolOnLocalWithErrorResult MainProtocolOnLocalWithErrorResult);
 
 
     fidl::OneWayStatus OnAnon(::test_protocollayouts::wire::MainProtocolOnAnonRequest MainProtocolOnAnonRequest);
 
 
-    fidl::OneWayStatus OnAnonWithError(::test_protocollayouts::wire::MainProtocolOnAnonWithErrorResult result);
+    fidl::OneWayStatus OnAnonWithError(::test_protocollayouts::wire::MainProtocolOnAnonWithErrorResult MainProtocolOnAnonWithErrorResult);
 
 
 };
@@ -5775,31 +5762,31 @@ class ::fidl::internal::WireWeakBufferEventSender<::test_protocollayouts::MainPr
     fidl::OneWayStatus OnAnonComposed(::test_protocollayouts_imported::wire::ComposedProtocolOnAnonComposedRequest ComposedProtocolOnAnonComposedRequest);
 
 
-    fidl::OneWayStatus OnAnonComposedWithError(::test_protocollayouts_imported::wire::ComposedProtocolOnAnonComposedWithErrorResult result);
+    fidl::OneWayStatus OnAnonComposedWithError(::test_protocollayouts_imported::wire::ComposedProtocolOnAnonComposedWithErrorResult ComposedProtocolOnAnonComposedWithErrorResult);
 
 
     fidl::OneWayStatus OnNamedComposed(::test_protocollayouts_imported::wire::ImportUnionPayload ImportUnionPayload);
 
 
-    fidl::OneWayStatus OnNamedComposedWithError(::test_protocollayouts_imported::wire::ComposedProtocolOnNamedComposedWithErrorResult result);
+    fidl::OneWayStatus OnNamedComposedWithError(::test_protocollayouts_imported::wire::ComposedProtocolOnNamedComposedWithErrorResult ComposedProtocolOnNamedComposedWithErrorResult);
 
 
     fidl::OneWayStatus OnImport(::test_protocollayouts_imported::wire::ImportUnionPayload ImportUnionPayload);
 
 
-    fidl::OneWayStatus OnImportWithError(::test_protocollayouts::wire::MainProtocolOnImportWithErrorResult result);
+    fidl::OneWayStatus OnImportWithError(::test_protocollayouts::wire::MainProtocolOnImportWithErrorResult MainProtocolOnImportWithErrorResult);
 
 
     fidl::OneWayStatus OnLocal(::test_protocollayouts::wire::LocalUnionPayload LocalUnionPayload);
 
 
-    fidl::OneWayStatus OnLocalWithError(::test_protocollayouts::wire::MainProtocolOnLocalWithErrorResult result);
+    fidl::OneWayStatus OnLocalWithError(::test_protocollayouts::wire::MainProtocolOnLocalWithErrorResult MainProtocolOnLocalWithErrorResult);
 
 
     fidl::OneWayStatus OnAnon(::test_protocollayouts::wire::MainProtocolOnAnonRequest MainProtocolOnAnonRequest);
 
 
-    fidl::OneWayStatus OnAnonWithError(::test_protocollayouts::wire::MainProtocolOnAnonWithErrorResult result);
+    fidl::OneWayStatus OnAnonWithError(::test_protocollayouts::wire::MainProtocolOnAnonWithErrorResult MainProtocolOnAnonWithErrorResult);
 
 
 };
@@ -5813,31 +5800,31 @@ class ::fidl::internal::WireEventSender<::test_protocollayouts::MainProtocol>
     fidl::OneWayStatus OnAnonComposed(::test_protocollayouts_imported::wire::ComposedProtocolOnAnonComposedRequest ComposedProtocolOnAnonComposedRequest);
 
 
-    fidl::OneWayStatus OnAnonComposedWithError(::test_protocollayouts_imported::wire::ComposedProtocolOnAnonComposedWithErrorResult result);
+    fidl::OneWayStatus OnAnonComposedWithError(::test_protocollayouts_imported::wire::ComposedProtocolOnAnonComposedWithErrorResult ComposedProtocolOnAnonComposedWithErrorResult);
 
 
     fidl::OneWayStatus OnNamedComposed(::test_protocollayouts_imported::wire::ImportUnionPayload ImportUnionPayload);
 
 
-    fidl::OneWayStatus OnNamedComposedWithError(::test_protocollayouts_imported::wire::ComposedProtocolOnNamedComposedWithErrorResult result);
+    fidl::OneWayStatus OnNamedComposedWithError(::test_protocollayouts_imported::wire::ComposedProtocolOnNamedComposedWithErrorResult ComposedProtocolOnNamedComposedWithErrorResult);
 
 
     fidl::OneWayStatus OnImport(::test_protocollayouts_imported::wire::ImportUnionPayload ImportUnionPayload);
 
 
-    fidl::OneWayStatus OnImportWithError(::test_protocollayouts::wire::MainProtocolOnImportWithErrorResult result);
+    fidl::OneWayStatus OnImportWithError(::test_protocollayouts::wire::MainProtocolOnImportWithErrorResult MainProtocolOnImportWithErrorResult);
 
 
     fidl::OneWayStatus OnLocal(::test_protocollayouts::wire::LocalUnionPayload LocalUnionPayload);
 
 
-    fidl::OneWayStatus OnLocalWithError(::test_protocollayouts::wire::MainProtocolOnLocalWithErrorResult result);
+    fidl::OneWayStatus OnLocalWithError(::test_protocollayouts::wire::MainProtocolOnLocalWithErrorResult MainProtocolOnLocalWithErrorResult);
 
 
     fidl::OneWayStatus OnAnon(::test_protocollayouts::wire::MainProtocolOnAnonRequest MainProtocolOnAnonRequest);
 
 
-    fidl::OneWayStatus OnAnonWithError(::test_protocollayouts::wire::MainProtocolOnAnonWithErrorResult result);
+    fidl::OneWayStatus OnAnonWithError(::test_protocollayouts::wire::MainProtocolOnAnonWithErrorResult MainProtocolOnAnonWithErrorResult);
 
 
 };
@@ -5851,31 +5838,31 @@ class ::fidl::internal::WireBufferEventSender<::test_protocollayouts::MainProtoc
     fidl::OneWayStatus OnAnonComposed(::test_protocollayouts_imported::wire::ComposedProtocolOnAnonComposedRequest ComposedProtocolOnAnonComposedRequest);
 
 
-    fidl::OneWayStatus OnAnonComposedWithError(::test_protocollayouts_imported::wire::ComposedProtocolOnAnonComposedWithErrorResult result);
+    fidl::OneWayStatus OnAnonComposedWithError(::test_protocollayouts_imported::wire::ComposedProtocolOnAnonComposedWithErrorResult ComposedProtocolOnAnonComposedWithErrorResult);
 
 
     fidl::OneWayStatus OnNamedComposed(::test_protocollayouts_imported::wire::ImportUnionPayload ImportUnionPayload);
 
 
-    fidl::OneWayStatus OnNamedComposedWithError(::test_protocollayouts_imported::wire::ComposedProtocolOnNamedComposedWithErrorResult result);
+    fidl::OneWayStatus OnNamedComposedWithError(::test_protocollayouts_imported::wire::ComposedProtocolOnNamedComposedWithErrorResult ComposedProtocolOnNamedComposedWithErrorResult);
 
 
     fidl::OneWayStatus OnImport(::test_protocollayouts_imported::wire::ImportUnionPayload ImportUnionPayload);
 
 
-    fidl::OneWayStatus OnImportWithError(::test_protocollayouts::wire::MainProtocolOnImportWithErrorResult result);
+    fidl::OneWayStatus OnImportWithError(::test_protocollayouts::wire::MainProtocolOnImportWithErrorResult MainProtocolOnImportWithErrorResult);
 
 
     fidl::OneWayStatus OnLocal(::test_protocollayouts::wire::LocalUnionPayload LocalUnionPayload);
 
 
-    fidl::OneWayStatus OnLocalWithError(::test_protocollayouts::wire::MainProtocolOnLocalWithErrorResult result);
+    fidl::OneWayStatus OnLocalWithError(::test_protocollayouts::wire::MainProtocolOnLocalWithErrorResult MainProtocolOnLocalWithErrorResult);
 
 
     fidl::OneWayStatus OnAnon(::test_protocollayouts::wire::MainProtocolOnAnonRequest MainProtocolOnAnonRequest);
 
 
-    fidl::OneWayStatus OnAnonWithError(::test_protocollayouts::wire::MainProtocolOnAnonWithErrorResult result);
+    fidl::OneWayStatus OnAnonWithError(::test_protocollayouts::wire::MainProtocolOnAnonWithErrorResult MainProtocolOnAnonWithErrorResult);
 
 
 };

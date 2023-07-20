@@ -708,6 +708,13 @@ type Method struct {
 	Transport *Transport
 }
 
+func (m Method) TheResponseArg() Parameter {
+	if len(m.ResponseArgs) != 1 {
+		panic(fmt.Sprintf("called TheResponseArg when there are %d response args", len(m.ResponseArgs)))
+	}
+	return m.ResponseArgs[0]
+}
+
 func (m Method) WireCompleterArg() string {
 	return m.appendName("Completer").nest("Sync").Name()
 }
@@ -1104,8 +1111,11 @@ func (c *compiler) compileProtocol(p fidlgen.Protocol) *Protocol {
 		name := methodNameContext.transform(v.Name)
 
 		var result *Result
-		if v.HasError || v.HasTransportError() {
-			result = c.resultForUnion[v.ResultType.Identifier]
+		if v.HasResultUnion() {
+			result, ok = c.resultForUnion[v.ResponsePayload.Identifier]
+			if !ok {
+				panic(fmt.Sprintf("resultForUnion is missing %s", v.ResponsePayload.Identifier))
+			}
 		}
 
 		methodMarker := protocolName.nest(name.Wire.Name())

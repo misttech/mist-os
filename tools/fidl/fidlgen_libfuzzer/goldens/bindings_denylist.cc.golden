@@ -106,7 +106,7 @@ extern "C" int LLVMFuzzerTestOneInput(const uint8_t* data_, size_t size_) {
       bool a = Allocate<bool>{}(&src_, &param_size_);
 
       xprintf("Invoking method test_bindingsdenylist_DenyEachBinding.OnlyDenyDart\n");
-      protocol_->OnlyDenyDart(std::move(a), [signaller = fuzzer_.NewCallbackSignaller()](::test::bindingsdenylist::DenyEachBinding_OnlyDenyDart_Result result) {
+      protocol_->OnlyDenyDart(std::move(a), [signaller = fuzzer_.NewCallbackSignaller()](::test::bindingsdenylist::DenyEachBinding_OnlyDenyDart_Result DenyEachBinding_OnlyDenyDart_Result) {
         xprintf("Invoked test_bindingsdenylist_DenyEachBinding.OnlyDenyDart\n");
         zx_status_t status_ = signaller.SignalCallback();
         if (status_ != ZX_OK) {
@@ -140,7 +140,7 @@ extern "C" int LLVMFuzzerTestOneInput(const uint8_t* data_, size_t size_) {
       bool a = Allocate<bool>{}(&src_, &param_size_);
 
       xprintf("Invoking method test_bindingsdenylist_DenyEachBinding.OnlyDenyGo\n");
-      protocol_->OnlyDenyGo(std::move(a), [signaller = fuzzer_.NewCallbackSignaller()](::test::bindingsdenylist::DenyEachBinding_OnlyDenyGo_Result result) {
+      protocol_->OnlyDenyGo(std::move(a), [signaller = fuzzer_.NewCallbackSignaller()](::test::bindingsdenylist::DenyEachBinding_OnlyDenyGo_Result DenyEachBinding_OnlyDenyGo_Result) {
         xprintf("Invoked test_bindingsdenylist_DenyEachBinding.OnlyDenyGo\n");
         zx_status_t status_ = signaller.SignalCallback();
         if (status_ != ZX_OK) {
@@ -174,7 +174,7 @@ extern "C" int LLVMFuzzerTestOneInput(const uint8_t* data_, size_t size_) {
       bool a = Allocate<bool>{}(&src_, &param_size_);
 
       xprintf("Invoking method test_bindingsdenylist_DenyEachBinding.OnlyDenyRust\n");
-      protocol_->OnlyDenyRust(std::move(a), [signaller = fuzzer_.NewCallbackSignaller()](::test::bindingsdenylist::DenyEachBinding_OnlyDenyRust_Result result) {
+      protocol_->OnlyDenyRust(std::move(a), [signaller = fuzzer_.NewCallbackSignaller()](::test::bindingsdenylist::DenyEachBinding_OnlyDenyRust_Result DenyEachBinding_OnlyDenyRust_Result) {
         xprintf("Invoked test_bindingsdenylist_DenyEachBinding.OnlyDenyRust\n");
         zx_status_t status_ = signaller.SignalCallback();
         if (status_ != ZX_OK) {
@@ -208,7 +208,7 @@ extern "C" int LLVMFuzzerTestOneInput(const uint8_t* data_, size_t size_) {
       bool a = Allocate<bool>{}(&src_, &param_size_);
 
       xprintf("Invoking method test_bindingsdenylist_DenyEachBinding.OnlyDenySyzkaller\n");
-      protocol_->OnlyDenySyzkaller(std::move(a), [signaller = fuzzer_.NewCallbackSignaller()](::test::bindingsdenylist::DenyEachBinding_OnlyDenySyzkaller_Result result) {
+      protocol_->OnlyDenySyzkaller(std::move(a), [signaller = fuzzer_.NewCallbackSignaller()](::test::bindingsdenylist::DenyEachBinding_OnlyDenySyzkaller_Result DenyEachBinding_OnlyDenySyzkaller_Result) {
         xprintf("Invoked test_bindingsdenylist_DenyEachBinding.OnlyDenySyzkaller\n");
         zx_status_t status_ = signaller.SignalCallback();
         if (status_ != ZX_OK) {

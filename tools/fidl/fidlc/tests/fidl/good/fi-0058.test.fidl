@@ -3,23 +3,27 @@
 // found in the LICENSE file.
 library test.good.fi0058;
 
-type ClientRequest = struct {
+type MyRequest = struct {
     in uint8;
 };
-type ServerResponse = struct {
+type MyResponse = struct {
     out int8;
 };
+type MyError = flexible enum {};
 
 protocol MyProtocol {
-    MyInfallible(ClientRequest) -> (ServerResponse);
-    MyFallible(ClientRequest) -> (ServerResponse) error uint32;
-    -> MyEvent(ServerResponse);
+    MyInfallible(MyRequest) -> (MyResponse);
+    MyFallible(MyRequest) -> (MyResponse) error MyError;
+    -> MyEvent(MyResponse);
 };
 
 type MyAnonymousReferences = struct {
-    a ClientRequest;
-    b ServerResponse;
-    c ClientRequest;
-    d ServerResponse;
-    e ServerResponse;
+    a MyRequest;
+    b MyResponse;
+    c MyRequest;
+    // There is no way to explicitly name the error result union.
+    // d MyProtocol_MyFallible_Result;
+    e MyResponse;
+    f MyError;
+    g MyResponse;
 };

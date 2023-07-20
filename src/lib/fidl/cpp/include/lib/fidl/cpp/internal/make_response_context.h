@@ -22,13 +22,13 @@ auto ConvertResponseDomainObjectToResult(
   constexpr bool kHasFrameworkError = FidlMethod::kHasFrameworkError;
 
   if constexpr (kHasDomainError) {
-    if (domain_object.result().err().has_value()) {
-      return ResultType{::fit::error(std::move(domain_object.result().err().value()))};
+    if (domain_object.err().has_value()) {
+      return ResultType{::fit::error(std::move(domain_object.err().value()))};
     }
   }
   if constexpr (kHasFrameworkError) {
-    if (domain_object.result().transport_err().has_value()) {
-      ::fidl::internal::TransportErr transport_err = domain_object.result().transport_err().value();
+    if (domain_object.transport_err().has_value()) {
+      ::fidl::internal::TransportErr transport_err = domain_object.transport_err().value();
       switch (transport_err) {
         case ::fidl::internal::TransportErr::kUnknownMethod: {
           return ResultType{::fit::error(::fidl::Error::UnknownMethod())};
@@ -40,11 +40,11 @@ auto ConvertResponseDomainObjectToResult(
   if constexpr (kHasDomainError || kHasFrameworkError) {
     constexpr bool IsEmptyStructPayload = !FidlMethod::kHasNonEmptyUserFacingResponse;
 
-    ZX_DEBUG_ASSERT(domain_object.result().response().has_value());
+    ZX_DEBUG_ASSERT(domain_object.response().has_value());
     if constexpr (IsEmptyStructPayload) {
       return ResultType{::fit::success()};
     } else {
-      return ResultType{::fit::ok(std::move(domain_object.result().response().value()))};
+      return ResultType{::fit::ok(std::move(domain_object.response().value()))};
     }
   } else {
     return ResultType{::fit::ok(std::move(domain_object))};

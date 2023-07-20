@@ -21,11 +21,6 @@
       ::fidl::internal::NaturalClone(storage_.y)};
 }
 
-::test_error::ExampleFooTopResponse::Storage_ test_error::ExampleFooTopResponse::CloneStorage_() const {
-  return Storage_{
-      ::fidl::internal::NaturalClone(storage_.result)};
-}
-
 std::shared_ptr<::test_error::ExampleFooResult::Storage_> test_error::ExampleFooResult::CloneStorage_() const {
   const Storage_& storage = *storage_;
   switch (storage_->index()) {

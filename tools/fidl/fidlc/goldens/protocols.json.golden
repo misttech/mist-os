@@ -1392,7 +1392,7 @@
           "has_response": true,
           "maybe_response_payload": {
             "kind": "identifier",
-            "identifier": "test.protocols/WithErrorSyntaxResponseAsStructTopResponse",
+            "identifier": "test.protocols/WithErrorSyntax_ResponseAsStruct_Result",
             "nullable": false,
             "type_shape_v1": {
               "inline_size": 24,
@@ -1506,7 +1506,7 @@
           "has_response": true,
           "maybe_response_payload": {
             "kind": "identifier",
-            "identifier": "test.protocols/WithErrorSyntaxErrorAsPrimitiveTopResponse",
+            "identifier": "test.protocols/WithErrorSyntax_ErrorAsPrimitive_Result",
             "nullable": false,
             "type_shape_v1": {
               "inline_size": 24,
@@ -1620,7 +1620,7 @@
           "has_response": true,
           "maybe_response_payload": {
             "kind": "identifier",
-            "identifier": "test.protocols/WithErrorSyntaxErrorAsEnumTopResponse",
+            "identifier": "test.protocols/WithErrorSyntax_ErrorAsEnum_Result",
             "nullable": false,
             "type_shape_v1": {
               "inline_size": 24,
@@ -1735,7 +1735,7 @@
           "has_response": true,
           "maybe_response_payload": {
             "kind": "identifier",
-            "identifier": "test.protocols/WithErrorSyntaxHandleInResultTopResponse",
+            "identifier": "test.protocols/WithErrorSyntax_HandleInResult_Result",
             "nullable": false,
             "type_shape_v1": {
               "inline_size": 24,
@@ -4974,328 +4974,11 @@
       }
     },
     {
-      "name": "test.protocols/WithErrorSyntaxErrorAsEnumTopResponse",
-      "naming_context": [
-        "WithErrorSyntax",
-        "ErrorAsEnum",
-        "Response"
-      ],
-      "location": {
-        "filename": "../../tools/fidl/fidlc/testdata/protocols.test.fidl",
-        "line": 40,
-        "column": 29,
-        "length": 2
-      },
-      "members": [
-        {
-          "type": {
-            "kind": "identifier",
-            "identifier": "test.protocols/WithErrorSyntax_ErrorAsEnum_Result",
-            "nullable": false,
-            "type_shape_v1": {
-              "inline_size": 24,
-              "alignment": 8,
-              "depth": 1,
-              "max_handles": 0,
-              "max_out_of_line": 8,
-              "has_padding": true,
-              "has_envelope": true,
-              "has_flexible_envelope": false
-            },
-            "type_shape_v2": {
-              "inline_size": 16,
-              "alignment": 8,
-              "depth": 1,
-              "max_handles": 0,
-              "max_out_of_line": 0,
-              "has_padding": true,
-              "has_envelope": true,
-              "has_flexible_envelope": false
-            }
-          },
-          "name": "result",
-          "location": {
-            "filename": "generated",
-            "line": 11,
-            "column": 1,
-            "length": 6
-          },
-          "field_shape_v1": {
-            "offset": 0,
-            "padding": 0
-          },
-          "field_shape_v2": {
-            "offset": 0,
-            "padding": 0
-          }
-        }
-      ],
-      "resource": false,
-      "type_shape_v1": {
-        "inline_size": 24,
-        "alignment": 8,
-        "depth": 1,
-        "max_handles": 0,
-        "max_out_of_line": 8,
-        "has_padding": true,
-        "has_envelope": true,
-        "has_flexible_envelope": false
-      },
-      "type_shape_v2": {
-        "inline_size": 16,
-        "alignment": 8,
-        "depth": 1,
-        "max_handles": 0,
-        "max_out_of_line": 0,
-        "has_padding": true,
-        "has_envelope": true,
-        "has_flexible_envelope": false
-      }
-    },
-    {
-      "name": "test.protocols/WithErrorSyntaxErrorAsPrimitiveTopResponse",
-      "naming_context": [
-        "WithErrorSyntax",
-        "ErrorAsPrimitive",
-        "Response"
-      ],
-      "location": {
-        "filename": "../../tools/fidl/fidlc/testdata/protocols.test.fidl",
-        "line": 39,
-        "column": 34,
-        "length": 2
-      },
-      "members": [
-        {
-          "type": {
-            "kind": "identifier",
-            "identifier": "test.protocols/WithErrorSyntax_ErrorAsPrimitive_Result",
-            "nullable": false,
-            "type_shape_v1": {
-              "inline_size": 24,
-              "alignment": 8,
-              "depth": 1,
-              "max_handles": 0,
-              "max_out_of_line": 8,
-              "has_padding": true,
-              "has_envelope": true,
-              "has_flexible_envelope": false
-            },
-            "type_shape_v2": {
-              "inline_size": 16,
-              "alignment": 8,
-              "depth": 1,
-              "max_handles": 0,
-              "max_out_of_line": 0,
-              "has_padding": true,
-              "has_envelope": true,
-              "has_flexible_envelope": false
-            }
-          },
-          "name": "result",
-          "location": {
-            "filename": "generated",
-            "line": 6,
-            "column": 1,
-            "length": 6
-          },
-          "field_shape_v1": {
-            "offset": 0,
-            "padding": 0
-          },
-          "field_shape_v2": {
-            "offset": 0,
-            "padding": 0
-          }
-        }
-      ],
-      "resource": false,
-      "type_shape_v1": {
-        "inline_size": 24,
-        "alignment": 8,
-        "depth": 1,
-        "max_handles": 0,
-        "max_out_of_line": 8,
-        "has_padding": true,
-        "has_envelope": true,
-        "has_flexible_envelope": false
-      },
-      "type_shape_v2": {
-        "inline_size": 16,
-        "alignment": 8,
-        "depth": 1,
-        "max_handles": 0,
-        "max_out_of_line": 0,
-        "has_padding": true,
-        "has_envelope": true,
-        "has_flexible_envelope": false
-      }
-    },
-    {
-      "name": "test.protocols/WithErrorSyntaxHandleInResultTopResponse",
-      "naming_context": [
-        "WithErrorSyntax",
-        "HandleInResult",
-        "Response"
-      ],
-      "location": {
-        "filename": "../../tools/fidl/fidlc/testdata/protocols.test.fidl",
-        "line": 41,
-        "column": 32,
-        "length": 46
-      },
-      "members": [
-        {
-          "type": {
-            "kind": "identifier",
-            "identifier": "test.protocols/WithErrorSyntax_HandleInResult_Result",
-            "nullable": false,
-            "type_shape_v1": {
-              "inline_size": 24,
-              "alignment": 8,
-              "depth": 1,
-              "max_handles": 1,
-              "max_out_of_line": 8,
-              "has_padding": true,
-              "has_envelope": true,
-              "has_flexible_envelope": false
-            },
-            "type_shape_v2": {
-              "inline_size": 16,
-              "alignment": 8,
-              "depth": 1,
-              "max_handles": 1,
-              "max_out_of_line": 0,
-              "has_padding": true,
-              "has_envelope": true,
-              "has_flexible_envelope": false
-            }
-          },
-          "name": "result",
-          "location": {
-            "filename": "generated",
-            "line": 16,
-            "column": 1,
-            "length": 6
-          },
-          "field_shape_v1": {
-            "offset": 0,
-            "padding": 0
-          },
-          "field_shape_v2": {
-            "offset": 0,
-            "padding": 0
-          }
-        }
-      ],
-      "resource": true,
-      "type_shape_v1": {
-        "inline_size": 24,
-        "alignment": 8,
-        "depth": 1,
-        "max_handles": 1,
-        "max_out_of_line": 8,
-        "has_padding": true,
-        "has_envelope": true,
-        "has_flexible_envelope": false
-      },
-      "type_shape_v2": {
-        "inline_size": 16,
-        "alignment": 8,
-        "depth": 1,
-        "max_handles": 1,
-        "max_out_of_line": 0,
-        "has_padding": true,
-        "has_envelope": true,
-        "has_flexible_envelope": false
-      }
-    },
-    {
-      "name": "test.protocols/WithErrorSyntaxResponseAsStructTopResponse",
-      "naming_context": [
-        "WithErrorSyntax",
-        "ResponseAsStruct",
-        "Response"
-      ],
-      "location": {
-        "filename": "../../tools/fidl/fidlc/testdata/protocols.test.fidl",
-        "line": 34,
-        "column": 34,
-        "length": 67
-      },
-      "members": [
-        {
-          "type": {
-            "kind": "identifier",
-            "identifier": "test.protocols/WithErrorSyntax_ResponseAsStruct_Result",
-            "nullable": false,
-            "type_shape_v1": {
-              "inline_size": 24,
-              "alignment": 8,
-              "depth": 1,
-              "max_handles": 0,
-              "max_out_of_line": 24,
-              "has_padding": true,
-              "has_envelope": true,
-              "has_flexible_envelope": false
-            },
-            "type_shape_v2": {
-              "inline_size": 16,
-              "alignment": 8,
-              "depth": 1,
-              "max_handles": 0,
-              "max_out_of_line": 24,
-              "has_padding": true,
-              "has_envelope": true,
-              "has_flexible_envelope": false
-            }
-          },
-          "name": "result",
-          "location": {
-            "filename": "generated",
-            "line": 1,
-            "column": 1,
-            "length": 6
-          },
-          "field_shape_v1": {
-            "offset": 0,
-            "padding": 0
-          },
-          "field_shape_v2": {
-            "offset": 0,
-            "padding": 0
-          }
-        }
-      ],
-      "resource": false,
-      "type_shape_v1": {
-        "inline_size": 24,
-        "alignment": 8,
-        "depth": 1,
-        "max_handles": 0,
-        "max_out_of_line": 24,
-        "has_padding": true,
-        "has_envelope": true,
-        "has_flexible_envelope": false
-      },
-      "type_shape_v2": {
-        "inline_size": 16,
-        "alignment": 8,
-        "depth": 1,
-        "max_handles": 0,
-        "max_out_of_line": 24,
-        "has_padding": true,
-        "has_envelope": true,
-        "has_flexible_envelope": false
-      }
-    },
-    {
       "name": "test.protocols/WithErrorSyntax_ErrorAsEnum_Response",
       "naming_context": [
         "WithErrorSyntax",
         "ErrorAsEnum",
         "Response",
-        "result",
         "response"
       ],
       "location": {
@@ -5333,7 +5016,6 @@
         "WithErrorSyntax",
         "ErrorAsPrimitive",
         "Response",
-        "result",
         "response"
       ],
       "location": {
@@ -5371,7 +5053,6 @@
         "WithErrorSyntax",
         "HandleInResult",
         "Response",
-        "result",
         "response"
       ],
       "location": {
@@ -5455,7 +5136,6 @@
         "WithErrorSyntax",
         "ResponseAsStruct",
         "Response",
-        "result",
         "response"
       ],
       "location": {
@@ -6169,8 +5849,7 @@
       "naming_context": [
         "WithErrorSyntax",
         "ErrorAsEnum",
-        "Response",
-        "result"
+        "Response"
       ],
       "location": {
         "filename": "../../tools/fidl/fidlc/testdata/protocols.test.fidl",
@@ -6216,7 +5895,7 @@
           },
           "location": {
             "filename": "generated",
-            "line": 12,
+            "line": 9,
             "column": 1,
             "length": 8
           }
@@ -6252,7 +5931,7 @@
           },
           "location": {
             "filename": "generated",
-            "line": 13,
+            "line": 10,
             "column": 1,
             "length": 3
           }
@@ -6286,8 +5965,7 @@
       "naming_context": [
         "WithErrorSyntax",
         "ErrorAsPrimitive",
-        "Response",
-        "result"
+        "Response"
       ],
       "location": {
         "filename": "../../tools/fidl/fidlc/testdata/protocols.test.fidl",
@@ -6333,7 +6011,7 @@
           },
           "location": {
             "filename": "generated",
-            "line": 7,
+            "line": 5,
             "column": 1,
             "length": 8
           }
@@ -6368,7 +6046,7 @@
           },
           "location": {
             "filename": "generated",
-            "line": 8,
+            "line": 6,
             "column": 1,
             "length": 3
           }
@@ -6402,8 +6080,7 @@
       "naming_context": [
         "WithErrorSyntax",
         "HandleInResult",
-        "Response",
-        "result"
+        "Response"
       ],
       "location": {
         "filename": "../../tools/fidl/fidlc/testdata/protocols.test.fidl",
@@ -6449,7 +6126,7 @@
           },
           "location": {
             "filename": "generated",
-            "line": 17,
+            "line": 13,
             "column": 1,
             "length": 8
           }
@@ -6484,7 +6161,7 @@
           },
           "location": {
             "filename": "generated",
-            "line": 18,
+            "line": 14,
             "column": 1,
             "length": 3
           }
@@ -6518,8 +6195,7 @@
       "naming_context": [
         "WithErrorSyntax",
         "ResponseAsStruct",
-        "Response",
-        "result"
+        "Response"
       ],
       "location": {
         "filename": "../../tools/fidl/fidlc/testdata/protocols.test.fidl",
@@ -6565,7 +6241,7 @@
           },
           "location": {
             "filename": "generated",
-            "line": 2,
+            "line": 1,
             "column": 1,
             "length": 8
           }
@@ -6600,7 +6276,7 @@
           },
           "location": {
             "filename": "generated",
-            "line": 3,
+            "line": 2,
             "column": 1,
             "length": 3
           }
@@ -6639,13 +6315,10 @@
     "test.protocols/WithProtocolEndsClientEndsRequest",
     "test.protocols/WithErrorSyntax_ResponseAsStruct_Response",
     "test.protocols/WithErrorSyntax_ResponseAsStruct_Result",
-    "test.protocols/WithErrorSyntaxResponseAsStructTopResponse",
     "test.protocols/WithErrorSyntax_HandleInResult_Response",
     "test.protocols/WithErrorSyntax_HandleInResult_Result",
-    "test.protocols/WithErrorSyntaxHandleInResultTopResponse",
     "test.protocols/WithErrorSyntax_ErrorAsPrimitive_Response",
     "test.protocols/WithErrorSyntax_ErrorAsPrimitive_Result",
-    "test.protocols/WithErrorSyntaxErrorAsPrimitiveTopResponse",
     "test.protocols/WithErrorSyntax_ErrorAsEnum_Response",
     "test.protocols/WithAndWithoutRequestResponseWithRequestWithResponseResponse",
     "test.protocols/WithAndWithoutRequestResponseWithRequestWithResponseRequest",
@@ -6678,7 +6351,6 @@
     "test.protocols/HandleRightsProtocol",
     "test.protocols/ErrorEnum",
     "test.protocols/WithErrorSyntax_ErrorAsEnum_Result",
-    "test.protocols/WithErrorSyntaxErrorAsEnumTopResponse",
     "test.protocols/WithErrorSyntax",
     "test.protocols/DiscoverableProtocol",
     "test.protocols/ChannelProtocolTakeHandleRequest",
@@ -6730,10 +6402,6 @@
     "test.protocols/WithAndWithoutRequestResponseWithRequestNoResponseRequest": "struct",
     "test.protocols/WithAndWithoutRequestResponseWithRequestWithResponseRequest": "struct",
     "test.protocols/WithAndWithoutRequestResponseWithRequestWithResponseResponse": "struct",
-    "test.protocols/WithErrorSyntaxErrorAsEnumTopResponse": "struct",
-    "test.protocols/WithErrorSyntaxErrorAsPrimitiveTopResponse": "struct",
-    "test.protocols/WithErrorSyntaxHandleInResultTopResponse": "struct",
-    "test.protocols/WithErrorSyntaxResponseAsStructTopResponse": "struct",
     "test.protocols/WithErrorSyntax_ErrorAsEnum_Response": "struct",
     "test.protocols/WithErrorSyntax_ErrorAsPrimitive_Response": "struct",
     "test.protocols/WithErrorSyntax_HandleInResult_Response": "struct",

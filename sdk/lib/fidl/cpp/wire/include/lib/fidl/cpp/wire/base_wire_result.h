@@ -138,15 +138,15 @@ class BaseWireResult<FidlMethod, std::enable_if_t<FidlMethod::kHasServerToClient
     static_assert(FidlMethod::kHasFrameworkError);
     // For a flexible method, we need to check whether the result is success
     // or transport_err.
-    if (raw_response->result.is_transport_err()) {
-      switch (raw_response->result.transport_err()) {
+    if (raw_response->is_transport_err()) {
+      switch (raw_response->transport_err()) {
         case ::fidl::internal::TransportErr::kUnknownMethod:
           SetStatus(::fidl::Status::UnknownMethod());
           return;
       }
       ZX_PANIC("Unknown transport_err");
     } else {
-      ZX_ASSERT_MSG(raw_response->result.is_response(), "Unknown FIDL result union variant");
+      ZX_ASSERT_MSG(raw_response->is_response(), "Unknown FIDL result union variant");
     }
   }
 };
@@ -226,36 +226,36 @@ class BaseWireResult<
   // for the |Unwrap| accessors.
   void ExtractValueFromDecoded(::fidl::WireResponse<FidlMethod>* raw_response) {
     if constexpr (FidlMethod::kHasDomainError && FidlMethod::kHasFrameworkError) {
-      if (raw_response->result.is_transport_err()) {
+      if (raw_response->is_transport_err()) {
         SetStatus(::fidl::Status::UnknownMethod());
-      } else if (raw_response->result.is_err()) {
-        result_ = fit::error(raw_response->result.err());
+      } else if (raw_response->is_err()) {
+        result_ = fit::error(raw_response->err());
       } else {
-        ZX_ASSERT_MSG(raw_response->result.is_response(), "Unknown FIDL result union variant");
+        ZX_ASSERT_MSG(raw_response->is_response(), "Unknown FIDL result union variant");
         if constexpr (FidlMethod::kHasNonEmptyUserFacingResponse) {
-          result_ = fit::ok(&(raw_response->result.response()));
+          result_ = fit::ok(&(raw_response->response()));
         } else {
           result_ = fit::ok();
         }
       }
     } else if constexpr (FidlMethod::kHasFrameworkError) {
-      if (raw_response->result.is_transport_err()) {
+      if (raw_response->is_transport_err()) {
         SetStatus(::fidl::Status::UnknownMethod());
       } else {
         // Result must be non-empty, because if there is no domain error
         // and the result is empty, we would use the template without the Unwrap
         // accessors.
         static_assert(FidlMethod::kHasNonEmptyUserFacingResponse);
-        ZX_ASSERT_MSG(raw_response->result.is_response(), "Unknown FIDL result union variant");
-        result_ = &(raw_response->result.response());
+        ZX_ASSERT_MSG(raw_response->is_response(), "Unknown FIDL result union variant");
+        result_ = &(raw_response->response());
       }
     } else if constexpr (FidlMethod::kHasDomainError) {
-      if (raw_response->result.is_err()) {
-        result_ = fit::error(raw_response->result.err());
+      if (raw_response->is_err()) {
+        result_ = fit::error(raw_response->err());
       } else {
-        ZX_ASSERT_MSG(raw_response->result.is_response(), "Unknown FIDL result union variant");
+        ZX_ASSERT_MSG(raw_response->is_response(), "Unknown FIDL result union variant");
         if constexpr (FidlMethod::kHasNonEmptyUserFacingResponse) {
-          result_ = fit::ok(&(raw_response->result.response()));
+          result_ = fit::ok(&(raw_response->response()));
         } else {
           result_ = fit::ok();
         }

@@ -27,15 +27,7 @@ protocol Example {
   ASSERT_NOT_NULL(response);
 
   auto id = static_cast<const fidl::flat::IdentifierType*>(response->type);
-  auto as_struct = static_cast<const fidl::flat::Struct*>(id->type_decl);
-  ASSERT_EQ(as_struct->members.size(), 1);
-
-  auto response_member = &as_struct->members.at(0);
-  ASSERT_EQ(response_member->type_ctor->type->kind, fidl::flat::Type::Kind::kIdentifier);
-  auto result_identifier =
-      static_cast<const fidl::flat::IdentifierType*>(response_member->type_ctor->type);
-  const fidl::flat::Union* result_union =
-      library.LookupUnion(std::string(result_identifier->name.decl_name()));
+  auto result_union = static_cast<const fidl::flat::Union*>(id->type_decl);
   ASSERT_NOT_NULL(result_union);
   ASSERT_NOT_NULL(result_union->attributes);
   ASSERT_TRUE(result_union->attributes->Get("result") != nullptr);
@@ -87,9 +79,9 @@ protocol MyProtocol {
   ASSERT_TRUE(method.has_response && method.maybe_response.get());
 
   auto id = static_cast<const fidl::flat::IdentifierType*>(method.maybe_response->type);
-  auto response = static_cast<const fidl::flat::Struct*>(id->type_decl);
-  EXPECT_TRUE(response->kind == fidl::flat::Decl::Kind::kStruct);
-  ASSERT_EQ(response->members.size(), 1);
+  auto response = static_cast<const fidl::flat::Union*>(id->type_decl);
+  EXPECT_TRUE(response->kind == fidl::flat::Decl::Kind::kUnion);
+  ASSERT_EQ(response->members.size(), 2);
 }
 
 TEST(ErrorsTests, GoodErrorEnum) {

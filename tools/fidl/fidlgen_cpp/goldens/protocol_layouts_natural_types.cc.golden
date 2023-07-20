@@ -11,36 +11,6 @@
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wshadow"
 
-::test_protocollayouts::MainProtocolTwoWayImportWithErrorTopResponse::Storage_ test_protocollayouts::MainProtocolTwoWayImportWithErrorTopResponse::CloneStorage_() const {
-  return Storage_{
-      ::fidl::internal::NaturalClone(storage_.result)};
-}
-
-::test_protocollayouts::MainProtocolOnImportWithErrorRequest::Storage_ test_protocollayouts::MainProtocolOnImportWithErrorRequest::CloneStorage_() const {
-  return Storage_{
-      ::fidl::internal::NaturalClone(storage_.result)};
-}
-
-::test_protocollayouts::MainProtocolTwoWayLocalWithErrorTopResponse::Storage_ test_protocollayouts::MainProtocolTwoWayLocalWithErrorTopResponse::CloneStorage_() const {
-  return Storage_{
-      ::fidl::internal::NaturalClone(storage_.result)};
-}
-
-::test_protocollayouts::MainProtocolOnLocalWithErrorRequest::Storage_ test_protocollayouts::MainProtocolOnLocalWithErrorRequest::CloneStorage_() const {
-  return Storage_{
-      ::fidl::internal::NaturalClone(storage_.result)};
-}
-
-::test_protocollayouts::MainProtocolTwoWayAnonWithErrorTopResponse::Storage_ test_protocollayouts::MainProtocolTwoWayAnonWithErrorTopResponse::CloneStorage_() const {
-  return Storage_{
-      ::fidl::internal::NaturalClone(storage_.result)};
-}
-
-::test_protocollayouts::MainProtocolOnAnonWithErrorRequest::Storage_ test_protocollayouts::MainProtocolOnAnonWithErrorRequest::CloneStorage_() const {
-  return Storage_{
-      ::fidl::internal::NaturalClone(storage_.result)};
-}
-
 ::test_protocollayouts::LocalTablePayload::Storage_ test_protocollayouts::LocalTablePayload::CloneStorage_() const {
   return Storage_{
       ::fidl::internal::NaturalClone(storage_.a)};

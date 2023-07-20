@@ -23,11 +23,14 @@ TEST(Anonymous, ScopedAndFlattenedNames) {
   same = std::is_same_v<test::wire::InnerTable, test::wire::ReqMember::InnerTable>;
   EXPECT_TRUE(same);
 
+  // Like other anonymous request/response types, a compiler-generated result
+  // union has no scoped name, since there is no parent type that contains it.
+  // Verify that it is the base class of fidl::WireResponse<...>:
   [[maybe_unused]] test::wire::UsesAnonymousFooMethodResult result_flat;
-  [[maybe_unused]] fidl::WireResponse<test::UsesAnonymous::FooMethod>::Result result_scoped;
-  same = std::is_same_v<test::wire::UsesAnonymousFooMethodResult,
-                        fidl::WireResponse<test::UsesAnonymous::FooMethod>::Result>;
-  EXPECT_TRUE(same);
+  [[maybe_unused]] fidl::WireResponse<test::UsesAnonymous::FooMethod> result_response;
+  bool base = std::is_base_of_v<test::wire::UsesAnonymousFooMethodResult,
+                                fidl::WireResponse<test::UsesAnonymous::FooMethod>>;
+  EXPECT_TRUE(base);
 
   [[maybe_unused]] test::wire::UsesAnonymousFooMethodResponse resp_flat;
   [[maybe_unused]] test::wire::UsesAnonymousFooMethodResult::Response resp_scoped;

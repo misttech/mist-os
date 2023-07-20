@@ -207,55 +207,28 @@ class Resource;
 class Protocol_ErrorBasic_Result;
 
 
-class ProtocolErrorBasicTopResponse;
-
-
 class Protocol_ErrorCompound_Result;
-
-
-class ProtocolErrorCompoundTopResponse;
 
 
 class Protocol_ErrorArrayBasic_Result;
 
 
-class ProtocolErrorArrayBasicTopResponse;
-
-
 class Protocol_ErrorArrayCompound_Result;
-
-
-class ProtocolErrorArrayCompoundTopResponse;
 
 
 class Protocol_ErrorVectorBasic_Result;
 
 
-class ProtocolErrorVectorBasicTopResponse;
-
-
 class Protocol_ErrorVectorCompound_Result;
-
-
-class ProtocolErrorVectorCompoundTopResponse;
 
 
 class Protocol_ErrorVectorOptional_Result;
 
 
-class ProtocolErrorVectorOptionalTopResponse;
-
-
 class Protocol_ErrorArrayVectorNested_Result;
 
 
-class ProtocolErrorArrayVectorNestedTopResponse;
-
-
 class Protocol_ErrorResource_Result;
-
-
-class ProtocolErrorResourceTopResponse;
 
 
 #ifdef __Fuchsia__
@@ -1169,29 +1142,6 @@ using Protocol_ErrorBasic_ResultPtr = ::std::unique_ptr<Protocol_ErrorBasic_Resu
 
 
 
-class ProtocolErrorBasicTopResponse final {
- public:
-  static const fidl_type_t* FidlType;
-  
-  ::test::typesinprotocols::Protocol_ErrorBasic_Result result;
-
-  static inline ::std::unique_ptr<ProtocolErrorBasicTopResponse> New() { return ::std::make_unique<ProtocolErrorBasicTopResponse>(); }
-
-  void Encode(::fidl::Encoder* _encoder, size_t _offset,
-               cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt);
-  static void Decode(::fidl::Decoder* _decoder, ProtocolErrorBasicTopResponse* value, size_t _offset);
-  zx_status_t Clone(ProtocolErrorBasicTopResponse* result) const;
-};
-
-inline zx_status_t Clone(const ::test::typesinprotocols::ProtocolErrorBasicTopResponse& _value,
-                         ::test::typesinprotocols::ProtocolErrorBasicTopResponse* _result) {
-  return _value.Clone(_result);
-}
-
-using ProtocolErrorBasicTopResponsePtr = ::std::unique_ptr<ProtocolErrorBasicTopResponse>;
-
-
-
 class Protocol_ErrorCompound_Result final {
  public:
   static const fidl_type_t* FidlType;
@@ -1299,29 +1249,6 @@ inline zx_status_t Clone(const ::test::typesinprotocols::Protocol_ErrorCompound_
 }
 
 using Protocol_ErrorCompound_ResultPtr = ::std::unique_ptr<Protocol_ErrorCompound_Result>;
-
-
-
-class ProtocolErrorCompoundTopResponse final {
- public:
-  static const fidl_type_t* FidlType;
-  
-  ::test::typesinprotocols::Protocol_ErrorCompound_Result result;
-
-  static inline ::std::unique_ptr<ProtocolErrorCompoundTopResponse> New() { return ::std::make_unique<ProtocolErrorCompoundTopResponse>(); }
-
-  void Encode(::fidl::Encoder* _encoder, size_t _offset,
-               cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt);
-  static void Decode(::fidl::Decoder* _decoder, ProtocolErrorCompoundTopResponse* value, size_t _offset);
-  zx_status_t Clone(ProtocolErrorCompoundTopResponse* result) const;
-};
-
-inline zx_status_t Clone(const ::test::typesinprotocols::ProtocolErrorCompoundTopResponse& _value,
-                         ::test::typesinprotocols::ProtocolErrorCompoundTopResponse* _result) {
-  return _value.Clone(_result);
-}
-
-using ProtocolErrorCompoundTopResponsePtr = ::std::unique_ptr<ProtocolErrorCompoundTopResponse>;
 
 
 
@@ -1435,29 +1362,6 @@ using Protocol_ErrorArrayBasic_ResultPtr = ::std::unique_ptr<Protocol_ErrorArray
 
 
 
-class ProtocolErrorArrayBasicTopResponse final {
- public:
-  static const fidl_type_t* FidlType;
-  
-  ::test::typesinprotocols::Protocol_ErrorArrayBasic_Result result;
-
-  static inline ::std::unique_ptr<ProtocolErrorArrayBasicTopResponse> New() { return ::std::make_unique<ProtocolErrorArrayBasicTopResponse>(); }
-
-  void Encode(::fidl::Encoder* _encoder, size_t _offset,
-               cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt);
-  static void Decode(::fidl::Decoder* _decoder, ProtocolErrorArrayBasicTopResponse* value, size_t _offset);
-  zx_status_t Clone(ProtocolErrorArrayBasicTopResponse* result) const;
-};
-
-inline zx_status_t Clone(const ::test::typesinprotocols::ProtocolErrorArrayBasicTopResponse& _value,
-                         ::test::typesinprotocols::ProtocolErrorArrayBasicTopResponse* _result) {
-  return _value.Clone(_result);
-}
-
-using ProtocolErrorArrayBasicTopResponsePtr = ::std::unique_ptr<ProtocolErrorArrayBasicTopResponse>;
-
-
-
 class Protocol_ErrorArrayCompound_Result final {
  public:
   static const fidl_type_t* FidlType;
@@ -1565,29 +1469,6 @@ inline zx_status_t Clone(const ::test::typesinprotocols::Protocol_ErrorArrayComp
 }
 
 using Protocol_ErrorArrayCompound_ResultPtr = ::std::unique_ptr<Protocol_ErrorArrayCompound_Result>;
-
-
-
-class ProtocolErrorArrayCompoundTopResponse final {
- public:
-  static const fidl_type_t* FidlType;
-  
-  ::test::typesinprotocols::Protocol_ErrorArrayCompound_Result result;
-
-  static inline ::std::unique_ptr<ProtocolErrorArrayCompoundTopResponse> New() { return ::std::make_unique<ProtocolErrorArrayCompoundTopResponse>(); }
-
-  void Encode(::fidl::Encoder* _encoder, size_t _offset,
-               cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt);
-  static void Decode(::fidl::Decoder* _decoder, ProtocolErrorArrayCompoundTopResponse* value, size_t _offset);
-  zx_status_t Clone(ProtocolErrorArrayCompoundTopResponse* result) const;
-};
-
-inline zx_status_t Clone(const ::test::typesinprotocols::ProtocolErrorArrayCompoundTopResponse& _value,
-                         ::test::typesinprotocols::ProtocolErrorArrayCompoundTopResponse* _result) {
-  return _value.Clone(_result);
-}
-
-using ProtocolErrorArrayCompoundTopResponsePtr = ::std::unique_ptr<ProtocolErrorArrayCompoundTopResponse>;
 
 
 
@@ -1701,29 +1582,6 @@ using Protocol_ErrorVectorBasic_ResultPtr = ::std::unique_ptr<Protocol_ErrorVect
 
 
 
-class ProtocolErrorVectorBasicTopResponse final {
- public:
-  static const fidl_type_t* FidlType;
-  
-  ::test::typesinprotocols::Protocol_ErrorVectorBasic_Result result;
-
-  static inline ::std::unique_ptr<ProtocolErrorVectorBasicTopResponse> New() { return ::std::make_unique<ProtocolErrorVectorBasicTopResponse>(); }
-
-  void Encode(::fidl::Encoder* _encoder, size_t _offset,
-               cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt);
-  static void Decode(::fidl::Decoder* _decoder, ProtocolErrorVectorBasicTopResponse* value, size_t _offset);
-  zx_status_t Clone(ProtocolErrorVectorBasicTopResponse* result) const;
-};
-
-inline zx_status_t Clone(const ::test::typesinprotocols::ProtocolErrorVectorBasicTopResponse& _value,
-                         ::test::typesinprotocols::ProtocolErrorVectorBasicTopResponse* _result) {
-  return _value.Clone(_result);
-}
-
-using ProtocolErrorVectorBasicTopResponsePtr = ::std::unique_ptr<ProtocolErrorVectorBasicTopResponse>;
-
-
-
 class Protocol_ErrorVectorCompound_Result final {
  public:
   static const fidl_type_t* FidlType;
@@ -1831,29 +1689,6 @@ inline zx_status_t Clone(const ::test::typesinprotocols::Protocol_ErrorVectorCom
 }
 
 using Protocol_ErrorVectorCompound_ResultPtr = ::std::unique_ptr<Protocol_ErrorVectorCompound_Result>;
-
-
-
-class ProtocolErrorVectorCompoundTopResponse final {
- public:
-  static const fidl_type_t* FidlType;
-  
-  ::test::typesinprotocols::Protocol_ErrorVectorCompound_Result result;
-
-  static inline ::std::unique_ptr<ProtocolErrorVectorCompoundTopResponse> New() { return ::std::make_unique<ProtocolErrorVectorCompoundTopResponse>(); }
-
-  void Encode(::fidl::Encoder* _encoder, size_t _offset,
-               cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt);
-  static void Decode(::fidl::Decoder* _decoder, ProtocolErrorVectorCompoundTopResponse* value, size_t _offset);
-  zx_status_t Clone(ProtocolErrorVectorCompoundTopResponse* result) const;
-};
-
-inline zx_status_t Clone(const ::test::typesinprotocols::ProtocolErrorVectorCompoundTopResponse& _value,
-                         ::test::typesinprotocols::ProtocolErrorVectorCompoundTopResponse* _result) {
-  return _value.Clone(_result);
-}
-
-using ProtocolErrorVectorCompoundTopResponsePtr = ::std::unique_ptr<ProtocolErrorVectorCompoundTopResponse>;
 
 
 
@@ -1967,29 +1802,6 @@ using Protocol_ErrorVectorOptional_ResultPtr = ::std::unique_ptr<Protocol_ErrorV
 
 
 
-class ProtocolErrorVectorOptionalTopResponse final {
- public:
-  static const fidl_type_t* FidlType;
-  
-  ::test::typesinprotocols::Protocol_ErrorVectorOptional_Result result;
-
-  static inline ::std::unique_ptr<ProtocolErrorVectorOptionalTopResponse> New() { return ::std::make_unique<ProtocolErrorVectorOptionalTopResponse>(); }
-
-  void Encode(::fidl::Encoder* _encoder, size_t _offset,
-               cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt);
-  static void Decode(::fidl::Decoder* _decoder, ProtocolErrorVectorOptionalTopResponse* value, size_t _offset);
-  zx_status_t Clone(ProtocolErrorVectorOptionalTopResponse* result) const;
-};
-
-inline zx_status_t Clone(const ::test::typesinprotocols::ProtocolErrorVectorOptionalTopResponse& _value,
-                         ::test::typesinprotocols::ProtocolErrorVectorOptionalTopResponse* _result) {
-  return _value.Clone(_result);
-}
-
-using ProtocolErrorVectorOptionalTopResponsePtr = ::std::unique_ptr<ProtocolErrorVectorOptionalTopResponse>;
-
-
-
 class Protocol_ErrorArrayVectorNested_Result final {
  public:
   static const fidl_type_t* FidlType;
@@ -2097,29 +1909,6 @@ inline zx_status_t Clone(const ::test::typesinprotocols::Protocol_ErrorArrayVect
 }
 
 using Protocol_ErrorArrayVectorNested_ResultPtr = ::std::unique_ptr<Protocol_ErrorArrayVectorNested_Result>;
-
-
-
-class ProtocolErrorArrayVectorNestedTopResponse final {
- public:
-  static const fidl_type_t* FidlType;
-  
-  ::test::typesinprotocols::Protocol_ErrorArrayVectorNested_Result result;
-
-  static inline ::std::unique_ptr<ProtocolErrorArrayVectorNestedTopResponse> New() { return ::std::make_unique<ProtocolErrorArrayVectorNestedTopResponse>(); }
-
-  void Encode(::fidl::Encoder* _encoder, size_t _offset,
-               cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt);
-  static void Decode(::fidl::Decoder* _decoder, ProtocolErrorArrayVectorNestedTopResponse* value, size_t _offset);
-  zx_status_t Clone(ProtocolErrorArrayVectorNestedTopResponse* result) const;
-};
-
-inline zx_status_t Clone(const ::test::typesinprotocols::ProtocolErrorArrayVectorNestedTopResponse& _value,
-                         ::test::typesinprotocols::ProtocolErrorArrayVectorNestedTopResponse* _result) {
-  return _value.Clone(_result);
-}
-
-using ProtocolErrorArrayVectorNestedTopResponsePtr = ::std::unique_ptr<ProtocolErrorArrayVectorNestedTopResponse>;
 
 
 
@@ -2232,34 +2021,6 @@ inline zx_status_t Clone(const ::test::typesinprotocols::Protocol_ErrorResource_
 }
 
 using Protocol_ErrorResource_ResultPtr = ::std::unique_ptr<Protocol_ErrorResource_Result>;
-
-#endif  // __Fuchsia__
-
-
-
-
-#ifdef __Fuchsia__
-
-class ProtocolErrorResourceTopResponse final {
- public:
-  static const fidl_type_t* FidlType;
-  
-  ::test::typesinprotocols::Protocol_ErrorResource_Result result;
-
-  static inline ::std::unique_ptr<ProtocolErrorResourceTopResponse> New() { return ::std::make_unique<ProtocolErrorResourceTopResponse>(); }
-
-  void Encode(::fidl::Encoder* _encoder, size_t _offset,
-               cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt);
-  static void Decode(::fidl::Decoder* _decoder, ProtocolErrorResourceTopResponse* value, size_t _offset);
-  zx_status_t Clone(ProtocolErrorResourceTopResponse* result) const;
-};
-
-inline zx_status_t Clone(const ::test::typesinprotocols::ProtocolErrorResourceTopResponse& _value,
-                         ::test::typesinprotocols::ProtocolErrorResourceTopResponse* _result) {
-  return _value.Clone(_result);
-}
-
-using ProtocolErrorResourceTopResponsePtr = ::std::unique_ptr<ProtocolErrorResourceTopResponse>;
 
 #endif  // __Fuchsia__
 
@@ -2907,47 +2668,47 @@ class Protocol_RequestEncoder {
   
   
   namespace _internal {
-__LOCAL extern "C" const fidl_type_t test_typesinprotocols_ProtocolErrorBasicTopResponseTable;
+__LOCAL extern "C" const fidl_type_t test_typesinprotocols_Protocol_ErrorBasic_ResultTable;
   
   
   
   
-__LOCAL extern "C" const fidl_type_t test_typesinprotocols_ProtocolErrorCompoundTopResponseTable;
+__LOCAL extern "C" const fidl_type_t test_typesinprotocols_Protocol_ErrorCompound_ResultTable;
   
   
   
   
-__LOCAL extern "C" const fidl_type_t test_typesinprotocols_ProtocolErrorArrayBasicTopResponseTable;
+__LOCAL extern "C" const fidl_type_t test_typesinprotocols_Protocol_ErrorArrayBasic_ResultTable;
   
   
   
   
-__LOCAL extern "C" const fidl_type_t test_typesinprotocols_ProtocolErrorArrayCompoundTopResponseTable;
+__LOCAL extern "C" const fidl_type_t test_typesinprotocols_Protocol_ErrorArrayCompound_ResultTable;
   
   
   
   
-__LOCAL extern "C" const fidl_type_t test_typesinprotocols_ProtocolErrorVectorBasicTopResponseTable;
+__LOCAL extern "C" const fidl_type_t test_typesinprotocols_Protocol_ErrorVectorBasic_ResultTable;
   
   
   
   
-__LOCAL extern "C" const fidl_type_t test_typesinprotocols_ProtocolErrorVectorCompoundTopResponseTable;
+__LOCAL extern "C" const fidl_type_t test_typesinprotocols_Protocol_ErrorVectorCompound_ResultTable;
   
   
   
   
-__LOCAL extern "C" const fidl_type_t test_typesinprotocols_ProtocolErrorVectorOptionalTopResponseTable;
+__LOCAL extern "C" const fidl_type_t test_typesinprotocols_Protocol_ErrorVectorOptional_ResultTable;
   
   
   
   
-__LOCAL extern "C" const fidl_type_t test_typesinprotocols_ProtocolErrorArrayVectorNestedTopResponseTable;
+__LOCAL extern "C" const fidl_type_t test_typesinprotocols_Protocol_ErrorArrayVectorNested_ResultTable;
   
   
   
   
-__LOCAL extern "C" const fidl_type_t test_typesinprotocols_ProtocolErrorResourceTopResponseTable;
+__LOCAL extern "C" const fidl_type_t test_typesinprotocols_Protocol_ErrorResource_ResultTable;
   
 
 }  // namespace _internal
@@ -2983,9 +2744,9 @@ class Protocol_ResponseEncoder {
 
     return _encoder->GetMessage();
   }
-  static ::fidl::HLCPPOutgoingMessage ErrorBasic(::fidl::MessageEncoder* _encoder, ::test::typesinprotocols::Protocol_ErrorBasic_Result* result) {
+  static ::fidl::HLCPPOutgoingMessage ErrorBasic(::fidl::MessageEncoder* _encoder, ::test::typesinprotocols::Protocol_ErrorBasic_Result* Protocol_ErrorBasic_Result) {
     _encoder->Alloc(16);
-    ::fidl::Encode(_encoder, result, 0 + sizeof(fidl_message_header_t));
+    ::fidl::Encode(_encoder, Protocol_ErrorBasic_Result, 0 + sizeof(fidl_message_header_t));
     
 
     return _encoder->GetMessage();
@@ -3038,9 +2799,9 @@ class Protocol_ResponseEncoder {
 
     return _encoder->GetMessage();
   }
-  static ::fidl::HLCPPOutgoingMessage ErrorCompound(::fidl::MessageEncoder* _encoder, ::test::typesinprotocols::Protocol_ErrorCompound_Result* result) {
+  static ::fidl::HLCPPOutgoingMessage ErrorCompound(::fidl::MessageEncoder* _encoder, ::test::typesinprotocols::Protocol_ErrorCompound_Result* Protocol_ErrorCompound_Result) {
     _encoder->Alloc(16);
-    ::fidl::Encode(_encoder, result, 0 + sizeof(fidl_message_header_t));
+    ::fidl::Encode(_encoder, Protocol_ErrorCompound_Result, 0 + sizeof(fidl_message_header_t));
     
 
     return _encoder->GetMessage();
@@ -3093,9 +2854,9 @@ class Protocol_ResponseEncoder {
 
     return _encoder->GetMessage();
   }
-  static ::fidl::HLCPPOutgoingMessage ErrorArrayBasic(::fidl::MessageEncoder* _encoder, ::test::typesinprotocols::Protocol_ErrorArrayBasic_Result* result) {
+  static ::fidl::HLCPPOutgoingMessage ErrorArrayBasic(::fidl::MessageEncoder* _encoder, ::test::typesinprotocols::Protocol_ErrorArrayBasic_Result* Protocol_ErrorArrayBasic_Result) {
     _encoder->Alloc(16);
-    ::fidl::Encode(_encoder, result, 0 + sizeof(fidl_message_header_t));
+    ::fidl::Encode(_encoder, Protocol_ErrorArrayBasic_Result, 0 + sizeof(fidl_message_header_t));
     
 
     return _encoder->GetMessage();
@@ -3148,9 +2909,9 @@ class Protocol_ResponseEncoder {
 
     return _encoder->GetMessage();
   }
-  static ::fidl::HLCPPOutgoingMessage ErrorArrayCompound(::fidl::MessageEncoder* _encoder, ::test::typesinprotocols::Protocol_ErrorArrayCompound_Result* result) {
+  static ::fidl::HLCPPOutgoingMessage ErrorArrayCompound(::fidl::MessageEncoder* _encoder, ::test::typesinprotocols::Protocol_ErrorArrayCompound_Result* Protocol_ErrorArrayCompound_Result) {
     _encoder->Alloc(16);
-    ::fidl::Encode(_encoder, result, 0 + sizeof(fidl_message_header_t));
+    ::fidl::Encode(_encoder, Protocol_ErrorArrayCompound_Result, 0 + sizeof(fidl_message_header_t));
     
 
     return _encoder->GetMessage();
@@ -3203,9 +2964,9 @@ class Protocol_ResponseEncoder {
 
     return _encoder->GetMessage();
   }
-  static ::fidl::HLCPPOutgoingMessage ErrorVectorBasic(::fidl::MessageEncoder* _encoder, ::test::typesinprotocols::Protocol_ErrorVectorBasic_Result* result) {
+  static ::fidl::HLCPPOutgoingMessage ErrorVectorBasic(::fidl::MessageEncoder* _encoder, ::test::typesinprotocols::Protocol_ErrorVectorBasic_Result* Protocol_ErrorVectorBasic_Result) {
     _encoder->Alloc(16);
-    ::fidl::Encode(_encoder, result, 0 + sizeof(fidl_message_header_t));
+    ::fidl::Encode(_encoder, Protocol_ErrorVectorBasic_Result, 0 + sizeof(fidl_message_header_t));
     
 
     return _encoder->GetMessage();
@@ -3258,9 +3019,9 @@ class Protocol_ResponseEncoder {
 
     return _encoder->GetMessage();
   }
-  static ::fidl::HLCPPOutgoingMessage ErrorVectorCompound(::fidl::MessageEncoder* _encoder, ::test::typesinprotocols::Protocol_ErrorVectorCompound_Result* result) {
+  static ::fidl::HLCPPOutgoingMessage ErrorVectorCompound(::fidl::MessageEncoder* _encoder, ::test::typesinprotocols::Protocol_ErrorVectorCompound_Result* Protocol_ErrorVectorCompound_Result) {
     _encoder->Alloc(16);
-    ::fidl::Encode(_encoder, result, 0 + sizeof(fidl_message_header_t));
+    ::fidl::Encode(_encoder, Protocol_ErrorVectorCompound_Result, 0 + sizeof(fidl_message_header_t));
     
 
     return _encoder->GetMessage();
@@ -3295,9 +3056,9 @@ class Protocol_ResponseEncoder {
 
     return _encoder->GetMessage();
   }
-  static ::fidl::HLCPPOutgoingMessage ErrorVectorOptional(::fidl::MessageEncoder* _encoder, ::test::typesinprotocols::Protocol_ErrorVectorOptional_Result* result) {
+  static ::fidl::HLCPPOutgoingMessage ErrorVectorOptional(::fidl::MessageEncoder* _encoder, ::test::typesinprotocols::Protocol_ErrorVectorOptional_Result* Protocol_ErrorVectorOptional_Result) {
     _encoder->Alloc(16);
-    ::fidl::Encode(_encoder, result, 0 + sizeof(fidl_message_header_t));
+    ::fidl::Encode(_encoder, Protocol_ErrorVectorOptional_Result, 0 + sizeof(fidl_message_header_t));
     
 
     return _encoder->GetMessage();
@@ -3326,9 +3087,9 @@ class Protocol_ResponseEncoder {
 
     return _encoder->GetMessage();
   }
-  static ::fidl::HLCPPOutgoingMessage ErrorArrayVectorNested(::fidl::MessageEncoder* _encoder, ::test::typesinprotocols::Protocol_ErrorArrayVectorNested_Result* result) {
+  static ::fidl::HLCPPOutgoingMessage ErrorArrayVectorNested(::fidl::MessageEncoder* _encoder, ::test::typesinprotocols::Protocol_ErrorArrayVectorNested_Result* Protocol_ErrorArrayVectorNested_Result) {
     _encoder->Alloc(16);
-    ::fidl::Encode(_encoder, result, 0 + sizeof(fidl_message_header_t));
+    ::fidl::Encode(_encoder, Protocol_ErrorArrayVectorNested_Result, 0 + sizeof(fidl_message_header_t));
     
 
     return _encoder->GetMessage();
@@ -3453,9 +3214,9 @@ class Protocol_ResponseEncoder {
 
     return _encoder->GetMessage();
   }
-  static ::fidl::HLCPPOutgoingMessage ErrorResource(::fidl::MessageEncoder* _encoder, ::test::typesinprotocols::Protocol_ErrorResource_Result* result) {
+  static ::fidl::HLCPPOutgoingMessage ErrorResource(::fidl::MessageEncoder* _encoder, ::test::typesinprotocols::Protocol_ErrorResource_Result* Protocol_ErrorResource_Result) {
     _encoder->Alloc(16);
-    ::fidl::Encode(_encoder, result, 0 + sizeof(fidl_message_header_t));
+    ::fidl::Encode(_encoder, Protocol_ErrorResource_Result, 0 + sizeof(fidl_message_header_t));
     
 
     return _encoder->GetMessage();
@@ -4496,36 +4257,6 @@ struct Equality<::test::typesinprotocols::Protocol_ErrorBasic_Result> {
     }
 };
 template <>
-struct CodingTraits<::test::typesinprotocols::ProtocolErrorBasicTopResponse>
-    : public EncodableCodingTraits<::test::typesinprotocols::ProtocolErrorBasicTopResponse, 16> {};
-
-
-template<>
-struct HasPadding<::test::typesinprotocols::ProtocolErrorBasicTopResponse> : public std::true_type {};
-
-
-
-template<>
-struct IsMemcpyCompatible<::test::typesinprotocols::ProtocolErrorBasicTopResponse> : public internal::BoolConstant<
-    !HasPadding<::test::typesinprotocols::ProtocolErrorBasicTopResponse>::value
-    && IsMemcpyCompatible<::test::typesinprotocols::Protocol_ErrorBasic_Result>::value> {};
-
-
-inline zx_status_t Clone(const ::test::typesinprotocols::ProtocolErrorBasicTopResponse& value,
-                         ::test::typesinprotocols::ProtocolErrorBasicTopResponse* result) {
-  return ::test::typesinprotocols::Clone(value, result);
-}
-
-template<>
-struct Equality<::test::typesinprotocols::ProtocolErrorBasicTopResponse> {
-  bool operator()(const ::test::typesinprotocols::ProtocolErrorBasicTopResponse& _lhs, const ::test::typesinprotocols::ProtocolErrorBasicTopResponse& _rhs) const {
-    if (!::fidl::Equals(_lhs.result, _rhs.result)) {
-      return false;
-    }
-    return true;
-  }
-};
-template <>
 struct IsFidlXUnion<::test::typesinprotocols::Protocol_ErrorCompound_Result> : public std::true_type {};
 
 template <>
@@ -4581,36 +4312,6 @@ struct Equality<::test::typesinprotocols::Protocol_ErrorCompound_Result> {
         return false;
       }
     }
-};
-template <>
-struct CodingTraits<::test::typesinprotocols::ProtocolErrorCompoundTopResponse>
-    : public EncodableCodingTraits<::test::typesinprotocols::ProtocolErrorCompoundTopResponse, 16> {};
-
-
-template<>
-struct HasPadding<::test::typesinprotocols::ProtocolErrorCompoundTopResponse> : public std::true_type {};
-
-
-
-template<>
-struct IsMemcpyCompatible<::test::typesinprotocols::ProtocolErrorCompoundTopResponse> : public internal::BoolConstant<
-    !HasPadding<::test::typesinprotocols::ProtocolErrorCompoundTopResponse>::value
-    && IsMemcpyCompatible<::test::typesinprotocols::Protocol_ErrorCompound_Result>::value> {};
-
-
-inline zx_status_t Clone(const ::test::typesinprotocols::ProtocolErrorCompoundTopResponse& value,
-                         ::test::typesinprotocols::ProtocolErrorCompoundTopResponse* result) {
-  return ::test::typesinprotocols::Clone(value, result);
-}
-
-template<>
-struct Equality<::test::typesinprotocols::ProtocolErrorCompoundTopResponse> {
-  bool operator()(const ::test::typesinprotocols::ProtocolErrorCompoundTopResponse& _lhs, const ::test::typesinprotocols::ProtocolErrorCompoundTopResponse& _rhs) const {
-    if (!::fidl::Equals(_lhs.result, _rhs.result)) {
-      return false;
-    }
-    return true;
-  }
 };
 template <>
 struct IsFidlXUnion<::test::typesinprotocols::Protocol_ErrorArrayBasic_Result> : public std::true_type {};
@@ -4670,36 +4371,6 @@ struct Equality<::test::typesinprotocols::Protocol_ErrorArrayBasic_Result> {
     }
 };
 template <>
-struct CodingTraits<::test::typesinprotocols::ProtocolErrorArrayBasicTopResponse>
-    : public EncodableCodingTraits<::test::typesinprotocols::ProtocolErrorArrayBasicTopResponse, 16> {};
-
-
-template<>
-struct HasPadding<::test::typesinprotocols::ProtocolErrorArrayBasicTopResponse> : public std::true_type {};
-
-
-
-template<>
-struct IsMemcpyCompatible<::test::typesinprotocols::ProtocolErrorArrayBasicTopResponse> : public internal::BoolConstant<
-    !HasPadding<::test::typesinprotocols::ProtocolErrorArrayBasicTopResponse>::value
-    && IsMemcpyCompatible<::test::typesinprotocols::Protocol_ErrorArrayBasic_Result>::value> {};
-
-
-inline zx_status_t Clone(const ::test::typesinprotocols::ProtocolErrorArrayBasicTopResponse& value,
-                         ::test::typesinprotocols::ProtocolErrorArrayBasicTopResponse* result) {
-  return ::test::typesinprotocols::Clone(value, result);
-}
-
-template<>
-struct Equality<::test::typesinprotocols::ProtocolErrorArrayBasicTopResponse> {
-  bool operator()(const ::test::typesinprotocols::ProtocolErrorArrayBasicTopResponse& _lhs, const ::test::typesinprotocols::ProtocolErrorArrayBasicTopResponse& _rhs) const {
-    if (!::fidl::Equals(_lhs.result, _rhs.result)) {
-      return false;
-    }
-    return true;
-  }
-};
-template <>
 struct IsFidlXUnion<::test::typesinprotocols::Protocol_ErrorArrayCompound_Result> : public std::true_type {};
 
 template <>
@@ -4755,36 +4426,6 @@ struct Equality<::test::typesinprotocols::Protocol_ErrorArrayCompound_Result> {
         return false;
       }
     }
-};
-template <>
-struct CodingTraits<::test::typesinprotocols::ProtocolErrorArrayCompoundTopResponse>
-    : public EncodableCodingTraits<::test::typesinprotocols::ProtocolErrorArrayCompoundTopResponse, 16> {};
-
-
-template<>
-struct HasPadding<::test::typesinprotocols::ProtocolErrorArrayCompoundTopResponse> : public std::true_type {};
-
-
-
-template<>
-struct IsMemcpyCompatible<::test::typesinprotocols::ProtocolErrorArrayCompoundTopResponse> : public internal::BoolConstant<
-    !HasPadding<::test::typesinprotocols::ProtocolErrorArrayCompoundTopResponse>::value
-    && IsMemcpyCompatible<::test::typesinprotocols::Protocol_ErrorArrayCompound_Result>::value> {};
-
-
-inline zx_status_t Clone(const ::test::typesinprotocols::ProtocolErrorArrayCompoundTopResponse& value,
-                         ::test::typesinprotocols::ProtocolErrorArrayCompoundTopResponse* result) {
-  return ::test::typesinprotocols::Clone(value, result);
-}
-
-template<>
-struct Equality<::test::typesinprotocols::ProtocolErrorArrayCompoundTopResponse> {
-  bool operator()(const ::test::typesinprotocols::ProtocolErrorArrayCompoundTopResponse& _lhs, const ::test::typesinprotocols::ProtocolErrorArrayCompoundTopResponse& _rhs) const {
-    if (!::fidl::Equals(_lhs.result, _rhs.result)) {
-      return false;
-    }
-    return true;
-  }
 };
 template <>
 struct IsFidlXUnion<::test::typesinprotocols::Protocol_ErrorVectorBasic_Result> : public std::true_type {};
@@ -4844,36 +4485,6 @@ struct Equality<::test::typesinprotocols::Protocol_ErrorVectorBasic_Result> {
     }
 };
 template <>
-struct CodingTraits<::test::typesinprotocols::ProtocolErrorVectorBasicTopResponse>
-    : public EncodableCodingTraits<::test::typesinprotocols::ProtocolErrorVectorBasicTopResponse, 16> {};
-
-
-template<>
-struct HasPadding<::test::typesinprotocols::ProtocolErrorVectorBasicTopResponse> : public std::true_type {};
-
-
-
-template<>
-struct IsMemcpyCompatible<::test::typesinprotocols::ProtocolErrorVectorBasicTopResponse> : public internal::BoolConstant<
-    !HasPadding<::test::typesinprotocols::ProtocolErrorVectorBasicTopResponse>::value
-    && IsMemcpyCompatible<::test::typesinprotocols::Protocol_ErrorVectorBasic_Result>::value> {};
-
-
-inline zx_status_t Clone(const ::test::typesinprotocols::ProtocolErrorVectorBasicTopResponse& value,
-                         ::test::typesinprotocols::ProtocolErrorVectorBasicTopResponse* result) {
-  return ::test::typesinprotocols::Clone(value, result);
-}
-
-template<>
-struct Equality<::test::typesinprotocols::ProtocolErrorVectorBasicTopResponse> {
-  bool operator()(const ::test::typesinprotocols::ProtocolErrorVectorBasicTopResponse& _lhs, const ::test::typesinprotocols::ProtocolErrorVectorBasicTopResponse& _rhs) const {
-    if (!::fidl::Equals(_lhs.result, _rhs.result)) {
-      return false;
-    }
-    return true;
-  }
-};
-template <>
 struct IsFidlXUnion<::test::typesinprotocols::Protocol_ErrorVectorCompound_Result> : public std::true_type {};
 
 template <>
@@ -4929,36 +4540,6 @@ struct Equality<::test::typesinprotocols::Protocol_ErrorVectorCompound_Result> {
         return false;
       }
     }
-};
-template <>
-struct CodingTraits<::test::typesinprotocols::ProtocolErrorVectorCompoundTopResponse>
-    : public EncodableCodingTraits<::test::typesinprotocols::ProtocolErrorVectorCompoundTopResponse, 16> {};
-
-
-template<>
-struct HasPadding<::test::typesinprotocols::ProtocolErrorVectorCompoundTopResponse> : public std::true_type {};
-
-
-
-template<>
-struct IsMemcpyCompatible<::test::typesinprotocols::ProtocolErrorVectorCompoundTopResponse> : public internal::BoolConstant<
-    !HasPadding<::test::typesinprotocols::ProtocolErrorVectorCompoundTopResponse>::value
-    && IsMemcpyCompatible<::test::typesinprotocols::Protocol_ErrorVectorCompound_Result>::value> {};
-
-
-inline zx_status_t Clone(const ::test::typesinprotocols::ProtocolErrorVectorCompoundTopResponse& value,
-                         ::test::typesinprotocols::ProtocolErrorVectorCompoundTopResponse* result) {
-  return ::test::typesinprotocols::Clone(value, result);
-}
-
-template<>
-struct Equality<::test::typesinprotocols::ProtocolErrorVectorCompoundTopResponse> {
-  bool operator()(const ::test::typesinprotocols::ProtocolErrorVectorCompoundTopResponse& _lhs, const ::test::typesinprotocols::ProtocolErrorVectorCompoundTopResponse& _rhs) const {
-    if (!::fidl::Equals(_lhs.result, _rhs.result)) {
-      return false;
-    }
-    return true;
-  }
 };
 template <>
 struct IsFidlXUnion<::test::typesinprotocols::Protocol_ErrorVectorOptional_Result> : public std::true_type {};
@@ -5018,36 +4599,6 @@ struct Equality<::test::typesinprotocols::Protocol_ErrorVectorOptional_Result> {
     }
 };
 template <>
-struct CodingTraits<::test::typesinprotocols::ProtocolErrorVectorOptionalTopResponse>
-    : public EncodableCodingTraits<::test::typesinprotocols::ProtocolErrorVectorOptionalTopResponse, 16> {};
-
-
-template<>
-struct HasPadding<::test::typesinprotocols::ProtocolErrorVectorOptionalTopResponse> : public std::true_type {};
-
-
-
-template<>
-struct IsMemcpyCompatible<::test::typesinprotocols::ProtocolErrorVectorOptionalTopResponse> : public internal::BoolConstant<
-    !HasPadding<::test::typesinprotocols::ProtocolErrorVectorOptionalTopResponse>::value
-    && IsMemcpyCompatible<::test::typesinprotocols::Protocol_ErrorVectorOptional_Result>::value> {};
-
-
-inline zx_status_t Clone(const ::test::typesinprotocols::ProtocolErrorVectorOptionalTopResponse& value,
-                         ::test::typesinprotocols::ProtocolErrorVectorOptionalTopResponse* result) {
-  return ::test::typesinprotocols::Clone(value, result);
-}
-
-template<>
-struct Equality<::test::typesinprotocols::ProtocolErrorVectorOptionalTopResponse> {
-  bool operator()(const ::test::typesinprotocols::ProtocolErrorVectorOptionalTopResponse& _lhs, const ::test::typesinprotocols::ProtocolErrorVectorOptionalTopResponse& _rhs) const {
-    if (!::fidl::Equals(_lhs.result, _rhs.result)) {
-      return false;
-    }
-    return true;
-  }
-};
-template <>
 struct IsFidlXUnion<::test::typesinprotocols::Protocol_ErrorArrayVectorNested_Result> : public std::true_type {};
 
 template <>
@@ -5103,36 +4654,6 @@ struct Equality<::test::typesinprotocols::Protocol_ErrorArrayVectorNested_Result
         return false;
       }
     }
-};
-template <>
-struct CodingTraits<::test::typesinprotocols::ProtocolErrorArrayVectorNestedTopResponse>
-    : public EncodableCodingTraits<::test::typesinprotocols::ProtocolErrorArrayVectorNestedTopResponse, 16> {};
-
-
-template<>
-struct HasPadding<::test::typesinprotocols::ProtocolErrorArrayVectorNestedTopResponse> : public std::true_type {};
-
-
-
-template<>
-struct IsMemcpyCompatible<::test::typesinprotocols::ProtocolErrorArrayVectorNestedTopResponse> : public internal::BoolConstant<
-    !HasPadding<::test::typesinprotocols::ProtocolErrorArrayVectorNestedTopResponse>::value
-    && IsMemcpyCompatible<::test::typesinprotocols::Protocol_ErrorArrayVectorNested_Result>::value> {};
-
-
-inline zx_status_t Clone(const ::test::typesinprotocols::ProtocolErrorArrayVectorNestedTopResponse& value,
-                         ::test::typesinprotocols::ProtocolErrorArrayVectorNestedTopResponse* result) {
-  return ::test::typesinprotocols::Clone(value, result);
-}
-
-template<>
-struct Equality<::test::typesinprotocols::ProtocolErrorArrayVectorNestedTopResponse> {
-  bool operator()(const ::test::typesinprotocols::ProtocolErrorArrayVectorNestedTopResponse& _lhs, const ::test::typesinprotocols::ProtocolErrorArrayVectorNestedTopResponse& _rhs) const {
-    if (!::fidl::Equals(_lhs.result, _rhs.result)) {
-      return false;
-    }
-    return true;
-  }
 };
 #ifdef __Fuchsia__
 
@@ -5192,41 +4713,6 @@ struct Equality<::test::typesinprotocols::Protocol_ErrorResource_Result> {
         return false;
       }
     }
-};
-
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
-
-template <>
-struct CodingTraits<::test::typesinprotocols::ProtocolErrorResourceTopResponse>
-    : public EncodableCodingTraits<::test::typesinprotocols::ProtocolErrorResourceTopResponse, 16> {};
-
-
-template<>
-struct HasPadding<::test::typesinprotocols::ProtocolErrorResourceTopResponse> : public std::true_type {};
-
-
-
-template<>
-struct IsMemcpyCompatible<::test::typesinprotocols::ProtocolErrorResourceTopResponse> : public internal::BoolConstant<
-    !HasPadding<::test::typesinprotocols::ProtocolErrorResourceTopResponse>::value
-    && IsMemcpyCompatible<::test::typesinprotocols::Protocol_ErrorResource_Result>::value> {};
-
-
-inline zx_status_t Clone(const ::test::typesinprotocols::ProtocolErrorResourceTopResponse& value,
-                         ::test::typesinprotocols::ProtocolErrorResourceTopResponse* result) {
-  return ::test::typesinprotocols::Clone(value, result);
-}
-
-template<>
-struct Equality<::test::typesinprotocols::ProtocolErrorResourceTopResponse> {
-  bool operator()(const ::test::typesinprotocols::ProtocolErrorResourceTopResponse& _lhs, const ::test::typesinprotocols::ProtocolErrorResourceTopResponse& _rhs) const {
-    if (!::fidl::Equals(_lhs.result, _rhs.result)) {
-      return false;
-    }
-    return true;
-  }
 };
 
 #endif  // __Fuchsia__
@@ -5558,31 +5044,31 @@ class Protocol_ResponseDecoder {
   virtual ~Protocol_ResponseDecoder() = default;
   static const fidl_type_t* GetType(uint64_t ordinal);
   virtual void TwoWayBasic(uint8_t uint8, uint16_t uint16, uint32_t uint32, uint64_t uint64, int8_t int8, int16_t int16, int32_t int32, int64_t int64, float float32, double float64, ::std::string string, ::fidl::StringPtr opt_string) = 0;
-  virtual void ErrorBasic(::test::typesinprotocols::Protocol_ErrorBasic_Result result) = 0;
+  virtual void ErrorBasic(::test::typesinprotocols::Protocol_ErrorBasic_Result Protocol_ErrorBasic_Result) = 0;
   virtual void EventBasic(uint8_t uint8, uint16_t uint16, uint32_t uint32, uint64_t uint64, int8_t int8, int16_t int16, int32_t int32, int64_t int64, float float32, double float64, ::std::string string, ::fidl::StringPtr opt_string) = 0;
   virtual void TwoWayCompound(::test::typesinprotocols::Bits bits, ::test::typesinprotocols::Enum enum_, ::test::typesinprotocols::Struct struct_, ::test::typesinprotocols::Table table, ::test::typesinprotocols::Union union_, ::std::unique_ptr<::test::typesinprotocols::Struct> opt_struct, ::std::unique_ptr<::test::typesinprotocols::Union> opt_union) = 0;
-  virtual void ErrorCompound(::test::typesinprotocols::Protocol_ErrorCompound_Result result) = 0;
+  virtual void ErrorCompound(::test::typesinprotocols::Protocol_ErrorCompound_Result Protocol_ErrorCompound_Result) = 0;
   virtual void EventCompound(::test::typesinprotocols::Bits bits, ::test::typesinprotocols::Enum enum_, ::test::typesinprotocols::Struct struct_, ::test::typesinprotocols::Table table, ::test::typesinprotocols::Union union_, ::std::unique_ptr<::test::typesinprotocols::Struct> opt_struct, ::std::unique_ptr<::test::typesinprotocols::Union> opt_union) = 0;
   virtual void TwoWayArrayBasic(::std::array<uint8_t, 5> array_uint8, ::std::array<uint16_t, 5> array_uint16, ::std::array<uint32_t, 5> array_uint32, ::std::array<uint64_t, 5> array_uint64, ::std::array<int8_t, 5> array_int8, ::std::array<int16_t, 5> array_int16, ::std::array<int32_t, 5> array_int32, ::std::array<int64_t, 5> array_int64, ::std::array<float, 5> array_float32, ::std::array<double, 5> array_float64, ::std::array<::std::string, 5> array_string, ::std::array<::fidl::StringPtr, 5> array_opt_string) = 0;
-  virtual void ErrorArrayBasic(::test::typesinprotocols::Protocol_ErrorArrayBasic_Result result) = 0;
+  virtual void ErrorArrayBasic(::test::typesinprotocols::Protocol_ErrorArrayBasic_Result Protocol_ErrorArrayBasic_Result) = 0;
   virtual void EventArrayBasic(::std::array<uint8_t, 5> array_uint8, ::std::array<uint16_t, 5> array_uint16, ::std::array<uint32_t, 5> array_uint32, ::std::array<uint64_t, 5> array_uint64, ::std::array<int8_t, 5> array_int8, ::std::array<int16_t, 5> array_int16, ::std::array<int32_t, 5> array_int32, ::std::array<int64_t, 5> array_int64, ::std::array<float, 5> array_float32, ::std::array<double, 5> array_float64, ::std::array<::std::string, 5> array_string, ::std::array<::fidl::StringPtr, 5> array_opt_string) = 0;
   virtual void TwoWayArrayCompound(::std::array<::test::typesinprotocols::Bits, 5> array_bits, ::std::array<::test::typesinprotocols::Enum, 5> array_enum, ::std::array<::test::typesinprotocols::Struct, 5> array_struct, ::std::array<::test::typesinprotocols::Table, 5> array_table, ::std::array<::test::typesinprotocols::Union, 5> array_union, ::std::array<::std::unique_ptr<::test::typesinprotocols::Struct>, 5> array_opt_struct, ::std::array<::std::unique_ptr<::test::typesinprotocols::Union>, 5> array_opt_union) = 0;
-  virtual void ErrorArrayCompound(::test::typesinprotocols::Protocol_ErrorArrayCompound_Result result) = 0;
+  virtual void ErrorArrayCompound(::test::typesinprotocols::Protocol_ErrorArrayCompound_Result Protocol_ErrorArrayCompound_Result) = 0;
   virtual void EventArrayCompound(::std::array<::test::typesinprotocols::Bits, 5> array_bits, ::std::array<::test::typesinprotocols::Enum, 5> array_enum, ::std::array<::test::typesinprotocols::Struct, 5> array_struct, ::std::array<::test::typesinprotocols::Table, 5> array_table, ::std::array<::test::typesinprotocols::Union, 5> array_union, ::std::array<::std::unique_ptr<::test::typesinprotocols::Struct>, 5> array_opt_struct, ::std::array<::std::unique_ptr<::test::typesinprotocols::Union>, 5> array_opt_union) = 0;
   virtual void TwoWayVectorBasic(::std::vector<uint8_t> vector_uint8, ::std::vector<uint16_t> vector_uint16, ::std::vector<uint32_t> vector_uint32, ::std::vector<uint64_t> vector_uint64, ::std::vector<int8_t> vector_int8, ::std::vector<int16_t> vector_int16, ::std::vector<int32_t> vector_int32, ::std::vector<int64_t> vector_int64, ::std::vector<float> vector_float32, ::std::vector<double> vector_float64, ::std::vector<::std::string> vector_string, ::std::vector<::fidl::StringPtr> vector_opt_string) = 0;
-  virtual void ErrorVectorBasic(::test::typesinprotocols::Protocol_ErrorVectorBasic_Result result) = 0;
+  virtual void ErrorVectorBasic(::test::typesinprotocols::Protocol_ErrorVectorBasic_Result Protocol_ErrorVectorBasic_Result) = 0;
   virtual void EventVectorBasic(::std::vector<uint8_t> vector_uint8, ::std::vector<uint16_t> vector_uint16, ::std::vector<uint32_t> vector_uint32, ::std::vector<uint64_t> vector_uint64, ::std::vector<int8_t> vector_int8, ::std::vector<int16_t> vector_int16, ::std::vector<int32_t> vector_int32, ::std::vector<int64_t> vector_int64, ::std::vector<float> vector_float32, ::std::vector<double> vector_float64, ::std::vector<::std::string> vector_string, ::std::vector<::fidl::StringPtr> vector_opt_string) = 0;
   virtual void TwoWayVectorCompound(::std::vector<::test::typesinprotocols::Bits> vector_bits, ::std::vector<::test::typesinprotocols::Enum> vector_enum, ::std::vector<::test::typesinprotocols::Struct> vector_struct, ::std::vector<::test::typesinprotocols::Table> vector_table, ::std::vector<::test::typesinprotocols::Union> vector_union, ::std::vector<::std::unique_ptr<::test::typesinprotocols::Struct>> vector_opt_struct, ::std::vector<::std::unique_ptr<::test::typesinprotocols::Union>> vector_opt_union) = 0;
-  virtual void ErrorVectorCompound(::test::typesinprotocols::Protocol_ErrorVectorCompound_Result result) = 0;
+  virtual void ErrorVectorCompound(::test::typesinprotocols::Protocol_ErrorVectorCompound_Result Protocol_ErrorVectorCompound_Result) = 0;
   virtual void EventVectorCompound(::std::vector<::test::typesinprotocols::Bits> vector_bits, ::std::vector<::test::typesinprotocols::Enum> vector_enum, ::std::vector<::test::typesinprotocols::Struct> vector_struct, ::std::vector<::test::typesinprotocols::Table> vector_table, ::std::vector<::test::typesinprotocols::Union> vector_union, ::std::vector<::std::unique_ptr<::test::typesinprotocols::Struct>> vector_opt_struct, ::std::vector<::std::unique_ptr<::test::typesinprotocols::Union>> vector_opt_union) = 0;
   virtual void TwoWayVectorOptional(::fidl::VectorPtr<uint8_t> opt_vector_uint8, ::fidl::VectorPtr<::std::string> opt_vector_string, ::fidl::VectorPtr<::std::unique_ptr<::test::typesinprotocols::Struct>> opt_vector_opt_struct) = 0;
-  virtual void ErrorVectorOptional(::test::typesinprotocols::Protocol_ErrorVectorOptional_Result result) = 0;
+  virtual void ErrorVectorOptional(::test::typesinprotocols::Protocol_ErrorVectorOptional_Result Protocol_ErrorVectorOptional_Result) = 0;
   virtual void EventVectorOptional(::fidl::VectorPtr<uint8_t> opt_vector_uint8, ::fidl::VectorPtr<::std::string> opt_vector_string, ::fidl::VectorPtr<::std::unique_ptr<::test::typesinprotocols::Struct>> opt_vector_opt_struct) = 0;
   virtual void TwoWayArrayVectorNested(::std::array<::std::array<uint8_t, 5>, 5> array_array_uint8, ::std::array<::std::vector<uint8_t>, 5> array_vector_uint8, ::std::vector<::std::array<uint8_t, 5>> vector_array_uint8, ::std::vector<::std::vector<uint8_t>> vector_vector_uint8) = 0;
-  virtual void ErrorArrayVectorNested(::test::typesinprotocols::Protocol_ErrorArrayVectorNested_Result result) = 0;
+  virtual void ErrorArrayVectorNested(::test::typesinprotocols::Protocol_ErrorArrayVectorNested_Result Protocol_ErrorArrayVectorNested_Result) = 0;
   virtual void EventArrayVectorNested(::std::array<::std::array<uint8_t, 5>, 5> array_array_uint8, ::std::array<::std::vector<uint8_t>, 5> array_vector_uint8, ::std::vector<::std::array<uint8_t, 5>> vector_array_uint8, ::std::vector<::std::vector<uint8_t>> vector_vector_uint8) = 0;
   virtual void TwoWayResource(::zx::handle handle, ::zx::vmo vmo, ::fidl::InterfaceHandle<::test::typesinprotocols::Protocol> client_end, ::fidl::InterfaceRequest<::test::typesinprotocols::Protocol> server_end, ::test::typesinprotocols::ResourceStruct struct_, ::test::typesinprotocols::ResourceTable table, ::test::typesinprotocols::ResourceUnion union_, ::zx::handle opt_handle, ::zx::vmo opt_vmo, ::fidl::InterfaceHandle<::test::typesinprotocols::Protocol> opt_client_end, ::fidl::InterfaceRequest<::test::typesinprotocols::Protocol> opt_server_end, ::std::unique_ptr<::test::typesinprotocols::ResourceStruct> opt_struct, ::std::unique_ptr<::test::typesinprotocols::ResourceUnion> opt_union, ::std::array<::zx::handle, 5> array_handle, ::std::array<::zx::vmo, 5> array_vmo, ::std::array<::fidl::InterfaceHandle<::test::typesinprotocols::Protocol>, 5> array_client_end, ::std::array<::fidl::InterfaceRequest<::test::typesinprotocols::Protocol>, 5> array_server_end, ::std::array<::test::typesinprotocols::ResourceStruct, 5> array_struct, ::std::array<::test::typesinprotocols::ResourceTable, 5> array_table, ::std::array<::test::typesinprotocols::ResourceUnion, 5> array_union, ::std::vector<::zx::handle> vector_handle, ::std::vector<::zx::vmo> vector_vmo, ::std::vector<::fidl::InterfaceHandle<::test::typesinprotocols::Protocol>> vector_client_end, ::std::vector<::fidl::InterfaceRequest<::test::typesinprotocols::Protocol>> vector_server_end, ::std::vector<::test::typesinprotocols::ResourceStruct> vector_struct, ::std::vector<::test::typesinprotocols::ResourceTable> vector_table, ::std::vector<::test::typesinprotocols::ResourceUnion> vector_union) = 0;
-  virtual void ErrorResource(::test::typesinprotocols::Protocol_ErrorResource_Result result) = 0;
+  virtual void ErrorResource(::test::typesinprotocols::Protocol_ErrorResource_Result Protocol_ErrorResource_Result) = 0;
   virtual void EventResource(::zx::handle handle, ::zx::vmo vmo, ::fidl::InterfaceHandle<::test::typesinprotocols::Protocol> client_end, ::fidl::InterfaceRequest<::test::typesinprotocols::Protocol> server_end, ::test::typesinprotocols::ResourceStruct struct_, ::test::typesinprotocols::ResourceTable table, ::test::typesinprotocols::ResourceUnion union_, ::zx::handle opt_handle, ::zx::vmo opt_vmo, ::fidl::InterfaceHandle<::test::typesinprotocols::Protocol> opt_client_end, ::fidl::InterfaceRequest<::test::typesinprotocols::Protocol> opt_server_end, ::std::unique_ptr<::test::typesinprotocols::ResourceStruct> opt_struct, ::std::unique_ptr<::test::typesinprotocols::ResourceUnion> opt_union, ::std::array<::zx::handle, 5> array_handle, ::std::array<::zx::vmo, 5> array_vmo, ::std::array<::fidl::InterfaceHandle<::test::typesinprotocols::Protocol>, 5> array_client_end, ::std::array<::fidl::InterfaceRequest<::test::typesinprotocols::Protocol>, 5> array_server_end, ::std::array<::test::typesinprotocols::ResourceStruct, 5> array_struct, ::std::array<::test::typesinprotocols::ResourceTable, 5> array_table, ::std::array<::test::typesinprotocols::ResourceUnion, 5> array_union, ::std::vector<::zx::handle> vector_handle, ::std::vector<::zx::vmo> vector_vmo, ::std::vector<::fidl::InterfaceHandle<::test::typesinprotocols::Protocol>> vector_client_end, ::std::vector<::fidl::InterfaceRequest<::test::typesinprotocols::Protocol>> vector_server_end, ::std::vector<::test::typesinprotocols::ResourceStruct> vector_struct, ::std::vector<::test::typesinprotocols::ResourceTable> vector_table, ::std::vector<::test::typesinprotocols::ResourceUnion> vector_union) = 0;
 };
 
@@ -5606,31 +5092,31 @@ class Protocol_Sync {
   virtual ~Protocol_Sync();
   virtual zx_status_t OneWayBasic(uint8_t uint8, uint16_t uint16, uint32_t uint32, uint64_t uint64, int8_t int8, int16_t int16, int32_t int32, int64_t int64, float float32, double float64, ::std::string string, ::fidl::StringPtr opt_string) = 0;
   virtual zx_status_t TwoWayBasic(uint8_t uint8, uint16_t uint16, uint32_t uint32, uint64_t uint64, int8_t int8, int16_t int16, int32_t int32, int64_t int64, float float32, double float64, ::std::string string, ::fidl::StringPtr opt_string, uint8_t* out_uint8, uint16_t* out_uint16, uint32_t* out_uint32, uint64_t* out_uint64, int8_t* out_int8, int16_t* out_int16, int32_t* out_int32, int64_t* out_int64, float* out_float32, double* out_float64, ::std::string* out_string, ::fidl::StringPtr* out_opt_string) = 0;
-  virtual zx_status_t ErrorBasic(::test::typesinprotocols::Protocol_ErrorBasic_Result* out_result) = 0;
+  virtual zx_status_t ErrorBasic(::test::typesinprotocols::Protocol_ErrorBasic_Result* out_Protocol_ErrorBasic_Result) = 0;
   virtual zx_status_t OneWayCompound(::test::typesinprotocols::Bits bits, ::test::typesinprotocols::Enum enum_, ::test::typesinprotocols::Struct struct_, ::test::typesinprotocols::Table table, ::test::typesinprotocols::Union union_, ::std::unique_ptr<::test::typesinprotocols::Struct> opt_struct, ::std::unique_ptr<::test::typesinprotocols::Union> opt_union) = 0;
   virtual zx_status_t TwoWayCompound(::test::typesinprotocols::Bits bits, ::test::typesinprotocols::Enum enum_, ::test::typesinprotocols::Struct struct_, ::test::typesinprotocols::Table table, ::test::typesinprotocols::Union union_, ::std::unique_ptr<::test::typesinprotocols::Struct> opt_struct, ::std::unique_ptr<::test::typesinprotocols::Union> opt_union, ::test::typesinprotocols::Bits* out_bits, ::test::typesinprotocols::Enum* out_enum_, ::test::typesinprotocols::Struct* out_struct_, ::test::typesinprotocols::Table* out_table, ::test::typesinprotocols::Union* out_union_, ::std::unique_ptr<::test::typesinprotocols::Struct>* out_opt_struct, ::std::unique_ptr<::test::typesinprotocols::Union>* out_opt_union) = 0;
-  virtual zx_status_t ErrorCompound(::test::typesinprotocols::Protocol_ErrorCompound_Result* out_result) = 0;
+  virtual zx_status_t ErrorCompound(::test::typesinprotocols::Protocol_ErrorCompound_Result* out_Protocol_ErrorCompound_Result) = 0;
   virtual zx_status_t OneWayArrayBasic(::std::array<uint8_t, 5> array_uint8, ::std::array<uint16_t, 5> array_uint16, ::std::array<uint32_t, 5> array_uint32, ::std::array<uint64_t, 5> array_uint64, ::std::array<int8_t, 5> array_int8, ::std::array<int16_t, 5> array_int16, ::std::array<int32_t, 5> array_int32, ::std::array<int64_t, 5> array_int64, ::std::array<float, 5> array_float32, ::std::array<double, 5> array_float64, ::std::array<::std::string, 5> array_string, ::std::array<::fidl::StringPtr, 5> array_opt_string) = 0;
   virtual zx_status_t TwoWayArrayBasic(::std::array<uint8_t, 5> array_uint8, ::std::array<uint16_t, 5> array_uint16, ::std::array<uint32_t, 5> array_uint32, ::std::array<uint64_t, 5> array_uint64, ::std::array<int8_t, 5> array_int8, ::std::array<int16_t, 5> array_int16, ::std::array<int32_t, 5> array_int32, ::std::array<int64_t, 5> array_int64, ::std::array<float, 5> array_float32, ::std::array<double, 5> array_float64, ::std::array<::std::string, 5> array_string, ::std::array<::fidl::StringPtr, 5> array_opt_string, ::std::array<uint8_t, 5>* out_array_uint8, ::std::array<uint16_t, 5>* out_array_uint16, ::std::array<uint32_t, 5>* out_array_uint32, ::std::array<uint64_t, 5>* out_array_uint64, ::std::array<int8_t, 5>* out_array_int8, ::std::array<int16_t, 5>* out_array_int16, ::std::array<int32_t, 5>* out_array_int32, ::std::array<int64_t, 5>* out_array_int64, ::std::array<float, 5>* out_array_float32, ::std::array<double, 5>* out_array_float64, ::std::array<::std::string, 5>* out_array_string, ::std::array<::fidl::StringPtr, 5>* out_array_opt_string) = 0;
-  virtual zx_status_t ErrorArrayBasic(::test::typesinprotocols::Protocol_ErrorArrayBasic_Result* out_result) = 0;
+  virtual zx_status_t ErrorArrayBasic(::test::typesinprotocols::Protocol_ErrorArrayBasic_Result* out_Protocol_ErrorArrayBasic_Result) = 0;
   virtual zx_status_t OneWayArrayCompound(::std::array<::test::typesinprotocols::Bits, 5> array_bits, ::std::array<::test::typesinprotocols::Enum, 5> array_enum, ::std::array<::test::typesinprotocols::Struct, 5> array_struct, ::std::array<::test::typesinprotocols::Table, 5> array_table, ::std::array<::test::typesinprotocols::Union, 5> array_union, ::std::array<::std::unique_ptr<::test::typesinprotocols::Struct>, 5> array_opt_struct, ::std::array<::std::unique_ptr<::test::typesinprotocols::Union>, 5> array_opt_union) = 0;
   virtual zx_status_t TwoWayArrayCompound(::std::array<::test::typesinprotocols::Bits, 5> array_bits, ::std::array<::test::typesinprotocols::Enum, 5> array_enum, ::std::array<::test::typesinprotocols::Struct, 5> array_struct, ::std::array<::test::typesinprotocols::Table, 5> array_table, ::std::array<::test::typesinprotocols::Union, 5> array_union, ::std::array<::std::unique_ptr<::test::typesinprotocols::Struct>, 5> array_opt_struct, ::std::array<::std::unique_ptr<::test::typesinprotocols::Union>, 5> array_opt_union, ::std::array<::test::typesinprotocols::Bits, 5>* out_array_bits, ::std::array<::test::typesinprotocols::Enum, 5>* out_array_enum, ::std::array<::test::typesinprotocols::Struct, 5>* out_array_struct, ::std::array<::test::typesinprotocols::Table, 5>* out_array_table, ::std::array<::test::typesinprotocols::Union, 5>* out_array_union, ::std::array<::std::unique_ptr<::test::typesinprotocols::Struct>, 5>* out_array_opt_struct, ::std::array<::std::unique_ptr<::test::typesinprotocols::Union>, 5>* out_array_opt_union) = 0;
-  virtual zx_status_t ErrorArrayCompound(::test::typesinprotocols::Protocol_ErrorArrayCompound_Result* out_result) = 0;
+  virtual zx_status_t ErrorArrayCompound(::test::typesinprotocols::Protocol_ErrorArrayCompound_Result* out_Protocol_ErrorArrayCompound_Result) = 0;
   virtual zx_status_t OneWayVectorBasic(::std::vector<uint8_t> vector_uint8, ::std::vector<uint16_t> vector_uint16, ::std::vector<uint32_t> vector_uint32, ::std::vector<uint64_t> vector_uint64, ::std::vector<int8_t> vector_int8, ::std::vector<int16_t> vector_int16, ::std::vector<int32_t> vector_int32, ::std::vector<int64_t> vector_int64, ::std::vector<float> vector_float32, ::std::vector<double> vector_float64, ::std::vector<::std::string> vector_string, ::std::vector<::fidl::StringPtr> vector_opt_string) = 0;
   virtual zx_status_t TwoWayVectorBasic(::std::vector<uint8_t> vector_uint8, ::std::vector<uint16_t> vector_uint16, ::std::vector<uint32_t> vector_uint32, ::std::vector<uint64_t> vector_uint64, ::std::vector<int8_t> vector_int8, ::std::vector<int16_t> vector_int16, ::std::vector<int32_t> vector_int32, ::std::vector<int64_t> vector_int64, ::std::vector<float> vector_float32, ::std::vector<double> vector_float64, ::std::vector<::std::string> vector_string, ::std::vector<::fidl::StringPtr> vector_opt_string, ::std::vector<uint8_t>* out_vector_uint8, ::std::vector<uint16_t>* out_vector_uint16, ::std::vector<uint32_t>* out_vector_uint32, ::std::vector<uint64_t>* out_vector_uint64, ::std::vector<int8_t>* out_vector_int8, ::std::vector<int16_t>* out_vector_int16, ::std::vector<int32_t>* out_vector_int32, ::std::vector<int64_t>* out_vector_int64, ::std::vector<float>* out_vector_float32, ::std::vector<double>* out_vector_float64, ::std::vector<::std::string>* out_vector_string, ::std::vector<::fidl::StringPtr>* out_vector_opt_string) = 0;
-  virtual zx_status_t ErrorVectorBasic(::test::typesinprotocols::Protocol_ErrorVectorBasic_Result* out_result) = 0;
+  virtual zx_status_t ErrorVectorBasic(::test::typesinprotocols::Protocol_ErrorVectorBasic_Result* out_Protocol_ErrorVectorBasic_Result) = 0;
   virtual zx_status_t OneWayVectorCompound(::std::vector<::test::typesinprotocols::Bits> vector_bits, ::std::vector<::test::typesinprotocols::Enum> vector_enum, ::std::vector<::test::typesinprotocols::Struct> vector_struct, ::std::vector<::test::typesinprotocols::Table> vector_table, ::std::vector<::test::typesinprotocols::Union> vector_union, ::std::vector<::std::unique_ptr<::test::typesinprotocols::Struct>> vector_opt_struct, ::std::vector<::std::unique_ptr<::test::typesinprotocols::Union>> vector_opt_union) = 0;
   virtual zx_status_t TwoWayVectorCompound(::std::vector<::test::typesinprotocols::Bits> vector_bits, ::std::vector<::test::typesinprotocols::Enum> vector_enum, ::std::vector<::test::typesinprotocols::Struct> vector_struct, ::std::vector<::test::typesinprotocols::Table> vector_table, ::std::vector<::test::typesinprotocols::Union> vector_union, ::std::vector<::std::unique_ptr<::test::typesinprotocols::Struct>> vector_opt_struct, ::std::vector<::std::unique_ptr<::test::typesinprotocols::Union>> vector_opt_union, ::std::vector<::test::typesinprotocols::Bits>* out_vector_bits, ::std::vector<::test::typesinprotocols::Enum>* out_vector_enum, ::std::vector<::test::typesinprotocols::Struct>* out_vector_struct, ::std::vector<::test::typesinprotocols::Table>* out_vector_table, ::std::vector<::test::typesinprotocols::Union>* out_vector_union, ::std::vector<::std::unique_ptr<::test::typesinprotocols::Struct>>* out_vector_opt_struct, ::std::vector<::std::unique_ptr<::test::typesinprotocols::Union>>* out_vector_opt_union) = 0;
-  virtual zx_status_t ErrorVectorCompound(::test::typesinprotocols::Protocol_ErrorVectorCompound_Result* out_result) = 0;
+  virtual zx_status_t ErrorVectorCompound(::test::typesinprotocols::Protocol_ErrorVectorCompound_Result* out_Protocol_ErrorVectorCompound_Result) = 0;
   virtual zx_status_t OneWayVectorOptional(::fidl::VectorPtr<uint8_t> opt_vector_uint8, ::fidl::VectorPtr<::std::string> opt_vector_string, ::fidl::VectorPtr<::std::unique_ptr<::test::typesinprotocols::Struct>> opt_vector_opt_struct) = 0;
   virtual zx_status_t TwoWayVectorOptional(::fidl::VectorPtr<uint8_t> opt_vector_uint8, ::fidl::VectorPtr<::std::string> opt_vector_string, ::fidl::VectorPtr<::std::unique_ptr<::test::typesinprotocols::Struct>> opt_vector_opt_struct, ::fidl::VectorPtr<uint8_t>* out_opt_vector_uint8, ::fidl::VectorPtr<::std::string>* out_opt_vector_string, ::fidl::VectorPtr<::std::unique_ptr<::test::typesinprotocols::Struct>>* out_opt_vector_opt_struct) = 0;
-  virtual zx_status_t ErrorVectorOptional(::test::typesinprotocols::Protocol_ErrorVectorOptional_Result* out_result) = 0;
+  virtual zx_status_t ErrorVectorOptional(::test::typesinprotocols::Protocol_ErrorVectorOptional_Result* out_Protocol_ErrorVectorOptional_Result) = 0;
   virtual zx_status_t OneWayArrayVectorNested(::std::array<::std::array<uint8_t, 5>, 5> array_array_uint8, ::std::array<::std::vector<uint8_t>, 5> array_vector_uint8, ::std::vector<::std::array<uint8_t, 5>> vector_array_uint8, ::std::vector<::std::vector<uint8_t>> vector_vector_uint8) = 0;
   virtual zx_status_t TwoWayArrayVectorNested(::std::array<::std::array<uint8_t, 5>, 5> array_array_uint8, ::std::array<::std::vector<uint8_t>, 5> array_vector_uint8, ::std::vector<::std::array<uint8_t, 5>> vector_array_uint8, ::std::vector<::std::vector<uint8_t>> vector_vector_uint8, ::std::array<::std::array<uint8_t, 5>, 5>* out_array_array_uint8, ::std::array<::std::vector<uint8_t>, 5>* out_array_vector_uint8, ::std::vector<::std::array<uint8_t, 5>>* out_vector_array_uint8, ::std::vector<::std::vector<uint8_t>>* out_vector_vector_uint8) = 0;
-  virtual zx_status_t ErrorArrayVectorNested(::test::typesinprotocols::Protocol_ErrorArrayVectorNested_Result* out_result) = 0;
+  virtual zx_status_t ErrorArrayVectorNested(::test::typesinprotocols::Protocol_ErrorArrayVectorNested_Result* out_Protocol_ErrorArrayVectorNested_Result) = 0;
   virtual zx_status_t OneWayResource(::zx::handle handle, ::zx::vmo vmo, ::fidl::InterfaceHandle<::test::typesinprotocols::Protocol> client_end, ::fidl::InterfaceRequest<::test::typesinprotocols::Protocol> server_end, ::test::typesinprotocols::ResourceStruct struct_, ::test::typesinprotocols::ResourceTable table, ::test::typesinprotocols::ResourceUnion union_, ::zx::handle opt_handle, ::zx::vmo opt_vmo, ::fidl::InterfaceHandle<::test::typesinprotocols::Protocol> opt_client_end, ::fidl::InterfaceRequest<::test::typesinprotocols::Protocol> opt_server_end, ::std::unique_ptr<::test::typesinprotocols::ResourceStruct> opt_struct, ::std::unique_ptr<::test::typesinprotocols::ResourceUnion> opt_union, ::std::array<::zx::handle, 5> array_handle, ::std::array<::zx::vmo, 5> array_vmo, ::std::array<::fidl::InterfaceHandle<::test::typesinprotocols::Protocol>, 5> array_client_end, ::std::array<::fidl::InterfaceRequest<::test::typesinprotocols::Protocol>, 5> array_server_end, ::std::array<::test::typesinprotocols::ResourceStruct, 5> array_struct, ::std::array<::test::typesinprotocols::ResourceTable, 5> array_table, ::std::array<::test::typesinprotocols::ResourceUnion, 5> array_union, ::std::vector<::zx::handle> vector_handle, ::std::vector<::zx::vmo> vector_vmo, ::std::vector<::fidl::InterfaceHandle<::test::typesinprotocols::Protocol>> vector_client_end, ::std::vector<::fidl::InterfaceRequest<::test::typesinprotocols::Protocol>> vector_server_end, ::std::vector<::test::typesinprotocols::ResourceStruct> vector_struct, ::std::vector<::test::typesinprotocols::ResourceTable> vector_table, ::std::vector<::test::typesinprotocols::ResourceUnion> vector_union) = 0;
   virtual zx_status_t TwoWayResource(::zx::handle handle, ::zx::vmo vmo, ::fidl::InterfaceHandle<::test::typesinprotocols::Protocol> client_end, ::fidl::InterfaceRequest<::test::typesinprotocols::Protocol> server_end, ::test::typesinprotocols::ResourceStruct struct_, ::test::typesinprotocols::ResourceTable table, ::test::typesinprotocols::ResourceUnion union_, ::zx::handle opt_handle, ::zx::vmo opt_vmo, ::fidl::InterfaceHandle<::test::typesinprotocols::Protocol> opt_client_end, ::fidl::InterfaceRequest<::test::typesinprotocols::Protocol> opt_server_end, ::std::unique_ptr<::test::typesinprotocols::ResourceStruct> opt_struct, ::std::unique_ptr<::test::typesinprotocols::ResourceUnion> opt_union, ::std::array<::zx::handle, 5> array_handle, ::std::array<::zx::vmo, 5> array_vmo, ::std::array<::fidl::InterfaceHandle<::test::typesinprotocols::Protocol>, 5> array_client_end, ::std::array<::fidl::InterfaceRequest<::test::typesinprotocols::Protocol>, 5> array_server_end, ::std::array<::test::typesinprotocols::ResourceStruct, 5> array_struct, ::std::array<::test::typesinprotocols::ResourceTable, 5> array_table, ::std::array<::test::typesinprotocols::ResourceUnion, 5> array_union, ::std::vector<::zx::handle> vector_handle, ::std::vector<::zx::vmo> vector_vmo, ::std::vector<::fidl::InterfaceHandle<::test::typesinprotocols::Protocol>> vector_client_end, ::std::vector<::fidl::InterfaceRequest<::test::typesinprotocols::Protocol>> vector_server_end, ::std::vector<::test::typesinprotocols::ResourceStruct> vector_struct, ::std::vector<::test::typesinprotocols::ResourceTable> vector_table, ::std::vector<::test::typesinprotocols::ResourceUnion> vector_union, ::zx::handle* out_handle, ::zx::vmo* out_vmo, ::fidl::InterfaceHandle<::test::typesinprotocols::Protocol>* out_client_end, ::fidl::InterfaceRequest<::test::typesinprotocols::Protocol>* out_server_end, ::test::typesinprotocols::ResourceStruct* out_struct_, ::test::typesinprotocols::ResourceTable* out_table, ::test::typesinprotocols::ResourceUnion* out_union_, ::zx::handle* out_opt_handle, ::zx::vmo* out_opt_vmo, ::fidl::InterfaceHandle<::test::typesinprotocols::Protocol>* out_opt_client_end, ::fidl::InterfaceRequest<::test::typesinprotocols::Protocol>* out_opt_server_end, ::std::unique_ptr<::test::typesinprotocols::ResourceStruct>* out_opt_struct, ::std::unique_ptr<::test::typesinprotocols::ResourceUnion>* out_opt_union, ::std::array<::zx::handle, 5>* out_array_handle, ::std::array<::zx::vmo, 5>* out_array_vmo, ::std::array<::fidl::InterfaceHandle<::test::typesinprotocols::Protocol>, 5>* out_array_client_end, ::std::array<::fidl::InterfaceRequest<::test::typesinprotocols::Protocol>, 5>* out_array_server_end, ::std::array<::test::typesinprotocols::ResourceStruct, 5>* out_array_struct, ::std::array<::test::typesinprotocols::ResourceTable, 5>* out_array_table, ::std::array<::test::typesinprotocols::ResourceUnion, 5>* out_array_union, ::std::vector<::zx::handle>* out_vector_handle, ::std::vector<::zx::vmo>* out_vector_vmo, ::std::vector<::fidl::InterfaceHandle<::test::typesinprotocols::Protocol>>* out_vector_client_end, ::std::vector<::fidl::InterfaceRequest<::test::typesinprotocols::Protocol>>* out_vector_server_end, ::std::vector<::test::typesinprotocols::ResourceStruct>* out_vector_struct, ::std::vector<::test::typesinprotocols::ResourceTable>* out_vector_table, ::std::vector<::test::typesinprotocols::ResourceUnion>* out_vector_union) = 0;
-  virtual zx_status_t ErrorResource(::test::typesinprotocols::Protocol_ErrorResource_Result* out_result) = 0;
+  virtual zx_status_t ErrorResource(::test::typesinprotocols::Protocol_ErrorResource_Result* out_Protocol_ErrorResource_Result) = 0;
 };
 
 class Protocol_Proxy final : public ::fidl::internal::Proxy, public Protocol {
@@ -5744,55 +5230,55 @@ class Protocol_SyncProxy : public ::test::typesinprotocols::Protocol_Sync {
   // cts-coverage-fidl-name:test.typesinprotocols/Protocol.TwoWayBasic
   zx_status_t TwoWayBasic(uint8_t uint8, uint16_t uint16, uint32_t uint32, uint64_t uint64, int8_t int8, int16_t int16, int32_t int32, int64_t int64, float float32, double float64, ::std::string string, ::fidl::StringPtr opt_string, uint8_t* out_uint8, uint16_t* out_uint16, uint32_t* out_uint32, uint64_t* out_uint64, int8_t* out_int8, int16_t* out_int16, int32_t* out_int32, int64_t* out_int64, float* out_float32, double* out_float64, ::std::string* out_string, ::fidl::StringPtr* out_opt_string) override;
   // cts-coverage-fidl-name:test.typesinprotocols/Protocol.ErrorBasic
-  zx_status_t ErrorBasic(::test::typesinprotocols::Protocol_ErrorBasic_Result* out_result) override;
+  zx_status_t ErrorBasic(::test::typesinprotocols::Protocol_ErrorBasic_Result* out_Protocol_ErrorBasic_Result) override;
   // cts-coverage-fidl-name:test.typesinprotocols/Protocol.OneWayCompound
   zx_status_t OneWayCompound(::test::typesinprotocols::Bits bits, ::test::typesinprotocols::Enum enum_, ::test::typesinprotocols::Struct struct_, ::test::typesinprotocols::Table table, ::test::typesinprotocols::Union union_, ::std::unique_ptr<::test::typesinprotocols::Struct> opt_struct, ::std::unique_ptr<::test::typesinprotocols::Union> opt_union) override;
   // cts-coverage-fidl-name:test.typesinprotocols/Protocol.TwoWayCompound
   zx_status_t TwoWayCompound(::test::typesinprotocols::Bits bits, ::test::typesinprotocols::Enum enum_, ::test::typesinprotocols::Struct struct_, ::test::typesinprotocols::Table table, ::test::typesinprotocols::Union union_, ::std::unique_ptr<::test::typesinprotocols::Struct> opt_struct, ::std::unique_ptr<::test::typesinprotocols::Union> opt_union, ::test::typesinprotocols::Bits* out_bits, ::test::typesinprotocols::Enum* out_enum_, ::test::typesinprotocols::Struct* out_struct_, ::test::typesinprotocols::Table* out_table, ::test::typesinprotocols::Union* out_union_, ::std::unique_ptr<::test::typesinprotocols::Struct>* out_opt_struct, ::std::unique_ptr<::test::typesinprotocols::Union>* out_opt_union) override;
   // cts-coverage-fidl-name:test.typesinprotocols/Protocol.ErrorCompound
-  zx_status_t ErrorCompound(::test::typesinprotocols::Protocol_ErrorCompound_Result* out_result) override;
+  zx_status_t ErrorCompound(::test::typesinprotocols::Protocol_ErrorCompound_Result* out_Protocol_ErrorCompound_Result) override;
   // cts-coverage-fidl-name:test.typesinprotocols/Protocol.OneWayArrayBasic
   zx_status_t OneWayArrayBasic(::std::array<uint8_t, 5> array_uint8, ::std::array<uint16_t, 5> array_uint16, ::std::array<uint32_t, 5> array_uint32, ::std::array<uint64_t, 5> array_uint64, ::std::array<int8_t, 5> array_int8, ::std::array<int16_t, 5> array_int16, ::std::array<int32_t, 5> array_int32, ::std::array<int64_t, 5> array_int64, ::std::array<float, 5> array_float32, ::std::array<double, 5> array_float64, ::std::array<::std::string, 5> array_string, ::std::array<::fidl::StringPtr, 5> array_opt_string) override;
   // cts-coverage-fidl-name:test.typesinprotocols/Protocol.TwoWayArrayBasic
   zx_status_t TwoWayArrayBasic(::std::array<uint8_t, 5> array_uint8, ::std::array<uint16_t, 5> array_uint16, ::std::array<uint32_t, 5> array_uint32, ::std::array<uint64_t, 5> array_uint64, ::std::array<int8_t, 5> array_int8, ::std::array<int16_t, 5> array_int16, ::std::array<int32_t, 5> array_int32, ::std::array<int64_t, 5> array_int64, ::std::array<float, 5> array_float32, ::std::array<double, 5> array_float64, ::std::array<::std::string, 5> array_string, ::std::array<::fidl::StringPtr, 5> array_opt_string, ::std::array<uint8_t, 5>* out_array_uint8, ::std::array<uint16_t, 5>* out_array_uint16, ::std::array<uint32_t, 5>* out_array_uint32, ::std::array<uint64_t, 5>* out_array_uint64, ::std::array<int8_t, 5>* out_array_int8, ::std::array<int16_t, 5>* out_array_int16, ::std::array<int32_t, 5>* out_array_int32, ::std::array<int64_t, 5>* out_array_int64, ::std::array<float, 5>* out_array_float32, ::std::array<double, 5>* out_array_float64, ::std::array<::std::string, 5>* out_array_string, ::std::array<::fidl::StringPtr, 5>* out_array_opt_string) override;
   // cts-coverage-fidl-name:test.typesinprotocols/Protocol.ErrorArrayBasic
-  zx_status_t ErrorArrayBasic(::test::typesinprotocols::Protocol_ErrorArrayBasic_Result* out_result) override;
+  zx_status_t ErrorArrayBasic(::test::typesinprotocols::Protocol_ErrorArrayBasic_Result* out_Protocol_ErrorArrayBasic_Result) override;
   // cts-coverage-fidl-name:test.typesinprotocols/Protocol.OneWayArrayCompound
   zx_status_t OneWayArrayCompound(::std::array<::test::typesinprotocols::Bits, 5> array_bits, ::std::array<::test::typesinprotocols::Enum, 5> array_enum, ::std::array<::test::typesinprotocols::Struct, 5> array_struct, ::std::array<::test::typesinprotocols::Table, 5> array_table, ::std::array<::test::typesinprotocols::Union, 5> array_union, ::std::array<::std::unique_ptr<::test::typesinprotocols::Struct>, 5> array_opt_struct, ::std::array<::std::unique_ptr<::test::typesinprotocols::Union>, 5> array_opt_union) override;
   // cts-coverage-fidl-name:test.typesinprotocols/Protocol.TwoWayArrayCompound
   zx_status_t TwoWayArrayCompound(::std::array<::test::typesinprotocols::Bits, 5> array_bits, ::std::array<::test::typesinprotocols::Enum, 5> array_enum, ::std::array<::test::typesinprotocols::Struct, 5> array_struct, ::std::array<::test::typesinprotocols::Table, 5> array_table, ::std::array<::test::typesinprotocols::Union, 5> array_union, ::std::array<::std::unique_ptr<::test::typesinprotocols::Struct>, 5> array_opt_struct, ::std::array<::std::unique_ptr<::test::typesinprotocols::Union>, 5> array_opt_union, ::std::array<::test::typesinprotocols::Bits, 5>* out_array_bits, ::std::array<::test::typesinprotocols::Enum, 5>* out_array_enum, ::std::array<::test::typesinprotocols::Struct, 5>* out_array_struct, ::std::array<::test::typesinprotocols::Table, 5>* out_array_table, ::std::array<::test::typesinprotocols::Union, 5>* out_array_union, ::std::array<::std::unique_ptr<::test::typesinprotocols::Struct>, 5>* out_array_opt_struct, ::std::array<::std::unique_ptr<::test::typesinprotocols::Union>, 5>* out_array_opt_union) override;
   // cts-coverage-fidl-name:test.typesinprotocols/Protocol.ErrorArrayCompound
-  zx_status_t ErrorArrayCompound(::test::typesinprotocols::Protocol_ErrorArrayCompound_Result* out_result) override;
+  zx_status_t ErrorArrayCompound(::test::typesinprotocols::Protocol_ErrorArrayCompound_Result* out_Protocol_ErrorArrayCompound_Result) override;
   // cts-coverage-fidl-name:test.typesinprotocols/Protocol.OneWayVectorBasic
   zx_status_t OneWayVectorBasic(::std::vector<uint8_t> vector_uint8, ::std::vector<uint16_t> vector_uint16, ::std::vector<uint32_t> vector_uint32, ::std::vector<uint64_t> vector_uint64, ::std::vector<int8_t> vector_int8, ::std::vector<int16_t> vector_int16, ::std::vector<int32_t> vector_int32, ::std::vector<int64_t> vector_int64, ::std::vector<float> vector_float32, ::std::vector<double> vector_float64, ::std::vector<::std::string> vector_string, ::std::vector<::fidl::StringPtr> vector_opt_string) override;
   // cts-coverage-fidl-name:test.typesinprotocols/Protocol.TwoWayVectorBasic
   zx_status_t TwoWayVectorBasic(::std::vector<uint8_t> vector_uint8, ::std::vector<uint16_t> vector_uint16, ::std::vector<uint32_t> vector_uint32, ::std::vector<uint64_t> vector_uint64, ::std::vector<int8_t> vector_int8, ::std::vector<int16_t> vector_int16, ::std::vector<int32_t> vector_int32, ::std::vector<int64_t> vector_int64, ::std::vector<float> vector_float32, ::std::vector<double> vector_float64, ::std::vector<::std::string> vector_string, ::std::vector<::fidl::StringPtr> vector_opt_string, ::std::vector<uint8_t>* out_vector_uint8, ::std::vector<uint16_t>* out_vector_uint16, ::std::vector<uint32_t>* out_vector_uint32, ::std::vector<uint64_t>* out_vector_uint64, ::std::vector<int8_t>* out_vector_int8, ::std::vector<int16_t>* out_vector_int16, ::std::vector<int32_t>* out_vector_int32, ::std::vector<int64_t>* out_vector_int64, ::std::vector<float>* out_vector_float32, ::std::vector<double>* out_vector_float64, ::std::vector<::std::string>* out_vector_string, ::std::vector<::fidl::StringPtr>* out_vector_opt_string) override;
   // cts-coverage-fidl-name:test.typesinprotocols/Protocol.ErrorVectorBasic
-  zx_status_t ErrorVectorBasic(::test::typesinprotocols::Protocol_ErrorVectorBasic_Result* out_result) override;
+  zx_status_t ErrorVectorBasic(::test::typesinprotocols::Protocol_ErrorVectorBasic_Result* out_Protocol_ErrorVectorBasic_Result) override;
   // cts-coverage-fidl-name:test.typesinprotocols/Protocol.OneWayVectorCompound
   zx_status_t OneWayVectorCompound(::std::vector<::test::typesinprotocols::Bits> vector_bits, ::std::vector<::test::typesinprotocols::Enum> vector_enum, ::std::vector<::test::typesinprotocols::Struct> vector_struct, ::std::vector<::test::typesinprotocols::Table> vector_table, ::std::vector<::test::typesinprotocols::Union> vector_union, ::std::vector<::std::unique_ptr<::test::typesinprotocols::Struct>> vector_opt_struct, ::std::vector<::std::unique_ptr<::test::typesinprotocols::Union>> vector_opt_union) override;
   // cts-coverage-fidl-name:test.typesinprotocols/Protocol.TwoWayVectorCompound
   zx_status_t TwoWayVectorCompound(::std::vector<::test::typesinprotocols::Bits> vector_bits, ::std::vector<::test::typesinprotocols::Enum> vector_enum, ::std::vector<::test::typesinprotocols::Struct> vector_struct, ::std::vector<::test::typesinprotocols::Table> vector_table, ::std::vector<::test::typesinprotocols::Union> vector_union, ::std::vector<::std::unique_ptr<::test::typesinprotocols::Struct>> vector_opt_struct, ::std::vector<::std::unique_ptr<::test::typesinprotocols::Union>> vector_opt_union, ::std::vector<::test::typesinprotocols::Bits>* out_vector_bits, ::std::vector<::test::typesinprotocols::Enum>* out_vector_enum, ::std::vector<::test::typesinprotocols::Struct>* out_vector_struct, ::std::vector<::test::typesinprotocols::Table>* out_vector_table, ::std::vector<::test::typesinprotocols::Union>* out_vector_union, ::std::vector<::std::unique_ptr<::test::typesinprotocols::Struct>>* out_vector_opt_struct, ::std::vector<::std::unique_ptr<::test::typesinprotocols::Union>>* out_vector_opt_union) override;
   // cts-coverage-fidl-name:test.typesinprotocols/Protocol.ErrorVectorCompound
-  zx_status_t ErrorVectorCompound(::test::typesinprotocols::Protocol_ErrorVectorCompound_Result* out_result) override;
+  zx_status_t ErrorVectorCompound(::test::typesinprotocols::Protocol_ErrorVectorCompound_Result* out_Protocol_ErrorVectorCompound_Result) override;
   // cts-coverage-fidl-name:test.typesinprotocols/Protocol.OneWayVectorOptional
   zx_status_t OneWayVectorOptional(::fidl::VectorPtr<uint8_t> opt_vector_uint8, ::fidl::VectorPtr<::std::string> opt_vector_string, ::fidl::VectorPtr<::std::unique_ptr<::test::typesinprotocols::Struct>> opt_vector_opt_struct) override;
   // cts-coverage-fidl-name:test.typesinprotocols/Protocol.TwoWayVectorOptional
   zx_status_t TwoWayVectorOptional(::fidl::VectorPtr<uint8_t> opt_vector_uint8, ::fidl::VectorPtr<::std::string> opt_vector_string, ::fidl::VectorPtr<::std::unique_ptr<::test::typesinprotocols::Struct>> opt_vector_opt_struct, ::fidl::VectorPtr<uint8_t>* out_opt_vector_uint8, ::fidl::VectorPtr<::std::string>* out_opt_vector_string, ::fidl::VectorPtr<::std::unique_ptr<::test::typesinprotocols::Struct>>* out_opt_vector_opt_struct) override;
   // cts-coverage-fidl-name:test.typesinprotocols/Protocol.ErrorVectorOptional
-  zx_status_t ErrorVectorOptional(::test::typesinprotocols::Protocol_ErrorVectorOptional_Result* out_result) override;
+  zx_status_t ErrorVectorOptional(::test::typesinprotocols::Protocol_ErrorVectorOptional_Result* out_Protocol_ErrorVectorOptional_Result) override;
   // cts-coverage-fidl-name:test.typesinprotocols/Protocol.OneWayArrayVectorNested
   zx_status_t OneWayArrayVectorNested(::std::array<::std::array<uint8_t, 5>, 5> array_array_uint8, ::std::array<::std::vector<uint8_t>, 5> array_vector_uint8, ::std::vector<::std::array<uint8_t, 5>> vector_array_uint8, ::std::vector<::std::vector<uint8_t>> vector_vector_uint8) override;
   // cts-coverage-fidl-name:test.typesinprotocols/Protocol.TwoWayArrayVectorNested
   zx_status_t TwoWayArrayVectorNested(::std::array<::std::array<uint8_t, 5>, 5> array_array_uint8, ::std::array<::std::vector<uint8_t>, 5> array_vector_uint8, ::std::vector<::std::array<uint8_t, 5>> vector_array_uint8, ::std::vector<::std::vector<uint8_t>> vector_vector_uint8, ::std::array<::std::array<uint8_t, 5>, 5>* out_array_array_uint8, ::std::array<::std::vector<uint8_t>, 5>* out_array_vector_uint8, ::std::vector<::std::array<uint8_t, 5>>* out_vector_array_uint8, ::std::vector<::std::vector<uint8_t>>* out_vector_vector_uint8) override;
   // cts-coverage-fidl-name:test.typesinprotocols/Protocol.ErrorArrayVectorNested
-  zx_status_t ErrorArrayVectorNested(::test::typesinprotocols::Protocol_ErrorArrayVectorNested_Result* out_result) override;
+  zx_status_t ErrorArrayVectorNested(::test::typesinprotocols::Protocol_ErrorArrayVectorNested_Result* out_Protocol_ErrorArrayVectorNested_Result) override;
   // cts-coverage-fidl-name:test.typesinprotocols/Protocol.OneWayResource
   zx_status_t OneWayResource(::zx::handle handle, ::zx::vmo vmo, ::fidl::InterfaceHandle<::test::typesinprotocols::Protocol> client_end, ::fidl::InterfaceRequest<::test::typesinprotocols::Protocol> server_end, ::test::typesinprotocols::ResourceStruct struct_, ::test::typesinprotocols::ResourceTable table, ::test::typesinprotocols::ResourceUnion union_, ::zx::handle opt_handle, ::zx::vmo opt_vmo, ::fidl::InterfaceHandle<::test::typesinprotocols::Protocol> opt_client_end, ::fidl::InterfaceRequest<::test::typesinprotocols::Protocol> opt_server_end, ::std::unique_ptr<::test::typesinprotocols::ResourceStruct> opt_struct, ::std::unique_ptr<::test::typesinprotocols::ResourceUnion> opt_union, ::std::array<::zx::handle, 5> array_handle, ::std::array<::zx::vmo, 5> array_vmo, ::std::array<::fidl::InterfaceHandle<::test::typesinprotocols::Protocol>, 5> array_client_end, ::std::array<::fidl::InterfaceRequest<::test::typesinprotocols::Protocol>, 5> array_server_end, ::std::array<::test::typesinprotocols::ResourceStruct, 5> array_struct, ::std::array<::test::typesinprotocols::ResourceTable, 5> array_table, ::std::array<::test::typesinprotocols::ResourceUnion, 5> array_union, ::std::vector<::zx::handle> vector_handle, ::std::vector<::zx::vmo> vector_vmo, ::std::vector<::fidl::InterfaceHandle<::test::typesinprotocols::Protocol>> vector_client_end, ::std::vector<::fidl::InterfaceRequest<::test::typesinprotocols::Protocol>> vector_server_end, ::std::vector<::test::typesinprotocols::ResourceStruct> vector_struct, ::std::vector<::test::typesinprotocols::ResourceTable> vector_table, ::std::vector<::test::typesinprotocols::ResourceUnion> vector_union) override;
   // cts-coverage-fidl-name:test.typesinprotocols/Protocol.TwoWayResource
   zx_status_t TwoWayResource(::zx::handle handle, ::zx::vmo vmo, ::fidl::InterfaceHandle<::test::typesinprotocols::Protocol> client_end, ::fidl::InterfaceRequest<::test::typesinprotocols::Protocol> server_end, ::test::typesinprotocols::ResourceStruct struct_, ::test::typesinprotocols::ResourceTable table, ::test::typesinprotocols::ResourceUnion union_, ::zx::handle opt_handle, ::zx::vmo opt_vmo, ::fidl::InterfaceHandle<::test::typesinprotocols::Protocol> opt_client_end, ::fidl::InterfaceRequest<::test::typesinprotocols::Protocol> opt_server_end, ::std::unique_ptr<::test::typesinprotocols::ResourceStruct> opt_struct, ::std::unique_ptr<::test::typesinprotocols::ResourceUnion> opt_union, ::std::array<::zx::handle, 5> array_handle, ::std::array<::zx::vmo, 5> array_vmo, ::std::array<::fidl::InterfaceHandle<::test::typesinprotocols::Protocol>, 5> array_client_end, ::std::array<::fidl::InterfaceRequest<::test::typesinprotocols::Protocol>, 5> array_server_end, ::std::array<::test::typesinprotocols::ResourceStruct, 5> array_struct, ::std::array<::test::typesinprotocols::ResourceTable, 5> array_table, ::std::array<::test::typesinprotocols::ResourceUnion, 5> array_union, ::std::vector<::zx::handle> vector_handle, ::std::vector<::zx::vmo> vector_vmo, ::std::vector<::fidl::InterfaceHandle<::test::typesinprotocols::Protocol>> vector_client_end, ::std::vector<::fidl::InterfaceRequest<::test::typesinprotocols::Protocol>> vector_server_end, ::std::vector<::test::typesinprotocols::ResourceStruct> vector_struct, ::std::vector<::test::typesinprotocols::ResourceTable> vector_table, ::std::vector<::test::typesinprotocols::ResourceUnion> vector_union, ::zx::handle* out_handle, ::zx::vmo* out_vmo, ::fidl::InterfaceHandle<::test::typesinprotocols::Protocol>* out_client_end, ::fidl::InterfaceRequest<::test::typesinprotocols::Protocol>* out_server_end, ::test::typesinprotocols::ResourceStruct* out_struct_, ::test::typesinprotocols::ResourceTable* out_table, ::test::typesinprotocols::ResourceUnion* out_union_, ::zx::handle* out_opt_handle, ::zx::vmo* out_opt_vmo, ::fidl::InterfaceHandle<::test::typesinprotocols::Protocol>* out_opt_client_end, ::fidl::InterfaceRequest<::test::typesinprotocols::Protocol>* out_opt_server_end, ::std::unique_ptr<::test::typesinprotocols::ResourceStruct>* out_opt_struct, ::std::unique_ptr<::test::typesinprotocols::ResourceUnion>* out_opt_union, ::std::array<::zx::handle, 5>* out_array_handle, ::std::array<::zx::vmo, 5>* out_array_vmo, ::std::array<::fidl::InterfaceHandle<::test::typesinprotocols::Protocol>, 5>* out_array_client_end, ::std::array<::fidl::InterfaceRequest<::test::typesinprotocols::Protocol>, 5>* out_array_server_end, ::std::array<::test::typesinprotocols::ResourceStruct, 5>* out_array_struct, ::std::array<::test::typesinprotocols::ResourceTable, 5>* out_array_table, ::std::array<::test::typesinprotocols::ResourceUnion, 5>* out_array_union, ::std::vector<::zx::handle>* out_vector_handle, ::std::vector<::zx::vmo>* out_vector_vmo, ::std::vector<::fidl::InterfaceHandle<::test::typesinprotocols::Protocol>>* out_vector_client_end, ::std::vector<::fidl::InterfaceRequest<::test::typesinprotocols::Protocol>>* out_vector_server_end, ::std::vector<::test::typesinprotocols::ResourceStruct>* out_vector_struct, ::std::vector<::test::typesinprotocols::ResourceTable>* out_vector_table, ::std::vector<::test::typesinprotocols::ResourceUnion>* out_vector_union) override;
   // cts-coverage-fidl-name:test.typesinprotocols/Protocol.ErrorResource
-  zx_status_t ErrorResource(::test::typesinprotocols::Protocol_ErrorResource_Result* out_result) override;
+  zx_status_t ErrorResource(::test::typesinprotocols::Protocol_ErrorResource_Result* out_Protocol_ErrorResource_Result) override;
 
   private:
   ::fidl::internal::SynchronousProxy proxy_;

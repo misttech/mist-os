@@ -29,10 +29,6 @@ template <>
 struct fidl::ostream::Formatter<::test_errorsyntax::ExampleUseOfErrorSyntaxCallWhichMayFailResult> {
   static std::ostream& Format(std::ostream& os, const ::test_errorsyntax::ExampleUseOfErrorSyntaxCallWhichMayFailResult& value);
 };
-template <>
-struct fidl::ostream::Formatter<::test_errorsyntax::ExampleUseOfErrorSyntaxCallWhichMayFailTopResponse> {
-  static std::ostream& Format(std::ostream& os, const ::test_errorsyntax::ExampleUseOfErrorSyntaxCallWhichMayFailTopResponse& value);
-};
 
 namespace test_errorsyntax {
 
@@ -41,8 +37,6 @@ std::ostream& operator<<(std::ostream& os, const ::test_errorsyntax::ExampleUseO
 std::ostream& operator<<(std::ostream& os, const ::test_errorsyntax::ExampleUseOfErrorSyntaxCallWhichMayFailResponse& value);
 
 std::ostream& operator<<(std::ostream& os, const ::test_errorsyntax::ExampleUseOfErrorSyntaxCallWhichMayFailResult& value);
-
-std::ostream& operator<<(std::ostream& os, const ::test_errorsyntax::ExampleUseOfErrorSyntaxCallWhichMayFailTopResponse& value);
 
 }  // namespace test_errorsyntax
 

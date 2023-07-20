@@ -35,26 +35,6 @@
   ],
   "dependency_identifiers": [
     {
-      "identifier": "test.protocolpayloads.imported/ComposedProtocolOnComposedWithErrorRequest",
-      "location": {
-        "is_virtual": false,
-        "file": "../../tools/fidl/fidlc/testdata/protocol_payloads/imported.test.fidl",
-        "data": "(ImportStructPayload)",
-        "start_offset": 425,
-        "end_offset": 446
-      }
-    },
-    {
-      "identifier": "test.protocolpayloads.imported/ComposedProtocolTwoWayComposedWithErrorTopResponse",
-      "location": {
-        "is_virtual": false,
-        "file": "../../tools/fidl/fidlc/testdata/protocol_payloads/imported.test.fidl",
-        "data": "(ImportStructPayload)",
-        "start_offset": 309,
-        "end_offset": 330
-      }
-    },
-    {
       "identifier": "test.protocolpayloads.imported/ImportStructPayload",
       "location": {
         "is_virtual": false,
@@ -362,54 +342,6 @@
     },
     {
       "is_anonymous": true,
-      "identifier": "test.protocolpayloads/MainProtocolOnAnonWithErrorRequest",
-      "members": [
-        {
-          "name": "result",
-          "location": {
-            "is_virtual": true
-          },
-          "type": {
-            "kind": "identifier",
-            "is_anonymous": true
-          }
-        }
-      ]
-    },
-    {
-      "is_anonymous": true,
-      "identifier": "test.protocolpayloads/MainProtocolOnImportWithErrorRequest",
-      "members": [
-        {
-          "name": "result",
-          "location": {
-            "is_virtual": true
-          },
-          "type": {
-            "kind": "identifier",
-            "is_anonymous": true
-          }
-        }
-      ]
-    },
-    {
-      "is_anonymous": true,
-      "identifier": "test.protocolpayloads/MainProtocolOnLocalWithErrorRequest",
-      "members": [
-        {
-          "name": "result",
-          "location": {
-            "is_virtual": true
-          },
-          "type": {
-            "kind": "identifier",
-            "is_anonymous": true
-          }
-        }
-      ]
-    },
-    {
-      "is_anonymous": true,
       "identifier": "test.protocolpayloads/MainProtocolOneWayAnonRequest",
       "members": [
         {
@@ -532,54 +464,6 @@
           },
           "type": {
             "kind": "primitive"
-          }
-        }
-      ]
-    },
-    {
-      "is_anonymous": true,
-      "identifier": "test.protocolpayloads/MainProtocolTwoWayAnonWithErrorTopResponse",
-      "members": [
-        {
-          "name": "result",
-          "location": {
-            "is_virtual": true
-          },
-          "type": {
-            "kind": "identifier",
-            "is_anonymous": true
-          }
-        }
-      ]
-    },
-    {
-      "is_anonymous": true,
-      "identifier": "test.protocolpayloads/MainProtocolTwoWayImportWithErrorTopResponse",
-      "members": [
-        {
-          "name": "result",
-          "location": {
-            "is_virtual": true
-          },
-          "type": {
-            "kind": "identifier",
-            "is_anonymous": true
-          }
-        }
-      ]
-    },
-    {
-      "is_anonymous": true,
-      "identifier": "test.protocolpayloads/MainProtocolTwoWayLocalWithErrorTopResponse",
-      "members": [
-        {
-          "name": "result",
-          "location": {
-            "is_virtual": true
-          },
-          "type": {
-            "kind": "identifier",
-            "is_anonymous": true
           }
         }
       ]

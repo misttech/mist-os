@@ -397,7 +397,7 @@ struct ::fidl::internal::NaturalServerDispatcher<::test_protocols::WithAndWithou
 
 template <>
 struct ::fidl::internal::NaturalMethodTypes<::test_protocols::WithErrorSyntax::ResponseAsStruct> {
-  using Response = ::test_protocols::WithErrorSyntaxResponseAsStructTopResponse;
+  using Response = ::test_protocols::WithErrorSyntaxResponseAsStructResult;
 
   using Completer = fidl::Completer<::fidl::internal::NaturalCompleterBase<::test_protocols::WithErrorSyntax::ResponseAsStruct>>;
   using ResultCallback =
@@ -406,7 +406,7 @@ struct ::fidl::internal::NaturalMethodTypes<::test_protocols::WithErrorSyntax::R
 
 template <>
 struct ::fidl::internal::NaturalMethodTypes<::test_protocols::WithErrorSyntax::ErrorAsPrimitive> {
-  using Response = ::test_protocols::WithErrorSyntaxErrorAsPrimitiveTopResponse;
+  using Response = ::test_protocols::WithErrorSyntaxErrorAsPrimitiveResult;
 
   using Completer = fidl::Completer<::fidl::internal::NaturalCompleterBase<::test_protocols::WithErrorSyntax::ErrorAsPrimitive>>;
   using ResultCallback =
@@ -415,7 +415,7 @@ struct ::fidl::internal::NaturalMethodTypes<::test_protocols::WithErrorSyntax::E
 
 template <>
 struct ::fidl::internal::NaturalMethodTypes<::test_protocols::WithErrorSyntax::ErrorAsEnum> {
-  using Response = ::test_protocols::WithErrorSyntaxErrorAsEnumTopResponse;
+  using Response = ::test_protocols::WithErrorSyntaxErrorAsEnumResult;
 
   using Completer = fidl::Completer<::fidl::internal::NaturalCompleterBase<::test_protocols::WithErrorSyntax::ErrorAsEnum>>;
   using ResultCallback =
@@ -424,7 +424,7 @@ struct ::fidl::internal::NaturalMethodTypes<::test_protocols::WithErrorSyntax::E
 
 template <>
 struct ::fidl::internal::NaturalMethodTypes<::test_protocols::WithErrorSyntax::HandleInResult> {
-  using Response = ::test_protocols::WithErrorSyntaxHandleInResultTopResponse;
+  using Response = ::test_protocols::WithErrorSyntaxHandleInResultResult;
 
   using Completer = fidl::Completer<::fidl::internal::NaturalCompleterBase<::test_protocols::WithErrorSyntax::HandleInResult>>;
   using ResultCallback =
@@ -432,13 +432,13 @@ struct ::fidl::internal::NaturalMethodTypes<::test_protocols::WithErrorSyntax::H
 };
 
 namespace test_protocols {
-__LOCAL extern "C" const fidl_type_t test_protocols_WithErrorSyntaxResponseAsStructTopResponseTable;
+__LOCAL extern "C" const fidl_type_t test_protocols_WithErrorSyntax_ResponseAsStruct_ResultTable;
 
-__LOCAL extern "C" const fidl_type_t test_protocols_WithErrorSyntaxErrorAsPrimitiveTopResponseTable;
+__LOCAL extern "C" const fidl_type_t test_protocols_WithErrorSyntax_ErrorAsPrimitive_ResultTable;
 
-__LOCAL extern "C" const fidl_type_t test_protocols_WithErrorSyntaxErrorAsEnumTopResponseTable;
+__LOCAL extern "C" const fidl_type_t test_protocols_WithErrorSyntax_ErrorAsEnum_ResultTable;
 
-__LOCAL extern "C" const fidl_type_t test_protocols_WithErrorSyntaxHandleInResultTopResponseTable;
+__LOCAL extern "C" const fidl_type_t test_protocols_WithErrorSyntax_HandleInResult_ResultTable;
 
 #ifdef __Fuchsia__
 }  // namespace test_protocols
@@ -452,14 +452,14 @@ class ::fidl::Response<::test_protocols::WithErrorSyntax::ResponseAsStruct> fina
 };
 template <>
 class ::fidl::internal::ResponseMessageConverter<::test_protocols::WithErrorSyntax::ResponseAsStruct> {
-  using DomainObject = ::test_protocols::WithErrorSyntaxResponseAsStructTopResponse;
+  using DomainObject = ::test_protocols::WithErrorSyntaxResponseAsStructResult;
 
  public:
   static DomainObject IntoDomainObject(const ::fidl::Response<::test_protocols::WithErrorSyntax::ResponseAsStruct>& m) {
     if (m.is_error()) {
-      return DomainObject{{.result = ::test_protocols::WithErrorSyntaxResponseAsStructResult::WithErr(m.error_value())}};
+      return DomainObject::WithErr(m.error_value());
     } else {
-      return DomainObject{{.result = ::test_protocols::WithErrorSyntaxResponseAsStructResult::WithResponse(std::move(m.value()))}};
+      return DomainObject::WithResponse(std::move(m.value()));
     }
   }
 };
@@ -484,14 +484,14 @@ class ::fidl::Response<::test_protocols::WithErrorSyntax::ErrorAsPrimitive> fina
 };
 template <>
 class ::fidl::internal::ResponseMessageConverter<::test_protocols::WithErrorSyntax::ErrorAsPrimitive> {
-  using DomainObject = ::test_protocols::WithErrorSyntaxErrorAsPrimitiveTopResponse;
+  using DomainObject = ::test_protocols::WithErrorSyntaxErrorAsPrimitiveResult;
 
  public:
   static DomainObject IntoDomainObject(const ::fidl::Response<::test_protocols::WithErrorSyntax::ErrorAsPrimitive>& m) {
     if (m.is_error()) {
-      return DomainObject{{.result = ::test_protocols::WithErrorSyntaxErrorAsPrimitiveResult::WithErr(m.error_value())}};
+      return DomainObject::WithErr(m.error_value());
     } else {
-      return DomainObject{{.result = ::test_protocols::WithErrorSyntaxErrorAsPrimitiveResult::WithResponse({})}};
+      return DomainObject::WithResponse({});
     }
   }
 };
@@ -514,14 +514,14 @@ class ::fidl::Response<::test_protocols::WithErrorSyntax::ErrorAsEnum> final : p
 };
 template <>
 class ::fidl::internal::ResponseMessageConverter<::test_protocols::WithErrorSyntax::ErrorAsEnum> {
-  using DomainObject = ::test_protocols::WithErrorSyntaxErrorAsEnumTopResponse;
+  using DomainObject = ::test_protocols::WithErrorSyntaxErrorAsEnumResult;
 
  public:
   static DomainObject IntoDomainObject(const ::fidl::Response<::test_protocols::WithErrorSyntax::ErrorAsEnum>& m) {
     if (m.is_error()) {
-      return DomainObject{{.result = ::test_protocols::WithErrorSyntaxErrorAsEnumResult::WithErr(m.error_value())}};
+      return DomainObject::WithErr(m.error_value());
     } else {
-      return DomainObject{{.result = ::test_protocols::WithErrorSyntaxErrorAsEnumResult::WithResponse({})}};
+      return DomainObject::WithResponse({});
     }
   }
 };
@@ -544,14 +544,14 @@ class ::fidl::Response<::test_protocols::WithErrorSyntax::HandleInResult> final 
 };
 template <>
 class ::fidl::internal::ResponseMessageConverter<::test_protocols::WithErrorSyntax::HandleInResult> {
-  using DomainObject = ::test_protocols::WithErrorSyntaxHandleInResultTopResponse;
+  using DomainObject = ::test_protocols::WithErrorSyntaxHandleInResultResult;
 
  public:
   static DomainObject IntoDomainObject(::fidl::Response<::test_protocols::WithErrorSyntax::HandleInResult> m) {
     if (m.is_error()) {
-      return DomainObject{{.result = ::test_protocols::WithErrorSyntaxHandleInResultResult::WithErr(m.error_value())}};
+      return DomainObject::WithErr(m.error_value());
     } else {
-      return DomainObject{{.result = ::test_protocols::WithErrorSyntaxHandleInResultResult::WithResponse(std::move(m.value()))}};
+      return DomainObject::WithResponse(std::move(m.value()));
     }
   }
 };

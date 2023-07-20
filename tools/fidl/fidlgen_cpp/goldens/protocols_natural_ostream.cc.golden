@@ -86,27 +86,11 @@ std::ostream& fidl::ostream::Formatter<::test_protocols::WithErrorSyntaxResponse
   os << "}";
   return os;
 }
-std::ostream& fidl::ostream::Formatter<::test_protocols::WithErrorSyntaxResponseAsStructTopResponse>::Format(std::ostream& os, const ::test_protocols::WithErrorSyntaxResponseAsStructTopResponse& value) {
-  os << "test_protocols::WithErrorSyntaxResponseAsStructTopResponse";
-  os << "{ ";
-  os << "result";
-  os << " = " << fidl::ostream::Formatted<::test_protocols::WithErrorSyntaxResponseAsStructResult>(value.result()) << ", ";
-  os << "}";
-  return os;
-}
 std::ostream& fidl::ostream::Formatter<::test_protocols::WithErrorSyntaxErrorAsPrimitiveResponse>::Format(std::ostream& os, const ::test_protocols::WithErrorSyntaxErrorAsPrimitiveResponse& value) {
   os << "test_protocols::WithErrorSyntaxErrorAsPrimitiveResponse";
   os << "{ ";
   os << "__reserved";
   os << " = " << fidl::ostream::Formatted<uint8_t>(value.__reserved()) << ", ";
-  os << "}";
-  return os;
-}
-std::ostream& fidl::ostream::Formatter<::test_protocols::WithErrorSyntaxErrorAsPrimitiveTopResponse>::Format(std::ostream& os, const ::test_protocols::WithErrorSyntaxErrorAsPrimitiveTopResponse& value) {
-  os << "test_protocols::WithErrorSyntaxErrorAsPrimitiveTopResponse";
-  os << "{ ";
-  os << "result";
-  os << " = " << fidl::ostream::Formatted<::test_protocols::WithErrorSyntaxErrorAsPrimitiveResult>(value.result()) << ", ";
   os << "}";
   return os;
 }
@@ -118,27 +102,11 @@ std::ostream& fidl::ostream::Formatter<::test_protocols::WithErrorSyntaxErrorAsE
   os << "}";
   return os;
 }
-std::ostream& fidl::ostream::Formatter<::test_protocols::WithErrorSyntaxErrorAsEnumTopResponse>::Format(std::ostream& os, const ::test_protocols::WithErrorSyntaxErrorAsEnumTopResponse& value) {
-  os << "test_protocols::WithErrorSyntaxErrorAsEnumTopResponse";
-  os << "{ ";
-  os << "result";
-  os << " = " << fidl::ostream::Formatted<::test_protocols::WithErrorSyntaxErrorAsEnumResult>(value.result()) << ", ";
-  os << "}";
-  return os;
-}
 std::ostream& fidl::ostream::Formatter<::test_protocols::WithErrorSyntaxHandleInResultResponse>::Format(std::ostream& os, const ::test_protocols::WithErrorSyntaxHandleInResultResponse& value) {
   os << "test_protocols::WithErrorSyntaxHandleInResultResponse";
   os << "{ ";
   os << "h";
   os << " = " << fidl::ostream::Formatted<::zx::handle>(value.h()) << ", ";
-  os << "}";
-  return os;
-}
-std::ostream& fidl::ostream::Formatter<::test_protocols::WithErrorSyntaxHandleInResultTopResponse>::Format(std::ostream& os, const ::test_protocols::WithErrorSyntaxHandleInResultTopResponse& value) {
-  os << "test_protocols::WithErrorSyntaxHandleInResultTopResponse";
-  os << "{ ";
-  os << "result";
-  os << " = " << fidl::ostream::Formatted<::test_protocols::WithErrorSyntaxHandleInResultResult>(value.result()) << ", ";
   os << "}";
   return os;
 }
@@ -498,20 +466,12 @@ std::ostream& operator<<(std::ostream& os, const ::test_protocols::WithErrorSynt
   return fidl::ostream::Formatter<::test_protocols::WithErrorSyntaxResponseAsStructResult>::Format(os, value);
 }
 
-std::ostream& operator<<(std::ostream& os, const ::test_protocols::WithErrorSyntaxResponseAsStructTopResponse& value) {
-  return fidl::ostream::Formatter<::test_protocols::WithErrorSyntaxResponseAsStructTopResponse>::Format(os, value);
-}
-
 std::ostream& operator<<(std::ostream& os, const ::test_protocols::WithErrorSyntaxErrorAsPrimitiveResponse& value) {
   return fidl::ostream::Formatter<::test_protocols::WithErrorSyntaxErrorAsPrimitiveResponse>::Format(os, value);
 }
 
 std::ostream& operator<<(std::ostream& os, const ::test_protocols::WithErrorSyntaxErrorAsPrimitiveResult& value) {
   return fidl::ostream::Formatter<::test_protocols::WithErrorSyntaxErrorAsPrimitiveResult>::Format(os, value);
-}
-
-std::ostream& operator<<(std::ostream& os, const ::test_protocols::WithErrorSyntaxErrorAsPrimitiveTopResponse& value) {
-  return fidl::ostream::Formatter<::test_protocols::WithErrorSyntaxErrorAsPrimitiveTopResponse>::Format(os, value);
 }
 
 std::ostream& operator<<(std::ostream& os, const ::test_protocols::WithErrorSyntaxErrorAsEnumResponse& value) {
@@ -522,20 +482,12 @@ std::ostream& operator<<(std::ostream& os, const ::test_protocols::WithErrorSynt
   return fidl::ostream::Formatter<::test_protocols::WithErrorSyntaxErrorAsEnumResult>::Format(os, value);
 }
 
-std::ostream& operator<<(std::ostream& os, const ::test_protocols::WithErrorSyntaxErrorAsEnumTopResponse& value) {
-  return fidl::ostream::Formatter<::test_protocols::WithErrorSyntaxErrorAsEnumTopResponse>::Format(os, value);
-}
-
 std::ostream& operator<<(std::ostream& os, const ::test_protocols::WithErrorSyntaxHandleInResultResponse& value) {
   return fidl::ostream::Formatter<::test_protocols::WithErrorSyntaxHandleInResultResponse>::Format(os, value);
 }
 
 std::ostream& operator<<(std::ostream& os, const ::test_protocols::WithErrorSyntaxHandleInResultResult& value) {
   return fidl::ostream::Formatter<::test_protocols::WithErrorSyntaxHandleInResultResult>::Format(os, value);
-}
-
-std::ostream& operator<<(std::ostream& os, const ::test_protocols::WithErrorSyntaxHandleInResultTopResponse& value) {
-  return fidl::ostream::Formatter<::test_protocols::WithErrorSyntaxHandleInResultTopResponse>::Format(os, value);
 }
 
 std::ostream& operator<<(std::ostream& os, const ::test_protocols::ChannelProtocolMethodARequest& value) {

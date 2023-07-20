@@ -456,7 +456,6 @@ pub struct Method {
     pub maybe_request_payload: Option<Type>,
     pub has_response: bool,
     pub maybe_response_payload: Option<Type>,
-    pub maybe_response_result_type: Option<Type>,
     pub maybe_response_success_type: Option<Type>,
     pub maybe_response_err_type: Option<Type>,
     pub is_composed: bool,
@@ -742,13 +741,10 @@ impl FidlIr {
             })
     }
 
-    pub fn is_type_used_for_message_body(
-        &self,
-        identifier: &CompoundIdentifier,
-    ) -> Result<bool, Error> {
+    pub fn is_type_used_for_message_body(&self, identifier: &CompoundIdentifier) -> bool {
         match self.message_body_type_names.as_ref() {
-            Some(set) => Ok(set.contains(&identifier)),
-            None => Err(anyhow!("Must call |build| first")),
+            Some(set) => set.contains(&identifier),
+            None => panic!("Must call FidlIr::build() first"),
         }
     }
 
@@ -773,15 +769,6 @@ impl FidlIr {
                                 Ok(())
                             }
                             _ => Err(anyhow!("The kind of the response payload for method {:?} must be 'identifier'", method.name)),
-                        }?;
-                    }
-                    if method.maybe_response_result_type.is_some() {
-                        match method.maybe_response_result_type.as_ref().unwrap() {
-                            Type::Identifier { identifier, .. } => {
-                                message_body_type_names.insert(identifier.clone());
-                                Ok(())
-                            }
-                            _ => Err(anyhow!("The kind of the response result type for method {:?} must be 'identifier'", method.name)),
                         }?;
                     }
                     if method.maybe_response_success_type.is_some() {
@@ -913,6 +900,10 @@ impl Method {
         ir: &'a FidlIr,
     ) -> Result<Option<Vec<MethodParameter<'a>>>, Error> {
         get_payload_parameters(self.has_response, self.maybe_response_payload.as_ref(), ir)
+    }
+
+    pub fn has_result_union(&self) -> bool {
+        self.maybe_response_success_type.is_some()
     }
 }
 

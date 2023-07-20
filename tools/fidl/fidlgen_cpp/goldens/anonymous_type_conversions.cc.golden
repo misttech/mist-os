@@ -60,15 +60,6 @@ namespace internal {
   };
 }
 
-::test_anonymous::SomeProtocolSomeMethodTopResponse WireNaturalConversionTraits<::test_anonymous::wire::SomeProtocolSomeMethodTopResponse, ::test_anonymous::SomeProtocolSomeMethodTopResponse>::ToNatural(::test_anonymous::wire::SomeProtocolSomeMethodTopResponse src) {
-  return ::test_anonymous::SomeProtocolSomeMethodTopResponse(WireNaturalConversionTraits<::test_anonymous::wire::SomeProtocolSomeMethodResult, ::test_anonymous::SomeProtocolSomeMethodResult>::ToNatural(std::move(src.result)));
-}
-::test_anonymous::wire::SomeProtocolSomeMethodTopResponse WireNaturalConversionTraits<::test_anonymous::wire::SomeProtocolSomeMethodTopResponse, ::test_anonymous::SomeProtocolSomeMethodTopResponse>::ToWire(fidl::AnyArena& arena, ::test_anonymous::SomeProtocolSomeMethodTopResponse src) {
-  return ::test_anonymous::wire::SomeProtocolSomeMethodTopResponse{
-      .result = WireNaturalConversionTraits<::test_anonymous::wire::SomeProtocolSomeMethodResult, ::test_anonymous::SomeProtocolSomeMethodResult>::ToWire(arena, std::move(src.result())),
-  };
-}
-
 ::test_anonymous::FunctionApplication WireNaturalConversionTraits<::test_anonymous::wire::FunctionApplication, ::test_anonymous::FunctionApplication>::ToNatural(::test_anonymous::wire::FunctionApplication src) {
   ::test_anonymous::FunctionApplication dst;
   if (src.has_func()) {
@@ -198,11 +189,11 @@ namespace internal {
 
 ::fidl::Response<::test_anonymous::SomeProtocol::SomeMethod> WireNaturalConversionTraits<::fidl::WireResponse<::test_anonymous::SomeProtocol::SomeMethod>, ::fidl::Response<::test_anonymous::SomeProtocol::SomeMethod>>::ToNatural(::fidl::WireResponse<::test_anonymous::SomeProtocol::SomeMethod> src) {
   return ::fidl::Response<::test_anonymous::SomeProtocol::SomeMethod>(
-      WireNaturalConversionTraits<::test_anonymous::wire::SomeProtocolSomeMethodTopResponse, ::fit::result<::test_anonymous::SomeProtocolSomeMethodError, ::test_anonymous::SomeProtocolSomeMethodResponse>>::ToNatural(std::move(src)));
+      WireNaturalConversionTraits<::test_anonymous::wire::SomeProtocolSomeMethodResult, ::fit::result<::test_anonymous::SomeProtocolSomeMethodError, ::test_anonymous::SomeProtocolSomeMethodResponse>>::ToNatural(std::move(src)));
 }
 ::fidl::WireResponse<::test_anonymous::SomeProtocol::SomeMethod> WireNaturalConversionTraits<::fidl::WireResponse<::test_anonymous::SomeProtocol::SomeMethod>, ::fidl::Response<::test_anonymous::SomeProtocol::SomeMethod>>::ToWire(fidl::AnyArena& arena, ::fidl::Response<::test_anonymous::SomeProtocol::SomeMethod> src) {
   return ::fidl::WireResponse<::test_anonymous::SomeProtocol::SomeMethod>(
-      WireNaturalConversionTraits<::test_anonymous::wire::SomeProtocolSomeMethodTopResponse, ::fit::result<::test_anonymous::SomeProtocolSomeMethodError, ::test_anonymous::SomeProtocolSomeMethodResponse>>::ToWire(arena, std::move(src)));
+      WireNaturalConversionTraits<::test_anonymous::wire::SomeProtocolSomeMethodResult, ::fit::result<::test_anonymous::SomeProtocolSomeMethodError, ::test_anonymous::SomeProtocolSomeMethodResponse>>::ToWire(arena, std::move(src)));
 }
 
 #endif  // __Fuchsia__

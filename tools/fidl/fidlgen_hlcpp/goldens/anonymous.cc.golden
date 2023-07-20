@@ -1209,33 +1209,6 @@ void SomeProtocol_SomeMethod_Result::EnsureStorageInitialized(::fidl_xunion_tag_
   }
 }
 
-extern "C" const fidl_type_t test_anonymous_SomeProtocolSomeMethodTopResponseTable;
-const fidl_type_t* SomeProtocolSomeMethodTopResponse::FidlType = &test_anonymous_SomeProtocolSomeMethodTopResponseTable;
-
-void SomeProtocolSomeMethodTopResponse::Encode(::fidl::Encoder* _encoder, size_t _offset,
-                                               cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
-  if (::fidl::IsMemcpyCompatible<SomeProtocolSomeMethodTopResponse>::value) {
-    memcpy(_encoder->template GetPtr<SomeProtocolSomeMethodTopResponse>(_offset), this, sizeof(SomeProtocolSomeMethodTopResponse));
-  } else {
-    ::fidl::Encode(_encoder, &result, _offset + 0);
-  }
-}
-
-void SomeProtocolSomeMethodTopResponse::Decode(::fidl::Decoder* _decoder, SomeProtocolSomeMethodTopResponse* _value, size_t _offset) {
-  if (::fidl::IsMemcpyCompatible<SomeProtocolSomeMethodTopResponse>::value) {
-    memcpy(_value, _decoder->template GetPtr<SomeProtocolSomeMethodTopResponse>(_offset), sizeof(SomeProtocolSomeMethodTopResponse));
-  } else {
-    ::fidl::Decode(_decoder, &_value->result, _offset + 0);
-  }
-}
-
-zx_status_t SomeProtocolSomeMethodTopResponse::Clone(SomeProtocolSomeMethodTopResponse* _result) const {
-  zx_status_t _status = ::fidl::Clone(result, &_result->result);
-  if (_status != ZX_OK)
-    return _status;
-  return ZX_OK;
-}
-
 //
 // Proxies and stubs definitions
 //
@@ -1244,7 +1217,7 @@ zx_status_t SomeProtocolSomeMethodTopResponse::Clone(SomeProtocolSomeMethodTopRe
 namespace _internal {
 __LOCAL extern "C" const fidl_type_t test_anonymous_SomeProtocolSomeMethodRequestTable;
 
-__LOCAL extern "C" const fidl_type_t test_anonymous_SomeProtocolSomeMethodTopResponseTable;
+__LOCAL extern "C" const fidl_type_t test_anonymous_SomeProtocol_SomeMethod_ResultTable;
 
 }  // namespace _internal
 
@@ -1267,7 +1240,7 @@ const fidl_type_t* ::test::anonymous::SomeProtocol_RequestDecoder::GetType(uint6
 const fidl_type_t* SomeProtocol_ResponseDecoder::GetType(uint64_t ordinal) {
   switch (ordinal) {
     case ::test::anonymous::internal::kSomeProtocol_SomeMethod_Ordinal:
-      return &::test::anonymous::_internal::test_anonymous_SomeProtocolSomeMethodTopResponseTable;
+      return &::test::anonymous::_internal::test_anonymous_SomeProtocol_SomeMethod_ResultTable;
       ;
     default:
       return nullptr;
@@ -1308,7 +1281,7 @@ SomeProtocol_SomeMethod_ResponseHandler(SomeProtocol::SomeMethodCallback&& callb
         callback_(::fidl::DecodeAs<::test::anonymous::SomeProtocol_SomeMethod_Result>(&decoder, 0 + sizeof(fidl_message_header_t)));
         return ZX_OK;
       },
-      &::test::anonymous::_internal::test_anonymous_SomeProtocolSomeMethodTopResponseTable);
+      &::test::anonymous::_internal::test_anonymous_SomeProtocol_SomeMethod_ResultTable);
 }
 
 }  // namespace
@@ -1331,10 +1304,10 @@ class SomeProtocol_SomeMethod_Responder final {
   SomeProtocol_SomeMethod_Responder(::fidl::internal::PendingResponse response)
       : response_(std::move(response)) {}
 
-  void operator()(::test::anonymous::SomeProtocol_SomeMethod_Result result) {
+  void operator()(::test::anonymous::SomeProtocol_SomeMethod_Result SomeProtocol_SomeMethod_Result) {
     ::fidl::MessageEncoder _encoder(::test::anonymous::internal::kSomeProtocol_SomeMethod_Ordinal, ::test::anonymous::internal::kSomeProtocol_SomeMethod_DynamicFlags);
-    const fidl_type_t* resp_type = &::test::anonymous::_internal::test_anonymous_SomeProtocolSomeMethodTopResponseTable;
-    response_.Send(resp_type, ::test::anonymous::SomeProtocol_ResponseEncoder::SomeMethod(&_encoder, &result));
+    const fidl_type_t* resp_type = &::test::anonymous::_internal::test_anonymous_SomeProtocol_SomeMethod_ResultTable;
+    response_.Send(resp_type, ::test::anonymous::SomeProtocol_ResponseEncoder::SomeMethod(&_encoder, &SomeProtocol_SomeMethod_Result));
   }
 
  private:
@@ -1396,17 +1369,17 @@ SomeProtocol_SyncProxy::SomeProtocol_SyncProxy(::zx::channel channel)
 
 SomeProtocol_SyncProxy::~SomeProtocol_SyncProxy() = default;
 
-zx_status_t SomeProtocol_SyncProxy::SomeMethod(::test::anonymous::UnionMember union_member, ::test::anonymous::TableMember table_member, ::test::anonymous::SomeProtocol_SomeMethod_Result* out_result) {
+zx_status_t SomeProtocol_SyncProxy::SomeMethod(::test::anonymous::UnionMember union_member, ::test::anonymous::TableMember table_member, ::test::anonymous::SomeProtocol_SomeMethod_Result* out_SomeProtocol_SomeMethod_Result) {
   ::fidl::MessageEncoder _encoder(::test::anonymous::internal::kSomeProtocol_SomeMethod_Ordinal, ::test::anonymous::internal::kSomeProtocol_SomeMethod_DynamicFlags);
   ::fidl::IncomingMessageBuffer buffer_;
   ::fidl::HLCPPIncomingMessage response_ = buffer_.CreateEmptyIncomingMessage();
   const fidl_type_t* req_type = &::test::anonymous::_internal::test_anonymous_SomeProtocolSomeMethodRequestTable;
-  const fidl_type_t* resp_type = &::test::anonymous::_internal::test_anonymous_SomeProtocolSomeMethodTopResponseTable;
+  const fidl_type_t* resp_type = &::test::anonymous::_internal::test_anonymous_SomeProtocol_SomeMethod_ResultTable;
   zx_status_t status_ = proxy_.Call(req_type, resp_type, ::test::anonymous::SomeProtocol_RequestEncoder::SomeMethod(&_encoder, &union_member, &table_member), &response_);
   if (status_ != ZX_OK)
     return status_;
   ::fidl::Decoder decoder_(std::move(response_));
-  *out_result = ::fidl::DecodeAs<::test::anonymous::SomeProtocol_SomeMethod_Result>(&decoder_, 0 + sizeof(fidl_message_header_t));
+  *out_SomeProtocol_SomeMethod_Result = ::fidl::DecodeAs<::test::anonymous::SomeProtocol_SomeMethod_Result>(&decoder_, 0 + sizeof(fidl_message_header_t));
   return ZX_OK;
 }
 

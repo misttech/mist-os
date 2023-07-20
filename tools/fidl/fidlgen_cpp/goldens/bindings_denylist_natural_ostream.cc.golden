@@ -27,14 +27,6 @@ std::ostream& fidl::ostream::Formatter<::test_bindingsdenylist::DenyEachBindingO
   os << "}";
   return os;
 }
-std::ostream& fidl::ostream::Formatter<::test_bindingsdenylist::DenyEachBindingOnlyDenyDartTopResponse>::Format(std::ostream& os, const ::test_bindingsdenylist::DenyEachBindingOnlyDenyDartTopResponse& value) {
-  os << "test_bindingsdenylist::DenyEachBindingOnlyDenyDartTopResponse";
-  os << "{ ";
-  os << "result";
-  os << " = " << fidl::ostream::Formatted<::test_bindingsdenylist::DenyEachBindingOnlyDenyDartResult>(value.result()) << ", ";
-  os << "}";
-  return os;
-}
 std::ostream& fidl::ostream::Formatter<::test_bindingsdenylist::DenyEachBindingOnlyDenyGoRequest>::Format(std::ostream& os, const ::test_bindingsdenylist::DenyEachBindingOnlyDenyGoRequest& value) {
   os << "test_bindingsdenylist::DenyEachBindingOnlyDenyGoRequest";
   os << "{ ";
@@ -48,14 +40,6 @@ std::ostream& fidl::ostream::Formatter<::test_bindingsdenylist::DenyEachBindingO
   os << "{ ";
   os << "b";
   os << " = " << fidl::ostream::Formatted<int32_t>(value.b()) << ", ";
-  os << "}";
-  return os;
-}
-std::ostream& fidl::ostream::Formatter<::test_bindingsdenylist::DenyEachBindingOnlyDenyGoTopResponse>::Format(std::ostream& os, const ::test_bindingsdenylist::DenyEachBindingOnlyDenyGoTopResponse& value) {
-  os << "test_bindingsdenylist::DenyEachBindingOnlyDenyGoTopResponse";
-  os << "{ ";
-  os << "result";
-  os << " = " << fidl::ostream::Formatted<::test_bindingsdenylist::DenyEachBindingOnlyDenyGoResult>(value.result()) << ", ";
   os << "}";
   return os;
 }
@@ -75,14 +59,6 @@ std::ostream& fidl::ostream::Formatter<::test_bindingsdenylist::DenyEachBindingO
   os << "}";
   return os;
 }
-std::ostream& fidl::ostream::Formatter<::test_bindingsdenylist::DenyEachBindingOnlyDenyLibfuzzerTopResponse>::Format(std::ostream& os, const ::test_bindingsdenylist::DenyEachBindingOnlyDenyLibfuzzerTopResponse& value) {
-  os << "test_bindingsdenylist::DenyEachBindingOnlyDenyLibfuzzerTopResponse";
-  os << "{ ";
-  os << "result";
-  os << " = " << fidl::ostream::Formatted<::test_bindingsdenylist::DenyEachBindingOnlyDenyLibfuzzerResult>(value.result()) << ", ";
-  os << "}";
-  return os;
-}
 std::ostream& fidl::ostream::Formatter<::test_bindingsdenylist::DenyEachBindingOnlyDenyRustRequest>::Format(std::ostream& os, const ::test_bindingsdenylist::DenyEachBindingOnlyDenyRustRequest& value) {
   os << "test_bindingsdenylist::DenyEachBindingOnlyDenyRustRequest";
   os << "{ ";
@@ -99,14 +75,6 @@ std::ostream& fidl::ostream::Formatter<::test_bindingsdenylist::DenyEachBindingO
   os << "}";
   return os;
 }
-std::ostream& fidl::ostream::Formatter<::test_bindingsdenylist::DenyEachBindingOnlyDenyRustTopResponse>::Format(std::ostream& os, const ::test_bindingsdenylist::DenyEachBindingOnlyDenyRustTopResponse& value) {
-  os << "test_bindingsdenylist::DenyEachBindingOnlyDenyRustTopResponse";
-  os << "{ ";
-  os << "result";
-  os << " = " << fidl::ostream::Formatted<::test_bindingsdenylist::DenyEachBindingOnlyDenyRustResult>(value.result()) << ", ";
-  os << "}";
-  return os;
-}
 std::ostream& fidl::ostream::Formatter<::test_bindingsdenylist::DenyEachBindingOnlyDenySyzkallerRequest>::Format(std::ostream& os, const ::test_bindingsdenylist::DenyEachBindingOnlyDenySyzkallerRequest& value) {
   os << "test_bindingsdenylist::DenyEachBindingOnlyDenySyzkallerRequest";
   os << "{ ";
@@ -120,14 +88,6 @@ std::ostream& fidl::ostream::Formatter<::test_bindingsdenylist::DenyEachBindingO
   os << "{ ";
   os << "b";
   os << " = " << fidl::ostream::Formatted<int32_t>(value.b()) << ", ";
-  os << "}";
-  return os;
-}
-std::ostream& fidl::ostream::Formatter<::test_bindingsdenylist::DenyEachBindingOnlyDenySyzkallerTopResponse>::Format(std::ostream& os, const ::test_bindingsdenylist::DenyEachBindingOnlyDenySyzkallerTopResponse& value) {
-  os << "test_bindingsdenylist::DenyEachBindingOnlyDenySyzkallerTopResponse";
-  os << "{ ";
-  os << "result";
-  os << " = " << fidl::ostream::Formatted<::test_bindingsdenylist::DenyEachBindingOnlyDenySyzkallerResult>(value.result()) << ", ";
   os << "}";
   return os;
 }
@@ -247,10 +207,6 @@ std::ostream& operator<<(std::ostream& os, const ::test_bindingsdenylist::DenyEa
   return fidl::ostream::Formatter<::test_bindingsdenylist::DenyEachBindingOnlyDenyDartResult>::Format(os, value);
 }
 
-std::ostream& operator<<(std::ostream& os, const ::test_bindingsdenylist::DenyEachBindingOnlyDenyDartTopResponse& value) {
-  return fidl::ostream::Formatter<::test_bindingsdenylist::DenyEachBindingOnlyDenyDartTopResponse>::Format(os, value);
-}
-
 std::ostream& operator<<(std::ostream& os, const ::test_bindingsdenylist::DenyEachBindingOnlyDenyGoRequest& value) {
   return fidl::ostream::Formatter<::test_bindingsdenylist::DenyEachBindingOnlyDenyGoRequest>::Format(os, value);
 }
@@ -261,10 +217,6 @@ std::ostream& operator<<(std::ostream& os, const ::test_bindingsdenylist::DenyEa
 
 std::ostream& operator<<(std::ostream& os, const ::test_bindingsdenylist::DenyEachBindingOnlyDenyGoResult& value) {
   return fidl::ostream::Formatter<::test_bindingsdenylist::DenyEachBindingOnlyDenyGoResult>::Format(os, value);
-}
-
-std::ostream& operator<<(std::ostream& os, const ::test_bindingsdenylist::DenyEachBindingOnlyDenyGoTopResponse& value) {
-  return fidl::ostream::Formatter<::test_bindingsdenylist::DenyEachBindingOnlyDenyGoTopResponse>::Format(os, value);
 }
 
 std::ostream& operator<<(std::ostream& os, const ::test_bindingsdenylist::DenyEachBindingOnlyDenyLibfuzzerRequest& value) {
@@ -279,10 +231,6 @@ std::ostream& operator<<(std::ostream& os, const ::test_bindingsdenylist::DenyEa
   return fidl::ostream::Formatter<::test_bindingsdenylist::DenyEachBindingOnlyDenyLibfuzzerResult>::Format(os, value);
 }
 
-std::ostream& operator<<(std::ostream& os, const ::test_bindingsdenylist::DenyEachBindingOnlyDenyLibfuzzerTopResponse& value) {
-  return fidl::ostream::Formatter<::test_bindingsdenylist::DenyEachBindingOnlyDenyLibfuzzerTopResponse>::Format(os, value);
-}
-
 std::ostream& operator<<(std::ostream& os, const ::test_bindingsdenylist::DenyEachBindingOnlyDenyRustRequest& value) {
   return fidl::ostream::Formatter<::test_bindingsdenylist::DenyEachBindingOnlyDenyRustRequest>::Format(os, value);
 }
@@ -295,10 +243,6 @@ std::ostream& operator<<(std::ostream& os, const ::test_bindingsdenylist::DenyEa
   return fidl::ostream::Formatter<::test_bindingsdenylist::DenyEachBindingOnlyDenyRustResult>::Format(os, value);
 }
 
-std::ostream& operator<<(std::ostream& os, const ::test_bindingsdenylist::DenyEachBindingOnlyDenyRustTopResponse& value) {
-  return fidl::ostream::Formatter<::test_bindingsdenylist::DenyEachBindingOnlyDenyRustTopResponse>::Format(os, value);
-}
-
 std::ostream& operator<<(std::ostream& os, const ::test_bindingsdenylist::DenyEachBindingOnlyDenySyzkallerRequest& value) {
   return fidl::ostream::Formatter<::test_bindingsdenylist::DenyEachBindingOnlyDenySyzkallerRequest>::Format(os, value);
 }
@@ -309,10 +253,6 @@ std::ostream& operator<<(std::ostream& os, const ::test_bindingsdenylist::DenyEa
 
 std::ostream& operator<<(std::ostream& os, const ::test_bindingsdenylist::DenyEachBindingOnlyDenySyzkallerResult& value) {
   return fidl::ostream::Formatter<::test_bindingsdenylist::DenyEachBindingOnlyDenySyzkallerResult>::Format(os, value);
-}
-
-std::ostream& operator<<(std::ostream& os, const ::test_bindingsdenylist::DenyEachBindingOnlyDenySyzkallerTopResponse& value) {
-  return fidl::ostream::Formatter<::test_bindingsdenylist::DenyEachBindingOnlyDenySyzkallerTopResponse>::Format(os, value);
 }
 
 std::ostream& operator<<(std::ostream& os, const ::test_bindingsdenylist::MemberOnlyAppearsInImportingLibrary& value) {

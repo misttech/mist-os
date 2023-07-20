@@ -8,4 +8,4 @@
 
 #include <test/protocols/cpp/libfuzzer_decode_encode.h>
 
-static_assert(::fuzzing::test_protocols_decoder_encoders.size() == 80);
+static_assert(::fuzzing::test_protocols_decoder_encoders.size() == 72);

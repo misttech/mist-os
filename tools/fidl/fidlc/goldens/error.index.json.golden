@@ -65,22 +65,6 @@
     },
     {
       "is_anonymous": true,
-      "identifier": "test.error/ExampleFooTopResponse",
-      "members": [
-        {
-          "name": "result",
-          "location": {
-            "is_virtual": true
-          },
-          "type": {
-            "kind": "identifier",
-            "is_anonymous": true
-          }
-        }
-      ]
-    },
-    {
-      "is_anonymous": true,
       "identifier": "test.error/Example_foo_Response",
       "members": [
         {

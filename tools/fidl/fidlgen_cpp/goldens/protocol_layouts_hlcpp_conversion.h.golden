@@ -73,66 +73,6 @@ struct HLCPPToNaturalTraits<fidl::InterfaceRequestHandler<::test::protocollayout
 };
 
 template <>
-struct NaturalToHLCPPTraits<::test_protocollayouts::MainProtocolTwoWayImportWithErrorTopResponse> {
-  using HLCPPType = ::test::protocollayouts::MainProtocolTwoWayImportWithErrorTopResponse;
-  static inline ::test::protocollayouts::MainProtocolTwoWayImportWithErrorTopResponse Convert(::test_protocollayouts::MainProtocolTwoWayImportWithErrorTopResponse&&);
-};
-template <>
-struct HLCPPToNaturalTraits<::test::protocollayouts::MainProtocolTwoWayImportWithErrorTopResponse> {
-  using NaturalType = ::test_protocollayouts::MainProtocolTwoWayImportWithErrorTopResponse;
-  static inline ::test_protocollayouts::MainProtocolTwoWayImportWithErrorTopResponse Convert(::test::protocollayouts::MainProtocolTwoWayImportWithErrorTopResponse&&);
-};
-template <>
-struct NaturalToHLCPPTraits<::test_protocollayouts::MainProtocolOnImportWithErrorRequest> {
-  using HLCPPType = ::test::protocollayouts::MainProtocolOnImportWithErrorRequest;
-  static inline ::test::protocollayouts::MainProtocolOnImportWithErrorRequest Convert(::test_protocollayouts::MainProtocolOnImportWithErrorRequest&&);
-};
-template <>
-struct HLCPPToNaturalTraits<::test::protocollayouts::MainProtocolOnImportWithErrorRequest> {
-  using NaturalType = ::test_protocollayouts::MainProtocolOnImportWithErrorRequest;
-  static inline ::test_protocollayouts::MainProtocolOnImportWithErrorRequest Convert(::test::protocollayouts::MainProtocolOnImportWithErrorRequest&&);
-};
-template <>
-struct NaturalToHLCPPTraits<::test_protocollayouts::MainProtocolTwoWayLocalWithErrorTopResponse> {
-  using HLCPPType = ::test::protocollayouts::MainProtocolTwoWayLocalWithErrorTopResponse;
-  static inline ::test::protocollayouts::MainProtocolTwoWayLocalWithErrorTopResponse Convert(::test_protocollayouts::MainProtocolTwoWayLocalWithErrorTopResponse&&);
-};
-template <>
-struct HLCPPToNaturalTraits<::test::protocollayouts::MainProtocolTwoWayLocalWithErrorTopResponse> {
-  using NaturalType = ::test_protocollayouts::MainProtocolTwoWayLocalWithErrorTopResponse;
-  static inline ::test_protocollayouts::MainProtocolTwoWayLocalWithErrorTopResponse Convert(::test::protocollayouts::MainProtocolTwoWayLocalWithErrorTopResponse&&);
-};
-template <>
-struct NaturalToHLCPPTraits<::test_protocollayouts::MainProtocolOnLocalWithErrorRequest> {
-  using HLCPPType = ::test::protocollayouts::MainProtocolOnLocalWithErrorRequest;
-  static inline ::test::protocollayouts::MainProtocolOnLocalWithErrorRequest Convert(::test_protocollayouts::MainProtocolOnLocalWithErrorRequest&&);
-};
-template <>
-struct HLCPPToNaturalTraits<::test::protocollayouts::MainProtocolOnLocalWithErrorRequest> {
-  using NaturalType = ::test_protocollayouts::MainProtocolOnLocalWithErrorRequest;
-  static inline ::test_protocollayouts::MainProtocolOnLocalWithErrorRequest Convert(::test::protocollayouts::MainProtocolOnLocalWithErrorRequest&&);
-};
-template <>
-struct NaturalToHLCPPTraits<::test_protocollayouts::MainProtocolTwoWayAnonWithErrorTopResponse> {
-  using HLCPPType = ::test::protocollayouts::MainProtocolTwoWayAnonWithErrorTopResponse;
-  static inline ::test::protocollayouts::MainProtocolTwoWayAnonWithErrorTopResponse Convert(::test_protocollayouts::MainProtocolTwoWayAnonWithErrorTopResponse&&);
-};
-template <>
-struct HLCPPToNaturalTraits<::test::protocollayouts::MainProtocolTwoWayAnonWithErrorTopResponse> {
-  using NaturalType = ::test_protocollayouts::MainProtocolTwoWayAnonWithErrorTopResponse;
-  static inline ::test_protocollayouts::MainProtocolTwoWayAnonWithErrorTopResponse Convert(::test::protocollayouts::MainProtocolTwoWayAnonWithErrorTopResponse&&);
-};
-template <>
-struct NaturalToHLCPPTraits<::test_protocollayouts::MainProtocolOnAnonWithErrorRequest> {
-  using HLCPPType = ::test::protocollayouts::MainProtocolOnAnonWithErrorRequest;
-  static inline ::test::protocollayouts::MainProtocolOnAnonWithErrorRequest Convert(::test_protocollayouts::MainProtocolOnAnonWithErrorRequest&&);
-};
-template <>
-struct HLCPPToNaturalTraits<::test::protocollayouts::MainProtocolOnAnonWithErrorRequest> {
-  using NaturalType = ::test_protocollayouts::MainProtocolOnAnonWithErrorRequest;
-  static inline ::test_protocollayouts::MainProtocolOnAnonWithErrorRequest Convert(::test::protocollayouts::MainProtocolOnAnonWithErrorRequest&&);
-};
-template <>
 struct NaturalToHLCPPTraits<::test_protocollayouts::LocalTablePayload> {
   using HLCPPType = ::test::protocollayouts::LocalTablePayload;
   static inline ::test::protocollayouts::LocalTablePayload Convert(::test_protocollayouts::LocalTablePayload&&);
@@ -283,72 +223,6 @@ struct HLCPPToNaturalTraits<::test::protocollayouts::MainProtocol_OnAnonWithErro
   static inline ::test_protocollayouts::MainProtocolOnAnonWithErrorResult Convert(::test::protocollayouts::MainProtocol_OnAnonWithError_Result&&);
 };
 
-::test::protocollayouts::MainProtocolTwoWayImportWithErrorTopResponse NaturalToHLCPPTraits<::test_protocollayouts::MainProtocolTwoWayImportWithErrorTopResponse>::Convert(::test_protocollayouts::MainProtocolTwoWayImportWithErrorTopResponse&& value) {
-  ::test::protocollayouts::MainProtocolTwoWayImportWithErrorTopResponse hlcpp;
-  hlcpp.result = ::fidl::NaturalToHLCPP(std::move(value.result()));
-  return hlcpp;
-}
-
-::test_protocollayouts::MainProtocolTwoWayImportWithErrorTopResponse HLCPPToNaturalTraits<::test::protocollayouts::MainProtocolTwoWayImportWithErrorTopResponse>::Convert(::test::protocollayouts::MainProtocolTwoWayImportWithErrorTopResponse&& value) {
-  return ::test_protocollayouts::MainProtocolTwoWayImportWithErrorTopResponse{{
-      .result = ::fidl::HLCPPToNatural(std::move(value.result)),
-  }};
-}
-::test::protocollayouts::MainProtocolOnImportWithErrorRequest NaturalToHLCPPTraits<::test_protocollayouts::MainProtocolOnImportWithErrorRequest>::Convert(::test_protocollayouts::MainProtocolOnImportWithErrorRequest&& value) {
-  ::test::protocollayouts::MainProtocolOnImportWithErrorRequest hlcpp;
-  hlcpp.result = ::fidl::NaturalToHLCPP(std::move(value.result()));
-  return hlcpp;
-}
-
-::test_protocollayouts::MainProtocolOnImportWithErrorRequest HLCPPToNaturalTraits<::test::protocollayouts::MainProtocolOnImportWithErrorRequest>::Convert(::test::protocollayouts::MainProtocolOnImportWithErrorRequest&& value) {
-  return ::test_protocollayouts::MainProtocolOnImportWithErrorRequest{{
-      .result = ::fidl::HLCPPToNatural(std::move(value.result)),
-  }};
-}
-::test::protocollayouts::MainProtocolTwoWayLocalWithErrorTopResponse NaturalToHLCPPTraits<::test_protocollayouts::MainProtocolTwoWayLocalWithErrorTopResponse>::Convert(::test_protocollayouts::MainProtocolTwoWayLocalWithErrorTopResponse&& value) {
-  ::test::protocollayouts::MainProtocolTwoWayLocalWithErrorTopResponse hlcpp;
-  hlcpp.result = ::fidl::NaturalToHLCPP(std::move(value.result()));
-  return hlcpp;
-}
-
-::test_protocollayouts::MainProtocolTwoWayLocalWithErrorTopResponse HLCPPToNaturalTraits<::test::protocollayouts::MainProtocolTwoWayLocalWithErrorTopResponse>::Convert(::test::protocollayouts::MainProtocolTwoWayLocalWithErrorTopResponse&& value) {
-  return ::test_protocollayouts::MainProtocolTwoWayLocalWithErrorTopResponse{{
-      .result = ::fidl::HLCPPToNatural(std::move(value.result)),
-  }};
-}
-::test::protocollayouts::MainProtocolOnLocalWithErrorRequest NaturalToHLCPPTraits<::test_protocollayouts::MainProtocolOnLocalWithErrorRequest>::Convert(::test_protocollayouts::MainProtocolOnLocalWithErrorRequest&& value) {
-  ::test::protocollayouts::MainProtocolOnLocalWithErrorRequest hlcpp;
-  hlcpp.result = ::fidl::NaturalToHLCPP(std::move(value.result()));
-  return hlcpp;
-}
-
-::test_protocollayouts::MainProtocolOnLocalWithErrorRequest HLCPPToNaturalTraits<::test::protocollayouts::MainProtocolOnLocalWithErrorRequest>::Convert(::test::protocollayouts::MainProtocolOnLocalWithErrorRequest&& value) {
-  return ::test_protocollayouts::MainProtocolOnLocalWithErrorRequest{{
-      .result = ::fidl::HLCPPToNatural(std::move(value.result)),
-  }};
-}
-::test::protocollayouts::MainProtocolTwoWayAnonWithErrorTopResponse NaturalToHLCPPTraits<::test_protocollayouts::MainProtocolTwoWayAnonWithErrorTopResponse>::Convert(::test_protocollayouts::MainProtocolTwoWayAnonWithErrorTopResponse&& value) {
-  ::test::protocollayouts::MainProtocolTwoWayAnonWithErrorTopResponse hlcpp;
-  hlcpp.result = ::fidl::NaturalToHLCPP(std::move(value.result()));
-  return hlcpp;
-}
-
-::test_protocollayouts::MainProtocolTwoWayAnonWithErrorTopResponse HLCPPToNaturalTraits<::test::protocollayouts::MainProtocolTwoWayAnonWithErrorTopResponse>::Convert(::test::protocollayouts::MainProtocolTwoWayAnonWithErrorTopResponse&& value) {
-  return ::test_protocollayouts::MainProtocolTwoWayAnonWithErrorTopResponse{{
-      .result = ::fidl::HLCPPToNatural(std::move(value.result)),
-  }};
-}
-::test::protocollayouts::MainProtocolOnAnonWithErrorRequest NaturalToHLCPPTraits<::test_protocollayouts::MainProtocolOnAnonWithErrorRequest>::Convert(::test_protocollayouts::MainProtocolOnAnonWithErrorRequest&& value) {
-  ::test::protocollayouts::MainProtocolOnAnonWithErrorRequest hlcpp;
-  hlcpp.result = ::fidl::NaturalToHLCPP(std::move(value.result()));
-  return hlcpp;
-}
-
-::test_protocollayouts::MainProtocolOnAnonWithErrorRequest HLCPPToNaturalTraits<::test::protocollayouts::MainProtocolOnAnonWithErrorRequest>::Convert(::test::protocollayouts::MainProtocolOnAnonWithErrorRequest&& value) {
-  return ::test_protocollayouts::MainProtocolOnAnonWithErrorRequest{{
-      .result = ::fidl::HLCPPToNatural(std::move(value.result)),
-  }};
-}
 ::test::protocollayouts::LocalTablePayload NaturalToHLCPPTraits<::test_protocollayouts::LocalTablePayload>::Convert(::test_protocollayouts::LocalTablePayload&& value) {
   ::test::protocollayouts::LocalTablePayload hlcpp;
   if (value.a().has_value()) {

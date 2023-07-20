@@ -7,26 +7,20 @@ __LOCAL extern const struct FidlCodedUnion test_protocollayoutssamelibrary_Union
 __LOCAL extern const struct FidlCodedUnion test_protocollayoutssamelibrary_UnionPayloadNullableRefTable;
 __LOCAL extern const struct FidlCodedUnion test_protocollayoutssamelibrary_MainProtocol_TwoWayLocalWithError_ResultTable;
 __LOCAL extern const struct FidlCodedUnion test_protocollayoutssamelibrary_MainProtocol_TwoWayLocalWithError_ResultNullableRefTable;
-__LOCAL extern const struct FidlCodedStruct test_protocollayoutssamelibrary_MainProtocolTwoWayLocalWithErrorTopResponseTable;
 __LOCAL extern const struct FidlCodedUnion test_protocollayoutssamelibrary_ComposedProtocol_TwoWayNamedComposedWithError_ResultTable;
 __LOCAL extern const struct FidlCodedUnion test_protocollayoutssamelibrary_ComposedProtocol_TwoWayNamedComposedWithError_ResultNullableRefTable;
-__LOCAL extern const struct FidlCodedStruct test_protocollayoutssamelibrary_ComposedProtocolTwoWayNamedComposedWithErrorTopResponseTable;
 __LOCAL extern const struct FidlCodedTable test_protocollayoutssamelibrary_TablePayloadTable;
 __LOCAL extern const struct FidlCodedUnion test_protocollayoutssamelibrary_MainProtocol_OnLocalWithError_ResultTable;
 __LOCAL extern const struct FidlCodedUnion test_protocollayoutssamelibrary_MainProtocol_OnLocalWithError_ResultNullableRefTable;
-__LOCAL extern const struct FidlCodedStruct test_protocollayoutssamelibrary_MainProtocolOnLocalWithErrorRequestTable;
 __LOCAL extern const struct FidlCodedUnion test_protocollayoutssamelibrary_ComposedProtocol_OnNamedComposedWithError_ResultTable;
 __LOCAL extern const struct FidlCodedUnion test_protocollayoutssamelibrary_ComposedProtocol_OnNamedComposedWithError_ResultNullableRefTable;
-__LOCAL extern const struct FidlCodedStruct test_protocollayoutssamelibrary_ComposedProtocolOnNamedComposedWithErrorRequestTable;
 __LOCAL extern const struct FidlCodedUnion test_protocollayoutssamelibrary_MainProtocol_TwoWayAnonWithError_ResponseTable;
 __LOCAL extern const struct FidlCodedUnion test_protocollayoutssamelibrary_MainProtocol_TwoWayAnonWithError_ResponseNullableRefTable;
 __LOCAL extern const struct FidlCodedUnion test_protocollayoutssamelibrary_MainProtocol_TwoWayAnonWithError_ResultTable;
 __LOCAL extern const struct FidlCodedUnion test_protocollayoutssamelibrary_MainProtocol_TwoWayAnonWithError_ResultNullableRefTable;
-__LOCAL extern const struct FidlCodedStruct test_protocollayoutssamelibrary_MainProtocolTwoWayAnonWithErrorTopResponseTable;
 __LOCAL extern const struct FidlCodedTable test_protocollayoutssamelibrary_MainProtocol_OnAnonWithError_ResponseTable;
 __LOCAL extern const struct FidlCodedUnion test_protocollayoutssamelibrary_MainProtocol_OnAnonWithError_ResultTable;
 __LOCAL extern const struct FidlCodedUnion test_protocollayoutssamelibrary_MainProtocol_OnAnonWithError_ResultNullableRefTable;
-__LOCAL extern const struct FidlCodedStruct test_protocollayoutssamelibrary_MainProtocolOnAnonWithErrorRequestTable;
 __LOCAL extern const struct FidlCodedTable test_protocollayoutssamelibrary_MainProtocolTwoWayAnonWithErrorRequestTable;
 __LOCAL extern const struct FidlCodedTable test_protocollayoutssamelibrary_MainProtocolTwoWayAnonResponseTable;
 __LOCAL extern const struct FidlCodedUnion test_protocollayoutssamelibrary_MainProtocolTwoWayAnonRequestTable;
@@ -38,11 +32,9 @@ __LOCAL extern const struct FidlCodedUnion test_protocollayoutssamelibrary_Compo
 __LOCAL extern const struct FidlCodedUnion test_protocollayoutssamelibrary_ComposedProtocol_TwoWayAnonComposedWithError_ResponseNullableRefTable;
 __LOCAL extern const struct FidlCodedUnion test_protocollayoutssamelibrary_ComposedProtocol_TwoWayAnonComposedWithError_ResultTable;
 __LOCAL extern const struct FidlCodedUnion test_protocollayoutssamelibrary_ComposedProtocol_TwoWayAnonComposedWithError_ResultNullableRefTable;
-__LOCAL extern const struct FidlCodedStruct test_protocollayoutssamelibrary_ComposedProtocolTwoWayAnonComposedWithErrorTopResponseTable;
 __LOCAL extern const struct FidlCodedTable test_protocollayoutssamelibrary_ComposedProtocol_OnAnonComposedWithError_ResponseTable;
 __LOCAL extern const struct FidlCodedUnion test_protocollayoutssamelibrary_ComposedProtocol_OnAnonComposedWithError_ResultTable;
 __LOCAL extern const struct FidlCodedUnion test_protocollayoutssamelibrary_ComposedProtocol_OnAnonComposedWithError_ResultNullableRefTable;
-__LOCAL extern const struct FidlCodedStruct test_protocollayoutssamelibrary_ComposedProtocolOnAnonComposedWithErrorRequestTable;
 __LOCAL extern const struct FidlCodedTable test_protocollayoutssamelibrary_ComposedProtocolTwoWayAnonComposedWithErrorRequestTable;
 __LOCAL extern const struct FidlCodedTable test_protocollayoutssamelibrary_ComposedProtocolTwoWayAnonComposedResponseTable;
 __LOCAL extern const struct FidlCodedUnion test_protocollayoutssamelibrary_ComposedProtocolTwoWayAnonComposedRequestTable;
@@ -54,29 +46,29 @@ __LOCAL extern const struct FidlCodedTable test_protocollayoutssamelibrary_Compo
 __LOCAL extern const struct FidlCodedUnion test_protocollayoutssamelibrary_ComposedProtocolTwoWayAnonComposedRequestMessageTable;
 __LOCAL extern const struct FidlCodedTable test_protocollayoutssamelibrary_ComposedProtocolTwoWayAnonComposedResponseMessageTable;
 __LOCAL extern const struct FidlCodedTable test_protocollayoutssamelibrary_ComposedProtocolTwoWayAnonComposedWithErrorRequestMessageTable;
-__LOCAL extern const struct FidlCodedStruct test_protocollayoutssamelibrary_ComposedProtocolTwoWayAnonComposedWithErrorResponseMessageTable;
+__LOCAL extern const struct FidlCodedUnion test_protocollayoutssamelibrary_ComposedProtocolTwoWayAnonComposedWithErrorResponseMessageTable;
 __LOCAL extern const struct FidlCodedUnion test_protocollayoutssamelibrary_ComposedProtocolOnAnonComposedEventMessageTable;
-__LOCAL extern const struct FidlCodedStruct test_protocollayoutssamelibrary_ComposedProtocolOnAnonComposedWithErrorEventMessageTable;
-__LOCAL extern const struct FidlCodedStruct test_protocollayoutssamelibrary_ComposedProtocolTwoWayNamedComposedWithErrorResponseMessageTable;
-__LOCAL extern const struct FidlCodedStruct test_protocollayoutssamelibrary_ComposedProtocolOnNamedComposedWithErrorEventMessageTable;
+__LOCAL extern const struct FidlCodedUnion test_protocollayoutssamelibrary_ComposedProtocolOnAnonComposedWithErrorEventMessageTable;
+__LOCAL extern const struct FidlCodedUnion test_protocollayoutssamelibrary_ComposedProtocolTwoWayNamedComposedWithErrorResponseMessageTable;
+__LOCAL extern const struct FidlCodedUnion test_protocollayoutssamelibrary_ComposedProtocolOnNamedComposedWithErrorEventMessageTable;
 __LOCAL extern const struct FidlCodedTable test_protocollayoutssamelibrary_MainProtocolOneWayAnonComposedRequestMessageTable;
 __LOCAL extern const struct FidlCodedUnion test_protocollayoutssamelibrary_MainProtocolTwoWayAnonComposedRequestMessageTable;
 __LOCAL extern const struct FidlCodedTable test_protocollayoutssamelibrary_MainProtocolTwoWayAnonComposedResponseMessageTable;
 __LOCAL extern const struct FidlCodedTable test_protocollayoutssamelibrary_MainProtocolTwoWayAnonComposedWithErrorRequestMessageTable;
-__LOCAL extern const struct FidlCodedStruct test_protocollayoutssamelibrary_MainProtocolTwoWayAnonComposedWithErrorResponseMessageTable;
+__LOCAL extern const struct FidlCodedUnion test_protocollayoutssamelibrary_MainProtocolTwoWayAnonComposedWithErrorResponseMessageTable;
 __LOCAL extern const struct FidlCodedUnion test_protocollayoutssamelibrary_MainProtocolOnAnonComposedEventMessageTable;
-__LOCAL extern const struct FidlCodedStruct test_protocollayoutssamelibrary_MainProtocolOnAnonComposedWithErrorEventMessageTable;
-__LOCAL extern const struct FidlCodedStruct test_protocollayoutssamelibrary_MainProtocolTwoWayNamedComposedWithErrorResponseMessageTable;
-__LOCAL extern const struct FidlCodedStruct test_protocollayoutssamelibrary_MainProtocolOnNamedComposedWithErrorEventMessageTable;
-__LOCAL extern const struct FidlCodedStruct test_protocollayoutssamelibrary_MainProtocolTwoWayLocalWithErrorResponseMessageTable;
-__LOCAL extern const struct FidlCodedStruct test_protocollayoutssamelibrary_MainProtocolOnLocalWithErrorEventMessageTable;
+__LOCAL extern const struct FidlCodedUnion test_protocollayoutssamelibrary_MainProtocolOnAnonComposedWithErrorEventMessageTable;
+__LOCAL extern const struct FidlCodedUnion test_protocollayoutssamelibrary_MainProtocolTwoWayNamedComposedWithErrorResponseMessageTable;
+__LOCAL extern const struct FidlCodedUnion test_protocollayoutssamelibrary_MainProtocolOnNamedComposedWithErrorEventMessageTable;
+__LOCAL extern const struct FidlCodedUnion test_protocollayoutssamelibrary_MainProtocolTwoWayLocalWithErrorResponseMessageTable;
+__LOCAL extern const struct FidlCodedUnion test_protocollayoutssamelibrary_MainProtocolOnLocalWithErrorEventMessageTable;
 __LOCAL extern const struct FidlCodedTable test_protocollayoutssamelibrary_MainProtocolOneWayAnonRequestMessageTable;
 __LOCAL extern const struct FidlCodedUnion test_protocollayoutssamelibrary_MainProtocolTwoWayAnonRequestMessageTable;
 __LOCAL extern const struct FidlCodedTable test_protocollayoutssamelibrary_MainProtocolTwoWayAnonResponseMessageTable;
 __LOCAL extern const struct FidlCodedTable test_protocollayoutssamelibrary_MainProtocolTwoWayAnonWithErrorRequestMessageTable;
-__LOCAL extern const struct FidlCodedStruct test_protocollayoutssamelibrary_MainProtocolTwoWayAnonWithErrorResponseMessageTable;
+__LOCAL extern const struct FidlCodedUnion test_protocollayoutssamelibrary_MainProtocolTwoWayAnonWithErrorResponseMessageTable;
 __LOCAL extern const struct FidlCodedUnion test_protocollayoutssamelibrary_MainProtocolOnAnonEventMessageTable;
-__LOCAL extern const struct FidlCodedStruct test_protocollayoutssamelibrary_MainProtocolOnAnonWithErrorEventMessageTable;
+__LOCAL extern const struct FidlCodedUnion test_protocollayoutssamelibrary_MainProtocolOnAnonWithErrorEventMessageTable;
 
 
 
@@ -98,11 +90,6 @@ static const struct FidlUnionField Fields83test_protocollayoutssamelibrary_MainP
     /*FidlUnionField*/{.type=(fidl_type_t*)(&fidl_internal_kUint32Table)}
 };
 const struct FidlCodedUnion test_protocollayoutssamelibrary_MainProtocol_TwoWayLocalWithError_ResultNullableRefTable = {.tag=kFidlTypeUnion, .field_count=2u, .fields=Fields83test_protocollayoutssamelibrary_MainProtocol_TwoWayLocalWithError_ResultNullableRef, .nullable=kFidlNullability_Nullable, .name="test.protocollayoutssamelibrary/MainProtocol_TwoWayLocalWithError_Result", .strictness=kFidlStrictness_Strict, .is_resource=kFidlIsResource_NotResource};
-static const struct FidlStructElement Fields75test_protocollayoutssamelibrary_MainProtocolTwoWayLocalWithErrorTopResponse[] = {
-    /*FidlStructPadding*/{.field=/*FidlStructField*/{.header=/*FidlStructElementHeader*/{.element_type=kFidlStructElementType_Field, .is_resource=kFidlIsResource_NotResource},.offset_v2=0u, .field_type=(fidl_type_t*)(&test_protocollayoutssamelibrary_MainProtocol_TwoWayLocalWithError_ResultTable)}}
-};
-const struct FidlCodedStruct test_protocollayoutssamelibrary_MainProtocolTwoWayLocalWithErrorTopResponseTable = {.tag=kFidlTypeStruct, .contains_envelope=kFidlContainsEnvelope_ContainsEnvelope, .is_empty=kFidlEmpty_IsNotEmpty, .elements=Fields75test_protocollayoutssamelibrary_MainProtocolTwoWayLocalWithErrorTopResponse, .element_count=1u, .size_v2=16u, .name="test.protocollayoutssamelibrary/MainProtocolTwoWayLocalWithErrorTopResponse"};
-
 static const struct FidlUnionField Fields84test_protocollayoutssamelibrary_ComposedProtocol_TwoWayNamedComposedWithError_Result[] = {
     /*FidlUnionField*/{.type=(fidl_type_t*)(&test_protocollayoutssamelibrary_UnionPayloadTable)},
     /*FidlUnionField*/{.type=(fidl_type_t*)(&fidl_internal_kUint32Table)}
@@ -113,11 +100,6 @@ static const struct FidlUnionField Fields95test_protocollayoutssamelibrary_Compo
     /*FidlUnionField*/{.type=(fidl_type_t*)(&fidl_internal_kUint32Table)}
 };
 const struct FidlCodedUnion test_protocollayoutssamelibrary_ComposedProtocol_TwoWayNamedComposedWithError_ResultNullableRefTable = {.tag=kFidlTypeUnion, .field_count=2u, .fields=Fields95test_protocollayoutssamelibrary_ComposedProtocol_TwoWayNamedComposedWithError_ResultNullableRef, .nullable=kFidlNullability_Nullable, .name="test.protocollayoutssamelibrary/ComposedProtocol_TwoWayNamedComposedWithError_Result", .strictness=kFidlStrictness_Strict, .is_resource=kFidlIsResource_NotResource};
-static const struct FidlStructElement Fields87test_protocollayoutssamelibrary_ComposedProtocolTwoWayNamedComposedWithErrorTopResponse[] = {
-    /*FidlStructPadding*/{.field=/*FidlStructField*/{.header=/*FidlStructElementHeader*/{.element_type=kFidlStructElementType_Field, .is_resource=kFidlIsResource_NotResource},.offset_v2=0u, .field_type=(fidl_type_t*)(&test_protocollayoutssamelibrary_ComposedProtocol_TwoWayNamedComposedWithError_ResultTable)}}
-};
-const struct FidlCodedStruct test_protocollayoutssamelibrary_ComposedProtocolTwoWayNamedComposedWithErrorTopResponseTable = {.tag=kFidlTypeStruct, .contains_envelope=kFidlContainsEnvelope_ContainsEnvelope, .is_empty=kFidlEmpty_IsNotEmpty, .elements=Fields87test_protocollayoutssamelibrary_ComposedProtocolTwoWayNamedComposedWithErrorTopResponse, .element_count=1u, .size_v2=16u, .name="test.protocollayoutssamelibrary/ComposedProtocolTwoWayNamedComposedWithErrorTopResponse"};
-
 static const struct FidlTableField Fields44test_protocollayoutssamelibrary_TablePayload[] = {
     /*FidlTableField*/{.type=(fidl_type_t*)(&fidl_internal_kUint16Table), .ordinal=1u}
 };
@@ -133,11 +115,6 @@ static const struct FidlUnionField Fields79test_protocollayoutssamelibrary_MainP
     /*FidlUnionField*/{.type=(fidl_type_t*)(&fidl_internal_kUint32Table)}
 };
 const struct FidlCodedUnion test_protocollayoutssamelibrary_MainProtocol_OnLocalWithError_ResultNullableRefTable = {.tag=kFidlTypeUnion, .field_count=2u, .fields=Fields79test_protocollayoutssamelibrary_MainProtocol_OnLocalWithError_ResultNullableRef, .nullable=kFidlNullability_Nullable, .name="test.protocollayoutssamelibrary/MainProtocol_OnLocalWithError_Result", .strictness=kFidlStrictness_Strict, .is_resource=kFidlIsResource_NotResource};
-static const struct FidlStructElement Fields67test_protocollayoutssamelibrary_MainProtocolOnLocalWithErrorRequest[] = {
-    /*FidlStructPadding*/{.field=/*FidlStructField*/{.header=/*FidlStructElementHeader*/{.element_type=kFidlStructElementType_Field, .is_resource=kFidlIsResource_NotResource},.offset_v2=0u, .field_type=(fidl_type_t*)(&test_protocollayoutssamelibrary_MainProtocol_OnLocalWithError_ResultTable)}}
-};
-const struct FidlCodedStruct test_protocollayoutssamelibrary_MainProtocolOnLocalWithErrorRequestTable = {.tag=kFidlTypeStruct, .contains_envelope=kFidlContainsEnvelope_ContainsEnvelope, .is_empty=kFidlEmpty_IsNotEmpty, .elements=Fields67test_protocollayoutssamelibrary_MainProtocolOnLocalWithErrorRequest, .element_count=1u, .size_v2=16u, .name="test.protocollayoutssamelibrary/MainProtocolOnLocalWithErrorRequest"};
-
 static const struct FidlUnionField Fields80test_protocollayoutssamelibrary_ComposedProtocol_OnNamedComposedWithError_Result[] = {
     /*FidlUnionField*/{.type=(fidl_type_t*)(&test_protocollayoutssamelibrary_TablePayloadTable)},
     /*FidlUnionField*/{.type=(fidl_type_t*)(&fidl_internal_kUint32Table)}
@@ -148,11 +125,6 @@ static const struct FidlUnionField Fields91test_protocollayoutssamelibrary_Compo
     /*FidlUnionField*/{.type=(fidl_type_t*)(&fidl_internal_kUint32Table)}
 };
 const struct FidlCodedUnion test_protocollayoutssamelibrary_ComposedProtocol_OnNamedComposedWithError_ResultNullableRefTable = {.tag=kFidlTypeUnion, .field_count=2u, .fields=Fields91test_protocollayoutssamelibrary_ComposedProtocol_OnNamedComposedWithError_ResultNullableRef, .nullable=kFidlNullability_Nullable, .name="test.protocollayoutssamelibrary/ComposedProtocol_OnNamedComposedWithError_Result", .strictness=kFidlStrictness_Strict, .is_resource=kFidlIsResource_NotResource};
-static const struct FidlStructElement Fields79test_protocollayoutssamelibrary_ComposedProtocolOnNamedComposedWithErrorRequest[] = {
-    /*FidlStructPadding*/{.field=/*FidlStructField*/{.header=/*FidlStructElementHeader*/{.element_type=kFidlStructElementType_Field, .is_resource=kFidlIsResource_NotResource},.offset_v2=0u, .field_type=(fidl_type_t*)(&test_protocollayoutssamelibrary_ComposedProtocol_OnNamedComposedWithError_ResultTable)}}
-};
-const struct FidlCodedStruct test_protocollayoutssamelibrary_ComposedProtocolOnNamedComposedWithErrorRequestTable = {.tag=kFidlTypeStruct, .contains_envelope=kFidlContainsEnvelope_ContainsEnvelope, .is_empty=kFidlEmpty_IsNotEmpty, .elements=Fields79test_protocollayoutssamelibrary_ComposedProtocolOnNamedComposedWithErrorRequest, .element_count=1u, .size_v2=16u, .name="test.protocollayoutssamelibrary/ComposedProtocolOnNamedComposedWithErrorRequest"};
-
 static const struct FidlUnionField Fields73test_protocollayoutssamelibrary_MainProtocol_TwoWayAnonWithError_Response[] = {
     /*FidlUnionField*/{.type=(fidl_type_t*)(&fidl_internal_kBoolTable)}
 };
@@ -171,11 +143,6 @@ static const struct FidlUnionField Fields82test_protocollayoutssamelibrary_MainP
     /*FidlUnionField*/{.type=(fidl_type_t*)(&fidl_internal_kUint32Table)}
 };
 const struct FidlCodedUnion test_protocollayoutssamelibrary_MainProtocol_TwoWayAnonWithError_ResultNullableRefTable = {.tag=kFidlTypeUnion, .field_count=2u, .fields=Fields82test_protocollayoutssamelibrary_MainProtocol_TwoWayAnonWithError_ResultNullableRef, .nullable=kFidlNullability_Nullable, .name="test.protocollayoutssamelibrary/MainProtocol_TwoWayAnonWithError_Result", .strictness=kFidlStrictness_Strict, .is_resource=kFidlIsResource_NotResource};
-static const struct FidlStructElement Fields74test_protocollayoutssamelibrary_MainProtocolTwoWayAnonWithErrorTopResponse[] = {
-    /*FidlStructPadding*/{.field=/*FidlStructField*/{.header=/*FidlStructElementHeader*/{.element_type=kFidlStructElementType_Field, .is_resource=kFidlIsResource_NotResource},.offset_v2=0u, .field_type=(fidl_type_t*)(&test_protocollayoutssamelibrary_MainProtocol_TwoWayAnonWithError_ResultTable)}}
-};
-const struct FidlCodedStruct test_protocollayoutssamelibrary_MainProtocolTwoWayAnonWithErrorTopResponseTable = {.tag=kFidlTypeStruct, .contains_envelope=kFidlContainsEnvelope_ContainsEnvelope, .is_empty=kFidlEmpty_IsNotEmpty, .elements=Fields74test_protocollayoutssamelibrary_MainProtocolTwoWayAnonWithErrorTopResponse, .element_count=1u, .size_v2=16u, .name="test.protocollayoutssamelibrary/MainProtocolTwoWayAnonWithErrorTopResponse"};
-
 static const struct FidlTableField Fields69test_protocollayoutssamelibrary_MainProtocol_OnAnonWithError_Response[] = {
     /*FidlTableField*/{.type=(fidl_type_t*)(&fidl_internal_kUint16Table), .ordinal=1u}
 };
@@ -191,11 +158,6 @@ static const struct FidlUnionField Fields78test_protocollayoutssamelibrary_MainP
     /*FidlUnionField*/{.type=(fidl_type_t*)(&fidl_internal_kUint32Table)}
 };
 const struct FidlCodedUnion test_protocollayoutssamelibrary_MainProtocol_OnAnonWithError_ResultNullableRefTable = {.tag=kFidlTypeUnion, .field_count=2u, .fields=Fields78test_protocollayoutssamelibrary_MainProtocol_OnAnonWithError_ResultNullableRef, .nullable=kFidlNullability_Nullable, .name="test.protocollayoutssamelibrary/MainProtocol_OnAnonWithError_Result", .strictness=kFidlStrictness_Strict, .is_resource=kFidlIsResource_NotResource};
-static const struct FidlStructElement Fields66test_protocollayoutssamelibrary_MainProtocolOnAnonWithErrorRequest[] = {
-    /*FidlStructPadding*/{.field=/*FidlStructField*/{.header=/*FidlStructElementHeader*/{.element_type=kFidlStructElementType_Field, .is_resource=kFidlIsResource_NotResource},.offset_v2=0u, .field_type=(fidl_type_t*)(&test_protocollayoutssamelibrary_MainProtocol_OnAnonWithError_ResultTable)}}
-};
-const struct FidlCodedStruct test_protocollayoutssamelibrary_MainProtocolOnAnonWithErrorRequestTable = {.tag=kFidlTypeStruct, .contains_envelope=kFidlContainsEnvelope_ContainsEnvelope, .is_empty=kFidlEmpty_IsNotEmpty, .elements=Fields66test_protocollayoutssamelibrary_MainProtocolOnAnonWithErrorRequest, .element_count=1u, .size_v2=16u, .name="test.protocollayoutssamelibrary/MainProtocolOnAnonWithErrorRequest"};
-
 static const struct FidlTableField Fields70test_protocollayoutssamelibrary_MainProtocolTwoWayAnonWithErrorRequest[] = {
     /*FidlTableField*/{.type=(fidl_type_t*)(&fidl_internal_kUint16Table), .ordinal=1u}
 };
@@ -245,11 +207,6 @@ static const struct FidlUnionField Fields94test_protocollayoutssamelibrary_Compo
     /*FidlUnionField*/{.type=(fidl_type_t*)(&fidl_internal_kUint32Table)}
 };
 const struct FidlCodedUnion test_protocollayoutssamelibrary_ComposedProtocol_TwoWayAnonComposedWithError_ResultNullableRefTable = {.tag=kFidlTypeUnion, .field_count=2u, .fields=Fields94test_protocollayoutssamelibrary_ComposedProtocol_TwoWayAnonComposedWithError_ResultNullableRef, .nullable=kFidlNullability_Nullable, .name="test.protocollayoutssamelibrary/ComposedProtocol_TwoWayAnonComposedWithError_Result", .strictness=kFidlStrictness_Strict, .is_resource=kFidlIsResource_NotResource};
-static const struct FidlStructElement Fields86test_protocollayoutssamelibrary_ComposedProtocolTwoWayAnonComposedWithErrorTopResponse[] = {
-    /*FidlStructPadding*/{.field=/*FidlStructField*/{.header=/*FidlStructElementHeader*/{.element_type=kFidlStructElementType_Field, .is_resource=kFidlIsResource_NotResource},.offset_v2=0u, .field_type=(fidl_type_t*)(&test_protocollayoutssamelibrary_ComposedProtocol_TwoWayAnonComposedWithError_ResultTable)}}
-};
-const struct FidlCodedStruct test_protocollayoutssamelibrary_ComposedProtocolTwoWayAnonComposedWithErrorTopResponseTable = {.tag=kFidlTypeStruct, .contains_envelope=kFidlContainsEnvelope_ContainsEnvelope, .is_empty=kFidlEmpty_IsNotEmpty, .elements=Fields86test_protocollayoutssamelibrary_ComposedProtocolTwoWayAnonComposedWithErrorTopResponse, .element_count=1u, .size_v2=16u, .name="test.protocollayoutssamelibrary/ComposedProtocolTwoWayAnonComposedWithErrorTopResponse"};
-
 static const struct FidlTableField Fields81test_protocollayoutssamelibrary_ComposedProtocol_OnAnonComposedWithError_Response[] = {
     /*FidlTableField*/{.type=(fidl_type_t*)(&fidl_internal_kUint16Table), .ordinal=1u}
 };
@@ -265,11 +222,6 @@ static const struct FidlUnionField Fields90test_protocollayoutssamelibrary_Compo
     /*FidlUnionField*/{.type=(fidl_type_t*)(&fidl_internal_kUint32Table)}
 };
 const struct FidlCodedUnion test_protocollayoutssamelibrary_ComposedProtocol_OnAnonComposedWithError_ResultNullableRefTable = {.tag=kFidlTypeUnion, .field_count=2u, .fields=Fields90test_protocollayoutssamelibrary_ComposedProtocol_OnAnonComposedWithError_ResultNullableRef, .nullable=kFidlNullability_Nullable, .name="test.protocollayoutssamelibrary/ComposedProtocol_OnAnonComposedWithError_Result", .strictness=kFidlStrictness_Strict, .is_resource=kFidlIsResource_NotResource};
-static const struct FidlStructElement Fields78test_protocollayoutssamelibrary_ComposedProtocolOnAnonComposedWithErrorRequest[] = {
-    /*FidlStructPadding*/{.field=/*FidlStructField*/{.header=/*FidlStructElementHeader*/{.element_type=kFidlStructElementType_Field, .is_resource=kFidlIsResource_NotResource},.offset_v2=0u, .field_type=(fidl_type_t*)(&test_protocollayoutssamelibrary_ComposedProtocol_OnAnonComposedWithError_ResultTable)}}
-};
-const struct FidlCodedStruct test_protocollayoutssamelibrary_ComposedProtocolOnAnonComposedWithErrorRequestTable = {.tag=kFidlTypeStruct, .contains_envelope=kFidlContainsEnvelope_ContainsEnvelope, .is_empty=kFidlEmpty_IsNotEmpty, .elements=Fields78test_protocollayoutssamelibrary_ComposedProtocolOnAnonComposedWithErrorRequest, .element_count=1u, .size_v2=16u, .name="test.protocollayoutssamelibrary/ComposedProtocolOnAnonComposedWithErrorRequest"};
-
 static const struct FidlTableField Fields82test_protocollayoutssamelibrary_ComposedProtocolTwoWayAnonComposedWithErrorRequest[] = {
     /*FidlTableField*/{.type=(fidl_type_t*)(&fidl_internal_kUint16Table), .ordinal=1u}
 };
@@ -320,30 +272,30 @@ static const struct FidlTableField Fields89test_protocollayoutssamelibrary_Compo
 };
 const struct FidlCodedTable test_protocollayoutssamelibrary_ComposedProtocolTwoWayAnonComposedWithErrorRequestMessageTable = {.tag=kFidlTypeTable, .fields=Fields89test_protocollayoutssamelibrary_ComposedProtocolTwoWayAnonComposedWithErrorRequestMessage, .field_count=1u, .is_resource=kFidlIsResource_NotResource, .name="test.protocollayoutssamelibrary/ComposedProtocolTwoWayAnonComposedWithErrorRequestMessage"};
 
-static const struct FidlStructElement Fields90test_protocollayoutssamelibrary_ComposedProtocolTwoWayAnonComposedWithErrorResponseMessage[] = {
-    /*FidlStructPadding*/{.field=/*FidlStructField*/{.header=/*FidlStructElementHeader*/{.element_type=kFidlStructElementType_Field, .is_resource=kFidlIsResource_NotResource},.offset_v2=0u, .field_type=(fidl_type_t*)(&test_protocollayoutssamelibrary_ComposedProtocol_TwoWayAnonComposedWithError_ResultTable)}}
+static const struct FidlUnionField Fields90test_protocollayoutssamelibrary_ComposedProtocolTwoWayAnonComposedWithErrorResponseMessage[] = {
+    /*FidlUnionField*/{.type=(fidl_type_t*)(&test_protocollayoutssamelibrary_ComposedProtocol_TwoWayAnonComposedWithError_ResponseTable)},
+    /*FidlUnionField*/{.type=(fidl_type_t*)(&fidl_internal_kUint32Table)}
 };
-const struct FidlCodedStruct test_protocollayoutssamelibrary_ComposedProtocolTwoWayAnonComposedWithErrorResponseMessageTable = {.tag=kFidlTypeStruct, .contains_envelope=kFidlContainsEnvelope_ContainsEnvelope, .is_empty=kFidlEmpty_IsNotEmpty, .elements=Fields90test_protocollayoutssamelibrary_ComposedProtocolTwoWayAnonComposedWithErrorResponseMessage, .element_count=1u, .size_v2=16u, .name="test.protocollayoutssamelibrary/ComposedProtocolTwoWayAnonComposedWithErrorResponseMessage"};
-
+const struct FidlCodedUnion test_protocollayoutssamelibrary_ComposedProtocolTwoWayAnonComposedWithErrorResponseMessageTable = {.tag=kFidlTypeUnion, .field_count=2u, .fields=Fields90test_protocollayoutssamelibrary_ComposedProtocolTwoWayAnonComposedWithErrorResponseMessage, .nullable=kFidlNullability_Nonnullable, .name="test.protocollayoutssamelibrary/ComposedProtocolTwoWayAnonComposedWithErrorResponseMessage", .strictness=kFidlStrictness_Strict, .is_resource=kFidlIsResource_NotResource};
 static const struct FidlUnionField Fields74test_protocollayoutssamelibrary_ComposedProtocolOnAnonComposedEventMessage[] = {
     /*FidlUnionField*/{.type=(fidl_type_t*)(&fidl_internal_kBoolTable)}
 };
 const struct FidlCodedUnion test_protocollayoutssamelibrary_ComposedProtocolOnAnonComposedEventMessageTable = {.tag=kFidlTypeUnion, .field_count=1u, .fields=Fields74test_protocollayoutssamelibrary_ComposedProtocolOnAnonComposedEventMessage, .nullable=kFidlNullability_Nonnullable, .name="test.protocollayoutssamelibrary/ComposedProtocolOnAnonComposedEventMessage", .strictness=kFidlStrictness_Strict, .is_resource=kFidlIsResource_NotResource};
-static const struct FidlStructElement Fields83test_protocollayoutssamelibrary_ComposedProtocolOnAnonComposedWithErrorEventMessage[] = {
-    /*FidlStructPadding*/{.field=/*FidlStructField*/{.header=/*FidlStructElementHeader*/{.element_type=kFidlStructElementType_Field, .is_resource=kFidlIsResource_NotResource},.offset_v2=0u, .field_type=(fidl_type_t*)(&test_protocollayoutssamelibrary_ComposedProtocol_OnAnonComposedWithError_ResultTable)}}
+static const struct FidlUnionField Fields83test_protocollayoutssamelibrary_ComposedProtocolOnAnonComposedWithErrorEventMessage[] = {
+    /*FidlUnionField*/{.type=(fidl_type_t*)(&test_protocollayoutssamelibrary_ComposedProtocol_OnAnonComposedWithError_ResponseTable)},
+    /*FidlUnionField*/{.type=(fidl_type_t*)(&fidl_internal_kUint32Table)}
 };
-const struct FidlCodedStruct test_protocollayoutssamelibrary_ComposedProtocolOnAnonComposedWithErrorEventMessageTable = {.tag=kFidlTypeStruct, .contains_envelope=kFidlContainsEnvelope_ContainsEnvelope, .is_empty=kFidlEmpty_IsNotEmpty, .elements=Fields83test_protocollayoutssamelibrary_ComposedProtocolOnAnonComposedWithErrorEventMessage, .element_count=1u, .size_v2=16u, .name="test.protocollayoutssamelibrary/ComposedProtocolOnAnonComposedWithErrorEventMessage"};
-
-static const struct FidlStructElement Fields91test_protocollayoutssamelibrary_ComposedProtocolTwoWayNamedComposedWithErrorResponseMessage[] = {
-    /*FidlStructPadding*/{.field=/*FidlStructField*/{.header=/*FidlStructElementHeader*/{.element_type=kFidlStructElementType_Field, .is_resource=kFidlIsResource_NotResource},.offset_v2=0u, .field_type=(fidl_type_t*)(&test_protocollayoutssamelibrary_ComposedProtocol_TwoWayNamedComposedWithError_ResultTable)}}
+const struct FidlCodedUnion test_protocollayoutssamelibrary_ComposedProtocolOnAnonComposedWithErrorEventMessageTable = {.tag=kFidlTypeUnion, .field_count=2u, .fields=Fields83test_protocollayoutssamelibrary_ComposedProtocolOnAnonComposedWithErrorEventMessage, .nullable=kFidlNullability_Nonnullable, .name="test.protocollayoutssamelibrary/ComposedProtocolOnAnonComposedWithErrorEventMessage", .strictness=kFidlStrictness_Strict, .is_resource=kFidlIsResource_NotResource};
+static const struct FidlUnionField Fields91test_protocollayoutssamelibrary_ComposedProtocolTwoWayNamedComposedWithErrorResponseMessage[] = {
+    /*FidlUnionField*/{.type=(fidl_type_t*)(&test_protocollayoutssamelibrary_UnionPayloadTable)},
+    /*FidlUnionField*/{.type=(fidl_type_t*)(&fidl_internal_kUint32Table)}
 };
-const struct FidlCodedStruct test_protocollayoutssamelibrary_ComposedProtocolTwoWayNamedComposedWithErrorResponseMessageTable = {.tag=kFidlTypeStruct, .contains_envelope=kFidlContainsEnvelope_ContainsEnvelope, .is_empty=kFidlEmpty_IsNotEmpty, .elements=Fields91test_protocollayoutssamelibrary_ComposedProtocolTwoWayNamedComposedWithErrorResponseMessage, .element_count=1u, .size_v2=16u, .name="test.protocollayoutssamelibrary/ComposedProtocolTwoWayNamedComposedWithErrorResponseMessage"};
-
-static const struct FidlStructElement Fields84test_protocollayoutssamelibrary_ComposedProtocolOnNamedComposedWithErrorEventMessage[] = {
-    /*FidlStructPadding*/{.field=/*FidlStructField*/{.header=/*FidlStructElementHeader*/{.element_type=kFidlStructElementType_Field, .is_resource=kFidlIsResource_NotResource},.offset_v2=0u, .field_type=(fidl_type_t*)(&test_protocollayoutssamelibrary_ComposedProtocol_OnNamedComposedWithError_ResultTable)}}
+const struct FidlCodedUnion test_protocollayoutssamelibrary_ComposedProtocolTwoWayNamedComposedWithErrorResponseMessageTable = {.tag=kFidlTypeUnion, .field_count=2u, .fields=Fields91test_protocollayoutssamelibrary_ComposedProtocolTwoWayNamedComposedWithErrorResponseMessage, .nullable=kFidlNullability_Nonnullable, .name="test.protocollayoutssamelibrary/ComposedProtocolTwoWayNamedComposedWithErrorResponseMessage", .strictness=kFidlStrictness_Strict, .is_resource=kFidlIsResource_NotResource};
+static const struct FidlUnionField Fields84test_protocollayoutssamelibrary_ComposedProtocolOnNamedComposedWithErrorEventMessage[] = {
+    /*FidlUnionField*/{.type=(fidl_type_t*)(&test_protocollayoutssamelibrary_TablePayloadTable)},
+    /*FidlUnionField*/{.type=(fidl_type_t*)(&fidl_internal_kUint32Table)}
 };
-const struct FidlCodedStruct test_protocollayoutssamelibrary_ComposedProtocolOnNamedComposedWithErrorEventMessageTable = {.tag=kFidlTypeStruct, .contains_envelope=kFidlContainsEnvelope_ContainsEnvelope, .is_empty=kFidlEmpty_IsNotEmpty, .elements=Fields84test_protocollayoutssamelibrary_ComposedProtocolOnNamedComposedWithErrorEventMessage, .element_count=1u, .size_v2=16u, .name="test.protocollayoutssamelibrary/ComposedProtocolOnNamedComposedWithErrorEventMessage"};
-
+const struct FidlCodedUnion test_protocollayoutssamelibrary_ComposedProtocolOnNamedComposedWithErrorEventMessageTable = {.tag=kFidlTypeUnion, .field_count=2u, .fields=Fields84test_protocollayoutssamelibrary_ComposedProtocolOnNamedComposedWithErrorEventMessage, .nullable=kFidlNullability_Nonnullable, .name="test.protocollayoutssamelibrary/ComposedProtocolOnNamedComposedWithErrorEventMessage", .strictness=kFidlStrictness_Strict, .is_resource=kFidlIsResource_NotResource};
 static const struct FidlTableField Fields76test_protocollayoutssamelibrary_MainProtocolOneWayAnonComposedRequestMessage[] = {
     /*FidlTableField*/{.type=(fidl_type_t*)(&fidl_internal_kUint16Table), .ordinal=1u}
 };
@@ -363,40 +315,40 @@ static const struct FidlTableField Fields85test_protocollayoutssamelibrary_MainP
 };
 const struct FidlCodedTable test_protocollayoutssamelibrary_MainProtocolTwoWayAnonComposedWithErrorRequestMessageTable = {.tag=kFidlTypeTable, .fields=Fields85test_protocollayoutssamelibrary_MainProtocolTwoWayAnonComposedWithErrorRequestMessage, .field_count=1u, .is_resource=kFidlIsResource_NotResource, .name="test.protocollayoutssamelibrary/MainProtocolTwoWayAnonComposedWithErrorRequestMessage"};
 
-static const struct FidlStructElement Fields86test_protocollayoutssamelibrary_MainProtocolTwoWayAnonComposedWithErrorResponseMessage[] = {
-    /*FidlStructPadding*/{.field=/*FidlStructField*/{.header=/*FidlStructElementHeader*/{.element_type=kFidlStructElementType_Field, .is_resource=kFidlIsResource_NotResource},.offset_v2=0u, .field_type=(fidl_type_t*)(&test_protocollayoutssamelibrary_ComposedProtocol_TwoWayAnonComposedWithError_ResultTable)}}
+static const struct FidlUnionField Fields86test_protocollayoutssamelibrary_MainProtocolTwoWayAnonComposedWithErrorResponseMessage[] = {
+    /*FidlUnionField*/{.type=(fidl_type_t*)(&test_protocollayoutssamelibrary_ComposedProtocol_TwoWayAnonComposedWithError_ResponseTable)},
+    /*FidlUnionField*/{.type=(fidl_type_t*)(&fidl_internal_kUint32Table)}
 };
-const struct FidlCodedStruct test_protocollayoutssamelibrary_MainProtocolTwoWayAnonComposedWithErrorResponseMessageTable = {.tag=kFidlTypeStruct, .contains_envelope=kFidlContainsEnvelope_ContainsEnvelope, .is_empty=kFidlEmpty_IsNotEmpty, .elements=Fields86test_protocollayoutssamelibrary_MainProtocolTwoWayAnonComposedWithErrorResponseMessage, .element_count=1u, .size_v2=16u, .name="test.protocollayoutssamelibrary/MainProtocolTwoWayAnonComposedWithErrorResponseMessage"};
-
+const struct FidlCodedUnion test_protocollayoutssamelibrary_MainProtocolTwoWayAnonComposedWithErrorResponseMessageTable = {.tag=kFidlTypeUnion, .field_count=2u, .fields=Fields86test_protocollayoutssamelibrary_MainProtocolTwoWayAnonComposedWithErrorResponseMessage, .nullable=kFidlNullability_Nonnullable, .name="test.protocollayoutssamelibrary/MainProtocolTwoWayAnonComposedWithErrorResponseMessage", .strictness=kFidlStrictness_Strict, .is_resource=kFidlIsResource_NotResource};
 static const struct FidlUnionField Fields70test_protocollayoutssamelibrary_MainProtocolOnAnonComposedEventMessage[] = {
     /*FidlUnionField*/{.type=(fidl_type_t*)(&fidl_internal_kBoolTable)}
 };
 const struct FidlCodedUnion test_protocollayoutssamelibrary_MainProtocolOnAnonComposedEventMessageTable = {.tag=kFidlTypeUnion, .field_count=1u, .fields=Fields70test_protocollayoutssamelibrary_MainProtocolOnAnonComposedEventMessage, .nullable=kFidlNullability_Nonnullable, .name="test.protocollayoutssamelibrary/MainProtocolOnAnonComposedEventMessage", .strictness=kFidlStrictness_Strict, .is_resource=kFidlIsResource_NotResource};
-static const struct FidlStructElement Fields79test_protocollayoutssamelibrary_MainProtocolOnAnonComposedWithErrorEventMessage[] = {
-    /*FidlStructPadding*/{.field=/*FidlStructField*/{.header=/*FidlStructElementHeader*/{.element_type=kFidlStructElementType_Field, .is_resource=kFidlIsResource_NotResource},.offset_v2=0u, .field_type=(fidl_type_t*)(&test_protocollayoutssamelibrary_ComposedProtocol_OnAnonComposedWithError_ResultTable)}}
+static const struct FidlUnionField Fields79test_protocollayoutssamelibrary_MainProtocolOnAnonComposedWithErrorEventMessage[] = {
+    /*FidlUnionField*/{.type=(fidl_type_t*)(&test_protocollayoutssamelibrary_ComposedProtocol_OnAnonComposedWithError_ResponseTable)},
+    /*FidlUnionField*/{.type=(fidl_type_t*)(&fidl_internal_kUint32Table)}
 };
-const struct FidlCodedStruct test_protocollayoutssamelibrary_MainProtocolOnAnonComposedWithErrorEventMessageTable = {.tag=kFidlTypeStruct, .contains_envelope=kFidlContainsEnvelope_ContainsEnvelope, .is_empty=kFidlEmpty_IsNotEmpty, .elements=Fields79test_protocollayoutssamelibrary_MainProtocolOnAnonComposedWithErrorEventMessage, .element_count=1u, .size_v2=16u, .name="test.protocollayoutssamelibrary/MainProtocolOnAnonComposedWithErrorEventMessage"};
-
-static const struct FidlStructElement Fields87test_protocollayoutssamelibrary_MainProtocolTwoWayNamedComposedWithErrorResponseMessage[] = {
-    /*FidlStructPadding*/{.field=/*FidlStructField*/{.header=/*FidlStructElementHeader*/{.element_type=kFidlStructElementType_Field, .is_resource=kFidlIsResource_NotResource},.offset_v2=0u, .field_type=(fidl_type_t*)(&test_protocollayoutssamelibrary_ComposedProtocol_TwoWayNamedComposedWithError_ResultTable)}}
+const struct FidlCodedUnion test_protocollayoutssamelibrary_MainProtocolOnAnonComposedWithErrorEventMessageTable = {.tag=kFidlTypeUnion, .field_count=2u, .fields=Fields79test_protocollayoutssamelibrary_MainProtocolOnAnonComposedWithErrorEventMessage, .nullable=kFidlNullability_Nonnullable, .name="test.protocollayoutssamelibrary/MainProtocolOnAnonComposedWithErrorEventMessage", .strictness=kFidlStrictness_Strict, .is_resource=kFidlIsResource_NotResource};
+static const struct FidlUnionField Fields87test_protocollayoutssamelibrary_MainProtocolTwoWayNamedComposedWithErrorResponseMessage[] = {
+    /*FidlUnionField*/{.type=(fidl_type_t*)(&test_protocollayoutssamelibrary_UnionPayloadTable)},
+    /*FidlUnionField*/{.type=(fidl_type_t*)(&fidl_internal_kUint32Table)}
 };
-const struct FidlCodedStruct test_protocollayoutssamelibrary_MainProtocolTwoWayNamedComposedWithErrorResponseMessageTable = {.tag=kFidlTypeStruct, .contains_envelope=kFidlContainsEnvelope_ContainsEnvelope, .is_empty=kFidlEmpty_IsNotEmpty, .elements=Fields87test_protocollayoutssamelibrary_MainProtocolTwoWayNamedComposedWithErrorResponseMessage, .element_count=1u, .size_v2=16u, .name="test.protocollayoutssamelibrary/MainProtocolTwoWayNamedComposedWithErrorResponseMessage"};
-
-static const struct FidlStructElement Fields80test_protocollayoutssamelibrary_MainProtocolOnNamedComposedWithErrorEventMessage[] = {
-    /*FidlStructPadding*/{.field=/*FidlStructField*/{.header=/*FidlStructElementHeader*/{.element_type=kFidlStructElementType_Field, .is_resource=kFidlIsResource_NotResource},.offset_v2=0u, .field_type=(fidl_type_t*)(&test_protocollayoutssamelibrary_ComposedProtocol_OnNamedComposedWithError_ResultTable)}}
+const struct FidlCodedUnion test_protocollayoutssamelibrary_MainProtocolTwoWayNamedComposedWithErrorResponseMessageTable = {.tag=kFidlTypeUnion, .field_count=2u, .fields=Fields87test_protocollayoutssamelibrary_MainProtocolTwoWayNamedComposedWithErrorResponseMessage, .nullable=kFidlNullability_Nonnullable, .name="test.protocollayoutssamelibrary/MainProtocolTwoWayNamedComposedWithErrorResponseMessage", .strictness=kFidlStrictness_Strict, .is_resource=kFidlIsResource_NotResource};
+static const struct FidlUnionField Fields80test_protocollayoutssamelibrary_MainProtocolOnNamedComposedWithErrorEventMessage[] = {
+    /*FidlUnionField*/{.type=(fidl_type_t*)(&test_protocollayoutssamelibrary_TablePayloadTable)},
+    /*FidlUnionField*/{.type=(fidl_type_t*)(&fidl_internal_kUint32Table)}
 };
-const struct FidlCodedStruct test_protocollayoutssamelibrary_MainProtocolOnNamedComposedWithErrorEventMessageTable = {.tag=kFidlTypeStruct, .contains_envelope=kFidlContainsEnvelope_ContainsEnvelope, .is_empty=kFidlEmpty_IsNotEmpty, .elements=Fields80test_protocollayoutssamelibrary_MainProtocolOnNamedComposedWithErrorEventMessage, .element_count=1u, .size_v2=16u, .name="test.protocollayoutssamelibrary/MainProtocolOnNamedComposedWithErrorEventMessage"};
-
-static const struct FidlStructElement Fields79test_protocollayoutssamelibrary_MainProtocolTwoWayLocalWithErrorResponseMessage[] = {
-    /*FidlStructPadding*/{.field=/*FidlStructField*/{.header=/*FidlStructElementHeader*/{.element_type=kFidlStructElementType_Field, .is_resource=kFidlIsResource_NotResource},.offset_v2=0u, .field_type=(fidl_type_t*)(&test_protocollayoutssamelibrary_MainProtocol_TwoWayLocalWithError_ResultTable)}}
+const struct FidlCodedUnion test_protocollayoutssamelibrary_MainProtocolOnNamedComposedWithErrorEventMessageTable = {.tag=kFidlTypeUnion, .field_count=2u, .fields=Fields80test_protocollayoutssamelibrary_MainProtocolOnNamedComposedWithErrorEventMessage, .nullable=kFidlNullability_Nonnullable, .name="test.protocollayoutssamelibrary/MainProtocolOnNamedComposedWithErrorEventMessage", .strictness=kFidlStrictness_Strict, .is_resource=kFidlIsResource_NotResource};
+static const struct FidlUnionField Fields79test_protocollayoutssamelibrary_MainProtocolTwoWayLocalWithErrorResponseMessage[] = {
+    /*FidlUnionField*/{.type=(fidl_type_t*)(&test_protocollayoutssamelibrary_UnionPayloadTable)},
+    /*FidlUnionField*/{.type=(fidl_type_t*)(&fidl_internal_kUint32Table)}
 };
-const struct FidlCodedStruct test_protocollayoutssamelibrary_MainProtocolTwoWayLocalWithErrorResponseMessageTable = {.tag=kFidlTypeStruct, .contains_envelope=kFidlContainsEnvelope_ContainsEnvelope, .is_empty=kFidlEmpty_IsNotEmpty, .elements=Fields79test_protocollayoutssamelibrary_MainProtocolTwoWayLocalWithErrorResponseMessage, .element_count=1u, .size_v2=16u, .name="test.protocollayoutssamelibrary/MainProtocolTwoWayLocalWithErrorResponseMessage"};
-
-static const struct FidlStructElement Fields72test_protocollayoutssamelibrary_MainProtocolOnLocalWithErrorEventMessage[] = {
-    /*FidlStructPadding*/{.field=/*FidlStructField*/{.header=/*FidlStructElementHeader*/{.element_type=kFidlStructElementType_Field, .is_resource=kFidlIsResource_NotResource},.offset_v2=0u, .field_type=(fidl_type_t*)(&test_protocollayoutssamelibrary_MainProtocol_OnLocalWithError_ResultTable)}}
+const struct FidlCodedUnion test_protocollayoutssamelibrary_MainProtocolTwoWayLocalWithErrorResponseMessageTable = {.tag=kFidlTypeUnion, .field_count=2u, .fields=Fields79test_protocollayoutssamelibrary_MainProtocolTwoWayLocalWithErrorResponseMessage, .nullable=kFidlNullability_Nonnullable, .name="test.protocollayoutssamelibrary/MainProtocolTwoWayLocalWithErrorResponseMessage", .strictness=kFidlStrictness_Strict, .is_resource=kFidlIsResource_NotResource};
+static const struct FidlUnionField Fields72test_protocollayoutssamelibrary_MainProtocolOnLocalWithErrorEventMessage[] = {
+    /*FidlUnionField*/{.type=(fidl_type_t*)(&test_protocollayoutssamelibrary_TablePayloadTable)},
+    /*FidlUnionField*/{.type=(fidl_type_t*)(&fidl_internal_kUint32Table)}
 };
-const struct FidlCodedStruct test_protocollayoutssamelibrary_MainProtocolOnLocalWithErrorEventMessageTable = {.tag=kFidlTypeStruct, .contains_envelope=kFidlContainsEnvelope_ContainsEnvelope, .is_empty=kFidlEmpty_IsNotEmpty, .elements=Fields72test_protocollayoutssamelibrary_MainProtocolOnLocalWithErrorEventMessage, .element_count=1u, .size_v2=16u, .name="test.protocollayoutssamelibrary/MainProtocolOnLocalWithErrorEventMessage"};
-
+const struct FidlCodedUnion test_protocollayoutssamelibrary_MainProtocolOnLocalWithErrorEventMessageTable = {.tag=kFidlTypeUnion, .field_count=2u, .fields=Fields72test_protocollayoutssamelibrary_MainProtocolOnLocalWithErrorEventMessage, .nullable=kFidlNullability_Nonnullable, .name="test.protocollayoutssamelibrary/MainProtocolOnLocalWithErrorEventMessage", .strictness=kFidlStrictness_Strict, .is_resource=kFidlIsResource_NotResource};
 static const struct FidlTableField Fields68test_protocollayoutssamelibrary_MainProtocolOneWayAnonRequestMessage[] = {
     /*FidlTableField*/{.type=(fidl_type_t*)(&fidl_internal_kUint16Table), .ordinal=1u}
 };
@@ -416,17 +368,17 @@ static const struct FidlTableField Fields77test_protocollayoutssamelibrary_MainP
 };
 const struct FidlCodedTable test_protocollayoutssamelibrary_MainProtocolTwoWayAnonWithErrorRequestMessageTable = {.tag=kFidlTypeTable, .fields=Fields77test_protocollayoutssamelibrary_MainProtocolTwoWayAnonWithErrorRequestMessage, .field_count=1u, .is_resource=kFidlIsResource_NotResource, .name="test.protocollayoutssamelibrary/MainProtocolTwoWayAnonWithErrorRequestMessage"};
 
-static const struct FidlStructElement Fields78test_protocollayoutssamelibrary_MainProtocolTwoWayAnonWithErrorResponseMessage[] = {
-    /*FidlStructPadding*/{.field=/*FidlStructField*/{.header=/*FidlStructElementHeader*/{.element_type=kFidlStructElementType_Field, .is_resource=kFidlIsResource_NotResource},.offset_v2=0u, .field_type=(fidl_type_t*)(&test_protocollayoutssamelibrary_MainProtocol_TwoWayAnonWithError_ResultTable)}}
+static const struct FidlUnionField Fields78test_protocollayoutssamelibrary_MainProtocolTwoWayAnonWithErrorResponseMessage[] = {
+    /*FidlUnionField*/{.type=(fidl_type_t*)(&test_protocollayoutssamelibrary_MainProtocol_TwoWayAnonWithError_ResponseTable)},
+    /*FidlUnionField*/{.type=(fidl_type_t*)(&fidl_internal_kUint32Table)}
 };
-const struct FidlCodedStruct test_protocollayoutssamelibrary_MainProtocolTwoWayAnonWithErrorResponseMessageTable = {.tag=kFidlTypeStruct, .contains_envelope=kFidlContainsEnvelope_ContainsEnvelope, .is_empty=kFidlEmpty_IsNotEmpty, .elements=Fields78test_protocollayoutssamelibrary_MainProtocolTwoWayAnonWithErrorResponseMessage, .element_count=1u, .size_v2=16u, .name="test.protocollayoutssamelibrary/MainProtocolTwoWayAnonWithErrorResponseMessage"};
-
+const struct FidlCodedUnion test_protocollayoutssamelibrary_MainProtocolTwoWayAnonWithErrorResponseMessageTable = {.tag=kFidlTypeUnion, .field_count=2u, .fields=Fields78test_protocollayoutssamelibrary_MainProtocolTwoWayAnonWithErrorResponseMessage, .nullable=kFidlNullability_Nonnullable, .name="test.protocollayoutssamelibrary/MainProtocolTwoWayAnonWithErrorResponseMessage", .strictness=kFidlStrictness_Strict, .is_resource=kFidlIsResource_NotResource};
 static const struct FidlUnionField Fields62test_protocollayoutssamelibrary_MainProtocolOnAnonEventMessage[] = {
     /*FidlUnionField*/{.type=(fidl_type_t*)(&fidl_internal_kBoolTable)}
 };
 const struct FidlCodedUnion test_protocollayoutssamelibrary_MainProtocolOnAnonEventMessageTable = {.tag=kFidlTypeUnion, .field_count=1u, .fields=Fields62test_protocollayoutssamelibrary_MainProtocolOnAnonEventMessage, .nullable=kFidlNullability_Nonnullable, .name="test.protocollayoutssamelibrary/MainProtocolOnAnonEventMessage", .strictness=kFidlStrictness_Flexible, .is_resource=kFidlIsResource_NotResource};
-static const struct FidlStructElement Fields71test_protocollayoutssamelibrary_MainProtocolOnAnonWithErrorEventMessage[] = {
-    /*FidlStructPadding*/{.field=/*FidlStructField*/{.header=/*FidlStructElementHeader*/{.element_type=kFidlStructElementType_Field, .is_resource=kFidlIsResource_NotResource},.offset_v2=0u, .field_type=(fidl_type_t*)(&test_protocollayoutssamelibrary_MainProtocol_OnAnonWithError_ResultTable)}}
+static const struct FidlUnionField Fields71test_protocollayoutssamelibrary_MainProtocolOnAnonWithErrorEventMessage[] = {
+    /*FidlUnionField*/{.type=(fidl_type_t*)(&test_protocollayoutssamelibrary_MainProtocol_OnAnonWithError_ResponseTable)},
+    /*FidlUnionField*/{.type=(fidl_type_t*)(&fidl_internal_kUint32Table)}
 };
-const struct FidlCodedStruct test_protocollayoutssamelibrary_MainProtocolOnAnonWithErrorEventMessageTable = {.tag=kFidlTypeStruct, .contains_envelope=kFidlContainsEnvelope_ContainsEnvelope, .is_empty=kFidlEmpty_IsNotEmpty, .elements=Fields71test_protocollayoutssamelibrary_MainProtocolOnAnonWithErrorEventMessage, .element_count=1u, .size_v2=16u, .name="test.protocollayoutssamelibrary/MainProtocolOnAnonWithErrorEventMessage"};
-
+const struct FidlCodedUnion test_protocollayoutssamelibrary_MainProtocolOnAnonWithErrorEventMessageTable = {.tag=kFidlTypeUnion, .field_count=2u, .fields=Fields71test_protocollayoutssamelibrary_MainProtocolOnAnonWithErrorEventMessage, .nullable=kFidlNullability_Nonnullable, .name="test.protocollayoutssamelibrary/MainProtocolOnAnonWithErrorEventMessage", .strictness=kFidlStrictness_Strict, .is_resource=kFidlIsResource_NotResource};

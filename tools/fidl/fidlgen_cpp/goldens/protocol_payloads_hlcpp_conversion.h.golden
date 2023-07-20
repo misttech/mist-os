@@ -83,26 +83,6 @@ struct HLCPPToNaturalTraits<::test::protocolpayloads::LocalStructPayload> {
   static inline ::test_protocolpayloads::LocalStructPayload Convert(::test::protocolpayloads::LocalStructPayload&&);
 };
 template <>
-struct NaturalToHLCPPTraits<::test_protocolpayloads::MainProtocolTwoWayLocalWithErrorTopResponse> {
-  using HLCPPType = ::test::protocolpayloads::MainProtocolTwoWayLocalWithErrorTopResponse;
-  static inline ::test::protocolpayloads::MainProtocolTwoWayLocalWithErrorTopResponse Convert(::test_protocolpayloads::MainProtocolTwoWayLocalWithErrorTopResponse&&);
-};
-template <>
-struct HLCPPToNaturalTraits<::test::protocolpayloads::MainProtocolTwoWayLocalWithErrorTopResponse> {
-  using NaturalType = ::test_protocolpayloads::MainProtocolTwoWayLocalWithErrorTopResponse;
-  static inline ::test_protocolpayloads::MainProtocolTwoWayLocalWithErrorTopResponse Convert(::test::protocolpayloads::MainProtocolTwoWayLocalWithErrorTopResponse&&);
-};
-template <>
-struct NaturalToHLCPPTraits<::test_protocolpayloads::MainProtocolOnLocalWithErrorRequest> {
-  using HLCPPType = ::test::protocolpayloads::MainProtocolOnLocalWithErrorRequest;
-  static inline ::test::protocolpayloads::MainProtocolOnLocalWithErrorRequest Convert(::test_protocolpayloads::MainProtocolOnLocalWithErrorRequest&&);
-};
-template <>
-struct HLCPPToNaturalTraits<::test::protocolpayloads::MainProtocolOnLocalWithErrorRequest> {
-  using NaturalType = ::test_protocolpayloads::MainProtocolOnLocalWithErrorRequest;
-  static inline ::test_protocolpayloads::MainProtocolOnLocalWithErrorRequest Convert(::test::protocolpayloads::MainProtocolOnLocalWithErrorRequest&&);
-};
-template <>
 struct NaturalToHLCPPTraits<::test_protocolpayloads::MainProtocolOneWayAnonRequest> {
   using HLCPPType = ::test::protocolpayloads::MainProtocolOneWayAnonRequest;
   static inline ::test::protocolpayloads::MainProtocolOneWayAnonRequest Convert(::test_protocolpayloads::MainProtocolOneWayAnonRequest&&);
@@ -153,16 +133,6 @@ struct HLCPPToNaturalTraits<::test::protocolpayloads::MainProtocol_TwoWayAnonWit
   static inline ::test_protocolpayloads::MainProtocolTwoWayAnonWithErrorResponse Convert(::test::protocolpayloads::MainProtocol_TwoWayAnonWithError_Response&&);
 };
 template <>
-struct NaturalToHLCPPTraits<::test_protocolpayloads::MainProtocolTwoWayAnonWithErrorTopResponse> {
-  using HLCPPType = ::test::protocolpayloads::MainProtocolTwoWayAnonWithErrorTopResponse;
-  static inline ::test::protocolpayloads::MainProtocolTwoWayAnonWithErrorTopResponse Convert(::test_protocolpayloads::MainProtocolTwoWayAnonWithErrorTopResponse&&);
-};
-template <>
-struct HLCPPToNaturalTraits<::test::protocolpayloads::MainProtocolTwoWayAnonWithErrorTopResponse> {
-  using NaturalType = ::test_protocolpayloads::MainProtocolTwoWayAnonWithErrorTopResponse;
-  static inline ::test_protocolpayloads::MainProtocolTwoWayAnonWithErrorTopResponse Convert(::test::protocolpayloads::MainProtocolTwoWayAnonWithErrorTopResponse&&);
-};
-template <>
 struct NaturalToHLCPPTraits<::test_protocolpayloads::MainProtocolOnAnonRequest> {
   using HLCPPType = ::test::protocolpayloads::MainProtocolOnAnonRequest;
   static inline ::test::protocolpayloads::MainProtocolOnAnonRequest Convert(::test_protocolpayloads::MainProtocolOnAnonRequest&&);
@@ -181,36 +151,6 @@ template <>
 struct HLCPPToNaturalTraits<::test::protocolpayloads::MainProtocol_OnAnonWithError_Response> {
   using NaturalType = ::test_protocolpayloads::MainProtocolOnAnonWithErrorResponse;
   static inline ::test_protocolpayloads::MainProtocolOnAnonWithErrorResponse Convert(::test::protocolpayloads::MainProtocol_OnAnonWithError_Response&&);
-};
-template <>
-struct NaturalToHLCPPTraits<::test_protocolpayloads::MainProtocolOnAnonWithErrorRequest> {
-  using HLCPPType = ::test::protocolpayloads::MainProtocolOnAnonWithErrorRequest;
-  static inline ::test::protocolpayloads::MainProtocolOnAnonWithErrorRequest Convert(::test_protocolpayloads::MainProtocolOnAnonWithErrorRequest&&);
-};
-template <>
-struct HLCPPToNaturalTraits<::test::protocolpayloads::MainProtocolOnAnonWithErrorRequest> {
-  using NaturalType = ::test_protocolpayloads::MainProtocolOnAnonWithErrorRequest;
-  static inline ::test_protocolpayloads::MainProtocolOnAnonWithErrorRequest Convert(::test::protocolpayloads::MainProtocolOnAnonWithErrorRequest&&);
-};
-template <>
-struct NaturalToHLCPPTraits<::test_protocolpayloads::MainProtocolTwoWayImportWithErrorTopResponse> {
-  using HLCPPType = ::test::protocolpayloads::MainProtocolTwoWayImportWithErrorTopResponse;
-  static inline ::test::protocolpayloads::MainProtocolTwoWayImportWithErrorTopResponse Convert(::test_protocolpayloads::MainProtocolTwoWayImportWithErrorTopResponse&&);
-};
-template <>
-struct HLCPPToNaturalTraits<::test::protocolpayloads::MainProtocolTwoWayImportWithErrorTopResponse> {
-  using NaturalType = ::test_protocolpayloads::MainProtocolTwoWayImportWithErrorTopResponse;
-  static inline ::test_protocolpayloads::MainProtocolTwoWayImportWithErrorTopResponse Convert(::test::protocolpayloads::MainProtocolTwoWayImportWithErrorTopResponse&&);
-};
-template <>
-struct NaturalToHLCPPTraits<::test_protocolpayloads::MainProtocolOnImportWithErrorRequest> {
-  using HLCPPType = ::test::protocolpayloads::MainProtocolOnImportWithErrorRequest;
-  static inline ::test::protocolpayloads::MainProtocolOnImportWithErrorRequest Convert(::test_protocolpayloads::MainProtocolOnImportWithErrorRequest&&);
-};
-template <>
-struct HLCPPToNaturalTraits<::test::protocolpayloads::MainProtocolOnImportWithErrorRequest> {
-  using NaturalType = ::test_protocolpayloads::MainProtocolOnImportWithErrorRequest;
-  static inline ::test_protocolpayloads::MainProtocolOnImportWithErrorRequest Convert(::test::protocolpayloads::MainProtocolOnImportWithErrorRequest&&);
 };
 template <>
 struct NaturalToHLCPPTraits<::test_protocolpayloads::MainProtocolTwoWayLocalWithErrorResult> {
@@ -286,28 +226,6 @@ struct HLCPPToNaturalTraits<::test::protocolpayloads::MainProtocol_OnImportWithE
       .b = ::fidl::HLCPPToNatural(std::move(value.b)),
   }};
 }
-::test::protocolpayloads::MainProtocolTwoWayLocalWithErrorTopResponse NaturalToHLCPPTraits<::test_protocolpayloads::MainProtocolTwoWayLocalWithErrorTopResponse>::Convert(::test_protocolpayloads::MainProtocolTwoWayLocalWithErrorTopResponse&& value) {
-  ::test::protocolpayloads::MainProtocolTwoWayLocalWithErrorTopResponse hlcpp;
-  hlcpp.result = ::fidl::NaturalToHLCPP(std::move(value.result()));
-  return hlcpp;
-}
-
-::test_protocolpayloads::MainProtocolTwoWayLocalWithErrorTopResponse HLCPPToNaturalTraits<::test::protocolpayloads::MainProtocolTwoWayLocalWithErrorTopResponse>::Convert(::test::protocolpayloads::MainProtocolTwoWayLocalWithErrorTopResponse&& value) {
-  return ::test_protocolpayloads::MainProtocolTwoWayLocalWithErrorTopResponse{{
-      .result = ::fidl::HLCPPToNatural(std::move(value.result)),
-  }};
-}
-::test::protocolpayloads::MainProtocolOnLocalWithErrorRequest NaturalToHLCPPTraits<::test_protocolpayloads::MainProtocolOnLocalWithErrorRequest>::Convert(::test_protocolpayloads::MainProtocolOnLocalWithErrorRequest&& value) {
-  ::test::protocolpayloads::MainProtocolOnLocalWithErrorRequest hlcpp;
-  hlcpp.result = ::fidl::NaturalToHLCPP(std::move(value.result()));
-  return hlcpp;
-}
-
-::test_protocolpayloads::MainProtocolOnLocalWithErrorRequest HLCPPToNaturalTraits<::test::protocolpayloads::MainProtocolOnLocalWithErrorRequest>::Convert(::test::protocolpayloads::MainProtocolOnLocalWithErrorRequest&& value) {
-  return ::test_protocolpayloads::MainProtocolOnLocalWithErrorRequest{{
-      .result = ::fidl::HLCPPToNatural(std::move(value.result)),
-  }};
-}
 ::test::protocolpayloads::MainProtocolOneWayAnonRequest NaturalToHLCPPTraits<::test_protocolpayloads::MainProtocolOneWayAnonRequest>::Convert(::test_protocolpayloads::MainProtocolOneWayAnonRequest&& value) {
   ::test::protocolpayloads::MainProtocolOneWayAnonRequest hlcpp;
   hlcpp.a = ::fidl::NaturalToHLCPP(std::move(value.a()));
@@ -373,17 +291,6 @@ struct HLCPPToNaturalTraits<::test::protocolpayloads::MainProtocol_OnImportWithE
       .b = ::fidl::HLCPPToNatural(std::move(value.b)),
   }};
 }
-::test::protocolpayloads::MainProtocolTwoWayAnonWithErrorTopResponse NaturalToHLCPPTraits<::test_protocolpayloads::MainProtocolTwoWayAnonWithErrorTopResponse>::Convert(::test_protocolpayloads::MainProtocolTwoWayAnonWithErrorTopResponse&& value) {
-  ::test::protocolpayloads::MainProtocolTwoWayAnonWithErrorTopResponse hlcpp;
-  hlcpp.result = ::fidl::NaturalToHLCPP(std::move(value.result()));
-  return hlcpp;
-}
-
-::test_protocolpayloads::MainProtocolTwoWayAnonWithErrorTopResponse HLCPPToNaturalTraits<::test::protocolpayloads::MainProtocolTwoWayAnonWithErrorTopResponse>::Convert(::test::protocolpayloads::MainProtocolTwoWayAnonWithErrorTopResponse&& value) {
-  return ::test_protocolpayloads::MainProtocolTwoWayAnonWithErrorTopResponse{{
-      .result = ::fidl::HLCPPToNatural(std::move(value.result)),
-  }};
-}
 ::test::protocolpayloads::MainProtocolOnAnonRequest NaturalToHLCPPTraits<::test_protocolpayloads::MainProtocolOnAnonRequest>::Convert(::test_protocolpayloads::MainProtocolOnAnonRequest&& value) {
   ::test::protocolpayloads::MainProtocolOnAnonRequest hlcpp;
   hlcpp.a = ::fidl::NaturalToHLCPP(std::move(value.a()));
@@ -408,39 +315,6 @@ struct HLCPPToNaturalTraits<::test::protocolpayloads::MainProtocol_OnImportWithE
   return ::test_protocolpayloads::MainProtocolOnAnonWithErrorResponse{{
       .a = ::fidl::HLCPPToNatural(std::move(value.a)),
       .b = ::fidl::HLCPPToNatural(std::move(value.b)),
-  }};
-}
-::test::protocolpayloads::MainProtocolOnAnonWithErrorRequest NaturalToHLCPPTraits<::test_protocolpayloads::MainProtocolOnAnonWithErrorRequest>::Convert(::test_protocolpayloads::MainProtocolOnAnonWithErrorRequest&& value) {
-  ::test::protocolpayloads::MainProtocolOnAnonWithErrorRequest hlcpp;
-  hlcpp.result = ::fidl::NaturalToHLCPP(std::move(value.result()));
-  return hlcpp;
-}
-
-::test_protocolpayloads::MainProtocolOnAnonWithErrorRequest HLCPPToNaturalTraits<::test::protocolpayloads::MainProtocolOnAnonWithErrorRequest>::Convert(::test::protocolpayloads::MainProtocolOnAnonWithErrorRequest&& value) {
-  return ::test_protocolpayloads::MainProtocolOnAnonWithErrorRequest{{
-      .result = ::fidl::HLCPPToNatural(std::move(value.result)),
-  }};
-}
-::test::protocolpayloads::MainProtocolTwoWayImportWithErrorTopResponse NaturalToHLCPPTraits<::test_protocolpayloads::MainProtocolTwoWayImportWithErrorTopResponse>::Convert(::test_protocolpayloads::MainProtocolTwoWayImportWithErrorTopResponse&& value) {
-  ::test::protocolpayloads::MainProtocolTwoWayImportWithErrorTopResponse hlcpp;
-  hlcpp.result = ::fidl::NaturalToHLCPP(std::move(value.result()));
-  return hlcpp;
-}
-
-::test_protocolpayloads::MainProtocolTwoWayImportWithErrorTopResponse HLCPPToNaturalTraits<::test::protocolpayloads::MainProtocolTwoWayImportWithErrorTopResponse>::Convert(::test::protocolpayloads::MainProtocolTwoWayImportWithErrorTopResponse&& value) {
-  return ::test_protocolpayloads::MainProtocolTwoWayImportWithErrorTopResponse{{
-      .result = ::fidl::HLCPPToNatural(std::move(value.result)),
-  }};
-}
-::test::protocolpayloads::MainProtocolOnImportWithErrorRequest NaturalToHLCPPTraits<::test_protocolpayloads::MainProtocolOnImportWithErrorRequest>::Convert(::test_protocolpayloads::MainProtocolOnImportWithErrorRequest&& value) {
-  ::test::protocolpayloads::MainProtocolOnImportWithErrorRequest hlcpp;
-  hlcpp.result = ::fidl::NaturalToHLCPP(std::move(value.result()));
-  return hlcpp;
-}
-
-::test_protocolpayloads::MainProtocolOnImportWithErrorRequest HLCPPToNaturalTraits<::test::protocolpayloads::MainProtocolOnImportWithErrorRequest>::Convert(::test::protocolpayloads::MainProtocolOnImportWithErrorRequest&& value) {
-  return ::test_protocolpayloads::MainProtocolOnImportWithErrorRequest{{
-      .result = ::fidl::HLCPPToNatural(std::move(value.result)),
   }};
 }
 

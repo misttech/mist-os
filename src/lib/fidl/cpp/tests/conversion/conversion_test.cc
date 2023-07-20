@@ -452,7 +452,7 @@ TEST(NaturalToWireConversion, ResponseEmptyResultSuccess) {
   fidl::Arena arena;
   fidl::WireResponse<test_types::ErrorSyntax::EmptyPayload> wire =
       fidl::ToWire(arena, fidl::Response<test_types::ErrorSyntax::EmptyPayload>(::fit::ok()));
-  ASSERT_TRUE(wire.result.is_response());
+  ASSERT_TRUE(wire.is_response());
 }
 
 TEST(WireToNaturalConversion, ResponseEmptyResultError) {
@@ -467,8 +467,8 @@ TEST(NaturalToWireConversion, ResponseEmptyResultError) {
   fidl::Arena arena;
   fidl::Response<test_types::ErrorSyntax::EmptyPayload> natural(::fit::error(123));
   fidl::WireResponse<test_types::ErrorSyntax::EmptyPayload> wire = fidl::ToWire(arena, natural);
-  ASSERT_TRUE(wire.result.is_err());
-  EXPECT_EQ(123, wire.result.err());
+  ASSERT_TRUE(wire.is_err());
+  EXPECT_EQ(123, wire.err());
 }
 
 TEST(WireToNaturalConversion, ResponseResultSuccess) {
@@ -484,8 +484,8 @@ TEST(NaturalToWireConversion, ResponseResultSuccess) {
   fidl::Response<test_types::ErrorSyntax::FooPayload> natural(::fit::ok(123));
   fidl::WireResponse<test_types::ErrorSyntax::FooPayload> wire =
       fidl::ToWire(arena, std::move(natural));
-  ASSERT_TRUE(wire.result.is_response());
-  EXPECT_EQ(123, wire.result.response().bar);
+  ASSERT_TRUE(wire.is_response());
+  EXPECT_EQ(123, wire.response().bar);
 }
 
 TEST(WireToNaturalConversion, ResponseResultError) {
@@ -501,8 +501,8 @@ TEST(NaturalToWireConversion, ResponseResultError) {
   fidl::Response<test_types::ErrorSyntax::FooPayload> natural(fit::error(123));
   fidl::WireResponse<test_types::ErrorSyntax::FooPayload> wire =
       fidl::ToWire(arena, std::move(natural));
-  ASSERT_TRUE(wire.result.is_err());
-  EXPECT_EQ(123, wire.result.err());
+  ASSERT_TRUE(wire.is_err());
+  EXPECT_EQ(123, wire.err());
 }
 
 TEST(WireToNaturalConversion, Event) {

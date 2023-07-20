@@ -310,11 +310,10 @@ protocol UseOfProtocol {
   EXPECT_STREQ("example_UseOfProtocolMethodResponseMessage", type5->coded_name.c_str());
   EXPECT_TRUE(type5->is_coding_needed);
   EXPECT_EQ(16, type5->size_v2);
-  ASSERT_EQ(fidl::coded::Type::Kind::kStruct, type5->kind);
-  auto type5_message = static_cast<const fidl::coded::StructType*>(type5);
-  EXPECT_TRUE(type5_message->contains_envelope);
+  ASSERT_EQ(fidl::coded::Type::Kind::kUnion, type5->kind);
+  auto type5_message = static_cast<const fidl::coded::UnionType*>(type5);
   EXPECT_STREQ("example/UseOfProtocolMethodResponseMessage", type5_message->qname.c_str());
-  EXPECT_EQ(1, type5_message->elements.size());
+  EXPECT_EQ(2, type5_message->fields.size());
 
   auto anon_payload_name =
       fidl::flat::Name::Key(library.LookupLibrary("example"), "UseOfProtocol_Method_Response");
@@ -1423,13 +1422,11 @@ protocol UseOfProtocol {
   EXPECT_STREQ("example_UseOfProtocolMethodResponseMessage", type4->coded_name.c_str());
   EXPECT_TRUE(type4->is_coding_needed);
   EXPECT_EQ(16, type4->size_v2);
-  ASSERT_EQ(fidl::coded::Type::Kind::kStruct, type4->kind);
-  auto type4_message = static_cast<const fidl::coded::StructType*>(type4);
-  ASSERT_FALSE(type4_message->is_empty);
-  EXPECT_TRUE(type4_message->contains_envelope);
+  ASSERT_EQ(fidl::coded::Type::Kind::kUnion, type4->kind);
+  auto type4_message = static_cast<const fidl::coded::UnionType*>(type4);
   EXPECT_NULL(type4_message->maybe_reference_type);
   EXPECT_STREQ("example/UseOfProtocolMethodResponseMessage", type4_message->qname.c_str());
-  ASSERT_EQ(1, type4_message->elements.size());
+  ASSERT_EQ(2, type4_message->fields.size());
 
   auto anon_payload_name =
       fidl::flat::Name::Key(library.LookupLibrary("example"), "UseOfProtocol_Method_Response");
@@ -1539,11 +1536,10 @@ protocol UseOfProtocol {
   EXPECT_STREQ("example_UseOfProtocolMethodResponseMessage", type4->coded_name.c_str());
   EXPECT_TRUE(type4->is_coding_needed);
   EXPECT_EQ(16, type4->size_v2);
-  ASSERT_EQ(fidl::coded::Type::Kind::kStruct, type4->kind);
-  auto type4_message = static_cast<const fidl::coded::StructType*>(type4);
-  EXPECT_TRUE(type4_message->contains_envelope);
+  ASSERT_EQ(fidl::coded::Type::Kind::kUnion, type4->kind);
+  auto type4_message = static_cast<const fidl::coded::UnionType*>(type4);
   EXPECT_STREQ("example/UseOfProtocolMethodResponseMessage", type4_message->qname.c_str());
-  ASSERT_EQ(1, type4_message->elements.size());
+  ASSERT_EQ(2, type4_message->fields.size());
 
   auto anon_payload_name =
       fidl::flat::Name::Key(library.LookupLibrary("example"), "UseOfProtocol_Method_Response");
@@ -1653,11 +1649,10 @@ protocol UseOfProtocol {
   EXPECT_STREQ("example_UseOfProtocolMethodResponseMessage", type6->coded_name.c_str());
   EXPECT_TRUE(type6->is_coding_needed);
   EXPECT_EQ(16, type6->size_v2);
-  ASSERT_EQ(fidl::coded::Type::Kind::kStruct, type6->kind);
-  auto type6_message = static_cast<const fidl::coded::StructType*>(type6);
-  EXPECT_TRUE(type6_message->contains_envelope);
+  ASSERT_EQ(fidl::coded::Type::Kind::kUnion, type6->kind);
+  auto type6_message = static_cast<const fidl::coded::UnionType*>(type6);
   EXPECT_STREQ("example/UseOfProtocolMethodResponseMessage", type6_message->qname.c_str());
-  ASSERT_EQ(1, type6_message->elements.size());
+  ASSERT_EQ(2, type6_message->fields.size());
 
   auto anon_payload_name =
       fidl::flat::Name::Key(library.LookupLibrary("example"), "UseOfProtocol_Method_Response");

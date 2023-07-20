@@ -849,7 +849,7 @@ func compile(r fidlgen.Root) *Root {
 
 	for _, v := range r.Protocols {
 		for _, m := range v.Methods {
-			if m.HasError || m.HasTransportError() {
+			if m.HasResultUnion() {
 				var p Payloader
 				valueTypeDecl, ok := decls[m.ValueType.Identifier]
 				if ok {
@@ -870,9 +870,9 @@ func compile(r fidlgen.Root) *Root {
 					case *Struct:
 						s.SetInResult(result)
 					}
-					if resultTypeDecl, ok := decls[m.ResultType.Identifier]; !ok {
+					if resultTypeDecl, ok := decls[m.ResponsePayload.Identifier]; !ok {
 						panic(fmt.Sprintf("success struct %s in library, but result union %s is not",
-							m.ValueType.Identifier, m.ResultType.Identifier))
+							m.ValueType.Identifier, m.ResponsePayload.Identifier))
 					} else {
 						u := resultTypeDecl.(*Union)
 						u.Result = result

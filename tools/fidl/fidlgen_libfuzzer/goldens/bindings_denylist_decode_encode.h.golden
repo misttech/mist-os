@@ -15,7 +15,7 @@
 
 namespace fuzzing {
 
-inline constexpr ::std::array<::fidl::fuzzing::DecoderEncoderForType, 28>
+inline constexpr ::std::array<::fidl::fuzzing::DecoderEncoderForType, 20>
     test_bindingsdenylist_decoder_encoders = {
         ::fidl::fuzzing::DecoderEncoderForType{
             .fidl_type_name = "::test_bindingsdenylist::wire::DenyEachBindingOnlyDenyDartRequest",
@@ -42,18 +42,6 @@ inline constexpr ::std::array<::fidl::fuzzing::DecoderEncoderForType, 28>
             .decoder_encoder = ::fidl::fuzzing::DecoderEncoderImpl<::test_bindingsdenylist::wire::DenyEachBindingOnlyDenyDartResponse, true>,
         },
         ::fidl::fuzzing::DecoderEncoderForType{
-            .fidl_type_name = "::test_bindingsdenylist::wire::DenyEachBindingOnlyDenyDartTopResponse",
-            .has_flexible_envelope = false,
-            .treat_bytes_as_transactional_message = false,
-            .decoder_encoder = ::fidl::fuzzing::DecoderEncoderImpl<::test_bindingsdenylist::wire::DenyEachBindingOnlyDenyDartTopResponse, false>,
-        },
-        ::fidl::fuzzing::DecoderEncoderForType{
-            .fidl_type_name = "A transactional message using ::test_bindingsdenylist::wire::DenyEachBindingOnlyDenyDartTopResponse as the body",
-            .has_flexible_envelope = false,
-            .treat_bytes_as_transactional_message = true,
-            .decoder_encoder = ::fidl::fuzzing::DecoderEncoderImpl<::test_bindingsdenylist::wire::DenyEachBindingOnlyDenyDartTopResponse, true>,
-        },
-        ::fidl::fuzzing::DecoderEncoderForType{
             .fidl_type_name = "::test_bindingsdenylist::wire::DenyEachBindingOnlyDenyGoRequest",
             .has_flexible_envelope = false,
             .treat_bytes_as_transactional_message = false,
@@ -76,18 +64,6 @@ inline constexpr ::std::array<::fidl::fuzzing::DecoderEncoderForType, 28>
             .has_flexible_envelope = false,
             .treat_bytes_as_transactional_message = true,
             .decoder_encoder = ::fidl::fuzzing::DecoderEncoderImpl<::test_bindingsdenylist::wire::DenyEachBindingOnlyDenyGoResponse, true>,
-        },
-        ::fidl::fuzzing::DecoderEncoderForType{
-            .fidl_type_name = "::test_bindingsdenylist::wire::DenyEachBindingOnlyDenyGoTopResponse",
-            .has_flexible_envelope = false,
-            .treat_bytes_as_transactional_message = false,
-            .decoder_encoder = ::fidl::fuzzing::DecoderEncoderImpl<::test_bindingsdenylist::wire::DenyEachBindingOnlyDenyGoTopResponse, false>,
-        },
-        ::fidl::fuzzing::DecoderEncoderForType{
-            .fidl_type_name = "A transactional message using ::test_bindingsdenylist::wire::DenyEachBindingOnlyDenyGoTopResponse as the body",
-            .has_flexible_envelope = false,
-            .treat_bytes_as_transactional_message = true,
-            .decoder_encoder = ::fidl::fuzzing::DecoderEncoderImpl<::test_bindingsdenylist::wire::DenyEachBindingOnlyDenyGoTopResponse, true>,
         },
         ::fidl::fuzzing::DecoderEncoderForType{
             .fidl_type_name = "::test_bindingsdenylist::wire::DenyEachBindingOnlyDenyRustRequest",
@@ -114,18 +90,6 @@ inline constexpr ::std::array<::fidl::fuzzing::DecoderEncoderForType, 28>
             .decoder_encoder = ::fidl::fuzzing::DecoderEncoderImpl<::test_bindingsdenylist::wire::DenyEachBindingOnlyDenyRustResponse, true>,
         },
         ::fidl::fuzzing::DecoderEncoderForType{
-            .fidl_type_name = "::test_bindingsdenylist::wire::DenyEachBindingOnlyDenyRustTopResponse",
-            .has_flexible_envelope = false,
-            .treat_bytes_as_transactional_message = false,
-            .decoder_encoder = ::fidl::fuzzing::DecoderEncoderImpl<::test_bindingsdenylist::wire::DenyEachBindingOnlyDenyRustTopResponse, false>,
-        },
-        ::fidl::fuzzing::DecoderEncoderForType{
-            .fidl_type_name = "A transactional message using ::test_bindingsdenylist::wire::DenyEachBindingOnlyDenyRustTopResponse as the body",
-            .has_flexible_envelope = false,
-            .treat_bytes_as_transactional_message = true,
-            .decoder_encoder = ::fidl::fuzzing::DecoderEncoderImpl<::test_bindingsdenylist::wire::DenyEachBindingOnlyDenyRustTopResponse, true>,
-        },
-        ::fidl::fuzzing::DecoderEncoderForType{
             .fidl_type_name = "::test_bindingsdenylist::wire::DenyEachBindingOnlyDenySyzkallerRequest",
             .has_flexible_envelope = false,
             .treat_bytes_as_transactional_message = false,
@@ -148,18 +112,6 @@ inline constexpr ::std::array<::fidl::fuzzing::DecoderEncoderForType, 28>
             .has_flexible_envelope = false,
             .treat_bytes_as_transactional_message = true,
             .decoder_encoder = ::fidl::fuzzing::DecoderEncoderImpl<::test_bindingsdenylist::wire::DenyEachBindingOnlyDenySyzkallerResponse, true>,
-        },
-        ::fidl::fuzzing::DecoderEncoderForType{
-            .fidl_type_name = "::test_bindingsdenylist::wire::DenyEachBindingOnlyDenySyzkallerTopResponse",
-            .has_flexible_envelope = false,
-            .treat_bytes_as_transactional_message = false,
-            .decoder_encoder = ::fidl::fuzzing::DecoderEncoderImpl<::test_bindingsdenylist::wire::DenyEachBindingOnlyDenySyzkallerTopResponse, false>,
-        },
-        ::fidl::fuzzing::DecoderEncoderForType{
-            .fidl_type_name = "A transactional message using ::test_bindingsdenylist::wire::DenyEachBindingOnlyDenySyzkallerTopResponse as the body",
-            .has_flexible_envelope = false,
-            .treat_bytes_as_transactional_message = true,
-            .decoder_encoder = ::fidl::fuzzing::DecoderEncoderImpl<::test_bindingsdenylist::wire::DenyEachBindingOnlyDenySyzkallerTopResponse, true>,
         },
         ::fidl::fuzzing::DecoderEncoderForType{
             .fidl_type_name = "::test_bindingsdenylist::wire::MemberOnlyAppearsInImportingLibrary",

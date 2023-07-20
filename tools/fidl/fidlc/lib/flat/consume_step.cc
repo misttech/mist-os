@@ -346,24 +346,7 @@ bool ConsumeStep::CreateMethodResult(
   if (!RegisterDecl(std::move(union_decl)))
     return false;
 
-  // Make a new response struct for the method containing just the
-  // result union.
-  std::vector<Struct::Member> response_members;
-  response_members.emplace_back(method->source_signature(), IdentifierTypeForDecl(result_decl),
-                                result_context->name(), nullptr, std::make_unique<AttributeList>());
-
-  const auto& response_context = result_context->parent();
-  const Name response_name = Name::CreateAnonymous(library(), response_span, response_context,
-                                                   Name::Provenance::kCompilerGenerated);
-  auto struct_decl = std::make_unique<Struct>(method->source_signature(),
-                                              /* attributes = */ std::make_unique<AttributeList>(),
-                                              response_name, std::move(response_members),
-                                              /* resourceness = */ std::nullopt);
-  auto payload = IdentifierTypeForDecl(struct_decl.get());
-  if (!RegisterDecl(std::move(struct_decl)))
-    return false;
-
-  *out_payload = std::move(payload);
+  *out_payload = IdentifierTypeForDecl(result_decl);
   return true;
 }
 
@@ -420,53 +403,45 @@ void ConsumeStep::ConsumeProtocolDeclaration(
       // two-way method or an event, we check has_request here.
       bool has_transport_error = has_request && strictness == types::Strictness::kFlexible;
 
+      const auto response_context = has_request ? protocol_context->EnterResponse(method_name)
+                                                : protocol_context->EnterEvent(method_name);
+
       if (has_error || has_transport_error) {
         SourceSpan response_span = method->maybe_response->span();
-        const auto response_context = has_request ? protocol_context->EnterResult(method_name)
-                                                  : protocol_context->EnterEvent(method_name);
-
-        std::shared_ptr<NamingContext> result_context, success_variant_context, err_variant_context,
+        std::shared_ptr<NamingContext> success_variant_context, err_variant_context,
             transport_err_variant_context;
-        // TODO(fxbug.dev/95231): remove this comment when outer-most struct is no longer used.
+
+        // In protocol P, if method M is flexible or uses the error syntax, its
+        // response is the following compiler-generated union:
         //
-        // The error syntax and flexible methods for protocol P and method M
-        // desugars to the following type:
+        //     type P_M_Result = union {
+        //       // The "success variant".
+        //       1: response @generated_name("P_M_Response") [user specified response type];
+        //       // The "error variant". Marked `reserved` if there is no error.
+        //       2: err @generated_name("P_M_Error") [user specified error type];
+        //       // Omitted for strict methods.
+        //       3: transport_err fidl.TransportErr;
+        //     };
         //
-        // // the "response"
-        // struct {
-        //   // the "result"
-        //   result @generated_name("P_M_Result") union {
-        //     // the "success variant"
-        //     1: response @generated_name("P_M_Response") [user specified response type];
-        //     // the "error variant"
-        //     2: err @generated_name("P_M_Error") [user specified error type];
-        //     3: transport_err  zx.Status;
-        //   };
-        // };
+        // This naming scheme is inconsistent with other compiler-generated
+        // names (e.g. PMRequest) because the error syntax predates anonymous
+        // layouts. We keep it like this for backwards compatibility.
         //
-        // If the method is strict, transport_err will not be provided. If the method is flexible
-        // but does not have an error, the err variant will be marked as reserved.
-        //
-        // Note that this can lead to ambiguity with the success variant, since its member
-        // name within the union is "response". The naming convention within fidlc
-        // is to refer to each type using the name provided in the comments
-        // above (i.e. "response" refers to the top level struct, not the success variant).
-        //
-        // The naming scheme for the result type and the success variant in a response
-        // with an error type predates the design of the anonymous name flattening
-        // algorithm, and we therefore they are overridden to be backwards compatible.
-        result_context = response_context->EnterMember(generated_source_file()->AddLine("result"));
-        result_context->set_name_override(
+        // Note that although the success variant is named P_M_Response, in the
+        // fidlc codebase we use the word "response" to refer to the outermost
+        // type, which in this case is P_M_Result.
+        response_context->set_name_override(
             utils::StringJoin({protocol_name.decl_name(), method_name.data(), "Result"}, "_"));
         success_variant_context =
-            result_context->EnterMember(generated_source_file()->AddLine("response"));
+            response_context->EnterMember(generated_source_file()->AddLine("response"));
         success_variant_context->set_name_override(
             utils::StringJoin({protocol_name.decl_name(), method_name.data(), "Response"}, "_"));
-        err_variant_context = result_context->EnterMember(generated_source_file()->AddLine("err"));
+        err_variant_context =
+            response_context->EnterMember(generated_source_file()->AddLine("err"));
         err_variant_context->set_name_override(
             utils::StringJoin({protocol_name.decl_name(), method_name.data(), "Error"}, "_"));
         transport_err_variant_context =
-            result_context->EnterMember(generated_source_file()->AddLine("transport_err"));
+            response_context->EnterMember(generated_source_file()->AddLine("transport_err"));
 
         std::unique_ptr<TypeConstructor> result_payload;
 
@@ -484,8 +459,6 @@ void ConsumeStep::ConsumeProtocolDeclaration(
                                 &maybe_response))
           return;
       } else {
-        const auto response_context = has_request ? protocol_context->EnterResponse(method_name)
-                                                  : protocol_context->EnterEvent(method_name);
         std::unique_ptr<TypeConstructor> response_payload;
         if (!ConsumeParameterList(method_name, response_context, std::move(method->maybe_response),
                                   /*is_request_or_response=*/true, &response_payload)) {

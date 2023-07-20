@@ -30,16 +30,6 @@ std::string NamingContext::BuildFlattenedName(SourceSpan name, Kind kind,
       result.append("Response");
       return result;
     }
-    case Kind::kMethodResult: {
-      std::string result = utils::to_upper_camel_case(std::string(parent->name_.data()));
-      result.append(utils::to_upper_camel_case(std::string(name.data())));
-      // We can't use [protocol][method]Response, because that is occupied by the success variant of
-      // the result type, if this method has an error.
-      //
-      // TODO(fxbug.dev/95231): Unnecessary once we remove `TopResponse` wrappers altogether.
-      result.append("TopResponse");
-      return result;
-    }
   }
 }
 
@@ -58,15 +48,12 @@ std::vector<std::string> NamingContext::Context() const {
     // embedded in the Kind. When collapsing the stack of contexts into a list
     // of strings, we need to flatten this case out to avoid losing this data.
     switch (current->kind_) {
-      case Kind::kMethodRequest: {
+      case Kind::kMethodRequest:
         names.push_back("Request");
         break;
-      };
       case Kind::kMethodResponse:
-      case Kind::kMethodResult: {
         names.push_back("Response");
         break;
-      }
       case Kind::kDecl:
       case Kind::kLayoutMember:
         break;

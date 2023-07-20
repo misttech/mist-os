@@ -40,7 +40,7 @@
 <table>
     <tr><th>Name</th><th>Type</th></tr>
         <tr>
-            <td><code>result</code></td>
+            <td><code>payload</code></td>
             <td>
                 <code><a class='link' href='#ComposedProtocol_OnAnonComposedWithError_Result'>ComposedProtocol_OnAnonComposedWithError_Result</a></code>
             </td>
@@ -76,7 +76,7 @@
 <table>
     <tr><th>Name</th><th>Type</th></tr>
         <tr>
-            <td><code>result</code></td>
+            <td><code>payload</code></td>
             <td>
                 <code><a class='link' href='#ComposedProtocol_OnNamedComposedWithError_Result'>ComposedProtocol_OnNamedComposedWithError_Result</a></code>
             </td>
@@ -172,7 +172,7 @@
 <table>
     <tr><th>Name</th><th>Type</th></tr>
         <tr>
-            <td><code>result</code></td>
+            <td><code>payload</code></td>
             <td>
                 <code><a class='link' href='#ComposedProtocol_TwoWayAnonComposedWithError_Result'>ComposedProtocol_TwoWayAnonComposedWithError_Result</a></code>
             </td>
@@ -232,7 +232,7 @@
 <table>
     <tr><th>Name</th><th>Type</th></tr>
         <tr>
-            <td><code>result</code></td>
+            <td><code>payload</code></td>
             <td>
                 <code><a class='link' href='#ComposedProtocol_TwoWayNamedComposedWithError_Result'>ComposedProtocol_TwoWayNamedComposedWithError_Result</a></code>
             </td>
@@ -290,7 +290,7 @@
 <table>
     <tr><th>Name</th><th>Type</th></tr>
         <tr>
-            <td><code>result</code></td>
+            <td><code>payload</code></td>
             <td>
                 <code><a class='link' href='#ComposedProtocol_OnAnonComposedWithError_Result'>ComposedProtocol_OnAnonComposedWithError_Result</a></code>
             </td>
@@ -308,7 +308,7 @@
 <table>
     <tr><th>Name</th><th>Type</th></tr>
         <tr>
-            <td><code>result</code></td>
+            <td><code>payload</code></td>
             <td>
                 <code><a class='link' href='#MainProtocol_OnAnonWithError_Result'>MainProtocol_OnAnonWithError_Result</a></code>
             </td>
@@ -344,7 +344,7 @@
 <table>
     <tr><th>Name</th><th>Type</th></tr>
         <tr>
-            <td><code>result</code></td>
+            <td><code>payload</code></td>
             <td>
                 <code><a class='link' href='#MainProtocol_OnLocalWithError_Result'>MainProtocol_OnLocalWithError_Result</a></code>
             </td>
@@ -380,7 +380,7 @@
 <table>
     <tr><th>Name</th><th>Type</th></tr>
         <tr>
-            <td><code>result</code></td>
+            <td><code>payload</code></td>
             <td>
                 <code><a class='link' href='#ComposedProtocol_OnNamedComposedWithError_Result'>ComposedProtocol_OnNamedComposedWithError_Result</a></code>
             </td>
@@ -542,7 +542,7 @@
 <table>
     <tr><th>Name</th><th>Type</th></tr>
         <tr>
-            <td><code>result</code></td>
+            <td><code>payload</code></td>
             <td>
                 <code><a class='link' href='#ComposedProtocol_TwoWayAnonComposedWithError_Result'>ComposedProtocol_TwoWayAnonComposedWithError_Result</a></code>
             </td>
@@ -572,7 +572,7 @@
 <table>
     <tr><th>Name</th><th>Type</th></tr>
         <tr>
-            <td><code>result</code></td>
+            <td><code>payload</code></td>
             <td>
                 <code><a class='link' href='#MainProtocol_TwoWayAnonWithError_Result'>MainProtocol_TwoWayAnonWithError_Result</a></code>
             </td>
@@ -632,7 +632,7 @@
 <table>
     <tr><th>Name</th><th>Type</th></tr>
         <tr>
-            <td><code>result</code></td>
+            <td><code>payload</code></td>
             <td>
                 <code><a class='link' href='#MainProtocol_TwoWayLocalWithError_Result'>MainProtocol_TwoWayLocalWithError_Result</a></code>
             </td>
@@ -692,7 +692,7 @@
 <table>
     <tr><th>Name</th><th>Type</th></tr>
         <tr>
-            <td><code>result</code></td>
+            <td><code>payload</code></td>
             <td>
                 <code><a class='link' href='#ComposedProtocol_TwoWayNamedComposedWithError_Result'>ComposedProtocol_TwoWayNamedComposedWithError_Result</a></code>
             </td>

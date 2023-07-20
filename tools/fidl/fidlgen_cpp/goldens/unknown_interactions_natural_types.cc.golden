@@ -22,29 +22,9 @@
       ::fidl::internal::NaturalClone(storage_.__reserved)};
 }
 
-::test_unknowninteractions::UnknownInteractionsProtocolStrictTwoWayErrTopResponse::Storage_ test_unknowninteractions::UnknownInteractionsProtocolStrictTwoWayErrTopResponse::CloneStorage_() const {
-  return Storage_{
-      ::fidl::internal::NaturalClone(storage_.result)};
-}
-
 ::test_unknowninteractions::UnknownInteractionsProtocolStrictTwoWayFieldsErrResponse::Storage_ test_unknowninteractions::UnknownInteractionsProtocolStrictTwoWayFieldsErrResponse::CloneStorage_() const {
   return Storage_{
       ::fidl::internal::NaturalClone(storage_.some_field)};
-}
-
-::test_unknowninteractions::UnknownInteractionsProtocolStrictTwoWayFieldsErrTopResponse::Storage_ test_unknowninteractions::UnknownInteractionsProtocolStrictTwoWayFieldsErrTopResponse::CloneStorage_() const {
-  return Storage_{
-      ::fidl::internal::NaturalClone(storage_.result)};
-}
-
-::test_unknowninteractions::UnknownInteractionsProtocolStrictTwoWayUnionErrTopResponse::Storage_ test_unknowninteractions::UnknownInteractionsProtocolStrictTwoWayUnionErrTopResponse::CloneStorage_() const {
-  return Storage_{
-      ::fidl::internal::NaturalClone(storage_.result)};
-}
-
-::test_unknowninteractions::UnknownInteractionsProtocolStrictTwoWayTableErrTopResponse::Storage_ test_unknowninteractions::UnknownInteractionsProtocolStrictTwoWayTableErrTopResponse::CloneStorage_() const {
-  return Storage_{
-      ::fidl::internal::NaturalClone(storage_.result)};
 }
 
 ::test_unknowninteractions::UnknownInteractionsProtocolFlexibleTwoWayResponse::Storage_ test_unknowninteractions::UnknownInteractionsProtocolFlexibleTwoWayResponse::CloneStorage_() const {
@@ -52,29 +32,9 @@
       ::fidl::internal::NaturalClone(storage_.__reserved)};
 }
 
-::test_unknowninteractions::UnknownInteractionsProtocolFlexibleTwoWayTopResponse::Storage_ test_unknowninteractions::UnknownInteractionsProtocolFlexibleTwoWayTopResponse::CloneStorage_() const {
-  return Storage_{
-      ::fidl::internal::NaturalClone(storage_.result)};
-}
-
 ::test_unknowninteractions::UnknownInteractionsProtocolFlexibleTwoWayFieldsResponse::Storage_ test_unknowninteractions::UnknownInteractionsProtocolFlexibleTwoWayFieldsResponse::CloneStorage_() const {
   return Storage_{
       ::fidl::internal::NaturalClone(storage_.some_field)};
-}
-
-::test_unknowninteractions::UnknownInteractionsProtocolFlexibleTwoWayFieldsTopResponse::Storage_ test_unknowninteractions::UnknownInteractionsProtocolFlexibleTwoWayFieldsTopResponse::CloneStorage_() const {
-  return Storage_{
-      ::fidl::internal::NaturalClone(storage_.result)};
-}
-
-::test_unknowninteractions::UnknownInteractionsProtocolFlexibleTwoWayUnionTopResponse::Storage_ test_unknowninteractions::UnknownInteractionsProtocolFlexibleTwoWayUnionTopResponse::CloneStorage_() const {
-  return Storage_{
-      ::fidl::internal::NaturalClone(storage_.result)};
-}
-
-::test_unknowninteractions::UnknownInteractionsProtocolFlexibleTwoWayTableTopResponse::Storage_ test_unknowninteractions::UnknownInteractionsProtocolFlexibleTwoWayTableTopResponse::CloneStorage_() const {
-  return Storage_{
-      ::fidl::internal::NaturalClone(storage_.result)};
 }
 
 ::test_unknowninteractions::UnknownInteractionsProtocolFlexibleTwoWayErrResponse::Storage_ test_unknowninteractions::UnknownInteractionsProtocolFlexibleTwoWayErrResponse::CloneStorage_() const {
@@ -82,29 +42,9 @@
       ::fidl::internal::NaturalClone(storage_.__reserved)};
 }
 
-::test_unknowninteractions::UnknownInteractionsProtocolFlexibleTwoWayErrTopResponse::Storage_ test_unknowninteractions::UnknownInteractionsProtocolFlexibleTwoWayErrTopResponse::CloneStorage_() const {
-  return Storage_{
-      ::fidl::internal::NaturalClone(storage_.result)};
-}
-
 ::test_unknowninteractions::UnknownInteractionsProtocolFlexibleTwoWayFieldsErrResponse::Storage_ test_unknowninteractions::UnknownInteractionsProtocolFlexibleTwoWayFieldsErrResponse::CloneStorage_() const {
   return Storage_{
       ::fidl::internal::NaturalClone(storage_.some_field)};
-}
-
-::test_unknowninteractions::UnknownInteractionsProtocolFlexibleTwoWayFieldsErrTopResponse::Storage_ test_unknowninteractions::UnknownInteractionsProtocolFlexibleTwoWayFieldsErrTopResponse::CloneStorage_() const {
-  return Storage_{
-      ::fidl::internal::NaturalClone(storage_.result)};
-}
-
-::test_unknowninteractions::UnknownInteractionsProtocolFlexibleTwoWayUnionErrTopResponse::Storage_ test_unknowninteractions::UnknownInteractionsProtocolFlexibleTwoWayUnionErrTopResponse::CloneStorage_() const {
-  return Storage_{
-      ::fidl::internal::NaturalClone(storage_.result)};
-}
-
-::test_unknowninteractions::UnknownInteractionsProtocolFlexibleTwoWayTableErrTopResponse::Storage_ test_unknowninteractions::UnknownInteractionsProtocolFlexibleTwoWayTableErrTopResponse::CloneStorage_() const {
-  return Storage_{
-      ::fidl::internal::NaturalClone(storage_.result)};
 }
 
 ::test_unknowninteractions::UnknownInteractionsProtocolStrictEventFieldsRequest::Storage_ test_unknowninteractions::UnknownInteractionsProtocolStrictEventFieldsRequest::CloneStorage_() const {
@@ -117,29 +57,9 @@
       ::fidl::internal::NaturalClone(storage_.__reserved)};
 }
 
-::test_unknowninteractions::UnknownInteractionsProtocolStrictEventErrRequest::Storage_ test_unknowninteractions::UnknownInteractionsProtocolStrictEventErrRequest::CloneStorage_() const {
-  return Storage_{
-      ::fidl::internal::NaturalClone(storage_.result)};
-}
-
 ::test_unknowninteractions::UnknownInteractionsProtocolStrictEventFieldsErrResponse::Storage_ test_unknowninteractions::UnknownInteractionsProtocolStrictEventFieldsErrResponse::CloneStorage_() const {
   return Storage_{
       ::fidl::internal::NaturalClone(storage_.some_field)};
-}
-
-::test_unknowninteractions::UnknownInteractionsProtocolStrictEventFieldsErrRequest::Storage_ test_unknowninteractions::UnknownInteractionsProtocolStrictEventFieldsErrRequest::CloneStorage_() const {
-  return Storage_{
-      ::fidl::internal::NaturalClone(storage_.result)};
-}
-
-::test_unknowninteractions::UnknownInteractionsProtocolStrictEventUnionErrRequest::Storage_ test_unknowninteractions::UnknownInteractionsProtocolStrictEventUnionErrRequest::CloneStorage_() const {
-  return Storage_{
-      ::fidl::internal::NaturalClone(storage_.result)};
-}
-
-::test_unknowninteractions::UnknownInteractionsProtocolStrictEventTableErrRequest::Storage_ test_unknowninteractions::UnknownInteractionsProtocolStrictEventTableErrRequest::CloneStorage_() const {
-  return Storage_{
-      ::fidl::internal::NaturalClone(storage_.result)};
 }
 
 ::test_unknowninteractions::UnknownInteractionsProtocolFlexibleEventFieldsRequest::Storage_ test_unknowninteractions::UnknownInteractionsProtocolFlexibleEventFieldsRequest::CloneStorage_() const {
@@ -152,29 +72,9 @@
       ::fidl::internal::NaturalClone(storage_.__reserved)};
 }
 
-::test_unknowninteractions::UnknownInteractionsProtocolFlexibleEventErrRequest::Storage_ test_unknowninteractions::UnknownInteractionsProtocolFlexibleEventErrRequest::CloneStorage_() const {
-  return Storage_{
-      ::fidl::internal::NaturalClone(storage_.result)};
-}
-
 ::test_unknowninteractions::UnknownInteractionsProtocolFlexibleEventFieldsErrResponse::Storage_ test_unknowninteractions::UnknownInteractionsProtocolFlexibleEventFieldsErrResponse::CloneStorage_() const {
   return Storage_{
       ::fidl::internal::NaturalClone(storage_.some_field)};
-}
-
-::test_unknowninteractions::UnknownInteractionsProtocolFlexibleEventFieldsErrRequest::Storage_ test_unknowninteractions::UnknownInteractionsProtocolFlexibleEventFieldsErrRequest::CloneStorage_() const {
-  return Storage_{
-      ::fidl::internal::NaturalClone(storage_.result)};
-}
-
-::test_unknowninteractions::UnknownInteractionsProtocolFlexibleEventUnionErrRequest::Storage_ test_unknowninteractions::UnknownInteractionsProtocolFlexibleEventUnionErrRequest::CloneStorage_() const {
-  return Storage_{
-      ::fidl::internal::NaturalClone(storage_.result)};
-}
-
-::test_unknowninteractions::UnknownInteractionsProtocolFlexibleEventTableErrRequest::Storage_ test_unknowninteractions::UnknownInteractionsProtocolFlexibleEventTableErrRequest::CloneStorage_() const {
-  return Storage_{
-      ::fidl::internal::NaturalClone(storage_.result)};
 }
 
 ::test_unknowninteractions::UnknownInteractionsAjarProtocolStrictTwoWayFieldsResponse::Storage_ test_unknowninteractions::UnknownInteractionsAjarProtocolStrictTwoWayFieldsResponse::CloneStorage_() const {
@@ -187,29 +87,9 @@
       ::fidl::internal::NaturalClone(storage_.__reserved)};
 }
 
-::test_unknowninteractions::UnknownInteractionsAjarProtocolStrictTwoWayErrTopResponse::Storage_ test_unknowninteractions::UnknownInteractionsAjarProtocolStrictTwoWayErrTopResponse::CloneStorage_() const {
-  return Storage_{
-      ::fidl::internal::NaturalClone(storage_.result)};
-}
-
 ::test_unknowninteractions::UnknownInteractionsAjarProtocolStrictTwoWayFieldsErrResponse::Storage_ test_unknowninteractions::UnknownInteractionsAjarProtocolStrictTwoWayFieldsErrResponse::CloneStorage_() const {
   return Storage_{
       ::fidl::internal::NaturalClone(storage_.some_field)};
-}
-
-::test_unknowninteractions::UnknownInteractionsAjarProtocolStrictTwoWayFieldsErrTopResponse::Storage_ test_unknowninteractions::UnknownInteractionsAjarProtocolStrictTwoWayFieldsErrTopResponse::CloneStorage_() const {
-  return Storage_{
-      ::fidl::internal::NaturalClone(storage_.result)};
-}
-
-::test_unknowninteractions::UnknownInteractionsAjarProtocolStrictTwoWayUnionErrTopResponse::Storage_ test_unknowninteractions::UnknownInteractionsAjarProtocolStrictTwoWayUnionErrTopResponse::CloneStorage_() const {
-  return Storage_{
-      ::fidl::internal::NaturalClone(storage_.result)};
-}
-
-::test_unknowninteractions::UnknownInteractionsAjarProtocolStrictTwoWayTableErrTopResponse::Storage_ test_unknowninteractions::UnknownInteractionsAjarProtocolStrictTwoWayTableErrTopResponse::CloneStorage_() const {
-  return Storage_{
-      ::fidl::internal::NaturalClone(storage_.result)};
 }
 
 ::test_unknowninteractions::UnknownInteractionsAjarProtocolStrictEventFieldsRequest::Storage_ test_unknowninteractions::UnknownInteractionsAjarProtocolStrictEventFieldsRequest::CloneStorage_() const {
@@ -222,29 +102,9 @@
       ::fidl::internal::NaturalClone(storage_.__reserved)};
 }
 
-::test_unknowninteractions::UnknownInteractionsAjarProtocolStrictEventErrRequest::Storage_ test_unknowninteractions::UnknownInteractionsAjarProtocolStrictEventErrRequest::CloneStorage_() const {
-  return Storage_{
-      ::fidl::internal::NaturalClone(storage_.result)};
-}
-
 ::test_unknowninteractions::UnknownInteractionsAjarProtocolStrictEventFieldsErrResponse::Storage_ test_unknowninteractions::UnknownInteractionsAjarProtocolStrictEventFieldsErrResponse::CloneStorage_() const {
   return Storage_{
       ::fidl::internal::NaturalClone(storage_.some_field)};
-}
-
-::test_unknowninteractions::UnknownInteractionsAjarProtocolStrictEventFieldsErrRequest::Storage_ test_unknowninteractions::UnknownInteractionsAjarProtocolStrictEventFieldsErrRequest::CloneStorage_() const {
-  return Storage_{
-      ::fidl::internal::NaturalClone(storage_.result)};
-}
-
-::test_unknowninteractions::UnknownInteractionsAjarProtocolStrictEventUnionErrRequest::Storage_ test_unknowninteractions::UnknownInteractionsAjarProtocolStrictEventUnionErrRequest::CloneStorage_() const {
-  return Storage_{
-      ::fidl::internal::NaturalClone(storage_.result)};
-}
-
-::test_unknowninteractions::UnknownInteractionsAjarProtocolStrictEventTableErrRequest::Storage_ test_unknowninteractions::UnknownInteractionsAjarProtocolStrictEventTableErrRequest::CloneStorage_() const {
-  return Storage_{
-      ::fidl::internal::NaturalClone(storage_.result)};
 }
 
 ::test_unknowninteractions::UnknownInteractionsAjarProtocolFlexibleEventFieldsRequest::Storage_ test_unknowninteractions::UnknownInteractionsAjarProtocolFlexibleEventFieldsRequest::CloneStorage_() const {
@@ -257,29 +117,9 @@
       ::fidl::internal::NaturalClone(storage_.__reserved)};
 }
 
-::test_unknowninteractions::UnknownInteractionsAjarProtocolFlexibleEventErrRequest::Storage_ test_unknowninteractions::UnknownInteractionsAjarProtocolFlexibleEventErrRequest::CloneStorage_() const {
-  return Storage_{
-      ::fidl::internal::NaturalClone(storage_.result)};
-}
-
 ::test_unknowninteractions::UnknownInteractionsAjarProtocolFlexibleEventFieldsErrResponse::Storage_ test_unknowninteractions::UnknownInteractionsAjarProtocolFlexibleEventFieldsErrResponse::CloneStorage_() const {
   return Storage_{
       ::fidl::internal::NaturalClone(storage_.some_field)};
-}
-
-::test_unknowninteractions::UnknownInteractionsAjarProtocolFlexibleEventFieldsErrRequest::Storage_ test_unknowninteractions::UnknownInteractionsAjarProtocolFlexibleEventFieldsErrRequest::CloneStorage_() const {
-  return Storage_{
-      ::fidl::internal::NaturalClone(storage_.result)};
-}
-
-::test_unknowninteractions::UnknownInteractionsAjarProtocolFlexibleEventUnionErrRequest::Storage_ test_unknowninteractions::UnknownInteractionsAjarProtocolFlexibleEventUnionErrRequest::CloneStorage_() const {
-  return Storage_{
-      ::fidl::internal::NaturalClone(storage_.result)};
-}
-
-::test_unknowninteractions::UnknownInteractionsAjarProtocolFlexibleEventTableErrRequest::Storage_ test_unknowninteractions::UnknownInteractionsAjarProtocolFlexibleEventTableErrRequest::CloneStorage_() const {
-  return Storage_{
-      ::fidl::internal::NaturalClone(storage_.result)};
 }
 
 ::test_unknowninteractions::UnknownInteractionsClosedProtocolStrictTwoWayFieldsResponse::Storage_ test_unknowninteractions::UnknownInteractionsClosedProtocolStrictTwoWayFieldsResponse::CloneStorage_() const {
@@ -292,29 +132,9 @@
       ::fidl::internal::NaturalClone(storage_.__reserved)};
 }
 
-::test_unknowninteractions::UnknownInteractionsClosedProtocolStrictTwoWayErrTopResponse::Storage_ test_unknowninteractions::UnknownInteractionsClosedProtocolStrictTwoWayErrTopResponse::CloneStorage_() const {
-  return Storage_{
-      ::fidl::internal::NaturalClone(storage_.result)};
-}
-
 ::test_unknowninteractions::UnknownInteractionsClosedProtocolStrictTwoWayFieldsErrResponse::Storage_ test_unknowninteractions::UnknownInteractionsClosedProtocolStrictTwoWayFieldsErrResponse::CloneStorage_() const {
   return Storage_{
       ::fidl::internal::NaturalClone(storage_.some_field)};
-}
-
-::test_unknowninteractions::UnknownInteractionsClosedProtocolStrictTwoWayFieldsErrTopResponse::Storage_ test_unknowninteractions::UnknownInteractionsClosedProtocolStrictTwoWayFieldsErrTopResponse::CloneStorage_() const {
-  return Storage_{
-      ::fidl::internal::NaturalClone(storage_.result)};
-}
-
-::test_unknowninteractions::UnknownInteractionsClosedProtocolStrictTwoWayUnionErrTopResponse::Storage_ test_unknowninteractions::UnknownInteractionsClosedProtocolStrictTwoWayUnionErrTopResponse::CloneStorage_() const {
-  return Storage_{
-      ::fidl::internal::NaturalClone(storage_.result)};
-}
-
-::test_unknowninteractions::UnknownInteractionsClosedProtocolStrictTwoWayTableErrTopResponse::Storage_ test_unknowninteractions::UnknownInteractionsClosedProtocolStrictTwoWayTableErrTopResponse::CloneStorage_() const {
-  return Storage_{
-      ::fidl::internal::NaturalClone(storage_.result)};
 }
 
 ::test_unknowninteractions::UnknownInteractionsClosedProtocolStrictEventFieldsRequest::Storage_ test_unknowninteractions::UnknownInteractionsClosedProtocolStrictEventFieldsRequest::CloneStorage_() const {
@@ -327,29 +147,9 @@
       ::fidl::internal::NaturalClone(storage_.__reserved)};
 }
 
-::test_unknowninteractions::UnknownInteractionsClosedProtocolStrictEventErrRequest::Storage_ test_unknowninteractions::UnknownInteractionsClosedProtocolStrictEventErrRequest::CloneStorage_() const {
-  return Storage_{
-      ::fidl::internal::NaturalClone(storage_.result)};
-}
-
 ::test_unknowninteractions::UnknownInteractionsClosedProtocolStrictEventFieldsErrResponse::Storage_ test_unknowninteractions::UnknownInteractionsClosedProtocolStrictEventFieldsErrResponse::CloneStorage_() const {
   return Storage_{
       ::fidl::internal::NaturalClone(storage_.some_field)};
-}
-
-::test_unknowninteractions::UnknownInteractionsClosedProtocolStrictEventFieldsErrRequest::Storage_ test_unknowninteractions::UnknownInteractionsClosedProtocolStrictEventFieldsErrRequest::CloneStorage_() const {
-  return Storage_{
-      ::fidl::internal::NaturalClone(storage_.result)};
-}
-
-::test_unknowninteractions::UnknownInteractionsClosedProtocolStrictEventUnionErrRequest::Storage_ test_unknowninteractions::UnknownInteractionsClosedProtocolStrictEventUnionErrRequest::CloneStorage_() const {
-  return Storage_{
-      ::fidl::internal::NaturalClone(storage_.result)};
-}
-
-::test_unknowninteractions::UnknownInteractionsClosedProtocolStrictEventTableErrRequest::Storage_ test_unknowninteractions::UnknownInteractionsClosedProtocolStrictEventTableErrRequest::CloneStorage_() const {
-  return Storage_{
-      ::fidl::internal::NaturalClone(storage_.result)};
 }
 
 ::test_unknowninteractions::UnknownInteractionsDriverProtocolStrictTwoWayFieldsResponse::Storage_ test_unknowninteractions::UnknownInteractionsDriverProtocolStrictTwoWayFieldsResponse::CloneStorage_() const {
@@ -362,29 +162,9 @@
       ::fidl::internal::NaturalClone(storage_.__reserved)};
 }
 
-::test_unknowninteractions::UnknownInteractionsDriverProtocolStrictTwoWayErrTopResponse::Storage_ test_unknowninteractions::UnknownInteractionsDriverProtocolStrictTwoWayErrTopResponse::CloneStorage_() const {
-  return Storage_{
-      ::fidl::internal::NaturalClone(storage_.result)};
-}
-
 ::test_unknowninteractions::UnknownInteractionsDriverProtocolStrictTwoWayFieldsErrResponse::Storage_ test_unknowninteractions::UnknownInteractionsDriverProtocolStrictTwoWayFieldsErrResponse::CloneStorage_() const {
   return Storage_{
       ::fidl::internal::NaturalClone(storage_.some_field)};
-}
-
-::test_unknowninteractions::UnknownInteractionsDriverProtocolStrictTwoWayFieldsErrTopResponse::Storage_ test_unknowninteractions::UnknownInteractionsDriverProtocolStrictTwoWayFieldsErrTopResponse::CloneStorage_() const {
-  return Storage_{
-      ::fidl::internal::NaturalClone(storage_.result)};
-}
-
-::test_unknowninteractions::UnknownInteractionsDriverProtocolStrictTwoWayUnionErrTopResponse::Storage_ test_unknowninteractions::UnknownInteractionsDriverProtocolStrictTwoWayUnionErrTopResponse::CloneStorage_() const {
-  return Storage_{
-      ::fidl::internal::NaturalClone(storage_.result)};
-}
-
-::test_unknowninteractions::UnknownInteractionsDriverProtocolStrictTwoWayTableErrTopResponse::Storage_ test_unknowninteractions::UnknownInteractionsDriverProtocolStrictTwoWayTableErrTopResponse::CloneStorage_() const {
-  return Storage_{
-      ::fidl::internal::NaturalClone(storage_.result)};
 }
 
 ::test_unknowninteractions::UnknownInteractionsDriverProtocolFlexibleTwoWayResponse::Storage_ test_unknowninteractions::UnknownInteractionsDriverProtocolFlexibleTwoWayResponse::CloneStorage_() const {
@@ -392,29 +172,9 @@
       ::fidl::internal::NaturalClone(storage_.__reserved)};
 }
 
-::test_unknowninteractions::UnknownInteractionsDriverProtocolFlexibleTwoWayTopResponse::Storage_ test_unknowninteractions::UnknownInteractionsDriverProtocolFlexibleTwoWayTopResponse::CloneStorage_() const {
-  return Storage_{
-      ::fidl::internal::NaturalClone(storage_.result)};
-}
-
 ::test_unknowninteractions::UnknownInteractionsDriverProtocolFlexibleTwoWayFieldsResponse::Storage_ test_unknowninteractions::UnknownInteractionsDriverProtocolFlexibleTwoWayFieldsResponse::CloneStorage_() const {
   return Storage_{
       ::fidl::internal::NaturalClone(storage_.some_field)};
-}
-
-::test_unknowninteractions::UnknownInteractionsDriverProtocolFlexibleTwoWayFieldsTopResponse::Storage_ test_unknowninteractions::UnknownInteractionsDriverProtocolFlexibleTwoWayFieldsTopResponse::CloneStorage_() const {
-  return Storage_{
-      ::fidl::internal::NaturalClone(storage_.result)};
-}
-
-::test_unknowninteractions::UnknownInteractionsDriverProtocolFlexibleTwoWayUnionTopResponse::Storage_ test_unknowninteractions::UnknownInteractionsDriverProtocolFlexibleTwoWayUnionTopResponse::CloneStorage_() const {
-  return Storage_{
-      ::fidl::internal::NaturalClone(storage_.result)};
-}
-
-::test_unknowninteractions::UnknownInteractionsDriverProtocolFlexibleTwoWayTableTopResponse::Storage_ test_unknowninteractions::UnknownInteractionsDriverProtocolFlexibleTwoWayTableTopResponse::CloneStorage_() const {
-  return Storage_{
-      ::fidl::internal::NaturalClone(storage_.result)};
 }
 
 ::test_unknowninteractions::UnknownInteractionsDriverProtocolFlexibleTwoWayErrResponse::Storage_ test_unknowninteractions::UnknownInteractionsDriverProtocolFlexibleTwoWayErrResponse::CloneStorage_() const {
@@ -422,29 +182,9 @@
       ::fidl::internal::NaturalClone(storage_.__reserved)};
 }
 
-::test_unknowninteractions::UnknownInteractionsDriverProtocolFlexibleTwoWayErrTopResponse::Storage_ test_unknowninteractions::UnknownInteractionsDriverProtocolFlexibleTwoWayErrTopResponse::CloneStorage_() const {
-  return Storage_{
-      ::fidl::internal::NaturalClone(storage_.result)};
-}
-
 ::test_unknowninteractions::UnknownInteractionsDriverProtocolFlexibleTwoWayFieldsErrResponse::Storage_ test_unknowninteractions::UnknownInteractionsDriverProtocolFlexibleTwoWayFieldsErrResponse::CloneStorage_() const {
   return Storage_{
       ::fidl::internal::NaturalClone(storage_.some_field)};
-}
-
-::test_unknowninteractions::UnknownInteractionsDriverProtocolFlexibleTwoWayFieldsErrTopResponse::Storage_ test_unknowninteractions::UnknownInteractionsDriverProtocolFlexibleTwoWayFieldsErrTopResponse::CloneStorage_() const {
-  return Storage_{
-      ::fidl::internal::NaturalClone(storage_.result)};
-}
-
-::test_unknowninteractions::UnknownInteractionsDriverProtocolFlexibleTwoWayUnionErrTopResponse::Storage_ test_unknowninteractions::UnknownInteractionsDriverProtocolFlexibleTwoWayUnionErrTopResponse::CloneStorage_() const {
-  return Storage_{
-      ::fidl::internal::NaturalClone(storage_.result)};
-}
-
-::test_unknowninteractions::UnknownInteractionsDriverProtocolFlexibleTwoWayTableErrTopResponse::Storage_ test_unknowninteractions::UnknownInteractionsDriverProtocolFlexibleTwoWayTableErrTopResponse::CloneStorage_() const {
-  return Storage_{
-      ::fidl::internal::NaturalClone(storage_.result)};
 }
 
 ::test_unknowninteractions::UnknownInteractionsAjarDriverProtocolStrictTwoWayFieldsResponse::Storage_ test_unknowninteractions::UnknownInteractionsAjarDriverProtocolStrictTwoWayFieldsResponse::CloneStorage_() const {
@@ -457,29 +197,9 @@
       ::fidl::internal::NaturalClone(storage_.__reserved)};
 }
 
-::test_unknowninteractions::UnknownInteractionsAjarDriverProtocolStrictTwoWayErrTopResponse::Storage_ test_unknowninteractions::UnknownInteractionsAjarDriverProtocolStrictTwoWayErrTopResponse::CloneStorage_() const {
-  return Storage_{
-      ::fidl::internal::NaturalClone(storage_.result)};
-}
-
 ::test_unknowninteractions::UnknownInteractionsAjarDriverProtocolStrictTwoWayFieldsErrResponse::Storage_ test_unknowninteractions::UnknownInteractionsAjarDriverProtocolStrictTwoWayFieldsErrResponse::CloneStorage_() const {
   return Storage_{
       ::fidl::internal::NaturalClone(storage_.some_field)};
-}
-
-::test_unknowninteractions::UnknownInteractionsAjarDriverProtocolStrictTwoWayFieldsErrTopResponse::Storage_ test_unknowninteractions::UnknownInteractionsAjarDriverProtocolStrictTwoWayFieldsErrTopResponse::CloneStorage_() const {
-  return Storage_{
-      ::fidl::internal::NaturalClone(storage_.result)};
-}
-
-::test_unknowninteractions::UnknownInteractionsAjarDriverProtocolStrictTwoWayUnionErrTopResponse::Storage_ test_unknowninteractions::UnknownInteractionsAjarDriverProtocolStrictTwoWayUnionErrTopResponse::CloneStorage_() const {
-  return Storage_{
-      ::fidl::internal::NaturalClone(storage_.result)};
-}
-
-::test_unknowninteractions::UnknownInteractionsAjarDriverProtocolStrictTwoWayTableErrTopResponse::Storage_ test_unknowninteractions::UnknownInteractionsAjarDriverProtocolStrictTwoWayTableErrTopResponse::CloneStorage_() const {
-  return Storage_{
-      ::fidl::internal::NaturalClone(storage_.result)};
 }
 
 ::test_unknowninteractions::UnknownInteractionsClosedDriverProtocolStrictTwoWayFieldsResponse::Storage_ test_unknowninteractions::UnknownInteractionsClosedDriverProtocolStrictTwoWayFieldsResponse::CloneStorage_() const {
@@ -492,29 +212,9 @@
       ::fidl::internal::NaturalClone(storage_.__reserved)};
 }
 
-::test_unknowninteractions::UnknownInteractionsClosedDriverProtocolStrictTwoWayErrTopResponse::Storage_ test_unknowninteractions::UnknownInteractionsClosedDriverProtocolStrictTwoWayErrTopResponse::CloneStorage_() const {
-  return Storage_{
-      ::fidl::internal::NaturalClone(storage_.result)};
-}
-
 ::test_unknowninteractions::UnknownInteractionsClosedDriverProtocolStrictTwoWayFieldsErrResponse::Storage_ test_unknowninteractions::UnknownInteractionsClosedDriverProtocolStrictTwoWayFieldsErrResponse::CloneStorage_() const {
   return Storage_{
       ::fidl::internal::NaturalClone(storage_.some_field)};
-}
-
-::test_unknowninteractions::UnknownInteractionsClosedDriverProtocolStrictTwoWayFieldsErrTopResponse::Storage_ test_unknowninteractions::UnknownInteractionsClosedDriverProtocolStrictTwoWayFieldsErrTopResponse::CloneStorage_() const {
-  return Storage_{
-      ::fidl::internal::NaturalClone(storage_.result)};
-}
-
-::test_unknowninteractions::UnknownInteractionsClosedDriverProtocolStrictTwoWayUnionErrTopResponse::Storage_ test_unknowninteractions::UnknownInteractionsClosedDriverProtocolStrictTwoWayUnionErrTopResponse::CloneStorage_() const {
-  return Storage_{
-      ::fidl::internal::NaturalClone(storage_.result)};
-}
-
-::test_unknowninteractions::UnknownInteractionsClosedDriverProtocolStrictTwoWayTableErrTopResponse::Storage_ test_unknowninteractions::UnknownInteractionsClosedDriverProtocolStrictTwoWayTableErrTopResponse::CloneStorage_() const {
-  return Storage_{
-      ::fidl::internal::NaturalClone(storage_.result)};
 }
 
 ::test_unknowninteractions::UnknownInteractionsProtocolStrictTwoWayTableResponse::Storage_ test_unknowninteractions::UnknownInteractionsProtocolStrictTwoWayTableResponse::CloneStorage_() const {

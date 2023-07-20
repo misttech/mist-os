@@ -35,8 +35,6 @@ class SomeProtocolSomeMethodRequest;
 
 class SomeProtocolSomeMethodResponse;
 
-class SomeProtocolSomeMethodTopResponse;
-
 class FunctionApplication;
 
 class TableMember;
@@ -823,65 +821,6 @@ class SomeProtocolSomeMethodResult {
   }
 };
 
-extern "C" const fidl_type_t test_anonymous_SomeProtocolSomeMethodTopResponseTable;
-
-class SomeProtocolSomeMethodTopResponse {
- private:
-  struct Storage_;
-
- public:
-  SomeProtocolSomeMethodTopResponse(Storage_ storage) noexcept;
-  SomeProtocolSomeMethodTopResponse(::test_anonymous::SomeProtocolSomeMethodResult result) noexcept;
-
-#pragma clang diagnostic push
-#pragma clang diagnostic ignored "-Wdefaulted-function-deleted"
-  // Default constructs a |SomeProtocolSomeMethodTopResponse| only if all of its members are default constructible.
-  SomeProtocolSomeMethodTopResponse() = default;
-#pragma clang diagnostic pop
-
-  SomeProtocolSomeMethodTopResponse(SomeProtocolSomeMethodTopResponse&&) noexcept = default;
-  SomeProtocolSomeMethodTopResponse& operator=(SomeProtocolSomeMethodTopResponse&&) noexcept = default;
-  SomeProtocolSomeMethodTopResponse(const SomeProtocolSomeMethodTopResponse& other) noexcept;
-  SomeProtocolSomeMethodTopResponse& operator=(const SomeProtocolSomeMethodTopResponse& other) noexcept;
-
-  bool operator==(const SomeProtocolSomeMethodTopResponse& other) const noexcept {
-    return ::fidl::internal::NaturalStructCodingTraits<::test_anonymous::SomeProtocolSomeMethodTopResponse, 16>::Equal(this, &other);
-  }
-  bool operator!=(const SomeProtocolSomeMethodTopResponse& other) const noexcept {
-    return !::fidl::internal::NaturalStructCodingTraits<::test_anonymous::SomeProtocolSomeMethodTopResponse, 16>::Equal(this, &other);
-  }
-
-  const ::test_anonymous::SomeProtocolSomeMethodResult&
-  result() const {
-    return storage_.result;
-  }
-
-  ::test_anonymous::SomeProtocolSomeMethodResult& result() {
-    return storage_.result;
-  }
-
-  // Setter for result.
-  //
-
-  SomeProtocolSomeMethodTopResponse& result(::test_anonymous::SomeProtocolSomeMethodResult value);
-
-  SomeProtocolSomeMethodTopResponse(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag);
-
- private:
-  struct Storage_ final {
-    ::test_anonymous::SomeProtocolSomeMethodResult result;
-  };
-
-  Storage_ storage_;
-  Storage_ CloneStorage_() const;
-
-  friend struct ::fidl::internal::NaturalStructCodingTraits<::test_anonymous::SomeProtocolSomeMethodTopResponse, 16>;
-  friend struct ::fidl::internal::MemberVisitor<::test_anonymous::SomeProtocolSomeMethodTopResponse>;
-  static constexpr auto kMembers = std::make_tuple(::fidl::internal::NaturalStructMember<Storage_, ::test_anonymous::SomeProtocolSomeMethodResult, fidl::internal::NaturalCodingConstraintEmpty>{
-      &Storage_::result, 0});
-  static constexpr auto kPadding = std::make_tuple();
-};
-
 inline OverrideTest::OverrideTest(Storage_ storage) noexcept : storage_(std::move(storage)) {}
 inline OverrideTest::OverrideTest(::test_anonymous::Op op, ::fidl::Box<::test_anonymous::Expression> left, ::fidl::Box<::test_anonymous::Expression> right) noexcept
     : storage_({.op = std::move(op),
@@ -1002,23 +941,6 @@ inline SomeProtocolSomeMethodResponse& SomeProtocolSomeMethodResponse::bits_memb
   return *this;
 }
 
-inline SomeProtocolSomeMethodTopResponse::SomeProtocolSomeMethodTopResponse(Storage_ storage) noexcept : storage_(std::move(storage)) {}
-inline SomeProtocolSomeMethodTopResponse::SomeProtocolSomeMethodTopResponse(::test_anonymous::SomeProtocolSomeMethodResult result) noexcept
-    : storage_({.result = std::move(result)}) {}
-inline SomeProtocolSomeMethodTopResponse::SomeProtocolSomeMethodTopResponse(const ::test_anonymous::SomeProtocolSomeMethodTopResponse& other) noexcept : ::test_anonymous::SomeProtocolSomeMethodTopResponse(other.CloneStorage_()) {}
-inline SomeProtocolSomeMethodTopResponse& ::test_anonymous::SomeProtocolSomeMethodTopResponse::operator=(const ::test_anonymous::SomeProtocolSomeMethodTopResponse& other) noexcept {
-  storage_ = other.CloneStorage_();
-  return *this;
-}
-
-inline SomeProtocolSomeMethodTopResponse::SomeProtocolSomeMethodTopResponse(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag) : SomeProtocolSomeMethodTopResponse(Storage_{
-                                                                                                                                              .result = ::fidl::internal::DefaultConstructPossiblyInvalidObjectTag{},
-                                                                                                                                          }) {}
-inline SomeProtocolSomeMethodTopResponse& SomeProtocolSomeMethodTopResponse::result(::test_anonymous::SomeProtocolSomeMethodResult value) {
-  storage_.result = std::move(value);
-  return *this;
-}
-
 }  // namespace test_anonymous
 namespace fidl {
 
@@ -1109,28 +1031,6 @@ struct IsStruct<::test_anonymous::SomeProtocolSomeMethodResponse> : public std::
 template <>
 struct internal::NaturalCodingTraits<::test_anonymous::SomeProtocolSomeMethodResponse, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalStructCodingTraits<::test_anonymous::SomeProtocolSomeMethodResponse, 4> {};
-
-extern "C" const fidl_type_t test_anonymous_SomeProtocolSomeMethodTopResponseTable;
-
-template <>
-struct IsFidlType<::test_anonymous::SomeProtocolSomeMethodTopResponse> : public std::true_type {};
-
-template <>
-struct TypeTraits<::test_anonymous::SomeProtocolSomeMethodTopResponse> {
-  static constexpr uint32_t kMaxNumHandles = 0;
-  static constexpr uint32_t kMaxDepth = 1;
-  static constexpr uint32_t kPrimarySize = 16;
-  static constexpr uint32_t kMaxOutOfLine = 0;
-  static constexpr bool kHasEnvelope = true;
-  static constexpr bool kHasPointer = true;
-};
-
-template <>
-struct IsStruct<::test_anonymous::SomeProtocolSomeMethodTopResponse> : public std::true_type {};
-
-template <>
-struct internal::NaturalCodingTraits<::test_anonymous::SomeProtocolSomeMethodTopResponse, ::fidl::internal::NaturalCodingConstraintEmpty> final
-    : public ::fidl::internal::NaturalStructCodingTraits<::test_anonymous::SomeProtocolSomeMethodTopResponse, 16> {};
 
 extern "C" const fidl_type_t test_anonymous_FunctionApplicationTable;
 

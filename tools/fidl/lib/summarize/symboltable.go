@@ -33,14 +33,18 @@ func (p *structPayload) AsParameters(tp typePrinter) string {
 
 // identifierPayload is a wrapper for implementing parameterizer on fidlgen.EncodedCompoundIdentifier.
 type identifierPayload struct {
-	fidlgen.EncodedCompoundIdentifier
+	identifier    fidlgen.EncodedCompoundIdentifier
+	isResultUnion bool
 }
 
 func (p *identifierPayload) Name() fidlgen.EncodedCompoundIdentifier {
-	return p.EncodedCompoundIdentifier
+	return p.identifier
 }
 
 func (p *identifierPayload) AsParameters(_ typePrinter) string {
+	if p.isResultUnion {
+		return fmt.Sprintf("(%v result)", p.Name())
+	}
 	return fmt.Sprintf("(%v payload)", p.Name())
 }
 
@@ -107,11 +111,14 @@ func (n *symbolTable) isStruct(name fidlgen.EncodedCompoundIdentifier) bool {
 }
 
 // getPayload returns the stored payload definition, if one exists.
-func (n *symbolTable) getPayload(name fidlgen.EncodedCompoundIdentifier) parameterizer {
+func (n *symbolTable) getPayload(name fidlgen.EncodedCompoundIdentifier, isResultUnion bool) parameterizer {
 	if theStruct, ok := n.structDecls[name]; ok {
 		return &structPayload{*theStruct}
 	}
-	return &identifierPayload{name}
+	return &identifierPayload{
+		identifier:    name,
+		isResultUnion: isResultUnion,
+	}
 }
 
 // fidlTypeString converts the FIDL type declaration into a string per RFC-0050.

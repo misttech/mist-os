@@ -139,21 +139,6 @@ struct WireTypeForNaturalType<::test_protocols::WithErrorSyntaxResponseAsStructR
 };
 
 template <>
-struct WireNaturalConversionTraits<::test_protocols::wire::WithErrorSyntaxResponseAsStructTopResponse, ::test_protocols::WithErrorSyntaxResponseAsStructTopResponse> {
-  static ::test_protocols::WithErrorSyntaxResponseAsStructTopResponse ToNatural(::test_protocols::wire::WithErrorSyntaxResponseAsStructTopResponse src);
-  static ::test_protocols::wire::WithErrorSyntaxResponseAsStructTopResponse ToWire(fidl::AnyArena& arena, ::test_protocols::WithErrorSyntaxResponseAsStructTopResponse src);
-};
-
-template <>
-struct NaturalTypeForWireType<::test_protocols::wire::WithErrorSyntaxResponseAsStructTopResponse> {
-  using type = ::test_protocols::WithErrorSyntaxResponseAsStructTopResponse;
-};
-template <>
-struct WireTypeForNaturalType<::test_protocols::WithErrorSyntaxResponseAsStructTopResponse> {
-  using type = ::test_protocols::wire::WithErrorSyntaxResponseAsStructTopResponse;
-};
-
-template <>
 struct WireNaturalConversionTraits<::test_protocols::wire::WithErrorSyntaxErrorAsPrimitiveResponse, ::test_protocols::WithErrorSyntaxErrorAsPrimitiveResponse> {
   static ::test_protocols::WithErrorSyntaxErrorAsPrimitiveResponse ToNatural(::test_protocols::wire::WithErrorSyntaxErrorAsPrimitiveResponse src);
   static ::test_protocols::wire::WithErrorSyntaxErrorAsPrimitiveResponse ToWire(fidl::AnyArena& arena, ::test_protocols::WithErrorSyntaxErrorAsPrimitiveResponse src);
@@ -166,21 +151,6 @@ struct NaturalTypeForWireType<::test_protocols::wire::WithErrorSyntaxErrorAsPrim
 template <>
 struct WireTypeForNaturalType<::test_protocols::WithErrorSyntaxErrorAsPrimitiveResponse> {
   using type = ::test_protocols::wire::WithErrorSyntaxErrorAsPrimitiveResponse;
-};
-
-template <>
-struct WireNaturalConversionTraits<::test_protocols::wire::WithErrorSyntaxErrorAsPrimitiveTopResponse, ::test_protocols::WithErrorSyntaxErrorAsPrimitiveTopResponse> {
-  static ::test_protocols::WithErrorSyntaxErrorAsPrimitiveTopResponse ToNatural(::test_protocols::wire::WithErrorSyntaxErrorAsPrimitiveTopResponse src);
-  static ::test_protocols::wire::WithErrorSyntaxErrorAsPrimitiveTopResponse ToWire(fidl::AnyArena& arena, ::test_protocols::WithErrorSyntaxErrorAsPrimitiveTopResponse src);
-};
-
-template <>
-struct NaturalTypeForWireType<::test_protocols::wire::WithErrorSyntaxErrorAsPrimitiveTopResponse> {
-  using type = ::test_protocols::WithErrorSyntaxErrorAsPrimitiveTopResponse;
-};
-template <>
-struct WireTypeForNaturalType<::test_protocols::WithErrorSyntaxErrorAsPrimitiveTopResponse> {
-  using type = ::test_protocols::wire::WithErrorSyntaxErrorAsPrimitiveTopResponse;
 };
 
 template <>
@@ -198,21 +168,6 @@ struct WireTypeForNaturalType<::test_protocols::WithErrorSyntaxErrorAsEnumRespon
   using type = ::test_protocols::wire::WithErrorSyntaxErrorAsEnumResponse;
 };
 
-template <>
-struct WireNaturalConversionTraits<::test_protocols::wire::WithErrorSyntaxErrorAsEnumTopResponse, ::test_protocols::WithErrorSyntaxErrorAsEnumTopResponse> {
-  static ::test_protocols::WithErrorSyntaxErrorAsEnumTopResponse ToNatural(::test_protocols::wire::WithErrorSyntaxErrorAsEnumTopResponse src);
-  static ::test_protocols::wire::WithErrorSyntaxErrorAsEnumTopResponse ToWire(fidl::AnyArena& arena, ::test_protocols::WithErrorSyntaxErrorAsEnumTopResponse src);
-};
-
-template <>
-struct NaturalTypeForWireType<::test_protocols::wire::WithErrorSyntaxErrorAsEnumTopResponse> {
-  using type = ::test_protocols::WithErrorSyntaxErrorAsEnumTopResponse;
-};
-template <>
-struct WireTypeForNaturalType<::test_protocols::WithErrorSyntaxErrorAsEnumTopResponse> {
-  using type = ::test_protocols::wire::WithErrorSyntaxErrorAsEnumTopResponse;
-};
-
 #ifdef __Fuchsia__
 
 template <>
@@ -228,25 +183,6 @@ struct NaturalTypeForWireType<::test_protocols::wire::WithErrorSyntaxHandleInRes
 template <>
 struct WireTypeForNaturalType<::test_protocols::WithErrorSyntaxHandleInResultResponse> {
   using type = ::test_protocols::wire::WithErrorSyntaxHandleInResultResponse;
-};
-
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
-
-template <>
-struct WireNaturalConversionTraits<::test_protocols::wire::WithErrorSyntaxHandleInResultTopResponse, ::test_protocols::WithErrorSyntaxHandleInResultTopResponse> {
-  static ::test_protocols::WithErrorSyntaxHandleInResultTopResponse ToNatural(::test_protocols::wire::WithErrorSyntaxHandleInResultTopResponse src);
-  static ::test_protocols::wire::WithErrorSyntaxHandleInResultTopResponse ToWire(fidl::AnyArena& arena, ::test_protocols::WithErrorSyntaxHandleInResultTopResponse src);
-};
-
-template <>
-struct NaturalTypeForWireType<::test_protocols::wire::WithErrorSyntaxHandleInResultTopResponse> {
-  using type = ::test_protocols::WithErrorSyntaxHandleInResultTopResponse;
-};
-template <>
-struct WireTypeForNaturalType<::test_protocols::WithErrorSyntaxHandleInResultTopResponse> {
-  using type = ::test_protocols::wire::WithErrorSyntaxHandleInResultTopResponse;
 };
 
 #endif  // __Fuchsia__

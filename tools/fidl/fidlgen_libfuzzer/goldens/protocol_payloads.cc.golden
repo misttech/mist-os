@@ -168,7 +168,7 @@ extern "C" int LLVMFuzzerTestOneInput(const uint8_t* data_, size_t size_) {
       int32_t a = Allocate<int32_t>{}(&src_, &param_size_);
 
       xprintf("Invoking method test_protocolpayloads_MainProtocol.TwoWayComposedWithError\n");
-      protocol_->TwoWayComposedWithError(std::move(a), [signaller = fuzzer_.NewCallbackSignaller()](::test::protocolpayloads::imported::ComposedProtocol_TwoWayComposedWithError_Result result) {
+      protocol_->TwoWayComposedWithError(std::move(a), [signaller = fuzzer_.NewCallbackSignaller()](::test::protocolpayloads::imported::ComposedProtocol_TwoWayComposedWithError_Result ComposedProtocol_TwoWayComposedWithError_Result) {
         xprintf("Invoked test_protocolpayloads_MainProtocol.TwoWayComposedWithError\n");
         zx_status_t status_ = signaller.SignalCallback();
         if (status_ != ZX_OK) {
@@ -273,7 +273,7 @@ extern "C" int LLVMFuzzerTestOneInput(const uint8_t* data_, size_t size_) {
       uint32_t b = Allocate<uint32_t>{}(&src_, &param_size_);
 
       xprintf("Invoking method test_protocolpayloads_MainProtocol.TwoWayLocalWithError\n");
-      protocol_->TwoWayLocalWithError(std::move(a), std::move(b), [signaller = fuzzer_.NewCallbackSignaller()](::test::protocolpayloads::MainProtocol_TwoWayLocalWithError_Result result) {
+      protocol_->TwoWayLocalWithError(std::move(a), std::move(b), [signaller = fuzzer_.NewCallbackSignaller()](::test::protocolpayloads::MainProtocol_TwoWayLocalWithError_Result MainProtocol_TwoWayLocalWithError_Result) {
         xprintf("Invoked test_protocolpayloads_MainProtocol.TwoWayLocalWithError\n");
         zx_status_t status_ = signaller.SignalCallback();
         if (status_ != ZX_OK) {
@@ -369,7 +369,7 @@ extern "C" int LLVMFuzzerTestOneInput(const uint8_t* data_, size_t size_) {
       int32_t a = Allocate<int32_t>{}(&src_, &param_size_);
 
       xprintf("Invoking method test_protocolpayloads_MainProtocol.TwoWayImportWithError\n");
-      protocol_->TwoWayImportWithError(std::move(a), [signaller = fuzzer_.NewCallbackSignaller()](::test::protocolpayloads::MainProtocol_TwoWayImportWithError_Result result) {
+      protocol_->TwoWayImportWithError(std::move(a), [signaller = fuzzer_.NewCallbackSignaller()](::test::protocolpayloads::MainProtocol_TwoWayImportWithError_Result MainProtocol_TwoWayImportWithError_Result) {
         xprintf("Invoked test_protocolpayloads_MainProtocol.TwoWayImportWithError\n");
         zx_status_t status_ = signaller.SignalCallback();
         if (status_ != ZX_OK) {
@@ -474,7 +474,7 @@ extern "C" int LLVMFuzzerTestOneInput(const uint8_t* data_, size_t size_) {
       uint32_t b = Allocate<uint32_t>{}(&src_, &param_size_);
 
       xprintf("Invoking method test_protocolpayloads_MainProtocol.TwoWayAnonWithError\n");
-      protocol_->TwoWayAnonWithError(std::move(a), std::move(b), [signaller = fuzzer_.NewCallbackSignaller()](::test::protocolpayloads::MainProtocol_TwoWayAnonWithError_Result result) {
+      protocol_->TwoWayAnonWithError(std::move(a), std::move(b), [signaller = fuzzer_.NewCallbackSignaller()](::test::protocolpayloads::MainProtocol_TwoWayAnonWithError_Result MainProtocol_TwoWayAnonWithError_Result) {
         xprintf("Invoked test_protocolpayloads_MainProtocol.TwoWayAnonWithError\n");
         zx_status_t status_ = signaller.SignalCallback();
         if (status_ != ZX_OK) {

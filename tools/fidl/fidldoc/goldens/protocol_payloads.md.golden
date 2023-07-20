@@ -46,7 +46,7 @@
 <table>
     <tr><th>Name</th><th>Type</th></tr>
         <tr>
-            <td><code>result</code></td>
+            <td><code>payload</code></td>
             <td>
                 <code><a class='link' href='#MainProtocol_OnAnonWithError_Result'>MainProtocol_OnAnonWithError_Result</a></code>
             </td>
@@ -82,7 +82,7 @@
 <table>
     <tr><th>Name</th><th>Type</th></tr>
         <tr>
-            <td><code>result</code></td>
+            <td><code>payload</code></td>
             <td>
                 <code><a class='link' href='../test.protocolpayloads.imported/'>test.protocolpayloads.imported</a>/<a class='link' href='../test.protocolpayloads.imported/#ComposedProtocol_OnComposedWithError_Result'>ComposedProtocol_OnComposedWithError_Result</a></code>
             </td>
@@ -118,7 +118,7 @@
 <table>
     <tr><th>Name</th><th>Type</th></tr>
         <tr>
-            <td><code>result</code></td>
+            <td><code>payload</code></td>
             <td>
                 <code><a class='link' href='#MainProtocol_OnImportWithError_Result'>MainProtocol_OnImportWithError_Result</a></code>
             </td>
@@ -160,7 +160,7 @@
 <table>
     <tr><th>Name</th><th>Type</th></tr>
         <tr>
-            <td><code>result</code></td>
+            <td><code>payload</code></td>
             <td>
                 <code><a class='link' href='#MainProtocol_OnLocalWithError_Result'>MainProtocol_OnLocalWithError_Result</a></code>
             </td>
@@ -322,7 +322,7 @@
 <table>
     <tr><th>Name</th><th>Type</th></tr>
         <tr>
-            <td><code>result</code></td>
+            <td><code>payload</code></td>
             <td>
                 <code><a class='link' href='#MainProtocol_TwoWayAnonWithError_Result'>MainProtocol_TwoWayAnonWithError_Result</a></code>
             </td>
@@ -382,7 +382,7 @@
 <table>
     <tr><th>Name</th><th>Type</th></tr>
         <tr>
-            <td><code>result</code></td>
+            <td><code>payload</code></td>
             <td>
                 <code><a class='link' href='../test.protocolpayloads.imported/'>test.protocolpayloads.imported</a>/<a class='link' href='../test.protocolpayloads.imported/#ComposedProtocol_TwoWayComposedWithError_Result'>ComposedProtocol_TwoWayComposedWithError_Result</a></code>
             </td>
@@ -442,7 +442,7 @@
 <table>
     <tr><th>Name</th><th>Type</th></tr>
         <tr>
-            <td><code>result</code></td>
+            <td><code>payload</code></td>
             <td>
                 <code><a class='link' href='#MainProtocol_TwoWayImportWithError_Result'>MainProtocol_TwoWayImportWithError_Result</a></code>
             </td>
@@ -520,7 +520,7 @@
 <table>
     <tr><th>Name</th><th>Type</th></tr>
         <tr>
-            <td><code>result</code></td>
+            <td><code>payload</code></td>
             <td>
                 <code><a class='link' href='#MainProtocol_TwoWayLocalWithError_Result'>MainProtocol_TwoWayLocalWithError_Result</a></code>
             </td>

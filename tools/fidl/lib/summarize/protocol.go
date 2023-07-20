@@ -56,10 +56,10 @@ func newMethod(s *symbolTable, parent fidlgen.EncodedCompoundIdentifier, m fidlg
 		method:     m,
 	}
 	if m.RequestPayload != nil {
-		out.requestPayload = s.getPayload(m.RequestPayload.Identifier)
+		out.requestPayload = s.getPayload(m.RequestPayload.Identifier, false)
 	}
 	if m.ResponsePayload != nil {
-		out.responsePayload = s.getPayload(m.ResponsePayload.Identifier)
+		out.responsePayload = s.getPayload(m.ResponsePayload.Identifier, m.HasResultUnion())
 	}
 	return out
 }

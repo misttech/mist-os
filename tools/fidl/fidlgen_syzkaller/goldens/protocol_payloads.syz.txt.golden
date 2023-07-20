@@ -132,7 +132,6 @@ test_protocolpayloads_MainProtocolTwoWayComposedWithErrorRequestHandles {
 } [packed]
 test_protocolpayloads_MainProtocolTwoWayComposedWithErrorResponse {
     hdr fidl_message_header[7681984876526769495]
-    resultInLine test_protocolpayloads_imported_ComposedProtocol_TwoWayComposedWithError_ResultInLine
 } [packed]
 test_protocolpayloads_MainProtocolTwoWayComposedWithErrorResponseHandles {
     void void
@@ -146,7 +145,6 @@ test_protocolpayloads_MainProtocolOnComposedEventHandles {
 } [packed]
 test_protocolpayloads_MainProtocolOnComposedWithErrorEvent {
     hdr fidl_message_header[7167282778061495960]
-    resultInLine test_protocolpayloads_imported_ComposedProtocol_OnComposedWithError_ResultInLine
 } [packed]
 test_protocolpayloads_MainProtocolOnComposedWithErrorEventHandles {
     void void
@@ -185,11 +183,9 @@ test_protocolpayloads_MainProtocolTwoWayLocalWithErrorRequestHandles {
 } [packed]
 test_protocolpayloads_MainProtocolTwoWayLocalWithErrorResponse {
     hdr fidl_message_header[2898559119954589948]
-    resultInLine test_protocolpayloads_MainProtocol_TwoWayLocalWithError_ResultInLine
-    resultOutOfLine test_protocolpayloads_MainProtocol_TwoWayLocalWithError_ResultOutOfLine
 } [packed]
 test_protocolpayloads_MainProtocolTwoWayLocalWithErrorResponseHandles {
-    result test_protocolpayloads_MainProtocol_TwoWayLocalWithError_ResultHandles
+    void void
 } [packed]
 test_protocolpayloads_MainProtocolOnLocalEvent {
     hdr fidl_message_header[5135782819583756313]
@@ -201,11 +197,9 @@ test_protocolpayloads_MainProtocolOnLocalEventHandles {
 } [packed]
 test_protocolpayloads_MainProtocolOnLocalWithErrorEvent {
     hdr fidl_message_header[5678277415565140399]
-    resultInLine test_protocolpayloads_MainProtocol_OnLocalWithError_ResultInLine
-    resultOutOfLine test_protocolpayloads_MainProtocol_OnLocalWithError_ResultOutOfLine
 } [packed]
 test_protocolpayloads_MainProtocolOnLocalWithErrorEventHandles {
-    result test_protocolpayloads_MainProtocol_OnLocalWithError_ResultHandles
+    void void
 } [packed]
 test_protocolpayloads_MainProtocolOneWayImportRequest {
     hdr fidl_message_header[3344777159365288972]
@@ -237,11 +231,9 @@ test_protocolpayloads_MainProtocolTwoWayImportWithErrorRequestHandles {
 } [packed]
 test_protocolpayloads_MainProtocolTwoWayImportWithErrorResponse {
     hdr fidl_message_header[4286143084949642173]
-    resultInLine test_protocolpayloads_MainProtocol_TwoWayImportWithError_ResultInLine
-    resultOutOfLine test_protocolpayloads_MainProtocol_TwoWayImportWithError_ResultOutOfLine
 } [packed]
 test_protocolpayloads_MainProtocolTwoWayImportWithErrorResponseHandles {
-    result test_protocolpayloads_MainProtocol_TwoWayImportWithError_ResultHandles
+    void void
 } [packed]
 test_protocolpayloads_MainProtocolOnImportEvent {
     hdr fidl_message_header[1996489653379631369]
@@ -252,11 +244,9 @@ test_protocolpayloads_MainProtocolOnImportEventHandles {
 } [packed]
 test_protocolpayloads_MainProtocolOnImportWithErrorEvent {
     hdr fidl_message_header[7102941407914553861]
-    resultInLine test_protocolpayloads_MainProtocol_OnImportWithError_ResultInLine
-    resultOutOfLine test_protocolpayloads_MainProtocol_OnImportWithError_ResultOutOfLine
 } [packed]
 test_protocolpayloads_MainProtocolOnImportWithErrorEventHandles {
-    result test_protocolpayloads_MainProtocol_OnImportWithError_ResultHandles
+    void void
 } [packed]
 test_protocolpayloads_MainProtocolOneWayAnonRequest {
     hdr fidl_message_header[811587311021806764]
@@ -292,11 +282,9 @@ test_protocolpayloads_MainProtocolTwoWayAnonWithErrorRequestHandles {
 } [packed]
 test_protocolpayloads_MainProtocolTwoWayAnonWithErrorResponse {
     hdr fidl_message_header[6368863385719175734]
-    resultInLine test_protocolpayloads_MainProtocol_TwoWayAnonWithError_ResultInLine
-    resultOutOfLine test_protocolpayloads_MainProtocol_TwoWayAnonWithError_ResultOutOfLine
 } [packed]
 test_protocolpayloads_MainProtocolTwoWayAnonWithErrorResponseHandles {
-    result test_protocolpayloads_MainProtocol_TwoWayAnonWithError_ResultHandles
+    void void
 } [packed]
 test_protocolpayloads_MainProtocolOnAnonEvent {
     hdr fidl_message_header[4815229650203439104]
@@ -308,11 +296,9 @@ test_protocolpayloads_MainProtocolOnAnonEventHandles {
 } [packed]
 test_protocolpayloads_MainProtocolOnAnonWithErrorEvent {
     hdr fidl_message_header[5024931894357412354]
-    resultInLine test_protocolpayloads_MainProtocol_OnAnonWithError_ResultInLine
-    resultOutOfLine test_protocolpayloads_MainProtocol_OnAnonWithError_ResultOutOfLine
 } [packed]
 test_protocolpayloads_MainProtocolOnAnonWithErrorEventHandles {
-    result test_protocolpayloads_MainProtocol_OnAnonWithError_ResultHandles
+    void void
 } [packed]
 
 resource zx_chan_test_protocolpayloads_MainProtocol_client[zx_chan]

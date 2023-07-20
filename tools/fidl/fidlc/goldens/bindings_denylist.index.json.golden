@@ -460,22 +460,6 @@
   "structs": [
     {
       "is_anonymous": true,
-      "identifier": "test.bindingsdenylist/AllowedDeniedTopResponse",
-      "members": [
-        {
-          "name": "result",
-          "location": {
-            "is_virtual": true
-          },
-          "type": {
-            "kind": "identifier",
-            "is_anonymous": true
-          }
-        }
-      ]
-    },
-    {
-      "is_anonymous": true,
       "identifier": "test.bindingsdenylist/Allowed_Denied_Response",
       "members": [
         {
@@ -646,22 +630,6 @@
     },
     {
       "is_anonymous": true,
-      "identifier": "test.bindingsdenylist/DenyEachBindingOnlyDenyCppTopResponse",
-      "members": [
-        {
-          "name": "result",
-          "location": {
-            "is_virtual": true
-          },
-          "type": {
-            "kind": "identifier",
-            "is_anonymous": true
-          }
-        }
-      ]
-    },
-    {
-      "is_anonymous": true,
       "identifier": "test.bindingsdenylist/DenyEachBindingOnlyDenyDartRequest",
       "members": [
         {
@@ -675,22 +643,6 @@
           },
           "type": {
             "kind": "primitive"
-          }
-        }
-      ]
-    },
-    {
-      "is_anonymous": true,
-      "identifier": "test.bindingsdenylist/DenyEachBindingOnlyDenyDartTopResponse",
-      "members": [
-        {
-          "name": "result",
-          "location": {
-            "is_virtual": true
-          },
-          "type": {
-            "kind": "identifier",
-            "is_anonymous": true
           }
         }
       ]
@@ -716,22 +668,6 @@
     },
     {
       "is_anonymous": true,
-      "identifier": "test.bindingsdenylist/DenyEachBindingOnlyDenyGoTopResponse",
-      "members": [
-        {
-          "name": "result",
-          "location": {
-            "is_virtual": true
-          },
-          "type": {
-            "kind": "identifier",
-            "is_anonymous": true
-          }
-        }
-      ]
-    },
-    {
-      "is_anonymous": true,
       "identifier": "test.bindingsdenylist/DenyEachBindingOnlyDenyLibfuzzerRequest",
       "members": [
         {
@@ -745,22 +681,6 @@
           },
           "type": {
             "kind": "primitive"
-          }
-        }
-      ]
-    },
-    {
-      "is_anonymous": true,
-      "identifier": "test.bindingsdenylist/DenyEachBindingOnlyDenyLibfuzzerTopResponse",
-      "members": [
-        {
-          "name": "result",
-          "location": {
-            "is_virtual": true
-          },
-          "type": {
-            "kind": "identifier",
-            "is_anonymous": true
           }
         }
       ]
@@ -786,22 +706,6 @@
     },
     {
       "is_anonymous": true,
-      "identifier": "test.bindingsdenylist/DenyEachBindingOnlyDenyRustTopResponse",
-      "members": [
-        {
-          "name": "result",
-          "location": {
-            "is_virtual": true
-          },
-          "type": {
-            "kind": "identifier",
-            "is_anonymous": true
-          }
-        }
-      ]
-    },
-    {
-      "is_anonymous": true,
       "identifier": "test.bindingsdenylist/DenyEachBindingOnlyDenySyzkallerRequest",
       "members": [
         {
@@ -815,22 +719,6 @@
           },
           "type": {
             "kind": "primitive"
-          }
-        }
-      ]
-    },
-    {
-      "is_anonymous": true,
-      "identifier": "test.bindingsdenylist/DenyEachBindingOnlyDenySyzkallerTopResponse",
-      "members": [
-        {
-          "name": "result",
-          "location": {
-            "is_virtual": true
-          },
-          "type": {
-            "kind": "identifier",
-            "is_anonymous": true
           }
         }
       ]

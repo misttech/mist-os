@@ -48,34 +48,15 @@
       ::fidl::internal::NaturalClone(storage_.c)};
 }
 
-::test_protocols::WithErrorSyntaxResponseAsStructTopResponse::Storage_ test_protocols::WithErrorSyntaxResponseAsStructTopResponse::CloneStorage_() const {
-  return Storage_{
-      ::fidl::internal::NaturalClone(storage_.result)};
-}
-
 ::test_protocols::WithErrorSyntaxErrorAsPrimitiveResponse::Storage_ test_protocols::WithErrorSyntaxErrorAsPrimitiveResponse::CloneStorage_() const {
   return Storage_{
       ::fidl::internal::NaturalClone(storage_.__reserved)};
-}
-
-::test_protocols::WithErrorSyntaxErrorAsPrimitiveTopResponse::Storage_ test_protocols::WithErrorSyntaxErrorAsPrimitiveTopResponse::CloneStorage_() const {
-  return Storage_{
-      ::fidl::internal::NaturalClone(storage_.result)};
 }
 
 ::test_protocols::WithErrorSyntaxErrorAsEnumResponse::Storage_ test_protocols::WithErrorSyntaxErrorAsEnumResponse::CloneStorage_() const {
   return Storage_{
       ::fidl::internal::NaturalClone(storage_.__reserved)};
 }
-
-::test_protocols::WithErrorSyntaxErrorAsEnumTopResponse::Storage_ test_protocols::WithErrorSyntaxErrorAsEnumTopResponse::CloneStorage_() const {
-  return Storage_{
-      ::fidl::internal::NaturalClone(storage_.result)};
-}
-
-#ifdef __Fuchsia__
-
-#endif  // __Fuchsia__
 
 #ifdef __Fuchsia__
 

@@ -465,11 +465,9 @@ test_protocols_WithErrorSyntaxResponseAsStructRequestHandles {
 } [packed]
 test_protocols_WithErrorSyntaxResponseAsStructResponse {
     hdr fidl_message_header[268248568430741139]
-    resultInLine test_protocols_WithErrorSyntax_ResponseAsStruct_ResultInLine
-    resultOutOfLine test_protocols_WithErrorSyntax_ResponseAsStruct_ResultOutOfLine
 } [packed]
 test_protocols_WithErrorSyntaxResponseAsStructResponseHandles {
-    result test_protocols_WithErrorSyntax_ResponseAsStruct_ResultHandles
+    void void
 } [packed]
 test_protocols_WithErrorSyntaxErrorAsPrimitiveRequest {
     hdr fidl_message_header[6930994461233198567]
@@ -479,11 +477,9 @@ test_protocols_WithErrorSyntaxErrorAsPrimitiveRequestHandles {
 } [packed]
 test_protocols_WithErrorSyntaxErrorAsPrimitiveResponse {
     hdr fidl_message_header[6930994461233198567]
-    resultInLine test_protocols_WithErrorSyntax_ErrorAsPrimitive_ResultInLine
-    resultOutOfLine test_protocols_WithErrorSyntax_ErrorAsPrimitive_ResultOutOfLine
 } [packed]
 test_protocols_WithErrorSyntaxErrorAsPrimitiveResponseHandles {
-    result test_protocols_WithErrorSyntax_ErrorAsPrimitive_ResultHandles
+    void void
 } [packed]
 test_protocols_WithErrorSyntaxErrorAsEnumRequest {
     hdr fidl_message_header[5491891352371277635]
@@ -493,11 +489,9 @@ test_protocols_WithErrorSyntaxErrorAsEnumRequestHandles {
 } [packed]
 test_protocols_WithErrorSyntaxErrorAsEnumResponse {
     hdr fidl_message_header[5491891352371277635]
-    resultInLine test_protocols_WithErrorSyntax_ErrorAsEnum_ResultInLine
-    resultOutOfLine test_protocols_WithErrorSyntax_ErrorAsEnum_ResultOutOfLine
 } [packed]
 test_protocols_WithErrorSyntaxErrorAsEnumResponseHandles {
-    result test_protocols_WithErrorSyntax_ErrorAsEnum_ResultHandles
+    void void
 } [packed]
 test_protocols_WithErrorSyntaxHandleInResultRequest {
     hdr fidl_message_header[1371676333068455103]
@@ -507,11 +501,9 @@ test_protocols_WithErrorSyntaxHandleInResultRequestHandles {
 } [packed]
 test_protocols_WithErrorSyntaxHandleInResultResponse {
     hdr fidl_message_header[1371676333068455103]
-    resultInLine test_protocols_WithErrorSyntax_HandleInResult_ResultInLine
-    resultOutOfLine test_protocols_WithErrorSyntax_HandleInResult_ResultOutOfLine
 } [packed]
 test_protocols_WithErrorSyntaxHandleInResultResponseHandles {
-    result test_protocols_WithErrorSyntax_HandleInResult_ResultHandles
+    void void
 } [packed]
 
 resource zx_chan_test_protocols_WithErrorSyntax_client[zx_chan]

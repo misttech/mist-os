@@ -265,17 +265,6 @@ func (msg *someProtocolWithCtxSomeMethodRequest) Marshaler() _bindings.Marshaler
 	return _msomeProtocolWithCtxSomeMethodRequest
 }
 
-type someProtocolWithCtxSomeMethodResponse struct {
-	_      struct{}                     `fidl:"s" fidl_size_v2:"16" fidl_alignment_v2:"8"`
-	Result SomeProtocolSomeMethodResult `fidl_offset_v2:"0"`
-}
-
-var _msomeProtocolWithCtxSomeMethodResponse = _bindings.CreateLazyMarshaler(someProtocolWithCtxSomeMethodResponse{})
-
-func (msg *someProtocolWithCtxSomeMethodResponse) Marshaler() _bindings.Marshaler {
-	return _msomeProtocolWithCtxSomeMethodResponse
-}
-
 type I_expressionTag uint64
 
 const (
@@ -372,6 +361,64 @@ func (_m *Expression) GetUnknownData() _bindings.UnknownData {
 	return _m.I_unknownData.(_bindings.UnknownData)
 }
 
+type I_unionMemberTag uint64
+
+const (
+	UnionMember_unknownData = 0 // 0x00000000
+	UnionMemberUnionData    = 2 // 0x00000002
+)
+
+type UnionMember struct {
+	I_unionMemberTag `fidl:"x" fidl_size_v2:"16" fidl_alignment_v2:"8" fidl_resource:"false"`
+	I_unknownData    interface{}
+	UnionData        uint8 `fidl_ordinal:"2"`
+}
+
+var _mUnionMember = _bindings.CreateLazyMarshaler(UnionMember{})
+
+func (msg *UnionMember) Marshaler() _bindings.Marshaler {
+	return _mUnionMember
+}
+
+func (_m *UnionMember) reset() {
+	switch _m.I_unionMemberTag {
+	case 2:
+		var _zeroed uint8
+		_m.UnionData = _zeroed
+	default:
+		var _zeroed interface{}
+		_m.I_unknownData = _zeroed
+	}
+}
+
+func (_m *UnionMember) Which() I_unionMemberTag {
+	switch _m.I_unionMemberTag {
+	case 2:
+		return UnionMemberUnionData
+	default:
+		return UnionMember_unknownData
+	}
+}
+
+func (_m *UnionMember) Ordinal() uint64 {
+	return uint64(_m.I_unionMemberTag)
+}
+
+func (_m *UnionMember) SetUnionData(unionData uint8) {
+	_m.reset()
+	_m.I_unionMemberTag = UnionMemberUnionData
+	_m.UnionData = unionData
+}
+
+func UnionMemberWithUnionData(unionData uint8) UnionMember {
+	var _u UnionMember
+	_u.SetUnionData(unionData)
+	return _u
+}
+func (_m *UnionMember) GetUnknownData() _bindings.UnknownData {
+	return _m.I_unknownData.(_bindings.UnknownData)
+}
+
 type I_someProtocolSomeMethodResultTag uint64
 
 const (
@@ -432,64 +479,6 @@ func SomeProtocolSomeMethodResultWithErr(err SomeProtocolSomeMethodError) SomePr
 	var _u SomeProtocolSomeMethodResult
 	_u.SetErr(err)
 	return _u
-}
-
-type I_unionMemberTag uint64
-
-const (
-	UnionMember_unknownData = 0 // 0x00000000
-	UnionMemberUnionData    = 2 // 0x00000002
-)
-
-type UnionMember struct {
-	I_unionMemberTag `fidl:"x" fidl_size_v2:"16" fidl_alignment_v2:"8" fidl_resource:"false"`
-	I_unknownData    interface{}
-	UnionData        uint8 `fidl_ordinal:"2"`
-}
-
-var _mUnionMember = _bindings.CreateLazyMarshaler(UnionMember{})
-
-func (msg *UnionMember) Marshaler() _bindings.Marshaler {
-	return _mUnionMember
-}
-
-func (_m *UnionMember) reset() {
-	switch _m.I_unionMemberTag {
-	case 2:
-		var _zeroed uint8
-		_m.UnionData = _zeroed
-	default:
-		var _zeroed interface{}
-		_m.I_unknownData = _zeroed
-	}
-}
-
-func (_m *UnionMember) Which() I_unionMemberTag {
-	switch _m.I_unionMemberTag {
-	case 2:
-		return UnionMemberUnionData
-	default:
-		return UnionMember_unknownData
-	}
-}
-
-func (_m *UnionMember) Ordinal() uint64 {
-	return uint64(_m.I_unionMemberTag)
-}
-
-func (_m *UnionMember) SetUnionData(unionData uint8) {
-	_m.reset()
-	_m.I_unionMemberTag = UnionMemberUnionData
-	_m.UnionData = unionData
-}
-
-func UnionMemberWithUnionData(unionData uint8) UnionMember {
-	var _u UnionMember
-	_u.SetUnionData(unionData)
-	return _u
-}
-func (_m *UnionMember) GetUnknownData() _bindings.UnknownData {
-	return _m.I_unknownData.(_bindings.UnknownData)
 }
 
 type FunctionApplication struct {
@@ -642,9 +631,9 @@ type SomeProtocolWithCtxInterface _bindings.ChannelProxy
 
 func (p *SomeProtocolWithCtxInterface) SomeMethod(ctx_ _bindings.Context, unionMember UnionMember, tableMember TableMember) (SomeProtocolSomeMethodResult, error) {
 	req_ := &someProtocolWithCtxSomeMethodRequest{UnionMember: unionMember, TableMember: tableMember}
-	resp_ := &someProtocolWithCtxSomeMethodResponse{}
+	resp_ := &SomeProtocolSomeMethodResult{}
 	err_ := ((*_bindings.ChannelProxy)(p)).Call(SomeProtocolSomeMethodOrdinal, req_, resp_)
-	return (*resp_).Result, err_
+	return (*resp_), err_
 }
 
 type SomeProtocolWithCtx interface {
@@ -675,8 +664,8 @@ func (s_ *SomeProtocolWithCtxStub) Dispatch(args_ _bindings.DispatchArgs) (_bind
 		if err_ := _bindings.Unmarshal(marshalerCtx, args_.Bytes, args_.HandleInfos, in_); err_ != nil {
 			return nil, false, err_
 		}
-		result, err_ := s_.Impl.SomeMethod(args_.Ctx, (*in_).UnionMember, (*in_).TableMember)
-		out_ := &someProtocolWithCtxSomeMethodResponse{Result: result}
+		payload, err_ := s_.Impl.SomeMethod(args_.Ctx, (*in_).UnionMember, (*in_).TableMember)
+		out_ := &payload
 		return out_, true, err_
 	}
 	return nil, false, _bindings.ErrUnknownOrdinal

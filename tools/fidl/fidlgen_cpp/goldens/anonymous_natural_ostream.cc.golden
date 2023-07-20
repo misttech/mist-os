@@ -119,14 +119,6 @@ std::ostream& fidl::ostream::Formatter<::test_anonymous::SomeProtocolSomeMethodR
   os << "}";
   return os;
 }
-std::ostream& fidl::ostream::Formatter<::test_anonymous::SomeProtocolSomeMethodTopResponse>::Format(std::ostream& os, const ::test_anonymous::SomeProtocolSomeMethodTopResponse& value) {
-  os << "test_anonymous::SomeProtocolSomeMethodTopResponse";
-  os << "{ ";
-  os << "result";
-  os << " = " << fidl::ostream::Formatted<::test_anonymous::SomeProtocolSomeMethodResult>(value.result()) << ", ";
-  os << "}";
-  return os;
-}
 std::ostream& fidl::ostream::Formatter<::test_anonymous::FunctionApplication>::Format(std::ostream& os, const ::test_anonymous::FunctionApplication& value) {
   os << "test_anonymous::FunctionApplication";
   os << "{ ";
@@ -250,10 +242,6 @@ std::ostream& operator<<(std::ostream& os, const ::test_anonymous::SomeProtocolS
 
 std::ostream& operator<<(std::ostream& os, const ::test_anonymous::SomeProtocolSomeMethodResult& value) {
   return fidl::ostream::Formatter<::test_anonymous::SomeProtocolSomeMethodResult>::Format(os, value);
-}
-
-std::ostream& operator<<(std::ostream& os, const ::test_anonymous::SomeProtocolSomeMethodTopResponse& value) {
-  return fidl::ostream::Formatter<::test_anonymous::SomeProtocolSomeMethodTopResponse>::Format(os, value);
 }
 
 #pragma clang diagnostic pop

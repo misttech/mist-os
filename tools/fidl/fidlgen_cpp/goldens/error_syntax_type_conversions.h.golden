@@ -55,21 +55,6 @@ struct WireTypeForNaturalType<::test_errorsyntax::ExampleUseOfErrorSyntaxCallWhi
 };
 
 template <>
-struct WireNaturalConversionTraits<::test_errorsyntax::wire::ExampleUseOfErrorSyntaxCallWhichMayFailTopResponse, ::test_errorsyntax::ExampleUseOfErrorSyntaxCallWhichMayFailTopResponse> {
-  static ::test_errorsyntax::ExampleUseOfErrorSyntaxCallWhichMayFailTopResponse ToNatural(::test_errorsyntax::wire::ExampleUseOfErrorSyntaxCallWhichMayFailTopResponse src);
-  static ::test_errorsyntax::wire::ExampleUseOfErrorSyntaxCallWhichMayFailTopResponse ToWire(fidl::AnyArena& arena, ::test_errorsyntax::ExampleUseOfErrorSyntaxCallWhichMayFailTopResponse src);
-};
-
-template <>
-struct NaturalTypeForWireType<::test_errorsyntax::wire::ExampleUseOfErrorSyntaxCallWhichMayFailTopResponse> {
-  using type = ::test_errorsyntax::ExampleUseOfErrorSyntaxCallWhichMayFailTopResponse;
-};
-template <>
-struct WireTypeForNaturalType<::test_errorsyntax::ExampleUseOfErrorSyntaxCallWhichMayFailTopResponse> {
-  using type = ::test_errorsyntax::wire::ExampleUseOfErrorSyntaxCallWhichMayFailTopResponse;
-};
-
-template <>
 struct WireNaturalConversionTraits<::test_errorsyntax::wire::ExampleUseOfErrorSyntaxCallWhichMayFailResult, ::test_errorsyntax::ExampleUseOfErrorSyntaxCallWhichMayFailResult> {
   static ::test_errorsyntax::ExampleUseOfErrorSyntaxCallWhichMayFailResult ToNatural(::test_errorsyntax::wire::ExampleUseOfErrorSyntaxCallWhichMayFailResult src);
   static ::test_errorsyntax::wire::ExampleUseOfErrorSyntaxCallWhichMayFailResult ToWire(fidl::AnyArena& arena, ::test_errorsyntax::ExampleUseOfErrorSyntaxCallWhichMayFailResult src);
