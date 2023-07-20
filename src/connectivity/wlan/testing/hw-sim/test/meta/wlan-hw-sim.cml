@@ -1,0 +1,97 @@
+// Copyright 2023 The Fuchsia Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style license that can be
+// found in the LICENSE file.
+{
+    include: [
+        "//sdk/lib/driver_test_realm/meta/client.shard.cml",
+        "syslog/client.shard.cml",
+    ],
+    children: [
+        {
+            name: "stash",
+            url: "#meta/stash_secure.cm",
+        },
+        {
+            name: "wlancfg",
+            url: "#meta/wlancfg.cm",
+        },
+        {
+            name: "wlandevicemonitor",
+            url: "#meta/wlandevicemonitor.cm",
+        },
+        {
+            name: "regulatory_region",
+            url: "#meta/regulatory_region.cm",
+        },
+    ],
+    offer: [
+        {
+            protocol: "fuchsia.logger.LogSink",
+            from: "parent",
+            to: [
+                "#regulatory_region",
+                "#stash",
+                "#wlancfg",
+                "#wlandevicemonitor",
+            ],
+        },
+        {
+            protocol: "fuchsia.stash.SecureStore",
+            from: "#stash",
+            to: "#wlancfg",
+        },
+        {
+            protocol: "fuchsia.location.namedplace.RegulatoryRegionWatcher",
+            from: "#regulatory_region",
+            to: "#wlancfg",
+        },
+        {
+            protocol: "fuchsia.wlan.device.service.DeviceMonitor",
+            from: "#wlandevicemonitor",
+            to: [ "#wlancfg" ],
+            dependency: "weak",
+        },
+        {
+            directory: "dev-class",
+            from: "#driver_test_realm",
+            as: "dev-wlanphy",
+            to: "#wlandevicemonitor",
+            subdir: "wlanphy",
+        },
+        {
+            storage: "data",
+            from: "parent",
+            to: [
+                "#stash",
+                "#wlancfg",
+            ],
+        },
+        {
+            storage: "cache",
+            from: "parent",
+            to: "#regulatory_region",
+        },
+    ],
+    expose: [
+        {
+            protocol: [
+                "fuchsia.wlan.policy.AccessPointProvider",
+                "fuchsia.wlan.policy.ClientProvider",
+            ],
+            from: "#wlancfg",
+        },
+        {
+            protocol: "fuchsia.wlan.device.service.DeviceMonitor",
+            from: "#wlandevicemonitor",
+        },
+        {
+            protocol: "fuchsia.driver.test.Realm",
+            from: "#driver_test_realm",
+        },
+        {
+            directory: "dev-topological",
+            from: "#driver_test_realm",
+            rights: [ "r*" ],
+        },
+    ],
+}
