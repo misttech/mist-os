@@ -120,7 +120,7 @@ async fn create_test_realm<'a, N: Netstack>(
         .expect("join network with realm should succeed");
 
     let server_realm: netemul::TestRealm<'_> = sandbox
-        .create_netstack_realm_with::<netstack_testing_common::realms::Netstack2, _, _>(
+        .create_netstack_realm_with::<N, _, _>(
             "server-realm",
             &[KnownServiceProvider::DhcpServer { persistent: false }],
         )
@@ -543,7 +543,7 @@ async fn watch_configuration_handles_interface_removal<N: Netstack>(name: &str) 
     let sock = fasync::net::UdpSocket::bind_in_realm(
         &server_realm,
         std::net::SocketAddr::V4(std::net::SocketAddrV4::new(
-            std::net::Ipv4Addr::BROADCAST,
+            std::net::Ipv4Addr::UNSPECIFIED,
             dhcp_protocol::SERVER_PORT.into(),
         )),
     )
