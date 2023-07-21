@@ -15,8 +15,8 @@ use {
             object_record::{AttributeKey, Timestamp},
             transaction::{LockKey, Options, TRANSACTION_METADATA_MAX_AMOUNT},
             writeback_cache::{FlushableMetadata, StorageReservation, WritebackCache},
-            AssocObj, HandleOwner, Mutation, ObjectKey, ObjectStore, ObjectValue,
-            StoreObjectHandle, TrimMode, TrimResult,
+            AssocObj, DataObjectHandle, HandleOwner, Mutation, ObjectKey, ObjectStore, ObjectValue,
+            TrimMode, TrimResult,
         },
         round::{how_many, round_up},
     },
@@ -32,12 +32,12 @@ pub use crate::object_store::writeback_cache::CACHE_READ_AHEAD_SIZE;
 const FLUSH_BATCH_SIZE: u64 = 524_288;
 
 pub struct CachingObjectHandle<S: HandleOwner> {
-    handle: StoreObjectHandle<S>,
+    handle: DataObjectHandle<S>,
     cache: WritebackCache<S::Buffer>,
 }
 
 impl<S: HandleOwner> CachingObjectHandle<S> {
-    pub fn new(handle: StoreObjectHandle<S>) -> Self {
+    pub fn new(handle: DataObjectHandle<S>) -> Self {
         let size = handle.get_size();
         let buffer = handle.owner().create_data_buffer(handle.object_id(), size);
         Self { handle, cache: WritebackCache::new(buffer) }
@@ -55,7 +55,7 @@ impl<S: HandleOwner> CachingObjectHandle<S> {
         &self.cache.data_buffer()
     }
 
-    pub fn uncached_handle(&self) -> &StoreObjectHandle<S> {
+    pub fn uncached_handle(&self) -> &DataObjectHandle<S> {
         &self.handle
     }
 

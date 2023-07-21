@@ -5,6 +5,7 @@
 pub mod allocator;
 pub mod basic_object_handle;
 pub mod caching_object_handle;
+mod data_object_handle;
 pub mod directory;
 mod extent_record;
 mod flush;
@@ -15,7 +16,6 @@ mod merge;
 pub mod object_manager;
 mod object_record;
 pub mod project_id;
-mod store_object_handle;
 #[cfg(test)]
 mod testing;
 pub mod transaction;
@@ -26,10 +26,10 @@ pub mod writeback_cache;
 
 pub use basic_object_handle::{BasicObjectHandle, SetExtendedAttributeMode};
 pub use caching_object_handle::CachingObjectHandle;
+pub use data_object_handle::{DataObjectHandle, DirectWriter};
 pub use directory::Directory;
 pub use key_manager::KeyUnwrapper;
 pub use object_record::{ChildValue, ObjectDescriptor, PosixAttributes, Timestamp};
-pub use store_object_handle::{DirectWriter, StoreObjectHandle};
 
 use {
     crate::{
@@ -109,7 +109,7 @@ const OBJECT_ID_HI_MASK: u64 = 0xffffffff00000000;
 // At time of writing, this threshold limits transactions that delete extents to about 10,000 bytes.
 const TRANSACTION_MUTATION_THRESHOLD: usize = 200;
 
-/// StoreObjectHandle stores an owner that must implement this trait, which allows the handle to get
+/// DataObjectHandle stores an owner that must implement this trait, which allows the handle to get
 /// back to an ObjectStore and provides a callback for creating a data buffer for the handle.
 pub trait HandleOwner: AsRef<ObjectStore> + Send + Sync + 'static {
     type Buffer: DataBuffer;
@@ -460,7 +460,7 @@ pub struct ObjectStore {
     // has been replayed, so during that time, store_info_handle will be None and records
     // just get sent to the tree. Once the journal has been replayed, we can open the store
     // and load all the other layer information.
-    store_info_handle: OnceCell<StoreObjectHandle<ObjectStore>>,
+    store_info_handle: OnceCell<DataObjectHandle<ObjectStore>>,
 
     // The cipher to use for encrypted mutations, if this store is encrypted.
     mutations_cipher: Mutex<Option<StreamCipher>>,
@@ -819,7 +819,7 @@ impl ObjectStore {
         object_id: u64,
         options: HandleOptions,
         mut crypt: Option<Arc<dyn Crypt>>,
-    ) -> Result<StoreObjectHandle<S>, Error> {
+    ) -> Result<DataObjectHandle<S>, Error> {
         let store = owner.as_ref().as_ref();
         let store_crypt = store.crypt();
         if crypt.is_none() {
@@ -851,7 +851,7 @@ impl ObjectStore {
             .ok_or(FxfsError::NotFound)?;
         if let ObjectValue::Attribute { size } = item.value {
             ensure!(size <= MAX_FILE_SIZE, FxfsError::Inconsistent);
-            Ok(StoreObjectHandle::new(
+            Ok(DataObjectHandle::new(
                 owner.clone(),
                 object_id,
                 keys,
@@ -874,7 +874,7 @@ impl ObjectStore {
         options: HandleOptions,
         mut crypt: Option<&dyn Crypt>,
         create_attributes: Option<&fio::MutableNodeAttributes>,
-    ) -> Result<StoreObjectHandle<S>, Error> {
+    ) -> Result<DataObjectHandle<S>, Error> {
         let store = owner.as_ref().as_ref();
         if object_id == INVALID_OBJECT_ID {
             object_id = store.get_next_object_id().await?;
@@ -932,7 +932,7 @@ impl ObjectStore {
                 ObjectValue::attribute(0),
             ),
         );
-        Ok(StoreObjectHandle::new(
+        Ok(DataObjectHandle::new(
             owner.clone(),
             object_id,
             unwrapped_keys.map(KeyUnwrapper::new_from_unwrapped),
@@ -953,7 +953,7 @@ impl ObjectStore {
         options: HandleOptions,
         crypt: Option<&dyn Crypt>,
         create_attributes: Option<&fio::MutableNodeAttributes>,
-    ) -> Result<StoreObjectHandle<S>, Error> {
+    ) -> Result<DataObjectHandle<S>, Error> {
         ObjectStore::create_object_with_id(
             owner,
             &mut transaction,

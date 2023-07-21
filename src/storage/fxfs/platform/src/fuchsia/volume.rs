@@ -874,7 +874,7 @@ mod tests {
     #[fuchsia::test]
     async fn test_background_flush() {
         // We have to do a bit of set-up ourselves for this test, since we want to be able to access
-        // the underlying StoreObjectHandle at the same time as the FxFile which corresponds to it.
+        // the underlying DataObjectHandle at the same time as the FxFile which corresponds to it.
         let device = DeviceHolder::new(FakeDevice::new(8192, 512));
         let filesystem = FxFilesystem::new_empty(device).await.unwrap();
         {
@@ -953,7 +953,7 @@ mod tests {
     #[fuchsia::test(threads = 2)]
     async fn test_background_flush_with_warning_memory_pressure() {
         // We have to do a bit of set-up ourselves for this test, since we want to be able to access
-        // the underlying StoreObjectHandle at the same time as the FxFile which corresponds to it.
+        // the underlying DataObjectHandle at the same time as the FxFile which corresponds to it.
         let device = DeviceHolder::new(FakeDevice::new(8192, 512));
         let filesystem = FxFilesystem::new_empty(device).await.unwrap();
         {
@@ -1050,7 +1050,7 @@ mod tests {
     #[fuchsia::test(threads = 2)]
     async fn test_background_flush_with_critical_memory_pressure() {
         // We have to do a bit of set-up ourselves for this test, since we want to be able to access
-        // the underlying StoreObjectHandle at the same time as the FxFile which corresponds to it.
+        // the underlying DataObjectHandle at the same time as the FxFile which corresponds to it.
         let device = DeviceHolder::new(FakeDevice::new(8192, 512));
         let filesystem = FxFilesystem::new_empty(device).await.unwrap();
         {

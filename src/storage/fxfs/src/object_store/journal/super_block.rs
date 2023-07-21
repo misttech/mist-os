@@ -43,8 +43,8 @@ use {
             },
             transaction::{AssocObj, Options},
             tree::MajorCompactable,
-            HandleOptions, HandleOwner, Mutation, ObjectKey, ObjectStore, ObjectValue,
-            StoreObjectHandle,
+            DataObjectHandle, HandleOptions, HandleOwner, Mutation, ObjectKey, ObjectStore,
+            ObjectValue,
         },
         range::RangeExt,
         serialized_types::{
@@ -313,7 +313,7 @@ async fn read(
 async fn write<S: HandleOwner>(
     super_block_header: &SuperBlockHeader,
     items: LayerSet<ObjectKey, ObjectValue>,
-    handle: StoreObjectHandle<S>,
+    handle: DataObjectHandle<S>,
 ) -> Result<(), Error> {
     let object_manager = handle.store().filesystem().object_manager().clone();
     // TODO(fxbug.dev/95404): Don't use the same code here for Journal and SuperBlock. They
@@ -485,7 +485,7 @@ impl SuperBlockHeader {
     /// wipe out any stale super-blocks when rewriting Fxfs.
     /// This isn't a secure shred in any way, it just ensures the super-block is not recognized as a
     /// super-block.
-    pub async fn shred<S: HandleOwner>(handle: StoreObjectHandle<S>) -> Result<(), Error> {
+    pub async fn shred<S: HandleOwner>(handle: DataObjectHandle<S>) -> Result<(), Error> {
         let mut buf =
             handle.store().device().allocate_buffer(handle.store().device().block_size() as usize);
         buf.as_mut_slice().fill(0u8);
@@ -556,14 +556,14 @@ impl SuperBlockHeader {
 }
 
 struct SuperBlockWriter<'a, S: HandleOwner> {
-    handle: StoreObjectHandle<S>,
+    handle: DataObjectHandle<S>,
     writer: JournalWriter,
     next_extent_offset: u64,
     reservation: &'a Reservation,
 }
 
 impl<'a, S: HandleOwner> SuperBlockWriter<'a, S> {
-    fn new(handle: StoreObjectHandle<S>, reservation: &'a Reservation) -> Self {
+    fn new(handle: DataObjectHandle<S>, reservation: &'a Reservation) -> Self {
         Self {
             handle,
             writer: JournalWriter::new(BLOCK_SIZE as usize, 0),
@@ -641,7 +641,7 @@ mod tests {
                 allocator::Allocator,
                 journal::JournalCheckpoint,
                 transaction::{Options, TransactionHandler},
-                HandleOptions, ObjectHandle, ObjectKey, ObjectStore, StoreObjectHandle,
+                DataObjectHandle, HandleOptions, ObjectHandle, ObjectKey, ObjectStore,
             },
             serialized_types::LATEST_VERSION,
         },
@@ -655,7 +655,7 @@ mod tests {
     const TEST_DEVICE_BLOCK_COUNT: u64 = 16384;
 
     async fn filesystem_and_super_block_handles(
-    ) -> (OpenFxFilesystem, StoreObjectHandle<ObjectStore>, StoreObjectHandle<ObjectStore>) {
+    ) -> (OpenFxFilesystem, DataObjectHandle<ObjectStore>, DataObjectHandle<ObjectStore>) {
         let device =
             DeviceHolder::new(FakeDevice::new(TEST_DEVICE_BLOCK_COUNT, TEST_DEVICE_BLOCK_SIZE));
         let fs = FxFilesystem::new_empty(device).await.expect("new_empty failed");
@@ -728,7 +728,7 @@ mod tests {
             transaction.commit().await.expect("commit failed");
         }
 
-        // Note here that StoreObjectHandle caches the size given to it at construction.
+        // Note here that DataObjectHandle caches the size given to it at construction.
         // If we want to know the true size after a super-block has been written, we need
         // a new handle.
         assert!(

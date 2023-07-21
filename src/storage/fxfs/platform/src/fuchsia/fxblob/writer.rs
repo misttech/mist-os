@@ -32,7 +32,7 @@ use {
         object_store::{
             directory::{replace_child_with_object, ObjectDescriptor, ReplacedChild},
             transaction::{LockKey, Options},
-            StoreObjectHandle, Timestamp, BLOB_MERKLE_ATTRIBUTE_ID,
+            DataObjectHandle, Timestamp, BLOB_MERKLE_ATTRIBUTE_ID,
         },
         round::{round_down, round_up},
         serialized_types::BlobMetadata,
@@ -73,7 +73,7 @@ pub trait BlobWriterProtocol {
 /// The blob cannot be read until writes complete and hash is verified.
 pub struct FxDeliveryBlob {
     hash: Hash,
-    handle: StoreObjectHandle<FxVolume>,
+    handle: DataObjectHandle<FxVolume>,
     parent: Arc<BlobDirectory>,
     open_count: AtomicUsize,
     is_completed: AtomicBool,
@@ -146,7 +146,7 @@ impl Inner {
         header.payload_length
     }
 
-    async fn write_payload(&mut self, handle: &StoreObjectHandle<FxVolume>) -> Result<(), Error> {
+    async fn write_payload(&mut self, handle: &DataObjectHandle<FxVolume>) -> Result<(), Error> {
         debug_assert!(self.allocated_space);
         let final_write =
             (self.payload_persisted as usize + self.buffer.len()) == self.header().payload_length;
@@ -223,7 +223,7 @@ impl FxDeliveryBlob {
     pub(crate) fn new(
         parent: Arc<BlobDirectory>,
         hash: Hash,
-        handle: StoreObjectHandle<FxVolume>,
+        handle: DataObjectHandle<FxVolume>,
     ) -> Arc<Self> {
         let file = Arc::new(Self {
             hash,

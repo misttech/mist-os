@@ -24,9 +24,8 @@ use {
         object_handle::{ObjectHandle, ObjectHandleExt, INVALID_OBJECT_ID},
         object_store::{
             object_manager::ReservationUpdate,
-            store_object_handle::DirectWriter,
             transaction::{AllocatorMutation, AssocObj, LockKey, Mutation, Options, Transaction},
-            tree, CachingObjectHandle, HandleOptions, ObjectStore,
+            tree, CachingObjectHandle, DirectWriter, HandleOptions, ObjectStore,
         },
         range::RangeExt,
         round::{round_div, round_down},

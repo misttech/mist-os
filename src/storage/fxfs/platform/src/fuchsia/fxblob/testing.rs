@@ -11,7 +11,7 @@ use {
     delivery_blob::{delivery_blob_path, CompressionMode, Type1Blob},
     fidl_fuchsia_io::{self as fio, MAX_TRANSFER_SIZE},
     fuchsia_merkle::{Hash, MerkleTreeBuilder},
-    fxfs::object_store::{directory::Directory, HandleOptions, ObjectStore, StoreObjectHandle},
+    fxfs::object_store::{directory::Directory, DataObjectHandle, HandleOptions, ObjectStore},
     storage_device::{fake_device::FakeDevice, DeviceHolder},
 };
 
@@ -28,7 +28,7 @@ pub async fn new_blob_fixture() -> TestFixture {
 pub trait BlobFixture {
     async fn write_blob(&self, data: &[u8]) -> Hash;
     async fn read_blob(&self, name: &str) -> Vec<u8>;
-    async fn get_blob_handle(&self, name: &str) -> StoreObjectHandle<FxVolume>;
+    async fn get_blob_handle(&self, name: &str) -> DataObjectHandle<FxVolume>;
 }
 
 #[async_trait]
@@ -76,7 +76,7 @@ impl BlobFixture for TestFixture {
         data
     }
 
-    async fn get_blob_handle(&self, name: &str) -> StoreObjectHandle<FxVolume> {
+    async fn get_blob_handle(&self, name: &str) -> DataObjectHandle<FxVolume> {
         let root_object_id = self.volume().volume().store().root_directory_object_id();
         let root_dir =
             Directory::open(self.volume().volume(), root_object_id).await.expect("open failed");

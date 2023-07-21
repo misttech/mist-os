@@ -25,7 +25,7 @@ use {
     },
 };
 
-/// To read the super-block and journal, we use this handle since we cannot use StoreObjectHandle
+/// To read the super-block and journal, we use this handle since we cannot use DataObjectHandle
 /// until we've replayed the whole journal.  Clients must supply the extents to be used.
 pub struct BootstrapObjectHandle {
     object_id: u64,

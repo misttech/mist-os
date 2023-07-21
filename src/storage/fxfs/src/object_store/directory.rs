@@ -16,8 +16,8 @@ use {
                 ObjectValue, PosixAttributes, Timestamp,
             },
             transaction::{LockKey, Mutation, Options, Transaction},
-            BasicObjectHandle, HandleOptions, HandleOwner, ObjectStore, SetExtendedAttributeMode,
-            StoreObjectHandle,
+            BasicObjectHandle, DataObjectHandle, HandleOptions, HandleOwner, ObjectStore,
+            SetExtendedAttributeMode,
         },
         trace_duration,
     },
@@ -252,7 +252,7 @@ impl<S: HandleOwner> Directory<S> {
         &self,
         transaction: &mut Transaction<'a>,
         name: &str,
-        handle: &StoreObjectHandle<S>,
+        handle: &DataObjectHandle<S>,
     ) -> Result<(), Error> {
         ensure!(!self.is_deleted(), FxfsError::Deleted);
         transaction.add(
@@ -325,7 +325,7 @@ impl<S: HandleOwner> Directory<S> {
         transaction: &mut Transaction<'a>,
         name: &str,
         create_attributes: Option<&fio::MutableNodeAttributes>,
-    ) -> Result<StoreObjectHandle<S>, Error> {
+    ) -> Result<DataObjectHandle<S>, Error> {
         ensure!(!self.is_deleted(), FxfsError::Deleted);
         let handle = ObjectStore::create_object(
             &self.owner,

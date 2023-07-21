@@ -49,8 +49,8 @@ use {
                 ObjectStoreMutation, Options, Transaction, TxnMutation,
                 TRANSACTION_MAX_JOURNAL_USAGE,
             },
-            HandleOptions, HandleOwner, Item, ItemRef, LastObjectId, LockState,
-            NewChildStoreOptions, ObjectStore, StoreObjectHandle, INVALID_OBJECT_ID,
+            DataObjectHandle, HandleOptions, HandleOwner, Item, ItemRef, LastObjectId, LockState,
+            NewChildStoreOptions, ObjectStore, INVALID_OBJECT_ID,
         },
         range::RangeExt,
         round::{round_div, round_down, round_up},
@@ -198,7 +198,7 @@ pub(super) fn journal_handle_options() -> HandleOptions {
 /// ability to have mutations that are to be applied atomically together.
 pub struct Journal {
     objects: Arc<ObjectManager>,
-    handle: OnceCell<StoreObjectHandle<ObjectStore>>,
+    handle: OnceCell<DataObjectHandle<ObjectStore>>,
     super_block_manager: SuperBlockManager,
     inner: Mutex<Inner>,
     writer_mutex: futures::lock::Mutex<()>,
@@ -324,10 +324,10 @@ pub trait JournalHandle: ReadObjectHandle {
     fn discard_extents(&mut self, discard_offset: u64);
 }
 
-// Provide a stub implementation for StoreObjectHandle so we can use it in
+// Provide a stub implementation for DataObjectHandle so we can use it in
 // Journal::read_transactions.  Manual extent management is a NOP (which is OK since presumably the
-// StoreObjectHandle already knows where its extents live).
-impl<S: HandleOwner> JournalHandle for StoreObjectHandle<S> {
+// DataObjectHandle already knows where its extents live).
+impl<S: HandleOwner> JournalHandle for DataObjectHandle<S> {
     fn start_offset(&self) -> Option<u64> {
         None
     }

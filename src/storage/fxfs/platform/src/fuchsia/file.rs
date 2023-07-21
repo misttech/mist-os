@@ -22,7 +22,7 @@ use {
         filesystem::SyncOptions,
         log::*,
         object_handle::{ObjectHandle, ObjectProperties, ReadObjectHandle},
-        object_store::{StoreObjectHandle, Timestamp},
+        object_store::{DataObjectHandle, Timestamp},
         round::{round_down, round_up},
     },
     once_cell::sync::Lazy,
@@ -56,7 +56,7 @@ pub struct FxFile {
 }
 
 impl FxFile {
-    pub fn new(handle: StoreObjectHandle<FxVolume>) -> Arc<Self> {
+    pub fn new(handle: DataObjectHandle<FxVolume>) -> Arc<Self> {
         let file = Arc::new(Self {
             handle: PagedObjectHandle::new(handle),
             open_count: AtomicUsize::new(0),

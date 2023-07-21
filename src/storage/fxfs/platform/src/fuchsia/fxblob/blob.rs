@@ -32,7 +32,7 @@ use {
         errors::FxfsError,
         log::*,
         object_handle::{GetProperties, ObjectHandle, ObjectProperties, ReadObjectHandle},
-        object_store::{HandleOwner, StoreObjectHandle},
+        object_store::{DataObjectHandle, HandleOwner},
         round::{round_down, round_up},
     },
     once_cell::sync::{Lazy, OnceCell},
@@ -76,7 +76,7 @@ pub async fn init_vmex_resource() -> Result<(), Error> {
 
 /// Represents an immutable blob stored on Fxfs with associated an merkle tree.
 pub struct FxBlob {
-    handle: StoreObjectHandle<FxVolume>,
+    handle: DataObjectHandle<FxVolume>,
     buffer: VmoDataBuffer,
     open_count: AtomicUsize,
     merkle_tree: MerkleTree,
@@ -87,7 +87,7 @@ pub struct FxBlob {
 
 impl FxBlob {
     pub fn new(
-        handle: StoreObjectHandle<FxVolume>,
+        handle: DataObjectHandle<FxVolume>,
         merkle_tree: MerkleTree,
         compressed_chunk_size: u64,
         compressed_offsets: Vec<u64>,

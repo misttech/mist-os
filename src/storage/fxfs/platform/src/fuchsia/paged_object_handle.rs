@@ -23,8 +23,8 @@ use {
             transaction::{
                 AssocObj, LockKey, Mutation, Options, Transaction, TRANSACTION_METADATA_MAX_AMOUNT,
             },
-            AttributeKey, BasicObjectHandle, HandleOwner, ObjectKey, ObjectStore, ObjectValue,
-            StoreObjectHandle, Timestamp,
+            AttributeKey, BasicObjectHandle, DataObjectHandle, HandleOwner, ObjectKey, ObjectStore,
+            ObjectValue, Timestamp,
         },
         round::{how_many, round_up},
     },
@@ -52,7 +52,7 @@ const SPARE_SIZE: u64 = TRANSACTION_METADATA_MAX_AMOUNT;
 pub struct PagedObjectHandle {
     inner: Mutex<Inner>,
     buffer: VmoDataBuffer,
-    handle: StoreObjectHandle<FxVolume>,
+    handle: DataObjectHandle<FxVolume>,
 }
 
 struct Inner {
@@ -222,7 +222,7 @@ impl Inner {
 }
 
 impl PagedObjectHandle {
-    pub fn new(handle: StoreObjectHandle<FxVolume>) -> Self {
+    pub fn new(handle: DataObjectHandle<FxVolume>) -> Self {
         let size = handle.get_size();
         Self {
             buffer: handle.owner().create_data_buffer(handle.object_id(), size),
@@ -275,7 +275,7 @@ impl PagedObjectHandle {
         self.store().filesystem().allocator()
     }
 
-    pub fn uncached_handle(&self) -> &StoreObjectHandle<FxVolume> {
+    pub fn uncached_handle(&self) -> &DataObjectHandle<FxVolume> {
         &self.handle
     }
 
@@ -975,7 +975,7 @@ impl FlushBatch {
         &self,
         transaction: &mut Transaction<'a>,
         vmo_data_buffer: &VmoDataBuffer,
-        handle: &'a StoreObjectHandle<FxVolume>,
+        handle: &'a DataObjectHandle<FxVolume>,
         content_size: u64,
     ) -> Result<(), Error> {
         for range in &self.ranges {

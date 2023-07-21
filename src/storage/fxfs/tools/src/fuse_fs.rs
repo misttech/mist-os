@@ -15,8 +15,8 @@ use {
         log::info,
         object_handle::{GetProperties, ObjectProperties},
         object_store::{
-            volume::root_volume, Directory, HandleOptions, ObjectDescriptor, ObjectKey, ObjectKind,
-            ObjectStore, ObjectValue, StoreObjectHandle, Timestamp,
+            volume::root_volume, DataObjectHandle, Directory, HandleOptions, ObjectDescriptor,
+            ObjectKey, ObjectKind, ObjectStore, ObjectValue, Timestamp,
         },
     },
     fxfs_crypto::Crypt,
@@ -70,7 +70,7 @@ pub struct FuseFs {
     pub mount_path: String,
     // Each entry in object_handle_cache stores an object_handle and a counter that is incremented
     // on its open/create and decremented on its release.
-    pub object_handle_cache: Arc<RwLock<HashMap<u64, (Arc<StoreObjectHandle<ObjectStore>>, u32)>>>,
+    pub object_handle_cache: Arc<RwLock<HashMap<u64, (Arc<DataObjectHandle<ObjectStore>>, u32)>>>,
 }
 
 impl FuseFs {
@@ -206,7 +206,7 @@ impl FuseFs {
     pub async fn get_object_handle(
         &self,
         object_id: u64,
-    ) -> FxfsResult<Arc<StoreObjectHandle<ObjectStore>>> {
+    ) -> FxfsResult<Arc<DataObjectHandle<ObjectStore>>> {
         {
             // Check in the cache if the handle of requested object exists.
             // Functions that have a matching create/open call should have the object handle in cache.
@@ -237,7 +237,7 @@ impl FuseFs {
     pub async fn load_object_handle(
         &self,
         object_id: u64,
-    ) -> FxfsResult<Arc<StoreObjectHandle<ObjectStore>>> {
+    ) -> FxfsResult<Arc<DataObjectHandle<ObjectStore>>> {
         let mut object_handle_cache = self.object_handle_cache.write().await;
 
         if let Some((handle, counter)) = object_handle_cache.get_mut(&object_id) {

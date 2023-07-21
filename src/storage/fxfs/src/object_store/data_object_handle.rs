@@ -47,7 +47,7 @@ use {
     storage_device::buffer::{Buffer, BufferRef, MutableBufferRef},
 };
 
-pub struct StoreObjectHandle<S: HandleOwner> {
+pub struct DataObjectHandle<S: HandleOwner> {
     owner: Arc<S>,
     object_id: u64,
     attribute_id: u64,
@@ -57,7 +57,7 @@ pub struct StoreObjectHandle<S: HandleOwner> {
     content_size: AtomicU64,
 }
 
-impl<S: HandleOwner> StoreObjectHandle<S> {
+impl<S: HandleOwner> DataObjectHandle<S> {
     pub fn new(
         owner: Arc<S>,
         object_id: u64,
@@ -1489,7 +1489,7 @@ impl<S: HandleOwner> StoreObjectHandle<S> {
     }
 }
 
-impl<S: HandleOwner> AssociatedObject for StoreObjectHandle<S> {
+impl<S: HandleOwner> AssociatedObject for DataObjectHandle<S> {
     fn will_apply_mutation(&self, mutation: &Mutation, _object_id: u64, _manager: &ObjectManager) {
         match mutation {
             Mutation::ObjectStore(ObjectStoreMutation {
@@ -1501,7 +1501,7 @@ impl<S: HandleOwner> AssociatedObject for StoreObjectHandle<S> {
     }
 }
 
-impl<S: HandleOwner> ObjectHandle for StoreObjectHandle<S> {
+impl<S: HandleOwner> ObjectHandle for DataObjectHandle<S> {
     fn set_trace(&self, v: bool) {
         info!(store_id = self.store().store_object_id, oid = self.object_id(), trace = v, "trace");
         self.trace.store(v, atomic::Ordering::Relaxed);
@@ -1525,7 +1525,7 @@ impl<S: HandleOwner> ObjectHandle for StoreObjectHandle<S> {
 }
 
 #[async_trait]
-impl<S: HandleOwner> GetProperties for StoreObjectHandle<S> {
+impl<S: HandleOwner> GetProperties for DataObjectHandle<S> {
     async fn get_properties(&self) -> Result<ObjectProperties, Error> {
         // Take a read guard since we need to return a consistent view of all object properties.
         let fs = self.store().filesystem();
@@ -1563,14 +1563,14 @@ impl<S: HandleOwner> GetProperties for StoreObjectHandle<S> {
 }
 
 #[async_trait]
-impl<S: HandleOwner> ReadObjectHandle for StoreObjectHandle<S> {
+impl<S: HandleOwner> ReadObjectHandle for DataObjectHandle<S> {
     async fn read(&self, offset: u64, buf: MutableBufferRef<'_>) -> Result<usize, Error> {
         self.read_from(self.attribute_id(), offset, buf).await
     }
 }
 
 #[async_trait]
-impl<S: HandleOwner> WriteObjectHandle for StoreObjectHandle<S> {
+impl<S: HandleOwner> WriteObjectHandle for DataObjectHandle<S> {
     async fn write_or_append(&self, offset: Option<u64>, buf: BufferRef<'_>) -> Result<u64, Error> {
         let offset = offset.unwrap_or(self.get_size());
         let mut transaction = self.new_transaction().await?;
@@ -1597,7 +1597,7 @@ impl<S: HandleOwner> WriteObjectHandle for StoreObjectHandle<S> {
             return Ok(());
         }
         let mut transaction = self.new_transaction().await?;
-        StoreObjectHandle::write_timestamps(self, &mut transaction, crtime, mtime).await?;
+        DataObjectHandle::write_timestamps(self, &mut transaction, crtime, mtime).await?;
         transaction.commit().await?;
         Ok(())
     }
@@ -1610,7 +1610,7 @@ impl<S: HandleOwner> WriteObjectHandle for StoreObjectHandle<S> {
 /// Like object_handle::Writer, but allows custom transaction options to be set, and makes every
 /// write go directly to the handle in a transaction.
 pub struct DirectWriter<'a, S: HandleOwner> {
-    handle: &'a StoreObjectHandle<S>,
+    handle: &'a DataObjectHandle<S>,
     options: transaction::Options<'a>,
     buffer: Buffer<'a>,
     offset: u64,
@@ -1628,7 +1628,7 @@ impl<S: HandleOwner> Drop for DirectWriter<'_, S> {
 }
 
 impl<'a, S: HandleOwner> DirectWriter<'a, S> {
-    pub fn new(handle: &'a StoreObjectHandle<S>, options: transaction::Options<'a>) -> Self {
+    pub fn new(handle: &'a DataObjectHandle<S>, options: transaction::Options<'a>) -> Self {
         Self {
             handle,
             options,
@@ -1717,7 +1717,7 @@ mod tests {
                 object_record::{ObjectKey, ObjectValue, Timestamp},
                 transaction::{Mutation, Options, TransactionHandler},
                 volume::root_volume,
-                Directory, HandleOptions, LockKey, ObjectStore, PosixAttributes, StoreObjectHandle,
+                DataObjectHandle, Directory, HandleOptions, LockKey, ObjectStore, PosixAttributes,
                 TRANSACTION_MUTATION_THRESHOLD,
             },
             round::{round_down, round_up},
@@ -1754,7 +1754,7 @@ mod tests {
     async fn test_filesystem_and_object_with_key(
         crypt: Option<&dyn Crypt>,
         write_object_test_data: bool,
-    ) -> (OpenFxFilesystem, StoreObjectHandle<ObjectStore>) {
+    ) -> (OpenFxFilesystem, DataObjectHandle<ObjectStore>) {
         let fs = test_filesystem().await;
         let store = fs.root_store();
         let object;
@@ -1799,11 +1799,11 @@ mod tests {
         (fs, object)
     }
 
-    async fn test_filesystem_and_object() -> (OpenFxFilesystem, StoreObjectHandle<ObjectStore>) {
+    async fn test_filesystem_and_object() -> (OpenFxFilesystem, DataObjectHandle<ObjectStore>) {
         test_filesystem_and_object_with_key(Some(&InsecureCrypt::new()), true).await
     }
 
-    async fn test_filesystem_and_empty_object() -> (OpenFxFilesystem, StoreObjectHandle<ObjectStore>)
+    async fn test_filesystem_and_empty_object() -> (OpenFxFilesystem, DataObjectHandle<ObjectStore>)
     {
         test_filesystem_and_object_with_key(Some(&InsecureCrypt::new()), false).await
     }
@@ -1965,12 +1965,12 @@ mod tests {
 
         struct AlignTest {
             fill: u8,
-            object: StoreObjectHandle<ObjectStore>,
+            object: DataObjectHandle<ObjectStore>,
             mirror: Vec<u8>,
         }
 
         impl AlignTest {
-            async fn new(object: StoreObjectHandle<ObjectStore>) -> Self {
+            async fn new(object: DataObjectHandle<ObjectStore>) -> Self {
                 let mirror = {
                     let mut buf = object.allocate_buffer(object.get_size() as usize);
                     assert_eq!(object.read(0, buf.as_mut()).await.expect("read failed"), buf.len());
@@ -2025,7 +2025,7 @@ mod tests {
         fs.close().await.expect("Close failed");
     }
 
-    async fn test_preallocate_common(fs: &FxFilesystem, object: StoreObjectHandle<ObjectStore>) {
+    async fn test_preallocate_common(fs: &FxFilesystem, object: DataObjectHandle<ObjectStore>) {
         let allocator = fs.allocator();
         let allocated_before = allocator.get_allocated_bytes();
         let mut transaction = object.new_transaction().await.expect("new_transaction failed");
@@ -2542,7 +2542,7 @@ mod tests {
         }
 
         // Checks to see if the object needs to be trimmed.
-        async fn needs_trim(store: &Arc<ObjectStore>) -> Option<StoreObjectHandle<ObjectStore>> {
+        async fn needs_trim(store: &Arc<ObjectStore>) -> Option<DataObjectHandle<ObjectStore>> {
             let root_directory = Directory::open(store, store.root_directory_object_id())
                 .await
                 .expect("open failed");
