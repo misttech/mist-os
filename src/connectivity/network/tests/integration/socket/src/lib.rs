@@ -45,7 +45,7 @@ use netemul::{RealmTcpListener as _, RealmTcpStream as _, RealmUdpSocket as _, T
 use netstack_testing_common::{
     constants::ipv6 as ipv6_consts,
     devices, ndp, ping,
-    realms::{KnownServiceProvider, Netstack, Netstack2, NetstackVersion, TestSandboxExt as _},
+    realms::{KnownServiceProvider, Netstack, NetstackVersion, TestSandboxExt as _},
     Result,
 };
 use netstack_testing_macros::netstack_test;
@@ -126,23 +126,35 @@ enum UdpProtocol {
     UdpProtocol::Synchronous; "synchronous_protocol")]
 #[test_case(
     UdpProtocol::Fast; "fast_protocol")]
-async fn test_udp_socket(name: &str, protocol: UdpProtocol) {
+async fn test_udp_socket<N: Netstack>(name: &str, protocol: UdpProtocol) {
     let sandbox = netemul::TestSandbox::new().expect("failed to create sandbox");
     let net = sandbox.create_network("net").await.expect("failed to create network");
 
-    let client = match protocol {
-        UdpProtocol::Synchronous => sandbox
-            .create_netstack_realm::<Netstack2, _>(format!("{}_client", name))
-            .expect("failed to create client realm"),
-        UdpProtocol::Fast => sandbox
-            .create_realm(
-                format!("{}_client", name),
-                [KnownServiceProvider::Netstack(NetstackVersion::Netstack2 {
-                    fast_udp: true,
-                    tracing: false,
-                })],
-            )
-            .expect("failed to create client realm"),
+    let (client, server) = match protocol {
+        UdpProtocol::Synchronous => {
+            let client = sandbox
+                .create_netstack_realm::<N, _>(format!("{}_client", name))
+                .expect("failed to create client realm");
+            let server = sandbox
+                .create_netstack_realm::<N, _>(format!("{}_server", name))
+                .expect("failed to create server realm");
+            (client, server)
+        }
+        UdpProtocol::Fast => {
+            let version = match N::VERSION {
+                NetstackVersion::Netstack2 { tracing, fast_udp: _ } => {
+                    NetstackVersion::Netstack2 { tracing, fast_udp: true }
+                }
+                version => version,
+            };
+            let client = sandbox
+                .create_realm(format!("{}_client", name), [KnownServiceProvider::Netstack(version)])
+                .expect("failed to create client realm");
+            let server = sandbox
+                .create_realm(format!("{}_client", name), [KnownServiceProvider::Netstack(version)])
+                .expect("failed to create client realm");
+            (client, server)
+        }
     };
 
     let client_ep = client
@@ -155,20 +167,6 @@ async fn test_udp_socket(name: &str, protocol: UdpProtocol) {
         .await
         .expect("client failed to join network");
     client_ep.add_address_and_subnet_route(CLIENT_SUBNET).await.expect("configure address");
-    let server = match protocol {
-        UdpProtocol::Synchronous => sandbox
-            .create_netstack_realm::<Netstack2, _>(format!("{}_server", name))
-            .expect("failed to create server realm"),
-        UdpProtocol::Fast => sandbox
-            .create_realm(
-                format!("{}_server", name),
-                [KnownServiceProvider::Netstack(NetstackVersion::Netstack2 {
-                    fast_udp: true,
-                    tracing: false,
-                })],
-            )
-            .expect("failed to create server realm"),
-    };
     let server_ep = server
         .join_network_with(
             &net,
@@ -226,6 +224,7 @@ struct UdpSendMsgPreflight {
 
 async fn setup_fastudp_network<'a>(
     name: &'a str,
+    version: NetstackVersion,
     sandbox: &'a netemul::TestSandbox,
     socket_domain: fposix_socket::Domain,
 ) -> (
@@ -235,14 +234,14 @@ async fn setup_fastudp_network<'a>(
     fposix_socket::DatagramSocketProxy,
 ) {
     let net = sandbox.create_network("net").await.expect("create network");
+    let version = match version {
+        NetstackVersion::Netstack2 { tracing, fast_udp: _ } => {
+            NetstackVersion::Netstack2 { tracing, fast_udp: true }
+        }
+        version => version,
+    };
     let netstack = sandbox
-        .create_realm(
-            name,
-            [KnownServiceProvider::Netstack(NetstackVersion::Netstack2 {
-                fast_udp: true,
-                tracing: false,
-            })],
-        )
+        .create_realm(name, [KnownServiceProvider::Netstack(version)])
         .expect("create netstack realm");
     let iface = netstack.join_network(&net, "ep").await.expect("failed to join network");
 
@@ -515,7 +514,10 @@ fn assert_preflights_invalidated(
 )]
 #[test_case("route_removed", UdpCacheInvalidationReason::RouteRemoved)]
 #[test_case("route_added", UdpCacheInvalidationReason::RouteAdded)]
-async fn udp_send_msg_preflight_fidl<I: net_types::ip::Ip + UdpSendMsgPreflightTestIpExt>(
+async fn udp_send_msg_preflight_fidl<
+    N: Netstack,
+    I: net_types::ip::Ip + UdpSendMsgPreflightTestIpExt,
+>(
     root_name: &str,
     test_name: &str,
     invalidation_reason: UdpCacheInvalidationReason,
@@ -523,7 +525,7 @@ async fn udp_send_msg_preflight_fidl<I: net_types::ip::Ip + UdpSendMsgPreflightT
     let sandbox = netemul::TestSandbox::new().expect("create sandbox");
     let realm_name = format!("{}_{}", root_name, test_name);
     let (_net, _netstack, iface, socket) =
-        setup_fastudp_network(&realm_name, &sandbox, I::SOCKET_DOMAIN).await;
+        setup_fastudp_network(&realm_name, N::VERSION, &sandbox, I::SOCKET_DOMAIN).await;
 
     let successful_preflights = udp_send_msg_preflight_fidl_setup::<I>(&iface, &socket).await;
 
@@ -593,7 +595,7 @@ enum UdpCacheInvalidationReasonV4 {
 
 #[netstack_test]
 #[test_case("broadcast_called", UdpCacheInvalidationReasonV4::BroadcastCalled)]
-async fn udp_send_msg_preflight_fidl_v4only(
+async fn udp_send_msg_preflight_fidl_v4only<N: Netstack>(
     root_name: &str,
     test_name: &str,
     invalidation_reason: UdpCacheInvalidationReasonV4,
@@ -601,7 +603,7 @@ async fn udp_send_msg_preflight_fidl_v4only(
     let sandbox = netemul::TestSandbox::new().expect("create sandbox");
     let realm_name = format!("{}_{}", root_name, test_name);
     let (_net, _netstack, iface, socket) =
-        setup_fastudp_network(&realm_name, &sandbox, Ipv4::SOCKET_DOMAIN).await;
+        setup_fastudp_network(&realm_name, N::VERSION, &sandbox, Ipv4::SOCKET_DOMAIN).await;
 
     let successful_preflights = udp_send_msg_preflight_fidl_setup::<Ipv4>(&iface, &socket).await;
 
@@ -624,7 +626,7 @@ enum UdpCacheInvalidationReasonV6 {
 
 #[netstack_test]
 #[test_case("ipv6_only_called", UdpCacheInvalidationReasonV6::Ipv6OnlyCalled)]
-async fn udp_send_msg_preflight_fidl_v6only(
+async fn udp_send_msg_preflight_fidl_v6only<N: Netstack>(
     root_name: &str,
     test_name: &str,
     invalidation_reason: UdpCacheInvalidationReasonV6,
@@ -632,7 +634,7 @@ async fn udp_send_msg_preflight_fidl_v6only(
     let sandbox = netemul::TestSandbox::new().expect("create sandbox");
     let realm_name = format!("{}_{}", root_name, test_name);
     let (_net, _netstack, iface, socket) =
-        setup_fastudp_network(&realm_name, &sandbox, Ipv6::SOCKET_DOMAIN).await;
+        setup_fastudp_network(&realm_name, N::VERSION, &sandbox, Ipv6::SOCKET_DOMAIN).await;
 
     let successful_preflights = udp_send_msg_preflight_fidl_setup::<Ipv6>(&iface, &socket).await;
 
@@ -657,7 +659,7 @@ enum UdpCacheInvalidationReasonNdp {
 #[netstack_test]
 #[test_case("ra", UdpCacheInvalidationReasonNdp::RouterAdvertisement)]
 #[test_case("ra_with_prefix", UdpCacheInvalidationReasonNdp::RouterAdvertisementWithPrefix)]
-async fn udp_send_msg_preflight_fidl_ndp(
+async fn udp_send_msg_preflight_fidl_ndp<N: Netstack>(
     root_name: &str,
     test_name: &str,
     invalidation_reason: UdpCacheInvalidationReasonNdp,
@@ -665,7 +667,7 @@ async fn udp_send_msg_preflight_fidl_ndp(
     let sandbox = netemul::TestSandbox::new().expect("create sandbox");
     let realm_name = format!("{}_{}", root_name, test_name);
     let (net, realm, iface, socket) =
-        setup_fastudp_network(&realm_name, &sandbox, Ipv6::SOCKET_DOMAIN).await;
+        setup_fastudp_network(&realm_name, N::VERSION, &sandbox, Ipv6::SOCKET_DOMAIN).await;
     let fake_ep = net.create_fake_endpoint().expect("create fake endpoint");
 
     let successful_preflights = udp_send_msg_preflight_fidl_setup::<Ipv6>(&iface, &socket).await;
@@ -914,10 +916,10 @@ async fn assert_preflight_response_invalidated(
 }
 
 #[netstack_test]
-async fn udp_send_msg_preflight_autogen_addr_invalidation(name: &str) {
+async fn udp_send_msg_preflight_autogen_addr_invalidation<N: Netstack>(name: &str) {
     let sandbox = netemul::TestSandbox::new().expect("create sandbox");
     let (net, netstack, iface, socket) =
-        setup_fastudp_network(name, &sandbox, fposix_socket::Domain::Ipv6).await;
+        setup_fastudp_network(name, N::VERSION, &sandbox, fposix_socket::Domain::Ipv6).await;
 
     let interfaces_state = netstack
         .connect_to_protocol::<fnet_interfaces::StateMarker>()
@@ -1034,10 +1036,10 @@ async fn udp_send_msg_preflight_autogen_addr_invalidation(name: &str) {
 }
 
 #[netstack_test]
-async fn udp_send_msg_preflight_dad_failure(name: &str) {
+async fn udp_send_msg_preflight_dad_failure<N: Netstack>(name: &str) {
     let sandbox = netemul::TestSandbox::new().expect("create sandbox");
     let (net, _netstack, iface, socket) =
-        setup_fastudp_network(name, &sandbox, fposix_socket::Domain::Ipv6).await;
+        setup_fastudp_network(name, N::VERSION, &sandbox, fposix_socket::Domain::Ipv6).await;
 
     let preflight = connect_socket_and_validate_preflight(
         &socket,
@@ -1220,15 +1222,22 @@ async fn toggle_cmsg(
 #[test_case("ipv6_pktinfo", CmsgType::Ipv6PktInfo)]
 #[test_case("so_timestamp_ns", CmsgType::SoTimestampNs)]
 #[test_case("so_timestamp", CmsgType::SoTimestamp)]
-async fn udp_recv_msg_postflight_fidl(root_name: &str, test_name: &str, cmsg_type: CmsgType) {
+async fn udp_recv_msg_postflight_fidl<N: Netstack>(
+    root_name: &str,
+    test_name: &str,
+    cmsg_type: CmsgType,
+) {
     let sandbox = netemul::TestSandbox::new().expect("failed to create sandbox");
+    let version = match N::VERSION {
+        NetstackVersion::Netstack2 { tracing, fast_udp: _ } => {
+            NetstackVersion::Netstack2 { tracing, fast_udp: true }
+        }
+        version => version,
+    };
     let netstack = sandbox
         .create_realm(
             format!("{}_{}", root_name, test_name),
-            [KnownServiceProvider::Netstack(NetstackVersion::Netstack2 {
-                fast_udp: true,
-                tracing: false,
-            })],
+            [KnownServiceProvider::Netstack(version)],
         )
         .expect("failed to create netstack realm");
 

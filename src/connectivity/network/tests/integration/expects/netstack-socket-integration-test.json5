@@ -18,6 +18,10 @@
                 "tcp_connect_bound_to_device_ns2",
                 "tcp_socket_shutdown_listener_v4_ns2",
                 "tcp_socket_shutdown_listener_v6_ns2",
+                "test_udp_socket_ns3::fast_protocol",
+                "test_udp_socket_ns3::synchronous_protocol",
+                "udp_recv_msg_postflight_fidl_ns3*",
+                "udp_send_msg_preflight*ns3*",
             ],
         },
         {
