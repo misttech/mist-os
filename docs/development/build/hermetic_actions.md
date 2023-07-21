@@ -89,7 +89,7 @@ inputs to the action's one or more outputs that were discovered at runtime. The
 format of a depfile is one or more lines as follows:
 
 ```
-[output_file1]: [input_file1] [input_file2...]
+[output_file1] [output_file2...]: [input_file1] [input_file2...]
 ```
 
 All paths in a depfile must be relative to `root_build_dir` (which is set as the
