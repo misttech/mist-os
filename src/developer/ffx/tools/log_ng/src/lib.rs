@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use diagnostics_data::LogTextDisplayOptions;
+use diagnostics_data::{LogTextColor, LogTextDisplayOptions};
 use error::LogError;
 use fho::{daemon_protocol, AvailabilityFlag, FfxMain, FfxTool, MachineWriter, ToolIO};
 use fidl::endpoints::create_proxy;
@@ -61,21 +61,24 @@ async fn log_main(
     let is_json = writer.is_machine();
     let node_name = rcs_proxy.identify_host().await??.nodename;
     let target_query = TargetQuery { string_matcher: node_name, ..Default::default() };
-    log_loop(
-        target_collection_proxy,
-        target_query,
-        cmd,
-        DefaultLogFormatter::new(
-            LogFilterCriteria::default(),
-            writer,
-            LogFormatterOptions {
-                // TODO(https://fxbug.dev/121413): Add support for log options.
-                display: if is_json { None } else { Some(LogTextDisplayOptions::default()) },
-                ..Default::default()
+    let formatter = DefaultLogFormatter::new(
+        LogFilterCriteria::default(),
+        writer,
+        LogFormatterOptions {
+            // TODO(https://fxbug.dev/121413): Add support for log options.
+            display: if is_json {
+                None
+            } else {
+                Some(LogTextDisplayOptions {
+                    show_tags: !cmd.hide_tags,
+                    color: if cmd.no_color { LogTextColor::None } else { LogTextColor::BySeverity },
+                    ..Default::default()
+                })
             },
-        ),
-    )
-    .await?;
+            ..Default::default()
+        },
+    );
+    log_loop(target_collection_proxy, target_query, cmd, formatter).await?;
     Ok(())
 }
 
@@ -207,7 +210,8 @@ fn get_stream_mode(cmd: LogCommand) -> Result<fidl_fuchsia_diagnostics::StreamMo
 mod tests {
     use super::*;
     use crate::testing_utils::{
-        handle_rcs_connection, handle_target_collection_connection, TaskManager, TestEvent,
+        handle_rcs_connection, handle_target_collection_connection, Configuration, TaskManager,
+        TestEvent,
     };
     use assert_matches::assert_matches;
     use diagnostics_data::{BuilderArgs, LogsDataBuilder, Severity, Timestamp};
@@ -217,6 +221,7 @@ mod tests {
     use futures::StreamExt;
     use log_command::{log_formatter::LogData, parse_time, DumpCommand};
     use selectors::parse_log_interest_selector;
+    use std::rc::Rc;
 
     #[fuchsia::test]
     async fn json_logger_test() {
@@ -259,6 +264,8 @@ mod tests {
                         severity: Severity::Info,
                         timestamp_nanos: Timestamp::from(0),
                     })
+                    .set_pid(1)
+                    .set_tid(2)
                     .set_message("Hello world!")
                     .build(),
                 ),
@@ -339,7 +346,149 @@ mod tests {
 
         assert_eq!(
             test_buffers.stdout.into_string(),
-            "[00000.000000][][][ffx] INFO: Hello world!\n".to_string()
+            "[00000.000000][1][2][ffx] INFO: Hello world!\u{1b}[m\n".to_string()
+        );
+        assert_matches!(event_stream.next().await, Some(TestEvent::LogSettingsConnectionClosed));
+    }
+
+    #[fuchsia::test]
+    async fn logger_does_not_color_logs_if_disabled() {
+        let (rcs_proxy, rcs_server) = create_proxy::<RemoteControlMarker>().unwrap();
+        let (target_collection_proxy, target_collection_server) =
+            create_proxy::<TargetCollectionMarker>().unwrap();
+        let tool = LogTool {
+            cmd: LogCommand {
+                sub_command: Some(LogSubCommand::Dump(DumpCommand {
+                    session: log_command::SessionSpec::Relative(0),
+                })),
+                no_color: true,
+                ..LogCommand::default()
+            },
+            rcs_proxy: rcs_proxy,
+            target_collection: target_collection_proxy,
+        };
+        let mut task_manager = TaskManager::new();
+        let mut event_stream = task_manager.take_event_stream().unwrap();
+        let scheduler = task_manager.get_scheduler();
+        task_manager.spawn(handle_rcs_connection(rcs_server, scheduler.clone()));
+        task_manager.spawn(handle_target_collection_connection(
+            target_collection_server,
+            scheduler.clone(),
+        ));
+        let test_buffers = TestBuffers::default();
+        let mut main_result = task_manager
+            .spawn_result(tool.main(MachineWriter::<LogEntry>::new_test(None, &test_buffers)));
+        // Run all tasks until exit.
+        task_manager.run().await;
+        // Ensure that main exited successfully.
+        main_result.next().await.unwrap().unwrap();
+
+        assert_eq!(
+            test_buffers.stdout.into_string(),
+            "[00000.000000][1][2][ffx] INFO: Hello world!\n".to_string()
+        );
+        assert_matches!(event_stream.next().await, Some(TestEvent::LogSettingsConnectionClosed));
+    }
+
+    #[fuchsia::test]
+    async fn logger_shows_tags_by_default() {
+        let (rcs_proxy, rcs_server) = create_proxy::<RemoteControlMarker>().unwrap();
+        let (target_collection_proxy, target_collection_server) =
+            create_proxy::<TargetCollectionMarker>().unwrap();
+        let tool = LogTool {
+            cmd: LogCommand {
+                sub_command: Some(LogSubCommand::Dump(DumpCommand {
+                    session: log_command::SessionSpec::Relative(0),
+                })),
+                ..LogCommand::default()
+            },
+            rcs_proxy: rcs_proxy,
+            target_collection: target_collection_proxy,
+        };
+        let mut task_manager = TaskManager::new_with_config(Rc::new(Configuration {
+            messages: vec![LogsDataBuilder::new(BuilderArgs {
+                component_url: Some("ffx".into()),
+                moniker: "ffx".into(),
+                severity: Severity::Info,
+                timestamp_nanos: Timestamp::from(0),
+            })
+            .set_pid(1)
+            .set_tid(2)
+            .add_tag("test tag")
+            .set_message("Hello world!")
+            .build()],
+            ..Default::default()
+        }));
+        let mut event_stream = task_manager.take_event_stream().unwrap();
+        let scheduler = task_manager.get_scheduler();
+        task_manager.spawn(handle_rcs_connection(rcs_server, scheduler.clone()));
+        task_manager.spawn(handle_target_collection_connection(
+            target_collection_server,
+            scheduler.clone(),
+        ));
+        let test_buffers = TestBuffers::default();
+        let mut main_result = task_manager
+            .spawn_result(tool.main(MachineWriter::<LogEntry>::new_test(None, &test_buffers)));
+        // Run all tasks until exit.
+        task_manager.run().await;
+        // Ensure that main exited successfully.
+        main_result.next().await.unwrap().unwrap();
+
+        assert_eq!(
+            test_buffers.stdout.into_string(),
+            "[00000.000000][1][2][ffx][test tag] INFO: Hello world!\u{1b}[m\n".to_string()
+        );
+        assert_matches!(event_stream.next().await, Some(TestEvent::LogSettingsConnectionClosed));
+    }
+
+    #[fuchsia::test]
+    async fn logger_hides_tag_when_hidden() {
+        let (rcs_proxy, rcs_server) = create_proxy::<RemoteControlMarker>().unwrap();
+        let (target_collection_proxy, target_collection_server) =
+            create_proxy::<TargetCollectionMarker>().unwrap();
+        let tool = LogTool {
+            cmd: LogCommand {
+                sub_command: Some(LogSubCommand::Dump(DumpCommand {
+                    session: log_command::SessionSpec::Relative(0),
+                })),
+                hide_tags: true,
+                ..LogCommand::default()
+            },
+            rcs_proxy: rcs_proxy,
+            target_collection: target_collection_proxy,
+        };
+        let mut task_manager = TaskManager::new_with_config(Rc::new(Configuration {
+            messages: vec![LogsDataBuilder::new(BuilderArgs {
+                component_url: Some("ffx".into()),
+                moniker: "ffx".into(),
+                severity: Severity::Info,
+                timestamp_nanos: Timestamp::from(0),
+            })
+            .set_pid(1)
+            .set_tid(2)
+            .add_tag("test tag")
+            .set_message("Hello world!")
+            .build()],
+            ..Default::default()
+        }));
+        let mut event_stream = task_manager.take_event_stream().unwrap();
+        let scheduler = task_manager.get_scheduler();
+        task_manager.spawn(handle_rcs_connection(rcs_server, scheduler.clone()));
+        task_manager.spawn(handle_target_collection_connection(
+            target_collection_server,
+            scheduler.clone(),
+        ));
+        let test_buffers = TestBuffers::default();
+        let mut main_result = task_manager
+            .spawn_result(tool.main(MachineWriter::<LogEntry>::new_test(None, &test_buffers)));
+        // Run all tasks until exit.
+        task_manager.run().await;
+        // Ensure that main exited successfully.
+        main_result.next().await.unwrap().unwrap();
+
+        assert_eq!(
+            test_buffers.stdout.into_string(),
+            "[00000.000000][1][2][ffx] INFO: Hello world!\u{1b}[m\n".to_string()
         );
         assert_matches!(event_stream.next().await, Some(TestEvent::LogSettingsConnectionClosed));
     }
@@ -379,7 +528,7 @@ mod tests {
 
         assert_eq!(
             test_buffers.stdout.into_string(),
-            "[00000.000000][][][ffx] INFO: Hello world!\n".to_string()
+            "[00000.000000][1][2][ffx] INFO: Hello world!\u{1b}[m\n".to_string()
         );
         assert_matches!(event_stream.next().await, Some(TestEvent::SeverityChanged(s)) if s == severity);
         assert_matches!(event_stream.next().await, Some(TestEvent::LogSettingsConnectionClosed));

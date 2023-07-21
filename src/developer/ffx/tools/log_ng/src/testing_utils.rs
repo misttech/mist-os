@@ -5,9 +5,9 @@
 // TODO(https://fxbug.dev/129623): Move this somewhere else and
 // make the logic more generic.
 
-use std::{future::Future, pin::Pin};
+use std::{future::Future, pin::Pin, rc::Rc};
 
-use diagnostics_data::{BuilderArgs, LogsDataBuilder, Severity, Timestamp};
+use diagnostics_data::{BuilderArgs, LogsData, LogsDataBuilder, Severity, Timestamp};
 use fidl::endpoints::{DiscoverableProtocolMarker as _, RequestStream, ServerEnd};
 use fidl_fuchsia_developer_ffx::{
     TargetCollectionMarker, TargetCollectionRequest, TargetMarker, TargetRequest,
@@ -30,6 +30,28 @@ use futures::{
 
 const NODENAME: &str = "Rust";
 
+/// Test configuration
+pub struct Configuration {
+    pub messages: Vec<LogsData>,
+}
+
+impl Default for Configuration {
+    fn default() -> Self {
+        Self {
+            messages: vec![LogsDataBuilder::new(BuilderArgs {
+                component_url: Some("ffx".into()),
+                moniker: "ffx".into(),
+                severity: Severity::Info,
+                timestamp_nanos: Timestamp::from(0),
+            })
+            .set_pid(1)
+            .set_tid(2)
+            .set_message("Hello world!")
+            .build()],
+        }
+    }
+}
+
 /// A scoped task executor that receives tasks to run over a channel
 /// and runs them to completion.
 pub struct TaskManager {
@@ -42,11 +64,16 @@ pub struct TaskManager {
 impl TaskManager {
     /// Create a new TaskManager
     pub fn new() -> Self {
+        Self::new_with_config(Rc::new(Configuration::default()))
+    }
+
+    /// Create a new TaskManager
+    pub fn new_with_config(config: Rc<Configuration>) -> Self {
         let (sender, receiver) = unbounded();
         let (events_sender, events_receiver) = unbounded();
         Self {
             tasks: FuturesUnordered::new(),
-            scheduler: TaskScheduler::new(sender, events_sender),
+            scheduler: TaskScheduler::new(sender, events_sender, config),
             receiver,
             events_receiver: Some(events_receiver),
         }
@@ -121,6 +148,7 @@ pub enum TestEvent {
 pub struct TaskScheduler {
     sender: UnboundedSender<Pin<Box<dyn Future<Output = ()>>>>,
     event_sender: UnboundedSender<TestEvent>,
+    pub config: Rc<Configuration>,
 }
 
 impl TaskScheduler {
@@ -128,8 +156,9 @@ impl TaskScheduler {
     fn new(
         sender: UnboundedSender<Pin<Box<dyn Future<Output = ()>>>>,
         event_sender: UnboundedSender<TestEvent>,
+        config: Rc<Configuration>,
     ) -> Self {
-        Self { sender, event_sender }
+        Self { sender, event_sender, config }
     }
 
     /// Spawn a task onto the task manager
@@ -144,7 +173,10 @@ impl TaskScheduler {
     }
 }
 
-async fn handle_archive_accessor(mut stream: ArchiveAccessorRequestStream) {
+async fn handle_archive_accessor(
+    mut stream: ArchiveAccessorRequestStream,
+    scheduler: TaskScheduler,
+) {
     while let Some(Ok(ArchiveAccessorRequest::StreamDiagnostics {
         parameters: _,
         stream,
@@ -154,20 +186,7 @@ async fn handle_archive_accessor(mut stream: ArchiveAccessorRequestStream) {
         // Ignore the result, because the client may choose to close the channel.
         let _ = responder.send();
         stream
-            .write(
-                serde_json::to_string(
-                    &LogsDataBuilder::new(BuilderArgs {
-                        component_url: Some("ffx".into()),
-                        moniker: "ffx".into(),
-                        severity: Severity::Info,
-                        timestamp_nanos: Timestamp::from(0),
-                    })
-                    .set_message("Hello world!")
-                    .build(),
-                )
-                .unwrap()
-                .as_bytes(),
-            )
+            .write(serde_json::to_string(&scheduler.config.messages).unwrap().as_bytes())
             .unwrap();
     }
 }
@@ -194,6 +213,7 @@ async fn handle_connect_capability(
         ArchiveAccessorMarker::PROTOCOL_NAME => {
             handle_archive_accessor(
                 ServerEnd::<ArchiveAccessorMarker>::new(channel).into_stream().unwrap(),
+                scheduler.clone(),
             )
             .await
         }
