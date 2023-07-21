@@ -53,6 +53,8 @@ constexpr std::chrono::nanoseconds kOperationTimeout =
 const Options kDefaultOptions = {kSleepDuration, true, kDefaultLogSeverity};
 const Options kDisabledOptions = {kSleepDuration, false, kDefaultLogSeverity};
 
+constexpr std::chrono::seconds kPollLimit = std::chrono::seconds(10);
+
 // Test that we can start the watchdog.
 TEST(Watchdog, StartTest) {
   auto watchdog = CreateWatchdog(kDefaultOptions);
@@ -135,6 +137,20 @@ bool CheckOccurance(const std::string& str, const std::string_view substr, int e
   return count == expected;
 }
 
+// Polls until timeout, returning early if the result is true, otherwise returns the result of the
+// callback.
+bool PollUntilTrueOrTimeout(const std::function<bool()>& callback,
+                            const std::chrono::seconds& timeout) {
+  auto expiry = std::chrono::steady_clock::now() + timeout;
+  while (std::chrono::steady_clock::now() <= expiry) {
+    if (callback()) {
+      return true;
+    }
+    std::this_thread::sleep_for(kSleepDuration);
+  }
+  return callback();
+}
+
 TEST(Watchdog, TryToAddDuplicate) {
   auto watchdog = CreateWatchdog(kDefaultOptions);
   EXPECT_TRUE(watchdog->Start().is_ok());
@@ -151,8 +167,8 @@ TEST(Watchdog, TryToAddDuplicateAfterTimeout) {
   EXPECT_TRUE(watchdog->Start().is_ok());
   TestOperation op(kTestOperationName1, kOperationTimeout);
   TestOperationTracker tracker(&op, watchdog.get());
-  std::this_thread::sleep_for(std::chrono::seconds(kOperationTimeoutSeconds + 1));
-  ASSERT_TRUE(tracker.TimeoutHandlerCalled());
+  ASSERT_TRUE(
+      PollUntilTrueOrTimeout([&tracker]() { return tracker.TimeoutHandlerCalled(); }, kPollLimit));
   ASSERT_EQ(watchdog->Track(&tracker).error_value(), ZX_ERR_ALREADY_EXISTS);
 }
 
@@ -207,8 +223,8 @@ TEST(Watchdog, OperationTimesOut) {
     {
       TestOperation op(kTestOperationName1, kOperationTimeout);
       TestOperationTracker tracker(&op, watchdog.get());
-      std::this_thread::sleep_for(std::chrono::seconds(kOperationTimeoutSeconds + 1));
-      ASSERT_TRUE(tracker.TimeoutHandlerCalled());
+      ASSERT_TRUE(PollUntilTrueOrTimeout([&tracker]() { return tracker.TimeoutHandlerCalled(); },
+                                         kPollLimit));
     }
   }
   auto str = log_tester::RetrieveLogs(std::move(fd_pair));
@@ -286,13 +302,14 @@ TEST(Watchdog, MultipleOperationsTimeout) {
     {
       TestOperation op1(kTestOperationName1, kOperationTimeout);
       TestOperation op2(kTestOperationName2, kOperationTimeout);
-      TestOperation op3(kTestOperationName3, kOperationTimeout + std::chrono::seconds(10));
+      TestOperation op3(kTestOperationName3, kOperationTimeout + kPollLimit * 4);
       TestOperationTracker tracker1(&op1, watchdog.get());
       TestOperationTracker tracker3(&op3, watchdog.get());
       TestOperationTracker tracker2(&op2, watchdog.get());
-      std::this_thread::sleep_for(std::chrono::seconds(kOperationTimeoutSeconds + 1));
-      ASSERT_TRUE(tracker1.TimeoutHandlerCalled());
-      ASSERT_TRUE(tracker2.TimeoutHandlerCalled());
+      ASSERT_TRUE(PollUntilTrueOrTimeout([&tracker1]() { return tracker1.TimeoutHandlerCalled(); },
+                                         kPollLimit));
+      ASSERT_TRUE(PollUntilTrueOrTimeout([&tracker2]() { return tracker2.TimeoutHandlerCalled(); },
+                                         kPollLimit));
       ASSERT_FALSE(tracker3.TimeoutHandlerCalled());
     }
   }
@@ -316,7 +333,8 @@ TEST(Watchdog, LoggedOnlyOnce) {
 
       // Sleep as long as it takes to scan in-flight operation twice.
       std::this_thread::sleep_for(std::chrono::seconds((2 * kOperationTimeoutSeconds) + 1));
-      ASSERT_TRUE(tracker.TimeoutHandlerCalled());
+      ASSERT_TRUE(PollUntilTrueOrTimeout([&tracker]() { return tracker.TimeoutHandlerCalled(); },
+                                         kPollLimit));
       ASSERT_EQ(tracker.TimeoutHandlerCalledCount(), 1);
     }
   }
@@ -341,7 +359,8 @@ TEST(Watchdog, DelayedCompletionLogging) {
 
       // Sleep as long as it takes to scan in-flight operation twice.
       std::this_thread::sleep_for(std::chrono::seconds((2 * kOperationTimeoutSeconds) + 1));
-      ASSERT_TRUE(tracker.TimeoutHandlerCalled());
+      ASSERT_TRUE(PollUntilTrueOrTimeout([&tracker]() { return tracker.TimeoutHandlerCalled(); },
+                                         kPollLimit));
       ASSERT_EQ(tracker.TimeoutHandlerCalledCount(), 1);
     }
   }
