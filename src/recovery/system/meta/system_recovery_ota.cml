@@ -106,28 +106,28 @@
             from: "self",
             as: "blob-exec",
             to: "#pkg-recovery",
-            dependency: "weak_for_migration",
+            dependency: "weak",
         },
         {
             directory: "config-data-override",
             from: "self",
             as: "config-data",
             to: "#pkg-recovery",
-            dependency: "weak_for_migration",
+            dependency: "weak",
         },
         {
             directory: "root-ssl-certificates-override",
             from: "self",
             as: "root-ssl-certificates",
             to: "#pkg-recovery",
-            dependency: "weak_for_migration",
+            dependency: "weak",
         },
         {
             directory: "build-info-override",
             from: "self",
             as: "build-info",
             to: "#pkg-recovery",
-            dependency: "weak_for_migration",
+            dependency: "weak",
         },
 
         // Offer other protocols that pkg-recovery expects.

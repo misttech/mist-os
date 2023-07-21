@@ -21,7 +21,6 @@
             protocol: "fuchsia.media.SessionAudioConsumerFactory",
             from: "#multizone_leader",
             to: "#bt-a2dp",
-            dependency: "weak_for_migration",
         },
     ],
 }

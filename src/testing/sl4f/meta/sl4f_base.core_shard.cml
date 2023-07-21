@@ -205,7 +205,6 @@
             ],
             from: "#session-manager",
             to: "#sl4f",
-            dependency: "weak_for_migration",
             source_availability: "unknown",
         },
         {

@@ -686,7 +686,7 @@
 
             // This must be weak because miscsvc needs sysmem from devfs, which creates
             // a cycle. sysmem can be made into a non-driver to fix this.
-            dependency: "weak_for_migration",
+            dependency: "weak",
         },
         {
             protocol: [ "fuchsia.sysmem.Allocator" ],
@@ -760,7 +760,6 @@
                 "#console-launcher",
                 "#netsvc",
             ],
-            dependency: "weak_for_migration",
         },
         {
             directory: [
@@ -770,14 +769,12 @@
             ],
             from: "#pkg-cache",
             to: "#console-launcher",
-            dependency: "weak_for_migration",
         },
         {
             directory: "shell-commands-bin",
             from: "#base_resolver",
             as: "bin",
             to: "#console-launcher",
-            dependency: "weak_for_migration",
         },
         {
             directory: [
@@ -786,7 +783,6 @@
             ],
             from: "#fshost",
             to: [ "#console-launcher" ],
-            dependency: "weak_for_migration",
         },
 
         // Offer the log services to the console

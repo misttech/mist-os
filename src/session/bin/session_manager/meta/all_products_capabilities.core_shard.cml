@@ -12,7 +12,6 @@
                 "fuchsia.session.Launcher",
             ],
             from: "#session-manager",
-            dependency: "weak_for_migration",
         },
     ],
     offer: [
