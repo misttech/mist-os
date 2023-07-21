@@ -13,6 +13,15 @@
             include: "../loopback_isolated_tcp_fin_wait_filter.json5",
         },
         {
+            type: "skip",
+            matchers: [
+                // NS3 does not support dual-stack TCP sockets yet, and these
+                // tests are known to occasionally timeout rather than fail
+                // (e.g. https://fxbug.dev/130377).
+                "All/SocketInetLoopbackIsolatedTest.TCPActiveCloseTimeWaitTest/ListenV6Any_ConnectV4Any",
+            ],
+        },
+        {
             type: "expect_failure",
             matchers: [
                 // Netstack3 does not support dual-stack TCP sockets yet.
