@@ -608,7 +608,7 @@ pub enum UseFromRef {
 }
 
 /// The scope of an event.
-#[derive(Debug, PartialEq, Eq, Hash, Clone, Reference)]
+#[derive(Debug, PartialEq, Eq, Hash, Clone, Reference, Ord, PartialOrd)]
 #[reference(expected = "\"#<collection-name>\", \"#<child-name>\", or none")]
 pub enum EventScope {
     /// A reference to a child or a collection.
@@ -1184,6 +1184,28 @@ pub struct Document {
     pub config: Option<BTreeMap<ConfigKey, ConfigValueType>>,
 }
 
+impl<T> Canonicalize for Vec<T>
+where
+    T: Canonicalize + CapabilityClause,
+{
+    fn canonicalize(&mut self) {
+        self.iter_mut().for_each(|c| c.canonicalize());
+        self.sort_by(|a, b| {
+            // Sort by capability type, then by the name of the first entry for
+            // that type.
+            let a_type = a.capability_type();
+            let b_type = b.capability_type();
+            a_type.cmp(b_type).then_with(|| {
+                let a_names = a.names();
+                let b_names = b.names();
+                let a_first_name = a_names.first().unwrap();
+                let b_first_name = b_names.first().unwrap();
+                a_first_name.cmp(b_first_name)
+            })
+        });
+    }
+}
+
 /// Merges `$self.$field_name` into `$other.$field_name` according to the rules documented for
 /// [`include`], where `$self` and `$other` are of type [`Document`] and $field_name is a
 /// capability routing field of [`Document`]: `use`, `offer`, `expose`, or `capabilities`.
@@ -1367,6 +1389,31 @@ impl Document {
         self.merge_config(other, include_path)?;
 
         Ok(())
+    }
+
+    pub fn canonicalize(&mut self) {
+        // Don't sort `include` - the order there matters.
+        if let Some(children) = &mut self.children {
+            children.sort_by(|a, b| a.name.cmp(&b.name));
+        }
+        if let Some(collections) = &mut self.collections {
+            collections.sort_by(|a, b| a.name.cmp(&b.name));
+        }
+        if let Some(environments) = &mut self.environments {
+            environments.sort_by(|a, b| a.name.cmp(&b.name));
+        }
+        if let Some(capabilities) = &mut self.capabilities {
+            capabilities.canonicalize();
+        }
+        if let Some(offers) = &mut self.offer {
+            offers.canonicalize();
+        }
+        if let Some(expose) = &mut self.expose {
+            expose.canonicalize();
+        }
+        if let Some(r#use) = &mut self.r#use {
+            r#use.canonicalize();
+        }
     }
 
     fn merge_program(
@@ -2783,6 +2830,10 @@ pub trait CapabilityClause: Clone + PartialEq {
     }
 }
 
+trait Canonicalize {
+    fn canonicalize(&mut self);
+}
+
 pub trait AsClause {
     fn r#as(&self) -> Option<&Name>;
 }
@@ -2804,6 +2855,19 @@ fn always_one<T>(o: Option<OneOrMany<T>>) -> Option<T> {
         OneOrMany::One(o) => o,
         OneOrMany::Many(_) => panic!("many is impossible"),
     })
+}
+
+impl Canonicalize for Capability {
+    fn canonicalize(&mut self) {
+        // Sort the names of the capabilities. Only capabilities with OneOrMany values are included here.
+        if let Some(service) = &mut self.service {
+            service.canonicalize()
+        } else if let Some(protocol) = &mut self.protocol {
+            protocol.canonicalize()
+        } else if let Some(event_stream) = &mut self.event_stream {
+            event_stream.canonicalize()
+        }
+    }
 }
 
 impl CapabilityClause for Capability {
@@ -2978,6 +3042,22 @@ impl FromClause for DebugRegistration {
     }
 }
 
+impl Canonicalize for Use {
+    fn canonicalize(&mut self) {
+        // Sort the names of the capabilities. Only capabilities with OneOrMany values are included here.
+        if let Some(service) = &mut self.service {
+            service.canonicalize();
+        } else if let Some(protocol) = &mut self.protocol {
+            protocol.canonicalize();
+        } else if let Some(event_stream) = &mut self.event_stream {
+            event_stream.canonicalize();
+            if let Some(scope) = &mut self.scope {
+                scope.canonicalize();
+            }
+        }
+    }
+}
+
 impl CapabilityClause for Use {
     fn service(&self) -> Option<OneOrMany<Name>> {
         self.service.clone()
@@ -3076,6 +3156,28 @@ impl FromClause for Expose {
 impl RightsClause for Use {
     fn rights(&self) -> Option<&Rights> {
         self.rights.as_ref()
+    }
+}
+
+impl Canonicalize for Expose {
+    fn canonicalize(&mut self) {
+        // Sort the names of the capabilities. Only capabilities with OneOrMany values are included here.
+        if let Some(service) = &mut self.service {
+            service.canonicalize();
+        } else if let Some(protocol) = &mut self.protocol {
+            protocol.canonicalize();
+        } else if let Some(directory) = &mut self.directory {
+            directory.canonicalize();
+        } else if let Some(runner) = &mut self.runner {
+            runner.canonicalize();
+        } else if let Some(resolver) = &mut self.resolver {
+            resolver.canonicalize();
+        } else if let Some(event_stream) = &mut self.event_stream {
+            event_stream.canonicalize();
+            if let Some(scope) = &mut self.scope {
+                scope.canonicalize();
+            }
+        }
     }
 }
 
@@ -3179,6 +3281,30 @@ impl RightsClause for Expose {
 impl FromClause for Offer {
     fn from_(&self) -> OneOrMany<AnyRef<'_>> {
         one_or_many_from_impl(&self.from)
+    }
+}
+
+impl Canonicalize for Offer {
+    fn canonicalize(&mut self) {
+        // Sort the names of the capabilities. Only capabilities with OneOrMany values are included here.
+        if let Some(service) = &mut self.service {
+            service.canonicalize();
+        } else if let Some(protocol) = &mut self.protocol {
+            protocol.canonicalize();
+        } else if let Some(directory) = &mut self.directory {
+            directory.canonicalize();
+        } else if let Some(runner) = &mut self.runner {
+            runner.canonicalize();
+        } else if let Some(resolver) = &mut self.resolver {
+            resolver.canonicalize();
+        } else if let Some(storage) = &mut self.storage {
+            storage.canonicalize();
+        } else if let Some(event_stream) = &mut self.event_stream {
+            event_stream.canonicalize();
+            if let Some(scope) = &mut self.scope {
+                scope.canonicalize();
+            }
+        }
     }
 }
 
@@ -3514,12 +3640,28 @@ mod tests {
     use super::*;
     use {
         assert_matches::assert_matches,
+        difference::Changeset,
         error::{Error, Location},
-        serde_json::{self, json},
+        serde_json::{self, json, to_string_pretty},
         serde_json5,
         std::path::Path,
         test_case::test_case,
     };
+
+    macro_rules! assert_json_eq {
+        ($a:expr, $e:expr) => {{
+            if $a != $e {
+                let expected = to_string_pretty(&$e).unwrap();
+                let actual = to_string_pretty(&$a).unwrap();
+                assert_eq!(
+                    $a,
+                    $e,
+                    "JSON actual != expected. Diffs:\n\n{}",
+                    Changeset::new(&actual, &expected, "\n")
+                );
+            }
+        }};
+    }
 
     // Exercise reference parsing tests on `OfferFromRef` because it contains every reference
     // subtype.
@@ -4047,6 +4189,139 @@ mod tests {
             Err(Error::Validate { err, .. })
                 if err == "Found conflicting entry for config key `foo` in `some/path`."
         );
+    }
+
+    #[test]
+    fn test_canonicalize() {
+        let mut some = document(json!({
+            "children": [
+                // Will be sorted by name
+                { "name": "b_child", "url": "http://foo/b" },
+                { "name": "a_child", "url": "http://foo/a" },
+            ],
+            "environments": [
+                // Will be sorted by name
+                { "name": "b_env" },
+                { "name": "a_env" },
+            ],
+            "collections": [
+                // Will be sorted by name
+                { "name": "b_coll", "durability": "transient" },
+                { "name": "a_coll", "durability": "transient" },
+            ],
+            // Will have entries sorted by capability type, then
+            // by capability name (using the first entry in Many cases).
+            "capabilities": [
+                // Will be transformed to the "one" form
+                { "protocol": ["foo"] },
+                { "protocol": "bar" },  // Will appear before protocol: foo
+                // Will have list of names sorted
+                { "service": ["b", "a"] },
+                // Will have list of names sorted
+                { "event_stream": ["b", "a"] },
+                { "runner": "myrunner" },
+            ],
+            // Same rules as for "capabilities".
+            "offer": [
+                { "protocol": ["foo"], "from": "#a_child", "to": "#b_child"  },
+                { "protocol": "bar", "from": "#a_child", "to": "#b_child"  },  // Will appear before protocol: foo
+                // Will have list of names sorted
+                { "service": ["b", "a"], "from": "#a_child", "to": "#b_child"  },
+                // Will have list of names sorted
+                {
+                    "event_stream": ["b", "a"],
+                    "from": "#a_child",
+                    "to": "#b_child",
+                    "scope": ["#b", "#c", "#a"]  // Also gets sorted
+                },
+                { "runner": [ "myrunner", "a" ], "from": "#a_child", "to": "#b_child"  },
+                { "runner": [ "b" ], "from": "#a_child", "to": "#b_child"  },
+                { "directory": [ "b" ], "from": "#a_child", "to": "#b_child"  },
+            ],
+            "expose": [
+                { "protocol": ["foo"], "from": "#a_child" },
+                { "protocol": "bar", "from": "#a_child" },  // Will appear before protocol: foo
+                // Will have list of names sorted
+                { "service": ["b", "a"], "from": "#a_child" },
+                // Will have list of names sorted
+                {
+                    "event_stream": ["b", "a"],
+                    "from": "#a_child",
+                    "scope": ["#b", "#c", "#a"]  // Also gets sorted
+                },
+                { "runner": [ "myrunner", "a" ], "from": "#a_child" },
+                { "runner": [ "b" ], "from": "#a_child" },
+                { "directory": [ "b" ], "from": "#a_child" },
+            ],
+            "use": [
+                // Will be transformed to the "one" form
+                { "protocol": ["foo"] },
+                { "protocol": "bar" },  // Will appear before protocol: foo
+                // Will have list of names sorted
+                { "service": ["b", "a"] },
+                // Will have list of names sorted
+                { "event_stream": ["b", "a"], "scope": ["#b", "#a"] },
+            ],
+        }));
+        some.canonicalize();
+
+        assert_json_eq!(
+            some,
+            document(json!({
+                "children": [
+                    { "name": "a_child", "url": "http://foo/a" },
+                    { "name": "b_child", "url": "http://foo/b" },
+                ],
+                "collections": [
+                    { "name": "a_coll", "durability": "transient" },
+                    { "name": "b_coll", "durability": "transient" },
+                ],
+                "environments": [
+                    { "name": "a_env" },
+                    { "name": "b_env" },
+                ],
+                "capabilities": [
+                    { "event_stream": ["a", "b"] },
+                    { "protocol": "bar" },
+                    { "protocol": "foo" },
+                    { "runner": "myrunner" },
+                    { "service": ["a", "b"] },
+                ],
+                "use": [
+                    { "event_stream": ["a", "b"], "scope": ["#a", "#b"] },
+                    { "protocol": "bar" },
+                    { "protocol": "foo" },
+                    { "service": ["a", "b"] },
+                ],
+                "offer": [
+                    { "directory": "b", "from": "#a_child", "to": "#b_child" },
+                    {
+                        "event_stream": ["a", "b"],
+                        "from": "#a_child",
+                        "to": "#b_child",
+                        "scope": ["#a", "#b", "#c"],
+                    },
+                    { "protocol": "bar", "from": "#a_child", "to": "#b_child" },
+                    { "protocol": "foo", "from": "#a_child", "to": "#b_child" },
+                    { "runner": [ "a", "myrunner" ], "from": "#a_child", "to": "#b_child" },
+                    { "runner": "b", "from": "#a_child", "to": "#b_child" },
+                    { "service": ["a", "b"], "from": "#a_child", "to": "#b_child" },
+                ],
+                "expose": [
+                    { "directory": "b", "from": "#a_child" },
+                    {
+                        "event_stream": ["a", "b"],
+                        "from": "#a_child",
+                        "scope": ["#a", "#b", "#c"],
+                    },
+                    { "protocol": "bar", "from": "#a_child" },
+                    { "protocol": "foo", "from": "#a_child" },
+                    { "runner": [ "a", "myrunner" ], "from": "#a_child" },
+                    { "runner": "b", "from": "#a_child" },
+                    { "service": ["a", "b"], "from": "#a_child" },
+                ],
+            }))
+        )
     }
 
     #[test]

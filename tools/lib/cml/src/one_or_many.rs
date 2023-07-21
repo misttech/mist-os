@@ -9,7 +9,7 @@ use std::{
 
 /// Represents either a single value, or multiple values of T.
 /// Useful for differentiating between an array of length 1 and a single value.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Ord, PartialOrd, Eq)]
 pub enum OneOrMany<T> {
     /// A single instance of T.
     One(T),
@@ -39,6 +39,31 @@ impl<T> OneOrMany<T> {
         match self {
             Self::One(_) => 1,
             Self::Many(v) => v.len(),
+        }
+    }
+}
+
+impl<T> OneOrMany<T>
+where
+    T: Ord + Clone,
+{
+    /// Canonicalizes self by:
+    /// * Transforming to ::One() if is_many() but len() == 1
+    /// * Sorting items if is_many()
+    pub fn canonicalize(&mut self) {
+        let mut replace_with = None;
+        match self {
+            OneOrMany::One(_) => {}
+            OneOrMany::Many(many) => {
+                if many.len() == 1 {
+                    replace_with = Some(many.first().unwrap().clone());
+                } else {
+                    many.sort();
+                }
+            }
+        }
+        if let Some(t) = replace_with {
+            *self = OneOrMany::One(t);
         }
     }
 }
