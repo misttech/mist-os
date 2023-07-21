@@ -94,7 +94,13 @@ async fn exec_set(ctx: &EnvironmentContext, set_cmd: &SetCommand) -> Result<()> 
 }
 
 async fn exec_remove(ctx: &EnvironmentContext, remove_cmd: &RemoveCommand) -> Result<()> {
-    remove_cmd.query(ctx).remove().await
+    let entry = remove_cmd.query(ctx);
+    // Check that there is a value before removing it.
+    if let Ok(Some(_val)) = entry.get_raw::<Option<Value>>().await {
+        entry.remove().await
+    } else {
+        ffx_bail_with_code!(2, "Configuration key not found")
+    }
 }
 
 async fn exec_add(ctx: &EnvironmentContext, add_cmd: &AddCommand) -> Result<()> {
@@ -177,9 +183,10 @@ async fn exec_analytics(analytics_cmd: &AnalyticsCommand) -> Result<()> {
 #[cfg(test)]
 mod test {
     use super::*;
+    use errors::{FfxError, IntoExitCode};
     use ffx_config::test_init;
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_exec_env_set_set_values() -> Result<()> {
         let test_env = test_init().await?;
         let writer = Vec::<u8>::new();
@@ -188,5 +195,77 @@ mod test {
         exec_env_set(&test_env.context, writer, &cmd).await?;
         assert_eq!(cmd.file, test_env.load().await.get_user().unwrap());
         Ok(())
+    }
+
+    #[fuchsia::test]
+    async fn test_gey_key() {
+        let test_env = test_init().await.expect("test env initialized");
+        test_env
+            .context
+            .query("some-key")
+            .level(Some(ConfigLevel::User))
+            .set("a value".into())
+            .await
+            .expect("setting value");
+
+        let get_cmd = GetCommand {
+            name: Some("some-key".into()),
+            process: MappingMode::Substitute,
+            select: ffx_config::SelectMode::First,
+            build_dir: None,
+        };
+
+        let mut writer = Vec::<u8>::new();
+        exec_get(&test_env.context, &get_cmd, &mut writer).await.expect("getting value");
+        assert_eq!(String::from_utf8(writer).unwrap(), "\"a value\"\n".to_string());
+    }
+
+    #[fuchsia::test]
+    async fn test_remove_key() {
+        let test_env = test_init().await.expect("test env initialized");
+        test_env
+            .context
+            .query("some-key")
+            .level(Some(ConfigLevel::User))
+            .set("a value".into())
+            .await
+            .expect("setting value");
+
+        let remove_cmd =
+            RemoveCommand { name: "some-key".into(), level: ConfigLevel::User, build_dir: None };
+
+        let get_cmd = GetCommand {
+            name: Some("some-key".into()),
+            process: MappingMode::Substitute,
+            select: ffx_config::SelectMode::First,
+            build_dir: None,
+        };
+
+        exec_remove(&test_env.context, &remove_cmd).await.expect("remove");
+
+        let mut writer = Vec::<u8>::new();
+        match exec_get(&test_env.context, &get_cmd, &mut writer).await {
+            Ok(_) => panic!("Expected error getting removed key"),
+            Err(e) => assert_eq!(e.to_string(), "Value not found"),
+        };
+    }
+
+    #[fuchsia::test]
+    async fn test_remove_nonexistant_key() {
+        let test_env = test_init().await.expect("test env initialized");
+
+        let remove_cmd =
+            RemoveCommand { name: "some-key".into(), level: ConfigLevel::User, build_dir: None };
+
+        match exec_remove(&test_env.context, &remove_cmd).await {
+            Ok(_) => panic!("Expected error getting removed key"),
+            Err(e) => {
+                if let Some(ffx_err) = e.downcast_ref::<FfxError>() {
+                    assert_eq!(ffx_err.to_string(), "Configuration key not found");
+                    assert!(ffx_err.exit_code() != 0, "Expected non-zero exit code");
+                } else {
+                }
+            }
+        };
     }
 }
