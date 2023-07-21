@@ -97,12 +97,13 @@ async fn read_with_timeout<T: AsyncRead + Unpin>(
             .await
         {
             Ok(Reply::Info(msg)) => listener.on_info(msg)?,
-            // If we get a TIMEDOUT response, keep reading -- that's just the usb_bulk crate
-            // not willing to spend more than 800ms waiting for a result
             Err(e) => {
+                // If we get a TIMEDOUT response, keep reading -- that's just the usb_bulk crate
+                // not willing to spend more than 800ms waiting for a result
+                // Desired code:
                 // if let Some(ioe) = e.downcast_ref::<std::io::Error>() {
-                //     if ioe.kind() == std::io::ErrorKind::TimedOut {
-                //         continue;
+                //     if ioe.kind() != std::io::ErrorKind::TimedOut {
+                //         ...
                 //     }
                 // }
                 // Unfortunately usb_bulk does not try to interpret the
@@ -110,12 +111,19 @@ async fn read_with_timeout<T: AsyncRead + Unpin>(
                 // ErrorKind::Other.  So we can't check if the kind is
                 // Timeout.  So instead, let's just read the text of
                 // the error, ugh.
-                if e.to_string() == "Read error: -110" {
-                    continue;
+                if e.to_string() != "Read error: -110" {
+                    bail!(e);
                 }
-                bail!(e)
             }
             other => return other,
+        }
+        // We can't actually rely on `on_timeout()` to time out, because while
+        // `usb_bulk` claims that it implements `AsyncRead`, it's not actually
+        // async.  As a result, on_timeout() doesn't work.  We'll leave it in
+        // to avoid problems in the future, and so our unit tests can remain
+        // asynchronous.
+        if std::time::Instant::now() > end_time {
+            bail!(SendError::Timeout);
         }
     }
 }
