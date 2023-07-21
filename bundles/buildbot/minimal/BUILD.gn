@@ -24,19 +24,15 @@ group("additional_build_targets") {
   deps = [
     "//examples",
     "//examples:tests",
-
-    # TODO(fxbug.dev/128952): Enable after fxbug.dev/129033 is fixed or the
-    # Flutter deps are removed on RISC-V.
-    # sdk:tests
+    "//sdk:tests",
 
     # TODO(fxbug.dev/122609): Enable the rest after removing Go dependencies.
     # "//src/connectivity/network:tests",
-    "//src/connectivity/network/tests/fidl:netstack-fidl-tests-with-expectations",
     "//src/connectivity/network/tests/fidl:netstack-debug-fidl-test",
     "//src/connectivity/network/tests/fidl:netstack-error-fidl-tests",
+    "//src/connectivity/network/tests/fidl:netstack-fidl-tests-with-expectations",
 
-    # TODO(fxbug.dev/128554): Enable once //src/starnix/containers/debian
-    # supports RISC-V.
+    # TODO(fxbug.dev/130998): Enable once all dependencies succeed on RISC-V.
     # "//src/developer:tests",
 
     "//src/fonts:tests",
