@@ -8,7 +8,7 @@
 ## **PROTOCOLS**
 
 ## Protocol {#Protocol}
-*Defined in [test.typesinprotocols/types_in_protocols.test.fidl](https://cs.opensource.google/fuchsia/fuchsia/+/main:tools/fidl/fidlc/testdata/types_in_protocols.test.fidl;l=161)*
+*Defined in [test.typesinprotocols/types_in_protocols.test.fidl](https://cs.opensource.google/fuchsia/fuchsia/+/main:tools/fidl/fidlc/testdata/types_in_protocols.test.fidl;l=151)*
 
 
 ### ErrorArrayBasic {#Protocol.ErrorArrayBasic}
@@ -2965,7 +2965,7 @@
 </table>
 
 ### ArrayVectorNested  {#ArrayVectorNested data-text="ArrayVectorNested"}
-*Defined in [test.typesinprotocols/types_in_protocols.test.fidl](https://cs.opensource.google/fuchsia/fuchsia/+/main:tools/fidl/fidlc/testdata/types_in_protocols.test.fidl;l=116)*
+*Defined in [test.typesinprotocols/types_in_protocols.test.fidl](https://cs.opensource.google/fuchsia/fuchsia/+/main:tools/fidl/fidlc/testdata/types_in_protocols.test.fidl;l=111)*
 
 <table>
     <tr><th>Field</th><th>Type</th><th>Description</th><th>Default</th></tr>
@@ -3170,7 +3170,7 @@
 </table>
 
 ### Resource [resource](/fuchsia-src/reference/fidl/language/language.md#value-vs-resource){:.fidl-attribute} {#Resource data-text="Resource"}
-*Defined in [test.typesinprotocols/types_in_protocols.test.fidl](https://cs.opensource.google/fuchsia/fuchsia/+/main:tools/fidl/fidlc/testdata/types_in_protocols.test.fidl;l=128)*
+*Defined in [test.typesinprotocols/types_in_protocols.test.fidl](https://cs.opensource.google/fuchsia/fuchsia/+/main:tools/fidl/fidlc/testdata/types_in_protocols.test.fidl;l=118)*
 
 <table>
     <tr><th>Field</th><th>Type</th><th>Description</th><th>Default</th></tr>
@@ -3403,7 +3403,7 @@
 &lt;EMPTY&gt;
 
 ### VectorBasic  {#VectorBasic data-text="VectorBasic"}
-*Defined in [test.typesinprotocols/types_in_protocols.test.fidl](https://cs.opensource.google/fuchsia/fuchsia/+/main:tools/fidl/fidlc/testdata/types_in_protocols.test.fidl;l=80)*
+*Defined in [test.typesinprotocols/types_in_protocols.test.fidl](https://cs.opensource.google/fuchsia/fuchsia/+/main:tools/fidl/fidlc/testdata/types_in_protocols.test.fidl;l=75)*
 
 <table>
     <tr><th>Field</th><th>Type</th><th>Description</th><th>Default</th></tr>
@@ -3506,7 +3506,7 @@
 </table>
 
 ### VectorCompound  {#VectorCompound data-text="VectorCompound"}
-*Defined in [test.typesinprotocols/types_in_protocols.test.fidl](https://cs.opensource.google/fuchsia/fuchsia/+/main:tools/fidl/fidlc/testdata/types_in_protocols.test.fidl;l=95)*
+*Defined in [test.typesinprotocols/types_in_protocols.test.fidl](https://cs.opensource.google/fuchsia/fuchsia/+/main:tools/fidl/fidlc/testdata/types_in_protocols.test.fidl;l=90)*
 
 <table>
     <tr><th>Field</th><th>Type</th><th>Description</th><th>Default</th></tr>
@@ -3569,7 +3569,7 @@
 </table>
 
 ### VectorOptional  {#VectorOptional data-text="VectorOptional"}
-*Defined in [test.typesinprotocols/types_in_protocols.test.fidl](https://cs.opensource.google/fuchsia/fuchsia/+/main:tools/fidl/fidlc/testdata/types_in_protocols.test.fidl;l=105)*
+*Defined in [test.typesinprotocols/types_in_protocols.test.fidl](https://cs.opensource.google/fuchsia/fuchsia/+/main:tools/fidl/fidlc/testdata/types_in_protocols.test.fidl;l=100)*
 
 <table>
     <tr><th>Field</th><th>Type</th><th>Description</th><th>Default</th></tr>
@@ -3649,7 +3649,7 @@ Type: <code>uint32</code>
 ## **UNIONS**
 
 ### Protocol_ErrorArrayBasic_Result [strict](/fuchsia-src/reference/fidl/language/language.md#strict-vs-flexible){:.fidl-attribute}  {#Protocol_ErrorArrayBasic_Result data-text="Protocol_ErrorArrayBasic_Result"}
-*Defined in [test.typesinprotocols/types_in_protocols.test.fidl](https://cs.opensource.google/fuchsia/fuchsia/+/main:tools/fidl/fidlc/testdata/types_in_protocols.test.fidl;l=174)*
+*Defined in [test.typesinprotocols/types_in_protocols.test.fidl](https://cs.opensource.google/fuchsia/fuchsia/+/main:tools/fidl/fidlc/testdata/types_in_protocols.test.fidl;l=164)*
 <table>
     <tr><th>Ordinal</th><th>Variant</th><th>Type</th><th>Description</th></tr>
         <tr id="Protocol_ErrorArrayBasic_Result.response">
@@ -3671,7 +3671,7 @@ Type: <code>uint32</code>
 </table>
 
 ### Protocol_ErrorArrayCompound_Result [strict](/fuchsia-src/reference/fidl/language/language.md#strict-vs-flexible){:.fidl-attribute}  {#Protocol_ErrorArrayCompound_Result data-text="Protocol_ErrorArrayCompound_Result"}
-*Defined in [test.typesinprotocols/types_in_protocols.test.fidl](https://cs.opensource.google/fuchsia/fuchsia/+/main:tools/fidl/fidlc/testdata/types_in_protocols.test.fidl;l=179)*
+*Defined in [test.typesinprotocols/types_in_protocols.test.fidl](https://cs.opensource.google/fuchsia/fuchsia/+/main:tools/fidl/fidlc/testdata/types_in_protocols.test.fidl;l=169)*
 <table>
     <tr><th>Ordinal</th><th>Variant</th><th>Type</th><th>Description</th></tr>
         <tr id="Protocol_ErrorArrayCompound_Result.response">
@@ -3693,7 +3693,7 @@ Type: <code>uint32</code>
 </table>
 
 ### Protocol_ErrorArrayVectorNested_Result [strict](/fuchsia-src/reference/fidl/language/language.md#strict-vs-flexible){:.fidl-attribute}  {#Protocol_ErrorArrayVectorNested_Result data-text="Protocol_ErrorArrayVectorNested_Result"}
-*Defined in [test.typesinprotocols/types_in_protocols.test.fidl](https://cs.opensource.google/fuchsia/fuchsia/+/main:tools/fidl/fidlc/testdata/types_in_protocols.test.fidl;l=199)*
+*Defined in [test.typesinprotocols/types_in_protocols.test.fidl](https://cs.opensource.google/fuchsia/fuchsia/+/main:tools/fidl/fidlc/testdata/types_in_protocols.test.fidl;l=189)*
 <table>
     <tr><th>Ordinal</th><th>Variant</th><th>Type</th><th>Description</th></tr>
         <tr id="Protocol_ErrorArrayVectorNested_Result.response">
@@ -3715,7 +3715,7 @@ Type: <code>uint32</code>
 </table>
 
 ### Protocol_ErrorBasic_Result [strict](/fuchsia-src/reference/fidl/language/language.md#strict-vs-flexible){:.fidl-attribute}  {#Protocol_ErrorBasic_Result data-text="Protocol_ErrorBasic_Result"}
-*Defined in [test.typesinprotocols/types_in_protocols.test.fidl](https://cs.opensource.google/fuchsia/fuchsia/+/main:tools/fidl/fidlc/testdata/types_in_protocols.test.fidl;l=164)*
+*Defined in [test.typesinprotocols/types_in_protocols.test.fidl](https://cs.opensource.google/fuchsia/fuchsia/+/main:tools/fidl/fidlc/testdata/types_in_protocols.test.fidl;l=154)*
 <table>
     <tr><th>Ordinal</th><th>Variant</th><th>Type</th><th>Description</th></tr>
         <tr id="Protocol_ErrorBasic_Result.response">
@@ -3737,7 +3737,7 @@ Type: <code>uint32</code>
 </table>
 
 ### Protocol_ErrorCompound_Result [strict](/fuchsia-src/reference/fidl/language/language.md#strict-vs-flexible){:.fidl-attribute}  {#Protocol_ErrorCompound_Result data-text="Protocol_ErrorCompound_Result"}
-*Defined in [test.typesinprotocols/types_in_protocols.test.fidl](https://cs.opensource.google/fuchsia/fuchsia/+/main:tools/fidl/fidlc/testdata/types_in_protocols.test.fidl;l=169)*
+*Defined in [test.typesinprotocols/types_in_protocols.test.fidl](https://cs.opensource.google/fuchsia/fuchsia/+/main:tools/fidl/fidlc/testdata/types_in_protocols.test.fidl;l=159)*
 <table>
     <tr><th>Ordinal</th><th>Variant</th><th>Type</th><th>Description</th></tr>
         <tr id="Protocol_ErrorCompound_Result.response">
@@ -3759,7 +3759,7 @@ Type: <code>uint32</code>
 </table>
 
 ### Protocol_ErrorResource_Result [strict](/fuchsia-src/reference/fidl/language/language.md#strict-vs-flexible){:.fidl-attribute} [resource](/fuchsia-src/reference/fidl/language/language.md#value-vs-resource){:.fidl-attribute} {#Protocol_ErrorResource_Result data-text="Protocol_ErrorResource_Result"}
-*Defined in [test.typesinprotocols/types_in_protocols.test.fidl](https://cs.opensource.google/fuchsia/fuchsia/+/main:tools/fidl/fidlc/testdata/types_in_protocols.test.fidl;l=204)*
+*Defined in [test.typesinprotocols/types_in_protocols.test.fidl](https://cs.opensource.google/fuchsia/fuchsia/+/main:tools/fidl/fidlc/testdata/types_in_protocols.test.fidl;l=194)*
 <table>
     <tr><th>Ordinal</th><th>Variant</th><th>Type</th><th>Description</th></tr>
         <tr id="Protocol_ErrorResource_Result.response">
@@ -3781,7 +3781,7 @@ Type: <code>uint32</code>
 </table>
 
 ### Protocol_ErrorVectorBasic_Result [strict](/fuchsia-src/reference/fidl/language/language.md#strict-vs-flexible){:.fidl-attribute}  {#Protocol_ErrorVectorBasic_Result data-text="Protocol_ErrorVectorBasic_Result"}
-*Defined in [test.typesinprotocols/types_in_protocols.test.fidl](https://cs.opensource.google/fuchsia/fuchsia/+/main:tools/fidl/fidlc/testdata/types_in_protocols.test.fidl;l=184)*
+*Defined in [test.typesinprotocols/types_in_protocols.test.fidl](https://cs.opensource.google/fuchsia/fuchsia/+/main:tools/fidl/fidlc/testdata/types_in_protocols.test.fidl;l=174)*
 <table>
     <tr><th>Ordinal</th><th>Variant</th><th>Type</th><th>Description</th></tr>
         <tr id="Protocol_ErrorVectorBasic_Result.response">
@@ -3803,7 +3803,7 @@ Type: <code>uint32</code>
 </table>
 
 ### Protocol_ErrorVectorCompound_Result [strict](/fuchsia-src/reference/fidl/language/language.md#strict-vs-flexible){:.fidl-attribute}  {#Protocol_ErrorVectorCompound_Result data-text="Protocol_ErrorVectorCompound_Result"}
-*Defined in [test.typesinprotocols/types_in_protocols.test.fidl](https://cs.opensource.google/fuchsia/fuchsia/+/main:tools/fidl/fidlc/testdata/types_in_protocols.test.fidl;l=189)*
+*Defined in [test.typesinprotocols/types_in_protocols.test.fidl](https://cs.opensource.google/fuchsia/fuchsia/+/main:tools/fidl/fidlc/testdata/types_in_protocols.test.fidl;l=179)*
 <table>
     <tr><th>Ordinal</th><th>Variant</th><th>Type</th><th>Description</th></tr>
         <tr id="Protocol_ErrorVectorCompound_Result.response">
@@ -3825,7 +3825,7 @@ Type: <code>uint32</code>
 </table>
 
 ### Protocol_ErrorVectorOptional_Result [strict](/fuchsia-src/reference/fidl/language/language.md#strict-vs-flexible){:.fidl-attribute}  {#Protocol_ErrorVectorOptional_Result data-text="Protocol_ErrorVectorOptional_Result"}
-*Defined in [test.typesinprotocols/types_in_protocols.test.fidl](https://cs.opensource.google/fuchsia/fuchsia/+/main:tools/fidl/fidlc/testdata/types_in_protocols.test.fidl;l=194)*
+*Defined in [test.typesinprotocols/types_in_protocols.test.fidl](https://cs.opensource.google/fuchsia/fuchsia/+/main:tools/fidl/fidlc/testdata/types_in_protocols.test.fidl;l=184)*
 <table>
     <tr><th>Ordinal</th><th>Variant</th><th>Type</th><th>Description</th></tr>
         <tr id="Protocol_ErrorVectorOptional_Result.response">

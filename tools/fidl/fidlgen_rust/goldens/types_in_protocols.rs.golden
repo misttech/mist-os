@@ -131,12 +131,16 @@ pub struct ArrayCompound {
     pub array_struct: [Struct; 5],
     pub array_table: [Table; 5],
     pub array_union: [Union; 5],
+    pub array_opt_struct: [Option<Box<Struct>>; 5],
+    pub array_opt_union: [Option<Box<Union>>; 5],
 }
 
 impl fidl::Persistable for ArrayCompound {}
 
 #[derive(Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub struct ArrayVectorNested {
+    pub array_array_uint8: [[u8; 5]; 5],
+    pub array_vector_uint8: [Vec<u8>; 5],
     pub vector_array_uint8: Vec<[u8; 5]>,
     pub vector_vector_uint8: Vec<Vec<u8>>,
 }
@@ -419,8 +423,18 @@ pub type ProtocolErrorArrayBasicResult = Result<
     ),
     u32,
 >;
-pub type ProtocolErrorArrayCompoundResult =
-    Result<([Bits; 5], [Enum; 5], [Struct; 5], [Table; 5], [Union; 5]), u32>;
+pub type ProtocolErrorArrayCompoundResult = Result<
+    (
+        [Bits; 5],
+        [Enum; 5],
+        [Struct; 5],
+        [Table; 5],
+        [Union; 5],
+        [Option<Box<Struct>>; 5],
+        [Option<Box<Union>>; 5],
+    ),
+    u32,
+>;
 pub type ProtocolErrorVectorBasicResult = Result<
     (
         Vec<u8>,
@@ -454,7 +468,8 @@ pub type ProtocolErrorVectorOptionalResult = Result<
     (Option<Vec<u8>>, Option<Vec<String>>, Option<Vec<Struct>>, Option<Vec<Option<Box<Struct>>>>),
     u32,
 >;
-pub type ProtocolErrorArrayVectorNestedResult = Result<(Vec<[u8; 5]>, Vec<Vec<u8>>), u32>;
+pub type ProtocolErrorArrayVectorNestedResult =
+    Result<([[u8; 5]; 5], [Vec<u8>; 5], Vec<[u8; 5]>, Vec<Vec<u8>>), u32>;
 pub type ProtocolErrorResourceResult = Result<
     (
         fidl::Handle,
@@ -616,10 +631,20 @@ pub trait ProtocolProxyInterface: Send + Sync {
         array_struct: &[Struct; 5],
         array_table: &[Table; 5],
         array_union: &[Union; 5],
+        array_opt_struct: &[Option<Box<Struct>>; 5],
+        array_opt_union: &[Option<Box<Union>>; 5],
     ) -> Result<(), fidl::Error>;
     type TwoWayArrayCompoundResponseFut: std::future::Future<
             Output = Result<
-                ([Bits; 5], [Enum; 5], [Struct; 5], [Table; 5], [Union; 5]),
+                (
+                    [Bits; 5],
+                    [Enum; 5],
+                    [Struct; 5],
+                    [Table; 5],
+                    [Union; 5],
+                    [Option<Box<Struct>>; 5],
+                    [Option<Box<Union>>; 5],
+                ),
                 fidl::Error,
             >,
         > + Send;
@@ -630,6 +655,8 @@ pub trait ProtocolProxyInterface: Send + Sync {
         array_struct: &[Struct; 5],
         array_table: &[Table; 5],
         array_union: &[Union; 5],
+        array_opt_struct: &[Option<Box<Struct>>; 5],
+        array_opt_union: &[Option<Box<Union>>; 5],
     ) -> Self::TwoWayArrayCompoundResponseFut;
     type ErrorArrayCompoundResponseFut: std::future::Future<Output = Result<ProtocolErrorArrayCompoundResult, fidl::Error>>
         + Send;
@@ -753,13 +780,18 @@ pub trait ProtocolProxyInterface: Send + Sync {
     fn r#error_vector_optional(&self) -> Self::ErrorVectorOptionalResponseFut;
     fn r#one_way_array_vector_nested(
         &self,
+        array_array_uint8: &[[u8; 5]; 5],
+        array_vector_uint8: &[Vec<u8>; 5],
         vector_array_uint8: &[[u8; 5]],
         vector_vector_uint8: &[Vec<u8>],
     ) -> Result<(), fidl::Error>;
-    type TwoWayArrayVectorNestedResponseFut: std::future::Future<Output = Result<(Vec<[u8; 5]>, Vec<Vec<u8>>), fidl::Error>>
-        + Send;
+    type TwoWayArrayVectorNestedResponseFut: std::future::Future<
+            Output = Result<([[u8; 5]; 5], [Vec<u8>; 5], Vec<[u8; 5]>, Vec<Vec<u8>>), fidl::Error>,
+        > + Send;
     fn r#two_way_array_vector_nested(
         &self,
+        array_array_uint8: &[[u8; 5]; 5],
+        array_vector_uint8: &[Vec<u8>; 5],
         vector_array_uint8: &[[u8; 5]],
         vector_vector_uint8: &[Vec<u8>],
     ) -> Self::TwoWayArrayVectorNestedResponseFut;
@@ -1189,9 +1221,19 @@ impl ProtocolSynchronousProxy {
         mut array_struct: &[Struct; 5],
         mut array_table: &[Table; 5],
         mut array_union: &[Union; 5],
+        mut array_opt_struct: &[Option<Box<Struct>>; 5],
+        mut array_opt_union: &[Option<Box<Union>>; 5],
     ) -> Result<(), fidl::Error> {
         self.client.send::<ArrayCompound>(
-            (array_bits, array_enum, array_struct, array_table, array_union),
+            (
+                array_bits,
+                array_enum,
+                array_struct,
+                array_table,
+                array_union,
+                array_opt_struct,
+                array_opt_union,
+            ),
             0x464948bae1bda09d,
             fidl::encoding::DynamicFlags::empty(),
         )
@@ -1204,10 +1246,31 @@ impl ProtocolSynchronousProxy {
         mut array_struct: &[Struct; 5],
         mut array_table: &[Table; 5],
         mut array_union: &[Union; 5],
+        mut array_opt_struct: &[Option<Box<Struct>>; 5],
+        mut array_opt_union: &[Option<Box<Union>>; 5],
         ___deadline: zx::Time,
-    ) -> Result<([Bits; 5], [Enum; 5], [Struct; 5], [Table; 5], [Union; 5]), fidl::Error> {
+    ) -> Result<
+        (
+            [Bits; 5],
+            [Enum; 5],
+            [Struct; 5],
+            [Table; 5],
+            [Union; 5],
+            [Option<Box<Struct>>; 5],
+            [Option<Box<Union>>; 5],
+        ),
+        fidl::Error,
+    > {
         let _response = self.client.send_query::<ArrayCompound, ArrayCompound>(
-            (array_bits, array_enum, array_struct, array_table, array_union),
+            (
+                array_bits,
+                array_enum,
+                array_struct,
+                array_table,
+                array_union,
+                array_opt_struct,
+                array_opt_union,
+            ),
             0xbcae616f8e1ea7b,
             fidl::encoding::DynamicFlags::empty(),
             ___deadline,
@@ -1218,6 +1281,8 @@ impl ProtocolSynchronousProxy {
             _response.array_struct,
             _response.array_table,
             _response.array_union,
+            _response.array_opt_struct,
+            _response.array_opt_union,
         ))
     }
 
@@ -1234,8 +1299,17 @@ impl ProtocolSynchronousProxy {
             fidl::encoding::DynamicFlags::empty(),
             ___deadline,
         )?;
-        Ok(_response
-            .map(|x| (x.array_bits, x.array_enum, x.array_struct, x.array_table, x.array_union)))
+        Ok(_response.map(|x| {
+            (
+                x.array_bits,
+                x.array_enum,
+                x.array_struct,
+                x.array_table,
+                x.array_union,
+                x.array_opt_struct,
+                x.array_opt_union,
+            )
+        }))
     }
 
     pub fn r#one_way_vector_basic(
@@ -1533,11 +1607,13 @@ impl ProtocolSynchronousProxy {
 
     pub fn r#one_way_array_vector_nested(
         &self,
+        mut array_array_uint8: &[[u8; 5]; 5],
+        mut array_vector_uint8: &[Vec<u8>; 5],
         mut vector_array_uint8: &[[u8; 5]],
         mut vector_vector_uint8: &[Vec<u8>],
     ) -> Result<(), fidl::Error> {
         self.client.send::<ArrayVectorNested>(
-            (vector_array_uint8, vector_vector_uint8),
+            (array_array_uint8, array_vector_uint8, vector_array_uint8, vector_vector_uint8),
             0x520dc9cb9b9b5ed7,
             fidl::encoding::DynamicFlags::empty(),
         )
@@ -1545,17 +1621,24 @@ impl ProtocolSynchronousProxy {
 
     pub fn r#two_way_array_vector_nested(
         &self,
+        mut array_array_uint8: &[[u8; 5]; 5],
+        mut array_vector_uint8: &[Vec<u8>; 5],
         mut vector_array_uint8: &[[u8; 5]],
         mut vector_vector_uint8: &[Vec<u8>],
         ___deadline: zx::Time,
-    ) -> Result<(Vec<[u8; 5]>, Vec<Vec<u8>>), fidl::Error> {
+    ) -> Result<([[u8; 5]; 5], [Vec<u8>; 5], Vec<[u8; 5]>, Vec<Vec<u8>>), fidl::Error> {
         let _response = self.client.send_query::<ArrayVectorNested, ArrayVectorNested>(
-            (vector_array_uint8, vector_vector_uint8),
+            (array_array_uint8, array_vector_uint8, vector_array_uint8, vector_vector_uint8),
             0x4a438ce0948817dc,
             fidl::encoding::DynamicFlags::empty(),
             ___deadline,
         )?;
-        Ok((_response.vector_array_uint8, _response.vector_vector_uint8))
+        Ok((
+            _response.array_array_uint8,
+            _response.array_vector_uint8,
+            _response.vector_array_uint8,
+            _response.vector_vector_uint8,
+        ))
     }
 
     pub fn r#error_array_vector_nested(
@@ -1571,7 +1654,9 @@ impl ProtocolSynchronousProxy {
             fidl::encoding::DynamicFlags::empty(),
             ___deadline,
         )?;
-        Ok(_response.map(|x| (x.vector_array_uint8, x.vector_vector_uint8)))
+        Ok(_response.map(|x| {
+            (x.array_array_uint8, x.array_vector_uint8, x.vector_array_uint8, x.vector_vector_uint8)
+        }))
     }
 
     pub fn r#one_way_resource(
@@ -2040,6 +2125,8 @@ impl ProtocolProxy {
         mut array_struct: &[Struct; 5],
         mut array_table: &[Table; 5],
         mut array_union: &[Union; 5],
+        mut array_opt_struct: &[Option<Box<Struct>>; 5],
+        mut array_opt_union: &[Option<Box<Union>>; 5],
     ) -> Result<(), fidl::Error> {
         ProtocolProxyInterface::r#one_way_array_compound(
             self,
@@ -2048,6 +2135,8 @@ impl ProtocolProxy {
             array_struct,
             array_table,
             array_union,
+            array_opt_struct,
+            array_opt_union,
         )
     }
 
@@ -2058,8 +2147,17 @@ impl ProtocolProxy {
         mut array_struct: &[Struct; 5],
         mut array_table: &[Table; 5],
         mut array_union: &[Union; 5],
-    ) -> fidl::client::QueryResponseFut<([Bits; 5], [Enum; 5], [Struct; 5], [Table; 5], [Union; 5])>
-    {
+        mut array_opt_struct: &[Option<Box<Struct>>; 5],
+        mut array_opt_union: &[Option<Box<Union>>; 5],
+    ) -> fidl::client::QueryResponseFut<(
+        [Bits; 5],
+        [Enum; 5],
+        [Struct; 5],
+        [Table; 5],
+        [Union; 5],
+        [Option<Box<Struct>>; 5],
+        [Option<Box<Union>>; 5],
+    )> {
         ProtocolProxyInterface::r#two_way_array_compound(
             self,
             array_bits,
@@ -2067,6 +2165,8 @@ impl ProtocolProxy {
             array_struct,
             array_table,
             array_union,
+            array_opt_struct,
+            array_opt_union,
         )
     }
 
@@ -2262,11 +2362,15 @@ impl ProtocolProxy {
 
     pub fn r#one_way_array_vector_nested(
         &self,
+        mut array_array_uint8: &[[u8; 5]; 5],
+        mut array_vector_uint8: &[Vec<u8>; 5],
         mut vector_array_uint8: &[[u8; 5]],
         mut vector_vector_uint8: &[Vec<u8>],
     ) -> Result<(), fidl::Error> {
         ProtocolProxyInterface::r#one_way_array_vector_nested(
             self,
+            array_array_uint8,
+            array_vector_uint8,
             vector_array_uint8,
             vector_vector_uint8,
         )
@@ -2274,11 +2378,16 @@ impl ProtocolProxy {
 
     pub fn r#two_way_array_vector_nested(
         &self,
+        mut array_array_uint8: &[[u8; 5]; 5],
+        mut array_vector_uint8: &[Vec<u8>; 5],
         mut vector_array_uint8: &[[u8; 5]],
         mut vector_vector_uint8: &[Vec<u8>],
-    ) -> fidl::client::QueryResponseFut<(Vec<[u8; 5]>, Vec<Vec<u8>>)> {
+    ) -> fidl::client::QueryResponseFut<([[u8; 5]; 5], [Vec<u8>; 5], Vec<[u8; 5]>, Vec<Vec<u8>>)>
+    {
         ProtocolProxyInterface::r#two_way_array_vector_nested(
             self,
+            array_array_uint8,
+            array_vector_uint8,
             vector_array_uint8,
             vector_vector_uint8,
         )
@@ -2832,16 +2941,33 @@ impl ProtocolProxyInterface for ProtocolProxy {
         mut array_struct: &[Struct; 5],
         mut array_table: &[Table; 5],
         mut array_union: &[Union; 5],
+        mut array_opt_struct: &[Option<Box<Struct>>; 5],
+        mut array_opt_union: &[Option<Box<Union>>; 5],
     ) -> Result<(), fidl::Error> {
         self.client.send::<ArrayCompound>(
-            (array_bits, array_enum, array_struct, array_table, array_union),
+            (
+                array_bits,
+                array_enum,
+                array_struct,
+                array_table,
+                array_union,
+                array_opt_struct,
+                array_opt_union,
+            ),
             0x464948bae1bda09d,
             fidl::encoding::DynamicFlags::empty(),
         )
     }
 
-    type TwoWayArrayCompoundResponseFut =
-        fidl::client::QueryResponseFut<([Bits; 5], [Enum; 5], [Struct; 5], [Table; 5], [Union; 5])>;
+    type TwoWayArrayCompoundResponseFut = fidl::client::QueryResponseFut<(
+        [Bits; 5],
+        [Enum; 5],
+        [Struct; 5],
+        [Table; 5],
+        [Union; 5],
+        [Option<Box<Struct>>; 5],
+        [Option<Box<Union>>; 5],
+    )>;
     fn r#two_way_array_compound(
         &self,
         mut array_bits: &[Bits; 5],
@@ -2849,11 +2975,23 @@ impl ProtocolProxyInterface for ProtocolProxy {
         mut array_struct: &[Struct; 5],
         mut array_table: &[Table; 5],
         mut array_union: &[Union; 5],
+        mut array_opt_struct: &[Option<Box<Struct>>; 5],
+        mut array_opt_union: &[Option<Box<Union>>; 5],
     ) -> Self::TwoWayArrayCompoundResponseFut {
         fn _decode(
             mut _buf: Result<fidl::MessageBufEtc, fidl::Error>,
-        ) -> Result<([Bits; 5], [Enum; 5], [Struct; 5], [Table; 5], [Union; 5]), fidl::Error>
-        {
+        ) -> Result<
+            (
+                [Bits; 5],
+                [Enum; 5],
+                [Struct; 5],
+                [Table; 5],
+                [Union; 5],
+                [Option<Box<Struct>>; 5],
+                [Option<Box<Union>>; 5],
+            ),
+            fidl::Error,
+        > {
             let _response =
                 fidl::client::decode_transaction_body::<ArrayCompound, 0xbcae616f8e1ea7b>(_buf?)?;
             Ok((
@@ -2862,13 +3000,28 @@ impl ProtocolProxyInterface for ProtocolProxy {
                 _response.array_struct,
                 _response.array_table,
                 _response.array_union,
+                _response.array_opt_struct,
+                _response.array_opt_union,
             ))
         }
-        self.client.send_query_and_decode::<
-            ArrayCompound,
-            ([Bits; 5], [Enum; 5], [Struct; 5], [Table; 5], [Union; 5]),
-        >(
-            (array_bits, array_enum, array_struct, array_table, array_union,),
+        self.client.send_query_and_decode::<ArrayCompound, (
+            [Bits; 5],
+            [Enum; 5],
+            [Struct; 5],
+            [Table; 5],
+            [Union; 5],
+            [Option<Box<Struct>>; 5],
+            [Option<Box<Union>>; 5],
+        )>(
+            (
+                array_bits,
+                array_enum,
+                array_struct,
+                array_table,
+                array_union,
+                array_opt_struct,
+                array_opt_union,
+            ),
             0xbcae616f8e1ea7b,
             fidl::encoding::DynamicFlags::empty(),
             _decode,
@@ -2886,7 +3039,15 @@ impl ProtocolProxyInterface for ProtocolProxy {
                 0x52257f80e29c1a04,
             >(_buf?)?;
             Ok(_response.map(|x| {
-                (x.array_bits, x.array_enum, x.array_struct, x.array_table, x.array_union)
+                (
+                    x.array_bits,
+                    x.array_enum,
+                    x.array_struct,
+                    x.array_table,
+                    x.array_union,
+                    x.array_opt_struct,
+                    x.array_opt_union,
+                )
             }))
         }
         self.client.send_query_and_decode::<
@@ -3289,34 +3450,46 @@ impl ProtocolProxyInterface for ProtocolProxy {
 
     fn r#one_way_array_vector_nested(
         &self,
+        mut array_array_uint8: &[[u8; 5]; 5],
+        mut array_vector_uint8: &[Vec<u8>; 5],
         mut vector_array_uint8: &[[u8; 5]],
         mut vector_vector_uint8: &[Vec<u8>],
     ) -> Result<(), fidl::Error> {
         self.client.send::<ArrayVectorNested>(
-            (vector_array_uint8, vector_vector_uint8),
+            (array_array_uint8, array_vector_uint8, vector_array_uint8, vector_vector_uint8),
             0x520dc9cb9b9b5ed7,
             fidl::encoding::DynamicFlags::empty(),
         )
     }
 
     type TwoWayArrayVectorNestedResponseFut =
-        fidl::client::QueryResponseFut<(Vec<[u8; 5]>, Vec<Vec<u8>>)>;
+        fidl::client::QueryResponseFut<([[u8; 5]; 5], [Vec<u8>; 5], Vec<[u8; 5]>, Vec<Vec<u8>>)>;
     fn r#two_way_array_vector_nested(
         &self,
+        mut array_array_uint8: &[[u8; 5]; 5],
+        mut array_vector_uint8: &[Vec<u8>; 5],
         mut vector_array_uint8: &[[u8; 5]],
         mut vector_vector_uint8: &[Vec<u8>],
     ) -> Self::TwoWayArrayVectorNestedResponseFut {
         fn _decode(
             mut _buf: Result<fidl::MessageBufEtc, fidl::Error>,
-        ) -> Result<(Vec<[u8; 5]>, Vec<Vec<u8>>), fidl::Error> {
+        ) -> Result<([[u8; 5]; 5], [Vec<u8>; 5], Vec<[u8; 5]>, Vec<Vec<u8>>), fidl::Error> {
             let _response = fidl::client::decode_transaction_body::<
                 ArrayVectorNested,
                 0x4a438ce0948817dc,
             >(_buf?)?;
-            Ok((_response.vector_array_uint8, _response.vector_vector_uint8))
+            Ok((
+                _response.array_array_uint8,
+                _response.array_vector_uint8,
+                _response.vector_array_uint8,
+                _response.vector_vector_uint8,
+            ))
         }
-        self.client.send_query_and_decode::<ArrayVectorNested, (Vec<[u8; 5]>, Vec<Vec<u8>>)>(
-            (vector_array_uint8, vector_vector_uint8),
+        self.client.send_query_and_decode::<
+            ArrayVectorNested,
+            ([[u8; 5]; 5], [Vec<u8>; 5], Vec<[u8; 5]>, Vec<Vec<u8>>),
+        >(
+            (array_array_uint8, array_vector_uint8, vector_array_uint8, vector_vector_uint8,),
             0x4a438ce0948817dc,
             fidl::encoding::DynamicFlags::empty(),
             _decode,
@@ -3333,7 +3506,14 @@ impl ProtocolProxyInterface for ProtocolProxy {
                 fidl::encoding::ResultType<ArrayVectorNested, u32>,
                 0x7e168d89e1dac8a7,
             >(_buf?)?;
-            Ok(_response.map(|x| (x.vector_array_uint8, x.vector_vector_uint8)))
+            Ok(_response.map(|x| {
+                (
+                    x.array_array_uint8,
+                    x.array_vector_uint8,
+                    x.vector_array_uint8,
+                    x.vector_vector_uint8,
+                )
+            }))
         }
         self.client.send_query_and_decode::<
             fidl::encoding::EmptyPayload,
@@ -3727,6 +3907,8 @@ pub enum ProtocolEvent {
         array_struct: [Struct; 5],
         array_table: [Table; 5],
         array_union: [Union; 5],
+        array_opt_struct: [Option<Box<Struct>>; 5],
+        array_opt_union: [Option<Box<Union>>; 5],
     },
     EventVectorBasic {
         vector_uint8: Vec<u8>,
@@ -3758,6 +3940,8 @@ pub enum ProtocolEvent {
         opt_vector_opt_struct: Option<Vec<Option<Box<Struct>>>>,
     },
     EventArrayVectorNested {
+        array_array_uint8: [[u8; 5]; 5],
+        array_vector_uint8: [Vec<u8>; 5],
         vector_array_uint8: Vec<[u8; 5]>,
         vector_vector_uint8: Vec<Vec<u8>>,
     },
@@ -3892,16 +4076,34 @@ impl ProtocolEvent {
     #[allow(irrefutable_let_patterns)]
     pub fn into_event_array_compound(
         self,
-    ) -> Option<([Bits; 5], [Enum; 5], [Struct; 5], [Table; 5], [Union; 5])> {
+    ) -> Option<(
+        [Bits; 5],
+        [Enum; 5],
+        [Struct; 5],
+        [Table; 5],
+        [Union; 5],
+        [Option<Box<Struct>>; 5],
+        [Option<Box<Union>>; 5],
+    )> {
         if let ProtocolEvent::EventArrayCompound {
             array_bits,
             array_enum,
             array_struct,
             array_table,
             array_union,
+            array_opt_struct,
+            array_opt_union,
         } = self
         {
-            Some((array_bits, array_enum, array_struct, array_table, array_union))
+            Some((
+                array_bits,
+                array_enum,
+                array_struct,
+                array_table,
+                array_union,
+                array_opt_struct,
+                array_opt_union,
+            ))
         } else {
             None
         }
@@ -4013,11 +4215,17 @@ impl ProtocolEvent {
         }
     }
     #[allow(irrefutable_let_patterns)]
-    pub fn into_event_array_vector_nested(self) -> Option<(Vec<[u8; 5]>, Vec<Vec<u8>>)> {
-        if let ProtocolEvent::EventArrayVectorNested { vector_array_uint8, vector_vector_uint8 } =
-            self
+    pub fn into_event_array_vector_nested(
+        self,
+    ) -> Option<([[u8; 5]; 5], [Vec<u8>; 5], Vec<[u8; 5]>, Vec<Vec<u8>>)> {
+        if let ProtocolEvent::EventArrayVectorNested {
+            array_array_uint8,
+            array_vector_uint8,
+            vector_array_uint8,
+            vector_vector_uint8,
+        } = self
         {
-            Some((vector_array_uint8, vector_vector_uint8))
+            Some((array_array_uint8, array_vector_uint8, vector_array_uint8, vector_vector_uint8))
         } else {
             None
         }
@@ -4203,6 +4411,8 @@ impl ProtocolEvent {
                     array_struct: out.array_struct,
                     array_table: out.array_table,
                     array_union: out.array_union,
+                    array_opt_struct: out.array_opt_struct,
+                    array_opt_union: out.array_opt_union,
                 }))
             }
             0x3f9d405e7191eff6 => {
@@ -4270,6 +4480,8 @@ impl ProtocolEvent {
                     &mut out,
                 )?;
                 Ok((ProtocolEvent::EventArrayVectorNested {
+                    array_array_uint8: out.array_array_uint8,
+                    array_vector_uint8: out.array_vector_uint8,
                     vector_array_uint8: out.vector_array_uint8,
                     vector_vector_uint8: out.vector_vector_uint8,
                 }))
@@ -4621,6 +4833,8 @@ impl futures::Stream for ProtocolRequestStream {
                         array_struct: req.array_struct,
                         array_table: req.array_table,
                         array_union: req.array_union,
+                        array_opt_struct: req.array_opt_struct,
+                        array_opt_union: req.array_opt_union,
 
                         control_handle,
                     })
@@ -4641,6 +4855,8 @@ impl futures::Stream for ProtocolRequestStream {
                         array_struct: req.array_struct,
                         array_table: req.array_table,
                         array_union: req.array_union,
+                        array_opt_struct: req.array_opt_struct,
+                        array_opt_union: req.array_opt_union,
 
                         responder: ProtocolTwoWayArrayCompoundResponder {
                             control_handle: std::mem::ManuallyDrop::new(control_handle),
@@ -4880,6 +5096,8 @@ impl futures::Stream for ProtocolRequestStream {
                     let control_handle = ProtocolControlHandle { inner: this.inner.clone() };
 
                     Ok(ProtocolRequest::OneWayArrayVectorNested {
+                        array_array_uint8: req.array_array_uint8,
+                        array_vector_uint8: req.array_vector_uint8,
                         vector_array_uint8: req.vector_array_uint8,
                         vector_vector_uint8: req.vector_vector_uint8,
 
@@ -4897,6 +5115,8 @@ impl futures::Stream for ProtocolRequestStream {
                     let control_handle = ProtocolControlHandle { inner: this.inner.clone() };
 
                     Ok(ProtocolRequest::TwoWayArrayVectorNested {
+                        array_array_uint8: req.array_array_uint8,
+                        array_vector_uint8: req.array_vector_uint8,
                         vector_array_uint8: req.vector_array_uint8,
                         vector_vector_uint8: req.vector_vector_uint8,
 
@@ -5137,6 +5357,8 @@ pub enum ProtocolRequest {
         array_struct: [Struct; 5],
         array_table: [Table; 5],
         array_union: [Union; 5],
+        array_opt_struct: [Option<Box<Struct>>; 5],
+        array_opt_union: [Option<Box<Union>>; 5],
         control_handle: ProtocolControlHandle,
     },
     TwoWayArrayCompound {
@@ -5145,6 +5367,8 @@ pub enum ProtocolRequest {
         array_struct: [Struct; 5],
         array_table: [Table; 5],
         array_union: [Union; 5],
+        array_opt_struct: [Option<Box<Struct>>; 5],
+        array_opt_union: [Option<Box<Union>>; 5],
         responder: ProtocolTwoWayArrayCompoundResponder,
     },
     ErrorArrayCompound {
@@ -5224,11 +5448,15 @@ pub enum ProtocolRequest {
         responder: ProtocolErrorVectorOptionalResponder,
     },
     OneWayArrayVectorNested {
+        array_array_uint8: [[u8; 5]; 5],
+        array_vector_uint8: [Vec<u8>; 5],
         vector_array_uint8: Vec<[u8; 5]>,
         vector_vector_uint8: Vec<Vec<u8>>,
         control_handle: ProtocolControlHandle,
     },
     TwoWayArrayVectorNested {
+        array_array_uint8: [[u8; 5]; 5],
+        array_vector_uint8: [Vec<u8>; 5],
         vector_array_uint8: Vec<[u8; 5]>,
         vector_vector_uint8: Vec<Vec<u8>>,
         responder: ProtocolTwoWayArrayVectorNestedResponder,
@@ -5597,18 +5825,37 @@ impl ProtocolRequest {
     #[allow(irrefutable_let_patterns)]
     pub fn into_one_way_array_compound(
         self,
-    ) -> Option<([Bits; 5], [Enum; 5], [Struct; 5], [Table; 5], [Union; 5], ProtocolControlHandle)>
-    {
+    ) -> Option<(
+        [Bits; 5],
+        [Enum; 5],
+        [Struct; 5],
+        [Table; 5],
+        [Union; 5],
+        [Option<Box<Struct>>; 5],
+        [Option<Box<Union>>; 5],
+        ProtocolControlHandle,
+    )> {
         if let ProtocolRequest::OneWayArrayCompound {
             array_bits,
             array_enum,
             array_struct,
             array_table,
             array_union,
+            array_opt_struct,
+            array_opt_union,
             control_handle,
         } = self
         {
-            Some((array_bits, array_enum, array_struct, array_table, array_union, control_handle))
+            Some((
+                array_bits,
+                array_enum,
+                array_struct,
+                array_table,
+                array_union,
+                array_opt_struct,
+                array_opt_union,
+                control_handle,
+            ))
         } else {
             None
         }
@@ -5623,6 +5870,8 @@ impl ProtocolRequest {
         [Struct; 5],
         [Table; 5],
         [Union; 5],
+        [Option<Box<Struct>>; 5],
+        [Option<Box<Union>>; 5],
         ProtocolTwoWayArrayCompoundResponder,
     )> {
         if let ProtocolRequest::TwoWayArrayCompound {
@@ -5631,10 +5880,21 @@ impl ProtocolRequest {
             array_struct,
             array_table,
             array_union,
+            array_opt_struct,
+            array_opt_union,
             responder,
         } = self
         {
-            Some((array_bits, array_enum, array_struct, array_table, array_union, responder))
+            Some((
+                array_bits,
+                array_enum,
+                array_struct,
+                array_table,
+                array_union,
+                array_opt_struct,
+                array_opt_union,
+                responder,
+            ))
         } else {
             None
         }
@@ -5925,14 +6185,23 @@ impl ProtocolRequest {
     #[allow(irrefutable_let_patterns)]
     pub fn into_one_way_array_vector_nested(
         self,
-    ) -> Option<(Vec<[u8; 5]>, Vec<Vec<u8>>, ProtocolControlHandle)> {
+    ) -> Option<([[u8; 5]; 5], [Vec<u8>; 5], Vec<[u8; 5]>, Vec<Vec<u8>>, ProtocolControlHandle)>
+    {
         if let ProtocolRequest::OneWayArrayVectorNested {
+            array_array_uint8,
+            array_vector_uint8,
             vector_array_uint8,
             vector_vector_uint8,
             control_handle,
         } = self
         {
-            Some((vector_array_uint8, vector_vector_uint8, control_handle))
+            Some((
+                array_array_uint8,
+                array_vector_uint8,
+                vector_array_uint8,
+                vector_vector_uint8,
+                control_handle,
+            ))
         } else {
             None
         }
@@ -5941,14 +6210,28 @@ impl ProtocolRequest {
     #[allow(irrefutable_let_patterns)]
     pub fn into_two_way_array_vector_nested(
         self,
-    ) -> Option<(Vec<[u8; 5]>, Vec<Vec<u8>>, ProtocolTwoWayArrayVectorNestedResponder)> {
+    ) -> Option<(
+        [[u8; 5]; 5],
+        [Vec<u8>; 5],
+        Vec<[u8; 5]>,
+        Vec<Vec<u8>>,
+        ProtocolTwoWayArrayVectorNestedResponder,
+    )> {
         if let ProtocolRequest::TwoWayArrayVectorNested {
+            array_array_uint8,
+            array_vector_uint8,
             vector_array_uint8,
             vector_vector_uint8,
             responder,
         } = self
         {
-            Some((vector_array_uint8, vector_vector_uint8, responder))
+            Some((
+                array_array_uint8,
+                array_vector_uint8,
+                vector_array_uint8,
+                vector_vector_uint8,
+                responder,
+            ))
         } else {
             None
         }
@@ -6317,9 +6600,19 @@ impl ProtocolControlHandle {
         mut array_struct: &[Struct; 5],
         mut array_table: &[Table; 5],
         mut array_union: &[Union; 5],
+        mut array_opt_struct: &[Option<Box<Struct>>; 5],
+        mut array_opt_union: &[Option<Box<Union>>; 5],
     ) -> Result<(), fidl::Error> {
         self.inner.send::<ArrayCompound>(
-            (array_bits, array_enum, array_struct, array_table, array_union),
+            (
+                array_bits,
+                array_enum,
+                array_struct,
+                array_table,
+                array_union,
+                array_opt_struct,
+                array_opt_union,
+            ),
             0,
             0x1e63a00079aa7415,
             fidl::encoding::DynamicFlags::empty(),
@@ -6405,11 +6698,13 @@ impl ProtocolControlHandle {
 
     pub fn send_event_array_vector_nested(
         &self,
+        mut array_array_uint8: &[[u8; 5]; 5],
+        mut array_vector_uint8: &[Vec<u8>; 5],
         mut vector_array_uint8: &[[u8; 5]],
         mut vector_vector_uint8: &[Vec<u8>],
     ) -> Result<(), fidl::Error> {
         self.inner.send::<ArrayVectorNested>(
-            (vector_array_uint8, vector_vector_uint8),
+            (array_array_uint8, array_vector_uint8, vector_array_uint8, vector_vector_uint8),
             0,
             0x110b72cfebc4037e,
             fidl::encoding::DynamicFlags::empty(),
@@ -7224,8 +7519,18 @@ impl ProtocolTwoWayArrayCompoundResponder {
         mut array_struct: &[Struct; 5],
         mut array_table: &[Table; 5],
         mut array_union: &[Union; 5],
+        mut array_opt_struct: &[Option<Box<Struct>>; 5],
+        mut array_opt_union: &[Option<Box<Union>>; 5],
     ) -> Result<(), fidl::Error> {
-        let r = self.send_raw(array_bits, array_enum, array_struct, array_table, array_union);
+        let r = self.send_raw(
+            array_bits,
+            array_enum,
+            array_struct,
+            array_table,
+            array_union,
+            array_opt_struct,
+            array_opt_union,
+        );
         if r.is_err() {
             self.control_handle.shutdown();
         }
@@ -7242,8 +7547,18 @@ impl ProtocolTwoWayArrayCompoundResponder {
         mut array_struct: &[Struct; 5],
         mut array_table: &[Table; 5],
         mut array_union: &[Union; 5],
+        mut array_opt_struct: &[Option<Box<Struct>>; 5],
+        mut array_opt_union: &[Option<Box<Union>>; 5],
     ) -> Result<(), fidl::Error> {
-        let r = self.send_raw(array_bits, array_enum, array_struct, array_table, array_union);
+        let r = self.send_raw(
+            array_bits,
+            array_enum,
+            array_struct,
+            array_table,
+            array_union,
+            array_opt_struct,
+            array_opt_union,
+        );
         self.drop_without_shutdown();
         r
     }
@@ -7255,6 +7570,8 @@ impl ProtocolTwoWayArrayCompoundResponder {
         mut array_struct: &[Struct; 5],
         mut array_table: &[Table; 5],
         mut array_union: &[Union; 5],
+        mut array_opt_struct: &[Option<Box<Struct>>; 5],
+        mut array_opt_union: &[Option<Box<Union>>; 5],
     ) -> Result<(), fidl::Error> {
         let msg = fidl::encoding::TransactionMessage {
             header: fidl::encoding::TransactionHeader::new(
@@ -7262,7 +7579,15 @@ impl ProtocolTwoWayArrayCompoundResponder {
                 self.ordinal,
                 fidl::encoding::DynamicFlags::empty(),
             ),
-            body: (array_bits, array_enum, array_struct, array_table, array_union),
+            body: (
+                array_bits,
+                array_enum,
+                array_struct,
+                array_table,
+                array_union,
+                array_opt_struct,
+                array_opt_union,
+            ),
         };
 
         fidl::encoding::with_tls_encode_buf(|bytes, handles| {
@@ -7314,7 +7639,18 @@ impl ProtocolErrorArrayCompoundResponder {
     /// Sets the channel to shutdown if an error occurs.
     pub fn send(
         self,
-        mut result: Result<(&[Bits; 5], &[Enum; 5], &[Struct; 5], &[Table; 5], &[Union; 5]), u32>,
+        mut result: Result<
+            (
+                &[Bits; 5],
+                &[Enum; 5],
+                &[Struct; 5],
+                &[Table; 5],
+                &[Union; 5],
+                &[Option<Box<Struct>>; 5],
+                &[Option<Box<Union>>; 5],
+            ),
+            u32,
+        >,
     ) -> Result<(), fidl::Error> {
         let r = self.send_raw(result);
         if r.is_err() {
@@ -7328,7 +7664,18 @@ impl ProtocolErrorArrayCompoundResponder {
     /// an error occurs.
     pub fn send_no_shutdown_on_err(
         self,
-        mut result: Result<(&[Bits; 5], &[Enum; 5], &[Struct; 5], &[Table; 5], &[Union; 5]), u32>,
+        mut result: Result<
+            (
+                &[Bits; 5],
+                &[Enum; 5],
+                &[Struct; 5],
+                &[Table; 5],
+                &[Union; 5],
+                &[Option<Box<Struct>>; 5],
+                &[Option<Box<Union>>; 5],
+            ),
+            u32,
+        >,
     ) -> Result<(), fidl::Error> {
         let r = self.send_raw(result);
         self.drop_without_shutdown();
@@ -7337,7 +7684,18 @@ impl ProtocolErrorArrayCompoundResponder {
 
     fn send_raw(
         &self,
-        mut result: Result<(&[Bits; 5], &[Enum; 5], &[Struct; 5], &[Table; 5], &[Union; 5]), u32>,
+        mut result: Result<
+            (
+                &[Bits; 5],
+                &[Enum; 5],
+                &[Struct; 5],
+                &[Table; 5],
+                &[Union; 5],
+                &[Option<Box<Struct>>; 5],
+                &[Option<Box<Union>>; 5],
+            ),
+            u32,
+        >,
     ) -> Result<(), fidl::Error> {
         let msg = fidl::encoding::TransactionMessage {
             header: fidl::encoding::TransactionHeader::new(
@@ -8126,10 +8484,17 @@ impl ProtocolTwoWayArrayVectorNestedResponder {
     /// Sets the channel to shutdown if an error occurs.
     pub fn send(
         self,
+        mut array_array_uint8: &[[u8; 5]; 5],
+        mut array_vector_uint8: &[Vec<u8>; 5],
         mut vector_array_uint8: &[[u8; 5]],
         mut vector_vector_uint8: &[Vec<u8>],
     ) -> Result<(), fidl::Error> {
-        let r = self.send_raw(vector_array_uint8, vector_vector_uint8);
+        let r = self.send_raw(
+            array_array_uint8,
+            array_vector_uint8,
+            vector_array_uint8,
+            vector_vector_uint8,
+        );
         if r.is_err() {
             self.control_handle.shutdown();
         }
@@ -8141,16 +8506,25 @@ impl ProtocolTwoWayArrayVectorNestedResponder {
     /// an error occurs.
     pub fn send_no_shutdown_on_err(
         self,
+        mut array_array_uint8: &[[u8; 5]; 5],
+        mut array_vector_uint8: &[Vec<u8>; 5],
         mut vector_array_uint8: &[[u8; 5]],
         mut vector_vector_uint8: &[Vec<u8>],
     ) -> Result<(), fidl::Error> {
-        let r = self.send_raw(vector_array_uint8, vector_vector_uint8);
+        let r = self.send_raw(
+            array_array_uint8,
+            array_vector_uint8,
+            vector_array_uint8,
+            vector_vector_uint8,
+        );
         self.drop_without_shutdown();
         r
     }
 
     fn send_raw(
         &self,
+        mut array_array_uint8: &[[u8; 5]; 5],
+        mut array_vector_uint8: &[Vec<u8>; 5],
         mut vector_array_uint8: &[[u8; 5]],
         mut vector_vector_uint8: &[Vec<u8>],
     ) -> Result<(), fidl::Error> {
@@ -8160,7 +8534,7 @@ impl ProtocolTwoWayArrayVectorNestedResponder {
                 self.ordinal,
                 fidl::encoding::DynamicFlags::empty(),
             ),
-            body: (vector_array_uint8, vector_vector_uint8),
+            body: (array_array_uint8, array_vector_uint8, vector_array_uint8, vector_vector_uint8),
         };
 
         fidl::encoding::with_tls_encode_buf(|bytes, handles| {
@@ -8212,7 +8586,7 @@ impl ProtocolErrorArrayVectorNestedResponder {
     /// Sets the channel to shutdown if an error occurs.
     pub fn send(
         self,
-        mut result: Result<(&[[u8; 5]], &[Vec<u8>]), u32>,
+        mut result: Result<(&[[u8; 5]; 5], &[Vec<u8>; 5], &[[u8; 5]], &[Vec<u8>]), u32>,
     ) -> Result<(), fidl::Error> {
         let r = self.send_raw(result);
         if r.is_err() {
@@ -8226,7 +8600,7 @@ impl ProtocolErrorArrayVectorNestedResponder {
     /// an error occurs.
     pub fn send_no_shutdown_on_err(
         self,
-        mut result: Result<(&[[u8; 5]], &[Vec<u8>]), u32>,
+        mut result: Result<(&[[u8; 5]; 5], &[Vec<u8>; 5], &[[u8; 5]], &[Vec<u8>]), u32>,
     ) -> Result<(), fidl::Error> {
         let r = self.send_raw(result);
         self.drop_without_shutdown();
@@ -8235,7 +8609,7 @@ impl ProtocolErrorArrayVectorNestedResponder {
 
     fn send_raw(
         &self,
-        mut result: Result<(&[[u8; 5]], &[Vec<u8>]), u32>,
+        mut result: Result<(&[[u8; 5]; 5], &[Vec<u8>; 5], &[[u8; 5]], &[Vec<u8>]), u32>,
     ) -> Result<(), fidl::Error> {
         let msg = fidl::encoding::TransactionMessage {
             header: fidl::encoding::TransactionHeader::new(
@@ -9319,25 +9693,15 @@ mod internal {
             // Delegate to tuple encoding.
             fidl::encoding::Encode::<ArrayCompound>::encode(
                 (
-                    <fidl::encoding::Array<Bits, 5> as fidl::encoding::ValueTypeMarker>::borrow(
-                        &self.array_bits,
-                    ),
-                    <fidl::encoding::Array<Enum, 5> as fidl::encoding::ValueTypeMarker>::borrow(
-                        &self.array_enum,
-                    ),
-                    <fidl::encoding::Array<Struct, 5> as fidl::encoding::ValueTypeMarker>::borrow(
-                        &self.array_struct,
-                    ),
-                    <fidl::encoding::Array<Table, 5> as fidl::encoding::ValueTypeMarker>::borrow(
-                        &self.array_table,
-                    ),
-                    <fidl::encoding::Array<Union, 5> as fidl::encoding::ValueTypeMarker>::borrow(
-                        &self.array_union,
-                    ),
+                    <fidl::encoding::Array<Bits, 5> as fidl::encoding::ValueTypeMarker>::borrow(&self.array_bits),
+                    <fidl::encoding::Array<Enum, 5> as fidl::encoding::ValueTypeMarker>::borrow(&self.array_enum),
+                    <fidl::encoding::Array<Struct, 5> as fidl::encoding::ValueTypeMarker>::borrow(&self.array_struct),
+                    <fidl::encoding::Array<Table, 5> as fidl::encoding::ValueTypeMarker>::borrow(&self.array_table),
+                    <fidl::encoding::Array<Union, 5> as fidl::encoding::ValueTypeMarker>::borrow(&self.array_union),
+                    <fidl::encoding::Array<fidl::encoding::Boxed<Struct>, 5> as fidl::encoding::ValueTypeMarker>::borrow(&self.array_opt_struct),
+                    <fidl::encoding::Array<fidl::encoding::OptionalUnion<Union>, 5> as fidl::encoding::ValueTypeMarker>::borrow(&self.array_opt_union),
                 ),
-                encoder,
-                offset,
-                _depth,
+                encoder, offset, _depth
             )
         }
     }
@@ -9347,7 +9711,9 @@ mod internal {
             T2: fidl::encoding::Encode<fidl::encoding::Array<Struct, 5>>,
             T3: fidl::encoding::Encode<fidl::encoding::Array<Table, 5>>,
             T4: fidl::encoding::Encode<fidl::encoding::Array<Union, 5>>,
-        > fidl::encoding::Encode<ArrayCompound> for (T0, T1, T2, T3, T4)
+            T5: fidl::encoding::Encode<fidl::encoding::Array<fidl::encoding::Boxed<Struct>, 5>>,
+            T6: fidl::encoding::Encode<fidl::encoding::Array<fidl::encoding::OptionalUnion<Union>, 5>>,
+        > fidl::encoding::Encode<ArrayCompound> for (T0, T1, T2, T3, T4, T5, T6)
     {
         #[inline]
         unsafe fn encode(
@@ -9395,6 +9761,16 @@ mod internal {
                 fidl::encoding::WireFormatVersion::V2 => 128,
             };
             self.4.encode(encoder, offset + member_offset, depth)?;
+            let member_offset = match encoder.context.wire_format_version {
+                fidl::encoding::WireFormatVersion::V1 => 248,
+                fidl::encoding::WireFormatVersion::V2 => 208,
+            };
+            self.5.encode(encoder, offset + member_offset, depth)?;
+            let member_offset = match encoder.context.wire_format_version {
+                fidl::encoding::WireFormatVersion::V1 => 288,
+                fidl::encoding::WireFormatVersion::V2 => 248,
+            };
+            self.6.encode(encoder, offset + member_offset, depth)?;
             Ok(())
         }
     }
@@ -9408,6 +9784,12 @@ mod internal {
                 array_struct: fidl::new_empty!(fidl::encoding::Array<Struct, 5>),
                 array_table: fidl::new_empty!(fidl::encoding::Array<Table, 5>),
                 array_union: fidl::new_empty!(fidl::encoding::Array<Union, 5>),
+                array_opt_struct: fidl::new_empty!(
+                    fidl::encoding::Array<fidl::encoding::Boxed<Struct>, 5>
+                ),
+                array_opt_union: fidl::new_empty!(
+                    fidl::encoding::Array<fidl::encoding::OptionalUnion<Union>, 5>
+                ),
             }
         }
 
@@ -9471,6 +9853,28 @@ mod internal {
                 fidl::encoding::WireFormatVersion::V2 => 128,
             };
             fidl::decode!(fidl::encoding::Array<Union, 5>, &mut self.array_union, decoder, offset + member_offset, _depth)?;
+            let member_offset = match decoder.context.wire_format_version {
+                fidl::encoding::WireFormatVersion::V1 => 248,
+                fidl::encoding::WireFormatVersion::V2 => 208,
+            };
+            fidl::decode!(
+                fidl::encoding::Array<fidl::encoding::Boxed<Struct>, 5>,
+                &mut self.array_opt_struct,
+                decoder,
+                offset + member_offset,
+                _depth
+            )?;
+            let member_offset = match decoder.context.wire_format_version {
+                fidl::encoding::WireFormatVersion::V1 => 288,
+                fidl::encoding::WireFormatVersion::V2 => 248,
+            };
+            fidl::decode!(
+                fidl::encoding::Array<fidl::encoding::OptionalUnion<Union>, 5>,
+                &mut self.array_opt_union,
+                decoder,
+                offset + member_offset,
+                _depth
+            )?;
             Ok(())
         }
     }
@@ -9515,6 +9919,8 @@ mod internal {
             // Delegate to tuple encoding.
             fidl::encoding::Encode::<ArrayVectorNested>::encode(
                 (
+                    <fidl::encoding::Array<fidl::encoding::Array<u8, 5>, 5> as fidl::encoding::ValueTypeMarker>::borrow(&self.array_array_uint8),
+                    <fidl::encoding::Array<fidl::encoding::UnboundedVector<u8>, 5> as fidl::encoding::ValueTypeMarker>::borrow(&self.array_vector_uint8),
                     <fidl::encoding::UnboundedVector<fidl::encoding::Array<u8, 5>> as fidl::encoding::ValueTypeMarker>::borrow(&self.vector_array_uint8),
                     <fidl::encoding::UnboundedVector<fidl::encoding::UnboundedVector<u8>> as fidl::encoding::ValueTypeMarker>::borrow(&self.vector_vector_uint8),
                 ),
@@ -9523,11 +9929,13 @@ mod internal {
         }
     }
     unsafe impl<
-            T0: fidl::encoding::Encode<fidl::encoding::UnboundedVector<fidl::encoding::Array<u8, 5>>>,
-            T1: fidl::encoding::Encode<
+            T0: fidl::encoding::Encode<fidl::encoding::Array<fidl::encoding::Array<u8, 5>, 5>>,
+            T1: fidl::encoding::Encode<fidl::encoding::Array<fidl::encoding::UnboundedVector<u8>, 5>>,
+            T2: fidl::encoding::Encode<fidl::encoding::UnboundedVector<fidl::encoding::Array<u8, 5>>>,
+            T3: fidl::encoding::Encode<
                 fidl::encoding::UnboundedVector<fidl::encoding::UnboundedVector<u8>>,
             >,
-        > fidl::encoding::Encode<ArrayVectorNested> for (T0, T1)
+        > fidl::encoding::Encode<ArrayVectorNested> for (T0, T1, T2, T3)
     {
         #[inline]
         unsafe fn encode(
@@ -9540,20 +9948,36 @@ mod internal {
             // Zero out padding regions. There's no need to apply masks
             // because the unmasked parts will be overwritten by fields.
             match encoder.context.wire_format_version {
-                fidl::encoding::WireFormatVersion::V1 => {}
-                fidl::encoding::WireFormatVersion::V2 => {}
+                fidl::encoding::WireFormatVersion::V1 => unsafe {
+                    let ptr = encoder.buf.as_mut_ptr().add(offset).offset(24);
+                    (ptr as *mut u64).write_unaligned(0);
+                },
+                fidl::encoding::WireFormatVersion::V2 => unsafe {
+                    let ptr = encoder.buf.as_mut_ptr().add(offset).offset(24);
+                    (ptr as *mut u64).write_unaligned(0);
+                },
             };
             // Write the fields.
+            let member_offset = match encoder.context.wire_format_version {
+                fidl::encoding::WireFormatVersion::V1 => 0,
+                fidl::encoding::WireFormatVersion::V2 => 0,
+            };
+            self.0.encode(encoder, offset + member_offset, depth)?;
+            let member_offset = match encoder.context.wire_format_version {
+                fidl::encoding::WireFormatVersion::V1 => 32,
+                fidl::encoding::WireFormatVersion::V2 => 32,
+            };
+            self.1.encode(encoder, offset + member_offset, depth)?;
             let member_offset = match encoder.context.wire_format_version {
                 fidl::encoding::WireFormatVersion::V1 => 112,
                 fidl::encoding::WireFormatVersion::V2 => 112,
             };
-            self.0.encode(encoder, offset + member_offset, depth)?;
+            self.2.encode(encoder, offset + member_offset, depth)?;
             let member_offset = match encoder.context.wire_format_version {
                 fidl::encoding::WireFormatVersion::V1 => 128,
                 fidl::encoding::WireFormatVersion::V2 => 128,
             };
-            self.1.encode(encoder, offset + member_offset, depth)?;
+            self.3.encode(encoder, offset + member_offset, depth)?;
             Ok(())
         }
     }
@@ -9562,6 +9986,12 @@ mod internal {
         #[inline(always)]
         fn new_empty() -> Self {
             Self {
+                array_array_uint8: fidl::new_empty!(
+                    fidl::encoding::Array<fidl::encoding::Array<u8, 5>, 5>
+                ),
+                array_vector_uint8: fidl::new_empty!(
+                    fidl::encoding::Array<fidl::encoding::UnboundedVector<u8>, 5>
+                ),
                 vector_array_uint8: fidl::new_empty!(
                     fidl::encoding::UnboundedVector<fidl::encoding::Array<u8, 5>>
                 ),
@@ -9581,9 +10011,53 @@ mod internal {
             decoder.debug_check_bounds::<Self>(offset);
             // Verify that padding bytes are zero.
             match decoder.context.wire_format_version {
-                fidl::encoding::WireFormatVersion::V1 => {}
-                fidl::encoding::WireFormatVersion::V2 => {}
+                fidl::encoding::WireFormatVersion::V1 => {
+                    let ptr = unsafe { decoder.buf.as_ptr().add(offset).offset(24) };
+                    let padval = unsafe { (ptr as *const u64).read_unaligned() };
+                    let maskedval = padval & 0xffffffffffffff00u64;
+                    if (maskedval != 0) {
+                        return Err(fidl::Error::NonZeroPadding {
+                            padding_start: offset
+                                + 24
+                                + ((0xffffffffffffff00u64 as u64).trailing_zeros() / 8) as usize,
+                        });
+                    }
+                }
+                fidl::encoding::WireFormatVersion::V2 => {
+                    let ptr = unsafe { decoder.buf.as_ptr().add(offset).offset(24) };
+                    let padval = unsafe { (ptr as *const u64).read_unaligned() };
+                    let maskedval = padval & 0xffffffffffffff00u64;
+                    if (maskedval != 0) {
+                        return Err(fidl::Error::NonZeroPadding {
+                            padding_start: offset
+                                + 24
+                                + ((0xffffffffffffff00u64 as u64).trailing_zeros() / 8) as usize,
+                        });
+                    }
+                }
             };
+            let member_offset = match decoder.context.wire_format_version {
+                fidl::encoding::WireFormatVersion::V1 => 0,
+                fidl::encoding::WireFormatVersion::V2 => 0,
+            };
+            fidl::decode!(
+                fidl::encoding::Array<fidl::encoding::Array<u8, 5>, 5>,
+                &mut self.array_array_uint8,
+                decoder,
+                offset + member_offset,
+                _depth
+            )?;
+            let member_offset = match decoder.context.wire_format_version {
+                fidl::encoding::WireFormatVersion::V1 => 32,
+                fidl::encoding::WireFormatVersion::V2 => 32,
+            };
+            fidl::decode!(
+                fidl::encoding::Array<fidl::encoding::UnboundedVector<u8>, 5>,
+                &mut self.array_vector_uint8,
+                decoder,
+                offset + member_offset,
+                _depth
+            )?;
             let member_offset = match decoder.context.wire_format_version {
                 fidl::encoding::WireFormatVersion::V1 => 112,
                 fidl::encoding::WireFormatVersion::V2 => 112,

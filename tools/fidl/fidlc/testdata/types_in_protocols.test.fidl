@@ -68,12 +68,7 @@ type ArrayCompound = struct {
     array_struct array<Struct, 5>;
     array_table array<Table, 5>;
     array_union array<Union, 5>;
-
-    // TODO(fxbug.dev/54368): Fix issues with parameter type conversion.
-    @bindings_denylist("rust")
     array_opt_struct array<box<Struct>, 5>;
-    // TODO(fxbug.dev/54368): Fix issues with parameter type conversion.
-    @bindings_denylist("rust")
     array_opt_union array<Union:optional, 5>;
 };
 
@@ -114,13 +109,8 @@ type VectorOptional = struct {
 };
 
 type ArrayVectorNested = struct {
-    // TODO(fxbug.dev/54368): Fix issues with parameter type conversion.
-    @bindings_denylist("rust")
     array_array_uint8 array<array<uint8, 5>, 5>;
-    // TODO(fxbug.dev/54368): Fix issues with parameter type conversion.
-    @bindings_denylist("rust")
     array_vector_uint8 array<vector<uint8>, 5>;
-
     vector_array_uint8 vector<array<uint8, 5>>;
     vector_vector_uint8 vector<vector<uint8>>;
 };
