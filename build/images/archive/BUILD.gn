@@ -45,17 +45,6 @@ archive_formats = [
   "zip",
 ]
 archive_targets = []
-generated_file("archive-images-manifest") {
-  testonly = true
-  outputs = [ "$root_build_dir/archive-images-manifest.json" ]
-  output_conversion = "json"
-  data_keys = [ "images" ]
-  deps = [
-    ":archive-extras",
-    "//build/images",
-    "//build/images/tools:bootserver",
-  ]
-}
 foreach(format, archive_formats) {
   archive_targets += [
     {
@@ -66,8 +55,10 @@ foreach(format, archive_formats) {
       deps = [
         ":archive-extras",
         ":paver-script",
+        "//build/images",
         "//build/images/flash:fastboot_manifest_archive",
         "//build/images/flash:flash_script_archive",
+        "//build/images/tools:bootserver",
       ]
       metadata = {
         archives = [
@@ -88,6 +79,20 @@ foreach(target, archive_targets + paver_targets) {
 }
 
 foreach(target, archive_targets + fastboot_targets + paver_targets) {
+  _archive_manifest_target = "${target.name}_archive_manifest"
+  _archive_manifest_file = get_label_info(":${target.name}", "target_gen_dir") +
+                           "/${_archive_manifest_target}.json"
+
+  # Create a manifest that lists all images generated from the
+  # transitive dependencies of the current target.
+  generated_file(_archive_manifest_target) {
+    testonly = true
+    outputs = [ _archive_manifest_file ]
+    output_conversion = "json"
+    data_keys = [ "images" ]
+    deps = target.deps
+  }
+
   action(target.name) {
     deps = []
     if (defined(target.deps)) {
@@ -118,8 +123,13 @@ foreach(target, archive_targets + fastboot_targets + paver_targets) {
     }
 
     args += [
-      "archive-images-manifest.json",
+      rebase_path(_archive_manifest_file, root_build_dir),
       "checkout_artifacts.json",
+    ]
+
+    deps += [
+      ":${_archive_manifest_target}",
+      "//:checkout_artifacts",
     ]
 
     if (defined(target.metadata)) {

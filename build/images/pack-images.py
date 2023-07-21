@@ -2,6 +2,23 @@
 # Copyright 2018 The Fuchsia Authors. All rights reserved.
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
+"""Generate build archive or paving/flashing script.
+
+This program takes as input one or more JSON files that
+describe "image files" according to the //:images schema.
+
+Use --pave, --pave_zedboot, --netboot or --fastboot_boot
+to generate a paving/flashing script, which will reference
+input image file paths extracted from the input manifest(s).
+
+Use --archive to generate a potentially-compressed tarball
+containing all image files whose input JSON description
+sets the "archive" attribute to "true".
+
+Note that the archive will also contain auto-generated
+pave.sh, pave_zedboot.sh and netboot.sh scripts, as well
+as an images.json file describing its content.
+"""
 
 import io
 import argparse
@@ -192,29 +209,29 @@ def write_archive(outfile, images, board_name, additional_bootserver_arguments):
 
 
 def main():
-    parser = argparse.ArgumentParser(description='Pack Fuchsia build images.')
-    parser.add_argument(
-        '--depfile', metavar='FILE', help='Write Ninja dependencies file')
+    parser = argparse.ArgumentParser(
+        description=__doc__, formatter_class=argparse.RawTextHelpFormatter)
     parser.add_argument(
         'json',
         nargs='+',
-        metavar='FILE',
-        help='Read JSON image list from FILE')
-    parser.add_argument(
+        metavar='IMAGE_MANIFEST',
+        help='Read JSON image list from IMAGE_MANIFEST')
+    group = parser.add_mutually_exclusive_group(required=True)
+    group.add_argument(
         '--pave', metavar='FILE', help='Write paving bootserver script to FILE')
-    parser.add_argument(
+    group.add_argument(
         '--pave_zedboot',
         metavar='FILE',
         help='Write zedboot paving bootserver script to FILE')
-    parser.add_argument(
+    group.add_argument(
         '--netboot',
         metavar='FILE',
         help='Write netboot bootserver script to FILE')
-    parser.add_argument(
+    group.add_argument(
         '--fastboot_boot',
         metavar='FILE',
         help="Write fastboot boot script to FILE")
-    parser.add_argument(
+    group.add_argument(
         '--archive', metavar='FILE', help='Write archive to FILE')
     parser.add_argument(
         '--format',
@@ -226,6 +243,8 @@ def main():
         action='append',
         default=[],
         help='additional arguments to pass to bootserver in generated scripts')
+    parser.add_argument(
+        '--depfile', metavar='FILE', help='Write Ninja dependencies file')
     args = parser.parse_args()
 
     # Keep track of every input file for the depfile.
@@ -257,18 +276,18 @@ def main():
     if args.pave:
         outfile = args.pave
         write_script_for(args.pave, 'bootserver_pave')
-    if args.pave_zedboot:
+    elif args.pave_zedboot:
         outfile = args.pave_zedboot
         write_script_for(args.pave_zedboot, 'bootserver_pave_zedboot')
-    if args.netboot:
+    elif args.netboot:
         outfile = args.netboot
         write_script_for(args.netboot, 'bootserver_netboot')
-    if args.fastboot_boot:
+    elif args.fastboot_boot:
         outfile = args.fastboot_boot
         write_script_for(
             args.fastboot_boot, "fastboot_boot", binary_name="fastboot")
 
-    if args.archive:
+    elif args.archive:
         outfile = args.archive
         archive_images = [
             image for image in images if image.get('archive', False)
@@ -278,7 +297,9 @@ def main():
             outfile, archive_images, args.board_name,
             ' '.join(args.additional_bootserver_arguments))
 
-    if outfile and args.depfile:
+    assert outfile
+
+    if args.depfile:
         with open(args.depfile, 'w') as depfile:
             depfile.write('%s: %s\n' % (outfile, ' '.join(sorted(files_read))))
 
