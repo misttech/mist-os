@@ -31,6 +31,12 @@ type DependencyType = strict enum {
     WEAK = 2;
     /// A weak dependency specifically used to mark cyclic dependencies from
     /// migrated v1 components.
+    ///
+    /// # Deprecation
+    ///
+    /// This is being removed as v1 components are gone. Components using this should try upgrading
+    /// to a STRONG dependency, or use WEAK if there is still a cyclic dependency.
+    @available(deprecated=14, removed=15, legacy=true)
     WEAK_FOR_MIGRATION = 3;
 };
 
