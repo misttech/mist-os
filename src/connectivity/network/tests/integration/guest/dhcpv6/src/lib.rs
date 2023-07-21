@@ -76,7 +76,7 @@ async fn gets_dns_servers(name: &str) {
                     zone_index: iface.id(),
                 },
                 config: fnet_dhcpv6_ext::ClientConfig {
-                    information_config: fnet_dhcpv6::InformationConfig { dns_servers: true },
+                    information_config: fnet_dhcpv6_ext::InformationConfig { dns_servers: true },
                     non_temporary_address_config: Default::default(),
                     prefix_delegation_config: None,
                 },
@@ -258,7 +258,8 @@ fn start_dhcpv6_client(
                     zone_index: interface_id,
                 },
                 config: client_config,
-            },
+            }
+            .into(),
             server_end,
         )
         .expect("call fuchsia.net.dhcpv6/ClientProvider.NewClient");
