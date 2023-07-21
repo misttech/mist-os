@@ -86,6 +86,7 @@ fxfs_sources = [
   "src/object_store/journal/reader.rs",
   "src/object_store/journal/super_block.rs",
   "src/object_store/journal/writer.rs",
+  "src/object_store/key_manager.rs",
   "src/object_store/merge.rs",
   "src/object_store/object_manager.rs",
   "src/object_store/object_record.rs",

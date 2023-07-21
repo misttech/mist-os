@@ -10,6 +10,7 @@ mod extent_record;
 mod flush;
 pub mod graveyard;
 pub mod journal;
+mod key_manager;
 mod merge;
 pub mod object_manager;
 mod object_record;
@@ -26,6 +27,7 @@ pub mod writeback_cache;
 pub use basic_object_handle::{BasicObjectHandle, SetExtendedAttributeMode};
 pub use caching_object_handle::CachingObjectHandle;
 pub use directory::Directory;
+pub use key_manager::KeyUnwrapper;
 pub use object_record::{ChildValue, ObjectDescriptor, PosixAttributes, Timestamp};
 pub use store_object_handle::{DirectWriter, StoreObjectHandle};
 
@@ -49,7 +51,6 @@ use {
             allocator::SimpleAllocator,
             graveyard::Graveyard,
             journal::{JournalCheckpoint, JournaledTransaction},
-            store_object_handle::KeyUnwrapper,
             transaction::{
                 AssocObj, AssociatedObject, LockKey, ObjectStoreMutation, Operation, Options,
                 Transaction, UpdateMutationsKey,
