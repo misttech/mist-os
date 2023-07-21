@@ -1786,10 +1786,7 @@ mod test {
     use crate::{
         context::testutil::{FakeNonSyncCtx, WrappedFakeSyncCtx},
         data_structures::socketmap::SocketMap,
-        device::{
-            testutil::{FakeDeviceId, FakeStrongDeviceId, FakeWeakDeviceId, MultipleDevicesId},
-            WeakId,
-        },
+        device::testutil::{FakeDeviceId, FakeStrongDeviceId, FakeWeakDeviceId, MultipleDevicesId},
         ip::{
             device::state::IpDeviceStateIpExt,
             socket::testutil::{FakeBufferIpSocketCtx, FakeDeviceConfig, FakeIpSocketCtx},
@@ -1806,9 +1803,9 @@ mod test {
     impl<I: Ip + IpExt + IpDeviceStateIpExt + TestIpExt> DatagramIpExt for I {}
 
     #[derive(Debug)]
-    struct FakeAddrSpec<I, D>(Never, PhantomData<(I, D)>);
+    struct FakeAddrSpec<I>(Never, PhantomData<I>);
 
-    impl<I: IpExt, D: WeakId> SocketMapAddrSpec for FakeAddrSpec<I, D> {
+    impl<I: IpExt> SocketMapAddrSpec for FakeAddrSpec<I> {
         type IpAddr = I::Addr;
         type IpVersion = I;
         type LocalIdentifier = u8;
@@ -1867,23 +1864,16 @@ mod test {
     }
 
     impl<A, I: DatagramIpExt, D: FakeStrongDeviceId>
-        SocketMapConflictPolicy<
-            A,
-            Sharing,
-            FakeWeakDeviceId<D>,
-            FakeAddrSpec<I, FakeWeakDeviceId<D>>,
-        > for FakeStateSpec<I, FakeWeakDeviceId<D>>
+        SocketMapConflictPolicy<A, Sharing, FakeWeakDeviceId<D>, FakeAddrSpec<I>>
+        for FakeStateSpec<I, FakeWeakDeviceId<D>>
     {
         fn check_insert_conflicts(
             _new_sharing_state: &Sharing,
             _addr: &A,
-            _socketmap: &SocketMap<
-                AddrVec<FakeWeakDeviceId<D>, FakeAddrSpec<I, FakeWeakDeviceId<D>>>,
-                Bound<Self>,
-            >,
+            _socketmap: &SocketMap<AddrVec<FakeWeakDeviceId<D>, FakeAddrSpec<I>>, Bound<Self>>,
         ) -> Result<(), InsertError>
         where
-            Bound<Self>: Tagged<AddrVec<FakeWeakDeviceId<D>, FakeAddrSpec<I, FakeWeakDeviceId<D>>>>,
+            Bound<Self>: Tagged<AddrVec<FakeWeakDeviceId<D>, FakeAddrSpec<I>>>,
         {
             // Addresses are completely independent and shadowing doesn't cause
             // conflicts.
@@ -1892,16 +1882,16 @@ mod test {
     }
 
     impl<I: DatagramIpExt, D: FakeStrongDeviceId>
-        DatagramSocketSpec<FakeWeakDeviceId<D>, FakeAddrSpec<I, FakeWeakDeviceId<D>>>
+        DatagramSocketSpec<FakeWeakDeviceId<D>, FakeAddrSpec<I>>
         for FakeStateSpec<I, FakeWeakDeviceId<D>>
     {
         type Serializer<B: BufferMut> = B;
         fn make_packet<B: BufferMut>(
             body: B,
             _addr: &ConnIpAddr<
-                <FakeAddrSpec<I, FakeWeakDeviceId<D>> as SocketMapAddrSpec>::IpAddr,
-                <FakeAddrSpec<I, FakeWeakDeviceId<D>> as SocketMapAddrSpec>::LocalIdentifier,
-                <FakeAddrSpec<I, FakeWeakDeviceId<D>> as SocketMapAddrSpec>::RemoteIdentifier,
+                <FakeAddrSpec<I> as SocketMapAddrSpec>::IpAddr,
+                <FakeAddrSpec<I> as SocketMapAddrSpec>::LocalIdentifier,
+                <FakeAddrSpec<I> as SocketMapAddrSpec>::RemoteIdentifier,
             >,
         ) -> Self::Serializer<B> {
             body
@@ -1937,11 +1927,7 @@ mod test {
     }
 
     type FakeSyncCtx<I, D> = WrappedFakeSyncCtx<
-        Sockets<
-            FakeWeakDeviceId<D>,
-            FakeAddrSpec<I, FakeWeakDeviceId<D>>,
-            FakeStateSpec<I, FakeWeakDeviceId<D>>,
-        >,
+        Sockets<FakeWeakDeviceId<D>, FakeAddrSpec<I>, FakeStateSpec<I, FakeWeakDeviceId<D>>>,
         FakeBufferIpSocketCtx<I, D>,
         SendIpPacketMeta<I, D, SpecifiedAddr<<I as Ip>::Addr>>,
         D,
@@ -1951,7 +1937,7 @@ mod test {
         fn with_sockets(
             sockets: Sockets<
                 FakeWeakDeviceId<D>,
-                FakeAddrSpec<I, FakeWeakDeviceId<D>>,
+                FakeAddrSpec<I>,
                 FakeStateSpec<I, FakeWeakDeviceId<D>>,
             >,
         ) -> Self {
@@ -1964,7 +1950,7 @@ mod test {
 
     impl<I: DatagramIpExt + IpLayerIpExt, D: FakeStrongDeviceId + 'static>
         DatagramStateContext<
-            FakeAddrSpec<I, FakeWeakDeviceId<D>>,
+            FakeAddrSpec<I>,
             FakeNonSyncCtx<(), (), ()>,
             FakeStateSpec<I, FakeWeakDeviceId<D>>,
         > for FakeSyncCtx<I, D>
@@ -1982,7 +1968,7 @@ mod test {
                 &mut Self::IpSocketsCtx<'_>,
                 &Sockets<
                     FakeWeakDeviceId<D>,
-                    FakeAddrSpec<I, FakeWeakDeviceId<D>>,
+                    FakeAddrSpec<I>,
                     FakeStateSpec<I, FakeWeakDeviceId<D>>,
                 >,
             ) -> O,
@@ -2000,7 +1986,7 @@ mod test {
                 &mut Self::IpSocketsCtx<'_>,
                 &mut Sockets<
                     FakeWeakDeviceId<D>,
-                    FakeAddrSpec<I, FakeWeakDeviceId<D>>,
+                    FakeAddrSpec<I>,
                     FakeStateSpec<I, FakeWeakDeviceId<D>>,
                 >,
                 &mut Self::LocalIdAllocator,
@@ -2015,10 +2001,8 @@ mod test {
     }
 
     impl<I: DatagramIpExt + IpLayerIpExt, D: FakeStrongDeviceId + 'static>
-        DatagramStateNonSyncContext<
-            FakeAddrSpec<I, FakeWeakDeviceId<FakeDeviceId>>,
-            FakeStateSpec<I, FakeWeakDeviceId<D>>,
-        > for FakeNonSyncCtx<(), (), ()>
+        DatagramStateNonSyncContext<FakeAddrSpec<I>, FakeStateSpec<I, FakeWeakDeviceId<D>>>
+        for FakeNonSyncCtx<(), (), ()>
     {
         fn try_alloc_listen_identifier(
             &mut self,
@@ -2031,7 +2015,7 @@ mod test {
     impl<I: DatagramIpExt, D: FakeStrongDeviceId + 'static>
         LocalIdentifierAllocator<
             FakeWeakDeviceId<D>,
-            FakeAddrSpec<I, FakeWeakDeviceId<D>>,
+            FakeAddrSpec<I>,
             FakeNonSyncCtx<(), (), ()>,
             FakeStateSpec<I, FakeWeakDeviceId<D>>,
         > for ()
@@ -2040,16 +2024,15 @@ mod test {
             &mut self,
             bound: &BoundSocketMap<
                 FakeWeakDeviceId<D>,
-                FakeAddrSpec<I, FakeWeakDeviceId<D>>,
+                FakeAddrSpec<I>,
                 FakeStateSpec<I, FakeWeakDeviceId<D>>,
             >,
             _ctx: &mut FakeNonSyncCtx<(), (), ()>,
             _flow: DatagramFlowId<
-                <FakeAddrSpec<I, FakeWeakDeviceId<D>> as SocketMapAddrSpec>::IpAddr,
-                <FakeAddrSpec<I, FakeWeakDeviceId<D>> as SocketMapAddrSpec>::RemoteIdentifier,
+                <FakeAddrSpec<I> as SocketMapAddrSpec>::IpAddr,
+                <FakeAddrSpec<I> as SocketMapAddrSpec>::RemoteIdentifier,
             >,
-        ) -> Option<<FakeAddrSpec<I, FakeWeakDeviceId<D>> as SocketMapAddrSpec>::LocalIdentifier>
-        {
+        ) -> Option<<FakeAddrSpec<I> as SocketMapAddrSpec>::LocalIdentifier> {
             (0..u8::MAX).find_map(|identifier| {
                 bound
                     .listeners()
@@ -2129,7 +2112,7 @@ mod test {
 
     #[ip_test]
     fn default_hop_limits<I: Ip + DatagramIpExt + IpLayerIpExt>() {
-        let mut sync_ctx = FakeSyncCtx::<I, _>::with_sockets(Sockets::default());
+        let mut sync_ctx = FakeSyncCtx::<I, FakeDeviceId>::with_sockets(Sockets::default());
         let mut non_sync_ctx = FakeNonSyncCtx::default();
 
         let unbound = create(&mut sync_ctx);
