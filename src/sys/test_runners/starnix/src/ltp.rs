@@ -208,7 +208,7 @@ pub async fn run_ltp_cases(
             parsed_results.count_results(&line);
         }
 
-        let exit_code_result = read_result(component_controller.take_event_stream()).await;
+        let exit_code_result = read_ltp_test_result(component_controller.take_event_stream()).await;
 
         let result = if let Some(expected_test_results) = &expected_test_results {
             // If a result file was present, we check the parsed results to determine whether or not
@@ -317,4 +317,29 @@ fn start_command(
     };
 
     Ok((start_test_component(start_info, component_runner)?, std_handles))
+}
+
+async fn read_ltp_test_result(
+    event_stream: frunner::ComponentControllerEventStream,
+) -> ftest::Result_ {
+    // Base value used by the ComponentRunner implementation in Starnix to
+    // return non-zero error codes (see src/starnix/kernel/execution/component_runner.rs ).
+    //
+    // TODO(fxbug.dev/130980): Cleanup this once we have a proper mechanism to
+    // get Linux exit code from component runner.
+    const COMPONENT_EXIT_CODE_BASE: i32 = 1024;
+
+    // Status code used by LTP tests for skipped tests. See
+    // https://github.com/linux-test-project/ltp/blob/master/include/tst_res_flags.h .
+    const LTP_RESULT_TCONF: i32 = COMPONENT_EXIT_CODE_BASE + 32;
+
+    match read_component_epitaph(event_stream).await {
+        zx::Status::OK => {
+            ftest::Result_ { status: Some(ftest::Status::Passed), ..Default::default() }
+        }
+        status if status.into_raw() == LTP_RESULT_TCONF => {
+            ftest::Result_ { status: Some(ftest::Status::Skipped), ..Default::default() }
+        }
+        _ => ftest::Result_ { status: Some(ftest::Status::Failed), ..Default::default() },
+    }
 }

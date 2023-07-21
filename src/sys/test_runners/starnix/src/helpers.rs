@@ -182,13 +182,11 @@ pub fn start_test_component(
     Ok(component_controller)
 }
 
-/// Reads the result of the test run from `event_stream`.
-///
-/// The result is determined by reading the epitaph from the provided `event_stream`.
-pub async fn read_result(
+/// Reads the epitaph from the provided `event_stream`.
+pub async fn read_component_epitaph(
     mut event_stream: frunner::ComponentControllerEventStream,
-) -> ftest::Result_ {
-    let component_epitaph = match event_stream.next().await {
+) -> zx::Status {
+    match event_stream.next().await {
         Some(Err(fidl::Error::ClientChannelClosed { status, .. })) => status,
         result => {
             tracing::error!(
@@ -199,9 +197,14 @@ pub async fn read_result(
             // read.
             zx::Status::INTERNAL
         }
-    };
+    }
+}
 
-    match component_epitaph {
+/// Reads the result of the test run from `event_stream`.
+///
+/// The result is determined by reading the epitaph from the provided `event_stream`.
+pub async fn read_result(event_stream: frunner::ComponentControllerEventStream) -> ftest::Result_ {
+    match read_component_epitaph(event_stream).await {
         zx::Status::OK => {
             ftest::Result_ { status: Some(ftest::Status::Passed), ..Default::default() }
         }

@@ -36,6 +36,13 @@ use crate::{
     types::*,
 };
 
+/// Component controller epitaph value used as the base value to pass non-zero error
+/// codes to the calling component.
+///
+/// TODO(fxbug.dev/130980): Cleanup this once we have a proper mechanism to
+/// get Linux exit code from component runner.
+const COMPONENT_EXIT_CODE_BASE: i32 = 1024;
+
 /// Starts a component inside the given container.
 ///
 /// The component's `binary` can either:
@@ -249,6 +256,9 @@ async fn serve_component_controller(
                 Ok(Ok(ExitStatus::Exit(0))) => {
                     controller_handle.shutdown_with_epitaph(zx::Status::OK)
                 }
+                Ok(Ok(ExitStatus::Exit(n))) => controller_handle.shutdown_with_epitaph(
+                    zx::Status::from_raw(COMPONENT_EXIT_CODE_BASE + n as i32),
+                ),
                 _ => controller_handle.shutdown_with_epitaph(zx::Status::from_raw(
                     fcomponent::Error::InstanceDied.into_primitive() as i32,
                 )),
