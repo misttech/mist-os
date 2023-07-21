@@ -287,10 +287,7 @@ template("assemble_security_pkg_test_system") {
                              "assembly_fxfs_image_size_bytes",
                            ])
     testonly = true
-    generate_vbmeta = false
     generate_fvm = !use_fxfs_blob
-    generate_fvm_fastboot = false
-    generate_fvm_nand = false
     generate_fxfs = use_fxfs_blob
     use_fxfs_blob = use_fxfs_blob
     if (!use_fxfs_blob) {

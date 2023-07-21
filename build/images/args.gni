@@ -155,10 +155,6 @@ declare_args() {
   # The size in bytes of the FVM partition on the target eMMC devices.
   # Specifying this parameter will lead build to generate a fvm.fastboot.blk
   # suitable for flashing through fastboot for eMMC devices.
-  # Informs GN that a nand-fvm will be outputted.
-  # TODO(b/291945693): Delete fvm_emmc_partition_size when all users have moved
-  # to generate_fastboot_fvm.
-  fvm_emmc_partition_size = false
   assembly_generate_fvm_fastboot = false
 
   # Specifying these variables will generate a NAND FVM image suitable for
@@ -166,10 +162,6 @@ declare_args() {
   # in order to properly initialize the FTL metadata in the OOB area.
   # `fvm_max_disk_size` should also be nonzero or else minfs will not have any
   # room to initialize on boot.
-  # Informs GN that a nand-fvm will be outputted along with a temporary file.
-  # TODO(b/291945693): Delete fvm_ftl_nand_block_count when all users have moved
-  # to generate_nand_fvm.
-  fvm_ftl_nand_block_count = false
   assembly_generate_fvm_nand = false
 
   # Allows a product to specify the recovery image used in the zirconr slot.

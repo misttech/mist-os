@@ -246,11 +246,11 @@ template("assembled_system") {
   if (defined(invoker.generate_fvm)) {
     _generate_fvm = invoker.generate_fvm
   }
-  _generate_fvm_fastboot = _generate_fvm && fvm_emmc_partition_size != false
+  _generate_fvm_fastboot = false
   if (defined(invoker.generate_fvm_fastboot)) {
     _generate_fvm_fastboot = invoker.generate_fvm_fastboot
   }
-  _generate_fvm_nand = _generate_fvm && fvm_ftl_nand_block_count != false
+  _generate_fvm_nand = false
   if (defined(invoker.generate_fvm_nand)) {
     _generate_fvm_nand = invoker.generate_fvm_nand
   }
@@ -258,7 +258,7 @@ template("assembled_system") {
   if (defined(invoker.generate_fxfs)) {
     _generate_fxfs = invoker.generate_fxfs
   }
-  _generate_vbmeta = use_vbmeta
+  _generate_vbmeta = false
   if (defined(invoker.generate_vbmeta)) {
     _generate_vbmeta = invoker.generate_vbmeta
   }

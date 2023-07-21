@@ -84,10 +84,8 @@ template("_cuckoo_kernel_zbi_test") {
     allow_eng_platform_bundle_use = true
     generate_fvm = !fxfs_blob
     generate_fxfs = fxfs_blob
-    generate_fvm_fastboot = !fxfs_blob && (assembly_generate_fvm_fastboot ||
-                                           fvm_emmc_partition_size != false)
-    generate_fvm_nand = !fxfs_blob && (assembly_generate_fvm_nand ||
-                                       fvm_ftl_nand_block_count != false)
+    generate_fvm_fastboot = !fxfs_blob && assembly_generate_fvm_fastboot
+    generate_fvm_nand = !fxfs_blob && assembly_generate_fvm_nand
     generate_vbmeta = use_vbmeta
   }
 

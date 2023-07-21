@@ -39,7 +39,6 @@ product_assembly_configuration("product_assembly_config") {
 bringup_base = {
   testonly = true
   output_dir = root_build_dir
-  generate_fvm = false
   generate_vbmeta = use_vbmeta
 
   if (custom_signing_script != "") {

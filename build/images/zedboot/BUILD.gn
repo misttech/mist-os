@@ -28,7 +28,6 @@ assembled_system("zedboot_assembly") {
   image_name = "zedboot"
   include_component_id_index = true
   include_shell_commands = false
-  generate_fvm = false
   generate_vbmeta = use_vbmeta
   fshost_config = board_zedboot_fshost_config
   use_bringup_platform_bundles_only = true

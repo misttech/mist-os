@@ -48,10 +48,8 @@ if (is_fuchsia) {
     generate_fvm = !bootfs_only && !fxfs_blob
     generate_fxfs = !bootfs_only && fxfs_blob
 
-    generate_fvm_fastboot = generate_fvm && (assembly_generate_fvm_fastboot ||
-                                             fvm_emmc_partition_size != false)
-    generate_fvm_nand = generate_fvm && (assembly_generate_fvm_nand ||
-                                         fvm_ftl_nand_block_count != false)
+    generate_fvm_fastboot = generate_fvm && assembly_generate_fvm_fastboot
+    generate_fvm_nand = generate_fvm && assembly_generate_fvm_nand
     generate_vbmeta = use_vbmeta
 
     ramdisk_in_zbi = true
@@ -346,10 +344,8 @@ if (is_fuchsia) {
     generate_fvm = !bootfs_only && !fxfs_blob
     generate_fxfs = !bootfs_only && fxfs_blob
 
-    generate_fvm_fastboot = generate_fvm && (assembly_generate_fvm_fastboot ||
-                                             fvm_emmc_partition_size != false)
-    generate_fvm_nand = generate_fvm && (assembly_generate_fvm_nand ||
-                                         fvm_ftl_nand_block_count != false)
+    generate_fvm_fastboot = generate_fvm && assembly_generate_fvm_fastboot
+    generate_fvm_nand = generate_fvm && assembly_generate_fvm_nand
     generate_vbmeta = use_vbmeta
 
     ramdisk_in_zbi = true

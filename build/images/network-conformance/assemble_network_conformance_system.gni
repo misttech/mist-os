@@ -64,8 +64,6 @@ template("assemble_network_conformance_system") {
       generate_fxfs = true
     }
     use_explicit_images_config_only = true
-    generate_vbmeta = false
-    generate_fvm_fastboot = false
     ramdisk_in_zbi = true
 
     product_assembly_config_label = ":${labels.product_config}"
