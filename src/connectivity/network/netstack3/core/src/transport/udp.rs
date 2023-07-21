@@ -108,13 +108,13 @@ impl UdpStateBuilder {
 }
 
 /// Convenience alias to make names shorter.
-type UdpBoundSocketMap<I, D> = BoundSocketMap<IpPortSpec<I, D>, Udp<I, D>>;
+type UdpBoundSocketMap<I, D> = BoundSocketMap<D, IpPortSpec<I, D>, Udp<I, D>>;
 
 /// A collection of UDP sockets.
 #[derive(Derivative)]
 #[derivative(Default(bound = ""))]
 pub(crate) struct Sockets<I: Ip + IpExt, D: WeakId> {
-    sockets: DatagramSockets<IpPortSpec<I, D>, Udp<I, D>>,
+    sockets: DatagramSockets<D, IpPortSpec<I, D>, Udp<I, D>>,
     /// lazy_port_alloc is lazy-initialized when it's used.
     lazy_port_alloc: Option<PortAlloc<UdpBoundSocketMap<I, D>>>,
 }
@@ -141,14 +141,14 @@ struct Udp<I, D>(PhantomData<(I, D)>, Never);
 fn iter_receiving_addrs<I: Ip + IpExt, D: WeakId>(
     addr: ConnIpAddr<I::Addr, NonZeroU16, NonZeroU16>,
     device: D,
-) -> impl Iterator<Item = AddrVec<IpPortSpec<I, D>>> {
+) -> impl Iterator<Item = AddrVec<D, IpPortSpec<I, D>>> {
     crate::socket::address::AddrVecIter::with_device(addr.into(), device)
 }
 
 fn check_posix_sharing<I: IpExt, D: WeakId>(
     new_sharing: Sharing,
-    dest: AddrVec<IpPortSpec<I, D>>,
-    socketmap: &SocketMap<AddrVec<IpPortSpec<I, D>>, Bound<Udp<I, D>>>,
+    dest: AddrVec<D, IpPortSpec<I, D>>,
+    socketmap: &SocketMap<AddrVec<D, IpPortSpec<I, D>>, Bound<Udp<I, D>>>,
 ) -> Result<(), InsertError> {
     // Having a value present at a shadowed address is disqualifying, unless
     // both the new and existing sockets allow port sharing.
@@ -190,8 +190,8 @@ fn check_posix_sharing<I: IpExt, D: WeakId>(
     // values for entries with and without device IDs specified.
     fn conflict_exists<I: IpExt, D: WeakId>(
         new_sharing: Sharing,
-        socketmap: &SocketMap<AddrVec<IpPortSpec<I, D>>, Bound<Udp<I, D>>>,
-        addr: impl Into<AddrVec<IpPortSpec<I, D>>>,
+        socketmap: &SocketMap<AddrVec<D, IpPortSpec<I, D>>, Bound<Udp<I, D>>>,
+        addr: impl Into<AddrVec<D, IpPortSpec<I, D>>>,
         mut is_conflicting: impl FnMut(&AddrVecTag) -> bool,
     ) -> bool {
         socketmap.descendant_counts(&addr.into()).any(|(tag, _): &(_, NonZeroUsize)| {
@@ -355,14 +355,15 @@ impl<I: IpExt, D: Id> SocketMapStateSpec for Udp<I, D> {
     type ConnAddrState = AddrState<Self::ConnId>;
 }
 
-impl<AA, I: IpExt, D: WeakId> SocketMapConflictPolicy<AA, Sharing, IpPortSpec<I, D>> for Udp<I, D>
+impl<AA, I: IpExt, D: WeakId> SocketMapConflictPolicy<AA, Sharing, D, IpPortSpec<I, D>>
+    for Udp<I, D>
 where
-    AA: Into<AddrVec<IpPortSpec<I, D>>> + Clone,
+    AA: Into<AddrVec<D, IpPortSpec<I, D>>> + Clone,
 {
     fn check_insert_conflicts(
         new_sharing_state: &Sharing,
         addr: &AA,
-        socketmap: &SocketMap<AddrVec<IpPortSpec<I, D>>, Bound<Self>>,
+        socketmap: &SocketMap<AddrVec<D, IpPortSpec<I, D>>, Bound<Self>>,
     ) -> Result<(), InsertError> {
         check_posix_sharing(*new_sharing_state, addr.clone().into(), socketmap)
     }
@@ -373,7 +374,7 @@ impl<I: IpExt, D: WeakId> DatagramSocketStateSpec for Udp<I, D> {
     type UnboundSharingState = Sharing;
 }
 
-impl<I: IpExt, D: WeakId> DatagramSocketSpec<IpPortSpec<I, D>> for Udp<I, D> {
+impl<I: IpExt, D: WeakId> DatagramSocketSpec<D, IpPortSpec<I, D>> for Udp<I, D> {
     type Serializer<B: BufferMut> = Nested<B, UdpPacketBuilder<I::Addr>>;
     fn make_packet<B: BufferMut>(
         body: B,
@@ -595,7 +596,7 @@ impl<T> AddrState<T> {
     }
 }
 
-impl<'a, I: Ip + IpExt, D: WeakId + 'a> AddrEntry<'a, IpPortSpec<I, D>, Udp<I, D>> {
+impl<'a, I: Ip + IpExt, D: WeakId + 'a> AddrEntry<'a, D, IpPortSpec<I, D>, Udp<I, D>> {
     /// Returns an iterator that yields a `LookupResult` for each contained ID.
     fn collect_all_ids(self) -> impl Iterator<Item = LookupResult<I, D>> + 'a {
         match self {
@@ -620,7 +621,7 @@ impl<'a, I: Ip + IpExt, D: WeakId + 'a> AddrEntry<'a, IpPortSpec<I, D>, Udp<I, D
     }
 }
 
-impl<I: Ip + IpExt, D: WeakId> DatagramSockets<IpPortSpec<I, D>, Udp<I, D>> {
+impl<I: Ip + IpExt, D: WeakId> DatagramSockets<D, IpPortSpec<I, D>, Udp<I, D>> {
     /// Finds the socket(s) that should receive an incoming packet.
     ///
     /// Uses the provided addresses and receiving device to look up sockets that
@@ -1462,7 +1463,11 @@ impl<I: IpExt, C: StateNonSyncContext<I>, SC: StateContext<I, C>>
         O,
         F: FnOnce(
             &mut Self::IpSocketsCtx<'_>,
-            &DatagramSockets<IpPortSpec<I, SC::WeakDeviceId>, Udp<I, SC::WeakDeviceId>>,
+            &DatagramSockets<
+                SC::WeakDeviceId,
+                IpPortSpec<I, SC::WeakDeviceId>,
+                Udp<I, SC::WeakDeviceId>,
+            >,
         ) -> O,
     >(
         &mut self,
@@ -1477,7 +1482,11 @@ impl<I: IpExt, C: StateNonSyncContext<I>, SC: StateContext<I, C>>
         O,
         F: FnOnce(
             &mut Self::IpSocketsCtx<'_>,
-            &mut DatagramSockets<IpPortSpec<I, SC::WeakDeviceId>, Udp<I, SC::WeakDeviceId>>,
+            &mut DatagramSockets<
+                SC::WeakDeviceId,
+                IpPortSpec<I, SC::WeakDeviceId>,
+                Udp<I, SC::WeakDeviceId>,
+            >,
             &mut Self::LocalIdAllocator,
         ) -> O,
     >(
@@ -1502,12 +1511,12 @@ impl<I: IpExt, D: WeakId, C: StateNonSyncContext<I>>
 }
 
 impl<I: IpExt, C: StateNonSyncContext<I>, D: WeakId>
-    LocalIdentifierAllocator<IpPortSpec<I, D>, C, Udp<I, D>>
+    LocalIdentifierAllocator<D, IpPortSpec<I, D>, C, Udp<I, D>>
     for Option<PortAlloc<UdpBoundSocketMap<I, D>>>
 {
     fn try_alloc_local_id(
         &mut self,
-        bound: &BoundSocketMap<IpPortSpec<I, D>, Udp<I, D>>,
+        bound: &BoundSocketMap<D, IpPortSpec<I, D>, Udp<I, D>>,
         ctx: &mut C,
         flow: datagram::DatagramFlowId<I::Addr, NonZeroU16>,
     ) -> Option<NonZeroU16> {
@@ -1929,8 +1938,8 @@ pub enum SocketInfo<A: IpAddress, D> {
     Connected(ConnInfo<A, D>),
 }
 
-impl<I: IpExt, D: WeakId> From<DatagramSocketInfo<IpPortSpec<I, D>>> for SocketInfo<I::Addr, D> {
-    fn from(value: DatagramSocketInfo<IpPortSpec<I, D>>) -> Self {
+impl<I: IpExt, D: WeakId> From<DatagramSocketInfo<D, IpPortSpec<I, D>>> for SocketInfo<I::Addr, D> {
+    fn from(value: DatagramSocketInfo<D, IpPortSpec<I, D>>) -> Self {
         match value {
             DatagramSocketInfo::Unbound => Self::Unbound,
             DatagramSocketInfo::Listener(addr) => Self::Listener(addr.into()),
@@ -2289,7 +2298,7 @@ mod tests {
 
     fn conn_addr<I>(
         device: Option<FakeWeakDeviceId<FakeDeviceId>>,
-    ) -> AddrVec<IpPortSpec<I, FakeWeakDeviceId<FakeDeviceId>>>
+    ) -> AddrVec<FakeWeakDeviceId<FakeDeviceId>, IpPortSpec<I, FakeWeakDeviceId<FakeDeviceId>>>
     where
         I: Ip + TestIpExt,
     {
@@ -2304,7 +2313,7 @@ mod tests {
 
     fn local_listener<I>(
         device: Option<FakeWeakDeviceId<FakeDeviceId>>,
-    ) -> AddrVec<IpPortSpec<I, FakeWeakDeviceId<FakeDeviceId>>>
+    ) -> AddrVec<FakeWeakDeviceId<FakeDeviceId>, IpPortSpec<I, FakeWeakDeviceId<FakeDeviceId>>>
     where
         I: Ip + TestIpExt,
     {
@@ -2315,7 +2324,7 @@ mod tests {
 
     fn wildcard_listener<I>(
         device: Option<FakeWeakDeviceId<FakeDeviceId>>,
-    ) -> AddrVec<IpPortSpec<I, FakeWeakDeviceId<FakeDeviceId>>>
+    ) -> AddrVec<FakeWeakDeviceId<FakeDeviceId>, IpPortSpec<I, FakeWeakDeviceId<FakeDeviceId>>>
     where
         I: Ip + TestIpExt,
     {
@@ -2336,8 +2345,8 @@ mod tests {
     #[test_case(local_listener(None), [wildcard_listener(None)]; "local listener no device")]
     #[test_case(wildcard_listener(None), []; "wildcard listener no device")]
     fn test_udp_addr_vec_iter_shadows_conn<I: Ip + IpExt, D: WeakId, const N: usize>(
-        addr: AddrVec<IpPortSpec<I, D>>,
-        expected_shadows: [AddrVec<IpPortSpec<I, D>>; N],
+        addr: AddrVec<D, IpPortSpec<I, D>>,
+        expected_shadows: [AddrVec<D, IpPortSpec<I, D>>; N],
     ) {
         assert_eq!(addr.iter_shadows().collect::<HashSet<_>>(), HashSet::from(expected_shadows));
     }
@@ -6057,6 +6066,7 @@ where {
     }
 
     type FakeBoundSocketMap<I> = BoundSocketMap<
+        FakeWeakDeviceId<FakeDeviceId>,
         IpPortSpec<I, FakeWeakDeviceId<FakeDeviceId>>,
         Udp<I, FakeWeakDeviceId<FakeDeviceId>>,
     >;
@@ -6064,7 +6074,8 @@ where {
     fn listen<I: Ip + IpExt>(
         ip: I::Addr,
         port: u16,
-    ) -> AddrVec<IpPortSpec<I, FakeWeakDeviceId<FakeDeviceId>>> {
+    ) -> AddrVec<FakeWeakDeviceId<FakeDeviceId>, IpPortSpec<I, FakeWeakDeviceId<FakeDeviceId>>>
+    {
         let addr = SpecifiedAddr::new(ip);
         let port = NonZeroU16::new(port).expect("port must be nonzero");
         AddrVec::Listen(ListenerAddr {
@@ -6077,7 +6088,8 @@ where {
         ip: I::Addr,
         port: u16,
         device: FakeWeakDeviceId<FakeDeviceId>,
-    ) -> AddrVec<IpPortSpec<I, FakeWeakDeviceId<FakeDeviceId>>> {
+    ) -> AddrVec<FakeWeakDeviceId<FakeDeviceId>, IpPortSpec<I, FakeWeakDeviceId<FakeDeviceId>>>
+    {
         let addr = SpecifiedAddr::new(ip);
         let port = NonZeroU16::new(port).expect("port must be nonzero");
         AddrVec::Listen(ListenerAddr {
@@ -6091,7 +6103,8 @@ where {
         local_port: u16,
         remote_ip: I::Addr,
         remote_port: u16,
-    ) -> AddrVec<IpPortSpec<I, FakeWeakDeviceId<FakeDeviceId>>> {
+    ) -> AddrVec<FakeWeakDeviceId<FakeDeviceId>, IpPortSpec<I, FakeWeakDeviceId<FakeDeviceId>>>
+    {
         let local_ip = SpecifiedAddr::new(local_ip).expect("addr must be specified");
         let local_port = NonZeroU16::new(local_port).expect("port must be nonzero");
         let remote_ip = SpecifiedAddr::new(remote_ip).expect("addr must be specified");
@@ -6159,7 +6172,15 @@ where {
         (listen_device(ip_v4!("0.0.0.0"), 1, FakeWeakDeviceId(FakeDeviceId)), Sharing::Exclusive)],
             Err(InsertError::IndirectConflict); "any_listener_indirect_conflict_conn")]
     fn bind_sequence<
-        C: IntoIterator<Item = (AddrVec<IpPortSpec<Ipv4, FakeWeakDeviceId<FakeDeviceId>>>, Sharing)>,
+        C: IntoIterator<
+            Item = (
+                AddrVec<
+                    FakeWeakDeviceId<FakeDeviceId>,
+                    IpPortSpec<Ipv4, FakeWeakDeviceId<FakeDeviceId>>,
+                >,
+                Sharing,
+            ),
+        >,
     >(
         spec: C,
         expected: Result<(), InsertError>,
@@ -6206,7 +6227,13 @@ where {
     fn remove_sequence<I>(spec: I)
     where
         I: IntoIterator<
-            Item = (AddrVec<IpPortSpec<Ipv4, FakeWeakDeviceId<FakeDeviceId>>>, Sharing),
+            Item = (
+                AddrVec<
+                    FakeWeakDeviceId<FakeDeviceId>,
+                    IpPortSpec<Ipv4, FakeWeakDeviceId<FakeDeviceId>>,
+                >,
+                Sharing,
+            ),
         >,
         I::IntoIter: ExactSizeIterator,
     {

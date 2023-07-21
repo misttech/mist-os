@@ -114,10 +114,11 @@ where
         let conn_addr =
             ConnIpAddr { local: (local_ip, local_port), remote: (remote_ip, remote_port) };
 
-        let addrs_to_search = AddrVecIter::<IpPortSpec<I, SC::WeakDeviceId>>::with_device(
-            conn_addr.into(),
-            sync_ctx.downgrade_device_id(device),
-        );
+        let addrs_to_search =
+            AddrVecIter::<SC::WeakDeviceId, IpPortSpec<I, SC::WeakDeviceId>>::with_device(
+                conn_addr.into(),
+                sync_ctx.downgrade_device_id(device),
+            );
 
         sync_ctx.with_ip_transport_ctx_isn_generator_and_tcp_sockets_mut(
             |ip_transport_ctx, isn, sockets| {
@@ -146,7 +147,7 @@ fn handle_incoming_packet<I, B, C, SC>(
     sockets: &mut Sockets<I, SC::WeakDeviceId, C>,
     conn_addr: ConnIpAddr<I::Addr, NonZeroU16, NonZeroU16>,
     incoming_device: &SC::DeviceId,
-    mut addrs_to_search: AddrVecIter<IpPortSpec<I, SC::WeakDeviceId>>,
+    mut addrs_to_search: AddrVecIter<SC::WeakDeviceId, IpPortSpec<I, SC::WeakDeviceId>>,
     incoming: Segment<&[u8]>,
     now: C::Instant,
 ) where
@@ -598,6 +599,7 @@ where
                         BoundConnection::to_socket_state((state, sharing, addr)),
                     );
                     <BoundConnection as ConvertSocketTypeState<
+                        SC::WeakDeviceId,
                         IpPortSpec<I, SC::WeakDeviceId>,
                         _,
                     >>::from_socket_id_ref(entry.key())
