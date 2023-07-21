@@ -19,8 +19,7 @@ information available to accessibility services such as the screen reader.
 
 * _UI Framework_ - for the purpose of this doc, a "UI Framework" is something
   that draws a user-visible view on Fuchsia. Typically these are Flutter or
-  Chromium views. Ermine, the sysUI on Workstation, uses the Flutter UI
-  Framework.
+  Chromium views.
 
 ## Design
 

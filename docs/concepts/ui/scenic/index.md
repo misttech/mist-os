@@ -34,7 +34,7 @@ composited with the GPU.
 ### Visual effects {#responsibility-visual-effects}
 
 Scenic is responsible for visual effects that cannot be baked into the content
-provided by clients. For example, Scenic's (deprecated) [Gfx](gfx/index.md) API
+provided by clients. For example, Scenic's (deprecated) GFX API
 allows clients to insert content into a 3D scene, where objects from different
 apps can cast shadows and reflect light onto each other. Similarly,
 [Flatland](flatland/index.md) is designed to support effects such as "group
@@ -109,7 +109,7 @@ the scene graph are among the most important.
 
 The current situation is complicated because, for historical reasons, Scenic
 supports two distinct *kinds* of scene graphs, the deprecated
-[Gfx](gfx/index.md) API and the more "future proof"
+Gfx API and the more "future proof"
 [Flatland](flatland/index.md) API.
 
 Scenic supports instantiation of one scene graph at a time: there can either be
@@ -149,7 +149,7 @@ and the system *Display Driver*.
 ## Sessions
 
 Scenic's two composition protocols ([Flatland](flatland/index.md) and
-[Gfx](gfx/index.md)) have commonalities which are discussed here; see the linked
+Gfx have commonalities which are discussed here; see the linked
 pages for details which pertain to one or the other.
 
 In both cases, a "session" refers to a FIDL channel that a client uses to

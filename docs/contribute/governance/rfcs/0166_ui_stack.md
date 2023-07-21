@@ -74,7 +74,6 @@ Accessibility teams.
 
 * [Scenic](/docs/concepts/ui/scenic/index.md) - Fuchsia platform component that handles
   graphical composition, focus management, and routing of graphical input.
-* [Gfx](/docs/concepts/ui/scenic/gfx/index.md) - Legacy Scenic graphics API. Found in
   [fuchsia.ui.scenic](https://fuchsia.dev/reference/fidl/fuchsia.ui.scenic) and
   [fuchsia.ui.gfx](https://fuchsia.dev/reference/fidl/fuchsia.ui.gfx/).
 * [Flatland](/docs/concepts/ui/scenic/flatland/index.md) - Plan of record Scenic

@@ -19,9 +19,6 @@ toc:
     section:
     - title: "Flatland timeline"
       path: /docs/concepts/ui/scenic/flatland/timeline.md
-  - title: "Gfx"
-    section:
-    - include: /docs/concepts/ui/scenic/gfx/_toc.yaml
   - title: "Life of a pixel"
     path: /docs/concepts/ui/scenic/life_of_a_pixel.md
   - title: "Life of a Flatland image"
