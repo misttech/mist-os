@@ -141,7 +141,29 @@ Used as a parameter to assembled_system().
 
 **Current value (from the default):** `false`
 
-From //build/images/args.gni:189
+From //build/images/args.gni:187
+
+### assembly_generate_fvm_fastboot
+
+The size in bytes of the FVM partition on the target eMMC devices.
+Specifying this parameter will lead build to generate a fvm.fastboot.blk
+suitable for flashing through fastboot for eMMC devices.
+
+**Current value (from the default):** `false`
+
+From //build/images/args.gni:158
+
+### assembly_generate_fvm_nand
+
+Specifying these variables will generate a NAND FVM image suitable for
+directly flashing via fastboot. The NAND characteristics are required
+in order to properly initialize the FTL metadata in the OOB area.
+`fvm_max_disk_size` should also be nonzero or else minfs will not have any
+room to initialize on boot.
+
+**Current value (from the default):** `false`
+
+From //build/images/args.gni:165
 
 ### authorized_ssh_keys_label
 
@@ -306,7 +328,7 @@ From //build/testing/environments.gni:9
 
 **Current value (from the default):** `false`
 
-From //build/images/args.gni:217
+From //build/images/args.gni:215
 
 ### bazel_product_bundle_prefix
 
@@ -331,7 +353,7 @@ The actual bazel_product_bundle used for Bazel assembly is:
 
 **Current value (from the default):** `false`
 
-From //build/images/args.gni:216
+From //build/images/args.gni:214
 
 ### bazel_quiet
 
@@ -380,7 +402,7 @@ False means no limit.
 
 **Current value for `target_cpu = "arm64"`:** `10485760000`
 
-From //boards/common/arm64-common.gni:11
+From //boards/common/arm64-common.gni:14
 
 **Overridden from the default:** `false`
 
@@ -515,7 +537,7 @@ by the board definition rather than the product definition.
 
 **Current value for `target_cpu = "arm64"`:** `["//bundles/packages/prod:drivers-system"]`
 
-From //boards/common/arm64-common.gni:29
+From //boards/common/arm64-common.gni:32
 
 **Overridden from the default:** `[]`
 
@@ -574,7 +596,19 @@ From //build/board.gni:57
 
 BoardInformation file for use with Product Assembly
 
-**Current value (from the default):** `false`
+**Current value for `target_cpu = "arm64"`:** `"//boards/arm64/board_information.json5"`
+
+From //boards/common/arm64-common.gni:10
+
+**Overridden from the default:** `false`
+
+From //build/board.gni:101
+
+**Current value for `target_cpu = "x64"`:** `"//boards/x64/board_information.json5"`
+
+From //boards/x64.gni:12
+
+**Overridden from the default:** `false`
 
 From //build/board.gni:101
 
@@ -594,7 +628,7 @@ From //build/board.gni:106
 
 **Current value for `target_cpu = "x64"`:** `true`
 
-From //boards/x64.gni:87
+From //boards/x64.gni:79
 
 **Overridden from the default:** `false`
 
@@ -641,7 +675,7 @@ board definition rather than the product definition.
 
 **Current value for `target_cpu = "arm64"`:** `["//src/hwinfo:default_board_config", "//src/graphics/bin/vulkan_loader"]`
 
-From //boards/common/arm64-common.gni:31
+From //boards/common/arm64-common.gni:34
 
 **Overridden from the default:** `[]`
 
@@ -836,7 +870,7 @@ From //build/board.gni:117
 
 **Current value for `target_cpu = "x64"`:** `"//boards/images:bringup_fastboot_default"`
 
-From //boards/x64.gni:93
+From //boards/x64.gni:85
 
 **Overridden from the default:** `false`
 
@@ -856,7 +890,7 @@ From //build/board.gni:116
 
 **Current value for `target_cpu = "x64"`:** `"//boards/images:bringup_default"`
 
-From //boards/x64.gni:91
+From //boards/x64.gni:83
 
 **Overridden from the default:** `false`
 
@@ -3104,7 +3138,7 @@ useful for including verification and other Bazel assembly specific targets.
 
 **Current value (from the default):** `[]`
 
-From //build/images/args.gni:221
+From //build/images/args.gni:219
 
 ### extra_gn_labels_for_bazel_inputs
 
@@ -3502,30 +3536,6 @@ Enables kernel tracing of futex interactions
 **Current value (from the default):** `false`
 
 From //zircon/kernel/params.gni:60
-
-### fvm_emmc_partition_size
-
-The size in bytes of the FVM partition on the target eMMC devices.
-Specifying this parameter will lead build to generate a fvm.fastboot.blk
-suitable for flashing through fastboot for eMMC devices.
-Informs GN that a nand-fvm will be outputted.
-
-**Current value (from the default):** `false`
-
-From //build/images/args.gni:159
-
-### fvm_ftl_nand_block_count
-
-Specifying these variables will generate a NAND FVM image suitable for
-directly flashing via fastboot. The NAND characteristics are required
-in order to properly initialize the FTL metadata in the OOB area.
-`fvm_max_disk_size` should also be nonzero or else minfs will not have any
-room to initialize on boot.
-Informs GN that a nand-fvm will be outputted along with a temporary file.
-
-**Current value (from the default):** `false`
-
-From //build/images/args.gni:167
 
 ### fvm_partition
 
@@ -3979,7 +3989,7 @@ From //build/board.gni:110
 
 **Current value for `target_cpu = "x64"`:** `"//boards/images:x64"`
 
-From //boards/x64.gni:89
+From //boards/x64.gni:81
 
 **Overridden from the default:** `false`
 
@@ -4036,7 +4046,7 @@ assembled_system().  See documentation there.
 
 **Current value (from the default):** `false`
 
-From //build/images/args.gni:185
+From //build/images/args.gni:183
 
 ### include_zxdb_large_tests
 
@@ -4583,7 +4593,7 @@ of how they are stored).
 
 **Current value for `target_cpu = "arm64"`:** `5216665600`
 
-From //boards/common/arm64-common.gni:13
+From //boards/common/arm64-common.gni:16
 
 **Overridden from the default:** `false`
 
@@ -4605,7 +4615,7 @@ TODO(b/291953514): Enforce this by implementing an image size checker.
 
 **Current value for `target_cpu = "arm64"`:** `16777216`
 
-From //boards/common/arm64-common.gni:36
+From //boards/common/arm64-common.gni:39
 
 **Overridden from the default:** `0`
 
@@ -4628,7 +4638,7 @@ From //src/diagnostics/log_listener/BUILD.gn:11
 
 **Current value for `target_cpu = "arm64"`:** `16777216`
 
-From //boards/common/arm64-common.gni:37
+From //boards/common/arm64-common.gni:40
 
 **Overridden from the default:** `0`
 
@@ -5419,7 +5429,7 @@ From //build/board.gni:133
 
 **Current value for `target_cpu = "x64"`:** `["//out/not-default/fuchsia.esp.blk"]`
 
-From //boards/x64.gni:95
+From //boards/x64.gni:87
 
 **Overridden from the default:** `[]`
 
@@ -5440,7 +5450,7 @@ From //build/board.gni:132
 
 **Current value for `target_cpu = "x64"`:** `"//boards/partitions:x64"`
 
-From //boards/x64.gni:94
+From //boards/x64.gni:86
 
 **Overridden from the default:** `false`
 
@@ -6991,7 +7001,7 @@ Example value: "//build/images/recovery"
 
 **Current value (from the default):** `"//build/images/zedboot"`
 
-From //build/images/args.gni:176
+From //build/images/args.gni:174
 
 ### recovery_logo_path
 
@@ -8173,7 +8183,7 @@ exactly what you are doing.
 
 **Current value (from the default):** `false`
 
-From //build/images/args.gni:196
+From //build/images/args.gni:194
 
 ### use_blink
 
@@ -8527,7 +8537,7 @@ is meant solely for developer debugging.
 
 **Current value (from the default):** `false`
 
-From //build/images/args.gni:181
+From //build/images/args.gni:179
 
 ### vim3_mcu_fan_default_level
 
@@ -8739,7 +8749,7 @@ From //build/board.gni:113
 
 **Current value for `target_cpu = "x64"`:** `"//boards/images:zedboot_default"`
 
-From //boards/x64.gni:90
+From //boards/x64.gni:82
 
 **Overridden from the default:** `false`
 
