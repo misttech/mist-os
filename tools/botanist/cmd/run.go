@@ -172,7 +172,7 @@ func (r *RunCommand) setupFFX(ctx context.Context, fuchsiaTargets []targets.Fuch
 		defer flush()
 		ffx.SetStdoutStderr(stdout, stderr)
 		if r.ffxExperimentLevel > 0 {
-			if err := ffx.SetLogLevel(ctx, ffxutil.Trace); err != nil {
+			if err := ffx.SetLogLevel(ctx, ffxutil.Debug); err != nil {
 				return cleanup, err
 			}
 		}
