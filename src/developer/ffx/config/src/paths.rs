@@ -15,17 +15,15 @@ pub const USER_FILE: &str = ".ffx_user_config.json";
 
 impl EnvironmentContext {
     pub fn get_default_user_file_path(&self) -> Result<PathBuf> {
-        use EnvironmentKind::*;
-        match self.env_kind() {
-            Isolated { isolate_root, .. } => Ok(isolate_root.join(USER_FILE)),
+        match self.env_kind().isolate_root() {
+            Some(isolate_root) => Ok(isolate_root.join(USER_FILE)),
             _ => get_default_user_file_path(),
         }
     }
 
     pub fn get_default_env_path(&self) -> Result<PathBuf> {
-        use EnvironmentKind::*;
-        match self.env_kind() {
-            Isolated { isolate_root, .. } => Ok(isolate_root.join(ENV_FILE)),
+        match self.env_kind().isolate_root() {
+            Some(isolate_root) => Ok(isolate_root.join(ENV_FILE)),
             _ => default_env_path(),
         }
     }
@@ -40,7 +38,7 @@ impl EnvironmentContext {
     /// return it. Otherwise None.
     pub fn get_build_config_file(&self) -> Option<&Utf8Path> {
         match self.env_kind() {
-            EnvironmentKind::ConfigDomain(domain) => domain.get_build_config_file(),
+            EnvironmentKind::ConfigDomain { domain, .. } => domain.get_build_config_file(),
             _ => None,
         }
     }
@@ -52,38 +50,37 @@ impl EnvironmentContext {
                 Ok(p.join(".ffx-daemon/daemon.sock"))
             }
             (_, EnvironmentKind::Isolated { isolate_root }) => Ok(isolate_root.join("daemon.sock")),
+            (_, EnvironmentKind::ConfigDomain { isolate_root: Some(isolate_root), .. }) => {
+                Ok(isolate_root.join("daemon.sock").into())
+            }
             (_, _) => Ok(hoist::default_ascendd_path()),
         }
     }
 
     pub fn get_runtime_path(&self) -> Result<PathBuf> {
-        use EnvironmentKind::*;
-        match self.env_kind() {
-            Isolated { isolate_root, .. } => Ok(isolate_root.join("runtime")),
+        match self.env_kind().isolate_root() {
+            Some(isolate_root) => Ok(isolate_root.join("runtime")),
             _ => get_runtime_base_path(),
         }
     }
 
     pub fn get_cache_path(&self) -> Result<PathBuf> {
-        use EnvironmentKind::*;
-        match self.env_kind() {
-            Isolated { isolate_root, .. } => Ok(isolate_root.join("cache")),
+        match self.env_kind().isolate_root() {
+            Some(isolate_root) => Ok(isolate_root.join("cache")),
             _ => get_cache_base_path(),
         }
     }
 
     pub fn get_config_path(&self) -> Result<PathBuf> {
-        use EnvironmentKind::*;
-        match self.env_kind() {
-            Isolated { isolate_root, .. } => Ok(isolate_root.join("config")),
+        match self.env_kind().isolate_root() {
+            Some(isolate_root) => Ok(isolate_root.join("config")),
             _ => get_config_base_path(),
         }
     }
 
     pub fn get_data_path(&self) -> Result<PathBuf> {
-        use EnvironmentKind::*;
-        match self.env_kind() {
-            Isolated { isolate_root, .. } => Ok(isolate_root.join("data")),
+        match self.env_kind().isolate_root() {
+            Some(isolate_root) => Ok(isolate_root.join("data")),
             _ => get_data_base_path(),
         }
     }

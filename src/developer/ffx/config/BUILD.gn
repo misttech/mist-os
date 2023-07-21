@@ -39,7 +39,9 @@ rustc_library("lib") {
   ]
 
   test_deps = [
+    "//src/developer/ffx/config/domain:test_data",
     "//src/lib/fuchsia-async",
+    "//third_party/rust_crates:assert_matches",
     "//third_party/rust_crates:futures",
   ]
 
@@ -71,6 +73,11 @@ rustc_library("lib") {
     "src/runtime.rs",
     "src/storage.rs",
   ]
+
+  _domains_test_data_path =
+      rebase_path("//src/developer/ffx/config/domain/test_data",
+                  "$root_out_dir/..")
+  rustenv = [ "DOMAINS_TEST_DATA_PATH=$_domains_test_data_path" ]
 }
 
 group("tests") {

@@ -8,6 +8,7 @@ use crate::{
     BuildOverride, ConfigMap, ConfigQuery, Environment,
 };
 use anyhow::{Context, Result};
+use camino::Utf8PathBuf;
 use errors::ffx_error;
 use ffx_config_domain::ConfigDomain;
 use sdk::{Sdk, SdkRoot};
@@ -82,10 +83,34 @@ impl EnvironmentContext {
     /// `fuchsia_env` file at its root.
     pub fn config_domain(
         exe_kind: ExecutableKind,
-        env_file: ConfigDomain,
+        domain: ConfigDomain,
         runtime_args: ConfigMap,
+        isolate_root: Option<PathBuf>,
     ) -> Self {
-        Self::new(EnvironmentKind::ConfigDomain(env_file), exe_kind, None, runtime_args, None)
+        Self::new(
+            EnvironmentKind::ConfigDomain { domain, isolate_root },
+            exe_kind,
+            None,
+            runtime_args,
+            None,
+        )
+    }
+
+    /// Initialize an environment type for a config domain context, looking for
+    /// a fuchsia_env file at the given path.
+    pub fn config_domain_root(
+        exe_kind: ExecutableKind,
+        domain_root: Utf8PathBuf,
+        runtime_args: ConfigMap,
+        isolate_root: Option<PathBuf>,
+    ) -> Result<Self> {
+        let domain_config = ConfigDomain::find_root(&domain_root).with_context(|| {
+            ffx_error!("Could not find config domain root from '{domain_root}'")
+        })?;
+        let domain = ConfigDomain::load_from(&domain_config).with_context(|| {
+            ffx_error!("Could not load config domain file at '{domain_config}'")
+        })?;
+        Ok(Self::config_domain(exe_kind, domain, runtime_args, isolate_root))
     }
 
     /// Initialize an environment type for an in tree context, rooted at `tree_root` and if
@@ -144,10 +169,10 @@ impl EnvironmentContext {
         env_file_path: Option<PathBuf>,
     ) -> Result<Self, EnvironmentDetectError> {
         // strong signals that we're running...
-        if let Some(env_file_path) = ConfigDomain::find_root(current_dir.try_into()?) {
+        if let Some(domain_path) = ConfigDomain::find_root(current_dir.try_into()?) {
             // - a config-domain: we found a fuchsia-env file
-            let env_file = ConfigDomain::load_from(&env_file_path)?;
-            Ok(Self::config_domain(exe_kind, env_file, runtime_args))
+            let domain = ConfigDomain::load_from(&domain_path)?;
+            Ok(Self::config_domain(exe_kind, domain, runtime_args, None))
         } else if let Some(tree_root) = Self::find_jiri_root(current_dir)? {
             // - in-tree: we found a jiri root, and...
             // look for a .fx-build-dir file and use that instead.
@@ -185,7 +210,9 @@ impl EnvironmentContext {
     pub fn build_dir(&self) -> Option<&Path> {
         match &self.kind {
             EnvironmentKind::InTree { build_dir, .. } => build_dir.as_deref(),
-            EnvironmentKind::ConfigDomain(domain) => Some(domain.get_build_dir()?.as_std_path()),
+            EnvironmentKind::ConfigDomain { domain, .. } => {
+                Some(domain.get_build_dir()?.as_std_path())
+            }
             _ => None,
         }
     }
@@ -275,7 +302,7 @@ impl EnvironmentContext {
             self.query("sdk.root").build(Some(BuildOverride::NoBuild)).get().await.ok();
 
         match (&self.kind, runtime_root) {
-            (EnvironmentKind::ConfigDomain(domain), None) => {
+            (EnvironmentKind::ConfigDomain { domain, .. }, None) => {
                 self.sdk_from_config(domain.get_explicit_sdk_root().map(|p| p.as_std_path())).await
             }
             (EnvironmentKind::InTree { build_dir: Some(build_dir), .. }, None) => {
@@ -442,7 +469,11 @@ fn find_sdk_root(start_path: &Path) -> Result<Option<PathBuf>> {
 mod test {
     use super::*;
 
+    use assert_matches::assert_matches;
+    use camino::Utf8Path;
     use tempfile::tempdir;
+
+    const DOMAINS_TEST_DATA_PATH: &str = env!("DOMAINS_TEST_DATA_PATH");
 
     impl Default for EnvironmentContext {
         fn default() -> Self {
@@ -484,5 +515,79 @@ mod test {
         std::fs::create_dir(meta_path).unwrap();
 
         assert!(find_sdk_root(&start_path).unwrap().is_none());
+    }
+
+    fn domains_test_data_path() -> &'static Utf8Path {
+        Utf8Path::new(DOMAINS_TEST_DATA_PATH)
+    }
+
+    #[fuchsia_async::run_singlethreaded(test)]
+    async fn test_config_domain_context() {
+        let domain_root = domains_test_data_path().join("basic_example");
+        let context = EnvironmentContext::config_domain_root(
+            ExecutableKind::Test,
+            domain_root.clone(),
+            Default::default(),
+            None,
+        )
+        .expect("config domain context");
+
+        check_config_domain_paths(&context, &domain_root).await;
+    }
+
+    #[fuchsia_async::run_singlethreaded(test)]
+    async fn test_config_domain_context_isolated() {
+        let isolate_dir = tempdir().expect("tempdir");
+        let domain_root = domains_test_data_path().join("basic_example");
+        let context = EnvironmentContext::config_domain_root(
+            ExecutableKind::Test,
+            domain_root.clone(),
+            Default::default(),
+            Some(isolate_dir.path().to_owned()),
+        )
+        .expect("isolated config domain context");
+
+        check_config_domain_paths(&context, &domain_root).await;
+        check_isolated_paths(&context, &isolate_dir.path());
+    }
+
+    #[test]
+    fn test_config_isolated_context() {
+        let isolate_dir = tempdir().expect("tempdir");
+        let context = EnvironmentContext::isolated(
+            ExecutableKind::Test,
+            isolate_dir.path().to_owned(),
+            Default::default(),
+            Default::default(),
+            None,
+        );
+
+        check_isolated_paths(&context, &isolate_dir.path());
+    }
+
+    async fn check_config_domain_paths(context: &EnvironmentContext, domain_root: &Utf8Path) {
+        let domain_root = domain_root.canonicalize().expect("canonicalized domain root");
+        assert_eq!(context.build_dir().unwrap(), domain_root.join("bazel-out"));
+        assert_eq!(
+            context.get_build_config_file().unwrap(),
+            domain_root.join(".fuchsia-build-config.json")
+        );
+        assert_matches!(context.get_sdk_root().await.unwrap(), SdkRoot::Full(path) if path == domain_root.join("bazel-project/external/fuchsia_sdk"));
+    }
+
+    fn check_isolated_paths(context: &EnvironmentContext, isolate_dir: &Path) {
+        assert_eq!(
+            context.get_default_user_file_path().unwrap(),
+            isolate_dir.join(crate::paths::USER_FILE)
+        );
+        assert_eq!(
+            context.get_default_env_path().unwrap(),
+            isolate_dir.join(crate::paths::ENV_FILE)
+        );
+        assert_eq!(context.get_default_ascendd_path().unwrap(), isolate_dir.join("daemon.sock"));
+        assert_eq!(context.get_runtime_path().unwrap(), isolate_dir.join("runtime"));
+        assert_eq!(context.get_cache_path().unwrap(), isolate_dir.join("cache"));
+        assert_eq!(context.get_config_path().unwrap(), isolate_dir.join("config"));
+        assert_eq!(context.get_data_path().unwrap(), isolate_dir.join("data"));
     }
 }

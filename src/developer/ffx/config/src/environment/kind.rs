@@ -3,7 +3,10 @@
 // found in the LICENSE file.
 
 use ffx_config_domain::ConfigDomain;
-use std::{fmt, path::PathBuf};
+use std::{
+    fmt,
+    path::{Path, PathBuf},
+};
 
 /// The type of environment we're running in, along with relevant information about
 /// that environment.
@@ -11,7 +14,7 @@ use std::{fmt, path::PathBuf};
 pub enum EnvironmentKind {
     /// In a project with a fuchsia_env file at its root with config domain info
     /// in it.
-    ConfigDomain(ConfigDomain),
+    ConfigDomain { domain: ConfigDomain, isolate_root: Option<PathBuf> },
     /// In a fuchsia.git build tree with a jiri root and possibly a build directory.
     InTree { tree_root: PathBuf, build_dir: Option<PathBuf> },
     /// Isolated within a particular directory for testing or consistency purposes
@@ -21,13 +24,30 @@ pub enum EnvironmentKind {
     NoContext,
 }
 
+impl EnvironmentKind {
+    /// Get the isolate root of this environment
+    pub fn isolate_root(&self) -> Option<&Path> {
+        match self {
+            Self::ConfigDomain { isolate_root, .. } => isolate_root.as_deref(),
+            Self::Isolated { isolate_root } => Some(&isolate_root),
+            _ => None,
+        }
+    }
+}
+
 impl std::fmt::Display for EnvironmentKind {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         use EnvironmentKind::*;
         match self {
-            ConfigDomain(domain) => {
+            ConfigDomain { domain, isolate_root: None } => {
                 write!(f, "Fuchsia Project Rooted at {}", domain.root(),)
             }
+            ConfigDomain { domain, isolate_root: Some(isolation_root) } => write!(
+                f,
+                "Fuchsia Project Rooted at {} using isolation root at {}",
+                domain.root(),
+                isolation_root.display(),
+            ),
             InTree { tree_root, build_dir: Some(build_dir) } => write!(
                 f,
                 "Fuchsia.git In-Tree Rooted at {root}, with default build directory of {build}",

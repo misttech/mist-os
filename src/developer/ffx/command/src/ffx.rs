@@ -4,6 +4,7 @@
 
 use crate::{user_error, Error, FfxContext, MetricsSession, Result};
 use argh::FromArgs;
+use camino::Utf8PathBuf;
 use ffx_command_error::bug;
 use ffx_config::{environment::ExecutableKind, EnvironmentContext, FfxConfigBacked};
 use ffx_daemon_proxy::Injection;
@@ -168,6 +169,11 @@ pub struct Ffx {
     /// override the path to the environment configuration file (file path)
     pub env: Option<String>,
 
+    #[argh(option, hidden_help)]
+    /// override the detection of the project root from which a config domain
+    /// file is found (Warning: This is part of an experimental feature)
+    pub env_root: Option<Utf8PathBuf>,
+
     #[argh(option)]
     /// produce output for a machine in the specified format; available formats: "json",
     /// "json-pretty"
@@ -209,6 +215,15 @@ pub struct Ffx {
 
 impl Ffx {
     pub fn load_context(&self, exe_kind: ExecutableKind) -> Result<EnvironmentContext> {
+        let env_vars = HashMap::from_iter(std::env::vars());
+        self.load_context_with_env(exe_kind, env_vars)
+    }
+
+    fn load_context_with_env(
+        &self,
+        exe_kind: ExecutableKind,
+        env_vars: HashMap<String, String>,
+    ) -> Result<EnvironmentContext> {
         // Configuration initialization must happen before ANY calls to the config (or the cache won't
         // properly have the runtime parameters.
         let overrides = self.runtime_config_overrides();
@@ -216,21 +231,34 @@ impl Ffx {
         let env_path = self.env.as_ref().map(PathBuf::from);
 
         // If we're given an isolation setting, use that. Otherwise do a normal detection of the environment.
-        match (self, std::env::var_os("FFX_ISOLATE_DIR")) {
-            (Ffx { isolate_dir: Some(path), .. }, _) => Ok(EnvironmentContext::isolated(
-                exe_kind,
-                path.to_path_buf(),
-                HashMap::from_iter(std::env::vars()),
-                runtime_args,
-                env_path,
-            )),
-            (_, Some(path_str)) => Ok(EnvironmentContext::isolated(
-                exe_kind,
-                PathBuf::from(path_str),
-                HashMap::from_iter(std::env::vars()),
-                runtime_args,
-                env_path,
-            )),
+        match (self, env_vars.get("FFX_ISOLATE_DIR").map(PathBuf::from)) {
+            (Ffx { env_root: Some(domain_root), isolate_dir: Some(isolate_root), .. }, _) => {
+                EnvironmentContext::config_domain_root(
+                    exe_kind,
+                    domain_root.clone(),
+                    runtime_args,
+                    Some(isolate_root.clone()),
+                )
+                .map_err(Into::into)
+            }
+            (Ffx { env_root: Some(domain_root), .. }, isolate_root) => {
+                EnvironmentContext::config_domain_root(
+                    exe_kind,
+                    domain_root.clone(),
+                    runtime_args,
+                    isolate_root.clone(),
+                )
+                .map_err(Into::into)
+            }
+            (Ffx { isolate_dir: Some(ref path), .. }, _) | (_, Some(ref path)) => {
+                Ok(EnvironmentContext::isolated(
+                    exe_kind,
+                    path.clone(),
+                    env_vars,
+                    runtime_args,
+                    env_path,
+                ))
+            }
             _ => EnvironmentContext::detect(
                 exe_kind,
                 runtime_args,
@@ -265,6 +293,11 @@ impl Ffx {
 #[cfg(test)]
 mod test {
     use super::*;
+
+    use assert_matches::assert_matches;
+    use ffx_config::environment::EnvironmentKind;
+    use std::io::Write;
+    use tempfile::{tempdir, TempDir};
 
     #[test]
     fn cmd_only_last_component() {
@@ -323,5 +356,83 @@ mod test {
             cmd_line.redact_subcmd(&TestCmd::default()),
             vec!["ffx", "--env", "-v", "subcommand", "--arg", "--stuff"]
         );
+    }
+
+    fn simple_config_domain_root() -> TempDir {
+        let root = tempdir().expect("domain context root directory");
+        std::fs::File::create(root.path().join("fuchsia_env.toml"))
+            .expect("fuchsia_env.toml")
+            .write_all(b"[fuchsia]")
+            .expect("fuchsia section");
+        root
+    }
+
+    #[test]
+    fn test_load_config_domain_context() {
+        let domain_root = simple_config_domain_root();
+        let ffx = Ffx {
+            env_root: Some(domain_root.path().join("fuchsia_env.toml").try_into().unwrap()),
+            ..Default::default()
+        };
+        let context = ffx
+            .load_context_with_env(ExecutableKind::Test, Default::default())
+            .expect("domain context");
+        assert_matches!(
+            context.env_kind(),
+            EnvironmentKind::ConfigDomain { isolate_root: None, .. }
+        );
+    }
+
+    #[test]
+    fn test_load_isolated_arg_config_domain_context() {
+        let domain_root = simple_config_domain_root();
+        let isolate_dir = tempdir().expect("isolate dir");
+        let ffx = Ffx {
+            env_root: Some(domain_root.path().join("fuchsia_env.toml").try_into().unwrap()),
+            isolate_dir: Some(isolate_dir.path().to_owned()),
+            ..Default::default()
+        };
+        let context = ffx
+            .load_context_with_env(ExecutableKind::Test, Default::default())
+            .expect("domain context");
+        assert_matches!(
+            context.env_kind(),
+            EnvironmentKind::ConfigDomain { isolate_root: Some(_), .. }
+        );
+    }
+
+    #[test]
+    fn test_load_isolated_env_config_domain_context() {
+        let domain_root = simple_config_domain_root();
+        let isolate_dir = tempdir().expect("isolate dir");
+        let isolate_dir_str = isolate_dir.path().to_string_lossy().to_string();
+        let ffx = Ffx {
+            env_root: Some(domain_root.path().join("fuchsia_env.toml").try_into().unwrap()),
+            ..Default::default()
+        };
+        let env_vars = HashMap::from_iter([("FFX_ISOLATE_DIR".to_owned(), isolate_dir_str)]);
+        let context =
+            ffx.load_context_with_env(ExecutableKind::Test, env_vars).expect("domain context");
+        assert_matches!(
+            context.env_kind(),
+            EnvironmentKind::ConfigDomain { isolate_root: Some(_), .. }
+        );
+    }
+
+    #[test]
+    fn test_load_isolated_arg_overriding_env_config_domain_context() {
+        let domain_root = simple_config_domain_root();
+        let isolate_dir = tempdir().expect("isolate dir");
+        let isolate_dir_str = isolate_dir.path().to_string_lossy().to_string();
+        let ffx = Ffx {
+            env_root: Some(domain_root.path().join("fuchsia_env.toml").try_into().unwrap()),
+            isolate_dir: Some(isolate_dir.path().to_owned()),
+            ..Default::default()
+        };
+        let env_vars: HashMap<String, String> =
+            [("FFX_ISOLATE_DIR".to_owned(), "/dev/zero".to_owned())].into_iter().collect();
+        let context =
+            ffx.load_context_with_env(ExecutableKind::Test, env_vars).expect("domain context");
+        assert_matches!(context.env_kind(), EnvironmentKind::ConfigDomain { isolate_root: Some(root), .. } if root == &PathBuf::from(&isolate_dir_str));
     }
 }
