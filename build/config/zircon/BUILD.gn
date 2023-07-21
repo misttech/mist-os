@@ -282,26 +282,11 @@ config("machine") {
   }
 }
 
-# TODO(fxbug.dev/54322): Use the config under //third_party/ulib/musl once the C
-# library has been migrated to the GN build.
-config("musl_headers") {
-  _musl_dir = "//zircon/third_party/ulib/musl"
-  visibility = [
-    "${_musl_dir}/*",
-    "//zircon/system/ulib/c:*",
-  ]
-  cflags = [
-    "-idirafter",
-    rebase_path("${_musl_dir}/include", root_build_dir),
-  ]
-  asmflags = cflags
-}
-
 variant("user") {
   defines = [ "_ALL_SOURCE" ]
   configs = [
     ":nolibc",
-    ":musl_headers",
+    "//zircon/third_party/ulib/musl:headers",
   ]
 
   if (is_gcc) {
