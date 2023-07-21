@@ -12,8 +12,6 @@ if (is_host) {
     edition = "2021"
 
     sources = [
-      "src/api.rs",
-      "src/blob.rs",
       "src/boxed/api.rs",
       "src/boxed/blob.rs",
       "src/boxed/data_source.rs",
@@ -25,23 +23,7 @@ if (is_host) {
       "src/boxed/system.rs",
       "src/boxed/update_package.rs",
       "src/boxed/zbi.rs",
-      "src/component.rs",
-      "src/component_capability.rs",
-      "src/component_instance.rs",
-      "src/component_instance_capability.rs",
-      "src/component_manager.rs",
-      "src/component_resolver.rs",
-      "src/data_source.rs",
-      "src/hash.rs",
       "src/lib.rs",
-      "src/package.rs",
-      "src/package_resolver.rs",
-      "src/product_bundle.rs",
-      "src/scrutiny.rs",
-      "src/system.rs",
-      "src/todo.rs",
-      "src/update_package.rs",
-      "src/zbi.rs",
     ]
 
     deps = [
