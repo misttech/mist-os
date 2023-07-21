@@ -35,7 +35,7 @@ use netstack_testing_common::{
     interfaces,
     realms::{
         KnownServiceProvider, ManagementAgent, Manager, ManagerConfig, NetCfgVersion, Netstack,
-        Netstack2, TestRealmExt as _, TestSandboxExt,
+        TestRealmExt as _, TestSandboxExt,
     },
     try_all, try_any, wait_for_component_stopped, ASYNC_EVENT_NEGATIVE_CHECK_TIMEOUT,
     ASYNC_EVENT_POSITIVE_CHECK_TIMEOUT,
@@ -1370,7 +1370,7 @@ struct MasqueradeTestSetup {
     };
     "ipv6"
 )]
-async fn test_masquerade<M: Manager>(name: &str, setup: MasqueradeTestSetup) {
+async fn test_masquerade<N: Netstack, M: Manager>(name: &str, setup: MasqueradeTestSetup) {
     let MasqueradeTestSetup {
         client_ip,
         client_subnet,
@@ -1388,14 +1388,12 @@ async fn test_masquerade<M: Manager>(name: &str, setup: MasqueradeTestSetup) {
 
     let client_net = sandbox.create_network("client").await.expect("create network");
     let server_net = sandbox.create_network("server").await.expect("create network");
-    let client = sandbox
-        .create_netstack_realm::<Netstack2, _>(format!("{}_client", name))
-        .expect("create realm");
-    let server = sandbox
-        .create_netstack_realm::<Netstack2, _>(format!("{}_server", name))
-        .expect("create realm");
+    let client =
+        sandbox.create_netstack_realm::<N, _>(format!("{}_client", name)).expect("create realm");
+    let server =
+        sandbox.create_netstack_realm::<N, _>(format!("{}_server", name)).expect("create realm");
     let router = sandbox
-        .create_netstack_realm_with::<Netstack2, _, _>(
+        .create_netstack_realm_with::<N, _, _>(
             format!("{name}_router"),
             &[
                 KnownServiceProvider::Manager {

@@ -33,6 +33,7 @@
             matchers: [
                 "test_forwarding_netcfg_advanced_ns3",
                 "test_forwarding_netcfg_basic_ns3",
+                "test_masquerade_ns3*",
             ],
         },
         {
