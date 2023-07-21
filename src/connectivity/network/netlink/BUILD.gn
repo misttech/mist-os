@@ -67,6 +67,7 @@ rustc_library("netlink") {
     "src/netlink_packet.rs",
     "src/protocol_family.rs",
     "src/routes.rs",
+    "src/rules.rs",
   ]
 
   configs -= [ "//build/config/rust/lints:allow_unused_results" ]

@@ -71,9 +71,10 @@ pub mod route {
         interfaces,
         netlink_packet::{self, errno::Errno},
         routes,
+        rules::{RuleRequest, RuleRequestHandler, RuleTable},
     };
 
-    use netlink_packet_core::{NetlinkHeader, NLM_F_ACK, NLM_F_DUMP};
+    use netlink_packet_core::{NetlinkHeader, NLM_F_ACK, NLM_F_DUMP, NLM_F_REPLACE};
     use netlink_packet_route::{
         rtnl::{
             address::{nlas::Nla as AddressNla, AddressMessage},
@@ -139,7 +140,8 @@ pub mod route {
 
     impl ProtocolFamily for NetlinkRoute {
         type InnerMessage = RtnlMessage;
-        type RequestHandler<S: Sender<Self::InnerMessage>> = NetlinkRouteRequestHandler<S>;
+        type RequestHandler<S: Sender<Self::InnerMessage>> =
+            NetlinkRouteRequestHandler<S, RuleTable>;
 
         const NAME: &'static str = "NETLINK_ROUTE";
     }
@@ -147,10 +149,12 @@ pub mod route {
     #[derive(Clone)]
     pub(crate) struct NetlinkRouteRequestHandler<
         S: Sender<<NetlinkRoute as ProtocolFamily>::InnerMessage>,
+        R: RuleRequestHandler,
     > {
         pub(crate) interfaces_request_sink: mpsc::Sender<interfaces::Request<S>>,
         pub(crate) v4_routes_request_sink: mpsc::Sender<routes::Request<S, Ipv4>>,
         pub(crate) v6_routes_request_sink: mpsc::Sender<routes::Request<S, Ipv6>>,
+        pub(crate) rules_request_handler: R,
     }
 
     struct ExtractedAddressRequest {
@@ -390,16 +394,20 @@ pub mod route {
     }
 
     #[async_trait]
-    impl<S: Sender<<NetlinkRoute as ProtocolFamily>::InnerMessage>>
-        NetlinkFamilyRequestHandler<NetlinkRoute, S> for NetlinkRouteRequestHandler<S>
+    impl<S: Sender<<NetlinkRoute as ProtocolFamily>::InnerMessage>, R: RuleRequestHandler>
+        NetlinkFamilyRequestHandler<NetlinkRoute, S> for NetlinkRouteRequestHandler<S, R>
     {
         async fn handle_request(
             &mut self,
             req: NetlinkMessage<RtnlMessage>,
             client: &mut InternalClient<NetlinkRoute, S>,
         ) {
-            let Self { interfaces_request_sink, v4_routes_request_sink, v6_routes_request_sink } =
-                self;
+            let Self {
+                interfaces_request_sink,
+                v4_routes_request_sink,
+                v6_routes_request_sink,
+                rules_request_handler,
+            } = self;
 
             let (req_header, payload) = req.into_parts();
             let req = match payload {
@@ -415,6 +423,7 @@ pub mod route {
             };
 
             let is_dump = req_header.flags & NLM_F_DUMP == NLM_F_DUMP;
+            let is_replace = req_header.flags & NLM_F_REPLACE == NLM_F_REPLACE;
             let expects_ack = req_header.flags & NLM_F_ACK == NLM_F_ACK;
 
             use RtnlMessage::*;
@@ -645,6 +654,47 @@ pub mod route {
 
                     client.send_unicast(netlink_packet::new_done(req_header))
                 }
+                GetRule(_msg) => {
+                    if !is_dump {
+                        client.send_unicast(
+                            netlink_packet::new_error(Err(Errno::ENOTSUP), req_header)
+                        );
+                        return;
+                    }
+                    match rules_request_handler.handle_request(RuleRequest::DumpRules) {
+                        Ok(()) => client.send_unicast(netlink_packet::new_done(req_header)),
+                        Err(e) => client.send_unicast(
+                            netlink_packet::new_error(Err(e), req_header)
+                        )
+                    }
+                }
+                NewRule(msg) => {
+                    if is_replace {
+                        log_warn!("unimplemented: RTM_NEWRULE requests with NLM_F_REPLACE set.");
+                        client.send_unicast(
+                            netlink_packet::new_error(Err(Errno::ENOTSUP), req_header)
+                        );
+                        return;
+                    }
+                    match rules_request_handler.handle_request(RuleRequest::New(msg)) {
+                        Ok(()) => if expects_ack {
+                            client.send_unicast(netlink_packet::new_error(Ok(()), req_header))
+                        },
+                        Err(e) => client.send_unicast(
+                            netlink_packet::new_error(Err(e), req_header)
+                        ),
+                    }
+                }
+                DelRule(msg) => {
+                    match rules_request_handler.handle_request(RuleRequest::Del(msg)) {
+                        Ok(()) => if expects_ack {
+                            client.send_unicast(netlink_packet::new_error(Ok(()), req_header))
+                        },
+                        Err(e) => client.send_unicast(
+                            netlink_packet::new_error(Err(e), req_header)
+                        ),
+                    }
+                }
                 NewLink(_)
                 | DelLink(_)
                 | NewLinkProp(_)
@@ -670,11 +720,7 @@ pub mod route {
                 // TODO(https://issuetracker.google.com/283137907): Implement NewQueueDiscipline.
                 | NewQueueDiscipline(_)
                 // TODO(https://issuetracker.google.com/283137907): Implement DelQueueDiscipline.
-                | DelQueueDiscipline(_)
-                // TODO(https://issuetracker.google.com/283134947): Implement NewRule.
-                | NewRule(_)
-                // TODO(https://issuetracker.google.com/283134947): Implement DelRule.
-                | DelRule(_) => {
+                | DelQueueDiscipline(_) => {
                     if expects_ack {
                         log_warn!(
                             "Received unsupported NETLINK_ROUTE request; responding with an Ack: {:?}",
@@ -700,9 +746,7 @@ pub mod route {
                 // Non-dump GetRoute is not currently necessary for our use.
                 | GetRoute(_)
                 // TODO(https://issuetracker.google.com/283137907): Implement GetQueueDiscipline.
-                | GetQueueDiscipline(_)
-                // TODO(https://issuetracker.google.com/283134947): Implement GetRule.
-                | GetRule(_) => {
+                | GetQueueDiscipline(_) => {
                     if is_dump {
                         log_warn!(
                             "Received unsupported NETLINK_ROUTE DUMP request; responding with Done: {:?}",
@@ -874,11 +918,11 @@ mod test {
         ip::{AddrSubnetEither, IpVersion, Ipv4, Ipv6},
         Witness as _,
     };
-    use netlink_packet_core::{NetlinkHeader, NLM_F_ACK, NLM_F_DUMP};
+    use netlink_packet_core::{NetlinkHeader, NLM_F_ACK, NLM_F_DUMP, NLM_F_REPLACE};
     use netlink_packet_route::{
         rtnl::address::nlas::Nla as AddressNla, AddressMessage, LinkMessage, RouteMessage,
-        RtnlMessage, TcMessage, AF_INET, AF_INET6, AF_PACKET, AF_UNSPEC, IFA_F_NOPREFIXROUTE,
-        IFF_UP,
+        RtnlMessage, RuleMessage, TcMessage, AF_INET, AF_INET6, AF_PACKET, AF_UNSPEC,
+        IFA_F_NOPREFIXROUTE, IFF_UP,
     };
     use test_case::test_case;
 
@@ -888,6 +932,7 @@ mod test {
         netlink_packet::{self, errno::Errno},
         protocol_family::route::{NetlinkRoute, NetlinkRouteRequestHandler},
         routes,
+        rules::{RuleRequest, RuleRequestHandler, RuleTable},
     };
 
     enum ExpectedResponse {
@@ -966,10 +1011,11 @@ mod test {
         let (v4_routes_request_sink, _v4_routes_request_stream) = mpsc::channel(0);
         let (v6_routes_request_sink, _v6_routes_request_stream) = mpsc::channel(0);
 
-        let mut handler = NetlinkRouteRequestHandler::<FakeSender<_>> {
+        let mut handler = NetlinkRouteRequestHandler::<FakeSender<_>, _> {
             interfaces_request_sink,
             v4_routes_request_sink,
             v6_routes_request_sink,
+            rules_request_handler: RuleTable::default(),
         };
 
         let (mut client_sink, mut client) = crate::client::testutil::new_fake_client::<NetlinkRoute>(
@@ -1032,10 +1078,11 @@ mod test {
         let (v4_routes_request_sink, _v4_routes_request_stream) = mpsc::channel(0);
         let (v6_routes_request_sink, _v6_routes_request_stream) = mpsc::channel(0);
 
-        let mut handler = NetlinkRouteRequestHandler::<FakeSender<_>> {
+        let mut handler = NetlinkRouteRequestHandler::<FakeSender<_>, _> {
             interfaces_request_sink,
             v4_routes_request_sink,
             v6_routes_request_sink,
+            rules_request_handler: RuleTable::default(),
         };
 
         let ((), ()) = futures::future::join(handler.handle_request(request, &mut client), async {
@@ -2334,10 +2381,11 @@ mod test {
         let (v4_routes_request_sink, mut v4_routes_request_stream) = mpsc::channel(0);
         let (v6_routes_request_sink, mut v6_routes_request_stream) = mpsc::channel(0);
 
-        let mut handler = NetlinkRouteRequestHandler::<FakeSender<_>> {
+        let mut handler = NetlinkRouteRequestHandler::<FakeSender<_>, _> {
             interfaces_request_sink,
             v4_routes_request_sink,
             v6_routes_request_sink,
+            rules_request_handler: RuleTable::default(),
         };
         let ((), ()) = futures::future::join(handler.handle_request(request, &mut client), async {
             if family == AF_UNSPEC || family == AF_INET {
@@ -2488,5 +2536,145 @@ mod test {
                 }))
                 .collect::<Vec<_>>(),
         )
+    }
+
+    #[derive(Clone, Debug)]
+    pub(crate) struct FakeRuleRequestHandler {
+        pub(crate) expected_request: Option<RuleRequest>,
+        pub(crate) response: Result<(), Errno>,
+    }
+
+    impl RuleRequestHandler for FakeRuleRequestHandler {
+        fn handle_request(&mut self, actual_request: RuleRequest) -> Result<(), Errno> {
+            let Self { expected_request, response } = self;
+            assert_eq!(Some(actual_request), *expected_request);
+            *response
+        }
+    }
+
+    #[test_case(
+        RtnlMessage::GetRule,
+        0,
+        None,
+        Ok(()),
+        Some(ExpectedResponse::Error(Errno::ENOTSUP)); "get_rule_no_dump")]
+    #[test_case(
+        RtnlMessage::GetRule,
+        NLM_F_DUMP,
+        Some(RuleRequest::DumpRules),
+        Ok(()),
+        Some(ExpectedResponse::Done); "get_rule_dump")]
+    #[test_case(
+        RtnlMessage::GetRule,
+        NLM_F_DUMP,
+        Some(RuleRequest::DumpRules),
+        Err(Errno::ENOTSUP),
+        Some(ExpectedResponse::Error(Errno::ENOTSUP)); "get_rule_dump_fails")]
+    #[test_case(
+        RtnlMessage::NewRule,
+        0,
+        Some(RuleRequest::New(RuleMessage::default())),
+        Ok(()),
+        None; "new_rule_succeeds")]
+    #[test_case(
+        RtnlMessage::NewRule,
+        NLM_F_ACK,
+        Some(RuleRequest::New(RuleMessage::default())),
+        Ok(()),
+        Some(ExpectedResponse::Ack); "new_rule_succeeds_with_ack")]
+    #[test_case(
+        RtnlMessage::NewRule,
+        0,
+        Some(RuleRequest::New(RuleMessage::default())),
+        Err(Errno::ENOTSUP),
+        Some(ExpectedResponse::Error(Errno::ENOTSUP)); "new_rule_fails")]
+    #[test_case(
+        RtnlMessage::NewRule,
+        NLM_F_REPLACE,
+        Some(RuleRequest::New(RuleMessage::default())),
+        Ok(()),
+        Some(ExpectedResponse::Error(Errno::ENOTSUP)); "new_rule_replace_unimplemented")]
+    #[test_case(
+        RtnlMessage::DelRule,
+        0,
+        Some(RuleRequest::Del(RuleMessage::default())),
+        Ok(()),
+        None; "del_rule_succeeds")]
+    #[test_case(
+        RtnlMessage::DelRule,
+        NLM_F_ACK,
+        Some(RuleRequest::Del(RuleMessage::default())),
+        Ok(()),
+        Some(ExpectedResponse::Ack); "del_rule_succeeds_with_ack")]
+    #[test_case(
+        RtnlMessage::DelRule,
+        0,
+        Some(RuleRequest::Del(RuleMessage::default())),
+        Err(Errno::ENOTSUP),
+        Some(ExpectedResponse::Error(Errno::ENOTSUP)); "del_rule_fails")]
+    #[fuchsia::test]
+    async fn test_rule_request(
+        rule_fn: fn(RuleMessage) -> RtnlMessage,
+        flags: u16,
+        expected_request: Option<RuleRequest>,
+        mocked_rule_response: Result<(), Errno>,
+        expected_response: Option<ExpectedResponse>,
+    ) {
+        let (interfaces_request_sink, _interfaces_request_stream) = mpsc::channel(0);
+        let (v4_routes_request_sink, _v4_routes_request_stream) = mpsc::channel(0);
+        let (v6_routes_request_sink, _v6_routes_request_stream) = mpsc::channel(0);
+
+        let mut handler = NetlinkRouteRequestHandler::<FakeSender<_>, _> {
+            interfaces_request_sink,
+            v4_routes_request_sink,
+            v6_routes_request_sink,
+            rules_request_handler: FakeRuleRequestHandler {
+                expected_request,
+                response: mocked_rule_response,
+            },
+        };
+
+        let (mut client_sink, mut client) = {
+            crate::client::testutil::new_fake_client::<NetlinkRoute>(
+                crate::client::testutil::CLIENT_ID_1,
+                &[],
+            )
+        };
+
+        let header = header_with_flags(flags);
+
+        handler
+            .handle_request(
+                NetlinkMessage::new(
+                    header,
+                    NetlinkPayload::InnerMessage(rule_fn(RuleMessage::default())),
+                ),
+                &mut client,
+            )
+            .await;
+
+        match expected_response {
+            Some(ExpectedResponse::Ack) => {
+                assert_eq!(
+                    client_sink.take_messages(),
+                    [SentMessage::unicast(netlink_packet::new_error(Ok(()), header))]
+                )
+            }
+            Some(ExpectedResponse::Error(e)) => {
+                assert_eq!(
+                    client_sink.take_messages(),
+                    [SentMessage::unicast(netlink_packet::new_error(Err(e), header))]
+                )
+            }
+            Some(ExpectedResponse::Done) => {
+                assert_eq!(
+                    client_sink.take_messages(),
+                    [SentMessage::unicast(netlink_packet::new_done(header))]
+                )
+            }
+            None => {
+                assert_eq!(client_sink.take_messages(), [])
+            }
+        }
     }
 }
