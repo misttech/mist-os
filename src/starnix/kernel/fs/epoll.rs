@@ -161,9 +161,9 @@ impl EpollFileObject {
     }
 
     /// Checks if this EpollFileObject monitors the `epoll_file_object` at `epoll_file_handle`.
-    fn monitors(&self, epoll_file_handle: &FileHandle, depth_left: u32) -> Result<bool, Errno> {
+    fn check_monitors(&self, epoll_file_handle: &FileHandle, depth_left: u32) -> Result<(), Errno> {
         if depth_left == 0 {
-            return Ok(true);
+            return error!(EINVAL);
         }
 
         let state = self.state.read();
@@ -171,16 +171,15 @@ impl EpollFileObject {
             match nested_object.target()?.downcast_file::<EpollFileObject>() {
                 None => continue,
                 Some(target) => {
-                    if target.monitors(epoll_file_handle, depth_left - 1)?
-                        || Arc::ptr_eq(&nested_object.target()?, epoll_file_handle)
-                    {
-                        return Ok(true);
+                    if Arc::ptr_eq(&nested_object.target()?, epoll_file_handle) {
+                        return error!(ELOOP);
                     }
+                    target.check_monitors(epoll_file_handle, depth_left - 1)?;
                 }
             }
         }
 
-        Ok(false)
+        Ok(())
     }
 
     /// Asynchronously wait on certain events happening on a FileHandle.
@@ -196,9 +195,9 @@ impl EpollFileObject {
 
         // Check if adding this file would cause a cycle at a max depth of 5.
         if let Some(epoll_to_add) = file.downcast_file::<EpollFileObject>() {
-            if epoll_to_add.monitors(epoll_file_handle, MAX_NESTED_DEPTH)? {
-                return error!(ELOOP);
-            }
+            // We need to check for `MAX_NESTED_DEPTH - 1` because adding `epoll_to_add` to self
+            // would result in a total depth of one more.
+            epoll_to_add.check_monitors(epoll_file_handle, MAX_NESTED_DEPTH - 1)?;
         }
 
         let mut state = self.state.write();
