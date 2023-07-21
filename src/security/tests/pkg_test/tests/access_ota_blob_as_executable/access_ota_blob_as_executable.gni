@@ -151,7 +151,6 @@ template("access_ota_blob_as_executable") {
              "//src/security/tests/pkg_test/reboot:security_pkg_reboot-component",
 
              # Production SWD components.
-             "//src/sys/pkg/bin/pkg-cache:production-component-and-config",
              "//src/sys/pkg/bin/pkg-resolver:production-component-and-config",
              "//src/sys/pkg/bin/system-update-committer:component",
              "//src/sys/pkg/bin/system-updater:production-component-and-config",
@@ -178,6 +177,14 @@ template("access_ota_blob_as_executable") {
              ":${test_name}_v1_tuf_repo_resources",
              ":${test_name}_v1_update_package_resource",
            ]
+
+    if (use_fxfs_blob) {
+      deps += [
+        "//src/sys/pkg/bin/pkg-cache:production-component-and-config-fxblob",
+      ]
+    } else {
+      deps += [ "//src/sys/pkg/bin/pkg-cache:production-component-and-config-cpp-blobfs" ]
+    }
 
     # TODO(fxbug.dev/88453): Complete test dependency composition to eliminate
     # error logs:

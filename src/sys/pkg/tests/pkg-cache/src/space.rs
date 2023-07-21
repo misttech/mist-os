@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use {
-    crate::{blob_written, get_missing_blobs, write_blob, TestEnv},
+    crate::{blob_written, compress_and_write_blob, get_missing_blobs, TestEnv},
     assert_matches::assert_matches,
     blobfs_ramdisk::{BlobfsRamdisk, Ramdisk},
     fidl_fuchsia_io as fio, fidl_fuchsia_paver as fpaver,
@@ -41,8 +41,8 @@ async fn do_fetch(package_cache: &fpkg::PackageCacheProxy, pkg: &Package) {
         .collect::<HashMap<_, Vec<u8>>>();
 
     let meta_blob =
-        needed_blobs.open_meta_blob(fpkg::BlobType::Uncompressed).await.unwrap().unwrap().unwrap();
-    let () = write_blob(&meta_far.contents, *meta_blob).await.unwrap();
+        needed_blobs.open_meta_blob(fpkg::BlobType::Delivery).await.unwrap().unwrap().unwrap();
+    let () = compress_and_write_blob(&meta_far.contents, *meta_blob).await.unwrap();
     let () = blob_written(&needed_blobs, meta_far.merkle).await;
 
     let missing_blobs = get_missing_blobs(&needed_blobs).await;
@@ -50,13 +50,12 @@ async fn do_fetch(package_cache: &fpkg::PackageCacheProxy, pkg: &Package) {
         let buf = contents.remove(&blob.blob_id.into()).unwrap();
 
         let content_blob = needed_blobs
-            .open_blob(&blob.blob_id, fpkg::BlobType::Uncompressed)
+            .open_blob(&blob.blob_id, fpkg::BlobType::Delivery)
             .await
             .unwrap()
             .unwrap()
             .unwrap();
-
-        let () = write_blob(&buf, *content_blob).await.unwrap();
+        let () = compress_and_write_blob(&buf, *content_blob).await.unwrap();
         let () = blob_written(&needed_blobs, BlobId::from(blob.blob_id).into()).await;
     }
 
@@ -107,7 +106,7 @@ async fn setup_test_env(
 ) -> (TestEnv, Package) {
     let blobfs = match blobfs {
         Some(fs) => fs,
-        None => BlobfsRamdisk::start().await.unwrap(),
+        None => BlobfsRamdisk::builder().impl_from_env().start().await.unwrap(),
     };
     let system_image_package =
         SystemImageBuilder::new().static_packages(static_packages).build().await;
@@ -197,8 +196,8 @@ async fn gc_dynamic_index_protected() {
         .collect::<HashMap<_, Vec<u8>>>();
 
     let meta_blob =
-        needed_blobs.open_meta_blob(fpkg::BlobType::Uncompressed).await.unwrap().unwrap().unwrap();
-    let () = write_blob(&meta_far.contents, *meta_blob).await.unwrap();
+        needed_blobs.open_meta_blob(fpkg::BlobType::Delivery).await.unwrap().unwrap().unwrap();
+    let () = compress_and_write_blob(&meta_far.contents, *meta_blob).await.unwrap();
     let () = blob_written(&needed_blobs, meta_far.merkle).await;
 
     // Ensure that the new meta.far is persisted despite having missing blobs, and the "old" blobs
@@ -213,13 +212,13 @@ async fn gc_dynamic_index_protected() {
         let buf = contents.remove(&blob.blob_id.into()).unwrap();
 
         let content_blob = needed_blobs
-            .open_blob(&blob.blob_id, fpkg::BlobType::Uncompressed)
+            .open_blob(&blob.blob_id, fpkg::BlobType::Delivery)
             .await
             .unwrap()
             .unwrap()
             .unwrap();
 
-        let () = write_blob(&buf, *content_blob).await.unwrap();
+        let () = compress_and_write_blob(&buf, *content_blob).await.unwrap();
         let () = blob_written(&needed_blobs, BlobId::from(blob.blob_id).into()).await;
 
         // Run a GC to try to reap blobs protected by meta far.
@@ -251,6 +250,7 @@ async fn gc_random_blobs() {
         .await
         .unwrap();
     let blobfs = BlobfsRamdisk::builder()
+        .impl_from_env()
         .with_blob(b"blobby mcblobberson".to_vec())
         .start()
         .await
@@ -330,8 +330,8 @@ async fn gc_updated_static_package() {
         .collect::<HashMap<_, Vec<u8>>>();
 
     let meta_blob =
-        needed_blobs.open_meta_blob(fpkg::BlobType::Uncompressed).await.unwrap().unwrap().unwrap();
-    let () = write_blob(&meta_far.contents, *meta_blob).await.unwrap();
+        needed_blobs.open_meta_blob(fpkg::BlobType::Delivery).await.unwrap().unwrap().unwrap();
+    let () = compress_and_write_blob(&meta_far.contents, *meta_blob).await.unwrap();
     let () = blob_written(&needed_blobs, meta_far.merkle).await;
 
     // Ensure that the new meta.far is persisted despite having missing blobs, and the "old" blobs
@@ -346,13 +346,13 @@ async fn gc_updated_static_package() {
         let buf = contents.remove(&blob.blob_id.into()).unwrap();
 
         let content_blob = needed_blobs
-            .open_blob(&blob.blob_id, fpkg::BlobType::Uncompressed)
+            .open_blob(&blob.blob_id, fpkg::BlobType::Delivery)
             .await
             .unwrap()
             .unwrap()
             .unwrap();
 
-        let () = write_blob(&buf, *content_blob).await.unwrap();
+        let () = compress_and_write_blob(&buf, *content_blob).await.unwrap();
         let () = blob_written(&needed_blobs, BlobId::from(blob.blob_id).into()).await;
 
         // Run a GC to try to reap blobs protected by meta far.
@@ -371,30 +371,19 @@ async fn gc_updated_static_package() {
     assert_eq!(env.blobfs.list_blobs().expect("all blobs"), expected_blobs);
 }
 
-#[fuchsia_async::run_singlethreaded(test)]
-async fn blob_write_fails_when_out_of_space() {
+async fn blob_write_fails_when_out_of_space(
+    very_small_blobfs: blobfs_ramdisk::BlobfsRamdisk,
+    blob_implementation: blobfs_ramdisk::Implementation,
+) {
     let system_image_package = SystemImageBuilder::new().build().await;
-
-    // Create a 2MB blobfs (4096 blocks * 512 bytes / block), which is about the minimum size blobfs
-    // will fit in and still be able to write our small package.
-    // See https://fuchsia.dev/fuchsia-src/concepts/filesystems/blobfs for information on the
-    // blobfs format and metadata overhead.
-    let very_small_blobfs = Ramdisk::builder()
-        .block_count(4096)
-        .into_blobfs_builder()
-        .await
-        .expect("made blobfs builder")
-        .start()
-        .await
-        .expect("started blobfs");
     system_image_package
         .write_to_blobfs_dir(&very_small_blobfs.root_dir().expect("wrote system image to blobfs"));
 
-    // A very large version of the same package, to put in the repo.
-    // Critically, this package contains an incompressible 4MB asset in the meta.far,
+    // A very large package, to put in the repo.
+    // Critically, this package contains an incompressible 3MB asset in the meta.far,
     // which is larger than our blobfs, and attempting to resolve this package will result in
     // blobfs returning out of space.
-    const LARGE_ASSET_FILE_SIZE: u64 = 2 * 1024 * 1024;
+    const LARGE_ASSET_FILE_SIZE: u64 = 3 * 1024 * 1024;
     let mut rng = StdRng::from_seed([0u8; 32]);
     let rng = &mut rng as &mut dyn RngCore;
     let pkg = PackageBuilder::new("pkg-a")
@@ -421,6 +410,7 @@ async fn blob_write_fails_when_out_of_space() {
             very_small_blobfs,
             Some(*system_image_package.meta_far_merkle_root()),
         )
+        .blobfs_impl(blob_implementation)
         .build()
         .await;
 
@@ -437,10 +427,55 @@ async fn blob_write_fails_when_out_of_space() {
         .map_ok(|res| res.map_err(Status::from_raw));
 
     let meta_blob =
-        needed_blobs.open_meta_blob(fpkg::BlobType::Uncompressed).await.unwrap().unwrap().unwrap();
-
+        needed_blobs.open_meta_blob(fpkg::BlobType::Delivery).await.unwrap().unwrap().unwrap();
     let (meta_far, _contents) = pkg.contents();
-    assert_eq!(write_blob(&meta_far.contents, *meta_blob).await, Err(Status::NO_SPACE));
+    let () = compress_and_write_blob(&meta_far.contents, *meta_blob)
+        .await
+        .unwrap_err()
+        .assert_out_of_space();
+}
+
+#[fuchsia_async::run_singlethreaded(test)]
+async fn cpp_blobfs_blob_write_fails_when_out_of_space() {
+    // Create a 2MB blobfs (4096 blocks * 512 bytes / block), which is about the minimum size blobfs
+    // will fit in and still be able to write our small package.
+    // See https://fuchsia.dev/fuchsia-src/concepts/filesystems/blobfs for information on the
+    // blobfs format and metadata overhead.
+    let very_small_blobfs = Ramdisk::builder()
+        .block_count(4096)
+        .into_blobfs_builder()
+        .await
+        .expect("made blobfs builder")
+        .cpp_blobfs()
+        .start()
+        .await
+        .expect("started blobfs");
+
+    let () = blob_write_fails_when_out_of_space(
+        very_small_blobfs,
+        blobfs_ramdisk::Implementation::CppBlobfs,
+    )
+    .await;
+}
+
+#[fuchsia_async::run_singlethreaded(test)]
+async fn fxblob_blob_write_fails_when_out_of_space() {
+    // Create a 3MB fxblob (6144 blocks * 512 bytes / block).
+    let very_small_blobfs = Ramdisk::builder()
+        .block_count(6144)
+        .into_blobfs_builder()
+        .await
+        .expect("made blobfs builder")
+        .fxblob()
+        .start()
+        .await
+        .expect("started blobfs");
+
+    let () = blob_write_fails_when_out_of_space(
+        very_small_blobfs,
+        blobfs_ramdisk::Implementation::Fxblob,
+    )
+    .await;
 }
 
 enum GcProtection {
@@ -494,8 +529,8 @@ async fn subpackage_blobs_protected_from_gc(gc_protection: GcProtection) {
     // Write the meta.far.
     let meta_far = superpackage.contents().0;
     let meta_blob =
-        needed_blobs.open_meta_blob(fpkg::BlobType::Uncompressed).await.unwrap().unwrap().unwrap();
-    let () = write_blob(&meta_far.contents, *meta_blob).await.unwrap();
+        needed_blobs.open_meta_blob(fpkg::BlobType::Delivery).await.unwrap().unwrap().unwrap();
+    let () = compress_and_write_blob(&meta_far.contents, *meta_blob).await.unwrap();
     let () = blob_written(&needed_blobs, meta_far.merkle).await;
 
     // Get the missing blobs iterator.
@@ -521,13 +556,15 @@ async fn subpackage_blobs_protected_from_gc(gc_protection: GcProtection) {
     let subpackage_meta_blob = needed_blobs
         .open_blob(
             &BlobId::from(*subpackage.meta_far_merkle_root()).into(),
-            fpkg::BlobType::Uncompressed,
+            fpkg::BlobType::Delivery,
         )
         .await
         .unwrap()
         .unwrap()
         .unwrap();
-    let () = write_blob(&subpackage_meta_far.contents, *subpackage_meta_blob).await.unwrap();
+    let () = compress_and_write_blob(&subpackage_meta_far.contents, *subpackage_meta_blob)
+        .await
+        .unwrap();
     let () = blob_written(&needed_blobs, subpackage_meta_far.merkle).await;
 
     // Subpackage meta.far should now be in blobfs.
@@ -559,15 +596,14 @@ async fn subpackage_blobs_protected_from_gc(gc_protection: GcProtection) {
 
     // Write a subpackage content blob.
     let subpackage_content_blob_a = needed_blobs
-        .open_blob(
-            &BlobId::from(subpackage_content_files[0].0).into(),
-            fpkg::BlobType::Uncompressed,
-        )
+        .open_blob(&BlobId::from(subpackage_content_files[0].0).into(), fpkg::BlobType::Delivery)
         .await
         .unwrap()
         .unwrap()
         .unwrap();
-    let () = write_blob(&subpackage_content_files[0].1, *subpackage_content_blob_a).await.unwrap();
+    let () = compress_and_write_blob(&subpackage_content_files[0].1, *subpackage_content_blob_a)
+        .await
+        .unwrap();
     let () = blob_written(&needed_blobs, BlobId::from(subpackage_content_files[0].0).into()).await;
 
     // Subpackage content blob should now be in blobfs.
@@ -579,15 +615,14 @@ async fn subpackage_blobs_protected_from_gc(gc_protection: GcProtection) {
 
     // Write the other subpackage content blob.
     let subpackage_content_blob_b = needed_blobs
-        .open_blob(
-            &BlobId::from(subpackage_content_files[1].0).into(),
-            fpkg::BlobType::Uncompressed,
-        )
+        .open_blob(&BlobId::from(subpackage_content_files[1].0).into(), fpkg::BlobType::Delivery)
         .await
         .unwrap()
         .unwrap()
         .unwrap();
-    let () = write_blob(&subpackage_content_files[1].1, *subpackage_content_blob_b).await.unwrap();
+    let () = compress_and_write_blob(&subpackage_content_files[1].1, *subpackage_content_blob_b)
+        .await
+        .unwrap();
     let () = blob_written(&needed_blobs, BlobId::from(subpackage_content_files[1].0).into()).await;
 
     // Other subpackage content blob should now be in blobfs.

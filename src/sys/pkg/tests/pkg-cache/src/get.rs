@@ -4,8 +4,8 @@
 
 use {
     crate::{
-        blob_written, get_and_verify_package, get_and_verify_packages, get_missing_blobs,
-        write_blob, TestEnv,
+        blob_written, compress_and_write_blob, get_and_verify_package, get_and_verify_packages,
+        get_missing_blobs, write_blob, TestEnv,
     },
     assert_matches::assert_matches,
     fidl_fuchsia_io as fio,
@@ -41,9 +41,7 @@ async fn get_multiple_packages_with_no_content_blobs() {
     let () = env.stop().await;
 }
 
-#[fuchsia_async::run_singlethreaded(test)]
-async fn get_single_package_with_no_content_blobs() {
-    let env = TestEnv::builder().build().await;
+async fn get_single_package_with_no_content_blobs(env: TestEnv, blob_type: fpkg::BlobType) {
     let mut initial_blobfs_blobs = env.blobfs.list_blobs().unwrap();
 
     let pkg = PackageBuilder::new("single-blob").build().await.unwrap();
@@ -62,10 +60,13 @@ async fn get_single_package_with_no_content_blobs() {
 
     let (meta_far, _) = pkg.contents();
 
-    let meta_blob =
-        needed_blobs.open_meta_blob(fpkg::BlobType::Uncompressed).await.unwrap().unwrap().unwrap();
-
-    let () = write_blob(&meta_far.contents, *meta_blob).await.unwrap();
+    let meta_blob = needed_blobs.open_meta_blob(blob_type).await.unwrap().unwrap().unwrap();
+    let () = match blob_type {
+        fpkg::BlobType::Uncompressed => write_blob(&meta_far.contents, *meta_blob).await.unwrap(),
+        fpkg::BlobType::Delivery => {
+            compress_and_write_blob(&meta_far.contents, *meta_blob).await.unwrap()
+        }
+    };
     let () = blob_written(&needed_blobs, meta_far.merkle).await;
 
     assert_eq!(get_missing_blobs(&needed_blobs).await, vec![]);
@@ -79,6 +80,33 @@ async fn get_single_package_with_no_content_blobs() {
     assert_eq!(env.blobfs.list_blobs().unwrap(), expected_blobs);
 
     let () = env.stop().await;
+}
+
+#[fuchsia_async::run_singlethreaded(test)]
+async fn get_single_package_with_no_content_blobs_cpp_blobfs_uncompressed() {
+    let () = get_single_package_with_no_content_blobs(
+        TestEnv::builder().cpp_blobfs().build().await,
+        fpkg::BlobType::Uncompressed,
+    )
+    .await;
+}
+
+#[fuchsia_async::run_singlethreaded(test)]
+async fn get_single_package_with_no_content_blobs_cpp_blobfs_delivery() {
+    let () = get_single_package_with_no_content_blobs(
+        TestEnv::builder().cpp_blobfs().build().await,
+        fpkg::BlobType::Delivery,
+    )
+    .await;
+}
+
+#[fuchsia_async::run_singlethreaded(test)]
+async fn get_single_package_with_no_content_blobs_fxblob() {
+    let () = get_single_package_with_no_content_blobs(
+        TestEnv::builder().fxblob().build().await,
+        fpkg::BlobType::Delivery,
+    )
+    .await;
 }
 
 #[fuchsia_async::run_singlethreaded(test)]
@@ -146,7 +174,7 @@ async fn get_and_hold_directory() {
 
     // `OpenMetaBlob()` for already cached package closes the channel with with a `ZX_OK` epitaph.
     assert_matches!(
-        needed_blobs.open_meta_blob(fpkg::BlobType::Uncompressed).await,
+        needed_blobs.open_meta_blob(fpkg::BlobType::Delivery).await,
         Err(fidl::Error::ClientChannelClosed { status: Status::OK, .. })
     );
 
@@ -214,21 +242,23 @@ async fn handles_partially_written_pkg() {
     let dir = {
         let data = &b"different contents"[..];
         let hash = MerkleTree::from_reader(data).unwrap().root();
+        let compressed =
+            delivery_blob::Type1Blob::generate(data, delivery_blob::CompressionMode::Always);
 
         let pkg_cache = env.client();
         let mut get = pkg_cache.get(meta_blob_info.into()).unwrap();
 
-        assert_matches!(get.open_meta_blob(fpkg::BlobType::Uncompressed).await.unwrap(), None);
+        assert_matches!(get.open_meta_blob(fpkg::BlobType::Delivery).await.unwrap(), None);
         let missing = get.get_missing_blobs().try_concat().await.unwrap();
         assert_eq!(missing, vec![fpkg_ext::BlobInfo { blob_id: hash.into(), length: 0 }]);
 
-        let blob = get.open_blob(hash.into(), fpkg::BlobType::Uncompressed).await.unwrap().unwrap();
+        let blob = get.open_blob(hash.into(), fpkg::BlobType::Delivery).await.unwrap().unwrap();
         let (blob, closer) = (blob.blob, blob.closer);
-        let blob = match blob.truncate(data.len() as u64).await.unwrap() {
+        let blob = match blob.truncate(compressed.len() as u64).await.unwrap() {
             fpkg_ext::cache::TruncateBlobSuccess::NeedsData(blob) => blob,
             fpkg_ext::cache::TruncateBlobSuccess::AllWritten(_) => panic!("not the empty blob"),
         };
-        let blob = match blob.write(data).await.unwrap() {
+        let blob = match blob.write(&compressed).await.unwrap() {
             fpkg_ext::cache::BlobWriteSuccess::NeedsData(_) => panic!("blob should be written"),
             fpkg_ext::cache::BlobWriteSuccess::AllWritten(blob) => blob,
         };
@@ -539,9 +569,10 @@ async fn get_package_with_transitive_subpackage_as_content_blob() {
     let () = verify_superpackage_get(&superpackage, &[subpackage0, subpackage1]).await;
 }
 
-#[fuchsia_async::run_singlethreaded(test)]
-async fn fxblob() {
-    let env = TestEnv::builder().use_fxblob().build().await;
+async fn get_with_specific_blobfs_implementation(
+    env: TestEnv,
+    blob_type_verifier: impl Fn(&fpkg::BlobWriter),
+) {
     let initial_blobfs_blobs = env.blobfs.list_blobs().unwrap();
     let pkg = PackageBuilder::new("single-blob")
         .add_resource_at("content-blob", &b"content-blob-contents"[..])
@@ -563,15 +594,8 @@ async fn fxblob() {
     let (meta_far, _) = pkg.contents();
     let meta_blob =
         needed_blobs.open_meta_blob(fpkg::BlobType::Delivery).await.unwrap().unwrap().unwrap();
-    match &*meta_blob {
-        fpkg::BlobWriter::File(_) => panic!("should be using fuchsia.fxfs.BlobWriter"),
-        fpkg::BlobWriter::Writer(_) => (),
-    }
-    let compressed = delivery_blob::Type1Blob::generate(
-        &meta_far.contents,
-        delivery_blob::CompressionMode::Always,
-    );
-    let () = write_blob(&compressed, *meta_blob).await.unwrap();
+    let () = blob_type_verifier(&*meta_blob);
+    let () = compress_and_write_blob(&meta_far.contents, *meta_blob).await.unwrap();
     let () = blob_written(&needed_blobs, meta_far.merkle).await;
 
     let [missing_blob]: [_; 1] = get_missing_blobs(&needed_blobs).await.try_into().unwrap();
@@ -581,15 +605,8 @@ async fn fxblob() {
         .unwrap()
         .unwrap()
         .unwrap();
-    match &*content_blob {
-        fpkg::BlobWriter::File(_) => panic!("should be using fuchsia.fxfs.BlobWriter"),
-        fpkg::BlobWriter::Writer(_) => (),
-    }
-    let compressed = delivery_blob::Type1Blob::generate(
-        b"content-blob-contents",
-        delivery_blob::CompressionMode::Always,
-    );
-    let () = write_blob(&compressed, *content_blob).await.unwrap();
+    let () = blob_type_verifier(&*content_blob);
+    let () = compress_and_write_blob(b"content-blob-contents", *content_blob).await.unwrap();
     let () = blob_written(&needed_blobs, BlobId::from(missing_blob.blob_id).into()).await;
 
     let () = get_fut.await.unwrap().unwrap();
@@ -601,4 +618,30 @@ async fn fxblob() {
     assert!(env.blobfs.list_blobs().unwrap().is_superset(&pkg_blobs));
 
     let () = env.stop().await;
+}
+
+// Uses fxblob regardless of production structured config
+#[fuchsia_async::run_singlethreaded(test)]
+async fn fxblob() {
+    let () = get_with_specific_blobfs_implementation(
+        TestEnv::builder().fxblob().build().await,
+        |blob| match blob {
+            fpkg::BlobWriter::File(_) => panic!("should be using fuchsia.fxfs.BlobWriter"),
+            fpkg::BlobWriter::Writer(_) => (),
+        },
+    )
+    .await;
+}
+
+// Uses c++blobfs regardless of production structured config
+#[fuchsia_async::run_singlethreaded(test)]
+async fn cpp_blobfs() {
+    let () = get_with_specific_blobfs_implementation(
+        TestEnv::builder().cpp_blobfs().build().await,
+        |blob| match blob {
+            fpkg::BlobWriter::File(_) => (),
+            fpkg::BlobWriter::Writer(_) => panic!("should be using fuchsia.io.File"),
+        },
+    )
+    .await;
 }

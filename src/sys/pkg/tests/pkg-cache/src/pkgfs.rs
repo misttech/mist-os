@@ -4,14 +4,13 @@
 
 use {
     crate::TestEnv,
-    blobfs_ramdisk::BlobfsRamdisk,
     fidl_fuchsia_io as fio,
     fuchsia_pkg_testing::{PackageBuilder, SystemImageBuilder},
 };
 
 #[fuchsia_async::run_singlethreaded(test)]
 async fn expose_pkgfs_ctl_validation_missing_file() {
-    let blobfs = BlobfsRamdisk::start().await.unwrap();
+    let blobfs = blobfs_ramdisk::BlobfsRamdisk::builder().impl_from_env().start().await.unwrap();
     let base_package_with_missing_blob = PackageBuilder::new("has-missing-blob")
         .add_resource_at("missing-blob", b"missing-blob-contents".as_slice())
         .build()

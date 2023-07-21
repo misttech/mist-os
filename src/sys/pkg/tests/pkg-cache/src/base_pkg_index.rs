@@ -4,7 +4,6 @@
 
 use {
     crate::TestEnv,
-    blobfs_ramdisk::BlobfsRamdisk,
     fidl_fuchsia_pkg::{PackageIndexIteratorMarker, PackageIndexIteratorProxy},
     fidl_fuchsia_pkg_ext::BlobId,
     fuchsia_hash::Hash,
@@ -80,7 +79,10 @@ async fn verify_base_packages_iterator(
 #[fuchsia::test]
 async fn no_base_package_error() {
     let env = TestEnv::builder()
-        .blobfs_and_system_image_hash(BlobfsRamdisk::start().await.unwrap(), Some([0u8; 32].into()))
+        .blobfs_and_system_image_hash(
+            blobfs_ramdisk::BlobfsRamdisk::builder().impl_from_env().start().await.unwrap(),
+            Some([0u8; 32].into()),
+        )
         .build()
         .await;
     let res = env.proxies.package_cache.sync().await;

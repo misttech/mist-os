@@ -71,7 +71,8 @@ impl Client {
             .get(BlobInfo { blob_id: meta_far_blob, length: 0 })
             .map_err(GetAlreadyCachedError::Get)?;
         if let Some(_) = get
-            .open_meta_blob(fpkg::BlobType::Uncompressed)
+            // Both c++blobfs and fxblob support Delivery, only c++blobfs supports Uncompressed.
+            .open_meta_blob(fpkg::BlobType::Delivery)
             .await
             .map_err(GetAlreadyCachedError::OpenMetaBlob)?
         {
@@ -728,7 +729,7 @@ mod tests {
         ) -> Self {
             match self.stream.next().await {
                 Some(Ok(NeededBlobsRequest::OpenMetaBlob { blob_type, responder })) => {
-                    assert_eq!(blob_type, fpkg::BlobType::Uncompressed);
+                    assert_eq!(blob_type, fpkg::BlobType::Delivery);
                     responder.send(res.map(|o| o.map(fpkg::BlobWriter::File))).unwrap();
                 }
                 r => panic!("Unexpected request: {:?}", r),
@@ -744,7 +745,7 @@ mod tests {
             match self.stream.next().await {
                 Some(Ok(NeededBlobsRequest::OpenBlob { blob_id, blob_type, responder })) => {
                     assert_eq!(BlobId::from(blob_id), expected_blob_id);
-                    assert_eq!(blob_type, fpkg::BlobType::Uncompressed);
+                    assert_eq!(blob_type, fpkg::BlobType::Delivery);
                     responder.send(res.map(|o| o.map(fpkg::BlobWriter::File))).unwrap();
                 }
                 r => panic!("Unexpected request: {:?}", r),
@@ -876,10 +877,7 @@ mod tests {
             async move {
                 let mut get = client.get(blob_info(2)).unwrap();
 
-                assert_matches!(
-                    get.open_meta_blob(fpkg::BlobType::Uncompressed).await.unwrap(),
-                    None
-                );
+                assert_matches!(get.open_meta_blob(fpkg::BlobType::Delivery).await.unwrap(), None);
                 assert_eq!(get.get_missing_blobs().try_concat().await.unwrap(), vec![]);
                 let pkg_dir = get.finish().await.unwrap();
 
@@ -911,10 +909,7 @@ mod tests {
             async move {
                 let mut get = client.get(blob_info(2)).unwrap();
 
-                assert_matches!(
-                    get.open_meta_blob(fpkg::BlobType::Uncompressed).await.unwrap(),
-                    None
-                );
+                assert_matches!(get.open_meta_blob(fpkg::BlobType::Delivery).await.unwrap(), None);
 
                 // ensure sending the request doesn't fail, then unblock closing the channel, then
                 // ensure the get_missing_blobs call detects the closed iterator as success instead
@@ -956,26 +951,20 @@ mod tests {
             async {
                 {
                     let opener = get.make_open_meta_blob();
-                    assert_matches!(opener.open(fpkg::BlobType::Uncompressed).await.unwrap(), None);
-                    assert_matches!(
-                        opener.open(fpkg::BlobType::Uncompressed).await.unwrap(),
-                        Some(_)
-                    );
+                    assert_matches!(opener.open(fpkg::BlobType::Delivery).await.unwrap(), None);
+                    assert_matches!(opener.open(fpkg::BlobType::Delivery).await.unwrap(), Some(_));
                 }
+                assert_matches!(get.open_meta_blob(fpkg::BlobType::Delivery).await.unwrap(), None);
                 assert_matches!(
-                    get.open_meta_blob(fpkg::BlobType::Uncompressed).await.unwrap(),
-                    None
-                );
-                assert_matches!(
-                    get.open_meta_blob(fpkg::BlobType::Uncompressed).await.unwrap(),
+                    get.open_meta_blob(fpkg::BlobType::Delivery).await.unwrap(),
                     Some(_)
                 );
                 assert_matches!(
-                    get.open_meta_blob(fpkg::BlobType::Uncompressed).await,
+                    get.open_meta_blob(fpkg::BlobType::Delivery).await,
                     Err(OpenBlobError::OutOfSpace)
                 );
                 assert_matches!(
-                    get.open_meta_blob(fpkg::BlobType::Uncompressed).await,
+                    get.open_meta_blob(fpkg::BlobType::Delivery).await,
                     Err(OpenBlobError::UnspecifiedIo)
                 );
             },
@@ -1006,26 +995,23 @@ mod tests {
             async {
                 {
                     let opener = get.make_open_blob(blob_id(2));
-                    assert_matches!(opener.open(fpkg::BlobType::Uncompressed).await.unwrap(), None);
-                    assert_matches!(
-                        opener.open(fpkg::BlobType::Uncompressed).await.unwrap(),
-                        Some(_)
-                    );
+                    assert_matches!(opener.open(fpkg::BlobType::Delivery).await.unwrap(), None);
+                    assert_matches!(opener.open(fpkg::BlobType::Delivery).await.unwrap(), Some(_));
                 }
                 assert_matches!(
-                    get.open_blob(blob_id(10), fpkg::BlobType::Uncompressed).await.unwrap(),
+                    get.open_blob(blob_id(10), fpkg::BlobType::Delivery).await.unwrap(),
                     None
                 );
                 assert_matches!(
-                    get.open_blob(blob_id(11), fpkg::BlobType::Uncompressed).await.unwrap(),
+                    get.open_blob(blob_id(11), fpkg::BlobType::Delivery).await.unwrap(),
                     Some(_)
                 );
                 assert_matches!(
-                    get.open_blob(blob_id(12), fpkg::BlobType::Uncompressed).await,
+                    get.open_blob(blob_id(12), fpkg::BlobType::Delivery).await,
                     Err(OpenBlobError::OutOfSpace)
                 );
                 assert_matches!(
-                    get.open_blob(blob_id(13), fpkg::BlobType::Uncompressed).await,
+                    get.open_blob(blob_id(13), fpkg::BlobType::Delivery).await,
                     Err(OpenBlobError::UnspecifiedIo)
                 );
             },
@@ -1038,7 +1024,7 @@ mod tests {
         let (mut get, pending_get) = PendingGet::new().await;
         let _ = pending_get.finish();
 
-        assert_matches!(get.open_meta_blob(fpkg::BlobType::Uncompressed).await, Ok(None));
+        assert_matches!(get.open_meta_blob(fpkg::BlobType::Delivery).await, Ok(None));
         assert_eq!(get.get_missing_blobs().try_concat().await.unwrap(), vec![]);
     }
 

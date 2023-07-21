@@ -1031,7 +1031,7 @@ async fn fetch_delivery_blob_fallback() {
 
 #[fuchsia::test]
 async fn fxblob() {
-    let env = TestEnvBuilder::new().use_fxblob().fetch_delivery_blob(true).build().await;
+    let env = TestEnvBuilder::new().fxblob().fetch_delivery_blob(true).build().await;
     let pkg = make_pkg_with_extra_blobs("using-fx-blob", 1).await;
     let repo = Arc::new(
         RepositoryBuilder::from_template_dir(EMPTY_REPO_PATH)

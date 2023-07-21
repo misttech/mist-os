@@ -57,18 +57,33 @@ enum SuppliedRamdisk {
     Unformatted(Ramdisk),
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 /// The blob filesystem implementation to use.
-enum Implementation {
+pub enum Implementation {
     /// The older C++ implementation.
-    Blobfs,
+    CppBlobfs,
     /// The newer Rust implementation that uses FxFs.
-    FxBlob,
+    Fxblob,
+}
+
+impl Implementation {
+    /// The production blobfs implementation (and downstream decisions like whether pkg-cache
+    /// should use /blob or fuchsia.fxfs/BlobCreator to write blobs) is determined by a GN
+    /// variable. This function returns the implementation determined by said GN variable, so that
+    /// clients inheriting production configs can create a BlobfsRamdisk backed by the appropriate
+    /// implementation.
+    pub fn from_env() -> Self {
+        match env!("FXFS_BLOB") {
+            "true" => Self::Fxblob,
+            "false" => Self::CppBlobfs,
+            other => panic!("unexpected value for env var 'FXFS_BLOB': {other}"),
+        }
+    }
 }
 
 impl BlobfsRamdiskBuilder {
     fn new() -> Self {
-        Self { ramdisk: None, blobs: vec![], implementation: Implementation::Blobfs }
+        Self { ramdisk: None, blobs: vec![], implementation: Implementation::CppBlobfs }
     }
 
     /// Configures this blobfs to use the already formatted given backing ramdisk.
@@ -89,18 +104,24 @@ impl BlobfsRamdiskBuilder {
 
     /// Use the blobfs implementation of the blob file system (the older C++ implementation that
     /// provides a fuchsia.io interface).
-    pub fn blobfs(self) -> Self {
-        Self { implementation: Implementation::Blobfs, ..self }
+    pub fn cpp_blobfs(self) -> Self {
+        Self { implementation: Implementation::CppBlobfs, ..self }
     }
 
     /// Use the fxblob implementation of the blob file system (the newer Rust implementation built
     /// on fxfs that has a custom FIDL interface).
     pub fn fxblob(self) -> Self {
-        Self { implementation: Implementation::FxBlob, ..self }
+        Self { implementation: Implementation::Fxblob, ..self }
     }
 
-    fn implementation(self, implementation: Implementation) -> Self {
+    /// Use the provided blobfs implementation.
+    pub fn implementation(self, implementation: Implementation) -> Self {
         Self { implementation, ..self }
+    }
+
+    /// Use the blobfs implementation that would be active in the production configuration.
+    pub fn impl_from_env(self) -> Self {
+        self.implementation(Implementation::from_env())
     }
 
     /// Starts a blobfs server with the current configuration options.
@@ -116,14 +137,14 @@ impl BlobfsRamdiskBuilder {
 
         // Spawn blobfs on top of the ramdisk.
         let mut fs = match implementation {
-            Implementation::Blobfs => fs_management::filesystem::Filesystem::new(
+            Implementation::CppBlobfs => fs_management::filesystem::Filesystem::new(
                 ramdisk_controller,
                 fs_management::Blobfs {
                     allow_delivery_blobs: true,
                     ..fs_management::Blobfs::dynamic_child()
                 },
             ),
-            Implementation::FxBlob => fs_management::filesystem::Filesystem::new(
+            Implementation::Fxblob => fs_management::filesystem::Filesystem::new(
                 ramdisk_controller,
                 fs_management::Fxfs::default(),
             ),
@@ -133,10 +154,10 @@ impl BlobfsRamdiskBuilder {
         }
 
         let fs = match implementation {
-            Implementation::Blobfs => ServingFilesystem::SingleVolume(
+            Implementation::CppBlobfs => ServingFilesystem::SingleVolume(
                 fs.serve().await.context("serving single volume filesystem")?,
             ),
-            Implementation::FxBlob => {
+            Implementation::Fxblob => {
                 let mut fs =
                     fs.serve_multi_volume().await.context("serving multi volume filesystem")?;
                 if needs_format {
@@ -252,8 +273,8 @@ impl ServingFilesystem {
 
     fn implementation(&self) -> Implementation {
         match self {
-            Self::SingleVolume(_) => Implementation::Blobfs,
-            Self::MultiVolume(_) => Implementation::FxBlob,
+            Self::SingleVolume(_) => Implementation::CppBlobfs,
+            Self::MultiVolume(_) => Implementation::Fxblob,
         }
     }
 }
@@ -589,7 +610,7 @@ mod tests {
     #[fuchsia_async::run_singlethreaded(test)]
     async fn blobfs_remount() {
         let blobfs =
-            BlobfsRamdisk::builder().blobfs().with_blob(&b"test"[..]).start().await.unwrap();
+            BlobfsRamdisk::builder().cpp_blobfs().with_blob(&b"test"[..]).start().await.unwrap();
         let blobs = blobfs.list_blobs().unwrap();
 
         let blobfs = blobfs.into_builder().await.unwrap().start().await.unwrap();
@@ -663,7 +684,7 @@ mod tests {
 
     #[fuchsia_async::run_singlethreaded(test)]
     async fn blobfs_does_not_support_blob_creator_api() {
-        let blobfs = BlobfsRamdisk::builder().blobfs().start().await.unwrap();
+        let blobfs = BlobfsRamdisk::builder().cpp_blobfs().start().await.unwrap();
 
         assert!(blobfs.blob_creator_proxy().unwrap().is_none());
 

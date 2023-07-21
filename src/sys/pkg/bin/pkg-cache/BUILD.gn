@@ -5,6 +5,7 @@
 import("//build/components.gni")
 import("//build/rust/rustc_library.gni")
 import("//build/testing/environments.gni")
+import("//src/storage/fshost/generated_fshost_config.gni")
 import("//src/sys/pkg/bin/grand-swd-binary/gsb.gni")
 
 rustc_library("lib") {
@@ -102,17 +103,41 @@ fuchsia_structured_config_rust_lib("config_lib") {
 fuchsia_structured_config_values("config_values_from_gn") {
   cm_label = ":manifest"
   values = {
-    use_fxblob = false
+    # LINT.IfChange
+    use_fxblob = fxfs_blob
+
+    # LINT.ThenChange(/src/sys/pkg/testing/blobfs-ramdisk/BUILD.gn)
     use_system_image = true
   }
+  visibility = [ ":*" ]
 }
 
 fuchsia_structured_config_values("config_values_from_gn-ignore-system-image") {
   cm_label = ":manifest"
   values = {
+    # TODO(fxbug.dev/130959) Recovery should use fxblob if available.
     use_fxblob = false
     use_system_image = false
   }
+  visibility = [ ":*" ]
+}
+
+fuchsia_structured_config_values("config_values_from_gn-cpp-blobfs") {
+  cm_label = ":manifest"
+  values = {
+    use_fxblob = false
+    use_system_image = true
+  }
+  visibility = [ ":*" ]
+}
+
+fuchsia_structured_config_values("config_values_from_gn-fxblob") {
+  cm_label = ":manifest"
+  values = {
+    use_fxblob = true
+    use_system_image = true
+  }
+  visibility = [ ":*" ]
 }
 
 grand_swd_binary("bin") {
@@ -135,6 +160,20 @@ group("ignore-system-image-component-and-config") {
   public_deps = [
     ":component",
     ":config_values_from_gn-ignore-system-image",
+  ]
+}
+
+group("production-component-and-config-cpp-blobfs") {
+  public_deps = [
+    ":component",
+    ":config_values_from_gn-cpp-blobfs",
+  ]
+}
+
+group("production-component-and-config-fxblob") {
+  public_deps = [
+    ":component",
+    ":config_values_from_gn-fxblob",
   ]
 }
 

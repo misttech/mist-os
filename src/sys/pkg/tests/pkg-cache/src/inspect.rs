@@ -4,8 +4,8 @@
 
 use {
     crate::{
-        blob_written, get_and_verify_packages, get_missing_blobs, replace_retained_packages,
-        write_blob, write_meta_far, write_needed_blobs, TestEnv,
+        blob_written, compress_and_write_blob, get_and_verify_packages, get_missing_blobs,
+        replace_retained_packages, write_meta_far, write_needed_blobs, TestEnv,
     },
     assert_matches::assert_matches,
     fidl_fuchsia_io as fio,
@@ -236,7 +236,7 @@ async fn dynamic_index_needed_blobs() {
     let (meta_far, _) = pkg.contents();
 
     let meta_blob =
-        needed_blobs.open_meta_blob(fpkg::BlobType::Uncompressed).await.unwrap().unwrap().unwrap();
+        needed_blobs.open_meta_blob(fpkg::BlobType::Delivery).await.unwrap().unwrap().unwrap();
 
     let hierarchy = env.inspect_hierarchy().await;
 
@@ -254,7 +254,7 @@ async fn dynamic_index_needed_blobs() {
         }
     );
 
-    let () = write_blob(&meta_far.contents, *meta_blob).await.unwrap();
+    let () = compress_and_write_blob(&meta_far.contents, *meta_blob).await.unwrap();
     let () = blob_written(&needed_blobs, BlobId::from(meta_far.merkle).into()).await;
     env.wait_for_and_return_inspect_state(tree_assertion!(
         "root": contains {
@@ -332,9 +332,8 @@ async fn dynamic_index_package_hash_update() {
     let (meta_far, _) = pkg.contents();
 
     let meta_blob =
-        needed_blobs.open_meta_blob(fpkg::BlobType::Uncompressed).await.unwrap().unwrap().unwrap();
-
-    let () = write_blob(&meta_far.contents, *meta_blob).await.unwrap();
+        needed_blobs.open_meta_blob(fpkg::BlobType::Delivery).await.unwrap().unwrap().unwrap();
+    let () = compress_and_write_blob(&meta_far.contents, *meta_blob).await.unwrap();
     let () = blob_written(&needed_blobs, meta_far.merkle).await;
 
     assert_eq!(get_missing_blobs(&needed_blobs).await, vec![]);
@@ -469,22 +468,18 @@ async fn package_cache_get() {
         .map_ok(|res| res.map_err(zx::Status::from_raw));
 
     // Request received, expect client requesting meta far.
-
     expect_and_return_inspect(&env, "need-meta-far").await;
 
     // Expect client fulfilling meta far.
-
     let (meta_far, contents) = package.contents();
     write_meta_far(&needed_blobs, meta_far).await;
 
     // Meta far done, expect client requesting missing blobs.
-
     expect_and_return_inspect(&env, "enumerate-missing-blobs").await;
 
     let missing_blobs = get_missing_blobs(&needed_blobs).await;
 
     // Missing blobs requested, expect client writing content blobs.
-
     let hierarchy = expect_and_return_inspect(&env, "need-content-blobs").await;
     contains_missing_blob_stats(&hierarchy, 2, 0, 0);
 
@@ -499,22 +494,19 @@ async fn package_cache_get() {
     let buf = contents.remove(&blob.blob_id.into()).unwrap();
 
     let content_blob = needed_blobs
-        .open_blob(&blob.blob_id, fpkg::BlobType::Uncompressed)
+        .open_blob(&blob.blob_id, fpkg::BlobType::Delivery)
         .await
         .unwrap()
         .unwrap()
         .unwrap();
 
     // Content blob open for writing.
-
     let hierarchy = expect_and_return_inspect(&env, "need-content-blobs").await;
     contains_missing_blob_stats(&hierarchy, 2, 1, 0);
-
-    let () = write_blob(&buf, *content_blob).await.unwrap();
+    let () = compress_and_write_blob(&buf, *content_blob).await.unwrap();
     let () = blob_written(&needed_blobs, BlobId::from(blob.blob_id).into()).await;
 
     // Content blob written.
-
     let hierarchy = expect_and_return_inspect(&env, "need-content-blobs").await;
     contains_missing_blob_stats(&hierarchy, 1, 0, 1);
 
@@ -523,22 +515,19 @@ async fn package_cache_get() {
     let buf = contents.remove(&blob.blob_id.into()).unwrap();
 
     let content_blob = needed_blobs
-        .open_blob(&blob.blob_id, fpkg::BlobType::Uncompressed)
+        .open_blob(&blob.blob_id, fpkg::BlobType::Delivery)
         .await
         .unwrap()
         .unwrap()
         .unwrap();
 
     // Last content blob open for writing.
-
     let hierarchy = expect_and_return_inspect(&env, "need-content-blobs").await;
     contains_missing_blob_stats(&hierarchy, 1, 1, 1);
-
-    let () = write_blob(&buf, *content_blob).await.unwrap();
+    let () = compress_and_write_blob(&buf, *content_blob).await.unwrap();
     let () = blob_written(&needed_blobs, BlobId::from(blob.blob_id).into()).await;
 
     // Last content blob written.
-
     assert_eq!(contents, Default::default());
     assert_eq!(None, missing_blobs_iter.next());
 

@@ -41,7 +41,27 @@ mod retained_packages;
 mod space;
 mod sync;
 
-async fn write_blob(contents: &[u8], blob: fpkg::BlobWriter) -> Result<(), zx::Status> {
+#[derive(Debug)]
+enum WriteBlobError {
+    File(zx::Status),
+    Writer(blob_writer::WriteError),
+}
+
+impl WriteBlobError {
+    fn assert_out_of_space(&self) {
+        match self {
+            Self::File(s) => assert_eq!(*s, zx::Status::NO_SPACE),
+            Self::Writer(e) => assert_matches!(
+                e,
+                blob_writer::WriteError::BytesReady(s) if *s == zx::Status::NO_SPACE
+            ),
+        }
+    }
+}
+
+/// Writes `contents` to `blob`. If `blob` was opened as a `Delivery` blob, then contents should
+/// already be compressed.
+async fn write_blob(contents: &[u8], blob: fpkg::BlobWriter) -> Result<(), WriteBlobError> {
     match blob {
         fpkg::BlobWriter::File(file) => {
             let file = file.into_proxy().unwrap();
@@ -51,10 +71,13 @@ async fn write_blob(contents: &[u8], blob: fpkg::BlobWriter) -> Result<(), zx::S
                 .unwrap()
                 .map_err(zx::Status::from_raw)
                 .unwrap();
-            fuchsia_fs::file::write(&file, contents).await.map_err(|e| match e {
-                fuchsia_fs::file::WriteError::WriteError(s) => s,
-                _ => zx::Status::INTERNAL,
-            })?;
+            fuchsia_fs::file::write(&file, contents)
+                .await
+                .map_err(|e| match e {
+                    fuchsia_fs::file::WriteError::WriteError(s) => s,
+                    _ => zx::Status::INTERNAL,
+                })
+                .map_err(WriteBlobError::File)?;
             let () = file.close().await.unwrap().map_err(zx::Status::from_raw).unwrap();
         }
         fpkg::BlobWriter::Writer(writer) => {
@@ -66,11 +89,24 @@ async fn write_blob(contents: &[u8], blob: fpkg::BlobWriter) -> Result<(), zx::S
             .unwrap()
             .write(contents)
             .await
-            .unwrap();
+            .map_err(WriteBlobError::Writer)?;
         }
     }
 
     Ok(())
+}
+
+/// Compresses `contents` then writes the compressed bytes to `blob`. `blob` should have been
+/// opened as a `Delivery` blob.
+async fn compress_and_write_blob(
+    contents: &[u8],
+    blob: fpkg::BlobWriter,
+) -> Result<(), WriteBlobError> {
+    write_blob(
+        &delivery_blob::Type1Blob::generate(&contents, delivery_blob::CompressionMode::Attempt),
+        blob,
+    )
+    .await
 }
 
 // Calls fuchsia.pkg/NeededBlobs.GetMissingBlobs and reads from the iterator until it ends.
@@ -126,8 +162,8 @@ async fn get_and_verify_package(
 
 pub async fn write_meta_far(needed_blobs: &fpkg::NeededBlobsProxy, meta_far: BlobContents) {
     let meta_blob =
-        needed_blobs.open_meta_blob(fpkg::BlobType::Uncompressed).await.unwrap().unwrap().unwrap();
-    let () = write_blob(&meta_far.contents, *meta_blob).await.unwrap();
+        needed_blobs.open_meta_blob(fpkg::BlobType::Delivery).await.unwrap().unwrap().unwrap();
+    let () = compress_and_write_blob(&meta_far.contents, *meta_blob).await.unwrap();
     let () = blob_written(needed_blobs, meta_far.merkle).await;
 }
 
@@ -151,12 +187,12 @@ pub async fn write_needed_blobs(
         }
         for blob_info in chunk {
             let blob_proxy = needed_blobs
-                .open_blob(&blob_info.blob_id, fpkg::BlobType::Uncompressed)
+                .open_blob(&blob_info.blob_id, fpkg::BlobType::Delivery)
                 .await
                 .unwrap()
                 .unwrap()
                 .unwrap();
-            let () = write_blob(
+            let () = compress_and_write_blob(
                 available_blobs
                     .remove(&fpkg_ext::BlobId::from(blob_info.blob_id).into())
                     .unwrap()
@@ -211,9 +247,9 @@ async fn verify_package_cached(
     // If the package is active in the dynamic index, the server will send a `ZX_OK` epitaph then
     // close the channel.
     // If all the blobs are cached but the package is not active in the dynamic index the server
-    // will reply with `Ok(false)`, meaning that the metadata blob is cached and GetMissingBlobs
+    // will reply with `Ok(None)`, meaning that the metadata blob is cached and GetMissingBlobs
     // needs to be performed (but the iterator obtained with GetMissingBlobs should be empty).
-    let epitaph_received = match needed_blobs.open_meta_blob(fpkg::BlobType::Uncompressed).await {
+    let epitaph_received = match needed_blobs.open_meta_blob(fpkg::BlobType::Delivery).await {
         Err(fidl::Error::ClientChannelClosed { status: Status::OK, .. }) => true,
         Ok(Ok(None)) => false,
         Ok(r) => {
@@ -306,15 +342,10 @@ impl Blobfs for BlobfsRamdisk {
 
 struct TestEnvBuilder<BlobfsAndSystemImageFut> {
     paver_service_builder: Option<MockPaverServiceBuilder>,
-    blobfs_and_system_image: Box<dyn FnOnce(BlobImplementation) -> BlobfsAndSystemImageFut>,
+    blobfs_and_system_image:
+        Box<dyn FnOnce(blobfs_ramdisk::Implementation) -> BlobfsAndSystemImageFut>,
     ignore_system_image: bool,
-    blob_implementation: BlobImplementation,
-}
-
-#[derive(Debug, PartialEq, Eq, Clone, Copy)]
-enum BlobImplementation {
-    Blobfs,
-    FxBlob,
+    blob_implementation: Option<blobfs_ramdisk::Implementation>,
 }
 
 impl TestEnvBuilder<BoxFuture<'static, (BlobfsRamdisk, Option<Hash>)>> {
@@ -324,14 +355,8 @@ impl TestEnvBuilder<BoxFuture<'static, (BlobfsRamdisk, Option<Hash>)>> {
                 async move {
                     let system_image_package =
                         fuchsia_pkg_testing::SystemImageBuilder::new().build().await;
-                    let blobfs = BlobfsRamdisk::builder();
-                    let blobfs = match blob_impl {
-                        BlobImplementation::Blobfs => blobfs.blobfs(),
-                        BlobImplementation::FxBlob => blobfs.fxblob(),
-                    }
-                    .start()
-                    .await
-                    .unwrap();
+                    let blobfs =
+                        BlobfsRamdisk::builder().implementation(blob_impl).start().await.unwrap();
                     let () = system_image_package.write_to_blobfs_dir(&blobfs.root_dir().unwrap());
                     (blobfs, Some(*system_image_package.meta_far_merkle_root()))
                 }
@@ -339,7 +364,7 @@ impl TestEnvBuilder<BoxFuture<'static, (BlobfsRamdisk, Option<Hash>)>> {
             }),
             paver_service_builder: None,
             ignore_system_image: false,
-            blob_implementation: BlobImplementation::Blobfs,
+            blob_implementation: None,
         }
     }
 }
@@ -385,7 +410,8 @@ where
         system_image: &Package,
         extra_packages: &[&Package],
     ) -> TestEnvBuilder<future::Ready<(BlobfsRamdisk, Option<Hash>)>> {
-        let blobfs = BlobfsRamdisk::start().await.unwrap();
+        assert_eq!(self.blob_implementation, None);
+        let blobfs = BlobfsRamdisk::builder().impl_from_env().start().await.unwrap();
         let root_dir = blobfs.root_dir().unwrap();
         let () = system_image.write_to_blobfs_dir(&root_dir);
         for pkg in extra_packages {
@@ -399,7 +425,7 @@ where
             }),
             paver_service_builder: self.paver_service_builder,
             ignore_system_image: self.ignore_system_image,
-            blob_implementation: self.blob_implementation,
+            blob_implementation: Some(blobfs_ramdisk::Implementation::from_env()),
         }
     }
 
@@ -408,13 +434,27 @@ where
         Self { ignore_system_image: true, ..self }
     }
 
-    fn use_fxblob(self) -> Self {
-        assert_eq!(self.blob_implementation, BlobImplementation::Blobfs);
-        Self { blob_implementation: BlobImplementation::FxBlob, ..self }
+    fn fxblob(self) -> Self {
+        assert_eq!(self.blob_implementation, None);
+        Self { blob_implementation: Some(blobfs_ramdisk::Implementation::Fxblob), ..self }
+    }
+
+    fn cpp_blobfs(self) -> Self {
+        assert_eq!(self.blob_implementation, None);
+        Self { blob_implementation: Some(blobfs_ramdisk::Implementation::CppBlobfs), ..self }
+    }
+
+    fn blobfs_impl(self, impl_: blobfs_ramdisk::Implementation) -> Self {
+        assert_eq!(self.blob_implementation, None);
+        Self { blob_implementation: Some(impl_), ..self }
     }
 
     async fn build(self) -> TestEnv<ConcreteBlobfs> {
-        let (blobfs, system_image) = (self.blobfs_and_system_image)(self.blob_implementation).await;
+        let (blob_implementation, blob_implementation_overridden) = match self.blob_implementation {
+            Some(blob_implementation) => (blob_implementation, true),
+            None => (blobfs_ramdisk::Implementation::from_env(), false),
+        };
+        let (blobfs, system_image) = (self.blobfs_and_system_image)(blob_implementation).await;
         let local_child_svc_dir = vfs::pseudo_directory! {};
 
         // Cobalt mocks so we can assert that we emit the correct events
@@ -498,7 +538,7 @@ where
             "blob" => vfs::remote::remote_dir(blobfs.root_proxy()),
             "svc" => local_child_svc_dir,
         };
-        if self.blob_implementation == BlobImplementation::FxBlob {
+        if matches!(blob_implementation, blobfs_ramdisk::Implementation::Fxblob) {
             local_child_out_dir
                 .add_entry("blob-svc", vfs::remote::remote_dir(blobfs.svc_dir()))
                 .unwrap();
@@ -511,13 +551,20 @@ where
             .add_child("pkg_cache", "#meta/pkg-cache.cm", ChildOptions::new())
             .await
             .unwrap();
-        if self.ignore_system_image || self.blob_implementation == BlobImplementation::FxBlob {
+        if self.ignore_system_image || blob_implementation_overridden {
             builder.init_mutable_config_from_package(&pkg_cache).await.unwrap();
             if self.ignore_system_image {
                 builder.set_config_value_bool(&pkg_cache, "use_system_image", false).await.unwrap();
             }
-            if self.blob_implementation == BlobImplementation::FxBlob {
-                builder.set_config_value_bool(&pkg_cache, "use_fxblob", true).await.unwrap();
+            if blob_implementation_overridden {
+                builder
+                    .set_config_value_bool(
+                        &pkg_cache,
+                        "use_fxblob",
+                        matches!(blob_implementation, blobfs_ramdisk::Implementation::Fxblob),
+                    )
+                    .await
+                    .unwrap();
             }
         }
         let system_update_committer = builder
@@ -584,7 +631,7 @@ where
             )
             .await
             .unwrap();
-        if self.blob_implementation == BlobImplementation::FxBlob {
+        if matches!(blob_implementation, blobfs_ramdisk::Implementation::Fxblob) {
             builder
                 .add_route(
                     Route::new()
@@ -801,10 +848,8 @@ impl<B: Blobfs> TestEnv<B> {
         let blobfs = blobfs::Client::new(self.blobfs.root_proxy(), None);
         // c++blobfs supports uncompressed and delivery blobs and FxBlob only supports delivery
         // blobs, so we always write delivery blobs.
-        let compressed =
-            delivery_blob::Type1Blob::generate(contents, delivery_blob::CompressionMode::Always);
-        let () = write_blob(
-            &compressed,
+        let () = compress_and_write_blob(
+            contents,
             blobfs.open_blob_for_write(hash, fpkg::BlobType::Delivery).await.unwrap(),
         )
         .await

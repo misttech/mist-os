@@ -4,6 +4,7 @@
 
 import("//build/components.gni")
 import("//build/rust/rustc_library.gni")
+import("//src/storage/fshost/generated_fshost_config.gni")
 
 rustc_library("blobfs-ramdisk") {
   testonly = true
@@ -43,6 +44,11 @@ rustc_library("blobfs-ramdisk") {
     "src/test.rs",
   ]
   configs += [ "//build/config/rust/lints:clippy_warn_all" ]
+
+  # The GN variable `fxfs_blob` sets the structured config that determines whether production
+  # pkg-cache uses the fuchsa.fxfs/BlobCreator write API. Tests that use the production pkg-cache
+  # structured config need to know this value so they can create the correct blobfs dependency.
+  rustenv = [ "FXFS_BLOB=${fxfs_blob}" ]
 }
 
 fuchsia_component("test-component") {

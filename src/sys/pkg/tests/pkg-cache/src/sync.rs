@@ -11,7 +11,7 @@ impl crate::Blobfs for BrokenBlobfs {
         fidl::endpoints::create_proxy::<fio::DirectoryMarker>().unwrap().0
     }
     fn svc_dir(&self) -> fio::DirectoryProxy {
-        panic!("BrokenBlobfs does not have a svc dir")
+        fidl::endpoints::create_proxy::<fio::DirectoryMarker>().unwrap().0
     }
 }
 

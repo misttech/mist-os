@@ -3,7 +3,6 @@
 // found in the LICENSE file.
 
 use {
-    crate::errors::{CreateError, WriteError},
     fidl_fuchsia_fxfs::BlobWriterProxy,
     fuchsia_zircon as zx,
     futures::{
@@ -13,6 +12,7 @@ use {
 };
 
 mod errors;
+pub use errors::{CreateError, WriteError};
 
 /// BlobWriter is a wrapper around the fuchsia.fxfs.BlobWriter fidl protocol. Clients will use this
 /// library to write blobs to disk.
