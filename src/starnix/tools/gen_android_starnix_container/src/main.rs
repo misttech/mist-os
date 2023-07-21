@@ -141,8 +141,10 @@ fn generate(cmd: Command) -> Result<()> {
             .with_context(|| format!("Adding subpackage from manifest: {}", &hal))?;
 
         let hal_package_name = manifest.name().to_string();
-        let hal_manifest = hal_manifest::load_from_package(&manifest)
-            .with_context(|| format!("Reading hal manifest from package: {}", hal))?;
+        let (hal_manifest, hal_manifest_source_path) =
+            hal_manifest::load_from_package(&manifest)
+                .with_context(|| format!("Reading hal manifest from package: {}", hal))?;
+        inputs_for_depfile.extend(hal_manifest_source_path);
         // If a HAL manifest contains `init_rc`, copy that file to
         // `etc/init/{hal_package_name}.rc` in the ODM filesystem.
         if let Some(blob) = hal_manifest.init_rc {
