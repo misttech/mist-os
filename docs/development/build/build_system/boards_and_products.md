@@ -83,16 +83,32 @@ that require network connectivity.
 For more see [Bringup Product Definition](/docs/development/build/build_system/bringup.md)
 
 ### Core {#core-product}
+
 `core` is a minimal feature set that can install additional software (such as
 items added to the "universe" dependency set). It is the starting point for
 all higher-level product configurations. It has common network capabilities
 and can update a system over-the-air.
 
-### Workstation {#workstation-product}
+### Minimal
 
-`workstation_eng` is a basis for a general purpose development environment, good
-for working on UI, media and many other high-level features. This is also
-the best environment for enthusiasts to play with and explore.
+As [RFC-0220](/docs/contribute/governance/rfcs/0220_the_future_of_in_tree_products.md)
+Minimal is intended to be "the smallest thing which can be called Fuchsia." Definitionally, this is a system which can:
+* Boot into userspace
+* Run Component Manager and components
+* Update itself using our over-the-air update system (This implies that storage and networking are working, with drivers provided by the board)
+
+### Workbench
+Workbench is a product configuration for local development, running larger
+tests which cannot or should not be packaged hermetically, and exercising larger
+parts of the Fuchsia platform than minimal supports. It is intended to be like a
+literal workbench in that it supports development tools and allows a developer
+to poke at the system and make changes. It is not intended to be a product that
+ships to users, or be a basis for those products.
+
+
+
+
+
 
 [products-source]: /products/
 [boards-source]: /boards/

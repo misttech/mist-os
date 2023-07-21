@@ -15,7 +15,6 @@ types:
   - "Custom"
   - "Prebuilt"
 products:
-  - "Workstation"
   - "Core"
 boards:
   - "NUC"
@@ -28,13 +27,6 @@ hosts:
   - "macOS"
   - "N/A"
 guides:
-  - type: "Custom"
-    product: "Workstation"
-    board: "NUC"
-    method: "USB Flash Drive"
-    host: "N/A"
-    url: "/docs/development/hardware/intel_nuc.md"
-    title: "Install Fuchsia on a NUC"
   - type: "Custom"
     product: "Core"
     board: "VIM"
