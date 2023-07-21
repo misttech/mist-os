@@ -31,10 +31,10 @@ const MIN_REPLY_LENGTH: usize = 4;
 const MAX_REPLY_LENGTH: usize = 64;
 const DATA_SIZE_LENGTH: usize = 8;
 
-impl TryFrom<Vec<u8>> for Reply {
+impl TryFrom<&[u8]> for Reply {
     type Error = anyhow::Error;
 
-    fn try_from(byte_vec: Vec<u8>) -> Result<Self, Self::Error> {
+    fn try_from(byte_vec: &[u8]) -> Result<Self, Self::Error> {
         if byte_vec.len() < MIN_REPLY_LENGTH {
             return Err(anyhow!("Fastboot reply must have {} bytes at least!", MIN_REPLY_LENGTH));
         }

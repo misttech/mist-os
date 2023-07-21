@@ -88,10 +88,10 @@ pub enum Command {
 
 const MAX_COMMAND_LENGTH: usize = 64;
 
-impl TryFrom<ClientVariable> for Vec<u8> {
+impl TryFrom<&ClientVariable> for Vec<u8> {
     type Error = anyhow::Error;
 
-    fn try_from(var: ClientVariable) -> Result<Self, Self::Error> {
+    fn try_from(var: &ClientVariable) -> Result<Self, Self::Error> {
         match var {
             ClientVariable::All => Ok(b"all".to_vec()),
             ClientVariable::Version => Ok(b"version".to_vec()),
@@ -114,7 +114,7 @@ impl TryFrom<ClientVariable> for Vec<u8> {
     }
 }
 
-fn concat_message(cmd: &[u8], s: String) -> Result<Vec<u8>, anyhow::Error> {
+fn concat_message(cmd: &[u8], s: &str) -> Result<Vec<u8>, anyhow::Error> {
     let bytes = s.as_bytes();
     if MAX_COMMAND_LENGTH - cmd.len() < bytes.len() {
         return Err(anyhow!("Message name is too long for command."));
@@ -122,10 +122,10 @@ fn concat_message(cmd: &[u8], s: String) -> Result<Vec<u8>, anyhow::Error> {
     Ok([cmd, &bytes[..]].concat())
 }
 
-impl TryFrom<Command> for Vec<u8> {
+impl TryFrom<&Command> for Vec<u8> {
     type Error = anyhow::Error;
 
-    fn try_from(command: Command) -> Result<Self, Self::Error> {
+    fn try_from(command: &Command) -> Result<Self, Self::Error> {
         match command {
             Command::GetVar(v) => Ok([b"getvar:", &Vec::<u8>::try_from(v)?[..]].concat()),
             Command::Download(s) => Ok([b"download:", format!("{:08x}", s).as_bytes()].concat()),
@@ -137,15 +137,17 @@ impl TryFrom<Command> for Vec<u8> {
             Command::Reboot => Ok(b"reboot".to_vec()),
             Command::RebootBootLoader => Ok(b"reboot-bootloader".to_vec()),
             Command::UpdateSuper(partition_name, arg) => {
-                concat_message(b"update-super:", format!("{}:{}", partition_name, arg))
+                concat_message(b"update-super:", &format!("{}:{}", partition_name, arg))
             }
-            Command::CreateLogicalPartition(partition_name, size) => {
-                concat_message(b"create-logical-partition:", format!("{}:{}", partition_name, size))
-            }
+            Command::CreateLogicalPartition(partition_name, size) => concat_message(
+                b"create-logical-partition:",
+                &format!("{}:{}", partition_name, size),
+            ),
             Command::DeleteLogicalPartition(s) => concat_message(b"delete-logical-partition:", s),
-            Command::ResizeLogicalPartition(partition_name, size) => {
-                concat_message(b"resize-logical-partition:", format!("{}:{}", partition_name, size))
-            }
+            Command::ResizeLogicalPartition(partition_name, size) => concat_message(
+                b"resize-logical-partition:",
+                &format!("{}:{}", partition_name, size),
+            ),
             Command::IsLogical(s) => concat_message(b"is-logical:", s),
             Command::SetActive(s) => concat_message(b"set_active:", s),
             Command::Oem(s) => concat_message(b"oem ", s),
