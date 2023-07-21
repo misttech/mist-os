@@ -8,9 +8,15 @@ import("//build/testing/environments.gni")
 fuchsia_component("test-root") {
   testonly = true
   manifest = "meta/test-root.cml"
+  deps = [ "//src/storage/memfs:memfs_component" ]
 }
 
 fuchsia_test_package("realm-factory-test") {
+  test_specs = {
+    log_settings = {
+      max_severity = "ERROR"
+    }
+  }
   test_components = [ ":test-root" ]
   subpackages = [
     "../testing/realm-factory:realm-factory",

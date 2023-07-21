@@ -4,6 +4,7 @@
 {
     include: [
         "//sdk/lib/sys/component/realm_builder.shard.cml",
+        "inspect/offer.shard.cml",
         "syslog/client.shard.cml",
     ],
     children: [
@@ -15,12 +16,50 @@
             name: "test_suite",
             url: "test-suite#meta/test-suite.cm",
         },
+        {
+            name: "memfs",
+            url: "#meta/memfs.cm",
+        },
+    ],
+    capabilities: [
+        {
+            storage: "data",
+            from: "#memfs",
+            subdir: "data",
+            backing_dir: "memfs",
+            storage_id: "static_instance_id_or_moniker",
+        },
+        {
+            storage: "cache",
+            from: "#memfs",
+            subdir: "cache",
+            backing_dir: "memfs",
+            storage_id: "static_instance_id_or_moniker",
+        },
     ],
     offer: [
         {
             protocol: "test.wlan.realm.RealmFactory",
             from: "#test_realm_factory",
             to: "#test_suite",
+        },
+        {
+            storage: "data",
+            from: "self",
+            to: "#test_realm_factory",
+        },
+        {
+            storage: "cache",
+            from: "self",
+            to: "#test_realm_factory",
+        },
+        {
+            event_stream: [
+                "capability_requested",
+                "directory_ready",
+            ],
+            from: "parent",
+            to: "#test_realm_factory",
         },
     ],
     expose: [

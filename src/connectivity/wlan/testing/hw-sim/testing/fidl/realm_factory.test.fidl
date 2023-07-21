@@ -5,11 +5,11 @@
 library test.wlan.realm;
 
 using fuchsia.testing.harness;
+using fuchsia.io;
 
 /// RealmOptions tells the RealmFactory protocol how to create the test realm.
 type RealmOptions = resource table {
-    /// FIXME: Add some options here.
-    1: example_option bool;
+    1: devfs_server_end server_end:fuchsia.io.Directory;
 };
 
 @discoverable

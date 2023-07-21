@@ -209,6 +209,7 @@ fuchsia_structured_config_rust_lib("archivist-config") {
 
 group("archivist-for-embedding-bundle") {
   visibility = [
+    "//src/connectivity/wlan/testing/hw-sim/*",
     "//src/diagnostics/*",
     "//src/lib/diagnostics/*",
     "//src/sys/component_manager/tests/*",

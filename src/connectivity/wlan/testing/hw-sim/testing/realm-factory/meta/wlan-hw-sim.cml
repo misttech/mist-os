@@ -24,6 +24,9 @@
             url: "#meta/regulatory_region.cm",
         },
     ],
+    use: [
+        { protocol: "fuchsia.diagnostics.ArchiveAccessor" },
+    ],
     offer: [
         {
             protocol: "fuchsia.logger.LogSink",

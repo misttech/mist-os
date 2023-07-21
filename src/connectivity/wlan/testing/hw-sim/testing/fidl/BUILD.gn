@@ -6,5 +6,8 @@ import("//build/fidl/fidl.gni")
 
 fidl("test.wlan.realm") {
   sources = [ "realm_factory.test.fidl" ]
-  public_deps = [ "//sdk/fidl/fuchsia.testing.harness" ]
+  public_deps = [
+    "//sdk/fidl/fuchsia.io",
+    "//sdk/fidl/fuchsia.testing.harness",
+  ]
 }
