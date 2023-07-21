@@ -50,6 +50,11 @@ fuchsia_test_component("fidl-fuchsia-posix-socket-ext-test") {
     "//src/connectivity/network/netstack3:component-debug",
     "//src/connectivity/network/testing/netemul/service:netemul-sandbox",
   ]
+  if (current_cpu == "riscv64") {
+    # TODO(fxbug.dev/122609): Make all tests depend on netstack3 on RISC-V
+    # and remove this.
+    deps -= [ "//src/connectivity/network/netstack:component-debug" ]
+  }
 }
 
 fuchsia_test_package("fidl-fuchsia-posix-socket-ext-tests") {

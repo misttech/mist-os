@@ -129,6 +129,11 @@ fuchsia_unittest_package("fuchsia-async-tests") {
     ":fuchsia-async_test",
     "//src/connectivity/network/netstack:component",
   ]
+  if (current_cpu == "riscv64") {
+    # TODO(fxbug.dev/122609): Make this target depend on netstack3 on RISC-V
+    # and remove this.
+    deps -= [ "//src/connectivity/network/netstack:component" ]
+  }
   test_specs = {
     environments = [ emu_env ]
   }

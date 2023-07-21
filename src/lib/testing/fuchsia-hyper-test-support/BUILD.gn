@@ -42,6 +42,11 @@ fuchsia_unittest_package("fuchsia-hyper-test-support-tests") {
     "//src/connectivity/network/dns:component",
     "//src/connectivity/network/netstack:component",
   ]
+  if (current_cpu == "riscv64") {
+    # TODO(fxbug.dev/122609): Make this target depend on netstack3 on RISC-V
+    # and remove this.
+    deps -= [ "//src/connectivity/network/netstack:component" ]
+  }
   manifest = "meta/fuchsia_hyper_test_support_lib_test.cml"
 }
 
