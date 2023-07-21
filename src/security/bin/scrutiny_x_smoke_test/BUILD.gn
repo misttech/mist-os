@@ -5,12 +5,12 @@
 import("//build/rust/rustc_binary.gni")
 
 if (is_host) {
-  rustc_binary("scrutiny_x_boxed_smoke_test") {
-    output_name = "scrutiny_x_boxed_smoke_test"
+  rustc_binary("scrutiny_x_smoke_test") {
+    output_name = "scrutiny_x_smoke_test"
     edition = "2021"
-    source_root = "src/boxed/main.rs"
+    source_root = "src/main.rs"
 
-    sources = [ "src/boxed/main.rs" ]
+    sources = [ "src/main.rs" ]
     deps = [
       "//src/security/lib/scrutiny/x:scrutiny_x",
       "//third_party/rust_crates:anyhow",

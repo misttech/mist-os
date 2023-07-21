@@ -7,7 +7,7 @@ use anyhow::bail;
 use anyhow::Context as _;
 use anyhow::Result;
 use argh::FromArgs;
-use scrutiny_x::boxed as scrutiny;
+use scrutiny_x as scrutiny;
 use std::fs::read_dir;
 use std::fs::write;
 use std::fs::File;
@@ -71,7 +71,7 @@ fn run_smoke_test(args: Args) -> Result<()> {
         let depfile = File::create(depfile).context("creating depfile")?;
         write_depfile(depfile, &product_bundle, &stamp).context("writing depfile")?;
 
-        write(stamp, "Scrutiny X boxed smoke test complete\n").context("writing stamp file")?;
+        write(stamp, "Scrutiny X smoke test complete\n").context("writing stamp file")?;
     }
 
     Ok(())
