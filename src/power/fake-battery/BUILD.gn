@@ -13,7 +13,10 @@ driver_bind_rules("fake_battery_bind") {
 }
 
 source_set("fake_battery_driver_lib") {
-  sources = [ "fake-battery-driver.cc" ]
+  sources = [
+    "driver.cc",
+    "power_source_protocol_server.cc",
+  ]
 
   public_deps = [
     "//sdk/fidl/fuchsia.hardware.powersource:fuchsia.hardware.powersource_cpp",

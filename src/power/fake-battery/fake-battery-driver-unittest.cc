@@ -2,8 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include "fake-battery-driver.h"
-
+#include <fidl/fuchsia.hardware.powersource/cpp/wire.h>
 #include <lib/async-loop/loop.h>
 #include <lib/async_patterns/testing/cpp/dispatcher_bound.h>
 #include <lib/driver/component/cpp/driver_base.h>
@@ -17,8 +16,10 @@
 
 #include <gtest/gtest.h>
 
-#include "fidl/fuchsia.hardware.powersource/cpp/natural_types.h"
+#include "driver.h"
 
+namespace fake_battery::testing {
+namespace {
 using fuchsia_hardware_powersource::wire::BatteryUnit;
 using fuchsia_hardware_powersource::wire::PowerType;
 
@@ -107,3 +108,6 @@ TEST_F(FakeBatteryDriverTest, CanGetInfo) {
     }
   });
 }
+
+}  // namespace
+}  // namespace fake_battery::testing
