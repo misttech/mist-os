@@ -145,6 +145,11 @@ if (is_fuchsia) {
 
     generate_fvm = !fxfs_blob
     generate_fxfs = fxfs_blob
+    generate_fvm_fastboot = !fxfs_blob && (assembly_generate_fvm_fastboot ||
+                                           fvm_emmc_partition_size != false)
+    generate_fvm_nand = !fxfs_blob && (assembly_generate_fvm_nand ||
+                                       fvm_ftl_nand_block_count != false)
+    generate_vbmeta = use_vbmeta
 
     include_component_id_index = true
 
@@ -359,8 +364,10 @@ if (is_fuchsia) {
         ]
       }
     }
-    if (!fxfs_blob && (fvm_emmc_partition_size != false ||
-                       fvm_ftl_nand_block_count != false)) {
+    if (!fxfs_blob &&
+        (assembly_generate_fvm_fastboot || assembly_generate_fvm_nand ||
+         fvm_emmc_partition_size != false ||
+         fvm_ftl_nand_block_count != false)) {
       _assembly_contents += [ files.fvm_fastboot ]
       if (files.recovery_name != "zedboot") {
         _recovery_contents += [ files.recovery_fvm_fastboot ]

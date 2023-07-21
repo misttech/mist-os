@@ -109,13 +109,7 @@ fvm_partition = "fvm"
 active_partition = "a"
 fastboot_product = "galilei"
 
-# For VIM3, FVM partition uses all of the remaining eMMC. However, the total size of the eMMC
-# storage maybe 16G or 32G depending on whether it is a basic or pro version. In addition,
-# the actual size of the user block allocated by Fuchsia can be further different. (i.e. 'lsblk'
-# shows a 29G size user block for the 32Gb version). To avoid the risk of overflowing
-# available size, here we set it to be the same as sherlock (3280mb), which is clearly safe
-# and sufficient for now.
-fvm_emmc_partition_size = 3439329280
+assembly_generate_fvm_fastboot = true
 
 # Supports only physical devices.
 board_is_emu = false

@@ -55,6 +55,7 @@ if (is_fuchsia) {
     generate_vbmeta = false
     generate_fvm = true
     generate_fvm_fastboot = false
+    generate_fvm_nand = false
     assembly_images_config_label = ":images_config"
     product_assembly_config_label = "//build/assembly:default_product_config"
     use_bringup_platform_bundles_only = true
@@ -73,6 +74,7 @@ if (is_fuchsia) {
     generate_vbmeta = false
     generate_fvm = true
     generate_fvm_fastboot = false
+    generate_fvm_nand = false
     assembly_images_config_label = ":images_config_recovery"
     product_assembly_config_label = "//build/assembly:default_product_config"
     use_bringup_platform_bundles_only = true

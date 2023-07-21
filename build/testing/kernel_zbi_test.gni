@@ -4,6 +4,7 @@
 
 import("//build/assembly/assembled_system.gni")
 import("//build/board.gni")
+import("//build/images/args.gni")
 import("//build/testing/zbi_test.gni")
 
 cuckoo_kernel_zbi_test_params = {
@@ -83,6 +84,11 @@ template("_cuckoo_kernel_zbi_test") {
     allow_eng_platform_bundle_use = true
     generate_fvm = !fxfs_blob
     generate_fxfs = fxfs_blob
+    generate_fvm_fastboot = !fxfs_blob && (assembly_generate_fvm_fastboot ||
+                                           fvm_emmc_partition_size != false)
+    generate_fvm_nand = !fxfs_blob && (assembly_generate_fvm_nand ||
+                                       fvm_ftl_nand_block_count != false)
+    generate_vbmeta = use_vbmeta
   }
 
   foreach(input_group, cuckoo_kernel_zbi_test_params.input_groups) {

@@ -88,6 +88,15 @@ generated_images_config("x64") {
     # TODO(fxbug.dev/68692): finish implementing decompression in Gigaboot so we
     # can compress here to speed up FVM transmission.k
     compress = false
+
+    # TODO(fxbug.dev/78185): don't hardcode the expected size, we should instead
+    # inflate to whatever the FVM partition size is at runtime.
+    #
+    # For now just hardcode 16GiB which is the minimum FVM partition size defined
+    # in the x64 paver.
+    #
+    # This also assumes we are not using raw NAND but that's a safer assumption.
+    # In this case "emmc" is a misnomer, it really just means "not raw NAND".
     truncate_to_length = 17179869184
   }
 }
@@ -120,6 +129,8 @@ generated_images_config("av400") {
 
   fvm.emmc = {
     compress = true
+
+    # AV400 has 4GB in total, give a safer value(3GB) temporarily
     truncate_to_length = 3221225472
   }
 }
@@ -131,6 +142,8 @@ generated_images_config("buckeye") {
 
   fvm.emmc = {
     compress = true
+
+    # BUCKEYE has 8GB in total, give a safer value(3GB) temporarily
     truncate_to_length = 3221225472
   }
 }
@@ -146,6 +159,13 @@ generated_images_config("vim3") {
 
   fvm.emmc = {
     compress = true
+
+    # For VIM3, FVM partition uses all of the remaining eMMC. However, the total size of the eMMC
+    # storage maybe 16G or 32G depending on whether it is a basic or pro version. In addition,
+    # the actual size of the user block allocated by Fuchsia can be further different. (i.e. 'lsblk'
+    # shows a 29G size user block for the 32Gb version). To avoid the risk of overflowing
+    # available size, here we set it to be the same as sherlock (3280mb), which is clearly safe
+    # and sufficient for now.
     truncate_to_length = 3439329280
   }
 }
@@ -176,6 +196,16 @@ generated_images_config("chromebook-x64") {
 
   fvm.emmc = {
     compress = false
+
+    # TODO(fxbug.dev/78185): don't hardcode the expected size, we should instead
+    # inflate to whatever the FVM partition size is at runtime.
+    #
+    # For now just hardcode 16GiB which is the minimum FVM partition size defined
+    # in the chromebook-x64 paver:
+    # http://cs/fuchsia/src/storage/lib/paver/chromebook-x64.cc?l=124
+    #
+    # This also assumes we are not using raw NAND but that's a safer assumption.
+    # In this case "emmc" is a misnomer, it really just means "not raw NAND".
     truncate_to_length = 17179869184
   }
 

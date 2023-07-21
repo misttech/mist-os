@@ -6,6 +6,7 @@ import("//build/assembly/assembled_system.gni")
 import("//build/assembly/product_assembly_configuration.gni")
 import("//build/assembly/sshd_config.gni")
 import("//build/board.gni")
+import("//build/images/args.gni")
 import("//build/images/paths.gni")
 import("//build/images/vboot/vboot.gni")
 import("//build/images/zedboot/zedboot_args.gni")
@@ -46,6 +47,13 @@ if (is_fuchsia) {
     image_name = "fuchsia"
     generate_fvm = !bootfs_only && !fxfs_blob
     generate_fxfs = !bootfs_only && fxfs_blob
+
+    generate_fvm_fastboot = generate_fvm && (assembly_generate_fvm_fastboot ||
+                                             fvm_emmc_partition_size != false)
+    generate_fvm_nand = generate_fvm && (assembly_generate_fvm_nand ||
+                                         fvm_ftl_nand_block_count != false)
+    generate_vbmeta = use_vbmeta
+
     ramdisk_in_zbi = true
 
     assembly_images_config_label = images_config_label
@@ -337,6 +345,13 @@ if (is_fuchsia) {
     core_realm_definition = ":core"
     generate_fvm = !bootfs_only && !fxfs_blob
     generate_fxfs = !bootfs_only && fxfs_blob
+
+    generate_fvm_fastboot = generate_fvm && (assembly_generate_fvm_fastboot ||
+                                             fvm_emmc_partition_size != false)
+    generate_fvm_nand = generate_fvm && (assembly_generate_fvm_nand ||
+                                         fvm_ftl_nand_block_count != false)
+    generate_vbmeta = use_vbmeta
+
     ramdisk_in_zbi = true
 
     include_component_id_index = true

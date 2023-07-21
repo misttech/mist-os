@@ -58,8 +58,7 @@ active_partition = "a"
 fastboot_product = "clover"
 fvm_partition = "fvm"
 
-# A non-false value indicates to GN that a nand image will be generated.
-fvm_ftl_nand_block_count = 1
+assembly_generate_fvm_nand = true
 
 # Supports only physical devices.
 board_is_emu = false

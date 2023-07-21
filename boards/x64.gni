@@ -63,15 +63,7 @@ avb_key =
 avb_atx_metadata =
     "//third_party/android/platform/external/avb/test/data/atx_metadata.bin"
 
-# TODO(fxbug.dev/78185): don't hardcode the expected size, we should instead
-# inflate to whatever the FVM partition size is at runtime.
-#
-# For now just hardcode 16GiB which is the minimum FVM partition size defined
-# in the x64 paver.
-#
-# This also assumes we are not using raw NAND but that's a safer assumption.
-# In this case "emmc" is a misnomer, it really just means "not raw NAND".
-fvm_emmc_partition_size = 17179869184
+assembly_generate_fvm_fastboot = true
 
 zircon_a_partition = "zircon-a"
 zircon_b_partition = "zircon-b"

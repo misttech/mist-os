@@ -187,18 +187,21 @@ import("//src/developer/ffx/build/ffx_action.gni")
 #   generate_signed_zbi (optional; default: false)
 #     [bool] Whether a signed zbi will be generated.
 #
-#   generate_vbmeta (optional; default: use_vbmeta)
+#   generate_vbmeta (optional; default: false)
 #     [bool] Whether a vbmeta will be generated.
 #
 #   generate_fvm (optional; default: false)
 #     [bool] Whether a fvm will be generated
 #
 #   generate_fvm_fastboot (optional; default: false)
-#     [bool] Whether a fastboot fvm (nand) will be generated.
+#     [bool] Whether a fastboot fvm will be generated.
+#
+#   generate_fvm_nand (optional; default: false)
+#     [bool] Whether a nand fvm will be generated.
 #
 #   generate_fxfs (optional; default: false)
 #     [bool] Whether a fxfs image will be generated.
-#     Exclusive with generate_fvm and generate_fvm_fastboot. EXPERIMENTAL.
+#     Exclusive with generate_fvm and generate_fvm_*. EXPERIMENTAL.
 #
 #
 # Optional copy() for the images:
@@ -239,26 +242,31 @@ template("assembled_system") {
                "assembly_fxfs_image_size_bytes",
              ])
 
-  generate_fvm = false
+  _generate_fvm = false
   if (defined(invoker.generate_fvm)) {
-    generate_fvm = invoker.generate_fvm
+    _generate_fvm = invoker.generate_fvm
   }
-  generate_fvm_fastboot = generate_fvm && (fvm_emmc_partition_size != false ||
-                                           fvm_ftl_nand_block_count != false)
+  _generate_fvm_fastboot = _generate_fvm && fvm_emmc_partition_size != false
   if (defined(invoker.generate_fvm_fastboot)) {
-    generate_fvm_fastboot = invoker.generate_fvm_fastboot
+    _generate_fvm_fastboot = invoker.generate_fvm_fastboot
   }
-  generate_fxfs = false
+  _generate_fvm_nand = _generate_fvm && fvm_ftl_nand_block_count != false
+  if (defined(invoker.generate_fvm_nand)) {
+    _generate_fvm_nand = invoker.generate_fvm_nand
+  }
+  _generate_fxfs = false
   if (defined(invoker.generate_fxfs)) {
-    generate_fxfs = invoker.generate_fxfs
+    _generate_fxfs = invoker.generate_fxfs
   }
-  generate_vbmeta = use_vbmeta
+  _generate_vbmeta = use_vbmeta
   if (defined(invoker.generate_vbmeta)) {
-    generate_vbmeta = invoker.generate_vbmeta
+    _generate_vbmeta = invoker.generate_vbmeta
   }
-  assert(!generate_fvm || !generate_fxfs,
+
+  assert(!(_generate_fvm || _generate_fvm_fastboot || _generate_fvm_nand) ||
+             !_generate_fxfs,
          "Only one of Fxfs and FVM can host blobs")
-  _supports_blobs = generate_fvm || generate_fxfs
+  _supports_blobs = _generate_fvm || _generate_fxfs
 
   generate_image_metadata = true
   if (defined(invoker.generate_image_metadata)) {
@@ -277,11 +285,11 @@ template("assembled_system") {
           !defined(image_metadata_overrides.zbi_signed),
           "No signed ZBI will be built: no metadata override should be provided")
     }
-    if (!generate_vbmeta) {
+    if (!_generate_vbmeta) {
       assert(!defined(image_metadata_overrides.vbmeta),
              "No VBMeta will be built: no metadata override should be provided")
     }
-    if (!generate_fvm) {
+    if (!_generate_fvm) {
       error_msg =
           "No FVMs will be built: no metadata override should be provided"
       assert(!defined(image_metadata_overrides.fvm), error_msg)
@@ -290,7 +298,7 @@ template("assembled_system") {
       assert(!defined(image_metadata_overrides.fvm_fastboot), error_msg)
       not_needed([ "error_msg" ])
     }
-    if (!generate_fxfs) {
+    if (!_generate_fxfs) {
       assert(
           !defined(image_metadata_overrides.fxfs),
           "No Fxfs image will be built: no metadata override should be provided")
@@ -419,14 +427,21 @@ template("assembled_system") {
     zbi_signed = "${zbi}.signed"
     vbmeta = "${outdir}/${image_name}.vbmeta"
 
-    if (generate_fvm) {
+    if (_generate_fvm || _generate_fvm_fastboot || _generate_fvm_nand) {
       blobfs = "${outdir}/blob.blk"
+    }
+    if (_generate_fvm) {
       fvm = "${outdir}/fvm.blk"
       fvm_sparse = "${outdir}/fvm.sparse.blk"
       fvm_blob_sparse = "${outdir}/fvm.blob.sparse.blk"
-      fvm_fastboot_tmp = "${outdir}/fvm.fastboot.tmp.blk"
+    }
+    if (_generate_fvm_fastboot || _generate_fvm_nand) {
       fvm_fastboot = "${outdir}/fvm.fastboot.blk"
-    } else if (generate_fxfs) {
+    }
+    if (_generate_fvm_nand) {
+      fvm_fastboot_tmp = "${outdir}/fvm.fastboot.tmp.blk"
+    }
+    if (_generate_fxfs) {
       fxfs = "${outdir}/fxfs.blk"
       fxfs_sparse = "${outdir}/fxfs.sparse.blk"
     }
@@ -867,7 +882,7 @@ template("assembled_system") {
       outputs += [ files.zbi_signed ]
     }
 
-    if (generate_vbmeta) {
+    if (_generate_vbmeta) {
       outputs += [ files.vbmeta ]
     }
 
@@ -897,21 +912,21 @@ template("assembled_system") {
         files.base_meta_package,
         files.base_pkg_abi_revision,
       ]
-      if (generate_fvm) {
+      if (_generate_fvm) {
         outputs += [
           files.fvm,
           files.fvm_sparse,
           files.blobfs,
           files.fvm_blob_sparse,
         ]
-        if (generate_fvm_fastboot) {
-          outputs += [ files.fvm_fastboot ]
-          if (fvm_ftl_nand_block_count != false) {
-            outputs += [ files.fvm_fastboot_tmp ]
-          }
-        }
       }
-      if (generate_fxfs) {
+      if (_generate_fvm_fastboot || _generate_fvm_nand) {
+        outputs += [ files.fvm_fastboot ]
+      }
+      if (_generate_fvm_nand) {
+        outputs += [ files.fvm_fastboot_tmp ]
+      }
+      if (_generate_fxfs) {
         outputs += [
           files.fxfs,
           files.fxfs_sparse,
@@ -984,7 +999,7 @@ template("assembled_system") {
             forward_variables_from(_image_overrides["zbi"], "*")
           },
         ]
-        if (generate_fvm) {
+        if (_generate_fvm) {
           images += [
             # BlobFS
             {
@@ -1013,7 +1028,7 @@ template("assembled_system") {
               forward_variables_from(_image_overrides["fvm_sparse"], "*")
             },
           ]
-        } else if (generate_fxfs) {
+        } else if (_generate_fxfs) {
           images += [
             {
               name = "${namespace}.fxfs"
@@ -1055,7 +1070,7 @@ template("assembled_system") {
         }
 
         # Optionally add the vbmeta image.
-        if (generate_vbmeta) {
+        if (_generate_vbmeta) {
           images += [
             {
               name = namespace
@@ -1076,7 +1091,7 @@ template("assembled_system") {
         }
 
         # Optionally include the blob-only sparse FVM.
-        if (generate_fvm && include_fvm_blob_sparse) {
+        if (_generate_fvm && include_fvm_blob_sparse) {
           images += [
             {
               name = "${namespace}.fvm_blob_sparse"
@@ -1089,7 +1104,7 @@ template("assembled_system") {
         }
 
         # Optionally include the fastboot FVM.
-        if (generate_fvm_fastboot) {
+        if (_generate_fvm_fastboot || _generate_fvm_nand) {
           images += [
             {
               name = "${namespace}.fvm_fastboot"
@@ -1160,7 +1175,7 @@ template("assembled_system") {
       }
     }
 
-    if (generate_vbmeta) {
+    if (_generate_vbmeta) {
       copy(labels.copy_vbmeta) {
         forward_variables_from(invoker,
                                [
@@ -1186,7 +1201,7 @@ template("assembled_system") {
       if (generate_signed_zbi) {
         public_deps += [ ":${labels.copy_zbi_signed}" ]
       }
-      if (generate_vbmeta) {
+      if (_generate_vbmeta) {
         public_deps += [ ":${labels.copy_vbmeta}" ]
       }
     }

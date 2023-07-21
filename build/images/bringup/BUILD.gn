@@ -40,6 +40,7 @@ bringup_base = {
   testonly = true
   output_dir = root_build_dir
   generate_fvm = false
+  generate_vbmeta = use_vbmeta
 
   if (custom_signing_script != "") {
     inputs = custom_signing_script_inputs

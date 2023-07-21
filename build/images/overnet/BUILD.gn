@@ -4,6 +4,7 @@
 
 import("//build/assembly/assembled_system.gni")
 import("//build/board.gni")
+import("//build/images/args.gni")
 import("//build/testing/host_test_data.gni")
 import("//src/sys/core/build/core.gni")
 
@@ -19,6 +20,15 @@ assembled_system("overnet") {
   assembly_images_config_label = images_config_label
   product_assembly_config_label = "//build/assembly:default_product_config"
   use_bringup_platform_bundles_only = true
+
+  generate_fvm = !fxfs_blob
+  generate_fxfs = fxfs_blob
+
+  generate_fvm_fastboot =
+      assembly_generate_fvm_fastboot || fvm_emmc_partition_size != false
+  generate_fvm_nand =
+      assembly_generate_fvm_nand || fvm_ftl_nand_block_count != false
+  generate_vbmeta = use_vbmeta
 
   base_packages = [
     "//src/connectivity/overnet/overnetstack",

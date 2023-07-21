@@ -95,16 +95,7 @@ fvm_partition = "fvm"
 # chromebook partition.
 active_partition = "d"
 
-# TODO(fxbug.dev/78185): don't hardcode the expected size, we should instead
-# inflate to whatever the FVM partition size is at runtime.
-#
-# For now just hardcode 16GiB which is the minimum FVM partition size defined
-# in the chromebook-x64 paver:
-# http://cs/fuchsia/src/storage/lib/paver/chromebook-x64.cc?l=124
-#
-# This also assumes we are not using raw NAND but that's a safer assumption.
-# In this case "emmc" is a misnomer, it really just means "not raw NAND".
-fvm_emmc_partition_size = 17179869184
+assembly_generate_fvm_fastboot = true
 
 firmware_prebuilts = [
   {

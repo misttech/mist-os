@@ -67,8 +67,7 @@ fvm_partition = "fvm"
 active_partition = "a"
 fastboot_product = "buckeye"
 
-# BUCKEYE has 8GB in total, give a safer value(3GB) temporarily
-fvm_emmc_partition_size = 3221225472
+assembly_generate_fvm_fastboot = true
 
 # Supports only physical devices.
 board_is_emu = false

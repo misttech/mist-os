@@ -156,7 +156,10 @@ declare_args() {
   # Specifying this parameter will lead build to generate a fvm.fastboot.blk
   # suitable for flashing through fastboot for eMMC devices.
   # Informs GN that a nand-fvm will be outputted.
+  # TODO(b/291945693): Delete fvm_emmc_partition_size when all users have moved
+  # to generate_fastboot_fvm.
   fvm_emmc_partition_size = false
+  assembly_generate_fvm_fastboot = false
 
   # Specifying these variables will generate a NAND FVM image suitable for
   # directly flashing via fastboot. The NAND characteristics are required
@@ -164,7 +167,10 @@ declare_args() {
   # `fvm_max_disk_size` should also be nonzero or else minfs will not have any
   # room to initialize on boot.
   # Informs GN that a nand-fvm will be outputted along with a temporary file.
+  # TODO(b/291945693): Delete fvm_ftl_nand_block_count when all users have moved
+  # to generate_nand_fvm.
   fvm_ftl_nand_block_count = false
+  assembly_generate_fvm_nand = false
 
   # Allows a product to specify the recovery image used in the zirconr slot.
   # Default recovery image is zedboot. Overriding this value will keep zedboot
