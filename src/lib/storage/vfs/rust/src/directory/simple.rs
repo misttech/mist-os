@@ -119,8 +119,10 @@ where
             }
         }
     }
-    /// Registers a given function to be used when an item that is not present is opened. Typically
-    /// used for logging.
+
+    /// The provided function will be called whenever this VFS receives an open request for a path
+    /// that is not present in the VFS. The function is invoked with the full path of the missing
+    /// entry, relative to the root of this VFS. Typically this function is used for logging.
     pub fn set_not_found_handler(
         self: Arc<Self>,
         handler: Box<dyn FnMut(&str) + Send + Sync + 'static>,
@@ -204,9 +206,8 @@ where
             }
         };
 
-        // Create copies so if this fails to open we can call the not found handler
+        // Create a copy so if this fails to open we can call the not found handler
         let ref_copy = self.clone();
-        let name_copy = name.to_string();
 
         // Do not hold the mutex more than necessary and the Mutex is not re-entrant.  So we need to
         // make sure to release the lock before we call `open()` is it may turn out to be a
@@ -220,21 +221,17 @@ where
             self.get_or_insert_entry(scope.clone(), flags, name, path_ref)
         };
         let describe = flags.intersects(fio::OpenFlags::DESCRIBE);
-        let found = match res {
+        match res {
             Err(status) => {
                 send_on_open_with_error(describe, server_end, status);
-                false
+
+                let mut handler = ref_copy.not_found_handler.lock().unwrap();
+                if let Some(handler) = handler.as_mut() {
+                    handler(path_ref.as_str());
+                }
             }
             Ok(entry) => {
                 entry.open(scope, flags, path, server_end);
-                true
-            }
-        };
-
-        if !found {
-            let mut handler = ref_copy.not_found_handler.lock().unwrap();
-            if let Some(handler) = handler.as_mut() {
-                handler(&name_copy);
             }
         }
     }
@@ -515,7 +512,9 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::file::vmo::read_only;
+    use crate::{assert_event, file::vmo::read_only};
+    use fidl::endpoints::create_proxy;
+    use std::sync::{Arc, Mutex};
 
     #[test]
     fn add_entry_success() {
@@ -543,5 +542,44 @@ mod tests {
             .add_entry("a".repeat(10000), read_only(b"test"))
             .expect_err("add entry whose name is too long should fail");
         assert_eq!(status, Status::BAD_PATH);
+    }
+
+    #[fuchsia::test]
+    async fn not_found_handler() {
+        let dir = crate::directory::mutable::simple();
+        let path_mutex = Arc::new(Mutex::new(None));
+        let path_mutex_clone = path_mutex.clone();
+        dir.clone().set_not_found_handler(Box::new(move |path| {
+            *path_mutex_clone.lock().unwrap() = Some(path.to_string());
+        }));
+
+        let sub_dir = crate::directory::mutable::simple();
+        let path_mutex_clone = path_mutex.clone();
+        sub_dir.clone().set_not_found_handler(Box::new(move |path| {
+            *path_mutex_clone.lock().unwrap() = Some(path.to_string());
+        }));
+        dir.add_entry("dir", sub_dir).expect("add entry with valid filename should succeed");
+
+        dir.add_entry("file", read_only(b"test"))
+            .expect("add entry with valid filename should succeed");
+
+        let scope = ExecutionScope::new();
+
+        for (path, expectation) in vec![
+            (".", None),
+            ("does-not-exist", Some("does-not-exist".to_string())),
+            ("file", None),
+            ("dir", None),
+            ("dir/does-not-exist", Some("dir/does-not-exist".to_string())),
+        ] {
+            let (proxy, server_end) =
+                create_proxy::<fio::NodeMarker>().expect("Failed to create connection endpoints");
+            let flags = fio::OpenFlags::NODE_REFERENCE | fio::OpenFlags::DESCRIBE;
+            let path = Path::validate_and_split(path).unwrap();
+            dir.clone().open(scope.clone(), flags, path, server_end.into_channel().into());
+            assert_event!(proxy, fio::NodeEvent::OnOpen_ { .. }, {});
+
+            assert_eq!(expectation, path_mutex.lock().unwrap().take());
+        }
     }
 }

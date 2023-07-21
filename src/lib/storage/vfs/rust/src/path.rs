@@ -149,6 +149,11 @@ impl Path {
         self.inner
     }
 
+    /// Returns a reference to the full string that represents this path.
+    pub fn as_str(&self) -> &str {
+        self.inner.as_str()
+    }
+
     /// Like `into_string` but returns a reference and the path returned is valid for fuchsia.io
     /// i.e. if there are no remaining components, "." is returned.
     fn remainder(&self) -> &str {
@@ -168,6 +173,8 @@ impl PartialEq for Path {
 impl Eq for Path {}
 
 impl AsRef<str> for Path {
+    /// Returns a reference to the remaining portion of this path that will be used in future
+    /// `next` calls.
     fn as_ref(&self) -> &str {
         self.remainder()
     }
@@ -464,6 +471,28 @@ mod tests {
                 assert_eq!(path.into_string(), "".to_string());
             }
         }
+    }
+
+    #[test]
+    fn as_str() {
+        simple_construction_test! {
+            path: "a/b/c",
+            mut path => {
+                assert!(!path.is_empty());
+                assert!(!path.is_dir());
+                assert!(!path.is_single_component());
+                assert_eq!(path.as_ref(), "a/b/c");
+                assert_eq!(path.as_str(), "a/b/c");
+                assert_eq!(path.next(), Some("a"));
+                assert_eq!(path.as_str(), "a/b/c");
+                assert_eq!(path.next(), Some("b"));
+                assert_eq!(path.as_str(), "a/b/c");
+                assert_eq!(path.next(), Some("c"));
+                assert_eq!(path.as_str(), "a/b/c");
+                assert_eq!(path.next(), None);
+                assert_eq!(path.as_str(), "a/b/c");
+            }
+        };
     }
 
     #[test]
