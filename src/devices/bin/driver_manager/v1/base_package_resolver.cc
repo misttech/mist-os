@@ -89,9 +89,17 @@ zx::result<std::unique_ptr<Driver>> BasePackageResolver::FetchDriver(
 zx::result<fidl::WireSyncClient<fio::Directory>> BasePackageResolver::GetPackageDir(
     const std::string& url) {
   if (component::FuchsiaPkgUrl::IsFuchsiaPkgScheme(url)) {
-    return Resolve(url);
+    return ResolveBaseUrl(url);
   }
-
+  // Attempt to resolve the package from the boot url using the boot resolver.
+  // If the package for the url is not found (ZX_ERR_NOT_FOUND is returned),
+  // then continue on and return a proxy to /boot.
+  if (IsFuchsiaBootScheme(url)) {
+    zx::result resolve_boot_result = ResolveBootUrl(url);
+    if (resolve_boot_result.status_value() != ZX_ERR_NOT_FOUND) {
+      return resolve_boot_result;
+    }
+  }
   zx::result base_path_result = GetBasePathFromUrl(url);
   if (base_path_result.is_error()) {
     LOGF(ERROR, "Failed to get base path of url: '%s'", url.c_str());
@@ -114,50 +122,72 @@ zx::result<fidl::WireSyncClient<fio::Directory>> BasePackageResolver::GetPackage
   return zx::ok(fidl::WireSyncClient<fio::Directory>{std::move(client_end)});
 }
 
-zx::result<fidl::WireSyncClient<fio::Directory>> BasePackageResolver::Resolve(
+static zx_status_t map_resolve_err_to_zx_status(
+    fuchsia_component_resolution::wire::ResolverError resolver_error) {
+  switch (resolver_error) {
+    case fuchsia_component_resolution::wire::ResolverError::kIo:
+      return ZX_ERR_IO;
+    case fuchsia_component_resolution::wire::ResolverError::kManifestNotFound:
+      return ZX_ERR_NOT_FOUND;
+    case fuchsia_component_resolution::wire::ResolverError::kPackageNotFound:
+      return ZX_ERR_NOT_FOUND;
+    case fuchsia_component_resolution::wire::ResolverError::kResourceUnavailable:
+      return ZX_ERR_UNAVAILABLE;
+    case fuchsia_component_resolution::wire::ResolverError::kInvalidManifest:
+      return ZX_ERR_INVALID_ARGS;
+    case fuchsia_component_resolution::wire::ResolverError::kInvalidArgs:
+      return ZX_ERR_INVALID_ARGS;
+    case fuchsia_component_resolution::wire::ResolverError::kInvalidAbiRevision:
+      return ZX_ERR_INVALID_ARGS;
+    case fuchsia_component_resolution::wire::ResolverError::kNoSpace:
+      return ZX_ERR_NO_SPACE;
+    case fuchsia_component_resolution::wire::ResolverError::kNotSupported:
+      return ZX_ERR_NOT_SUPPORTED;
+    case fuchsia_component_resolution::wire::ResolverError::kAbiRevisionNotFound:
+      return ZX_ERR_NOT_FOUND;
+    default:
+      return ZX_ERR_INTERNAL;
+  }
+}
+
+zx::result<fidl::WireSyncClient<fio::Directory>> BasePackageResolver::ResolveBaseUrl(
     const std::string& component_url) {
-  if (!resolver_client_.is_valid()) {
+  if (!base_resolver_client_.is_valid()) {
     if (zx_status_t status = ConnectToResolverService(); status != ZX_OK) {
-      LOGF(ERROR, "Failed to connect to base package resolver service %s",
+      LOGF(ERROR, "Failed to connect to base component resolver service %s",
            zx_status_get_string(status));
       return zx::error(status);
     }
   }
-
-  // TODO(fxbug.dev/123042) This is synchronous for now so we can get the proof of concept working.
-  // Eventually we will want to do this asynchronously.
-  auto result =
-      resolver_client_->Resolve(fidl::StringView(fidl::StringView::FromExternal(component_url)));
+  // TODO(fxbug.dev/123042) This is synchronous for now so we can get the proof of concept
+  // working. Eventually we will want to do this asynchronously.
+  auto result = base_resolver_client_->Resolve((fidl::StringView::FromExternal(component_url)));
   if (!result.ok() || result->is_error()) {
-    LOGF(ERROR, "Failed to resolve base package");
+    LOGF(ERROR, "Failed to resolve boot package");
     if (!result.ok()) {
       return zx::error(ZX_ERR_INTERNAL);
-    } else {
-      switch (result->error_value()) {
-        case fuchsia_component_resolution::wire::ResolverError::kIo:
-          return zx::error(ZX_ERR_IO);
-        case fuchsia_component_resolution::wire::ResolverError::kManifestNotFound:
-          return zx::error(ZX_ERR_NOT_FOUND);
-        case fuchsia_component_resolution::wire::ResolverError::kPackageNotFound:
-          return zx::error(ZX_ERR_NOT_FOUND);
-        case fuchsia_component_resolution::wire::ResolverError::kResourceUnavailable:
-          return zx::error(ZX_ERR_UNAVAILABLE);
-        case fuchsia_component_resolution::wire::ResolverError::kInvalidManifest:
-          return zx::error(ZX_ERR_INVALID_ARGS);
-        case fuchsia_component_resolution::wire::ResolverError::kInvalidArgs:
-          return zx::error(ZX_ERR_INVALID_ARGS);
-        case fuchsia_component_resolution::wire::ResolverError::kInvalidAbiRevision:
-          return zx::error(ZX_ERR_INVALID_ARGS);
-        case fuchsia_component_resolution::wire::ResolverError::kNoSpace:
-          return zx::error(ZX_ERR_NO_SPACE);
-        case fuchsia_component_resolution::wire::ResolverError::kNotSupported:
-          return zx::error(ZX_ERR_NOT_SUPPORTED);
-        case fuchsia_component_resolution::wire::ResolverError::kAbiRevisionNotFound:
-          return zx::error(ZX_ERR_NOT_FOUND);
-        default:
-          return zx::error(ZX_ERR_INTERNAL);
-      }
     }
+    return zx::error(map_resolve_err_to_zx_status(result->error_value()));
+  }
+  return zx::ok(fidl::WireSyncClient(std::move(result.value()->component.package().directory())));
+}
+
+zx::result<fidl::WireSyncClient<fio::Directory>> BasePackageResolver::ResolveBootUrl(
+    const std::string& package_url) {
+  if (!boot_resolver_client_.is_valid()) {
+    if (zx_status_t status = ConnectToBootResolverService(); status != ZX_OK) {
+      LOGF(ERROR, "Failed to connect to boot package resolver service %s",
+           zx_status_get_string(status));
+      return zx::error(status);
+    }
+  }
+  auto result = boot_resolver_client_->Resolve((fidl::StringView::FromExternal(package_url)));
+  if (!result.ok() || result->is_error()) {
+    LOGF(ERROR, "Failed to resolve boot package");
+    if (!result.ok()) {
+      return zx::error(ZX_ERR_INTERNAL);
+    }
+    return zx::error(map_resolve_err_to_zx_status(result->error_value()));
   }
   return zx::ok(fidl::WireSyncClient(std::move(result.value()->component.package().directory())));
 }
@@ -168,8 +198,17 @@ zx_status_t BasePackageResolver::ConnectToResolverService() {
   if (client_end.is_error()) {
     return client_end.error_value();
   }
-  resolver_client_ = fidl::WireSyncClient(std::move(*client_end));
+  base_resolver_client_ = fidl::WireSyncClient(std::move(*client_end));
   return ZX_OK;
 }
 
+zx_status_t BasePackageResolver::ConnectToBootResolverService() {
+  auto client_end = component::Connect<fuchsia_component_resolution::Resolver>(
+      "/svc/fuchsia.component.resolution.Resolver-boot");
+  if (client_end.is_error()) {
+    return client_end.error_value();
+  }
+  boot_resolver_client_ = fidl::WireSyncClient(std::move(*client_end));
+  return ZX_OK;
+}
 }  // namespace internal

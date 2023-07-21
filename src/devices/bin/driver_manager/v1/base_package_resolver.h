@@ -25,14 +25,23 @@ class BasePackageResolver : public PackageResolverInterface {
   // Creates the directory client for |url|.
   zx::result<fidl::WireSyncClient<fuchsia_io::Directory>> GetPackageDir(const std::string& url);
 
-  // Connects to the base package resolver service if not already connected.
+  // Connects to the base component resolver service if not already connected.
   zx_status_t ConnectToResolverService();
 
-  // Returns a resolved component for a fuchsia-pkg:// |component_url|.
-  zx::result<fidl::WireSyncClient<fuchsia_io::Directory>> Resolve(const std::string& component_url);
+  // Connects to the boot component resolver service if not already connected.
+  zx_status_t ConnectToBootResolverService();
+
+  // Returns a resolved component's package directory for a fuchsia-pkg:// |component_url|.
+  zx::result<fidl::WireSyncClient<fuchsia_io::Directory>> ResolveBaseUrl(
+      const std::string& component_url);
+
+  // Returns a resolved component's package directory for a fuchsia-boot:// |component_url|.
+  zx::result<fidl::WireSyncClient<fuchsia_io::Directory>> ResolveBootUrl(
+      const std::string& package_url);
 
   fidl::WireSyncClient<fuchsia_boot::Arguments>* boot_args_;
-  fidl::WireSyncClient<fuchsia_component_resolution::Resolver> resolver_client_;
+  fidl::WireSyncClient<fuchsia_component_resolution::Resolver> base_resolver_client_;
+  fidl::WireSyncClient<fuchsia_component_resolution::Resolver> boot_resolver_client_;
 };
 }  // namespace internal
 
