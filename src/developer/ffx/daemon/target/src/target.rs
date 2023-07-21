@@ -5,7 +5,7 @@
 use crate::{
     fastboot::{get_var, network::tcp::TcpNetworkFactory, open_interface_with_serial},
     logger::{streamer::DiagnosticsStreamer, Logger},
-    overnet::host_pipe::{spawn, spawn_circuit, HostAddr, LogBuffer},
+    overnet::host_pipe::{spawn, HostAddr, LogBuffer},
     FASTBOOT_MAX_AGE, MDNS_MAX_AGE, ZEDBOOT_MAX_AGE,
 };
 use addr::TargetAddr;
@@ -964,47 +964,21 @@ impl Target {
                 }
             }
 
-            let modes = ffx_config::get_connection_modes().await;
             let watchdogs: bool =
                 ffx_config::get("watchdogs.host_pipe.enabled").await.unwrap_or(false);
-            let legacy = async {
-                if modes.use_legacy() {
-                    let nr = spawn(weak_target.clone(), watchdogs).await;
-                    match nr {
-                        Ok(mut hp) => {
-                            tracing::debug!(
-                                "Legacy host pipe spawn returned OK for {target_name_str}"
-                            );
-                            let r = hp.wait().await;
-                            // XXX(raggi): decide what to do with this log data:
-                            tracing::info!("HostPipeConnection returned: {:?}", r);
-                        }
-                        Err(e) => {
-                            tracing::warn!("HostPipeBuilderConnection returned: {:?}", e);
-                        }
-                    }
+            let nr = spawn(weak_target.clone(), watchdogs).await;
+            match nr {
+                Ok(mut hp) => {
+                    tracing::debug!("host pipe spawn returned OK for {target_name_str}");
+                    let r = hp.wait().await;
+                    // XXX(raggi): decide what to do with this log data:
+                    tracing::info!("HostPipeConnection returned: {:?}", r);
                 }
-            };
-            let circuit = async {
-                if modes.use_cso() {
-                    let nr = spawn_circuit(weak_target.clone(), watchdogs).await;
-                    match nr {
-                        Ok(mut hp) => {
-                            tracing::debug!(
-                                "Circuit host pipe spawn_circuit returned OK for {target_name_str}"
-                            );
-                            let r = hp.wait().await;
-                            // XXX(raggi): decide what to do with this log data:
-                            tracing::info!("Circuit HostPipeConnection returned: {:?}", r);
-                        }
-                        Err(e) => {
-                            tracing::warn!("Circuit host pipe spawn_circuit {:?}", e);
-                        }
-                    }
+                Err(e) => {
+                    tracing::warn!("Host pipe spawn {:?}", e);
                 }
-            };
+            }
 
-            futures::future::join(legacy, circuit).await;
             weak_target.upgrade().and_then(|target| {
                 tracing::debug!("Exiting run_host_pipe for {target_name_str}");
                 target.host_pipe.borrow_mut().take()

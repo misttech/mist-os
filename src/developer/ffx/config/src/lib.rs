@@ -206,56 +206,6 @@ pub async fn show_metrics_status<W: Write>(mut writer: W) -> Result<()> {
     Ok(())
 }
 
-/// Indicates whether we should use CSO or Legacy overnet connections.
-#[derive(Copy, Clone, PartialEq, Eq)]
-pub enum ConnectionModes {
-    CsoEnabled,
-    CsoDisabled,
-    CsoOnly,
-}
-
-impl ConnectionModes {
-    /// Whether we should use CSO connections.
-    pub fn use_cso(&self) -> bool {
-        match self {
-            ConnectionModes::CsoEnabled | ConnectionModes::CsoOnly => true,
-            ConnectionModes::CsoDisabled => false,
-        }
-    }
-
-    /// Whether we should use Legacy connections.
-    pub fn use_legacy(&self) -> bool {
-        match self {
-            ConnectionModes::CsoEnabled | ConnectionModes::CsoDisabled => true,
-            ConnectionModes::CsoOnly => false,
-        }
-    }
-}
-
-/// Ask the config whether we should use legacy overnet or CSO to connect, or both.
-pub async fn get_connection_modes() -> ConnectionModes {
-    let mode: Option<String> = get("overnet.cso").await.unwrap_or_else(|e| {
-        tracing::warn!("Error getting `overnet.cso` config option: {:?}", e);
-        None
-    });
-
-    mode.as_ref()
-        .and_then(|x| match x.as_str() {
-            "enabled" => Some(ConnectionModes::CsoEnabled),
-            "disabled" => Some(ConnectionModes::CsoDisabled),
-            "only" => Some(ConnectionModes::CsoOnly),
-            other => {
-                tracing::warn!(
-                    "{:?} is not a valid value for the `overnet.cso` config \
-                                (should be \"enabled\", \"disabled\" or \"only\")",
-                    other
-                );
-                None
-            }
-        })
-        .unwrap_or(ConnectionModes::CsoEnabled)
-}
-
 ////////////////////////////////////////////////////////////////////////////////
 // tests
 #[cfg(test)]

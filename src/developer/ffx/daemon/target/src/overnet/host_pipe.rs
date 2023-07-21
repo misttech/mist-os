@@ -12,7 +12,6 @@ use ffx_ssh::ssh::build_ssh_command;
 use fuchsia_async::{unblock, Task, Timer};
 use futures::io::{copy_buf, AsyncBufRead, BufReader};
 use futures_lite::{io::AsyncBufReadExt, stream::StreamExt};
-use hoist::OvernetInstance;
 use shared_child::SharedChild;
 use std::{
     cell::RefCell,
@@ -94,23 +93,6 @@ pub(crate) trait HostPipeChildBuilder {
 }
 
 #[derive(Copy, Clone)]
-pub(crate) struct HostPipeChildCircuitBuilder {}
-
-#[async_trait(?Send)]
-impl HostPipeChildBuilder for HostPipeChildCircuitBuilder {
-    async fn new(
-        &self,
-        addr: SocketAddr,
-        id: u64,
-        stderr_buf: Rc<LogBuffer>,
-        event_queue: events::Queue<TargetEvent>,
-        watchdogs: bool,
-    ) -> Result<(Option<HostAddr>, HostPipeChild)> {
-        HostPipeChild::new_inner(addr, id, stderr_buf, event_queue, true, watchdogs).await
-    }
-}
-
-#[derive(Copy, Clone)]
 pub(crate) struct HostPipeChildDefaultBuilder {}
 
 #[async_trait(?Send)]
@@ -123,7 +105,7 @@ impl HostPipeChildBuilder for HostPipeChildDefaultBuilder {
         event_queue: events::Queue<TargetEvent>,
         watchdogs: bool,
     ) -> Result<(Option<HostAddr>, HostPipeChild)> {
-        HostPipeChild::new_inner(addr, id, stderr_buf, event_queue, false, watchdogs).await
+        HostPipeChild::new_inner(addr, id, stderr_buf, event_queue, watchdogs).await
     }
 }
 
@@ -164,7 +146,6 @@ impl HostPipeChild {
         id: u64,
         stderr_buf: Rc<LogBuffer>,
         event_queue: events::Queue<TargetEvent>,
-        circuit: bool,
         watchdogs: bool,
     ) -> Result<(Option<HostAddr>, HostPipeChild)> {
         // TODO (119900): Re-enable ABI checks when ffx repository server uses ssh to setup
@@ -172,10 +153,7 @@ impl HostPipeChild {
         let id_string = format!("{}", id);
         let mut args = vec!["echo", "++ $SSH_CONNECTION ++", "&&", "remote_control_runner"];
 
-        if circuit {
-            args.push("--circuit");
-        }
-
+        args.push("--circuit");
         args.push(id_string.as_str());
 
         // Before running remote_control_runner, we look up the environment
@@ -198,7 +176,7 @@ impl HostPipeChild {
         // todo(fxb/108692) remove this use of the global hoist when we put the main one in the environment context
         // instead -- this one is very deeply embedded, but isn't used by tests (that I've found).
         let (pipe_rx, mut pipe_tx) = futures::AsyncReadExt::split(
-            overnet_pipe(hoist::hoist(), circuit).context("creating local overnet pipe")?,
+            overnet_pipe(hoist::hoist()).context("creating local overnet pipe")?,
         );
 
         let stdout =
@@ -401,20 +379,6 @@ where
     }
 }
 
-pub(crate) async fn spawn_circuit(
-    target: Weak<Target>,
-    watchdogs: bool,
-) -> Result<HostPipeConnection<HostPipeChildCircuitBuilder>> {
-    let host_pipe_child_builder = HostPipeChildCircuitBuilder {};
-    HostPipeConnection::<HostPipeChildCircuitBuilder>::spawn_with_builder(
-        target,
-        host_pipe_child_builder,
-        RETRY_DELAY,
-        watchdogs,
-    )
-    .await
-}
-
 pub(crate) async fn spawn(
     target: Weak<Target>,
     watchdogs: bool,
@@ -433,7 +397,11 @@ impl<T> HostPipeConnection<T>
 where
     T: HostPipeChildBuilder + Copy,
 {
-    async fn start_child_pipe(target: &Weak<Target>, builder: T, watchdogs: bool) -> Result<Arc<HostPipeChild>> {
+    async fn start_child_pipe(
+        target: &Weak<Target>,
+        builder: T,
+        watchdogs: bool,
+    ) -> Result<Arc<HostPipeChild>> {
         let target = target.upgrade().ok_or(anyhow!("Target has gone"))?;
         let target_nodename = target.nodename();
         tracing::debug!("Spawning new host-pipe instance to target {:?}", target_nodename);
@@ -516,22 +484,21 @@ where
             );
             Timer::new(self.relaunch_command_delay).await;
 
-            let hpc =
-                Self::start_child_pipe(&Rc::downgrade(&self.target), self.host_pipe_child_builder, self.watchdogs)
-                    .await?;
+            let hpc = Self::start_child_pipe(
+                &Rc::downgrade(&self.target),
+                self.host_pipe_child_builder,
+                self.watchdogs,
+            )
+            .await?;
             self.inner = hpc;
         }
     }
 }
 
-fn overnet_pipe(overnet_instance: &hoist::Hoist, circuit: bool) -> Result<fidl::AsyncSocket> {
+fn overnet_pipe(overnet_instance: &hoist::Hoist) -> Result<fidl::AsyncSocket> {
     let (local_socket, remote_socket) = fidl::Socket::create_stream();
     let local_socket = fidl::AsyncSocket::from_socket(local_socket)?;
-    if circuit {
-        overnet_instance.start_client_socket(remote_socket).detach();
-    } else {
-        overnet_instance.connect_as_mesh_controller()?.attach_socket_link(remote_socket)?;
-    }
+    overnet_instance.start_client_socket(remote_socket).detach();
 
     Ok(local_socket)
 }
@@ -646,7 +613,7 @@ mod test {
             Rc::downgrade(&target),
             FakeHostPipeChildBuilder { operation_type: ChildOperationType::Normal },
             Duration::default(),
-            false
+            false,
         )
         .await;
         assert_matches!(res, Ok(_));
@@ -664,7 +631,7 @@ mod test {
             Rc::downgrade(&target),
             FakeHostPipeChildBuilder { operation_type: ChildOperationType::InternalFailure },
             Duration::default(),
-            false
+            false,
         )
         .await;
         assert!(res.is_err());

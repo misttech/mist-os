@@ -15,21 +15,6 @@ use termion::is_tty;
 
 pub mod asserts;
 
-// Pass the value of the config_key into the isolate.
-// (Note that due to interior mutability, the isolate will
-// be changed even though it's not &mut)
-async fn set_in_isolate(
-    context: &ffx_config::EnvironmentContext,
-    isolate: &ffx_isolate::Isolate,
-    config_key: &str,
-) -> Result<()> {
-    let val: Option<String> = context.get(config_key).await?;
-    if let Some(s) = val {
-        set_value_in_isolate(&isolate, config_key, Value::String(s)).await?;
-    }
-    Ok(())
-}
-
 // Set a config value
 // (Note that due to interior mutability, the isolate will
 // be changed even though it's not &mut)
@@ -58,7 +43,6 @@ pub async fn new_isolate(name: &str) -> Result<ffx_isolate::Isolate> {
     let ssh_key = ffx_config::get::<String, _>("ssh.priv").await?.into();
     let context = global_env_context().context("No global context")?;
     let isolate = ffx_isolate::Isolate::new_with_sdk(name, ssh_key, &context).await?;
-    set_in_isolate(&context, &isolate, "overnet.cso").await?;
     set_value_in_isolate(&isolate, "watchdogs.host_pipe.enabled", true.into()).await?;
     // Globally change the log file to one appropriate to the isolate.  We'll reset it after
     // the test completes
