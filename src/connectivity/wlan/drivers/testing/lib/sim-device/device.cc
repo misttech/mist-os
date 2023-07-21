@@ -41,6 +41,7 @@ void DeviceAddArgs::CopyRawDeviceAddArgs(const device_add_args_t& args) {
       // expecting the lifetime of the ops to outlast the device's lifetime.
       .proto_ops = args.proto_ops,
       .flags = args.flags,
+      .outgoing_dir_channel = args.outgoing_dir_channel,
   };
 
   // Update our local copies.
@@ -69,7 +70,7 @@ void DeviceAddArgs::CopyRawDeviceAddArgs(const device_add_args_t& args) {
 
   // Update the raw pointers in our device_add_args_t to point to our locally copied data.
   SetRawPointers();
-}
+}  // namespace wlan::simulation
 
 void DeviceAddArgs::SetRawPointers() {
   // Some of the information in device_add_args_t must point to our local copies
@@ -270,7 +271,6 @@ void FakeDevMgr::DeviceAsyncRemove(zx_device_t* device) {
     unbind_state_ = DdkCallState::kCallPending;
     return;
   }
-
   // TODO(fxbug.dev/76420) - Add async support for DeviceUnbind()
   DeviceUnbind(device);
 }

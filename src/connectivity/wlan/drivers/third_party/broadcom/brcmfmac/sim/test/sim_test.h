@@ -20,11 +20,13 @@
 #include "src/connectivity/wlan/drivers/third_party/broadcom/brcmfmac/sim/sim_device.h"
 #include "zircon/system/ulib/sync/include/lib/sync/cpp/completion.h"
 
+namespace wlan_fullmac = fuchsia_wlan_fullmac::wire;
+
 namespace wlan::brcmfmac {
 
 // This class represents an interface created on a simulated device, collecting all of the
 // attributes related to that interface.
-class SimInterface {
+class SimInterface : public fdf::WireServer<fuchsia_wlan_fullmac::WlanFullmacImplIfc> {
  public:
   // Track state of association
   struct AssocContext {
@@ -36,26 +38,26 @@ class SimInterface {
 
     common::MacAddr bssid;
     std::vector<uint8_t> ies;
-    wlan_channel_t channel;
+    wlan_common::WlanChannel channel;
   };
 
   struct SoftApContext {
-    cssid_t ssid;
+    wlan_ieee80211::CSsid ssid;
   };
 
   // Useful statistics about operations performed
   struct Stats {
     size_t connect_attempts = 0;
     size_t connect_successes = 0;
-    std::list<wlan_fullmac_connect_confirm_t> connect_results;
-    std::list<wlan_fullmac_assoc_ind_t> assoc_indications;
-    std::list<wlan_fullmac_auth_ind_t> auth_indications;
-    std::list<wlan_fullmac_deauth_confirm_t> deauth_results;
-    std::list<wlan_fullmac_deauth_indication_t> deauth_indications;
-    std::list<wlan_fullmac_disassoc_indication_t> disassoc_indications;
-    std::list<wlan_fullmac_channel_switch_info_t> csa_indications;
-    std::list<wlan_fullmac_start_confirm_t> start_confirmations;
-    std::list<wlan_fullmac_stop_confirm_t> stop_confirmations;
+    std::list<wlan_fullmac::WlanFullmacConnectConfirm> connect_results;
+    std::list<wlan_fullmac::WlanFullmacAssocInd> assoc_indications;
+    std::list<wlan_fullmac::WlanFullmacAuthInd> auth_indications;
+    std::list<wlan_fullmac::WlanFullmacDeauthConfirm> deauth_results;
+    std::list<wlan_fullmac::WlanFullmacDeauthIndication> deauth_indications;
+    std::list<wlan_fullmac::WlanFullmacDisassocIndication> disassoc_indications;
+    std::list<wlan_fullmac::WlanFullmacChannelSwitchInfo> csa_indications;
+    std::list<wlan_fullmac::WlanFullmacStartConfirm> start_confirmations;
+    std::list<wlan_fullmac::WlanFullmacStopConfirm> stop_confirmations;
   };
 
   // Default scan options
@@ -64,59 +66,85 @@ class SimInterface {
   static constexpr uint32_t kDefaultPassiveScanDwellTimeMs = 120;
 
   // SoftAP defaults
-  static constexpr cssid_t kDefaultSoftApSsid = {.len = 10, .data = "Sim_SoftAP"};
-  static constexpr wlan_channel_t kDefaultSoftApChannel = {
-      .primary = 11, .cbw = CHANNEL_BANDWIDTH_CBW20, .secondary80 = 0};
+  static constexpr wlan_ieee80211::CSsid kDefaultSoftApSsid = {.len = 10,
+                                                               .data = {
+                                                                   .data_ = "Sim_SoftAP",
+                                                               }};
+  static constexpr wlan_common::WlanChannel kDefaultSoftApChannel = {
+      .primary = 11, .cbw = wlan_common::ChannelBandwidth::kCbw20, .secondary80 = 0};
   static constexpr uint32_t kDefaultSoftApBeaconPeriod = 100;
   static constexpr uint32_t kDefaultSoftApDtimPeriod = 100;
 
-  SimInterface() = default;
+  SimInterface();
   SimInterface(const SimInterface&) = delete;
+  ~SimInterface();
 
-  zx_status_t Init(std::shared_ptr<simulation::Environment> env, wlan_mac_role_t role);
+  zx_status_t Init(std::shared_ptr<simulation::Environment> env, wlan_common::WlanMacRole role);
 
-  ~SimInterface() {
-    if (if_impl_ops_)
-      if_impl_ops_->stop(if_impl_ctx_);
-    if (ch_sme_ != ZX_HANDLE_INVALID) {
-      zx_handle_close(ch_sme_);
-    }
-    if (ch_mlme_ != ZX_HANDLE_INVALID) {
-      zx_handle_close(ch_mlme_);
-    }
-  }
+  // This function establish connection between this object and WlanInterface instance.
+  zx_status_t Connect(fdf::ClientEnd<fuchsia_wlan_fullmac::WlanFullmacImpl> client_end);
+
+  // Create server_dispatcher_.
+  void CreateDispatcher();
+  // Shutdown server_dispatcher_.
+  void DestroyDispatcher();
 
   // Default SME Callbacks
-  virtual void OnScanResult(const wlan_fullmac_scan_result_t* result);
-  virtual void OnScanEnd(const wlan_fullmac_scan_end_t* end);
-  virtual void OnAuthInd(const wlan_fullmac_auth_ind_t* resp);
-  virtual void OnDeauthConf(const wlan_fullmac_deauth_confirm_t* resp);
-  virtual void OnDeauthInd(const wlan_fullmac_deauth_indication_t* ind);
-  virtual void OnConnectConf(const wlan_fullmac_connect_confirm_t* resp);
-  virtual void OnRoamConf(const wlan_fullmac_roam_confirm_t* resp);
-  virtual void OnAssocInd(const wlan_fullmac_assoc_ind_t* ind);
-  virtual void OnDisassocConf(const wlan_fullmac_disassoc_confirm_t* resp) {}
-  virtual void OnDisassocInd(const wlan_fullmac_disassoc_indication_t* ind);
-  virtual void OnStartConf(const wlan_fullmac_start_confirm_t* resp);
-  virtual void OnStopConf(const wlan_fullmac_stop_confirm_t* resp);
-  virtual void OnEapolConf(const wlan_fullmac_eapol_confirm_t* resp) {}
-  virtual void OnChannelSwitch(const wlan_fullmac_channel_switch_info_t* ind);
-  virtual void OnSignalReport(const wlan_fullmac_signal_report_indication_t* ind) {}
-  virtual void OnEapolInd(const wlan_fullmac_eapol_indication_t* ind) {}
-  virtual void OnWmmStatusResp(const zx_status_t status, const wlan_wmm_parameters_t* resp) {}
-  virtual void OnRelayCapturedFrame(const wlan_fullmac_captured_frame_result_t* result) {}
+  // Implementation of fuchsia_wlan_fullmac::WlanFullmacImplIfc.
+  void OnScanResult(OnScanResultRequestView request, fdf::Arena& arena,
+                    OnScanResultCompleter::Sync& completer) override;
+  void OnScanEnd(OnScanEndRequestView request, fdf::Arena& arena,
+                 OnScanEndCompleter::Sync& completer) override;
+  void ConnectConf(ConnectConfRequestView request, fdf::Arena& arena,
+                   ConnectConfCompleter::Sync& completer) override;
+  void RoamConf(RoamConfRequestView request, fdf::Arena& arena,
+                RoamConfCompleter::Sync& completer) override;
+  void AuthInd(AuthIndRequestView request, fdf::Arena& arena,
+               AuthIndCompleter::Sync& completer) override;
+  void DeauthConf(DeauthConfRequestView request, fdf::Arena& arena,
+                  DeauthConfCompleter::Sync& completer) override;
+  void DeauthInd(DeauthIndRequestView request, fdf::Arena& arena,
+                 DeauthIndCompleter::Sync& completer) override;
+  void AssocInd(AssocIndRequestView request, fdf::Arena& arena,
+                AssocIndCompleter::Sync& completer) override;
+  void DisassocConf(DisassocConfRequestView request, fdf::Arena& arena,
+                    DisassocConfCompleter::Sync& completer) override;
+  void DisassocInd(DisassocIndRequestView request, fdf::Arena& arena,
+                   DisassocIndCompleter::Sync& completer) override;
+  void StartConf(StartConfRequestView request, fdf::Arena& arena,
+                 StartConfCompleter::Sync& completer) override;
+  void StopConf(StopConfRequestView request, fdf::Arena& arena,
+                StopConfCompleter::Sync& completer) override;
+  void EapolConf(EapolConfRequestView request, fdf::Arena& arena,
+                 EapolConfCompleter::Sync& completer) override;
+  void OnChannelSwitch(OnChannelSwitchRequestView request, fdf::Arena& arena,
+                       OnChannelSwitchCompleter::Sync& completer) override;
+  void SignalReport(SignalReportRequestView request, fdf::Arena& arena,
+                    SignalReportCompleter::Sync& completer) override;
+  void EapolInd(EapolIndRequestView request, fdf::Arena& arena,
+                EapolIndCompleter::Sync& completer) override;
+  void RelayCapturedFrame(RelayCapturedFrameRequestView request, fdf::Arena& arena,
+                          RelayCapturedFrameCompleter::Sync& completer) override;
+  void OnPmkAvailable(OnPmkAvailableRequestView request, fdf::Arena& arena,
+                      OnPmkAvailableCompleter::Sync& completer) override;
+  void SaeHandshakeInd(SaeHandshakeIndRequestView request, fdf::Arena& arena,
+                       SaeHandshakeIndCompleter::Sync& completer) override;
+  void SaeFrameRx(SaeFrameRxRequestView request, fdf::Arena& arena,
+                  SaeFrameRxCompleter::Sync& completer) override;
+  void OnWmmStatusResp(OnWmmStatusRespRequestView request, fdf::Arena& arena,
+                       OnWmmStatusRespCompleter::Sync& completer) override;
 
   // Query an interface
-  void Query(wlan_fullmac_query_info_t* out_info);
+  void Query(wlan_fullmac::WlanFullmacQueryInfo* out_info);
 
   // Query for MAC sublayer feature support on an interface
-  void QueryMacSublayerSupport(mac_sublayer_support_t* out_resp);
+  void QueryMacSublayerSupport(wlan_common::MacSublayerSupport* out_resp);
 
   // Query for security feature support on an interface
-  void QuerySecuritySupport(security_support_t* out_resp);
+  void QuerySecuritySupport(wlan_common::SecuritySupport* out_resp);
 
   // Query for spectrum management support on an interface
-  void QuerySpectrumManagementSupport(spectrum_management_support_t* out_resp);
+  void QuerySpectrumManagementSupport(wlan_common::SpectrumManagementSupport* out_resp);
 
   // Stop an interface
   void StopInterface();
@@ -127,23 +155,23 @@ class SimInterface {
   // Start an assocation with a fake AP. We can use these for subsequent association events, but
   // not interleaved association events (which I doubt are terribly useful, anyway). Note that for
   // the moment only non-authenticated associations are supported.
-  void StartConnect(const common::MacAddr& bssid, const cssid_t& ssid,
-                    const wlan_channel_t& channel);
+  void StartConnect(const common::MacAddr& bssid, const wlan_ieee80211::CSsid& ssid,
+                    const wlan_common::WlanChannel& channel);
   void AssociateWith(const simulation::FakeAp& ap,
                      std::optional<zx::duration> delay = std::nullopt);
 
-  void DeauthenticateFrom(const common::MacAddr& bssid, reason_code_t reason);
+  void DeauthenticateFrom(const common::MacAddr& bssid, wlan_ieee80211::ReasonCode reason);
 
   // Scan operations
   void StartScan(uint64_t txn_id = 0, bool active = false,
                  std::optional<const std::vector<uint8_t>> channels =
                      std::optional<const std::vector<uint8_t>>{});
-  std::optional<wlan_scan_result_t> ScanResultCode(uint64_t txn_id);
-  const std::list<wlan_fullmac_scan_result_t>* ScanResultList(uint64_t txn_id);
+  std::optional<wlan_fullmac::WlanScanResult> ScanResultCode(uint64_t txn_id);
+  const std::list<wlan_fullmac::WlanFullmacScanResult>* ScanResultList(uint64_t txn_id);
 
   // SoftAP operation
-  void StartSoftAp(const cssid_t& ssid = kDefaultSoftApSsid,
-                   const wlan_channel_t& channel = kDefaultSoftApChannel,
+  void StartSoftAp(const wlan_ieee80211::CSsid& ssid = kDefaultSoftApSsid,
+                   const wlan_common::WlanChannel& channel = kDefaultSoftApChannel,
                    uint32_t beacon_period = kDefaultSoftApBeaconPeriod,
                    uint32_t dtim_period = kDefaultSoftApDtimPeriod);
   void StopSoftAp();
@@ -152,12 +180,7 @@ class SimInterface {
 
   std::shared_ptr<simulation::Environment> env_;
 
-  static wlan_fullmac_impl_ifc_protocol_ops_t default_sme_dispatch_tbl_;
-  wlan_fullmac_impl_ifc_protocol default_ifc_ = {.ops = &default_sme_dispatch_tbl_, .ctx = this};
-
-  // This provides our DDK (wlanif-impl) API into the interface
-  void* if_impl_ctx_ = nullptr;
-  const wlan_fullmac_impl_protocol_ops_t* if_impl_ops_ = nullptr;
+  fdf::WireSyncClient<fuchsia_wlan_fullmac::WlanFullmacImpl> client_;
 
   // Unique identifier provided by the driver
   uint16_t iface_id_;
@@ -176,14 +199,21 @@ class SimInterface {
   // Allows us to track individual operations
   Stats stats_ = {};
 
+  fdf::Arena test_arena_;
+
  private:
-  wlan_mac_role_t role_ = 0;
+  // Dispatch the FIDL request from fuchsia_wlan_fullmac::WlanFullmacImplIfc.
+  fdf::Dispatcher server_dispatcher_;
+  // The completion waits for the completion of the AsyncShutdown() of server_dispatcher_.
+  libsync::Completion server_completion_;
+
+  wlan_common::WlanMacRole role_;
 
   // Track scan results
   struct ScanStatus {
     // If not present, indicates that the scan has not completed yet
-    std::optional<wlan_scan_result_t> result_code = std::nullopt;
-    std::list<wlan_fullmac_scan_result_t> result_list;
+    std::optional<wlan_fullmac::WlanScanResult> result_code = std::nullopt;
+    std::list<wlan_fullmac::WlanFullmacScanResult> result_list;
   };
   // One entry per scan started
   std::map<uint64_t, ScanStatus> scan_results_;
@@ -214,10 +244,8 @@ class SimTest : public ::zxtest::Test, public simulation::StationIfc {
  protected:
   // Create a new interface on the simulated device, providing the specified role and function
   // callbacks
-  zx_status_t StartInterface(
-      wlan_mac_role_t role, SimInterface* sim_ifc,
-      std::optional<const wlan_fullmac_impl_ifc_protocol*> sme_protocol = std::nullopt,
-      std::optional<common::MacAddr> mac_addr = std::nullopt);
+  zx_status_t StartInterface(wlan_common::WlanMacRole role, SimInterface* sim_ifc,
+                             std::optional<common::MacAddr> mac_addr = std::nullopt);
 
   // Stop and delete a SimInterface
   zx_status_t DeleteInterface(SimInterface* ifc);
@@ -238,6 +266,7 @@ class SimTest : public ::zxtest::Test, public simulation::StationIfc {
   fdf::WireSharedClient<fuchsia_wlan_phyimpl::WlanPhyImpl> client_;
   fidl::WireSyncClient<fuchsia_factory_wlan::Iovar> factory_device_;
   fdf::Dispatcher client_dispatcher_;
+  // The dispatcher to manage the lifecycle of devices.
   fdf::Dispatcher driver_dispatcher_;
   fdf::Arena test_arena_;
   libsync::Completion completion_;

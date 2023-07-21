@@ -19,15 +19,16 @@ constexpr zx::duration kSimulatedClockDuration = zx::sec(10);
 }  // namespace
 
 // Some default AP and association request values
-constexpr wlan_channel_t kDefaultChannel = {
-    .primary = 9, .cbw = CHANNEL_BANDWIDTH_CBW20, .secondary80 = 0};
-constexpr cssid_t kDefaultSsid = {.len = 15, .data = "Fuchsia Fake AP"};
+constexpr wlan_common::WlanChannel kDefaultChannel = {
+    .primary = 9, .cbw = wlan_common::ChannelBandwidth::kCbw20, .secondary80 = 0};
+constexpr wlan_ieee80211::CSsid kDefaultSsid = {.len = 15, .data = {.data_ = "Fuchsia Fake AP"}};
 const common::MacAddr kDefaultBssid({0x12, 0x34, 0x56, 0x78, 0x9a, 0xbc});
 const common::MacAddr kSecondBssid({0x12, 0x34, 0x56, 0x78, 0x9b, 0xbd});
 const common::MacAddr kMadeupClient({0xde, 0xad, 0xbe, 0xef, 0x00, 0x01});
 
 struct ClientIfc : public SimInterface {
-  void OnDeauthInd(const wlan_fullmac_deauth_indication_t* ind) override;
+  void DeauthInd(DeauthIndRequestView request, fdf::Arena& arena,
+                 DeauthIndCompleter::Sync& completer) override;
 
   // Once test is finished, associations and disassociations from teardowns are ignored
   bool test_complete_ = false;
@@ -55,16 +56,17 @@ class BeaconLostTest : public SimTest {
 };
 
 // Ignore any deauth indications that are received during teardown
-void ClientIfc::OnDeauthInd(const wlan_fullmac_deauth_indication_t* ind) {
+void ClientIfc::DeauthInd(DeauthIndRequestView request, fdf::Arena& arena,
+                          DeauthIndCompleter::Sync& completer) {
   if (!test_complete_) {
-    SimInterface::OnDeauthInd(ind);
+    SimInterface::DeauthInd(request, arena, completer);
   }
 }
 
 // Create our device instance and hook up the callbacks
 void BeaconLostTest::Init() {
   ASSERT_EQ(SimTest::Init(), ZX_OK);
-  ASSERT_EQ(StartInterface(WLAN_MAC_ROLE_CLIENT, &client_ifc_), ZX_OK);
+  ASSERT_EQ(StartInterface(wlan_common::WlanMacRole::kClient, &client_ifc_), ZX_OK);
   env_->ScheduleNotification(std::bind(&BeaconLostTest::Finish, this), kTestDuration);
 }
 
@@ -157,7 +159,7 @@ TEST_F(BeaconLostTest, WrongBeaconLossTest) {
   // Start up fake AP
   simulation::FakeAp ap1(env_.get(), kDefaultBssid, kDefaultSsid, kDefaultChannel);
   ap1.EnableBeacon(zx::msec(100));
-  constexpr cssid_t kWrongSsid = {.len = 14, .data = "Fuchsia Fake AP"};
+  constexpr wlan_ieee80211::CSsid kWrongSsid = {.len = 14, .data = {.data_ = "Fuchsia Fake AP"}};
   ASSERT_NE(kDefaultSsid.len, kWrongSsid.len);
   env_->MoveStation(&ap1, -50, 0);
   aps_.push_back(&ap1);
@@ -201,7 +203,7 @@ TEST_F(BeaconLostTest, TempBeaconLossTest) {
   // Start up fake AP
   simulation::FakeAp ap1(env_.get(), kDefaultBssid, kDefaultSsid, kDefaultChannel);
   ap1.EnableBeacon(zx::msec(100));
-  constexpr cssid_t kWrongSsid = {.len = 14, .data = "Fuchsia Fake AP"};
+  constexpr wlan_ieee80211::CSsid kWrongSsid = {.len = 14, .data = {.data_ = "Fuchsia Fake AP"}};
   ASSERT_NE(kDefaultSsid.len, kWrongSsid.len);
   env_->MoveStation(&ap1, 0, 0);
   aps_.push_back(&ap1);

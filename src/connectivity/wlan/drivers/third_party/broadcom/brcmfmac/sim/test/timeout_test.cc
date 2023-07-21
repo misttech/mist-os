@@ -15,10 +15,10 @@
 namespace wlan::brcmfmac {
 
 // Some default AP and association request values
-constexpr wlan_channel_t kDefaultChannel = {
-    .primary = 9, .cbw = CHANNEL_BANDWIDTH_CBW20, .secondary80 = 0};
+constexpr wlan_common::WlanChannel kDefaultChannel = {
+    .primary = 9, .cbw = wlan_common::ChannelBandwidth::kCbw20, .secondary80 = 0};
 
-constexpr cssid_t kDefaultSsid = {.len = 15, .data = "Fuchsia Fake AP"};
+constexpr wlan_ieee80211::CSsid kDefaultSsid = {.len = 15, .data = {.data_ = "Fuchsia Fake AP"}};
 const common::MacAddr kDefaultBssid({0x12, 0x34, 0x56, 0x78, 0x9a, 0xbc});
 
 constexpr uint64_t kDefaultScanTxnId = 0;
@@ -40,7 +40,7 @@ class TimeoutTest : public SimTest {
 // Create our device instance and hook up the callbacks
 void TimeoutTest::Init() {
   ASSERT_EQ(SimTest::Init(), ZX_OK);
-  ASSERT_EQ(StartInterface(WLAN_MAC_ROLE_CLIENT, &client_ifc_), ZX_OK);
+  ASSERT_EQ(StartInterface(wlan_common::WlanMacRole::kClient, &client_ifc_), ZX_OK);
 }
 
 // Verify scan timeout is triggered.
@@ -66,7 +66,7 @@ TEST_F(TimeoutTest, ScanTimeout) {
   EXPECT_TRUE(result);
 
   // Verify result was an error code
-  EXPECT_EQ(*result, WLAN_SCAN_RESULT_CANCELED_BY_DRIVER_OR_FIRMWARE);
+  EXPECT_EQ(*result, wlan_fullmac::WlanScanResult::kCanceledByDriverOrFirmware);
 
   // No results should have been seen
   auto scan_result_list = client_ifc_.ScanResultList(kDefaultScanTxnId);
@@ -99,7 +99,8 @@ TEST_F(TimeoutTest, AssocTimeout) {
   // Receiving assoc_resp in SME with error status.
   EXPECT_EQ(client_ifc_.stats_.connect_attempts, 1U);
   EXPECT_EQ(connect_results->size(), 1U);
-  EXPECT_EQ(connect_results->front().result_code, STATUS_CODE_REFUSED_REASON_UNSPECIFIED);
+  EXPECT_EQ(connect_results->front().result_code,
+            wlan_ieee80211::StatusCode::kRefusedReasonUnspecified);
 }
 
 // verify the disassociation timeout is triggered.
@@ -109,9 +110,10 @@ TEST_F(TimeoutTest, DisassocTimeout) {
   // Ignore disassociation req in sim-fw.
   brcmf_simdev* sim = device_->GetSim();
   sim->sim_fw->err_inj_.AddErrInjCmd(BRCMF_C_DISASSOC, ZX_OK, BCME_OK, client_ifc_.iface_id_);
-  env_->ScheduleNotification(std::bind(&SimInterface::DeauthenticateFrom, &client_ifc_,
-                                       kDefaultBssid, REASON_CODE_UNSPECIFIED_REASON),
-                             zx::msec(10));
+  env_->ScheduleNotification(
+      std::bind(&SimInterface::DeauthenticateFrom, &client_ifc_, kDefaultBssid,
+                wlan_ieee80211::ReasonCode::kUnspecifiedReason),
+      zx::msec(10));
 
   env_->Run(kTestDuration);
 
@@ -133,9 +135,10 @@ TEST_F(TimeoutTest, ScanAfterAssocTimeout) {
   sim->sim_fw->err_inj_.AddErrInjCmd(BRCMF_C_SET_SSID, ZX_OK, BCME_OK, client_ifc_.iface_id_);
   // There are three timers for them, and all have been cancelled.
   client_ifc_.AssociateWith(ap, zx::msec(10));
-  env_->ScheduleNotification(std::bind(&SimInterface::DeauthenticateFrom, &client_ifc_,
-                                       kDefaultBssid, REASON_CODE_UNSPECIFIED_REASON),
-                             zx::sec(1));
+  env_->ScheduleNotification(
+      std::bind(&SimInterface::DeauthenticateFrom, &client_ifc_, kDefaultBssid,
+                wlan_ieee80211::ReasonCode::kUnspecifiedReason),
+      zx::sec(1));
   env_->ScheduleNotification(std::bind(&SimInterface::StartScan, &client_ifc_, kDefaultScanTxnId,
                                        false, std::optional<const std::vector<uint8_t>>{}),
                              zx::sec(3));
@@ -150,7 +153,7 @@ TEST_F(TimeoutTest, ScanAfterAssocTimeout) {
   // Verify that the scan completed successfully
   auto result = client_ifc_.ScanResultCode(kDefaultScanTxnId);
   EXPECT_TRUE(result);
-  EXPECT_EQ(*result, WLAN_SCAN_RESULT_SUCCESS);
+  EXPECT_EQ(*result, wlan_fullmac::WlanScanResult::kSuccess);
 
   // There is only one AP in the environment, but two scan results will be heard from SME since the
   // scan dwell time is twice the beacon interval.

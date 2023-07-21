@@ -35,10 +35,10 @@ constexpr zx::duration kSimulatedClockDuration = zx::sec(10);
 }  // namespace
 
 // Some default AP and association request values
-constexpr wlan_channel_t kDefaultChannel = {
-    .primary = 9, .cbw = CHANNEL_BANDWIDTH_CBW20, .secondary80 = 0};
+constexpr wlan_common::WlanChannel kDefaultChannel = {
+    .primary = 9, .cbw = wlan_common::ChannelBandwidth::kCbw20, .secondary80 = 0};
 constexpr simulation::WlanTxInfo kDefaultTxInfo = {.channel = kDefaultChannel};
-constexpr cssid_t kApSsid = {.len = 15, .data = "Fuchsia Fake AP"};
+constexpr wlan_ieee80211::CSsid kApSsid = {.len = 15, .data = {.data_ = "Fuchsia Fake AP"}};
 const common::MacAddr kApBssid({0x12, 0x34, 0x56, 0x78, 0x9a, 0xbc});
 constexpr uint8_t kIes[] = {
     // SSID
@@ -108,6 +108,27 @@ const std::vector<uint8_t> kSampleEapol = {
     0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
     0x00, 0x00, 0x16, 0xdd, 0x14, 0x00, 0x0f, 0xac, 0x04, 0xf8, 0xac, 0xf0, 0xb5, 0xc5, 0xa3, 0xd1,
     0x2e, 0x83, 0xb6, 0xb5, 0x60, 0x5b, 0x8d, 0x75, 0x68};
+
+class DataFrameTest;
+
+class DataFrameInterface : public SimInterface {
+ public:
+  void DeauthInd(DeauthIndRequestView request, fdf::Arena& arena,
+                 DeauthIndCompleter::Sync& completer) override;
+  void ConnectConf(ConnectConfRequestView request, fdf::Arena& arena,
+                   ConnectConfCompleter::Sync& completer) override;
+  void DisassocInd(DisassocIndRequestView request, fdf::Arena& arena,
+                   DisassocIndCompleter::Sync& completer) override;
+  void EapolConf(EapolConfRequestView request, fdf::Arena& arena,
+                 EapolConfCompleter::Sync& completer) override;
+  void SignalReport(SignalReportRequestView request, fdf::Arena& arena,
+                    SignalReportCompleter::Sync& completer) override;
+  void EapolInd(EapolIndRequestView request, fdf::Arena& arena,
+                EapolIndCompleter::Sync& completer) override;
+
+  DataFrameTest* test_;
+};
+
 class DataFrameTest : public SimTest {
  public:
   // How long an individual test will run for. We need an end time because tests run until no more
@@ -127,17 +148,25 @@ class DataFrameTest : public SimTest {
   // Send a data frame to the ap
   void ClientTx(common::MacAddr dstAddr, common::MacAddr srcAddr, std::vector<uint8_t>& ethFrame);
 
+  // Fullmac event handlers
+  void OnDeauthInd(const wlan_fullmac::WlanFullmacDeauthIndication* ind);
+  void OnConnectConf(const wlan_fullmac::WlanFullmacConnectConfirm* resp);
+  void OnDisassocInd(const wlan_fullmac::WlanFullmacDisassocIndication* ind);
+  void OnEapolConf(const wlan_fullmac::WlanFullmacEapolConfirm* resp);
+  void OnSignalReport(const wlan_fullmac::WlanFullmacSignalReportIndication* ind);
+  void OnEapolInd(const wlan_fullmac::WlanFullmacEapolIndication* ind);
+
  protected:
   struct AssocContext {
     // Information about the BSS we are attempting to associate with. Used to generate the
     // appropriate MLME calls (Join => Auth => Assoc).
-    wlan_channel_t channel = kDefaultChannel;
+    wlan_common::WlanChannel channel = kDefaultChannel;
     common::MacAddr bssid = kApBssid;
-    cssid_t ssid = kApSsid;
+    wlan_ieee80211::CSsid ssid = kApSsid;
     std::vector<uint8_t> ies = std::vector<uint8_t>(kIes, kIes + sizeof(kIes));
 
     // There should be one result for each association response received
-    std::list<status_code_t> expected_results;
+    std::list<wlan_ieee80211::StatusCode> expected_results;
 
     // Track number of association responses
     size_t connect_resp_count = 0;
@@ -150,7 +179,7 @@ class DataFrameTest : public SimTest {
   struct EapolContext {
     std::list<std::vector<uint8_t>> sent_data;
     std::list<std::vector<uint8_t>> received_data;
-    std::list<wlan_eapol_result_t> tx_eapol_conf_codes;
+    std::list<wlan_fullmac::WlanEapolResult> tx_eapol_conf_codes;
   };
 
   // data frames sent by our driver detected by the environment
@@ -166,7 +195,7 @@ class DataFrameTest : public SimTest {
   size_t eapol_ind_count;
 
   // This is the interface we will use for our single client interface
-  SimInterface client_ifc_;
+  DataFrameInterface client_ifc_;
 
   // The MAC address of our client interface
   common::MacAddr ifc_mac_;
@@ -187,59 +216,38 @@ class DataFrameTest : public SimTest {
   // StationIfc overrides
   void Rx(std::shared_ptr<const simulation::SimFrame> frame,
           std::shared_ptr<const simulation::WlanRxInfo> info) override;
-
-  // SME callbacks
-  static wlan_fullmac_impl_ifc_protocol_ops_t sme_ops_;
-  wlan_fullmac_impl_ifc_protocol sme_protocol_ = {.ops = &sme_ops_, .ctx = this};
-
-  // Fullmac event handlers
-  void OnDeauthInd(const wlan_fullmac_deauth_indication_t* ind);
-  void OnConnectConf(const wlan_fullmac_connect_confirm_t* resp);
-  void OnDisassocInd(const wlan_fullmac_disassoc_indication_t* ind);
-  void OnEapolConf(const wlan_fullmac_eapol_confirm_t* resp);
-  void OnSignalReport(const wlan_fullmac_signal_report_indication* ind);
-  void OnEapolInd(const wlan_fullmac_eapol_indication_t* ind);
 };
 
-// Since we're acting as wlan_fullmac, we need handlers for any protocol calls we may receive
-wlan_fullmac_impl_ifc_protocol_ops_t DataFrameTest::sme_ops_ = {
-    .on_scan_result =
-        [](void* cookie, const wlan_fullmac_scan_result_t* result) {
-          // Ignore
-        },
-    .on_scan_end =
-        [](void* cookie, const wlan_fullmac_scan_end_t* end) {
-          // Ignore
-        },
-    .connect_conf =
-        [](void* cookie, const wlan_fullmac_connect_confirm_t* resp) {
-          static_cast<DataFrameTest*>(cookie)->OnConnectConf(resp);
-        },
-    .deauth_ind =
-        [](void* cookie, const wlan_fullmac_deauth_indication_t* ind) {
-          static_cast<DataFrameTest*>(cookie)->OnDeauthInd(ind);
-        },
-    .disassoc_conf =
-        [](void* cookie, const wlan_fullmac_disassoc_confirm_t* resp) {
-          // Ignore
-        },
-    .disassoc_ind =
-        [](void* cookie, const wlan_fullmac_disassoc_indication_t* ind) {
-          static_cast<DataFrameTest*>(cookie)->OnDisassocInd(ind);
-        },
-    .eapol_conf =
-        [](void* cookie, const wlan_fullmac_eapol_confirm_t* resp) {
-          static_cast<DataFrameTest*>(cookie)->OnEapolConf(resp);
-        },
-    .signal_report =
-        [](void* cookie, const wlan_fullmac_signal_report_indication* ind) {
-          static_cast<DataFrameTest*>(cookie)->OnSignalReport(ind);
-        },
-    .eapol_ind =
-        [](void* cookie, const wlan_fullmac_eapol_indication_t* ind) {
-          static_cast<DataFrameTest*>(cookie)->OnEapolInd(ind);
-        },
-};
+void DataFrameInterface::DeauthInd(DeauthIndRequestView request, fdf::Arena& arena,
+                                   DeauthIndCompleter::Sync& completer) {
+  test_->OnDeauthInd(&request->ind);
+  completer.buffer(arena).Reply();
+}
+void DataFrameInterface::ConnectConf(ConnectConfRequestView request, fdf::Arena& arena,
+                                     ConnectConfCompleter::Sync& completer) {
+  test_->OnConnectConf(&request->resp);
+  completer.buffer(arena).Reply();
+}
+void DataFrameInterface::DisassocInd(DisassocIndRequestView request, fdf::Arena& arena,
+                                     DisassocIndCompleter::Sync& completer) {
+  test_->OnDisassocInd(&request->ind);
+  completer.buffer(arena).Reply();
+}
+void DataFrameInterface::EapolConf(EapolConfRequestView request, fdf::Arena& arena,
+                                   EapolConfCompleter::Sync& completer) {
+  test_->OnEapolConf(&request->resp);
+  completer.buffer(arena).Reply();
+}
+void DataFrameInterface::SignalReport(SignalReportRequestView request, fdf::Arena& arena,
+                                      SignalReportCompleter::Sync& completer) {
+  test_->OnSignalReport(&request->ind);
+  completer.buffer(arena).Reply();
+}
+void DataFrameInterface::EapolInd(EapolIndRequestView request, fdf::Arena& arena,
+                                  EapolIndCompleter::Sync& completer) {
+  test_->OnEapolInd(&request->ind);
+  completer.buffer(arena).Reply();
+}
 
 // Create our device instance and hook up the callbacks
 void DataFrameTest::Init() {
@@ -249,8 +257,10 @@ void DataFrameTest::Init() {
   non_eapol_data_count = 0;
   eapol_ind_count = 0;
 
+  client_ifc_.test_ = this;
+
   // Bring up the interface
-  ASSERT_EQ(StartInterface(WLAN_MAC_ROLE_CLIENT, &client_ifc_, &sme_protocol_), ZX_OK);
+  ASSERT_EQ(StartInterface(wlan_common::WlanMacRole::kClient, &client_ifc_), ZX_OK);
 
   // Figure out the interface's mac address
   client_ifc_.GetMacAddr(&ifc_mac_);
@@ -267,31 +277,31 @@ void DataFrameTest::Finish() {
   aps_.clear();
 }
 
-void DataFrameTest::OnDeauthInd(const wlan_fullmac_deauth_indication_t* ind) {
+void DataFrameTest::OnDeauthInd(const wlan_fullmac::WlanFullmacDeauthIndication* ind) {
   if (!testing_rx_freeze_deauth_) {
     // This function is only used for rx freeze deauth testing now.
     return;
   }
   assoc_context_.deauth_ind_count++;
-  assoc_context_.expected_results.push_front(STATUS_CODE_SUCCESS);
+  assoc_context_.expected_results.push_front(wlan_ieee80211::StatusCode::kSuccess);
   // Do a re-association right after deauth.
   env_->ScheduleNotification(std::bind(&DataFrameTest::StartConnect, this), zx::msec(200));
 }
 
-void DataFrameTest::OnConnectConf(const wlan_fullmac_connect_confirm_t* resp) {
+void DataFrameTest::OnConnectConf(const wlan_fullmac::WlanFullmacConnectConfirm* resp) {
   assoc_context_.connect_resp_count++;
   EXPECT_EQ(resp->result_code, assoc_context_.expected_results.front());
   assoc_context_.expected_results.pop_front();
 }
 
-void DataFrameTest::OnEapolConf(const wlan_fullmac_eapol_confirm_t* resp) {
+void DataFrameTest::OnEapolConf(const wlan_fullmac::WlanFullmacEapolConfirm* resp) {
   eapol_context_.tx_eapol_conf_codes.push_back(resp->result_code);
 }
 
-void DataFrameTest::OnEapolInd(const wlan_fullmac_eapol_indication_t* ind) {
+void DataFrameTest::OnEapolInd(const wlan_fullmac::WlanFullmacEapolIndication* ind) {
   std::vector<uint8_t> resp;
-  resp.resize(ind->data_count);
-  std::memcpy(resp.data(), ind->data_list, ind->data_count);
+  resp.resize(ind->data.count());
+  std::memcpy(resp.data(), ind->data.data(), ind->data.count());
 
   eapol_context_.received_data.push_back(std::move(resp));
 
@@ -301,7 +311,7 @@ void DataFrameTest::OnEapolInd(const wlan_fullmac_eapol_indication_t* ind) {
   eapol_ind_count++;
 }
 
-void DataFrameTest::OnSignalReport(const wlan_fullmac_signal_report_indication* ind) {
+void DataFrameTest::OnSignalReport(const wlan_fullmac::WlanFullmacSignalReportIndication* ind) {
   if (!testing_rx_freeze_deauth_) {
     // This function is only used for rx freeze deauth testing now.
     return;
@@ -314,28 +324,32 @@ void DataFrameTest::OnSignalReport(const wlan_fullmac_signal_report_indication* 
   env_->ScheduleNotification(transmit, zx::msec(200));
 }
 
-void DataFrameTest::OnDisassocInd(const wlan_fullmac_disassoc_indication_t* ind) {}
+void DataFrameTest::OnDisassocInd(const wlan_fullmac::WlanFullmacDisassocIndication* ind) {}
 
 void DataFrameTest::StartConnect() {
   // Send connect request
-  wlan_fullmac_connect_req connect_req = {};
-  std::memcpy(connect_req.selected_bss.bssid, assoc_context_.bssid.byte, ETH_ALEN);
-  connect_req.selected_bss.ies_list = assoc_context_.ies.data();
-  connect_req.selected_bss.ies_count = assoc_context_.ies.size();
-  connect_req.selected_bss.channel = assoc_context_.channel;
-  connect_req.auth_type = WLAN_AUTH_TYPE_OPEN_SYSTEM;
-  connect_req.connect_failure_timeout = 1000;  // ~1s (although value is ignored for now)
-  client_ifc_.if_impl_ops_->connect_req(client_ifc_.if_impl_ctx_, &connect_req);
+  auto builder = wlan_fullmac::WlanFullmacImplConnectReqRequest::Builder(client_ifc_.test_arena_);
+  fuchsia_wlan_internal::wire::BssDescription bss;
+  std::memcpy(bss.bssid.data(), assoc_context_.bssid.byte, ETH_ALEN);
+  bss.ies =
+      fidl::VectorView<uint8_t>::FromExternal(assoc_context_.ies.data(), assoc_context_.ies.size());
+  bss.channel = assoc_context_.channel;
+  builder.selected_bss(bss);
+  builder.auth_type(wlan_fullmac::WlanAuthType::kOpenSystem);
+  builder.connect_failure_timeout(1000);  // ~1s (although value is ignored for now)
+  auto result = client_ifc_.client_.buffer(client_ifc_.test_arena_)->ConnectReq(builder.Build());
+  EXPECT_TRUE(result.ok());
 }
 
 void DataFrameTest::TxEapolRequest(common::MacAddr dstAddr, common::MacAddr srcAddr,
                                    const std::vector<uint8_t>& eapol) {
-  wlan_fullmac_eapol_req eapol_req = {};
-  memcpy(eapol_req.dst_addr, dstAddr.byte, ETH_ALEN);
-  memcpy(eapol_req.src_addr, srcAddr.byte, ETH_ALEN);
-  eapol_req.data_list = eapol.data();
-  eapol_req.data_count = eapol.size();
-  client_ifc_.if_impl_ops_->eapol_req(client_ifc_.if_impl_ctx_, &eapol_req);
+  wlan_fullmac::WlanFullmacEapolReq eapol_req;
+  memcpy(eapol_req.dst_addr.data(), dstAddr.byte, ETH_ALEN);
+  memcpy(eapol_req.src_addr.data(), srcAddr.byte, ETH_ALEN);
+  eapol_req.data =
+      fidl::VectorView<uint8_t>::FromExternal(const_cast<uint8_t*>(eapol.data()), eapol.size());
+  auto result = client_ifc_.client_.buffer(client_ifc_.test_arena_)->EapolReq(eapol_req);
+  EXPECT_TRUE(result.ok());
 }
 
 void DataFrameTest::ClientTx(common::MacAddr dstAddr, common::MacAddr srcAddr,
@@ -371,13 +385,13 @@ TEST_F(DataFrameTest, TxDataFrame) {
   // Create our device instance
   Init();
 
-  // Start up our fake AP
+  // Start up our fake APs
   simulation::FakeAp ap(env_.get(), kApBssid, kApSsid, kDefaultChannel);
   ap.EnableBeacon(zx::msec(100));
   aps_.push_back(&ap);
 
   // Assoc driver with fake AP
-  assoc_context_.expected_results.push_front(STATUS_CODE_SUCCESS);
+  assoc_context_.expected_results.push_front(wlan_ieee80211::StatusCode::kSuccess);
   env_->ScheduleNotification(std::bind(&DataFrameTest::StartConnect, this), zx::msec(10));
 
   constexpr uint16_t kFrameId = 123;
@@ -420,7 +434,7 @@ TEST_F(DataFrameTest, TxMalformedDataFrame) {
   aps_.push_back(&ap);
 
   // Assoc driver with fake AP
-  assoc_context_.expected_results.push_front(STATUS_CODE_SUCCESS);
+  assoc_context_.expected_results.push_front(wlan_ieee80211::StatusCode::kSuccess);
   env_->ScheduleNotification(std::bind(&DataFrameTest::StartConnect, this), zx::msec(10));
 
   // Simulate sending a illegal ethernet frame from us to the AP
@@ -450,7 +464,7 @@ TEST_F(DataFrameTest, TxEapolFrame) {
   aps_.push_back(&ap);
 
   // Assoc driver with fake AP
-  assoc_context_.expected_results.push_front(STATUS_CODE_SUCCESS);
+  assoc_context_.expected_results.push_front(wlan_ieee80211::StatusCode::kSuccess);
   env_->ScheduleNotification(std::bind(&DataFrameTest::StartConnect, this), zx::msec(10));
 
   // Simulate sending a EAPOL packet from us to the AP
@@ -463,7 +477,7 @@ TEST_F(DataFrameTest, TxEapolFrame) {
 
   // Verify response
   EXPECT_EQ(assoc_context_.connect_resp_count, 1U);
-  EXPECT_EQ(eapol_context_.tx_eapol_conf_codes.front(), WLAN_EAPOL_RESULT_SUCCESS);
+  EXPECT_EQ(eapol_context_.tx_eapol_conf_codes.front(), wlan_fullmac::WlanEapolResult::kSuccess);
 
   auto& tx_results = device_->DataPath().TxResults();
   ASSERT_EQ(tx_results.size(), 0);
@@ -487,7 +501,7 @@ TEST_F(DataFrameTest, RxDataFrame) {
   aps_.push_back(&ap);
 
   // Assoc driver with fake AP
-  assoc_context_.expected_results.push_front(STATUS_CODE_SUCCESS);
+  assoc_context_.expected_results.push_front(wlan_ieee80211::StatusCode::kSuccess);
   env_->ScheduleNotification(std::bind(&DataFrameTest::StartConnect, this), delay);
 
   // Want to send packet from test to driver
@@ -524,7 +538,7 @@ TEST_F(DataFrameTest, RxMalformedDataFrame) {
   aps_.push_back(&ap);
 
   // Assoc driver with fake AP
-  assoc_context_.expected_results.push_front(STATUS_CODE_SUCCESS);
+  assoc_context_.expected_results.push_front(wlan_ieee80211::StatusCode::kSuccess);
   env_->ScheduleNotification(std::bind(&DataFrameTest::StartConnect, this), zx::msec(30));
 
   // ethernet frame too small to hold ethernet header
@@ -553,7 +567,7 @@ TEST_F(DataFrameTest, RxEapolFrame) {
   aps_.push_back(&ap);
 
   // Assoc driver with fake AP
-  assoc_context_.expected_results.push_front(STATUS_CODE_SUCCESS);
+  assoc_context_.expected_results.push_front(wlan_ieee80211::StatusCode::kSuccess);
   env_->ScheduleNotification(std::bind(&DataFrameTest::StartConnect, this), zx::msec(30));
 
   // Want to send packet from test to driver
@@ -588,7 +602,7 @@ TEST_F(DataFrameTest, RxEapolFrameAfterAssoc) {
   aps_.push_back(&ap);
 
   // Assoc driver with fake AP
-  assoc_context_.expected_results.push_front(STATUS_CODE_SUCCESS);
+  assoc_context_.expected_results.push_front(wlan_ieee80211::StatusCode::kSuccess);
   env_->ScheduleNotification(std::bind(&DataFrameTest::StartConnect, this), delay);
 
   // Want to send packet from test to driver
@@ -622,7 +636,7 @@ TEST_F(DataFrameTest, RxUcastBeforeAssoc) {
   aps_.push_back(&ap);
 
   // Assoc driver with fake AP
-  assoc_context_.expected_results.push_front(STATUS_CODE_SUCCESS);
+  assoc_context_.expected_results.push_front(wlan_ieee80211::StatusCode::kSuccess);
   env_->ScheduleNotification(std::bind(&DataFrameTest::StartConnect, this), delay);
 
   std::vector<uint8_t> expected =
@@ -654,7 +668,7 @@ TEST_F(DataFrameTest, DeauthWhenRxFreeze) {
   simulation::FakeAp ap(env_.get(), kApBssid, kApSsid, kDefaultChannel);
   aps_.push_back(&ap);
 
-  assoc_context_.expected_results.push_front(STATUS_CODE_SUCCESS);
+  assoc_context_.expected_results.push_front(wlan_ieee80211::StatusCode::kSuccess);
   env_->ScheduleNotification(std::bind(&DataFrameTest::StartConnect, this), kFirstAssocDelay);
 
   env_->Run(kRxFreezeTestDuration);

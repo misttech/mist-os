@@ -1,0 +1,776 @@
+// Copyright 2022 The Fuchsia Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style license that can be
+// found in the LICENSE file.
+library fuchsia.wlan.fullmac;
+
+using fuchsia.wlan.common;
+using fuchsia.wlan.internal;
+using fuchsia.wlan.ieee80211 as ieee80211;
+using zx;
+
+type WlanScanType = strict enum : uint8 {
+    ACTIVE = 1;
+    PASSIVE = 2;
+};
+
+// LINT.IfChange
+/// WFA WMM v1.2, 2.2.2 Table 5
+/// Length of the WMM Parameter Element body. This does not include IE and vendor IE headers,
+/// and only includes the QoS Info, reserved, and AC parameters fields.
+const WLAN_WMM_PARAM_LEN uint32 = 18;
+// LINT.ThenChange(//sdk/fidl/fuchsia.wlan.mlme/wlan_mlme.fidl)
+
+/// Max length for vendor IEs to be added to the association request. This is currently
+/// used for WPA.
+const WLAN_VIE_MAX_LEN uint32 = 510;
+const WLAN_MAX_OP_RATES uint32 = 12;
+
+type WlanAuthType = strict enum : uint8 {
+    OPEN_SYSTEM = 1;
+    SHARED_KEY = 2;
+    FAST_BSS_TRANSITION = 3;
+    SAE = 4;
+};
+
+type WlanFullmacAuthInd = struct {
+    peer_sta_address ieee80211.MacAddr;
+    auth_type WlanAuthType;
+};
+
+type WlanFullmacDeauthReq = struct {
+    peer_sta_address ieee80211.MacAddr;
+    reason_code ieee80211.ReasonCode;
+};
+
+type WlanFullmacAssocInd = struct {
+    peer_sta_address ieee80211.MacAddr;
+    // Interval specified in time units.
+    listen_interval uint16;
+    ssid ieee80211.CSsid;
+    rsne_len uint64;
+    rsne array<uint8, ieee80211.WLAN_IE_BODY_MAX_LEN>;
+    vendor_ie_len uint64;
+    vendor_ie array<uint8, WLAN_VIE_MAX_LEN>;
+};
+
+type WlanFullmacDisassocReq = struct {
+    peer_sta_address ieee80211.MacAddr;
+    reason_code ieee80211.ReasonCode;
+};
+
+type WlanFullmacResetReq = struct {
+    sta_address ieee80211.MacAddr;
+    set_default_mib bool;
+};
+
+type WlanFullmacStartReq = struct {
+    ssid ieee80211.CSsid;
+    bss_type fuchsia.wlan.common.BssType;
+    beacon_period uint32;
+    dtim_period uint32;
+    channel uint8;
+    rsne_len uint64;
+    rsne array<uint8, ieee80211.WLAN_IE_BODY_MAX_LEN>;
+    vendor_ie_len uint64;
+    vendor_ie array<uint8, WLAN_VIE_MAX_LEN>;
+};
+
+type WlanFullmacStopReq = struct {
+    ssid ieee80211.CSsid;
+};
+
+type SetKeyDescriptor = struct {
+    key vector<uint8>:MAX;
+    key_id uint16;
+    key_type fuchsia.wlan.common.WlanKeyType;
+    address ieee80211.MacAddr;
+    rsc uint64;
+    cipher_suite_oui array<uint8, 3>;
+    cipher_suite_type ieee80211.CipherSuiteType;
+};
+
+const WLAN_MAX_KEYLIST_SIZE uint32 = 4;
+
+type WlanFullmacSetKeysReq = struct {
+    num_keys uint64;
+    keylist array<SetKeyDescriptor, WLAN_MAX_KEYLIST_SIZE>;
+};
+
+type WlanFullmacSetKeysResp = struct {
+    num_keys uint64;
+    statuslist array<zx.Status, WLAN_MAX_KEYLIST_SIZE>;
+};
+
+type DeleteKeyDescriptor = struct {
+    key_id uint16;
+    key_type fuchsia.wlan.common.WlanKeyType;
+    address ieee80211.MacAddr;
+};
+
+type WlanFullmacDelKeysReq = struct {
+    num_keys uint64;
+    keylist array<DeleteKeyDescriptor, WLAN_MAX_KEYLIST_SIZE>;
+};
+
+type WlanFullmacEapolReq = struct {
+    src_addr ieee80211.MacAddr;
+    dst_addr ieee80211.MacAddr;
+    data vector<uint8>:MAX;
+};
+
+/// This struct is sent from SME to wlanif, indicating the result of SAE handshake process.
+type WlanFullmacSaeHandshakeResp = struct {
+    peer_sta_address ieee80211.MacAddr;
+    status_code ieee80211.StatusCode;
+};
+
+/// This struct is sent in both directions, containing the information of SAE authentication
+/// frames, sae_fields maps to challenge text, see IEEE Std 802.11-2016, 9.3.3.12.
+type WlanFullmacSaeFrame = struct {
+    peer_sta_address ieee80211.MacAddr;
+    status_code ieee80211.StatusCode;
+    seq_num uint16;
+    sae_fields vector<uint8>:MAX;
+};
+
+/// Bits used to request management frame subtypes to be captured. Also used by driver to indicate
+/// which management frame subtypes are supported for capture.
+///
+/// These values are set at `1 << MgmtFrameSubtypeValue`
+/// See IEEE Std 802.11-2016, 9.2.4.1.3, for value of each management frame subtype
+type WlanMgmtCaptureFlag = strict enum : uint32 {
+    ASSOC_REQ = 0x1;
+    ASSOC_RESP = 0x2;
+    REASSOC_REQ = 0x4;
+    REASSOC_RESP = 0x8;
+    PROBE_REQ = 0x10;
+    PROBE_RESP = 0x20;
+    TIMING_AD = 0x40;
+
+    BEACON = 0x100;
+    ATIM = 0x200;
+    DISASSOC = 0x400;
+    AUTH = 0x800;
+    DEAUTH = 0x1000;
+    ACTION = 0x2000;
+    ACTION_NO_ACK = 0x4000;
+};
+
+type WlanFullmacStartCaptureFramesReq = struct {
+    mgmt_frame_flags uint32;
+};
+
+type WlanFullmacStartCaptureFramesResp = struct {
+    status int32;
+    supported_mgmt_frames uint32;
+};
+
+type WlanFullmacScanResult = struct {
+    txn_id uint64;
+    // Time of the scan result relative to when the system was powered on.
+    // See https://fuchsia.dev/fuchsia-src/concepts/time/language_support#monotonic_time
+    timestamp_nanos zx.Time;
+    bss fuchsia.wlan.internal.BssDescription;
+};
+
+type WlanScanResult = strict enum : uint8 {
+    SUCCESS = 0;
+    NOT_SUPPORTED = 1;
+    INVALID_ARGS = 2;
+    INTERNAL_ERROR = 3;
+    SHOULD_WAIT = 4;
+    CANCELED_BY_DRIVER_OR_FIRMWARE = 5;
+};
+
+type WlanFullmacScanEnd = struct {
+    txn_id uint64;
+    code WlanScanResult;
+};
+
+type WlanFullmacReconnectReq = struct {
+    peer_sta_address ieee80211.MacAddr;
+};
+
+type WlanFullmacConnectConfirm = struct {
+    peer_sta_address ieee80211.MacAddr;
+    result_code ieee80211.StatusCode;
+
+    // These fields are only valid if the result is success.
+    association_id uint16;
+    association_ies vector<uint8>:MAX;
+};
+
+/// Result of a roam attempt.
+/// Note that an unsuccessful roam attempt does not imply disassociation. Where a roam
+/// failure causes a fullmac driver to disassociate, the fullmac driver must explicitly
+/// disassociate.
+type WlanFullmacRoamConfirm = struct {
+    target_bssid ieee80211.MacAddr;
+    result_code ieee80211.StatusCode;
+    /// Full BSS description.
+    /// This field is only valid if the result is success.
+    selected_bss fuchsia.wlan.internal.BssDescription;
+};
+
+type WlanAuthResult = strict enum : uint8 {
+    SUCCESS = 0;
+    REFUSED = 1;
+    ANTI_CLOGGING_TOKEN_REQUIRED = 2;
+    FINITE_CYCLIC_GROUP_NOT_SUPPORTED = 3;
+    REJECTED = 4;
+    FAILURE_TIMEOUT = 5;
+};
+
+type WlanFullmacAuthResp = struct {
+    peer_sta_address ieee80211.MacAddr;
+    result_code WlanAuthResult;
+};
+
+type WlanFullmacDeauthConfirm = struct {
+    peer_sta_address ieee80211.MacAddr;
+};
+
+type WlanFullmacDeauthIndication = struct {
+    peer_sta_address ieee80211.MacAddr;
+    reason_code ieee80211.ReasonCode;
+    /// locally_initiated is true if deauth is initiated from the device,
+    /// and is false if it's initiated remotely (e.g. due to deauth frame)
+    locally_initiated bool;
+};
+
+type WlanAssocResult = strict enum : uint8 {
+    SUCCESS = 0;
+    REFUSED_REASON_UNSPECIFIED = 1;
+    REFUSED_NOT_AUTHENTICATED = 2;
+    REFUSED_CAPABILITIES_MISMATCH = 3;
+    REFUSED_EXTERNAL_REASON = 4;
+    REFUSED_AP_OUT_OF_MEMORY = 5;
+    REFUSED_BASIC_RATES_MISMATCH = 6;
+    REJECTED_EMERGENCY_SERVICES_NOT_SUPPORTED = 7;
+    REFUSED_TEMPORARILY = 8;
+};
+
+type WlanFullmacAssocResp = struct {
+    peer_sta_address ieee80211.MacAddr;
+    result_code WlanAssocResult;
+    association_id uint16;
+};
+
+type WlanFullmacDisassocConfirm = struct {
+    status zx.Status;
+};
+
+type WlanFullmacDisassocIndication = struct {
+    peer_sta_address ieee80211.MacAddr;
+    reason_code ieee80211.ReasonCode;
+    /// locally_initiated is true if diassoc is initiated from the device,
+    /// and is false if it's initiated remotely (e.g. due to disassoc frame)
+    locally_initiated bool;
+};
+
+type WlanStartResult = strict enum : uint8 {
+    SUCCESS = 0;
+    BSS_ALREADY_STARTED_OR_JOINED = 1;
+    RESET_REQUIRED_BEFORE_START = 2;
+    NOT_SUPPORTED = 3;
+};
+
+type WlanFullmacStartConfirm = struct {
+    result_code WlanStartResult;
+};
+
+type WlanStopResult = strict enum : uint8 {
+    SUCCESS = 0;
+    BSS_ALREADY_STOPPED = 1;
+    INTERNAL_ERROR = 2;
+};
+
+type WlanFullmacStopConfirm = struct {
+    result_code WlanStopResult;
+};
+
+type WlanEapolResult = strict enum : uint8 {
+    SUCCESS = 0;
+    TRANSMISSION_FAILURE = 1;
+};
+
+type WlanFullmacEapolConfirm = struct {
+    result_code WlanEapolResult;
+    /// This value corresponds to the dst_addr in the EapolRequest we're confirming.
+    /// IEEE 802.11-2016 does not include this field, but we need it to disambiguate
+    /// if multiple EAPoL handshakes are ongoing.
+    dst_addr ieee80211.MacAddr;
+};
+
+type WlanFullmacSignalReportIndication = struct {
+    rssi_dbm int8;
+    snr_db int8;
+};
+
+type WlanFullmacEapolIndication = struct {
+    src_addr ieee80211.MacAddr;
+    dst_addr ieee80211.MacAddr;
+    data vector<uint8>:MAX;
+};
+
+type WlanFullmacSaeHandshakeInd = struct {
+    peer_sta_address ieee80211.MacAddr;
+};
+
+type WlanFullmacBandCapability = struct {
+    /// The values of this struct apply to the band indicated in this field.
+    band fuchsia.wlan.common.WlanBand;
+
+    /// Basic rates supported in units of 500 kbit/s (as defined in
+    /// IEEE Std 802.11-2016, 9.4.2.3), e.g., 0x02 represents 1 Mbps.
+    /// The value returned by this type indicates all the non-HT rates
+    /// the device supports transmitting and receiving.
+    basic_rate_count uint8;
+    basic_rate_list array<uint8, ieee80211.MAX_SUPPORTED_BASIC_RATES>;
+
+    /// If the device supports the HT PHY mode in this band, then ht_supported is
+    /// set to true, and the value in ht_caps indicates the capabilities. Otherwise,
+    /// ht_supported is set to false.
+    ht_supported bool;
+    ht_caps ieee80211.HtCapabilities;
+
+    /// If the device supports the VHT PHY mode in this band, then vht_supported is
+    /// set to true, and the value in vht_caps indicates the capabilities. Otherwise,
+    /// vht_supported is set to false.
+    vht_supported bool;
+    vht_caps ieee80211.VhtCapabilities;
+
+    /// A list of operating channels considered valid by hardware, in the context of
+    /// regulatory information known to the device driver, at the time of its
+    /// construction during iface creation. In this context, an operating channel
+    /// means a channel which APs may transmit Beacon frames on in the current
+    /// regulatory domain.
+    ///
+    /// This list should be used to determine efficacy of subsequent requests to
+    /// scan a subset of channels using the iface, or to determine which operating
+    /// channel to use when starting an AP.
+    operating_channel_count uint16;
+    operating_channel_list array<uint8, ieee80211.MAX_UNIQUE_CHANNEL_NUMBERS>;
+};
+
+type WlanFullmacFeature = strict enum : uint32 {
+    /// Supports DMA buffer transfer protocol
+    DMA = 0x1;
+    /// Synthetic (i.e., non-physical) device
+    SYNTH = 0x2;
+};
+
+type WlanFullmacQueryInfo = struct {
+    sta_addr ieee80211.MacAddr;
+    /// WLAN_MAC_ROLE_*
+    role fuchsia.wlan.common.WlanMacRole;
+    /// WLAN_FULLMAC_FEATURE_*
+    features uint32;
+    band_cap_list array<WlanFullmacBandCapability, fuchsia.wlan.common.MAX_BANDS>;
+    band_cap_count uint8;
+};
+
+type WlanFullmacRssiStats = struct {
+    hist vector<uint64>:MAX;
+};
+
+// LINT.IfChange
+/// Histogram bucket.
+type WlanFullmacHistBucket = struct {
+    /// Index into a lookup table for each histogram type. The lookup table for each type is
+    /// described below in the comments for each type.
+    bucket_index uint16;
+    /// The count of samples in the bucket.
+    num_samples uint64;
+};
+
+/// All histograms have a fixed number of buckets. To save space, each histogram type
+/// uses a vector to hold only non-empty buckets (a sparse histogram), with these constants as the
+/// max size of each vector.
+/// Noise floor values range from -255 to -1 dBm.
+const WLAN_FULLMAC_MAX_NOISE_FLOOR_SAMPLES uint8 = 255;
+/// Size of RX_RATE_INDEX lookup table (see comments in RxRateIndexHistogram).
+const WLAN_FULLMAC_MAX_RX_RATE_INDEX_SAMPLES uint8 = 196;
+/// RSSI values range from -255 to -1 dBm.
+const WLAN_FULLMAC_MAX_RSSI_SAMPLES uint8 = 255;
+/// SNR values range from 0 to 255 dB.
+const WLAN_FULLMAC_MAX_SNR_SAMPLES uint16 = 256;
+
+/// Antenna frequency.
+type WlanFullmacAntennaFreq = strict enum : uint8 {
+    /// 2.4 GHz.
+    ANTENNA_2_G = 1;
+    /// 5 GHz.
+    ANTENNA_5_G = 2;
+};
+
+/// Identifier for antenna.
+type WlanFullmacAntennaId = struct {
+    freq WlanFullmacAntennaFreq;
+    /// 0 indexed antenna number of freq.
+    index uint8;
+};
+
+/// The scope of the histogram, e.g. if the histogram contains data for the entire station, or has
+/// data for just a single antenna.
+type WlanFullmacHistScope = strict enum : uint8 {
+    STATION = 1;
+    PER_ANTENNA = 2;
+};
+
+/// Histogram for noise floor samples.
+type WlanFullmacNoiseFloorHistogram = struct {
+    hist_scope WlanFullmacHistScope;
+    /// If hist_scope is PER_ANTENNA, antenna_id must be provided.
+    antenna_id WlanFullmacAntennaId;
+    /// Sparse histogram of noise floor of current channel in dBm. Each sample's bucket_index is an
+    /// index into this list of dBm values: [-255, -254, ... -1]. For example, if
+    /// noise_floor_samples contains a WlanFullmacHistBucket with bucket_index = 165 and num_samples =
+    /// 50, that means there were 50 frames counted that had a noise floor of -90 dBm.
+    noise_floor_samples vector<WlanFullmacHistBucket>:WLAN_FULLMAC_MAX_NOISE_FLOOR_SAMPLES;
+    /// Count of invalid samples encountered, if any.
+    invalid_samples uint64;
+};
+
+/// Histogram for received data rate.
+type WlanFullmacRxRateIndexHistogram = struct {
+    hist_scope WlanFullmacHistScope;
+    /// If hist_scope is PER_ANTENNA, antenna_id must be provided.
+    antenna_id WlanFullmacAntennaId;
+    /// Sparse histogram of count of received frames for each rate. Each sample's bucket_index is an
+    /// index into this lookup table:
+    /// 0-3: B-MCS 0-3
+    /// 4-11: G-MCS 0-7
+    /// 12-27: N-MCS 0-15 (BW20)
+    /// 28-43: N-MCS 0-15 (BW40)
+    /// 44-59: N-MCS 0-15 (BW20:SGI)
+    /// 60-75: N-MCS 0-15 (BW40:SGI)
+    /// 76-85: AC-MCS 0-9 (VHT:BW20:NSS1)
+    /// 86-95: AC-MCS 0-9 (VHT:BW20:NSS2)
+    /// 96-105: AC-MCS 0-9 (VHT:BW40:NSS1)
+    /// 106-115: AC-MCS 0-9 (VHT:BW40:NSS2)
+    /// 116-125: AC-MCS 0-9 (VHT:BW80:NSS1)
+    /// 126-135: AC-MCS 0-9 (VHT:BW80:NSS2)
+    /// 136-145: AC-MCS 0-9 (VHT:BW20:NSS1:SGI)
+    /// 146-155: AC-MCS 0-9 (VHT:BW20:NSS2:SGI)
+    /// 156-165: AC-MCS 0-9 (VHT:BW40:NSS1:SGI)
+    /// 166-175: AC-MCS 0-9 (VHT:BW40:NSS2:SGI)
+    /// 176-185: AC-MCS 0-9 (VHT:BW80:NSS1:SGI)
+    /// 186-195: AC-MCS 0-9 (VHT:BW80:NSS2:SGI)
+    ///
+    /// For example, if rx_rate_index_samples contains a WlanFullmacHistBucket with bucket_index = 75
+    /// and num_samples = 50, that means there were 50 frames counted that had a rate corresponding
+    /// to N-MCS 15 (BW40:SGI).
+    rx_rate_index_samples vector<WlanFullmacHistBucket>:WLAN_FULLMAC_MAX_RX_RATE_INDEX_SAMPLES;
+    /// Count of invalid samples encountered, if any.
+    invalid_samples uint64;
+};
+
+/// Histogram for received signal strength indicator (RSSI).
+type WlanFullmacRssiHistogram = struct {
+    hist_scope WlanFullmacHistScope;
+    /// If hist_scope is PER_ANTENNA, antenna_id must be provided.
+    antenna_id WlanFullmacAntennaId;
+    /// Sparse histogram of RSSI of AP in dBm. Each sample's bucket_index is an index
+    /// into this list of dBm values: [-255, -254, ... -1]. For example, if rssi_samples
+    /// contains a WlanFullmacHistBucket with bucket_index = 225 and num_samples = 50, that means
+    /// there were 50 frames counted that had a signal level of -30 dBm.
+    rssi_samples vector<WlanFullmacHistBucket>:WLAN_FULLMAC_MAX_RSSI_SAMPLES;
+    /// Count of invalid samples encountered, if any.
+    invalid_samples uint64;
+};
+
+/// Histogram for signal to noise ratio (SNR).
+type WlanFullmacSnrHistogram = struct {
+    hist_scope WlanFullmacHistScope;
+    /// If hist_scope is PER_ANTENNA, antenna_id must be provided.
+    antenna_id WlanFullmacAntennaId;
+    /// Sparse histogram of signal to noise ratio in dB. Each sample's bucket_index is an index
+    /// into this list of dB values: [0, 1, ... 255]. For example, if snr_samples contains a
+    /// WlanFullmacHistBucket with value = 60 and num_samples = 50, that means there were 50 frames
+    /// counted that had a SNR of 60 dB.
+    snr_samples vector<WlanFullmacHistBucket>:WLAN_FULLMAC_MAX_SNR_SAMPLES;
+    /// Count of invalid samples encountered, if any.
+    @allow_deprecated_struct_defaults
+    invalid_samples uint64 = 0;
+};
+
+/// For each histogram type (e.g. RSSI), there can be multiple histograms up to this limit. For
+/// example, an interface might have 1 histogram for station-wide RSSI, but also 1 for each of the
+/// antennas used by the interface.
+const WLAN_FULLMAC_MAX_HISTOGRAMS_PER_TYPE uint8 = 8;
+// LINT.ThenChange(//sdk/fidl/fuchsia.wlan.stats/wlan_stats.fidl)
+
+/// The number of 802.11B rates in the WlanFullmacRxRateIndexHistogram lookup table.
+const WLAN_FULLMAC_NUM_RATES_B uint8 = 4;
+/// The number of 802.11G rates in the WlanFullmacRxRateIndexHistogram lookup table.
+const WLAN_FULLMAC_NUM_RATES_G uint8 = 8;
+/// The number of 802.11N rates in the WlanFullmacRxRateIndexHistogram lookup table.
+const WLAN_FULLMAC_NUM_RATES_N uint8 = 64;
+/// The number of 802.11AC rates in the WlanFullmacRxRateIndexHistogram lookup table.
+const WLAN_FULLMAC_NUM_RATES_AC uint8 = 120;
+
+// TODO(fxbug.dev/83621): Use wlan_stats.fidl structure after fxbug.dev/85462 is fixed
+type WlanFullmacIfaceCounterStats = struct {
+    rx_unicast_total uint64;
+    rx_unicast_drop uint64;
+    rx_multicast uint64;
+    tx_total uint64;
+    tx_drop uint64;
+};
+
+// TODO(fxbug.dev/83621): Use wlan_stats.fidl structure after fxbug.dev/85462 is fixed
+type WlanFullmacIfaceHistogramStats = table {
+    /// Noise floor histogram(s).
+    1: noise_floor_histograms
+            vector<WlanFullmacNoiseFloorHistogram>:WLAN_FULLMAC_MAX_HISTOGRAMS_PER_TYPE;
+    /// Received signal strength indicator (RSSI) histogram(s).
+    2: rssi_histograms vector<WlanFullmacRssiHistogram>:WLAN_FULLMAC_MAX_HISTOGRAMS_PER_TYPE;
+    /// Received rate index histogram(s).
+    3: rx_rate_index_histograms
+            vector<WlanFullmacRxRateIndexHistogram>:WLAN_FULLMAC_MAX_HISTOGRAMS_PER_TYPE;
+    /// Signal to noise ratio (SNR) histogram(s).
+    4: snr_histograms vector<WlanFullmacSnrHistogram>:WLAN_FULLMAC_MAX_HISTOGRAMS_PER_TYPE;
+};
+
+type WlanFullmacCapturedFrameResult = struct {
+    data vector<uint8>:MAX;
+};
+
+type WlanFullmacChannelSwitchInfo = struct {
+    new_channel uint8;
+};
+
+type WlanFullmacPmkInfo = struct {
+    pmk vector<uint8>:MAX;
+    pmkid vector<uint8>:MAX;
+};
+
+@discoverable
+@transport("Driver")
+closed protocol WlanFullmacImplIfc {
+    // MLME operations
+    strict OnScanResult(struct {
+        result WlanFullmacScanResult;
+    }) -> ();
+    strict OnScanEnd(struct {
+        end WlanFullmacScanEnd;
+    }) -> ();
+    strict ConnectConf(struct {
+        resp WlanFullmacConnectConfirm;
+    }) -> ();
+    /// Result of a roam attempt.
+    strict RoamConf(struct {
+        resp WlanFullmacRoamConfirm;
+    }) -> ();
+    strict AuthInd(struct {
+        resp WlanFullmacAuthInd;
+    }) -> ();
+    strict DeauthConf(struct {
+        resp WlanFullmacDeauthConfirm;
+    }) -> ();
+    strict DeauthInd(struct {
+        ind WlanFullmacDeauthIndication;
+    }) -> ();
+    strict AssocInd(struct {
+        resp WlanFullmacAssocInd;
+    }) -> ();
+    strict DisassocConf(struct {
+        resp WlanFullmacDisassocConfirm;
+    }) -> ();
+    strict DisassocInd(struct {
+        ind WlanFullmacDisassocIndication;
+    }) -> ();
+    strict StartConf(struct {
+        resp WlanFullmacStartConfirm;
+    }) -> ();
+    strict StopConf(struct {
+        resp WlanFullmacStopConfirm;
+    }) -> ();
+    strict EapolConf(struct {
+        resp WlanFullmacEapolConfirm;
+    }) -> ();
+    strict OnChannelSwitch(struct {
+        ind WlanFullmacChannelSwitchInfo;
+    }) -> ();
+
+    // MLME extensions
+    strict SignalReport(struct {
+        ind WlanFullmacSignalReportIndication;
+    }) -> ();
+    strict EapolInd(struct {
+        ind WlanFullmacEapolIndication;
+    }) -> ();
+    strict RelayCapturedFrame(struct {
+        result WlanFullmacCapturedFrameResult;
+    }) -> ();
+    strict OnPmkAvailable(struct {
+        info WlanFullmacPmkInfo;
+    }) -> ();
+    strict SaeHandshakeInd(struct {
+        ind WlanFullmacSaeHandshakeInd;
+    }) -> ();
+    strict SaeFrameRx(struct {
+        frame WlanFullmacSaeFrame;
+    }) -> ();
+    strict OnWmmStatusResp(struct {
+        status zx.Status;
+        wmm_params fuchsia.wlan.common.WlanWmmParameters;
+    }) -> ();
+};
+
+@discoverable
+@transport("Driver")
+closed protocol WlanFullmacImpl {
+    // Lifecycle operations
+    strict Start(resource struct {
+        ifc client_end:WlanFullmacImplIfc;
+    }) -> (resource struct {
+        // status zx.Status;
+        sme_channel zx.Handle:CHANNEL;
+    }) error zx.Status;
+    strict Stop() -> ();
+
+    // State operation
+    strict Query() -> (struct {
+        info WlanFullmacQueryInfo;
+    }) error zx.Status;
+    strict QueryMacSublayerSupport() -> (struct {
+        resp fuchsia.wlan.common.MacSublayerSupport;
+    }) error zx.Status;
+    strict QuerySecuritySupport() -> (struct {
+        resp fuchsia.wlan.common.SecuritySupport;
+    }) error zx.Status;
+    strict QuerySpectrumManagementSupport() -> (struct {
+        resp fuchsia.wlan.common.SpectrumManagementSupport;
+    }) error zx.Status;
+
+    // MLME operations
+    strict StartScan(table {
+        1: txn_id uint64;
+        2: scan_type WlanScanType;
+        /// List of channels to scan on. An empty list of channels will cause a
+        /// scan request to immediately return a WlanFullmacScanEnd with code INVALID_ARGS.
+        ///
+        /// Invalid channel numbers will be silently ignored. The validity of a channel
+        /// number depends on the current regulatory region, and a FullMAC driver cannot
+        /// always determine the region setting. This is especially the case when
+        /// firmware changes the region setting dynamically.
+        3: channels vector<uint8>:ieee80211.MAX_UNIQUE_CHANNEL_NUMBERS;
+        /// List of SSIDs to scan for. An empty list of ssids is the same as specifying
+        /// a list containing only the wildcard SSID.
+        ///
+        /// There is no limit on the number of SSIDs specified. A large number of
+        /// SSIDs may result in extended scan times because of hardware limitations on
+        /// the number of SSIDs permitted per scan request and the technical limitation
+        /// in IEEE 802.11-2016 that limits the number of SSIDs in a single Probe Request
+        /// frame to ieee80211.SSID_LIST_MAX SSIDs.
+        4: ssids vector<ieee80211.CSsid>:MAX;
+        5: min_channel_time uint32;
+        6: max_channel_time uint32;
+    }) -> ();
+    strict ConnectReq(table {
+        1: selected_bss fuchsia.wlan.internal.BssDescription;
+        // Timeout specified in beacon interval.
+        2: connect_failure_timeout uint32;
+
+        /// Additional parameters specific to the authentication exchange.
+        3: auth_type WlanAuthType;
+        // sae_password is ignored except when SAE_DRIVER_AUTH is enabled and the
+        // auth_type is SAE.
+        4: sae_password vector<uint8>:MAX;
+
+        /// WEP key used in the authentication exchange. Only included for WEP security type.
+        // TODO(fxbug.dev/85462): this should be optional, but we can't because
+        // Banjo code generation would give us "a field has incomplete type" error
+        5: wep_key SetKeyDescriptor;
+
+        /// Additional parameters specific to the association exchange.
+        6: security_ie vector<uint8>:ieee80211.WLAN_IE_MAX_LEN;
+    }) -> ();
+    strict ReconnectReq(struct {
+        req WlanFullmacReconnectReq;
+    }) -> ();
+    strict AuthResp(struct {
+        resp WlanFullmacAuthResp;
+    }) -> ();
+    strict DeauthReq(struct {
+        req WlanFullmacDeauthReq;
+    }) -> ();
+    strict AssocResp(struct {
+        resp WlanFullmacAssocResp;
+    }) -> ();
+    strict DisassocReq(struct {
+        req WlanFullmacDisassocReq;
+    }) -> ();
+    strict ResetReq(struct {
+        req WlanFullmacResetReq;
+    }) -> ();
+    strict StartReq(struct {
+        req WlanFullmacStartReq;
+    }) -> ();
+    strict StopReq(struct {
+        req WlanFullmacStopReq;
+    }) -> ();
+    strict SetKeysReq(struct {
+        req WlanFullmacSetKeysReq;
+    }) -> (struct {
+        resp WlanFullmacSetKeysResp;
+    });
+    strict DelKeysReq(struct {
+        req WlanFullmacDelKeysReq;
+    }) -> ();
+    strict EapolReq(struct {
+        req WlanFullmacEapolReq;
+    }) -> ();
+
+    // MLME extensions
+    strict GetIfaceCounterStats() -> (struct {
+        stats WlanFullmacIfaceCounterStats;
+    }) error zx.Status;
+    strict GetIfaceHistogramStats() -> (struct {
+        stats WlanFullmacIfaceHistogramStats;
+    }) error zx.Status;
+    strict StartCaptureFrames(struct {
+        req WlanFullmacStartCaptureFramesReq;
+    }) -> (struct {
+        resp WlanFullmacStartCaptureFramesResp;
+    });
+    strict StopCaptureFrames() -> ();
+    strict SaeHandshakeResp(struct {
+        resp WlanFullmacSaeHandshakeResp;
+    }) -> ();
+    strict SaeFrameTx(struct {
+        frame WlanFullmacSaeFrame;
+    }) -> ();
+    strict WmmStatusReq() -> ();
+
+    // Configuration operations
+    strict SetMulticastPromisc(struct {
+        enable bool;
+    }) -> () error zx.Status;
+
+    // Notify the interface whether it's online or offline. For client interfaces the online status
+    // changes based on such things as being associated/disassociated with an AP. For encrypted
+    // connections this will be regulated by MLME calls to SetControlledPort, for open connections
+    // the interface is considered online as soon as association is confirmed.
+    //
+    // A SoftAP interface is set to online when:
+    // 1) The driver confirms that a request to start a SoftAP succeeded.
+    // A SoftAP interface is set to offline when:
+    // 1) A request to stop a SoftAP is received.
+    // 2) The driver indicates that the SoftAP has stopped (possibly already offline because of 1).
+    //
+    // The call will ONLY be made when the state actually changes. For example in the situation
+    // above where a call to stop an AP has been made there will be a call to OnLinkStateChanged.
+    // However when the driver confirms this there will be no additional call to OnLinkStateChanged
+    // because it was already offline.
+    strict OnLinkStateChanged(struct {
+        online bool;
+    }) -> ();
+};
+
+
+service Service {
+    wlan_fullmac_impl client_end:WlanFullmacImpl;
+};

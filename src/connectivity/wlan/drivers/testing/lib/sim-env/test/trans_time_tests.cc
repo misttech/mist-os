@@ -2,8 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include <fuchsia/wlan/common/c/banjo.h>
-
 #include <memory>
 
 #include <gmock/gmock.h>
@@ -26,8 +24,8 @@ constexpr zx::duration kSimulatedClockDuration = zx::sec(10);
 using ::testing::NotNull;
 
 constexpr simulation::WlanTxInfo kDefaultTxInfo = {
-    .channel = {.primary = 9, .cbw = CHANNEL_BANDWIDTH_CBW20, .secondary80 = 0}};
-constexpr cssid_t kDefaultSsid = {.len = 15, .data = "Fuchsia Fake AP"};
+    .channel = {.primary = 9, .cbw = wlan_common::ChannelBandwidth::kCbw20, .secondary80 = 0}};
+constexpr wlan_ieee80211::CSsid kDefaultSsid = {.len = 15, .data = {.data_ = "Fuchsia Fake AP"}};
 const common::MacAddr kDefaultBssid({0x12, 0x34, 0x56, 0x78, 0x9a, 0xbc});
 
 // This is the distance between stations we used in this test.
@@ -35,7 +33,7 @@ const int32_t kDefaultTestDis = 3;
 // This is the time when the first transmission start.
 constexpr zx::duration kFirstTransTime = zx::msec(50);
 
-void checkChannel(const wlan_channel_t& channel) {
+void checkChannel(const wlan_common::WlanChannel& channel) {
   EXPECT_EQ(channel.primary, kDefaultTxInfo.channel.primary);
   EXPECT_EQ(channel.cbw, kDefaultTxInfo.channel.cbw);
   EXPECT_EQ(channel.secondary80, kDefaultTxInfo.channel.secondary80);
@@ -102,7 +100,8 @@ void SimStation::RxMgmtFrame(std::shared_ptr<const simulation::SimManagementFram
       ASSERT_THAT(ssid_generic_ie, NotNull());
       auto ssid_ie = std::static_pointer_cast<simulation::SsidInformationElement>(ssid_generic_ie);
       EXPECT_EQ(ssid_ie->ssid_.len, kDefaultSsid.len);
-      EXPECT_EQ(std::memcmp(ssid_ie->ssid_.data, kDefaultSsid.data, kDefaultSsid.len), 0);
+      EXPECT_EQ(std::memcmp(ssid_ie->ssid_.data.data(), kDefaultSsid.data.data(), kDefaultSsid.len),
+                0);
       EXPECT_EQ(beacon_frame->bssid_, kDefaultBssid);
       recv_times_.push_back(env_->GetTime());
       break;

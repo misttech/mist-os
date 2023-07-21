@@ -28,7 +28,7 @@ TEST_F(SimTest, ActiveScan) {
   ASSERT_EQ(Init(), ZX_OK);
 
   SimInterface client_ifc;
-  ASSERT_EQ(StartInterface(WLAN_MAC_ROLE_CLIENT, &client_ifc), ZX_OK);
+  ASSERT_EQ(StartInterface(wlan_common::WlanMacRole::kClient, &client_ifc), ZX_OK);
 
   BRCMF_SET_VALUE(getentropy, 1);
 
@@ -40,7 +40,7 @@ TEST_F(SimTest, ActiveScan) {
   // Verify that scan completed successfully
   auto scan_result = client_ifc.ScanResultCode(kScanId);
   ASSERT_TRUE(scan_result);
-  EXPECT_EQ(*scan_result, ZX_OK);
+  EXPECT_EQ(*scan_result, wlan_fullmac::WlanScanResult::kSuccess);
 }
 
 }  // namespace wlan::brcmfmac

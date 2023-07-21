@@ -12,8 +12,6 @@
 
 #include <memory>
 
-#include <gtest/gtest.h>
-
 #include "src/connectivity/wlan/lib/common/cpp/include/wlan/common/channel.h"
 #include "src/connectivity/wlan/lib/mlme/cpp/include/wlan/mlme/mac_frame.h"
 

@@ -131,6 +131,8 @@ class Device : public DeviceType,
 
   // Notify the protocol connection completion.
   libsync::Completion protocol_connected_;
+  // Default driver dispatcher in the form of async_dispatcher_t
+  async_dispatcher_t* driver_async_dispatcher_;
 
  private:
   std::unique_ptr<brcmf_pub> brcmf_pub_;

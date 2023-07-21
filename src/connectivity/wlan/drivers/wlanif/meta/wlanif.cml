@@ -9,17 +9,13 @@
     ],
     program: {
         runner: "driver",
-        compat: "driver/brcmfmac.so",
-        bind: "meta/bind/brcmfmac_sdio.bindbc",
+        bind: "meta/bind/wlanif.bindbc",
         colocate: "true",
+        compat: "driver/wlanif.so",
+        default_dispatcher_opts: [ "allow_sync_calls" ],
+        fallback: "false",
     },
-    capabilities: [
-        { service: "fuchsia.wlan.phyimpl.Service" },
-    ],
-    expose: [
-        {
-            service: "fuchsia.wlan.phyimpl.Service",
-            from: "self",
-        },
+    use: [
+        { service: "fuchsia.wlan.fullmac.Service" },
     ],
 }

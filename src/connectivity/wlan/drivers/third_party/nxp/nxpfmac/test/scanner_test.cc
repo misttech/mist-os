@@ -154,10 +154,12 @@ TEST_F(ScannerTest, Scan) {
   Scanner scanner(&context_, kBssIndex);
 
   // Perform an active scan
-  wlan_fullmac_scan_req_t scan_request{
-      .txn_id = kTxnId,
-      .scan_type = WLAN_SCAN_TYPE_ACTIVE,
-  };
+  fidl::Arena arena;
+  auto builder = fuchsia_wlan_fullmac::wire::WlanFullmacImplStartScanRequest::Builder(arena);
+  builder.txn_id(kTxnId);
+  builder.scan_type(fuchsia_wlan_fullmac::wire::WlanScanType::kActive);
+  builder.min_channel_time(0);
+  auto scan_request = builder.Build();
   ASSERT_OK(scanner.Scan(&scan_request, kDefaultTimeout, on_scan_result, on_scan_end));
 
   // The Set ioctl should've been called immediately, that's what starts the scan
@@ -233,7 +235,12 @@ TEST_F(ScannerTest, StopScan) {
     Scanner scanner(&context_, kBssIndex);
 
     // Perform an active scan
-    wlan_fullmac_scan_req_t scan_request{.txn_id = kTxnId, .scan_type = WLAN_SCAN_TYPE_ACTIVE};
+    fidl::Arena arena;
+    auto builder = fuchsia_wlan_fullmac::wire::WlanFullmacImplStartScanRequest::Builder(arena);
+    builder.txn_id(kTxnId);
+    builder.scan_type(fuchsia_wlan_fullmac::wire::WlanScanType::kActive);
+    builder.min_channel_time(0);
+    auto scan_request = builder.Build();
 
     ASSERT_OK(scanner.Scan(&scan_request, kDefaultTimeout, nullptr, on_scan_end));
 
@@ -279,12 +286,19 @@ TEST_F(ScannerTest, ScanSpecificSsids) {
   constexpr uint32_t kBssIndex = 0;
   constexpr uint64_t kTxnId = 42;
 
-  wlan_fullmac_scan_req_t scan_request{.txn_id = kTxnId, .scan_type = WLAN_SCAN_TYPE_ACTIVE};
+  fidl::Arena arena;
+  auto builder = fuchsia_wlan_fullmac::wire::WlanFullmacImplStartScanRequest::Builder(arena);
+  builder.txn_id(kTxnId);
+  builder.scan_type(fuchsia_wlan_fullmac::wire::WlanScanType::kActive);
+  constexpr fuchsia_wlan_ieee80211::wire::CSsid kSsids[] = {{.len = 4, .data{"foo"}},
+                                                            {.len = 8, .data{"another"}}};
 
-  constexpr cssid_t kSsids[] = {{.len = 4, .data{"foo"}}, {.len = 8, .data{"another"}}};
+  builder.ssids(fidl::VectorView<fuchsia_wlan_ieee80211::wire::CSsid>::FromExternal(
+      const_cast<fuchsia_wlan_ieee80211::wire::CSsid*>(kSsids),
+      sizeof(kSsids) / sizeof(kSsids[0])));
+  builder.min_channel_time(0);
 
-  scan_request.ssids_list = kSsids;
-  scan_request.ssids_count = std::size(kSsids);
+  auto scan_request = builder.Build();
 
   auto on_ioctl = [&](t_void*, pmlan_ioctl_req req) -> mlan_status {
     if (req->action == MLAN_ACT_GET) {
@@ -298,8 +312,8 @@ TEST_F(ScannerTest, ScanSpecificSsids) {
     auto scan_cfg = reinterpret_cast<wlan_user_scan_cfg*>(scan->param.user_scan.scan_cfg_buf);
 
     // Check that the requested SSIDs are part of the request.
-    EXPECT_BYTES_EQ(kSsids[0].data, scan_cfg->ssid_list[0].ssid, kSsids[0].len);
-    EXPECT_BYTES_EQ(kSsids[1].data, scan_cfg->ssid_list[1].ssid, kSsids[1].len);
+    EXPECT_BYTES_EQ(kSsids[0].data.data(), scan_cfg->ssid_list[0].ssid, kSsids[0].len);
+    EXPECT_BYTES_EQ(kSsids[1].data.data(), scan_cfg->ssid_list[1].ssid, kSsids[1].len);
     // The next SSID should be empty.
     EXPECT_EQ('\0', scan_cfg->ssid_list[2].ssid[0]);
     ioctl_adapter_->OnIoctlComplete(req, wlan::nxpfmac::IoctlStatus::Success);
@@ -333,14 +347,19 @@ TEST_F(ScannerTest, ScanTooManySsids) {
   constexpr uint64_t kTxnId = 42;
   constexpr size_t kTooManySsids = 11;
 
-  wlan_fullmac_scan_req_t scan_request{.txn_id = kTxnId, .scan_type = WLAN_SCAN_TYPE_ACTIVE};
-
   // Just use an empty list, the important thing is the number of SSIDs.
-  constexpr cssid_t kSsids[kTooManySsids] = {};
+  fidl::Arena arena;
+  auto builder = fuchsia_wlan_fullmac::wire::WlanFullmacImplStartScanRequest::Builder(arena);
+  builder.txn_id(kTxnId);
+  builder.scan_type(fuchsia_wlan_fullmac::wire::WlanScanType::kActive);
+  constexpr fuchsia_wlan_ieee80211::wire::CSsid kSsids[kTooManySsids] = {};
 
-  scan_request.ssids_list = kSsids;
-  scan_request.ssids_count = std::size(kSsids);
-  ASSERT_GT(scan_request.ssids_count, 1u);
+  builder.ssids(fidl::VectorView<fuchsia_wlan_ieee80211::wire::CSsid>::FromExternal(
+      const_cast<fuchsia_wlan_ieee80211::wire::CSsid*>(kSsids), kTooManySsids));
+  builder.min_channel_time(0);
+
+  auto scan_request = builder.Build();
+  ASSERT_GT(scan_request.ssids().count(), 1u);
 
   Scanner scanner(&context_, kBssIndex);
 
@@ -355,7 +374,12 @@ TEST_F(ScannerTest, ScanTimeout) {
   constexpr uint64_t kTxnId = 42;
   constexpr zx_duration_t kShortTimeout = ZX_MSEC(5);
 
-  wlan_fullmac_scan_req_t scan_request{.txn_id = kTxnId, .scan_type = WLAN_SCAN_TYPE_ACTIVE};
+  fidl::Arena arena;
+  auto builder = fuchsia_wlan_fullmac::wire::WlanFullmacImplStartScanRequest::Builder(arena);
+  builder.txn_id(kTxnId);
+  builder.scan_type(fuchsia_wlan_fullmac::wire::WlanScanType::kActive);
+  builder.min_channel_time(0);
+  auto scan_request = builder.Build();
 
   std::atomic<int> on_ioctl_calls = 0;
   std::atomic<bool> get_scan_results_called = false;

@@ -69,6 +69,7 @@ Device::Device(zx_device_t* parent)
   ZX_ASSERT_MSG(!dispatcher.is_error(), "%s(): Dispatcher created failed: %s\n", __func__,
                 zx_status_get_string(dispatcher.status_value()));
   dispatcher_ = std::move(*dispatcher);
+  driver_async_dispatcher_ = fdf::Dispatcher::GetCurrent()->async_dispatcher();
 }
 
 Device::~Device() {
@@ -241,8 +242,18 @@ void Device::CreateIface(CreateIfaceRequestView request, fdf::Arena& arena,
       }
 
       WlanInterface* interface = nullptr;
-      if ((status = WlanInterface::Create(this, kClientInterfaceName, wdev, create_iface_req.role,
-                                          &interface)) != ZX_OK) {
+
+      libsync::Completion created;
+      // Create WlanInterface on the default driver dispatcher to ensure its OutgoingDirectory is
+      // only accessed on a single thread.
+      async::PostTask(driver_async_dispatcher_, [&]() {
+        status = WlanInterface::Create(this, kClientInterfaceName, wdev, create_iface_req.role,
+                                       &interface);
+        created.Signal();
+      });
+      created.Wait();
+      if (status != ZX_OK) {
+        BRCMF_ERR("Failed to create WlanInterface: %s", zx_status_get_string(status));
         completer.buffer(arena).ReplyError(status);
         return;
       }
@@ -279,8 +290,18 @@ void Device::CreateIface(CreateIfaceRequestView request, fdf::Arena& arena,
       }
 
       WlanInterface* interface = nullptr;
-      if ((status = WlanInterface::Create(this, kApInterfaceName, wdev, create_iface_req.role,
-                                          &interface)) != ZX_OK) {
+
+      libsync::Completion created;
+      // Create WlanInterface on the default driver dispatcher to ensure its OutgoingDirectory is
+      // only accessed on a single thread.
+      async::PostTask(driver_async_dispatcher_, [&]() {
+        status =
+            WlanInterface::Create(this, kApInterfaceName, wdev, create_iface_req.role, &interface);
+        created.Signal();
+      });
+      created.Wait();
+      if (status != ZX_OK) {
+        BRCMF_ERR("Failed to create WlanInterface: %s", zx_status_get_string(status));
         completer.buffer(arena).ReplyError(status);
         return;
       }
@@ -316,7 +337,6 @@ void Device::CreateIface(CreateIfaceRequestView request, fdf::Arena& arena,
   auto builder = fuchsia_wlan_phyimpl::wire::WlanPhyImplCreateIfaceResponse::Builder(fidl_arena);
   builder.iface_id(iface_id);
   completer.buffer(arena).ReplySuccess(builder.Build());
-  return;
 }
 
 void Device::DestroyIface(DestroyIfaceRequestView request, fdf::Arena& arena,
@@ -334,16 +354,17 @@ void Device::DestroyIface(DestroyIfaceRequestView request, fdf::Arena& arena,
   switch (iface_id) {
     case kClientInterfaceId: {
       libsync::Completion device_removal;
-      DestroyIface(&client_interface_, [&, completer = completer.ToAsync(),
+      DestroyIface(&client_interface_, [&device_removal, completer = completer.ToAsync(),
                                         arena = std::move(arena), iface_id](auto status) mutable {
         if (status != ZX_OK) {
           BRCMF_ERR("Device::DestroyIface() Error destroying Client interface : %s",
                     zx_status_get_string(status));
           completer.buffer(arena).ReplyError(status);
-        } else {
-          BRCMF_DBG(WLANPHY, "Interface %d destroyed successfully", iface_id);
-          completer.buffer(arena).ReplySuccess();
+          device_removal.Signal();
+          return;
         }
+        BRCMF_DBG(WLANPHY, "Interface %d destroyed successfully", iface_id);
+        completer.buffer(arena).ReplySuccess();
         device_removal.Signal();
       });
       zx_status_t status = device_removal.Wait(kDeviceRemovalTimeout);
@@ -355,16 +376,17 @@ void Device::DestroyIface(DestroyIfaceRequestView request, fdf::Arena& arena,
     }
     case kApInterfaceId: {
       libsync::Completion device_removal;
-      DestroyIface(&ap_interface_, [&, completer = completer.ToAsync(), arena = std::move(arena),
-                                    iface_id](auto status) mutable {
+      DestroyIface(&ap_interface_, [&device_removal, completer = completer.ToAsync(),
+                                    arena = std::move(arena), iface_id](auto status) mutable {
         if (status != ZX_OK) {
           BRCMF_ERR("Device::DestroyIface() Error destroying AP interface : %s",
                     zx_status_get_string(status));
           completer.buffer(arena).ReplyError(status);
-        } else {
-          BRCMF_DBG(WLANPHY, "Interface %d destroyed successfully", iface_id);
-          completer.buffer(arena).ReplySuccess();
+          device_removal.Signal();
+          return;
         }
+        BRCMF_DBG(WLANPHY, "Interface %d destroyed successfully", iface_id);
+        completer.buffer(arena).ReplySuccess();
         device_removal.Signal();
       });
       zx_status_t status = device_removal.Wait(kDeviceRemovalTimeout);
@@ -599,14 +621,25 @@ void Device::DestroyIface(WlanInterface** iface_ptr, fit::callback<void(zx_statu
 
   iface->RemovePort();
   wireless_dev* wdev = iface->take_wdev();
-  if ((status = brcmf_cfg80211_del_iface(brcmf_pub_->config, wdev)) != ZX_OK) {
-    BRCMF_ERR("Failed to del iface, status: %s", zx_status_get_string(status));
-    iface->set_wdev(wdev);
-    respond(status);
-    return;
-  }
-  iface->DdkAsyncRemove([status, respond = std::move(respond)]() mutable { respond(status); });
-  *iface_ptr = nullptr;
+
+  libsync::Completion destroyed;
+  // In SIM tests, the Reomve() function below deletes WlanInterface, make sure this operation
+  // happens on the default driver dispatcher to ensure the OutgoingDirectory of WlanInterface is
+  // only accessed on a single thread.
+  async::PostTask(driver_async_dispatcher_, [&]() {
+    if ((status = brcmf_cfg80211_del_iface(brcmf_pub_->config, wdev)) != ZX_OK) {
+      BRCMF_ERR("Failed to del iface, status: %s", zx_status_get_string(status));
+      iface->set_wdev(wdev);
+      respond(status);
+      destroyed.Signal();
+      return;
+    }
+    iface->Remove([status, respond = std::move(respond)]() mutable { respond(status); });
+    *iface_ptr = nullptr;
+
+    destroyed.Signal();
+  });
+  destroyed.Wait();
 }
 
 }  // namespace brcmfmac

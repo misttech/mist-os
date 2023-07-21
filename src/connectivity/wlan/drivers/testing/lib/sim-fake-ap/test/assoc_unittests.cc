@@ -2,9 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include <fuchsia/wlan/common/c/banjo.h>
-#include <fuchsia/wlan/ieee80211/cpp/fidl.h>
-
 #include <gtest/gtest.h>
 
 #include "src/connectivity/wlan/drivers/testing/lib/sim-env/sim-env.h"
@@ -18,15 +15,13 @@ constexpr zx::duration kSimulatedClockDuration = zx::sec(10);
 
 }  // namespace
 
-namespace wlan_ieee80211 = ::fuchsia::wlan::ieee80211;
-
 constexpr simulation::WlanTxInfo kDefaultTxInfo = {
-    .channel = {.primary = 9, .cbw = CHANNEL_BANDWIDTH_CBW20, .secondary80 = 0}};
-constexpr cssid_t kApSsid = {.len = 15, .data = "Fuchsia Fake AP"};
+    .channel = {.primary = 9, .cbw = wlan_common::ChannelBandwidth::kCbw20, .secondary80 = 0}};
+constexpr wlan_ieee80211::CSsid kApSsid = {.len = 15, .data = {.data_ = "Fuchsia Fake AP"}};
 const common::MacAddr kApBssid({0x12, 0x34, 0x56, 0x78, 0x9a, 0xbc});
 const common::MacAddr kClientMacAddr({0x11, 0x22, 0x33, 0x44, 0xee, 0xff});
-constexpr auto kClientDisassocReason = wlan_ieee80211::ReasonCode::UNSPECIFIED_REASON;
-constexpr auto kApDisassocReason = wlan_ieee80211::ReasonCode::INVALID_AUTHENTICATION;
+constexpr auto kClientDisassocReason = wlan_ieee80211::ReasonCode::kUnspecifiedReason;
+constexpr auto kApDisassocReason = wlan_ieee80211::ReasonCode::kInvalidAuthentication;
 
 class AssocTest : public ::testing::Test, public simulation::StationIfc {
  public:
@@ -47,7 +42,7 @@ class AssocTest : public ::testing::Test, public simulation::StationIfc {
           std::shared_ptr<const simulation::WlanRxInfo> info) override;
 };
 
-void validateChannel(const wlan_channel_t& channel) {
+void validateChannel(const wlan_common::WlanChannel& channel) {
   EXPECT_EQ(channel.primary, kDefaultTxInfo.channel.primary);
   EXPECT_EQ(channel.cbw, kDefaultTxInfo.channel.cbw);
   EXPECT_EQ(channel.secondary80, kDefaultTxInfo.channel.secondary80);
@@ -94,7 +89,7 @@ void AssocTest::Rx(std::shared_ptr<const simulation::SimFrame> frame,
 // AUTHENTICATED in AP.
 void AssocTest::FinishAuth() {
   simulation::SimAuthFrame auth_req_frame(kClientMacAddr, kApBssid, 1, simulation::AUTH_TYPE_OPEN,
-                                          wlan_ieee80211::StatusCode::SUCCESS);
+                                          wlan_ieee80211::StatusCode::kSuccess);
   env_.Tx(auth_req_frame, kDefaultTxInfo, this);
 }
 
@@ -113,14 +108,16 @@ TEST_F(AssocTest, RefuseIfNotAuthenticated) {
 
   env_.Run(kSimulatedClockDuration);
 
-  EXPECT_EQ(assoc_status_list_.front(), wlan_ieee80211::StatusCode::REFUSED_REASON_UNSPECIFIED);
+  EXPECT_EQ(assoc_status_list_.front(), wlan_ieee80211::StatusCode::kRefusedReasonUnspecified);
   assoc_status_list_.pop_front();
   EXPECT_EQ(assoc_status_list_.size(), 0U);
 }
 
 TEST_F(AssocTest, RefusedWrongSsid) {
-  static constexpr cssid_t kWrongLenSsid = {.len = 14, .data = "Fuchsia Fake A"};
-  static constexpr cssid_t kWrongSsid = {.len = 15, .data = "Fuchsia Fake AA"};
+  static constexpr wlan_ieee80211::CSsid kWrongLenSsid = {.len = 14,
+                                                          .data = {.data_ = "Fuchsia Fake A"}};
+  static constexpr wlan_ieee80211::CSsid kWrongSsid = {.len = 15,
+                                                       .data = {.data_ = "Fuchsia Fake AA"}};
 
   FinishAuth();
 
@@ -138,15 +135,15 @@ TEST_F(AssocTest, RefusedWrongSsid) {
 
   EXPECT_EQ(assoc_resp_count_, 2U);
   ASSERT_EQ(assoc_status_list_.size(), (size_t)2);
-  EXPECT_EQ(assoc_status_list_.front(), wlan_ieee80211::StatusCode::REFUSED_REASON_UNSPECIFIED);
+  EXPECT_EQ(assoc_status_list_.front(), wlan_ieee80211::StatusCode::kRefusedReasonUnspecified);
   assoc_status_list_.pop_front();
-  EXPECT_EQ(assoc_status_list_.front(), wlan_ieee80211::StatusCode::REFUSED_REASON_UNSPECIFIED);
+  EXPECT_EQ(assoc_status_list_.front(), wlan_ieee80211::StatusCode::kRefusedReasonUnspecified);
   assoc_status_list_.pop_front();
 }
 
 TEST_F(AssocTest, IgnoredRequests) {
   constexpr simulation::WlanTxInfo kWrongChannelTxInfo = {
-      .channel = {.primary = 10, .cbw = CHANNEL_BANDWIDTH_CBW20, .secondary80 = 0}};
+      .channel = {.primary = 10, .cbw = wlan_common::ChannelBandwidth::kCbw20, .secondary80 = 0}};
 
   static const common::MacAddr kWrongBssid({0x12, 0x34, 0x56, 0x78, 0x9a, 0xbd});
 
@@ -198,11 +195,11 @@ TEST_F(AssocTest, BasicUse) {
 
   EXPECT_EQ(assoc_resp_count_, 3U);
   ASSERT_EQ(assoc_status_list_.size(), (size_t)3);
-  EXPECT_EQ(assoc_status_list_.front(), wlan_ieee80211::StatusCode::SUCCESS);
+  EXPECT_EQ(assoc_status_list_.front(), wlan_ieee80211::StatusCode::kSuccess);
   assoc_status_list_.pop_front();
-  EXPECT_EQ(assoc_status_list_.front(), wlan_ieee80211::StatusCode::REFUSED_TEMPORARILY);
+  EXPECT_EQ(assoc_status_list_.front(), wlan_ieee80211::StatusCode::kRefusedTemporarily);
   assoc_status_list_.pop_front();
-  EXPECT_EQ(assoc_status_list_.front(), wlan_ieee80211::StatusCode::REFUSED_TEMPORARILY);
+  EXPECT_EQ(assoc_status_list_.front(), wlan_ieee80211::StatusCode::kRefusedTemporarily);
   assoc_status_list_.pop_front();
 }
 
@@ -228,7 +225,7 @@ TEST_F(AssocTest, IgnoreAssociations) {
   EXPECT_EQ(assoc_resp_count_, 0U);
 }
 
-/* Verify that association requests are refused with REFUSED_TEMPORARILY when the association
+/* Verify that association requests are refused with kRefusedTemporarily when the association
    handling state is set to ASSOC_REFUSED_TEMPORARILY.
 
    Timeline for this test:
@@ -247,7 +244,7 @@ TEST_F(AssocTest, TemporarilyRefuseAssociations) {
 
   EXPECT_EQ(assoc_resp_count_, 1U);
   ASSERT_EQ(assoc_status_list_.size(), (size_t)1);
-  EXPECT_EQ(assoc_status_list_.front(), wlan_ieee80211::StatusCode::REFUSED_TEMPORARILY);
+  EXPECT_EQ(assoc_status_list_.front(), wlan_ieee80211::StatusCode::kRefusedTemporarily);
   assoc_status_list_.pop_front();
 }
 
@@ -270,7 +267,7 @@ TEST_F(AssocTest, RefuseAssociations) {
 
   EXPECT_EQ(assoc_resp_count_, 1U);
   ASSERT_EQ(assoc_status_list_.size(), (size_t)1);
-  EXPECT_EQ(assoc_status_list_.front(), wlan_ieee80211::StatusCode::REFUSED_REASON_UNSPECIFIED);
+  EXPECT_EQ(assoc_status_list_.front(), wlan_ieee80211::StatusCode::kRefusedReasonUnspecified);
   assoc_status_list_.pop_front();
 }
 
@@ -302,7 +299,7 @@ TEST_F(AssocTest, DisassocFromSta) {
   // clients should be 0.
   EXPECT_EQ(assoc_resp_count_, 1U);
   ASSERT_EQ(assoc_status_list_.size(), (size_t)1);
-  EXPECT_EQ(assoc_status_list_.front(), wlan_ieee80211::StatusCode::SUCCESS);
+  EXPECT_EQ(assoc_status_list_.front(), wlan_ieee80211::StatusCode::kSuccess);
   EXPECT_EQ(ap_.GetNumAssociatedClient(), 0U);
   assoc_status_list_.pop_front();
 }
@@ -331,7 +328,7 @@ TEST_F(AssocTest, DisassocFromAp) {
   // clients should be 0.
   EXPECT_EQ(assoc_resp_count_, 1U);
   ASSERT_EQ(assoc_status_list_.size(), (size_t)1);
-  EXPECT_EQ(assoc_status_list_.front(), wlan_ieee80211::StatusCode::SUCCESS);
+  EXPECT_EQ(assoc_status_list_.front(), wlan_ieee80211::StatusCode::kSuccess);
   EXPECT_EQ(ap_.GetNumAssociatedClient(), 0U);
   EXPECT_EQ(disassoc_req_count_, 1U);
   EXPECT_EQ(disassoc_reason_list_.front(), kApDisassocReason);

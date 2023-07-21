@@ -14,14 +14,14 @@
 namespace wlan::brcmfmac {
 
 // Some default AP and association request values
-constexpr wlan_channel_t kDefaultChannel = {
-    .primary = 9, .cbw = CHANNEL_BANDWIDTH_CBW20, .secondary80 = 0};
-constexpr wlan_channel_t kSwitchedChannel = {
-    .primary = 20, .cbw = CHANNEL_BANDWIDTH_CBW20, .secondary80 = 0};
-constexpr wlan_channel_t kSecondSwitchedChannel = {
-    .primary = 30, .cbw = CHANNEL_BANDWIDTH_CBW20, .secondary80 = 0};
+constexpr wlan_common::WlanChannel kDefaultChannel = {
+    .primary = 9, .cbw = wlan_common::ChannelBandwidth::kCbw20, .secondary80 = 0};
+constexpr wlan_common::WlanChannel kSwitchedChannel = {
+    .primary = 20, .cbw = wlan_common::ChannelBandwidth::kCbw20, .secondary80 = 0};
+constexpr wlan_common::WlanChannel kSecondSwitchedChannel = {
+    .primary = 30, .cbw = wlan_common::ChannelBandwidth::kCbw20, .secondary80 = 0};
 const uint16_t kDefaultCSACount = 3;
-constexpr cssid_t kDefaultSsid = {.len = 15, .data = "Fuchsia Fake AP"};
+constexpr wlan_ieee80211::CSsid kDefaultSsid = {.len = 15, .data = {.data_ = "Fuchsia Fake AP"}};
 const common::MacAddr kDefaultBssid({0x12, 0x34, 0x56, 0x78, 0x9a, 0xbc});
 
 class ChannelSwitchTest : public SimTest {
@@ -33,10 +33,10 @@ class ChannelSwitchTest : public SimTest {
   void Init();
 
   // Schedule a future SetChannel event for the first AP in list
-  void ScheduleChannelSwitch(const wlan_channel_t& new_channel, zx::duration when);
+  void ScheduleChannelSwitch(const wlan_common::WlanChannel& new_channel, zx::duration when);
 
   // Send one fake CSA beacon using the identification consistent of default ssid and bssid.
-  void SendFakeCSABeacon(wlan_channel_t& dst_channel);
+  void SendFakeCSABeacon(wlan_common::WlanChannel& dst_channel);
 
  protected:
   // Number of received assoc responses.
@@ -47,7 +47,7 @@ class ChannelSwitchTest : public SimTest {
   std::list<simulation::FakeAp*> aps_;
 };
 
-void ChannelSwitchTest::SendFakeCSABeacon(wlan_channel_t& dst_channel) {
+void ChannelSwitchTest::SendFakeCSABeacon(wlan_common::WlanChannel& dst_channel) {
   constexpr simulation::WlanTxInfo kDefaultTxInfo = {.channel = kDefaultChannel};
 
   simulation::SimBeaconFrame fake_csa_beacon(kDefaultSsid, kDefaultBssid);
@@ -59,11 +59,11 @@ void ChannelSwitchTest::SendFakeCSABeacon(wlan_channel_t& dst_channel) {
 // Create our device instance and hook up the callbacks
 void ChannelSwitchTest::Init() {
   ASSERT_EQ(SimTest::Init(), ZX_OK);
-  ASSERT_EQ(StartInterface(WLAN_MAC_ROLE_CLIENT, &client_ifc_), ZX_OK);
+  ASSERT_EQ(StartInterface(wlan_common::WlanMacRole::kClient, &client_ifc_), ZX_OK);
 }
 
 // This function schedules a Setchannel() event for the first AP in AP list.
-void ChannelSwitchTest::ScheduleChannelSwitch(const wlan_channel_t& new_channel,
+void ChannelSwitchTest::ScheduleChannelSwitch(const wlan_common::WlanChannel& new_channel,
                                               zx::duration when) {
   env_->ScheduleNotification(std::bind(&simulation::FakeAp::SetChannel, aps_.front(), new_channel),
                              when);
@@ -148,7 +148,7 @@ TEST_F(ChannelSwitchTest, SwitchBackInDiffInterval) {
 // This test verifies CSA beacons from APs which are not associated with client will not trigger
 // channel switch event in driver.
 TEST_F(ChannelSwitchTest, NotSwitchForDifferentAP) {
-  constexpr cssid_t kWrongSsid = {.len = 14, .data = "Fuchsia Fake AP"};
+  constexpr wlan_ieee80211::CSsid kWrongSsid = {.len = 14, .data = {.data_ = "Fuchsia Fake AP"}};
   ASSERT_NE(kDefaultSsid.len, kWrongSsid.len);
   const common::MacAddr kWrongBssid({0x12, 0x34, 0x56, 0x78, 0x9b, 0xbc});
   ASSERT_NE(kDefaultBssid, kWrongBssid);

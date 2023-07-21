@@ -9,9 +9,7 @@
 
 namespace wlan::simulation {
 
-namespace wlan_ieee80211 = ::fuchsia::wlan::ieee80211;
-
-void FakeAp::SetChannel(const wlan_channel_t& channel) {
+void FakeAp::SetChannel(const wlan_common::WlanChannel& channel) {
   // Time until next beacon.
   zx::duration diff_to_next_beacon = beacon_state_.next_beacon_time - environment_->GetTime();
 
@@ -54,7 +52,7 @@ void FakeAp::SetBssid(const common::MacAddr& bssid) {
   beacon_state_.beacon_frame_.bssid_ = bssid;
 }
 
-void FakeAp::SetSsid(const cssid_t& ssid) {
+void FakeAp::SetSsid(const wlan_ieee80211::CSsid& ssid) {
   ssid_ = ssid;
   beacon_state_.beacon_frame_.AddSsidIe(ssid);
 }
@@ -81,7 +79,7 @@ zx_status_t FakeAp::SetSecurity(struct Security sec) {
   return ZX_OK;
 }
 
-bool FakeAp::CanReceiveChannel(const wlan_channel_t& channel) {
+bool FakeAp::CanReceiveChannel(const wlan_common::WlanChannel& channel) {
   // For now, require an exact match
   return ((channel.primary == tx_info_.channel.primary) && (channel.cbw == tx_info_.channel.cbw) &&
           (channel.secondary80 == tx_info_.channel.secondary80));
@@ -177,8 +175,7 @@ void FakeAp::ScheduleAssocResp(wlan_ieee80211::StatusCode status, const common::
       std::bind(&FakeAp::HandleAssocRespNotification, this, status, dst), assoc_resp_interval_);
 }
 
-void FakeAp::ScheduleReassocResp(::fuchsia::wlan::ieee80211::StatusCode status,
-                                 const common::MacAddr& dst) {
+void FakeAp::ScheduleReassocResp(wlan_ieee80211::StatusCode status, const common::MacAddr& dst) {
   environment_->ScheduleNotification(
       [this, status, dst] { HandleReassocRespNotification(status, dst); }, reassoc_resp_interval_);
 }
@@ -235,8 +232,6 @@ void FakeAp::Rx(std::shared_ptr<const SimFrame> frame, std::shared_ptr<const Wla
 }
 
 void FakeAp::RxMgmtFrame(std::shared_ptr<const SimManagementFrame> mgmt_frame) {
-  using wlan_ieee80211::StatusCode;
-
   switch (mgmt_frame->MgmtFrameType()) {
     // TODO(fxbug.dev/89334): A probe response should only be sent if the Probe Request
     // contains the SSID of this AP.
@@ -258,43 +253,49 @@ void FakeAp::RxMgmtFrame(std::shared_ptr<const SimManagementFrame> mgmt_frame) {
       }
 
       if (assoc_handling_mode_ == ASSOC_REFUSED_TEMPORARILY) {
-        ScheduleAssocResp(StatusCode::REFUSED_TEMPORARILY, assoc_req_frame->src_addr_);
+        ScheduleAssocResp(wlan_ieee80211::StatusCode::kRefusedTemporarily,
+                          assoc_req_frame->src_addr_);
         return;
       }
 
       if (assoc_handling_mode_ == ASSOC_REFUSED) {
-        ScheduleAssocResp(StatusCode::REFUSED_REASON_UNSPECIFIED, assoc_req_frame->src_addr_);
+        ScheduleAssocResp(wlan_ieee80211::StatusCode::kRefusedReasonUnspecified,
+                          assoc_req_frame->src_addr_);
         return;
       }
 
       if ((assoc_req_frame->ssid_.len != ssid_.len) ||
-          memcmp(assoc_req_frame->ssid_.data, ssid_.data, ssid_.len)) {
-        ScheduleAssocResp(StatusCode::REFUSED_REASON_UNSPECIFIED, assoc_req_frame->src_addr_);
+          memcmp(assoc_req_frame->ssid_.data.data(), ssid_.data.data(), ssid_.len)) {
+        ScheduleAssocResp(wlan_ieee80211::StatusCode::kRefusedReasonUnspecified,
+                          assoc_req_frame->src_addr_);
         return;
       }
 
       auto client = FindClient(assoc_req_frame->src_addr_);
 
       if (!client) {
-        ScheduleAssocResp(StatusCode::REFUSED_REASON_UNSPECIFIED, assoc_req_frame->src_addr_);
+        ScheduleAssocResp(wlan_ieee80211::StatusCode::kRefusedReasonUnspecified,
+                          assoc_req_frame->src_addr_);
         return;
       }
 
       // Make sure the client is not associated.
       if (client->status_ == Client::ASSOCIATED) {
-        ScheduleAssocResp(StatusCode::REFUSED_TEMPORARILY, assoc_req_frame->src_addr_);
+        ScheduleAssocResp(wlan_ieee80211::StatusCode::kRefusedTemporarily,
+                          assoc_req_frame->src_addr_);
         return;
       }
 
       if (client->status_ != Client::AUTHENTICATED) {
         // If the status of this client is AUTHENTICATING, we also remove it from the list.
         RemoveClient(assoc_req_frame->src_addr_);
-        ScheduleAssocResp(StatusCode::REFUSED_REASON_UNSPECIFIED, assoc_req_frame->src_addr_);
+        ScheduleAssocResp(wlan_ieee80211::StatusCode::kRefusedReasonUnspecified,
+                          assoc_req_frame->src_addr_);
         return;
       }
 
       client->status_ = Client::ASSOCIATED;
-      ScheduleAssocResp(StatusCode::SUCCESS, assoc_req_frame->src_addr_);
+      ScheduleAssocResp(wlan_ieee80211::StatusCode::kSuccess, assoc_req_frame->src_addr_);
       break;
     }
 
@@ -328,14 +329,14 @@ void FakeAp::RxMgmtFrame(std::shared_ptr<const SimManagementFrame> mgmt_frame) {
       }
 
       if (security_.sec_type != auth_req_frame->sec_proto_type_) {
-        ScheduleAuthResp(auth_req_frame, StatusCode::REFUSED_REASON_UNSPECIFIED);
+        ScheduleAuthResp(auth_req_frame, wlan_ieee80211::StatusCode::kRefusedReasonUnspecified);
         return;
       }
 
       // If it's not matching AP's authentication handling mode, just reply a refuse.
       if (auth_req_frame->auth_type_ != security_.auth_handling_mode) {
         RemoveClient(auth_req_frame->src_addr_);
-        ScheduleAuthResp(auth_req_frame, StatusCode::REFUSED_REASON_UNSPECIFIED);
+        ScheduleAuthResp(auth_req_frame, wlan_ieee80211::StatusCode::kRefusedReasonUnspecified);
         return;
       }
 
@@ -343,13 +344,13 @@ void FakeAp::RxMgmtFrame(std::shared_ptr<const SimManagementFrame> mgmt_frame) {
       if ((security_.sec_type == SEC_PROTO_TYPE_WPA1 ||
            security_.sec_type == SEC_PROTO_TYPE_WPA2) &&
           auth_req_frame->auth_type_ != AUTH_TYPE_OPEN) {
-        ScheduleAuthResp(auth_req_frame, StatusCode::REFUSED_REASON_UNSPECIFIED);
+        ScheduleAuthResp(auth_req_frame, wlan_ieee80211::StatusCode::kRefusedReasonUnspecified);
         return;
       }
 
       if (security_.sec_type == SEC_PROTO_TYPE_WPA3 &&
           auth_req_frame->auth_type_ != AUTH_TYPE_SAE) {
-        ScheduleAuthResp(auth_req_frame, StatusCode::REFUSED_REASON_UNSPECIFIED);
+        ScheduleAuthResp(auth_req_frame, wlan_ieee80211::StatusCode::kRefusedReasonUnspecified);
         return;
       }
 
@@ -362,7 +363,7 @@ void FakeAp::RxMgmtFrame(std::shared_ptr<const SimManagementFrame> mgmt_frame) {
       }
 
       // Status of auth req should be WLAN_STATUS_CODE_SUCCESS
-      if (auth_req_frame->status_ != StatusCode::SUCCESS) {
+      if (auth_req_frame->status_ != wlan_ieee80211::StatusCode::kSuccess) {
         RemoveClient(auth_req_frame->src_addr_);
         return;
       }
@@ -397,9 +398,9 @@ void FakeAp::RxMgmtFrame(std::shared_ptr<const SimManagementFrame> mgmt_frame) {
               if (security_.expect_challenge_failure) {
                 // Refuse authentication if this AP has been configured to.
                 // TODO (fxb/61139): Actually check the challenge response rather than hardcoding
-                // authentication success or failure using expect_challenge_failure.
+                // authentication kSuccess or failure using expect_challenge_failure.
                 RemoveClient(auth_req_frame->src_addr_);
-                ScheduleAuthResp(auth_req_frame, StatusCode::CHALLENGE_FAILURE);
+                ScheduleAuthResp(auth_req_frame, wlan_ieee80211::StatusCode::kChallengeFailure);
                 return;
               }
 
@@ -425,7 +426,7 @@ void FakeAp::RxMgmtFrame(std::shared_ptr<const SimManagementFrame> mgmt_frame) {
           ZX_ASSERT_MSG(false, "Unsupported auth_handling_mode.");
       }
 
-      ScheduleAuthResp(auth_req_frame, StatusCode::SUCCESS);
+      ScheduleAuthResp(auth_req_frame, wlan_ieee80211::StatusCode::kSuccess);
       break;
     }
 
@@ -442,12 +443,14 @@ void FakeAp::RxMgmtFrame(std::shared_ptr<const SimManagementFrame> mgmt_frame) {
       }
 
       if (assoc_handling_mode_ == ASSOC_REFUSED_TEMPORARILY) {
-        ScheduleReassocResp(StatusCode::REFUSED_TEMPORARILY, reassoc_req_frame->src_addr_);
+        ScheduleReassocResp(wlan_ieee80211::StatusCode::kRefusedTemporarily,
+                            reassoc_req_frame->src_addr_);
         return;
       }
 
       if (assoc_handling_mode_ == ASSOC_REFUSED) {
-        ScheduleReassocResp(StatusCode::REFUSED_REASON_UNSPECIFIED, reassoc_req_frame->src_addr_);
+        ScheduleReassocResp(wlan_ieee80211::StatusCode::kRefusedReasonUnspecified,
+                            reassoc_req_frame->src_addr_);
         return;
       }
 
@@ -461,7 +464,7 @@ void FakeAp::RxMgmtFrame(std::shared_ptr<const SimManagementFrame> mgmt_frame) {
       // When we test more complicated reassociation paths, we might differentiate which
       // state the STA lands in.
       client->status_ = Client::ASSOCIATED;
-      ScheduleReassocResp(StatusCode::SUCCESS, reassoc_req_frame->src_addr_);
+      ScheduleReassocResp(wlan_ieee80211::StatusCode::kSuccess, reassoc_req_frame->src_addr_);
       break;
     }
 
@@ -565,8 +568,7 @@ void FakeAp::HandleAssocRespNotification(wlan_ieee80211::StatusCode status, comm
   environment_->Tx(assoc_resp_frame, tx_info_, this);
 }
 
-void FakeAp::HandleReassocRespNotification(::fuchsia::wlan::ieee80211::StatusCode status,
-                                           common::MacAddr dst) {
+void FakeAp::HandleReassocRespNotification(wlan_ieee80211::StatusCode status, common::MacAddr dst) {
   SimReassocRespFrame reassoc_resp_frame(bssid_, dst, status);
   reassoc_resp_frame.capability_info_.set_val(beacon_state_.beacon_frame_.capability_info_.val());
   environment_->Tx(reassoc_resp_frame, tx_info_, this);

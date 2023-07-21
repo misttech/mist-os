@@ -30,13 +30,39 @@ constexpr zx::duration kSimulatedClockDuration = zx::sec(10);
 
 }  // namespace
 
-namespace wlan_ieee80211 = ::fuchsia::wlan::ieee80211;
+namespace wlan_ieee80211 = wlan_ieee80211;
 
 constexpr uint16_t kDefaultCh = 149;
-constexpr wlan_channel_t kDefaultChannel = {
-    .primary = kDefaultCh, .cbw = CHANNEL_BANDWIDTH_CBW20, .secondary80 = 0};
+constexpr wlan_common::WlanChannel kDefaultChannel = {
+    .primary = kDefaultCh, .cbw = wlan_common::ChannelBandwidth::kCbw20, .secondary80 = 0};
 const common::MacAddr kFakeMac({0xde, 0xad, 0xbe, 0xef, 0x00, 0x02});
-constexpr cssid_t kDefaultSsid = {.len = 6, .data = "Sim_AP"};
+constexpr wlan_ieee80211::CSsid kDefaultSsid = {.len = 6, .data = {.data_ = "Sim_AP"}};
+
+class CreateSoftAPTest;
+
+class SoftApInterface : public SimInterface {
+ public:
+  void AuthInd(AuthIndRequestView request, fdf::Arena& arena,
+               AuthIndCompleter::Sync& completer) override;
+  void DeauthInd(DeauthIndRequestView request, fdf::Arena& arena,
+                 DeauthIndCompleter::Sync& completer) override;
+  void DeauthConf(DeauthConfRequestView request, fdf::Arena& arena,
+                  DeauthConfCompleter::Sync& completer) override;
+  void AssocInd(AssocIndRequestView request, fdf::Arena& arena,
+                AssocIndCompleter::Sync& completer) override;
+  void DisassocConf(DisassocConfRequestView request, fdf::Arena& arena,
+                    DisassocConfCompleter::Sync& completer) override;
+  void DisassocInd(DisassocIndRequestView request, fdf::Arena& arena,
+                   DisassocIndCompleter::Sync& completer) override;
+  void StartConf(StartConfRequestView request, fdf::Arena& arena,
+                 StartConfCompleter::Sync& completer) override;
+  void StopConf(StopConfRequestView request, fdf::Arena& arena,
+                StopConfCompleter::Sync& completer) override;
+  void OnChannelSwitch(OnChannelSwitchRequestView request, fdf::Arena& arena,
+                       OnChannelSwitchCompleter::Sync& completer) override;
+
+  CreateSoftAPTest* test_;
+};
 
 class CreateSoftAPTest : public SimTest {
  public:
@@ -59,8 +85,8 @@ class CreateSoftAPTest : public SimTest {
   void VerifyAuth();
   void VerifyAssoc();
   void VerifyNotAssoc();
-  void VerifyStartAPConf(uint8_t status);
-  void VerifyStopAPConf(uint8_t status);
+  void VerifyStartAPConf(wlan_fullmac::WlanStartResult status);
+  void VerifyStopAPConf(wlan_fullmac::WlanStopResult status);
   void VerifyNumOfClient(uint16_t expect_client_num);
   void ClearAssocInd();
   void InjectStartAPError();
@@ -69,6 +95,15 @@ class CreateSoftAPTest : public SimTest {
   void InjectStopAPError();
   void SetExpectMacForInds(common::MacAddr set_mac);
 
+  void OnAuthInd(const wlan_fullmac::WlanFullmacAuthInd* ind);
+  void OnDeauthInd(const wlan_fullmac::WlanFullmacDeauthIndication* ind);
+  void OnDeauthConf(const wlan_fullmac::WlanFullmacDeauthConfirm* resp);
+  void OnAssocInd(const wlan_fullmac::WlanFullmacAssocInd* ind);
+  void OnDisassocConf(const wlan_fullmac::WlanFullmacDisassocConfirm* resp);
+  void OnDisassocInd(const wlan_fullmac::WlanFullmacDisassocIndication* ind);
+  void OnStartConf(const wlan_fullmac::WlanFullmacStartConfirm* resp);
+  void OnStopConf(const wlan_fullmac::WlanFullmacStopConfirm* resp);
+  void OnChannelSwitch(const wlan_fullmac::WlanFullmacChannelSwitchInfo* info);
   // Status field in the last received authentication frame.
   wlan_ieee80211::StatusCode auth_resp_status_;
 
@@ -80,8 +115,8 @@ class CreateSoftAPTest : public SimTest {
   bool disassoc_conf_recv_ = false;
   bool start_conf_received_ = false;
   bool stop_conf_received_ = false;
-  uint8_t start_conf_status_;
-  uint8_t stop_conf_status_;
+  wlan_fullmac::WlanStartResult start_conf_status_;
+  wlan_fullmac::WlanStopResult stop_conf_status_;
 
   // The expect mac address for indications
   common::MacAddr ind_expect_mac_ = kFakeMac;
@@ -94,21 +129,56 @@ class CreateSoftAPTest : public SimTest {
   void Rx(std::shared_ptr<const simulation::SimFrame> frame,
           std::shared_ptr<const simulation::WlanRxInfo> info) override;
   // SME callbacks
-  static wlan_fullmac_impl_ifc_protocol_ops_t sme_ops_;
-  wlan_fullmac_impl_ifc_protocol sme_protocol_ = {.ops = &sme_ops_, .ctx = this};
-  SimInterface softap_ifc_;
+  SoftApInterface softap_ifc_;
 
-  void OnAuthInd(const wlan_fullmac_auth_ind_t* ind);
-  void OnDeauthInd(const wlan_fullmac_deauth_indication_t* ind);
-  void OnDeauthConf(const wlan_fullmac_deauth_confirm_t* resp);
-  void OnAssocInd(const wlan_fullmac_assoc_ind_t* ind);
-  void OnDisassocConf(const wlan_fullmac_disassoc_confirm_t* resp);
-  void OnDisassocInd(const wlan_fullmac_disassoc_indication_t* ind);
-  void OnStartConf(const wlan_fullmac_start_confirm_t* resp);
-  void OnStopConf(const wlan_fullmac_stop_confirm_t* resp);
-  void OnChannelSwitch(const wlan_fullmac_channel_switch_info_t* info);
   uint16_t CreateRsneIe(uint8_t* buffer);
 };
+
+void SoftApInterface::AuthInd(AuthIndRequestView request, fdf::Arena& arena,
+                              AuthIndCompleter::Sync& completer) {
+  test_->OnAuthInd(&request->resp);
+  completer.buffer(arena).Reply();
+}
+void SoftApInterface::DeauthInd(DeauthIndRequestView request, fdf::Arena& arena,
+                                DeauthIndCompleter::Sync& completer) {
+  test_->OnDeauthInd(&request->ind);
+  completer.buffer(arena).Reply();
+}
+void SoftApInterface::DeauthConf(DeauthConfRequestView request, fdf::Arena& arena,
+                                 DeauthConfCompleter::Sync& completer) {
+  test_->OnDeauthConf(&request->resp);
+  completer.buffer(arena).Reply();
+}
+void SoftApInterface::AssocInd(AssocIndRequestView request, fdf::Arena& arena,
+                               AssocIndCompleter::Sync& completer) {
+  test_->OnAssocInd(&request->resp);
+  completer.buffer(arena).Reply();
+}
+void SoftApInterface::DisassocConf(DisassocConfRequestView request, fdf::Arena& arena,
+                                   DisassocConfCompleter::Sync& completer) {
+  test_->OnDisassocConf(&request->resp);
+  completer.buffer(arena).Reply();
+}
+void SoftApInterface::DisassocInd(DisassocIndRequestView request, fdf::Arena& arena,
+                                  DisassocIndCompleter::Sync& completer) {
+  test_->OnDisassocInd(&request->ind);
+  completer.buffer(arena).Reply();
+}
+void SoftApInterface::StartConf(StartConfRequestView request, fdf::Arena& arena,
+                                StartConfCompleter::Sync& completer) {
+  test_->OnStartConf(&request->resp);
+  completer.buffer(arena).Reply();
+}
+void SoftApInterface::StopConf(StopConfRequestView request, fdf::Arena& arena,
+                               StopConfCompleter::Sync& completer) {
+  test_->OnStopConf(&request->resp);
+  completer.buffer(arena).Reply();
+}
+void SoftApInterface::OnChannelSwitch(OnChannelSwitchRequestView request, fdf::Arena& arena,
+                                      OnChannelSwitchCompleter::Sync& completer) {
+  test_->OnChannelSwitch(&request->ind);
+  completer.buffer(arena).Reply();
+}
 
 void CreateSoftAPTest::Rx(std::shared_ptr<const simulation::SimFrame> frame,
                           std::shared_ptr<const simulation::WlanRxInfo> info) {
@@ -122,52 +192,15 @@ void CreateSoftAPTest::Rx(std::shared_ptr<const simulation::SimFrame> frame,
   }
 }
 
-wlan_fullmac_impl_ifc_protocol_ops_t CreateSoftAPTest::sme_ops_ = {
-    // SME operations
-    .auth_ind =
-        [](void* cookie, const wlan_fullmac_auth_ind_t* ind) {
-          static_cast<CreateSoftAPTest*>(cookie)->OnAuthInd(ind);
-        },
-    .deauth_conf =
-        [](void* cookie, const wlan_fullmac_deauth_confirm_t* resp) {
-          static_cast<CreateSoftAPTest*>(cookie)->OnDeauthConf(resp);
-        },
-    .deauth_ind =
-        [](void* cookie, const wlan_fullmac_deauth_indication_t* ind) {
-          static_cast<CreateSoftAPTest*>(cookie)->OnDeauthInd(ind);
-        },
-    .assoc_ind =
-        [](void* cookie, const wlan_fullmac_assoc_ind_t* ind) {
-          static_cast<CreateSoftAPTest*>(cookie)->OnAssocInd(ind);
-        },
-    .disassoc_conf =
-        [](void* cookie, const wlan_fullmac_disassoc_confirm_t* resp) {
-          static_cast<CreateSoftAPTest*>(cookie)->OnDisassocConf(resp);
-        },
-    .disassoc_ind =
-        [](void* cookie, const wlan_fullmac_disassoc_indication_t* ind) {
-          static_cast<CreateSoftAPTest*>(cookie)->OnDisassocInd(ind);
-        },
-    .start_conf =
-        [](void* cookie, const wlan_fullmac_start_confirm_t* resp) {
-          static_cast<CreateSoftAPTest*>(cookie)->OnStartConf(resp);
-        },
-    .stop_conf =
-        [](void* cookie, const wlan_fullmac_stop_confirm_t* resp) {
-          static_cast<CreateSoftAPTest*>(cookie)->OnStopConf(resp);
-        },
-    .on_channel_switch =
-        [](void* cookie, const wlan_fullmac_channel_switch_info_t* info) {
-          static_cast<CreateSoftAPTest*>(cookie)->OnChannelSwitch(info);
-        },
-};
-
-void CreateSoftAPTest::Init() { ASSERT_EQ(SimTest::Init(), ZX_OK); }
+void CreateSoftAPTest::Init() {
+  ASSERT_EQ(SimTest::Init(), ZX_OK);
+  softap_ifc_.test_ = this;
+}
 
 void CreateSoftAPTest::CreateInterface() {
   zx_status_t status;
 
-  status = SimTest::StartInterface(WLAN_MAC_ROLE_AP, &softap_ifc_, &sme_protocol_);
+  status = SimTest::StartInterface(wlan_common::WlanMacRole::kAp, &softap_ifc_);
   ASSERT_EQ(status, ZX_OK);
 }
 
@@ -235,9 +268,9 @@ uint16_t CreateSoftAPTest::CreateRsneIe(uint8_t* buffer) {
 }
 
 zx_status_t CreateSoftAPTest::StartSoftAP() {
-  wlan_fullmac_start_req_t start_req = {
-      .ssid = {.len = 6, .data = "Sim_AP"},
-      .bss_type = BSS_TYPE_INFRASTRUCTURE,
+  wlan_fullmac::WlanFullmacStartReq start_req = {
+      .ssid = {.len = 6, .data = {.data_ = "Sim_AP"}},
+      .bss_type = fuchsia_wlan_common::wire::BssType::kInfrastructure,
       .beacon_period = 100,
       .dtim_period = 100,
       .channel = kDefaultCh,
@@ -246,9 +279,10 @@ zx_status_t CreateSoftAPTest::StartSoftAP() {
   // If sec mode is requested, create a dummy RSNE IE (our SoftAP only
   // supports WPA2)
   if (sec_enabled_ == true) {
-    start_req.rsne_len = CreateRsneIe(start_req.rsne);
+    start_req.rsne_len = CreateRsneIe(start_req.rsne.data());
   }
-  softap_ifc_.if_impl_ops_->start_req(softap_ifc_.if_impl_ctx_, &start_req);
+  auto result = softap_ifc_.client_.buffer(softap_ifc_.test_arena_)->StartReq(start_req);
+  EXPECT_TRUE(result.ok());
 
   // Retrieve wsec from SIM FW to check if it is set appropriately
   brcmf_simdev* sim = device_->GetSim();
@@ -286,48 +320,49 @@ void CreateSoftAPTest::InjectSetSsidError() {
 void CreateSoftAPTest::SetExpectMacForInds(common::MacAddr set_mac) { ind_expect_mac_ = set_mac; }
 
 zx_status_t CreateSoftAPTest::StopSoftAP() {
-  wlan_fullmac_stop_req_t stop_req{
-      .ssid = {.len = 6, .data = "Sim_AP"},
+  wlan_fullmac::WlanFullmacStopReq stop_req{
+      .ssid = {.len = 6, .data = {.data_ = "Sim_AP"}},
   };
-  softap_ifc_.if_impl_ops_->stop_req(softap_ifc_.if_impl_ctx_, &stop_req);
+  auto result = softap_ifc_.client_.buffer(softap_ifc_.test_arena_)->StopReq(stop_req);
+  EXPECT_TRUE(result.ok());
   return ZX_OK;
 }
 
-void CreateSoftAPTest::OnAuthInd(const wlan_fullmac_auth_ind_t* ind) {
-  ASSERT_EQ(std::memcmp(ind->peer_sta_address, ind_expect_mac_.byte, ETH_ALEN), 0);
+void CreateSoftAPTest::OnAuthInd(const wlan_fullmac::WlanFullmacAuthInd* ind) {
+  ASSERT_EQ(std::memcmp(ind->peer_sta_address.data(), ind_expect_mac_.byte, ETH_ALEN), 0);
   auth_ind_recv_ = true;
 }
-void CreateSoftAPTest::OnDeauthInd(const wlan_fullmac_deauth_indication_t* ind) {
-  ASSERT_EQ(std::memcmp(ind->peer_sta_address, ind_expect_mac_.byte, ETH_ALEN), 0);
+void CreateSoftAPTest::OnDeauthInd(const wlan_fullmac::WlanFullmacDeauthIndication* ind) {
+  ASSERT_EQ(std::memcmp(ind->peer_sta_address.data(), ind_expect_mac_.byte, ETH_ALEN), 0);
   deauth_ind_recv_ = true;
 }
-void CreateSoftAPTest::OnDeauthConf(const wlan_fullmac_deauth_confirm_t* resp) {
-  ASSERT_EQ(std::memcmp(resp->peer_sta_address, ind_expect_mac_.byte, ETH_ALEN), 0);
+void CreateSoftAPTest::OnDeauthConf(const wlan_fullmac::WlanFullmacDeauthConfirm* resp) {
+  ASSERT_EQ(std::memcmp(resp->peer_sta_address.data(), ind_expect_mac_.byte, ETH_ALEN), 0);
   deauth_conf_recv_ = true;
 }
-void CreateSoftAPTest::OnAssocInd(const wlan_fullmac_assoc_ind_t* ind) {
-  ASSERT_EQ(std::memcmp(ind->peer_sta_address, ind_expect_mac_.byte, ETH_ALEN), 0);
+void CreateSoftAPTest::OnAssocInd(const wlan_fullmac::WlanFullmacAssocInd* ind) {
+  ASSERT_EQ(std::memcmp(ind->peer_sta_address.data(), ind_expect_mac_.byte, ETH_ALEN), 0);
   assoc_ind_recv_ = true;
 }
-void CreateSoftAPTest::OnDisassocConf(const wlan_fullmac_disassoc_confirm_t* resp) {
+void CreateSoftAPTest::OnDisassocConf(const wlan_fullmac::WlanFullmacDisassocConfirm* resp) {
   disassoc_conf_recv_ = true;
 }
-void CreateSoftAPTest::OnDisassocInd(const wlan_fullmac_disassoc_indication_t* ind) {
-  ASSERT_EQ(std::memcmp(ind->peer_sta_address, ind_expect_mac_.byte, ETH_ALEN), 0);
+void CreateSoftAPTest::OnDisassocInd(const wlan_fullmac::WlanFullmacDisassocIndication* ind) {
+  ASSERT_EQ(std::memcmp(ind->peer_sta_address.data(), ind_expect_mac_.byte, ETH_ALEN), 0);
   disassoc_ind_recv_ = true;
 }
 
-void CreateSoftAPTest::OnStartConf(const wlan_fullmac_start_confirm_t* resp) {
+void CreateSoftAPTest::OnStartConf(const wlan_fullmac::WlanFullmacStartConfirm* resp) {
   start_conf_received_ = true;
   start_conf_status_ = resp->result_code;
 }
 
-void CreateSoftAPTest::OnStopConf(const wlan_fullmac_stop_confirm_t* resp) {
+void CreateSoftAPTest::OnStopConf(const wlan_fullmac::WlanFullmacStopConfirm* resp) {
   stop_conf_received_ = true;
   stop_conf_status_ = resp->result_code;
 }
 
-void CreateSoftAPTest::OnChannelSwitch(const wlan_fullmac_channel_switch_info_t* info) {}
+void CreateSoftAPTest::OnChannelSwitch(const wlan_fullmac::WlanFullmacChannelSwitchInfo* info) {}
 
 void CreateSoftAPTest::TxAssocReq(common::MacAddr client_mac) {
   // Get the mac address of the SoftAP
@@ -342,7 +377,7 @@ void CreateSoftAPTest::TxAuthReq(simulation::SimAuthType auth_type, common::MacA
   common::MacAddr soft_ap_mac;
   softap_ifc_.GetMacAddr(&soft_ap_mac);
   simulation::SimAuthFrame auth_req_frame(client_mac, soft_ap_mac, 1, auth_type,
-                                          wlan_ieee80211::StatusCode::SUCCESS);
+                                          wlan_ieee80211::StatusCode::kSuccess);
   env_->Tx(auth_req_frame, tx_info_, this);
 }
 
@@ -352,7 +387,7 @@ void CreateSoftAPTest::TxDisassocReq(common::MacAddr client_mac) {
   softap_ifc_.GetMacAddr(&soft_ap_mac);
   // Disassociate with the SoftAP
   simulation::SimDisassocReqFrame disassoc_req_frame(
-      client_mac, soft_ap_mac, wlan_ieee80211::ReasonCode::LEAVING_NETWORK_DISASSOC);
+      client_mac, soft_ap_mac, wlan_ieee80211::ReasonCode::kLeavingNetworkDisassoc);
   env_->Tx(disassoc_req_frame, tx_info_, this);
 }
 
@@ -362,17 +397,18 @@ void CreateSoftAPTest::TxDeauthReq(common::MacAddr client_mac) {
   softap_ifc_.GetMacAddr(&soft_ap_mac);
   // Disassociate with the SoftAP
   simulation::SimDeauthFrame deauth_frame(client_mac, soft_ap_mac,
-                                          wlan_ieee80211::ReasonCode::LEAVING_NETWORK_DEAUTH);
+                                          wlan_ieee80211::ReasonCode::kLeavingNetworkDeauth);
   env_->Tx(deauth_frame, tx_info_, this);
 }
 
 void CreateSoftAPTest::DeauthClient(common::MacAddr client_mac) {
-  wlan_fullmac_deauth_req_t req;
+  wlan_fullmac::WlanFullmacDeauthReq req;
 
-  memcpy(req.peer_sta_address, client_mac.byte, ETH_ALEN);
-  req.reason_code = 0;
+  memcpy(req.peer_sta_address.data(), client_mac.byte, ETH_ALEN);
+  req.reason_code = wlan_ieee80211::ReasonCode::kReserved0;
 
-  softap_ifc_.if_impl_ops_->deauth_req(softap_ifc_.if_impl_ctx_, &req);
+  auto result = softap_ifc_.client_.buffer(softap_ifc_.test_arena_)->DeauthReq(req);
+  EXPECT_TRUE(result.ok());
 }
 
 void CreateSoftAPTest::VerifyAuth() {
@@ -403,12 +439,12 @@ void CreateSoftAPTest::VerifyNotAssoc() {
   VerifyNumOfClient(0);
 }
 
-void CreateSoftAPTest::VerifyStartAPConf(uint8_t status) {
+void CreateSoftAPTest::VerifyStartAPConf(wlan_fullmac::WlanStartResult status) {
   ASSERT_EQ(start_conf_received_, true);
   ASSERT_EQ(start_conf_status_, status);
 }
 
-void CreateSoftAPTest::VerifyStopAPConf(uint8_t status) {
+void CreateSoftAPTest::VerifyStopAPConf(wlan_fullmac::WlanStopResult status) {
   ASSERT_EQ(stop_conf_received_, true);
   ASSERT_EQ(stop_conf_status_, status);
 }
@@ -429,7 +465,7 @@ TEST_F(CreateSoftAPTest, CreateSoftAP) {
   delay += kStartAPLinkEventDelay + kApStartedEventDelay + zx::msec(10);
   env_->ScheduleNotification(std::bind(&CreateSoftAPTest::StopSoftAP, this), delay);
   env_->Run(kSimulatedClockDuration);
-  VerifyStartAPConf(WLAN_START_RESULT_SUCCESS);
+  VerifyStartAPConf(wlan_fullmac::WlanStartResult::kSuccess);
 }
 
 TEST_F(CreateSoftAPTest, CreateSoftAPFail) {
@@ -439,7 +475,7 @@ TEST_F(CreateSoftAPTest, CreateSoftAPFail) {
   InjectStartAPError();
   env_->ScheduleNotification(std::bind(&CreateSoftAPTest::StartSoftAP, this), zx::msec(50));
   env_->Run(kSimulatedClockDuration);
-  VerifyStartAPConf(WLAN_START_RESULT_NOT_SUPPORTED);
+  VerifyStartAPConf(wlan_fullmac::WlanStartResult::kNotSupported);
 }
 
 TEST_F(CreateSoftAPTest, CreateSoftAPFail_ChanSetError) {
@@ -449,7 +485,7 @@ TEST_F(CreateSoftAPTest, CreateSoftAPFail_ChanSetError) {
   InjectChanspecError();
   env_->ScheduleNotification(std::bind(&CreateSoftAPTest::StartSoftAP, this), zx::msec(50));
   env_->Run(kSimulatedClockDuration);
-  VerifyStartAPConf(WLAN_START_RESULT_NOT_SUPPORTED);
+  VerifyStartAPConf(wlan_fullmac::WlanStartResult::kNotSupported);
 }
 
 // SoftAP can encounter this specific SET_SSID firmware error, which we detect and log.
@@ -464,7 +500,7 @@ TEST_F(CreateSoftAPTest, CreateSoftAPFail_SetSsidError) {
   ASSERT_EQ(count, 0u);
   env_->Run(kSimulatedClockDuration);
 
-  VerifyStartAPConf(WLAN_START_RESULT_NOT_SUPPORTED);
+  VerifyStartAPConf(wlan_fullmac::WlanStartResult::kNotSupported);
 
   // Verify inspect is updated.
   GetApSetSsidErrInspectCount(&count);
@@ -480,7 +516,7 @@ TEST_F(CreateSoftAPTest, BssIovarFail) {
   // Start SoftAP
   StartSoftAP();
   StopSoftAP();
-  VerifyStopAPConf(WLAN_START_RESULT_SUCCESS);
+  VerifyStopAPConf(wlan_fullmac::WlanStopResult::kSuccess);
 }
 // Start SoftAP in secure mode and then restart in open mode.
 // Appropriate secure mode is checked in StartSoftAP() after SoftAP
@@ -588,7 +624,7 @@ TEST_F(CreateSoftAPTest, AssocWithWrongAuth) {
                              zx::msec(10));
   env_->ScheduleNotification(std::bind(&CreateSoftAPTest::VerifyNotAssoc, this), zx::msec(20));
   env_->Run(kSimulatedClockDuration);
-  EXPECT_EQ(auth_resp_status_, wlan_ieee80211::StatusCode::REFUSED_REASON_UNSPECIFIED);
+  EXPECT_EQ(auth_resp_status_, wlan_ieee80211::StatusCode::kRefusedReasonUnspecified);
 }
 
 TEST_F(CreateSoftAPTest, DeauthBeforeAssoc) {

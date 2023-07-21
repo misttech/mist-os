@@ -17,10 +17,10 @@
 
 namespace wlan::brcmfmac {
 
-constexpr wlan_channel_t kDefaultChannel = {
-    .primary = 9, .cbw = CHANNEL_BANDWIDTH_CBW20, .secondary80 = 0};
+constexpr wlan_common::WlanChannel kDefaultChannel = {
+    .primary = 9, .cbw = wlan_common::ChannelBandwidth::kCbw20, .secondary80 = 0};
 const common::MacAddr kDefaultBssid({0x12, 0x34, 0x56, 0x78, 0x9a, 0xbc});
-constexpr cssid_t kDefaultSsid = {.len = 15, .data = "Fuchsia Fake AP"};
+constexpr wlan_ieee80211::CSsid kDefaultSsid = {.len = 15, .data = {.data_ = "Fuchsia Fake AP"}};
 
 class CrashRecoveryTest : public SimTest {
  public:
@@ -31,7 +31,7 @@ class CrashRecoveryTest : public SimTest {
   void ScheduleCrash(zx::duration delay);
   void RecreateClientIface();
   void VerifyScanResult(const uint64_t scan_id, size_t min_result_num,
-                        wlan_scan_result_t expect_code);
+                        wlan_fullmac::WlanScanResult expect_code);
 
   // Get the value of inspect counter of firmware recovery. It is used to verify the number of
   // counted firmware recovery in driver's metrics.
@@ -45,7 +45,7 @@ class CrashRecoveryTest : public SimTest {
 
 void CrashRecoveryTest::Init() {
   ASSERT_EQ(SimTest::Init(), ZX_OK);
-  ASSERT_EQ(StartInterface(WLAN_MAC_ROLE_CLIENT, &client_ifc_), ZX_OK);
+  ASSERT_EQ(StartInterface(wlan_common::WlanMacRole::kClient, &client_ifc_), ZX_OK);
   ap_.EnableBeacon(zx::msec(100));
   brcmf_simdev* sim = device_->GetSim();
   client_ifp_ = brcmf_get_ifp(sim->drvr, client_ifc_.iface_id_);
@@ -59,7 +59,7 @@ void CrashRecoveryTest::RecreateClientIface() {
   // Since the interface was destroyed as part of the recovery process, we
   // need to notify the sim about it before attempting to recreate.
   SimTest::InterfaceDestroyed(&client_ifc_);
-  SimTest::StartInterface(WLAN_MAC_ROLE_CLIENT, &client_ifc_);
+  SimTest::StartInterface(wlan_common::WlanMacRole::kClient, &client_ifc_);
   brcmf_simdev* sim = device_->GetSim();
   client_ifp_ = brcmf_get_ifp(sim->drvr, client_ifc_.iface_id_);
 }
@@ -74,16 +74,18 @@ void CrashRecoveryTest::ScheduleCrash(zx::duration delay) {
 }
 
 void CrashRecoveryTest::VerifyScanResult(const uint64_t scan_id, size_t min_result_num,
-                                         wlan_scan_result_t expect_code) {
+                                         wlan_fullmac::WlanScanResult expect_code) {
   EXPECT_GE(client_ifc_.ScanResultList(scan_id)->size(), min_result_num);
 
-  wlan_fullmac_scan_result_t back_scan_result = client_ifc_.ScanResultList(scan_id)->back();
-  auto ssid = brcmf_find_ssid_in_ies(back_scan_result.bss.ies_list, back_scan_result.bss.ies_count);
-  common::MacAddr bssid(back_scan_result.bss.bssid);
+  wlan_fullmac::WlanFullmacScanResult back_scan_result =
+      client_ifc_.ScanResultList(scan_id)->back();
+  auto ssid =
+      brcmf_find_ssid_in_ies(back_scan_result.bss.ies.data(), back_scan_result.bss.ies.count());
+  common::MacAddr bssid(back_scan_result.bss.bssid.data());
 
   EXPECT_EQ(bssid, kDefaultBssid);
   EXPECT_EQ(ssid.size(), kDefaultSsid.len);
-  EXPECT_EQ(std::memcmp(ssid.data(), kDefaultSsid.data, kDefaultSsid.len), 0);
+  EXPECT_EQ(std::memcmp(ssid.data(), kDefaultSsid.data.data(), kDefaultSsid.len), 0);
 
   ASSERT_NE(client_ifc_.ScanResultCode(scan_id), std::nullopt);
   EXPECT_EQ(client_ifc_.ScanResultCode(scan_id).value(), expect_code);
@@ -187,7 +189,7 @@ TEST_F(CrashRecoveryTest, ScanAfterCrashAfterConnect) {
 
   env_->Run(kTestDuration);
 
-  VerifyScanResult(kScanId, kExpectMinScanResultNumber, WLAN_SCAN_RESULT_SUCCESS);
+  VerifyScanResult(kScanId, kExpectMinScanResultNumber, wlan_fullmac::WlanScanResult::kSuccess);
 
   // Verify inspect is updated.
   uint64_t count;

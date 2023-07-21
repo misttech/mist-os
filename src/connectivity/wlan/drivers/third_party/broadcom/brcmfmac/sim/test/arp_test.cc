@@ -62,27 +62,38 @@ void VerifyNonArpFrame(const std::vector<uint8_t>& frame) {
 
 }  // namespace
 
-struct GenericIfc : public SimInterface {
-  void OnAssocInd(const wlan_fullmac_assoc_ind_t* ind) override;
-  void OnStartConf(const wlan_fullmac_start_confirm_t* resp) override;
-  void OnStopConf(const wlan_fullmac_stop_confirm_t* resp) override;
+class ArpTest;
 
-  bool assoc_ind_recv_ = false;
+struct GenericIfc : public SimInterface {
+ public:
+  void AssocInd(AssocIndRequestView request, fdf::Arena& arena,
+                AssocIndCompleter::Sync& completer) override;
+
+  void StartConf(StartConfRequestView request, fdf::Arena& arena,
+                 StartConfCompleter::Sync& completer) override;
+
+  void StopConf(StopConfRequestView request, fdf::Arena& arena,
+                StopConfCompleter::Sync& completer) override;
+
+  ArpTest* test_;
 };
 
 class ArpTest : public SimTest {
  public:
   static constexpr zx::duration kTestDuration = zx::sec(100);
 
-  ArpTest() = default;
   void Init();
   void CleanupApInterface();
+
+  void OnAssocInd(const wlan_fullmac::WlanFullmacAssocInd* ind);
+  void OnStartConf(const wlan_fullmac::WlanFullmacStartConfirm* resp);
+  void OnStopConf(const wlan_fullmac::WlanFullmacStopConfirm* resp);
 
   // Send a frame directly into the environment
   void Tx(const std::vector<uint8_t>& ethFrame);
 
   // Interface management
-  zx_status_t SetMulticastPromisc(bool enable);
+  void SetMulticastPromisc(bool enable);
   void StartAndStopSoftAP();
 
   // Simulation of client associating to a SoftAP interface
@@ -93,30 +104,52 @@ class ArpTest : public SimTest {
   void ScheduleArpFrameTx(zx::duration when, bool expect_rx);
   void ScheduleNonArpFrameTx(zx::duration when);
 
+  bool assoc_ind_recv_ = false;
+
  protected:
   std::vector<uint8_t> ethFrame;
   GenericIfc sim_ifc_;
 };
 
-void GenericIfc::OnAssocInd(const wlan_fullmac_assoc_ind_t* ind) {
-  ASSERT_EQ(std::memcmp(ind->peer_sta_address, kTheirMac.byte, ETH_ALEN), 0);
+void GenericIfc::AssocInd(AssocIndRequestView request, fdf::Arena& arena,
+                          AssocIndCompleter::Sync& completer) {
+  test_->OnAssocInd(&request->resp);
+  completer.buffer(arena).Reply();
+}
+
+void GenericIfc::StartConf(StartConfRequestView request, fdf::Arena& arena,
+                           StartConfCompleter::Sync& completer) {
+  test_->OnStartConf(&request->resp);
+  completer.buffer(arena).Reply();
+}
+
+void GenericIfc::StopConf(StopConfRequestView request, fdf::Arena& arena,
+                          StopConfCompleter::Sync& completer) {
+  test_->OnStopConf(&request->resp);
+  completer.buffer(arena).Reply();
+}
+
+void ArpTest::OnAssocInd(const wlan_fullmac::WlanFullmacAssocInd* ind) {
+  ASSERT_EQ(std::memcmp(ind->peer_sta_address.data(), kTheirMac.byte, ETH_ALEN), 0);
   assoc_ind_recv_ = true;
 }
 
-void GenericIfc::OnStartConf(const wlan_fullmac_start_confirm_t* resp) {
-  ASSERT_EQ(resp->result_code, WLAN_START_RESULT_SUCCESS);
+void ArpTest::OnStartConf(const wlan_fullmac::WlanFullmacStartConfirm* resp) {
+  ASSERT_EQ(resp->result_code, wlan_fullmac::WlanStartResult::kSuccess);
 }
 
-void GenericIfc::OnStopConf(const wlan_fullmac_stop_confirm_t* resp) {
-  ASSERT_EQ(resp->result_code, WLAN_STOP_RESULT_SUCCESS);
+void ArpTest::OnStopConf(const wlan_fullmac::WlanFullmacStopConfirm* resp) {
+  ASSERT_EQ(resp->result_code, wlan_fullmac::WlanStopResult::kSuccess);
 }
 
-void ArpTest::Init() { ASSERT_EQ(SimTest::Init(), ZX_OK); }
+void ArpTest::Init() {
+  ASSERT_EQ(SimTest::Init(), ZX_OK);
+  sim_ifc_.test_ = this;
+}
 
-zx_status_t ArpTest::SetMulticastPromisc(bool enable) {
-  const wlan_fullmac_impl_protocol_ops_t* ops = sim_ifc_.if_impl_ops_;
-  void* ctx = sim_ifc_.if_impl_ctx_;
-  return ops->set_multicast_promisc(ctx, enable);
+void ArpTest::SetMulticastPromisc(bool enable) {
+  auto result = sim_ifc_.client_.buffer(sim_ifc_.test_arena_)->SetMulticastPromisc(enable);
+  EXPECT_TRUE(result.ok());
 }
 
 void ArpTest::TxAuthandAssocReq() {
@@ -124,7 +157,7 @@ void ArpTest::TxAuthandAssocReq() {
   const common::MacAddr mac(kTheirMac);
   simulation::WlanTxInfo tx_info = {.channel = SimInterface::kDefaultSoftApChannel};
   simulation::SimAuthFrame auth_req_frame(mac, kOurMac, 1, simulation::AUTH_TYPE_OPEN,
-                                          ::fuchsia::wlan::ieee80211::StatusCode::SUCCESS);
+                                          wlan_ieee80211::StatusCode::kSuccess);
   env_->Tx(auth_req_frame, tx_info, this);
   simulation::SimAssocReqFrame assoc_req_frame(mac, kOurMac, SimInterface::kDefaultSoftApSsid);
   env_->Tx(assoc_req_frame, tx_info, this);
@@ -133,7 +166,7 @@ void ArpTest::TxAuthandAssocReq() {
 void ArpTest::VerifyAssoc() {
   // Verify the event indications were received and
   // the number of clients
-  ASSERT_EQ(sim_ifc_.assoc_ind_recv_, true);
+  ASSERT_EQ(assoc_ind_recv_, true);
   brcmf_simdev* sim = device_->GetSim();
   uint16_t num_clients = sim->sim_fw->GetNumClients(sim_ifc_.iface_id_);
   ASSERT_EQ(num_clients, 1U);
@@ -171,7 +204,8 @@ void ArpTest::ScheduleNonArpFrameTx(zx::duration when) {
 void ArpTest::StartAndStopSoftAP() {
   common::MacAddr ap_mac({0xfa, 0xfb, 0xfc, 0xfd, 0xfe, 0xff});
   GenericIfc softap_ifc;
-  ASSERT_EQ(SimTest::StartInterface(WLAN_MAC_ROLE_AP, &softap_ifc, std::nullopt, ap_mac), ZX_OK);
+  softap_ifc.test_ = this;
+  ASSERT_EQ(SimTest::StartInterface(wlan_common::WlanMacRole::kAp, &softap_ifc, ap_mac), ZX_OK);
   softap_ifc.StartSoftAp();
   softap_ifc.StopSoftAp();
 }
@@ -180,7 +214,7 @@ void ArpTest::StartAndStopSoftAP() {
 // promiscuous mode is enabled.
 TEST_F(ArpTest, SoftApArpOffload) {
   Init();
-  ASSERT_EQ(SimTest::StartInterface(WLAN_MAC_ROLE_AP, &sim_ifc_, std::nullopt, kOurMac), ZX_OK);
+  ASSERT_EQ(SimTest::StartInterface(wlan_common::WlanMacRole::kAp, &sim_ifc_, kOurMac), ZX_OK);
   sim_ifc_.StartSoftAp();
 
   // Have the test associate with the AP
@@ -217,7 +251,7 @@ TEST_F(ArpTest, SoftApArpOffload) {
 TEST_F(ArpTest, ClientArpOffload) {
   Init();
 
-  ASSERT_EQ(SimTest::StartInterface(WLAN_MAC_ROLE_CLIENT, &sim_ifc_, std::nullopt, kOurMac), ZX_OK);
+  ASSERT_EQ(SimTest::StartInterface(wlan_common::WlanMacRole::kClient, &sim_ifc_, kOurMac), ZX_OK);
 
   // Start a fake AP
   simulation::FakeAp ap(env_.get(), kTheirMac, SimInterface::kDefaultSoftApSsid,
@@ -255,7 +289,7 @@ TEST_F(ArpTest, ClientArpOffload) {
 TEST_F(ArpTest, SoftAPStartStopDoesNotAffectArpOl) {
   Init();
 
-  ASSERT_EQ(SimTest::StartInterface(WLAN_MAC_ROLE_CLIENT, &sim_ifc_, std::nullopt, kOurMac), ZX_OK);
+  ASSERT_EQ(SimTest::StartInterface(wlan_common::WlanMacRole::kClient, &sim_ifc_, kOurMac), ZX_OK);
 
   // Start a fake AP
   simulation::FakeAp ap(env_.get(), kTheirMac, SimInterface::kDefaultSoftApSsid,
@@ -298,7 +332,7 @@ TEST_F(ArpTest, ClientArpOffloadNoSoftApFeat) {
   // We disable SoftAP feature, so that our driver enabled Arp offload.
   device_->GetSim()->drvr->feat_flags &= (!BIT(BRCMF_FEAT_AP));
 
-  ASSERT_EQ(SimTest::StartInterface(WLAN_MAC_ROLE_CLIENT, &sim_ifc_, std::nullopt, kOurMac), ZX_OK);
+  ASSERT_EQ(SimTest::StartInterface(wlan_common::WlanMacRole::kClient, &sim_ifc_, kOurMac), ZX_OK);
 
   // Start a fake AP
   simulation::FakeAp ap(env_.get(), kTheirMac, SimInterface::kDefaultSoftApSsid,

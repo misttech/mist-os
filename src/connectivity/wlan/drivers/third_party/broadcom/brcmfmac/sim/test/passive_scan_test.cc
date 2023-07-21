@@ -29,8 +29,8 @@ using simulation::SimBeaconFrame;
 class PassiveScanTest;
 
 struct ApInfo {
-  explicit ApInfo(simulation::Environment* env, const common::MacAddr& bssid, const cssid_t& ssid,
-                  const wlan_channel_t& channel)
+  explicit ApInfo(simulation::Environment* env, const common::MacAddr& bssid,
+                  const wlan_ieee80211::CSsid& ssid, const wlan_common::WlanChannel& channel)
       : ap_(env, bssid, ssid, channel) {}
 
   simulation::FakeAp ap_;
@@ -45,20 +45,21 @@ class PassiveScanTestInterface : public SimInterface {
   // Add a functor that can be run on each scan result by the VerifyScanResult method.
   // This allows scan results to be inspected (e.g. with EXPECT_EQ) as they come in, rather than
   // storing scan results for analysis after the sim env run has completed.
-  void AddVerifierFunction(std::function<void(const wlan_fullmac_scan_result_t&)>);
+  void AddVerifierFunction(std::function<void(const wlan_fullmac::WlanFullmacScanResult&)>);
 
   // Remove any verifier functions from the object.
   void ClearVerifierFunction();
 
   // Run the verifier method (if one was added) on the given scan result.
-  void VerifyScanResult(wlan_fullmac_scan_result_t result);
+  void VerifyScanResult(wlan_fullmac::WlanFullmacScanResult result);
 
-  void OnScanResult(const wlan_fullmac_scan_result_t* result) override;
+  void OnScanResult(OnScanResultRequestView request, fdf::Arena& arena,
+                    OnScanResultCompleter::Sync& completer) override;
 
   PassiveScanTest* test_ = nullptr;
 
  private:
-  std::function<void(const wlan_fullmac_scan_result_t&)> verifier_fn_;
+  std::function<void(const wlan_fullmac::WlanFullmacScanResult&)> verifier_fn_;
 };
 
 class PassiveScanTest : public SimTest {
@@ -70,13 +71,15 @@ class PassiveScanTest : public SimTest {
   void Init();
 
   // Create a new AP with the specified parameters, and tell it to start beaconing.
-  void StartFakeAp(const common::MacAddr& bssid, const cssid_t& ssid, const wlan_channel_t& channel,
+  void StartFakeAp(const common::MacAddr& bssid, const wlan_ieee80211::CSsid& ssid,
+                   const wlan_common::WlanChannel& channel,
                    zx::duration beacon_interval = kBeaconInterval);
 
   // Start a fake AP with a beacon mutator that will be applied to each beacon before it is sent.
   // The fake AP will begin beaconing immediately.
   void StartFakeApWithErrInjBeacon(
-      const common::MacAddr& bssid, const cssid_t& ssid, const wlan_channel_t& channel,
+      const common::MacAddr& bssid, const wlan_ieee80211::CSsid& ssid,
+      const wlan_common::WlanChannel& channel,
       std::function<SimBeaconFrame(const SimBeaconFrame&)> beacon_mutator,
       zx::duration beacon_interval = kBeaconInterval);
 
@@ -90,20 +93,22 @@ class PassiveScanTest : public SimTest {
 
 void PassiveScanTest::Init() {
   ASSERT_EQ(SimTest::Init(), ZX_OK);
-  ASSERT_EQ(StartInterface(WLAN_MAC_ROLE_CLIENT, &client_ifc_), ZX_OK);
+  ASSERT_EQ(StartInterface(wlan_common::WlanMacRole::kClient, &client_ifc_), ZX_OK);
   client_ifc_.test_ = this;
   client_ifc_.ClearVerifierFunction();
 }
 
-void PassiveScanTest::StartFakeAp(const common::MacAddr& bssid, const cssid_t& ssid,
-                                  const wlan_channel_t& channel, zx::duration beacon_interval) {
+void PassiveScanTest::StartFakeAp(const common::MacAddr& bssid, const wlan_ieee80211::CSsid& ssid,
+                                  const wlan_common::WlanChannel& channel,
+                                  zx::duration beacon_interval) {
   auto ap_info = std::make_unique<ApInfo>(env_.get(), bssid, ssid, channel);
   ap_info->ap_.EnableBeacon(beacon_interval);
   aps_.push_back(std::move(ap_info));
 }
 
 void PassiveScanTest::StartFakeApWithErrInjBeacon(
-    const common::MacAddr& bssid, const cssid_t& ssid, const wlan_channel_t& channel,
+    const common::MacAddr& bssid, const wlan_ieee80211::CSsid& ssid,
+    const wlan_common::WlanChannel& channel,
     std::function<SimBeaconFrame(const SimBeaconFrame&)> beacon_mutator,
     zx::duration beacon_interval) {
   auto ap_info = std::make_unique<ApInfo>(env_.get(), bssid, ssid, channel);
@@ -113,28 +118,28 @@ void PassiveScanTest::StartFakeApWithErrInjBeacon(
 }
 
 void PassiveScanTestInterface::AddVerifierFunction(
-    std::function<void(const wlan_fullmac_scan_result_t&)> verifier_fn) {
+    std::function<void(const wlan_fullmac::WlanFullmacScanResult&)> verifier_fn) {
   verifier_fn_ = std::move(verifier_fn);
 }
 
 void PassiveScanTestInterface::ClearVerifierFunction() { verifier_fn_ = nullptr; }
 
-void PassiveScanTestInterface::VerifyScanResult(wlan_fullmac_scan_result_t result) {
+void PassiveScanTestInterface::VerifyScanResult(wlan_fullmac::WlanFullmacScanResult result) {
   if (verifier_fn_ != nullptr) {
     verifier_fn_(result);
   }
 }
 
 // Verify that each incoming scan result is as expected, using VerifyScanResult.
-void PassiveScanTestInterface::OnScanResult(const wlan_fullmac_scan_result_t* result) {
-  SimInterface::OnScanResult(result);
-  ASSERT_NOT_NULL(result);
-  VerifyScanResult(*result);
+void PassiveScanTestInterface::OnScanResult(OnScanResultRequestView request, fdf::Arena& arena,
+                                            OnScanResultCompleter::Sync& completer) {
+  SimInterface::OnScanResult(request, arena, completer);
+  VerifyScanResult(request->result);
 }
 
-constexpr wlan_channel_t kDefaultChannel = {
-    .primary = 9, .cbw = CHANNEL_BANDWIDTH_CBW40, .secondary80 = 0};
-constexpr cssid_t kDefaultSsid = {.len = 15, .data = "Fuchsia Fake AP"};
+constexpr wlan_common::WlanChannel kDefaultChannel = {
+    .primary = 9, .cbw = wlan_common::ChannelBandwidth::kCbw40, .secondary80 = 0};
+constexpr wlan_ieee80211::CSsid kDefaultSsid = {.len = 15, .data = {.data_ = "Fuchsia Fake AP"}};
 const common::MacAddr kDefaultBssid({0x12, 0x34, 0x56, 0x78, 0x9a, 0xbc});
 
 TEST_F(PassiveScanTest, BasicFunctionality) {
@@ -156,20 +161,20 @@ TEST_F(PassiveScanTest, BasicFunctionality) {
 
   // The lambda arg will be run on each result, inside PassiveScanTestInterface::VerifyScanResults.
   client_ifc_.AddVerifierFunction(
-      [&test_start_timestamp_nanos](const wlan_fullmac_scan_result_t& result) {
+      [&test_start_timestamp_nanos](const wlan_fullmac::WlanFullmacScanResult& result) {
         // Verify timestamp is after test start
         ASSERT_GT(result.timestamp_nanos, test_start_timestamp_nanos);
 
         // Verify BSSID.
-        ASSERT_EQ(sizeof(result.bss.bssid), sizeof(common::MacAddr::byte));
-        const common::MacAddr result_bssid(result.bss.bssid);
+        ASSERT_EQ(sizeof(result.bss.bssid.data()), sizeof(common::MacAddr::byte));
+        const common::MacAddr result_bssid(result.bss.bssid.data());
         EXPECT_EQ(result_bssid.Cmp(kDefaultBssid), 0);
 
         // Verify SSID.
-        auto ssid = brcmf_find_ssid_in_ies(result.bss.ies_list, result.bss.ies_count);
+        auto ssid = brcmf_find_ssid_in_ies(result.bss.ies.data(), result.bss.ies.count());
         EXPECT_EQ(ssid.size(), kDefaultSsid.len);
-        ASSERT_LE(kDefaultSsid.len, sizeof(kDefaultSsid.data));
-        EXPECT_EQ(std::memcmp(ssid.data(), kDefaultSsid.data, kDefaultSsid.len), 0);
+        ASSERT_LE(kDefaultSsid.len, kDefaultSsid.data.size());
+        EXPECT_EQ(std::memcmp(ssid.data(), kDefaultSsid.data.data(), kDefaultSsid.len), 0);
 
         // Verify channel
         EXPECT_EQ(result.bss.channel.primary, kDefaultChannel.primary);
@@ -201,13 +206,14 @@ TEST_F(PassiveScanTest, EmptyChannelList) {
                              kScanStartTime);
 
   // The driver should exit early and return no scan results.
-  client_ifc_.AddVerifierFunction([](const wlan_fullmac_scan_result_t& result) { FAIL(); });
+  client_ifc_.AddVerifierFunction(
+      [](const wlan_fullmac::WlanFullmacScanResult& result) { FAIL(); });
 
   env_->Run(kDefaultTestDuration);
 
   auto result_code = client_ifc_.ScanResultCode(kScanId);
   ASSERT_TRUE(result_code.has_value());
-  ASSERT_EQ(result_code.value(), WLAN_SCAN_RESULT_INVALID_ARGS);
+  ASSERT_EQ(result_code.value(), wlan_fullmac::WlanScanResult::kInvalidArgs);
 }
 
 TEST_F(PassiveScanTest, ScanWithMalformedBeaconMissingSsidInformationElement) {
@@ -235,19 +241,19 @@ TEST_F(PassiveScanTest, ScanWithMalformedBeaconMissingSsidInformationElement) {
                              kScanStartTime);
 
   client_ifc_.AddVerifierFunction(
-      [&test_start_timestamp_nanos](const wlan_fullmac_scan_result_t& result) {
+      [&test_start_timestamp_nanos](const wlan_fullmac::WlanFullmacScanResult& result) {
         // Verify timestamp is after test start
         ASSERT_GT(result.timestamp_nanos, test_start_timestamp_nanos);
 
         // Verify BSSID.
-        ASSERT_EQ(sizeof(result.bss.bssid), sizeof(common::MacAddr::byte));
-        const common::MacAddr result_bssid(result.bss.bssid);
+        ASSERT_EQ(result.bss.bssid.size(), sizeof(common::MacAddr::byte));
+        const common::MacAddr result_bssid(result.bss.bssid.data());
         EXPECT_EQ(result_bssid.Cmp(kDefaultBssid), 0);
 
         // Verify that SSID is empty, since there was no SSID IE.
-        auto ssid = brcmf_find_ssid_in_ies(result.bss.ies_list, result.bss.ies_count);
+        auto ssid = brcmf_find_ssid_in_ies(result.bss.ies.data(), result.bss.ies.count());
         EXPECT_EQ(ssid.size(), 0u);
-        ASSERT_LE(kDefaultSsid.len, sizeof(kDefaultSsid.data));
+        ASSERT_LE(kDefaultSsid.len, kDefaultSsid.data.size());
 
         // Verify channel
         EXPECT_EQ(result.bss.channel.primary, kDefaultChannel.primary);
@@ -287,7 +293,7 @@ TEST_F(PassiveScanTest, ScanWhenFirmwareBusy) {
 
   EXPECT_EQ(client_ifc_.ScanResultList(kScanId)->size(), 0U);
   ASSERT_NE(client_ifc_.ScanResultCode(kScanId), std::nullopt);
-  EXPECT_EQ(client_ifc_.ScanResultCode(kScanId).value(), WLAN_SCAN_RESULT_SHOULD_WAIT);
+  EXPECT_EQ(client_ifc_.ScanResultCode(kScanId).value(), wlan_fullmac::WlanScanResult::kShouldWait);
 }
 
 TEST_F(PassiveScanTest, ScanWhileAssocInProgress) {
@@ -313,7 +319,7 @@ TEST_F(PassiveScanTest, ScanWhileAssocInProgress) {
 
   EXPECT_EQ(client_ifc_.ScanResultList(kScanId)->size(), 0U);
   ASSERT_NE(client_ifc_.ScanResultCode(kScanId), std::nullopt);
-  EXPECT_EQ(client_ifc_.ScanResultCode(kScanId).value(), WLAN_SCAN_RESULT_SHOULD_WAIT);
+  EXPECT_EQ(client_ifc_.ScanResultCode(kScanId).value(), wlan_fullmac::WlanScanResult::kShouldWait);
 }
 
 TEST_F(PassiveScanTest, ScanAbortedInFirmware) {
@@ -342,6 +348,6 @@ TEST_F(PassiveScanTest, ScanAbortedInFirmware) {
   EXPECT_EQ(client_ifc_.ScanResultList(kScanId)->size(), 0U);
   ASSERT_NE(client_ifc_.ScanResultCode(kScanId), std::nullopt);
   EXPECT_EQ(client_ifc_.ScanResultCode(kScanId).value(),
-            WLAN_SCAN_RESULT_CANCELED_BY_DRIVER_OR_FIRMWARE);
+            wlan_fullmac::WlanScanResult::kCanceledByDriverOrFirmware);
 }
 }  // namespace wlan::brcmfmac

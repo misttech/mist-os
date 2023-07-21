@@ -128,7 +128,7 @@ TEST(LifecycleTest, StartWithSmeChannel) {
   fidl::Arena create_arena;
   auto builder_create =
       fuchsia_wlan_phyimpl::wire::WlanPhyImplCreateIfaceRequest::Builder(create_arena);
-  builder_create.role(fuchsia_wlan_common::wire::WlanMacRole::kClient);
+  builder_create.role(wlan_common::WlanMacRole::kClient);
   builder_create.mlme_channel(std::move(local));
   auto result_create = client.buffer(test_arena_)->CreateIface(builder_create.Build());
   EXPECT_TRUE(result_create.ok());
@@ -141,7 +141,7 @@ TEST(LifecycleTest, StartWithSmeChannel) {
   fidl::Arena create_arena_again;
   auto builder_create_again =
       fuchsia_wlan_phyimpl::wire::WlanPhyImplCreateIfaceRequest::Builder(create_arena_again);
-  builder_create_again.role(fuchsia_wlan_common::wire::WlanMacRole::kClient);
+  builder_create_again.role(wlan_common::WlanMacRole::kClient);
   builder_create_again.mlme_channel(std::move(local_again));
   auto result_create_again = client.buffer(test_arena_)->CreateIface(builder_create_again.Build());
   EXPECT_TRUE(result_create_again.ok());
@@ -151,20 +151,50 @@ TEST(LifecycleTest, StartWithSmeChannel) {
   // Simulate start call from Fuchsia's generic wlanif-impl driver.
   auto iface = dev_mgr->FindLatestByProtocolId(ZX_PROTOCOL_WLAN_FULLMAC_IMPL);
   ASSERT_NE(iface, nullptr);
-  void* ctx = iface->DevArgs().ctx;
-  auto* iface_ops =
-      static_cast<const wlan_fullmac_impl_protocol_ops_t*>(iface->DevArgs().proto_ops);
-  zx_handle_t mlme_channel = ZX_HANDLE_INVALID;
-  wlan_fullmac_impl_ifc_protocol_t ifc_ops{};
-  status = iface_ops->start(ctx, &ifc_ops, &mlme_channel);
-  EXPECT_EQ(status, ZX_OK);
-  EXPECT_EQ(mlme_channel, test_mlme_channel);
 
-  // Verify calling start again will fail with proper error code.
-  mlme_channel = ZX_HANDLE_INVALID;
-  status = iface_ops->start(ctx, &ifc_ops, &mlme_channel);
-  EXPECT_EQ(status, ZX_ERR_ALREADY_BOUND);
-  EXPECT_EQ(mlme_channel, ZX_HANDLE_INVALID);
+  auto fullmac_endpoints =
+      fdf::CreateEndpoints<fuchsia_wlan_fullmac::Service::WlanFullmacImpl::ProtocolType>();
+  EXPECT_FALSE(fullmac_endpoints.is_error());
+  {
+    zx::channel client_token, server_token;
+    EXPECT_EQ(ZX_OK, zx::channel::create(0, &client_token, &server_token));
+    EXPECT_EQ(ZX_OK, fdf::ProtocolConnect(
+                         std::move(client_token),
+                         fdf::Channel(fullmac_endpoints->server.TakeChannel().release())));
+
+    fbl::StringBuffer<fuchsia_io::wire::kMaxPathLength> path;
+    path.AppendPrintf("svc/%s/default/%s",
+                      fuchsia_wlan_fullmac::Service::WlanFullmacImpl::ServiceName,
+                      fuchsia_wlan_fullmac::Service::WlanFullmacImpl::Name);
+    // Serve the WlanFullmacImpl protocol on `server_token` found at `path` within
+    // the outgoing directory. Here we get the client end outgoing_dir_channel from the device
+    // managed by FakeDevMgr.
+    EXPECT_EQ(ZX_OK, status = fdio_service_connect_at(iface->DevArgs().outgoing_dir_channel,
+                                                      path.c_str(), server_token.release()));
+  }
+  auto fullmac_client = fdf::WireSyncClient<fuchsia_wlan_fullmac::WlanFullmacImpl>(
+      std::move(fullmac_endpoints->client));
+
+  fdf::Arena arena('T');
+  {
+    auto endpoints = fdf::CreateEndpoints<fuchsia_wlan_fullmac::WlanFullmacImplIfc>();
+    EXPECT_FALSE(endpoints.is_error());
+
+    auto result = fullmac_client.buffer(arena)->Start(std::move(endpoints->client));
+    EXPECT_TRUE(result.ok());
+    EXPECT_FALSE(result->is_error());
+    EXPECT_EQ(result->value()->sme_channel.get(), test_mlme_channel);
+  }
+
+  {
+    // Verify calling start again will fail with proper error code.
+    auto endpoints = fdf::CreateEndpoints<fuchsia_wlan_fullmac::WlanFullmacImplIfc>();
+    EXPECT_FALSE(endpoints.is_error());
+    auto result = fullmac_client.buffer(arena)->Start(std::move(endpoints->client));
+    EXPECT_TRUE(result.ok());
+    EXPECT_TRUE(result->is_error());
+    EXPECT_EQ(result->error_value(), ZX_ERR_ALREADY_BOUND);
+  }
 
   // check that without specifying iface id, destroy iface fails
   fidl::Arena destroy_fail_arena;

@@ -2,9 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include <fuchsia/wlan/common/c/banjo.h>
-#include <fuchsia/wlan/ieee80211/cpp/fidl.h>
-
 #include <gtest/gtest.h>
 
 #include "src/connectivity/wlan/drivers/testing/lib/sim-env/sim-env.h"
@@ -18,18 +15,18 @@ constexpr zx::duration kSimulatedClockDuration = zx::sec(10);
 
 }  // namespace
 
-namespace wlan_ieee80211 = ::fuchsia::wlan::ieee80211;
+namespace wlan_ieee80211 = wlan_ieee80211;
 
 constexpr simulation::WlanTxInfo kDefaultTxInfo = {
-    .channel = {.primary = 9, .cbw = CHANNEL_BANDWIDTH_CBW20, .secondary80 = 0}};
+    .channel = {.primary = 9, .cbw = wlan_common::ChannelBandwidth::kCbw20, .secondary80 = 0}};
 constexpr simulation::WlanTxInfo kWrongChannelTxInfo = {
-    .channel = {.primary = 10, .cbw = CHANNEL_BANDWIDTH_CBW20, .secondary80 = 0}};
-constexpr cssid_t kApSsid = {.len = 15, .data = "Fuchsia Fake AP"};
+    .channel = {.primary = 10, .cbw = wlan_common::ChannelBandwidth::kCbw20, .secondary80 = 0}};
+constexpr wlan_ieee80211::CSsid kApSsid = {.len = 15, .data = {.data_ = "Fuchsia Fake AP"}};
 const common::MacAddr kApBssid({0x11, 0x11, 0x11, 0x11, 0x11, 0x11});
 static const common::MacAddr kWrongBssid({0x12, 0x34, 0x56, 0x78, 0x9a, 0xbd});
 const common::MacAddr kClientMacAddr({0x22, 0x22, 0x22, 0x22, 0x22, 0x22});
 
-void validateChannel(const wlan_channel_t& channel) {
+void validateChannel(const wlan_common::WlanChannel& channel) {
   EXPECT_EQ(channel.primary, kDefaultTxInfo.channel.primary);
   EXPECT_EQ(channel.cbw, kDefaultTxInfo.channel.cbw);
   EXPECT_EQ(channel.secondary80, kDefaultTxInfo.channel.secondary80);
@@ -91,14 +88,14 @@ void AuthTest::Rx(std::shared_ptr<const simulation::SimFrame> frame,
 
 TEST_F(AuthTest, OpenSystemBasicUse) {
   simulation::SimAuthFrame auth_req_frame(kClientMacAddr, kApBssid, 1, simulation::AUTH_TYPE_OPEN,
-                                          wlan_ieee80211::StatusCode::SUCCESS);
+                                          wlan_ieee80211::StatusCode::kSuccess);
   env_.ScheduleNotification(
       std::bind(&simulation::Environment::Tx, &env_, auth_req_frame, kDefaultTxInfo, this),
       zx::sec(1));
 
   env_.Run(kSimulatedClockDuration);
 
-  ValidateAuthResp(2, simulation::AUTH_TYPE_OPEN, wlan_ieee80211::StatusCode::SUCCESS);
+  ValidateAuthResp(2, simulation::AUTH_TYPE_OPEN, wlan_ieee80211::StatusCode::kSuccess);
 
   EXPECT_EQ(auth_resps_received_.empty(), true);
 }
@@ -108,22 +105,22 @@ TEST_F(AuthTest, SharedKeyBasicUse) {
 
   simulation::SimAuthFrame auth_req_frame1(kClientMacAddr, kApBssid, 1,
                                            simulation::AUTH_TYPE_SHARED_KEY,
-                                           wlan_ieee80211::StatusCode::SUCCESS);
+                                           wlan_ieee80211::StatusCode::kSuccess);
   env_.ScheduleNotification(
       std::bind(&simulation::Environment::Tx, &env_, auth_req_frame1, kDefaultTxInfo, this),
       zx::sec(1));
 
   simulation::SimAuthFrame auth_req_frame2(kClientMacAddr, kApBssid, 3,
                                            simulation::AUTH_TYPE_SHARED_KEY,
-                                           wlan_ieee80211::StatusCode::SUCCESS);
+                                           wlan_ieee80211::StatusCode::kSuccess);
   env_.ScheduleNotification(
       std::bind(&simulation::Environment::Tx, &env_, auth_req_frame2, kDefaultTxInfo, this),
       zx::sec(2));
 
   env_.Run(kSimulatedClockDuration);
 
-  ValidateAuthResp(2, simulation::AUTH_TYPE_SHARED_KEY, wlan_ieee80211::StatusCode::SUCCESS);
-  ValidateAuthResp(4, simulation::AUTH_TYPE_SHARED_KEY, wlan_ieee80211::StatusCode::SUCCESS);
+  ValidateAuthResp(2, simulation::AUTH_TYPE_SHARED_KEY, wlan_ieee80211::StatusCode::kSuccess);
+  ValidateAuthResp(4, simulation::AUTH_TYPE_SHARED_KEY, wlan_ieee80211::StatusCode::kSuccess);
 
   EXPECT_EQ(auth_resps_received_.empty(), true);
 }
@@ -132,14 +129,14 @@ TEST_F(AuthTest, OpenSystemAuthTwiceTest) {
   ap_.SetSecurity({.auth_handling_mode = simulation::AUTH_TYPE_OPEN});
 
   simulation::SimAuthFrame auth_req_frame1(kClientMacAddr, kApBssid, 3, simulation::AUTH_TYPE_OPEN,
-                                           wlan_ieee80211::StatusCode::SUCCESS);
+                                           wlan_ieee80211::StatusCode::kSuccess);
   env_.ScheduleNotification(
       std::bind(&simulation::Environment::Tx, &env_, auth_req_frame1, kDefaultTxInfo, this),
       zx::sec(1));
 
   // Send Authentication request after station is associated.
   simulation::SimAuthFrame auth_req_frame(kClientMacAddr, kApBssid, 1, simulation::AUTH_TYPE_OPEN,
-                                          wlan_ieee80211::StatusCode::SUCCESS);
+                                          wlan_ieee80211::StatusCode::kSuccess);
   env_.ScheduleNotification(
       std::bind(&simulation::Environment::Tx, &env_, auth_req_frame, kDefaultTxInfo, this),
       zx::sec(2));
@@ -150,7 +147,7 @@ TEST_F(AuthTest, OpenSystemAuthTwiceTest) {
       zx::sec(3));
 
   simulation::SimAuthFrame auth_after_assoc(kClientMacAddr, kApBssid, 1, simulation::AUTH_TYPE_OPEN,
-                                            wlan_ieee80211::StatusCode::SUCCESS);
+                                            wlan_ieee80211::StatusCode::kSuccess);
   env_.ScheduleNotification(
       std::bind(&simulation::Environment::Tx, &env_, auth_after_assoc, kDefaultTxInfo, this),
       zx::sec(4));
@@ -165,7 +162,7 @@ TEST_F(AuthTest, SharedKeyIgnoreTest) {
   // Wrong bssid frame should be ignore
   simulation::SimAuthFrame wrong_bssid_frame(kClientMacAddr, kWrongBssid, 1,
                                              simulation::AUTH_TYPE_SHARED_KEY,
-                                             wlan_ieee80211::StatusCode::SUCCESS);
+                                             wlan_ieee80211::StatusCode::kSuccess);
   env_.ScheduleNotification(
       std::bind(&simulation::Environment::Tx, &env_, wrong_bssid_frame, kDefaultTxInfo, this),
       zx::sec(1));
@@ -173,15 +170,15 @@ TEST_F(AuthTest, SharedKeyIgnoreTest) {
   // Wrong channel frame should be ignore
   simulation::SimAuthFrame wrong_channel_frame(kClientMacAddr, kApBssid, 1,
                                                simulation::AUTH_TYPE_SHARED_KEY,
-                                               wlan_ieee80211::StatusCode::SUCCESS);
+                                               wlan_ieee80211::StatusCode::kSuccess);
   env_.ScheduleNotification(std::bind(&simulation::Environment::Tx, &env_, wrong_channel_frame,
                                       kWrongChannelTxInfo, this),
                             zx::sec(2));
 
-  // auth req with status StatusCode::REFUSED_REASON_UNSPECIFIED should be ignored
+  // auth req with status StatusCode::kRefusedReasonUnspecified should be ignored
   simulation::SimAuthFrame refuse_frame(kClientMacAddr, kApBssid, 1,
                                         simulation::AUTH_TYPE_SHARED_KEY,
-                                        wlan_ieee80211::StatusCode::REFUSED_REASON_UNSPECIFIED);
+                                        wlan_ieee80211::StatusCode::kRefusedReasonUnspecified);
   env_.ScheduleNotification(
       std::bind(&simulation::Environment::Tx, &env_, refuse_frame, kDefaultTxInfo, this),
       zx::sec(3));
@@ -189,7 +186,7 @@ TEST_F(AuthTest, SharedKeyIgnoreTest) {
   // auth req with sequence number 2 should be ignored
   simulation::SimAuthFrame seq_num_two_frame(kClientMacAddr, kApBssid, 2,
                                              simulation::AUTH_TYPE_SHARED_KEY,
-                                             wlan_ieee80211::StatusCode::SUCCESS);
+                                             wlan_ieee80211::StatusCode::kSuccess);
   env_.ScheduleNotification(
       std::bind(&simulation::Environment::Tx, &env_, seq_num_two_frame, kDefaultTxInfo, this),
       zx::sec(4));
@@ -197,7 +194,7 @@ TEST_F(AuthTest, SharedKeyIgnoreTest) {
   // auth req with sequence number 4 should be ignored
   simulation::SimAuthFrame seq_num_four_frame(kClientMacAddr, kApBssid, 4,
                                               simulation::AUTH_TYPE_SHARED_KEY,
-                                              wlan_ieee80211::StatusCode::SUCCESS);
+                                              wlan_ieee80211::StatusCode::kSuccess);
   env_.ScheduleNotification(
       std::bind(&simulation::Environment::Tx, &env_, seq_num_four_frame, kDefaultTxInfo, this),
       zx::sec(5));
@@ -209,7 +206,7 @@ TEST_F(AuthTest, SharedKeyIgnoreTest) {
 TEST_F(AuthTest, OpenSystemRefuseTest) {
   simulation::SimAuthFrame wrong_type_frame(kClientMacAddr, kApBssid, 1,
                                             simulation::AUTH_TYPE_SHARED_KEY,
-                                            wlan_ieee80211::StatusCode::SUCCESS);
+                                            wlan_ieee80211::StatusCode::kSuccess);
   env_.ScheduleNotification(
       std::bind(&simulation::Environment::Tx, &env_, wrong_type_frame, kDefaultTxInfo, this),
       zx::sec(3));
@@ -218,7 +215,7 @@ TEST_F(AuthTest, OpenSystemRefuseTest) {
   // The auth type in frame is the same as that in auth req frame, and if auth type in quth req is
   // different from that in AP's auth_handling_mode, it will reply a refuse auth resp frame.
   ValidateAuthResp(2, simulation::AUTH_TYPE_SHARED_KEY,
-                   wlan_ieee80211::StatusCode::REFUSED_REASON_UNSPECIFIED);
+                   wlan_ieee80211::StatusCode::kRefusedReasonUnspecified);
 
   EXPECT_EQ(auth_resps_received_.empty(), true);
 }
@@ -227,7 +224,7 @@ TEST_F(AuthTest, SharedKeyRefuseTest) {
   ap_.SetSecurity({.auth_handling_mode = simulation::AUTH_TYPE_SHARED_KEY});
 
   simulation::SimAuthFrame wrong_type_frame(kClientMacAddr, kApBssid, 1, simulation::AUTH_TYPE_OPEN,
-                                            wlan_ieee80211::StatusCode::SUCCESS);
+                                            wlan_ieee80211::StatusCode::kSuccess);
   env_.ScheduleNotification(
       std::bind(&simulation::Environment::Tx, &env_, wrong_type_frame, kDefaultTxInfo, this),
       zx::sec(3));
@@ -235,7 +232,7 @@ TEST_F(AuthTest, SharedKeyRefuseTest) {
   env_.Run(kSimulatedClockDuration);
 
   ValidateAuthResp(2, simulation::AUTH_TYPE_OPEN,
-                   wlan_ieee80211::StatusCode::REFUSED_REASON_UNSPECIFIED);
+                   wlan_ieee80211::StatusCode::kRefusedReasonUnspecified);
 
   EXPECT_EQ(auth_resps_received_.empty(), true);
 }

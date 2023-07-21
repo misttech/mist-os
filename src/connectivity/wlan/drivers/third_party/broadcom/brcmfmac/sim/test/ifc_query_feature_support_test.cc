@@ -25,16 +25,16 @@ TEST_F(SimTest, ClientIfcQueryMacSublayerSupport) {
   ASSERT_EQ(Init(), ZX_OK);
 
   SimInterface client_ifc;
-  ASSERT_EQ(StartInterface(WLAN_MAC_ROLE_CLIENT, &client_ifc, std::nullopt, kDefaultMac), ZX_OK);
+  ASSERT_EQ(StartInterface(wlan_common::WlanMacRole::kClient, &client_ifc, kDefaultMac), ZX_OK);
 
-  mac_sublayer_support_t resp;
+  wlan_common::MacSublayerSupport resp;
   env_->ScheduleNotification(std::bind(&SimInterface::QueryMacSublayerSupport, &client_ifc, &resp),
                              zx::sec(1));
   env_->Run(kSimulatedClockDuration);
 
   EXPECT_FALSE(resp.rate_selection_offload.supported);
-  EXPECT_EQ(resp.data_plane.data_plane_type, DATA_PLANE_TYPE_GENERIC_NETWORK_DEVICE);
-  EXPECT_EQ(resp.device.mac_implementation_type, MAC_IMPLEMENTATION_TYPE_FULLMAC);
+  EXPECT_EQ(resp.data_plane.data_plane_type, wlan_common::DataPlaneType::kGenericNetworkDevice);
+  EXPECT_EQ(resp.device.mac_implementation_type, wlan_common::MacImplementationType::kFullmac);
 }
 
 // Verify that a query for security features support works on a client interface
@@ -42,9 +42,9 @@ TEST_F(SimTest, ClientIfcQuerySecuritySupport) {
   ASSERT_EQ(Init(), ZX_OK);
 
   SimInterface client_ifc;
-  ASSERT_EQ(StartInterface(WLAN_MAC_ROLE_CLIENT, &client_ifc, std::nullopt, kDefaultMac), ZX_OK);
+  ASSERT_EQ(StartInterface(wlan_common::WlanMacRole::kClient, &client_ifc, kDefaultMac), ZX_OK);
 
-  security_support_t resp;
+  wlan_common::SecuritySupport resp;
   env_->ScheduleNotification(std::bind(&SimInterface::QuerySecuritySupport, &client_ifc, &resp),
                              zx::sec(1));
   env_->Run(kSimulatedClockDuration);
@@ -59,9 +59,9 @@ TEST_F(SimTest, ClientIfcQuerySpectrumManagementSupport) {
   ASSERT_EQ(Init(), ZX_OK);
 
   SimInterface client_ifc;
-  ASSERT_EQ(StartInterface(WLAN_MAC_ROLE_CLIENT, &client_ifc, std::nullopt, kDefaultMac), ZX_OK);
+  ASSERT_EQ(StartInterface(wlan_common::WlanMacRole::kClient, &client_ifc, kDefaultMac), ZX_OK);
 
-  spectrum_management_support_t resp;
+  wlan_common::SpectrumManagementSupport resp;
   env_->ScheduleNotification(
       std::bind(&SimInterface::QuerySpectrumManagementSupport, &client_ifc, &resp), zx::sec(1));
   env_->Run(kSimulatedClockDuration);

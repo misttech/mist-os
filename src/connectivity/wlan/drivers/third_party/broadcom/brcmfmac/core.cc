@@ -238,7 +238,6 @@ void brcmf_netdev_set_allmulti(struct net_device* ndev) {
   }
 }
 
-
 void brcmf_tx_complete(struct brcmf_pub* drvr, cpp20::span<wlan::drivers::components::Frame> frames,
                        zx_status_t result) {
   drvr->device->NetDev().CompleteTx(frames, result);
@@ -531,7 +530,8 @@ zx_status_t brcmf_add_if(struct brcmf_pub* drvr, int32_t bsscfgidx, int32_t ifid
   }
 
   ndev->needs_free_net_device = true;
-  ifp = ndev_to_if(ndev);
+  ifp = new (std::nothrow) brcmf_if();
+  ndev->priv = static_cast<decltype(ndev->priv)>(ifp);
   ifp->ndev = ndev;
   /* store mapping ifidx to bsscfgidx */
   if (drvr->if2bss[ifidx] == BRCMF_BSSIDX_INVALID) {
@@ -808,11 +808,6 @@ struct net_device* brcmf_allocate_net_device(size_t priv_size, const char* name)
   if (dev == NULL) {
     return NULL;
   }
-  dev->priv = static_cast<decltype(dev->priv)>(calloc(1, priv_size));
-  if (dev->priv == NULL) {
-    free(dev);
-    return NULL;
-  }
   brcmf_write_net_device_name(dev, name);
   dev->stats = {};  // initialize stats counters to 0
 
@@ -821,7 +816,7 @@ struct net_device* brcmf_allocate_net_device(size_t priv_size, const char* name)
 
 void brcmf_free_net_device(struct net_device* dev) {
   if (dev != NULL) {
-    free(dev->priv);
+    delete ndev_to_if(dev);
     delete dev;
   }
 }

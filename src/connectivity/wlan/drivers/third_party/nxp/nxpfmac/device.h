@@ -129,6 +129,7 @@ class Device : public DeviceType,
 
   // Notify the protocol connection completion.
   libsync::Completion protocol_connected_;
+  async_dispatcher_t* driver_async_dispatcher_;
 
   EventRegistration defer_rx_work_event_;
   EventRegistration flush_rx_work_event_;

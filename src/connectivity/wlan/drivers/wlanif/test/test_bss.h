@@ -9,7 +9,6 @@
 #include <fuchsia/wlan/ieee80211/cpp/fidl.h>
 #include <fuchsia/wlan/mlme/cpp/fidl.h>
 
-#include <gtest/gtest.h>
 #include <wlan/common/macaddr.h>
 
 namespace wlan_fullmac_test {

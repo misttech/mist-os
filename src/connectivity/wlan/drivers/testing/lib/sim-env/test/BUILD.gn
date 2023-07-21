@@ -30,8 +30,6 @@ executable("rx_tests") {
   sources = [ "rx_tests.cc" ]
 
   deps = [
-    "//sdk/fidl/fuchsia.wlan.common:fuchsia.wlan.common_banjo_c",
-    "//sdk/fidl/fuchsia.wlan.ieee80211:fuchsia.wlan.ieee80211_hlcpp",
     "//src/connectivity/wlan/drivers/testing/lib/sim-env",
     "//src/lib/fxl/test/:gtest_main",
     "//third_party/googletest:gmock",
@@ -50,7 +48,6 @@ executable("frame_ie_tests") {
   sources = [ "frame_ie_tests.cc" ]
 
   deps = [
-    "//sdk/fidl/fuchsia.wlan.common:fuchsia.wlan.common_banjo_c",
     "//src/connectivity/wlan/drivers/testing/lib/sim-env",
     "//src/lib/fxl/test/:gtest_main",
     "//third_party/googletest:gmock",
@@ -69,7 +66,6 @@ executable("location_tests") {
   sources = [ "location_tests.cc" ]
 
   deps = [
-    "//sdk/fidl/fuchsia.wlan.common:fuchsia.wlan.common_banjo_c",
     "//src/connectivity/wlan/drivers/testing/lib/sim-env",
     "//src/lib/fxl/test/:gtest_main",
     "//third_party/googletest:gmock",
@@ -88,7 +84,6 @@ executable("trans_time_tests") {
   sources = [ "trans_time_tests.cc" ]
 
   deps = [
-    "//sdk/fidl/fuchsia.wlan.common:fuchsia.wlan.common_banjo_c",
     "//src/connectivity/wlan/drivers/testing/lib/sim-env",
     "//src/lib/fxl/test/:gtest_main",
     "//third_party/googletest:gmock",

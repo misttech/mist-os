@@ -13,7 +13,8 @@
 #ifndef SRC_CONNECTIVITY_WLAN_DRIVERS_THIRD_PARTY_NXP_NXPFMAC_SOFTAP_H_
 #define SRC_CONNECTIVITY_WLAN_DRIVERS_THIRD_PARTY_NXP_NXPFMAC_SOFTAP_H_
 
-#include <fidl/fuchsia.wlan.ieee80211/cpp/common_types.h>
+#include <fidl/fuchsia.wlan.fullmac/cpp/driver/wire.h>
+#include <fidl/fuchsia.wlan.ieee80211/cpp/wire_types.h>
 #include <fuchsia/hardware/wlan/fullmac/cpp/banjo.h>
 #include <lib/sync/completion.h>
 #include <netinet/if_ether.h>
@@ -46,16 +47,18 @@ class SoftApIfc {
 
 class SoftAp {
  public:
-  using StatusCode = fuchsia_wlan_ieee80211::StatusCode;
+  using StatusCode = fuchsia_wlan_ieee80211::wire::StatusCode;
 
   SoftAp(SoftApIfc* ifc, DeviceContext* context, uint32_t bss_index);
   ~SoftAp();
   // Attempt to start the SoftAP on the given bss and channel. Returns appropriate
   // WLAN_START_RESULT_XX.
-  wlan_start_result_t Start(const wlan_fullmac_start_req* req) __TA_EXCLUDES(mutex_);
+  wlan_start_result_t Start(const fuchsia_wlan_fullmac::wire::WlanFullmacStartReq* req)
+      __TA_EXCLUDES(mutex_);
 
   // Returns appropriate WLAN_STOP_RESULT_XX.
-  wlan_stop_result_t Stop(const wlan_fullmac_stop_req* req) __TA_EXCLUDES(mutex_);
+  wlan_stop_result_t Stop(const fuchsia_wlan_fullmac::wire::WlanFullmacStopReq* req)
+      __TA_EXCLUDES(mutex_);
   zx_status_t DeauthSta(const uint8_t sta_mac_addr[ETH_ALEN], uint16_t reason_code)
       __TA_EXCLUDES(mutex_);
 
@@ -65,7 +68,7 @@ class SoftAp {
   void OnStaDisconnect(pmlan_event event) __TA_EXCLUDES(mutex_);
   DeviceContext* context_ = nullptr;
   const uint32_t bss_index_;
-  cssid_t ssid_ = {};
+  fuchsia_wlan_ieee80211::wire::CSsid ssid_ = {};
   bool started_ __TA_GUARDED(mutex_) = false;
   std::unordered_set<wlan::common::MacAddr, wlan::common::MacAddrHasher> deauth_sta_set_;
   std::mutex mutex_;

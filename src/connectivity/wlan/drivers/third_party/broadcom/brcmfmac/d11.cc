@@ -204,6 +204,106 @@ static void brcmu_d11ac_decchspec(struct brcmu_chan* ch) {
   }
 }
 
+uint16_t channel_to_chanspec(const brcmu_d11inf* d11inf,
+                             const fuchsia_wlan_common::WlanChannel* ch) {
+  struct brcmu_chan ch_inf;
+
+  ch_inf.chnum = ch->primary();
+
+  switch (ch->cbw()) {
+    case fuchsia_wlan_common::ChannelBandwidth::kCbw20:
+      ch_inf.bw = BRCMU_CHAN_BW_20;
+      ch_inf.sb = BRCMU_CHAN_SB_NONE;
+      break;
+    case fuchsia_wlan_common::ChannelBandwidth::kCbw40:
+      ch_inf.bw = BRCMU_CHAN_BW_40;
+      ch_inf.sb = BRCMU_CHAN_SB_U;
+      break;
+    case fuchsia_wlan_common::ChannelBandwidth::kCbw40Below:
+      ch_inf.bw = BRCMU_CHAN_BW_40;
+      ch_inf.sb = BRCMU_CHAN_SB_L;
+      break;
+    case fuchsia_wlan_common::ChannelBandwidth::kCbw80:
+    case fuchsia_wlan_common::ChannelBandwidth::kCbw160:
+    case fuchsia_wlan_common::ChannelBandwidth::kCbw80P80:
+    default:
+      BRCMF_ERR("unsupported channel width: %zu", static_cast<uint32_t>(ch->cbw()));
+      break;
+  }
+
+  // ch_info.band is handled by encchspec
+  d11inf->encchspec(&ch_inf);
+
+  return ch_inf.chspec;
+}
+
+uint16_t channel_to_chanspec(const brcmu_d11inf* d11inf,
+                             const fuchsia_wlan_common::wire::WlanChannel* ch) {
+  struct brcmu_chan ch_inf;
+
+  ch_inf.chnum = ch->primary;
+
+  switch (ch->cbw) {
+    case fuchsia_wlan_common::wire::ChannelBandwidth::kCbw20:
+      ch_inf.bw = BRCMU_CHAN_BW_20;
+      ch_inf.sb = BRCMU_CHAN_SB_NONE;
+      break;
+    case fuchsia_wlan_common::wire::ChannelBandwidth::kCbw40:
+      ch_inf.bw = BRCMU_CHAN_BW_40;
+      ch_inf.sb = BRCMU_CHAN_SB_U;
+      break;
+    case fuchsia_wlan_common::wire::ChannelBandwidth::kCbw40Below:
+      ch_inf.bw = BRCMU_CHAN_BW_40;
+      ch_inf.sb = BRCMU_CHAN_SB_L;
+      break;
+    case fuchsia_wlan_common::wire::ChannelBandwidth::kCbw80:
+    case fuchsia_wlan_common::wire::ChannelBandwidth::kCbw160:
+    case fuchsia_wlan_common::wire::ChannelBandwidth::kCbw80P80:
+    default:
+      BRCMF_ERR("unsupported channel width: %zu", static_cast<uint32_t>(ch->cbw));
+      break;
+  }
+
+  // ch_info.band is handled by encchspec
+  d11inf->encchspec(&ch_inf);
+
+  return ch_inf.chspec;
+}
+
+void chanspec_to_channel(const brcmu_d11inf* d11_inf, uint16_t chanspec,
+                         fuchsia_wlan_common::wire::WlanChannel* ch) {
+  brcmu_chan ch_inf = {.chspec = chanspec};
+  d11_inf->decchspec(&ch_inf);
+
+  ch->primary = ch_inf.chnum;
+  ch->secondary80 = 0;
+
+  switch (ch_inf.bw) {
+    case BRCMU_CHAN_BW_20:
+      ch->cbw = fuchsia_wlan_common::wire::ChannelBandwidth::kCbw20;
+      break;
+    case BRCMU_CHAN_BW_40:
+      switch (ch_inf.sb) {
+        case BRCMU_CHAN_SB_U:
+          ch->cbw = fuchsia_wlan_common::wire::ChannelBandwidth::kCbw40;
+          break;
+        case BRCMU_CHAN_SB_L:
+          ch->cbw = fuchsia_wlan_common::wire::ChannelBandwidth::kCbw40Below;
+          break;
+        default:
+          BRCMF_ERR("unsupported channel side band: %hhu", static_cast<uint8_t>(ch_inf.sb));
+          break;
+      }
+      break;
+    case BRCMU_CHAN_BW_80:
+      ch->cbw = fuchsia_wlan_common::wire::ChannelBandwidth::kCbw80;
+      break;
+    default:
+      BRCMF_ERR("unsupported channel width: %zu", ch_inf.bw);
+      break;
+  }
+}
+
 uint16_t channel_to_chanspec(const brcmu_d11inf* d11inf, const wlan_channel_t* ch) {
   struct brcmu_chan ch_inf;
 
@@ -226,12 +326,11 @@ uint16_t channel_to_chanspec(const brcmu_d11inf* d11inf, const wlan_channel_t* c
     case CHANNEL_BANDWIDTH_CBW160:
     case CHANNEL_BANDWIDTH_CBW80P80:
     default:
-      BRCMF_ERR("unsupported channel width");
+      BRCMF_ERR("unsupported channel width: %zu", ch->cbw);
       break;
   }
 
   // ch_info.band is handled by encchspec
-
   d11inf->encchspec(&ch_inf);
 
   return ch_inf.chspec;
@@ -265,7 +364,7 @@ void chanspec_to_channel(const brcmu_d11inf* d11_inf, uint16_t chanspec, wlan_ch
       ch->cbw = CHANNEL_BANDWIDTH_CBW80;
       break;
     default:
-      BRCMF_ERR("unsupported channel width");
+      BRCMF_ERR("unsupported channel width: %zu", ch_inf.bw);
       break;
   }
 }

@@ -15,7 +15,7 @@ InformationElement::~InformationElement() = default;
 SsidInformationElement::SsidInformationElement(
     const wlan::simulation::SsidInformationElement& ssid_ie) {
   ssid_.len = ssid_ie.ssid_.len;
-  std::memcpy(ssid_.data, ssid_ie.ssid_.data, ssid_.len);
+  std::memcpy(ssid_.data.data(), ssid_ie.ssid_.data.data(), ssid_.len);
 }
 
 InformationElement::SimIeType SsidInformationElement::IeType() const { return IE_TYPE_SSID; }
@@ -23,7 +23,7 @@ InformationElement::SimIeType SsidInformationElement::IeType() const { return IE
 std::vector<uint8_t> SsidInformationElement::ToRawIe() const {
   std::vector<uint8_t> buf = {IE_TYPE_SSID, ssid_.len};
   for (int i = 0; i < ssid_.len; ++i) {
-    buf.push_back(ssid_.data[i]);
+    buf.push_back(ssid_.data.data()[i]);
   }
   return buf;
 }
@@ -90,13 +90,14 @@ std::shared_ptr<InformationElement> SimManagementFrame::FindIe(
   return std::shared_ptr<InformationElement>(nullptr);
 }
 
-void SimManagementFrame::AddSsidIe(const cssid_t& ssid) {
+void SimManagementFrame::AddSsidIe(const wlan_ieee80211::CSsid& ssid) {
   auto ie = std::make_shared<SsidInformationElement>(ssid);
   // Ensure no IE with this IE type exists.
   AddIe(InformationElement::IE_TYPE_SSID, ie);
 }
 
-void SimManagementFrame::AddCsaIe(const wlan_channel_t& channel, uint8_t channel_switch_count) {
+void SimManagementFrame::AddCsaIe(const wlan_common::WlanChannel& channel,
+                                  uint8_t channel_switch_count) {
   // for nonmesh STAs, this field either is set to the number of TBTTs until the STA sending the
   // Channel Switch Announcement element switches to the new channel or is set to 0.
   auto ie = std::make_shared<CsaInformationElement>(false, channel.primary, channel_switch_count);
@@ -127,7 +128,8 @@ void SimManagementFrame::RemoveIe(InformationElement::SimIeType ie_type) {
 }
 
 /* SimBeaconFrame function implementations.*/
-SimBeaconFrame::SimBeaconFrame(const cssid_t& ssid, const common::MacAddr& bssid) : bssid_(bssid) {
+SimBeaconFrame::SimBeaconFrame(const wlan_ieee80211::CSsid& ssid, const common::MacAddr& bssid)
+    : bssid_(bssid) {
   // Beacon automatically gets the SSID information element.
   AddSsidIe(ssid);
 }
@@ -159,7 +161,7 @@ SimFrame* SimProbeReqFrame::CopyFrame() const { return new SimProbeReqFrame(*thi
 
 /* SimProbeRespFrame function implementations.*/
 SimProbeRespFrame::SimProbeRespFrame(const common::MacAddr& src, const common::MacAddr& dst,
-                                     const cssid_t& ssid)
+                                     const wlan_ieee80211::CSsid& ssid)
     : SimManagementFrame(src, dst) {
   // Probe response automatically gets the SSID information element.
   AddSsidIe(ssid);

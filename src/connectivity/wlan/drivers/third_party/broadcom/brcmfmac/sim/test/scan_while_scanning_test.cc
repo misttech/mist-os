@@ -21,7 +21,7 @@ TEST_F(SimTest, ScanWhileScanning) {
   ASSERT_EQ(Init(), ZX_OK);
 
   SimInterface client_ifc;
-  StartInterface(WLAN_MAC_ROLE_CLIENT, &client_ifc);
+  StartInterface(wlan_common::WlanMacRole::kClient, &client_ifc);
 
   env_->ScheduleNotification(std::bind(&SimInterface::StartScan, &client_ifc, kFirstScanId, false,
                                        std::optional<const std::vector<uint8_t>>{}),
@@ -35,12 +35,12 @@ TEST_F(SimTest, ScanWhileScanning) {
   // Verify that first scan completed successfully
   auto first_result = client_ifc.ScanResultCode(kFirstScanId);
   EXPECT_NE(first_result, std::nullopt);
-  EXPECT_EQ(*first_result, WLAN_SCAN_RESULT_SUCCESS);
+  EXPECT_EQ(*first_result, fuchsia_wlan_fullmac::WlanScanResult::kSuccess);
 
   // Verify that second scan completed, but was not successful
   auto second_result = client_ifc.ScanResultCode(kSecondScanId);
   EXPECT_NE(second_result, std::nullopt);
-  EXPECT_NE(*second_result, WLAN_SCAN_RESULT_SUCCESS);
+  EXPECT_NE(*second_result, fuchsia_wlan_fullmac::WlanScanResult::kSuccess);
 }
 
 }  // namespace wlan::brcmfmac

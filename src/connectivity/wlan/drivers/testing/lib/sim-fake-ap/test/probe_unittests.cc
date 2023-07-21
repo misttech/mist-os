@@ -22,13 +22,13 @@ constexpr zx::duration kSimulatedClockDuration = zx::sec(10);
 using ::testing::NotNull;
 
 constexpr simulation::WlanTxInfo kAp1TxInfo = {
-    .channel = {.primary = 9, .cbw = CHANNEL_BANDWIDTH_CBW20, .secondary80 = 0}};
-constexpr cssid_t kAp1Ssid = {.len = 16, .data = "Fuchsia Fake AP1"};
+    .channel = {.primary = 9, .cbw = wlan_common::ChannelBandwidth::kCbw20, .secondary80 = 0}};
+constexpr wlan_ieee80211::CSsid kAp1Ssid = {.len = 16, .data = {.data_ = "Fuchsia Fake AP1"}};
 const common::MacAddr kAp1Bssid({0x12, 0x34, 0x56, 0x78, 0x9a, 0xbc});
 
 constexpr simulation::WlanTxInfo kAp2TxInfo = {
-    .channel = {.primary = 10, .cbw = CHANNEL_BANDWIDTH_CBW20, .secondary80 = 0}};
-constexpr cssid_t kAp2Ssid = {.len = 16, .data = "Fuchsia Fake AP2"};
+    .channel = {.primary = 10, .cbw = wlan_common::ChannelBandwidth::kCbw20, .secondary80 = 0}};
+constexpr wlan_ieee80211::CSsid kAp2Ssid = {.len = 16, .data = {.data_ = "Fuchsia Fake AP2"}};
 const common::MacAddr kAp2Bssid({0x12, 0x34, 0x56, 0x78, 0x9a, 0xcc});
 
 const common::MacAddr kClientMacAddr({0x11, 0x22, 0x33, 0x44, 0xee, 0xff});
@@ -47,8 +47,8 @@ class ProbeTest : public ::testing::Test, public simulation::StationIfc {
 
   unsigned probe_resp_count_ = 0;
   std::list<common::MacAddr> bssid_resp_list_;
-  std::list<cssid_t> ssid_resp_list_;
-  std::list<wlan_channel_t> channel_resp_list_;
+  std::list<wlan_ieee80211::CSsid> ssid_resp_list_;
+  std::list<wlan_common::WlanChannel> channel_resp_list_;
   std::list<double> sig_strength_resp_list;
 
  private:
@@ -79,15 +79,16 @@ void ProbeTest::Rx(std::shared_ptr<const simulation::SimFrame> frame,
   ssid_resp_list_.push_back(ssid_ie->ssid_);
 }
 
-void compareChannel(const wlan_channel_t& channel1, const wlan_channel_t& channel2) {
+void compareChannel(const wlan_common::WlanChannel& channel1,
+                    const wlan_common::WlanChannel& channel2) {
   EXPECT_EQ(channel1.primary, channel2.primary);
   EXPECT_EQ(channel1.cbw, channel2.cbw);
   EXPECT_EQ(channel1.secondary80, channel2.secondary80);
 }
 
-void compareSsid(const cssid_t& ssid1, const cssid_t& ssid2) {
+void compareSsid(const wlan_ieee80211::CSsid& ssid1, const wlan_ieee80211::CSsid& ssid2) {
   ASSERT_EQ(ssid1.len, ssid2.len);
-  EXPECT_EQ(memcmp(ssid1.data, ssid2.data, ssid1.len), 0);
+  EXPECT_EQ(memcmp(ssid1.data.data(), ssid2.data.data(), ssid1.len), 0);
 }
 
 /* Verify that probe request which is sent to a channel with no ap active on, will not get
@@ -95,7 +96,7 @@ void compareSsid(const cssid_t& ssid1, const cssid_t& ssid2) {
  */
 TEST_F(ProbeTest, DifferentChannel) {
   constexpr simulation::WlanTxInfo kWrongChannelTxInfo = {
-      .channel = {.primary = 11, .cbw = CHANNEL_BANDWIDTH_CBW20, .secondary80 = 0}};
+      .channel = {.primary = 11, .cbw = wlan_common::ChannelBandwidth::kCbw20, .secondary80 = 0}};
 
   simulation::SimProbeReqFrame probe_req_frame(kClientMacAddr);
   env_.ScheduleNotification(

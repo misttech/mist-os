@@ -45,11 +45,11 @@ SoftAp::SoftAp(SoftApIfc* ifc, DeviceContext* context, uint32_t bss_index)
 
 SoftAp::~SoftAp() {
   // Attempt to stop the Soft AP and ignore the error.
-  wlan_fullmac_stop_req req = {.ssid = ssid_};
+  fuchsia_wlan_fullmac::wire::WlanFullmacStopReq req = {.ssid = ssid_};
   Stop(&req);
 }
 
-wlan_start_result_t SoftAp::Start(const wlan_fullmac_start_req* req) {
+wlan_start_result_t SoftAp::Start(const fuchsia_wlan_fullmac::wire::WlanFullmacStartReq* req) {
   std::lock_guard lock(mutex_);
   IoctlRequest<mlan_ds_bss> start_req(MLAN_IOCTL_BSS, MLAN_ACT_GET, bss_index_,
                                       {.sub_command = MLAN_OID_UAP_BSS_CONFIG});
@@ -86,7 +86,7 @@ wlan_start_result_t SoftAp::Start(const wlan_fullmac_start_req* req) {
   // BSS get should have copied the default config into the ioctl buffer, just set ssid,
   // channel and band from the request
   start_req.IoctlReq().action = MLAN_ACT_SET;
-  memcpy(&bss_cfg.ssid.ssid, req->ssid.data, req->ssid.len);
+  memcpy(&bss_cfg.ssid.ssid, req->ssid.data.data(), req->ssid.len);
   bss_cfg.ssid.ssid_len = req->ssid.len;
   bss_cfg.channel = req->channel;
   bss_cfg.bandcfg.chanBand = band_from_channel(req->channel);
@@ -118,7 +118,7 @@ wlan_start_result_t SoftAp::Start(const wlan_fullmac_start_req* req) {
   return WLAN_START_RESULT_SUCCESS;
 }
 
-wlan_stop_result_t SoftAp::Stop(const wlan_fullmac_stop_req* req) {
+wlan_stop_result_t SoftAp::Stop(const fuchsia_wlan_fullmac::wire::WlanFullmacStopReq* req) {
   {
     std::lock_guard lock(mutex_);
     if (!started_) {
@@ -126,8 +126,9 @@ wlan_stop_result_t SoftAp::Stop(const wlan_fullmac_stop_req* req) {
       return WLAN_STOP_RESULT_BSS_ALREADY_STOPPED;
     }
     // Ensure the requested ssid matches the started ssid.
-    if (memcmp(req->ssid.data, ssid_.data, req->ssid.len) != 0) {
-      NXPF_ERR("Stop req ssid: %s does not match started ssid: %s", req->ssid.data, ssid_.data);
+    if (memcmp(req->ssid.data.data(), ssid_.data.data(), req->ssid.len) != 0) {
+      NXPF_ERR("Stop req ssid: %s does not match started ssid: %s", req->ssid.data.data(),
+               ssid_.data.data());
       return WLAN_STOP_RESULT_INTERNAL_ERROR;
     }
   }

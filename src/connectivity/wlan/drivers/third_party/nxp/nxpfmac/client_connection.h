@@ -13,6 +13,7 @@
 #ifndef SRC_CONNECTIVITY_WLAN_DRIVERS_THIRD_PARTY_NXP_NXPFMAC_CLIENT_CONNECTION_H_
 #define SRC_CONNECTIVITY_WLAN_DRIVERS_THIRD_PARTY_NXP_NXPFMAC_CLIENT_CONNECTION_H_
 
+#include <fidl/fuchsia.wlan.fullmac/cpp/driver/wire.h>
 #include <fidl/fuchsia.wlan.ieee80211/cpp/common_types.h>
 #include <fuchsia/hardware/wlan/fullmac/cpp/banjo.h>
 #include <lib/stdcompat/span.h>
@@ -46,6 +47,10 @@ class ClientConnectionIfc {
                            cpp20::span<const uint8_t> trailing_data) = 0;
 };
 
+constexpr size_t kConnectReqBufferSize =
+    fidl::MaxSizeInChannel<fuchsia_wlan_fullmac::wire::WlanFullmacImplConnectReqRequest,
+                           fidl::MessageDirection::kSending>();
+
 class ClientConnection {
  public:
   using StatusCode = fuchsia_wlan_ieee80211::StatusCode;
@@ -59,8 +64,8 @@ class ClientConnection {
   // connection attempt is already in progress. Returns ZX_OK if the request is successfully
   // initiated, `on_connect` will be called asynchronously with the result of the connection
   // attempt.
-  zx_status_t Connect(const wlan_fullmac_connect_req_t* req, OnConnectCallback&& on_connect)
-      __TA_EXCLUDES(mutex_);
+  zx_status_t Connect(const fuchsia_wlan_fullmac::wire::WlanFullmacImplConnectReqRequest* req,
+                      OnConnectCallback&& on_connect) __TA_EXCLUDES(mutex_);
   // Cancel a connection attempt. This will call the on_connect callback passed to Connect if a
   // connection attempt was found. Returns ZX_ERR_NOT_FOUND if no connection attempt is in progress.
   zx_status_t CancelConnect() __TA_EXCLUDES(mutex_);
@@ -77,15 +82,16 @@ class ClientConnection {
   zx_status_t OnSaeResponse(const uint8_t* peer, uint16_t status_code) __TA_EXCLUDES(mutex_);
 
  private:
-  zx_status_t ConnectLocked(const wlan_fullmac_connect_req_t* req, OnConnectCallback&& on_connect)
-      __TA_REQUIRES(mutex_);
+  zx_status_t ConnectLocked(const fuchsia_wlan_fullmac::wire::WlanFullmacImplConnectReqRequest* req,
+                            OnConnectCallback&& on_connect) __TA_REQUIRES(mutex_);
 
   zx_status_t OnSaeResponseLocked(const uint8_t* peer, uint16_t status_code) __TA_REQUIRES(mutex_);
   void OnDisconnect(uint16_t reason_code) __TA_EXCLUDES(mutex_);
   void OnManagementFrame(pmlan_event event) __TA_EXCLUDES(mutex_);
   void OnSaeTimeout() __TA_EXCLUDES(mutex_);
 
-  zx_status_t InitiateSaeHandshake(const wlan_fullmac_connect_req_t* req);
+  zx_status_t InitiateSaeHandshake(
+      const fuchsia_wlan_fullmac::wire::WlanFullmacImplConnectReqRequest* req);
   zx_status_t RegisterForMgmtFrames(const std::vector<wlan::ManagementSubtype>& types);
   zx_status_t RemainOnChannel(uint8_t channel);
   zx_status_t CancelRemainOnChannel();
@@ -94,7 +100,7 @@ class ClientConnection {
                                  uint8_t* out_group_cipher_suite);
   zx_status_t ClearIes();
   zx_status_t ConfigureIes(const uint8_t* ies, size_t ies_count);
-  zx_status_t SetAuthMode(wlan_auth_type_t auth_type);
+  zx_status_t SetAuthMode(fuchsia_wlan_fullmac::wire::WlanAuthType auth_type);
   zx_status_t SetEncryptMode(uint8_t cipher_suite);
   zx_status_t SetWpaEnabled(bool enabled);
 

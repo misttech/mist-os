@@ -25,9 +25,9 @@ TEST_F(SimTest, ClientIfcQuery) {
   ASSERT_EQ(Init(), ZX_OK);
 
   SimInterface client_ifc;
-  ASSERT_EQ(StartInterface(WLAN_MAC_ROLE_CLIENT, &client_ifc, std::nullopt, kDefaultMac), ZX_OK);
+  ASSERT_EQ(StartInterface(wlan_common::WlanMacRole::kClient, &client_ifc, kDefaultMac), ZX_OK);
 
-  wlan_fullmac_query_info_t ifc_query_result;
+  wlan_fullmac::WlanFullmacQueryInfo ifc_query_result;
   // TODO(fxbug.dev/94163): This query silently logs errors and fails because the
   // the "chanspecs", "ldpc_cap", and other iovars are not supported by the simulated firmware.
   env_->ScheduleNotification(std::bind(&SimInterface::Query, &client_ifc, &ifc_query_result),
@@ -35,20 +35,21 @@ TEST_F(SimTest, ClientIfcQuery) {
   env_->Run(kSimulatedClockDuration);
 
   // Mac address returned should match the one we specified when we created the interface
-  ASSERT_EQ(fuchsia_wlan_ieee80211_MAC_ADDR_LEN, common::kMacAddrLen);
+  ASSERT_EQ(wlan_ieee80211::kMacAddrLen, common::kMacAddrLen);
   EXPECT_EQ(
-      0, memcmp(kDefaultMac.byte, ifc_query_result.sta_addr, fuchsia_wlan_ieee80211_MAC_ADDR_LEN));
+      0, memcmp(kDefaultMac.byte, ifc_query_result.sta_addr.data(), wlan_ieee80211::kMacAddrLen));
 
-  EXPECT_EQ(ifc_query_result.role, WLAN_MAC_ROLE_CLIENT);
+  EXPECT_EQ(ifc_query_result.role, wlan_common::WlanMacRole::kClient);
 
   // Number of bands shouldn't exceed the maximum allowable
-  ASSERT_LE(ifc_query_result.band_cap_count, (size_t)fuchsia_wlan_common_MAX_BANDS);
+  ASSERT_LE(ifc_query_result.band_cap_count, (size_t)wlan_common::kMaxBands);
 
   for (size_t band = 0; band < ifc_query_result.band_cap_count; band++) {
-    wlan_fullmac_band_capability* band_cap = &ifc_query_result.band_cap_list[band];
+    wlan_fullmac::WlanFullmacBandCapability* band_cap = &ifc_query_result.band_cap_list[band];
 
     // Band id should be in valid range
-    EXPECT_TRUE(band_cap->band == WLAN_BAND_TWO_GHZ || band_cap->band == WLAN_BAND_FIVE_GHZ);
+    EXPECT_TRUE(band_cap->band == wlan_common::WlanBand::kTwoGhz ||
+                band_cap->band == wlan_common::WlanBand::kFiveGhz);
   }
 }
 
@@ -57,7 +58,7 @@ TEST_F(SimTest, BadNchainIovar) {
   ASSERT_EQ(Init(), ZX_OK);
 
   SimInterface client_ifc;
-  ASSERT_EQ(StartInterface(WLAN_MAC_ROLE_CLIENT, &client_ifc), ZX_OK);
+  ASSERT_EQ(StartInterface(wlan_common::WlanMacRole::kClient, &client_ifc), ZX_OK);
 
   // This invalid value of rxchain data has the potential to overflow the driver's internal
   // data structures
@@ -66,7 +67,7 @@ TEST_F(SimTest, BadNchainIovar) {
   sim->sim_fw->err_inj_.AddErrInjIovar("rxstreams_cap", ZX_OK, BCME_OK, client_ifc.iface_id_,
                                        &alt_rxchain_data);
 
-  wlan_fullmac_query_info_t ifc_query_result;
+  wlan_fullmac::WlanFullmacQueryInfo ifc_query_result;
   env_->ScheduleNotification(std::bind(&SimInterface::Query, &client_ifc, &ifc_query_result),
                              zx::sec(1));
   env_->Run(kSimulatedClockDuration);

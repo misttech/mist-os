@@ -23,12 +23,12 @@
 
 namespace wlan::brcmfmac {
 
-namespace wlan_ieee80211 = ::fuchsia::wlan::ieee80211;
+namespace wlan_ieee80211 = wlan_ieee80211;
 
 // Some default AP and association request values
-constexpr wlan_channel_t kDefaultChannel = {
-    .primary = 9, .cbw = CHANNEL_BANDWIDTH_CBW20, .secondary80 = 0};
-constexpr cssid_t kDefaultSsid = {.len = 15, .data = "Fuchsia Fake AP"};
+constexpr wlan_common::WlanChannel kDefaultChannel = {
+    .primary = 9, .cbw = wlan_common::ChannelBandwidth::kCbw20, .secondary80 = 0};
+constexpr wlan_ieee80211::CSsid kDefaultSsid = {.len = 15, .data = {.data_ = "Fuchsia Fake AP"}};
 const uint8_t kIes[] = {
     // SSID
     0x00, 0x0f, 'F', 'u', 'c', 'h', 's', 'i', 'a', ' ', 'F', 'a', 'k', 'e', ' ', 'A', 'P',
@@ -69,12 +69,35 @@ const uint8_t kIes[] = {
     0x10, 0x3c, 0x00, 0x01, 0x03, 0x10, 0x49, 0x00, 0x06, 0x00, 0x37, 0x2a, 0x00, 0x01, 0x20};
 const common::MacAddr kDefaultBssid({0x12, 0x34, 0x56, 0x78, 0x9a, 0xbc});
 const common::MacAddr kMadeupClient({0xde, 0xad, 0xbe, 0xef, 0x00, 0x01});
-constexpr auto kDefaultApDisassocReason = wlan_ieee80211::ReasonCode::UNSPECIFIED_REASON;
-constexpr auto kDefaultApDeauthReason = wlan_ieee80211::ReasonCode::INVALID_AUTHENTICATION;
-constexpr auto kDefaultClientDeauthReason = wlan_ieee80211::ReasonCode::LEAVING_NETWORK_DISASSOC;
+constexpr auto kDefaultApDisassocReason = wlan_ieee80211::ReasonCode::kUnspecifiedReason;
+constexpr auto kDefaultApDeauthReason = wlan_ieee80211::ReasonCode::kInvalidAuthentication;
+constexpr auto kDefaultClientDeauthReason = wlan_ieee80211::ReasonCode::kLeavingNetworkDisassoc;
 // Sim firmware returns these values for SNR and RSSI.
 const uint8_t kDefaultSimFwSnr = 40;
 const int8_t kDefaultSimFwRssi = -20;
+
+class ConnectTest;
+class ConnectInterface : public SimInterface {
+ public:
+  void OnScanResult(OnScanResultRequestView request, fdf::Arena& arena,
+                    OnScanResultCompleter::Sync& completer) override;
+  void OnScanEnd(OnScanEndRequestView request, fdf::Arena& arena,
+                 OnScanEndCompleter::Sync& completer) override;
+  void ConnectConf(ConnectConfRequestView request, fdf::Arena& arena,
+                   ConnectConfCompleter::Sync& completer) override;
+  void DisassocConf(DisassocConfRequestView request, fdf::Arena& arena,
+                    DisassocConfCompleter::Sync& completer) override;
+  void DeauthConf(DeauthConfRequestView request, fdf::Arena& arena,
+                  DeauthConfCompleter::Sync& completer) override;
+  void DeauthInd(DeauthIndRequestView request, fdf::Arena& arena,
+                 DeauthIndCompleter::Sync& completer) override;
+  void DisassocInd(DisassocIndRequestView request, fdf::Arena& arena,
+                   DisassocIndCompleter::Sync& completer) override;
+  void SignalReport(SignalReportRequestView request, fdf::Arena& arena,
+                    SignalReportCompleter::Sync& completer) override;
+
+  ConnectTest* test_;
+};
 
 class ConnectTest : public SimTest {
  public:
@@ -115,11 +138,20 @@ class ConnectTest : public SimTest {
   void DeauthFromAp();
 
   void ConnectErrorInject();
-  void ConnectErrorEventInject(brcmf_fweh_event_status_t ret_status, status_code_t ret_reason);
+  void ConnectErrorEventInject(brcmf_fweh_event_status_t ret_status,
+                               wlan_ieee80211::StatusCode ret_reason);
 
-  void GetIfaceCounterStats(wlan_fullmac_iface_counter_stats_t* out_stats);
-  void GetIfaceHistogramStats(wlan_fullmac_iface_histogram_stats_t* out_stats);
+  void GetIfaceCounterStats(wlan_fullmac::WlanFullmacIfaceCounterStats* out_stats);
+  void GetIfaceHistogramStats(wlan_fullmac::WlanFullmacIfaceHistogramStats* out_stats);
   void DetailedHistogramErrorInject();
+
+  // Event handlers
+  void OnConnectConf(const wlan_fullmac::WlanFullmacConnectConfirm* resp);
+  void OnDisassocInd(const wlan_fullmac::WlanFullmacDisassocIndication* ind);
+  void OnDisassocConf(const wlan_fullmac::WlanFullmacDisassocConfirm* resp);
+  void OnDeauthConf(const wlan_fullmac::WlanFullmacDeauthConfirm* resp);
+  void OnDeauthInd(const wlan_fullmac::WlanFullmacDeauthIndication* ind);
+  void OnSignalReport(const wlan_fullmac::WlanFullmacSignalReportIndication* ind);
 
  protected:
   struct ConnectContext {
@@ -127,11 +159,11 @@ class ConnectTest : public SimTest {
     // appropriate MLME calls (Join => Auth => Assoc).
     simulation::WlanTxInfo tx_info = {.channel = kDefaultChannel};
     common::MacAddr bssid = kDefaultBssid;
-    cssid_t ssid = kDefaultSsid;
+    wlan_ieee80211::CSsid ssid = kDefaultSsid;
     std::vector<uint8_t> ies = std::vector<uint8_t>(kIes, kIes + sizeof(kIes));
 
     // There should be one result for each association response received
-    std::list<status_code_t> expected_results;
+    std::list<wlan_ieee80211::StatusCode> expected_results;
     std::vector<uint8_t> expected_wmm_param;
 
     // An optional function to call when we see the association request go out.
@@ -160,14 +192,14 @@ class ConnectTest : public SimTest {
   };
 
   struct AssocRespInfo {
-    wlan_channel_t channel;
+    wlan_common::WlanChannel channel;
     common::MacAddr src;
     common::MacAddr dst;
     wlan_ieee80211::StatusCode status;
   };
 
   // This is the interface we will use for our single client interface
-  SimInterface client_ifc_;
+  ConnectInterface client_ifc_;
 
   ConnectContext context_;
 
@@ -208,55 +240,48 @@ class ConnectTest : public SimTest {
   // StationIfc overrides
   void Rx(std::shared_ptr<const simulation::SimFrame> frame,
           std::shared_ptr<const simulation::WlanRxInfo> info) override;
-
-  // SME callbacks
-  static wlan_fullmac_impl_ifc_protocol_ops_t sme_ops_;
-  wlan_fullmac_impl_ifc_protocol sme_protocol_ = {.ops = &sme_ops_, .ctx = this};
-
-  // Event handlers
-  void OnConnectConf(const wlan_fullmac_connect_confirm_t* resp);
-  void OnDisassocInd(const wlan_fullmac_disassoc_indication_t* ind);
-  void OnDisassocConf(const wlan_fullmac_disassoc_confirm_t* resp);
-  void OnDeauthConf(const wlan_fullmac_deauth_confirm_t* resp);
-  void OnDeauthInd(const wlan_fullmac_deauth_indication_t* ind);
-  void OnSignalReport(const wlan_fullmac_signal_report_indication* ind);
 };
 
-// Since we're acting as wlan_fullmac, we need handlers for any protocol calls we may receive
-wlan_fullmac_impl_ifc_protocol_ops_t ConnectTest::sme_ops_ = {
-    .on_scan_result =
-        [](void* cookie, const wlan_fullmac_scan_result_t* result) {
-          // Ignore
-        },
-    .on_scan_end =
-        [](void* cookie, const wlan_fullmac_scan_end_t* end) {
-          // Ignore
-        },
-    .connect_conf =
-        [](void* cookie, const wlan_fullmac_connect_confirm_t* resp) {
-          static_cast<ConnectTest*>(cookie)->OnConnectConf(resp);
-        },
-    .deauth_conf =
-        [](void* cookie, const wlan_fullmac_deauth_confirm_t* resp) {
-          static_cast<ConnectTest*>(cookie)->OnDeauthConf(resp);
-        },
-    .deauth_ind =
-        [](void* cookie, const wlan_fullmac_deauth_indication_t* ind) {
-          static_cast<ConnectTest*>(cookie)->OnDeauthInd(ind);
-        },
-    .disassoc_conf =
-        [](void* cookie, const wlan_fullmac_disassoc_confirm_t* resp) {
-          static_cast<ConnectTest*>(cookie)->OnDisassocConf(resp);
-        },
-    .disassoc_ind =
-        [](void* cookie, const wlan_fullmac_disassoc_indication_t* ind) {
-          static_cast<ConnectTest*>(cookie)->OnDisassocInd(ind);
-        },
-    .signal_report =
-        [](void* cookie, const wlan_fullmac_signal_report_indication* ind) {
-          static_cast<ConnectTest*>(cookie)->OnSignalReport(ind);
-        },
-};
+void ConnectInterface::OnScanResult(OnScanResultRequestView request, fdf::Arena& arena,
+                                    OnScanResultCompleter::Sync& completer) {
+  // Ignore and reply.
+  completer.buffer(arena).Reply();
+}
+void ConnectInterface::OnScanEnd(OnScanEndRequestView request, fdf::Arena& arena,
+                                 OnScanEndCompleter::Sync& completer) {
+  // Ignore and reply.
+  completer.buffer(arena).Reply();
+}
+void ConnectInterface::ConnectConf(ConnectConfRequestView request, fdf::Arena& arena,
+                                   ConnectConfCompleter::Sync& completer) {
+  test_->OnConnectConf(&request->resp);
+  completer.buffer(arena).Reply();
+}
+void ConnectInterface::DisassocConf(DisassocConfRequestView request, fdf::Arena& arena,
+                                    DisassocConfCompleter::Sync& completer) {
+  test_->OnDisassocConf(&request->resp);
+  completer.buffer(arena).Reply();
+}
+void ConnectInterface::DeauthConf(DeauthConfRequestView request, fdf::Arena& arena,
+                                  DeauthConfCompleter::Sync& completer) {
+  test_->OnDeauthConf(&request->resp);
+  completer.buffer(arena).Reply();
+}
+void ConnectInterface::DeauthInd(DeauthIndRequestView request, fdf::Arena& arena,
+                                 DeauthIndCompleter::Sync& completer) {
+  test_->OnDeauthInd(&request->ind);
+  completer.buffer(arena).Reply();
+}
+void ConnectInterface::DisassocInd(DisassocIndRequestView request, fdf::Arena& arena,
+                                   DisassocIndCompleter::Sync& completer) {
+  test_->OnDisassocInd(&request->ind);
+  completer.buffer(arena).Reply();
+}
+void ConnectInterface::SignalReport(SignalReportRequestView request, fdf::Arena& arena,
+                                    SignalReportCompleter::Sync& completer) {
+  test_->OnSignalReport(&request->ind);
+  completer.buffer(arena).Reply();
+}
 
 void ConnectTest::Rx(std::shared_ptr<const simulation::SimFrame> frame,
                      std::shared_ptr<const simulation::WlanRxInfo> info) {
@@ -302,7 +327,8 @@ void ConnectTest::Rx(std::shared_ptr<const simulation::SimFrame> frame,
 // Create our device instance and hook up the callbacks
 void ConnectTest::Init() {
   ASSERT_EQ(SimTest::Init(), ZX_OK);
-  ASSERT_EQ(StartInterface(WLAN_MAC_ROLE_CLIENT, &client_ifc_, &sme_protocol_), ZX_OK);
+  client_ifc_.test_ = this;
+  ASSERT_EQ(StartInterface(wlan_common::WlanMacRole::kClient, &client_ifc_), ZX_OK);
   context_.connect_resp_count = 0;
   context_.disassoc_conf_count = 0;
   context_.deauth_ind_count = 0;
@@ -330,16 +356,16 @@ void ConnectTest::DisassocFromAp() {
   }
 }
 
-void ConnectTest::OnConnectConf(const wlan_fullmac_connect_confirm_t* resp) {
+void ConnectTest::OnConnectConf(const wlan_fullmac::WlanFullmacConnectConfirm* resp) {
   context_.connect_resp_count++;
   EXPECT_EQ(resp->result_code, context_.expected_results.front());
 
   if (!context_.expected_wmm_param.empty()) {
-    EXPECT_GT(resp->association_ies_count, 0ul);
+    EXPECT_GT(resp->association_ies.count(), 0ul);
     bool contains_wmm_param = false;
     for (size_t offset = 0;
-         offset <= resp->association_ies_count - context_.expected_wmm_param.size(); offset++) {
-      if (memcmp(resp->association_ies_list + offset, &context_.expected_wmm_param[0],
+         offset <= resp->association_ies.count() - context_.expected_wmm_param.size(); offset++) {
+      if (memcmp(resp->association_ies.data() + offset, &context_.expected_wmm_param[0],
                  context_.expected_wmm_param.size()) == 0) {
         contains_wmm_param = true;
         break;
@@ -358,17 +384,17 @@ void ConnectTest::OnConnectConf(const wlan_fullmac_connect_confirm_t* resp) {
   }
 }
 
-void ConnectTest::OnDisassocConf(const wlan_fullmac_disassoc_confirm_t* resp) {
+void ConnectTest::OnDisassocConf(const wlan_fullmac::WlanFullmacDisassocConfirm* resp) {
   if (resp->status == ZX_OK) {
     context_.disassoc_conf_count++;
   }
 }
 
-void ConnectTest::OnDeauthConf(const wlan_fullmac_deauth_confirm_t* resp) {
+void ConnectTest::OnDeauthConf(const wlan_fullmac::WlanFullmacDeauthConfirm* resp) {
   context_.deauth_conf_count++;
 }
 
-void ConnectTest::OnDeauthInd(const wlan_fullmac_deauth_indication_t* ind) {
+void ConnectTest::OnDeauthInd(const wlan_fullmac::WlanFullmacDeauthIndication* ind) {
   context_.deauth_ind_count++;
   if (ind->locally_initiated) {
     context_.ind_locally_initiated_count++;
@@ -376,7 +402,7 @@ void ConnectTest::OnDeauthInd(const wlan_fullmac_deauth_indication_t* ind) {
   client_ifc_.stats_.deauth_indications.push_back(*ind);
 }
 
-void ConnectTest::OnDisassocInd(const wlan_fullmac_disassoc_indication_t* ind) {
+void ConnectTest::OnDisassocInd(const wlan_fullmac::WlanFullmacDisassocIndication* ind) {
   context_.disassoc_ind_count++;
   if (ind->locally_initiated) {
     context_.ind_locally_initiated_count++;
@@ -389,7 +415,7 @@ void ConnectTest::OnDisassocInd(const wlan_fullmac_disassoc_indication_t* ind) {
   }
 }
 
-void ConnectTest::OnSignalReport(const wlan_fullmac_signal_report_indication* ind) {
+void ConnectTest::OnSignalReport(const wlan_fullmac::WlanFullmacSignalReportIndication* ind) {
   context_.signal_ind_count++;
   context_.signal_ind_rssi = ind->rssi_dbm;
   context_.signal_ind_snr = ind->snr_db;
@@ -397,22 +423,25 @@ void ConnectTest::OnSignalReport(const wlan_fullmac_signal_report_indication* in
 
 void ConnectTest::StartConnect() {
   // Send connect request
-  wlan_fullmac_connect_req connect_req = {};
-  std::memcpy(connect_req.selected_bss.bssid, context_.bssid.byte, ETH_ALEN);
-  connect_req.selected_bss.ies_list = context_.ies.data();
-  connect_req.selected_bss.ies_count = context_.ies.size();
-  connect_req.selected_bss.channel = context_.tx_info.channel;
-  connect_req.auth_type = WLAN_AUTH_TYPE_OPEN_SYSTEM;
-  connect_req.connect_failure_timeout = 1000;  // ~1s (although value is ignored for now)
-  client_ifc_.if_impl_ops_->connect_req(client_ifc_.if_impl_ctx_, &connect_req);
+  auto builder = wlan_fullmac::WlanFullmacImplConnectReqRequest::Builder(client_ifc_.test_arena_);
+  fuchsia_wlan_internal::wire::BssDescription bss;
+  std::memcpy(bss.bssid.data(), context_.bssid.byte, ETH_ALEN);
+  bss.ies = fidl::VectorView<uint8_t>(client_ifc_.test_arena_, context_.ies);
+  bss.channel = context_.tx_info.channel;
+  builder.selected_bss(bss);
+  builder.auth_type(wlan_fullmac::WlanAuthType::kOpenSystem);
+  builder.connect_failure_timeout(1000);  // ~1s (although value is ignored for now)
+  auto result = client_ifc_.client_.buffer(client_ifc_.test_arena_)->ConnectReq(builder.Build());
+  EXPECT_TRUE(result.ok());
 }
 
 void ConnectTest::StartReconnect() {
   // Send reconnect request
   // This is what SME does on a disassoc ind.
-  wlan_fullmac_reconnect_req reconnect_req = {};
-  std::memcpy(reconnect_req.peer_sta_address, context_.bssid.byte, ETH_ALEN);
-  client_ifc_.if_impl_ops_->reconnect_req(client_ifc_.if_impl_ctx_, &reconnect_req);
+  wlan_fullmac::WlanFullmacReconnectReq reconnect_req;
+  std::memcpy(reconnect_req.peer_sta_address.data(), context_.bssid.byte, ETH_ALEN);
+  auto result = client_ifc_.client_.buffer(client_ifc_.test_arena_)->ReconnectReq(reconnect_req);
+  EXPECT_TRUE(result.ok());
 }
 
 // Verify that we get a signal report when associated.
@@ -425,7 +454,7 @@ TEST_F(ConnectTest, SignalReportTest) {
   ap.EnableBeacon(zx::msec(100));
   aps_.push_back(&ap);
 
-  context_.expected_results.push_front(STATUS_CODE_SUCCESS);
+  context_.expected_results.push_front(wlan_ieee80211::StatusCode::kSuccess);
 
   env_->ScheduleNotification(std::bind(&ConnectTest::StartConnect, this), zx::msec(10));
 
@@ -438,12 +467,21 @@ TEST_F(ConnectTest, SignalReportTest) {
   EXPECT_EQ(context_.signal_ind_rssi, kDefaultSimFwRssi);
 }
 
-void ConnectTest::GetIfaceCounterStats(wlan_fullmac_iface_counter_stats_t* out_stats) {
-  client_ifc_.if_impl_ops_->get_iface_counter_stats(client_ifc_.if_impl_ctx_, out_stats);
+void ConnectTest::GetIfaceCounterStats(wlan_fullmac::WlanFullmacIfaceCounterStats* out_stats) {
+  auto result = client_ifc_.client_.buffer(client_ifc_.test_arena_)->GetIfaceCounterStats();
+  EXPECT_TRUE(result.ok());
+  if (!result->is_error()) {
+    *out_stats = result->value()->stats;
+  }
 }
 
-void ConnectTest::GetIfaceHistogramStats(wlan_fullmac_iface_histogram_stats_t* out_stats) {
-  client_ifc_.if_impl_ops_->get_iface_histogram_stats(client_ifc_.if_impl_ctx_, out_stats);
+void ConnectTest::GetIfaceHistogramStats(wlan_fullmac::WlanFullmacIfaceHistogramStats* out_stats) {
+  auto result = client_ifc_.client_.buffer(client_ifc_.test_arena_)->GetIfaceHistogramStats();
+  EXPECT_TRUE(result.ok());
+  // Copy the pointers out, the data still exist in client_ifc_.test_arena_.
+  if (!result->is_error()) {
+    *out_stats = result->value()->stats;
+  }
 }
 
 TEST_F(ConnectTest, GetIfaceCounterStatsTest) {
@@ -454,8 +492,8 @@ TEST_F(ConnectTest, GetIfaceCounterStatsTest) {
   simulation::FakeAp ap(env_.get(), kDefaultBssid, kDefaultSsid, kDefaultChannel);
   ap.EnableBeacon(zx::msec(100));
 
-  context_.expected_results.push_front(STATUS_CODE_SUCCESS);
-  wlan_fullmac_iface_counter_stats_t stats = {};
+  context_.expected_results.push_front(wlan_ieee80211::StatusCode::kSuccess);
+  wlan_fullmac::WlanFullmacIfaceCounterStats stats = {};
 
   env_->ScheduleNotification(std::bind(&ConnectTest::StartConnect, this), zx::msec(10));
   env_->ScheduleNotification(std::bind(&ConnectTest::GetIfaceCounterStats, this, &stats),
@@ -484,8 +522,8 @@ TEST_F(ConnectTest, GetIfaceHistogramStatsTest) {
   simulation::FakeAp ap(env_.get(), kDefaultBssid, kDefaultSsid, kDefaultChannel);
   ap.EnableBeacon(zx::msec(100));
 
-  context_.expected_results.push_front(STATUS_CODE_SUCCESS);
-  wlan_fullmac_iface_histogram_stats_t stats = {};
+  context_.expected_results.push_front(wlan_ieee80211::StatusCode::kSuccess);
+  wlan_fullmac::WlanFullmacIfaceHistogramStats stats;
 
   env_->ScheduleNotification(std::bind(&ConnectTest::StartConnect, this), zx::msec(10));
   env_->ScheduleNotification(std::bind(&ConnectTest::GetIfaceHistogramStats, this, &stats),
@@ -494,8 +532,8 @@ TEST_F(ConnectTest, GetIfaceHistogramStatsTest) {
   env_->Run(kTestDuration);
 
   // Sim firmware returns these fake values for per-antenna histograms.
-  const auto& expected_hist_scope = WLAN_FULLMAC_HIST_SCOPE_PER_ANTENNA;
-  const auto& expected_antenna_freq = WLAN_FULLMAC_ANTENNA_FREQ_ANTENNA_2_G;
+  const auto& expected_hist_scope = wlan_fullmac::WlanFullmacHistScope::kPerAntenna;
+  const auto& expected_antenna_freq = wlan_fullmac::WlanFullmacAntennaFreq::kAntenna2G;
   const uint8_t expected_antenna_index = 0;
   const uint8_t expected_snr_index = 60;
   const uint8_t expected_snr_num_frames = 50;
@@ -504,33 +542,33 @@ TEST_F(ConnectTest, GetIfaceHistogramStatsTest) {
   // get handling between real and sim firmware (e.g. fxr/404141). When wstats_counters is fully
   // supported in sim firmware we can test for the expected noise floor, RSSI, and rate buckets.
 
-  ASSERT_EQ(stats.noise_floor_histograms_count, 1U);
-  EXPECT_EQ(stats.noise_floor_histograms_list[0].hist_scope, expected_hist_scope);
-  EXPECT_EQ(stats.noise_floor_histograms_list[0].antenna_id.freq, expected_antenna_freq);
-  EXPECT_EQ(stats.noise_floor_histograms_list[0].antenna_id.index, expected_antenna_index);
+  ASSERT_EQ(stats.noise_floor_histograms().count(), 1U);
+  EXPECT_EQ(stats.noise_floor_histograms().data()[0].hist_scope, expected_hist_scope);
+  EXPECT_EQ(stats.noise_floor_histograms().data()[0].antenna_id.freq, expected_antenna_freq);
+  EXPECT_EQ(stats.noise_floor_histograms().data()[0].antenna_id.index, expected_antenna_index);
 
-  ASSERT_EQ(stats.rssi_histograms_count, 1U);
-  EXPECT_EQ(stats.rssi_histograms_list[0].hist_scope, expected_hist_scope);
-  EXPECT_EQ(stats.rssi_histograms_list[0].antenna_id.freq, expected_antenna_freq);
-  EXPECT_EQ(stats.rssi_histograms_list[0].antenna_id.index, expected_antenna_index);
+  ASSERT_EQ(stats.rssi_histograms().count(), 1U);
+  EXPECT_EQ(stats.rssi_histograms().data()[0].hist_scope, expected_hist_scope);
+  EXPECT_EQ(stats.rssi_histograms().data()[0].antenna_id.freq, expected_antenna_freq);
+  EXPECT_EQ(stats.rssi_histograms().data()[0].antenna_id.index, expected_antenna_index);
 
-  ASSERT_EQ(stats.rx_rate_index_histograms_count, 1U);
-  EXPECT_EQ(stats.rx_rate_index_histograms_list[0].hist_scope, expected_hist_scope);
-  EXPECT_EQ(stats.rx_rate_index_histograms_list[0].antenna_id.freq, expected_antenna_freq);
-  EXPECT_EQ(stats.rx_rate_index_histograms_list[0].antenna_id.index, expected_antenna_index);
+  ASSERT_EQ(stats.rx_rate_index_histograms().count(), 1U);
+  EXPECT_EQ(stats.rx_rate_index_histograms().data()[0].hist_scope, expected_hist_scope);
+  EXPECT_EQ(stats.rx_rate_index_histograms().data()[0].antenna_id.freq, expected_antenna_freq);
+  EXPECT_EQ(stats.rx_rate_index_histograms().data()[0].antenna_id.index, expected_antenna_index);
 
-  ASSERT_EQ(stats.snr_histograms_count, 1U);
-  EXPECT_EQ(stats.snr_histograms_list[0].hist_scope, expected_hist_scope);
-  EXPECT_EQ(stats.snr_histograms_list[0].antenna_id.freq, expected_antenna_freq);
-  EXPECT_EQ(stats.snr_histograms_list[0].antenna_id.index, expected_antenna_index);
+  ASSERT_EQ(stats.snr_histograms().count(), 1U);
+  EXPECT_EQ(stats.snr_histograms().data()[0].hist_scope, expected_hist_scope);
+  EXPECT_EQ(stats.snr_histograms().data()[0].antenna_id.freq, expected_antenna_freq);
+  EXPECT_EQ(stats.snr_histograms().data()[0].antenna_id.index, expected_antenna_index);
   uint64_t snr_samples_count = 0;
   uint64_t snr_bucket_index = 0;
   uint64_t snr_bucket_num_samples = 0;
-  for (uint64_t i = 0; i < stats.snr_histograms_list[0].snr_samples_count; i++) {
-    if (stats.snr_histograms_list[0].snr_samples_list[i].num_samples != 0) {
+  for (uint64_t i = 0; i < stats.snr_histograms().data()[0].snr_samples.count(); i++) {
+    if (stats.snr_histograms().data()[0].snr_samples.data()[i].num_samples != 0) {
       snr_samples_count++;
-      snr_bucket_index = stats.snr_histograms_list[0].snr_samples_list[i].bucket_index;
-      snr_bucket_num_samples = stats.snr_histograms_list[0].snr_samples_list[i].num_samples;
+      snr_bucket_index = stats.snr_histograms().data()[0].snr_samples.data()[i].bucket_index;
+      snr_bucket_num_samples = stats.snr_histograms().data()[0].snr_samples.data()[i].num_samples;
     }
   }
 
@@ -547,8 +585,8 @@ TEST_F(ConnectTest, GetIfaceHistogramStatsNotSupportedTest) {
   simulation::FakeAp ap(env_.get(), kDefaultBssid, kDefaultSsid, kDefaultChannel);
   ap.EnableBeacon(zx::msec(100));
 
-  context_.expected_results.push_front(STATUS_CODE_SUCCESS);
-  wlan_fullmac_iface_histogram_stats_t stats = {};
+  context_.expected_results.push_front(wlan_ieee80211::StatusCode::kSuccess);
+  wlan_fullmac::WlanFullmacIfaceHistogramStats stats = {};
 
   DetailedHistogramErrorInject();
   env_->ScheduleNotification(std::bind(&ConnectTest::StartConnect, this), zx::msec(10));
@@ -557,10 +595,10 @@ TEST_F(ConnectTest, GetIfaceHistogramStatsNotSupportedTest) {
 
   env_->Run(kTestDuration);
 
-  EXPECT_EQ(stats.noise_floor_histograms_count, 0U);
-  EXPECT_EQ(stats.rssi_histograms_count, 0U);
-  EXPECT_EQ(stats.rx_rate_index_histograms_count, 0U);
-  EXPECT_EQ(stats.snr_histograms_count, 0U);
+  EXPECT_FALSE(stats.has_noise_floor_histograms());
+  EXPECT_FALSE(stats.has_rssi_histograms());
+  EXPECT_FALSE(stats.has_rx_rate_index_histograms());
+  EXPECT_FALSE(stats.has_snr_histograms());
 }
 
 void ConnectTest::ConnectErrorInject() {
@@ -569,10 +607,11 @@ void ConnectTest::ConnectErrorInject() {
 }
 
 void ConnectTest::ConnectErrorEventInject(brcmf_fweh_event_status_t ret_status,
-                                          status_code_t ret_reason) {
+                                          wlan_ieee80211::StatusCode ret_reason) {
   brcmf_simdev* sim = device_->GetSim();
-  sim->sim_fw->err_inj_.AddErrEventInjCmd(BRCMF_C_SET_SSID, BRCMF_E_ASSOC, ret_status, ret_reason,
-                                          0, client_ifc_.iface_id_);
+  sim->sim_fw->err_inj_.AddErrEventInjCmd(BRCMF_C_SET_SSID, BRCMF_E_ASSOC, ret_status,
+                                          static_cast<status_code_t>(ret_reason), 0,
+                                          client_ifc_.iface_id_);
 }
 
 void ConnectTest::StartDisassoc() {
@@ -599,18 +638,19 @@ void ConnectTest::StartDeauth() {
 }
 
 void ConnectTest::DisassocClient(const common::MacAddr& mac_addr) {
-  wlan_fullmac_disassoc_req disassoc_req = {};
+  wlan_fullmac::WlanFullmacDisassocReq disassoc_req;
 
-  std::memcpy(disassoc_req.peer_sta_address, mac_addr.byte, ETH_ALEN);
-  client_ifc_.if_impl_ops_->disassoc_req(client_ifc_.if_impl_ctx_, &disassoc_req);
+  std::memcpy(disassoc_req.peer_sta_address.data(), mac_addr.byte, ETH_ALEN);
+  auto result = client_ifc_.client_.buffer(client_ifc_.test_arena_)->DisassocReq(disassoc_req);
+  EXPECT_TRUE(result.ok());
 }
 
 void ConnectTest::DeauthClient() {
-  wlan_fullmac_deauth_req_t deauth_req = {
-      .reason_code = static_cast<reason_code_t>(kDefaultClientDeauthReason)};
+  wlan_fullmac::WlanFullmacDeauthReq deauth_req = {.reason_code = kDefaultClientDeauthReason};
 
-  std::memcpy(deauth_req.peer_sta_address, context_.bssid.byte, ETH_ALEN);
-  client_ifc_.if_impl_ops_->deauth_req(client_ifc_.if_impl_ctx_, &deauth_req);
+  std::memcpy(deauth_req.peer_sta_address.data(), context_.bssid.byte, ETH_ALEN);
+  auto result = client_ifc_.client_.buffer(client_ifc_.test_arena_)->DeauthReq(deauth_req);
+  EXPECT_TRUE(result.ok());
 }
 
 void ConnectTest::DeauthFromAp() {
@@ -660,9 +700,10 @@ TEST_F(ConnectTest, NoAps) {
 
   const common::MacAddr kBssid({0x12, 0x34, 0x56, 0x78, 0x9a, 0xbc});
   context_.bssid = kBssid;
-  context_.expected_results.push_front(STATUS_CODE_REJECTED_SEQUENCE_TIMEOUT);
-  context_.ssid = {.len = 6, .data = "TestAP"};
-  context_.tx_info.channel = {.primary = 9, .cbw = CHANNEL_BANDWIDTH_CBW20, .secondary80 = 0};
+  context_.expected_results.push_front(wlan_ieee80211::StatusCode::kRejectedSequenceTimeout);
+  context_.ssid = {.len = 6, .data = {.data_ = "TestAP"}};
+  context_.tx_info.channel = {
+      .primary = 9, .cbw = wlan_common::ChannelBandwidth::kCbw20, .secondary80 = 0};
 
   env_->ScheduleNotification(std::bind(&ConnectTest::StartConnect, this), zx::msec(10));
 
@@ -681,7 +722,7 @@ TEST_F(ConnectTest, SimpleTest) {
   ap.EnableBeacon(zx::msec(100));
   aps_.push_back(&ap);
 
-  context_.expected_results.push_front(STATUS_CODE_SUCCESS);
+  context_.expected_results.push_front(wlan_ieee80211::StatusCode::kSuccess);
 
   env_->ScheduleNotification(std::bind(&ConnectTest::StartConnect, this), zx::msec(10));
 
@@ -702,7 +743,7 @@ TEST_F(ConnectTest, SimpleConnectTest) {
   ap.EnableBeacon(zx::msec(100));
   aps_.push_back(&ap);
 
-  context_.expected_results.push_front(STATUS_CODE_SUCCESS);
+  context_.expected_results.push_front(wlan_ieee80211::StatusCode::kSuccess);
 
   env_->ScheduleNotification([this] { StartConnect(); }, zx::msec(10));
 
@@ -723,7 +764,7 @@ TEST_F(ConnectTest, SsidTest) {
   ap.EnableBeacon(zx::msec(100));
   aps_.push_back(&ap);
 
-  context_.expected_results.push_front(STATUS_CODE_SUCCESS);
+  context_.expected_results.push_front(wlan_ieee80211::StatusCode::kSuccess);
 
   env_->ScheduleNotification(std::bind(&ConnectTest::StartConnect, this), zx::msec(10));
 
@@ -737,10 +778,10 @@ TEST_F(ConnectTest, WrongIds) {
   // Create our device instance
   Init();
 
-  constexpr wlan_channel_t kWrongChannel = {
-      .primary = 8, .cbw = CHANNEL_BANDWIDTH_CBW20, .secondary80 = 0};
+  constexpr wlan_common::WlanChannel kWrongChannel = {
+      .primary = 8, .cbw = wlan_common::ChannelBandwidth::kCbw20, .secondary80 = 0};
   ASSERT_NE(kDefaultChannel.primary, kWrongChannel.primary);
-  constexpr cssid_t kWrongSsid = {.len = 14, .data = "Fuchsia Fake AP"};
+  constexpr wlan_ieee80211::CSsid kWrongSsid = {.len = 14, .data = {.data_ = "Fuchsia Fake AP"}};
   ASSERT_NE(kDefaultSsid.len, kWrongSsid.len);
   const common::MacAddr kWrongBssid({0x12, 0x34, 0x56, 0x78, 0x9b, 0xbc});
   ASSERT_NE(kDefaultBssid, kWrongBssid);
@@ -753,7 +794,7 @@ TEST_F(ConnectTest, WrongIds) {
   simulation::FakeAp ap3(env_.get(), kDefaultBssid, kWrongSsid, kDefaultChannel);
   aps_.push_back(&ap3);
 
-  context_.expected_results.push_front(STATUS_CODE_REFUSED_REASON_UNSPECIFIED);
+  context_.expected_results.push_front(wlan_ieee80211::StatusCode::kRefusedReasonUnspecified);
 
   env_->ScheduleNotification(std::bind(&ConnectTest::StartConnect, this), zx::msec(10));
 
@@ -775,9 +816,9 @@ TEST_F(ConnectTest, RepeatedConnectTest) {
 
   // The associations at 11ms and 12ms should be immediately refused (because there is already an
   // association in progress), and eventually the association that was in progress should succeed.
-  context_.expected_results.push_back(STATUS_CODE_REFUSED_REASON_UNSPECIFIED);
-  context_.expected_results.push_back(STATUS_CODE_REFUSED_REASON_UNSPECIFIED);
-  context_.expected_results.push_back(STATUS_CODE_SUCCESS);
+  context_.expected_results.push_back(wlan_ieee80211::StatusCode::kRefusedReasonUnspecified);
+  context_.expected_results.push_back(wlan_ieee80211::StatusCode::kRefusedReasonUnspecified);
+  context_.expected_results.push_back(wlan_ieee80211::StatusCode::kSuccess);
 
   env_->ScheduleNotification(std::bind(&ConnectTest::StartConnect, this), zx::msec(10));
   env_->ScheduleNotification(std::bind(&ConnectTest::StartConnect, this), zx::msec(11));
@@ -798,7 +839,7 @@ TEST_F(ConnectTest, ApIgnoredRequest) {
   ap.SetAssocHandling(simulation::FakeAp::ASSOC_IGNORED);
   aps_.push_back(&ap);
 
-  context_.expected_results.push_front(STATUS_CODE_REJECTED_SEQUENCE_TIMEOUT);
+  context_.expected_results.push_front(wlan_ieee80211::StatusCode::kRejectedSequenceTimeout);
 
   env_->ScheduleNotification(std::bind(&ConnectTest::StartConnect, this), zx::msec(10));
 
@@ -822,7 +863,7 @@ TEST_F(ConnectTest, ApTemporarilyRefusedRequest) {
   ap.SetAssocHandling(simulation::FakeAp::ASSOC_REFUSED_TEMPORARILY);
   aps_.push_back(&ap);
 
-  context_.expected_results.push_front(STATUS_CODE_REFUSED_TEMPORARILY);
+  context_.expected_results.push_front(wlan_ieee80211::StatusCode::kRefusedTemporarily);
 
   env_->ScheduleNotification(std::bind(&ConnectTest::StartConnect, this), zx::msec(10));
 
@@ -836,7 +877,7 @@ TEST_F(ConnectTest, ApTemporarilyRefusedRequest) {
   ASSERT_EQ(max_assoc_retries, kMaxAssocRetries);
   // We should have gotten a refusal from the fake AP
   EXPECT_EQ(assoc_responses_.size(), max_assoc_retries + 1);
-  EXPECT_EQ(assoc_responses_.front().status, wlan_ieee80211::StatusCode::REFUSED_TEMPORARILY);
+  EXPECT_EQ(assoc_responses_.front().status, wlan_ieee80211::StatusCode::kRefusedTemporarily);
 
   // Make sure we got our response from the driver
   EXPECT_EQ(context_.connect_resp_count, 1U);
@@ -853,7 +894,7 @@ TEST_F(ConnectTest, ApRefusedRequest) {
   ap.SetAssocHandling(simulation::FakeAp::ASSOC_REFUSED);
   aps_.push_back(&ap);
 
-  context_.expected_results.push_front(STATUS_CODE_REFUSED_REASON_UNSPECIFIED);
+  context_.expected_results.push_front(wlan_ieee80211::StatusCode::kRefusedReasonUnspecified);
 
   env_->ScheduleNotification(std::bind(&ConnectTest::StartConnect, this), zx::msec(10));
 
@@ -868,12 +909,11 @@ TEST_F(ConnectTest, ApRefusedRequest) {
 
   // We should have gotten a refusal from the fake AP.
   EXPECT_EQ(assoc_responses_.size(), max_assoc_retries + 1);
-  EXPECT_EQ(assoc_responses_.front().status,
-            wlan_ieee80211::StatusCode::REFUSED_REASON_UNSPECIFIED);
+  EXPECT_EQ(assoc_responses_.front().status, wlan_ieee80211::StatusCode::kRefusedReasonUnspecified);
 
   // The AP should have received 1 deauth, no matter there were how many firmware assoc retries.
   EXPECT_EQ(deauth_frames_.size(), 1U);
-  EXPECT_EQ(deauth_frames_.front(), wlan_ieee80211::ReasonCode::STA_LEAVING);
+  EXPECT_EQ(deauth_frames_.front(), wlan_ieee80211::ReasonCode::kStaLeaving);
   // Make sure we got our response from the driver
   EXPECT_EQ(context_.connect_resp_count, 1U);
 }
@@ -889,7 +929,7 @@ TEST_F(ConnectTest, SimFwIgnoreConnectReq) {
   simulation::FakeAp ap(env_.get(), kDefaultBssid, kDefaultSsid, kDefaultChannel);
   aps_.push_back(&ap);
 
-  context_.expected_results.push_back(STATUS_CODE_REFUSED_REASON_UNSPECIFIED);
+  context_.expected_results.push_back(wlan_ieee80211::StatusCode::kRefusedReasonUnspecified);
 
   ConnectErrorInject();
   env_->ScheduleNotification(std::bind(&ConnectTest::StartConnect, this), zx::msec(50));
@@ -908,14 +948,14 @@ void ConnectTest::SendBadResp() {
   common::MacAddr wrong_src(context_.bssid);
   wrong_src.byte[ETH_ALEN - 1]++;
   simulation::SimAssocRespFrame wrong_bss_frame(wrong_src, my_mac,
-                                                wlan_ieee80211::StatusCode::SUCCESS);
+                                                wlan_ieee80211::StatusCode::kSuccess);
   env_->Tx(wrong_bss_frame, context_.tx_info, this);
 
   // Send a response to a different STA
   common::MacAddr wrong_dst(my_mac);
   wrong_dst.byte[ETH_ALEN - 1]++;
   simulation::SimAssocRespFrame wrong_dst_frame(context_.bssid, wrong_dst,
-                                                wlan_ieee80211::StatusCode::SUCCESS);
+                                                wlan_ieee80211::StatusCode::kSuccess);
   env_->Tx(wrong_dst_frame, context_.tx_info, this);
 }
 
@@ -934,7 +974,7 @@ TEST_F(ConnectTest, IgnoreRespMismatch) {
 
   aps_.push_back(&ap);
 
-  context_.expected_results.push_front(STATUS_CODE_REJECTED_SEQUENCE_TIMEOUT);
+  context_.expected_results.push_front(wlan_ieee80211::StatusCode::kRejectedSequenceTimeout);
   context_.on_assoc_req_callback = std::bind(&ConnectTest::SendBadResp, this);
 
   env_->ScheduleNotification(std::bind(&ConnectTest::StartConnect, this), zx::msec(10));
@@ -952,7 +992,7 @@ void ConnectTest::SendMultipleResp() {
   common::MacAddr my_mac;
   client_ifc_.GetMacAddr(&my_mac);
   simulation::SimAssocRespFrame multiple_resp_frame(context_.bssid, my_mac,
-                                                    wlan_ieee80211::StatusCode::SUCCESS);
+                                                    wlan_ieee80211::StatusCode::kSuccess);
   for (unsigned i = 0; i < kRespCount; i++) {
     env_->Tx(multiple_resp_frame, context_.tx_info, this);
   }
@@ -966,7 +1006,7 @@ void ConnectTest::SendAssocRespWithWmm() {
   EXPECT_EQ(status, ZX_OK);
   common::MacAddr my_mac(mac_buf);
   simulation::SimAssocRespFrame assoc_resp_frame(context_.bssid, my_mac,
-                                                 wlan_ieee80211::StatusCode::SUCCESS);
+                                                 wlan_ieee80211::StatusCode::kSuccess);
 
   uint8_t raw_ies[] = {
       // WMM param
@@ -987,7 +1027,7 @@ void ConnectTest::SendOpenAuthResp() {
   common::MacAddr my_mac;
   client_ifc_.GetMacAddr(&my_mac);
   simulation::SimAuthFrame auth_resp(context_.bssid, my_mac, 2, simulation::AUTH_TYPE_OPEN,
-                                     wlan_ieee80211::StatusCode::SUCCESS);
+                                     wlan_ieee80211::StatusCode::kSuccess);
   env_->Tx(auth_resp, context_.tx_info, this);
 }
 
@@ -996,7 +1036,7 @@ TEST_F(ConnectTest, IgnoreExtraResp) {
   // Create our device instance
   Init();
 
-  context_.expected_results.push_front(STATUS_CODE_SUCCESS);
+  context_.expected_results.push_front(wlan_ieee80211::StatusCode::kSuccess);
   context_.on_assoc_req_callback = std::bind(&ConnectTest::SendMultipleResp, this);
   context_.on_auth_req_callback = std::bind(&ConnectTest::SendOpenAuthResp, this);
 
@@ -1017,23 +1057,23 @@ TEST_F(ConnectTest, AssocWhileScanning) {
   simulation::FakeAp ap(env_.get(), kDefaultBssid, kDefaultSsid, kDefaultChannel);
   aps_.push_back(&ap);
 
-  context_.expected_results.push_front(STATUS_CODE_SUCCESS);
+  context_.expected_results.push_front(wlan_ieee80211::StatusCode::kSuccess);
   context_.on_assoc_req_callback = std::bind(&ConnectTest::SendMultipleResp, this);
 
   env_->ScheduleNotification(std::bind(&ConnectTest::StartConnect, this), zx::msec(10));
 
   const uint8_t channels_list[] = {1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11};
-  wlan_fullmac_scan_req_t scan_req = {
-      .txn_id = 42,
-      .scan_type = WLAN_SCAN_TYPE_PASSIVE,
-      .channels_list = channels_list,
-      .channels_count = 11,
-      .ssids_list = nullptr,
-      .ssids_count = 0,
-      .min_channel_time = 0,
-      .max_channel_time = 100,
-  };
-  client_ifc_.if_impl_ops_->start_scan(client_ifc_.if_impl_ctx_, &scan_req);
+  auto builder = wlan_fullmac::WlanFullmacImplStartScanRequest::Builder(client_ifc_.test_arena_);
+
+  builder.txn_id(42);
+  builder.scan_type(wlan_fullmac::WlanScanType::kPassive);
+  auto channels = std::vector<uint8_t>(channels_list, channels_list + sizeof(channels_list));
+  builder.channels(fidl::VectorView<uint8_t>(client_ifc_.test_arena_, channels));
+  builder.min_channel_time(0);
+  builder.max_channel_time(100);
+
+  auto result = client_ifc_.client_.buffer(client_ifc_.test_arena_)->StartScan(builder.Build());
+  EXPECT_TRUE(result.ok());
 
   env_->Run(kTestDuration);
 
@@ -1046,7 +1086,7 @@ TEST_F(ConnectTest, AssocWithWmm) {
 
   uint8_t expected_wmm_param[] = {0x80, 0x00, 0x03, 0xa4, 0x00, 0x00, 0x27, 0xa4, 0x00,
                                   0x00, 0x42, 0x43, 0x5e, 0x00, 0x62, 0x32, 0x2f, 0x00};
-  context_.expected_results.push_front(STATUS_CODE_SUCCESS);
+  context_.expected_results.push_front(wlan_ieee80211::StatusCode::kSuccess);
   context_.expected_wmm_param.insert(context_.expected_wmm_param.end(), expected_wmm_param,
                                      expected_wmm_param + sizeof(expected_wmm_param));
   context_.on_assoc_req_callback = std::bind(&ConnectTest::SendAssocRespWithWmm, this);
@@ -1063,8 +1103,8 @@ TEST_F(ConnectTest, AssocStatusAndReasonCodeMismatchHandling) {
   // Create our device instance
   Init();
 
-  ConnectErrorEventInject(BRCMF_E_STATUS_NO_ACK, STATUS_CODE_SUCCESS);
-  context_.expected_results.push_back(STATUS_CODE_REFUSED_REASON_UNSPECIFIED);
+  ConnectErrorEventInject(BRCMF_E_STATUS_NO_ACK, wlan_ieee80211::StatusCode::kSuccess);
+  context_.expected_results.push_back(wlan_ieee80211::StatusCode::kRefusedReasonUnspecified);
 
   env_->ScheduleNotification(std::bind(&ConnectTest::StartConnect, this), zx::msec(50));
   env_->Run(kTestDuration);
@@ -1081,7 +1121,7 @@ TEST_F(ConnectTest, DisassocFromSelfTest) {
   simulation::FakeAp ap(env_.get(), kDefaultBssid, kDefaultSsid, kDefaultChannel);
   aps_.push_back(&ap);
 
-  context_.expected_results.push_front(STATUS_CODE_SUCCESS);
+  context_.expected_results.push_front(wlan_ieee80211::StatusCode::kSuccess);
 
   env_->ScheduleNotification(std::bind(&ConnectTest::StartConnect, this), zx::msec(10));
   start_disassoc_ = true;
@@ -1121,7 +1161,7 @@ TEST_F(ConnectTest, DisassocNotSelfTest) {
   simulation::FakeAp ap(env_.get(), kDefaultBssid, kDefaultSsid, kDefaultChannel);
   aps_.push_back(&ap);
 
-  context_.expected_results.push_front(STATUS_CODE_SUCCESS);
+  context_.expected_results.push_front(wlan_ieee80211::StatusCode::kSuccess);
 
   env_->ScheduleNotification(std::bind(&ConnectTest::StartConnect, this), zx::msec(10));
   start_disassoc_ = true;
@@ -1142,7 +1182,7 @@ TEST_F(ConnectTest, DisassocFromAPTest) {
   simulation::FakeAp ap(env_.get(), kDefaultBssid, kDefaultSsid, kDefaultChannel);
   aps_.push_back(&ap);
 
-  context_.expected_results.push_front(STATUS_CODE_SUCCESS);
+  context_.expected_results.push_front(wlan_ieee80211::StatusCode::kSuccess);
 
   env_->ScheduleNotification(std::bind(&ConnectTest::StartConnect, this), zx::msec(10));
   disassoc_from_ap_ = true;
@@ -1155,7 +1195,7 @@ TEST_F(ConnectTest, DisassocFromAPTest) {
   EXPECT_EQ(context_.ind_locally_initiated_count, 0U);
 
   EXPECT_EQ(client_ifc_.stats_.disassoc_indications.size(), 1U);
-  const wlan_fullmac_disassoc_indication_t& disassoc_ind =
+  const wlan_fullmac::WlanFullmacDisassocIndication& disassoc_ind =
       client_ifc_.stats_.disassoc_indications.front();
   EXPECT_EQ(disassoc_ind.locally_initiated, false);
 }
@@ -1170,7 +1210,7 @@ TEST_F(ConnectTest, LinkEventTest) {
   ap.EnableBeacon(zx::msec(100));
   aps_.push_back(&ap);
 
-  context_.expected_results.push_front(STATUS_CODE_SUCCESS);
+  context_.expected_results.push_front(wlan_ieee80211::StatusCode::kSuccess);
 
   env_->ScheduleNotification(std::bind(&ConnectTest::StartConnect, this), zx::msec(10));
   disassoc_from_ap_ = true;
@@ -1195,7 +1235,7 @@ TEST_F(ConnectTest, deauth_from_ap) {
   ap.EnableBeacon(zx::msec(100));
   aps_.push_back(&ap);
 
-  context_.expected_results.push_front(STATUS_CODE_SUCCESS);
+  context_.expected_results.push_front(wlan_ieee80211::StatusCode::kSuccess);
 
   env_->ScheduleNotification(std::bind(&ConnectTest::StartConnect, this), zx::msec(10));
   deauth_from_ap_ = true;
@@ -1221,7 +1261,7 @@ TEST_F(ConnectTest, deauth_from_self) {
   ap.EnableBeacon(zx::msec(100));
   aps_.push_back(&ap);
 
-  context_.expected_results.push_front(STATUS_CODE_SUCCESS);
+  context_.expected_results.push_front(wlan_ieee80211::StatusCode::kSuccess);
 
   env_->ScheduleNotification(std::bind(&ConnectTest::StartConnect, this), zx::msec(10));
   deauth_from_ap_ = false;
@@ -1247,8 +1287,8 @@ TEST_F(ConnectTest, deauth_from_self_then_from_ap) {
   ap.EnableBeacon(zx::msec(100));
   aps_.push_back(&ap);
 
-  context_.expected_results.push_front(STATUS_CODE_SUCCESS);
-  context_.expected_results.push_front(STATUS_CODE_SUCCESS);
+  context_.expected_results.push_front(wlan_ieee80211::StatusCode::kSuccess);
+  context_.expected_results.push_front(wlan_ieee80211::StatusCode::kSuccess);
 
   env_->ScheduleNotification(std::bind(&ConnectTest::StartConnect, this), zx::msec(10));
   env_->ScheduleNotification(std::bind(&ConnectTest::DeauthClient, this), zx::sec(1));
@@ -1273,8 +1313,8 @@ TEST_F(ConnectTest, simple_reconnect_via_assoc) {
   simulation::FakeAp ap(env_.get(), kDefaultBssid, kDefaultSsid, kDefaultChannel);
   aps_.push_back(&ap);
 
-  context_.expected_results.push_front(STATUS_CODE_SUCCESS);
-  context_.expected_results.push_front(STATUS_CODE_SUCCESS);
+  context_.expected_results.push_front(wlan_ieee80211::StatusCode::kSuccess);
+  context_.expected_results.push_front(wlan_ieee80211::StatusCode::kSuccess);
 
   env_->ScheduleNotification(std::bind(&ConnectTest::StartConnect, this), zx::msec(10));
   env_->ScheduleNotification(std::bind(&ConnectTest::DisassocFromAp, this), zx::sec(2));
@@ -1296,8 +1336,8 @@ TEST_F(ConnectTest, reconnect_via_assoc_success) {
   simulation::FakeAp ap(env_.get(), kDefaultBssid, kDefaultSsid, kDefaultChannel);
   aps_.push_back(&ap);
 
-  context_.expected_results.push_front(STATUS_CODE_SUCCESS);
-  context_.expected_results.push_front(STATUS_CODE_SUCCESS);
+  context_.expected_results.push_front(wlan_ieee80211::StatusCode::kSuccess);
+  context_.expected_results.push_front(wlan_ieee80211::StatusCode::kSuccess);
   // Schedule reconnect via assoc when disassoc notification is received at SME.
   start_reconnect_assoc_ = true;
 
@@ -1322,8 +1362,8 @@ TEST_F(ConnectTest, reconnect_assoc_fails) {
   simulation::FakeAp ap(env_.get(), kDefaultBssid, kDefaultSsid, kDefaultChannel);
   aps_.push_back(&ap);
 
-  context_.expected_results.push_front(STATUS_CODE_SUCCESS);
-  context_.expected_results.push_front(STATUS_CODE_SUCCESS);
+  context_.expected_results.push_front(wlan_ieee80211::StatusCode::kSuccess);
+  context_.expected_results.push_front(wlan_ieee80211::StatusCode::kSuccess);
   // Issue reconnect assoc soon after disassoc notification is received at SME.
   start_reconnect_assoc_instant_ = true;
 
@@ -1346,8 +1386,8 @@ TEST_F(ConnectTest, deauth_during_reconnect_via_assoc) {
   simulation::FakeAp ap(env_.get(), kDefaultBssid, kDefaultSsid, kDefaultChannel);
   aps_.push_back(&ap);
 
-  context_.expected_results.push_front(STATUS_CODE_SUCCESS);
-  context_.expected_results.push_front(STATUS_CODE_SUCCESS);
+  context_.expected_results.push_front(wlan_ieee80211::StatusCode::kSuccess);
+  context_.expected_results.push_front(wlan_ieee80211::StatusCode::kSuccess);
 
   env_->ScheduleNotification(std::bind(&ConnectTest::StartConnect, this), zx::msec(10));
   env_->ScheduleNotification(std::bind(&ConnectTest::DisassocFromAp, this), zx::sec(2));
@@ -1377,7 +1417,7 @@ TEST_F(ConnectTest, AssocMaxRetries) {
   ap.SetAssocHandling(simulation::FakeAp::ASSOC_REFUSED);
   aps_.push_back(&ap);
 
-  context_.expected_results.push_front(STATUS_CODE_REFUSED_REASON_UNSPECIFIED);
+  context_.expected_results.push_front(wlan_ieee80211::StatusCode::kRefusedReasonUnspecified);
 
   zx_status_t status;
   uint32_t max_assoc_retries = 5;
@@ -1395,12 +1435,11 @@ TEST_F(ConnectTest, AssocMaxRetries) {
   ASSERT_EQ(max_assoc_retries, assoc_retries);
   // Should have received as many refusals as the configured # of retries.
   EXPECT_EQ(assoc_responses_.size(), max_assoc_retries + 1);
-  EXPECT_EQ(assoc_responses_.front().status,
-            wlan_ieee80211::StatusCode::REFUSED_REASON_UNSPECIFIED);
+  EXPECT_EQ(assoc_responses_.front().status, wlan_ieee80211::StatusCode::kRefusedReasonUnspecified);
 
   // The AP should have received 1 deauth, no matter there were how many firmware assoc retries.
   EXPECT_EQ(deauth_frames_.size(), 1U);
-  EXPECT_EQ(deauth_frames_.front(), wlan_ieee80211::ReasonCode::STA_LEAVING);
+  EXPECT_EQ(deauth_frames_.front(), wlan_ieee80211::ReasonCode::kStaLeaving);
   // Make sure we got our response from the driver
   EXPECT_EQ(context_.connect_resp_count, 1U);
 }
@@ -1415,7 +1454,7 @@ TEST_F(ConnectTest, AssocMaxRetriesWhenTimedOut) {
   ap.SetAssocHandling(simulation::FakeAp::ASSOC_IGNORED);
   aps_.push_back(&ap);
 
-  context_.expected_results.push_front(STATUS_CODE_REFUSED_REASON_UNSPECIFIED);
+  context_.expected_results.push_front(wlan_ieee80211::StatusCode::kRefusedReasonUnspecified);
 
   uint32_t max_assoc_retries = 5;
   brcmf_simdev* sim = device_->GetSim();
@@ -1442,7 +1481,7 @@ TEST_F(ConnectTest, AssocNoRetries) {
   ap.SetAssocHandling(simulation::FakeAp::ASSOC_REFUSED);
   aps_.push_back(&ap);
 
-  context_.expected_results.push_front(STATUS_CODE_REFUSED_REASON_UNSPECIFIED);
+  context_.expected_results.push_front(wlan_ieee80211::StatusCode::kRefusedReasonUnspecified);
 
   zx_status_t status;
   uint32_t max_assoc_retries = 0;
@@ -1461,12 +1500,11 @@ TEST_F(ConnectTest, AssocNoRetries) {
 
   // We should have gotten a refusal from the fake AP.
   EXPECT_EQ(assoc_responses_.size(), 1U);
-  EXPECT_EQ(assoc_responses_.front().status,
-            wlan_ieee80211::StatusCode::REFUSED_REASON_UNSPECIFIED);
+  EXPECT_EQ(assoc_responses_.front().status, wlan_ieee80211::StatusCode::kRefusedReasonUnspecified);
 
   // The AP should have received 1 deauth, no matter there were how many firmware assoc retries.
   EXPECT_EQ(deauth_frames_.size(), 1U);
-  EXPECT_EQ(deauth_frames_.front(), wlan_ieee80211::ReasonCode::STA_LEAVING);
+  EXPECT_EQ(deauth_frames_.front(), wlan_ieee80211::ReasonCode::kStaLeaving);
 
   // Make sure we got our response from the driver
   EXPECT_EQ(context_.connect_resp_count, 1U);

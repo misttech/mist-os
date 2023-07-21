@@ -70,7 +70,7 @@ TEST_F(SoftApTest, Constructible) {
 
 TEST_F(SoftApTest, Start) {
   constexpr uint32_t kBssIndex = 1;
-  wlan_fullmac_start_req request = {.channel = kTestChannel};
+  fuchsia_wlan_fullmac::wire::WlanFullmacStartReq request = {.channel = kTestChannel};
 
   sync_completion_t ioctl_completion;
 
@@ -108,7 +108,7 @@ TEST_F(SoftApTest, Start) {
 
   SoftAp softap(&test_ifc_, &context_, kBssIndex);
 
-  memcpy(request.ssid.data, kTestSoftApSsid, sizeof(kTestSoftApSsid));
+  memcpy(request.ssid.data.data(), kTestSoftApSsid, sizeof(kTestSoftApSsid));
   request.ssid.len = sizeof(kTestSoftApSsid);
   ASSERT_EQ(softap.Start(&request), WLAN_START_RESULT_SUCCESS);
 
@@ -176,15 +176,15 @@ TEST_F(SoftApTest, CheckRates) {
   SoftAp softap(&test_ifc_, &context_, kBssIndex);
 
   // Start the Soft AP on a 2.4Ghz channel
-  wlan_fullmac_start_req start_req = {.channel = kTest24GChannel};
-  memcpy(start_req.ssid.data, kTestSoftApSsid, sizeof(kTestSoftApSsid));
+  fuchsia_wlan_fullmac::wire::WlanFullmacStartReq start_req = {.channel = kTest24GChannel};
+  memcpy(start_req.ssid.data.data(), kTestSoftApSsid, sizeof(kTestSoftApSsid));
   start_req.ssid.len = sizeof(kTestSoftApSsid);
   ASSERT_EQ(softap.Start(&start_req), WLAN_START_RESULT_SUCCESS);
   ASSERT_OK(sync_completion_wait(&ioctl_completion, ZX_TIME_INFINITE));
 
   // Stop the Soft AP.
-  wlan_fullmac_stop_req stop_req;
-  memcpy(stop_req.ssid.data, kTestSoftApSsid, sizeof(kTestSoftApSsid));
+  fuchsia_wlan_fullmac::wire::WlanFullmacStopReq stop_req;
+  memcpy(stop_req.ssid.data.data(), kTestSoftApSsid, sizeof(kTestSoftApSsid));
   stop_req.ssid.len = sizeof(kTestSoftApSsid);
   ASSERT_EQ(softap.Stop(&stop_req), WLAN_STOP_RESULT_SUCCESS);
 
@@ -195,7 +195,7 @@ TEST_F(SoftApTest, CheckRates) {
 
 TEST_F(SoftApTest, Stop) {
   constexpr uint32_t kBssIndex = 1;
-  wlan_fullmac_start_req start_req = {.channel = kTestChannel};
+  fuchsia_wlan_fullmac::wire::WlanFullmacStartReq start_req = {.channel = kTestChannel};
   sync_completion_t ioctl_completion;
 
   // Test that stopping a SoftAP works as expected.
@@ -221,28 +221,28 @@ TEST_F(SoftApTest, Stop) {
   });
 
   SoftAp softap(&test_ifc_, &context_, kBssIndex);
-  wlan_fullmac_stop_req stop_req;
+  fuchsia_wlan_fullmac::wire::WlanFullmacStopReq stop_req;
 
-  memcpy(stop_req.ssid.data, kTestSoftApSsid, sizeof(kTestSoftApSsid));
+  memcpy(stop_req.ssid.data.data(), kTestSoftApSsid, sizeof(kTestSoftApSsid));
   stop_req.ssid.len = sizeof(kTestSoftApSsid);
 
   // Attempt to stop the Soft AP before it is started should fail
   ASSERT_EQ(WLAN_STOP_RESULT_BSS_ALREADY_STOPPED, softap.Stop(&stop_req));
 
   // Start the Soft AP.
-  memcpy(start_req.ssid.data, kTestSoftApSsid, sizeof(kTestSoftApSsid));
+  memcpy(start_req.ssid.data.data(), kTestSoftApSsid, sizeof(kTestSoftApSsid));
   start_req.ssid.len = sizeof(kTestSoftApSsid);
 
   ASSERT_EQ(softap.Start(&start_req), WLAN_START_RESULT_SUCCESS);
 
   uint8_t wrong_ssid[] = "Wrong_SoftAP";
   // Attempt to stop a different Soft AP (wrong ssid)
-  memcpy(stop_req.ssid.data, wrong_ssid, sizeof(wrong_ssid));
+  memcpy(stop_req.ssid.data.data(), wrong_ssid, sizeof(wrong_ssid));
   stop_req.ssid.len = sizeof(wrong_ssid);
   ASSERT_EQ(softap.Stop(&stop_req), WLAN_STOP_RESULT_INTERNAL_ERROR);
 
   // Stopping the correct Soft AP should succeed.
-  memcpy(stop_req.ssid.data, kTestSoftApSsid, sizeof(kTestSoftApSsid));
+  memcpy(stop_req.ssid.data.data(), kTestSoftApSsid, sizeof(kTestSoftApSsid));
   stop_req.ssid.len = sizeof(kTestSoftApSsid);
   ASSERT_EQ(softap.Stop(&stop_req), WLAN_STOP_RESULT_SUCCESS);
 
@@ -257,7 +257,7 @@ TEST_F(SoftApTest, Stop) {
 TEST_F(SoftApTest, StaConnectDisconnectSoftAp) {
   constexpr uint8_t kTestSoftApClient[] = {0x0, 0x1, 0x2, 0x3, 0x4, 0x5};
   constexpr uint32_t kBssIndex = 1;
-  wlan_fullmac_start_req request = {.channel = kTestChannel};
+  fuchsia_wlan_fullmac::wire::WlanFullmacStartReq request = {.channel = kTestChannel};
 
   sync_completion_t ioctl_completion;
   class TestSoftApIfc : public SoftApIfc {
@@ -309,7 +309,7 @@ TEST_F(SoftApTest, StaConnectDisconnectSoftAp) {
 
   SoftAp softap(&test_ifc, &context_, kBssIndex);
 
-  memcpy(request.ssid.data, kTestSoftApSsid, sizeof(kTestSoftApSsid));
+  memcpy(request.ssid.data.data(), kTestSoftApSsid, sizeof(kTestSoftApSsid));
   request.ssid.len = sizeof(kTestSoftApSsid);
   ASSERT_EQ(softap.Start(&request), WLAN_START_RESULT_SUCCESS);
 
@@ -347,7 +347,7 @@ TEST_F(SoftApTest, StaConnectDisconnectSoftAp) {
 TEST_F(SoftApTest, StaLocalDisconnect) {
   constexpr uint8_t kTestSoftApClient[] = {0x0, 0x1, 0x2, 0x3, 0x4, 0x5};
   constexpr uint32_t kBssIndex = 1;
-  wlan_fullmac_start_req request = {.channel = kTestChannel};
+  fuchsia_wlan_fullmac::wire::WlanFullmacStartReq request = {.channel = kTestChannel};
 
   sync_completion_t ioctl_completion;
   class TestSoftApIfc : public SoftApIfc {
@@ -415,7 +415,7 @@ TEST_F(SoftApTest, StaLocalDisconnect) {
 
   SoftAp softap(&test_ifc, &context_, kBssIndex);
 
-  memcpy(request.ssid.data, kTestSoftApSsid, sizeof(kTestSoftApSsid));
+  memcpy(request.ssid.data.data(), kTestSoftApSsid, sizeof(kTestSoftApSsid));
   request.ssid.len = sizeof(kTestSoftApSsid);
   env_.ScheduleNotification([&]() { ASSERT_EQ(softap.Start(&request), WLAN_START_RESULT_SUCCESS); },
                             zx::msec(10));
@@ -455,8 +455,8 @@ TEST_F(SoftApTest, StaLocalDisconnect) {
   EXPECT_EQ(test_ifc.num_disconnect, 1);
 
   // Finally, Stop the SoftAP
-  wlan_fullmac_stop_req stop_req;
-  memcpy(stop_req.ssid.data, kTestSoftApSsid, sizeof(kTestSoftApSsid));
+  fuchsia_wlan_fullmac::wire::WlanFullmacStopReq stop_req;
+  memcpy(stop_req.ssid.data.data(), kTestSoftApSsid, sizeof(kTestSoftApSsid));
   stop_req.ssid.len = sizeof(kTestSoftApSsid);
   ASSERT_EQ(softap.Stop(&stop_req), WLAN_STOP_RESULT_SUCCESS);
 }

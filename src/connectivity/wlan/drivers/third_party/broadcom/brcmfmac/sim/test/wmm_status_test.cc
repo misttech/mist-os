@@ -11,38 +11,31 @@
 
 namespace wlan::brcmfmac {
 
+class WmmStatusInterface : public SimInterface {
+ public:
+  void OnWmmStatusResp(OnWmmStatusRespRequestView request, fdf::Arena& arena,
+                       OnWmmStatusRespCompleter::Sync& completer) override;
+
+  bool on_wmm_status_resp_called_ = false;
+};
+
 class WmmStatusTest : public SimTest {
  public:
   WmmStatusTest() = default;
   void Init();
 
-  SimInterface client_ifc_;
-  bool on_wmm_status_resp_called_ = false;
-
-  // SME callbacks
-  static wlan_fullmac_impl_ifc_protocol_ops_t sme_ops_;
-  wlan_fullmac_impl_ifc_protocol sme_protocol_ = {.ops = &sme_ops_, .ctx = this};
-
-  // Event handlers
-  void OnWmmStatusResp(zx_status_t status, const wlan_wmm_parameters_t* resp);
-};
-
-// Since we're acting as wlanif, we need handlers for any protocol calls we may receive
-wlan_fullmac_impl_ifc_protocol_ops_t WmmStatusTest::sme_ops_ = {
-    .on_wmm_status_resp =
-        [](void* ctx, zx_status_t status, const wlan_wmm_parameters_t* resp) {
-          static_cast<WmmStatusTest*>(ctx)->OnWmmStatusResp(status, resp);
-        },
+  WmmStatusInterface client_ifc_;
 };
 
 void WmmStatusTest::Init() {
   ASSERT_EQ(SimTest::Init(), ZX_OK);
-  ASSERT_EQ(StartInterface(WLAN_MAC_ROLE_CLIENT, &client_ifc_, &sme_protocol_), ZX_OK);
-  on_wmm_status_resp_called_ = false;
+  ASSERT_EQ(StartInterface(wlan_common::WlanMacRole::kClient, &client_ifc_), ZX_OK);
 }
 
-void WmmStatusTest::OnWmmStatusResp(zx_status_t status, const wlan_wmm_parameters_t* resp) {
-  ASSERT_EQ(status, ZX_OK);
+void WmmStatusInterface::OnWmmStatusResp(OnWmmStatusRespRequestView request, fdf::Arena& arena,
+                                         OnWmmStatusRespCompleter::Sync& completer) {
+  ASSERT_EQ(request->status, ZX_OK);
+  auto* resp = &request->wmm_params;
 
   EXPECT_TRUE(resp->apsd);
 
@@ -71,13 +64,14 @@ void WmmStatusTest::OnWmmStatusResp(zx_status_t status, const wlan_wmm_parameter
   EXPECT_TRUE(resp->ac_vo_params.acm);
 
   on_wmm_status_resp_called_ = true;
+  completer.buffer(arena).Reply();
 }
 
 TEST_F(WmmStatusTest, WmmStatus) {
   Init();
 
-  client_ifc_.if_impl_ops_->wmm_status_req(client_ifc_.if_impl_ctx_);
-  EXPECT_TRUE(on_wmm_status_resp_called_);
+  auto result = client_ifc_.client_.buffer(client_ifc_.test_arena_)->WmmStatusReq();
+  EXPECT_TRUE(client_ifc_.on_wmm_status_resp_called_);
 }
 
 }  // namespace wlan::brcmfmac

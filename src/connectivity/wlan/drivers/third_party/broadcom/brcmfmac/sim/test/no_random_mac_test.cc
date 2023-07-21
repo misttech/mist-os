@@ -26,7 +26,7 @@ TEST_F(SimTest, RandomMacNotSupported) {
   ASSERT_EQ(Init(), ZX_OK);
 
   SimInterface client_ifc;
-  ASSERT_EQ(StartInterface(WLAN_MAC_ROLE_CLIENT, &client_ifc), ZX_OK);
+  ASSERT_EQ(StartInterface(wlan_common::WlanMacRole::kClient, &client_ifc), ZX_OK);
 
   env_->ScheduleNotification(std::bind(&SimInterface::StartScan, &client_ifc, kScanTxnId, true,
                                        std::optional<const std::vector<uint8_t>>{}),
@@ -39,7 +39,7 @@ TEST_F(SimTest, RandomMacNotSupported) {
   EXPECT_TRUE(scan_result);
 
   // Verify that scan was successful
-  EXPECT_EQ(*scan_result, ZX_OK);
+  EXPECT_EQ(*scan_result, wlan_fullmac::WlanScanResult::kSuccess);
 }
 
 }  // namespace wlan::brcmfmac

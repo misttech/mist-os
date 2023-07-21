@@ -13,10 +13,12 @@
 
 #include "src/connectivity/wlan/drivers/third_party/nxp/nxpfmac/client_connection.h"
 
+#include <fidl/fuchsia.wlan.fullmac/cpp/fidl.h>
 #include <fuchsia/wlan/ieee80211/c/banjo.h>
 #include <lib/ddk/debug.h>
 #include <netinet/if_ether.h>
 
+#include <src/lib/fidl/cpp/include/lib/fidl/cpp/wire_natural_conversions.h>
 #include <wlan/common/mac_frame.h>
 
 #include "src/connectivity/wlan/drivers/third_party/nxp/nxpfmac/debug.h"
@@ -45,27 +47,20 @@ constexpr uint8_t kSaeFramePriority = 7u;
 // data and updating pointers to that data.
 class ConnectRequestParams {
  public:
-  explicit ConnectRequestParams(const wlan_fullmac_connect_req_t* req)
-      : sae_password_(req->sae_password_list, req->sae_password_list + req->sae_password_count),
-        security_ies_(req->security_ie_list, req->security_ie_list + req->security_ie_count),
-        wep_key_(req->wep_key.key_list, req->wep_key.key_list + req->wep_key.key_count),
-        selected_bss_ies_(req->selected_bss.ies_list,
-                          req->selected_bss.ies_list + req->selected_bss.ies_count) {
-    memcpy(&request_, req, sizeof(request_));
-    request_.sae_password_list = sae_password_.data();
-    request_.security_ie_list = security_ies_.data();
-    request_.wep_key.key_list = wep_key_.data();
-    request_.selected_bss.ies_list = selected_bss_ies_.data();
+  explicit ConnectRequestParams(
+      const fuchsia_wlan_fullmac::wire::WlanFullmacImplConnectReqRequest* req)
+      : request_arena_() {
+    auto natural_req = fidl::ToNatural(*req);
+    request_ = fidl::ToWire(request_arena_, natural_req);
   }
 
-  const wlan_fullmac_connect_req_t* get() const { return &request_; }
+  const fuchsia_wlan_fullmac::wire::WlanFullmacImplConnectReqRequest* get() const {
+    return &request_;
+  }
 
  private:
-  std::vector<uint8_t> sae_password_;
-  std::vector<uint8_t> security_ies_;
-  std::vector<uint8_t> wep_key_;
-  std::vector<uint8_t> selected_bss_ies_;
-  wlan_fullmac_connect_req_t request_;
+  fidl::Arena<kConnectReqBufferSize> request_arena_;
+  fuchsia_wlan_fullmac::wire::WlanFullmacImplConnectReqRequest request_;
 };
 
 ClientConnection::ClientConnection(ClientConnectionIfc* ifc, DeviceContext* context,
@@ -129,15 +124,16 @@ ClientConnection::~ClientConnection() {
   }
 }
 
-zx_status_t ClientConnection::Connect(const wlan_fullmac_connect_req_t* req,
-                                      OnConnectCallback&& on_connect) {
+zx_status_t ClientConnection::Connect(
+    const fuchsia_wlan_fullmac::wire::WlanFullmacImplConnectReqRequest* req,
+    OnConnectCallback&& on_connect) {
   std::lock_guard lock(mutex_);
   if (state_ != State::Idle && state_ != State::Authenticating) {
     NXPF_ERR("Invalid state for connect call: %d", state_.Load());
     return ZX_ERR_BAD_STATE;
   }
 
-  const bool is_sae = req->auth_type == WLAN_AUTH_TYPE_SAE;
+  const bool is_sae = req->auth_type() == fuchsia_wlan_fullmac::wire::WlanAuthType::kSae;
   if (is_sae) {
     zx_status_t status = InitiateSaeHandshake(req);
     if (status != ZX_OK) {
@@ -160,9 +156,17 @@ zx_status_t ClientConnection::Connect(const wlan_fullmac_connect_req_t* req,
   return ConnectLocked(req, std::move(on_connect));
 }
 
-zx_status_t ClientConnection::ConnectLocked(const wlan_fullmac_connect_req_t* req,
-                                            OnConnectCallback&& on_connect) {
-  auto ssid = IeView(req->selected_bss.ies_list, req->selected_bss.ies_count).get(SSID);
+zx_status_t ClientConnection::ConnectLocked(
+    const fuchsia_wlan_fullmac::wire::WlanFullmacImplConnectReqRequest* req,
+    OnConnectCallback&& on_connect) {
+  if (!req->has_selected_bss() || !req->has_auth_type()) {
+    NXPF_ERR("Missing field in connection request: %s %s",
+             req->has_selected_bss() ? "" : "selected_bss",
+             req->has_auth_type() ? "" : "auth_type");
+    return ZX_ERR_INVALID_ARGS;
+  }
+
+  auto ssid = IeView(req->selected_bss().ies.data(), req->selected_bss().ies.count()).get(SSID);
   if (!ssid) {
     NXPF_ERR("Missing SSID in connection request");
     return ZX_ERR_INVALID_ARGS;
@@ -178,10 +182,10 @@ zx_status_t ClientConnection::ConnectLocked(const wlan_fullmac_connect_req_t* re
     return status;
   }
 
-  if (req->wep_key.key_count > 0) {
+  if (req->has_wep_key() && req->wep_key().key.count() > 0) {
     // The WEP key address should be considered a group key, set address to broadcast address.
-    set_key_descriptor_t wep_key = req->wep_key;
-    memset(wep_key.address, 0xFF, ETH_ALEN);
+    fuchsia_wlan_fullmac::wire::SetKeyDescriptor& wep_key = req->wep_key();
+    memset(wep_key.address.data(), 0xFF, ETH_ALEN);
     status = key_ring_->AddKey(wep_key);
     if (status != ZX_OK) {
       NXPF_ERR("Could not set WEP key: %s", zx_status_get_string(status));
@@ -202,27 +206,33 @@ zx_status_t ClientConnection::ConnectLocked(const wlan_fullmac_connect_req_t* re
     NXPF_ERR("Failed to clear IEs: %s", zx_status_get_string(status));
     return status;
   }
-  status = ConfigureIes(req->security_ie_list, req->security_ie_count);
-  if (status != ZX_OK) {
-    NXPF_ERR("Failed to configure security IEs: %s", zx_status_get_string(status));
-    return status;
-  }
-
-  status = SetAuthMode(req->auth_type);
-  if (status != ZX_OK) {
-    NXPF_ERR("Failed to set auth mode %u: %s", req->auth_type, zx_status_get_string(status));
-    return status;
-  }
 
   uint8_t pairwise_cipher_suite = 0;
   uint8_t group_cipher_suite = 0;
-  status = GetRsnCipherSuites(req->security_ie_list, req->security_ie_count, &pairwise_cipher_suite,
-                              &group_cipher_suite);
-  // ZX_ERR_NOT_FOUND indicates there was no RSN IE, this could happen for an open network for
-  // example. Don't treat this as an error, just use the default values of 0, there doesn't seem to
-  // be a useful constant for this.
-  if (status != ZX_OK && status != ZX_ERR_NOT_FOUND) {
-    NXPF_ERR("Failed to get cipher suite from IEs: %s", zx_status_get_string(status));
+
+  if (!req->has_security_ie() || req->security_ie().count() <= 0) {
+    NXPF_INFO("No security_ie found in connect request.");
+  } else {
+    status = ConfigureIes(req->security_ie().data(), req->security_ie().count());
+    if (status != ZX_OK) {
+      NXPF_ERR("Failed to configure security IEs: %s", zx_status_get_string(status));
+      return status;
+    }
+
+    status = GetRsnCipherSuites(req->security_ie().data(), req->security_ie().count(),
+                                &pairwise_cipher_suite, &group_cipher_suite);
+    // ZX_ERR_NOT_FOUND indicates there was no RSN IE, this could happen for an open network for
+    // example. Don't treat this as an error, just use the default values of 0, there doesn't seem
+    // to be a useful constant for this.
+    if (status != ZX_OK && status != ZX_ERR_NOT_FOUND) {
+      NXPF_ERR("Failed to get cipher suite from IEs: %s", zx_status_get_string(status));
+      return status;
+    }
+  }
+
+  status = SetAuthMode(req->auth_type());
+  if (status != ZX_OK) {
+    NXPF_ERR("Failed to set auth mode %u: %s", req->auth_type(), zx_status_get_string(status));
     return status;
   }
 
@@ -250,7 +260,7 @@ zx_status_t ClientConnection::ConnectLocked(const wlan_fullmac_connect_req_t* re
 
   on_connect_ = std::move(on_connect);
 
-  const bool is_host_mlme = req->auth_type == WLAN_AUTH_TYPE_SAE;
+  const bool is_host_mlme = req->auth_type() == fuchsia_wlan_fullmac::wire::WlanAuthType::kSae;
   auto on_connect_complete = [this, is_host_mlme](mlan_ioctl_req* req, IoctlStatus io_status) {
     std::lock_guard lock(mutex_);
     if (state_ != State::Connecting) {
@@ -312,11 +322,11 @@ zx_status_t ClientConnection::ConnectLocked(const wlan_fullmac_connect_req_t* re
       mlan_ds_bss{
           .sub_command = MLAN_OID_BSS_START,
           .param = {.ssid_bssid = {.idx = bss_index_,
-                                   .channel = req->selected_bss.channel.primary,
+                                   .channel = req->selected_bss().channel.primary,
                                    .host_mlme = is_host_mlme}},
       });
   mlan_ssid_bssid& bss = connect_request_->UserReq().param.ssid_bssid;
-  memcpy(bss.bssid, req->selected_bss.bssid, ETH_ALEN);
+  memcpy(bss.bssid, req->selected_bss().bssid.data(), ETH_ALEN);
   bss.ssid.ssid_len = ssid->size();
   memcpy(bss.ssid.ssid, ssid->data(), bss.ssid.ssid_len);
 
@@ -411,7 +421,7 @@ zx_status_t ClientConnection::TransmitAuthFrame(const uint8_t* source_mac,
       NXPF_ERR("Attempt to send auth frame without first initiating a connection attempt");
       return ZX_ERR_BAD_STATE;
     }
-    channel = connect_request_params_->get()->selected_bss.channel.primary;
+    channel = connect_request_params_->get()->selected_bss().channel.primary;
     client_mac_.Set(source_mac);
     ap_mac_.Set(destination_mac);
   }
@@ -647,7 +657,8 @@ void ClientConnection::OnSaeTimeout() {
   CompleteConnection(StatusCode::kJoinFailure);
 }
 
-zx_status_t ClientConnection::InitiateSaeHandshake(const wlan_fullmac_connect_req_t* req) {
+zx_status_t ClientConnection::InitiateSaeHandshake(
+    const fuchsia_wlan_fullmac::wire::WlanFullmacImplConnectReqRequest* req) {
   // The SAE handshake requires that we manually handle some management frames. Register to receive
   // them here before the authentication process starts.
   zx_status_t status = RegisterForMgmtFrames({wlan::ManagementSubtype::kAuthentication,
@@ -658,7 +669,7 @@ zx_status_t ClientConnection::InitiateSaeHandshake(const wlan_fullmac_connect_re
     return status;
   }
 
-  ifc_->InitiateSaeHandshake(req->selected_bss.bssid);
+  ifc_->InitiateSaeHandshake(req->selected_bss().bssid.data());
   return ZX_OK;
 }
 
@@ -785,23 +796,23 @@ zx_status_t ClientConnection::ConfigureIes(const uint8_t* ies, size_t ies_count)
   return ZX_OK;
 }
 
-zx_status_t ClientConnection::SetAuthMode(wlan_auth_type_t auth_type) {
+zx_status_t ClientConnection::SetAuthMode(fuchsia_wlan_fullmac::wire::WlanAuthType auth_type) {
   uint32_t auth_mode = 0;
   switch (auth_type) {
-    case WLAN_AUTH_TYPE_OPEN_SYSTEM:
+    case fuchsia_wlan_fullmac::wire::WlanAuthType::kOpenSystem:
       auth_mode = MLAN_AUTH_MODE_OPEN;
       break;
-    case WLAN_AUTH_TYPE_SHARED_KEY:
+    case fuchsia_wlan_fullmac::wire::WlanAuthType::kSharedKey:
       // When asked to use a shared key (which should only happen for WEP), we will direct the
       // firmware to use auto-detect, which will fall back on open WEP if shared WEP fails to
       // succeed. This was chosen to allow us to avoid implementing WEP auto-detection at higher
       // levels of the wlan stack.
       auth_mode = MLAN_AUTH_MODE_AUTO;
       break;
-    case WLAN_AUTH_TYPE_FAST_BSS_TRANSITION:
+    case fuchsia_wlan_fullmac::wire::WlanAuthType::kFastBssTransition:
       auth_mode = MLAN_AUTH_MODE_FT;
       break;
-    case WLAN_AUTH_TYPE_SAE:
+    case fuchsia_wlan_fullmac::wire::WlanAuthType::kSae:
       auth_mode = MLAN_AUTH_MODE_SAE;
       break;
     default:

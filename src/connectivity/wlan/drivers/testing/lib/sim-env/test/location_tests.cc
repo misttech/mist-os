@@ -2,8 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include <fuchsia/wlan/common/c/banjo.h>
-
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
 
@@ -22,19 +20,19 @@ constexpr zx::duration kSimulatedClockDuration = zx::sec(10);
 using ::testing::NotNull;
 
 constexpr simulation::WlanTxInfo kDefaultTxInfo = {
-    .channel = {.primary = 9, .cbw = CHANNEL_BANDWIDTH_CBW20, .secondary80 = 0}};
-constexpr cssid_t kDefaultSsid = {.len = 15, .data = "Fuchsia Fake AP"};
+    .channel = {.primary = 9, .cbw = wlan_common::ChannelBandwidth::kCbw20, .secondary80 = 0}};
+constexpr wlan_ieee80211::CSsid kDefaultSsid = {.len = 15, .data = {.data_ = "Fuchsia Fake AP"}};
 const common::MacAddr kDefaultBssid({0x12, 0x34, 0x56, 0x78, 0x9a, 0xbc});
 
-void checkChannel(const wlan_channel_t& channel) {
+void checkChannel(const wlan_common::WlanChannel& channel) {
   EXPECT_EQ(channel.primary, kDefaultTxInfo.channel.primary);
   EXPECT_EQ(channel.cbw, kDefaultTxInfo.channel.cbw);
   EXPECT_EQ(channel.secondary80, kDefaultTxInfo.channel.secondary80);
 }
 
-void checkSsid(const cssid_t& ssid) {
+void checkSsid(const wlan_ieee80211::CSsid& ssid) {
   EXPECT_EQ(ssid.len, kDefaultSsid.len);
-  EXPECT_EQ(std::memcmp(ssid.data, kDefaultSsid.data, kDefaultSsid.len), 0);
+  EXPECT_EQ(std::memcmp(ssid.data.data(), kDefaultSsid.data.data(), kDefaultSsid.len), 0);
 }
 
 class SimStation : public wlan::simulation::StationIfc {

@@ -154,11 +154,11 @@ source_set("core") {
   deps = [
     ":timer",
     "//sdk/fidl/fuchsia.wlan.common:fuchsia.wlan.common_banjo_c",
-    "//sdk/fidl/fuchsia.wlan.ieee80211:fuchsia.wlan.ieee80211_hlcpp",
     "//sdk/lib/driver/component/cpp:cpp",
+    "//src/connectivity/wlan/drivers/lib/fullmac_ifc",
     "//src/connectivity/wlan/drivers/third_party/broadcom/brcmfmac/inspect",
     "//src/connectivity/wlan/lib/common/cpp:common",
-    "//src/lib/ddk",
+    "//src/lib/ddktl",
     "//third_party/bcmdhd/crossdriver:bcmdhd_crossdriver",
     "//zircon/system/ulib/async",
   ]
@@ -169,8 +169,9 @@ source_set("core") {
     "//sdk/banjo/fuchsia.hardware.wlan.fullmac:fuchsia.hardware.wlan.fullmac_banjo_cpp",
     "//sdk/banjo/fuchsia.hardware.wlanphyimpl:fuchsia.hardware.wlanphyimpl_banjo_cpp",
     "//sdk/fidl/fuchsia.factory.wlan:fuchsia.factory.wlan_cpp_wire",
-    "//sdk/fidl/fuchsia.wlan.common:fuchsia.wlan.common_hlcpp",
+    "//sdk/fidl/fuchsia.wlan.fullmac:fuchsia.wlan.fullmac_cpp_driver",
     "//sdk/fidl/fuchsia.wlan.phyimpl:fuchsia.wlan.phyimpl_cpp_driver",
+    "//sdk/lib/driver/component/cpp:cpp",
     "//sdk/lib/stdcompat",
     "//src/connectivity/wlan/drivers/lib/components:cpp",
     "//src/connectivity/wlan/drivers/third_party/broadcom/brcmfmac/recovery",
@@ -235,7 +236,7 @@ fuchsia_driver("fuchsia_driver-driver") {
 
 fuchsia_driver_component("fuchsia_driver") {
   component_name = "brcmfmac"
-  manifest = "meta/brcmfmac.cml"
+  manifest = "meta/brcmfmac_sdio.cml"
   deps = [ ":fuchsia_driver-driver" ]
   visibility += [
     "//bundles/drivers:pci",

@@ -33,11 +33,28 @@ test("device_unittest") {
     "//src/devices/lib/driver",
     "//src/devices/testing/mock-ddk",
     "//src/lib/ddk",
+    "//zircon/system/ulib/sync",
+    "//zircon/system/ulib/sync:sync-cpp",
+    "//zircon/system/ulib/zx",
+    "//zircon/system/ulib/zxtest",
+  ]
+
+  # TODO(https://fxbug.dev/58162): delete the below and fix compiler warnings
+  configs += [ "//build/config:Wno-conversion" ]
+}
+
+test("convert_unittest") {
+  output_name = "wlanif_convert_unittest"
+
+  sources = [ "convert_unittest.cc" ]
+
+  deps = [
+    "//src/connectivity/wlan/drivers/lib/log/cpp/test:log_overrides",
+    "//src/connectivity/wlan/drivers/wlanif:lib_source",
     "//src/lib/fxl/test:gtest_main",
-    "//src/lib/testing/loop_fixture",
-    "//third_party/googletest:gmock",
     "//third_party/googletest:gtest",
     "//zircon/system/ulib/sync",
+    "//zircon/system/ulib/sync:sync-cpp",
     "//zircon/system/ulib/zx",
   ]
 
@@ -45,7 +62,10 @@ test("device_unittest") {
   configs += [ "//build/config:Wno-conversion" ]
 }
 
-tests = [ "device" ]
+tests = [
+  "device",
+  "convert",
+]
 
 foreach(test, tests) {
   name = "${test}_test"

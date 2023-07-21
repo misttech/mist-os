@@ -14,6 +14,7 @@
 #ifndef SRC_CONNECTIVITY_WLAN_DRIVERS_THIRD_PARTY_NXP_NXPFMAC_SCANNER_H_
 #define SRC_CONNECTIVITY_WLAN_DRIVERS_THIRD_PARTY_NXP_NXPFMAC_SCANNER_H_
 
+#include <fidl/fuchsia.wlan.fullmac/cpp/driver/wire.h>
 #include <fuchsia/hardware/wlan/fullmac/cpp/banjo.h>
 #include <lib/fit/function.h>
 #include <zircon/compiler.h>
@@ -40,8 +41,9 @@ class Scanner {
   // Start a scan. Returns ZX_ERR_ALREADY_EXISTS if a scan is already in progress. The scan will
   // time out after the given timeout has elapsed. Scan results are reported one at a time through
   // the `on_scan_result` callback and `on_scan_end` will be called when the scan ends.
-  zx_status_t Scan(const wlan_fullmac_scan_req_t* req, zx_duration_t timeout,
-                   OnScanResult&& on_scan_result, OnScanEnd&& on_scan_end) __TA_EXCLUDES(mutex_);
+  zx_status_t Scan(const fuchsia_wlan_fullmac::wire::WlanFullmacImplStartScanRequest* req,
+                   zx_duration_t timeout, OnScanResult&& on_scan_result, OnScanEnd&& on_scan_end)
+      __TA_EXCLUDES(mutex_);
 
   // Perform a connect scan. This is a quick scan that only scans for the given SSID and only on the
   // given channel. Note that this is a synchronous scan and it's only intended to populate the
@@ -59,7 +61,8 @@ class Scanner {
   zx_status_t StopScan() __TA_EXCLUDES(mutex_);
 
  private:
-  zx_status_t PrepareScanRequest(const wlan_fullmac_scan_req_t* req) __TA_REQUIRES(mutex_);
+  zx_status_t PrepareScanRequest(
+      const fuchsia_wlan_fullmac::wire::WlanFullmacImplStartScanRequest* req) __TA_REQUIRES(mutex_);
   void PopulateScanChannel(wlan_user_scan_chan& user_scan_chan, uint8_t channel, uint8_t scan_type,
                            uint32_t channel_time);
   void OnScanReport(pmlan_event event) __TA_EXCLUDES(mutex_);

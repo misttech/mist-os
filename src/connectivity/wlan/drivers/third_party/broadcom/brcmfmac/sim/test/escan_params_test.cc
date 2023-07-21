@@ -18,40 +18,32 @@ constexpr zx::duration kSimulatedClockDuration = zx::sec(10);
 
 constexpr uint64_t kScanTxnId = 0x4a65616e6e65;
 const uint8_t kDefaultChannelsList[11] = {1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11};
-const wlan_fullmac_scan_req kDefaultScanReq = {
-    .txn_id = kScanTxnId,
-    .scan_type = WLAN_SCAN_TYPE_ACTIVE,
-    .channels_list = kDefaultChannelsList,
-    .channels_count = 11,
-    .ssids_list = nullptr,
-    .ssids_count = 0,
-    .min_channel_time = SimInterface::kDefaultActiveScanDwellTimeMs,
-    .max_channel_time = SimInterface::kDefaultActiveScanDwellTimeMs,
-};
 
 // For this test, we don't want to use the default scan handlers provided by SimInterface
 class EscanArgsIfc : public SimInterface {
  public:
-  void OnScanResult(const wlan_fullmac_scan_result_t* result) override {}
-  void OnScanEnd(const wlan_fullmac_scan_end_t* end) override;
+  void OnScanEnd(OnScanEndRequestView request, fdf::Arena& arena,
+                 OnScanEndCompleter::Sync& completer) override;
   bool ScanCompleted() { return scan_completed_; }
-  wlan_scan_result_t ScanResult() { return scan_result_; }
+  wlan_fullmac::WlanScanResult ScanResult() { return scan_result_; }
 
  private:
   bool scan_completed_ = false;
-  wlan_scan_result_t scan_result_;
+  wlan_fullmac::WlanScanResult scan_result_;
 };
 
-void EscanArgsIfc::OnScanEnd(const wlan_fullmac_scan_end_t* end) {
-  EXPECT_EQ(end->txn_id, kScanTxnId);
+void EscanArgsIfc::OnScanEnd(OnScanEndRequestView request, fdf::Arena& arena,
+                             OnScanEndCompleter::Sync& completer) {
+  EXPECT_EQ(request->end.txn_id, kScanTxnId);
   scan_completed_ = true;
-  scan_result_ = end->code;
+  scan_result_ = request->end.code;
+  completer.buffer(arena).Reply();
 }
 
 class EscanArgsTest : public SimTest {
  public:
   void Init();
-  void RunScanTest(const wlan_fullmac_scan_req& req);
+  void RunScanTest(const wlan_fullmac::WlanFullmacImplStartScanRequest& req);
 
  protected:
   EscanArgsIfc client_ifc_;
@@ -59,11 +51,12 @@ class EscanArgsTest : public SimTest {
 
 void EscanArgsTest::Init() {
   ASSERT_EQ(SimTest::Init(), ZX_OK);
-  ASSERT_EQ(StartInterface(WLAN_MAC_ROLE_CLIENT, &client_ifc_), ZX_OK);
+  ASSERT_EQ(StartInterface(wlan_common::WlanMacRole::kClient, &client_ifc_), ZX_OK);
 }
 
-void EscanArgsTest::RunScanTest(const wlan_fullmac_scan_req& req) {
-  client_ifc_.if_impl_ops_->start_scan(client_ifc_.if_impl_ctx_, &req);
+void EscanArgsTest::RunScanTest(const wlan_fullmac::WlanFullmacImplStartScanRequest& req) {
+  auto result = client_ifc_.client_.buffer(client_ifc_.test_arena_)->StartScan(req);
+  ASSERT_TRUE(result.ok());
   env_->Run(kSimulatedClockDuration);
   ASSERT_TRUE(client_ifc_.ScanCompleted());
 }
@@ -71,29 +64,48 @@ void EscanArgsTest::RunScanTest(const wlan_fullmac_scan_req& req) {
 // Verify that invalid scan params result in a failed scan result
 TEST_F(EscanArgsTest, BadScanArgs) {
   Init();
-  wlan_fullmac_scan_req req;
+  {
+    auto builder = wlan_fullmac::WlanFullmacImplStartScanRequest::Builder(client_ifc_.test_arena_);
 
-  // Dwell time of zero
-  req = kDefaultScanReq;
-  req.min_channel_time = 0;
-  req.max_channel_time = 0;
-  RunScanTest(req);
-  EXPECT_NE(client_ifc_.ScanResult(), WLAN_SCAN_RESULT_SUCCESS);
+    builder.txn_id(kScanTxnId);
+    builder.scan_type(wlan_fullmac::WlanScanType::kActive);
+    builder.channels(
+        fidl::VectorView<uint8_t>::FromExternal(const_cast<uint8_t*>(kDefaultChannelsList), 11));
+    builder.min_channel_time(0);
+    builder.max_channel_time(0);
+
+    // Dwell time of zero
+    RunScanTest(builder.Build());
+  }
+  EXPECT_NE(client_ifc_.ScanResult(), wlan_fullmac::WlanScanResult::kSuccess);
 
   // min dwell time > max dwell time
-  req = kDefaultScanReq;
-  req.min_channel_time = req.max_channel_time + 1;
-  RunScanTest(req);
-  EXPECT_NE(client_ifc_.ScanResult(), WLAN_SCAN_RESULT_SUCCESS);
+  {
+    auto builder = wlan_fullmac::WlanFullmacImplStartScanRequest::Builder(client_ifc_.test_arena_);
+
+    builder.txn_id(kScanTxnId);
+    builder.scan_type(wlan_fullmac::WlanScanType::kActive);
+    builder.channels(
+        fidl::VectorView<uint8_t>::FromExternal(const_cast<uint8_t*>(kDefaultChannelsList), 11));
+    builder.min_channel_time(SimInterface::kDefaultActiveScanDwellTimeMs + 1);
+    builder.max_channel_time(SimInterface::kDefaultActiveScanDwellTimeMs);
+
+    // Dwell time of zero
+    RunScanTest(builder.Build());
+  }
+  EXPECT_NE(client_ifc_.ScanResult(), wlan_fullmac::WlanScanResult::kSuccess);
 }
 
 TEST_F(EscanArgsTest, EmptyChannelList) {
   Init();
-  wlan_fullmac_scan_req req;
-  req = kDefaultScanReq;
-  req.channels_count = 0;
-  RunScanTest(req);
-  EXPECT_EQ(client_ifc_.ScanResult(), WLAN_SCAN_RESULT_INVALID_ARGS);
+  auto builder = wlan_fullmac::WlanFullmacImplStartScanRequest::Builder(client_ifc_.test_arena_);
+
+  builder.txn_id(kScanTxnId), builder.scan_type(wlan_fullmac::WlanScanType::kActive),
+      builder.min_channel_time(SimInterface::kDefaultActiveScanDwellTimeMs + 1);
+  builder.max_channel_time(SimInterface::kDefaultActiveScanDwellTimeMs);
+
+  RunScanTest(builder.Build());
+  EXPECT_EQ(client_ifc_.ScanResult(), wlan_fullmac::WlanScanResult::kInvalidArgs);
 }
 
 }  // namespace wlan::brcmfmac

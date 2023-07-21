@@ -62,11 +62,12 @@ source_set("core") {
   public_deps = [
     ":debug",
     "//sdk/banjo/fuchsia.hardware.wlan.fullmac:fuchsia.hardware.wlan.fullmac_banjo_cpp",
-    "//sdk/fidl/fuchsia.wlan.ieee80211:fuchsia.wlan.ieee80211_hlcpp",
+    "//sdk/fidl/fuchsia.wlan.fullmac:fuchsia.wlan.fullmac_cpp_driver",
     "//sdk/fidl/fuchsia.wlan.phyimpl:fuchsia.wlan.phyimpl_cpp_driver",
     "//sdk/lib/driver/component/cpp:cpp",
     "//sdk/lib/fit",
     "//src/connectivity/wlan/drivers/lib/components:cpp",
+    "//src/connectivity/wlan/drivers/lib/fullmac_ifc",
     "//src/connectivity/wlan/drivers/lib/timer:cpp",
     "//src/connectivity/wlan/lib/common/cpp:common",
     "//src/devices/lib/driver:driver_runtime",

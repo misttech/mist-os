@@ -21,6 +21,8 @@
 #ifndef SRC_CONNECTIVITY_WLAN_DRIVERS_THIRD_PARTY_BROADCOM_BRCMFMAC_CORE_H_
 #define SRC_CONNECTIVITY_WLAN_DRIVERS_THIRD_PARTY_BROADCOM_BRCMFMAC_CORE_H_
 
+#include <fidl/fuchsia.wlan.fullmac/cpp/driver/wire.h>
+#include <fidl/fuchsia.wlan.fullmac/cpp/fidl.h>
 #include <fuchsia/hardware/network/driver/c/banjo.h>
 #include <fuchsia/hardware/wlan/fullmac/c/banjo.h>
 #include <fuchsia/hardware/wlanphyimpl/c/banjo.h>
@@ -48,6 +50,7 @@
 #include "fwil_types.h"
 #include "linuxisms.h"
 #include "recovery/recovery_trigger.h"
+#include "src/connectivity/wlan/drivers/lib/fullmac_ifc/wlan_fullmac_ifc.h"
 #include "workqueue.h"
 
 #define TOE_TX_CSUM_OL 0x00000001
@@ -212,7 +215,6 @@ using reassoc_context_t = struct {
  * @roam_req_lock: guards roam_req.
  * @reassoc_context: holds info used during an in-progress reassociation (roam).
  * @bss: information on current bss.
- * @ies: ies of the current bss.
  * @pend_8021x_cnt: tracks outstanding number of 802.1x frames.
  * @pend_8021x_wait: used for signalling change in count.
  * @disconnect_done: used for signalling disconnect done for connect to proceed
@@ -229,11 +231,8 @@ struct brcmf_if {
   int32_t bsscfgidx;
   uint8_t mac_addr[ETH_ALEN];
   uint8_t netif_stop;
-  wlan_fullmac_connect_req_t connect_req;
+  fuchsia_wlan_fullmac::WlanFullmacImplConnectReqRequest connect_req;
   reassoc_context_t reassoc_context;
-  uint8_t ies[fuchsia::wlan::ieee80211::WLAN_MSDU_MAX_LEN];
-  uint8_t wep_key_bytes[MAX_SUPPORTED_WEP_KEY_LEN];
-  uint8_t security_ie[fuchsia::wlan::ieee80211::WLAN_IE_MAX_LEN];
   // spinlock_t netif_stop_lock;
   std::atomic<int> pend_8021x_cnt;
   sync_completion_t pend_8021x_wait;
@@ -280,7 +279,7 @@ struct net_device {
   uint32_t scan_num_results;
   std::mutex scan_sync_id_mutex;  // Used to ensure that sync_id is stored before processing results
   std::shared_mutex if_proto_lock;  // Used as RW-lock for if_proto.
-  wlan_fullmac_impl_ifc_protocol_t if_proto;
+  std::unique_ptr<wlan::WlanFullmacIfc> if_proto;
   uint8_t dev_addr[ETH_ALEN];
   char name[NET_DEVICE_NAME_MAX_LEN];
   void* priv;
@@ -318,14 +317,11 @@ struct net_device {
 
     // rssi histogram, index = -(rssi), For ex, -128 => 128....-1 => 1
     std::array<uint64_t, RSSI_HISTOGRAM_LEN> rssi_buckets;
-    std::vector<wlan_fullmac_noise_floor_histogram_t> noise_floor_histograms;
-    std::vector<wlan_fullmac_hist_bucket_t> noise_floor_samples;
-    std::vector<wlan_fullmac_rssi_histogram_t> rssi_histograms;
-    std::vector<wlan_fullmac_hist_bucket_t> rssi_samples;
-    std::vector<wlan_fullmac_rx_rate_index_histogram_t> rx_rate_index_histograms;
-    std::vector<wlan_fullmac_hist_bucket_t> rx_rate_index_samples;
-    std::vector<wlan_fullmac_snr_histogram_t> snr_histograms;
-    std::vector<wlan_fullmac_hist_bucket_t> snr_samples;
+    std::vector<fuchsia_wlan_fullmac::wire::WlanFullmacNoiseFloorHistogram> noise_floor_histograms;
+    std::vector<fuchsia_wlan_fullmac::wire::WlanFullmacRssiHistogram> rssi_histograms;
+    std::vector<fuchsia_wlan_fullmac::wire::WlanFullmacRxRateIndexHistogram>
+        rx_rate_index_histograms;
+    std::vector<fuchsia_wlan_fullmac::wire::WlanFullmacSnrHistogram> snr_histograms;
     brcmf_pktcnt_le fw_pktcnt;
   } stats;
   zx::channel mlme_channel;

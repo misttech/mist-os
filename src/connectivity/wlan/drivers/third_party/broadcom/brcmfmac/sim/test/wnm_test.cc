@@ -17,12 +17,12 @@
 namespace wlan::brcmfmac {
 
 // Some default AP and association request values
-constexpr cssid_t kDefaultSsid = {.len = 15, .data = "Fuchsia Fake AP"};
+constexpr wlan_ieee80211::CSsid kDefaultSsid = {.len = 15, .data = {.data_ = "Fuchsia Fake AP"}};
 
-constexpr wlan_channel_t kAp0Channel = {
-    .primary = 9, .cbw = CHANNEL_BANDWIDTH_CBW20, .secondary80 = 0};
-constexpr wlan_channel_t kAp1Channel = {
-    .primary = 11, .cbw = CHANNEL_BANDWIDTH_CBW20, .secondary80 = 0};
+constexpr wlan_common::WlanChannel kAp0Channel = {
+    .primary = 9, .cbw = wlan_common::ChannelBandwidth::kCbw20, .secondary80 = 0};
+constexpr wlan_common::WlanChannel kAp1Channel = {
+    .primary = 11, .cbw = wlan_common::ChannelBandwidth::kCbw20, .secondary80 = 0};
 const uint8_t kAp1OperatingClass = 101;
 
 const common::MacAddr kAp0Bssid("12:34:56:78:9a:bc");
@@ -75,7 +75,7 @@ void WnmTest::PreInit() {
 void WnmTest::Init() {
   ASSERT_EQ(SimTest::Init(), ZX_OK);
 
-  ASSERT_EQ(StartInterface(WLAN_MAC_ROLE_CLIENT, &client_ifc_), ZX_OK);
+  ASSERT_EQ(StartInterface(wlan_common::WlanMacRole::kClient, &client_ifc_), ZX_OK);
   btm_req_frame_count_ = 0;
 }
 

@@ -37,7 +37,7 @@ void CountryCodeTest::Init() { ASSERT_EQ(SimTest::Init(), ZX_OK); }
 void CountryCodeTest::CreateInterface() {
   zx_status_t status;
 
-  status = StartInterface(WLAN_MAC_ROLE_CLIENT, &client_ifc_);
+  status = StartInterface(wlan_common::WlanMacRole::kClient, &client_ifc_);
   ASSERT_EQ(status, ZX_OK);
 }
 

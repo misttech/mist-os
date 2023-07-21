@@ -29,6 +29,7 @@
 namespace {
 
 constexpr uint32_t kBeaconFixedSize = 12u;
+constexpr uint32_t kMinChannelTime = 200;  // msecs
 
 }  // namespace
 
@@ -42,11 +43,17 @@ Scanner::Scanner(DeviceContext* context, uint32_t bss_index)
 
 Scanner::~Scanner() { StopScan(); }
 
-zx_status_t Scanner::Scan(const wlan_fullmac_scan_req_t* req, zx_duration_t timeout,
-                          OnScanResult&& on_scan_result, OnScanEnd&& on_scan_end) {
+zx_status_t Scanner::Scan(const fuchsia_wlan_fullmac::wire::WlanFullmacImplStartScanRequest* req,
+                          zx_duration_t timeout, OnScanResult&& on_scan_result,
+                          OnScanEnd&& on_scan_end) {
   const std::lock_guard lock(mutex_);
   if (scan_in_progress_) {
     return ZX_ERR_ALREADY_EXISTS;
+  }
+
+  if (!req->has_txn_id()) {
+    NXPF_ERR("Required field not provided: rxn_id");
+    return ZX_ERR_INVALID_ARGS;
   }
 
   const zx_status_t status = PrepareScanRequest(req);
@@ -105,7 +112,7 @@ zx_status_t Scanner::Scan(const wlan_fullmac_scan_req_t* req, zx_duration_t time
     return ZX_ERR_INTERNAL;
   }
 
-  txn_id_ = req->txn_id;
+  txn_id_ = req->txn_id();
   scan_in_progress_ = true;
 
   return ZX_OK;
@@ -113,18 +120,32 @@ zx_status_t Scanner::Scan(const wlan_fullmac_scan_req_t* req, zx_duration_t time
 
 zx_status_t Scanner::ConnectScan(const uint8_t* ssid, size_t ssid_len, uint8_t channel,
                                  zx_duration_t timeout) {
-  cssid ssid_data = {.len = static_cast<uint8_t>(ssid_len)};
+  // The arena that backs the scan request and the vectors inside. Make sure the usage of those data
+  // in the vector ends before this function returns.
+  fidl::Arena arena;
+  fuchsia_wlan_ieee80211::wire::CSsid ssid_data = {.len = static_cast<uint8_t>(ssid_len)};
   if (ssid_len > sizeof(ssid_data.data)) {
     NXPF_ERR("SSID length %zu exceeds maximum length %zu", ssid_len, sizeof(ssid_data.data));
     return ZX_ERR_INVALID_ARGS;
   }
-  memcpy(ssid_data.data, ssid, ssid_len);
 
-  wlan_fullmac_scan_req request{.scan_type = WLAN_SCAN_TYPE_ACTIVE,
-                                .channels_list = &channel,
-                                .channels_count = 1,
-                                .ssids_list = &ssid_data,
-                                .ssids_count = 1};
+  memcpy(ssid_data.data.data(), ssid, ssid_len);
+
+  std::vector<fuchsia_wlan_ieee80211::wire::CSsid> ssid_vec;
+  ssid_vec.push_back(ssid_data);
+
+  std::vector<uint8_t> channel_vec;
+  channel_vec.push_back(channel);
+
+  auto builder = fuchsia_wlan_fullmac::wire::WlanFullmacImplStartScanRequest::Builder(arena);
+
+  builder.txn_id(0);
+  builder.scan_type(fuchsia_wlan_fullmac::wire::WlanScanType::kActive);
+  builder.channels(fidl::VectorView<uint8_t>(arena, channel_vec));
+  builder.ssids(fidl::VectorView<fuchsia_wlan_ieee80211::wire::CSsid>(arena, ssid_vec));
+  builder.min_channel_time(kMinChannelTime);
+
+  auto request = builder.Build();
 
   sync_completion_t scan_complete;
   wlan_scan_result_t scan_result = WLAN_SCAN_RESULT_INTERNAL_ERROR;
@@ -188,45 +209,42 @@ zx_status_t Scanner::StopScan() __TA_NO_THREAD_SAFETY_ANALYSIS {
   return ZX_OK;
 }
 
-zx_status_t Scanner::PrepareScanRequest(const wlan_fullmac_scan_req_t* req) {
-  if (req->ssids_count > MRVDRV_MAX_SSID_LIST_LENGTH) {
-    NXPF_ERR("Requested %zu SSIDs in scan but only %d supported", req->ssids_count,
-             MRVDRV_MAX_SSID_LIST_LENGTH);
-    return ZX_ERR_INVALID_ARGS;
-  }
-
-  if (req->channels_count > WLAN_USER_SCAN_CHAN_MAX) {
-    NXPF_ERR("Requested %zu channels in scan but only %d supported", req->channels_count,
-             WLAN_USER_SCAN_CHAN_MAX);
-    return ZX_ERR_INVALID_ARGS;
-  }
-
-  uint8_t scan_type = 0;
-  switch (req->scan_type) {
-    case WLAN_SCAN_TYPE_ACTIVE:
-      scan_type = MLAN_SCAN_TYPE_ACTIVE;
-      break;
-    case WLAN_SCAN_TYPE_PASSIVE:
-      scan_type = MLAN_SCAN_TYPE_PASSIVE;
-      break;
-    default:
-      NXPF_ERR("Invalid scan type %u requested", req->scan_type);
-      return ZX_ERR_INVALID_ARGS;
-  }
-
+zx_status_t Scanner::PrepareScanRequest(
+    const fuchsia_wlan_fullmac::wire::WlanFullmacImplStartScanRequest* req) {
   scan_request_ = ScanRequestType(MLAN_IOCTL_SCAN, MLAN_ACT_SET, bss_index_,
                                   {.sub_command = MLAN_OID_SCAN_USER_CONFIG});
   auto scan_cfg =
       reinterpret_cast<wlan_user_scan_cfg*>(scan_request_.UserReq().param.user_scan.scan_cfg_buf);
   scan_cfg->ext_scan_type = EXT_SCAN_ENHANCE;
 
-  // Copy SSIDs if this is a targeted scan.
-  for (size_t i = 0; i < req->ssids_count; ++i) {
-    const uint8_t len =
-        std::min<uint8_t>(req->ssids_list[i].len, sizeof(scan_cfg->ssid_list[i].ssid));
-    memcpy(scan_cfg->ssid_list[i].ssid, req->ssids_list[i].data, len);
-    // Leave ssid_list[i].max_len set to zero here, based on other drivers it doesn't seem necessary
-    // to set it.
+  if (req->has_ssids()) {
+    if (req->ssids().count() > MRVDRV_MAX_SSID_LIST_LENGTH) {
+      NXPF_ERR("Requested %zu SSIDs in scan but only %d supported", req->ssids().count(),
+               MRVDRV_MAX_SSID_LIST_LENGTH);
+      return ZX_ERR_INVALID_ARGS;
+    }
+
+    // Copy SSIDs if this is a targeted scan.
+    for (size_t i = 0; i < req->ssids().count(); ++i) {
+      const uint8_t len =
+          std::min<uint8_t>(req->ssids().data()[i].len, sizeof(scan_cfg->ssid_list[i].ssid));
+      memcpy(scan_cfg->ssid_list[i].ssid, req->ssids().data()[i].data.data(), len);
+      // Leave ssid_list[i].max_len set to zero here, based on other drivers it doesn't seem
+      // necessary to set it.
+    }
+  }
+
+  uint8_t scan_type = 0;
+  switch (req->scan_type()) {
+    case fuchsia_wlan_fullmac::wire::WlanScanType::kActive:
+      scan_type = MLAN_SCAN_TYPE_ACTIVE;
+      break;
+    case fuchsia_wlan_fullmac::wire::WlanScanType::kPassive:
+      scan_type = MLAN_SCAN_TYPE_PASSIVE;
+      break;
+    default:
+      NXPF_ERR("Invalid scan type %u requested", req->scan_type());
+      return ZX_ERR_INVALID_ARGS;
   }
 
   // Retrieve a list of supported channels. This just calls into mlan and doesn't reach firmware so
@@ -241,7 +259,13 @@ zx_status_t Scanner::PrepareScanRequest(const wlan_fullmac_scan_req_t* req) {
   }
   auto& chanlist = get_channels.UserReq().param.chanlist;
 
-  if (req->channels_count > 0) {
+  if (req->has_channels() && req->channels().count() > 0) {
+    if (req->channels().count() > WLAN_USER_SCAN_CHAN_MAX) {
+      NXPF_ERR("Requested %zu channels in scan but only %d supported", req->channels().count(),
+               WLAN_USER_SCAN_CHAN_MAX);
+      return ZX_ERR_INVALID_ARGS;
+    }
+
     // Create a set of all supported channels so we can filter out any requested channels that are
     // not supported.
     std::unordered_set<uint32_t> supported_channels;
@@ -250,16 +274,16 @@ zx_status_t Scanner::PrepareScanRequest(const wlan_fullmac_scan_req_t* req) {
     }
 
     // Channels to scan provided in request, copy them.
-    for (size_t i = 0; i < req->channels_count; ++i) {
-      if (supported_channels.find(req->channels_list[i]) != supported_channels.end()) {
-        PopulateScanChannel(scan_cfg->chan_list[i], req->channels_list[i], scan_type,
-                            req->min_channel_time);
+    for (size_t i = 0; i < req->channels().count(); ++i) {
+      if (supported_channels.find(req->channels().data()[i]) != supported_channels.end()) {
+        PopulateScanChannel(scan_cfg->chan_list[i], req->channels().data()[i], scan_type,
+                            req->min_channel_time());
       }
     }
   } else {
     for (size_t i = 0; i < chanlist.num_of_chan && i < WLAN_USER_SCAN_CHAN_MAX; ++i) {
       PopulateScanChannel(scan_cfg->chan_list[i], static_cast<uint8_t>(chanlist.cf[i].channel),
-                          scan_type, req->min_channel_time);
+                          scan_type, req->min_channel_time());
     }
   }
   return ZX_OK;

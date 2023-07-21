@@ -43,11 +43,7 @@ using wlan::nxpfmac::DeviceContext;
 constexpr uint8_t kIesWithSsid[] = {"\x00\x04Test"};
 constexpr uint8_t kTestChannel = 6;
 constexpr uint32_t kTestBssIndex = 3;
-constexpr wlan_fullmac_connect_req_t kMinimumConnectReq = {
-    .selected_bss{.ies_list = kIesWithSsid,
-                  .ies_count = sizeof(kIesWithSsid),
-                  .channel{.primary = kTestChannel}},
-    .auth_type = WLAN_AUTH_TYPE_OPEN_SYSTEM};
+constexpr uint8_t kBss[] = {0x01, 0x02, 0x03, 0x04, 0x05, 0x06};
 
 // Barebones Device Class (at this time mainly for the dispatcher to handle timers)
 struct TestDevice : public Device {
@@ -55,7 +51,6 @@ struct TestDevice : public Device {
   static zx_status_t Create(zx_device_t *parent, async_dispatcher_t *dispatcher,
                             sync_completion_t *destruction_compl, TestDevice **out_device) {
     auto device = new TestDevice(parent, dispatcher, destruction_compl);
-
     *out_device = device;
     return ZX_OK;
   }
@@ -120,6 +115,19 @@ struct ClientConnectionTest : public zxtest::Test {
                                             .event_handler_ = &event_handler_,
                                             .ioctl_adapter_ = ioctl_adapter_.get(),
                                             .data_plane_ = test_data_plane_->GetDataPlane()};
+
+    auto builder =
+        fuchsia_wlan_fullmac::wire::WlanFullmacImplConnectReqRequest::Builder(request_arena_);
+
+    fuchsia_wlan_internal::wire::BssDescription bss;
+    memcpy(bss.bssid.data(), kBss, sizeof(kBss));
+    bss.ies = fidl::VectorView<uint8_t>::FromExternal(const_cast<uint8_t *>(kIesWithSsid),
+                                                      sizeof(kIesWithSsid));
+    bss.channel.primary = kTestChannel;
+
+    builder.selected_bss(bss);
+    builder.auth_type(fuchsia_wlan_fullmac::wire::WlanAuthType::kOpenSystem);
+    default_request_ = builder.Build();
   }
 
   void TearDown() override {
@@ -164,6 +172,8 @@ struct ClientConnectionTest : public zxtest::Test {
     return MLAN_STATUS_FAILURE;
   }
 
+  fidl::Arena<wlan::nxpfmac::kConnectReqBufferSize> request_arena_;
+  fuchsia_wlan_fullmac::wire::WlanFullmacImplConnectReqRequest default_request_;
   std::unique_ptr<async::Loop> event_loop_;
   wlan::simulation::Environment env_ = {};
   TestDevice *test_device_ = nullptr;
@@ -185,15 +195,11 @@ TEST_F(ClientConnectionTest, Constructible) {
 }
 
 TEST_F(ClientConnectionTest, Connect) {
-  constexpr uint8_t kBss[] = {0x01, 0x02, 0x03, 0x04, 0x05, 0x06};
   constexpr uint8_t kStaAddr[] = {0x0e, 0x0d, 0x16, 0x28, 0x3a, 0x4c};
   constexpr uint32_t kBssIndex = 0;
   constexpr int8_t kTestRssi = -64;
   constexpr int8_t kTestSnr = 28;
   constexpr zx::duration kSignalLogTimeout = zx::sec(30);
-
-  wlan_fullmac_connect_req_t request = kMinimumConnectReq;
-  memcpy(request.selected_bss.bssid, kBss, sizeof(kBss));
 
   sync_completion_t ioctl_completion;
 
@@ -276,7 +282,7 @@ TEST_F(ClientConnectionTest, Connect) {
     sync_completion_signal(&connect_completion);
   };
 
-  ASSERT_OK(connection.Connect(&request, std::move(on_connect)));
+  ASSERT_OK(connection.Connect(&default_request_, std::move(on_connect)));
 
   ASSERT_OK(sync_completion_wait(&ioctl_completion, ZX_TIME_INFINITE));
   ASSERT_OK(sync_completion_wait(&connect_completion, ZX_TIME_INFINITE));
@@ -326,11 +332,9 @@ TEST_F(ClientConnectionTest, CancelConnect) {
 
   ClientConnection connection(&test_ifc_, &context_, key_ring_.get(), kBssIndex);
 
-  wlan_fullmac_connect_req_t request = kMinimumConnectReq;
-
   sync_completion_t completion;
   ASSERT_OK(connection.Connect(
-      &request, [&](ClientConnection::StatusCode status_code, const uint8_t *, size_t) {
+      &default_request_, [&](ClientConnection::StatusCode status_code, const uint8_t *, size_t) {
         EXPECT_EQ(ClientConnection::StatusCode::kCanceled, status_code);
         sync_completion_signal(&completion);
       }));
@@ -374,8 +378,6 @@ TEST_F(ClientConnectionTest, Disconnect) {
   // First ensure that if we're not connected we can't disconnect.
   ASSERT_EQ(ZX_ERR_NOT_CONNECTED, connection.Disconnect(kStaAddr, kReasonCode, [](auto) {}));
 
-  wlan_fullmac_connect_req_t request = kMinimumConnectReq;
-
   sync_completion_t connect_completion;
   auto on_connect = [&](ClientConnection::StatusCode status, const uint8_t *ies, size_t ies_len) {
     EXPECT_EQ(ClientConnection::StatusCode::kSuccess, status);
@@ -383,7 +385,7 @@ TEST_F(ClientConnectionTest, Disconnect) {
   };
 
   // Now connect so that we can successfully disconnect
-  ASSERT_OK(connection.Connect(&request, std::move(on_connect)));
+  ASSERT_OK(connection.Connect(&default_request_, std::move(on_connect)));
   ASSERT_OK(sync_completion_wait(&connect_completion, ZX_TIME_INFINITE));
 
   // Disconnecting should now work.
@@ -436,8 +438,6 @@ TEST_F(ClientConnectionTest, DisconnectOnDestruct) {
   {
     ClientConnection connection(&test_ifc_, &context_, key_ring_.get(), kTestBssIndex);
 
-    wlan_fullmac_connect_req_t request = kMinimumConnectReq;
-
     sync_completion_t connect_completion;
     auto on_connect = [&](ClientConnection::StatusCode status, const uint8_t *ies, size_t ies_len) {
       EXPECT_EQ(ClientConnection::StatusCode::kSuccess, status);
@@ -445,7 +445,7 @@ TEST_F(ClientConnectionTest, DisconnectOnDestruct) {
     };
 
     // First we connect so that we can successfully disconnect
-    ASSERT_OK(connection.Connect(&request, std::move(on_connect)));
+    ASSERT_OK(connection.Connect(&default_request_, std::move(on_connect)));
     ASSERT_OK(sync_completion_wait(&connect_completion, ZX_TIME_INFINITE));
   }
   // The ClientConnection object has now gone out of scope and should have disconnected as part of
@@ -490,7 +490,7 @@ TEST_F(ClientConnectionTest, DisconnectAsyncFailure) {
   };
 
   // Now connect so that we can successfully disconnect
-  ASSERT_OK(connection.Connect(&kMinimumConnectReq, std::move(on_connect)));
+  ASSERT_OK(connection.Connect(&default_request_, std::move(on_connect)));
   ASSERT_OK(sync_completion_wait(&connect_completion, ZX_TIME_INFINITE));
 
   sync_completion_t disconnect_completion;
@@ -540,7 +540,7 @@ TEST_F(ClientConnectionTest, DisconnectWhileDisconnectInProgress) {
   };
 
   // Now connect so that we can successfully disconnect
-  ASSERT_OK(connection.Connect(&kMinimumConnectReq, std::move(on_connect)));
+  ASSERT_OK(connection.Connect(&default_request_, std::move(on_connect)));
   ASSERT_OK(sync_completion_wait(&connect_completion, ZX_TIME_INFINITE));
 
   ASSERT_OK(connection.Disconnect(kStaAddr, kReasonCode, [&](wlan::nxpfmac::IoctlStatus status) {
@@ -560,12 +560,16 @@ TEST_F(ClientConnectionTest, InitiateSaeHandshake) {
 
   // Create a request with a specific BSSID and SAE auth method, this should trigger the SAE
   // handshake request.
-  const wlan_fullmac_connect_req_t req{
-      .selected_bss = {.bssid{0x01, 0x02, 0x03, 0x04, 0x05, 0x06}},
-      .auth_type = WLAN_AUTH_TYPE_SAE,
-  };
+  fidl::Arena arena;
+  auto builder = fuchsia_wlan_fullmac::wire::WlanFullmacImplConnectReqRequest::Builder(arena);
 
-  test_ifc_.initiate_sae_handshake_.ExpectCall(req.selected_bss.bssid);
+  fuchsia_wlan_internal::wire::BssDescription bss;
+  memcpy(bss.bssid.data(), kBss, sizeof(kBss));
+  builder.selected_bss(bss);
+  builder.auth_type(fuchsia_wlan_fullmac::wire::WlanAuthType::kSae);
+  auto req = builder.Build();
+
+  test_ifc_.initiate_sae_handshake_.ExpectCall(req.selected_bss().bssid.data());
 
   ClientConnection connection(&test_ifc_, &context_, key_ring_.get(), kTestBssIndex);
 
@@ -624,12 +628,17 @@ TEST_F(ClientConnectionTest, TransmitAuthFrame) {
 
   // We need to connect first, there has to be a stored connection request for the auth frame
   // transmission to work and the connection has to be in the correct state.
-  const wlan_fullmac_connect_req_t req{
-      .selected_bss = {.bssid{0x01, 0x02, 0x03, 0x04, 0x05, 0x06}, .channel{.primary = kChannel}},
-      .auth_type = WLAN_AUTH_TYPE_SAE,
-  };
+  fidl::Arena arena;
+  auto builder = fuchsia_wlan_fullmac::wire::WlanFullmacImplConnectReqRequest::Builder(arena);
 
-  test_ifc_.initiate_sae_handshake_.ExpectCall(req.selected_bss.bssid);
+  fuchsia_wlan_internal::wire::BssDescription bss;
+  memcpy(bss.bssid.data(), kBss, sizeof(kBss));
+  bss.channel.primary = kChannel;
+  builder.selected_bss(bss);
+  builder.auth_type(fuchsia_wlan_fullmac::wire::WlanAuthType::kSae);
+  auto req = builder.Build();
+
+  test_ifc_.initiate_sae_handshake_.ExpectCall(req.selected_bss().bssid.data());
   ASSERT_OK(connection.Connect(&req, [](ClientConnection::StatusCode, const uint8_t *, size_t) {}));
   test_ifc_.initiate_sae_handshake_.VerifyAndClear();
 

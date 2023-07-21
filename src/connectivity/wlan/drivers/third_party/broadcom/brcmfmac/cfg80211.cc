@@ -18,11 +18,6 @@
 
 #include "src/connectivity/wlan/drivers/third_party/broadcom/brcmfmac/cfg80211.h"
 
-#include <fuchsia/hardware/wlan/fullmac/c/banjo.h>
-#include <fuchsia/hardware/wlanphyimpl/c/banjo.h>
-#include <fuchsia/wlan/common/c/banjo.h>
-#include <fuchsia/wlan/ieee80211/cpp/fidl.h>
-#include <fuchsia/wlan/internal/c/banjo.h>
 #include <lib/ddk/metadata.h>
 #include <lib/zx/clock.h>
 #include <netinet/if_ether.h>
@@ -46,8 +41,6 @@
 #include <wlan/common/ieee80211_codes.h>
 #include <wlan/common/macaddr.h>
 
-#include "fuchsia/wlan/common/cpp/fidl.h"
-#include "fuchsia/wlan/ieee80211/c/banjo.h"
 #include "src/connectivity/wlan/drivers/third_party/broadcom/brcmfmac/bcdc.h"
 #include "src/connectivity/wlan/drivers/third_party/broadcom/brcmfmac/bits.h"
 #include "src/connectivity/wlan/drivers/third_party/broadcom/brcmfmac/brcmu_d11.h"
@@ -739,7 +732,7 @@ static void brcmf_signal_scan_end(struct net_device* ndev, uint64_t txn_id,
   args.txn_id = txn_id;
   args.code = scan_result_code;
   std::shared_lock<std::shared_mutex> guard(ndev->if_proto_lock);
-  if (ndev->if_proto.ops == nullptr) {
+  if (ndev->if_proto == nullptr) {
     BRCMF_IFDBG(WLANIF, ndev, "interface stopped-- skipping signal scan end callback ");
   } else {
     BRCMF_DBG(SCAN, "Signaling on_scan_end with txn_id %ld and code %d", args.txn_id, args.code);
@@ -754,7 +747,7 @@ static void brcmf_signal_scan_end(struct net_device* ndev, uint64_t txn_id,
                 : args.code == WLAN_SCAN_RESULT_INTERNAL_ERROR ? "internal error"
                                                                : "unknown",
                 ndev->scan_num_results);
-    wlan_fullmac_impl_ifc_on_scan_end(&ndev->if_proto, &args);
+    ndev->if_proto->OnScanEnd(&args);
   }
 }
 
@@ -900,11 +893,17 @@ static zx_status_t brcmf_dev_escan_set_randmac(struct brcmf_if* ifp) {
 
 static zx_status_t brcmf_escan_prep(struct brcmf_cfg80211_info* cfg,
                                     struct brcmf_scan_params_le* params_le,
-                                    const wlan_fullmac_scan_req_t* request) {
-  uint32_t n_ssids;
-  uint32_t n_channels;
-  int32_t offset;
+                                    const wlan_fullmac::WlanFullmacImplStartScanRequest* request) {
+  uint32_t n_ssids = 0;
+  uint32_t n_channels = 0;
+  int32_t offset = 0;
   uint16_t chanspec;
+
+  if (!(request->has_scan_type() && request->has_channels())) {
+    BRCMF_ERR("Missing required field, scan_type: %d, channels: %d", request->has_scan_type(),
+              request->has_channels());
+    return ZX_ERR_INVALID_ARGS;
+  }
 
   fill_with_broadcast_addr(params_le->bssid);
 
@@ -915,65 +914,70 @@ static zx_status_t brcmf_escan_prep(struct brcmf_cfg80211_info* cfg,
   // Do not filter scan results based on BSS type.
   params_le->bss_type = DOT11_BSSTYPE_ANY;
 
-  if (request->scan_type == WLAN_SCAN_TYPE_ACTIVE) {
+  if (request->scan_type() == wlan_fullmac::WlanScanType::kActive) {
     params_le->scan_type = BRCMF_SCANTYPE_ACTIVE;
-    params_le->active_time = request->min_channel_time;
+    params_le->active_time = request->min_channel_time();
     params_le->nprobes = BRCMF_ACTIVE_SCAN_NUM_PROBES;
     params_le->passive_time = -1;
   } else {
     params_le->scan_type = BRCMF_SCANTYPE_PASSIVE;
-    params_le->passive_time = request->min_channel_time;
+    params_le->passive_time = request->min_channel_time();
     params_le->active_time = -1;
   }
   params_le->channel_num = 0;
   params_le->home_time = -1;
 
   /* Copy channel array if applicable */
-  n_channels = request->channels_count;
+  n_channels = request->channels().count();
   BRCMF_DBG(SCAN, "### List of channelspecs to scan ### %d", n_channels);
-  if (n_channels > 0) {
+  if (n_channels == 0) {
+    BRCMF_ERR("Scan request contains empty channel list.");
+    return ZX_ERR_INVALID_ARGS;
+  } else {
     for (uint32_t i = 0; i < n_channels; i++) {
       wlan_channel_t wlan_chan;
-      wlan_chan.primary = request->channels_list[i];
+      wlan_chan.primary = request->channels().data()[i];
       wlan_chan.cbw = CHANNEL_BANDWIDTH_CBW20;
       wlan_chan.secondary80 = 0;
       chanspec = channel_to_chanspec(&cfg->d11inf, &wlan_chan);
-      BRCMF_DBG(SCAN, "Chan : %d, Channel spec: %x", request->channels_list[i], chanspec);
+      BRCMF_DBG(SCAN, "Chan : %d, Channel spec: %x", request->channels().data()[i], chanspec);
       params_le->channel_list[i] = chanspec;
     }
-  } else {
-    BRCMF_ERR("Scan request contains empty channel list.");
-    return ZX_ERR_INVALID_ARGS;
   }
 
   /* Add number of channels to channel_num */
   params_le->channel_num = n_channels & BRCMF_SCAN_PARAMS_COUNT_MASK;
 
-  /* Set SSID fields as applicable */
-  n_ssids = request->ssids_count;
-  BRCMF_DBG(SCAN, "### List of SSIDs to scan ### %d", n_ssids);
+  if (!request->has_ssids()) {
+    BRCMF_DBG(SCAN, "No ssids field in the request.");
+  } else {
+    /* Set SSID fields as applicable */
+    n_ssids = request->ssids().count();
+    BRCMF_DBG(SCAN, "### List of SSIDs to scan ### %d", n_ssids);
 
-  /* Copy ssids_list if non-empty */
-  if (n_ssids > 0) {
-    offset = offsetof(struct brcmf_scan_params_le, channel_list) + n_channels * sizeof(uint16_t);
-    offset = roundup(offset, sizeof(uint32_t));
-    struct brcmf_ssid_le* ssid_le =
-        reinterpret_cast<struct brcmf_ssid_le*>(reinterpret_cast<char*>(params_le) + offset);
-    for (uint32_t i = 0; i < n_ssids; i++, ssid_le++) {
-      if (request->ssids_list[i].len > wlan_ieee80211::MAX_SSID_BYTE_LEN) {
-        BRCMF_ERR("SSID in scan request SSID list too long(no longer than %hhu bytes)",
-                  wlan_ieee80211::MAX_SSID_BYTE_LEN);
-        return ZX_ERR_INVALID_ARGS;
-      }
-      ssid_le->SSID_len = request->ssids_list[i].len;
-      memcpy(&ssid_le->SSID, request->ssids_list[i].data, request->ssids_list[i].len);
-      if (ssid_le->SSID_len == 0) {
-        BRCMF_DBG(SCAN, "%d: Broadcast scan", i);
-      } else {
-        BRCMF_DBG(SCAN, "%d: Targeted scan", i);
+    /* Copy ssids_list if non-empty */
+    if (n_ssids > 0) {
+      offset = offsetof(struct brcmf_scan_params_le, channel_list) + n_channels * sizeof(uint16_t);
+      offset = roundup(offset, sizeof(uint32_t));
+      struct brcmf_ssid_le* ssid_le =
+          reinterpret_cast<struct brcmf_ssid_le*>(reinterpret_cast<char*>(params_le) + offset);
+      for (uint32_t i = 0; i < n_ssids; i++, ssid_le++) {
+        if (request->ssids().data()[i].len > wlan_ieee80211::MAX_SSID_BYTE_LEN) {
+          BRCMF_ERR("SSID in scan request SSID list too long(no longer than %hhu bytes)",
+                    wlan_ieee80211::MAX_SSID_BYTE_LEN);
+          return ZX_ERR_INVALID_ARGS;
+        }
+        ssid_le->SSID_len = request->ssids().data()[i].len;
+        memcpy(&ssid_le->SSID, request->ssids().data()[i].data.data(),
+               request->ssids().data()[i].len);
+        if (ssid_le->SSID_len == 0) {
+          BRCMF_DBG(SCAN, "%d: Broadcast scan", i);
+        } else {
+          BRCMF_DBG(SCAN, "%d: Targeted scan", i);
 #if !defined(NDEBUG)
-        BRCMF_DBG(SCAN, "  ssid:" FMT_SSID, FMT_SSID_BYTES(ssid_le->SSID, ssid_le->SSID_len));
+          BRCMF_DBG(SCAN, "  ssid:" FMT_SSID, FMT_SSID_BYTES(ssid_le->SSID, ssid_le->SSID_len));
 #endif /* !defined(NDEBUG) */
+        }
       }
     }
   }
@@ -1005,20 +1009,30 @@ static inline uint16_t brcmf_next_sync_id(struct brcmf_cfg80211_info* cfg) {
 }
 
 static zx_status_t brcmf_run_escan(struct brcmf_cfg80211_info* cfg, struct brcmf_if* ifp,
-                                   const wlan_fullmac_scan_req_t* request, uint16_t* sync_id_out) {
-  if (request == nullptr) {
+                                   const wlan_fullmac::WlanFullmacImplStartScanRequest* request,
+                                   uint16_t* sync_id_out) {
+  // Check required fields.
+  if (request == nullptr || !(request->has_channels() && request->has_min_channel_time() &&
+                              request->has_max_channel_time())) {
+    BRCMF_ERR(
+        "Missing required field, request: %d, channels: %d, min_channel_time: %d, max_channel_time: %d",
+        request ? 1 : 0, request ? request->has_channels() : 0,
+        request ? request->has_min_channel_time() : 0,
+        request ? request->has_max_channel_time() : 0);
     return ZX_ERR_INVALID_ARGS;
   }
 
   // Validate dwell times
-  if (request->min_channel_time == 0 || request->max_channel_time < request->min_channel_time) {
-    BRCMF_ERR("Invalid dwell times in escan request min: %u max: %u", request->min_channel_time,
-              request->max_channel_time);
+  if (request->min_channel_time() == 0 ||
+      request->max_channel_time() < request->min_channel_time()) {
+    BRCMF_ERR("Invalid dwell times in escan request min: %u max: %u", request->min_channel_time(),
+              request->max_channel_time());
     return ZX_ERR_INVALID_ARGS;
   }
 
+  size_t ssids_count = request->has_ssids() ? request->ssids().count() : 0;
   // Calculate space needed for parameters
-  size_t params_size = brcmf_escan_params_size(request->channels_count, request->ssids_count);
+  size_t params_size = brcmf_escan_params_size(request->channels().count(), ssids_count);
 
   // Validate command size
   size_t total_cmd_size = params_size + sizeof("escan");
@@ -1076,7 +1090,8 @@ exit:
   return err;
 }
 
-static zx_status_t brcmf_do_escan(struct brcmf_if* ifp, const wlan_fullmac_scan_req_t* req,
+static zx_status_t brcmf_do_escan(struct brcmf_if* ifp,
+                                  const wlan_fullmac::WlanFullmacImplStartScanRequest* req,
                                   uint16_t* sync_id_out) {
   struct brcmf_cfg80211_info* cfg = ifp->drvr->config;
   zx_status_t err;
@@ -1134,7 +1149,8 @@ zx_status_t brcmf_check_scan_status(unsigned long scan_status,
   return out_scan_status;
 }
 
-zx_status_t brcmf_cfg80211_scan(struct net_device* ndev, const wlan_fullmac_scan_req_t* req,
+zx_status_t brcmf_cfg80211_scan(struct net_device* ndev,
+                                const wlan_fullmac::WlanFullmacImplStartScanRequest* req,
                                 uint16_t* sync_id_out) {
   zx_status_t err;
 
@@ -1229,7 +1245,7 @@ static zx_status_t brcmf_set_pmk(struct brcmf_if* ifp, const uint8_t* pmk_data, 
 
 static void brcmf_notify_deauth(struct net_device* ndev, const uint8_t peer_sta_address[ETH_ALEN]) {
   std::shared_lock<std::shared_mutex> guard(ndev->if_proto_lock);
-  if (ndev->if_proto.ops == nullptr) {
+  if (ndev->if_proto == nullptr) {
     BRCMF_IFDBG(WLANIF, ndev, "interface stopped -- skipping deauth confirm callback");
     return;
   }
@@ -1242,12 +1258,12 @@ static void brcmf_notify_deauth(struct net_device* ndev, const uint8_t peer_sta_
   BRCMF_IFDBG(WLANIF, ndev, "  address: " FMT_MAC "", FMT_MAC_ARGS(peer_sta_address));
 #endif /* !defined(NDEBUG) */
 
-  wlan_fullmac_impl_ifc_deauth_conf(&ndev->if_proto, &resp);
+  ndev->if_proto->DeauthConf(&resp);
 }
 
 static void brcmf_notify_disassoc(struct net_device* ndev, zx_status_t status) {
   std::shared_lock<std::shared_mutex> guard(ndev->if_proto_lock);
-  if (ndev->if_proto.ops == nullptr) {
+  if (ndev->if_proto == nullptr) {
     BRCMF_IFDBG(WLANIF, ndev, "interface stopped -- skipping disassoc confirm callback");
     return;
   }
@@ -1255,7 +1271,7 @@ static void brcmf_notify_disassoc(struct net_device* ndev, zx_status_t status) {
   wlan_fullmac_disassoc_confirm_t resp = {};
   resp.status = status;
   BRCMF_IFDBG(WLANIF, ndev, "Sending disassoc confirm to SME. status: %" PRIu32 "", status);
-  wlan_fullmac_impl_ifc_disassoc_conf(&ndev->if_proto, &resp);
+  ndev->if_proto->DisassocConf(&resp);
 }
 
 // Send deauth_ind to SME (can be from client or softap)
@@ -1263,7 +1279,7 @@ static void brcmf_notify_deauth_ind(net_device* ndev, const uint8_t mac_addr[ETH
                                     wlan_ieee80211::ReasonCode reason_code,
                                     bool locally_initiated) {
   std::shared_lock<std::shared_mutex> guard(ndev->if_proto_lock);
-  if (ndev->if_proto.ops == nullptr) {
+  if (ndev->if_proto == nullptr) {
     BRCMF_IFDBG(WLANIF, ndev, "interface stopped -- skipping deauth ind callback");
     return;
   }
@@ -1279,7 +1295,7 @@ static void brcmf_notify_deauth_ind(net_device* ndev, const uint8_t mac_addr[ETH
   memcpy(ind.peer_sta_address, mac_addr, ETH_ALEN);
   ind.reason_code = static_cast<reason_code_t>(reason_code);
   ind.locally_initiated = locally_initiated;
-  wlan_fullmac_impl_ifc_deauth_ind(&ndev->if_proto, &ind);
+  ndev->if_proto->DeauthInd(&ind);
 }
 
 // Send disassoc_ind to SME (can be from client or softap)
@@ -1287,7 +1303,7 @@ static void brcmf_notify_disassoc_ind(net_device* ndev, const uint8_t mac_addr[E
                                       wlan_ieee80211::ReasonCode reason_code,
                                       bool locally_initiated) {
   std::shared_lock<std::shared_mutex> guard(ndev->if_proto_lock);
-  if (ndev->if_proto.ops == nullptr) {
+  if (ndev->if_proto == nullptr) {
     BRCMF_IFDBG(WLANIF, ndev, "interface stopped -- skipping disassoc ind callback");
     return;
   }
@@ -1303,14 +1319,14 @@ static void brcmf_notify_disassoc_ind(net_device* ndev, const uint8_t mac_addr[E
   memcpy(ind.peer_sta_address, mac_addr, ETH_ALEN);
   ind.reason_code = static_cast<reason_code_t>(reason_code);
   ind.locally_initiated = locally_initiated;
-  wlan_fullmac_impl_ifc_disassoc_ind(&ndev->if_proto, &ind);
+  ndev->if_proto->DisassocInd(&ind);
 }
 
 static void cfg80211_disconnected(struct brcmf_cfg80211_vif* vif,
                                   wlan_ieee80211::ReasonCode reason_code, uint16_t event_code) {
   struct net_device* ndev = vif->wdev.netdev;
   std::shared_lock<std::shared_mutex> guard(ndev->if_proto_lock);
-  if (ndev->if_proto.ops == nullptr) {
+  if (ndev->if_proto == nullptr) {
     BRCMF_IFDBG(WLANIF, ndev, "interface stopped -- skipping link down callback");
     return;
   }
@@ -1398,23 +1414,24 @@ static void brcmf_link_down(struct brcmf_cfg80211_vif* vif, wlan_ieee80211::Reas
   BRCMF_DBG(TRACE, "Exit");
 }
 
-static zx_status_t brcmf_set_auth_type(struct net_device* ndev, uint8_t auth_type) {
+static zx_status_t brcmf_set_auth_type(struct net_device* ndev,
+                                       fuchsia_wlan_fullmac::WlanAuthType auth_type) {
   brcmf_if* ifp = ndev_to_if(ndev);
   int32_t val = 0;
   zx_status_t status = ZX_OK;
 
   switch (auth_type) {
-    case WLAN_AUTH_TYPE_OPEN_SYSTEM:
+    case fuchsia_wlan_fullmac::WlanAuthType::kOpenSystem:
       val = BRCMF_AUTH_MODE_OPEN;
       break;
-    case WLAN_AUTH_TYPE_SHARED_KEY:
+    case fuchsia_wlan_fullmac::WlanAuthType::kSharedKey:
       // When asked to use a shared key (which should only happen for WEP), we will direct the
       // firmware to use auto-detect, which will fall back on open WEP if shared WEP fails to
       // succeed. This was chosen to allow us to avoid implementing WEP auto-detection at higher
       // levels of the wlan stack.
       val = BRCMF_AUTH_MODE_AUTO;
       break;
-    case WLAN_AUTH_TYPE_SAE:
+    case fuchsia_wlan_fullmac::WlanAuthType::kSae:
       val = BRCMF_AUTH_MODE_SAE;
       break;
     default:
@@ -1745,7 +1762,7 @@ static inline bool brcmf_tlv_ie_has_msft_type(const uint8_t* ie, uint8_t oui_typ
 
 void brcmf_return_assoc_result(struct net_device* ndev, status_code_t status_code) {
   std::shared_lock<std::shared_mutex> guard(ndev->if_proto_lock);
-  if (ndev->if_proto.ops == nullptr) {
+  if (ndev->if_proto == nullptr) {
     BRCMF_IFDBG(WLANIF, ndev, "interface stopped -- skipping association callback");
     return;
   }
@@ -1768,7 +1785,7 @@ void brcmf_return_assoc_result(struct net_device* ndev, status_code_t status_cod
 
   BRCMF_IFDBG(WLANIF, ndev, "Sending connect result to SME. result: %" PRIu16 ", aid: %" PRIu16,
               conf.result_code, conf.association_id);
-  wlan_fullmac_impl_ifc_connect_conf(&ndev->if_proto, &conf);
+  ndev->if_proto->ConnectConf(&conf);
 }
 
 // Stops roam timer, cleans up roam request, and returns roam result.
@@ -1783,7 +1800,7 @@ void brcmf_return_roam_result(struct net_device* ndev, const uint8_t* target_bss
 
   cfg->roam_timer->Stop();
   brcmf_clear_bit(brcmf_vif_status_bit_t::ROAMING, &vif->sme_state);
-  if (ndev->if_proto.ops == nullptr) {
+  if (ndev->if_proto == nullptr) {
     BRCMF_IFDBG(WLANIF, ndev, "interface stopped -- skipping roam result callback");
     return;
   }
@@ -1812,7 +1829,7 @@ void brcmf_return_roam_result(struct net_device* ndev, const uint8_t* target_bss
   BRCMF_INFO("Firmware-initiated roam");
   BRCMF_IFDBG(WLANIF, ndev, "Sending roam result: 0x%x, BSSID: " FMT_MAC, conf.result_code,
               FMT_MAC_ARGS(conf.target_bssid));
-  wlan_fullmac_impl_ifc_roam_conf(&ndev->if_proto, &conf);
+  ndev->if_proto->RoamConf(&conf);
 }
 
 std::vector<uint8_t> brcmf_find_ssid_in_ies(const uint8_t* ie, size_t ie_len) {
@@ -1833,11 +1850,12 @@ std::vector<uint8_t> brcmf_find_ssid_in_ies(const uint8_t* ie, size_t ie_len) {
   return ssid;
 }
 
-zx_status_t brcmf_cfg80211_connect(struct net_device* ndev, const wlan_fullmac_connect_req_t* req) {
+zx_status_t brcmf_cfg80211_connect(
+    struct net_device* ndev, const fuchsia_wlan_fullmac::WlanFullmacImplConnectReqRequest* req) {
   struct brcmf_if* ifp = ndev_to_if(ndev);
   struct brcmf_cfg80211_info* cfg = ifp->drvr->config;
   struct brcmf_join_params join_params;
-  wlan_channel_t chan_override;
+  fuchsia_wlan_common::WlanChannel chan_override;
   uint16_t chanspec;
   size_t join_params_size = 0;
   std::vector<uint8_t> ssid;
@@ -1845,6 +1863,10 @@ zx_status_t brcmf_cfg80211_connect(struct net_device* ndev, const wlan_fullmac_c
   bcme_status_t fw_err = BCME_OK;
   bool is_rsn_ie = true;
 
+  if (!req->selected_bss().has_value()) {
+    BRCMF_ERR("Missing required field, selected_bss: %d", req->selected_bss().has_value());
+    return ZX_ERR_INVALID_ARGS;
+  }
   BRCMF_DBG(TRACE, "Enter");
   if (!check_vif_up(ifp->vif)) {
     return ZX_ERR_IO;
@@ -1864,17 +1886,17 @@ zx_status_t brcmf_cfg80211_connect(struct net_device* ndev, const wlan_fullmac_c
     goto done;
   }
 
-  if (req->security_ie_count >= TLV_HDR_LEN &&
-      req->security_ie_list[0] == WLAN_IE_TYPE_VENDOR_SPECIFIC &&
-      brcmf_tlv_ie_has_msft_type(req->security_ie_list, WPA_OUI_TYPE)) {
+  if (req->security_ie().has_value() && req->security_ie()->size() >= TLV_HDR_LEN &&
+      req->security_ie()->data()[0] == WLAN_IE_TYPE_VENDOR_SPECIFIC &&
+      brcmf_tlv_ie_has_msft_type(req->security_ie()->data(), WPA_OUI_TYPE)) {
     // Not RSNE but is WPA1 IE
     is_rsn_ie = false;
   }
 
-  if (req->security_ie_count > 0) {
+  if (req->security_ie().has_value() && req->security_ie()->size() > 0) {
     // Set wpaie only if there's security ie
-    err = brcmf_fil_iovar_data_set(ifp, "wpaie", req->security_ie_list, req->security_ie_count,
-                                   &fw_err);
+    err = brcmf_fil_iovar_data_set(ifp, "wpaie", req->security_ie()->data(),
+                                   req->security_ie()->size(), &fw_err);
     if (err != ZX_OK) {
       BRCMF_ERR("wpaie failed: %s, fw err %s", zx_status_get_string(err),
                 brcmf_fil_get_errstr(fw_err));
@@ -1891,8 +1913,8 @@ zx_status_t brcmf_cfg80211_connect(struct net_device* ndev, const wlan_fullmac_c
     BRCMF_DBG(TRACE, "Applied Vndr IEs for Assoc request");
   }
 
-  if (req->security_ie_count > 0) {
-    struct brcmf_vs_tlv* tmp_ie = (struct brcmf_vs_tlv*)req->security_ie_list;
+  if (req->security_ie().has_value() && req->security_ie()->size() > 0) {
+    struct brcmf_vs_tlv* tmp_ie = (struct brcmf_vs_tlv*)req->security_ie()->data();
     err = brcmf_configure_wpaie(ifp, tmp_ie, is_rsn_ie, false);
     if (err != ZX_OK) {
       BRCMF_ERR("Failed to install RSNE: %s", zx_status_get_string(err));
@@ -1906,14 +1928,14 @@ zx_status_t brcmf_cfg80211_connect(struct net_device* ndev, const wlan_fullmac_c
   // encoding 80Mhz and the upper layer had always passed 20Mhz historically so also need to
   // test whether the 40Mhz encoding works properly.
   // TODO(fxbug.dev/65770) - Remove this override.
-  chan_override = ifp->connect_req.selected_bss.channel;
-  chan_override.cbw = CHANNEL_BANDWIDTH_CBW20;
+  chan_override = ifp->connect_req.selected_bss()->channel();
+  chan_override.cbw() = fuchsia_wlan_common::ChannelBandwidth::kCbw20;
 
   chanspec = channel_to_chanspec(&cfg->d11inf, &chan_override);
   cfg->channel = chanspec;
 
-  ssid = brcmf_find_ssid_in_ies(ifp->connect_req.selected_bss.ies_list,
-                                ifp->connect_req.selected_bss.ies_count);
+  ssid = brcmf_find_ssid_in_ies(ifp->connect_req.selected_bss()->ies().data(),
+                                ifp->connect_req.selected_bss()->ies().size());
 
   join_params_size = sizeof(join_params);
   memset(&join_params, 0, join_params_size);
@@ -1921,7 +1943,7 @@ zx_status_t brcmf_cfg80211_connect(struct net_device* ndev, const wlan_fullmac_c
   memcpy(&join_params.ssid_le.SSID, ssid.data(), ssid.size());
   join_params.ssid_le.SSID_len = ssid.size();
 
-  memcpy(join_params.params_le.bssid, ifp->connect_req.selected_bss.bssid, ETH_ALEN);
+  memcpy(join_params.params_le.bssid, ifp->connect_req.selected_bss()->bssid().data(), ETH_ALEN);
   join_params.params_le.chanspec_num = 1;
   join_params.params_le.chanspec_list[0] = chanspec;
 
@@ -2264,7 +2286,7 @@ static void cfg80211_signal_ind(net_device* ndev) {
   struct brcmf_if* ifp = ndev_to_if(ndev);
   brcmf_cfg80211_info* cfg = ifp->drvr->config;
   std::shared_lock<std::shared_mutex> guard(ndev->if_proto_lock);
-  if (ndev->if_proto.ops == nullptr) {
+  if (ndev->if_proto == nullptr) {
     BRCMF_IFDBG(WLANIF, ndev, "interface stopped -- skipping signal report indication callback");
     // Stop the timer
     cfg->signal_report_timer->Stop();
@@ -2281,7 +2303,7 @@ static void cfg80211_signal_ind(net_device* ndev) {
       // Store the value in ndev (dumped out when link goes down)
       ndev->last_known_rssi_dbm = rssi;
       ndev->last_known_snr_db = snr;
-      wlan_fullmac_impl_ifc_signal_report(&ndev->if_proto, &signal_ind);
+      ndev->if_proto->SignalReport(&signal_ind);
     }
     cfg->connect_log_cnt++;
     if (cfg->connect_log_cnt >= BRCMF_CONNECT_LOG_COUNT) {
@@ -2426,7 +2448,7 @@ static zx_status_t brcmf_cfg80211_del_key(struct net_device* ndev, uint8_t key_i
   }
 
   memset(key, 0, sizeof(*key));
-  key->index = (uint32_t)key_idx;
+  key->index = static_cast<uint32_t>(key_idx);
   key->flags = BRCMF_PRIMARY_KEY;
 
   /* Clear the key/index */
@@ -2437,7 +2459,7 @@ static zx_status_t brcmf_cfg80211_del_key(struct net_device* ndev, uint8_t key_i
 }
 
 static zx_status_t brcmf_cfg80211_add_key(struct net_device* ndev,
-                                          const set_key_descriptor_t* req) {
+                                          const wlan_fullmac::SetKeyDescriptor* req) {
   struct brcmf_if* ifp = ndev_to_if(ndev);
   struct brcmf_wsec_key* key;
   int32_t val;
@@ -2445,7 +2467,7 @@ static zx_status_t brcmf_cfg80211_add_key(struct net_device* ndev,
   zx_status_t err;
   bool ext_key;
   uint8_t key_idx = req->key_id;
-  const uint8_t* mac_addr = req->address;
+  const uint8_t* mac_addr = req->address.data();
 
   BRCMF_DBG(TRACE, "Enter");
   BRCMF_DBG(CONN, "key index (%d)", key_idx);
@@ -2459,19 +2481,19 @@ static zx_status_t brcmf_cfg80211_add_key(struct net_device* ndev,
     return ZX_ERR_INVALID_ARGS;
   }
 
-  if (req->key_count == 0) {
+  if (req->key.count() == 0) {
     return brcmf_cfg80211_del_key(ndev, key_idx);
   }
 
-  if (req->key_count > sizeof(key->data)) {
-    BRCMF_ERR("Too long key length (%zu)", req->key_count);
+  if (req->key.count() > sizeof(key->data)) {
+    BRCMF_ERR("Too long key length (%zu)", req->key.count());
     return ZX_ERR_INVALID_ARGS;
   }
 
   ext_key = false;
   if (mac_addr && !address_is_multicast(mac_addr) &&
-      (req->cipher_suite_type != WPA_CIPHER_WEP_40) &&
-      (req->cipher_suite_type != WPA_CIPHER_WEP_104)) {
+      (req->cipher_suite_type != fuchsia_wlan_ieee80211::wire::CipherSuiteType::kWep40) &&
+      (req->cipher_suite_type != fuchsia_wlan_ieee80211::wire::CipherSuiteType::kWep104)) {
     BRCMF_DBG(TRACE, "Ext key, mac " FMT_MAC, FMT_MAC_ARGS(mac_addr));
     ext_key = true;
   }
@@ -2481,37 +2503,37 @@ static zx_status_t brcmf_cfg80211_add_key(struct net_device* ndev,
   if ((ext_key) && (!address_is_multicast(mac_addr))) {
     memcpy((char*)&key->ea, (void*)mac_addr, ETH_ALEN);
   }
-  key->len = req->key_count;
+  key->len = req->key.count();
   key->index = key_idx;
-  memcpy(key->data, req->key_list, key->len);
+  memcpy(key->data, req->key.data(), key->len);
   if (!ext_key) {
     key->flags = BRCMF_PRIMARY_KEY;
   }
 
   switch (req->cipher_suite_type) {
-    case WPA_CIPHER_WEP_40:
+    case fuchsia_wlan_ieee80211::wire::CipherSuiteType::kWep40:
       key->algo = CRYPTO_ALGO_WEP1;
       val = WEP_ENABLED;
       BRCMF_DBG(CONN, "WPA_CIPHER_WEP_40");
       break;
-    case WPA_CIPHER_WEP_104:
+    case fuchsia_wlan_ieee80211::wire::CipherSuiteType::kWep104:
       key->algo = CRYPTO_ALGO_WEP128;
       val = WEP_ENABLED;
       BRCMF_DBG(CONN, "WPA_CIPHER_WEP_104");
       break;
-    case WPA_CIPHER_TKIP:
+    case fuchsia_wlan_ieee80211::wire::CipherSuiteType::kTkip:
       /* Note: Linux swaps the Tx and Rx MICs in client mode, but this doesn't work for us (see
          fxbug.dev/28642). It's unclear why this would be necessary. */
       key->algo = CRYPTO_ALGO_TKIP;
       val = TKIP_ENABLED;
       BRCMF_DBG(CONN, "WPA_CIPHER_TKIP");
       break;
-    case WPA_CIPHER_CMAC_128:
+    case fuchsia_wlan_ieee80211::wire::CipherSuiteType::kBipCmac128:
       key->algo = CRYPTO_ALGO_AES_CCM;
       val = AES_ENABLED;
       BRCMF_DBG(CONN, "WPA_CIPHER_CMAC_128");
       break;
-    case WPA_CIPHER_CCMP_128:
+    case fuchsia_wlan_ieee80211::wire::CipherSuiteType::kCcmp128:
       key->algo = CRYPTO_ALGO_AES_CCM;
       val = AES_ENABLED;
       BRCMF_DBG(CONN, "WPA_CIPHER_CCMP_128");
@@ -2554,7 +2576,7 @@ done:
 void brcmf_cfg80211_handle_eapol_frame(struct brcmf_if* ifp, const void* data, size_t size) {
   struct net_device* ndev = ifp->ndev;
   std::shared_lock<std::shared_mutex> guard(ndev->if_proto_lock);
-  if (ndev->if_proto.ops == nullptr) {
+  if (ndev->if_proto == nullptr) {
     BRCMF_IFDBG(WLANIF, ndev, "interface stopped -- skipping eapol frame callback");
     return;
   }
@@ -2568,7 +2590,7 @@ void brcmf_cfg80211_handle_eapol_frame(struct brcmf_if* ifp, const void* data, s
 
   BRCMF_IFDBG(WLANIF, ndev, "Sending EAPOL frame to SME. data_len: %zu", eapol_ind.data_count);
 
-  wlan_fullmac_impl_ifc_eapol_ind(&ndev->if_proto, &eapol_ind);
+  ndev->if_proto->EapolInd(&eapol_ind);
 }
 
 #define EAPOL_ETHERNET_TYPE_UINT16 0x8e88
@@ -2631,7 +2653,7 @@ static void brcmf_return_scan_result(struct net_device* ndev, uint16_t channel, 
                                      uint8_t* ie, size_t ie_len, int16_t rssi_dbm) {
   std::shared_lock<std::shared_mutex> guard(ndev->if_proto_lock);
   struct brcmf_cfg80211_info* cfg = ndev_to_if(ndev)->drvr->config;
-  if (ndev->if_proto.ops == nullptr) {
+  if (ndev->if_proto == nullptr) {
     BRCMF_IFDBG(WLANIF, ndev, "interface stopped -- skipping scan result callback");
     return;
   }
@@ -2669,7 +2691,7 @@ static void brcmf_return_scan_result(struct net_device* ndev, uint16_t channel, 
   BRCMF_DBG(SCAN, "  ssid: " FMT_SSID, FMT_SSID_VECT(ssid));
 #endif /* !defined(NDEBUG) */
   ndev->scan_num_results++;
-  wlan_fullmac_impl_ifc_on_scan_result(&ndev->if_proto, &result);
+  ndev->if_proto->OnScanResult(&result);
 }
 
 static zx_status_t brcmf_inform_single_bss(struct net_device* ndev, struct brcmf_cfg80211_info* cfg,
@@ -3206,7 +3228,7 @@ skip_fw_cmds:
 // Returns an MLME result code (WLAN_START_RESULT_*) if an error is encountered.
 // If all iovars succeed, MLME is notified when E_LINK event is received.
 static uint8_t brcmf_cfg80211_start_ap(struct net_device* ndev,
-                                       const wlan_fullmac_start_req_t* req) {
+                                       const wlan_fullmac::WlanFullmacStartReq* req) {
   struct brcmf_if* ifp = ndev_to_if(ndev);
   struct brcmf_cfg80211_info* cfg = ifp->drvr->config;
 
@@ -3220,7 +3242,7 @@ static uint8_t brcmf_cfg80211_start_ap(struct net_device* ndev,
     return WLAN_START_RESULT_BSS_ALREADY_STARTED_OR_JOINED;
   }
 
-  if (req->bss_type != BSS_TYPE_INFRASTRUCTURE) {
+  if (req->bss_type != fuchsia_wlan_common::wire::BssType::kInfrastructure) {
     BRCMF_ERR("Attempt to start AP in unsupported mode (%d)", req->bss_type);
     return WLAN_START_RESULT_NOT_SUPPORTED;
   }
@@ -3245,8 +3267,8 @@ static uint8_t brcmf_cfg80211_start_ap(struct net_device* ndev,
 
   BRCMF_DBG(TRACE,
             "ssid: " FMT_SSID "  beacon period: %d  dtim_period: %d  channel: %d  rsne_len: %zd",
-            FMT_SSID_BYTES(req->ssid.data, req->ssid.len), req->beacon_period, req->dtim_period,
-            req->channel, req->rsne_len);
+            FMT_SSID_BYTES(req->ssid.data.data(), req->ssid.len), req->beacon_period,
+            req->dtim_period, req->channel, req->rsne_len);
 
   wlan_channel_t channel = {};
   uint16_t chanspec = 0;
@@ -3255,7 +3277,7 @@ static uint8_t brcmf_cfg80211_start_ap(struct net_device* ndev,
 
   struct brcmf_ssid_le ssid_le;
   memset(&ssid_le, 0, sizeof(ssid_le));
-  memcpy(ssid_le.SSID, req->ssid.data, req->ssid.len);
+  memcpy(ssid_le.SSID, req->ssid.data.data(), req->ssid.len);
   ssid_le.SSID_len = req->ssid.len;
 
   brcmf_enable_mpc(ifp, 0);
@@ -3271,7 +3293,7 @@ static uint8_t brcmf_cfg80211_start_ap(struct net_device* ndev,
 
   // Configure RSN IE
   if (req->rsne_len != 0) {
-    struct brcmf_vs_tlv* tmp_ie = (struct brcmf_vs_tlv*)req->rsne;
+    struct brcmf_vs_tlv* tmp_ie = (struct brcmf_vs_tlv*)req->rsne.data();
     status = brcmf_configure_wpaie(ifp, tmp_ie, true, true);
     if (status != ZX_OK) {
       BRCMF_ERR("Failed to install RSNE: %s", zx_status_get_string(status));
@@ -3422,17 +3444,12 @@ static zx_status_t brcmf_notify_tdls_peer_event(struct brcmf_if* ifp,
 
 // Country is initialized to US by default. This should be retrieved from location services
 // when available.
-zx_status_t brcmf_if_start(net_device* ndev, const wlan_fullmac_impl_ifc_protocol_t* ifc,
-                           zx_handle_t* out_mlme_channel) {
+zx_status_t brcmf_if_start(net_device* ndev, zx_handle_t* out_mlme_channel) {
   if (!ndev->mlme_channel.is_valid()) {
     return ZX_ERR_ALREADY_BOUND;
   }
 
   BRCMF_IFDBG(WLANIF, ndev, "Starting wlan_fullmac interface");
-  {
-    std::lock_guard<std::shared_mutex> guard(ndev->if_proto_lock);
-    ndev->if_proto = *ifc;
-  }
   brcmf_netdev_open(ndev);
   ndev->is_up = true;
 
@@ -3445,29 +3462,29 @@ void brcmf_if_stop(net_device* ndev) {
   BRCMF_IFDBG(WLANIF, ndev, "Stopping wlan_fullmac interface");
 
   std::lock_guard<std::shared_mutex> guard(ndev->if_proto_lock);
-  ndev->if_proto.ops = nullptr;
-  ndev->if_proto.ctx = nullptr;
+  ndev->if_proto.reset();
   ndev->is_up = false;
   BRCMF_IFDBG(WLANIF, ndev, "wlan_fullmac interface stopped");
 }
 
-void brcmf_if_start_scan(net_device* ndev, const wlan_fullmac_scan_req_t* req) {
+void brcmf_if_start_scan(net_device* ndev,
+                         const wlan_fullmac::WlanFullmacImplStartScanRequest* req) {
   std::shared_lock<std::shared_mutex> guard(ndev->if_proto_lock);
-  if (ndev->if_proto.ops == nullptr) {
+  if (ndev->if_proto == nullptr) {
     BRCMF_IFDBG(WLANIF, ndev, "interface stopped -- skipping scan request.");
     return;
   }
   zx_status_t result;
 
-  BRCMF_IFDBG(WLANIF, ndev, "Scan request from SME. txn_id: %" PRIu64 ", type: %s", req->txn_id,
-              req->scan_type == WLAN_SCAN_TYPE_PASSIVE  ? "passive"
-              : req->scan_type == WLAN_SCAN_TYPE_ACTIVE ? "active"
-                                                        : "invalid");
+  BRCMF_IFDBG(WLANIF, ndev, "Scan request from SME. txn_id: %" PRIu64 ", type: %s", req->txn_id(),
+              req->scan_type() == wlan_fullmac::WlanScanType::kPassive  ? "passive"
+              : req->scan_type() == wlan_fullmac::WlanScanType::kActive ? "active"
+                                                                        : "invalid");
 
   ndev->scan_num_results = 0;
 
   uint16_t sync_id = 0;
-  BRCMF_DBG(SCAN, "About to scan! Txn ID %lu", req->txn_id);
+  BRCMF_DBG(SCAN, "About to scan! Txn ID %lu", req->txn_id());
   // Lock here so that we ensure that the sync_id is stored in ndev before we start processing
   // results. Otherwise this thread might get suspended and results would come in and be discareded
   // because the sync_id would not match.
@@ -3475,38 +3492,48 @@ void brcmf_if_start_scan(net_device* ndev, const wlan_fullmac_scan_req_t* req) {
   result = brcmf_cfg80211_scan(ndev, req, &sync_id);
   switch (result) {
     case ZX_OK:
-      ndev->scan_txn_id = req->txn_id;
+      ndev->scan_txn_id = req->txn_id();
       ndev->scan_sync_id = sync_id;
       break;
     case ZX_ERR_SHOULD_WAIT:
       BRCMF_INFO("Scan failed. Firmware busy: %d %s", result, zx_status_get_string(result));
-      brcmf_signal_scan_end(ndev, req->txn_id, WLAN_SCAN_RESULT_SHOULD_WAIT);
+      brcmf_signal_scan_end(ndev, req->txn_id(), WLAN_SCAN_RESULT_SHOULD_WAIT);
       break;
     case ZX_ERR_INVALID_ARGS:
       BRCMF_ERR("Scan failed. Invalid arguments: %d %s", result, zx_status_get_string(result));
-      brcmf_signal_scan_end(ndev, req->txn_id, WLAN_SCAN_RESULT_INVALID_ARGS);
+      brcmf_signal_scan_end(ndev, req->txn_id(), WLAN_SCAN_RESULT_INVALID_ARGS);
       break;
     default:
       BRCMF_INFO("Scan failed. Internal error: %d %s", result, zx_status_get_string(result));
-      brcmf_signal_scan_end(ndev, req->txn_id, WLAN_SCAN_RESULT_INTERNAL_ERROR);
+      brcmf_signal_scan_end(ndev, req->txn_id(), WLAN_SCAN_RESULT_INTERNAL_ERROR);
   }
 }
 
-void brcmf_if_connect_req(net_device* ndev, const wlan_fullmac_connect_req_t* req) {
+void brcmf_if_connect_req(net_device* ndev,
+                          const wlan_fullmac::WlanFullmacImplConnectReqRequest* req) {
   std::shared_lock<std::shared_mutex> guard(ndev->if_proto_lock);
   struct brcmf_if* ifp = ndev_to_if(ndev);
   struct brcmf_cfg80211_profile* profile = &ifp->vif->profile;
+  fuchsia_wlan_fullmac::WlanFullmacImplConnectReqRequest* saved_req = &ifp->connect_req;
 
-  if (ndev->if_proto.ops == nullptr) {
+  if (ndev->if_proto == nullptr) {
     BRCMF_IFDBG(WLANIF, ndev, "interface stopped -- skipping connect request");
+    return;
+  }
+
+  if (!(req->has_selected_bss() && req->has_auth_type())) {
+    BRCMF_ERR("Missing required field, selected_bss: %d, auth_type: %d", req->has_selected_bss(),
+              req->has_auth_type());
     return;
   }
 
   wlan_fullmac_connect_confirm_t result = {};
   zx_status_t status;
-  memcpy(result.peer_sta_address, req->selected_bss.bssid, sizeof(req->selected_bss.bssid));
+  memcpy(result.peer_sta_address, req->selected_bss().bssid.data(),
+         req->selected_bss().bssid.size());
 
-  auto ssid = brcmf_find_ssid_in_ies(req->selected_bss.ies_list, req->selected_bss.ies_count);
+  auto ssid =
+      brcmf_find_ssid_in_ies(req->selected_bss().ies.data(), req->selected_bss().ies.count());
 
   if (ssid.empty()) {
     BRCMF_DBG(WLANIF, "Connect request from SME exited: no SSID in request");
@@ -3514,50 +3541,34 @@ void brcmf_if_connect_req(net_device* ndev, const wlan_fullmac_connect_req_t* re
     goto fail;
   }
 
-  if (req->wep_key.key_count > 0 && !(req->auth_type == WLAN_AUTH_TYPE_SHARED_KEY ||
-                                      req->auth_type == WLAN_AUTH_TYPE_OPEN_SYSTEM)) {
-    BRCMF_DBG(WLANIF, "Connect request from SME exited: unexpected WEP key in request");
-    result.result_code = STATUS_CODE_JOIN_FAILURE;
-    goto fail;
-  }
+  if (req->has_wep_key()) {
+    if (req->wep_key().key.count() > 0 &&
+        !(req->auth_type() == wlan_fullmac::WlanAuthType::kSharedKey ||
+          req->auth_type() == wlan_fullmac::WlanAuthType::kOpenSystem)) {
+      BRCMF_DBG(WLANIF, "Connect request from SME exited: unexpected WEP key in request");
+      result.result_code = STATUS_CODE_JOIN_FAILURE;
+      goto fail;
+    }
 
-  if (req->wep_key.key_count > MAX_SUPPORTED_WEP_KEY_LEN) {
-    BRCMF_DBG(WLANIF, "Connect request from SME exited: WEP key len %zu larger than %d",
-              req->wep_key.key_count, MAX_SUPPORTED_WEP_KEY_LEN);
-    result.result_code = STATUS_CODE_JOIN_FAILURE;
-    goto fail;
+    if (req->wep_key().key.count() > MAX_SUPPORTED_WEP_KEY_LEN) {
+      BRCMF_DBG(WLANIF, "Connect request from SME exited: WEP key len %zu larger than %d",
+                req->wep_key().key.count(), MAX_SUPPORTED_WEP_KEY_LEN);
+      result.result_code = STATUS_CODE_JOIN_FAILURE;
+      goto fail;
+    }
   }
 
   BRCMF_IFDBG(WLANIF, ndev, "Connect request from SME.");
 #if !defined(NDEBUG)
   BRCMF_IFDBG(WLANIF, ndev, "  ssid: " FMT_SSID ", bssid: " FMT_MAC ", channel: %u",
-              FMT_SSID_VECT(ssid), FMT_MAC_ARGS(req->selected_bss.bssid),
-              req->selected_bss.channel.primary);
+              FMT_SSID_VECT(ssid), FMT_MAC_ARGS(req->selected_bss().bssid),
+              req->selected_bss().channel.primary);
 #endif /* !defined(NDEBUG) */
 
-  memcpy(&ifp->connect_req, req, sizeof(ifp->connect_req));
-  if (ifp->connect_req.selected_bss.ies_count > fuchsia::wlan::ieee80211::WLAN_MSDU_MAX_LEN) {
-    ifp->connect_req.selected_bss.ies_count = fuchsia::wlan::ieee80211::WLAN_MSDU_MAX_LEN;
-  }
-  // BSS IES, WEP key, and security IE pointers point to data we don't own,
-  // so we have to copy them over.
-  memcpy(&ifp->ies, ifp->connect_req.selected_bss.ies_list,
-         ifp->connect_req.selected_bss.ies_count);
-  ifp->connect_req.selected_bss.ies_list = ifp->ies;
+  // Saving the request as FIDL natural type.
+  *saved_req = fidl::ToNatural(*req);
 
-  if (ifp->connect_req.wep_key.key_count > 0) {
-    memcpy(&ifp->wep_key_bytes, ifp->connect_req.wep_key.key_list,
-           ifp->connect_req.wep_key.key_count);
-    ifp->connect_req.wep_key.key_list = ifp->wep_key_bytes;
-  }
-
-  if (ifp->connect_req.security_ie_count > fuchsia::wlan::ieee80211::WLAN_IE_MAX_LEN) {
-    ifp->connect_req.security_ie_count = fuchsia::wlan::ieee80211::WLAN_IE_MAX_LEN;
-  }
-  memcpy(&ifp->security_ie, ifp->connect_req.security_ie_list, ifp->connect_req.security_ie_count);
-  ifp->connect_req.security_ie_list = ifp->security_ie;
-
-  memcpy(profile->bssid, req->selected_bss.bssid, ETH_ALEN);
+  memcpy(profile->bssid, req->selected_bss().bssid.data(), ETH_ALEN);
 
   status = brcmf_configure_opensecurity(ifp);
   if (status != ZX_OK) {
@@ -3566,8 +3577,8 @@ void brcmf_if_connect_req(net_device* ndev, const wlan_fullmac_connect_req_t* re
     goto fail;
   }
 
-  if (ifp->connect_req.wep_key.key_count > 0) {
-    auto add_key_result = brcmf_cfg80211_add_key(ndev, &ifp->connect_req.wep_key);
+  if (req->has_wep_key() && ifp->connect_req.wep_key()->key().size() > 0) {
+    auto add_key_result = brcmf_cfg80211_add_key(ndev, &req->wep_key());
     if (add_key_result != ZX_OK) {
       BRCMF_DBG(WLANIF, "Connect request from SME exited: unable to set WEP key");
       result.result_code = STATUS_CODE_JOIN_FAILURE;
@@ -3575,16 +3586,16 @@ void brcmf_if_connect_req(net_device* ndev, const wlan_fullmac_connect_req_t* re
     }
   }
 
-  if (brcmf_set_auth_type(ndev, ifp->connect_req.auth_type) != ZX_OK) {
+  if (brcmf_set_auth_type(ndev, ifp->connect_req.auth_type().value()) != ZX_OK) {
     BRCMF_IFDBG(WLANIF, ndev, "Connect request from SME exited: bad auth_type parameters");
     result.result_code = STATUS_CODE_UNSUPPORTED_AUTH_ALGORITHM;
     goto fail;
   }
 
-  if (ifp->connect_req.security_ie_count > 0) {
-    BRCMF_DBG(TEMP, " * * Security IE non-zero! %ld", ifp->connect_req.security_ie_count);
-    BRCMF_DBG_HEX_DUMP(BRCMF_IS_ON(BYTES), ifp->connect_req.security_ie_list,
-                       ifp->connect_req.security_ie_count, "Security IE:");
+  if (ifp->connect_req.security_ie()->size() > 0) {
+    BRCMF_DBG(TEMP, " * * Security IE non-zero! %ld", ifp->connect_req.security_ie()->size());
+    BRCMF_DBG_HEX_DUMP(BRCMF_IS_ON(BYTES), ifp->connect_req.security_ie()->data(),
+                       ifp->connect_req.security_ie()->size(), "Security IE:");
   }
 
   brcmf_cfg80211_connect(ndev, &ifp->connect_req);
@@ -3592,17 +3603,18 @@ void brcmf_if_connect_req(net_device* ndev, const wlan_fullmac_connect_req_t* re
   return;
 
 fail:
-  wlan_fullmac_impl_ifc_connect_conf(&ndev->if_proto, &result);
+  ndev->if_proto->ConnectConf(&result);
 }
 
-void brcmf_if_reconnect_req(net_device* ndev, const wlan_fullmac_reconnect_req_t* req) {
+void brcmf_if_reconnect_req(net_device* ndev, const wlan_fullmac::WlanFullmacReconnectReq* req) {
   struct brcmf_if* ifp = ndev_to_if(ndev);
 
-  if (memcmp(req->peer_sta_address, ifp->connect_req.selected_bss.bssid, ETH_ALEN)) {
+  if (memcmp(req->peer_sta_address.data(), ifp->connect_req.selected_bss()->bssid().data(),
+             ETH_ALEN)) {
     BRCMF_ERR("Requested MAC != Connected MAC");
 #if !defined(NDEBUG)
-    const uint8_t* old_mac = ifp->connect_req.selected_bss.bssid;
-    const uint8_t* new_mac = req->peer_sta_address;
+    const uint8_t* old_mac = ifp->connect_req.selected_bss()->bssid().data();
+    const uint8_t* new_mac = req->peer_sta_address.data();
     BRCMF_IFDBG(WLANIF, ndev, " requested mac: " FMT_MAC ", connected mac: " FMT_MAC,
                 FMT_MAC_ARGS(new_mac), FMT_MAC_ARGS(old_mac));
 #endif /* !defined(NDEBUG) */
@@ -3616,19 +3628,19 @@ void brcmf_if_reconnect_req(net_device* ndev, const wlan_fullmac_reconnect_req_t
 
 // In AP mode, receive a response from wlan_fullmac confirming that a client was successfully
 // authenticated.
-void brcmf_if_auth_resp(net_device* ndev, const wlan_fullmac_auth_resp_t* ind) {
+void brcmf_if_auth_resp(net_device* ndev, const wlan_fullmac::WlanFullmacAuthResp* ind) {
   struct brcmf_if* ifp = ndev_to_if(ndev);
 
   BRCMF_IFDBG(WLANIF, ndev, "Auth response from SME. result: %s",
-              ind->result_code == WLAN_AUTH_RESULT_SUCCESS   ? "success"
-              : ind->result_code == WLAN_AUTH_RESULT_REFUSED ? "refused"
-              : ind->result_code == WLAN_AUTH_RESULT_ANTI_CLOGGING_TOKEN_REQUIRED
+              ind->result_code == wlan_fullmac::WlanAuthResult::kSuccess   ? "success"
+              : ind->result_code == wlan_fullmac::WlanAuthResult::kRefused ? "refused"
+              : ind->result_code == wlan_fullmac::WlanAuthResult::kAntiCloggingTokenRequired
                   ? "anti-clogging token required"
-              : ind->result_code == WLAN_AUTH_RESULT_FINITE_CYCLIC_GROUP_NOT_SUPPORTED
+              : ind->result_code == wlan_fullmac::WlanAuthResult::kFiniteCyclicGroupNotSupported
                   ? "finite cyclic group not supported"
-              : ind->result_code == WLAN_AUTH_RESULT_REJECTED        ? "rejected"
-              : ind->result_code == WLAN_AUTH_RESULT_FAILURE_TIMEOUT ? "timeout"
-                                                                     : "invalid");
+              : ind->result_code == wlan_fullmac::WlanAuthResult::kRejected       ? "rejected"
+              : ind->result_code == wlan_fullmac::WlanAuthResult::kFailureTimeout ? "timeout"
+                                                                                  : "invalid");
 #if !defined(NDEBUG)
   BRCMF_IFDBG(WLANIF, ndev, "  , address: " FMT_MAC, FMT_MAC_ARGS(ind->peer_sta_address));
 #endif /* !defined(NDEBUG) */
@@ -3638,34 +3650,34 @@ void brcmf_if_auth_resp(net_device* ndev, const wlan_fullmac_auth_resp_t* ind) {
     return;
   }
 
-  if (ind->result_code == WLAN_AUTH_RESULT_SUCCESS) {
-    const uint8_t* mac = ind->peer_sta_address;
+  if (ind->result_code == wlan_fullmac::WlanAuthResult::kSuccess) {
+    const uint8_t* mac = ind->peer_sta_address.data();
     BRCMF_DBG(CONN, "Successfully authenticated client " FMT_MAC "\n", FMT_MAC_ARGS(mac));
     return;
   }
 
   wlan_ieee80211::ReasonCode reason = {};
   switch (ind->result_code) {
-    case WLAN_AUTH_RESULT_REFUSED:
-    case WLAN_AUTH_RESULT_REJECTED:
+    case wlan_fullmac::WlanAuthResult::kRefused:
+    case wlan_fullmac::WlanAuthResult::kRejected:
       reason = wlan_ieee80211::ReasonCode::NOT_AUTHENTICATED;
       break;
-    case WLAN_AUTH_RESULT_FAILURE_TIMEOUT:
+    case wlan_fullmac::WlanAuthResult::kFailureTimeout:
       reason = wlan_ieee80211::ReasonCode::TIMEOUT;
       break;
-    case WLAN_AUTH_RESULT_ANTI_CLOGGING_TOKEN_REQUIRED:
-    case WLAN_AUTH_RESULT_FINITE_CYCLIC_GROUP_NOT_SUPPORTED:
+    case wlan_fullmac::WlanAuthResult::kAntiCloggingTokenRequired:
+    case wlan_fullmac::WlanAuthResult::kFiniteCyclicGroupNotSupported:
     default:
       reason = wlan_ieee80211::ReasonCode::UNSPECIFIED_REASON;
       break;
   }
-  brcmf_cfg80211_del_station(ndev, ind->peer_sta_address, reason);
+  brcmf_cfg80211_del_station(ndev, ind->peer_sta_address.data(), reason);
 }
 
 // Respond to a MLME-DEAUTHENTICATE.request message. Note that we are required to respond with a
 // MLME-DEAUTHENTICATE.confirm on completion (or failure), even though there is no status
 // reported.
-void brcmf_if_deauth_req(net_device* ndev, const wlan_fullmac_deauth_req_t* req) {
+void brcmf_if_deauth_req(net_device* ndev, const wlan_fullmac::WlanFullmacDeauthReq* req) {
   struct brcmf_if* ifp = ndev_to_if(ndev);
   BRCMF_IFDBG(WLANIF, ndev, "Deauth request from SME. reason: %" PRIu16 "", req->reason_code);
 
@@ -3673,8 +3685,9 @@ void brcmf_if_deauth_req(net_device* ndev, const wlan_fullmac_deauth_req_t* req)
     struct brcmf_scb_val_le scbval;
     bcme_status_t fw_err = BCME_OK;
 
-    memcpy(&scbval.ea, req->peer_sta_address, ETH_ALEN);
-    scbval.val = req->reason_code;
+    memcpy(&scbval.ea, req->peer_sta_address.data(), ETH_ALEN);
+    // The FIDL reason code is defined in uint16_t, so no information will be lost.
+    scbval.val = static_cast<uint32>(req->reason_code);
     zx_status_t status = brcmf_fil_cmd_data_set(ifp, BRCMF_C_SCB_DEAUTHENTICATE_FOR_REASON, &scbval,
                                                 sizeof(scbval), &fw_err);
     if (status != ZX_OK) {
@@ -3686,16 +3699,17 @@ void brcmf_if_deauth_req(net_device* ndev, const wlan_fullmac_deauth_req_t* req)
   }
 
   // Client IF processing
-  if (brcmf_cfg80211_disconnect(ndev, req->peer_sta_address, req->reason_code, true) != ZX_OK) {
+  if (brcmf_cfg80211_disconnect(ndev, req->peer_sta_address.data(),
+                                static_cast<uint32_t>(req->reason_code), true) != ZX_OK) {
     // Request to disconnect failed, so respond immediately
-    brcmf_notify_deauth(ndev, req->peer_sta_address);
+    brcmf_notify_deauth(ndev, req->peer_sta_address.data());
   }  // else wait for disconnect to complete before sending response
 
   // Workaround for fxbug.dev/28829: allow time for disconnect to complete
   zx_nanosleep(zx_deadline_after(ZX_MSEC(50)));
 }
 
-void brcmf_if_assoc_resp(net_device* ndev, const wlan_fullmac_assoc_resp_t* ind) {
+void brcmf_if_assoc_resp(net_device* ndev, const wlan_fullmac::WlanFullmacAssocResp* ind) {
   struct brcmf_if* ifp = ndev_to_if(ndev);
 
   BRCMF_IFDBG(WLANIF, ndev, "Assoc response from SME. result: %" PRIu8 ", aid: %" PRIu16,
@@ -3709,8 +3723,8 @@ void brcmf_if_assoc_resp(net_device* ndev, const wlan_fullmac_assoc_resp_t* ind)
     return;
   }
 
-  if (ind->result_code == WLAN_ASSOC_RESULT_SUCCESS) {
-    const uint8_t* mac = ind->peer_sta_address;
+  if (ind->result_code == wlan_fullmac::WlanAssocResult::kSuccess) {
+    const uint8_t* mac = ind->peer_sta_address.data();
     BRCMF_DBG(CONN, "Successfully associated client " FMT_MAC, FMT_MAC_ARGS(mac));
     return;
   }
@@ -3719,38 +3733,39 @@ void brcmf_if_assoc_resp(net_device* ndev, const wlan_fullmac_assoc_resp_t* ind)
   // available for an association response is too small.
   wlan_ieee80211::ReasonCode reason = {};
   switch (ind->result_code) {
-    case WLAN_ASSOC_RESULT_REFUSED_NOT_AUTHENTICATED:
+    case wlan_fullmac::WlanAssocResult::kRefusedNotAuthenticated:
       reason = wlan_ieee80211::ReasonCode::NOT_AUTHENTICATED;
       break;
-    case WLAN_ASSOC_RESULT_REFUSED_CAPABILITIES_MISMATCH:
+    case wlan_fullmac::WlanAssocResult::kRefusedCapabilitiesMismatch:
       reason = wlan_ieee80211::ReasonCode::INVALID_RSNE_CAPABILITIES;
       break;
-    case WLAN_ASSOC_RESULT_REFUSED_REASON_UNSPECIFIED:
-    case WLAN_ASSOC_RESULT_REFUSED_EXTERNAL_REASON:
-    case WLAN_ASSOC_RESULT_REFUSED_AP_OUT_OF_MEMORY:
-    case WLAN_ASSOC_RESULT_REFUSED_BASIC_RATES_MISMATCH:
-    case WLAN_ASSOC_RESULT_REJECTED_EMERGENCY_SERVICES_NOT_SUPPORTED:
-    case WLAN_ASSOC_RESULT_REFUSED_TEMPORARILY:
+    case wlan_fullmac::WlanAssocResult::kRefusedReasonUnspecified:
+    case wlan_fullmac::WlanAssocResult::kRefusedExternalReason:
+    case wlan_fullmac::WlanAssocResult::kRefusedApOutOfMemory:
+    case wlan_fullmac::WlanAssocResult::kRefusedBasicRatesMismatch:
+    case wlan_fullmac::WlanAssocResult::kRejectedEmergencyServicesNotSupported:
+    case wlan_fullmac::WlanAssocResult::kRefusedTemporarily:
     default:
       reason = wlan_ieee80211::ReasonCode::UNSPECIFIED_REASON;
       break;
   }
-  brcmf_cfg80211_del_station(ndev, ind->peer_sta_address, reason);
+  // The copy removed, why we want to copy before passing it into the next function?
+  brcmf_cfg80211_del_station(ndev, ind->peer_sta_address.data(), reason);
 }
 
-void brcmf_if_disassoc_req(net_device* ndev, const wlan_fullmac_disassoc_req_t* req) {
+void brcmf_if_disassoc_req(net_device* ndev, const wlan_fullmac::WlanFullmacDisassocReq* req) {
   BRCMF_IFDBG(WLANIF, ndev, "Disassoc request from SME. reason: %" PRIu16, req->reason_code);
 #if !defined(NDEBUG)
   BRCMF_IFDBG(WLANIF, ndev, "  address: " FMT_MAC, FMT_MAC_ARGS(req->peer_sta_address));
 #endif /* !defined(NDEBUG) */
-  zx_status_t status =
-      brcmf_cfg80211_disconnect(ndev, req->peer_sta_address, req->reason_code, false);
+  zx_status_t status = brcmf_cfg80211_disconnect(ndev, req->peer_sta_address.data(),
+                                                 static_cast<uint16_t>(req->reason_code), false);
   if (status != ZX_OK) {
     brcmf_notify_disassoc(ndev, status);
   }  // else notification will happen asynchronously
 }
 
-void brcmf_if_reset_req(net_device* ndev, const wlan_fullmac_reset_req_t* req) {
+void brcmf_if_reset_req(net_device* ndev, const wlan_fullmac::WlanFullmacResetReq* req) {
   BRCMF_IFDBG(WLANIF, ndev, "Reset request from SME.");
 #if !defined(NDEBUG)
   BRCMF_IFDBG(WLANIF, ndev, "  address: " FMT_MAC, FMT_MAC_ARGS(req->sta_address));
@@ -3761,7 +3776,7 @@ void brcmf_if_reset_req(net_device* ndev, const wlan_fullmac_reset_req_t* req) {
 
 void brcmf_if_start_conf(net_device* ndev, uint8_t result) {
   std::shared_lock<std::shared_mutex> guard(ndev->if_proto_lock);
-  if (ndev->if_proto.ops == nullptr) {
+  if (ndev->if_proto == nullptr) {
     BRCMF_IFDBG(WLANIF, ndev, "interface stopped -- skipping AP start callback");
     return;
   }
@@ -3774,7 +3789,7 @@ void brcmf_if_start_conf(net_device* ndev, uint8_t result) {
               : result == WLAN_START_RESULT_NOT_SUPPORTED                 ? "not supported"
                                                                           : "unknown");
 
-  wlan_fullmac_impl_ifc_start_conf(&ndev->if_proto, &start_conf);
+  ndev->if_proto->StartConf(&start_conf);
 }
 
 // AP start timeout worker
@@ -3800,11 +3815,11 @@ static void brcmf_ap_start_timeout(struct brcmf_cfg80211_info* cfg) {
 }
 
 /* Start AP mode */
-void brcmf_if_start_req(net_device* ndev, const wlan_fullmac_start_req_t* req) {
+void brcmf_if_start_req(net_device* ndev, const wlan_fullmac::WlanFullmacStartReq* req) {
   BRCMF_IFDBG(WLANIF, ndev, "Start AP request from SME. rsne_len: %zu, channel: %u", req->rsne_len,
               req->channel);
 #if !defined(NDEBUG)
-  BRCMF_DBG(WLANIF, "  ssid: " FMT_SSID, FMT_SSID_BYTES(req->ssid.data, req->ssid.len));
+  BRCMF_DBG(WLANIF, "  ssid: " FMT_SSID, FMT_SSID_BYTES(req->ssid.data.data(), req->ssid.len));
 #endif /* !defined(NDEBUG) */
 
   uint8_t result_code = brcmf_cfg80211_start_ap(ndev, req);
@@ -3814,16 +3829,16 @@ void brcmf_if_start_req(net_device* ndev, const wlan_fullmac_start_req_t* req) {
 }
 
 /* Stop AP mode */
-void brcmf_if_stop_req(net_device* ndev, const wlan_fullmac_stop_req_t* req) {
+void brcmf_if_stop_req(net_device* ndev, const wlan_fullmac::WlanFullmacStopReq* req) {
   std::shared_lock<std::shared_mutex> guard(ndev->if_proto_lock);
-  if (ndev->if_proto.ops == nullptr) {
+  if (ndev->if_proto == nullptr) {
     BRCMF_IFDBG(WLANIF, ndev, "interface stopped -- skipping AP stop callback");
     return;
   }
 
   BRCMF_IFDBG(WLANIF, ndev, "Stop AP request from SME.");
 #if !defined(NDEBUG)
-  BRCMF_DBG(WLANIF, "  ssid: " FMT_SSID, FMT_SSID_BYTES(req->ssid.data, req->ssid.len));
+  BRCMF_DBG(WLANIF, "  ssid: " FMT_SSID, FMT_SSID_BYTES(req->ssid.data.data(), req->ssid.len));
 #endif /* !defined(NDEBUG) */
 
   uint8_t result_code = brcmf_cfg80211_stop_ap(ndev);
@@ -3835,17 +3850,17 @@ void brcmf_if_stop_req(net_device* ndev, const wlan_fullmac_stop_req_t* req) {
               : result_code == WLAN_STOP_RESULT_INTERNAL_ERROR      ? "internal error"
                                                                     : "unknown");
 
-  wlan_fullmac_impl_ifc_stop_conf(&ndev->if_proto, &result);
+  ndev->if_proto->StopConf(&result);
 }
 
-void brcmf_if_set_keys_req(net_device* ndev, const wlan_fullmac_set_keys_req_t* req,
-                           wlan_fullmac_set_keys_resp_t* resp) {
+void brcmf_if_set_keys_req(net_device* ndev, const wlan_fullmac::WlanFullmacSetKeysReq* req,
+                           wlan_fullmac::WlanFullmacSetKeysResp* resp) {
   BRCMF_IFDBG(WLANIF, ndev, "Set keys request from SME. num_keys: %zu", req->num_keys);
   zx_status_t result;
 
   resp->num_keys = req->num_keys;
   for (size_t i = 0; i < req->num_keys; i++) {
-    result = brcmf_cfg80211_add_key(ndev, &req->keylist[i]);
+    result = brcmf_cfg80211_add_key(ndev, &req->keylist.data()[i]);
     if (result != ZX_OK) {
       BRCMF_WARN("Error setting key %zu: %s.", i, zx_status_get_string(result));
     }
@@ -3853,35 +3868,36 @@ void brcmf_if_set_keys_req(net_device* ndev, const wlan_fullmac_set_keys_req_t* 
   }
 }
 
-void brcmf_if_del_keys_req(net_device* ndev, const wlan_fullmac_del_keys_req_t* req) {
+void brcmf_if_del_keys_req(net_device* ndev, const wlan_fullmac::WlanFullmacDelKeysReq* req) {
   BRCMF_IFDBG(WLANIF, ndev, "Del keys request from SME. num_keys: %zu", req->num_keys);
 
   BRCMF_ERR("Unimplemented");
 }
 
-static void brcmf_send_eapol_confirm(net_device* ndev, const wlan_fullmac_eapol_req_t* req,
+static void brcmf_send_eapol_confirm(net_device* ndev, const wlan_fullmac::WlanFullmacEapolReq* req,
                                      zx_status_t result) {
   wlan_fullmac_eapol_confirm_t confirm;
   confirm.result_code =
       result == ZX_OK ? WLAN_EAPOL_RESULT_SUCCESS : WLAN_EAPOL_RESULT_TRANSMISSION_FAILURE;
-  std::memcpy(confirm.dst_addr, req->dst_addr, ETH_ALEN);
+  std::memcpy(confirm.dst_addr, req->dst_addr.data(), ETH_ALEN);
   BRCMF_IFDBG(WLANIF, ndev, "Sending EAPOL xmit confirm to SME. result: %s",
               confirm.result_code == WLAN_EAPOL_RESULT_SUCCESS                ? "success"
               : confirm.result_code == WLAN_EAPOL_RESULT_TRANSMISSION_FAILURE ? "failure"
                                                                               : "unknown");
-  wlan_fullmac_impl_ifc_eapol_conf(&ndev->if_proto, &confirm);
+  ndev->if_proto->EapolConf(&confirm);
 }
 
-static void brcmf_populate_eapol_eth_header(uint8_t* dest, const wlan_fullmac_eapol_req_t* req) {
+static void brcmf_populate_eapol_eth_header(uint8_t* dest,
+                                            const wlan_fullmac::WlanFullmacEapolReq* req) {
   // IEEE Std. 802.3-2015, 3.1.1
-  memcpy(dest, req->dst_addr, ETH_ALEN);
-  memcpy(dest + ETH_ALEN, req->src_addr, ETH_ALEN);
+  memcpy(dest, req->dst_addr.data(), ETH_ALEN);
+  memcpy(dest + ETH_ALEN, req->src_addr.data(), ETH_ALEN);
   *reinterpret_cast<uint16_t*>(dest + 2 * ETH_ALEN) = EAPOL_ETHERNET_TYPE_UINT16;
-  memcpy(dest + 2 * ETH_ALEN + sizeof(uint16_t), req->data_list, req->data_count);
+  memcpy(dest + 2 * ETH_ALEN + sizeof(uint16_t), req->data.data(), req->data.count());
 }
 
-static void brcmf_if_eapol_req_netdev(net_device* ndev, const wlan_fullmac_eapol_req_t* req,
-                                      int length) {
+static void brcmf_if_eapol_req_netdev(net_device* ndev,
+                                      const wlan_fullmac::WlanFullmacEapolReq* req, int length) {
   struct brcmf_if* ifp = ndev_to_if(ndev);
   struct brcmf_pub* drvr = ifp->drvr;
   wlan::drivers::components::FrameContainer frames = brcmf_bus_acquire_tx_space(drvr->bus_if, 1);
@@ -3904,19 +3920,19 @@ static void brcmf_if_eapol_req_netdev(net_device* ndev, const wlan_fullmac_eapol
   brcmf_send_eapol_confirm(ndev, req, result);
 }
 
-void brcmf_if_eapol_req(net_device* ndev, const wlan_fullmac_eapol_req_t* req) {
+void brcmf_if_eapol_req(net_device* ndev, const wlan_fullmac::WlanFullmacEapolReq* req) {
   std::shared_lock<std::shared_mutex> guard(ndev->if_proto_lock);
-  if (ndev->if_proto.ops == nullptr) {
+  if (ndev->if_proto == nullptr) {
     BRCMF_IFDBG(WLANIF, ndev, "interface stopped -- skipping EAPOL xmit callback");
     return;
   }
 
-  BRCMF_IFDBG(WLANIF, ndev, "EAPOL xmit request from SME. data_len: %zu", req->data_count);
+  BRCMF_IFDBG(WLANIF, ndev, "EAPOL xmit request from SME. data_len: %zu", req->data.count());
 
   int packet_length;
 
   // Ethernet header length + EAPOL PDU length
-  packet_length = 2 * ETH_ALEN + sizeof(uint16_t) + req->data_count;
+  packet_length = 2 * ETH_ALEN + sizeof(uint16_t) + req->data.count();
 
   brcmf_if_eapol_req_netdev(ndev, req, packet_length);
 }
@@ -3975,14 +3991,16 @@ static uint16_t brcmf_get_mcs_map(uint32_t nchain, uint16_t supp) {
   return mcs_map;
 }
 
-static void brcmf_update_ht_cap(struct brcmf_if* ifp, wlan_fullmac_band_capability* band_cap,
+static void brcmf_update_ht_cap(struct brcmf_if* ifp,
+                                wlan_fullmac::WlanFullmacBandCapability* band_cap,
                                 uint32_t bw_cap[2], uint32_t ldpc_cap, uint32_t nchain,
                                 uint32_t max_ampdu_len_exp) {
   zx_status_t status;
 
   band_cap->ht_supported = true;
 
-  wlan::HtCapabilities* ht_caps = wlan::HtCapabilities::View(&band_cap->ht_caps);
+  wlan::HtCapabilities* ht_caps =
+      wlan::HtCapabilities::ViewFromRawBytes(band_cap->ht_caps.bytes.data());
 
   // LDPC Support
   if (ldpc_cap) {
@@ -3990,7 +4008,7 @@ static void brcmf_update_ht_cap(struct brcmf_if* ifp, wlan_fullmac_band_capabili
   }
 
   // Bandwidth-related flags
-  if (bw_cap[band_cap->band] & WLC_BW_40MHZ_BIT) {
+  if (bw_cap[static_cast<uint8_t>(band_cap->band)] & WLC_BW_40MHZ_BIT) {
     ht_caps->ht_cap_info.set_chan_width_set(true);
     ht_caps->ht_cap_info.set_short_gi_40(true);
   }
@@ -4036,14 +4054,16 @@ static void brcmf_update_ht_cap(struct brcmf_if* ifp, wlan_fullmac_band_capabili
   memset(&ht_caps->mcs_set, 0xff, nchain);
 }
 
-static void brcmf_update_vht_cap(struct brcmf_if* ifp, wlan_fullmac_band_capability* band_cap,
+static void brcmf_update_vht_cap(struct brcmf_if* ifp,
+                                 wlan_fullmac::WlanFullmacBandCapability* band_cap,
                                  uint32_t bw_cap[2], uint32_t nchain, uint32_t ldpc_cap,
                                  uint32_t max_ampdu_len_exp) {
   uint16_t mcs_map;
 
   band_cap->vht_supported = true;
 
-  wlan::VhtCapabilities* vht_caps = wlan::VhtCapabilities::View(&band_cap->vht_caps);
+  wlan::VhtCapabilities* vht_caps =
+      wlan::VhtCapabilities::ViewFromRawBytes(band_cap->vht_caps.bytes.data());
 
   // Set Max MPDU length to 11454
   // TODO (fxbug.dev/29107): Value hardcoded from firmware behavior of the BCM4356 and BCM4359
@@ -4052,7 +4072,7 @@ static void brcmf_update_vht_cap(struct brcmf_if* ifp, wlan_fullmac_band_capabil
 
   /* 80MHz is mandatory */
   vht_caps->vht_cap_info.set_sgi_cbw80(true);
-  if (bw_cap[band_cap->band] & WLC_BW_160MHZ_BIT) {
+  if (bw_cap[static_cast<uint8_t>(band_cap->band)] & WLC_BW_160MHZ_BIT) {
     vht_caps->vht_cap_info.set_supported_cbw_set(1);
     vht_caps->vht_cap_info.set_sgi_cbw160(true);
   }
@@ -4121,9 +4141,9 @@ static void brcmf_update_vht_cap(struct brcmf_if* ifp, wlan_fullmac_band_capabil
   vht_caps->vht_cap_info.set_max_ampdu_exp(max_ampdu_len_exp);
 }
 
-static void brcmf_dump_80211_ht_caps(ht_capabilities_t* caps) {
+static void brcmf_dump_80211_ht_caps(fuchsia_wlan_ieee80211::wire::HtCapabilities* caps) {
   // wlan::HtCapabilities
-  wlan::HtCapabilities* ht_caps = wlan::HtCapabilities::View(caps);
+  wlan::HtCapabilities* ht_caps = wlan::HtCapabilities::ViewFromRawBytes(caps->bytes.data());
   BRCMF_DBG_UNFILTERED("     ht_cap_info: %#x", ht_caps->ht_cap_info.as_uint16());
   BRCMF_DBG_UNFILTERED("     ampdu_params: %#x", ht_caps->ampdu_params.val());
 
@@ -4138,23 +4158,23 @@ static void brcmf_dump_80211_ht_caps(ht_capabilities_t* caps) {
   BRCMF_DBG_UNFILTERED("     asel_cap: %#x", ht_caps->asel_cap.val());
 }
 
-static void brcmf_dump_80211_vht_caps(vht_capabilities_t* caps) {
-  wlan::VhtCapabilities* vht_caps = wlan::VhtCapabilities::View(caps);
+static void brcmf_dump_80211_vht_caps(fuchsia_wlan_ieee80211::wire::VhtCapabilities* caps) {
+  wlan::VhtCapabilities* vht_caps = wlan::VhtCapabilities::ViewFromRawBytes(caps->bytes.data());
   BRCMF_DBG_UNFILTERED("     vht_cap_info: %#lx", vht_caps->vht_cap_info.as_uint32());
   BRCMF_DBG_UNFILTERED("     vht_mcs_nss: %#" PRIx64 "", vht_caps->vht_mcs_nss.as_uint64());
 }
 
-static void brcmf_dump_if_band_cap(wlan_fullmac_band_capability_t* band_cap) {
+static void brcmf_dump_if_band_cap(wlan_fullmac::WlanFullmacBandCapability* band_cap) {
   char band_str[32];
   switch (band_cap->band) {
-    case WLAN_BAND_TWO_GHZ:
+    case wlan_common::WlanBand::kTwoGhz:
       sprintf(band_str, "2GHz");
       break;
-    case WLAN_BAND_FIVE_GHZ:
+    case wlan_common::WlanBand::kFiveGhz:
       sprintf(band_str, "5GHz");
       break;
     default:
-      sprintf(band_str, "unknown (%d)", band_cap->band);
+      sprintf(band_str, "unknown (%hhu)", static_cast<uint8_t>(band_cap->band));
       break;
   }
   BRCMF_DBG_UNFILTERED("   band: %s", band_str);
@@ -4168,7 +4188,7 @@ static void brcmf_dump_if_band_cap(wlan_fullmac_band_capability_t* band_cap) {
   char rates_str[fuchsia_wlan_ieee80211_MAX_SUPPORTED_BASIC_RATES * 6 + 1];
   char* str = rates_str;
   for (unsigned i = 0; i < band_cap->basic_rate_count; i++) {
-    str += sprintf(str, "%s%d", i > 0 ? " " : "", band_cap->basic_rate_list[i]);
+    str += sprintf(str, "%s%d", i > 0 ? " " : "", band_cap->basic_rate_list.data()[i]);
   }
   BRCMF_DBG_UNFILTERED("     basic_rates: %s", rates_str);
 
@@ -4181,7 +4201,7 @@ static void brcmf_dump_if_band_cap(wlan_fullmac_band_capability_t* band_cap) {
   char channels_str[fuchsia_wlan_ieee80211_MAX_UNIQUE_CHANNEL_NUMBERS * 4 + 1];
   str = channels_str;
   for (unsigned i = 0; i < band_cap->operating_channel_count; i++) {
-    str += sprintf(str, "%s%d", i > 0 ? " " : "", band_cap->operating_channel_list[i]);
+    str += sprintf(str, "%s%d", i > 0 ? " " : "", band_cap->operating_channel_list.data()[i]);
   }
   BRCMF_DBG_UNFILTERED("     channels: %s", channels_str);
 
@@ -4196,21 +4216,24 @@ static void brcmf_dump_if_band_cap(wlan_fullmac_band_capability_t* band_cap) {
   }
 }
 
-static void brcmf_dump_if_query_info(wlan_fullmac_query_info_t* info) {
+static void brcmf_dump_if_query_info(wlan_fullmac::WlanFullmacQueryInfo* info) {
   BRCMF_DBG_UNFILTERED(" Device capabilities as reported to wlanif:");
-  BRCMF_DBG_UNFILTERED("   sta_addr: " FMT_MAC, FMT_MAC_ARGS(info->sta_addr));
-  BRCMF_DBG_UNFILTERED("   role(s): %s%s%s", info->role & WLAN_MAC_ROLE_CLIENT ? "client " : "",
-                       info->role & WLAN_MAC_ROLE_AP ? "ap " : "",
-                       info->role & WLAN_MAC_ROLE_MESH ? "mesh " : "");
-  BRCMF_DBG_UNFILTERED("   feature(s): %s%s",
-                       info->features & WLAN_FULLMAC_FEATURE_DMA ? "DMA " : "",
-                       info->features & WLAN_FULLMAC_FEATURE_SYNTH ? "SYNTH " : "");
+  BRCMF_DBG_UNFILTERED("   sta_addr: " FMT_MAC, FMT_MAC_ARGS(info->sta_addr.data()));
+  BRCMF_DBG_UNFILTERED("   role(s): %s%s%s",
+                       info->role == wlan_common::WlanMacRole::kClient ? "client " : "",
+                       info->role == wlan_common::WlanMacRole::kAp ? "ap " : "",
+                       info->role == wlan_common::WlanMacRole::kMesh ? "mesh " : "");
+  BRCMF_DBG_UNFILTERED(
+      "   feature(s): %s%s",
+      info->features & static_cast<uint32_t>(wlan_fullmac::WlanFullmacFeature::kDma) ? "DMA " : "",
+      info->features & static_cast<uint32_t>(wlan_fullmac::WlanFullmacFeature::kSynth) ? "SYNTH "
+                                                                                       : "");
   for (unsigned i = 0; i < info->band_cap_count; i++) {
     brcmf_dump_if_band_cap(&info->band_cap_list[i]);
   }
 }
 
-void brcmf_if_query(net_device* ndev, wlan_fullmac_query_info_t* info) {
+void brcmf_if_query(net_device* ndev, wlan_fullmac::WlanFullmacQueryInfo* info) {
   struct brcmf_if* ifp = ndev_to_if(ndev);
   struct wireless_dev* wdev = ndev_to_wdev(ndev);
   struct brcmf_cfg80211_info* cfg = ifp->drvr->config;
@@ -4230,10 +4253,25 @@ void brcmf_if_query(net_device* ndev, wlan_fullmac_query_info_t* info) {
   memset(info, 0, sizeof(*info));
 
   // mac_addr
-  memcpy(info->sta_addr, ifp->mac_addr, ETH_ALEN);
+  memcpy(info->sta_addr.data(), ifp->mac_addr, ETH_ALEN);
 
   // role
-  info->role = wdev->iftype;
+  switch (wdev->iftype) {
+    case WLAN_MAC_ROLE_CLIENT: {
+      info->role = wlan_common::WlanMacRole::kClient;
+      break;
+    }
+    case WLAN_MAC_ROLE_AP: {
+      info->role = wlan_common::WlanMacRole::kAp;
+      break;
+    }
+    case WLAN_MAC_ROLE_MESH: {
+      info->role = wlan_common::WlanMacRole::kMesh;
+      break;
+    }
+    default:
+      BRCMF_ERR("Invalid wdev->iftype obtained : %u", wdev->iftype);
+  }
 
   // bands
   uint32_t bandlist[3];
@@ -4244,8 +4282,8 @@ void brcmf_if_query(net_device* ndev, wlan_fullmac_query_info_t* info) {
     return;
   }
 
-  wlan_fullmac_band_capability_t* band_cap_2ghz = nullptr;
-  wlan_fullmac_band_capability_t* band_cap_5ghz = nullptr;
+  wlan_fullmac::WlanFullmacBandCapability* band_cap_2ghz = nullptr;
+  wlan_fullmac::WlanFullmacBandCapability* band_cap_5ghz = nullptr;
 
   /* first entry in bandlist is number of bands */
   info->band_cap_count = bandlist[0];
@@ -4254,20 +4292,20 @@ void brcmf_if_query(net_device* ndev, wlan_fullmac_query_info_t* info) {
       BRCMF_ERR("insufficient space in query response for all bands, truncating");
       continue;
     }
-    wlan_fullmac_band_capability* band_cap = &info->band_cap_list[i - 1];
+    wlan_fullmac::WlanFullmacBandCapability* band_cap = &info->band_cap_list[i - 1];
     if (bandlist[i] == WLC_BAND_2G) {
-      band_cap->band = WLAN_BAND_TWO_GHZ;
+      band_cap->band = wlan_common::WlanBand::kTwoGhz;
       band_cap->basic_rate_count =
           std::min<size_t>(fuchsia_wlan_ieee80211_MAX_SUPPORTED_BASIC_RATES, wl_g_rates_size);
-      memcpy(band_cap->basic_rate_list, wl_g_rates,
-             band_cap->basic_rate_count * sizeof(*band_cap->basic_rate_list));
+      memcpy(band_cap->basic_rate_list.data(), wl_g_rates,
+             band_cap->basic_rate_count * sizeof(*band_cap->basic_rate_list.data()));
       band_cap_2ghz = band_cap;
     } else if (bandlist[i] == WLC_BAND_5G) {
-      band_cap->band = WLAN_BAND_FIVE_GHZ;
+      band_cap->band = wlan_common::WlanBand::kFiveGhz;
       band_cap->basic_rate_count =
           std::min<size_t>(fuchsia_wlan_ieee80211_MAX_SUPPORTED_BASIC_RATES, wl_a_rates_size);
-      memcpy(band_cap->basic_rate_list, wl_a_rates,
-             band_cap->basic_rate_count * sizeof(*band_cap->basic_rate_list));
+      memcpy(band_cap->basic_rate_list.data(), wl_a_rates,
+             band_cap->basic_rate_count * sizeof(*band_cap->basic_rate_list.data()));
       band_cap_5ghz = band_cap;
     }
   }
@@ -4292,7 +4330,7 @@ void brcmf_if_query(net_device* ndev, wlan_fullmac_query_info_t* info) {
     cfg->d11inf.decchspec(&ch);
 
     // Find the appropriate band
-    wlan_fullmac_band_capability_t* band_cap = nullptr;
+    wlan_fullmac::WlanFullmacBandCapability* band_cap = nullptr;
     if (ch.band == BRCMU_CHAN_BAND_2G) {
       band_cap = band_cap_2ghz;
     } else if (ch.band == BRCMU_CHAN_BAND_5G) {
@@ -4401,15 +4439,15 @@ fail_pbuf:
   free(pbuf);
 }
 
-void brcmf_if_query_mac_sublayer_support(net_device* ndev, mac_sublayer_support_t* resp) {
+void brcmf_if_query_mac_sublayer_support(net_device* ndev, wlan_common::MacSublayerSupport* resp) {
   BRCMF_IFDBG(WLANIF, ndev, "Query MAC sublayer feature support request received from SME.");
 
   memset(resp, 0, sizeof(*resp));
-  resp->data_plane.data_plane_type = DATA_PLANE_TYPE_GENERIC_NETWORK_DEVICE;
-  resp->device.mac_implementation_type = MAC_IMPLEMENTATION_TYPE_FULLMAC;
+  resp->data_plane.data_plane_type = wlan_common::DataPlaneType::kGenericNetworkDevice;
+  resp->device.mac_implementation_type = wlan_common::MacImplementationType::kFullmac;
 }
 
-void brcmf_if_query_security_support(net_device* ndev, security_support_t* resp) {
+void brcmf_if_query_security_support(net_device* ndev, wlan_common::SecuritySupport* resp) {
   struct brcmf_if* ifp = ndev_to_if(ndev);
   BRCMF_IFDBG(WLANIF, ndev, "Query security feature support request received from SME.");
 
@@ -4423,7 +4461,7 @@ void brcmf_if_query_security_support(net_device* ndev, security_support_t* resp)
 }
 
 void brcmf_if_query_spectrum_management_support(net_device* ndev,
-                                                spectrum_management_support_t* resp) {
+                                                wlan_common::SpectrumManagementSupport* resp) {
   struct brcmf_if* ifp = ndev_to_if(ndev);
   BRCMF_IFDBG(WLANIF, ndev, "Query spectrum management support request received from SME.");
 
@@ -4450,11 +4488,12 @@ zx_status_t brcmf_convert_antenna_id(const histograms_report_t& histograms_repor
   return ZX_OK;
 }
 
-void brcmf_get_noise_floor_samples(const histograms_report_t& histograms_report,
-                                   std::vector<wlan_fullmac_hist_bucket_t>* out_noise_floor_samples,
-                                   uint64_t* out_invalid_samples) {
-  for (size_t i = 0; i < WLAN_FULLMAC_MAX_NOISE_FLOOR_SAMPLES; ++i) {
-    wlan_fullmac_hist_bucket_t bucket;
+void brcmf_get_noise_floor_samples(
+    const histograms_report_t& histograms_report,
+    std::vector<wlan_fullmac::WlanFullmacHistBucket>* out_noise_floor_samples,
+    uint64_t* out_invalid_samples) {
+  for (size_t i = 0; i < wlan_fullmac::kWlanFullmacMaxNoiseFloorSamples; ++i) {
+    wlan_fullmac::WlanFullmacHistBucket bucket;
     bucket.bucket_index = i;
     bucket.num_samples = histograms_report.rxnoiseflr[i];
     out_noise_floor_samples->push_back(bucket);
@@ -4464,10 +4503,10 @@ void brcmf_get_noise_floor_samples(const histograms_report_t& histograms_report,
 }
 
 void brcmf_get_rssi_samples(const histograms_report_t& histograms_report,
-                            std::vector<wlan_fullmac_hist_bucket_t>* out_rssi_samples,
+                            std::vector<wlan_fullmac::WlanFullmacHistBucket>* out_rssi_samples,
                             uint64_t* out_invalid_samples) {
-  for (size_t i = 0; i < WLAN_FULLMAC_MAX_RSSI_SAMPLES; ++i) {
-    wlan_fullmac_hist_bucket_t bucket;
+  for (size_t i = 0; i < wlan_fullmac::kWlanFullmacMaxRssiSamples; ++i) {
+    wlan_fullmac::WlanFullmacHistBucket bucket;
     bucket.bucket_index = i;
     bucket.num_samples = histograms_report.rxrssi[i];
     out_rssi_samples->push_back(bucket);
@@ -4477,10 +4516,10 @@ void brcmf_get_rssi_samples(const histograms_report_t& histograms_report,
 }
 
 void brcmf_get_snr_samples(const histograms_report_t& histograms_report,
-                           std::vector<wlan_fullmac_hist_bucket_t>* out_snr_samples,
+                           std::vector<wlan_fullmac::WlanFullmacHistBucket>* out_snr_samples,
                            uint64_t* out_invalid_samples) {
-  for (size_t i = 0; i < WLAN_FULLMAC_MAX_SNR_SAMPLES; ++i) {
-    wlan_fullmac_hist_bucket_t bucket;
+  for (size_t i = 0; i < wlan_fullmac::kWlanFullmacMaxSnrSamples; ++i) {
+    wlan_fullmac::WlanFullmacHistBucket bucket;
     bucket.bucket_index = i;
     bucket.num_samples = histograms_report.rxsnr[i];
     out_snr_samples->push_back(bucket);
@@ -4491,15 +4530,15 @@ void brcmf_get_snr_samples(const histograms_report_t& histograms_report,
 
 void brcmf_get_rx_rate_index_samples(
     const histograms_report_t& histograms_report,
-    std::vector<wlan_fullmac_hist_bucket_t>* out_rx_rate_index_samples,
+    std::vector<wlan_fullmac::WlanFullmacHistBucket>* out_rx_rate_index_samples,
     uint64_t* out_invalid_samples) {
   uint32_t rxrate[WLAN_FULLMAC_MAX_RX_RATE_INDEX_SAMPLES];
   brcmu_set_rx_rate_index_hist_rx11ac(histograms_report.rx11ac, rxrate);
   brcmu_set_rx_rate_index_hist_rx11b(histograms_report.rx11b, rxrate);
   brcmu_set_rx_rate_index_hist_rx11g(histograms_report.rx11g, rxrate);
   brcmu_set_rx_rate_index_hist_rx11n(histograms_report.rx11n, rxrate);
-  for (uint8_t i = 0; i < WLAN_FULLMAC_MAX_RX_RATE_INDEX_SAMPLES; ++i) {
-    wlan_fullmac_hist_bucket_t bucket;
+  for (uint8_t i = 0; i < wlan_fullmac::kWlanFullmacMaxRxRateIndexSamples; ++i) {
+    wlan_fullmac::WlanFullmacHistBucket bucket;
     bucket.bucket_index = i;
     bucket.num_samples = rxrate[i];
     out_rx_rate_index_samples->push_back(bucket);
@@ -4508,48 +4547,63 @@ void brcmf_get_rx_rate_index_samples(
   *out_invalid_samples = 0;
 }
 
+void GetFIDLAntennaIdFromBanjo(const wlan_fullmac_antenna_id_t& antenna_id,
+                               wlan_fullmac::WlanFullmacAntennaId* out_antenna_id) {
+  switch (antenna_id.freq) {
+    case WLAN_FULLMAC_ANTENNA_FREQ_ANTENNA_2_G:
+      out_antenna_id->freq = wlan_fullmac::WlanFullmacAntennaFreq::kAntenna2G;
+      break;
+    case WLAN_FULLMAC_ANTENNA_FREQ_ANTENNA_5_G:
+      out_antenna_id->freq = wlan_fullmac::WlanFullmacAntennaFreq::kAntenna5G;
+      break;
+    default:
+      BRCMF_ERR("Unknown antenna frequency: %hhu", antenna_id.freq);
+  }
+  out_antenna_id->index = antenna_id.index;
+}
+
 void brcmf_convert_histograms_report_noise_floor(
     const histograms_report_t& histograms_report, const wlan_fullmac_antenna_id_t& antenna_id,
-    wlan_fullmac_noise_floor_histogram_t* out_hist,
-    std::vector<wlan_fullmac_hist_bucket_t>* out_samples) {
-  out_hist->antenna_id = antenna_id;
-  out_hist->hist_scope = WLAN_FULLMAC_HIST_SCOPE_PER_ANTENNA;
-  brcmf_get_noise_floor_samples(histograms_report, out_samples, &out_hist->invalid_samples);
-  out_hist->noise_floor_samples_count = out_samples->size();
-  out_hist->noise_floor_samples_list = out_samples->data();
+    wlan_fullmac::WlanFullmacNoiseFloorHistogram* out_hist, fidl::AnyArena& arena) {
+  GetFIDLAntennaIdFromBanjo(antenna_id, &out_hist->antenna_id);
+  out_hist->hist_scope = wlan_fullmac::WlanFullmacHistScope::kPerAntenna;
+  std::vector<wlan_fullmac::WlanFullmacHistBucket> samples;
+  brcmf_get_noise_floor_samples(histograms_report, &samples, &out_hist->invalid_samples);
+  out_hist->noise_floor_samples =
+      fidl::VectorView<wlan_fullmac::WlanFullmacHistBucket>(arena, samples);
 }
 
 void brcmf_convert_histograms_report_rx_rate_index(
     const histograms_report_t& histograms_report, const wlan_fullmac_antenna_id_t& antenna_id,
-    wlan_fullmac_rx_rate_index_histogram_t* out_hist,
-    std::vector<wlan_fullmac_hist_bucket_t>* out_samples) {
-  out_hist->antenna_id = antenna_id;
-  out_hist->hist_scope = WLAN_FULLMAC_HIST_SCOPE_PER_ANTENNA;
-  brcmf_get_rx_rate_index_samples(histograms_report, out_samples, &out_hist->invalid_samples);
-  out_hist->rx_rate_index_samples_count = out_samples->size();
-  out_hist->rx_rate_index_samples_list = out_samples->data();
+    wlan_fullmac::WlanFullmacRxRateIndexHistogram* out_hist, fidl::AnyArena& arena) {
+  GetFIDLAntennaIdFromBanjo(antenna_id, &out_hist->antenna_id);
+  out_hist->hist_scope = wlan_fullmac::WlanFullmacHistScope::kPerAntenna;
+  std::vector<wlan_fullmac::WlanFullmacHistBucket> samples;
+  brcmf_get_rx_rate_index_samples(histograms_report, &samples, &out_hist->invalid_samples);
+  out_hist->rx_rate_index_samples =
+      fidl::VectorView<wlan_fullmac::WlanFullmacHistBucket>(arena, samples);
 }
 
 void brcmf_convert_histograms_report_rssi(const histograms_report_t& histograms_report,
                                           const wlan_fullmac_antenna_id_t& antenna_id,
-                                          wlan_fullmac_rssi_histogram_t* out_hist,
-                                          std::vector<wlan_fullmac_hist_bucket_t>* out_samples) {
-  out_hist->antenna_id = antenna_id;
-  out_hist->hist_scope = WLAN_FULLMAC_HIST_SCOPE_PER_ANTENNA;
-  brcmf_get_rssi_samples(histograms_report, out_samples, &out_hist->invalid_samples);
-  out_hist->rssi_samples_count = out_samples->size();
-  out_hist->rssi_samples_list = out_samples->data();
+                                          wlan_fullmac::WlanFullmacRssiHistogram* out_hist,
+                                          fidl::AnyArena& arena) {
+  GetFIDLAntennaIdFromBanjo(antenna_id, &out_hist->antenna_id);
+  out_hist->hist_scope = wlan_fullmac::WlanFullmacHistScope::kPerAntenna;
+  std::vector<wlan_fullmac::WlanFullmacHistBucket> samples;
+  brcmf_get_rssi_samples(histograms_report, &samples, &out_hist->invalid_samples);
+  out_hist->rssi_samples = fidl::VectorView<wlan_fullmac::WlanFullmacHistBucket>(arena, samples);
 }
 
 void brcmf_convert_histograms_report_snr(const histograms_report_t& histograms_report,
                                          const wlan_fullmac_antenna_id_t& antenna_id,
-                                         wlan_fullmac_snr_histogram_t* out_hist,
-                                         std::vector<wlan_fullmac_hist_bucket_t>* out_samples) {
-  out_hist->antenna_id = antenna_id;
-  out_hist->hist_scope = WLAN_FULLMAC_HIST_SCOPE_PER_ANTENNA;
-  brcmf_get_snr_samples(histograms_report, out_samples, &out_hist->invalid_samples);
-  out_hist->snr_samples_count = out_samples->size();
-  out_hist->snr_samples_list = out_samples->data();
+                                         wlan_fullmac::WlanFullmacSnrHistogram* out_hist,
+                                         fidl::AnyArena& arena) {
+  GetFIDLAntennaIdFromBanjo(antenna_id, &out_hist->antenna_id);
+  out_hist->hist_scope = wlan_fullmac::WlanFullmacHistScope::kPerAntenna;
+  std::vector<wlan_fullmac::WlanFullmacHistBucket> samples;
+  brcmf_get_snr_samples(histograms_report, &samples, &out_hist->invalid_samples);
+  out_hist->snr_samples = fidl::VectorView<wlan_fullmac::WlanFullmacHistBucket>(arena, samples);
 }
 
 zx_status_t brcmf_get_histograms_report(brcmf_if* ifp, histograms_report_t* out_report) {
@@ -4608,10 +4662,10 @@ zx_status_t brcmf_get_histograms_report(brcmf_if* ifp, histograms_report_t* out_
 
 }  // namespace
 
-zx_status_t brcmf_if_get_iface_counter_stats(net_device* ndev,
-                                             wlan_fullmac_iface_counter_stats_t* out_stats) {
+zx_status_t brcmf_if_get_iface_counter_stats(
+    net_device* ndev, wlan_fullmac::WlanFullmacIfaceCounterStats* out_stats) {
   std::shared_lock<std::shared_mutex> guard(ndev->if_proto_lock);
-  if (ndev->if_proto.ops == nullptr) {
+  if (ndev->if_proto == nullptr) {
     BRCMF_IFDBG(WLANIF, ndev, "interface stopped -- skipping get iface counter stats");
     return ZX_ERR_INTERNAL;
   }
@@ -4649,23 +4703,21 @@ zx_status_t brcmf_if_get_iface_counter_stats(net_device* ndev,
   return ZX_OK;
 }
 
-zx_status_t brcmf_if_get_iface_histogram_stats(net_device* ndev,
-                                               wlan_fullmac_iface_histogram_stats_t* out_stats) {
+zx_status_t brcmf_if_get_iface_histogram_stats(
+    net_device* ndev, wlan_fullmac::WlanFullmacIfaceHistogramStats* out_stats,
+    fidl::AnyArena& arena) {
   std::shared_lock<std::shared_mutex> guard(ndev->if_proto_lock);
-  if (ndev->if_proto.ops == nullptr) {
+  if (ndev->if_proto == nullptr) {
     BRCMF_IFDBG(WLANIF, ndev, "interface stopped -- skipping get iface histogram stats");
     return ZX_ERR_INTERNAL;
   }
   struct brcmf_if* ifp = ndev_to_if(ndev);
+  auto stats_builder = wlan_fullmac::WlanFullmacIfaceHistogramStats::Builder(arena);
 
   ndev->stats.noise_floor_histograms = {};
-  ndev->stats.noise_floor_samples = {};
   ndev->stats.rssi_histograms = {};
-  ndev->stats.rssi_samples = {};
   ndev->stats.rx_rate_index_histograms = {};
-  ndev->stats.rx_rate_index_samples = {};
   ndev->stats.snr_histograms = {};
-  ndev->stats.snr_samples = {};
 
   if (brcmf_feat_is_enabled(ifp, BRCMF_FEAT_MFG)) {
     // MFG builds do not support many of the stats iovars.
@@ -4695,33 +4747,36 @@ zx_status_t brcmf_if_get_iface_histogram_stats(net_device* ndev,
   }
   ndev->stats.noise_floor_histograms.resize(1);
   brcmf_convert_histograms_report_noise_floor(histograms_report, antenna_id,
-                                              ndev->stats.noise_floor_histograms.data(),
-                                              &ndev->stats.noise_floor_samples);
+                                              ndev->stats.noise_floor_histograms.data(), arena);
+  ndev->stats.rssi_histograms.resize(1);
+  brcmf_convert_histograms_report_rssi(histograms_report, antenna_id,
+                                       ndev->stats.rssi_histograms.data(), arena);
   ndev->stats.rx_rate_index_histograms.resize(1);
   brcmf_convert_histograms_report_rx_rate_index(histograms_report, antenna_id,
-                                                ndev->stats.rx_rate_index_histograms.data(),
-                                                &ndev->stats.rx_rate_index_samples);
-  ndev->stats.rssi_histograms.resize(1);
-  brcmf_convert_histograms_report_rssi(
-      histograms_report, antenna_id, ndev->stats.rssi_histograms.data(), &ndev->stats.rssi_samples);
+                                                ndev->stats.rx_rate_index_histograms.data(), arena);
   ndev->stats.snr_histograms.resize(1);
   brcmf_convert_histograms_report_snr(histograms_report, antenna_id,
-                                      ndev->stats.snr_histograms.data(), &ndev->stats.snr_samples);
+                                      ndev->stats.snr_histograms.data(), arena);
 
-  out_stats->noise_floor_histograms_count = ndev->stats.noise_floor_histograms.size();
-  out_stats->noise_floor_histograms_list = ndev->stats.noise_floor_histograms.data();
-  out_stats->rssi_histograms_count = ndev->stats.rssi_histograms.size();
-  out_stats->rssi_histograms_list = ndev->stats.rssi_histograms.data();
-  out_stats->rx_rate_index_histograms_count = ndev->stats.rx_rate_index_histograms.size();
-  out_stats->rx_rate_index_histograms_list = ndev->stats.rx_rate_index_histograms.data();
-  out_stats->snr_histograms_count = ndev->stats.snr_histograms.size();
-  out_stats->snr_histograms_list = ndev->stats.snr_histograms.data();
+  // Conversion from banjo to FIDL table.
+  stats_builder.noise_floor_histograms(
+      fidl::VectorView<wlan_fullmac::WlanFullmacNoiseFloorHistogram>(
+          arena, ndev->stats.noise_floor_histograms));
+  stats_builder.rssi_histograms(
+      fidl::VectorView<wlan_fullmac::WlanFullmacRssiHistogram>(arena, ndev->stats.rssi_histograms));
+  stats_builder.rx_rate_index_histograms(
+      fidl::VectorView<wlan_fullmac::WlanFullmacRxRateIndexHistogram>(
+          arena, ndev->stats.rx_rate_index_histograms));
+  stats_builder.snr_histograms(
+      fidl::VectorView<wlan_fullmac::WlanFullmacSnrHistogram>(arena, ndev->stats.snr_histograms));
+
+  *out_stats = stats_builder.Build();
 
   return ZX_OK;
 }
 
 zx_status_t brcmf_if_sae_handshake_resp(net_device* ndev,
-                                        const wlan_fullmac_sae_handshake_resp_t* resp) {
+                                        const wlan_fullmac::WlanFullmacSaeHandshakeResp* resp) {
   struct brcmf_if* ifp = ndev_to_if(ndev);
   bcme_status_t fw_err = BCME_OK;
   zx_status_t err = ZX_OK;
@@ -4732,11 +4787,12 @@ zx_status_t brcmf_if_sae_handshake_resp(net_device* ndev,
     return ZX_ERR_INVALID_ARGS;
   }
 
-  if (memcmp(resp->peer_sta_address, ifp->connect_req.selected_bss.bssid, ETH_ALEN)) {
+  if (memcmp(resp->peer_sta_address.data(), ifp->connect_req.selected_bss()->bssid().data(),
+             ETH_ALEN)) {
     BRCMF_ERR("Auth MAC != Join MAC");
 #if !defined(NDEBUG)
-    const uint8_t* old_mac = ifp->connect_req.selected_bss.bssid;
-    const uint8_t* new_mac = resp->peer_sta_address;
+    const uint8_t* old_mac = ifp->connect_req.selected_bss()->bssid().data();
+    const uint8_t* new_mac = resp->peer_sta_address.data();
     BRCMF_DBG(CONN, " auth mac: " FMT_MAC ", join mac: " FMT_MAC, FMT_MAC_ARGS(new_mac),
               FMT_MAC_ARGS(old_mac));
 #endif /* !defined(NDEBUG) */
@@ -4748,8 +4804,8 @@ zx_status_t brcmf_if_sae_handshake_resp(net_device* ndev,
     BRCMF_ERR("Ignoring mismatch and using join MAC address");
   }
 
-  auto ssid = brcmf_find_ssid_in_ies(ifp->connect_req.selected_bss.ies_list,
-                                     ifp->connect_req.selected_bss.ies_count);
+  auto ssid = brcmf_find_ssid_in_ies(ifp->connect_req.selected_bss()->ies().data(),
+                                     ifp->connect_req.selected_bss()->ies().size());
   if (ssid.empty()) {
     BRCMF_ERR("No SSID IE in BSS");
     brcmf_return_assoc_result(ndev, STATUS_CODE_REFUSED_REASON_UNSPECIFIED);
@@ -4774,14 +4830,15 @@ zx_status_t brcmf_if_sae_handshake_resp(net_device* ndev,
   return err;
 }
 
-zx_status_t brcmf_if_sae_frame_tx(net_device* ndev, const wlan_fullmac_sae_frame_t* frame) {
+zx_status_t brcmf_if_sae_frame_tx(net_device* ndev,
+                                  const wlan_fullmac::WlanFullmacSaeFrame* frame) {
   struct brcmf_if* ifp = ndev_to_if(ndev);
   bcme_status_t fw_err = BCME_OK;
   zx_status_t err = ZX_OK;
 
   // Mac header(24 bytes) + Auth frame header(6 bytes) + sae_fields length.
-  uint32_t frame_size =
-      sizeof(wlan::MgmtFrameHeader) + sizeof(wlan::Authentication) + frame->sae_fields_count;
+  uint32_t frame_size = sizeof(wlan::MgmtFrameHeader) + sizeof(wlan::Authentication) +
+                        frame->sae_fields.count();  // LOOK INTO THIS _count;
   // Carry the SAE authentication frame in the last field of assoc_mgr_cmd.
   uint32_t cmd_buf_len = sizeof(assoc_mgr_cmd_t) + frame_size;
   uint8_t cmd_buf[cmd_buf_len];
@@ -4798,9 +4855,9 @@ zx_status_t brcmf_if_sae_frame_tx(net_device* ndev, const wlan_fullmac_sae_frame
       reinterpret_cast<brcmf_sae_auth_frame*>(cmd_buf + offsetof(assoc_mgr_cmd_t, params));
 
   // Set MAC addresses in MAC header, firmware will check these parts, and fill other missing parts.
-  sae_frame->mac_hdr.addr1 = wlan::common::MacAddr(frame->peer_sta_address);  // DA
-  sae_frame->mac_hdr.addr2 = wlan::common::MacAddr(ifp->mac_addr);            // SA
-  sae_frame->mac_hdr.addr3 = wlan::common::MacAddr(frame->peer_sta_address);  // BSSID
+  sae_frame->mac_hdr.addr1 = wlan::common::MacAddr(frame->peer_sta_address.data());  // DA
+  sae_frame->mac_hdr.addr2 = wlan::common::MacAddr(ifp->mac_addr);                   // SA
+  sae_frame->mac_hdr.addr3 = wlan::common::MacAddr(frame->peer_sta_address.data());  // BSSID
 
   BRCMF_DBG(CONN,
             "The peer_sta_address: " FMT_MAC ", the ifp mac is: " FMT_MAC
@@ -4811,20 +4868,20 @@ zx_status_t brcmf_if_sae_frame_tx(net_device* ndev, const wlan_fullmac_sae_frame
   // Fill the authentication frame header fields.
   sae_frame->auth_hdr.auth_algorithm_number = BRCMF_AUTH_MODE_SAE;
   sae_frame->auth_hdr.auth_txn_seq_number = frame->seq_num;
-  sae_frame->auth_hdr.status_code = frame->status_code;
+  sae_frame->auth_hdr.status_code = static_cast<uint16_t>(frame->status_code);
 
   BRCMF_DBG(CONN, "auth_algorithm_number: %u, auth_txn_seq_number: %u, status_code: %u",
             sae_frame->auth_hdr.auth_algorithm_number, sae_frame->auth_hdr.auth_txn_seq_number,
             sae_frame->auth_hdr.status_code);
 
   // Attach SAE payload after authentication frame header.
-  memcpy(sae_frame->sae_payload, frame->sae_fields_list, frame->sae_fields_count);
+  memcpy(sae_frame->sae_payload, frame->sae_fields.data(), frame->sae_fields.count());
 
   err = brcmf_fil_iovar_data_set(ifp, "assoc_mgr_cmd", cmd_buf, cmd_buf_len, &fw_err);
   if (err != ZX_OK) {
     BRCMF_ERR("Error sending SAE auth frame. err: %s, fw_err: %s", zx_status_get_string(err),
               brcmf_fil_get_errstr(fw_err));
-    brcmf_return_assoc_result(ndev, STATUS_CODE_REFUSED_UNAUTHENTICATED_ACCESS_NOT_SUPPORTED);
+    // brcmf_return_assoc_result(ndev, STATUS_CODE_REFUSED_UNAUTHENTICATED_ACCESS_NOT_SUPPORTED);
   }
 
   return err;
@@ -4838,8 +4895,8 @@ zx_status_t brcmf_if_set_multicast_promisc(net_device* ndev, bool enable) {
 }
 
 void brcmf_if_start_capture_frames(net_device* ndev,
-                                   const wlan_fullmac_start_capture_frames_req_t* req,
-                                   wlan_fullmac_start_capture_frames_resp_t* resp) {
+                                   const wlan_fullmac::WlanFullmacStartCaptureFramesReq* req,
+                                   wlan_fullmac::WlanFullmacStartCaptureFramesResp* resp) {
   BRCMF_ERR("start_capture_frames not supported");
   resp->status = ZX_ERR_NOT_SUPPORTED;
   resp->supported_mgmt_frames = 0;
@@ -4867,14 +4924,14 @@ void brcmf_if_wmm_status_req(net_device* ndev) {
   brcmf_if* ifp = ndev_to_if(ndev);
 
   std::shared_lock<std::shared_mutex> guard(ndev->if_proto_lock);
-  if (ndev->if_proto.ops == nullptr) {
+  if (ndev->if_proto == nullptr) {
     BRCMF_IFDBG(WLANIF, ndev, "interface stopped -- ignoring wmm status req");
     return;
   }
 
   if (ifp == nullptr) {
     BRCMF_ERR("ifp is null");
-    wlan_fullmac_impl_ifc_on_wmm_status_resp(&ndev->if_proto, ZX_ERR_INTERNAL, &resp);
+    ndev->if_proto->OnWmmStatusResp(ZX_ERR_INTERNAL, &resp);
     return;
   }
   // Retrieve the value of iovar wme_bss_disable. If the iovar is not present or
@@ -4886,7 +4943,7 @@ void brcmf_if_wmm_status_req(net_device* ndev) {
     } else {
       status = ZX_ERR_NOT_SUPPORTED;
     }
-    wlan_fullmac_impl_ifc_on_wmm_status_resp(&ndev->if_proto, status, &resp);
+    ndev->if_proto->OnWmmStatusResp(status, &resp);
     return;
   }
 
@@ -4895,7 +4952,7 @@ void brcmf_if_wmm_status_req(net_device* ndev) {
   if (status != ZX_OK) {
     BRCMF_ERR("could not get STA WMM status: %s, fw err %s", zx_status_get_string(status),
               brcmf_fil_get_errstr(fw_err));
-    wlan_fullmac_impl_ifc_on_wmm_status_resp(&ndev->if_proto, status, &resp);
+    ndev->if_proto->OnWmmStatusResp(status, &resp);
     return;
   }
 
@@ -4904,7 +4961,7 @@ void brcmf_if_wmm_status_req(net_device* ndev) {
   if (status != ZX_OK) {
     BRCMF_ERR("could not get WMM APSD: %s, fw err %s", zx_status_get_string(status),
               brcmf_fil_get_errstr(fw_err));
-    wlan_fullmac_impl_ifc_on_wmm_status_resp(&ndev->if_proto, status, &resp);
+    ndev->if_proto->OnWmmStatusResp(status, &resp);
     return;
   }
 
@@ -4913,8 +4970,7 @@ void brcmf_if_wmm_status_req(net_device* ndev) {
   brcmf_if_convert_ac_param(&ac_params[AC_BK], &resp.ac_bk_params);
   brcmf_if_convert_ac_param(&ac_params[AC_VI], &resp.ac_vi_params);
   brcmf_if_convert_ac_param(&ac_params[AC_VO], &resp.ac_vo_params);
-
-  wlan_fullmac_impl_ifc_on_wmm_status_resp(&ndev->if_proto, status, &resp);
+  ndev->if_proto->OnWmmStatusResp(status, &resp);
 }
 
 zx_status_t brcmf_alloc_vif(struct brcmf_cfg80211_info* cfg, uint16_t type,
@@ -5065,7 +5121,7 @@ zx_status_t brcmf_notify_channel_switch(struct brcmf_if* ifp, const struct brcmf
   }
   struct net_device* ndev = ifp->ndev;
   std::shared_lock<std::shared_mutex> guard(ndev->if_proto_lock);
-  if (ndev->if_proto.ops == nullptr) {
+  if (ndev->if_proto == nullptr) {
     BRCMF_IFDBG(WLANIF, ndev, "interface stopped -- skipping channel switch callback");
     return ZX_ERR_INVALID_ARGS;
   }
@@ -5100,7 +5156,7 @@ zx_status_t brcmf_notify_channel_switch(struct brcmf_if* ifp, const struct brcmf
   info.new_channel = ctl_chan;
 
   // Inform wlanif of the channel switch.
-  wlan_fullmac_impl_ifc_on_channel_switch(&ndev->if_proto, &info);
+  ndev->if_proto->OnChannelSwitch(&info);
   return ZX_OK;
 }
 
@@ -5114,7 +5170,7 @@ static zx_status_t brcmf_notify_start_auth(struct brcmf_if* ifp, const struct br
                                            void* data) {
   struct net_device* ndev = ifp->ndev;
   std::shared_lock<std::shared_mutex> guard(ndev->if_proto_lock);
-  if (ndev->if_proto.ops == nullptr) {
+  if (ndev->if_proto == nullptr) {
     BRCMF_IFDBG(WLANIF, ndev, "interface stopped -- skipping SAE auth start notifications.");
     return ZX_ERR_BAD_HANDLE;
   }
@@ -5150,7 +5206,7 @@ static zx_status_t brcmf_notify_start_auth(struct brcmf_if* ifp, const struct br
     BRCMF_ERR("Set assoc_mgr_cmd fail. err: %s, fw_err: %s", zx_status_get_string(err),
               brcmf_fil_get_errstr(fw_err));
   }
-  wlan_fullmac_impl_ifc_sae_handshake_ind(&ndev->if_proto, &ind);
+  ndev->if_proto->SaeHandshakeInd(&ind);
 
   return err;
 }
@@ -5158,7 +5214,7 @@ static zx_status_t brcmf_notify_start_auth(struct brcmf_if* ifp, const struct br
 static zx_status_t brcmf_rx_auth_frame(struct brcmf_if* ifp, const uint32_t datalen, void* data) {
   struct net_device* ndev = ifp->ndev;
   std::shared_lock<std::shared_mutex> guard(ndev->if_proto_lock);
-  if (ndev->if_proto.ops == nullptr) {
+  if (ndev->if_proto == nullptr) {
     BRCMF_IFDBG(WLANIF, ndev, "interface stopped -- skipping SAE auth frame receive handler.");
     return ZX_ERR_BAD_HANDLE;
   }
@@ -5173,7 +5229,7 @@ static zx_status_t brcmf_rx_auth_frame(struct brcmf_if* ifp, const uint32_t data
   BRCMF_DBG(CONN, " sequence number: %u", pframe_hdr->auth_txn_seq_number);
 
   // Copy authentication frame header information.
-  memcpy(frame.peer_sta_address, &ifp->connect_req.selected_bss.bssid, ETH_ALEN);
+  memcpy(frame.peer_sta_address, ifp->connect_req.selected_bss()->bssid().data(), ETH_ALEN);
   frame.status_code = pframe_hdr->status_code;
   frame.seq_num = pframe_hdr->auth_txn_seq_number;
 
@@ -5182,7 +5238,7 @@ static zx_status_t brcmf_rx_auth_frame(struct brcmf_if* ifp, const uint32_t data
   frame.sae_fields_list = pframe + sizeof(wlan::Authentication);
 
   // Sending SAE authentication up to SME, not rx from SME.
-  wlan_fullmac_impl_ifc_sae_frame_rx(&ndev->if_proto, &frame);
+  ndev->if_proto->SaeFrameRx(&frame);
   return ZX_OK;
 }
 
@@ -5214,7 +5270,7 @@ static zx_status_t brcmf_clear_firmware_connection_state(brcmf_if* ifp) {
   bcme_status_t fw_err = BCME_OK;
 
   struct brcmf_scb_val_le scbval;
-  memcpy(&scbval.ea, ifp->connect_req.selected_bss.bssid, ETH_ALEN);
+  memcpy(&scbval.ea, ifp->connect_req.selected_bss()->bssid().data(), ETH_ALEN);
   scbval.val = static_cast<uint32_t>(wlan_ieee80211::ReasonCode::STA_LEAVING);
   brcmf_set_bit(brcmf_vif_status_bit_t::DISCONNECTING, &ifp->vif->sme_state);
   status = brcmf_fil_cmd_data_set(ifp, BRCMF_C_DISASSOC, &scbval, sizeof(scbval), &fw_err);
@@ -5358,7 +5414,7 @@ static zx_status_t brcmf_handle_assoc_ind(struct brcmf_if* ifp, const struct brc
                                           void* data) {
   struct net_device* ndev = ifp->ndev;
   std::shared_lock<std::shared_mutex> guard(ndev->if_proto_lock);
-  if (ndev->if_proto.ops == nullptr) {
+  if (ndev->if_proto == nullptr) {
     BRCMF_IFDBG(WLANIF, ndev, "interface stopped -- skipping assoc ind callback");
     return ZX_OK;
   }
@@ -5425,7 +5481,7 @@ static zx_status_t brcmf_handle_assoc_ind(struct brcmf_if* ifp, const struct brc
               FMT_MAC_ARGS(assoc_ind_params.peer_sta_address));
 #endif /* !defined(NDEBUG) */
 
-  wlan_fullmac_impl_ifc_assoc_ind(&ndev->if_proto, &assoc_ind_params);
+  ndev->if_proto->AssocInd(&assoc_ind_params);
   return ZX_OK;
 }
 
@@ -5616,7 +5672,7 @@ static zx_status_t brcmf_process_auth_ind_event(struct brcmf_if* ifp,
   if (e->reason == BRCMF_E_STATUS_SUCCESS) {
     struct net_device* ndev = ifp->ndev;
     std::shared_lock<std::shared_mutex> guard(ndev->if_proto_lock);
-    if (ndev->if_proto.ops == nullptr) {
+    if (ndev->if_proto == nullptr) {
       BRCMF_IFDBG(WLANIF, ndev, "interface stopped -- skipping auth ind callback");
       return ZX_OK;
     }
@@ -5649,7 +5705,7 @@ static zx_status_t brcmf_process_auth_ind_event(struct brcmf_if* ifp,
                 FMT_MAC_ARGS(auth_ind_params.peer_sta_address));
 #endif /* !defined(NDEBUG) */
 
-    wlan_fullmac_impl_ifc_auth_ind(&ndev->if_proto, &auth_ind_params);
+    ndev->if_proto->AuthInd(&auth_ind_params);
   }
   return ZX_OK;
 }
@@ -5856,7 +5912,7 @@ zx_status_t brcmf_update_bss_info(struct brcmf_if* ifp) {
   // Copy info into relevant fields.
   const uint8_t* ie_ptr = reinterpret_cast<uint8_t*>(bss_info) + bss_info->ie_offset;
   cfg->capability = bss_info->capability;
-  memcpy(&ifp->ies, ie_ptr, bss_info->ie_length);
+  memcpy(ifp->connect_req.selected_bss()->ies().data(), ie_ptr, bss_info->ie_length);
   brcmf_init_prof(prof);
   memcpy(&prof->bssid, &bss_info->BSSID, ETH_ALEN);
   prof->beacon_period = bss_info->beacon_period;
@@ -5976,10 +6032,10 @@ static zx_status_t brcmf_notify_vif_event(struct brcmf_if* ifp, const struct brc
 }
 
 static void brcmf_init_conf(struct brcmf_cfg80211_conf* conf) {
-  conf->frag_threshold = (uint32_t)-1;
-  conf->rts_threshold = (uint32_t)-1;
-  conf->retry_short = (uint32_t)-1;
-  conf->retry_long = (uint32_t)-1;
+  conf->frag_threshold = static_cast<uint32_t>(-1);
+  conf->rts_threshold = static_cast<uint32_t>(-1);
+  conf->retry_short = static_cast<uint32_t>(-1);
+  conf->retry_long = static_cast<uint32_t>(-1);
 }
 
 static bool brcmf_roaming_enabled(struct brcmf_if* ifp) {

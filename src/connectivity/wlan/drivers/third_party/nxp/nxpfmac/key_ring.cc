@@ -13,6 +13,8 @@
 
 #include "src/connectivity/wlan/drivers/third_party/nxp/nxpfmac/key_ring.h"
 
+#include <fidl/fuchsia.wlan.fullmac/cpp/driver/wire.h>
+
 #include "src/connectivity/wlan/drivers/third_party/nxp/nxpfmac/ioctl_adapter.h"
 #include "src/connectivity/wlan/drivers/third_party/nxp/nxpfmac/mlan.h"
 
@@ -38,8 +40,8 @@ KeyRing::~KeyRing() {
   }
 }
 
-zx_status_t KeyRing::AddKey(const set_key_descriptor_t& key) {
-  if (key.key_count == 0) {
+zx_status_t KeyRing::AddKey(const fuchsia_wlan_fullmac::wire::SetKeyDescriptor& key) {
+  if (key.key.count() == 0) {
     return ZX_ERR_INVALID_ARGS;
   }
 
@@ -51,16 +53,16 @@ zx_status_t KeyRing::AddKey(const set_key_descriptor_t& key) {
 
   auto& encrypt_key = request.UserReq().param.encrypt_key;
 
-  if (key.key_count > sizeof(encrypt_key.key_material)) {
-    NXPF_ERR("Key length %zu exceeds maximum possible size of %zu", key.key_count,
+  if (key.key.count() > sizeof(encrypt_key.key_material)) {
+    NXPF_ERR("Key length %zu exceeds maximum possible size of %zu", key.key.count(),
              sizeof(encrypt_key.key_material));
     return ZX_ERR_INVALID_ARGS;
   }
 
-  memcpy(encrypt_key.key_material, key.key_list, key.key_count);
-  encrypt_key.key_len = static_cast<uint32_t>(key.key_count);
-  memcpy(encrypt_key.mac_addr, key.address, sizeof(encrypt_key.mac_addr));
-  if (is_broadcast_mac(key.address)) {
+  memcpy(encrypt_key.key_material, key.key.data(), key.key.count());
+  encrypt_key.key_len = static_cast<uint32_t>(key.key.count());
+  memcpy(encrypt_key.mac_addr, key.address.data(), sizeof(encrypt_key.mac_addr));
+  if (is_broadcast_mac(key.address.data())) {
     encrypt_key.key_flags |= KEY_FLAG_GROUP_KEY;
   }
 
@@ -72,10 +74,10 @@ zx_status_t KeyRing::AddKey(const set_key_descriptor_t& key) {
   }
 
   switch (key.cipher_suite_type) {
-    case CIPHER_SUITE_TYPE_WEP_40:
-    case CIPHER_SUITE_TYPE_WEP_104:
+    case fuchsia_wlan_ieee80211::wire::CipherSuiteType::kWep40:
+    case fuchsia_wlan_ieee80211::wire::CipherSuiteType::kWep104:
       break;
-    case CIPHER_SUITE_TYPE_TKIP: {
+    case fuchsia_wlan_ieee80211::wire::CipherSuiteType::kTkip: {
       // The RX and TX parts of the key needs to be swapped around as they are currently from the
       // APs point of view. Some supplicants perform this swap so that when the key gets to this
       // point it's ready to go. Our supplicant does not do this and firmware expects us to do the
@@ -89,24 +91,24 @@ zx_status_t KeyRing::AddKey(const set_key_descriptor_t& key) {
              &encrypt_key.key_material[kApToClientKeyOffset], sizeof(tmp));
       memcpy(&encrypt_key.key_material[kApToClientKeyOffset], tmp, sizeof(tmp));
     } break;
-    case CIPHER_SUITE_TYPE_GCMP_128:
+    case fuchsia_wlan_ieee80211::wire::CipherSuiteType::kGcmp128:
       encrypt_key.key_flags |= KEY_FLAG_GCMP;
       break;
-    case CIPHER_SUITE_TYPE_GCMP_256:
+    case fuchsia_wlan_ieee80211::wire::CipherSuiteType::kGcmp256:
       encrypt_key.key_flags |= KEY_FLAG_GCMP_256;
       break;
-    case CIPHER_SUITE_TYPE_BIP_CMAC_128:
+    case fuchsia_wlan_ieee80211::wire::CipherSuiteType::kBipCmac128:
       encrypt_key.key_flags |= KEY_FLAG_AES_MCAST_IGTK;
       break;
-    case CIPHER_SUITE_TYPE_BIP_GMAC_128:
+    case fuchsia_wlan_ieee80211::wire::CipherSuiteType::kBipGmac128:
       encrypt_key.key_flags |= KEY_FLAG_AES_MCAST_IGTK | KEY_FLAG_GMAC_128;
       break;
-    case CIPHER_SUITE_TYPE_BIP_GMAC_256:
+    case fuchsia_wlan_ieee80211::wire::CipherSuiteType::kBipGmac256:
       encrypt_key.key_flags |= KEY_FLAG_AES_MCAST_IGTK | KEY_FLAG_GMAC_256;
       break;
-    case CIPHER_SUITE_TYPE_CCMP_128:
+    case fuchsia_wlan_ieee80211::wire::CipherSuiteType::kCcmp128:
       break;
-    case CIPHER_SUITE_TYPE_CCMP_256:
+    case fuchsia_wlan_ieee80211::wire::CipherSuiteType::kCcmp256:
       encrypt_key.key_flags |= KEY_FLAG_CCMP_256;
       break;
     default:

@@ -77,6 +77,9 @@ void Device::DdkInit(ddk::InitTxn txn) {
     }
     fidl_dispatcher_ = std::move(*dispatcher);
 
+    // Store the default driver dispatcher for creating interface.
+    driver_async_dispatcher_ = fdf::Dispatcher::GetCurrent()->async_dispatcher();
+
     zx_status_t status = Init(&mlan_device_, &bus_);
     if (status != ZX_OK) {
       NXPF_ERR("nxpfmac: Init failed: %s", zx_status_get_string(status));
@@ -250,6 +253,8 @@ void Device::CreateIface(CreateIfaceRequestView request, fdf::Arena &arena,
   }
 
   uint16_t iface_id = 0;
+  uint8_t mac_address[ETH_ALEN];
+  const char *name;
 
   switch (request->role()) {
     case fuchsia_wlan_common::wire::WlanMacRole::kClient: {
@@ -258,26 +263,13 @@ void Device::CreateIface(CreateIfaceRequestView request, fdf::Arena &arena,
         completer.buffer(arena).ReplyError(ZX_ERR_ALREADY_EXISTS);
         return;
       }
-      uint8_t mac_address[ETH_ALEN];
       if (request->has_init_sta_addr()) {
         memcpy(mac_address, request->init_sta_addr().data(), ETH_ALEN);
       } else {
         memcpy(mac_address, mac_address_, ETH_ALEN);
       }
-
-      WlanInterface *interface = nullptr;
-      zx_status_t status = WlanInterface::Create(parent(), kClientInterfaceName, kClientInterfaceId,
-                                                 WLAN_MAC_ROLE_CLIENT, context_, mac_address,
-                                                 std::move(request->mlme_channel()), &interface);
-      if (status != ZX_OK) {
-        NXPF_ERR("Could not create client interface: %s", zx_status_get_string(status));
-        completer.buffer(arena).ReplyError(status);
-        return;
-      }
-
-      client_interface_ = interface;  // The lifecycle of `interface` is owned by the devhost.
+      name = kClientInterfaceName;
       iface_id = kClientInterfaceId;
-
       break;
     }
     case fuchsia_wlan_common::wire::WlanMacRole::kAp: {
@@ -291,21 +283,9 @@ void Device::CreateIface(CreateIfaceRequestView request, fdf::Arena &arena,
         completer.buffer(arena).ReplyError(ZX_ERR_INVALID_ARGS);
         return;
       }
-      uint8_t mac_address[ETH_ALEN];
       memcpy(mac_address, request->init_sta_addr().data(), ETH_ALEN);
-
-      WlanInterface *interface = nullptr;
-      zx_status_t status = WlanInterface::Create(parent(), kApInterfaceName, kApInterfaceId,
-                                                 WLAN_MAC_ROLE_AP, context_, mac_address,
-                                                 std::move(request->mlme_channel()), &interface);
-      if (status != ZX_OK) {
-        NXPF_ERR("Could not create AP interface: %s", zx_status_get_string(status));
-        completer.buffer(arena).ReplyError(status);
-        return;
-      }
-      ap_interface_ = interface;  // The lifecycle of `interface` is owned by the devhost.
+      name = kApInterfaceName;
       iface_id = kApInterfaceId;
-
       break;
     };
     default: {
@@ -313,6 +293,62 @@ void Device::CreateIface(CreateIfaceRequestView request, fdf::Arena &arena,
       completer.buffer(arena).ReplyError(ZX_ERR_NOT_SUPPORTED);
       return;
     }
+  }
+
+  auto endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
+  if (endpoints.is_error()) {
+    NXPF_ERR("failed to create endpoints: %s\n", endpoints.status_string());
+    return;
+  }
+
+  WlanInterface *interface = nullptr;
+  // Create the iface and serve the protocol wlan_fullmac_impl protocol in its outgoing directory in
+  // the default driver dispatcher, because they contain outgoing directory operations.
+  libsync::Completion served;
+  async::PostTask(driver_async_dispatcher_, [&]() {
+    zx_status_t status =
+        WlanInterface::Create(parent(), iface_id, request->role(), context_, mac_address,
+                              std::move(request->mlme_channel()), &interface);
+    if (status != ZX_OK) {
+      NXPF_ERR("Could not create client interface: %s", zx_status_get_string(status));
+      completer.buffer(arena).ReplyError(status);
+      return;
+    }
+
+    status = interface->ServeWlanFullmacImplProtocol(std::move(endpoints->server));
+    if (status != ZX_OK) {
+      NXPF_ERR("failed to serve WlanFullmacImpl service: %s\n", zx_status_get_string(status));
+      completer.buffer(arena).ReplyError(status);
+      return;
+    }
+    served.Signal();
+  });
+  served.Wait();
+
+  std::array<const char *, 1> offers{
+      fuchsia_wlan_fullmac::Service::Name,
+  };
+
+  zx_status_t status = interface->DdkAdd(::ddk::DeviceAddArgs(name)
+                                             .set_proto_id(ZX_PROTOCOL_WLAN_FULLMAC_IMPL)
+                                             .set_runtime_service_offers(offers)
+                                             .set_outgoing_dir(endpoints->client.TakeChannel()));
+  if (status != ZX_OK) {
+    NXPF_ERR("Failed to add fullmac device: %s", zx_status_get_string(status));
+    return;
+  }
+
+  // The lifecycle of `interface` is owned by the devhost.
+  switch (iface_id) {
+    case kClientInterfaceId:
+      client_interface_ = interface;
+      break;
+    case kApInterfaceId:
+      ap_interface_ = interface;
+      break;
+    default:
+      NXPF_ERR("iface id not supported: %u", iface_id);
+      return;
   }
 
   fidl::Arena fidl_arena;

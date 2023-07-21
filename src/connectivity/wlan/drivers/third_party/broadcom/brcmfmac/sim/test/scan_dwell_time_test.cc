@@ -18,9 +18,9 @@
 namespace wlan::brcmfmac {
 
 // Fake AP configuration
-constexpr wlan_channel_t kDefaultChannel = {
-    .primary = 9, .cbw = CHANNEL_BANDWIDTH_CBW20, .secondary80 = 0};
-constexpr cssid_t kDefaultSsid = {.len = 15, .data = "Fuchsia Fake AP"};
+constexpr wlan_common::WlanChannel kDefaultChannel = {
+    .primary = 9, .cbw = wlan_common::ChannelBandwidth::kCbw20, .secondary80 = 0};
+constexpr wlan_ieee80211::CSsid kDefaultSsid = {.len = 15, .data = {.data_ = "Fuchsia Fake AP"}};
 const common::MacAddr kDefaultBssid({0x12, 0x34, 0x56, 0x78, 0x9a, 0xbc});
 constexpr zx::duration kBeaconInterval = zx::msec(SimInterface::kDefaultPassiveScanDwellTimeMs - 1);
 
@@ -39,7 +39,7 @@ class ScanTest : public SimTest {
 
 void ScanTest::Init() {
   ASSERT_EQ(SimTest::Init(), ZX_OK);
-  ASSERT_EQ(StartInterface(WLAN_MAC_ROLE_CLIENT, &client_ifc_), ZX_OK);
+  ASSERT_EQ(StartInterface(wlan_common::WlanMacRole::kClient, &client_ifc_), ZX_OK);
 }
 
 TEST_F(ScanTest, PassiveDwellTime) {
@@ -69,15 +69,15 @@ TEST_F(ScanTest, PassiveDwellTime) {
     EXPECT_TRUE(scan_result_code);
 
     // Check list of bsses seen
-    EXPECT_EQ(*scan_result_code, WLAN_SCAN_RESULT_SUCCESS);
+    EXPECT_EQ(*scan_result_code, wlan_fullmac::WlanScanResult::kSuccess);
     auto scan_result_list = client_ifc_.ScanResultList(scan_attempt);
     EXPECT_GT(scan_result_list->size(), 0U);
-    for (const wlan_fullmac_scan_result_t& scan_result : *scan_result_list) {
+    for (const wlan_fullmac::WlanFullmacScanResult& scan_result : *scan_result_list) {
       auto& bss = scan_result.bss;
-      EXPECT_EQ(kDefaultBssid, common::MacAddr(bss.bssid));
-      auto ssid = brcmf_find_ssid_in_ies(bss.ies_list, bss.ies_count);
+      EXPECT_EQ(kDefaultBssid, common::MacAddr(bss.bssid.data()));
+      auto ssid = brcmf_find_ssid_in_ies(bss.ies.data(), bss.ies.count());
       EXPECT_EQ(kDefaultSsid.len, ssid.size());
-      EXPECT_EQ(memcmp(kDefaultSsid.data, ssid.data(), ssid.size()), 0);
+      EXPECT_EQ(memcmp(kDefaultSsid.data.data(), ssid.data(), ssid.size()), 0);
       EXPECT_EQ(kDefaultChannel.primary, bss.channel.primary);
       EXPECT_EQ(kDefaultChannel.cbw, bss.channel.cbw);
       EXPECT_GT(scan_result.timestamp_nanos, start_timestamp);

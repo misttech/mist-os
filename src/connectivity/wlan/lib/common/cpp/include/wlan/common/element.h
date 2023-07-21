@@ -486,6 +486,11 @@ struct HtCapabilities {
     return reinterpret_cast<HtCapabilities*>(ddk);
   }
 
+  static HtCapabilities* ViewFromRawBytes(uint8_t bytes[fuchsia::wlan::ieee80211::HT_CAP_LEN]) {
+    static_assert(sizeof(HtCapabilities) == fuchsia::wlan::ieee80211::HT_CAP_LEN);
+    return reinterpret_cast<HtCapabilities*>(bytes);
+  }
+
   static HtCapabilities FromDdk(const ht_capabilities_t& ddk) {
     HtCapabilities dst{};
 
@@ -732,6 +737,11 @@ struct VhtCapabilities {
   static VhtCapabilities* View(vht_capabilities_t* ddk) {
     static_assert(sizeof(VhtCapabilities) == sizeof(vht_capabilities_t));
     return reinterpret_cast<VhtCapabilities*>(ddk);
+  }
+
+  static VhtCapabilities* ViewFromRawBytes(uint8_t bytes[fuchsia::wlan::ieee80211::VHT_CAP_LEN]) {
+    static_assert(sizeof(VhtCapabilities) == fuchsia::wlan::ieee80211::VHT_CAP_LEN);
+    return reinterpret_cast<VhtCapabilities*>(bytes);
   }
 
   static VhtCapabilities FromDdk(const vht_capabilities_t& ddk) {

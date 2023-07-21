@@ -13,7 +13,7 @@
 #ifndef SRC_CONNECTIVITY_WLAN_DRIVERS_THIRD_PARTY_NXP_NXPFMAC_KEY_RING_H_
 #define SRC_CONNECTIVITY_WLAN_DRIVERS_THIRD_PARTY_NXP_NXPFMAC_KEY_RING_H_
 
-#include <fuchsia/hardware/wlan/fullmac/cpp/banjo.h>
+#include <fidl/fuchsia.wlan.fullmac/cpp/driver/wire.h>
 
 namespace wlan::nxpfmac {
 
@@ -24,7 +24,7 @@ class KeyRing {
   KeyRing(IoctlAdapter* ioctl_adapter, uint32_t bss_index);
   ~KeyRing();
 
-  zx_status_t AddKey(const set_key_descriptor_t& key);
+  zx_status_t AddKey(const fuchsia_wlan_fullmac::wire::SetKeyDescriptor& key);
   zx_status_t RemoveKey(uint16_t key_index, const uint8_t* addr);
 
   zx_status_t RemoveAllKeys();

@@ -5,8 +5,8 @@
 #ifndef SRC_CONNECTIVITY_WLAN_DRIVERS_TESTING_LIB_SIM_FAKE_AP_SIM_FAKE_AP_H_
 #define SRC_CONNECTIVITY_WLAN_DRIVERS_TESTING_LIB_SIM_FAKE_AP_SIM_FAKE_AP_H_
 
-#include <fuchsia/wlan/common/c/banjo.h>
-#include <fuchsia/wlan/ieee80211/cpp/fidl.h>
+#include <fidl/fuchsia.wlan.common/cpp/wire.h>
+#include <fidl/fuchsia.wlan.ieee80211/cpp/wire.h>
 #include <lib/zx/time.h>
 #include <netinet/if_ether.h>
 #include <stdint.h>
@@ -22,6 +22,8 @@
 #include "src/connectivity/wlan/drivers/testing/lib/sim-env/sim-frame.h"
 #include "src/connectivity/wlan/drivers/testing/lib/sim-env/sim-sta-ifc.h"
 
+namespace wlan_ieee80211 = fuchsia_wlan_ieee80211::wire;
+namespace wlan_common = fuchsia_wlan_common::wire;
 namespace wlan::simulation {
 
 // To simulate an AP. Only keep minimum information for sim-fw to generate
@@ -61,8 +63,8 @@ class FakeAp final : public StationIfc {
 
   explicit FakeAp(Environment* environ) : environment_(environ) { environ->AddStation(this); }
 
-  FakeAp(Environment* environ, const common::MacAddr& bssid, const cssid_t& ssid,
-         const wlan_channel_t channel)
+  FakeAp(Environment* environ, const common::MacAddr& bssid, const wlan_ieee80211::CSsid& ssid,
+         const wlan_common::WlanChannel channel)
       : environment_(environ), bssid_(bssid), ssid_(ssid) {
     environ->AddStation(this);
     tx_info_.channel = channel;
@@ -75,18 +77,19 @@ class FakeAp final : public StationIfc {
 
   ~FakeAp() { environment_->RemoveStation(this); }
 
-  void SetChannel(const wlan_channel_t& channel);
+  void SetChannel(const wlan_common::WlanChannel& channel);
   void SetBssid(const common::MacAddr& bssid);
-  void SetSsid(const cssid_t& ssid);
+  void SetSsid(const wlan_ieee80211::CSsid& ssid);
   void SetCsaBeaconInterval(zx::duration interval);
 
-  wlan_channel_t GetChannel() const { return tx_info_.channel; }
+  wlan_common::WlanChannel GetChannel() const { return tx_info_.channel; }
+
   common::MacAddr GetBssid() const { return bssid_; }
-  cssid_t GetSsid() const { return ssid_; }
+  wlan_ieee80211::CSsid GetSsid() const { return ssid_; }
   uint32_t GetNumAssociatedClient() const;
 
   // Will we receive a message sent on the specified channel?
-  bool CanReceiveChannel(const wlan_channel_t& channel);
+  bool CanReceiveChannel(const wlan_common::WlanChannel& channel);
 
   // When this is not called, the default is open network.
   zx_status_t SetSecurity(struct Security sec);
@@ -102,8 +105,7 @@ class FakeAp final : public StationIfc {
   void SetAssocHandling(enum AssocHandling mode);
 
   // Disassociate a Station
-  zx_status_t DisassocSta(const common::MacAddr& sta_mac,
-                          ::fuchsia::wlan::ieee80211::ReasonCode reason);
+  zx_status_t DisassocSta(const common::MacAddr& sta_mac, wlan_ieee80211::ReasonCode reason);
 
   // Send a BSS Transition Management request.
   void SendBtmReq(const simulation::SimBtmReqFrame& btm_req);
@@ -129,12 +131,11 @@ class FakeAp final : public StationIfc {
   void RxDataFrame(std::shared_ptr<const SimDataFrame> data_frame);
 
   void ScheduleNextBeacon();
-  void ScheduleAssocResp(::fuchsia::wlan::ieee80211::StatusCode status, const common::MacAddr& dst);
-  void ScheduleReassocResp(::fuchsia::wlan::ieee80211::StatusCode status,
-                           const common::MacAddr& dst);
+  void ScheduleAssocResp(wlan_ieee80211::StatusCode status, const common::MacAddr& dst);
+  void ScheduleReassocResp(wlan_ieee80211::StatusCode status, const common::MacAddr& dst);
   void ScheduleProbeResp(const common::MacAddr& dst);
   void ScheduleAuthResp(std::shared_ptr<const SimAuthFrame> auth_frame_in,
-                        ::fuchsia::wlan::ieee80211::StatusCode status);
+                        wlan_ieee80211::StatusCode status);
   void ScheduleQosData(bool toDS, bool fromDS, const common::MacAddr& addr1,
                        const common::MacAddr& addr2, const common::MacAddr& addr3,
                        const std::vector<uint8_t>& payload);
@@ -142,10 +143,8 @@ class FakeAp final : public StationIfc {
   // Event handlers
   void HandleBeaconNotification();
   void HandleStopCsaBeaconNotification();
-  void HandleAssocRespNotification(::fuchsia::wlan::ieee80211::StatusCode status,
-                                   common::MacAddr dst);
-  void HandleReassocRespNotification(::fuchsia::wlan::ieee80211::StatusCode status,
-                                     common::MacAddr dst);
+  void HandleAssocRespNotification(wlan_ieee80211::StatusCode status, common::MacAddr dst);
+  void HandleReassocRespNotification(wlan_ieee80211::StatusCode status, common::MacAddr dst);
   void HandleProbeRespNotification(common::MacAddr dst);
   void HandleAuthRespNotification(SimAuthFrame auth_resp_frame);
   void HandleQosDataNotification(bool toDS, bool fromDS, const common::MacAddr& addr1,
@@ -158,7 +157,7 @@ class FakeAp final : public StationIfc {
   // meta information needed for sending transmissions
   simulation::WlanTxInfo tx_info_;
   common::MacAddr bssid_;
-  cssid_t ssid_;
+  wlan_ieee80211::CSsid ssid_;
   struct Security security_ = {.cipher_suite = IEEE80211_CIPHER_SUITE_NONE};
 
   struct BeaconState {
@@ -167,7 +166,7 @@ class FakeAp final : public StationIfc {
     // Are we waiting for the execution of scheduled channel switch announcement?
     bool is_switching_channel = false;
     // This is the channel AP about to change to
-    wlan_channel_t channel_after_csa;
+    wlan_common::WlanChannel channel_after_csa;
 
     // Unique value that is associated with the next beacon event
     uint64_t beacon_notification_id;

@@ -46,7 +46,7 @@ class SimHardware : public simulation::StationIfc {
   void EnableRx() { rx_enabled_ = true; }
   void DisableRx() { rx_enabled_ = false; }
 
-  void SetChannel(wlan_channel_t channel) { channel_ = channel; }
+  void SetChannel(wlan_common::WlanChannel channel) { channel_ = channel; }
 
   void GetRevInfo(brcmf_rev_info_le* rev_info);
 
@@ -67,7 +67,7 @@ class SimHardware : public simulation::StationIfc {
 
  private:
   bool rx_enabled_ = false;
-  wlan_channel_t channel_;
+  wlan_common::WlanChannel channel_;
   std::shared_ptr<simulation::Environment> env_;
   EventHandlers event_handlers_;
   std::list<uint64_t> scheduled_ids;

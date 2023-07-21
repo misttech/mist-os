@@ -13,7 +13,16 @@
         colocate: "true",
         compat: "driver/brcmfmac.so",
     },
+    capabilities: [
+        { service: "fuchsia.wlan.phyimpl.Service" },
+    ],
     use: [
         { service: "fuchsia.hardware.pci.Service" },
+    ],
+    expose: [
+        {
+            service: "fuchsia.wlan.phyimpl.Service",
+            from: "self",
+        },
     ],
 }

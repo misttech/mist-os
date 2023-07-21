@@ -13,8 +13,10 @@
 #ifndef SRC_CONNECTIVITY_WLAN_DRIVERS_THIRD_PARTY_NXP_NXPFMAC_WLAN_INTERFACE_H_
 #define SRC_CONNECTIVITY_WLAN_DRIVERS_THIRD_PARTY_NXP_NXPFMAC_WLAN_INTERFACE_H_
 
+#include <fidl/fuchsia.wlan.fullmac/cpp/driver/wire.h>
 #include <fuchsia/hardware/wlan/fullmac/cpp/banjo.h>
 #include <lib/async-loop/cpp/loop.h>
+#include <lib/driver/outgoing/cpp/outgoing_directory.h>
 #include <lib/fit/function.h>
 #include <zircon/types.h>
 
@@ -24,6 +26,7 @@
 #include <wlan/drivers/components/frame.h>
 #include <wlan/drivers/components/network_port.h>
 
+#include "src/connectivity/wlan/drivers/lib/fullmac_ifc/wlan_fullmac_ifc.h"
 #include "src/connectivity/wlan/drivers/third_party/nxp/nxpfmac/client_connection.h"
 #include "src/connectivity/wlan/drivers/third_party/nxp/nxpfmac/key_ring.h"
 #include "src/connectivity/wlan/drivers/third_party/nxp/nxpfmac/scanner.h"
@@ -36,7 +39,7 @@ class WlanInterface;
 using WlanInterfaceDeviceType = ::ddk::Device<WlanInterface>;
 
 class WlanInterface : public WlanInterfaceDeviceType,
-                      public ::ddk::WlanFullmacImplProtocol<WlanInterface, ::ddk::base_protocol>,
+                      public fdf::WireServer<fuchsia_wlan_fullmac::WlanFullmacImpl>,
                       public ClientConnectionIfc,
                       public SoftApIfc,
                       public wlan::drivers::components::NetworkPort,
@@ -44,8 +47,8 @@ class WlanInterface : public WlanInterfaceDeviceType,
  public:
   // Static factory function.  The returned instance is unowned, since its lifecycle is managed by
   // the devhost.
-  static zx_status_t Create(zx_device_t* parent, const char* name, uint32_t iface_index,
-                            wlan_mac_role_t role, DeviceContext* context,
+  static zx_status_t Create(zx_device_t* parent, uint32_t iface_index,
+                            fuchsia_wlan_common::wire::WlanMacRole role, DeviceContext* context,
                             const uint8_t mac_address[ETH_ALEN], zx::channel&& mlme_channel,
                             WlanInterface** out_interface);
 
@@ -57,43 +60,64 @@ class WlanInterface : public WlanInterfaceDeviceType,
   // Device operations.
   void DdkRelease();
 
+  // Serves the WlanFullmacImpl protocol on `server_end`.
+  zx_status_t ServeWlanFullmacImplProtocol(fidl::ServerEnd<fuchsia_io::Directory> server_end);
+
   void OnEapolResponse(wlan::drivers::components::Frame&& frame);
   void OnEapolTransmitted(zx_status_t status, const uint8_t* dst_addr);
 
-  // ZX_PROTOCOL_WLAN_FULLMAC_IMPL operations.
-  zx_status_t WlanFullmacImplStart(const wlan_fullmac_impl_ifc_protocol_t* ifc,
-                                   zx::channel* out_mlme_channel);
-  void WlanFullmacImplStop();
-  void WlanFullmacImplQuery(wlan_fullmac_query_info_t* info);
-  void WlanFullmacImplQueryMacSublayerSupport(mac_sublayer_support_t* resp);
-  void WlanFullmacImplQuerySecuritySupport(security_support_t* resp);
-  void WlanFullmacImplQuerySpectrumManagementSupport(spectrum_management_support_t* resp);
-  void WlanFullmacImplStartScan(const wlan_fullmac_scan_req_t* req);
-  void WlanFullmacImplConnectReq(const wlan_fullmac_connect_req_t* req);
-  void WlanFullmacImplReconnectReq(const wlan_fullmac_reconnect_req_t* req);
-  void WlanFullmacImplAuthResp(const wlan_fullmac_auth_resp_t* resp);
-  void WlanFullmacImplDeauthReq(const wlan_fullmac_deauth_req_t* req);
-  void WlanFullmacImplAssocResp(const wlan_fullmac_assoc_resp_t* resp);
-  void WlanFullmacImplDisassocReq(const wlan_fullmac_disassoc_req_t* req);
-  void WlanFullmacImplResetReq(const wlan_fullmac_reset_req_t* req);
-  void WlanFullmacImplStartReq(const wlan_fullmac_start_req_t* req);
-  void WlanFullmacImplStopReq(const wlan_fullmac_stop_req_t* req);
-  void WlanFullmacImplSetKeysReq(const wlan_fullmac_set_keys_req_t* req,
-                                 wlan_fullmac_set_keys_resp_t* resp);
-  void WlanFullmacImplDelKeysReq(const wlan_fullmac_del_keys_req_t* req);
-  void WlanFullmacImplEapolReq(const wlan_fullmac_eapol_req_t* req);
-  void WlanFullmacImplStatsQueryReq();
-  zx_status_t WlanFullmacImplGetIfaceCounterStats(wlan_fullmac_iface_counter_stats_t* out_stats);
-  zx_status_t WlanFullmacImplGetIfaceHistogramStats(
-      wlan_fullmac_iface_histogram_stats_t* out_stats);
-  void WlanFullmacImplStartCaptureFrames(const wlan_fullmac_start_capture_frames_req_t* req,
-                                         wlan_fullmac_start_capture_frames_resp_t* resp);
-  void WlanFullmacImplStopCaptureFrames();
-  zx_status_t WlanFullmacImplSetMulticastPromisc(bool enable);
-  void WlanFullmacImplSaeHandshakeResp(const wlan_fullmac_sae_handshake_resp_t* resp);
-  void WlanFullmacImplSaeFrameTx(const wlan_fullmac_sae_frame_t* frame);
-  void WlanFullmacImplWmmStatusReq();
-  void WlanFullmacImplOnLinkStateChanged(bool online);
+  // WlanFullmacImpl implementations, dispatching FIDL requests from wlanif driver.
+  void Start(StartRequestView request, fdf::Arena& arena, StartCompleter::Sync& completer) override;
+  void Stop(fdf::Arena& arena, StopCompleter::Sync& completer) override;
+  void Query(fdf::Arena& arena, QueryCompleter::Sync& completer) override;
+  void QueryMacSublayerSupport(fdf::Arena& arena,
+                               QueryMacSublayerSupportCompleter::Sync& completer) override;
+  void QuerySecuritySupport(fdf::Arena& arena,
+                            QuerySecuritySupportCompleter::Sync& completer) override;
+  void QuerySpectrumManagementSupport(
+      fdf::Arena& arena, QuerySpectrumManagementSupportCompleter::Sync& completer) override;
+  void StartScan(StartScanRequestView request, fdf::Arena& arena,
+                 StartScanCompleter::Sync& completer) override;
+  void ConnectReq(ConnectReqRequestView request, fdf::Arena& arena,
+                  ConnectReqCompleter::Sync& completer) override;
+  void ReconnectReq(ReconnectReqRequestView request, fdf::Arena& arena,
+                    ReconnectReqCompleter::Sync& completer) override;
+  void AuthResp(AuthRespRequestView request, fdf::Arena& arena,
+                AuthRespCompleter::Sync& completer) override;
+  void DeauthReq(DeauthReqRequestView request, fdf::Arena& arena,
+                 DeauthReqCompleter::Sync& completer) override;
+  void AssocResp(AssocRespRequestView request, fdf::Arena& arena,
+                 AssocRespCompleter::Sync& completer) override;
+  void DisassocReq(DisassocReqRequestView request, fdf::Arena& arena,
+                   DisassocReqCompleter::Sync& completer) override;
+  void ResetReq(ResetReqRequestView request, fdf::Arena& arena,
+                ResetReqCompleter::Sync& completer) override;
+  void StartReq(StartReqRequestView request, fdf::Arena& arena,
+                StartReqCompleter::Sync& completer) override;
+  void StopReq(StopReqRequestView request, fdf::Arena& arena,
+               StopReqCompleter::Sync& completer) override;
+  void SetKeysReq(SetKeysReqRequestView request, fdf::Arena& arena,
+                  SetKeysReqCompleter::Sync& completer) override;
+  void DelKeysReq(DelKeysReqRequestView request, fdf::Arena& arena,
+                  DelKeysReqCompleter::Sync& completer) override;
+  void EapolReq(EapolReqRequestView request, fdf::Arena& arena,
+                EapolReqCompleter::Sync& completer) override;
+  void GetIfaceCounterStats(fdf::Arena& arena,
+                            GetIfaceCounterStatsCompleter::Sync& completer) override;
+  void GetIfaceHistogramStats(fdf::Arena& arena,
+                              GetIfaceHistogramStatsCompleter::Sync& completer) override;
+  void StartCaptureFrames(StartCaptureFramesRequestView request, fdf::Arena& arena,
+                          StartCaptureFramesCompleter::Sync& completer) override;
+  void StopCaptureFrames(fdf::Arena& arena, StopCaptureFramesCompleter::Sync& completer) override;
+  void SetMulticastPromisc(SetMulticastPromiscRequestView request, fdf::Arena& arena,
+                           SetMulticastPromiscCompleter::Sync& completer) override;
+  void SaeHandshakeResp(SaeHandshakeRespRequestView request, fdf::Arena& arena,
+                        SaeHandshakeRespCompleter::Sync& completer) override;
+  void SaeFrameTx(SaeFrameTxRequestView request, fdf::Arena& arena,
+                  SaeFrameTxCompleter::Sync& completer) override;
+  void WmmStatusReq(fdf::Arena& arena, WmmStatusReqCompleter::Sync& completer) override;
+  void OnLinkStateChanged(OnLinkStateChangedRequestView request, fdf::Arena& arena,
+                          OnLinkStateChangedCompleter::Sync& completer) override;
 
   // ClientConnectionIfc implementation.
   void OnDisconnectEvent(uint16_t reason_code) override;
@@ -114,9 +138,9 @@ class WlanInterface : public WlanInterfaceDeviceType,
   void MacSetMode(mode_t mode, cpp20::span<const uint8_t> multicast_macs) override;
 
  private:
-  explicit WlanInterface(zx_device_t* parent, uint32_t iface_index, wlan_mac_role_t role,
-                         DeviceContext* context, const uint8_t mac_address[ETH_ALEN],
-                         zx::channel&& mlme_channel);
+  explicit WlanInterface(zx_device_t* parent, uint32_t iface_index,
+                         fuchsia_wlan_common::wire::WlanMacRole role, DeviceContext* context,
+                         const uint8_t mac_address[ETH_ALEN], zx::channel&& mlme_channel);
 
   zx_status_t SetMacAddressInFw();
   void ConfirmDeauth() __TA_EXCLUDES(fullmac_ifc_mutex_);
@@ -124,7 +148,7 @@ class WlanInterface : public WlanInterfaceDeviceType,
   void ConfirmConnectReq(ClientConnection::StatusCode status, const uint8_t* ies = nullptr,
                          size_t ies_len = 0) __TA_EXCLUDES(fullmac_ifc_mutex_);
 
-  wlan_mac_role_t role_;
+  fuchsia_wlan_common::wire::WlanMacRole role_;
   uint32_t iface_index_;
   zx::channel mlme_channel_;
 
@@ -137,8 +161,11 @@ class WlanInterface : public WlanInterfaceDeviceType,
   SoftAp soft_ap_ __TA_GUARDED(mutex_);
   DeviceContext* context_ = nullptr;
 
-  ::ddk::WlanFullmacImplIfcProtocolClient fullmac_ifc_ __TA_GUARDED(fullmac_ifc_mutex_);
+  std::unique_ptr<wlan::WlanFullmacIfc> fullmac_ifc_ __TA_GUARDED(fullmac_ifc_mutex_);
   std::mutex fullmac_ifc_mutex_;
+
+  // Serves fuchsia_wlan_fullmac::Service.
+  fdf::OutgoingDirectory outgoing_dir_;
 
   uint8_t mac_address_[ETH_ALEN] = {};
 

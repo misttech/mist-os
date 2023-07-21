@@ -11,12 +11,14 @@ all_hdrs = [
   "driver.h",
   "debug.h",
   "fullmac_mlme.h",
+  "convert.h",
 ]
 
 all_src = [
   "device.cc",
   "driver.cc",
   "fullmac_mlme.cc",
+  "convert.cc",
 ]
 
 all_deps = [
@@ -24,6 +26,7 @@ all_deps = [
   "//sdk/banjo/fuchsia.hardware.wlan.fullmac:fuchsia.hardware.wlan.fullmac_banjo_cpp",
   "//sdk/fidl/fuchsia.wlan.common:fuchsia.wlan.common_banjo_c",
   "//sdk/fidl/fuchsia.wlan.device:fuchsia.wlan.device_hlcpp",
+  "//sdk/fidl/fuchsia.wlan.fullmac:fuchsia.wlan.fullmac_cpp_driver",
   "//sdk/fidl/fuchsia.wlan.internal:fuchsia.wlan.internal_banjo_c",
   "//sdk/fidl/fuchsia.wlan.internal:fuchsia.wlan.internal_hlcpp",
   "//sdk/fidl/fuchsia.wlan.mlme:fuchsia.wlan.mlme_hlcpp",
@@ -31,6 +34,7 @@ all_deps = [
   "//src/connectivity/wlan/lib/common/cpp:common",
   "//src/connectivity/wlan/lib/mlme/fullmac/c-binding:wlan-fullmac-mlme-c",
   "//src/devices/lib/driver",
+  "//src/devices/lib/driver:driver_runtime",
   "//src/lib/ddk",
 
   # TODO(fxbug.dev/38599): The fdio dependency here is purely due to
@@ -64,9 +68,9 @@ fuchsia_driver("wlanif_driver-driver") {
 
 fuchsia_driver_component("wlanif_driver") {
   component_name = "wlanif"
+  manifest = "meta/wlanif.cml"
   deps = [ ":wlanif_driver-driver" ]
   info = "wlanif_driver-info.json"
-  manifest = "meta/wlanif_driver.cml"
 }
 
 fuchsia_driver_package("wlanif") {

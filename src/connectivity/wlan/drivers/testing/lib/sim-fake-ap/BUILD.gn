@@ -11,8 +11,7 @@ static_library("sim-fake-ap") {
   deps = [ "//src/lib/ddk" ]
 
   public_deps = [
-    "//sdk/fidl/fuchsia.wlan.common:fuchsia.wlan.common_banjo_c",
-    "//sdk/fidl/fuchsia.wlan.ieee80211:fuchsia.wlan.ieee80211_hlcpp",
+    "//sdk/fidl/fuchsia.wlan.ieee80211:fuchsia.wlan.ieee80211_cpp_wire",
     "//src/connectivity/wlan/drivers/testing/lib/sim-env",
   ]
 

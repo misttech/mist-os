@@ -10,11 +10,12 @@
 namespace wlan::brcmfmac {
 
 // Some default AP and association request values
-constexpr cssid_t kDefaultSsid = {.len = 15, .data = "Fuchsia Fake AP"};
+constexpr wlan_ieee80211::CSsid kDefaultSsid = {.len = 15, .data = {.data_ = "Fuchsia Fake AP"}};
 
-const wlan_channel_t kAp0Channel = {.primary = 9, .cbw = CHANNEL_BANDWIDTH_CBW20, .secondary80 = 0};
-const wlan_channel_t kAp1Channel = {
-    .primary = 11, .cbw = CHANNEL_BANDWIDTH_CBW20, .secondary80 = 0};
+const wlan_common::WlanChannel kAp0Channel = {
+    .primary = 9, .cbw = wlan_common::ChannelBandwidth::kCbw20, .secondary80 = 0};
+const wlan_common::WlanChannel kAp1Channel = {
+    .primary = 11, .cbw = wlan_common::ChannelBandwidth::kCbw20, .secondary80 = 0};
 const simulation::WlanTxInfo kAp0TxInfo = {.channel = kAp0Channel};
 
 const common::MacAddr kAp0Bssid("12:34:56:78:9a:bc");
@@ -40,7 +41,7 @@ class ReassocTest : public SimTest {
 // Create our device instance and hook up the callbacks
 void ReassocTest::Init() {
   ASSERT_EQ(SimTest::Init(), ZX_OK);
-  ASSERT_EQ(StartInterface(WLAN_MAC_ROLE_CLIENT, &client_ifc_), ZX_OK);
+  ASSERT_EQ(StartInterface(wlan_common::WlanMacRole::kClient, &client_ifc_), ZX_OK);
 }
 
 // This function schedules a reassoc response frame sent from an AP.
@@ -66,7 +67,7 @@ TEST_F(ReassocTest, IgnoreSpuriousReassocResp) {
   client_ifc_.GetMacAddr(&client_mac);
   // Intentionally create a response frame that never had a corresponding request.
   simulation::SimReassocRespFrame reassoc_resp(kAp0Bssid, client_mac,
-                                               ::fuchsia::wlan::ieee80211::StatusCode::SUCCESS);
+                                               wlan_ieee80211::StatusCode::kSuccess);
   ScheduleReassocResp(reassoc_resp, zx::sec(1));
   env_->Run(kTestDuration);
 

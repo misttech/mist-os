@@ -71,7 +71,7 @@ TEST_F(ErrInjTest, ErrInjectorReplacementValues) {
 
 TEST_F(ErrInjTest, CheckIfErrInjCmdEnabledWorks) {
   ASSERT_EQ(Init(), ZX_OK);
-  ASSERT_EQ(StartInterface(WLAN_MAC_ROLE_CLIENT, &client_ifc_), ZX_OK);
+  ASSERT_EQ(StartInterface(wlan_common::WlanMacRole::kClient, &client_ifc_), ZX_OK);
 
   brcmf_simdev* sim = device_->GetSim();
   struct brcmf_if* ifp = brcmf_get_ifp(sim->drvr, client_ifc_.iface_id_);
@@ -90,7 +90,7 @@ TEST_F(ErrInjTest, CheckIfErrInjCmdEnabledWorks) {
 
 TEST_F(ErrInjTest, CheckIfErrInjIovarEnabledWorks) {
   ASSERT_EQ(Init(), ZX_OK);
-  ASSERT_EQ(StartInterface(WLAN_MAC_ROLE_CLIENT, &client_ifc_), ZX_OK);
+  ASSERT_EQ(StartInterface(wlan_common::WlanMacRole::kClient, &client_ifc_), ZX_OK);
 
   brcmf_simdev* sim = device_->GetSim();
   struct brcmf_if* ifp = brcmf_get_ifp(sim->drvr, client_ifc_.iface_id_);
@@ -117,7 +117,7 @@ TEST_F(ErrInjTest, CmdFirmwareErrorLifecycle) {
   constexpr uint16_t kDefaultChanspec = 53397;
 
   ASSERT_EQ(Init(), ZX_OK);
-  ASSERT_EQ(StartInterface(WLAN_MAC_ROLE_CLIENT, &client_ifc_), ZX_OK);
+  ASSERT_EQ(StartInterface(wlan_common::WlanMacRole::kClient, &client_ifc_), ZX_OK);
 
   // Initialize variables
   zx_status_t status = ZX_OK;
@@ -128,7 +128,7 @@ TEST_F(ErrInjTest, CmdFirmwareErrorLifecycle) {
 
   // Initialize parameter for BRCMF_C_SET_SSID, here we use kDefaultSoftApSsid as the fake
   // association target, the content doesn't really affect the result.
-  memcpy(&join_params.ssid_le.SSID, SimInterface::kDefaultSoftApSsid.data,
+  memcpy(&join_params.ssid_le.SSID, SimInterface::kDefaultSoftApSsid.data.data(),
          SimInterface::kDefaultSoftApSsid.len);
   join_params.ssid_le.SSID_len = SimInterface::kDefaultSoftApSsid.len;
 
@@ -167,7 +167,7 @@ TEST_F(ErrInjTest, IovarFirmwareErrorLifecycle) {
   const common::MacAddr kDefaultBssid({0x12, 0x34, 0x56, 0x78, 0x9a, 0xbc});
 
   ASSERT_EQ(Init(), ZX_OK);
-  ASSERT_EQ(StartInterface(WLAN_MAC_ROLE_CLIENT, &client_ifc_), ZX_OK);
+  ASSERT_EQ(StartInterface(wlan_common::WlanMacRole::kClient, &client_ifc_), ZX_OK);
 
   // Initialize variables
   zx_status_t status = ZX_OK;

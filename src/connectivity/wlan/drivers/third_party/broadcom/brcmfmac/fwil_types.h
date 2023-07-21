@@ -23,7 +23,7 @@
 #include <wlan/common/mac_frame.h>
 
 #include "linuxisms.h"
-namespace wlan_ieee80211 = ::fuchsia::wlan::ieee80211;
+namespace ieee80211 = ::fuchsia::wlan::ieee80211;
 
 #define BRCMF_FIL_ACTION_FRAME_SIZE 1800
 
@@ -377,7 +377,7 @@ struct brcmf_bss_info_le {
   uint16_t beacon_period; /* units are Kusec */
   uint16_t capability;    /* Capability information */
   uint8_t SSID_len;
-  uint8_t SSID[wlan_ieee80211::MAX_SSID_BYTE_LEN];
+  uint8_t SSID[ieee80211::MAX_SSID_BYTE_LEN];
   struct {
     uint32_t count;     /* # rates in this set */
     uint8_t rates[16];  /* rates in 500kbps units w/hi bit set if basic */
@@ -413,7 +413,7 @@ struct brcm_rateset_le {
 
 struct brcmf_ssid_le {
   uint32_t SSID_len;
-  unsigned char SSID[wlan_ieee80211::MAX_SSID_BYTE_LEN];
+  unsigned char SSID[ieee80211::MAX_SSID_BYTE_LEN];
 };
 
 struct brcmf_scan_params_le {
@@ -703,7 +703,7 @@ struct brcmf_fil_wowl_pattern_le {
 struct brcmf_mbss_ssid_le {
   uint32_t bsscfgidx;
   uint32_t SSID_len;
-  unsigned char SSID[wlan_ieee80211::MAX_SSID_BYTE_LEN];
+  unsigned char SSID[ieee80211::MAX_SSID_BYTE_LEN];
 };
 
 /**
@@ -883,7 +883,7 @@ struct brcmf_pno_net_info_le {
   uint8_t bssid[ETH_ALEN];
   uint8_t channel;
   uint8_t SSID_len;
-  uint8_t SSID[wlan_ieee80211::MAX_SSID_BYTE_LEN];
+  uint8_t SSID[ieee80211::MAX_SSID_BYTE_LEN];
   uint16_t RSSI;
   uint16_t timestamp;
 };

@@ -98,7 +98,7 @@ class SimFirmware {
   };
 
   struct ScanResult {
-    wlan_channel_t channel;
+    wlan_common::WlanChannel channel;
     common::MacAddr bssid;
     wlan::CapabilityInfo bss_capability;
     int8_t rssi_dbm;
@@ -116,7 +116,7 @@ class SimFirmware {
     bool is_active;
 
     // Optional filters
-    std::optional<cssid_t> ssid;
+    std::optional<wlan_ieee80211::CSsid> ssid;
     std::optional<common::MacAddr> bssid;
 
     // Time per channel
@@ -137,7 +137,7 @@ class SimFirmware {
 
   struct AssocOpts {
     common::MacAddr bssid;
-    cssid_t ssid;
+    wlan_ieee80211::CSsid ssid;
     bss_type_t bss_type;
   };
 
@@ -229,7 +229,7 @@ class SimFirmware {
   // Num of clients currently associated with the SoftAP IF
   uint16_t GetNumClients(uint16_t ifidx);
 
-  void TriggerFirmwareDisassoc(::fuchsia::wlan::ieee80211::ReasonCode reason);
+  void TriggerFirmwareDisassoc(wlan_ieee80211::ReasonCode reason);
 
   // Firmware iovar accessors
   zx_status_t IovarsSet(uint16_t ifidx, const char* name, const void* value, size_t value_len,
@@ -243,8 +243,8 @@ class SimFirmware {
   void ErrorInjectAllClear();
 
   // channel-chanspec helper functions
-  void convert_chanspec_to_channel(uint16_t chanspec, wlan_channel_t* ch);
-  uint16_t convert_channel_to_chanspec(wlan_channel_t* channel);
+  void convert_chanspec_to_channel(uint16_t chanspec, wlan_common::WlanChannel* ch);
+  uint16_t convert_channel_to_chanspec(wlan_common::WlanChannel* channel);
 
   // Bus operations: calls from driver
   zx_status_t BusPreinit();
@@ -393,8 +393,7 @@ class SimFirmware {
   zx_status_t HandleJoinRequest(const void* value, size_t value_len);
   void HandleAssocReq(std::shared_ptr<const simulation::SimAssocReqFrame> frame);
   void HandleDisconnectForClientIF(std::shared_ptr<const simulation::SimManagementFrame> frame,
-                                   const common::MacAddr& bssid,
-                                   ::fuchsia::wlan::ieee80211::ReasonCode reason);
+                                   const common::MacAddr& bssid, wlan_ieee80211::ReasonCode reason);
   void HandleAuthReq(std::shared_ptr<const simulation::SimAuthFrame> frame);
   void HandleAuthResp(std::shared_ptr<const simulation::SimAuthFrame> frame);
   void HandleReassocResp(std::shared_ptr<const simulation::SimReassocReqFrame> frame);
@@ -410,7 +409,7 @@ class SimFirmware {
   void EscanComplete(brcmf_fweh_event_status_t event_status);
 
   // Association operations
-  void AssocInit(std::unique_ptr<AssocOpts> assoc_opts, wlan_channel_t& channel);
+  void AssocInit(std::unique_ptr<AssocOpts> assoc_opts, wlan_common::WlanChannel& channel);
   void AssocScanResultSeen(const ScanResult& scan_result);
   void AssocScanDone(brcmf_fweh_event_status_t event_status);
   void AuthStart();  // Scan complete, start authentication process
@@ -418,15 +417,14 @@ class SimFirmware {
   void SetAssocState(AssocState::AssocStateName state);
   void AssocClearContext();
   void AuthClearContext();
-  void AssocHandleFailure(::fuchsia::wlan::ieee80211::StatusCode status);
+  void AssocHandleFailure(wlan_ieee80211::StatusCode status);
   void AuthHandleFailure();
   void DisassocStart(brcmf_scb_val_le* scb_val);
-  void DisassocLocalClient(::fuchsia::wlan::ieee80211::ReasonCode reason);
-  void SetStateToDisassociated(::fuchsia::wlan::ieee80211::ReasonCode reason,
-                               bool locally_initiated);
-  void ReassocInit(std::unique_ptr<ReassocOpts> reassoc_opts, wlan_channel_t& channel);
+  void DisassocLocalClient(wlan_ieee80211::ReasonCode reason);
+  void SetStateToDisassociated(wlan_ieee80211::ReasonCode reason, bool locally_initiated);
+  void ReassocInit(std::unique_ptr<ReassocOpts> reassoc_opts, wlan_common::WlanChannel& channel);
   void ReassocStart();
-  void ReassocHandleFailure(::fuchsia::wlan::ieee80211::StatusCode status);
+  void ReassocHandleFailure(wlan_ieee80211::StatusCode status);
   zx_status_t ReassocToCurrentAp(std::shared_ptr<const simulation::SimReassocRespFrame> frame);
   zx_status_t ReassocToDifferentAp(std::shared_ptr<const simulation::SimReassocRespFrame> frame);
 
@@ -447,7 +445,7 @@ class SimFirmware {
   void RxDataFrame(std::shared_ptr<const simulation::SimDataFrame> data_frame,
                    std::shared_ptr<const simulation::WlanRxInfo> info);
   static int8_t RssiDbmFromSignalStrength(double signal_strength);
-  void RxBeacon(const wlan_channel_t& channel,
+  void RxBeacon(const wlan_common::WlanChannel& channel,
                 std::shared_ptr<const simulation::SimBeaconFrame> frame, double signal_strength);
   void RxAssocResp(std::shared_ptr<const simulation::SimAssocRespFrame> frame);
   void RxDisassocReq(std::shared_ptr<const simulation::SimDisassocReqFrame> frame);
@@ -456,24 +454,23 @@ class SimFirmware {
   void RxActionFrame(std::shared_ptr<const simulation::SimActionFrame> action_frame);
   void RxWnmActionFrame(std::shared_ptr<const simulation::SimWnmActionFrame> wnm_frame);
   void RxBtmReqFrame(std::shared_ptr<const simulation::SimBtmReqFrame> btm_req_frame);
-  void RxProbeResp(const wlan_channel_t& channel,
+  void RxProbeResp(const wlan_common::WlanChannel& channel,
                    std::shared_ptr<const simulation::SimProbeRespFrame> frame,
                    double signal_strength);
   void RxAuthFrame(std::shared_ptr<const simulation::SimAuthFrame> frame);
 
   // Handler for channel switch.
-  void ConductChannelSwitch(const wlan_channel_t& dst_channel, uint8_t mode);
+  void ConductChannelSwitch(const wlan_common::WlanChannel& dst_channel, uint8_t mode);
   void RxDeauthReq(std::shared_ptr<const simulation::SimDeauthFrame> frame);
 
   void StopSoftAP(uint16_t ifidx);
 
   // Update the SAE status when firmware receives an auth frame from remote stations.
   zx_status_t RemoteUpdateExternalSaeStatus(uint16_t seq_num,
-                                            ::fuchsia::wlan::ieee80211::StatusCode status_code,
+                                            wlan_ieee80211::StatusCode status_code,
                                             const uint8_t* sae_payload, size_t text_len);
   // Update the SAE status when firmware receives an auth frame from the driver.
-  zx_status_t LocalUpdateExternalSaeStatus(uint16_t seq_num,
-                                           ::fuchsia::wlan::ieee80211::StatusCode status_code,
+  zx_status_t LocalUpdateExternalSaeStatus(uint16_t seq_num, wlan_ieee80211::StatusCode status_code,
                                            const uint8_t* sae_payload, size_t text_len);
 
   // Allocate a buffer for an event (brcmf_event)
@@ -497,7 +494,7 @@ class SimFirmware {
 
   // Get the channel of IF the parameter indicates whether we need to find softAP ifidx or client
   // ifidx.
-  wlan_channel_t GetIfChannel(bool is_ap);
+  wlan_common::WlanChannel GetIfChannel(bool is_ap);
 
   // Get IF idx of matching bsscfgidx.
   int16_t GetIfidxByBsscfgidx(int32_t bsscfgidx);
@@ -507,7 +504,7 @@ class SimFirmware {
   // value "true" means it is triggered by a deauth frame, and "false" means ut's triggered by a
   // disassoc frame.
   bool FindAndRemoveClient(const common::MacAddr client_mac, bool motivation_deauth,
-                           ::fuchsia::wlan::ieee80211::ReasonCode deauth_reason);
+                           wlan_ieee80211::ReasonCode deauth_reason);
   std::shared_ptr<Client> FindClient(const common::MacAddr client_mac);
   void ScheduleLinkEvent(zx::duration when, uint16_t ifidx);
   void SendAPStartLinkEvent(uint16_t ifidx);

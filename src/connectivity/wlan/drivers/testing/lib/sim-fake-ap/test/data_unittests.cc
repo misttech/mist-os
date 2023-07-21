@@ -2,8 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include <fuchsia/wlan/ieee80211/cpp/fidl.h>
-
 #include <gtest/gtest.h>
 
 #include "src/connectivity/wlan/drivers/testing/lib/sim-env/sim-env.h"
@@ -18,8 +16,8 @@ constexpr zx::duration kSimulatedClockDuration = zx::sec(10);
 }  // namespace
 
 constexpr simulation::WlanTxInfo kDefaultTxInfo = {
-    .channel = {.primary = 9, .cbw = CHANNEL_BANDWIDTH_CBW20, .secondary80 = 0}};
-constexpr cssid_t kApSsid = {.len = 15, .data = "Fuchsia Fake AP"};
+    .channel = {.primary = 9, .cbw = wlan_common::ChannelBandwidth::kCbw20, .secondary80 = 0}};
+constexpr wlan_ieee80211::CSsid kApSsid = {.len = 15, .data = {.data_ = "Fuchsia Fake AP"}};
 const common::MacAddr kApBssid({0x12, 0x34, 0x56, 0x78, 0x9a, 0xbc});
 const common::MacAddr kSrcClientMacAddr({0x11, 0x22, 0x33, 0x44, 0xee, 0xff});
 const common::MacAddr kDstClientMacAddr({0xfe, 0xdc, 0xba, 0x98, 0x76, 0x54});
@@ -103,7 +101,7 @@ void DataTest::Rx(std::shared_ptr<const simulation::SimFrame> frame,
 // AUTHENTICATED in AP.
 void DataTest::FinishAuth(common::MacAddr addr) {
   simulation::SimAuthFrame auth_req_frame(addr, kApBssid, 1, simulation::AUTH_TYPE_OPEN,
-                                          ::fuchsia::wlan::ieee80211::StatusCode::SUCCESS);
+                                          wlan_ieee80211::StatusCode::kSuccess);
   env_.Tx(auth_req_frame, kDefaultTxInfo, this);
 }
 

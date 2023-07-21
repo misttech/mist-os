@@ -43,10 +43,10 @@ class FirmwareConfigTest : public SimTest {
  public:
   static constexpr bool kArpNdOffloadEnabled = true;
   static constexpr bool kArpNdOffloadDisabled = false;
-  void ArpNdOffloadConfigValidate(wlan_mac_role_t role, bool expect_enabled);
+  void ArpNdOffloadConfigValidate(wlan_common::WlanMacRole role, bool expect_enabled);
 };
 
-void FirmwareConfigTest::ArpNdOffloadConfigValidate(wlan_mac_role_t role, bool expected) {
+void FirmwareConfigTest::ArpNdOffloadConfigValidate(wlan_common::WlanMacRole role, bool expected) {
   uint32_t mode = 0;
   bool arpoe = false;
   bool ndoe = false;
@@ -78,7 +78,7 @@ TEST_F(FirmwareConfigTest, ArpNdOffloadClientConfigTestWithoutSoftApFeat) {
 
   // When SoftAP feature is unavailable, we expect driver to enable arp/nd offload.
   device_->GetSim()->drvr->feat_flags &= (!BIT(BRCMF_FEAT_AP));
-  ArpNdOffloadConfigValidate(WLAN_MAC_ROLE_CLIENT, kArpNdOffloadEnabled);
+  ArpNdOffloadConfigValidate(wlan_common::WlanMacRole::kClient, kArpNdOffloadEnabled);
 }
 
 TEST_F(FirmwareConfigTest, ArpNdOffloadClientConfigTestWithSoftApFeat) {
@@ -86,13 +86,13 @@ TEST_F(FirmwareConfigTest, ArpNdOffloadClientConfigTestWithSoftApFeat) {
 
   // When SoftAP feature is available, we expect driver to not enable arp/nd offload.
   device_->GetSim()->drvr->feat_flags |= BIT(BRCMF_FEAT_AP);
-  ArpNdOffloadConfigValidate(WLAN_MAC_ROLE_CLIENT, kArpNdOffloadDisabled);
+  ArpNdOffloadConfigValidate(wlan_common::WlanMacRole::kClient, kArpNdOffloadDisabled);
 }
 
 TEST_F(FirmwareConfigTest, ArpNdOffloadApConfigTestWithSoftApFeat) {
   Init();
   device_->GetSim()->drvr->feat_flags |= BIT(BRCMF_FEAT_AP);
-  ArpNdOffloadConfigValidate(WLAN_MAC_ROLE_AP, kArpNdOffloadDisabled);
+  ArpNdOffloadConfigValidate(wlan_common::WlanMacRole::kAp, kArpNdOffloadDisabled);
 }
 
 TEST_F(FirmwareConfigTest, WnmDisabledClient) {
@@ -100,7 +100,7 @@ TEST_F(FirmwareConfigTest, WnmDisabledClient) {
   SimInterface ifc;
   uint32_t iovar;
 
-  EXPECT_EQ(StartInterface(WLAN_MAC_ROLE_CLIENT, &ifc), ZX_OK);
+  EXPECT_EQ(StartInterface(wlan_common::WlanMacRole::kClient, &ifc), ZX_OK);
   struct brcmf_if* ifp = brcmf_get_ifp(device_->GetSim()->drvr, ifc.iface_id_);
   const auto get_status = brcmf_fil_iovar_int_get(ifp, "wnm", &iovar, nullptr);
   ASSERT_EQ(get_status, ZX_OK);
@@ -112,7 +112,7 @@ TEST_F(FirmwareConfigTest, MchanDisabledClient) {
   SimInterface ifc;
   uint32_t iovar;
 
-  EXPECT_EQ(StartInterface(WLAN_MAC_ROLE_CLIENT, &ifc), ZX_OK);
+  EXPECT_EQ(StartInterface(wlan_common::WlanMacRole::kClient, &ifc), ZX_OK);
   struct brcmf_if* ifp = brcmf_get_ifp(device_->GetSim()->drvr, ifc.iface_id_);
   brcmf_fil_iovar_int_get(ifp, "mchan", &iovar, nullptr);
   EXPECT_EQ(kMchanState, iovar);
@@ -123,7 +123,7 @@ TEST_F(FirmwareConfigTest, MchanDisabledSoftAp) {
   SimInterface ifc;
   uint32_t iovar;
 
-  EXPECT_EQ(StartInterface(WLAN_MAC_ROLE_AP, &ifc), ZX_OK);
+  EXPECT_EQ(StartInterface(wlan_common::WlanMacRole::kAp, &ifc), ZX_OK);
   struct brcmf_if* ifp = brcmf_get_ifp(device_->GetSim()->drvr, ifc.iface_id_);
   brcmf_fil_iovar_int_get(ifp, "mchan", &iovar, nullptr);
   EXPECT_EQ(kMchanState, iovar);
@@ -156,7 +156,7 @@ TEST_F(FirmwareConfigTest, RoamEngineDisabledByDefault) {
   SimInterface ifc;
   uint32_t iovar;
 
-  EXPECT_EQ(StartInterface(WLAN_MAC_ROLE_CLIENT, &ifc), ZX_OK);
+  EXPECT_EQ(StartInterface(wlan_common::WlanMacRole::kClient, &ifc), ZX_OK);
   struct brcmf_if* ifp = brcmf_get_ifp(device_->GetSim()->drvr, ifc.iface_id_);
   const auto get_status = brcmf_fil_iovar_int_get(ifp, "roam_off", &iovar, nullptr);
 
@@ -170,7 +170,7 @@ TEST_F(FirmwareConfigTest, RoamEngineEnabledViaFeatureFlag) {
   uint32_t iovar;
 
   device_->GetSim()->drvr->feat_flags |= BIT(BRCMF_FEAT_ROAM_ENGINE);
-  EXPECT_EQ(StartInterface(WLAN_MAC_ROLE_CLIENT, &ifc), ZX_OK);
+  EXPECT_EQ(StartInterface(wlan_common::WlanMacRole::kClient, &ifc), ZX_OK);
   struct brcmf_if* ifp = brcmf_get_ifp(device_->GetSim()->drvr, ifc.iface_id_);
   const auto get_status = brcmf_fil_iovar_int_get(ifp, "roam_off", &iovar, nullptr);
 
@@ -183,7 +183,7 @@ TEST_F(FirmwareConfigTest, BeaconTimeoutDefault) {
   SimInterface ifc;
   uint32_t iovar;
 
-  EXPECT_EQ(StartInterface(WLAN_MAC_ROLE_CLIENT, &ifc), ZX_OK);
+  EXPECT_EQ(StartInterface(wlan_common::WlanMacRole::kClient, &ifc), ZX_OK);
   struct brcmf_if* ifp = brcmf_get_ifp(device_->GetSim()->drvr, ifc.iface_id_);
   const auto get_status = brcmf_fil_iovar_int_get(ifp, "bcn_timeout", &iovar, nullptr);
 
@@ -197,7 +197,7 @@ TEST_F(FirmwareConfigTest, BeaconTimeoutWhenRoamEngineIsSetup) {
   uint32_t iovar;
 
   device_->GetSim()->drvr->feat_flags |= BIT(BRCMF_FEAT_ROAM_ENGINE);
-  EXPECT_EQ(StartInterface(WLAN_MAC_ROLE_CLIENT, &ifc), ZX_OK);
+  EXPECT_EQ(StartInterface(wlan_common::WlanMacRole::kClient, &ifc), ZX_OK);
   struct brcmf_if* ifp = brcmf_get_ifp(device_->GetSim()->drvr, ifc.iface_id_);
   const auto get_status = brcmf_fil_iovar_int_get(ifp, "bcn_timeout", &iovar, nullptr);
 

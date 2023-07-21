@@ -10,9 +10,9 @@
 
 namespace wlan::brcmfmac {
 
-constexpr wlan_channel_t kDefaultChannel = {
-    .primary = 9, .cbw = CHANNEL_BANDWIDTH_CBW20, .secondary80 = 0};
-constexpr cssid_t kDefaultSsid = {.len = 15, .data = "Fuchsia Fake AP"};
+constexpr wlan_common::WlanChannel kDefaultChannel = {
+    .primary = 9, .cbw = wlan_common::ChannelBandwidth::kCbw20, .secondary80 = 0};
+constexpr wlan_ieee80211::CSsid kDefaultSsid = {.len = 15, .data = {.data_ = "Fuchsia Fake AP"}};
 const common::MacAddr kDefaultBssid({0x12, 0x34, 0x56, 0x78, 0x9a, 0xbc});
 constexpr uint64_t kFirstScanId = 0x112233;
 constexpr uint64_t kSecondScanId = 0x112234;
@@ -21,8 +21,10 @@ class ScanAndApStartTest;
 
 class ScanTestIfc : public SimInterface {
  public:
-  void OnScanEnd(const wlan_fullmac_scan_end_t* end) override;
-  void OnStartConf(const wlan_fullmac_start_confirm_t* resp) override;
+  void OnScanEnd(OnScanEndRequestView request, fdf::Arena& arena,
+                 OnScanEndCompleter::Sync& completer) override;
+  void StartConf(StartConfRequestView request, fdf::Arena& arena,
+                 StartConfCompleter::Sync& completer) override;
 
   ScanAndApStartTest* test_;
 };
@@ -35,8 +37,8 @@ class ScanAndApStartTest : public SimTest {
   void StartAp();
 
   // Event handlers, invoked by events received on interfaces.
-  void OnScanEnd(const wlan_fullmac_scan_end_t* end);
-  void OnStartConf(const wlan_fullmac_start_confirm_t* resp);
+  void OnScanEnd();
+  void OnStartConf();
 
   std::unique_ptr<simulation::FakeAp> ap_;
 
@@ -49,21 +51,23 @@ class ScanAndApStartTest : public SimTest {
   enum { NOT_STARTED, STARTED, DONE } ap_start_progress_ = NOT_STARTED;
 };
 
-void ScanTestIfc::OnScanEnd(const wlan_fullmac_scan_end_t* end) {
+void ScanTestIfc::OnScanEnd(OnScanEndRequestView request, fdf::Arena& arena,
+                            OnScanEndCompleter::Sync& completer) {
   // Notify test interface framework
-  SimInterface::OnScanEnd(end);
+  SimInterface::OnScanEnd(request, arena, completer);
 
   // Notify test
-  test_->OnScanEnd(end);
+  test_->OnScanEnd();
 }
 
 // When we receive confirmation that the AP start operation has completed, let the test know
-void ScanTestIfc::OnStartConf(const wlan_fullmac_start_confirm_t* resp) {
+void ScanTestIfc::StartConf(StartConfRequestView request, fdf::Arena& arena,
+                            StartConfCompleter::Sync& completer) {
   // Notify test interface framework
-  SimInterface::OnStartConf(resp);
+  SimInterface::StartConf(request, arena, completer);
 
   // Notify test
-  test_->OnStartConf(resp);
+  test_->OnStartConf();
 }
 
 void ScanAndApStartTest::Init() {
@@ -76,11 +80,11 @@ void ScanAndApStartTest::Init() {
                                              kDefaultChannel);
   ap_->EnableBeacon(zx::msec(60));
 
-  StartInterface(WLAN_MAC_ROLE_CLIENT, &client_ifc_);
-  StartInterface(WLAN_MAC_ROLE_AP, &softap_ifc_);
+  StartInterface(wlan_common::WlanMacRole::kClient, &client_ifc_);
+  StartInterface(wlan_common::WlanMacRole::kAp, &softap_ifc_);
 }
 
-void ScanAndApStartTest::OnScanEnd(const wlan_fullmac_scan_end_t* end) {
+void ScanAndApStartTest::OnScanEnd() {
   brcmf_simdev* simdev = device_->GetSim();
 
   // Verify that Start AP has been called
@@ -90,9 +94,7 @@ void ScanAndApStartTest::OnScanEnd(const wlan_fullmac_scan_end_t* end) {
   EXPECT_EQ(ap_start_progress_ == STARTED, brcmf_is_ap_start_pending(simdev->drvr->config));
 }
 
-void ScanAndApStartTest::OnStartConf(const wlan_fullmac_start_confirm_t* resp) {
-  ap_start_progress_ = DONE;
-}
+void ScanAndApStartTest::OnStartConf() { ap_start_progress_ = DONE; }
 
 void ScanAndApStartTest::StartAp() {
   ap_start_progress_ = STARTED;
@@ -122,11 +124,12 @@ TEST_F(ScanAndApStartTest, ScanApStartInterference) {
   // Scan should have been cancelled by AP start operation
   auto result = client_ifc_.ScanResultCode(kFirstScanId);
   EXPECT_NE(result, std::nullopt);
-  EXPECT_EQ(*result, WLAN_SCAN_RESULT_CANCELED_BY_DRIVER_OR_FIRMWARE);
+  EXPECT_EQ(*result, wlan_fullmac::WlanScanResult::kCanceledByDriverOrFirmware);
 
   // Make sure the AP iface started successfully.
   EXPECT_EQ(softap_ifc_.stats_.start_confirmations.size(), 1U);
-  EXPECT_EQ(softap_ifc_.stats_.start_confirmations.back().result_code, WLAN_START_RESULT_SUCCESS);
+  EXPECT_EQ(softap_ifc_.stats_.start_confirmations.back().result_code,
+            wlan_fullmac::WlanStartResult::kSuccess);
 }
 
 TEST_F(ScanAndApStartTest, ScanAbortFailure) {
@@ -148,11 +151,12 @@ TEST_F(ScanAndApStartTest, ScanAbortFailure) {
   // The first scan should be done because the abort is failed
   auto first_result = client_ifc_.ScanResultCode(kFirstScanId);
   EXPECT_NE(first_result, std::nullopt);
-  EXPECT_EQ(*first_result, WLAN_SCAN_RESULT_SUCCESS);
+  EXPECT_EQ(*first_result, wlan_fullmac::WlanScanResult::kSuccess);
 
   // Make sure the AP iface started successfully.
   EXPECT_EQ(softap_ifc_.stats_.start_confirmations.size(), 1U);
-  EXPECT_EQ(softap_ifc_.stats_.start_confirmations.back().result_code, WLAN_START_RESULT_SUCCESS);
+  EXPECT_EQ(softap_ifc_.stats_.start_confirmations.back().result_code,
+            wlan_fullmac::WlanStartResult::kSuccess);
 
   env_->ScheduleNotification(std::bind(&SimInterface::StartScan, &client_ifc_, kSecondScanId, false,
                                        std::optional<const std::vector<uint8_t>>{}),
@@ -166,7 +170,7 @@ TEST_F(ScanAndApStartTest, ScanAbortFailure) {
   // brcmf_scan_status_bit_t::ABORT bit.
   auto second_result = client_ifc_.ScanResultCode(kSecondScanId);
   EXPECT_NE(second_result, std::nullopt);
-  EXPECT_EQ(*second_result, WLAN_SCAN_RESULT_SUCCESS);
+  EXPECT_EQ(*second_result, wlan_fullmac::WlanScanResult::kSuccess);
 }
 
 // This test verifies that when a scan request from SME is canceled by the driver because of an AP
@@ -191,12 +195,12 @@ TEST_F(ScanAndApStartTest, ScanWhileApStart) {
   // The first scan should be done because the abort is failed
   auto first_result = client_ifc_.ScanResultCode(kFirstScanId);
   EXPECT_NE(first_result, std::nullopt);
-  EXPECT_EQ(*first_result, WLAN_SCAN_RESULT_SHOULD_WAIT);
+  EXPECT_EQ(*first_result, wlan_fullmac::WlanScanResult::kShouldWait);
 
   // The result of AP iface start should be NOT_SUPPORT when timeout happened.
   EXPECT_EQ(softap_ifc_.stats_.start_confirmations.size(), 1U);
   EXPECT_EQ(softap_ifc_.stats_.start_confirmations.back().result_code,
-            WLAN_START_RESULT_NOT_SUPPORTED);
+            wlan_fullmac::WlanStartResult::kNotSupported);
 }
 
 }  // namespace wlan::brcmfmac

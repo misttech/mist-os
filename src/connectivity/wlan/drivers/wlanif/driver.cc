@@ -17,19 +17,24 @@
 zx_status_t wlan_fullmac_bind(void* ctx, zx_device_t* device) {
   wlan::drivers::log::Instance::Init(kFiltSetting);
   ltrace_fn();
-
-  wlan_fullmac_impl_protocol_t wlan_fullmac_impl_proto;
   zx_status_t status;
-  status = device_get_protocol(device, ZX_PROTOCOL_WLAN_FULLMAC_IMPL,
-                               static_cast<void*>(&wlan_fullmac_impl_proto));
-  if (status != ZX_OK) {
-    lerror("bind: no wlan_fullmac_impl protocol (%s)", zx_status_get_string(status));
-    return ZX_ERR_INTERNAL;
+
+  auto endpoints = fdf::CreateEndpoints<fuchsia_wlan_fullmac::WlanFullmacImpl>();
+  if (endpoints.is_error()) {
+    lerror("Creating end point error: %s", zx_status_get_string(endpoints.status_value()));
+    return endpoints.status_value();
   }
 
-  auto wlan_fullmac_dev = std::make_unique<wlanif::Device>(device, wlan_fullmac_impl_proto);
+  auto wlan_fullmac_dev = std::make_unique<wlanif::Device>(device);
 
-  status = wlan_fullmac_dev->Bind();
+  if ((status = wlan_fullmac_dev->ConnectToWlanFullmacImpl()) != ZX_OK) {
+    lerror("Failed connecting to wlan fullmac impl driver: %s", zx_status_get_string(status));
+  }
+
+  if ((status = wlan_fullmac_dev->Bind()) != ZX_OK) {
+    lerror("Failed adding wlan fullmac device: %s", zx_status_get_string(status));
+  }
+
   if (status != ZX_OK) {
     lerror("could not bind: %s", zx_status_get_string(status));
   } else {
