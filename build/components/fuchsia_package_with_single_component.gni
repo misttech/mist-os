@@ -30,7 +30,7 @@ import("fuchsia_package.gni")
 # }
 #
 # fuchsia_package_with_single_component("rot13") {
-#   manifest = "meta/rot13.cmx"
+#   manifest = "meta/rot13.cml"
 #   deps = [ ":rot13_encoder_decoder" ]
 # }
 # ```

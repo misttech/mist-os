@@ -18,7 +18,7 @@ import("//build/testing/test_spec.gni")
 #   component = ":my-component"
 # }
 # ```
-# The above can be tested with `fx test fuchsia-pkg://fuchsia.com/my-package#meta/my-component.cmx`.
+# The above can be tested with `fx test fuchsia-pkg://fuchsia.com/my-package#meta/my-component.cm`.
 #
 # Parameters
 #

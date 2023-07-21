@@ -26,7 +26,7 @@ import("fuchsia_unittest_component.gni")
 # ```
 #
 # The above will generate a manifest and create a test with the launch URL:
-# fuchsia-pkg://fuchsia.com/rot13-test#meta/rot13-test.cmx
+# fuchsia-pkg://fuchsia.com/rot13-test#meta/rot13-test.cm
 #
 # Parameters
 #

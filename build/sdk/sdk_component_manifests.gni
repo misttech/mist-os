@@ -34,11 +34,8 @@ template("sdk_component_manifests") {
 
   foreach(manifest, invoker.manifests) {
     manifest_extension = get_path_info(manifest, "extension")
-    if (manifest_extension != "cml" && manifest_extension != "cmx") {
-      assert(
-          false,
-          "Unknown manifest format for \"${invoker.manifest}\", must be \".cml\" or \".cmx\"")
-    }
+    assert(manifest_extension == "cml",
+           "Unknown manifest format for \"${manifest}\", must be \".cml\"")
     manifest_file = get_path_info(manifest, "file")
     file_dest = "$file_base/$manifest_file"
     file_records += [

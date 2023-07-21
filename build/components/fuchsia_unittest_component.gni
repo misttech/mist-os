@@ -44,8 +44,8 @@ import("fuchsia_test_component_manifest.gni")
 #
 # The above will generate a manifest for each test and include both components in a single package,
 # which can be run with the launch URLs:
-# fuchsia-pkg://fuchsia.com/rot13-tests#meta/rot13-encoder-test.cmx
-# fuchsia-pkg://fuchsia.com/rot13-tests#meta/rot13-decoder-test.cmx
+# fuchsia-pkg://fuchsia.com/rot13-tests#meta/rot13-encoder-test.cm
+# fuchsia-pkg://fuchsia.com/rot13-tests#meta/rot13-decoder-test.cm
 #
 # Parameters
 #
