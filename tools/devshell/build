@@ -148,6 +148,11 @@ function main {
     echo -e "\\n------ RUNNING ${tool} ------"
   fi
 
+  # Moving the goma-check before we actually start the build.
+  # We used to check goma only when build failed but the user pays a few seconds
+  # to kick off the build and wait for the failure.
+  goma-check
+
   if [ -n "${fint_params_path}" ]; then
     readonly fint="${FX_CACHE_DIR}/fint"
     "$FUCHSIA_DIR/tools/integration/bootstrap.sh" -o "$fint" || exit $?
@@ -166,9 +171,6 @@ build_dir: \"${FUCHSIA_BUILD_DIR}\"
   fi
 
   status=$?
-  if [[ "${status}" -ne 0 ]]; then
-    goma-check
-  fi
 
   exit-with-message
 }
@@ -176,7 +178,11 @@ build_dir: \"${FUCHSIA_BUILD_DIR}\"
 function goma-check {
   if grep -q "^ *use_goma = true" "${FUCHSIA_BUILD_DIR}/args.gn"; then
     if ! fx-command-run goma_ctl status >/dev/null 2>&1; then
-      fx-error "Goma is enabled but not started. Please run 'fx goma' first."
+      fx-warn "Goma is enabled but not started."
+      fx-info "Starting Goma..."
+      # We may be able to get away with running `goma_ctl ensure_start`
+      # but it is safer to run the goma helper script which runs more checks.
+      fx-command-run goma
     fi
   fi
 }
