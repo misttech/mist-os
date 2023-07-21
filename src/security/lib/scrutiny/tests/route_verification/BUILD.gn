@@ -20,11 +20,6 @@ import("//src/sys/core/build/core_shard.gni")
 import("//zircon/kernel/phys/qemu.gni")
 
 if (is_fuchsia) {
-  group("tests") {
-    testonly = true
-    deps = []
-  }
-
   fuchsia_component("component_with_broken_use") {
     testonly = true
     manifest = "meta/component_with_broken_use.cml"

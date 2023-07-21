@@ -1637,12 +1637,6 @@ group("developer_host_tools") {
   }
 }
 
-group("recovery_image") {
-  # TODO(fxbug.dev/37792): Investigate use of testonly here.
-  testonly = true
-  deps = [ "build/images/recovery" ]
-}
-
 group("package_archive") {
   testonly = true
   public_deps = [ "//build/gn:package_archive" ]

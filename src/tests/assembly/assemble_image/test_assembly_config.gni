@@ -103,8 +103,22 @@ template("test_assembly_config") {
   }
 
   if (is_fuchsia) {
+    fuchsia_labels = {
+      board_information = "${target_name}.board_information"
+    }
     fuchsia_files = {
       assembly_config = "${target_out_dir}/${target_name}_product_config/product_assembly_config.json"
+      board_information =
+          "${target_out_dir}/${target_name}_board/board_information.json"
+    }
+
+    generated_file(fuchsia_labels.board_information) {
+      outputs = [ fuchsia_files.board_information ]
+      output_conversion = "json"
+      contents = {
+        name = "test board"
+        provided_features = []
+      }
     }
 
     product_config_label = "${target_name}_product_config"
@@ -162,6 +176,8 @@ template("test_assembly_config") {
                rebase_path(files.ffx_tool, root_build_dir),
                "--product-assembly-config",
                rebase_path(fuchsia_files.assembly_config, root_build_dir),
+               "--board-information",
+               rebase_path(fuchsia_files.board_information, root_build_dir),
                "--legacy-bundle",
                rebase_path("$outdir/legacy", root_build_dir),
                "--input-bundles-dir",
@@ -172,6 +188,7 @@ template("test_assembly_config") {
                rebase_path(stamp, root_build_dir),
              ] + additional_args_param
       deps = [
+               ":${fuchsia_labels.board_information}",
                ":${product_config_label}",
                ":input_bundle",
                labels.ffx_tool,
@@ -180,6 +197,7 @@ template("test_assembly_config") {
       inputs = [
         files.ffx_tool,
         fuchsia_files.assembly_config,
+        fuchsia_files.board_information,
       ]
       outputs = [
         stamp,

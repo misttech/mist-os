@@ -2,6 +2,8 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
+import("//build/board.gni")
+
 assert(is_fuchsia, "These can only be defined in the default toolchain")
 
 # WARNING: Known to infrastructure
@@ -18,15 +20,23 @@ group("core") {
     # Add in e2e tests excluded from `no_e2e`.
     "//bundles/fidl:tests",
     "//sdk:tests",
-    "//src:e2e_tests",
-
-    # TODO(http://fxbug.dev/114960) Re-instate these tests when they correctly
-    # select the environments that they can run on.
-    #
-    # "//tools:e2e_tests",
-
-    ":cuckoo_tests",
   ]
+
+  # The following tests, as e2e tests, require a board to be defined in order to
+  # be valid tests, so they are excluded from builds that don't configure a
+  # board.
+  if (has_board) {
+    deps += [
+      "//src:e2e_tests",
+
+      # TODO(http://fxbug.dev/114960) Re-instate these tests when they correctly
+      # select the environments that they can run on.
+      #
+      # "//tools:e2e_tests",
+
+      ":cuckoo_tests",
+    ]
+  }
 
   # Ensure paths to known e2e test libs are always up-to-date.
   deps += e2e_test_libs

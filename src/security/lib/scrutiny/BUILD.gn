@@ -21,9 +21,11 @@ group("lib") {
   }
 }
 
-group("tests") {
-  testonly = true
-  public_deps = [ "tests($target_toolchain)" ]
+if (is_fuchsia) {
+  group("tests") {
+    testonly = true
+    public_deps = [ "tests" ]
+  }
 }
 
 if (is_host) {

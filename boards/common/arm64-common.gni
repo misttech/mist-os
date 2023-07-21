@@ -6,6 +6,9 @@ import("//build/board.gni")
 
 has_board = true
 
+# BoardInformation for Product Assembly
+board_information_for_assembly = "//boards/arm64/board_information.json5"
+
 target_cpu = "arm64"
 
 blobfs_capacity = 10485760000  # 10000 MiB

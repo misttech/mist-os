@@ -101,9 +101,11 @@ if (is_host) {
     product_bundle = "$outdir/product_bundle"
   }
 
-  host_test_data("testdata") {
-    deps = [ ":product_bundle($target_toolchain)" ]
-    sources = [ files.product_bundle ]
+  if (has_board) {
+    host_test_data("testdata") {
+      deps = [ ":product_bundle($target_toolchain)" ]
+      sources = [ files.product_bundle ]
+    }
   }
 
   config("test_config") {
@@ -113,7 +115,11 @@ if (is_host) {
 
   rustc_library("plugins") {
     name = "scrutiny_plugins"
-    with_unit_tests = true
+
+    # The unit-tests binary include some tests that are really integration
+    # tests that use an assembled product bundle as test input.
+    with_unit_tests = has_board
+
     edition = "2021"
     visibility = [
       "//src/security/lib/scrutiny/*",
@@ -167,19 +173,21 @@ if (is_host) {
 
     non_rust_deps = [ "//src/lib/chunked-compression" ]
 
-    test_deps = [
-      ":testdata",
-      "//sdk/fidl/fuchsia.io:fuchsia.io_rust",
-      "//src/lib/fuchsia",
-      "//src/security/lib/scrutiny/testing",
-      "//src/sys/lib/fuchsia-zbi/abi",
-      "//third_party/rust_crates:assert_matches",
-      "//third_party/rust_crates:sha2",
-      "//third_party/rust_crates:tempfile",
-      "//third_party/rust_crates:uuid",
-      "//third_party/rust_crates:zerocopy",
-      "//tools/lib/cml",
-    ]
+    if (with_unit_tests) {
+      test_deps = [
+        ":testdata",
+        "//sdk/fidl/fuchsia.io:fuchsia.io_rust",
+        "//src/lib/fuchsia",
+        "//src/security/lib/scrutiny/testing",
+        "//src/sys/lib/fuchsia-zbi/abi",
+        "//third_party/rust_crates:assert_matches",
+        "//third_party/rust_crates:sha2",
+        "//third_party/rust_crates:tempfile",
+        "//third_party/rust_crates:uuid",
+        "//third_party/rust_crates:zerocopy",
+        "//tools/lib/cml",
+      ]
+    }
 
     sources = [
       "src/additional_boot_args/collection.rs",
@@ -250,5 +258,7 @@ if (is_host) {
 
 group("tests") {
   testonly = true
-  public_deps = [ ":plugins_test($host_toolchain)" ]
+  if (has_board) {
+    public_deps = [ ":plugins_test($host_toolchain)" ]
+  }
 }

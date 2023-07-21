@@ -671,6 +671,17 @@ template("assembled_system") {
       "product",
       "--product",
       rebase_path(files.product_assembly_config, root_build_dir),
+    ]
+
+    # If it's not set, assembly will fail, but this will at least allow GN to
+    # complete in situations where assembly won't be run.
+    if (board_information_for_assembly != false) {
+      args += [
+        "--board-info",
+        rebase_path(board_information_for_assembly, root_build_dir),
+      ]
+    }
+    args += [
       "--input-bundles-dir",
       rebase_path(files.platform_common_aibs_dir, root_build_dir),
       "--legacy-bundle",
@@ -678,13 +689,6 @@ template("assembled_system") {
       "--outdir",
       rebase_path(files.outdir, root_build_dir),
     ]
-
-    if (board_information_for_assembly != false) {
-      args += [
-        "--board-info",
-        rebase_path(board_information_for_assembly, root_build_dir),
-      ]
-    }
 
     deps = [
              ":${labels.legacy_assembly_input_bundle}",

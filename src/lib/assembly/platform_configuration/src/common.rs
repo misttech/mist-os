@@ -97,28 +97,7 @@ pub(crate) trait DefineSubsystemConfiguration<T> {
 pub(crate) struct ConfigurationContext<'a> {
     pub feature_set_level: &'a FeatureSupportLevel,
     pub build_type: &'a BuildType,
-    pub board_info: Option<&'a BoardInformation>,
-}
-
-impl Default for ConfigurationContext<'_> {
-    /// Use e.g. in tests that initialize only relevant fields.
-    ///
-    /// For example:
-    ///
-    /// ```ignore
-    ///  let context = ConfigurationContext {
-    ///      feature_set_level: &FeatureSupportLevel::Minimal,
-    ///      build_type: &BuildType::Eng,
-    ///      ..Default::default()
-    ///  };
-    ///  ```
-    fn default() -> Self {
-        Self {
-            feature_set_level: &FeatureSupportLevel::Minimal,
-            build_type: &BuildType::User,
-            board_info: None,
-        }
-    }
+    pub board_info: &'a BoardInformation,
 }
 
 /// A struct for collecting multiple kinds of platform configuration.
@@ -619,8 +598,40 @@ impl ICUMapGetExt for ICUMap {
 }
 
 #[cfg(test)]
+impl ConfigurationContext<'_> {
+    /// Use e.g. in tests that initialize only relevant fields.
+    ///
+    /// For example:
+    ///
+    /// ```
+    ///  use crate::subsystems::prelude::*;
+    ///  let context = ConfigurationContext {
+    ///      feature_set_level: &FeatureSupportLevel::Minimal,
+    ///      build_type: &BuildType::Eng,
+    ///      ..Default::default()
+    ///  };
+    ///  ```
+    pub(crate) fn default_for_tests() -> Self {
+        Self {
+            feature_set_level: &FeatureSupportLevel::Minimal,
+            build_type: &BuildType::User,
+            board_info: &tests::BOARD_INFORMATION_FOR_TESTS,
+        }
+    }
+}
+
+#[cfg(test)]
 mod tests {
     use super::*;
+    use lazy_static::lazy_static;
+
+    lazy_static! {
+        pub(crate) static ref BOARD_INFORMATION_FOR_TESTS: BoardInformation = BoardInformation {
+            name: "Test Board".into(),
+            provided_features: vec![],
+            main_support_bundle: None,
+        };
+    }
 
     #[test]
     fn test_config_builder() {

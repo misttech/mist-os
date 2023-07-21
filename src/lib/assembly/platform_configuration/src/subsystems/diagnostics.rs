@@ -107,7 +107,7 @@ mod tests {
         let context = ConfigurationContext {
             feature_set_level: &FeatureSupportLevel::Minimal,
             build_type: &BuildType::Eng,
-            ..Default::default()
+            ..ConfigurationContext::default_for_tests()
         };
         let diagnostics =
             DiagnosticsConfig { archivist: Some(ArchivistConfig::Default), ..Default::default() };
@@ -161,7 +161,7 @@ mod tests {
         let context = ConfigurationContext {
             feature_set_level: &FeatureSupportLevel::Minimal,
             build_type: &BuildType::Eng,
-            ..Default::default()
+            ..ConfigurationContext::default_for_tests()
         };
         let diagnostics = DiagnosticsConfig {
             additional_serial_log_components: vec!["/core/foo".to_string()],
@@ -191,7 +191,7 @@ mod tests {
         let context = ConfigurationContext {
             feature_set_level: &FeatureSupportLevel::Minimal,
             build_type: &BuildType::Eng,
-            ..Default::default()
+            ..ConfigurationContext::default_for_tests()
         };
         let diagnostics =
             DiagnosticsConfig { archivist: Some(ArchivistConfig::LowMem), ..Default::default() };
@@ -220,8 +220,7 @@ mod tests {
         let context = ConfigurationContext {
             feature_set_level: &FeatureSupportLevel::Bootstrap,
             build_type: &BuildType::Eng,
-            board_info: None,
-            ..Default::default()
+            ..ConfigurationContext::default_for_tests()
         };
         let mut builder = ConfigurationBuilderImpl::new(&None);
 
@@ -246,8 +245,7 @@ mod tests {
         let context = ConfigurationContext {
             feature_set_level: &FeatureSupportLevel::Minimal,
             build_type: &BuildType::User,
-            board_info: None,
-            ..Default::default()
+            ..ConfigurationContext::default_for_tests()
         };
         let mut builder = ConfigurationBuilderImpl::new(&None);
 

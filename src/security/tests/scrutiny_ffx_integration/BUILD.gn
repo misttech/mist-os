@@ -4,6 +4,7 @@
 
 import("//build/assembly/assembled_system.gni")
 import("//build/assembly/generated_images_config.gni")
+import("//build/board.gni")
 import("//build/components/fuchsia_package.gni")
 import("//build/config.gni")
 import("//build/testing/host_test_data.gni")
@@ -85,73 +86,81 @@ if (is_fuchsia) {
 }
 
 if (is_host) {
-  host_test_data("testdata") {
-    deps = [
-      ":${_assemble_system_recovery_target_name}.image_assembler($target_toolchain)",
-      ":${_assemble_system_target_name}.image_assembler($target_toolchain)",
-    ]
-    sources = [
-      get_label_info(
-              ":${_assemble_system_target_name}.image_assembler($target_toolchain)",
-              "target_out_dir") + "/${_assemble_system_target_name}/blob.blk",
-      get_label_info(
-              ":${_assemble_system_target_name}.image_assembler($target_toolchain)",
-              "target_out_dir") + "/${_assemble_system_target_name}/${_assemble_system_target_name}.zbi",
-      get_label_info(
-              ":${_assemble_system_recovery_target_name}.image_assembler($target_toolchain)",
-              "target_out_dir") + "/${_assemble_system_recovery_target_name}/${_assemble_system_recovery_target_name}.zbi",
-    ]
-    outputs = [ "$target_out_dir/testdata/{{source_file_part}}" ]
-
-    metadata = {
-      package_barrier = []
+  if (has_board) {
+    group("host_tests") {
+      testonly = true
+      deps = [ ":scrutiny_ffx_integration_test" ]
     }
-  }
 
-  # Required for the test to be able to call ffx.
-  host_test_data("copy_host_tools") {
-    sources = [ "${host_tools_dir}/ffx-scrutiny" ]
-    deps = [ "//src/developer/ffx/plugins/scrutiny:ffx_scrutiny_tool_host_tool($host_toolchain)" ]
-    outputs = [ "$target_out_dir/host_tools/{{source_file_part}}" ]
-  }
+    host_test_data("testdata") {
+      deps = [
+        ":${_assemble_system_recovery_target_name}.image_assembler($target_toolchain)",
+        ":${_assemble_system_target_name}.image_assembler($target_toolchain)",
+      ]
+      sources = [
+        get_label_info(
+                ":${_assemble_system_target_name}.image_assembler($target_toolchain)",
+                "target_out_dir") + "/${_assemble_system_target_name}/blob.blk",
+        get_label_info(
+                ":${_assemble_system_target_name}.image_assembler($target_toolchain)",
+                "target_out_dir") + "/${_assemble_system_target_name}/${_assemble_system_target_name}.zbi",
+        get_label_info(
+                ":${_assemble_system_recovery_target_name}.image_assembler($target_toolchain)",
+                "target_out_dir") + "/${_assemble_system_recovery_target_name}/${_assemble_system_recovery_target_name}.zbi",
+      ]
+      outputs = [ "$target_out_dir/testdata/{{source_file_part}}" ]
 
-  config("config") {
-    testdata_out_dir =
-        get_label_info(":testdata($host_toolchain)", "target_out_dir")
-    host_tools_out_dir =
-        get_label_info(":copy_host_tools($host_toolchain)", "target_out_dir")
-    ffx_path = "$host_tools_out_dir/host_tools/ffx-scrutiny"
-    blobfs_path = "$testdata_out_dir/testdata/blob.blk"
-    zbi_path = "$testdata_out_dir/testdata/${_assemble_system_target_name}.zbi"
-    recovery_zbi_path = "$testdata_out_dir/testdata/${_assemble_system_recovery_target_name}.zbi"
-
-    rustenv = [
-      "FFX_TOOL_PATH=" + rebase_path(ffx_path, root_build_dir),
-      "BLOBFS_PATH=" + rebase_path(blobfs_path, root_build_dir),
-      "ZBI_PATH=" + rebase_path(zbi_path, root_build_dir),
-      "RECOVERY_ZBI_PATH=" + rebase_path(recovery_zbi_path, root_build_dir),
-    ]
-  }
-
-  rustc_test("scrutiny_ffx_integration_test") {
-    source_root = "src/lib.rs"
-    edition = "2021"
-    deps = [
-      ":copy_host_tools($host_toolchain)",
-      ":testdata($host_toolchain)",
-      "//third_party/rust_crates:tempfile",
-    ]
-    sources = [ "src/lib.rs" ]
-    configs += [ ":config" ]
-
-    # TODO(fxbug.dev/97055): LSAN says that Scrutiny has a leak, disable this test in ASAN
-    if (is_asan) {
-      test_environments = []
+      metadata = {
+        package_barrier = []
+      }
     }
-  }
-}
 
-group("tests") {
-  testonly = true
-  deps = [ ":scrutiny_ffx_integration_test($host_toolchain)" ]
+    # Required for the test to be able to call ffx.
+    host_test_data("copy_host_tools") {
+      sources = [ "${host_tools_dir}/ffx-scrutiny" ]
+      deps = [ "//src/developer/ffx/plugins/scrutiny:ffx_scrutiny_tool_host_tool($host_toolchain)" ]
+      outputs = [ "$target_out_dir/host_tools/{{source_file_part}}" ]
+    }
+
+    config("config") {
+      ffx_path = "$target_out_dir/host_tools/ffx-scrutiny"
+      blobfs_path = "$target_out_dir/testdata/blob.blk"
+      zbi_path = "$target_out_dir/testdata/${_assemble_system_target_name}.zbi"
+      recovery_zbi_path = "$target_out_dir/testdata/${_assemble_system_recovery_target_name}.zbi"
+
+      rustenv = [
+        "FFX_TOOL_PATH=" + rebase_path(ffx_path, root_build_dir),
+        "BLOBFS_PATH=" + rebase_path(blobfs_path, root_build_dir),
+        "ZBI_PATH=" + rebase_path(zbi_path, root_build_dir),
+        "RECOVERY_ZBI_PATH=" + rebase_path(recovery_zbi_path, root_build_dir),
+      ]
+    }
+
+    rustc_test("scrutiny_ffx_integration_test") {
+      source_root = "src/lib.rs"
+      edition = "2021"
+      deps = [
+        ":copy_host_tools",
+        ":testdata",
+        "//third_party/rust_crates:tempfile",
+      ]
+      sources = [ "src/lib.rs" ]
+      configs += [ ":config" ]
+
+      # TODO(fxbug.dev/97055): LSAN says that Scrutiny has a leak, disable this test in ASAN
+      if (is_asan) {
+        test_environments = []
+      }
+    }
+  } else {
+    # If there's no board, just stub out the host_tests group.
+    group("host_tests") {
+    }
+
+    # And then these vars aren't needed.
+    not_needed([
+                 "_assemble_system_target_name",
+                 "_assemble_system_recovery_target_name",
+               ])
+  }
 }

@@ -49,7 +49,10 @@ rustc_library("platform_configuration") {
     "//third_party/rust_crates:serde",
     "//third_party/rust_crates:serde_json",
   ]
-  test_deps = [ "//src/lib/assembly/util" ]
+  test_deps = [
+    "//src/lib/assembly/util",
+    "//third_party/rust_crates:lazy_static",
+  ]
   configs += [ "//build/config/rust/lints:clippy_warn_all" ]
 }
 
