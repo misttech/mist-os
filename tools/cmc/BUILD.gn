@@ -17,6 +17,7 @@ rustc_binary("cmc") {
     "//sdk/fidl/fuchsia.component.decl:fuchsia.component.decl_rust",
     "//sdk/fidl/fuchsia.data:fuchsia.data_rust",
     "//src/lib/fidl/rust/fidl",
+    "//src/lib/tempfile-ext",
     "//src/sys/lib/cm_rust",
     "//src/sys/lib/cm_types",
     "//third_party/rust_crates:anyhow",
@@ -24,6 +25,7 @@ rustc_binary("cmc") {
     "//third_party/rust_crates:serde_json5",
     "//third_party/rust_crates:strsim",
     "//third_party/rust_crates:structopt",
+    "//third_party/rust_crates:tempfile",
     "//tools/lib/cml",
     "//tools/lib/reference_doc",
   ]

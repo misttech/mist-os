@@ -11,6 +11,7 @@ use fidl::persist;
 use std::fs;
 use std::io::Write;
 use std::path::PathBuf;
+use tempfile_ext::NamedTempFileExt as _;
 
 /// Read in a CML file and produce the equivalent CM.
 pub fn compile(
@@ -38,6 +39,11 @@ pub fn compile(
             output
         ))),
     }?;
+    util::ensure_directory_exists(&output)?;
+    let output_parent = output.parent().ok_or(Error::invalid_args(format!(
+        "Output file {:?} does not have a parent directory.",
+        output
+    )))?;
 
     let mut document = util::read_cml(&file)?;
     let includes = include::transitive_includes(&file, &includepath, &includeroot)?;
@@ -56,10 +62,6 @@ pub fn compile(
         }
     }
 
-    util::ensure_directory_exists(&output)?;
-    let mut out_file =
-        fs::OpenOptions::new().create(true).truncate(true).write(true).open(output)?;
-
     let options = cml::CompileOptions::new()
         .file(&file)
         .features(features)
@@ -67,7 +69,11 @@ pub fn compile(
     let options =
         if let Some(s) = config_package_path { options.config_package_path(s) } else { options };
     let out_data = cml::compile(&document, options)?;
-    out_file.write_all(&persist(&out_data)?)?;
+
+    // Write to the output file, but only if the bytes have changed.
+    let mut tmp = tempfile::NamedTempFile::new_in(output_parent)?;
+    tmp.write_all(&persist(&out_data)?);
+    tmp.persist_if_changed(&output).map_err(|e| e.error)?;
 
     // Write includes to depfile
     if let Some(depfile_path) = depfile {
