@@ -449,7 +449,7 @@ impl KeyboardBinding {
         // Input devices can have multiple types so ensure `report` is a KeyboardInputReport.
         match &report.keyboard {
             None => {
-                inspect_status.count_filtered_report(&report);
+                inspect_status.count_filtered_report();
                 return (previous_report, None);
             }
             _ => (),
@@ -467,7 +467,7 @@ impl KeyboardBinding {
                     InputPipelineErrorMetricDimensionEvent::KeyboardFailedToParse,
                     std::format!("Failed to parse keyboard keys: {:?}", report),
                 );
-                inspect_status.count_filtered_report(&report);
+                inspect_status.count_filtered_report();
                 return (previous_report, None);
             }
         };
