@@ -22,7 +22,7 @@ use net_types::ip::Ip as _;
 use netemul::InStack;
 use netstack_testing_common::{
     constants, get_inspect_data,
-    realms::{KnownServiceProvider, Netstack, Netstack2, TestSandboxExt as _},
+    realms::{KnownServiceProvider, Netstack, TestSandboxExt as _},
     Result,
 };
 use netstack_testing_macros::netstack_test;
@@ -1605,7 +1605,7 @@ const CONFIG_DATA_NONEXISTENT: &str = "/pkg/netstack/idontexist.json";
     false, "INFO", "2m0s", true, true, CONFIG_DATA_NONEXISTENT, None;
     "config-data file is nonexistent"
 )]
-async fn inspect_config(
+async fn inspect_config<N: Netstack>(
     name: &str,
     log_packets: bool,
     verbosity: &str,
@@ -1617,9 +1617,8 @@ async fn inspect_config(
 ) {
     let sandbox = netemul::TestSandbox::new().expect("create sandbox");
     let realm = {
-        let mut netstack = fidl_fuchsia_netemul::ChildDef::from(&KnownServiceProvider::Netstack(
-            Netstack2::VERSION,
-        ));
+        let mut netstack =
+            fidl_fuchsia_netemul::ChildDef::from(&KnownServiceProvider::Netstack(N::VERSION));
         let fidl_fuchsia_netemul::ChildDef { program_args, .. } = &mut netstack;
         *program_args = Some(vec![
             format!("--log-packets={log_packets}"),

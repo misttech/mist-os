@@ -32,6 +32,9 @@
 
                 // Hangs indefinitely.
                 "inspect_socket_stats_ns3",
+
+                // Hangs indefinitely.
+                "inspect_config_ns3*",
             ],
         },
     ],
