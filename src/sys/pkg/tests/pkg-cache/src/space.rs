@@ -16,10 +16,7 @@ use {
     futures::TryFutureExt,
     mock_paver::{hooks as mphooks, MockPaverServiceBuilder, PaverEvent},
     rand::prelude::*,
-    std::{
-        collections::{BTreeSet, HashMap, HashSet},
-        io::Read as _,
-    },
+    std::collections::{BTreeSet, HashMap, HashSet},
 };
 
 // TODO(fxbug.dev/76724): Deduplicate this function.
@@ -371,111 +368,88 @@ async fn gc_updated_static_package() {
     assert_eq!(env.blobfs.list_blobs().expect("all blobs"), expected_blobs);
 }
 
-async fn blob_write_fails_when_out_of_space(
-    very_small_blobfs: blobfs_ramdisk::BlobfsRamdisk,
-    blob_implementation: blobfs_ramdisk::Implementation,
-) {
+async fn gc_frees_space_so_write_can_succeed(blob_implementation: blobfs_ramdisk::Implementation) {
+    // Create a 7 MB blobfs (14,336 blocks * 512 bytes / block).
+    let small_blobfs = Ramdisk::builder()
+        .block_count(14336)
+        .into_blobfs_builder()
+        .await
+        .expect("made blobfs builder")
+        .implementation(blob_implementation)
+        .start()
+        .await
+        .expect("started blobfs");
+
+    // Write an orphaned incompressible 4 MB blob.
+    let mut orphan_data = vec![0; 4 * 1024 * 1024];
+    StdRng::from_seed([0u8; 32]).fill(&mut orphan_data[..]);
+    let orphan_hash = fuchsia_merkle::MerkleTree::from_reader(&orphan_data[..]).unwrap().root();
+    let () = small_blobfs.add_blob_from(&orphan_hash, &orphan_data[..]).unwrap();
+    assert!(small_blobfs.list_blobs().unwrap().contains(&orphan_hash));
+
+    // Create a TestEnv using this blobfs.
     let system_image_package = SystemImageBuilder::new().build().await;
     system_image_package
-        .write_to_blobfs_dir(&very_small_blobfs.root_dir().expect("wrote system image to blobfs"));
-
-    // A very large package, to put in the repo.
-    // Critically, this package contains an incompressible 3MB asset in the meta.far,
-    // which is larger than our blobfs, and attempting to resolve this package will result in
-    // blobfs returning out of space.
-    const LARGE_ASSET_FILE_SIZE: u64 = 3 * 1024 * 1024;
-    let mut rng = StdRng::from_seed([0u8; 32]);
-    let rng = &mut rng as &mut dyn RngCore;
-    let pkg = PackageBuilder::new("pkg-a")
-        .add_resource_at("meta/asset", rng.take(LARGE_ASSET_FILE_SIZE))
-        .build()
-        .await
-        .expect("build large package");
-
-    // The size of the meta far should be the size of our asset, plus three 4k-aligned files:
-    //  - meta/contents
-    //  - meta/fuchsia.abi/abi-revision
-    //  - meta/package
-    // Content chunks in FARs are 4KiB-aligned, so the most empty FAR we can get is 12KiB:
-    // meta/package at one alignment boundary, meta/fuchsia.abi/abi-revision at the next alignment
-    // boundary, and meta/contents is empty.
-    // This FAR should be 12KiB + the size of our asset file.
-    assert_eq!(
-        pkg.meta_far().unwrap().metadata().unwrap().len(),
-        LARGE_ASSET_FILE_SIZE + 4096 + 4096 + 4096
-    );
-
+        .write_to_blobfs_dir(&small_blobfs.root_dir().expect("wrote system image to blobfs"));
     let env = TestEnv::builder()
         .blobfs_and_system_image_hash(
-            very_small_blobfs,
+            small_blobfs,
             Some(*system_image_package.meta_far_merkle_root()),
         )
         .blobfs_impl(blob_implementation)
         .build()
         .await;
 
+    // Try to cache a package with an incompressible 4 MB meta.far.
+    let pkg = PackageBuilder::new("pkg-a")
+        .add_resource_at("meta/asset", &orphan_data[..])
+        .build()
+        .await
+        .expect("build large package");
+    assert_ne!(*pkg.meta_far_merkle_root(), orphan_hash);
     let meta_blob_info =
         fpkg::BlobInfo { blob_id: BlobId::from(*pkg.meta_far_merkle_root()).into(), length: 0 };
-
     let (needed_blobs, needed_blobs_server_end) =
         fidl::endpoints::create_proxy::<NeededBlobsMarker>().unwrap();
-    let (_dir, dir_server_end) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>().unwrap();
-    let _get_fut = env
+    let (dir, dir_server_end) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>().unwrap();
+    let get_fut = env
         .proxies
         .package_cache
         .get(&meta_blob_info, needed_blobs_server_end, Some(dir_server_end))
         .map_ok(|res| res.map_err(Status::from_raw));
 
+    // Writing the meta.far should fail with NO_SPACE.
+    let (meta_far, _contents) = pkg.contents();
     let meta_blob =
         needed_blobs.open_meta_blob(fpkg::BlobType::Delivery).await.unwrap().unwrap().unwrap();
-    let (meta_far, _contents) = pkg.contents();
     let () = compress_and_write_blob(&meta_far.contents, *meta_blob)
         .await
         .unwrap_err()
         .assert_out_of_space();
+
+    // GC should free space, allowing the meta.far write and therefore get to succeed.
+    let () = env.proxies.space_manager.gc().await.unwrap().unwrap();
+    assert!(!env.blobfs.list_blobs().unwrap().contains(&orphan_hash));
+    let meta_blob =
+        needed_blobs.open_meta_blob(fpkg::BlobType::Delivery).await.unwrap().unwrap().unwrap();
+    let () = compress_and_write_blob(&meta_far.contents, *meta_blob).await.unwrap();
+    let () = blob_written(&needed_blobs, meta_far.merkle).await;
+    let (_, blob_iterator_server_end) =
+        fidl::endpoints::create_proxy::<fpkg::BlobInfoIteratorMarker>().unwrap();
+    let () = needed_blobs.get_missing_blobs(blob_iterator_server_end).unwrap();
+
+    let () = get_fut.await.unwrap().unwrap();
+    let () = pkg.verify_contents(&dir).await.unwrap();
 }
 
 #[fuchsia_async::run_singlethreaded(test)]
-async fn cpp_blobfs_blob_write_fails_when_out_of_space() {
-    // Create a 2MB blobfs (4096 blocks * 512 bytes / block), which is about the minimum size blobfs
-    // will fit in and still be able to write our small package.
-    // See https://fuchsia.dev/fuchsia-src/concepts/filesystems/blobfs for information on the
-    // blobfs format and metadata overhead.
-    let very_small_blobfs = Ramdisk::builder()
-        .block_count(4096)
-        .into_blobfs_builder()
-        .await
-        .expect("made blobfs builder")
-        .cpp_blobfs()
-        .start()
-        .await
-        .expect("started blobfs");
-
-    let () = blob_write_fails_when_out_of_space(
-        very_small_blobfs,
-        blobfs_ramdisk::Implementation::CppBlobfs,
-    )
-    .await;
+async fn gc_frees_space_so_write_can_succeed_cpp_blobfs() {
+    let () = gc_frees_space_so_write_can_succeed(blobfs_ramdisk::Implementation::CppBlobfs).await;
 }
 
 #[fuchsia_async::run_singlethreaded(test)]
-async fn fxblob_blob_write_fails_when_out_of_space() {
-    // Create a 3MB fxblob (6144 blocks * 512 bytes / block).
-    let very_small_blobfs = Ramdisk::builder()
-        .block_count(6144)
-        .into_blobfs_builder()
-        .await
-        .expect("made blobfs builder")
-        .fxblob()
-        .start()
-        .await
-        .expect("started blobfs");
-
-    let () = blob_write_fails_when_out_of_space(
-        very_small_blobfs,
-        blobfs_ramdisk::Implementation::Fxblob,
-    )
-    .await;
+async fn gc_frees_space_so_write_can_succeed_fxblob() {
+    let () = gc_frees_space_so_write_can_succeed(blobfs_ramdisk::Implementation::Fxblob).await;
 }
 
 enum GcProtection {

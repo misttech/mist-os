@@ -5,7 +5,7 @@
 use {
     crate::base_packages::BasePackages,
     crate::index::PackageIndex,
-    anyhow::{anyhow, Context, Error},
+    anyhow::Context as _,
     fidl_fuchsia_space::{
         ErrorCode as SpaceErrorCode, ManagerRequest as SpaceManagerRequest,
         ManagerRequestStream as SpaceManagerRequestStream,
@@ -23,7 +23,7 @@ pub async fn serve(
     package_index: Arc<async_lock::RwLock<PackageIndex>>,
     commit_status_provider: CommitStatusProviderProxy,
     mut stream: SpaceManagerRequestStream,
-) -> Result<(), Error> {
+) -> Result<(), anyhow::Error> {
     let event_pair = commit_status_provider
         .is_current_system_committed()
         .await
@@ -83,11 +83,12 @@ async fn gc(
                 info!("{} blobs collected...", i + 1);
             }
         }
+        info!("Garbage collection done. Collected {} blobs.", eligible_blobs.len());
         Ok(())
     }
     .await
-    .map_err(|e: Error| {
-        error!("Failed to perform GC operation: {:#}", anyhow!(e));
+    .map_err(|e: anyhow::Error| {
+        error!("Failed to perform GC operation: {:#}", e);
         SpaceErrorCode::Internal
     })?;
 
