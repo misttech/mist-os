@@ -241,9 +241,10 @@ group("tests") {
   testonly = true
 
   # See comment above about tests-involving-guests
-  assert_no_deps = [ "guest:*" ]
+  assert_no_deps = [ "guest:netstack-guest-integration-tests" ]
   deps = [
            ":netstack-integration-tests",
+           "guest:build-only",
            "macros:netstack_testing_macros_test",
          ] + err_log_package_deps
 
