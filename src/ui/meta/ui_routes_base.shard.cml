@@ -8,14 +8,6 @@
 {
     use: [
         {
-            // Expose FlatlandDisplay to the V1 realm for the benefit of
-            // flatland_benchmark.
-            // TODO(fxbug.dev/104906): Remove this when no longer needed.
-            protocol: [ "fuchsia.ui.composition.FlatlandDisplay" ],
-            from: "#ui",
-            dependency: "weak_for_migration",
-        },
-        {
             protocol: [
                 "fuchsia.accessibility.gesture.ListenerRegistry",
                 "fuchsia.accessibility.semantics.SemanticsManager",
@@ -44,7 +36,6 @@
                 "fuchsia.ui.views.ViewRefInstalled",
             ],
             from: "#ui",
-            dependency: "weak_for_migration",
         },
     ],
     offer: [
