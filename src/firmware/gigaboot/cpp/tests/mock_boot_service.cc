@@ -7,6 +7,8 @@
 #include <lib/cksum.h>
 #include <lib/stdcompat/span.h>
 
+#include "efi/protocol/managed-network.h"
+#include "efi/protocol/simple-network.h"
 #include "efi/system-table.h"
 #include "src/lib/utf_conversion/utf_conversion.h"
 
@@ -51,6 +53,10 @@ void Device::InitDevicePathProtocol(std::vector<std::string_view> path_nodes) {
   device_path_buffer_.push_back(4);
   device_path_buffer_.push_back(0);
 }
+
+ManagedNetworkDevice::ManagedNetworkDevice(std::vector<std::string_view> paths,
+                                           efi_simple_network_mode state)
+    : Device(std::move(paths)), mnp_(state) {}
 
 BlockDevice::BlockDevice(std::vector<std::string_view> paths, size_t blocks)
     : Device(paths), total_blocks_(blocks) {
@@ -199,33 +205,28 @@ efi_status MockStubService::LocateHandleBuffer(efi_locate_search_type search_typ
     return EFI_UNSUPPORTED;
   }
 
+  bool (*search_func)(Device* d) = nullptr;
   if (IsProtocol<efi_block_io_protocol>(*protocol)) {
-    // Find all handles that support block io protocols.
-    std::vector<efi_handle> lists;
-    for (auto& ele : devices_) {
-      if (ele->GetBlockIoProtocol()) {
-        lists.push_back(ele);
-      }
-    }
-
-    // The returned list to store in `buf` is expected to be freed with BootServices->FreePool()
-    // eventually. Thus here we allocate the buffer with BootServices->AllocatePool() and copy over
-    // the result.
-    *num_handles = lists.size();
-    size_t size_in_bytes = lists.size() * sizeof(efi_handle);
-    void* buffer;
-    efi_status status = gEfiSystemTable->BootServices->AllocatePool(EfiLoaderData /*don't care*/,
-                                                                    size_in_bytes, &buffer);
-    if (status != EFI_SUCCESS) {
-      return status;
-    }
-
-    memcpy(buffer, lists.data(), size_in_bytes);
-    *buf = reinterpret_cast<efi_handle*>(buffer);
-    return EFI_SUCCESS;
+    search_func = [](Device* d) { return d->GetBlockIoProtocol() != nullptr; };
+  } else if (IsProtocol<efi_managed_network_protocol>(*protocol)) {
+    search_func = [](Device* d) { return d->GetManagedNetworkProtocol() != nullptr; };
+  } else {
+    return EFI_UNSUPPORTED;
   }
 
-  return EFI_UNSUPPORTED;
+  std::vector<Device*> lists;
+  std::copy_if(devices_.cbegin(), devices_.cend(), std::back_inserter(lists), search_func);
+  *num_handles = lists.size();
+  size_t size_in_bytes = lists.size() * sizeof(decltype(lists)::value_type);
+  void* buffer;
+  efi_status status = gEfiSystemTable->BootServices->AllocatePool(EfiLoaderData /*don't care*/,
+                                                                  size_in_bytes, &buffer);
+  if (status != EFI_SUCCESS) {
+    return status;
+  }
+  std::copy(lists.cbegin(), lists.cend(), reinterpret_cast<Device**>(buffer));
+  *buf = reinterpret_cast<efi_handle*>(buffer);
+  return EFI_SUCCESS;
 }
 
 efi_status MockStubService::OpenProtocol(efi_handle handle, const efi_guid* protocol, void** intf,
@@ -243,6 +244,8 @@ efi_status MockStubService::OpenProtocol(efi_handle handle, const efi_guid* prot
     *intf = (*iter_find)->GetBlockIoProtocol();
   } else if (IsProtocol<efi_disk_io_protocol>(*protocol)) {
     *intf = (*iter_find)->GetDiskIoProtocol();
+  } else if (IsProtocol<efi_managed_network_protocol>(*protocol)) {
+    *intf = (*iter_find)->GetManagedNetworkProtocol();
   }
 
   return *intf ? EFI_SUCCESS : EFI_UNSUPPORTED;

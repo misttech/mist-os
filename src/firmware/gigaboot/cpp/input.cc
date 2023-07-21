@@ -169,7 +169,11 @@ std::optional<char> InputReceiver::GetKeyPrompt(std::string_view valid_keys, zx:
   const zx::duration tick = zx::sec(timeout == zx::duration::infinite() ? 0 : 1);
   do {
     if (!prompt.empty()) {
-      LOG("%.*s %" PRIu64 "s", static_cast<int>(prompt.size()), prompt.data(), timeout.to_secs());
+      if (tick != zx::duration(0)) {
+        LOG("%.*s %" PRIu64 "s", static_cast<int>(prompt.size()), prompt.data(), timeout.to_secs());
+      } else {
+        LOG("%.*s", static_cast<int>(prompt.size()), prompt.data());
+      }
     }
 
     fit::result<efi_status, char> key = GetKey(zx::sec(1));

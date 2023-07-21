@@ -15,6 +15,7 @@ test("gigaboot_unittests") {
     "mock_boot_service.cc",
     "mock_boot_service.h",
     "mock_efi_variables.h",
+    "network_test.cc",
     "tss2_uefi_tests.cc",
     "utils_test.cc",
   ]

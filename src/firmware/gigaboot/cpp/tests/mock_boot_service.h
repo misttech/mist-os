@@ -6,6 +6,7 @@
 #define SRC_FIRMWARE_GIGABOOT_CPP_TESTS_MOCK_BOOT_SERVICE_H_
 
 #include <lib/efi/testing/fake_disk_io_protocol.h>
+#include <lib/efi/testing/fake_network_protocol.h>
 #include <lib/efi/testing/stub_boot_services.h>
 #include <lib/fit/defer.h>
 #include <lib/zbitl/view.h>
@@ -17,25 +18,31 @@
 #include <efi/protocol/block-io.h>
 #include <efi/protocol/device-path.h>
 #include <efi/protocol/disk-io.h>
+#include <efi/protocol/graphics-output.h>
+#include <efi/protocol/managed-network.h>
+#include <efi/protocol/simple-network.h>
 #include <efi/protocol/tcg2.h>
+#include <efi/system-table.h>
 #include <efi/types.h>
 #include <fbl/no_destructor.h>
 #include <gtest/gtest.h>
+#include <phys/efi/main.h>
 #include <phys/efi/protocol.h>
 
 #include "acpi.h"
-#include "utils.h"
+#include "network.h"
 
 namespace gigaboot {
 
 // A helper class that mocks a device that exports UEFI protocols in the UEFI environment.
 class Device {
  public:
-  explicit Device(std::vector<std::string_view> paths) { InitDevicePathProtocol(paths); }
+  explicit Device(std::vector<std::string_view> paths) { InitDevicePathProtocol(std::move(paths)); }
   virtual efi_block_io_protocol* GetBlockIoProtocol() { return nullptr; }
   virtual efi_disk_io_protocol* GetDiskIoProtocol() { return nullptr; }
   virtual efi_tcg2_protocol* GetTcg2Protocol() { return nullptr; }
   virtual efi_graphics_output_protocol* GetGraphicsOutputProtocol() { return nullptr; }
+  virtual efi_managed_network_protocol* GetManagedNetworkProtocol() { return nullptr; }
 
   efi_device_path_protocol* GetDevicePathProtocol() {
     return reinterpret_cast<efi_device_path_protocol*>(device_path_buffer_.data());
@@ -74,6 +81,17 @@ class BlockDevice : public Device {
   efi_block_io_protocol block_io_protocol_;
   efi::FakeDiskIoProtocol fake_disk_io_protocol_;
   size_t total_blocks_;
+};
+
+class ManagedNetworkDevice : public Device {
+ public:
+  ManagedNetworkDevice(std::vector<std::string_view> paths, efi_simple_network_mode state);
+  efi_managed_network_protocol* GetManagedNetworkProtocol() override { return mnp_.protocol(); }
+  void SetModeData(const efi_simple_network_mode& data) { mnp_.SetModeData(data); }
+  efi::FakeManagedNetworkProtocol& GetFakeProtocol() { return mnp_; }
+
+ private:
+  efi::FakeManagedNetworkProtocol mnp_;
 };
 
 class Tcg2Device : public Device {

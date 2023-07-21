@@ -19,6 +19,7 @@
 #include <efi/protocol/disk-io.h>
 #include <efi/protocol/file.h>
 #include <efi/protocol/graphics-output.h>
+#include <efi/protocol/managed-network.h>
 #include <efi/protocol/serial-io.h>
 #include <efi/protocol/simple-text-output.h>
 #include <efi/protocol/tcg2.h>
@@ -46,6 +47,10 @@ inline constexpr const efi_guid& kEfiProtocolGuid<efi_graphics_output_protocol> 
 
 template <>
 inline constexpr const efi_guid& kEfiProtocolGuid<efi_serial_io_protocol> = SerialIoProtocol;
+
+template <>
+inline constexpr const efi_guid& kEfiProtocolGuid<efi_managed_network_protocol> =
+    ManagedNetworkProtocol;
 
 namespace gigaboot {
 
