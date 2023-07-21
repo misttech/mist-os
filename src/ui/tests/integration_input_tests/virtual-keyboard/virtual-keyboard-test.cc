@@ -139,6 +139,7 @@ std::vector<ui_testing::UITestRealm::Config> UIConfigurationsToTest() {
              .name = "root-ssl-certificates",
              .type = fuchsia::component::decl::DependencyType::STRONG,
          }}};
+    configs.push_back(std::move(config));
   }
 
   return configs;
