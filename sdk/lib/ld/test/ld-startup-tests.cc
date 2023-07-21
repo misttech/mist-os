@@ -34,7 +34,7 @@
 #include <lib/ld/testing/test-log-socket.h>
 #include <lib/ld/testing/test-processargs.h>
 #else
-#include "posix.h"
+#include "../posix.h"
 #endif
 
 namespace {
