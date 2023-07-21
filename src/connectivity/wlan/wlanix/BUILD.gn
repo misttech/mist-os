@@ -26,10 +26,22 @@ rustc_binary("wlanix_bin") {
     "//src/lib/fuchsia-component",
     "//third_party/rust_crates:anyhow",
     "//third_party/rust_crates:futures",
+    "//third_party/rust_crates:netlink-packet-generic",
+    "//third_party/rust_crates:netlink-packet-utils",
     "//third_party/rust_crates:tracing",
   ]
 
-  sources = [ "src/main.rs" ]
+  test_deps = [ "//third_party/rust_crates:test-case" ]
+
+  sources = [
+    "src/main.rs",
+    "src/nl80211/attr/band.rs",
+    "src/nl80211/attr/mod.rs",
+    "src/nl80211/cmd.rs",
+    "src/nl80211/constants.rs",
+    "src/nl80211/mod.rs",
+    "src/nl80211/nested.rs",
+  ]
 }
 
 fuchsia_component("component") {
@@ -40,4 +52,8 @@ fuchsia_component("component") {
 
 fuchsia_package("wlanix") {
   deps = [ ":component" ]
+}
+
+fuchsia_unittest_package("wlanix-tests") {
+  deps = [ ":wlanix_bin_test" ]
 }

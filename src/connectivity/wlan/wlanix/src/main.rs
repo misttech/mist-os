@@ -10,6 +10,9 @@ use {
     tracing::{error, info, warn},
 };
 
+#[allow(unused)]
+mod nl80211;
+
 async fn handle_wifi_sta_iface_request(req: fidl_wlanix::WifiStaIfaceRequest) -> Result<(), Error> {
     match req {
         fidl_wlanix::WifiStaIfaceRequest::GetName { responder } => {
