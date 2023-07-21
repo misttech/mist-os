@@ -25,7 +25,6 @@ gvisor_tests = [
   "accept_bind_stream_test",
   "accept_bind_test",
   "access_test",
-  "affinity_test",
   "aio_test",
   "bad_test",
   "bind_test",
@@ -197,6 +196,7 @@ gvisor_tests = [
 ]
 
 gvisor_tests_run_as_root = [
+  "affinity_test",
   "chown_test",
   "chroot_test",
   "fcntl_test",

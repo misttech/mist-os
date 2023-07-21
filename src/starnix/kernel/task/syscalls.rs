@@ -569,6 +569,9 @@ pub fn sys_sched_setaffinity(
     cpusetsize: u32,
     user_mask: UserAddress,
 ) -> Result<(), Errno> {
+    if !current_task.creds().has_capability(CAP_SYS_NICE) {
+        return error!(EPERM);
+    }
     if pid < 0 {
         return error!(EINVAL);
     }

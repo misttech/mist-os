@@ -391,7 +391,6 @@
                 "sched_getattr02",
                 "sched_rr_get_interval02",
                 "sched_rr_get_interval03",
-                "sched_setaffinity01",
                 "sched_setattr01",
                 "sched_setparam01",
                 "sched_setparam02",
