@@ -268,6 +268,10 @@ by above installation step.
 ```
 
 ### Python Style Guide
+**Running** `cd $FUCHSIA_DIR && sh $FUCHSIA_DIR/src/testing/end_to_end/honeydew/scripts/format.sh`
+**will automatically perform all of the below mentioned style guide checks. Run this script**
+**and fix any errors it suggests.**
+
 HoneyDew code follows [Google Python Style Guide] and it is important to ensure
 any new code written continue to follow these guidelines.
 
@@ -276,9 +280,6 @@ alerting the CL author prior to submitting the CL. Until then CL author need to
 follow the below instructions every time HoneyDew code is changed.
 
 #### formatting
-**Running** `cd $FUCHSIA_DIR && sh $FUCHSIA_DIR/src/testing/end_to_end/honeydew/scripts/format.sh`
-**will automatically perform the below mentioned formatting steps**
-
 * Remove unused code by running below command
     ```shell
     (fuchsia_python_venv)~/fuchsia$ autoflake --in-place --remove-unused-variables --remove-all-unused-imports --remove-duplicate-keys --recursive $FUCHSIA_DIR/src/testing/end_to_end/honeydew/

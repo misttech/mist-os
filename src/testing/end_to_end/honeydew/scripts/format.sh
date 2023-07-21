@@ -3,10 +3,8 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-set -e
 
 # Formats the HoneyDew code as per coding guidelines
-
 LACEWING_SRC="$FUCHSIA_DIR/src/testing/end_to_end"
 HONEYDEW_SRC="$LACEWING_SRC/honeydew"
 
@@ -39,3 +37,39 @@ echo "Formatting the code..."
 isort $HONEYDEW_SRC
 # Format the code (using YAPF)
 fx format-code
+
+
+echo "Running static type check using 'mypy'..."
+mypy --config-file=$HONEYDEW_SRC/pyproject.toml $HONEYDEW_SRC > /dev/null 2>&1
+if [ $? -eq 0 ]; then
+    echo "Code is 'mypy' compliant"
+else
+    echo -e "\n"
+    echo "Code is not 'mypy' compliant!"
+    echo "Please run below command sequence, fix all the issues and then rerun this script"
+    echo "*************************************"
+    echo "$ source $VENV_PATH/bin/activate"
+    echo "$ mypy --config-file=$HONEYDEW_SRC/pyproject.toml $HONEYDEW_SRC"
+    echo "*************************************"
+    echo -e "\n"
+    exit 1
+fi
+
+echo "Running static code analysis using 'pylint'..."
+pylint --rcfile=$HONEYDEW_SRC/linter/pylintrc $HONEYDEW_SRC/honeydew/ > /dev/null 2>&1 \
+&& \
+pylint --rcfile=$HONEYDEW_SRC/linter/pylintrc $HONEYDEW_SRC/tests/ > /dev/null 2>&1
+if [ $? -eq 0 ]; then
+    echo "Code is 'pylint' compliant"
+else
+    echo -e "\n"
+    echo "Code is not 'pylint' compliant!"
+    echo "Please run below command sequence, fix all the issues and then rerun this script"
+    echo "*************************************"
+    echo "$ source $VENV_PATH/bin/activate"
+    echo "$ pylint --rcfile=$HONEYDEW_SRC/linter/pylintrc $HONEYDEW_SRC/honeydew/"
+    echo "$ pylint --rcfile=$HONEYDEW_SRC/linter/pylintrc $HONEYDEW_SRC/tests/"
+    echo "*************************************"
+    echo -e "\n"
+    exit 1
+fi
