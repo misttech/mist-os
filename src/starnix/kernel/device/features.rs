@@ -4,7 +4,7 @@
 
 use crate::{
     device::{
-        binder::create_binders, framebuffer::fb_device_init, input::input_device_init,
+        binder::create_binders, framebuffer::fb_device_init, input::init_input_devices,
         starnix::magma_device_init,
     },
     logging::log_warn,
@@ -14,6 +14,8 @@ use crate::{
 use std::sync::Arc;
 
 use fidl_fuchsia_ui_composition as fuicomposition;
+use fidl_fuchsia_ui_input3 as fuiinput;
+use fidl_fuchsia_ui_views as fuiviews;
 
 /// Parses and runs the features from the provided "program strvec". Some features,
 /// should be enabled on a per-component basis. We run this when we first
@@ -29,7 +31,7 @@ pub fn run_features(entries: &Vec<String>, kernel: &Arc<Kernel>) -> Result<(), E
             "selinux_enabled" => {}
             "framebuffer" => {
                 fb_device_init(kernel);
-                input_device_init(kernel);
+                init_input_devices(kernel);
             }
             "magma" => {
                 magma_device_init(kernel);
@@ -59,8 +61,20 @@ pub fn run_component_features(
                     touch_source: Some(touch_source_stream),
                     ..Default::default()
                 };
-                kernel.framebuffer.start_server(view_bound_protocols, outgoing_dir.take().unwrap());
-                kernel.input_device.start_relay(touch_source_proxy);
+                let view_identity = fuiviews::ViewIdentityOnCreation::from(
+                    fuchsia_scenic::ViewRefPair::new().expect("Failed to create ViewRefPair"),
+                );
+                let view_ref = fuchsia_scenic::duplicate_view_ref(&view_identity.view_ref)
+                    .expect("Failed to dup view ref.");
+                let keyboard =
+                    fuchsia_component::client::connect_to_protocol::<fuiinput::KeyboardMarker>()
+                        .expect("Failed to connect to keyboard");
+                kernel.framebuffer.start_server(
+                    view_bound_protocols,
+                    view_identity,
+                    outgoing_dir.take().unwrap(),
+                );
+                kernel.input_device.start_relay(touch_source_proxy, keyboard, view_ref);
             }
             "binder" => {}
             "logd" => {}

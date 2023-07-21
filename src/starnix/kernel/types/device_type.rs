@@ -17,6 +17,7 @@ pub const FB_MAJOR: u32 = 29;
 pub const DYN_MAJOR: u32 = 234;
 
 pub const TOUCH_INPUT_MINOR: u32 = 0;
+pub const KEYBOARD_INPUT_MINOR: u32 = 1;
 
 #[derive(Copy, Clone, Debug, Default, Eq, Ord, PartialEq, PartialOrd)]
 pub struct DeviceType(dev_t);
@@ -47,6 +48,7 @@ impl DeviceType {
 
     // Input
     pub const TOUCH_INPUT: DeviceType = DeviceType::new(INPUT_MAJOR, TOUCH_INPUT_MINOR);
+    pub const KEYBOARD_INPUT: DeviceType = DeviceType::new(INPUT_MAJOR, KEYBOARD_INPUT_MINOR);
 
     pub const fn new(major: u32, minor: u32) -> DeviceType {
         // This encoding is part of the Linux UAPI. The encoded value is

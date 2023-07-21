@@ -21,6 +21,7 @@ workbench_platform_config = {
     },
     "input": {
         "supported_input_devices": [
+            "keyboard",
             "mouse",
             "touchscreen",
         ],

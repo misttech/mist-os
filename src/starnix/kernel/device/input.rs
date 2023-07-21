@@ -20,35 +20,49 @@ use crate::{
 
 use fidl::endpoints::Proxy as _; // for `on_closed()`
 use fidl::handle::fuchsia_handles::Signals;
+use fidl_fuchsia_ui_input3 as fuiinput;
 use fidl_fuchsia_ui_pointer::{
     self as fuipointer, EventPhase as FidlEventPhase, TouchEvent as FidlTouchEvent,
     TouchResponse as FidlTouchResponse, TouchResponseType,
 };
+use fidl_fuchsia_ui_views as fuiviews;
 use fuchsia_async as fasync;
 use fuchsia_zircon as zx;
-use futures::future::{self, Either};
+use futures::{
+    future::{self, Either},
+    StreamExt as _,
+};
 use std::{collections::VecDeque, sync::Arc};
 use zerocopy::AsBytes as _; // for `as_bytes()`
 
 pub struct InputDevice {
     // Right now the input device assumes that there is only one input file, and that it represents
     // a touch input device. This structure will soon change to support multiple input files.
-    input_file: Arc<InputFile>,
+    touch_input_file: Arc<InputFile>,
+
+    keyboard_input_file: Arc<InputFile>,
 }
 
 impl InputDevice {
     pub fn new(framebuffer: Arc<Framebuffer>) -> Arc<Self> {
         let fb_state = framebuffer.info.read();
-        let input_file = InputFile::new(
+        let touch_input_file = InputFile::new_touch(
             fb_state.xres.try_into().expect("Failed to convert framebuffer width to i32."),
             fb_state.yres.try_into().expect("Failed to convert framebuffer height to i32."),
         );
+        let keyboard_input_file = InputFile::new_keyboard();
         std::mem::drop(fb_state);
-        Arc::new(InputDevice { input_file })
+        Arc::new(InputDevice { touch_input_file, keyboard_input_file })
     }
 
-    pub fn start_relay(&self, touch_source_proxy: fuipointer::TouchSourceProxy) {
-        self.input_file.start_relay(touch_source_proxy);
+    pub fn start_relay(
+        &self,
+        touch_source_proxy: fuipointer::TouchSourceProxy,
+        keyboard: fuiinput::KeyboardProxy,
+        view_ref: fuiviews::ViewRef,
+    ) {
+        self.touch_input_file.start_touch_relay(touch_source_proxy);
+        self.keyboard_input_file.start_keyboard_relay(keyboard, view_ref);
     }
 }
 
@@ -64,7 +78,8 @@ impl DeviceOps for Arc<InputDevice> {
             // Because all open input files share the same underlying input file, the clients
             // may race for events. This does not matter right now, since there is only ever
             // one client, but eventually each open should get its own sequence of events.
-            TOUCH_INPUT_MINOR => Ok(Box::new(self.input_file.clone())),
+            TOUCH_INPUT_MINOR => Ok(Box::new(self.touch_input_file.clone())),
+            KEYBOARD_INPUT_MINOR => Ok(Box::new(self.keyboard_input_file.clone())),
             _ => error!(EINVAL),
         }
     }
@@ -123,7 +138,7 @@ impl InputFile {
         uapi::input_id { bustype: BUS_VIRTUAL as u16, product: 0, vendor: 0, version: 0 };
 
     /// Creates an `InputFile` instance suitable for emulating a touchscreen.
-    fn new(width: i32, height: i32) -> Arc<Self> {
+    fn new_touch(width: i32, height: i32) -> Arc<Self> {
         // Fuchsia scales the position reported by the touch sensor to fit view coordinates.
         // Hence, the range of touch positions is exactly the same as the range of view
         // coordinates.
@@ -159,6 +174,27 @@ impl InputFile {
         })
     }
 
+    fn new_keyboard() -> Arc<Self> {
+        Arc::new(Self {
+            driver_version: Self::DRIVER_VERSION,
+            input_id: Self::INPUT_ID,
+            supported_keys: keyboard_key_attributes(),
+            supported_position_attributes: keyboard_position_attributes(),
+            supported_motion_attributes: BitSet::new(), // None supported, not a mouse.
+            supported_switches: BitSet::new(),          // None supported
+            supported_leds: BitSet::new(),              // None supported
+            supported_haptics: BitSet::new(),           // None supported
+            supported_misc_features: BitSet::new(),     // None supported
+            properties: keyboard_properties(),
+            x_axis_info: uapi::input_absinfo::default(),
+            y_axis_info: uapi::input_absinfo::default(),
+            inner: Mutex::new(InputFileMutableState {
+                events: VecDeque::new(),
+                waiters: WaitQueue::default(),
+            }),
+        })
+    }
+
     /// Starts reading events from the Fuchsia input system, and making those events available
     /// to the guest system.
     ///
@@ -169,13 +205,13 @@ impl InputFile {
     /// # Parameters
     /// * `touch_source_proxy`: a connection to the Fuchsia input system, which will provide
     ///   touch events associated with the Fuchsia `View` created by Starnix.
-    fn start_relay(
+    fn start_touch_relay(
         self: &Arc<Self>,
         touch_source_proxy: fuipointer::TouchSourceProxy,
     ) -> std::thread::JoinHandle<()> {
         let slf = self.clone();
         std::thread::Builder::new()
-            .name("kthread-input-relay".to_string())
+            .name("kthread-touch-relay".to_string())
             .spawn(move || {
                 fasync::LocalExecutor::new().run_singlethreaded(async {
                     let mut previous_event_disposition = vec![];
@@ -244,6 +280,41 @@ impl InputFile {
                 })
             })
             .expect("able to create threads")
+    }
+
+    fn start_keyboard_relay(
+        self: &Arc<Self>,
+        keyboard: fuiinput::KeyboardProxy,
+        view_ref: fuiviews::ViewRef,
+    ) -> std::thread::JoinHandle<()> {
+        let slf = self.clone();
+        std::thread::Builder::new()
+            .name("kthread-keyboard-relay".to_string())
+            .spawn(move || {
+                fasync::LocalExecutor::new().run_singlethreaded(async {
+                    let (keyboard_listener, mut event_stream) =
+                        fidl::endpoints::create_request_stream::<fuiinput::KeyboardListenerMarker>(
+                        )
+                        .expect("Failed to create keyboard proxy and stream");
+                    if keyboard.add_listener(view_ref, keyboard_listener).await.is_err() {
+                        log_warn!("Could not register keyboard listener");
+                    }
+                    while let Some(Ok(request)) = event_stream.next().await {
+                        match request {
+                            fuiinput::KeyboardListenerRequest::OnKeyEvent { event, responder } => {
+                                let new_events = parse_fidl_keyboard_event(&event);
+                                let mut inner = slf.inner.lock();
+
+                                inner.events.extend(new_events);
+                                inner.waiters.notify_fd_events(FdEvents::POLLIN);
+
+                                responder.send(fuiinput::KeyEventStatus::Handled).expect("");
+                            }
+                        }
+                    }
+                })
+            })
+            .expect("Failed to create thread")
     }
 }
 
@@ -431,6 +502,63 @@ fn touch_properties() -> BitSet<{ min_bytes(INPUT_PROP_CNT) }> {
     attrs
 }
 
+/// Returns appropriate `KEY`-board related flags for a keyboard device.
+fn keyboard_key_attributes() -> BitSet<{ min_bytes(KEY_CNT) }> {
+    let mut attrs = BitSet::new();
+    attrs.set(BTN_MISC);
+    attrs
+}
+
+/// Returns appropriate `ABS`-olute position related flags for a keyboard device.
+fn keyboard_position_attributes() -> BitSet<{ min_bytes(ABS_CNT) }> {
+    BitSet::new()
+}
+
+/// Returns appropriate `INPUT_PROP`-erties for a keyboard device.
+fn keyboard_properties() -> BitSet<{ min_bytes(INPUT_PROP_CNT) }> {
+    let mut attrs = BitSet::new();
+    attrs.set(INPUT_PROP_DIRECT);
+    attrs
+}
+
+/// Returns a vector of `uapi::input_events` representing the provided `fidl_event`.
+///
+/// A single `KeyEvent` may translate into multiple `uapi::input_events`.
+///
+/// If translation fails an empty vector is returned.
+fn parse_fidl_keyboard_event(fidl_event: &fuiinput::KeyEvent) -> Vec<uapi::input_event> {
+    match fidl_event {
+        &fuiinput::KeyEvent {
+            timestamp: Some(time_nanos),
+            type_: Some(event_type),
+            key: Some(fidl_fuchsia_input::Key::Escape),
+            ..
+        } => {
+            let time = timeval_from_time(zx::Time::from_nanos(time_nanos));
+            let key_event = uapi::input_event {
+                time,
+                type_: uapi::EV_KEY as u16,
+                code: uapi::KEY_POWER as u16,
+                value: if event_type == fuiinput::KeyEventType::Pressed { 1 } else { 0 },
+            };
+
+            let sync_event = uapi::input_event {
+                // See https://www.kernel.org/doc/Documentation/input/event-codes.rst.
+                time,
+                type_: uapi::EV_SYN as u16,
+                code: uapi::SYN_REPORT as u16,
+                value: 0,
+            };
+
+            let mut events = vec![];
+            events.push(key_event);
+            events.push(sync_event);
+            events
+        }
+        _ => vec![],
+    }
+}
+
 /// Returns `Some` if the FIDL event included a `timestamp`, and a `pointer_sample` which includes
 /// both `position_in_viewport` and `phase`. Returns `None` otherwise.
 fn parse_fidl_touch_event(fidl_event: &FidlTouchEvent) -> Option<TouchEvent> {
@@ -543,16 +671,7 @@ fn phase_change_from_fidl_phase(fidl_phase: &FidlEventPhase) -> Option<PhaseChan
     }
 }
 
-pub fn input_device_init(kernel: &Arc<Kernel>) {
-    // Also register an input device, which can be used to read pointer events
-    // associated with the framebuffer's `View`.
-    //
-    // Note: input requires the `framebuffer` feature, because Starnix cannot receive
-    // input events without a Fuchsia `View`.
-    //
-    // TODO(quiche): When adding support for multiple input devices, ensure
-    // that the appropriate `InputFile` is associated with the appropriate
-    // `INPUT_MINOR`.
+pub fn init_input_devices(kernel: &Arc<Kernel>) {
     kernel
         .device_registry
         .register_chrdev_major(INPUT_MAJOR, kernel.input_device.clone())
@@ -563,13 +682,21 @@ pub fn input_device_init(kernel: &Arc<Kernel>) {
         KType::Class,
         SysFsDirectory::new,
     );
-    let input_attr = KObjectDeviceAttribute::new(
+    let touch_attr = KObjectDeviceAttribute::new(
         b"event0",
         b"input/event0",
-        DeviceType::new(INPUT_MAJOR, 0),
+        DeviceType::new(INPUT_MAJOR, TOUCH_INPUT_MINOR),
         DeviceMode::Char,
     );
-    kernel.add_chr_device(input_class, input_attr);
+    kernel.add_chr_device(input_class.clone(), touch_attr);
+
+    let keyboard_attr = KObjectDeviceAttribute::new(
+        b"event1",
+        b"input/event1",
+        DeviceType::new(INPUT_MAJOR, KEYBOARD_INPUT_MINOR),
+        DeviceMode::Char,
+    );
+    kernel.add_chr_device(input_class, keyboard_attr);
 }
 
 #[cfg(test)]
@@ -589,7 +716,6 @@ mod test {
         EventPhase, TouchEvent, TouchPointerSample, TouchResponse, TouchSourceMarker,
         TouchSourceRequest,
     };
-    use futures::StreamExt as _; // for `next()`
     use test_case::test_case;
     use test_util::assert_near;
     use zerocopy::FromBytes as _; // for `read_from()`
@@ -635,14 +761,26 @@ mod test {
         }
     }
 
-    fn start_input(
+    fn start_touch_input(
     ) -> (Arc<InputFile>, fuipointer::TouchSourceRequestStream, std::thread::JoinHandle<()>) {
-        let input_file = InputFile::new(720, 1200);
+        let input_file = InputFile::new_touch(720, 1200);
         let (touch_source_proxy, touch_source_stream) =
             fidl::endpoints::create_proxy_and_stream::<TouchSourceMarker>()
                 .expect("failed to create TouchSource channel");
-        let relay_thread = input_file.start_relay(touch_source_proxy);
+        let relay_thread = input_file.start_touch_relay(touch_source_proxy);
         (input_file, touch_source_stream, relay_thread)
+    }
+
+    fn start_keyboard_input(
+    ) -> (Arc<InputFile>, fuiinput::KeyboardRequestStream, std::thread::JoinHandle<()>) {
+        let input_file = InputFile::new_keyboard();
+        let (keyboard_proxy, keyboard_stream) =
+            fidl::endpoints::create_proxy_and_stream::<fuiinput::KeyboardMarker>()
+                .expect("failed to create Keyboard channel");
+        let view_ref_pair =
+            fuchsia_scenic::ViewRefPair::new().expect("Failed to create ViewRefPair");
+        let relay_thread = input_file.start_keyboard_relay(keyboard_proxy, view_ref_pair.view_ref);
+        (input_file, keyboard_stream, relay_thread)
     }
 
     fn make_kernel_objects(file: Arc<InputFile>) -> (Arc<Kernel>, CurrentTask, Arc<FileObject>) {
@@ -705,7 +843,7 @@ mod test {
     #[::fuchsia::test()]
     async fn initial_watch_request_has_empty_responses_arg() {
         // Set up resources.
-        let (_input_file, mut touch_source_stream, relay_thread) = start_input();
+        let (_input_file, mut touch_source_stream, relay_thread) = start_touch_input();
 
         // Verify that the watch request has empty `responses`.
         assert_matches!(
@@ -722,7 +860,7 @@ mod test {
     #[::fuchsia::test]
     async fn later_watch_requests_have_responses_arg_matching_earlier_watch_replies() {
         // Set up resources.
-        let (_input_file, mut touch_source_stream, relay_thread) = start_input();
+        let (_input_file, mut touch_source_stream, relay_thread) = start_touch_input();
 
         // Reply to first `Watch` with two `TouchEvent`s.
         match touch_source_stream.next().await {
@@ -760,7 +898,7 @@ mod test {
     #[::fuchsia::test]
     async fn notifies_polling_waiters_of_new_data() {
         // Set up resources.
-        let (input_file, mut touch_source_stream, relay_thread) = start_input();
+        let (input_file, mut touch_source_stream, relay_thread) = start_touch_input();
         let waiter1 = Waiter::new();
         let waiter2 = Waiter::new();
         let (_kernel, current_task, file_object) = make_kernel_objects(input_file.clone());
@@ -799,7 +937,7 @@ mod test {
     #[::fuchsia::test]
     async fn notifies_blocked_waiter_of_new_data() {
         // Set up resources.
-        let (input_file, mut touch_source_stream, relay_thread) = start_input();
+        let (input_file, mut touch_source_stream, relay_thread) = start_touch_input();
         let waiter = Waiter::new();
         let (_kernel, current_task, file_object) = make_kernel_objects(input_file.clone());
 
@@ -849,7 +987,7 @@ mod test {
     #[::fuchsia::test]
     async fn honors_wait_cancellation() {
         // Set up input resources.
-        let (input_file, mut touch_source_stream, relay_thread) = start_input();
+        let (input_file, mut touch_source_stream, relay_thread) = start_touch_input();
         let waiter1 = Waiter::new();
         let waiter2 = Waiter::new();
         let (_kernel, current_task, file_object) = make_kernel_objects(input_file.clone());
@@ -894,7 +1032,7 @@ mod test {
     #[::fuchsia::test]
     async fn query_events() {
         // Set up resources.
-        let (input_file, mut touch_source_stream, relay_thread) = start_input();
+        let (input_file, mut touch_source_stream, relay_thread) = start_touch_input();
         let (_kernel, current_task, file_object) = make_kernel_objects(input_file.clone());
 
         // Check initial expectation.
@@ -928,7 +1066,7 @@ mod test {
     #[::fuchsia::test]
     async fn provides_correct_axis_ranges((x_max, y_max): (i32, i32), ioctl_op: u32) -> (i32, i32) {
         // Set up resources.
-        let input_file = InputFile::new(x_max, y_max);
+        let input_file = InputFile::new_touch(x_max, y_max);
         let (_kernel, current_task, file_object) = make_kernel_objects(input_file.clone());
         let address = map_memory(
             &current_task,
@@ -969,7 +1107,7 @@ mod test {
         let event_code = event_code as u16;
 
         // Set up resources.
-        let (input_file, mut touch_source_stream, relay_thread) = start_input();
+        let (input_file, mut touch_source_stream, relay_thread) = start_touch_input();
         let (_kernel, current_task, file_object) = make_kernel_objects(input_file.clone());
 
         // Reply to first `Watch` request.
@@ -1012,7 +1150,7 @@ mod test {
         let event_code = event_code as u16;
 
         // Set up resources.
-        let (input_file, mut touch_source_stream, relay_thread) = start_input();
+        let (input_file, mut touch_source_stream, relay_thread) = start_touch_input();
         let (_kernel, current_task, file_object) = make_kernel_objects(input_file.clone());
 
         // Reply to first `Watch` request.
@@ -1057,7 +1195,7 @@ mod test {
     #[::fuchsia::test]
     async fn sends_acceptable_coordinates((x, y): (f32, f32)) {
         // Set up resources.
-        let (input_file, mut touch_source_stream, relay_thread) = start_input();
+        let (input_file, mut touch_source_stream, relay_thread) = start_touch_input();
         let (_kernel, current_task, file_object) = make_kernel_objects(input_file.clone());
 
         // Reply to first `Watch` request.
@@ -1109,7 +1247,7 @@ mod test {
         event: TouchEvent,
     ) -> Option<TouchResponse> {
         // Set up resources.
-        let (_input_file, mut touch_source_stream, relay_thread) = start_input();
+        let (_input_file, mut touch_source_stream, relay_thread) = start_touch_input();
 
         // Reply to first `Watch` request.
         answer_next_watch_request(&mut touch_source_stream, event).await;
@@ -1124,5 +1262,74 @@ mod test {
 
         // Return the value for `test_case` to match on.
         responses.get(0).cloned()
+    }
+
+    #[::fuchsia::test]
+    async fn sends_keyboard_events() {
+        let (keyboard_file, mut keyboard_stream, relay_thread) = start_keyboard_input();
+        let (_kernel, current_task, file_object) = make_kernel_objects(keyboard_file.clone());
+
+        let keyboard_listener = match keyboard_stream.next().await {
+            Some(Ok(fuiinput::KeyboardRequest::AddListener {
+                view_ref: _,
+                listener,
+                responder,
+            })) => {
+                let _ = responder.send();
+                listener.into_proxy().expect("Failed to create proxy")
+            }
+            _ => {
+                panic!("Failed to get event");
+            }
+        };
+
+        let key_event = fuiinput::KeyEvent {
+            timestamp: Some(0),
+            type_: Some(fuiinput::KeyEventType::Pressed),
+            key: Some(fidl_fuchsia_input::Key::Escape),
+            ..Default::default()
+        };
+
+        let _ = keyboard_listener.on_key_event(&key_event).await;
+        std::mem::drop(keyboard_stream); // Close Zircon channel.
+        std::mem::drop(keyboard_listener); // Close Zircon channel.
+        relay_thread.join().expect("relay thread failed"); // Wait for relay thread to finish.
+        let events = read_uapi_events(keyboard_file, &file_object, &current_task);
+        assert_eq!(events.len(), 2);
+        assert_eq!(events[0].code, uapi::KEY_POWER as u16);
+    }
+
+    #[::fuchsia::test]
+    async fn skips_non_esc_keyboard_events() {
+        let (keyboard_file, mut keyboard_stream, relay_thread) = start_keyboard_input();
+        let (_kernel, current_task, file_object) = make_kernel_objects(keyboard_file.clone());
+
+        let keyboard_listener = match keyboard_stream.next().await {
+            Some(Ok(fuiinput::KeyboardRequest::AddListener {
+                view_ref: _,
+                listener,
+                responder,
+            })) => {
+                let _ = responder.send();
+                listener.into_proxy().expect("Failed to create proxy")
+            }
+            _ => {
+                panic!("Failed to get event");
+            }
+        };
+
+        let key_event = fuiinput::KeyEvent {
+            timestamp: Some(0),
+            type_: Some(fuiinput::KeyEventType::Pressed),
+            key: Some(fidl_fuchsia_input::Key::A),
+            ..Default::default()
+        };
+
+        let _ = keyboard_listener.on_key_event(&key_event).await;
+        std::mem::drop(keyboard_stream); // Close Zircon channel.
+        std::mem::drop(keyboard_listener); // Close Zircon channel.
+        relay_thread.join().expect("relay thread failed"); // Wait for relay thread to finish.
+        let events = read_uapi_events(keyboard_file, &file_object, &current_task);
+        assert_eq!(events.len(), 0);
     }
 }

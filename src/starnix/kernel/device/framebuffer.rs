@@ -22,7 +22,7 @@ use crate::{
 use fidl_fuchsia_math as fmath;
 use fidl_fuchsia_ui_composition as fuicomposition;
 use fidl_fuchsia_ui_display_singleton as fuidisplay;
-use fidl_fuchsia_ui_views::ViewportCreationToken;
+use fidl_fuchsia_ui_views as fuiviews;
 use fuchsia_component::client::connect_channel_to_protocol;
 use fuchsia_zircon as zx;
 use std::sync::Arc;
@@ -105,10 +105,11 @@ impl Framebuffer {
     pub fn start_server(
         &self,
         view_bound_protocols: fuicomposition::ViewBoundProtocols,
+        view_identity: fuiviews::ViewIdentityOnCreation,
         outgoing_dir: fidl::endpoints::ServerEnd<fidl_fuchsia_io::DirectoryMarker>,
     ) {
         if let Some(server) = &self.server {
-            spawn_view_provider(server.clone(), view_bound_protocols, outgoing_dir);
+            spawn_view_provider(server.clone(), view_bound_protocols, view_identity, outgoing_dir);
         }
     }
 
@@ -116,7 +117,7 @@ impl Framebuffer {
     ///
     /// # Parameters
     /// * `viewport_token`: handles to the child view
-    pub fn present_view(&self, viewport_token: ViewportCreationToken) {
+    pub fn present_view(&self, viewport_token: fuiviews::ViewportCreationToken) {
         if let Some(server) = &self.server {
             init_viewport_scene(server.clone(), viewport_token);
         }

@@ -23,7 +23,7 @@ use flatland_frame_scheduling_lib::{
 use fuchsia_async as fasync;
 use fuchsia_component::{client::connect_channel_to_protocol, server::ServiceFs};
 use fuchsia_framebuffer::{sysmem::BufferCollectionAllocator, FrameUsage};
-use fuchsia_scenic::{BufferCollectionTokenPair, ViewRefPair};
+use fuchsia_scenic::BufferCollectionTokenPair;
 use fuchsia_zircon as zx;
 use futures::{StreamExt, TryStreamExt};
 use std::sync::{mpsc::channel, Arc};
@@ -224,11 +224,13 @@ pub fn init_viewport_scene(
 pub fn spawn_view_provider(
     server: Arc<FramebufferServer>,
     view_bound_protocols: fuicomposition::ViewBoundProtocols,
+    view_identity: fuiviews::ViewIdentityOnCreation,
     outgoing_dir: fidl::endpoints::ServerEnd<fidl_fuchsia_io::DirectoryMarker>,
 ) {
     std::thread::Builder::new().name("kthread-view-provider".to_string()).spawn(|| {
         let mut executor = fasync::LocalExecutor::new();
         let mut view_bound_protocols = Some(view_bound_protocols);
+        let mut view_identity = Some(view_identity);
         executor.run_singlethreaded(async move {
             let mut service_fs = ServiceFs::new_local();
             service_fs.dir("svc").add_fidl_service(ExposedProtocols::ViewProvider);
@@ -241,9 +243,6 @@ pub fn spawn_view_provider(
                     match event {
                         fuiapp::ViewProviderRequest::CreateView2 { args, control_handle: _ } => {
                             let  view_creation_token = args.view_creation_token.unwrap();
-                            let  view_identity = fuiviews::ViewIdentityOnCreation::from(
-                                ViewRefPair::new().expect("Failed to create ViewRefPair"),
-                            );
                             // We don't actually care about the parent viewport at the moment, because we don't resize.
                             let (_parent_viewport_watcher, parent_viewport_watcher_request) =
                                 create_proxy::<fuicomposition::ParentViewportWatcherMarker>()
@@ -252,7 +251,7 @@ pub fn spawn_view_provider(
                                 .flatland
                                 .create_view2(
                                      view_creation_token,
-                                     view_identity,
+                                     view_identity.take().expect("cannot create view because view identity has been consumed"),
                                     view_bound_protocols.take().expect("cannot create view because view bound protocols have been consumed"),
                                     parent_viewport_watcher_request,
                                 )
