@@ -52,6 +52,7 @@ impl DefaultByBuildType for SwdConfig {
             update_checker: Some(UpdateChecker::default_by_build_type(build_type)),
             on_verification_failure: VerificationFailureAction::default(),
             tuf_config_path: None,
+            include_configurator: false,
         }
     }
 }
@@ -90,6 +91,12 @@ impl DefineSubsystemConfiguration<Option<SwdConfig>> for SwdSubsystemConfig {
                     // so do not include `no_update_checker` AIB that requires the realm.
                     FeatureSupportLevel::Bootstrap => {}
                 };
+            }
+        }
+
+        if let Some(SwdConfig { include_configurator, .. }) = subsystem_config {
+            if *include_configurator {
+                builder.platform_bundle("system_update_configurator");
             }
         }
 
@@ -188,6 +195,7 @@ mod tests {
             update_checker: None,
             on_verification_failure: VerificationFailureAction::default(),
             tuf_config_path: None,
+            ..Default::default()
         };
         let policy = config.policy.value_or_default_from_build_type(build_type);
         let update_checker = config.update_checker.value_or_default_from_build_type(build_type);
@@ -205,6 +213,7 @@ mod tests {
             update_checker: None,
             on_verification_failure: VerificationFailureAction::default(),
             tuf_config_path: None,
+            ..Default::default()
         };
         let policy = config.policy.value_or_default_from_build_type(build_type);
         let update_checker = config.update_checker.value_or_default_from_build_type(build_type);
@@ -229,6 +238,7 @@ mod tests {
             update_checker: None,
             on_verification_failure: VerificationFailureAction::default(),
             tuf_config_path: None,
+            ..Default::default()
         };
         let policy = config.policy.value_or_default_from_build_type(build_type);
         let update_checker = config.update_checker.value_or_default_from_build_type(build_type);

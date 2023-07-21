@@ -101,6 +101,7 @@ user_platform_aib_names =
 
       # SWD (Software Delivery)
       "omaha_client",
+      "system_update_configurator",
 
       # Netstack
       "netstack3",

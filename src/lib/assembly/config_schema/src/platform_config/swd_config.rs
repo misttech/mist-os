@@ -16,6 +16,7 @@ pub struct SwdConfig {
     pub update_checker: Option<UpdateChecker>,
     pub on_verification_failure: VerificationFailureAction,
     pub tuf_config_path: Option<Utf8PathBuf>,
+    pub include_configurator: bool,
 }
 
 /// The SWD Policies are laid out in
@@ -154,7 +155,8 @@ mod tests {
                     }
                 })),
                 on_verification_failure: VerificationFailureAction::Reboot,
-                tuf_config_path: Some(Utf8PathBuf::from_str("/path/to/tuf_config.json").unwrap())
+                tuf_config_path: Some(Utf8PathBuf::from_str("/path/to/tuf_config.json").unwrap()),
+                ..Default::default()
             }
         );
     }

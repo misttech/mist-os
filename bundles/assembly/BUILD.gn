@@ -1423,6 +1423,11 @@ assembly_input_bundle("no_update_checker") {
   ]
 }
 
+# Include the system-update-configurator component as part of the SWD subsystem.
+# TODO(fxbug.dev/123798): Fill out once transition pieces are in place.
+assembly_input_bundle("system_update_configurator") {
+}
+
 # AIB to enable virtualization support.
 #
 # optional: product must specify its inclusion
