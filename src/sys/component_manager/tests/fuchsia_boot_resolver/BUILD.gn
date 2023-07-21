@@ -35,8 +35,6 @@ if (current_toolchain == default_toolchain) {
   # `assembled_system` builds a zbi for consumption by the test.
   assembled_system("test_zbi") {
     testonly = true
-    generate_fvm = false
-    generate_vbmeta = false
     assembly_images_config_label = ":images_config"
     product_assembly_config_label = "//build/assembly:default_product_config"
     use_bringup_platform_bundles_only = true

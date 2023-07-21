@@ -59,8 +59,6 @@ if (is_fuchsia) {
   assembled_system("assembly") {
     allow_eng_platform_bundle_use = true
     testonly = true
-    generate_fvm = false
-    generate_vbmeta = false
     bootfs_labels = [ ":bootfs" ]
     base_packages = []
     cmdline = [

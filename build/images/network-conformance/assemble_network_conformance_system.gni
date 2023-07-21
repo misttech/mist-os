@@ -63,7 +63,6 @@ template("assemble_network_conformance_system") {
       assembly_images_config_label = ":${labels.images_config_fxfs}"
       generate_fxfs = true
     }
-    use_explicit_images_config_only = true
     ramdisk_in_zbi = true
 
     product_assembly_config_label = ":${labels.product_config}"

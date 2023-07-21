@@ -220,28 +220,6 @@ template("assembled_system") {
   assert(defined(invoker.assembly_images_config_label),
          "Need to define assembly_images_config_label")
 
-  # These arguments are deprecated and unused.
-  # Remove these from all assembled_system() invocations then remove them from
-  # this list.
-  not_needed(invoker,
-             [
-               "board_name",
-               "ramdisk_fvm_in_zbi",
-               "zbi_name",
-               "zbi_signing_script_deps",
-               "use_explicit_images_config_only",
-               "zbi_signing_args",
-               "zbi_signing_script_deps",
-               "assembly_blob_layout_format",
-               "blobfs_minimum_inodes",
-               "blobfs_minimum_data_bytes",
-               "blobfs_maximum_bytes",
-               "blobfs_maximum_contents_size",
-               "assembly_fvm_slice_size",
-               "fvm_truncate_to_length",
-               "assembly_fxfs_image_size_bytes",
-             ])
-
   _generate_fvm = false
   if (defined(invoker.generate_fvm)) {
     _generate_fvm = invoker.generate_fvm
@@ -525,12 +503,8 @@ template("assembled_system") {
   }
 
   ramdisk_in_zbi = false
-  if (defined(invoker.ramdisk_fvm_in_zbi)) {
-    ramdisk_in_zbi = invoker.ramdisk_fvm_in_zbi && _supports_blobs
-  }
   if (defined(invoker.ramdisk_in_zbi)) {
-    ramdisk_in_zbi =
-        (invoker.ramdisk_in_zbi && _supports_blobs) || ramdisk_in_zbi
+    ramdisk_in_zbi = invoker.ramdisk_in_zbi && _supports_blobs
   }
 
   _additional_boot_args = []
@@ -847,11 +821,6 @@ template("assembled_system") {
       ":${labels.product_assembler}",
       labels.images_config,
     ]
-
-    # Set the deps needed in order to run the zbi_signing_script
-    if (defined(invoker.zbi_signing_script_deps)) {
-      deps += invoker.zbi_signing_script_deps
-    }
 
     # Validate that the Assembly-built fshost is identical to the GN-built
     # fshost until the latter is removed.
