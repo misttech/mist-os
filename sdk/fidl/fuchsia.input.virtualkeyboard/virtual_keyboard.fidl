@@ -49,7 +49,6 @@ type VisibilityChangeReason = flexible enum {
 /// # Roles
 /// This protocol will typically be:
 /// * Implemented by platform components which control UI policy.
-///   For example, Root Presenter, or the Workstation Session.
 /// * Consumed by application runtimes. For example, Flutter, Chromium.
 @discoverable
 closed protocol ControllerCreator {
@@ -179,7 +178,6 @@ closed protocol Controller {
 /// # Roles
 /// This protocol will typically be:
 /// * Implemented by platform components which control UI policy.
-///   For example, Root Presenter, or the Workstation Session.
 /// * Consumed by components which provide a GUI affordance for text input.
 @discoverable
 closed protocol Manager {
