@@ -30,68 +30,83 @@ import("//build/compiled_action.gni")
 #     TODO(fxbug.dev/129576): Remove after soft-migration.
 #
 template("android_starnix_container") {
-  assert(defined(invoker.base), "Need to define base")
-  assert(defined(invoker.system), "Need to define system")
+  if (current_toolchain == default_toolchain) {
+    assert(defined(invoker.base), "Need to define base")
+    assert(defined(invoker.system), "Need to define system")
 
-  compiled_action(target_name) {
-    forward_variables_from(invoker,
-                           [
-                             "deps",
-                             "testonly",
-                           ])
-    if (!defined(deps)) {
-      deps = []
-    }
+    compiled_action(target_name) {
+      forward_variables_from(invoker,
+                             [
+                               "deps",
+                               "testonly",
+                             ])
+      if (!defined(deps)) {
+        deps = []
+      }
 
-    depfile = "$target_gen_dir/$target_name.d"
-    tool = "//src/starnix/tools/gen_android_starnix_container:gen_android_starnix_container_bin"
-    tool_output_name = "gen-android-starnix-container"
+      depfile = "$target_gen_dir/$target_name.d"
+      tool = "//src/starnix/tools/gen_android_starnix_container:gen_android_starnix_container_bin"
+      tool_output_name = "gen-android-starnix-container"
 
-    _outdir = "${target_out_dir}/${target_name}"
-    inputs = [ invoker.system ]
-    outputs = [ "${_outdir}/package_manifest.json" ]
+      _outdir = "${target_out_dir}/${target_name}"
+      inputs = [ invoker.system ]
+      outputs = [ "${_outdir}/package_manifest.json" ]
 
-    args = [
-      "--name",
-      target_name,
-      "--outdir",
-      rebase_path(_outdir, root_build_dir),
-      "--system",
-      rebase_path(invoker.system, root_build_dir),
-      "--depfile",
-      rebase_path(depfile, root_build_dir),
-    ]
-
-    _base_manifest =
-        get_label_info(invoker.base, "target_out_dir") + "/" +
-        get_label_info(invoker.base, "name") + "/package_manifest.json"
-    _base_meta_far = get_label_info(invoker.base, "target_out_dir") + "/" +
-                     get_label_info(invoker.base, "name") + "/meta.far"
-    args += [
-      "--base",
-      rebase_path(_base_manifest, root_build_dir),
-    ]
-    inputs += [
-      _base_manifest,
-      _base_meta_far,
-    ]
-    deps += [ invoker.base ]
-
-    foreach(hal, invoker.hals) {
-      _hal_manifest = get_label_info(hal, "target_out_dir") + "/" +
-                      get_label_info(hal, "name") + "/package_manifest.json"
-      args += [
-        "--hal",
-        rebase_path(_hal_manifest, root_build_dir),
+      args = [
+        "--name",
+        target_name,
+        "--outdir",
+        rebase_path(_outdir, root_build_dir),
+        "--system",
+        rebase_path(invoker.system, root_build_dir),
+        "--depfile",
+        rebase_path(depfile, root_build_dir),
       ]
-      inputs += [ _hal_manifest ]
-      deps += [ hal ]
-    }
 
-    if (defined(invoker.always_populate_odm)) {
-      if (invoker.always_populate_odm) {
-        args += [ "--always-populate-odm" ]
+      _base_manifest =
+          get_label_info(invoker.base, "target_out_dir") + "/" +
+          get_label_info(invoker.base, "name") + "/package_manifest.json"
+      _base_meta_far = get_label_info(invoker.base, "target_out_dir") + "/" +
+                       get_label_info(invoker.base, "name") + "/meta.far"
+      args += [
+        "--base",
+        rebase_path(_base_manifest, root_build_dir),
+      ]
+      inputs += [
+        _base_manifest,
+        _base_meta_far,
+      ]
+      deps += [ invoker.base ]
+
+      foreach(hal, invoker.hals) {
+        _hal_manifest = get_label_info(hal, "target_out_dir") + "/" +
+                        get_label_info(hal, "name") + "/package_manifest.json"
+        args += [
+          "--hal",
+          rebase_path(_hal_manifest, root_build_dir),
+        ]
+        inputs += [ _hal_manifest ]
+        deps += [ hal ]
+      }
+
+      if (defined(invoker.always_populate_odm)) {
+        if (invoker.always_populate_odm) {
+          args += [ "--always-populate-odm" ]
+        }
       }
     }
+  } else {
+    # Redirect to a toolchain where the dependency packages exist.
+    group(target_name) {
+      forward_variables_from(invoker,
+                             [
+                               "testonly",
+                               "visibility",
+                             ])
+      deps = [ ":${target_name}(${default_toolchain})" ]
+    }
+
+    # Suppress unused variable warnings.
+    not_needed(invoker, "*")
   }
 }
