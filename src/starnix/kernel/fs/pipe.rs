@@ -162,10 +162,10 @@ impl Pipe {
         self.messages.write_stream(data, None, &mut vec![])
     }
 
-    fn query_events(&self) -> FdEvents {
+    fn query_events(&self, flags: OpenFlags) -> FdEvents {
         let mut events = FdEvents::empty();
 
-        if self.is_readable() {
+        if flags.can_read() && self.is_readable() {
             let writer_closed = self.writer_count == 0 && self.had_writer;
             let has_data = !self.messages.is_empty();
             if writer_closed {
@@ -176,7 +176,7 @@ impl Pipe {
             }
         }
 
-        if self.is_writable(1) {
+        if flags.can_write() && self.is_writable(1) {
             if self.reader_count == 0 && self.had_reader {
                 events |= FdEvents::POLLERR;
             }
@@ -281,14 +281,15 @@ impl FileOps for PipeFileObject {
     fn close(&self, file: &FileObject) {
         let mut events = FdEvents::empty();
         let mut pipe = self.pipe.lock();
-        if file.flags().can_read() {
+        let flags = file.flags();
+        if flags.can_read() {
             assert!(pipe.reader_count > 0);
             pipe.reader_count -= 1;
             if pipe.reader_count == 0 {
                 events |= FdEvents::POLLOUT;
             }
         }
-        if file.flags().can_write() {
+        if flags.can_write() {
             assert!(pipe.writer_count > 0);
             pipe.writer_count -= 1;
             if pipe.writer_count == 0 {
@@ -358,21 +359,28 @@ impl FileOps for PipeFileObject {
 
     fn wait_async(
         &self,
-        _file: &FileObject,
+        file: &FileObject,
         _current_task: &CurrentTask,
         waiter: &Waiter,
-        events: FdEvents,
+        mut events: FdEvents,
         handler: EventHandler,
     ) -> Option<WaitCanceler> {
+        let flags = file.flags();
+        if !flags.can_read() {
+            events.remove(FdEvents::POLLIN);
+        }
+        if !flags.can_write() {
+            events.remove(FdEvents::POLLOUT);
+        }
         Some(self.pipe.lock().waiters.wait_async_events(waiter, events, handler))
     }
 
     fn query_events(
         &self,
-        _file: &FileObject,
+        file: &FileObject,
         _current_task: &CurrentTask,
     ) -> Result<FdEvents, Errno> {
-        Ok(self.pipe.lock().query_events())
+        Ok(self.pipe.lock().query_events(file.flags()))
     }
 
     fn fcntl(
