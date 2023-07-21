@@ -1175,8 +1175,7 @@ impl NamespaceNode {
         a.mount.as_ref().map(Arc::as_ptr) == b.mount.as_ref().map(Arc::as_ptr)
     }
 
-    // This is pub only for sdcard_hack to use. Make it private again once we unwind that.
-    pub fn with_new_entry(&self, entry: DirEntryHandle) -> NamespaceNode {
+    fn with_new_entry(&self, entry: DirEntryHandle) -> NamespaceNode {
         NamespaceNode { mount: self.mount.clone(), entry }
     }
 

@@ -1435,22 +1435,7 @@ fn do_mount_create(
         String::from_utf8_lossy(data)
     );
 
-    let mut fs = current_task.create_filesystem(fs_type, source, flags, data)?;
-
-    // HACK! Shadow's Android's FUSE proxy with a proxy implemented in starnix. Delete once FUSE is
-    // working well enough.
-    if current_task.kernel().features.contains("sdcard_hack") && fs_type == b"fuse" {
-        if target.path_escaping_chroot() != b"/mnt/user/0/emulated" {
-            log_error!("unexpected FUSE mount target {:?}", target.path_escaping_chroot());
-            return error!(EINVAL);
-        }
-        fs = super::sdcard_hack::SdcardHackFs::new_fs(
-            current_task,
-            fs.options.clone(),
-            b"/data/media",
-        )?;
-    }
-
+    let fs = current_task.create_filesystem(fs_type, source, flags, data)?;
     target.mount(WhatToMount::Fs(fs), flags)
 }
 
