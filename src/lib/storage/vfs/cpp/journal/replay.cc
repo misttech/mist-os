@@ -81,7 +81,11 @@ std::optional<const JournalEntryView> ParseEntry(storage::VmoBuffer* journal_buf
   //
   // This way, the internal details of on-disk journal storage are hidden from the public API of
   // parsing entries.
-  entry_view.DecodePayloadBlocks();
+  if (const zx::result decode_result = entry_view.DecodePayloadBlocks(); decode_result.is_error()) {
+    FX_LOGST(ERROR, "journal") << "replay: DecodePayloadBlocks failed: "
+                               << decode_result.status_string();
+    return std::nullopt;
+  }
 
   return entry_view;
 }

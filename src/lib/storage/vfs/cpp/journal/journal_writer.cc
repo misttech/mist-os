@@ -167,7 +167,7 @@ zx_status_t JournalWriter::WriteMetadataToJournal(JournalWorkItem* work) {
   zx_status_t status = WriteOperationToJournal(work->reservation.buffer_view());
   // Although the payload may be encoded while written to the journal, it should be decoded
   // when written to the final on-disk location later.
-  entry.DecodePayloadBlocks();
+  ZX_ASSERT(entry.DecodePayloadBlocks().is_ok());  // Should never fail when creating a new entry.
   return status;
 }
 

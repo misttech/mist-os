@@ -53,14 +53,24 @@ void JournalEntryView::Encode(const std::vector<storage::BufferedOperation>& ope
   footer()->checksum = CalculateChecksum();
 }
 
-void JournalEntryView::DecodePayloadBlocks() {
+zx::result<> JournalEntryView::DecodePayloadBlocks() {
+  // Verify that all escaped blocks start with the correct prefix.
   for (uint32_t i = 0; i < header().PayloadBlocks(); i++) {
     if (header_.EscapedBlock(i)) {
-      auto block_ptr = reinterpret_cast<uint64_t*>(view_.Data(kJournalEntryHeaderBlocks + i));
-      ZX_ASSERT(*block_ptr == 0);
+      uint64_t* block_ptr = reinterpret_cast<uint64_t*>(view_.Data(kJournalEntryHeaderBlocks + i));
+      if (*block_ptr != 0) {
+        return zx::error(ZX_ERR_IO_DATA_INTEGRITY);
+      }
+    }
+  }
+  // Overwrite escaped block with correct payload prefix.
+  for (uint32_t i = 0; i < header().PayloadBlocks(); i++) {
+    if (header_.EscapedBlock(i)) {
+      uint64_t* block_ptr = reinterpret_cast<uint64_t*>(view_.Data(kJournalEntryHeaderBlocks + i));
       *block_ptr = kJournalEntryMagic;
     }
   }
+  return zx::ok();
 }
 
 uint32_t JournalEntryView::CalculateChecksum() const {

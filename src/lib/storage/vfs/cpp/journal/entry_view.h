@@ -5,6 +5,7 @@
 #ifndef SRC_LIB_STORAGE_VFS_CPP_JOURNAL_ENTRY_VIEW_H_
 #define SRC_LIB_STORAGE_VFS_CPP_JOURNAL_ENTRY_VIEW_H_
 
+#include <lib/zx/result.h>
 #include <zircon/types.h>
 
 #include <fbl/macros.h>
@@ -41,8 +42,8 @@ class JournalEntryView {
   }
 
   // Iterates through all blocks in the previously set entry, and resets all escaped blocks within
-  // the constructor-provided buffer.
-  void DecodePayloadBlocks();
+  // the constructor-provided buffer. On failure, does not modify underlying view.
+  zx::result<> DecodePayloadBlocks();
 
   // Calculates the checksum of all blocks excluding the commit block.
   uint32_t CalculateChecksum() const;

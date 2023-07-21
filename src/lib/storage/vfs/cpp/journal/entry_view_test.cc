@@ -242,15 +242,34 @@ TEST_F(EntryViewEscapedTest, EscapedBlocksCanBeDecoded) {
 
   JournalEntryView view(buffer_view, operations(), 1);
 
-  EXPECT_EQ(ptr[0], 0ul) << "Payload prefix should have been escaped, but it was not";
+  ASSERT_EQ(ptr[0], 0ul) << "Payload prefix should have been escaped, but it was not";
 
-  view.DecodePayloadBlocks();
+  ASSERT_TRUE(view.DecodePayloadBlocks().is_ok());
   auto header = view.header();
 
   EXPECT_TRUE(header.EscapedBlock(0));
   EXPECT_EQ(kTarget, header.TargetBlock(0));
   EXPECT_EQ(kJournalEntryMagic, ptr[0]) << "Payload prefix should have been reset, but it was not";
   EXPECT_EQ(0xDEADBEEF, ptr[1]) << "Remainter of payload should have remained untouched";
+}
+
+TEST_F(EntryViewEscapedTest, ShouldDetectIncorrectEscapedBlockPrefix) {
+  auto buffer_view = make_view(3);
+  uint64_t* ptr = static_cast<uint64_t*>(buffer_view.Data(kJournalEntryHeaderBlocks));
+  // This value will be escaped.
+  ptr[0] = kJournalEntryMagic;
+  // This part of the block will be unmodified.
+  ptr[1] = 0xDEADBEEF;
+
+  JournalEntryView view(buffer_view, operations(), 1);
+
+  ASSERT_EQ(ptr[0], 0ul) << "Payload prefix should have been escaped, but it was not";
+  // Overwrite the zero'd prefix with anything non-zero which should fail decoding.
+  ptr[0] = 1ul;
+
+  ASSERT_TRUE(view.DecodePayloadBlocks().is_error())
+      << "Should fail to decode escaped blocks with incorrect payload prefix";
+  ASSERT_EQ(ptr[0], 1ul) << "Payload prefix should not be modified if decoding fails";
 }
 
 }  // namespace
