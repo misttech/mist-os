@@ -1511,6 +1511,7 @@ mod tests {
         subnet: Subnet<A>,
         next_hop1: A,
         next_hop2: A,
+        num_sink_messages: usize,
     ) -> TestRequestResult
     where
         A::Version: fnet_routes_ext::FidlRouteIpExt + fnet_routes_ext::admin::FidlRouteAdminIpExt,
@@ -1582,7 +1583,12 @@ mod tests {
         };
 
         assert_eq!(&other_sink.take_messages()[..], &[]);
-        TestRequestResult { messages: route_sink.take_messages(), waiter_result }
+        let mut messages = Vec::new();
+        while messages.len() < num_sink_messages {
+            messages.push(route_sink.next_message().await);
+        }
+        assert_eq!(route_sink.next_message().now_or_never(), None);
+        TestRequestResult { messages, waiter_result }
     }
 
     #[test_case(V4_SUB1, V4_NEXTHOP1, V4_NEXTHOP2; "v4_route_dump")]
@@ -1598,6 +1604,26 @@ mod tests {
         }
         .try_into()
         .expect("should fit into u8");
+
+        let expected_messages = vec![
+            SentMessage::unicast(
+                create_netlink_route_message(
+                    address_family,
+                    subnet.prefix(),
+                    create_nlas::<A::Version>(Some(subnet), Some(next_hop1), DEV1, METRIC1),
+                )
+                .into_rtnl_new_route(TEST_SEQUENCE_NUMBER, true),
+            ),
+            SentMessage::unicast(
+                create_netlink_route_message(
+                    address_family,
+                    subnet.prefix(),
+                    create_nlas::<A::Version>(Some(subnet), Some(next_hop2), DEV2, METRIC2),
+                )
+                .into_rtnl_new_route(TEST_SEQUENCE_NUMBER, true),
+            ),
+        ];
+
         pretty_assertions::assert_eq!(
             {
                 let mut test_request_result = test_request(
@@ -1613,6 +1639,7 @@ mod tests {
                     subnet,
                     next_hop1,
                     next_hop2,
+                    expected_messages.len(),
                 )
                 .await;
                 test_request_result.messages.sort_by_key(|message| {
@@ -1636,37 +1663,7 @@ mod tests {
                 });
                 test_request_result
             },
-            TestRequestResult {
-                messages: vec![
-                    SentMessage::unicast(
-                        create_netlink_route_message(
-                            address_family,
-                            subnet.prefix(),
-                            create_nlas::<A::Version>(
-                                Some(subnet),
-                                Some(next_hop1),
-                                DEV1,
-                                METRIC1,
-                            ),
-                        )
-                        .into_rtnl_new_route(TEST_SEQUENCE_NUMBER, true),
-                    ),
-                    SentMessage::unicast(
-                        create_netlink_route_message(
-                            address_family,
-                            subnet.prefix(),
-                            create_nlas::<A::Version>(
-                                Some(subnet),
-                                Some(next_hop2),
-                                DEV2,
-                                METRIC2,
-                            ),
-                        )
-                        .into_rtnl_new_route(TEST_SEQUENCE_NUMBER, true),
-                    ),
-                ],
-                waiter_result: Ok(()),
-            },
+            TestRequestResult { messages: expected_messages, waiter_result: Ok(()) },
         )
     }
 
@@ -1893,6 +1890,7 @@ mod tests {
         subnet: Subnet<A>,
         next_hop1: A,
         next_hop2: A,
+        num_sink_messages: usize,
     ) -> TestRequestResult
     where
         A::Version: fnet_routes_ext::FidlRouteIpExt + fnet_routes_ext::admin::FidlRouteAdminIpExt,
@@ -1923,6 +1921,7 @@ mod tests {
             subnet,
             next_hop1,
             next_hop2,
+            num_sink_messages,
         )
         .await
     }
@@ -1985,7 +1984,8 @@ mod tests {
                 route_set_results.into_iter(),
                 subnet,
                 next_hop1,
-                next_hop2
+                next_hop2,
+                messages.len(),
             )
             .await,
             TestRequestResult { messages, waiter_result },
@@ -2159,6 +2159,9 @@ mod tests {
         // already existing, we use a route that has METRIC3
         let unicast_route_args = create_unicast_route_args(subnet, next_hop1, DEV1.into(), METRIC3);
 
+        // No routes will be added successfully, so there are no expected messages.
+        let expected_messages = Vec::new();
+
         pretty_assertions::assert_eq!(
             test_request(
                 RequestArgs::Route(RouteRequestArgs::New(NewRouteArgs::Unicast(
@@ -2187,10 +2190,11 @@ mod tests {
                 subnet,
                 next_hop1,
                 next_hop2,
+                expected_messages.len(),
             )
             .await,
             TestRequestResult {
-                messages: Vec::new(),
+                messages: expected_messages,
                 waiter_result: Err(RequestError::UnrecognizedInterface),
             },
         )

@@ -39,10 +39,8 @@ pub trait SenderReceiverProvider {
 #[cfg(test)]
 pub(crate) mod testutil {
     use super::*;
-    use std::{
-        marker::PhantomData,
-        sync::{Arc, Mutex},
-    };
+    use futures::{FutureExt as _, StreamExt as _};
+    use std::marker::PhantomData;
 
     #[derive(Clone, Debug, PartialEq, Eq)]
     pub(crate) struct SentMessage<M> {
@@ -60,33 +58,44 @@ pub(crate) mod testutil {
         }
     }
 
-    #[derive(Clone, Debug, Default)]
+    #[derive(Clone, Debug)]
     pub(crate) struct FakeSender<M> {
-        sent_messages: Arc<Mutex<Vec<SentMessage<M>>>>,
+        sender: futures::channel::mpsc::UnboundedSender<SentMessage<M>>,
     }
 
     impl<M: Clone + Send + NetlinkSerializable + 'static> Sender<M> for FakeSender<M> {
         fn send(&mut self, message: NetlinkMessage<M>, group: Option<ModernGroup>) {
-            self.sent_messages.lock().unwrap().push(SentMessage { message, group })
+            self.sender
+                .unbounded_send(SentMessage { message, group })
+                .expect("unable to send message");
         }
     }
 
     pub(crate) struct FakeSenderSink<M> {
-        messages: Arc<Mutex<Vec<SentMessage<M>>>>,
+        receiver: futures::channel::mpsc::UnboundedReceiver<SentMessage<M>>,
     }
 
     impl<M> FakeSenderSink<M> {
         pub(crate) fn take_messages(&mut self) -> Vec<SentMessage<M>> {
-            core::mem::take(&mut *self.messages.lock().unwrap())
+            let mut messages = Vec::new();
+            while let Some(msg_opt) = self.receiver.next().now_or_never() {
+                match msg_opt {
+                    Some(msg) => messages.push(msg),
+                    None => return messages, // Stream closed.
+                };
+            }
+            // All receiver messages that were ready were added.
+            messages
+        }
+
+        pub(crate) async fn next_message(&mut self) -> SentMessage<M> {
+            self.receiver.next().await.expect("receiver unexpectedly closed")
         }
     }
 
     pub(crate) fn fake_sender_with_sink<M>() -> (FakeSender<M>, FakeSenderSink<M>) {
-        let shared_message_buffer = Arc::new(Mutex::new(Vec::default()));
-        (
-            FakeSender { sent_messages: shared_message_buffer.clone() },
-            FakeSenderSink { messages: shared_message_buffer },
-        )
+        let (sender, receiver) = futures::channel::mpsc::unbounded();
+        (FakeSender { sender }, FakeSenderSink { receiver })
     }
 
     #[derive(Debug)]

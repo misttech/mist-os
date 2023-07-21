@@ -283,7 +283,7 @@ mod tests {
     use test_case::test_case;
 
     use crate::{
-        messaging::testutil::{fake_sender_with_sink, FakeSender, SentMessage},
+        messaging::testutil::{fake_sender_with_sink, SentMessage},
         protocol_family::testutil::{
             new_fake_netlink_message, FakeProtocolFamily, MODERN_GROUP1, MODERN_GROUP2,
         },
@@ -302,8 +302,9 @@ mod tests {
     // client are observed on the internal client.
     #[test]
     fn test_group_memberships() {
+        let (sender, _sink) = fake_sender_with_sink();
         let (external_client, internal_client) =
-            new_client_pair::<FakeProtocolFamily, _>(testutil::CLIENT_ID_1, FakeSender::default());
+            new_client_pair::<FakeProtocolFamily, _>(testutil::CLIENT_ID_1, sender);
 
         assert!(!internal_client.member_of_group(MODERN_GROUP1));
         assert!(!internal_client.member_of_group(MODERN_GROUP2));
