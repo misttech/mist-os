@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use std::collections::HashMap;
+use std::{collections::HashMap, io::Cursor};
 
 use anyhow::{Context, Result};
 use argh::FromArgs;
@@ -12,10 +12,11 @@ use fuchsia_pkg::{PackageBuilder, PackageManifest};
 use fuchsia_url::RelativePackageUrl;
 use std::fs::File;
 
+mod depfile;
 mod hal_manifest;
 mod remote_bundle;
 
-use crate::remote_bundle::Writer;
+use crate::{depfile::Depfile, remote_bundle::Writer};
 
 /// Construct a starnix container that can include an Android system and HALs.
 #[derive(FromArgs)]
@@ -91,7 +92,7 @@ fn add_to_odm(
     src: &fuchsia_pkg::BlobInfo,
     dst: &[&str],
     odm_writer: &mut Writer,
-) -> Result<String, anyhow::Error> {
+) -> Result<String> {
     let src = &src.source_path;
     File::open(src)
         .and_then(|mut file| odm_writer.add_file(dst, &mut file))
@@ -99,26 +100,54 @@ fn add_to_odm(
     Ok(src.clone())
 }
 
+fn clone_package(
+    manifest_path: &Utf8PathBuf,
+    outdir: &String,
+    deps: &mut Depfile,
+) -> Result<PackageBuilder> {
+    let manifest = PackageManifest::try_load_from(manifest_path)
+        .with_context(|| format!("Reading base starnix package: {}", manifest_path))?;
+
+    // Our tool will eventually read everything in the base package.
+    deps.track_inputs(manifest.blobs().iter().map(|b| b.source_path.clone()));
+
+    // [`PackageBuilder::from_manifest`] will unpack the contents of the `meta.far` into `outdir`.
+    // Track those outputs too.
+    if let Some(blob) =
+        manifest.blobs().iter().find(|b| b.path == PackageManifest::META_FAR_BLOB_PATH)
+    {
+        let bytes = std::fs::read(&blob.source_path)
+            .with_context(|| format!("reading {}", blob.source_path))?;
+        let meta_far =
+            fuchsia_archive::Utf8Reader::new(Cursor::new(bytes)).context("reading FAR")?;
+        deps.track_outputs(meta_far.list().map(|e| format!("{}/{}", outdir, e.path())));
+    }
+
+    let builder =
+        PackageBuilder::from_manifest(manifest, outdir).context("Parsing base starnix package")?;
+
+    Ok(builder)
+}
+
 fn generate(cmd: Command) -> Result<()> {
+    // Track inputs and outputs for producing a depfile for incremental build correctness.
+    let mut deps = Depfile::new();
+
     // Bootstrap the package builder with the contents of the base package, but update the
     // internal and published names.
-    let manifest = PackageManifest::try_load_from(&cmd.base)
-        .with_context(|| format!("Reading base starnix package: {}", cmd.base))?;
-    let mut builder = PackageBuilder::from_manifest(manifest, &cmd.outdir)
-        .context("Parsing base starnix package")?;
+    let mut builder = clone_package(&cmd.base, &cmd.outdir.to_string(), &mut deps)?;
     builder.name(&cmd.name);
     builder.published_name(&cmd.name);
 
-    // Track inputs for producing a depfile for incremental build correctness.
-    let mut inputs_for_depfile: Vec<String> = Vec::new();
-
     let system_files = add_ext4_image("system", &cmd.outdir, &cmd.system, &mut builder)?;
-    inputs_for_depfile.extend(system_files.into_values());
+    deps.track_input(cmd.system.to_string());
+    deps.track_outputs(system_files.into_values());
 
     // Combine the vendor image with the system image.
     if let Some(vendor_path) = cmd.vendor {
         let vendor_files = add_ext4_image("vendor", &cmd.outdir, &vendor_path, &mut builder)?;
-        inputs_for_depfile.extend(vendor_files.into_values());
+        deps.track_input(vendor_path.to_string());
+        deps.track_outputs(vendor_files.into_values());
     }
 
     // Initialize ODM filesystem.
@@ -144,11 +173,11 @@ fn generate(cmd: Command) -> Result<()> {
         let (hal_manifest, hal_manifest_source_path) =
             hal_manifest::load_from_package(&manifest)
                 .with_context(|| format!("Reading hal manifest from package: {}", hal))?;
-        inputs_for_depfile.extend(hal_manifest_source_path);
+        deps.track_inputs(hal_manifest_source_path);
         // If a HAL manifest contains `init_rc`, copy that file to
         // `etc/init/{hal_package_name}.rc` in the ODM filesystem.
         if let Some(blob) = hal_manifest.init_rc {
-            inputs_for_depfile.push(add_to_odm(
+            deps.track_input(add_to_odm(
                 &blob,
                 &["etc", "init", &format!("{hal_package_name}.rc")],
                 &mut odm_writer,
@@ -157,7 +186,7 @@ fn generate(cmd: Command) -> Result<()> {
         // If a HAL manifest contains `vintf_manifest`, copy that file to
         // `etc/vintf/manifest/{hal_package_name}.xml` in the ODM filesystem.
         if let Some(blob) = hal_manifest.vintf_manifest {
-            inputs_for_depfile.push(add_to_odm(
+            deps.track_input(add_to_odm(
                 &blob,
                 &["etc", "vintf", "manifest", &format!("{hal_package_name}.xml")],
                 &mut odm_writer,
@@ -172,7 +201,7 @@ fn generate(cmd: Command) -> Result<()> {
         builder
             .add_file_as_blob(dst, &src)
             .with_context(|| format!("Adding blob from file: {}", &src))?;
-        inputs_for_depfile.push(src.clone());
+        deps.track_output(src.clone());
     }
 
     // Build the starnix container.
@@ -180,21 +209,19 @@ fn generate(cmd: Command) -> Result<()> {
     let manifest_path = cmd.outdir.join("package_manifest.json");
     builder.manifest_path(manifest_path);
     builder.build(&cmd.outdir, &metafar_path).context("Building starnix container")?;
-
-    if let Some(depfile) = cmd.depfile {
-        let mut deps: Vec<String> = vec![
+    deps.track_outputs(
+        vec![
             cmd.outdir.join("meta.far"),
             cmd.outdir.join("meta/fuchsia.abi/abi-revision"),
             cmd.outdir.join("meta/fuchsia.pkg/subpackages"),
             cmd.outdir.join("meta/package"),
-            cmd.outdir.join(format!("meta/{}.cm", cmd.name)),
         ]
         .iter()
-        .map(|p| p.to_string())
-        .collect();
-        deps.extend(inputs_for_depfile);
-        let mut deps: String = deps.iter().map(|p| format!("{p} ")).collect();
-        deps += &format!(": {}", cmd.system);
+        .map(|p| p.to_string()),
+    );
+
+    if let Some(depfile) = cmd.depfile {
+        let deps: String = deps.into();
         std::fs::write(&depfile, &deps).with_context(|| format!("Writing depfile: {}", depfile))?;
     }
 

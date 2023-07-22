@@ -32,6 +32,7 @@ if (is_host) {
       "//src/starnix/lib/linux_uapi",
       "//src/storage/ext4/lib/ext4_extract",
       "//src/storage/ext4/lib/metadata",
+      "//src/sys/pkg/lib/far/rust:fuchsia-archive",
       "//src/sys/pkg/lib/fuchsia-pkg",
       "//third_party/rust_crates:anyhow",
       "//third_party/rust_crates:argh",
@@ -48,6 +49,7 @@ if (is_host) {
     ]
 
     sources = [
+      "src/depfile.rs",
       "src/hal_manifest.rs",
       "src/main.rs",
       "src/remote_bundle.rs",
