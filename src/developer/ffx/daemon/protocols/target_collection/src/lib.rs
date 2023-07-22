@@ -572,7 +572,7 @@ fn handle_discovered_target(tc: &Rc<TargetCollection>, t: ffx::TargetInfo) -> Op
         let target = tc.merge_insert(match Target::from_fastboot_target_info(t) {
             Ok(ret) => ret,
             Err(e) => {
-                tracing::trace!("Error while making target: {:?}", e);
+                tracing::debug!("Error while making target: {:?}", e);
                 return None;
             }
         });

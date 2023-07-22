@@ -622,7 +622,7 @@ impl Target {
         }
 
         if former_state == new_state {
-            tracing::debug!(
+            tracing::trace!(
                 "State unchanged for {}@{} from {:?}",
                 self.nodename_str(),
                 self.id(),

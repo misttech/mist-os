@@ -236,7 +236,7 @@ fn open_interface<F>(mut cb: F) -> Result<Interface>
 where
     F: FnMut(&InterfaceInfo) -> bool,
 {
-    tracing::trace!("opening usb interface via open_interface");
+    tracing::debug!("Selecting USB fastboot interface to open");
 
     let mut open_cb = |info: &InterfaceInfo| -> bool {
         if is_fastboot_match(info) {
@@ -253,7 +253,7 @@ fn enumerate_interfaces<F>(mut cb: F)
 where
     F: FnMut(&InterfaceInfo),
 {
-    tracing::trace!("usb calling enumerate_interface");
+    tracing::debug!("Enumerating USB fastboot interfaces");
     let mut cb = |info: &InterfaceInfo| -> bool {
         if is_fastboot_match(info) {
             cb(info)
@@ -278,7 +278,7 @@ pub async fn find_devices() -> Vec<FastbootDevice> {
         return products;
     }
 
-    tracing::trace!("discovering fastboot devices via usb");
+    tracing::debug!("Discovering fastboot devices via usb");
 
     let serials = find_serial_numbers();
     let in_use = SERIALS_IN_USE.lock().await;
@@ -300,7 +300,7 @@ pub async fn find_devices() -> Vec<FastbootDevice> {
                     }
                 }
             }
-            Err(e) => tracing::error!("error opening usb interface: {}", e),
+            Err(e) => tracing::error!("Error opening USB interface: {}", e),
         }
     }
     products
@@ -308,7 +308,7 @@ pub async fn find_devices() -> Vec<FastbootDevice> {
 
 #[tracing::instrument]
 pub fn open_interface_with_serial(serial: &String) -> Result<Interface> {
-    tracing::trace!("opening interface with serial number: {}", serial);
+    tracing::debug!("Opening USB fastboot interface with serial number: {}", serial);
     open_interface(|info: &InterfaceInfo| -> bool { extract_serial_number(info) == *serial })
 }
 
