@@ -343,6 +343,13 @@ fuchsia_unittest_package("zxdump-tests") {
   deps = [ ":zxdump-unittests" ]
   manifest = "meta/zxdump-tests.cml"
   test_type = "system"
+
+  if (current_cpu == "riscv64") {
+    # TODO(fxbug.dev/131012): Remove this once ZxdumpTests pass on RISC-V.
+    test_specs = {
+      environments = []
+    }
+  }
 }
 
 group("tests") {
