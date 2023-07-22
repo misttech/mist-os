@@ -52,10 +52,14 @@ moment:
 **Perfcompare is not supported yet for `integration.git` CLs.**
 
 Specifically, CLs that change dependencies in Jiri manifest files or
-that use `patches.json` are not yet supported yet by
-perfcompare. Perfcompare does not know how to check out the source
-before and after the change in this case, so it would give wrong
-results in this case.
+`jiri.lock` files or that use `patches.json` are not yet supported by
+perfcompare. This includes CLs that change prebuilt packages, such as
+toolchain roll CLs.
+
+Perfcompare does not know how to check out the source and prebuilt
+binaries before and after the CL in these cases, so it will give wrong
+results in these cases. It will produce a finding that there is no
+change in performance, even if the CL does change performance.
 
 ## Example output
 
