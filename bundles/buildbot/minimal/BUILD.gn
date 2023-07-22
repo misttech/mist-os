@@ -18,6 +18,8 @@ group("minimal") {
 # Contains additional targets to be built that are not needed for tests.
 # This allows bots to ensure buildable targets do not regress even if they are
 # not being run by another bot (i.e., during bringup of a new CPU architecture).
+# TODO(fxbug.dev/131001): Define the set of tests that should run in the group
+# above, similar to other buildbot bundles, and minimize or remove this group.
 group("additional_build_targets") {
   testonly = true
 
@@ -38,10 +40,7 @@ group("additional_build_targets") {
     "//src/fonts:tests",
     "//src/hwinfo:tests",
     "//src/intl:tests",
-
-    # TODO(fxbug.dev/129959): Enable after disabling failing targets on RISC-V.
-    # "//src/lib:tests",
-
+    "//src/lib:tests",
     "//src/power:tests",
   ]
 }
