@@ -2,16 +2,19 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-// Use parking_lot so that we don't need to make the dependency conditional.
+// Use these crates so that we don't need to make the dependency conditional.
+use lock_api as _;
 use parking_lot as _;
 
 #[cfg(not(any(test, debug_assertions)))]
-pub type Mutex<T> = parking_lot::Mutex<T>;
+pub type Mutex<T> = fuchsia_sync::Mutex<T>;
 #[cfg(not(any(test, debug_assertions)))]
-pub type MutexGuard<'a, T> = parking_lot::MutexGuard<'a, T>;
+pub type MutexGuard<'a, T> = fuchsia_sync::MutexGuard<'a, T>;
 #[allow(unused)]
 #[cfg(not(any(test, debug_assertions)))]
-pub type MappedMutexGuard<'a, T> = parking_lot::MappedMutexGuard<'a, T>;
+pub type MappedMutexGuard<'a, T> = fuchsia_sync::MappedMutexGuard<'a, T>;
+
+// TODO(fxbug.dev/88603): Switch RWLocks to fuchsia_sync as well once fuchsia_sync offers RWLocks.
 #[cfg(not(any(test, debug_assertions)))]
 pub type RwLock<T> = parking_lot::RwLock<T>;
 #[cfg(not(any(test, debug_assertions)))]
@@ -20,12 +23,16 @@ pub type RwLockReadGuard<'a, T> = parking_lot::RwLockReadGuard<'a, T>;
 pub type RwLockWriteGuard<'a, T> = parking_lot::RwLockWriteGuard<'a, T>;
 
 #[cfg(any(test, debug_assertions))]
-pub type Mutex<T> = tracing_mutex::parkinglot::TracingMutex<T>;
+type RawTracingMutex = tracing_mutex::lockapi::TracingWrapper<fuchsia_sync::RawSyncMutex>;
 #[cfg(any(test, debug_assertions))]
-pub type MutexGuard<'a, T> = tracing_mutex::parkinglot::TracingMutexGuard<'a, T>;
+pub type Mutex<T> = lock_api::Mutex<RawTracingMutex, T>;
+#[cfg(any(test, debug_assertions))]
+pub type MutexGuard<'a, T> = lock_api::MutexGuard<'a, RawTracingMutex, T>;
 #[allow(unused)]
 #[cfg(any(test, debug_assertions))]
-pub type MappedMutexGuard<'a, T> = tracing_mutex::parkinglot::TracingMappedMutexGuard<'a, T>;
+pub type MappedMutexGuard<'a, T> = lock_api::MappedMutexGuard<'a, RawTracingMutex, T>;
+
+// TODO(fxbug.dev/88603): Switch RWLocks to fuchsia_sync as well once fuchsia_sync offers RWLocks.
 #[cfg(any(test, debug_assertions))]
 pub type RwLock<T> = tracing_mutex::parkinglot::TracingRwLock<T>;
 #[cfg(any(test, debug_assertions))]
