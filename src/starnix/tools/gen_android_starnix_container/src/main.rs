@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use std::{collections::HashMap, io::Cursor};
+use std::{collections::HashMap, fs::File, io::Cursor};
 
 use anyhow::{Context, Result};
 use argh::FromArgs;
@@ -10,7 +10,6 @@ use camino::{Utf8Path, Utf8PathBuf};
 use ext4_extract::ext4_extract;
 use fuchsia_pkg::{PackageBuilder, PackageManifest};
 use fuchsia_url::RelativePackageUrl;
-use std::fs::File;
 
 mod depfile;
 mod hal_manifest;
@@ -58,7 +57,6 @@ struct Command {
 
 fn main() -> Result<()> {
     let cmd: Command = argh::from_env();
-    let _ = &cmd.always_populate_odm;
     generate(cmd)
 }
 
@@ -129,6 +127,45 @@ fn clone_package(
     Ok(builder)
 }
 
+/// TODO(fxbug.dev/129576): Delete after soft migrating the rc/xml files.
+struct SoftMigrate129576 {
+    should_copy: bool,
+}
+
+impl SoftMigrate129576 {
+    fn new(system: &HashMap<String, String>) -> Result<SoftMigrate129576> {
+        // Conditionally control whether to copy, by checking for the number of HALs
+        // in `system/vendor/etc/vintf/manifest.xml`. If there are less than 11 HALs,
+        // which is a signal that migration has begun, activate copying.
+        // See https://bugs.fuchsia.dev/p/fuchsia/issues/detail?id=129576#c26 for
+        // context on this constant.
+        use ext4_metadata::{Metadata, ROOT_INODE_NUM};
+        let metadata = std::fs::read(&system["metadata.v1"]).context("Reading metadata")?;
+        let m = Metadata::deserialize(&metadata)?;
+        let Ok(manifest) = m.lookup(ROOT_INODE_NUM, "system").and_then(
+            |n| m.lookup(n, "vendor")
+        ).and_then(
+            |n| m.lookup(n, "etc")
+        ).and_then(
+            |n| m.lookup(n, "vintf")
+        ).and_then(
+            |n| m.lookup(n, "manifest.xml")
+        ) else {
+            // If failed, assume the file does not exist.
+            return Ok(SoftMigrate129576 { should_copy: true });
+        };
+        let manifest =
+            std::fs::read(&system[&format!("{manifest}")]).context("Reading manifest")?;
+        Ok(SoftMigrate129576 {
+            should_copy: String::from_utf8_lossy(&manifest).matches("<hal ").count() < 11,
+        })
+    }
+
+    fn should_copy(&self) -> bool {
+        self.should_copy
+    }
+}
+
 fn generate(cmd: Command) -> Result<()> {
     // Track inputs and outputs for producing a depfile for incremental build correctness.
     let mut deps = Depfile::new();
@@ -140,6 +177,7 @@ fn generate(cmd: Command) -> Result<()> {
     builder.published_name(&cmd.name);
 
     let system_files = add_ext4_image("system", &cmd.outdir, &cmd.system, &mut builder)?;
+    let soft_migrate = SoftMigrate129576::new(&system_files)?;
     deps.track_input(cmd.system.to_string());
     deps.track_outputs(system_files.into_values());
 
@@ -177,20 +215,24 @@ fn generate(cmd: Command) -> Result<()> {
         // If a HAL manifest contains `init_rc`, copy that file to
         // `etc/init/{hal_package_name}.rc` in the ODM filesystem.
         if let Some(blob) = hal_manifest.init_rc {
-            deps.track_input(add_to_odm(
-                &blob,
-                &["etc", "init", &format!("{hal_package_name}.rc")],
-                &mut odm_writer,
-            )?);
+            if soft_migrate.should_copy() || cmd.always_populate_odm {
+                deps.track_input(add_to_odm(
+                    &blob,
+                    &["etc", "init", &format!("{hal_package_name}.rc")],
+                    &mut odm_writer,
+                )?);
+            }
         }
         // If a HAL manifest contains `vintf_manifest`, copy that file to
         // `etc/vintf/manifest/{hal_package_name}.xml` in the ODM filesystem.
         if let Some(blob) = hal_manifest.vintf_manifest {
-            deps.track_input(add_to_odm(
-                &blob,
-                &["etc", "vintf", "manifest", &format!("{hal_package_name}.xml")],
-                &mut odm_writer,
-            )?);
+            if soft_migrate.should_copy() || cmd.always_populate_odm {
+                deps.track_input(add_to_odm(
+                    &blob,
+                    &["etc", "vintf", "manifest", &format!("{hal_package_name}.xml")],
+                    &mut odm_writer,
+                )?);
+            }
         }
     }
 
