@@ -5950,12 +5950,51 @@ From //third_party/pigweed/src/pw_build/python_gn_args.gni:23
 
 ### pw_build_PYTHON_PIP_DOWNLOAD_ALL_PLATFORMS
 
+DOCSTAG: [default-pip-gn-args]
 Set pw_python_venv.vendor_wheel targets to download Python packages for all
 platform combinations. This takes a significant amount of time.
 
 **Current value (from the default):** `false`
 
-From //third_party/pigweed/src/pw_build/python_gn_args.gni:27
+From //third_party/pigweed/src/pw_build/python_gn_args.gni:28
+
+### pw_build_PYTHON_PIP_INSTALL_DISABLE_CACHE
+
+Adds '--no-cache-dir' forcing pip to ignore any previously cached Python
+packages. On most systems this is located in ~/.cache/pip/
+
+**Current value (from the default):** `false`
+
+From //third_party/pigweed/src/pw_build/python_gn_args.gni:41
+
+### pw_build_PYTHON_PIP_INSTALL_FIND_LINKS
+
+List of paths to folders containing Python wheels (*.whl) or source tar
+files (*.tar.gz). Pip will check each of these directories when looking for
+potential install candidates.
+
+**Current value (from the default):** `[]`
+
+From //third_party/pigweed/src/pw_build/python_gn_args.gni:46
+
+### pw_build_PYTHON_PIP_INSTALL_OFFLINE
+
+Adds --no-index forcing pip to not reach out to the internet (pypi.org) to
+download packages. Using this opiton requires setting
+pw_build_PYTHON_PIP_INSTALL_FIND_LINKS as well.
+
+**Current value (from the default):** `false`
+
+From //third_party/pigweed/src/pw_build/python_gn_args.gni:37
+
+### pw_build_PYTHON_PIP_INSTALL_REQUIRE_HASHES
+
+Adds '--require-hashes'. This option enforces hash checking on Python
+package files.
+
+**Current value (from the default):** `false`
+
+From //third_party/pigweed/src/pw_build/python_gn_args.gni:32
 
 ### pw_build_PYTHON_TEST_COVERAGE
 
