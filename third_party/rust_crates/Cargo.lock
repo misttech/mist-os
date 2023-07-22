@@ -1322,6 +1322,7 @@ dependencies = [
  "libm",
  "linked-hash-map",
  "lipsum",
+ "lock_api 0.4.7",
  "log",
  "loom",
  "lru-cache",

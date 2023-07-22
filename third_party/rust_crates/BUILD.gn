@@ -431,6 +431,10 @@ if (current_os == "fuchsia") {
   }
 }
 
+group("lock_api") {
+  public_deps = [ ":lock_api-v0_4_7" ]
+}
+
 import("//src/lib/diagnostics/log/log_visibility.gni")
 
 group("log") {
