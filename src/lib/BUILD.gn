@@ -112,6 +112,7 @@ group("tests") {
     "fuchsia-image-format:tests",
     "fuchsia-lockfile:tests",
     "fuchsia-runtime:tests",
+    "fuchsia-sync:tests",
     "fuchsia-url:tests",
     "fxl:tests",
     "gcs:tests($host_toolchain)",
