@@ -283,8 +283,11 @@
                 "sched_setparam05",
                 "sched_setscheduler02",
                 "sched_stress",
+
+                // Two skipped test cases for select variants that do not exist in 64 bit.
                 "select01",
                 "select02",
+
                 "send01",
                 "send02",
                 "sendfile02",
