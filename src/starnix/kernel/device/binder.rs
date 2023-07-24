@@ -2377,6 +2377,10 @@ impl MemoryAccessor for RemoteResourceAccessor {
     fn write_memory_partial(&self, _addr: UserAddress, _bytes: &[u8]) -> Result<usize, Errno> {
         error!(ENOTSUP)
     }
+
+    fn zero(&self, _addr: UserAddress, _length: usize) -> Result<usize, Errno> {
+        error!(ENOTSUP)
+    }
 }
 
 impl ResourceAccessor for RemoteResourceAccessor {
@@ -2478,6 +2482,7 @@ impl MemoryAccessor for Task {
         log_trace!("Reading {} bytes of memory from {:?}", bytes.len(), addr);
         self.mm.read_memory_to_slice(addr, bytes)
     }
+
     fn read_memory_partial_to_slice(
         &self,
         addr: UserAddress,
@@ -2486,13 +2491,19 @@ impl MemoryAccessor for Task {
         log_trace!("Reading up to {} bytes of memory from {:?}", bytes.len(), addr);
         self.mm.read_memory_partial_to_slice(addr, bytes)
     }
+
     fn write_memory(&self, addr: UserAddress, bytes: &[u8]) -> Result<usize, Errno> {
         log_trace!("Writing {} bytes to {:?}", bytes.len(), addr);
         self.mm.write_memory(addr, bytes)
     }
+
     fn write_memory_partial(&self, addr: UserAddress, bytes: &[u8]) -> Result<usize, Errno> {
         log_trace!("Writing up to {} bytes to {:?}", bytes.len(), addr);
         self.mm.write_memory_partial(addr, bytes)
+    }
+
+    fn zero(&self, addr: UserAddress, length: usize) -> Result<usize, Errno> {
+        self.mm.zero(addr, length)
     }
 }
 

@@ -29,6 +29,9 @@ pub trait OutputBuffer: std::fmt::Debug {
     /// Returns the number of bytes already written into the buffer.
     fn bytes_written(&self) -> usize;
 
+    /// Fills this buffer with zeros.
+    fn zero(&mut self) -> Result<usize, Errno>;
+
     /// Write the content of `buffer` into this buffer. If this buffer is too small, the write will
     /// be partial.
     ///
@@ -221,8 +224,32 @@ impl<'a> OutputBuffer for UserBuffersOutputBuffer<'a> {
     fn available(&self) -> usize {
         self.available
     }
+
     fn bytes_written(&self) -> usize {
         self.bytes_written
+    }
+
+    fn zero(&mut self) -> Result<usize, Errno> {
+        let mut bytes_written = 0;
+        while let Some(mut buffer) = self.buffers.pop() {
+            if buffer.is_null() {
+                continue;
+            }
+
+            let count = self.mm.zero(buffer.address, buffer.length)?;
+            buffer.advance(count)?;
+            bytes_written += count;
+
+            self.available -= count;
+            self.bytes_written += count;
+
+            if !buffer.is_empty() {
+                self.buffers.push(buffer);
+                break;
+            }
+        }
+
+        Ok(bytes_written)
     }
 }
 
@@ -366,6 +393,13 @@ impl OutputBuffer for VecOutputBuffer {
 
     fn bytes_written(&self) -> usize {
         self.bytes_written
+    }
+
+    fn zero(&mut self) -> Result<usize, Errno> {
+        let previous_bytes_written = self.bytes_written;
+        self.buffer.as_mut_slice()[previous_bytes_written..].fill(0);
+        self.bytes_written = self.buffer.len();
+        Ok(self.bytes_written - previous_bytes_written)
     }
 }
 

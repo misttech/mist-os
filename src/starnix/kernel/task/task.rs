@@ -100,6 +100,7 @@ impl MemoryAccessor for CurrentTask {
     fn read_memory_to_slice(&self, addr: UserAddress, bytes: &mut [u8]) -> Result<(), Errno> {
         self.mm.read_memory_to_slice(addr, bytes)
     }
+
     fn read_memory_partial_to_slice(
         &self,
         addr: UserAddress,
@@ -107,11 +108,17 @@ impl MemoryAccessor for CurrentTask {
     ) -> Result<usize, Errno> {
         self.mm.read_memory_partial_to_slice(addr, bytes)
     }
+
     fn write_memory(&self, addr: UserAddress, bytes: &[u8]) -> Result<usize, Errno> {
         self.mm.write_memory(addr, bytes)
     }
+
     fn write_memory_partial(&self, addr: UserAddress, bytes: &[u8]) -> Result<usize, Errno> {
         self.mm.write_memory_partial(addr, bytes)
+    }
+
+    fn zero(&self, addr: UserAddress, length: usize) -> Result<usize, Errno> {
+        self.mm.zero(addr, length)
     }
 }
 

@@ -432,6 +432,17 @@ impl<'a> OutputBuffer for SpliceOutputBuffer<'a> {
     fn bytes_written(&self) -> usize {
         self.len - self.available
     }
+
+    fn zero(&mut self) -> Result<usize, Errno> {
+        let bytes = vec![0; self.available];
+        let len = bytes.len();
+        if len > 0 {
+            self.pipe.messages.write_message(bytes.into());
+            self.pipe.notify_write();
+            self.available -= len;
+        }
+        Ok(len)
+    }
 }
 
 /// An InputBuffer that will read the data from `pipe`.

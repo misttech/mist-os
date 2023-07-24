@@ -143,10 +143,7 @@ impl FileOps for DevZero {
         _offset: usize,
         data: &mut dyn OutputBuffer,
     ) -> Result<usize, Errno> {
-        data.write_each(&mut |bytes| {
-            bytes.fill(0);
-            Ok(bytes.len())
-        })
+        data.zero()
     }
 }
 

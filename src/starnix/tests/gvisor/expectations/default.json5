@@ -829,9 +829,6 @@
                 "Inotify.MoveWatchedTargetGeneratesEvents",
                 "Inotify.GetdentsGeneratesAccessEvent",
 
-                // readv_test
-                "ReadvTestNoFixture.TruncatedAtMax",
-
                 // Breaks tests that run after it.
                 "MountTest.MaxMounts",
 

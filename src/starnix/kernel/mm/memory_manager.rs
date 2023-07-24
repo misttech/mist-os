@@ -194,6 +194,17 @@ impl Mapping {
         }
         self.vmo.write(bytes, self.address_to_offset(addr)).map_err(|_| errno!(EFAULT))
     }
+
+    fn zero(&self, addr: UserAddress, length: usize) -> Result<usize, Errno> {
+        if !self.prot_flags.contains(ProtectionFlags::WRITE) {
+            return error!(EFAULT);
+        }
+
+        self.vmo
+            .op_range(zx::VmoOp::ZERO, self.address_to_offset(addr), length as u64)
+            .map_err(|_| errno!(EFAULT))?;
+        Ok(length)
+    }
 }
 
 const PROGRAM_BREAK_LIMIT: u64 = 64 * 1024 * 1024;
@@ -1079,6 +1090,23 @@ impl MemoryManagerState {
             Ok(bytes.len())
         }
     }
+
+    fn zero(&self, addr: UserAddress, length: usize) -> Result<usize, Errno> {
+        let mut bytes_written = 0;
+        for (mapping, len) in self.get_contiguous_mappings_at(addr, length)? {
+            let next_offset = bytes_written + len;
+            if mapping.zero(addr + bytes_written, len).is_err() {
+                break;
+            }
+            bytes_written = next_offset;
+        }
+
+        if length != bytes_written {
+            error!(EFAULT)
+        } else {
+            Ok(length)
+        }
+    }
 }
 
 fn create_user_vmar(vmar: &zx::Vmar, vmar_info: &zx::VmarInfo) -> Result<zx::Vmar, zx::Status> {
@@ -1134,6 +1162,11 @@ pub trait MemoryAccessor {
     /// - `addr`: The address to write to.
     /// - `bytes`: The bytes to write from.
     fn write_memory_partial(&self, addr: UserAddress, bytes: &[u8]) -> Result<usize, Errno>;
+
+    /// Writes zeros starting at `addr` and continuing for `length` bytes.
+    ///
+    /// Returns the number of bytes that were zeroed.
+    fn zero(&self, addr: UserAddress, length: usize) -> Result<usize, Errno>;
 }
 
 pub trait MemoryAccessorExt: MemoryAccessor {
@@ -1369,6 +1402,10 @@ impl MemoryAccessor for MemoryManager {
 
     fn write_memory_partial(&self, addr: UserAddress, bytes: &[u8]) -> Result<usize, Errno> {
         self.state.read().write_memory_partial(addr, bytes)
+    }
+
+    fn zero(&self, addr: UserAddress, length: usize) -> Result<usize, Errno> {
+        self.state.read().zero(addr, length)
     }
 }
 

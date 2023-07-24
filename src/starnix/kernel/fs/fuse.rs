@@ -1569,15 +1569,22 @@ impl FuseOperation {
             fn available(&self) -> usize {
                 usize::MAX
             }
+
             fn bytes_written(&self) -> usize {
                 self.written
             }
+
+            fn zero(&mut self) -> Result<usize, Errno> {
+                panic!("Should not be called");
+            }
+
             fn write_each(
                 &mut self,
                 _callback: &mut OutputBufferCallback<'_>,
             ) -> Result<usize, Errno> {
                 panic!("Should not be called.");
             }
+
             fn write_all(&mut self, buffer: &[u8]) -> Result<usize, Errno> {
                 self.written += buffer.len();
                 Ok(buffer.len())
