@@ -353,10 +353,6 @@ func fuchsiaLogChecks() []FailureModeCheck {
 			OnlyOnStates: []string{"TIMED_OUT"},
 		},
 		&stringInLogCheck{
-			String: "failed to resolve fuchsia-pkg://fuchsia.com/run_test_component#bin/run-test-component",
-			Type:   swarmingOutputType,
-		},
-		&stringInLogCheck{
 			String: "Got no package for fuchsia-pkg://",
 			Type:   swarmingOutputType,
 		},
