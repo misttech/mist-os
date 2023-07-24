@@ -9,12 +9,6 @@
             environment: "#core-env",
         },
     ],
-    use: [
-        {
-            protocol: [ "fuchsia.bluetooth.deviceid.DeviceIdentification" ],
-            from: "#bt-device-id",
-        },
-    ],
     offer: [
         {
             protocol: [ "fuchsia.logger.LogSink" ],

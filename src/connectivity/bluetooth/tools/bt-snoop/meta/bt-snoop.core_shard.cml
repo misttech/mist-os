@@ -9,13 +9,6 @@
             environment: "#core-env",
         },
     ],
-    use: [
-        // Supports running `fx shell bt-snoop-cli`.
-        {
-            protocol: [ "fuchsia.bluetooth.snoop.Snoop" ],
-            from: "#bt-snoop",
-        },
-    ],
     offer: [
         {
             protocol: [ "fuchsia.logger.LogSink" ],

@@ -2,14 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 {
-    // Have /core use RCS so that svc_for_legacy_shell, and thus sshd_host, and thus
-    // remote_control_runner can see it.
-    use: [
-        {
-            protocol: "fuchsia.developer.remotecontrol.RemoteControl",
-            from: "#remote-control",
-        },
-    ],
     offer: [
         {
             protocol: [ "fuchsia.buildinfo.Provider" ],
@@ -73,13 +65,6 @@
             ],
             from: "parent",
             to: "#remote-control",
-        },
-
-        // Make RCS available to the runner command
-        {
-            protocol: "fuchsia.developer.remotecontrol.RemoteControl",
-            from: "#remote-control",
-            to: "#sshd-host",
         },
     ],
 }

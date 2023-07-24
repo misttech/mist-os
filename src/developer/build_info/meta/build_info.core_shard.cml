@@ -10,12 +10,6 @@
             url: "fuchsia-pkg://fuchsia.com/build-info-service#meta/build-info.cm",
         },
     ],
-    use: [
-        {
-            protocol: "fuchsia.buildinfo.Provider",
-            from: "#build-info",
-        },
-    ],
     offer: [
         {
             directory: "build-info",

@@ -9,12 +9,6 @@
             environment: "#core-env",
         },
     ],
-    use: [
-        {
-            protocol: [ "fuchsia.process.explorer.Query" ],
-            from: "#process_explorer",
-        },
-    ],
     offer: [
         {
             protocol: [

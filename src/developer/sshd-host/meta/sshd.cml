@@ -1,76 +1,86 @@
-// Copyright 2022 The Fuchsia Authors. All rights reserved.
+// Copyright 2023 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 {
     include: [ "syslog/client.shard.cml" ],
     program: {
         runner: "elf",
-        binary: "bin/sshd-host",
-        forward_stdout_to: "log",
+        binary: "bin/sshd",
+        args: [
+            "-ie",
+            "-f",
+            "/config/data/sshd_config",
+        ],
+
+        // stdin and stdout are forwarded to the SSH connection fd.
+        forward_stdout_to: "none",
         forward_stderr_to: "log",
     },
-    collections: [
-        {
-            name: "shell",
-            durability: "transient",
-        },
-    ],
+
+    // TODO(fxbug.dev/130576): Remove unused capabilities once shell tools run outside the
+    // sshd realm.
     use: [
-        {
-            protocol: "fuchsia.component.Realm",
-            from: "framework",
-        },
-        {
-            protocol: [
-                // Needed to get ssh keys from the bootloader file.
-                "fuchsia.boot.Items",
-
-                // Needed to listen on TCP port 22.
-                "fuchsia.posix.socket.Provider",
-
-                // Needed to launch `hostkeygen` child processes.
-                "fuchsia.process.Launcher",
-            ],
-        },
-
-        // Needed to provision ssh keys (from bootloader file).
         {
             directory: "config-data",
             rights: [ "r*" ],
             path: "/config/data",
         },
         {
+            directory: "bin",
+            rights: [ "rx*" ],
+            path: "/bin",
+        },
+        {
+            directory: "blob",
+            rights: [ "rw*" ],
+            path: "/blob",
+        },
+        {
+            directory: "boot",
+            rights: [ "rx*" ],
+            path: "/boot",
+        },
+        {
+            directory: "build-info",
+            rights: [ "r*" ],
+            path: "/config/build-info",
+        },
+        {
+            directory: "root-ssl-certificates",
+            rights: [ "r*" ],
+            path: "/config/ssl",
+        },
+        {
             directory: "data",
             rights: [ "rw*" ],
             path: "/data",
         },
-    ],
-    offer: [
         {
-            directory: [
-                "bin",
-                "blob",
-                "boot",
-                "build-info",
-                "config-data",
-                "data",
-                "dev-topological",
-                "pkgfs",
-                "root-ssl-certificates",
-                "system",
-                "tmp",
-            ],
-            from: "parent",
-            to: "#shell",
+            directory: "dev-topological",
+            rights: [ "rw*" ],
+            path: "/dev",
         },
         {
             directory: "mnt",
-            from: "parent",
-            to: "#shell",
+            rights: [ "rw*" ],
+            path: "/mnt",
             availability: "optional",
         },
-
-        // Protocols in shell namespace.
+        {
+            directory: "pkgfs",
+            rights: [ "rx*" ],
+            path: "/pkgfs",
+        },
+        {
+            directory: "system",
+            rights: [ "rx*" ],
+            path: "/system",
+        },
+        {
+            directory: "tmp",
+            rights: [ "rw*" ],
+            path: "/tmp",
+        },
         {
             protocol: [
                 "fuchsia.bluetooth.bredr.Profile",
@@ -171,11 +181,9 @@
                 "fuchsia.virtualconsole.SessionManager",
                 "fuchsia.vulkan.loader.Loader",
             ],
-            from: "parent",
-            to: "#shell",
         },
 
-        // Optional protocols in shell namespace that are not available on all builds.
+        // Optional protocols that are not available on all builds.
         {
             protocol: [
                 "fuchsia.audio.ffxdaemon.AudioDaemon",
@@ -289,8 +297,6 @@
                 "fuchsia.wlan.wlanix.Wlanix",
                 "sl4f.Binder",
             ],
-            from: "parent",
-            to: "#shell",
             availability: "optional",
         },
 
@@ -302,8 +308,6 @@
                 "fuchsia.overnet.ServiceConsumer",
                 "fuchsia.overnet.ServicePublisher",
             ],
-            from: "parent",
-            to: "#shell",
         },
 
         // TODO(https://fxbug.dev/90433): prune these once MDNS is a CFv2 component.
@@ -319,8 +323,6 @@
                 "fuchsia.net.mdns.ServiceSubscriber2",
                 "fuchsia.net.mdns.Subscriber",
             ],
-            from: "parent",
-            to: "#shell",
         },
     ],
 }

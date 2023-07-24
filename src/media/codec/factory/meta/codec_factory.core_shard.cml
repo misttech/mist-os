@@ -9,12 +9,6 @@
             environment: "#core-env",
         },
     ],
-    use: [
-        {
-            protocol: "fuchsia.mediacodec.CodecFactory",
-            from: "#codec_factory",
-        },
-    ],
     offer: [
         {
             directory: "dev-class",

@@ -11,19 +11,6 @@
             environment: "#core-env",
         },
     ],
-    use: [
-        {
-            protocol: [
-                "fuchsia.factory.AlphaFactoryStoreProvider",
-                "fuchsia.factory.CastCredentialsFactoryStoreProvider",
-                "fuchsia.factory.MiscFactoryStoreProvider",
-                "fuchsia.factory.PlayReadyFactoryStoreProvider",
-                "fuchsia.factory.WeaveFactoryStoreProvider",
-                "fuchsia.factory.WidevineFactoryStoreProvider",
-            ],
-            from: "#factory_store_providers",
-        },
-    ],
     offer: [
         {
             directory: "dev-class",

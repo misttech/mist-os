@@ -201,8 +201,7 @@
             availability: "same_as_target",
         },
         {
-            // Routed to session-manager via omaha_client_service.core_shard.cml or
-            // system_update_checker.core_shard.cml.
+            // Routed to session-manager via all_products_capabilities.core_shard.cml.
             protocol: [
                 "fuchsia.update.channel.Provider",
                 "fuchsia.update.channelcontrol.ChannelControl",
@@ -244,7 +243,7 @@
             availability: "same_as_target",
         },
         {
-            // Routed to session-manager via bt-bootstrap.core_shard.cml
+            // Routed to session-manager via product-specific core shard.
             protocol: [ "fuchsia.bluetooth.sys.Bootstrap" ],
             from: "parent",
             to: "#session",

@@ -17,14 +17,6 @@ Include the A2DP profile and tool in your build. For example, if using `fx set`,
 Look at the [bt-a2dp README](/src/connectivity/bluetooth/profiles/bt-a2dp/README.md) for any additional dependencies that
 may be needed.
 
-Include the [A2DP testonly core shard](/src/connectivity/bluetooth/profiles/bt-a2dp/meta/bt-a2dp-testonly.core_shard.cml)
-in your product configuration. This allows all testonly capabilities to be available to this tool.
-For example, if using `fx set`, add:
-
-```
---args 'core_realm_shards+=["//src/connectivity/bluetooth/profiles/bt-a2dp:testonly-core-shard"]'
-```
-
 ## PTS Testing
 
 1) Launch `$ bt-cli` and make sure the adapter is discoverable using `discoverable`.

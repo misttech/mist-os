@@ -20,7 +20,6 @@ group("tests") {
     "bedrock:tests",
     "cache_manager:tests",
     "component_manager:tests",
-    "core:tests",
     "early_boot_instrumentation:tests",
     "full-resolver:tests",
     "fuzzing:tests",

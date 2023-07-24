@@ -9,12 +9,6 @@
             environment: "#core-env",
         },
     ],
-    use: [
-        {
-            protocol: [ "fuchsia.audio.ffxdaemon.AudioDaemon" ],
-            from: "#audio_ffx_daemon",
-        },
-    ],
     offer: [
         {
             protocol: "fuchsia.logger.LogSink",

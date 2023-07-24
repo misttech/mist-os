@@ -10,16 +10,6 @@
             environment: "#core-env",
         },
     ],
-    use: [
-        {
-            protocol: [ "fuchsia.session.scene.Manager" ],
-            from: "#ui",
-        },
-        {
-            protocol: [ "fuchsia.lightsensor.Sensor" ],
-            from: "#ui",
-        },
-    ],
     offer: [
         // Routes to session-manager.
         {

@@ -8,12 +8,6 @@
             url: "fuchsia-pkg://fuchsia.com/ext4_readonly#meta/ext4_readonly.cm",
         },
     ],
-    use: [
-        {
-            protocol: "fuchsia.storage.ext4.Server",
-            from: "#fuchsia_storage_ext4_server",
-        },
-    ],
     offer: [
         {
             protocol: [ "fuchsia.logger.LogSink" ],

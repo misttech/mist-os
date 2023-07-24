@@ -1,18 +1,10 @@
 // Copyright 2022 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
+
+// The common parts of both the eager and lazy core shards.
+// Not usable without a child named "bt-a2dp", which is provided by those shards.
 {
-    // The common parts of both the eager and lazy core shards.
-    // Not usable without a child named "bt-a2dp", which is provided by those shards.
-    use: [
-        {
-            protocol: [
-                "fuchsia.bluetooth.a2dp.AudioMode",
-                "fuchsia.bluetooth.internal.a2dp.Controller",
-            ],
-            from: "#bt-a2dp",
-        },
-    ],
     offer: [
         {
             protocol: [

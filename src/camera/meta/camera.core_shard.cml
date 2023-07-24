@@ -9,13 +9,6 @@
             environment: "#core-env",
         },
     ],
-    use: [
-        {
-            // Make camera device watcher available to v1 components
-            protocol: "fuchsia.camera3.DeviceWatcher",
-            from: "#camera_device_watcher",
-        },
-    ],
     offer: [
         {
             protocol: [
