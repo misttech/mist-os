@@ -68,7 +68,7 @@ the system. Users may continue developing and maintaining existing legacy
 components while migrations take place at their own pace. However, if you write
 a new component, you are strongly advised to make it a modern component unless
 there is some reason it must be legacy. All legacy components in-tree must
-appear in the GN allowlist at [//build/components/cmx][gn-cmx-allowlist].
+appear in the GN allowlist at `//build/components/cmx`.
 
 For build configurations that include a [session
 component][glossary.session-component], all capabilities hosted by legacy
@@ -184,7 +184,6 @@ Reach out for questions or for status updates:
 [fuchsia-component]: https://fuchsia.dev/reference/fidl/fuchsia.component
 [fuchsia-sys2]: https://fuchsia.dev/reference/fidl/fuchsia.sys2
 [fuchsia-sys]: https://fuchsia.dev/reference/fidl/fuchsia.sys
-[gn-cmx-allowlist]: /build/components/cmx/BUILD.gn
 [initial-processes]: /docs/concepts/process/everything_between_power_on_and_your_component.md#initial-processes
 [intro]: /docs/concepts/components/v2/introduction.md
 [label-cf-v2-migration]: https://bugs.fuchsia.dev/p/fuchsia/issues/list?q=label%3Acf-v2-migration
