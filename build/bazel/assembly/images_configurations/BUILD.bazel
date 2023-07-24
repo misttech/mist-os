@@ -16,11 +16,7 @@ load(
     "fuchsia_zbi",
 )
 
-package(default_visibility = [
-    "//build/bazel/assembly:__subpackages__",
-    "//products/workbench:__subpackages__",
-    "//vendor/google:__subpackages__",
-])
+package(default_visibility = ["//visibility:public"])
 
 fuchsia_images_configuration(
     name = "fuchsia_x64",

@@ -11,11 +11,7 @@ load(
     "fuchsia_partitions_configuration",
 )
 
-package(default_visibility = [
-    "//build/bazel/assembly:__pkg__",
-    "//products/workbench:__subpackages__",
-    "//vendor/google:__subpackages__",
-])
+package(default_visibility = ["//visibility:public"])
 
 fuchsia_partition(
     name = "zircon-a",

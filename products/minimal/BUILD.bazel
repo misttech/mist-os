@@ -1,0 +1,89 @@
+# Copyright 2022 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+load("@legacy_ninja_build_outputs//:build_args.bzl", "authorized_ssh_keys_label")
+load(
+    "@fuchsia_sdk//fuchsia:assembly.bzl",
+    "BUILD_TYPES",
+    "INPUT_DEVICE_TYPE",
+    "fuchsia_elf_sizes",
+    "fuchsia_product_bundle",
+    "fuchsia_product_configuration",
+    "fuchsia_product_image",
+)
+
+# LINT.IfChange
+fuchsia_product_configuration(
+    name = "product_config",
+    json_config = {
+        "platform": {
+            "build_type": BUILD_TYPES.ENG,
+            "development_support": {
+                "authorized_ssh_keys_path": "LABEL(%s)" % authorized_ssh_keys_label if authorized_ssh_keys_label else None,
+            },
+            "fonts": {
+                "enabled": False,
+            },
+            "input": {
+                "supported_input_devices": [
+                    INPUT_DEVICE_TYPE.BUTTON,
+                    INPUT_DEVICE_TYPE.TOUCHSCREEN,
+                ],
+            },
+            "storage": {
+                "configure_fshost": True,
+                "live_usb_enabled": False,
+            },
+        },
+    },
+)
+# LINT.ThenChange(//products/minimal/BUILD.gn)
+
+fuchsia_product_image(
+    name = "image.x64",
+    board_config = "//boards:x64",
+    image = "//build/bazel/assembly/images_configurations:fuchsia_x64",
+    legacy_aib = "//build/bazel/assembly/assembly_input_bundles:legacy_fuchsia",
+    platform_aibs = "//build/bazel/assembly/assembly_input_bundles:platform_eng",
+    product_config = ":product_config",
+)
+
+fuchsia_elf_sizes(
+    name = "elf_sizes.x64",
+    product_image = ":image.x64",
+)
+
+fuchsia_product_bundle(
+    name = "product_bundle.x64",
+    board_name = "x64",
+    partitions_config = "//build/bazel/assembly/partitions_configurations:x64",
+    product_image = ":image.x64",
+    product_name = "fuchsia",
+    repository_keys = "//src/sys/pkg/repositories/devhost/keys",
+    update_epoch = "1",
+)
+
+fuchsia_product_image(
+    name = "image.qemu-x64",
+    board_config = "//boards:qemu-x64",
+    image = "//build/bazel/assembly/images_configurations:fuchsia_qemu-x64",
+    legacy_aib = "//build/bazel/assembly/assembly_input_bundles:legacy_fuchsia",
+    platform_aibs = "//build/bazel/assembly/assembly_input_bundles:platform_eng",
+    product_config = ":product_config",
+)
+
+fuchsia_elf_sizes(
+    name = "elf_sizes.qemu-x64",
+    product_image = ":image.qemu-x64",
+)
+
+fuchsia_product_bundle(
+    name = "product_bundle.qemu-x64",
+    board_name = "qemu-x64",
+    partitions_config = "//build/bazel/assembly/partitions_configurations:qemu-x64",
+    product_image = ":image.qemu-x64",
+    product_name = "fuchsia",
+    repository_keys = "//src/sys/pkg/repositories/devhost/keys",
+    update_epoch = "1",
+)

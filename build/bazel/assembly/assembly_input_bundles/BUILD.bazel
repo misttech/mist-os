@@ -9,11 +9,7 @@ load("//build/bazel/assembly:platform_aib.bzl", "platform_aib")
 load("//build/bazel/assembly:platform_aibs.bzl", "platform_aibs")
 load("//:bundles/assembly/platform_aib_names.bzl", "BRINGUP_PLATFORM_AIB_NAMES", "ENG_PLATFORM_AIB_NAMES", "ENG_PLATFORM_AIB_NAMES_RISCV64", "USERDEBUG_PLATFORM_AIB_NAMES", "USERDEBUG_PLATFORM_AIB_NAMES_RISCV64", "USER_PLATFORM_AIB_NAMES", "USER_PLATFORM_AIB_NAMES_RISCV64")
 
-package(default_visibility = [
-    "//build/bazel/assembly:__subpackages__",
-    "//products/workbench:__subpackages__",
-    "//vendor/google:__subpackages__",
-])
+package(default_visibility = ["//visibility:public"])
 
 assembly_bundle(
     name = "legacy_fuchsia",

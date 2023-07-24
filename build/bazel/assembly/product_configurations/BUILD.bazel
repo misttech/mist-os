@@ -32,33 +32,6 @@ fuchsia_product_configuration(
 
 # LINT.IfChange
 fuchsia_product_configuration(
-    name = "minimal",
-    json_config = {
-        "platform": {
-            "build_type": BUILD_TYPES.ENG,
-            "development_support": {
-                "authorized_ssh_keys_path": "LABEL(%s)" % authorized_ssh_keys_label if authorized_ssh_keys_label else None,
-            },
-            "fonts": {
-                "enabled": False,
-            },
-            "input": {
-                "supported_input_devices": [
-                    INPUT_DEVICE_TYPE.BUTTON,
-                    INPUT_DEVICE_TYPE.TOUCHSCREEN,
-                ],
-            },
-            "storage": {
-                "configure_fshost": True,
-                "live_usb_enabled": False,
-            },
-        },
-    },
-)
-# LINT.ThenChange(//products/minimal/BUILD.gn)
-
-# LINT.IfChange
-fuchsia_product_configuration(
     name = "core",
     base_packages = [
         ":small-open-fonts-collection",

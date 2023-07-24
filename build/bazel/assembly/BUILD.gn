@@ -8,24 +8,6 @@ import("//build/images/custom_signing.gni")
 import("//build/product.gni")
 
 if (is_fuchsia) {
-  bazel_product_bundle("minimal.x64") {
-    testonly = true
-    allow_eng_platform_bundle_use = true
-    bazel_product_bundle_target = "//build/bazel/assembly:minimal.x64"
-    bazel_product_image_target =
-        "//build/bazel/assembly:product_image_minimal.x64"
-    bazel_inputs_from_gn = [ "//build/images/fuchsia:fuchsia.bazel_legacy_aib" ]
-  }
-
-  bazel_product_bundle("minimal.qemu-x64") {
-    testonly = true
-    allow_eng_platform_bundle_use = true
-    bazel_product_bundle_target = "//build/bazel/assembly:minimal.qemu-x64"
-    bazel_product_image_target =
-        "//build/bazel/assembly:product_image_minimal.qemu-x64"
-    bazel_inputs_from_gn = [ "//build/images/fuchsia:fuchsia.bazel_legacy_aib" ]
-  }
-
   # Only do drivers lists comparison when both GN and Bazel assembly are done in
   # the same build.
   if (!use_bazel_images_only && bazel_product_bundle_target != "" &&

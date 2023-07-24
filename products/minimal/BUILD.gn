@@ -4,6 +4,7 @@
 
 import("//build/assembly/product_assembly_configuration.gni")
 import("//build/assembly/sshd_config.gni")
+import("//build/bazel/assembly/bazel_product_bundle.gni")
 
 assert(
     is_fuchsia,
@@ -40,4 +41,23 @@ product_assembly_configuration("minimal") {
   product = {
   }
 }
-# LINT.ThenChange(//build/bazel/assembly/product_configurations/BUILD.bazel)
+
+# LINT.ThenChange(//products/minimal/BUILD.bazel)
+
+bazel_product_bundle("product_bundle.x64") {
+  testonly = true
+  allow_eng_platform_bundle_use = true
+  bazel_product_bundle_target = ":product_bundle.x64"
+  bazel_product_image_target = ":image.x64"
+  bazel_elf_sizes_target = ":elf_sizes.x64"
+  bazel_inputs_from_gn = [ "//build/images/fuchsia:fuchsia.bazel_legacy_aib" ]
+}
+
+bazel_product_bundle("product_bundle.qemu-x64") {
+  testonly = true
+  allow_eng_platform_bundle_use = true
+  bazel_product_bundle_target = ":product_bundle.qemu-x64"
+  bazel_product_image_target = ":image.qemu-x64"
+  bazel_elf_sizes_target = ":elf_sizes.qemu-x64"
+  bazel_inputs_from_gn = [ "//build/images/fuchsia:fuchsia.bazel_legacy_aib" ]
+}

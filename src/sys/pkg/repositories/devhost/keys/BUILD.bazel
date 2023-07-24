@@ -4,6 +4,8 @@
 
 load("@fuchsia_sdk//fuchsia:assembly.bzl", "fuchsia_repository_keys")
 
+package(default_visibility = ["//visibility:public"])
+
 fuchsia_repository_keys(
     name = "keys",
     keys = [
@@ -11,10 +13,5 @@ fuchsia_repository_keys(
         "snapshot.json",
         "targets.json",
         "timestamp.json",
-    ],
-    visibility = [
-        "//build/bazel/assembly:__subpackages__",
-        "//products/workbench:__subpackages__",
-        "//vendor/google:__subpackages__",
     ],
 )
