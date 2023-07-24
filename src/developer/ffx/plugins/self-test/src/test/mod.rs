@@ -60,6 +60,7 @@ pub async fn get_target_nodename() -> Result<String> {
     }
 
     let isolate = new_isolate("initial-target-discovery").await?;
+    isolate.start_daemon().await?;
 
     // ensure a daemon is spun up first, so we have a moment to discover targets.
     let out = isolate.ffx(&["target", "wait", "-t", "5"]).await?;
