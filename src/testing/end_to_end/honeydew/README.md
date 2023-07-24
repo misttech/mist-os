@@ -244,9 +244,6 @@ INFO:honeydew.device_classes.fuchsia_device_base:Snapshot file has been saved @ 
 ```python
 >>> emu.close()
 >>> del emu
-
-# call this in the end
->>> ffx.close()
 ```
 
 ## HoneyDew code guidelines

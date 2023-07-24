@@ -4,6 +4,7 @@
 # found in the LICENSE file.
 """Provides methods for Host-(Fuchsia)Target interactions via FFX."""
 
+import atexit
 import json
 import logging
 import subprocess
@@ -38,6 +39,7 @@ def setup(logs_dir: str) -> None:
     * Creates a new isolation dir needed to run FFX in isolation mode.
       This results in spawning a new FFX daemon.
     * Initializes a directory for storing FFX logs (ffx.log and ffx.daemon.log).
+    * Registers FFX isolation dir clean up to run on normal program termination.
 
     Args:
         logs_dir: Directory for storing FFX logs (ffx.log and ffx.daemon.log).
@@ -51,8 +53,8 @@ def setup(logs_dir: str) -> None:
       single location.
     * If this method is not called then FFX logs will not be saved and will use
       the system level FFX daemon (instead of spawning new one using isolation).
-    * Ensure to call close() in the end if you have called this setup() method.
-      Otherwise, FFX daemon start by this method will not be killed.
+    * FFX daemon clean up is already handled by this method though users can
+      manually call close() to clean up earlier in the process if necessary.
     """
     global _ISOLATE_DIR
     global _LOGS_DIR
@@ -62,6 +64,9 @@ def setup(logs_dir: str) -> None:
 
     _ISOLATE_DIR = fuchsia_controller.IsolateDir()
     _LOGGER.debug("ffx isolation dir is: '%s'", _ISOLATE_DIR.directory())
+    # Prevent FFX daemon leaks by ensuring clean up occurs upon normal
+    # program termination.
+    atexit.register(close)
 
     _LOGS_DIR = logs_dir
     _LOGGER.debug("ffx logs dir is '%s'", _LOGS_DIR)

@@ -78,7 +78,9 @@ def destroy(
     for fuchsia_device in fuchsia_devices:
         fuchsia_device.close()
 
-    # Call `ffx.close` in the end only after closing all the HoneyDew devices
+    # Call `ffx.close` manually even though it's already registered for clean up
+    # in `ffx.setup` in order to minimize chance of FFX daemon leak in the event
+    # that SIGKILL/SIGTERM is received between `destroy` and test program exit.
     ffx.close()
 
 
