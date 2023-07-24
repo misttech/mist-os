@@ -2,37 +2,23 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 {
-    children: [
-        {
-            name: "system-update-configurator",
-            url: "fuchsia-pkg://fuchsia.com/system-update-configurator#meta/system-update-configurator.cm",
-        },
-    ],
     use: [
         {
             protocol: [
                 "fuchsia.update.config.OptOut",
                 "fuchsia.update.config.OptOutAdmin",
             ],
-            from: "#system-update-configurator",
+            from: "#system-update",
         },
     ],
     offer: [
-        {
-            protocol: [
-                "fuchsia.inspect.InspectSink",
-                "fuchsia.logger.LogSink",
-            ],
-            from: "parent",
-            to: [ "#system-update-configurator" ],
-        },
         {
             protocol: [
                 "fuchsia.tee.Application.99dc95b2-938e-47eb-80e8-9404ae8a1385",
                 "fuchsia.tee.DeviceInfo",
             ],
             from: "#tee_manager",
-            to: [ "#system-update-configurator" ],
+            to: [ "#system-update" ],
         },
     ],
 }

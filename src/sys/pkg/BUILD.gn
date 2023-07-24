@@ -58,10 +58,6 @@ group("tools") {
 
 # TODO(fxbug.dev/123798) Remove after migration to assembly.
 group("system-update-configurator-transitional") {
-  public_deps = [
-    "bin/system-update-configurator",
-    "bin/system-update-configurator:core-shard",
-  ]
 }
 
 group("system-update-configurator") {

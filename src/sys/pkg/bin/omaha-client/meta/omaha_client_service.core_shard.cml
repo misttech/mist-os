@@ -14,13 +14,6 @@
     ],
     offer: [
         {
-            protocol: "fuchsia.update.config.OptOut",
-            from: "#system-update-configurator",
-            to: "#system-update",
-            source_availability: "unknown",
-            availability: "optional",
-        },
-        {
             protocol: [
                 "fuchsia.cobalt.SystemDataUpdater",
                 "fuchsia.metrics.MetricEventLoggerFactory",

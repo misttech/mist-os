@@ -32,11 +32,6 @@
             to: "#system-updater",
         },
         {
-            protocol: [ "fuchsia.logger.LogSink" ],
-            from: "parent",
-            to: [ "#system-updater" ],
-        },
-        {
             protocol: [
                 "fuchsia.hardware.power.statecontrol.Admin",
                 "fuchsia.paver.Paver",

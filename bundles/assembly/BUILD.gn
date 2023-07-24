@@ -1424,8 +1424,32 @@ assembly_input_bundle("no_update_checker") {
 }
 
 # Include the system-update-configurator component as part of the SWD subsystem.
-# TODO(fxbug.dev/123798): Fill out once transition pieces are in place.
 assembly_input_bundle("system_update_configurator") {
+  base_packages = [ "//src/sys/pkg/bin/system-update-configurator" ]
+  compiled_packages = [
+    {
+      name = "core"
+      component_shards = [
+        {
+          component_name = "core"
+          shards = rebase_path(
+                  [ "//src/sys/pkg/bin/system-update-configurator/meta/core-shard.cml" ],
+                  root_build_dir)
+        },
+      ]
+    },
+    {
+      name = "system-update-realm"
+      component_shards = [
+        {
+          component_name = "system-update-realm"
+          shards = rebase_path(
+                  [ "//src/sys/pkg/bin/system-update-configurator/meta/system-update-shard.cml" ],
+                  root_build_dir)
+        },
+      ]
+    },
+  ]
 }
 
 # AIB to enable virtualization support.

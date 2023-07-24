@@ -13,9 +13,10 @@
     offer: [
         {
             protocol: "fuchsia.update.config.OptOut",
-            from: "parent",
+            from: "#system-update-configurator",
             to: "#omaha-client-service",
-            availability: "same_as_target",
+            source_availability: "unknown",
+            availability: "optional",
         },
         {
             protocol: "fuchsia.update.installer.Installer",
@@ -51,14 +52,6 @@
         {
             protocol: "fuchsia.update.CommitStatusProvider",
             from: "#system-update-committer",
-            to: "#omaha-client-service",
-        },
-        {
-            protocol: [
-                "fuchsia.inspect.InspectSink",
-                "fuchsia.logger.LogSink",
-            ],
-            from: "parent",
             to: "#omaha-client-service",
         },
         {
