@@ -107,22 +107,6 @@ std::vector<ui_testing::UITestRealm::Config> UIConfigurationsToTest() {
       fuchsia::input::virtualkeyboard::Manager::Name_,
       fuchsia::input::virtualkeyboard::ControllerCreator::Name_};
 
-  // GFX x scene manager
-  {
-    ui_testing::UITestRealm::Config config;
-    config.accessibility_owner = ui_testing::UITestRealm::AccessibilityOwnerType::FAKE;
-    config.use_scene_owner = true;
-    config.ui_to_client_services = protocols_required;
-    config.passthrough_capabilities = {
-        {Protocol{fuchsia::kernel::VmexResource::Name_},
-         Protocol{fuchsia::process::Launcher::Name_},
-         Directory{
-             .name = "root-ssl-certificates",
-             .type = fuchsia::component::decl::DependencyType::STRONG,
-         }}};
-    configs.push_back(std::move(config));
-  }
-
   // Flatland x scene manager
   {
     ui_testing::UITestRealm::Config config;

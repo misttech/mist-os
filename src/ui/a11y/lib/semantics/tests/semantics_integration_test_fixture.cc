@@ -84,18 +84,6 @@ std::vector<ui_testing::UITestRealm::Config> SemanticsIntegrationTestV2::UIConfi
       },
   };
 
-  // Gfx x scene manager
-  {
-    ui_testing::UITestRealm::Config config;
-
-    config.device_pixel_ratio = kDevicePixelRatio;
-    config.use_scene_owner = true;
-    config.ui_to_client_services = {fuchsia::ui::scenic::Scenic::Name_};
-
-    config.passthrough_capabilities = passthrough_capabilities;
-    configs.push_back(config);
-  }
-
   // Flatland x scene manager
   {
     ui_testing::UITestRealm::Config config;
