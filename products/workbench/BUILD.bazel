@@ -47,6 +47,22 @@ fuchsia_product_bundle(
 )
 
 fuchsia_product_bundle(
+    name = "product_bundle_eng.qemu-x64",
+    board_name = "qemu-x64",
+    default_virtual_device = ":workbench_emu",
+    partitions_config = ":partitions.x64",
+    product_image = ":assembly_eng.qemu-x64",
+    product_name = "workbench_eng",
+    recovery = ":assembly_eng.qemu-x64_recovery",
+    repository_keys = "//src/sys/pkg/repositories/devhost/keys",
+    update_epoch = "1",
+    update_version_file = "@legacy_ninja_build_outputs//:build_info_version.txt",
+    virtual_devices = [
+        ":workbench_emu",
+    ],
+)
+
+fuchsia_product_bundle(
     name = "product_bundle_eng.vim3",
     board_name = "vim3",
     partitions_config = "//build/bazel/assembly/partitions_configurations:vim3",
@@ -126,6 +142,24 @@ fuchsia_product_image(
 fuchsia_product_image(
     name = "assembly_eng.x64",
     board_config = "//boards:x64",
+    image = ":images_config",
+    legacy_aib = "//build/bazel/assembly/assembly_input_bundles:legacy_fuchsia",
+    platform_aibs = "//build/bazel/assembly/assembly_input_bundles:platform_eng",
+    product_config = ":assembly_config_eng",
+)
+
+fuchsia_product_image(
+    name = "assembly_eng.qemu-x64_recovery",
+    board_config = "//boards:qemu-x64",
+    image = ":recovery_images_config",
+    legacy_aib = "//build/bazel/assembly/assembly_input_bundles:legacy_fuchsia",
+    platform_aibs = "//build/bazel/assembly/assembly_input_bundles:platform_eng",
+    product_config = ":assembly_config_eng",
+)
+
+fuchsia_product_image(
+    name = "assembly_eng.qemu-x64",
+    board_config = "//boards:qemu-x64",
     image = ":images_config",
     legacy_aib = "//build/bazel/assembly/assembly_input_bundles:legacy_fuchsia",
     platform_aibs = "//build/bazel/assembly/assembly_input_bundles:platform_eng",
