@@ -386,13 +386,11 @@ impl File for FxFile {
     }
 
     async fn list_extended_attributes(&self) -> Result<Vec<Vec<u8>>, Status> {
-        let basic = self.handle.basic_handle();
-        basic.list_extended_attributes().await.map_err(map_to_status)
+        self.handle.store_handle().list_extended_attributes().await.map_err(map_to_status)
     }
 
     async fn get_extended_attribute(&self, name: Vec<u8>) -> Result<Vec<u8>, Status> {
-        let basic = self.handle.basic_handle();
-        basic.get_extended_attribute(name).await.map_err(map_to_status)
+        self.handle.store_handle().get_extended_attribute(name).await.map_err(map_to_status)
     }
 
     async fn set_extended_attribute(
@@ -401,13 +399,15 @@ impl File for FxFile {
         value: Vec<u8>,
         mode: fio::SetExtendedAttributeMode,
     ) -> Result<(), Status> {
-        let basic = self.handle.basic_handle();
-        basic.set_extended_attribute(name, value, mode.into()).await.map_err(map_to_status)
+        self.handle
+            .store_handle()
+            .set_extended_attribute(name, value, mode.into())
+            .await
+            .map_err(map_to_status)
     }
 
     async fn remove_extended_attribute(&self, name: Vec<u8>) -> Result<(), Status> {
-        let basic = self.handle.basic_handle();
-        basic.remove_extended_attribute(name).await.map_err(map_to_status)
+        self.handle.store_handle().remove_extended_attribute(name).await.map_err(map_to_status)
     }
 
     async fn sync(&self, mode: SyncMode) -> Result<(), Status> {

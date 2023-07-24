@@ -24,7 +24,8 @@ use {
                 self, AssocObj, AssociatedObject, LockKey, Mutation, ObjectStoreMutation, Options,
                 Transaction,
             },
-            HandleOptions, HandleOwner, KeyUnwrapper, ObjectStore, TrimMode, TrimResult,
+            HandleOptions, HandleOwner, KeyUnwrapper, ObjectStore, StoreObjectHandle, TrimMode,
+            TrimResult,
         },
         range::RangeExt,
         round::{round_down, round_up},
@@ -40,19 +41,23 @@ use {
         cmp::min,
         ops::{Bound, Range},
         sync::{
-            atomic::{self, AtomicBool, AtomicU64},
+            atomic::{self, AtomicU64},
             Arc,
         },
     },
     storage_device::buffer::{Buffer, BufferRef, MutableBufferRef},
 };
 
+/// DataObjectHandle is a typed handle for file-like objects that store data in the default data
+/// attribute. In addition to traditional files, this means things like the journal, superblocks,
+/// and layer files.
+///
+/// It caches the content size of the data attribute it was configured for, and has helpers for
+/// complex extent manipulation, as well as implementations of ReadObjectHandle and
+/// WriteObjectHandle.
 pub struct DataObjectHandle<S: HandleOwner> {
-    owner: Arc<S>,
-    object_id: u64,
+    handle: StoreObjectHandle<S>,
     attribute_id: u64,
-    options: HandleOptions,
-    trace: AtomicBool,
     keys: Option<KeyUnwrapper>,
     content_size: AtomicU64,
 }
@@ -68,18 +73,15 @@ impl<S: HandleOwner> DataObjectHandle<S> {
         trace: bool,
     ) -> Self {
         Self {
-            owner,
-            object_id,
+            handle: StoreObjectHandle::new(owner, object_id, options, trace),
             keys,
             attribute_id,
-            options,
-            trace: AtomicBool::new(trace),
             content_size: AtomicU64::new(size),
         }
     }
 
     pub fn owner(&self) -> &Arc<S> {
-        &self.owner
+        self.handle.owner()
     }
 
     pub fn attribute_id(&self) -> u64 {
@@ -87,11 +89,15 @@ impl<S: HandleOwner> DataObjectHandle<S> {
     }
 
     pub fn store(&self) -> &ObjectStore {
-        self.owner.as_ref().as_ref()
+        self.handle.store()
     }
 
     pub fn trace(&self) -> bool {
-        self.trace.load(atomic::Ordering::Relaxed)
+        self.handle.trace()
+    }
+
+    pub fn handle(&self) -> &StoreObjectHandle<S> {
+        &self.handle
     }
 
     /// Extend the file with the given extent.  The only use case for this right now is for files
@@ -111,7 +117,11 @@ impl<S: HandleOwner> DataObjectHandle<S> {
         transaction.add_with_object(
             self.store().store_object_id,
             Mutation::replace_or_insert_object(
-                ObjectKey::attribute(self.object_id, self.attribute_id, AttributeKey::Attribute),
+                ObjectKey::attribute(
+                    self.object_id(),
+                    self.attribute_id(),
+                    AttributeKey::Attribute,
+                ),
                 ObjectValue::attribute(new_size),
             ),
             AssocObj::Borrowed(self),
@@ -119,7 +129,7 @@ impl<S: HandleOwner> DataObjectHandle<S> {
         transaction.add(
             self.store().store_object_id,
             Mutation::merge_object(
-                ObjectKey::extent(self.object_id, self.attribute_id, old_end..new_size),
+                ObjectKey::extent(self.object_id(), self.attribute_id(), old_end..new_size),
                 ObjectValue::Extent(ExtentValue::new(device_range.start)),
             ),
         );
@@ -213,7 +223,7 @@ impl<S: HandleOwner> DataObjectHandle<S> {
         if self.trace() {
             info!(
                 store_id = self.store().store_object_id(),
-                oid = self.object_id,
+                oid = self.object_id(),
                 device_range = ?(device_offset..device_offset + buf.len() as u64),
                 len = buf.len(),
                 "W",
@@ -249,7 +259,7 @@ impl<S: HandleOwner> DataObjectHandle<S> {
         let layer_set = tree.layer_set();
         let key = ExtentKey { range };
         let lower_bound = ObjectKey::attribute(
-            self.object_id,
+            self.object_id(),
             attribute_id,
             AttributeKey::Extent(key.search_key()),
         );
@@ -268,7 +278,7 @@ impl<S: HandleOwner> DataObjectHandle<S> {
             ..
         }) = iter.get()
         {
-            if *object_id != self.object_id || *attr_id != attribute_id {
+            if *object_id != self.object_id() || *attr_id != attribute_id {
                 break;
             }
             if let ExtentValue::Some { device_offset, .. } = value {
@@ -279,7 +289,7 @@ impl<S: HandleOwner> DataObjectHandle<S> {
                     if trace {
                         info!(
                             store_id = self.store().store_object_id(),
-                            oid = self.object_id,
+                            oid = self.object_id(),
                             device_range = ?range,
                             len = range.end - range.start,
                             ?extent_key,
@@ -306,13 +316,13 @@ impl<S: HandleOwner> DataObjectHandle<S> {
         range: Range<u64>,
     ) -> Result<(), Error> {
         let deallocated =
-            self.deallocate_old_extents(transaction, self.attribute_id, range.clone()).await?;
+            self.deallocate_old_extents(transaction, self.attribute_id(), range.clone()).await?;
         if deallocated > 0 {
             self.update_allocated_size(transaction, 0, deallocated).await?;
             transaction.add(
                 self.store().store_object_id,
                 Mutation::merge_object(
-                    ObjectKey::extent(self.object_id, self.attribute_id, range),
+                    ObjectKey::extent(self.object_id(), self.attribute_id(), range),
                     ObjectValue::Extent(ExtentValue::deleted_extent()),
                 ),
             );
@@ -340,8 +350,8 @@ impl<S: HandleOwner> DataObjectHandle<S> {
         let tree = &self.store().tree;
         let layer_set = tree.layer_set();
         let offset_key = ObjectKey::attribute(
-            self.object_id,
-            self.attribute_id,
+            self.object_id(),
+            self.attribute_id(),
             AttributeKey::Extent(ExtentKey::search_key_from_offset(start_offset)),
         );
         let mut merger = layer_set.merger();
@@ -365,7 +375,7 @@ impl<S: HandleOwner> DataObjectHandle<S> {
                     ..
                 }) => {
                     // Equivalent of getting no extents back
-                    if *object_id != self.object_id || *attribute_id != self.attribute_id {
+                    if *object_id != self.object_id() || *attribute_id != self.attribute_id() {
                         if allocated == Some(false) || allocated.is_none() {
                             end = self.get_size();
                             allocated = Some(false);
@@ -439,14 +449,15 @@ impl<S: HandleOwner> DataObjectHandle<S> {
             return Ok(());
         }
         let (aligned, mut transfer_buf) = self.align_buffer(offset, buf).await?;
-        self.multi_write(transaction, self.attribute_id, &[aligned], transfer_buf.as_mut()).await?;
+        self.multi_write(transaction, self.attribute_id(), &[aligned], transfer_buf.as_mut())
+            .await?;
         if offset + buf.len() as u64 > self.txn_get_size(transaction) {
             transaction.add_with_object(
                 self.store().store_object_id,
                 Mutation::replace_or_insert_object(
                     ObjectKey::attribute(
-                        self.object_id,
-                        self.attribute_id,
+                        self.object_id(),
+                        self.attribute_id(),
                         AttributeKey::Attribute,
                     ),
                     ObjectValue::attribute(offset + buf.len() as u64),
@@ -497,7 +508,7 @@ impl<S: HandleOwner> DataObjectHandle<S> {
             if trace {
                 info!(
                     store_id,
-                    oid = self.object_id,
+                    oid = self.object_id(),
                     ?device_range,
                     len = device_range.end - device_range.start,
                     "A",
@@ -535,7 +546,7 @@ impl<S: HandleOwner> DataObjectHandle<S> {
                         let tail = checksums.split_off((l / block_size) as usize);
                         mutations.push(Mutation::merge_object(
                             ObjectKey::extent(
-                                self.object_id,
+                                self.object_id(),
                                 attribute_id,
                                 current_range.start..current_range.start + l,
                             ),
@@ -604,8 +615,8 @@ impl<S: HandleOwner> DataObjectHandle<S> {
             let mut merger = layer_set.merger();
             let mut iter = merger
                 .seek(Bound::Included(&ObjectKey::attribute(
-                    self.object_id,
-                    self.attribute_id,
+                    self.object_id(),
+                    self.attribute_id(),
                     AttributeKey::Extent(ExtentKey::search_key_from_offset(offset)),
                 )))
                 .await?;
@@ -625,8 +636,8 @@ impl<S: HandleOwner> DataObjectHandle<S> {
                             },
                         value,
                         ..
-                    }) if *object_id == self.object_id
-                        && *attribute_id == self.attribute_id
+                    }) if *object_id == self.object_id()
+                        && *attribute_id == self.attribute_id()
                         && range.start <= offset =>
                     {
                         match value {
@@ -701,8 +712,8 @@ impl<S: HandleOwner> DataObjectHandle<S> {
                                 ..
                             }) = maybe_item_ref
                             {
-                                if *object_id == self.object_id
-                                    && *attribute_id == self.attribute_id
+                                if *object_id == self.object_id()
+                                    && *attribute_id == self.attribute_id()
                                     && offset < range.start
                                 {
                                     let bytes_until_next_extent = range.start - offset;
@@ -719,8 +730,8 @@ impl<S: HandleOwner> DataObjectHandle<S> {
                                 store_object_id,
                                 Mutation::insert_object(
                                     ObjectKey::extent(
-                                        self.object_id,
-                                        self.attribute_id,
+                                        self.object_id(),
+                                        self.attribute_id(),
                                         offset..offset + device_range_len,
                                     ),
                                     ObjectValue::Extent(ExtentValue::new(device_range.start)),
@@ -776,7 +787,7 @@ impl<S: HandleOwner> DataObjectHandle<S> {
         &self,
         transaction: &Transaction<'_>,
     ) -> Result<ObjectStoreMutation, Error> {
-        self.store().txn_get_object_mutation(transaction, self.object_id).await
+        self.store().txn_get_object_mutation(transaction, self.object_id()).await
     }
 
     // Within a transaction, the size of the object might have changed, so get the size from there
@@ -785,7 +796,11 @@ impl<S: HandleOwner> DataObjectHandle<S> {
         transaction
             .get_object_mutation(
                 self.store().store_object_id,
-                ObjectKey::attribute(self.object_id, self.attribute_id, AttributeKey::Attribute),
+                ObjectKey::attribute(
+                    self.object_id(),
+                    self.attribute_id(),
+                    AttributeKey::Attribute,
+                ),
             )
             .and_then(|m| {
                 if let ObjectItem { value: ObjectValue::Attribute { size }, .. } = m.item {
@@ -853,8 +868,8 @@ impl<S: HandleOwner> DataObjectHandle<S> {
             store
                 .trim_some(
                     transaction,
-                    self.object_id,
-                    self.attribute_id,
+                    self.object_id(),
+                    self.attribute_id(),
                     TrimMode::FromOffset(size),
                 )
                 .await?,
@@ -864,7 +879,10 @@ impl<S: HandleOwner> DataObjectHandle<S> {
             // Add the object to the graveyard in case the following transactions don't get
             // replayed.
             let graveyard_id = store.graveyard_directory_object_id();
-            match store.tree.find(&ObjectKey::graveyard_entry(graveyard_id, self.object_id)).await?
+            match store
+                .tree
+                .find(&ObjectKey::graveyard_entry(graveyard_id, self.object_id()))
+                .await?
             {
                 Some(ObjectItem { value: ObjectValue::Some, .. })
                 | Some(ObjectItem { value: ObjectValue::Trim, .. }) => {
@@ -874,7 +892,7 @@ impl<S: HandleOwner> DataObjectHandle<S> {
                     transaction.add(
                         store.store_object_id,
                         Mutation::replace_or_insert_object(
-                            ObjectKey::graveyard_entry(graveyard_id, self.object_id),
+                            ObjectKey::graveyard_entry(graveyard_id, self.object_id()),
                             ObjectValue::Trim,
                         ),
                     );
@@ -884,7 +902,11 @@ impl<S: HandleOwner> DataObjectHandle<S> {
         transaction.add_with_object(
             store.store_object_id,
             Mutation::replace_or_insert_object(
-                ObjectKey::attribute(self.object_id, self.attribute_id, AttributeKey::Attribute),
+                ObjectKey::attribute(
+                    self.object_id(),
+                    self.attribute_id(),
+                    AttributeKey::Attribute,
+                ),
                 ObjectValue::attribute(size),
             ),
             AssocObj::Borrowed(self),
@@ -904,8 +926,8 @@ impl<S: HandleOwner> DataObjectHandle<S> {
             store
                 .trim_some(
                     transaction,
-                    self.object_id,
-                    self.attribute_id,
+                    self.object_id(),
+                    self.attribute_id(),
                     TrimMode::FromOffset(old_size)
                 )
                 .await?,
@@ -921,8 +943,8 @@ impl<S: HandleOwner> DataObjectHandle<S> {
             let aligned_old_size = round_down(old_size, block_size);
             let iter = merger
                 .seek(Bound::Included(&ObjectKey::extent(
-                    self.object_id,
-                    self.attribute_id,
+                    self.object_id(),
+                    self.attribute_id(),
                     aligned_old_size..aligned_old_size + 1,
                 )))
                 .await?;
@@ -937,7 +959,7 @@ impl<S: HandleOwner> DataObjectHandle<S> {
                 ..
             }) = iter.get()
             {
-                if *object_id == self.object_id && *attribute_id == self.attribute_id {
+                if *object_id == self.object_id() && *attribute_id == self.attribute_id() {
                     let device_offset = device_offset
                         .checked_add(aligned_old_size - extent_key.range.start)
                         .ok_or(FxfsError::Inconsistent)?;
@@ -959,7 +981,11 @@ impl<S: HandleOwner> DataObjectHandle<S> {
         transaction.add_with_object(
             store.store_object_id,
             Mutation::replace_or_insert_object(
-                ObjectKey::attribute(self.object_id, self.attribute_id, AttributeKey::Attribute),
+                ObjectKey::attribute(
+                    self.object_id(),
+                    self.attribute_id(),
+                    AttributeKey::Attribute,
+                ),
                 ObjectValue::attribute(size),
             ),
             AssocObj::Borrowed(self),
@@ -982,8 +1008,8 @@ impl<S: HandleOwner> DataObjectHandle<S> {
         let mut merger = layer_set.merger();
         let mut iter = merger
             .seek(Bound::Included(&ObjectKey::attribute(
-                self.object_id,
-                self.attribute_id,
+                self.object_id(),
+                self.attribute_id(),
                 AttributeKey::Extent(ExtentKey::search_key_from_offset(file_range.start)),
             )))
             .await?;
@@ -1004,8 +1030,8 @@ impl<S: HandleOwner> DataObjectHandle<S> {
                             },
                         value: ObjectValue::Extent(ExtentValue::Some { device_offset, .. }),
                         ..
-                    }) if *object_id == self.object_id
-                        && *attribute_id == self.attribute_id
+                    }) if *object_id == self.object_id()
+                        && *attribute_id == self.attribute_id()
                         && range.start < file_range.end =>
                     {
                         ensure!(
@@ -1049,8 +1075,8 @@ impl<S: HandleOwner> DataObjectHandle<S> {
                             },
                         value: ObjectValue::Extent(ExtentValue::None),
                         ..
-                    }) if *object_id == self.object_id
-                        && *attribute_id == self.attribute_id
+                    }) if *object_id == self.object_id()
+                        && *attribute_id == self.attribute_id()
                         && range.end < file_range.end =>
                     {
                         iter.advance().await?;
@@ -1078,7 +1104,7 @@ impl<S: HandleOwner> DataObjectHandle<S> {
             transaction.add(
                 self.store().store_object_id,
                 Mutation::merge_object(
-                    ObjectKey::extent(self.object_id, self.attribute_id, this_file_range),
+                    ObjectKey::extent(self.object_id(), self.attribute_id(), this_file_range),
                     ObjectValue::Extent(ExtentValue::new(device_range.start)),
                 ),
             );
@@ -1091,8 +1117,8 @@ impl<S: HandleOwner> DataObjectHandle<S> {
                 self.store().store_object_id,
                 Mutation::replace_or_insert_object(
                     ObjectKey::attribute(
-                        self.object_id,
-                        self.attribute_id,
+                        self.object_id(),
+                        self.attribute_id(),
                         AttributeKey::Attribute,
                     ),
                     ObjectValue::attribute(file_range.end),
@@ -1181,15 +1207,11 @@ impl<S: HandleOwner> DataObjectHandle<S> {
     /// Get the default set of transaction options for this object. This is mostly the overall
     /// default, modified by any [`HandleOptions`] held by this handle.
     pub fn default_transaction_options<'b>(&self) -> Options<'b> {
-        Options { skip_journal_checks: self.options.skip_journal_checks, ..Default::default() }
+        self.handle.default_transaction_options()
     }
 
     pub async fn new_transaction<'b>(&self) -> Result<Transaction<'b>, Error> {
-        self.new_transaction_with_options(Options {
-            skip_journal_checks: self.options.skip_journal_checks,
-            ..Default::default()
-        })
-        .await
+        self.new_transaction_with_options(self.default_transaction_options()).await
     }
 
     pub async fn new_transaction_with_options<'b>(
@@ -1202,11 +1224,11 @@ impl<S: HandleOwner> DataObjectHandle<S> {
             .new_transaction(
                 &[
                     LockKey::object_attribute(
-                        self.store().store_object_id,
-                        self.object_id,
-                        self.attribute_id,
+                        self.store().store_object_id(),
+                        self.object_id(),
+                        self.attribute_id(),
                     ),
-                    LockKey::object(self.store().store_object_id, self.object_id),
+                    LockKey::object(self.store().store_object_id(), self.object_id()),
                 ],
                 options,
             )
@@ -1224,7 +1246,7 @@ impl<S: HandleOwner> DataObjectHandle<S> {
         let tree = &store.tree;
         let layer_set = tree.layer_set();
         let mut merger = layer_set.merger();
-        let key = ObjectKey::attribute(self.object_id, attribute_id, AttributeKey::Attribute);
+        let key = ObjectKey::attribute(self.object_id(), attribute_id, AttributeKey::Attribute);
         let mut iter = merger.seek(Bound::Included(&key)).await?;
         let (mut buffer, size) = match iter.get() {
             Some(item) if item.key == &key => match item.value {
@@ -1254,7 +1276,7 @@ impl<S: HandleOwner> DataObjectHandle<S> {
                         },
                     value: ObjectValue::Extent(extent_value),
                     ..
-                }) if *object_id == self.object_id && *attr_id == attribute_id => {
+                }) if *object_id == self.object_id() && *attr_id == attribute_id => {
                     if let ExtentValue::Some { device_offset, key_id, .. } = extent_value {
                         let offset = extent_key.range.start as usize;
                         buffer.as_mut_slice()[last_offset..offset].fill(0);
@@ -1282,7 +1304,7 @@ impl<S: HandleOwner> DataObjectHandle<S> {
     /// Writes an entire attribute.
     pub async fn write_attr(&self, attribute_id: u64, data: &[u8]) -> Result<(), Error> {
         // Must be different attribute otherwise cached size gets out of date.
-        assert_ne!(attribute_id, self.attribute_id);
+        assert_ne!(attribute_id, self.attribute_id());
         let rounded_len = round_up(data.len() as u64, self.block_size()).unwrap();
         let mut buffer = self.store().device.allocate_buffer(rounded_len as usize);
         let slice = buffer.as_mut_slice();
@@ -1294,7 +1316,7 @@ impl<S: HandleOwner> DataObjectHandle<S> {
         transaction.add(
             self.store().store_object_id,
             Mutation::replace_or_insert_object(
-                ObjectKey::attribute(self.object_id, attribute_id, AttributeKey::Attribute),
+                ObjectKey::attribute(self.object_id(), attribute_id, AttributeKey::Attribute),
                 ObjectValue::attribute(data.len() as u64),
             ),
         );
@@ -1339,8 +1361,8 @@ impl<S: HandleOwner> DataObjectHandle<S> {
                     store
                         .trim_some(
                             &mut transaction,
-                            self.object_id,
-                            self.attribute_id,
+                            self.object_id(),
+                            self.attribute_id(),
                             TrimMode::FromOffset(size)
                         )
                         .await?,
@@ -1382,7 +1404,7 @@ impl<S: HandleOwner> DataObjectHandle<S> {
         let _guard = fs
             .read_lock(&[LockKey::object_attribute(
                 self.store().store_object_id,
-                self.object_id,
+                self.object_id(),
                 attribute_id,
             )])
             .await;
@@ -1395,7 +1417,7 @@ impl<S: HandleOwner> DataObjectHandle<S> {
         let mut merger = layer_set.merger();
         let mut iter = merger
             .seek(Bound::Included(&ObjectKey::extent(
-                self.object_id,
+                self.object_id(),
                 attribute_id,
                 offset..offset + 1,
             )))
@@ -1415,7 +1437,7 @@ impl<S: HandleOwner> DataObjectHandle<S> {
             ..
         }) = iter.get()
         {
-            if *object_id != self.object_id || *attr_id != attribute_id {
+            if *object_id != self.object_id() || *attr_id != attribute_id {
                 break;
             }
             ensure!(
@@ -1443,7 +1465,7 @@ impl<S: HandleOwner> DataObjectHandle<S> {
                     if trace {
                         info!(
                             store_id = self.store().store_object_id(),
-                            oid = self.object_id,
+                            oid = self.object_id(),
                             device_range = ?(device_offset..device_offset + to_copy as u64),
                             "R",
                         );
@@ -1465,7 +1487,7 @@ impl<S: HandleOwner> DataObjectHandle<S> {
                     if trace {
                         info!(
                             store_id = self.store().store_object_id(),
-                            oid = self.object_id,
+                            oid = self.object_id(),
                             device_range = ?(device_offset..device_offset + align_buf.len() as u64),
                             "RT",
                         );
@@ -1503,20 +1525,19 @@ impl<S: HandleOwner> AssociatedObject for DataObjectHandle<S> {
 
 impl<S: HandleOwner> ObjectHandle for DataObjectHandle<S> {
     fn set_trace(&self, v: bool) {
-        info!(store_id = self.store().store_object_id, oid = self.object_id(), trace = v, "trace");
-        self.trace.store(v, atomic::Ordering::Relaxed);
+        self.handle.set_trace(v)
     }
 
     fn object_id(&self) -> u64 {
-        return self.object_id;
+        self.handle.object_id()
     }
 
     fn allocate_buffer(&self, size: usize) -> Buffer<'_> {
-        self.store().device.allocate_buffer(size)
+        self.handle.allocate_buffer(size)
     }
 
     fn block_size(&self) -> u64 {
-        self.store().block_size()
+        self.handle.block_size()
     }
 
     fn get_size(&self) -> u64 {
@@ -1530,11 +1551,11 @@ impl<S: HandleOwner> GetProperties for DataObjectHandle<S> {
         // Take a read guard since we need to return a consistent view of all object properties.
         let fs = self.store().filesystem();
         let _guard =
-            fs.read_lock(&[LockKey::object(self.store().store_object_id, self.object_id)]).await;
+            fs.read_lock(&[LockKey::object(self.store().store_object_id, self.object_id())]).await;
         let item = self
             .store()
             .tree
-            .find(&ObjectKey::object(self.object_id))
+            .find(&ObjectKey::object(self.object_id()))
             .await?
             .expect("Unable to find object record");
         match item.value {
@@ -1581,11 +1602,7 @@ impl<S: HandleOwner> WriteObjectHandle for DataObjectHandle<S> {
     }
 
     async fn truncate(&self, size: u64) -> Result<(), Error> {
-        self.truncate_with_options(
-            Options { skip_journal_checks: self.options.skip_journal_checks, ..Default::default() },
-            size,
-        )
-        .await
+        self.truncate_with_options(self.default_transaction_options(), size).await
     }
 
     async fn write_timestamps(
@@ -2112,7 +2129,7 @@ mod tests {
         let (fs, object) = test_filesystem_and_empty_object().await;
 
         let object = ObjectStore::open_object(
-            &object.owner,
+            object.owner(),
             object.object_id(),
             HandleOptions::default(),
             None,
@@ -2183,7 +2200,7 @@ mod tests {
         let (fs, object) = test_filesystem_and_empty_object().await;
 
         let object = ObjectStore::open_object(
-            &object.owner,
+            object.owner(),
             object.object_id(),
             HandleOptions::default(),
             None,
@@ -2304,7 +2321,7 @@ mod tests {
         let (fs, object) = test_filesystem_and_empty_object().await;
 
         let object = ObjectStore::open_object(
-            &object.owner,
+            object.owner(),
             object.object_id(),
             HandleOptions::default(),
             None,
@@ -2359,7 +2376,7 @@ mod tests {
         let (fs, object) = test_filesystem_and_empty_object().await;
 
         let object = ObjectStore::open_object(
-            &object.owner,
+            object.owner(),
             object.object_id(),
             HandleOptions::default(),
             None,
@@ -2779,7 +2796,7 @@ mod tests {
 
         store
             .tombstone(
-                object.object_id,
+                object.object_id(),
                 Options { borrow_metadata_space: true, ..Default::default() },
             )
             .await

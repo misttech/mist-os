@@ -5,16 +5,25 @@
 use {
     crate::{
         errors::FxfsError,
+        log::*,
         lsm_tree::types::{ItemRef, LayerIterator},
+        object_handle::ObjectHandle,
         object_store::{
             object_record::{ExtendedAttributeValue, ObjectKey, ObjectKeyData, ObjectValue},
             transaction::{LockKey, Mutation, Options},
-            HandleOwner, ObjectStore,
+            HandleOptions, HandleOwner, ObjectStore,
         },
     },
     anyhow::{anyhow, bail, ensure, Error},
     fidl_fuchsia_io as fio,
-    std::{ops::Bound, sync::Arc},
+    std::{
+        ops::Bound,
+        sync::{
+            atomic::{self, AtomicBool},
+            Arc,
+        },
+    },
+    storage_device::buffer::Buffer,
 };
 
 /// The mode of operation when setting extended attributes. This is the same as the fidl definition
@@ -40,20 +49,54 @@ impl From<fio::SetExtendedAttributeMode> for SetExtendedAttributeMode {
     }
 }
 
-/// An ObjectHandle implementation that can represent any object capable of having attributes. The
-/// attributes are written and read wholesale, so it's not suitable for reading and writing the
-/// data attribute for files.
-// TODO(sdemos): extend this with extent reading and writing, right now it just handles inline
-// extended attributes.
+/// StoreObjectHandle is the lowest-level, untyped handle to an object with the id [`object_id`] in
+/// a particular store, [`owner`]. It provides functionality shared across all objects, such as
+/// reading and writing attributes and managing encryption keys.
+///
+/// Since it's untyped, it doesn't do any object kind validation, and is generally meant to
+/// implement higher-level typed handles.
+///
+/// For file-like objects with a data attribute, DataObjectHandle implements traits and helpers for
+/// doing more complex extent management and caches the content size.
+///
+/// For directory-like objects, Directory knows how to add and remove child objects and enumerate
+/// its children.
 pub struct StoreObjectHandle<S: HandleOwner> {
     owner: Arc<S>,
     object_id: u64,
+    options: HandleOptions,
+    trace: AtomicBool,
+}
+
+impl<S: HandleOwner> ObjectHandle for StoreObjectHandle<S> {
+    fn set_trace(&self, v: bool) {
+        info!(store_id = self.store().store_object_id, oid = self.object_id(), trace = v, "trace");
+        self.trace.store(v, atomic::Ordering::Relaxed);
+    }
+
+    fn object_id(&self) -> u64 {
+        return self.object_id;
+    }
+
+    fn allocate_buffer(&self, size: usize) -> Buffer<'_> {
+        self.store().device.allocate_buffer(size)
+    }
+
+    fn block_size(&self) -> u64 {
+        self.store().block_size()
+    }
+
+    fn get_size(&self) -> u64 {
+        // Things calling get_size assume you are talking about an associated data attribute, which
+        // the untyped StoreObjectHandle doesn't know about.
+        0
+    }
 }
 
 impl<S: HandleOwner> StoreObjectHandle<S> {
     /// Make a new StoreObjectHandle for the object with id [`object_id`] in store [`owner`].
-    pub fn new(owner: Arc<S>, object_id: u64) -> Self {
-        Self { owner, object_id }
+    pub fn new(owner: Arc<S>, object_id: u64, options: HandleOptions, trace: bool) -> Self {
+        Self { owner, object_id, options, trace: AtomicBool::new(trace) }
     }
 
     pub fn owner(&self) -> &Arc<S> {
@@ -64,12 +107,22 @@ impl<S: HandleOwner> StoreObjectHandle<S> {
         self.owner.as_ref().as_ref()
     }
 
+    pub fn trace(&self) -> bool {
+        self.trace.load(atomic::Ordering::Relaxed)
+    }
+
+    /// Get the default set of transaction options for this object. This is mostly the overall
+    /// default, modified by any [`HandleOptions`] held by this handle.
+    pub fn default_transaction_options<'b>(&self) -> Options<'b> {
+        Options { skip_journal_checks: self.options.skip_journal_checks, ..Default::default() }
+    }
+
     pub async fn list_extended_attributes(&self) -> Result<Vec<Vec<u8>>, Error> {
         let layer_set = self.store().tree().layer_set();
         let mut merger = layer_set.merger();
         // Seek to the first extended attribute key for this object.
         let mut iter = merger
-            .seek(Bound::Included(&ObjectKey::extended_attribute(self.object_id, Vec::new())))
+            .seek(Bound::Included(&ObjectKey::extended_attribute(self.object_id(), Vec::new())))
             .await?;
         let mut out = Vec::new();
         while let Some(item) = iter.get() {
@@ -77,7 +130,7 @@ impl<S: HandleOwner> StoreObjectHandle<S> {
             if item.value != &ObjectValue::None {
                 match item.key {
                     ObjectKey { object_id, data: ObjectKeyData::ExtendedAttribute { name } } => {
-                        if self.object_id != *object_id {
+                        if self.object_id() != *object_id {
                             bail!(anyhow!(FxfsError::Inconsistent)
                                 .context("list_extended_attributes: wrong object id"))
                         }
@@ -97,7 +150,7 @@ impl<S: HandleOwner> StoreObjectHandle<S> {
         let item = self
             .store()
             .tree()
-            .find(&ObjectKey::extended_attribute(self.object_id, name))
+            .find(&ObjectKey::extended_attribute(self.object_id(), name))
             .await?
             .ok_or(anyhow!(FxfsError::NotFound))?;
         match item.value {
@@ -130,11 +183,11 @@ impl<S: HandleOwner> StoreObjectHandle<S> {
         let store = self.store();
         let fs = store.filesystem();
         let tree = store.tree();
-        let object_key = ObjectKey::extended_attribute(self.object_id, name);
+        let object_key = ObjectKey::extended_attribute(self.object_id(), name);
 
         // NB: We need to take this lock before we potentially look up the value to prevent racing
         // with another set.
-        let keys = [LockKey::object(store.store_object_id(), self.object_id)];
+        let keys = [LockKey::object(store.store_object_id(), self.object_id())];
         let mut transaction = fs.new_transaction(&keys, Options::default()).await?;
 
         if mode != SetExtendedAttributeMode::Set {
@@ -171,13 +224,13 @@ impl<S: HandleOwner> StoreObjectHandle<S> {
         let store = self.store();
         let fs = store.filesystem();
         let tree = store.tree();
-        let object_key = ObjectKey::extended_attribute(self.object_id, name);
+        let object_key = ObjectKey::extended_attribute(self.object_id(), name);
 
         // NB: The API says we have to return an error if the attribute doesn't exist, so we have
         // to look it up first to make sure we have a record of it before we delete it. Make sure
         // we take a lock and make a transaction before we do so we don't race with other
         // operations.
-        let keys = [LockKey::object(store.store_object_id(), self.object_id)];
+        let keys = [LockKey::object(store.store_object_id(), self.object_id())];
         let mut transaction = fs.new_transaction(&keys, Options::default()).await?;
 
         {
@@ -277,7 +330,15 @@ mod tests {
 
         transaction.commit().await.expect("commit failed");
 
-        (fs, Arc::new(StoreObjectHandle::new(object.owner().clone(), object.object_id())))
+        (
+            fs,
+            Arc::new(StoreObjectHandle::new(
+                object.owner().clone(),
+                object.object_id(),
+                HandleOptions::default(),
+                false,
+            )),
+        )
     }
 
     #[fuchsia::test(threads = 3)]

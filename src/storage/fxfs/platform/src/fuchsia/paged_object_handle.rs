@@ -283,8 +283,8 @@ impl PagedObjectHandle {
         self.handle.get_size()
     }
 
-    pub fn basic_handle(&self) -> StoreObjectHandle<FxVolume> {
-        StoreObjectHandle::new(self.owner().clone(), self.object_id())
+    pub fn store_handle(&self) -> &StoreObjectHandle<FxVolume> {
+        self.handle.handle()
     }
 
     pub async fn read_uncached(&self, range: std::ops::Range<u64>) -> Result<Buffer<'_>, Error> {

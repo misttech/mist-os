@@ -37,27 +37,29 @@ use {
 pub use crate::object_store::object_record::ObjectDescriptor;
 
 /// A directory stores name to child object mappings.
-pub struct Directory<S> {
-    owner: Arc<S>,
-    object_id: u64,
+pub struct Directory<S: HandleOwner> {
+    handle: StoreObjectHandle<S>,
     is_deleted: AtomicBool,
 }
 
 impl<S: HandleOwner> Directory<S> {
     fn new(owner: Arc<S>, object_id: u64) -> Self {
-        Directory { owner, object_id, is_deleted: AtomicBool::new(false) }
+        Directory {
+            handle: StoreObjectHandle::new(owner, object_id, HandleOptions::default(), false),
+            is_deleted: AtomicBool::new(false),
+        }
     }
 
     pub fn object_id(&self) -> u64 {
-        return self.object_id;
+        self.handle.object_id()
     }
 
     pub fn owner(&self) -> &Arc<S> {
-        &self.owner
+        self.handle.owner()
     }
 
     pub fn store(&self) -> &ObjectStore {
-        self.owner.as_ref().as_ref()
+        self.handle.store()
     }
 
     pub fn is_deleted(&self) -> bool {
@@ -95,7 +97,7 @@ impl<S: HandleOwner> Directory<S> {
             )
         });
         transaction.add(
-            store.store_object_id,
+            store.store_object_id(),
             Mutation::insert_object(
                 ObjectKey::object(object_id),
                 ObjectValue::Object {
@@ -157,9 +159,11 @@ impl<S: HandleOwner> Directory<S> {
         let mut child_object_id = INVALID_OBJECT_ID;
         loop {
             let mut lock_keys = match child_object_id {
-                INVALID_OBJECT_ID => vec![LockKey::object(store.store_object_id(), self.object_id)],
+                INVALID_OBJECT_ID => {
+                    vec![LockKey::object(store.store_object_id(), self.object_id())]
+                }
                 _ => vec![
-                    LockKey::object(store.store_object_id(), self.object_id),
+                    LockKey::object(store.store_object_id(), self.object_id()),
                     LockKey::object(store.store_object_id(), child_object_id),
                 ],
             };
@@ -209,7 +213,7 @@ impl<S: HandleOwner> Directory<S> {
         if self.is_deleted() {
             return Ok(None);
         }
-        match self.store().tree().find(&ObjectKey::child(self.object_id, name)).await? {
+        match self.store().tree().find(&ObjectKey::child(self.object_id(), name)).await? {
             None | Some(ObjectItem { value: ObjectValue::None, .. }) => Ok(None),
             Some(ObjectItem {
                 value: ObjectValue::Child(ChildValue { object_id, object_descriptor }),
@@ -227,11 +231,11 @@ impl<S: HandleOwner> Directory<S> {
         create_attributes: Option<&fio::MutableNodeAttributes>,
     ) -> Result<Directory<S>, Error> {
         ensure!(!self.is_deleted(), FxfsError::Deleted);
-        let handle = Directory::create(transaction, &self.owner, create_attributes).await?;
+        let handle = Directory::create(transaction, self.owner(), create_attributes).await?;
         transaction.add(
             self.store().store_object_id(),
             Mutation::replace_or_insert_object(
-                ObjectKey::child(self.object_id, name),
+                ObjectKey::child(self.object_id(), name),
                 ObjectValue::child(handle.object_id(), ObjectDescriptor::Directory),
             ),
         );
@@ -258,7 +262,7 @@ impl<S: HandleOwner> Directory<S> {
         transaction.add(
             self.store().store_object_id(),
             Mutation::replace_or_insert_object(
-                ObjectKey::child(self.object_id, name),
+                ObjectKey::child(self.object_id(), name),
                 ObjectValue::child(handle.object_id(), ObjectDescriptor::File),
             ),
         );
@@ -288,7 +292,7 @@ impl<S: HandleOwner> Directory<S> {
         let ObjectValue::Object{ attributes: ObjectAttributes{ project_id, .. }, .. } =
             transaction.get_object_mutation(
                 store_id,
-                ObjectKey::object(self.object_id)
+                ObjectKey::object(self.object_id())
         ).unwrap().item.value else {
             return Err(anyhow!(FxfsError::Inconsistent));
         };
@@ -328,7 +332,7 @@ impl<S: HandleOwner> Directory<S> {
     ) -> Result<DataObjectHandle<S>, Error> {
         ensure!(!self.is_deleted(), FxfsError::Deleted);
         let handle = ObjectStore::create_object(
-            &self.owner,
+            self.owner(),
             transaction,
             HandleOptions::default(),
             None,
@@ -362,7 +366,7 @@ impl<S: HandleOwner> Directory<S> {
         transaction.add(
             self.store().store_object_id(),
             Mutation::replace_or_insert_object(
-                ObjectKey::child(self.object_id, name),
+                ObjectKey::child(self.object_id(), name),
                 ObjectValue::child(symlink_id, ObjectDescriptor::Symlink),
             ),
         );
@@ -388,7 +392,7 @@ impl<S: HandleOwner> Directory<S> {
         transaction.add(
             self.store().store_object_id(),
             Mutation::replace_or_insert_object(
-                ObjectKey::child(self.object_id, volume_name),
+                ObjectKey::child(self.object_id(), volume_name),
                 ObjectValue::child(store_object_id, ObjectDescriptor::Volume),
             ),
         );
@@ -413,7 +417,7 @@ impl<S: HandleOwner> Directory<S> {
         transaction.add(
             self.store().store_object_id(),
             Mutation::replace_or_insert_object(
-                ObjectKey::child(self.object_id, volume_name),
+                ObjectKey::child(self.object_id(), volume_name),
                 ObjectValue::None,
             ),
         );
@@ -440,7 +444,7 @@ impl<S: HandleOwner> Directory<S> {
         transaction.add(
             self.store().store_object_id(),
             Mutation::replace_or_insert_object(
-                ObjectKey::child(self.object_id, name),
+                ObjectKey::child(self.object_id(), name),
                 ObjectValue::child(object_id, descriptor),
             ),
         );
@@ -464,7 +468,7 @@ impl<S: HandleOwner> Directory<S> {
     ) -> Result<(), Error> {
         ensure!(!self.is_deleted(), FxfsError::Deleted);
         let mut mutation =
-            self.store().txn_get_object_mutation(&transaction, self.object_id).await?;
+            self.store().txn_get_object_mutation(&transaction, self.object_id()).await?;
         if let ObjectValue::Object { attributes, kind: ObjectKind::Directory { sub_dirs } } =
             &mut mutation.item.value
         {
@@ -516,7 +520,7 @@ impl<S: HandleOwner> Directory<S> {
         let item = self
             .store()
             .tree()
-            .find(&ObjectKey::object(self.object_id))
+            .find(&ObjectKey::object(self.object_id()))
             .await?
             .ok_or(anyhow!(FxfsError::NotFound))?;
         match item.value {
@@ -542,14 +546,12 @@ impl<S: HandleOwner> Directory<S> {
 
     pub async fn list_extended_attributes(&self) -> Result<Vec<Vec<u8>>, Error> {
         ensure!(!self.is_deleted(), FxfsError::Deleted);
-        let handle = StoreObjectHandle::new(self.owner.clone(), self.object_id);
-        handle.list_extended_attributes().await
+        self.handle.list_extended_attributes().await
     }
 
     pub async fn get_extended_attribute(&self, name: Vec<u8>) -> Result<Vec<u8>, Error> {
         ensure!(!self.is_deleted(), FxfsError::Deleted);
-        let handle = StoreObjectHandle::new(self.owner.clone(), self.object_id);
-        handle.get_extended_attribute(name).await
+        self.handle.get_extended_attribute(name).await
     }
 
     pub async fn set_extended_attribute(
@@ -559,14 +561,12 @@ impl<S: HandleOwner> Directory<S> {
         mode: SetExtendedAttributeMode,
     ) -> Result<(), Error> {
         ensure!(!self.is_deleted(), FxfsError::Deleted);
-        let handle = StoreObjectHandle::new(self.owner.clone(), self.object_id);
-        handle.set_extended_attribute(name, value, mode).await
+        self.handle.set_extended_attribute(name, value, mode).await
     }
 
     pub async fn remove_extended_attribute(&self, name: Vec<u8>) -> Result<(), Error> {
         ensure!(!self.is_deleted(), FxfsError::Deleted);
-        let handle = StoreObjectHandle::new(self.owner.clone(), self.object_id);
-        handle.remove_extended_attribute(name).await
+        self.handle.remove_extended_attribute(name).await
     }
 
     /// Returns an iterator that will return directory entries skipping deleted ones.  Example
@@ -596,7 +596,7 @@ impl<S: HandleOwner> Directory<S> {
     ) -> Result<DirectoryIterator<'a, 'b>, Error> {
         ensure!(!self.is_deleted(), FxfsError::Deleted);
         let mut iter =
-            merger.seek(Bound::Included(&ObjectKey::child(self.object_id, from))).await?;
+            merger.seek(Bound::Included(&ObjectKey::child(self.object_id(), from))).await?;
         // Skip deleted entries.
         loop {
             match iter.get() {
@@ -604,12 +604,12 @@ impl<S: HandleOwner> Directory<S> {
                     key: ObjectKey { object_id, .. },
                     value: ObjectValue::None,
                     ..
-                }) if *object_id == self.object_id => {}
+                }) if *object_id == self.object_id() => {}
                 _ => break,
             }
             iter.advance().await?;
         }
-        Ok(DirectoryIterator { object_id: self.object_id, iter })
+        Ok(DirectoryIterator { object_id: self.object_id(), iter })
     }
 }
 
@@ -617,7 +617,7 @@ impl<S: HandleOwner> fmt::Debug for Directory<S> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("Directory")
             .field("store_id", &self.store().store_object_id())
-            .field("object_id", &self.object_id)
+            .field("object_id", &self.object_id())
             .finish()
     }
 }
@@ -687,7 +687,7 @@ pub async fn replace_child<'a, S: HandleOwner>(
         transaction.add(
             store_id,
             Mutation::replace_or_insert_object(
-                ObjectKey::child(src_dir.object_id, src_name),
+                ObjectKey::child(src_dir.object_id(), src_name),
                 ObjectValue::None,
             ),
         );
@@ -765,7 +765,7 @@ pub async fn replace_child_with_object<'a, S: HandleOwner>(
     };
     transaction.add(
         store_id,
-        Mutation::replace_or_insert_object(ObjectKey::child(dst.0.object_id, dst.1), new_value),
+        Mutation::replace_or_insert_object(ObjectKey::child(dst.0.object_id(), dst.1), new_value),
     );
     dst.0
         .update_attributes(
@@ -1233,9 +1233,10 @@ mod tests {
         let (oid, object_descriptor) =
             child_dir2.lookup("bar").await.expect("lookup failed").expect("not found");
         assert_eq!(object_descriptor, ObjectDescriptor::File);
-        let bar = ObjectStore::open_object(&child_dir2.owner, oid, HandleOptions::default(), None)
-            .await
-            .expect("Open failed");
+        let bar =
+            ObjectStore::open_object(&child_dir2.owner(), oid, HandleOptions::default(), None)
+                .await
+                .expect("Open failed");
         let mut buf = bar.allocate_buffer(TEST_DEVICE_BLOCK_SIZE as usize);
         bar.read(0, buf.as_mut()).await.expect("read failed");
         assert_eq!(buf.as_slice(), vec![0xaa; TEST_DEVICE_BLOCK_SIZE as usize]);
