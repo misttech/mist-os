@@ -60,7 +60,7 @@ use crate::{
         WeakDeviceId,
     },
     ip::{
-        device::IpDeviceEvent,
+        device::{IpDeviceEvent, Ipv4DeviceConfigurationUpdate, Ipv6DeviceConfigurationUpdate},
         icmp::{BufferIcmpContext, IcmpConnId, IcmpContext, IcmpIpExt},
         types::{AddableEntryEither, AddableMetric, Entry, RawMetric},
         IpLayerEvent,
@@ -738,7 +738,11 @@ impl<A: IpAddress> FakeEventDispatcherConfig<A> {
 /// state configured.
 #[derive(Clone, Default)]
 pub struct FakeEventDispatcherBuilder {
-    devices: Vec<(UnicastAddr<Mac>, Option<(IpAddr, SubnetEither)>)>,
+    devices: Vec<(
+        UnicastAddr<Mac>,
+        Option<(IpAddr, SubnetEither)>,
+        Option<(Ipv4DeviceConfigurationUpdate, Ipv6DeviceConfigurationUpdate)>,
+    )>,
     arp_table_entries: Vec<(usize, Ipv4Addr, UnicastAddr<Mac>)>,
     ndp_table_entries: Vec<(usize, UnicastAddr<Ipv6Addr>, UnicastAddr<Mac>)>,
     // usize refers to index into devices Vec.
@@ -757,7 +761,11 @@ impl FakeEventDispatcherBuilder {
         assert!(cfg.subnet.contains(&cfg.remote_ip));
 
         let mut builder = FakeEventDispatcherBuilder::default();
-        builder.devices.push((cfg.local_mac, Some((cfg.local_ip.get().into(), cfg.subnet.into()))));
+        builder.devices.push((
+            cfg.local_mac,
+            Some((cfg.local_ip.get().into(), cfg.subnet.into())),
+            None,
+        ));
 
         match cfg.remote_ip.get().into() {
             IpAddr::V4(ip) => builder.arp_table_entries.push((0, ip, cfg.remote_mac)),
@@ -784,7 +792,23 @@ impl FakeEventDispatcherBuilder {
     /// future calls to `add_arp_table_entry` and `add_device_route`.
     pub fn add_device(&mut self, mac: UnicastAddr<Mac>) -> usize {
         let idx = self.devices.len();
-        self.devices.push((mac, None));
+        self.devices.push((mac, None, None));
+        idx
+    }
+
+    /// Add a device with an IPv4 and IPv6 configuration.
+    ///
+    /// `add_device_with_config` is like `add_device`, except that it takes an
+    /// IPv4 and IPv6 configuration to apply to the device when it is enabled.
+    #[cfg(test)]
+    pub(crate) fn add_device_with_config(
+        &mut self,
+        mac: UnicastAddr<Mac>,
+        ipv4_config: Ipv4DeviceConfigurationUpdate,
+        ipv6_config: Ipv6DeviceConfigurationUpdate,
+    ) -> usize {
+        let idx = self.devices.len();
+        self.devices.push((mac, None, Some((ipv4_config, ipv6_config))));
         idx
     }
 
@@ -800,7 +824,33 @@ impl FakeEventDispatcherBuilder {
         subnet: Subnet<A>,
     ) -> usize {
         let idx = self.devices.len();
-        self.devices.push((mac, Some((ip.into(), subnet.into()))));
+        self.devices.push((mac, Some((ip.into(), subnet.into())), None));
+        self.device_routes.push((subnet.into(), idx));
+        idx
+    }
+
+    /// Add a device with an associated IP address and a particular IPv4 and
+    /// IPv6 configuration.
+    ///
+    /// `add_device_with_ip_and_config` is like `add_device`, except that it
+    /// takes an associated IP address and subnet to assign to the device, as
+    /// well as IPv4 and IPv6 configurations to apply to the device when it is
+    /// enabled.
+    #[cfg(test)]
+    pub(crate) fn add_device_with_ip_and_config<A: IpAddress>(
+        &mut self,
+        mac: UnicastAddr<Mac>,
+        ip: A,
+        subnet: Subnet<A>,
+        ipv4_config: Ipv4DeviceConfigurationUpdate,
+        ipv6_config: Ipv6DeviceConfigurationUpdate,
+    ) -> usize {
+        let idx = self.devices.len();
+        self.devices.push((
+            mac,
+            Some((ip.into(), subnet.into())),
+            Some((ipv4_config, ipv6_config)),
+        ));
         self.device_routes.push((subnet.into(), idx));
         idx
     }
@@ -862,7 +912,7 @@ impl FakeEventDispatcherBuilder {
         } = self;
         let idx_to_device_id: Vec<_> = devices
             .into_iter()
-            .map(|(mac, ip_subnet)| {
+            .map(|(mac, ip_subnet, device_configs)| {
                 let eth_id = crate::device::add_ethernet_device(
                     sync_ctx,
                     mac,
@@ -870,6 +920,22 @@ impl FakeEventDispatcherBuilder {
                     DEFAULT_INTERFACE_METRIC,
                 );
                 let id = eth_id.clone().into();
+                if let Some((ipv4_config, ipv6_config)) = device_configs {
+                    let _previous = crate::device::update_ipv4_configuration(
+                        sync_ctx,
+                        non_sync_ctx,
+                        &id,
+                        ipv4_config,
+                    )
+                    .unwrap();
+                    let _previous = crate::device::update_ipv6_configuration(
+                        sync_ctx,
+                        non_sync_ctx,
+                        &id,
+                        ipv6_config,
+                    )
+                    .unwrap();
+                }
                 crate::device::testutil::enable_device(sync_ctx, non_sync_ctx, &id);
                 match ip_subnet {
                     Some((IpAddr::V4(ip), SubnetEither::V4(subnet))) => {

@@ -3091,7 +3091,8 @@ mod tests {
         },
         ip::{
             device::{
-                state::AddrSubnetAndManualConfigEither, IpDeviceConfigurationUpdate, IpDeviceEvent,
+                slaac::SlaacConfiguration, state::AddrSubnetAndManualConfigEither,
+                IpDeviceConfigurationUpdate, IpDeviceEvent, Ipv4DeviceConfigurationUpdate,
                 Ipv6DeviceConfigurationUpdate, RemovedReason,
             },
             testutil::is_in_ip_multicast,
@@ -4415,6 +4416,11 @@ mod tests {
             Ipv6DeviceConfigurationUpdate {
                 // Doesn't matter as long as DAD is enabled.
                 dad_transmits: Some(NonZeroU8::new(1)),
+                // Auto-generate a link-local address.
+                slaac_config: Some(SlaacConfiguration {
+                    enable_stable_addresses: true,
+                    ..Default::default()
+                }),
                 ip_config: Some(IpDeviceConfigurationUpdate {
                     ip_enabled: Some(true),
                     ..Default::default()
@@ -4552,10 +4558,19 @@ mod tests {
         let v4_subnet = AddrSubnet::from_witness(v4_config.local_ip, 16).unwrap().subnet();
         let dev_idx0 =
             builder.add_device_with_ip(v4_config.local_mac, v4_config.local_ip.get(), v4_subnet);
-        let dev_idx1 = builder.add_device_with_ip(
+        let dev_idx1 = builder.add_device_with_ip_and_config(
             v6_config.local_mac,
             v6_config.local_ip.get(),
             AddrSubnet::from_witness(v6_config.local_ip, 64).unwrap().subnet(),
+            Ipv4DeviceConfigurationUpdate::default(),
+            Ipv6DeviceConfigurationUpdate {
+                // Auto-generate a link-local address.
+                slaac_config: Some(SlaacConfiguration {
+                    enable_stable_addresses: true,
+                    ..Default::default()
+                }),
+                ..Default::default()
+            },
         );
         let (Ctx { sync_ctx, mut non_sync_ctx }, device_ids) = builder.clone().build();
         let sync_ctx = &sync_ctx;
@@ -4665,6 +4680,11 @@ mod tests {
                 Ipv6DeviceConfigurationUpdate {
                     // Doesn't matter as long as DAD is enabled.
                     dad_transmits: Some(NonZeroU8::new(1)),
+                    // Auto-generate a link-local address.
+                    slaac_config: Some(SlaacConfiguration {
+                        enable_stable_addresses: true,
+                        ..Default::default()
+                    }),
                     ip_config: Some(IpDeviceConfigurationUpdate {
                         ip_enabled: Some(true),
                         ..Default::default()

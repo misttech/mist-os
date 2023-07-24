@@ -474,7 +474,8 @@ mod tests {
         device::{testutil::FakeDeviceId, DeviceId},
         ip::{
             device::{
-                IpDeviceConfigurationUpdate, Ipv6DeviceConfigurationUpdate, Ipv6DeviceTimerId,
+                slaac::SlaacConfiguration, IpDeviceConfigurationUpdate,
+                Ipv6DeviceConfigurationUpdate, Ipv6DeviceTimerId,
             },
             gmp::{
                 GmpHandler as _, GroupJoinResult, GroupLeaveResult, MemberState, MulticastGroupSet,
@@ -1277,6 +1278,11 @@ mod tests {
                     // specified source address.
                     dad_transmits: Some(None),
                     max_router_solicitations: Some(None),
+                    // Auto-generate a link-local address.
+                    slaac_config: Some(SlaacConfiguration {
+                        enable_stable_addresses: true,
+                        ..Default::default()
+                    }),
                     ip_config: Some(IpDeviceConfigurationUpdate {
                         ip_enabled: Some(ip_enabled),
                         gmp_enabled: Some(gmp_enabled),

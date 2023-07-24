@@ -1113,31 +1113,34 @@ fn enable_ipv6_device_with_config<
 
     // TODO(https://fxbug.dev/95946): Generate link-local address with opaque
     // IIDs.
-    if let Some(iid) = sync_ctx.get_eui64_iid(device_id) {
-        let link_local_addr_sub = {
-            let mut addr = [0; 16];
-            addr[0..2].copy_from_slice(&[0xfe, 0x80]);
-            addr[(Ipv6::UNICAST_INTERFACE_IDENTIFIER_BITS / 8) as usize..].copy_from_slice(&iid);
+    if config.slaac_config.enable_stable_addresses {
+        if let Some(iid) = sync_ctx.get_eui64_iid(device_id) {
+            let link_local_addr_sub = {
+                let mut addr = [0; 16];
+                addr[0..2].copy_from_slice(&[0xfe, 0x80]);
+                addr[(Ipv6::UNICAST_INTERFACE_IDENTIFIER_BITS / 8) as usize..]
+                    .copy_from_slice(&iid);
 
-            AddrSubnet::new(
-                Ipv6Addr::from(addr),
-                Ipv6Addr::BYTES * 8 - Ipv6::UNICAST_INTERFACE_IDENTIFIER_BITS,
-            )
-            .expect("valid link-local address")
-        };
+                AddrSubnet::new(
+                    Ipv6Addr::from(addr),
+                    Ipv6Addr::BYTES * 8 - Ipv6::UNICAST_INTERFACE_IDENTIFIER_BITS,
+                )
+                .expect("valid link-local address")
+            };
 
-        match add_ipv6_addr_subnet_with_config(
-            sync_ctx,
-            ctx,
-            device_id,
-            link_local_addr_sub,
-            Ipv6AddrConfig::SLAAC_LINK_LOCAL,
-            config,
-        ) {
-            Ok(_) => {}
-            Err(ExistsError) => {
-                // The address may have been added by admin action so it is safe
-                // to swallow the exists error.
+            match add_ipv6_addr_subnet_with_config(
+                sync_ctx,
+                ctx,
+                device_id,
+                link_local_addr_sub,
+                Ipv6AddrConfig::SLAAC_LINK_LOCAL,
+                config,
+            ) {
+                Ok(_) => {}
+                Err(ExistsError) => {
+                    // The address may have been added by admin action so it is safe
+                    // to swallow the exists error.
+                }
             }
         }
     }
@@ -2240,6 +2243,7 @@ mod tests {
     use assert_matches::assert_matches;
     use fakealloc::collections::HashSet;
     use ip_test_macro::ip_test;
+    use test_case::test_case;
 
     use lock_order::Locked;
     use net_declare::net_ip_v6;
@@ -2434,6 +2438,11 @@ mod tests {
                 // solicitation.
                 dad_transmits: Some(NonZeroU8::new(1)),
                 max_router_solicitations: Some(NonZeroU8::new(1)),
+                // Auto-generate a link-local address.
+                slaac_config: Some(SlaacConfiguration {
+                    enable_stable_addresses: true,
+                    ..Default::default()
+                }),
                 ip_config: Some(IpDeviceConfigurationUpdate {
                     gmp_enabled: Some(true),
                     ..Default::default()
@@ -2710,6 +2719,11 @@ mod tests {
             Ipv6DeviceConfigurationUpdate {
                 dad_transmits: Some(NonZeroU8::new(1)),
                 max_router_solicitations: Some(NonZeroU8::new(1)),
+                // Auto-generate a link-local address.
+                slaac_config: Some(SlaacConfiguration {
+                    enable_stable_addresses: true,
+                    ..Default::default()
+                }),
                 ip_config: Some(IpDeviceConfigurationUpdate {
                     gmp_enabled: Some(true),
                     ..Default::default()
@@ -3093,6 +3107,48 @@ mod tests {
                     gmp_enabled: Some(true),
                 }),
             }),
+        );
+    }
+
+    #[test_case(false; "stable addresses enabled generates link local")]
+    #[test_case(true; "stable addresses disabled does not generate link local")]
+    fn configure_link_local_address_generation(enable_stable_addresses: bool) {
+        let FakeCtx { sync_ctx, mut non_sync_ctx } =
+            Ctx::new_with_builder(StackStateBuilder::default());
+        non_sync_ctx.timer_ctx().assert_no_timers_installed();
+        let local_mac = Ipv6::FAKE_CONFIG.local_mac;
+        let device_id = crate::device::add_ethernet_device(
+            &sync_ctx,
+            local_mac,
+            ethernet::MaxFrameSize::from_mtu(Ipv6::MINIMUM_LINK_MTU).unwrap(),
+            DEFAULT_INTERFACE_METRIC,
+        )
+        .into();
+
+        let new_config = Ipv6DeviceConfigurationUpdate {
+            slaac_config: Some(SlaacConfiguration {
+                enable_stable_addresses,
+                ..Default::default()
+            }),
+            ..Default::default()
+        };
+        let _prev = update_ipv6_configuration(&sync_ctx, &mut non_sync_ctx, &device_id, new_config);
+        Ipv6::set_ip_device_enabled(&sync_ctx, &mut non_sync_ctx, &device_id, true, false);
+
+        let expected_addrs = if enable_stable_addresses {
+            HashSet::from([local_mac.to_ipv6_link_local().ipv6_unicast_addr()])
+        } else {
+            HashSet::new()
+        };
+        assert_eq!(
+            IpDeviceStateContext::<Ipv6, _>::with_address_ids(
+                &mut Locked::new(&sync_ctx),
+                &device_id,
+                |addrs, _sync_ctx| {
+                    addrs.map(|addr_id| addr_id.addr_sub().addr()).collect::<HashSet<_>>()
+                }
+            ),
+            expected_addrs,
         );
     }
 }

@@ -648,6 +648,7 @@ mod tests {
         },
         ip::{
             device::{
+                slaac::SlaacConfiguration,
                 testutil::UpdateIpDeviceConfigurationAndFlagsTestIpExt as _,
                 Ipv6DeviceConfigurationUpdate,
             },
@@ -1511,6 +1512,20 @@ mod tests {
             DEFAULT_INTERFACE_METRIC,
         );
         let device_id = eth_device_id.clone().into();
+        // Configure the device to generate a link-local address.
+        let _: Ipv6DeviceConfigurationUpdate = update_ipv6_configuration(
+            sync_ctx,
+            &mut non_sync_ctx,
+            &device_id,
+            Ipv6DeviceConfigurationUpdate {
+                slaac_config: Some(SlaacConfiguration {
+                    enable_stable_addresses: true,
+                    ..Default::default()
+                }),
+                ..Default::default()
+            },
+        )
+        .unwrap();
         Ipv6::set_ip_device_enabled(sync_ctx, &mut non_sync_ctx, &device_id, true, false);
 
         let remote_mac_bytes = remote_mac.bytes();

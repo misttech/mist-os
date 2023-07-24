@@ -85,8 +85,8 @@ mod tests {
                     TemporarySlaacConfig,
                 },
                 testutil::with_assigned_ipv6_addr_subnets,
-                IpAddressId as _, IpDeviceConfigurationUpdate, Ipv6DeviceConfigurationUpdate,
-                Ipv6DeviceHandler, Ipv6DeviceTimerId,
+                IpAddressId as _, IpDeviceConfigurationUpdate, Ipv4DeviceConfigurationUpdate,
+                Ipv6DeviceConfigurationUpdate, Ipv6DeviceHandler, Ipv6DeviceTimerId,
             },
             receive_ip_packet,
             testutil::is_in_ip_multicast,
@@ -226,9 +226,29 @@ mod tests {
         DeviceId<crate::testutil::FakeNonSyncCtx>,
     ) {
         let mut local = FakeEventDispatcherBuilder::default();
-        let local_dev_idx = local.add_device(local_mac());
+        let local_dev_idx = local.add_device_with_config(
+            local_mac(),
+            Ipv4DeviceConfigurationUpdate::default(),
+            Ipv6DeviceConfigurationUpdate {
+                slaac_config: Some(SlaacConfiguration {
+                    enable_stable_addresses: true,
+                    ..Default::default()
+                }),
+                ..Default::default()
+            },
+        );
         let mut remote = FakeEventDispatcherBuilder::default();
-        let remote_dev_idx = remote.add_device(remote_mac());
+        let remote_dev_idx = remote.add_device_with_config(
+            remote_mac(),
+            Ipv4DeviceConfigurationUpdate::default(),
+            Ipv6DeviceConfigurationUpdate {
+                slaac_config: Some(SlaacConfiguration {
+                    enable_stable_addresses: true,
+                    ..Default::default()
+                }),
+                ..Default::default()
+            },
+        );
         let (local, local_device_ids) = local.build();
         let (remote, remote_device_ids) = remote.build();
 
@@ -381,6 +401,10 @@ mod tests {
         let update = Ipv6DeviceConfigurationUpdate {
             // Doesn't matter as long as we perform DAD.
             dad_transmits: Some(NonZeroU8::new(1)),
+            slaac_config: Some(SlaacConfiguration {
+                enable_stable_addresses: true,
+                ..Default::default()
+            }),
             ip_config: Some(IpDeviceConfigurationUpdate {
                 ip_enabled: Some(true),
                 ..Default::default()
@@ -1246,6 +1270,7 @@ mod tests {
 
     #[test]
     fn test_host_send_router_solicitations() {
+        #[track_caller]
         fn validate_params(
             src_mac: Mac,
             src_ip: Ipv6Addr,
@@ -1279,6 +1304,10 @@ mod tests {
             Ipv6DeviceConfigurationUpdate {
                 // Test expects to send 3 RSs.
                 max_router_solicitations: Some(NonZeroU8::new(3)),
+                slaac_config: Some(SlaacConfiguration {
+                    enable_stable_addresses: true,
+                    ..Default::default()
+                }),
                 ip_config: Some(IpDeviceConfigurationUpdate {
                     ip_enabled: Some(true),
                     ..Default::default()
@@ -1378,6 +1407,10 @@ mod tests {
             &device_id,
             Ipv6DeviceConfigurationUpdate {
                 max_router_solicitations: Some(NonZeroU8::new(2)),
+                slaac_config: Some(SlaacConfiguration {
+                    enable_stable_addresses: true,
+                    ..Default::default()
+                }),
                 ip_config: Some(IpDeviceConfigurationUpdate {
                     ip_enabled: Some(true),
                     ..Default::default()

@@ -1232,11 +1232,14 @@ mod tests {
         device::{
             socket::Frame,
             testutil::{set_forwarding_enabled, FakeDeviceId, FakeWeakDeviceId},
-            DeviceId,
+            update_ipv6_configuration, DeviceId,
         },
         error::{ExistsError, NotFoundError},
         ip::{
-            device::{nud::DynamicNeighborUpdateSource, IpAddressId as _},
+            device::{
+                nud::DynamicNeighborUpdateSource, slaac::SlaacConfiguration, IpAddressId as _,
+                IpDeviceConfigurationUpdate, Ipv6DeviceConfigurationUpdate,
+            },
             dispatch_receive_ip_packet_name, receive_ip_packet,
             testutil::is_in_ip_multicast,
         },
@@ -2338,7 +2341,24 @@ mod tests {
         )
         .into();
 
-        crate::device::testutil::enable_device(&sync_ctx, &mut non_sync_ctx, &device);
+        // Enable the device and configure it to generate a link-local address.
+        let _: Ipv6DeviceConfigurationUpdate = update_ipv6_configuration(
+            sync_ctx,
+            &mut non_sync_ctx,
+            &device,
+            Ipv6DeviceConfigurationUpdate {
+                slaac_config: Some(SlaacConfiguration {
+                    enable_stable_addresses: true,
+                    ..Default::default()
+                }),
+                ip_config: Some(IpDeviceConfigurationUpdate {
+                    ip_enabled: Some(true),
+                    ..Default::default()
+                }),
+                ..Default::default()
+            },
+        )
+        .unwrap();
         // Verify that there is a single assigned address.
         assert_eq!(
             sync_ctx

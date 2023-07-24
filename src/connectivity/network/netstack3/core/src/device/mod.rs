@@ -2691,6 +2691,12 @@ mod tests {
                 // Enable DAD so that the auto-generated address triggers a DAD
                 // message immediately on interface enable.
                 dad_transmits: Some(Some(nonzero!(1u8))),
+                // Enable stable addresses so the link-local address is auto-
+                // generated.
+                slaac_config: Some(SlaacConfiguration {
+                    enable_stable_addresses: true,
+                    ..Default::default()
+                }),
                 ip_config: Some(IpDeviceConfigurationUpdate {
                     ip_enabled: Some(true),
                     ..Default::default()
