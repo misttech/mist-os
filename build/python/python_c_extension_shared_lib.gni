@@ -29,6 +29,7 @@ template("python_c_extension_shared_lib") {
     output_name = shlib_output_name
     forward_variables_from(invoker,
                            [
+                             "assert_no_deps",
                              "testonly",
                              "sources",
                              "deps",

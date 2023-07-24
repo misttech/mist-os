@@ -26,6 +26,10 @@ import("//build/rust/rustc_library.gni")
 #  * fidl_ir_target
 #    - Required: The label of the target that generates the FIDL IR JSON file.
 #    - Type: label
+#  * deps
+#    - Optional: Dependencies added unalterd to the deps for this library.
+#         Used only to set non-fidl rust bindings. The use of public_deps is
+#         instead of deps is strongly advised.
 #
 #  * testonly, visibility, public_deps
 #    - Optional: Usual GN meanings.
@@ -95,6 +99,7 @@ template("fidl_rust") {
     }
     not_needed(invoker,
                [
+                 "deps",
                  "public_deps",
                  "visibility",
                  "disable_rustdoc",
@@ -126,6 +131,9 @@ template("fidl_rust") {
         "//third_party/rust_crates:bitflags",
         "//third_party/rust_crates:futures",
       ]
+      if (defined(invoker.deps)) {
+        deps += invoker.deps
+      }
 
       # TODO(https://fxbug.dev/104019): Avoid this suppression. At the time of
       # writing it is needed because this target might depend on another FIDL

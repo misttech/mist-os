@@ -79,6 +79,18 @@ template("ffx_tool") {
   output_unversioned = "${output_name}_unversioned"
   output_metadata = "${output_name}.json"
 
+  assert_no_deps = []
+  if (defined(invoker.assert_no_deps)) {
+    assert_no_deps += invoker.assert_no_deps
+  }
+
+  if (defined(invoker.sdk_category) && invoker.sdk_category != "internal") {
+    assert_no_deps += [
+      "//sdk:marker-internal",
+      "//sdk:marker-unknown",
+    ]
+  }
+
   # Make the rust binary
   rustc_binary(target_unversioned) {
     output_name = output_unversioned
@@ -89,6 +101,7 @@ template("ffx_tool") {
                              "sdk_target_name",
                              "sdk_category",
                              "sdk_deps",
+                             "assert_no_deps",
                            ])
   }
 

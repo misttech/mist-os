@@ -669,3 +669,27 @@ golden_files("sdk_atom_manifest_goldens") {
   }
   deps = [ ":get_atoms_from_sdk_manifest($target_toolchain)" ]
 }
+
+# These markers are used to define dependencies on FIDL bindings
+# so host tools can assert_no_deps to make sure all host tools
+# in the SDK are only using FIDL libraries included in the SDK.
+group("marker-cts") {
+}
+group("marker-excluded") {
+}
+group("marker-experimental") {
+}
+group("marker-internal") {
+}
+group("marker-unknown") {
+}
+group("marker-partner") {
+}
+group("marker-partner_internal") {
+}
+group("marker-public") {
+}
+
+# Marker for the allow list for use in a subtool.
+group("marker-allowed-for-ffx-subtool") {
+}

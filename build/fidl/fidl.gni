@@ -258,6 +258,27 @@ template("fidl") {
       # Only import the fidl_rust() template if in a rust-capable toolchain and
       # rust bindings are to be defined.
       import("//build/rust/fidl_rust.gni")
+      marker_deps = []
+      if (is_host) {
+        # Rust is used for ffx host tools, so add SDK category markers to
+        # the rust targets to make sure host tools are built using only
+        # FIDL libraries that are in permissible categories.
+        import("//src/developer/ffx/build/ffx_subtool_allowlist.gni")
+
+        # check for allowed marker before adding category
+        label_name = get_label_info(":$target_name", "label_no_toolchain")
+        is_allowed = ffx_subtool_fidl_allowlist + [ label_name ] -
+                     [ label_name ] != ffx_subtool_fidl_allowlist
+        if (is_allowed) {
+          sdk_category = "allowed-for-ffx-subtool"
+        } else {
+          sdk_category = "unknown"
+          if (defined(invoker.sdk_category)) {
+            sdk_category = invoker.sdk_category
+          }
+        }
+        marker_deps += [ "//sdk:marker-${sdk_category}" ]
+      }
 
       # Define the Rust bindings.
       fidl_rust("${target_name}_rust") {
@@ -269,6 +290,7 @@ template("fidl") {
                                  "disable_rustdoc",
                                ])
         forward_variables_from(common_parameters, "*", [ "fidl_target" ])
+        deps = marker_deps
         fidl_gen_dir += "/rust"
       }
 

@@ -96,6 +96,12 @@ python_c_extension("fuchsia_controller_py") {
     ":lib",
     "//zircon/system/public",
   ]
+
+  # make sure no fidl libraries not in the SDK are used.
+  assert_no_deps = [
+    "//sdk:marker-internal",
+    "//sdk:marker-unknown",
+  ]
 }
 
 python_library("fidl_bindings") {

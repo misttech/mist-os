@@ -153,6 +153,15 @@ template("ffx_plugin") {
                                  "with_unit_tests",
                                  "original_target_name",
                                ])
+
+        # make sure no fidl libraries not in the SDK are used.
+        assert_no_deps = [
+          "//sdk:marker-cts",
+          "//sdk:marker-excluded",
+          "//sdk:marker-experimental",
+          "//sdk:marker-internal",
+          "//sdk:marker-unknown",
+        ]
       }
 
       args_deps += [ ":" + sub_cmd ]
