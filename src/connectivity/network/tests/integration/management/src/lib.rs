@@ -69,7 +69,7 @@ async fn with_netcfg_owned_device<
     manager_config: ManagerConfig,
     with_dhcpv6_client: bool,
     after_interface_up: F,
-) {
+) -> String {
     let sandbox = netemul::TestSandbox::new().expect("create sandbox");
     let realm = sandbox
         .create_netstack_realm_with::<N, _, _>(
@@ -105,7 +105,7 @@ async fn with_netcfg_owned_device<
     let wait_for_netmgr =
         wait_for_component_stopped(&realm, M::MANAGEMENT_AGENT.get_component_name(), None).fuse();
     futures::pin_mut!(wait_for_netmgr);
-    let (if_id, _if_name): (u64, String) = interfaces::wait_for_non_loopback_interface_up(
+    let (if_id, if_name): (u64, String) = interfaces::wait_for_non_loopback_interface_up(
         &interface_state,
         &mut wait_for_netmgr,
         None,
@@ -123,22 +123,33 @@ async fn with_netcfg_owned_device<
     // NetCfg is still in the process of configuring them after adding them to
     // the Netstack, which causes spurious errors.
     realm.shutdown().await.expect("failed to shutdown realm");
+
+    if_name
 }
 
 /// Test that NetCfg discovers a newly added device and it adds the device
 /// to the Netstack.
 #[netstack_test]
-async fn test_oir<M: Manager, N: Netstack>(name: &str) {
-    with_netcfg_owned_device::<M, N, _>(
+#[test_case(ManagerConfig::Empty, "eth"; "no_prefix")]
+#[test_case(ManagerConfig::IfacePrefix, "testeth"; "with_prefix")]
+async fn test_oir<M: Manager, N: Netstack>(name: &str, config: ManagerConfig, prefix: &str) {
+    let if_name = with_netcfg_owned_device::<M, N, _>(
         name,
-        ManagerConfig::Empty,
+        config,
         false, /* with_dhcpv6_client */
         |_if_id: u64,
          _: &netemul::TestNetwork<'_>,
          _: &fnet_interfaces::StateProxy,
          _: &netemul::TestRealm<'_>| async {}.boxed_local(),
     )
-    .await
+    .await;
+
+    assert!(
+        if_name.starts_with(prefix),
+        "expected interface name to start with '{}', got = '{}'",
+        prefix,
+        if_name,
+    );
 }
 
 // Test that Netcfg discovers a device, adds it to the Netstack,
@@ -152,7 +163,7 @@ async fn test_install_only_no_provisioning<M: Manager, N: Netstack>(name: &str) 
     const DHCPV6_SERVER_PORT: u16 = 546;
     const DHCPV6_CLIENT_PORT: u16 = 547;
 
-    with_netcfg_owned_device::<M, N, _>(
+    let _if_name: String = with_netcfg_owned_device::<M, N, _>(
         name,
         ManagerConfig::InstallOnly,
         true, /* with_dhcpv6_client */
@@ -253,7 +264,7 @@ async fn test_install_only_no_provisioning<M: Manager, N: Netstack>(name: &str) 
             .boxed_local()
         },
     )
-    .await
+    .await;
 }
 
 /// Tests that stable interface name conflicts are handled gracefully.
@@ -756,7 +767,7 @@ async fn observes_stop_events<M: Manager, N: Netstack>(name: &str) {
 /// that enabled.
 #[netstack_test]
 async fn test_forwarding<M: Manager, N: Netstack>(name: &str) {
-    with_netcfg_owned_device::<M, N, _>(
+    let _if_name: String = with_netcfg_owned_device::<M, N, _>(
         name,
         ManagerConfig::Forwarding,
         false, /* with_dhcpv6_client */
@@ -798,7 +809,7 @@ async fn test_forwarding<M: Manager, N: Netstack>(name: &str) {
             .boxed_local()
         },
     )
-    .await
+    .await;
 }
 
 #[netstack_test]
@@ -1202,7 +1213,7 @@ async fn test_prefix_provider_full_integration<M: Manager, N: Netstack>(name: &s
         stream.next().await.expect("expected DHCPv6 message")
     }
 
-    with_netcfg_owned_device::<M, N, _>(
+    let _if_name: String = with_netcfg_owned_device::<M, N, _>(
         name,
         ManagerConfig::Dhcpv6,
         true, /* with_dhcpv6_client */

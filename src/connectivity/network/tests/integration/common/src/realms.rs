@@ -171,6 +171,7 @@ pub enum ManagerConfig {
     Dhcpv6,
     Forwarding,
     InstallOnly,
+    IfacePrefix,
 }
 
 impl ManagerConfig {
@@ -180,6 +181,7 @@ impl ManagerConfig {
             ManagerConfig::Dhcpv6 => "/pkg/netcfg/dhcpv6.json",
             ManagerConfig::Forwarding => "/pkg/netcfg/forwarding.json",
             ManagerConfig::InstallOnly => "/pkg/netcfg/install_only.json",
+            ManagerConfig::IfacePrefix => "/pkg/netcfg/iface_prefix.json",
         }
     }
 }
@@ -317,7 +319,8 @@ impl<'a> From<&'a KnownServiceProvider> for fnetemul::ChildDef {
                     ManagerConfig::Dhcpv6 => true,
                     ManagerConfig::Forwarding
                     | ManagerConfig::Empty
-                    | ManagerConfig::InstallOnly => false,
+                    | ManagerConfig::InstallOnly
+                    | ManagerConfig::IfacePrefix => false,
                 };
 
                 fnetemul::ChildDef {

@@ -117,6 +117,7 @@ package_deps = [
   ":netcfg-netemul-config",
   ":netcfg-with-dhcpv6-netemul-config",
   ":netcfg-with-forwarding-netemul-config",
+  ":netcfg-with-iface-name-prefix",
   ":netcfg-without-provisioning-netemul-config",
   "//src/connectivity/network/netcfg:component-advanced",
   "//src/connectivity/network/netcfg:component-basic",
@@ -210,6 +211,12 @@ resource("netcfg-without-provisioning-netemul-config") {
   testonly = true
   sources = [ "management/config/install_only.json" ]
   outputs = [ "netcfg/install_only.json" ]
+}
+
+resource("netcfg-with-iface-name-prefix") {
+  testonly = true
+  sources = [ "management/config/iface_prefix.json" ]
+  outputs = [ "netcfg/iface_prefix.json" ]
 }
 
 resource("netstack-empty-netemul-config") {
