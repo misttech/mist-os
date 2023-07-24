@@ -11,19 +11,6 @@ fuchsia_component("test-root") {
   deps = [ "//src/storage/memfs:memfs_component" ]
 }
 
-fuchsia_test_package("realm-factory-test") {
-  test_specs = {
-    log_settings = {
-      max_severity = "ERROR"
-    }
-  }
-  test_components = [ ":test-root" ]
-  subpackages = [
-    "../testing/realm-factory:realm-factory",
-    "../testing/realm-factory:test-suite",
-  ]
-}
-
 fuchsia_component("scan-contemporary-privacy") {
   testonly = true
   manifest = "meta/scan_contemporary_privacy.cml"
@@ -224,7 +211,6 @@ fuchsia_test_package("wlan-hw-sim-rate-selection-tests") {
 group("wlan-hw-sim-component-tests") {
   testonly = true
   deps = [
-    ":realm-factory-test",
     ":wlan-hw-sim-contemporary-privacy-tests",
     ":wlan-hw-sim-legacy-privacy-tests",
     ":wlan-hw-sim-rate-selection-tests",

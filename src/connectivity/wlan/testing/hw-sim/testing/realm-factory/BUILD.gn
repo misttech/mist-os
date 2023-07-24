@@ -40,8 +40,6 @@ fuchsia_component("wlan-hw-sim-component") {
     "//src/connectivity/location/regulatory_region:regulatory_region_component",
     "//src/connectivity/wlan/testing:wlan_test_driver_deps",
     "//src/connectivity/wlan/wlancfg:service",
-    "//src/connectivity/wlan/wlandevicemonitor:wlandevicemonitor-values",
-    "//src/connectivity/wlan/wlandevicemonitor:wlandevicemonitor_component",
     "//src/devices/misc/drivers/test-parent",
     "//src/sys/stash:stash_secure_v2",
   ]
@@ -60,39 +58,7 @@ fuchsia_package("realm-factory") {
   deps = [
     ":realm-factory-component",
     ":wlan-hw-sim-component",
+    "//src/connectivity/wlan/wlandevicemonitor:wlandevicemonitor_component",
     "//src/diagnostics/archivist:archivist-for-embedding-bundle",
   ]
-}
-
-rustc_test("realm-factory-test") {
-  edition = "2021"
-  source_root = "src/test.rs"
-  sources = [ source_root ]
-  name = "realm_factory_test"
-  deps = [
-    "../fidl:test.wlan.realm_rust",
-    "//sdk/fidl/fuchsia.driver.test:fuchsia.driver.test_rust",
-    "//sdk/fidl/fuchsia.wlan.device.service:fuchsia.wlan.device.service_rust",
-    "//sdk/fidl/fuchsia.wlan.policy:fuchsia.wlan.policy_rust",
-    "//sdk/fidl/fuchsia.wlan.tap:fuchsia.wlan.tap_rust",
-    "//sdk/lib/device-watcher/rust",
-    "//src/lib/fidl/rust/fidl",
-    "//src/lib/fuchsia",
-    "//src/lib/fuchsia-component",
-    "//src/testing/realm_proxy",
-    "//third_party/rust_crates:anyhow",
-    "//third_party/rust_crates:tracing",
-  ]
-}
-
-fuchsia_component("test-suite-component") {
-  testonly = true
-  component_name = "test-suite"
-  manifest = "meta/test-suite.cml"
-  deps = [ ":realm-factory-test" ]
-}
-
-fuchsia_package("test-suite") {
-  testonly = true
-  deps = [ ":test-suite-component" ]
 }

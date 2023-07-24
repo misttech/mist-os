@@ -18,6 +18,7 @@
         {
             protocol: [
                 "fuchsia.component.Binder",
+                "fuchsia.diagnostics.ArchiveAccessor",
                 "fuchsia.logger.LogSink",
                 "fuchsia.process.Launcher",
             ],

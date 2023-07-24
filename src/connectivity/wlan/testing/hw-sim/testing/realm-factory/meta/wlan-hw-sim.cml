@@ -15,14 +15,6 @@
             name: "wlancfg",
             url: "#meta/wlancfg.cm",
         },
-        {
-            name: "wlandevicemonitor",
-            url: "#meta/wlandevicemonitor.cm",
-        },
-        {
-            name: "regulatory_region",
-            url: "#meta/regulatory_region.cm",
-        },
     ],
     use: [
         { protocol: "fuchsia.diagnostics.ArchiveAccessor" },
@@ -32,10 +24,8 @@
             protocol: "fuchsia.logger.LogSink",
             from: "parent",
             to: [
-                "#regulatory_region",
                 "#stash",
                 "#wlancfg",
-                "#wlandevicemonitor",
             ],
         },
         {
@@ -45,21 +35,14 @@
         },
         {
             protocol: "fuchsia.location.namedplace.RegulatoryRegionWatcher",
-            from: "#regulatory_region",
+            from: "parent",
             to: "#wlancfg",
         },
         {
             protocol: "fuchsia.wlan.device.service.DeviceMonitor",
-            from: "#wlandevicemonitor",
+            from: "parent",
             to: [ "#wlancfg" ],
             dependency: "weak",
-        },
-        {
-            directory: "dev-class",
-            from: "#driver_test_realm",
-            as: "dev-wlanphy",
-            to: "#wlandevicemonitor",
-            subdir: "wlanphy",
         },
         {
             storage: "data",
@@ -68,11 +51,6 @@
                 "#stash",
                 "#wlancfg",
             ],
-        },
-        {
-            storage: "cache",
-            from: "parent",
-            to: "#regulatory_region",
         },
     ],
     expose: [
@@ -84,15 +62,16 @@
             from: "#wlancfg",
         },
         {
-            protocol: "fuchsia.wlan.device.service.DeviceMonitor",
-            from: "#wlandevicemonitor",
-        },
-        {
             protocol: "fuchsia.driver.test.Realm",
             from: "#driver_test_realm",
         },
         {
             directory: "dev-topological",
+            from: "#driver_test_realm",
+            rights: [ "r*" ],
+        },
+        {
+            directory: "dev-class",
             from: "#driver_test_realm",
             rights: [ "r*" ],
         },

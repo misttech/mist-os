@@ -70,8 +70,103 @@ async fn setup_archivist(builder: &RealmBuilder, wlan_components: &ChildRef) -> 
     Ok(())
 }
 
+async fn setup_wlandevicemonitor(
+    builder: &RealmBuilder,
+    wlan_components: &ChildRef,
+    use_legacy_privacy: bool,
+) -> Result<(), Error> {
+    let wlandevicemonitor = builder
+        .add_child("wlandevicemonitor", "#meta/wlandevicemonitor.cm", ChildOptions::new())
+        .await?;
+
+    builder.init_mutable_config_to_empty(&wlandevicemonitor).await?;
+
+    builder.set_config_value_bool(&wlandevicemonitor, "wep_supported", use_legacy_privacy).await?;
+    builder.set_config_value_bool(&wlandevicemonitor, "wpa1_supported", use_legacy_privacy).await?;
+
+    builder
+        .add_route(
+            Route::new()
+                .capability(
+                    Capability::protocol_by_name("fuchsia.wlan.device.service.DeviceMonitor")
+                        .weak(),
+                )
+                .from(&wlandevicemonitor)
+                .to(wlan_components),
+        )
+        .await?;
+
+    builder
+        .add_route(
+            Route::new()
+                .capability(Capability::directory("dev-class").subdir("wlanphy").as_("dev-wlanphy"))
+                .from(wlan_components)
+                .to(&wlandevicemonitor),
+        )
+        .await?;
+
+    builder
+        .add_route(
+            Route::new()
+                .capability(Capability::protocol_by_name(
+                    "fuchsia.wlan.device.service.DeviceMonitor",
+                ))
+                .from(&wlandevicemonitor)
+                .to(Ref::parent()),
+        )
+        .await?;
+
+    builder
+        .add_route(
+            Route::new()
+                .capability(Capability::protocol_by_name("fuchsia.logger.LogSink"))
+                .from(Ref::parent())
+                .to(&wlandevicemonitor),
+        )
+        .await?;
+
+    Ok(())
+}
+
+async fn setup_regulatory_region(
+    builder: &RealmBuilder,
+    wlan_components: &ChildRef,
+) -> Result<(), Error> {
+    let regulatory_region = builder
+        .add_child("regulatory_region", "#meta/regulatory_region.cm", ChildOptions::new())
+        .await?;
+
+    builder
+        .add_route(
+            Route::new()
+                .capability(
+                    Capability::protocol_by_name(
+                        "fuchsia.location.namedplace.RegulatoryRegionWatcher",
+                    )
+                    .weak(),
+                )
+                .from(&regulatory_region)
+                .to(wlan_components),
+        )
+        .await?;
+
+    builder
+        .add_route(
+            Route::new()
+                .capability(Capability::protocol_by_name("fuchsia.logger.LogSink"))
+                .capability(Capability::storage("cache"))
+                .from(Ref::parent())
+                .to(&regulatory_region),
+        )
+        .await?;
+
+    Ok(())
+}
+
 async fn build_realm(mut options: ftest::RealmOptions) -> Result<RealmInstance, Error> {
     info!("building the realm using options {:?}", options);
+
+    let wlan_config = options.wlan_config.unwrap_or(ftest::WlanConfig { ..Default::default() });
 
     let builder = RealmBuilder::new().await?;
 
@@ -81,15 +176,25 @@ async fn build_realm(mut options: ftest::RealmOptions) -> Result<RealmInstance, 
 
     setup_archivist(&builder, &wlan_components).await?;
 
+    setup_wlandevicemonitor(
+        &builder,
+        &wlan_components,
+        wlan_config.use_legacy_privacy.unwrap_or(false),
+    )
+    .await?;
+
+    if wlan_config.with_regulatory_region.unwrap_or(true) {
+        setup_regulatory_region(&builder, &wlan_components).await?;
+    } else {
+        info!("No regulatory region");
+    }
+
     builder
         .add_route(
             Route::new()
                 .capability(Capability::protocol_by_name("fuchsia.driver.test.Realm"))
                 .capability(Capability::protocol_by_name("fuchsia.wlan.policy.ClientProvider"))
                 .capability(Capability::protocol_by_name("fuchsia.wlan.policy.AccessPointProvider"))
-                .capability(Capability::protocol_by_name(
-                    "fuchsia.wlan.device.service.DeviceMonitor",
-                ))
                 .capability(Capability::directory("dev-topological"))
                 .capability(Capability::directory("dev-class"))
                 .from(&wlan_components)
@@ -103,13 +208,16 @@ async fn build_realm(mut options: ftest::RealmOptions) -> Result<RealmInstance, 
                 .capability(Capability::protocol_by_name("fuchsia.logger.LogSink"))
                 .capability(Capability::protocol_by_name("fuchsia.process.Launcher"))
                 .capability(Capability::storage("data"))
-                .capability(Capability::storage("cache"))
                 .from(Ref::parent())
                 .to(&wlan_components),
         )
         .await?;
 
-    let realm = builder.build().await?;
+    let realm = if let Some(name) = wlan_config.name {
+        builder.build_with_name(name).await?
+    } else {
+        builder.build().await?
+    };
 
     let devfs = options.devfs_server_end.take().unwrap();
 
