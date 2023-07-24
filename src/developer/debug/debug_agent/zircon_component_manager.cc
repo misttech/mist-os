@@ -427,8 +427,8 @@ class ZirconComponentManager::TestLauncher : public fxl::RefCountedThreadSafe<Te
   }
 
   // Unused but required by the test framework.
-  void OnRunEvents(fidl::Result<fuchsia_test_manager::RunController::GetEvents> events) {
-    if (!events->events().empty()) {
+  void OnRunEvents(fidl::Result<fuchsia_test_manager::RunController::GetEvents> result) {
+    if (result.is_ok() && !result->events().empty()) {
       FX_LOGS_FIRST_N(WARNING, 1) << "Not implemented yet";
       run_controller_->GetEvents().Then([self = fxl::RefPtr<TestLauncher>(this)](auto& res) {
         self->OnRunEvents(std::move(res));

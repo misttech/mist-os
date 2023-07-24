@@ -16,8 +16,8 @@ Attached Process 1 state=Running koid=?? name=hello_starnix component=starnix_ke
 [zxdb] next
 🛑 main() • hello_starnix.cc:10
 
-[zxdb] b execute_syscall
-Created Breakpoint 2 @ execute_syscall
+[zxdb] b -t execute execute_syscall
+Created Breakpoint 2 type=execute @ execute_syscall
 
 [zxdb] c
 🛑 on bp 2
@@ -30,7 +30,7 @@ execute_syscall
 main() • hello_starnix.cc
 
 [zxdb] bp rm
-Removed Breakpoint 2 @ execute_syscall
+Removed Breakpoint 2 type=execute @ execute_syscall
 
 [zxdb] c
 Process 1 exited with code 0.
