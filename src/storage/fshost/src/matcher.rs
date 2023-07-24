@@ -244,17 +244,24 @@ struct FvmMatcher {
 
     // Set if we want to mount the data partition.
     data: bool,
+
+    // Set to true if we already matched a partition. It doesn't make sense to try and match
+    // multiple main system partitions.
+    already_matched: bool,
 }
 
 impl FvmMatcher {
     fn new(ramdisk_required: Option<String>, netboot: bool, blobfs: bool, data: bool) -> Self {
-        Self { ramdisk_required, netboot, blobfs, data }
+        Self { ramdisk_required, netboot, blobfs, data, already_matched: false }
     }
 }
 
 #[async_trait]
 impl Matcher for FvmMatcher {
     async fn match_device(&self, device: &mut dyn Device) -> bool {
+        if self.already_matched {
+            return false;
+        }
         if let Some(ramdisk_prefix) = &self.ramdisk_required {
             if !device.topological_path().starts_with(ramdisk_prefix) {
                 return false;
@@ -298,6 +305,9 @@ impl Matcher for FvmMatcher {
                 }
             }
         }
+        // Once we have matched and processed the main system partitions, fuse this matcher so we
+        // don't match any other partitions.
+        self.already_matched = true;
         Ok(())
     }
 }
@@ -899,6 +909,30 @@ mod tests {
                     .expect_mount_blobfs_on()
                     .expect_format_data()
                     .expect_bind_data()
+            )
+            .await
+            .expect("match_device failed"));
+    }
+
+    #[fuchsia::test]
+    async fn test_multiple_fvm_partitions_second_fails() {
+        let mut matchers = Matchers::new(&default_config(), None);
+
+        assert!(matchers
+            .match_device(
+                &mut MockDevice::new().set_content_format(DiskFormat::Fvm),
+                &mut MockEnv::new()
+                    .expect_bind_and_enumerate_fvm()
+                    .expect_mount_data_on()
+                    .expect_mount_blobfs_on()
+            )
+            .await
+            .expect("match_device failed"));
+
+        assert!(!matchers
+            .match_device(
+                &mut MockDevice::new().set_content_format(DiskFormat::Fvm),
+                &mut MockEnv::new()
             )
             .await
             .expect("match_device failed"));
