@@ -146,7 +146,9 @@ class __EXPORT VolumeManager {
   // device, at a device path of |/zxcrypt/unsealed/block| below the block device.  This will only
   // work once you have called |OpenClient| and used that handle to call
   // |EncryptedVolumeClient::Unseal| or |EncryptedVolumeClient::UnsealWithImplicitKey|.
-  zx_status_t OpenInnerBlockDevice(const zx::duration& timeout, fbl::unique_fd* out);
+  // This returns the controller to the block device.
+  zx::result<fidl::ClientEnd<fuchsia_device::Controller>> OpenInnerBlockDevice(
+      const zx::duration& timeout);
 
  private:
   // The underlying block device.

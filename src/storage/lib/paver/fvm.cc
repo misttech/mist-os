@@ -93,8 +93,27 @@ zx::result<bool> FvmIsVirtualPartition(
 struct PartitionInfo {
   fvm::PartitionDescriptor* pd = nullptr;
   fvm::PartitionDescriptor aligned_pd = {};
-  fbl::unique_fd new_part;
+  fidl::ClientEnd<fuchsia_device::Controller> controller;
+  fidl::ClientEnd<partition::Partition> partition;
   bool active = false;
+
+  zx::result<> SetPartition(fidl::ClientEnd<fuchsia_device::Controller> controller) {
+    fidl::ClientEnd<partition::Partition> partition;
+    zx::result server = fidl::CreateEndpoints(&partition);
+    if (server.is_error()) {
+      ERROR("Failed creating endpoints: %s", server.status_string());
+      return server.take_error();
+    }
+    if (fidl::OneWayStatus status =
+            fidl::WireCall(controller)->ConnectToDeviceFidl(server->TakeChannel());
+        !status.ok()) {
+      ERROR("Failed to connect to device fidl: %s", status.FormatDescription().c_str());
+      return zx::error(status.status());
+    }
+    this->controller = std::move(controller);
+    this->partition = std::move(partition);
+    return zx::ok();
+  }
 };
 
 ptrdiff_t GetExtentOffset(size_t extent) {
@@ -374,15 +393,7 @@ zx::result<zxcrypt::VolumeManager> ZxcryptCreate(PartitionInfo* part) {
     return zx::error(status);
   }
 
-  fdio_cpp::FdioCaller part_caller(std::move(part->new_part));
-  zx::result part_channel = part_caller.take_channel();
-  if (part_channel.is_error()) {
-    return part_channel.take_error();
-  }
-
-  zxcrypt::VolumeManager zxcrypt_manager(
-      fidl::ClientEnd<fuchsia_device::Controller>(std::move(part_channel.value())),
-      std::move(devfs_root));
+  zxcrypt::VolumeManager zxcrypt_manager(std::move(part->controller), std::move(devfs_root));
   zx::channel client_chan;
   if (zx_status_t status = zxcrypt_manager.OpenClient(zx::sec(3), client_chan); status != ZX_OK) {
     ERROR("Could not open zxcrypt volume manager\n");
@@ -400,10 +411,13 @@ zx::result<zxcrypt::VolumeManager> ZxcryptCreate(PartitionInfo* part) {
     return zx::error(status);
   }
 
-  if (zx_status_t status = zxcrypt_manager.OpenInnerBlockDevice(zx::sec(3), &part->new_part);
-      status != ZX_OK) {
-    ERROR("Could not open zxcrypt volume\n");
-    return zx::error(status);
+  zx::result controller = zxcrypt_manager.OpenInnerBlockDevice(zx::sec(3));
+  if (controller.is_error()) {
+    ERROR("Could not open zxcrypt volume: %s\n", controller.status_string());
+    return controller.take_error();
+  }
+  if (zx::result status = part->SetPartition(std::move(controller.value())); status.is_error()) {
+    return status.take_error();
   }
 
   return zx::ok(std::move(zxcrypt_manager));
@@ -570,13 +584,10 @@ zx::result<std::vector<BoundZxcryptDevice>> AllocatePartitions(
       ERROR("Couldn't allocate partition: %s\n", channel.status_string());
       return zx::error(ZX_ERR_NO_SPACE);
     } else {
-      fbl::unique_fd partition;
-      if (zx_status_t status = fdio_fd_create(channel.value().TakeChannel().release(),
-                                              partition.reset_and_get_address());
-          status != ZX_OK) {
-        return zx::error(status);
+      if (zx::result status = part_info.SetPartition(std::move(channel.value()));
+          status.is_error()) {
+        return status.take_error();
       }
-      part_info.new_part = std::move(partition);
     }
 
     // Add filter drivers.
@@ -596,9 +607,8 @@ zx::result<std::vector<BoundZxcryptDevice>> AllocatePartitions(
       uint64_t offset = ext.slice_start;
       uint64_t length = ext.slice_count;
 
-      fdio_cpp::UnownedFdioCaller partition_connection(part_info.new_part.get());
-      auto result =
-          fidl::WireCall(partition_connection.borrow_as<volume::Volume>())->Extend(offset, length);
+      fidl::UnownedClientEnd<volume::Volume> volume(part_info.partition.channel().borrow());
+      auto result = fidl::WireCall(volume)->Extend(offset, length);
       auto status = result.ok() ? result.value().status : result.status();
       if (status != ZX_OK) {
         ERROR("Failed to extend partition: %s\n", zx_status_get_string(status));
@@ -833,10 +843,7 @@ zx::result<> FvmStreamPartitions(const fbl::unique_fd& devfs_root,
 
   // Now that all partitions are preallocated, begin streaming data to them.
   for (size_t p = 0; p < parts.size(); p++) {
-    fdio_cpp::UnownedFdioCaller partition_connection(parts[p].new_part.get());
-    fidl::UnownedClientEnd device = partition_connection.borrow_as<block::Block>();
-
-    const fidl::WireResult result = fidl::WireCall(device)->GetInfo();
+    const fidl::WireResult result = fidl::WireCall(parts[p].partition)->GetInfo();
     if (!result.ok()) {
       ERROR("Couldn't get partition block info: %s\n", result.FormatDescription().c_str());
       return zx::error(result.status());
@@ -854,7 +861,7 @@ zx::result<> FvmStreamPartitions(const fbl::unique_fd& devfs_root,
       return endpoints.take_error();
     }
     auto& [session, server] = endpoints.value();
-    if (fidl::Status result = fidl::WireCall(device)->OpenSession(std::move(server));
+    if (fidl::Status result = fidl::WireCall(parts[p].partition)->OpenSession(std::move(server));
         !result.ok()) {
       return zx::error(result.status());
     }
@@ -894,11 +901,9 @@ zx::result<> FvmStreamPartitions(const fbl::unique_fd& devfs_root,
   }
 
   for (const PartitionInfo& part_info : parts) {
-    fdio_cpp::UnownedFdioCaller partition_connection(part_info.new_part.get());
     // Upgrade the old partition (currently active) to the new partition (currently
     // inactive) so the new partition persists.
-    auto result =
-        fidl::WireCall(partition_connection.borrow_as<partition::Partition>())->GetInstanceGuid();
+    auto result = fidl::WireCall(part_info.partition)->GetInstanceGuid();
     if (!result.ok() || result.value().status != ZX_OK) {
       ERROR("Failed to get unique GUID of new partition\n");
       return zx::error(ZX_ERR_BAD_STATE);

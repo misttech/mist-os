@@ -87,8 +87,6 @@ class TestDevice final {
 
   const fbl::unique_fd& devfs_root() const { return devmgr_.devfs_root(); }
 
-  const fbl::unique_fd& zxcrypt() const { return zxcrypt_; }
-
   // Returns a connection to the parent device.
   fidl::UnownedClientEnd<fuchsia_device::Controller> parent_controller() const {
     return fvm_controller_;
@@ -135,14 +133,13 @@ class TestDevice final {
 
   // Returns a connection to the zxcrypt device.
   fidl::UnownedClientEnd<fuchsia_hardware_block::Block> zxcrypt_block() const {
-    fdio_cpp::UnownedFdioCaller caller(zxcrypt_);
-    return caller.borrow_as<fuchsia_hardware_block::Block>();
+    return fidl::UnownedClientEnd<fuchsia_hardware_block::Block>(
+        zxcrypt_volume_.channel().borrow());
   }
 
   // Returns a connection to the zxcrypt device.
   fidl::UnownedClientEnd<fuchsia_hardware_block_volume::Volume> zxcrypt_volume() const {
-    fdio_cpp::UnownedFdioCaller caller(zxcrypt_);
-    return caller.borrow_as<fuchsia_hardware_block_volume::Volume>();
+    return zxcrypt_volume_.borrow();
   }
 
   // Returns the block size of the zxcrypt device.
@@ -290,8 +287,10 @@ class TestDevice final {
   //  The underlying FVM partition.
   fidl::ClientEnd<fuchsia_hardware_block_volume::Volume> fvm_;
 
-  // File descriptor for the zxcrypt volume.
-  fbl::unique_fd zxcrypt_;
+  // Channels for the zxcrypt volume.
+  fidl::ClientEnd<fuchsia_device::Controller> zxcrypt_controller_;
+  fidl::ClientEnd<fuchsia_hardware_block_volume::Volume> zxcrypt_volume_;
+
   // The zxcrypt volume
   std::optional<zxcrypt::VolumeManager> volume_manager_;
   // The cached block count.

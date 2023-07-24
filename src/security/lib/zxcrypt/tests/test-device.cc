@@ -139,7 +139,8 @@ void TestDevice::Rebind() {
   ASSERT_NOT_NULL(sep);
 
   Disconnect();
-  zxcrypt_.reset();
+  zxcrypt_controller_.reset();
+  zxcrypt_volume_.reset();
   fvm_.reset();
 
   if (strlen(fvm_part_path_) != 0) {
@@ -380,7 +381,7 @@ void TestDevice::CreateFvmPart(size_t device_size, size_t block_size) {
 }
 
 void TestDevice::Connect() {
-  ZX_DEBUG_ASSERT(!zxcrypt_);
+  ZX_DEBUG_ASSERT(!zxcrypt_volume_);
 
   volume_manager_ = zxcrypt::VolumeManager(new_parent_controller(), devfs_root().duplicate());
   zx::channel zxc_client_chan;
@@ -393,7 +394,14 @@ void TestDevice::Connect() {
   // volume_->Open() call below will fail, so this is safe to ignore.
   rc = volume_client.Unseal(key_.get(), key_.len(), 0);
   ASSERT_TRUE(rc == ZX_OK || rc == ZX_ERR_BAD_STATE);
-  ASSERT_OK(volume_manager_->OpenInnerBlockDevice(kTimeout, &zxcrypt_));
+  zx::result zxcrypt = volume_manager_->OpenInnerBlockDevice(kTimeout);
+  ASSERT_OK(zxcrypt);
+  zxcrypt_controller_ = std::move(zxcrypt.value());
+  zx::result zxcrypt_server = fidl::CreateEndpoints(&zxcrypt_volume_);
+  ASSERT_OK(zxcrypt_server);
+  ASSERT_OK(fidl::WireCall(zxcrypt_controller_)
+                ->ConnectToDeviceFidl(zxcrypt_server.value().TakeChannel())
+                .status());
 
   {
     const fidl::WireResult result = fidl::WireCall(zxcrypt_block())->GetInfo();
@@ -441,7 +449,9 @@ void TestDevice::Disconnect() {
     memset(&req_, 0, sizeof(req_));
     client_ = nullptr;
   }
-  zxcrypt_.reset();
+  zxcrypt_controller_.reset();
+  zxcrypt_volume_.reset();
+
   volume_manager_.reset();
   block_size_ = 0;
   block_count_ = 0;

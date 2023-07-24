@@ -295,14 +295,15 @@ zx_status_t VolumeManager::Unbind() {
   return fidl::WireCall(block_controller_)->UnbindChildren().status();
 }
 
-zx_status_t VolumeManager::OpenInnerBlockDevice(const zx::duration& timeout, fbl::unique_fd* out) {
+zx::result<fidl::ClientEnd<fuchsia_device::Controller>> VolumeManager::OpenInnerBlockDevice(
+    const zx::duration& timeout) {
   zx::result path_base = RelativeTopologicalPath(block_controller_);
   if (path_base.is_error()) {
     xprintf("could not get topological path: %s\n", path_base.status_string());
-    return path_base.error_value();
+    return path_base.take_error();
   }
   fbl::String path_block_exposed =
-      fbl::String::Concat({path_base.value(), "/zxcrypt/unsealed/block"});
+      fbl::String::Concat({path_base.value(), "/zxcrypt/unsealed/block/device_controller"});
 
   // Wait for the unsealed and block devices to bind
   zx::result channel = device_watcher::RecursiveWaitForFile(devfs_root_fd_.get(),
@@ -310,14 +311,9 @@ zx_status_t VolumeManager::OpenInnerBlockDevice(const zx::duration& timeout, fbl
   if (channel.is_error()) {
     xprintf("failure waiting for %s to exist: %s\n", path_block_exposed.c_str(),
             channel.status_string());
-    return channel.error_value();
+    return channel.take_error();
   }
-  if (zx_status_t status = fdio_fd_create(channel.value().release(), out->reset_and_get_address());
-      status != ZX_OK) {
-    xprintf("failed to open zxcrypt volume: %s\n", zx_status_get_string(status));
-    return status;
-  }
-  return ZX_OK;
+  return zx::ok(fidl::ClientEnd<fuchsia_device::Controller>(std::move(channel.value())));
 }
 
 zx_status_t VolumeManager::OpenClient(const zx::duration& timeout, zx::channel& out) {
