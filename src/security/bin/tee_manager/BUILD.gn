@@ -6,6 +6,7 @@ import("//build/components.gni")
 import("//build/config.gni")
 import("//build/rust/rustc_binary.gni")
 import("//build/testing/environments.gni")
+import("//src/sys/core/build/core_shard.gni")
 
 group("tests") {
   testonly = true
@@ -139,4 +140,10 @@ executable("optee_smoke_test_bin") {
 
   # TODO(fxbug.dev/58162): delete the below and fix compiler warnings
   configs += [ "//build/config:Wno-conversion" ]
+}
+
+# TODO(fxbug.dev/104628): Remove `base` from core_shard filename when it is no longer
+# included by other core shards.
+core_shard("core_shard") {
+  shard_file = "meta/tee_manager.core_shard.base.cml"
 }
