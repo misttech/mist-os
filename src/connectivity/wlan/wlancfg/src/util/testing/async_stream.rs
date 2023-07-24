@@ -4,7 +4,8 @@
 #![cfg(test)]
 
 use {
-    fuchsia_async as fasync,
+    fuchsia_async::{self as fasync, TimeoutExt},
+    fuchsia_zircon as zx,
     futures::{future::Either, prelude::*, stream::StreamFuture, task::Poll},
     pin_utils::pin_mut,
 };
@@ -26,18 +27,20 @@ where
     ResultFut: Future<Output = Out>,
 {
     pin_mut!(result_fut);
-    let mut select_fut = futures::future::select(background_fut, result_fut);
 
-    // Set a maximum loop count. After then, panic if the result_fut is still stalled (pending).
-    const MAX_LOOP_COUNT: i32 = 2000;
-    for _loop_count in 1..MAX_LOOP_COUNT {
-        match exec.run_until_stalled(&mut select_fut) {
-            Poll::Ready(Either::Left(_)) => panic!("Background future finished"),
-            Poll::Ready(Either::Right((out, _background_fut))) => return out,
-            Poll::Pending => {}
-        }
+    // Set an arbitrary timeout to catch the case where `result_fut` never provides a result.
+    // Even a few milliseconds should be sufficient on all but the slowest hardware.
+    const RESULT_TIMEOUT: zx::Duration = zx::Duration::from_seconds(5);
+    let result_fut_with_timeout = result_fut.on_timeout(RESULT_TIMEOUT, || {
+        panic!("Future failed to produce a result within {} seconds", RESULT_TIMEOUT.into_seconds())
+    });
+
+    // Advance both futures, with the expectation that only `result_fut` will finish.
+    let mut select_fut = futures::future::select(background_fut, result_fut_with_timeout);
+    match exec.run_singlethreaded(&mut select_fut) {
+        Either::Left(_) => panic!("Background future finished"),
+        Either::Right((result, _background_fut)) => return result,
     }
-    panic!("Future failed to produce a result in {} iterations", MAX_LOOP_COUNT);
 }
 
 #[track_caller]
