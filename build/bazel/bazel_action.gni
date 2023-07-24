@@ -21,7 +21,7 @@ declare_args() {
 # The caller should pass a list of Bazel target patterns for the
 # `bazel build` command, as well as a list Bazel output files relative
 # to the workspace's root that will be copied into the
-# GN target's target_gen_dir by default.
+# GN target's target_out_dir by default.
 #
 # All inputs seen by the Bazel command must be defined in the
 # @legacy_ninja_build_outputs Bazel repository, which is populated by
@@ -29,8 +29,8 @@ declare_args() {
 # //build/bazel:legacy_ninja_build_outputs target.
 #
 # The bazel-generated files will be copied (possibly hard-linked) into the
-# `target_gen_dir` matching the GN action for this template call (since
-# GN requires that an action's output file be in either target_gen_dir
+# `target_out_dir` matching the GN action for this template call (since
+# GN requires that an action's output file be in either target_out_dir
 # or target_out_dir).
 #
 # This also takes a list of Bazel target patterns, since Bazel does not
@@ -95,7 +95,7 @@ declare_args() {
 #   directory_timestamp_outputs: (optional)
 #
 #     When allow_directory_in_outputs is set, a list of one ore more output
-#     files inside the output directories. Paths are relative to target_gen_dir.
+#     files inside the output directories. Paths are relative to target_out_dir.
 #     This is useful to provide Ninja with a file timestamp it can rely on
 #     (directory timestamps are not usable, and not managed in a consistent way
 #     across platforms).
@@ -117,20 +117,12 @@ declare_args() {
 #          ]
 #       }
 #
-#     Type: list of paths relative to target_gen_dir.
+#     Type: list of paths relative to target_out_dir.
 #     Default: empty
 #
 #   extra_bazel_args: (optional)
 #     A list extra command line arguments to pass to Bazel.
 #     Type: list of string.
-
-#   use_target_out_dir: (optional, default: true)
-#     Use target_out_dir instead of target_gen_dir when linking/copying Bazel
-#     outputs into Ninja.
-#
-#     NOTE: This arg is here to facilitate a soft transition, this will soon
-#     become the default behavior of the template. i.e. Outputs of bazel_actions
-#     will live in target_out_dir soon. See https://fxbug.dev/125898.
 #
 #   deps:
 #   metadata:
@@ -171,7 +163,7 @@ declare_args() {
 #
 #   Where <bazel_path> is a Bazel output path, relative to the Bazel workspace
 #   that looks like "bazel-bin/<bazel_target_package>/<output_file>", and
-#   where <ninja_path> is an output path relative to the `target_gen_dir`
+#   where <ninja_path> is an output path relative to the `target_out_dir`
 #   of the current target.
 #
 #   Moreover, the <bazel_path> value supports these special substitution
@@ -262,19 +254,10 @@ template("bazel_action") {
     _num_bazel_outputs += 1
   }
 
-  _use_target_out_dir = true
-  if (defined(invoker.use_target_out_dir)) {
-    _use_target_out_dir = invoker.use_target_out_dir
-  }
-
   _ninja_outputs = _ninja_output_list
   _outputs = []
   foreach(path, _ninja_outputs) {
-    if (_use_target_out_dir) {
-      _outputs += [ target_out_dir + "/" + path ]
-    } else {
-      _outputs += [ target_gen_dir + "/" + path ]
-    }
+    _outputs += [ target_out_dir + "/" + path ]
   }
 
   _bazel_inputs = []
@@ -346,19 +329,11 @@ template("bazel_action") {
           _allow_directory_in_outputs,
           "directory_timestamp_outputs is not useful when there are no directory copies (allow_directory_in_outputs=false)")
       foreach(path, invoker.directory_timestamp_outputs) {
-        if (_use_target_out_dir) {
-          outputs += [ target_out_dir + "/" + path ]
-        } else {
-          outputs += [ target_gen_dir + "/" + path ]
-        }
+        outputs += [ target_out_dir + "/" + path ]
       }
     }
 
-    if (_use_target_out_dir) {
-      _path_mapping = "${target_out_dir}/${target_name}.path_mapping"
-    } else {
-      _path_mapping = "${target_gen_dir}/${target_name}.path_mapping"
-    }
+    _path_mapping = "${target_out_dir}/${target_name}.path_mapping"
     outputs += [ _path_mapping ]
 
     args = [
