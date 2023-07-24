@@ -1574,7 +1574,7 @@ func (member *EnumMember) IsUnknown() bool {
 	return member.HasAttribute("Unknown")
 }
 
-// Bits represents a FIDL declaration of an bits.
+// Bits represents a FIDL declaration of a bits.
 type Bits struct {
 	layoutDecl
 	Type       Type         `json:"type"`

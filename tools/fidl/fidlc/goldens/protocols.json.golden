@@ -1417,31 +1417,6 @@
           },
           "is_composed": false,
           "has_error": true,
-          "maybe_response_result_type": {
-            "kind": "identifier",
-            "identifier": "test.protocols/WithErrorSyntax_ResponseAsStruct_Result",
-            "nullable": false,
-            "type_shape_v1": {
-              "inline_size": 24,
-              "alignment": 8,
-              "depth": 1,
-              "max_handles": 0,
-              "max_out_of_line": 24,
-              "has_padding": true,
-              "has_envelope": true,
-              "has_flexible_envelope": false
-            },
-            "type_shape_v2": {
-              "inline_size": 16,
-              "alignment": 8,
-              "depth": 1,
-              "max_handles": 0,
-              "max_out_of_line": 24,
-              "has_padding": true,
-              "has_envelope": true,
-              "has_flexible_envelope": false
-            }
-          },
           "maybe_response_success_type": {
             "kind": "identifier",
             "identifier": "test.protocols/WithErrorSyntax_ResponseAsStruct_Response",
@@ -1531,31 +1506,6 @@
           },
           "is_composed": false,
           "has_error": true,
-          "maybe_response_result_type": {
-            "kind": "identifier",
-            "identifier": "test.protocols/WithErrorSyntax_ErrorAsPrimitive_Result",
-            "nullable": false,
-            "type_shape_v1": {
-              "inline_size": 24,
-              "alignment": 8,
-              "depth": 1,
-              "max_handles": 0,
-              "max_out_of_line": 8,
-              "has_padding": true,
-              "has_envelope": true,
-              "has_flexible_envelope": false
-            },
-            "type_shape_v2": {
-              "inline_size": 16,
-              "alignment": 8,
-              "depth": 1,
-              "max_handles": 0,
-              "max_out_of_line": 0,
-              "has_padding": true,
-              "has_envelope": true,
-              "has_flexible_envelope": false
-            }
-          },
           "maybe_response_success_type": {
             "kind": "identifier",
             "identifier": "test.protocols/WithErrorSyntax_ErrorAsPrimitive_Response",
@@ -1645,31 +1595,6 @@
           },
           "is_composed": false,
           "has_error": true,
-          "maybe_response_result_type": {
-            "kind": "identifier",
-            "identifier": "test.protocols/WithErrorSyntax_ErrorAsEnum_Result",
-            "nullable": false,
-            "type_shape_v1": {
-              "inline_size": 24,
-              "alignment": 8,
-              "depth": 1,
-              "max_handles": 0,
-              "max_out_of_line": 8,
-              "has_padding": true,
-              "has_envelope": true,
-              "has_flexible_envelope": false
-            },
-            "type_shape_v2": {
-              "inline_size": 16,
-              "alignment": 8,
-              "depth": 1,
-              "max_handles": 0,
-              "max_out_of_line": 0,
-              "has_padding": true,
-              "has_envelope": true,
-              "has_flexible_envelope": false
-            }
-          },
           "maybe_response_success_type": {
             "kind": "identifier",
             "identifier": "test.protocols/WithErrorSyntax_ErrorAsEnum_Response",
@@ -1760,31 +1685,6 @@
           },
           "is_composed": false,
           "has_error": true,
-          "maybe_response_result_type": {
-            "kind": "identifier",
-            "identifier": "test.protocols/WithErrorSyntax_HandleInResult_Result",
-            "nullable": false,
-            "type_shape_v1": {
-              "inline_size": 24,
-              "alignment": 8,
-              "depth": 1,
-              "max_handles": 1,
-              "max_out_of_line": 8,
-              "has_padding": true,
-              "has_envelope": true,
-              "has_flexible_envelope": false
-            },
-            "type_shape_v2": {
-              "inline_size": 16,
-              "alignment": 8,
-              "depth": 1,
-              "max_handles": 1,
-              "max_out_of_line": 0,
-              "has_padding": true,
-              "has_envelope": true,
-              "has_flexible_envelope": false
-            }
-          },
           "maybe_response_success_type": {
             "kind": "identifier",
             "identifier": "test.protocols/WithErrorSyntax_HandleInResult_Response",

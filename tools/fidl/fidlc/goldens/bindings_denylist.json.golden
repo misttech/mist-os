@@ -355,31 +355,6 @@
           },
           "is_composed": false,
           "has_error": true,
-          "maybe_response_result_type": {
-            "kind": "identifier",
-            "identifier": "test.bindingsdenylist/Allowed_Denied_Result",
-            "nullable": false,
-            "type_shape_v1": {
-              "inline_size": 24,
-              "alignment": 8,
-              "depth": 3,
-              "max_handles": 0,
-              "max_out_of_line": 80,
-              "has_padding": true,
-              "has_envelope": true,
-              "has_flexible_envelope": true
-            },
-            "type_shape_v2": {
-              "inline_size": 16,
-              "alignment": 8,
-              "depth": 3,
-              "max_handles": 0,
-              "max_out_of_line": 48,
-              "has_padding": true,
-              "has_envelope": true,
-              "has_flexible_envelope": true
-            }
-          },
           "maybe_response_success_type": {
             "kind": "identifier",
             "identifier": "test.bindingsdenylist/Allowed_Denied_Response",
@@ -671,31 +646,6 @@
           },
           "is_composed": false,
           "has_error": true,
-          "maybe_response_result_type": {
-            "kind": "identifier",
-            "identifier": "test.bindingsdenylist/DenyEachBinding_OnlyDenyCpp_Result",
-            "nullable": false,
-            "type_shape_v1": {
-              "inline_size": 24,
-              "alignment": 8,
-              "depth": 1,
-              "max_handles": 0,
-              "max_out_of_line": 8,
-              "has_padding": true,
-              "has_envelope": true,
-              "has_flexible_envelope": false
-            },
-            "type_shape_v2": {
-              "inline_size": 16,
-              "alignment": 8,
-              "depth": 1,
-              "max_handles": 0,
-              "max_out_of_line": 0,
-              "has_padding": true,
-              "has_envelope": true,
-              "has_flexible_envelope": false
-            }
-          },
           "maybe_response_success_type": {
             "kind": "identifier",
             "identifier": "test.bindingsdenylist/DenyEachBinding_OnlyDenyCpp_Response",
@@ -843,31 +793,6 @@
           },
           "is_composed": false,
           "has_error": true,
-          "maybe_response_result_type": {
-            "kind": "identifier",
-            "identifier": "test.bindingsdenylist/DenyEachBinding_OnlyDenyDart_Result",
-            "nullable": false,
-            "type_shape_v1": {
-              "inline_size": 24,
-              "alignment": 8,
-              "depth": 1,
-              "max_handles": 0,
-              "max_out_of_line": 8,
-              "has_padding": true,
-              "has_envelope": true,
-              "has_flexible_envelope": false
-            },
-            "type_shape_v2": {
-              "inline_size": 16,
-              "alignment": 8,
-              "depth": 1,
-              "max_handles": 0,
-              "max_out_of_line": 0,
-              "has_padding": true,
-              "has_envelope": true,
-              "has_flexible_envelope": false
-            }
-          },
           "maybe_response_success_type": {
             "kind": "identifier",
             "identifier": "test.bindingsdenylist/DenyEachBinding_OnlyDenyDart_Response",
@@ -1015,31 +940,6 @@
           },
           "is_composed": false,
           "has_error": true,
-          "maybe_response_result_type": {
-            "kind": "identifier",
-            "identifier": "test.bindingsdenylist/DenyEachBinding_OnlyDenyGo_Result",
-            "nullable": false,
-            "type_shape_v1": {
-              "inline_size": 24,
-              "alignment": 8,
-              "depth": 1,
-              "max_handles": 0,
-              "max_out_of_line": 8,
-              "has_padding": true,
-              "has_envelope": true,
-              "has_flexible_envelope": false
-            },
-            "type_shape_v2": {
-              "inline_size": 16,
-              "alignment": 8,
-              "depth": 1,
-              "max_handles": 0,
-              "max_out_of_line": 0,
-              "has_padding": true,
-              "has_envelope": true,
-              "has_flexible_envelope": false
-            }
-          },
           "maybe_response_success_type": {
             "kind": "identifier",
             "identifier": "test.bindingsdenylist/DenyEachBinding_OnlyDenyGo_Response",
@@ -1187,31 +1087,6 @@
           },
           "is_composed": false,
           "has_error": true,
-          "maybe_response_result_type": {
-            "kind": "identifier",
-            "identifier": "test.bindingsdenylist/DenyEachBinding_OnlyDenyLibfuzzer_Result",
-            "nullable": false,
-            "type_shape_v1": {
-              "inline_size": 24,
-              "alignment": 8,
-              "depth": 1,
-              "max_handles": 0,
-              "max_out_of_line": 8,
-              "has_padding": true,
-              "has_envelope": true,
-              "has_flexible_envelope": false
-            },
-            "type_shape_v2": {
-              "inline_size": 16,
-              "alignment": 8,
-              "depth": 1,
-              "max_handles": 0,
-              "max_out_of_line": 0,
-              "has_padding": true,
-              "has_envelope": true,
-              "has_flexible_envelope": false
-            }
-          },
           "maybe_response_success_type": {
             "kind": "identifier",
             "identifier": "test.bindingsdenylist/DenyEachBinding_OnlyDenyLibfuzzer_Response",
@@ -1359,31 +1234,6 @@
           },
           "is_composed": false,
           "has_error": true,
-          "maybe_response_result_type": {
-            "kind": "identifier",
-            "identifier": "test.bindingsdenylist/DenyEachBinding_OnlyDenyRust_Result",
-            "nullable": false,
-            "type_shape_v1": {
-              "inline_size": 24,
-              "alignment": 8,
-              "depth": 1,
-              "max_handles": 0,
-              "max_out_of_line": 8,
-              "has_padding": true,
-              "has_envelope": true,
-              "has_flexible_envelope": false
-            },
-            "type_shape_v2": {
-              "inline_size": 16,
-              "alignment": 8,
-              "depth": 1,
-              "max_handles": 0,
-              "max_out_of_line": 0,
-              "has_padding": true,
-              "has_envelope": true,
-              "has_flexible_envelope": false
-            }
-          },
           "maybe_response_success_type": {
             "kind": "identifier",
             "identifier": "test.bindingsdenylist/DenyEachBinding_OnlyDenyRust_Response",
@@ -1531,31 +1381,6 @@
           },
           "is_composed": false,
           "has_error": true,
-          "maybe_response_result_type": {
-            "kind": "identifier",
-            "identifier": "test.bindingsdenylist/DenyEachBinding_OnlyDenySyzkaller_Result",
-            "nullable": false,
-            "type_shape_v1": {
-              "inline_size": 24,
-              "alignment": 8,
-              "depth": 1,
-              "max_handles": 0,
-              "max_out_of_line": 8,
-              "has_padding": true,
-              "has_envelope": true,
-              "has_flexible_envelope": false
-            },
-            "type_shape_v2": {
-              "inline_size": 16,
-              "alignment": 8,
-              "depth": 1,
-              "max_handles": 0,
-              "max_out_of_line": 0,
-              "has_padding": true,
-              "has_envelope": true,
-              "has_flexible_envelope": false
-            }
-          },
           "maybe_response_success_type": {
             "kind": "identifier",
             "identifier": "test.bindingsdenylist/DenyEachBinding_OnlyDenySyzkaller_Response",

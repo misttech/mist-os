@@ -860,7 +860,7 @@
                     "type": "boolean"
                 },
                 "has_error": {
-                    "description": "Flag indicating whether method uses the error syntax. If true, maybe_response_payload will be a single-element struct wrapping the result union, and the response will be further broken down in the  `maybe_response_result_type`, `maybe_response_success_type`, and `maybe_response_err_type` fields.",
+                    "description": "Flag indicating whether method uses the error syntax. If true, `maybe_response_payload` will be a result union, and the response will be further broken down in `maybe_response_success_type` and `maybe_response_err_type`.",
                     "type": "boolean"
                 },
                 "location": {
@@ -879,17 +879,13 @@
                     "$ref": "#/definitions/identifier-type",
                     "description": "Optional response type. This is the wire form of the response, so if error syntax is used, this is the result union."
                 },
-                "maybe_response_result_type": {
-                    "$ref": "#/definitions/type",
-                    "description": "(DEPRECATED: Use maybe_response_payload instead.) Type of the result union (only present if has_error is true or strict is false)"
-                },
                 "maybe_response_success_type": {
                     "$ref": "#/definitions/type",
-                    "description": "Type of the success variant of the result union (only present if has_error is true or strict is false)"
+                    "description": "Type of the success variant of the result union (only present if `has_error` is true or `strict` is false)"
                 },
                 "maybe_response_err_type": {
                     "$ref": "#/definitions/type",
-                    "description": "Type of the error variant of the result union (only present if has_error is true)"
+                    "description": "Type of the error variant of the result union (only present if `has_error` is true)"
                 },
                 "name": {
                     "$ref": "#/definitions/identifier",
@@ -900,7 +896,7 @@
                     "description": "Ordinal number of the protocol method"
                 },
                 "strict": {
-                    "description": "Flag indicating whether the method supports unknown interactions. If false, maybe_response_payload will be a single-element struct wrapping the result union, and the response will be further broken down in the `maybe_response_result_type` and `maybe_response_success_type` fields.",
+                    "description": "Flag indicating that the method does not support unknown interactions. If false (i.e. the method is flexible), `maybe_response_payload` will be a result union, and the response will be further broken down in `maybe_response_success_type`.",
                     "type": "boolean"
                 }
             },

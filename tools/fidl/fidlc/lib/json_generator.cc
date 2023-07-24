@@ -423,7 +423,7 @@ void JSONGenerator::Generate(const flat::Protocol::MethodWithInfo& method_with_i
     GenerateObjectMember("is_composed", method_with_info.is_composed);
     GenerateObjectMember("has_error", value.has_error);
     if (value.HasResultUnion()) {
-      GenerateObjectMember("maybe_response_result_type", value.maybe_response->type);
+      ZX_ASSERT(value.maybe_response->type->kind == flat::Type::Kind::kIdentifier);
       auto response_id = static_cast<const flat::IdentifierType*>(value.maybe_response->type);
       ZX_ASSERT(response_id->type_decl->kind == flat::Decl::Kind::kUnion);
       auto result_union = static_cast<const flat::Union*>(response_id->type_decl);

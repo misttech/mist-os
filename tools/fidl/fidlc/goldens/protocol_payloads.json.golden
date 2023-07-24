@@ -224,31 +224,6 @@
           },
           "is_composed": true,
           "has_error": true,
-          "maybe_response_result_type": {
-            "kind": "identifier",
-            "identifier": "test.protocolpayloads.imported/ComposedProtocol_TwoWayComposedWithError_Result",
-            "nullable": false,
-            "type_shape_v1": {
-              "inline_size": 24,
-              "alignment": 8,
-              "depth": 1,
-              "max_handles": 0,
-              "max_out_of_line": 8,
-              "has_padding": true,
-              "has_envelope": true,
-              "has_flexible_envelope": false
-            },
-            "type_shape_v2": {
-              "inline_size": 16,
-              "alignment": 8,
-              "depth": 1,
-              "max_handles": 0,
-              "max_out_of_line": 0,
-              "has_padding": true,
-              "has_envelope": true,
-              "has_flexible_envelope": false
-            }
-          },
           "maybe_response_success_type": {
             "kind": "identifier",
             "identifier": "test.protocolpayloads.imported/ImportStructPayload",
@@ -378,31 +353,6 @@
           },
           "is_composed": true,
           "has_error": true,
-          "maybe_response_result_type": {
-            "kind": "identifier",
-            "identifier": "test.protocolpayloads.imported/ComposedProtocol_OnComposedWithError_Result",
-            "nullable": false,
-            "type_shape_v1": {
-              "inline_size": 24,
-              "alignment": 8,
-              "depth": 1,
-              "max_handles": 0,
-              "max_out_of_line": 8,
-              "has_padding": true,
-              "has_envelope": true,
-              "has_flexible_envelope": false
-            },
-            "type_shape_v2": {
-              "inline_size": 16,
-              "alignment": 8,
-              "depth": 1,
-              "max_handles": 0,
-              "max_out_of_line": 0,
-              "has_padding": true,
-              "has_envelope": true,
-              "has_flexible_envelope": false
-            }
-          },
           "maybe_response_success_type": {
             "kind": "identifier",
             "identifier": "test.protocolpayloads.imported/ImportStructPayload",
@@ -622,31 +572,6 @@
           },
           "is_composed": false,
           "has_error": true,
-          "maybe_response_result_type": {
-            "kind": "identifier",
-            "identifier": "test.protocolpayloads/MainProtocol_TwoWayLocalWithError_Result",
-            "nullable": false,
-            "type_shape_v1": {
-              "inline_size": 24,
-              "alignment": 8,
-              "depth": 1,
-              "max_handles": 0,
-              "max_out_of_line": 8,
-              "has_padding": true,
-              "has_envelope": true,
-              "has_flexible_envelope": false
-            },
-            "type_shape_v2": {
-              "inline_size": 16,
-              "alignment": 8,
-              "depth": 1,
-              "max_handles": 0,
-              "max_out_of_line": 8,
-              "has_padding": true,
-              "has_envelope": true,
-              "has_flexible_envelope": false
-            }
-          },
           "maybe_response_success_type": {
             "kind": "identifier",
             "identifier": "test.protocolpayloads/LocalStructPayload",
@@ -776,31 +701,6 @@
           },
           "is_composed": false,
           "has_error": true,
-          "maybe_response_result_type": {
-            "kind": "identifier",
-            "identifier": "test.protocolpayloads/MainProtocol_OnLocalWithError_Result",
-            "nullable": false,
-            "type_shape_v1": {
-              "inline_size": 24,
-              "alignment": 8,
-              "depth": 1,
-              "max_handles": 0,
-              "max_out_of_line": 8,
-              "has_padding": true,
-              "has_envelope": true,
-              "has_flexible_envelope": false
-            },
-            "type_shape_v2": {
-              "inline_size": 16,
-              "alignment": 8,
-              "depth": 1,
-              "max_handles": 0,
-              "max_out_of_line": 8,
-              "has_padding": true,
-              "has_envelope": true,
-              "has_flexible_envelope": false
-            }
-          },
           "maybe_response_success_type": {
             "kind": "identifier",
             "identifier": "test.protocolpayloads/LocalStructPayload",
@@ -1020,31 +920,6 @@
           },
           "is_composed": false,
           "has_error": true,
-          "maybe_response_result_type": {
-            "kind": "identifier",
-            "identifier": "test.protocolpayloads/MainProtocol_TwoWayImportWithError_Result",
-            "nullable": false,
-            "type_shape_v1": {
-              "inline_size": 24,
-              "alignment": 8,
-              "depth": 1,
-              "max_handles": 0,
-              "max_out_of_line": 8,
-              "has_padding": true,
-              "has_envelope": true,
-              "has_flexible_envelope": false
-            },
-            "type_shape_v2": {
-              "inline_size": 16,
-              "alignment": 8,
-              "depth": 1,
-              "max_handles": 0,
-              "max_out_of_line": 0,
-              "has_padding": true,
-              "has_envelope": true,
-              "has_flexible_envelope": false
-            }
-          },
           "maybe_response_success_type": {
             "kind": "identifier",
             "identifier": "test.protocolpayloads.imported/ImportStructPayload",
@@ -1174,31 +1049,6 @@
           },
           "is_composed": false,
           "has_error": true,
-          "maybe_response_result_type": {
-            "kind": "identifier",
-            "identifier": "test.protocolpayloads/MainProtocol_OnImportWithError_Result",
-            "nullable": false,
-            "type_shape_v1": {
-              "inline_size": 24,
-              "alignment": 8,
-              "depth": 1,
-              "max_handles": 0,
-              "max_out_of_line": 8,
-              "has_padding": true,
-              "has_envelope": true,
-              "has_flexible_envelope": false
-            },
-            "type_shape_v2": {
-              "inline_size": 16,
-              "alignment": 8,
-              "depth": 1,
-              "max_handles": 0,
-              "max_out_of_line": 0,
-              "has_padding": true,
-              "has_envelope": true,
-              "has_flexible_envelope": false
-            }
-          },
           "maybe_response_success_type": {
             "kind": "identifier",
             "identifier": "test.protocolpayloads.imported/ImportStructPayload",
@@ -1418,31 +1268,6 @@
           },
           "is_composed": false,
           "has_error": true,
-          "maybe_response_result_type": {
-            "kind": "identifier",
-            "identifier": "test.protocolpayloads/MainProtocol_TwoWayAnonWithError_Result",
-            "nullable": false,
-            "type_shape_v1": {
-              "inline_size": 24,
-              "alignment": 8,
-              "depth": 1,
-              "max_handles": 0,
-              "max_out_of_line": 8,
-              "has_padding": true,
-              "has_envelope": true,
-              "has_flexible_envelope": false
-            },
-            "type_shape_v2": {
-              "inline_size": 16,
-              "alignment": 8,
-              "depth": 1,
-              "max_handles": 0,
-              "max_out_of_line": 8,
-              "has_padding": true,
-              "has_envelope": true,
-              "has_flexible_envelope": false
-            }
-          },
           "maybe_response_success_type": {
             "kind": "identifier",
             "identifier": "test.protocolpayloads/MainProtocol_TwoWayAnonWithError_Response",
@@ -1572,31 +1397,6 @@
           },
           "is_composed": false,
           "has_error": true,
-          "maybe_response_result_type": {
-            "kind": "identifier",
-            "identifier": "test.protocolpayloads/MainProtocol_OnAnonWithError_Result",
-            "nullable": false,
-            "type_shape_v1": {
-              "inline_size": 24,
-              "alignment": 8,
-              "depth": 1,
-              "max_handles": 0,
-              "max_out_of_line": 8,
-              "has_padding": true,
-              "has_envelope": true,
-              "has_flexible_envelope": false
-            },
-            "type_shape_v2": {
-              "inline_size": 16,
-              "alignment": 8,
-              "depth": 1,
-              "max_handles": 0,
-              "max_out_of_line": 8,
-              "has_padding": true,
-              "has_envelope": true,
-              "has_flexible_envelope": false
-            }
-          },
           "maybe_response_success_type": {
             "kind": "identifier",
             "identifier": "test.protocolpayloads/MainProtocol_OnAnonWithError_Response",

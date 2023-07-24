@@ -264,31 +264,6 @@
           },
           "is_composed": true,
           "has_error": true,
-          "maybe_response_result_type": {
-            "kind": "identifier",
-            "identifier": "test.protocollayouts.imported/ComposedProtocol_TwoWayAnonComposedWithError_Result",
-            "nullable": false,
-            "type_shape_v1": {
-              "inline_size": 24,
-              "alignment": 8,
-              "depth": 2,
-              "max_handles": 0,
-              "max_out_of_line": 32,
-              "has_padding": true,
-              "has_envelope": true,
-              "has_flexible_envelope": false
-            },
-            "type_shape_v2": {
-              "inline_size": 16,
-              "alignment": 8,
-              "depth": 2,
-              "max_handles": 0,
-              "max_out_of_line": 16,
-              "has_padding": true,
-              "has_envelope": true,
-              "has_flexible_envelope": false
-            }
-          },
           "maybe_response_success_type": {
             "kind": "identifier",
             "identifier": "test.protocollayouts.imported/ComposedProtocol_TwoWayAnonComposedWithError_Response",
@@ -418,31 +393,6 @@
           },
           "is_composed": true,
           "has_error": true,
-          "maybe_response_result_type": {
-            "kind": "identifier",
-            "identifier": "test.protocollayouts.imported/ComposedProtocol_OnAnonComposedWithError_Result",
-            "nullable": false,
-            "type_shape_v1": {
-              "inline_size": 24,
-              "alignment": 8,
-              "depth": 3,
-              "max_handles": 0,
-              "max_out_of_line": 40,
-              "has_padding": true,
-              "has_envelope": true,
-              "has_flexible_envelope": true
-            },
-            "type_shape_v2": {
-              "inline_size": 16,
-              "alignment": 8,
-              "depth": 3,
-              "max_handles": 0,
-              "max_out_of_line": 24,
-              "has_padding": true,
-              "has_envelope": true,
-              "has_flexible_envelope": true
-            }
-          },
           "maybe_response_success_type": {
             "kind": "identifier",
             "identifier": "test.protocollayouts.imported/ComposedProtocol_OnAnonComposedWithError_Response",
@@ -662,31 +612,6 @@
           },
           "is_composed": true,
           "has_error": true,
-          "maybe_response_result_type": {
-            "kind": "identifier",
-            "identifier": "test.protocollayouts.imported/ComposedProtocol_TwoWayNamedComposedWithError_Result",
-            "nullable": false,
-            "type_shape_v1": {
-              "inline_size": 24,
-              "alignment": 8,
-              "depth": 2,
-              "max_handles": 0,
-              "max_out_of_line": 32,
-              "has_padding": true,
-              "has_envelope": true,
-              "has_flexible_envelope": false
-            },
-            "type_shape_v2": {
-              "inline_size": 16,
-              "alignment": 8,
-              "depth": 2,
-              "max_handles": 0,
-              "max_out_of_line": 16,
-              "has_padding": true,
-              "has_envelope": true,
-              "has_flexible_envelope": false
-            }
-          },
           "maybe_response_success_type": {
             "kind": "identifier",
             "identifier": "test.protocollayouts.imported/ImportUnionPayload",
@@ -816,31 +741,6 @@
           },
           "is_composed": true,
           "has_error": true,
-          "maybe_response_result_type": {
-            "kind": "identifier",
-            "identifier": "test.protocollayouts.imported/ComposedProtocol_OnNamedComposedWithError_Result",
-            "nullable": false,
-            "type_shape_v1": {
-              "inline_size": 24,
-              "alignment": 8,
-              "depth": 3,
-              "max_handles": 0,
-              "max_out_of_line": 40,
-              "has_padding": true,
-              "has_envelope": true,
-              "has_flexible_envelope": true
-            },
-            "type_shape_v2": {
-              "inline_size": 16,
-              "alignment": 8,
-              "depth": 3,
-              "max_handles": 0,
-              "max_out_of_line": 24,
-              "has_padding": true,
-              "has_envelope": true,
-              "has_flexible_envelope": true
-            }
-          },
           "maybe_response_success_type": {
             "kind": "identifier",
             "identifier": "test.protocollayouts.imported/ImportTablePayload",
@@ -1060,31 +960,6 @@
           },
           "is_composed": false,
           "has_error": true,
-          "maybe_response_result_type": {
-            "kind": "identifier",
-            "identifier": "test.protocollayouts/MainProtocol_TwoWayImportWithError_Result",
-            "nullable": false,
-            "type_shape_v1": {
-              "inline_size": 24,
-              "alignment": 8,
-              "depth": 2,
-              "max_handles": 0,
-              "max_out_of_line": 32,
-              "has_padding": true,
-              "has_envelope": true,
-              "has_flexible_envelope": false
-            },
-            "type_shape_v2": {
-              "inline_size": 16,
-              "alignment": 8,
-              "depth": 2,
-              "max_handles": 0,
-              "max_out_of_line": 16,
-              "has_padding": true,
-              "has_envelope": true,
-              "has_flexible_envelope": false
-            }
-          },
           "maybe_response_success_type": {
             "kind": "identifier",
             "identifier": "test.protocollayouts.imported/ImportUnionPayload",
@@ -1214,31 +1089,6 @@
           },
           "is_composed": false,
           "has_error": true,
-          "maybe_response_result_type": {
-            "kind": "identifier",
-            "identifier": "test.protocollayouts/MainProtocol_OnImportWithError_Result",
-            "nullable": false,
-            "type_shape_v1": {
-              "inline_size": 24,
-              "alignment": 8,
-              "depth": 3,
-              "max_handles": 0,
-              "max_out_of_line": 40,
-              "has_padding": true,
-              "has_envelope": true,
-              "has_flexible_envelope": true
-            },
-            "type_shape_v2": {
-              "inline_size": 16,
-              "alignment": 8,
-              "depth": 3,
-              "max_handles": 0,
-              "max_out_of_line": 24,
-              "has_padding": true,
-              "has_envelope": true,
-              "has_flexible_envelope": true
-            }
-          },
           "maybe_response_success_type": {
             "kind": "identifier",
             "identifier": "test.protocollayouts.imported/ImportTablePayload",
@@ -1458,31 +1308,6 @@
           },
           "is_composed": false,
           "has_error": true,
-          "maybe_response_result_type": {
-            "kind": "identifier",
-            "identifier": "test.protocollayouts/MainProtocol_TwoWayLocalWithError_Result",
-            "nullable": false,
-            "type_shape_v1": {
-              "inline_size": 24,
-              "alignment": 8,
-              "depth": 2,
-              "max_handles": 0,
-              "max_out_of_line": 32,
-              "has_padding": true,
-              "has_envelope": true,
-              "has_flexible_envelope": true
-            },
-            "type_shape_v2": {
-              "inline_size": 16,
-              "alignment": 8,
-              "depth": 2,
-              "max_handles": 0,
-              "max_out_of_line": 16,
-              "has_padding": true,
-              "has_envelope": true,
-              "has_flexible_envelope": true
-            }
-          },
           "maybe_response_success_type": {
             "kind": "identifier",
             "identifier": "test.protocollayouts/LocalUnionPayload",
@@ -1612,31 +1437,6 @@
           },
           "is_composed": false,
           "has_error": true,
-          "maybe_response_result_type": {
-            "kind": "identifier",
-            "identifier": "test.protocollayouts/MainProtocol_OnLocalWithError_Result",
-            "nullable": false,
-            "type_shape_v1": {
-              "inline_size": 24,
-              "alignment": 8,
-              "depth": 3,
-              "max_handles": 0,
-              "max_out_of_line": 40,
-              "has_padding": true,
-              "has_envelope": true,
-              "has_flexible_envelope": true
-            },
-            "type_shape_v2": {
-              "inline_size": 16,
-              "alignment": 8,
-              "depth": 3,
-              "max_handles": 0,
-              "max_out_of_line": 24,
-              "has_padding": true,
-              "has_envelope": true,
-              "has_flexible_envelope": true
-            }
-          },
           "maybe_response_success_type": {
             "kind": "identifier",
             "identifier": "test.protocollayouts/LocalTablePayload",
@@ -1856,31 +1656,6 @@
           },
           "is_composed": false,
           "has_error": true,
-          "maybe_response_result_type": {
-            "kind": "identifier",
-            "identifier": "test.protocollayouts/MainProtocol_TwoWayAnonWithError_Result",
-            "nullable": false,
-            "type_shape_v1": {
-              "inline_size": 24,
-              "alignment": 8,
-              "depth": 2,
-              "max_handles": 0,
-              "max_out_of_line": 32,
-              "has_padding": true,
-              "has_envelope": true,
-              "has_flexible_envelope": true
-            },
-            "type_shape_v2": {
-              "inline_size": 16,
-              "alignment": 8,
-              "depth": 2,
-              "max_handles": 0,
-              "max_out_of_line": 16,
-              "has_padding": true,
-              "has_envelope": true,
-              "has_flexible_envelope": true
-            }
-          },
           "maybe_response_success_type": {
             "kind": "identifier",
             "identifier": "test.protocollayouts/MainProtocol_TwoWayAnonWithError_Response",
@@ -2010,31 +1785,6 @@
           },
           "is_composed": false,
           "has_error": true,
-          "maybe_response_result_type": {
-            "kind": "identifier",
-            "identifier": "test.protocollayouts/MainProtocol_OnAnonWithError_Result",
-            "nullable": false,
-            "type_shape_v1": {
-              "inline_size": 24,
-              "alignment": 8,
-              "depth": 3,
-              "max_handles": 0,
-              "max_out_of_line": 40,
-              "has_padding": true,
-              "has_envelope": true,
-              "has_flexible_envelope": true
-            },
-            "type_shape_v2": {
-              "inline_size": 16,
-              "alignment": 8,
-              "depth": 3,
-              "max_handles": 0,
-              "max_out_of_line": 24,
-              "has_padding": true,
-              "has_envelope": true,
-              "has_flexible_envelope": true
-            }
-          },
           "maybe_response_success_type": {
             "kind": "identifier",
             "identifier": "test.protocollayouts/MainProtocol_OnAnonWithError_Response",

@@ -331,31 +331,6 @@
           },
           "is_composed": false,
           "has_error": true,
-          "maybe_response_result_type": {
-            "kind": "identifier",
-            "identifier": "test.typesinprotocols/Protocol_ErrorBasic_Result",
-            "nullable": false,
-            "type_shape_v1": {
-              "inline_size": 24,
-              "alignment": 8,
-              "depth": 2,
-              "max_handles": 0,
-              "max_out_of_line": 4294967295,
-              "has_padding": true,
-              "has_envelope": true,
-              "has_flexible_envelope": false
-            },
-            "type_shape_v2": {
-              "inline_size": 16,
-              "alignment": 8,
-              "depth": 2,
-              "max_handles": 0,
-              "max_out_of_line": 4294967295,
-              "has_padding": true,
-              "has_envelope": true,
-              "has_flexible_envelope": false
-            }
-          },
           "maybe_response_success_type": {
             "kind": "identifier",
             "identifier": "test.typesinprotocols/Basic",
@@ -590,31 +565,6 @@
           },
           "is_composed": false,
           "has_error": true,
-          "maybe_response_result_type": {
-            "kind": "identifier",
-            "identifier": "test.typesinprotocols/Protocol_ErrorCompound_Result",
-            "nullable": false,
-            "type_shape_v1": {
-              "inline_size": 24,
-              "alignment": 8,
-              "depth": 2,
-              "max_handles": 0,
-              "max_out_of_line": 112,
-              "has_padding": true,
-              "has_envelope": true,
-              "has_flexible_envelope": true
-            },
-            "type_shape_v2": {
-              "inline_size": 16,
-              "alignment": 8,
-              "depth": 2,
-              "max_handles": 0,
-              "max_out_of_line": 80,
-              "has_padding": true,
-              "has_envelope": true,
-              "has_flexible_envelope": true
-            }
-          },
           "maybe_response_success_type": {
             "kind": "identifier",
             "identifier": "test.typesinprotocols/Compound",
@@ -849,31 +799,6 @@
           },
           "is_composed": false,
           "has_error": true,
-          "maybe_response_result_type": {
-            "kind": "identifier",
-            "identifier": "test.typesinprotocols/Protocol_ErrorArrayBasic_Result",
-            "nullable": false,
-            "type_shape_v1": {
-              "inline_size": 24,
-              "alignment": 8,
-              "depth": 2,
-              "max_handles": 0,
-              "max_out_of_line": 4294967295,
-              "has_padding": true,
-              "has_envelope": true,
-              "has_flexible_envelope": false
-            },
-            "type_shape_v2": {
-              "inline_size": 16,
-              "alignment": 8,
-              "depth": 2,
-              "max_handles": 0,
-              "max_out_of_line": 4294967295,
-              "has_padding": true,
-              "has_envelope": true,
-              "has_flexible_envelope": false
-            }
-          },
           "maybe_response_success_type": {
             "kind": "identifier",
             "identifier": "test.typesinprotocols/ArrayBasic",
@@ -1108,31 +1033,6 @@
           },
           "is_composed": false,
           "has_error": true,
-          "maybe_response_result_type": {
-            "kind": "identifier",
-            "identifier": "test.typesinprotocols/Protocol_ErrorArrayCompound_Result",
-            "nullable": false,
-            "type_shape_v1": {
-              "inline_size": 24,
-              "alignment": 8,
-              "depth": 2,
-              "max_handles": 0,
-              "max_out_of_line": 528,
-              "has_padding": true,
-              "has_envelope": true,
-              "has_flexible_envelope": true
-            },
-            "type_shape_v2": {
-              "inline_size": 16,
-              "alignment": 8,
-              "depth": 2,
-              "max_handles": 0,
-              "max_out_of_line": 368,
-              "has_padding": true,
-              "has_envelope": true,
-              "has_flexible_envelope": true
-            }
-          },
           "maybe_response_success_type": {
             "kind": "identifier",
             "identifier": "test.typesinprotocols/ArrayCompound",
@@ -1367,31 +1267,6 @@
           },
           "is_composed": false,
           "has_error": true,
-          "maybe_response_result_type": {
-            "kind": "identifier",
-            "identifier": "test.typesinprotocols/Protocol_ErrorVectorBasic_Result",
-            "nullable": false,
-            "type_shape_v1": {
-              "inline_size": 24,
-              "alignment": 8,
-              "depth": 3,
-              "max_handles": 0,
-              "max_out_of_line": 4294967295,
-              "has_padding": true,
-              "has_envelope": true,
-              "has_flexible_envelope": false
-            },
-            "type_shape_v2": {
-              "inline_size": 16,
-              "alignment": 8,
-              "depth": 3,
-              "max_handles": 0,
-              "max_out_of_line": 4294967295,
-              "has_padding": true,
-              "has_envelope": true,
-              "has_flexible_envelope": false
-            }
-          },
           "maybe_response_success_type": {
             "kind": "identifier",
             "identifier": "test.typesinprotocols/VectorBasic",
@@ -1626,31 +1501,6 @@
           },
           "is_composed": false,
           "has_error": true,
-          "maybe_response_result_type": {
-            "kind": "identifier",
-            "identifier": "test.typesinprotocols/Protocol_ErrorVectorCompound_Result",
-            "nullable": false,
-            "type_shape_v1": {
-              "inline_size": 24,
-              "alignment": 8,
-              "depth": 3,
-              "max_handles": 0,
-              "max_out_of_line": 4294967295,
-              "has_padding": true,
-              "has_envelope": true,
-              "has_flexible_envelope": true
-            },
-            "type_shape_v2": {
-              "inline_size": 16,
-              "alignment": 8,
-              "depth": 3,
-              "max_handles": 0,
-              "max_out_of_line": 4294967295,
-              "has_padding": true,
-              "has_envelope": true,
-              "has_flexible_envelope": true
-            }
-          },
           "maybe_response_success_type": {
             "kind": "identifier",
             "identifier": "test.typesinprotocols/VectorCompound",
@@ -1885,31 +1735,6 @@
           },
           "is_composed": false,
           "has_error": true,
-          "maybe_response_result_type": {
-            "kind": "identifier",
-            "identifier": "test.typesinprotocols/Protocol_ErrorVectorOptional_Result",
-            "nullable": false,
-            "type_shape_v1": {
-              "inline_size": 24,
-              "alignment": 8,
-              "depth": 3,
-              "max_handles": 0,
-              "max_out_of_line": 4294967295,
-              "has_padding": true,
-              "has_envelope": true,
-              "has_flexible_envelope": false
-            },
-            "type_shape_v2": {
-              "inline_size": 16,
-              "alignment": 8,
-              "depth": 3,
-              "max_handles": 0,
-              "max_out_of_line": 4294967295,
-              "has_padding": true,
-              "has_envelope": true,
-              "has_flexible_envelope": false
-            }
-          },
           "maybe_response_success_type": {
             "kind": "identifier",
             "identifier": "test.typesinprotocols/VectorOptional",
@@ -2144,31 +1969,6 @@
           },
           "is_composed": false,
           "has_error": true,
-          "maybe_response_result_type": {
-            "kind": "identifier",
-            "identifier": "test.typesinprotocols/Protocol_ErrorArrayVectorNested_Result",
-            "nullable": false,
-            "type_shape_v1": {
-              "inline_size": 24,
-              "alignment": 8,
-              "depth": 3,
-              "max_handles": 0,
-              "max_out_of_line": 4294967295,
-              "has_padding": true,
-              "has_envelope": true,
-              "has_flexible_envelope": false
-            },
-            "type_shape_v2": {
-              "inline_size": 16,
-              "alignment": 8,
-              "depth": 3,
-              "max_handles": 0,
-              "max_out_of_line": 4294967295,
-              "has_padding": true,
-              "has_envelope": true,
-              "has_flexible_envelope": false
-            }
-          },
           "maybe_response_success_type": {
             "kind": "identifier",
             "identifier": "test.typesinprotocols/ArrayVectorNested",
@@ -2403,31 +2203,6 @@
           },
           "is_composed": false,
           "has_error": true,
-          "maybe_response_result_type": {
-            "kind": "identifier",
-            "identifier": "test.typesinprotocols/Protocol_ErrorResource_Result",
-            "nullable": false,
-            "type_shape_v1": {
-              "inline_size": 24,
-              "alignment": 8,
-              "depth": 3,
-              "max_handles": 4294967295,
-              "max_out_of_line": 4294967295,
-              "has_padding": true,
-              "has_envelope": true,
-              "has_flexible_envelope": true
-            },
-            "type_shape_v2": {
-              "inline_size": 16,
-              "alignment": 8,
-              "depth": 3,
-              "max_handles": 4294967295,
-              "max_out_of_line": 4294967295,
-              "has_padding": true,
-              "has_envelope": true,
-              "has_flexible_envelope": true
-            }
-          },
           "maybe_response_success_type": {
             "kind": "identifier",
             "identifier": "test.typesinprotocols/Resource",
