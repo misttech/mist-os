@@ -53,6 +53,7 @@ if (use_bringup_assembly) {
     ]
   }
 }
+
 group("verifications") {
   testonly = true
   deps = []
