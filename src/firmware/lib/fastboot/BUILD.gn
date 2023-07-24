@@ -50,3 +50,11 @@ source_set("lib") {
     "//zircon/system/ulib/zx",
   ]
 }
+
+group("tests") {
+  testonly = true
+  deps = [
+    "rust:tests",
+    "test",
+  ]
+}

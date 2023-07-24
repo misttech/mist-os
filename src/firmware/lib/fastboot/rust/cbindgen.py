@@ -36,7 +36,7 @@ def generate_ffi():
 
     # cbindgen doesn't currently add header guards and fx format-code won't add
     # them if they don't exist, so put something there and let fx format-code
-    # fix it up. We also need a license header.
+    # fix it up. We also need a license header and some lint checks.
     BINDINGS_PATH.write_text(
         f"""\
         // Copyright 2023 The Fuchsia Authors. All rights reserved.
@@ -48,7 +48,11 @@ def generate_ffi():
         #ifndef FOO_H_
         #define FOO_H_
 
+        // LINT.IfChange
+
         {BINDINGS_PATH.read_text()}
+
+        // LINT.ThenChange(../src/lib.rs)
 
         #endif  // FOO_H_
         """)

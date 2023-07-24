@@ -11,7 +11,7 @@ group("tests") {
     "fastboot-usb:tests",
     "gigaboot/cpp/tests:tests",
     "lib/abr/test",
-    "lib/fastboot/test",
+    "lib/fastboot:tests",
     "lib/storage/test",
     "lib/zbi/test",
     "lib/zircon_boot/test",

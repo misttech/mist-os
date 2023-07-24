@@ -12,9 +12,26 @@ rustc_staticlib("fastboot-c") {
 
   configs -= [ "//build/config/rust/lints:allow_unused_results" ]
 
-  deps = []
+  deps = [
+    "//src/lib/fuchsia-async",
+    "//src/lib/zircon/rust:fuchsia-zircon",
+    "//src/recovery/lib/installer",
+    "//src/recovery/lib/recovery-util",
+    "//third_party/rust_crates:anyhow",
+  ]
+
+  test_deps = [ "//src/lib/fuchsia" ]
 
   public = [ "ffi_c/bindings.h" ]
 
   sources = [ "src/lib.rs" ]
+}
+
+fuchsia_unittest_package("fastboot-c-test") {
+  deps = [ ":fastboot-c_test" ]
+}
+
+group("tests") {
+  testonly = true
+  deps = [ ":fastboot-c-test" ]
 }
