@@ -4,20 +4,12 @@
 
 import("//src/storage/fshost/generated_fshost_config.gni")
 
-if (is_fuchsia) {
-  group("tests") {
-    testonly = true
-    deps = [ "pkg_test/tests" ]
-  }
-}
+group("tests") {
+  testonly = true
+  deps = [ "pkg_test/tests" ]
 
-if (is_host) {
-  group("host_tests") {
-    testonly = true
-
-    # TODO(fxbug.dev/126146): Support Fxblob in scrutiny
-    if (!fxfs_blob) {
-      deps = [ "scrutiny_ffx_integration:host_tests" ]
-    }
+  # TODO(fxbug.dev/126146): Support Fxblob in scrutiny
+  if (!fxfs_blob) {
+    deps += [ "scrutiny_ffx_integration:tests" ]
   }
 }

@@ -31,14 +31,17 @@ pub fn assemble(args: ProductArgs) -> Result<()> {
     let config: AssemblyConfig =
         util::read_config(&product).context("Loading product configuration")?;
 
-    let board_info =
-        util::read_config::<BoardInformation>(board_info).context("Loading board information")?;
+    let board_info = board_info
+        .map(|path| {
+            util::read_config::<BoardInformation>(path).context("Loading board information")
+        })
+        .transpose()?;
 
     let mut builder = ImageAssemblyConfigBuilder::default();
 
     // Get platform configuration based on the AssemblyConfig and the BoardInformation.
     let configuration =
-        assembly_platform_configuration::define_configuration(&config, &board_info)?;
+        assembly_platform_configuration::define_configuration(&config, board_info.as_ref())?;
 
     // Set the configuration for the rest of the packages.
     for (package, config) in configuration.package_configs {
