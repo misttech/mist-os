@@ -47,12 +47,31 @@ constexpr uint32_t capture_yuv2rgb_offset[3] = {0, 0, 0};
 // AOBUS Register
 #define AOBUS_GEN_PWR_SLEEP0 (0x03a << 2)
 
-// CBUS Reset Register
-#define RESET0_LEVEL (0x0420 << 2)
-#define RESET1_LEVEL (0x0421 << 2)
-#define RESET2_LEVEL (0x0422 << 2)
-#define RESET4_LEVEL (0x0424 << 2)
-#define RESET7_LEVEL (0x0427 << 2)
+// EE Reset registers on the CBUS (regular power-gated config registers domain).
+//
+// A311D datasheet section 8.8.2.1 "Register Description" > "EE Reset" describes
+// the bits under the RESET{0,7}_REGISTER sections. The RESET{0,7}_MASK and
+// RESET{0,7}_LEVEL sections describe the interactions between the registers,
+// the watchdog timer, and the reset condition.
+//
+// A311D datasheet section 8.8.2.1 has full MMIO addresses. S905D3 datasheet
+// section 6.8.2 with the same tile covers the same registers, and also
+// explicitly states that the base for all registers is 0xffd0'1000. This
+// address is listed under the RESET entry in A311D section 8.1 "System" >
+// "Memory Map" and S905D3 datasheet section 6.1 with the same name.
+//
+// The following datasheets have matching information.
+// * S905D2, Section 6.7.2.1 "EE Reset", Section 6.1 "Memory Map"
+// * T931, Section 6.8.2.1 "EE Reset", Section 6.1 "Memory Map"
+//
+// TODO(fxbug.dev/130970): Offsets here are relative to 0xffd0'0000, which
+// belongs to a reserved block in all datasheets. Add an MMIO range for RESET
+// registers, and have these offsets be relative to that range.
+#define RESET0_LEVEL 0x1080
+#define RESET1_LEVEL 0x1084
+#define RESET2_LEVEL 0x1088
+#define RESET4_LEVEL 0x1090
+#define RESET7_LEVEL 0x109c
 
 #define READ32_VPU_REG(a) vpu_mmio_->Read32(a)
 #define WRITE32_VPU_REG(a, v) vpu_mmio_->Write32(v, a)
