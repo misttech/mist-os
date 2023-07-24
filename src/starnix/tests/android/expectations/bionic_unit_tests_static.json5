@@ -70,9 +70,6 @@
                 "android_mallopt.DISABLED_multiple_enable_gwp_asan",
                 "malloc.DISABLED_alloc_after_fork",
 
-                // sigqueue(getpid(), (32 + 4), signal_value) fails
-                "android_mallopt.set_allocation_limit_multiple_threads",
-
                 // Requires MTE support
                 "malloc.disable_mte",
 
@@ -212,6 +209,9 @@
         {
             type: "skip",
             matchers: [
+                // This test is passing in some configurations.
+                "android_mallopt.set_allocation_limit_multiple_threads",
+
                 // This test writes 2GB of zero bytes to /dev/null, which we currently try to log.
                 "*.fwrite_int_overflow",
 
