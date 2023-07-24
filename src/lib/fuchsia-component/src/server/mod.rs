@@ -21,6 +21,7 @@ use {
         task::{Context, Poll},
     },
     thiserror::Error,
+    tracing::warn,
     vfs::{
         directory::{
             entry::DirectoryEntry,
@@ -460,7 +461,7 @@ macro_rules! add_functions {
         pub fn dir(&mut self, path: impl Into<String>) -> ServiceFsDir<'_, ServiceObjTy> {
             let path: String = path.into();
             let name: Name = path.try_into().expect("Invalid path");
-            let dir = Arc::downcast(self.dir.get_or_insert(name, simple).into_any())
+            let dir = Arc::downcast(self.dir.get_or_insert(name, new_simple_dir).into_any())
                 .unwrap_or_else(|_| panic!("Not a directory"));
             ServiceFsDir { fs: self.fs(), dir }
         }
@@ -508,9 +509,10 @@ impl<ServiceObjTy: ServiceObjTrait> ServiceFs<ServiceObjTy> {
     fn new_impl() -> Self {
         let (new_connection_sender, new_connection_receiver) = mpsc::unbounded();
         let scope = ExecutionScope::new();
+        let dir = new_simple_dir();
         Self {
             scope: scope.clone(),
-            dir: simple(),
+            dir,
             new_connection_sender,
             new_connection_receiver,
             services: Vec::new(),
@@ -559,6 +561,17 @@ impl<ServiceObjTy: ServiceObjTrait> ServiceFs<ServiceObjTy> {
 
         Ok(ProtocolConnector { directory_request })
     }
+}
+
+fn new_simple_dir() -> Arc<Simple<ImmutableConnection>> {
+    let dir = simple();
+    dir.clone().set_not_found_handler(Box::new(move |path| {
+        warn!(
+            "ServiceFs received request to `{}` but has not been configured to serve this path.",
+            path
+        );
+    }));
+    dir
 }
 
 /// `ProtocolConnector` allows connecting to capabilities exposed by ServiceFs
