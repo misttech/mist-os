@@ -56,17 +56,6 @@ group("recovery") {
 group("tools") {
 }
 
-# TODO(fxbug.dev/123798) Remove after migration to assembly.
-group("system-update-configurator-transitional") {
-}
-
-group("system-update-configurator") {
-  public_deps = [
-    "bin/system-update-configurator",
-    "bin/system-update-configurator:core-shard",
-  ]
-}
-
 group("pkgfs-disable-executability-restrictions") {
   public_deps = [ "bin/pkg-cache:disable-executability-restrictions" ]
   deps = [ "//build/validate:non_production_tag" ]
