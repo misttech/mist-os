@@ -1145,40 +1145,42 @@ impl Telemetry {
                                 state.network_is_likely_hidden,
                             )
                             .await;
+                        // Logs user requested connection during short duration connection, which indicates
+                        // that the we did not successfully select the user's preferred connection.
+                        if info.connected_duration < METRICS_SHORT_CONNECT_DURATION {
+                            match info.disconnect_source {
+                                fidl_sme::DisconnectSource::User(
+                                    fidl_sme::UserDisconnectReason::FidlConnectRequest,
+                                )
+                                | fidl_sme::DisconnectSource::User(
+                                    fidl_sme::UserDisconnectReason::NetworkUnsaved,
+                                ) => {
+                                    let metric_events = vec![
+                                MetricEvent {
+                                    metric_id: metrics::POLICY_FIDL_CONNECTION_ATTEMPTS_DURING_SHORT_CONNECTION_METRIC_ID,
+                                    event_codes: vec![],
+                                    payload: MetricEventPayload::Count(1),
+                                },
+                                MetricEvent {
+                                    metric_id: metrics::POLICY_FIDL_CONNECTION_ATTEMPTS_DURING_SHORT_CONNECTION_DETAILED_METRIC_ID,
+                                    event_codes: vec![info.previous_connect_reason as u32],
+                                    payload: MetricEventPayload::Count(1),
+                                }
+                            ];
+
+                                    log_cobalt_1dot1_batch!(
+                                        self.stats_logger.cobalt_1dot1_proxy,
+                                        &metric_events,
+                                        "log_fidl_connect_request_during_short_duration",
+                                    );
+                                }
+                                _ => {}
+                            }
+                        }
                     }
                     _ => {
                         warn!("Received disconnect event while not connected. Metric may not be logged");
                     }
-                }
-
-                // Logs user requested connection during short duration connection, which indicates
-                // that the we did not successfully select the user's preferred connection.
-                if info.disconnect_source
-                    == fidl_sme::DisconnectSource::User(
-                        fidl_sme::UserDisconnectReason::FidlConnectRequest,
-                    )
-                    && duration < METRICS_SHORT_CONNECT_DURATION
-                {
-                    let metric_events = vec![
-                        MetricEvent {
-                            metric_id:
-                                metrics::POLICY_FIDL_CONNECTION_ATTEMPTS_DURING_SHORT_CONNECTION_METRIC_ID,
-                            event_codes: vec![],
-                            payload: MetricEventPayload::Count(1),
-                        },
-                        MetricEvent {
-                            metric_id:
-                                metrics::POLICY_FIDL_CONNECTION_ATTEMPTS_DURING_SHORT_CONNECTION_DETAILED_METRIC_ID,
-                            event_codes: vec![info.previous_connect_reason as u32],
-                            payload: MetricEventPayload::Count(1),
-                        }
-                    ];
-
-                    log_cobalt_1dot1_batch!(
-                        self.stats_logger.cobalt_1dot1_proxy,
-                        &metric_events,
-                        "log_fidl_connect_request_during_short_duration",
-                    );
                 }
 
                 let connect_start_time = if info.is_sme_reconnecting {
@@ -5453,12 +5455,11 @@ mod tests {
         test_helper.send_connected_event(random_bss_description!(Wpa2));
         assert_eq!(test_helper.advance_test_fut(&mut test_fut), Poll::Pending);
 
-        test_helper.advance_by(1.minute(), test_fut.as_mut());
-
         let channel = generate_random_channel();
         let ap_state = random_bss_description!(Wpa2, channel: channel).into();
+        // Log disconnect with reason FidlConnectRequest during short duration
         let info = DisconnectInfo {
-            connected_duration: 1.minute(),
+            connected_duration: METRICS_SHORT_CONNECT_DURATION - 1.second(),
             disconnect_source: fidl_sme::DisconnectSource::User(
                 fidl_sme::UserDisconnectReason::FidlConnectRequest,
             ),
@@ -5470,17 +5471,45 @@ mod tests {
             info: info.clone(),
         });
 
+        test_helper.send_connected_event(random_bss_description!(Wpa2));
+        assert_eq!(test_helper.advance_test_fut(&mut test_fut), Poll::Pending);
+
+        // Log disconnect with reason NetworkUnsaved during short duration
+        let info = DisconnectInfo {
+            disconnect_source: fidl_sme::DisconnectSource::User(
+                fidl_sme::UserDisconnectReason::NetworkUnsaved,
+            ),
+            ..info
+        };
+        test_helper.telemetry_sender.send(TelemetryEvent::Disconnected {
+            track_subsequent_downtime: true,
+            info: info.clone(),
+        });
+
+        test_helper.send_connected_event(random_bss_description!(Wpa2));
+        assert_eq!(test_helper.advance_test_fut(&mut test_fut), Poll::Pending);
+
+        // Log disconnect with reason NetworkUnsaved during longer duration connection
+        let info = DisconnectInfo {
+            connected_duration: METRICS_SHORT_CONNECT_DURATION + 1.second(),
+            ..info
+        };
+        test_helper.telemetry_sender.send(TelemetryEvent::Disconnected {
+            track_subsequent_downtime: true,
+            info: info.clone(),
+        });
+
         test_helper.drain_cobalt_events(&mut test_fut);
 
         let logged_metrics = test_helper.get_logged_metrics(
             metrics::POLICY_FIDL_CONNECTION_ATTEMPTS_DURING_SHORT_CONNECTION_METRIC_ID,
         );
-        assert_eq!(logged_metrics.len(), 1);
+        assert_eq!(logged_metrics.len(), 2);
 
         let logged_metrics = test_helper.get_logged_metrics(
             metrics::POLICY_FIDL_CONNECTION_ATTEMPTS_DURING_SHORT_CONNECTION_DETAILED_METRIC_ID,
         );
-        assert_eq!(logged_metrics.len(), 1);
+        assert_eq!(logged_metrics.len(), 2);
         assert_eq!(logged_metrics[0].event_codes, vec![info.previous_connect_reason as u32]);
     }
 
