@@ -8,7 +8,17 @@
 #define READ32_CBUS_REG(a) cbus_mmio_->Read32(0x400 + a)
 #define WRITE32_CBUS_REG(a, v) cbus_mmio_->Write32(v, 0x400 + a)
 
-// Offsets
+// Register offsets from the A311D datasheet section 8.9.2 "GPIO Multiplex
+// Function", Table 8-23 "Pin Mux Registers".
+//
+// Section 8.9.2 states that all the registers below are on CBUS (regular
+// power-gated domain), and their offsets are relative to 0xff63'4400. Section
+// 8.1 "System" > "Memory Map" lists this range as PERIPHS_REGS.
+//
+// The following datasheets have matching information.
+// * S905D2, Section 6.8.2 "GPIO Multiplex Function", Section 6.1 "Memory Map"
+// * S905D3, Section 6.9.2 "GPIO Multiplex Function", Section 6.1 "Memory Map"
+// * T931, Section 6.9.2 "GPIO Multiplex Function", Section 6.1 "Memory Map"
 #define PAD_PULL_UP_EN_REG3 (0x4b << 2)
 #define PAD_PULL_UP_REG3 (0x3d << 2)
 #define P_PREG_PAD_GPIO3_EN_N (0x19 << 2)
