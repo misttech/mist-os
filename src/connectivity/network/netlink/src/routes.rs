@@ -56,18 +56,22 @@ pub(crate) enum GetRouteArgs {
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub(crate) struct UnicastRouteArgs<I: Ip> {
     // The network and prefix of the route.
-    subnet: Subnet<I::Addr>,
+    pub subnet: Subnet<I::Addr>,
     // The forwarding action. Unicast routes are gateway/direct routes and must
     // have a target.
-    target: fnet_routes_ext::RouteTarget<I>,
+    pub target: fnet_routes_ext::RouteTarget<I>,
     // The metric used to weigh the importance of the route.
-    priority: u32,
+    pub priority: u32,
+    // The routing table.
+    // TODO(issuetracker.google.com/289582515): Use this to add routes to
+    // a RouteSet based on the table value.
+    #[allow(unused)]
+    pub table: u32,
 }
 
 /// Arguments for an RTM_NEWROUTE [`Request`].
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub(crate) enum NewRouteArgs<I: Ip> {
-    #[allow(unused)]
     /// Direct or gateway routes.
     Unicast(UnicastRouteArgs<I>),
 }
@@ -784,7 +788,7 @@ impl<I: Ip> From<NewRouteArgs<I>> for fnet_routes_ext::Route<I> {
     fn from(new_route_args: NewRouteArgs<I>) -> Self {
         match new_route_args {
             NewRouteArgs::Unicast(args) => {
-                let UnicastRouteArgs { subnet, target, priority } = args;
+                let UnicastRouteArgs { subnet, target, priority, table: _ } = args;
                 fnet_routes_ext::Route {
                     destination: subnet,
                     action: fnet_routes_ext::RouteAction::Forward(target),
@@ -811,7 +815,7 @@ fn new_route_matches_existing<I: Ip>(
     existing_routes: &HashSet<NetlinkRouteMessage>,
 ) -> bool {
     existing_routes.iter().any(|NetlinkRouteMessage(existing_route)| {
-        let UnicastRouteArgs { subnet, target: _, priority } = match route {
+        let UnicastRouteArgs { subnet, target: _, priority, table: _ } = match route {
             NewRouteArgs::Unicast(args) => args,
         };
         if subnet.prefix() != existing_route.header.destination_prefix_length {
@@ -1487,6 +1491,7 @@ mod tests {
                 next_hop: SpecifiedAddr::new(next_hop),
             },
             priority,
+            table: Default::default(),
         }
     }
 
@@ -2303,6 +2308,7 @@ mod tests {
                         .map(|a| SpecifiedAddr::new(a).expect("nexthop should be specified")),
                 },
                 priority: metric,
+                table: Default::default(),
             })
         };
         let existing_routes = {

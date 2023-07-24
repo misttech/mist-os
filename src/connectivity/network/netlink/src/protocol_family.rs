@@ -55,6 +55,9 @@ pub mod route {
 
     use std::{fmt::Display, num::NonZeroU32};
 
+    use fidl_fuchsia_net_routes_ext as fnet_routes_ext;
+
+    use assert_matches::assert_matches;
     use futures::{
         channel::{mpsc, oneshot},
         sink::SinkExt as _,
@@ -62,9 +65,9 @@ pub mod route {
     use net_types::{
         ip::{
             AddrSubnetEither, AddrSubnetError, Ip, IpAddr, IpAddress as _, IpVersion, Ipv4,
-            Ipv4Addr, Ipv6, Ipv6Addr,
+            Ipv4Addr, Ipv6, Ipv6Addr, Subnet, SubnetEither,
         },
-        SpecifiedAddress,
+        SpecifiedAddr, SpecifiedAddress,
     };
 
     use crate::{
@@ -88,8 +91,9 @@ pub mod route {
                 RTNLGRP_LINK, RTNLGRP_MDB, RTNLGRP_MPLS_NETCONF, RTNLGRP_MPLS_ROUTE,
                 RTNLGRP_ND_USEROPT, RTNLGRP_NEIGH, RTNLGRP_NONE, RTNLGRP_NOP2, RTNLGRP_NOP4,
                 RTNLGRP_NOTIFY, RTNLGRP_NSID, RTNLGRP_PHONET_IFADDR, RTNLGRP_PHONET_ROUTE,
-                RTNLGRP_TC,
+                RTNLGRP_TC, RTN_UNICAST, RT_TABLE_COMPAT,
             },
+            route::{nlas::Nla as RouteNla, RouteMessage},
             LinkMessage, RtnlMessage,
         },
         IFF_UP,
@@ -263,51 +267,42 @@ pub mod route {
             }
         };
 
-        let addr = match message.header.family.into() {
-            AF_INET => {
-                const BYTES: usize = Ipv4Addr::BYTES as usize;
-                if address_bytes.len() < BYTES {
-                    return Err(Errno::EINVAL);
-                }
-
-                let mut bytes = [0; BYTES as usize];
-                bytes.copy_from_slice(&address_bytes[..BYTES]);
-                let addr: Ipv4Addr = bytes.into();
-                if addr.is_specified() {
-                    IpAddr::V4(addr)
-                } else {
-                    // Linux treats adding the unspecified IPv4 address as a
-                    // no-op.
-                    return Ok(None);
-                }
-            }
-            AF_INET6 => {
-                const BYTES: usize = Ipv6Addr::BYTES as usize;
-                if address_bytes.len() < BYTES {
-                    return Err(Errno::EINVAL);
-                }
-
-                let mut bytes = [0; BYTES];
-                bytes.copy_from_slice(&address_bytes[..BYTES]);
-                let addr: Ipv6Addr = bytes.into();
-                if addr.is_specified() {
-                    IpAddr::V6(bytes.into())
-                } else {
-                    // Linux returns this error when adding the unspecified IPv6
-                    // address.
-                    return Err(Errno::EADDRNOTAVAIL);
-                }
-            }
+        let family = match message.header.family.into() {
+            AF_INET => IpVersion::V4,
+            AF_INET6 => IpVersion::V6,
             family => {
                 log_debug!(
-                    "invalid address family ({}) in address {} request from {}: {:?}",
+                    "invalid address family ({}) in new address \
+                    request from {}: {:?}",
                     family,
-                    kind,
                     client,
-                    req,
+                    req
                 );
                 return Err(Errno::EINVAL);
             }
+        };
+
+        let addr = match ip_addr_from_bytes(address_bytes, family) {
+            Ok(addr) => {
+                match addr.clone() {
+                    IpAddr::V4(addr) => {
+                        if !addr.is_specified() {
+                            // Linux treats adding the unspecified IPv4 address as a
+                            // no-op.
+                            return Ok(None);
+                        }
+                    }
+                    IpAddr::V6(addr) => {
+                        if !addr.is_specified() {
+                            // Linux returns this error when adding the unspecified IPv6
+                            // address.
+                            return Err(Errno::EADDRNOTAVAIL);
+                        }
+                    }
+                };
+                addr
+            }
+            Err(errno) => return Err(errno),
         };
 
         let address = match AddrSubnetEither::new(addr, message.header.prefix_len) {
@@ -391,6 +386,223 @@ pub mod route {
         }
 
         Ok(interfaces::SetLinkArgs { link, enable })
+    }
+
+    /// An IPv4 extracted route request or an IPv6 extracted route request.
+    #[derive(Debug)]
+    enum ExtractedRouteRequestEither {
+        V4(ExtractedRouteRequest<Ipv4>),
+        V6(ExtractedRouteRequest<Ipv6>),
+    }
+
+    #[derive(Debug)]
+    enum ExtractedRouteRequest<I: Ip> {
+        // A gateway or direct route.
+        Unicast(ExtractedUnicastRouteRequest<I>),
+    }
+    /// Route request information from a route of type `RTN_UNICAST`.
+    #[derive(Debug)]
+    struct ExtractedUnicastRouteRequest<I: Ip> {
+        subnet: Subnet<I::Addr>,
+        target: fnet_routes_ext::RouteTarget<I>,
+        priority: u32,
+        table: u32,
+    }
+
+    // Extracts unicast route information from a request.
+    // Returns an error if the request is malformed. This error
+    // should be returned to the client.
+    fn extract_data_from_unicast_route_message(
+        family: IpVersion,
+        message: &RouteMessage,
+        client: &impl Display,
+        req: &RtnlMessage,
+        kind: &str,
+    ) -> Result<ExtractedRouteRequestEither, Errno> {
+        let destination_prefix_len = message.header.destination_prefix_length;
+        let mut table: u32 = message.header.table.into();
+
+        let mut destination_bytes = None;
+        let mut outbound_interface = None;
+        let mut next_hop_bytes = None;
+        let mut priority = None;
+        message.nlas.iter().for_each(|nla| match nla {
+            RouteNla::Destination(bytes) => destination_bytes = Some(bytes),
+            RouteNla::Oif(id) => outbound_interface = Some(id),
+            RouteNla::Gateway(bytes) => next_hop_bytes = Some(bytes),
+            RouteNla::Priority(num) => priority = Some(*num),
+            RouteNla::Table(num) => {
+                // When the table is set to `RT_TABLE_COMPAT`, the table id is greater than
+                // `u8::MAX` and cannot be represented in the header u8. The actual table
+                // number is stored in the `RTA_TABLE` NLA.
+                // We expect to see the NLA if the value in the header is `RT_TABLE_COMPAT`,
+                // although we will use it if it is present, regardless of if `RT_TABLE_COMPAT`
+                // is specified.
+                if message.header.table != RT_TABLE_COMPAT {
+                    log_debug!(
+                        "`RTA_TABLE` is expected only when table in header is `RT_TABLE_COMPAT`, \
+                        but it was {}. Using provided value of {} in the NLA",
+                        message.header.table,
+                        table
+                    );
+                }
+                table = *num
+            }
+            nla => {
+                log_warn!(
+                    "ignoring unexpected Route NLA in {} request from {}: {:?}; req = {:?}",
+                    kind,
+                    client,
+                    nla,
+                    req,
+                );
+            }
+        });
+
+        let outbound_interface: u64 = match outbound_interface {
+            Some(id) => *id as u64,
+            None => {
+                // TODO(issuetracker.google.com/292103361): Resolve destination IP to
+                // find interface index if it is not provided explicitly.
+                log_warn!(
+                    "unsupported request: missing `RTA_OIF` in route {} request from {}: {:?}",
+                    kind,
+                    client,
+                    req
+                );
+                return Err(Errno::ENOTSUP);
+            }
+        };
+
+        let destination_addr = match destination_bytes {
+            Some(bytes) => ip_addr_from_bytes(bytes, family)?,
+            None => {
+                // Use the unspecified address if there wasn't a destination NLA present
+                // and the prefix len is 0.
+                if destination_prefix_len != 0 {
+                    log_warn!(
+                        "rejecting route {} request with prefix length {} and missing `RTA_DST` \
+                    from {}: {:?}",
+                        kind,
+                        destination_prefix_len,
+                        client,
+                        req
+                    );
+                    return Err(Errno::EINVAL);
+                }
+                match family {
+                    IpVersion::V4 => IpAddr::V4(Ipv4::UNSPECIFIED_ADDRESS),
+                    IpVersion::V6 => IpAddr::V6(Ipv6::UNSPECIFIED_ADDRESS),
+                }
+            }
+        };
+
+        let next_hop = match next_hop_bytes {
+            Some(bytes) => match ip_addr_from_bytes(bytes, family) {
+                Ok(addr) => match addr {
+                    // Linux ignores the provided nexthop if it is the default route. To conform
+                    // to Linux expectations, we map the nexthop to `None` when it is unspecified.
+                    IpAddr::V4(addr) => SpecifiedAddr::new(addr).map(IpAddr::V4),
+                    IpAddr::V6(addr) => SpecifiedAddr::new(addr).map(IpAddr::V6),
+                },
+                Err(errno) => return Err(errno),
+            },
+            None => None,
+        };
+
+        // If the metric NLA is not specified, there are default values that
+        // should be supplied to match Linux expectations.
+        //
+        // Per https://www.man7.org/linux/man-pages/man8/route.8.html,
+        //
+        //   ip route - show / manipulate the IP routing table.
+        //
+        //       metric M
+        //            set the metric field in the routing table (used by routing
+        //            daemons) to M. If this option is not specified the metric
+        //            for inet6 (IPv6) address family defaults to '1', for inet
+        //            (IPv4) it defaults to '0'. You should always specify an
+        //            explicit metric value to not rely on those defaults - they
+        //            also differ from iproute2.
+        let priority: u32 = match priority {
+            Some(priority) => priority,
+            None => match family {
+                IpVersion::V4 => 0,
+                IpVersion::V6 => 1,
+            },
+        };
+
+        let extracted_route_request_either =
+            match SubnetEither::new(destination_addr, destination_prefix_len) {
+                Ok(SubnetEither::V4(v4_subnet)) => {
+                    let next_hop = next_hop
+                        .and_then(|hop| assert_matches!(hop, IpAddr::V4(addr) => Some(addr)));
+                    ExtractedRouteRequestEither::V4(ExtractedRouteRequest::Unicast(
+                        ExtractedUnicastRouteRequest {
+                            subnet: v4_subnet,
+                            target: fnet_routes_ext::RouteTarget { outbound_interface, next_hop },
+                            priority,
+                            table,
+                        },
+                    ))
+                }
+                Ok(SubnetEither::V6(v6_subnet)) => {
+                    let next_hop = next_hop
+                        .and_then(|hop| assert_matches!(hop, IpAddr::V6(addr) => Some(addr)));
+                    ExtractedRouteRequestEither::V6(ExtractedRouteRequest::Unicast(
+                        ExtractedUnicastRouteRequest {
+                            subnet: v6_subnet,
+                            target: fnet_routes_ext::RouteTarget { outbound_interface, next_hop },
+                            priority,
+                            table,
+                        },
+                    ))
+                }
+                Err(e) => {
+                    log_warn!(
+                        "{:?} subnet ({}) in route {} request from {}: {:?}",
+                        e,
+                        destination_addr,
+                        kind,
+                        client,
+                        req,
+                    );
+                    return Err(Errno::EINVAL);
+                }
+            };
+
+        Ok(extracted_route_request_either)
+    }
+
+    fn ip_addr_from_bytes(addr_bytes: &[u8], address_family: IpVersion) -> Result<IpAddr, Errno> {
+        match address_family {
+            IpVersion::V4 => {
+                const BYTES: usize = Ipv4Addr::BYTES as usize;
+                // To conform to Linux expectations, we allow more than the needed bytes
+                // to be present and cut off the remainder.
+                if addr_bytes.len() < BYTES {
+                    return Err(Errno::EINVAL);
+                }
+
+                let mut bytes = [0; BYTES as usize];
+                bytes.copy_from_slice(&addr_bytes[..BYTES]);
+                let addr: Ipv4Addr = bytes.into();
+                return Ok(IpAddr::V4(addr));
+            }
+            IpVersion::V6 => {
+                const BYTES: usize = Ipv6Addr::BYTES as usize;
+                // To conform to Linux expectations, we allow more than the needed bytes
+                // to be present and cut off the remainder.
+                if addr_bytes.len() < BYTES {
+                    return Err(Errno::EINVAL);
+                }
+
+                let mut bytes = [0; BYTES];
+                bytes.copy_from_slice(&addr_bytes[..BYTES]);
+                let addr: Ipv6Addr = bytes.into();
+                return Ok(IpAddr::V6(addr));
+            }
+        }
     }
 
     #[async_trait]
@@ -614,30 +826,46 @@ pub mod route {
                         AF_UNSPEC => {
                             // V4 routes are requested prior to V6 routes to conform
                             // with `ip list` output.
-                            process_dump_for_routes_worker::<_, Ipv4>(
+                            process_routes_worker_request::<_, Ipv4>(
                                 v4_routes_request_sink,
                                 client,
-                                req_header
-                            ).await;
-                            process_dump_for_routes_worker::<_, Ipv6>(
+                                req_header,
+                                routes::RouteRequestArgs::Get(
+                                    routes::GetRouteArgs::Dump,
+                                ),
+                            ).await
+                            .expect("route dump requests are infallible");
+                        process_routes_worker_request::<_, Ipv6>(
                                 v6_routes_request_sink,
                                 client,
-                                req_header
-                            ).await;
+                                req_header,
+                                routes::RouteRequestArgs::Get(
+                                    routes::GetRouteArgs::Dump,
+                                ),
+                            ).await
+                            .expect("route dump requests are infallible");
                         },
                         AF_INET => {
-                            process_dump_for_routes_worker::<_, Ipv4>(
+                            process_routes_worker_request::<_, Ipv4>(
                                 v4_routes_request_sink,
                                 client,
-                                req_header
-                            ).await;
+                                req_header,
+                                routes::RouteRequestArgs::Get(
+                                    routes::GetRouteArgs::Dump,
+                                ),
+                            ).await
+                            .expect("route dump requests are infallible");
                         },
                         AF_INET6 => {
-                            process_dump_for_routes_worker::<_, Ipv6>(
+                            process_routes_worker_request::<_, Ipv6>(
                                 v6_routes_request_sink,
                                 client,
-                                req_header
-                            ).await;
+                                req_header,
+                                routes::RouteRequestArgs::Get(
+                                    routes::GetRouteArgs::Dump,
+                                ),
+                            ).await
+                            .expect("route dump requests are infallible");
                         },
                         family => {
                             log_debug!(
@@ -695,6 +923,109 @@ pub mod route {
                         ),
                     }
                 }
+                NewRoute(ref message) => {
+                    // TODO(issuetracker.google/290803327): Emulate REPLACE by
+                    // dispatching a delete then add request to Netstack.
+                    let is_replace = req_header.flags & NLM_F_REPLACE == NLM_F_REPLACE;
+                    if is_replace {
+                        log_warn!("unsupported request type: NLM_F_REPLACE flag present in new \
+                            route request from {}: {:?}", client, req);
+                        client.send_unicast(
+                            netlink_packet::new_error(Err(Errno::ENOTSUP), req_header));
+                        return;
+                    }
+
+                    if message.header.kind != RTN_UNICAST {
+                        log_warn!("unsupported request type: {} route present in new route \
+                            request from {}: {:?}, only `RTN_UNICAST` is supported",
+                            message.header.kind, client, req);
+                        client.send_unicast(
+                            netlink_packet::new_error(Err(Errno::ENOTSUP), req_header));
+                        return;
+                    }
+
+                    let family = match message.header.address_family.into() {
+                        AF_INET => IpVersion::V4,
+                        AF_INET6 => IpVersion::V6,
+                        family => {
+                            log_debug!("invalid address family ({}) in new route \
+                                request from {}: {:?}", family, client, req);
+                            return client.send_unicast(
+                                netlink_packet::new_error(Err(Errno::EINVAL), req_header)
+                            );
+                        }
+                    };
+
+                    let extracted_request = match extract_data_from_unicast_route_message(
+                        family,
+                        message,
+                        client,
+                        &req,
+                        "new",
+                    ) {
+                        Ok(req) => req,
+                        Err(e) => {
+                            return client.send_unicast(
+                                netlink_packet::new_error(Err(e), req_header)
+                            );
+                        }
+                    };
+
+                    let result = match extracted_request {
+                        ExtractedRouteRequestEither::V4(req) => {
+                            let ExtractedRouteRequest::Unicast(
+                                ExtractedUnicastRouteRequest {
+                                    subnet,
+                                    target,
+                                    priority,
+                                    table
+                            }) = req;
+
+                            process_routes_worker_request::<_, Ipv4>(
+                                v4_routes_request_sink,
+                                client,
+                                req_header,
+                                routes::RouteRequestArgs::New(
+                                    routes::NewRouteArgs::Unicast(
+                                        routes::UnicastRouteArgs {
+                                            subnet,
+                                            target,
+                                            priority,
+                                            table
+                            }))).await
+                        }
+                        ExtractedRouteRequestEither::V6(req) => {
+                            let ExtractedRouteRequest::Unicast(
+                                ExtractedUnicastRouteRequest {
+                                    subnet,
+                                    target,
+                                    priority,
+                                    table,
+                            }) = req;
+
+                            process_routes_worker_request::<_, Ipv6>(
+                                v6_routes_request_sink,
+                                client,
+                                req_header,
+                                routes::RouteRequestArgs::New(
+                                    routes::NewRouteArgs::Unicast(
+                                        routes::UnicastRouteArgs {
+                                            subnet,
+                                            target,
+                                            priority,
+                                            table,
+                            }))).await
+                        }
+                    };
+
+                    match result {
+                        Ok(()) => if expects_ack {
+                            client.send_unicast(netlink_packet::new_error(Ok(()), req_header))
+                        },
+                        Err(e) => client.send_unicast(
+                            netlink_packet::new_error(Err(e.into_errno()), req_header)),
+                    }
+                }
                 NewLink(_)
                 | DelLink(_)
                 | NewLinkProp(_)
@@ -713,8 +1044,6 @@ pub mod route {
                 | NewNeighbour(_)
                 // TODO(https://issuetracker.google.com/285127790): Implement DelNeighbour.
                 | DelNeighbour(_)
-                // TODO(https://issuetracker.google.com/283136222): Implement NewRoute.
-                | NewRoute(_)
                 // TODO(https://issuetracker.google.com/283136222): Implement DelRoute.
                 | DelRoute(_)
                 // TODO(https://issuetracker.google.com/283137907): Implement NewQueueDiscipline.
@@ -771,29 +1100,26 @@ pub mod route {
         }
     }
 
-    async fn process_dump_for_routes_worker<
+    // Dispatch a route request to the given v4 or v6 Routes sink.
+    async fn process_routes_worker_request<
         S: Sender<<NetlinkRoute as ProtocolFamily>::InnerMessage>,
         I: Ip,
     >(
         sink: &mut mpsc::Sender<routes::Request<S, I>>,
         client: &mut InternalClient<NetlinkRoute, S>,
         req_header: NetlinkHeader,
-    ) {
+        route_request: routes::RouteRequestArgs<I>,
+    ) -> Result<(), routes::RequestError> {
         let (completer, waiter) = oneshot::channel();
         sink.send(routes::Request {
-            args: routes::RequestArgs::Route(routes::RouteRequestArgs::Get(
-                routes::GetRouteArgs::Dump,
-            )),
+            args: routes::RequestArgs::Route(route_request),
             sequence_number: req_header.sequence_number,
             client: client.clone(),
             completer,
         })
         .await
         .expect("route event loop should never terminate");
-        waiter
-            .await
-            .expect("routes event loop should have handled the request")
-            .expect("route dump requests are infallible");
+        waiter.await.expect("routes event loop should have handled the request")
     }
 
     /// A connection to the Route Netlink Protocol family.
@@ -911,18 +1237,24 @@ mod test {
 
     use std::num::NonZeroU32;
 
+    use fidl_fuchsia_net_routes_ext as fnet_routes_ext;
+
     use assert_matches::assert_matches;
     use futures::{channel::mpsc, future::FutureExt as _, stream::StreamExt as _};
-    use net_declare::net_addr_subnet;
+    use net_declare::{net_addr_subnet, net_ip_v4, net_ip_v6, net_subnet_v4, net_subnet_v6};
     use net_types::{
-        ip::{AddrSubnetEither, IpVersion, Ipv4, Ipv6},
-        Witness as _,
+        ip::{
+            AddrSubnetEither, IpAddr, IpVersion, Ipv4, Ipv4Addr, Ipv6, Ipv6Addr, Subnet,
+            SubnetEither,
+        },
+        SpecifiedAddr, Witness as _,
     };
     use netlink_packet_core::{NetlinkHeader, NLM_F_ACK, NLM_F_DUMP, NLM_F_REPLACE};
     use netlink_packet_route::{
-        rtnl::address::nlas::Nla as AddressNla, AddressMessage, LinkMessage, RouteMessage,
-        RtnlMessage, RuleMessage, TcMessage, AF_INET, AF_INET6, AF_PACKET, AF_UNSPEC,
-        IFA_F_NOPREFIXROUTE, IFF_UP,
+        rtnl::address::nlas::Nla as AddressNla, rtnl::route::nlas::Nla as RouteNla, AddressMessage,
+        LinkMessage, RouteMessage, RtnlMessage, RuleMessage, TcMessage, AF_INET, AF_INET6,
+        AF_PACKET, AF_UNSPEC, IFA_F_NOPREFIXROUTE, IFF_UP, RTN_MULTICAST, RTN_UNICAST,
+        RT_TABLE_COMPAT, RT_TABLE_MAIN,
     };
     use test_case::test_case;
 
@@ -2367,7 +2699,10 @@ mod test {
         )
     }
 
-    async fn test_route_request(
+    // Separate from `test_route_request`, because RTM_GETROUTE requests do not have typed
+    // arguments and there needs to be an option to send a DUMP request to the
+    // v4 and v6 routes worker.
+    async fn test_get_route_request(
         family: u16,
         request: NetlinkMessage<RtnlMessage>,
         expected_request: Option<routes::GetRouteArgs>,
@@ -2518,13 +2853,13 @@ mod test {
         };
 
         pretty_assertions::assert_eq!(
-            test_route_request(
+            test_get_route_request(
                 family,
                 NetlinkMessage::new(
                     header,
                     NetlinkPayload::InnerMessage(RtnlMessage::GetRoute(route_message)),
                 ),
-                expected_request_args
+                expected_request_args,
             )
             .await,
             expected_response
@@ -2676,5 +3011,892 @@ mod test {
                 assert_eq!(client_sink.take_messages(), [])
             }
         }
+    }
+
+    const TEST_V4_SUBNET: Subnet<Ipv4Addr> = net_subnet_v4!("192.0.2.0/24");
+    const TEST_V4_NEXTHOP: Ipv4Addr = net_ip_v4!("192.0.2.1");
+    const TEST_V6_SUBNET: Subnet<Ipv6Addr> = net_subnet_v6!("2001:db8::0/32");
+    const TEST_V6_NEXTHOP: Ipv6Addr = net_ip_v6!("2001:db8::1");
+
+    fn test_v4_nexthop_spec_addr() -> IpAddr<SpecifiedAddr<Ipv4Addr>, SpecifiedAddr<Ipv6Addr>> {
+        IpAddr::V4(SpecifiedAddr::new(TEST_V4_NEXTHOP).unwrap())
+    }
+
+    fn test_v6_nexthop_spec_addr() -> IpAddr<SpecifiedAddr<Ipv4Addr>, SpecifiedAddr<Ipv6Addr>> {
+        IpAddr::V6(SpecifiedAddr::new(TEST_V6_NEXTHOP).unwrap())
+    }
+
+    #[derive(Clone)]
+    struct RouteRequestAndResponse<R> {
+        request: R,
+        response: Result<(), routes::RequestError>,
+    }
+
+    enum RouteRequestKind {
+        New,
+        #[allow(unused)]
+        // TODO(issuetracker.google.com/283136222): Handle `RTM_DELROUTE`
+        // requests from clients.
+        Del,
+    }
+
+    struct TestRouteCase {
+        kind: RouteRequestKind,
+        flags: u16,
+        family: u16,
+        nlas: Vec<RouteNla>,
+        destination_prefix_len: u8,
+        table: u8,
+        rtm_type: u8,
+        expected_request_args: Option<RouteRequestAndResponse<RouteRequestArgsEither>>,
+        expected_response: Option<ExpectedResponse>,
+    }
+
+    fn bytes_from_spec_addr(
+        a: &IpAddr<SpecifiedAddr<Ipv4Addr>, SpecifiedAddr<Ipv6Addr>>,
+    ) -> Vec<u8> {
+        match a {
+            IpAddr::V4(a) => a.ipv4_bytes().to_vec(),
+            IpAddr::V6(a) => a.ipv6_bytes().to_vec(),
+        }
+    }
+
+    fn bytes_from_subnet(a: &SubnetEither) -> Vec<u8> {
+        match a {
+            SubnetEither::V4(a) => a.network().ipv4_bytes().to_vec(),
+            SubnetEither::V6(a) => a.network().ipv6_bytes().to_vec(),
+        }
+    }
+
+    fn new_valid_route_request(
+        kind: RouteRequestKind,
+        flags: u16,
+        dst: SubnetEither,
+        next_hop: Option<IpAddr<SpecifiedAddr<Ipv4Addr>, SpecifiedAddr<Ipv6Addr>>>,
+        extra_nlas: impl IntoIterator<Item = RouteNla>,
+        interface_id: u64,
+        table: u8,
+        rtm_type: u8,
+        response: Result<(), routes::RequestError>,
+    ) -> TestRouteCase {
+        let extra_nlas = extra_nlas.into_iter().collect::<Vec<_>>();
+        let table_from_nla = extra_nlas.clone().into_iter().find_map(|nla| match nla {
+            RouteNla::Table(table) => Some(table),
+            _ => None,
+        });
+        let priority_from_nla = extra_nlas.clone().into_iter().find_map(|nla| match nla {
+            RouteNla::Priority(priority) => Some(priority),
+            _ => None,
+        });
+
+        TestRouteCase {
+            kind,
+            flags,
+            family: match dst {
+                SubnetEither::V4(_) => AF_INET,
+                SubnetEither::V6(_) => AF_INET6,
+            },
+            nlas: [
+                RouteNla::Destination(bytes_from_subnet(&dst)),
+                RouteNla::Oif(interface_id_as_u32(interface_id)),
+            ]
+            .into_iter()
+            .chain(extra_nlas.into_iter())
+            .collect(),
+            destination_prefix_len: match dst {
+                SubnetEither::V4(subnet) => subnet.prefix(),
+                SubnetEither::V6(subnet) => subnet.prefix(),
+            },
+            table,
+            rtm_type,
+            expected_request_args: Some(RouteRequestAndResponse {
+                request: {
+                    match dst {
+                        SubnetEither::V4(subnet) => {
+                            RouteRequestArgsEither::V4(routes::RequestArgs::Route(
+                                routes::RouteRequestArgs::New(routes::NewRouteArgs::Unicast(
+                                    routes::UnicastRouteArgs {
+                                        subnet,
+                                        target: fnet_routes_ext::RouteTarget {
+                                            outbound_interface: interface_id,
+                                            next_hop: next_hop.and_then(|hop| {
+                                                assert_matches!(
+                                                    hop,
+                                                    IpAddr::V4(addr) => Some(addr)
+                                                )
+                                            }),
+                                        },
+                                        // `0` is the default metric value for IPv4 routes when the
+                                        // NLA is not provided.
+                                        priority: priority_from_nla.unwrap_or(0),
+                                        // Use the table value from the NLA if provided.
+                                        table: table_from_nla.unwrap_or(table as u32),
+                                    },
+                                )),
+                            ))
+                        }
+                        SubnetEither::V6(subnet) => {
+                            RouteRequestArgsEither::V6(routes::RequestArgs::Route(
+                                routes::RouteRequestArgs::New(routes::NewRouteArgs::Unicast(
+                                    routes::UnicastRouteArgs {
+                                        subnet,
+                                        target: fnet_routes_ext::RouteTarget {
+                                            outbound_interface: interface_id,
+                                            next_hop: next_hop.and_then(|hop| {
+                                                assert_matches!(
+                                                    hop,
+                                                    IpAddr::V6(addr) => Some(addr)
+                                                )
+                                            }),
+                                        },
+                                        // `1` is the default metric value for IPv6 routes when the
+                                        // NLA is not provided.
+                                        priority: priority_from_nla.unwrap_or(1),
+                                        // Use the table value from the NLA if provided.
+                                        table: table_from_nla.unwrap_or(table as u32),
+                                    },
+                                )),
+                            ))
+                        }
+                    }
+                },
+                response,
+            }),
+            expected_response: (flags & NLM_F_ACK == NLM_F_ACK).then_some(ExpectedResponse::Ack),
+        }
+    }
+
+    fn new_valid_new_route_request_with_extra_nlas(
+        flags: u16,
+        addr: SubnetEither,
+        next_hop: Option<IpAddr<SpecifiedAddr<Ipv4Addr>, SpecifiedAddr<Ipv6Addr>>>,
+        extra_nlas: impl IntoIterator<Item = RouteNla>,
+        interface_id: u64,
+        table: u8,
+        rtm_type: u8,
+        response: Result<(), routes::RequestError>,
+    ) -> TestRouteCase {
+        new_valid_route_request(
+            RouteRequestKind::New,
+            flags,
+            addr,
+            next_hop,
+            extra_nlas,
+            interface_id,
+            table,
+            rtm_type,
+            response,
+        )
+    }
+
+    fn new_valid_new_route_request(
+        flags: u16,
+        addr: SubnetEither,
+        interface_id: u64,
+        table: u8,
+        rtm_type: u8,
+        response: Result<(), routes::RequestError>,
+    ) -> TestRouteCase {
+        new_valid_new_route_request_with_extra_nlas(
+            flags,
+            addr,
+            None,
+            None,
+            interface_id,
+            table,
+            rtm_type,
+            response,
+        )
+    }
+
+    fn new_invalid_new_route_request(
+        flags: u16,
+        addr: SubnetEither,
+        interface_id: u64,
+        table: u8,
+        rtm_type: u8,
+        errno: Errno,
+    ) -> TestRouteCase {
+        new_invalid_new_route_request_with_extra_nlas(
+            flags,
+            addr,
+            None,
+            None,
+            interface_id,
+            table,
+            rtm_type,
+            errno,
+        )
+    }
+
+    fn new_invalid_new_route_request_with_extra_nlas(
+        flags: u16,
+        addr: SubnetEither,
+        next_hop: Option<IpAddr<SpecifiedAddr<Ipv4Addr>, SpecifiedAddr<Ipv6Addr>>>,
+        extra_nlas: impl IntoIterator<Item = RouteNla>,
+        interface_id: u64,
+        table: u8,
+        rtm_type: u8,
+        errno: Errno,
+    ) -> TestRouteCase {
+        TestRouteCase {
+            expected_request_args: None,
+            expected_response: Some(ExpectedResponse::Error(errno)),
+            ..new_valid_new_route_request_with_extra_nlas(
+                flags,
+                addr,
+                next_hop,
+                extra_nlas,
+                interface_id,
+                table,
+                rtm_type,
+                Ok(()),
+            )
+        }
+    }
+
+    #[derive(Clone, Debug)]
+    enum RouteRequestArgsEither {
+        V4(routes::RequestArgs<Ipv4>),
+        V6(routes::RequestArgs<Ipv6>),
+    }
+
+    impl From<routes::RequestArgs<Ipv4>> for RouteRequestArgsEither {
+        fn from(args: routes::RequestArgs<Ipv4>) -> Self {
+            RouteRequestArgsEither::V4(args)
+        }
+    }
+
+    impl From<routes::RequestArgs<Ipv6>> for RouteRequestArgsEither {
+        fn from(args: routes::RequestArgs<Ipv6>) -> Self {
+            RouteRequestArgsEither::V6(args)
+        }
+    }
+
+    async fn test_route_request(
+        family: u16,
+        request: NetlinkMessage<RtnlMessage>,
+        req_and_resp: Option<RouteRequestAndResponse<RouteRequestArgsEither>>,
+    ) -> Vec<SentMessage<RtnlMessage>> {
+        let (mut client_sink, mut client) = {
+            crate::client::testutil::new_fake_client::<NetlinkRoute>(
+                crate::client::testutil::CLIENT_ID_1,
+                &[],
+            )
+        };
+
+        let (interfaces_request_sink, _interfaces_request_stream) = mpsc::channel(0);
+        let (v4_routes_request_sink, mut v4_routes_request_stream) = mpsc::channel(0);
+        let (v6_routes_request_sink, mut v6_routes_request_stream) = mpsc::channel(0);
+
+        let mut handler = NetlinkRouteRequestHandler::<FakeSender<_>, _> {
+            interfaces_request_sink,
+            v4_routes_request_sink,
+            v6_routes_request_sink,
+            rules_request_handler: RuleTable::default(),
+        };
+
+        match req_and_resp {
+            None => {
+                handler.handle_request(request, &mut client).await;
+                if family == AF_INET {
+                    assert_matches!(v4_routes_request_stream.next().now_or_never(), None);
+                } else if family == AF_INET6 {
+                    assert_matches!(v6_routes_request_stream.next().now_or_never(), None);
+                }
+            }
+            Some(RouteRequestAndResponse { request: expected_request, response }) => {
+                let ((), ()) =
+                    futures::future::join(handler.handle_request(request, &mut client), async {
+                        if family == AF_INET {
+                            let next = v4_routes_request_stream.next();
+                            let request = assert_matches!(
+                                expected_request,
+                                RouteRequestArgsEither::V4(request) => request
+                            );
+                            let routes::Request { args, sequence_number: _, client: _, completer } =
+                                next.await.expect("handler should send request");
+                            assert_eq!(args, request);
+                            completer.send(response).expect("handler should be alive");
+                        } else if family == AF_INET6 {
+                            let next = v6_routes_request_stream.next();
+                            let request = assert_matches!(
+                                expected_request,
+                                RouteRequestArgsEither::V6(request) => request
+                            );
+                            let routes::Request { args, sequence_number: _, client: _, completer } =
+                                next.await.expect("handler should send request");
+                            assert_eq!(args, request);
+                            completer.send(response).expect("handler should be alive");
+                        }
+                    })
+                    .await;
+            }
+        }
+
+        client_sink.take_messages()
+    }
+
+    /// Test RTM_NEWROUTE and RTM_DELROUTE
+    // Add route tests cases.
+    #[test_case(
+        TestRouteCase {
+            family: AF_UNSPEC,
+            ..new_invalid_new_route_request(
+                NLM_F_ACK,
+                SubnetEither::V4(TEST_V4_SUBNET),
+                interfaces::testutil::LO_INTERFACE_ID,
+                RT_TABLE_MAIN,
+                RTN_UNICAST,
+                Errno::EINVAL,
+            )
+        }; "new_v4_invalid_family_ack")]
+    #[test_case(
+        TestRouteCase {
+            family: AF_UNSPEC,
+            ..new_invalid_new_route_request(
+                0,
+                SubnetEither::V6(TEST_V6_SUBNET),
+                interfaces::testutil::LO_INTERFACE_ID,
+                RT_TABLE_MAIN,
+                RTN_UNICAST,
+                Errno::EINVAL,
+            )
+        }; "new_v6_invalid_family_no_ack")]
+    #[test_case(
+        TestRouteCase {
+            flags: NLM_F_ACK | NLM_F_REPLACE,
+            ..new_invalid_new_route_request(
+                NLM_F_ACK,
+                SubnetEither::V4(TEST_V4_SUBNET),
+                interfaces::testutil::LO_INTERFACE_ID,
+                RT_TABLE_MAIN,
+                RTN_UNICAST,
+                Errno::ENOTSUP,
+            )
+        }; "new_v4_replace_flag_ack")]
+    #[test_case(
+        new_invalid_new_route_request(
+            NLM_F_REPLACE,
+            SubnetEither::V6(TEST_V6_SUBNET),
+            interfaces::testutil::LO_INTERFACE_ID,
+            RT_TABLE_MAIN,
+            RTN_UNICAST,
+            Errno::ENOTSUP,
+        ); "new_v6_replace_flag_no_ack")]
+    #[test_case(
+        new_invalid_new_route_request(
+            NLM_F_ACK,
+            SubnetEither::V4(TEST_V4_SUBNET),
+            interfaces::testutil::LO_INTERFACE_ID,
+            RT_TABLE_MAIN,
+            RTN_MULTICAST,
+            Errno::ENOTSUP); "new_v4_non_unicast_type_ack")]
+    #[test_case(
+        new_invalid_new_route_request(
+            0,
+            SubnetEither::V6(TEST_V6_SUBNET),
+            interfaces::testutil::LO_INTERFACE_ID,
+            RT_TABLE_MAIN,
+            RTN_MULTICAST,
+            Errno::ENOTSUP); "new_v6_non_unicast_type_no_ack")]
+    #[test_case(
+        new_valid_new_route_request(
+            NLM_F_ACK,
+            SubnetEither::V4(net_subnet_v4!("0.0.0.0/0")),
+            interfaces::testutil::LO_INTERFACE_ID,
+            RT_TABLE_MAIN,
+            RTN_UNICAST,
+            Ok(())); "new_v4_default_route_ok_ack")]
+    #[test_case(
+        new_valid_new_route_request(
+            0,
+            SubnetEither::V4(net_subnet_v4!("0.0.0.0/24")),
+            interfaces::testutil::LO_INTERFACE_ID,
+            RT_TABLE_MAIN,
+            RTN_UNICAST,
+            Ok(())); "new_v4_unspecified_route_non_zero_prefix_ok_no_ack")]
+    #[test_case(
+        new_valid_new_route_request(
+            NLM_F_ACK,
+            SubnetEither::V6(net_subnet_v6!("::/0")),
+            interfaces::testutil::LO_INTERFACE_ID,
+            RT_TABLE_MAIN,
+            RTN_UNICAST,
+            Ok(())); "new_v6_default_route_prefix_ack")]
+    #[test_case(
+        new_valid_new_route_request(
+            0,
+            SubnetEither::V6(net_subnet_v6!("::/64")),
+            interfaces::testutil::LO_INTERFACE_ID,
+            RT_TABLE_MAIN,
+            RTN_UNICAST,
+            Ok(())); "new_v6_unspecified_route_non_zero_prefix_no_ack")]
+    #[test_case(
+        new_valid_new_route_request(
+            NLM_F_ACK,
+            SubnetEither::V4(TEST_V4_SUBNET),
+            interfaces::testutil::LO_INTERFACE_ID,
+            RT_TABLE_MAIN,
+            RTN_UNICAST,
+            Ok(())); "new_v4_ok_ack")]
+    #[test_case(
+        new_valid_new_route_request(
+            NLM_F_ACK,
+            SubnetEither::V6(TEST_V6_SUBNET),
+            interfaces::testutil::LO_INTERFACE_ID,
+            RT_TABLE_MAIN,
+            RTN_UNICAST,
+            Ok(())); "new_v6_ok_ack")]
+    #[test_case(
+        new_valid_new_route_request(
+            0,
+            SubnetEither::V4(TEST_V4_SUBNET),
+            interfaces::testutil::LO_INTERFACE_ID,
+            RT_TABLE_MAIN,
+            RTN_UNICAST,
+            Ok(())); "new_v4_ok_no_ack")]
+    #[test_case(
+        new_valid_new_route_request(
+            0,
+            SubnetEither::V6(TEST_V6_SUBNET),
+            interfaces::testutil::LO_INTERFACE_ID,
+            RT_TABLE_MAIN,
+            RTN_UNICAST,
+            Ok(())); "new_v6_ok_no_ack")]
+    #[test_case(
+        new_valid_new_route_request_with_extra_nlas(
+            NLM_F_ACK,
+            SubnetEither::V4(TEST_V4_SUBNET),
+            Some(test_v4_nexthop_spec_addr()),
+            [RouteNla::Gateway(bytes_from_spec_addr(
+                &test_v4_nexthop_spec_addr()
+            ))],
+            interfaces::testutil::LO_INTERFACE_ID,
+            RT_TABLE_MAIN,
+            RTN_UNICAST,
+            Ok(())); "new_v4_with_nexthop_ok_ack")]
+    #[test_case(
+        new_valid_new_route_request_with_extra_nlas(
+            0,
+            SubnetEither::V6(TEST_V6_SUBNET),
+            Some(test_v6_nexthop_spec_addr()),
+            [RouteNla::Gateway(bytes_from_spec_addr(
+                &test_v6_nexthop_spec_addr()
+            ))],
+            interfaces::testutil::LO_INTERFACE_ID,
+            RT_TABLE_MAIN,
+            RTN_UNICAST,
+            Ok(())); "new_v6_with_nexthop_ok_no_ack")]
+    #[test_case(
+        new_invalid_new_route_request_with_extra_nlas(
+            NLM_F_ACK,
+            SubnetEither::V4(TEST_V4_SUBNET),
+            Some(test_v4_nexthop_spec_addr()),
+            [RouteNla::Gateway(Vec::new())],
+            interfaces::testutil::LO_INTERFACE_ID,
+            RT_TABLE_MAIN,
+            RTN_UNICAST,
+            Errno::EINVAL); "new_v4_with_invalid_nexthop_ok_ack")]
+    #[test_case(
+        new_invalid_new_route_request_with_extra_nlas(
+            0,
+            SubnetEither::V6(TEST_V6_SUBNET),
+            Some(test_v6_nexthop_spec_addr()),
+            [RouteNla::Gateway(Vec::new())],
+            interfaces::testutil::LO_INTERFACE_ID,
+            RT_TABLE_MAIN,
+            RTN_UNICAST,
+            Errno::EINVAL); "new_v6_with_invalid_nexthop_ok_no_ack")]
+    #[test_case(
+        new_valid_new_route_request_with_extra_nlas(
+            NLM_F_ACK,
+            SubnetEither::V4(TEST_V4_SUBNET),
+            None,
+            [RouteNla::Gateway(net_ip_v4!("0.0.0.0").ipv4_bytes().to_vec())],
+            interfaces::testutil::LO_INTERFACE_ID,
+            RT_TABLE_MAIN,
+            RTN_UNICAST,
+            Ok(())); "new_v4_unspecified_nexthop_ok_ack")]
+    #[test_case(
+        new_valid_new_route_request_with_extra_nlas(
+            0,
+            SubnetEither::V6(TEST_V6_SUBNET),
+            None,
+            [RouteNla::Gateway(net_ip_v6!("::").ipv6_bytes().to_vec())],
+            interfaces::testutil::LO_INTERFACE_ID,
+            RT_TABLE_MAIN,
+            RTN_UNICAST,
+            Ok(())); "new_v6_unspecified_nexthop_no_ack")]
+    #[test_case(
+        new_valid_new_route_request_with_extra_nlas(
+            NLM_F_ACK,
+            SubnetEither::V4(TEST_V4_SUBNET),
+            None,
+            [RouteNla::Priority(100)],
+            interfaces::testutil::LO_INTERFACE_ID,
+            RT_TABLE_MAIN,
+            RTN_UNICAST,
+            Ok(())); "new_v4_priority_nla_ok_ack")]
+    #[test_case(
+        new_valid_new_route_request_with_extra_nlas(
+            0,
+            SubnetEither::V6(TEST_V6_SUBNET),
+            None,
+            [RouteNla::Priority(100)],
+            interfaces::testutil::LO_INTERFACE_ID,
+            RT_TABLE_MAIN,
+            RTN_UNICAST,
+            Ok(())); "new_v6_priority_nla_ok_no_ack")]
+    #[test_case(
+        TestRouteCase {
+            expected_response: Some(ExpectedResponse::Error(Errno::EINVAL)),
+            ..new_valid_new_route_request(
+                NLM_F_ACK,
+                SubnetEither::V4(TEST_V4_SUBNET),
+                interfaces::testutil::LO_INTERFACE_ID,
+                RT_TABLE_MAIN,
+                RTN_UNICAST,
+                Err(routes::RequestError::InvalidRequest),
+            )
+        }; "new_v4_invalid_request_response_ack")]
+    #[test_case(
+        TestRouteCase {
+            expected_response: Some(ExpectedResponse::Error(Errno::EINVAL)),
+            ..new_valid_new_route_request(
+                NLM_F_ACK,
+                SubnetEither::V6(TEST_V6_SUBNET),
+                interfaces::testutil::LO_INTERFACE_ID,
+                RT_TABLE_MAIN,
+                RTN_UNICAST,
+                Err(routes::RequestError::InvalidRequest),
+            )
+        }; "new_v6_invalid_request_response_no_ack")]
+    #[test_case(
+        TestRouteCase {
+            expected_response: Some(ExpectedResponse::Error(Errno::ENODEV)),
+            ..new_valid_new_route_request(
+                0,
+                SubnetEither::V6(TEST_V6_SUBNET),
+                interfaces::testutil::LO_INTERFACE_ID,
+                RT_TABLE_MAIN,
+                RTN_UNICAST,
+                Err(routes::RequestError::UnrecognizedInterface),
+            )
+        }; "new_v6_unrecognized_interface_response_no_ack")]
+    #[test_case(
+        TestRouteCase {
+            expected_response: Some(ExpectedResponse::Error(Errno::ENOTSUP)),
+            ..new_valid_new_route_request(
+                0,
+                SubnetEither::V6(TEST_V6_SUBNET),
+                interfaces::testutil::LO_INTERFACE_ID,
+                RT_TABLE_MAIN,
+                RTN_UNICAST,
+                Err(routes::RequestError::Unknown),
+            )
+        }; "new_v6_unknown_response_no_ack")]
+    #[test_case(
+        TestRouteCase {
+            nlas: vec![
+                RouteNla::Destination(bytes_from_subnet(
+                    &SubnetEither::V4(TEST_V4_SUBNET)
+                )),
+            ],
+            ..new_invalid_new_route_request(
+                0,
+                SubnetEither::V4(TEST_V4_SUBNET),
+                interfaces::testutil::LO_INTERFACE_ID,
+                RT_TABLE_MAIN,
+                RTN_UNICAST,
+                Errno::ENOTSUP,
+            )
+        }; "new_v4_missing_oif_nla_ack")]
+    #[test_case(
+        TestRouteCase {
+            nlas: vec![
+                RouteNla::Destination(bytes_from_subnet(
+                    &SubnetEither::V6(TEST_V6_SUBNET)
+                )),
+            ],
+            ..new_invalid_new_route_request(
+                0,
+                SubnetEither::V6(TEST_V6_SUBNET),
+                interfaces::testutil::LO_INTERFACE_ID,
+                RT_TABLE_MAIN,
+                RTN_UNICAST,
+                Errno::ENOTSUP,
+            )
+        }; "new_v6_missing_oif_nla_ack")]
+    #[test_case(
+        TestRouteCase {
+            nlas: vec![
+                RouteNla::Destination(bytes_from_subnet(
+                    &SubnetEither::V4(TEST_V4_SUBNET)
+                )),
+            ],
+            ..new_invalid_new_route_request(
+                0,
+                SubnetEither::V4(TEST_V4_SUBNET),
+                interfaces::testutil::LO_INTERFACE_ID,
+                RT_TABLE_MAIN,
+                RTN_UNICAST,
+                Errno::ENOTSUP,
+            )
+        }; "new_v4_missing_oif_nla_no_ack")]
+    #[test_case(
+        TestRouteCase {
+            nlas: vec![
+                RouteNla::Destination(bytes_from_subnet(
+                    &SubnetEither::V6(TEST_V6_SUBNET)
+                )),
+            ],
+            ..new_invalid_new_route_request(
+                0,
+                SubnetEither::V6(TEST_V6_SUBNET),
+                interfaces::testutil::LO_INTERFACE_ID,
+                RT_TABLE_MAIN,
+                RTN_UNICAST,
+                Errno::ENOTSUP,
+            )
+        }; "new_v6_missing_oif_nla_no_ack")]
+    #[test_case(
+        TestRouteCase {
+            nlas: vec![
+                RouteNla::Oif(interfaces::testutil::ETH_INTERFACE_ID.try_into().unwrap()),
+            ],
+            destination_prefix_len: 1,
+            ..new_invalid_new_route_request(
+                NLM_F_ACK,
+                SubnetEither::V4(TEST_V4_SUBNET),
+                interfaces::testutil::LO_INTERFACE_ID,
+                RT_TABLE_MAIN,
+                RTN_UNICAST,
+                Errno::EINVAL,
+            )
+        }; "new_v4_missing_destination_nla_nonzero_prefix_ack")]
+    #[test_case(
+        TestRouteCase {
+            nlas: vec![
+                RouteNla::Oif(interfaces::testutil::ETH_INTERFACE_ID.try_into().unwrap()),
+            ],
+            destination_prefix_len: 1,
+            ..new_invalid_new_route_request(
+                0,
+                SubnetEither::V6(TEST_V6_SUBNET),
+                interfaces::testutil::LO_INTERFACE_ID,
+                RT_TABLE_MAIN,
+                RTN_UNICAST,
+                Errno::EINVAL,
+            )
+        }; "new_v6_missing_destination_nla_nonzero_prefix_no_ack")]
+    #[test_case(
+        TestRouteCase {
+            nlas: vec![
+                RouteNla::Oif(interfaces::testutil::LO_INTERFACE_ID.try_into().unwrap()),
+            ],
+            ..new_valid_new_route_request(
+                NLM_F_ACK,
+                SubnetEither::V4(net_subnet_v4!("0.0.0.0/0")),
+                interfaces::testutil::LO_INTERFACE_ID,
+                RT_TABLE_MAIN,
+                RTN_UNICAST,
+                Ok(()))}; "new_v4_missing_destination_nla_zero_prefix_ack")]
+    #[test_case(
+        TestRouteCase {
+            nlas: vec![
+                RouteNla::Oif(interfaces::testutil::LO_INTERFACE_ID.try_into().unwrap()),
+            ],
+            ..new_valid_new_route_request(
+                0,
+                SubnetEither::V6(net_subnet_v6!("::/0")),
+                interfaces::testutil::LO_INTERFACE_ID,
+                RT_TABLE_MAIN,
+                RTN_UNICAST,
+                Ok(()))}; "new_v6_missing_destination_nla_zero_prefix_no_ack")]
+    #[test_case(
+        TestRouteCase {
+            nlas: Vec::new(),
+            ..new_invalid_new_route_request(
+                NLM_F_ACK,
+                SubnetEither::V4(TEST_V4_SUBNET),
+                interfaces::testutil::LO_INTERFACE_ID,
+                RT_TABLE_MAIN,
+                RTN_UNICAST,
+                Errno::ENOTSUP,
+            )
+        }; "new_v4_no_nlas_ack")]
+    #[test_case(
+        TestRouteCase {
+            nlas: Vec::new(),
+            ..new_invalid_new_route_request(
+                0,
+                SubnetEither::V6(TEST_V6_SUBNET),
+                interfaces::testutil::LO_INTERFACE_ID,
+                RT_TABLE_MAIN,
+                RTN_UNICAST,
+                Errno::ENOTSUP,
+            )
+        }; "new_v6_no_nlas_no_ack")]
+    #[test_case(
+        TestRouteCase {
+            nlas: vec![RouteNla::Destination(Vec::new())],
+            ..new_invalid_new_route_request(
+                NLM_F_ACK,
+                SubnetEither::V4(TEST_V4_SUBNET),
+                interfaces::testutil::LO_INTERFACE_ID,
+                RT_TABLE_MAIN,
+                RTN_UNICAST,
+                Errno::ENOTSUP,
+            )
+        }; "new_v4_invalid_destination_nla_ack")]
+    #[test_case(
+        TestRouteCase {
+            nlas: vec![RouteNla::Destination(Vec::new())],
+            ..new_invalid_new_route_request(
+                0,
+                SubnetEither::V6(TEST_V6_SUBNET),
+                interfaces::testutil::LO_INTERFACE_ID,
+                RT_TABLE_MAIN,
+                RTN_UNICAST,
+                Errno::ENOTSUP,
+            )
+        }; "new_v6_invalid_destination_nla_no_ack")]
+    #[test_case(
+        new_valid_new_route_request_with_extra_nlas(
+            NLM_F_ACK,
+            SubnetEither::V4(TEST_V4_SUBNET),
+            None,
+            // `RT_TABLE_COMPAT` is generally used when `table` is outside the bounds of u8 values.
+            [RouteNla::Table(u8::MAX as u32 + 1)],
+            interfaces::testutil::LO_INTERFACE_ID,
+            RT_TABLE_COMPAT,
+            RTN_UNICAST,
+            Ok(())); "new_v4_with_table_nla_rt_table_compat_ack")]
+    #[test_case(
+        new_valid_new_route_request_with_extra_nlas(
+            0,
+            SubnetEither::V6(TEST_V6_SUBNET),
+            None,
+            // `RT_TABLE_COMPAT` is generally used when `table` is outside the bounds of u8 values.
+            [RouteNla::Table(u8::MAX as u32 + 1)],
+            interfaces::testutil::LO_INTERFACE_ID,
+            RT_TABLE_COMPAT,
+            RTN_UNICAST,
+            Ok(())); "new_v6_with_table_nla_rt_table_compat_no_ack")]
+    #[test_case(
+        new_valid_new_route_request_with_extra_nlas(
+            NLM_F_ACK,
+            SubnetEither::V4(TEST_V4_SUBNET),
+            None,
+            [RouteNla::Table(u8::MAX as u32 + 1)],
+            interfaces::testutil::LO_INTERFACE_ID,
+            RT_TABLE_MAIN,
+            RTN_UNICAST,
+            Ok(())); "new_v4_with_table_nla_rt_table_main_ack")]
+    #[test_case(
+        new_valid_new_route_request_with_extra_nlas(
+            0,
+            SubnetEither::V6(TEST_V6_SUBNET),
+            None,
+            [RouteNla::Table(u8::MAX as u32 + 1)],
+            interfaces::testutil::LO_INTERFACE_ID,
+            RT_TABLE_MAIN,
+            RTN_UNICAST,
+            Ok(())); "new_v6_with_table_nla_rt_table_main_no_ack")]
+    #[test_case(
+        TestRouteCase {
+            destination_prefix_len: u8::MAX,
+            ..new_invalid_new_route_request(
+                NLM_F_ACK,
+                SubnetEither::V4(TEST_V4_SUBNET),
+                interfaces::testutil::LO_INTERFACE_ID,
+                RT_TABLE_MAIN,
+                RTN_UNICAST,
+                Errno::EINVAL,
+            )
+        }; "new_v4_invalid_prefix_len_ack")]
+    #[test_case(
+        TestRouteCase {
+            destination_prefix_len: u8::MAX,
+            ..new_invalid_new_route_request(
+                0,
+                SubnetEither::V6(TEST_V6_SUBNET),
+                interfaces::testutil::LO_INTERFACE_ID,
+                RT_TABLE_MAIN,
+                RTN_UNICAST,
+                Errno::EINVAL,
+            )
+        }; "new_v6_invalid_prefix_len_no_ack")]
+    #[test_case(
+        TestRouteCase {
+            destination_prefix_len: 0,
+            ..new_invalid_new_route_request(
+                NLM_F_ACK,
+                SubnetEither::V4(TEST_V4_SUBNET),
+                interfaces::testutil::LO_INTERFACE_ID,
+                RT_TABLE_MAIN,
+                RTN_UNICAST,
+                Errno::EINVAL,
+            )
+        }; "new_v4_zero_prefix_len_ack")]
+    #[test_case(
+        TestRouteCase {
+            destination_prefix_len: 0,
+            ..new_invalid_new_route_request(
+                0,
+                SubnetEither::V6(TEST_V6_SUBNET),
+                interfaces::testutil::LO_INTERFACE_ID,
+                RT_TABLE_MAIN,
+                RTN_UNICAST,
+                Errno::EINVAL,
+            )
+        }; "new_v6_zero_prefix_len_no_ack")]
+    #[fuchsia::test]
+    async fn test_new_del_route(test_case: TestRouteCase) {
+        let TestRouteCase {
+            kind,
+            flags,
+            family,
+            nlas,
+            destination_prefix_len,
+            table,
+            rtm_type,
+            expected_request_args,
+            expected_response,
+        } = test_case;
+
+        let header = header_with_flags(flags);
+        let route_message = {
+            let mut message = RouteMessage::default();
+            message.header.address_family = family.try_into().unwrap();
+            message.header.destination_prefix_length = destination_prefix_len;
+            message.header.table = table;
+            message.header.kind = rtm_type;
+            message.nlas = nlas;
+            message
+        };
+
+        let (message, request) = match kind {
+            RouteRequestKind::New => (RtnlMessage::NewRoute(route_message), expected_request_args),
+            RouteRequestKind::Del => unreachable!("del tests currently unsupported"),
+        };
+
+        pretty_assertions::assert_eq!(
+            test_route_request(
+                family,
+                NetlinkMessage::new(header, NetlinkPayload::InnerMessage(message)),
+                request,
+            )
+            .await,
+            expected_response
+                .into_iter()
+                .map(|response| SentMessage::unicast(match response {
+                    ExpectedResponse::Ack => netlink_packet::new_error(Ok(()), header),
+                    ExpectedResponse::Done => netlink_packet::new_done(header),
+                    ExpectedResponse::Error(e) => netlink_packet::new_error(Err(e), header),
+                }))
+                .collect::<Vec<_>>(),
+        )
     }
 }
