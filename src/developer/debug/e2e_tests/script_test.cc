@@ -123,6 +123,13 @@ void ScriptTest::ProcessUntilNextOutput() {
   loop().QuitNow();
 }
 
+void ScriptTest::OnTestExited(const std::string& url) {
+  // Insert a definitive marker for a test component being completed. Scripts that use `run-test`
+  // will want to depend on this output so we remain listening for test_runner messages until it has
+  // completely shutdown.
+  loop().PostTask(FROM_HERE, [this, url]() { console().Output("Test Done: " + url, false); });
+}
+
 void ScriptTest::RegisterScriptTests() {
   std::filesystem::path test_scripts_dir =
       (std::filesystem::path(GetSelfPath()).parent_path() / ZXDB_E2E_TESTS_SCRIPTS_DIR)

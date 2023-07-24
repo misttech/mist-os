@@ -335,7 +335,6 @@ class ZirconComponentManager::TestLauncher : public fxl::RefCountedThreadSafe<Te
 
     fuchsia_test_manager::RunOptions run_options;
     run_options.case_filters_to_run() = std::move(case_filters);
-    run_options.arguments() = {"--gtest_break_on_failure"};  // does no harm to rust tests.
     auto add_suite_res = run_builder->AddSuite(
         {test_url_, std::move(run_options), CreateEndpointsAndBind(suite_controller_)});
     if (!add_suite_res.is_ok()) {

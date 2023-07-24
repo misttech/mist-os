@@ -28,7 +28,6 @@ if (is_host) {
       "main.cc",
       "script_test.cc",
       "script_test.h",
-      "test_run_failing_test_component.cc",
     ]
 
     deps = [

@@ -29,6 +29,8 @@ class ScriptTest : public E2eTest, public MockConsole::OutputObserver {
   // Scan the directory and register all script tests.
   static void RegisterScriptTests();
 
+  void OnTestExited(const std::string& url) override;
+
  private:
   // Process the next lines in the script until we meet a new output pattern.
   // This will either set |expected_output_pattern_| or finish the test.
