@@ -81,7 +81,7 @@ use crate::{
 /// [RFC 4861 section 4.3]: https://tools.ietf.org/html/rfc4861#section-4.3
 /// [RFC 4861 section 4.4]: https://tools.ietf.org/html/rfc4861#section-4.4
 /// [RFC 4861 section 4.5]: https://tools.ietf.org/html/rfc4861#section-4.5
-pub(super) const REQUIRED_NDP_IP_PACKET_HOP_LIMIT: u8 = 255;
+pub(crate) const REQUIRED_NDP_IP_PACKET_HOP_LIMIT: u8 = 255;
 
 /// The default number of ICMP error messages to send per second.
 ///

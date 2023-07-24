@@ -8,7 +8,7 @@ pub(crate) mod arp;
 pub mod ethernet;
 pub(crate) mod link;
 pub mod loopback;
-pub(crate) mod ndp;
+pub mod ndp;
 pub mod queue;
 pub mod socket;
 mod state;

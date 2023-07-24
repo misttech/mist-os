@@ -991,7 +991,6 @@ pub mod testutil {
 
     impl<Meta> FakeFrameCtx<Meta> {
         /// Take all frames sent so far.
-        #[cfg(test)]
         pub(crate) fn take_frames(&mut self) -> Vec<(Meta, Vec<u8>)> {
             core::mem::take(&mut self.frames)
         }

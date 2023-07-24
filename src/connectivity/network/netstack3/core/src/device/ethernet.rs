@@ -40,6 +40,7 @@ use crate::{
     device::{
         arp::{
             ArpContext, ArpFrameMetadata, ArpPacketHandler, ArpState, ArpTimerId, BufferArpContext,
+            BufferArpSenderContext,
         },
         link::LinkDevice,
         queue::{
@@ -61,8 +62,8 @@ use crate::{
     },
     ip::{
         device::nud::{
-            BufferNudContext, BufferNudHandler, NeighborLinkAddr, NudContext, NudHandler, NudState,
-            NudTimerId,
+            BufferNudContext, BufferNudHandler, BufferNudSenderContext, NeighborLinkAddr,
+            NudContext, NudHandler, NudState, NudTimerId,
         },
         types::RawMetric,
     },
@@ -324,9 +325,41 @@ fn send_ethernet_frame<
 
 impl<
         B: BufferMut,
-        NonSyncCtx: BufferNonSyncContext<B>,
+        BufferNonSyncCtx: BufferNonSyncContext<B>,
         L: LockBefore<crate::lock_ordering::IpState<Ipv6>>,
-    > BufferNudContext<B, Ipv6, EthernetLinkDevice, NonSyncCtx>
+    > BufferNudContext<B, Ipv6, EthernetLinkDevice, BufferNonSyncCtx>
+    for Locked<&SyncCtx<BufferNonSyncCtx>, L>
+{
+    type BufferSenderCtx<'a> =
+        Locked<&'a SyncCtx<BufferNonSyncCtx>, crate::lock_ordering::EthernetIpv6Nud>;
+
+    fn with_nud_state_mut_and_buf_ctx<
+        O,
+        F: FnOnce(&mut NudState<Ipv6, Mac>, &mut Self::BufferSenderCtx<'_>) -> O,
+    >(
+        &mut self,
+        device_id: &EthernetDeviceId<BufferNonSyncCtx>,
+        cb: F,
+    ) -> O {
+        with_ethernet_state_and_sync_ctx(self, device_id, |mut state, sync_ctx| {
+            // We lock the state at the Ethernet IPv6 NUD lock level, but the
+            // callback needs access to the sync context as well as the NUD
+            // state, so we also cast its lock level to the same so that only
+            // locks that may be acquired _after_ the IPv6 NUD lock may be
+            // acquired in the callback.
+            type LockLevel = crate::lock_ordering::EthernetIpv6Nud;
+            let mut nud = state.lock::<LockLevel>();
+            let mut locked = sync_ctx.cast_locked::<LockLevel>();
+            cb(&mut nud, &mut locked)
+        })
+    }
+}
+
+impl<
+        B: BufferMut,
+        NonSyncCtx: BufferNonSyncContext<B>,
+        L: LockBefore<crate::lock_ordering::AllDeviceSockets>,
+    > BufferNudSenderContext<B, Ipv6, EthernetLinkDevice, NonSyncCtx>
     for Locked<&SyncCtx<NonSyncCtx>, L>
 {
     fn send_ip_packet_to_neighbor_link_addr<S: Serializer<Buffer = B>>(
@@ -1093,7 +1126,31 @@ impl<
         B: BufferMut,
         C: BufferNonSyncContext<B>,
         L: LockBefore<crate::lock_ordering::IpState<Ipv4>>,
-    > BufferArpContext<EthernetLinkDevice, C, B> for Locked<&SyncCtx<C>, L>
+    > BufferArpContext<B, EthernetLinkDevice, C> for Locked<&SyncCtx<C>, L>
+{
+    type BufferArpSenderCtx<'a> = Locked<&'a SyncCtx<C>, crate::lock_ordering::EthernetIpv4Arp>;
+
+    fn with_arp_state_mut_and_buf_ctx<
+        O,
+        F: FnOnce(&mut ArpState<EthernetLinkDevice>, &mut Self::BufferArpSenderCtx<'_>) -> O,
+    >(
+        &mut self,
+        device_id: &EthernetDeviceId<C>,
+        cb: F,
+    ) -> O {
+        with_ethernet_state_and_sync_ctx(self, device_id, |mut state, sync_ctx| {
+            let mut arp = state.lock::<crate::lock_ordering::EthernetIpv4Arp>();
+            let mut locked = sync_ctx.cast_locked::<crate::lock_ordering::EthernetIpv4Arp>();
+            cb(&mut arp, &mut locked)
+        })
+    }
+}
+
+impl<
+        B: BufferMut,
+        C: BufferNonSyncContext<B>,
+        L: LockBefore<crate::lock_ordering::AllDeviceSockets>,
+    > BufferArpSenderContext<EthernetLinkDevice, C, B> for Locked<&SyncCtx<C>, L>
 {
     fn send_ip_packet_to_neighbor_link_addr<S: Serializer<Buffer = B>>(
         &mut self,
@@ -1208,7 +1265,7 @@ pub fn resolve_ethernet_link_addr<I: Ip, NonSyncCtx: NonSyncContext>(
 
 #[cfg(test)]
 mod tests {
-    use alloc::{collections::hash_map::HashMap, vec, vec::Vec};
+    use alloc::{vec, vec::Vec};
 
     use ip_test_macro::ip_test;
     use net_declare::net_mac;
@@ -1253,7 +1310,6 @@ mod tests {
     struct FakeEthernetCtx {
         static_state: StaticEthernetDeviceState,
         dynamic_state: DynamicEthernetDeviceState,
-        static_arp_entries: HashMap<SpecifiedAddr<Ipv4Addr>, Mac>,
         tx_queue: TransmitQueueState<(), Buf<Vec<u8>>, BufVecU8Allocator>,
     }
 
@@ -1266,7 +1322,6 @@ mod tests {
                     metric: DEFAULT_INTERFACE_METRIC,
                 },
                 dynamic_state: DynamicEthernetDeviceState::new(max_frame_size),
-                static_arp_entries: Default::default(),
                 tx_queue: Default::default(),
             }
         }
@@ -1275,10 +1330,29 @@ mod tests {
     type FakeNonSyncCtx =
         crate::context::testutil::FakeNonSyncCtx<EthernetTimerId<FakeDeviceId>, (), ()>;
 
-    type FakeCtx =
+    type FakeCtx = crate::context::testutil::WrappedFakeSyncCtx<
+        ArpState<EthernetLinkDevice>,
+        FakeEthernetCtx,
+        FakeDeviceId,
+        FakeDeviceId,
+    >;
+
+    type FakeInnerCtx =
         crate::context::testutil::FakeSyncCtx<FakeEthernetCtx, FakeDeviceId, FakeDeviceId>;
 
     impl BufferSocketHandler<EthernetLinkDevice, FakeNonSyncCtx> for FakeCtx {
+        fn handle_frame(
+            &mut self,
+            ctx: &mut FakeNonSyncCtx,
+            device: &Self::DeviceId,
+            frame: Frame<&[u8]>,
+            whole_frame: &[u8],
+        ) {
+            self.inner.handle_frame(ctx, device, frame, whole_frame)
+        }
+    }
+
+    impl BufferSocketHandler<EthernetLinkDevice, FakeNonSyncCtx> for FakeInnerCtx {
         fn handle_frame(
             &mut self,
             _ctx: &mut FakeNonSyncCtx,
@@ -1293,6 +1367,16 @@ mod tests {
     impl EthernetIpLinkDeviceStaticStateContext for FakeCtx {
         fn with_static_ethernet_device_state<O, F: FnOnce(&StaticEthernetDeviceState) -> O>(
             &mut self,
+            device_id: &FakeDeviceId,
+            cb: F,
+        ) -> O {
+            self.inner.with_static_ethernet_device_state(device_id, cb)
+        }
+    }
+
+    impl EthernetIpLinkDeviceStaticStateContext for FakeInnerCtx {
+        fn with_static_ethernet_device_state<O, F: FnOnce(&StaticEthernetDeviceState) -> O>(
+            &mut self,
             &FakeDeviceId: &FakeDeviceId,
             cb: F,
         ) -> O {
@@ -1301,6 +1385,30 @@ mod tests {
     }
 
     impl EthernetIpLinkDeviceDynamicStateContext<FakeNonSyncCtx> for FakeCtx {
+        fn with_ethernet_device_state<
+            O,
+            F: FnOnce(&StaticEthernetDeviceState, &DynamicEthernetDeviceState) -> O,
+        >(
+            &mut self,
+            device_id: &FakeDeviceId,
+            cb: F,
+        ) -> O {
+            self.inner.with_ethernet_device_state(device_id, cb)
+        }
+
+        fn with_ethernet_device_state_mut<
+            O,
+            F: FnOnce(&StaticEthernetDeviceState, &mut DynamicEthernetDeviceState) -> O,
+        >(
+            &mut self,
+            device_id: &FakeDeviceId,
+            cb: F,
+        ) -> O {
+            self.inner.with_ethernet_device_state_mut(device_id, cb)
+        }
+    }
+
+    impl EthernetIpLinkDeviceDynamicStateContext<FakeNonSyncCtx> for FakeInnerCtx {
         fn with_ethernet_device_state<
             O,
             F: FnOnce(&StaticEthernetDeviceState, &DynamicEthernetDeviceState) -> O,
@@ -1361,73 +1469,57 @@ mod tests {
         }
     }
 
-    impl<B: BufferMut> BufferNudHandler<B, Ipv6, EthernetLinkDevice, FakeNonSyncCtx> for FakeCtx {
-        fn send_ip_packet_to_neighbor<S: Serializer<Buffer = B>>(
+    impl ArpContext<EthernetLinkDevice, FakeNonSyncCtx> for FakeCtx {
+        fn get_protocol_addr(
             &mut self,
             _ctx: &mut FakeNonSyncCtx,
             _device_id: &Self::DeviceId,
-            _lookup_addr: SpecifiedAddr<Ipv6Addr>,
-            _body: S,
-        ) -> Result<(), S> {
+        ) -> Option<Ipv4Addr> {
             unimplemented!()
+        }
+
+        fn get_hardware_addr(
+            &mut self,
+            _ctx: &mut FakeNonSyncCtx,
+            _device_id: &Self::DeviceId,
+        ) -> UnicastAddr<Mac> {
+            self.inner.get_ref().static_state.mac
+        }
+
+        fn with_arp_state_mut<O, F: FnOnce(&mut ArpState<EthernetLinkDevice>) -> O>(
+            &mut self,
+            _device_id: &Self::DeviceId,
+            cb: F,
+        ) -> O {
+            cb(&mut self.outer)
         }
     }
 
-    impl NudHandler<Ipv4, EthernetLinkDevice, FakeNonSyncCtx> for FakeCtx {
-        fn set_dynamic_neighbor(
-            &mut self,
-            _ctx: &mut FakeNonSyncCtx,
-            _device_id: &Self::DeviceId,
-            _neighbor: SpecifiedAddr<Ipv4Addr>,
-            _link_addr: Mac,
-            _is_confirmation: DynamicNeighborUpdateSource,
-        ) {
-            unimplemented!()
-        }
+    impl<B: BufferMut> BufferArpContext<B, EthernetLinkDevice, FakeNonSyncCtx> for FakeCtx {
+        type BufferArpSenderCtx<'a> = FakeInnerCtx;
 
-        fn set_static_neighbor(
-            &mut self,
-            _ctx: &mut FakeNonSyncCtx,
-            _device_id: &Self::DeviceId,
-            neighbor: SpecifiedAddr<Ipv4Addr>,
-            link_addr: Mac,
-        ) {
-            let _: Option<Mac> = self.get_mut().static_arp_entries.insert(neighbor, link_addr);
-        }
-
-        fn flush(&mut self, _ctx: &mut FakeNonSyncCtx, _device_id: &Self::DeviceId) {
-            unimplemented!()
-        }
-
-        fn resolve_link_addr(
+        fn with_arp_state_mut_and_buf_ctx<
+            O,
+            F: FnOnce(&mut ArpState<EthernetLinkDevice>, &mut Self::BufferArpSenderCtx<'_>) -> O,
+        >(
             &mut self,
             _device_id: &Self::DeviceId,
-            _dst: &SpecifiedAddr<Ipv4Addr>,
-        ) -> NeighborLinkAddr<Mac> {
-            unimplemented!()
+            cb: F,
+        ) -> O {
+            let Self { outer, inner } = self;
+            cb(outer, inner)
         }
     }
 
-    impl<B: BufferMut> BufferNudHandler<B, Ipv4, EthernetLinkDevice, FakeNonSyncCtx> for FakeCtx {
-        fn send_ip_packet_to_neighbor<S: Serializer<Buffer = B>>(
+    impl<B: BufferMut> BufferArpSenderContext<EthernetLinkDevice, FakeNonSyncCtx, B> for FakeInnerCtx {
+        fn send_ip_packet_to_neighbor_link_addr<S: Serializer<Buffer = B>>(
             &mut self,
             ctx: &mut FakeNonSyncCtx,
             device_id: &Self::DeviceId,
-            lookup_addr: SpecifiedAddr<Ipv4Addr>,
+            link_addr: Mac,
             body: S,
         ) -> Result<(), S> {
-            if let Some(link_addr) = self.get_ref().static_arp_entries.get(&lookup_addr).cloned() {
-                send_as_ethernet_frame_to_dst(
-                    self,
-                    ctx,
-                    device_id,
-                    link_addr,
-                    body,
-                    EtherType::Ipv4,
-                )
-            } else {
-                Ok(())
-            }
+            send_as_ethernet_frame_to_dst(self, ctx, device_id, link_addr, body, EtherType::Ipv4)
         }
     }
 
@@ -1443,11 +1535,44 @@ mod tests {
         type Buffer = Buf<Vec<u8>>;
 
         fn parse_outgoing_frame(buf: &[u8]) -> Result<SentFrame<&[u8]>, ParseSentFrameError> {
+            FakeInnerCtx::parse_outgoing_frame(buf)
+        }
+    }
+
+    impl TransmitQueueCommon<EthernetLinkDevice, FakeNonSyncCtx> for FakeInnerCtx {
+        type Meta = ();
+        type Allocator = BufVecU8Allocator;
+        type Buffer = Buf<Vec<u8>>;
+
+        fn parse_outgoing_frame(buf: &[u8]) -> Result<SentFrame<&[u8]>, ParseSentFrameError> {
             SentFrame::try_parse_as_ethernet(buf)
         }
     }
 
     impl TransmitQueueContext<EthernetLinkDevice, FakeNonSyncCtx> for FakeCtx {
+        fn with_transmit_queue_mut<
+            O,
+            F: FnOnce(&mut TransmitQueueState<Self::Meta, Self::Buffer, Self::Allocator>) -> O,
+        >(
+            &mut self,
+            device_id: &Self::DeviceId,
+            cb: F,
+        ) -> O {
+            self.inner.with_transmit_queue_mut(device_id, cb)
+        }
+
+        fn send_frame(
+            &mut self,
+            ctx: &mut FakeNonSyncCtx,
+            device_id: &Self::DeviceId,
+            (): Self::Meta,
+            buf: Self::Buffer,
+        ) -> Result<(), DeviceSendFrameError<(Self::Meta, Self::Buffer)>> {
+            TransmitQueueContext::send_frame(&mut self.inner, ctx, device_id, (), buf)
+        }
+    }
+
+    impl TransmitQueueContext<EthernetLinkDevice, FakeNonSyncCtx> for FakeInnerCtx {
         fn with_transmit_queue_mut<
             O,
             F: FnOnce(&mut TransmitQueueState<Self::Meta, Self::Buffer, Self::Allocator>) -> O,
@@ -1473,6 +1598,23 @@ mod tests {
     }
 
     impl DeviceIdContext<EthernetLinkDevice> for FakeCtx {
+        type DeviceId = FakeDeviceId;
+        type WeakDeviceId = FakeWeakDeviceId<FakeDeviceId>;
+        fn downgrade_device_id(&self, device_id: &Self::DeviceId) -> Self::WeakDeviceId {
+            self.inner.downgrade_device_id(device_id)
+        }
+        fn is_device_installed(&self, device_id: &Self::DeviceId) -> bool {
+            self.inner.is_device_installed(device_id)
+        }
+        fn upgrade_weak_device_id(
+            &self,
+            weak_device_id: &Self::WeakDeviceId,
+        ) -> Option<Self::DeviceId> {
+            self.inner.upgrade_weak_device_id(weak_device_id)
+        }
+    }
+
+    impl DeviceIdContext<EthernetLinkDevice> for FakeInnerCtx {
         type DeviceId = FakeDeviceId;
         type WeakDeviceId = FakeWeakDeviceId<FakeDeviceId>;
         fn downgrade_device_id(&self, device_id: &Self::DeviceId) -> Self::WeakDeviceId {
@@ -1519,10 +1661,16 @@ mod tests {
         // and that we don't send an Ethernet frame whose size is greater than
         // the MTU.
         fn test(size: usize, expect_frames_sent: usize) {
-            let crate::context::testutil::FakeCtx { mut sync_ctx, mut non_sync_ctx } =
-                crate::context::testutil::FakeCtx::with_sync_ctx(FakeCtx::with_state(
-                    FakeEthernetCtx::new(FAKE_CONFIG_V4.local_mac, IPV6_MIN_IMPLIED_MAX_FRAME_SIZE),
-                ));
+            let crate::context::testutil::FakeCtxWithSyncCtx { mut sync_ctx, mut non_sync_ctx } =
+                crate::context::testutil::FakeCtxWithSyncCtx::with_sync_ctx(
+                    FakeCtx::with_inner_and_outer_state(
+                        FakeEthernetCtx::new(
+                            FAKE_CONFIG_V4.local_mac,
+                            IPV6_MIN_IMPLIED_MAX_FRAME_SIZE,
+                        ),
+                        ArpState::default(),
+                    ),
+                );
 
             insert_static_arp_table_entry(
                 &mut sync_ctx,
@@ -1538,7 +1686,7 @@ mod tests {
                 FAKE_CONFIG_V4.remote_ip,
                 Buf::new(&mut vec![0; size], ..),
             );
-            assert_eq!(sync_ctx.frames().len(), expect_frames_sent);
+            assert_eq!(sync_ctx.inner.frames().len(), expect_frames_sent);
         }
 
         test(usize::try_from(u32::from(Ipv6::MINIMUM_LINK_MTU)).unwrap(), 1);

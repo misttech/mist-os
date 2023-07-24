@@ -18,8 +18,88 @@
 //!
 //! [RFC 4861]: https://tools.ietf.org/html/rfc4861
 
+/// Test utilities for NDP.
+pub mod testutil {
+    use crate::ip::icmp::REQUIRED_NDP_IP_PACKET_HOP_LIMIT;
+    use alloc::vec::Vec;
+    use net_types::{
+        ethernet::Mac,
+        ip::{Ipv6, Ipv6Addr},
+    };
+    use packet::{Buf, InnerPacketBuilder as _, Serializer as _};
+    use packet_formats::{
+        icmp::{
+            ndp::{
+                options::NdpOptionBuilder, NeighborAdvertisement, NeighborSolicitation,
+                OptionSequenceBuilder,
+            },
+            IcmpPacketBuilder, IcmpUnusedCode,
+        },
+        ip::Ipv6Proto,
+        ipv6::Ipv6PacketBuilder,
+    };
+
+    /// Serialize an IP packet containing a neighbor advertisement with the
+    /// provided parameters.
+    pub fn neighbor_advertisement_ip_packet(
+        src_ip: Ipv6Addr,
+        dst_ip: Ipv6Addr,
+        router_flag: bool,
+        solicited_flag: bool,
+        override_flag: bool,
+        mac: Mac,
+    ) -> Buf<Vec<u8>> {
+        OptionSequenceBuilder::new([NdpOptionBuilder::TargetLinkLayerAddress(&mac.bytes())].iter())
+            .into_serializer()
+            .encapsulate(IcmpPacketBuilder::<Ipv6, &[u8], _>::new(
+                src_ip,
+                dst_ip,
+                IcmpUnusedCode,
+                NeighborAdvertisement::new(router_flag, solicited_flag, override_flag, src_ip),
+            ))
+            .encapsulate(Ipv6PacketBuilder::new(
+                src_ip,
+                dst_ip,
+                REQUIRED_NDP_IP_PACKET_HOP_LIMIT,
+                Ipv6Proto::Icmpv6,
+            ))
+            .serialize_vec_outer()
+            .unwrap()
+            .unwrap_b()
+    }
+
+    /// Serialize an IP packet containing a neighbor solicitation with the
+    /// provided parameters.
+    pub fn neighbor_solicitation_ip_packet(
+        src_ip: Ipv6Addr,
+        dst_ip: Ipv6Addr,
+        target_addr: Ipv6Addr,
+        mac: Mac,
+    ) -> Buf<Vec<u8>> {
+        OptionSequenceBuilder::new([NdpOptionBuilder::SourceLinkLayerAddress(&mac.bytes())].iter())
+            .into_serializer()
+            .encapsulate(IcmpPacketBuilder::<Ipv6, &[u8], _>::new(
+                src_ip,
+                dst_ip,
+                IcmpUnusedCode,
+                NeighborSolicitation::new(target_addr),
+            ))
+            .encapsulate(Ipv6PacketBuilder::new(
+                src_ip,
+                dst_ip,
+                REQUIRED_NDP_IP_PACKET_HOP_LIMIT,
+                Ipv6Proto::Icmpv6,
+            ))
+            .serialize_vec_outer()
+            .unwrap()
+            .unwrap_b()
+    }
+}
+
 #[cfg(test)]
 mod tests {
+    use super::*;
+
     use alloc::{collections::HashSet, vec, vec::Vec};
     use core::{
         convert::{TryFrom, TryInto as _},
@@ -43,8 +123,7 @@ mod tests {
         icmp::{
             ndp::{
                 options::{NdpOption, NdpOptionBuilder, PrefixInformation},
-                NdpPacket, NeighborAdvertisement, OptionSequenceBuilder, Options,
-                RouterAdvertisement, RouterSolicitation,
+                NdpPacket, OptionSequenceBuilder, Options, RouterAdvertisement, RouterSolicitation,
             },
             IcmpEchoRequest, IcmpPacketBuilder, IcmpUnusedCode, Icmpv6Packet,
         },
@@ -88,6 +167,7 @@ mod tests {
                 IpAddressId as _, IpDeviceConfigurationUpdate, Ipv4DeviceConfigurationUpdate,
                 Ipv6DeviceConfigurationUpdate, Ipv6DeviceHandler, Ipv6DeviceTimerId,
             },
+            icmp::REQUIRED_NDP_IP_PACKET_HOP_LIMIT,
             receive_ip_packet,
             testutil::is_in_ip_multicast,
             SendIpPacketMeta,
@@ -149,8 +229,6 @@ mod tests {
         )
     }
 
-    const REQUIRED_NDP_IP_PACKET_HOP_LIMIT: u8 = 255;
-
     // TODO(https://github.com/rust-lang/rust/issues/67441): Make these constants once const
     // Option::unwrap is stablized
     fn local_mac() -> UnicastAddr<Mac> {
@@ -167,35 +245,6 @@ mod tests {
 
     fn remote_ip() -> UnicastAddr<Ipv6Addr> {
         UnicastAddr::from_witness(FAKE_CONFIG_V6.remote_ip).unwrap()
-    }
-
-    fn neighbor_advertisement_message(
-        src_ip: Ipv6Addr,
-        dst_ip: Ipv6Addr,
-        router_flag: bool,
-        solicited_flag: bool,
-        override_flag: bool,
-        mac: Option<Mac>,
-    ) -> Buf<Vec<u8>> {
-        let mac = mac.map(|x| x.bytes());
-
-        let mut options = Vec::new();
-
-        if let Some(ref mac) = mac {
-            options.push(NdpOptionBuilder::TargetLinkLayerAddress(mac));
-        }
-
-        OptionSequenceBuilder::new(options.iter())
-            .into_serializer()
-            .encapsulate(IcmpPacketBuilder::<Ipv6, &[u8], _>::new(
-                src_ip,
-                dst_ip,
-                IcmpUnusedCode,
-                NeighborAdvertisement::new(router_flag, solicited_flag, override_flag, src_ip),
-            ))
-            .serialize_vec_outer()
-            .unwrap()
-            .unwrap_b()
     }
 
     impl TryFrom<DeviceId<crate::testutil::FakeNonSyncCtx>> for EthernetDeviceId<FakeNonSyncCtx> {
@@ -2840,26 +2889,14 @@ mod tests {
             ctx,
             &device,
             FrameDestination::Multicast,
-            Buf::new(
-                neighbor_advertisement_message(
-                    src_ip,
-                    dest_ip,
-                    router_flag,
-                    solicited_flag,
-                    override_flag,
-                    Some(peer_mac),
-                ),
-                ..,
-            )
-            .encapsulate(Ipv6PacketBuilder::new(
+            testutil::neighbor_advertisement_ip_packet(
                 src_ip,
                 dest_ip,
-                REQUIRED_NDP_IP_PACKET_HOP_LIMIT,
-                Ipv6Proto::Icmpv6,
-            ))
-            .serialize_vec_outer()
-            .unwrap()
-            .unwrap_b(),
+                router_flag,
+                solicited_flag,
+                override_flag,
+                peer_mac,
+            ),
         )
     }
 

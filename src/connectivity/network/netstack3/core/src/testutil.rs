@@ -18,14 +18,11 @@ use core::{
 
 use net_types::{
     ethernet::Mac,
-    ip::{AddrSubnet, Ip, IpAddr, Ipv4, Ipv4Addr, Ipv6, Ipv6Addr, SubnetEither},
+    ip::{AddrSubnet, Ip, IpAddr, IpAddress, Ipv4, Ipv4Addr, Ipv6, Ipv6Addr, Subnet, SubnetEither},
     UnicastAddr, Witness,
 };
 #[cfg(test)]
-use net_types::{
-    ip::{IpAddress, IpInvariant, Subnet},
-    MulticastAddr, SpecifiedAddr,
-};
+use net_types::{ip::IpInvariant, MulticastAddr, SpecifiedAddr};
 use packet::{Buf, BufferMut};
 #[cfg(test)]
 use packet_formats::ip::IpProto;
@@ -289,8 +286,8 @@ impl FakeNonSyncCtx {
         )
     }
 
-    #[cfg(test)]
-    pub(crate) fn take_frames(&mut self) -> Vec<(EthernetWeakDeviceId<FakeNonSyncCtx>, Vec<u8>)> {
+    /// Take all frames sent so far.
+    pub fn take_frames(&mut self) -> Vec<(EthernetWeakDeviceId<FakeNonSyncCtx>, Vec<u8>)> {
         self.with_inner_mut(|ctx| ctx.frame_ctx_mut().take_frames())
     }
 
@@ -816,8 +813,7 @@ impl FakeEventDispatcherBuilder {
     ///
     /// `add_device_with_ip` is like `add_device`, except that it takes an
     /// associated IP address and subnet to assign to the device.
-    #[cfg(test)]
-    pub(crate) fn add_device_with_ip<A: IpAddress>(
+    pub fn add_device_with_ip<A: IpAddress>(
         &mut self,
         mac: UnicastAddr<Mac>,
         ip: A,
