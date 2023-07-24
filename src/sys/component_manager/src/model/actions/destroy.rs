@@ -87,12 +87,7 @@ async fn do_destroy(component: &Arc<ComponentInstance>) -> Result<(), DestroyAct
     // Now that all children have been destroyed, destroy the parent.
     component.destroy_instance().await?;
 
-    // Only consider the component fully destroyed once it's no longer executing any lifecycle
-    // transitions.
-    {
-        let mut state = component.lock_state().await;
-        state.set(InstanceState::Destroyed);
-    }
+    // Wait for any remaining blocking tasks and actions finish up.
     fn wait(nf: Option<impl Future + Send + 'static>) -> BoxFuture<'static, ()> {
         Box::pin(async {
             if let Some(nf) = nf {
@@ -100,8 +95,6 @@ async fn do_destroy(component: &Arc<ComponentInstance>) -> Result<(), DestroyAct
             }
         })
     }
-
-    // Wait for any remaining blocking tasks and actions finish up.
     let task_shutdown = Box::pin(component.blocking_task_scope().shutdown());
     let nfs = {
         let actions = component.lock_actions().await;
@@ -112,6 +105,10 @@ async fn do_destroy(component: &Arc<ComponentInstance>) -> Result<(), DestroyAct
         ]
     };
     join_all(nfs.into_iter()).await;
+
+    // Only consider the component fully destroyed once it's no longer executing any lifecycle
+    // transitions.
+    component.lock_state().await.set(InstanceState::Destroyed);
 
     Ok(())
 }
@@ -318,8 +315,7 @@ pub mod tests {
         }
     }
 
-    // Blocks an action so that we can verify the number of notifiers for the action
-    // and eventually unblock it.
+    // An action that blocks until it receives a value on an mpsc channel.
     pub struct MockAction<O: Send + Sync + Clone + Debug + 'static> {
         rx: Mutex<mpsc::Receiver<()>>,
         key: ActionKey,
@@ -329,8 +325,8 @@ pub mod tests {
     impl<O: Send + Sync + Clone + Debug + 'static> MockAction<O> {
         pub fn new(key: ActionKey, result: O) -> (Self, mpsc::Sender<()>) {
             let (tx, rx) = mpsc::channel::<()>(0);
-            let blocker = Self { rx: Mutex::new(rx), key, result };
-            (blocker, tx)
+            let action = Self { rx: Mutex::new(rx), key, result };
+            (action, tx)
         }
     }
 
@@ -491,6 +487,94 @@ pub mod tests {
             Ok(fsys::StartResult::Started) as Result<fsys::StartResult, StartActionError>,
         )
         .await;
+    }
+
+    #[fuchsia::test]
+    async fn destroy_marks_destroyed_after_blocking_tasks() {
+        let components = vec![
+            ("root", ComponentDeclBuilder::new().add_lazy_child("a").build()),
+            ("a", component_decl_with_test_runner()),
+        ];
+        let test = ActionsTest::new("root", components, None).await;
+        test.model.start().await;
+
+        let component_root = test.model.root().clone();
+        let component_a = test.look_up(vec!["a"].try_into().unwrap()).await;
+
+        // Run a blocking task that panics if the component has Destroyed state.
+        // The task does the check once it receives a value on the `task_start` channel.
+        let (mut task_start_tx, mut task_start_rx) = mpsc::channel::<()>(0);
+        let (mut task_done_tx, mut task_done_rx) = mpsc::channel::<()>(0);
+        let a = component_a.clone();
+        let fut = async move {
+            task_start_rx.next().await;
+            if matches!(*a.lock_state().await, InstanceState::Destroyed) {
+                panic!("component state was set to destroyed before blocking task finished");
+            }
+            task_done_tx.try_send(()).unwrap();
+        };
+        component_a.blocking_task_scope().add_task(fut).await;
+
+        let mock_action_key = ActionKey::Start;
+        let (mock_action, mut mock_action_unblocker) = MockAction::new(
+            mock_action_key.clone(),
+            Ok(fsys::StartResult::Started) as Result<fsys::StartResult, StartActionError>,
+        );
+
+        // Spawn a mock action on 'a' that stalls
+        {
+            let mut actions = component_a.lock_actions().await;
+            let _ = actions.register_no_wait(&component_a, mock_action);
+        }
+
+        // Spawn a destroy child action on root for `a`.
+        // This eventually leads to a destroy action on `a`.
+        let destroy_child_fut = {
+            let mut actions = component_root.lock_actions().await;
+            actions.register_no_wait(
+                &component_root,
+                DestroyChildAction::new("a".try_into().unwrap(), 0),
+            )
+        };
+
+        // Check that the destroy action is waiting on the mock action.
+        loop {
+            let actions = component_a.lock_actions().await;
+            assert!(actions.contains(&mock_action_key));
+
+            // Check the reference count on the notifier of the mock action
+            let rx = &actions.rep[&mock_action_key];
+            let rx = rx
+                .downcast_ref::<ActionNotifier<Result<fsys::StartResult, StartActionError>>>()
+                .expect("action notifier has unexpected type");
+            let refcount = rx.refcount.load(Ordering::Relaxed);
+
+            // expected reference count:
+            // - 1 for the ActionSet that owns the notifier
+            // - 1 for destroy action to wait on the mock action
+            if refcount == 2 {
+                assert!(actions.contains(&ActionKey::Destroy));
+                break;
+            }
+
+            // The destroy action hasn't blocked on the mock action yet.
+            // Wait for that to happen and check again.
+            drop(actions);
+            fasync::Timer::new(fasync::Time::after(zx::Duration::from_millis(100))).await;
+        }
+
+        // Now that the Destroy action is waiting on the Start action, it should also
+        // be waiting on the blocking task, so start the blocking task to verity instance state.
+        task_start_tx.try_send(()).unwrap();
+
+        // Wait for the blocking task to finish. It should finish without panicking.
+        task_done_rx.next().await;
+
+        // Unblock the mock action, causing destroy to complete as well
+        mock_action_unblocker.try_send(()).unwrap();
+
+        destroy_child_fut.await.unwrap();
+        assert!(is_child_deleted(&component_root, &component_a).await);
     }
 
     #[fuchsia::test]
