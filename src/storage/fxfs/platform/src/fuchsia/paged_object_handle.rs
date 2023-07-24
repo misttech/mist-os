@@ -23,8 +23,8 @@ use {
             transaction::{
                 AssocObj, LockKey, Mutation, Options, Transaction, TRANSACTION_METADATA_MAX_AMOUNT,
             },
-            AttributeKey, BasicObjectHandle, DataObjectHandle, HandleOwner, ObjectKey, ObjectStore,
-            ObjectValue, Timestamp,
+            AttributeKey, DataObjectHandle, HandleOwner, ObjectKey, ObjectStore, ObjectValue,
+            StoreObjectHandle, Timestamp,
         },
         round::{how_many, round_up},
     },
@@ -283,8 +283,8 @@ impl PagedObjectHandle {
         self.handle.get_size()
     }
 
-    pub fn basic_handle(&self) -> BasicObjectHandle<FxVolume> {
-        BasicObjectHandle::new(self.owner().clone(), self.object_id())
+    pub fn basic_handle(&self) -> StoreObjectHandle<FxVolume> {
+        StoreObjectHandle::new(self.owner().clone(), self.object_id())
     }
 
     pub async fn read_uncached(&self, range: std::ops::Range<u64>) -> Result<Buffer<'_>, Error> {

@@ -16,8 +16,8 @@ use {
                 ObjectValue, PosixAttributes, Timestamp,
             },
             transaction::{LockKey, Mutation, Options, Transaction},
-            BasicObjectHandle, DataObjectHandle, HandleOptions, HandleOwner, ObjectStore,
-            SetExtendedAttributeMode,
+            DataObjectHandle, HandleOptions, HandleOwner, ObjectStore, SetExtendedAttributeMode,
+            StoreObjectHandle,
         },
         trace_duration,
     },
@@ -542,13 +542,13 @@ impl<S: HandleOwner> Directory<S> {
 
     pub async fn list_extended_attributes(&self) -> Result<Vec<Vec<u8>>, Error> {
         ensure!(!self.is_deleted(), FxfsError::Deleted);
-        let handle = BasicObjectHandle::new(self.owner.clone(), self.object_id);
+        let handle = StoreObjectHandle::new(self.owner.clone(), self.object_id);
         handle.list_extended_attributes().await
     }
 
     pub async fn get_extended_attribute(&self, name: Vec<u8>) -> Result<Vec<u8>, Error> {
         ensure!(!self.is_deleted(), FxfsError::Deleted);
-        let handle = BasicObjectHandle::new(self.owner.clone(), self.object_id);
+        let handle = StoreObjectHandle::new(self.owner.clone(), self.object_id);
         handle.get_extended_attribute(name).await
     }
 
@@ -559,13 +559,13 @@ impl<S: HandleOwner> Directory<S> {
         mode: SetExtendedAttributeMode,
     ) -> Result<(), Error> {
         ensure!(!self.is_deleted(), FxfsError::Deleted);
-        let handle = BasicObjectHandle::new(self.owner.clone(), self.object_id);
+        let handle = StoreObjectHandle::new(self.owner.clone(), self.object_id);
         handle.set_extended_attribute(name, value, mode).await
     }
 
     pub async fn remove_extended_attribute(&self, name: Vec<u8>) -> Result<(), Error> {
         ensure!(!self.is_deleted(), FxfsError::Deleted);
-        let handle = BasicObjectHandle::new(self.owner.clone(), self.object_id);
+        let handle = StoreObjectHandle::new(self.owner.clone(), self.object_id);
         handle.remove_extended_attribute(name).await
     }
 

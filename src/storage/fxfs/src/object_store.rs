@@ -3,7 +3,6 @@
 // found in the LICENSE file.
 
 pub mod allocator;
-pub mod basic_object_handle;
 pub mod caching_object_handle;
 mod data_object_handle;
 pub mod directory;
@@ -16,6 +15,7 @@ mod merge;
 pub mod object_manager;
 mod object_record;
 pub mod project_id;
+mod store_object_handle;
 #[cfg(test)]
 mod testing;
 pub mod transaction;
@@ -24,12 +24,12 @@ mod tree_cache;
 pub mod volume;
 pub mod writeback_cache;
 
-pub use basic_object_handle::{BasicObjectHandle, SetExtendedAttributeMode};
 pub use caching_object_handle::CachingObjectHandle;
 pub use data_object_handle::{DataObjectHandle, DirectWriter};
 pub use directory::Directory;
 pub use key_manager::KeyUnwrapper;
 pub use object_record::{ChildValue, ObjectDescriptor, PosixAttributes, Timestamp};
+pub use store_object_handle::{SetExtendedAttributeMode, StoreObjectHandle};
 
 use {
     crate::{

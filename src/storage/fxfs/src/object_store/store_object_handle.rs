@@ -45,13 +45,13 @@ impl From<fio::SetExtendedAttributeMode> for SetExtendedAttributeMode {
 /// data attribute for files.
 // TODO(sdemos): extend this with extent reading and writing, right now it just handles inline
 // extended attributes.
-pub struct BasicObjectHandle<S: HandleOwner> {
+pub struct StoreObjectHandle<S: HandleOwner> {
     owner: Arc<S>,
     object_id: u64,
 }
 
-impl<S: HandleOwner> BasicObjectHandle<S> {
-    /// Make a new BasicObjectHandle for the object with id [`object_id`] in store [`owner`].
+impl<S: HandleOwner> StoreObjectHandle<S> {
+    /// Make a new StoreObjectHandle for the object with id [`object_id`] in store [`owner`].
     pub fn new(owner: Arc<S>, object_id: u64) -> Self {
         Self { owner, object_id }
     }
@@ -220,8 +220,8 @@ mod tests {
             object_handle::ObjectHandle,
             object_store::{
                 transaction::{Options, TransactionHandler},
-                BasicObjectHandle, Directory, HandleOptions, LockKey, ObjectStore,
-                SetExtendedAttributeMode,
+                Directory, HandleOptions, LockKey, ObjectStore, SetExtendedAttributeMode,
+                StoreObjectHandle,
             },
         },
         fuchsia_async as fasync,
@@ -244,7 +244,7 @@ mod tests {
     }
 
     async fn test_filesystem_and_empty_object(
-    ) -> (OpenFxFilesystem, Arc<BasicObjectHandle<ObjectStore>>) {
+    ) -> (OpenFxFilesystem, Arc<StoreObjectHandle<ObjectStore>>) {
         let fs = test_filesystem().await;
         let store = fs.root_store();
         let object;
@@ -277,7 +277,7 @@ mod tests {
 
         transaction.commit().await.expect("commit failed");
 
-        (fs, Arc::new(BasicObjectHandle::new(object.owner().clone(), object.object_id())))
+        (fs, Arc::new(StoreObjectHandle::new(object.owner().clone(), object.object_id())))
     }
 
     #[fuchsia::test(threads = 3)]
