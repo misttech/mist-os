@@ -233,6 +233,10 @@ fn run_task(current_task: &mut CurrentTask) -> Result<ExitStatus, Error> {
             }
             _ => return Err(format_err!("failed to restricted_enter: {:?} {:?}", state, status)),
         }
+
+        // Copy the register state out of the VMO.
+        restricted_state.read_state(&mut state);
+
         match reason_code {
             zx::sys::ZX_RESTRICTED_REASON_SYSCALL => {
                 trace_duration!(
@@ -240,9 +244,6 @@ fn run_task(current_task: &mut CurrentTask) -> Result<ExitStatus, Error> {
                     trace_name_run_task_loop!(),
                     trace_arg_name!() => syscall_decl.name
                 );
-
-                // Copy the register state out of the VMO.
-                restricted_state.read_state(&mut state);
 
                 // Store the new register state in the current task before dispatching the system call.
                 current_task.registers =
@@ -271,9 +272,6 @@ fn run_task(current_task: &mut CurrentTask) -> Result<ExitStatus, Error> {
                 process_completed_exception(current_task, exception_result);
             }
             zx::sys::ZX_RESTRICTED_REASON_KICK => {
-                // Copy the register state out of the VMO.
-                restricted_state.read_state(&mut state);
-
                 // Update the task's register state.
                 current_task.registers =
                     zx::sys::zx_thread_state_general_regs_t::from(&state).into();
