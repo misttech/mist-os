@@ -23,6 +23,7 @@ pub fn sys_socket(
     let flags = socket_type & (SOCK_NONBLOCK | SOCK_CLOEXEC);
     let domain = parse_socket_domain(domain)?;
     let socket_type = parse_socket_type(domain, socket_type)?;
+    // Should we use parse_socket_protocol here?
     let protocol = SocketProtocol::from_raw(protocol);
     let open_flags = socket_flags_to_open_flags(flags);
     let socket_file = new_socket_file(current_task, domain, socket_type, open_flags, protocol)?;
@@ -63,6 +64,28 @@ fn parse_socket_type(domain: SocketDomain, socket_type: u32) -> Result<SocketTyp
     } else {
         socket_type
     })
+}
+
+fn parse_socket_protocol(
+    domain: SocketDomain,
+    socket_type: SocketType,
+    protocol: u32,
+) -> Result<SocketProtocol, Errno> {
+    let protocol = SocketProtocol::from_raw(protocol);
+    if domain == SocketDomain::Inet {
+        match (socket_type, protocol) {
+            (SocketType::Raw, _) => {
+                // Should we have different behavior error when called by root?
+                return error!(EPROTONOSUPPORT);
+            }
+            (SocketType::Datagram, SocketProtocol::UDP) => (),
+            (SocketType::Datagram, _) => return error!(EPROTONOSUPPORT),
+            (SocketType::Stream, SocketProtocol::TCP) => (),
+            (SocketType::Stream, _) => return error!(EPROTONOSUPPORT),
+            _ => (),
+        }
+    }
+    Ok(protocol)
 }
 
 fn parse_socket_address(
@@ -342,15 +365,19 @@ pub fn sys_socketpair(
     current_task: &CurrentTask,
     domain: u32,
     socket_type: u32,
-    _protocol: u32,
+    protocol: u32,
     user_sockets: UserRef<[FdNumber; 2]>,
 ) -> Result<(), Errno> {
     let flags = socket_type & (SOCK_NONBLOCK | SOCK_CLOEXEC);
     let domain = parse_socket_domain(domain)?;
-    if domain != SocketDomain::Unix {
+    if !matches!(domain, SocketDomain::Unix | SocketDomain::Inet) {
         return error!(EAFNOSUPPORT);
     }
     let socket_type = parse_socket_type(domain, socket_type)?;
+    let _protocol = parse_socket_protocol(domain, socket_type, protocol)?;
+    if domain != SocketDomain::Unix {
+        return error!(EOPNOTSUPP);
+    }
     let open_flags = socket_flags_to_open_flags(flags);
 
     let (left, right) = UnixSocket::new_pair(current_task, domain, socket_type, open_flags)?;
@@ -772,7 +799,7 @@ mod tests {
                 0,
                 UserRef::new(UserAddress::default())
             ),
-            error!(EAFNOSUPPORT)
+            error!(EPROTONOSUPPORT)
         );
         assert_eq!(
             sys_socketpair(

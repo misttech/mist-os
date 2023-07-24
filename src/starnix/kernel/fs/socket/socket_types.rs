@@ -124,10 +124,13 @@ impl SocketType {
     }
 }
 
-#[derive(Default, Debug, Copy, Clone)]
+#[derive(Default, Debug, Copy, Clone, PartialEq, Eq)]
 pub struct SocketProtocol(u32);
 
 impl SocketProtocol {
+    pub const UDP: SocketProtocol = SocketProtocol(uapi::IPPROTO_UDP);
+    pub const TCP: SocketProtocol = SocketProtocol(uapi::IPPROTO_TCP);
+
     pub fn from_raw(protocol: u32) -> Self {
         SocketProtocol(protocol)
     }

@@ -287,7 +287,6 @@
                 // Two skipped test cases for select variants that do not exist in 64 bit.
                 "select01",
                 "select02",
-
                 "send01",
                 "send02",
                 "sendfile02",
@@ -326,7 +325,6 @@
                 "socketcall01",
                 "socketcall02",
                 "socketcall03",
-                "socketpair01",
                 "sockioctl01",
                 "ssetmask01",
                 "stat04",
