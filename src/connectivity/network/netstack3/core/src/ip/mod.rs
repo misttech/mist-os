@@ -2922,12 +2922,11 @@ pub(crate) mod testutil {
         }
     }
 
-    impl<Outer, S: AsRef<FakeIpDeviceIdCtx<D>>, Meta, D: FakeStrongDeviceId + 'static>
-        DeviceIdContext<AnyDevice>
-        for crate::context::testutil::WrappedFakeSyncCtx<Outer, S, Meta, D>
+    impl<Outer, Inner: DeviceIdContext<AnyDevice>> DeviceIdContext<AnyDevice>
+        for crate::context::testutil::Wrapped<Outer, Inner>
     {
-        type DeviceId = D;
-        type WeakDeviceId = D::Weak;
+        type DeviceId = Inner::DeviceId;
+        type WeakDeviceId = Inner::WeakDeviceId;
 
         fn downgrade_device_id(&self, device_id: &Self::DeviceId) -> Self::WeakDeviceId {
             self.inner.downgrade_device_id(device_id)

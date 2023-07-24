@@ -1389,12 +1389,15 @@ pub mod testutil {
     }
 
     #[cfg(test)]
-    #[derive(Derivative)]
-    #[derivative(Default(bound = "Outer: Default, S: Default"))]
-    pub(crate) struct WrappedFakeSyncCtx<Outer, S, Meta, DeviceId> {
-        pub(crate) inner: FakeSyncCtx<S, Meta, DeviceId>,
+    #[derive(Default)]
+    pub(crate) struct Wrapped<Outer, Inner> {
+        pub(crate) inner: Inner,
         pub(crate) outer: Outer,
     }
+
+    #[cfg(test)]
+    pub(crate) type WrappedFakeSyncCtx<Outer, S, Meta, DeviceId> =
+        Wrapped<Outer, FakeSyncCtx<S, Meta, DeviceId>>;
 
     #[cfg(test)]
     impl<Outer, S, Meta, DeviceId> WrappedFakeSyncCtx<Outer, S, Meta, DeviceId> {
@@ -1404,20 +1407,16 @@ pub mod testutil {
     }
 
     #[cfg(test)]
-    impl<Outer, S, Meta, DeviceId> AsRef<FakeSyncCtx<S, Meta, DeviceId>>
-        for WrappedFakeSyncCtx<Outer, S, Meta, DeviceId>
-    {
-        fn as_ref(&self) -> &FakeSyncCtx<S, Meta, DeviceId> {
-            &self.inner
+    impl<Outer, T, Inner: AsRef<T>> AsRef<T> for Wrapped<Outer, Inner> {
+        fn as_ref(&self) -> &T {
+            self.inner.as_ref()
         }
     }
 
     #[cfg(test)]
-    impl<Outer, S, Meta, DeviceId> AsMut<FakeSyncCtx<S, Meta, DeviceId>>
-        for WrappedFakeSyncCtx<Outer, S, Meta, DeviceId>
-    {
-        fn as_mut(&mut self) -> &mut FakeSyncCtx<S, Meta, DeviceId> {
-            &mut self.inner
+    impl<Outer, T, Inner: AsMut<T>> AsMut<T> for Wrapped<Outer, Inner> {
+        fn as_mut(&mut self) -> &mut T {
+            self.inner.as_mut()
         }
     }
 
@@ -1506,23 +1505,14 @@ pub mod testutil {
     }
 
     #[cfg(test)]
-    impl<Outer, S, Meta, DeviceId> AsMut<FakeFrameCtx<Meta>>
-        for WrappedFakeSyncCtx<Outer, S, Meta, DeviceId>
-    {
-        fn as_mut(&mut self) -> &mut FakeFrameCtx<Meta> {
-            &mut self.inner.frames
-        }
-    }
-
-    #[cfg(test)]
-    impl<Outer, S, Meta, DeviceId> WithFakeFrameContext<Meta>
-        for WrappedFakeSyncCtx<Outer, S, Meta, DeviceId>
+    impl<Outer, Inner: WithFakeFrameContext<Meta>, Meta> WithFakeFrameContext<Meta>
+        for Wrapped<Outer, Inner>
     {
         fn with_fake_frame_ctx_mut<O, F: FnOnce(&mut FakeFrameCtx<Meta>) -> O>(
             &mut self,
             f: F,
         ) -> O {
-            f(&mut self.inner.frames)
+            self.inner.with_fake_frame_ctx_mut(f)
         }
     }
 
