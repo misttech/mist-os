@@ -161,12 +161,21 @@ int HidButtonsDevice::Thread() {
           continue;
         }
 
-        uint8_t val;
-        gpio_read(&gpios_[i].gpio, &val);
-        if (!!val != debounce_states_[i].value) {
+        fidl::WireResult read_result = gpios_[i].client->Read();
+        if (!read_result.ok()) {
+          zxlogf(ERROR, "Failed to send Read request to gpio %lu: %s", i,
+                 read_result.status_string());
+          return read_result.status();
+        }
+        if (read_result->is_error()) {
+          zxlogf(ERROR, "Failed to read gpio %lu: %s", i,
+                 zx_status_get_string(read_result->error_value()));
+          return read_result->error_value();
+        }
+        if (!!read_result.value()->value != debounce_states_[i].value) {
           Notify(i);
         }
-        debounce_states_[i].value = val;
+        debounce_states_[i].value = read_result.value()->value;
       }
 
       poll_timer_.set(zx::deadline_after(poll_period_), zx::duration(0));
@@ -218,15 +227,47 @@ zx_status_t HidButtonsDevice::HidbusGetDescriptor(hid_description_type_t desc_ty
 
 // Requires interrupts to be disabled for all rows/cols.
 bool HidButtonsDevice::MatrixScan(uint32_t row, uint32_t col, zx_duration_t delay) {
-  gpio_config_in(&gpios_[col].gpio, GPIO_NO_PULL);  // Float column to find row in use.
+  auto& gpio_col = gpios_[col];
+  {
+    fidl::WireResult result = gpio_col.client->ConfigIn(
+        fuchsia_hardware_gpio::GpioFlags::kNoPull);  // Float column to find row in use.
+    if (!result.ok()) {
+      zxlogf(ERROR, "Failed to send ConfigIn request to gpio %u: %s", col, result.status_string());
+      return result.status();
+    }
+    if (result->is_error()) {
+      zxlogf(ERROR, "Failed to configuire gpio %u to input: %s", col,
+             zx_status_get_string(result->error_value()));
+      return result->error_value();
+    }
+  }
   zx::nanosleep(zx::deadline_after(zx::duration(delay)));
 
-  uint8_t val;
-  gpio_read(&gpios_[row].gpio, &val);
+  fidl::WireResult read_result = gpios_[row].client->Read();
+  if (!read_result.ok()) {
+    zxlogf(ERROR, "Failed to send Read request to gpio %u: %s", row, read_result.status_string());
+    return read_result.status();
+  }
+  if (read_result->is_error()) {
+    zxlogf(ERROR, "Failed to read gpio %u: %s", row,
+           zx_status_get_string(read_result->error_value()));
+    return read_result->error_value();
+  }
 
-  gpio_config_out(&gpios_[col].gpio, gpios_[col].config.matrix.output_value);
-  zxlogf(DEBUG, "row %u col %u val %u", row, col, val);
-  return static_cast<bool>(val);
+  {
+    fidl::WireResult result = gpio_col.client->ConfigOut(gpio_col.config.matrix.output_value);
+    if (!result.ok()) {
+      zxlogf(ERROR, "Failed to send ConfigOut request to gpio %u: %s", col, result.status_string());
+      return result.status();
+    }
+    if (result->is_error()) {
+      zxlogf(ERROR, "Failed to configuire gpio %u to output: %s", col,
+             zx_status_get_string(result->error_value()));
+      return result->error_value();
+    }
+  }
+  zxlogf(DEBUG, "row %u col %u val %u", row, col, read_result.value()->value);
+  return static_cast<bool>(read_result.value()->value);
 }
 
 zx_status_t HidButtonsDevice::HidbusGetReport(uint8_t rpt_type, uint8_t rpt_id, uint8_t* data,
@@ -250,10 +291,21 @@ zx_status_t HidButtonsDevice::HidbusGetReport(uint8_t rpt_type, uint8_t rpt_id, 
     if (buttons_[i].type == BUTTONS_TYPE_MATRIX) {
       new_value = MatrixScan(buttons_[i].gpioA_idx, buttons_[i].gpioB_idx, buttons_[i].gpio_delay);
     } else if (buttons_[i].type == BUTTONS_TYPE_DIRECT) {
-      uint8_t val;
-      gpio_read(&gpios_[buttons_[i].gpioA_idx].gpio, &val);
-      zxlogf(DEBUG, "GPIO direct read %u for button %lu", val, i);
-      new_value = val;
+      auto gpio_index = buttons_[i].gpioA_idx;
+      fidl::WireResult read_result = gpios_[gpio_index].client->Read();
+      if (!read_result.ok()) {
+        zxlogf(ERROR, "Failed to send Read request to gpio %u: %s", gpio_index,
+               read_result.status_string());
+        return read_result.status();
+      }
+      if (read_result->is_error()) {
+        zxlogf(ERROR, "Failed to read gpio %u: %s", gpio_index,
+               zx_status_get_string(read_result->error_value()));
+        return read_result->error_value();
+      }
+
+      new_value = read_result.value()->value;
+      zxlogf(DEBUG, "GPIO direct read %u for button %lu", new_value, i);
     } else {
       zxlogf(ERROR, "unknown button type %u", buttons_[i].type);
       return ZX_ERR_INTERNAL;
@@ -292,11 +344,50 @@ zx_status_t HidButtonsDevice::HidbusSetProtocol(uint8_t protocol) { return ZX_OK
 uint8_t HidButtonsDevice::ReconfigurePolarity(uint32_t idx, uint64_t int_port) {
   zxlogf(DEBUG, "gpio %u port %lu", idx, int_port);
   uint8_t current = 0, old;
-  gpio_read(&gpios_[idx].gpio, &current);
+  auto& gpio = gpios_[idx];
+
+  fidl::WireResult read_result1 = gpio.client->Read();
+  if (!read_result1.ok()) {
+    zxlogf(ERROR, "Failed to send Read request to gpio %u: %s", idx, read_result1.status_string());
+    return read_result1.status();
+  }
+  if (read_result1->is_error()) {
+    zxlogf(ERROR, "Failed to read gpio %u: %s", idx,
+           zx_status_get_string(read_result1->error_value()));
+    return read_result1->error_value();
+  }
+  current = read_result1.value()->value;
+
   do {
-    gpio_set_polarity(&gpios_[idx].gpio, current ? GPIO_POLARITY_LOW : GPIO_POLARITY_HIGH);
+    {
+      fidl::WireResult result =
+          gpio.client->SetPolarity(current ? fuchsia_hardware_gpio::GpioPolarity::kLow
+                                           : fuchsia_hardware_gpio::GpioPolarity::kHigh);
+      if (!result.ok()) {
+        zxlogf(ERROR, "Failed to send SetPolarity request to gpio %u: %s", idx,
+               result.status_string());
+        return result.status();
+      }
+      if (result->is_error()) {
+        zxlogf(ERROR, "Failed to set polarity of gpio %u: %s", idx,
+               zx_status_get_string(result->error_value()));
+        return result->error_value();
+      }
+    }
+
     old = current;
-    gpio_read(&gpios_[idx].gpio, &current);
+    fidl::WireResult read_result2 = gpio.client->Read();
+    if (!read_result2.ok()) {
+      zxlogf(ERROR, "Failed to send Read request to gpio %u: %s", idx,
+             read_result2.status_string());
+      return read_result2.status();
+    }
+    if (read_result2->is_error()) {
+      zxlogf(ERROR, "Failed to read gpio %u: %s", idx,
+             zx_status_get_string(read_result2->error_value()));
+      return read_result2->error_value();
+    }
+    current = read_result2.value()->value;
     zxlogf(TRACE, "old gpio %u new gpio %u", old, current);
     // If current switches after setup, we setup a new trigger for it (opposite edge).
   } while (current != old);
@@ -307,16 +398,49 @@ zx_status_t HidButtonsDevice::ConfigureInterrupt(uint32_t idx, uint64_t int_port
   zxlogf(DEBUG, "gpio %u port %lu", idx, int_port);
   zx_status_t status;
   uint8_t current = 0;
-  gpio_read(&gpios_[idx].gpio, &current);
-  gpio_release_interrupt(&gpios_[idx].gpio);
-  // We setup a trigger for the opposite of the current GPIO value.
-  status = gpio_get_interrupt(&gpios_[idx].gpio,
-                              current ? ZX_INTERRUPT_MODE_EDGE_LOW : ZX_INTERRUPT_MODE_EDGE_HIGH,
-                              gpios_[idx].irq.reset_and_get_address());
-  if (status != ZX_OK) {
-    zxlogf(ERROR, "gpio_get_interrupt failed %d", status);
-    return status;
+  auto& gpio = gpios_[idx];
+
+  fidl::WireResult read_result = gpio.client->Read();
+  if (!read_result.ok()) {
+    zxlogf(ERROR, "Failed to send Read request to gpio %u: %s", idx, read_result.status_string());
+    return read_result.status();
   }
+  if (read_result->is_error()) {
+    zxlogf(ERROR, "Failed to read gpio %u: %s", idx,
+           zx_status_get_string(read_result->error_value()));
+    return read_result->error_value();
+  }
+  current = read_result.value()->value;
+
+  {
+    fidl::WireResult result = gpio.client->ReleaseInterrupt();
+    if (!result.ok()) {
+      zxlogf(ERROR, "Failed to send ReleaseInterrupt request to gpio %u: %s", idx,
+             result.status_string());
+      return result.status();
+    }
+    if (result->is_error() && result->error_value() != ZX_ERR_NOT_FOUND) {
+      zxlogf(ERROR, "Failed to release interrupt for gpio %u: %s", idx,
+             zx_status_get_string(result->error_value()));
+      return result->error_value();
+    }
+  }
+
+  // We setup a trigger for the opposite of the current GPIO value.
+  fidl::WireResult interrupt_result =
+      gpio.client->GetInterrupt(current ? ZX_INTERRUPT_MODE_EDGE_LOW : ZX_INTERRUPT_MODE_EDGE_HIGH);
+  if (!interrupt_result.ok()) {
+    zxlogf(ERROR, "Failed to send GetInterrupt request to gpio %u: %s", idx,
+           interrupt_result.status_string());
+    return interrupt_result.status();
+  }
+  if (interrupt_result->is_error()) {
+    zxlogf(ERROR, "Failed to get interrupt for gpio %u: %s", idx,
+           zx_status_get_string(interrupt_result->error_value()));
+    return interrupt_result->error_value();
+  }
+  gpio.irq = std::move(interrupt_result.value()->irq);
+
   status = gpios_[idx].irq.bind(port_, int_port, 0);
   if (status != ZX_OK) {
     zxlogf(ERROR, "zx_interrupt_bind failed %d", status);
@@ -410,31 +534,58 @@ zx_status_t HidButtonsDevice::Bind(fbl::Array<Gpio> gpios,
 
   // Setup.
   for (uint32_t i = 0; i < gpios_.size(); ++i) {
-    status = gpio_set_alt_function(&gpios_[i].gpio, 0);  // 0 means function GPIO.
-    if (status != ZX_OK) {
-      zxlogf(ERROR, "gpio_set_alt_function failed %d", status);
-      return ZX_ERR_NOT_SUPPORTED;
-    }
-    if (gpios_[i].config.type == BUTTONS_GPIO_TYPE_MATRIX_OUTPUT) {
-      status = gpio_config_out(&gpios_[i].gpio, gpios_[i].config.matrix.output_value);
-      if (status != ZX_OK) {
-        zxlogf(ERROR, "gpio_config_out failed %d", status);
+    auto& gpio = gpios_[i];
+    {
+      fidl::WireResult result = gpio.client->SetAltFunction(0);  // 0 means function GPIO.
+      if (!result.ok()) {
+        zxlogf(ERROR, "Failed to send SetAltFunction request to gpio %u: %s", i,
+               result.status_string());
+        return result.status();
+      }
+      if (result->is_error()) {
+        zxlogf(ERROR, "Failed to set alt function for gpio %u: %s", i,
+               zx_status_get_string(result->error_value()));
         return ZX_ERR_NOT_SUPPORTED;
       }
-    } else if (gpios_[i].config.type == BUTTONS_GPIO_TYPE_INTERRUPT) {
-      status = gpio_config_in(&gpios_[i].gpio, gpios_[i].config.interrupt.internal_pull);
-      if (status != ZX_OK) {
-        zxlogf(ERROR, "gpio_config_in failed %d", status);
+    }
+
+    if (gpio.config.type == BUTTONS_GPIO_TYPE_MATRIX_OUTPUT) {
+      fidl::WireResult result = gpio.client->ConfigOut(gpio.config.matrix.output_value);
+      if (!result.ok()) {
+        zxlogf(ERROR, "Failed to send ConfigOut request to gpio %u: %s", i, result.status_string());
+        return result.status();
+      }
+      if (result->is_error()) {
+        zxlogf(ERROR, "Failed to configure gpio %u to output: %s", i,
+               zx_status_get_string(result->error_value()));
+        return ZX_ERR_NOT_SUPPORTED;
+      }
+    } else if (gpio.config.type == BUTTONS_GPIO_TYPE_INTERRUPT) {
+      fidl::WireResult result = gpio.client->ConfigIn(
+          static_cast<fuchsia_hardware_gpio::GpioFlags>(gpio.config.interrupt.internal_pull));
+      if (!result.ok()) {
+        zxlogf(ERROR, "Failed to send ConfigIn request to gpio %u: %s", i, result.status_string());
+        return result.status();
+      }
+      if (result->is_error()) {
+        zxlogf(ERROR, "Failed to configure gpio %u to input: %s", i,
+               zx_status_get_string(result->error_value()));
         return ZX_ERR_NOT_SUPPORTED;
       }
       status = ConfigureInterrupt(i, kPortKeyInterruptStart + i);
       if (status != ZX_OK) {
         return status;
       }
-    } else if (gpios_[i].config.type == BUTTONS_GPIO_TYPE_POLL) {
-      status = gpio_config_in(&gpios_[i].gpio, gpios_[i].config.poll.internal_pull);
-      if (status != ZX_OK) {
-        zxlogf(ERROR, "gpio_config_in failed %d", status);
+    } else if (gpio.config.type == BUTTONS_GPIO_TYPE_POLL) {
+      fidl::WireResult result = gpio.client->ConfigIn(
+          static_cast<fuchsia_hardware_gpio::GpioFlags>(gpio.config.interrupt.internal_pull));
+      if (!result.ok()) {
+        zxlogf(ERROR, "Failed to send ConfigIn request to gpio %u: %s", i, result.status_string());
+        return result.status();
+      }
+      if (result->is_error()) {
+        zxlogf(ERROR, "Failed to configure gpio %u to input: %s", i,
+               zx_status_get_string(result->error_value()));
         return ZX_ERR_NOT_SUPPORTED;
       }
     }
@@ -553,12 +704,15 @@ static zx_status_t hid_buttons_bind(void* ctx, zx_device_t* parent) {
       default:
         return ZX_ERR_NOT_SUPPORTED;
     };
-    zx_status_t status =
-        device_get_fragment_protocol(parent, name, ZX_PROTOCOL_GPIO, &gpios[i].gpio);
-    if (status != ZX_OK) {
-      zxlogf(ERROR, "Could not get protocol");
+    zx::result gpio_client =
+        ddk::Device<void>::DdkConnectFragmentFidlProtocol<fuchsia_hardware_gpio::Service::Device>(
+            parent, name);
+    if (gpio_client.is_error()) {
+      zxlogf(ERROR, "Failed to get gpio protocol from fragment %s: %s", name,
+             gpio_client.status_string());
       return ZX_ERR_INTERNAL;
     }
+    gpios[i].client.Bind(std::move(gpio_client.value()));
     gpios[i].config = configs.value()[i];
   }
 
@@ -571,9 +725,19 @@ static zx_status_t hid_buttons_bind(void* ctx, zx_device_t* parent) {
 }
 
 bool HidButtonsDevice::GetState(ButtonType type) {
-  uint8_t val;
-  gpio_read(&gpios_[buttons_[button_map_[type]].gpioA_idx].gpio, &val);
-  return static_cast<bool>(val);
+  auto gpio_index = buttons_[button_map_[type]].gpioA_idx;
+  auto& gpio = gpios_[gpio_index];
+  fidl::WireResult result = gpio.client->Read();
+  if (!result.ok()) {
+    zxlogf(ERROR, "Failed to send Read request to gpio %u: %s", gpio_index, result.status_string());
+    return result.status();
+  }
+  if (result->is_error()) {
+    zxlogf(ERROR, "Failed to read gpio %u: %s", gpio_index,
+           zx_status_get_string(result->error_value()));
+    return result->error_value();
+  }
+  return static_cast<bool>(result.value()->value);
 }
 
 zx_status_t HidButtonsDevice::RegisterNotify(uint8_t types, ButtonsNotifyInterface* notify) {

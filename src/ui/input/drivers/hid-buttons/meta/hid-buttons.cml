@@ -15,5 +15,7 @@
         default_dispatcher_opts: [ "allow_sync_calls" ],
         fallback: "false",
     },
-    use: [],
+    use: [
+        { service: "fuchsia.hardware.gpio.Service" },
+    ],
 }

@@ -41,12 +41,13 @@ static const device_metadata_t available_buttons_metadata[] = {
 
 zx_status_t Buckeye::ButtonsInit() {
   const ddk::BindRule kMicPrivacyRules[] = {
-      ddk::MakeAcceptBindRule(bind_fuchsia::PROTOCOL,
-                              bind_fuchsia_hardware_gpio::BIND_PROTOCOL_DEVICE),
+      ddk::MakeAcceptBindRule(bind_fuchsia::FIDL_PROTOCOL,
+                              bind_fuchsia_hardware_gpio::BIND_FIDL_PROTOCOL_SERVICE),
       ddk::MakeAcceptBindRule(bind_fuchsia::GPIO_PIN,
                               bind_fuchsia_amlogic_platform_a5::GPIOD_PIN_ID_PIN_3)};
   const device_bind_prop_t kMicPrivacyProps[] = {
-      ddk::MakeProperty(bind_fuchsia::PROTOCOL, bind_fuchsia_hardware_gpio::BIND_PROTOCOL_DEVICE),
+      ddk::MakeProperty(bind_fuchsia::FIDL_PROTOCOL,
+                        bind_fuchsia_hardware_gpio::BIND_FIDL_PROTOCOL_SERVICE),
       ddk::MakeProperty(bind_fuchsia_hardware_gpio::FUNCTION,
                         bind_fuchsia_hardware_gpio::FUNCTION_MIC_MUTE),
   };

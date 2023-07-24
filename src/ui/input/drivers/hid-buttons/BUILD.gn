@@ -44,9 +44,9 @@ source_set("common") {
 
   public_deps = [
     ":hid-buttons-bind",
-    "//sdk/banjo/fuchsia.hardware.gpio:fuchsia.hardware.gpio_banjo_cpp",
     "//sdk/banjo/fuchsia.hardware.hidbus:fuchsia.hardware.hidbus_banjo_cpp",
     "//sdk/fidl/fuchsia.buttons:fuchsia.buttons_cpp_wire",
+    "//sdk/fidl/fuchsia.hardware.gpio:fuchsia.hardware.gpio_cpp_wire",
     "//src/devices/lib/driver",
     "//src/lib/ddk",
     "//src/lib/ddk:ddk-metadata-headers",
@@ -71,8 +71,10 @@ test("hid-buttons-test") {
   sources = [ "hid-buttons-test.cc" ]
   deps = [
     ":common",
-    "//sdk/banjo/fuchsia.hardware.gpio:fuchsia.hardware.gpio_banjo_cpp_mock",
+    "//sdk/lib/async_patterns/testing/cpp",
+    "//src/devices/gpio/testing/fake-gpio",
     "//src/devices/testing/mock-ddk",
+    "//zircon/system/ulib/async-loop:async-loop-cpp",
     "//zircon/system/ulib/mock-function",
     "//zircon/system/ulib/zxtest",
   ]

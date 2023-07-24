@@ -6,7 +6,7 @@
 #define SRC_UI_INPUT_DRIVERS_HID_BUTTONS_HID_BUTTONS_H_
 
 #include <fidl/fuchsia.buttons/cpp/wire.h>
-#include <fuchsia/hardware/gpio/c/banjo.h>
+#include <fidl/fuchsia.hardware.gpio/cpp/wire.h>
 #include <fuchsia/hardware/hidbus/cpp/banjo.h>
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async-loop/default.h>
@@ -60,7 +60,7 @@ using ButtonType = fuchsia_buttons::wire::ButtonType;
 class HidButtonsDevice : public DeviceType {
  public:
   struct Gpio {
-    gpio_protocol_t gpio;
+    fidl::WireSyncClient<fuchsia_hardware_gpio::Gpio> client;
     zx::interrupt irq;
     buttons_gpio_config_t config;
   };

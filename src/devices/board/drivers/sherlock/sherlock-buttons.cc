@@ -52,45 +52,49 @@ static const device_metadata_t available_buttons_metadata[] = {
 
 zx_status_t Sherlock::ButtonsInit() {
   const ddk::BindRule kVolUpRules[] = {
-      ddk::MakeAcceptBindRule(bind_fuchsia::PROTOCOL,
-                              bind_fuchsia_hardware_gpio::BIND_PROTOCOL_DEVICE),
+      ddk::MakeAcceptBindRule(bind_fuchsia::FIDL_PROTOCOL,
+                              bind_fuchsia_hardware_gpio::BIND_FIDL_PROTOCOL_SERVICE),
       ddk::MakeAcceptBindRule(bind_fuchsia::GPIO_PIN,
                               bind_fuchsia_amlogic_platform_t931::GPIOZ_PIN_ID_PIN_4)};
   const device_bind_prop_t kVolUpProps[] = {
-      ddk::MakeProperty(bind_fuchsia::PROTOCOL, bind_fuchsia_hardware_gpio::BIND_PROTOCOL_DEVICE),
+      ddk::MakeProperty(bind_fuchsia::FIDL_PROTOCOL,
+                        bind_fuchsia_hardware_gpio::BIND_FIDL_PROTOCOL_SERVICE),
       ddk::MakeProperty(bind_fuchsia_hardware_gpio::FUNCTION,
                         bind_fuchsia_hardware_gpio::FUNCTION_VOLUME_UP),
   };
 
   const ddk::BindRule kVolDownRules[] = {
-      ddk::MakeAcceptBindRule(bind_fuchsia::PROTOCOL,
-                              bind_fuchsia_hardware_gpio::BIND_PROTOCOL_DEVICE),
+      ddk::MakeAcceptBindRule(bind_fuchsia::FIDL_PROTOCOL,
+                              bind_fuchsia_hardware_gpio::BIND_FIDL_PROTOCOL_SERVICE),
       ddk::MakeAcceptBindRule(bind_fuchsia::GPIO_PIN,
                               bind_fuchsia_amlogic_platform_t931::GPIOZ_PIN_ID_PIN_5)};
   const device_bind_prop_t kVolDownProps[] = {
-      ddk::MakeProperty(bind_fuchsia::PROTOCOL, bind_fuchsia_hardware_gpio::BIND_PROTOCOL_DEVICE),
+      ddk::MakeProperty(bind_fuchsia::FIDL_PROTOCOL,
+                        bind_fuchsia_hardware_gpio::BIND_FIDL_PROTOCOL_SERVICE),
       ddk::MakeProperty(bind_fuchsia_hardware_gpio::FUNCTION,
                         bind_fuchsia_hardware_gpio::FUNCTION_VOLUME_DOWN),
   };
 
   const ddk::BindRule kVolBothRules[] = {
-      ddk::MakeAcceptBindRule(bind_fuchsia::PROTOCOL,
-                              bind_fuchsia_hardware_gpio::BIND_PROTOCOL_DEVICE),
+      ddk::MakeAcceptBindRule(bind_fuchsia::FIDL_PROTOCOL,
+                              bind_fuchsia_hardware_gpio::BIND_FIDL_PROTOCOL_SERVICE),
       ddk::MakeAcceptBindRule(bind_fuchsia::GPIO_PIN,
                               bind_fuchsia_amlogic_platform_t931::GPIOZ_PIN_ID_PIN_13)};
   const device_bind_prop_t kVolBothProps[] = {
-      ddk::MakeProperty(bind_fuchsia::PROTOCOL, bind_fuchsia_hardware_gpio::BIND_PROTOCOL_DEVICE),
+      ddk::MakeProperty(bind_fuchsia::FIDL_PROTOCOL,
+                        bind_fuchsia_hardware_gpio::BIND_FIDL_PROTOCOL_SERVICE),
       ddk::MakeProperty(bind_fuchsia_hardware_gpio::FUNCTION,
                         bind_fuchsia_hardware_gpio::FUNCTION_VOLUME_BOTH),
   };
 
   const ddk::BindRule kMicPrivacyRules[] = {
-      ddk::MakeAcceptBindRule(bind_fuchsia::PROTOCOL,
-                              bind_fuchsia_hardware_gpio::BIND_PROTOCOL_DEVICE),
+      ddk::MakeAcceptBindRule(bind_fuchsia::FIDL_PROTOCOL,
+                              bind_fuchsia_hardware_gpio::BIND_FIDL_PROTOCOL_SERVICE),
       ddk::MakeAcceptBindRule(bind_fuchsia::GPIO_PIN,
                               bind_fuchsia_amlogic_platform_t931::GPIOH_PIN_ID_PIN_3)};
   const device_bind_prop_t kMicPrivacyProps[] = {
-      ddk::MakeProperty(bind_fuchsia::PROTOCOL, bind_fuchsia_hardware_gpio::BIND_PROTOCOL_DEVICE),
+      ddk::MakeProperty(bind_fuchsia::FIDL_PROTOCOL,
+                        bind_fuchsia_hardware_gpio::BIND_FIDL_PROTOCOL_SERVICE),
       ddk::MakeProperty(bind_fuchsia_hardware_gpio::FUNCTION,
                         bind_fuchsia_hardware_gpio::FUNCTION_MIC_MUTE),
   };
