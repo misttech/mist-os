@@ -4,7 +4,7 @@
 
 //! A collection of types that represent the various parts of socket addresses.
 
-use core::{convert::Infallible as Never, marker::PhantomData, num::NonZeroU16};
+use core::num::NonZeroU16;
 
 use derivative::Derivative;
 use net_types::{
@@ -12,10 +12,7 @@ use net_types::{
     SpecifiedAddr,
 };
 
-use crate::{
-    ip::IpExt,
-    socket::{AddrVec, SocketMapAddrSpec},
-};
+use crate::socket::{AddrVec, SocketMapAddrSpec};
 
 /// The IP address and identifier (port) of a listening socket.
 #[derive(Copy, Clone, Debug, Eq, Hash, PartialEq)]
@@ -49,41 +46,41 @@ pub(crate) struct ConnAddr<A: IpAddress, D, LI, RI> {
 
 /// Uninstantiable type used to implement [`SocketMapAddrSpec`] for addresses
 /// with IP addresses and 16-bit local and remote port identifiers.
-pub(crate) struct IpPortSpec<I>(PhantomData<I>, Never);
+pub(crate) enum IpPortSpec {}
 
-impl<I: Ip + IpExt> SocketMapAddrSpec for IpPortSpec<I> {
-    type IpVersion = I;
-    type IpAddr = I::Addr;
+impl SocketMapAddrSpec for IpPortSpec {
     type RemoteIdentifier = NonZeroU16;
     type LocalIdentifier = NonZeroU16;
 }
 
-impl<A: SocketMapAddrSpec> From<ListenerIpAddr<A::IpAddr, A::LocalIdentifier>> for IpAddrVec<A> {
-    fn from(listener: ListenerIpAddr<A::IpAddr, A::LocalIdentifier>) -> Self {
+impl<I: Ip, A: SocketMapAddrSpec> From<ListenerIpAddr<I::Addr, A::LocalIdentifier>>
+    for IpAddrVec<I, A>
+{
+    fn from(listener: ListenerIpAddr<I::Addr, A::LocalIdentifier>) -> Self {
         IpAddrVec::Listener(listener)
     }
 }
 
-impl<A: SocketMapAddrSpec> From<ConnIpAddr<A::IpAddr, A::LocalIdentifier, A::RemoteIdentifier>>
-    for IpAddrVec<A>
+impl<I: Ip, A: SocketMapAddrSpec> From<ConnIpAddr<I::Addr, A::LocalIdentifier, A::RemoteIdentifier>>
+    for IpAddrVec<I, A>
 {
-    fn from(conn: ConnIpAddr<A::IpAddr, A::LocalIdentifier, A::RemoteIdentifier>) -> Self {
+    fn from(conn: ConnIpAddr<I::Addr, A::LocalIdentifier, A::RemoteIdentifier>) -> Self {
         IpAddrVec::Connected(conn)
     }
 }
 
-impl<D, A: SocketMapAddrSpec> From<ListenerAddr<A::IpAddr, D, A::LocalIdentifier>>
-    for AddrVec<D, A>
+impl<I: Ip, D, A: SocketMapAddrSpec> From<ListenerAddr<I::Addr, D, A::LocalIdentifier>>
+    for AddrVec<I, D, A>
 {
-    fn from(listener: ListenerAddr<A::IpAddr, D, A::LocalIdentifier>) -> Self {
+    fn from(listener: ListenerAddr<I::Addr, D, A::LocalIdentifier>) -> Self {
         AddrVec::Listen(listener)
     }
 }
 
-impl<D, A: SocketMapAddrSpec> From<ConnAddr<A::IpAddr, D, A::LocalIdentifier, A::RemoteIdentifier>>
-    for AddrVec<D, A>
+impl<I: Ip, D, A: SocketMapAddrSpec>
+    From<ConnAddr<I::Addr, D, A::LocalIdentifier, A::RemoteIdentifier>> for AddrVec<I, D, A>
 {
-    fn from(conn: ConnAddr<A::IpAddr, D, A::LocalIdentifier, A::RemoteIdentifier>) -> Self {
+    fn from(conn: ConnAddr<I::Addr, D, A::LocalIdentifier, A::RemoteIdentifier>) -> Self {
         AddrVec::Conn(conn)
     }
 }
@@ -98,13 +95,13 @@ impl<D, A: SocketMapAddrSpec> From<ConnAddr<A::IpAddr, D, A::LocalIdentifier, A:
     PartialEq(bound = ""),
     Hash(bound = "")
 )]
-pub(crate) enum IpAddrVec<A: SocketMapAddrSpec> {
-    Listener(ListenerIpAddr<A::IpAddr, A::LocalIdentifier>),
-    Connected(ConnIpAddr<A::IpAddr, A::LocalIdentifier, A::RemoteIdentifier>),
+pub(crate) enum IpAddrVec<I: Ip, A: SocketMapAddrSpec> {
+    Listener(ListenerIpAddr<I::Addr, A::LocalIdentifier>),
+    Connected(ConnIpAddr<I::Addr, A::LocalIdentifier, A::RemoteIdentifier>),
 }
 
-impl<A: SocketMapAddrSpec> IpAddrVec<A> {
-    fn with_device<D>(self, device: Option<D>) -> AddrVec<D, A> {
+impl<I: Ip, A: SocketMapAddrSpec> IpAddrVec<I, A> {
+    fn with_device<D>(self, device: Option<D>) -> AddrVec<I, D, A> {
         match self {
             IpAddrVec::Listener(ip) => AddrVec::Listen(ListenerAddr { ip, device }),
             IpAddrVec::Connected(ip) => AddrVec::Conn(ConnAddr { ip, device }),
@@ -112,7 +109,7 @@ impl<A: SocketMapAddrSpec> IpAddrVec<A> {
     }
 }
 
-impl<A: SocketMapAddrSpec> IpAddrVec<A> {
+impl<I: Ip, A: SocketMapAddrSpec> IpAddrVec<I, A> {
     /// Returns the next smallest address vector that would receive all the same
     /// packets as this one.
     ///
@@ -126,11 +123,11 @@ impl<A: SocketMapAddrSpec> IpAddrVec<A> {
                 None
             }
             IpAddrVec::Connected(ConnIpAddr { local: (local_ip, local_identifier), remote }) => {
-                let _: (SpecifiedAddr<A::IpAddr>, A::RemoteIdentifier) = remote;
+                let _: (SpecifiedAddr<I::Addr>, A::RemoteIdentifier) = remote;
                 Some(ListenerIpAddr { addr: Some(local_ip), identifier: local_identifier })
             }
             IpAddrVec::Listener(ListenerIpAddr { addr: Some(addr), identifier }) => {
-                let _: SpecifiedAddr<A::IpAddr> = addr;
+                let _: SpecifiedAddr<I::Addr> = addr;
                 Some(ListenerIpAddr { addr: None, identifier })
             }
         }
@@ -138,14 +135,14 @@ impl<A: SocketMapAddrSpec> IpAddrVec<A> {
     }
 }
 
-enum AddrVecIterInner<D, A: SocketMapAddrSpec> {
-    WithDevice { device: D, emitted_device: bool, addr: IpAddrVec<A> },
-    NoDevice { addr: IpAddrVec<A> },
+enum AddrVecIterInner<I: Ip, D, A: SocketMapAddrSpec> {
+    WithDevice { device: D, emitted_device: bool, addr: IpAddrVec<I, A> },
+    NoDevice { addr: IpAddrVec<I, A> },
     Done,
 }
 
-impl<D: Clone, A: SocketMapAddrSpec> Iterator for AddrVecIterInner<D, A> {
-    type Item = AddrVec<D, A>;
+impl<I: Ip, D: Clone, A: SocketMapAddrSpec> Iterator for AddrVecIterInner<I, D, A> {
+    type Item = AddrVec<I, D, A>;
 
     fn next(&mut self) -> Option<Self::Item> {
         match self {
@@ -190,20 +187,20 @@ impl<D: Clone, A: SocketMapAddrSpec> Iterator for AddrVecIterInner<D, A> {
 ///
 /// The first yielded address is always the one provided via
 /// [`AddrVecIter::with_device`] or [`AddrVecIter::without_device`].
-pub(crate) struct AddrVecIter<D, A: SocketMapAddrSpec>(AddrVecIterInner<D, A>);
+pub(crate) struct AddrVecIter<I: Ip, D, A: SocketMapAddrSpec>(AddrVecIterInner<I, D, A>);
 
-impl<D, A: SocketMapAddrSpec> AddrVecIter<D, A> {
-    pub(crate) fn with_device(addr: IpAddrVec<A>, device: D) -> Self {
+impl<I: Ip, D, A: SocketMapAddrSpec> AddrVecIter<I, D, A> {
+    pub(crate) fn with_device(addr: IpAddrVec<I, A>, device: D) -> Self {
         Self(AddrVecIterInner::WithDevice { device, emitted_device: false, addr })
     }
 
-    pub(crate) fn without_device(addr: IpAddrVec<A>) -> Self {
+    pub(crate) fn without_device(addr: IpAddrVec<I, A>) -> Self {
         Self(AddrVecIterInner::NoDevice { addr })
     }
 }
 
-impl<D: Clone, A: SocketMapAddrSpec> Iterator for AddrVecIter<D, A> {
-    type Item = AddrVec<D, A>;
+impl<I: Ip, D: Clone, A: SocketMapAddrSpec> Iterator for AddrVecIter<I, D, A> {
+    type Item = AddrVec<I, D, A>;
 
     fn next(&mut self) -> Option<Self::Item> {
         let Self(it) = self;

@@ -424,14 +424,15 @@ impl<I: IpExt, D: WeakId, C: NonSyncContext>
     SocketMapUpdateSharingPolicy<
         ListenerAddr<I::Addr, D, NonZeroU16>,
         ListenerSharingState,
+        I,
         D,
-        IpPortSpec<I>,
+        IpPortSpec,
     > for TcpSocketSpec<I, D, C>
 where
-    Bound<Self>: Tagged<AddrVec<D, IpPortSpec<I>>, Tag = AddrVecTag>,
+    Bound<Self>: Tagged<AddrVec<I, D, IpPortSpec>, Tag = AddrVecTag>,
 {
     fn allows_sharing_update(
-        socketmap: &SocketMap<AddrVec<D, IpPortSpec<I>>, Bound<Self>>,
+        socketmap: &SocketMap<AddrVec<I, D, IpPortSpec>, Bound<Self>>,
         addr: &ListenerAddr<I::Addr, D, NonZeroU16>,
         ListenerSharingState{listening: old_listening, sharing: old_sharing}: &ListenerSharingState,
         ListenerSharingState{listening: new_listening, sharing: new_sharing}: &ListenerSharingState,
@@ -632,14 +633,15 @@ impl<I: IpExt, D: WeakId, C: NonSyncContext>
     SocketMapConflictPolicy<
         ListenerAddr<I::Addr, D, NonZeroU16>,
         ListenerSharingState,
+        I,
         D,
-        IpPortSpec<I>,
+        IpPortSpec,
     > for TcpSocketSpec<I, D, C>
 {
     fn check_insert_conflicts(
         sharing: &ListenerSharingState,
         addr: &ListenerAddr<I::Addr, D, NonZeroU16>,
-        socketmap: &SocketMap<AddrVec<D, IpPortSpec<I>>, Bound<Self>>,
+        socketmap: &SocketMap<AddrVec<I, D, IpPortSpec>, Bound<Self>>,
     ) -> Result<(), InsertError> {
         let addr = AddrVec::Listen(addr.clone());
         let ListenerSharingState { listening: _, sharing } = sharing;
@@ -689,14 +691,15 @@ impl<I: IpExt, D: WeakId, C: NonSyncContext>
     SocketMapConflictPolicy<
         ConnAddr<I::Addr, D, NonZeroU16, NonZeroU16>,
         SharingState,
+        I,
         D,
-        IpPortSpec<I>,
+        IpPortSpec,
     > for TcpSocketSpec<I, D, C>
 {
     fn check_insert_conflicts(
         _sharing: &SharingState,
         addr: &ConnAddr<I::Addr, D, NonZeroU16, NonZeroU16>,
-        socketmap: &SocketMap<AddrVec<D, IpPortSpec<I>>, Bound<Self>>,
+        socketmap: &SocketMap<AddrVec<I, D, IpPortSpec>, Bound<Self>>,
     ) -> Result<(), InsertError> {
         // We need to make sure there are no present sockets that have the same
         // 4-tuple with the to-be-added socket.
@@ -806,17 +809,17 @@ struct Unbound<D> {
 
 /// Holds all the TCP socket states.
 pub(crate) struct Sockets<I: IpExt, D: WeakId, C: NonSyncContext> {
-    port_alloc: PortAlloc<BoundSocketMap<D, IpPortSpec<I>, TcpSocketSpec<I, D, C>>>,
+    port_alloc: PortAlloc<BoundSocketMap<I, D, IpPortSpec, TcpSocketSpec<I, D, C>>>,
     inactive: IdMap<Unbound<D>>,
-    socketmap: BoundSocketMap<D, IpPortSpec<I>, TcpSocketSpec<I, D, C>>,
+    socketmap: BoundSocketMap<I, D, IpPortSpec, TcpSocketSpec<I, D, C>>,
     bound_state: IdMapCollection<
         BoundSocketId<TcpSocketSpec<I, D, C>>,
-        BoundSocketState<D, IpPortSpec<I>, TcpSocketSpec<I, D, C>>,
+        BoundSocketState<I, D, IpPortSpec, TcpSocketSpec<I, D, C>>,
     >,
 }
 
 impl<I: IpExt, D: WeakId, C: NonSyncContext> PortAllocImpl
-    for BoundSocketMap<D, IpPortSpec<I>, TcpSocketSpec<I, D, C>>
+    for BoundSocketMap<I, D, IpPortSpec, TcpSocketSpec<I, D, C>>
 {
     const TABLE_SIZE: NonZeroUsize = nonzero!(20usize);
     const EPHEMERAL_RANGE: RangeInclusive<u16> = 49152..=65535;
@@ -1000,7 +1003,7 @@ impl<I: IpExt> BoundId<I> {
         self,
         bound_state: &IdMapCollection<
             BoundSocketId<TcpSocketSpec<I, D, C>>,
-            BoundSocketState<D, IpPortSpec<I>, TcpSocketSpec<I, D, C>>,
+            BoundSocketState<I, D, IpPortSpec, TcpSocketSpec<I, D, C>>,
         >,
     ) -> Option<(
         &MaybeListener<I, C::ReturnedBuffers, C::ListenerNotifier>,
@@ -1014,7 +1017,7 @@ impl<I: IpExt> BoundId<I> {
         self,
         bound_state: &mut IdMapCollection<
             BoundSocketId<TcpSocketSpec<I, D, C>>,
-            BoundSocketState<D, IpPortSpec<I>, TcpSocketSpec<I, D, C>>,
+            BoundSocketState<I, D, IpPortSpec, TcpSocketSpec<I, D, C>>,
         >,
     ) -> Option<(
         &mut MaybeListener<I, C::ReturnedBuffers, C::ListenerNotifier>,
@@ -1030,7 +1033,7 @@ impl<I: IpExt> ListenerId<I> {
         self,
         bound_state: &IdMapCollection<
             BoundSocketId<TcpSocketSpec<I, D, C>>,
-            BoundSocketState<D, IpPortSpec<I>, TcpSocketSpec<I, D, C>>,
+            BoundSocketState<I, D, IpPortSpec, TcpSocketSpec<I, D, C>>,
         >,
     ) -> Option<(
         &MaybeListener<I, C::ReturnedBuffers, C::ListenerNotifier>,
@@ -1044,7 +1047,7 @@ impl<I: IpExt> ListenerId<I> {
         self,
         bound_state: &mut IdMapCollection<
             BoundSocketId<TcpSocketSpec<I, D, C>>,
-            BoundSocketState<D, IpPortSpec<I>, TcpSocketSpec<I, D, C>>,
+            BoundSocketState<I, D, IpPortSpec, TcpSocketSpec<I, D, C>>,
         >,
     ) -> Option<(
         &mut MaybeListener<I, C::ReturnedBuffers, C::ListenerNotifier>,
@@ -1060,7 +1063,7 @@ impl<I: IpExt> MaybeListenerId<I> {
         self,
         bound_state: &IdMapCollection<
             BoundSocketId<TcpSocketSpec<I, D, C>>,
-            BoundSocketState<D, IpPortSpec<I>, TcpSocketSpec<I, D, C>>,
+            BoundSocketState<I, D, IpPortSpec, TcpSocketSpec<I, D, C>>,
         >,
     ) -> Option<(
         &MaybeListener<I, C::ReturnedBuffers, C::ListenerNotifier>,
@@ -1076,7 +1079,7 @@ impl<I: IpExt> MaybeListenerId<I> {
         self,
         bound_state: &mut IdMapCollection<
             BoundSocketId<TcpSocketSpec<I, D, C>>,
-            BoundSocketState<D, IpPortSpec<I>, TcpSocketSpec<I, D, C>>,
+            BoundSocketState<I, D, IpPortSpec, TcpSocketSpec<I, D, C>>,
         >,
     ) -> Option<(
         &mut MaybeListener<I, C::ReturnedBuffers, C::ListenerNotifier>,
@@ -1092,12 +1095,12 @@ impl<I: IpExt> MaybeListenerId<I> {
         self,
         bound_state: &mut IdMapCollection<
             BoundSocketId<TcpSocketSpec<I, D, C>>,
-            BoundSocketState<D, IpPortSpec<I>, TcpSocketSpec<I, D, C>>,
+            BoundSocketState<I, D, IpPortSpec, TcpSocketSpec<I, D, C>>,
         >,
     ) -> IdMapCollectionOccupied<
         '_,
         BoundSocketId<TcpSocketSpec<I, D, C>>,
-        BoundSocketState<D, IpPortSpec<I>, TcpSocketSpec<I, D, C>>,
+        BoundSocketState<I, D, IpPortSpec, TcpSocketSpec<I, D, C>>,
     > {
         match bound_state.entry(BoundSocketId::Listener(self)) {
             IdMapCollectionEntry::Vacant(_) => panic!("invalid MaybeListenerId: not found"),
@@ -1111,7 +1114,7 @@ impl<I: IpExt> MaybeClosedConnectionId<I> {
         self,
         bound_state: &IdMapCollection<
             BoundSocketId<TcpSocketSpec<I, D, C>>,
-            BoundSocketState<D, IpPortSpec<I>, TcpSocketSpec<I, D, C>>,
+            BoundSocketState<I, D, IpPortSpec, TcpSocketSpec<I, D, C>>,
         >,
     ) -> Option<(
         &Connection<I, D, C::Instant, C::ReceiveBuffer, C::SendBuffer, C::ProvidedBuffers>,
@@ -1127,7 +1130,7 @@ impl<I: IpExt> MaybeClosedConnectionId<I> {
         self,
         bound_state: &mut IdMapCollection<
             BoundSocketId<TcpSocketSpec<I, D, C>>,
-            BoundSocketState<D, IpPortSpec<I>, TcpSocketSpec<I, D, C>>,
+            BoundSocketState<I, D, IpPortSpec, TcpSocketSpec<I, D, C>>,
         >,
     ) -> Option<(
         &mut Connection<I, D, C::Instant, C::ReceiveBuffer, C::SendBuffer, C::ProvidedBuffers>,
@@ -1143,12 +1146,12 @@ impl<I: IpExt> MaybeClosedConnectionId<I> {
         self,
         bound_state: &mut IdMapCollection<
             BoundSocketId<TcpSocketSpec<I, D, C>>,
-            BoundSocketState<D, IpPortSpec<I>, TcpSocketSpec<I, D, C>>,
+            BoundSocketState<I, D, IpPortSpec, TcpSocketSpec<I, D, C>>,
         >,
     ) -> IdMapCollectionOccupied<
         '_,
         BoundSocketId<TcpSocketSpec<I, D, C>>,
-        BoundSocketState<D, IpPortSpec<I>, TcpSocketSpec<I, D, C>>,
+        BoundSocketState<I, D, IpPortSpec, TcpSocketSpec<I, D, C>>,
     > {
         match bound_state.entry(BoundSocketId::Connection(self)) {
             IdMapCollectionEntry::Vacant(_) => panic!("invalid ConnectionId: not found"),
@@ -1162,7 +1165,7 @@ impl<I: IpExt> ConnectionId<I> {
         self,
         bound_state: &IdMapCollection<
             BoundSocketId<TcpSocketSpec<I, D, C>>,
-            BoundSocketState<D, IpPortSpec<I>, TcpSocketSpec<I, D, C>>,
+            BoundSocketState<I, D, IpPortSpec, TcpSocketSpec<I, D, C>>,
         >,
     ) -> Option<(
         &Connection<I, D, C::Instant, C::ReceiveBuffer, C::SendBuffer, C::ProvidedBuffers>,
@@ -1181,7 +1184,7 @@ impl<I: IpExt> ConnectionId<I> {
         self,
         bound_state: &mut IdMapCollection<
             BoundSocketId<TcpSocketSpec<I, D, C>>,
-            BoundSocketState<D, IpPortSpec<I>, TcpSocketSpec<I, D, C>>,
+            BoundSocketState<I, D, IpPortSpec, TcpSocketSpec<I, D, C>>,
         >,
     ) -> Option<(
         &mut Connection<I, D, C::Instant, C::ReceiveBuffer, C::SendBuffer, C::ProvidedBuffers>,
@@ -1200,12 +1203,12 @@ impl<I: IpExt> ConnectionId<I> {
         self,
         bound_state: &mut IdMapCollection<
             BoundSocketId<TcpSocketSpec<I, D, C>>,
-            BoundSocketState<D, IpPortSpec<I>, TcpSocketSpec<I, D, C>>,
+            BoundSocketState<I, D, IpPortSpec, TcpSocketSpec<I, D, C>>,
         >,
     ) -> IdMapCollectionOccupied<
         '_,
         BoundSocketId<TcpSocketSpec<I, D, C>>,
-        BoundSocketState<D, IpPortSpec<I>, TcpSocketSpec<I, D, C>>,
+        BoundSocketState<I, D, IpPortSpec, TcpSocketSpec<I, D, C>>,
     > {
         MaybeClosedConnectionId::from(self).get_bound_state_entry(bound_state)
     }
@@ -1477,14 +1480,14 @@ impl<I: IpLayerIpExt, C: NonSyncContext, SC: SyncContext<I, C>> SocketHandler<I,
                         ListenerSharingState { sharing: *sharing, listening: false },
                         |addr, sharing| {
                             let entry = socket_bound_state.push_entry(
-                                |index| <BoundListener as ConvertSocketTypeState<SC::WeakDeviceId, IpPortSpec<I>, _>>::to_socket_id(index.into()),
+                                |index| <BoundListener as ConvertSocketTypeState<I, SC::WeakDeviceId, IpPortSpec, _>>::to_socket_id(index.into()),
                                 BoundListener::to_socket_state((
                                     MaybeListener::Bound(bound_state),
                                     sharing,
                                     addr,
                                 )),
                             );
-                            <BoundListener as ConvertSocketTypeState<SC::WeakDeviceId, IpPortSpec<I>, _>>::from_socket_id_ref(entry.key()).clone()
+                            <BoundListener as ConvertSocketTypeState<I, SC::WeakDeviceId, IpPortSpec, _>>::from_socket_id_ref(entry.key()).clone()
                         },
                     )
                     .map(|entry| {
@@ -1635,8 +1638,9 @@ impl<I: IpLayerIpExt, C: NonSyncContext, SC: SyncContext<I, C>> SocketHandler<I,
                     );
                     let MaybeClosedConnectionId(index, marker) =
                         <BoundConnection as ConvertSocketTypeState<
+                            I,
                             Self::WeakDeviceId,
-                            IpPortSpec<I>,
+                            IpPortSpec,
                             _,
                         >>::from_socket_id_ref(entry.key())
                         .clone();
@@ -1723,8 +1727,9 @@ impl<I: IpLayerIpExt, C: NonSyncContext, SC: SyncContext<I, C>> SocketHandler<I,
                     );
                     let MaybeClosedConnectionId(index, marker) =
                         <BoundConnection as ConvertSocketTypeState<
+                            I,
                             Self::WeakDeviceId,
-                            IpPortSpec<I>,
+                            IpPortSpec,
                             _,
                         >>::from_socket_id_ref(entry.key())
                         .clone();
@@ -2953,8 +2958,9 @@ where
 fn connect_inner<I, SC, C>(
     isn: &IsnGenerator<C::Instant>,
     socketmap: &mut BoundSocketMap<
+        I,
         SC::WeakDeviceId,
-        IpPortSpec<I>,
+        IpPortSpec,
         TcpSocketSpec<I, SC::WeakDeviceId, C>,
     >,
     make_connection: impl FnOnce(
