@@ -120,6 +120,10 @@ import("//build/toolchain/rbe.gni")
 #   quiet_clippy (boolean, optional)
 #     Passed through to rustc_artifact(), see that template for documentation.
 #
+#   disable_rustdoc (optional)
+#     Don't add this target to https://fuchsia.dev/go/rustdoc
+#     NOTE: for binaries this is enabled by default
+#
 #   original_target_name (optional)
 #     The name of the target as it appears in the BUILD file. Enables tooling
 #     to find the template invocation in a BUILD file where this target was defined.
@@ -295,6 +299,14 @@ template("rustc_binary") {
     # TODO(https://fxbug.dev/43781) remove "non_rust_deps" as a concept
     if (defined(invoker.non_rust_deps)) {
       deps += invoker.non_rust_deps
+    }
+
+    metadata = {
+      if (defined(invoker.disable_rustdoc)) {
+        disable_rustdoc = [ invoker.disable_rustdoc ]
+      } else {
+        disable_rustdoc = [ true ]
+      }
     }
   }
 }

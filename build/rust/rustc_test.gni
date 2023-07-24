@@ -206,6 +206,7 @@ template("rustc_test_internal") {
             include = [ "//src/sys/test_runners/rust/default.shard.cml" ]
           },
         ]
+        disable_rustdoc = [ true ]
       }
     }
     pass_through.data_deps = _data_deps

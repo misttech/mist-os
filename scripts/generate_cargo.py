@@ -586,8 +586,6 @@ def main():
         cur = ""
         result = []
         for t in rust_targets:
-            if t["type"] == "executable":
-                continue
             if meta := project.rust_targets[t["label"]].get("metadata"):
                 if disable := meta.get("disable_rustdoc"):
                     if disable == [True]:
