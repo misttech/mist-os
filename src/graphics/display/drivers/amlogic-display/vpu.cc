@@ -47,6 +47,20 @@ constexpr uint32_t capture_yuv2rgb_offset[3] = {0, 0, 0};
 // AOBUS Register
 #define AOBUS_GEN_PWR_SLEEP0 (0x03a << 2)
 
+// The AO (Always On) power domain is described in A311D datasheet section
+// 8.2.1 "Top Level Power Domains", which gives an overview of all power
+// domains.  The EE (Everything Else) abbreviation is decoded in the
+// AO_RTI_PWR_CNTL_REG0 register documentation, in A311D datasheet section 8.2.5
+// "Power/Isolation/Memory Power Down Register Summary".
+//
+// S912 datasheet section 17 "Power Domain" presents similar information in more
+// depth. The S912 also has AO / EE / CPU power domains, and the main difference
+// from our supported chips is the lack of an A72 CPU complex. In particular,
+// it's helpful to compare the following figures:
+// * S912: Figure III.17.1 "Power Domain" vs A311D: Figure 8-2 "Power Domain"
+// * S912: Table III.17.1 "Power on Sequence of Different Power Domains" vs
+//   A311D: Table 8-2 with the same title
+
 // EE Reset registers on the CBUS (regular power-gated config registers domain).
 //
 // A311D datasheet section 8.8.2.1 "Register Description" > "EE Reset" describes
@@ -55,7 +69,7 @@ constexpr uint32_t capture_yuv2rgb_offset[3] = {0, 0, 0};
 // the watchdog timer, and the reset condition.
 //
 // A311D datasheet section 8.8.2.1 has full MMIO addresses. S905D3 datasheet
-// section 6.8.2 with the same tile covers the same registers, and also
+// section 6.8.2 with the same title covers the same registers, and also
 // explicitly states that the base for all registers is 0xffd0'1000. This
 // address is listed under the RESET entry in A311D section 8.1 "System" >
 // "Memory Map" and S905D3 datasheet section 6.1 with the same name.
