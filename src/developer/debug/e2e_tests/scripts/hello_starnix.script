@@ -9,7 +9,7 @@ Waiting for process matching "hello_starnix".
 [zxdb] b hello_starnix.cc:9
 Created Breakpoint 1 @ hello_starnix.cc:9
 
-[zxdb] run-test fuchsia-pkg://fuchsia.com/zxdb_e2e_inferiors#meta/hello_starnix.cm
+[zxdb] run-test --realm /core/testing:system-tests fuchsia-pkg://fuchsia.com/zxdb_e2e_inferiors#meta/hello_starnix.cm
 Attached Process 1 state=Running koid=?? name=hello_starnix component=starnix_kernel.cm
 🛑 on bp 1 main() • hello_starnix.cc:9
 

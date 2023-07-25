@@ -58,6 +58,8 @@ static_library("lib") {
     "stdio_handles.h",
     "system_interface.cc",
     "system_interface.h",
+    "test_realm.cc",
+    "test_realm.h",
     "thread_handle.h",
     "time.h",
     "unwind.cc",

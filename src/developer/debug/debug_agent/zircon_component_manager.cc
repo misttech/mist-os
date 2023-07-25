@@ -13,6 +13,7 @@
 #include <lib/fit/defer.h>
 #include <lib/syslog/cpp/macros.h>
 #include <unistd.h>
+#include <zircon/errors.h>
 #include <zircon/processargs.h>
 #include <zircon/types.h>
 
@@ -26,6 +27,7 @@
 #include "src/developer/debug/debug_agent/debugged_process.h"
 #include "src/developer/debug/debug_agent/filter.h"
 #include "src/developer/debug/debug_agent/stdio_handles.h"
+#include "src/developer/debug/debug_agent/test_realm.h"
 #include "src/developer/debug/ipc/records.h"
 #include "src/developer/debug/shared/logging/file_line_function.h"
 #include "src/developer/debug/shared/logging/logging.h"
@@ -315,9 +317,6 @@ class ZirconComponentManager::TestLauncher : public fxl::RefCountedThreadSafe<Te
   debug::Status Launch(std::string url, std::optional<std::string> realm,
                        std::vector<std::string> case_filters,
                        ZirconComponentManager* component_manager, DebugAgent* debug_agent) {
-    if (realm) {
-      return debug::Status("Realm parameter is not supported yet");
-    }
     test_url_ = std::move(url);
     component_manager_ = component_manager->GetWeakPtr();
     debug_agent_ = debug_agent ? debug_agent->GetWeakPtr() : nullptr;
@@ -335,11 +334,27 @@ class ZirconComponentManager::TestLauncher : public fxl::RefCountedThreadSafe<Te
 
     fuchsia_test_manager::RunOptions run_options;
     run_options.case_filters_to_run() = std::move(case_filters);
-    auto add_suite_res = run_builder->AddSuite(
-        {test_url_, std::move(run_options), CreateEndpointsAndBind(suite_controller_)});
-    if (!add_suite_res.is_ok()) {
-      return debug::ZxStatus(add_suite_res.error_value().status(),
-                             add_suite_res.error_value().FormatDescription());
+    if (realm) {
+      auto get_test_realm_res = GetTestRealmAndOffers(*realm);
+      if (!get_test_realm_res.is_ok()) {
+        return get_test_realm_res.error_value();
+      }
+
+      auto add_suite_in_realm_res = run_builder->AddSuiteInRealm(
+          {std::move(get_test_realm_res->realm), std::move(get_test_realm_res->offers),
+           get_test_realm_res->test_collection, test_url_, std::move(run_options),
+           CreateEndpointsAndBind(suite_controller_)});
+      if (!add_suite_in_realm_res.is_ok()) {
+        return debug::ZxStatus(add_suite_in_realm_res.error_value().status(),
+                               add_suite_in_realm_res.error_value().FormatDescription());
+      }
+    } else {
+      auto add_suite_res = run_builder->AddSuite(
+          {test_url_, std::move(run_options), CreateEndpointsAndBind(suite_controller_)});
+      if (!add_suite_res.is_ok()) {
+        return debug::ZxStatus(add_suite_res.error_value().status(),
+                               add_suite_res.error_value().FormatDescription());
+      }
     }
     auto build_res = run_builder->Build(CreateEndpointsAndBind(run_controller_));
     if (!build_res.is_ok()) {
