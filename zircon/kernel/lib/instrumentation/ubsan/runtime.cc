@@ -92,6 +92,12 @@ struct UnreachableData {
   SourceLocation Loc;
 };
 
+struct AlignmentAssumptionData {
+  SourceLocation Loc;
+  SourceLocation AssumptionLoc;
+  const TypeDescriptor& Type;
+};
+
 using ValueHandle = uintptr_t;
 
 const char* TypeCheckKindMsg(TypeCheckKind kind) {
@@ -304,5 +310,27 @@ void __ubsan_handle_pointer_overflow(PointerOverflowData* Data, ValueHandle Base
 void __ubsan_handle_builtin_unreachable(UnreachableData* Data) {
   auto start = UbsanPanicStart("Executed unreachable code", Data->Loc);
 }
+
+void __ubsan_handle_alignment_assumption(AlignmentAssumptionData* Data, ValueHandle Pointer,
+                                         ValueHandle Alignment, ValueHandle Offset) {
+  auto start = UbsanPanicStart("Alignment Assumption violation", Data->Loc);
+  PrintTypeDescriptor(Data->Type);
+  printf("Pointer: 0x%016lx\n", Pointer);
+  printf("Alignment: 0x%016lx\n", Alignment);
+  printf("Offset: 0x%016lx\n", Offset);
+}
+
+// TODO(https://fxbug.dev/105063): Add missing handlers:
+// * invalid_builtin
+// * nonnull_return_v1
+// * nullability_return_v1
+// * nullability_arg
+// * cfi_check_fail
+// * cfi_bad_type
+
+// NOTE: The following functions should never be generated in the kernel ubsan:
+//  * missing_return
+//  * vla_bound_not_positive
+//  * float_cast_overflow
 
 }  // extern "C"

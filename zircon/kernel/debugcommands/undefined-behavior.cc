@@ -18,6 +18,8 @@
 #include <stdio.h>
 #include <string.h>
 
+#if __has_feature(undefined_behavior_sanitizer)
+
 namespace {
 
 // The compiler cannot assume it knows the return value of Launder.
@@ -71,6 +73,16 @@ void misaligned_ptr() {
   printf("misaligned pointer access: *%p\n", addr);
   uint32_t val = *addr;
   printf("result: %x\n", val);
+}
+
+void unaligned_assumption() {
+  // Make a false alignment assumption on a pointer.
+  uint64_t aligned = 0;
+  uint32_t* addr = reinterpret_cast<uint32_t*>(Launder(reinterpret_cast<uintptr_t>(&aligned)) + 1);
+
+  printf("assuming that %p is aligned to 256 bytes.\n", addr);
+  uint32_t* __attribute__((align_value(256))) p = addr;
+  printf("p: %x\n", *p);
 }
 
 void array_oob() {
@@ -138,6 +150,7 @@ static int cmd_usage(const char* cmd_name) {
   printf("%s overflow_ptr             : pointer arithmetic that overflows\n", cmd_name);
   printf("%s overflow_signed_int_add  : signed integer addition that overflows\n", cmd_name);
   printf("%s overflow_signed_int_shift: signed integer shift that overflows\n", cmd_name);
+  printf("%s unaligned_assumption     : make a wrong alignment assumption\n", cmd_name);
   printf("%s undefined_enum           : use an undefined value in a enum\n", cmd_name);
   printf("%s undefined_bool           : use a bool that is not true nor false\n", cmd_name);
   printf("%s unreachable              : execute unreachable code.\n", cmd_name);
@@ -162,6 +175,8 @@ static int cmd_ub(int argc, const cmd_args* argv, uint32_t flags) {
     overflow_signed_int_add();
   } else if (!strcmp(argv[1].str, "overflow_signed_int_shift")) {
     overflow_signed_int_shift();
+  } else if (!strcmp(argv[1].str, "unaligned_assumption")) {
+    unaligned_assumption();
   } else if (!strcmp(argv[1].str, "undefined_enum")) {
     undefined_enum();
   } else if (!strcmp(argv[1].str, "undefined_bool")) {
@@ -174,3 +189,5 @@ static int cmd_ub(int argc, const cmd_args* argv, uint32_t flags) {
 
   return 0;
 }
+
+#endif  // __has_feature(undefined_behavior_sanitizer)
