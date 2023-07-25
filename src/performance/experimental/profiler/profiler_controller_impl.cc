@@ -4,23 +4,41 @@
 
 #include "profiler_controller_impl.h"
 
+#include <elf.h>
+#include <lib/fit/result.h>
 #include <lib/syslog/cpp/macros.h>
+#include <lib/zx/handle.h>
 #include <lib/zx/job.h>
+#include <lib/zx/process.h>
+#include <lib/zx/result.h>
+#include <lib/zx/thread.h>
+#include <lib/zx/time.h>
+#include <zircon/errors.h>
+#include <zircon/syscalls.h>
+#include <zircon/system/ulib/elf-search/include/elf-search.h>
+#include <zircon/types.h>
+
+#include <algorithm>
+#include <cstddef>
+#include <cstdint>
+#include <ios>
+#include <memory>
+#include <mutex>
+#include <sstream>
+#include <unordered_map>
+#include <utility>
+#include <vector>
 
 #include <src/lib/fsl/socket/strings.h>
-#include <src/lib/unwinder/cfi_unwinder.h>
-#include <src/lib/unwinder/fp_unwinder.h>
-#include <src/lib/unwinder/fuchsia.h>
-#include <src/lib/unwinder/unwind.h>
+#include <src/lib/unwinder/module.h>
 
 #include "sampler.h"
+#include "symbolization_context.h"
 #include "targets.h"
 #include "taskfinder.h"
-#include "zircon/system/ulib/elf-search/include/elf-search.h"
 
 void profiler::ProfilerControllerImpl::Configure(ConfigureRequest& request,
                                                  ConfigureCompleter::Sync& completer) {
-  std::lock_guard lock(state_lock_);
   if (state_ != ProfilingState::Unconfigured) {
     completer.Reply(fit::error(fuchsia_cpu_profiler::SessionConfigureError::kBadState));
     return;
@@ -71,7 +89,7 @@ void profiler::ProfilerControllerImpl::Configure(ConfigureRequest& request,
     return;
   }
 
-  targets_.clear();
+  targets_.Clear();
   for (auto&& [koid, handle] : *handles_result) {
     zx_info_handle_basic_t info;
     zx_status_t res = handle.get_info(ZX_INFO_HANDLE_BASIC, &info, sizeof(info), nullptr, nullptr);
@@ -88,7 +106,7 @@ void profiler::ProfilerControllerImpl::Configure(ConfigureRequest& request,
         zx_status_t res = process.get_info(ZX_INFO_HANDLE_BASIC, &handle_info, sizeof(handle_info),
                                            nullptr, nullptr);
         if (res != ZX_OK) {
-          FX_PLOGS(ERROR, res) << "Failed to get info about handle: " << handle.get();
+          FX_PLOGS(ERROR, res) << "Failed to get info about handle: " << process.get();
           completer.Reply(
               fit::error(fuchsia_cpu_profiler::SessionConfigureError::kInvalidConfiguration));
           return;
@@ -100,20 +118,28 @@ void profiler::ProfilerControllerImpl::Configure(ConfigureRequest& request,
               fit::error(fuchsia_cpu_profiler::SessionConfigureError::kInvalidConfiguration));
           return;
         }
-        JobTarget job_target{handle_info.related_koid};
-        job_target.processes.push_back(std::move(*process_target));
-        targets_.push_back(std::move(job_target));
+        if (zx::result res = targets_.AddProcess(std::move(*process_target)); res.is_error()) {
+          FX_PLOGS(ERROR, res.status_value()) << "Failed to add process target";
+          completer.Reply(
+              fit::error(fuchsia_cpu_profiler::SessionConfigureError::kInvalidConfiguration));
+          return;
+        }
         break;
       }
       case ZX_OBJ_TYPE_JOB: {
         zx::result<JobTarget> job_target = MakeJobTarget(zx::job{std::move(handle)});
         if (job_target.is_error()) {
-          FX_PLOGS(ERROR, res) << "Failed to make a job target";
+          FX_PLOGS(ERROR, job_target.status_value()) << "Failed to make a job target";
           completer.Reply(
               fit::error(fuchsia_cpu_profiler::SessionConfigureError::kInvalidConfiguration));
           return;
         }
-        targets_.push_back(std::move(*job_target));
+        if (zx::result res = targets_.AddJob(std::move(*job_target)); res.is_error()) {
+          FX_PLOGS(ERROR, res.status_value()) << "Failed to add process target";
+          completer.Reply(
+              fit::error(fuchsia_cpu_profiler::SessionConfigureError::kInvalidConfiguration));
+          return;
+        }
         break;
       }
       case ZX_OBJ_TYPE_THREAD: {
@@ -148,18 +174,32 @@ void profiler::ProfilerControllerImpl::Configure(ConfigureRequest& request,
           return;
         }
 
-        std::vector<ThreadTarget> threads;
-        threads.push_back(ThreadTarget{std::move(thread), koid});
-        ProcessTarget process_target{zx::process{std::move(process)}, koid, std::move(threads)};
-        elf_search::ForEachModule(*zx::unowned_process{process.get()},
+        ProcessTarget process_target{zx::process{std::move(process)}, pid,
+                                     std::unordered_map<zx_koid_t, ThreadTarget>{}};
+        elf_search::ForEachModule(*zx::unowned_process{process_target.handle.get()},
                                   [&process_target](const elf_search::ModuleInfo& info) {
                                     process_target.unwinder_data->modules.emplace_back(
                                         info.vaddr, &process_target.unwinder_data->memory,
                                         unwinder::Module::AddressMode::kProcess);
                                   });
-        JobTarget job_target{handle_info.related_koid};
-        job_target.processes.push_back(std::move(process_target));
-        targets_.push_back(std::move(job_target));
+
+        if (zx::result<> res = targets_.AddProcess(std::move(process_target)); res.is_error()) {
+          // If the process already exists, then we'll just append to the existing one below
+          if (res.status_value() != ZX_ERR_ALREADY_EXISTS) {
+            FX_PLOGS(ERROR, res.status_value()) << "Failed to add process target";
+            completer.Reply(
+                fit::error(fuchsia_cpu_profiler::SessionConfigureError::kInvalidConfiguration));
+            return;
+          }
+        }
+
+        if (zx::result res = targets_.AddThread(pid, ThreadTarget{std::move(thread), koid});
+            res.is_error()) {
+          FX_PLOGS(ERROR, res.status_value()) << "Failed to add thread target: " << koid;
+          completer.Reply(
+              fit::error(fuchsia_cpu_profiler::SessionConfigureError::kInvalidConfiguration));
+          return;
+        }
         break;
       }
       default:
@@ -176,14 +216,13 @@ void profiler::ProfilerControllerImpl::Configure(ConfigureRequest& request,
 
 void profiler::ProfilerControllerImpl::Start(StartRequest& request,
                                              StartCompleter::Sync& completer) {
-  std::lock_guard lock(state_lock_);
   if (state_ != ProfilingState::Stopped) {
     completer.Reply(fit::error(fuchsia_cpu_profiler::SessionStartError::kBadState));
     return;
   }
 
-  FX_LOGS(INFO) << "Starting Collection for " << targets_.size() << " targets";
   sampler_ = std::make_unique<Sampler>(dispatcher_, std::move(targets_));
+  targets_.Clear();
   zx::result<> start_res = sampler_->Start();
   if (start_res.is_error()) {
     Reset();
@@ -195,7 +234,6 @@ void profiler::ProfilerControllerImpl::Start(StartRequest& request,
 }
 
 void profiler::ProfilerControllerImpl::Stop(StopCompleter::Sync& completer) {
-  std::lock_guard lock(state_lock_);
   zx::result<> stop_res = sampler_->Stop();
   if (stop_res.is_error()) {
     FX_PLOGS(ERROR, stop_res.status_value()) << "Sampler failed to stop";
@@ -292,20 +330,18 @@ void profiler::ProfilerControllerImpl::Stop(StopCompleter::Sync& completer) {
 }
 
 void profiler::ProfilerControllerImpl::Reset(ResetCompleter::Sync& completer) {
-  std::lock_guard lock(state_lock_);
   Reset();
   completer.Reply();
 }
 
 void profiler::ProfilerControllerImpl::OnUnbound(
     fidl::UnbindInfo info, fidl::ServerEnd<fuchsia_cpu_profiler::Session> server_end) {
-  std::lock_guard lock(state_lock_);
   Reset();
 }
 
 void profiler::ProfilerControllerImpl::Reset() {
   sampler_.reset();
   socket_.reset();
-  targets_ = std::vector<JobTarget>();
+  targets_.Clear();
   state_ = ProfilingState::Unconfigured;
 }

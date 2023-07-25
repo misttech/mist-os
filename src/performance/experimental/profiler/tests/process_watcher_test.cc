@@ -6,11 +6,14 @@
 
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async-loop/default.h>
-#include <lib/syslog/cpp/macros.h>
+#include <lib/zx/process.h>
+#include <lib/zx/result.h>
+#include <lib/zx/thread.h>
+#include <zircon/types.h>
 
-#include <condition_variable>
-#include <mutex>
+#include <atomic>
 #include <thread>
+#include <utility>
 
 #include <gtest/gtest.h>
 
@@ -18,14 +21,16 @@
 //
 // Note that the starting thread is paused, but not the starter thread. That ensures we don't
 // accidentally deadlock ourself when handling the debug exception.
+std::atomic<bool> saw_child;
+
 TEST(ProcessWatcherTests, SelfThreads) {
-  std::atomic<bool> saw_child = false;
+  saw_child = false;
   async::Loop loop(&kAsyncLoopConfigAttachToCurrentThread);
   zx::unowned_process self = zx::process::self();
 
   ProcessWatcher watcher{std::move(self),
-                         [&saw_child](zx_koid_t, zx_koid_t, zx::thread t) { saw_child = true; }};
-  std::thread thread_spawner{[&saw_child]() {
+                         [](zx_koid_t, zx_koid_t, zx::thread t) { saw_child = true; }};
+  std::thread thread_spawner{[]() {
     for (;;) {
       if (saw_child) {
         return;

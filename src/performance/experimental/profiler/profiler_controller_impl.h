@@ -13,6 +13,7 @@
 #include <zircon/compiler.h>
 
 #include "sampler.h"
+#include "targets.h"
 
 namespace profiler {
 class ProfilerControllerImpl : public fidl::Server<fuchsia_cpu_profiler::Session> {
@@ -28,8 +29,8 @@ class ProfilerControllerImpl : public fidl::Server<fuchsia_cpu_profiler::Session
   ~ProfilerControllerImpl() override = default;
 
  private:
-  void Reset() __TA_REQUIRES(state_lock_);
-  zx::socket socket_ __TA_GUARDED(state_lock_);
+  void Reset();
+  zx::socket socket_;
 
   enum ProfilingState {
     Unconfigured,
@@ -37,11 +38,10 @@ class ProfilerControllerImpl : public fidl::Server<fuchsia_cpu_profiler::Session
     Stopped,
   };
   async_dispatcher_t* dispatcher_;
-  std::mutex state_lock_;
-  std::unique_ptr<Sampler> sampler_ __TA_GUARDED(state_lock_);
-  ProfilingState state_ __TA_GUARDED(state_lock_) = ProfilingState::Unconfigured;
+  std::unique_ptr<Sampler> sampler_;
+  ProfilingState state_ = ProfilingState::Unconfigured;
 
-  std::vector<JobTarget> targets_;
+  TargetTree targets_;
 };
 }  // namespace profiler
 

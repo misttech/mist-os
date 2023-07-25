@@ -7,20 +7,35 @@
 #include <lib/syslog/cpp/macros.h>
 #include <lib/zx/job.h>
 #include <lib/zx/process.h>
+#include <lib/zx/result.h>
 #include <lib/zx/socket.h>
 #include <lib/zx/thread.h>
-#include <lib/zx/vmar.h>
-#include <lib/zx/vmo.h>
+#include <lib/zx/time.h>
+#include <unistd.h>
+#include <zircon/errors.h>
+#include <zircon/rights.h>
+#include <zircon/syscalls.h>
+#include <zircon/threads.h>
+#include <zircon/types.h>
 
+#include <cctype>
+#include <cstddef>
+#include <cstdlib>
+#include <set>
 #include <sstream>
+#include <string>
 #include <thread>
+#include <utility>
+#include <vector>
 
 #include <gtest/gtest.h>
-
-#include "src/lib/fsl/socket/strings.h"
+#include <src/lib/fsl/socket/strings.h>
 
 void MakeWork() {
   for (;;) {
+    // We need to have at least some side effect producing code or a release build will elide the
+    // entire function
+    FX_LOGS(TRACE) << "Working!";
   }
   zx_thread_exit();
 }
@@ -37,19 +52,16 @@ TEST(ProfilerIntegrationTest, EndToEnd) {
   zx::process self;
   zx::process::self()->duplicate(ZX_RIGHT_SAME_RIGHTS, &self);
 
-  zx::thread child;
-  zx_status_t res = zx::thread::create(self, "TestChild", 9, 0, &child);
+  std::thread child(MakeWork);
+  const zx::unowned_thread child_handle{native_thread_get_zx_handle(child.native_handle())};
+  child.detach();
 
-  static uint8_t stack[1024] __ALIGNED(16);
-  res = child.start(reinterpret_cast<uintptr_t>(MakeWork),
-                    reinterpret_cast<uintptr_t>(stack + sizeof(stack)), 0, 0);
-  ASSERT_EQ(ZX_OK, res);
-
-  res = child.wait_one(ZX_THREAD_RUNNING, zx::deadline_after(zx::sec(1)), nullptr);
+  zx_status_t res =
+      child_handle->wait_one(ZX_THREAD_RUNNING, zx::deadline_after(zx::sec(1)), nullptr);
   ASSERT_EQ(ZX_OK, res);
 
   zx_info_handle_basic_t info;
-  res = child.get_info(ZX_INFO_HANDLE_BASIC, &info, sizeof(info), nullptr, nullptr);
+  res = child_handle->get_info(ZX_INFO_HANDLE_BASIC, &info, sizeof(info), nullptr, nullptr);
   ASSERT_EQ(ZX_OK, res);
 
   fuchsia_cpu_profiler::SamplingConfig sampling_config{{

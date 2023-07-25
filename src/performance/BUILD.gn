@@ -6,6 +6,7 @@ group("tests") {
   deps = [
     "cpuperf:tests",
     "cpuperf_provider:tests",
+    "experimental/profiler:tests",
     "lib:tests",
     "memory:tests",
     "perfetto-bridge:tests",

@@ -5,6 +5,8 @@
 #ifndef SRC_PERFORMANCE_EXPERIMENTAL_PROFILER_SAMPLER_H_
 #define SRC_PERFORMANCE_EXPERIMENTAL_PROFILER_SAMPLER_H_
 
+#include <lib/async/cpp/task.h>
+#include <lib/async/dispatcher.h>
 #include <lib/syslog/cpp/macros.h>
 #include <lib/zx/process.h>
 #include <lib/zx/result.h>
@@ -12,9 +14,8 @@
 #include <lib/zx/thread.h>
 #include <lib/zxdump/elf-search.h>
 #include <zircon/compiler.h>
+#include <zircon/types.h>
 
-#include <condition_variable>
-#include <mutex>
 #include <vector>
 
 #include <src/lib/unwinder/cfi_unwinder.h>
@@ -35,7 +36,7 @@ struct Sample {
 
 class Sampler {
  public:
-  explicit Sampler(async_dispatcher_t* dispatcher, std::vector<JobTarget> targets)
+  explicit Sampler(async_dispatcher_t* dispatcher, TargetTree targets)
       : dispatcher_(dispatcher), targets_(std::move(targets)) {}
 
   zx::result<> Start();
@@ -51,18 +52,12 @@ class Sampler {
   void AddThread(async_dispatcher_t* dispatcher, async::WaitBase* wait, zx_status_t status,
                  const zx_packet_signal_t* signal) {}
 
-  void CollectSamples();
-  enum State {
-    Running,
-    Stopped,
-  };
+  void CollectSamples(async_dispatcher_t* dispatcher, async::TaskBase* task, zx_status_t status);
 
   async_dispatcher_t* dispatcher_;
+  async::TaskMethod<profiler::Sampler, &profiler::Sampler::CollectSamples> sample_task_{this};
 
-  std::atomic<State> state_ = State::Stopped;
-  std::condition_variable state_cv_;
-
-  std::vector<JobTarget> targets_;
+  TargetTree targets_;
   std::vector<zx::ticks> inspecting_durations_;
   std::vector<Sample> samples_;
   std::vector<std::unique_ptr<ProcessWatcher>> watchers_;
