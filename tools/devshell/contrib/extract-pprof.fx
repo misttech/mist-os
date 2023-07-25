@@ -4,7 +4,7 @@
 # found in the LICENSE file.
 
 #### CATEGORY=Run, inspect and debug
-#### EXECUTABLE=${PREBUILT_3P_DIR}/python3/${HOST_PLATFORM}/bin/python3 ${FUCHSIA_DIR}/tools/devshell/contrib/extract-pprof.py
+#### EXECUTABLE=${PREBUILT_PYTHON3} ${FUCHSIA_DIR}/tools/devshell/contrib/extract-pprof.py
 ### Extract pprof data from inspect.json
 ## Fuchsia diagnostics provides a component inspection mechanism ("inspect")
 ## (see ## https://fuchsia.dev/fuchsia-src/development/diagnostics/inspect);

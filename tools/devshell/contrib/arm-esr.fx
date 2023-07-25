@@ -8,4 +8,4 @@
 
 ## Run `fx arm-esr --help` for usage.
 
-#### EXECUTABLE=${PREBUILT_3P_DIR}/python3/${HOST_PLATFORM}/bin/python3 ${FUCHSIA_DIR}/zircon/kernel/scripts/arm-esr.py
+#### EXECUTABLE=${PREBUILT_PYTHON3} ${FUCHSIA_DIR}/zircon/kernel/scripts/arm-esr.py

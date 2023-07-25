@@ -15,4 +15,4 @@ readonly SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pw
 source "$SCRIPT_DIR/../lib/vars.sh" || exit $?
 
 fx-config-read
-cd $FUCHSIA_BUILD_DIR && "${PREBUILT_PYTHON3_DIR}/bin/python3.8" "$SCRIPT_DIR"/publish.py "$@"
+cd $FUCHSIA_BUILD_DIR && "${PREBUILT_PYTHON3}" "$SCRIPT_DIR"/publish.py "$@"

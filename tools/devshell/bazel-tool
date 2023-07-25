@@ -23,7 +23,7 @@ fi
 source "$(cd "$(dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"/lib/bazel_utils.sh || exit $?
 fx-update-bazel-workspace
 
-"${PREBUILT_PYTHON3_DIR}/bin/python3" "${FUCHSIA_DIR}"/scripts/bazel-tool \
+"${PREBUILT_PYTHON3}" "${FUCHSIA_DIR}"/scripts/bazel-tool \
     --workspace="${BAZEL_WORKSPACE}" \
     --bazel="$(fx-get-bazel)" \
     --buildifier="${PREBUILT_BUILDIFIER}" \
