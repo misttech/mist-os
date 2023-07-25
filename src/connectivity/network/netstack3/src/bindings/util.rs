@@ -107,7 +107,7 @@ impl NeedsDataNotifier {
 /// by the Bindings side. It is a [`Stream`] of wakeups scheduled by the Core
 /// and upon receiving those wakeups, Bindings should perform any blocked
 /// work.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub(crate) struct NeedsDataWatcher {
     inner: Weak<NeedsData>,
 }

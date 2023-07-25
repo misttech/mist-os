@@ -424,9 +424,7 @@ impl NonSyncContext for FakeNonSyncCtx {
 
     type ReturnedBuffers = ();
 
-    type ProvidedBuffers = ();
-
-    type ListenerNotifier = ();
+    type ListenerNotifierOrProvidedBuffers = ();
 
     fn new_passive_open_buffers(
         buffer_sizes: BufferSizes,

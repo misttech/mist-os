@@ -50,7 +50,7 @@ use crate::{
 };
 
 impl<C: NonSyncContext> BufferProvider<C::ReceiveBuffer, C::SendBuffer> for C {
-    type ActiveOpen = C::ProvidedBuffers;
+    type ActiveOpen = C::ListenerNotifierOrProvidedBuffers;
 
     type PassiveOpen = C::ReturnedBuffers;
 
@@ -69,7 +69,7 @@ where
         + BufferProvider<
             C::ReceiveBuffer,
             C::SendBuffer,
-            ActiveOpen = <C as NonSyncContext>::ProvidedBuffers,
+            ActiveOpen = <C as NonSyncContext>::ListenerNotifierOrProvidedBuffers,
             PassiveOpen = <C as NonSyncContext>::ReturnedBuffers,
         >,
     SC: SyncContext<I, C>,
@@ -156,7 +156,7 @@ fn handle_incoming_packet<I, B, C, SC>(
         + BufferProvider<
             C::ReceiveBuffer,
             C::SendBuffer,
-            ActiveOpen = <C as NonSyncContext>::ProvidedBuffers,
+            ActiveOpen = <C as NonSyncContext>::ListenerNotifierOrProvidedBuffers,
             PassiveOpen = <C as NonSyncContext>::ReturnedBuffers,
         >,
     SC: BufferTransportIpContext<I, C, EmptyBuf> + DeviceIpSocketHandler<I, C>,
@@ -297,7 +297,7 @@ where
         + BufferProvider<
             C::ReceiveBuffer,
             C::SendBuffer,
-            ActiveOpen = <C as NonSyncContext>::ProvidedBuffers,
+            ActiveOpen = <C as NonSyncContext>::ListenerNotifierOrProvidedBuffers,
             PassiveOpen = <C as NonSyncContext>::ReturnedBuffers,
         >,
     SC: BufferTransportIpContext<I, C, EmptyBuf> + DeviceIpSocketHandler<I, C>,
@@ -448,7 +448,7 @@ where
         + BufferProvider<
             C::ReceiveBuffer,
             C::SendBuffer,
-            ActiveOpen = <C as NonSyncContext>::ProvidedBuffers,
+            ActiveOpen = <C as NonSyncContext>::ListenerNotifierOrProvidedBuffers,
             PassiveOpen = <C as NonSyncContext>::ReturnedBuffers,
         >,
     SC: BufferTransportIpContext<I, C, EmptyBuf> + DeviceIpSocketHandler<I, C>,

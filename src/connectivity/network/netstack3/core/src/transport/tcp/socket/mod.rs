@@ -137,13 +137,15 @@ pub trait NonSyncContext: TimerContext<TimerId> + TracingContext {
     /// open connection becomes established. The bindings can use this object
     /// to read/write bytes from/into the created buffers.
     type ReturnedBuffers: Debug;
-    /// The object that is needed from the bindings to initiate a connection,
-    /// it is provided by the bindings and will be later used to construct
-    /// buffers when the connection becomes established.
-    type ProvidedBuffers: Debug + Takeable + IntoBuffers<Self::ReceiveBuffer, Self::SendBuffer>;
-    /// The object that will signal to Bindings whether there are any incoming
-    /// connections on this listener.
-    type ListenerNotifier: Debug + ListenerNotifier;
+    /// The extra information provided by the Bindings that implements platform
+    /// dependent behaviors. It serves as a [`ListenerNotifier`] if the socket
+    /// was used as a listener and it will be used to provide buffers if used
+    /// to establish connections.
+    type ListenerNotifierOrProvidedBuffers: Debug
+        + Takeable
+        + Clone
+        + IntoBuffers<Self::ReceiveBuffer, Self::SendBuffer>
+        + ListenerNotifier;
 
     /// The buffer sizes to use when creating new sockets.
     fn default_buffer_sizes() -> BufferSizes;
@@ -252,9 +254,20 @@ impl<I: IpExt, D: Id, C: NonSyncContext> SocketMapStateSpec for TcpSocketSpec<I,
     type ListenerId = MaybeListenerId<I>;
     type ConnId = MaybeClosedConnectionId<I>;
 
-    type ListenerState = MaybeListener<I, C::ReturnedBuffers, C::ListenerNotifier>;
-    type ConnState =
-        Connection<I, D, C::Instant, C::ReceiveBuffer, C::SendBuffer, C::ProvidedBuffers>;
+    type ListenerState = MaybeListener<
+        I,
+        C::ReturnedBuffers,
+        C::ListenerNotifierOrProvidedBuffers,
+        C::ListenerNotifierOrProvidedBuffers,
+    >;
+    type ConnState = Connection<
+        I,
+        D,
+        C::Instant,
+        C::ReceiveBuffer,
+        C::SendBuffer,
+        C::ListenerNotifierOrProvidedBuffers,
+    >;
 
     type ListenerSharingState = ListenerSharingState;
     type ConnSharingState = SharingState;
@@ -800,17 +813,18 @@ impl<I: Ip, D, LI, RI> Tagged<ConnAddr<I::Addr, D, LI, RI>> for ConnAddrState<I>
 
 #[derive(Debug, Derivative, Clone)]
 #[cfg_attr(test, derive(PartialEq))]
-struct Unbound<D> {
+struct Unbound<D, Extra> {
     bound_device: Option<D>,
     buffer_sizes: BufferSizes,
     socket_options: SocketOptions,
     sharing: SharingState,
+    socket_extra: Extra,
 }
 
 /// Holds all the TCP socket states.
 pub(crate) struct Sockets<I: IpExt, D: WeakId, C: NonSyncContext> {
     port_alloc: PortAlloc<BoundSocketMap<I, D, IpPortSpec, TcpSocketSpec<I, D, C>>>,
-    inactive: IdMap<Unbound<D>>,
+    inactive: IdMap<Unbound<D, C::ListenerNotifierOrProvidedBuffers>>,
     socketmap: BoundSocketMap<I, D, IpPortSpec, TcpSocketSpec<I, D, C>>,
     bound_state: IdMapCollection<
         BoundSocketId<TcpSocketSpec<I, D, C>>,
@@ -850,7 +864,7 @@ impl<I: IpExt, D: WeakId, C: NonSyncContext> Sockets<I, D, C> {
     fn get_listener_by_id_mut(
         &mut self,
         id: ListenerId<I>,
-    ) -> Option<&mut Listener<I, C::ReturnedBuffers, C::ListenerNotifier>> {
+    ) -> Option<&mut Listener<I, C::ReturnedBuffers, C::ListenerNotifierOrProvidedBuffers>> {
         self.bound_state
             .get_mut(&BoundSocketId::Listener(MaybeListenerId::from(id)))
             .map(BoundListener::from_socket_state_mut)
@@ -944,24 +958,29 @@ impl<I: Ip, PassiveOpen, Notifier> Listener<I, PassiveOpen, Notifier> {
 
 #[derive(Clone, Debug)]
 #[cfg_attr(test, derive(Eq, PartialEq))]
-struct BoundState {
+struct BoundState<Extra> {
     buffer_sizes: BufferSizes,
     socket_options: SocketOptions,
+    socket_extra: Extra,
 }
 
 /// Represents either a bound socket or a listener socket.
 #[derive(Debug)]
 #[cfg_attr(test, derive(PartialEq))]
-enum MaybeListener<I: Ip, PassiveOpen, Notifier> {
-    Bound(BoundState),
+enum MaybeListener<I: Ip, PassiveOpen, Extra, Notifier> {
+    Bound(BoundState<Extra>),
     Listener(Listener<I, PassiveOpen, Notifier>),
 }
 
-impl<I: Ip, PassiveOpen: core::fmt::Debug, Notifier: Debug>
-    MaybeListener<I, PassiveOpen, Notifier>
+impl<
+        I: Ip,
+        PassiveOpen: core::fmt::Debug,
+        Extra: Debug,
+        Notifier: Debug + Into<Extra> + Takeable,
+    > MaybeListener<I, PassiveOpen, Extra, Notifier>
 {
     fn maybe_shutdown(&mut self) -> Option<Listener<I, PassiveOpen, Notifier>> {
-        let (buffer_sizes, socket_options) = match self {
+        let (buffer_sizes, socket_options, socket_extra) = match self {
             Self::Bound(_) => return None,
             Self::Listener(Listener {
                 backlog: _,
@@ -969,11 +988,15 @@ impl<I: Ip, PassiveOpen: core::fmt::Debug, Notifier: Debug>
                 pending: _,
                 buffer_sizes,
                 socket_options,
-                notifier: _,
-            }) => (buffer_sizes.clone(), socket_options.clone()),
+                notifier,
+            }) => (buffer_sizes.clone(), socket_options.clone(), notifier.take().into()),
         };
+        let replaced = core::mem::replace(
+            self,
+            Self::Bound(BoundState { buffer_sizes, socket_options, socket_extra }),
+        );
         assert_matches!(
-            core::mem::replace(self, Self::Bound(BoundState { buffer_sizes, socket_options })),
+            replaced,
             Self::Listener(listener) => Some(listener)
         )
     }
@@ -1006,7 +1029,12 @@ impl<I: IpExt> BoundId<I> {
             BoundSocketState<I, D, IpPortSpec, TcpSocketSpec<I, D, C>>,
         >,
     ) -> Option<(
-        &MaybeListener<I, C::ReturnedBuffers, C::ListenerNotifier>,
+        &MaybeListener<
+            I,
+            C::ReturnedBuffers,
+            C::ListenerNotifierOrProvidedBuffers,
+            C::ListenerNotifierOrProvidedBuffers,
+        >,
         &ListenerSharingState,
         &ListenerAddr<I::Addr, D, NonZeroU16>,
     )> {
@@ -1020,7 +1048,12 @@ impl<I: IpExt> BoundId<I> {
             BoundSocketState<I, D, IpPortSpec, TcpSocketSpec<I, D, C>>,
         >,
     ) -> Option<(
-        &mut MaybeListener<I, C::ReturnedBuffers, C::ListenerNotifier>,
+        &mut MaybeListener<
+            I,
+            C::ReturnedBuffers,
+            C::ListenerNotifierOrProvidedBuffers,
+            C::ListenerNotifierOrProvidedBuffers,
+        >,
         &mut ListenerSharingState,
         &mut ListenerAddr<I::Addr, D, NonZeroU16>,
     )> {
@@ -1036,7 +1069,12 @@ impl<I: IpExt> ListenerId<I> {
             BoundSocketState<I, D, IpPortSpec, TcpSocketSpec<I, D, C>>,
         >,
     ) -> Option<(
-        &MaybeListener<I, C::ReturnedBuffers, C::ListenerNotifier>,
+        &MaybeListener<
+            I,
+            C::ReturnedBuffers,
+            C::ListenerNotifierOrProvidedBuffers,
+            C::ListenerNotifierOrProvidedBuffers,
+        >,
         &ListenerSharingState,
         &ListenerAddr<I::Addr, D, NonZeroU16>,
     )> {
@@ -1050,7 +1088,12 @@ impl<I: IpExt> ListenerId<I> {
             BoundSocketState<I, D, IpPortSpec, TcpSocketSpec<I, D, C>>,
         >,
     ) -> Option<(
-        &mut MaybeListener<I, C::ReturnedBuffers, C::ListenerNotifier>,
+        &mut MaybeListener<
+            I,
+            C::ReturnedBuffers,
+            C::ListenerNotifierOrProvidedBuffers,
+            C::ListenerNotifierOrProvidedBuffers,
+        >,
         &mut ListenerSharingState,
         &mut ListenerAddr<I::Addr, D, NonZeroU16>,
     )> {
@@ -1066,7 +1109,12 @@ impl<I: IpExt> MaybeListenerId<I> {
             BoundSocketState<I, D, IpPortSpec, TcpSocketSpec<I, D, C>>,
         >,
     ) -> Option<(
-        &MaybeListener<I, C::ReturnedBuffers, C::ListenerNotifier>,
+        &MaybeListener<
+            I,
+            C::ReturnedBuffers,
+            C::ListenerNotifierOrProvidedBuffers,
+            C::ListenerNotifierOrProvidedBuffers,
+        >,
         &ListenerSharingState,
         &ListenerAddr<I::Addr, D, NonZeroU16>,
     )> {
@@ -1082,7 +1130,12 @@ impl<I: IpExt> MaybeListenerId<I> {
             BoundSocketState<I, D, IpPortSpec, TcpSocketSpec<I, D, C>>,
         >,
     ) -> Option<(
-        &mut MaybeListener<I, C::ReturnedBuffers, C::ListenerNotifier>,
+        &mut MaybeListener<
+            I,
+            C::ReturnedBuffers,
+            C::ListenerNotifierOrProvidedBuffers,
+            C::ListenerNotifierOrProvidedBuffers,
+        >,
         &mut ListenerSharingState,
         &mut ListenerAddr<I::Addr, D, NonZeroU16>,
     )> {
@@ -1117,7 +1170,14 @@ impl<I: IpExt> MaybeClosedConnectionId<I> {
             BoundSocketState<I, D, IpPortSpec, TcpSocketSpec<I, D, C>>,
         >,
     ) -> Option<(
-        &Connection<I, D, C::Instant, C::ReceiveBuffer, C::SendBuffer, C::ProvidedBuffers>,
+        &Connection<
+            I,
+            D,
+            C::Instant,
+            C::ReceiveBuffer,
+            C::SendBuffer,
+            C::ListenerNotifierOrProvidedBuffers,
+        >,
         &SharingState,
         &ConnAddr<I::Addr, D, NonZeroU16, NonZeroU16>,
     )> {
@@ -1133,7 +1193,14 @@ impl<I: IpExt> MaybeClosedConnectionId<I> {
             BoundSocketState<I, D, IpPortSpec, TcpSocketSpec<I, D, C>>,
         >,
     ) -> Option<(
-        &mut Connection<I, D, C::Instant, C::ReceiveBuffer, C::SendBuffer, C::ProvidedBuffers>,
+        &mut Connection<
+            I,
+            D,
+            C::Instant,
+            C::ReceiveBuffer,
+            C::SendBuffer,
+            C::ListenerNotifierOrProvidedBuffers,
+        >,
         &mut SharingState,
         &mut ConnAddr<I::Addr, D, NonZeroU16, NonZeroU16>,
     )> {
@@ -1168,7 +1235,14 @@ impl<I: IpExt> ConnectionId<I> {
             BoundSocketState<I, D, IpPortSpec, TcpSocketSpec<I, D, C>>,
         >,
     ) -> Option<(
-        &Connection<I, D, C::Instant, C::ReceiveBuffer, C::SendBuffer, C::ProvidedBuffers>,
+        &Connection<
+            I,
+            D,
+            C::Instant,
+            C::ReceiveBuffer,
+            C::SendBuffer,
+            C::ListenerNotifierOrProvidedBuffers,
+        >,
         &SharingState,
         &ConnAddr<I::Addr, D, NonZeroU16, NonZeroU16>,
     )> {
@@ -1187,7 +1261,14 @@ impl<I: IpExt> ConnectionId<I> {
             BoundSocketState<I, D, IpPortSpec, TcpSocketSpec<I, D, C>>,
         >,
     ) -> Option<(
-        &mut Connection<I, D, C::Instant, C::ReceiveBuffer, C::SendBuffer, C::ProvidedBuffers>,
+        &mut Connection<
+            I,
+            D,
+            C::Instant,
+            C::ReceiveBuffer,
+            C::SendBuffer,
+            C::ListenerNotifierOrProvidedBuffers,
+        >,
         &mut SharingState,
         &mut ConnAddr<I::Addr, D, NonZeroU16, NonZeroU16>,
     )> {
@@ -1278,7 +1359,11 @@ impl HandshakeStatus {
 pub(crate) trait SocketHandler<I: Ip, C: NonSyncContext>:
     DeviceIdContext<AnyDevice>
 {
-    fn create_socket(&mut self, ctx: &mut C) -> UnboundId<I>;
+    fn create_socket(
+        &mut self,
+        ctx: &mut C,
+        socket_extra: C::ListenerNotifierOrProvidedBuffers,
+    ) -> UnboundId<I>;
 
     fn bind(
         &mut self,
@@ -1292,7 +1377,6 @@ pub(crate) trait SocketHandler<I: Ip, C: NonSyncContext>:
         &mut self,
         id: BoundId<I>,
         backlog: NonZeroUsize,
-        notifier: C::ListenerNotifier,
     ) -> Result<ListenerId<I>, ListenError>;
 
     fn accept(
@@ -1309,7 +1393,6 @@ pub(crate) trait SocketHandler<I: Ip, C: NonSyncContext>:
         ctx: &mut C,
         id: BoundId<I>,
         remote: SocketAddr<I::Addr, Self::DeviceId>,
-        netstack_buffers: C::ProvidedBuffers,
     ) -> Result<ConnectionId<I>, ConnectError>;
 
     fn connect_unbound(
@@ -1318,7 +1401,6 @@ pub(crate) trait SocketHandler<I: Ip, C: NonSyncContext>:
         id: UnboundId<I>,
         remote_ip: ZonedAddr<I::Addr, Self::DeviceId>,
         remote_port: NonZeroU16,
-        netstack_buffers: C::ProvidedBuffers,
     ) -> Result<ConnectionId<I>, ConnectError>;
 
     fn get_handshake_status(&mut self, id: ConnectionId<I>) -> HandshakeStatus;
@@ -1331,7 +1413,7 @@ pub(crate) trait SocketHandler<I: Ip, C: NonSyncContext>:
         &mut self,
         ctx: &mut C,
         id: ListenerId<I>,
-    ) -> (BoundId<I>, C::ListenerNotifier);
+    ) -> (BoundId<I>, C::ListenerNotifierOrProvidedBuffers);
 
     fn get_unbound_info(&mut self, id: UnboundId<I>) -> UnboundInfo<Self::WeakDeviceId>;
     fn get_bound_info(&mut self, id: BoundId<I>) -> BoundInfo<I::Addr, Self::WeakDeviceId>;
@@ -1400,12 +1482,17 @@ pub(crate) trait SocketHandler<I: Ip, C: NonSyncContext>:
 }
 
 impl<I: IpLayerIpExt, C: NonSyncContext, SC: SyncContext<I, C>> SocketHandler<I, C> for SC {
-    fn create_socket(&mut self, _ctx: &mut C) -> UnboundId<I> {
+    fn create_socket(
+        &mut self,
+        _ctx: &mut C,
+        socket_extra: C::ListenerNotifierOrProvidedBuffers,
+    ) -> UnboundId<I> {
         let unbound = Unbound {
             buffer_sizes: C::default_buffer_sizes(),
             bound_device: Default::default(),
             sharing: Default::default(),
             socket_options: Default::default(),
+            socket_extra,
         };
         UnboundId(
             self.with_tcp_sockets_mut(move |sockets| sockets.inactive.push(unbound)),
@@ -1436,16 +1523,17 @@ impl<I: IpLayerIpExt, C: NonSyncContext, SC: SyncContext<I, C>> SocketHandler<I,
                     Some(port) => port,
                 };
                 debug!("bind {id:?} to {addr:?}:{}", port.get());
-                let inactive_entry = match inactive.entry(id.into()) {
+                let mut inactive_entry = match inactive.entry(id.into()) {
                     IdMapEntry::Vacant(_) => panic!("invalid unbound ID"),
                     IdMapEntry::Occupied(o) => o,
                 };
 
-                let Unbound { bound_device, buffer_sizes, socket_options, sharing } =
-                    &inactive_entry.get();
+                let Unbound { bound_device, buffer_sizes, socket_options, sharing, socket_extra, } =
+                    inactive_entry.get_mut();
                 let bound_state = BoundState {
                     buffer_sizes: buffer_sizes.clone(),
                     socket_options: socket_options.clone(),
+                    socket_extra: socket_extra.take(),
                 };
 
                 let (local_ip, device) = match addr {
@@ -1497,7 +1585,7 @@ impl<I: IpLayerIpExt, C: NonSyncContext, SC: SyncContext<I, C>> SocketHandler<I,
                     .map_err(|_: (InsertError, ListenerSharingState)| {
                         LocalAddressError::AddressInUse
                     })?;
-                let _: Unbound<_> = inactive_entry.remove();
+                let _: Unbound<_, _> = inactive_entry.remove();
                 Ok(bound)
             },
         )
@@ -1507,7 +1595,6 @@ impl<I: IpLayerIpExt, C: NonSyncContext, SC: SyncContext<I, C>> SocketHandler<I,
         &mut self,
         id: BoundId<I>,
         backlog: NonZeroUsize,
-        notifier: C::ListenerNotifier,
     ) -> Result<ListenerId<I>, ListenError> {
         self.with_tcp_sockets_mut(|sockets| {
             debug!("listen on {id:?} with backlog {backlog}");
@@ -1529,12 +1616,12 @@ impl<I: IpLayerIpExt, C: NonSyncContext, SC: SyncContext<I, C>> SocketHandler<I,
             };
 
             match listener {
-                MaybeListener::Bound(BoundState { buffer_sizes, socket_options }) => {
+                MaybeListener::Bound(BoundState { buffer_sizes, socket_options, socket_extra }) => {
                     *listener = MaybeListener::Listener(Listener::new(
                         backlog,
                         buffer_sizes.clone(),
                         socket_options.clone(),
-                        notifier,
+                        socket_extra.clone(),
                     ));
                 }
                 MaybeListener::Listener(_) => {
@@ -1587,7 +1674,6 @@ impl<I: IpLayerIpExt, C: NonSyncContext, SC: SyncContext<I, C>> SocketHandler<I,
         ctx: &mut C,
         id: BoundId<I>,
         remote: SocketAddr<I::Addr, Self::DeviceId>,
-        netstack_buffers: C::ProvidedBuffers,
     ) -> Result<ConnectionId<I>, ConnectError> {
         let bound_id = MaybeListenerId::from(id);
         let SocketAddr { ip: remote_ip, port: remote_port } = remote;
@@ -1598,7 +1684,7 @@ impl<I: IpLayerIpExt, C: NonSyncContext, SC: SyncContext<I, C>> SocketHandler<I,
                 let (bound, sharing, bound_addr) =
                     bound_id.get_from_bound_state(bound_state).expect("invalid bound");
                 let bound = assert_matches!(bound, MaybeListener::Bound(b) => b);
-                let BoundState { buffer_sizes, socket_options } = bound.clone();
+                let BoundState { buffer_sizes, socket_options, socket_extra } = bound.clone();
                 let ListenerAddr { ip, device: bound_device } = bound_addr;
                 let bound_addr = bound_addr.clone();
                 let ListenerIpAddr { addr: local_ip, identifier: local_port } = *ip;
@@ -1628,6 +1714,8 @@ impl<I: IpLayerIpExt, C: NonSyncContext, SC: SyncContext<I, C>> SocketHandler<I,
                 )?;
 
                 let ListenerSharingState { sharing, listening: _ } = *sharing;
+                let buffer_sizes = buffer_sizes.clone();
+                let socket_options = socket_options.clone();
                 let make_connection = move |addr, state| {
                     let _ = bound_state
                         .remove(&crate::socket::SocketId::Listener(bound_id))
@@ -1655,9 +1743,9 @@ impl<I: IpLayerIpExt, C: NonSyncContext, SC: SyncContext<I, C>> SocketHandler<I,
                     ip_sock,
                     local_port,
                     remote_port,
-                    netstack_buffers,
-                    buffer_sizes.clone(),
-                    socket_options.clone(),
+                    socket_extra,
+                    buffer_sizes,
+                    socket_options,
                     sharing,
                     mms,
                 )?;
@@ -1677,7 +1765,6 @@ impl<I: IpLayerIpExt, C: NonSyncContext, SC: SyncContext<I, C>> SocketHandler<I,
         id: UnboundId<I>,
         remote_ip: ZonedAddr<I::Addr, Self::DeviceId>,
         remote_port: NonZeroU16,
-        netstack_buffers: C::ProvidedBuffers,
     ) -> Result<ConnectionId<I>, ConnectError> {
         self.with_ip_transport_ctx_isn_generator_and_tcp_sockets_mut(
             |ip_transport_ctx, isn, sockets| {
@@ -1686,8 +1773,13 @@ impl<I: IpLayerIpExt, C: NonSyncContext, SC: SyncContext<I, C>> SocketHandler<I,
                     id_map::Entry::Vacant(_) => panic!("invalid unbound ID {:?}", id),
                     id_map::Entry::Occupied(o) => o,
                 };
-                let Unbound { bound_device, buffer_sizes: _, socket_options: _, sharing: _ } =
-                    inactive.get();
+                let Unbound {
+                    bound_device,
+                    buffer_sizes: _,
+                    socket_options: _,
+                    sharing: _,
+                    socket_extra: _,
+                } = inactive.get();
 
                 let (remote_ip, device) =
                     crate::transport::resolve_addr_with_device(remote_ip, bound_device.clone())?;
@@ -1713,8 +1805,13 @@ impl<I: IpLayerIpExt, C: NonSyncContext, SC: SyncContext<I, C>> SocketHandler<I,
                     None => return Err(ConnectError::NoPort),
                 };
 
-                let Unbound { buffer_sizes, bound_device: _, socket_options, sharing } =
-                    inactive.get();
+                let Unbound {
+                    buffer_sizes,
+                    bound_device: _,
+                    socket_options,
+                    sharing,
+                    socket_extra,
+                } = inactive.get();
 
                 let mms = ip_transport_ctx
                     .get_mms(ctx, &ip_sock)
@@ -1744,13 +1841,13 @@ impl<I: IpLayerIpExt, C: NonSyncContext, SC: SyncContext<I, C>> SocketHandler<I,
                     ip_sock,
                     local_port,
                     remote_port,
-                    netstack_buffers,
+                    socket_extra.clone(),
                     buffer_sizes.clone(),
                     socket_options.clone(),
                     *sharing,
                     mms,
                 )?;
-                let _: Unbound<_> = inactive.remove();
+                let _: Unbound<_, _> = inactive.remove();
                 Ok(conn_id)
             },
         )
@@ -1832,7 +1929,7 @@ impl<I: IpLayerIpExt, C: NonSyncContext, SC: SyncContext<I, C>> SocketHandler<I,
         &mut self,
         ctx: &mut C,
         id: ListenerId<I>,
-    ) -> (BoundId<I>, C::ListenerNotifier) {
+    ) -> (BoundId<I>, C::ListenerNotifierOrProvidedBuffers) {
         self.with_ip_transport_ctx_and_tcp_sockets_mut(
             |ip_transport_ctx, Sockets { bound_state, socketmap, inactive: _, port_alloc: _ }| {
                 debug!("shutdown on {id:?}");
@@ -1903,8 +2000,13 @@ impl<I: IpLayerIpExt, C: NonSyncContext, SC: SyncContext<I, C>> SocketHandler<I,
         self.with_ip_transport_ctx_and_tcp_sockets_mut(|sync_ctx, sockets| {
             debug!("set device on {id:?} to {device:?}");
             let Sockets { bound_state: _, inactive, port_alloc: _, socketmap: _ } = sockets;
-            let Unbound { bound_device, buffer_sizes: _, socket_options: _, sharing: _ } =
-                inactive.get_mut(id.into()).expect("invalid unbound socket ID");
+            let Unbound {
+                bound_device,
+                buffer_sizes: _,
+                socket_options: _,
+                sharing: _,
+                socket_extra: _,
+            } = inactive.get_mut(id.into()).expect("invalid unbound socket ID");
             *bound_device = device.map(|d| sync_ctx.downgrade_device_id(&d));
         })
     }
@@ -2177,8 +2279,13 @@ impl<I: IpLayerIpExt, C: NonSyncContext, SC: SyncContext<I, C>> SocketHandler<I,
     fn set_reuseaddr_unbound(&mut self, id: UnboundId<I>, reuse: bool) {
         self.with_tcp_sockets_mut(|sockets| {
             let Sockets { bound_state: _, port_alloc: _, inactive, socketmap: _ } = sockets;
-            let Unbound { sharing, bound_device: _, buffer_sizes: _, socket_options: _ } =
-                inactive.get_mut(id.into()).expect("invalid socket ID");
+            let Unbound {
+                sharing,
+                bound_device: _,
+                buffer_sizes: _,
+                socket_options: _,
+                socket_extra: _,
+            } = inactive.get_mut(id.into()).expect("invalid socket ID");
             *sharing = match reuse {
                 true => SharingState::ReuseAddress,
                 false => SharingState::Exclusive,
@@ -2244,6 +2351,7 @@ impl<I: IpLayerIpExt, C: NonSyncContext, SC: SyncContext<I, C>> SocketHandler<I,
                 *soft_error = soft_error.or(state.on_icmp_error(error, seq));
 
                 if let State::Closed(Closed { reason }) = state {
+                    tracing::info!("handshake_status: {handshake_status:?}");
                     handshake_status.update_if_pending(HandshakeStatus::Aborted);
                     match *acceptor {
                         Some(acceptor) => match acceptor {
@@ -2355,8 +2463,13 @@ fn get_reuseaddr<I: IpLayerIpExt, C: NonSyncContext, SC: SyncContext<I, C>>(
         let Sockets { bound_state, port_alloc: _, inactive, socketmap: _ } = sockets;
         let maybe_listener_id: MaybeListenerId<_> = match id {
             SocketId::Unbound(id) => {
-                let Unbound { sharing, bound_device: _, buffer_sizes: _, socket_options: _ } =
-                    inactive.get(id.into()).expect("invalid socket ID");
+                let Unbound {
+                    sharing,
+                    bound_device: _,
+                    buffer_sizes: _,
+                    socket_options: _,
+                    socket_extra: _,
+                } = inactive.get(id.into()).expect("invalid socket ID");
                 return match sharing {
                     SharingState::Exclusive => false,
                     SharingState::ReuseAddress => true,
@@ -2373,7 +2486,7 @@ fn get_reuseaddr<I: IpLayerIpExt, C: NonSyncContext, SC: SyncContext<I, C>>(
                 };
             }
         };
-        let (_, sharing, _): (&MaybeListener<_, _, _>, _, &ListenerAddr<_, _, _>) =
+        let (_, sharing, _): (&MaybeListener<_, _, _, _>, _, &ListenerAddr<_, _, _>) =
             maybe_listener_id.get_from_bound_state(bound_state).expect("invalid listener state");
         let ListenerSharingState { sharing, listening: _ } = sharing;
         return match sharing {
@@ -2422,7 +2535,7 @@ fn do_send_inner<I, SC, C>(
         C::Instant,
         C::ReceiveBuffer,
         C::SendBuffer,
-        C::ProvidedBuffers,
+        C::ListenerNotifierOrProvidedBuffers,
     >,
     addr: &ConnAddr<I::Addr, SC::WeakDeviceId, NonZeroU16, NonZeroU16>,
     ip_transport_ctx: &mut SC,
@@ -2535,8 +2648,13 @@ fn set_buffer_size<
         let Sockets { bound_state, port_alloc: _, inactive, socketmap: _ } = sockets;
         let get_listener = match id {
             SocketId::Unbound(id) => {
-                let Unbound { bound_device: _, buffer_sizes, socket_options: _, sharing: _ } =
-                    inactive.get_mut(id.into()).expect("invalid unbound ID");
+                let Unbound {
+                    bound_device: _,
+                    buffer_sizes,
+                    socket_options: _,
+                    sharing: _,
+                    socket_extra: _,
+                } = inactive.get_mut(id.into()).expect("invalid unbound ID");
                 return Which::set_unconnected_size(buffer_sizes, size);
             }
             SocketId::Connection(id) => {
@@ -2564,7 +2682,11 @@ fn set_buffer_size<
         let (state, _, _): (_, &mut ListenerSharingState, &mut ListenerAddr<_, _, _>) =
             get_listener;
         let buffer_sizes = match state {
-            MaybeListener::Bound(BoundState { buffer_sizes, socket_options: _ }) => buffer_sizes,
+            MaybeListener::Bound(BoundState {
+                buffer_sizes,
+                socket_options: _,
+                socket_extra: _,
+            }) => buffer_sizes,
             MaybeListener::Listener(Listener {
                 backlog: _,
                 ready: _,
@@ -2592,8 +2714,13 @@ fn get_buffer_size<
         let sizes = (|| {
             let listener = match id {
                 SocketId::Unbound(id) => {
-                    let Unbound { bound_device: _, buffer_sizes, socket_options: _, sharing: _ } =
-                        inactive.get(id.into()).expect("invalid unbound ID");
+                    let Unbound {
+                        bound_device: _,
+                        buffer_sizes,
+                        socket_options: _,
+                        sharing: _,
+                        socket_extra: _,
+                    } = inactive.get(id.into()).expect("invalid unbound ID");
                     return buffer_sizes.into_optional();
                 }
                 SocketId::Connection(id) => {
@@ -2620,9 +2747,11 @@ fn get_buffer_size<
 
             let (state, _, _): (_, &ListenerSharingState, &ListenerAddr<_, _, _>) = listener;
             match state {
-                MaybeListener::Bound(BoundState { buffer_sizes, socket_options: _ }) => {
-                    buffer_sizes
-                }
+                MaybeListener::Bound(BoundState {
+                    buffer_sizes,
+                    socket_options: _,
+                    socket_extra: _,
+                }) => buffer_sizes,
                 MaybeListener::Listener(Listener {
                     backlog: _,
                     ready: _,
@@ -2639,16 +2768,24 @@ fn get_buffer_size<
 }
 
 /// Creates a new socket in unbound state.
-pub fn create_socket<I, C>(sync_ctx: &SyncCtx<C>, ctx: &mut C) -> UnboundId<I>
+pub fn create_socket<I, C>(
+    sync_ctx: &SyncCtx<C>,
+    ctx: &mut C,
+    socket_extra: C::ListenerNotifierOrProvidedBuffers,
+) -> UnboundId<I>
 where
     I: IpExt,
     C: crate::NonSyncContext,
 {
     let mut sync_ctx = Locked::new(sync_ctx);
     I::map_ip(
-        IpInvariant((&mut sync_ctx, ctx)),
-        |IpInvariant((sync_ctx, ctx))| SocketHandler::create_socket(sync_ctx, ctx),
-        |IpInvariant((sync_ctx, ctx))| SocketHandler::create_socket(sync_ctx, ctx),
+        IpInvariant((&mut sync_ctx, ctx, socket_extra)),
+        |IpInvariant((sync_ctx, ctx, socket_extra))| {
+            SocketHandler::create_socket(sync_ctx, ctx, socket_extra)
+        },
+        |IpInvariant((sync_ctx, ctx, socket_extra))| {
+            SocketHandler::create_socket(sync_ctx, ctx, socket_extra)
+        },
     )
 }
 
@@ -2801,7 +2938,6 @@ pub fn listen<I, C>(
     sync_ctx: &SyncCtx<C>,
     id: BoundId<I>,
     backlog: NonZeroUsize,
-    notifier: C::ListenerNotifier,
 ) -> Result<ListenerId<I>, ListenError>
 where
     I: IpExt,
@@ -2809,13 +2945,9 @@ where
 {
     let mut sync_ctx = Locked::new(sync_ctx);
     I::map_ip(
-        (IpInvariant((&mut sync_ctx, backlog, notifier)), id),
-        |(IpInvariant((sync_ctx, backlog, notifier)), id)| {
-            SocketHandler::listen(sync_ctx, id, backlog, notifier)
-        },
-        |(IpInvariant((sync_ctx, backlog, notifier)), id)| {
-            SocketHandler::listen(sync_ctx, id, backlog, notifier)
-        },
+        (IpInvariant((&mut sync_ctx, backlog)), id),
+        |(IpInvariant((sync_ctx, backlog)), id)| SocketHandler::listen(sync_ctx, id, backlog),
+        |(IpInvariant((sync_ctx, backlog)), id)| SocketHandler::listen(sync_ctx, id, backlog),
     )
 }
 
@@ -2893,7 +3025,6 @@ pub fn connect_bound<I, C>(
     ctx: &mut C,
     id: BoundId<I>,
     remote: SocketAddr<I::Addr, DeviceId<C>>,
-    netstack_buffers: C::ProvidedBuffers,
 ) -> Result<ConnectionId<I>, ConnectError>
 where
     I: IpExt,
@@ -2901,12 +3032,12 @@ where
 {
     let mut sync_ctx = Locked::new(sync_ctx);
     I::map_ip(
-        (IpInvariant((&mut sync_ctx, ctx, netstack_buffers)), id, remote),
-        |(IpInvariant((sync_ctx, ctx, netstack_buffers)), id, remote)| {
-            SocketHandler::connect_bound(sync_ctx, ctx, id, remote, netstack_buffers)
+        (IpInvariant((&mut sync_ctx, ctx)), id, remote),
+        |(IpInvariant((sync_ctx, ctx)), id, remote)| {
+            SocketHandler::connect_bound(sync_ctx, ctx, id, remote)
         },
-        |(IpInvariant((sync_ctx, ctx, netstack_buffers)), id, remote)| {
-            SocketHandler::connect_bound(sync_ctx, ctx, id, remote, netstack_buffers)
+        |(IpInvariant((sync_ctx, ctx)), id, remote)| {
+            SocketHandler::connect_bound(sync_ctx, ctx, id, remote)
         },
     )
 }
@@ -2923,7 +3054,6 @@ pub fn connect_unbound<I, C>(
     id: UnboundId<I>,
     remote_ip: ZonedAddr<I::Addr, DeviceId<C>>,
     remote_port: NonZeroU16,
-    netstack_buffers: C::ProvidedBuffers,
 ) -> Result<ConnectionId<I>, ConnectError>
 where
     I: IpExt,
@@ -2931,26 +3061,12 @@ where
 {
     let mut sync_ctx = Locked::new(sync_ctx);
     I::map_ip(
-        (IpInvariant((&mut sync_ctx, ctx, remote_port, netstack_buffers)), id, remote_ip),
-        |(IpInvariant((sync_ctx, ctx, remote_port, netstack_buffers)), id, remote_ip)| {
-            SocketHandler::connect_unbound(
-                sync_ctx,
-                ctx,
-                id,
-                remote_ip,
-                remote_port,
-                netstack_buffers,
-            )
+        (IpInvariant((&mut sync_ctx, ctx, remote_port)), id, remote_ip),
+        |(IpInvariant((sync_ctx, ctx, remote_port)), id, remote_ip)| {
+            SocketHandler::connect_unbound(sync_ctx, ctx, id, remote_ip, remote_port)
         },
-        |(IpInvariant((sync_ctx, ctx, remote_port, netstack_buffers)), id, remote_ip)| {
-            SocketHandler::connect_unbound(
-                sync_ctx,
-                ctx,
-                id,
-                remote_ip,
-                remote_port,
-                netstack_buffers,
-            )
+        |(IpInvariant((sync_ctx, ctx, remote_port)), id, remote_ip)| {
+            SocketHandler::connect_unbound(sync_ctx, ctx, id, remote_ip, remote_port)
         },
     )
 }
@@ -2972,7 +3088,7 @@ fn connect_inner<I, SC, C>(
     ip_sock: IpSock<I, SC::WeakDeviceId, DefaultSendOptions>,
     local_port: NonZeroU16,
     remote_port: NonZeroU16,
-    netstack_buffers: C::ProvidedBuffers,
+    netstack_buffers: C::ListenerNotifierOrProvidedBuffers,
     buffer_sizes: BufferSizes,
     socket_options: SocketOptions,
     sharing: SharingState,
@@ -3143,7 +3259,7 @@ pub fn shutdown_listener<I, C>(
     sync_ctx: &SyncCtx<C>,
     ctx: &mut C,
     id: ListenerId<I>,
-) -> (BoundId<I>, C::ListenerNotifier)
+) -> (BoundId<I>, C::ListenerNotifierOrProvidedBuffers)
 where
     I: IpExt,
     C: crate::NonSyncContext,
@@ -3308,10 +3424,15 @@ pub struct ConnectionInfo<A: IpAddress, D> {
     pub device: Option<D>,
 }
 
-impl<D: Clone> From<&'_ Unbound<D>> for UnboundInfo<D> {
-    fn from(unbound: &Unbound<D>) -> Self {
-        let Unbound { bound_device: device, buffer_sizes: _, socket_options: _, sharing: _ } =
-            unbound;
+impl<D: Clone, Extra> From<&'_ Unbound<D, Extra>> for UnboundInfo<D> {
+    fn from(unbound: &Unbound<D, Extra>) -> Self {
+        let Unbound {
+            bound_device: device,
+            buffer_sizes: _,
+            socket_options: _,
+            sharing: _,
+            socket_extra: _,
+        } = unbound;
         Self { device: device.clone() }
     }
 }
@@ -3908,12 +4029,50 @@ mod tests {
         }
     }
 
+    #[derive(Debug, Clone, PartialEq, Eq)]
+    pub enum ProvidedBuffers {
+        Buffers(WriteBackClientBuffers),
+        NoBuffers,
+    }
+
+    impl Default for ProvidedBuffers {
+        fn default() -> Self {
+            Self::NoBuffers
+        }
+    }
+
+    impl From<WriteBackClientBuffers> for ProvidedBuffers {
+        fn from(buffers: WriteBackClientBuffers) -> Self {
+            ProvidedBuffers::Buffers(buffers)
+        }
+    }
+
+    impl From<ProvidedBuffers> for WriteBackClientBuffers {
+        fn from(extra: ProvidedBuffers) -> Self {
+            match extra {
+                ProvidedBuffers::Buffers(buffers) => buffers,
+                ProvidedBuffers::NoBuffers => Default::default(),
+            }
+        }
+    }
+
+    impl From<ProvidedBuffers> for () {
+        fn from(_: ProvidedBuffers) -> Self {
+            ()
+        }
+    }
+
+    impl From<()> for ProvidedBuffers {
+        fn from(_: ()) -> Self {
+            Default::default()
+        }
+    }
+
     impl NonSyncContext for TcpNonSyncCtx {
         type ReceiveBuffer = Rc<RefCell<RingBuffer>>;
         type SendBuffer = TestSendBuffer;
         type ReturnedBuffers = ClientBuffers;
-        type ProvidedBuffers = WriteBackClientBuffers;
-        type ListenerNotifier = ();
+        type ListenerNotifierOrProvidedBuffers = ProvidedBuffers;
 
         fn new_passive_open_buffers(
             buffer_sizes: BufferSizes,
@@ -3931,18 +4090,25 @@ mod tests {
         }
     }
 
-    type WriteBackClientBuffers = Rc<RefCell<Option<ClientBuffers>>>;
+    #[derive(Debug, Default, Clone, PartialEq, Eq)]
+    pub struct WriteBackClientBuffers(Rc<RefCell<Option<ClientBuffers>>>);
 
-    impl IntoBuffers<Rc<RefCell<RingBuffer>>, TestSendBuffer> for WriteBackClientBuffers {
+    impl IntoBuffers<Rc<RefCell<RingBuffer>>, TestSendBuffer> for ProvidedBuffers {
         fn into_buffers(
             self,
             buffer_sizes: BufferSizes,
         ) -> (Rc<RefCell<RingBuffer>>, TestSendBuffer) {
             let buffers = ClientBuffers::new(buffer_sizes);
-            *self.as_ref().borrow_mut() = Some(buffers.clone());
+            if let ProvidedBuffers::Buffers(b) = self {
+                *b.0.as_ref().borrow_mut() = Some(buffers.clone());
+            }
             let ClientBuffers { receive, send } = buffers;
             (receive, TestSendBuffer::new(send, Default::default()))
         }
+    }
+
+    impl ListenerNotifier for ProvidedBuffers {
+        fn new_incoming_connections(&mut self, _: usize) {}
     }
 
     impl<I: TcpTestIpExt, D: FakeStrongDeviceId + 'static> DeviceIpSocketHandler<I, TcpNonSyncCtx>
@@ -4203,7 +4369,7 @@ mod tests {
 
         let backlog = NonZeroUsize::new(1).unwrap();
         let server = net.with_context(REMOTE, |TcpCtx { sync_ctx, non_sync_ctx }| {
-            let conn = SocketHandler::create_socket(sync_ctx, non_sync_ctx);
+            let conn = SocketHandler::create_socket(sync_ctx, non_sync_ctx, Default::default());
             let bound = SocketHandler::bind(
                 sync_ctx,
                 non_sync_ctx,
@@ -4212,12 +4378,16 @@ mod tests {
                 Some(server_port),
             )
             .expect("failed to bind the server socket");
-            SocketHandler::listen(sync_ctx, bound, backlog, ()).expect("can listen")
+            SocketHandler::listen(sync_ctx, bound, backlog).expect("can listen")
         });
 
         let client_ends = WriteBackClientBuffers::default();
         let client = net.with_context(LOCAL, |TcpCtx { sync_ctx, non_sync_ctx }| {
-            let conn = SocketHandler::create_socket(sync_ctx, non_sync_ctx);
+            let conn = SocketHandler::create_socket(
+                sync_ctx,
+                non_sync_ctx,
+                ProvidedBuffers::Buffers(client_ends.clone()),
+            );
             if client_reuse_addr {
                 SocketHandler::set_reuseaddr_unbound(sync_ctx, conn, true);
             }
@@ -4238,7 +4408,6 @@ mod tests {
                         ip: ZonedAddr::Unzoned(I::FAKE_CONFIG.remote_ip),
                         port: server_port,
                     },
-                    client_ends.clone(),
                 )
                 .expect("failed to connect")
             } else {
@@ -4248,7 +4417,6 @@ mod tests {
                     conn,
                     ZonedAddr::Unzoned(I::FAKE_CONFIG.remote_ip),
                     server_port,
-                    client_ends.clone(),
                 )
                 .expect("failed to connect")
             }
@@ -4319,7 +4487,7 @@ mod tests {
         assert_connected(REMOTE, accepted);
 
         let ClientBuffers { send: client_snd_end, receive: client_rcv_end } =
-            client_ends.as_ref().borrow_mut().take().unwrap();
+            client_ends.0.as_ref().borrow_mut().take().unwrap();
         let ClientBuffers { send: accepted_snd_end, receive: accepted_rcv_end } = accepted_ends;
         for snd_end in [client_snd_end.clone(), accepted_snd_end] {
             snd_end.borrow_mut().extend_from_slice(b"Hello");
@@ -4346,11 +4514,16 @@ mod tests {
         // Check the listener is in correct state.
         assert_eq!(
             net.sync_ctx(REMOTE).outer.sockets.get_listener_by_id_mut(server),
-            Some(&mut Listener::new(backlog, BufferSizes::default(), SocketOptions::default(), ())),
+            Some(&mut Listener::new(
+                backlog,
+                BufferSizes::default(),
+                SocketOptions::default(),
+                Default::default()
+            )),
         );
 
         net.with_context(REMOTE, |TcpCtx { sync_ctx, non_sync_ctx }| {
-            let (bound, ()) = SocketHandler::shutdown_listener(sync_ctx, non_sync_ctx, server);
+            let (bound, _) = SocketHandler::shutdown_listener(sync_ctx, non_sync_ctx, server);
             SocketHandler::remove_bound(sync_ctx, bound);
         });
 
@@ -4386,8 +4559,8 @@ mod tests {
                 I::FAKE_CONFIG.local_ip,
                 I::FAKE_CONFIG.subnet.prefix(),
             ));
-        let s1 = SocketHandler::create_socket(&mut sync_ctx, &mut non_sync_ctx);
-        let s2 = SocketHandler::create_socket(&mut sync_ctx, &mut non_sync_ctx);
+        let s1 = SocketHandler::create_socket(&mut sync_ctx, &mut non_sync_ctx, Default::default());
+        let s2 = SocketHandler::create_socket(&mut sync_ctx, &mut non_sync_ctx, Default::default());
 
         let _b1 = SocketHandler::bind(
             &mut sync_ctx,
@@ -4437,17 +4610,19 @@ mod tests {
             if port == available_port {
                 continue;
             }
-            let unbound = SocketHandler::create_socket(&mut sync_ctx, &mut non_sync_ctx);
+            let unbound =
+                SocketHandler::create_socket(&mut sync_ctx, &mut non_sync_ctx, Default::default());
             let bound =
                 SocketHandler::bind(&mut sync_ctx, &mut non_sync_ctx, unbound, None, Some(port))
                     .expect("uncontested bind");
-            let _listener = SocketHandler::listen(&mut sync_ctx, bound, nonzero!(1usize), ())
-                .expect("can listen");
+            let _listener =
+                SocketHandler::listen(&mut sync_ctx, bound, nonzero!(1usize)).expect("can listen");
         }
 
         // Now that all but the LOCAL_PORT are occupied, ask the stack to
         // select a port.
-        let unbound = SocketHandler::create_socket(&mut sync_ctx, &mut non_sync_ctx);
+        let unbound =
+            SocketHandler::create_socket(&mut sync_ctx, &mut non_sync_ctx, Default::default());
         let result = SocketHandler::bind(&mut sync_ctx, &mut non_sync_ctx, unbound, None, None)
             .map(|bound| SocketHandler::get_bound_info(&mut sync_ctx, bound).port);
         assert_eq!(result, expected_result);
@@ -4461,7 +4636,8 @@ mod tests {
                 I::FAKE_CONFIG.remote_ip,
                 I::FAKE_CONFIG.subnet.prefix(),
             ));
-        let unbound = SocketHandler::create_socket(&mut sync_ctx, &mut non_sync_ctx);
+        let unbound =
+            SocketHandler::create_socket(&mut sync_ctx, &mut non_sync_ctx, Default::default());
         assert_matches!(
             SocketHandler::bind(
                 &mut sync_ctx,
@@ -4488,7 +4664,8 @@ mod tests {
                 Ipv6::FAKE_CONFIG.remote_ip,
                 Ipv6::FAKE_CONFIG.subnet.prefix(),
             ));
-        let unbound = SocketHandler::create_socket(&mut sync_ctx, &mut non_sync_ctx);
+        let unbound =
+            SocketHandler::create_socket(&mut sync_ctx, &mut non_sync_ctx, Default::default());
         assert_matches!(
             SocketHandler::bind(
                 &mut sync_ctx,
@@ -4515,7 +4692,8 @@ mod tests {
                 Ipv6::FAKE_CONFIG.remote_ip,
                 Ipv6::FAKE_CONFIG.subnet.prefix(),
             ));
-        let unbound = SocketHandler::create_socket(&mut sync_ctx, &mut non_sync_ctx);
+        let unbound =
+            SocketHandler::create_socket(&mut sync_ctx, &mut non_sync_ctx, Default::default());
         let bound = SocketHandler::bind(&mut sync_ctx, &mut non_sync_ctx, unbound, None, None)
             .expect("bind succeeds");
         assert_matches!(
@@ -4524,7 +4702,6 @@ mod tests {
                 &mut non_sync_ctx,
                 bound,
                 SocketAddr { ip: ZonedAddr::Unzoned(ll_ip), port: PORT_1 },
-                Default::default(),
             ),
             Err(ConnectError::Zone(ZonedAddressError::RequiredZoneNotProvided))
         );
@@ -4554,23 +4731,23 @@ mod tests {
         );
         const PORT: NonZeroU16 = nonzero!(100u16);
         let client_connection = net.with_context(LOCAL, |TcpCtx { sync_ctx, non_sync_ctx }| {
-            let socket: UnboundId<Ipv6> = SocketHandler::create_socket(sync_ctx, non_sync_ctx);
+            let socket: UnboundId<Ipv6> =
+                SocketHandler::create_socket(sync_ctx, non_sync_ctx, Default::default());
             SocketHandler::connect_unbound(
                 sync_ctx,
                 non_sync_ctx,
                 socket,
                 ZonedAddr::Unzoned(server_ip),
                 PORT,
-                Default::default(),
             )
             .expect("can connect")
         });
         net.with_context(REMOTE, |TcpCtx { sync_ctx, non_sync_ctx }| {
-            let socket = SocketHandler::create_socket(sync_ctx, non_sync_ctx);
+            let socket = SocketHandler::create_socket(sync_ctx, non_sync_ctx, Default::default());
             let bound = SocketHandler::bind(sync_ctx, non_sync_ctx, socket, None, Some(PORT))
                 .expect("failed to bind the client socket");
             let _listener =
-                SocketHandler::listen(sync_ctx, bound, NonZeroUsize::MIN, ()).expect("can listen");
+                SocketHandler::listen(sync_ctx, bound, NonZeroUsize::MIN).expect("can listen");
         });
 
         // Advance until the connection is established.
@@ -4634,20 +4811,20 @@ mod tests {
         );
         const PORT: NonZeroU16 = nonzero!(100u16);
         let server_listener = net.with_context(LOCAL, |TcpCtx { sync_ctx, non_sync_ctx }| {
-            let socket: UnboundId<Ipv6> = SocketHandler::create_socket(sync_ctx, non_sync_ctx);
+            let socket: UnboundId<Ipv6> =
+                SocketHandler::create_socket(sync_ctx, non_sync_ctx, Default::default());
             let bound = SocketHandler::bind(sync_ctx, non_sync_ctx, socket, None, Some(PORT))
                 .expect("failed to bind the client socket");
-            SocketHandler::listen(sync_ctx, bound, NonZeroUsize::MIN, ()).expect("can listen")
+            SocketHandler::listen(sync_ctx, bound, NonZeroUsize::MIN).expect("can listen")
         });
         let client_connection = net.with_context(REMOTE, |TcpCtx { sync_ctx, non_sync_ctx }| {
-            let socket = SocketHandler::create_socket(sync_ctx, non_sync_ctx);
+            let socket = SocketHandler::create_socket(sync_ctx, non_sync_ctx, Default::default());
             SocketHandler::connect_unbound(
                 sync_ctx,
                 non_sync_ctx,
                 socket,
                 AddrAndZone::new(server_ip.get(), FakeDeviceId).unwrap().into(),
                 PORT,
-                Default::default(),
             )
             .expect("failed to open a connection")
         });
@@ -4706,7 +4883,7 @@ mod tests {
         let mut net = new_test_net::<I>();
 
         let client = net.with_context(LOCAL, |TcpCtx { sync_ctx, non_sync_ctx }| {
-            let conn = SocketHandler::create_socket(sync_ctx, non_sync_ctx);
+            let conn = SocketHandler::create_socket(sync_ctx, non_sync_ctx, Default::default());
             let conn = SocketHandler::bind(
                 sync_ctx,
                 non_sync_ctx,
@@ -4720,7 +4897,6 @@ mod tests {
                 non_sync_ctx,
                 conn,
                 SocketAddr { ip: ZonedAddr::Unzoned(I::FAKE_CONFIG.remote_ip), port: PORT_1 },
-                Default::default(),
             )
             .expect("failed to connect")
         });
@@ -4789,7 +4965,8 @@ mod tests {
         let TcpCtx { mut sync_ctx, mut non_sync_ctx } =
             TcpCtx::with_sync_ctx(TcpSyncCtx::<I, _>::new_multiple_devices());
 
-        let bound_a = SocketHandler::create_socket(&mut sync_ctx, &mut non_sync_ctx);
+        let bound_a =
+            SocketHandler::create_socket(&mut sync_ctx, &mut non_sync_ctx, Default::default());
         SocketHandler::set_unbound_device(
             &mut sync_ctx,
             &mut non_sync_ctx,
@@ -4799,10 +4976,10 @@ mod tests {
         let bound_a =
             SocketHandler::bind(&mut sync_ctx, &mut non_sync_ctx, bound_a, None, Some(LOCAL_PORT))
                 .expect("bind should succeed");
-        let _bound_a = SocketHandler::listen(&mut sync_ctx, bound_a, nonzero!(10usize), ())
-            .expect("can listen");
+        let _bound_a =
+            SocketHandler::listen(&mut sync_ctx, bound_a, nonzero!(10usize)).expect("can listen");
 
-        let s = SocketHandler::create_socket(&mut sync_ctx, &mut non_sync_ctx);
+        let s = SocketHandler::create_socket(&mut sync_ctx, &mut non_sync_ctx, Default::default());
         // Binding `s` to the unspecified address should fail since the address
         // is shadowed by `bound_a`.
         assert_matches!(
@@ -4841,7 +5018,8 @@ mod tests {
                 Default::default(),
             ));
 
-        let unbound = SocketHandler::create_socket(&mut sync_ctx, &mut non_sync_ctx);
+        let unbound =
+            SocketHandler::create_socket(&mut sync_ctx, &mut non_sync_ctx, Default::default());
         let bound = SocketHandler::bind(
             &mut sync_ctx,
             &mut non_sync_ctx,
@@ -4875,14 +5053,14 @@ mod tests {
                 Default::default(),
             ));
 
-        let unbound = SocketHandler::create_socket(&mut sync_ctx, &mut non_sync_ctx);
+        let unbound =
+            SocketHandler::create_socket(&mut sync_ctx, &mut non_sync_ctx, Default::default());
         let bound = SocketHandler::connect_unbound(
             &mut sync_ctx,
             &mut non_sync_ctx,
             unbound,
             AddrAndZone::new(*ll_addr, MultipleDevicesId::A).unwrap().into(),
             LOCAL_PORT,
-            Default::default(),
         )
         .expect("connect should succeed");
 
@@ -4909,15 +5087,16 @@ mod tests {
                 I::FAKE_CONFIG.remote_ip,
                 I::FAKE_CONFIG.subnet.prefix(),
             ));
-        let unbound = SocketHandler::create_socket(&mut sync_ctx, &mut non_sync_ctx);
+        let unbound =
+            SocketHandler::create_socket(&mut sync_ctx, &mut non_sync_ctx, Default::default());
 
         let (addr, port) = (SpecifiedAddr::new(ip_addr).map(ZonedAddr::Unzoned), PORT_1);
         let bound =
             SocketHandler::bind(&mut sync_ctx, &mut non_sync_ctx, unbound, addr, Some(port))
                 .expect("bind should succeed");
         let info = if listen {
-            let listener = SocketHandler::listen(&mut sync_ctx, bound, nonzero!(25usize), ())
-                .expect("can listen");
+            let listener =
+                SocketHandler::listen(&mut sync_ctx, bound, nonzero!(25usize)).expect("can listen");
             SocketHandler::get_listener_info(&mut sync_ctx, listener)
         } else {
             SocketHandler::get_bound_info(&mut sync_ctx, bound)
@@ -4939,7 +5118,8 @@ mod tests {
         let local = SocketAddr { ip: ZonedAddr::Unzoned(I::FAKE_CONFIG.local_ip), port: PORT_1 };
         let remote = SocketAddr { ip: ZonedAddr::Unzoned(I::FAKE_CONFIG.remote_ip), port: PORT_2 };
 
-        let unbound = SocketHandler::create_socket(&mut sync_ctx, &mut non_sync_ctx);
+        let unbound =
+            SocketHandler::create_socket(&mut sync_ctx, &mut non_sync_ctx, Default::default());
         let bound = SocketHandler::bind(
             &mut sync_ctx,
             &mut non_sync_ctx,
@@ -4949,14 +5129,9 @@ mod tests {
         )
         .expect("bind should succeed");
 
-        let connected = SocketHandler::connect_bound(
-            &mut sync_ctx,
-            &mut non_sync_ctx,
-            bound,
-            remote,
-            Default::default(),
-        )
-        .expect("connect should succeed");
+        let connected =
+            SocketHandler::connect_bound(&mut sync_ctx, &mut non_sync_ctx, bound, remote)
+                .expect("connect should succeed");
 
         assert_eq!(
             SocketHandler::get_connection_info(&mut sync_ctx, connected),
@@ -5003,7 +5178,8 @@ mod tests {
         );
 
         let local_server = net.with_context(LOCAL, |TcpCtx { sync_ctx, non_sync_ctx }| {
-            let unbound = SocketHandler::<Ipv6, _>::create_socket(sync_ctx, non_sync_ctx);
+            let unbound =
+                SocketHandler::<Ipv6, _>::create_socket(sync_ctx, non_sync_ctx, Default::default());
             let device = FakeDeviceId;
             let bind_addr = match listen_any {
                 true => None,
@@ -5012,11 +5188,11 @@ mod tests {
             let bind =
                 SocketHandler::bind(sync_ctx, non_sync_ctx, unbound, bind_addr, Some(PORT_1))
                     .expect("failed to bind the client socket");
-            SocketHandler::listen(sync_ctx, bind, nonzero!(1usize), ()).expect("can listen")
+            SocketHandler::listen(sync_ctx, bind, nonzero!(1usize)).expect("can listen")
         });
 
         let _remote_client = net.with_context(REMOTE, |TcpCtx { sync_ctx, non_sync_ctx }| {
-            let unbound = SocketHandler::create_socket(sync_ctx, non_sync_ctx);
+            let unbound = SocketHandler::create_socket(sync_ctx, non_sync_ctx, Default::default());
             let device = FakeDeviceId;
             SocketHandler::connect_unbound(
                 sync_ctx,
@@ -5024,7 +5200,6 @@ mod tests {
                 unbound,
                 ZonedAddr::Zoned(AddrAndZone::new(*server_ip, device).unwrap()),
                 PORT_1,
-                Default::default(),
             )
             .expect("failed to connect")
         });
@@ -5071,7 +5246,8 @@ mod tests {
             port: PORT_2,
         };
 
-        let unbound = SocketHandler::create_socket(&mut sync_ctx, &mut non_sync_ctx);
+        let unbound =
+            SocketHandler::create_socket(&mut sync_ctx, &mut non_sync_ctx, Default::default());
         let bound = SocketHandler::bind(
             &mut sync_ctx,
             &mut non_sync_ctx,
@@ -5090,14 +5266,9 @@ mod tests {
             }
         );
 
-        let connected = SocketHandler::connect_bound(
-            &mut sync_ctx,
-            &mut non_sync_ctx,
-            bound,
-            remote_addr,
-            Default::default(),
-        )
-        .expect("connect should succeed");
+        let connected =
+            SocketHandler::connect_bound(&mut sync_ctx, &mut non_sync_ctx, bound, remote_addr)
+                .expect("connect should succeed");
 
         assert_eq!(
             SocketHandler::get_connection_info(&mut sync_ctx, connected),
@@ -5249,7 +5420,8 @@ mod tests {
                 I::FAKE_CONFIG.remote_ip,
                 I::FAKE_CONFIG.subnet.prefix(),
             ));
-        let unbound = SocketHandler::create_socket(&mut sync_ctx, &mut non_sync_ctx);
+        let unbound =
+            SocketHandler::create_socket(&mut sync_ctx, &mut non_sync_ctx, Default::default());
         SocketHandler::remove_unbound(&mut sync_ctx, unbound);
 
         sync_ctx.with_tcp_sockets(
@@ -5267,7 +5439,8 @@ mod tests {
                 I::FAKE_CONFIG.remote_ip,
                 I::FAKE_CONFIG.subnet.prefix(),
             ));
-        let unbound = SocketHandler::create_socket(&mut sync_ctx, &mut non_sync_ctx);
+        let unbound =
+            SocketHandler::create_socket(&mut sync_ctx, &mut non_sync_ctx, Default::default());
         let bound = SocketHandler::bind(
             &mut sync_ctx,
             &mut non_sync_ctx,
@@ -5291,7 +5464,7 @@ mod tests {
         set_logger_for_test();
         let mut net = new_test_net::<I>();
         let local_listener = net.with_context(LOCAL, |TcpCtx { sync_ctx, non_sync_ctx }| {
-            let unbound = SocketHandler::create_socket(sync_ctx, non_sync_ctx);
+            let unbound = SocketHandler::create_socket(sync_ctx, non_sync_ctx, Default::default());
             let bound = SocketHandler::bind(
                 sync_ctx,
                 non_sync_ctx,
@@ -5300,19 +5473,18 @@ mod tests {
                 Some(PORT_1),
             )
             .expect("bind should succeed");
-            SocketHandler::listen(sync_ctx, bound, NonZeroUsize::new(5).unwrap(), ())
+            SocketHandler::listen(sync_ctx, bound, NonZeroUsize::new(5).unwrap())
                 .expect("can listen")
         });
 
         let remote_connection = net.with_context(REMOTE, |TcpCtx { sync_ctx, non_sync_ctx }| {
-            let unbound = SocketHandler::create_socket(sync_ctx, non_sync_ctx);
+            let unbound = SocketHandler::create_socket(sync_ctx, non_sync_ctx, Default::default());
             SocketHandler::connect_unbound(
                 sync_ctx,
                 non_sync_ctx,
                 unbound,
                 ZonedAddr::Unzoned(I::FAKE_CONFIG.local_ip),
                 PORT_1,
-                Default::default(),
             )
             .expect("connect should succeed")
         });
@@ -5334,14 +5506,13 @@ mod tests {
         // Create a second half-open connection so that we have one entry in the
         // pending queue.
         let second_connection = net.with_context(REMOTE, |TcpCtx { sync_ctx, non_sync_ctx }| {
-            let unbound = SocketHandler::create_socket(sync_ctx, non_sync_ctx);
+            let unbound = SocketHandler::create_socket(sync_ctx, non_sync_ctx, Default::default());
             SocketHandler::connect_unbound(
                 sync_ctx,
                 non_sync_ctx,
                 unbound,
                 ZonedAddr::Unzoned(I::FAKE_CONFIG.local_ip),
                 PORT_1,
-                Default::default(),
             )
             .expect("connect should succeed")
         });
@@ -5353,7 +5524,7 @@ mod tests {
             assert_matches!(non_sync_ctx.timer_ctx().timers().len(), 1);
         });
 
-        let (local_bound, ()) = net.with_context(LOCAL, |TcpCtx { sync_ctx, non_sync_ctx }| {
+        let (local_bound, _) = net.with_context(LOCAL, |TcpCtx { sync_ctx, non_sync_ctx }| {
             SocketHandler::shutdown_listener(sync_ctx, non_sync_ctx, local_listener)
         });
 
@@ -5384,7 +5555,8 @@ mod tests {
         });
 
         net.with_context(LOCAL, |TcpCtx { sync_ctx, non_sync_ctx }| {
-            let new_unbound = SocketHandler::create_socket(sync_ctx, non_sync_ctx);
+            let new_unbound =
+                SocketHandler::create_socket(sync_ctx, non_sync_ctx, Default::default());
             assert_matches!(
                 SocketHandler::bind(
                     sync_ctx,
@@ -5397,20 +5569,20 @@ mod tests {
             );
             // Bring the already-shutdown listener back to listener again.
             let _: ListenerId<_> =
-                SocketHandler::listen(sync_ctx, local_bound, NonZeroUsize::new(5).unwrap(), ())
+                SocketHandler::listen(sync_ctx, local_bound, NonZeroUsize::new(5).unwrap())
                     .expect("can listen again");
         });
 
         let new_remote_connection =
             net.with_context(REMOTE, |TcpCtx { sync_ctx, non_sync_ctx }| {
-                let unbound = SocketHandler::create_socket(sync_ctx, non_sync_ctx);
+                let unbound =
+                    SocketHandler::create_socket(sync_ctx, non_sync_ctx, Default::default());
                 SocketHandler::connect_unbound(
                     sync_ctx,
                     non_sync_ctx,
                     unbound,
                     ZonedAddr::Unzoned(I::FAKE_CONFIG.local_ip),
                     PORT_1,
-                    Default::default(),
                 )
                 .expect("connect should succeed")
             });
@@ -5439,7 +5611,7 @@ mod tests {
         let mut remote_sizes = BufferSizes { send: 1024, receive: 2000 };
 
         let local_listener = net.with_context(LOCAL, |TcpCtx { sync_ctx, non_sync_ctx }| {
-            let unbound = SocketHandler::create_socket(sync_ctx, non_sync_ctx);
+            let unbound = SocketHandler::create_socket(sync_ctx, non_sync_ctx, Default::default());
             let bound = SocketHandler::bind(
                 sync_ctx,
                 non_sync_ctx,
@@ -5455,12 +5627,12 @@ mod tests {
                 bound,
                 local_sizes.receive,
             );
-            SocketHandler::listen(sync_ctx, bound, NonZeroUsize::new(5).unwrap(), ())
+            SocketHandler::listen(sync_ctx, bound, NonZeroUsize::new(5).unwrap())
                 .expect("can listen")
         });
 
         let remote_connection = net.with_context(REMOTE, |TcpCtx { sync_ctx, non_sync_ctx }| {
-            let unbound = SocketHandler::create_socket(sync_ctx, non_sync_ctx);
+            let unbound = SocketHandler::create_socket(sync_ctx, non_sync_ctx, Default::default());
             SocketHandler::set_send_buffer_size(sync_ctx, non_sync_ctx, unbound, remote_sizes.send);
             SocketHandler::set_receive_buffer_size(
                 sync_ctx,
@@ -5474,7 +5646,6 @@ mod tests {
                 unbound,
                 ZonedAddr::Unzoned(I::FAKE_CONFIG.local_ip),
                 PORT_1,
-                Default::default(),
             )
             .expect("connect should succeed")
         });
@@ -5590,19 +5761,21 @@ mod tests {
             ));
 
         let first_bound = {
-            let unbound = SocketHandler::create_socket(&mut sync_ctx, &mut non_sync_ctx);
+            let unbound =
+                SocketHandler::create_socket(&mut sync_ctx, &mut non_sync_ctx, Default::default());
             SocketHandler::set_reuseaddr_unbound(&mut sync_ctx, unbound, true);
             SocketHandler::bind(&mut sync_ctx, &mut non_sync_ctx, unbound, None, None)
                 .expect("bind succeeds")
         };
         let _second_bound = {
-            let unbound = SocketHandler::create_socket(&mut sync_ctx, &mut non_sync_ctx);
+            let unbound =
+                SocketHandler::create_socket(&mut sync_ctx, &mut non_sync_ctx, Default::default());
             SocketHandler::set_reuseaddr_unbound(&mut sync_ctx, unbound, true);
             SocketHandler::bind(&mut sync_ctx, &mut non_sync_ctx, unbound, None, None)
                 .expect("bind succeeds")
         };
 
-        let _listen = SocketHandler::listen(&mut sync_ctx, first_bound, nonzero!(10usize), ())
+        let _listen = SocketHandler::listen(&mut sync_ctx, first_bound, nonzero!(10usize))
             .expect("can listen");
     }
 
@@ -5622,13 +5795,15 @@ mod tests {
                 I::FAKE_CONFIG.subnet.prefix(),
             ));
 
-        let unbound = SocketHandler::create_socket(&mut sync_ctx, &mut non_sync_ctx);
+        let unbound =
+            SocketHandler::create_socket(&mut sync_ctx, &mut non_sync_ctx, Default::default());
         SocketHandler::set_reuseaddr_unbound(&mut sync_ctx, unbound, set_reuseaddr[0]);
         let _first_bound =
             SocketHandler::bind(&mut sync_ctx, &mut non_sync_ctx, unbound, None, Some(PORT_1))
                 .expect("bind succeeds");
 
-        let unbound = SocketHandler::create_socket(&mut sync_ctx, &mut non_sync_ctx);
+        let unbound =
+            SocketHandler::create_socket(&mut sync_ctx, &mut non_sync_ctx, Default::default());
         SocketHandler::set_reuseaddr_unbound(&mut sync_ctx, unbound, set_reuseaddr[1]);
         let second_bind_result =
             SocketHandler::bind(&mut sync_ctx, &mut non_sync_ctx, unbound, None, Some(PORT_1));
@@ -5654,7 +5829,8 @@ mod tests {
                 FakeTcpState::default(),
             ));
 
-        let unbound = SocketHandler::create_socket(&mut sync_ctx, &mut non_sync_ctx);
+        let unbound =
+            SocketHandler::create_socket(&mut sync_ctx, &mut non_sync_ctx, Default::default());
         let first = SocketHandler::bind(
             &mut sync_ctx,
             &mut non_sync_ctx,
@@ -5664,7 +5840,8 @@ mod tests {
         )
         .unwrap();
 
-        let unbound = SocketHandler::create_socket(&mut sync_ctx, &mut non_sync_ctx);
+        let unbound =
+            SocketHandler::create_socket(&mut sync_ctx, &mut non_sync_ctx, Default::default());
         let _second = SocketHandler::bind(
             &mut sync_ctx,
             &mut non_sync_ctx,
@@ -5687,7 +5864,8 @@ mod tests {
                 I::FAKE_CONFIG.remote_ip,
                 I::FAKE_CONFIG.subnet.prefix(),
             ));
-        let unbound = SocketHandler::create_socket(&mut sync_ctx, &mut non_sync_ctx);
+        let unbound =
+            SocketHandler::create_socket(&mut sync_ctx, &mut non_sync_ctx, Default::default());
         SocketHandler::set_reuseaddr_unbound(&mut sync_ctx, unbound, true);
         let first = SocketHandler::bind(
             &mut sync_ctx,
@@ -5698,7 +5876,8 @@ mod tests {
         )
         .unwrap();
 
-        let unbound = SocketHandler::create_socket(&mut sync_ctx, &mut non_sync_ctx);
+        let unbound =
+            SocketHandler::create_socket(&mut sync_ctx, &mut non_sync_ctx, Default::default());
         SocketHandler::set_reuseaddr_unbound(&mut sync_ctx, unbound, true);
         let second =
             SocketHandler::bind(&mut sync_ctx, &mut non_sync_ctx, unbound, None, Some(PORT_1))
@@ -5722,7 +5901,7 @@ mod tests {
         let mut net = new_test_net::<I>();
 
         let server = net.with_context(LOCAL, |TcpCtx { sync_ctx, non_sync_ctx }| {
-            let unbound = SocketHandler::create_socket(sync_ctx, non_sync_ctx);
+            let unbound = SocketHandler::create_socket(sync_ctx, non_sync_ctx, Default::default());
             SocketHandler::set_reuseaddr_unbound(sync_ctx, unbound, true);
             let bound = SocketHandler::bind(
                 sync_ctx,
@@ -5732,18 +5911,17 @@ mod tests {
                 Some(PORT_1),
             )
             .expect("failed to bind the client socket");
-            SocketHandler::listen(sync_ctx, bound, nonzero!(10usize), ()).expect("can listen")
+            SocketHandler::listen(sync_ctx, bound, nonzero!(10usize)).expect("can listen")
         });
 
         let client = net.with_context(REMOTE, |TcpCtx { sync_ctx, non_sync_ctx }| {
-            let unbound = SocketHandler::create_socket(sync_ctx, non_sync_ctx);
+            let unbound = SocketHandler::create_socket(sync_ctx, non_sync_ctx, Default::default());
             SocketHandler::connect_unbound(
                 sync_ctx,
                 non_sync_ctx,
                 unbound,
                 ZonedAddr::Unzoned(I::FAKE_CONFIG.local_ip),
                 PORT_1,
-                Default::default(),
             )
             .expect("connect should succeed")
         });
@@ -5763,10 +5941,10 @@ mod tests {
             let (_server_conn, _, _): (_, SocketAddr<_, _>, ClientBuffers) =
                 SocketHandler::accept(sync_ctx, non_sync_ctx, server).expect("pending connection");
 
-            let (server, ()) = SocketHandler::shutdown_listener(sync_ctx, non_sync_ctx, server);
+            let (server, _) = SocketHandler::shutdown_listener(sync_ctx, non_sync_ctx, server);
             SocketHandler::remove_bound(sync_ctx, server);
 
-            let unbound = SocketHandler::create_socket(sync_ctx, non_sync_ctx);
+            let unbound = SocketHandler::create_socket(sync_ctx, non_sync_ctx, Default::default());
             assert_eq!(
                 SocketHandler::bind(sync_ctx, non_sync_ctx, unbound, None, Some(PORT_1)),
                 Err(LocalAddressError::AddressInUse)
@@ -5797,12 +5975,14 @@ mod tests {
         let [first_addr, second_addr] =
             bind_specified.map(|b| b.then_some(I::FAKE_CONFIG.local_ip).map(ZonedAddr::Unzoned));
         let first_bound = {
-            let unbound = SocketHandler::create_socket(&mut sync_ctx, &mut non_sync_ctx);
+            let unbound =
+                SocketHandler::create_socket(&mut sync_ctx, &mut non_sync_ctx, Default::default());
             SocketHandler::bind(&mut sync_ctx, &mut non_sync_ctx, unbound, first_addr, Some(PORT_1))
                 .expect("bind succeeds")
         };
 
-        let second = SocketHandler::create_socket(&mut sync_ctx, &mut non_sync_ctx);
+        let second =
+            SocketHandler::create_socket(&mut sync_ctx, &mut non_sync_ctx, Default::default());
 
         // Binding the second socket will fail because the first doesn't have
         // SO_REUSEADDR set.
@@ -5852,19 +6032,21 @@ mod tests {
             ));
 
         let bound = {
-            let unbound = SocketHandler::create_socket(&mut sync_ctx, &mut non_sync_ctx);
+            let unbound =
+                SocketHandler::create_socket(&mut sync_ctx, &mut non_sync_ctx, Default::default());
             SocketHandler::set_reuseaddr_unbound(&mut sync_ctx, unbound, true);
             SocketHandler::bind(&mut sync_ctx, &mut non_sync_ctx, unbound, None, Some(PORT_1))
                 .expect("bind succeeds")
         };
 
         let listener = {
-            let unbound = SocketHandler::create_socket(&mut sync_ctx, &mut non_sync_ctx);
+            let unbound =
+                SocketHandler::create_socket(&mut sync_ctx, &mut non_sync_ctx, Default::default());
             SocketHandler::set_reuseaddr_unbound(&mut sync_ctx, unbound, true);
             let bound =
                 SocketHandler::bind(&mut sync_ctx, &mut non_sync_ctx, unbound, None, Some(PORT_1))
                     .expect("bind succeeds");
-            SocketHandler::listen(&mut sync_ctx, bound, nonzero!(5usize), ()).expect("can listen")
+            SocketHandler::listen(&mut sync_ctx, bound, nonzero!(5usize)).expect("can listen")
         };
 
         // We can't clear SO_REUSEADDR on the listener because it's sharing with
@@ -5881,7 +6063,6 @@ mod tests {
             &mut non_sync_ctx,
             bound,
             SocketAddr { ip: ZonedAddr::Unzoned(I::FAKE_CONFIG.remote_ip), port: PORT_1 },
-            Default::default(),
         )
         .expect("can connect");
         SocketHandler::set_reuseaddr_listener(&mut sync_ctx, listener, false).expect("can unset")
@@ -5954,14 +6135,14 @@ mod tests {
                 I::FAKE_CONFIG.subnet.prefix(),
             ));
 
-        let unbound = SocketHandler::create_socket(&mut sync_ctx, &mut non_sync_ctx);
+        let unbound =
+            SocketHandler::create_socket(&mut sync_ctx, &mut non_sync_ctx, Default::default());
         let connection = SocketHandler::connect_unbound(
             &mut sync_ctx,
             &mut non_sync_ctx,
             unbound,
             ZonedAddr::Unzoned(I::FAKE_CONFIG.remote_ip),
             PORT_1,
-            Default::default(),
         )
         .expect("failed to create a connection socket");
         let frames = sync_ctx.inner.take_frames();
@@ -6074,21 +6255,20 @@ mod tests {
 
         let backlog = NonZeroUsize::new(1).unwrap();
         let server = net.with_context(REMOTE, |TcpCtx { sync_ctx, non_sync_ctx }| {
-            let conn = SocketHandler::create_socket(sync_ctx, non_sync_ctx);
+            let conn = SocketHandler::create_socket(sync_ctx, non_sync_ctx, Default::default());
             let bound = SocketHandler::bind(sync_ctx, non_sync_ctx, conn, None, Some(PORT_1))
                 .expect("failed to bind the server socket");
-            SocketHandler::listen(sync_ctx, bound, backlog, ()).expect("can listen")
+            SocketHandler::listen(sync_ctx, bound, backlog).expect("can listen")
         });
 
         net.with_context(LOCAL, |TcpCtx { sync_ctx, non_sync_ctx }| {
-            let conn = SocketHandler::create_socket(sync_ctx, non_sync_ctx);
+            let conn = SocketHandler::create_socket(sync_ctx, non_sync_ctx, Default::default());
             let _client = SocketHandler::connect_unbound(
                 sync_ctx,
                 non_sync_ctx,
                 conn,
                 ZonedAddr::Unzoned(I::FAKE_CONFIG.remote_ip),
                 PORT_1,
-                Default::default(),
             )
             .expect("failed to connect");
         });
@@ -6148,7 +6328,7 @@ mod tests {
         );
         // Locally, we create a connection with a full accept queue.
         let listener = net.with_context(LOCAL, |TcpCtx { sync_ctx, non_sync_ctx }| {
-            let unbound = SocketHandler::create_socket(sync_ctx, non_sync_ctx);
+            let unbound = SocketHandler::create_socket(sync_ctx, non_sync_ctx, Default::default());
             SocketHandler::set_reuseaddr_unbound(sync_ctx, unbound, true);
             let bound = SocketHandler::bind(
                 sync_ctx,
@@ -6158,19 +6338,18 @@ mod tests {
                 Some(CLIENT_PORT),
             )
             .expect("failed to bind");
-            SocketHandler::listen(sync_ctx, bound, NonZeroUsize::new(1).unwrap(), ())
+            SocketHandler::listen(sync_ctx, bound, NonZeroUsize::new(1).unwrap())
                 .expect("failed to listen")
         });
         // This connection is never used, just to keep accept queue full.
         let extra_conn = net.with_context(REMOTE, |TcpCtx { sync_ctx, non_sync_ctx }| {
-            let unbound = SocketHandler::create_socket(sync_ctx, non_sync_ctx);
+            let unbound = SocketHandler::create_socket(sync_ctx, non_sync_ctx, Default::default());
             SocketHandler::connect_unbound(
                 sync_ctx,
                 non_sync_ctx,
                 unbound,
                 ZonedAddr::Unzoned(I::FAKE_CONFIG.local_ip),
                 CLIENT_PORT,
-                Default::default(),
             )
             .expect("failed to connect")
         });
@@ -6209,14 +6388,13 @@ mod tests {
         // Try to initiate a connection from the remote since we have an active
         // listener locally.
         let conn = net.with_context(REMOTE, |TcpCtx { sync_ctx, non_sync_ctx }| {
-            let unbound = SocketHandler::create_socket(sync_ctx, non_sync_ctx);
+            let unbound = SocketHandler::create_socket(sync_ctx, non_sync_ctx, Default::default());
             SocketHandler::connect_unbound(
                 sync_ctx,
                 non_sync_ctx,
                 unbound,
                 ZonedAddr::Unzoned(I::FAKE_CONFIG.local_ip),
                 CLIENT_PORT,
-                Default::default(),
             )
             .expect("failed to connect")
         });
@@ -6242,7 +6420,7 @@ mod tests {
                 .expect("failed to accept a new connection");
         });
         let conn = net.with_context(REMOTE, |TcpCtx { sync_ctx, non_sync_ctx }| {
-            let unbound = SocketHandler::create_socket(sync_ctx, non_sync_ctx);
+            let unbound = SocketHandler::create_socket(sync_ctx, non_sync_ctx, Default::default());
             let bound = SocketHandler::bind(
                 sync_ctx,
                 non_sync_ctx,
@@ -6256,7 +6434,6 @@ mod tests {
                 non_sync_ctx,
                 bound,
                 SocketAddr { ip: ZonedAddr::Unzoned(I::FAKE_CONFIG.local_ip), port: CLIENT_PORT },
-                Default::default(),
             )
             .expect("failed to connect")
         });
@@ -6298,7 +6475,7 @@ mod tests {
         // Now we are using the same 4-tuple again to try to create a new
         // connection, this should fail.
         net.with_context(LOCAL, |TcpCtx { sync_ctx, non_sync_ctx }| {
-            let unbound = SocketHandler::create_socket(sync_ctx, non_sync_ctx);
+            let unbound = SocketHandler::create_socket(sync_ctx, non_sync_ctx, Default::default());
             SocketHandler::set_reuseaddr_unbound(sync_ctx, unbound, true);
             let bound = SocketHandler::bind(
                 sync_ctx,
@@ -6314,7 +6491,6 @@ mod tests {
                     non_sync_ctx,
                     bound,
                     SocketAddr { ip: ZonedAddr::Unzoned(I::FAKE_CONFIG.remote_ip), port: PORT_1 },
-                    Default::default(),
                 ),
                 Err(ConnectError::ConnectionExists),
             )
