@@ -198,32 +198,6 @@ example, because the package is in base).
 
 From //build/security.gni:227
 
-### av400_has_codec
-
-**Current value (from the default):** `true`
-
-From //src/devices/board/drivers/av400/BUILD.gn:9
-
-### av400_has_loopback
-
-**Current value (from the default):** `false`
-
-From //src/devices/board/drivers/av400/BUILD.gn:10
-
-### av400_pdm_use_dsp
-
-**Current value (from the default):** `false`
-
-From //src/devices/board/drivers/av400/BUILD.gn:14
-
-### av400_tdm_use_dsp
-
-Audio data can be processed using HW DSP FW.
-
-**Current value (from the default):** `false`
-
-From //src/devices/board/drivers/av400/BUILD.gn:13
-
 ### avb_algorithm
 
 **Current value (from the default):** `"DEPRECATED"`
@@ -883,12 +857,6 @@ From //boards/x64.gni:83
 **Overridden from the default:** `false`
 
 From //build/board.gni:116
-
-### buckeye_has_codec
-
-**Current value (from the default):** `false`
-
-From //src/devices/board/drivers/buckeye/BUILD.gn:9
 
 ### build_all_vp9_file_decoder_conformance_tests
 
@@ -7829,7 +7797,7 @@ Whether or not logging is disabled globally.
 
 **Current value (from the default):** `false`
 
-From //src/starnix/kernel/BUILD.gn:14
+From //src/starnix/kernel/BUILD.gn:13
 
 ### starnix_disable_tracing
 
@@ -7837,7 +7805,7 @@ Whether or not tracing is disabled globally.
 
 **Current value (from the default):** `true`
 
-From //src/starnix/kernel/BUILD.gn:17
+From //src/starnix/kernel/BUILD.gn:16
 
 ### target_cpu
 
