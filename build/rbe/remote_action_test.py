@@ -2021,11 +2021,14 @@ remote_metadata: {{
             with mock.patch.object(Path, 'rename') as mock_rename:
                 with mock.patch.object(Path, 'chmod') as mock_chmod:
                     with mock.patch.object(Path, 'stat') as mock_stat:
-                        status = stub.download(
-                            downloader=self.downloader,
-                            working_dir_abs=Path('/root/work'),
-                            dest=dest,
-                        )
+                        with mock.patch.object(
+                                remote_action, 'is_download_stub_file',
+                                return_value=False) as mock_is_stub:
+                            status = stub.download(
+                                downloader=self.downloader,
+                                working_dir_abs=working_dir,
+                                dest=dest,
+                            )
         self.assertEqual(status.returncode, download_status)
         mock_download.assert_called_with(
             path=remote_action.download_temp_location(working_dir / dest),
@@ -2034,7 +2037,53 @@ remote_metadata: {{
         )
         mock_stat.assert_called()
         mock_chmod.assert_called()
-        mock_rename.assert_called()
+        mock_is_stub.assert_called_once()
+        mock_rename.assert_called_with(working_dir / dest)
+
+    def test_download_to_alt_dest_preserving_backup_stub(self):
+        blob_digest = "00111ddeee000aa/24"
+        stub = remote_action.DownloadStubInfo(
+            path=Path('foo/bar.baz'),
+            type="file",
+            blob_digest=blob_digest,
+            action_digest="bce876da011112/14",
+            build_id="random-id777",
+        )
+        working_dir = Path('/root/work')
+        dest = Path('some/where/else.baz')
+        download_status = 0
+        with mock.patch.object(remotetool.RemoteTool, 'download_blob',
+                               return_value=cl_utils.SubprocessResult(
+                                   download_status)) as mock_download:
+            with mock.patch.object(Path, 'rename') as mock_rename:
+                with mock.patch.object(Path, 'chmod') as mock_chmod:
+                    with mock.patch.object(Path, 'stat') as mock_stat:
+                        with mock.patch.object(
+                                remote_action, 'is_download_stub_file',
+                                return_value=True) as mock_is_stub:
+                            status = stub.download(
+                                downloader=self.downloader,
+                                working_dir_abs=working_dir,
+                                dest=dest,
+                            )
+        self.assertEqual(status.returncode, download_status)
+        mock_download.assert_called_with(
+            path=remote_action.download_temp_location(working_dir / dest),
+            digest=blob_digest,
+            cwd=working_dir,
+        )
+        mock_stat.assert_called()
+        mock_chmod.assert_called()
+        mock_is_stub.assert_called_once()
+        mock_rename.assert_has_calls(
+            [
+                mock.call(
+                    remote_action.download_stub_backup_location(
+                        working_dir / dest)),
+                mock.call(working_dir / dest),
+            ],
+            any_order=False,  # order matters
+        )
 
     def test_download_fail(self):
         stub = remote_action.DownloadStubInfo(

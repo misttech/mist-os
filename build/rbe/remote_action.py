@@ -752,8 +752,11 @@ class DownloadStubInfo(object):
         if status.returncode == 0:  # download complete, success
             # Reflect the mode/permissions from stub to the real file.
             temp_dl.chmod(dest_abs.stat().st_mode)
-            # Backup the download stub.  This preserves the xattr.
-            dest_abs.rename(download_stub_backup_location(dest_abs))
+
+            if is_download_stub_file(dest_abs):
+                # Backup the download stub.  This preserves the xattr.
+                dest_abs.rename(download_stub_backup_location(dest_abs))
+
             temp_dl.rename(dest_abs)
 
         return status
