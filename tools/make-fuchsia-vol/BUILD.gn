@@ -31,6 +31,8 @@ if (is_host) {
     test_deps = [
       ":test_bin",
       ":test_data",
+      "//third_party/rust_crates:camino",
+      "//third_party/rust_crates:tempfile",
       "//third_party/rust_crates:zstd",
       "//third_party/zstd",
     ]

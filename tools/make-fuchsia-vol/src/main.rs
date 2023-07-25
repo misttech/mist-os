@@ -65,7 +65,7 @@ struct TopLevel {
     #[argh(option, default = "Arch::X64")]
     host_arch: Arch,
 
-    /// path to bootx64.efi
+    /// path to fuchsia-efi.efi
     #[argh(option)]
     bootloader: Option<Utf8PathBuf>,
 
@@ -476,7 +476,11 @@ fn check_args(args: &mut TopLevel) -> Result<(), Error> {
 
     if args.bootloader.is_none() {
         if let Some(build_dir) = &args.fuchsia_build_dir {
-            args.bootloader = Some(build_dir.join("kernel.efi_x64").join("bootx64.efi"));
+            let bootloader_dir = match args.arch {
+                Arch::X64 => build_dir.join("kernel.efi_x64"),
+                Arch::Arm64 => build_dir.join("kernel.efi_arm64"),
+            };
+            args.bootloader = Some(bootloader_dir.join("fuchsia-efi.efi"));
         } else {
             bail!("Missing --bootloader");
         }
@@ -775,25 +779,33 @@ fn write_abr(disk: &mut File, offset: u64, boot_part: BootPart) -> Result<(), Er
 #[cfg(test)]
 mod tests {
     use {
-        super::{run, TopLevel},
-        argh::FromArgs,
+        super::*,
+        camino::{Utf8Path, Utf8PathBuf},
     };
 
     #[test]
     fn test_compare_golden() {
+        let tmp = tempfile::tempdir().unwrap();
+        let dir = Utf8Path::from_path(tmp.path()).unwrap();
+
         for i in 0..11 {
-            std::fs::write(format!("/tmp/placeholder.{}", i), vec![i; 8192]).unwrap();
+            std::fs::write(dir.join(format!("placeholder.{}", i)), vec![i; 8192]).unwrap();
         }
 
         let current_exe = std::env::current_exe().unwrap();
 
-        let test_data_dir = current_exe.parent().unwrap().join("make-fuchsia-vol_test_data");
+        let test_data_dir = Utf8PathBuf::from_path_buf(
+            current_exe.parent().unwrap().join("make-fuchsia-vol_test_data"),
+        )
+        .unwrap();
 
         const IMAGE_SIZE: usize = 67108864;
+
+        let image_path = dir.join("image");
         run(TopLevel::from_args(
             &["make-fuchsia-vol"],
             &[
-                "/tmp/image",
+                image_path.as_str(),
                 "--abr-size",
                 "8192",
                 "--resize",
@@ -803,39 +815,39 @@ mod tests {
                 "--efi-size",
                 "40000000",
                 "--bootloader",
-                "/tmp/placeholder.0",
+                dir.join("placeholder.0").as_str(),
                 "--zbi",
-                "/tmp/placeholder.1",
+                dir.join("placeholder.1").as_str(),
                 "--zedboot",
-                "/tmp/placeholder.2",
+                dir.join("placeholder.2").as_str(),
                 "--cmdline",
-                "/tmp/placeholder.3",
+                dir.join("placeholder.3").as_str(),
                 "--sparse-fvm",
-                "/tmp/placeholder.4",
+                dir.join("placeholder.4").as_str(),
                 "--zircon-a",
-                "/tmp/placeholder.5",
+                dir.join("placeholder.5").as_str(),
                 "--vbmeta-a",
-                "/tmp/placeholder.6",
+                dir.join("placeholder.6").as_str(),
                 "--zircon-b",
-                "/tmp/placeholder.7",
+                dir.join("placeholder.7").as_str(),
                 "--vbmeta-b",
-                "/tmp/placeholder.8",
+                dir.join("placeholder.8").as_str(),
                 "--zircon-r",
-                "/tmp/placeholder.9",
+                dir.join("placeholder.9").as_str(),
                 "--vbmeta-r",
-                "/tmp/placeholder.10",
+                dir.join("placeholder.10").as_str(),
                 "--fuchsia-build-dir",
-                &test_data_dir.to_string_lossy(),
+                test_data_dir.as_str(),
             ],
         )
         .unwrap())
         .expect("run failed");
 
         for i in 0..11 {
-            std::fs::remove_file(format!("/tmp/placeholder.{}", i)).unwrap();
+            std::fs::remove_file(dir.join(format!("placeholder.{}", i))).unwrap();
         }
 
-        let image = std::fs::read("/tmp/image").expect("Unable to read /tmp/image");
+        let image = std::fs::read(&image_path).expect("Unable to read image");
         let file =
             std::fs::File::open(test_data_dir.join("golden")).expect("Unable to read golden");
         let golden = zstd::decode_all(file).expect("Unable to decompress");
