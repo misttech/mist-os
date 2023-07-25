@@ -25,7 +25,6 @@
             type: "expect_failure",
             matchers: [
                 "SocketTest.CloseClonedSocketAfterTcpRst",
-                "SocketTest.PassFD",
             ]
         }
     ],

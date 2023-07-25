@@ -107,7 +107,6 @@
                 "AllTCPSockets/TCPSocketPairTest.SetGetTCPCongestionLargeReadBuffer/*",
                 "AllTCPSockets/TCPSocketPairTest.SetCongestionControlFailsForUnsupported/*",
                 "AllTCPSockets/TCPSocketPairTest.SoLingerOptionWithReset/*",
-                "AllTCPSockets/TCPSocketPairTest.TestTCPCloseWithData/*",
                 "AllTCPSockets/TCPSocketPairTest.SetTCPWindowClampBelowMinRcvBufConnectedSocket/*",
                 "AllTCPSockets/TCPSocketPairTest.IpMulticastTtlDefault/*",
                 "AllTCPSockets/TCPSocketPairTest.IpMulticastLoopDefault/*",

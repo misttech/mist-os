@@ -68,7 +68,6 @@
 
                 // Read after shutdown.
                 "ReadAfterShutdownTests/ReadAfterShutdownTest.Success/IPv*_Datagram_Self_SHUT_RD_NonBlockingRead_NoPendingData",
-                "ReadAfterShutdownTests/ReadAfterShutdownTest.Success/IPv*_Stream_Self_SHUT_WR_*BlockingRead_NoPendingData",
 
                 // ICMP sockets.
                 "NetSocket/IcmpSocketTest.GetSockoptSoProtocol/*",
