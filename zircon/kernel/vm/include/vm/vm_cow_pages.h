@@ -117,6 +117,17 @@ class VmCowPages final : public VmHierarchyBase,
     DEBUG_ASSERT(root);
     bool result = root->page_source_ && root->page_source_->properties().is_preserving_page_content;
     DEBUG_ASSERT(result == is_root_source_user_pager_backed_locked());
+
+    // Calling snapshot-at-least-on-write of a slice in a snapshot-modified tree is unsupported
+    // as it creates an inconsistent structure.
+    if (is_slice_locked()) {
+      DEBUG_ASSERT(parent_);
+      AssertHeld(parent_->lock_ref());
+      if (parent_->is_self_or_parent_hidden_locked()) {
+        result = false;
+      }
+    }
+
     return result;
   }
 

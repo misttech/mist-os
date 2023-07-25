@@ -1820,4 +1820,53 @@ TEST_F(VmoClone2TestCase, DropParentCommittedBytes) {
   }
 }
 
+// Tests that creating a SNAPSHOT_AT_LEAST_ON_WRITE child of a slice in the middle of a
+// unidirectional chain works
+TEST_F(VmoClone2TestCase, SnapshotAtLeastOnWriteSliceInChain) {
+  zx::pager pager;
+  ASSERT_OK(zx::pager::create(0, &pager));
+
+  zx::port port;
+  ASSERT_OK(zx::port::create(0, &port));
+
+  zx::vmo vmo_src;
+  ASSERT_OK(zx::vmo::create(zx_system_get_page_size(), 0, &vmo_src));
+
+  // Make unidirectional chain
+  zx::vmo vmo;
+  ASSERT_OK(pager.create_vmo(0, port, 0, zx_system_get_page_size(), &vmo));
+
+  pager.supply_pages(vmo, 0, zx_system_get_page_size(), vmo_src, 0);
+  static constexpr uint32_t kOriginalData = 0xdead1eaf;
+  ASSERT_NO_FATAL_FAILURE(VmoWrite(vmo, kOriginalData));
+
+  zx::vmo clone1;
+  ASSERT_OK(vmo.create_child(ZX_VMO_CHILD_SNAPSHOT_AT_LEAST_ON_WRITE, 0, zx_system_get_page_size(),
+                             &clone1));
+  static constexpr uint32_t kNewData = 0xc0ffee;
+  ASSERT_NO_FATAL_FAILURE(VmoWrite(clone1, kNewData));
+
+  zx::vmo clone2;
+  ASSERT_OK(clone1.create_child(ZX_VMO_CHILD_SNAPSHOT_AT_LEAST_ON_WRITE, 0,
+                                zx_system_get_page_size(), &clone2));
+
+  static constexpr uint32_t kNewerData = 0x1eaf;
+  ASSERT_NO_FATAL_FAILURE(VmoWrite(clone2, kNewerData));
+
+  // Slice the middle of the chain
+  zx::vmo slice;
+  ASSERT_OK(clone1.create_child(ZX_VMO_CHILD_SLICE, 0, zx_system_get_page_size(), &slice));
+
+  // Snapshot-at-least-on-write the slice.
+  zx::vmo snapshot;
+  ASSERT_OK(slice.create_child(ZX_VMO_CHILD_SNAPSHOT_AT_LEAST_ON_WRITE, 0,
+                               zx_system_get_page_size(), &snapshot));
+
+  ASSERT_NO_FATAL_FAILURE(VmoCheck(vmo, kOriginalData));
+  ASSERT_NO_FATAL_FAILURE(VmoCheck(clone1, kNewData));
+  ASSERT_NO_FATAL_FAILURE(VmoCheck(slice, kNewData));
+  ASSERT_NO_FATAL_FAILURE(VmoCheck(snapshot, kNewData));
+  ASSERT_NO_FATAL_FAILURE(VmoCheck(clone2, kNewerData));
+}
+
 }  // namespace vmo_test
