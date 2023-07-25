@@ -1,3 +1,0 @@
-fuchsia-pkg://fuchsia.com/devfs-test#meta/devfs-test.cmx
-fuchsia-pkg://fuchsia.com/has_deprecated_shell#meta/has_deprecated_shell.cmx
-fuchsia-pkg://fuchsia.com/policy-integration-tests#meta/deprecated_shell_allowed.cmx

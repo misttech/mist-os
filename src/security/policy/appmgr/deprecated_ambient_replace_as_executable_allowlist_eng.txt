@@ -1,9 +1,0 @@
-# This is an allowlist intended for use in _eng build types, including core and
-# bringup.  While no package lacking a strictly need to mark memory as executable
-# memory to perform its function should make use of it (because that makes it very
-# difficult to use those packages in more-restricted build types), we choose to be
-# permissive here so that unit tests of JITs or other tests that transitively
-# include a JIT may still get the permissive executability policy.  Known users
-# include many of the chromium tests.
-
-*

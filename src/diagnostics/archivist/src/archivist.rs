@@ -54,7 +54,7 @@ pub struct Archivist {
     /// Task writing logs to serial.
     _serial_task: Option<fasync::Task<()>>,
 
-    /// Tasks receiving external events from component manager and appmgr.
+    /// Tasks receiving external events from component manager.
     incoming_external_event_producers: Vec<fasync::Task<()>>,
 
     /// The diagnostics pipelines that have been installed.

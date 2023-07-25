@@ -108,7 +108,7 @@ template("component_id_index_config") {
     deps = [ ":${component_id_index_merged_inputs}" ]
   }
 
-  # TODO(fxbug.dev/102390): Obsolete, will be removed in a future change.
+  # TODO(fxbug.dev/130900): Remove this once possible
   config_data("${target_name}-config-data") {
     forward_variables_from(invoker,
                            [

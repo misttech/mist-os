@@ -37,10 +37,7 @@ assembly_input_groups("bootstrap") {
 
 assembly_input_groups("legacy") {
   visibility = [ "*" ]
-  base_packages = [
-    "//src/sys/core:component_id_index_no_restrict_storage",
-    "//src/security/policy:appmgr_policy_eng",
-  ]
+  base_packages = [ "//src/sys/core:component_id_index_no_restrict_storage" ]
 }
 
 assembly_input_groups("network") {

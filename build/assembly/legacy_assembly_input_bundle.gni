@@ -421,6 +421,8 @@ template("legacy_assembly_input_bundle") {
     }
 
     component_id_index_dep = [ ":${target_name}.component_id_index_config" ]
+
+    # TODO(fxbug.dev/130900): Remove this dep once possible
     component_id_index_config_data_dep =
         [ ":${target_name}.component_id_index_config-config-data" ]
   } else {

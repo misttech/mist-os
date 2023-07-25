@@ -1,4 +1,0 @@
-# Component Tests
-fuchsia-pkg://fuchsia.com/component-manager-tests#meta/component_manager_boot_env_tests.cmx
-fuchsia-pkg://fuchsia.com/policy-integration-tests#meta/root_resource_allowed.cmx
-fuchsia-pkg://fuchsia.com/fuchsia-zircon-tests#meta/fuchsia-zircon-tests.cmx
