@@ -4,7 +4,6 @@
 
 import("//build/components.gni")
 import("//build/rust/rustc_binary.gni")
-import("//build/rust/rustc_library.gni")
 import("//build/rust/rustc_macro.gni")
 import("//build/rust/rustc_test.gni")
 import("//src/starnix/kernel/starnix.gni")
@@ -37,8 +36,8 @@ static_library("restricted_trampoline") {
   }
 }
 
-rustc_library("starnix_lib") {
-  name = "starnix"
+rustc_binary("starnix_kernel_bin") {
+  name = "starnix_kernel"
   edition = "2021"
   with_unit_tests = true
 
@@ -48,7 +47,7 @@ rustc_library("starnix_lib") {
     "hwasan",
   ]
 
-  source_root = "lib.rs"
+  source_root = "main.rs"
   deps = [
     ":starnix_kernel_config",
     "//sdk/fidl/fuchsia.component:fuchsia.component_rust",
@@ -64,6 +63,7 @@ rustc_library("starnix_lib") {
     "//sdk/fidl/fuchsia.posix.socket.packet:fuchsia.posix.socket.packet_rust",
     "//sdk/fidl/fuchsia.posix.socket.raw:fuchsia.posix.socket.raw_rust",
     "//sdk/fidl/fuchsia.process:fuchsia.process_rust",
+    "//sdk/fidl/fuchsia.process.lifecycle:fuchsia.process.lifecycle_rust",
     "//sdk/fidl/fuchsia.starnix.binder:fuchsia.starnix.binder_rust",
     "//sdk/fidl/fuchsia.starnix.container:fuchsia.starnix.container_rust",
     "//sdk/fidl/fuchsia.sysmem:fuchsia.sysmem_rust",
@@ -78,9 +78,11 @@ rustc_library("starnix_lib") {
     "//src/graphics/lib/magma/src/libmagma",
     "//src/lib/debug/rust",
     "//src/lib/diagnostics/inspect/contrib/rust",
+    "//src/lib/diagnostics/inspect/runtime/rust",
     "//src/lib/diagnostics/inspect/rust",
     "//src/lib/fdio/rust:fdio",
     "//src/lib/fidl/rust/fidl",
+    "//src/lib/fuchsia",
     "//src/lib/fuchsia-async",
     "//src/lib/fuchsia-component",
     "//src/lib/fuchsia-fs",
@@ -90,6 +92,7 @@ rustc_library("starnix_lib") {
     "//src/lib/process_builder",
     "//src/lib/storage/vfs/rust:vfs",
     "//src/lib/trace/rust:trace",
+    "//src/lib/trace/rust:trace-provider",
     "//src/lib/ui/flatland-frame-scheduling:flatland-frame-scheduling-lib",
     "//src/lib/ui/fuchsia-framebuffer",
     "//src/lib/ui/fuchsia-scenic",
@@ -97,6 +100,7 @@ rustc_library("starnix_lib") {
     "//src/lib/vulkan",
     "//src/lib/zircon/rust:fuchsia-zircon",
     "//src/starnix/lib/extended_pstate:lib",
+    "//src/starnix/lib/kill_job_on_panic",
     "//src/starnix/lib/linux_uapi",
     "//src/starnix/lib/magma",
     "//src/starnix/lib/syncio",
@@ -105,6 +109,7 @@ rustc_library("starnix_lib") {
     "//src/storage/ext4/read-only:ext4-read-only",
     "//src/sys/lib/runner",
     "//third_party/rust_crates:anyhow",
+    "//third_party/rust_crates:async-lock",
     "//third_party/rust_crates:async-trait",
     "//third_party/rust_crates:bitflags",
     "//third_party/rust_crates:derivative",
@@ -147,7 +152,7 @@ rustc_library("starnix_lib") {
   }
 
   test_deps = [
-    "//src/lib/fuchsia",
+    "//src/lib/fuchsia-fs",
     "//src/lib/fuchsia-fs",
     "//src/lib/test_util",
     "//src/storage/ext4/tests:test_img",
@@ -272,10 +277,10 @@ rustc_library("starnix_lib") {
     "fs/vmo_file.rs",
     "fs/wd_number.rs",
     "fs/xattr.rs",
-    "lib.rs",
     "loader.rs",
     "lock.rs",
     "logging.rs",
+    "main.rs",
     "mm/futex_table.rs",
     "mm/memory_manager.rs",
     "mm/mod.rs",
@@ -372,51 +377,6 @@ rustc_library("starnix_lib") {
   }
 
   configs += [ "//build/config/rust/lints:clippy_warn_all" ]
-
-  # This should only be used by the starnix kernel binary.
-  visibility = [ ":*" ]
-}
-
-rustc_binary("starnix_kernel_bin") {
-  name = "starnix_kernel"
-  edition = "2021"
-
-  # TODO(fxbug.dev/107698): Re-enable starnix in these environments.
-  exclude_toolchain_tags = [
-    "asan",
-    "hwasan",
-  ]
-
-  source_root = "main.rs"
-  sources = [ "main.rs" ]
-  deps = [
-    ":starnix_lib",
-    "//sdk/fidl/fuchsia.component.runner:fuchsia.component.runner_rust",
-    "//sdk/fidl/fuchsia.process.lifecycle:fuchsia.process.lifecycle_rust",
-    "//sdk/fidl/fuchsia.starnix.container:fuchsia.starnix.container_rust",
-    "//src/lib/diagnostics/inspect/runtime/rust",
-    "//src/lib/diagnostics/inspect/rust",
-    "//src/lib/fidl/rust/fidl",
-    "//src/lib/fuchsia",
-    "//src/lib/fuchsia-async",
-    "//src/lib/fuchsia-component",
-    "//src/lib/fuchsia-runtime",
-    "//src/lib/trace/rust:trace",
-    "//src/lib/trace/rust:trace-provider",
-    "//src/starnix/lib/kill_job_on_panic",
-    "//third_party/rust_crates:anyhow",
-    "//third_party/rust_crates:async-lock",
-    "//third_party/rust_crates:futures",
-  ]
-  if (current_cpu == "x64") {
-    deps += [ "//src/starnix/lib/extended_pstate:lib" ]
-  }
-
-  configs += [
-    # Needed to provide symbols required by libmagma.
-    "//build/config/fuchsia:static_cpp_standard_library",
-    "//build/config/rust/lints:clippy_warn_all",
-  ]
 }
 
 # The starnix kernel manifest, used by all containers.
@@ -442,7 +402,7 @@ fuchsia_unittest_package("starnix-tests") {
   manifest = "meta/starnix-tests.cml"
   deps = [
     ":starnix-test-files",
-    ":starnix_lib_test",
+    ":starnix_kernel_bin_test",
     "//src/starnix/examples/hello_starnix:bin",
   ]
   test_specs = {
