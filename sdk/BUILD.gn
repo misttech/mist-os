@@ -12,6 +12,7 @@ import("//build/sdk/generate_final_idk.gni")
 import("//build/sdk/merged_sdk.gni")
 import("//build/sdk/sdk.gni")
 import("//build/sdk/sdk_documentation.gni")
+import("//tools/check-licenses/build/license_data.gni")
 import("config.gni")
 
 _sdk_public_deps = [
@@ -190,6 +191,15 @@ sdk_documentation("musl_license") {
   ]
 }
 
+# Build this target to generate a NOTICE file for the SDK.
+# Uncomment the next line, build it, then manually copy the output
+# to "//tools/check-licenses/assets/sdk/NOTICE.fuchsia"
+# TODO(fxbug.dev/102264): Build the NOTICE file automatically during SDK generation.
+#
+#license_data("sdk_notice_gen") {
+#  target = "//sdk"
+#}
+
 # Notice file for all contents in the Fuchsia SDK.
 # TODO(fxbug.dev/102264): Replace this with individual notices for each SDK element.
 sdk_documentation("sdk_notice") {
@@ -199,7 +209,7 @@ sdk_documentation("sdk_notice") {
 
   files = [
     {
-      source = "//tools/check-licenses/static/sdk/NOTICE.fuchsia"
+      source = "//tools/check-licenses/assets/sdk/NOTICE.fuchsia"
       dest = "NOTICE.fuchsia"
     },
   ]
