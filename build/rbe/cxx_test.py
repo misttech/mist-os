@@ -54,6 +54,7 @@ class CxxActionTests(unittest.TestCase):
         self.assertEqual(
             c.compiler,
             cxx.CompilerTool(tool=Path('clang++'), type=cxx.Compiler.CLANG))
+        self.assertFalse(c.save_temps)
         self.assertTrue(c.compiler_is_clang)
         self.assertFalse(c.compiler_is_gcc)
         self.assertEqual(c.target, '')
@@ -82,6 +83,54 @@ class CxxActionTests(unittest.TestCase):
             _strs(['clang++', '-c', ii_file, '-o', output]),
         )
 
+    def test_clang_cxx_save_temps(self):
+        source = Path('hello.cc')
+        ii_file = Path('obj/path/to/hello.cc.ii')
+        output = Path('obj/path/to/hello.cc.o')
+        c = cxx.CxxAction(
+            _strs(['clang++', '-c', source, '-o', output, '--save-temps']))
+        self.assertTrue(c.save_temps)
+        self.assertEqual(c.output_file, output)
+        self.assertEqual(
+            c.compiler,
+            cxx.CompilerTool(tool=Path('clang++'), type=cxx.Compiler.CLANG))
+        self.assertTrue(c.compiler_is_clang)
+        self.assertFalse(c.compiler_is_gcc)
+        self.assertEqual(c.target, '')
+        self.assertEqual(
+            c.sources,
+            [cxx.Source(file=source, dialect=cxx.SourceLanguage.CXX)])
+        self.assertTrue(c.dialect_is_cxx)
+        self.assertFalse(c.dialect_is_c)
+        self.assertIsNone(c.depfile)
+        self.assertIsNone(c.sysroot)
+        self.assertIsNone(c.profile_list)
+        self.assertEqual(list(c.input_files()), [source])
+        self.assertEqual(
+            list(c.output_files()),
+            [
+                output,
+                # This .ii file is implicitly output by the compiler,
+                # but not the same as what we explicitly choose with ii_file.
+                Path('hello.ii'),
+                Path('hello.bc'),
+                Path('hello.s'),
+            ])
+        self.assertEqual(list(c.output_dirs()), [])
+        self.assertFalse(c.uses_macos_sdk)
+        self.assertIsNone(c.crash_diagnostics_dir)
+        self.assertEqual(c.preprocessed_output, ii_file)
+        preprocess, compile = c.split_preprocessing()
+        self.assertEqual(
+            preprocess,
+            _strs(
+                ['clang++', '-c', source, '-o', ii_file, '-E', '-fno-blocks']),
+        )
+        self.assertEqual(
+            compile,
+            _strs(['clang++', '-c', ii_file, '-o', output, '--save-temps']),
+        )
+
     def test_simple_clang_c(self):
         source = Path('hello.c')
         i_file = Path('hello.i')
@@ -93,6 +142,7 @@ class CxxActionTests(unittest.TestCase):
             cxx.CompilerTool(tool=Path('clang'), type=cxx.Compiler.CLANG))
         self.assertTrue(c.compiler_is_clang)
         self.assertFalse(c.compiler_is_gcc)
+        self.assertFalse(c.save_temps)
         self.assertEqual(c.target, '')
         self.assertEqual(
             c.sources, [cxx.Source(file=source, dialect=cxx.SourceLanguage.C)])
@@ -114,6 +164,51 @@ class CxxActionTests(unittest.TestCase):
         self.assertEqual(
             compile,
             _strs(['clang', '-c', i_file, '-o', output]),
+        )
+
+    def test_clang_c_save_temps(self):
+        source = Path('hello.c')
+        i_file = Path('obj/path/to/hello.i')
+        output = Path('obj/path/to/hello.o')
+        c = cxx.CxxAction(
+            _strs(['clang', '-c', source, '-o', output, '--save-temps']))
+        self.assertEqual(c.output_file, output)
+        self.assertEqual(
+            c.compiler,
+            cxx.CompilerTool(tool=Path('clang'), type=cxx.Compiler.CLANG))
+        self.assertTrue(c.compiler_is_clang)
+        self.assertFalse(c.compiler_is_gcc)
+        self.assertTrue(c.save_temps)
+        self.assertEqual(c.target, '')
+        self.assertEqual(
+            c.sources, [cxx.Source(file=source, dialect=cxx.SourceLanguage.C)])
+        self.assertFalse(c.dialect_is_cxx)
+        self.assertTrue(c.dialect_is_c)
+        self.assertIsNone(c.depfile)
+        self.assertIsNone(c.sysroot)
+        self.assertIsNone(c.profile_list)
+        self.assertEqual(list(c.input_files()), [source])
+        self.assertEqual(
+            list(c.output_files()),
+            [
+                output,
+                # This .i file is implicitly output by the compiler,
+                # but not the same as what we explicitly choose with ii_file.
+                Path('hello.i'),
+                Path('hello.bc'),
+                Path('hello.s'),
+            ])
+        self.assertEqual(list(c.output_dirs()), [])
+        self.assertIsNone(c.crash_diagnostics_dir)
+        self.assertEqual(c.preprocessed_output, i_file)
+        preprocess, compile = c.split_preprocessing()
+        self.assertEqual(
+            preprocess,
+            _strs(['clang', '-c', source, '-o', i_file, '-E', '-fno-blocks']),
+        )
+        self.assertEqual(
+            compile,
+            _strs(['clang', '-c', i_file, '-o', output, '--save-temps']),
         )
 
     def test_simple_clang_asm(self):

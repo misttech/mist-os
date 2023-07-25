@@ -65,6 +65,12 @@ def _cxx_command_scanner() -> argparse.ArgumentParser:
         metavar="DIR",
         help="additional directory where clang produces crash reports",
     )
+    parser.add_argument(
+        "--save-temps",
+        action="store_true",
+        default=False,
+        help="Compiler saves intermediate files.",
+    )
     return parser
 
 
@@ -319,6 +325,10 @@ class CxxAction(object):
         return self._sources
 
     @property
+    def save_temps(self) -> bool:
+        return self._attributes.save_temps
+
+    @property
     def compiler_is_clang(self) -> bool:
         return self.compiler.type == Compiler.CLANG
 
@@ -339,14 +349,33 @@ class CxxAction(object):
         return self._attributes.profile_list
 
     @property
-    def preprocessed_output(self) -> Path:
+    def preprocessed_suffix(self) -> str:
         if self._dialect == SourceLanguage.CXX:
-            pp_ext = '.ii'
+            return '.ii'
         else:
-            pp_ext = '.i'
+            return '.i'
 
+    @property
+    def preprocessed_output(self) -> Path:
+        """This is an explicitly named preprocessed output.
+
+        Depending on the compiler, this may not necessarily match the implicit
+        name of the corresponding output from --save-temps.
+        """
         # replaces .o with .i or .ii
-        return self.output_file.with_suffix(pp_ext)
+        return self.output_file.with_suffix(self.preprocessed_suffix)
+
+    @property
+    def save_temps_output_stem(self) -> Path:
+        """This is the location stem of --save-temps output files (for clang).
+
+        Note that ALL parent dirs and ALL extensions (like .cc.o) get removed.
+
+        Returns:
+          A Path stem, to which extensions like .ii can be appended.
+        """
+        name = self.output_file.name
+        return Path(_remove_suffix(name, ''.join(self.output_file.suffixes)))
 
     @property
     def uses_macos_sdk(self) -> bool:
@@ -370,7 +399,11 @@ class CxxAction(object):
         # for remote actions (but it does not hurt).
         if self.output_file:
             yield self.output_file  # This should be first, for naming purposes
-        # TODO: intermediate outputs from -save-temps, like .i, .s
+
+            if self.save_temps:
+                stem = self.save_temps_output_stem
+                for suffix in (self.preprocessed_suffix, '.bc', '.s'):
+                    yield stem.with_suffix(suffix)
 
     def output_dirs(self) -> Iterable[Path]:
         if self.crash_diagnostics_dir:
@@ -381,6 +414,8 @@ class CxxAction(object):
         for tok in self._command:
             if tok == str(self.output_file):
                 yield str(self.preprocessed_output)
+            elif tok == '--save-temps':  # no need during preprocessing
+                pass
             else:
                 # TODO: discard irrelevant flags, like linker flags
                 yield tok
