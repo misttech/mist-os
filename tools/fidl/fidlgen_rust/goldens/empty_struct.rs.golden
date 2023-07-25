@@ -140,13 +140,13 @@ impl fidl::endpoints::Proxy for EmptyProtocolProxy {
 }
 
 impl EmptyProtocolProxy {
-    /// Create a new Proxy for EmptyProtocol
+    /// Create a new Proxy for test.emptystruct/EmptyProtocol.
     pub fn new(channel: fidl::AsyncChannel) -> Self {
         let protocol_name = <EmptyProtocolMarker as fidl::endpoints::ProtocolMarker>::DEBUG_NAME;
         Self { client: fidl::client::Client::new(channel, protocol_name) }
     }
 
-    /// Get a Stream of events from the remote end of the EmptyProtocol protocol
+    /// Get a Stream of events from the remote end of the protocol.
     ///
     /// # Panics
     ///
@@ -212,15 +212,13 @@ impl futures::Stream for EmptyProtocolEventStream {
         mut self: std::pin::Pin<&mut Self>,
         cx: &mut std::task::Context<'_>,
     ) -> std::task::Poll<Option<Self::Item>> {
-        let buf = match futures::ready!(futures::stream::StreamExt::poll_next_unpin(
+        match futures::ready!(futures::stream::StreamExt::poll_next_unpin(
             &mut self.event_receiver,
             cx
         )?) {
-            Some(buf) => buf,
-            None => return std::task::Poll::Ready(None),
-        };
-
-        std::task::Poll::Ready(Some(EmptyProtocolEvent::decode(buf)))
+            Some(buf) => std::task::Poll::Ready(Some(EmptyProtocolEvent::decode(buf))),
+            None => std::task::Poll::Ready(None),
+        }
     }
 }
 
@@ -239,12 +237,11 @@ impl EmptyProtocolEvent {
         }
     }
 
-    /// Decodes a message buffer as a [`EmptyProtocolEvent`]. Transaction
-    /// ID in the message must be zero; this method does not check TXID.
+    /// Decodes a message buffer as a [`EmptyProtocolEvent`].
     fn decode(mut buf: fidl::MessageBufEtc) -> Result<EmptyProtocolEvent, fidl::Error> {
         let (bytes, _handles) = buf.split_mut();
         let (tx_header, _body_bytes) = fidl::encoding::decode_transaction_header(bytes)?;
-
+        debug_assert_eq!(tx_header.tx_id(), 0);
         match tx_header.ordinal() {
             0x1ff0ccf9b710e23f => {
                 let mut out = fidl::new_empty!(EmptyProtocolReceiveRequest);
@@ -264,7 +261,7 @@ impl EmptyProtocolEvent {
     }
 }
 
-/// A Stream of incoming requests for EmptyProtocol
+/// A Stream of incoming requests for test.emptystruct/EmptyProtocol.
 pub struct EmptyProtocolRequestStream {
     inner: std::sync::Arc<fidl::ServeInner>,
     is_terminated: bool,
@@ -307,7 +304,7 @@ impl futures::Stream for EmptyProtocolRequestStream {
         cx: &mut std::task::Context<'_>,
     ) -> std::task::Poll<Option<Self::Item>> {
         let this = &mut *self;
-        if this.inner.poll_shutdown(cx) {
+        if this.inner.check_shutdown(cx) {
             this.is_terminated = true;
             return std::task::Poll::Ready(None);
         }
@@ -340,7 +337,6 @@ impl futures::Stream for EmptyProtocolRequestStream {
                         &mut req,
                     )?;
                     let control_handle = EmptyProtocolControlHandle { inner: this.inner.clone() };
-
                     Ok(EmptyProtocolRequest::Send_ { e: req.e, control_handle })
                 }
                 0x76a931254962cea => {
@@ -352,7 +348,6 @@ impl futures::Stream for EmptyProtocolRequestStream {
                         &mut req,
                     )?;
                     let control_handle = EmptyProtocolControlHandle { inner: this.inner.clone() };
-
                     Ok(EmptyProtocolRequest::SendAndReceive {
                         e: req.e,
 
@@ -480,38 +475,28 @@ impl EmptyProtocolSendAndReceiveResponder {
     ///
     /// Sets the channel to shutdown if an error occurs.
     pub fn send(self, mut e: &Empty) -> Result<(), fidl::Error> {
-        let r = self.send_raw(e);
-        if r.is_err() {
+        let _result = self.send_raw(e);
+        if _result.is_err() {
             self.control_handle.shutdown();
         }
         self.drop_without_shutdown();
-        r
+        _result
     }
 
-    /// Similar to "send" but does not shutdown the channel if
-    /// an error occurs.
+    /// Similar to "send" but does not shutdown the channel if an error occurs.
     pub fn send_no_shutdown_on_err(self, mut e: &Empty) -> Result<(), fidl::Error> {
-        let r = self.send_raw(e);
+        let _result = self.send_raw(e);
         self.drop_without_shutdown();
-        r
+        _result
     }
 
     fn send_raw(&self, mut e: &Empty) -> Result<(), fidl::Error> {
-        let msg = fidl::encoding::TransactionMessage {
-            header: fidl::encoding::TransactionHeader::new(
-                self.tx_id,
-                self.ordinal,
-                fidl::encoding::DynamicFlags::empty(),
-            ),
-            body: (e,),
-        };
-
-        fidl::encoding::with_tls_encode_buf(|bytes, handles| {
-            fidl::encoding::Encoder::encode::<
-                fidl::encoding::TransactionMessageType<EmptyProtocolSendAndReceiveResponse>,
-            >(bytes, handles, msg)?;
-            self.control_handle.inner.send_raw_msg(&*bytes, &mut *handles)
-        })
+        self.control_handle.inner.send::<EmptyProtocolSendAndReceiveResponse>(
+            (e,),
+            self.tx_id,
+            self.ordinal,
+            fidl::encoding::DynamicFlags::empty(),
+        )
     }
 }
 

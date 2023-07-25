@@ -191,13 +191,13 @@ impl fidl::endpoints::Proxy for SimpleProtocolProxy {
 }
 
 impl SimpleProtocolProxy {
-    /// Create a new Proxy for SimpleProtocol
+    /// Create a new Proxy for test.nullable/SimpleProtocol.
     pub fn new(channel: fidl::AsyncChannel) -> Self {
         let protocol_name = <SimpleProtocolMarker as fidl::endpoints::ProtocolMarker>::DEBUG_NAME;
         Self { client: fidl::client::Client::new(channel, protocol_name) }
     }
 
-    /// Get a Stream of events from the remote end of the SimpleProtocol protocol
+    /// Get a Stream of events from the remote end of the protocol.
     ///
     /// # Panics
     ///
@@ -249,15 +249,13 @@ impl futures::Stream for SimpleProtocolEventStream {
         mut self: std::pin::Pin<&mut Self>,
         cx: &mut std::task::Context<'_>,
     ) -> std::task::Poll<Option<Self::Item>> {
-        let buf = match futures::ready!(futures::stream::StreamExt::poll_next_unpin(
+        match futures::ready!(futures::stream::StreamExt::poll_next_unpin(
             &mut self.event_receiver,
             cx
         )?) {
-            Some(buf) => buf,
-            None => return std::task::Poll::Ready(None),
-        };
-
-        std::task::Poll::Ready(Some(SimpleProtocolEvent::decode(buf)))
+            Some(buf) => std::task::Poll::Ready(Some(SimpleProtocolEvent::decode(buf))),
+            None => std::task::Poll::Ready(None),
+        }
     }
 }
 
@@ -265,12 +263,11 @@ impl futures::Stream for SimpleProtocolEventStream {
 pub enum SimpleProtocolEvent {}
 
 impl SimpleProtocolEvent {
-    /// Decodes a message buffer as a [`SimpleProtocolEvent`]. Transaction
-    /// ID in the message must be zero; this method does not check TXID.
+    /// Decodes a message buffer as a [`SimpleProtocolEvent`].
     fn decode(mut buf: fidl::MessageBufEtc) -> Result<SimpleProtocolEvent, fidl::Error> {
         let (bytes, _handles) = buf.split_mut();
         let (tx_header, _body_bytes) = fidl::encoding::decode_transaction_header(bytes)?;
-
+        debug_assert_eq!(tx_header.tx_id(), 0);
         match tx_header.ordinal() {
             _ => Err(fidl::Error::UnknownOrdinal {
                 ordinal: tx_header.ordinal(),
@@ -281,7 +278,7 @@ impl SimpleProtocolEvent {
     }
 }
 
-/// A Stream of incoming requests for SimpleProtocol
+/// A Stream of incoming requests for test.nullable/SimpleProtocol.
 pub struct SimpleProtocolRequestStream {
     inner: std::sync::Arc<fidl::ServeInner>,
     is_terminated: bool,
@@ -324,7 +321,7 @@ impl futures::Stream for SimpleProtocolRequestStream {
         cx: &mut std::task::Context<'_>,
     ) -> std::task::Poll<Option<Self::Item>> {
         let this = &mut *self;
-        if this.inner.poll_shutdown(cx) {
+        if this.inner.check_shutdown(cx) {
             this.is_terminated = true;
             return std::task::Poll::Ready(None);
         }
@@ -357,7 +354,6 @@ impl futures::Stream for SimpleProtocolRequestStream {
                         &mut req,
                     )?;
                     let control_handle = SimpleProtocolControlHandle { inner: this.inner.clone() };
-
                     Ok(SimpleProtocolRequest::Add {
                         a: req.a,
                         b: req.b,
@@ -466,38 +462,28 @@ impl SimpleProtocolAddResponder {
     ///
     /// Sets the channel to shutdown if an error occurs.
     pub fn send(self, mut sum: i32) -> Result<(), fidl::Error> {
-        let r = self.send_raw(sum);
-        if r.is_err() {
+        let _result = self.send_raw(sum);
+        if _result.is_err() {
             self.control_handle.shutdown();
         }
         self.drop_without_shutdown();
-        r
+        _result
     }
 
-    /// Similar to "send" but does not shutdown the channel if
-    /// an error occurs.
+    /// Similar to "send" but does not shutdown the channel if an error occurs.
     pub fn send_no_shutdown_on_err(self, mut sum: i32) -> Result<(), fidl::Error> {
-        let r = self.send_raw(sum);
+        let _result = self.send_raw(sum);
         self.drop_without_shutdown();
-        r
+        _result
     }
 
     fn send_raw(&self, mut sum: i32) -> Result<(), fidl::Error> {
-        let msg = fidl::encoding::TransactionMessage {
-            header: fidl::encoding::TransactionHeader::new(
-                self.tx_id,
-                self.ordinal,
-                fidl::encoding::DynamicFlags::empty(),
-            ),
-            body: (sum,),
-        };
-
-        fidl::encoding::with_tls_encode_buf(|bytes, handles| {
-            fidl::encoding::Encoder::encode::<
-                fidl::encoding::TransactionMessageType<SimpleProtocolAddResponse>,
-            >(bytes, handles, msg)?;
-            self.control_handle.inner.send_raw_msg(&*bytes, &mut *handles)
-        })
+        self.control_handle.inner.send::<SimpleProtocolAddResponse>(
+            (sum,),
+            self.tx_id,
+            self.ordinal,
+            fidl::encoding::DynamicFlags::empty(),
+        )
     }
 }
 

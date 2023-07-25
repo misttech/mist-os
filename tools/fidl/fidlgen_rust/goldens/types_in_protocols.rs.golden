@@ -1919,13 +1919,13 @@ impl fidl::endpoints::Proxy for ProtocolProxy {
 }
 
 impl ProtocolProxy {
-    /// Create a new Proxy for Protocol
+    /// Create a new Proxy for test.typesinprotocols/Protocol.
     pub fn new(channel: fidl::AsyncChannel) -> Self {
         let protocol_name = <ProtocolMarker as fidl::endpoints::ProtocolMarker>::DEBUG_NAME;
         Self { client: fidl::client::Client::new(channel, protocol_name) }
     }
 
-    /// Get a Stream of events from the remote end of the Protocol protocol
+    /// Get a Stream of events from the remote end of the protocol.
     ///
     /// # Panics
     ///
@@ -3850,15 +3850,13 @@ impl futures::Stream for ProtocolEventStream {
         mut self: std::pin::Pin<&mut Self>,
         cx: &mut std::task::Context<'_>,
     ) -> std::task::Poll<Option<Self::Item>> {
-        let buf = match futures::ready!(futures::stream::StreamExt::poll_next_unpin(
+        match futures::ready!(futures::stream::StreamExt::poll_next_unpin(
             &mut self.event_receiver,
             cx
         )?) {
-            Some(buf) => buf,
-            None => return std::task::Poll::Ready(None),
-        };
-
-        std::task::Poll::Ready(Some(ProtocolEvent::decode(buf)))
+            Some(buf) => std::task::Poll::Ready(Some(ProtocolEvent::decode(buf))),
+            None => std::task::Poll::Ready(None),
+        }
     }
 }
 
@@ -4326,12 +4324,11 @@ impl ProtocolEvent {
         }
     }
 
-    /// Decodes a message buffer as a [`ProtocolEvent`]. Transaction
-    /// ID in the message must be zero; this method does not check TXID.
+    /// Decodes a message buffer as a [`ProtocolEvent`].
     fn decode(mut buf: fidl::MessageBufEtc) -> Result<ProtocolEvent, fidl::Error> {
         let (bytes, _handles) = buf.split_mut();
         let (tx_header, _body_bytes) = fidl::encoding::decode_transaction_header(bytes)?;
-
+        debug_assert_eq!(tx_header.tx_id(), 0);
         match tx_header.ordinal() {
             0x51c5b06295c10c40 => {
                 let mut out = fidl::new_empty!(Basic);
@@ -4532,7 +4529,7 @@ impl ProtocolEvent {
     }
 }
 
-/// A Stream of incoming requests for Protocol
+/// A Stream of incoming requests for test.typesinprotocols/Protocol.
 pub struct ProtocolRequestStream {
     inner: std::sync::Arc<fidl::ServeInner>,
     is_terminated: bool,
@@ -4575,7 +4572,7 @@ impl futures::Stream for ProtocolRequestStream {
         cx: &mut std::task::Context<'_>,
     ) -> std::task::Poll<Option<Self::Item>> {
         let this = &mut *self;
-        if this.inner.poll_shutdown(cx) {
+        if this.inner.check_shutdown(cx) {
             this.is_terminated = true;
             return std::task::Poll::Ready(None);
         }
@@ -4608,7 +4605,6 @@ impl futures::Stream for ProtocolRequestStream {
                         &mut req,
                     )?;
                     let control_handle = ProtocolControlHandle { inner: this.inner.clone() };
-
                     Ok(ProtocolRequest::OneWayBasic {
                         uint8: req.uint8,
                         uint16: req.uint16,
@@ -4635,7 +4631,6 @@ impl futures::Stream for ProtocolRequestStream {
                         &mut req,
                     )?;
                     let control_handle = ProtocolControlHandle { inner: this.inner.clone() };
-
                     Ok(ProtocolRequest::TwoWayBasic {
                         uint8: req.uint8,
                         uint16: req.uint16,
@@ -4666,7 +4661,6 @@ impl futures::Stream for ProtocolRequestStream {
                         &mut req,
                     )?;
                     let control_handle = ProtocolControlHandle { inner: this.inner.clone() };
-
                     Ok(ProtocolRequest::ErrorBasic {
                         responder: ProtocolErrorBasicResponder {
                             control_handle: std::mem::ManuallyDrop::new(control_handle),
@@ -4684,7 +4678,6 @@ impl futures::Stream for ProtocolRequestStream {
                         &mut req,
                     )?;
                     let control_handle = ProtocolControlHandle { inner: this.inner.clone() };
-
                     Ok(ProtocolRequest::OneWayCompound {
                         bits: req.bits,
                         enum_: req.enum_,
@@ -4706,7 +4699,6 @@ impl futures::Stream for ProtocolRequestStream {
                         &mut req,
                     )?;
                     let control_handle = ProtocolControlHandle { inner: this.inner.clone() };
-
                     Ok(ProtocolRequest::TwoWayCompound {
                         bits: req.bits,
                         enum_: req.enum_,
@@ -4732,7 +4724,6 @@ impl futures::Stream for ProtocolRequestStream {
                         &mut req,
                     )?;
                     let control_handle = ProtocolControlHandle { inner: this.inner.clone() };
-
                     Ok(ProtocolRequest::ErrorCompound {
                         responder: ProtocolErrorCompoundResponder {
                             control_handle: std::mem::ManuallyDrop::new(control_handle),
@@ -4750,7 +4741,6 @@ impl futures::Stream for ProtocolRequestStream {
                         &mut req,
                     )?;
                     let control_handle = ProtocolControlHandle { inner: this.inner.clone() };
-
                     Ok(ProtocolRequest::OneWayArrayBasic {
                         array_uint8: req.array_uint8,
                         array_uint16: req.array_uint16,
@@ -4777,7 +4767,6 @@ impl futures::Stream for ProtocolRequestStream {
                         &mut req,
                     )?;
                     let control_handle = ProtocolControlHandle { inner: this.inner.clone() };
-
                     Ok(ProtocolRequest::TwoWayArrayBasic {
                         array_uint8: req.array_uint8,
                         array_uint16: req.array_uint16,
@@ -4808,7 +4797,6 @@ impl futures::Stream for ProtocolRequestStream {
                         &mut req,
                     )?;
                     let control_handle = ProtocolControlHandle { inner: this.inner.clone() };
-
                     Ok(ProtocolRequest::ErrorArrayBasic {
                         responder: ProtocolErrorArrayBasicResponder {
                             control_handle: std::mem::ManuallyDrop::new(control_handle),
@@ -4826,7 +4814,6 @@ impl futures::Stream for ProtocolRequestStream {
                         &mut req,
                     )?;
                     let control_handle = ProtocolControlHandle { inner: this.inner.clone() };
-
                     Ok(ProtocolRequest::OneWayArrayCompound {
                         array_bits: req.array_bits,
                         array_enum: req.array_enum,
@@ -4848,7 +4835,6 @@ impl futures::Stream for ProtocolRequestStream {
                         &mut req,
                     )?;
                     let control_handle = ProtocolControlHandle { inner: this.inner.clone() };
-
                     Ok(ProtocolRequest::TwoWayArrayCompound {
                         array_bits: req.array_bits,
                         array_enum: req.array_enum,
@@ -4874,7 +4860,6 @@ impl futures::Stream for ProtocolRequestStream {
                         &mut req,
                     )?;
                     let control_handle = ProtocolControlHandle { inner: this.inner.clone() };
-
                     Ok(ProtocolRequest::ErrorArrayCompound {
                         responder: ProtocolErrorArrayCompoundResponder {
                             control_handle: std::mem::ManuallyDrop::new(control_handle),
@@ -4892,7 +4877,6 @@ impl futures::Stream for ProtocolRequestStream {
                         &mut req,
                     )?;
                     let control_handle = ProtocolControlHandle { inner: this.inner.clone() };
-
                     Ok(ProtocolRequest::OneWayVectorBasic {
                         vector_uint8: req.vector_uint8,
                         vector_uint16: req.vector_uint16,
@@ -4919,7 +4903,6 @@ impl futures::Stream for ProtocolRequestStream {
                         &mut req,
                     )?;
                     let control_handle = ProtocolControlHandle { inner: this.inner.clone() };
-
                     Ok(ProtocolRequest::TwoWayVectorBasic {
                         vector_uint8: req.vector_uint8,
                         vector_uint16: req.vector_uint16,
@@ -4950,7 +4933,6 @@ impl futures::Stream for ProtocolRequestStream {
                         &mut req,
                     )?;
                     let control_handle = ProtocolControlHandle { inner: this.inner.clone() };
-
                     Ok(ProtocolRequest::ErrorVectorBasic {
                         responder: ProtocolErrorVectorBasicResponder {
                             control_handle: std::mem::ManuallyDrop::new(control_handle),
@@ -4968,7 +4950,6 @@ impl futures::Stream for ProtocolRequestStream {
                         &mut req,
                     )?;
                     let control_handle = ProtocolControlHandle { inner: this.inner.clone() };
-
                     Ok(ProtocolRequest::OneWayVectorCompound {
                         vector_bits: req.vector_bits,
                         vector_enum: req.vector_enum,
@@ -4990,7 +4971,6 @@ impl futures::Stream for ProtocolRequestStream {
                         &mut req,
                     )?;
                     let control_handle = ProtocolControlHandle { inner: this.inner.clone() };
-
                     Ok(ProtocolRequest::TwoWayVectorCompound {
                         vector_bits: req.vector_bits,
                         vector_enum: req.vector_enum,
@@ -5016,7 +4996,6 @@ impl futures::Stream for ProtocolRequestStream {
                         &mut req,
                     )?;
                     let control_handle = ProtocolControlHandle { inner: this.inner.clone() };
-
                     Ok(ProtocolRequest::ErrorVectorCompound {
                         responder: ProtocolErrorVectorCompoundResponder {
                             control_handle: std::mem::ManuallyDrop::new(control_handle),
@@ -5034,7 +5013,6 @@ impl futures::Stream for ProtocolRequestStream {
                         &mut req,
                     )?;
                     let control_handle = ProtocolControlHandle { inner: this.inner.clone() };
-
                     Ok(ProtocolRequest::OneWayVectorOptional {
                         opt_vector_uint8: req.opt_vector_uint8,
                         opt_vector_string: req.opt_vector_string,
@@ -5053,7 +5031,6 @@ impl futures::Stream for ProtocolRequestStream {
                         &mut req,
                     )?;
                     let control_handle = ProtocolControlHandle { inner: this.inner.clone() };
-
                     Ok(ProtocolRequest::TwoWayVectorOptional {
                         opt_vector_uint8: req.opt_vector_uint8,
                         opt_vector_string: req.opt_vector_string,
@@ -5076,7 +5053,6 @@ impl futures::Stream for ProtocolRequestStream {
                         &mut req,
                     )?;
                     let control_handle = ProtocolControlHandle { inner: this.inner.clone() };
-
                     Ok(ProtocolRequest::ErrorVectorOptional {
                         responder: ProtocolErrorVectorOptionalResponder {
                             control_handle: std::mem::ManuallyDrop::new(control_handle),
@@ -5094,7 +5070,6 @@ impl futures::Stream for ProtocolRequestStream {
                         &mut req,
                     )?;
                     let control_handle = ProtocolControlHandle { inner: this.inner.clone() };
-
                     Ok(ProtocolRequest::OneWayArrayVectorNested {
                         array_array_uint8: req.array_array_uint8,
                         array_vector_uint8: req.array_vector_uint8,
@@ -5113,7 +5088,6 @@ impl futures::Stream for ProtocolRequestStream {
                         &mut req,
                     )?;
                     let control_handle = ProtocolControlHandle { inner: this.inner.clone() };
-
                     Ok(ProtocolRequest::TwoWayArrayVectorNested {
                         array_array_uint8: req.array_array_uint8,
                         array_vector_uint8: req.array_vector_uint8,
@@ -5136,7 +5110,6 @@ impl futures::Stream for ProtocolRequestStream {
                         &mut req,
                     )?;
                     let control_handle = ProtocolControlHandle { inner: this.inner.clone() };
-
                     Ok(ProtocolRequest::ErrorArrayVectorNested {
                         responder: ProtocolErrorArrayVectorNestedResponder {
                             control_handle: std::mem::ManuallyDrop::new(control_handle),
@@ -5154,7 +5127,6 @@ impl futures::Stream for ProtocolRequestStream {
                         &mut req,
                     )?;
                     let control_handle = ProtocolControlHandle { inner: this.inner.clone() };
-
                     Ok(ProtocolRequest::OneWayResource {
                         handle: req.handle,
                         vmo: req.vmo,
@@ -5196,7 +5168,6 @@ impl futures::Stream for ProtocolRequestStream {
                         &mut req,
                     )?;
                     let control_handle = ProtocolControlHandle { inner: this.inner.clone() };
-
                     Ok(ProtocolRequest::TwoWayResource {
                         handle: req.handle,
                         vmo: req.vmo,
@@ -5242,7 +5213,6 @@ impl futures::Stream for ProtocolRequestStream {
                         &mut req,
                     )?;
                     let control_handle = ProtocolControlHandle { inner: this.inner.clone() };
-
                     Ok(ProtocolRequest::ErrorResource {
                         responder: ProtocolErrorResourceResponder {
                             control_handle: std::mem::ManuallyDrop::new(control_handle),
@@ -6831,19 +6801,18 @@ impl ProtocolTwoWayBasicResponder {
         mut string: &str,
         mut opt_string: Option<&str>,
     ) -> Result<(), fidl::Error> {
-        let r = self.send_raw(
+        let _result = self.send_raw(
             uint8, uint16, uint32, uint64, int8, int16, int32, int64, float32, float64, string,
             opt_string,
         );
-        if r.is_err() {
+        if _result.is_err() {
             self.control_handle.shutdown();
         }
         self.drop_without_shutdown();
-        r
+        _result
     }
 
-    /// Similar to "send" but does not shutdown the channel if
-    /// an error occurs.
+    /// Similar to "send" but does not shutdown the channel if an error occurs.
     pub fn send_no_shutdown_on_err(
         self,
         mut uint8: u8,
@@ -6859,12 +6828,12 @@ impl ProtocolTwoWayBasicResponder {
         mut string: &str,
         mut opt_string: Option<&str>,
     ) -> Result<(), fidl::Error> {
-        let r = self.send_raw(
+        let _result = self.send_raw(
             uint8, uint16, uint32, uint64, int8, int16, int32, int64, float32, float64, string,
             opt_string,
         );
         self.drop_without_shutdown();
-        r
+        _result
     }
 
     fn send_raw(
@@ -6882,24 +6851,15 @@ impl ProtocolTwoWayBasicResponder {
         mut string: &str,
         mut opt_string: Option<&str>,
     ) -> Result<(), fidl::Error> {
-        let msg = fidl::encoding::TransactionMessage {
-            header: fidl::encoding::TransactionHeader::new(
-                self.tx_id,
-                self.ordinal,
-                fidl::encoding::DynamicFlags::empty(),
-            ),
-            body: (
+        self.control_handle.inner.send::<Basic>(
+            (
                 uint8, uint16, uint32, uint64, int8, int16, int32, int64, float32, float64, string,
                 opt_string,
             ),
-        };
-
-        fidl::encoding::with_tls_encode_buf(|bytes, handles| {
-            fidl::encoding::Encoder::encode::<fidl::encoding::TransactionMessageType<Basic>>(
-                bytes, handles, msg,
-            )?;
-            self.control_handle.inner.send_raw_msg(&*bytes, &mut *handles)
-        })
+            self.tx_id,
+            self.ordinal,
+            fidl::encoding::DynamicFlags::empty(),
+        )
     }
 }
 
@@ -6948,16 +6908,15 @@ impl ProtocolErrorBasicResponder {
             u32,
         >,
     ) -> Result<(), fidl::Error> {
-        let r = self.send_raw(result);
-        if r.is_err() {
+        let _result = self.send_raw(result);
+        if _result.is_err() {
             self.control_handle.shutdown();
         }
         self.drop_without_shutdown();
-        r
+        _result
     }
 
-    /// Similar to "send" but does not shutdown the channel if
-    /// an error occurs.
+    /// Similar to "send" but does not shutdown the channel if an error occurs.
     pub fn send_no_shutdown_on_err(
         self,
         mut result: Result<
@@ -6965,9 +6924,9 @@ impl ProtocolErrorBasicResponder {
             u32,
         >,
     ) -> Result<(), fidl::Error> {
-        let r = self.send_raw(result);
+        let _result = self.send_raw(result);
         self.drop_without_shutdown();
-        r
+        _result
     }
 
     fn send_raw(
@@ -6977,21 +6936,12 @@ impl ProtocolErrorBasicResponder {
             u32,
         >,
     ) -> Result<(), fidl::Error> {
-        let msg = fidl::encoding::TransactionMessage {
-            header: fidl::encoding::TransactionHeader::new(
-                self.tx_id,
-                self.ordinal,
-                fidl::encoding::DynamicFlags::empty(),
-            ),
-            body: result,
-        };
-
-        fidl::encoding::with_tls_encode_buf(|bytes, handles| {
-            fidl::encoding::Encoder::encode::<
-                fidl::encoding::TransactionMessageType<fidl::encoding::ResultType<Basic, u32>>,
-            >(bytes, handles, msg)?;
-            self.control_handle.inner.send_raw_msg(&*bytes, &mut *handles)
-        })
+        self.control_handle.inner.send::<fidl::encoding::ResultType<Basic, u32>>(
+            result,
+            self.tx_id,
+            self.ordinal,
+            fidl::encoding::DynamicFlags::empty(),
+        )
     }
 }
 
@@ -7043,16 +6993,15 @@ impl ProtocolTwoWayCompoundResponder {
         mut opt_struct: Option<&Struct>,
         mut opt_union: Option<&Union>,
     ) -> Result<(), fidl::Error> {
-        let r = self.send_raw(bits, enum_, struct_, table, union, opt_struct, opt_union);
-        if r.is_err() {
+        let _result = self.send_raw(bits, enum_, struct_, table, union, opt_struct, opt_union);
+        if _result.is_err() {
             self.control_handle.shutdown();
         }
         self.drop_without_shutdown();
-        r
+        _result
     }
 
-    /// Similar to "send" but does not shutdown the channel if
-    /// an error occurs.
+    /// Similar to "send" but does not shutdown the channel if an error occurs.
     pub fn send_no_shutdown_on_err(
         self,
         mut bits: Bits,
@@ -7063,9 +7012,9 @@ impl ProtocolTwoWayCompoundResponder {
         mut opt_struct: Option<&Struct>,
         mut opt_union: Option<&Union>,
     ) -> Result<(), fidl::Error> {
-        let r = self.send_raw(bits, enum_, struct_, table, union, opt_struct, opt_union);
+        let _result = self.send_raw(bits, enum_, struct_, table, union, opt_struct, opt_union);
         self.drop_without_shutdown();
-        r
+        _result
     }
 
     fn send_raw(
@@ -7078,21 +7027,12 @@ impl ProtocolTwoWayCompoundResponder {
         mut opt_struct: Option<&Struct>,
         mut opt_union: Option<&Union>,
     ) -> Result<(), fidl::Error> {
-        let msg = fidl::encoding::TransactionMessage {
-            header: fidl::encoding::TransactionHeader::new(
-                self.tx_id,
-                self.ordinal,
-                fidl::encoding::DynamicFlags::empty(),
-            ),
-            body: (bits, enum_, struct_, table, union, opt_struct, opt_union),
-        };
-
-        fidl::encoding::with_tls_encode_buf(|bytes, handles| {
-            fidl::encoding::Encoder::encode::<fidl::encoding::TransactionMessageType<Compound>>(
-                bytes, handles, msg,
-            )?;
-            self.control_handle.inner.send_raw_msg(&*bytes, &mut *handles)
-        })
+        self.control_handle.inner.send::<Compound>(
+            (bits, enum_, struct_, table, union, opt_struct, opt_union),
+            self.tx_id,
+            self.ordinal,
+            fidl::encoding::DynamicFlags::empty(),
+        )
     }
 }
 
@@ -7141,16 +7081,15 @@ impl ProtocolErrorCompoundResponder {
             u32,
         >,
     ) -> Result<(), fidl::Error> {
-        let r = self.send_raw(result);
-        if r.is_err() {
+        let _result = self.send_raw(result);
+        if _result.is_err() {
             self.control_handle.shutdown();
         }
         self.drop_without_shutdown();
-        r
+        _result
     }
 
-    /// Similar to "send" but does not shutdown the channel if
-    /// an error occurs.
+    /// Similar to "send" but does not shutdown the channel if an error occurs.
     pub fn send_no_shutdown_on_err(
         self,
         mut result: Result<
@@ -7158,9 +7097,9 @@ impl ProtocolErrorCompoundResponder {
             u32,
         >,
     ) -> Result<(), fidl::Error> {
-        let r = self.send_raw(result);
+        let _result = self.send_raw(result);
         self.drop_without_shutdown();
-        r
+        _result
     }
 
     fn send_raw(
@@ -7170,21 +7109,12 @@ impl ProtocolErrorCompoundResponder {
             u32,
         >,
     ) -> Result<(), fidl::Error> {
-        let msg = fidl::encoding::TransactionMessage {
-            header: fidl::encoding::TransactionHeader::new(
-                self.tx_id,
-                self.ordinal,
-                fidl::encoding::DynamicFlags::empty(),
-            ),
-            body: result,
-        };
-
-        fidl::encoding::with_tls_encode_buf(|bytes, handles| {
-            fidl::encoding::Encoder::encode::<
-                fidl::encoding::TransactionMessageType<fidl::encoding::ResultType<Compound, u32>>,
-            >(bytes, handles, msg)?;
-            self.control_handle.inner.send_raw_msg(&*bytes, &mut *handles)
-        })
+        self.control_handle.inner.send::<fidl::encoding::ResultType<Compound, u32>>(
+            result,
+            self.tx_id,
+            self.ordinal,
+            fidl::encoding::DynamicFlags::empty(),
+        )
     }
 }
 
@@ -7241,7 +7171,7 @@ impl ProtocolTwoWayArrayBasicResponder {
         mut array_string: &[String; 5],
         mut array_opt_string: &[Option<String>; 5],
     ) -> Result<(), fidl::Error> {
-        let r = self.send_raw(
+        let _result = self.send_raw(
             array_uint8,
             array_uint16,
             array_uint32,
@@ -7255,15 +7185,14 @@ impl ProtocolTwoWayArrayBasicResponder {
             array_string,
             array_opt_string,
         );
-        if r.is_err() {
+        if _result.is_err() {
             self.control_handle.shutdown();
         }
         self.drop_without_shutdown();
-        r
+        _result
     }
 
-    /// Similar to "send" but does not shutdown the channel if
-    /// an error occurs.
+    /// Similar to "send" but does not shutdown the channel if an error occurs.
     pub fn send_no_shutdown_on_err(
         self,
         mut array_uint8: &[u8; 5],
@@ -7279,7 +7208,7 @@ impl ProtocolTwoWayArrayBasicResponder {
         mut array_string: &[String; 5],
         mut array_opt_string: &[Option<String>; 5],
     ) -> Result<(), fidl::Error> {
-        let r = self.send_raw(
+        let _result = self.send_raw(
             array_uint8,
             array_uint16,
             array_uint32,
@@ -7294,7 +7223,7 @@ impl ProtocolTwoWayArrayBasicResponder {
             array_opt_string,
         );
         self.drop_without_shutdown();
-        r
+        _result
     }
 
     fn send_raw(
@@ -7312,13 +7241,8 @@ impl ProtocolTwoWayArrayBasicResponder {
         mut array_string: &[String; 5],
         mut array_opt_string: &[Option<String>; 5],
     ) -> Result<(), fidl::Error> {
-        let msg = fidl::encoding::TransactionMessage {
-            header: fidl::encoding::TransactionHeader::new(
-                self.tx_id,
-                self.ordinal,
-                fidl::encoding::DynamicFlags::empty(),
-            ),
-            body: (
+        self.control_handle.inner.send::<ArrayBasic>(
+            (
                 array_uint8,
                 array_uint16,
                 array_uint32,
@@ -7332,14 +7256,10 @@ impl ProtocolTwoWayArrayBasicResponder {
                 array_string,
                 array_opt_string,
             ),
-        };
-
-        fidl::encoding::with_tls_encode_buf(|bytes, handles| {
-            fidl::encoding::Encoder::encode::<fidl::encoding::TransactionMessageType<ArrayBasic>>(
-                bytes, handles, msg,
-            )?;
-            self.control_handle.inner.send_raw_msg(&*bytes, &mut *handles)
-        })
+            self.tx_id,
+            self.ordinal,
+            fidl::encoding::DynamicFlags::empty(),
+        )
     }
 }
 
@@ -7401,16 +7321,15 @@ impl ProtocolErrorArrayBasicResponder {
             u32,
         >,
     ) -> Result<(), fidl::Error> {
-        let r = self.send_raw(result);
-        if r.is_err() {
+        let _result = self.send_raw(result);
+        if _result.is_err() {
             self.control_handle.shutdown();
         }
         self.drop_without_shutdown();
-        r
+        _result
     }
 
-    /// Similar to "send" but does not shutdown the channel if
-    /// an error occurs.
+    /// Similar to "send" but does not shutdown the channel if an error occurs.
     pub fn send_no_shutdown_on_err(
         self,
         mut result: Result<
@@ -7431,9 +7350,9 @@ impl ProtocolErrorArrayBasicResponder {
             u32,
         >,
     ) -> Result<(), fidl::Error> {
-        let r = self.send_raw(result);
+        let _result = self.send_raw(result);
         self.drop_without_shutdown();
-        r
+        _result
     }
 
     fn send_raw(
@@ -7456,21 +7375,12 @@ impl ProtocolErrorArrayBasicResponder {
             u32,
         >,
     ) -> Result<(), fidl::Error> {
-        let msg = fidl::encoding::TransactionMessage {
-            header: fidl::encoding::TransactionHeader::new(
-                self.tx_id,
-                self.ordinal,
-                fidl::encoding::DynamicFlags::empty(),
-            ),
-            body: result,
-        };
-
-        fidl::encoding::with_tls_encode_buf(|bytes, handles| {
-            fidl::encoding::Encoder::encode::<
-                fidl::encoding::TransactionMessageType<fidl::encoding::ResultType<ArrayBasic, u32>>,
-            >(bytes, handles, msg)?;
-            self.control_handle.inner.send_raw_msg(&*bytes, &mut *handles)
-        })
+        self.control_handle.inner.send::<fidl::encoding::ResultType<ArrayBasic, u32>>(
+            result,
+            self.tx_id,
+            self.ordinal,
+            fidl::encoding::DynamicFlags::empty(),
+        )
     }
 }
 
@@ -7522,7 +7432,7 @@ impl ProtocolTwoWayArrayCompoundResponder {
         mut array_opt_struct: &[Option<Box<Struct>>; 5],
         mut array_opt_union: &[Option<Box<Union>>; 5],
     ) -> Result<(), fidl::Error> {
-        let r = self.send_raw(
+        let _result = self.send_raw(
             array_bits,
             array_enum,
             array_struct,
@@ -7531,15 +7441,14 @@ impl ProtocolTwoWayArrayCompoundResponder {
             array_opt_struct,
             array_opt_union,
         );
-        if r.is_err() {
+        if _result.is_err() {
             self.control_handle.shutdown();
         }
         self.drop_without_shutdown();
-        r
+        _result
     }
 
-    /// Similar to "send" but does not shutdown the channel if
-    /// an error occurs.
+    /// Similar to "send" but does not shutdown the channel if an error occurs.
     pub fn send_no_shutdown_on_err(
         self,
         mut array_bits: &[Bits; 5],
@@ -7550,7 +7459,7 @@ impl ProtocolTwoWayArrayCompoundResponder {
         mut array_opt_struct: &[Option<Box<Struct>>; 5],
         mut array_opt_union: &[Option<Box<Union>>; 5],
     ) -> Result<(), fidl::Error> {
-        let r = self.send_raw(
+        let _result = self.send_raw(
             array_bits,
             array_enum,
             array_struct,
@@ -7560,7 +7469,7 @@ impl ProtocolTwoWayArrayCompoundResponder {
             array_opt_union,
         );
         self.drop_without_shutdown();
-        r
+        _result
     }
 
     fn send_raw(
@@ -7573,13 +7482,8 @@ impl ProtocolTwoWayArrayCompoundResponder {
         mut array_opt_struct: &[Option<Box<Struct>>; 5],
         mut array_opt_union: &[Option<Box<Union>>; 5],
     ) -> Result<(), fidl::Error> {
-        let msg = fidl::encoding::TransactionMessage {
-            header: fidl::encoding::TransactionHeader::new(
-                self.tx_id,
-                self.ordinal,
-                fidl::encoding::DynamicFlags::empty(),
-            ),
-            body: (
+        self.control_handle.inner.send::<ArrayCompound>(
+            (
                 array_bits,
                 array_enum,
                 array_struct,
@@ -7588,14 +7492,10 @@ impl ProtocolTwoWayArrayCompoundResponder {
                 array_opt_struct,
                 array_opt_union,
             ),
-        };
-
-        fidl::encoding::with_tls_encode_buf(|bytes, handles| {
-            fidl::encoding::Encoder::encode::<fidl::encoding::TransactionMessageType<ArrayCompound>>(
-                bytes, handles, msg,
-            )?;
-            self.control_handle.inner.send_raw_msg(&*bytes, &mut *handles)
-        })
+            self.tx_id,
+            self.ordinal,
+            fidl::encoding::DynamicFlags::empty(),
+        )
     }
 }
 
@@ -7652,16 +7552,15 @@ impl ProtocolErrorArrayCompoundResponder {
             u32,
         >,
     ) -> Result<(), fidl::Error> {
-        let r = self.send_raw(result);
-        if r.is_err() {
+        let _result = self.send_raw(result);
+        if _result.is_err() {
             self.control_handle.shutdown();
         }
         self.drop_without_shutdown();
-        r
+        _result
     }
 
-    /// Similar to "send" but does not shutdown the channel if
-    /// an error occurs.
+    /// Similar to "send" but does not shutdown the channel if an error occurs.
     pub fn send_no_shutdown_on_err(
         self,
         mut result: Result<
@@ -7677,9 +7576,9 @@ impl ProtocolErrorArrayCompoundResponder {
             u32,
         >,
     ) -> Result<(), fidl::Error> {
-        let r = self.send_raw(result);
+        let _result = self.send_raw(result);
         self.drop_without_shutdown();
-        r
+        _result
     }
 
     fn send_raw(
@@ -7697,23 +7596,12 @@ impl ProtocolErrorArrayCompoundResponder {
             u32,
         >,
     ) -> Result<(), fidl::Error> {
-        let msg = fidl::encoding::TransactionMessage {
-            header: fidl::encoding::TransactionHeader::new(
-                self.tx_id,
-                self.ordinal,
-                fidl::encoding::DynamicFlags::empty(),
-            ),
-            body: result,
-        };
-
-        fidl::encoding::with_tls_encode_buf(|bytes, handles| {
-            fidl::encoding::Encoder::encode::<
-                fidl::encoding::TransactionMessageType<
-                    fidl::encoding::ResultType<ArrayCompound, u32>,
-                >,
-            >(bytes, handles, msg)?;
-            self.control_handle.inner.send_raw_msg(&*bytes, &mut *handles)
-        })
+        self.control_handle.inner.send::<fidl::encoding::ResultType<ArrayCompound, u32>>(
+            result,
+            self.tx_id,
+            self.ordinal,
+            fidl::encoding::DynamicFlags::empty(),
+        )
     }
 }
 
@@ -7770,7 +7658,7 @@ impl ProtocolTwoWayVectorBasicResponder {
         mut vector_string: &[String],
         mut vector_opt_string: &[Option<String>],
     ) -> Result<(), fidl::Error> {
-        let r = self.send_raw(
+        let _result = self.send_raw(
             vector_uint8,
             vector_uint16,
             vector_uint32,
@@ -7784,15 +7672,14 @@ impl ProtocolTwoWayVectorBasicResponder {
             vector_string,
             vector_opt_string,
         );
-        if r.is_err() {
+        if _result.is_err() {
             self.control_handle.shutdown();
         }
         self.drop_without_shutdown();
-        r
+        _result
     }
 
-    /// Similar to "send" but does not shutdown the channel if
-    /// an error occurs.
+    /// Similar to "send" but does not shutdown the channel if an error occurs.
     pub fn send_no_shutdown_on_err(
         self,
         mut vector_uint8: &[u8],
@@ -7808,7 +7695,7 @@ impl ProtocolTwoWayVectorBasicResponder {
         mut vector_string: &[String],
         mut vector_opt_string: &[Option<String>],
     ) -> Result<(), fidl::Error> {
-        let r = self.send_raw(
+        let _result = self.send_raw(
             vector_uint8,
             vector_uint16,
             vector_uint32,
@@ -7823,7 +7710,7 @@ impl ProtocolTwoWayVectorBasicResponder {
             vector_opt_string,
         );
         self.drop_without_shutdown();
-        r
+        _result
     }
 
     fn send_raw(
@@ -7841,13 +7728,8 @@ impl ProtocolTwoWayVectorBasicResponder {
         mut vector_string: &[String],
         mut vector_opt_string: &[Option<String>],
     ) -> Result<(), fidl::Error> {
-        let msg = fidl::encoding::TransactionMessage {
-            header: fidl::encoding::TransactionHeader::new(
-                self.tx_id,
-                self.ordinal,
-                fidl::encoding::DynamicFlags::empty(),
-            ),
-            body: (
+        self.control_handle.inner.send::<VectorBasic>(
+            (
                 vector_uint8,
                 vector_uint16,
                 vector_uint32,
@@ -7861,14 +7743,10 @@ impl ProtocolTwoWayVectorBasicResponder {
                 vector_string,
                 vector_opt_string,
             ),
-        };
-
-        fidl::encoding::with_tls_encode_buf(|bytes, handles| {
-            fidl::encoding::Encoder::encode::<fidl::encoding::TransactionMessageType<VectorBasic>>(
-                bytes, handles, msg,
-            )?;
-            self.control_handle.inner.send_raw_msg(&*bytes, &mut *handles)
-        })
+            self.tx_id,
+            self.ordinal,
+            fidl::encoding::DynamicFlags::empty(),
+        )
     }
 }
 
@@ -7930,16 +7808,15 @@ impl ProtocolErrorVectorBasicResponder {
             u32,
         >,
     ) -> Result<(), fidl::Error> {
-        let r = self.send_raw(result);
-        if r.is_err() {
+        let _result = self.send_raw(result);
+        if _result.is_err() {
             self.control_handle.shutdown();
         }
         self.drop_without_shutdown();
-        r
+        _result
     }
 
-    /// Similar to "send" but does not shutdown the channel if
-    /// an error occurs.
+    /// Similar to "send" but does not shutdown the channel if an error occurs.
     pub fn send_no_shutdown_on_err(
         self,
         mut result: Result<
@@ -7960,9 +7837,9 @@ impl ProtocolErrorVectorBasicResponder {
             u32,
         >,
     ) -> Result<(), fidl::Error> {
-        let r = self.send_raw(result);
+        let _result = self.send_raw(result);
         self.drop_without_shutdown();
-        r
+        _result
     }
 
     fn send_raw(
@@ -7985,23 +7862,12 @@ impl ProtocolErrorVectorBasicResponder {
             u32,
         >,
     ) -> Result<(), fidl::Error> {
-        let msg = fidl::encoding::TransactionMessage {
-            header: fidl::encoding::TransactionHeader::new(
-                self.tx_id,
-                self.ordinal,
-                fidl::encoding::DynamicFlags::empty(),
-            ),
-            body: result,
-        };
-
-        fidl::encoding::with_tls_encode_buf(|bytes, handles| {
-            fidl::encoding::Encoder::encode::<
-                fidl::encoding::TransactionMessageType<
-                    fidl::encoding::ResultType<VectorBasic, u32>,
-                >,
-            >(bytes, handles, msg)?;
-            self.control_handle.inner.send_raw_msg(&*bytes, &mut *handles)
-        })
+        self.control_handle.inner.send::<fidl::encoding::ResultType<VectorBasic, u32>>(
+            result,
+            self.tx_id,
+            self.ordinal,
+            fidl::encoding::DynamicFlags::empty(),
+        )
     }
 }
 
@@ -8053,7 +7919,7 @@ impl ProtocolTwoWayVectorCompoundResponder {
         mut vector_opt_struct: &[Option<Box<Struct>>],
         mut vector_opt_union: &[Option<Box<Union>>],
     ) -> Result<(), fidl::Error> {
-        let r = self.send_raw(
+        let _result = self.send_raw(
             vector_bits,
             vector_enum,
             vector_struct,
@@ -8062,15 +7928,14 @@ impl ProtocolTwoWayVectorCompoundResponder {
             vector_opt_struct,
             vector_opt_union,
         );
-        if r.is_err() {
+        if _result.is_err() {
             self.control_handle.shutdown();
         }
         self.drop_without_shutdown();
-        r
+        _result
     }
 
-    /// Similar to "send" but does not shutdown the channel if
-    /// an error occurs.
+    /// Similar to "send" but does not shutdown the channel if an error occurs.
     pub fn send_no_shutdown_on_err(
         self,
         mut vector_bits: &[Bits],
@@ -8081,7 +7946,7 @@ impl ProtocolTwoWayVectorCompoundResponder {
         mut vector_opt_struct: &[Option<Box<Struct>>],
         mut vector_opt_union: &[Option<Box<Union>>],
     ) -> Result<(), fidl::Error> {
-        let r = self.send_raw(
+        let _result = self.send_raw(
             vector_bits,
             vector_enum,
             vector_struct,
@@ -8091,7 +7956,7 @@ impl ProtocolTwoWayVectorCompoundResponder {
             vector_opt_union,
         );
         self.drop_without_shutdown();
-        r
+        _result
     }
 
     fn send_raw(
@@ -8104,13 +7969,8 @@ impl ProtocolTwoWayVectorCompoundResponder {
         mut vector_opt_struct: &[Option<Box<Struct>>],
         mut vector_opt_union: &[Option<Box<Union>>],
     ) -> Result<(), fidl::Error> {
-        let msg = fidl::encoding::TransactionMessage {
-            header: fidl::encoding::TransactionHeader::new(
-                self.tx_id,
-                self.ordinal,
-                fidl::encoding::DynamicFlags::empty(),
-            ),
-            body: (
+        self.control_handle.inner.send::<VectorCompound>(
+            (
                 vector_bits,
                 vector_enum,
                 vector_struct,
@@ -8119,14 +7979,10 @@ impl ProtocolTwoWayVectorCompoundResponder {
                 vector_opt_struct,
                 vector_opt_union,
             ),
-        };
-
-        fidl::encoding::with_tls_encode_buf(|bytes, handles| {
-            fidl::encoding::Encoder::encode::<
-                fidl::encoding::TransactionMessageType<VectorCompound>,
-            >(bytes, handles, msg)?;
-            self.control_handle.inner.send_raw_msg(&*bytes, &mut *handles)
-        })
+            self.tx_id,
+            self.ordinal,
+            fidl::encoding::DynamicFlags::empty(),
+        )
     }
 }
 
@@ -8183,16 +8039,15 @@ impl ProtocolErrorVectorCompoundResponder {
             u32,
         >,
     ) -> Result<(), fidl::Error> {
-        let r = self.send_raw(result);
-        if r.is_err() {
+        let _result = self.send_raw(result);
+        if _result.is_err() {
             self.control_handle.shutdown();
         }
         self.drop_without_shutdown();
-        r
+        _result
     }
 
-    /// Similar to "send" but does not shutdown the channel if
-    /// an error occurs.
+    /// Similar to "send" but does not shutdown the channel if an error occurs.
     pub fn send_no_shutdown_on_err(
         self,
         mut result: Result<
@@ -8208,9 +8063,9 @@ impl ProtocolErrorVectorCompoundResponder {
             u32,
         >,
     ) -> Result<(), fidl::Error> {
-        let r = self.send_raw(result);
+        let _result = self.send_raw(result);
         self.drop_without_shutdown();
-        r
+        _result
     }
 
     fn send_raw(
@@ -8228,23 +8083,12 @@ impl ProtocolErrorVectorCompoundResponder {
             u32,
         >,
     ) -> Result<(), fidl::Error> {
-        let msg = fidl::encoding::TransactionMessage {
-            header: fidl::encoding::TransactionHeader::new(
-                self.tx_id,
-                self.ordinal,
-                fidl::encoding::DynamicFlags::empty(),
-            ),
-            body: result,
-        };
-
-        fidl::encoding::with_tls_encode_buf(|bytes, handles| {
-            fidl::encoding::Encoder::encode::<
-                fidl::encoding::TransactionMessageType<
-                    fidl::encoding::ResultType<VectorCompound, u32>,
-                >,
-            >(bytes, handles, msg)?;
-            self.control_handle.inner.send_raw_msg(&*bytes, &mut *handles)
-        })
+        self.control_handle.inner.send::<fidl::encoding::ResultType<VectorCompound, u32>>(
+            result,
+            self.tx_id,
+            self.ordinal,
+            fidl::encoding::DynamicFlags::empty(),
+        )
     }
 }
 
@@ -8293,21 +8137,20 @@ impl ProtocolTwoWayVectorOptionalResponder {
         mut opt_vector_struct: Option<&[Struct]>,
         mut opt_vector_opt_struct: Option<&[Option<Box<Struct>>]>,
     ) -> Result<(), fidl::Error> {
-        let r = self.send_raw(
+        let _result = self.send_raw(
             opt_vector_uint8,
             opt_vector_string,
             opt_vector_struct,
             opt_vector_opt_struct,
         );
-        if r.is_err() {
+        if _result.is_err() {
             self.control_handle.shutdown();
         }
         self.drop_without_shutdown();
-        r
+        _result
     }
 
-    /// Similar to "send" but does not shutdown the channel if
-    /// an error occurs.
+    /// Similar to "send" but does not shutdown the channel if an error occurs.
     pub fn send_no_shutdown_on_err(
         self,
         mut opt_vector_uint8: Option<&[u8]>,
@@ -8315,14 +8158,14 @@ impl ProtocolTwoWayVectorOptionalResponder {
         mut opt_vector_struct: Option<&[Struct]>,
         mut opt_vector_opt_struct: Option<&[Option<Box<Struct>>]>,
     ) -> Result<(), fidl::Error> {
-        let r = self.send_raw(
+        let _result = self.send_raw(
             opt_vector_uint8,
             opt_vector_string,
             opt_vector_struct,
             opt_vector_opt_struct,
         );
         self.drop_without_shutdown();
-        r
+        _result
     }
 
     fn send_raw(
@@ -8332,21 +8175,12 @@ impl ProtocolTwoWayVectorOptionalResponder {
         mut opt_vector_struct: Option<&[Struct]>,
         mut opt_vector_opt_struct: Option<&[Option<Box<Struct>>]>,
     ) -> Result<(), fidl::Error> {
-        let msg = fidl::encoding::TransactionMessage {
-            header: fidl::encoding::TransactionHeader::new(
-                self.tx_id,
-                self.ordinal,
-                fidl::encoding::DynamicFlags::empty(),
-            ),
-            body: (opt_vector_uint8, opt_vector_string, opt_vector_struct, opt_vector_opt_struct),
-        };
-
-        fidl::encoding::with_tls_encode_buf(|bytes, handles| {
-            fidl::encoding::Encoder::encode::<
-                fidl::encoding::TransactionMessageType<VectorOptional>,
-            >(bytes, handles, msg)?;
-            self.control_handle.inner.send_raw_msg(&*bytes, &mut *handles)
-        })
+        self.control_handle.inner.send::<VectorOptional>(
+            (opt_vector_uint8, opt_vector_string, opt_vector_struct, opt_vector_opt_struct),
+            self.tx_id,
+            self.ordinal,
+            fidl::encoding::DynamicFlags::empty(),
+        )
     }
 }
 
@@ -8395,16 +8229,15 @@ impl ProtocolErrorVectorOptionalResponder {
             u32,
         >,
     ) -> Result<(), fidl::Error> {
-        let r = self.send_raw(result);
-        if r.is_err() {
+        let _result = self.send_raw(result);
+        if _result.is_err() {
             self.control_handle.shutdown();
         }
         self.drop_without_shutdown();
-        r
+        _result
     }
 
-    /// Similar to "send" but does not shutdown the channel if
-    /// an error occurs.
+    /// Similar to "send" but does not shutdown the channel if an error occurs.
     pub fn send_no_shutdown_on_err(
         self,
         mut result: Result<
@@ -8412,9 +8245,9 @@ impl ProtocolErrorVectorOptionalResponder {
             u32,
         >,
     ) -> Result<(), fidl::Error> {
-        let r = self.send_raw(result);
+        let _result = self.send_raw(result);
         self.drop_without_shutdown();
-        r
+        _result
     }
 
     fn send_raw(
@@ -8424,23 +8257,12 @@ impl ProtocolErrorVectorOptionalResponder {
             u32,
         >,
     ) -> Result<(), fidl::Error> {
-        let msg = fidl::encoding::TransactionMessage {
-            header: fidl::encoding::TransactionHeader::new(
-                self.tx_id,
-                self.ordinal,
-                fidl::encoding::DynamicFlags::empty(),
-            ),
-            body: result,
-        };
-
-        fidl::encoding::with_tls_encode_buf(|bytes, handles| {
-            fidl::encoding::Encoder::encode::<
-                fidl::encoding::TransactionMessageType<
-                    fidl::encoding::ResultType<VectorOptional, u32>,
-                >,
-            >(bytes, handles, msg)?;
-            self.control_handle.inner.send_raw_msg(&*bytes, &mut *handles)
-        })
+        self.control_handle.inner.send::<fidl::encoding::ResultType<VectorOptional, u32>>(
+            result,
+            self.tx_id,
+            self.ordinal,
+            fidl::encoding::DynamicFlags::empty(),
+        )
     }
 }
 
@@ -8489,21 +8311,20 @@ impl ProtocolTwoWayArrayVectorNestedResponder {
         mut vector_array_uint8: &[[u8; 5]],
         mut vector_vector_uint8: &[Vec<u8>],
     ) -> Result<(), fidl::Error> {
-        let r = self.send_raw(
+        let _result = self.send_raw(
             array_array_uint8,
             array_vector_uint8,
             vector_array_uint8,
             vector_vector_uint8,
         );
-        if r.is_err() {
+        if _result.is_err() {
             self.control_handle.shutdown();
         }
         self.drop_without_shutdown();
-        r
+        _result
     }
 
-    /// Similar to "send" but does not shutdown the channel if
-    /// an error occurs.
+    /// Similar to "send" but does not shutdown the channel if an error occurs.
     pub fn send_no_shutdown_on_err(
         self,
         mut array_array_uint8: &[[u8; 5]; 5],
@@ -8511,14 +8332,14 @@ impl ProtocolTwoWayArrayVectorNestedResponder {
         mut vector_array_uint8: &[[u8; 5]],
         mut vector_vector_uint8: &[Vec<u8>],
     ) -> Result<(), fidl::Error> {
-        let r = self.send_raw(
+        let _result = self.send_raw(
             array_array_uint8,
             array_vector_uint8,
             vector_array_uint8,
             vector_vector_uint8,
         );
         self.drop_without_shutdown();
-        r
+        _result
     }
 
     fn send_raw(
@@ -8528,21 +8349,12 @@ impl ProtocolTwoWayArrayVectorNestedResponder {
         mut vector_array_uint8: &[[u8; 5]],
         mut vector_vector_uint8: &[Vec<u8>],
     ) -> Result<(), fidl::Error> {
-        let msg = fidl::encoding::TransactionMessage {
-            header: fidl::encoding::TransactionHeader::new(
-                self.tx_id,
-                self.ordinal,
-                fidl::encoding::DynamicFlags::empty(),
-            ),
-            body: (array_array_uint8, array_vector_uint8, vector_array_uint8, vector_vector_uint8),
-        };
-
-        fidl::encoding::with_tls_encode_buf(|bytes, handles| {
-            fidl::encoding::Encoder::encode::<
-                fidl::encoding::TransactionMessageType<ArrayVectorNested>,
-            >(bytes, handles, msg)?;
-            self.control_handle.inner.send_raw_msg(&*bytes, &mut *handles)
-        })
+        self.control_handle.inner.send::<ArrayVectorNested>(
+            (array_array_uint8, array_vector_uint8, vector_array_uint8, vector_vector_uint8),
+            self.tx_id,
+            self.ordinal,
+            fidl::encoding::DynamicFlags::empty(),
+        )
     }
 }
 
@@ -8588,46 +8400,34 @@ impl ProtocolErrorArrayVectorNestedResponder {
         self,
         mut result: Result<(&[[u8; 5]; 5], &[Vec<u8>; 5], &[[u8; 5]], &[Vec<u8>]), u32>,
     ) -> Result<(), fidl::Error> {
-        let r = self.send_raw(result);
-        if r.is_err() {
+        let _result = self.send_raw(result);
+        if _result.is_err() {
             self.control_handle.shutdown();
         }
         self.drop_without_shutdown();
-        r
+        _result
     }
 
-    /// Similar to "send" but does not shutdown the channel if
-    /// an error occurs.
+    /// Similar to "send" but does not shutdown the channel if an error occurs.
     pub fn send_no_shutdown_on_err(
         self,
         mut result: Result<(&[[u8; 5]; 5], &[Vec<u8>; 5], &[[u8; 5]], &[Vec<u8>]), u32>,
     ) -> Result<(), fidl::Error> {
-        let r = self.send_raw(result);
+        let _result = self.send_raw(result);
         self.drop_without_shutdown();
-        r
+        _result
     }
 
     fn send_raw(
         &self,
         mut result: Result<(&[[u8; 5]; 5], &[Vec<u8>; 5], &[[u8; 5]], &[Vec<u8>]), u32>,
     ) -> Result<(), fidl::Error> {
-        let msg = fidl::encoding::TransactionMessage {
-            header: fidl::encoding::TransactionHeader::new(
-                self.tx_id,
-                self.ordinal,
-                fidl::encoding::DynamicFlags::empty(),
-            ),
-            body: result,
-        };
-
-        fidl::encoding::with_tls_encode_buf(|bytes, handles| {
-            fidl::encoding::Encoder::encode::<
-                fidl::encoding::TransactionMessageType<
-                    fidl::encoding::ResultType<ArrayVectorNested, u32>,
-                >,
-            >(bytes, handles, msg)?;
-            self.control_handle.inner.send_raw_msg(&*bytes, &mut *handles)
-        })
+        self.control_handle.inner.send::<fidl::encoding::ResultType<ArrayVectorNested, u32>>(
+            result,
+            self.tx_id,
+            self.ordinal,
+            fidl::encoding::DynamicFlags::empty(),
+        )
     }
 }
 
@@ -8699,7 +8499,7 @@ impl ProtocolTwoWayResourceResponder {
         mut vector_table: Vec<ResourceTable>,
         mut vector_union: Vec<ResourceUnion>,
     ) -> Result<(), fidl::Error> {
-        let r = self.send_raw(
+        let _result = self.send_raw(
             handle,
             vmo,
             client_end,
@@ -8728,15 +8528,14 @@ impl ProtocolTwoWayResourceResponder {
             vector_table,
             vector_union,
         );
-        if r.is_err() {
+        if _result.is_err() {
             self.control_handle.shutdown();
         }
         self.drop_without_shutdown();
-        r
+        _result
     }
 
-    /// Similar to "send" but does not shutdown the channel if
-    /// an error occurs.
+    /// Similar to "send" but does not shutdown the channel if an error occurs.
     pub fn send_no_shutdown_on_err(
         self,
         mut handle: fidl::Handle,
@@ -8767,7 +8566,7 @@ impl ProtocolTwoWayResourceResponder {
         mut vector_table: Vec<ResourceTable>,
         mut vector_union: Vec<ResourceUnion>,
     ) -> Result<(), fidl::Error> {
-        let r = self.send_raw(
+        let _result = self.send_raw(
             handle,
             vmo,
             client_end,
@@ -8797,7 +8596,7 @@ impl ProtocolTwoWayResourceResponder {
             vector_union,
         );
         self.drop_without_shutdown();
-        r
+        _result
     }
 
     fn send_raw(
@@ -8830,13 +8629,8 @@ impl ProtocolTwoWayResourceResponder {
         mut vector_table: Vec<ResourceTable>,
         mut vector_union: Vec<ResourceUnion>,
     ) -> Result<(), fidl::Error> {
-        let msg = fidl::encoding::TransactionMessage {
-            header: fidl::encoding::TransactionHeader::new(
-                self.tx_id,
-                self.ordinal,
-                fidl::encoding::DynamicFlags::empty(),
-            ),
-            body: (
+        self.control_handle.inner.send::<Resource>(
+            (
                 handle,
                 vmo,
                 client_end,
@@ -8865,14 +8659,10 @@ impl ProtocolTwoWayResourceResponder {
                 vector_table.as_mut(),
                 vector_union.as_mut(),
             ),
-        };
-
-        fidl::encoding::with_tls_encode_buf(|bytes, handles| {
-            fidl::encoding::Encoder::encode::<fidl::encoding::TransactionMessageType<Resource>>(
-                bytes, handles, msg,
-            )?;
-            self.control_handle.inner.send_raw_msg(&*bytes, &mut *handles)
-        })
+            self.tx_id,
+            self.ordinal,
+            fidl::encoding::DynamicFlags::empty(),
+        )
     }
 }
 
@@ -8949,16 +8739,15 @@ impl ProtocolErrorResourceResponder {
             u32,
         >,
     ) -> Result<(), fidl::Error> {
-        let r = self.send_raw(result);
-        if r.is_err() {
+        let _result = self.send_raw(result);
+        if _result.is_err() {
             self.control_handle.shutdown();
         }
         self.drop_without_shutdown();
-        r
+        _result
     }
 
-    /// Similar to "send" but does not shutdown the channel if
-    /// an error occurs.
+    /// Similar to "send" but does not shutdown the channel if an error occurs.
     pub fn send_no_shutdown_on_err(
         self,
         mut result: Result<
@@ -8994,9 +8783,9 @@ impl ProtocolErrorResourceResponder {
             u32,
         >,
     ) -> Result<(), fidl::Error> {
-        let r = self.send_raw(result);
+        let _result = self.send_raw(result);
         self.drop_without_shutdown();
-        r
+        _result
     }
 
     fn send_raw(
@@ -9034,13 +8823,8 @@ impl ProtocolErrorResourceResponder {
             u32,
         >,
     ) -> Result<(), fidl::Error> {
-        let msg = fidl::encoding::TransactionMessage {
-            header: fidl::encoding::TransactionHeader::new(
-                self.tx_id,
-                self.ordinal,
-                fidl::encoding::DynamicFlags::empty(),
-            ),
-            body: result.as_mut().map_err(|e| *e).map(
+        self.control_handle.inner.send::<fidl::encoding::ResultType<Resource, u32>>(
+            result.as_mut().map_err(|e| *e).map(
                 |(
                     handle,
                     vmo,
@@ -9109,14 +8893,10 @@ impl ProtocolErrorResourceResponder {
                     )
                 },
             ),
-        };
-
-        fidl::encoding::with_tls_encode_buf(|bytes, handles| {
-            fidl::encoding::Encoder::encode::<
-                fidl::encoding::TransactionMessageType<fidl::encoding::ResultType<Resource, u32>>,
-            >(bytes, handles, msg)?;
-            self.control_handle.inner.send_raw_msg(&*bytes, &mut *handles)
-        })
+            self.tx_id,
+            self.ordinal,
+            fidl::encoding::DynamicFlags::empty(),
+        )
     }
 }
 

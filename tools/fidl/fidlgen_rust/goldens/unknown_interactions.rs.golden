@@ -1620,14 +1620,14 @@ impl fidl::endpoints::Proxy for UnknownInteractionsAjarProtocolProxy {
 }
 
 impl UnknownInteractionsAjarProtocolProxy {
-    /// Create a new Proxy for UnknownInteractionsAjarProtocol
+    /// Create a new Proxy for test.unknowninteractions/UnknownInteractionsAjarProtocol.
     pub fn new(channel: fidl::AsyncChannel) -> Self {
         let protocol_name =
             <UnknownInteractionsAjarProtocolMarker as fidl::endpoints::ProtocolMarker>::DEBUG_NAME;
         Self { client: fidl::client::Client::new(channel, protocol_name) }
     }
 
-    /// Get a Stream of events from the remote end of the UnknownInteractionsAjarProtocol protocol
+    /// Get a Stream of events from the remote end of the protocol.
     ///
     /// # Panics
     ///
@@ -1917,15 +1917,15 @@ impl futures::Stream for UnknownInteractionsAjarProtocolEventStream {
         mut self: std::pin::Pin<&mut Self>,
         cx: &mut std::task::Context<'_>,
     ) -> std::task::Poll<Option<Self::Item>> {
-        let buf = match futures::ready!(futures::stream::StreamExt::poll_next_unpin(
+        match futures::ready!(futures::stream::StreamExt::poll_next_unpin(
             &mut self.event_receiver,
             cx
         )?) {
-            Some(buf) => buf,
-            None => return std::task::Poll::Ready(None),
-        };
-
-        std::task::Poll::Ready(Some(UnknownInteractionsAjarProtocolEvent::decode(buf)))
+            Some(buf) => {
+                std::task::Poll::Ready(Some(UnknownInteractionsAjarProtocolEvent::decode(buf)))
+            }
+            None => std::task::Poll::Ready(None),
+        }
     }
 }
 
@@ -2136,14 +2136,13 @@ impl UnknownInteractionsAjarProtocolEvent {
         }
     }
 
-    /// Decodes a message buffer as a [`UnknownInteractionsAjarProtocolEvent`]. Transaction
-    /// ID in the message must be zero; this method does not check TXID.
+    /// Decodes a message buffer as a [`UnknownInteractionsAjarProtocolEvent`].
     fn decode(
         mut buf: fidl::MessageBufEtc,
     ) -> Result<UnknownInteractionsAjarProtocolEvent, fidl::Error> {
         let (bytes, _handles) = buf.split_mut();
         let (tx_header, _body_bytes) = fidl::encoding::decode_transaction_header(bytes)?;
-
+        debug_assert_eq!(tx_header.tx_id(), 0);
         match tx_header.ordinal() {
             0x6022ae999e9dc2b0 => {
                 let mut out = fidl::new_empty!(fidl::encoding::EmptyPayload);
@@ -2279,9 +2278,6 @@ impl UnknownInteractionsAjarProtocolEvent {
                 Ok(UnknownInteractionsAjarProtocolEvent::_UnknownEvent {
                     ordinal: tx_header.ordinal(),
                 })
-                // MessageBufEtc will close handles on drop, before the
-                // application can handle the _UnknownEvent variant, so this
-                // satisfies the RFC-0138 requirement to close handles first.
             }
             _ => Err(fidl::Error::UnknownOrdinal {
                 ordinal: tx_header.ordinal(),
@@ -2291,7 +2287,7 @@ impl UnknownInteractionsAjarProtocolEvent {
     }
 }
 
-/// A Stream of incoming requests for UnknownInteractionsAjarProtocol
+/// A Stream of incoming requests for test.unknowninteractions/UnknownInteractionsAjarProtocol.
 pub struct UnknownInteractionsAjarProtocolRequestStream {
     inner: std::sync::Arc<fidl::ServeInner>,
     is_terminated: bool,
@@ -2334,7 +2330,7 @@ impl futures::Stream for UnknownInteractionsAjarProtocolRequestStream {
         cx: &mut std::task::Context<'_>,
     ) -> std::task::Poll<Option<Self::Item>> {
         let this = &mut *self;
-        if this.inner.poll_shutdown(cx) {
+        if this.inner.check_shutdown(cx) {
             this.is_terminated = true;
             return std::task::Poll::Ready(None);
         }
@@ -2364,9 +2360,8 @@ impl futures::Stream for UnknownInteractionsAjarProtocolRequestStream {
                     let control_handle = UnknownInteractionsAjarProtocolControlHandle {
                         inner: this.inner.clone(),
                     };
-
                     Ok(UnknownInteractionsAjarProtocolRequest::StrictOneWay {
-                            control_handle,
+                        control_handle,
                     })
                 }
                 0x2275b8171ae4834f => {
@@ -2375,9 +2370,8 @@ impl futures::Stream for UnknownInteractionsAjarProtocolRequestStream {
                     let control_handle = UnknownInteractionsAjarProtocolControlHandle {
                         inner: this.inner.clone(),
                     };
-
                     Ok(UnknownInteractionsAjarProtocolRequest::FlexibleOneWay {
-                            control_handle,
+                        control_handle,
                     })
                 }
                 0x50e66d328336038 => {
@@ -2386,13 +2380,12 @@ impl futures::Stream for UnknownInteractionsAjarProtocolRequestStream {
                     let control_handle = UnknownInteractionsAjarProtocolControlHandle {
                         inner: this.inner.clone(),
                     };
-
                     Ok(UnknownInteractionsAjarProtocolRequest::StrictTwoWay {
-                            responder:UnknownInteractionsAjarProtocolStrictTwoWayResponder {
-                                control_handle: std::mem::ManuallyDrop::new(control_handle),
-                                tx_id: header.tx_id(),
-                                ordinal: header.ordinal(),
-                            },
+                        responder: UnknownInteractionsAjarProtocolStrictTwoWayResponder {
+                            control_handle: std::mem::ManuallyDrop::new(control_handle),
+                            tx_id: header.tx_id(),
+                            ordinal: header.ordinal(),
+                        },
                     })
                 }
                 0x1947e36d61e4493a => {
@@ -2401,13 +2394,12 @@ impl futures::Stream for UnknownInteractionsAjarProtocolRequestStream {
                     let control_handle = UnknownInteractionsAjarProtocolControlHandle {
                         inner: this.inner.clone(),
                     };
-
                     Ok(UnknownInteractionsAjarProtocolRequest::StrictTwoWayFields {
-                            responder:UnknownInteractionsAjarProtocolStrictTwoWayFieldsResponder {
-                                control_handle: std::mem::ManuallyDrop::new(control_handle),
-                                tx_id: header.tx_id(),
-                                ordinal: header.ordinal(),
-                            },
+                        responder: UnknownInteractionsAjarProtocolStrictTwoWayFieldsResponder {
+                            control_handle: std::mem::ManuallyDrop::new(control_handle),
+                            tx_id: header.tx_id(),
+                            ordinal: header.ordinal(),
+                        },
                     })
                 }
                 0x5177371967e0e6d1 => {
@@ -2416,13 +2408,12 @@ impl futures::Stream for UnknownInteractionsAjarProtocolRequestStream {
                     let control_handle = UnknownInteractionsAjarProtocolControlHandle {
                         inner: this.inner.clone(),
                     };
-
                     Ok(UnknownInteractionsAjarProtocolRequest::StrictTwoWayUnion {
-                            responder:UnknownInteractionsAjarProtocolStrictTwoWayUnionResponder {
-                                control_handle: std::mem::ManuallyDrop::new(control_handle),
-                                tx_id: header.tx_id(),
-                                ordinal: header.ordinal(),
-                            },
+                        responder: UnknownInteractionsAjarProtocolStrictTwoWayUnionResponder {
+                            control_handle: std::mem::ManuallyDrop::new(control_handle),
+                            tx_id: header.tx_id(),
+                            ordinal: header.ordinal(),
+                        },
                     })
                 }
                 0x6f8f9343b34e2ed4 => {
@@ -2431,13 +2422,12 @@ impl futures::Stream for UnknownInteractionsAjarProtocolRequestStream {
                     let control_handle = UnknownInteractionsAjarProtocolControlHandle {
                         inner: this.inner.clone(),
                     };
-
                     Ok(UnknownInteractionsAjarProtocolRequest::StrictTwoWayTable {
-                            responder:UnknownInteractionsAjarProtocolStrictTwoWayTableResponder {
-                                control_handle: std::mem::ManuallyDrop::new(control_handle),
-                                tx_id: header.tx_id(),
-                                ordinal: header.ordinal(),
-                            },
+                        responder: UnknownInteractionsAjarProtocolStrictTwoWayTableResponder {
+                            control_handle: std::mem::ManuallyDrop::new(control_handle),
+                            tx_id: header.tx_id(),
+                            ordinal: header.ordinal(),
+                        },
                     })
                 }
                 0x5b47637577c69006 => {
@@ -2446,13 +2436,12 @@ impl futures::Stream for UnknownInteractionsAjarProtocolRequestStream {
                     let control_handle = UnknownInteractionsAjarProtocolControlHandle {
                         inner: this.inner.clone(),
                     };
-
                     Ok(UnknownInteractionsAjarProtocolRequest::StrictTwoWayErr {
-                            responder:UnknownInteractionsAjarProtocolStrictTwoWayErrResponder {
-                                control_handle: std::mem::ManuallyDrop::new(control_handle),
-                                tx_id: header.tx_id(),
-                                ordinal: header.ordinal(),
-                            },
+                        responder: UnknownInteractionsAjarProtocolStrictTwoWayErrResponder {
+                            control_handle: std::mem::ManuallyDrop::new(control_handle),
+                            tx_id: header.tx_id(),
+                            ordinal: header.ordinal(),
+                        },
                     })
                 }
                 0x844ff7bb3f186d9 => {
@@ -2461,13 +2450,12 @@ impl futures::Stream for UnknownInteractionsAjarProtocolRequestStream {
                     let control_handle = UnknownInteractionsAjarProtocolControlHandle {
                         inner: this.inner.clone(),
                     };
-
                     Ok(UnknownInteractionsAjarProtocolRequest::StrictTwoWayFieldsErr {
-                            responder:UnknownInteractionsAjarProtocolStrictTwoWayFieldsErrResponder {
-                                control_handle: std::mem::ManuallyDrop::new(control_handle),
-                                tx_id: header.tx_id(),
-                                ordinal: header.ordinal(),
-                            },
+                        responder: UnknownInteractionsAjarProtocolStrictTwoWayFieldsErrResponder {
+                            control_handle: std::mem::ManuallyDrop::new(control_handle),
+                            tx_id: header.tx_id(),
+                            ordinal: header.ordinal(),
+                        },
                     })
                 }
                 0x2cbfd5a859d4ac95 => {
@@ -2476,13 +2464,12 @@ impl futures::Stream for UnknownInteractionsAjarProtocolRequestStream {
                     let control_handle = UnknownInteractionsAjarProtocolControlHandle {
                         inner: this.inner.clone(),
                     };
-
                     Ok(UnknownInteractionsAjarProtocolRequest::StrictTwoWayUnionErr {
-                            responder:UnknownInteractionsAjarProtocolStrictTwoWayUnionErrResponder {
-                                control_handle: std::mem::ManuallyDrop::new(control_handle),
-                                tx_id: header.tx_id(),
-                                ordinal: header.ordinal(),
-                            },
+                        responder: UnknownInteractionsAjarProtocolStrictTwoWayUnionErrResponder {
+                            control_handle: std::mem::ManuallyDrop::new(control_handle),
+                            tx_id: header.tx_id(),
+                            ordinal: header.ordinal(),
+                        },
                     })
                 }
                 0x30c9e1b3da57dc37 => {
@@ -2491,28 +2478,19 @@ impl futures::Stream for UnknownInteractionsAjarProtocolRequestStream {
                     let control_handle = UnknownInteractionsAjarProtocolControlHandle {
                         inner: this.inner.clone(),
                     };
-
                     Ok(UnknownInteractionsAjarProtocolRequest::StrictTwoWayTableErr {
-                            responder:UnknownInteractionsAjarProtocolStrictTwoWayTableErrResponder {
-                                control_handle: std::mem::ManuallyDrop::new(control_handle),
-                                tx_id: header.tx_id(),
-                                ordinal: header.ordinal(),
-                            },
+                        responder: UnknownInteractionsAjarProtocolStrictTwoWayTableErrResponder {
+                            control_handle: std::mem::ManuallyDrop::new(control_handle),
+                            tx_id: header.tx_id(),
+                            ordinal: header.ordinal(),
+                        },
                     })
                 }
                 _ if header.tx_id() == 0 && header.dynamic_flags().contains(fidl::encoding::DynamicFlags::FLEXIBLE) => {
-                    let control_handle = UnknownInteractionsAjarProtocolControlHandle {
-                        inner: this.inner.clone(),
-                    };
                     Ok(UnknownInteractionsAjarProtocolRequest::_UnknownMethod {
                         ordinal: header.ordinal(),
-                        control_handle,
+                        control_handle: UnknownInteractionsAjarProtocolControlHandle { inner: this.inner.clone() },
                     })
-                    // with_tls_decode_buf will clear the handles when we return
-                    // before the application can handle the _UnknownMethod, so
-                    // we don't need to clear it explicitly to meet the RFC
-                    // requirement to close handles before calling an unknown
-                    // interaction handler.
                 }
                 _ => Err(fidl::Error::UnknownOrdinal {
                     ordinal: header.ordinal(),
@@ -2939,38 +2917,28 @@ impl UnknownInteractionsAjarProtocolStrictTwoWayResponder {
     ///
     /// Sets the channel to shutdown if an error occurs.
     pub fn send(self) -> Result<(), fidl::Error> {
-        let r = self.send_raw();
-        if r.is_err() {
+        let _result = self.send_raw();
+        if _result.is_err() {
             self.control_handle.shutdown();
         }
         self.drop_without_shutdown();
-        r
+        _result
     }
 
-    /// Similar to "send" but does not shutdown the channel if
-    /// an error occurs.
+    /// Similar to "send" but does not shutdown the channel if an error occurs.
     pub fn send_no_shutdown_on_err(self) -> Result<(), fidl::Error> {
-        let r = self.send_raw();
+        let _result = self.send_raw();
         self.drop_without_shutdown();
-        r
+        _result
     }
 
     fn send_raw(&self) -> Result<(), fidl::Error> {
-        let msg = fidl::encoding::TransactionMessage {
-            header: fidl::encoding::TransactionHeader::new(
-                self.tx_id,
-                self.ordinal,
-                fidl::encoding::DynamicFlags::empty(),
-            ),
-            body: (),
-        };
-
-        fidl::encoding::with_tls_encode_buf(|bytes, handles| {
-            fidl::encoding::Encoder::encode::<
-                fidl::encoding::TransactionMessageType<fidl::encoding::EmptyPayload>,
-            >(bytes, handles, msg)?;
-            self.control_handle.inner.send_raw_msg(&*bytes, &mut *handles)
-        })
+        self.control_handle.inner.send::<fidl::encoding::EmptyPayload>(
+            (),
+            self.tx_id,
+            self.ordinal,
+            fidl::encoding::DynamicFlags::empty(),
+        )
     }
 }
 
@@ -3013,40 +2981,28 @@ impl UnknownInteractionsAjarProtocolStrictTwoWayFieldsResponder {
     ///
     /// Sets the channel to shutdown if an error occurs.
     pub fn send(self, mut some_field: i32) -> Result<(), fidl::Error> {
-        let r = self.send_raw(some_field);
-        if r.is_err() {
+        let _result = self.send_raw(some_field);
+        if _result.is_err() {
             self.control_handle.shutdown();
         }
         self.drop_without_shutdown();
-        r
+        _result
     }
 
-    /// Similar to "send" but does not shutdown the channel if
-    /// an error occurs.
+    /// Similar to "send" but does not shutdown the channel if an error occurs.
     pub fn send_no_shutdown_on_err(self, mut some_field: i32) -> Result<(), fidl::Error> {
-        let r = self.send_raw(some_field);
+        let _result = self.send_raw(some_field);
         self.drop_without_shutdown();
-        r
+        _result
     }
 
     fn send_raw(&self, mut some_field: i32) -> Result<(), fidl::Error> {
-        let msg = fidl::encoding::TransactionMessage {
-            header: fidl::encoding::TransactionHeader::new(
-                self.tx_id,
-                self.ordinal,
-                fidl::encoding::DynamicFlags::empty(),
-            ),
-            body: (some_field,),
-        };
-
-        fidl::encoding::with_tls_encode_buf(|bytes, handles| {
-            fidl::encoding::Encoder::encode::<
-                fidl::encoding::TransactionMessageType<
-                    UnknownInteractionsAjarProtocolStrictTwoWayFieldsResponse,
-                >,
-            >(bytes, handles, msg)?;
-            self.control_handle.inner.send_raw_msg(&*bytes, &mut *handles)
-        })
+        self.control_handle.inner.send::<UnknownInteractionsAjarProtocolStrictTwoWayFieldsResponse>(
+            (some_field,),
+            self.tx_id,
+            self.ordinal,
+            fidl::encoding::DynamicFlags::empty(),
+        )
     }
 }
 
@@ -3092,46 +3048,34 @@ impl UnknownInteractionsAjarProtocolStrictTwoWayUnionResponder {
         self,
         mut payload: &UnknownInteractionsAjarProtocolStrictTwoWayUnionResponse,
     ) -> Result<(), fidl::Error> {
-        let r = self.send_raw(payload);
-        if r.is_err() {
+        let _result = self.send_raw(payload);
+        if _result.is_err() {
             self.control_handle.shutdown();
         }
         self.drop_without_shutdown();
-        r
+        _result
     }
 
-    /// Similar to "send" but does not shutdown the channel if
-    /// an error occurs.
+    /// Similar to "send" but does not shutdown the channel if an error occurs.
     pub fn send_no_shutdown_on_err(
         self,
         mut payload: &UnknownInteractionsAjarProtocolStrictTwoWayUnionResponse,
     ) -> Result<(), fidl::Error> {
-        let r = self.send_raw(payload);
+        let _result = self.send_raw(payload);
         self.drop_without_shutdown();
-        r
+        _result
     }
 
     fn send_raw(
         &self,
         mut payload: &UnknownInteractionsAjarProtocolStrictTwoWayUnionResponse,
     ) -> Result<(), fidl::Error> {
-        let msg = fidl::encoding::TransactionMessage {
-            header: fidl::encoding::TransactionHeader::new(
-                self.tx_id,
-                self.ordinal,
-                fidl::encoding::DynamicFlags::empty(),
-            ),
-            body: payload,
-        };
-
-        fidl::encoding::with_tls_encode_buf(|bytes, handles| {
-            fidl::encoding::Encoder::encode::<
-                fidl::encoding::TransactionMessageType<
-                    UnknownInteractionsAjarProtocolStrictTwoWayUnionResponse,
-                >,
-            >(bytes, handles, msg)?;
-            self.control_handle.inner.send_raw_msg(&*bytes, &mut *handles)
-        })
+        self.control_handle.inner.send::<UnknownInteractionsAjarProtocolStrictTwoWayUnionResponse>(
+            payload,
+            self.tx_id,
+            self.ordinal,
+            fidl::encoding::DynamicFlags::empty(),
+        )
     }
 }
 
@@ -3177,46 +3121,34 @@ impl UnknownInteractionsAjarProtocolStrictTwoWayTableResponder {
         self,
         mut payload: &UnknownInteractionsAjarProtocolStrictTwoWayTableResponse,
     ) -> Result<(), fidl::Error> {
-        let r = self.send_raw(payload);
-        if r.is_err() {
+        let _result = self.send_raw(payload);
+        if _result.is_err() {
             self.control_handle.shutdown();
         }
         self.drop_without_shutdown();
-        r
+        _result
     }
 
-    /// Similar to "send" but does not shutdown the channel if
-    /// an error occurs.
+    /// Similar to "send" but does not shutdown the channel if an error occurs.
     pub fn send_no_shutdown_on_err(
         self,
         mut payload: &UnknownInteractionsAjarProtocolStrictTwoWayTableResponse,
     ) -> Result<(), fidl::Error> {
-        let r = self.send_raw(payload);
+        let _result = self.send_raw(payload);
         self.drop_without_shutdown();
-        r
+        _result
     }
 
     fn send_raw(
         &self,
         mut payload: &UnknownInteractionsAjarProtocolStrictTwoWayTableResponse,
     ) -> Result<(), fidl::Error> {
-        let msg = fidl::encoding::TransactionMessage {
-            header: fidl::encoding::TransactionHeader::new(
-                self.tx_id,
-                self.ordinal,
-                fidl::encoding::DynamicFlags::empty(),
-            ),
-            body: payload,
-        };
-
-        fidl::encoding::with_tls_encode_buf(|bytes, handles| {
-            fidl::encoding::Encoder::encode::<
-                fidl::encoding::TransactionMessageType<
-                    UnknownInteractionsAjarProtocolStrictTwoWayTableResponse,
-                >,
-            >(bytes, handles, msg)?;
-            self.control_handle.inner.send_raw_msg(&*bytes, &mut *handles)
-        })
+        self.control_handle.inner.send::<UnknownInteractionsAjarProtocolStrictTwoWayTableResponse>(
+            payload,
+            self.tx_id,
+            self.ordinal,
+            fidl::encoding::DynamicFlags::empty(),
+        )
     }
 }
 
@@ -3259,40 +3191,30 @@ impl UnknownInteractionsAjarProtocolStrictTwoWayErrResponder {
     ///
     /// Sets the channel to shutdown if an error occurs.
     pub fn send(self, mut result: Result<(), i32>) -> Result<(), fidl::Error> {
-        let r = self.send_raw(result);
-        if r.is_err() {
+        let _result = self.send_raw(result);
+        if _result.is_err() {
             self.control_handle.shutdown();
         }
         self.drop_without_shutdown();
-        r
+        _result
     }
 
-    /// Similar to "send" but does not shutdown the channel if
-    /// an error occurs.
+    /// Similar to "send" but does not shutdown the channel if an error occurs.
     pub fn send_no_shutdown_on_err(self, mut result: Result<(), i32>) -> Result<(), fidl::Error> {
-        let r = self.send_raw(result);
+        let _result = self.send_raw(result);
         self.drop_without_shutdown();
-        r
+        _result
     }
 
     fn send_raw(&self, mut result: Result<(), i32>) -> Result<(), fidl::Error> {
-        let msg = fidl::encoding::TransactionMessage {
-            header: fidl::encoding::TransactionHeader::new(
+        self.control_handle
+            .inner
+            .send::<fidl::encoding::ResultType<fidl::encoding::EmptyStruct, i32>>(
+                result,
                 self.tx_id,
                 self.ordinal,
                 fidl::encoding::DynamicFlags::empty(),
-            ),
-            body: result,
-        };
-
-        fidl::encoding::with_tls_encode_buf(|bytes, handles| {
-            fidl::encoding::Encoder::encode::<
-                fidl::encoding::TransactionMessageType<
-                    fidl::encoding::ResultType<fidl::encoding::EmptyStruct, i32>,
-                >,
-            >(bytes, handles, msg)?;
-            self.control_handle.inner.send_raw_msg(&*bytes, &mut *handles)
-        })
+            )
     }
 }
 
@@ -3335,43 +3257,31 @@ impl UnknownInteractionsAjarProtocolStrictTwoWayFieldsErrResponder {
     ///
     /// Sets the channel to shutdown if an error occurs.
     pub fn send(self, mut result: Result<i32, i32>) -> Result<(), fidl::Error> {
-        let r = self.send_raw(result);
-        if r.is_err() {
+        let _result = self.send_raw(result);
+        if _result.is_err() {
             self.control_handle.shutdown();
         }
         self.drop_without_shutdown();
-        r
+        _result
     }
 
-    /// Similar to "send" but does not shutdown the channel if
-    /// an error occurs.
+    /// Similar to "send" but does not shutdown the channel if an error occurs.
     pub fn send_no_shutdown_on_err(self, mut result: Result<i32, i32>) -> Result<(), fidl::Error> {
-        let r = self.send_raw(result);
+        let _result = self.send_raw(result);
         self.drop_without_shutdown();
-        r
+        _result
     }
 
     fn send_raw(&self, mut result: Result<i32, i32>) -> Result<(), fidl::Error> {
-        let msg = fidl::encoding::TransactionMessage {
-            header: fidl::encoding::TransactionHeader::new(
-                self.tx_id,
-                self.ordinal,
-                fidl::encoding::DynamicFlags::empty(),
-            ),
-            body: result.map(|some_field| (some_field,)),
-        };
-
-        fidl::encoding::with_tls_encode_buf(|bytes, handles| {
-            fidl::encoding::Encoder::encode::<
-                fidl::encoding::TransactionMessageType<
-                    fidl::encoding::ResultType<
-                        UnknownInteractionsAjarProtocolStrictTwoWayFieldsErrResponse,
-                        i32,
-                    >,
-                >,
-            >(bytes, handles, msg)?;
-            self.control_handle.inner.send_raw_msg(&*bytes, &mut *handles)
-        })
+        self.control_handle.inner.send::<fidl::encoding::ResultType<
+            UnknownInteractionsAjarProtocolStrictTwoWayFieldsErrResponse,
+            i32,
+        >>(
+            result.map(|some_field| (some_field,)),
+            self.tx_id,
+            self.ordinal,
+            fidl::encoding::DynamicFlags::empty(),
+        )
     }
 }
 
@@ -3417,49 +3327,37 @@ impl UnknownInteractionsAjarProtocolStrictTwoWayUnionErrResponder {
         self,
         mut result: Result<&UnknownInteractionsAjarProtocolStrictTwoWayUnionErrResponse, i32>,
     ) -> Result<(), fidl::Error> {
-        let r = self.send_raw(result);
-        if r.is_err() {
+        let _result = self.send_raw(result);
+        if _result.is_err() {
             self.control_handle.shutdown();
         }
         self.drop_without_shutdown();
-        r
+        _result
     }
 
-    /// Similar to "send" but does not shutdown the channel if
-    /// an error occurs.
+    /// Similar to "send" but does not shutdown the channel if an error occurs.
     pub fn send_no_shutdown_on_err(
         self,
         mut result: Result<&UnknownInteractionsAjarProtocolStrictTwoWayUnionErrResponse, i32>,
     ) -> Result<(), fidl::Error> {
-        let r = self.send_raw(result);
+        let _result = self.send_raw(result);
         self.drop_without_shutdown();
-        r
+        _result
     }
 
     fn send_raw(
         &self,
         mut result: Result<&UnknownInteractionsAjarProtocolStrictTwoWayUnionErrResponse, i32>,
     ) -> Result<(), fidl::Error> {
-        let msg = fidl::encoding::TransactionMessage {
-            header: fidl::encoding::TransactionHeader::new(
-                self.tx_id,
-                self.ordinal,
-                fidl::encoding::DynamicFlags::empty(),
-            ),
-            body: result,
-        };
-
-        fidl::encoding::with_tls_encode_buf(|bytes, handles| {
-            fidl::encoding::Encoder::encode::<
-                fidl::encoding::TransactionMessageType<
-                    fidl::encoding::ResultType<
-                        UnknownInteractionsAjarProtocolStrictTwoWayUnionErrResponse,
-                        i32,
-                    >,
-                >,
-            >(bytes, handles, msg)?;
-            self.control_handle.inner.send_raw_msg(&*bytes, &mut *handles)
-        })
+        self.control_handle.inner.send::<fidl::encoding::ResultType<
+            UnknownInteractionsAjarProtocolStrictTwoWayUnionErrResponse,
+            i32,
+        >>(
+            result,
+            self.tx_id,
+            self.ordinal,
+            fidl::encoding::DynamicFlags::empty(),
+        )
     }
 }
 
@@ -3505,49 +3403,37 @@ impl UnknownInteractionsAjarProtocolStrictTwoWayTableErrResponder {
         self,
         mut result: Result<&UnknownInteractionsAjarProtocolStrictTwoWayTableErrResponse, i32>,
     ) -> Result<(), fidl::Error> {
-        let r = self.send_raw(result);
-        if r.is_err() {
+        let _result = self.send_raw(result);
+        if _result.is_err() {
             self.control_handle.shutdown();
         }
         self.drop_without_shutdown();
-        r
+        _result
     }
 
-    /// Similar to "send" but does not shutdown the channel if
-    /// an error occurs.
+    /// Similar to "send" but does not shutdown the channel if an error occurs.
     pub fn send_no_shutdown_on_err(
         self,
         mut result: Result<&UnknownInteractionsAjarProtocolStrictTwoWayTableErrResponse, i32>,
     ) -> Result<(), fidl::Error> {
-        let r = self.send_raw(result);
+        let _result = self.send_raw(result);
         self.drop_without_shutdown();
-        r
+        _result
     }
 
     fn send_raw(
         &self,
         mut result: Result<&UnknownInteractionsAjarProtocolStrictTwoWayTableErrResponse, i32>,
     ) -> Result<(), fidl::Error> {
-        let msg = fidl::encoding::TransactionMessage {
-            header: fidl::encoding::TransactionHeader::new(
-                self.tx_id,
-                self.ordinal,
-                fidl::encoding::DynamicFlags::empty(),
-            ),
-            body: result,
-        };
-
-        fidl::encoding::with_tls_encode_buf(|bytes, handles| {
-            fidl::encoding::Encoder::encode::<
-                fidl::encoding::TransactionMessageType<
-                    fidl::encoding::ResultType<
-                        UnknownInteractionsAjarProtocolStrictTwoWayTableErrResponse,
-                        i32,
-                    >,
-                >,
-            >(bytes, handles, msg)?;
-            self.control_handle.inner.send_raw_msg(&*bytes, &mut *handles)
-        })
+        self.control_handle.inner.send::<fidl::encoding::ResultType<
+            UnknownInteractionsAjarProtocolStrictTwoWayTableErrResponse,
+            i32,
+        >>(
+            result,
+            self.tx_id,
+            self.ordinal,
+            fidl::encoding::DynamicFlags::empty(),
+        )
     }
 }
 
@@ -3794,13 +3680,13 @@ impl fidl::endpoints::Proxy for UnknownInteractionsClosedProtocolProxy {
 }
 
 impl UnknownInteractionsClosedProtocolProxy {
-    /// Create a new Proxy for UnknownInteractionsClosedProtocol
+    /// Create a new Proxy for test.unknowninteractions/UnknownInteractionsClosedProtocol.
     pub fn new(channel: fidl::AsyncChannel) -> Self {
         let protocol_name = <UnknownInteractionsClosedProtocolMarker as fidl::endpoints::ProtocolMarker>::DEBUG_NAME;
         Self { client: fidl::client::Client::new(channel, protocol_name) }
     }
 
-    /// Get a Stream of events from the remote end of the UnknownInteractionsClosedProtocol protocol
+    /// Get a Stream of events from the remote end of the protocol.
     ///
     /// # Panics
     ///
@@ -4082,15 +3968,15 @@ impl futures::Stream for UnknownInteractionsClosedProtocolEventStream {
         mut self: std::pin::Pin<&mut Self>,
         cx: &mut std::task::Context<'_>,
     ) -> std::task::Poll<Option<Self::Item>> {
-        let buf = match futures::ready!(futures::stream::StreamExt::poll_next_unpin(
+        match futures::ready!(futures::stream::StreamExt::poll_next_unpin(
             &mut self.event_receiver,
             cx
         )?) {
-            Some(buf) => buf,
-            None => return std::task::Poll::Ready(None),
-        };
-
-        std::task::Poll::Ready(Some(UnknownInteractionsClosedProtocolEvent::decode(buf)))
+            Some(buf) => {
+                std::task::Poll::Ready(Some(UnknownInteractionsClosedProtocolEvent::decode(buf)))
+            }
+            None => std::task::Poll::Ready(None),
+        }
     }
 }
 
@@ -4184,14 +4070,13 @@ impl UnknownInteractionsClosedProtocolEvent {
         }
     }
 
-    /// Decodes a message buffer as a [`UnknownInteractionsClosedProtocolEvent`]. Transaction
-    /// ID in the message must be zero; this method does not check TXID.
+    /// Decodes a message buffer as a [`UnknownInteractionsClosedProtocolEvent`].
     fn decode(
         mut buf: fidl::MessageBufEtc,
     ) -> Result<UnknownInteractionsClosedProtocolEvent, fidl::Error> {
         let (bytes, _handles) = buf.split_mut();
         let (tx_header, _body_bytes) = fidl::encoding::decode_transaction_header(bytes)?;
-
+        debug_assert_eq!(tx_header.tx_id(), 0);
         match tx_header.ordinal() {
             0xa8ee6ee302f693b => {
                 let mut out = fidl::new_empty!(fidl::encoding::EmptyPayload);
@@ -4266,7 +4151,7 @@ impl UnknownInteractionsClosedProtocolEvent {
     }
 }
 
-/// A Stream of incoming requests for UnknownInteractionsClosedProtocol
+/// A Stream of incoming requests for test.unknowninteractions/UnknownInteractionsClosedProtocol.
 pub struct UnknownInteractionsClosedProtocolRequestStream {
     inner: std::sync::Arc<fidl::ServeInner>,
     is_terminated: bool,
@@ -4309,7 +4194,7 @@ impl futures::Stream for UnknownInteractionsClosedProtocolRequestStream {
         cx: &mut std::task::Context<'_>,
     ) -> std::task::Poll<Option<Self::Item>> {
         let this = &mut *self;
-        if this.inner.poll_shutdown(cx) {
+        if this.inner.check_shutdown(cx) {
             this.is_terminated = true;
             return std::task::Poll::Ready(None);
         }
@@ -4339,9 +4224,8 @@ impl futures::Stream for UnknownInteractionsClosedProtocolRequestStream {
                     let control_handle = UnknownInteractionsClosedProtocolControlHandle {
                         inner: this.inner.clone(),
                     };
-
                     Ok(UnknownInteractionsClosedProtocolRequest::StrictOneWay {
-                            control_handle,
+                        control_handle,
                     })
                 }
                 0x5eda305d6b22f1f7 => {
@@ -4350,13 +4234,12 @@ impl futures::Stream for UnknownInteractionsClosedProtocolRequestStream {
                     let control_handle = UnknownInteractionsClosedProtocolControlHandle {
                         inner: this.inner.clone(),
                     };
-
                     Ok(UnknownInteractionsClosedProtocolRequest::StrictTwoWay {
-                            responder:UnknownInteractionsClosedProtocolStrictTwoWayResponder {
-                                control_handle: std::mem::ManuallyDrop::new(control_handle),
-                                tx_id: header.tx_id(),
-                                ordinal: header.ordinal(),
-                            },
+                        responder: UnknownInteractionsClosedProtocolStrictTwoWayResponder {
+                            control_handle: std::mem::ManuallyDrop::new(control_handle),
+                            tx_id: header.tx_id(),
+                            ordinal: header.ordinal(),
+                        },
                     })
                 }
                 0x1323afa3e0541253 => {
@@ -4365,13 +4248,12 @@ impl futures::Stream for UnknownInteractionsClosedProtocolRequestStream {
                     let control_handle = UnknownInteractionsClosedProtocolControlHandle {
                         inner: this.inner.clone(),
                     };
-
                     Ok(UnknownInteractionsClosedProtocolRequest::StrictTwoWayFields {
-                            responder:UnknownInteractionsClosedProtocolStrictTwoWayFieldsResponder {
-                                control_handle: std::mem::ManuallyDrop::new(control_handle),
-                                tx_id: header.tx_id(),
-                                ordinal: header.ordinal(),
-                            },
+                        responder: UnknownInteractionsClosedProtocolStrictTwoWayFieldsResponder {
+                            control_handle: std::mem::ManuallyDrop::new(control_handle),
+                            tx_id: header.tx_id(),
+                            ordinal: header.ordinal(),
+                        },
                     })
                 }
                 0x68b32554eb0f6fa7 => {
@@ -4380,13 +4262,12 @@ impl futures::Stream for UnknownInteractionsClosedProtocolRequestStream {
                     let control_handle = UnknownInteractionsClosedProtocolControlHandle {
                         inner: this.inner.clone(),
                     };
-
                     Ok(UnknownInteractionsClosedProtocolRequest::StrictTwoWayUnion {
-                            responder:UnknownInteractionsClosedProtocolStrictTwoWayUnionResponder {
-                                control_handle: std::mem::ManuallyDrop::new(control_handle),
-                                tx_id: header.tx_id(),
-                                ordinal: header.ordinal(),
-                            },
+                        responder: UnknownInteractionsClosedProtocolStrictTwoWayUnionResponder {
+                            control_handle: std::mem::ManuallyDrop::new(control_handle),
+                            tx_id: header.tx_id(),
+                            ordinal: header.ordinal(),
+                        },
                     })
                 }
                 0x6e4a94d44b69e785 => {
@@ -4395,13 +4276,12 @@ impl futures::Stream for UnknownInteractionsClosedProtocolRequestStream {
                     let control_handle = UnknownInteractionsClosedProtocolControlHandle {
                         inner: this.inner.clone(),
                     };
-
                     Ok(UnknownInteractionsClosedProtocolRequest::StrictTwoWayTable {
-                            responder:UnknownInteractionsClosedProtocolStrictTwoWayTableResponder {
-                                control_handle: std::mem::ManuallyDrop::new(control_handle),
-                                tx_id: header.tx_id(),
-                                ordinal: header.ordinal(),
-                            },
+                        responder: UnknownInteractionsClosedProtocolStrictTwoWayTableResponder {
+                            control_handle: std::mem::ManuallyDrop::new(control_handle),
+                            tx_id: header.tx_id(),
+                            ordinal: header.ordinal(),
+                        },
                     })
                 }
                 0x4fa35d5433db4d3a => {
@@ -4410,13 +4290,12 @@ impl futures::Stream for UnknownInteractionsClosedProtocolRequestStream {
                     let control_handle = UnknownInteractionsClosedProtocolControlHandle {
                         inner: this.inner.clone(),
                     };
-
                     Ok(UnknownInteractionsClosedProtocolRequest::StrictTwoWayErr {
-                            responder:UnknownInteractionsClosedProtocolStrictTwoWayErrResponder {
-                                control_handle: std::mem::ManuallyDrop::new(control_handle),
-                                tx_id: header.tx_id(),
-                                ordinal: header.ordinal(),
-                            },
+                        responder: UnknownInteractionsClosedProtocolStrictTwoWayErrResponder {
+                            control_handle: std::mem::ManuallyDrop::new(control_handle),
+                            tx_id: header.tx_id(),
+                            ordinal: header.ordinal(),
+                        },
                     })
                 }
                 0xb22aebf23bb58fd => {
@@ -4425,13 +4304,12 @@ impl futures::Stream for UnknownInteractionsClosedProtocolRequestStream {
                     let control_handle = UnknownInteractionsClosedProtocolControlHandle {
                         inner: this.inner.clone(),
                     };
-
                     Ok(UnknownInteractionsClosedProtocolRequest::StrictTwoWayFieldsErr {
-                            responder:UnknownInteractionsClosedProtocolStrictTwoWayFieldsErrResponder {
-                                control_handle: std::mem::ManuallyDrop::new(control_handle),
-                                tx_id: header.tx_id(),
-                                ordinal: header.ordinal(),
-                            },
+                        responder: UnknownInteractionsClosedProtocolStrictTwoWayFieldsErrResponder {
+                            control_handle: std::mem::ManuallyDrop::new(control_handle),
+                            tx_id: header.tx_id(),
+                            ordinal: header.ordinal(),
+                        },
                     })
                 }
                 0xcd65d4d29a43c80 => {
@@ -4440,13 +4318,12 @@ impl futures::Stream for UnknownInteractionsClosedProtocolRequestStream {
                     let control_handle = UnknownInteractionsClosedProtocolControlHandle {
                         inner: this.inner.clone(),
                     };
-
                     Ok(UnknownInteractionsClosedProtocolRequest::StrictTwoWayUnionErr {
-                            responder:UnknownInteractionsClosedProtocolStrictTwoWayUnionErrResponder {
-                                control_handle: std::mem::ManuallyDrop::new(control_handle),
-                                tx_id: header.tx_id(),
-                                ordinal: header.ordinal(),
-                            },
+                        responder: UnknownInteractionsClosedProtocolStrictTwoWayUnionErrResponder {
+                            control_handle: std::mem::ManuallyDrop::new(control_handle),
+                            tx_id: header.tx_id(),
+                            ordinal: header.ordinal(),
+                        },
                     })
                 }
                 0x117dde20b92f7b90 => {
@@ -4455,13 +4332,12 @@ impl futures::Stream for UnknownInteractionsClosedProtocolRequestStream {
                     let control_handle = UnknownInteractionsClosedProtocolControlHandle {
                         inner: this.inner.clone(),
                     };
-
                     Ok(UnknownInteractionsClosedProtocolRequest::StrictTwoWayTableErr {
-                            responder:UnknownInteractionsClosedProtocolStrictTwoWayTableErrResponder {
-                                control_handle: std::mem::ManuallyDrop::new(control_handle),
-                                tx_id: header.tx_id(),
-                                ordinal: header.ordinal(),
-                            },
+                        responder: UnknownInteractionsClosedProtocolStrictTwoWayTableErrResponder {
+                            control_handle: std::mem::ManuallyDrop::new(control_handle),
+                            tx_id: header.tx_id(),
+                            ordinal: header.ordinal(),
+                        },
                     })
                 }
                 _ => Err(fidl::Error::UnknownOrdinal {
@@ -4783,38 +4659,28 @@ impl UnknownInteractionsClosedProtocolStrictTwoWayResponder {
     ///
     /// Sets the channel to shutdown if an error occurs.
     pub fn send(self) -> Result<(), fidl::Error> {
-        let r = self.send_raw();
-        if r.is_err() {
+        let _result = self.send_raw();
+        if _result.is_err() {
             self.control_handle.shutdown();
         }
         self.drop_without_shutdown();
-        r
+        _result
     }
 
-    /// Similar to "send" but does not shutdown the channel if
-    /// an error occurs.
+    /// Similar to "send" but does not shutdown the channel if an error occurs.
     pub fn send_no_shutdown_on_err(self) -> Result<(), fidl::Error> {
-        let r = self.send_raw();
+        let _result = self.send_raw();
         self.drop_without_shutdown();
-        r
+        _result
     }
 
     fn send_raw(&self) -> Result<(), fidl::Error> {
-        let msg = fidl::encoding::TransactionMessage {
-            header: fidl::encoding::TransactionHeader::new(
-                self.tx_id,
-                self.ordinal,
-                fidl::encoding::DynamicFlags::empty(),
-            ),
-            body: (),
-        };
-
-        fidl::encoding::with_tls_encode_buf(|bytes, handles| {
-            fidl::encoding::Encoder::encode::<
-                fidl::encoding::TransactionMessageType<fidl::encoding::EmptyPayload>,
-            >(bytes, handles, msg)?;
-            self.control_handle.inner.send_raw_msg(&*bytes, &mut *handles)
-        })
+        self.control_handle.inner.send::<fidl::encoding::EmptyPayload>(
+            (),
+            self.tx_id,
+            self.ordinal,
+            fidl::encoding::DynamicFlags::empty(),
+        )
     }
 }
 
@@ -4857,40 +4723,30 @@ impl UnknownInteractionsClosedProtocolStrictTwoWayFieldsResponder {
     ///
     /// Sets the channel to shutdown if an error occurs.
     pub fn send(self, mut some_field: i32) -> Result<(), fidl::Error> {
-        let r = self.send_raw(some_field);
-        if r.is_err() {
+        let _result = self.send_raw(some_field);
+        if _result.is_err() {
             self.control_handle.shutdown();
         }
         self.drop_without_shutdown();
-        r
+        _result
     }
 
-    /// Similar to "send" but does not shutdown the channel if
-    /// an error occurs.
+    /// Similar to "send" but does not shutdown the channel if an error occurs.
     pub fn send_no_shutdown_on_err(self, mut some_field: i32) -> Result<(), fidl::Error> {
-        let r = self.send_raw(some_field);
+        let _result = self.send_raw(some_field);
         self.drop_without_shutdown();
-        r
+        _result
     }
 
     fn send_raw(&self, mut some_field: i32) -> Result<(), fidl::Error> {
-        let msg = fidl::encoding::TransactionMessage {
-            header: fidl::encoding::TransactionHeader::new(
+        self.control_handle
+            .inner
+            .send::<UnknownInteractionsClosedProtocolStrictTwoWayFieldsResponse>(
+                (some_field,),
                 self.tx_id,
                 self.ordinal,
                 fidl::encoding::DynamicFlags::empty(),
-            ),
-            body: (some_field,),
-        };
-
-        fidl::encoding::with_tls_encode_buf(|bytes, handles| {
-            fidl::encoding::Encoder::encode::<
-                fidl::encoding::TransactionMessageType<
-                    UnknownInteractionsClosedProtocolStrictTwoWayFieldsResponse,
-                >,
-            >(bytes, handles, msg)?;
-            self.control_handle.inner.send_raw_msg(&*bytes, &mut *handles)
-        })
+            )
     }
 }
 
@@ -4936,46 +4792,36 @@ impl UnknownInteractionsClosedProtocolStrictTwoWayUnionResponder {
         self,
         mut payload: &UnknownInteractionsClosedProtocolStrictTwoWayUnionResponse,
     ) -> Result<(), fidl::Error> {
-        let r = self.send_raw(payload);
-        if r.is_err() {
+        let _result = self.send_raw(payload);
+        if _result.is_err() {
             self.control_handle.shutdown();
         }
         self.drop_without_shutdown();
-        r
+        _result
     }
 
-    /// Similar to "send" but does not shutdown the channel if
-    /// an error occurs.
+    /// Similar to "send" but does not shutdown the channel if an error occurs.
     pub fn send_no_shutdown_on_err(
         self,
         mut payload: &UnknownInteractionsClosedProtocolStrictTwoWayUnionResponse,
     ) -> Result<(), fidl::Error> {
-        let r = self.send_raw(payload);
+        let _result = self.send_raw(payload);
         self.drop_without_shutdown();
-        r
+        _result
     }
 
     fn send_raw(
         &self,
         mut payload: &UnknownInteractionsClosedProtocolStrictTwoWayUnionResponse,
     ) -> Result<(), fidl::Error> {
-        let msg = fidl::encoding::TransactionMessage {
-            header: fidl::encoding::TransactionHeader::new(
+        self.control_handle
+            .inner
+            .send::<UnknownInteractionsClosedProtocolStrictTwoWayUnionResponse>(
+                payload,
                 self.tx_id,
                 self.ordinal,
                 fidl::encoding::DynamicFlags::empty(),
-            ),
-            body: payload,
-        };
-
-        fidl::encoding::with_tls_encode_buf(|bytes, handles| {
-            fidl::encoding::Encoder::encode::<
-                fidl::encoding::TransactionMessageType<
-                    UnknownInteractionsClosedProtocolStrictTwoWayUnionResponse,
-                >,
-            >(bytes, handles, msg)?;
-            self.control_handle.inner.send_raw_msg(&*bytes, &mut *handles)
-        })
+            )
     }
 }
 
@@ -5021,46 +4867,36 @@ impl UnknownInteractionsClosedProtocolStrictTwoWayTableResponder {
         self,
         mut payload: &UnknownInteractionsClosedProtocolStrictTwoWayTableResponse,
     ) -> Result<(), fidl::Error> {
-        let r = self.send_raw(payload);
-        if r.is_err() {
+        let _result = self.send_raw(payload);
+        if _result.is_err() {
             self.control_handle.shutdown();
         }
         self.drop_without_shutdown();
-        r
+        _result
     }
 
-    /// Similar to "send" but does not shutdown the channel if
-    /// an error occurs.
+    /// Similar to "send" but does not shutdown the channel if an error occurs.
     pub fn send_no_shutdown_on_err(
         self,
         mut payload: &UnknownInteractionsClosedProtocolStrictTwoWayTableResponse,
     ) -> Result<(), fidl::Error> {
-        let r = self.send_raw(payload);
+        let _result = self.send_raw(payload);
         self.drop_without_shutdown();
-        r
+        _result
     }
 
     fn send_raw(
         &self,
         mut payload: &UnknownInteractionsClosedProtocolStrictTwoWayTableResponse,
     ) -> Result<(), fidl::Error> {
-        let msg = fidl::encoding::TransactionMessage {
-            header: fidl::encoding::TransactionHeader::new(
+        self.control_handle
+            .inner
+            .send::<UnknownInteractionsClosedProtocolStrictTwoWayTableResponse>(
+                payload,
                 self.tx_id,
                 self.ordinal,
                 fidl::encoding::DynamicFlags::empty(),
-            ),
-            body: payload,
-        };
-
-        fidl::encoding::with_tls_encode_buf(|bytes, handles| {
-            fidl::encoding::Encoder::encode::<
-                fidl::encoding::TransactionMessageType<
-                    UnknownInteractionsClosedProtocolStrictTwoWayTableResponse,
-                >,
-            >(bytes, handles, msg)?;
-            self.control_handle.inner.send_raw_msg(&*bytes, &mut *handles)
-        })
+            )
     }
 }
 
@@ -5103,40 +4939,30 @@ impl UnknownInteractionsClosedProtocolStrictTwoWayErrResponder {
     ///
     /// Sets the channel to shutdown if an error occurs.
     pub fn send(self, mut result: Result<(), i32>) -> Result<(), fidl::Error> {
-        let r = self.send_raw(result);
-        if r.is_err() {
+        let _result = self.send_raw(result);
+        if _result.is_err() {
             self.control_handle.shutdown();
         }
         self.drop_without_shutdown();
-        r
+        _result
     }
 
-    /// Similar to "send" but does not shutdown the channel if
-    /// an error occurs.
+    /// Similar to "send" but does not shutdown the channel if an error occurs.
     pub fn send_no_shutdown_on_err(self, mut result: Result<(), i32>) -> Result<(), fidl::Error> {
-        let r = self.send_raw(result);
+        let _result = self.send_raw(result);
         self.drop_without_shutdown();
-        r
+        _result
     }
 
     fn send_raw(&self, mut result: Result<(), i32>) -> Result<(), fidl::Error> {
-        let msg = fidl::encoding::TransactionMessage {
-            header: fidl::encoding::TransactionHeader::new(
+        self.control_handle
+            .inner
+            .send::<fidl::encoding::ResultType<fidl::encoding::EmptyStruct, i32>>(
+                result,
                 self.tx_id,
                 self.ordinal,
                 fidl::encoding::DynamicFlags::empty(),
-            ),
-            body: result,
-        };
-
-        fidl::encoding::with_tls_encode_buf(|bytes, handles| {
-            fidl::encoding::Encoder::encode::<
-                fidl::encoding::TransactionMessageType<
-                    fidl::encoding::ResultType<fidl::encoding::EmptyStruct, i32>,
-                >,
-            >(bytes, handles, msg)?;
-            self.control_handle.inner.send_raw_msg(&*bytes, &mut *handles)
-        })
+            )
     }
 }
 
@@ -5181,43 +5007,31 @@ impl UnknownInteractionsClosedProtocolStrictTwoWayFieldsErrResponder {
     ///
     /// Sets the channel to shutdown if an error occurs.
     pub fn send(self, mut result: Result<i32, i32>) -> Result<(), fidl::Error> {
-        let r = self.send_raw(result);
-        if r.is_err() {
+        let _result = self.send_raw(result);
+        if _result.is_err() {
             self.control_handle.shutdown();
         }
         self.drop_without_shutdown();
-        r
+        _result
     }
 
-    /// Similar to "send" but does not shutdown the channel if
-    /// an error occurs.
+    /// Similar to "send" but does not shutdown the channel if an error occurs.
     pub fn send_no_shutdown_on_err(self, mut result: Result<i32, i32>) -> Result<(), fidl::Error> {
-        let r = self.send_raw(result);
+        let _result = self.send_raw(result);
         self.drop_without_shutdown();
-        r
+        _result
     }
 
     fn send_raw(&self, mut result: Result<i32, i32>) -> Result<(), fidl::Error> {
-        let msg = fidl::encoding::TransactionMessage {
-            header: fidl::encoding::TransactionHeader::new(
-                self.tx_id,
-                self.ordinal,
-                fidl::encoding::DynamicFlags::empty(),
-            ),
-            body: result.map(|some_field| (some_field,)),
-        };
-
-        fidl::encoding::with_tls_encode_buf(|bytes, handles| {
-            fidl::encoding::Encoder::encode::<
-                fidl::encoding::TransactionMessageType<
-                    fidl::encoding::ResultType<
-                        UnknownInteractionsClosedProtocolStrictTwoWayFieldsErrResponse,
-                        i32,
-                    >,
-                >,
-            >(bytes, handles, msg)?;
-            self.control_handle.inner.send_raw_msg(&*bytes, &mut *handles)
-        })
+        self.control_handle.inner.send::<fidl::encoding::ResultType<
+            UnknownInteractionsClosedProtocolStrictTwoWayFieldsErrResponse,
+            i32,
+        >>(
+            result.map(|some_field| (some_field,)),
+            self.tx_id,
+            self.ordinal,
+            fidl::encoding::DynamicFlags::empty(),
+        )
     }
 }
 
@@ -5263,49 +5077,37 @@ impl UnknownInteractionsClosedProtocolStrictTwoWayUnionErrResponder {
         self,
         mut result: Result<&UnknownInteractionsClosedProtocolStrictTwoWayUnionErrResponse, i32>,
     ) -> Result<(), fidl::Error> {
-        let r = self.send_raw(result);
-        if r.is_err() {
+        let _result = self.send_raw(result);
+        if _result.is_err() {
             self.control_handle.shutdown();
         }
         self.drop_without_shutdown();
-        r
+        _result
     }
 
-    /// Similar to "send" but does not shutdown the channel if
-    /// an error occurs.
+    /// Similar to "send" but does not shutdown the channel if an error occurs.
     pub fn send_no_shutdown_on_err(
         self,
         mut result: Result<&UnknownInteractionsClosedProtocolStrictTwoWayUnionErrResponse, i32>,
     ) -> Result<(), fidl::Error> {
-        let r = self.send_raw(result);
+        let _result = self.send_raw(result);
         self.drop_without_shutdown();
-        r
+        _result
     }
 
     fn send_raw(
         &self,
         mut result: Result<&UnknownInteractionsClosedProtocolStrictTwoWayUnionErrResponse, i32>,
     ) -> Result<(), fidl::Error> {
-        let msg = fidl::encoding::TransactionMessage {
-            header: fidl::encoding::TransactionHeader::new(
-                self.tx_id,
-                self.ordinal,
-                fidl::encoding::DynamicFlags::empty(),
-            ),
-            body: result,
-        };
-
-        fidl::encoding::with_tls_encode_buf(|bytes, handles| {
-            fidl::encoding::Encoder::encode::<
-                fidl::encoding::TransactionMessageType<
-                    fidl::encoding::ResultType<
-                        UnknownInteractionsClosedProtocolStrictTwoWayUnionErrResponse,
-                        i32,
-                    >,
-                >,
-            >(bytes, handles, msg)?;
-            self.control_handle.inner.send_raw_msg(&*bytes, &mut *handles)
-        })
+        self.control_handle.inner.send::<fidl::encoding::ResultType<
+            UnknownInteractionsClosedProtocolStrictTwoWayUnionErrResponse,
+            i32,
+        >>(
+            result,
+            self.tx_id,
+            self.ordinal,
+            fidl::encoding::DynamicFlags::empty(),
+        )
     }
 }
 
@@ -5351,49 +5153,37 @@ impl UnknownInteractionsClosedProtocolStrictTwoWayTableErrResponder {
         self,
         mut result: Result<&UnknownInteractionsClosedProtocolStrictTwoWayTableErrResponse, i32>,
     ) -> Result<(), fidl::Error> {
-        let r = self.send_raw(result);
-        if r.is_err() {
+        let _result = self.send_raw(result);
+        if _result.is_err() {
             self.control_handle.shutdown();
         }
         self.drop_without_shutdown();
-        r
+        _result
     }
 
-    /// Similar to "send" but does not shutdown the channel if
-    /// an error occurs.
+    /// Similar to "send" but does not shutdown the channel if an error occurs.
     pub fn send_no_shutdown_on_err(
         self,
         mut result: Result<&UnknownInteractionsClosedProtocolStrictTwoWayTableErrResponse, i32>,
     ) -> Result<(), fidl::Error> {
-        let r = self.send_raw(result);
+        let _result = self.send_raw(result);
         self.drop_without_shutdown();
-        r
+        _result
     }
 
     fn send_raw(
         &self,
         mut result: Result<&UnknownInteractionsClosedProtocolStrictTwoWayTableErrResponse, i32>,
     ) -> Result<(), fidl::Error> {
-        let msg = fidl::encoding::TransactionMessage {
-            header: fidl::encoding::TransactionHeader::new(
-                self.tx_id,
-                self.ordinal,
-                fidl::encoding::DynamicFlags::empty(),
-            ),
-            body: result,
-        };
-
-        fidl::encoding::with_tls_encode_buf(|bytes, handles| {
-            fidl::encoding::Encoder::encode::<
-                fidl::encoding::TransactionMessageType<
-                    fidl::encoding::ResultType<
-                        UnknownInteractionsClosedProtocolStrictTwoWayTableErrResponse,
-                        i32,
-                    >,
-                >,
-            >(bytes, handles, msg)?;
-            self.control_handle.inner.send_raw_msg(&*bytes, &mut *handles)
-        })
+        self.control_handle.inner.send::<fidl::encoding::ResultType<
+            UnknownInteractionsClosedProtocolStrictTwoWayTableErrResponse,
+            i32,
+        >>(
+            result,
+            self.tx_id,
+            self.ordinal,
+            fidl::encoding::DynamicFlags::empty(),
+        )
     }
 }
 
@@ -5797,14 +5587,14 @@ impl fidl::endpoints::Proxy for UnknownInteractionsProtocolProxy {
 }
 
 impl UnknownInteractionsProtocolProxy {
-    /// Create a new Proxy for UnknownInteractionsProtocol
+    /// Create a new Proxy for test.unknowninteractions/UnknownInteractionsProtocol.
     pub fn new(channel: fidl::AsyncChannel) -> Self {
         let protocol_name =
             <UnknownInteractionsProtocolMarker as fidl::endpoints::ProtocolMarker>::DEBUG_NAME;
         Self { client: fidl::client::Client::new(channel, protocol_name) }
     }
 
-    /// Get a Stream of events from the remote end of the UnknownInteractionsProtocol protocol
+    /// Get a Stream of events from the remote end of the protocol.
     ///
     /// # Panics
     ///
@@ -6329,15 +6119,15 @@ impl futures::Stream for UnknownInteractionsProtocolEventStream {
         mut self: std::pin::Pin<&mut Self>,
         cx: &mut std::task::Context<'_>,
     ) -> std::task::Poll<Option<Self::Item>> {
-        let buf = match futures::ready!(futures::stream::StreamExt::poll_next_unpin(
+        match futures::ready!(futures::stream::StreamExt::poll_next_unpin(
             &mut self.event_receiver,
             cx
         )?) {
-            Some(buf) => buf,
-            None => return std::task::Poll::Ready(None),
-        };
-
-        std::task::Poll::Ready(Some(UnknownInteractionsProtocolEvent::decode(buf)))
+            Some(buf) => {
+                std::task::Poll::Ready(Some(UnknownInteractionsProtocolEvent::decode(buf)))
+            }
+            None => std::task::Poll::Ready(None),
+        }
     }
 }
 
@@ -6546,14 +6336,13 @@ impl UnknownInteractionsProtocolEvent {
         }
     }
 
-    /// Decodes a message buffer as a [`UnknownInteractionsProtocolEvent`]. Transaction
-    /// ID in the message must be zero; this method does not check TXID.
+    /// Decodes a message buffer as a [`UnknownInteractionsProtocolEvent`].
     fn decode(
         mut buf: fidl::MessageBufEtc,
     ) -> Result<UnknownInteractionsProtocolEvent, fidl::Error> {
         let (bytes, _handles) = buf.split_mut();
         let (tx_header, _body_bytes) = fidl::encoding::decode_transaction_header(bytes)?;
-
+        debug_assert_eq!(tx_header.tx_id(), 0);
         match tx_header.ordinal() {
             0x9842669255c4fc1 => {
                 let mut out = fidl::new_empty!(fidl::encoding::EmptyPayload);
@@ -6689,9 +6478,6 @@ impl UnknownInteractionsProtocolEvent {
                 Ok(UnknownInteractionsProtocolEvent::_UnknownEvent {
                     ordinal: tx_header.ordinal(),
                 })
-                // MessageBufEtc will close handles on drop, before the
-                // application can handle the _UnknownEvent variant, so this
-                // satisfies the RFC-0138 requirement to close handles first.
             }
             _ => Err(fidl::Error::UnknownOrdinal {
                 ordinal: tx_header.ordinal(),
@@ -6701,7 +6487,7 @@ impl UnknownInteractionsProtocolEvent {
     }
 }
 
-/// A Stream of incoming requests for UnknownInteractionsProtocol
+/// A Stream of incoming requests for test.unknowninteractions/UnknownInteractionsProtocol.
 pub struct UnknownInteractionsProtocolRequestStream {
     inner: std::sync::Arc<fidl::ServeInner>,
     is_terminated: bool,
@@ -6744,7 +6530,7 @@ impl futures::Stream for UnknownInteractionsProtocolRequestStream {
         cx: &mut std::task::Context<'_>,
     ) -> std::task::Poll<Option<Self::Item>> {
         let this = &mut *self;
-        if this.inner.poll_shutdown(cx) {
+        if this.inner.check_shutdown(cx) {
             this.is_terminated = true;
             return std::task::Poll::Ready(None);
         }
@@ -6774,9 +6560,8 @@ impl futures::Stream for UnknownInteractionsProtocolRequestStream {
                     let control_handle = UnknownInteractionsProtocolControlHandle {
                         inner: this.inner.clone(),
                     };
-
                     Ok(UnknownInteractionsProtocolRequest::StrictOneWay {
-                            control_handle,
+                        control_handle,
                     })
                 }
                 0x818bb3a7a910446 => {
@@ -6785,9 +6570,8 @@ impl futures::Stream for UnknownInteractionsProtocolRequestStream {
                     let control_handle = UnknownInteractionsProtocolControlHandle {
                         inner: this.inner.clone(),
                     };
-
                     Ok(UnknownInteractionsProtocolRequest::FlexibleOneWay {
-                            control_handle,
+                        control_handle,
                     })
                 }
                 0x734c996b0f37b942 => {
@@ -6796,13 +6580,12 @@ impl futures::Stream for UnknownInteractionsProtocolRequestStream {
                     let control_handle = UnknownInteractionsProtocolControlHandle {
                         inner: this.inner.clone(),
                     };
-
                     Ok(UnknownInteractionsProtocolRequest::StrictTwoWay {
-                            responder:UnknownInteractionsProtocolStrictTwoWayResponder {
-                                control_handle: std::mem::ManuallyDrop::new(control_handle),
-                                tx_id: header.tx_id(),
-                                ordinal: header.ordinal(),
-                            },
+                        responder: UnknownInteractionsProtocolStrictTwoWayResponder {
+                            control_handle: std::mem::ManuallyDrop::new(control_handle),
+                            tx_id: header.tx_id(),
+                            ordinal: header.ordinal(),
+                        },
                     })
                 }
                 0x334f4e7fff460ae3 => {
@@ -6811,13 +6594,12 @@ impl futures::Stream for UnknownInteractionsProtocolRequestStream {
                     let control_handle = UnknownInteractionsProtocolControlHandle {
                         inner: this.inner.clone(),
                     };
-
                     Ok(UnknownInteractionsProtocolRequest::StrictTwoWayFields {
-                            responder:UnknownInteractionsProtocolStrictTwoWayFieldsResponder {
-                                control_handle: std::mem::ManuallyDrop::new(control_handle),
-                                tx_id: header.tx_id(),
-                                ordinal: header.ordinal(),
-                            },
+                        responder: UnknownInteractionsProtocolStrictTwoWayFieldsResponder {
+                            control_handle: std::mem::ManuallyDrop::new(control_handle),
+                            tx_id: header.tx_id(),
+                            ordinal: header.ordinal(),
+                        },
                     })
                 }
                 0x2212805eca592cad => {
@@ -6826,13 +6608,12 @@ impl futures::Stream for UnknownInteractionsProtocolRequestStream {
                     let control_handle = UnknownInteractionsProtocolControlHandle {
                         inner: this.inner.clone(),
                     };
-
                     Ok(UnknownInteractionsProtocolRequest::StrictTwoWayUnion {
-                            responder:UnknownInteractionsProtocolStrictTwoWayUnionResponder {
-                                control_handle: std::mem::ManuallyDrop::new(control_handle),
-                                tx_id: header.tx_id(),
-                                ordinal: header.ordinal(),
-                            },
+                        responder: UnknownInteractionsProtocolStrictTwoWayUnionResponder {
+                            control_handle: std::mem::ManuallyDrop::new(control_handle),
+                            tx_id: header.tx_id(),
+                            ordinal: header.ordinal(),
+                        },
                     })
                 }
                 0x746ebf8659ff23b7 => {
@@ -6841,13 +6622,12 @@ impl futures::Stream for UnknownInteractionsProtocolRequestStream {
                     let control_handle = UnknownInteractionsProtocolControlHandle {
                         inner: this.inner.clone(),
                     };
-
                     Ok(UnknownInteractionsProtocolRequest::StrictTwoWayTable {
-                            responder:UnknownInteractionsProtocolStrictTwoWayTableResponder {
-                                control_handle: std::mem::ManuallyDrop::new(control_handle),
-                                tx_id: header.tx_id(),
-                                ordinal: header.ordinal(),
-                            },
+                        responder: UnknownInteractionsProtocolStrictTwoWayTableResponder {
+                            control_handle: std::mem::ManuallyDrop::new(control_handle),
+                            tx_id: header.tx_id(),
+                            ordinal: header.ordinal(),
+                        },
                     })
                 }
                 0x6d1c6002c51bb967 => {
@@ -6856,13 +6636,12 @@ impl futures::Stream for UnknownInteractionsProtocolRequestStream {
                     let control_handle = UnknownInteractionsProtocolControlHandle {
                         inner: this.inner.clone(),
                     };
-
                     Ok(UnknownInteractionsProtocolRequest::StrictTwoWayErr {
-                            responder:UnknownInteractionsProtocolStrictTwoWayErrResponder {
-                                control_handle: std::mem::ManuallyDrop::new(control_handle),
-                                tx_id: header.tx_id(),
-                                ordinal: header.ordinal(),
-                            },
+                        responder: UnknownInteractionsProtocolStrictTwoWayErrResponder {
+                            control_handle: std::mem::ManuallyDrop::new(control_handle),
+                            tx_id: header.tx_id(),
+                            ordinal: header.ordinal(),
+                        },
                     })
                 }
                 0x2182a49480e5bd2b => {
@@ -6871,13 +6650,12 @@ impl futures::Stream for UnknownInteractionsProtocolRequestStream {
                     let control_handle = UnknownInteractionsProtocolControlHandle {
                         inner: this.inner.clone(),
                     };
-
                     Ok(UnknownInteractionsProtocolRequest::StrictTwoWayFieldsErr {
-                            responder:UnknownInteractionsProtocolStrictTwoWayFieldsErrResponder {
-                                control_handle: std::mem::ManuallyDrop::new(control_handle),
-                                tx_id: header.tx_id(),
-                                ordinal: header.ordinal(),
-                            },
+                        responder: UnknownInteractionsProtocolStrictTwoWayFieldsErrResponder {
+                            control_handle: std::mem::ManuallyDrop::new(control_handle),
+                            tx_id: header.tx_id(),
+                            ordinal: header.ordinal(),
+                        },
                     })
                 }
                 0x453af745d38b20ca => {
@@ -6886,13 +6664,12 @@ impl futures::Stream for UnknownInteractionsProtocolRequestStream {
                     let control_handle = UnknownInteractionsProtocolControlHandle {
                         inner: this.inner.clone(),
                     };
-
                     Ok(UnknownInteractionsProtocolRequest::StrictTwoWayUnionErr {
-                            responder:UnknownInteractionsProtocolStrictTwoWayUnionErrResponder {
-                                control_handle: std::mem::ManuallyDrop::new(control_handle),
-                                tx_id: header.tx_id(),
-                                ordinal: header.ordinal(),
-                            },
+                        responder: UnknownInteractionsProtocolStrictTwoWayUnionErrResponder {
+                            control_handle: std::mem::ManuallyDrop::new(control_handle),
+                            tx_id: header.tx_id(),
+                            ordinal: header.ordinal(),
+                        },
                     })
                 }
                 0x4c26c7ab89cb68d8 => {
@@ -6901,13 +6678,12 @@ impl futures::Stream for UnknownInteractionsProtocolRequestStream {
                     let control_handle = UnknownInteractionsProtocolControlHandle {
                         inner: this.inner.clone(),
                     };
-
                     Ok(UnknownInteractionsProtocolRequest::StrictTwoWayTableErr {
-                            responder:UnknownInteractionsProtocolStrictTwoWayTableErrResponder {
-                                control_handle: std::mem::ManuallyDrop::new(control_handle),
-                                tx_id: header.tx_id(),
-                                ordinal: header.ordinal(),
-                            },
+                        responder: UnknownInteractionsProtocolStrictTwoWayTableErrResponder {
+                            control_handle: std::mem::ManuallyDrop::new(control_handle),
+                            tx_id: header.tx_id(),
+                            ordinal: header.ordinal(),
+                        },
                     })
                 }
                 0x4a5bb3397008b7c => {
@@ -6916,13 +6692,12 @@ impl futures::Stream for UnknownInteractionsProtocolRequestStream {
                     let control_handle = UnknownInteractionsProtocolControlHandle {
                         inner: this.inner.clone(),
                     };
-
                     Ok(UnknownInteractionsProtocolRequest::FlexibleTwoWay {
-                            responder:UnknownInteractionsProtocolFlexibleTwoWayResponder {
-                                control_handle: std::mem::ManuallyDrop::new(control_handle),
-                                tx_id: header.tx_id(),
-                                ordinal: header.ordinal(),
-                            },
+                        responder: UnknownInteractionsProtocolFlexibleTwoWayResponder {
+                            control_handle: std::mem::ManuallyDrop::new(control_handle),
+                            tx_id: header.tx_id(),
+                            ordinal: header.ordinal(),
+                        },
                     })
                 }
                 0x3b13f82f44813a32 => {
@@ -6931,13 +6706,12 @@ impl futures::Stream for UnknownInteractionsProtocolRequestStream {
                     let control_handle = UnknownInteractionsProtocolControlHandle {
                         inner: this.inner.clone(),
                     };
-
                     Ok(UnknownInteractionsProtocolRequest::FlexibleTwoWayFields {
-                            responder:UnknownInteractionsProtocolFlexibleTwoWayFieldsResponder {
-                                control_handle: std::mem::ManuallyDrop::new(control_handle),
-                                tx_id: header.tx_id(),
-                                ordinal: header.ordinal(),
-                            },
+                        responder: UnknownInteractionsProtocolFlexibleTwoWayFieldsResponder {
+                            control_handle: std::mem::ManuallyDrop::new(control_handle),
+                            tx_id: header.tx_id(),
+                            ordinal: header.ordinal(),
+                        },
                     })
                 }
                 0x44301e4e8d514fb6 => {
@@ -6946,13 +6720,12 @@ impl futures::Stream for UnknownInteractionsProtocolRequestStream {
                     let control_handle = UnknownInteractionsProtocolControlHandle {
                         inner: this.inner.clone(),
                     };
-
                     Ok(UnknownInteractionsProtocolRequest::FlexibleTwoWayUnion {
-                            responder:UnknownInteractionsProtocolFlexibleTwoWayUnionResponder {
-                                control_handle: std::mem::ManuallyDrop::new(control_handle),
-                                tx_id: header.tx_id(),
-                                ordinal: header.ordinal(),
-                            },
+                        responder: UnknownInteractionsProtocolFlexibleTwoWayUnionResponder {
+                            control_handle: std::mem::ManuallyDrop::new(control_handle),
+                            tx_id: header.tx_id(),
+                            ordinal: header.ordinal(),
+                        },
                     })
                 }
                 0x7f492934b6c76187 => {
@@ -6961,13 +6734,12 @@ impl futures::Stream for UnknownInteractionsProtocolRequestStream {
                     let control_handle = UnknownInteractionsProtocolControlHandle {
                         inner: this.inner.clone(),
                     };
-
                     Ok(UnknownInteractionsProtocolRequest::FlexibleTwoWayTable {
-                            responder:UnknownInteractionsProtocolFlexibleTwoWayTableResponder {
-                                control_handle: std::mem::ManuallyDrop::new(control_handle),
-                                tx_id: header.tx_id(),
-                                ordinal: header.ordinal(),
-                            },
+                        responder: UnknownInteractionsProtocolFlexibleTwoWayTableResponder {
+                            control_handle: std::mem::ManuallyDrop::new(control_handle),
+                            tx_id: header.tx_id(),
+                            ordinal: header.ordinal(),
+                        },
                     })
                 }
                 0x61240f878cc37c07 => {
@@ -6976,13 +6748,12 @@ impl futures::Stream for UnknownInteractionsProtocolRequestStream {
                     let control_handle = UnknownInteractionsProtocolControlHandle {
                         inner: this.inner.clone(),
                     };
-
                     Ok(UnknownInteractionsProtocolRequest::FlexibleTwoWayErr {
-                            responder:UnknownInteractionsProtocolFlexibleTwoWayErrResponder {
-                                control_handle: std::mem::ManuallyDrop::new(control_handle),
-                                tx_id: header.tx_id(),
-                                ordinal: header.ordinal(),
-                            },
+                        responder: UnknownInteractionsProtocolFlexibleTwoWayErrResponder {
+                            control_handle: std::mem::ManuallyDrop::new(control_handle),
+                            tx_id: header.tx_id(),
+                            ordinal: header.ordinal(),
+                        },
                     })
                 }
                 0xf2b9611a9089b05 => {
@@ -6991,13 +6762,12 @@ impl futures::Stream for UnknownInteractionsProtocolRequestStream {
                     let control_handle = UnknownInteractionsProtocolControlHandle {
                         inner: this.inner.clone(),
                     };
-
                     Ok(UnknownInteractionsProtocolRequest::FlexibleTwoWayFieldsErr {
-                            responder:UnknownInteractionsProtocolFlexibleTwoWayFieldsErrResponder {
-                                control_handle: std::mem::ManuallyDrop::new(control_handle),
-                                tx_id: header.tx_id(),
-                                ordinal: header.ordinal(),
-                            },
+                        responder: UnknownInteractionsProtocolFlexibleTwoWayFieldsErrResponder {
+                            control_handle: std::mem::ManuallyDrop::new(control_handle),
+                            tx_id: header.tx_id(),
+                            ordinal: header.ordinal(),
+                        },
                     })
                 }
                 0x2172940a75f107d7 => {
@@ -7006,13 +6776,12 @@ impl futures::Stream for UnknownInteractionsProtocolRequestStream {
                     let control_handle = UnknownInteractionsProtocolControlHandle {
                         inner: this.inner.clone(),
                     };
-
                     Ok(UnknownInteractionsProtocolRequest::FlexibleTwoWayUnionErr {
-                            responder:UnknownInteractionsProtocolFlexibleTwoWayUnionErrResponder {
-                                control_handle: std::mem::ManuallyDrop::new(control_handle),
-                                tx_id: header.tx_id(),
-                                ordinal: header.ordinal(),
-                            },
+                        responder: UnknownInteractionsProtocolFlexibleTwoWayUnionErrResponder {
+                            control_handle: std::mem::ManuallyDrop::new(control_handle),
+                            tx_id: header.tx_id(),
+                            ordinal: header.ordinal(),
+                        },
                     })
                 }
                 0x6d8aab48e1693bf2 => {
@@ -7021,62 +6790,32 @@ impl futures::Stream for UnknownInteractionsProtocolRequestStream {
                     let control_handle = UnknownInteractionsProtocolControlHandle {
                         inner: this.inner.clone(),
                     };
-
                     Ok(UnknownInteractionsProtocolRequest::FlexibleTwoWayTableErr {
-                            responder:UnknownInteractionsProtocolFlexibleTwoWayTableErrResponder {
-                                control_handle: std::mem::ManuallyDrop::new(control_handle),
-                                tx_id: header.tx_id(),
-                                ordinal: header.ordinal(),
-                            },
+                        responder: UnknownInteractionsProtocolFlexibleTwoWayTableErrResponder {
+                            control_handle: std::mem::ManuallyDrop::new(control_handle),
+                            tx_id: header.tx_id(),
+                            ordinal: header.ordinal(),
+                        },
                     })
                 }
                 _ if header.tx_id() == 0 && header.dynamic_flags().contains(fidl::encoding::DynamicFlags::FLEXIBLE) => {
-                    let control_handle = UnknownInteractionsProtocolControlHandle {
-                        inner: this.inner.clone(),
-                    };
                     Ok(UnknownInteractionsProtocolRequest::_UnknownMethod {
                         ordinal: header.ordinal(),
-                        control_handle,
+                        control_handle: UnknownInteractionsProtocolControlHandle { inner: this.inner.clone() },
                         unknown_method_type: fidl::endpoints::UnknownMethodType::OneWay,
                     })
-                    // with_tls_decode_buf will clear the handles when we return
-                    // before the application can handle the _UnknownMethod, so
-                    // we don't need to clear it explicitly to meet the RFC
-                    // requirement to close handles before calling an unknown
-                    // interaction handler.
                 }
                 _ if header.dynamic_flags().contains(fidl::encoding::DynamicFlags::FLEXIBLE) => {
-                    let control_handle = UnknownInteractionsProtocolControlHandle {
-                        inner: this.inner.clone(),
-                    };
-
-                    let msg = fidl::encoding::TransactionMessage {
-                        header: fidl::encoding::TransactionHeader::new(
-                            header.tx_id(), header.ordinal(), header.dynamic_flags(),
-                        ),
-                        body: fidl::encoding::Flexible::<()>::FrameworkErr(
-                            fidl::encoding::FrameworkErr::UnknownMethod
-                        ),
-                    };
-
-                    // RFC-0138 requires us to close handles in the incoming
-                    // message before replying, so we can't wait for
-                    // with_tls_decode_buf to auto-clear handles when we return.
-                    handles.clear();
-
-                    // We are inside of with_tls_decode_buf, so we can't use
-                    // with_tls_encode_buf. However, we know that the unknown
-                    // interaction reply will not contain any handles, so
-                    // creating a new Vec here does not cause an allocation.
-                    let mut handles = Vec::new();
-                    fidl::encoding::Encoder::encode::<
-                        fidl::encoding::TransactionMessageType<fidl::encoding::FlexibleType<fidl::encoding::EmptyStruct>>
-                    >(bytes, &mut handles, msg)?;
-                    control_handle.inner.send_raw_msg(&*bytes, &mut handles)?;
-
+                    this.inner.send_framework_err(
+                        fidl::encoding::FrameworkErr::UnknownMethod,
+                        header.tx_id(),
+                        header.ordinal(),
+                        header.dynamic_flags(),
+                        (bytes, handles),
+                    )?;
                     Ok(UnknownInteractionsProtocolRequest::_UnknownMethod {
                         ordinal: header.ordinal(),
-                        control_handle,
+                        control_handle: UnknownInteractionsProtocolControlHandle { inner: this.inner.clone() },
                         unknown_method_type: fidl::endpoints::UnknownMethodType::TwoWay,
                     })
                 }
@@ -7637,38 +7376,28 @@ impl UnknownInteractionsProtocolStrictTwoWayResponder {
     ///
     /// Sets the channel to shutdown if an error occurs.
     pub fn send(self) -> Result<(), fidl::Error> {
-        let r = self.send_raw();
-        if r.is_err() {
+        let _result = self.send_raw();
+        if _result.is_err() {
             self.control_handle.shutdown();
         }
         self.drop_without_shutdown();
-        r
+        _result
     }
 
-    /// Similar to "send" but does not shutdown the channel if
-    /// an error occurs.
+    /// Similar to "send" but does not shutdown the channel if an error occurs.
     pub fn send_no_shutdown_on_err(self) -> Result<(), fidl::Error> {
-        let r = self.send_raw();
+        let _result = self.send_raw();
         self.drop_without_shutdown();
-        r
+        _result
     }
 
     fn send_raw(&self) -> Result<(), fidl::Error> {
-        let msg = fidl::encoding::TransactionMessage {
-            header: fidl::encoding::TransactionHeader::new(
-                self.tx_id,
-                self.ordinal,
-                fidl::encoding::DynamicFlags::empty(),
-            ),
-            body: (),
-        };
-
-        fidl::encoding::with_tls_encode_buf(|bytes, handles| {
-            fidl::encoding::Encoder::encode::<
-                fidl::encoding::TransactionMessageType<fidl::encoding::EmptyPayload>,
-            >(bytes, handles, msg)?;
-            self.control_handle.inner.send_raw_msg(&*bytes, &mut *handles)
-        })
+        self.control_handle.inner.send::<fidl::encoding::EmptyPayload>(
+            (),
+            self.tx_id,
+            self.ordinal,
+            fidl::encoding::DynamicFlags::empty(),
+        )
     }
 }
 
@@ -7711,40 +7440,28 @@ impl UnknownInteractionsProtocolStrictTwoWayFieldsResponder {
     ///
     /// Sets the channel to shutdown if an error occurs.
     pub fn send(self, mut some_field: i32) -> Result<(), fidl::Error> {
-        let r = self.send_raw(some_field);
-        if r.is_err() {
+        let _result = self.send_raw(some_field);
+        if _result.is_err() {
             self.control_handle.shutdown();
         }
         self.drop_without_shutdown();
-        r
+        _result
     }
 
-    /// Similar to "send" but does not shutdown the channel if
-    /// an error occurs.
+    /// Similar to "send" but does not shutdown the channel if an error occurs.
     pub fn send_no_shutdown_on_err(self, mut some_field: i32) -> Result<(), fidl::Error> {
-        let r = self.send_raw(some_field);
+        let _result = self.send_raw(some_field);
         self.drop_without_shutdown();
-        r
+        _result
     }
 
     fn send_raw(&self, mut some_field: i32) -> Result<(), fidl::Error> {
-        let msg = fidl::encoding::TransactionMessage {
-            header: fidl::encoding::TransactionHeader::new(
-                self.tx_id,
-                self.ordinal,
-                fidl::encoding::DynamicFlags::empty(),
-            ),
-            body: (some_field,),
-        };
-
-        fidl::encoding::with_tls_encode_buf(|bytes, handles| {
-            fidl::encoding::Encoder::encode::<
-                fidl::encoding::TransactionMessageType<
-                    UnknownInteractionsProtocolStrictTwoWayFieldsResponse,
-                >,
-            >(bytes, handles, msg)?;
-            self.control_handle.inner.send_raw_msg(&*bytes, &mut *handles)
-        })
+        self.control_handle.inner.send::<UnknownInteractionsProtocolStrictTwoWayFieldsResponse>(
+            (some_field,),
+            self.tx_id,
+            self.ordinal,
+            fidl::encoding::DynamicFlags::empty(),
+        )
     }
 }
 
@@ -7790,46 +7507,34 @@ impl UnknownInteractionsProtocolStrictTwoWayUnionResponder {
         self,
         mut payload: &UnknownInteractionsProtocolStrictTwoWayUnionResponse,
     ) -> Result<(), fidl::Error> {
-        let r = self.send_raw(payload);
-        if r.is_err() {
+        let _result = self.send_raw(payload);
+        if _result.is_err() {
             self.control_handle.shutdown();
         }
         self.drop_without_shutdown();
-        r
+        _result
     }
 
-    /// Similar to "send" but does not shutdown the channel if
-    /// an error occurs.
+    /// Similar to "send" but does not shutdown the channel if an error occurs.
     pub fn send_no_shutdown_on_err(
         self,
         mut payload: &UnknownInteractionsProtocolStrictTwoWayUnionResponse,
     ) -> Result<(), fidl::Error> {
-        let r = self.send_raw(payload);
+        let _result = self.send_raw(payload);
         self.drop_without_shutdown();
-        r
+        _result
     }
 
     fn send_raw(
         &self,
         mut payload: &UnknownInteractionsProtocolStrictTwoWayUnionResponse,
     ) -> Result<(), fidl::Error> {
-        let msg = fidl::encoding::TransactionMessage {
-            header: fidl::encoding::TransactionHeader::new(
-                self.tx_id,
-                self.ordinal,
-                fidl::encoding::DynamicFlags::empty(),
-            ),
-            body: payload,
-        };
-
-        fidl::encoding::with_tls_encode_buf(|bytes, handles| {
-            fidl::encoding::Encoder::encode::<
-                fidl::encoding::TransactionMessageType<
-                    UnknownInteractionsProtocolStrictTwoWayUnionResponse,
-                >,
-            >(bytes, handles, msg)?;
-            self.control_handle.inner.send_raw_msg(&*bytes, &mut *handles)
-        })
+        self.control_handle.inner.send::<UnknownInteractionsProtocolStrictTwoWayUnionResponse>(
+            payload,
+            self.tx_id,
+            self.ordinal,
+            fidl::encoding::DynamicFlags::empty(),
+        )
     }
 }
 
@@ -7875,46 +7580,34 @@ impl UnknownInteractionsProtocolStrictTwoWayTableResponder {
         self,
         mut payload: &UnknownInteractionsProtocolStrictTwoWayTableResponse,
     ) -> Result<(), fidl::Error> {
-        let r = self.send_raw(payload);
-        if r.is_err() {
+        let _result = self.send_raw(payload);
+        if _result.is_err() {
             self.control_handle.shutdown();
         }
         self.drop_without_shutdown();
-        r
+        _result
     }
 
-    /// Similar to "send" but does not shutdown the channel if
-    /// an error occurs.
+    /// Similar to "send" but does not shutdown the channel if an error occurs.
     pub fn send_no_shutdown_on_err(
         self,
         mut payload: &UnknownInteractionsProtocolStrictTwoWayTableResponse,
     ) -> Result<(), fidl::Error> {
-        let r = self.send_raw(payload);
+        let _result = self.send_raw(payload);
         self.drop_without_shutdown();
-        r
+        _result
     }
 
     fn send_raw(
         &self,
         mut payload: &UnknownInteractionsProtocolStrictTwoWayTableResponse,
     ) -> Result<(), fidl::Error> {
-        let msg = fidl::encoding::TransactionMessage {
-            header: fidl::encoding::TransactionHeader::new(
-                self.tx_id,
-                self.ordinal,
-                fidl::encoding::DynamicFlags::empty(),
-            ),
-            body: payload,
-        };
-
-        fidl::encoding::with_tls_encode_buf(|bytes, handles| {
-            fidl::encoding::Encoder::encode::<
-                fidl::encoding::TransactionMessageType<
-                    UnknownInteractionsProtocolStrictTwoWayTableResponse,
-                >,
-            >(bytes, handles, msg)?;
-            self.control_handle.inner.send_raw_msg(&*bytes, &mut *handles)
-        })
+        self.control_handle.inner.send::<UnknownInteractionsProtocolStrictTwoWayTableResponse>(
+            payload,
+            self.tx_id,
+            self.ordinal,
+            fidl::encoding::DynamicFlags::empty(),
+        )
     }
 }
 
@@ -7957,40 +7650,30 @@ impl UnknownInteractionsProtocolStrictTwoWayErrResponder {
     ///
     /// Sets the channel to shutdown if an error occurs.
     pub fn send(self, mut result: Result<(), i32>) -> Result<(), fidl::Error> {
-        let r = self.send_raw(result);
-        if r.is_err() {
+        let _result = self.send_raw(result);
+        if _result.is_err() {
             self.control_handle.shutdown();
         }
         self.drop_without_shutdown();
-        r
+        _result
     }
 
-    /// Similar to "send" but does not shutdown the channel if
-    /// an error occurs.
+    /// Similar to "send" but does not shutdown the channel if an error occurs.
     pub fn send_no_shutdown_on_err(self, mut result: Result<(), i32>) -> Result<(), fidl::Error> {
-        let r = self.send_raw(result);
+        let _result = self.send_raw(result);
         self.drop_without_shutdown();
-        r
+        _result
     }
 
     fn send_raw(&self, mut result: Result<(), i32>) -> Result<(), fidl::Error> {
-        let msg = fidl::encoding::TransactionMessage {
-            header: fidl::encoding::TransactionHeader::new(
+        self.control_handle
+            .inner
+            .send::<fidl::encoding::ResultType<fidl::encoding::EmptyStruct, i32>>(
+                result,
                 self.tx_id,
                 self.ordinal,
                 fidl::encoding::DynamicFlags::empty(),
-            ),
-            body: result,
-        };
-
-        fidl::encoding::with_tls_encode_buf(|bytes, handles| {
-            fidl::encoding::Encoder::encode::<
-                fidl::encoding::TransactionMessageType<
-                    fidl::encoding::ResultType<fidl::encoding::EmptyStruct, i32>,
-                >,
-            >(bytes, handles, msg)?;
-            self.control_handle.inner.send_raw_msg(&*bytes, &mut *handles)
-        })
+            )
     }
 }
 
@@ -8033,43 +7716,31 @@ impl UnknownInteractionsProtocolStrictTwoWayFieldsErrResponder {
     ///
     /// Sets the channel to shutdown if an error occurs.
     pub fn send(self, mut result: Result<i32, i32>) -> Result<(), fidl::Error> {
-        let r = self.send_raw(result);
-        if r.is_err() {
+        let _result = self.send_raw(result);
+        if _result.is_err() {
             self.control_handle.shutdown();
         }
         self.drop_without_shutdown();
-        r
+        _result
     }
 
-    /// Similar to "send" but does not shutdown the channel if
-    /// an error occurs.
+    /// Similar to "send" but does not shutdown the channel if an error occurs.
     pub fn send_no_shutdown_on_err(self, mut result: Result<i32, i32>) -> Result<(), fidl::Error> {
-        let r = self.send_raw(result);
+        let _result = self.send_raw(result);
         self.drop_without_shutdown();
-        r
+        _result
     }
 
     fn send_raw(&self, mut result: Result<i32, i32>) -> Result<(), fidl::Error> {
-        let msg = fidl::encoding::TransactionMessage {
-            header: fidl::encoding::TransactionHeader::new(
-                self.tx_id,
-                self.ordinal,
-                fidl::encoding::DynamicFlags::empty(),
-            ),
-            body: result.map(|some_field| (some_field,)),
-        };
-
-        fidl::encoding::with_tls_encode_buf(|bytes, handles| {
-            fidl::encoding::Encoder::encode::<
-                fidl::encoding::TransactionMessageType<
-                    fidl::encoding::ResultType<
-                        UnknownInteractionsProtocolStrictTwoWayFieldsErrResponse,
-                        i32,
-                    >,
-                >,
-            >(bytes, handles, msg)?;
-            self.control_handle.inner.send_raw_msg(&*bytes, &mut *handles)
-        })
+        self.control_handle.inner.send::<fidl::encoding::ResultType<
+            UnknownInteractionsProtocolStrictTwoWayFieldsErrResponse,
+            i32,
+        >>(
+            result.map(|some_field| (some_field,)),
+            self.tx_id,
+            self.ordinal,
+            fidl::encoding::DynamicFlags::empty(),
+        )
     }
 }
 
@@ -8115,49 +7786,37 @@ impl UnknownInteractionsProtocolStrictTwoWayUnionErrResponder {
         self,
         mut result: Result<&UnknownInteractionsProtocolStrictTwoWayUnionErrResponse, i32>,
     ) -> Result<(), fidl::Error> {
-        let r = self.send_raw(result);
-        if r.is_err() {
+        let _result = self.send_raw(result);
+        if _result.is_err() {
             self.control_handle.shutdown();
         }
         self.drop_without_shutdown();
-        r
+        _result
     }
 
-    /// Similar to "send" but does not shutdown the channel if
-    /// an error occurs.
+    /// Similar to "send" but does not shutdown the channel if an error occurs.
     pub fn send_no_shutdown_on_err(
         self,
         mut result: Result<&UnknownInteractionsProtocolStrictTwoWayUnionErrResponse, i32>,
     ) -> Result<(), fidl::Error> {
-        let r = self.send_raw(result);
+        let _result = self.send_raw(result);
         self.drop_without_shutdown();
-        r
+        _result
     }
 
     fn send_raw(
         &self,
         mut result: Result<&UnknownInteractionsProtocolStrictTwoWayUnionErrResponse, i32>,
     ) -> Result<(), fidl::Error> {
-        let msg = fidl::encoding::TransactionMessage {
-            header: fidl::encoding::TransactionHeader::new(
-                self.tx_id,
-                self.ordinal,
-                fidl::encoding::DynamicFlags::empty(),
-            ),
-            body: result,
-        };
-
-        fidl::encoding::with_tls_encode_buf(|bytes, handles| {
-            fidl::encoding::Encoder::encode::<
-                fidl::encoding::TransactionMessageType<
-                    fidl::encoding::ResultType<
-                        UnknownInteractionsProtocolStrictTwoWayUnionErrResponse,
-                        i32,
-                    >,
-                >,
-            >(bytes, handles, msg)?;
-            self.control_handle.inner.send_raw_msg(&*bytes, &mut *handles)
-        })
+        self.control_handle.inner.send::<fidl::encoding::ResultType<
+            UnknownInteractionsProtocolStrictTwoWayUnionErrResponse,
+            i32,
+        >>(
+            result,
+            self.tx_id,
+            self.ordinal,
+            fidl::encoding::DynamicFlags::empty(),
+        )
     }
 }
 
@@ -8203,49 +7862,37 @@ impl UnknownInteractionsProtocolStrictTwoWayTableErrResponder {
         self,
         mut result: Result<&UnknownInteractionsProtocolStrictTwoWayTableErrResponse, i32>,
     ) -> Result<(), fidl::Error> {
-        let r = self.send_raw(result);
-        if r.is_err() {
+        let _result = self.send_raw(result);
+        if _result.is_err() {
             self.control_handle.shutdown();
         }
         self.drop_without_shutdown();
-        r
+        _result
     }
 
-    /// Similar to "send" but does not shutdown the channel if
-    /// an error occurs.
+    /// Similar to "send" but does not shutdown the channel if an error occurs.
     pub fn send_no_shutdown_on_err(
         self,
         mut result: Result<&UnknownInteractionsProtocolStrictTwoWayTableErrResponse, i32>,
     ) -> Result<(), fidl::Error> {
-        let r = self.send_raw(result);
+        let _result = self.send_raw(result);
         self.drop_without_shutdown();
-        r
+        _result
     }
 
     fn send_raw(
         &self,
         mut result: Result<&UnknownInteractionsProtocolStrictTwoWayTableErrResponse, i32>,
     ) -> Result<(), fidl::Error> {
-        let msg = fidl::encoding::TransactionMessage {
-            header: fidl::encoding::TransactionHeader::new(
-                self.tx_id,
-                self.ordinal,
-                fidl::encoding::DynamicFlags::empty(),
-            ),
-            body: result,
-        };
-
-        fidl::encoding::with_tls_encode_buf(|bytes, handles| {
-            fidl::encoding::Encoder::encode::<
-                fidl::encoding::TransactionMessageType<
-                    fidl::encoding::ResultType<
-                        UnknownInteractionsProtocolStrictTwoWayTableErrResponse,
-                        i32,
-                    >,
-                >,
-            >(bytes, handles, msg)?;
-            self.control_handle.inner.send_raw_msg(&*bytes, &mut *handles)
-        })
+        self.control_handle.inner.send::<fidl::encoding::ResultType<
+            UnknownInteractionsProtocolStrictTwoWayTableErrResponse,
+            i32,
+        >>(
+            result,
+            self.tx_id,
+            self.ordinal,
+            fidl::encoding::DynamicFlags::empty(),
+        )
     }
 }
 
@@ -8288,40 +7935,28 @@ impl UnknownInteractionsProtocolFlexibleTwoWayResponder {
     ///
     /// Sets the channel to shutdown if an error occurs.
     pub fn send(self) -> Result<(), fidl::Error> {
-        let r = self.send_raw();
-        if r.is_err() {
+        let _result = self.send_raw();
+        if _result.is_err() {
             self.control_handle.shutdown();
         }
         self.drop_without_shutdown();
-        r
+        _result
     }
 
-    /// Similar to "send" but does not shutdown the channel if
-    /// an error occurs.
+    /// Similar to "send" but does not shutdown the channel if an error occurs.
     pub fn send_no_shutdown_on_err(self) -> Result<(), fidl::Error> {
-        let r = self.send_raw();
+        let _result = self.send_raw();
         self.drop_without_shutdown();
-        r
+        _result
     }
 
     fn send_raw(&self) -> Result<(), fidl::Error> {
-        let msg = fidl::encoding::TransactionMessage {
-            header: fidl::encoding::TransactionHeader::new(
-                self.tx_id,
-                self.ordinal,
-                fidl::encoding::DynamicFlags::FLEXIBLE,
-            ),
-            body: fidl::encoding::Flexible::new(()),
-        };
-
-        fidl::encoding::with_tls_encode_buf(|bytes, handles| {
-            fidl::encoding::Encoder::encode::<
-                fidl::encoding::TransactionMessageType<
-                    fidl::encoding::FlexibleType<fidl::encoding::EmptyStruct>,
-                >,
-            >(bytes, handles, msg)?;
-            self.control_handle.inner.send_raw_msg(&*bytes, &mut *handles)
-        })
+        self.control_handle.inner.send::<fidl::encoding::FlexibleType<fidl::encoding::EmptyStruct>>(
+            fidl::encoding::Flexible::new(()),
+            self.tx_id,
+            self.ordinal,
+            fidl::encoding::DynamicFlags::FLEXIBLE,
+        )
     }
 }
 
@@ -8364,42 +7999,30 @@ impl UnknownInteractionsProtocolFlexibleTwoWayFieldsResponder {
     ///
     /// Sets the channel to shutdown if an error occurs.
     pub fn send(self, mut some_field: i32) -> Result<(), fidl::Error> {
-        let r = self.send_raw(some_field);
-        if r.is_err() {
+        let _result = self.send_raw(some_field);
+        if _result.is_err() {
             self.control_handle.shutdown();
         }
         self.drop_without_shutdown();
-        r
+        _result
     }
 
-    /// Similar to "send" but does not shutdown the channel if
-    /// an error occurs.
+    /// Similar to "send" but does not shutdown the channel if an error occurs.
     pub fn send_no_shutdown_on_err(self, mut some_field: i32) -> Result<(), fidl::Error> {
-        let r = self.send_raw(some_field);
+        let _result = self.send_raw(some_field);
         self.drop_without_shutdown();
-        r
+        _result
     }
 
     fn send_raw(&self, mut some_field: i32) -> Result<(), fidl::Error> {
-        let msg = fidl::encoding::TransactionMessage {
-            header: fidl::encoding::TransactionHeader::new(
-                self.tx_id,
-                self.ordinal,
-                fidl::encoding::DynamicFlags::FLEXIBLE,
-            ),
-            body: fidl::encoding::Flexible::new((some_field,)),
-        };
-
-        fidl::encoding::with_tls_encode_buf(|bytes, handles| {
-            fidl::encoding::Encoder::encode::<
-                fidl::encoding::TransactionMessageType<
-                    fidl::encoding::FlexibleType<
-                        UnknownInteractionsProtocolFlexibleTwoWayFieldsResponse,
-                    >,
-                >,
-            >(bytes, handles, msg)?;
-            self.control_handle.inner.send_raw_msg(&*bytes, &mut *handles)
-        })
+        self.control_handle.inner.send::<fidl::encoding::FlexibleType<
+            UnknownInteractionsProtocolFlexibleTwoWayFieldsResponse,
+        >>(
+            fidl::encoding::Flexible::new((some_field,)),
+            self.tx_id,
+            self.ordinal,
+            fidl::encoding::DynamicFlags::FLEXIBLE,
+        )
     }
 }
 
@@ -8445,48 +8068,36 @@ impl UnknownInteractionsProtocolFlexibleTwoWayUnionResponder {
         self,
         mut payload: &UnknownInteractionsProtocolFlexibleTwoWayUnionResponse,
     ) -> Result<(), fidl::Error> {
-        let r = self.send_raw(payload);
-        if r.is_err() {
+        let _result = self.send_raw(payload);
+        if _result.is_err() {
             self.control_handle.shutdown();
         }
         self.drop_without_shutdown();
-        r
+        _result
     }
 
-    /// Similar to "send" but does not shutdown the channel if
-    /// an error occurs.
+    /// Similar to "send" but does not shutdown the channel if an error occurs.
     pub fn send_no_shutdown_on_err(
         self,
         mut payload: &UnknownInteractionsProtocolFlexibleTwoWayUnionResponse,
     ) -> Result<(), fidl::Error> {
-        let r = self.send_raw(payload);
+        let _result = self.send_raw(payload);
         self.drop_without_shutdown();
-        r
+        _result
     }
 
     fn send_raw(
         &self,
         mut payload: &UnknownInteractionsProtocolFlexibleTwoWayUnionResponse,
     ) -> Result<(), fidl::Error> {
-        let msg = fidl::encoding::TransactionMessage {
-            header: fidl::encoding::TransactionHeader::new(
-                self.tx_id,
-                self.ordinal,
-                fidl::encoding::DynamicFlags::FLEXIBLE,
-            ),
-            body: fidl::encoding::Flexible::new(payload),
-        };
-
-        fidl::encoding::with_tls_encode_buf(|bytes, handles| {
-            fidl::encoding::Encoder::encode::<
-                fidl::encoding::TransactionMessageType<
-                    fidl::encoding::FlexibleType<
-                        UnknownInteractionsProtocolFlexibleTwoWayUnionResponse,
-                    >,
-                >,
-            >(bytes, handles, msg)?;
-            self.control_handle.inner.send_raw_msg(&*bytes, &mut *handles)
-        })
+        self.control_handle.inner.send::<fidl::encoding::FlexibleType<
+            UnknownInteractionsProtocolFlexibleTwoWayUnionResponse,
+        >>(
+            fidl::encoding::Flexible::new(payload),
+            self.tx_id,
+            self.ordinal,
+            fidl::encoding::DynamicFlags::FLEXIBLE,
+        )
     }
 }
 
@@ -8532,48 +8143,36 @@ impl UnknownInteractionsProtocolFlexibleTwoWayTableResponder {
         self,
         mut payload: &UnknownInteractionsProtocolFlexibleTwoWayTableResponse,
     ) -> Result<(), fidl::Error> {
-        let r = self.send_raw(payload);
-        if r.is_err() {
+        let _result = self.send_raw(payload);
+        if _result.is_err() {
             self.control_handle.shutdown();
         }
         self.drop_without_shutdown();
-        r
+        _result
     }
 
-    /// Similar to "send" but does not shutdown the channel if
-    /// an error occurs.
+    /// Similar to "send" but does not shutdown the channel if an error occurs.
     pub fn send_no_shutdown_on_err(
         self,
         mut payload: &UnknownInteractionsProtocolFlexibleTwoWayTableResponse,
     ) -> Result<(), fidl::Error> {
-        let r = self.send_raw(payload);
+        let _result = self.send_raw(payload);
         self.drop_without_shutdown();
-        r
+        _result
     }
 
     fn send_raw(
         &self,
         mut payload: &UnknownInteractionsProtocolFlexibleTwoWayTableResponse,
     ) -> Result<(), fidl::Error> {
-        let msg = fidl::encoding::TransactionMessage {
-            header: fidl::encoding::TransactionHeader::new(
-                self.tx_id,
-                self.ordinal,
-                fidl::encoding::DynamicFlags::FLEXIBLE,
-            ),
-            body: fidl::encoding::Flexible::new(payload),
-        };
-
-        fidl::encoding::with_tls_encode_buf(|bytes, handles| {
-            fidl::encoding::Encoder::encode::<
-                fidl::encoding::TransactionMessageType<
-                    fidl::encoding::FlexibleType<
-                        UnknownInteractionsProtocolFlexibleTwoWayTableResponse,
-                    >,
-                >,
-            >(bytes, handles, msg)?;
-            self.control_handle.inner.send_raw_msg(&*bytes, &mut *handles)
-        })
+        self.control_handle.inner.send::<fidl::encoding::FlexibleType<
+            UnknownInteractionsProtocolFlexibleTwoWayTableResponse,
+        >>(
+            fidl::encoding::Flexible::new(payload),
+            self.tx_id,
+            self.ordinal,
+            fidl::encoding::DynamicFlags::FLEXIBLE,
+        )
     }
 }
 
@@ -8616,40 +8215,31 @@ impl UnknownInteractionsProtocolFlexibleTwoWayErrResponder {
     ///
     /// Sets the channel to shutdown if an error occurs.
     pub fn send(self, mut result: Result<(), i32>) -> Result<(), fidl::Error> {
-        let r = self.send_raw(result);
-        if r.is_err() {
+        let _result = self.send_raw(result);
+        if _result.is_err() {
             self.control_handle.shutdown();
         }
         self.drop_without_shutdown();
-        r
+        _result
     }
 
-    /// Similar to "send" but does not shutdown the channel if
-    /// an error occurs.
+    /// Similar to "send" but does not shutdown the channel if an error occurs.
     pub fn send_no_shutdown_on_err(self, mut result: Result<(), i32>) -> Result<(), fidl::Error> {
-        let r = self.send_raw(result);
+        let _result = self.send_raw(result);
         self.drop_without_shutdown();
-        r
+        _result
     }
 
     fn send_raw(&self, mut result: Result<(), i32>) -> Result<(), fidl::Error> {
-        let msg = fidl::encoding::TransactionMessage {
-            header: fidl::encoding::TransactionHeader::new(
-                self.tx_id,
-                self.ordinal,
-                fidl::encoding::DynamicFlags::FLEXIBLE,
-            ),
-            body: fidl::encoding::FlexibleResult::new(result),
-        };
-
-        fidl::encoding::with_tls_encode_buf(|bytes, handles| {
-            fidl::encoding::Encoder::encode::<
-                fidl::encoding::TransactionMessageType<
-                    fidl::encoding::FlexibleResultType<fidl::encoding::EmptyStruct, i32>,
-                >,
-            >(bytes, handles, msg)?;
-            self.control_handle.inner.send_raw_msg(&*bytes, &mut *handles)
-        })
+        self.control_handle.inner.send::<fidl::encoding::FlexibleResultType<
+            fidl::encoding::EmptyStruct,
+            i32,
+        >>(
+            fidl::encoding::FlexibleResult::new(result),
+            self.tx_id,
+            self.ordinal,
+            fidl::encoding::DynamicFlags::FLEXIBLE,
+        )
     }
 }
 
@@ -8692,43 +8282,31 @@ impl UnknownInteractionsProtocolFlexibleTwoWayFieldsErrResponder {
     ///
     /// Sets the channel to shutdown if an error occurs.
     pub fn send(self, mut result: Result<i32, i32>) -> Result<(), fidl::Error> {
-        let r = self.send_raw(result);
-        if r.is_err() {
+        let _result = self.send_raw(result);
+        if _result.is_err() {
             self.control_handle.shutdown();
         }
         self.drop_without_shutdown();
-        r
+        _result
     }
 
-    /// Similar to "send" but does not shutdown the channel if
-    /// an error occurs.
+    /// Similar to "send" but does not shutdown the channel if an error occurs.
     pub fn send_no_shutdown_on_err(self, mut result: Result<i32, i32>) -> Result<(), fidl::Error> {
-        let r = self.send_raw(result);
+        let _result = self.send_raw(result);
         self.drop_without_shutdown();
-        r
+        _result
     }
 
     fn send_raw(&self, mut result: Result<i32, i32>) -> Result<(), fidl::Error> {
-        let msg = fidl::encoding::TransactionMessage {
-            header: fidl::encoding::TransactionHeader::new(
-                self.tx_id,
-                self.ordinal,
-                fidl::encoding::DynamicFlags::FLEXIBLE,
-            ),
-            body: fidl::encoding::FlexibleResult::new(result.map(|some_field| (some_field,))),
-        };
-
-        fidl::encoding::with_tls_encode_buf(|bytes, handles| {
-            fidl::encoding::Encoder::encode::<
-                fidl::encoding::TransactionMessageType<
-                    fidl::encoding::FlexibleResultType<
-                        UnknownInteractionsProtocolFlexibleTwoWayFieldsErrResponse,
-                        i32,
-                    >,
-                >,
-            >(bytes, handles, msg)?;
-            self.control_handle.inner.send_raw_msg(&*bytes, &mut *handles)
-        })
+        self.control_handle.inner.send::<fidl::encoding::FlexibleResultType<
+            UnknownInteractionsProtocolFlexibleTwoWayFieldsErrResponse,
+            i32,
+        >>(
+            fidl::encoding::FlexibleResult::new(result.map(|some_field| (some_field,))),
+            self.tx_id,
+            self.ordinal,
+            fidl::encoding::DynamicFlags::FLEXIBLE,
+        )
     }
 }
 
@@ -8774,49 +8352,37 @@ impl UnknownInteractionsProtocolFlexibleTwoWayUnionErrResponder {
         self,
         mut result: Result<&UnknownInteractionsProtocolFlexibleTwoWayUnionErrResponse, i32>,
     ) -> Result<(), fidl::Error> {
-        let r = self.send_raw(result);
-        if r.is_err() {
+        let _result = self.send_raw(result);
+        if _result.is_err() {
             self.control_handle.shutdown();
         }
         self.drop_without_shutdown();
-        r
+        _result
     }
 
-    /// Similar to "send" but does not shutdown the channel if
-    /// an error occurs.
+    /// Similar to "send" but does not shutdown the channel if an error occurs.
     pub fn send_no_shutdown_on_err(
         self,
         mut result: Result<&UnknownInteractionsProtocolFlexibleTwoWayUnionErrResponse, i32>,
     ) -> Result<(), fidl::Error> {
-        let r = self.send_raw(result);
+        let _result = self.send_raw(result);
         self.drop_without_shutdown();
-        r
+        _result
     }
 
     fn send_raw(
         &self,
         mut result: Result<&UnknownInteractionsProtocolFlexibleTwoWayUnionErrResponse, i32>,
     ) -> Result<(), fidl::Error> {
-        let msg = fidl::encoding::TransactionMessage {
-            header: fidl::encoding::TransactionHeader::new(
-                self.tx_id,
-                self.ordinal,
-                fidl::encoding::DynamicFlags::FLEXIBLE,
-            ),
-            body: fidl::encoding::FlexibleResult::new(result),
-        };
-
-        fidl::encoding::with_tls_encode_buf(|bytes, handles| {
-            fidl::encoding::Encoder::encode::<
-                fidl::encoding::TransactionMessageType<
-                    fidl::encoding::FlexibleResultType<
-                        UnknownInteractionsProtocolFlexibleTwoWayUnionErrResponse,
-                        i32,
-                    >,
-                >,
-            >(bytes, handles, msg)?;
-            self.control_handle.inner.send_raw_msg(&*bytes, &mut *handles)
-        })
+        self.control_handle.inner.send::<fidl::encoding::FlexibleResultType<
+            UnknownInteractionsProtocolFlexibleTwoWayUnionErrResponse,
+            i32,
+        >>(
+            fidl::encoding::FlexibleResult::new(result),
+            self.tx_id,
+            self.ordinal,
+            fidl::encoding::DynamicFlags::FLEXIBLE,
+        )
     }
 }
 
@@ -8862,49 +8428,37 @@ impl UnknownInteractionsProtocolFlexibleTwoWayTableErrResponder {
         self,
         mut result: Result<&UnknownInteractionsProtocolFlexibleTwoWayTableErrResponse, i32>,
     ) -> Result<(), fidl::Error> {
-        let r = self.send_raw(result);
-        if r.is_err() {
+        let _result = self.send_raw(result);
+        if _result.is_err() {
             self.control_handle.shutdown();
         }
         self.drop_without_shutdown();
-        r
+        _result
     }
 
-    /// Similar to "send" but does not shutdown the channel if
-    /// an error occurs.
+    /// Similar to "send" but does not shutdown the channel if an error occurs.
     pub fn send_no_shutdown_on_err(
         self,
         mut result: Result<&UnknownInteractionsProtocolFlexibleTwoWayTableErrResponse, i32>,
     ) -> Result<(), fidl::Error> {
-        let r = self.send_raw(result);
+        let _result = self.send_raw(result);
         self.drop_without_shutdown();
-        r
+        _result
     }
 
     fn send_raw(
         &self,
         mut result: Result<&UnknownInteractionsProtocolFlexibleTwoWayTableErrResponse, i32>,
     ) -> Result<(), fidl::Error> {
-        let msg = fidl::encoding::TransactionMessage {
-            header: fidl::encoding::TransactionHeader::new(
-                self.tx_id,
-                self.ordinal,
-                fidl::encoding::DynamicFlags::FLEXIBLE,
-            ),
-            body: fidl::encoding::FlexibleResult::new(result),
-        };
-
-        fidl::encoding::with_tls_encode_buf(|bytes, handles| {
-            fidl::encoding::Encoder::encode::<
-                fidl::encoding::TransactionMessageType<
-                    fidl::encoding::FlexibleResultType<
-                        UnknownInteractionsProtocolFlexibleTwoWayTableErrResponse,
-                        i32,
-                    >,
-                >,
-            >(bytes, handles, msg)?;
-            self.control_handle.inner.send_raw_msg(&*bytes, &mut *handles)
-        })
+        self.control_handle.inner.send::<fidl::encoding::FlexibleResultType<
+            UnknownInteractionsProtocolFlexibleTwoWayTableErrResponse,
+            i32,
+        >>(
+            fidl::encoding::FlexibleResult::new(result),
+            self.tx_id,
+            self.ordinal,
+            fidl::encoding::DynamicFlags::FLEXIBLE,
+        )
     }
 }
 

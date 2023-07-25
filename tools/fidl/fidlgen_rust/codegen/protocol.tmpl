@@ -7,20 +7,16 @@
 {{- define "ProtocolDeclaration" }}
 {{- $protocol := . }}
 #[derive(Debug, Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash)]
-pub struct {{ $protocol.Name }}Marker;
+pub struct {{ $protocol.Marker }};
 
-impl fidl::endpoints::ProtocolMarker for {{ $protocol.Name }}Marker {
-    type Proxy = {{ $protocol.Name }}Proxy;
-    type RequestStream = {{ $protocol.Name }}RequestStream;
-    {{- if .ProtocolName }}
-    const DEBUG_NAME: &'static str = "{{ $protocol.ProtocolName }}";
-    {{- else }}
-    const DEBUG_NAME: &'static str = "(anonymous) {{ $protocol.Name }}";
-    {{- end }}
+impl fidl::endpoints::ProtocolMarker for {{ $protocol.Marker }} {
+    type Proxy = {{ $protocol.Proxy }};
+    type RequestStream = {{ $protocol.RequestStream }};
+    const DEBUG_NAME: &'static str = "{{ $protocol.DebugName }}";
 }
 
-{{- if $protocol.ProtocolName }}
-impl fidl::endpoints::DiscoverableProtocolMarker for {{ $protocol.Name }}Marker {}
+{{- if $protocol.Discoverable }}
+impl fidl::endpoints::DiscoverableProtocolMarker for {{ $protocol.Marker }} {}
 {{- end }}
 
 {{- range $method := $protocol.Methods }}
@@ -29,10 +25,10 @@ pub type {{ $method.Response.TupleType }} = {{ $method.Response.TupleTypeAliasRh
 {{- end }}
 {{- end }}
 
-pub trait {{ $protocol.Name }}ProxyInterface: Send + Sync {
+pub trait {{ $protocol.ProxyInterface }}: Send + Sync {
     {{- range $method := $protocol.Methods }}
     {{- if and $method.HasRequest $method.HasResponse }}
-    type {{ $method.CamelName }}ResponseFut: std::future::Future<Output = Result<{{ $method.Response.TupleType }}, fidl::Error>> + Send;
+    type {{ $method.ResponseFut }}: std::future::Future<Output = Result<{{ $method.Response.TupleType }}, fidl::Error>> + Send;
     {{- end }}
 
     {{- if $method.HasRequest }}
@@ -45,7 +41,7 @@ pub trait {{ $protocol.Name }}ProxyInterface: Send + Sync {
         {{- end }}
     )
     {{- if $method.HasResponse }}
-    -> Self::{{ $method.CamelName }}ResponseFut
+    -> Self::{{ $method.ResponseFut }}
     {{- else }}
     -> Result<(), fidl::Error>
     {{- end }}
@@ -60,14 +56,14 @@ pub trait {{ $protocol.Name }}ProxyInterface: Send + Sync {
 
 #[derive(Debug)]
 #[cfg(target_os = "fuchsia")]
-pub struct {{ $protocol.Name }}SynchronousProxy {
+pub struct {{ $protocol.SynchronousProxy }} {
     client: fidl::client::sync::Client,
 }
 
 #[cfg(target_os = "fuchsia")]
-impl {{ $protocol.Name }}SynchronousProxy {
+impl {{ $protocol.SynchronousProxy }} {
     pub fn new(channel: fidl::Channel) -> Self {
-        let protocol_name = <{{ $protocol.Name }}Marker as fidl::endpoints::ProtocolMarker>::DEBUG_NAME;
+        let protocol_name = <{{ $protocol.Marker }} as fidl::endpoints::ProtocolMarker>::DEBUG_NAME;
         Self { client: fidl::client::sync::Client::new(channel, protocol_name) }
     }
 
@@ -77,8 +73,8 @@ impl {{ $protocol.Name }}SynchronousProxy {
 
     /// Waits until an event arrives and returns it. It is safe for other
     /// threads to make concurrent requests while waiting for an event.
-    pub fn wait_for_event(&self, deadline: zx::Time) -> Result<{{ $protocol.Name }}Event, fidl::Error> {
-        {{ $protocol.Name }}Event::decode(self.client.wait_for_event(deadline)?)
+    pub fn wait_for_event(&self, deadline: zx::Time) -> Result<{{ $protocol.Event }}, fidl::Error> {
+        {{ $protocol.Event }}::decode(self.client.wait_for_event(deadline)?)
     }
 
     {{- range $method := $protocol.Methods }}
@@ -107,7 +103,7 @@ impl {{ $protocol.Name }}SynchronousProxy {
             ___deadline,
         )?
         {{- if $method.IsFlexible }}
-        .into_result::<{{ $protocol.Name }}Marker>("{{ $method.Name }}")?
+        .into_result::<{{ $protocol.Marker }}>("{{ $method.Name }}")?
         {{- end }};
         Ok({{ call $method.Response.ConvertToTuple "_response" }})
         {{- else }}
@@ -123,12 +119,12 @@ impl {{ $protocol.Name }}SynchronousProxy {
 }
 
 #[derive(Debug, Clone)]
-pub struct {{ $protocol.Name }}Proxy {
+pub struct {{ $protocol.Proxy }} {
     client: fidl::client::Client,
 }
 
-impl fidl::endpoints::Proxy for {{ $protocol.Name }}Proxy {
-    type Protocol = {{ $protocol.Name }}Marker;
+impl fidl::endpoints::Proxy for {{ $protocol.Proxy }} {
+    type Protocol = {{ $protocol.Marker }};
 
     fn from_channel(inner: fidl::AsyncChannel) -> Self {
         Self::new(inner)
@@ -143,20 +139,20 @@ impl fidl::endpoints::Proxy for {{ $protocol.Name }}Proxy {
     }
 }
 
-impl {{ $protocol.Name }}Proxy {
-    /// Create a new Proxy for {{ $protocol.Name }}
+impl {{ $protocol.Proxy }} {
+    /// Create a new Proxy for {{ $protocol.ECI }}.
     pub fn new(channel: fidl::AsyncChannel) -> Self {
-        let protocol_name = <{{ $protocol.Name }}Marker as fidl::endpoints::ProtocolMarker>::DEBUG_NAME;
+        let protocol_name = <{{ $protocol.Marker }} as fidl::endpoints::ProtocolMarker>::DEBUG_NAME;
         Self { client: fidl::client::Client::new(channel, protocol_name) }
     }
 
-    /// Get a Stream of events from the remote end of the {{ $protocol.Name }} protocol
+    /// Get a Stream of events from the remote end of the protocol.
     ///
     /// # Panics
     ///
     /// Panics if the event stream was already taken.
-    pub fn take_event_stream(&self) -> {{ $protocol.Name }}EventStream {
-        {{ $protocol.Name }}EventStream {
+    pub fn take_event_stream(&self) -> {{ $protocol.EventStream }} {
+        {{ $protocol.EventStream }} {
             event_receiver: self.client.take_event_receiver(),
         }
     }
@@ -178,7 +174,7 @@ impl {{ $protocol.Name }}Proxy {
     {{- else }}
     -> Result<(), fidl::Error> {
     {{- end }}
-        {{ $protocol.Name }}ProxyInterface::r#{{ $method.Name }}(self,
+        {{ $protocol.ProxyInterface }}::r#{{ $method.Name }}(self,
             {{- range $method.Request.Parameters }}
             {{ .Name }},
             {{- end }}
@@ -188,22 +184,22 @@ impl {{ $protocol.Name }}Proxy {
     {{- end }}
 }
 
-impl {{ $protocol.Name }}ProxyInterface for {{ $protocol.Name }}Proxy {
+impl {{ $protocol.ProxyInterface }} for {{ $protocol.Proxy }} {
     {{- range $method := $protocol.Methods }}
     {{- if $method.HasRequest }}
     {{ "" }}
     {{- if $method.HasResponse }}
-    type {{ $method.CamelName }}ResponseFut = fidl::client::QueryResponseFut<{{ $method.Response.TupleType }}>;
+    type {{ $method.ResponseFut }} = fidl::client::QueryResponseFut<{{ $method.Response.TupleType }}>;
     fn r#{{ $method.Name }}(
         &self,
         {{- range $method.Request.Parameters }}
         mut {{ .Name }}: {{ .Type }},
         {{- end }}
-    ) -> Self::{{ $method.CamelName }}ResponseFut {
+    ) -> Self::{{ $method.ResponseFut }} {
         fn _decode(mut _buf: Result<fidl::MessageBufEtc, fidl::Error>) -> Result<{{ $method.Response.TupleType }}, fidl::Error> {
             let _response = fidl::client::decode_transaction_body::<{{ $method.Response.FidlType }}, {{ $method.Ordinal | printf "%#x" }}>(_buf?)?
             {{- if $method.IsFlexible }}
-            .into_result::<{{ $protocol.Name }}Marker>("{{ $method.Name }}")?
+            .into_result::<{{ $protocol.Marker }}>("{{ $method.Name }}")?
             {{- end }};
             Ok({{ call $method.Response.ConvertToTuple "_response" }})
         }
@@ -235,37 +231,35 @@ impl {{ $protocol.Name }}ProxyInterface for {{ $protocol.Name }}Proxy {
     {{- end }}
 }
 
-pub struct {{ $protocol.Name }}EventStream {
+pub struct {{ $protocol.EventStream }} {
     event_receiver: fidl::client::EventReceiver,
 }
 
-impl std::marker::Unpin for {{ $protocol.Name }}EventStream {}
+impl std::marker::Unpin for {{ $protocol.EventStream }} {}
 
-impl futures::stream::FusedStream for {{ $protocol.Name }}EventStream {
+impl futures::stream::FusedStream for {{ $protocol.EventStream }} {
     fn is_terminated(&self) -> bool {
         self.event_receiver.is_terminated()
     }
 }
 
-impl futures::Stream for {{ $protocol.Name }}EventStream {
-    type Item = Result<{{ $protocol.Name }}Event, fidl::Error>;
+impl futures::Stream for {{ $protocol.EventStream }} {
+    type Item = Result<{{ $protocol.Event }}, fidl::Error>;
 
     fn poll_next(mut self: std::pin::Pin<&mut Self>, cx: &mut std::task::Context<'_>)
         -> std::task::Poll<Option<Self::Item>>
     {
-        let buf = match futures::ready!(
+        match futures::ready!(
             futures::stream::StreamExt::poll_next_unpin(&mut self.event_receiver, cx)?
         ) {
-            Some(buf) => buf,
-            None => return std::task::Poll::Ready(None),
-        };
-
-        std::task::Poll::Ready(Some({{ $protocol.Name }}Event::decode(buf)))
+            Some(buf) => std::task::Poll::Ready(Some({{ $protocol.Event }}::decode(buf))),
+            None => std::task::Poll::Ready(None),
+        }
     }
 }
 
 #[derive(Debug)]
-pub enum {{ $protocol.Name }}Event {
+pub enum {{ $protocol.Event }} {
     {{- range $method := $protocol.Methods }}
     {{- if not $method.HasRequest }}
     {{ $method.CamelName }} {
@@ -285,12 +279,12 @@ pub enum {{ $protocol.Name }}Event {
     {{- end }}
 }
 
-impl {{ $protocol.Name }}Event {
+impl {{ $protocol.Event }} {
     {{- range $method := $protocol.Methods }}
     {{- if not $method.HasRequest }}
     #[allow(irrefutable_let_patterns)]
     pub fn into_{{ $method.Name }}(self) -> Option<{{ $method.Response.TupleType }}> {
-        if let {{ $protocol.Name }}Event::{{ $method.CamelName }} {
+        if let {{ $protocol.Event }}::{{ $method.CamelName }} {
             {{- range $method.Response.Parameters }}
             {{ .Name }},
             {{- end }}
@@ -307,12 +301,11 @@ impl {{ $protocol.Name }}Event {
     {{- end }}
     {{- end }}
 
-    /// Decodes a message buffer as a [`{{ $protocol.Name }}Event`]. Transaction
-    /// ID in the message must be zero; this method does not check TXID.
-    fn decode(mut buf: fidl::MessageBufEtc) -> Result<{{ $protocol.Name }}Event, fidl::Error> {
+    /// Decodes a message buffer as a [`{{ $protocol.Event }}`].
+    fn decode(mut buf: fidl::MessageBufEtc) -> Result<{{ $protocol.Event }}, fidl::Error> {
         let (bytes, _handles) = buf.split_mut();
         let (tx_header, _body_bytes) = fidl::encoding::decode_transaction_header(bytes)?;
-
+        debug_assert_eq!(tx_header.tx_id(), 0);
         match tx_header.ordinal() {
             {{- range $method := $protocol.Methods }}
             {{- if not $method.HasRequest }}
@@ -320,7 +313,7 @@ impl {{ $protocol.Name }}Event {
                 let mut out = fidl::new_empty!({{ $method.Response.FidlType }});
                 fidl::encoding::Decoder::decode_into::<{{ $method.Response.FidlType }}>(&tx_header, _body_bytes, _handles, &mut out)?;
                 Ok((
-                    {{ $protocol.Name }}Event::{{ $method.CamelName }} {
+                    {{ $protocol.Event }}::{{ $method.CamelName }} {
                         {{- call $method.Response.ConvertToFields "out" }}
                     }
                 ))
@@ -329,39 +322,36 @@ impl {{ $protocol.Name }}Event {
             {{- end }}
             {{- if $protocol.OneWayUnknownInteractions }}
             _ if tx_header.dynamic_flags().contains(fidl::encoding::DynamicFlags::FLEXIBLE) => {
-                Ok({{ $protocol.Name }}Event::_UnknownEvent {
+                Ok({{ $protocol.Event }}::_UnknownEvent {
                     ordinal: tx_header.ordinal(),
                 })
-                // MessageBufEtc will close handles on drop, before the
-                // application can handle the _UnknownEvent variant, so this
-                // satisfies the RFC-0138 requirement to close handles first.
             }
             {{- end }}
             _ => Err(fidl::Error::UnknownOrdinal {
                 ordinal: tx_header.ordinal(),
-                protocol_name: <{{ $protocol.Name }}Marker as fidl::endpoints::ProtocolMarker>::DEBUG_NAME,
+                protocol_name: <{{ $protocol.Marker }} as fidl::endpoints::ProtocolMarker>::DEBUG_NAME,
             })
         }
     }
 }
 
-/// A Stream of incoming requests for {{ $protocol.Name }}
-pub struct {{ $protocol.Name }}RequestStream {
+/// A Stream of incoming requests for {{ $protocol.ECI }}.
+pub struct {{ $protocol.RequestStream }} {
     inner: std::sync::Arc<fidl::ServeInner>,
     is_terminated: bool,
 }
 
-impl std::marker::Unpin for {{ $protocol.Name }}RequestStream {}
+impl std::marker::Unpin for {{ $protocol.RequestStream }} {}
 
-impl futures::stream::FusedStream for {{ $protocol.Name }}RequestStream {
+impl futures::stream::FusedStream for {{ $protocol.RequestStream }} {
     fn is_terminated(&self) -> bool {
         self.is_terminated
     }
 }
 
-impl fidl::endpoints::RequestStream for {{ $protocol.Name }}RequestStream {
-    type Protocol = {{ $protocol.Name }}Marker;
-    type ControlHandle = {{ $protocol.Name }}ControlHandle;
+impl fidl::endpoints::RequestStream for {{ $protocol.RequestStream }} {
+    type Protocol = {{ $protocol.Marker }};
+    type ControlHandle = {{ $protocol.ControlHandle }};
 
     fn from_channel(channel: fidl::AsyncChannel) -> Self {
         Self {
@@ -371,7 +361,7 @@ impl fidl::endpoints::RequestStream for {{ $protocol.Name }}RequestStream {
     }
 
     fn control_handle(&self) -> Self::ControlHandle {
-        {{ $protocol.Name }}ControlHandle { inner: self.inner.clone() }
+        {{ $protocol.ControlHandle }} { inner: self.inner.clone() }
     }
 
     fn into_inner(self) -> (::std::sync::Arc<fidl::ServeInner>, bool) {
@@ -383,19 +373,19 @@ impl fidl::endpoints::RequestStream for {{ $protocol.Name }}RequestStream {
     }
 }
 
-impl futures::Stream for {{ $protocol.Name }}RequestStream {
-    type Item = Result<{{ $protocol.Name }}Request, fidl::Error>;
+impl futures::Stream for {{ $protocol.RequestStream }} {
+    type Item = Result<{{ $protocol.Request }}, fidl::Error>;
 
     fn poll_next(mut self: std::pin::Pin<&mut Self>, cx: &mut std::task::Context<'_>)
         -> std::task::Poll<Option<Self::Item>>
     {
         let this = &mut *self;
-        if this.inner.poll_shutdown(cx) {
+        if this.inner.check_shutdown(cx) {
             this.is_terminated = true;
             return std::task::Poll::Ready(None);
         }
         if this.is_terminated {
-            panic!("polled {{ $protocol.Name }}RequestStream after completion");
+            panic!("polled {{ $protocol.RequestStream }} after completion");
         }
         fidl::encoding::with_tls_decode_buf(|bytes, handles| {
             match this.inner.channel().read_etc(cx, bytes, handles) {
@@ -417,20 +407,19 @@ impl futures::Stream for {{ $protocol.Name }}RequestStream {
                 {{ .Ordinal | printf "%#x" }} => {
                     let mut req = fidl::new_empty!({{ $method.Request.FidlType }});
                     fidl::encoding::Decoder::decode_into::<{{ $method.Request.FidlType }}>(&header, _body_bytes, handles, &mut req)?;
-                    let control_handle = {{ $protocol.Name }}ControlHandle {
+                    let control_handle = {{ $protocol.ControlHandle }} {
                         inner: this.inner.clone(),
                     };
-
-                    Ok({{ $protocol.Name }}Request::{{ $method.CamelName }} {
+                    Ok({{ $protocol.Request }}::{{ $method.CamelName }} {
                         {{- call $method.Request.ConvertToFields "req" }}
                         {{- if $method.HasResponse }}
-                            responder: {{- $protocol.Name }}{{- $method.CamelName }}Responder {
-                                control_handle: std::mem::ManuallyDrop::new(control_handle),
-                                tx_id: header.tx_id(),
-                                ordinal: header.ordinal(),
-                            },
-                            {{- else }}
-                            control_handle,
+                        responder: {{ $method.Responder }} {
+                            control_handle: std::mem::ManuallyDrop::new(control_handle),
+                            tx_id: header.tx_id(),
+                            ordinal: header.ordinal(),
+                        },
+                        {{- else }}
+                        control_handle,
                         {{- end }}
                     })
                 }
@@ -438,55 +427,26 @@ impl futures::Stream for {{ $protocol.Name }}RequestStream {
                 {{- end }}
                 {{- if $protocol.OneWayUnknownInteractions }}
                 _ if header.tx_id() == 0 && header.dynamic_flags().contains(fidl::encoding::DynamicFlags::FLEXIBLE) => {
-                    let control_handle = {{ $protocol.Name }}ControlHandle {
-                        inner: this.inner.clone(),
-                    };
-                    Ok({{ $protocol.Name }}Request::_UnknownMethod {
+                    Ok({{ $protocol.Request }}::_UnknownMethod {
                         ordinal: header.ordinal(),
-                        control_handle,
+                        control_handle: {{ $protocol.ControlHandle }} { inner: this.inner.clone() },
                         {{- if $protocol.TwoWayUnknownInteractions }}
                         unknown_method_type: fidl::endpoints::UnknownMethodType::OneWay,
                         {{- end }}
                     })
-                    // with_tls_decode_buf will clear the handles when we return
-                    // before the application can handle the _UnknownMethod, so
-                    // we don't need to clear it explicitly to meet the RFC
-                    // requirement to close handles before calling an unknown
-                    // interaction handler.
                 }
                 {{- if $protocol.TwoWayUnknownInteractions }}
                 _ if header.dynamic_flags().contains(fidl::encoding::DynamicFlags::FLEXIBLE) => {
-                    let control_handle = {{ $protocol.Name }}ControlHandle {
-                        inner: this.inner.clone(),
-                    };
-
-                    let msg = fidl::encoding::TransactionMessage {
-                        header: fidl::encoding::TransactionHeader::new(
-                            header.tx_id(), header.ordinal(), header.dynamic_flags(),
-                        ),
-                        body: fidl::encoding::Flexible::<()>::FrameworkErr(
-                            fidl::encoding::FrameworkErr::UnknownMethod
-                        ),
-                    };
-
-                    // RFC-0138 requires us to close handles in the incoming
-                    // message before replying, so we can't wait for
-                    // with_tls_decode_buf to auto-clear handles when we return.
-                    handles.clear();
-
-                    // We are inside of with_tls_decode_buf, so we can't use
-                    // with_tls_encode_buf. However, we know that the unknown
-                    // interaction reply will not contain any handles, so
-                    // creating a new Vec here does not cause an allocation.
-                    let mut handles = Vec::new();
-                    fidl::encoding::Encoder::encode::<
-                        fidl::encoding::TransactionMessageType<fidl::encoding::FlexibleType<fidl::encoding::EmptyStruct>>
-                    >(bytes, &mut handles, msg)?;
-                    control_handle.inner.send_raw_msg(&*bytes, &mut handles)?;
-
-                    Ok({{ $protocol.Name }}Request::_UnknownMethod {
+                    this.inner.send_framework_err(
+                        fidl::encoding::FrameworkErr::UnknownMethod,
+                        header.tx_id(),
+                        header.ordinal(),
+                        header.dynamic_flags(),
+                        (bytes, handles),
+                    )?;
+                    Ok({{ $protocol.Request }}::_UnknownMethod {
                         ordinal: header.ordinal(),
-                        control_handle,
+                        control_handle: {{ $protocol.ControlHandle }} { inner: this.inner.clone() },
                         unknown_method_type: fidl::endpoints::UnknownMethodType::TwoWay,
                     })
                 }
@@ -494,7 +454,7 @@ impl futures::Stream for {{ $protocol.Name }}RequestStream {
                 {{- end }}
                 _ => Err(fidl::Error::UnknownOrdinal {
                     ordinal: header.ordinal(),
-                    protocol_name: <{{ $protocol.Name }}Marker as fidl::endpoints::ProtocolMarker>::DEBUG_NAME,
+                    protocol_name: <{{ $protocol.Marker }} as fidl::endpoints::ProtocolMarker>::DEBUG_NAME,
                 }),
             }))
         })
@@ -505,7 +465,7 @@ impl futures::Stream for {{ $protocol.Name }}RequestStream {
 ///{{ . }}
 {{- end }}
 #[derive(Debug)]
-pub enum {{ $protocol.Name }}Request {
+pub enum {{ $protocol.Request }} {
     {{- range $method := $protocol.Methods }}
     {{- if $method.HasRequest }}
     {{- range .DocComments }}
@@ -516,9 +476,9 @@ pub enum {{ $protocol.Name }}Request {
         {{ .Name }}: {{ .OwnedType }},
         {{- end }}
         {{- if $method.HasResponse }}
-        responder: {{ $protocol.Name }}{{ $method.CamelName }}Responder,
+        responder: {{ $method.Responder }},
         {{- else }}
-        control_handle: {{ $protocol.Name }}ControlHandle,
+        control_handle: {{ $protocol.ControlHandle }},
         {{- end }}
     },
     {{- end }}
@@ -530,7 +490,7 @@ pub enum {{ $protocol.Name }}Request {
     _UnknownMethod {
         /// Ordinal of the method that was called.
         ordinal: u64,
-        control_handle: {{ $protocol.Name }}ControlHandle,
+        control_handle: {{ $protocol.ControlHandle }},
         {{- if $protocol.TwoWayUnknownInteractions }}
         unknown_method_type: fidl::endpoints::UnknownMethodType,
         {{- end }}
@@ -538,7 +498,7 @@ pub enum {{ $protocol.Name }}Request {
     {{- end }}
 }
 
-impl {{ $protocol.Name }}Request {
+impl {{ $protocol.Request }} {
     {{- range $method := $protocol.Methods }}
     {{- if $method.HasRequest }}
     {{ "" }}
@@ -548,12 +508,12 @@ impl {{ $protocol.Name }}Request {
         {{ .OwnedType }},
         {{- end }}
         {{- if $method.HasResponse }}
-        {{ $protocol.Name }}{{ $method.CamelName }}Responder
+        {{ $method.Responder }}
         {{- else }}
-        {{ $protocol.Name }}ControlHandle
+        {{ $protocol.ControlHandle }}
         {{- end }}
     )> {
-        if let {{ $protocol.Name }}Request::{{ $method.CamelName }} {
+        if let {{ $protocol.Request }}::{{ $method.CamelName }} {
             {{- range $method.Request.Parameters }}
             {{ .Name }},
             {{- end }}
@@ -585,30 +545,30 @@ impl {{ $protocol.Name }}Request {
         match *self {
             {{- range $method := $protocol.Methods }}
             {{- if $method.HasRequest }}
-            {{ $protocol.Name }}Request::{{ $method.CamelName }}{..} => "{{ $method.Name }}",
+            {{ $protocol.Request }}::{{ $method.CamelName }}{..} => "{{ $method.Name }}",
             {{- end }}
             {{- end }}
 
             {{- if $protocol.TwoWayUnknownInteractions }}
-            {{ $protocol.Name }}Request::_UnknownMethod {
+            {{ $protocol.Request }}::_UnknownMethod {
                 unknown_method_type: fidl::endpoints::UnknownMethodType::OneWay, ..
             } => "unknown one-way method",
-            {{ $protocol.Name }}Request::_UnknownMethod {
+            {{ $protocol.Request }}::_UnknownMethod {
                 unknown_method_type: fidl::endpoints::UnknownMethodType::TwoWay, ..
             } => "unknown two-way method",
             {{- else if $protocol.OneWayUnknownInteractions }}
-            {{ $protocol.Name }}Request::_UnknownMethod {..} => "unknown one-way method",
+            {{ $protocol.Request }}::_UnknownMethod {..} => "unknown one-way method",
             {{- end }}
         }
     }
 }
 
 #[derive(Debug, Clone)]
-pub struct {{ $protocol.Name }}ControlHandle {
+pub struct {{ $protocol.ControlHandle }} {
     inner: std::sync::Arc<fidl::ServeInner>,
 }
 
-impl fidl::endpoints::ControlHandle for {{ $protocol.Name }}ControlHandle {
+impl fidl::endpoints::ControlHandle for {{ $protocol.ControlHandle }} {
     fn shutdown(&self) {
         self.inner.shutdown()
     }
@@ -626,7 +586,7 @@ impl fidl::endpoints::ControlHandle for {{ $protocol.Name }}ControlHandle {
     }
 }
 
-impl {{ $protocol.Name }}ControlHandle {
+impl {{ $protocol.ControlHandle }} {
     {{- range $method := $protocol.Methods }}
     {{- if not $method.HasRequest }}
     {{ "" }}
@@ -651,16 +611,16 @@ impl {{ $protocol.Name }}ControlHandle {
 {{- if and $method.HasRequest $method.HasResponse }}
 #[must_use = "FIDL methods require a response to be sent"]
 #[derive(Debug)]
-pub struct {{ $protocol.Name }}{{ $method.CamelName }}Responder {
-    control_handle: std::mem::ManuallyDrop<{{ $protocol.Name }}ControlHandle>,
+pub struct {{ $method.Responder }} {
+    control_handle: std::mem::ManuallyDrop<{{ $protocol.ControlHandle }}>,
     tx_id: u32,
     ordinal: u64,
 }
 
-/// Set the the channel to be shutdown (see [`{{ $protocol.Name }}ControlHandle::shutdown`])
+/// Set the the channel to be shutdown (see [`{{ $protocol.ControlHandle }}::shutdown`])
 /// if the responder is dropped without sending a response, so that the client
 /// doesn't hang. To prevent this behavior, call `drop_without_shutdown`.
-impl std::ops::Drop for {{ $protocol.Name }}{{ $method.CamelName }}Responder {
+impl std::ops::Drop for {{ $method.Responder }} {
     fn drop(&mut self) {
         self.control_handle.shutdown();
         // Safety: drops once, never accessed again
@@ -668,10 +628,10 @@ impl std::ops::Drop for {{ $protocol.Name }}{{ $method.CamelName }}Responder {
     }
 }
 
-impl fidl::endpoints::Responder for {{ $protocol.Name }}{{ $method.CamelName }}Responder {
-    type ControlHandle = {{ $protocol.Name }}ControlHandle;
+impl fidl::endpoints::Responder for {{ $method.Responder }} {
+    type ControlHandle = {{ $protocol.ControlHandle }};
 
-    fn control_handle(&self) -> &{{ $protocol.Name }}ControlHandle {
+    fn control_handle(&self) -> &{{ $protocol.ControlHandle }} {
         &self.control_handle
     }
 
@@ -683,7 +643,7 @@ impl fidl::endpoints::Responder for {{ $protocol.Name }}{{ $method.CamelName }}R
     }
 }
 
-impl {{ $protocol.Name }}{{ $method.CamelName }}Responder {
+impl {{ $method.Responder }} {
     /// Sends a response to the FIDL transaction.
     ///
     /// Sets the channel to shutdown if an error occurs.
@@ -692,32 +652,31 @@ impl {{ $protocol.Name }}{{ $method.CamelName }}Responder {
         mut {{ .Name }}: {{ .Type }},
         {{- end }}
     ) -> Result<(), fidl::Error> {
-        let r = self.send_raw(
+        let _result = self.send_raw(
             {{- range $method.Response.Parameters }}
             {{ .Name }},
             {{- end }}
         );
-        if r.is_err() {
+        if _result.is_err() {
             self.control_handle.shutdown();
         }
         self.drop_without_shutdown();
-        r
+        _result
     }
 
-    /// Similar to "send" but does not shutdown the channel if
-    /// an error occurs.
+    /// Similar to "send" but does not shutdown the channel if an error occurs.
     pub fn send_no_shutdown_on_err(self,
         {{- range $method.Response.Parameters }}
         mut {{ .Name }}: {{ .Type }},
         {{- end }}
     ) -> Result<(), fidl::Error> {
-        let r = self.send_raw(
+        let _result = self.send_raw(
             {{- range $method.Response.Parameters }}
             {{ .Name }},
             {{- end }}
         );
         self.drop_without_shutdown();
-        r
+        _result
     }
 
     fn send_raw(
@@ -726,19 +685,12 @@ impl {{ $protocol.Name }}{{ $method.CamelName }}Responder {
         mut {{ .Name }}: {{ .Type }},
         {{- end }}
     ) -> Result<(), fidl::Error> {
-        let msg = fidl::encoding::TransactionMessage {
-            header: fidl::encoding::TransactionHeader::new(
-                self.tx_id, self.ordinal, {{ $method.DynamicFlags }},
-            ),
-            body: {{ $method.Response.EncodeExpr }},
-        };
-
-        fidl::encoding::with_tls_encode_buf(|bytes, handles| {
-            fidl::encoding::Encoder::encode::<
-                fidl::encoding::TransactionMessageType<{{ $method.Response.FidlType }}>
-            >(bytes, handles, msg)?;
-            self.control_handle.inner.send_raw_msg(&*bytes, &mut *handles)
-        })
+        self.control_handle.inner.send::<{{ $method.Response.FidlType }}>(
+            {{ $method.Response.EncodeExpr }},
+            self.tx_id,
+            self.ordinal,
+            {{ $method.DynamicFlags }}
+        )
     }
 }
 {{- end }}

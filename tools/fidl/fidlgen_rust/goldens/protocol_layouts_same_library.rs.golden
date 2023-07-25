@@ -549,13 +549,13 @@ impl fidl::endpoints::Proxy for ComposedProtocolProxy {
 }
 
 impl ComposedProtocolProxy {
-    /// Create a new Proxy for ComposedProtocol
+    /// Create a new Proxy for test.protocollayoutssamelibrary/ComposedProtocol.
     pub fn new(channel: fidl::AsyncChannel) -> Self {
         let protocol_name = <ComposedProtocolMarker as fidl::endpoints::ProtocolMarker>::DEBUG_NAME;
         Self { client: fidl::client::Client::new(channel, protocol_name) }
     }
 
-    /// Get a Stream of events from the remote end of the ComposedProtocol protocol
+    /// Get a Stream of events from the remote end of the protocol.
     ///
     /// # Panics
     ///
@@ -745,15 +745,13 @@ impl futures::Stream for ComposedProtocolEventStream {
         mut self: std::pin::Pin<&mut Self>,
         cx: &mut std::task::Context<'_>,
     ) -> std::task::Poll<Option<Self::Item>> {
-        let buf = match futures::ready!(futures::stream::StreamExt::poll_next_unpin(
+        match futures::ready!(futures::stream::StreamExt::poll_next_unpin(
             &mut self.event_receiver,
             cx
         )?) {
-            Some(buf) => buf,
-            None => return std::task::Poll::Ready(None),
-        };
-
-        std::task::Poll::Ready(Some(ComposedProtocolEvent::decode(buf)))
+            Some(buf) => std::task::Poll::Ready(Some(ComposedProtocolEvent::decode(buf))),
+            None => std::task::Poll::Ready(None),
+        }
     }
 }
 
@@ -803,12 +801,11 @@ impl ComposedProtocolEvent {
         }
     }
 
-    /// Decodes a message buffer as a [`ComposedProtocolEvent`]. Transaction
-    /// ID in the message must be zero; this method does not check TXID.
+    /// Decodes a message buffer as a [`ComposedProtocolEvent`].
     fn decode(mut buf: fidl::MessageBufEtc) -> Result<ComposedProtocolEvent, fidl::Error> {
         let (bytes, _handles) = buf.split_mut();
         let (tx_header, _body_bytes) = fidl::encoding::decode_transaction_header(bytes)?;
-
+        debug_assert_eq!(tx_header.tx_id(), 0);
         match tx_header.ordinal() {
             0x49a6eee3a0300e28 => {
                 let mut out = fidl::new_empty!(ComposedProtocolOnAnonComposedRequest);
@@ -856,7 +853,7 @@ impl ComposedProtocolEvent {
     }
 }
 
-/// A Stream of incoming requests for ComposedProtocol
+/// A Stream of incoming requests for test.protocollayoutssamelibrary/ComposedProtocol.
 pub struct ComposedProtocolRequestStream {
     inner: std::sync::Arc<fidl::ServeInner>,
     is_terminated: bool,
@@ -899,7 +896,7 @@ impl futures::Stream for ComposedProtocolRequestStream {
         cx: &mut std::task::Context<'_>,
     ) -> std::task::Poll<Option<Self::Item>> {
         let this = &mut *self;
-        if this.inner.poll_shutdown(cx) {
+        if this.inner.check_shutdown(cx) {
             this.is_terminated = true;
             return std::task::Poll::Ready(None);
         }
@@ -930,7 +927,6 @@ impl futures::Stream for ComposedProtocolRequestStream {
                     >(&header, _body_bytes, handles, &mut req)?;
                     let control_handle =
                         ComposedProtocolControlHandle { inner: this.inner.clone() };
-
                     Ok(ComposedProtocolRequest::OneWayAnonComposed { payload: req, control_handle })
                 }
                 0x7083713dee9435f4 => {
@@ -940,7 +936,6 @@ impl futures::Stream for ComposedProtocolRequestStream {
                     >(&header, _body_bytes, handles, &mut req)?;
                     let control_handle =
                         ComposedProtocolControlHandle { inner: this.inner.clone() };
-
                     Ok(ComposedProtocolRequest::TwoWayAnonComposed {
                         payload: req,
                         responder: ComposedProtocolTwoWayAnonComposedResponder {
@@ -958,7 +953,6 @@ impl futures::Stream for ComposedProtocolRequestStream {
                     >(&header, _body_bytes, handles, &mut req)?;
                     let control_handle =
                         ComposedProtocolControlHandle { inner: this.inner.clone() };
-
                     Ok(ComposedProtocolRequest::TwoWayAnonComposedWithError {
                         payload: req,
                         responder: ComposedProtocolTwoWayAnonComposedWithErrorResponder {
@@ -978,7 +972,6 @@ impl futures::Stream for ComposedProtocolRequestStream {
                     )?;
                     let control_handle =
                         ComposedProtocolControlHandle { inner: this.inner.clone() };
-
                     Ok(ComposedProtocolRequest::OneWayNamedComposed {
                         payload: req,
                         control_handle,
@@ -994,7 +987,6 @@ impl futures::Stream for ComposedProtocolRequestStream {
                     )?;
                     let control_handle =
                         ComposedProtocolControlHandle { inner: this.inner.clone() };
-
                     Ok(ComposedProtocolRequest::TwoWayNamedComposed {
                         payload: req,
                         responder: ComposedProtocolTwoWayNamedComposedResponder {
@@ -1014,7 +1006,6 @@ impl futures::Stream for ComposedProtocolRequestStream {
                     )?;
                     let control_handle =
                         ComposedProtocolControlHandle { inner: this.inner.clone() };
-
                     Ok(ComposedProtocolRequest::TwoWayNamedComposedWithError {
                         payload: req,
                         responder: ComposedProtocolTwoWayNamedComposedWithErrorResponder {
@@ -1264,44 +1255,34 @@ impl ComposedProtocolTwoWayAnonComposedResponder {
         self,
         mut payload: &ComposedProtocolTwoWayAnonComposedResponse,
     ) -> Result<(), fidl::Error> {
-        let r = self.send_raw(payload);
-        if r.is_err() {
+        let _result = self.send_raw(payload);
+        if _result.is_err() {
             self.control_handle.shutdown();
         }
         self.drop_without_shutdown();
-        r
+        _result
     }
 
-    /// Similar to "send" but does not shutdown the channel if
-    /// an error occurs.
+    /// Similar to "send" but does not shutdown the channel if an error occurs.
     pub fn send_no_shutdown_on_err(
         self,
         mut payload: &ComposedProtocolTwoWayAnonComposedResponse,
     ) -> Result<(), fidl::Error> {
-        let r = self.send_raw(payload);
+        let _result = self.send_raw(payload);
         self.drop_without_shutdown();
-        r
+        _result
     }
 
     fn send_raw(
         &self,
         mut payload: &ComposedProtocolTwoWayAnonComposedResponse,
     ) -> Result<(), fidl::Error> {
-        let msg = fidl::encoding::TransactionMessage {
-            header: fidl::encoding::TransactionHeader::new(
-                self.tx_id,
-                self.ordinal,
-                fidl::encoding::DynamicFlags::empty(),
-            ),
-            body: payload,
-        };
-
-        fidl::encoding::with_tls_encode_buf(|bytes, handles| {
-            fidl::encoding::Encoder::encode::<
-                fidl::encoding::TransactionMessageType<ComposedProtocolTwoWayAnonComposedResponse>,
-            >(bytes, handles, msg)?;
-            self.control_handle.inner.send_raw_msg(&*bytes, &mut *handles)
-        })
+        self.control_handle.inner.send::<ComposedProtocolTwoWayAnonComposedResponse>(
+            payload,
+            self.tx_id,
+            self.ordinal,
+            fidl::encoding::DynamicFlags::empty(),
+        )
     }
 }
 
@@ -1347,49 +1328,37 @@ impl ComposedProtocolTwoWayAnonComposedWithErrorResponder {
         self,
         mut result: Result<&ComposedProtocolTwoWayAnonComposedWithErrorResponse, u32>,
     ) -> Result<(), fidl::Error> {
-        let r = self.send_raw(result);
-        if r.is_err() {
+        let _result = self.send_raw(result);
+        if _result.is_err() {
             self.control_handle.shutdown();
         }
         self.drop_without_shutdown();
-        r
+        _result
     }
 
-    /// Similar to "send" but does not shutdown the channel if
-    /// an error occurs.
+    /// Similar to "send" but does not shutdown the channel if an error occurs.
     pub fn send_no_shutdown_on_err(
         self,
         mut result: Result<&ComposedProtocolTwoWayAnonComposedWithErrorResponse, u32>,
     ) -> Result<(), fidl::Error> {
-        let r = self.send_raw(result);
+        let _result = self.send_raw(result);
         self.drop_without_shutdown();
-        r
+        _result
     }
 
     fn send_raw(
         &self,
         mut result: Result<&ComposedProtocolTwoWayAnonComposedWithErrorResponse, u32>,
     ) -> Result<(), fidl::Error> {
-        let msg = fidl::encoding::TransactionMessage {
-            header: fidl::encoding::TransactionHeader::new(
-                self.tx_id,
-                self.ordinal,
-                fidl::encoding::DynamicFlags::empty(),
-            ),
-            body: result,
-        };
-
-        fidl::encoding::with_tls_encode_buf(|bytes, handles| {
-            fidl::encoding::Encoder::encode::<
-                fidl::encoding::TransactionMessageType<
-                    fidl::encoding::ResultType<
-                        ComposedProtocolTwoWayAnonComposedWithErrorResponse,
-                        u32,
-                    >,
-                >,
-            >(bytes, handles, msg)?;
-            self.control_handle.inner.send_raw_msg(&*bytes, &mut *handles)
-        })
+        self.control_handle.inner.send::<fidl::encoding::ResultType<
+            ComposedProtocolTwoWayAnonComposedWithErrorResponse,
+            u32,
+        >>(
+            result,
+            self.tx_id,
+            self.ordinal,
+            fidl::encoding::DynamicFlags::empty(),
+        )
     }
 }
 
@@ -1432,38 +1401,28 @@ impl ComposedProtocolTwoWayNamedComposedResponder {
     ///
     /// Sets the channel to shutdown if an error occurs.
     pub fn send(self, mut payload: &TablePayload) -> Result<(), fidl::Error> {
-        let r = self.send_raw(payload);
-        if r.is_err() {
+        let _result = self.send_raw(payload);
+        if _result.is_err() {
             self.control_handle.shutdown();
         }
         self.drop_without_shutdown();
-        r
+        _result
     }
 
-    /// Similar to "send" but does not shutdown the channel if
-    /// an error occurs.
+    /// Similar to "send" but does not shutdown the channel if an error occurs.
     pub fn send_no_shutdown_on_err(self, mut payload: &TablePayload) -> Result<(), fidl::Error> {
-        let r = self.send_raw(payload);
+        let _result = self.send_raw(payload);
         self.drop_without_shutdown();
-        r
+        _result
     }
 
     fn send_raw(&self, mut payload: &TablePayload) -> Result<(), fidl::Error> {
-        let msg = fidl::encoding::TransactionMessage {
-            header: fidl::encoding::TransactionHeader::new(
-                self.tx_id,
-                self.ordinal,
-                fidl::encoding::DynamicFlags::empty(),
-            ),
-            body: payload,
-        };
-
-        fidl::encoding::with_tls_encode_buf(|bytes, handles| {
-            fidl::encoding::Encoder::encode::<fidl::encoding::TransactionMessageType<TablePayload>>(
-                bytes, handles, msg,
-            )?;
-            self.control_handle.inner.send_raw_msg(&*bytes, &mut *handles)
-        })
+        self.control_handle.inner.send::<TablePayload>(
+            payload,
+            self.tx_id,
+            self.ordinal,
+            fidl::encoding::DynamicFlags::empty(),
+        )
     }
 }
 
@@ -1506,43 +1465,31 @@ impl ComposedProtocolTwoWayNamedComposedWithErrorResponder {
     ///
     /// Sets the channel to shutdown if an error occurs.
     pub fn send(self, mut result: Result<&UnionPayload, u32>) -> Result<(), fidl::Error> {
-        let r = self.send_raw(result);
-        if r.is_err() {
+        let _result = self.send_raw(result);
+        if _result.is_err() {
             self.control_handle.shutdown();
         }
         self.drop_without_shutdown();
-        r
+        _result
     }
 
-    /// Similar to "send" but does not shutdown the channel if
-    /// an error occurs.
+    /// Similar to "send" but does not shutdown the channel if an error occurs.
     pub fn send_no_shutdown_on_err(
         self,
         mut result: Result<&UnionPayload, u32>,
     ) -> Result<(), fidl::Error> {
-        let r = self.send_raw(result);
+        let _result = self.send_raw(result);
         self.drop_without_shutdown();
-        r
+        _result
     }
 
     fn send_raw(&self, mut result: Result<&UnionPayload, u32>) -> Result<(), fidl::Error> {
-        let msg = fidl::encoding::TransactionMessage {
-            header: fidl::encoding::TransactionHeader::new(
-                self.tx_id,
-                self.ordinal,
-                fidl::encoding::DynamicFlags::empty(),
-            ),
-            body: result,
-        };
-
-        fidl::encoding::with_tls_encode_buf(|bytes, handles| {
-            fidl::encoding::Encoder::encode::<
-                fidl::encoding::TransactionMessageType<
-                    fidl::encoding::ResultType<UnionPayload, u32>,
-                >,
-            >(bytes, handles, msg)?;
-            self.control_handle.inner.send_raw_msg(&*bytes, &mut *handles)
-        })
+        self.control_handle.inner.send::<fidl::encoding::ResultType<UnionPayload, u32>>(
+            result,
+            self.tx_id,
+            self.ordinal,
+            fidl::encoding::DynamicFlags::empty(),
+        )
     }
 }
 
@@ -1827,13 +1774,13 @@ impl fidl::endpoints::Proxy for MainProtocolProxy {
 }
 
 impl MainProtocolProxy {
-    /// Create a new Proxy for MainProtocol
+    /// Create a new Proxy for test.protocollayoutssamelibrary/MainProtocol.
     pub fn new(channel: fidl::AsyncChannel) -> Self {
         let protocol_name = <MainProtocolMarker as fidl::endpoints::ProtocolMarker>::DEBUG_NAME;
         Self { client: fidl::client::Client::new(channel, protocol_name) }
     }
 
-    /// Get a Stream of events from the remote end of the MainProtocol protocol
+    /// Get a Stream of events from the remote end of the protocol.
     ///
     /// # Panics
     ///
@@ -2170,15 +2117,13 @@ impl futures::Stream for MainProtocolEventStream {
         mut self: std::pin::Pin<&mut Self>,
         cx: &mut std::task::Context<'_>,
     ) -> std::task::Poll<Option<Self::Item>> {
-        let buf = match futures::ready!(futures::stream::StreamExt::poll_next_unpin(
+        match futures::ready!(futures::stream::StreamExt::poll_next_unpin(
             &mut self.event_receiver,
             cx
         )?) {
-            Some(buf) => buf,
-            None => return std::task::Poll::Ready(None),
-        };
-
-        std::task::Poll::Ready(Some(MainProtocolEvent::decode(buf)))
+            Some(buf) => std::task::Poll::Ready(Some(MainProtocolEvent::decode(buf))),
+            None => std::task::Poll::Ready(None),
+        }
     }
 }
 
@@ -2264,12 +2209,11 @@ impl MainProtocolEvent {
         }
     }
 
-    /// Decodes a message buffer as a [`MainProtocolEvent`]. Transaction
-    /// ID in the message must be zero; this method does not check TXID.
+    /// Decodes a message buffer as a [`MainProtocolEvent`].
     fn decode(mut buf: fidl::MessageBufEtc) -> Result<MainProtocolEvent, fidl::Error> {
         let (bytes, _handles) = buf.split_mut();
         let (tx_header, _body_bytes) = fidl::encoding::decode_transaction_header(bytes)?;
-
+        debug_assert_eq!(tx_header.tx_id(), 0);
         match tx_header.ordinal() {
             0x49a6eee3a0300e28 => {
                 let mut out = fidl::new_empty!(ComposedProtocolOnAnonComposedRequest);
@@ -2350,7 +2294,7 @@ impl MainProtocolEvent {
     }
 }
 
-/// A Stream of incoming requests for MainProtocol
+/// A Stream of incoming requests for test.protocollayoutssamelibrary/MainProtocol.
 pub struct MainProtocolRequestStream {
     inner: std::sync::Arc<fidl::ServeInner>,
     is_terminated: bool,
@@ -2393,7 +2337,7 @@ impl futures::Stream for MainProtocolRequestStream {
         cx: &mut std::task::Context<'_>,
     ) -> std::task::Poll<Option<Self::Item>> {
         let this = &mut *self;
-        if this.inner.poll_shutdown(cx) {
+        if this.inner.check_shutdown(cx) {
             this.is_terminated = true;
             return std::task::Poll::Ready(None);
         }
@@ -2423,7 +2367,6 @@ impl futures::Stream for MainProtocolRequestStream {
                         ComposedProtocolOneWayAnonComposedRequest,
                     >(&header, _body_bytes, handles, &mut req)?;
                     let control_handle = MainProtocolControlHandle { inner: this.inner.clone() };
-
                     Ok(MainProtocolRequest::OneWayAnonComposed { payload: req, control_handle })
                 }
                 0x7083713dee9435f4 => {
@@ -2432,7 +2375,6 @@ impl futures::Stream for MainProtocolRequestStream {
                         ComposedProtocolTwoWayAnonComposedRequest,
                     >(&header, _body_bytes, handles, &mut req)?;
                     let control_handle = MainProtocolControlHandle { inner: this.inner.clone() };
-
                     Ok(MainProtocolRequest::TwoWayAnonComposed {
                         payload: req,
                         responder: MainProtocolTwoWayAnonComposedResponder {
@@ -2449,7 +2391,6 @@ impl futures::Stream for MainProtocolRequestStream {
                         ComposedProtocolTwoWayAnonComposedWithErrorRequest,
                     >(&header, _body_bytes, handles, &mut req)?;
                     let control_handle = MainProtocolControlHandle { inner: this.inner.clone() };
-
                     Ok(MainProtocolRequest::TwoWayAnonComposedWithError {
                         payload: req,
                         responder: MainProtocolTwoWayAnonComposedWithErrorResponder {
@@ -2468,7 +2409,6 @@ impl futures::Stream for MainProtocolRequestStream {
                         &mut req,
                     )?;
                     let control_handle = MainProtocolControlHandle { inner: this.inner.clone() };
-
                     Ok(MainProtocolRequest::OneWayNamedComposed { payload: req, control_handle })
                 }
                 0x45b4d3d31b374054 => {
@@ -2480,7 +2420,6 @@ impl futures::Stream for MainProtocolRequestStream {
                         &mut req,
                     )?;
                     let control_handle = MainProtocolControlHandle { inner: this.inner.clone() };
-
                     Ok(MainProtocolRequest::TwoWayNamedComposed {
                         payload: req,
                         responder: MainProtocolTwoWayNamedComposedResponder {
@@ -2499,7 +2438,6 @@ impl futures::Stream for MainProtocolRequestStream {
                         &mut req,
                     )?;
                     let control_handle = MainProtocolControlHandle { inner: this.inner.clone() };
-
                     Ok(MainProtocolRequest::TwoWayNamedComposedWithError {
                         payload: req,
                         responder: MainProtocolTwoWayNamedComposedWithErrorResponder {
@@ -2518,7 +2456,6 @@ impl futures::Stream for MainProtocolRequestStream {
                         &mut req,
                     )?;
                     let control_handle = MainProtocolControlHandle { inner: this.inner.clone() };
-
                     Ok(MainProtocolRequest::OneWayLocal { payload: req, control_handle })
                 }
                 0x26998b4c1e8a9a57 => {
@@ -2530,7 +2467,6 @@ impl futures::Stream for MainProtocolRequestStream {
                         &mut req,
                     )?;
                     let control_handle = MainProtocolControlHandle { inner: this.inner.clone() };
-
                     Ok(MainProtocolRequest::TwoWayLocal {
                         payload: req,
                         responder: MainProtocolTwoWayLocalResponder {
@@ -2549,7 +2485,6 @@ impl futures::Stream for MainProtocolRequestStream {
                         &mut req,
                     )?;
                     let control_handle = MainProtocolControlHandle { inner: this.inner.clone() };
-
                     Ok(MainProtocolRequest::TwoWayLocalWithError {
                         payload: req,
                         responder: MainProtocolTwoWayLocalWithErrorResponder {
@@ -2568,7 +2503,6 @@ impl futures::Stream for MainProtocolRequestStream {
                         &mut req,
                     )?;
                     let control_handle = MainProtocolControlHandle { inner: this.inner.clone() };
-
                     Ok(MainProtocolRequest::OneWayAnon { payload: req, control_handle })
                 }
                 0x3fd7ad8e52b07e2e => {
@@ -2580,7 +2514,6 @@ impl futures::Stream for MainProtocolRequestStream {
                         &mut req,
                     )?;
                     let control_handle = MainProtocolControlHandle { inner: this.inner.clone() };
-
                     Ok(MainProtocolRequest::TwoWayAnon {
                         payload: req,
                         responder: MainProtocolTwoWayAnonResponder {
@@ -2599,7 +2532,6 @@ impl futures::Stream for MainProtocolRequestStream {
                         &mut req,
                     )?;
                     let control_handle = MainProtocolControlHandle { inner: this.inner.clone() };
-
                     Ok(MainProtocolRequest::TwoWayAnonWithError {
                         payload: req,
                         responder: MainProtocolTwoWayAnonWithErrorResponder {
@@ -2980,44 +2912,34 @@ impl MainProtocolTwoWayAnonComposedResponder {
         self,
         mut payload: &ComposedProtocolTwoWayAnonComposedResponse,
     ) -> Result<(), fidl::Error> {
-        let r = self.send_raw(payload);
-        if r.is_err() {
+        let _result = self.send_raw(payload);
+        if _result.is_err() {
             self.control_handle.shutdown();
         }
         self.drop_without_shutdown();
-        r
+        _result
     }
 
-    /// Similar to "send" but does not shutdown the channel if
-    /// an error occurs.
+    /// Similar to "send" but does not shutdown the channel if an error occurs.
     pub fn send_no_shutdown_on_err(
         self,
         mut payload: &ComposedProtocolTwoWayAnonComposedResponse,
     ) -> Result<(), fidl::Error> {
-        let r = self.send_raw(payload);
+        let _result = self.send_raw(payload);
         self.drop_without_shutdown();
-        r
+        _result
     }
 
     fn send_raw(
         &self,
         mut payload: &ComposedProtocolTwoWayAnonComposedResponse,
     ) -> Result<(), fidl::Error> {
-        let msg = fidl::encoding::TransactionMessage {
-            header: fidl::encoding::TransactionHeader::new(
-                self.tx_id,
-                self.ordinal,
-                fidl::encoding::DynamicFlags::empty(),
-            ),
-            body: payload,
-        };
-
-        fidl::encoding::with_tls_encode_buf(|bytes, handles| {
-            fidl::encoding::Encoder::encode::<
-                fidl::encoding::TransactionMessageType<ComposedProtocolTwoWayAnonComposedResponse>,
-            >(bytes, handles, msg)?;
-            self.control_handle.inner.send_raw_msg(&*bytes, &mut *handles)
-        })
+        self.control_handle.inner.send::<ComposedProtocolTwoWayAnonComposedResponse>(
+            payload,
+            self.tx_id,
+            self.ordinal,
+            fidl::encoding::DynamicFlags::empty(),
+        )
     }
 }
 
@@ -3063,49 +2985,37 @@ impl MainProtocolTwoWayAnonComposedWithErrorResponder {
         self,
         mut result: Result<&ComposedProtocolTwoWayAnonComposedWithErrorResponse, u32>,
     ) -> Result<(), fidl::Error> {
-        let r = self.send_raw(result);
-        if r.is_err() {
+        let _result = self.send_raw(result);
+        if _result.is_err() {
             self.control_handle.shutdown();
         }
         self.drop_without_shutdown();
-        r
+        _result
     }
 
-    /// Similar to "send" but does not shutdown the channel if
-    /// an error occurs.
+    /// Similar to "send" but does not shutdown the channel if an error occurs.
     pub fn send_no_shutdown_on_err(
         self,
         mut result: Result<&ComposedProtocolTwoWayAnonComposedWithErrorResponse, u32>,
     ) -> Result<(), fidl::Error> {
-        let r = self.send_raw(result);
+        let _result = self.send_raw(result);
         self.drop_without_shutdown();
-        r
+        _result
     }
 
     fn send_raw(
         &self,
         mut result: Result<&ComposedProtocolTwoWayAnonComposedWithErrorResponse, u32>,
     ) -> Result<(), fidl::Error> {
-        let msg = fidl::encoding::TransactionMessage {
-            header: fidl::encoding::TransactionHeader::new(
-                self.tx_id,
-                self.ordinal,
-                fidl::encoding::DynamicFlags::empty(),
-            ),
-            body: result,
-        };
-
-        fidl::encoding::with_tls_encode_buf(|bytes, handles| {
-            fidl::encoding::Encoder::encode::<
-                fidl::encoding::TransactionMessageType<
-                    fidl::encoding::ResultType<
-                        ComposedProtocolTwoWayAnonComposedWithErrorResponse,
-                        u32,
-                    >,
-                >,
-            >(bytes, handles, msg)?;
-            self.control_handle.inner.send_raw_msg(&*bytes, &mut *handles)
-        })
+        self.control_handle.inner.send::<fidl::encoding::ResultType<
+            ComposedProtocolTwoWayAnonComposedWithErrorResponse,
+            u32,
+        >>(
+            result,
+            self.tx_id,
+            self.ordinal,
+            fidl::encoding::DynamicFlags::empty(),
+        )
     }
 }
 
@@ -3148,38 +3058,28 @@ impl MainProtocolTwoWayNamedComposedResponder {
     ///
     /// Sets the channel to shutdown if an error occurs.
     pub fn send(self, mut payload: &TablePayload) -> Result<(), fidl::Error> {
-        let r = self.send_raw(payload);
-        if r.is_err() {
+        let _result = self.send_raw(payload);
+        if _result.is_err() {
             self.control_handle.shutdown();
         }
         self.drop_without_shutdown();
-        r
+        _result
     }
 
-    /// Similar to "send" but does not shutdown the channel if
-    /// an error occurs.
+    /// Similar to "send" but does not shutdown the channel if an error occurs.
     pub fn send_no_shutdown_on_err(self, mut payload: &TablePayload) -> Result<(), fidl::Error> {
-        let r = self.send_raw(payload);
+        let _result = self.send_raw(payload);
         self.drop_without_shutdown();
-        r
+        _result
     }
 
     fn send_raw(&self, mut payload: &TablePayload) -> Result<(), fidl::Error> {
-        let msg = fidl::encoding::TransactionMessage {
-            header: fidl::encoding::TransactionHeader::new(
-                self.tx_id,
-                self.ordinal,
-                fidl::encoding::DynamicFlags::empty(),
-            ),
-            body: payload,
-        };
-
-        fidl::encoding::with_tls_encode_buf(|bytes, handles| {
-            fidl::encoding::Encoder::encode::<fidl::encoding::TransactionMessageType<TablePayload>>(
-                bytes, handles, msg,
-            )?;
-            self.control_handle.inner.send_raw_msg(&*bytes, &mut *handles)
-        })
+        self.control_handle.inner.send::<TablePayload>(
+            payload,
+            self.tx_id,
+            self.ordinal,
+            fidl::encoding::DynamicFlags::empty(),
+        )
     }
 }
 
@@ -3222,43 +3122,31 @@ impl MainProtocolTwoWayNamedComposedWithErrorResponder {
     ///
     /// Sets the channel to shutdown if an error occurs.
     pub fn send(self, mut result: Result<&UnionPayload, u32>) -> Result<(), fidl::Error> {
-        let r = self.send_raw(result);
-        if r.is_err() {
+        let _result = self.send_raw(result);
+        if _result.is_err() {
             self.control_handle.shutdown();
         }
         self.drop_without_shutdown();
-        r
+        _result
     }
 
-    /// Similar to "send" but does not shutdown the channel if
-    /// an error occurs.
+    /// Similar to "send" but does not shutdown the channel if an error occurs.
     pub fn send_no_shutdown_on_err(
         self,
         mut result: Result<&UnionPayload, u32>,
     ) -> Result<(), fidl::Error> {
-        let r = self.send_raw(result);
+        let _result = self.send_raw(result);
         self.drop_without_shutdown();
-        r
+        _result
     }
 
     fn send_raw(&self, mut result: Result<&UnionPayload, u32>) -> Result<(), fidl::Error> {
-        let msg = fidl::encoding::TransactionMessage {
-            header: fidl::encoding::TransactionHeader::new(
-                self.tx_id,
-                self.ordinal,
-                fidl::encoding::DynamicFlags::empty(),
-            ),
-            body: result,
-        };
-
-        fidl::encoding::with_tls_encode_buf(|bytes, handles| {
-            fidl::encoding::Encoder::encode::<
-                fidl::encoding::TransactionMessageType<
-                    fidl::encoding::ResultType<UnionPayload, u32>,
-                >,
-            >(bytes, handles, msg)?;
-            self.control_handle.inner.send_raw_msg(&*bytes, &mut *handles)
-        })
+        self.control_handle.inner.send::<fidl::encoding::ResultType<UnionPayload, u32>>(
+            result,
+            self.tx_id,
+            self.ordinal,
+            fidl::encoding::DynamicFlags::empty(),
+        )
     }
 }
 
@@ -3301,38 +3189,28 @@ impl MainProtocolTwoWayLocalResponder {
     ///
     /// Sets the channel to shutdown if an error occurs.
     pub fn send(self, mut payload: &TablePayload) -> Result<(), fidl::Error> {
-        let r = self.send_raw(payload);
-        if r.is_err() {
+        let _result = self.send_raw(payload);
+        if _result.is_err() {
             self.control_handle.shutdown();
         }
         self.drop_without_shutdown();
-        r
+        _result
     }
 
-    /// Similar to "send" but does not shutdown the channel if
-    /// an error occurs.
+    /// Similar to "send" but does not shutdown the channel if an error occurs.
     pub fn send_no_shutdown_on_err(self, mut payload: &TablePayload) -> Result<(), fidl::Error> {
-        let r = self.send_raw(payload);
+        let _result = self.send_raw(payload);
         self.drop_without_shutdown();
-        r
+        _result
     }
 
     fn send_raw(&self, mut payload: &TablePayload) -> Result<(), fidl::Error> {
-        let msg = fidl::encoding::TransactionMessage {
-            header: fidl::encoding::TransactionHeader::new(
-                self.tx_id,
-                self.ordinal,
-                fidl::encoding::DynamicFlags::empty(),
-            ),
-            body: payload,
-        };
-
-        fidl::encoding::with_tls_encode_buf(|bytes, handles| {
-            fidl::encoding::Encoder::encode::<fidl::encoding::TransactionMessageType<TablePayload>>(
-                bytes, handles, msg,
-            )?;
-            self.control_handle.inner.send_raw_msg(&*bytes, &mut *handles)
-        })
+        self.control_handle.inner.send::<TablePayload>(
+            payload,
+            self.tx_id,
+            self.ordinal,
+            fidl::encoding::DynamicFlags::empty(),
+        )
     }
 }
 
@@ -3375,43 +3253,31 @@ impl MainProtocolTwoWayLocalWithErrorResponder {
     ///
     /// Sets the channel to shutdown if an error occurs.
     pub fn send(self, mut result: Result<&UnionPayload, u32>) -> Result<(), fidl::Error> {
-        let r = self.send_raw(result);
-        if r.is_err() {
+        let _result = self.send_raw(result);
+        if _result.is_err() {
             self.control_handle.shutdown();
         }
         self.drop_without_shutdown();
-        r
+        _result
     }
 
-    /// Similar to "send" but does not shutdown the channel if
-    /// an error occurs.
+    /// Similar to "send" but does not shutdown the channel if an error occurs.
     pub fn send_no_shutdown_on_err(
         self,
         mut result: Result<&UnionPayload, u32>,
     ) -> Result<(), fidl::Error> {
-        let r = self.send_raw(result);
+        let _result = self.send_raw(result);
         self.drop_without_shutdown();
-        r
+        _result
     }
 
     fn send_raw(&self, mut result: Result<&UnionPayload, u32>) -> Result<(), fidl::Error> {
-        let msg = fidl::encoding::TransactionMessage {
-            header: fidl::encoding::TransactionHeader::new(
-                self.tx_id,
-                self.ordinal,
-                fidl::encoding::DynamicFlags::empty(),
-            ),
-            body: result,
-        };
-
-        fidl::encoding::with_tls_encode_buf(|bytes, handles| {
-            fidl::encoding::Encoder::encode::<
-                fidl::encoding::TransactionMessageType<
-                    fidl::encoding::ResultType<UnionPayload, u32>,
-                >,
-            >(bytes, handles, msg)?;
-            self.control_handle.inner.send_raw_msg(&*bytes, &mut *handles)
-        })
+        self.control_handle.inner.send::<fidl::encoding::ResultType<UnionPayload, u32>>(
+            result,
+            self.tx_id,
+            self.ordinal,
+            fidl::encoding::DynamicFlags::empty(),
+        )
     }
 }
 
@@ -3454,41 +3320,31 @@ impl MainProtocolTwoWayAnonResponder {
     ///
     /// Sets the channel to shutdown if an error occurs.
     pub fn send(self, mut payload: &MainProtocolTwoWayAnonResponse) -> Result<(), fidl::Error> {
-        let r = self.send_raw(payload);
-        if r.is_err() {
+        let _result = self.send_raw(payload);
+        if _result.is_err() {
             self.control_handle.shutdown();
         }
         self.drop_without_shutdown();
-        r
+        _result
     }
 
-    /// Similar to "send" but does not shutdown the channel if
-    /// an error occurs.
+    /// Similar to "send" but does not shutdown the channel if an error occurs.
     pub fn send_no_shutdown_on_err(
         self,
         mut payload: &MainProtocolTwoWayAnonResponse,
     ) -> Result<(), fidl::Error> {
-        let r = self.send_raw(payload);
+        let _result = self.send_raw(payload);
         self.drop_without_shutdown();
-        r
+        _result
     }
 
     fn send_raw(&self, mut payload: &MainProtocolTwoWayAnonResponse) -> Result<(), fidl::Error> {
-        let msg = fidl::encoding::TransactionMessage {
-            header: fidl::encoding::TransactionHeader::new(
-                self.tx_id,
-                self.ordinal,
-                fidl::encoding::DynamicFlags::empty(),
-            ),
-            body: payload,
-        };
-
-        fidl::encoding::with_tls_encode_buf(|bytes, handles| {
-            fidl::encoding::Encoder::encode::<
-                fidl::encoding::TransactionMessageType<MainProtocolTwoWayAnonResponse>,
-            >(bytes, handles, msg)?;
-            self.control_handle.inner.send_raw_msg(&*bytes, &mut *handles)
-        })
+        self.control_handle.inner.send::<MainProtocolTwoWayAnonResponse>(
+            payload,
+            self.tx_id,
+            self.ordinal,
+            fidl::encoding::DynamicFlags::empty(),
+        )
     }
 }
 
@@ -3534,46 +3390,37 @@ impl MainProtocolTwoWayAnonWithErrorResponder {
         self,
         mut result: Result<&MainProtocolTwoWayAnonWithErrorResponse, u32>,
     ) -> Result<(), fidl::Error> {
-        let r = self.send_raw(result);
-        if r.is_err() {
+        let _result = self.send_raw(result);
+        if _result.is_err() {
             self.control_handle.shutdown();
         }
         self.drop_without_shutdown();
-        r
+        _result
     }
 
-    /// Similar to "send" but does not shutdown the channel if
-    /// an error occurs.
+    /// Similar to "send" but does not shutdown the channel if an error occurs.
     pub fn send_no_shutdown_on_err(
         self,
         mut result: Result<&MainProtocolTwoWayAnonWithErrorResponse, u32>,
     ) -> Result<(), fidl::Error> {
-        let r = self.send_raw(result);
+        let _result = self.send_raw(result);
         self.drop_without_shutdown();
-        r
+        _result
     }
 
     fn send_raw(
         &self,
         mut result: Result<&MainProtocolTwoWayAnonWithErrorResponse, u32>,
     ) -> Result<(), fidl::Error> {
-        let msg = fidl::encoding::TransactionMessage {
-            header: fidl::encoding::TransactionHeader::new(
-                self.tx_id,
-                self.ordinal,
-                fidl::encoding::DynamicFlags::empty(),
-            ),
-            body: result,
-        };
-
-        fidl::encoding::with_tls_encode_buf(|bytes, handles| {
-            fidl::encoding::Encoder::encode::<
-                fidl::encoding::TransactionMessageType<
-                    fidl::encoding::ResultType<MainProtocolTwoWayAnonWithErrorResponse, u32>,
-                >,
-            >(bytes, handles, msg)?;
-            self.control_handle.inner.send_raw_msg(&*bytes, &mut *handles)
-        })
+        self.control_handle.inner.send::<fidl::encoding::ResultType<
+            MainProtocolTwoWayAnonWithErrorResponse,
+            u32,
+        >>(
+            result,
+            self.tx_id,
+            self.ordinal,
+            fidl::encoding::DynamicFlags::empty(),
+        )
     }
 }
 

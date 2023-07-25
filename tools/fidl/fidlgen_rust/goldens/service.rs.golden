@@ -89,13 +89,13 @@ impl fidl::endpoints::Proxy for FirstProtocolProxy {
 }
 
 impl FirstProtocolProxy {
-    /// Create a new Proxy for FirstProtocol
+    /// Create a new Proxy for test.service/FirstProtocol.
     pub fn new(channel: fidl::AsyncChannel) -> Self {
         let protocol_name = <FirstProtocolMarker as fidl::endpoints::ProtocolMarker>::DEBUG_NAME;
         Self { client: fidl::client::Client::new(channel, protocol_name) }
     }
 
-    /// Get a Stream of events from the remote end of the FirstProtocol protocol
+    /// Get a Stream of events from the remote end of the protocol.
     ///
     /// # Panics
     ///
@@ -138,15 +138,13 @@ impl futures::Stream for FirstProtocolEventStream {
         mut self: std::pin::Pin<&mut Self>,
         cx: &mut std::task::Context<'_>,
     ) -> std::task::Poll<Option<Self::Item>> {
-        let buf = match futures::ready!(futures::stream::StreamExt::poll_next_unpin(
+        match futures::ready!(futures::stream::StreamExt::poll_next_unpin(
             &mut self.event_receiver,
             cx
         )?) {
-            Some(buf) => buf,
-            None => return std::task::Poll::Ready(None),
-        };
-
-        std::task::Poll::Ready(Some(FirstProtocolEvent::decode(buf)))
+            Some(buf) => std::task::Poll::Ready(Some(FirstProtocolEvent::decode(buf))),
+            None => std::task::Poll::Ready(None),
+        }
     }
 }
 
@@ -154,12 +152,11 @@ impl futures::Stream for FirstProtocolEventStream {
 pub enum FirstProtocolEvent {}
 
 impl FirstProtocolEvent {
-    /// Decodes a message buffer as a [`FirstProtocolEvent`]. Transaction
-    /// ID in the message must be zero; this method does not check TXID.
+    /// Decodes a message buffer as a [`FirstProtocolEvent`].
     fn decode(mut buf: fidl::MessageBufEtc) -> Result<FirstProtocolEvent, fidl::Error> {
         let (bytes, _handles) = buf.split_mut();
         let (tx_header, _body_bytes) = fidl::encoding::decode_transaction_header(bytes)?;
-
+        debug_assert_eq!(tx_header.tx_id(), 0);
         match tx_header.ordinal() {
             _ => Err(fidl::Error::UnknownOrdinal {
                 ordinal: tx_header.ordinal(),
@@ -169,7 +166,7 @@ impl FirstProtocolEvent {
     }
 }
 
-/// A Stream of incoming requests for FirstProtocol
+/// A Stream of incoming requests for test.service/FirstProtocol.
 pub struct FirstProtocolRequestStream {
     inner: std::sync::Arc<fidl::ServeInner>,
     is_terminated: bool,
@@ -212,7 +209,7 @@ impl futures::Stream for FirstProtocolRequestStream {
         cx: &mut std::task::Context<'_>,
     ) -> std::task::Poll<Option<Self::Item>> {
         let this = &mut *self;
-        if this.inner.poll_shutdown(cx) {
+        if this.inner.check_shutdown(cx) {
             this.is_terminated = true;
             return std::task::Poll::Ready(None);
         }
@@ -245,7 +242,6 @@ impl futures::Stream for FirstProtocolRequestStream {
                         &mut req,
                     )?;
                     let control_handle = FirstProtocolControlHandle { inner: this.inner.clone() };
-
                     Ok(FirstProtocolRequest::MethodOnFirst { control_handle })
                 }
                 _ => Err(fidl::Error::UnknownOrdinal {
@@ -373,13 +369,13 @@ impl fidl::endpoints::Proxy for SecondProtocolProxy {
 }
 
 impl SecondProtocolProxy {
-    /// Create a new Proxy for SecondProtocol
+    /// Create a new Proxy for test.service/SecondProtocol.
     pub fn new(channel: fidl::AsyncChannel) -> Self {
         let protocol_name = <SecondProtocolMarker as fidl::endpoints::ProtocolMarker>::DEBUG_NAME;
         Self { client: fidl::client::Client::new(channel, protocol_name) }
     }
 
-    /// Get a Stream of events from the remote end of the SecondProtocol protocol
+    /// Get a Stream of events from the remote end of the protocol.
     ///
     /// # Panics
     ///
@@ -422,15 +418,13 @@ impl futures::Stream for SecondProtocolEventStream {
         mut self: std::pin::Pin<&mut Self>,
         cx: &mut std::task::Context<'_>,
     ) -> std::task::Poll<Option<Self::Item>> {
-        let buf = match futures::ready!(futures::stream::StreamExt::poll_next_unpin(
+        match futures::ready!(futures::stream::StreamExt::poll_next_unpin(
             &mut self.event_receiver,
             cx
         )?) {
-            Some(buf) => buf,
-            None => return std::task::Poll::Ready(None),
-        };
-
-        std::task::Poll::Ready(Some(SecondProtocolEvent::decode(buf)))
+            Some(buf) => std::task::Poll::Ready(Some(SecondProtocolEvent::decode(buf))),
+            None => std::task::Poll::Ready(None),
+        }
     }
 }
 
@@ -438,12 +432,11 @@ impl futures::Stream for SecondProtocolEventStream {
 pub enum SecondProtocolEvent {}
 
 impl SecondProtocolEvent {
-    /// Decodes a message buffer as a [`SecondProtocolEvent`]. Transaction
-    /// ID in the message must be zero; this method does not check TXID.
+    /// Decodes a message buffer as a [`SecondProtocolEvent`].
     fn decode(mut buf: fidl::MessageBufEtc) -> Result<SecondProtocolEvent, fidl::Error> {
         let (bytes, _handles) = buf.split_mut();
         let (tx_header, _body_bytes) = fidl::encoding::decode_transaction_header(bytes)?;
-
+        debug_assert_eq!(tx_header.tx_id(), 0);
         match tx_header.ordinal() {
             _ => Err(fidl::Error::UnknownOrdinal {
                 ordinal: tx_header.ordinal(),
@@ -454,7 +447,7 @@ impl SecondProtocolEvent {
     }
 }
 
-/// A Stream of incoming requests for SecondProtocol
+/// A Stream of incoming requests for test.service/SecondProtocol.
 pub struct SecondProtocolRequestStream {
     inner: std::sync::Arc<fidl::ServeInner>,
     is_terminated: bool,
@@ -497,7 +490,7 @@ impl futures::Stream for SecondProtocolRequestStream {
         cx: &mut std::task::Context<'_>,
     ) -> std::task::Poll<Option<Self::Item>> {
         let this = &mut *self;
-        if this.inner.poll_shutdown(cx) {
+        if this.inner.check_shutdown(cx) {
             this.is_terminated = true;
             return std::task::Poll::Ready(None);
         }
@@ -530,7 +523,6 @@ impl futures::Stream for SecondProtocolRequestStream {
                         &mut req,
                     )?;
                     let control_handle = SecondProtocolControlHandle { inner: this.inner.clone() };
-
                     Ok(SecondProtocolRequest::MethodOnSecond { control_handle })
                 }
                 _ => Err(fidl::Error::UnknownOrdinal {

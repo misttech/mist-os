@@ -114,13 +114,13 @@ impl fidl::endpoints::Proxy for ExampleProxy {
 }
 
 impl ExampleProxy {
-    /// Create a new Proxy for Example
+    /// Create a new Proxy for test.error/Example.
     pub fn new(channel: fidl::AsyncChannel) -> Self {
         let protocol_name = <ExampleMarker as fidl::endpoints::ProtocolMarker>::DEBUG_NAME;
         Self { client: fidl::client::Client::new(channel, protocol_name) }
     }
 
-    /// Get a Stream of events from the remote end of the Example protocol
+    /// Get a Stream of events from the remote end of the protocol.
     ///
     /// # Panics
     ///
@@ -174,15 +174,13 @@ impl futures::Stream for ExampleEventStream {
         mut self: std::pin::Pin<&mut Self>,
         cx: &mut std::task::Context<'_>,
     ) -> std::task::Poll<Option<Self::Item>> {
-        let buf = match futures::ready!(futures::stream::StreamExt::poll_next_unpin(
+        match futures::ready!(futures::stream::StreamExt::poll_next_unpin(
             &mut self.event_receiver,
             cx
         )?) {
-            Some(buf) => buf,
-            None => return std::task::Poll::Ready(None),
-        };
-
-        std::task::Poll::Ready(Some(ExampleEvent::decode(buf)))
+            Some(buf) => std::task::Poll::Ready(Some(ExampleEvent::decode(buf))),
+            None => std::task::Poll::Ready(None),
+        }
     }
 }
 
@@ -190,12 +188,11 @@ impl futures::Stream for ExampleEventStream {
 pub enum ExampleEvent {}
 
 impl ExampleEvent {
-    /// Decodes a message buffer as a [`ExampleEvent`]. Transaction
-    /// ID in the message must be zero; this method does not check TXID.
+    /// Decodes a message buffer as a [`ExampleEvent`].
     fn decode(mut buf: fidl::MessageBufEtc) -> Result<ExampleEvent, fidl::Error> {
         let (bytes, _handles) = buf.split_mut();
         let (tx_header, _body_bytes) = fidl::encoding::decode_transaction_header(bytes)?;
-
+        debug_assert_eq!(tx_header.tx_id(), 0);
         match tx_header.ordinal() {
             _ => Err(fidl::Error::UnknownOrdinal {
                 ordinal: tx_header.ordinal(),
@@ -205,7 +202,7 @@ impl ExampleEvent {
     }
 }
 
-/// A Stream of incoming requests for Example
+/// A Stream of incoming requests for test.error/Example.
 pub struct ExampleRequestStream {
     inner: std::sync::Arc<fidl::ServeInner>,
     is_terminated: bool,
@@ -248,7 +245,7 @@ impl futures::Stream for ExampleRequestStream {
         cx: &mut std::task::Context<'_>,
     ) -> std::task::Poll<Option<Self::Item>> {
         let this = &mut *self;
-        if this.inner.poll_shutdown(cx) {
+        if this.inner.check_shutdown(cx) {
             this.is_terminated = true;
             return std::task::Poll::Ready(None);
         }
@@ -281,7 +278,6 @@ impl futures::Stream for ExampleRequestStream {
                         &mut req,
                     )?;
                     let control_handle = ExampleControlHandle { inner: this.inner.clone() };
-
                     Ok(ExampleRequest::Foo {
                         s: req.s,
 
@@ -388,40 +384,28 @@ impl ExampleFooResponder {
     ///
     /// Sets the channel to shutdown if an error occurs.
     pub fn send(self, mut result: Result<i64, u32>) -> Result<(), fidl::Error> {
-        let r = self.send_raw(result);
-        if r.is_err() {
+        let _result = self.send_raw(result);
+        if _result.is_err() {
             self.control_handle.shutdown();
         }
         self.drop_without_shutdown();
-        r
+        _result
     }
 
-    /// Similar to "send" but does not shutdown the channel if
-    /// an error occurs.
+    /// Similar to "send" but does not shutdown the channel if an error occurs.
     pub fn send_no_shutdown_on_err(self, mut result: Result<i64, u32>) -> Result<(), fidl::Error> {
-        let r = self.send_raw(result);
+        let _result = self.send_raw(result);
         self.drop_without_shutdown();
-        r
+        _result
     }
 
     fn send_raw(&self, mut result: Result<i64, u32>) -> Result<(), fidl::Error> {
-        let msg = fidl::encoding::TransactionMessage {
-            header: fidl::encoding::TransactionHeader::new(
-                self.tx_id,
-                self.ordinal,
-                fidl::encoding::DynamicFlags::empty(),
-            ),
-            body: result.map(|y| (y,)),
-        };
-
-        fidl::encoding::with_tls_encode_buf(|bytes, handles| {
-            fidl::encoding::Encoder::encode::<
-                fidl::encoding::TransactionMessageType<
-                    fidl::encoding::ResultType<ExampleFooResponse, u32>,
-                >,
-            >(bytes, handles, msg)?;
-            self.control_handle.inner.send_raw_msg(&*bytes, &mut *handles)
-        })
+        self.control_handle.inner.send::<fidl::encoding::ResultType<ExampleFooResponse, u32>>(
+            result.map(|y| (y,)),
+            self.tx_id,
+            self.ordinal,
+            fidl::encoding::DynamicFlags::empty(),
+        )
     }
 }
 

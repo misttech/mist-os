@@ -238,13 +238,13 @@ impl fidl::endpoints::Proxy for ProtocolProxy {
 }
 
 impl ProtocolProxy {
-    /// Create a new Proxy for Protocol
+    /// Create a new Proxy for test.requestflexibleenvelope/Protocol.
     pub fn new(channel: fidl::AsyncChannel) -> Self {
         let protocol_name = <ProtocolMarker as fidl::endpoints::ProtocolMarker>::DEBUG_NAME;
         Self { client: fidl::client::Client::new(channel, protocol_name) }
     }
 
-    /// Get a Stream of events from the remote end of the Protocol protocol
+    /// Get a Stream of events from the remote end of the protocol.
     ///
     /// # Panics
     ///
@@ -335,15 +335,13 @@ impl futures::Stream for ProtocolEventStream {
         mut self: std::pin::Pin<&mut Self>,
         cx: &mut std::task::Context<'_>,
     ) -> std::task::Poll<Option<Self::Item>> {
-        let buf = match futures::ready!(futures::stream::StreamExt::poll_next_unpin(
+        match futures::ready!(futures::stream::StreamExt::poll_next_unpin(
             &mut self.event_receiver,
             cx
         )?) {
-            Some(buf) => buf,
-            None => return std::task::Poll::Ready(None),
-        };
-
-        std::task::Poll::Ready(Some(ProtocolEvent::decode(buf)))
+            Some(buf) => std::task::Poll::Ready(Some(ProtocolEvent::decode(buf))),
+            None => std::task::Poll::Ready(None),
+        }
     }
 }
 
@@ -351,12 +349,11 @@ impl futures::Stream for ProtocolEventStream {
 pub enum ProtocolEvent {}
 
 impl ProtocolEvent {
-    /// Decodes a message buffer as a [`ProtocolEvent`]. Transaction
-    /// ID in the message must be zero; this method does not check TXID.
+    /// Decodes a message buffer as a [`ProtocolEvent`].
     fn decode(mut buf: fidl::MessageBufEtc) -> Result<ProtocolEvent, fidl::Error> {
         let (bytes, _handles) = buf.split_mut();
         let (tx_header, _body_bytes) = fidl::encoding::decode_transaction_header(bytes)?;
-
+        debug_assert_eq!(tx_header.tx_id(), 0);
         match tx_header.ordinal() {
             _ => Err(fidl::Error::UnknownOrdinal {
                 ordinal: tx_header.ordinal(),
@@ -366,7 +363,7 @@ impl ProtocolEvent {
     }
 }
 
-/// A Stream of incoming requests for Protocol
+/// A Stream of incoming requests for test.requestflexibleenvelope/Protocol.
 pub struct ProtocolRequestStream {
     inner: std::sync::Arc<fidl::ServeInner>,
     is_terminated: bool,
@@ -409,7 +406,7 @@ impl futures::Stream for ProtocolRequestStream {
         cx: &mut std::task::Context<'_>,
     ) -> std::task::Poll<Option<Self::Item>> {
         let this = &mut *self;
-        if this.inner.poll_shutdown(cx) {
+        if this.inner.check_shutdown(cx) {
             this.is_terminated = true;
             return std::task::Poll::Ready(None);
         }
@@ -439,7 +436,6 @@ impl futures::Stream for ProtocolRequestStream {
                         ProtocolRequestStrictResponseFlexibleRequest,
                     >(&header, _body_bytes, handles, &mut req)?;
                     let control_handle = ProtocolControlHandle { inner: this.inner.clone() };
-
                     Ok(ProtocolRequest::RequestStrictResponseFlexible {
                         s: req.s,
 
@@ -456,7 +452,6 @@ impl futures::Stream for ProtocolRequestStream {
                         ProtocolRequestFlexibleResponseStrictRequest,
                     >(&header, _body_bytes, handles, &mut req)?;
                     let control_handle = ProtocolControlHandle { inner: this.inner.clone() };
-
                     Ok(ProtocolRequest::RequestFlexibleResponseStrict {
                         s: req.s,
 
@@ -588,40 +583,28 @@ impl ProtocolRequestStrictResponseFlexibleResponder {
     ///
     /// Sets the channel to shutdown if an error occurs.
     pub fn send(self, mut f: &FlexibleFoo) -> Result<(), fidl::Error> {
-        let r = self.send_raw(f);
-        if r.is_err() {
+        let _result = self.send_raw(f);
+        if _result.is_err() {
             self.control_handle.shutdown();
         }
         self.drop_without_shutdown();
-        r
+        _result
     }
 
-    /// Similar to "send" but does not shutdown the channel if
-    /// an error occurs.
+    /// Similar to "send" but does not shutdown the channel if an error occurs.
     pub fn send_no_shutdown_on_err(self, mut f: &FlexibleFoo) -> Result<(), fidl::Error> {
-        let r = self.send_raw(f);
+        let _result = self.send_raw(f);
         self.drop_without_shutdown();
-        r
+        _result
     }
 
     fn send_raw(&self, mut f: &FlexibleFoo) -> Result<(), fidl::Error> {
-        let msg = fidl::encoding::TransactionMessage {
-            header: fidl::encoding::TransactionHeader::new(
-                self.tx_id,
-                self.ordinal,
-                fidl::encoding::DynamicFlags::empty(),
-            ),
-            body: (f,),
-        };
-
-        fidl::encoding::with_tls_encode_buf(|bytes, handles| {
-            fidl::encoding::Encoder::encode::<
-                fidl::encoding::TransactionMessageType<
-                    ProtocolRequestStrictResponseFlexibleResponse,
-                >,
-            >(bytes, handles, msg)?;
-            self.control_handle.inner.send_raw_msg(&*bytes, &mut *handles)
-        })
+        self.control_handle.inner.send::<ProtocolRequestStrictResponseFlexibleResponse>(
+            (f,),
+            self.tx_id,
+            self.ordinal,
+            fidl::encoding::DynamicFlags::empty(),
+        )
     }
 }
 
@@ -664,40 +647,28 @@ impl ProtocolRequestFlexibleResponseStrictResponder {
     ///
     /// Sets the channel to shutdown if an error occurs.
     pub fn send(self, mut f: &StrictFoo) -> Result<(), fidl::Error> {
-        let r = self.send_raw(f);
-        if r.is_err() {
+        let _result = self.send_raw(f);
+        if _result.is_err() {
             self.control_handle.shutdown();
         }
         self.drop_without_shutdown();
-        r
+        _result
     }
 
-    /// Similar to "send" but does not shutdown the channel if
-    /// an error occurs.
+    /// Similar to "send" but does not shutdown the channel if an error occurs.
     pub fn send_no_shutdown_on_err(self, mut f: &StrictFoo) -> Result<(), fidl::Error> {
-        let r = self.send_raw(f);
+        let _result = self.send_raw(f);
         self.drop_without_shutdown();
-        r
+        _result
     }
 
     fn send_raw(&self, mut f: &StrictFoo) -> Result<(), fidl::Error> {
-        let msg = fidl::encoding::TransactionMessage {
-            header: fidl::encoding::TransactionHeader::new(
-                self.tx_id,
-                self.ordinal,
-                fidl::encoding::DynamicFlags::empty(),
-            ),
-            body: (f,),
-        };
-
-        fidl::encoding::with_tls_encode_buf(|bytes, handles| {
-            fidl::encoding::Encoder::encode::<
-                fidl::encoding::TransactionMessageType<
-                    ProtocolRequestFlexibleResponseStrictResponse,
-                >,
-            >(bytes, handles, msg)?;
-            self.control_handle.inner.send_raw_msg(&*bytes, &mut *handles)
-        })
+        self.control_handle.inner.send::<ProtocolRequestFlexibleResponseStrictResponse>(
+            (f,),
+            self.tx_id,
+            self.ordinal,
+            fidl::encoding::DynamicFlags::empty(),
+        )
     }
 }
 

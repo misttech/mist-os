@@ -107,13 +107,13 @@ impl fidl::endpoints::Proxy for SubProxy {
 }
 
 impl SubProxy {
-    /// Create a new Proxy for Sub
+    /// Create a new Proxy for test.inheritance/sub.
     pub fn new(channel: fidl::AsyncChannel) -> Self {
         let protocol_name = <SubMarker as fidl::endpoints::ProtocolMarker>::DEBUG_NAME;
         Self { client: fidl::client::Client::new(channel, protocol_name) }
     }
 
-    /// Get a Stream of events from the remote end of the Sub protocol
+    /// Get a Stream of events from the remote end of the protocol.
     ///
     /// # Panics
     ///
@@ -165,15 +165,13 @@ impl futures::Stream for SubEventStream {
         mut self: std::pin::Pin<&mut Self>,
         cx: &mut std::task::Context<'_>,
     ) -> std::task::Poll<Option<Self::Item>> {
-        let buf = match futures::ready!(futures::stream::StreamExt::poll_next_unpin(
+        match futures::ready!(futures::stream::StreamExt::poll_next_unpin(
             &mut self.event_receiver,
             cx
         )?) {
-            Some(buf) => buf,
-            None => return std::task::Poll::Ready(None),
-        };
-
-        std::task::Poll::Ready(Some(SubEvent::decode(buf)))
+            Some(buf) => std::task::Poll::Ready(Some(SubEvent::decode(buf))),
+            None => std::task::Poll::Ready(None),
+        }
     }
 }
 
@@ -181,12 +179,11 @@ impl futures::Stream for SubEventStream {
 pub enum SubEvent {}
 
 impl SubEvent {
-    /// Decodes a message buffer as a [`SubEvent`]. Transaction
-    /// ID in the message must be zero; this method does not check TXID.
+    /// Decodes a message buffer as a [`SubEvent`].
     fn decode(mut buf: fidl::MessageBufEtc) -> Result<SubEvent, fidl::Error> {
         let (bytes, _handles) = buf.split_mut();
         let (tx_header, _body_bytes) = fidl::encoding::decode_transaction_header(bytes)?;
-
+        debug_assert_eq!(tx_header.tx_id(), 0);
         match tx_header.ordinal() {
             _ => Err(fidl::Error::UnknownOrdinal {
                 ordinal: tx_header.ordinal(),
@@ -196,7 +193,7 @@ impl SubEvent {
     }
 }
 
-/// A Stream of incoming requests for Sub
+/// A Stream of incoming requests for test.inheritance/sub.
 pub struct SubRequestStream {
     inner: std::sync::Arc<fidl::ServeInner>,
     is_terminated: bool,
@@ -239,7 +236,7 @@ impl futures::Stream for SubRequestStream {
         cx: &mut std::task::Context<'_>,
     ) -> std::task::Poll<Option<Self::Item>> {
         let this = &mut *self;
-        if this.inner.poll_shutdown(cx) {
+        if this.inner.check_shutdown(cx) {
             this.is_terminated = true;
             return std::task::Poll::Ready(None);
         }
@@ -272,7 +269,6 @@ impl futures::Stream for SubRequestStream {
                         &mut req,
                     )?;
                     let control_handle = SubControlHandle { inner: this.inner.clone() };
-
                     Ok(SubRequest::Foo {
                         s: req.s,
 
@@ -379,38 +375,28 @@ impl SubFooResponder {
     ///
     /// Sets the channel to shutdown if an error occurs.
     pub fn send(self, mut y: i64) -> Result<(), fidl::Error> {
-        let r = self.send_raw(y);
-        if r.is_err() {
+        let _result = self.send_raw(y);
+        if _result.is_err() {
             self.control_handle.shutdown();
         }
         self.drop_without_shutdown();
-        r
+        _result
     }
 
-    /// Similar to "send" but does not shutdown the channel if
-    /// an error occurs.
+    /// Similar to "send" but does not shutdown the channel if an error occurs.
     pub fn send_no_shutdown_on_err(self, mut y: i64) -> Result<(), fidl::Error> {
-        let r = self.send_raw(y);
+        let _result = self.send_raw(y);
         self.drop_without_shutdown();
-        r
+        _result
     }
 
     fn send_raw(&self, mut y: i64) -> Result<(), fidl::Error> {
-        let msg = fidl::encoding::TransactionMessage {
-            header: fidl::encoding::TransactionHeader::new(
-                self.tx_id,
-                self.ordinal,
-                fidl::encoding::DynamicFlags::empty(),
-            ),
-            body: (y,),
-        };
-
-        fidl::encoding::with_tls_encode_buf(|bytes, handles| {
-            fidl::encoding::Encoder::encode::<
-                fidl::encoding::TransactionMessageType<SuperFooResponse>,
-            >(bytes, handles, msg)?;
-            self.control_handle.inner.send_raw_msg(&*bytes, &mut *handles)
-        })
+        self.control_handle.inner.send::<SuperFooResponse>(
+            (y,),
+            self.tx_id,
+            self.ordinal,
+            fidl::encoding::DynamicFlags::empty(),
+        )
     }
 }
 
@@ -484,13 +470,13 @@ impl fidl::endpoints::Proxy for Super_Proxy {
 }
 
 impl Super_Proxy {
-    /// Create a new Proxy for Super_
+    /// Create a new Proxy for test.inheritance/super.
     pub fn new(channel: fidl::AsyncChannel) -> Self {
         let protocol_name = <Super_Marker as fidl::endpoints::ProtocolMarker>::DEBUG_NAME;
         Self { client: fidl::client::Client::new(channel, protocol_name) }
     }
 
-    /// Get a Stream of events from the remote end of the Super_ protocol
+    /// Get a Stream of events from the remote end of the protocol.
     ///
     /// # Panics
     ///
@@ -542,15 +528,13 @@ impl futures::Stream for Super_EventStream {
         mut self: std::pin::Pin<&mut Self>,
         cx: &mut std::task::Context<'_>,
     ) -> std::task::Poll<Option<Self::Item>> {
-        let buf = match futures::ready!(futures::stream::StreamExt::poll_next_unpin(
+        match futures::ready!(futures::stream::StreamExt::poll_next_unpin(
             &mut self.event_receiver,
             cx
         )?) {
-            Some(buf) => buf,
-            None => return std::task::Poll::Ready(None),
-        };
-
-        std::task::Poll::Ready(Some(Super_Event::decode(buf)))
+            Some(buf) => std::task::Poll::Ready(Some(Super_Event::decode(buf))),
+            None => std::task::Poll::Ready(None),
+        }
     }
 }
 
@@ -558,12 +542,11 @@ impl futures::Stream for Super_EventStream {
 pub enum Super_Event {}
 
 impl Super_Event {
-    /// Decodes a message buffer as a [`Super_Event`]. Transaction
-    /// ID in the message must be zero; this method does not check TXID.
+    /// Decodes a message buffer as a [`Super_Event`].
     fn decode(mut buf: fidl::MessageBufEtc) -> Result<Super_Event, fidl::Error> {
         let (bytes, _handles) = buf.split_mut();
         let (tx_header, _body_bytes) = fidl::encoding::decode_transaction_header(bytes)?;
-
+        debug_assert_eq!(tx_header.tx_id(), 0);
         match tx_header.ordinal() {
             _ => Err(fidl::Error::UnknownOrdinal {
                 ordinal: tx_header.ordinal(),
@@ -573,7 +556,7 @@ impl Super_Event {
     }
 }
 
-/// A Stream of incoming requests for Super_
+/// A Stream of incoming requests for test.inheritance/super.
 pub struct Super_RequestStream {
     inner: std::sync::Arc<fidl::ServeInner>,
     is_terminated: bool,
@@ -616,7 +599,7 @@ impl futures::Stream for Super_RequestStream {
         cx: &mut std::task::Context<'_>,
     ) -> std::task::Poll<Option<Self::Item>> {
         let this = &mut *self;
-        if this.inner.poll_shutdown(cx) {
+        if this.inner.check_shutdown(cx) {
             this.is_terminated = true;
             return std::task::Poll::Ready(None);
         }
@@ -649,7 +632,6 @@ impl futures::Stream for Super_RequestStream {
                         &mut req,
                     )?;
                     let control_handle = Super_ControlHandle { inner: this.inner.clone() };
-
                     Ok(Super_Request::Foo {
                         s: req.s,
 
@@ -756,38 +738,28 @@ impl Super_FooResponder {
     ///
     /// Sets the channel to shutdown if an error occurs.
     pub fn send(self, mut y: i64) -> Result<(), fidl::Error> {
-        let r = self.send_raw(y);
-        if r.is_err() {
+        let _result = self.send_raw(y);
+        if _result.is_err() {
             self.control_handle.shutdown();
         }
         self.drop_without_shutdown();
-        r
+        _result
     }
 
-    /// Similar to "send" but does not shutdown the channel if
-    /// an error occurs.
+    /// Similar to "send" but does not shutdown the channel if an error occurs.
     pub fn send_no_shutdown_on_err(self, mut y: i64) -> Result<(), fidl::Error> {
-        let r = self.send_raw(y);
+        let _result = self.send_raw(y);
         self.drop_without_shutdown();
-        r
+        _result
     }
 
     fn send_raw(&self, mut y: i64) -> Result<(), fidl::Error> {
-        let msg = fidl::encoding::TransactionMessage {
-            header: fidl::encoding::TransactionHeader::new(
-                self.tx_id,
-                self.ordinal,
-                fidl::encoding::DynamicFlags::empty(),
-            ),
-            body: (y,),
-        };
-
-        fidl::encoding::with_tls_encode_buf(|bytes, handles| {
-            fidl::encoding::Encoder::encode::<
-                fidl::encoding::TransactionMessageType<SuperFooResponse>,
-            >(bytes, handles, msg)?;
-            self.control_handle.inner.send_raw_msg(&*bytes, &mut *handles)
-        })
+        self.control_handle.inner.send::<SuperFooResponse>(
+            (y,),
+            self.tx_id,
+            self.ordinal,
+            fidl::encoding::DynamicFlags::empty(),
+        )
     }
 }
 

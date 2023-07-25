@@ -179,13 +179,13 @@ impl fidl::endpoints::Proxy for AllowedProxy {
 }
 
 impl AllowedProxy {
-    /// Create a new Proxy for Allowed
+    /// Create a new Proxy for test.bindingsdenylist/Allowed.
     pub fn new(channel: fidl::AsyncChannel) -> Self {
         let protocol_name = <AllowedMarker as fidl::endpoints::ProtocolMarker>::DEBUG_NAME;
         Self { client: fidl::client::Client::new(channel, protocol_name) }
     }
 
-    /// Get a Stream of events from the remote end of the Allowed protocol
+    /// Get a Stream of events from the remote end of the protocol.
     ///
     /// # Panics
     ///
@@ -216,15 +216,13 @@ impl futures::Stream for AllowedEventStream {
         mut self: std::pin::Pin<&mut Self>,
         cx: &mut std::task::Context<'_>,
     ) -> std::task::Poll<Option<Self::Item>> {
-        let buf = match futures::ready!(futures::stream::StreamExt::poll_next_unpin(
+        match futures::ready!(futures::stream::StreamExt::poll_next_unpin(
             &mut self.event_receiver,
             cx
         )?) {
-            Some(buf) => buf,
-            None => return std::task::Poll::Ready(None),
-        };
-
-        std::task::Poll::Ready(Some(AllowedEvent::decode(buf)))
+            Some(buf) => std::task::Poll::Ready(Some(AllowedEvent::decode(buf))),
+            None => std::task::Poll::Ready(None),
+        }
     }
 }
 
@@ -232,12 +230,11 @@ impl futures::Stream for AllowedEventStream {
 pub enum AllowedEvent {}
 
 impl AllowedEvent {
-    /// Decodes a message buffer as a [`AllowedEvent`]. Transaction
-    /// ID in the message must be zero; this method does not check TXID.
+    /// Decodes a message buffer as a [`AllowedEvent`].
     fn decode(mut buf: fidl::MessageBufEtc) -> Result<AllowedEvent, fidl::Error> {
         let (bytes, _handles) = buf.split_mut();
         let (tx_header, _body_bytes) = fidl::encoding::decode_transaction_header(bytes)?;
-
+        debug_assert_eq!(tx_header.tx_id(), 0);
         match tx_header.ordinal() {
             _ => Err(fidl::Error::UnknownOrdinal {
                 ordinal: tx_header.ordinal(),
@@ -247,7 +244,7 @@ impl AllowedEvent {
     }
 }
 
-/// A Stream of incoming requests for Allowed
+/// A Stream of incoming requests for test.bindingsdenylist/Allowed.
 pub struct AllowedRequestStream {
     inner: std::sync::Arc<fidl::ServeInner>,
     is_terminated: bool,
@@ -290,7 +287,7 @@ impl futures::Stream for AllowedRequestStream {
         cx: &mut std::task::Context<'_>,
     ) -> std::task::Poll<Option<Self::Item>> {
         let this = &mut *self;
-        if this.inner.poll_shutdown(cx) {
+        if this.inner.check_shutdown(cx) {
             this.is_terminated = true;
             return std::task::Poll::Ready(None);
         }
@@ -521,13 +518,13 @@ impl fidl::endpoints::Proxy for DenyEachBindingProxy {
 }
 
 impl DenyEachBindingProxy {
-    /// Create a new Proxy for DenyEachBinding
+    /// Create a new Proxy for test.bindingsdenylist/DenyEachBinding.
     pub fn new(channel: fidl::AsyncChannel) -> Self {
         let protocol_name = <DenyEachBindingMarker as fidl::endpoints::ProtocolMarker>::DEBUG_NAME;
         Self { client: fidl::client::Client::new(channel, protocol_name) }
     }
 
-    /// Get a Stream of events from the remote end of the DenyEachBinding protocol
+    /// Get a Stream of events from the remote end of the protocol.
     ///
     /// # Panics
     ///
@@ -706,15 +703,13 @@ impl futures::Stream for DenyEachBindingEventStream {
         mut self: std::pin::Pin<&mut Self>,
         cx: &mut std::task::Context<'_>,
     ) -> std::task::Poll<Option<Self::Item>> {
-        let buf = match futures::ready!(futures::stream::StreamExt::poll_next_unpin(
+        match futures::ready!(futures::stream::StreamExt::poll_next_unpin(
             &mut self.event_receiver,
             cx
         )?) {
-            Some(buf) => buf,
-            None => return std::task::Poll::Ready(None),
-        };
-
-        std::task::Poll::Ready(Some(DenyEachBindingEvent::decode(buf)))
+            Some(buf) => std::task::Poll::Ready(Some(DenyEachBindingEvent::decode(buf))),
+            None => std::task::Poll::Ready(None),
+        }
     }
 }
 
@@ -722,12 +717,11 @@ impl futures::Stream for DenyEachBindingEventStream {
 pub enum DenyEachBindingEvent {}
 
 impl DenyEachBindingEvent {
-    /// Decodes a message buffer as a [`DenyEachBindingEvent`]. Transaction
-    /// ID in the message must be zero; this method does not check TXID.
+    /// Decodes a message buffer as a [`DenyEachBindingEvent`].
     fn decode(mut buf: fidl::MessageBufEtc) -> Result<DenyEachBindingEvent, fidl::Error> {
         let (bytes, _handles) = buf.split_mut();
         let (tx_header, _body_bytes) = fidl::encoding::decode_transaction_header(bytes)?;
-
+        debug_assert_eq!(tx_header.tx_id(), 0);
         match tx_header.ordinal() {
             _ => Err(fidl::Error::UnknownOrdinal {
                 ordinal: tx_header.ordinal(),
@@ -738,7 +732,7 @@ impl DenyEachBindingEvent {
     }
 }
 
-/// A Stream of incoming requests for DenyEachBinding
+/// A Stream of incoming requests for test.bindingsdenylist/DenyEachBinding.
 pub struct DenyEachBindingRequestStream {
     inner: std::sync::Arc<fidl::ServeInner>,
     is_terminated: bool,
@@ -781,7 +775,7 @@ impl futures::Stream for DenyEachBindingRequestStream {
         cx: &mut std::task::Context<'_>,
     ) -> std::task::Poll<Option<Self::Item>> {
         let this = &mut *self;
-        if this.inner.poll_shutdown(cx) {
+        if this.inner.check_shutdown(cx) {
             this.is_terminated = true;
             return std::task::Poll::Ready(None);
         }
@@ -814,7 +808,6 @@ impl futures::Stream for DenyEachBindingRequestStream {
                         &mut req,
                     )?;
                     let control_handle = DenyEachBindingControlHandle { inner: this.inner.clone() };
-
                     Ok(DenyEachBindingRequest::OnlyDenyCpp {
                         a: req.a,
 
@@ -834,7 +827,6 @@ impl futures::Stream for DenyEachBindingRequestStream {
                         &mut req,
                     )?;
                     let control_handle = DenyEachBindingControlHandle { inner: this.inner.clone() };
-
                     Ok(DenyEachBindingRequest::OnlyDenyDart {
                         a: req.a,
 
@@ -854,7 +846,6 @@ impl futures::Stream for DenyEachBindingRequestStream {
                         &mut req,
                     )?;
                     let control_handle = DenyEachBindingControlHandle { inner: this.inner.clone() };
-
                     Ok(DenyEachBindingRequest::OnlyDenyGo {
                         a: req.a,
 
@@ -874,7 +865,6 @@ impl futures::Stream for DenyEachBindingRequestStream {
                         &mut req,
                     )?;
                     let control_handle = DenyEachBindingControlHandle { inner: this.inner.clone() };
-
                     Ok(DenyEachBindingRequest::OnlyDenyLibfuzzer {
                         a: req.a,
 
@@ -894,7 +884,6 @@ impl futures::Stream for DenyEachBindingRequestStream {
                         &mut req,
                     )?;
                     let control_handle = DenyEachBindingControlHandle { inner: this.inner.clone() };
-
                     Ok(DenyEachBindingRequest::OnlyDenySyzkaller {
                         a: req.a,
 
@@ -1050,40 +1039,30 @@ impl DenyEachBindingOnlyDenyCppResponder {
     ///
     /// Sets the channel to shutdown if an error occurs.
     pub fn send(self, mut result: Result<i32, u32>) -> Result<(), fidl::Error> {
-        let r = self.send_raw(result);
-        if r.is_err() {
+        let _result = self.send_raw(result);
+        if _result.is_err() {
             self.control_handle.shutdown();
         }
         self.drop_without_shutdown();
-        r
+        _result
     }
 
-    /// Similar to "send" but does not shutdown the channel if
-    /// an error occurs.
+    /// Similar to "send" but does not shutdown the channel if an error occurs.
     pub fn send_no_shutdown_on_err(self, mut result: Result<i32, u32>) -> Result<(), fidl::Error> {
-        let r = self.send_raw(result);
+        let _result = self.send_raw(result);
         self.drop_without_shutdown();
-        r
+        _result
     }
 
     fn send_raw(&self, mut result: Result<i32, u32>) -> Result<(), fidl::Error> {
-        let msg = fidl::encoding::TransactionMessage {
-            header: fidl::encoding::TransactionHeader::new(
+        self.control_handle
+            .inner
+            .send::<fidl::encoding::ResultType<DenyEachBindingOnlyDenyCppResponse, u32>>(
+                result.map(|b| (b,)),
                 self.tx_id,
                 self.ordinal,
                 fidl::encoding::DynamicFlags::empty(),
-            ),
-            body: result.map(|b| (b,)),
-        };
-
-        fidl::encoding::with_tls_encode_buf(|bytes, handles| {
-            fidl::encoding::Encoder::encode::<
-                fidl::encoding::TransactionMessageType<
-                    fidl::encoding::ResultType<DenyEachBindingOnlyDenyCppResponse, u32>,
-                >,
-            >(bytes, handles, msg)?;
-            self.control_handle.inner.send_raw_msg(&*bytes, &mut *handles)
-        })
+            )
     }
 }
 
@@ -1126,40 +1105,31 @@ impl DenyEachBindingOnlyDenyDartResponder {
     ///
     /// Sets the channel to shutdown if an error occurs.
     pub fn send(self, mut result: Result<i32, u32>) -> Result<(), fidl::Error> {
-        let r = self.send_raw(result);
-        if r.is_err() {
+        let _result = self.send_raw(result);
+        if _result.is_err() {
             self.control_handle.shutdown();
         }
         self.drop_without_shutdown();
-        r
+        _result
     }
 
-    /// Similar to "send" but does not shutdown the channel if
-    /// an error occurs.
+    /// Similar to "send" but does not shutdown the channel if an error occurs.
     pub fn send_no_shutdown_on_err(self, mut result: Result<i32, u32>) -> Result<(), fidl::Error> {
-        let r = self.send_raw(result);
+        let _result = self.send_raw(result);
         self.drop_without_shutdown();
-        r
+        _result
     }
 
     fn send_raw(&self, mut result: Result<i32, u32>) -> Result<(), fidl::Error> {
-        let msg = fidl::encoding::TransactionMessage {
-            header: fidl::encoding::TransactionHeader::new(
-                self.tx_id,
-                self.ordinal,
-                fidl::encoding::DynamicFlags::empty(),
-            ),
-            body: result.map(|b| (b,)),
-        };
-
-        fidl::encoding::with_tls_encode_buf(|bytes, handles| {
-            fidl::encoding::Encoder::encode::<
-                fidl::encoding::TransactionMessageType<
-                    fidl::encoding::ResultType<DenyEachBindingOnlyDenyDartResponse, u32>,
-                >,
-            >(bytes, handles, msg)?;
-            self.control_handle.inner.send_raw_msg(&*bytes, &mut *handles)
-        })
+        self.control_handle.inner.send::<fidl::encoding::ResultType<
+            DenyEachBindingOnlyDenyDartResponse,
+            u32,
+        >>(
+            result.map(|b| (b,)),
+            self.tx_id,
+            self.ordinal,
+            fidl::encoding::DynamicFlags::empty(),
+        )
     }
 }
 
@@ -1202,40 +1172,30 @@ impl DenyEachBindingOnlyDenyGoResponder {
     ///
     /// Sets the channel to shutdown if an error occurs.
     pub fn send(self, mut result: Result<i32, u32>) -> Result<(), fidl::Error> {
-        let r = self.send_raw(result);
-        if r.is_err() {
+        let _result = self.send_raw(result);
+        if _result.is_err() {
             self.control_handle.shutdown();
         }
         self.drop_without_shutdown();
-        r
+        _result
     }
 
-    /// Similar to "send" but does not shutdown the channel if
-    /// an error occurs.
+    /// Similar to "send" but does not shutdown the channel if an error occurs.
     pub fn send_no_shutdown_on_err(self, mut result: Result<i32, u32>) -> Result<(), fidl::Error> {
-        let r = self.send_raw(result);
+        let _result = self.send_raw(result);
         self.drop_without_shutdown();
-        r
+        _result
     }
 
     fn send_raw(&self, mut result: Result<i32, u32>) -> Result<(), fidl::Error> {
-        let msg = fidl::encoding::TransactionMessage {
-            header: fidl::encoding::TransactionHeader::new(
+        self.control_handle
+            .inner
+            .send::<fidl::encoding::ResultType<DenyEachBindingOnlyDenyGoResponse, u32>>(
+                result.map(|b| (b,)),
                 self.tx_id,
                 self.ordinal,
                 fidl::encoding::DynamicFlags::empty(),
-            ),
-            body: result.map(|b| (b,)),
-        };
-
-        fidl::encoding::with_tls_encode_buf(|bytes, handles| {
-            fidl::encoding::Encoder::encode::<
-                fidl::encoding::TransactionMessageType<
-                    fidl::encoding::ResultType<DenyEachBindingOnlyDenyGoResponse, u32>,
-                >,
-            >(bytes, handles, msg)?;
-            self.control_handle.inner.send_raw_msg(&*bytes, &mut *handles)
-        })
+            )
     }
 }
 
@@ -1278,40 +1238,31 @@ impl DenyEachBindingOnlyDenyLibfuzzerResponder {
     ///
     /// Sets the channel to shutdown if an error occurs.
     pub fn send(self, mut result: Result<i32, u32>) -> Result<(), fidl::Error> {
-        let r = self.send_raw(result);
-        if r.is_err() {
+        let _result = self.send_raw(result);
+        if _result.is_err() {
             self.control_handle.shutdown();
         }
         self.drop_without_shutdown();
-        r
+        _result
     }
 
-    /// Similar to "send" but does not shutdown the channel if
-    /// an error occurs.
+    /// Similar to "send" but does not shutdown the channel if an error occurs.
     pub fn send_no_shutdown_on_err(self, mut result: Result<i32, u32>) -> Result<(), fidl::Error> {
-        let r = self.send_raw(result);
+        let _result = self.send_raw(result);
         self.drop_without_shutdown();
-        r
+        _result
     }
 
     fn send_raw(&self, mut result: Result<i32, u32>) -> Result<(), fidl::Error> {
-        let msg = fidl::encoding::TransactionMessage {
-            header: fidl::encoding::TransactionHeader::new(
-                self.tx_id,
-                self.ordinal,
-                fidl::encoding::DynamicFlags::empty(),
-            ),
-            body: result.map(|b| (b,)),
-        };
-
-        fidl::encoding::with_tls_encode_buf(|bytes, handles| {
-            fidl::encoding::Encoder::encode::<
-                fidl::encoding::TransactionMessageType<
-                    fidl::encoding::ResultType<DenyEachBindingOnlyDenyLibfuzzerResponse, u32>,
-                >,
-            >(bytes, handles, msg)?;
-            self.control_handle.inner.send_raw_msg(&*bytes, &mut *handles)
-        })
+        self.control_handle.inner.send::<fidl::encoding::ResultType<
+            DenyEachBindingOnlyDenyLibfuzzerResponse,
+            u32,
+        >>(
+            result.map(|b| (b,)),
+            self.tx_id,
+            self.ordinal,
+            fidl::encoding::DynamicFlags::empty(),
+        )
     }
 }
 
@@ -1354,40 +1305,31 @@ impl DenyEachBindingOnlyDenySyzkallerResponder {
     ///
     /// Sets the channel to shutdown if an error occurs.
     pub fn send(self, mut result: Result<i32, u32>) -> Result<(), fidl::Error> {
-        let r = self.send_raw(result);
-        if r.is_err() {
+        let _result = self.send_raw(result);
+        if _result.is_err() {
             self.control_handle.shutdown();
         }
         self.drop_without_shutdown();
-        r
+        _result
     }
 
-    /// Similar to "send" but does not shutdown the channel if
-    /// an error occurs.
+    /// Similar to "send" but does not shutdown the channel if an error occurs.
     pub fn send_no_shutdown_on_err(self, mut result: Result<i32, u32>) -> Result<(), fidl::Error> {
-        let r = self.send_raw(result);
+        let _result = self.send_raw(result);
         self.drop_without_shutdown();
-        r
+        _result
     }
 
     fn send_raw(&self, mut result: Result<i32, u32>) -> Result<(), fidl::Error> {
-        let msg = fidl::encoding::TransactionMessage {
-            header: fidl::encoding::TransactionHeader::new(
-                self.tx_id,
-                self.ordinal,
-                fidl::encoding::DynamicFlags::empty(),
-            ),
-            body: result.map(|b| (b,)),
-        };
-
-        fidl::encoding::with_tls_encode_buf(|bytes, handles| {
-            fidl::encoding::Encoder::encode::<
-                fidl::encoding::TransactionMessageType<
-                    fidl::encoding::ResultType<DenyEachBindingOnlyDenySyzkallerResponse, u32>,
-                >,
-            >(bytes, handles, msg)?;
-            self.control_handle.inner.send_raw_msg(&*bytes, &mut *handles)
-        })
+        self.control_handle.inner.send::<fidl::encoding::ResultType<
+            DenyEachBindingOnlyDenySyzkallerResponse,
+            u32,
+        >>(
+            result.map(|b| (b,)),
+            self.tx_id,
+            self.ordinal,
+            fidl::encoding::DynamicFlags::empty(),
+        )
     }
 }
 
@@ -1471,14 +1413,14 @@ impl fidl::endpoints::Proxy for ImportsSameNameContextProxy {
 }
 
 impl ImportsSameNameContextProxy {
-    /// Create a new Proxy for ImportsSameNameContext
+    /// Create a new Proxy for test.bindingsdenylist/ImportsSameNameContext.
     pub fn new(channel: fidl::AsyncChannel) -> Self {
         let protocol_name =
             <ImportsSameNameContextMarker as fidl::endpoints::ProtocolMarker>::DEBUG_NAME;
         Self { client: fidl::client::Client::new(channel, protocol_name) }
     }
 
-    /// Get a Stream of events from the remote end of the ImportsSameNameContext protocol
+    /// Get a Stream of events from the remote end of the protocol.
     ///
     /// # Panics
     ///
@@ -1533,15 +1475,13 @@ impl futures::Stream for ImportsSameNameContextEventStream {
         mut self: std::pin::Pin<&mut Self>,
         cx: &mut std::task::Context<'_>,
     ) -> std::task::Poll<Option<Self::Item>> {
-        let buf = match futures::ready!(futures::stream::StreamExt::poll_next_unpin(
+        match futures::ready!(futures::stream::StreamExt::poll_next_unpin(
             &mut self.event_receiver,
             cx
         )?) {
-            Some(buf) => buf,
-            None => return std::task::Poll::Ready(None),
-        };
-
-        std::task::Poll::Ready(Some(ImportsSameNameContextEvent::decode(buf)))
+            Some(buf) => std::task::Poll::Ready(Some(ImportsSameNameContextEvent::decode(buf))),
+            None => std::task::Poll::Ready(None),
+        }
     }
 }
 
@@ -1549,12 +1489,11 @@ impl futures::Stream for ImportsSameNameContextEventStream {
 pub enum ImportsSameNameContextEvent {}
 
 impl ImportsSameNameContextEvent {
-    /// Decodes a message buffer as a [`ImportsSameNameContextEvent`]. Transaction
-    /// ID in the message must be zero; this method does not check TXID.
+    /// Decodes a message buffer as a [`ImportsSameNameContextEvent`].
     fn decode(mut buf: fidl::MessageBufEtc) -> Result<ImportsSameNameContextEvent, fidl::Error> {
         let (bytes, _handles) = buf.split_mut();
         let (tx_header, _body_bytes) = fidl::encoding::decode_transaction_header(bytes)?;
-
+        debug_assert_eq!(tx_header.tx_id(), 0);
         match tx_header.ordinal() {
             _ => Err(fidl::Error::UnknownOrdinal {
                 ordinal: tx_header.ordinal(),
@@ -1565,7 +1504,7 @@ impl ImportsSameNameContextEvent {
     }
 }
 
-/// A Stream of incoming requests for ImportsSameNameContext
+/// A Stream of incoming requests for test.bindingsdenylist/ImportsSameNameContext.
 pub struct ImportsSameNameContextRequestStream {
     inner: std::sync::Arc<fidl::ServeInner>,
     is_terminated: bool,
@@ -1608,7 +1547,7 @@ impl futures::Stream for ImportsSameNameContextRequestStream {
         cx: &mut std::task::Context<'_>,
     ) -> std::task::Poll<Option<Self::Item>> {
         let this = &mut *self;
-        if this.inner.poll_shutdown(cx) {
+        if this.inner.check_shutdown(cx) {
             this.is_terminated = true;
             return std::task::Poll::Ready(None);
         }
@@ -1638,9 +1577,8 @@ impl futures::Stream for ImportsSameNameContextRequestStream {
                     let control_handle = ImportsSameNameContextControlHandle {
                         inner: this.inner.clone(),
                     };
-
                     Ok(ImportsSameNameContextRequest::Unattributed {
-                            control_handle,
+                        control_handle,
                     })
                 }
                 0x2874096c521236f8 => {
@@ -1649,9 +1587,8 @@ impl futures::Stream for ImportsSameNameContextRequestStream {
                     let control_handle = ImportsSameNameContextControlHandle {
                         inner: this.inner.clone(),
                     };
-
                     Ok(ImportsSameNameContextRequest::AlwaysAppearsInImportingLibrary {
-                            control_handle,
+                        control_handle,
                     })
                 }
                 _ => Err(fidl::Error::UnknownOrdinal {

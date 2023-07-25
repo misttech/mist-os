@@ -143,17 +143,30 @@ type Protocol struct {
 	fidlgen.Protocol
 	// Compound identifier referring to this protocol.
 	ECI EncodedCompoundIdentifier
-	// Name of the protocol as a Rust CamelCase identifier. Since only protocols
-	// from the same library are included, this will never be qualified, so it
-	// is just the CamelCase name of the protocol.
-	Name string
-	// List of methods that are part of this protocol. Processed from
-	// fidlgen.Protocol to add Rust-specific fields.
+	// String to use for ProtocolMarker::DEBUG_NAME.
+	DebugName string
+	// True if the protocol is marked @discoverable.
+	Discoverable bool
+	// Name of the protocol's Marker struct.
+	Marker string
+	// Name of the protocol's Proxy struct.
+	Proxy string
+	// Name of the protocol's ProxyInterface trait.
+	ProxyInterface string
+	// Name of the protocol's SynchronousProxy struct.
+	SynchronousProxy string
+	// Name of the protocol's Request enum.
+	Request string
+	// Name of the protocol's RequestStream struct.
+	RequestStream string
+	// Name of the protocol's Event enum.
+	Event string
+	// Name of the protocol's EventStream struct.
+	EventStream string
+	// Name of the protocol's ControlHandle struct.
+	ControlHandle string
+	// List of methods that are part of this protocol.
 	Methods []Method
-	// Name of this protocol for legacy (pre-RFC-0041) service discovery, if the
-	// protocol is marked as discoverable. This value does not include enclosing
-	// quote marks.
-	ProtocolName string
 }
 
 // Method is a method defined in a protocol.
@@ -168,6 +181,10 @@ type Method struct {
 	// Name of the method converted to CamelCase. Used when generating
 	// rust-types associated with this method, such as responders.
 	CamelName string
+	// Name of the method's Responder struct.
+	Responder string
+	// Name of the method's ResponseFut type in the protocol's ProxyInterface trait.
+	ResponseFut string
 
 	Request  Payload
 	Response Payload
@@ -1339,22 +1356,46 @@ func (c *compiler) compileResponse(m fidlgen.Method) Payload {
 }
 
 func (c *compiler) compileProtocol(val fidlgen.Protocol) Protocol {
+	name := c.compileCamelCompoundIdentifier(val.Name)
 	r := Protocol{
-		Protocol:     val,
-		ECI:          val.Name,
-		Name:         c.compileCamelCompoundIdentifier(val.Name),
-		Methods:      []Method{},
-		ProtocolName: strings.Trim(val.GetProtocolName(), "\""),
+		Protocol:         val,
+		ECI:              val.Name,
+		Marker:           name + "Marker",
+		Proxy:            name + "Proxy",
+		ProxyInterface:   name + "ProxyInterface",
+		SynchronousProxy: name + "SynchronousProxy",
+		Request:          name + "Request",
+		RequestStream:    name + "RequestStream",
+		Event:            name + "Event",
+		EventStream:      name + "EventStream",
+		ControlHandle:    name + "ControlHandle",
+	}
+	if discoverableName := strings.Trim(val.GetProtocolName(), "\""); discoverableName != "" {
+		r.Discoverable = true
+		// TODO(fxbug.dev/100767): Currently discoverable protocols get
+		// PROTOCOL_NAME set equal to DEBUG_NAME, and we change both to use the
+		// "fuchsia.foo.Bar" format. We should instead use distinct formats for
+		// DEBUG_NAME and PROTOCOL_NAME.
+		r.DebugName = discoverableName
+	} else {
+		// TODO(fxbug.dev/100767): Include the library name in DEBUG_NAME, i.e.
+		// "fuchsia.foo/Bar" rather than just "Bar".
+		r.DebugName = "(anonymous) " + name
 	}
 
 	for _, v := range val.Methods {
-		r.Methods = append(r.Methods, Method{
+		m := Method{
 			Method:    v,
 			Name:      compileSnakeIdentifier(v.Name),
 			CamelName: compileCamelIdentifier(v.Name),
 			Request:   c.compileRequest(v),
 			Response:  c.compileResponse(v),
-		})
+		}
+		if v.HasRequest && v.HasResponse {
+			m.Responder = name + m.CamelName + "Responder"
+			m.ResponseFut = m.CamelName + "ResponseFut"
+		}
+		r.Methods = append(r.Methods, m)
 	}
 
 	return r
