@@ -835,6 +835,14 @@ DEFINE_OPTION("kernel.select", SmallString, select, {"zircon"}, R"""(
 The name of the kernel package to boot from the STORAGE_KERNEL item in the ZBI.
 )""")
 
+DEFINE_OPTION("kernel.scheduler.prefer-little-cpus", bool, scheduler_prefer_little_cpus, {false}, R"""(
+When searching for a CPU on which to place a task, prefer little cores over big cores.  Enabling
+this option trades off improved performance in favor of reduced power consumption.
+
+DEPRECATED - This option is scheduled to be removed in an upcoming release.  Do not take any
+critical dependencies on it.
+)""")
+
 // Machine-specific options are included here for all the kernel places.
 // In the generator program, they're included separately.
 

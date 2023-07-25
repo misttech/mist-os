@@ -9,6 +9,7 @@
 #include <assert.h>
 #include <debug.h>
 #include <inttypes.h>
+#include <lib/boot-options/boot-options.h>
 #include <stddef.h>
 
 #include <fbl/alloc_checker.h>
@@ -187,23 +188,27 @@ void CpuSearchSet::DoInitialize(cpu_num_t this_cpu, size_t cpu_count, const Clus
     ordered_cpus_[i] = {i, cluster};
   }
 
-  // Sort the search set by these criteria in priority order:
+  // The search sets are sorted based on policy.
+  //
+  // If the policy is to prefer little CPUs (see `scheduler_prefer_little_cpus`) CPUs with smaller
+  // performance scales are sorted before those with larger scales.
+  //
+  // When `scheduler_prefer_little_cpus` is false, the search set is sorted by these criteria:
   //   1. Cache distance from this CPU.
   //   2. Modular cluster order, offset by this CPU's cluster id.
   //   3. Modular cluster member order, offset by this CPU's cluster member index.
   //
-  // These criteria result in a relaxed Latin Square with the following
-  // properties:
+  // The above criteria result in a relaxed Latin Square with the following properties:
   //   * A CPU is always at the front of its own search list (distance is 0).
   //   * The search list is ordered by increasing cache distance.
   //   * The search order is reasonably unique compared to other CPUs (a CPU is
   //     found as few times as possible at a given offset in all search lists).
   //
   const auto comparator = [this_cpu, &cluster_set, &map](const Entry& a, const Entry& b) {
-    // TODO(eieio): Temporary hack to put little cores at the beginning of the search sets for
-    // better idle power consumption. This can be removed or revised when a power model is
-    // introduced to better handle power vs. performance tradeoffs.
-    if (perf_scales_[a.cpu] != perf_scales_[b.cpu]) {
+    // If the system is configured to prefer little CPUs to improve idle power consumption, place
+    // them at the front of the search sets.
+    if (gBootOptions->scheduler_prefer_little_cpus &&
+        (perf_scales_[a.cpu] != perf_scales_[b.cpu])) {
       return perf_scales_[a.cpu] < perf_scales_[b.cpu];
     }
 
