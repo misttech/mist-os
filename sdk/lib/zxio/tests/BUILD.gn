@@ -10,6 +10,7 @@ group("tests") {
   deps = [
     ":zxio-standalone-package",
     ":zxio-unittest-package",
+    ":zxio-vmo-flags-unittest-package",
   ]
 }
 
@@ -117,4 +118,33 @@ fuchsia_unittest_component("zxio-standalone") {
 
 fuchsia_test_package("zxio-standalone-package") {
   test_components = [ ":zxio-standalone" ]
+}
+
+test("zxio-vmo-flags") {
+  output_name = "zxio-vmo-flags-test"
+  sources = [ "vmo-flags-test.cc" ]
+  deps = [
+    "//sdk/fidl/fuchsia.hardware.pty:fuchsia.hardware.pty_cpp_wire",
+    "//sdk/fidl/fuchsia.io:fuchsia.io_cpp_wire_testing",
+    "//sdk/fidl/fuchsia.kernel:fuchsia.kernel_cpp",
+    "//sdk/fidl/fuchsia.posix.socket:fuchsia.posix.socket_cpp_wire_testing",
+    "//sdk/fidl/fuchsia.posix.socket.packet:fuchsia.posix.socket.packet_cpp_wire_testing",
+    "//sdk/fidl/fuchsia.posix.socket.raw:fuchsia.posix.socket.raw_cpp_wire_testing",
+    "//sdk/lib/component/incoming/cpp",
+    "//sdk/lib/fdio",
+    "//sdk/lib/zxio",
+    "//sdk/lib/zxio:create_with_type",
+    "//zircon/system/ulib/zx",
+    "//zircon/system/ulib/zxtest:zxtest-streams",
+  ]
+}
+
+fuchsia_unittest_component("zxio-vmo-flags-test") {
+  manifest = "meta/zxio-vmo-flags-test.cml"
+  deps = [ ":zxio-vmo-flags" ]
+  test_type = "system"
+}
+
+fuchsia_test_package("zxio-vmo-flags-unittest-package") {
+  test_components = [ ":zxio-vmo-flags-test" ]
 }

@@ -127,6 +127,9 @@ class Vmo : public HasIo {
     if (info.rights & ZX_RIGHT_WRITE) {
       flags |= fuchsia_io::wire::OpenFlags::kRightWritable;
     }
+    if (info.rights & ZX_RIGHT_EXECUTE) {
+      flags |= fuchsia_io::wire::OpenFlags::kRightExecutable;
+    }
     *out_flags = static_cast<uint32_t>(flags);
     return ZX_OK;
   }
