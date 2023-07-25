@@ -61,6 +61,7 @@
         },
         {
             protocol: [
+                "fuchsia.net.stack.Stack",
                 "fuchsia.power.battery.BatteryManager",
                 "fuchsia.ui.composition.Allocator",
                 "fuchsia.ui.composition.Flatland",

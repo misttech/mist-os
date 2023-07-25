@@ -23,6 +23,7 @@
                 "fuchsia.net.routes.admin.SetProviderV6",
                 "fuchsia.net.routes.StateV4",
                 "fuchsia.net.routes.StateV6",
+                "fuchsia.net.stack.Stack",
                 "fuchsia.posix.socket.raw.Provider",
             ],
             from: "#network",
