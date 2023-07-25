@@ -97,7 +97,4 @@
             to: "#netstack",
         },
     ],
-    facets: {
-        "fuchsia.test": { type: "starnix" },
-    },
 }
