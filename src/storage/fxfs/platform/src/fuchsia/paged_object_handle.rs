@@ -6,13 +6,11 @@ use {
     crate::fuchsia::{
         pager::Pager,
         pager::{PagerVmoStatsOptions, VmoDirtyRange},
-        vmo_data_buffer::VmoDataBuffer,
         volume::FxVolume,
     },
     anyhow::{ensure, Context, Error},
     fidl_fuchsia_io as fio, fuchsia_zircon as zx,
     fxfs::{
-        data_buffer::DataBuffer,
         debug_assert_not_too_long,
         errors::FxfsError,
         filesystem::MAX_FILE_SIZE,
@@ -23,8 +21,8 @@ use {
             transaction::{
                 AssocObj, LockKey, Mutation, Options, Transaction, TRANSACTION_METADATA_MAX_AMOUNT,
             },
-            AttributeKey, DataObjectHandle, HandleOwner, ObjectKey, ObjectStore, ObjectValue,
-            StoreObjectHandle, Timestamp,
+            AttributeKey, DataObjectHandle, ObjectKey, ObjectStore, ObjectValue, StoreObjectHandle,
+            Timestamp,
         },
         round::{how_many, round_up},
     },
@@ -51,7 +49,7 @@ const SPARE_SIZE: u64 = TRANSACTION_METADATA_MAX_AMOUNT;
 
 pub struct PagedObjectHandle {
     inner: Mutex<Inner>,
-    buffer: VmoDataBuffer,
+    vmo: zx::Vmo,
     handle: DataObjectHandle<FxVolume>,
 }
 
@@ -225,7 +223,7 @@ impl PagedObjectHandle {
     pub fn new(handle: DataObjectHandle<FxVolume>) -> Self {
         let size = handle.get_size();
         Self {
-            buffer: handle.owner().create_data_buffer(handle.object_id(), size),
+            vmo: handle.owner().pager().create_vmo(handle.object_id(), size).unwrap(),
             handle,
             inner: Mutex::new(Inner {
                 dirty_crtime: DirtyTimestamp::None,
@@ -246,7 +244,7 @@ impl PagedObjectHandle {
     }
 
     pub fn vmo(&self) -> &zx::Vmo {
-        self.buffer.vmo()
+        &self.vmo
     }
 
     pub fn pager(&self) -> &Pager {
@@ -477,7 +475,7 @@ impl PagedObjectHandle {
             assert!(batch.dirty_byte_count == 0);
             batch.writeback_begin(self.vmo(), self.pager());
             batch
-                .add_to_transaction(&mut transaction, &self.buffer, &self.handle, content_size)
+                .add_to_transaction(&mut transaction, &self.vmo, &self.handle, content_size)
                 .await?;
         }
         transaction.commit().await.context("Failed to commit transaction")?;
@@ -543,7 +541,7 @@ impl PagedObjectHandle {
             .await?;
 
             batch
-                .add_to_transaction(&mut transaction, &self.buffer, &self.handle, content_size)
+                .add_to_transaction(&mut transaction, &self.vmo, &self.handle, content_size)
                 .await
                 .context("batch add_to_transaction failed")?;
             transaction.commit().await.context("Failed to commit transaction")?;
@@ -715,7 +713,12 @@ impl PagedObjectHandle {
         let keys = [LockKey::truncate(store.store_object_id(), self.handle.object_id())];
         let _truncate_guard = debug_assert_not_too_long!(fs.write_lock(&keys));
 
-        self.buffer.resize(new_size).await;
+        let old_vmo_size = self.vmo.get_size()?;
+        if new_size > old_vmo_size {
+            self.vmo.set_size(new_size)?;
+        } else {
+            self.vmo.set_content_size(&new_size)?;
+        }
 
         let previous_content_size = self.handle.get_size();
         let mut inner = self.inner.lock().unwrap();
@@ -817,7 +820,7 @@ impl PagedObjectHandle {
             }
             (
                 inner.dirty_page_count,
-                self.buffer.size(),
+                self.vmo.get_content_size()?,
                 inner.dirty_crtime.timestamp(),
                 inner.dirty_mtime.timestamp(),
             )
@@ -882,7 +885,7 @@ impl ObjectHandle for PagedObjectHandle {
         self.handle.block_size()
     }
     fn get_size(&self) -> u64 {
-        self.buffer.size()
+        self.vmo.get_content_size().unwrap()
     }
 }
 
@@ -974,7 +977,7 @@ impl FlushBatch {
     async fn add_to_transaction<'a>(
         &self,
         transaction: &mut Transaction<'a>,
-        vmo_data_buffer: &VmoDataBuffer,
+        vmo: &zx::Vmo,
         handle: &'a DataObjectHandle<FxVolume>,
         content_size: u64,
     ) -> Result<(), Error> {
@@ -1000,7 +1003,7 @@ impl FlushBatch {
                 let (head, tail) = slice.split_at_mut(
                     (std::cmp::min(range.end, content_size) - range.start).try_into().unwrap(),
                 );
-                vmo_data_buffer.raw_read(range.start, head);
+                vmo.read(head, range.start)?;
                 slice = tail;
                 // Zero out the tail.
                 if range.end > content_size {

@@ -11,7 +11,6 @@ use {
         errors::map_to_status,
         node::{FxNode, OpenedNode},
         pager::{PagerBackedVmo, TransferBuffers, TRANSFER_BUFFER_MAX_SIZE},
-        vmo_data_buffer::VmoDataBuffer,
         volume::info_to_filesystem_info,
         volume::FxVolume,
     },
@@ -32,7 +31,7 @@ use {
         errors::FxfsError,
         log::*,
         object_handle::{GetProperties, ObjectHandle, ObjectProperties, ReadObjectHandle},
-        object_store::{DataObjectHandle, HandleOwner},
+        object_store::DataObjectHandle,
         round::{round_down, round_up},
     },
     once_cell::sync::{Lazy, OnceCell},
@@ -77,7 +76,7 @@ pub async fn init_vmex_resource() -> Result<(), Error> {
 /// Represents an immutable blob stored on Fxfs with associated an merkle tree.
 pub struct FxBlob {
     handle: DataObjectHandle<FxVolume>,
-    buffer: VmoDataBuffer,
+    vmo: zx::Vmo,
     open_count: AtomicUsize,
     merkle_tree: MerkleTree,
     compressed_chunk_size: u64,
@@ -93,15 +92,14 @@ impl FxBlob {
         compressed_offsets: Vec<u64>,
         uncompressed_size: u64,
     ) -> Arc<Self> {
-        let buffer = handle.owner().create_data_buffer(handle.object_id(), uncompressed_size);
-        let vmo = buffer.vmo();
+        let vmo = handle.owner().pager().create_vmo(handle.object_id(), uncompressed_size).unwrap();
         let trimmed_merkle = &merkle_tree.root().to_string()[0..8];
         let name = format!("blob-{}", trimmed_merkle);
         let cstr_name = std::ffi::CString::new(name).unwrap();
         vmo.set_name(&cstr_name).unwrap();
         let file = Arc::new(Self {
             handle,
-            buffer,
+            vmo,
             open_count: AtomicUsize::new(0),
             merkle_tree,
             compressed_chunk_size,
@@ -366,16 +364,13 @@ impl File for FxBlob {
             return Err(Status::NOT_SUPPORTED);
         }
 
-        let vmo = self.buffer.vmo();
         let size = self.uncompressed_size;
-
         let mut child_options = zx::VmoChildOptions::SNAPSHOT_AT_LEAST_ON_WRITE;
         // By default, SNAPSHOT includes WRITE, so we explicitly remove it if not required.
         if !flags.contains(VmoFlags::WRITE) {
             child_options |= zx::VmoChildOptions::NO_WRITE
         }
-
-        let mut child_vmo = vmo.create_child(child_options, 0, size)?;
+        let mut child_vmo = self.vmo.create_child(child_options, 0, size)?;
 
         if flags.contains(VmoFlags::EXECUTE) {
             // TODO(fxbug.dev/122125): Filter out other flags.
@@ -436,7 +431,7 @@ impl PagerBackedVmo for FxBlob {
     }
 
     fn vmo(&self) -> &zx::Vmo {
-        self.buffer.vmo()
+        &self.vmo
     }
 
     // TODO(fxbug.dev/122125): refactor and share with file.rs
@@ -546,7 +541,7 @@ impl PagerBackedVmo for FxBlob {
 
 impl GetVmo for FxBlob {
     fn get_vmo(&self) -> &zx::Vmo {
-        self.buffer.vmo()
+        &self.vmo
     }
 }
 
