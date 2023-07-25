@@ -74,7 +74,7 @@ pub mod route {
         interfaces,
         netlink_packet::{self, errno::Errno},
         routes,
-        rules::{RuleRequest, RuleRequestHandler, RuleTable},
+        rules::{RuleRequest, RuleRequestArgs, RuleRequestHandler, RuleTable},
     };
 
     use netlink_packet_core::{NetlinkHeader, NLM_F_ACK, NLM_F_DUMP, NLM_F_REPLACE};
@@ -153,7 +153,7 @@ pub mod route {
     #[derive(Clone)]
     pub(crate) struct NetlinkRouteRequestHandler<
         S: Sender<<NetlinkRoute as ProtocolFamily>::InnerMessage>,
-        R: RuleRequestHandler,
+        R: RuleRequestHandler<S>,
     > {
         pub(crate) interfaces_request_sink: mpsc::Sender<interfaces::Request<S>>,
         pub(crate) v4_routes_request_sink: mpsc::Sender<routes::Request<S, Ipv4>>,
@@ -606,7 +606,7 @@ pub mod route {
     }
 
     #[async_trait]
-    impl<S: Sender<<NetlinkRoute as ProtocolFamily>::InnerMessage>, R: RuleRequestHandler>
+    impl<S: Sender<<NetlinkRoute as ProtocolFamily>::InnerMessage>, R: RuleRequestHandler<S>>
         NetlinkFamilyRequestHandler<NetlinkRoute, S> for NetlinkRouteRequestHandler<S, R>
     {
         async fn handle_request(
@@ -889,7 +889,12 @@ pub mod route {
                         );
                         return;
                     }
-                    match rules_request_handler.handle_request(RuleRequest::DumpRules) {
+                    let request = RuleRequest {
+                            args: RuleRequestArgs::DumpRules,
+                            sequence_number: req_header.sequence_number,
+                            client: client.clone(),
+                    };
+                    match rules_request_handler.handle_request(request) {
                         Ok(()) => client.send_unicast(netlink_packet::new_done(req_header)),
                         Err(e) => client.send_unicast(
                             netlink_packet::new_error(Err(e), req_header)
@@ -904,7 +909,12 @@ pub mod route {
                         );
                         return;
                     }
-                    match rules_request_handler.handle_request(RuleRequest::New(msg)) {
+                    let request = RuleRequest {
+                            args: RuleRequestArgs::New(msg),
+                            sequence_number: req_header.sequence_number,
+                            client: client.clone(),
+                    };
+                    match rules_request_handler.handle_request(request) {
                         Ok(()) => if expects_ack {
                             client.send_unicast(netlink_packet::new_error(Ok(()), req_header))
                         },
@@ -914,7 +924,12 @@ pub mod route {
                     }
                 }
                 DelRule(msg) => {
-                    match rules_request_handler.handle_request(RuleRequest::Del(msg)) {
+                    let request = RuleRequest {
+                            args: RuleRequestArgs::Del(msg),
+                            sequence_number: req_header.sequence_number,
+                            client: client.clone(),
+                    };
+                    match rules_request_handler.handle_request(request) {
                         Ok(()) => if expects_ack {
                             client.send_unicast(netlink_packet::new_error(Ok(()), req_header))
                         },
@@ -1264,7 +1279,7 @@ mod test {
         netlink_packet::{self, errno::Errno},
         protocol_family::route::{NetlinkRoute, NetlinkRouteRequestHandler},
         routes,
-        rules::{RuleRequest, RuleRequestHandler, RuleTable},
+        rules::{RuleRequest, RuleRequestArgs, RuleRequestHandler, RuleTable},
     };
 
     enum ExpectedResponse {
@@ -2875,14 +2890,18 @@ mod test {
 
     #[derive(Clone, Debug)]
     pub(crate) struct FakeRuleRequestHandler {
-        pub(crate) expected_request: Option<RuleRequest>,
+        pub(crate) expected_request_args: Option<RuleRequestArgs>,
         pub(crate) response: Result<(), Errno>,
     }
 
-    impl RuleRequestHandler for FakeRuleRequestHandler {
-        fn handle_request(&mut self, actual_request: RuleRequest) -> Result<(), Errno> {
-            let Self { expected_request, response } = self;
-            assert_eq!(Some(actual_request), *expected_request);
+    impl<S: Sender<<NetlinkRoute as ProtocolFamily>::InnerMessage>> RuleRequestHandler<S>
+        for FakeRuleRequestHandler
+    {
+        fn handle_request(&mut self, actual_request: RuleRequest<S>) -> Result<(), Errno> {
+            let Self { expected_request_args, response } = self;
+            let RuleRequest { args: actual_request_args, sequence_number: _, client: _ } =
+                actual_request;
+            assert_eq!(Some(actual_request_args), *expected_request_args);
             *response
         }
     }
@@ -2896,62 +2915,62 @@ mod test {
     #[test_case(
         RtnlMessage::GetRule,
         NLM_F_DUMP,
-        Some(RuleRequest::DumpRules),
+        Some(RuleRequestArgs::DumpRules),
         Ok(()),
         Some(ExpectedResponse::Done); "get_rule_dump")]
     #[test_case(
         RtnlMessage::GetRule,
         NLM_F_DUMP,
-        Some(RuleRequest::DumpRules),
+        Some(RuleRequestArgs::DumpRules),
         Err(Errno::ENOTSUP),
         Some(ExpectedResponse::Error(Errno::ENOTSUP)); "get_rule_dump_fails")]
     #[test_case(
         RtnlMessage::NewRule,
         0,
-        Some(RuleRequest::New(RuleMessage::default())),
+        Some(RuleRequestArgs::New(RuleMessage::default())),
         Ok(()),
         None; "new_rule_succeeds")]
     #[test_case(
         RtnlMessage::NewRule,
         NLM_F_ACK,
-        Some(RuleRequest::New(RuleMessage::default())),
+        Some(RuleRequestArgs::New(RuleMessage::default())),
         Ok(()),
         Some(ExpectedResponse::Ack); "new_rule_succeeds_with_ack")]
     #[test_case(
         RtnlMessage::NewRule,
         0,
-        Some(RuleRequest::New(RuleMessage::default())),
+        Some(RuleRequestArgs::New(RuleMessage::default())),
         Err(Errno::ENOTSUP),
         Some(ExpectedResponse::Error(Errno::ENOTSUP)); "new_rule_fails")]
     #[test_case(
         RtnlMessage::NewRule,
         NLM_F_REPLACE,
-        Some(RuleRequest::New(RuleMessage::default())),
+        Some(RuleRequestArgs::New(RuleMessage::default())),
         Ok(()),
         Some(ExpectedResponse::Error(Errno::ENOTSUP)); "new_rule_replace_unimplemented")]
     #[test_case(
         RtnlMessage::DelRule,
         0,
-        Some(RuleRequest::Del(RuleMessage::default())),
+        Some(RuleRequestArgs::Del(RuleMessage::default())),
         Ok(()),
         None; "del_rule_succeeds")]
     #[test_case(
         RtnlMessage::DelRule,
         NLM_F_ACK,
-        Some(RuleRequest::Del(RuleMessage::default())),
+        Some(RuleRequestArgs::Del(RuleMessage::default())),
         Ok(()),
         Some(ExpectedResponse::Ack); "del_rule_succeeds_with_ack")]
     #[test_case(
         RtnlMessage::DelRule,
         0,
-        Some(RuleRequest::Del(RuleMessage::default())),
+        Some(RuleRequestArgs::Del(RuleMessage::default())),
         Err(Errno::ENOTSUP),
         Some(ExpectedResponse::Error(Errno::ENOTSUP)); "del_rule_fails")]
     #[fuchsia::test]
     async fn test_rule_request(
         rule_fn: fn(RuleMessage) -> RtnlMessage,
         flags: u16,
-        expected_request: Option<RuleRequest>,
+        expected_request_args: Option<RuleRequestArgs>,
         mocked_rule_response: Result<(), Errno>,
         expected_response: Option<ExpectedResponse>,
     ) {
@@ -2964,7 +2983,7 @@ mod test {
             v4_routes_request_sink,
             v6_routes_request_sink,
             rules_request_handler: FakeRuleRequestHandler {
-                expected_request,
+                expected_request_args,
                 response: mocked_rule_response,
             },
         };

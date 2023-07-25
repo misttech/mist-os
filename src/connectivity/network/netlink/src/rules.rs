@@ -8,7 +8,12 @@
 
 use netlink_packet_route::rtnl::RuleMessage;
 
-use crate::netlink_packet::errno::Errno;
+use crate::{
+    client::InternalClient,
+    messaging::Sender,
+    netlink_packet::errno::Errno,
+    protocol_family::{route::NetlinkRoute, ProtocolFamily},
+};
 
 /// A table of PBR rules.
 ///
@@ -21,7 +26,7 @@ pub(crate) struct RuleTable {}
 
 /// The set of possible requests related to PBR rules.
 #[derive(Debug, Clone, PartialEq)]
-pub(crate) enum RuleRequest {
+pub(crate) enum RuleRequestArgs {
     /// A RTM_GETRULE request with the NLM_F_DUMP flag set.
     /// Note that non-dump RTM_GETRULE requests are not supported by Netlink
     /// (this is also true on Linux).
@@ -32,14 +37,30 @@ pub(crate) enum RuleRequest {
     Del(RuleMessage),
 }
 
-/// Handler trait for NETLINK_ROUTE requests related to PBR rules.
-pub(crate) trait RuleRequestHandler: Clone + Send + 'static {
-    fn handle_request(&mut self, req: RuleRequest) -> Result<(), Errno>;
+/// A Netlink request related to PBR rules.
+pub(crate) struct RuleRequest<S: Sender<<NetlinkRoute as ProtocolFamily>::InnerMessage>> {
+    /// The arguments for this request.
+    pub(crate) args: RuleRequestArgs,
+    /// The request's sequence number.
+    pub(crate) sequence_number: u32,
+    /// The client that made the request.
+    pub(crate) client: InternalClient<NetlinkRoute, S>,
 }
 
-impl RuleRequestHandler for RuleTable {
-    fn handle_request(&mut self, _req: RuleRequest) -> Result<(), Errno> {
+/// Handler trait for NETLINK_ROUTE requests related to PBR rules.
+pub(crate) trait RuleRequestHandler<S: Sender<<NetlinkRoute as ProtocolFamily>::InnerMessage>>:
+    Clone + Send + 'static
+{
+    fn handle_request(&mut self, req: RuleRequest<S>) -> Result<(), Errno>;
+}
+
+impl<S: Sender<<NetlinkRoute as ProtocolFamily>::InnerMessage>> RuleRequestHandler<S>
+    for RuleTable
+{
+    fn handle_request(&mut self, req: RuleRequest<S>) -> Result<(), Errno> {
         // TODO(https://issuetracker.google.com/283134947): Stub rule requests.
+        #[allow(unused_variables)]
+        let RuleRequest { args, sequence_number, client } = req;
         Ok(())
     }
 }
