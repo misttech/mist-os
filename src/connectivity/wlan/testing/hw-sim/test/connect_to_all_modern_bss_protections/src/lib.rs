@@ -4,6 +4,7 @@
 
 use {
     fidl_fuchsia_wlan_policy as fidl_policy,
+    fidl_test_wlan_realm::WlanConfig,
     fuchsia_zircon::prelude::*,
     ieee80211::{Bssid, Ssid},
     tracing::info,
@@ -11,18 +12,20 @@ use {
     wlan_hw_sim::*,
 };
 
-/// Test connections against all modern (non-WEP/WPA1) BSS protection types.
-#[fuchsia_async::run_singlethreaded(test)]
+/// Test connections against all modern bool (non-WEP/WPA1) BSS protection types.
+#[fuchsia::test]
 async fn connect_to_modern_wpa_network() {
-    init_syslog();
-
     let bss = Bssid(*b"wpaok!");
     // ssid, password, and psk are from "test case 2" of IEEE Std 802.11-2020 Annex J.4.2
     let ssid = Ssid::try_from("ThisIsASSID").unwrap();
     let password = Some("ThisIsAPassword");
     let psk = Some("0dc0d6eb90555ed6419756b9a15ec3e3209b63df707dd508d14581f8982721af");
 
-    let mut helper = test_utils::TestHelper::begin_test(default_wlantap_config_client()).await;
+    let mut helper = test_utils::TestHelper::begin_test(
+        default_wlantap_config_client(),
+        WlanConfig { use_legacy_privacy: Some(false), ..Default::default() },
+    )
+    .await;
     let () = loop_until_iface_is_found(&mut helper).await;
 
     let combinations = vec![
@@ -53,6 +56,7 @@ async fn connect_to_modern_wpa_network() {
         (Protection::Wpa3Personal, fidl_policy::SecurityType::Wpa3, password),
     ];
 
+    let test_realm_proxy = helper.test_realm_proxy();
     for (bss_protection, policy_security_type, credential) in combinations {
         info!(
             "Starting connection test for {} with Policy security {:?} and credential {:?}",
@@ -72,7 +76,7 @@ async fn connect_to_modern_wpa_network() {
 
         // Remove the network and await disconnection
         let (client_controller, mut client_state_update_stream) =
-            wlan_hw_sim::init_client_controller().await;
+            wlan_hw_sim::init_client_controller(&test_realm_proxy).await;
         remove_network(
             &client_controller,
             &ssid,

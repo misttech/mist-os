@@ -12,6 +12,7 @@ rustc_library("wlan-hw-sim") {
   edition = "2021"
 
   deps = [
+    "./testing/fidl:test.wlan.realm_rust",
     "//sdk/fidl/fuchsia.driver.test:fuchsia.driver.test_rust",
     "//sdk/fidl/fuchsia.hardware.network:fuchsia.hardware.network_rust",
     "//sdk/fidl/fuchsia.io:fuchsia.io_rust",
@@ -32,13 +33,13 @@ rustc_library("wlan-hw-sim") {
     "//src/connectivity/wlan/lib/ieee80211",
     "//src/connectivity/wlan/lib/rsn:wlan-rsn",
     "//src/connectivity/wlan/testing/wlantap-client",
-    "//src/lib/diagnostics/log/rust",
     "//src/lib/fdio/rust:fdio",
     "//src/lib/fidl/rust/fidl",
     "//src/lib/fuchsia-async",
     "//src/lib/fuchsia-component",
     "//src/lib/fuchsia-fs",
     "//src/lib/zircon/rust:fuchsia-zircon",
+    "//src/testing/realm_proxy",
     "//third_party/rust_crates:anyhow",
     "//third_party/rust_crates:futures",
     "//third_party/rust_crates:hex",

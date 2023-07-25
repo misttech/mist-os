@@ -15,8 +15,9 @@ use {
     fidl_fuchsia_wlan_device_service::DeviceMonitorMarker,
     fidl_fuchsia_wlan_ieee80211 as fidl_ieee80211,
     fidl_fuchsia_wlan_sme::{self as fidl_sme, ClientSmeProxy, ConnectRequest},
-    fidl_fuchsia_wlan_tap as fidl_tap, fuchsia_async as fasync,
-    fuchsia_component::client::connect_to_protocol,
+    fidl_fuchsia_wlan_tap as fidl_tap,
+    fidl_test_wlan_realm::WlanConfig,
+    fuchsia_async as fasync,
     fuchsia_zircon::DurationNum,
     futures::{
         channel::oneshot, future, join, stream::TryStreamExt, FutureExt, StreamExt, TryFutureExt,
@@ -128,16 +129,23 @@ fn scan_and_transmit_to_ap<'h>(
 
 /// Spawn two client and one AP wlantap devices. Verify that both clients connect to the AP by
 /// sending ethernet frames.
-#[fuchsia_async::run_singlethreaded(test)]
+#[fuchsia::test]
 async fn multiple_clients_ap() {
-    init_syslog();
+    let ctx = test_utils::TestRealmContext::new(WlanConfig {
+        use_legacy_privacy: Some(false),
+        ..Default::default()
+    })
+    .await;
 
-    let wlan_monitor_svc =
-        connect_to_protocol::<DeviceMonitorMarker>().expect("connecting to device monitor service");
+    let wlan_monitor_svc = ctx
+        .test_realm_proxy()
+        .connect_to_protocol::<DeviceMonitorMarker>()
+        .await
+        .expect("connecting to device monitor service");
 
     let network_config = NetworkConfigBuilder::open().ssid(&AP_SSID);
 
-    let mut dc = CreateDeviceHelper::new(&wlan_monitor_svc);
+    let mut dc = CreateDeviceHelper::new(ctx, &wlan_monitor_svc);
 
     let (mut ap_helper, _) = dc
         .create_device(default_wlantap_config_ap(), Some(network_config))

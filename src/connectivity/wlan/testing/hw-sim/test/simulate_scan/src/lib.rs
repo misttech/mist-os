@@ -4,6 +4,7 @@
 
 use {
     fidl_fuchsia_wlan_policy as fidl_policy,
+    fidl_test_wlan_realm::WlanConfig,
     ieee80211::{Bssid, Ssid},
     lazy_static::lazy_static,
     pin_utils::pin_mut,
@@ -32,15 +33,19 @@ lazy_static! {
 // but the results of wlanstack itself are untested.
 /// Test scan is working by simulating some fake APs that sends out beacon frames on specific
 /// channel and verify all beacon frames are correctly reported as valid networks.
-#[fuchsia_async::run_singlethreaded(test)]
+#[fuchsia::test]
 async fn simulate_scan() {
-    init_syslog();
-    let mut helper = test_utils::TestHelper::begin_test(default_wlantap_config_client()).await;
+    let mut helper = test_utils::TestHelper::begin_test(
+        default_wlantap_config_client(),
+        WlanConfig { use_legacy_privacy: Some(false), ..Default::default() },
+    )
+    .await;
     let () = loop_until_iface_is_found(&mut helper).await;
     let phy = helper.proxy();
 
     // Create a client controller.
-    let (client_controller, _update_stream) = init_client_controller().await;
+    let (client_controller, _update_stream) =
+        init_client_controller(&helper.test_realm_proxy()).await;
 
     let scan_result_list_fut = test_utils::policy_scan_for_networks(client_controller);
     pin_mut!(scan_result_list_fut);

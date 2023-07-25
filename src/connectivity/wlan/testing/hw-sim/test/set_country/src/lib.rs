@@ -6,7 +6,7 @@ use {
     fidl_fuchsia_wlan_device_service::{
         DeviceMonitorMarker, DeviceMonitorProxy, SetCountryRequest,
     },
-    fuchsia_component::client::connect_to_protocol,
+    fidl_test_wlan_realm::WlanConfig,
     fuchsia_zircon::sys::ZX_OK,
     fuchsia_zircon::DurationNum,
     futures::channel::oneshot,
@@ -28,14 +28,19 @@ async fn set_country_and_await_match<'a>(
 /// Test two things:
 ///  - If wlantap PHY device received the specified test country code
 ///  - If the SetCountry() returned successfully (ZX_OK).
-#[fuchsia_async::run_singlethreaded(test)]
+#[fuchsia::test]
 async fn set_country() {
-    init_syslog();
-
     const ALPHA2: &[u8; 2] = b"RS";
 
-    let mut helper = test_utils::TestHelper::begin_test(default_wlantap_config_client()).await;
-    let svc = connect_to_protocol::<DeviceMonitorMarker>()
+    let mut helper = test_utils::TestHelper::begin_test(
+        default_wlantap_config_client(),
+        WlanConfig { use_legacy_privacy: Some(false), ..Default::default() },
+    )
+    .await;
+    let svc = helper
+        .test_realm_proxy()
+        .connect_to_protocol::<DeviceMonitorMarker>()
+        .await
         .expect("Failed to connect to wlandevicemonitor");
 
     let resp = svc.list_phys().await.unwrap();

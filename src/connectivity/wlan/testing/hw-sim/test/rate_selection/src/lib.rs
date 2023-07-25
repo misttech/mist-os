@@ -6,6 +6,7 @@ use {
     anyhow::{Context, Error},
     fidl_fuchsia_wlan_common::{WlanTxResult, WlanTxResultCode, WlanTxResultEntry},
     fidl_fuchsia_wlan_policy as fidl_policy, fidl_fuchsia_wlan_tap as fidl_tap,
+    fidl_test_wlan_realm::WlanConfig,
     fuchsia_async::Interval,
     fuchsia_zircon::DurationNum,
     futures::{channel::mpsc, StreamExt},
@@ -27,8 +28,8 @@ use {
             buffered::{Buffered, DataFrame},
             Handler,
         },
-        init_syslog, loop_until_iface_is_found, netdevice_helper, test_utils, ApAdvertisement,
-        Beacon, AP_SSID, CLIENT_MAC_ADDR, ETH_DST_MAC,
+        loop_until_iface_is_found, netdevice_helper, test_utils, ApAdvertisement, Beacon, AP_SSID,
+        CLIENT_MAC_ADDR, ETH_DST_MAC,
     },
 };
 // Remedy for fxbug.dev/8165 (fxbug.dev/33151)
@@ -221,14 +222,11 @@ fn send_tx_result(
 }
 
 async fn send_eth_beacons<'a>(
+    client: netdevice_client::Client,
+    port: netdevice_client::Port,
     receiver: &'a mut mpsc::Receiver<Option<Maxima<TxVecCount>>>,
     phy: &'a fidl_tap::WlantapPhyProxy,
 ) -> Result<Maxima<TxVecCount>, Error> {
-    let (client, port) = netdevice_helper::create_client(fidl_fuchsia_net::MacAddress {
-        octets: CLIENT_MAC_ADDR.clone(),
-    })
-    .await
-    .expect("failed to create netdevice client");
     let (session, _task) = netdevice_helper::start_session(client, port).await;
 
     let mut buf: Vec<u8> = vec![];
@@ -270,14 +268,12 @@ async fn send_eth_beacons<'a>(
 /// Test rate selection is working correctly by verifying data rate is reduced once the Minstrel
 /// algorithm detects transmission failures. Transmission failures are simulated by fake tx status
 /// report created by the test.
-#[fuchsia_async::run_singlethreaded(test)]
+#[fuchsia::test]
 async fn rate_selection() {
-    init_syslog();
-
-    let mut helper = test_utils::TestHelper::begin_test(fidl_tap::WlantapPhyConfig {
-        quiet: true,
-        ..default_wlantap_config_client()
-    })
+    let mut helper = test_utils::TestHelper::begin_test(
+        fidl_tap::WlantapPhyConfig { quiet: true, ..default_wlantap_config_client() },
+        WlanConfig { use_legacy_privacy: Some(false), ..Default::default() },
+    )
     .await;
     let () = loop_until_iface_is_found(&mut helper).await;
 
@@ -294,7 +290,15 @@ async fn rate_selection() {
 
     let phy = helper.proxy();
     let (sender, mut receiver) = mpsc::channel(1);
-    let send_eth_beacons = send_eth_beacons(&mut receiver, &phy);
+
+    let (client, port) = netdevice_helper::create_client(
+        helper.devfs(),
+        fidl_fuchsia_net::MacAddress { octets: CLIENT_MAC_ADDR.clone() },
+    )
+    .await
+    .expect("failed to create netdevice client");
+
+    let send_eth_beacons = send_eth_beacons(client, port, &mut receiver, &phy);
     pin_mut!(send_eth_beacons);
 
     let mut tx_vec_counts = HashMap::new();

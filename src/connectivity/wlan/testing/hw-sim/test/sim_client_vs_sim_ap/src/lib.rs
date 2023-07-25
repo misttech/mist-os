@@ -5,6 +5,7 @@
 use {
     fidl_fuchsia_wlan_common as fidl_common, fidl_fuchsia_wlan_policy as fidl_policy,
     fidl_fuchsia_wlan_tap::WlantapPhyProxy,
+    fidl_test_wlan_realm::WlanConfig,
     fuchsia_zircon::DurationNum as _,
     futures::{channel::oneshot, join, TryFutureExt},
     pin_utils::pin_mut,
@@ -13,9 +14,9 @@ use {
     wlan_hw_sim::{
         default_wlantap_config_ap, default_wlantap_config_client,
         event::{self, action, Handler},
-        has_id_and_state, init_syslog, loop_until_iface_is_found, netdevice_helper,
-        rx_info_with_default_ap, test_utils, wait_until_client_state, Beacon, NetworkConfigBuilder,
-        AP_MAC_ADDR, AP_SSID, CLIENT_MAC_ADDR, ETH_DST_MAC, WLANCFG_DEFAULT_AP_CHANNEL,
+        has_id_and_state, loop_until_iface_is_found, netdevice_helper, rx_info_with_default_ap,
+        test_utils, wait_until_client_state, Beacon, NetworkConfigBuilder, AP_MAC_ADDR, AP_SSID,
+        CLIENT_MAC_ADDR, ETH_DST_MAC, WLANCFG_DEFAULT_AP_CHANNEL,
     },
 };
 
@@ -52,7 +53,8 @@ async fn verify_client_connects_to_ap(
     client_helper: &mut test_utils::TestHelper,
     ap_helper: &mut test_utils::TestHelper,
 ) {
-    let (client_controller, update_stream) = wlan_hw_sim::init_client_controller().await;
+    let (client_controller, update_stream) =
+        wlan_hw_sim::init_client_controller(&client_helper.test_realm_proxy()).await;
 
     let (sender, connect_confirm_receiver) = oneshot::channel();
     let network_config = NetworkConfigBuilder::protected(
@@ -247,15 +249,16 @@ async fn verify_ethernet_in_both_directions(
     client_helper: &mut test_utils::TestHelper,
     ap_helper: &mut test_utils::TestHelper,
 ) {
-    let (client_netdevice, client_port) =
-        netdevice_helper::create_client(fidl_fuchsia_net::MacAddress {
-            octets: CLIENT_MAC_ADDR.clone(),
-        })
-        .await
-        .expect("failed to create netdevice client for client");
-    let (ap_netdevice, ap_port) = netdevice_helper::create_client(fidl_fuchsia_net::MacAddress {
-        octets: AP_MAC_ADDR.0.clone(),
-    })
+    let (client_netdevice, client_port) = netdevice_helper::create_client(
+        &client_helper.devfs(),
+        fidl_fuchsia_net::MacAddress { octets: CLIENT_MAC_ADDR.clone() },
+    )
+    .await
+    .expect("failed to create netdevice client for client");
+    let (ap_netdevice, ap_port) = netdevice_helper::create_client(
+        &ap_helper.devfs(),
+        fidl_fuchsia_net::MacAddress { octets: AP_MAC_ADDR.0.clone() },
+    )
     .await
     .expect("failed to create netdevice client for AP");
 
@@ -319,23 +322,28 @@ async fn verify_ethernet_in_both_directions(
 
 /// Spawn two wlantap devices, one as client, the other AP. Verify the client connects to the AP
 /// and ethernet frames can reach each other from both ends.
-#[fuchsia_async::run_singlethreaded(test)]
+#[fuchsia::test]
 async fn sim_client_vs_sim_ap() {
-    init_syslog();
-
     let network_config = NetworkConfigBuilder::protected(
         fidl_policy::SecurityType::Wpa2,
         &PASS_PHRASE.as_bytes().to_vec(),
     )
     .ssid(&AP_SSID);
 
-    let mut client_helper =
-        test_utils::TestHelper::begin_test(default_wlantap_config_client()).await;
+    let mut client_helper = test_utils::TestHelper::begin_test(
+        default_wlantap_config_client(),
+        WlanConfig { use_legacy_privacy: Some(false), ..Default::default() },
+    )
+    .await;
     let client_proxy = client_helper.proxy();
     let () = loop_until_iface_is_found(&mut client_helper).await;
 
-    let mut ap_helper =
-        test_utils::TestHelper::begin_ap_test(default_wlantap_config_ap(), network_config).await;
+    let mut ap_helper = test_utils::TestHelper::begin_ap_test(
+        default_wlantap_config_ap(),
+        network_config,
+        WlanConfig { use_legacy_privacy: Some(false), ..Default::default() },
+    )
+    .await;
     let ap_proxy = ap_helper.proxy();
 
     verify_client_connects_to_ap(&client_proxy, &ap_proxy, &mut client_helper, &mut ap_helper)

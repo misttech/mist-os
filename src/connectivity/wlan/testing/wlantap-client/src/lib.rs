@@ -2,7 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {anyhow::Error, fidl_fuchsia_wlan_tap as wlantap, fuchsia_zircon as zx};
+use {
+    anyhow::Error, fidl_fuchsia_io as fio, fidl_fuchsia_wlan_tap as wlantap, fuchsia_zircon as zx,
+};
 
 pub struct Wlantap {
     proxy: wlantap::WlantapCtlProxy,
@@ -11,8 +13,12 @@ pub struct Wlantap {
 impl Wlantap {
     pub async fn open() -> Result<Self, Error> {
         let dir = fuchsia_fs::directory::open_in_namespace("/dev", fuchsia_fs::OpenFlags::empty())?;
+        Self::open_from_devfs(&dir).await
+    }
+
+    pub async fn open_from_devfs(devfs: &fio::DirectoryProxy) -> Result<Self, Error> {
         let proxy = device_watcher::recursive_wait_and_open::<wlantap::WlantapCtlMarker>(
-            &dir,
+            devfs,
             "sys/test/wlantapctl",
         )
         .await?;

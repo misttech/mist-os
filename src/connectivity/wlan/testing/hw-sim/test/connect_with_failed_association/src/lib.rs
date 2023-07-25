@@ -5,6 +5,7 @@
 use {
     fidl_fuchsia_wlan_ieee80211 as fidl_ieee80211, fidl_fuchsia_wlan_policy as fidl_policy,
     fidl_fuchsia_wlan_tap as fidl_tap,
+    fidl_test_wlan_realm::WlanConfig,
     fuchsia_zircon::DurationNum,
     ieee80211::{Bssid, Ssid},
     pin_utils::pin_mut,
@@ -76,17 +77,19 @@ async fn save_network_and_await_failed_connection(
 
 /// Test a client connect attempt fails if the association response contains a status code that is
 /// not success.
-#[fuchsia_async::run_singlethreaded(test)]
+#[fuchsia::test]
 async fn connect_with_failed_association() {
     const BSSID: Bssid = Bssid([0x62, 0x73, 0x73, 0x66, 0x6f, 0x6f]);
 
-    init_syslog();
-
-    let mut helper = test_utils::TestHelper::begin_test(default_wlantap_config_client()).await;
+    let mut helper = test_utils::TestHelper::begin_test(
+        default_wlantap_config_client(),
+        WlanConfig { use_legacy_privacy: Some(false), ..Default::default() },
+    )
+    .await;
     let () = loop_until_iface_is_found(&mut helper).await;
 
     let (mut client_controller, mut client_state_update_stream) =
-        wlan_hw_sim::init_client_controller().await;
+        wlan_hw_sim::init_client_controller(&helper.test_realm_proxy()).await;
     let save_network_fut = save_network_and_await_failed_connection(
         &mut client_controller,
         &mut client_state_update_stream,

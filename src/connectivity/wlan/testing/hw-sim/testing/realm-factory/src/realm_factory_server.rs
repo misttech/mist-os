@@ -7,7 +7,7 @@ use crate::realm_factory_impl::*;
 use {
     anyhow::{Error, Result},
     fidl_server::*,
-    fidl_test_wlan_realm as ftest, fuchsia_async as fasync,
+    fidl_test_wlan_realm as fidl_realm, fuchsia_async as fasync,
     futures::lock::Mutex,
     std::sync::Arc,
 };
@@ -22,17 +22,17 @@ impl RealmFactoryServer {
 }
 
 #[async_trait::async_trait]
-impl AsyncRequestHandler<ftest::RealmFactoryMarker> for RealmFactoryServer {
-    async fn handle_request(&self, request: ftest::RealmFactoryRequest) -> Result<(), Error> {
+impl AsyncRequestHandler<fidl_realm::RealmFactoryMarker> for RealmFactoryServer {
+    async fn handle_request(&self, request: fidl_realm::RealmFactoryRequest) -> Result<(), Error> {
         match request {
-            ftest::RealmFactoryRequest::SetRealmOptions { options, responder } => {
+            fidl_realm::RealmFactoryRequest::SetRealmOptions { options, responder } => {
                 let mut imp = self.imp.lock().await;
                 imp.set_realm_options(options)?;
                 responder.send(Ok(()))?;
                 Ok(())
             }
 
-            ftest::RealmFactoryRequest::CreateRealm { realm_server, responder } => {
+            fidl_realm::RealmFactoryRequest::CreateRealm { realm_server, responder } => {
                 let mut imp = self.imp.lock().await;
                 let realm = imp.create_realm().await?;
                 fasync::Task::spawn(async move {

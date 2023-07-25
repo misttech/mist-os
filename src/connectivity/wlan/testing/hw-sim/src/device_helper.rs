@@ -8,17 +8,22 @@ use {
     fidl_fuchsia_wlan_sme::{ApSmeProxy, ClientSmeProxy},
     fidl_fuchsia_wlan_tap::WlantapPhyConfig,
     fuchsia_zircon::DurationNum,
+    std::sync::Arc,
     tracing::info,
 };
 
 pub struct CreateDeviceHelper<'a> {
     dev_monitor: &'a DeviceMonitorProxy,
     iface_ids: Vec<u16>,
+    ctx: Arc<test_utils::TestRealmContext>,
 }
 
 impl<'a> CreateDeviceHelper<'a> {
-    pub fn new(dev_monitor: &'a DeviceMonitorProxy) -> CreateDeviceHelper<'a> {
-        return CreateDeviceHelper { dev_monitor, iface_ids: vec![] };
+    pub fn new(
+        ctx: Arc<test_utils::TestRealmContext>,
+        dev_monitor: &'a DeviceMonitorProxy,
+    ) -> CreateDeviceHelper<'a> {
+        return CreateDeviceHelper { ctx, dev_monitor, iface_ids: vec![] };
     }
 
     pub async fn create_device(
@@ -28,9 +33,14 @@ impl<'a> CreateDeviceHelper<'a> {
     ) -> Result<(test_utils::TestHelper, u16), anyhow::Error> {
         let helper = match network_config {
             Some(network_config) => {
-                test_utils::TestHelper::begin_ap_test(config, network_config).await
+                test_utils::TestHelper::begin_ap_test_with_context(
+                    self.ctx.clone(),
+                    config,
+                    network_config,
+                )
+                .await
             }
-            None => test_utils::TestHelper::begin_test(config).await,
+            None => test_utils::TestHelper::begin_test_with_context(self.ctx.clone(), config).await,
         };
 
         let iface_id = get_first_matching_iface_id(self.dev_monitor, |iface| {

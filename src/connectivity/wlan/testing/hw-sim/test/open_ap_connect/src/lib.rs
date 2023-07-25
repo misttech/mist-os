@@ -4,6 +4,7 @@
 
 use {
     fidl_fuchsia_wlan_ieee80211 as fidl_ieee80211,
+    fidl_test_wlan_realm::WlanConfig,
     fuchsia_zircon::DurationNum,
     futures::channel::oneshot,
     hex,
@@ -21,10 +22,8 @@ use {
 /// Test WLAN AP implementation by simulating a client that sends out authentication and
 /// association *request* frames. Verify AP responds correctly with authentication and
 /// association *response* frames, respectively.
-#[fuchsia_async::run_singlethreaded(test)]
+#[fuchsia::test]
 async fn open_ap_connect() {
-    init_syslog();
-
     // --- start test data block
 
     // frame 1 and 3 from ios12.1-connect-open-ap.pcapng
@@ -39,8 +38,12 @@ async fn open_ap_connect() {
 
     // Start up the AP
     let network_config = NetworkConfigBuilder::open().ssid(&AP_SSID);
-    let mut helper =
-        test_utils::TestHelper::begin_ap_test(default_wlantap_config_ap(), network_config).await;
+    let mut helper = test_utils::TestHelper::begin_ap_test(
+        default_wlantap_config_ap(),
+        network_config,
+        WlanConfig { use_legacy_privacy: Some(false), ..Default::default() },
+    )
+    .await;
 
     // (client->ap) send a mock auth req
     let proxy = helper.proxy();

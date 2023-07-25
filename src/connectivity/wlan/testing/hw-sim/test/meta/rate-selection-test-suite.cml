@@ -7,6 +7,9 @@
         "sys/component/realm_builder.shard.cml",
         "syslog/client.shard.cml",
     ],
+    program: {
+        binary: "bin/rate_selection_test_main",
+    },
     use: [
         { protocol: "test.wlan.realm.RealmFactory" },
     ],

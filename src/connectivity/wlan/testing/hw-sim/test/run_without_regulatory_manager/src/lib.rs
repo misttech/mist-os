@@ -5,21 +5,31 @@
 use {
     fidl::endpoints::{create_endpoints, create_proxy},
     fidl_fuchsia_wlan_policy as fidl_policy,
-    fuchsia_component::client::connect_to_protocol,
+    fidl_test_wlan_realm::WlanConfig,
     pin_utils::pin_mut,
     wlan_hw_sim::{event::action, *},
 };
 
 /// Test that we can connect to the policy service to discover a client interface when the
 /// RegulatoryRegionWatcher cannot be reached.
-#[fuchsia_async::run_singlethreaded(test)]
+#[fuchsia::test]
 async fn run_without_regulatory_manager() {
-    init_syslog();
-    let mut helper = test_utils::TestHelper::begin_test(default_wlantap_config_client()).await;
+    let mut helper = test_utils::TestHelper::begin_test(
+        default_wlantap_config_client(),
+        WlanConfig {
+            use_legacy_privacy: Some(false),
+            with_regulatory_region: Some(false),
+            ..Default::default()
+        },
+    )
+    .await;
     let () = loop_until_iface_is_found(&mut helper).await;
 
     // Connect to the client policy service and get a client controller.
-    let policy_provider = connect_to_protocol::<fidl_policy::ClientProviderMarker>()
+    let policy_provider = helper
+        .test_realm_proxy()
+        .connect_to_protocol::<fidl_policy::ClientProviderMarker>()
+        .await
         .expect("connecting to wlan policy");
     let (client_controller, server_end) = create_proxy().expect("creating client controller");
     let (update_client_end, _update_server_end) = create_endpoints();

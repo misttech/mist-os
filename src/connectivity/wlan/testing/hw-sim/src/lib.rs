@@ -14,12 +14,12 @@ use {
     fidl_fuchsia_wlan_common::WlanMacRole,
     fidl_fuchsia_wlan_mlme as fidl_mlme, fidl_fuchsia_wlan_policy as fidl_policy,
     fidl_fuchsia_wlan_tap::{WlanRxInfo, WlantapPhyConfig, WlantapPhyProxy},
-    fuchsia_component::client::connect_to_protocol,
     fuchsia_zircon as zx,
     fuchsia_zircon::prelude::*,
     ieee80211::{Bssid, Ssid},
     lazy_static::lazy_static,
     pin_utils::pin_mut,
+    realm_proxy::client::RealmProxyClient,
     std::{convert::TryFrom, future::Future, marker::Unpin},
     wlan_common::{
         bss::Protection,
@@ -523,13 +523,14 @@ impl ApAdvertisement for ProbeResponse {
 }
 
 pub async fn save_network_and_wait_until_connected(
+    realm_proxy: &RealmProxyClient,
     ssid: &Ssid,
     security_type: fidl_policy::SecurityType,
     credential: fidl_policy::Credential,
 ) -> (fidl_policy::ClientControllerProxy, fidl_policy::ClientStateUpdatesRequestStream) {
     // Connect to the client policy service and get a client controller.
     let (client_controller, mut client_state_update_stream) =
-        wlancfg_helper::init_client_controller().await;
+        wlancfg_helper::init_client_controller(realm_proxy).await;
 
     save_network(&client_controller, ssid, security_type, credential).await;
 
@@ -652,8 +653,10 @@ pub async fn connect_or_timeout(
         }
     };
 
+    let test_realm_proxy = helper.test_realm_proxy();
     let credential = password_or_psk_to_policy_credential(password_or_psk);
-    let connect = save_network_and_wait_until_connected(ssid, security_type, credential);
+    let connect =
+        save_network_and_wait_until_connected(&test_realm_proxy, ssid, security_type, credential);
     pin_mut!(connect);
     connect_or_timeout_with(helper, timeout, ssid, bssid, bss_protection, authenticator, connect)
         .await;
@@ -693,7 +696,10 @@ pub fn rx_wlan_data_frame(
 
 pub async fn loop_until_iface_is_found(helper: &mut test_utils::TestHelper) {
     // Connect to the client policy service and get a client controller.
-    let policy_provider = connect_to_protocol::<fidl_policy::ClientProviderMarker>()
+    let policy_provider = helper
+        .test_realm_proxy()
+        .connect_to_protocol::<fidl_policy::ClientProviderMarker>()
+        .await
         .expect("connecting to wlan policy");
     let (client_controller, server_end) = create_proxy().expect("creating client controller");
     let (update_client_end, _update_server_end) = create_endpoints();
@@ -733,8 +739,4 @@ pub async fn loop_until_iface_is_found(helper: &mut test_utils::TestHelper) {
             Ok(_) => return,
         }
     }
-}
-
-pub fn init_syslog() {
-    diagnostics_log::initialize(diagnostics_log::PublishOptions::default()).expect("init logging");
 }

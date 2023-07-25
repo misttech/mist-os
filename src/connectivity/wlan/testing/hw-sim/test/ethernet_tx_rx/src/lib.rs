@@ -4,6 +4,7 @@
 
 use {
     fidl_fuchsia_wlan_policy as fidl_policy,
+    fidl_test_wlan_realm::WlanConfig,
     fuchsia_zircon::DurationNum,
     ieee80211::Bssid,
     netdevice_client,
@@ -20,8 +21,8 @@ use {
             self,
             buffered::{Buffered, DataFrame},
         },
-        init_syslog, loop_until_iface_is_found, netdevice_helper, rx_wlan_data_frame, test_utils,
-        AP_SSID, CLIENT_MAC_ADDR, ETH_DST_MAC,
+        loop_until_iface_is_found, netdevice_helper, rx_wlan_data_frame, test_utils, AP_SSID,
+        CLIENT_MAC_ADDR, ETH_DST_MAC,
     },
 };
 
@@ -92,11 +93,13 @@ async fn verify_tx_and_rx(
 
 /// Test an ethernet device using netdevice backed by WLAN device and send and receive data
 /// frames by verifying frames are delivered without any change in both directions.
-#[fuchsia_async::run_singlethreaded(test)]
+#[fuchsia::test]
 async fn ethernet_tx_rx() {
-    init_syslog();
-
-    let mut helper = test_utils::TestHelper::begin_test(default_wlantap_config_client()).await;
+    let mut helper = test_utils::TestHelper::begin_test(
+        default_wlantap_config_client(),
+        WlanConfig { use_legacy_privacy: Some(false), ..Default::default() },
+    )
+    .await;
     let () = loop_until_iface_is_found(&mut helper).await;
 
     connect_or_timeout(
@@ -110,9 +113,10 @@ async fn ethernet_tx_rx() {
     )
     .await;
 
-    let (client, port) = netdevice_helper::create_client(fidl_fuchsia_net::MacAddress {
-        octets: CLIENT_MAC_ADDR.clone(),
-    })
+    let (client, port) = netdevice_helper::create_client(
+        &helper.devfs(),
+        fidl_fuchsia_net::MacAddress { octets: CLIENT_MAC_ADDR.clone() },
+    )
     .await
     .expect("failed to create netdevice client");
     let (session, _task) = netdevice_helper::start_session(client, port).await;

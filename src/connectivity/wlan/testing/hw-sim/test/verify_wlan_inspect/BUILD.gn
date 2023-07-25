@@ -7,6 +7,8 @@ import("//build/rust/rustc_test.gni")
 rustc_test("verify_wlan_inspect") {
   edition = "2021"
   deps = [
+    "../../testing/fidl:test.wlan.realm_rust",
+    "//sdk/fidl/fuchsia.diagnostics:fuchsia.diagnostics_rust",
     "//sdk/fidl/fuchsia.wlan.policy:fuchsia.wlan.policy_rust",
     "//src/connectivity/wlan/lib/common/rust:wlan-common",
     "//src/connectivity/wlan/lib/ieee80211",
@@ -14,8 +16,9 @@ rustc_test("verify_wlan_inspect") {
     "//src/lib/diagnostics/hierarchy/rust",
     "//src/lib/diagnostics/inspect/rust",
     "//src/lib/diagnostics/reader/rust",
-    "//src/lib/fuchsia-async",
+    "//src/lib/fuchsia",
     "//src/lib/zircon/rust:fuchsia-zircon",
+    "//src/testing/realm_proxy",
     "//third_party/rust_crates:anyhow",
     "//third_party/rust_crates:pin-utils",
   ]

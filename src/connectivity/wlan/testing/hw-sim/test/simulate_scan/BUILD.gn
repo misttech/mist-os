@@ -7,11 +7,12 @@ import("//build/rust/rustc_test.gni")
 rustc_test("simulate_scan") {
   edition = "2021"
   deps = [
+    "../../testing/fidl:test.wlan.realm_rust",
     "//sdk/fidl/fuchsia.wlan.policy:fuchsia.wlan.policy_rust",
     "//src/connectivity/wlan/lib/common/rust:wlan-common",
     "//src/connectivity/wlan/lib/ieee80211",
     "//src/connectivity/wlan/testing/hw-sim:wlan-hw-sim",
-    "//src/lib/fuchsia-async",
+    "//src/lib/fuchsia",
     "//third_party/rust_crates:lazy_static",
     "//third_party/rust_crates:pin-utils",
   ]

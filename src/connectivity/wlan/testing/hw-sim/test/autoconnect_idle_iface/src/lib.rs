@@ -4,6 +4,7 @@
 
 use {
     fidl_fuchsia_wlan_common as fidl_common, fidl_fuchsia_wlan_policy as fidl_policy,
+    fidl_test_wlan_realm::WlanConfig,
     fuchsia_zircon::prelude::*,
     tracing::info,
     wlan_common::{assert_variant, bss::Protection},
@@ -12,10 +13,15 @@ use {
 
 /// Tests that an idle interface is automatically connected to a saved network, if present and
 /// available, when client connections are enabled.
-#[fuchsia_async::run_singlethreaded(test)]
+#[fuchsia::test]
 async fn autoconnect_idle_iface() {
-    init_syslog();
-    let (client_controller, mut client_state_update_stream) = get_client_controller().await;
+    let ctx = test_utils::TestRealmContext::new(WlanConfig {
+        use_legacy_privacy: Some(false),
+        ..Default::default()
+    })
+    .await;
+    let (client_controller, mut client_state_update_stream) =
+        get_client_controller(&ctx.test_realm_proxy()).await;
 
     wait_until_client_state(&mut client_state_update_stream, |update| {
         if update.state == Some(fidl_policy::WlanClientState::ConnectionsDisabled) {
@@ -48,10 +54,12 @@ async fn autoconnect_idle_iface() {
     // Drop client provider controller to allow another to be created in the test setup.
     drop(client_controller);
 
-    let mut helper = test_utils::TestHelper::begin_test(default_wlantap_config_client()).await;
+    let mut helper =
+        test_utils::TestHelper::begin_test_with_context(ctx, default_wlantap_config_client()).await;
     let () = loop_until_iface_is_found(&mut helper).await;
 
-    let (_client_controller, mut client_state_update_stream) = init_client_controller().await;
+    let (_client_controller, mut client_state_update_stream) =
+        init_client_controller(&helper.test_realm_proxy()).await;
 
     let wait_for_connect =
         Box::pin(wait_until_client_state(&mut client_state_update_stream, |update| {

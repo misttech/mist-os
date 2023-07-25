@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 use {
     fidl_fuchsia_wlan_policy as fidl_policy,
+    fidl_test_wlan_realm::WlanConfig,
     fuchsia_zircon::{self as zx, prelude::*},
     ieee80211::{Bssid, Ssid},
     pin_utils::pin_mut,
@@ -59,13 +60,17 @@ async fn fail_to_connect_or_timeout(
 /// Test a client fails to connect to a network if the wrong credential type is
 /// provided by the user. In particular, this occurs when a password should have
 /// been provided and was not, or vice-versa.
-#[fuchsia_async::run_singlethreaded(test)]
+#[fuchsia::test]
 async fn connect_with_bad_password() {
-    init_syslog();
-    let mut helper = test_utils::TestHelper::begin_test(default_wlantap_config_client()).await;
+    let mut helper = test_utils::TestHelper::begin_test(
+        default_wlantap_config_client(),
+        WlanConfig { use_legacy_privacy: Some(true), ..Default::default() },
+    )
+    .await;
     let () = loop_until_iface_is_found(&mut helper).await;
 
-    let (client_controller, mut client_state_update_stream) = init_client_controller().await;
+    let (client_controller, mut client_state_update_stream) =
+        init_client_controller(&helper.test_realm_proxy()).await;
     let mut supplicant = Supplicant {
         controller: &client_controller,
         state_update_stream: &mut client_state_update_stream,

@@ -3,35 +3,37 @@
 // found in the LICENSE file.
 
 use {
-    fuchsia_component::client::connect_to_protocol_at_path,
+    fidl::endpoints::{create_proxy, Proxy},
+    fuchsia_component::client::connect_to_named_protocol_at_dir_root,
     futures::{FutureExt as _, StreamExt as _, TryStreamExt as _},
     netdevice_client,
     wlan_common::{appendable::Appendable, big_endian::BigEndianU16, mac},
 };
 
-const NETDEV_DIRECTORY: &str = "/dev/class/network";
-
 /// Returns a Netdevice client with the specified MAC address, or None if none is found.
 pub async fn create_client(
+    devfs: &fidl_fuchsia_io::DirectoryProxy,
     mac: fidl_fuchsia_net::MacAddress,
 ) -> Option<(netdevice_client::Client, netdevice_client::Port)> {
     let (directory, directory_server) =
-        fidl::endpoints::create_proxy::<fidl_fuchsia_io::DirectoryMarker>().expect("create proxy");
-    fdio::service_connect(NETDEV_DIRECTORY, directory_server.into_channel().into())
-        .expect("connect to netdevice devfs");
-    let devices =
-        fuchsia_fs::directory::readdir(&directory).await.expect("readdir failed").into_iter().map(
-            |file| {
-                let filepath = std::path::Path::new(NETDEV_DIRECTORY).join(&file.name);
-                let filepath = filepath
-                    .to_str()
-                    .unwrap_or_else(|| panic!("{} failed to convert to str", filepath.display()));
-                connect_to_protocol_at_path::<fidl_fuchsia_hardware_network::DeviceInstanceMarker>(
-                    filepath,
-                )
-                .expect("creating proxy")
-            },
-        );
+        create_proxy::<fidl_fuchsia_io::DirectoryMarker>().expect("create proxy");
+
+    fdio::service_connect_at(
+        devfs.as_channel().as_ref(),
+        "class/network",
+        directory_server.into_channel(),
+    )
+    .expect("connect to /dev/class/network");
+
+    let dirents = fuchsia_fs::directory::readdir(&directory).await.expect("readdir failed");
+    let devices = dirents.into_iter().map(|file| {
+        tracing::info!("Found file name {:?}", file.name);
+        connect_to_named_protocol_at_dir_root::<
+                fidl_fuchsia_hardware_network::DeviceInstanceMarker,
+            >(&directory, &file.name)
+            .expect("creating proxy")
+    });
+
     let results = futures::stream::iter(devices).filter_map(|netdev_device| async move {
         let (device_proxy, device_server) =
             fidl::endpoints::create_proxy::<fidl_fuchsia_hardware_network::DeviceMarker>()

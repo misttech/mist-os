@@ -5,7 +5,7 @@
 use {
     anyhow::*,
     fidl::endpoints::ServerEnd,
-    fidl_fuchsia_io as fio, fidl_test_wlan_realm as ftest,
+    fidl_test_wlan_realm as fidl_realm,
     fuchsia_component_test::{
         Capability, ChildOptions, ChildRef, RealmBuilder, RealmInstance, Ref, Route,
     },
@@ -13,15 +13,15 @@ use {
 };
 
 pub(crate) struct RealmFactoryImpl {
-    realm_options: Option<ftest::RealmOptions>,
+    realm_options: Option<fidl_realm::RealmOptions>,
 }
 
 impl RealmFactoryImpl {
     pub fn new() -> Self {
-        Self { realm_options: Some(ftest::RealmOptions { ..Default::default() }) }
+        Self { realm_options: Some(fidl_realm::RealmOptions { ..Default::default() }) }
     }
 
-    pub fn set_realm_options(&mut self, options: ftest::RealmOptions) -> Result<(), Error> {
+    pub fn set_realm_options(&mut self, options: fidl_realm::RealmOptions) -> Result<(), Error> {
         match self.realm_options {
             None => bail!("the realm has already been created"),
             Some(_) => self.realm_options.replace(options),
@@ -163,10 +163,11 @@ async fn setup_regulatory_region(
     Ok(())
 }
 
-async fn build_realm(mut options: ftest::RealmOptions) -> Result<RealmInstance, Error> {
+async fn build_realm(mut options: fidl_realm::RealmOptions) -> Result<RealmInstance, Error> {
     info!("building the realm using options {:?}", options);
 
-    let wlan_config = options.wlan_config.unwrap_or(ftest::WlanConfig { ..Default::default() });
+    let wlan_config =
+        options.wlan_config.unwrap_or(fidl_realm::WlanConfig { ..Default::default() });
 
     let builder = RealmBuilder::new().await?;
 
@@ -222,8 +223,8 @@ async fn build_realm(mut options: ftest::RealmOptions) -> Result<RealmInstance, 
     let devfs = options.devfs_server_end.take().unwrap();
 
     realm.root.get_exposed_dir().open(
-        fio::OpenFlags::DIRECTORY,
-        fio::ModeType::empty(),
+        fidl_fuchsia_io::OpenFlags::DIRECTORY,
+        fidl_fuchsia_io::ModeType::empty(),
         "dev-topological",
         ServerEnd::new(devfs.into_channel()),
     )?;

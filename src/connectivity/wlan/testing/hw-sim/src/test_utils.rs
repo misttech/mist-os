@@ -6,13 +6,14 @@ use {
         event::{self, Handler},
         wlancfg_helper::{start_ap_and_wait_for_confirmation, NetworkConfigBuilder},
     },
-    fidl::endpoints::create_proxy,
-    fidl_fuchsia_driver_test as fdt, fidl_fuchsia_wlan_policy as fidl_policy,
-    fidl_fuchsia_wlan_tap as wlantap,
+    fidl::endpoints::{create_endpoints, create_proxy},
+    fidl_fuchsia_driver_test as fidl_driver_test, fidl_fuchsia_wlan_policy as fidl_policy,
+    fidl_fuchsia_wlan_tap as wlantap, fidl_test_wlan_realm as fidl_realm,
     fuchsia_async::{DurationExt, Time, TimeoutExt, Timer},
     fuchsia_component::client::connect_to_protocol,
-    fuchsia_zircon::{self as zx, prelude::*, sys::ZX_ERR_ALREADY_BOUND, zx_status_t},
+    fuchsia_zircon::{self as zx, prelude::*},
     futures::{channel::oneshot, FutureExt, StreamExt},
+    realm_proxy::client::RealmProxyClient,
     std::{
         fmt::Display,
         future::Future,
@@ -21,12 +22,102 @@ use {
         sync::Arc,
         task::{Context, Poll},
     },
-    tracing::{debug, info, warn},
+    tracing::{debug, info},
     wlan_common::test_utils::ExpectWithin,
     wlantap_client::Wlantap,
 };
+
+// Struct that allows a test suite to interact with the test realm.
+//
+// If the test suite needs to connect to a protocol exposed by the test realm, it MUST use the
+// context's realm_proxy and cannot use fuchsia_component::client::connect_to_protocol.
+//
+// Similarly, if the test suite needs to connect to /dev hosted by the test realm, it must use the
+// context's devfs. There is currently no way to access any other directories in the test realm. If
+// the test suite needs to access any other directories, the test realm factory implementation and
+// FIDL API will need to be changed.
+//
+// Example:
+//
+// // Create a new test realm context
+// let ctx = ctx::new(fidl_realm::WlanConfig{ ..Default::default() };
+//
+// // Connect to a protocol
+// let protocol_proxy = ctx.test_realm_proxy()
+//   .connect_to_protocol::<fidl_fuchsia_protocol::Protocol>()
+//   .await?;
+//
+// // Connect to dev/class/network in the test realm
+// let (directory, directory_server) =
+//      create_proxy::<fidl_fuchsia_io::DirectoryMarker>()?;
+//  fdio::service_connect_at(
+//     ctx.devfs().as_channel().as_ref(),
+//     "class/network",
+//     directory_server.into_channel(),
+//  )?;
+pub struct TestRealmContext {
+    // The test realm proxy client, which allows the test suite to connect to protocols exposed by
+    // the test realm.
+    test_realm_proxy: Arc<RealmProxyClient>,
+
+    // A directory proxy connected to "/dev" in the test realm.
+    devfs: fidl_fuchsia_io::DirectoryProxy,
+}
+
+impl TestRealmContext {
+    // Connect to the test realm factory to create and start a new test realm and return the test
+    // realm context. This will also start the driver test realm.
+    //
+    // Panics if any errors occur when the realm factory is being created.
+    pub async fn new(config: fidl_realm::WlanConfig) -> Arc<Self> {
+        let realm_factory = connect_to_protocol::<fidl_realm::RealmFactoryMarker>()
+            .expect("Could not connect to realm factory protocol");
+
+        let (realm_client, realm_server) = create_endpoints();
+        let (devfs_proxy, devfs_server) = create_proxy().expect("Could not create devfs proxy");
+
+        // Create the test realm through the realm factory
+        let options = fidl_realm::RealmOptions {
+            devfs_server_end: Some(devfs_server),
+            wlan_config: Some(config),
+            ..Default::default()
+        };
+
+        let _ =
+            realm_factory.set_realm_options(options).await.expect("Could not set realm options");
+        let _ = realm_factory.create_realm(realm_server).await.expect("Could not create realm");
+
+        // Start the driver test realm
+        let test_realm_proxy = RealmProxyClient::from(realm_client);
+        let driver_test_realm_proxy = test_realm_proxy
+            .connect_to_protocol::<fidl_driver_test::RealmMarker>()
+            .await
+            .expect("Failed to connect to driver test realm");
+
+        driver_test_realm_proxy
+            .start(fidl_driver_test::RealmArgs {
+                use_driver_framework_v2: Some(true),
+                ..Default::default()
+            })
+            .await
+            .expect("FIDL error when starting driver test realm")
+            .expect("Driver test realm server returned an error");
+
+        Arc::new(Self { test_realm_proxy: Arc::new(test_realm_proxy), devfs: devfs_proxy })
+    }
+
+    pub fn test_realm_proxy(&self) -> Arc<RealmProxyClient> {
+        self.test_realm_proxy.clone()
+    }
+
+    pub fn devfs(&self) -> &fidl_fuchsia_io::DirectoryProxy {
+        &self.devfs
+    }
+}
+
 type EventStream = wlantap::WlantapPhyEventStream;
 pub struct TestHelper {
+    ctx: Arc<TestRealmContext>,
     _wlantap: Wlantap,
     proxy: Arc<wlantap::WlantapPhyProxy>,
     event_stream: Option<EventStream>,
@@ -77,55 +168,111 @@ where
     }
 }
 impl TestHelper {
-    pub async fn begin_test(config: wlantap::WlantapPhyConfig) -> Self {
-        let mut helper = TestHelper::create_phy_and_helper(config).await;
+    // Create a client TestHelper with a new TestRealmContext.
+    // NOTE: if a test case creates multiple TestHelpers that should all share the same test realm,
+    // it should use TestHelper::begin_test_with_context.
+    pub async fn begin_test(
+        phy_config: wlantap::WlantapPhyConfig,
+        realm_config: fidl_realm::WlanConfig,
+    ) -> Self {
+        let ctx = TestRealmContext::new(realm_config).await;
+        Self::begin_test_with_context(ctx, phy_config).await
+    }
+
+    // Create client TestHelper with a given TestRealmContext.
+    // If a test case creates multiple TestHelpers that must refer to the same instance of WLAN
+    // components, then all TestHelpers must use a copy of the same TestRealmContext.
+    //
+    // Example:
+    //
+    // // Create a new test realm context
+    // let ctx = TestRealmContext::new(fidl_realm::WlanConfig{ ..Default::default() };
+    //
+    // // Create both helpers with copies of the same context
+    // let helper1 = TestHelper::begin_test_with_context(
+    //    ctx.clone(),
+    //    default_wlantap_client_config(),
+    // ).await;
+    //
+    // let helper2 = TestHelper::begin_test_with_context(
+    //    ctx.clone(),
+    //    default_wlantap_client_config()).await;
+    pub async fn begin_test_with_context(
+        ctx: Arc<TestRealmContext>,
+        config: wlantap::WlantapPhyConfig,
+    ) -> Self {
+        let mut helper = TestHelper::create_phy_and_helper(config, ctx).await;
         helper.wait_for_wlan_softmac_start().await;
         helper
     }
+
+    // Create an AP TestHelper with a new TestRealmContext.
+    // NOTE: if a test case creates multiple TestHelpers that should all share the same test realm,
+    // it should use TestHelper::begin_ap_test_with_context.
     pub async fn begin_ap_test(
+        phy_config: wlantap::WlantapPhyConfig,
+        network_config: NetworkConfigBuilder,
+        realm_config: fidl_realm::WlanConfig,
+    ) -> Self {
+        let ctx = TestRealmContext::new(realm_config).await;
+        Self::begin_ap_test_with_context(ctx, phy_config, network_config).await
+    }
+
+    // Create AP TestHelper with a given TestRealmContext.
+    // If a test case creates multiple TestHelpers that must refer to the same instance of WLAN
+    // components, then all TestHelpers must use a copy of the same TestRealmContext.
+    //
+    // Example:
+    //
+    // // Create a new test realm context
+    // let ctx = TestRealmContext::new(fidl_realm::WlanConfig{ ..Default::default() };
+    //
+    // // Create both helpers with copies of the same context
+    // let helper1 = TestHelper::begin_ap_test_with_context(
+    //    ctx.clone(),
+    //    default_wlantap_client_config(),
+    //    network_config1,
+    // ).await;
+    //
+    // let helper2 = TestHelper::begin_ap_test_with_context(
+    //    ctx.clone(),
+    //    default_wlantap_client_config(),
+    //    network_config2
+    // ).await;
+    pub async fn begin_ap_test_with_context(
+        ctx: Arc<TestRealmContext>,
         config: wlantap::WlantapPhyConfig,
         network_config: NetworkConfigBuilder,
     ) -> Self {
-        let mut helper = TestHelper::create_phy_and_helper(config).await;
-        start_ap_and_wait_for_confirmation(network_config).await;
+        let mut helper = TestHelper::create_phy_and_helper(config, ctx).await;
+        start_ap_and_wait_for_confirmation(&helper.ctx.test_realm_proxy, network_config).await;
         helper.wait_for_wlan_softmac_start().await;
         helper
     }
-    pub async fn start_driver_test_realm() -> Result<(), zx_status_t> {
-        // Start the driver test realm which should start a new driver manager/host that will bind
-        // all the drivers in the test.
-        let driver_test_realm_proxy = connect_to_protocol::<fdt::RealmMarker>()
-            .expect("Failed to connect to driver test realm");
-        driver_test_realm_proxy
-            .start(fdt::RealmArgs { use_driver_framework_v2: Some(true), ..Default::default() })
-            .await
-            .expect("FIDL error when starting driver test realm")
-    }
-    async fn create_phy_and_helper(config: wlantap::WlantapPhyConfig) -> Self {
+    async fn create_phy_and_helper(
+        config: wlantap::WlantapPhyConfig,
+        ctx: Arc<TestRealmContext>,
+    ) -> Self {
         // If injected, wlancfg does not start automatically in a test component.
         // Connecting to the service to start wlancfg so that it can create new interfaces.
-        let _wlan_proxy =
-            connect_to_protocol::<fidl_policy::ClientProviderMarker>().expect("starting wlancfg");
-
-        match TestHelper::start_driver_test_realm().await {
-            Ok(_) => (),
-            Err(e) => {
-                // The user may have already called start_driver_test_realm(), in which case
-                // we can ignore the error. Otherwise, we have some other error that means
-                // the test realm hasn't started.
-                if e == ZX_ERR_ALREADY_BOUND {
-                    warn!("Could not start driver test realm: already started");
-                } else {
-                    panic!("Failed to start driver test realm {:?}", e);
-                }
-            }
-        }
+        let _wlan_proxy = ctx
+            .test_realm_proxy
+            .connect_to_protocol::<fidl_policy::ClientProviderMarker>()
+            .await
+            .expect("starting wlancfg");
 
         // Trigger creation of wlantap serviced phy and iface for testing.
-        let wlantap = Wlantap::open().await.expect("Failed to open wlantapctl");
+        let wlantap =
+            Wlantap::open_from_devfs(&ctx.devfs).await.expect("Failed to open wlantapctl");
         let proxy = wlantap.create_phy(config).await.expect("Failed to create wlantap PHY");
         let event_stream = Some(proxy.take_event_stream());
-        TestHelper { _wlantap: wlantap, proxy: Arc::new(proxy), event_stream, is_stopped: false }
+        TestHelper {
+            ctx,
+            _wlantap: wlantap,
+            proxy: Arc::new(proxy),
+            event_stream,
+            is_stopped: false,
+        }
     }
     async fn wait_for_wlan_softmac_start(&mut self) {
         let (sender, receiver) = oneshot::channel::<()>();
@@ -140,6 +287,12 @@ impl TestHelper {
     }
     pub fn proxy(&self) -> Arc<wlantap::WlantapPhyProxy> {
         self.proxy.clone()
+    }
+    pub fn test_realm_proxy(&self) -> Arc<RealmProxyClient> {
+        self.ctx.test_realm_proxy()
+    }
+    pub fn devfs(&self) -> &fidl_fuchsia_io::DirectoryProxy {
+        self.ctx.devfs()
     }
     /// Will run the main future until it completes or when it has run past the specified duration.
     /// Note that any events that are observed on the event stream will be passed to the

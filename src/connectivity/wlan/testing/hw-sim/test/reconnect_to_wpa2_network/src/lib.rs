@@ -6,11 +6,14 @@ use {
     anyhow::format_err,
     fidl_fuchsia_wlan_ieee80211 as fidl_ieee80211, fidl_fuchsia_wlan_policy as fidl_policy,
     fidl_fuchsia_wlan_tap as fidl_tap,
+    fidl_test_wlan_realm::WlanConfig,
     fuchsia_async::Task,
     fuchsia_zircon::prelude::*,
     futures::channel::oneshot,
     ieee80211::{Bssid, Ssid},
     pin_utils::pin_mut,
+    realm_proxy::client::RealmProxyClient,
+    std::sync::Arc,
     wlan_common::{
         bss::Protection,
         channel::{Cbw, Channel},
@@ -27,6 +30,7 @@ use {
 };
 
 async fn run_policy_and_assert_transparent_reconnect(
+    test_realm_proxy: Arc<RealmProxyClient>,
     ssid: &'static Ssid,
     // TODO(fxbug.dev/130230): Unify security protocol types and respect this parameter.
     _protection: &Protection,
@@ -37,6 +41,7 @@ async fn run_policy_and_assert_transparent_reconnect(
     let protection = fidl_policy::SecurityType::Wpa2;
     // Connect to the client policy service and get a client controller.
     let (_client_controller, mut client_state_updates) = save_network_and_wait_until_connected(
+        &test_realm_proxy,
         ssid,
         protection,
         password_or_psk_to_policy_credential(password),
@@ -124,15 +129,17 @@ fn scan_and_reassociate<'h>(
 /// is capable of rebuilding the link on its own when the AP
 /// disassociates the client. In this test, no data is being sent
 /// after the link becomes up.
-#[fuchsia_async::run_singlethreaded(test)]
+#[fuchsia::test]
 async fn reconnect_to_wpa2_network() {
-    init_syslog();
-
     const BSSID: Bssid = Bssid(*b"wpa2ok");
     const PROTECTION: Protection = Protection::Wpa2Personal;
     const PASSWORD: &str = "wpa2good";
 
-    let mut helper = test_utils::TestHelper::begin_test(default_wlantap_config_client()).await;
+    let mut helper = test_utils::TestHelper::begin_test(
+        default_wlantap_config_client(),
+        WlanConfig { use_legacy_privacy: Some(false), ..Default::default() },
+    )
+    .await;
     let () = loop_until_iface_is_found(&mut helper).await;
 
     let phy = helper.proxy();
@@ -150,6 +157,7 @@ async fn reconnect_to_wpa2_network() {
     };
 
     let run_policy_future = run_policy_and_assert_transparent_reconnect(
+        helper.test_realm_proxy(),
         &AP_SSID,
         &PROTECTION,
         Some(PASSWORD),
