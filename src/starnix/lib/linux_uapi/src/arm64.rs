@@ -11697,6 +11697,14 @@ pub struct termio {
     pub __bindgen_padding_0: u8,
 }
 #[repr(C)]
+#[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes, FromZeroes)]
+pub struct tms {
+    pub tms_utime: __kernel_clock_t,
+    pub tms_stime: __kernel_clock_t,
+    pub tms_cutime: __kernel_clock_t,
+    pub tms_cstime: __kernel_clock_t,
+}
+#[repr(C)]
 #[derive(Debug, Copy, Clone, AsBytes, FromBytes, FromZeroes)]
 pub struct iovec {
     pub iov_base: uaddr,

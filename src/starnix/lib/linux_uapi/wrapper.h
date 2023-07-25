@@ -64,6 +64,7 @@
 #include <linux/sysinfo.h>
 #include <linux/termios.h>
 #include <linux/time.h>
+#include <linux/times.h>
 #include <linux/timerfd.h>
 #include <linux/uio.h>
 #include <linux/un.h>

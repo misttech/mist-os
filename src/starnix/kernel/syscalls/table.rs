@@ -274,6 +274,7 @@ pub fn dispatch_syscall(
         timerfd_create[2],
         timerfd_gettime[2],
         timerfd_settime[4],
+        times[1],
         tkill[2],
         truncate[2],
         umask[1],

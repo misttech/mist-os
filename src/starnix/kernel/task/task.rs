@@ -1140,7 +1140,7 @@ impl Task {
 
         TaskTimeStats {
             user_time: zx::Duration::from_nanos(info.cpu_time),
-            // TODO: How can we calculate system time?
+            // TODO(fxbug.dev/127682): How can we calculate system time?
             system_time: zx::Duration::default(),
         }
     }

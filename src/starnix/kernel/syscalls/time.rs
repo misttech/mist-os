@@ -380,6 +380,23 @@ pub fn sys_setitimer(
     Ok(())
 }
 
+pub fn sys_times(current_task: &CurrentTask, buf: UserRef<tms>) -> Result<i64, Errno> {
+    if !buf.is_null() {
+        let thread_group = &current_task.thread_group;
+        let process_time_stats = thread_group.time_stats();
+        let children_time_stats = thread_group.read().children_time_stats;
+        let tms_result = tms {
+            tms_utime: duration_to_scheduler_clock(process_time_stats.user_time),
+            tms_stime: duration_to_scheduler_clock(process_time_stats.system_time),
+            tms_cutime: duration_to_scheduler_clock(children_time_stats.user_time),
+            tms_cstime: duration_to_scheduler_clock(children_time_stats.system_time),
+        };
+        current_task.write_object(buf, &tms_result)?;
+    }
+
+    Ok(duration_to_scheduler_clock(zx::Time::get_monotonic() - zx::Time::ZERO))
+}
+
 #[cfg(test)]
 mod test {
     use super::*;
