@@ -27,9 +27,7 @@
 #include <kernel/thread.h>
 #include <lk/init.h>
 #include <lk/main.h>
-
-// include this at least once in C++ code to make sure the static assert is valid
-#include <phys/arch/arch-handoff-asm.h>
+#include <phys/handoff.h>
 
 #define LOCAL_TRACE 0
 
@@ -54,7 +52,8 @@ void riscv64_init_percpu() {
 
 // Called in start.S prior to entering the main kernel.
 // Bootstraps the boot cpu as cpu 0 intrinsically, though it may have a nonzero hart.
-extern "C" void riscv64_boot_cpu_init(uint32_t hart_id) {
+extern "C" void riscv64_boot_cpu_init(PhysHandoff* handoff) {
+  uint32_t hart_id = static_cast<uint32_t>(handoff->arch_handoff.boot_hart_id);
   riscv64_init_percpu();
   riscv64_mp_early_init_percpu(hart_id, 0);
 }

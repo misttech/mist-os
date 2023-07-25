@@ -10,7 +10,6 @@
 #include <arch/defines.h>
 #include <arch/kernel_aspace.h>
 #include <zircon/tls.h>
-#include <phys/arch/arch-handoff-asm.h>
 #include <arch/code-patches/case-id-asm.h>
 #include <lib/code-patching/asm.h>
 #include <lib/arch/asm.h>
@@ -32,9 +31,6 @@ PhysbootHandoff = _start
 
     // save a0 (physboot handoff paddr) for later passing to lk_main
     mv      s0, a0
-
-    // load the boot hart id out of the PhysHandoff structure before we initialize the mmu
-    ld      s1, RISCV64_PHYSHANDOFF_BOOT_HART_ID_OFFSET(s0)
 
     // save the time stamp we recorded earlier
     lla     t0, kernel_entry_ticks
@@ -123,7 +119,7 @@ PhysbootHandoff = _start
     // This will do basic initialization of the cpu such as initializing
     // the main control registers and loading the exception vector table.
     // Also loads the per cpu register.
-    mv      a0, s1
+    mv      a0, s0
     call    riscv64_boot_cpu_init
 
     // save the time stamp just before entering C
