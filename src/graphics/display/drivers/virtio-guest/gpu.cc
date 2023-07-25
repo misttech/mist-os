@@ -686,8 +686,8 @@ void GpuDevice::virtio_gpu_flusher() {
   }
 }
 
-zx_status_t GpuDevice::virtio_gpu_start() {
-  zxlogf(TRACE, "VirtioGpuStart()");
+zx_status_t GpuDevice::Start() {
+  zxlogf(TRACE, "Start()");
 
   // Get the display info and see if we find a valid pmode
   zx_status_t status = get_display_info();
@@ -715,17 +715,7 @@ zx_status_t GpuDevice::virtio_gpu_start() {
   thrd_create_with_name(&flush_thread_, virtio_gpu_flusher_entry, this, "virtio-gpu-flusher");
   thrd_detach(flush_thread_);
 
-  zxlogf(TRACE, "VirtioGpuStart() publishing device");
-
-  status = DdkAdd("virtio-gpu-display");
-  device_ = zxdev();
-
-  if (status != ZX_OK) {
-    device_ = nullptr;
-    return status;
-  }
-
-  zxlogf(TRACE, "VirtioGpuStart() completed");
+  zxlogf(TRACE, "Start() completed");
   return ZX_OK;
 }
 
@@ -816,14 +806,26 @@ zx_status_t GpuDevice::Init() {
   StartIrqThread();
   DriverStatusOk();
 
-  // Start a worker thread that runs through a sequence to finish initializing the GPU
-  auto virtio_gpu_start_entry = [](void* arg) {
-    return static_cast<GpuDevice*>(arg)->virtio_gpu_start();
-  };
-  thrd_create_with_name(&start_thread_, virtio_gpu_start_entry, this, "virtio-gpu-starter");
-  thrd_detach(start_thread_);
+  status = DdkAdd("virtio-gpu-display");
+  device_ = zxdev();
 
-  return ZX_OK;
+  return status;
+}
+
+void GpuDevice::DdkInit(ddk::InitTxn txn) {
+  // Start a worker thread that runs through a sequence to finish initializing the GPU
+  start_thread_ = std::thread([this, init_txn = std::move(txn)]() mutable {
+    zx_status_t status = Start();
+    init_txn.Reply(status);
+  });
+}
+
+void GpuDevice::DdkRelease() {
+  if (start_thread_.joinable()) {
+    start_thread_.join();
+  }
+
+  virtio::Device::Release();
 }
 
 void GpuDevice::IrqRingUpdate() {

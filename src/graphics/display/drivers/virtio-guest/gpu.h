@@ -28,7 +28,7 @@ namespace virtio {
 class Ring;
 
 class GpuDevice;
-using DeviceType = ddk::Device<GpuDevice, ddk::GetProtocolable>;
+using DeviceType = ddk::Device<GpuDevice, ddk::GetProtocolable, ddk::Initializable>;
 class GpuDevice : public Device,
                   public DeviceType,
                   public ddk::DisplayControllerImplProtocol<GpuDevice, ddk::base_protocol> {
@@ -39,7 +39,9 @@ class GpuDevice : public Device,
 
   zx_status_t Init() override;
   zx_status_t DdkGetProtocol(uint32_t proto_id, void* out);
-  void DdkRelease() { virtio::Device::Release(); }
+
+  void DdkInit(ddk::InitTxn txn);
+  void DdkRelease();
 
   void IrqRingUpdate() override;
   void IrqConfigChange() override;
@@ -133,7 +135,7 @@ class GpuDevice : public Device,
   zx_status_t flush_resource(uint32_t resource_id, uint32_t width, uint32_t height);
   zx_status_t transfer_to_host_2d(uint32_t resource_id, uint32_t width, uint32_t height);
 
-  zx_status_t virtio_gpu_start();
+  zx_status_t Start();
 
   // Initializes the sysmem Allocator client used to import incoming buffer
   // collection tokens.
@@ -142,7 +144,7 @@ class GpuDevice : public Device,
   // until the device is released.
   zx_status_t InitSysmemAllocatorClient();
 
-  thrd_t start_thread_ = {};
+  std::thread start_thread_ = {};
 
   // the main virtio ring
   Ring vring_ = {this};
