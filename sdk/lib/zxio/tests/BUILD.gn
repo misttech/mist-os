@@ -124,12 +124,8 @@ test("zxio-vmo-flags") {
   output_name = "zxio-vmo-flags-test"
   sources = [ "vmo-flags-test.cc" ]
   deps = [
-    "//sdk/fidl/fuchsia.hardware.pty:fuchsia.hardware.pty_cpp_wire",
     "//sdk/fidl/fuchsia.io:fuchsia.io_cpp_wire_testing",
     "//sdk/fidl/fuchsia.kernel:fuchsia.kernel_cpp",
-    "//sdk/fidl/fuchsia.posix.socket:fuchsia.posix.socket_cpp_wire_testing",
-    "//sdk/fidl/fuchsia.posix.socket.packet:fuchsia.posix.socket.packet_cpp_wire_testing",
-    "//sdk/fidl/fuchsia.posix.socket.raw:fuchsia.posix.socket.raw_cpp_wire_testing",
     "//sdk/lib/component/incoming/cpp",
     "//sdk/lib/fdio",
     "//sdk/lib/zxio",

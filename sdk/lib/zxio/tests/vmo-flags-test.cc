@@ -6,13 +6,12 @@
 #include <lib/component/incoming/cpp/protocol.h>
 #include <lib/zx/channel.h>
 #include <lib/zx/vmo.h>
+#include <lib/zxio/cpp/create_with_type.h>
 #include <lib/zxio/zxio.h>
 #include <limits.h>
 #include <zircon/compiler.h>
 
 #include <zxtest/zxtest.h>
-
-#include "sdk/lib/zxio/private.h"
 
 namespace {
 
@@ -35,7 +34,7 @@ TEST(VmoTest, FlagsGetReadWrite) {
   ASSERT_OK(zx::stream::create(ZX_STREAM_MODE_READ | ZX_STREAM_MODE_WRITE, backing, kInitialSeek,
                                &stream));
   zxio_storage_t storage;
-  ASSERT_OK(zxio_vmo_init(&storage, std::move(backing), std::move(stream)));
+  ASSERT_OK(zxio::CreateVmo(&storage, std::move(backing), std::move(stream)));
   zxio_t* io = &storage.io;
 
   uint32_t raw_flags{};
@@ -63,7 +62,7 @@ TEST(VmoTest, FlagsGetReadOnly) {
   zx::stream ro_stream;
   ASSERT_OK(zx::stream::create(ZX_STREAM_MODE_READ, ro_vmo, kInitialSeek, &ro_stream));
   zxio_storage_t storage;
-  ASSERT_OK(zxio_vmo_init(&storage, std::move(ro_vmo), std::move(ro_stream)));
+  ASSERT_OK(zxio::CreateVmo(&storage, std::move(ro_vmo), std::move(ro_stream)));
   zxio_t* io = &storage.io;
 
   uint32_t raw_flags{};
@@ -98,7 +97,7 @@ TEST(VmoTest, FlagsGetReadExec) {
   zx::stream exec_stream;
   ASSERT_OK(zx::stream::create(ZX_STREAM_MODE_READ, exec_vmo, kInitialSeek, &exec_stream));
   zxio_storage_t storage_for_exec;
-  ASSERT_OK(zxio_vmo_init(&storage_for_exec, std::move(exec_vmo), std::move(exec_stream)));
+  ASSERT_OK(zxio::CreateVmo(&storage_for_exec, std::move(exec_vmo), std::move(exec_stream)));
   zxio_t* exec_io = &storage_for_exec.io;
 
   uint32_t raw_flags{};
