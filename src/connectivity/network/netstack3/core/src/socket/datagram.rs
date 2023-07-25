@@ -46,16 +46,11 @@ use crate::{
     },
 };
 
-/// Datagram socket storage.
-#[derive(Derivative)]
-#[derivative(Default(bound = ""))]
-pub(crate) struct Sockets<I: Ip, D: Id, A: SocketMapAddrSpec, S: DatagramSocketStateSpec>
-where
-    Bound<S>: Tagged<AddrVec<I, D, A>>,
-{
-    bound: BoundSocketMap<I, D, A, S>,
-    state: IdMap<SocketState<I, D, A, S>>,
-}
+/// Datagram demultiplexing map.
+pub(crate) type BoundSockets<I, D, A, S> = BoundSocketMap<I, D, A, S>;
+
+/// Storage of state for all datagram sockets.
+pub(crate) type SocketsState<I, D, A, S> = IdMap<SocketState<I, D, A, S>>;
 
 #[derive(Derivative)]
 #[derivative(Debug(bound = "D: Debug"))]
@@ -64,7 +59,7 @@ pub(crate) enum SocketState<I: Ip, D, A: SocketMapAddrSpec, S: DatagramSocketSta
     Bound(BoundSocketState<I, D, A, S>),
 }
 
-impl<I: Ip, D: Id, A: SocketMapAddrSpec, S: DatagramSocketStateSpec> Sockets<I, D, A, S>
+impl<I: Ip, D: Id, A: SocketMapAddrSpec, S: DatagramSocketStateSpec> BoundSockets<I, D, A, S>
 where
     Bound<S>: Tagged<AddrVec<I, D, A>>,
     S: SocketMapConflictPolicy<
@@ -92,13 +87,29 @@ where
             impl Iterator<Item = AddrEntry<'_, I, D, A, S>> + '_,
         >,
     > {
-        let Self { bound, state: _ } = self;
-        bound.lookup((src_ip, src_port), (dst_ip, dst_port), device)
+        self.lookup((src_ip, src_port), (dst_ip, dst_port), device)
     }
+}
 
+impl<I: Ip, D: Id, A: SocketMapAddrSpec, S: DatagramSocketStateSpec> SocketsState<I, D, A, S>
+where
+    Bound<S>: Tagged<AddrVec<I, D, A>>,
+    S: SocketMapConflictPolicy<
+            ListenerAddr<I::Addr, D, A::LocalIdentifier>,
+            <S as SocketMapStateSpec>::ListenerSharingState,
+            I,
+            D,
+            A,
+        > + SocketMapConflictPolicy<
+            ConnAddr<I::Addr, D, A::LocalIdentifier, A::RemoteIdentifier>,
+            <S as SocketMapStateSpec>::ConnSharingState,
+            I,
+            D,
+            A,
+        >,
+{
     pub(crate) fn get_socket_state(&self, id: &S::SocketId) -> Option<&SocketState<I, D, A, S>> {
-        let Self { state, bound: _ } = self;
-        state.get(id.get_key_index())
+        self.get(id.get_key_index())
     }
 }
 
@@ -367,7 +378,11 @@ where
     /// Calls the function with an immutable reference to the datagram sockets.
     fn with_sockets<
         O,
-        F: FnOnce(&mut Self::IpSocketsCtx<'_>, &Sockets<I, Self::WeakDeviceId, A, S>) -> O,
+        F: FnOnce(
+            &mut Self::IpSocketsCtx<'_>,
+            &SocketsState<I, Self::WeakDeviceId, A, S>,
+            &BoundSockets<I, Self::WeakDeviceId, A, S>,
+        ) -> O,
     >(
         &mut self,
         cb: F,
@@ -378,7 +393,8 @@ where
         O,
         F: FnOnce(
             &mut Self::IpSocketsCtx<'_>,
-            &mut Sockets<I, Self::WeakDeviceId, A, S>,
+            &mut SocketsState<I, Self::WeakDeviceId, A, S>,
+            &mut BoundSockets<I, Self::WeakDeviceId, A, S>,
             &mut Self::LocalIdAllocator,
         ) -> O,
     >(
@@ -419,7 +435,11 @@ pub(crate) trait BufferDatagramStateContext<
     /// Calls the function with an immutable reference to the datagram sockets.
     fn with_sockets_buf<
         O,
-        F: FnOnce(&mut Self::BufferIpSocketsCtx<'_>, &Sockets<I, Self::WeakDeviceId, A, S>) -> O,
+        F: FnOnce(
+            &mut Self::BufferIpSocketsCtx<'_>,
+            &SocketsState<I, Self::WeakDeviceId, A, S>,
+            &BoundSockets<I, Self::WeakDeviceId, A, S>,
+        ) -> O,
     >(
         &mut self,
         cb: F,
@@ -430,7 +450,8 @@ pub(crate) trait BufferDatagramStateContext<
         O,
         F: FnOnce(
             &mut Self::BufferIpSocketsCtx<'_>,
-            &mut Sockets<I, Self::WeakDeviceId, A, S>,
+            &mut SocketsState<I, Self::WeakDeviceId, A, S>,
+            &mut BoundSockets<I, Self::WeakDeviceId, A, S>,
             &mut Self::LocalIdAllocator,
         ) -> O,
     >(
@@ -455,7 +476,11 @@ where
 
     fn with_sockets_buf<
         O,
-        F: FnOnce(&mut Self::BufferIpSocketsCtx<'_>, &Sockets<I, SC::WeakDeviceId, A, S>) -> O,
+        F: FnOnce(
+            &mut Self::BufferIpSocketsCtx<'_>,
+            &SocketsState<I, Self::WeakDeviceId, A, S>,
+            &BoundSockets<I, Self::WeakDeviceId, A, S>,
+        ) -> O,
     >(
         &mut self,
         cb: F,
@@ -467,7 +492,8 @@ where
         O,
         F: FnOnce(
             &mut Self::BufferIpSocketsCtx<'_>,
-            &mut Sockets<I, SC::WeakDeviceId, A, S>,
+            &mut SocketsState<I, Self::WeakDeviceId, A, S>,
+            &mut BoundSockets<I, Self::WeakDeviceId, A, S>,
             &mut Self::LocalIdAllocator,
         ) -> O,
     >(
@@ -522,7 +548,7 @@ pub(crate) fn create<
 where
     Bound<S>: Tagged<AddrVec<I, SC::WeakDeviceId, A>>,
 {
-    sync_ctx.with_sockets_mut(|_sync_ctx, Sockets { state, bound: _ }, _allocator| {
+    sync_ctx.with_sockets_mut(|_sync_ctx, state, _bound, _allocator| {
         state.push(SocketState::Unbound(UnboundSocketState::default())).into()
     })
 }
@@ -552,8 +578,7 @@ where
     S::ConnAddrState: SocketMapAddrStateSpec<Id = S::ConnId, SharingState = S::ConnSharingState>,
     I: IpExt,
 {
-    sync_ctx.with_sockets_mut(|sync_ctx, state, _allocator| {
-        let Sockets { state, bound } = state;
+    sync_ctx.with_sockets_mut(|sync_ctx, state, bound, _allocator| {
         let (ip_options, info) = match state.remove(id.get_key_index()).expect("invalid socket ID")
         {
             SocketState::Unbound(UnboundSocketState { device: _, sharing: _, ip_options }) => {
@@ -596,8 +621,7 @@ pub(crate) fn get_info<
 where
     Bound<S>: Tagged<AddrVec<I, SC::WeakDeviceId, A>>,
 {
-    sync_ctx.with_sockets(|_sync_ctx, state| {
-        let Sockets { state, bound: _ } = state;
+    sync_ctx.with_sockets(|_sync_ctx, state, _bound| {
         match state.get(id.get_key_index()).expect("invalid socket ID") {
             SocketState::Unbound(_) => SocketInfo::Unbound,
             SocketState::Bound(BoundSocketState::Listener(state)) => {
@@ -632,8 +656,8 @@ where
     S::UnboundSharingState: Clone + Into<S::ListenerSharingState>,
     S::ListenerSharingState: Default,
 {
-    sync_ctx.with_sockets_mut(|sync_ctx, sockets, _allocator| {
-        listen_inner::<_, A, C, _, S>(sync_ctx, ctx, sockets, id, addr, local_id)
+    sync_ctx.with_sockets_mut(|sync_ctx, state, bound, _allocator| {
+        listen_inner::<_, A, C, _, S>(sync_ctx, ctx, state, bound, id, addr, local_id)
     })
 }
 
@@ -646,7 +670,8 @@ fn listen_inner<
 >(
     sync_ctx: &mut SC,
     ctx: &mut C,
-    sockets: &mut Sockets<I, SC::WeakDeviceId, A, S>,
+    state: &mut SocketsState<I, SC::WeakDeviceId, A, S>,
+    bound: &mut BoundSockets<I, SC::WeakDeviceId, A, S>,
     id: S::SocketId,
     addr: Option<ZonedAddr<I::Addr, SC::DeviceId>>,
     local_id: Option<A::LocalIdentifier>,
@@ -658,8 +683,6 @@ where
     S::UnboundSharingState: Clone + Into<S::ListenerSharingState>,
     S::ListenerSharingState: Default,
 {
-    let Sockets { state, bound } = sockets;
-
     let mut entry = match state.entry(id.get_key_index()) {
         IdMapEntry::Vacant(_) => panic!("unbound ID {:?} is invalid", id),
         IdMapEntry::Occupied(o) => o,
@@ -791,7 +814,7 @@ where
     S::ConnAddrState: SocketMapAddrStateSpec<Id = S::ConnId, SharingState = S::ConnSharingState>,
     S::ListenerSharingState: Into<S::ConnSharingState>,
 {
-    sync_ctx.with_sockets_mut(|sync_ctx, state, allocator| {
+    sync_ctx.with_sockets_mut(|sync_ctx, state, bound, allocator| {
         enum BoundMapSocketState<
             I: IpExt,
             D: Id,
@@ -809,7 +832,6 @@ where
                 S::ConnId,
             ),
         }
-        let Sockets { state, bound } = state;
         let mut entry = match state.entry(id.get_key_index()) {
             IdMapEntry::Vacant(_) => panic!("socket ID {:?} is invalid", id),
             IdMapEntry::Occupied(o) => o,
@@ -984,8 +1006,7 @@ where
     S::ConnAddrState: SocketMapAddrStateSpec<Id = S::ConnId, SharingState = S::ConnSharingState>,
     S::ConnSharingState: Into<S::ListenerSharingState>,
 {
-    sync_ctx.with_sockets_mut(|_sync_ctx, state, _allocator| {
-        let Sockets { state, bound } = state;
+    sync_ctx.with_sockets_mut(|_sync_ctx, state, bound, _allocator| {
         let mut entry = match state.entry(id.get_key_index()) {
             IdMapEntry::Vacant(_) => panic!("unbound ID {:?} is invalid", id),
             IdMapEntry::Occupied(o) => o,
@@ -1052,8 +1073,7 @@ pub(crate) fn shutdown_connected<
 where
     Bound<S>: Tagged<AddrVec<I, SC::WeakDeviceId, A>>,
 {
-    sync_ctx.with_sockets_mut(|_sync_ctx, state, _allocator| {
-        let Sockets { state, bound: _ } = state;
+    sync_ctx.with_sockets_mut(|_sync_ctx, state, _bound, _allocator| {
         let state = match state.get_mut(id.get_key_index()).expect("invalid socket ID") {
             SocketState::Unbound(_) | SocketState::Bound(BoundSocketState::Listener(_)) => {
                 return Err(ExpectedConnError)
@@ -1089,8 +1109,7 @@ pub(crate) fn get_shutdown_connected<
 where
     Bound<S>: Tagged<AddrVec<I, SC::WeakDeviceId, A>>,
 {
-    sync_ctx.with_sockets(|_sync_ctx, state| {
-        let Sockets { state, bound: _ } = state;
+    sync_ctx.with_sockets(|_sync_ctx, state, _bound| {
         let state = match state.get(id.get_key_index()).expect("invalid socket ID") {
             SocketState::Unbound(_) | SocketState::Bound(BoundSocketState::Listener(_)) => {
                 return None
@@ -1136,8 +1155,7 @@ pub(crate) fn send_conn<
 where
     Bound<S>: Tagged<AddrVec<I, SC::WeakDeviceId, A>>,
 {
-    sync_ctx.with_sockets_buf_mut(|sync_ctx, state, _allocator| {
-        let Sockets { bound: _, state } = state;
+    sync_ctx.with_sockets_buf_mut(|sync_ctx, state, _bound, _allocator| {
         let state = match state.get(id.get_key_index()).expect("invalid socket ID") {
             SocketState::Unbound(_) | SocketState::Bound(BoundSocketState::Listener(_)) => {
                 return Err(SendError::NotConnected(body))
@@ -1194,8 +1212,8 @@ where
     S::UnboundSharingState: Clone + Into<S::ListenerSharingState>,
     S::ListenerSharingState: Default,
 {
-    sync_ctx.with_sockets_buf_mut(|sync_ctx, state, _allocator| {
-        match listen_inner(sync_ctx, ctx, state, id.clone(), None, None) {
+    sync_ctx.with_sockets_buf_mut(|sync_ctx, state, bound, _allocator| {
+        match listen_inner(sync_ctx, ctx, state, bound, id.clone(), None, None) {
             Ok(()) | Err(Either::Left(ExpectedUnboundError)) => (),
             Err(Either::Right(e)) => return Err(Either::Left((body, e))),
         };
@@ -1203,7 +1221,6 @@ where
         // TODO(https://github.com/rust-lang/rust/issues/31436): Replace this
         // closure with a try-block.
         let send_result = (|| {
-            let Sockets { state, bound: _ } = state;
             let state = match state.get(id.get_key_index()).expect("no such socket") {
                 SocketState::Unbound(_) => panic!("expected bound socket"),
                 SocketState::Bound(state) => state,
@@ -1330,8 +1347,7 @@ where
         SocketMapAddrStateSpec<Id = S::ListenerId, SharingState = S::ListenerSharingState>,
     S::ConnAddrState: SocketMapAddrStateSpec<Id = S::ConnId, SharingState = S::ConnSharingState>,
 {
-    sync_ctx.with_sockets_mut(|sync_ctx, state, _allocator| {
-        let Sockets { state, bound } = state;
+    sync_ctx.with_sockets_mut(|sync_ctx, state, bound, _allocator| {
         match state.get_mut(id.get_key_index()).expect("invalid socket ID") {
             SocketState::Unbound(state) => {
                 let UnboundSocketState { ref mut device, sharing: _, ip_options: _ } = state;
@@ -1453,7 +1469,7 @@ where
         SocketMapAddrStateSpec<Id = S::ListenerId, SharingState = S::ListenerSharingState>,
     S::ConnAddrState: SocketMapAddrStateSpec<Id = S::ConnId, SharingState = S::ConnSharingState>,
 {
-    sync_ctx.with_sockets(|_sync_ctx, state| {
+    sync_ctx.with_sockets(|_sync_ctx, state, _bound| {
         let (_, device): (&IpOptions<_, _>, _) = get_options_device(state, id);
         device.clone()
     })
@@ -1563,7 +1579,7 @@ where
         SocketMapAddrStateSpec<Id = S::ListenerId, SharingState = S::ListenerSharingState>,
     S::ConnAddrState: SocketMapAddrStateSpec<Id = S::ConnId, SharingState = S::ConnSharingState>,
 {
-    sync_ctx.with_sockets_mut(|sync_ctx, state, _allocator| {
+    sync_ctx.with_sockets_mut(|sync_ctx, state, _bound, _allocator| {
         let (_, bound_device): (&IpOptions<_, _>, _) = get_options_device(state, id.clone());
 
         let interface = match interface {
@@ -1616,7 +1632,7 @@ where
 }
 
 fn get_options_device<I: IpExt, D: Id, A: SocketMapAddrSpec, S: DatagramSocketSpec<I, D, A>>(
-    Sockets { state, bound: _ }: &Sockets<I, D, A, S>,
+    state: &SocketsState<I, D, A, S>,
     id: S::SocketId,
 ) -> (&IpOptions<I::Addr, D>, &Option<D>)
 where
@@ -1650,7 +1666,7 @@ where
 }
 
 fn get_options_mut<I: Ip, D: Id, A: SocketMapAddrSpec, S: DatagramSocketSpec<I, D, A>>(
-    Sockets { state, bound: _ }: &mut Sockets<I, D, A, S>,
+    state: &mut SocketsState<I, D, A, S>,
     id: S::SocketId,
 ) -> &mut IpOptions<I::Addr, D>
 where
@@ -1701,8 +1717,8 @@ pub(crate) fn update_ip_hop_limit<
         SocketMapAddrStateSpec<Id = S::ListenerId, SharingState = S::ListenerSharingState>,
     S::ConnAddrState: SocketMapAddrStateSpec<Id = S::ConnId, SharingState = S::ConnSharingState>,
 {
-    sync_ctx.with_sockets_mut(|_sync_ctx, sockets, _allocator| {
-        let options = get_options_mut(sockets, id);
+    sync_ctx.with_sockets_mut(|_sync_ctx, state, _bound, _allocator| {
+        let options = get_options_mut(state, id);
 
         update(&mut options.hop_limits)
     })
@@ -1725,8 +1741,8 @@ where
         SocketMapAddrStateSpec<Id = S::ListenerId, SharingState = S::ListenerSharingState>,
     S::ConnAddrState: SocketMapAddrStateSpec<Id = S::ConnId, SharingState = S::ConnSharingState>,
 {
-    sync_ctx.with_sockets(|sync_ctx, sockets| {
-        let (options, device) = get_options_device(sockets, id);
+    sync_ctx.with_sockets(|sync_ctx, state, _bound| {
+        let (options, device) = get_options_device(state, id);
         let IpOptions { hop_limits, multicast_memberships: _ } = options;
         let device = device.as_ref().and_then(|d| sync_ctx.upgrade_weak_device_id(d));
         hop_limits.get_limits_with_defaults(&sync_ctx.get_default_hop_limits(device.as_ref()))
@@ -1748,8 +1764,7 @@ pub(crate) fn update_sharing<
 where
     Bound<S>: Tagged<AddrVec<I, SC::WeakDeviceId, A>>,
 {
-    sync_ctx.with_sockets_mut(|_sync_ctx, sockets, _allocator| {
-        let Sockets { state, bound: _ } = sockets;
+    sync_ctx.with_sockets_mut(|_sync_ctx, state, _bound, _allocator| {
         let state = match state.get_mut(id.get_key_index()).expect("socket not found") {
             SocketState::Bound(_) => return Err(ExpectedUnboundError),
             SocketState::Unbound(state) => state,
@@ -1783,8 +1798,7 @@ where
         ConnSharingState = Sharing,
     >,
 {
-    sync_ctx.with_sockets(|_sync_ctx, sockets| {
-        let Sockets { state, bound: _ } = &sockets;
+    sync_ctx.with_sockets(|_sync_ctx, state, _bound| {
         match state.get(id.get_key_index()).expect("socket not found") {
             SocketState::Unbound(state) => {
                 let UnboundSocketState { device: _, sharing, ip_options: _ } = state;
@@ -1959,22 +1973,32 @@ mod test {
         }
     }
 
+    #[derive(Derivative)]
+    #[derivative(Default(bound = ""))]
+    struct Sockets<I: TestIpExt, D: FakeStrongDeviceId> {
+        state: SocketsState<
+            I,
+            FakeWeakDeviceId<D>,
+            FakeAddrSpec,
+            FakeStateSpec<I, FakeWeakDeviceId<D>>,
+        >,
+        bound: BoundSockets<
+            I,
+            FakeWeakDeviceId<D>,
+            FakeAddrSpec,
+            FakeStateSpec<I, FakeWeakDeviceId<D>>,
+        >,
+    }
+
     type FakeSyncCtx<I, D> = WrappedFakeSyncCtx<
-        Sockets<I, FakeWeakDeviceId<D>, FakeAddrSpec, FakeStateSpec<I, FakeWeakDeviceId<D>>>,
+        Sockets<I, D>,
         FakeBufferIpSocketCtx<I, D>,
         SendIpPacketMeta<I, D, SpecifiedAddr<<I as Ip>::Addr>>,
         D,
     >;
 
     impl<I: DatagramIpExt, D: FakeStrongDeviceId + 'static> FakeSyncCtx<I, D> {
-        fn with_sockets(
-            sockets: Sockets<
-                I,
-                FakeWeakDeviceId<D>,
-                FakeAddrSpec,
-                FakeStateSpec<I, FakeWeakDeviceId<D>>,
-            >,
-        ) -> Self {
+        fn with_sockets(sockets: Sockets<I, D>) -> Self {
             Self::with_inner_and_outer_state(
                 FakeBufferIpSocketCtx::with_ctx(FakeIpSocketCtx::default()),
                 sockets,
@@ -2001,9 +2025,15 @@ mod test {
             O,
             F: FnOnce(
                 &mut Self::IpSocketsCtx<'_>,
-                &Sockets<
+                &SocketsState<
                     I,
-                    FakeWeakDeviceId<D>,
+                    Self::WeakDeviceId,
+                    FakeAddrSpec,
+                    FakeStateSpec<I, FakeWeakDeviceId<D>>,
+                >,
+                &BoundSockets<
+                    I,
+                    Self::WeakDeviceId,
                     FakeAddrSpec,
                     FakeStateSpec<I, FakeWeakDeviceId<D>>,
                 >,
@@ -2012,17 +2042,23 @@ mod test {
             &mut self,
             cb: F,
         ) -> O {
-            let Self { outer, inner } = self;
-            cb(inner, outer)
+            let Self { outer: Sockets { bound, state }, inner } = self;
+            cb(inner, state, bound)
         }
 
         fn with_sockets_mut<
             O,
             F: FnOnce(
                 &mut Self::IpSocketsCtx<'_>,
-                &mut Sockets<
+                &mut SocketsState<
                     I,
-                    FakeWeakDeviceId<D>,
+                    Self::WeakDeviceId,
+                    FakeAddrSpec,
+                    FakeStateSpec<I, FakeWeakDeviceId<D>>,
+                >,
+                &mut BoundSockets<
+                    I,
+                    Self::WeakDeviceId,
                     FakeAddrSpec,
                     FakeStateSpec<I, FakeWeakDeviceId<D>>,
                 >,
@@ -2032,8 +2068,8 @@ mod test {
             &mut self,
             cb: F,
         ) -> O {
-            let Self { outer, inner } = self;
-            cb(inner, outer, &mut ())
+            let Self { outer: Sockets { bound, state }, inner } = self;
+            cb(inner, state, bound, &mut ())
         }
     }
 
