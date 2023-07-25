@@ -8,7 +8,6 @@ import("//tools/fidl/fidlc/testdata/info.gni")
 
 source_set("fidl") {
   sources = [
-    "lib/check.cc",
     "lib/coded_types_generator.cc",
     "lib/compiled_transformer.cc",
     "lib/diagnostic_types.cc",

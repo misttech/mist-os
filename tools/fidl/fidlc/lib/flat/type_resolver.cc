@@ -92,8 +92,6 @@ bool TypeResolver::ResolveAsHandleRights(Resource* resource, Constant* constant,
 }
 
 bool TypeResolver::ResolveAsProtocol(const Constant* constant, const Protocol** out_decl) {
-  // TODO(fxbug.dev/75112): If/when this method is responsible for reporting errors, the
-  // `return false` statements should fail with ErrConstraintMustBeProtocol instead.
   if (constant->kind != Constant::Kind::kIdentifier)
     return false;
 

@@ -8,6 +8,7 @@
 
 #include "tools/fidl/fidlc/include/fidl/diagnostics.h"
 #include "tools/fidl/fidlc/include/fidl/experimental_flags.h"
+#include "tools/fidl/fidlc/include/fidl/flat/attributes.h"
 #include "tools/fidl/fidlc/include/fidl/flat/compile_step.h"
 #include "tools/fidl/fidlc/include/fidl/flat_ast.h"
 #include "tools/fidl/fidlc/include/fidl/raw_ast.h"
@@ -331,10 +332,9 @@ bool ConsumeStep::CreateMethodResult(
   // transport_err is not defined if the method is not flexible.
 
   std::vector<std::unique_ptr<Attribute>> result_attributes;
-  result_attributes.emplace_back(
-      std::make_unique<Attribute>(std::nullopt, generated_source_file()->AddLine("result")));
-
-  // TODO(fxbug.dev/8027): Join spans of response and error constructor for `result_name`.
+  auto result_span = generated_source_file()->AddLine("result");
+  result_attributes.emplace_back(std::make_unique<Attribute>(
+      std::nullopt, result_span, std::vector<std::unique_ptr<AttributeArg>>(), result_span));
   auto result_context = err_variant_context->parent();
   auto result_name = Name::CreateAnonymous(library(), response_span, result_context,
                                            Name::Provenance::kCompilerGenerated);
@@ -607,8 +607,6 @@ void ConsumeStep::MaybeOverrideName(AttributeList& attributes, NamingContext* co
   }
 }
 
-// TODO(fxbug.dev/77853): these conversion methods may need to be refactored
-//  once the new flat AST lands, and such coercion  is no longer needed.
 template <typename T>
 bool ConsumeStep::ConsumeValueLayout(std::unique_ptr<raw::Layout> layout,
                                      const std::shared_ptr<NamingContext>& context,

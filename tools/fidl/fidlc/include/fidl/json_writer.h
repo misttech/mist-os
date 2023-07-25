@@ -175,8 +175,9 @@ class JsonWriter {
 
   void EmitString(std::string_view value) {
     os_ << "\"";
-
     for (char c : value) {
+      // Escape control double quotes, backslashes, and control characters.
+      // We assume the rest is valid UTF-8 and pass it through to JSON.
       switch (c) {
         case '"':
           os_ << "\\\"";
@@ -187,19 +188,33 @@ class JsonWriter {
         case '\n':
           os_ << "\\n";
           break;
-        // TODO(fxbug.dev/7365): Escape more characters.
+        case '\r':
+          os_ << "\\r";
+          break;
+        case '\t':
+          os_ << "\\t";
+          break;
         default:
-          os_ << c;
+          auto u = static_cast<unsigned char>(c);
+          if (u < 0x02 || u == 0x7f) {
+            // ASCII control characters. Escape it.
+            char buf[7];
+            snprintf(buf, sizeof buf, "\\u%04x", u);
+            os_ << buf;
+          } else {
+            os_ << c;
+          }
           break;
       }
     }
     os_ << "\"";
   }
 
+  // Emits a string literal given its raw FIDL source (including the quotes).
   void EmitLiteral(std::string_view value) {
     for (auto it = value.begin(); it != value.end(); ++it) {
-      // Emit all characters in the string literal unchanged (including the
-      // enclosing double quotes and escape sequences like \\, \", \n, \r, \t)
+      // FIDL's string literal syntax is similar to JSON's, so we can emit most
+      // characters unchanged (including escape sequences \\, \", \n, \r, \t)
       // except for Unicode escape sequences, handled below.
       if (it[0] != '\\' || it[1] != 'u') {
         os_ << *it;

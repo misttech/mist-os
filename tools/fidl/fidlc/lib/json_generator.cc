@@ -256,11 +256,8 @@ void JSONGenerator::Generate(const flat::AttributeArg& value) {
     GenerateObjectMember("name", value.name.value(), Position::kFirst);
     GenerateObjectMember("type", value.value->type->name);
     GenerateObjectMember("value", value.value);
-
-    // TODO(fxbug.dev/7660): Be consistent in emitting location fields.
-    const SourceSpan& span = value.span;
-    if (span.valid())
-      GenerateObjectMember("location", NameSpan(span));
+    ZX_ASSERT(value.span.valid());
+    GenerateObjectMember("location", NameSpan(value.span));
   });
 }
 
@@ -269,11 +266,8 @@ void JSONGenerator::Generate(const flat::Attribute& value) {
     const auto& name = fidl::utils::to_lower_snake_case(std::string(value.name.data()));
     GenerateObjectMember("name", name, Position::kFirst);
     GenerateObjectMember("arguments", value.args);
-
-    // TODO(fxbug.dev/7660): Be consistent in emitting location fields.
-    const SourceSpan& span = value.span;
-    if (span.valid())
-      GenerateObjectMember("location", NameSpan(span));
+    ZX_ASSERT(value.span.valid());
+    GenerateObjectMember("location", NameSpan(value.span));
   });
 }
 
@@ -650,7 +644,6 @@ void JSONGenerator::Generate(const flat::Table::Member& value) {
       GenerateTypeAndFromAlias(value.maybe_used->type_ctor.get());
       GenerateObjectMember("name", value.maybe_used->name);
       GenerateObjectMember("location", NameSpan(value.maybe_used->name));
-      // TODO(fxbug.dev/7932): Support defaults on tables.
     } else {
       ZX_ASSERT(value.span);
       GenerateObjectMember("reserved", true);

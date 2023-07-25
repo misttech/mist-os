@@ -4015,7 +4015,13 @@
       "maybe_attributes": [
         {
           "name": "result",
-          "arguments": []
+          "arguments": [],
+          "location": {
+            "filename": "generated",
+            "line": 30,
+            "column": 1,
+            "length": 6
+          }
         }
       ],
       "members": [
@@ -4130,7 +4136,13 @@
       "maybe_attributes": [
         {
           "name": "result",
-          "arguments": []
+          "arguments": [],
+          "location": {
+            "filename": "generated",
+            "line": 6,
+            "column": 1,
+            "length": 6
+          }
         }
       ],
       "members": [
@@ -4245,7 +4257,13 @@
       "maybe_attributes": [
         {
           "name": "result",
-          "arguments": []
+          "arguments": [],
+          "location": {
+            "filename": "generated",
+            "line": 10,
+            "column": 1,
+            "length": 6
+          }
         }
       ],
       "members": [
@@ -4360,7 +4378,13 @@
       "maybe_attributes": [
         {
           "name": "result",
-          "arguments": []
+          "arguments": [],
+          "location": {
+            "filename": "generated",
+            "line": 14,
+            "column": 1,
+            "length": 6
+          }
         }
       ],
       "members": [
@@ -4475,7 +4499,13 @@
       "maybe_attributes": [
         {
           "name": "result",
-          "arguments": []
+          "arguments": [],
+          "location": {
+            "filename": "generated",
+            "line": 18,
+            "column": 1,
+            "length": 6
+          }
         }
       ],
       "members": [
@@ -4590,7 +4620,13 @@
       "maybe_attributes": [
         {
           "name": "result",
-          "arguments": []
+          "arguments": [],
+          "location": {
+            "filename": "generated",
+            "line": 22,
+            "column": 1,
+            "length": 6
+          }
         }
       ],
       "members": [
@@ -4705,7 +4741,13 @@
       "maybe_attributes": [
         {
           "name": "result",
-          "arguments": []
+          "arguments": [],
+          "location": {
+            "filename": "generated",
+            "line": 26,
+            "column": 1,
+            "length": 6
+          }
         }
       ],
       "members": [

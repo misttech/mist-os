@@ -14,7 +14,6 @@
 #include <variant>
 #include <vector>
 
-#include "tools/fidl/fidlc/include/fidl/check.h"
 #include "tools/fidl/fidlc/include/fidl/types.h"
 
 // The types in this file define structures that much more closely map
@@ -239,8 +238,8 @@ struct StructType : public Type {
         elements(std::move(elements)),
         qname(std::move(qname)),
         contains_envelope(contains_envelope) {
-    FIDL_CHECK(elements.size() <= std::numeric_limits<uint16_t>::max(),
-               "coding table stores element_count in uint16_t");
+    ZX_ASSERT_MSG(this->elements.size() <= std::numeric_limits<uint16_t>::max(),
+                  "coding table stores element_count in uint16_t");
   }
 
   std::vector<StructElement> elements;
@@ -320,8 +319,8 @@ struct ArrayType : public Type {
       : Type(Kind::kArray, std::move(name), array_size_v2, true, element_type->is_noop),
         element_type(element_type),
         element_size_v2(element_size_v2) {
-    FIDL_CHECK(element_size_v2 <= std::numeric_limits<uint16_t>::max(),
-               "coding table stores element_size_v2 in uint16_t");
+    ZX_ASSERT_MSG(element_size_v2 <= std::numeric_limits<uint16_t>::max(),
+                  "coding table stores element_size_v2 in uint16_t");
   }
 
   const Type* const element_type;

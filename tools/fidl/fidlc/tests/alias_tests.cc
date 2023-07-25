@@ -400,9 +400,6 @@ type TheStruct = struct {
   ASSERT_ERRORED_DURING_COMPILE(library, fidl::ErrIncludeCycle);
   ASSERT_SUBSTR(library.errors()[0]->msg.c_str(),
                 "alias 'TheAlias' -> struct 'TheStruct' -> alias 'TheAlias'");
-
-  // TODO(fxbug.dev/35218): once recursive type handling is improved, the error message should be
-  // more granular and should be asserted here.
 }
 
 TEST(AliasTests, BadCompoundIdentifier) {

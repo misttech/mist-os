@@ -94,11 +94,6 @@ struct Type : public Object {
   // Apply the provided constraints to this type, returning the newly constrained
   // Type and recording the invocation inside resolved_args.
   // For types in the new syntax, we receive the unresolved TypeConstraints.
-  // TODO(fxbug.dev/74193): We currently require a pointer to the calling TypeTemplate
-  // for error reporting purposes, since all of the constraint related errors are
-  // still tied to TypeTemplates. As we fully separate out the constraints and
-  // layout parameter (TypeTemplate::Create) code, we'll be able to remove this
-  // extraneous parameter.
   virtual bool ApplyConstraints(TypeResolver* resolver, const TypeConstraints& constraints,
                                 const Reference& layout, std::unique_ptr<Type>* out_type,
                                 LayoutInvocation* out_params) const = 0;
@@ -328,7 +323,6 @@ enum class TransportSide {
   kServer,
 };
 
-// TODO(fxbug.dev/43803) Add required and optional rights.
 struct TransportSideConstraints
     : public Constraints<ConstraintKind::kProtocol, ConstraintKind::kNullability> {
   using Constraints::Constraints;
@@ -337,6 +331,7 @@ struct TransportSideConstraints
                               const std::vector<std::unique_ptr<Constant>>& params,
                               size_t param_index) const override;
 };
+
 struct TransportSideType final : public Type, public TransportSideConstraints {
   using Constraints = TransportSideConstraints;
 

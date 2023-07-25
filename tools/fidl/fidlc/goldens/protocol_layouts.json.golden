@@ -2441,7 +2441,13 @@
       "maybe_attributes": [
         {
           "name": "result",
-          "arguments": []
+          "arguments": [],
+          "location": {
+            "filename": "generated",
+            "line": 40,
+            "column": 1,
+            "length": 6
+          }
         }
       ],
       "members": [
@@ -2556,7 +2562,13 @@
       "maybe_attributes": [
         {
           "name": "result",
-          "arguments": []
+          "arguments": [],
+          "location": {
+            "filename": "generated",
+            "line": 24,
+            "column": 1,
+            "length": 6
+          }
         }
       ],
       "members": [
@@ -2671,7 +2683,13 @@
       "maybe_attributes": [
         {
           "name": "result",
-          "arguments": []
+          "arguments": [],
+          "location": {
+            "filename": "generated",
+            "line": 32,
+            "column": 1,
+            "length": 6
+          }
         }
       ],
       "members": [
@@ -2860,7 +2878,13 @@
       "maybe_attributes": [
         {
           "name": "result",
-          "arguments": []
+          "arguments": [],
+          "location": {
+            "filename": "generated",
+            "line": 36,
+            "column": 1,
+            "length": 6
+          }
         }
       ],
       "members": [
@@ -2975,7 +2999,13 @@
       "maybe_attributes": [
         {
           "name": "result",
-          "arguments": []
+          "arguments": [],
+          "location": {
+            "filename": "generated",
+            "line": 20,
+            "column": 1,
+            "length": 6
+          }
         }
       ],
       "members": [
@@ -3090,7 +3120,13 @@
       "maybe_attributes": [
         {
           "name": "result",
-          "arguments": []
+          "arguments": [],
+          "location": {
+            "filename": "generated",
+            "line": 28,
+            "column": 1,
+            "length": 6
+          }
         }
       ],
       "members": [

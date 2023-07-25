@@ -781,7 +781,6 @@ class Layout final : public SourceElement {
 
   Kind kind;
   std::vector<std::unique_ptr<raw::LayoutMember>> members;
-  // TODO(fxbug.dev/79094): refactor this to only have a single null state.
   std::unique_ptr<Modifiers> modifiers;
   // TODO(fxbug.dev/77853): Eventually we'll make [Struct/Ordinaled/Value]Layout
   //  classes to inherit from the now-abstract Layout class, similar to what can

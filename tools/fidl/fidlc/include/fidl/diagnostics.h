@@ -256,9 +256,6 @@ constexpr ErrorDef<110, flat::Name, std::string_view, std::string_view, flat::Na
 constexpr ErrorDef<111, flat::Name, uint32_t, uint32_t> ErrInlineSizeExceedsLimit(
     "'{}' has an inline size of {} bytes, which exceeds the maximum allowed "
     "inline size of {} bytes");
-// TODO(fxbug.dev/70399): As part of consolidating name resolution, these should
-// be grouped into a single "expected foo but got bar" error, along with
-// ErrExpectedValueButGotType.
 constexpr ErrorDef<112> ErrOnlyClientEndsInServices("service members must be client_end:P");
 constexpr ErrorDef<113, std::string_view, std::string_view, std::string_view, std::string_view>
     ErrMismatchedTransportInServices(

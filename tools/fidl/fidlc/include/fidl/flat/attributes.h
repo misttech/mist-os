@@ -37,10 +37,6 @@ struct AttributeArg final : public Sourced, public HasClone<AttributeArg> {
 };
 
 struct Attribute final : public MaybeSourced, public HasClone<Attribute> {
-  // A constructor for synthetic attributes like @result.
-  explicit Attribute(std::optional<raw::SourceElement::Signature> maybe_signature, SourceSpan name)
-      : MaybeSourced(maybe_signature), name(name) {}
-
   Attribute(std::optional<raw::SourceElement::Signature> maybe_signature, SourceSpan name,
             std::vector<std::unique_ptr<AttributeArg>> args, SourceSpan span)
       : MaybeSourced(maybe_signature), name(name), args(std::move(args)), span(span) {}

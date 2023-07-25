@@ -6,6 +6,8 @@
 
 #include <zircon/assert.h>
 
+#include <algorithm>
+
 #include <re2/re2.h>
 
 #include "tools/fidl/fidlc/include/fidl/reporter.h"

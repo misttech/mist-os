@@ -623,7 +623,13 @@
       "maybe_attributes": [
         {
           "name": "result",
-          "arguments": []
+          "arguments": [],
+          "location": {
+            "filename": "generated",
+            "line": 8,
+            "column": 1,
+            "length": 6
+          }
         }
       ],
       "members": [
