@@ -980,6 +980,46 @@ impl FsNode {
         child: &FsNodeHandle,
     ) -> Result<(), Errno> {
         self.check_access(current_task, Access::WRITE)?;
+
+        // Check that `current_task` has permission to create the hard link.
+        //
+        // See description of /proc/sys/fs/protected_hardlinks in
+        // https://man7.org/linux/man-pages/man5/proc.5.html for details of the security
+        // vulnerabilities.
+        //
+        let creds = current_task.creds();
+        let (child_uid, mode) = {
+            let info = child.info();
+            (info.uid, info.mode)
+        };
+        // Check that the the filesystem UID of the calling process (`current_task`) is the same as
+        // the UID of the existing file. The check can be bypassed if the calling process has
+        // `CAP_FOWNER` capability.
+        if !creds.has_capability(CAP_FOWNER) && child_uid != creds.euid {
+            // If current_task is not the user of the existing file, it needs to have read and write
+            // access to the existing file.
+            child.check_access(current_task, Access::READ | Access::WRITE).map_err(|e| {
+                // `check_access(..)` returns EACCES when the access rights doesn't match - change
+                // it to EPERM to match Linux standards.
+                if e == EACCES {
+                    errno!(EPERM)
+                } else {
+                    e
+                }
+            })?;
+            // There are also security issues that may arise when users link to setuid, setgid, or
+            // special files.
+            if mode.contains(FileMode::ISGID | FileMode::IXGRP) {
+                return error!(EPERM);
+            };
+            if mode.contains(FileMode::ISUID) {
+                return error!(EPERM);
+            };
+            if !mode.contains(FileMode::IFREG) {
+                return error!(EPERM);
+            };
+        }
+
         self.ops().link(self, current_task, name, child)
     }
 

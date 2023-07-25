@@ -33,6 +33,7 @@
                 "LinkTest.LinkatDoesNotFollowSymlinkByDefault",
                 "LinkTest.LinkatWithSymlinkFollow",
                 "LinkTest.NewDirFDWithOpath",
+                "LinkTest.PermissionDenied",
                 "LinkTest.WithNewDirFD",
                 "LinkTest.WithOldDirFD",
 

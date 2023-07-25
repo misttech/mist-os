@@ -213,9 +213,6 @@
                 // Assumes structure of root directory.
                 "LseekTest.EtcPasswdDup",
 
-                // link_test
-                "LinkTest.PermissionDenied",
-
                 // madvise_test
                 "MadviseDontneedTest.CleansPrivateFilePage",
                 "MadviseDontforkTest.AddressLength",
