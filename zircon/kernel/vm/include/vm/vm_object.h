@@ -333,6 +333,11 @@ class VmObject : public VmHierarchyBase,
   virtual AttributionCounts AttributedPagesInRange(uint64_t offset, uint64_t len) const {
     return AttributionCounts{};
   }
+
+  // Returns the number of phsyical pages currently attributed to the VMO that is the owner of a
+  // reference.
+  virtual AttributionCounts AttributedPagesInReferenceOwner() const { return AttributionCounts{}; }
+
   // Returns the number of physical pages currently attributed to the object.
   AttributionCounts AttributedPages() const { return AttributedPagesInRange(0, size()); }
 

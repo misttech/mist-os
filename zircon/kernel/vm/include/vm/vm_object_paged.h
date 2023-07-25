@@ -136,6 +136,12 @@ class VmObjectPaged final : public VmObject {
     return AttributedPagesInRangeLocked(offset, len);
   }
 
+  AttributionCounts AttributedPagesInReferenceOwner() const override {
+    DEBUG_ASSERT(is_reference());
+    Guard<CriticalMutex> guard{lock()};
+    return cow_pages_locked()->AttributedPagesInRangeLocked(0, size_locked());
+  }
+
   zx_status_t CommitRange(uint64_t offset, uint64_t len) override {
     return CommitRangeInternal(offset, len, /*pin=*/false, /*write=*/false);
   }

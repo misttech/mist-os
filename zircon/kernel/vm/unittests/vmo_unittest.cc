@@ -444,6 +444,38 @@ static bool vmo_odd_size_commit_test() {
   END_TEST;
 }
 
+// Creates a vm object, checks that attribution via reference doesn't attribute pages unless we
+// specifically request it
+static bool vmo_reference_attribution_commit_test() {
+  BEGIN_TEST;
+
+  AutoVmScannerDisable scanner_disable;
+
+  static const size_t alloc_size = size_t{8} * PAGE_SIZE;
+  fbl::RefPtr<VmObjectPaged> vmo;
+  zx_status_t status = VmObjectPaged::Create(PMM_ALLOC_FLAG_ANY, 0u, alloc_size,
+                                             AttributionObject::GetKernelAttribution(), &vmo);
+  ASSERT_EQ(status, ZX_OK, "vmobject creation\n");
+  ASSERT_TRUE(vmo, "vmobject creation\n");
+
+  fbl::RefPtr<VmObject> vmo_reference;
+  status = vmo->CreateChildReference(Resizability::NonResizable, 0u, 0, true, &vmo_reference);
+  ASSERT_EQ(status, ZX_OK, "vmobject reference creation\n");
+  ASSERT_TRUE(vmo_reference, "vmobject reference creation\n");
+
+  auto ret = vmo->CommitRange(0, alloc_size);
+  EXPECT_EQ(ZX_OK, ret, "committing vm object\n");
+  EXPECT_EQ(alloc_size, PAGE_SIZE * vmo->AttributedPages().uncompressed, "committing vm object\n");
+
+  EXPECT_EQ(0u, PAGE_SIZE * vmo_reference->AttributedPages().uncompressed,
+            "vmo_reference attribution\n");
+
+  EXPECT_EQ(alloc_size, PAGE_SIZE * vmo_reference->AttributedPagesInReferenceOwner().uncompressed,
+            "vmo_reference page count\n");
+
+  END_TEST;
+}
+
 static bool vmo_create_physical_test() {
   BEGIN_TEST;
 
@@ -4003,6 +4035,7 @@ VM_UNITTEST(vmo_multiple_pin_contiguous_test)
 VM_UNITTEST(vmo_commit_test)
 VM_UNITTEST(vmo_commit_compressed_pages_test)
 VM_UNITTEST(vmo_odd_size_commit_test)
+VM_UNITTEST(vmo_reference_attribution_commit_test)
 VM_UNITTEST(vmo_create_physical_test)
 VM_UNITTEST(vmo_physical_pin_test)
 VM_UNITTEST(vmo_create_contiguous_test)
