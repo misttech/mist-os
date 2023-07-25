@@ -16,6 +16,7 @@ load(
     "fuchsia_images_configuration",
     "fuchsia_partition",
     "fuchsia_partitions_configuration",
+    "fuchsia_prebuilt_package",
     "fuchsia_product_bundle",
     "fuchsia_product_configuration",
     "fuchsia_product_image",
@@ -205,11 +206,12 @@ fuchsia_virtual_device(
 fuchsia_product_configuration(
     name = "assembly_config_eng",
     cache_packages = [
+        ":tiles_session",
     ],
     json_config = {
         "platform": workbench_platform_config,
         "product": {
-            "session_url": "",
+            "session_url": "fuchsia-pkg://fuchsia.com/tiles-session#meta/tiles-session.cm",
         },
     },
 )
@@ -298,4 +300,9 @@ fuchsia_filesystem_blobfs(
 
 fuchsia_filesystem_empty_data(
     name = "empty_data",
+)
+
+fuchsia_prebuilt_package(
+    name = "tiles_session",
+    archive = "@legacy_ninja_build_outputs//:tiles-session.far",
 )

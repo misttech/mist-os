@@ -63,7 +63,8 @@ fuchsia_structured_config_policy =
 extra_bazel_assembly_targets =
     [ "//build/bazel/assembly/assembly_outputs:verifications" ]
 
-extra_gn_labels_for_bazel_inputs = []
+extra_gn_labels_for_bazel_inputs =
+    [ "//src/ui/bin/tiles-session:tiles_session_bazel_inputs" ]
 
 # We need to skip the fshost configuration in Assembly for workbench until
 # minimal.gni supports configuring fshost via Assembly

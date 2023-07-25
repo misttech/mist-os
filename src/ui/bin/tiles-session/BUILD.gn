@@ -2,6 +2,7 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
+import("//build/bazel/bazel_inputs.gni")
 import("//build/components.gni")
 import("//build/rust/rustc_binary.gni")
 
@@ -68,4 +69,17 @@ fuchsia_package("tiles-session") {
     ":tiles_config_values",
     ":tiles_manifest",
   ]
+}
+
+# Make `tiles_session` available to products assembled with Bazel.
+#
+# TODO(fxbug.dev/122492): Make this less verbose.
+fuchsia_package_archive("tiles_session_archive") {
+  package = ":tiles-session"
+}
+
+bazel_input_resource("tiles_session_bazel_inputs") {
+  deps = [ ":tiles_session_archive" ]
+  sources = get_target_outputs(":tiles_session_archive")
+  outputs = [ "{{source_file_part}}" ]
 }
