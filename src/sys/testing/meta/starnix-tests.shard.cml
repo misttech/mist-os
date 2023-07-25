@@ -47,6 +47,7 @@
                 "fuchsia.kernel.Stats",
                 "fuchsia.kernel.VmexResource",
                 "fuchsia.sysmem.Allocator",
+                "fuchsia.sysmem2.Allocator",
                 "fuchsia.vulkan.loader.Loader",
             ],
             from: "parent",
