@@ -20,6 +20,8 @@ pub const S_IFMT: u16 = 0xf000;
 pub enum MetadataError {
     #[error("Node not found")]
     NotFound,
+    #[error("Node is not a directory")]
+    NotDir,
     #[error("Failed to deserialize metadata (corrupt?)")]
     FailedToDeserialize,
 }
@@ -38,9 +40,9 @@ impl Metadata {
     pub fn lookup(&self, parent: u64, name: &str) -> Result<u64, MetadataError> {
         self.nodes
             .get(&parent)
-            .unwrap()
+            .ok_or(MetadataError::NotFound)?
             .directory()
-            .unwrap()
+            .ok_or(MetadataError::NotDir)?
             .children
             .get(name)
             .ok_or(MetadataError::NotFound)
