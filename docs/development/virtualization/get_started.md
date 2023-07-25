@@ -40,7 +40,7 @@ For each guest operating system, there is a guest manager and a core shard that
 must be included in the build.
 
 Below, {{ '<var>' }}PRODUCT{{ '</var>' }} is typically one of `core`,
-`workstation_eng`, and {{ '<var>' }}BOARD{{ '</var>' }} is typically one of
+and {{ '<var>' }}BOARD{{ '</var>' }} is typically one of
 `x64`, `chromebook-x64`, `sherlock`.
 
 
@@ -109,45 +109,10 @@ Starting Termina
 …
 ```
 
-On products with a UI Stack (ex: `workstation`), the debian and zircon guests
+On products with a UI Stack, the debian and zircon guests
 will also create a window that displays a virtual framebuffer powered by a
 virtio-gpu. Input from that window will also be sent to the guest as a virtual
 keyboard.
-
-## Running on Workstation
-
-The Workstation product supports a more integrated Linux guest via the ‘Linux
-Terminal’ button in the launcher, powered by the `termina_guest` package. The
-`termina_guest` supports Vulkan acceleration inside the guest (on supported
-Intel devices), and also window-manager pass-through so that Linux
-applications will have their own Fuchsia Views.
-
-```sh
-# The Linux Terminal is disabled by on _eng builds so we need to re-add it:
-$ fx set workstation_eng.x64 \
-        --with-base //src/virtualization/packages/termina_guest
-```
-
-Note: The Linux Terminal requires a hardwired network connection to access the
-internet. If your device is connected to WiFi the Linux Terminal may fail to
-start. To use the Linux Terminal, some binaries need to be downloaded from the
-internet so this feature will not be functional until that initialization has
-been performed using a hard-wired network connection.
-
-Once you have built `workstation` you can launch the in one of two ways:
-
-1. If you have a `Linux Terminal` button in your sysui, you can click that and
-the VM will start and drop you into a linux shell once it has booted.
-1. If you don't have the `Linux Terminal` button, you can open the Fuchsia
-`Terminal` and run `guest vsh -c` to accomplish the same result.
-
-From here you can launch graphical Linux applications. As a simple example,
-here's how to run a simple Vulkan test application:
-
-```sh
-$ sudo apt install vulkan-tools
-$ vkcube
-```
 
 ## Running on QEMU
 
