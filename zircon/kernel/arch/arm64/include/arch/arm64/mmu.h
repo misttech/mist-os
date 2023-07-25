@@ -430,6 +430,9 @@ typedef uint64_t pte_t;
 const uint16_t MMU_ARM64_UNUSED_ASID = 0;
 const uint16_t MMU_ARM64_GLOBAL_ASID = 1;  // NOTE: keep in sync with start.S
 const uint16_t MMU_ARM64_FIRST_USER_ASID = 2;
+// User asids should not overlap with the unused or global asid sentinels.
+static_assert(MMU_ARM64_FIRST_USER_ASID > MMU_ARM64_UNUSED_ASID);
+static_assert(MMU_ARM64_FIRST_USER_ASID > MMU_ARM64_GLOBAL_ASID);
 
 // max address space id for 8 and 16 bit asid ranges
 const uint16_t MMU_ARM64_MAX_USER_ASID_8 = (1u << 8) - 1;

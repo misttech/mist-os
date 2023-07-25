@@ -1703,6 +1703,9 @@ zx_status_t ArmArchVmAspace::Init() {
           return status.status_value();
         }
         asid_ = status.value();
+      } else {
+        // Initialize to a valid value even when disabled to distinguish from the destroyed case.
+        asid_ = MMU_ARM64_FIRST_USER_ASID;
       }
     } else if (type_ == ArmAspaceType::kGuest) {
       DEBUG_ASSERT(base_ + size_ <= 1UL << MMU_GUEST_SIZE_SHIFT);
@@ -1868,8 +1871,10 @@ zx_status_t ArmArchVmAspace::Destroy() {
     if (feat_asid_enabled) {
       auto status = asid->Free(asid_);
       ASSERT(status.is_ok());
-      asid_ = MMU_ARM64_UNUSED_ASID;
+    } else {
+      DEBUG_ASSERT(asid_ == MMU_ARM64_FIRST_USER_ASID);
     }
+    asid_ = MMU_ARM64_UNUSED_ASID;
   }
 
   // Free the top level page table.
@@ -1894,14 +1899,16 @@ void ArmArchVmAspace::ContextSwitch(ArmArchVmAspace* old_aspace, ArmArchVmAspace
   // the context switch. Note that we do not need to perform this flush if we are switching to
   // the kernel's address space, as those mappings are global and will be unaffected by the flush.
   if (aspace && !feat_asid_enabled) {
-    // asid_ is always set to MMU_ARM64_UNUSED_ASID when ASID use is disabled, so this will
+    // asid_ is always set to MMU_ARM64_FIRST_USER_ASID when ASID use is disabled, so this will
     // invalidate all TLB entries except the global ones.
-    DEBUG_ASSERT(aspace->asid_ == MMU_ARM64_UNUSED_ASID);
+    DEBUG_ASSERT(aspace->asid_ == MMU_ARM64_FIRST_USER_ASID);
     ARM64_TLBI_ASID(aside1, aspace->asid_);
   }
   if (likely(aspace)) {
     aspace->canary_.Assert();
+    // Check that we are switching to a user aspace, and that the asid is in the valid range.
     DEBUG_ASSERT(aspace->type_ == ArmAspaceType::kUser);
+    DEBUG_ASSERT(aspace->asid_ >= MMU_ARM64_FIRST_USER_ASID);
 
     // Load the user space TTBR with the translation table and user space ASID.
     ttbr = ((uint64_t)aspace->asid_ << 48) | aspace->tt_phys_;
