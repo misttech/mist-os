@@ -22,10 +22,6 @@ For information about the future work related to localization, see
 -   Wire up and verify Chromium's
     [`navigator.language` and `navigator.languages`][navigator-languages].
 
-## Internationalization UI
-
--   For the Workstation product, design and implement an i18n settings UI.
-
 ## Fonts
 
 -   Use ICU4X to implement real language and script ID matching in font service.
