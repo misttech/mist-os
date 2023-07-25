@@ -6,8 +6,6 @@
 # before making changes to this file, and add a member of the fuchsia.dev
 # team as reviewer.
 toc:
-- title: "Build and Assemble Workstation Out of Tree"
-  path: /docs/contribute/roadmap/2021/workstation_out_of_tree.md
 - title: "Decentralized Product Integration"
   path: /docs/contribute/roadmap/2021/decentralized_product_integration.md
 - title: "Defining a Stable Driver Runtime"
