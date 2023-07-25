@@ -38,6 +38,7 @@ rustc_library("b") {
   source_root = "b/lib.rs"
   sources = [ "b/lib.rs" ]
   quiet_clippy = true
+  disable_rustdoc = true
 }
 
 rustc_library("c") {
@@ -46,6 +47,7 @@ rustc_library("c") {
   source_root = "c/lib.rs"
   sources = [ "c/lib.rs" ]
   quiet_clippy = true
+  disable_rustdoc = true
 }
 
 if (is_host) {
@@ -55,6 +57,7 @@ if (is_host) {
     source_root = "d/lib.rs"
     sources = [ "d/lib.rs" ]
     quiet_clippy = true
+    disable_rustdoc = true
   }
 
   gen_dir = "gen/build/rust/tests"
