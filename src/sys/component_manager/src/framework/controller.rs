@@ -11,7 +11,7 @@ use {
     fidl_fuchsia_component as fcomponent, fidl_fuchsia_component_runner as fcrunner,
     fuchsia_async as fasync, fuchsia_zircon as zx,
     futures::TryStreamExt,
-    tracing::warn,
+    tracing::{error, warn},
 };
 
 pub async fn run_controller(
@@ -120,15 +120,19 @@ pub struct ExecutionControllerTask {
 
 impl Drop for ExecutionControllerTask {
     fn drop(&mut self) {
-        let status = self
-            .stop_payload
-            .as_ref()
-            .expect("stop_payload was not set before the ExecutionControllerTask was dropped");
-        // There's not much we can do if the other end has closed their channel
-        let _ = self.control_handle.send_on_stop(&fcomponent::StoppedPayload {
-            status: Some(status.into_raw()),
-            ..Default::default()
-        });
+        match self.stop_payload.as_ref() {
+            Some(status) => {
+                // There's not much we can do if the other end has closed their channel
+                let _ = self.control_handle.send_on_stop(&fcomponent::StoppedPayload {
+                    status: Some(status.into_raw()),
+                    ..Default::default()
+                });
+            }
+            None => {
+                // TODO(fxbug.dev/130801): stop_payload is not when system is shutting down
+                error!("stop_payload was not set before the ExecutionControllerTask was dropped");
+            }
+        }
     }
 }
 
