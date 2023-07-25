@@ -82,8 +82,8 @@ constexpr uint32_t capture_yuv2rgb_offset[3] = {0, 0, 0};
 #define READ32_AOBUS_REG(a) aobus_mmio_->Read32(a)
 #define WRITE32_AOBUS_REG(a, v) aobus_mmio_->Write32(v, a)
 
-#define READ32_CBUS_REG(a) cbus_mmio_->Read32(a)
-#define WRITE32_CBUS_REG(a, v) cbus_mmio_->Write32(v, a)
+#define READ32_RESET_REG(a) reset_mmio_->Read32(a)
+#define WRITE32_RESET_REG(a, v) reset_mmio_->Write32(v, a)
 
 zx_status_t Vpu::Init(ddk::PDevFidl& pdev) {
   if (initialized_) {
@@ -111,10 +111,12 @@ zx_status_t Vpu::Init(ddk::PDevFidl& pdev) {
     return status;
   }
 
-  // Map CBUS registers
-  status = pdev.MapMmio(MMIO_CBUS, &cbus_mmio_);
+  // Map RESET registers
+  // TODO(fxbug.com/130970): Switch MMIO_CBUS to MMIO_RESET and update the board
+  // drivers.
+  status = pdev.MapMmio(MMIO_CBUS, &reset_mmio_);
   if (status != ZX_OK) {
-    DISP_ERROR("vpu: Could not map CBUS mmio\n");
+    DISP_ERROR("vpu: Could not map RESET mmio\n");
     return status;
   }
 
@@ -332,23 +334,23 @@ void Vpu::PowerOn() {
   // Reset VIU + VENC
   // Reset VENCI + VENCP + VADC + VENCL
   // Reset HDMI-APB + HDMI-SYS + HDMI-TX + HDMI-CEC
-  CLEAR_MASK32(CBUS, RESET0_LEVEL, ((1 << 5) | (1 << 10) | (1 << 19) | (1 << 13)));
-  CLEAR_MASK32(CBUS, RESET1_LEVEL, (1 << 5));
-  CLEAR_MASK32(CBUS, RESET2_LEVEL, (1 << 15));
-  CLEAR_MASK32(CBUS, RESET4_LEVEL,
+  CLEAR_MASK32(RESET, RESET0_LEVEL, ((1 << 5) | (1 << 10) | (1 << 19) | (1 << 13)));
+  CLEAR_MASK32(RESET, RESET1_LEVEL, (1 << 5));
+  CLEAR_MASK32(RESET, RESET2_LEVEL, (1 << 15));
+  CLEAR_MASK32(RESET, RESET4_LEVEL,
                ((1 << 6) | (1 << 7) | (1 << 13) | (1 << 5) | (1 << 9) | (1 << 4) | (1 << 12)));
-  CLEAR_MASK32(CBUS, RESET7_LEVEL, (1 << 7));
+  CLEAR_MASK32(RESET, RESET7_LEVEL, (1 << 7));
 
   // Remove VPU_HDMI ISO
   SET_BIT32(AOBUS, AOBUS_GEN_PWR_SLEEP0, 0, 9, 1);  // [9] VPU_HDMI
 
   // release Reset
-  SET_MASK32(CBUS, RESET0_LEVEL, ((1 << 5) | (1 << 10) | (1 << 19) | (1 << 13)));
-  SET_MASK32(CBUS, RESET1_LEVEL, (1 << 5));
-  SET_MASK32(CBUS, RESET2_LEVEL, (1 << 15));
-  SET_MASK32(CBUS, RESET4_LEVEL,
+  SET_MASK32(RESET, RESET0_LEVEL, ((1 << 5) | (1 << 10) | (1 << 19) | (1 << 13)));
+  SET_MASK32(RESET, RESET1_LEVEL, (1 << 5));
+  SET_MASK32(RESET, RESET2_LEVEL, (1 << 15));
+  SET_MASK32(RESET, RESET4_LEVEL,
              ((1 << 6) | (1 << 7) | (1 << 13) | (1 << 5) | (1 << 9) | (1 << 4) | (1 << 12)));
-  SET_MASK32(CBUS, RESET7_LEVEL, (1 << 7));
+  SET_MASK32(RESET, RESET7_LEVEL, (1 << 7));
 
   ConfigureClock();
 }

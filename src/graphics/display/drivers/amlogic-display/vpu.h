@@ -58,7 +58,7 @@ class Vpu {
   std::optional<fdf::MmioBuffer> vpu_mmio_;
   std::optional<fdf::MmioBuffer> hhi_mmio_;
   std::optional<fdf::MmioBuffer> aobus_mmio_;
-  std::optional<fdf::MmioBuffer> cbus_mmio_;
+  std::optional<fdf::MmioBuffer> reset_mmio_;
 
   bool initialized_ = false;
 
