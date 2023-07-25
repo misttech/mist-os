@@ -8,7 +8,7 @@
 
 #include <limits>
 
-#include "src/graphics/display/drivers/amlogic-display/cbus-regs.h"
+#include "src/graphics/display/drivers/amlogic-display/gpio-mux-regs.h"
 #include "src/graphics/display/drivers/amlogic-display/hhi-regs.h"
 #include "src/graphics/display/drivers/amlogic-display/vpu-regs.h"
 
@@ -69,9 +69,11 @@ zx_status_t HdmiHost::Init() {
     return status;
   }
 
-  status = pdev_.MapMmio(MMIO_CBUS, &cbus_mmio_);
+  // TODO(fxbug.com/130970): Switch MMIO_CBUS to MMIO_GPIO_MUX and update the
+  // board drivers.
+  status = pdev_.MapMmio(MMIO_CBUS, &gpio_mux_mmio_);
   if (status != ZX_OK) {
-    DISP_ERROR("Could not map CBUS mmio %d\n", status);
+    DISP_ERROR("Could not map GPIO MUX mmio %d\n", status);
     return status;
   }
 
@@ -85,10 +87,10 @@ zx_status_t HdmiHost::Init() {
 
 zx_status_t HdmiHost::HostOn() {
   /* Step 1: Initialize various clocks related to the HDMI Interface*/
-  SET_BIT32(CBUS, PAD_PULL_UP_EN_REG3, 0, 0, 2);
-  SET_BIT32(CBUS, PAD_PULL_UP_REG3, 0, 0, 2);
-  SET_BIT32(CBUS, P_PREG_PAD_GPIO3_EN_N, 3, 0, 2);
-  SET_BIT32(CBUS, PERIPHS_PIN_MUX_B, 0x11, 0, 8);
+  SET_BIT32(GPIO_MUX, PAD_PULL_UP_EN_REG3, 0, 0, 2);
+  SET_BIT32(GPIO_MUX, PAD_PULL_UP_REG3, 0, 0, 2);
+  SET_BIT32(GPIO_MUX, P_PREG_PAD_GPIO3_EN_N, 3, 0, 2);
+  SET_BIT32(GPIO_MUX, PERIPHS_PIN_MUX_B, 0x11, 0, 8);
 
   // enable clocks
   HhiHdmiClkCntlReg::Get()

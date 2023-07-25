@@ -2,11 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef SRC_GRAPHICS_DISPLAY_DRIVERS_AMLOGIC_DISPLAY_CBUS_REGS_H_
-#define SRC_GRAPHICS_DISPLAY_DRIVERS_AMLOGIC_DISPLAY_CBUS_REGS_H_
+#ifndef SRC_GRAPHICS_DISPLAY_DRIVERS_AMLOGIC_DISPLAY_GPIO_MUX_REGS_H_
+#define SRC_GRAPHICS_DISPLAY_DRIVERS_AMLOGIC_DISPLAY_GPIO_MUX_REGS_H_
 
-#define READ32_CBUS_REG(a) cbus_mmio_->Read32(0x400 + a)
-#define WRITE32_CBUS_REG(a, v) cbus_mmio_->Write32(v, 0x400 + a)
+#define READ32_GPIO_MUX_REG(a) gpio_mux_mmio_->Read32(a)
+#define WRITE32_GPIO_MUX_REG(a, v) gpio_mux_mmio_->Write32(v, a)
 
 // Register offsets from the A311D datasheet section 8.9.2 "GPIO Multiplex
 // Function", Table 8-23 "Pin Mux Registers".
@@ -24,4 +24,4 @@
 #define P_PREG_PAD_GPIO3_EN_N (0x19 << 2)
 #define PERIPHS_PIN_MUX_B (0xbb << 2)
 
-#endif  // SRC_GRAPHICS_DISPLAY_DRIVERS_AMLOGIC_DISPLAY_CBUS_REGS_H_
+#endif  // SRC_GRAPHICS_DISPLAY_DRIVERS_AMLOGIC_DISPLAY_GPIO_MUX_REGS_H_

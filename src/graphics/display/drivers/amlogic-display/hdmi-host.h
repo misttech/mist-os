@@ -132,7 +132,7 @@ class HdmiHost {
 
   std::optional<fdf::MmioBuffer> vpu_mmio_;
   std::optional<fdf::MmioBuffer> hhi_mmio_;
-  std::optional<fdf::MmioBuffer> cbus_mmio_;
+  std::optional<fdf::MmioBuffer> gpio_mux_mmio_;
 
   hdmi_param p_;
   ColorParam color_{
