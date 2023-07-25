@@ -16,7 +16,7 @@ configure the build. This includes any hardware-specific packages such as
 drivers. Recall the `fx set` command used previously:
 
 ```posix-terminal
-fx set workstation_eng.qemu-x64
+fx set workbench_eng.qemu-x64
 ```
 
 In this example, `qemu-x64` is the board name for FEMU. To build the same
@@ -27,7 +27,7 @@ Note: To determine the Fuchsia board name for your supported hardware, see the
 [device documentation](/docs/development/hardware/README.md).
 
 ```posix-terminal
-fx set workstation_eng.x64
+fx set workbench_eng.x64
 ```
 
 Running `fx build` will now generate an image for the target device.
@@ -50,7 +50,7 @@ Most Fuchsia-compatible devices use a bootloader that supports the
 ## Flash
 
 The process of loading the operating system onto the device is known as
-**flashing**. With a device in bootloader mode connected to your workstation,
+**flashing**. With a device in bootloader mode connected to your workbench,
 you can use the `flash` command to flash Fuchsia onto the device.
 
 ```posix-terminal
