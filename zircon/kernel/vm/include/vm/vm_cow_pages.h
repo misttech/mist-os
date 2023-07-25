@@ -120,6 +120,19 @@ class VmCowPages final : public VmHierarchyBase,
     return result;
   }
 
+  bool is_self_or_parent_hidden_locked() const TA_REQ(lock()) {
+    if (is_hidden_locked()) {
+      return true;
+    }
+    if (parent_) {
+      AssertHeld(parent_->lock_ref());
+      if (parent_->is_hidden_locked()) {
+        return true;
+      }
+    }
+    return false;
+  }
+
   bool can_evict() const {
     canary_.Assert();
     bool result = page_source_ && page_source_->properties().is_preserving_page_content;
@@ -717,6 +730,35 @@ class VmCowPages final : public VmHierarchyBase,
     // Bug: 36841
     if (is_slice_locked()) {
       return false;
+    }
+
+    return true;
+  }
+
+  bool can_snapshot_modified_locked() const TA_REQ(lock()) {
+    // We don't support COW clones for contiguous VMOs.
+    if (is_source_supplying_specific_physical_pages()) {
+      return false;
+    }
+
+    // Snapshots of slices aren't supported.
+    // Bug: 36841
+    if (is_slice_locked()) {
+      return false;
+    }
+
+    // TODO(sagebarreda@) Don't allow snapshots in unidirectional chain.
+
+    // Unless we are the root VMO, we can't snapshot if has non-slice children, as it would create
+    // an inconsistent hierarchy.
+    if (!parent_) {
+      return true;
+    }
+    for (auto& child : children_list_) {
+      AssertHeld(child.lock_ref());
+      if (!child.is_slice_locked()) {
+        return false;
+      }
     }
 
     return true;
