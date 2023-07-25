@@ -20,6 +20,7 @@ function get_exec_from_metadata {
   awk -F ' *= *' -f - "${metadata_file}" <<'EOF'
     /^#### +EXECUTABLE */ {
       gsub(/\${PREBUILT_3P_DIR}/, ENVIRON["PREBUILT_3P_DIR"], $2);
+      gsub(/\${PREBUILT_PYTHON3}/, ENVIRON["PREBUILT_PYTHON3"], $2);
       gsub(/\${FUCHSIA_DIR}/, ENVIRON["FUCHSIA_DIR"], $2);
       gsub(/\${HOST_TOOLS_DIR}/, ENVIRON["HOST_TOOLS_DIR"], $2);
       gsub(/\${HOST_PLATFORM}/, ENVIRON["HOST_PLATFORM"], $2);
