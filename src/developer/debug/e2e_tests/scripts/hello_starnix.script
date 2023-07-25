@@ -16,8 +16,9 @@ Attached Process 1 state=Running koid=?? name=hello_starnix component=starnix_ke
 [zxdb] next
 🛑 main() • hello_starnix.cc:10
 
-[zxdb] b -t execute execute_syscall
-Created Breakpoint 2 type=execute @ execute_syscall
+# TODO(fxbug.dev/131121): We should use hardware breakpoints here but they don't work on arm64.
+[zxdb] b sys_exit_group
+Created Breakpoint 2 @ sys_exit_group
 
 [zxdb] c
 🛑 on bp 2
@@ -25,12 +26,12 @@ Created Breakpoint 2 type=execute @ execute_syscall
 # Zxdb can unwind into restricted stack.
 [zxdb] f
 # When optimization is on, there might be other inlined frame so we only check
-# the existence of execute_syscall and main function in the backtrace.
-execute_syscall
+# the existence of sys_exit_group and main function in the backtrace.
+sys_exit_group
 main() • hello_starnix.cc
 
 [zxdb] bp rm
-Removed Breakpoint 2 type=execute @ execute_syscall
+Removed Breakpoint 2 @ sys_exit_group
 
 [zxdb] c
 Process 1 exited with code 0.
