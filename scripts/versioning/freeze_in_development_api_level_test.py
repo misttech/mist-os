@@ -13,41 +13,47 @@ import freeze_in_development_api_level
 
 SUPPORTED_API_LEVELS = [1]
 
-IN_DEVELOPMENT_API_LEVEL = 2
+TEST_VERSION_HISTORY_FILE_CONTENT = {
+    "data":
+        {
+            "name": "Platform version map",
+            "type": "version_history",
+            "api_levels":
+                {
+                    "1": {
+                        "abi_revision": "0x1",
+                        "status": "in-development"
+                    }
+                }
+        },
+    "schema_id": "https://fuchsia.dev/schema/version_history-22rnd667.json"
+}
+
 
 class TestFreezePlatformVersionMethods(unittest.TestCase):
 
-    def setUp(self):
-        self.test_dir = tempfile.mkdtemp()
-
-        self.fake_milestone_version_file = os.path.join(
-            self.test_dir, 'platform_version.json')
-        with open(self.fake_milestone_version_file, 'w') as f:
-            pv = {
-                'in_development_api_level': IN_DEVELOPMENT_API_LEVEL,
-                'supported_fuchsia_api_levels': SUPPORTED_API_LEVELS,
-            }
-            json.dump(pv, f)
-        freeze_in_development_api_level.PLATFORM_VERSION_PATH = self.fake_milestone_version_file
-
-
-    def tearDown(self):
-        shutil.rmtree(self.test_dir)
-
-
-    def _api_level_is_frozen(self, api_level):
-        with open(PLATFORM_VERSION_PATH, "r+") as f:
-            platform_version = json.load(f)
-            return api_level in platform_version["supported_fuchsia_api_levels"]
-
-
     def test_freeze_version_history(self):
-        self.assertFalse(_api_level_is_frozen(NEW_API_LEVEL))
+        expected_version_history = {
+            "data":
+                {
+                    "name": "Platform version map",
+                    "type": "version_history",
+                    "api_levels":
+                        {
+                            "1": {
+                                "abi_revision": "0x1",
+                                "status": "supported"
+                            }
+                        }
+                },
+            "schema_id":
+                "https://fuchsia.dev/schema/version_history-22rnd667.json"
+        }
 
-        freeze_in_development_api_level.freeze_in_development_api_level()
+        result = freeze_in_development_api_level.freeze_version_history(
+            TEST_VERSION_HISTORY_FILE_CONTENT)
+        self.assertEqual(result, expected_version_history)
 
-        self.assertTrue(_api_level_is_frozen(NEW_API_LEVEL))
 
-
-if __name__ == '__main__':
+if __name__ == "__main__":
     unittest.main()

@@ -25,12 +25,20 @@ if (is_host) {
     main_source = "update_platform_version_tests.py"
     sources = [ "update_platform_version.py" ]
   }
+
+  python_host_test("freeze_in_development_api_level_test") {
+    main_source = "freeze_in_development_api_level_test.py"
+    sources = [ "freeze_in_development_api_level.py" ]
+  }
 }
 
 group("tests") {
   testonly = true
 
-  deps = [ ":update_platform_version_tests($host_toolchain)" ]
+  deps = [
+    ":freeze_in_development_api_level_test($host_toolchain)",
+    ":update_platform_version_tests($host_toolchain)",
+  ]
 }
 
 action("bump_api_level") {
