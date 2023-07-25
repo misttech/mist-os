@@ -173,7 +173,7 @@
             to: "#sshd-host",
         },
 
-        // TODO(https://fxbug.dev/90433): prune these once MDNS is a CFv2 component.
+        // Used by mdns-util.
         {
             protocol: [
                 "fuchsia.net.mdns.HostNameResolver",
