@@ -83,7 +83,7 @@ void TestBindManagerBridge::AddCompositeNodeSpec(std::string composite,
                                                  std::unique_ptr<dfv2::CompositeNodeSpecV2> spec) {
   auto composite_info = fdi::MatchedCompositeInfo{{
       .composite_name = composite,
-      .driver_info = fdi::MatchedDriverInfo{{.driver_url = "fuchsia-boot:///#meta/test.cm"}},
+      .driver_info = fdi::MatchedDriverInfo{{.url = "fuchsia-boot:///#meta/test.cm"}},
   }};
   auto fidl_spec_info = fdi::MatchedCompositeNodeSpecInfo{{
       .name = composite,

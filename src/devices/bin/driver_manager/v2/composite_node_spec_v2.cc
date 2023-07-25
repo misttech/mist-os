@@ -22,7 +22,8 @@ zx::result<std::optional<DeviceOrNode>> CompositeNodeSpecV2::BindParentImpl(
   ZX_ASSERT(node_ptr);
   ZX_ASSERT(info.has_node_index() && info.has_node_index() && info.has_node_names() &&
             info.has_primary_index());
-  ZX_ASSERT(info.has_composite() && info.composite().has_composite_name());
+  ZX_ASSERT(info.has_composite() && info.composite().has_composite_name() &&
+            info.composite().has_driver_info() && info.composite().driver_info().has_url());
   ZX_ASSERT(info.has_name());
 
   if (!parent_set_collector_) {
@@ -32,6 +33,7 @@ zx::result<std::optional<DeviceOrNode>> CompositeNodeSpecV2::BindParentImpl(
     }
     parent_set_collector_ = ParentSetCollector(std::string(info.name().get()),
                                                std::move(node_names), info.primary_index());
+    driver_url_ = std::string(info.composite().driver_info().url().get());
   }
 
   zx::result<> add_result = parent_set_collector_->AddNode(info.node_index(), *node_ptr);
