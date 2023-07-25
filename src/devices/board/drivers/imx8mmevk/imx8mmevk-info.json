@@ -1,9 +1,0 @@
-{
-    "short_description": "imx8mm-evk board driver",
-    "manufacturer": "nxp",
-    "families": [],
-    "models": [],
-    "areas": [
-        "Board"
-    ]
-}

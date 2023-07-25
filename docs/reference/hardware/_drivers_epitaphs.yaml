@@ -344,3 +344,39 @@
   available_in_git: 'f144767476d742cc7fa7780927ad6c316ba4ec8f'
   areas: ['Board']
   path: '/src/devices/board/drivers/sherlock'
+- short_description: 'Synaptics AS370 board driver'
+  deletion_reason: 'Hardware is not actively supported'
+  gerrit_change_id: '888834'
+  available_in_git: '466281247ca8f90b5c8a694572fd3cff8664070e'
+  areas: ['Board']
+  path: '/src/devices/board/drivers/as370'
+- short_description: 'Amlogic AV400 board driver'
+  deletion_reason: 'Hardware is not actively supported'
+  gerrit_change_id: '888834'
+  available_in_git: '466281247ca8f90b5c8a694572fd3cff8664070e'
+  areas: ['Board']
+  path: '/src/devices/board/drivers/av400'
+- short_description: 'Buckeye board driver'
+  deletion_reason: 'Hardware is not actively supported'
+  gerrit_change_id: '888834'
+  available_in_git: '466281247ca8f90b5c8a694572fd3cff8664070e'
+  areas: ['Board']
+  path: '/src/devices/board/drivers/buckeye'
+- short_description: 'Clover board driver'
+  deletion_reason: 'Hardware is not actively supported'
+  gerrit_change_id: '888834'
+  available_in_git: '466281247ca8f90b5c8a694572fd3cff8664070e'
+  areas: ['Board']
+  path: '/src/devices/board/drivers/clover'
+- short_description: 'NXP iMX8MM EVK board driver'
+  deletion_reason: 'Hardware is not actively supported'
+  gerrit_change_id: '888834'
+  available_in_git: '466281247ca8f90b5c8a694572fd3cff8664070e'
+  areas: ['Board']
+  path: '/src/devices/board/drivers/imx8mmevk'
+- short_description: 'Pinecrest board driver'
+  deletion_reason: 'Hardware is not actively supported'
+  gerrit_change_id: '888834'
+  available_in_git: '466281247ca8f90b5c8a694572fd3cff8664070e'
+  areas: ['Board']
+  path: '/src/devices/board/drivers/pinecrest'

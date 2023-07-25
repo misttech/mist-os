@@ -5,16 +5,10 @@
 group("drivers") {
   deps = [
     "drivers/acpi-arm64",
-    "drivers/as370",
     "drivers/astro",
-    "drivers/av400",
-    "drivers/buckeye",
-    "drivers/clover",
-    "drivers/imx8mmevk",
     "drivers/integration-test",
     "drivers/machina",
     "drivers/nelson",
-    "drivers/pinecrest",
     "drivers/qemu-arm64",
     "drivers/qemu-riscv64",
     "drivers/sherlock:sherlock",

@@ -20,7 +20,6 @@ max_fuchsia_zbi_size = 33554432  # 32 mebibytes (MiB)
 _common_bootfs_deps = [
   "//src/devices/bin/driver_host2",
   "//src/devices/block/drivers/imx8m-sdmmc",
-  "//src/devices/board/drivers/imx8mmevk",
   "//src/devices/gpio/drivers/imx8m-gpio",
   "//src/devices/i2c/drivers/imx8m-i2c",
 ]

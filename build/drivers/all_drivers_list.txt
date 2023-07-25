@@ -99,16 +99,10 @@
 //src/devices/block/drivers/virtio:virtio_scsi-driver
 //src/devices/block/drivers/zxcrypt:zxcrypt-driver
 //src/devices/board/drivers/acpi-arm64:acpi-arm64-driver
-//src/devices/board/drivers/as370:as370-driver
 //src/devices/board/drivers/astro:astro-driver
-//src/devices/board/drivers/av400:av400-driver
-//src/devices/board/drivers/buckeye:buckeye-driver
-//src/devices/board/drivers/clover:clover-driver
-//src/devices/board/drivers/imx8mmevk:imx8mmevk-driver
 //src/devices/board/drivers/integration-test:integration-test-driver
 //src/devices/board/drivers/machina:machina-driver
 //src/devices/board/drivers/nelson:nelson-module-driver
-//src/devices/board/drivers/pinecrest:pinecrest-driver
 //src/devices/board/drivers/qemu-arm64:qemu-arm64-driver
 //src/devices/board/drivers/qemu-riscv64:qemu-riscv64-driver
 //src/devices/board/drivers/sherlock:sherlock-driver

@@ -10,7 +10,6 @@ board_description = "speaker platform board"
 _common_bootfs_deps = [
   "//src/devices/block/drivers/aml-sdmmc",
   "//src/devices/block/drivers/bootpart",
-  "//src/devices/board/drivers/buckeye",
   "//src/devices/clock/drivers/amlogic-clk",
   "//src/devices/cpu/drivers/aml-cpu",
   "//src/devices/gpio/drivers/aml-gpio",

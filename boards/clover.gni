@@ -11,7 +11,6 @@ _common_bootfs_deps = [
   "//boards/kernel_cmdline:clover",
   "//src/devices/block/drivers/aml-sdmmc",
   "//src/devices/block/drivers/ftl",
-  "//src/devices/board/drivers/clover",
   "//src/devices/clock/drivers/amlogic-clk",
   "//src/devices/cpu/drivers/aml-cpu",
   "//src/devices/gpio/drivers/aml-gpio",

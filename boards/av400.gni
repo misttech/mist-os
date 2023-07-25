@@ -20,7 +20,6 @@ _common_bootfs_deps = [
   "//src/connectivity/ethernet/drivers/realtek-8211f",
   "//src/devices/block/drivers/aml-sdmmc",
   "//src/devices/block/drivers/bootpart",
-  "//src/devices/board/drivers/av400",
   "//src/devices/clock/drivers/amlogic-clk",
   "//src/devices/cpu/drivers/aml-cpu",
   "//src/devices/gpio/drivers/aml-gpio",
