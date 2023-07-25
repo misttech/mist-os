@@ -11425,6 +11425,42 @@ pub const netlink_policy_type_attr_NL_POLICY_TYPE_ATTR_MASK: netlink_policy_type
 pub const netlink_policy_type_attr___NL_POLICY_TYPE_ATTR_MAX: netlink_policy_type_attr = 13;
 pub const netlink_policy_type_attr_NL_POLICY_TYPE_ATTR_MAX: netlink_policy_type_attr = 12;
 pub type netlink_policy_type_attr = crate::types::c_uint;
+pub const UNAME26: _bindgen_ty_51 = 131072;
+pub const ADDR_NO_RANDOMIZE: _bindgen_ty_51 = 262144;
+pub const FDPIC_FUNCPTRS: _bindgen_ty_51 = 524288;
+pub const MMAP_PAGE_ZERO: _bindgen_ty_51 = 1048576;
+pub const ADDR_COMPAT_LAYOUT: _bindgen_ty_51 = 2097152;
+pub const READ_IMPLIES_EXEC: _bindgen_ty_51 = 4194304;
+pub const ADDR_LIMIT_32BIT: _bindgen_ty_51 = 8388608;
+pub const SHORT_INODE: _bindgen_ty_51 = 16777216;
+pub const WHOLE_SECONDS: _bindgen_ty_51 = 33554432;
+pub const STICKY_TIMEOUTS: _bindgen_ty_51 = 67108864;
+pub const ADDR_LIMIT_3GB: _bindgen_ty_51 = 134217728;
+pub type _bindgen_ty_51 = crate::types::c_uint;
+pub const PER_LINUX: _bindgen_ty_52 = 0;
+pub const PER_LINUX_32BIT: _bindgen_ty_52 = 8388608;
+pub const PER_LINUX_FDPIC: _bindgen_ty_52 = 524288;
+pub const PER_SVR4: _bindgen_ty_52 = 68157441;
+pub const PER_SVR3: _bindgen_ty_52 = 83886082;
+pub const PER_SCOSVR3: _bindgen_ty_52 = 117440515;
+pub const PER_OSR5: _bindgen_ty_52 = 100663299;
+pub const PER_WYSEV386: _bindgen_ty_52 = 83886084;
+pub const PER_ISCR4: _bindgen_ty_52 = 67108869;
+pub const PER_BSD: _bindgen_ty_52 = 6;
+pub const PER_SUNOS: _bindgen_ty_52 = 67108870;
+pub const PER_XENIX: _bindgen_ty_52 = 83886087;
+pub const PER_LINUX32: _bindgen_ty_52 = 8;
+pub const PER_LINUX32_3GB: _bindgen_ty_52 = 134217736;
+pub const PER_IRIX32: _bindgen_ty_52 = 67108873;
+pub const PER_IRIXN32: _bindgen_ty_52 = 67108874;
+pub const PER_IRIX64: _bindgen_ty_52 = 67108875;
+pub const PER_RISCOS: _bindgen_ty_52 = 12;
+pub const PER_SOLARIS: _bindgen_ty_52 = 67108877;
+pub const PER_UW7: _bindgen_ty_52 = 68157454;
+pub const PER_OSF4: _bindgen_ty_52 = 15;
+pub const PER_HPUX: _bindgen_ty_52 = 16;
+pub const PER_MASK: _bindgen_ty_52 = 255;
+pub type _bindgen_ty_52 = crate::types::c_uint;
 #[repr(C)]
 #[derive(Debug, Copy, Clone, AsBytes, FromBytes, FromZeroes)]
 pub struct prctl_mm_map {

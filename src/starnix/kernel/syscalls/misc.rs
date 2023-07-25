@@ -24,16 +24,23 @@ pub fn sys_uname(current_task: &CurrentTask, name: UserRef<utsname_t>) -> Result
         domainname: [0; 65],
     };
 
-    // Get the UTS namespace from the perspective of this task.
-    let task_state = current_task.read();
-    let uts_ns = task_state.uts_ns.read();
-
     init_array(&mut result.sysname, b"Linux");
-    init_array(&mut result.nodename, uts_ns.hostname.as_slice());
-    init_array(&mut result.release, b"5.7.17-starnix");
+    if current_task.thread_group.read().personality.contains(PersonalityFlags::UNAME26) {
+        init_array(&mut result.release, b"2.6.40-starnix");
+    } else {
+        init_array(&mut result.release, b"5.7.17-starnix");
+    }
     init_array(&mut result.version, b"starnix");
     init_array(&mut result.machine, b"x86_64");
-    init_array(&mut result.domainname, uts_ns.domainname.as_slice());
+
+    {
+        // Get the UTS namespace from the perspective of this task.
+        let task_state = current_task.read();
+        let uts_ns = task_state.uts_ns.read();
+        init_array(&mut result.nodename, uts_ns.hostname.as_slice());
+        init_array(&mut result.domainname, uts_ns.domainname.as_slice());
+    }
+
     current_task.write_object(name, &result)?;
     Ok(())
 }
@@ -185,4 +192,14 @@ pub fn sys_unknown(
     not_implemented!("unknown syscall {:?}", SyscallDecl::from_number(syscall_number));
     // TODO: We should send SIGSYS once we have signals.
     error!(ENOSYS)
+}
+
+pub fn sys_personality(current_task: &CurrentTask, persona: u32) -> Result<SyscallResult, Errno> {
+    let mut state = current_task.task.thread_group.write();
+    let previous_value = state.personality.bits();
+    if persona != 0xffffffff {
+        // Use `from_bits_unchecked()` since we want to keep unknown flags.
+        state.personality = unsafe { PersonalityFlags::from_bits_unchecked(persona) };
+    }
+    Ok(previous_value.into())
 }

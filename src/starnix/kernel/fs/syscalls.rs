@@ -1707,7 +1707,9 @@ pub fn sys_pselect6(
         sigmask_addr,
     )?;
 
-    if !timeout_addr.is_null() {
+    if !timeout_addr.is_null()
+        && !current_task.thread_group.read().personality.contains(PersonalityFlags::STICKY_TIMEOUTS)
+    {
         let now = zx::Time::get_monotonic();
         let remaining = std::cmp::max(deadline - now, zx::Duration::from_seconds(0));
         current_task.write_object(timeout_addr, &timespec_from_duration(remaining))?;
@@ -1744,7 +1746,9 @@ pub fn sys_select(
         UserRef::<pselect6_sigmask>::default(),
     )?;
 
-    if !timeout_addr.is_null() {
+    if !timeout_addr.is_null()
+        && !current_task.thread_group.read().personality.contains(PersonalityFlags::STICKY_TIMEOUTS)
+    {
         let now = zx::Time::get_monotonic();
         let remaining = std::cmp::max(deadline - now, zx::Duration::from_seconds(0));
         current_task.write_object(timeout_addr, &timeval_from_duration(remaining))?;

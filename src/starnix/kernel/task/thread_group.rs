@@ -96,6 +96,9 @@ pub struct ThreadGroupMutableState {
 
     /// Time statistics accumulated from the children.
     pub children_time_stats: TaskTimeStats,
+
+    // Personality flags set with `sys_personality()`.
+    pub personality: PersonalityFlags,
 }
 
 /// A collection of `Task` objects that roughly correspond to a "process".
@@ -265,6 +268,7 @@ impl ThreadGroup {
                 terminating: false,
                 selinux: Default::default(),
                 children_time_stats: Default::default(),
+                personality: parent.as_ref().map(|p| p.personality).unwrap_or(Default::default()),
             }),
         });
 

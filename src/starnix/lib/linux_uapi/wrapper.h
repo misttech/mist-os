@@ -47,6 +47,7 @@
 #include <linux/netfilter_ipv6/ipv6_tables.h>
 #include <linux/netlink.h>
 #include <linux/oom.h>
+#include <linux/personality.h>
 #include <linux/poll.h>
 #include <linux/prctl.h>
 #include <linux/random.h>

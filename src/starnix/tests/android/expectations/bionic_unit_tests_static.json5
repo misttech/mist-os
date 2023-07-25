@@ -166,7 +166,6 @@
                 "stdlib.realpath__dot",
                 "stdlib.realpath__dot_dot",
                 "sys_msg.smoke",
-                "sys_personality.current_persona",
                 "sys_prctl.pr_cap_ambient",
                 "sys_ptrace.hardware_breakpoint",
                 "sys_ptrace.watchpoint_imprecise",
