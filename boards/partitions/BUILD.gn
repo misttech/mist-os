@@ -75,23 +75,6 @@ generated_partitions_config("qemu-x64") {
   hw_revision = "qemu-x64"
 }
 
-generated_partitions_config("as370") {
-  hw_revision = "av370"
-  zbi_a = "boot"
-}
-
-generated_partitions_config("av400") {
-  forward_variables_from(_vim3_boot, "*")
-  forward_variables_from(_standard_names, "*")
-  hw_revision = "av400"
-}
-
-generated_partitions_config("buckeye") {
-  forward_variables_from(_vim3_boot, "*")
-  forward_variables_from(_standard_names, "*")
-  hw_revision = "buckeye"
-}
-
 # NOTE: if you touch this target, please add this line to your commit
 # description so that the vim3 tests are run as we do not run vim3 tests in CQ
 # by default.
@@ -116,20 +99,11 @@ generated_partitions_config("chromebook-x64") {
   ]
 }
 
-generated_partitions_config("clover") {
-  forward_variables_from(_standard_names, "*")
-  hw_revision = "clover"
-}
-
 group("partitions") {
   testonly = true
   public_deps = [
     ":arm64",
-    ":as370",
-    ":av400",
-    ":buckeye",
     ":chromebook-x64",
-    ":clover",
     ":qemu-x64",
     ":vim3",
     ":x64",

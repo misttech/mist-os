@@ -122,32 +122,6 @@ generated_images_config("qemu-riscv64") {
   forward_variables_from(_default_fvm_with_size_limits, "*")
 }
 
-generated_images_config("av400") {
-  forward_variables_from(_default_zbi, "*")
-  forward_variables_from(_vim3_vbmeta, "*")
-  forward_variables_from(_default_fvm_with_size_limits, "*")
-
-  fvm.emmc = {
-    compress = true
-
-    # AV400 has 4GB in total, give a safer value(3GB) temporarily
-    truncate_to_length = 3221225472
-  }
-}
-
-generated_images_config("buckeye") {
-  forward_variables_from(_default_zbi, "*")
-  forward_variables_from(_vim3_vbmeta, "*")
-  forward_variables_from(_default_fvm_with_size_limits, "*")
-
-  fvm.emmc = {
-    compress = true
-
-    # BUCKEYE has 8GB in total, give a safer value(3GB) temporarily
-    truncate_to_length = 3221225472
-  }
-}
-
 # NOTE: if you touch this target, please add this line to your commit
 # description so that the vim3 tests are run as we do not run vim3 tests in CQ
 # by default.
@@ -167,22 +141,6 @@ generated_images_config("vim3") {
     # available size, here we set it to be the same as sherlock (3280mb), which is clearly safe
     # and sufficient for now.
     truncate_to_length = 3439329280
-  }
-}
-
-generated_images_config("clover") {
-  forward_variables_from(_default_zbi, "*")
-  forward_variables_from(_vim3_vbmeta, "*")
-  forward_variables_from(_default_fvm_with_size_limits, "*")
-
-  fvm.nand = {
-    compress = false
-    page_size = 4096
-    oob_size = 128
-    pages_per_block = 64
-    block_count = 1604
-
-    truncate_to_length = 3221225472
   }
 }
 
@@ -242,13 +200,6 @@ generated_images_config("zedboot_vim3") {
   forward_variables_from(_vim3_vbmeta, "*")
 }
 
-generated_images_config("zedboot_imx8mmevk") {
-  forward_variables_from(_default_zedboot_zbi, "*")
-  zbi.signing_script =
-      "//zircon/kernel/target/arm64/board/imx8mmevk/package-image.sh"
-  deps = [ "//zircon/kernel/target/arm64/boot-shim:imx8mmevk" ]
-}
-
 generated_images_config("zedboot_chromebook-x64") {
   forward_variables_from(_default_zedboot_zbi, "*")
   forward_variables_from(_default_vbmeta, "*")
@@ -280,13 +231,6 @@ generated_images_config("bringup_default") {
 generated_images_config("bringup_vim3") {
   forward_variables_from(_default_bringup_zbi, "*")
   forward_variables_from(_vim3_vbmeta, "*")
-}
-
-generated_images_config("bringup_imx8mmevk") {
-  forward_variables_from(_default_bringup_zbi, "*")
-  zbi.signing_script =
-      "//zircon/kernel/target/arm64/board/imx8mmevk/package-image.sh"
-  deps = [ "//zircon/kernel/target/arm64/boot-shim:imx8mmevk" ]
 }
 
 generated_images_config("bringup_chromebook-x64") {
@@ -335,17 +279,6 @@ generated_images_config("bringup_fastboot_vim3") {
   zbi.signing_args += _bringup_fastboot_vbmeta_args
 }
 
-generated_images_config("bringup_fastboot_imx8mmevk") {
-  forward_variables_from(_default_bringup_fastboot_zbi, "*")
-
-  _rebased_script = rebase_path(
-          "//zircon/kernel/target/arm64/board/imx8mmevk/package-image.sh",
-          root_build_dir)
-  zbi.signing_args += [ "-s ${_rebased_script}" ]
-  zbi.signing_args += vboot_action.args
-  deps = [ "//zircon/kernel/target/arm64/boot-shim:imx8mmevk" ]
-}
-
 generated_images_config("bringup_fastboot_chromebook-x64") {
   forward_variables_from(_default_bringup_fastboot_zbi, "*")
   forward_variables_from(_default_vbmeta, "*")
@@ -365,12 +298,8 @@ group("images") {
   public_deps = [
     # Fuchsia images configs
     ":arm64",
-    ":av400",
-    ":buckeye",
     ":chromebook-x64",
-    ":clover",
     ":default",
-    ":imx8mmevk",
     ":qemu-x64",
     ":vim3",
     ":x64",
@@ -379,21 +308,18 @@ group("images") {
     # zedboot images configs
     ":zedboot_chromebook-x64",
     ":zedboot_default",
-    ":zedboot_imx8mmevk",
     ":zedboot_qemu",
     ":zedboot_vim3",
 
     # bringup images configs
     ":bringup_chromebook-x64",
     ":bringup_default",
-    ":bringup_imx8mmevk",
     ":bringup_qemu",
     ":bringup_vim3",
 
     # bringup fastboot images configs
     ":bringup_fastboot_chromebook-x64",
     ":bringup_fastboot_default",
-    ":bringup_fastboot_imx8mmevk",
     ":bringup_fastboot_qemu",
     ":bringup_fastboot_vim3",
   ]
