@@ -1953,10 +1953,7 @@
   hardware buttons, or those with only network I/O.
 
   Simple products may specify a session component with no children, while complex
-  products have many children of the session component. For example, the
-  workstation session instantiates components to display the system user
-  interface, a command line shell, and a web browser as descendents of its session
-  component."
+  products have many children of the session component."
   see_also: ["<a href=\"/docs/glossary#component\">Component</a>"]
   related_guides: [""]
   area: ["Session", "Component Framework"]
