@@ -195,6 +195,10 @@ void SetConstants(const fbl::RefPtr<VmObject>& vmo) {
   ASSERT(ticks_to_mono_ratio.numerator() != 0);
   ASSERT(ticks_to_mono_ratio.denominator() != 0);
 
+  ktl::string_view version = version_string();
+  ASSERT_MSG(version.size() <= kMaxVersionString, "version string size %zu > max %zu: \"%.*s\"",
+             version.size(), kMaxVersionString, static_cast<int>(version.size()), version.data());
+
   // Initialize the constants that should be visible to the vDSO.
   // Rather than assigning each member individually, do this with
   // struct assignment and a compound literal so that the compiler
@@ -217,15 +221,24 @@ void SetConstants(const fbl::RefPtr<VmObject>& vmo) {
       ticks_to_mono_ratio.numerator(),
       ticks_to_mono_ratio.denominator(),
       pmm_count_total_bytes(),
-      strlen(version_string()),
-      "",
+      version.size(),
   };
-  ASSERT(constants.version_string_len < sizeof(constants.version_string));
-  memcpy(constants.version_string, version_string(), constants.version_string_len);
 
-  static_assert(sizeof(constants) == VDSO_DATA_CONSTANTS_SIZE, "gen-rodso-code.sh is suspect");
-  zx_status_t status = vmo->Write(&constants, VDSO_DATA_CONSTANTS, sizeof(constants));
-  ASSERT_MSG(status == ZX_OK, "vDSO VMO Write failed: %d", status);
+  auto write_vmo = [offset = uint64_t{VDSO_DATA_CONSTANTS}, &vmo](auto data) mutable {
+    ktl::span bytes = ktl::as_bytes(ktl::span(data));
+    zx_status_t status = vmo->Write(bytes.data(), offset, bytes.size());
+    ASSERT_MSG(status == ZX_OK, "vDSO VMO Write of %zu bytes at %#" PRIx64 " failed: %d",
+               bytes.size(), offset, status);
+    offset += bytes.size();
+  };
+
+  // Write the constants initialized above, without the flexible array member.
+  write_vmo(ktl::span{&constants, 1});
+
+  // Store the version string and NUL terminator in the flexible array member.
+  // The kMaxVersionString check ensures there is enough space for all that.
+  write_vmo(version);
+  write_vmo(ktl::span{"", 1});
 }
 
 // Conditionally patch some of the entry points related to time based on

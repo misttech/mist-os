@@ -6,6 +6,7 @@
 
 import("//build/zircon/c_utils.gni")
 import("//build/zircon/migrated_targets.gni")
+import("//build/zircon/zircon_cpu.gni")
 import("//zircon/kernel/params.gni")
 
 zx_library("userabi") {
@@ -39,7 +40,16 @@ zx_library("userabi") {
   } else {
     # Our own embedded "user" code needs some shared headers.
     visibility = [ "./*" ]
+
+    public_configs = [ ":userabi.user.config" ]
   }
+}
+
+config("userabi.user.config") {
+  visibility = [ ":*" ]
+
+  # Make <arch/defines.h> accessible.
+  include_dirs = [ "//zircon/kernel/arch/$zircon_cpu/include" ]
 }
 
 # Embed an RODSO layout object and extract address constants from it.

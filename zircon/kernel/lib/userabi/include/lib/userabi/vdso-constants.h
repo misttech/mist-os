@@ -12,30 +12,14 @@
 // environments.  It must use only the basic types so that struct
 // layouts match exactly in both contexts.
 
-#define VDSO_CONSTANTS_ALIGN 8
-// The version string is based on a 40 character representation of a git
-// hash. There is also a 4 byte 'git-' prefix, and possibly a 6 byte
-// '-dirty' suffix. Let's be generous and use 64 bytes.
-#define MAX_VERSION_STRING_SIZE 64
+#include <arch/defines.h>  // Defines PAGE_SIZE usable from assembly.
 
-// The manifest for the constants size is currently...
-// + 10 32-bit integers
-// |++ max_num_cpus (1)
-// |++ features (5)
-// |++ cache lines sizes (2)
-// |++ system page size (1)
-// |++ padding (1)
-// |++ ticks to mono ratio (2)
-// |
-// + 4 64-bit integers
-// | ticks_per_second (1)
-// | raw_ticks to ticks offset (1)
-// | physmem amount (1)
-// | version_string_len
-// |
-// + max version string size (64 bytes)
-//
-#define VDSO_CONSTANTS_SIZE ((12 * 4) + (4 * 8) + MAX_VERSION_STRING_SIZE)
+// The constants are put on their own whole page though the actual struct
+// is much smaller. Eventually, this will be used to change the contents
+// after boot. For now, it just ensures that there's always a bunch of free
+// space at the end where the version string can go.
+#define VDSO_CONSTANTS_ALIGN PAGE_SIZE
+#define VDSO_CONSTANTS_SIZE PAGE_SIZE
 
 #ifndef __ASSEMBLER__
 
@@ -102,11 +86,14 @@ struct vdso_constants {
   uint64_t version_string_len;
 
   // A NUL-terminated UTF-8 string returned by zx_system_get_version_string.
-  char version_string[MAX_VERSION_STRING_SIZE];
+  char version_string[];
 };
 
-static_assert(VDSO_CONSTANTS_SIZE == sizeof(vdso_constants), "Need to adjust VDSO_CONSTANTS_SIZE");
-static_assert(VDSO_CONSTANTS_ALIGN == alignof(vdso_constants),
+// This always leaves space for the NUL terminator.
+constexpr size_t kMaxVersionString = VDSO_CONSTANTS_SIZE - sizeof(vdso_constants) - 1;
+
+static_assert(VDSO_CONSTANTS_SIZE > sizeof(vdso_constants), "Need to adjust VDSO_CONSTANTS_SIZE");
+static_assert(VDSO_CONSTANTS_ALIGN >= alignof(vdso_constants),
               "Need to adjust VDSO_CONSTANTS_ALIGN");
 
 #endif  // __ASSEMBLER__
