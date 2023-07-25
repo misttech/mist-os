@@ -59,7 +59,7 @@ type NonDenseTable = table {
   ASSERT_EQ(errors.size(), 4);
   ASSERT_ERR(errors[0], fidl::ErrDuplicateMemberValue);
   ASSERT_ERR(errors[1], fidl::ErrNonDenseOrdinal);
-  ASSERT_ERR(errors[2], fidl::ErrDuplicateMemberName);
+  ASSERT_ERR(errors[2], fidl::ErrDuplicateElementName);
   ASSERT_ERR(errors[3], fidl::ErrWrongNumberOfLayoutParameters);
 }
 
@@ -139,7 +139,7 @@ type Foo = bits {
   EXPECT_ERR(errors[0], fidl::ErrTypeCannotBeConvertedToType);
   EXPECT_ERR(errors[1], fidl::ErrCouldNotResolveMember);
   EXPECT_ERR(errors[2], fidl::ErrCouldNotResolveMember);
-  EXPECT_ERR(errors[3], fidl::ErrDuplicateMemberNameCanonical);
+  EXPECT_ERR(errors[3], fidl::ErrDuplicateElementNameCanonical);
   EXPECT_ERR(errors[4], fidl::ErrDuplicateMemberValue);
   EXPECT_ERR(errors[5], fidl::ErrBitsMemberMustBePowerOfTwo);
 }
@@ -163,7 +163,7 @@ type Foo = flexible enum : uint8 {
   EXPECT_ERR(errors[0], fidl::ErrTypeCannotBeConvertedToType);
   EXPECT_ERR(errors[1], fidl::ErrCouldNotResolveMember);
   EXPECT_ERR(errors[2], fidl::ErrCouldNotResolveMember);
-  EXPECT_ERR(errors[3], fidl::ErrDuplicateMemberNameCanonical);
+  EXPECT_ERR(errors[3], fidl::ErrDuplicateElementNameCanonical);
   EXPECT_ERR(errors[4], fidl::ErrDuplicateMemberValue);
   EXPECT_ERR(errors[5], fidl::ErrFlexibleEnumMemberWithMaxValue);
 }
@@ -186,7 +186,7 @@ type Foo = struct {
   ASSERT_EQ(errors.size(), 5);
   EXPECT_ERR(errors[0], fidl::ErrWrongNumberOfLayoutParameters);
   EXPECT_ERR(errors[1], fidl::ErrWrongNumberOfLayoutParameters);
-  EXPECT_ERR(errors[2], fidl::ErrDuplicateStructMemberNameCanonical);
+  EXPECT_ERR(errors[2], fidl::ErrDuplicateElementNameCanonical);
   EXPECT_ERR(errors[3], fidl::ErrTypeCannotBeConvertedToType);
   EXPECT_ERR(errors[4], fidl::ErrCouldNotResolveMemberDefault);
 }
@@ -209,7 +209,7 @@ type Foo = table {
   EXPECT_ERR(errors[0], fidl::ErrOptionalTableMember);
   EXPECT_ERR(errors[1], fidl::ErrDuplicateTableFieldOrdinal);
   EXPECT_ERR(errors[2], fidl::ErrWrongNumberOfLayoutParameters);
-  EXPECT_ERR(errors[3], fidl::ErrDuplicateTableFieldNameCanonical);
+  EXPECT_ERR(errors[3], fidl::ErrDuplicateElementNameCanonical);
   EXPECT_ERR(errors[4], fidl::ErrNonDenseOrdinal);
 }
 
@@ -231,7 +231,7 @@ type Foo = union {
   EXPECT_ERR(errors[0], fidl::ErrOptionalUnionMember);
   EXPECT_ERR(errors[1], fidl::ErrDuplicateUnionMemberOrdinal);
   EXPECT_ERR(errors[2], fidl::ErrWrongNumberOfLayoutParameters);
-  EXPECT_ERR(errors[3], fidl::ErrDuplicateUnionMemberNameCanonical);
+  EXPECT_ERR(errors[3], fidl::ErrDuplicateElementNameCanonical);
   EXPECT_ERR(errors[4], fidl::ErrNonDenseOrdinal);
 }
 
@@ -253,7 +253,7 @@ protocol Foo {
   ASSERT_EQ(errors.size(), 5);
   EXPECT_ERR(errors[0], fidl::ErrComposingNonProtocol);
   EXPECT_ERR(errors[1], fidl::ErrInvalidSelectorValue);
-  EXPECT_ERR(errors[2], fidl::ErrDuplicateMethodNameCanonical);
+  EXPECT_ERR(errors[2], fidl::ErrDuplicateElementNameCanonical);
   EXPECT_ERR(errors[3], fidl::ErrCannotBeOptional);
   EXPECT_ERR(errors[4], fidl::ErrWrongNumberOfLayoutParameters);
 }
@@ -277,7 +277,7 @@ service Foo {
   EXPECT_ERR(errors[0], fidl::ErrOnlyClientEndsInServices);
   EXPECT_ERR(errors[1], fidl::ErrWrongNumberOfLayoutParameters);
   EXPECT_ERR(errors[2], fidl::ErrOnlyClientEndsInServices);
-  EXPECT_ERR(errors[3], fidl::ErrDuplicateServiceMemberNameCanonical);
+  EXPECT_ERR(errors[3], fidl::ErrDuplicateElementNameCanonical);
   EXPECT_ERR(errors[4], fidl::ErrOptionalServiceMember);
 }
 

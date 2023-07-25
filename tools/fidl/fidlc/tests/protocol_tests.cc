@@ -750,14 +750,16 @@ protocol Wrong {
 TEST(ProtocolTests, BadDuplicateMethodNames) {
   TestLibrary library;
   library.AddFile("bad/fi-0078-a.test.fidl");
-  ASSERT_ERRORED_TWICE_DURING_COMPILE(library, fidl::ErrDuplicateMethodName,
+  ASSERT_ERRORED_TWICE_DURING_COMPILE(library, fidl::ErrDuplicateElementName,
                                       fidl::ErrDuplicateMethodOrdinal);
+  ASSERT_SUBSTR(library.errors()[0]->msg.c_str(), "protocol method");
+  ASSERT_SUBSTR(library.errors()[0]->msg.c_str(), "MyMethod");
 }
 
 TEST(ProtocolTests, BadDuplicateMethodNamesFromImmediateComposition) {
   TestLibrary library;
   library.AddFile("bad/fi-0078-b.test.fidl");
-  ASSERT_ERRORED_DURING_COMPILE(library, fidl::ErrDuplicateMethodName);
+  ASSERT_ERRORED_DURING_COMPILE(library, fidl::ErrDuplicateElementName);
 }
 
 TEST(ProtocolTests, BadDuplicateMethodNamesFromMultipleComposition) {
@@ -777,7 +779,7 @@ protocol C {
     compose B;
 };
 )FIDL");
-  ASSERT_ERRORED_DURING_COMPILE(library, fidl::ErrDuplicateMethodName);
+  ASSERT_ERRORED_DURING_COMPILE(library, fidl::ErrDuplicateElementName);
 }
 
 TEST(ProtocolTests, BadDuplicateMethodNamesFromNestedComposition) {
@@ -805,7 +807,7 @@ protocol D {
     MethodA();
 };
 )FIDL");
-  ASSERT_ERRORED_DURING_COMPILE(library, fidl::ErrDuplicateMethodName);
+  ASSERT_ERRORED_DURING_COMPILE(library, fidl::ErrDuplicateElementName);
 }
 
 // See GetGeneratedOrdinal64ForTesting in test_library.h
@@ -880,7 +882,7 @@ protocol P {
   MethodWithDuplicateParams(struct {foo uint8; foo uint8; });
 };
 )FIDL");
-  ASSERT_ERRORED_DURING_COMPILE(library, fidl::ErrDuplicateStructMemberName);
+  ASSERT_ERRORED_DURING_COMPILE(library, fidl::ErrDuplicateElementName);
 }
 
 TEST(ProtocolTests, BadParameterizedTypedChannel) {

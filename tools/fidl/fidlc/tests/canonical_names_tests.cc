@@ -312,27 +312,48 @@ type Example = struct {};
 }
 
 TEST(CanonicalNamesTests, BadStructMembers) {
-  TestLibrary library;
-  library.AddFile("bad/fi-0090.test.fidl");
-  ASSERT_ERRORED_DURING_COMPILE(library, fidl::ErrDuplicateStructMemberNameCanonical);
+  TestLibrary library(R"FIDL(
+library example;
+
+type MyStruct = struct {
+    myStructMember string;
+    MyStructMember uint64;
+};
+)FIDL");
+  ASSERT_ERRORED_DURING_COMPILE(library, fidl::ErrDuplicateElementNameCanonical);
+  ASSERT_SUBSTR(library.errors()[0]->msg.c_str(), "struct member");
   ASSERT_SUBSTR(library.errors()[0]->msg.c_str(), "myStructMember");
   ASSERT_SUBSTR(library.errors()[0]->msg.c_str(), "MyStructMember");
   ASSERT_SUBSTR(library.errors()[0]->msg.c_str(), "my_struct_member");
 }
 
 TEST(CanonicalNamesTests, BadTableMembers) {
-  TestLibrary library;
-  library.AddFile("bad/fi-0096.test.fidl");
-  ASSERT_ERRORED_DURING_COMPILE(library, fidl::ErrDuplicateTableFieldNameCanonical);
+  TestLibrary library(R"FIDL(
+library example;
+
+type MyTable = table {
+    1: myField bool;
+    2: MyField bool;
+};
+)FIDL");
+  ASSERT_ERRORED_DURING_COMPILE(library, fidl::ErrDuplicateElementNameCanonical);
+  ASSERT_SUBSTR(library.errors()[0]->msg.c_str(), "table member");
   ASSERT_SUBSTR(library.errors()[0]->msg.c_str(), "myField");
   ASSERT_SUBSTR(library.errors()[0]->msg.c_str(), "MyField");
   ASSERT_SUBSTR(library.errors()[0]->msg.c_str(), "my_field");
 }
 
 TEST(CanonicalNamesTests, BadUnionMembers) {
-  TestLibrary library;
-  library.AddFile("bad/fi-0099.test.fidl");
-  ASSERT_ERRORED_DURING_COMPILE(library, fidl::ErrDuplicateUnionMemberNameCanonical);
+  TestLibrary library(R"FIDL(
+library example;
+
+type MyUnion = union {
+    1: myVariant bool;
+    2: MyVariant bool;
+};
+)FIDL");
+  ASSERT_ERRORED_DURING_COMPILE(library, fidl::ErrDuplicateElementNameCanonical);
+  ASSERT_SUBSTR(library.errors()[0]->msg.c_str(), "union member");
   ASSERT_SUBSTR(library.errors()[0]->msg.c_str(), "myVariant");
   ASSERT_SUBSTR(library.errors()[0]->msg.c_str(), "MyVariant");
   ASSERT_SUBSTR(library.errors()[0]->msg.c_str(), "my_variant");
@@ -347,16 +368,24 @@ type Example = enum {
   FooBar = 2;
 };
 )FIDL");
-  ASSERT_ERRORED_DURING_COMPILE(library, fidl::ErrDuplicateMemberNameCanonical);
+  ASSERT_ERRORED_DURING_COMPILE(library, fidl::ErrDuplicateElementNameCanonical);
+  ASSERT_SUBSTR(library.errors()[0]->msg.c_str(), "enum member");
   ASSERT_SUBSTR(library.errors()[0]->msg.c_str(), "fooBar");
   ASSERT_SUBSTR(library.errors()[0]->msg.c_str(), "FooBar");
   ASSERT_SUBSTR(library.errors()[0]->msg.c_str(), "foo_bar");
 }
 
 TEST(CanonicalNamesTests, BadBitsMembers) {
-  TestLibrary library;
-  library.AddFile("bad/fi-0106.test.fidl");
-  ASSERT_ERRORED_DURING_COMPILE(library, fidl::ErrDuplicateMemberNameCanonical);
+  TestLibrary library(R"FIDL(
+library example;
+
+type MyBits = bits {
+    fooBar = 1;
+    FooBar = 2;
+};
+)FIDL");
+  ASSERT_ERRORED_DURING_COMPILE(library, fidl::ErrDuplicateElementNameCanonical);
+  ASSERT_SUBSTR(library.errors()[0]->msg.c_str(), "bits member");
   ASSERT_SUBSTR(library.errors()[0]->msg.c_str(), "fooBar");
   ASSERT_SUBSTR(library.errors()[0]->msg.c_str(), "FooBar");
   ASSERT_SUBSTR(library.errors()[0]->msg.c_str(), "foo_bar");
@@ -365,7 +394,8 @@ TEST(CanonicalNamesTests, BadBitsMembers) {
 TEST(CanonicalNamesTests, BadProtocolMethods) {
   TestLibrary library;
   library.AddFile("bad/fi-0079.test.fidl");
-  ASSERT_ERRORED_DURING_COMPILE(library, fidl::ErrDuplicateMethodNameCanonical);
+  ASSERT_ERRORED_DURING_COMPILE(library, fidl::ErrDuplicateElementNameCanonical);
+  ASSERT_SUBSTR(library.errors()[0]->msg.c_str(), "protocol method");
   ASSERT_SUBSTR(library.errors()[0]->msg.c_str(), "myMethod");
   ASSERT_SUBSTR(library.errors()[0]->msg.c_str(), "MyMethod");
   ASSERT_SUBSTR(library.errors()[0]->msg.c_str(), "my_method");
@@ -379,7 +409,8 @@ protocol Example {
   example(struct { fooBar bool; FooBar bool; }) -> ();
 };
 )FIDL");
-  ASSERT_ERRORED_DURING_COMPILE(library, fidl::ErrDuplicateStructMemberNameCanonical);
+  ASSERT_ERRORED_DURING_COMPILE(library, fidl::ErrDuplicateElementNameCanonical);
+  ASSERT_SUBSTR(library.errors()[0]->msg.c_str(), "struct member");
   ASSERT_SUBSTR(library.errors()[0]->msg.c_str(), "fooBar");
   ASSERT_SUBSTR(library.errors()[0]->msg.c_str(), "FooBar");
   ASSERT_SUBSTR(library.errors()[0]->msg.c_str(), "foo_bar");
@@ -393,25 +424,45 @@ protocol Example {
   example() -> (struct { fooBar bool; FooBar bool; });
 };
 )FIDL");
-  ASSERT_ERRORED_DURING_COMPILE(library, fidl::ErrDuplicateStructMemberNameCanonical);
+  ASSERT_ERRORED_DURING_COMPILE(library, fidl::ErrDuplicateElementNameCanonical);
+  ASSERT_SUBSTR(library.errors()[0]->msg.c_str(), "struct member");
   ASSERT_SUBSTR(library.errors()[0]->msg.c_str(), "fooBar");
   ASSERT_SUBSTR(library.errors()[0]->msg.c_str(), "FooBar");
   ASSERT_SUBSTR(library.errors()[0]->msg.c_str(), "foo_bar");
 }
 
 TEST(CanonicalNamesTests, BadServiceMembers) {
-  TestLibrary library;
-  library.AddFile("bad/fi-0087.test.fidl");
-  ASSERT_ERRORED_DURING_COMPILE(library, fidl::ErrDuplicateServiceMemberNameCanonical);
+  TestLibrary library(R"FIDL(
+library example;
+
+protocol MyProtocol {};
+
+service MyService {
+    myServiceMember client_end:MyProtocol;
+    MyServiceMember client_end:MyProtocol;
+};
+)FIDL");
+  ASSERT_ERRORED_DURING_COMPILE(library, fidl::ErrDuplicateElementNameCanonical);
+  ASSERT_SUBSTR(library.errors()[0]->msg.c_str(), "service member");
   ASSERT_SUBSTR(library.errors()[0]->msg.c_str(), "myServiceMember");
   ASSERT_SUBSTR(library.errors()[0]->msg.c_str(), "MyServiceMember");
   ASSERT_SUBSTR(library.errors()[0]->msg.c_str(), "my_service_member");
 }
 
 TEST(CanonicalNamesTests, BadResourceProperties) {
-  TestLibrary library;
-  library.AddFile("bad/fi-0109.test.fidl");
-  ASSERT_ERRORED_DURING_COMPILE(library, fidl::ErrDuplicateResourcePropertyNameCanonical);
+  TestLibrary library(R"FIDL(
+library example;
+
+resource_definition MyResource : uint32 {
+    properties {
+        subtype flexible enum : uint32 {};
+        rights uint32;
+        Rights uint32;
+    };
+};
+)FIDL");
+  ASSERT_ERRORED_DURING_COMPILE(library, fidl::ErrDuplicateElementNameCanonical);
+  ASSERT_SUBSTR(library.errors()[0]->msg.c_str(), "resource property");
   ASSERT_SUBSTR(library.errors()[0]->msg.c_str(), "rights");
   ASSERT_SUBSTR(library.errors()[0]->msg.c_str(), "Rights");
   ASSERT_SUBSTR(library.errors()[0]->msg.c_str(), "rights");

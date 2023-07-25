@@ -198,9 +198,17 @@ TEST(StructsTests, BadDefaultValueNullableString) {
 }
 
 TEST(StructsTests, BadDuplicateMemberName) {
-  TestLibrary library;
-  library.AddFile("bad/fi-0089.test.fidl");
-  ASSERT_ERRORED_DURING_COMPILE(library, fidl::ErrDuplicateStructMemberName);
+  TestLibrary library(R"FIDL(
+library example;
+
+type MyStruct = struct {
+    my_struct_member string;
+    my_struct_member uint8;
+};
+)FIDL");
+  ASSERT_ERRORED_DURING_COMPILE(library, fidl::ErrDuplicateElementName);
+  ASSERT_SUBSTR(library.errors()[0]->msg.c_str(), "struct member");
+  ASSERT_SUBSTR(library.errors()[0]->msg.c_str(), "my_struct_member");
 }
 
 TEST(StructsTests, GoodMaxInlineSize) {

@@ -119,9 +119,17 @@ TEST(EnumsTests, BadEnumTestFloatType) {
 }
 
 TEST(EnumsTests, BadEnumTestDuplicateMember) {
-  TestLibrary library;
-  library.AddFile("bad/fi-0105.test.fidl");
-  ASSERT_ERRORED_DURING_COMPILE(library, fidl::ErrDuplicateMemberName);
+  TestLibrary library(R"FIDL(
+library example;
+
+type Fruit = flexible enum {
+    ORANGE = 1;
+    APPLE = 2;
+    ORANGE = 3;
+};
+)FIDL");
+  ASSERT_ERRORED_DURING_COMPILE(library, fidl::ErrDuplicateElementName);
+  ASSERT_SUBSTR(library.errors()[0]->msg.c_str(), "enum member");
   ASSERT_SUBSTR(library.errors()[0]->msg.c_str(), "ORANGE");
 }
 

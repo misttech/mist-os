@@ -1963,7 +1963,7 @@ type Foo = struct {
 };
 )FIDL");
   library.SelectVersion("example", "HEAD");
-  ASSERT_ERRORED_DURING_COMPILE(library, fidl::ErrDuplicateStructMemberName);
+  ASSERT_ERRORED_DURING_COMPILE(library, fidl::ErrDuplicateElementName);
 }
 
 TEST(VersioningTests, BadOverlappingMemberNamesEqualToOtherLegacy) {
@@ -1980,8 +1980,8 @@ type Foo = struct {
 )FIDL");
   library.SelectVersion("example", "HEAD");
   // Once for [1, 2), once for [LEGACY, +inf).
-  ASSERT_ERRORED_TWICE_DURING_COMPILE(library, fidl::ErrDuplicateStructMemberName,
-                                      fidl::ErrDuplicateStructMemberName);
+  ASSERT_ERRORED_TWICE_DURING_COMPILE(library, fidl::ErrDuplicateElementName,
+                                      fidl::ErrDuplicateElementName);
 }
 
 TEST(VersioningTests, BadOverlappingMemberNamesEqualToOtherCanonical) {
@@ -1995,7 +1995,7 @@ type Foo = struct {
 };
 )FIDL");
   library.SelectVersion("example", "HEAD");
-  ASSERT_ERRORED_DURING_COMPILE(library, fidl::ErrDuplicateStructMemberNameCanonical);
+  ASSERT_ERRORED_DURING_COMPILE(library, fidl::ErrDuplicateElementNameCanonical);
 }
 
 TEST(VersioningTests, BadOverlappingMemberNamesContainsOther) {
@@ -2010,7 +2010,7 @@ type Foo = struct {
 };
 )FIDL");
   library.SelectVersion("example", "HEAD");
-  ASSERT_ERRORED_DURING_COMPILE(library, fidl::ErrDuplicateStructMemberName);
+  ASSERT_ERRORED_DURING_COMPILE(library, fidl::ErrDuplicateElementName);
 }
 
 TEST(VersioningTests, BadOverlappingMemberNamesContainsOtherCanonical) {
@@ -2025,7 +2025,7 @@ type Foo = struct {
 };
 )FIDL");
   library.SelectVersion("example", "HEAD");
-  ASSERT_ERRORED_DURING_COMPILE(library, fidl::ErrDuplicateStructMemberNameCanonical);
+  ASSERT_ERRORED_DURING_COMPILE(library, fidl::ErrDuplicateElementNameCanonical);
 }
 
 TEST(VersioningTests, BadOverlappingMemberNamesIntersectsOther) {
@@ -2041,7 +2041,7 @@ type Foo = struct {
 };
 )FIDL");
   library.SelectVersion("example", "HEAD");
-  ASSERT_ERRORED_DURING_COMPILE(library, fidl::ErrDuplicateStructMemberName);
+  ASSERT_ERRORED_DURING_COMPILE(library, fidl::ErrDuplicateElementName);
 }
 
 TEST(VersioningTests, BadOverlappingMemberNamesIntersectsOtherCanonical) {
@@ -2057,7 +2057,7 @@ type Foo = struct {
 };
 )FIDL");
   library.SelectVersion("example", "HEAD");
-  ASSERT_ERRORED_DURING_COMPILE(library, fidl::ErrDuplicateStructMemberNameCanonical);
+  ASSERT_ERRORED_DURING_COMPILE(library, fidl::ErrDuplicateElementNameCanonical);
 }
 
 TEST(VersioningTests, BadOverlappingMemberNamesJustAtLegacy) {
@@ -2073,7 +2073,7 @@ type Foo = struct {
 };
 )FIDL");
   library.SelectVersion("example", "HEAD");
-  ASSERT_ERRORED_DURING_COMPILE(library, fidl::ErrDuplicateStructMemberName);
+  ASSERT_ERRORED_DURING_COMPILE(library, fidl::ErrDuplicateElementName);
 }
 
 TEST(VersioningTests, BadOverlappingMemberNamesJustAtLegacyCanonical) {
@@ -2089,7 +2089,7 @@ type Foo = struct {
 };
 )FIDL");
   library.SelectVersion("example", "HEAD");
-  ASSERT_ERRORED_DURING_COMPILE(library, fidl::ErrDuplicateStructMemberNameCanonical);
+  ASSERT_ERRORED_DURING_COMPILE(library, fidl::ErrDuplicateElementNameCanonical);
 }
 
 TEST(VersioningTests, BadOverlappingMemberNamesIntersectAtLegacy) {
@@ -2105,7 +2105,7 @@ type Foo = struct {
 };
 )FIDL");
   library.SelectVersion("example", "HEAD");
-  ASSERT_ERRORED_DURING_COMPILE(library, fidl::ErrDuplicateStructMemberName);
+  ASSERT_ERRORED_DURING_COMPILE(library, fidl::ErrDuplicateElementName);
 }
 
 TEST(VersioningTests, BadOverlappingMemberNamesIntersectAtLegacyCanonical) {
@@ -2121,7 +2121,7 @@ type Foo = struct {
 };
 )FIDL");
   library.SelectVersion("example", "HEAD");
-  ASSERT_ERRORED_DURING_COMPILE(library, fidl::ErrDuplicateStructMemberNameCanonical);
+  ASSERT_ERRORED_DURING_COMPILE(library, fidl::ErrDuplicateElementNameCanonical);
 }
 
 TEST(VersioningTests, BadOverlappingMemberNamesMultiple) {
@@ -2140,9 +2140,9 @@ type Foo = struct {
   library.SelectVersion("example", "HEAD");
   ASSERT_FALSE(library.Compile());
   ASSERT_EQ(library.errors().size(), 3);
-  EXPECT_ERR(library.errors()[0], fidl::ErrDuplicateStructMemberName);
-  EXPECT_ERR(library.errors()[1], fidl::ErrDuplicateStructMemberName);
-  EXPECT_ERR(library.errors()[2], fidl::ErrDuplicateStructMemberName);
+  EXPECT_ERR(library.errors()[0], fidl::ErrDuplicateElementName);
+  EXPECT_ERR(library.errors()[1], fidl::ErrDuplicateElementName);
+  EXPECT_ERR(library.errors()[2], fidl::ErrDuplicateElementName);
 }
 
 TEST(VersioningTests, BadOverlappingMemberNamesMultipleCanonical) {
@@ -2161,9 +2161,9 @@ type Foo = struct {
   library.SelectVersion("example", "HEAD");
   ASSERT_FALSE(library.Compile());
   ASSERT_EQ(library.errors().size(), 3);
-  EXPECT_ERR(library.errors()[0], fidl::ErrDuplicateStructMemberNameCanonical);
-  EXPECT_ERR(library.errors()[1], fidl::ErrDuplicateStructMemberNameCanonical);
-  EXPECT_ERR(library.errors()[2], fidl::ErrDuplicateStructMemberNameCanonical);
+  EXPECT_ERR(library.errors()[0], fidl::ErrDuplicateElementNameCanonical);
+  EXPECT_ERR(library.errors()[1], fidl::ErrDuplicateElementNameCanonical);
+  EXPECT_ERR(library.errors()[2], fidl::ErrDuplicateElementNameCanonical);
 }
 
 // TODO(fxbug.dev/101849): Generalize this with more comprehensive tests in

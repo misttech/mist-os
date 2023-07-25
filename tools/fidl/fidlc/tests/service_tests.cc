@@ -58,9 +58,19 @@ service SomeService {
 }
 
 TEST(ServiceTests, BadCannotHaveConflictingMembers) {
-  TestLibrary library;
-  library.AddFile("bad/fi-0085.test.fidl");
-  ASSERT_ERRORED_DURING_COMPILE(library, fidl::ErrDuplicateServiceMemberName);
+  TestLibrary library(R"FIDL(
+library example;
+
+protocol MyProtocol {};
+
+service MyService {
+    my_service_member client_end:MyProtocol;
+    my_service_member client_end:MyProtocol;
+};
+)FIDL");
+  ASSERT_ERRORED_DURING_COMPILE(library, fidl::ErrDuplicateElementName);
+  ASSERT_SUBSTR(library.errors()[0]->msg.c_str(), "service member");
+  ASSERT_SUBSTR(library.errors()[0]->msg.c_str(), "my_service_member");
 }
 
 TEST(ServiceTests, BadNoNullableProtocolMembers) {

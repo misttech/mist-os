@@ -97,9 +97,17 @@ type Foo = union {
 }
 
 TEST(TableTests, BadDuplicateFieldNames) {
-  TestLibrary library;
-  library.AddFile("bad/fi-0095.test.fidl");
-  ASSERT_ERRORED_DURING_COMPILE(library, fidl::ErrDuplicateTableFieldName);
+  TestLibrary library(R"FIDL(
+library test;
+
+type MyTable = table {
+    1: my_field string;
+    2: my_field uint32;
+};
+)FIDL");
+  ASSERT_ERRORED_DURING_COMPILE(library, fidl::ErrDuplicateElementName);
+  ASSERT_SUBSTR(library.errors()[0]->msg.c_str(), "table member");
+  ASSERT_SUBSTR(library.errors()[0]->msg.c_str(), "my_field");
 }
 
 TEST(TableTests, BadDuplicateOrdinals) {

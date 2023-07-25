@@ -170,9 +170,20 @@ TEST(ResourceTests, BadNoProperties) {
 }
 
 TEST(ResourceTests, BadDuplicateProperty) {
-  TestLibrary library;
-  library.AddFile("bad/fi-0108.test.fidl");
-  ASSERT_ERRORED_DURING_COMPILE(library, fidl::ErrDuplicateResourcePropertyName);
+  TestLibrary library(R"FIDL(
+library example;
+
+resource_definition MyResource : uint32 {
+    properties {
+        subtype flexible enum : uint32 {};
+        rights uint32;
+        rights uint32;
+    };
+};
+)FIDL");
+  ASSERT_ERRORED_DURING_COMPILE(library, fidl::ErrDuplicateElementName);
+  ASSERT_SUBSTR(library.errors()[0]->msg.c_str(), "resource property");
+  ASSERT_SUBSTR(library.errors()[0]->msg.c_str(), "rights");
 }
 
 TEST(ResourceTests, BadNotUint32) {

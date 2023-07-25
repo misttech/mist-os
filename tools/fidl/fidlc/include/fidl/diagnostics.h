@@ -10,6 +10,7 @@
 
 #include "tools/fidl/fidlc/include/fidl/diagnostic_types.h"
 #include "tools/fidl/fidlc/include/fidl/fixables.h"
+#include "tools/fidl/fidlc/include/fidl/flat_ast.h"
 #include "tools/fidl/fidlc/include/fidl/source_span.h"
 #include "tools/fidl/fidlc/include/fidl/versioning_types.h"
 
@@ -174,12 +175,12 @@ constexpr ErrorDef<75, const flat::Type *> ErrInvalidMethodPayloadType(
 constexpr RetiredDef<76> ErrResponsesWithErrorsMustNotBeEmpty;
 constexpr ErrorDef<77, std::string_view> ErrEmptyPayloadStructs(
     "method '{}' cannot have an empty struct as a payload, prefer omitting the payload altogether");
-constexpr ErrorDef<78, std::string_view, SourceSpan> ErrDuplicateMethodName(
-    "multiple protocol methods named '{}'; previous was at {}");
-constexpr ErrorDef<79, std::string_view, std::string_view, SourceSpan, std::string_view>
-    ErrDuplicateMethodNameCanonical(
-        "protocol method '{}' conflicts with method '{}' from {}; both are "
-        "represented by the canonical form '{}'");
+constexpr ErrorDef<78, flat::Element::Kind, std::string_view, SourceSpan> ErrDuplicateElementName(
+    "duplicate {} named '{}'; previous was at {}");
+constexpr ErrorDef<79, flat::Element::Kind, std::string_view, std::string_view, SourceSpan,
+                   std::string_view>
+    ErrDuplicateElementNameCanonical(
+        "{} '{}' conflicts with '{}' from {}; both are represented by the canonical form '{}'");
 constexpr ErrorDef<80> ErrGeneratedZeroValueOrdinal("Ordinal value 0 disallowed.");
 constexpr ErrorDef<81, SourceSpan> ErrDuplicateMethodOrdinal(
     "Multiple methods with the same ordinal in a protocol; previous was at {}.");
@@ -189,21 +190,13 @@ constexpr ErrorDef<83> ErrFuchsiaIoExplicitOrdinals(
     "fuchsia.io must have explicit ordinals (https://fxbug.dev/77623)");
 constexpr ErrorDef<84> ErrPayloadStructHasDefaultMembers(
     "default values are not allowed on members of request/response structs");
-constexpr ErrorDef<85, std::string_view, SourceSpan> ErrDuplicateServiceMemberName(
-    "multiple service members named '{}'; previous was at {}");
+constexpr RetiredDef<85> ErrDuplicateServiceMemberName;
 constexpr ErrorDef<86> ErrStrictUnionMustHaveNonReservedMember(
     "strict unions must have at least one non-reserved member");
-constexpr ErrorDef<87, std::string_view, std::string_view, SourceSpan, std::string_view>
-    ErrDuplicateServiceMemberNameCanonical(
-        "service member '{}' conflicts with member '{}' from {}; both are "
-        "represented by the canonical form '{}'");
+constexpr RetiredDef<87> ErrDuplicateServiceMemberNameCanonical;
 constexpr ErrorDef<88> ErrOptionalServiceMember("service members cannot be optional");
-constexpr ErrorDef<89, std::string_view, SourceSpan> ErrDuplicateStructMemberName(
-    "multiple struct fields named '{}'; previous was at {}");
-constexpr ErrorDef<90, std::string_view, std::string_view, SourceSpan, std::string_view>
-    ErrDuplicateStructMemberNameCanonical(
-        "struct field '{}' conflicts with field '{}' from {}; both are represented "
-        "by the canonical form '{}'");
+constexpr RetiredDef<89> ErrDuplicateStructMemberName;
+constexpr RetiredDef<90> ErrDuplicateStructMemberNameCanonical;
 constexpr ErrorDef<91, std::string_view, const flat::Type *> ErrInvalidStructMemberType(
     "struct field {} has an invalid default type {}");
 constexpr ErrorDef<92> ErrTooManyTableOrdinals(
@@ -212,43 +205,26 @@ constexpr ErrorDef<93> ErrMaxOrdinalNotTable(
     "the 64th ordinal of a table may only contain a table type");
 constexpr ErrorDef<94, SourceSpan> ErrDuplicateTableFieldOrdinal(
     "multiple table fields with the same ordinal; previous was at {}");
-constexpr ErrorDef<95, std::string_view, SourceSpan> ErrDuplicateTableFieldName(
-    "multiple table fields named '{}'; previous was at {}");
-constexpr ErrorDef<96, std::string_view, std::string_view, SourceSpan, std::string_view>
-    ErrDuplicateTableFieldNameCanonical(
-        "table field '{}' conflicts with field '{}' from {}; both are represented "
-        "by the canonical form '{}'");
+constexpr RetiredDef<95> ErrDuplicateTableFieldName;
+constexpr RetiredDef<96> ErrDuplicateTableFieldNameCanonical;
 constexpr ErrorDef<97, SourceSpan> ErrDuplicateUnionMemberOrdinal(
     "multiple union fields with the same ordinal; previous was at {}");
-constexpr ErrorDef<98, std::string_view, SourceSpan> ErrDuplicateUnionMemberName(
-    "multiple union members named '{}'; previous was at {}");
-constexpr ErrorDef<99, std::string_view, std::string_view, SourceSpan, std::string_view>
-    ErrDuplicateUnionMemberNameCanonical(
-        "union member '{}' conflicts with member '{}' from {}; both are represented "
-        "by the canonical form '{}'");
+constexpr RetiredDef<98> ErrDuplicateUnionMemberName;
+constexpr RetiredDef<99> ErrDuplicateUnionMemberNameCanonical;
 constexpr ErrorDef<100, uint64_t> ErrNonDenseOrdinal(
     "missing ordinal {} (ordinals must be dense); consider marking it reserved");
 constexpr ErrorDef<101> ErrCouldNotResolveSizeBound("unable to resolve size bound");
-constexpr ErrorDef<102, std::string_view> ErrCouldNotResolveMember("unable to resolve {} member");
+constexpr ErrorDef<102, flat::Decl::Kind> ErrCouldNotResolveMember("unable to resolve {} member");
 constexpr ErrorDef<103, std::string_view> ErrCouldNotResolveMemberDefault(
     "unable to resolve {} default value");
 constexpr ErrorDef<104> ErrCouldNotResolveAttributeArg("unable to resolve attribute argument");
-constexpr ErrorDef<105, std::string_view, std::string_view, SourceSpan> ErrDuplicateMemberName(
-    "multiple {} members named '{}'; previous was at {}");
-constexpr ErrorDef<106, std::string_view, std::string_view, std::string_view, SourceSpan,
-                   std::string_view>
-    ErrDuplicateMemberNameCanonical(
-        "{} member '{}' conflicts with member '{}' from {}; both are "
-        "represented by the canonical form '{}'");
-constexpr ErrorDef<107, std::string_view, std::string_view, std::string_view, SourceSpan>
+constexpr RetiredDef<105> ErrDuplicateMemberName;
+constexpr RetiredDef<106> ErrDuplicateMemberNameCanonical;
+constexpr ErrorDef<107, flat::Decl::Kind, std::string_view, std::string_view, SourceSpan>
     ErrDuplicateMemberValue(
         "value of {} member '{}' conflicts with previously declared member '{}' at {}");
-constexpr ErrorDef<108, std::string_view, SourceSpan> ErrDuplicateResourcePropertyName(
-    "multiple resource properties named '{}'; previous was at {}");
-constexpr ErrorDef<109, std::string_view, std::string_view, SourceSpan, std::string_view>
-    ErrDuplicateResourcePropertyNameCanonical(
-        "resource property '{}' conflicts with property '{}' from {}; both are "
-        "represented by the canonical form '{}'");
+constexpr RetiredDef<108> ErrDuplicateResourcePropertyName;
+constexpr RetiredDef<109> ErrDuplicateResourcePropertyNameCanonical;
 constexpr ErrorDef<110, flat::Name, std::string_view, std::string_view, flat::Name>
     ErrTypeMustBeResource(
         "'{}' may contain handles (due to member '{}'), so it must "
@@ -532,8 +508,8 @@ static constexpr const DiagnosticDef *kAllDiagnosticDefs[] = {
     /* fi-0075 */ &ErrInvalidMethodPayloadType,
     /* fi-0076 */ &ErrResponsesWithErrorsMustNotBeEmpty,
     /* fi-0077 */ &ErrEmptyPayloadStructs,
-    /* fi-0078 */ &ErrDuplicateMethodName,
-    /* fi-0079 */ &ErrDuplicateMethodNameCanonical,
+    /* fi-0078 */ &ErrDuplicateElementName,
+    /* fi-0079 */ &ErrDuplicateElementNameCanonical,
     /* fi-0080 */ &ErrGeneratedZeroValueOrdinal,
     /* fi-0081 */ &ErrDuplicateMethodOrdinal,
     /* fi-0082 */ &ErrInvalidSelectorValue,

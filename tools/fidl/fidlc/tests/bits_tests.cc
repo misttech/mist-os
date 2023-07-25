@@ -108,7 +108,8 @@ type Fruit = bits : uint64 {
     ORANGE = 4;
 };
 )FIDL");
-  ASSERT_ERRORED_DURING_COMPILE(library, fidl::ErrDuplicateMemberName);
+  ASSERT_ERRORED_DURING_COMPILE(library, fidl::ErrDuplicateElementName);
+  ASSERT_SUBSTR(library.errors()[0]->msg.c_str(), "bits member");
   ASSERT_SUBSTR(library.errors()[0]->msg.c_str(), "ORANGE");
 }
 

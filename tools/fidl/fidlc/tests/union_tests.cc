@@ -193,9 +193,17 @@ TEST(UnionTests, BadOrdinalsMustBeUnique) {
 }
 
 TEST(UnionTests, BadMemberNamesMustBeUnique) {
-  TestLibrary library;
-  library.AddFile("bad/fi-0098.test.fidl");
-  ASSERT_ERRORED_DURING_COMPILE(library, fidl::ErrDuplicateUnionMemberName);
+  TestLibrary library(R"FIDL(
+library test;
+
+type MyUnion = strict union {
+    1: my_variant string;
+    2: my_variant int32;
+};
+)FIDL");
+  ASSERT_ERRORED_DURING_COMPILE(library, fidl::ErrDuplicateElementName);
+  ASSERT_SUBSTR(library.errors()[0]->msg.c_str(), "union member");
+  ASSERT_SUBSTR(library.errors()[0]->msg.c_str(), "my_variant");
 }
 
 TEST(UnionTests, BadCannotStartAtZero) {
