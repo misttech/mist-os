@@ -635,19 +635,16 @@ impl ImageAssemblyConfigBuilder {
             base.insert(package_name.to_owned(), PackageEntry { path, manifest });
         }
 
-        // TODO(https://fxbug.dev/98103) Make the presence of the base package an explicit parameter
-        // Add the base drivers package to the base package if we're generating a base package
-        if !base.is_empty() || !cache.is_empty() || !system.is_empty() {
-            // TODO(fxbug.dev/128391): Add the base-config-manifest file to /boot/config
-            // while Driver Manager transitions to no longer reading the manifest from a package.
+        {
+            // TODO(https://fxbug.dev/98103) Make the presence of the base package an explicit parameter
+            // Add a base drivers manifest to Bootfs containing base driver urls, if any.
             let mut driver_manifest_builder = DriverManifestBuilder::default();
             for (package_url, driver_details) in base_drivers.entries {
                 driver_manifest_builder
                     .add_driver(driver_details, &package_url)
                     .with_context(|| format!("adding driver {}", &package_url))?;
             }
-            // TODO(fxbug.dev/128391): Add a base-driver manifest file to /boot
-            // while Driver Manager transitions to no longer reading the manifest from a package.
+            // TODO(fxbug.dev/128391): encapsulate manifests in a DomainConfig package.
             let manifest_path = outdir.join(BASE_DRIVER_MANIFEST_PATH);
             driver_manifest_builder.create_manifest_file(&manifest_path)?;
             bootfs_files.add_entry(FileEntry {
@@ -1009,6 +1006,35 @@ mod tests {
                 }
             ]
         );
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_builder_generates_empty_driver_manifest_in_bootfs() -> Result<()> {
+        let vars = TempdirPathsForTest::new();
+        let tools = FakeToolProvider::default();
+
+        // The builder should unconditionally generate base/boot manifest files,
+        // even if no drivers are included in the AIB.
+        let builder = get_minimum_config_builder(&vars.outdir, Vec::default());
+        let result: assembly_config_schema::ImageAssemblyConfig =
+            builder.build(&vars.outdir, &tools).unwrap();
+
+        assert_eq!(
+            result.bootfs_files.iter().map(|f| f.destination.clone()).sorted().collect::<Vec<_>>(),
+            vec![BASE_DRIVER_MANIFEST_PATH, BOOT_DRIVER_MANIFEST_PATH],
+        );
+
+        let base_driver_manifest: Vec<DriverManifest> = serde_json::from_reader(BufReader::new(
+            File::open(vars.outdir.join(BASE_DRIVER_MANIFEST_PATH))?,
+        ))?;
+        let boot_driver_manifest: Vec<DriverManifest> = serde_json::from_reader(BufReader::new(
+            File::open(vars.outdir.join(BOOT_DRIVER_MANIFEST_PATH))?,
+        ))?;
+
+        assert!(base_driver_manifest.is_empty());
+        assert!(boot_driver_manifest.is_empty());
 
         Ok(())
     }
