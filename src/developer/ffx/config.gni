@@ -95,12 +95,9 @@ dual_mode_defaults = [
   "//src/developer/ffx/plugins/emulator/data/config.json",
   "//src/developer/ffx/plugins/log/data/config.json",
   "//src/developer/ffx/plugins/product/data/config.json",
-  "//src/developer/ffx/plugins/product_bundle/data/config.json",
   "//src/developer/ffx/plugins/repository/data/config.json",
   "//src/developer/ffx/plugins/sdk/data/config.json",
-  "//src/developer/ffx/plugins/test/data/config.json",
   "//src/developer/ffx/plugins/trace/data/config.json",
-  "//src/developer/ffx/plugins/triage/data/config.json",
 ]
 
 # The same list as `dual_mode_plugins`, but with the normal suffix for plugins converted to
