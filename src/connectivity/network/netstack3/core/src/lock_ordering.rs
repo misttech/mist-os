@@ -116,7 +116,8 @@ pub(crate) struct IcmpSendTimestampReply<I>(PhantomData<I>, Never);
 pub(crate) struct TcpSockets<I>(PhantomData<I>, Never);
 pub(crate) struct TcpIsnGenerator<I>(PhantomData<I>, Never);
 
-pub(crate) struct UdpSockets<I>(PhantomData<I>, Never);
+pub(crate) struct UdpSocketsTable<I>(PhantomData<I>, Never);
+pub(crate) struct UdpBoundMap<I>(PhantomData<I>, Never);
 
 pub(crate) enum Ipv4StateNextPacketId {}
 
@@ -183,9 +184,11 @@ impl_lock_after!(IcmpTokenBucket<Ipv6> => TcpSockets<Ipv4>);
 // for `Ipv6`, but that doesn't play well with the blanket impls. Linearize IPv4
 // and IPv6, and TCP and UDP, like for `IpState` below.
 impl_lock_after!(TcpSockets<Ipv4> => TcpSockets<Ipv6>);
-impl_lock_after!(TcpSockets<Ipv6> => UdpSockets<Ipv4>);
-impl_lock_after!(UdpSockets<Ipv4> => UdpSockets<Ipv6>);
-impl_lock_after!(UdpSockets<Ipv6> => IpDeviceConfiguration<Ipv4>);
+impl_lock_after!(TcpSockets<Ipv6> => UdpSocketsTable<Ipv4>);
+impl_lock_after!(UdpSocketsTable<Ipv4> => UdpSocketsTable<Ipv6>);
+impl_lock_after!(UdpSocketsTable<Ipv6> => UdpBoundMap<Ipv4>);
+impl_lock_after!(UdpBoundMap<Ipv4> => UdpBoundMap<Ipv6>);
+impl_lock_after!(UdpBoundMap<Ipv6> => IpDeviceConfiguration<Ipv4>);
 impl_lock_after!(IpDeviceConfiguration<Ipv4> => IpDeviceConfiguration<Ipv6>);
 impl_lock_after!(IpDeviceConfiguration<Ipv6> => Ipv6DeviceRouteDiscovery);
 impl_lock_after!(Ipv6DeviceRouteDiscovery => IpStateRoutingTable<Ipv4>);

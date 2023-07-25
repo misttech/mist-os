@@ -2664,7 +2664,7 @@ impl<
         C: NonSyncContext,
         L: LockBefore<crate::lock_ordering::IcmpSockets<Ipv4>>
             + LockBefore<crate::lock_ordering::TcpSockets<Ipv4>>
-            + LockBefore<crate::lock_ordering::UdpSockets<Ipv4>>,
+            + LockBefore<crate::lock_ordering::UdpSocketsTable<Ipv4>>,
     > InnerIcmpContext<Ipv4, C> for Locked<&SyncCtx<C>, L>
 {
     fn receive_icmp_error(
@@ -2762,7 +2762,7 @@ impl<
         C: NonSyncContext,
         L: LockBefore<crate::lock_ordering::IcmpSockets<Ipv6>>
             + LockBefore<crate::lock_ordering::TcpSockets<Ipv6>>
-            + LockBefore<crate::lock_ordering::UdpSockets<Ipv6>>,
+            + LockBefore<crate::lock_ordering::UdpSocketsTable<Ipv6>>,
     > InnerIcmpContext<Ipv6, C> for Locked<&SyncCtx<C>, L>
 {
     fn receive_icmp_error(

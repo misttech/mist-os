@@ -84,31 +84,45 @@ impl<
     }
 }
 
-impl<C: NonSyncContext, L: LockBefore<crate::lock_ordering::UdpSockets<Ipv4>>>
+impl<C: NonSyncContext, L: LockBefore<crate::lock_ordering::UdpSocketsTable<Ipv4>>>
     udp::StateContext<Ipv4, C> for Locked<&SyncCtx<C>, L>
 {
-    type IpSocketsCtx<'a> = Locked<&'a SyncCtx<C>, crate::lock_ordering::UdpSockets<Ipv4>>;
+    type IpSocketsCtx<'a> = Locked<&'a SyncCtx<C>, crate::lock_ordering::UdpBoundMap<Ipv4>>;
 
     fn with_sockets<
         O,
-        F: FnOnce(&mut Self::IpSocketsCtx<'_>, &udp::Sockets<Ipv4, Self::WeakDeviceId>) -> O,
+        F: FnOnce(
+            &mut Self::IpSocketsCtx<'_>,
+            &udp::SocketsState<Ipv4, Self::WeakDeviceId>,
+            &udp::BoundSockets<Ipv4, Self::WeakDeviceId>,
+        ) -> O,
     >(
         &mut self,
         cb: F,
     ) -> O {
-        let (udp, mut locked) = self.read_lock_and::<crate::lock_ordering::UdpSockets<Ipv4>>();
-        cb(&mut locked, &udp)
+        let (socket_state, mut locked) =
+            self.read_lock_and::<crate::lock_ordering::UdpSocketsTable<Ipv4>>();
+        let (bound_sockets, mut locked) =
+            locked.read_lock_and::<crate::lock_ordering::UdpBoundMap<Ipv4>>();
+        cb(&mut locked, &socket_state, &bound_sockets)
     }
 
     fn with_sockets_mut<
         O,
-        F: FnOnce(&mut Self::IpSocketsCtx<'_>, &mut udp::Sockets<Ipv4, Self::WeakDeviceId>) -> O,
+        F: FnOnce(
+            &mut Self::IpSocketsCtx<'_>,
+            &mut udp::SocketsState<Ipv4, Self::WeakDeviceId>,
+            &mut udp::BoundSockets<Ipv4, Self::WeakDeviceId>,
+        ) -> O,
     >(
         &mut self,
         cb: F,
     ) -> O {
-        let (mut udp, mut locked) = self.write_lock_and::<crate::lock_ordering::UdpSockets<Ipv4>>();
-        cb(&mut locked, &mut udp)
+        let (mut socket_state, mut locked) =
+            self.write_lock_and::<crate::lock_ordering::UdpSocketsTable<Ipv4>>();
+        let (mut bound_sockets, mut locked) =
+            locked.write_lock_and::<crate::lock_ordering::UdpBoundMap<Ipv4>>();
+        cb(&mut locked, &mut socket_state, &mut bound_sockets)
     }
 
     fn should_send_port_unreachable(&mut self) -> bool {
@@ -116,31 +130,45 @@ impl<C: NonSyncContext, L: LockBefore<crate::lock_ordering::UdpSockets<Ipv4>>>
     }
 }
 
-impl<C: NonSyncContext, L: LockBefore<crate::lock_ordering::UdpSockets<Ipv6>>>
+impl<C: NonSyncContext, L: LockBefore<crate::lock_ordering::UdpSocketsTable<Ipv6>>>
     udp::StateContext<Ipv6, C> for Locked<&SyncCtx<C>, L>
 {
-    type IpSocketsCtx<'a> = Locked<&'a SyncCtx<C>, crate::lock_ordering::UdpSockets<Ipv6>>;
+    type IpSocketsCtx<'a> = Locked<&'a SyncCtx<C>, crate::lock_ordering::UdpBoundMap<Ipv6>>;
 
     fn with_sockets<
         O,
-        F: FnOnce(&mut Self::IpSocketsCtx<'_>, &udp::Sockets<Ipv6, Self::WeakDeviceId>) -> O,
+        F: FnOnce(
+            &mut Self::IpSocketsCtx<'_>,
+            &udp::SocketsState<Ipv6, Self::WeakDeviceId>,
+            &udp::BoundSockets<Ipv6, Self::WeakDeviceId>,
+        ) -> O,
     >(
         &mut self,
         cb: F,
     ) -> O {
-        let (udp, mut locked) = self.read_lock_and::<crate::lock_ordering::UdpSockets<Ipv6>>();
-        cb(&mut locked, &udp)
+        let (socket_state, mut locked) =
+            self.read_lock_and::<crate::lock_ordering::UdpSocketsTable<Ipv6>>();
+        let (bound_sockets, mut locked) =
+            locked.read_lock_and::<crate::lock_ordering::UdpBoundMap<Ipv6>>();
+        cb(&mut locked, &socket_state, &bound_sockets)
     }
 
     fn with_sockets_mut<
         O,
-        F: FnOnce(&mut Self::IpSocketsCtx<'_>, &mut udp::Sockets<Ipv6, Self::WeakDeviceId>) -> O,
+        F: FnOnce(
+            &mut Self::IpSocketsCtx<'_>,
+            &mut udp::SocketsState<Ipv6, Self::WeakDeviceId>,
+            &mut udp::BoundSockets<Ipv6, Self::WeakDeviceId>,
+        ) -> O,
     >(
         &mut self,
         cb: F,
     ) -> O {
-        let (mut udp, mut locked) = self.write_lock_and::<crate::lock_ordering::UdpSockets<Ipv6>>();
-        cb(&mut locked, &mut udp)
+        let (mut socket_state, mut locked) =
+            self.write_lock_and::<crate::lock_ordering::UdpSocketsTable<Ipv6>>();
+        let (mut bound_sockets, mut locked) =
+            locked.write_lock_and::<crate::lock_ordering::UdpBoundMap<Ipv6>>();
+        cb(&mut locked, &mut socket_state, &mut bound_sockets)
     }
 
     fn should_send_port_unreachable(&mut self) -> bool {
@@ -152,7 +180,7 @@ impl<
         I: IpExt,
         B: BufferMut,
         C: udp::BufferNonSyncContext<I, B> + crate::NonSyncContext,
-        L: LockBefore<crate::lock_ordering::UdpSockets<I>>,
+        L: LockBefore<crate::lock_ordering::UdpSocketsTable<I>>,
     > udp::BufferStateContext<I, C, B> for Locked<&SyncCtx<C>, L>
 where
     Self: udp::StateContext<I, C>,
