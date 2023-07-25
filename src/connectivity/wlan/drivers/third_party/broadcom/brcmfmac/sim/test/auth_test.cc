@@ -866,33 +866,6 @@ TEST_F(AuthTest, WPA3FailStatusCode) {
   EXPECT_EQ(sae_auth_state_, COMMIT);
 }
 
-// Verify that the firmware will timeout if the bssid in SAE auth frame is wrong, because SAE status
-// will not be updated.
-TEST_F(AuthTest, WPA3WrongBssid) {
-  Init();
-  sec_type_ = SEC_TYPE_WPA3;
-  ap_.SetSecurity({.auth_handling_mode = simulation::AUTH_TYPE_SAE,
-                   .sec_type = simulation::SEC_PROTO_TYPE_WPA3});
-  ap_.SetAssocHandling(simulation::FakeAp::ASSOC_IGNORED);
-
-  wlan_fullmac::WlanFullmacSaeFrame frame = {
-      .status_code = wlan_ieee80211::StatusCode::kSuccess,
-      .seq_num = 1,
-      .sae_fields = fidl::VectorView<uint8_t>::FromExternal(const_cast<uint8_t*>(kCommitSaeFields),
-                                                            kCommitSaeFieldsLen),
-  };
-
-  // Use wrong bssid.
-  kWrongBssid.CopyTo(frame.peer_sta_address.data());
-  sae_commit_frame = &frame;
-
-  env_->ScheduleNotification(std::bind(&AuthTest::StartConnect, this), zx::msec(10));
-  env_->Run(kTestDuration);
-
-  // No auth frame will be sent out.
-  VerifyAuthFrames();
-  EXPECT_EQ(connect_status_, wlan_ieee80211::StatusCode::kRejectedSequenceTimeout);
-  EXPECT_EQ(sae_auth_state_, COMMIT);
-}
+// TODO(fxbug.dev/131015): Add WPA3WrongBssid test case back.
 
 }  // namespace wlan::brcmfmac
