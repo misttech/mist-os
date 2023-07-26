@@ -131,17 +131,6 @@ legacy_bringup_image_metadata_overrides = {
   }
 }
 
-# For //build/images/bringup:bringup_fastboot.
-legacy_bringup_fastboot_image_metadata_overrides = {
-  if (sign_zbi) {
-    zbi_signed = {
-      name = "fuchsia"
-      type = "zbi_fastboot"
-      fastboot_boot = [ "boot" ]
-    }
-  }
-}
-
 # For //build/images/zedboot:zedboot_assembly.
 legacy_zedboot_image_metadata_overrides = {
   _zedboot_metadata_slot = "zedboot"
