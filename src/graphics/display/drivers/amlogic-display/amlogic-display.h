@@ -6,6 +6,7 @@
 #define SRC_GRAPHICS_DISPLAY_DRIVERS_AMLOGIC_DISPLAY_AMLOGIC_DISPLAY_H_
 
 #include <fidl/fuchsia.hardware.amlogiccanvas/cpp/wire.h>
+#include <fidl/fuchsia.hardware.gpio/cpp/wire.h>
 #include <fidl/fuchsia.hardware.sysmem/cpp/wire.h>
 #include <fidl/fuchsia.images2/cpp/wire.h>
 #include <fidl/fuchsia.sysmem/cpp/wire.h>
@@ -241,7 +242,7 @@ class AmlogicDisplay
   bool display_attached_ TA_GUARDED(display_mutex_) = false;
 
   // Hot Plug Detection
-  ddk::GpioProtocolClient hpd_gpio_{};
+  fidl::WireSyncClient<fuchsia_hardware_gpio::Gpio> hpd_gpio_;
   zx::interrupt hpd_irq_;
   thrd_t hpd_thread_;
 

@@ -925,12 +925,16 @@ int AmlogicDisplay::HpdThread() {
       break;
     }
     usleep(500000);
-    uint8_t hpd;
-    status = hpd_gpio_.Read(&hpd);
-    if (status != ZX_OK) {
-      DISP_ERROR("gpio_read failed HDMI HPD\n");
+    fidl::WireResult hpd_result = hpd_gpio_->Read();
+    if (!hpd_result.ok()) {
+      DISP_ERROR("Failed to send Read request to hpd gpio: %s", hpd_result.status_string());
       continue;
     }
+    if (hpd_result->is_error()) {
+      DISP_ERROR("Failed to read hpd gpio: %s", zx_status_get_string(hpd_result->error_value()));
+      continue;
+    }
+    uint8_t hpd = hpd_result.value()->value;
 
     fbl::AutoLock lock(&display_mutex_);
 
@@ -949,7 +953,16 @@ int AmlogicDisplay::HpdThread() {
       vout_->PopulateAddedDisplayArgs(&added_display_args, display_id_,
                                       kSupportedBanjoPixelFormats);
       display_added = true;
-      hpd_gpio_.SetPolarity(GPIO_POLARITY_LOW);
+      fidl::WireResult result = hpd_gpio_->SetPolarity(fuchsia_hardware_gpio::GpioPolarity::kLow);
+      if (!result.ok()) {
+        DISP_ERROR("Failed to send SetPolarity request to hpd gpio: %s", result.status_string());
+        return result.status();
+      }
+      if (result->is_error()) {
+        DISP_ERROR("Failed to set polarity of hpd gpio: %s",
+                   zx_status_get_string(result->error_value()));
+        return result->error_value();
+      }
     } else if (!hpd && display_attached_) {
       DISP_INFO("Display Disconnected!\n");
       vout_->DisplayDisconnected();
@@ -959,7 +972,16 @@ int AmlogicDisplay::HpdThread() {
       display_id_++;
       display_attached_ = false;
 
-      hpd_gpio_.SetPolarity(GPIO_POLARITY_HIGH);
+      fidl::WireResult result = hpd_gpio_->SetPolarity(fuchsia_hardware_gpio::GpioPolarity::kHigh);
+      if (!result.ok()) {
+        DISP_ERROR("Failed to send SetPolarity request to hpd gpio: %s", result.status_string());
+        return result.status();
+      }
+      if (result->is_error()) {
+        DISP_ERROR("Failed to set polarity of hpd gpio: %s",
+                   zx_status_get_string(result->error_value()));
+        return result->error_value();
+      }
     }
 
     if (dc_intf_.is_valid() && (display_removed || display_added)) {
@@ -982,24 +1004,41 @@ int AmlogicDisplay::HpdThread() {
 }
 
 zx_status_t AmlogicDisplay::SetupHotplugDisplayDetection() {
-  if (zx_status_t status = ddk::GpioProtocolClient::CreateFromDevice(
-          parent_, "gpio-hdmi-hotplug-detect", &hpd_gpio_);
-      status != ZX_OK) {
-    DISP_ERROR("Could not obtain GPIO protocol for HDMI hotplug detection: %s\n",
-               zx_status_get_string(status));
-    return status;
+  const char* kHpdGpioFragmentName = "gpio-hdmi-hotplug-detect";
+  zx::result hpd_gpio = DdkConnectFragmentFidlProtocol<fuchsia_hardware_gpio::Service::Device>(
+      parent_, kHpdGpioFragmentName);
+  if (hpd_gpio.is_error()) {
+    DISP_ERROR("Failed to get gpio protocol from fragment %s: %s", kHpdGpioFragmentName,
+               hpd_gpio.status_string());
+    return hpd_gpio.status_value();
+  }
+  hpd_gpio_.Bind(std::move(hpd_gpio.value()));
+
+  {
+    fidl::WireResult result = hpd_gpio_->ConfigIn(fuchsia_hardware_gpio::GpioFlags::kPullDown);
+    if (!result.ok()) {
+      DISP_ERROR("Failed to send ConfigIn request to hpd gpio: %s", result.status_string());
+      return result.status();
+    }
+    if (result->is_error()) {
+      DISP_ERROR("Failed to configure hpd gpio to input: %s",
+                 zx_status_get_string(result->error_value()));
+      return result->error_value();
+    }
   }
 
-  if (zx_status_t status = hpd_gpio_.ConfigIn(GPIO_PULL_DOWN); status != ZX_OK) {
-    DISP_ERROR("Hotplug detection GPIO input config failed: %s\n", zx_status_get_string(status));
-    return status;
+  fidl::WireResult interrupt_result = hpd_gpio_->GetInterrupt(ZX_INTERRUPT_MODE_LEVEL_HIGH);
+  if (!interrupt_result.ok()) {
+    DISP_ERROR("Failed to send GetInterrupt request to hpd gpio: %s",
+               interrupt_result.status_string());
+    return interrupt_result.status();
   }
-
-  if (zx_status_t status = hpd_gpio_.GetInterrupt(ZX_INTERRUPT_MODE_LEVEL_HIGH, &hpd_irq_);
-      status != ZX_OK) {
-    DISP_ERROR("Hotplug detection GPIO: cannot get interrupt: %s\n", zx_status_get_string(status));
-    return status;
+  if (interrupt_result->is_error()) {
+    DISP_ERROR("Failed to get interrupt from hpd gpio: %s",
+               zx_status_get_string(interrupt_result->error_value()));
+    return interrupt_result->error_value();
   }
+  hpd_irq_ = std::move(interrupt_result.value()->irq);
 
   auto hotplug_detection_thread = [](void* arg) {
     return static_cast<AmlogicDisplay*>(arg)->HpdThread();

@@ -5,8 +5,8 @@
 #ifndef SRC_GRAPHICS_DISPLAY_DRIVERS_AMLOGIC_DISPLAY_DSI_HOST_H_
 #define SRC_GRAPHICS_DISPLAY_DRIVERS_AMLOGIC_DISPLAY_DSI_HOST_H_
 
+#include <fidl/fuchsia.hardware.gpio/cpp/wire.h>
 #include <fuchsia/hardware/dsiimpl/cpp/banjo.h>
-#include <fuchsia/hardware/gpio/cpp/banjo.h>
 #include <lib/device-protocol/pdev-fidl.h>
 #include <lib/fit/function.h>
 #include <lib/zx/result.h>
@@ -50,7 +50,8 @@ class DsiHost {
   uint32_t panel_type() const { return panel_type_; }
 
  private:
-  DsiHost(zx_device_t* parent, uint32_t panel_type);
+  DsiHost(zx_device_t* parent, uint32_t panel_type,
+          fidl::ClientEnd<fuchsia_hardware_gpio::Gpio> lcd_gpio);
 
   void PhyEnable();
   void PhyDisable();
@@ -66,7 +67,7 @@ class DsiHost {
 
   ddk::DsiImplProtocolClient dsiimpl_;
 
-  ddk::GpioProtocolClient lcd_gpio_;
+  fidl::WireSyncClient<fuchsia_hardware_gpio::Gpio> lcd_gpio_;
 
   uint32_t panel_type_;
   const PanelConfig* panel_config_ = nullptr;

@@ -130,7 +130,16 @@ zx_status_t Lcd::LoadInitTable(cpp20::span<const uint8_t> buffer) {
           //
           // return ZX_ERR_UNKNOWN;
         } else {
-          gpio_.ConfigOut(buffer[i + 3]);
+          fidl::WireResult result = gpio_->ConfigOut(buffer[i + 3]);
+          if (!result.ok()) {
+            DISP_ERROR("Failed to send ConfigOut request to gpio: %s", result.status_string());
+            return result.status();
+          }
+          if (result->is_error()) {
+            DISP_ERROR("Failed to configure gpio to output: %s",
+                       zx_status_get_string(result->error_value()));
+            return result->error_value();
+          }
         }
         if (payload_size > 2 && buffer[i + 4]) {
           DISP_TRACE("dsi_set_gpio sleep %d", buffer[i + 4]);
@@ -242,7 +251,8 @@ zx::result<std::unique_ptr<Lcd>> Lcd::Create(uint32_t panel_type, cpp20::span<co
                                              cpp20::span<const uint8_t> dsi_off,
                                              fit::function<void(bool)> set_signal_power,
                                              ddk::DsiImplProtocolClient dsiimpl,
-                                             ddk::GpioProtocolClient gpio, bool already_enabled) {
+                                             fidl::ClientEnd<fuchsia_hardware_gpio::Gpio> gpio,
+                                             bool already_enabled) {
   fbl::AllocChecker alloc_checker;
   std::unique_ptr<Lcd> lcd =
       fbl::make_unique_checked<Lcd>(&alloc_checker, panel_type, std::move(set_signal_power));
@@ -257,7 +267,7 @@ zx::result<std::unique_ptr<Lcd>> Lcd::Create(uint32_t panel_type, cpp20::span<co
     DISP_ERROR("Could not obtain GPIO protocol\n");
     return zx::error(ZX_ERR_NO_RESOURCES);
   }
-  lcd->gpio_ = gpio;
+  lcd->gpio_.Bind(std::move(gpio));
 
   lcd->enabled_ = already_enabled;
   if (already_enabled) {

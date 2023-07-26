@@ -81,17 +81,26 @@ const PanelConfig* GetPanelConfig(uint32_t panel_type) {
 
 }  // namespace
 
-DsiHost::DsiHost(zx_device_t* parent, uint32_t panel_type)
+DsiHost::DsiHost(zx_device_t* parent, uint32_t panel_type,
+                 fidl::ClientEnd<fuchsia_hardware_gpio::Gpio> lcd_gpio)
     : pdev_(ddk::PDevFidl::FromFragment(parent)),
       dsiimpl_(parent, "dsi"),
-      lcd_gpio_(parent, "gpio-lcd-reset"),
+      lcd_gpio_(std::move(lcd_gpio)),
       panel_type_(panel_type) {}
 
 // static
 zx::result<std::unique_ptr<DsiHost>> DsiHost::Create(zx_device_t* parent, uint32_t panel_type) {
   fbl::AllocChecker ac;
-  std::unique_ptr<DsiHost> self =
-      fbl::make_unique_checked<DsiHost>(&ac, DsiHost(parent, panel_type));
+  const char* kLcdGpioFragmentName = "gpio-lcd-reset";
+  zx::result lcd_gpio =
+      ddk::Device<void>::DdkConnectFragmentFidlProtocol<fuchsia_hardware_gpio::Service::Device>(
+          parent, kLcdGpioFragmentName);
+  if (lcd_gpio.is_error()) {
+    DISP_ERROR("Failed to get gpio protocol from fragment: %s", kLcdGpioFragmentName);
+    return lcd_gpio.take_error();
+  }
+  std::unique_ptr<DsiHost> self = fbl::make_unique_checked<DsiHost>(
+      &ac, DsiHost(parent, panel_type, std::move(lcd_gpio.value())));
   if (!ac.check()) {
     DISP_ERROR("No memory to allocate a DSI host\n");
     return zx::error(ZX_ERR_NO_MEMORY);
@@ -120,10 +129,17 @@ zx::result<std::unique_ptr<DsiHost>> DsiHost::Create(zx_device_t* parent, uint32
   }
 
   // panel_type_ is now canonical.
+  lcd_gpio =
+      ddk::Device<void>::DdkConnectFragmentFidlProtocol<fuchsia_hardware_gpio::Service::Device>(
+          parent, kLcdGpioFragmentName);
+  if (lcd_gpio.is_error()) {
+    DISP_ERROR("Failed to get gpio protocol from fragment: %s", kLcdGpioFragmentName);
+    return lcd_gpio.take_error();
+  }
   zx::result<std::unique_ptr<Lcd>> lcd_or_status =
       Lcd::Create(self->panel_type_, self->panel_config_->dsi_on, self->panel_config_->dsi_off,
                   fit::bind_member(self.get(), &DsiHost::SetSignalPower), self->dsiimpl_,
-                  self->lcd_gpio_, kBootloaderDisplayEnabled);
+                  std::move(lcd_gpio.value()), kBootloaderDisplayEnabled);
   if (lcd_or_status.is_error()) {
     zxlogf(ERROR, "Failed to create LCD object: %s", lcd_or_status.status_string());
     return zx::error(lcd_or_status.error_value());
@@ -148,7 +164,6 @@ zx_status_t DsiHost::LoadPowerTable(cpp20::span<const PowerOp> commands,
     DISP_ERROR("No power commands to execute");
     return ZX_OK;
   }
-  uint8_t read_value = 0;
   uint8_t wait_count = 0;
   zx_status_t status = ZX_OK;
 
@@ -158,14 +173,24 @@ zx_status_t DsiHost::LoadPowerTable(cpp20::span<const PowerOp> commands,
       case kPowerOpExit:
         DISP_TRACE("power_exit");
         return ZX_OK;
-      case kPowerOpGpio:
+      case kPowerOpGpio: {
         DISP_TRACE("power_set_gpio pin #%d value=%d", op.index, op.value);
         if (op.index != 0) {
           DISP_ERROR("Unrecognized GPIO pin #%d, ignoring", op.index);
           break;
         }
-        lcd_gpio_.Write(op.value);
+        fidl::WireResult result = lcd_gpio_->Write(op.value);
+        if (!result.ok()) {
+          DISP_ERROR("Failed to send Write request to lcd gpio: %s", result.status_string());
+          return result.status();
+        }
+        if (result->is_error()) {
+          DISP_ERROR("Failed to write to lcd gpio: %s",
+                     zx_status_get_string(result->error_value()));
+          return result->error_value();
+        }
         break;
+      }
       case kPowerOpSignal:
         DISP_TRACE("power_signal dsi_init");
         if ((status = power_on()) != ZX_OK) {
@@ -179,10 +204,31 @@ zx_status_t DsiHost::LoadPowerTable(cpp20::span<const PowerOp> commands,
           DISP_ERROR("Unrecognized GPIO pin #%d, ignoring", op.index);
           break;
         }
-        lcd_gpio_.ConfigIn(0);
+        {
+          fidl::WireResult result =
+              lcd_gpio_->ConfigIn(fuchsia_hardware_gpio::GpioFlags::kPullDown);
+          if (!result.ok()) {
+            DISP_ERROR("Failed to send ConfigIn request to lcd gpio: %s", result.status_string());
+            return result.status();
+          }
+          if (result->is_error()) {
+            DISP_ERROR("Failed to configure lcd gpio to input: %s",
+                       zx_status_get_string(result->error_value()));
+            return result->error_value();
+          }
+        }
         for (wait_count = 0; wait_count < op.sleep_ms; wait_count++) {
-          lcd_gpio_.Read(&read_value);
-          if (read_value == op.value) {
+          fidl::WireResult read_result = lcd_gpio_->Read();
+          if (!read_result.ok()) {
+            DISP_ERROR("Failed to send Read request to lcd gpio: %s", read_result.status_string());
+            return read_result.status();
+          }
+          if (read_result->is_error()) {
+            DISP_ERROR("Failed to read lcd gpio: %s",
+                       zx_status_get_string(read_result->error_value()));
+            return read_result->error_value();
+          }
+          if (read_result.value()->value == op.value) {
             break;
           }
           zx::nanosleep(zx::deadline_after(zx::msec(1)));

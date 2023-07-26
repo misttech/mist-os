@@ -8,7 +8,6 @@
 #include <fidl/fuchsia.images2/cpp/wire.h>
 #include <fuchsia/hardware/display/controller/cpp/banjo.h>
 #include <fuchsia/hardware/dsiimpl/cpp/banjo.h>
-#include <fuchsia/hardware/gpio/cpp/banjo.h>
 #include <fuchsia/hardware/i2cimpl/cpp/banjo.h>
 #include <lib/device-protocol/display-panel.h>
 #include <lib/zx/result.h>

@@ -31,6 +31,7 @@
     use: [
         { protocol: "fuchsia.scheduler.ProfileProvider" },
         { service: "fuchsia.hardware.amlogiccanvas.Service" },
+        { service: "fuchsia.hardware.gpio.Service" },
         { service: "fuchsia.hardware.hdmi.Service" },
         { service: "fuchsia.hardware.platform.device.Service" },
         { service: "fuchsia.hardware.sysmem.Service" },

@@ -5,8 +5,8 @@
 #ifndef SRC_GRAPHICS_DISPLAY_DRIVERS_AMLOGIC_DISPLAY_LCD_H_
 #define SRC_GRAPHICS_DISPLAY_DRIVERS_AMLOGIC_DISPLAY_LCD_H_
 
+#include <fidl/fuchsia.hardware.gpio/cpp/wire.h>
 #include <fuchsia/hardware/dsiimpl/cpp/banjo.h>
-#include <fuchsia/hardware/gpio/cpp/banjo.h>
 #include <lib/fit/function.h>
 #include <unistd.h>
 #include <zircon/compiler.h>
@@ -30,7 +30,7 @@ class Lcd {
   static zx::result<std::unique_ptr<Lcd>> Create(
       uint32_t panel_type, cpp20::span<const uint8_t> dsi_on, cpp20::span<const uint8_t> dsi_off,
       fit::function<void(bool)> set_signal_power, ddk::DsiImplProtocolClient dsiimpl,
-      ddk::GpioProtocolClient gpio, bool already_enabled);
+      fidl::ClientEnd<fuchsia_hardware_gpio::Gpio> gpio, bool already_enabled);
 
   // Turn the panel on
   zx_status_t Enable();
@@ -49,7 +49,7 @@ class Lcd {
 
   uint32_t panel_type_;
   fit::function<void(bool)> set_signal_power_;
-  ddk::GpioProtocolClient gpio_;
+  fidl::WireSyncClient<fuchsia_hardware_gpio::Gpio> gpio_;
 
   // Init and shutdown sequences for the fixed panel.
   cpp20::span<const uint8_t> dsi_on_;
