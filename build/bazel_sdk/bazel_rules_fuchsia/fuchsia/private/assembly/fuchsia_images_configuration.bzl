@@ -112,13 +112,9 @@ def _fuchsia_images_configuration_impl(ctx):
             fvms.append(standard_fvm)
         elif FuchsiaFVMSparseInfo in image:
             raw_image = image[FuchsiaFVMSparseInfo]
-
-            # TODO(b/291958397): Remove this if-statement when no clients are
-            # supplying a blob-sparse fvm.
-            if raw_image.fvm_sparse_name != "fvm.blob.sparse":
-                sparse_fvm = dict(raw_image.fvm_info)
-                sparse_fvm["filesystems"] = _collect_file_systems(raw_image.filesystems, filesystems)
-                fvms.append(sparse_fvm)
+            sparse_fvm = dict(raw_image.fvm_info)
+            sparse_fvm["filesystems"] = _collect_file_systems(raw_image.filesystems, filesystems)
+            fvms.append(sparse_fvm)
         elif FuchsiaFVMNandInfo in image:
             raw_image = image[FuchsiaFVMNandInfo]
             nand_fvm = dict(raw_image.fvm_info)
