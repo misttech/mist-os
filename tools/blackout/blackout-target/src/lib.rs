@@ -205,8 +205,11 @@ pub async fn set_up_partition(
     let device_dir = match device_dir {
         Some(device_dir) => {
             device_controller = Some(
-                connect_to_named_protocol_at_dir_root::<ControllerMarker>(device_dir, ".")
-                    .context("new class path connect failed")?,
+                connect_to_named_protocol_at_dir_root::<ControllerMarker>(
+                    device_dir,
+                    "device_controller",
+                )
+                .context("new class path connect failed")?,
             );
             device_dir
         }
@@ -292,7 +295,7 @@ pub async fn set_up_partition(
     .context("create_fvm_volume failed")?;
     recursive_wait_and_open::<ControllerMarker>(
         device_dir,
-        &format!("/fvm/{}-p-1/block", partition_label),
+        &format!("/fvm/{}-p-1/block/device_controller", partition_label),
     )
     .await
     .context("recursive_wait for new fvm path failed")
@@ -309,7 +312,7 @@ pub async fn find_partition(
     if let Some(device_dir) = device_dir {
         match fuchsia_fs::directory::open_no_describe::<ControllerMarker>(
             device_dir,
-            &format!("/fvm/{}-p-1/block", partition_label),
+            &format!("/fvm/{}-p-1/block/device_controller", partition_label),
             fuchsia_fs::OpenFlags::empty(),
         ) {
             Ok(partition_controller) => {
@@ -320,11 +323,14 @@ pub async fn find_partition(
                 let device_controller =
                     fuchsia_component::client::connect_to_named_protocol_at_dir_root::<
                         ControllerMarker,
-                    >(device_dir, ".")?;
+                    >(device_dir, "device_controller")?;
                 fvm::bind_fvm_driver(&device_controller).await?;
-                recursive_wait(device_dir, &format!("/fvm/{}-p-1/block", partition_label))
-                    .await
-                    .context("recursive_wait on expected fvm path failed")?;
+                recursive_wait(
+                    device_dir,
+                    &format!("/fvm/{}-p-1/block/device_controller", partition_label),
+                )
+                .await
+                .context("recursive_wait on expected fvm path failed")?;
             }
             Err(err) => return Err(err).context("failed to open fvm path"),
         }

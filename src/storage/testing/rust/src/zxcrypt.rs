@@ -32,8 +32,10 @@ pub async fn set_up_insecure_zxcrypt(
     block_device: &fio::DirectoryProxy,
 ) -> Result<fio::DirectoryProxy> {
     const UNSEALED_BLOCK_PATH: &str = "unsealed/block";
-    let device_controller =
-        connect_to_named_protocol_at_dir_root::<ControllerMarker>(block_device, ".")?;
+    let device_controller = connect_to_named_protocol_at_dir_root::<ControllerMarker>(
+        block_device,
+        "device_controller",
+    )?;
     bind_zxcrypt_driver(&device_controller).await.context("zxcrypt driver bind")?;
 
     const ZXCRYPT_DEVICE_NAME: &str = "zxcrypt";

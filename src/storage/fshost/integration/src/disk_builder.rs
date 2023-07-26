@@ -136,10 +136,9 @@ fn initialize_gpt(vmo: &zx::Vmo, block_size: u64) {
 }
 
 async fn bind_gpt_driver(ramdisk: &RamdiskClient) {
-    let ramdisk_channel =
-        fidl::AsyncChannel::from_channel(ramdisk.open().await.unwrap().into_channel()).unwrap();
-    let controller_proxy = ControllerProxy::new(ramdisk_channel);
-    controller_proxy
+    ramdisk
+        .as_controller()
+        .unwrap()
         .bind(GPT_DRIVER_PATH)
         .await
         .expect("FIDL error calling bind()")
@@ -413,9 +412,11 @@ impl DiskBuilder {
 
         let device_dir =
             device_dir.as_ref().unwrap_or(ramdisk.as_dir().expect("invalid directory proxy"));
-        let device_controller =
-            connect_to_named_protocol_at_dir_root::<ControllerMarker>(device_dir, ".")
-                .expect("failed to connect to device controller");
+        let device_controller = connect_to_named_protocol_at_dir_root::<ControllerMarker>(
+            device_dir,
+            "device_controller",
+        )
+        .expect("failed to connect to device controller");
 
         // Initialize/provision the FVM headers and bind the FVM driver.
         let volume_manager = set_up_fvm(&device_controller, device_dir, FVM_SLICE_SIZE as usize)
@@ -433,10 +434,12 @@ impl DiskBuilder {
         )
         .await
         .expect("create_fvm_volume failed");
-        let blobfs_controller =
-            recursive_wait_and_open::<ControllerMarker>(&device_dir, "/fvm/blobfs-p-1/block")
-                .await
-                .expect("failed to open controller");
+        let blobfs_controller = recursive_wait_and_open::<ControllerMarker>(
+            &device_dir,
+            "/fvm/blobfs-p-1/block/device_controller",
+        )
+        .await
+        .expect("failed to open controller");
 
         let mut blobfs = Blobfs::new(blobfs_controller);
         blobfs.format().await.expect("format failed");
@@ -464,17 +467,22 @@ impl DiskBuilder {
             let data_dir = recursive_wait_and_open_directory(&device_dir, &data_block_path)
                 .await
                 .expect("failed to open data partition");
-            let data_controller =
-                connect_to_named_protocol_at_dir_root::<ControllerMarker>(&data_dir, ".")
-                    .expect("failed to connect to data device controller");
+            let data_controller = connect_to_named_protocol_at_dir_root::<ControllerMarker>(
+                &data_dir,
+                "device_controller",
+            )
+            .expect("failed to connect to data device controller");
             // Potentially set up zxcrypt, if we are configured to and aren't using Fxfs.
             let data_controller = if self.data_spec.format != Some("fxfs") && self.data_spec.zxcrypt
             {
                 let zxcrypt_block_dir = zxcrypt::set_up_insecure_zxcrypt(&data_dir)
                     .await
                     .expect("failed to set up zxcrypt");
-                connect_to_named_protocol_at_dir_root::<ControllerMarker>(&zxcrypt_block_dir, ".")
-                    .expect("failed to connect to the device")
+                connect_to_named_protocol_at_dir_root::<ControllerMarker>(
+                    &zxcrypt_block_dir,
+                    "device_controller",
+                )
+                .expect("failed to connect to the device")
             } else {
                 data_controller
             };

@@ -113,10 +113,12 @@ async fn find_data_partition(ramdisk_prefix: Option<String>) -> Result<Controlle
     // present thanks to calling get_info above.
     for entry in fuchsia_fs::directory::readdir(&fvm_dir).await? {
         // This will wait for the block entry to show up.
-        let proxy =
-            recursive_wait_and_open::<ControllerMarker>(&fvm_dir, &format!("{}/block", entry.name))
-                .await
-                .context("opening partition path")?;
+        let proxy = recursive_wait_and_open::<ControllerMarker>(
+            &fvm_dir,
+            &format!("{}/block/device_controller", entry.name),
+        )
+        .await
+        .context("opening partition path")?;
         match partition_matches_with_proxy(&proxy, &data_matcher).await {
             Ok(true) => {
                 return Ok(proxy);

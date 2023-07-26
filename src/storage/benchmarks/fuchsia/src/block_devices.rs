@@ -91,9 +91,11 @@ impl Ramdisk {
             volume_dir
         };
 
-        let volume_controller =
-            connect_to_named_protocol_at_dir_root::<ControllerMarker>(&volume_dir, ".")
-                .expect("failed to connect to the device controller");
+        let volume_controller = connect_to_named_protocol_at_dir_root::<ControllerMarker>(
+            &volume_dir,
+            "device_controller",
+        )
+        .expect("failed to connect to the device controller");
 
         Self { _ramdisk: ramdisk, volume_dir, volume_controller: volume_controller }
     }
@@ -122,9 +124,9 @@ async fn connect_to_system_fvm() -> Option<VolumeManagerProxy> {
     .await
     .ok()?;
 
-    let blobfs_controller =
-        connect_to_protocol_at_path::<ControllerMarker>(blobfs_dev_path.to_str().unwrap())
-            .unwrap_or_else(|_| panic!("Failed to connect to Controller at {:?}", blobfs_dev_path));
+    let controller_path = format!("{}/device_controller", blobfs_dev_path.to_str().unwrap());
+    let blobfs_controller = connect_to_protocol_at_path::<ControllerMarker>(&controller_path)
+        .unwrap_or_else(|_| panic!("Failed to connect to Controller at {:?}", controller_path));
     let path = blobfs_controller
         .get_topological_path()
         .await
@@ -282,9 +284,11 @@ impl FvmVolume {
             volume_dir
         };
 
-        let volume_controller =
-            connect_to_named_protocol_at_dir_root::<ControllerMarker>(&volume_dir, ".")
-                .expect("failed to connect to the device controller");
+        let volume_controller = connect_to_named_protocol_at_dir_root::<ControllerMarker>(
+            &volume_dir,
+            "device_controller",
+        )
+        .expect("failed to connect to the device controller");
 
         Self { volume, volume_dir, volume_controller: volume_controller }
     }
@@ -336,8 +340,11 @@ async fn set_up_fvm_volume(
     // allow the caller to access its zxcrypt child. Hence, we use the controller to get access
     // to the topological path and then call open().
     // Connect to the controller and get the device's topological path.
-    let controller = connect_to_protocol_at_path::<ControllerMarker>(device_path.to_str().unwrap())
-        .expect("failed to connect to controller");
+    let controller = connect_to_protocol_at_path::<ControllerMarker>(&format!(
+        "{}/device_controller",
+        device_path.to_str().unwrap()
+    ))
+    .expect("failed to connect to controller");
     let topo_path = controller
         .get_topological_path()
         .await

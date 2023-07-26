@@ -71,8 +71,9 @@ class BlockVerityTest : public zxtest::Test {
  protected:
   void BindAndOpenVerityDeviceManager() {
     fdio_cpp::UnownedFdioCaller caller(ramdisk_->devfs_root_fd());
+    std::string controller_path = std::string(ramdisk_->path()) + "/device_controller";
     zx::result channel =
-        component::ConnectAt<fuchsia_device::Controller>(caller.directory(), ramdisk_->path());
+        component::ConnectAt<fuchsia_device::Controller>(caller.directory(), controller_path);
     ASSERT_OK(channel.status_value());
     fbl::unique_fd devfs_root(dup(ramdisk_->devfs_root_fd().get()));
     zx::result verity = block_verity::VerifiedVolumeClient::CreateFromBlockDevice(
@@ -123,8 +124,9 @@ class BlockVerityTest : public zxtest::Test {
 
 TEST_F(BlockVerityTest, Bind) {
   fdio_cpp::UnownedFdioCaller caller(ramdisk_->devfs_root_fd());
+  std::string controller_path = std::string(ramdisk_->path()) + "/device_controller";
   zx::result channel =
-      component::ConnectAt<fuchsia_device::Controller>(caller.directory(), ramdisk_->path());
+      component::ConnectAt<fuchsia_device::Controller>(caller.directory(), controller_path);
   ASSERT_OK(channel.status_value());
   ASSERT_OK(BindVerityDriver(channel.value()));
   fbl::unique_fd devfs_root(dup(ramdisk_->devfs_root_fd().get()));

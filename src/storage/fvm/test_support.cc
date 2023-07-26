@@ -40,6 +40,12 @@ zx::result<fidl::ClientEnd<Protocol>> GetChannel(DeviceRef* device) {
   return component::ConnectAt<Protocol>(caller.directory(), device->path());
 }
 
+zx::result<fidl::ClientEnd<fuchsia_device::Controller>> GetController(DeviceRef* device) {
+  fdio_cpp::UnownedFdioCaller caller(device->devfs_root_fd());
+  std::string controller_path = std::string(device->path()).append("/device_controller");
+  return component::ConnectAt<fuchsia_device::Controller>(caller.directory(), controller_path);
+}
+
 template <typename Protocol>
 fidl::UnownedClientEnd<Protocol> GetChannel(VPartitionAdapter* device) {
   fdio_cpp::UnownedFdioCaller caller(device->fd());
@@ -70,7 +76,7 @@ zx_status_t RebindBlockDevice(DeviceRef* device) {
     return watcher.error_value();
   }
 
-  zx::result channel = GetChannel<fuchsia_device::Controller>(device);
+  zx::result channel = GetController(device);
   if (channel.is_error()) {
     return channel.status_value();
   }
@@ -286,7 +292,7 @@ std::unique_ptr<FvmAdapter> FvmAdapter::CreateGrowable(const fbl::unique_fd& dev
   }
 
   {
-    zx::result channel = GetChannel<fuchsia_device::Controller>(device);
+    zx::result channel = GetController(device);
     if (channel.is_error()) {
       ADD_FAILURE("ConnectAt(%s): %s", device->path(), channel.status_string());
       return nullptr;
@@ -364,7 +370,7 @@ zx_status_t FvmAdapter::Rebind(fbl::Vector<VPartitionAdapter*> vpartitions) {
   }
 
   // Bind the FVM to the block device.
-  zx::result channel = GetChannel<fuchsia_device::Controller>(block_device_);
+  zx::result channel = GetController(block_device_);
   if (channel.is_error()) {
     return channel.status_value();
   }

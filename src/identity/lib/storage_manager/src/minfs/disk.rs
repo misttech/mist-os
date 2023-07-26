@@ -120,7 +120,7 @@ async fn all_partitions(
     for child in dirents {
         match fuchsia_fs::directory::open_no_describe::<ControllerMarker>(
             &block_dir,
-            &child.name,
+            &format!("{}/device_controller", &child.name),
             fio::OpenFlags::NOT_DIRECTORY,
         ) {
             Ok(controller) => partitions.push(DevBlockPartition(controller)),
@@ -387,7 +387,7 @@ impl EncryptedBlockDevice for EncryptedDevBlockDevice {
         wait_for_node(&unsealed_dir, "block").await?;
         let unsealed_block = fuchsia_fs::directory::open_no_describe::<ControllerMarker>(
             &unsealed_dir,
-            "block",
+            "block/device_controller",
             fio::OpenFlags::NOT_DIRECTORY,
         )?;
         Ok(DevBlockDevice(unsealed_block))
@@ -837,16 +837,20 @@ pub mod test {
         let mock_devfs = pseudo_directory! {
             "class" => pseudo_directory! {
                 "block" => pseudo_directory! {
-                    "000" => host_mock_partition(&scope, 0, MockPartition {
+                    "000" => pseudo_directory! {
+                    "device_controller" => host_mock_partition(&scope, 0, MockPartition {
                             guid: Ok(BLOB_GUID),
                             label: Ok("other".to_string()),
                             block_dir: simple::simple(),
                     }),
-                    "001" => host_mock_partition(&scope, 1, MockPartition {
+                },
+                    "001" => pseudo_directory! {
+                    "device_controller" => host_mock_partition(&scope, 1, MockPartition {
                             guid: Ok(DATA_GUID),
                             label: Ok(ACCOUNT_LABEL.to_string()),
                             block_dir: simple::simple(),
                     }),
+                },
                 }
             }
         };
@@ -887,11 +891,13 @@ pub mod test {
         let mock_devfs = pseudo_directory! {
             "class" => pseudo_directory! {
                 "block" => pseudo_directory! {
-                    "000" => host_mock_partition(&scope, 0, MockPartition {
+                    "000" => pseudo_directory! {
+                    "device_controller" => host_mock_partition(&scope, 0, MockPartition {
                         guid: Ok(DATA_GUID),
                         label: Ok(ACCOUNT_LABEL.to_string()),
                         block_dir: block_dir.clone(),
                     }),
+                },
                 }
             },
             "mocks" => pseudo_directory! {
@@ -917,11 +923,13 @@ pub mod test {
         let mock_devfs = pseudo_directory! {
             "class" => pseudo_directory! {
                 "block" => pseudo_directory! {
-                    "000" => host_mock_partition(&scope, 0, MockPartition {
+                    "000" => pseudo_directory! {
+                        "device_controller" => host_mock_partition(&scope, 0, MockPartition {
                         guid: Ok(DATA_GUID),
                         label: Ok(ACCOUNT_LABEL.to_string()),
                         block_dir: block_dir.clone(),
                     }),
+                },
                 }
             },
             "mocks" => pseudo_directory! {

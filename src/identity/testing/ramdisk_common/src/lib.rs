@@ -118,7 +118,7 @@ pub async fn setup_ramdisk(
 
     let controller = device_watcher::recursive_wait_and_open::<ControllerMarker>(
         ramdisk_dir,
-        &format!("/fvm/{name}-p-1/block"),
+        &format!("/fvm/{name}-p-1/block/device_controller"),
     )
     .await
     .expect("Could not wait for inner fvm block device");

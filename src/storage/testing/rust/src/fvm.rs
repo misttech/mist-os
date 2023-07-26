@@ -38,12 +38,7 @@ pub fn format_for_fvm(block_device: &fio::DirectoryProxy, fvm_slice_size: usize)
 
 /// Binds the FVM driver to the device at `controller`. Does not wait for the driver to be ready.
 pub async fn bind_fvm_driver(controller: &ControllerProxy) -> Result<()> {
-    controller
-        .bind(FVM_DRIVER_PATH)
-        .await
-        .context("fvm driver bind call failed")?
-        .map_err(zx::Status::from_raw)
-        .context("fvm driver bind returned error")?;
+    controller.bind(FVM_DRIVER_PATH).await.context("fvm driver bind call failed").unwrap().unwrap();
     Ok(())
 }
 

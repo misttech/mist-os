@@ -208,7 +208,9 @@ zx::result<fidl::ClientEnd<fuchsia_device::Controller>> OpenPartitionImpl(
     fidl::ClientEnd<fuchsia_io::Directory> directory, const PartitionMatcher& matcher, bool wait) {
   auto cb = [&](fidl::UnownedClientEnd<fuchsia_io::Directory> directory, std::string_view name)
       -> std::optional<zx::result<fidl::ClientEnd<fuchsia_device::Controller>>> {
-    zx::result channel = component::ConnectAt<fuchsia_device::Controller>(directory, name);
+    std::string controller_path = std::string(name) + "/device_controller";
+    zx::result channel =
+        component::ConnectAt<fuchsia_device::Controller>(directory, controller_path);
     if (channel.is_error()) {
       return channel.take_error();
     }
