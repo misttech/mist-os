@@ -39,6 +39,11 @@ group("tests") {
   ]
 }
 
+group("e2e_tests") {
+  testonly = true
+  deps = [ "ffx:e2e_tests" ]
+}
+
 core_shard("default-laboratory-env-core-shard") {
   shard_file = "meta/default-laboratory-env.core_shard.cml"
 }

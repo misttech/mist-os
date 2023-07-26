@@ -17,6 +17,8 @@ use std::{
 };
 use tempfile::TempDir;
 
+pub mod test;
+
 /// Where to search for ffx and subtools, based on either being part of an
 /// ffx command (like `ffx self-test`) or being part of the build (using the
 /// build root to find things in either the host tool or test data targets.

@@ -1,0 +1,90 @@
+# Copyright 2023 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+import("//build/board.gni")
+import("//build/product.gni")
+import("//build/rust/rustc_test.gni")
+import("//build/sdk/product_bundle.gni")
+import("//build/testing/environments.gni")
+import("//build/testing/host_test_data.gni")
+
+group("e2e_tests") {
+  testonly = true
+  deps = []
+
+  # TODO(http://fxbug.dev/124461): Support product bundle for testing on mac
+  # For now, just test on linux.
+  # Also check for has_board, since this test cannot run on a configuration without a
+  # board.
+  if (is_host && is_linux && has_board) {
+    deps += [ ":emu_e2e_test" ]
+  }
+}
+
+# TODO(http://fxbug.dev/124461): Support product bundle for testing on mac
+# For now, just test on linux.
+# Also check for has_board, since this test cannot run on a configuration without a
+# board.
+if (is_host && is_linux && has_board) {
+  host_test_data("sdk_exported") {
+    sources = [ get_label_info("//sdk:core($default_toolchain)",
+                               "root_out_dir") + "/sdk/exported/core" ]
+
+    deps = [ "//sdk:core($default_toolchain)" ]
+  }
+
+  rustc_test("emu_e2e_test") {
+    edition = "2021"
+    sources = [ "src/lib.rs" ]
+
+    configs += [ ":test_config" ]
+
+    deps = [
+      "//src/developer/ffx/config:lib",
+      "//src/developer/ffx/lib/isolate:lib",
+      "//src/lib/fuchsia",
+      "//third_party/rust_crates:anyhow",
+      "//third_party/rust_crates:serde_json",
+      "//third_party/rust_crates:tempfile",
+    ]
+    data_deps = [
+      ":sdk_exported",
+      ":test_product_bundle",
+    ]
+    exclude_toolchain_tags = [
+      "asan",
+      "hwasan",
+      "tsan",
+      "ubsan",
+      "sancov",
+      "lsan",
+      "fuzzer",
+      "gcc",
+    ]
+  }
+
+  if (!use_bringup_assembly) {
+    pb_label = "//build/images/fuchsia:product_bundle($default_toolchain)"
+
+    files = {
+      outdir = get_label_info(pb_label, "target_out_dir")
+      product_bundle = "$outdir/product_bundle"
+    }
+
+    host_test_data("test_product_bundle") {
+      # Adding this causes a cyclic dependency since the product bundle depends on e2e tests
+      # deps = [ pb_label ]
+      sources = [ files.product_bundle ]
+    }
+
+    config("test_config") {
+      rustenv = [ "PRODUCT_BUNDLE_PATH_FROM_GN=" +
+                  rebase_path(files.product_bundle, root_build_dir) ]
+    }
+  } else {
+    config("test_config") {
+      rustenv = [ "PRODUCT_BUNDLE_PATH_FROM_GN=/dev/null" ]
+    }
+  }
+}

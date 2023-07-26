@@ -45,7 +45,7 @@ impl IsolatedEmulator {
         // Create paths to the files to hold the ssh key pair.
         // The key is not generated here, since ffx will generate the
         // key if it is missing when starting an emulator or flashing a device.
-        // If a  private key is supplied, it is used, but the public key path
+        // If a private key is supplied, it is used, but the public key path
         // is still in the temp dir.
         let ssh_priv_key = temp_dir.path().join("ssh_private_key");
         let ssh_pub_key = temp_dir.path().join("ssh_public_key");

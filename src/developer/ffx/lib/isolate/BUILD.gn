@@ -21,6 +21,7 @@ rustc_library("lib") {
     "//third_party/rust_crates:serde",
     "//third_party/rust_crates:serde_json",
     "//third_party/rust_crates:tempfile",
+    "//third_party/rust_crates:thiserror",
   ]
 
   _subtool_search_test_data =
@@ -35,7 +36,10 @@ rustc_library("lib") {
     "SUBTOOL_SEARCH_HOST_TOOLS=${_subtool_search_host_tools}",
   ]
 
-  sources = [ "src/lib.rs" ]
+  sources = [
+    "src/lib.rs",
+    "src/test.rs",
+  ]
 }
 
 group("tests") {

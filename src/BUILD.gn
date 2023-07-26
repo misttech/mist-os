@@ -61,6 +61,7 @@ group("e2e_tests") {
   testonly = true
   deps = [
     "connectivity:e2e_tests",
+    "developer:e2e_tests",
     "recovery:e2e_tests",
     "testing:e2e_tests",
     "tests",

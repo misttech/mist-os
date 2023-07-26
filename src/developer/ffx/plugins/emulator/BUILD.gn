@@ -64,14 +64,19 @@ if (is_host) {
       type = "companion_host_tool"
     }
   }
+
+  ffx_tool("ffx_emulator_tool") {
+    edition = "2021"
+    output_name = "ffx-emu"
+    deps = [
+      ":ffx_emulator_suite",
+      "//src/lib/fuchsia-async",
+    ]
+    sources = [ "src/main.rs" ]
+  }
 }
 
-ffx_tool("ffx_emulator_tool") {
-  edition = "2021"
-  output_name = "ffx-emu"
-  deps = [
-    ":ffx_emulator_suite",
-    "//src/lib/fuchsia-async",
-  ]
-  sources = [ "src/main.rs" ]
+group("e2e_tests") {
+  testonly = true
+  deps = [ "e2e_test:e2e_tests" ]
 }

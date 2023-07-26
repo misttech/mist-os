@@ -157,3 +157,9 @@ if (is_fuchsia) {
     ]
   }
 }
+
+# Tests that are end to end, and should be part of the e2e test suite.
+group("e2e_tests") {
+  testonly = true
+  deps = [ "plugins/emulator:e2e_tests" ]
+}
