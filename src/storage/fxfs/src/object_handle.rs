@@ -20,9 +20,6 @@ pub trait ObjectHandle: Send + Sync + 'static {
     /// object is contained in, but not necessarily unique within the entire system.
     fn object_id(&self) -> u64;
 
-    // Returns the size of the object.
-    fn get_size(&self) -> u64;
-
     /// Returns the filesystem block size, which should be at least as big as the device block size,
     /// but not necessarily the same.
     fn block_size(&self) -> u64;
@@ -64,6 +61,9 @@ pub trait ReadObjectHandle: ObjectHandle {
     /// Fills |buf| with up to |buf.len()| bytes read from |offset| on the underlying device.
     /// |offset| and |buf| must both be block-aligned.
     async fn read(&self, offset: u64, buf: MutableBufferRef<'_>) -> Result<usize, Error>;
+
+    /// Returns the size of the object.
+    fn get_size(&self) -> u64;
 }
 
 #[async_trait]

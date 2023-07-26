@@ -139,10 +139,6 @@ impl ObjectHandle for FakeObjectHandle {
         self.allocator.block_size().try_into().unwrap()
     }
 
-    fn get_size(&self) -> u64 {
-        self.object.get_size()
-    }
-
     fn allocate_buffer(&self, size: usize) -> Buffer<'_> {
         self.allocator.allocate_buffer(size)
     }
@@ -168,6 +164,10 @@ impl GetProperties for FakeObjectHandle {
 impl ReadObjectHandle for FakeObjectHandle {
     async fn read(&self, offset: u64, buf: MutableBufferRef<'_>) -> Result<usize, Error> {
         self.object.read(offset, buf)
+    }
+
+    fn get_size(&self) -> u64 {
+        self.object.get_size()
     }
 }
 

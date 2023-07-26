@@ -637,6 +637,7 @@ mod tests {
         },
         crate::{
             filesystem::{Filesystem, FxFilesystem, OpenFxFilesystem},
+            object_handle::ReadObjectHandle,
             object_store::{
                 allocator::Allocator,
                 journal::JournalCheckpoint,

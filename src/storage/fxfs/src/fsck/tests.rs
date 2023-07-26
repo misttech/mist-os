@@ -15,7 +15,7 @@ use {
             simple_persistent_layer::SimplePersistentLayerWriter,
             types::{Item, ItemRef, Key, LayerIterator, LayerWriter, Value},
         },
-        object_handle::{ObjectHandle, ObjectHandleExt, INVALID_OBJECT_ID},
+        object_handle::{ObjectHandle, ObjectHandleExt, ReadObjectHandle, INVALID_OBJECT_ID},
         object_store::{
             allocator::{Allocator, AllocatorKey, AllocatorValue, CoalescingIterator},
             directory::Directory,

@@ -14,7 +14,7 @@ use {
                 BoxedLayerIterator, Item, Key, Layer, LayerIterator, OrdUpperBound, RangeKey, Value,
             },
         },
-        object_handle::{ObjectHandle, INVALID_OBJECT_ID},
+        object_handle::{ReadObjectHandle, INVALID_OBJECT_ID},
         object_store::{
             allocator::{Allocator, AllocatorKey, AllocatorValue, CoalescingIterator},
             journal::super_block::SuperBlockInstance,

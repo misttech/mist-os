@@ -1539,10 +1539,6 @@ impl<S: HandleOwner> ObjectHandle for DataObjectHandle<S> {
     fn block_size(&self) -> u64 {
         self.handle.block_size()
     }
-
-    fn get_size(&self) -> u64 {
-        self.content_size.load(atomic::Ordering::Relaxed)
-    }
 }
 
 #[async_trait]
@@ -1587,6 +1583,10 @@ impl<S: HandleOwner> GetProperties for DataObjectHandle<S> {
 impl<S: HandleOwner> ReadObjectHandle for DataObjectHandle<S> {
     async fn read(&self, offset: u64, buf: MutableBufferRef<'_>) -> Result<usize, Error> {
         self.read_from(self.attribute_id(), offset, buf).await
+    }
+
+    fn get_size(&self) -> u64 {
+        self.content_size.load(atomic::Ordering::Relaxed)
     }
 }
 

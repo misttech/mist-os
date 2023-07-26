@@ -251,6 +251,10 @@ impl PagedObjectHandle {
         self.owner().pager()
     }
 
+    pub fn get_size(&self) -> u64 {
+        self.vmo.get_content_size().unwrap()
+    }
+
     async fn new_transaction<'a>(
         &self,
         reservation: Option<&'a Reservation>,
@@ -883,9 +887,6 @@ impl ObjectHandle for PagedObjectHandle {
     }
     fn block_size(&self) -> u64 {
         self.handle.block_size()
-    }
-    fn get_size(&self) -> u64 {
-        self.vmo.get_content_size().unwrap()
     }
 }
 

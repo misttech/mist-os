@@ -79,10 +79,6 @@ impl ObjectHandle for BootstrapObjectHandle {
         self.device.block_size().into()
     }
 
-    fn get_size(&self) -> u64 {
-        self.size
-    }
-
     fn set_trace(&self, trace: bool) {
         let old_value = self.trace.swap(trace, Ordering::Relaxed);
         if trace != old_value {
@@ -126,6 +122,10 @@ impl ReadObjectHandle for BootstrapObjectHandle {
             file_offset += extent_len;
         }
         Ok(len)
+    }
+
+    fn get_size(&self) -> u64 {
+        self.size
     }
 }
 

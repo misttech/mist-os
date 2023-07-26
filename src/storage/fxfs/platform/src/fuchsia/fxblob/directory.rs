@@ -32,7 +32,7 @@ use {
     fxfs::{
         errors::FxfsError,
         log::*,
-        object_handle::{ObjectHandle, ObjectProperties},
+        object_handle::{ObjectProperties, ReadObjectHandle},
         object_store::{
             self,
             directory::ObjectDescriptor,

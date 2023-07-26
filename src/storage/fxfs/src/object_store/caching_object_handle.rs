@@ -368,10 +368,6 @@ impl<S: HandleOwner> ObjectHandle for CachingObjectHandle<S> {
     fn block_size(&self) -> u64 {
         self.handle.block_size()
     }
-
-    fn get_size(&self) -> u64 {
-        self.cache.content_size()
-    }
 }
 
 #[async_trait]
@@ -395,6 +391,10 @@ impl<S: HandleOwner> GetProperties for CachingObjectHandle<S> {
 impl<S: HandleOwner> ReadObjectHandle for CachingObjectHandle<S> {
     async fn read(&self, offset: u64, mut buf: MutableBufferRef<'_>) -> Result<usize, Error> {
         self.cache.read(offset, buf.as_mut_slice(), &self.handle).await
+    }
+
+    fn get_size(&self) -> u64 {
+        self.cache.content_size()
     }
 }
 

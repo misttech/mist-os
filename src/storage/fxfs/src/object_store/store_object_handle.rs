@@ -85,12 +85,6 @@ impl<S: HandleOwner> ObjectHandle for StoreObjectHandle<S> {
     fn block_size(&self) -> u64 {
         self.store().block_size()
     }
-
-    fn get_size(&self) -> u64 {
-        // Things calling get_size assume you are talking about an associated data attribute, which
-        // the untyped StoreObjectHandle doesn't know about.
-        0
-    }
 }
 
 impl<S: HandleOwner> StoreObjectHandle<S> {

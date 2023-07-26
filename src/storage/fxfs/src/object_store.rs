@@ -46,7 +46,7 @@ use {
             types::{Item, ItemRef, LayerIterator},
             LSMTree,
         },
-        object_handle::{ObjectHandle, ObjectHandleExt, INVALID_OBJECT_ID},
+        object_handle::{ObjectHandle, ObjectHandleExt, ReadObjectHandle, INVALID_OBJECT_ID},
         object_store::{
             allocator::SimpleAllocator,
             graveyard::Graveyard,

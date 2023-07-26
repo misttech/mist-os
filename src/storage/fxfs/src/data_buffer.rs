@@ -916,15 +916,15 @@ mod tests {
             fill_buf(buf.as_mut_slice(), self.counter.fetch_add(1, Ordering::Relaxed));
             Ok(buf.len())
         }
+
+        fn get_size(&self) -> u64 {
+            unreachable!();
+        }
     }
 
     #[async_trait]
     impl ObjectHandle for FakeSource {
         fn object_id(&self) -> u64 {
-            unreachable!();
-        }
-
-        fn get_size(&self) -> u64 {
             unreachable!();
         }
 

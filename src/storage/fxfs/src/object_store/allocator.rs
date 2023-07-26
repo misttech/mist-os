@@ -21,7 +21,7 @@ use {
             },
             LSMTree, LayerSet,
         },
-        object_handle::{ObjectHandle, ObjectHandleExt, INVALID_OBJECT_ID},
+        object_handle::{ObjectHandle, ObjectHandleExt, ReadObjectHandle, INVALID_OBJECT_ID},
         object_store::{
             object_manager::ReservationUpdate,
             transaction::{AllocatorMutation, AssocObj, LockKey, Mutation, Options, Transaction},
@@ -757,7 +757,8 @@ impl SimpleAllocator {
                 }
                 inner.info = info;
             }
-            let layer_file_sizes = handles.iter().map(ObjectHandle::get_size).collect::<Vec<u64>>();
+            let layer_file_sizes =
+                handles.iter().map(ReadObjectHandle::get_size).collect::<Vec<u64>>();
             self.counters.lock().unwrap().persistent_layer_file_sizes = layer_file_sizes;
             self.tree
                 .append_layers(handles.into_boxed_slice())

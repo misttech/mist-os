@@ -13,7 +13,7 @@ use {
             types::{BoxedLayerIterator, ItemRef, LayerIteratorFilter},
             LSMTree,
         },
-        object_handle::{ObjectHandle, INVALID_OBJECT_ID},
+        object_handle::{ObjectHandle, ReadObjectHandle, INVALID_OBJECT_ID},
         object_store::{
             extent_record::ExtentValue,
             layer_size_from_encrypted_mutations_size,
@@ -240,7 +240,7 @@ impl ObjectStore {
 
         let layer_file_sizes = new_layers
             .iter()
-            .map(|l| l.handle().map(ObjectHandle::get_size).unwrap_or(0))
+            .map(|l| l.handle().map(ReadObjectHandle::get_size).unwrap_or(0))
             .collect::<Vec<u64>>();
 
         let total_layer_size = layer_file_sizes.iter().sum();
@@ -399,7 +399,7 @@ impl ObjectStore {
                 .immutable_layer_set()
                 .layers
                 .iter()
-                .map(|l| l.handle().map(ObjectHandle::get_size).unwrap_or(0))
+                .map(|l| l.handle().map(ReadObjectHandle::get_size).unwrap_or(0))
                 .sum::<u64>();
         reservation_update =
             ReservationUpdate::new(tree::reservation_amount_from_layer_size(total_layer_size));
