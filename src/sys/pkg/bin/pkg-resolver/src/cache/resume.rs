@@ -39,7 +39,11 @@ pub(super) async fn resuming_get<'a>(
         .await?;
 
     if response.status() != StatusCode::OK {
-        return Err(FetchError::BadHttpStatus { code: response.status(), uri: uri.to_string() });
+        return Err(FetchError::BadHttpStatus {
+            code: response.status(),
+            uri: uri.to_string(),
+            blob_type: blob_fetch_params.blob_type,
+        });
     }
 
     let expected_len = match (expected_len, response.size_hint().exact()) {

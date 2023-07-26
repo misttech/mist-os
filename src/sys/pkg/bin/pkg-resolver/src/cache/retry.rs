@@ -82,7 +82,7 @@ where
 
 #[cfg(test)]
 mod tests {
-    use {super::*, assert_matches::assert_matches, hyper::StatusCode};
+    use {super::*, assert_matches::assert_matches, fidl_fuchsia_pkg as fpkg, hyper::StatusCode};
 
     #[test]
     fn http_errors_aborts_on_io_error() {
@@ -100,13 +100,18 @@ mod tests {
         let err = FetchError::BadHttpStatus {
             code: StatusCode::INTERNAL_SERVER_ERROR,
             uri: "fake-uri".into(),
+            blob_type: fpkg::BlobType::Delivery,
         };
         assert_eq!(backoff.next_backoff(&err), Some(Duration::from_secs(0)));
         assert_eq!(backoff.next_backoff(&err), None);
     }
 
     fn make_rate_limit_error() -> FetchError {
-        FetchError::BadHttpStatus { code: StatusCode::TOO_MANY_REQUESTS, uri: "fake-uri".into() }
+        FetchError::BadHttpStatus {
+            code: StatusCode::TOO_MANY_REQUESTS,
+            uri: "fake-uri".into(),
+            blob_type: fpkg::BlobType::Delivery,
+        }
     }
 
     #[test]

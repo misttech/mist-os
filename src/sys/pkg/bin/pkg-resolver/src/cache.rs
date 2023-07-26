@@ -630,7 +630,6 @@ async fn fetch_blob(
                 http_client,
                 &context.mirrors,
                 merkle,
-                blob_fetch_params.blob_type(),
                 &context.opener,
                 context.expected_len,
                 blob_fetch_params,
@@ -652,10 +651,12 @@ async fn fetch_blob(
                     http_client,
                     &context.mirrors,
                     merkle,
-                    fpkg::BlobType::Uncompressed,
                     &context.opener,
                     context.expected_len,
-                    blob_fetch_params,
+                    BlobFetchParams {
+                        blob_type: fpkg::BlobType::Uncompressed,
+                        ..blob_fetch_params
+                    },
                     &stats,
                     cobalt_sender,
                     trace_id,
@@ -694,7 +695,6 @@ async fn fetch_blob_http(
     client: &fuchsia_hyper::HttpsClient,
     mirrors: &[MirrorConfig],
     merkle: BlobId,
-    blob_type: fpkg::BlobType,
     opener: &pkg::cache::DeferredOpenBlob,
     expected_len: Option<u64>,
     blob_fetch_params: BlobFetchParams,
@@ -709,8 +709,8 @@ async fn fetch_blob_http(
         return Err(FetchError::NoMirrors);
     };
     let mirror_stats = &stats.lock().for_mirror(blob_mirror_url.to_string());
-    let blob_url =
-        &make_blob_url(blob_mirror_url, &merkle, blob_type).map_err(FetchError::BlobUrl)?;
+    let blob_url = &make_blob_url(blob_mirror_url, &merkle, blob_fetch_params.blob_type)
+        .map_err(FetchError::BlobUrl)?;
     inspect.set_mirror(&blob_url.to_string());
     let flaked = &AtomicBool::new(false);
 
@@ -722,8 +722,10 @@ async fn fetch_blob_http(
             let res = async {
                 let inspect = inspect.attempt();
                 inspect.state(inspect::Http::CreateBlob);
-                if let Some(pkg::cache::NeededBlob { blob, closer: blob_closer }) =
-                    opener.open(blob_type).await.map_err(FetchError::CreateBlob)?
+                if let Some(pkg::cache::NeededBlob { blob, closer: blob_closer }) = opener
+                    .open(blob_fetch_params.blob_type)
+                    .await
+                    .map_err(FetchError::CreateBlob)?
                 {
                     inspect.state(inspect::Http::DownloadBlob);
                     let guard = ftrace::async_enter!(
@@ -979,8 +981,8 @@ pub enum FetchError {
     #[error("could not create blob")]
     CreateBlob(#[source] pkg::cache::OpenBlobError),
 
-    #[error("Blob fetch of {uri}: http request expected 200, got {code}")]
-    BadHttpStatus { code: hyper::StatusCode, uri: String },
+    #[error("Fetch of {blob_type:?} blob at {uri} failed: http request expected 200, got {code}")]
+    BadHttpStatus { code: hyper::StatusCode, uri: String, blob_type: fpkg::BlobType },
 
     #[error("repository has no configured mirrors")]
     NoMirrors,
@@ -1158,10 +1160,12 @@ impl FetchError {
     fn kind(&self) -> FetchErrorKind {
         use FetchError::*;
         match self {
-            BadHttpStatus { code: StatusCode::TOO_MANY_REQUESTS, uri: _ } => {
+            BadHttpStatus { code: StatusCode::TOO_MANY_REQUESTS, uri: _, blob_type: _ } => {
                 FetchErrorKind::NetworkRateLimit
             }
-            BadHttpStatus { code: StatusCode::NOT_FOUND, uri: _ } => FetchErrorKind::NotFound,
+            BadHttpStatus { code: StatusCode::NOT_FOUND, uri: _, blob_type: _ } => {
+                FetchErrorKind::NotFound
+            }
             Hyper { .. }
             | Http { .. }
             | BadHttpStatus { .. }
