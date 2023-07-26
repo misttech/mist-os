@@ -368,6 +368,87 @@ where
 {
     /// The synchronized context passed to the callback provided to
     /// `with_sockets_mut`.
+    type SocketsStateCtx<'a>: DatagramBoundStateContext<
+        I,
+        A,
+        C,
+        S,
+        DeviceId = Self::DeviceId,
+        WeakDeviceId = Self::WeakDeviceId,
+    >;
+
+    /// Calls the function with an immutable reference to the datagram sockets.
+    fn with_sockets_state<
+        O,
+        F: FnOnce(&mut Self::SocketsStateCtx<'_>, &SocketsState<I, Self::WeakDeviceId, A, S>) -> O,
+    >(
+        &mut self,
+        cb: F,
+    ) -> O;
+
+    /// Calls the function with a mutable reference to the datagram sockets.
+    fn with_sockets_state_mut<
+        O,
+        F: FnOnce(&mut Self::SocketsStateCtx<'_>, &mut SocketsState<I, Self::WeakDeviceId, A, S>) -> O,
+    >(
+        &mut self,
+        cb: F,
+    ) -> O;
+
+    // TODO(https://fxbug.dev/21198): remove default impls.
+    fn with_sockets<
+        O,
+        F: FnOnce(
+            &mut <Self::SocketsStateCtx<'_> as DatagramBoundStateContext<I, A, C, S>>::IpSocketsCtx<
+                '_,
+            >,
+            &SocketsState<I, Self::WeakDeviceId, A, S>,
+            &BoundSockets<I, Self::WeakDeviceId, A, S>,
+        ) -> O,
+    >(
+        &mut self,
+        cb: F,
+    ) -> O
+    where
+        S: DatagramSocketStateSpec,
+    {
+        self.with_sockets_state(|sync_ctx, state| {
+            sync_ctx.with_bound_sockets(|ctx, bound| cb(ctx, state, bound))
+        })
+    }
+
+    // TODO(https://fxbug.dev/21198): remove default impls.
+    fn with_sockets_mut<
+        O,
+        F: FnOnce(
+            &mut <Self::SocketsStateCtx<'_> as DatagramBoundStateContext<I, A, C, S>>::IpSocketsCtx<
+                '_,
+            >,
+            &mut SocketsState<I, Self::WeakDeviceId, A, S>,
+            &mut BoundSockets<I, Self::WeakDeviceId, A, S>,
+            &mut <Self::SocketsStateCtx<'_> as DatagramBoundStateContext<I, A, C, S>>::LocalIdAllocator,
+        ) -> O,
+    >(
+        &mut self,
+        cb: F,
+    ) -> O
+    where
+        S: DatagramSocketStateSpec,
+    {
+        self.with_sockets_state_mut(|sync_ctx, state| {
+            sync_ctx
+                .with_bound_sockets_mut(|ctx, bound, allocator| cb(ctx, state, bound, allocator))
+        })
+    }
+}
+
+pub(crate) trait DatagramBoundStateContext<I: IpExt, A: SocketMapAddrSpec, C, S: SocketMapStateSpec>:
+    DeviceIdContext<AnyDevice>
+where
+    Bound<S>: Tagged<AddrVec<I, Self::WeakDeviceId, A>>,
+{
+    /// The synchronized context passed to the callback provided to
+    /// `with_sockets_mut`.
     type IpSocketsCtx<'a>: TransportIpContext<I, C, DeviceId = Self::DeviceId, WeakDeviceId = Self::WeakDeviceId>
         + MulticastMembershipHandler<I, C>;
 
@@ -376,24 +457,19 @@ where
     type LocalIdAllocator: LocalIdentifierAllocator<I, Self::WeakDeviceId, A, C, S>;
 
     /// Calls the function with an immutable reference to the datagram sockets.
-    fn with_sockets<
+    fn with_bound_sockets<
         O,
-        F: FnOnce(
-            &mut Self::IpSocketsCtx<'_>,
-            &SocketsState<I, Self::WeakDeviceId, A, S>,
-            &BoundSockets<I, Self::WeakDeviceId, A, S>,
-        ) -> O,
+        F: FnOnce(&mut Self::IpSocketsCtx<'_>, &BoundSockets<I, Self::WeakDeviceId, A, S>) -> O,
     >(
         &mut self,
         cb: F,
     ) -> O;
 
     /// Calls the function with a mutable reference to the datagram sockets.
-    fn with_sockets_mut<
+    fn with_bound_sockets_mut<
         O,
         F: FnOnce(
             &mut Self::IpSocketsCtx<'_>,
-            &mut SocketsState<I, Self::WeakDeviceId, A, S>,
             &mut BoundSockets<I, Self::WeakDeviceId, A, S>,
             &mut Self::LocalIdAllocator,
         ) -> O,
@@ -401,6 +477,10 @@ where
         &mut self,
         cb: F,
     ) -> O;
+
+    /// Calls the function with only the inner context.
+    fn without_bound_sockets<O, F: FnOnce(&mut Self::IpSocketsCtx<'_>) -> O>(&mut self, cb: F)
+        -> O;
 }
 
 pub(crate) trait DatagramStateNonSyncContext<A: SocketMapAddrSpec, S: SocketMapStateSpec> {
@@ -424,6 +504,50 @@ pub(crate) trait BufferDatagramStateContext<
 >: DatagramStateContext<I, A, C, S> where
     Bound<S>: Tagged<AddrVec<I, Self::WeakDeviceId, A>>,
 {
+    type BufferSocketStateCtx<'a>: BufferDatagramBoundStateContext<
+        I,
+        A,
+        C,
+        S,
+        B,
+        DeviceId = Self::DeviceId,
+        WeakDeviceId = Self::WeakDeviceId,
+    >;
+
+    /// Calls the function with an immutable reference to the datagram sockets.
+    fn with_sockets_state_buf<
+        O,
+        F: FnOnce(
+            &mut Self::BufferSocketStateCtx<'_>,
+            &SocketsState<I, Self::WeakDeviceId, A, S>,
+        ) -> O,
+    >(
+        &mut self,
+        cb: F,
+    ) -> O;
+
+    /// Calls the function with a mutable reference to the datagram sockets.
+    fn with_sockets_state_mut_buf<
+        O,
+        F: FnOnce(
+            &mut Self::BufferSocketStateCtx<'_>,
+            &mut SocketsState<I, Self::WeakDeviceId, A, S>,
+        ) -> O,
+    >(
+        &mut self,
+        cb: F,
+    ) -> O;
+}
+
+pub(crate) trait BufferDatagramBoundStateContext<
+    I: IpExt,
+    A: SocketMapAddrSpec,
+    C,
+    S: SocketMapStateSpec,
+    B: BufferMut,
+>: DatagramBoundStateContext<I, A, C, S> where
+    Bound<S>: Tagged<AddrVec<I, Self::WeakDeviceId, A>>,
+{
     type BufferIpSocketsCtx<'a>: BufferTransportIpContext<
         I,
         C,
@@ -433,28 +557,29 @@ pub(crate) trait BufferDatagramStateContext<
     >;
 
     /// Calls the function with an immutable reference to the datagram sockets.
-    fn with_sockets_buf<
+    fn with_bound_sockets_buf<
         O,
-        F: FnOnce(
-            &mut Self::BufferIpSocketsCtx<'_>,
-            &SocketsState<I, Self::WeakDeviceId, A, S>,
-            &BoundSockets<I, Self::WeakDeviceId, A, S>,
-        ) -> O,
+        F: FnOnce(&mut Self::BufferIpSocketsCtx<'_>, &BoundSockets<I, Self::WeakDeviceId, A, S>) -> O,
     >(
         &mut self,
         cb: F,
     ) -> O;
 
     /// Calls the function with a mutable reference to the datagram sockets.
-    fn with_sockets_buf_mut<
+    fn with_bound_sockets_mut_buf<
         O,
         F: FnOnce(
             &mut Self::BufferIpSocketsCtx<'_>,
-            &mut SocketsState<I, Self::WeakDeviceId, A, S>,
             &mut BoundSockets<I, Self::WeakDeviceId, A, S>,
             &mut Self::LocalIdAllocator,
         ) -> O,
     >(
+        &mut self,
+        cb: F,
+    ) -> O;
+
+    /// Calls the function with only the inner context.
+    fn without_bound_sockets_buf<O, F: FnOnce(&mut Self::BufferIpSocketsCtx<'_>) -> O>(
         &mut self,
         cb: F,
     ) -> O;
@@ -470,29 +595,65 @@ impl<
     > BufferDatagramStateContext<I, A, C, S, B> for SC
 where
     Bound<S>: Tagged<AddrVec<I, SC::WeakDeviceId, A>>,
-    for<'a> SC::IpSocketsCtx<'a>: BufferTransportIpContext<I, C, B>,
+    for<'a> SC::SocketsStateCtx<'a>: BufferDatagramBoundStateContext<I, A, C, S, B>,
 {
-    type BufferIpSocketsCtx<'a> = SC::IpSocketsCtx<'a>;
+    type BufferSocketStateCtx<'a> = SC::SocketsStateCtx<'a>;
 
-    fn with_sockets_buf<
+    fn with_sockets_state_buf<
         O,
         F: FnOnce(
-            &mut Self::BufferIpSocketsCtx<'_>,
+            &mut Self::BufferSocketStateCtx<'_>,
             &SocketsState<I, Self::WeakDeviceId, A, S>,
-            &BoundSockets<I, Self::WeakDeviceId, A, S>,
         ) -> O,
     >(
         &mut self,
         cb: F,
     ) -> O {
-        Self::with_sockets(self, cb)
+        Self::with_sockets_state(self, cb)
     }
 
-    fn with_sockets_buf_mut<
+    fn with_sockets_state_mut_buf<
+        O,
+        F: FnOnce(
+            &mut Self::BufferSocketStateCtx<'_>,
+            &mut SocketsState<I, Self::WeakDeviceId, A, S>,
+        ) -> O,
+    >(
+        &mut self,
+        cb: F,
+    ) -> O {
+        Self::with_sockets_state_mut(self, cb)
+    }
+}
+
+impl<
+        I: IpExt,
+        A: SocketMapAddrSpec,
+        C,
+        S: SocketMapStateSpec,
+        B: BufferMut,
+        SC: DatagramBoundStateContext<I, A, C, S>,
+    > BufferDatagramBoundStateContext<I, A, C, S, B> for SC
+where
+    Bound<S>: Tagged<AddrVec<I, SC::WeakDeviceId, A>>,
+    for<'a> SC::IpSocketsCtx<'a>: BufferTransportIpContext<I, C, B>,
+{
+    type BufferIpSocketsCtx<'a> = SC::IpSocketsCtx<'a>;
+
+    fn with_bound_sockets_buf<
+        O,
+        F: FnOnce(&mut Self::BufferIpSocketsCtx<'_>, &BoundSockets<I, Self::WeakDeviceId, A, S>) -> O,
+    >(
+        &mut self,
+        cb: F,
+    ) -> O {
+        Self::with_bound_sockets(self, cb)
+    }
+
+    fn with_bound_sockets_mut_buf<
         O,
         F: FnOnce(
             &mut Self::BufferIpSocketsCtx<'_>,
-            &mut SocketsState<I, Self::WeakDeviceId, A, S>,
             &mut BoundSockets<I, Self::WeakDeviceId, A, S>,
             &mut Self::LocalIdAllocator,
         ) -> O,
@@ -500,7 +661,14 @@ where
         &mut self,
         cb: F,
     ) -> O {
-        Self::with_sockets_mut(self, cb)
+        Self::with_bound_sockets_mut(self, cb)
+    }
+
+    fn without_bound_sockets_buf<O, F: FnOnce(&mut Self::BufferIpSocketsCtx<'_>) -> O>(
+        &mut self,
+        cb: F,
+    ) -> O {
+        Self::without_bound_sockets(self, cb)
     }
 }
 
@@ -1155,7 +1323,7 @@ pub(crate) fn send_conn<
 where
     Bound<S>: Tagged<AddrVec<I, SC::WeakDeviceId, A>>,
 {
-    sync_ctx.with_sockets_buf_mut(|sync_ctx, state, _bound, _allocator| {
+    sync_ctx.with_sockets_state_buf(|sync_ctx, state| {
         let state = match state.get(id.get_key_index()).expect("invalid socket ID") {
             SocketState::Unbound(_) | SocketState::Bound(BoundSocketState::Listener(_)) => {
                 return Err(SendError::NotConnected(body))
@@ -1178,9 +1346,11 @@ where
 
         let ConnAddr { ip, device: _ } = addr;
 
-        sync_ctx
-            .send_ip_packet(ctx, &socket, S::make_packet(body, &ip), None)
-            .map_err(|(serializer, send_error)| SendError::IpSock(serializer, send_error))
+        sync_ctx.without_bound_sockets_buf(|sync_ctx| {
+            sync_ctx
+                .send_ip_packet(ctx, &socket, S::make_packet(body, &ip), None)
+                .map_err(|(serializer, send_error)| SendError::IpSock(serializer, send_error))
+        })
     })
 }
 
@@ -1212,77 +1382,79 @@ where
     S::UnboundSharingState: Clone + Into<S::ListenerSharingState>,
     S::ListenerSharingState: Default,
 {
-    sync_ctx.with_sockets_buf_mut(|sync_ctx, state, bound, _allocator| {
-        match listen_inner(sync_ctx, ctx, state, bound, id.clone(), None, None) {
-            Ok(()) | Err(Either::Left(ExpectedUnboundError)) => (),
-            Err(Either::Right(e)) => return Err(Either::Left((body, e))),
-        };
-
-        // TODO(https://github.com/rust-lang/rust/issues/31436): Replace this
-        // closure with a try-block.
-        let send_result = (|| {
-            let state = match state.get(id.get_key_index()).expect("no such socket") {
-                SocketState::Unbound(_) => panic!("expected bound socket"),
-                SocketState::Bound(state) => state,
+    sync_ctx.with_sockets_state_mut_buf(|sync_ctx, state| {
+        sync_ctx.with_bound_sockets_mut_buf(|sync_ctx, bound, _allocator| {
+            match listen_inner(sync_ctx, ctx, state, bound, id.clone(), None, None) {
+                Ok(()) | Err(Either::Left(ExpectedUnboundError)) => (),
+                Err(Either::Right(e)) => return Err(Either::Left((body, e))),
             };
-            match state {
-                BoundSocketState::Connected(state) => {
-                    let (
-                        ConnState { socket, clear_device_on_disconnect: _, shutdown },
-                        _,
-                        ConnAddr { ip: ConnIpAddr { local, remote: _ }, device },
-                    ): &(_, S::ConnSharingState, _) = state;
 
-                    let Shutdown { send: shutdown_write, receive: _ } = shutdown;
-                    if *shutdown_write {
-                        return Err(SendToError::NotWriteable(body));
-                    }
-                    let (local_ip, local_id) = local;
+            // TODO(https://github.com/rust-lang/rust/issues/31436): Replace this
+            // closure with a try-block.
+            let send_result = (|| {
+                let state = match state.get(id.get_key_index()).expect("no such socket") {
+                    SocketState::Unbound(_) => panic!("expected bound socket"),
+                    SocketState::Bound(state) => state,
+                };
+                match state {
+                    BoundSocketState::Connected(state) => {
+                        let (
+                            ConnState { socket, clear_device_on_disconnect: _, shutdown },
+                            _,
+                            ConnAddr { ip: ConnIpAddr { local, remote: _ }, device },
+                        ): &(_, S::ConnSharingState, _) = state;
 
-                    send_oneshot::<_, A, S, _, _, _>(
-                        sync_ctx,
-                        ctx,
-                        (Some(*local_ip), local_id.clone()),
-                        remote_ip,
-                        remote_identifier,
-                        device,
-                        socket.options(),
-                        socket.proto(),
-                        body,
-                    )
-                }
-                BoundSocketState::Listener(state) => {
-                    // TODO(https://fxbug.dev/92447) If `local_ip` is `None`, and so
-                    // `new_ip_socket` picks a local IP address for us, it may cause problems
-                    // when we don't match the bound listener addresses. We should revisit
-                    // whether that check is actually necessary.
-                    //
-                    // Also, if the local IP address is a multicast address this function should
-                    // probably fail and `send_udp_conn_to` must be used instead.
-                    let (
-                        ListenerState { ip_options },
-                        _,
-                        ListenerAddr {
-                            ip: ListenerIpAddr { addr: local_ip, identifier: local_port },
+                        let Shutdown { send: shutdown_write, receive: _ } = shutdown;
+                        if *shutdown_write {
+                            return Err(SendToError::NotWriteable(body));
+                        }
+                        let (local_ip, local_id) = local;
+
+                        send_oneshot::<_, A, S, _, _, _>(
+                            sync_ctx,
+                            ctx,
+                            (Some(*local_ip), local_id.clone()),
+                            remote_ip,
+                            remote_identifier,
                             device,
-                        },
-                    ): &(_, S::ListenerSharingState, _) = state;
+                            socket.options(),
+                            socket.proto(),
+                            body,
+                        )
+                    }
+                    BoundSocketState::Listener(state) => {
+                        // TODO(https://fxbug.dev/92447) If `local_ip` is `None`, and so
+                        // `new_ip_socket` picks a local IP address for us, it may cause problems
+                        // when we don't match the bound listener addresses. We should revisit
+                        // whether that check is actually necessary.
+                        //
+                        // Also, if the local IP address is a multicast address this function should
+                        // probably fail and `send_udp_conn_to` must be used instead.
+                        let (
+                            ListenerState { ip_options },
+                            _,
+                            ListenerAddr {
+                                ip: ListenerIpAddr { addr: local_ip, identifier: local_port },
+                                device,
+                            },
+                        ): &(_, S::ListenerSharingState, _) = state;
 
-                    send_oneshot::<_, A, S, _, _, _>(
-                        sync_ctx,
-                        ctx,
-                        (*local_ip, local_port.clone()),
-                        remote_ip,
-                        remote_identifier,
-                        device,
-                        ip_options,
-                        proto,
-                        body,
-                    )
+                        send_oneshot::<_, A, S, _, _, _>(
+                            sync_ctx,
+                            ctx,
+                            (*local_ip, local_port.clone()),
+                            remote_ip,
+                            remote_identifier,
+                            device,
+                            ip_options,
+                            proto,
+                            body,
+                        )
+                    }
                 }
-            }
-        })();
-        send_result.map_err(Either::Right)
+            })();
+            send_result.map_err(Either::Right)
+        })
     })
 }
 
@@ -1567,10 +1739,7 @@ pub(crate) fn set_multicast_membership<
     ctx: &mut C,
     id: S::SocketId,
     multicast_group: MulticastAddr<I::Addr>,
-    interface: MulticastMembershipInterfaceSelector<
-        I::Addr,
-        <SC::IpSocketsCtx<'_> as DeviceIdContext<AnyDevice>>::DeviceId,
-    >,
+    interface: MulticastMembershipInterfaceSelector<I::Addr, SC::DeviceId>,
     want_membership: bool,
 ) -> Result<(), SetMulticastMembershipError>
 where
@@ -1833,7 +2002,7 @@ mod test {
     use test_case::test_case;
 
     use crate::{
-        context::testutil::{FakeNonSyncCtx, WrappedFakeSyncCtx},
+        context::testutil::{FakeNonSyncCtx, Wrapped, WrappedFakeSyncCtx},
         data_structures::socketmap::SocketMap,
         device::testutil::{FakeDeviceId, FakeStrongDeviceId, FakeWeakDeviceId, MultipleDevicesId},
         ip::{
@@ -1973,36 +2142,30 @@ mod test {
         }
     }
 
-    #[derive(Derivative)]
-    #[derivative(Default(bound = ""))]
-    struct Sockets<I: TestIpExt, D: FakeStrongDeviceId> {
-        state: SocketsState<
-            I,
-            FakeWeakDeviceId<D>,
-            FakeAddrSpec,
-            FakeStateSpec<I, FakeWeakDeviceId<D>>,
-        >,
-        bound: BoundSockets<
-            I,
-            FakeWeakDeviceId<D>,
-            FakeAddrSpec,
-            FakeStateSpec<I, FakeWeakDeviceId<D>>,
-        >,
-    }
+    type FakeBoundSockets<I, D> =
+        BoundSockets<I, FakeWeakDeviceId<D>, FakeAddrSpec, FakeStateSpec<I, FakeWeakDeviceId<D>>>;
 
-    type FakeSyncCtx<I, D> = WrappedFakeSyncCtx<
-        Sockets<I, D>,
+    type FakeSocketsState<I, D> =
+        SocketsState<I, FakeWeakDeviceId<D>, FakeAddrSpec, FakeStateSpec<I, FakeWeakDeviceId<D>>>;
+
+    type FakeInnerSyncCtx<I, D> = crate::context::testutil::FakeSyncCtx<
         FakeBufferIpSocketCtx<I, D>,
         SendIpPacketMeta<I, D, SpecifiedAddr<<I as Ip>::Addr>>,
         D,
     >;
 
+    type FakeSyncCtx<I, D> =
+        Wrapped<FakeSocketsState<I, D>, Wrapped<FakeBoundSockets<I, D>, FakeInnerSyncCtx<I, D>>>;
+
     impl<I: DatagramIpExt, D: FakeStrongDeviceId + 'static> FakeSyncCtx<I, D> {
-        fn with_sockets(sockets: Sockets<I, D>) -> Self {
-            Self::with_inner_and_outer_state(
-                FakeBufferIpSocketCtx::with_ctx(FakeIpSocketCtx::default()),
-                sockets,
-            )
+        fn new_with_sockets(state: FakeSocketsState<I, D>, bound: FakeBoundSockets<I, D>) -> Self {
+            Self {
+                outer: state,
+                inner: WrappedFakeSyncCtx::with_inner_and_outer_state(
+                    FakeBufferIpSocketCtx::with_ctx(FakeIpSocketCtx::default()),
+                    bound,
+                ),
+            }
         }
     }
 
@@ -2014,23 +2177,62 @@ mod test {
             FakeStateSpec<I, FakeWeakDeviceId<D>>,
         > for FakeSyncCtx<I, D>
     {
-        type IpSocketsCtx<'a> = crate::context::testutil::FakeSyncCtx<
-            FakeBufferIpSocketCtx<I, D>,
-            SendIpPacketMeta<I, D, SpecifiedAddr<I::Addr>>,
-            D,
-        >;
-        type LocalIdAllocator = ();
+        type SocketsStateCtx<'a> = Wrapped<FakeBoundSockets<I, D>, FakeInnerSyncCtx<I, D>>;
 
-        fn with_sockets<
+        fn with_sockets_state<
             O,
             F: FnOnce(
-                &mut Self::IpSocketsCtx<'_>,
+                &mut Self::SocketsStateCtx<'_>,
                 &SocketsState<
                     I,
                     Self::WeakDeviceId,
                     FakeAddrSpec,
                     FakeStateSpec<I, FakeWeakDeviceId<D>>,
                 >,
+            ) -> O,
+        >(
+            &mut self,
+            cb: F,
+        ) -> O {
+            let Self { outer, inner } = self;
+            cb(inner, outer)
+        }
+
+        fn with_sockets_state_mut<
+            O,
+            F: FnOnce(
+                &mut Self::SocketsStateCtx<'_>,
+                &mut SocketsState<
+                    I,
+                    Self::WeakDeviceId,
+                    FakeAddrSpec,
+                    FakeStateSpec<I, FakeWeakDeviceId<D>>,
+                >,
+            ) -> O,
+        >(
+            &mut self,
+            cb: F,
+        ) -> O {
+            let Self { outer, inner } = self;
+            cb(inner, outer)
+        }
+    }
+
+    impl<I: DatagramIpExt + IpLayerIpExt, D: FakeStrongDeviceId + 'static>
+        DatagramBoundStateContext<
+            I,
+            FakeAddrSpec,
+            FakeNonSyncCtx<(), (), ()>,
+            FakeStateSpec<I, FakeWeakDeviceId<D>>,
+        > for Wrapped<FakeBoundSockets<I, D>, FakeInnerSyncCtx<I, D>>
+    {
+        type IpSocketsCtx<'a> = FakeInnerSyncCtx<I, D>;
+        type LocalIdAllocator = ();
+
+        fn with_bound_sockets<
+            O,
+            F: FnOnce(
+                &mut Self::IpSocketsCtx<'_>,
                 &BoundSockets<
                     I,
                     Self::WeakDeviceId,
@@ -2042,20 +2244,13 @@ mod test {
             &mut self,
             cb: F,
         ) -> O {
-            let Self { outer: Sockets { bound, state }, inner } = self;
-            cb(inner, state, bound)
+            let Self { outer, inner } = self;
+            cb(inner, outer)
         }
-
-        fn with_sockets_mut<
+        fn with_bound_sockets_mut<
             O,
             F: FnOnce(
                 &mut Self::IpSocketsCtx<'_>,
-                &mut SocketsState<
-                    I,
-                    Self::WeakDeviceId,
-                    FakeAddrSpec,
-                    FakeStateSpec<I, FakeWeakDeviceId<D>>,
-                >,
                 &mut BoundSockets<
                     I,
                     Self::WeakDeviceId,
@@ -2068,8 +2263,16 @@ mod test {
             &mut self,
             cb: F,
         ) -> O {
-            let Self { outer: Sockets { bound, state }, inner } = self;
-            cb(inner, state, bound, &mut ())
+            let Self { outer, inner } = self;
+            cb(inner, outer, &mut ())
+        }
+
+        fn without_bound_sockets<O, F: FnOnce(&mut Self::IpSocketsCtx<'_>) -> O>(
+            &mut self,
+            cb: F,
+        ) -> O {
+            let Self { outer: _, inner } = self;
+            cb(inner)
         }
     }
 
@@ -2123,7 +2326,10 @@ mod test {
 
     #[ip_test]
     fn set_get_hop_limits<I: Ip + DatagramIpExt + IpLayerIpExt>() {
-        let mut sync_ctx = FakeSyncCtx::<I, FakeDeviceId>::with_sockets(Sockets::default());
+        let mut sync_ctx = FakeSyncCtx::<I, FakeDeviceId>::new_with_sockets(
+            Default::default(),
+            Default::default(),
+        );
         let mut non_sync_ctx = FakeNonSyncCtx::default();
 
         let unbound = create(&mut sync_ctx);
@@ -2145,14 +2351,17 @@ mod test {
 
     #[ip_test]
     fn set_get_device_hop_limits<I: Ip + DatagramIpExt + IpLayerIpExt>() {
-        let mut sync_ctx = FakeSyncCtx::<I, _>::with_inner_and_outer_state(
-            FakeBufferIpSocketCtx::with_ctx(FakeIpSocketCtx::new([FakeDeviceConfig {
-                device: FakeDeviceId,
-                local_ips: Default::default(),
-                remote_ips: Default::default(),
-            }])),
-            Sockets::default(),
-        );
+        let mut sync_ctx = FakeSyncCtx::<I, _> {
+            outer: FakeSocketsState::default(),
+            inner: WrappedFakeSyncCtx::with_inner_and_outer_state(
+                FakeBufferIpSocketCtx::with_ctx(FakeIpSocketCtx::new([FakeDeviceConfig {
+                    device: FakeDeviceId,
+                    local_ips: Default::default(),
+                    remote_ips: Default::default(),
+                }])),
+                Default::default(),
+            ),
+        };
         let mut non_sync_ctx = FakeNonSyncCtx::default();
 
         let unbound = create(&mut sync_ctx);
@@ -2161,7 +2370,7 @@ mod test {
         let HopLimits { mut unicast, multicast } = DEFAULT_HOP_LIMITS;
         unicast = unicast.checked_add(1).unwrap();
         {
-            let ip_socket_ctx: &FakeIpSocketCtx<_, _> = sync_ctx.inner.get_ref().as_ref();
+            let ip_socket_ctx: &FakeIpSocketCtx<_, _> = sync_ctx.inner.inner.get_ref().as_ref();
             let mut default_hop_limit =
                 ip_socket_ctx.get_device_state(&FakeDeviceId).default_hop_limit.write();
             let default_hop_limit = default_hop_limit.deref_mut();
@@ -2174,7 +2383,7 @@ mod test {
         );
 
         // If the device is removed, use default hop limits.
-        AsMut::<FakeIpDeviceIdCtx<_>>::as_mut(&mut sync_ctx.inner.get_mut())
+        AsMut::<FakeIpDeviceIdCtx<_>>::as_mut(&mut sync_ctx.inner.inner.get_mut())
             .set_device_removed(FakeDeviceId, true);
         assert_eq!(
             get_ip_hop_limits(&mut sync_ctx, &non_sync_ctx, unbound.clone()),
@@ -2184,7 +2393,10 @@ mod test {
 
     #[ip_test]
     fn default_hop_limits<I: Ip + DatagramIpExt + IpLayerIpExt>() {
-        let mut sync_ctx = FakeSyncCtx::<I, FakeDeviceId>::with_sockets(Sockets::default());
+        let mut sync_ctx = FakeSyncCtx::<I, FakeDeviceId>::new_with_sockets(
+            Default::default(),
+            Default::default(),
+        );
         let mut non_sync_ctx = FakeNonSyncCtx::default();
 
         let unbound = create(&mut sync_ctx);
@@ -2218,7 +2430,8 @@ mod test {
 
     #[ip_test]
     fn bind_device_unbound<I: Ip + DatagramIpExt + IpLayerIpExt>() {
-        let mut sync_ctx = FakeSyncCtx::<I, _>::with_sockets(Sockets::default());
+        let mut sync_ctx =
+            FakeSyncCtx::<I, _>::new_with_sockets(Default::default(), Default::default());
         let mut non_sync_ctx = FakeNonSyncCtx::default();
 
         let unbound = create(&mut sync_ctx);
@@ -2235,14 +2448,17 @@ mod test {
 
     #[ip_test]
     fn send_to_binds_unbound<I: Ip + DatagramIpExt + IpLayerIpExt>() {
-        let mut sync_ctx = FakeSyncCtx::<I, FakeDeviceId>::with_inner_and_outer_state(
-            FakeBufferIpSocketCtx::with_ctx(FakeIpSocketCtx::new([FakeDeviceConfig {
-                device: FakeDeviceId,
-                local_ips: vec![I::FAKE_CONFIG.local_ip],
-                remote_ips: vec![I::FAKE_CONFIG.remote_ip],
-            }])),
-            Sockets::default(),
-        );
+        let mut sync_ctx = FakeSyncCtx::<I, FakeDeviceId> {
+            outer: Default::default(),
+            inner: WrappedFakeSyncCtx::with_inner_and_outer_state(
+                FakeBufferIpSocketCtx::with_ctx(FakeIpSocketCtx::new([FakeDeviceConfig {
+                    device: FakeDeviceId,
+                    local_ips: vec![I::FAKE_CONFIG.local_ip],
+                    remote_ips: vec![I::FAKE_CONFIG.remote_ip],
+                }])),
+                Default::default(),
+            ),
+        };
         let mut non_sync_ctx = FakeNonSyncCtx::default();
 
         let socket = create(&mut sync_ctx);
@@ -2266,14 +2482,17 @@ mod test {
 
     #[ip_test]
     fn send_to_no_route_still_binds<I: Ip + DatagramIpExt + IpLayerIpExt>() {
-        let mut sync_ctx = FakeSyncCtx::<I, FakeDeviceId>::with_inner_and_outer_state(
-            FakeBufferIpSocketCtx::with_ctx(FakeIpSocketCtx::new([FakeDeviceConfig {
-                device: FakeDeviceId,
-                local_ips: vec![I::FAKE_CONFIG.local_ip],
-                remote_ips: vec![],
-            }])),
-            Sockets::default(),
-        );
+        let mut sync_ctx = FakeSyncCtx::<I, _> {
+            outer: Default::default(),
+            inner: WrappedFakeSyncCtx::with_inner_and_outer_state(
+                FakeBufferIpSocketCtx::with_ctx(FakeIpSocketCtx::new([FakeDeviceConfig {
+                    device: FakeDeviceId,
+                    local_ips: vec![I::FAKE_CONFIG.local_ip],
+                    remote_ips: vec![],
+                }])),
+                Default::default(),
+            ),
+        };
         let mut non_sync_ctx = FakeNonSyncCtx::default();
 
         let socket = create(&mut sync_ctx);
