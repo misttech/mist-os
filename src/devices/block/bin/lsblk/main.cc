@@ -324,7 +324,7 @@ int cmd_read_blk(const char* dev, off_t offset, size_t count) {
     return -1;
   }
   zx::vmo out_vmo;
-  if (zx_status_t status = in_vmo.duplicate(ZX_RIGHTS_BASIC, &out_vmo); status != ZX_OK) {
+  if (zx_status_t status = in_vmo.duplicate(ZX_RIGHT_SAME_RIGHTS, &out_vmo); status != ZX_OK) {
     fprintf(stderr, "Failed to duplicate vmo handle: %s.\n", zx_status_get_string(status));
     return -1;
   }
@@ -338,7 +338,12 @@ int cmd_read_blk(const char* dev, off_t offset, size_t count) {
   const fidl::WireResult read_result =
       fidl::WireCall(block.value())->ReadBlocks(std::move(out_vmo), count, offset, 0);
   if (!read_result.ok()) {
-    fprintf(stderr, "Error from block device read: %s\n", read_result.FormatDescription().c_str());
+    fprintf(stderr, "FIDL error: %s\n", read_result.FormatDescription().c_str());
+    return -1;
+  }
+  if (read_result.value().is_error()) {
+    fprintf(stderr, "Error reading blocks from device: %s\n",
+            zx_status_get_string(read_result.value().error_value()));
     return -1;
   }
 
