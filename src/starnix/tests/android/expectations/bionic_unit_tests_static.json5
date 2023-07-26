@@ -89,6 +89,9 @@
                 // Requires a configured timezone.
                 "time.tzalloc_nullptr",
 
+                // Requires prctl(PR_GET_TAGGED_ADDR_CTRL) -> PR_TAGGED_ADDR_ENABLE
+                "heap_tagging_level_DeathTest.tagged_pointer_dies",
+
                 // Untriaged
                 "pthread.pthread_attr_getstack__main_thread",
                 "pthread.pthread_attr_getstack_in_signal_handler",
@@ -220,6 +223,7 @@
                 // These tests currently pass on arm64 and are SKIPPED on x86_64. Our test harness thinks skipped tests fail.
                 // Mark these skipped until we can figure out how to annotate them more precisely.
                 "scs_test.stack_overflow",
+                "scs_DeathTest.stack_overflow",
                 "stack_unwinding.unwind_through_signal_frame",
                 "stack_unwinding.unwind_through_signal_frame_SA_SIGINFO",
 
