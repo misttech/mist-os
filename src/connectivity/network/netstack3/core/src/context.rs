@@ -1983,10 +1983,10 @@ where
     pub(crate) fn new_legacy_simple_fake_network<CtxId: Copy + Debug + Hash + Eq>(
         a_id: CtxId,
         a: crate::testutil::FakeCtx,
-        a_device_id: EthernetDeviceId<crate::testutil::FakeNonSyncCtx>,
+        a_device_id: EthernetWeakDeviceId<crate::testutil::FakeNonSyncCtx>,
         b_id: CtxId,
         b: crate::testutil::FakeCtx,
-        b_device_id: EthernetDeviceId<crate::testutil::FakeNonSyncCtx>,
+        b_device_id: EthernetWeakDeviceId<crate::testutil::FakeNonSyncCtx>,
     ) -> FakeNetwork<
         CtxId,
         EthernetDeviceId<crate::testutil::FakeNonSyncCtx>,
@@ -2002,9 +2002,17 @@ where
             contexts,
             move |net, _device_id: EthernetWeakDeviceId<crate::testutil::FakeNonSyncCtx>| {
                 if net == a_id {
-                    vec![(b_id, b_device_id.clone(), None)]
+                    b_device_id
+                        .upgrade()
+                        .map(|device_id| (b_id, device_id, None))
+                        .into_iter()
+                        .collect::<Vec<_>>()
                 } else {
-                    vec![(a_id, a_device_id.clone(), None)]
+                    a_device_id
+                        .upgrade()
+                        .map(|device_id| (a_id, device_id, None))
+                        .into_iter()
+                        .collect::<Vec<_>>()
                 }
             },
         )

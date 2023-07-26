@@ -3799,10 +3799,10 @@ mod tests {
         let mut net = crate::context::testutil::new_legacy_simple_fake_network(
             LOCAL_CTX_NAME,
             local,
-            local_device_ids[0].clone(),
+            local_device_ids[0].downgrade(),
             REMOTE_CTX_NAME,
             remote,
-            remove_device_ids[0].clone(),
+            remove_device_ids[0].downgrade(),
         );
         core::mem::drop((local_device_ids, remove_device_ids));
 

@@ -3697,10 +3697,10 @@ mod tests {
         let mut net = crate::context::testutil::new_legacy_simple_fake_network(
             a,
             alice,
-            alice_device_ids[0].clone(),
+            alice_device_ids[0].downgrade(),
             b,
             bob,
-            bob_device_ids[0].clone(),
+            bob_device_ids[0].downgrade(),
         );
         // Make sure the (strongly referenced) device IDs are dropped before
         // `net`.

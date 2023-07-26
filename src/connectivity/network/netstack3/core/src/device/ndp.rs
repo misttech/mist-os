@@ -306,10 +306,10 @@ mod tests {
         let net = crate::context::testutil::new_legacy_simple_fake_network(
             "local",
             local,
-            local_eth_device_id.clone(),
+            local_eth_device_id.downgrade(),
             "remote",
             remote,
-            remote_eth_device_id.clone(),
+            remote_eth_device_id.downgrade(),
         );
 
         (net, local_eth_device_id, remote_eth_device_id.into())
@@ -438,10 +438,10 @@ mod tests {
         let mut net = crate::context::testutil::new_legacy_simple_fake_network(
             "local",
             local,
-            local_device_id.clone(),
+            local_device_id.downgrade(),
             "remote",
             remote,
-            remote_device_id.clone(),
+            remote_device_id.downgrade(),
         );
         let local_device_id = local_device_id.into();
         let remote_device_id = remote_device_id.into();
