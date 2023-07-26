@@ -1,0 +1,6 @@
+# Copyright 2023 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+import("//products/core.gni")
+# TODO(b/291975381): Move Fxfs images config here from //boards/x64-fxfs.gni.
