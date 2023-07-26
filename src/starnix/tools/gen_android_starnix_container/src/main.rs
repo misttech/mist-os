@@ -135,9 +135,9 @@ struct SoftMigrate129576 {
 impl SoftMigrate129576 {
     fn new(system: &HashMap<String, String>) -> Result<SoftMigrate129576> {
         // Conditionally control whether to copy, by checking for the number of HALs
-        // in `system/vendor/etc/vintf/manifest.xml`. If there are less than 11 HALs,
+        // in `system/vendor/etc/vintf/manifest.xml`. If there are less than 12 HALs,
         // which is a signal that migration has begun, activate copying.
-        // See https://bugs.fuchsia.dev/p/fuchsia/issues/detail?id=129576#c26 for
+        // See https://bugs.fuchsia.dev/p/fuchsia/issues/detail?id=129576#c36 for
         // context on this constant.
         use ext4_metadata::{Metadata, ROOT_INODE_NUM};
         let metadata = std::fs::read(&system["metadata.v1"]).context("Reading metadata")?;
@@ -157,7 +157,7 @@ impl SoftMigrate129576 {
         let manifest =
             std::fs::read(&system[&format!("{manifest}")]).context("Reading manifest")?;
         Ok(SoftMigrate129576 {
-            should_copy: String::from_utf8_lossy(&manifest).matches("<hal ").count() < 11,
+            should_copy: String::from_utf8_lossy(&manifest).matches("<hal ").count() < 12,
         })
     }
 
