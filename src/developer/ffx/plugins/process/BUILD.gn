@@ -14,6 +14,7 @@ ffx_plugin("ffx_process") {
     "//sdk/fidl/fuchsia.process.explorer:fuchsia.process.explorer_rust",
     "//src/developer/ffx/lib/fho:lib",
     "//src/lib/fidl/rust/fidl",
+    "//src/lib/zircon/rust:fuchsia-zircon-status",
     "//src/lib/zircon/rust:fuchsia-zircon-types",
     "//third_party/rust_crates:anyhow",
     "//third_party/rust_crates:async-trait",

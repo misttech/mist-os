@@ -134,8 +134,85 @@ void Explorer::GetStackTrace(GetStackTraceRequest& request,
   completer.Reply(zx::error(ZX_ERR_NOT_SUPPORTED));
 }
 
+class KillWalker final : public TaskEnumerator {
+ public:
+  KillWalker() = default;
+  ~KillWalker() = default;
+
+  zx::result<zx_koid_t> KillTask(std::variant<zx_koid_t, std::string> task) {
+    task_to_kill_ = task;
+    if (auto status = WalkRootJobTree(); status != ZX_ERR_STOP) {
+      if (status == ZX_OK) {
+        return zx::error(ZX_ERR_NOT_FOUND);
+      }
+      return zx::error(status);
+    }
+    return zx::ok(task_killed_.value());
+  }
+
+  zx_status_t OnProcess(int depth, zx_handle_t process_handle, zx_koid_t koid,
+                        zx_koid_t parent_koid) override {
+    zx::unowned_process process(process_handle);
+    if (auto task_koid = std::get_if<zx_koid_t>(&task_to_kill_); task_koid) {
+      if (*task_koid != koid) {
+        return ZX_OK;
+      }
+    } else {
+      auto& process_name = std::get<std::string>(task_to_kill_);
+      char name[ZX_MAX_NAME_LEN];
+
+      if (auto status = process->get_property(ZX_PROP_NAME, &name, sizeof(name)); status != ZX_OK) {
+        FX_LOGS(ERROR) << "Unable to get process name: " << zx_status_get_string(status);
+        return status;
+      }
+      if (process_name != name) {
+        return ZX_OK;
+      }
+    }
+    zx_status_t status = process->kill();
+    if (status != ZX_OK) {
+      return status;
+    }
+    task_killed_ = koid;
+    return ZX_ERR_STOP;
+  }
+
+  zx_status_t OnJob(int depth, zx_handle_t job_handle, zx_koid_t koid,
+                    zx_koid_t parent_koid) override {
+    zx::unowned_job job(job_handle);
+    if (auto* task_koid = std::get_if<zx_koid_t>(&task_to_kill_);
+        !task_koid || *task_koid != koid) {
+      return ZX_OK;
+    }
+    zx_status_t status = job->kill();
+    if (status != ZX_OK) {
+      return status;
+    }
+    task_killed_ = koid;
+    return ZX_ERR_STOP;
+  }
+
+ protected:
+  bool has_on_job() const override { return true; }
+  bool has_on_process() const override { return true; }
+
+ private:
+  std::variant<zx_koid_t, std::string> task_to_kill_;
+  std::optional<zx_koid_t> task_killed_;
+};
+
 void Explorer::KillTask(KillTaskRequest& request, KillTaskCompleter::Sync& completer) {
-  completer.Reply(zx::error(ZX_ERR_NOT_SUPPORTED));
+  KillWalker walker;
+  std::variant<zx_koid_t, std::string> task;
+  if (request.koid().has_value()) {
+    task = request.koid().value();
+  } else if (request.process_name().has_value()) {
+    task = request.process_name().value();
+  } else {
+    completer.Reply(zx::error(ZX_ERR_NOT_SUPPORTED));
+    return;
+  }
+  completer.Reply(walker.KillTask(task));
 }
 
 }  // namespace process_explorer

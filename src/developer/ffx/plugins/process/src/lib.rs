@@ -9,16 +9,20 @@ mod processes_data;
 mod write_human_readable_output;
 
 use anyhow::Result;
-use ffx_process_args::{Args, QueryCommand};
+use ffx_process_args::{Args, ProcessCommand, TaskToKill};
 use fho::{moniker, AvailabilityFlag, FfxMain, FfxTool, MachineWriter, ToolIO};
 use fidl_fuchsia_buildinfo::BuildInfo;
 use fidl_fuchsia_buildinfo::ProviderProxy;
-use fidl_fuchsia_process_explorer::QueryProxy;
+use fidl_fuchsia_process_explorer::{
+    ProcessExplorerKillTaskRequest, ProcessExplorerProxy, QueryProxy,
+};
 use fuchsia_map::json;
+use fuchsia_zircon_status::Status;
 use fuchsia_zircon_types::zx_koid_t;
 use futures::AsyncReadExt;
 use processes_data::{processed, raw};
 use std::collections::HashSet;
+use std::io::Write;
 use write_human_readable_output::{
     pretty_print_invalid_koids, pretty_print_processes_data, pretty_print_processes_name_and_koid,
 };
@@ -31,10 +35,12 @@ pub(crate) type Writer = MachineWriter<processed::ProcessesData>;
 pub struct ProcessTool {
     #[with(moniker("/core/process_explorer"))]
     query_proxy: QueryProxy,
+    #[with(moniker("/core/process_explorer"))]
+    explorer_proxy: ProcessExplorerProxy,
     #[with(moniker("/core/build-info"))]
     provider_proxy: ProviderProxy,
     #[command]
-    cmd: QueryCommand,
+    cmd: ProcessCommand,
 }
 
 fho::embedded_plugin!(ProcessTool);
@@ -44,17 +50,18 @@ impl FfxMain for ProcessTool {
     type Writer = Writer;
 
     async fn main(self, writer: Self::Writer) -> fho::Result<()> {
-        print_processes_data(self.query_proxy, self.provider_proxy, self.cmd, writer)
+        handle_cmd(self.query_proxy, self.explorer_proxy, self.provider_proxy, self.cmd, writer)
             .await
             .map_err(Into::into)
     }
 }
 
 /// Prints processes data.
-pub async fn print_processes_data(
+pub async fn handle_cmd(
     query_proxy: QueryProxy,
+    explorer_proxy: ProcessExplorerProxy,
     buildinfo_provider_proxy: ProviderProxy,
-    cmd: QueryCommand,
+    cmd: ProcessCommand,
     writer: MachineWriter<processed::ProcessesData>,
 ) -> Result<()> {
     let processes_data = get_processes_data(query_proxy).await?;
@@ -66,6 +73,7 @@ pub async fn print_processes_data(
         Args::List(arg) => list_subcommand(writer, output, arg.verbose),
         Args::Filter(arg) => filter_subcommand(writer, output, arg.process_koids),
         Args::GenerateFuchsiaMap(_) => generate_fuchsia_map_subcommand(writer, build_info, output),
+        Args::Kill(arg) => kill_subcommand(writer, explorer_proxy, arg.task_to_kill).await,
     }
 }
 
@@ -165,6 +173,31 @@ fn generate_fuchsia_map_subcommand(
     let json = json::make_fuchsia_map_json(processes_data, build_info);
     serde_json::to_writer(&mut w, &json)?;
     Ok(())
+}
+
+async fn kill_subcommand(
+    mut w: Writer,
+    explorer_proxy: ProcessExplorerProxy,
+    task: TaskToKill,
+) -> Result<()> {
+    let arg = match task {
+        TaskToKill::Koid(koid) => ProcessExplorerKillTaskRequest::Koid(koid),
+        TaskToKill::ProcessName(name) => ProcessExplorerKillTaskRequest::ProcessName(name),
+    };
+    match explorer_proxy.kill_task(&arg).await?.map_err(Status::from_raw) {
+        Ok(koid) => {
+            writeln!(w, "Successfully killed task: {}", koid)?;
+            Ok(())
+        }
+        Err(Status::NOT_FOUND) => {
+            writeln!(w, "Failed to find process")?;
+            Ok(())
+        }
+        Err(e) => {
+            writeln!(w, "Failed to kill process with error {:?}", e)?;
+            Err(e.into())
+        }
+    }
 }
 
 #[cfg(test)]

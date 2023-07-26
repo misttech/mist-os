@@ -7,8 +7,8 @@ use ffx_core::ffx_command;
 
 #[ffx_command()]
 #[derive(FromArgs, Debug, PartialEq)]
-#[argh(subcommand, name = "process", description = "Query processes related information")]
-pub struct QueryCommand {
+#[argh(subcommand, name = "process", description = "Processes related commands")]
+pub struct ProcessCommand {
     #[argh(subcommand)]
     pub arg: Args,
 }
@@ -19,6 +19,7 @@ pub enum Args {
     List(ListArg),
     Filter(FilterArg),
     GenerateFuchsiaMap(GenerateFuchsiaMapArg),
+    Kill(KillArg),
 }
 
 #[derive(FromArgs, PartialEq, Debug)]
@@ -53,3 +54,24 @@ pub struct FilterArg {
     description = "outputs the json required to generate a map of all processes and channels"
 )]
 pub struct GenerateFuchsiaMapArg {}
+
+#[derive(PartialEq, Debug)]
+pub enum TaskToKill {
+    Koid(u64),
+    ProcessName(String),
+}
+
+fn parse_task(arg: &str) -> Result<TaskToKill, String> {
+    Ok(if let Ok(koid) = arg.parse::<u64>() {
+        TaskToKill::Koid(koid)
+    } else {
+        TaskToKill::ProcessName(String::from(arg))
+    })
+}
+
+#[derive(FromArgs, PartialEq, Debug)]
+#[argh(subcommand, name = "kill", description = "Attempts to kill a process by its KOID")]
+pub struct KillArg {
+    #[argh(positional, from_str_fn(parse_task), description = "koid of process to kill.")]
+    pub task_to_kill: TaskToKill,
+}
