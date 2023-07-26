@@ -213,7 +213,7 @@ impl<NonSyncCtx: NonSyncContext, L: LockBefore<crate::lock_ordering::IpState<Ipv
         })
     }
 
-    fn with_nud_state_mut<O, F: FnOnce(&mut NudState<Ipv6, Mac>) -> O>(
+    fn with_nud_state_mut<O, F: FnOnce(&mut NudState<Ipv6, EthernetLinkDevice>) -> O>(
         &mut self,
         device_id: &EthernetDeviceId<NonSyncCtx>,
         cb: F,
@@ -335,7 +335,7 @@ impl<
 
     fn with_nud_state_mut_and_buf_ctx<
         O,
-        F: FnOnce(&mut NudState<Ipv6, Mac>, &mut Self::BufferSenderCtx<'_>) -> O,
+        F: FnOnce(&mut NudState<Ipv6, EthernetLinkDevice>, &mut Self::BufferSenderCtx<'_>) -> O,
     >(
         &mut self,
         device_id: &EthernetDeviceId<BufferNonSyncCtx>,
@@ -494,7 +494,7 @@ pub(crate) struct EthernetDeviceState {
     ipv4_arp: Mutex<ArpState<EthernetLinkDevice>>,
 
     /// IPv6 NUD state.
-    ipv6_nud: Mutex<NudState<Ipv6, Mac>>,
+    ipv6_nud: Mutex<NudState<Ipv6, EthernetLinkDevice>>,
 
     static_state: StaticEthernetDeviceState,
 
@@ -555,8 +555,8 @@ impl<C: NonSyncContext> RwLockFor<crate::lock_ordering::DeviceSockets>
 impl<C: NonSyncContext> LockFor<crate::lock_ordering::EthernetIpv6Nud>
     for IpLinkDeviceState<C, C::EthernetDeviceState, EthernetDeviceState>
 {
-    type Data = NudState<Ipv6, Mac>;
-    type Guard<'l> = crate::sync::LockGuard<'l, NudState<Ipv6, Mac>>
+    type Data = NudState<Ipv6, EthernetLinkDevice>;
+    type Guard<'l> = crate::sync::LockGuard<'l, NudState<Ipv6, EthernetLinkDevice>>
         where
             Self: 'l;
     fn lock(&self) -> Self::Guard<'_> {
@@ -1435,7 +1435,7 @@ mod tests {
     }
 
     impl NudHandler<Ipv6, EthernetLinkDevice, FakeNonSyncCtx> for FakeCtx {
-        fn set_dynamic_neighbor(
+        fn handle_neighbor_update(
             &mut self,
             _ctx: &mut FakeNonSyncCtx,
             _device_id: &Self::DeviceId,

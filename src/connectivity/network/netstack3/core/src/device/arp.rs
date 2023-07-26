@@ -165,7 +165,7 @@ impl<D: ArpDevice, C: ArpNonSyncCtx<D, SC::DeviceId>, SC: ArpContext<D, C>> NudC
         NonZeroDuration::new(DEFAULT_ARP_REQUEST_PERIOD).unwrap()
     }
 
-    fn with_nud_state_mut<O, F: FnOnce(&mut NudState<Ipv4, D::Address>) -> O>(
+    fn with_nud_state_mut<O, F: FnOnce(&mut NudState<Ipv4, D>) -> O>(
         &mut self,
         device_id: &SC::DeviceId,
         cb: F,
@@ -194,7 +194,7 @@ impl<
 
     fn with_nud_state_mut_and_buf_ctx<
         O,
-        F: FnOnce(&mut NudState<Ipv4, D::Address>, &mut Self::BufferSenderCtx<'_>) -> O,
+        F: FnOnce(&mut NudState<Ipv4, D>, &mut Self::BufferSenderCtx<'_>) -> O,
     >(
         &mut self,
         device_id: &SC::DeviceId,
@@ -385,7 +385,7 @@ fn handle_packet<
 
     let sender_hw_addr = packet.sender_hardware_address();
     if let Some(addr) = SpecifiedAddr::new(sender_addr) {
-        NudHandler::<Ipv4, D, _>::set_dynamic_neighbor(
+        NudHandler::<Ipv4, D, _>::handle_neighbor_update(
             sync_ctx,
             ctx,
             &device_id,
@@ -466,7 +466,7 @@ fn send_arp_request<D: ArpDevice, C: ArpNonSyncCtx<D, SC::DeviceId>, SC: ArpCont
 /// Each device will contain an `ArpState` object for each of the network
 /// protocols that it supports.
 pub(crate) struct ArpState<D: ArpDevice> {
-    nud: NudState<Ipv4, D::HType>,
+    nud: NudState<Ipv4, D>,
 }
 
 impl<D: ArpDevice> Default for ArpState<D> {

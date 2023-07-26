@@ -150,6 +150,7 @@ mod tests {
         device::{
             add_ip_addr_subnet, del_ip_addr, ethernet,
             link::LinkAddress,
+            remove_ethernet_device,
             testutil::{is_forwarding_enabled, receive_frame, set_forwarding_enabled},
             update_ipv6_configuration, DeviceId, EthernetDeviceId, EthernetWeakDeviceId,
             FrameDestination, Mtu,
@@ -272,7 +273,7 @@ mod tests {
             >,
         >,
         EthernetDeviceId<FakeNonSyncCtx>,
-        DeviceId<crate::testutil::FakeNonSyncCtx>,
+        EthernetDeviceId<FakeNonSyncCtx>,
     ) {
         let mut local = FakeEventDispatcherBuilder::default();
         let local_dev_idx = local.add_device_with_config(
@@ -312,14 +313,30 @@ mod tests {
             remote_eth_device_id.downgrade(),
         );
 
-        (net, local_eth_device_id, remote_eth_device_id.into())
+        (net, local_eth_device_id, remote_eth_device_id)
     }
 
     #[test]
     fn test_address_resolution() {
         set_logger_for_test();
-        let (mut net, local_eth_device_id, remote_device_id) = setup_net();
+        let (net, local_eth_device_id, remote_eth_device_id) = setup_net();
+
+        // Remove the devices so that existing NUD timers get cleaned up;
+        // otherwise, they would hold dangling references to the device when the
+        // sync context is dropped at the end of the test.
+        let local_device_id_clone = local_eth_device_id.clone();
+        let remote_device_id_clone = remote_eth_device_id.clone();
+        let mut net = scopeguard::guard(net, move |mut net| {
+            net.with_context("local", |Ctx { sync_ctx, non_sync_ctx }| {
+                remove_ethernet_device(sync_ctx, non_sync_ctx, local_device_id_clone);
+            });
+            net.with_context("remote", |Ctx { sync_ctx, non_sync_ctx }| {
+                remove_ethernet_device(sync_ctx, non_sync_ctx, remote_device_id_clone);
+            });
+        });
+
         let local_device_id = local_eth_device_id.into();
+        let remote_device_id = remote_eth_device_id.into();
 
         // Let's try to ping the remote device from the local device:
         let req = IcmpEchoRequest::new(0, 0);
@@ -389,12 +406,9 @@ mod tests {
             "local received advertisement"
         );
 
-        // The local timer should've been unscheduled.
+        // Upon link layer resolution, the original ping request should've been
+        // sent out.
         net.with_context("local", |Ctx { sync_ctx: _, non_sync_ctx }| {
-            assert_empty(non_sync_ctx.timer_ctx().timers());
-
-            // Upon link layer resolution, the original ping request should've been
-            // sent out.
             assert_eq!(non_sync_ctx.frames_sent().len(), 1);
         });
         let _: StepResult = net.step(receive_frame, handle_timer);
@@ -522,8 +536,9 @@ mod tests {
         // it cannot use the address because someone else has already taken that
         // address.
         set_logger_for_test();
-        let (mut net, local_eth_device_id, remote_device_id) = setup_net();
+        let (mut net, local_eth_device_id, remote_eth_device_id) = setup_net();
         let local_device_id = local_eth_device_id.clone().into();
+        let remote_device_id = remote_eth_device_id.into();
 
         // Enable DAD.
         let update = Ipv6DeviceConfigurationUpdate {
@@ -697,8 +712,9 @@ mod tests {
         // Test if the implementation is correct when we have more than 1 NS
         // packets to send.
         set_logger_for_test();
-        let (mut net, local_eth_device_id, remote_device_id) = setup_net();
+        let (mut net, local_eth_device_id, remote_eth_device_id) = setup_net();
         let local_device_id = local_eth_device_id.clone().into();
+        let remote_device_id = remote_eth_device_id.into();
 
         let update = Ipv6DeviceConfigurationUpdate {
             dad_transmits: Some(NonZeroU8::new(3)),

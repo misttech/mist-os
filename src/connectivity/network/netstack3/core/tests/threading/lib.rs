@@ -370,6 +370,9 @@ fn neighbor_resolution_and_send_queued_packets_atomic<I: Ip + TestIpExt>() {
             assert_eq!(body, [expected_payload], "frame was sent out of order!");
         }
 
-        drop(device);
+        // Remove the device so that existing NUD timers get cleaned up;
+        // otherwise, they would hold dangling references to the device when the
+        // sync context is dropped at the end of the test.
+        netstack3_core::device::remove_ethernet_device(&sync_ctx, &mut non_sync_ctx, device);
     })
 }

@@ -764,7 +764,7 @@ where
         match device_id {
             DeviceId::Ethernet(id) => {
                 if let Some(link_addr) = bytes_to_mac(link_addr) {
-                    NudHandler::<I, EthernetLinkDevice, _>::set_dynamic_neighbor(
+                    NudHandler::<I, EthernetLinkDevice, _>::handle_neighbor_update(
                         self,
                         ctx,
                         &id,
@@ -788,7 +788,7 @@ where
         match device_id {
             DeviceId::Ethernet(id) => {
                 if let Some(link_addr) = bytes_to_mac(link_addr) {
-                    NudHandler::<I, EthernetLinkDevice, _>::set_dynamic_neighbor(
+                    NudHandler::<I, EthernetLinkDevice, _>::handle_neighbor_update(
                         self,
                         ctx,
                         &id,

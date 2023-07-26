@@ -155,7 +155,7 @@ rustc_library("netstack3-core-instrumented") {
   }
 
   deps = lib_deps + lib_instrumented_deps
-  test_deps = lib_test_deps
+  test_deps = lib_test_deps + [ "//third_party/rust_crates:scopeguard" ]
 
   features = [ "instrumented" ]
 
