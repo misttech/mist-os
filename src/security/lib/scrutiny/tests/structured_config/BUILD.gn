@@ -80,7 +80,6 @@ if (is_fuchsia) {
     zbi = "${outdir}/assembly.zbi"
     fvm = "${outdir}/fvm.blk"
     fvm_sparse = "${outdir}/fvm.sparse.blk"
-    fvm_blob_sparse = "${outdir}/fvm.blob.sparse.blk"
 
     qemu_kernel = qemu_boot_shim.path
 
@@ -169,7 +168,6 @@ if (is_fuchsia) {
       files.blobfs,
       files.fvm,
       files.fvm_sparse,
-      files.fvm_blob_sparse,
       files.qemu_kernel,
       files.zbi,
     ]

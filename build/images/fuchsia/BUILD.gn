@@ -70,7 +70,6 @@ if (is_fuchsia) {
     blobfs = "${outdir}/blob.blk"
     fvm = "${outdir}/fvm.blk"
     fvm_sparse = "${outdir}/fvm.sparse.blk"
-    fvm_blob_sparse = "${outdir}/fvm.blob.sparse.blk"
     fvm_fastboot = "${outdir}/fvm.fastboot.blk"
     fxfs = "${outdir}/fxfs.blk"
     fxfs_sparse = "${outdir}/fxfs.sparse.blk"
@@ -100,7 +99,6 @@ if (is_fuchsia) {
     recovery_blobfs = "${recovery_outdir}/blob.blk"
     recovery_fvm = "${recovery_outdir}/fvm.blk"
     recovery_fvm_sparse = "${recovery_outdir}/fvm.sparse.blk"
-    recovery_fvm_blob_sparse = "${recovery_outdir}/fvm.blob.sparse.blk"
     recovery_fvm_fastboot = "${recovery_outdir}/fvm.fastboot.blk"
     recovery_fxfs = "${recovery_outdir}/fxfs.blk"
     recovery_fxfs_sparse = "${recovery_outdir}/fxfs.sparse.blk"
@@ -342,7 +340,6 @@ if (is_fuchsia) {
         files.blobfs,
         files.fvm,
         files.fvm_sparse,
-        files.fvm_blob_sparse,
       ]
     }
     _recovery_contents = [ files.qemu_kernel ]
@@ -357,7 +354,6 @@ if (is_fuchsia) {
           files.blobfs,
           files.fvm,
           files.fvm_sparse,
-          files.fvm_blob_sparse,
         ]
       }
     }

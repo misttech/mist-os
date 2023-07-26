@@ -2,7 +2,6 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-load("@legacy_ninja_build_outputs//:build_args.bzl", "use_vbmeta")
 load(
     "@fuchsia_sdk//fuchsia:assembly.bzl",
     "fuchsia_filesystem_blobfs",
@@ -27,7 +26,6 @@ fuchsia_images_configuration(
         # FVM outputs.
         ":standard_fvm",
         ":sparse_fvm",
-        ":blob_sparse_fvm",
         ":emmc_fvm_x64",
     ],
 )
@@ -49,7 +47,6 @@ fuchsia_images_configuration(
         # FVM outputs.
         ":standard_fvm_qemu-x64",
         ":sparse_fvm_qemu-x64",
-        ":blob_sparse_fvm_qemu-x64",
     ],
 )
 
@@ -62,7 +59,6 @@ fuchsia_images_configuration(
         # FVM outputs.
         ":standard_fvm",
         ":sparse_fvm",
-        ":blob_sparse_fvm",
         ":emmc_fvm_vim3",
     ],
 )
@@ -103,16 +99,6 @@ fuchsia_fvm_sparse(
     fvm_sparse_name = "fvm.sparse",
 )
 
-fuchsia_fvm_sparse(
-    name = "blob_sparse_fvm_qemu-x64",
-    filesystems = [
-        ":empty_data",
-        ":blobfs_qemu-x64",
-        ":internal_reserved",
-    ],
-    fvm_sparse_name = "fvm.blob.sparse",
-)
-
 fuchsia_fvm_standard(
     name = "standard_fvm",
     filesystems = [
@@ -131,16 +117,6 @@ fuchsia_fvm_sparse(
         ":internal_reserved",
     ],
     fvm_sparse_name = "fvm.sparse",
-)
-
-fuchsia_fvm_sparse(
-    name = "blob_sparse_fvm",
-    filesystems = [
-        ":empty_data",
-        ":blobfs",
-        ":internal_reserved",
-    ],
-    fvm_sparse_name = "fvm.blob.sparse",
 )
 
 fuchsia_fvm_standard(

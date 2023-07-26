@@ -312,7 +312,6 @@ fn load_assembly_manifest(
                 | Image::VBMeta(_)
                 | Image::FVM(_)
                 | Image::FVMSparse(_)
-                | Image::FVMSparseBlob(_)
                 | Image::FVMFastboot(_)
                 | Image::QemuKernel(_) => {
                     images.push(image);

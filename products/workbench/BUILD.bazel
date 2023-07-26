@@ -225,7 +225,6 @@ fuchsia_images_configuration(
         ":standard_fvm",
         ":fastboot_fvm",
         ":sparse_fvm",
-        ":blob_sparse_fvm",
     ],
 )
 
@@ -285,13 +284,6 @@ fuchsia_fvm_sparse(
     name = "sparse_fvm",
     filesystems = [":blobfs"],
     fvm_sparse_name = "fvm.sparse",
-)
-
-# Currently required by bazel_assembled_system
-fuchsia_fvm_sparse(
-    name = "blob_sparse_fvm",
-    filesystems = [":blobfs"],
-    fvm_sparse_name = "fvm.blob.sparse",
 )
 
 fuchsia_filesystem_blobfs(

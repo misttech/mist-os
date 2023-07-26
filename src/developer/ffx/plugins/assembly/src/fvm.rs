@@ -240,7 +240,7 @@ impl<'a> MultiFvmBuilder<'a> {
                 let builder = NandFvmBuilder {
                     tool,
                     output: output.clone(),
-                    sparse_blob_fvm: sparse_output,
+                    sparse_fvm: sparse_output,
                     max_disk_size: config.max_disk_size,
                     compression,
                     page_size: config.page_size,

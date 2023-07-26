@@ -31,7 +31,7 @@ import("//src/developer/ffx/build/ffx_action.gni")
 #     image not assembled is ignored. The scope contains the following:
 #
 #       [scope] zbi, zbi_signed, vbmeta, minfs, blobfs, fvm, fvm_sparse,
-#       fvm_blob_sparse, fvm_fastboot (optional)
+#       fvm_fastboot (optional)
 #         An arbitrary scope of additional metadata to record for the
 #         associated image.
 #
@@ -272,7 +272,6 @@ template("assembled_system") {
           "No FVMs will be built: no metadata override should be provided"
       assert(!defined(image_metadata_overrides.fvm), error_msg)
       assert(!defined(image_metadata_overrides.fvm_sparse), error_msg)
-      assert(!defined(image_metadata_overrides.fvm_blob_sparse), error_msg)
       assert(!defined(image_metadata_overrides.fvm_fastboot), error_msg)
       not_needed([ "error_msg" ])
     }
@@ -411,7 +410,6 @@ template("assembled_system") {
     if (_generate_fvm) {
       fvm = "${outdir}/fvm.blk"
       fvm_sparse = "${outdir}/fvm.sparse.blk"
-      fvm_blob_sparse = "${outdir}/fvm.blob.sparse.blk"
     }
     if (_generate_fvm_fastboot || _generate_fvm_nand) {
       fvm_fastboot = "${outdir}/fvm.fastboot.blk"
@@ -882,7 +880,6 @@ template("assembled_system") {
           files.fvm,
           files.fvm_sparse,
           files.blobfs,
-          files.fvm_blob_sparse,
         ]
       }
       if (_generate_fvm_fastboot || _generate_fvm_nand) {
@@ -923,8 +920,6 @@ template("assembled_system") {
           fvm = {
           }
           fvm_sparse = {
-          }
-          fvm_blob_sparse = {
           }
           fvm_fastboot = {
           }
@@ -1051,19 +1046,6 @@ template("assembled_system") {
                 path = rebase_path(files.vbmeta, root_build_dir)
               }
               forward_variables_from(_image_overrides["vbmeta"], "*")
-            },
-          ]
-        }
-
-        # Optionally include the blob-only sparse FVM.
-        if (_generate_fvm && include_fvm_blob_sparse) {
-          images += [
-            {
-              name = "${namespace}.fvm_blob_sparse"
-              path = rebase_path(files.fvm_blob_sparse, root_build_dir)
-              type = "blk"
-              forward_variables_from(_common_metadata, "*")
-              forward_variables_from(_image_overrides["fvm_blob_sparse"], "*")
             },
           ]
         }

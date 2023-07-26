@@ -38,7 +38,7 @@ func TestProductBundleUploads(t *testing.T) {
     "manifests": {
       "emu": {
         "disk_images": [
-          "obj/build/images/fuchsia/fuchsia/fvm.blob.sparse.blk"
+          "obj/build/images/fuchsia/fuchsia/fvm.sparse.blk"
         ],
         "initial_ramdisk": "fuchsia.zbi",
         "kernel": "multiboot.bin"
@@ -77,7 +77,7 @@ func TestProductBundleUploads(t *testing.T) {
     "manifests": {
       "emu": {
         "disk_images": [
-          "obj/build/images/fuchsia/fuchsia/fvm.blob.sparse.blk"
+          "obj/build/images/fuchsia/fuchsia/fvm.sparse.blk"
         ],
         "initial_ramdisk": "fuchsia.zbi",
         "kernel": "multiboot.bin"

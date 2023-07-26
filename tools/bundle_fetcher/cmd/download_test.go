@@ -558,7 +558,7 @@ var contentsProductBundle = map[string][]byte{
 		  "manifests": {
 			"emu": {
 			  "disk_images": [
-				"obj/build/images/fuchsia/fuchsia/fvm.blob.sparse.blk"
+				"obj/build/images/fuchsia/fuchsia/fvm.sparse.blk"
 			  ],
 			  "initial_ramdisk": "fuchsia.zbi",
 			  "kernel": "multiboot.bin"
@@ -648,7 +648,7 @@ var contentsProductBundle = map[string][]byte{
 			  "manifests": {
 				"emu": {
 				  "disk_images": [
-					"obj/build/images/fuchsia/fuchsia/fvm.blob.sparse.blk"
+					"obj/build/images/fuchsia/fuchsia/fvm.sparse.blk"
 				  ],
 				  "initial_ramdisk": "fuchsia.zbi",
 				  "kernel": "multiboot.bin"
@@ -708,7 +708,7 @@ func TestGetProductBundleData(t *testing.T) {
   "manifests": {
     "emu": {
       "disk_images": [
-        "obj/build/images/fuchsia/fuchsia/fvm.blob.sparse.blk"
+        "obj/build/images/fuchsia/fuchsia/fvm.sparse.blk"
       ],
       "initial_ramdisk": "fuchsia.zbi",
       "kernel": "multiboot.bin"

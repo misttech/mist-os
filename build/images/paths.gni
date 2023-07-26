@@ -86,10 +86,6 @@ files = {
       fvm_sparse = "${assembly_outdir}/fvm.sparse.blk"
     }
 
-    if (fvm_partition != "" && include_fvm_blob_sparse) {
-      fvm_blob_sparse = "${assembly_outdir}/fvm.blob.sparse.blk"
-    }
-
     if (supports_fastboot_fvm) {
       fvm_fastboot = "${assembly_outdir}/fvm.fastboot.blk"
     }

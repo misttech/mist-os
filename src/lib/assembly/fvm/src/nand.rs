@@ -11,7 +11,7 @@ use camino::Utf8PathBuf;
 /// ```
 /// let builder = NandFvmBuilder {
 ///     output: Utf8PathBuf::from("path/to/output.blk"),
-///     sparse_blob_fvm: Utf8PathBuf::from("path/to/fvm.blob.sparse.blk"),
+///     sparse_fvm: Utf8PathBuf::from("path/to/fvm.sparse.blk"),
 ///     max_disk_size: None,
 ///     compression: None,
 ///     page_size: 0,
@@ -27,8 +27,8 @@ pub struct NandFvmBuilder {
     pub tool: Box<dyn Tool>,
     /// The path to write the FVM to.
     pub output: Utf8PathBuf,
-    /// The path to the sparse, blob-only FVM on the host.
-    pub sparse_blob_fvm: Utf8PathBuf,
+    /// The path to the sparse FVM on the host.
+    pub sparse_fvm: Utf8PathBuf,
     /// The maximum disk size for the sparse FVM.
     /// The build will fail if the sparse FVM is larger than this.
     pub max_disk_size: Option<u64>,
@@ -76,7 +76,7 @@ impl NandFvmBuilder {
         maybe_append_value(&mut args, "compress", self.compression.as_ref());
 
         // A quirk of the FVM tool means the sparse argument *must* go last.
-        maybe_append_value(&mut args, "sparse", Some(self.sparse_blob_fvm.to_string()));
+        maybe_append_value(&mut args, "sparse", Some(self.sparse_fvm.to_string()));
 
         Ok(args)
     }
@@ -95,7 +95,7 @@ mod tests {
         let builder = NandFvmBuilder {
             tool: fvm_tool,
             output: "mypath".into(),
-            sparse_blob_fvm: "sparsepath".into(),
+            sparse_fvm: "sparsepath".into(),
             max_disk_size: Some(500),
             compression: Some("supercompress".into()),
             page_size: 1,

@@ -46,7 +46,6 @@ if (use_bringup_assembly) {
       "blob.blk",
       "fvm.blk",
       "fvm.sparse.blk",
-      "fvm.blob.sparse.blk",
       "fvm.fastboot.blk",
       "fuchsia.zbi",
       "fuchsia.vbmeta",

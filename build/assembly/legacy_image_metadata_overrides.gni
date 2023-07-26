@@ -94,14 +94,6 @@ legacy_fuchsia_image_metadata_overrides = {
       bootserver_pave = [ "--fvm" ]
     }
 
-    fvm_blob_sparse = {
-      name = "fvm.blob.sparse"
-
-      # Hack: Infra expects bootserver_pave to be present
-      # in the GN graph for this image to be built.
-      bootserver_pave = []
-    }
-
     fvm_fastboot = {
       name = "fvm.fastboot"
       archive = true

@@ -77,11 +77,6 @@ pub enum Image {
     /// Sparse FVM.
     FVMSparse(Utf8PathBuf),
 
-    /// Sparse blobfs-only FVM.
-    // TODO(b/291958397): This can be deleted, because blob sparse fvms are no
-    // longer in use.
-    FVMSparseBlob(Utf8PathBuf),
-
     /// Fastboot FVM.
     FVMFastboot(Utf8PathBuf),
 
@@ -115,7 +110,6 @@ impl Image {
             Image::BlobFS { path, .. } => path.as_path(),
             Image::FVM(s) => s.as_path(),
             Image::FVMSparse(s) => s.as_path(),
-            Image::FVMSparseBlob(s) => s.as_path(),
             Image::FVMFastboot(s) => s.as_path(),
             Image::Fxfs { path, .. } => path.as_path(),
             Image::FxfsSparse { path, .. } => path.as_path(),
@@ -133,7 +127,6 @@ impl Image {
             Image::BlobFS { path, .. } => *path = source,
             Image::FVM(s) => *s = source,
             Image::FVMSparse(s) => *s = source,
-            Image::FVMSparseBlob(s) => *s = source,
             Image::FVMFastboot(s) => *s = source,
             Image::Fxfs { path, .. } => *path = source,
             Image::FxfsSparse { path, .. } => *path = source,
@@ -152,7 +145,6 @@ impl Image {
             | Image::VBMeta(_)
             | Image::FVM(_)
             | Image::FVMSparse(_)
-            | Image::FVMSparseBlob(_)
             | Image::FVMFastboot(_)
             | Image::QemuKernel(_) => None,
         }
@@ -177,9 +169,6 @@ impl AssemblyManifest {
                 Image::FVM(path) => images.push(Image::FVM(path_relative_from(path, &base_path)?)),
                 Image::FVMSparse(path) => {
                     images.push(Image::FVMSparse(path_relative_from(path, &base_path)?))
-                }
-                Image::FVMSparseBlob(path) => {
-                    images.push(Image::FVMSparseBlob(path_relative_from(path, &base_path)?))
                 }
                 Image::FVMFastboot(path) => {
                     images.push(Image::FVMFastboot(path_relative_from(path, &base_path)?))
@@ -224,9 +213,6 @@ impl AssemblyManifest {
                 Image::FVM(path) => images.push(Image::FVM(manifest_dir.as_ref().join(path))),
                 Image::FVMSparse(path) => {
                     images.push(Image::FVMSparse(manifest_dir.as_ref().join(path)))
-                }
-                Image::FVMSparseBlob(path) => {
-                    images.push(Image::FVMSparseBlob(manifest_dir.as_ref().join(path)))
                 }
                 Image::FVMFastboot(path) => {
                     images.push(Image::FVMFastboot(manifest_dir.as_ref().join(path)))
@@ -348,13 +334,6 @@ impl Serialize for Image {
             Image::FVMSparse(path) => ImageSerializeHelper {
                 partition_type: "blk",
                 name: "storage-sparse",
-                path,
-                signed: None,
-                contents: None,
-            },
-            Image::FVMSparseBlob(path) => ImageSerializeHelper {
-                partition_type: "blk",
-                name: "storage-sparse-blob",
                 path,
                 signed: None,
                 contents: None,
@@ -582,7 +561,6 @@ impl<'de> Deserialize<'de> for Image {
                 }
             }
             ("blk", "storage-sparse", None) => Ok(Image::FVMSparse(helper.path)),
-            ("blk", "storage-sparse-blob", None) => Ok(Image::FVMSparseBlob(helper.path)),
             ("blk", "fvm.fastboot", None) => Ok(Image::FVMFastboot(helper.path)),
             ("kernel", "qemu-kernel", None) => Ok(Image::QemuKernel(helper.path)),
             (partition_type, name, _) => Err(de::Error::unknown_variant(
@@ -594,7 +572,6 @@ impl<'de> Deserialize<'de> for Image {
                     "(blk, blob)",
                     "(blk, storage-full)",
                     "(blk, storage-sparse)",
-                    "(blk, storage-sparse-blob)",
                     "(blk, fvm.fastboot)",
                     "(kernel, qemu-kernel)",
                 ],
@@ -628,7 +605,6 @@ mod tests {
                 Image::BlobFS { path: "blob.blk".into(), contents: Default::default() },
                 Image::FVM("fvm.blk".into()),
                 Image::FVMSparse("fvm.sparse.blk".into()),
-                Image::FVMSparseBlob("fvm.blob.sparse.blk".into()),
                 Image::FVMFastboot("fvm.fastboot.blk".into()),
                 Image::QemuKernel("qemu/kernel".into()),
             ],
@@ -667,7 +643,6 @@ mod tests {
                 Image::BlobFS { path: "blob.blk".into(), contents: Default::default() },
                 Image::FVM("fvm.blk".into()),
                 Image::FVMSparse("fvm.sparse.blk".into()),
-                Image::FVMSparseBlob("fvm.blob.sparse.blk".into()),
                 Image::FVMFastboot("fvm.fastboot.blk".into()),
                 Image::QemuKernel("qemu/kernel".into()),
             ],
@@ -706,7 +681,6 @@ mod tests {
                 Image::BlobFS { path: "path/to/blob.blk".into(), contents: Default::default() },
                 Image::FVM("path/to/fvm.blk".into()),
                 Image::FVMSparse("path/to/fvm.sparse.blk".into()),
-                Image::FVMSparseBlob("path/to/fvm.blob.sparse.blk".into()),
                 Image::FVMFastboot("path/to/fvm.fastboot.blk".into()),
                 Image::QemuKernel("path/to/qemu/kernel".into()),
             ],
@@ -776,7 +750,7 @@ mod tests {
     #[test]
     fn deserialize() {
         let manifest: AssemblyManifest = generate_test_manifest();
-        assert_eq!(manifest.images.len(), 9);
+        assert_eq!(manifest.images.len(), 8);
 
         for image in &manifest.images {
             let (expected, actual) = match image {
@@ -792,7 +766,6 @@ mod tests {
                 }
                 Image::FVM(path) => ("path/to/fvm.blk", path),
                 Image::FVMSparse(path) => ("path/to/fvm.sparse.blk", path),
-                Image::FVMSparseBlob(path) => ("path/to/fvm.blob.sparse.blk", path),
                 Image::FVMFastboot(path) => ("path/to/fvm.fastboot.blk", path),
                 Image::QemuKernel(path) => ("path/to/qemu/kernel", path),
                 _ => panic!("Unexpected item {:?}", image),
@@ -989,11 +962,6 @@ mod tests {
                 "type": "blk",
                 "name": "storage-sparse",
                 "path": "path/to/fvm.sparse.blk",
-            },
-            {
-                "type": "blk",
-                "name": "storage-sparse-blob",
-                "path": "path/to/fvm.blob.sparse.blk",
             },
             {
                 "type": "blk",

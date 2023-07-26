@@ -101,11 +101,6 @@ group("fvm.sparse.blk") {
   public_deps = [ labels.images ]
 }
 
-group("fvm.blob.sparse.blk") {
-  testonly = fuchsia_zbi_testonly
-  public_deps = [ labels.images ]
-}
-
 group("fvm.fastboot.blk") {
   testonly = fuchsia_zbi_testonly
   public_deps = [ labels.images ]
