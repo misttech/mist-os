@@ -226,13 +226,28 @@ impl FidlField {
                 ),
             },
             FidlFieldKind::Default => quote!(
-                #ident: src.#ident.unwrap_or_default(),
+                #ident: src
+                    .#ident
+                    .map(std::convert::TryFrom::try_from)
+                    .transpose()
+                    .map_err(anyhow::Error::from)?
+                    .unwrap_or_default(),
             ),
             FidlFieldKind::ExprDefault(default_ident) => quote!(
-                #ident: src.#ident.unwrap_or(#default_ident),
+                #ident: src
+                    .#ident
+                    .map(std::convert::TryFrom::try_from)
+                    .transpose()
+                    .map_err(anyhow::Error::from)?
+                    .unwrap_or(#default_ident),
             ),
             FidlFieldKind::HasDefault(value) => quote!(
-                #ident: src.#ident.unwrap_or(#value),
+                #ident: src
+                    .#ident
+                    .map(std::convert::TryFrom::try_from)
+                    .transpose()
+                    .map_err(anyhow::Error::from)?
+                    .unwrap_or(#value),
             ),
         }
     }

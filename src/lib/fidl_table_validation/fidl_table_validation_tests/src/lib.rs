@@ -8,6 +8,7 @@ use assert_matches::assert_matches;
 use fidl_table_validation::*;
 use fidl_test_tablevalidation::{Example, VecOfExample, WrapExample};
 use std::convert::TryFrom;
+use test_case::test_case;
 
 #[test]
 fn rejects_missing_fields() {
@@ -39,6 +40,26 @@ fn sets_default_fields() {
     }
 
     assert_matches!(Valid::try_from(Example::default()), Ok(Valid { num: 22 }));
+}
+
+#[test_case(u32::MAX, false)]
+#[test_case(22, true)]
+fn converts_default_fields(num: u32, expect_ok: bool) {
+    #[derive(ValidFidlTable, Debug, PartialEq)]
+    #[fidl_table_src(Example)]
+    struct Valid {
+        #[fidl_field_type(default = 22)]
+        // Note that u16 is smaller than the FIDL table type of u32 and
+        // exercises the conversion.
+        num: u16,
+    }
+
+    let got = Valid::try_from(Example { num: Some(num), ..Default::default() });
+    if expect_ok {
+        assert_matches!(got, Ok(Valid { num: got_num }) => assert_eq!(u32::from(got_num), num));
+    } else {
+        assert_matches!(got, Err(ExampleValidationError::InvalidField(_)))
+    }
 }
 
 #[test]
@@ -250,4 +271,66 @@ fn works_with_default_impls() {
         VecOfValid::try_from(VecOfExample { vec: Some(vec![Example::default()]), ..Default::default() }),
         Ok(VecOfValid { vec }) if vec == [Example::default()]
     );
+}
+
+#[test_case(None, true)]
+#[test_case(Some(Example::default()), false)]
+fn works_with_nested_default(inner: Option<Example>, expect_ok: bool) {
+    #[derive(ValidFidlTable, Debug, PartialEq)]
+    #[fidl_table_src(Example)]
+    struct Valid {
+        num: u32,
+    }
+
+    impl Default for Valid {
+        fn default() -> Self {
+            Self { num: 42 }
+        }
+    }
+
+    #[derive(ValidFidlTable, Debug, PartialEq)]
+    #[fidl_table_src(WrapExample)]
+    struct WrapValid {
+        #[fidl_field_type(default)]
+        inner: Valid,
+    }
+
+    let got = WrapValid::try_from(WrapExample { inner, ..Default::default() });
+    if expect_ok {
+        assert_matches!(
+            got,
+            Ok(WrapValid { inner }) => assert_eq!(inner, Default::default())
+        );
+    } else {
+        assert_matches!(got, Err(WrapExampleValidationError::InvalidField(_)));
+    }
+}
+
+#[test_case(None, true)]
+#[test_case(Some(Example::default()), false)]
+fn works_with_nested_identifier_default(inner: Option<Example>, expect_ok: bool) {
+    #[derive(ValidFidlTable, Debug, PartialEq, Eq)]
+    #[fidl_table_src(Example)]
+    struct Valid {
+        num: u32,
+    }
+
+    const DEFAULT_VALID: Valid = Valid { num: 42 };
+
+    #[derive(ValidFidlTable, Debug, PartialEq)]
+    #[fidl_table_src(WrapExample)]
+    struct WrapValid {
+        #[fidl_field_with_default(DEFAULT_VALID)]
+        inner: Valid,
+    }
+
+    let got = WrapValid::try_from(WrapExample { inner, ..Default::default() });
+    if expect_ok {
+        assert_matches!(
+            got,
+            Ok(WrapValid { inner }) => assert_eq!(inner, DEFAULT_VALID)
+        );
+    } else {
+        assert_matches!(got, Err(WrapExampleValidationError::InvalidField(_)));
+    }
 }

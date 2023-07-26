@@ -17,6 +17,7 @@ rustc_test("fidl_table_validation_tests_bin") {
     ":test.tablevalidation_rust",
     "//src/lib/fidl_table_validation",
     "//third_party/rust_crates:assert_matches",
+    "//third_party/rust_crates:test-case",
   ]
   sources = [ "src/lib.rs" ]
 }
