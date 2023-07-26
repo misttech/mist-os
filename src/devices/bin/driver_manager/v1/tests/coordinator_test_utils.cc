@@ -32,7 +32,6 @@ CoordinatorConfig DefaultConfig(async_dispatcher_t* bootargs_dispatcher,
   config.fs_provider = &dummy_fs_provider;
   config.suspend_timeout = zx::sec(2);
   config.resume_timeout = zx::sec(2);
-  config.path_prefix = "/pkg/";
   config.default_shutdown_system_state = fuchsia_device_manager::wire::SystemPowerState::kMexec;
   return config;
 }

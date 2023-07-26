@@ -10,9 +10,7 @@
 
 namespace {
 
-constexpr char kBootFirmwarePath[] = "lib/firmware";
-constexpr char kSystemFirmwarePath[] = "/system/lib/firmware";
-constexpr char kSystemPrefix[] = "/system/";
+constexpr char kBootFirmwarePath[] = "/boot/lib/firmware";
 
 zx_status_t LoadFirmwareAtPath(int fd, const char* path, zx::vmo* vmo, size_t* size) {
   fbl::unique_fd firmware_fd(openat(fd, path, O_RDONLY));
@@ -26,16 +24,11 @@ zx_status_t LoadFirmwareAtPath(int fd, const char* path, zx::vmo* vmo, size_t* s
 
 }  // namespace
 
-FirmwareLoader::FirmwareLoader(async_dispatcher_t* firmware_dispatcher, std::string path_prefix)
-    : firmware_dispatcher_(firmware_dispatcher), path_prefix_(std::move(path_prefix)) {}
+FirmwareLoader::FirmwareLoader(async_dispatcher_t* firmware_dispatcher)
+    : firmware_dispatcher_(firmware_dispatcher) {}
 
 void FirmwareLoader::LoadFirmware(const Driver* driver, const char* path,
                                   fit::callback<void(zx::result<LoadFirmwareResult>)> cb) const {
-  const std::string fwdirs[] = {
-      path_prefix_ + kBootFirmwarePath,
-      kSystemFirmwarePath,
-  };
-
   // Must be a relative path and no funny business.
   if (path[0] == '/' || path[0] == '.') {
     cb(zx::error(ZX_ERR_INVALID_ARGS));
@@ -48,29 +41,15 @@ void FirmwareLoader::LoadFirmware(const Driver* driver, const char* path,
     package_dir = driver->package_dir.duplicate();
   }
 
-  bool is_system = strncmp(driver->url.c_str(), kSystemPrefix, std::size(kSystemPrefix) - 1) == 0;
-
-  // This must occur in a separate thread as fdio operations may block when accessing /system or
+  // This must occur in a separate thread as fdio operations may block when accessing
   // /pkg, possibly deadlocking the system. See http://fxbug.dev/87127 for more context.
   async::PostTask(firmware_dispatcher_, [path = std::string(path),
-                                         package_dir = std::move(package_dir), is_system, fwdirs,
+                                         package_dir = std::move(package_dir),
                                          cb = std::move(cb)]() mutable {
-    // We are only going to check /system/ if the driver was loaded out of /system.
-    // This ensures that /system is available and loaded, as otherwise touching /system
-    // will wait, potentially forever.
-    size_t directories_to_check = 1;
-    if (is_system) {
-      directories_to_check = std::size(fwdirs);
-    }
-
     zx::vmo vmo;
     size_t size;
-    for (unsigned n = 0; n < directories_to_check; n++) {
-      fbl::unique_fd fd(open(fwdirs[n].c_str(), O_RDONLY, O_DIRECTORY));
-      if (fd.get() < 0) {
-        continue;
-      }
-
+    fbl::unique_fd fd(open(kBootFirmwarePath, O_RDONLY, O_DIRECTORY));
+    if (fd.get() >= 0) {
       zx_status_t status = LoadFirmwareAtPath(fd.get(), path.c_str(), &vmo, &size);
       if (status == ZX_OK) {
         cb(zx::ok(LoadFirmwareResult{std::move(vmo), size}));

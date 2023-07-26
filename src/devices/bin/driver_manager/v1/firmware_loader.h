@@ -17,14 +17,13 @@ struct LoadFirmwareResult {
 
 class FirmwareLoader {
  public:
-  FirmwareLoader(async_dispatcher_t* firmware_dispatcher, std::string path_prefix);
+  FirmwareLoader(async_dispatcher_t* firmware_dispatcher);
 
   void LoadFirmware(const Driver* driver, const char* path,
                     fit::callback<void(zx::result<LoadFirmwareResult>)> cb) const;
 
  private:
   async_dispatcher_t* const firmware_dispatcher_;
-  std::string path_prefix_;
 };
 
 #endif  // SRC_DEVICES_BIN_DRIVER_MANAGER_V1_FIRMWARE_LOADER_H_

@@ -72,7 +72,6 @@ int RunDfv1(driver_manager_config::Config dm_config,
       dm_config.delay_fallback_until_base_drivers_indexed();
   config.verbose = dm_config.verbose();
   config.fs_provider = &system_instance;
-  config.path_prefix = "/boot/";
   config.crash_policy = CrashPolicyFromString(dm_config.driver_host_crash_policy());
 
   // Waiting an infinite amount of time before falling back is effectively not

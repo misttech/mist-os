@@ -107,9 +107,6 @@ struct CoordinatorConfig {
       fuchsia_device_manager::SystemPowerState::kReboot;
   // Something to clone a handle from the environment to pass to a Devhost.
   FsProvider* fs_provider = nullptr;
-  // The path prefix to find binaries, drivers, etc. Typically this is "/boot/", but in test
-  // environments this might be different.
-  std::string path_prefix = "/boot/";
   // The decision to make when we encounter a driver host crash.
   DriverHostCrashPolicy crash_policy = DriverHostCrashPolicy::kRestartDriverHost;
 };

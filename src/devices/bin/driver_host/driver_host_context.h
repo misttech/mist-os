@@ -126,9 +126,6 @@ class DriverHostContext {
 
   DriverHostInspect& inspect() { return inspect_; }
 
-  const std::string& root_driver_path() const { return root_driver_path_; }
-  void set_root_driver_path(std::string_view path) { root_driver_path_ = path; }
-
  private:
   void FinalizeDyingDevices() TA_REQ(api_lock_);
 

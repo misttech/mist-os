@@ -296,7 +296,7 @@ Coordinator::Coordinator(CoordinatorConfig config, InspectManager* inspect_manag
       driver_loader_(config_.boot_args, std::move(config_.driver_index), &base_resolver_,
                      dispatcher, config_.delay_fallback_until_base_drivers_indexed,
                      &package_resolver_),
-      firmware_loader_(firmware_dispatcher, config_.path_prefix) {
+      firmware_loader_(firmware_dispatcher) {
   bind_driver_manager_ = std::make_unique<BindDriverManager>(this);
 
   device_manager_ = std::make_unique<DeviceManager>(this, config_.crash_policy);
@@ -351,7 +351,6 @@ void Coordinator::InitCoreDevices(std::string_view root_device_driver) {
 }
 
 zx_status_t Coordinator::NewDriverHost(const char* name, fbl::RefPtr<DriverHost>* out) {
-  std::string root_driver_path_arg;
   std::vector<const char*> env;
   if (driver_host_is_asan()) {
     env.push_back(kAsanEnvironment);
@@ -388,8 +387,6 @@ zx_status_t Coordinator::NewDriverHost(const char* name, fbl::RefPtr<DriverHost>
   if (config_.verbose) {
     env.push_back("devmgr.verbose=true");
   }
-  root_driver_path_arg = "devmgr.root_driver_path=" + config_.path_prefix + "driver/";
-  env.push_back(root_driver_path_arg.c_str());
 
   env.push_back(nullptr);
 
