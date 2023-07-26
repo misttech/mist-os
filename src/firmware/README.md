@@ -11,11 +11,9 @@ when bringing up a new board.
 The Firmware SDK build rules live in `//sdk/BUILD.gn`. The SDK is not built
 in the normal flow, but can be built manually as follows:
 
-1. Add `build_sdk_archives=true` to your gn args, typically by one of:
-   1. `fx set ... --args=build_sdk_archives=true`, or
-   2. `fx args` and add `build_sdk_archives = true` to the args file
 1. Run `fx build sdk:firmware`
 1. Find the resulting SDK archive at `<build_dir>/sdk/archive/firmware.tar.gz`
+   or its content at `<build_dir>/sdk/exported/firmware/`
 
 ## Porting
 
@@ -26,7 +24,7 @@ implementation available, as firmware toolchains are commonly C-only.
 
 General porting steps are:
 
-1. Build the Firmware SDK archive (see instructions above)
+1. Build the Firmware IDK archive (see instructions above)
 1. Unpack the archive in the firmware source tree
 1. Add the required files and paths to the firmware build system
 1. If necessary, modify SDK headers to work with the firmware source (e.g.

@@ -15,14 +15,30 @@ import("//build/sdk/sdk_documentation.gni")
 import("//tools/check-licenses/build/license_data.gni")
 import("config.gni")
 
-_sdk_public_deps = [
+# A list of sdk_collection() targets that determine the content
+# if the Fuchsia Core IDK, which provides stable and officially
+# supported Fuchsia APIs and ABIs.
+_fuchsia_core_idk_deps = [
   ":core",
   ":core_testing",
   ":e2e_testing",
-  ":zircon_sysroot",
 ]
 
-# This default target should contain all public or partner SDKs.
+# A list of sdk_collection() targets that correspond to all
+# IDK targets in the "public" and "partner" category. For now
+# this is only the Fuchsia Core IDK, with the exceptional addition
+# of //sdk:zircon_sysroot. See the documentation comment for the
+# latter to understand why this is needed.
+#
+# Note that //sdk:zircon_sysroot simply depends on
+# //zircon/public/sysroot/sdk:sysroot_sdk which is already
+# a transitive dependency of //sdk:core, so technically adding
+# this target here only ensures that `fx build sdk` will
+# also create $OUTPUT_DIR/sdk/exported/zircon_sysroot/ by
+# default, and should not affect other uses of _sdk_public_deps.
+_sdk_public_deps = _fuchsia_core_idk_deps + [ ":zircon_sysroot" ]
+
+# This default target should depend on all public or partner IDKs.
 group("sdk") {
   testonly = true
 
@@ -75,7 +91,8 @@ generated_file("plasa_manifest") {
 }
 
 # This target is used by infra builders to build all SDK archives that
-# make up the "core" SDK.
+# make up the "core" SDK. This is deprecated and will be removed once
+# https://fxbug.dev/126262 is fixed.
 group("archives") {
   testonly = true
   public_deps = [
@@ -84,14 +101,6 @@ group("archives") {
     ":e2e_testing_archive",
   ]
 }
-
-# Dependencies used to generate the official
-# Fuchsia Core IDK.
-_fuchsia_idk_deps = [
-  ":core",
-  ":core_testing",
-  ":e2e_testing",
-]
 
 # A target used to generate an IDK archive
 # that only contains prebuilt binaries for
@@ -103,11 +112,12 @@ _fuchsia_idk_deps = [
 # See https://fxbug.dev/126262
 merged_sdk("merged") {
   testonly = true
-  deps = _fuchsia_idk_deps
+  deps = _fuchsia_core_idk_deps
 }
 
 # This targets generates a "final" IDK archive
-# that contains prebuilt binaries for several
+
+# Note that this is part of the Fuchsia Core IDK.# that contains prebuilt binaries for several
 # target_cpu architecture. This is done by
 # performing several sub-builds and merging
 # the results explicitly.
@@ -118,7 +128,7 @@ merged_sdk("merged") {
 # See https://fxbug.dev/126262
 generate_final_idk("final_fuchsia_idk") {
   output_name = "fuchsia_idk"
-  sdk_target_labels = _fuchsia_idk_deps
+  sdk_target_labels = _fuchsia_core_idk_deps
   testonly = true
 }
 
@@ -225,13 +235,30 @@ sdk_molecule("license") {
   ]
 }
 
-sdk("zircon_sysroot") {
+# A tiny SDK collection used to export the content of the Zircon sysroot
+# This is only needed because several other parts of the Fuchsia build
+# depend on $OUTPUT_DIR/sdk/exported/zircon_sysroot/ to be available
+# and properly populated, see [1] for all details.
+#
+# Note that //zircon/public/sysroot/sdk:sysroot_sdk is already
+# a transitive dependency of //sdk:core, so using the content of
+# $OUTPUT_DIR/sdk/exported/core/ would be equivalent, except that
+# this directory is much longer to build (since it contains host tools).
+#
+# [1] https://cs.opensource.google/search?q=zircon_sysroot&ss=fuchsia%2Ffuchsia
+sdk_collection("zircon_sysroot") {
   category = "internal"
 
   deps = [ "//zircon/public/sysroot/sdk:sysroot_sdk" ]
+
+  # A compressed archive is never needed for this collection, only its
+  # export directory should be used by Fuchsia team developers.
+  generate_archive = false
 }
 
-sdk("e2e_testing") {
+# A set of SDK atoms related to developing end-to-end tests.
+# Note that this is part of the Fuchsia Core IDK.
+sdk_collection("e2e_testing") {
   # TODO(fxbug.dev/6128): this id should not be necessary.
   id = sdk_id
 
@@ -243,6 +270,11 @@ sdk("e2e_testing") {
     ":e2e_testing_tools",
     "//sdk/testing/sl4f/client:client_sdk($dart_toolchain)",
   ]
+
+  # TODO(https://fxbug.dev/126262): Remove this.
+  if (build_sdk_archives) {
+    generate_archive = true
+  }
 }
 
 sdk_molecule("e2e_testing_tools") {
@@ -366,7 +398,7 @@ sdk_molecule("core_lib") {
 }
 
 # Pieces of the IDK sans host tools (which are in ":host_tools").
-sdk_molecule("core_idk") {
+sdk_molecule("core_deps") {
   visibility = [ ":*" ]
 
   deps = [
@@ -384,7 +416,7 @@ sdk_molecule("core_idk") {
   ]
 }
 
-sdk_molecule("core_testing_idk") {
+sdk_molecule("core_testing_deps") {
   visibility = [ ":*" ]
 
   testonly = true
@@ -398,7 +430,7 @@ sdk_molecule("core_testing_idk") {
     "//zircon/system/ulib/async-testing:async-testing_sdk",
   ]
   if (!sdk_no_host_tools) {
-    # This target depends on //dsk:host_tools.all($host_toolchain) indirectly.
+    # This target depends on //sdk:host_tools.all($host_toolchain) indirectly.
     deps += [ "//tools/docsgen:ref_docs_sdk" ]
   }
 }
@@ -414,7 +446,7 @@ sdk_molecule("platform_fidls") {
 }
 
 # This SDK molecule is a collection of libraries only available to the in-tree
-# Bazel build. See https://fxrev.dev/737558 and https://fxbug.dev/113063.
+# Bazel build. See //sdk:platform.
 sdk_molecule("platform_libs") {
   visibility = [ ":*" ]
 
@@ -435,7 +467,11 @@ sdk_molecule("platform_libs") {
   ]
 }
 
-sdk("platform") {
+# A collection of SDK atoms used to populate the @internal_sdk Bazel
+# repository. Only used for the GN > Bazel migration of the build system.
+# Content are bound to change a lot. Nothing else should rely on this.
+# See https://fxrev.dev/737558 and https://fxbug.dev/113063.
+sdk_collection("platform") {
   id = sdk_id
 
   category = "internal"
@@ -446,7 +482,14 @@ sdk("platform") {
   ]
 }
 
-sdk("core") {
+# A collection of SDK atoms exposing the stable and officially supported
+# APIs and ABI of the "core" Fuchsia platform. Due to limitations of the
+# build system at the GN/Bazel boundary, this collection cannot contain
+# testonly atoms, but see //sdk:core_testing for those.
+#
+# This collection is part of the Fuchsia Core IDK, as well as used to
+# populate the @fuchsia_sdk Bazel repository used internally by the build.
+sdk_collection("core") {
   id = sdk_id
 
   category = "partner"
@@ -455,13 +498,22 @@ sdk("core") {
 
   filter_api_host_tools = !sdk_cross_compile_host_tools
 
-  deps = [ ":core_idk" ]
+  deps = [ ":core_deps" ]
   if (!sdk_no_host_tools) {
     deps += [ ":host_tools" ]
   }
+
+  # TODO(https://fxbug.dev/126262): Remove this.
+  if (build_sdk_archives) {
+    generate_archive = true
+  }
 }
 
-sdk("core_testing") {
+# A collection of test-related SDK atoms for the Fuchsia Core IDK.
+# Unlike //sdk:core, this collection can contain testonly atoms.
+# However, it cannot be used to popualte the @fuchsia_sdk Bazel
+# repository used internally.
+sdk_collection("core_testing") {
   id = sdk_id
 
   testonly = true
@@ -470,7 +522,12 @@ sdk("core_testing") {
 
   api = "manifests/core_testing.manifest"
 
-  deps = [ ":core_testing_idk" ]
+  deps = [ ":core_testing_deps" ]
+
+  # TODO(https://fxbug.dev/126262): Remove this.
+  if (build_sdk_archives) {
+    generate_archive = true
+  }
 }
 
 group("host_tools.all") {
@@ -486,10 +543,10 @@ group("host_tools.all") {
 }
 
 if (is_host) {
-  # An IDK that only contains host tools that are used by the
+  # A collection that only contains host tools that are used by the
   # Fuchsia build system itself. In particular, this is where
   # `ffx` will pick companion host tools when running in-tree.
-  sdk("host_tools.internal") {
+  sdk_collection("host_tools.internal") {
     id = sdk_id
     category = "partner"
     api = "manifests/host_tools_${current_os}_${current_cpu}.manifest"
@@ -517,8 +574,8 @@ if (is_host) {
   }
 }
 
-# Firmware SDK.
-sdk("firmware") {
+# Firmware IDK. See /src/firmware/README.md
+sdk_collection("firmware") {
   category = "experimental"
 
   deps = [
@@ -531,6 +588,9 @@ sdk("firmware") {
     "//third_party/android/platform/external/avb:avb_sdk",
     "//zircon/public/sysroot/sdk:sysroot_sdk",
   ]
+
+  # An archive is always needed when building this target.
+  generate_archive = true
 }
 
 # Tools Fuchsia driver developers used on the host platform; where host is often
@@ -597,10 +657,10 @@ sdk_molecule("driver_fidl") {
   ]
 }
 
-# An experimental SDK for developing drivers.
-# WARNING (fxbug.dev/116642): the driver SDK will soon be removed.
-# DO NOT ADD anything here!
-sdk("driver") {
+# An SDK collection providing SDK atoms used for driver development.
+# Their API/ABI is not stable at all. Note: this cannot contain
+# testonly atoms.
+sdk_collection("driver") {
   id = sdk_id
 
   category = "experimental"
@@ -631,6 +691,11 @@ sdk("driver") {
   ]
   if (!sdk_no_host_tools) {
     deps += [ ":driver_host_tools" ]
+  }
+
+  if (build_sdk_archives) {
+    # TODO(fxbug.dev/116642): the driver SDK archive will soon be removed.
+    generate_archive = true
   }
 }
 

@@ -102,10 +102,10 @@ import("//build/sdk/sdk_atom_alias.gni")
 #
 #
 # However, without "runtime_deps", 'foo_sdk' will _not_ depend on 'bar_sdk',
-# which means that if an sdk() target depends on 'foo_sdk', the atom for
-# the 'bar_sdk' target will be ignored. The result is a "broken" exported
-# SDK that will not include a prebuilt for libbar.so, even though it is
-# needed at runtime by libfoo.so.
+# which means that if an sdk_collection() target depends on 'foo_sdk', the
+# atom for the 'bar_sdk' target will be ignored. The result is a "broken"
+# exported dir that will not include a prebuilt for libbar.so, even though
+# it is needed at runtime by libfoo.so.
 #
 # To fix this, set 'runtime_deps' to point to the SDK atom target for bar,
 # as in:

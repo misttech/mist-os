@@ -96,8 +96,9 @@ declare_args() {
   # afterwards.
   test_durations_file = ""
 
-  # Extra sdk() archive labels to be uploaded to the artifacts store. This is
-  # an extension mechanism for SDK bits outside of the main repository.
+  # Extra generate_final_idk() or sdk_collection() archive labels to be
+  # uploaded to the artifacts store. This is an extension mechanism for SDK
+  # bits outside of the main repository.
   sdk_archive_labels = []
 }
 

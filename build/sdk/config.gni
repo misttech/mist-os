@@ -5,7 +5,8 @@
 declare_args() {
   # Whether to build archives for sdk() targets by default.
   # This is deprecated, archives should instead be created through
-  # generate_final_idk().
+  # generate_final_idk(). Moreover, the sdk() template is deprecated
+  # and its use replaced with sdk_collection() instead.
   build_sdk_archives = false
 
   # Whether to only warn when an SDK has been modified.
