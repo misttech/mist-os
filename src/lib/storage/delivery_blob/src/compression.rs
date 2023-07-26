@@ -301,7 +301,10 @@ impl ChunkedArchive {
         if uncompressed_length <= (Self::MAX_CHUNKS * Self::TARGET_CHUNK_SIZE) {
             return Self::TARGET_CHUNK_SIZE;
         }
-        let chunk_size = uncompressed_length / ChunkedArchive::MAX_CHUNKS;
+        // TODO(https://github.com/rust-lang/rust/issues/88581): Replace with
+        // `{integer}::div_ceil()` when `int_roundings` is available.
+        let chunk_size =
+            round_up(uncompressed_length, ChunkedArchive::MAX_CHUNKS) / ChunkedArchive::MAX_CHUNKS;
         return round_up(chunk_size, chunk_alignment);
     }
 
@@ -628,6 +631,24 @@ mod tests {
             header.decode_seek_table(serialized_table, archive_length).unwrap_err(),
             ChunkedArchiveError::IntegrityError
         ));
+    }
+
+    #[test]
+    fn max_chunks() {
+        assert_eq!(
+            ChunkedArchive::chunk_size_for(
+                ChunkedArchive::MAX_CHUNKS * ChunkedArchive::TARGET_CHUNK_SIZE,
+                BLOCK_SIZE,
+            ),
+            ChunkedArchive::TARGET_CHUNK_SIZE
+        );
+        assert_eq!(
+            ChunkedArchive::chunk_size_for(
+                ChunkedArchive::MAX_CHUNKS * ChunkedArchive::TARGET_CHUNK_SIZE + 1,
+                BLOCK_SIZE,
+            ),
+            ChunkedArchive::TARGET_CHUNK_SIZE + BLOCK_SIZE
+        );
     }
 
     #[test]
