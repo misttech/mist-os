@@ -295,8 +295,7 @@ impl FsNodeOps for RemoteNode {
         owner: FsCred,
     ) -> Result<FsNodeHandle, Errno> {
         let name = get_name_str(name)?;
-        if !mode.is_reg() {
-            log_warn!("Can only create regular files in remotefs.");
+        if !(mode.is_reg() || mode.is_chr() || mode.is_blk() || mode.is_fifo() || mode.is_sock()) {
             return error!(EINVAL, name);
         }
 
@@ -346,7 +345,11 @@ impl FsNodeOps for RemoteNode {
             node_id = attrs.id;
         }
 
-        let ops = Box::new(RemoteNode { zxio, rights: self.rights });
+        let ops = if mode.is_reg() {
+            Box::new(RemoteNode { zxio, rights: self.rights }) as Box<dyn FsNodeOps>
+        } else {
+            Box::new(RemoteSpecialNode { zxio }) as Box<dyn FsNodeOps>
+        };
         let child =
             node.fs().create_node_with_id(ops, node_id, FsNodeInfo::new(node_id, mode, owner));
         Ok(child)
@@ -443,8 +446,10 @@ impl FsNodeOps for RemoteNode {
 
         let ops = if mode.is_lnk() {
             Box::new(RemoteSymlink { zxio }) as Box<dyn FsNodeOps>
-        } else {
+        } else if mode.is_reg() || mode.is_dir() {
             Box::new(RemoteNode { zxio, rights: self.rights }) as Box<dyn FsNodeOps>
+        } else {
+            Box::new(RemoteSpecialNode { zxio }) as Box<dyn FsNodeOps>
         };
         let child = node.fs().create_node_with_id(
             ops,
@@ -512,6 +517,79 @@ impl FsNodeOps for RemoteNode {
             FsNodeInfo::new(attrs.id, FileMode::IFLNK | FileMode::ALLOW_ALL, owner),
         );
         Ok(symlink)
+    }
+
+    fn get_xattr(
+        &self,
+        _node: &FsNode,
+        _current_task: &CurrentTask,
+        name: &FsStr,
+        _max_size: usize,
+    ) -> Result<ValueOrSize<FsString>, Errno> {
+        let value = self.zxio.xattr_get(name).map_err(|status| match status {
+            zx::Status::NOT_FOUND => errno!(ENODATA),
+            status => from_status_like_fdio!(status),
+        })?;
+        Ok(value.into())
+    }
+
+    fn set_xattr(
+        &self,
+        _node: &FsNode,
+        _current_task: &CurrentTask,
+        name: &FsStr,
+        value: &FsStr,
+        op: XattrOp,
+    ) -> Result<(), Errno> {
+        let mode = match op {
+            XattrOp::Set => XattrSetMode::Set,
+            XattrOp::Create => XattrSetMode::Create,
+            XattrOp::Replace => XattrSetMode::Replace,
+        };
+
+        self.zxio.xattr_set(name, value, mode).map_err(|status| match status {
+            zx::Status::NOT_FOUND => errno!(ENODATA),
+            status => from_status_like_fdio!(status),
+        })
+    }
+
+    fn remove_xattr(
+        &self,
+        _node: &FsNode,
+        _current_task: &CurrentTask,
+        name: &FsStr,
+    ) -> Result<(), Errno> {
+        self.zxio.xattr_remove(name).map_err(|status| match status {
+            zx::Status::NOT_FOUND => errno!(ENODATA),
+            _ => from_status_like_fdio!(status),
+        })
+    }
+
+    fn list_xattrs(
+        &self,
+        _node: &FsNode,
+        _current_task: &CurrentTask,
+        _size: usize,
+    ) -> Result<ValueOrSize<Vec<FsString>>, Errno> {
+        self.zxio
+            .xattr_list()
+            .map(ValueOrSize::from)
+            .map_err(|status| from_status_like_fdio!(status))
+    }
+}
+
+struct RemoteSpecialNode {
+    zxio: Arc<syncio::Zxio>,
+}
+
+impl FsNodeOps for RemoteSpecialNode {
+    fn create_file_ops(
+        &self,
+        _node: &FsNode,
+        _current_task: &CurrentTask,
+        _flags: OpenFlags,
+    ) -> Result<Box<dyn FileOps>, Errno> {
+        unreachable!("Special nodes cannot be opened.");
     }
 
     fn get_xattr(
@@ -1324,6 +1402,61 @@ mod test {
 
             // inode_num for .. for the second sub directory should be the first sub directory.
             assert_eq!(sink.dot_dot_inode_num, sub_dir1.entry.node.node_id);
+        })
+        .await;
+
+        fixture.close().await;
+    }
+
+    #[::fuchsia::test]
+    async fn test_remote_special_node() {
+        let fixture = TestFixture::new().await;
+        let (server, client) = zx::Channel::create();
+        fixture
+            .root()
+            .clone(fio::OpenFlags::CLONE_SAME_RIGHTS, server.into())
+            .expect("clone failed");
+        const FIFO_MODE: FileMode = FileMode::from_bits(FileMode::IFIFO.bits() | 0o777);
+        const REG_MODE: FileMode = FileMode::from_bits(FileMode::IFREG.bits());
+        let (kernel, current_task) = create_kernel_and_task();
+
+        fasync::unblock(move || {
+            let rights = fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE;
+            let fs = RemoteFs::new_fs(&kernel, client, "/", rights).expect("new_fs failed");
+            let ns = Namespace::new(fs);
+            current_task.fs().set_umask(FileMode::from_bits(0));
+            let root = ns.root();
+
+            // Create RemoteSpecialNode (e.g. FIFO)
+            root.create_node(&current_task, b"fifo", FIFO_MODE, DeviceType::NONE)
+                .expect("create_node failed");
+            let mut context = LookupContext::new(SymlinkMode::NoFollow);
+            let fifo_node = root
+                .lookup_child(&current_task, &mut context, b"fifo")
+                .expect("lookup_child failed");
+
+            // Test that we get expected behaviour for RemoteSpecialNode operation, e.g. test that
+            // truncate should return EINVAL
+            match fifo_node.entry.node.truncate(&current_task, 0) {
+                Ok(_) => {
+                    panic!("truncate passed for special node")
+                }
+                Err(errno) if errno == EINVAL => {}
+                Err(e) => {
+                    panic!("truncate failed with error {:?}", e)
+                }
+            };
+
+            // Create regular RemoteNode
+            root.create_node(&current_task, b"file", REG_MODE, DeviceType::NONE)
+                .expect("create_node failed");
+            let mut context = LookupContext::new(SymlinkMode::NoFollow);
+            let reg_node = root
+                .lookup_child(&current_task, &mut context, b"file")
+                .expect("lookup_child failed");
+
+            // We should be able to perform truncate on regular files
+            reg_node.entry.node.truncate(&current_task, 0).expect("truncate failed");
         })
         .await;
 

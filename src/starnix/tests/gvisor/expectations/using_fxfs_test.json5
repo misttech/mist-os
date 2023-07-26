@@ -18,13 +18,6 @@
                 // fallocate_test
                 "AllocateTest.Fallocate",
 
-                // fifo_test
-                "FifoTest.Fifo",
-                "FifoTest.FifoOpenRDWR",
-                "FifoTest.FifoOtrunc",
-                "FifoTest.FifoTruncNoOp",
-                "FifoTest.MknodAtFIFO",
-
                 // link_test
                 "LinkTest.AbsPathsNonDirFDsWithOpath",
                 "LinkTest.AbsPathsWithNonDirFDs",
@@ -33,13 +26,8 @@
                 "LinkTest.LinkatDoesNotFollowSymlinkByDefault",
                 "LinkTest.LinkatWithSymlinkFollow",
                 "LinkTest.NewDirFDWithOpath",
-                "LinkTest.PermissionDenied",
                 "LinkTest.WithNewDirFD",
                 "LinkTest.WithOldDirFD",
-
-                // mknod_test
-                "MknodTest.MknodAtFIFO",
-                "MknodTest.Socket",
             ],
         },
         {
