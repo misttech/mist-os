@@ -896,6 +896,7 @@ assembly_input_bundle("minimal_eng") {
     # Backend for ffx process command.
     "//src/developer/process_explorer:process_explorer_package",
     "//src/devices/bin/driver_playground:pkg",
+    "//src/testing/metrics-logger:metrics-logger-pkg",
   ]
   compiled_packages = [
     {
@@ -907,6 +908,7 @@ assembly_input_bundle("minimal_eng") {
                   [
                     "//src/developer/process_explorer/meta/process_explorer.core_shard.cml",
                     "//src/devices/bin/driver_playground/meta/driver_playground.core_shard.cml",
+                    "//src/testing/metrics-logger/meta/metrics-logger.core_shard.cml",
                   ],
                   root_build_dir)
         },

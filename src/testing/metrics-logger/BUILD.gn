@@ -89,12 +89,14 @@ rustc_binary("bin") {
   ]
 }
 
-core_shard("metrics-logger-shard") {
-  shard_file = "meta/metrics-logger.core_shard.cml"
+# Enabling soft-transition, remove when complete
+# TODO(b/292109564): Remove transition labels.
+group("metrics-logger") {
 }
 
-fuchsia_package_with_single_component("metrics-logger") {
+fuchsia_package_with_single_component("metrics-logger-pkg") {
   manifest = "meta/metrics-logger.cml"
+  package_name = "metrics-logger"
   deps = [ ":bin" ]
 }
 

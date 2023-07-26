@@ -25,9 +25,6 @@ group("end_to_end_deps") {
 
     # Needed for VP9 decode conformance testing.
     "//src/media/codec/examples:vp9_decoder_conformance_http",
-
-    # Service that tests use to log cpu usage into traces
-    "//src/testing/metrics-logger",
   ]
 }
 
