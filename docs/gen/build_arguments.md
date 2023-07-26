@@ -141,7 +141,7 @@ Used as a parameter to assembled_system().
 
 **Current value (from the default):** `false`
 
-From //build/images/args.gni:187
+From //build/images/args.gni:182
 
 ### assembly_generate_fvm_fastboot
 
@@ -151,7 +151,7 @@ suitable for flashing through fastboot for eMMC devices.
 
 **Current value (from the default):** `false`
 
-From //build/images/args.gni:158
+From //build/images/args.gni:153
 
 ### assembly_generate_fvm_nand
 
@@ -163,7 +163,7 @@ room to initialize on boot.
 
 **Current value (from the default):** `false`
 
-From //build/images/args.gni:165
+From //build/images/args.gni:160
 
 ### authorized_ssh_keys_label
 
@@ -302,7 +302,7 @@ From //build/testing/environments.gni:9
 
 **Current value (from the default):** `false`
 
-From //build/images/args.gni:215
+From //build/images/args.gni:210
 
 ### bazel_product_bundle_prefix
 
@@ -327,7 +327,7 @@ The actual bazel_product_bundle used for Bazel assembly is:
 
 **Current value (from the default):** `false`
 
-From //build/images/args.gni:214
+From //build/images/args.gni:209
 
 ### bazel_quiet
 
@@ -950,11 +950,13 @@ From //build/product.gni:7
 
 ### build_sdk_archives
 
-Whether to build SDK tarballs.
+Whether to build archives for sdk() targets by default.
+This is deprecated, archives should instead be created through
+generate_final_idk().
 
 **Current value (from the default):** `false`
 
-From //build/sdk/config.gni:7
+From //build/sdk/config.gni:9
 
 ### build_should_trace_actions
 
@@ -3100,7 +3102,7 @@ useful for including verification and other Bazel assembly specific targets.
 
 **Current value (from the default):** `[]`
 
-From //build/images/args.gni:219
+From //build/images/args.gni:214
 
 ### extra_gn_labels_for_bazel_inputs
 
@@ -3963,7 +3965,7 @@ Include an account partition in the FVM image if set to true.
 
 **Current value (from the default):** `false`
 
-From //build/images/args.gni:153
+From //build/images/args.gni:148
 
 ### include_clippy
 
@@ -3973,16 +3975,6 @@ causes clippy targets to get included in the build by default.
 **Current value (from the default):** `true`
 
 From //build/rust/config.gni:65
-
-### include_fvm_blob_sparse
-
-Include fvm.blob.sparse.blk image into the build if set to true
-TODO(b/291958397): This can be deleted, because blob sparse fvms are no
-longer in use.
-
-**Current value (from the default):** `false`
-
-From //build/images/args.gni:150
 
 ### include_internal_fonts
 
@@ -4008,7 +4000,7 @@ assembled_system().  See documentation there.
 
 **Current value (from the default):** `false`
 
-From //build/images/args.gni:183
+From //build/images/args.gni:178
 
 ### include_zxdb_large_tests
 
@@ -6672,6 +6664,20 @@ public config (which may -include a file or add defines directly).
 
 From //third_party/pigweed/src/pw_tokenizer/BUILD.gn:30
 
+### pw_toolchain_ARM_NONE_EABI_PREFIX
+
+This flag allows you to specify the root directory of the ARM GCC tools to
+to use when compiling with an arm-none-eabi toolchain. This is useful for
+debugging toolchain-related issues, or for building with an
+externally-provided toolchain.
+
+If the prefix begins with "//", it will be rebased to be relative to the
+root build directory.
+
+**Current value (from the default):** `""`
+
+From //third_party/pigweed/src/pw_toolchain/arm_gcc/toolchains.gni:32
+
 ### pw_toolchain_CLANG_PREFIX
 
 This flag allows you to specify the root directory of the clang, clang++,
@@ -6679,9 +6685,12 @@ and llvm-ar binaries to use when compiling with a clang-based toolchain.
 This is useful for debugging toolchain-related issues by building with an
 externally-provided toolchain.
 
-**Current value (from the default):** `""`
+If the prefix begins with "//", it will be rebased to be relative to the
+root build directory.
 
-From //third_party/pigweed/src/pw_toolchain/clang_tools.gni:23
+**Current value (from the default):** `"//prebuilt/third_party/bin/"`
+
+From //third_party/pigweed/src/pw_toolchain/clang_tools.gni:26
 
 ### pw_toolchain_COVERAGE_ENABLED
 
@@ -6734,9 +6743,12 @@ From //third_party/pigweed/src/pw_toolchain/rbe.gni:26
 
 This flag allows you to specify the root directory of the rustc binary.
 
-**Current value (from the default):** `""`
+If the prefix begins with "//", it will be rebased to be relative to the
+root build directory.
 
-From //third_party/pigweed/src/pw_toolchain/clang_tools.gni:26
+**Current value (from the default):** `"//prebuilt/third_party/bin/"`
+
+From //third_party/pigweed/src/pw_toolchain/clang_tools.gni:32
 
 ### pw_toolchain_SANITIZERS
 
@@ -7002,7 +7014,7 @@ Example value: "//build/images/recovery"
 
 **Current value (from the default):** `"//build/images/zedboot"`
 
-From //build/images/args.gni:174
+From //build/images/args.gni:169
 
 ### recovery_logo_path
 
@@ -7504,7 +7516,7 @@ From //sdk/config.gni:13
 
 Identifier for the Core SDK.
 
-**Current value (from the default):** `"13.99991231.0.1"`
+**Current value (from the default):** `"14.99991231.0.1"`
 
 From //sdk/config.gni:7
 
@@ -7517,7 +7529,7 @@ actions.
 
 **Current value (from the default):** `false`
 
-From //build/sdk/config.gni:20
+From //build/sdk/config.gni:22
 
 ### sdk_no_host_tools
 
@@ -7525,7 +7537,7 @@ Whether to omit host tools from the generated IDKs.
 
 **Current value (from the default):** `false`
 
-From //build/sdk/config.gni:14
+From //build/sdk/config.gni:16
 
 ### select_variant
 
@@ -8184,7 +8196,7 @@ exactly what you are doing.
 
 **Current value (from the default):** `false`
 
-From //build/images/args.gni:194
+From //build/images/args.gni:189
 
 ### use_blink
 
@@ -8538,7 +8550,7 @@ is meant solely for developer debugging.
 
 **Current value (from the default):** `false`
 
-From //build/images/args.gni:179
+From //build/images/args.gni:174
 
 ### vim3_mcu_fan_default_level
 
@@ -8649,7 +8661,7 @@ If false, any unacknowledged SDK change will cause a build failure.
 
 **Current value (from the default):** `false`
 
-From //build/sdk/config.gni:11
+From //build/sdk/config.gni:13
 
 ### wayland_bridge_protocol_logging
 
