@@ -329,7 +329,6 @@ template("legacy_assembly_input_bundle") {
       "//src/session/bin/session_manager/meta/terminal_capabilities.core_shard.cml",
       "//src/ui/meta/ui_routes_base.shard.cml",
       "//src/session/bin/session_manager/meta/session.smart.from_platform.core_shard.cml",
-      "//src/security/bin/tee_manager/meta/tee_manager.core_shard.base.cml",
     ]
 
     # Include the default core cml in the legacy AIB

@@ -142,8 +142,6 @@ executable("optee_smoke_test_bin") {
   configs += [ "//build/config:Wno-conversion" ]
 }
 
-# TODO(fxbug.dev/104628): Remove `base` from core_shard filename when it is no longer
-# included by other core shards.
 core_shard("core_shard") {
-  shard_file = "meta/tee_manager.core_shard.base.cml"
+  shard_file = "meta/tee_manager.core_shard.cml"
 }
