@@ -169,15 +169,18 @@ void BindManager::BindInternal(BindRequest request,
     return;
   }
 
-  // Check the DFv1 composites first, and don't bind to others if they match.
-  if (legacy_composite_manager_.BindNode(node)) {
+  // Check the DFv1 composites first.
+  std::vector<fdd::CompositeInfo> bound_legacy_composite_info =
+      legacy_composite_manager_.BindNode(node);
+  if (!bound_legacy_composite_info.empty()) {
     bind_node_set_.RemoveOrphanedNode(node->MakeComponentMoniker());
 
     // Complete bind if the node can't multibind. Otherwise, follow through to send
     // a match request to the Driver Index for composite node specs.
     if (!node->can_multibind_composites()) {
       if (request.tracker) {
-        request.tracker->ReportSuccessfulBind(node->MakeComponentMoniker(), "");
+        request.tracker->ReportSuccessfulBind(node->MakeComponentMoniker(),
+                                              bound_legacy_composite_info, {});
       }
       match_complete_callback();
       return;
@@ -193,9 +196,11 @@ void BindManager::BindInternal(BindRequest request,
   std::string driver_url_suffix = request.driver_url_suffix;
   auto match_callback =
       [this, request = std::move(request),
+       bound_legacy_composite_info = std::move(bound_legacy_composite_info),
        match_complete_callback = std::move(match_complete_callback)](
           fidl::WireUnownedResult<fdi::DriverIndex::MatchDriver>& result) mutable {
-        OnMatchDriverCallback(std::move(request), result, std::move(match_complete_callback));
+        OnMatchDriverCallback(std::move(request), result, bound_legacy_composite_info,
+                              std::move(match_complete_callback));
       };
   fidl::Arena arena;
   auto builder = fuchsia_driver_index::wire::MatchDriverArgs::Builder(arena)
@@ -209,6 +214,7 @@ void BindManager::BindInternal(BindRequest request,
 
 void BindManager::OnMatchDriverCallback(
     BindRequest request, fidl::WireUnownedResult<fdi::DriverIndex::MatchDriver>& result,
+    const std::vector<fdd::CompositeInfo>& bound_legacy_composite_infos,
     BindMatchCompleteCallback match_complete_callback) {
   auto report_no_bind = fit::defer([&request, &match_complete_callback]() mutable {
     if (request.tracker) {
@@ -224,33 +230,46 @@ void BindManager::OnMatchDriverCallback(
   // is something we should address.
   if (!node) {
     LOGF(WARNING, "Node was freed before it could be bound");
-    report_no_bind.call();
     return;
   }
 
-  auto driver_url =
+  BindResult bind_result =
       BindNodeToResult(*node, request.composite_only, result, request.tracker != nullptr);
-  if (driver_url == std::nullopt && !request.composite_only) {
+
+  if (!bind_result.bound() && !request.composite_only) {
     bind_node_set_.AddOrphanedNode(*node);
-    report_no_bind.call();
     return;
   }
 
-  bind_node_set_.RemoveOrphanedNode(node->MakeComponentMoniker().c_str());
-  report_no_bind.cancel();
-  if (request.tracker) {
-    request.tracker->ReportSuccessfulBind(node->MakeComponentMoniker(), driver_url.value_or(""));
+  auto node_moniker = node->MakeComponentMoniker();
+  bind_node_set_.RemoveOrphanedNode(node_moniker);
+
+  if (bind_result.bound()) {
+    report_no_bind.cancel();
+    if (request.tracker) {
+      if (bind_result.is_driver_url()) {
+        ZX_ASSERT(bound_legacy_composite_infos.empty());
+        request.tracker->ReportSuccessfulBind(node_moniker, bind_result.driver_url());
+
+      } else if (bind_result.is_composite_specs()) {
+        request.tracker->ReportSuccessfulBind(node_moniker, bound_legacy_composite_infos,
+                                              bind_result.composite_specs());
+      } else {
+        LOGF(ERROR, "Unknown bind result type for %s.", node_moniker.c_str());
+      }
+    }
+
+    match_complete_callback();
   }
-  match_complete_callback();
 }
 
-std::optional<std::string> BindManager::BindNodeToResult(
+BindResult BindManager::BindNodeToResult(
     Node& node, bool composite_only, fidl::WireUnownedResult<fdi::DriverIndex::MatchDriver>& result,
     bool has_tracker) {
   if (!result.ok()) {
     LOGF(ERROR, "Failed to call match Node '%s': %s", node.name().c_str(),
          result.error().FormatDescription().data());
-    return std::nullopt;
+    return BindResult();
   }
 
   if (result->is_error()) {
@@ -264,12 +283,12 @@ std::optional<std::string> BindManager::BindNodeToResult(
            zx_status_get_string(match_error));
     }
 
-    return std::nullopt;
+    return BindResult();
   }
 
   auto& matched_driver = result->value()->driver;
   if (composite_only && !matched_driver.is_parent_spec()) {
-    return std::nullopt;
+    return BindResult();
   }
 
   if (!matched_driver.is_driver() && !matched_driver.is_parent_spec()) {
@@ -277,7 +296,7 @@ std::optional<std::string> BindManager::BindNodeToResult(
          "Failed to match Node '%s', the MatchedDriver is not a normal driver or a "
          "parent spec.",
          node.name().c_str());
-    return std::nullopt;
+    return BindResult();
   }
 
   if (matched_driver.is_parent_spec() && !matched_driver.parent_spec().has_specs()) {
@@ -285,37 +304,37 @@ std::optional<std::string> BindManager::BindNodeToResult(
          "Failed to match Node '%s', the MatchedDriver is missing the composite node specs in the "
          "parent spec.",
          node.name().c_str());
-    return std::nullopt;
+    return BindResult();
   }
 
   if (matched_driver.is_parent_spec()) {
     auto result = BindNodeToSpec(node, matched_driver.parent_spec());
     if (!result.is_ok()) {
-      return std::nullopt;
+      return BindResult();
     }
-    return "";
+    return BindResult(result.value());
   }
 
   ZX_ASSERT(matched_driver.is_driver());
 
   // If the node is already part of a composite, it should not bind to a driver.
   if (bind_node_set_.MultibindContains(node.MakeComponentMoniker())) {
-    return std::nullopt;
+    return BindResult();
   }
 
   auto start_result = bridge_->StartDriver(node, matched_driver.driver());
   if (start_result.is_error()) {
     LOGF(ERROR, "Failed to start driver '%s': %s", node.name().c_str(),
          zx_status_get_string(start_result.error_value()));
-    return std::nullopt;
+    return BindResult();
   }
 
   node.OnBind();
-  return start_result.value();
+  return BindResult(start_result.value());
 }
 
-zx::result<> BindManager::BindNodeToSpec(
-    Node& node, fuchsia_driver_index::wire::MatchedCompositeNodeParentInfo parents) {
+zx::result<std::vector<fdi::wire::MatchedCompositeNodeSpecInfo>> BindManager::BindNodeToSpec(
+    Node& node, fdi::wire::MatchedCompositeNodeParentInfo parents) {
   if (node.can_multibind_composites()) {
     bind_node_set_.AddMultibindNode(node);
   }
@@ -330,12 +349,7 @@ zx::result<> BindManager::BindNodeToSpec(
     return result.take_error();
   }
 
-  auto composite_list = result.value();
-  if (composite_list.empty()) {
-    return zx::ok();
-  }
-
-  for (auto& composite : composite_list) {
+  for (auto& composite : result.value().completed_node_and_drivers) {
     auto weak_composite_node = std::get<std::weak_ptr<dfv2::Node>>(composite.node);
     std::shared_ptr composite_node = weak_composite_node.lock();
     ZX_ASSERT(composite_node);
@@ -348,7 +362,7 @@ zx::result<> BindManager::BindNodeToSpec(
     composite_node->OnBind();
   }
 
-  return zx::ok();
+  return zx::ok(result.value().bound_spec_infos);
 }
 
 void BindManager::ProcessPendingBindRequests() {

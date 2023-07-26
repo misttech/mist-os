@@ -18,6 +18,11 @@ struct CompositeNodeAndDriver {
   DeviceOrNode node;
 };
 
+struct BindSpecResult {
+  std::vector<fuchsia_driver_index::wire::MatchedCompositeNodeSpecInfo> bound_spec_infos;
+  std::vector<CompositeNodeAndDriver> completed_node_and_drivers;
+};
+
 // This class is responsible for managing composite node specs. It keeps track of the specs
 // and their matching composite driver and nodes. CompositeNodeSpecManager is owned by a
 // CompositeManagerBridge and must be outlived by it.
@@ -36,14 +41,18 @@ class CompositeNodeSpecManager {
 
   // Binds the device to the spec parents it was matched to. If |enable_multibind| is false,
   // CompositeNodeSpecManager will only bind the device to the first unbound parent. Depending
-  // on the implementation, the function either return an empty vector or a list of
+  // on the implementation, completed_node_and_drivers will return an empty vector or a list of
   // completed CompositeNodeAndDrivers.
-  zx::result<std::vector<CompositeNodeAndDriver>> BindParentSpec(
+  zx::result<BindSpecResult> BindParentSpec(
       fuchsia_driver_index::wire::MatchedCompositeNodeParentInfo match_info,
       const DeviceOrNode& device_or_node, bool enable_multibind = false);
-  zx::result<std::vector<CompositeNodeAndDriver>> BindParentSpec(
-      fuchsia_driver_index::MatchedCompositeNodeParentInfo match_info,
-      const DeviceOrNode& device_or_node, bool enable_multibind = false);
+
+  // Same as |BindParentSpec| but it takes in a natural typed |match_info|.
+  // Does not return the |BindSpecResult| like the wire type variant as the data in
+  // |BindSpecResult| will not outlive the call since the allocator used for them is
+  // local to this call.
+  zx::result<> BindParentSpec(fuchsia_driver_index::MatchedCompositeNodeParentInfo match_info,
+                              const DeviceOrNode& device_or_node, bool enable_multibind = false);
 
   std::vector<fuchsia_driver_development::wire::CompositeInfo> GetCompositeInfo(
       fidl::AnyArena& arena) const;

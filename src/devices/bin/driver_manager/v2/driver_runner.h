@@ -129,7 +129,7 @@ class DriverRunner : public fidl::WireServer<fuchsia_driver_framework::Composite
   // BindManagerBridge interface.
   zx::result<std::string> StartDriver(
       Node& node, fuchsia_driver_index::wire::MatchedDriverInfo driver_info) override;
-  zx::result<std::vector<CompositeNodeAndDriver>> BindToParentSpec(
+  zx::result<BindSpecResult> BindToParentSpec(
       fuchsia_driver_index::wire::MatchedCompositeNodeParentInfo match_info,
       std::weak_ptr<Node> node, bool enable_multibind) override;
   void RequestMatchFromDriverIndex(

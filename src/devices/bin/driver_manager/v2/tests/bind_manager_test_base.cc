@@ -157,7 +157,8 @@ std::shared_ptr<dfv2::Node> BindManagerTestBase::CreateNode(const std::string na
   return new_node;
 }
 
-void BindManagerTestBase::AddAndBindNode(std::string name, bool enable_multibind) {
+void BindManagerTestBase::AddAndBindNode(std::string name, bool enable_multibind,
+                                         std::shared_ptr<dfv2::BindResultTracker> tracker) {
   // This function should only be called for a new node.
   ASSERT_EQ(nodes_.find(name), nodes_.end());
 
@@ -165,20 +166,21 @@ void BindManagerTestBase::AddAndBindNode(std::string name, bool enable_multibind
   auto instance_id = GetOrAddInstanceId(name);
   node->set_properties({fdf::MakeProperty(arena_, BIND_PLATFORM_DEV_INSTANCE_ID, instance_id)});
   nodes_.emplace(name, node);
-  InvokeBind(name);
+  InvokeBind(name, std::move(tracker));
 }
 
 // This function should only be called when there's no ongoing bind.
 // Adds a new node and invoke Bind(). Then complete the bind request with
 // no matches. The ongoing bind flag should reset to false and the node
 // should be added in the orphaned nodes.
-void BindManagerTestBase::AddAndOrphanNode(std::string name, bool enable_multibind) {
+void BindManagerTestBase::AddAndOrphanNode(std::string name, bool enable_multibind,
+                                           std::shared_ptr<dfv2::BindResultTracker> tracker) {
   VerifyNoOngoingBind();
 
   size_t current_orphan_count = bind_manager_->NumOrphanedNodes();
 
   // Invoke bind for a new node in the bind manager.
-  AddAndBindNode(name, enable_multibind);
+  AddAndBindNode(name, enable_multibind, std::move(tracker));
   ASSERT_TRUE(bind_manager_->IsBindOngoing());
   ASSERT_EQ(current_orphan_count, bind_manager_->NumOrphanedNodes());
 
@@ -189,43 +191,49 @@ void BindManagerTestBase::AddAndOrphanNode(std::string name, bool enable_multibi
   ASSERT_EQ(current_orphan_count + 1, bind_manager_->NumOrphanedNodes());
 }
 
-void BindManagerTestBase::InvokeBind(std::string name) {
+void BindManagerTestBase::InvokeBind(std::string name,
+                                     std::shared_ptr<dfv2::BindResultTracker> tracker) {
   ASSERT_NE(nodes_.find(name), nodes_.end());
-  auto tracker = std::make_shared<dfv2::BindResultTracker>(
-      1, [](fidl::VectorView<fuchsia_driver_development::wire::NodeBindingInfo> info) {});
+  if (tracker == nullptr) {
+    tracker = std::make_shared<dfv2::BindResultTracker>(
+        1, [](fidl::VectorView<fuchsia_driver_development::wire::NodeBindingInfo> info) {});
+  }
   bind_manager_->Bind(*nodes_[name], "", tracker);
   RunLoopUntilIdle();
 }
 
-void BindManagerTestBase::InvokeBind_EXPECT_BIND_START(std::string name) {
+void BindManagerTestBase::InvokeBind_EXPECT_BIND_START(
+    std::string name, std::shared_ptr<dfv2::BindResultTracker> tracker) {
   VerifyNoOngoingBind();
-  InvokeBind(name);
+  InvokeBind(name, std::move(tracker));
   ASSERT_TRUE(bind_manager_->IsBindOngoing());
 }
 
-void BindManagerTestBase::InvokeBind_EXPECT_QUEUED(std::string name) {
+void BindManagerTestBase::InvokeBind_EXPECT_QUEUED(
+    std::string name, std::shared_ptr<dfv2::BindResultTracker> tracker) {
   auto expected_data = CurrentBindManagerData();
   expected_data.pending_bind_count += 1;
-  InvokeBind(name);
+  InvokeBind(name, std::move(tracker));
   VerifyBindManagerData(expected_data);
 }
 
-void BindManagerTestBase::AddAndBindNode_EXPECT_BIND_START(std::string name,
-                                                           bool enable_multibind) {
+void BindManagerTestBase::AddAndBindNode_EXPECT_BIND_START(
+    std::string name, bool enable_multibind, std::shared_ptr<dfv2::BindResultTracker> tracker) {
   VerifyNoOngoingBind();
   // Bind process should begin and send a match request to the Driver Index.
-  AddAndBindNode(name, enable_multibind);
+  AddAndBindNode(name, enable_multibind, std::move(tracker));
   ASSERT_TRUE(bind_manager_->IsBindOngoing());
 }
 
-void BindManagerTestBase::AddAndBindNode_EXPECT_QUEUED(std::string name, bool enable_multibind) {
+void BindManagerTestBase::AddAndBindNode_EXPECT_QUEUED(
+    std::string name, bool enable_multibind, std::shared_ptr<dfv2::BindResultTracker> tracker) {
   ASSERT_TRUE(bind_manager_->IsBindOngoing());
   auto expected_data = CurrentBindManagerData();
   expected_data.pending_bind_count += 1;
 
   // The bind request should be queued. There should be no new driver index MatchDriver
   // requests or orphaned nodes.
-  AddAndBindNode(name, enable_multibind);
+  AddAndBindNode(name, enable_multibind, std::move(tracker));
   ASSERT_TRUE(bind_manager_->IsBindOngoing());
   VerifyBindManagerData(expected_data);
 }

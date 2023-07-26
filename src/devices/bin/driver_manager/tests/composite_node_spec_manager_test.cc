@@ -183,7 +183,7 @@ TEST_F(CompositeNodeSpecManagerTest, TestAddMatchCompositeNodeSpec) {
       1u, composite_node_spec_manager_
               ->BindParentSpec(fidl::ToWire(allocator, matched_node_2), std::weak_ptr<dfv2::Node>())
               .value()
-              .size());
+              .completed_node_and_drivers.size());
   ASSERT_TRUE(composite_node_spec_manager_->specs().at(spec_name)->parent_specs()[1]);
 
   //  Bind parent spec 1.
@@ -343,7 +343,7 @@ TEST_F(CompositeNodeSpecManagerTest, TestMultibindDisabled) {
                     ->BindParentSpec(fidl::ToWire(allocator, matched_node),
                                      std::weak_ptr<dfv2::Node>(node_1), false)
                     .value()
-                    .size());
+                    .completed_node_and_drivers.size());
 
   ASSERT_TRUE(composite_node_spec_manager_->specs().at(spec_name_1)->parent_specs()[1]);
   ASSERT_FALSE(composite_node_spec_manager_->specs().at(spec_name_2)->parent_specs()[0]);
@@ -425,7 +425,7 @@ TEST_F(CompositeNodeSpecManagerTest, TestMultibindEnabled) {
                     ->BindParentSpec(fidl::ToWire(allocator, matched_node),
                                      std::weak_ptr<dfv2::Node>(), true)
                     .value()
-                    .size());
+                    .completed_node_and_drivers.size());
 
   ASSERT_TRUE(composite_node_spec_manager_->specs().at(spec_name_1)->parent_specs()[1]);
   ASSERT_TRUE(composite_node_spec_manager_->specs().at(spec_name_2)->parent_specs()[0]);

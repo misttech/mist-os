@@ -61,7 +61,7 @@ fit::result<fdf::CompositeNodeSpecError> CompositeNodeSpecManager::AddSpec(
   return fit::ok();
 }
 
-zx::result<std::vector<CompositeNodeAndDriver>> CompositeNodeSpecManager::BindParentSpec(
+zx::result<BindSpecResult> CompositeNodeSpecManager::BindParentSpec(
     fdi::wire::MatchedCompositeNodeParentInfo match_info, const DeviceOrNode &device_or_node,
     bool enable_multibind) {
   if (!match_info.has_specs() || match_info.specs().empty()) {
@@ -71,7 +71,7 @@ zx::result<std::vector<CompositeNodeAndDriver>> CompositeNodeSpecManager::BindPa
 
   // Go through each spec until we find an available one with an unbound parent. If
   // |enable_multibind| is true, then we will go through every spec.
-  auto found_parent_spec = false;
+  std::vector<fuchsia_driver_index::wire::MatchedCompositeNodeSpecInfo> bound_spec_infos;
   std::vector<CompositeNodeAndDriver> node_and_drivers;
   for (auto spec_info : match_info.specs()) {
     if (!spec_info.has_composite()) {
@@ -121,7 +121,7 @@ zx::result<std::vector<CompositeNodeAndDriver>> CompositeNodeSpecManager::BindPa
       continue;
     }
 
-    found_parent_spec = true;
+    bound_spec_infos.push_back(spec_info);
     auto composite_node = result.value();
     if (composite_node.has_value() && driver.has_driver_info()) {
       node_and_drivers.push_back(
@@ -129,23 +129,24 @@ zx::result<std::vector<CompositeNodeAndDriver>> CompositeNodeSpecManager::BindPa
     }
 
     if (!enable_multibind) {
-      return zx::ok(std::move(node_and_drivers));
+      return zx::ok(BindSpecResult{bound_spec_infos, std::move(node_and_drivers)});
     }
   }
 
-  if (found_parent_spec) {
-    return zx::ok(std::move(node_and_drivers));
+  if (!bound_spec_infos.empty()) {
+    return zx::ok(BindSpecResult{bound_spec_infos, std::move(node_and_drivers)});
   }
 
   return zx::error(ZX_ERR_NOT_FOUND);
 }
 
-zx::result<std::vector<CompositeNodeAndDriver>> CompositeNodeSpecManager::BindParentSpec(
+zx::result<> CompositeNodeSpecManager::BindParentSpec(
     fdi::MatchedCompositeNodeParentInfo match_info, const DeviceOrNode &device_or_node,
     bool enable_multibind) {
   fidl::Arena<> arena;
-  return BindParentSpec(fidl::ToWire(arena, std::move(match_info)), device_or_node,
-                        enable_multibind);
+  return zx::make_result(
+      BindParentSpec(fidl::ToWire(arena, std::move(match_info)), device_or_node, enable_multibind)
+          .status_value());
 }
 
 std::vector<fdd::wire::CompositeInfo> CompositeNodeSpecManager::GetCompositeInfo(

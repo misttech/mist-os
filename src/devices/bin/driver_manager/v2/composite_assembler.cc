@@ -300,21 +300,24 @@ zx_status_t CompositeDeviceManager::AddCompositeDevice(
   return ZX_OK;
 }
 
-bool CompositeDeviceManager::BindNode(std::shared_ptr<Node> node) {
-  bool did_match = false;
+std::vector<fdd::CompositeInfo> CompositeDeviceManager::BindNode(std::shared_ptr<Node> node) {
+  std::vector<fdd::CompositeInfo> result_info;
   for (auto& assembler : assemblers_) {
     if (!assembler->BindNode(node)) {
       continue;
     }
 
+    result_info.push_back(assembler->GetCompositeInfo());
+
     // If the node cannot multibind, then it should only be matched with one
     // legacy composite.
     if (!node->can_multibind_composites()) {
-      return true;
+      ZX_ASSERT(result_info.size() == 1);
+      return result_info;
     }
-    did_match = true;
   }
-  return did_match;
+
+  return result_info;
 }
 
 void CompositeDeviceManager::Publish(component::OutgoingDirectory& outgoing) {

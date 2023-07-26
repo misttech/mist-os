@@ -63,7 +63,7 @@ class CompositeAssemblerTest : public gtest::TestLoopFixture {
   std::optional<Devfs> devfs;
 };
 
-TEST_F(CompositeAssemblerTest, EmptyManager) { ASSERT_FALSE(manager.BindNode(node)); }
+TEST_F(CompositeAssemblerTest, EmptyManager) { ASSERT_TRUE(manager.BindNode(node).empty()); }
 
 TEST_F(CompositeAssemblerTest, NoMatches) {
   fuchsia_device_manager::CompositeDeviceDescriptor descriptor;
@@ -75,7 +75,7 @@ TEST_F(CompositeAssemblerTest, NoMatches) {
 
   descriptor.fragments().push_back(std::move(fragment));
   manager.AddCompositeDevice("device-1", descriptor);
-  ASSERT_FALSE(manager.BindNode(node));
+  ASSERT_TRUE(manager.BindNode(node).empty());
 }
 
 // Check that matching just one fragment out of multiple works as expected.
@@ -96,7 +96,7 @@ TEST_F(CompositeAssemblerTest, MatchButDontCreate) {
   descriptor.props()[0].value() = kPropValue;
 
   manager.AddCompositeDevice(std::string(kCompositeName), descriptor);
-  ASSERT_TRUE(manager.BindNode(node));
+  ASSERT_FALSE(manager.BindNode(node).empty());
 
   // Check that we did not create a second node.
   ASSERT_FALSE(bind_was_called);
@@ -119,7 +119,7 @@ TEST_F(CompositeAssemblerTest, CreateSingleParentComposite) {
 
   manager.AddCompositeDevice(std::string(kCompositeName), descriptor);
 
-  ASSERT_TRUE(manager.BindNode(node));
+  ASSERT_FALSE(manager.BindNode(node).empty());
 
   // Check that we created a child node.
   ASSERT_TRUE(bind_was_called);
@@ -136,7 +136,7 @@ TEST_F(CompositeAssemblerTest, CreateSingleParentComposite) {
   ASSERT_EQ(1ul, child->properties()[1].value.int_value());
 
   // Check that our node no longer matches now that the composite has been created.
-  ASSERT_FALSE(manager.BindNode(node));
+  ASSERT_TRUE(manager.BindNode(node).empty());
 }
 
 TEST_F(CompositeAssemblerTest, CreateTwoParentComposite) {
@@ -160,8 +160,8 @@ TEST_F(CompositeAssemblerTest, CreateTwoParentComposite) {
 
   manager.AddCompositeDevice(std::string(kCompositeName), descriptor);
 
-  ASSERT_TRUE(manager.BindNode(node));
-  ASSERT_TRUE(manager.BindNode(node2));
+  ASSERT_FALSE(manager.BindNode(node).empty());
+  ASSERT_FALSE(manager.BindNode(node2).empty());
 
   // Check that we created a child node.
   ASSERT_TRUE(bind_was_called);
@@ -179,7 +179,7 @@ TEST_F(CompositeAssemblerTest, CreateTwoParentComposite) {
   ASSERT_EQ(1ul, child->properties()[1].value.int_value());
 
   // Check that our node no longer matches now that the composite has been created.
-  ASSERT_FALSE(manager.BindNode(node));
+  ASSERT_TRUE(manager.BindNode(node).empty());
 }
 
 TEST_F(CompositeAssemblerTest, NodeRemovesCorrectly) {
@@ -204,14 +204,14 @@ TEST_F(CompositeAssemblerTest, NodeRemovesCorrectly) {
   manager.AddCompositeDevice(std::string(kCompositeName), descriptor);
 
   // Bind the second node, then reset it, then rebind it.
-  ASSERT_TRUE(manager.BindNode(node2));
+  ASSERT_FALSE(manager.BindNode(node2).empty());
   node2 = CreateNode("parent3");
 
-  ASSERT_TRUE(manager.BindNode(node2));
+  ASSERT_FALSE(manager.BindNode(node2).empty());
   ASSERT_EQ(0ul, node2->children().size());
 
   // Now bind the first node and check that the composite is created.
-  ASSERT_TRUE(manager.BindNode(node));
+  ASSERT_FALSE(manager.BindNode(node).empty());
 
   // Check that we created a child node.
   ASSERT_TRUE(bind_was_called);
@@ -225,7 +225,7 @@ TEST_F(CompositeAssemblerTest, NodeRemovesCorrectly) {
   ASSERT_EQ(kPropValue, child->properties()[0].value.int_value());
 
   // Check that our node no longer matches now that the composite has been created.
-  ASSERT_FALSE(manager.BindNode(node));
+  ASSERT_TRUE(manager.BindNode(node).empty());
 }
 
 // Check that having two composite devices that both bind to the same node works.
@@ -246,7 +246,7 @@ TEST_F(CompositeAssemblerTest, TwoSingleParentComposite) {
   manager.AddCompositeDevice(std::string(kCompositeName), descriptor);
   manager.AddCompositeDevice(std::string(kCompositeName2), descriptor);
 
-  ASSERT_TRUE(manager.BindNode(node));
+  ASSERT_FALSE(manager.BindNode(node).empty());
 
   // Check that both parents were created.
   ASSERT_TRUE(bind_was_called);
@@ -264,7 +264,7 @@ TEST_F(CompositeAssemblerTest, TwoSingleParentComposite) {
   ASSERT_EQ(1ul, child->parents().size());
 
   // Check that our node no longer matches now that both composites have been created.
-  ASSERT_FALSE(manager.BindNode(node));
+  ASSERT_TRUE(manager.BindNode(node).empty());
 }
 
 class FakeContext : public fpromise::context {
@@ -315,7 +315,7 @@ TEST_F(CompositeAssemblerTest, InspectNodes) {
     EXPECT_EQ(std::string("<unbound>"), inspect_fragment->value());
   }
 
-  ASSERT_TRUE(manager.BindNode(node));
+  ASSERT_FALSE(manager.BindNode(node).empty());
 
   // Check the inspect data with a bound node.
   {
@@ -351,7 +351,7 @@ TEST_F(CompositeAssemblerTest, ConnectToDeviceController) {
 
   manager.AddCompositeDevice(std::string(kCompositeName), descriptor);
 
-  ASSERT_TRUE(manager.BindNode(node));
+  ASSERT_FALSE(manager.BindNode(node).empty());
 
   fs::SynchronousVfs vfs(dispatcher());
   auto dev_res = devfs->Connect(vfs);

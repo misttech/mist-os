@@ -106,9 +106,10 @@ class CompositeDeviceManager
                                  fuchsia_device_manager::CompositeDeviceDescriptor descriptor);
 
   // Check this node against all of the composite devices that need to be created.
-  // Returns true if the node was successfully bound. If the node was bound to
-  // a composite device, then there is no need to bind it to a driver.
-  bool BindNode(std::shared_ptr<Node> node);
+  // Returns a vector of all composites that the node binded to. If the node was bound to
+  // any composite devices, then there is no need to bind it to a driver.
+  // An empty vector means the node did not bind to any composite devices.
+  std::vector<fuchsia_driver_development::CompositeInfo> BindNode(std::shared_ptr<Node> node);
 
   // Publish capabilities to the outgoing directory.
   // CompositeDeviceManager must outlive |outgoing| because it will be used

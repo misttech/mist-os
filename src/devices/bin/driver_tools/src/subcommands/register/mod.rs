@@ -71,9 +71,11 @@ pub async fn register(
                 for info in result {
                     writeln!(
                         writer,
-                        "Node '{}', Driver '{}'.",
+                        "Node '{}':\nDriver '{:#?}'\nComposite Specs '{:#?}'\nLegacy Composites '{:#?}'",
                         info.node_name.unwrap_or("<NA>".to_string()),
-                        info.driver_url.unwrap_or("<NA>".to_string()),
+                        info.driver_url,
+                        info.composite_specs,
+                        info.legacy_composites,
                     )?;
                 }
             }

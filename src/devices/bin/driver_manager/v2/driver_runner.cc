@@ -436,7 +436,7 @@ zx::result<std::string> DriverRunner::StartDriver(
   return zx::ok(std::string(driver_info.url().get()));
 }
 
-zx::result<std::vector<CompositeNodeAndDriver>> DriverRunner::BindToParentSpec(
+zx::result<BindSpecResult> DriverRunner::BindToParentSpec(
     fuchsia_driver_index::wire::MatchedCompositeNodeParentInfo match_info, std::weak_ptr<Node> node,
     bool enable_multibind) {
   return this->composite_node_spec_manager_.BindParentSpec(match_info, node, enable_multibind);

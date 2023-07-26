@@ -127,12 +127,19 @@ type DeviceInfo = table {
    14: protocol_name string:MAX;
 };
 
-/// Information about a driver binding to a node.
+/// Information about a node binding to either a driver or a composite.
 type NodeBindingInfo = table {
-    /// Full topological name of the node that was bound to.
+    /// Full topological name of the node.
     1: node_name string:fuchsia.device.manager.DEVICE_PATH_MAX;
-    /// The component url for the driver that bound to the node.
+    /// This is the component url for the driver that bound to the node.
+    /// If this is present, then |composite_specs| and |legacy_composites| must not be.
     2: driver_url string:fuchsia.url.MAX_URL_LENGTH;
+    /// The composite specs that this node binded to.
+    /// Can be present alongside |legacy_composites|, but not |driver_url|.
+    3: composite_specs vector<fuchsia.driver.index.MatchedCompositeNodeSpecInfo>:MAX;
+    /// The legacy composites that this node binded to.
+    /// Can be present alongside |composite_specs|, but not |driver_url|.
+    4: legacy_composites vector<CompositeInfo>:MAX;
 };
 
 closed protocol DriverInfoIterator {

@@ -25,10 +25,40 @@ struct BindRequest {
   bool composite_only;
 };
 
+class BindResult {
+  using CompositeSpecs = std::vector<fuchsia_driver_index::wire::MatchedCompositeNodeSpecInfo>;
+
+ public:
+  BindResult() : data_(std::monostate{}) {}
+
+  explicit BindResult(std::string_view driver_url) : data_(std::string(driver_url)) {}
+
+  explicit BindResult(CompositeSpecs composite_specs) : data_(std::move(composite_specs)) {}
+
+  bool bound() const { return !std::holds_alternative<std::monostate>(data_); }
+
+  bool is_driver_url() const { return std::holds_alternative<std::string>(data_); }
+
+  bool is_composite_specs() const { return std::holds_alternative<CompositeSpecs>(data_); }
+
+  std::string_view driver_url() const {
+    ZX_ASSERT(is_driver_url());
+    return std::get<std::string>(data_);
+  }
+
+  const CompositeSpecs& composite_specs() const {
+    ZX_ASSERT(is_composite_specs());
+    return std::get<CompositeSpecs>(data_);
+  }
+
+ private:
+  std::variant<std::monostate, std::string, CompositeSpecs> data_;
+};
+
 // Bridge class for driver manager related interactions.
 class BindManagerBridge {
  public:
-  virtual zx::result<std::vector<CompositeNodeAndDriver>> BindToParentSpec(
+  virtual zx::result<BindSpecResult> BindToParentSpec(
       fuchsia_driver_index::wire::MatchedCompositeNodeParentInfo match_info,
       std::weak_ptr<Node> node, bool enable_multibind) = 0;
 
@@ -159,17 +189,19 @@ class BindManager {
   void OnMatchDriverCallback(
       BindRequest request,
       fidl::WireUnownedResult<fuchsia_driver_index::DriverIndex::MatchDriver>& result,
+      const std::vector<fuchsia_driver_development::CompositeInfo>& bound_legacy_composite_info,
       BindMatchCompleteCallback match_complete_callback);
 
-  // Binds |node| to |result|. Returns a driver URL string if successful. Otherwise,
-  // return std::nullopt.
-  std::optional<std::string> BindNodeToResult(
+  // Binds |node| to |result|.
+  // Result contains a vector of composite spec info that the node binded to if it matched composite
+  // spec parents, or it will have a string with the driver URL if it matched directly to a driver.
+  BindResult BindNodeToResult(
       Node& node, bool composite_only,
       fidl::WireUnownedResult<fuchsia_driver_index::DriverIndex::MatchDriver>& result,
       bool has_tracker);
 
-  zx::result<> BindNodeToSpec(Node& node,
-                              fuchsia_driver_index::wire::MatchedCompositeNodeParentInfo parents);
+  zx::result<std::vector<fuchsia_driver_index::wire::MatchedCompositeNodeSpecInfo>> BindNodeToSpec(
+      Node& node, fuchsia_driver_index::wire::MatchedCompositeNodeParentInfo parents);
 
   // Queue of TryBindAllAvailable() callbacks pending for the next TryBindAllAvailable() trigger.
   std::vector<NodeBindingInfoResultCallback> pending_orphan_rebind_callbacks_;

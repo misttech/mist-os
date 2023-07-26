@@ -77,7 +77,7 @@ class TestBindManagerBridge final : public dfv2::BindManagerBridge, public Compo
   ~TestBindManagerBridge() = default;
 
   // BindManagerBridge implementation:
-  zx::result<std::vector<CompositeNodeAndDriver>> BindToParentSpec(
+  zx::result<BindSpecResult> BindToParentSpec(
       fuchsia_driver_index::wire::MatchedCompositeNodeParentInfo match_info,
       std::weak_ptr<dfv2::Node> node, bool enable_multibind) override {
     return composite_manager_.BindParentSpec(match_info, node, enable_multibind);
@@ -158,14 +158,18 @@ class BindManagerTestBase : public gtest::TestLoopFixture {
   // Creates a node and adds it to orphaned nodes by invoking bind with a failed match.
   // Should only be called when there's no ongoing bind. The node should not
   // already exist.
-  void AddAndOrphanNode(std::string name, bool enable_multibind = false);
+  void AddAndOrphanNode(std::string name, bool enable_multibind = false,
+                        std::shared_ptr<dfv2::BindResultTracker> tracker = nullptr);
 
   // Create a node and invoke Bind() for it.
   // If EXPECT_BIND_START, the function verifies that it started a new bind process.
   // If EXPECT_QUEUED, the function verifies that it queued new bind request.
-  void AddAndBindNode(std::string name, bool enable_multibind = false);
-  void AddAndBindNode_EXPECT_BIND_START(std::string name, bool enable_multibind = false);
-  void AddAndBindNode_EXPECT_QUEUED(std::string name, bool enable_multibind = false);
+  void AddAndBindNode(std::string name, bool enable_multibind = false,
+                      std::shared_ptr<dfv2::BindResultTracker> tracker = nullptr);
+  void AddAndBindNode_EXPECT_BIND_START(std::string name, bool enable_multibind = false,
+                                        std::shared_ptr<dfv2::BindResultTracker> tracker = nullptr);
+  void AddAndBindNode_EXPECT_QUEUED(std::string name, bool enable_multibind = false,
+                                    std::shared_ptr<dfv2::BindResultTracker> tracker = nullptr);
 
   // Adds a legacy composite.
   // If EXPECT_QUEUED, the function verifies that it queues a TryBindAllAvailable callback.
@@ -181,9 +185,11 @@ class BindManagerTestBase : public gtest::TestLoopFixture {
   // Invoke Bind() for the node with the given |name|. The node should already exist.
   // If EXPECT_BIND_START, the function verifies that it started a new bind process.
   // If EXPECT_QUEUED, the function verifies that it queued new bind request.
-  void InvokeBind(std::string name);
-  void InvokeBind_EXPECT_BIND_START(std::string name);
-  void InvokeBind_EXPECT_QUEUED(std::string name);
+  void InvokeBind(std::string name, std::shared_ptr<dfv2::BindResultTracker> tracker = nullptr);
+  void InvokeBind_EXPECT_BIND_START(std::string name,
+                                    std::shared_ptr<dfv2::BindResultTracker> tracker = nullptr);
+  void InvokeBind_EXPECT_QUEUED(std::string name,
+                                std::shared_ptr<dfv2::BindResultTracker> tracker = nullptr);
 
   // Invoke TryBindAllAvailable().
   // If EXPECT_BIND_START, the function verifies that it started a new bind process.

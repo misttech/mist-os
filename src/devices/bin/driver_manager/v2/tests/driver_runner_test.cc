@@ -2300,7 +2300,7 @@ TEST_F(DriverRunnerTest, TestBindResultTracker) {
   ASSERT_EQ(false, callback_called);
   tracker.ReportNoBind();
   ASSERT_EQ(false, callback_called);
-  tracker.ReportSuccessfulBind(std::string_view("node_name"), std::string_view("driver_url"));
+  tracker.ReportSuccessfulBind(std::string_view("node_name"), "driver_url");
   ASSERT_EQ(false, callback_called);
   tracker.ReportNoBind();
   ASSERT_EQ(true, callback_called);
@@ -2327,7 +2327,8 @@ TEST_F(DriverRunnerTest, TestBindResultTracker) {
       [callback_called_ptr](
           fidl::VectorView<fuchsia_driver_development::wire::NodeBindingInfo> results) {
         ASSERT_EQ(std::string_view("node_name"), results[0].node_name().get());
-        ASSERT_EQ(std::string_view("driver_url"), results[0].driver_url().get());
+        ASSERT_EQ(std::string_view("test_spec"), results[0].composite_specs()[0].name().get());
+        ASSERT_EQ(std::string_view("test_spec_2"), results[0].composite_specs()[1].name().get());
         ASSERT_EQ(1ul, results.count());
         *callback_called_ptr = true;
       };
@@ -2338,7 +2339,21 @@ TEST_F(DriverRunnerTest, TestBindResultTracker) {
   ASSERT_EQ(false, callback_called);
   tracker_three.ReportNoBind();
   ASSERT_EQ(false, callback_called);
-  tracker_three.ReportSuccessfulBind(std::string_view("node_name"), std::string_view("driver_url"));
+
+  {
+    fidl::Arena arena;
+    tracker_three.ReportSuccessfulBind(
+        std::string_view("node_name"), {},
+        std::vector{
+            fuchsia_driver_index::wire::MatchedCompositeNodeSpecInfo::Builder(arena)
+                .name("test_spec")
+                .Build(),
+            fuchsia_driver_index::wire::MatchedCompositeNodeSpecInfo::Builder(arena)
+                .name("test_spec_2")
+                .Build(),
+        });
+  }
+
   ASSERT_EQ(true, callback_called);
 }
 
