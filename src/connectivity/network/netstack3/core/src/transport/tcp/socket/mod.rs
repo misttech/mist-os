@@ -1412,11 +1412,7 @@ pub(crate) trait SocketHandler<I: Ip, C: NonSyncContext>:
     fn close_conn(&mut self, ctx: &mut C, id: ConnectionId<I>);
     fn remove_unbound(&mut self, id: UnboundId<I>);
     fn remove_bound(&mut self, id: BoundId<I>);
-    fn shutdown_listener(
-        &mut self,
-        ctx: &mut C,
-        id: ListenerId<I>,
-    ) -> (BoundId<I>, C::ListenerNotifierOrProvidedBuffers);
+    fn shutdown_listener(&mut self, ctx: &mut C, id: ListenerId<I>) -> BoundId<I>;
 
     fn get_unbound_info(&mut self, id: UnboundId<I>) -> UnboundInfo<Self::WeakDeviceId>;
     fn get_bound_info(&mut self, id: BoundId<I>) -> BoundInfo<I::Addr, Self::WeakDeviceId>;
@@ -1926,13 +1922,7 @@ impl<I: IpLayerIpExt, C: NonSyncContext, SC: SyncContext<I, C>> SocketHandler<I,
         );
     }
 
-    // TODO(https://fxbug.dev/126141): This should not return the notifier back
-    // to Bindings when we merge socket IDs.
-    fn shutdown_listener(
-        &mut self,
-        ctx: &mut C,
-        id: ListenerId<I>,
-    ) -> (BoundId<I>, C::ListenerNotifierOrProvidedBuffers) {
+    fn shutdown_listener(&mut self, ctx: &mut C, id: ListenerId<I>) -> BoundId<I> {
         self.with_ip_transport_ctx_and_tcp_sockets_mut(
             |ip_transport_ctx, Sockets { bound_state, socketmap, inactive: _, port_alloc: _ }| {
                 debug!("shutdown on {id:?}");
@@ -1959,7 +1949,7 @@ impl<I: IpLayerIpExt, C: NonSyncContext, SC: SyncContext<I, C>> SocketHandler<I,
                     ready,
                     buffer_sizes: _,
                     socket_options: _,
-                    notifier,
+                    notifier: _,
                 } = maybe_listener.maybe_shutdown().expect("must be a listener");
                 *sharing = new_sharing;
 
@@ -1989,7 +1979,7 @@ impl<I: IpLayerIpExt, C: NonSyncContext, SC: SyncContext<I, C>> SocketHandler<I,
                             });
                     }
                 }
-                (BoundId(id.into(), IpVersionMarker::default()), notifier)
+                BoundId(id.into(), IpVersionMarker::default())
             },
         )
     }
@@ -3258,28 +3248,17 @@ where
 ///
 /// The socket remains in the socket map as a bound socket, taking the port
 /// that the socket has been using. Returns the id of that bound socket.
-pub fn shutdown_listener<I, C>(
-    sync_ctx: &SyncCtx<C>,
-    ctx: &mut C,
-    id: ListenerId<I>,
-) -> (BoundId<I>, C::ListenerNotifierOrProvidedBuffers)
+pub fn shutdown_listener<I, C>(sync_ctx: &SyncCtx<C>, ctx: &mut C, id: ListenerId<I>) -> BoundId<I>
 where
     I: IpExt,
     C: crate::NonSyncContext,
 {
     let mut sync_ctx = Locked::new(sync_ctx);
-    let (bound, IpInvariant(notifier)) = I::map_ip(
+    I::map_ip(
         (IpInvariant((&mut sync_ctx, ctx)), id),
-        |(IpInvariant((sync_ctx, ctx)), id)| {
-            let (bound, notifier) = SocketHandler::shutdown_listener(sync_ctx, ctx, id);
-            (bound, IpInvariant(notifier))
-        },
-        |(IpInvariant((sync_ctx, ctx)), id)| {
-            let (bound, notifier) = SocketHandler::shutdown_listener(sync_ctx, ctx, id);
-            (bound, IpInvariant(notifier))
-        },
-    );
-    (bound, notifier)
+        |(IpInvariant((sync_ctx, ctx)), id)| SocketHandler::shutdown_listener(sync_ctx, ctx, id),
+        |(IpInvariant((sync_ctx, ctx)), id)| SocketHandler::shutdown_listener(sync_ctx, ctx, id),
+    )
 }
 
 /// Sets the POSIX SO_REUSEADDR socket option on an unbound socket.
@@ -4526,7 +4505,7 @@ mod tests {
         );
 
         net.with_context(REMOTE, |TcpCtx { sync_ctx, non_sync_ctx }| {
-            let (bound, _) = SocketHandler::shutdown_listener(sync_ctx, non_sync_ctx, server);
+            let bound = SocketHandler::shutdown_listener(sync_ctx, non_sync_ctx, server);
             SocketHandler::remove_bound(sync_ctx, bound);
         });
 
@@ -5527,7 +5506,7 @@ mod tests {
             assert_matches!(non_sync_ctx.timer_ctx().timers().len(), 1);
         });
 
-        let (local_bound, _) = net.with_context(LOCAL, |TcpCtx { sync_ctx, non_sync_ctx }| {
+        let local_bound = net.with_context(LOCAL, |TcpCtx { sync_ctx, non_sync_ctx }| {
             SocketHandler::shutdown_listener(sync_ctx, non_sync_ctx, local_listener)
         });
 
@@ -5944,7 +5923,7 @@ mod tests {
             let (_server_conn, _, _): (_, SocketAddr<_, _>, ClientBuffers) =
                 SocketHandler::accept(sync_ctx, non_sync_ctx, server).expect("pending connection");
 
-            let (server, _) = SocketHandler::shutdown_listener(sync_ctx, non_sync_ctx, server);
+            let server = SocketHandler::shutdown_listener(sync_ctx, non_sync_ctx, server);
             SocketHandler::remove_bound(sync_ctx, server);
 
             let unbound = SocketHandler::create_socket(sync_ctx, non_sync_ctx, Default::default());

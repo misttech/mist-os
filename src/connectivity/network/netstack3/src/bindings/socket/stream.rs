@@ -513,8 +513,7 @@ where
                 close_conn::<I, _>(sync_ctx, non_sync_ctx, conn);
             }
             SocketId::Listener(listener) => {
-                let (bound, _): (_, LocalZirconSocketAndNotifier) =
-                    shutdown_listener::<I, _>(sync_ctx, non_sync_ctx, listener);
+                let bound = shutdown_listener::<I, _>(sync_ctx, non_sync_ctx, listener);
                 remove_bound::<I, _>(sync_ctx, bound)
             }
         }
@@ -879,8 +878,7 @@ where
                 if mode.contains(fposix_socket::ShutdownMode::READ) {
                     let mut ctx = ctx.clone();
                     let Ctx { sync_ctx, non_sync_ctx } = &mut ctx;
-                    let (bound, _local_socket) =
-                        shutdown_listener::<I, _>(&sync_ctx, non_sync_ctx, listener);
+                    let bound = shutdown_listener::<I, _>(&sync_ctx, non_sync_ctx, listener);
                     *id = SocketId::Bound(bound);
                 }
                 Ok(())
