@@ -113,6 +113,8 @@
                 "futex_wake04",
                 "futimesat01",
                 "getcpu01",
+
+                // These getdents* tests "fail" because of skipped subtests.
                 "getdents01",
                 "getdents02",
                 "getitimer01",
