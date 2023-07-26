@@ -7,6 +7,7 @@
 
 use std::{
     collections::HashSet,
+    fmt::Debug,
     hash::{Hash, Hasher},
 };
 
@@ -20,11 +21,12 @@ use fidl_fuchsia_net_routes as fnet_routes;
 use fidl_fuchsia_net_routes_admin::RouteSetError;
 use fidl_fuchsia_net_routes_ext as fnet_routes_ext;
 
+use assert_matches::assert_matches;
+use derivative::Derivative;
 use futures::{
     channel::{mpsc, oneshot},
-    pin_mut, StreamExt as _, TryStreamExt as _,
+    pin_mut, FutureExt as _, StreamExt as _, TryStreamExt as _,
 };
-
 use net_types::{
     ip::{GenericOverIp, Ip, IpAddress, IpInvariant, IpVersion, Subnet},
     SpecifiedAddress as _,
@@ -65,7 +67,6 @@ pub(crate) struct UnicastRouteArgs<I: Ip> {
     // The routing table.
     // TODO(issuetracker.google.com/289582515): Use this to add routes to
     // a RouteSet based on the table value.
-    #[allow(unused)]
     pub table: u32,
 }
 
@@ -81,9 +82,6 @@ pub(crate) enum NewRouteArgs<I: Ip> {
 pub(crate) enum RouteRequestArgs<I: Ip> {
     /// RTM_GETROUTE
     Get(GetRouteArgs),
-    #[allow(unused)]
-    // TODO(issuetracker.google.com/283136222): Use this message type to handle
-    // `RTM_NEWROUTE` requests from clients.
     /// RTM_NEWROUTE
     New(NewRouteArgs<I>),
 }
@@ -186,6 +184,29 @@ pub(crate) struct Request<S: Sender<<NetlinkRoute as ProtocolFamily>::InnerMessa
     pub completer: oneshot::Sender<Result<(), RequestError>>,
 }
 
+fn respond_to_completer<S: Sender<<NetlinkRoute as ProtocolFamily>::InnerMessage>, D: Debug>(
+    client: InternalClient<NetlinkRoute, S>,
+    completer: oneshot::Sender<Result<(), RequestError>>,
+    result: Result<(), RequestError>,
+    request_for_log: D,
+) {
+    match completer.send(result) {
+        Ok(()) => (),
+        Err(err) => {
+            assert_eq!(err, result, "should get back what we tried to send");
+
+            // Not treated as a hard error because the socket may have been
+            // closed.
+            log_debug!(
+                "failed to send result ({:?}) to {} after handling {:?}",
+                result,
+                client,
+                request_for_log,
+            )
+        }
+    }
+}
+
 /// Contains the asynchronous work related to RTM_ROUTE messages.
 ///
 /// Connects to the route watcher and can respond to RTM_ROUTE
@@ -241,6 +262,23 @@ pub(crate) enum RoutesNetstackError<I: Ip> {
     /// Unexpected event was received from routes watcher.
     #[error("unexpected event: {0:?}")]
     UnexpectedEvent(fnet_routes_ext::Event<I>),
+}
+
+/// A subset of `RouteRequestArgs`, containing only `Request` types that can be pending.
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+pub(crate) enum PendingRouteRequestArgs<I: Ip> {
+    /// RTM_NEWROUTE
+    New(NewRouteArgs<I>),
+    // TODO(issuetracker.google.com/283136222): Add a `Del` type when RTM_DELROUTE
+    // requests are supported.
+}
+
+#[derive(Derivative)]
+#[derivative(Debug(bound = ""))]
+struct PendingRouteRequest<S: Sender<<NetlinkRoute as ProtocolFamily>::InnerMessage>, I: Ip> {
+    request_args: PendingRouteRequestArgs<I>,
+    client: InternalClient<NetlinkRoute, S>,
+    completer: oneshot::Sender<Result<(), RequestError>>,
 }
 
 impl<
@@ -330,7 +368,25 @@ impl<
         // event loop, we can have a dedicated shutdown signal.
         let mut request_stream = request_stream.chain(futures::stream::pending());
 
+        let mut pending_route_request = None;
+
         loop {
+            // Don't handle new requests until we complete handling the pending
+            // request.
+            let request_fut = match pending_route_request {
+                Some(_) => {
+                    log_debug!(
+                        "not awaiting on request stream because of pending request: {:?}",
+                        pending_route_request,
+                    );
+
+                    futures::future::pending().left_future()
+                }
+                None => request_stream.next().right_future(),
+            }
+            .fuse();
+            futures::pin_mut!(request_fut);
+
             futures::select! {
                 stream_res = route_event_stream.try_next() => {
                     let event = match stream_res {
@@ -359,15 +415,49 @@ impl<
                         }
                     }
                 }
-                req = request_stream.next() => {
-                    Self::handle_request(
-                        &interfaces_proxy,
-                        &route_set_proxy,
-                        &route_messages,
-                        req.expect(
-                            "request stream should never end because of chained `pending`",
-                        )
-                    ).await
+                req = request_fut => {
+                    assert_matches!(
+                        core::mem::replace(
+                            &mut pending_route_request,
+                            Self::handle_request(
+                                &interfaces_proxy,
+                                &route_set_proxy,
+                                &route_messages,
+                                req.expect(
+                                    "request stream should never end because of chained `pending`",
+                                ),
+                            ).await,
+                        ),
+                        None
+                    )
+                }
+            }
+
+            if let Some(pending_route_request_some) = pending_route_request.take() {
+                let PendingRouteRequest { request_args, client: _, completer: _ } =
+                    &pending_route_request_some;
+                let contains_route = match request_args {
+                    PendingRouteRequestArgs::New(route) => {
+                        new_route_matches_existing(&route, &route_messages)
+                    }
+                };
+
+                // TODO(issuetracker.google.com/283136222): Change `done` based on whether
+                // the args are for NEW OR DEL, after `RTM_DELROUTE` requests are supported.
+                let done = contains_route;
+
+                if done {
+                    log_debug!("completed pending request; req = {pending_route_request_some:?}");
+                    let PendingRouteRequest { request_args, client, completer } =
+                        pending_route_request_some;
+
+                    respond_to_completer(client, completer, Ok(()), request_args);
+                } else {
+                    // Put the pending request back so that it can be handled later.
+                    log_debug!(
+                        "pending request not done yet; req = {pending_route_request_some:?}"
+                    );
+                    pending_route_request = Some(pending_route_request_some);
                 }
             }
         }
@@ -432,12 +522,17 @@ impl<
         Ok(())
     }
 
+    /// Handles a new route request.
+    ///
+    /// Returns the `RouteRequestArgs` if the route was successfully
+    /// added so that the caller can make sure their local state (from the
+    /// routes watcher) has sent an event holding the added route.
     async fn handle_new_route_request(
         interfaces_proxy: &fnet_root::InterfacesProxy,
         route_set_proxy: &<I::RouteSetMarker as ProtocolMarker>::Proxy,
         new_route_args: NewRouteArgs<I>,
         existing_routes: &HashSet<NetlinkRouteMessage>,
-    ) -> Result<(), RequestError> {
+    ) -> Result<NewRouteArgs<I>, RequestError> {
         if new_route_matches_existing(&new_route_args, existing_routes) {
             return Err(RequestError::AlreadyExists);
         }
@@ -458,7 +553,7 @@ impl<
             .await
             .expect("sent add route request")
         {
-            Ok(true) => return Ok(()),
+            Ok(true) => return Ok(new_route_args),
             // TODO(issuetracker.google.com/289518732): Get the key (dest, metric)
             // and check if a route with the metric currently exists in the observed
             // set. If it exists, return `AlreadyExists` early without a call to
@@ -481,7 +576,7 @@ impl<
             .await
             .expect("sent add route request")
         {
-            Ok(true) => return Ok(()),
+            Ok(true) => return Ok(new_route_args),
             Ok(false) => return Err(RequestError::AlreadyExists),
             // Only try to add a route once more after authenticating. All errors
             // are treated as hard errors after the second add route attempt.
@@ -492,12 +587,17 @@ impl<
         };
     }
 
+    /// Handles a [`Request`].
+    ///
+    /// Returns a [`PendingRouteRequest`] if a route was updated and the
+    /// caller needs to make sure the update has been propagated to the local
+    /// state (the routes watcher has sent an event for our update).
     async fn handle_request(
         interfaces_proxy: &fnet_root::InterfacesProxy,
         route_set_proxy: &<I::RouteSetMarker as ProtocolMarker>::Proxy,
         route_messages: &HashSet<NetlinkRouteMessage>,
         Request { args, sequence_number, mut client, completer }: Request<S, I>,
-    ) {
+    ) -> Option<PendingRouteRequest<S, I>> {
         log_debug!("handling request {args:?} from {client}");
 
         let result = match args {
@@ -511,32 +611,33 @@ impl<
                     }
                 },
                 RouteRequestArgs::New(args) => {
-                    Self::handle_new_route_request(
+                    match Self::handle_new_route_request(
                         interfaces_proxy,
                         route_set_proxy,
                         args,
                         route_messages,
                     )
                     .await
+                    {
+                        Ok(new_route_args) => {
+                            // Route additions must be confirmed via a message from the Routes
+                            // watcher with the same Route struct.
+                            return Some(PendingRouteRequest {
+                                request_args: PendingRouteRequestArgs::New(new_route_args),
+                                client,
+                                completer,
+                            });
+                        }
+                        Err(e) => Err(e),
+                    }
                 }
             },
         };
 
         log_debug!("handled request {args:?} from {client} with result = {result:?}");
 
-        match completer.send(result) {
-            Ok(()) => (),
-            Err(result) => {
-                // Not treated as a hard error because the socket may have been
-                // closed.
-                log_warn!(
-                    "failed to send result ({:?}) to {} after handling request {:?}",
-                    result,
-                    client,
-                    args
-                )
-            }
-        }
+        respond_to_completer(client, completer, result, args);
+        None
     }
 }
 
@@ -864,11 +965,7 @@ mod tests {
     use fidl_fuchsia_net_routes_admin as fnet_routes_admin;
 
     use assert_matches::assert_matches;
-    use futures::{
-        future::{Future, FutureExt as _},
-        sink::SinkExt as _,
-        Stream,
-    };
+    use futures::{future::Future, sink::SinkExt as _, Stream};
     use net_declare::{net_ip_v4, net_ip_v6, net_subnet_v4, net_subnet_v6};
     use net_types::{
         ip::{GenericOverIp, Ipv4, Ipv4Addr, Ipv6, Ipv6Addr, Subnet},
@@ -925,12 +1022,17 @@ mod tests {
         }
     }
 
-    fn create_netlink_route_message(
-        address_family: u8,
+    fn create_netlink_route_message<I: Ip>(
         destination_prefix_length: u8,
         nlas: Vec<netlink_packet_route::route::Nla>,
     ) -> NetlinkRouteMessage {
         let mut route_header = RouteHeader::default();
+        let address_family: u8 = match I::VERSION {
+            IpVersion::V4 => AF_INET,
+            IpVersion::V6 => AF_INET6,
+        }
+        .try_into()
+        .expect("should fit into u8");
         route_header.address_family = address_family;
         route_header.destination_prefix_length = destination_prefix_length;
         route_header.kind = RTN_UNICAST;
@@ -1108,13 +1210,7 @@ mod tests {
         let prefix_length = subnet.prefix();
         let subnet = if prefix_length > 0 { Some(subnet) } else { None };
         let nlas = create_nlas::<I>(subnet, Some(next_hop), DEV1, METRIC1);
-        let address_family = match I::VERSION {
-            IpVersion::V4 => AF_INET,
-            IpVersion::V6 => AF_INET6,
-        }
-        .try_into()
-        .expect("should fit into u8");
-        let expected = create_netlink_route_message(address_family, prefix_length, nlas);
+        let expected = create_netlink_route_message::<I>(prefix_length, nlas);
 
         let actual: NetlinkRouteMessage = installed_route.try_into().unwrap();
         assert_eq!(actual, expected);
@@ -1157,7 +1253,7 @@ mod tests {
 
     #[test]
     fn test_into_rtnl_new_route_is_serializable() {
-        let route = create_netlink_route_message(0, 0, vec![]);
+        let route = create_netlink_route_message::<Ipv4>(0, vec![]);
         let new_route_message = route.into_rtnl_new_route(UNSPECIFIED_SEQUENCE_NUMBER, false);
         let mut buf = vec![0; new_route_message.buffer_len()];
         // Serialize will panic if `new_route_message` is malformed.
@@ -1166,7 +1262,7 @@ mod tests {
 
     #[test]
     fn test_into_rtnl_del_route_is_serializable() {
-        let route = create_netlink_route_message(0, 0, vec![]);
+        let route = create_netlink_route_message::<Ipv6>(0, vec![]);
         let del_route_message = route.into_rtnl_del_route();
         let mut buf = vec![0; del_route_message.buffer_len()];
         // Serialize will panic if `del_route_message` is malformed.
@@ -1195,14 +1291,7 @@ mod tests {
         assert_eq!(actual.len(), 1);
 
         let nlas = create_nlas::<I>(Some(subnet), Some(next_hop), interface_id, METRIC1);
-        let address_family = match I::VERSION {
-            IpVersion::V4 => AF_INET,
-            IpVersion::V6 => AF_INET6,
-        }
-        .try_into()
-        .expect("should fit into u8");
-        let netlink_route_message =
-            create_netlink_route_message(address_family, subnet.prefix(), nlas);
+        let netlink_route_message = create_netlink_route_message::<I>(subnet.prefix(), nlas);
         let expected: HashSet<NetlinkRouteMessage> =
             vec![netlink_route_message].into_iter().collect::<_>();
         assert_eq!(actual, expected);
@@ -1498,19 +1587,20 @@ mod tests {
     #[derive(Debug, PartialEq)]
     struct TestRequestResult {
         messages: Vec<SentMessage<RtnlMessage>>,
-        waiter_result: Result<(), RequestError>,
+        waiter_results: Vec<Result<(), RequestError>>,
     }
 
-    /// Test helper to handle a request.
+    /// Test helper to handle an iterator of route requests
+    /// using the same clients and event loop.
     ///
     /// `root_handler` returns a future that handles
     /// `fnet_root::InterfacesRequest`s.
-    async fn test_request<
+    async fn test_requests<
         A: IpAddress,
         Fut: Future<Output = ()>,
         F: FnOnce(fnet_root::InterfacesRequestStream) -> Fut,
     >(
-        args: RequestArgs<A::Version>,
+        args: impl IntoIterator<Item = RequestArgs<A::Version>>,
         root_handler: F,
         route_set_results: impl ExactSizeIterator<Item = RouteSetResult>,
         subnet: Subnet<A>,
@@ -1537,7 +1627,7 @@ mod tests {
             mut watcher_stream,
             mut route_set_stream,
             interfaces_request_stream,
-            mut request_sink,
+            request_sink,
         } = setup_with_route_clients::<A::Version>({
             let route_clients = ClientTable::default();
             route_clients.add_client(route_client.clone());
@@ -1558,18 +1648,24 @@ mod tests {
         assert_eq!(&route_sink.take_messages()[..], &[]);
         assert_eq!(&other_sink.take_messages()[..], &[]);
 
-        let (completer, waiter) = oneshot::channel();
-        let fut = request_sink
-            .send(Request {
-                args,
-                sequence_number: TEST_SEQUENCE_NUMBER,
-                client: route_client.clone(),
-                completer,
-            })
-            .then(|res| {
-                res.expect("send request");
-                waiter
-            });
+        let route_client = &route_client;
+        let fut = futures::stream::iter(args).fold(
+            (Vec::new(), request_sink),
+            |(mut results, mut request_sink), args| async move {
+                let (completer, waiter) = oneshot::channel();
+                request_sink
+                    .send(Request {
+                        args,
+                        sequence_number: TEST_SEQUENCE_NUMBER,
+                        client: route_client.clone(),
+                        completer,
+                    })
+                    .await
+                    .unwrap();
+                results.push(waiter.await.unwrap());
+                (results, request_sink)
+            },
+        );
 
         let route_set_fut = respond_to_route_set_modifications::<A::Version, _, _>(
             route_set_stream.by_ref(),
@@ -1580,8 +1676,8 @@ mod tests {
 
         let root_interfaces_fut = root_handler(interfaces_request_stream).fuse();
 
-        let waiter_result = futures::select! {
-            res = fut.fuse() => res.unwrap(),
+        let waiter_results = futures::select! {
+            (results, _request_sink) = fut.fuse() => results,
             res = futures::future::join3(route_set_fut, root_interfaces_fut, event_loop_fut) => {
                 unreachable!("eventloop/stream handlers should not return: {res:?}")
             }
@@ -1593,7 +1689,7 @@ mod tests {
             messages.push(route_sink.next_message().await);
         }
         assert_eq!(route_sink.next_message().now_or_never(), None);
-        TestRequestResult { messages, waiter_result }
+        TestRequestResult { messages, waiter_results }
     }
 
     #[test_case(V4_SUB1, V4_NEXTHOP1, V4_NEXTHOP2; "v4_route_dump")]
@@ -1603,25 +1699,16 @@ mod tests {
     where
         A::Version: fnet_routes_ext::FidlRouteIpExt + fnet_routes_ext::admin::FidlRouteAdminIpExt,
     {
-        let address_family: u8 = match A::Version::VERSION {
-            IpVersion::V4 => AF_INET,
-            IpVersion::V6 => AF_INET6,
-        }
-        .try_into()
-        .expect("should fit into u8");
-
         let expected_messages = vec![
             SentMessage::unicast(
-                create_netlink_route_message(
-                    address_family,
+                create_netlink_route_message::<A::Version>(
                     subnet.prefix(),
                     create_nlas::<A::Version>(Some(subnet), Some(next_hop1), DEV1, METRIC1),
                 )
                 .into_rtnl_new_route(TEST_SEQUENCE_NUMBER, true),
             ),
             SentMessage::unicast(
-                create_netlink_route_message(
-                    address_family,
+                create_netlink_route_message::<A::Version>(
                     subnet.prefix(),
                     create_nlas::<A::Version>(Some(subnet), Some(next_hop2), DEV2, METRIC2),
                 )
@@ -1631,8 +1718,8 @@ mod tests {
 
         pretty_assertions::assert_eq!(
             {
-                let mut test_request_result = test_request(
-                    RequestArgs::Route(RouteRequestArgs::Get(GetRouteArgs::Dump)),
+                let mut test_request_result = test_requests(
+                    [RequestArgs::Route(RouteRequestArgs::Get(GetRouteArgs::Dump))],
                     |interfaces_request_stream| async {
                         interfaces_request_stream
                             .for_each(|req| async move {
@@ -1668,7 +1755,7 @@ mod tests {
                 });
                 test_request_result
             },
-            TestRequestResult { messages: expected_messages, waiter_result: Ok(()) },
+            TestRequestResult { messages: expected_messages, waiter_results: vec![Ok(())] },
         )
     }
 
@@ -1722,6 +1809,7 @@ mod tests {
                                 route_set_result,
                                 RouteSetResult::AddResult(res) => res
                             );
+
                             responder
                                 .send(route_set_result)
                                 .expect("failed to respond to `AddRoute`");
@@ -1823,7 +1911,7 @@ mod tests {
                                                 route: route.try_into().unwrap(),
                                                 effective_properties:
                                                     fnet_routes_ext::EffectiveRouteProperties {
-                                                        metric: metric,
+                                                        metric,
                                                     },
                                             },
                                         )
@@ -1880,16 +1968,16 @@ mod tests {
         assert_eq!(route_set_results_len, counter.into_inner());
     }
 
-    /// A test helper to exercise a single route request.
+    /// A test helper to exercise multiple route requests.
     ///
     /// A test helper that calls the provided callback with a
     /// [`fnet_interfaces_admin::ControlRequest`] as they arrive.
-    async fn test_route_request<
+    async fn test_route_requests<
         A: IpAddress,
         Fut: Future<Output = ()>,
         F: FnMut(fnet_interfaces_admin::ControlRequest) -> Fut,
     >(
-        route_request_args: RouteRequestArgs<A::Version>,
+        args: impl IntoIterator<Item = RequestArgs<A::Version>>,
         mut control_request_handler: F,
         route_set_results: impl ExactSizeIterator<Item = RouteSetResult>,
         subnet: Subnet<A>,
@@ -1900,8 +1988,8 @@ mod tests {
     where
         A::Version: fnet_routes_ext::FidlRouteIpExt + fnet_routes_ext::admin::FidlRouteAdminIpExt,
     {
-        test_request(
-            RequestArgs::Route(route_request_args),
+        test_requests(
+            args,
             |interfaces_request_stream| async move {
                 interfaces_request_stream
                     .filter_map(|req| {
@@ -1931,69 +2019,74 @@ mod tests {
         .await
     }
 
-    // A test helper that calls `test_route_request()` with the provided
+    // A test helper that calls `test_route_requests()` with the provided
     // inputs and expected values.
-    async fn test_new_route_helper<A: IpAddress>(
+    async fn test_route_requests_helper<A: IpAddress>(
+        args: impl IntoIterator<Item = RequestArgs<A::Version>>,
+        expected_messages: Vec<SentMessage<RtnlMessage>>,
         route_set_results: Vec<RouteSetResult>,
-        waiter_result: Result<(), RequestError>,
+        waiter_results: Vec<Result<(), RequestError>>,
         subnet: Subnet<A>,
-        metric: u32,
     ) where
         A::Version: fnet_routes_ext::FidlRouteIpExt + fnet_routes_ext::admin::FidlRouteAdminIpExt,
     {
-        let (address_family, route_group) = match A::Version::VERSION {
-            IpVersion::V4 => (AF_INET, ModernGroup(RTNLGRP_IPV4_ROUTE)),
-            IpVersion::V6 => (AF_INET6, ModernGroup(RTNLGRP_IPV6_ROUTE)),
-        };
-
         let (next_hop1, next_hop2): (A, A) = A::Version::map_ip(
             (),
             |()| (V4_NEXTHOP1, V4_NEXTHOP2),
             |()| (V6_NEXTHOP1, V6_NEXTHOP2),
         );
 
-        // When the waiter result is Ok(()), then we know that the add
-        // was successful and we got a message.
-        let messages = match waiter_result {
-            Ok(()) => Vec::from([SentMessage::multicast(
-                create_netlink_route_message(
-                    address_family.try_into().expect("should fit into u8"),
-                    subnet.prefix(),
-                    create_nlas::<A::Version>(Some(subnet), Some(next_hop2), DEV1, metric),
-                )
-                .into_rtnl_new_route(UNSPECIFIED_SEQUENCE_NUMBER, false),
-                route_group,
-            )]),
-            Err(_) => Vec::new(),
-        };
-
-        let unicast_route_args = create_unicast_route_args(subnet, next_hop2, DEV1.into(), metric);
         pretty_assertions::assert_eq!(
-            test_route_request(
-                RouteRequestArgs::New(NewRouteArgs::Unicast(unicast_route_args)),
-                |req| async {
-                    match req {
-                        fnet_interfaces_admin::ControlRequest::GetAuthorizationForInterface {
-                            responder,
-                        } => {
-                            let (token, _) = fidl::EventPair::create();
-                            let grant = fnet_interfaces_admin::GrantForInterfaceAuthorization {
-                                interface_id: DEV1 as u64,
-                                token,
-                            };
-                            responder.send(grant).unwrap();
+            {
+                let mut test_request_result = test_route_requests(
+                    args,
+                    |req| async {
+                        match req {
+                            fnet_interfaces_admin::ControlRequest::GetAuthorizationForInterface {
+                                responder,
+                            } => {
+                                let (token, _) = fidl::EventPair::create();
+                                let grant = fnet_interfaces_admin::GrantForInterfaceAuthorization {
+                                    interface_id: DEV1 as u64,
+                                    token,
+                                };
+                                responder.send(grant).unwrap();
+                            }
+                            req => panic!("unexpected request {req:?}"),
                         }
-                        req => panic!("unexpected request {req:?}"),
-                    }
-                },
-                route_set_results.into_iter(),
-                subnet,
-                next_hop1,
-                next_hop2,
-                messages.len(),
-            )
-            .await,
-            TestRequestResult { messages, waiter_result },
+                    },
+                    route_set_results.into_iter(),
+                    subnet,
+                    next_hop1,
+                    next_hop2,
+                    expected_messages.len(),
+                )
+                .await;
+                test_request_result.messages.sort_by_key(|message| {
+                    // The sequence number sorts multicast messages prior to
+                    // unicast messages.
+                    let sequence_number = message.message.header.sequence_number;
+                    assert_matches!(
+                        &message.message.payload,
+                        NetlinkPayload::InnerMessage(RtnlMessage::NewRoute(m)) => {
+                            // We expect there to be exactly one Priority NLA present
+                            // for the given inputs.
+                            m.nlas.clone().into_iter().filter_map(|nla|
+                                match nla {
+                                    netlink_packet_route::route::Nla::Priority(priority) =>
+                                        Some((sequence_number, priority)),
+                                    netlink_packet_route::route::Nla::Destination(_)
+                                    | netlink_packet_route::route::Nla::Gateway(_)
+                                    | netlink_packet_route::route::Nla::Oif(_) => None,
+                                    _ => panic!("unexpected NLA {nla:?} present in payload"),
+                                }
+                            ).next()
+                        }
+                    )
+                });
+                test_request_result
+            },
+            TestRequestResult { messages: expected_messages, waiter_results },
         )
     }
 
@@ -2105,7 +2198,36 @@ mod tests {
     ) where
         A::Version: fnet_routes_ext::FidlRouteIpExt + fnet_routes_ext::admin::FidlRouteAdminIpExt,
     {
-        test_new_route_helper(route_set_results, waiter_result, subnet, metric).await;
+        let route_group = match A::Version::VERSION {
+            IpVersion::V4 => ModernGroup(RTNLGRP_IPV4_ROUTE),
+            IpVersion::V6 => ModernGroup(RTNLGRP_IPV6_ROUTE),
+        };
+
+        let next_hop: A = A::Version::map_ip((), |()| V4_NEXTHOP1, |()| V6_NEXTHOP1);
+
+        // When the waiter result is Ok(()), then we know that the add
+        // was successful and we got a message.
+        let messages = match waiter_result {
+            Ok(()) => Vec::from([SentMessage::multicast(
+                create_netlink_route_message::<A::Version>(
+                    subnet.prefix(),
+                    create_nlas::<A::Version>(Some(subnet), Some(next_hop), DEV1, metric),
+                )
+                .into_rtnl_new_route(UNSPECIFIED_SEQUENCE_NUMBER, false),
+                route_group,
+            )]),
+            Err(_) => Vec::new(),
+        };
+
+        let unicast_route_args = create_unicast_route_args(subnet, next_hop, DEV1.into(), metric);
+        test_route_requests_helper(
+            [RequestArgs::Route(RouteRequestArgs::New(NewRouteArgs::Unicast(unicast_route_args)))],
+            messages,
+            route_set_results,
+            vec![waiter_result],
+            subnet,
+        )
+        .await;
     }
 
     // Tests RTM_NEWROUTE when two unauthentication events are received - once prior to
@@ -2137,7 +2259,89 @@ mod tests {
     ) where
         A::Version: fnet_routes_ext::FidlRouteIpExt + fnet_routes_ext::admin::FidlRouteAdminIpExt,
     {
-        test_new_route_helper(route_set_results, waiter_result, subnet, METRIC3).await;
+        let next_hop: A = A::Version::map_ip((), |()| V4_NEXTHOP1, |()| V6_NEXTHOP1);
+        let unicast_route_args = create_unicast_route_args(subnet, next_hop, DEV1.into(), METRIC3);
+        test_route_requests_helper(
+            [RequestArgs::Route(RouteRequestArgs::New(NewRouteArgs::Unicast(unicast_route_args)))],
+            Vec::new(),
+            route_set_results,
+            vec![waiter_result],
+            subnet,
+        )
+        .await;
+    }
+
+    /// A test to exercise a `RTM_NEWROUTE` followed by a `RTM_GETROUTE`
+    /// route request, ensuring that the new route is included in the
+    /// dump request.
+    #[test_case(V4_SUB1, ModernGroup(RTNLGRP_IPV4_ROUTE))]
+    #[test_case(V6_SUB1, ModernGroup(RTNLGRP_IPV6_ROUTE))]
+    #[fuchsia::test]
+    async fn test_new_then_get_dump_request<A: IpAddress>(subnet: Subnet<A>, group: ModernGroup)
+    where
+        A::Version: fnet_routes_ext::FidlRouteIpExt + fnet_routes_ext::admin::FidlRouteAdminIpExt,
+    {
+        let (next_hop1, next_hop2): (A, A) = A::Version::map_ip(
+            (),
+            |()| (V4_NEXTHOP1, V4_NEXTHOP2),
+            |()| (V6_NEXTHOP1, V6_NEXTHOP2),
+        );
+
+        // There are two pre-set routes in `test_route_requests`.
+        // * subnet, next_hop1, DEV1, METRIC1
+        // * subnet, next_hop2, DEV2, METRIC2
+        // To add a new route that does not get rejected by the handler due to it
+        // already existing, we use a route that has METRIC3.
+        let unicast_route_args = create_unicast_route_args(subnet, next_hop1, DEV1.into(), METRIC3);
+
+        // We expect to see one multicast message, representing the route that was added.
+        // Then, three unicast messages, representing the two routes that existed already in the
+        // route set, and the one new route that was added.
+        let messages = vec![
+            SentMessage::multicast(
+                create_netlink_route_message::<A::Version>(
+                    subnet.prefix(),
+                    create_nlas::<A::Version>(Some(subnet), Some(next_hop1), DEV1, METRIC3),
+                )
+                .into_rtnl_new_route(UNSPECIFIED_SEQUENCE_NUMBER, false),
+                group,
+            ),
+            SentMessage::unicast(
+                create_netlink_route_message::<A::Version>(
+                    subnet.prefix(),
+                    create_nlas::<A::Version>(Some(subnet), Some(next_hop1), DEV1, METRIC1),
+                )
+                .into_rtnl_new_route(TEST_SEQUENCE_NUMBER, true),
+            ),
+            SentMessage::unicast(
+                create_netlink_route_message::<A::Version>(
+                    subnet.prefix(),
+                    create_nlas::<A::Version>(Some(subnet), Some(next_hop2), DEV2, METRIC2),
+                )
+                .into_rtnl_new_route(TEST_SEQUENCE_NUMBER, true),
+            ),
+            SentMessage::unicast(
+                create_netlink_route_message::<A::Version>(
+                    subnet.prefix(),
+                    create_nlas::<A::Version>(Some(subnet), Some(next_hop1), DEV1, METRIC3),
+                )
+                .into_rtnl_new_route(TEST_SEQUENCE_NUMBER, true),
+            ),
+        ];
+
+        test_route_requests_helper(
+            [
+                RequestArgs::Route(RouteRequestArgs::New(NewRouteArgs::Unicast(
+                    unicast_route_args,
+                ))),
+                RequestArgs::Route(RouteRequestArgs::Get(GetRouteArgs::Dump)),
+            ],
+            messages,
+            vec![RouteSetResult::AddResult(Ok(true))],
+            vec![Ok(()), Ok(())],
+            subnet,
+        )
+        .await;
     }
 
     /// Tests RTM_NEWROUTE when the interface is removed,
@@ -2157,7 +2361,7 @@ mod tests {
             |()| (V6_NEXTHOP1, V6_NEXTHOP2),
         );
 
-        // There are two pre-set routes in `test_route_request`.
+        // There are two pre-set routes in `test_route_requests`.
         // * subnet, next_hop1, DEV1, METRIC1
         // * subnet, next_hop2, DEV2, METRIC2
         // To add a new route that does not get rejected by the handler due to it
@@ -2168,10 +2372,10 @@ mod tests {
         let expected_messages = Vec::new();
 
         pretty_assertions::assert_eq!(
-            test_request(
-                RequestArgs::Route(RouteRequestArgs::New(NewRouteArgs::Unicast(
+            test_requests(
+                [RequestArgs::Route(RouteRequestArgs::New(NewRouteArgs::Unicast(
                     unicast_route_args
-                ))),
+                )))],
                 |interfaces_request_stream| async move {
                     interfaces_request_stream
                         .for_each(|req| {
@@ -2200,7 +2404,7 @@ mod tests {
             .await,
             TestRequestResult {
                 messages: expected_messages,
-                waiter_result: Err(RequestError::UnrecognizedInterface),
+                waiter_results: vec![Err(RequestError::UnrecognizedInterface)],
             },
         )
     }
@@ -2313,14 +2517,9 @@ mod tests {
         };
         let existing_routes = {
             let Route { subnet, device, nexthop, metric } = existing;
-            let address_family = match I::VERSION {
-                IpVersion::V4 => AF_INET,
-                IpVersion::V6 => AF_INET6,
-            };
             // Don't populate the Destination NLA if this is the default route.
             let destination = (subnet.prefix() != 0).then_some(subnet);
-            HashSet::from([create_netlink_route_message(
-                address_family as u8,
+            HashSet::from([create_netlink_route_message::<I>(
                 subnet.prefix(),
                 create_nlas::<I>(destination, nexthop, device, metric),
             )])
