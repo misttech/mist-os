@@ -227,12 +227,12 @@ impl<K: OrdLowerBound, V> Ord for MergeLayerIterator<'_, K, V> {
 }
 impl<K: OrdLowerBound, V> PartialOrd for MergeLayerIterator<'_, K, V> {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-        return Some(self.cmp(other));
+        Some(self.cmp(other))
     }
 }
 impl<K: OrdLowerBound, V> PartialEq for MergeLayerIterator<'_, K, V> {
     fn eq(&self, other: &Self) -> bool {
-        return self.cmp(other) == Ordering::Equal;
+        self.cmp(other) == Ordering::Equal
     }
 }
 impl<K: OrdLowerBound, V> Eq for MergeLayerIterator<'_, K, V> {}

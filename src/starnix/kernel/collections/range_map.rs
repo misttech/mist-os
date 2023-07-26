@@ -50,7 +50,7 @@ impl<T: Eq> Eq for RangeStart<T> {}
 /// PartialOrd according to the start of the Range.
 impl<T: Ord> PartialOrd for RangeStart<T> {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-        self.range.start.partial_cmp(&other.range.start)
+        Some(self.cmp(other))
     }
 }
 

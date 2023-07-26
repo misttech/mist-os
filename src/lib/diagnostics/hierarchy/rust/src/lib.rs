@@ -700,7 +700,7 @@ impl Ord for OrdStringSelector {
 
 impl PartialOrd for OrdStringSelector {
     fn partial_cmp(&self, other: &OrdStringSelector) -> Option<Ordering> {
-        Some(self.cmp(&other))
+        Some(self.cmp(other))
     }
 }
 

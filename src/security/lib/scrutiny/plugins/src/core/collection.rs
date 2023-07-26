@@ -127,7 +127,7 @@ impl<'a> From<&'a Package> for PackageUrlPart<'a> {
 
 impl PartialOrd<Package> for Package {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-        PackageUrlPart::from(self).partial_cmp(&PackageUrlPart::from(other))
+        Some(self.cmp(other))
     }
 }
 

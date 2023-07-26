@@ -34,21 +34,21 @@ impl ListResultItem {
 
 impl Ord for ListResultItem {
     fn cmp(&self, other: &Self) -> Ordering {
-        self.partial_cmp(other).unwrap()
+        match (self, other) {
+            (ListResultItem::Moniker(moniker), ListResultItem::Moniker(other_moniker))
+            | (
+                ListResultItem::MonikerWithUrl(MonikerWithUrl { moniker, .. }),
+                ListResultItem::MonikerWithUrl(MonikerWithUrl { moniker: other_moniker, .. }),
+            ) => moniker.cmp(other_moniker),
+            _ => unreachable!("all lists must contain variants of the same type"),
+        }
     }
 }
 
 impl PartialOrd for ListResultItem {
     // Compare based on the moniker only. To enable sorting using the moniker only.
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-        match (self, other) {
-            (ListResultItem::Moniker(moniker), ListResultItem::Moniker(other_moniker))
-            | (
-                ListResultItem::MonikerWithUrl(MonikerWithUrl { moniker, .. }),
-                ListResultItem::MonikerWithUrl(MonikerWithUrl { moniker: other_moniker, .. }),
-            ) => moniker.partial_cmp(other_moniker),
-            _ => unreachable!("all lists must contain variants of the same type"),
-        }
+        Some(self.cmp(other))
     }
 }
 

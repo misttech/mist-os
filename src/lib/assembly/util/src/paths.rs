@@ -186,7 +186,7 @@ mod from_impls {
 
 impl<P: PathTypeMarker> PartialOrd for TypedPathBuf<P> {
     fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
-        self.inner.partial_cmp(&other.inner)
+        Some(self.cmp(other))
     }
 }
 

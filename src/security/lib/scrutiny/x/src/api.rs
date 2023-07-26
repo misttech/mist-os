@@ -426,6 +426,7 @@ impl dyn AsBytes {
     }
 }
 
+#[allow(unknown_lints, clippy::incorrect_partial_ord_impl_on_ord_type)]
 impl PartialOrd for dyn AsBytes {
     fn partial_cmp(&self, other: &dyn AsBytes) -> Option<cmp::Ordering> {
         Some(self.compare(other))
@@ -461,6 +462,7 @@ impl dyn Hash {
     }
 }
 
+#[allow(unknown_lints, clippy::incorrect_partial_ord_impl_on_ord_type)]
 impl PartialOrd for dyn Hash {
     fn partial_cmp(&self, other: &Self) -> Option<cmp::Ordering> {
         Some(self.compare(other))

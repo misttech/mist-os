@@ -790,7 +790,7 @@ impl PacketBodyFragment {
 // offset.
 impl PartialOrd for PacketBodyFragment {
     fn partial_cmp(&self, other: &PacketBodyFragment) -> Option<Ordering> {
-        self.offset.partial_cmp(&other.offset)
+        Some(self.cmp(other))
     }
 }
 

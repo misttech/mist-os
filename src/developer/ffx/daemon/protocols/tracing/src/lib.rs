@@ -66,7 +66,7 @@ impl TriggerSetItem {
 
 impl std::cmp::PartialOrd for TriggerSetItem {
     fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
-        self.alert.partial_cmp(&other.alert)
+        Some(self.cmp(other))
     }
 }
 
