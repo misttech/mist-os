@@ -137,14 +137,14 @@ You can also invoke Ninja directly with <code>fx ninja</code> to customize or
 troubleshoot the build.
 </aside>
 
-## Exercise: Build Workstation
+## Exercise: Build Minimal
 
 In this exercise, you'll build the `minimal_eng` product configuration from
 source to run on the `qemu-x64` emulator board.
 
 ### Configure the build
 
-Set up the build environment for the `workstation_eng` product and `qemu-x64` board:
+Set up the build environment for the `minimal` product and `qemu-x64` board:
 
 ```posix-terminal
 fx set minimal.x64
@@ -175,9 +175,9 @@ fx list-packages
 This is a useful tool to determine if a package you need was properly included
 in the build configuration.
 
-### Build Fuchsia Workstation
+### Build Fuchsia Minimal
 
-Build the Workstation target with `fx build`:
+Build the Minimal target with `fx build`:
 
 <aside class="caution">
 A full build on a fresh checkout of the source can take upwards of 60-90 minutes
