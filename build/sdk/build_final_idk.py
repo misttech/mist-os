@@ -144,7 +144,7 @@ def main():
     parser.add_argument(
         "--extra-target-cpus",
         nargs="+",
-        required=True,
+        default=[],
         help="List of extra target CPU names.")
     parser.add_argument("--stamp-file", help="Optional output stamp file.")
     parser.add_argument(

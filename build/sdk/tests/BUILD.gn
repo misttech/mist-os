@@ -24,8 +24,8 @@ sdk_atom("sdk_atom_unittest") {
   }
 }
 
-# A minimal target to exercise the `sdk` template.
-sdk("sdk_unittest") {
+# A minimal target to exercise the `sdk_collection` template.
+sdk_collection("sdk_collection_unittest") {
   testonly = true
 
   category = "excluded"
@@ -34,8 +34,5 @@ sdk("sdk_unittest") {
 
 group("tests") {
   testonly = true
-  deps = [
-    ":sdk_unittest",
-    ":sdk_unittest_export",
-  ]
+  deps = [ ":sdk_collection_unittest" ]
 }

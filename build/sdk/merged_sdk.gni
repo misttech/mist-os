@@ -5,6 +5,18 @@
 import("//build/compiled_action.gni")
 import("config.gni")
 
+# Location of all exported SDK directories.
+#
+# Each exported SDK directory follows the IDK layout (and thus includes its
+# own top-level meta/manifest.json which lists all SDK atoms in that
+# directory).
+#
+_sdk_export_dir = "${root_out_dir}/sdk/exported"
+
+# Location of all SDK archives.
+#
+_sdk_archive_dir = "${root_out_dir}/sdk/archive"
+
 # Aggregates multiple SDKs into a single archive.
 #
 # Parameters
@@ -16,13 +28,6 @@ import("config.gni")
 template("merged_sdk") {
   assert(defined(invoker.deps), "Must define a 'deps' parameter")
   assert(invoker.deps != [], "'deps' may not be empty")
-
-  dep_count = 0
-  foreach(dep, invoker.deps) {
-    dep_count = dep_count + 1
-  }
-
-  export_dir = "${root_out_dir}/sdk/exported"
 
   merged_target = "${target_name}.generate"
   merged_archive = "$target_gen_dir/$target_name.tgz"
@@ -60,10 +65,7 @@ template("merged_sdk") {
     foreach(dep, invoker.deps) {
       dep_name = get_label_info(dep, "name")
       dep_gen_dir = get_label_info(dep, "target_gen_dir")
-      dep_dir = "${export_dir}/${dep_name}"
-      dep_stamp = "${dep_gen_dir}/${dep_name}.exported"
-
-      inputs += [ dep_stamp ]
+      dep_dir = "${_sdk_export_dir}/${dep_name}"
 
       args += [
         "--input-directory",
@@ -74,7 +76,7 @@ template("merged_sdk") {
 
   copy(target_name) {
     forward_variables_from(invoker, [ "testonly" ])
-    output_archive = "${root_out_dir}/sdk/archive/${target_name}.tar.gz"
+    output_archive = "${_sdk_archive_dir}/${target_name}.tar.gz"
 
     sources = [ merged_archive ]
 

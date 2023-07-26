@@ -21,8 +21,8 @@ import("//sdk/config.gni")
 #      value for the current build configuration. Defaults to `idk_target_cpus`.
 #
 #    sdk_target_labels: (required)
-#      List of labels to sdk() GN targets that will be merged into the
-#      final archive. Each one will be built for several CPU architecture.
+#      List of labels to sdk_collection() GN targets that will be merged into
+#      the final archive. Each one will be built for several CPU architecture.
 #
 #    output_name: (optional)
 #      Name of the archive, without a .tar.gz suffix. Default is target_name
@@ -31,12 +31,16 @@ import("//sdk/config.gni")
 #      Usual GN meaning.
 #
 template("generate_final_idk") {
-  if (sdk_no_host_tools) {
+  if (sdk_inside_idk_sub_build) {
     # sdk_no_host_tools should only be defined in the sub-builds generated
     # by build_final_idk.py, If this happens, do not define anything here.
     group(target_name) {
-      not_needed(invoker, "*")
     }
+
+    group("${target_name}.exported") {
+    }
+
+    not_needed(invoker, "*")
   } else {
     # Compute the list of target_cpu values that will require a sub-build
     # directory.
@@ -46,10 +50,9 @@ template("generate_final_idk") {
       _target_cpus = idk_target_cpus
     }
     _extra_target_cpus = _target_cpus + [ current_cpu ] - [ current_cpu ]
-
     assert(
-        _extra_target_cpus != [],
-        "The target_cpus list must include other architectures besides $host_cpu")
+        _extra_target_cpus != _target_cpus,
+        "The target_cpus argument must include the current target_cpu ($target_cpu): $_target_cpus")
 
     # Determine output archive location
     _output_name = target_name
@@ -94,10 +97,12 @@ template("generate_final_idk") {
              ] + _sdk_targets
 
       args += [
-                "--base-build-dir",
-                rebase_path(root_build_dir, root_build_dir),
-                "--extra-target-cpus",
-              ] + _extra_target_cpus
+        "--base-build-dir",
+        rebase_path(root_build_dir, root_build_dir),
+      ]
+      if (_extra_target_cpus != []) {
+        args += [ "--extra-target-cpus" ] + _extra_target_cpus
+      }
 
       if (cxx_rbe_enable) {
         args += [ "--cxx-rbe-enable" ]

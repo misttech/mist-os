@@ -643,7 +643,7 @@ action("get_atoms_from_sdk_manifest") {
   sdk_manifests = []
   foreach(dep, _sdk_public_deps) {
     name = get_label_info(dep, "name")
-    copy_dep = dep + "_copy"
+    copy_dep = dep + "_final_manifest"
     foreach(output, get_target_outputs(copy_dep)) {
       sdk_manifests += [ rebase_path(output, root_build_dir) ]
       inputs += [ output ]
