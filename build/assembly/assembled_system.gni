@@ -5,7 +5,6 @@
 import("//build/assembly/hermetic_inputs_for_image_assembly.gni")
 import("//build/assembly/legacy_assembly_input_bundle.gni")
 import("//build/bazel/bazel_inputs.gni")
-import("//build/images/args.gni")
 import("//build/python/python_action.gni")
 import("//build/zircon/tools.gni")
 import("//bundles/assembly/platform_aibs.gni")
@@ -246,19 +245,19 @@ template("assembled_system") {
          "Only one of Fxfs and FVM can host blobs")
   _supports_blobs = _generate_fvm || _generate_fxfs
 
-  generate_image_metadata = true
+  _generate_image_metadata = true
   if (defined(invoker.generate_image_metadata)) {
-    generate_image_metadata = invoker.generate_image_metadata
+    _generate_image_metadata = invoker.generate_image_metadata
   }
 
-  generate_signed_zbi = defined(invoker.zbi_signing_script)
+  _generate_signed_zbi = defined(invoker.zbi_signing_script)
   if (defined(invoker.generate_signed_zbi)) {
-    generate_signed_zbi = invoker.generate_signed_zbi
+    _generate_signed_zbi = invoker.generate_signed_zbi
   }
 
   forward_variables_from(invoker, [ "image_metadata_overrides" ])
   if (defined(image_metadata_overrides)) {
-    if (!sign_zbi) {
+    if (!_generate_signed_zbi) {
       assert(
           !defined(image_metadata_overrides.zbi_signed),
           "No signed ZBI will be built: no metadata override should be provided")
@@ -309,37 +308,37 @@ template("assembled_system") {
   fvm_tool_path = get_label_info(fvm_tool_target, "root_out_dir")
   fvm_tool_path += "/fvm"
 
-  image_name = target_name
+  _image_name = target_name
   if (defined(invoker.image_name)) {
-    image_name = invoker.image_name
+    _image_name = invoker.image_name
   }
 
-  namespace = image_name
+  _namespace = _image_name
   if (defined(invoker.namespace)) {
-    namespace = invoker.namespace
+    _namespace = invoker.namespace
   }
 
   # Internal labels used for Image Assembly.
   labels = {
-    base_packages_group = "${namespace}.base_packages"
-    cache_packages_group = "${namespace}.cache_packages"
-    meta_packages_group = "${namespace}.meta_packages"
-    all_packages_group = "${namespace}.packages"
-    legacy_assembly_input_bundle = "${namespace}.legacy_input_bundle"
+    base_packages_group = "${_namespace}.base_packages"
+    cache_packages_group = "${_namespace}.cache_packages"
+    meta_packages_group = "${_namespace}.meta_packages"
+    all_packages_group = "${_namespace}.packages"
+    legacy_assembly_input_bundle = "${_namespace}.legacy_input_bundle"
     fshost = "${legacy_assembly_input_bundle}.fshost"
-    fshost_validator = "${namespace}.fshost_validator"
-    image_assembly_inputs = "${namespace}.image_assembly_inputs"
-    product_assembler = "${namespace}.product_assembler"
-    image_assembler = "${namespace}.image_assembler"
-    copy_vbmeta = "${namespace}.copy_vbmeta"
-    copy_zbi = "${namespace}.copy_zbi"
-    copy_zbi_signed = "${namespace}.copy_zbi_signed"
-    copy_zbi_manifest = "${namespace}.copy_zbi_manifest"
-    copy_images = "${namespace}.copy_images"
-    shell_commands = "${namespace}.shell_commands"
-    assembly_generated_packages = "${namespace}.assembly_generated_packages"
-    compare_command_logs = "${namespace}.compare_command_logs"
-    compare_images_manifests = "${namespace}.compare_images_manifests"
+    fshost_validator = "${_namespace}.fshost_validator"
+    image_assembly_inputs = "${_namespace}.image_assembly_inputs"
+    product_assembler = "${_namespace}.product_assembler"
+    image_assembler = "${_namespace}.image_assembler"
+    copy_vbmeta = "${_namespace}.copy_vbmeta"
+    copy_zbi = "${_namespace}.copy_zbi"
+    copy_zbi_signed = "${_namespace}.copy_zbi_signed"
+    copy_zbi_manifest = "${_namespace}.copy_zbi_manifest"
+    copy_images = "${_namespace}.copy_images"
+    shell_commands = "${_namespace}.shell_commands"
+    assembly_generated_packages = "${_namespace}.assembly_generated_packages"
+    compare_command_logs = "${_namespace}.compare_command_logs"
+    compare_images_manifests = "${_namespace}.compare_images_manifests"
     images_config = invoker.assembly_images_config_label
 
     # *_platform_aib_labels come from //bundles/assembly/platform_aibs.gni
@@ -359,9 +358,9 @@ template("assembled_system") {
       }
     }
 
-    bazel_legacy_aib = "${namespace}.bazel_legacy_aib"
+    bazel_legacy_aib = "${_namespace}.bazel_legacy_aib"
     validation_legacy_aib =
-        "${namespace}.validation_legacy_assembly_input_bundle"
+        "${_namespace}.validation_legacy_assembly_input_bundle"
 
     product_assembly_config = invoker.product_assembly_config_label
   }
@@ -373,16 +372,17 @@ template("assembled_system") {
         get_label_info(labels.product_assembly_config, "name") +
         "/product_assembly_config.json"
 
-    image_assembly_inputs = "$target_out_dir/${namespace}.image_assembly_inputs"
+    image_assembly_inputs =
+        "$target_out_dir/${_namespace}.image_assembly_inputs"
 
-    gn_images_config = "$target_out_dir/${namespace}.images_config.json"
+    gn_images_config = "$target_out_dir/${_namespace}.images_config.json"
 
     images_config =
         get_label_info(invoker.assembly_images_config_label, "target_out_dir") +
         "/" + get_label_info(invoker.assembly_images_config_label, "name") +
         ".json"
 
-    outdir = "$target_out_dir/$namespace"
+    outdir = "$target_out_dir/$_namespace"
     gendir = "$outdir/gen"
 
     # The cmc_merge() template this is used with prepends $target_out_dir.
@@ -400,9 +400,9 @@ template("assembled_system") {
 
     bootfs_files = "${gendir}/bootfs_files.list"
     additional_boot_args = "${gendir}/additional_boot_args.txt"
-    zbi = "${outdir}/${image_name}.zbi"
+    zbi = "${outdir}/${_image_name}.zbi"
     zbi_signed = "${zbi}.signed"
-    vbmeta = "${outdir}/${image_name}.vbmeta"
+    vbmeta = "${outdir}/${_image_name}.vbmeta"
 
     if (_generate_fvm || _generate_fvm_fastboot || _generate_fvm_nand) {
       blobfs = "${outdir}/blob.blk"
@@ -442,7 +442,7 @@ template("assembled_system") {
 
     # Determine which ZBI we are shipping.
     zbi_final = zbi
-    if (generate_signed_zbi) {
+    if (_generate_signed_zbi) {
       zbi_final = zbi_signed
     }
 
@@ -510,21 +510,21 @@ template("assembled_system") {
     _additional_boot_args = invoker.additional_boot_args
   }
 
-  use_assembly_fshost =
+  _use_assembly_fshost =
       defined(invoker.use_assembly_fshost) && invoker.use_assembly_fshost
 
   # Defaults to true if the invoker doesn't pass "include_shell_commands"
-  include_shell_commands = _supports_blobs
+  _include_shell_commands = _supports_blobs
   if (defined(invoker.include_shell_commands)) {
     if (invoker.include_shell_commands) {
       assert(
           _supports_blobs,
           "Shell command package generation is only valid if the fvm is being created.")
     }
-    include_shell_commands = invoker.include_shell_commands
+    _include_shell_commands = invoker.include_shell_commands
   }
 
-  if (!include_shell_commands) {
+  if (!_include_shell_commands) {
     not_needed([ "_universe_packages" ])
   }
 
@@ -622,7 +622,7 @@ template("assembled_system") {
     base_driver_packages = _base_driver_packages
     boot_driver_packages = _boot_driver_packages
 
-    if (include_shell_commands) {
+    if (_include_shell_commands) {
       shell_command_packages =
           _base_packages + _universe_packages + _cache_packages
     }
@@ -633,7 +633,7 @@ template("assembled_system") {
     cache_packages = _cache_packages
     universe_packages = _universe_packages
     additional_boot_args = _additional_boot_args
-    use_assembly_fshost = use_assembly_fshost
+    use_assembly_fshost = _use_assembly_fshost
     ramdisk_in_zbi = ramdisk_in_zbi
   }
 
@@ -709,7 +709,7 @@ template("assembled_system") {
     output = files.image_assembly_inputs
   }
 
-  if (use_assembly_fshost) {
+  if (_use_assembly_fshost) {
     python_action("${labels.fshost_validator}") {
       forward_variables_from(invoker,
                              [
@@ -818,7 +818,7 @@ template("assembled_system") {
 
     # Validate that the Assembly-built fshost is identical to the GN-built
     # fshost until the latter is removed.
-    if (use_assembly_fshost) {
+    if (_use_assembly_fshost) {
       deps += [ ":${labels.fshost_validator}" ]
     }
 
@@ -841,7 +841,7 @@ template("assembled_system") {
       files.assembly_manifest,
     ]
 
-    if (generate_signed_zbi) {
+    if (_generate_signed_zbi) {
       outputs += [ files.zbi_signed ]
     }
 
@@ -907,7 +907,7 @@ template("assembled_system") {
         forward_variables_from(invoker.metadata, "*")
       }
 
-      if (generate_image_metadata) {
+      if (_generate_image_metadata) {
         _image_overrides = {
           zbi = {
           }
@@ -934,7 +934,7 @@ template("assembled_system") {
         }
       }
 
-      if (generate_image_metadata) {
+      if (_generate_image_metadata) {
         # (Mostly) common fields across all image metadata.
         _common_metadata = {
           label = get_label_info(":$target_name", "label_with_toolchain")
@@ -944,7 +944,7 @@ template("assembled_system") {
         images += [
           # ZBI
           {
-            name = namespace
+            name = _namespace
             type = "zbi"
 
             forward_variables_from(_common_metadata, "*")
@@ -963,7 +963,7 @@ template("assembled_system") {
           images += [
             # BlobFS
             {
-              name = "${namespace}.blob"
+              name = "${_namespace}.blob"
               path = rebase_path(files.blobfs, root_build_dir)
               type = "blk"
               forward_variables_from(_common_metadata, "*")
@@ -972,7 +972,7 @@ template("assembled_system") {
 
             # FVM
             {
-              name = "${namespace}.fvm"
+              name = "${_namespace}.fvm"
               path = rebase_path(files.fvm, root_build_dir)
               type = "blk"
               forward_variables_from(_common_metadata, "*")
@@ -981,7 +981,7 @@ template("assembled_system") {
 
             # Sparse FVM
             {
-              name = "${namespace}.fvm_sparse"
+              name = "${_namespace}.fvm_sparse"
               path = rebase_path(files.fvm_sparse, root_build_dir)
               type = "blk"
               forward_variables_from(_common_metadata, "*")
@@ -991,14 +991,14 @@ template("assembled_system") {
         } else if (_generate_fxfs) {
           images += [
             {
-              name = "${namespace}.fxfs"
+              name = "${_namespace}.fxfs"
               path = rebase_path(files.fxfs, root_build_dir)
               type = "fxfs-blk"
               forward_variables_from(_common_metadata, "*")
               forward_variables_from(_image_overrides["fxfs"], "*")
             },
             {
-              name = "${namespace}.fxfs_sparse"
+              name = "${_namespace}.fxfs_sparse"
               path = rebase_path(files.fxfs_sparse, root_build_dir)
               type = "blk"
               forward_variables_from(_common_metadata, "*")
@@ -1008,10 +1008,10 @@ template("assembled_system") {
         }
 
         # Optionally add the signed images.
-        if (sign_zbi) {
+        if (_generate_signed_zbi) {
           images += [
             {
-              name = namespace
+              name = _namespace
               type = "zbi.signed"
 
               forward_variables_from(_common_metadata, "*")
@@ -1033,7 +1033,7 @@ template("assembled_system") {
         if (_generate_vbmeta) {
           images += [
             {
-              name = namespace
+              name = _namespace
               type = "vbmeta"
               forward_variables_from(_common_metadata, "*")
               if (defined(invoker.output_dir)) {
@@ -1054,7 +1054,7 @@ template("assembled_system") {
         if (_generate_fvm_fastboot || _generate_fvm_nand) {
           images += [
             {
-              name = "${namespace}.fvm_fastboot"
+              name = "${_namespace}.fvm_fastboot"
               path = rebase_path(files.fvm_fastboot, root_build_dir)
               type = "blk"
               forward_variables_from(_common_metadata, "*")
@@ -1081,7 +1081,7 @@ template("assembled_system") {
 
     # The output name is the same as the original file by default.
     # Otherwise, it takes the output_name, and strips any extension.
-    output_name = "${image_name}"
+    output_name = "${_image_name}"
     if (defined(invoker.output_name)) {
       parts = string_split(invoker.output_name, ".")
       output_name = parts[0]
@@ -1109,7 +1109,7 @@ template("assembled_system") {
       deps = [ ":${labels.image_assembler}" ]
     }
 
-    if (generate_signed_zbi) {
+    if (_generate_signed_zbi) {
       copy(labels.copy_zbi_signed) {
         forward_variables_from(invoker,
                                [
@@ -1145,7 +1145,7 @@ template("assembled_system") {
         ":${labels.copy_zbi_manifest}",
         ":${labels.copy_zbi}",
       ]
-      if (generate_signed_zbi) {
+      if (_generate_signed_zbi) {
         public_deps += [ ":${labels.copy_zbi_signed}" ]
       }
       if (_generate_vbmeta) {
@@ -1175,7 +1175,7 @@ template("assembled_system") {
     dest_dir = rebase_path("${files.outdir}/${labels.bazel_legacy_aib}",
                            root_build_dir)
     deps = [ ":${labels.legacy_assembly_input_bundle}" ]
-    if (use_assembly_fshost) {
+    if (_use_assembly_fshost) {
       # TODO(b/287558873) Remove once fshost is migrated
       deps += [ ":${labels.fshost_validator}" ]
     }
@@ -1218,7 +1218,7 @@ template("assembled_system") {
 
       assembly_manifests = [
         {
-          image_name = namespace
+          image_name = _namespace
           assembly_manifest_path =
               rebase_path(files.assembly_manifest, root_build_dir)
           label = get_label_info(target_name, "label_with_toolchain")
