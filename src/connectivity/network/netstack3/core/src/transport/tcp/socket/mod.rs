@@ -71,11 +71,12 @@ use crate::{
     },
     socket::{
         address::{ConnAddr, ConnIpAddr, IpPortSpec, ListenerAddr, ListenerIpAddr},
-        AddrVec, Bound, BoundSocketMap, Connection as BoundConnection, ConvertSocketTypeState,
-        IncompatibleError, InsertError, Inserter, Listener as BoundListener, RemoveResult,
-        SocketId as BoundSocketId, SocketMapAddrStateSpec, SocketMapAddrStateUpdateSharingSpec,
-        SocketMapConflictPolicy, SocketMapStateSpec, SocketMapUpdateSharingPolicy,
-        SocketState as BoundSocketState, UpdateSharingError,
+        AddrVec, Bound, BoundSocketMap, Connection as BoundConnection, ConvertSocketMapState,
+        ConvertSocketTypeState, IncompatibleError, InsertError, Inserter,
+        Listener as BoundListener, RemoveResult, SocketId as BoundSocketId, SocketMapAddrStateSpec,
+        SocketMapAddrStateUpdateSharingSpec, SocketMapConflictPolicy, SocketMapStateSpec,
+        SocketMapUpdateSharingPolicy, SocketState as BoundSocketState, SocketStateSpec,
+        UpdateSharingError,
     },
     transport::tcp::{
         buffer::{IntoBuffers, ReceiveBuffer, SendBuffer},
@@ -254,6 +255,15 @@ impl<I: IpExt, D: Id, C: NonSyncContext> SocketMapStateSpec for TcpSocketSpec<I,
     type ListenerId = MaybeListenerId<I>;
     type ConnId = MaybeClosedConnectionId<I>;
 
+    type ListenerSharingState = ListenerSharingState;
+    type ConnSharingState = SharingState;
+    type AddrVecTag = AddrVecTag;
+
+    type ListenerAddrState = ListenerAddrState<I>;
+    type ConnAddrState = ConnAddrState<I>;
+}
+
+impl<I: IpExt, D: Id, C: NonSyncContext> SocketStateSpec for TcpSocketSpec<I, D, C> {
     type ListenerState = MaybeListener<
         I,
         C::ReturnedBuffers,
@@ -268,13 +278,6 @@ impl<I: IpExt, D: Id, C: NonSyncContext> SocketMapStateSpec for TcpSocketSpec<I,
         C::SendBuffer,
         C::ListenerNotifierOrProvidedBuffers,
     >;
-
-    type ListenerSharingState = ListenerSharingState;
-    type ConnSharingState = SharingState;
-    type AddrVecTag = AddrVecTag;
-
-    type ListenerAddrState = ListenerAddrState<I>;
-    type ConnAddrState = ConnAddrState<I>;
 }
 
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
@@ -1568,14 +1571,14 @@ impl<I: IpLayerIpExt, C: NonSyncContext, SC: SyncContext<I, C>> SocketHandler<I,
                         ListenerSharingState { sharing: *sharing, listening: false },
                         |addr, sharing| {
                             let entry = socket_bound_state.push_entry(
-                                |index| <BoundListener as ConvertSocketTypeState<I, SC::WeakDeviceId, IpPortSpec, _>>::to_socket_id(index.into()),
+                                |index| <BoundListener as ConvertSocketMapState<I, SC::WeakDeviceId, IpPortSpec, _>>::to_socket_id(index.into()),
                                 BoundListener::to_socket_state((
                                     MaybeListener::Bound(bound_state),
                                     sharing,
                                     addr,
                                 )),
                             );
-                            <BoundListener as ConvertSocketTypeState<I, SC::WeakDeviceId, IpPortSpec, _>>::from_socket_id_ref(entry.key()).clone()
+                            <BoundListener as ConvertSocketMapState<I, SC::WeakDeviceId, IpPortSpec, _>>::from_socket_id_ref(entry.key()).clone()
                         },
                     )
                     .map(|entry| {
@@ -1725,7 +1728,7 @@ impl<I: IpLayerIpExt, C: NonSyncContext, SC: SyncContext<I, C>> SocketHandler<I,
                         BoundConnection::to_socket_state((state, sharing, addr)),
                     );
                     let MaybeClosedConnectionId(index, marker) =
-                        <BoundConnection as ConvertSocketTypeState<
+                        <BoundConnection as ConvertSocketMapState<
                             I,
                             Self::WeakDeviceId,
                             IpPortSpec,
@@ -1823,7 +1826,7 @@ impl<I: IpLayerIpExt, C: NonSyncContext, SC: SyncContext<I, C>> SocketHandler<I,
                         BoundConnection::to_socket_state((state, *sharing, addr)),
                     );
                     let MaybeClosedConnectionId(index, marker) =
-                        <BoundConnection as ConvertSocketTypeState<
+                        <BoundConnection as ConvertSocketMapState<
                             I,
                             Self::WeakDeviceId,
                             IpPortSpec,
@@ -3081,7 +3084,7 @@ fn connect_inner<I, SC, C>(
     >,
     make_connection: impl FnOnce(
         ConnAddr<I::Addr, SC::WeakDeviceId, NonZeroU16, NonZeroU16>,
-        <TcpSocketSpec<I, SC::WeakDeviceId, C> as SocketMapStateSpec>::ConnState,
+        <TcpSocketSpec<I, SC::WeakDeviceId, C> as SocketStateSpec>::ConnState,
     ) -> ConnectionId<I>,
     ip_transport_ctx: &mut SC,
     ctx: &mut C,

@@ -117,6 +117,10 @@ impl<A: Eq + Hash, S> Default for ConnSocketMap<A, S> {
     }
 }
 
+/// Specification for the identifiers in an [`AddrVec`].
+///
+/// This is a convenience trait for bundling together the local and remote
+/// identifiers for a protocol.
 pub(crate) trait SocketMapAddrSpec {
     /// The local identifier portion of a socket address.
     type LocalIdentifier: Clone + Debug + Hash + Eq;
@@ -137,14 +141,10 @@ pub(crate) trait SocketMapStateSpec {
     /// An identifier for a connected socket.
     type ConnId: Clone + EntryKey + From<usize> + Debug;
 
-    /// The state stored for a listening socket.
-    type ListenerState: Debug;
     /// The state stored for a listening socket that is used to determine
     /// whether sockets can share an address.
     type ListenerSharingState: Clone + Debug;
 
-    /// The state stored for a connected socket.
-    type ConnState: Debug;
     /// The state stored for a connected socket that is used to determine
     /// whether sockets can share an address.
     type ConnSharingState: Clone + Debug;
@@ -156,6 +156,13 @@ pub(crate) trait SocketMapStateSpec {
     /// The state stored for a connected socket address.
     type ConnAddrState: SocketMapAddrStateSpec<Id = Self::ConnId, SharingState = Self::ConnSharingState>
         + Debug;
+}
+
+pub(crate) trait SocketStateSpec: SocketMapStateSpec {
+    /// The state stored for a listening socket.
+    type ListenerState: Debug;
+    /// The state stored for a connected socket.
+    type ConnState: Debug;
 }
 
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
@@ -181,9 +188,20 @@ impl<T> Inserter<T> for Never {
     }
 }
 
+/// Describes an entry in a [`SocketMap`] for a listener or connection address.
 pub(crate) trait SocketMapAddrStateSpec {
+    /// The type of ID that can be present at the address.
     type Id;
+
+    /// The sharing state for the address.
+    ///
+    /// This can be used to determine whether a socket can be inserted at the
+    /// address. Every socket has its own sharing state associated with it,
+    /// though the sharing state is not necessarily stored in the address
+    /// entry.
     type SharingState;
+
+    /// The type of inserter returned by [`SocketMapAddrStateSpec::try_get_inserter`].
     type Inserter<'a>: Inserter<Self::Id> + 'a
     where
         Self: 'a,
@@ -273,7 +291,7 @@ pub(crate) enum Bound<S: SocketMapStateSpec + ?Sized> {
 
 #[derive(Derivative)]
 #[derivative(Debug(bound = "D: Debug"))]
-pub(crate) enum SocketState<I: Ip, D, A: SocketMapAddrSpec, S: SocketMapStateSpec> {
+pub(crate) enum SocketState<I: Ip, D, A: SocketMapAddrSpec, S: SocketStateSpec> {
     Listener(
         (S::ListenerState, S::ListenerSharingState, ListenerAddr<I::Addr, D, A::LocalIdentifier>),
     ),
@@ -457,40 +475,11 @@ pub(crate) enum Connection {}
 /// View struct over one type of sockets in a [`BoundSocketMap`].
 pub(crate) struct Sockets<AddrToStateMap, SocketType>(AddrToStateMap, PhantomData<SocketType>);
 
-/// Provides associated types for a specific kind of socket.
-pub(crate) trait BoundSocketType<I, D, A, S> {
-    type Id: From<usize>;
-    type State;
-    type SharingState;
-    type Addr: Debug;
-    type AddrState: SocketMapAddrStateSpec<Id = Self::Id, SharingState = Self::SharingState>;
-}
-
-impl<I: Ip, D: Debug, A: SocketMapAddrSpec, S: SocketMapStateSpec> BoundSocketType<I, D, A, S>
-    for Listener
-{
-    type Id = S::ListenerId;
-    type State = S::ListenerState;
-    type SharingState = S::ListenerSharingState;
-    type Addr = ListenerAddr<I::Addr, D, A::LocalIdentifier>;
-    type AddrState = S::ListenerAddrState;
-}
-
-impl<I: Ip, D: Debug, A: SocketMapAddrSpec, S: SocketMapStateSpec> BoundSocketType<I, D, A, S>
-    for Connection
-{
-    type Id = S::ConnId;
-    type State = S::ConnState;
-    type SharingState = S::ConnSharingState;
-    type Addr = ConnAddr<I::Addr, D, A::LocalIdentifier, A::RemoteIdentifier>;
-    type AddrState = S::ConnAddrState;
-}
-
 impl<
         'a,
         I: Ip,
         D: Id,
-        SocketType: BoundSocketType<I, D, A, S> + ConvertSocketTypeState<I, D, A, S>,
+        SocketType: ConvertSocketMapState<I, D, A, S>,
         A: SocketMapAddrSpec,
         S: SocketMapStateSpec,
     > Sockets<&'a SocketMap<AddrVec<I, D, A>, Bound<S>>, SocketType>
@@ -548,7 +537,7 @@ impl<
         'a,
         I: Ip,
         D: Id,
-        SocketType: ConvertSocketTypeState<I, D, A, S>,
+        SocketType: ConvertSocketMapState<I, D, A, S>,
         A: SocketMapAddrSpec,
         S: SocketMapStateSpec
             + SocketMapConflictPolicy<SocketType::Addr, SocketType::SharingState, I, D, A>,
@@ -644,7 +633,7 @@ impl<
         'a,
         I: Ip,
         D: Id,
-        SocketType: ConvertSocketTypeState<I, D, A, S>,
+        SocketType: ConvertSocketMapState<I, D, A, S>,
         A: SocketMapAddrSpec,
         S: SocketMapStateSpec,
     > SocketStateEntry<'a, I, D, A, S, SocketType>
@@ -842,14 +831,26 @@ pub(crate) enum InsertError {
 
 /// Helper trait for converting between [`AddrVec`] and [`Bound`] and their
 /// variants.
-pub(crate) trait ConvertSocketTypeState<I: Ip, D, A: SocketMapAddrSpec, S: SocketMapStateSpec>:
-    BoundSocketType<I, D, A, S>
-{
+pub(crate) trait ConvertSocketMapState<I: Ip, D, A: SocketMapAddrSpec, S: SocketMapStateSpec> {
+    type Id: From<usize>;
+    type SharingState;
+    type Addr: Debug;
+    type AddrState: SocketMapAddrStateSpec<Id = Self::Id, SharingState = Self::SharingState>;
+
     fn to_addr_vec(addr: &Self::Addr) -> AddrVec<I, D, A>;
     fn from_addr_vec_ref(addr: &AddrVec<I, D, A>) -> &Self::Addr;
     fn from_bound_ref(bound: &Bound<S>) -> Option<&Self::AddrState>;
     fn from_bound_mut(bound: &mut Bound<S>) -> Option<&mut Self::AddrState>;
     fn to_bound(state: Self::AddrState) -> Bound<S>;
+    fn to_socket_id(id: Self::Id) -> SocketId<S>;
+    fn from_socket_id_ref(id: &SocketId<S>) -> &Self::Id;
+}
+
+/// Helper trait for converting between [`SocketState`] and its variants.
+pub(crate) trait ConvertSocketTypeState<I: Ip, D, A: SocketMapAddrSpec, S: SocketStateSpec>:
+    ConvertSocketMapState<I, D, A, S>
+{
+    type State;
     fn from_socket_state_ref(
         socket_state: &SocketState<I, D, A, S>,
     ) -> &(Self::State, Self::SharingState, Self::Addr);
@@ -862,15 +863,17 @@ pub(crate) trait ConvertSocketTypeState<I: Ip, D, A: SocketMapAddrSpec, S: Socke
     fn from_socket_state(
         socket_state: SocketState<I, D, A, S>,
     ) -> (Self::State, Self::SharingState, Self::Addr);
-    fn to_socket_id(id: Self::Id) -> SocketId<S>;
-    fn from_socket_id_ref(id: &SocketId<S>) -> &Self::Id;
 }
 
-impl<I: Ip, D: Id, A: SocketMapAddrSpec, S: SocketMapStateSpec> ConvertSocketTypeState<I, D, A, S>
+impl<I: Ip, D: Id, A: SocketMapAddrSpec, S: SocketMapStateSpec> ConvertSocketMapState<I, D, A, S>
     for Listener
 where
     Bound<S>: Tagged<AddrVec<I, D, A>>,
 {
+    type Id = S::ListenerId;
+    type SharingState = S::ListenerSharingState;
+    type Addr = ListenerAddr<I::Addr, D, A::LocalIdentifier>;
+    type AddrState = S::ListenerAddrState;
     fn to_addr_vec(addr: &Self::Addr) -> AddrVec<I, D, A> {
         AddrVec::Listen(addr.clone())
     }
@@ -899,7 +902,23 @@ where
     fn to_bound(state: S::ListenerAddrState) -> Bound<S> {
         Bound::Listen(state)
     }
+    fn from_socket_id_ref(id: &SocketId<S>) -> &Self::Id {
+        match id {
+            SocketId::Listener(id) => id,
+            SocketId::Connection(_) => unreachable!("connection ID for listener"),
+        }
+    }
+    fn to_socket_id(id: Self::Id) -> SocketId<S> {
+        SocketId::Listener(id)
+    }
+}
 
+impl<I: Ip, D: Id, A: SocketMapAddrSpec, S: SocketStateSpec> ConvertSocketTypeState<I, D, A, S>
+    for Listener
+where
+    Bound<S>: Tagged<AddrVec<I, D, A>>,
+{
+    type State = S::ListenerState;
     fn from_socket_state(
         socket_state: SocketState<I, D, A, S>,
     ) -> (Self::State, Self::SharingState, Self::Addr) {
@@ -938,22 +957,17 @@ where
     ) -> SocketState<I, D, A, S> {
         SocketState::Listener(state)
     }
-    fn from_socket_id_ref(id: &SocketId<S>) -> &Self::Id {
-        match id {
-            SocketId::Listener(id) => id,
-            SocketId::Connection(_) => unreachable!("connection ID for listener"),
-        }
-    }
-    fn to_socket_id(id: Self::Id) -> SocketId<S> {
-        SocketId::Listener(id)
-    }
 }
 
-impl<I: Ip, D: Id, A: SocketMapAddrSpec, S: SocketMapStateSpec> ConvertSocketTypeState<I, D, A, S>
+impl<I: Ip, D: Id, A: SocketMapAddrSpec, S: SocketMapStateSpec> ConvertSocketMapState<I, D, A, S>
     for Connection
 where
     Bound<S>: Tagged<AddrVec<I, D, A>>,
 {
+    type Id = S::ConnId;
+    type SharingState = S::ConnSharingState;
+    type Addr = ConnAddr<I::Addr, D, A::LocalIdentifier, A::RemoteIdentifier>;
+    type AddrState = S::ConnAddrState;
     fn to_addr_vec(addr: &Self::Addr) -> AddrVec<I, D, A> {
         AddrVec::Conn(addr.clone())
     }
@@ -983,6 +997,23 @@ where
         Bound::Conn(state)
     }
 
+    fn from_socket_id_ref(id: &SocketId<S>) -> &Self::Id {
+        match id {
+            SocketId::Connection(id) => id,
+            SocketId::Listener(_) => unreachable!("listener ID for connection"),
+        }
+    }
+    fn to_socket_id(id: Self::Id) -> SocketId<S> {
+        SocketId::Connection(id)
+    }
+}
+
+impl<I: Ip, D: Id, A: SocketMapAddrSpec, S: SocketStateSpec> ConvertSocketTypeState<I, D, A, S>
+    for Connection
+where
+    Bound<S>: Tagged<AddrVec<I, D, A>>,
+{
+    type State = S::ConnState;
     fn from_socket_state(
         socket_state: SocketState<I, D, A, S>,
     ) -> (Self::State, Self::SharingState, Self::Addr) {
@@ -1020,15 +1051,6 @@ where
         state: (Self::State, Self::SharingState, Self::Addr),
     ) -> SocketState<I, D, A, S> {
         SocketState::Connected(state)
-    }
-    fn from_socket_id_ref(id: &SocketId<S>) -> &Self::Id {
-        match id {
-            SocketId::Connection(id) => id,
-            SocketId::Listener(_) => unreachable!("listener ID for connection"),
-        }
-    }
-    fn to_socket_id(id: Self::Id) -> SocketId<S> {
-        SocketId::Connection(id)
     }
 }
 
@@ -1145,9 +1167,7 @@ mod tests {
         type ListenerId = Listener;
         type ConnId = Conn;
 
-        type ListenerState = u8;
         type ListenerSharingState = char;
-        type ConnState = u16;
         type ConnSharingState = char;
 
         type ListenerAddrState = Multiple<Listener>;

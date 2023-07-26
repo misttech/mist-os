@@ -42,7 +42,7 @@ use crate::{
         address::{AddrVecIter, ConnAddr, ConnIpAddr, ListenerIpAddr},
         AddrVec, Bound, BoundSocketMap, ExistsError, InsertError, ListenerAddr, SocketMapAddrSpec,
         SocketMapAddrStateSpec, SocketMapConflictPolicy, SocketMapStateSpec,
-        SocketState as BoundSocketState,
+        SocketState as BoundSocketState, SocketStateSpec,
     },
 };
 
@@ -673,7 +673,7 @@ where
 }
 
 pub(crate) trait DatagramSocketStateSpec:
-    SocketMapStateSpec<ListenerId = Self::SocketId, ConnId = Self::SocketId>
+    SocketStateSpec<ListenerId = Self::SocketId, ConnId = Self::SocketId>
 {
     type UnboundSharingState: Clone + Debug + Default;
     type SocketId: EntryKey + Clone + From<usize> + Debug;
@@ -2058,10 +2058,13 @@ mod test {
         type ConnAddrState = Id;
         type ConnId = Id;
         type ConnSharingState = Sharing;
-        type ConnState = ConnState<I, D>;
         type ListenerAddrState = Id;
         type ListenerId = Id;
         type ListenerSharingState = Sharing;
+    }
+
+    impl<I: DatagramIpExt, D: crate::device::Id> SocketStateSpec for FakeStateSpec<I, D> {
+        type ConnState = ConnState<I, D>;
         type ListenerState = ListenerState<I::Addr, D>;
     }
 

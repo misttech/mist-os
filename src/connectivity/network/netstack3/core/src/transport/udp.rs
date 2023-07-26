@@ -62,7 +62,7 @@ use crate::{
         },
         AddrVec, Bound, BoundSocketMap, IncompatibleError, InsertError, RemoveResult,
         SocketAddrType, SocketMapAddrStateSpec, SocketMapConflictPolicy, SocketMapStateSpec,
-        SocketState as DatagramBoundSocketState,
+        SocketState as DatagramBoundSocketState, SocketStateSpec,
     },
     sync::RwLock,
     trace_duration, transport, SyncCtx,
@@ -352,9 +352,6 @@ impl<I: IpExt, D: Id> SocketMapStateSpec for Udp<I, D> {
     type ListenerId = SocketId<I>;
     type ConnId = SocketId<I>;
 
-    type ListenerState = ListenerState<I::Addr, D>;
-    type ConnState = ConnState<I, D>;
-
     type AddrVecTag = AddrVecTag;
 
     type ListenerSharingState = Sharing;
@@ -363,6 +360,11 @@ impl<I: IpExt, D: Id> SocketMapStateSpec for Udp<I, D> {
     type ListenerAddrState = AddrState<Self::ListenerId>;
 
     type ConnAddrState = AddrState<Self::ConnId>;
+}
+
+impl<I: IpExt, D: Id> SocketStateSpec for Udp<I, D> {
+    type ListenerState = ListenerState<I::Addr, D>;
+    type ConnState = ConnState<I, D>;
 }
 
 impl<AA, I: IpExt, D: WeakId> SocketMapConflictPolicy<AA, Sharing, I, D, IpPortSpec> for Udp<I, D>

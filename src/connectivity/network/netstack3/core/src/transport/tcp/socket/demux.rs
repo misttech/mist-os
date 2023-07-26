@@ -31,7 +31,8 @@ use crate::{
     },
     socket::{
         address::{AddrVecIter, ConnAddr, ConnIpAddr, IpPortSpec, ListenerAddr},
-        AddrVec, Connection as BoundConnection, ConvertSocketTypeState, SocketId,
+        AddrVec, Connection as BoundConnection, ConvertSocketMapState, ConvertSocketTypeState as _,
+        SocketId,
     },
     trace_duration,
     transport::tcp::{
@@ -597,7 +598,7 @@ where
                         |index| SocketId::Connection(index.into()),
                         BoundConnection::to_socket_state((state, sharing, addr)),
                     );
-                    <BoundConnection as ConvertSocketTypeState<
+                    <BoundConnection as ConvertSocketMapState<
                         I,
                         SC::WeakDeviceId,
                         IpPortSpec,
