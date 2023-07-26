@@ -209,19 +209,16 @@ function diff_file_relpath() {
       case "$common_path" in
         gen/gopaths/*) expect=match; diff_json "$left" "$right"  ;;
         amber-files/repository/targets.json) expect=skip ;; # too big right now
-        *.unzipped/*.targets.json) expect=skip ;;  # diffs: sig, expires
         *) expect=diff ;;  # diffs: many hashes
       esac
       ;;
+    *.targets.json) expect=skip ;;  # diffs: sig, expires
 
-    snapshot.json | *.unzipped/*.snapshot.json) expect=skip ;;  # diffs: sig, expires, version (use diff_json)
-    timestamp.json)
-      case "$common_path" in
-        amber-files/repository/timestamp.json) expect=diff ;; # diffs: sig, expires, version
-        *) expect=match ;;
-      esac
-      diff_json "$left" "$right"
-      ;;
+    outputs.json) expect=skip ;;  # ordering differences from zircon/tools/zither
+    snapshot.json) expect=skip ;;  # diffs: sig, expires, version (use diff_json)
+    *.root.json) expect=skip ;;  # diffs: sig, expires
+    *.snapshot.json) expect=skip ;;  # diffs: sig, expires, version
+    timestamp.json) expect=ignore ;;  # diffs: sig, expires, version
     elf_sizes.json) expect=diff; diff_json "$left" "$right" ;;  # diffs: build_id
     recovery-eng_blobs.json) expect=diff; diff_json "$left" "$right" ;;  # diffs: bytes, merkle, size (ordering)
     *.zbi.json) expect=unknown; diff_json "$left" "$right" ;;  # diffs: crc32, size
@@ -229,7 +226,19 @@ function diff_file_relpath() {
 
     images.json) expect=skip ;;  # too many diffs
 
+    transfer.json) expect=skip ;;  # look like list of blob hashes
+
     compile_commands.json) expect=skip ;;  # too many
+
+    test.stringarrays.api_summary.json |
+      test.experimentalzxctypes.api_summary.json)
+      # printed types contain memory addresses
+      expect=ignore ;;
+
+    docs.goldens.json)
+      # in fuchsia-idk-build-*/gen/zircon/vdso
+      # looks like ordering differences
+      expect=ignore ;;
 
     # Diff formatted JSON for readability.
     *.json)
@@ -250,6 +259,8 @@ function diff_file_relpath() {
 
     *.image_assembly_inputs) expect=skip ;;  # too many blob/hash differences
     *.image_assembler_all_inputs) expect=skip ;;  # too many blob/hash differences
+
+    manifest.fini) expect=skip ;;  # looks like ordering differences
 
     # Bazel-related outputs
     java.log)
@@ -273,6 +284,27 @@ function diff_file_relpath() {
       esac
       ;;
 
+    request_cookie)
+      case "$common_path" in
+        gen/build/bazel/*/request_cookie) expect=ignore ;;  # looks like hash
+        *) expect=unknown ;;
+      esac
+      ;;
+
+    response_cookie)
+      case "$common_path" in
+        gen/build/bazel/*/response_cookie) expect=ignore ;;  # looks like hash
+        *) expect=unknown ;;
+      esac
+      ;;
+
+    server_info.rawproto)
+      case "$common_path" in
+        gen/build/bazel/*/server_info.rawproto) expect=ignore ;;  # probably PID
+        *) expect=unknown ;;
+      esac
+      ;;
+
     server.starttime) expect=ignore ;;  # timestamp
     server.pid.txt) expect=ignore ;;  # contains PID
 
@@ -290,7 +322,7 @@ function diff_file_relpath() {
       esac
       ;;
 
-    volatile-status.txt) expect=diff; diff_text "$left" "$right" ;;  # bears timestamp
+    volatile-status.txt) expect=ignore ;;  # bears timestamp
 
     test.cache_status)
       case "$common_path" in
