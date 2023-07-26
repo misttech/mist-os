@@ -1,0 +1,16 @@
+[
+    {
+        "kind": "protocol/member",
+        "name": "fuchsia.memory.debug/MemoryPressure.Signal",
+        "ordinal": "9127184292217169108",
+        "type": "(fuchsia.memorypressure/Level level)"
+    },
+    {
+        "kind": "protocol",
+        "name": "fuchsia.memory.debug/MemoryPressure"
+    },
+    {
+        "kind": "library",
+        "name": "fuchsia.memory.debug"
+    }
+]

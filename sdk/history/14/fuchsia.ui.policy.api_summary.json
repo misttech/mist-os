@@ -1,0 +1,48 @@
+[
+    {
+        "kind": "protocol/member",
+        "name": "fuchsia.ui.policy/DeviceListenerRegistry.RegisterListener",
+        "ordinal": "3431319511893564027",
+        "type": "(client_end:fuchsia.ui.policy/MediaButtonsListener listener) -> ()"
+    },
+    {
+        "kind": "protocol/member",
+        "name": "fuchsia.ui.policy/DeviceListenerRegistry.RegisterMediaButtonsListener",
+        "ordinal": "4045975772836867696",
+        "type": "(client_end:fuchsia.ui.policy/MediaButtonsListener listener)"
+    },
+    {
+        "kind": "protocol",
+        "name": "fuchsia.ui.policy/DeviceListenerRegistry"
+    },
+    {
+        "kind": "protocol/member",
+        "name": "fuchsia.ui.policy/DisplayBacklight.SetMinimumRgb",
+        "ordinal": "2693226552535686307",
+        "type": "(uint8 minimum_rgb) -> ()"
+    },
+    {
+        "kind": "protocol",
+        "name": "fuchsia.ui.policy/DisplayBacklight"
+    },
+    {
+        "kind": "protocol/member",
+        "name": "fuchsia.ui.policy/MediaButtonsListener.OnEvent",
+        "ordinal": "1650308738712569724",
+        "type": "(fuchsia.ui.input/MediaButtonsEvent event) -> ()"
+    },
+    {
+        "kind": "protocol/member",
+        "name": "fuchsia.ui.policy/MediaButtonsListener.OnMediaButtonsEvent",
+        "ordinal": "3179656525909478912",
+        "type": "(fuchsia.ui.input/MediaButtonsEvent event)"
+    },
+    {
+        "kind": "protocol",
+        "name": "fuchsia.ui.policy/MediaButtonsListener"
+    },
+    {
+        "kind": "library",
+        "name": "fuchsia.ui.policy"
+    }
+]

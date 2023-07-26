@@ -1,0 +1,28 @@
+[
+    {
+        "kind": "protocol/member",
+        "name": "fuchsia.device.fs/Connector.Connect",
+        "ordinal": "3169778387179902201",
+        "type": "(zx/Handle:CHANNEL server)"
+    },
+    {
+        "kind": "protocol",
+        "name": "fuchsia.device.fs/Connector"
+    },
+    {
+        "kind": "const",
+        "name": "fuchsia.device.fs/DEVICE_CONTROLLER_NAME",
+        "type": "string",
+        "value": "device_controller"
+    },
+    {
+        "kind": "const",
+        "name": "fuchsia.device.fs/DEVICE_PROTOCOL_NAME",
+        "type": "string",
+        "value": "device_protocol"
+    },
+    {
+        "kind": "library",
+        "name": "fuchsia.device.fs"
+    }
+]

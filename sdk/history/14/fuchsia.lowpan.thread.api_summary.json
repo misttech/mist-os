@@ -1,0 +1,191 @@
+[
+    {
+        "kind": "protocol/member",
+        "name": "fuchsia.lowpan.thread/Dataset.AttachAllNodesTo",
+        "ordinal": "6942273211107421950",
+        "type": "(vector<uint8>:254 dataset) -> (int64 delay_ms)"
+    },
+    {
+        "kind": "protocol/member",
+        "name": "fuchsia.lowpan.thread/Dataset.GetActiveTlvs",
+        "ordinal": "3460124668218219410",
+        "type": "() -> (vector<uint8>:<254,optional> dataset)"
+    },
+    {
+        "kind": "protocol/member",
+        "name": "fuchsia.lowpan.thread/Dataset.SetActiveTlvs",
+        "ordinal": "6525084555227265255",
+        "type": "(vector<uint8>:254 dataset) -> ()"
+    },
+    {
+        "kind": "protocol",
+        "name": "fuchsia.lowpan.thread/Dataset"
+    },
+    {
+        "kind": "protocol/member",
+        "name": "fuchsia.lowpan.thread/DatasetConnector.Connect",
+        "ordinal": "2657112590698602539",
+        "type": "(string:32 name,server_end:fuchsia.lowpan.thread/Dataset server_end)"
+    },
+    {
+        "kind": "protocol",
+        "name": "fuchsia.lowpan.thread/DatasetConnector"
+    },
+    {
+        "kind": "enum/member",
+        "name": "fuchsia.lowpan.thread/DetailedLoggingLevel.LOWPAN_LOG_ALERT",
+        "value": "2"
+    },
+    {
+        "kind": "enum/member",
+        "name": "fuchsia.lowpan.thread/DetailedLoggingLevel.LOWPAN_LOG_CRIT",
+        "value": "3"
+    },
+    {
+        "kind": "enum/member",
+        "name": "fuchsia.lowpan.thread/DetailedLoggingLevel.LOWPAN_LOG_DEBUG",
+        "value": "8"
+    },
+    {
+        "kind": "enum/member",
+        "name": "fuchsia.lowpan.thread/DetailedLoggingLevel.LOWPAN_LOG_EMERG",
+        "value": "1"
+    },
+    {
+        "kind": "enum/member",
+        "name": "fuchsia.lowpan.thread/DetailedLoggingLevel.LOWPAN_LOG_ERR",
+        "value": "4"
+    },
+    {
+        "kind": "enum/member",
+        "name": "fuchsia.lowpan.thread/DetailedLoggingLevel.LOWPAN_LOG_INFO",
+        "value": "7"
+    },
+    {
+        "kind": "enum/member",
+        "name": "fuchsia.lowpan.thread/DetailedLoggingLevel.LOWPAN_LOG_NOTICE",
+        "value": "6"
+    },
+    {
+        "kind": "enum/member",
+        "name": "fuchsia.lowpan.thread/DetailedLoggingLevel.LOWPAN_LOG_UNSPECIFIED",
+        "value": "0"
+    },
+    {
+        "kind": "enum/member",
+        "name": "fuchsia.lowpan.thread/DetailedLoggingLevel.LOWPAN_LOG_WARNING",
+        "value": "5"
+    },
+    {
+        "kind": "enum",
+        "name": "fuchsia.lowpan.thread/DetailedLoggingLevel",
+        "strictness": "flexible",
+        "type": "uint32"
+    },
+    {
+        "kind": "protocol/member",
+        "name": "fuchsia.lowpan.thread/Feature.GetFeatureConfig",
+        "ordinal": "3076391112764831249",
+        "type": "() -> (fuchsia.lowpan.thread/FeatureConfig config)"
+    },
+    {
+        "kind": "protocol/member",
+        "name": "fuchsia.lowpan.thread/Feature.UpdateFeatureConfig",
+        "ordinal": "3252908478979834896",
+        "type": "(fuchsia.lowpan.thread/FeatureConfig config) -> ()"
+    },
+    {
+        "kind": "protocol",
+        "name": "fuchsia.lowpan.thread/Feature"
+    },
+    {
+        "kind": "table/member",
+        "name": "fuchsia.lowpan.thread/FeatureConfig.detailed_logging_enabled",
+        "ordinal": "4",
+        "type": "bool"
+    },
+    {
+        "kind": "table/member",
+        "name": "fuchsia.lowpan.thread/FeatureConfig.detailed_logging_level",
+        "ordinal": "5",
+        "type": "fuchsia.lowpan.thread/DetailedLoggingLevel"
+    },
+    {
+        "kind": "table/member",
+        "name": "fuchsia.lowpan.thread/FeatureConfig.nat64_enabled",
+        "ordinal": "2",
+        "type": "bool"
+    },
+    {
+        "kind": "table/member",
+        "name": "fuchsia.lowpan.thread/FeatureConfig.srp_replication_enabled",
+        "ordinal": "3",
+        "type": "bool"
+    },
+    {
+        "kind": "table/member",
+        "name": "fuchsia.lowpan.thread/FeatureConfig.trel_enabled",
+        "ordinal": "1",
+        "type": "bool"
+    },
+    {
+        "kind": "table",
+        "name": "fuchsia.lowpan.thread/FeatureConfig"
+    },
+    {
+        "kind": "protocol/member",
+        "name": "fuchsia.lowpan.thread/FeatureConnector.Connect",
+        "ordinal": "5120311771156547493",
+        "type": "(string:32 name,server_end:fuchsia.lowpan.thread/Feature server_end)"
+    },
+    {
+        "kind": "protocol",
+        "name": "fuchsia.lowpan.thread/FeatureConnector"
+    },
+    {
+        "kind": "const",
+        "name": "fuchsia.lowpan.thread/MAX_DATASET_TLV_LEN",
+        "type": "uint8",
+        "value": "254"
+    },
+    {
+        "kind": "protocol/member",
+        "name": "fuchsia.lowpan.thread/Meshcop.UpdateTxtEntries",
+        "ordinal": "3858825760539413485",
+        "type": "(vector<fuchsia.lowpan.thread/TxtEntries>:32 txt_entries) -> ()"
+    },
+    {
+        "kind": "protocol",
+        "name": "fuchsia.lowpan.thread/Meshcop"
+    },
+    {
+        "kind": "protocol/member",
+        "name": "fuchsia.lowpan.thread/MeshcopConnector.Connect",
+        "ordinal": "6050714977181554427",
+        "type": "(string:32 name,server_end:fuchsia.lowpan.thread/Meshcop server_end)"
+    },
+    {
+        "kind": "protocol",
+        "name": "fuchsia.lowpan.thread/MeshcopConnector"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.lowpan.thread/TxtEntries.key",
+        "ordinal": "1",
+        "type": "string:254"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.lowpan.thread/TxtEntries.value",
+        "ordinal": "2",
+        "type": "vector<uint8>:253"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.lowpan.thread/TxtEntries"
+    },
+    {
+        "kind": "library",
+        "name": "fuchsia.lowpan.thread"
+    }
+]

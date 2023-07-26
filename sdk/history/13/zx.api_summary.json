@@ -25,6 +25,12 @@
     },
     {
         "kind": "const",
+        "name": "zx/IOB_MAX_REGIONS",
+        "type": "uint64",
+        "value": "64"
+    },
+    {
+        "kind": "const",
         "name": "zx/MAX_CPUS",
         "type": "uint64",
         "value": "512"
@@ -217,6 +223,11 @@
     },
     {
         "kind": "bits/member",
+        "name": "zx/Rights.ATTACH_VMO",
+        "value": "8388608"
+    },
+    {
+        "kind": "bits/member",
         "name": "zx/Rights.DESTROY",
         "value": "512"
     },
@@ -269,6 +280,11 @@
         "kind": "bits/member",
         "name": "zx/Rights.MANAGE_THREAD",
         "value": "262144"
+    },
+    {
+        "kind": "bits/member",
+        "name": "zx/Rights.MANAGE_VMO",
+        "value": "16777216"
     },
     {
         "kind": "bits/member",

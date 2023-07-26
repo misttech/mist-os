@@ -1,0 +1,843 @@
+[
+    {
+        "kind": "struct",
+        "name": "fuchsia.posix.socket.raw/Empty"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.posix.socket.raw/Icmpv6Filter.blocked_types",
+        "ordinal": "1",
+        "type": "array<uint32,8>"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.posix.socket.raw/Icmpv6Filter"
+    },
+    {
+        "kind": "union/member",
+        "name": "fuchsia.posix.socket.raw/Ipv6ChecksumConfiguration.disabled",
+        "ordinal": "1",
+        "type": "fuchsia.posix.socket.raw/Empty"
+    },
+    {
+        "kind": "union/member",
+        "name": "fuchsia.posix.socket.raw/Ipv6ChecksumConfiguration.offset",
+        "ordinal": "2",
+        "type": "int32"
+    },
+    {
+        "kind": "union",
+        "name": "fuchsia.posix.socket.raw/Ipv6ChecksumConfiguration",
+        "strictness": "strict"
+    },
+    {
+        "kind": "union/member",
+        "name": "fuchsia.posix.socket.raw/ProtocolAssociation.associated",
+        "ordinal": "2",
+        "type": "uint8"
+    },
+    {
+        "kind": "union/member",
+        "name": "fuchsia.posix.socket.raw/ProtocolAssociation.unassociated",
+        "ordinal": "1",
+        "type": "fuchsia.posix.socket.raw/Empty"
+    },
+    {
+        "kind": "union",
+        "name": "fuchsia.posix.socket.raw/ProtocolAssociation",
+        "strictness": "strict"
+    },
+    {
+        "kind": "protocol/member",
+        "name": "fuchsia.posix.socket.raw/Provider.Socket",
+        "ordinal": "1007234397603401681",
+        "type": "(fuchsia.posix.socket/Domain domain,fuchsia.posix.socket.raw/ProtocolAssociation proto) -> (fuchsia.posix.socket.raw/Provider_Socket_Result result)"
+    },
+    {
+        "kind": "protocol",
+        "name": "fuchsia.posix.socket.raw/Provider"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.posix.socket.raw/Provider_Socket_Response.s",
+        "ordinal": "1",
+        "type": "client_end:fuchsia.posix.socket.raw/Socket"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.posix.socket.raw/Provider_Socket_Response",
+        "resourceness": "resource"
+    },
+    {
+        "kind": "union/member",
+        "name": "fuchsia.posix.socket.raw/Provider_Socket_Result.err",
+        "ordinal": "2",
+        "type": "fuchsia.posix/Errno"
+    },
+    {
+        "kind": "union/member",
+        "name": "fuchsia.posix.socket.raw/Provider_Socket_Result.response",
+        "ordinal": "1",
+        "type": "fuchsia.posix.socket.raw/Provider_Socket_Response"
+    },
+    {
+        "kind": "union",
+        "name": "fuchsia.posix.socket.raw/Provider_Socket_Result",
+        "resourceness": "resource",
+        "strictness": "strict"
+    },
+    {
+        "kind": "const",
+        "name": "fuchsia.posix.socket.raw/SOCKET_PROTOCOL_NAME",
+        "type": "string",
+        "value": "fuchsia.posix.socket.raw/Socket"
+    },
+    {
+        "kind": "protocol/member",
+        "name": "fuchsia.posix.socket.raw/Socket.AddIpMembership",
+        "ordinal": "8555851866500740304",
+        "type": "(fuchsia.posix.socket/IpMulticastMembership membership) -> (fuchsia.posix.socket/BaseNetworkSocket_AddIpMembership_Result result)"
+    },
+    {
+        "kind": "protocol/member",
+        "name": "fuchsia.posix.socket.raw/Socket.AddIpv6Membership",
+        "ordinal": "8976925828978746547",
+        "type": "(fuchsia.posix.socket/Ipv6MulticastMembership membership) -> (fuchsia.posix.socket/BaseNetworkSocket_AddIpv6Membership_Result result)"
+    },
+    {
+        "kind": "protocol/member",
+        "name": "fuchsia.posix.socket.raw/Socket.Bind",
+        "ordinal": "341257625864901213",
+        "type": "(fuchsia.net/SocketAddress addr) -> (fuchsia.posix.socket/BaseNetworkSocket_Bind_Result result)"
+    },
+    {
+        "kind": "protocol/member",
+        "name": "fuchsia.posix.socket.raw/Socket.Clone2",
+        "ordinal": "2366825959783828089",
+        "type": "(server_end:fuchsia.unknown/Cloneable request)"
+    },
+    {
+        "kind": "protocol/member",
+        "name": "fuchsia.posix.socket.raw/Socket.Close",
+        "ordinal": "6540867515453498750",
+        "type": "() -> (fuchsia.unknown/Closeable_Close_Result result)"
+    },
+    {
+        "kind": "protocol/member",
+        "name": "fuchsia.posix.socket.raw/Socket.Connect",
+        "ordinal": "6847144460767430769",
+        "type": "(fuchsia.net/SocketAddress addr) -> (fuchsia.posix.socket/BaseNetworkSocket_Connect_Result result)"
+    },
+    {
+        "kind": "protocol/member",
+        "name": "fuchsia.posix.socket.raw/Socket.Describe",
+        "ordinal": "3699433233068630325",
+        "type": "() -> (fuchsia.posix.socket.raw/SocketDescribeResponse payload)"
+    },
+    {
+        "kind": "protocol/member",
+        "name": "fuchsia.posix.socket.raw/Socket.Disconnect",
+        "ordinal": "526467853197191602",
+        "type": "() -> (fuchsia.posix.socket/BaseNetworkSocket_Disconnect_Result result)"
+    },
+    {
+        "kind": "protocol/member",
+        "name": "fuchsia.posix.socket.raw/Socket.DropIpMembership",
+        "ordinal": "182553223798230275",
+        "type": "(fuchsia.posix.socket/IpMulticastMembership membership) -> (fuchsia.posix.socket/BaseNetworkSocket_DropIpMembership_Result result)"
+    },
+    {
+        "kind": "protocol/member",
+        "name": "fuchsia.posix.socket.raw/Socket.DropIpv6Membership",
+        "ordinal": "4760388853484462852",
+        "type": "(fuchsia.posix.socket/Ipv6MulticastMembership membership) -> (fuchsia.posix.socket/BaseNetworkSocket_DropIpv6Membership_Result result)"
+    },
+    {
+        "kind": "protocol/member",
+        "name": "fuchsia.posix.socket.raw/Socket.GetAcceptConn",
+        "ordinal": "7480036662830729574",
+        "type": "() -> (fuchsia.posix.socket/BaseSocket_GetAcceptConn_Result result)"
+    },
+    {
+        "kind": "protocol/member",
+        "name": "fuchsia.posix.socket.raw/Socket.GetBindToDevice",
+        "ordinal": "1923595528092321480",
+        "type": "() -> (fuchsia.posix.socket/BaseSocket_GetBindToDevice_Result result)"
+    },
+    {
+        "kind": "protocol/member",
+        "name": "fuchsia.posix.socket.raw/Socket.GetBroadcast",
+        "ordinal": "7528171145484924941",
+        "type": "() -> (fuchsia.posix.socket/BaseSocket_GetBroadcast_Result result)"
+    },
+    {
+        "kind": "protocol/member",
+        "name": "fuchsia.posix.socket.raw/Socket.GetError",
+        "ordinal": "6533942076392828603",
+        "type": "() -> (fuchsia.posix.socket/BaseSocket_GetError_Result result)"
+    },
+    {
+        "kind": "protocol/member",
+        "name": "fuchsia.posix.socket.raw/Socket.GetIcmpv6Filter",
+        "ordinal": "4881144689192274638",
+        "type": "() -> (fuchsia.posix.socket.raw/Socket_GetIcmpv6Filter_Result result)"
+    },
+    {
+        "kind": "protocol/member",
+        "name": "fuchsia.posix.socket.raw/Socket.GetInfo",
+        "ordinal": "4136397333996976570",
+        "type": "() -> (fuchsia.posix.socket.raw/Socket_GetInfo_Result result)"
+    },
+    {
+        "kind": "protocol/member",
+        "name": "fuchsia.posix.socket.raw/Socket.GetIpHeaderIncluded",
+        "ordinal": "8507962503858320886",
+        "type": "() -> (fuchsia.posix.socket.raw/Socket_GetIpHeaderIncluded_Result result)"
+    },
+    {
+        "kind": "protocol/member",
+        "name": "fuchsia.posix.socket.raw/Socket.GetIpMulticastInterface",
+        "ordinal": "3606206052295526084",
+        "type": "() -> (fuchsia.posix.socket/BaseNetworkSocket_GetIpMulticastInterface_Result result)"
+    },
+    {
+        "kind": "protocol/member",
+        "name": "fuchsia.posix.socket.raw/Socket.GetIpMulticastLoopback",
+        "ordinal": "4281558748838926578",
+        "type": "() -> (fuchsia.posix.socket/BaseNetworkSocket_GetIpMulticastLoopback_Result result)"
+    },
+    {
+        "kind": "protocol/member",
+        "name": "fuchsia.posix.socket.raw/Socket.GetIpMulticastTtl",
+        "ordinal": "317042887113285146",
+        "type": "() -> (fuchsia.posix.socket/BaseNetworkSocket_GetIpMulticastTtl_Result result)"
+    },
+    {
+        "kind": "protocol/member",
+        "name": "fuchsia.posix.socket.raw/Socket.GetIpPacketInfo",
+        "ordinal": "6103791408020719424",
+        "type": "() -> (fuchsia.posix.socket/BaseNetworkSocket_GetIpPacketInfo_Result result)"
+    },
+    {
+        "kind": "protocol/member",
+        "name": "fuchsia.posix.socket.raw/Socket.GetIpReceiveTtl",
+        "ordinal": "7461863537816252085",
+        "type": "() -> (fuchsia.posix.socket/BaseNetworkSocket_GetIpReceiveTtl_Result result)"
+    },
+    {
+        "kind": "protocol/member",
+        "name": "fuchsia.posix.socket.raw/Socket.GetIpReceiveTypeOfService",
+        "ordinal": "4708718459712264544",
+        "type": "() -> (fuchsia.posix.socket/BaseNetworkSocket_GetIpReceiveTypeOfService_Result result)"
+    },
+    {
+        "kind": "protocol/member",
+        "name": "fuchsia.posix.socket.raw/Socket.GetIpTtl",
+        "ordinal": "5180405804914549873",
+        "type": "() -> (fuchsia.posix.socket/BaseNetworkSocket_GetIpTtl_Result result)"
+    },
+    {
+        "kind": "protocol/member",
+        "name": "fuchsia.posix.socket.raw/Socket.GetIpTypeOfService",
+        "ordinal": "4041030972495847371",
+        "type": "() -> (fuchsia.posix.socket/BaseNetworkSocket_GetIpTypeOfService_Result result)"
+    },
+    {
+        "kind": "protocol/member",
+        "name": "fuchsia.posix.socket.raw/Socket.GetIpv6Checksum",
+        "ordinal": "109348586161071069",
+        "type": "() -> (fuchsia.posix.socket.raw/Socket_GetIpv6Checksum_Result result)"
+    },
+    {
+        "kind": "protocol/member",
+        "name": "fuchsia.posix.socket.raw/Socket.GetIpv6MulticastHops",
+        "ordinal": "5949652343433003306",
+        "type": "() -> (fuchsia.posix.socket/BaseNetworkSocket_GetIpv6MulticastHops_Result result)"
+    },
+    {
+        "kind": "protocol/member",
+        "name": "fuchsia.posix.socket.raw/Socket.GetIpv6MulticastInterface",
+        "ordinal": "2244759491290536066",
+        "type": "() -> (fuchsia.posix.socket/BaseNetworkSocket_GetIpv6MulticastInterface_Result result)"
+    },
+    {
+        "kind": "protocol/member",
+        "name": "fuchsia.posix.socket.raw/Socket.GetIpv6MulticastLoopback",
+        "ordinal": "4906028588272392643",
+        "type": "() -> (fuchsia.posix.socket/BaseNetworkSocket_GetIpv6MulticastLoopback_Result result)"
+    },
+    {
+        "kind": "protocol/member",
+        "name": "fuchsia.posix.socket.raw/Socket.GetIpv6Only",
+        "ordinal": "5378199598003566748",
+        "type": "() -> (fuchsia.posix.socket/BaseNetworkSocket_GetIpv6Only_Result result)"
+    },
+    {
+        "kind": "protocol/member",
+        "name": "fuchsia.posix.socket.raw/Socket.GetIpv6ReceiveHopLimit",
+        "ordinal": "3755446185578837184",
+        "type": "() -> (fuchsia.posix.socket/BaseNetworkSocket_GetIpv6ReceiveHopLimit_Result result)"
+    },
+    {
+        "kind": "protocol/member",
+        "name": "fuchsia.posix.socket.raw/Socket.GetIpv6ReceivePacketInfo",
+        "ordinal": "8848810376192257141",
+        "type": "() -> (fuchsia.posix.socket/BaseNetworkSocket_GetIpv6ReceivePacketInfo_Result result)"
+    },
+    {
+        "kind": "protocol/member",
+        "name": "fuchsia.posix.socket.raw/Socket.GetIpv6ReceiveTrafficClass",
+        "ordinal": "3329090250702405626",
+        "type": "() -> (fuchsia.posix.socket/BaseNetworkSocket_GetIpv6ReceiveTrafficClass_Result result)"
+    },
+    {
+        "kind": "protocol/member",
+        "name": "fuchsia.posix.socket.raw/Socket.GetIpv6TrafficClass",
+        "ordinal": "484971415598804740",
+        "type": "() -> (fuchsia.posix.socket/BaseNetworkSocket_GetIpv6TrafficClass_Result result)"
+    },
+    {
+        "kind": "protocol/member",
+        "name": "fuchsia.posix.socket.raw/Socket.GetIpv6UnicastHops",
+        "ordinal": "2446690571902507218",
+        "type": "() -> (fuchsia.posix.socket/BaseNetworkSocket_GetIpv6UnicastHops_Result result)"
+    },
+    {
+        "kind": "protocol/member",
+        "name": "fuchsia.posix.socket.raw/Socket.GetKeepAlive",
+        "ordinal": "3301874315258153426",
+        "type": "() -> (fuchsia.posix.socket/BaseSocket_GetKeepAlive_Result result)"
+    },
+    {
+        "kind": "protocol/member",
+        "name": "fuchsia.posix.socket.raw/Socket.GetLinger",
+        "ordinal": "5254329658518474309",
+        "type": "() -> (fuchsia.posix.socket/BaseSocket_GetLinger_Result result)"
+    },
+    {
+        "kind": "protocol/member",
+        "name": "fuchsia.posix.socket.raw/Socket.GetNoCheck",
+        "ordinal": "3230247044467750548",
+        "type": "() -> (fuchsia.posix.socket/BaseSocket_GetNoCheck_Result result)"
+    },
+    {
+        "kind": "protocol/member",
+        "name": "fuchsia.posix.socket.raw/Socket.GetOutOfBandInline",
+        "ordinal": "3786430745745692485",
+        "type": "() -> (fuchsia.posix.socket/BaseSocket_GetOutOfBandInline_Result result)"
+    },
+    {
+        "kind": "protocol/member",
+        "name": "fuchsia.posix.socket.raw/Socket.GetPeerName",
+        "ordinal": "2305507983875261230",
+        "type": "() -> (fuchsia.posix.socket/BaseNetworkSocket_GetPeerName_Result result)"
+    },
+    {
+        "kind": "protocol/member",
+        "name": "fuchsia.posix.socket.raw/Socket.GetReceiveBuffer",
+        "ordinal": "1495657654187499100",
+        "type": "() -> (fuchsia.posix.socket/BaseSocket_GetReceiveBuffer_Result result)"
+    },
+    {
+        "kind": "protocol/member",
+        "name": "fuchsia.posix.socket.raw/Socket.GetReuseAddress",
+        "ordinal": "7473477752945623205",
+        "type": "() -> (fuchsia.posix.socket/BaseSocket_GetReuseAddress_Result result)"
+    },
+    {
+        "kind": "protocol/member",
+        "name": "fuchsia.posix.socket.raw/Socket.GetReusePort",
+        "ordinal": "8795860040453978152",
+        "type": "() -> (fuchsia.posix.socket/BaseSocket_GetReusePort_Result result)"
+    },
+    {
+        "kind": "protocol/member",
+        "name": "fuchsia.posix.socket.raw/Socket.GetSendBuffer",
+        "ordinal": "8693407268113367307",
+        "type": "() -> (fuchsia.posix.socket/BaseSocket_GetSendBuffer_Result result)"
+    },
+    {
+        "kind": "protocol/member",
+        "name": "fuchsia.posix.socket.raw/Socket.GetSockName",
+        "ordinal": "5142868848782495621",
+        "type": "() -> (fuchsia.posix.socket/BaseNetworkSocket_GetSockName_Result result)"
+    },
+    {
+        "kind": "protocol/member",
+        "name": "fuchsia.posix.socket.raw/Socket.GetTimestamp",
+        "ordinal": "5328602765801471271",
+        "type": "() -> (fuchsia.posix.socket/BaseSocket_GetTimestamp_Result result)"
+    },
+    {
+        "kind": "protocol/member",
+        "name": "fuchsia.posix.socket.raw/Socket.Query",
+        "ordinal": "2763219980499352582",
+        "type": "() -> (vector<uint8> protocol)"
+    },
+    {
+        "kind": "protocol/member",
+        "name": "fuchsia.posix.socket.raw/Socket.RecvMsg",
+        "ordinal": "2160436252830312989",
+        "type": "(bool want_addr,uint32 data_len,bool want_control,fuchsia.posix.socket/RecvMsgFlags flags) -> (fuchsia.posix.socket.raw/Socket_RecvMsg_Result result)"
+    },
+    {
+        "kind": "protocol/member",
+        "name": "fuchsia.posix.socket.raw/Socket.SendMsg",
+        "ordinal": "3238627758883768664",
+        "type": "(fuchsia.net/SocketAddress:optional addr,vector<uint8> data,fuchsia.posix.socket/NetworkSocketSendControlData control,fuchsia.posix.socket/SendMsgFlags flags) -> (fuchsia.posix.socket.raw/Socket_SendMsg_Result result)"
+    },
+    {
+        "kind": "protocol/member",
+        "name": "fuchsia.posix.socket.raw/Socket.SetBindToDevice",
+        "ordinal": "2384854481495568324",
+        "type": "(string:15 value) -> (fuchsia.posix.socket/BaseSocket_SetBindToDevice_Result result)"
+    },
+    {
+        "kind": "protocol/member",
+        "name": "fuchsia.posix.socket.raw/Socket.SetBroadcast",
+        "ordinal": "6927627499941452103",
+        "type": "(bool value) -> (fuchsia.posix.socket/BaseSocket_SetBroadcast_Result result)"
+    },
+    {
+        "kind": "protocol/member",
+        "name": "fuchsia.posix.socket.raw/Socket.SetIcmpv6Filter",
+        "ordinal": "5674158579522627753",
+        "type": "(fuchsia.posix.socket.raw/Icmpv6Filter filter) -> (fuchsia.posix.socket.raw/Socket_SetIcmpv6Filter_Result result)"
+    },
+    {
+        "kind": "protocol/member",
+        "name": "fuchsia.posix.socket.raw/Socket.SetIpHeaderIncluded",
+        "ordinal": "418951727733401843",
+        "type": "(bool value) -> (fuchsia.posix.socket.raw/Socket_SetIpHeaderIncluded_Result result)"
+    },
+    {
+        "kind": "protocol/member",
+        "name": "fuchsia.posix.socket.raw/Socket.SetIpMulticastInterface",
+        "ordinal": "527761160117862142",
+        "type": "(uint64 iface,fuchsia.net/Ipv4Address address) -> (fuchsia.posix.socket/BaseNetworkSocket_SetIpMulticastInterface_Result result)"
+    },
+    {
+        "kind": "protocol/member",
+        "name": "fuchsia.posix.socket.raw/Socket.SetIpMulticastLoopback",
+        "ordinal": "2361394811737031658",
+        "type": "(bool value) -> (fuchsia.posix.socket/BaseNetworkSocket_SetIpMulticastLoopback_Result result)"
+    },
+    {
+        "kind": "protocol/member",
+        "name": "fuchsia.posix.socket.raw/Socket.SetIpMulticastTtl",
+        "ordinal": "7139134855189173921",
+        "type": "(fuchsia.posix.socket/OptionalUint8 value) -> (fuchsia.posix.socket/BaseNetworkSocket_SetIpMulticastTtl_Result result)"
+    },
+    {
+        "kind": "protocol/member",
+        "name": "fuchsia.posix.socket.raw/Socket.SetIpPacketInfo",
+        "ordinal": "4119974243205910038",
+        "type": "(bool value) -> (fuchsia.posix.socket/BaseNetworkSocket_SetIpPacketInfo_Result result)"
+    },
+    {
+        "kind": "protocol/member",
+        "name": "fuchsia.posix.socket.raw/Socket.SetIpReceiveTtl",
+        "ordinal": "5111968073129834539",
+        "type": "(bool value) -> (fuchsia.posix.socket/BaseNetworkSocket_SetIpReceiveTtl_Result result)"
+    },
+    {
+        "kind": "protocol/member",
+        "name": "fuchsia.posix.socket.raw/Socket.SetIpReceiveTypeOfService",
+        "ordinal": "7804570017426539759",
+        "type": "(bool value) -> (fuchsia.posix.socket/BaseNetworkSocket_SetIpReceiveTypeOfService_Result result)"
+    },
+    {
+        "kind": "protocol/member",
+        "name": "fuchsia.posix.socket.raw/Socket.SetIpTtl",
+        "ordinal": "3018047591309566447",
+        "type": "(fuchsia.posix.socket/OptionalUint8 value) -> (fuchsia.posix.socket/BaseNetworkSocket_SetIpTtl_Result result)"
+    },
+    {
+        "kind": "protocol/member",
+        "name": "fuchsia.posix.socket.raw/Socket.SetIpTypeOfService",
+        "ordinal": "690675822370712902",
+        "type": "(uint8 value) -> (fuchsia.posix.socket/BaseNetworkSocket_SetIpTypeOfService_Result result)"
+    },
+    {
+        "kind": "protocol/member",
+        "name": "fuchsia.posix.socket.raw/Socket.SetIpv6Checksum",
+        "ordinal": "1781033557084970164",
+        "type": "(fuchsia.posix.socket.raw/Ipv6ChecksumConfiguration config) -> (fuchsia.posix.socket.raw/Socket_SetIpv6Checksum_Result result)"
+    },
+    {
+        "kind": "protocol/member",
+        "name": "fuchsia.posix.socket.raw/Socket.SetIpv6MulticastHops",
+        "ordinal": "2718429581095699137",
+        "type": "(fuchsia.posix.socket/OptionalUint8 value) -> (fuchsia.posix.socket/BaseNetworkSocket_SetIpv6MulticastHops_Result result)"
+    },
+    {
+        "kind": "protocol/member",
+        "name": "fuchsia.posix.socket.raw/Socket.SetIpv6MulticastInterface",
+        "ordinal": "1395965093408451387",
+        "type": "(uint64 value) -> (fuchsia.posix.socket/BaseNetworkSocket_SetIpv6MulticastInterface_Result result)"
+    },
+    {
+        "kind": "protocol/member",
+        "name": "fuchsia.posix.socket.raw/Socket.SetIpv6MulticastLoopback",
+        "ordinal": "6156451754502527808",
+        "type": "(bool value) -> (fuchsia.posix.socket/BaseNetworkSocket_SetIpv6MulticastLoopback_Result result)"
+    },
+    {
+        "kind": "protocol/member",
+        "name": "fuchsia.posix.socket.raw/Socket.SetIpv6Only",
+        "ordinal": "5220781608480066490",
+        "type": "(bool value) -> (fuchsia.posix.socket/BaseNetworkSocket_SetIpv6Only_Result result)"
+    },
+    {
+        "kind": "protocol/member",
+        "name": "fuchsia.posix.socket.raw/Socket.SetIpv6ReceiveHopLimit",
+        "ordinal": "6639573101563103774",
+        "type": "(bool value) -> (fuchsia.posix.socket/BaseNetworkSocket_SetIpv6ReceiveHopLimit_Result result)"
+    },
+    {
+        "kind": "protocol/member",
+        "name": "fuchsia.posix.socket.raw/Socket.SetIpv6ReceivePacketInfo",
+        "ordinal": "1812020956834113384",
+        "type": "(bool value) -> (fuchsia.posix.socket/BaseNetworkSocket_SetIpv6ReceivePacketInfo_Result result)"
+    },
+    {
+        "kind": "protocol/member",
+        "name": "fuchsia.posix.socket.raw/Socket.SetIpv6ReceiveTrafficClass",
+        "ordinal": "6408759191306017184",
+        "type": "(bool value) -> (fuchsia.posix.socket/BaseNetworkSocket_SetIpv6ReceiveTrafficClass_Result result)"
+    },
+    {
+        "kind": "protocol/member",
+        "name": "fuchsia.posix.socket.raw/Socket.SetIpv6TrafficClass",
+        "ordinal": "7705790354277665615",
+        "type": "(fuchsia.posix.socket/OptionalUint8 value) -> (fuchsia.posix.socket/BaseNetworkSocket_SetIpv6TrafficClass_Result result)"
+    },
+    {
+        "kind": "protocol/member",
+        "name": "fuchsia.posix.socket.raw/Socket.SetIpv6UnicastHops",
+        "ordinal": "1548483910458288217",
+        "type": "(fuchsia.posix.socket/OptionalUint8 value) -> (fuchsia.posix.socket/BaseNetworkSocket_SetIpv6UnicastHops_Result result)"
+    },
+    {
+        "kind": "protocol/member",
+        "name": "fuchsia.posix.socket.raw/Socket.SetKeepAlive",
+        "ordinal": "6281950768033485511",
+        "type": "(bool value) -> (fuchsia.posix.socket/BaseSocket_SetKeepAlive_Result result)"
+    },
+    {
+        "kind": "protocol/member",
+        "name": "fuchsia.posix.socket.raw/Socket.SetLinger",
+        "ordinal": "4987845787467553166",
+        "type": "(bool linger,uint32 length_secs) -> (fuchsia.posix.socket/BaseSocket_SetLinger_Result result)"
+    },
+    {
+        "kind": "protocol/member",
+        "name": "fuchsia.posix.socket.raw/Socket.SetNoCheck",
+        "ordinal": "7763925129696671938",
+        "type": "(bool value) -> (fuchsia.posix.socket/BaseSocket_SetNoCheck_Result result)"
+    },
+    {
+        "kind": "protocol/member",
+        "name": "fuchsia.posix.socket.raw/Socket.SetOutOfBandInline",
+        "ordinal": "282799447597835321",
+        "type": "(bool value) -> (fuchsia.posix.socket/BaseSocket_SetOutOfBandInline_Result result)"
+    },
+    {
+        "kind": "protocol/member",
+        "name": "fuchsia.posix.socket.raw/Socket.SetReceiveBuffer",
+        "ordinal": "7713807381122805761",
+        "type": "(uint64 value_bytes) -> (fuchsia.posix.socket/BaseSocket_SetReceiveBuffer_Result result)"
+    },
+    {
+        "kind": "protocol/member",
+        "name": "fuchsia.posix.socket.raw/Socket.SetReuseAddress",
+        "ordinal": "2294389296622512246",
+        "type": "(bool value) -> (fuchsia.posix.socket/BaseSocket_SetReuseAddress_Result result)"
+    },
+    {
+        "kind": "protocol/member",
+        "name": "fuchsia.posix.socket.raw/Socket.SetReusePort",
+        "ordinal": "2656347923086679243",
+        "type": "(bool value) -> (fuchsia.posix.socket/BaseSocket_SetReusePort_Result result)"
+    },
+    {
+        "kind": "protocol/member",
+        "name": "fuchsia.posix.socket.raw/Socket.SetSendBuffer",
+        "ordinal": "8461890084235016816",
+        "type": "(uint64 value_bytes) -> (fuchsia.posix.socket/BaseSocket_SetSendBuffer_Result result)"
+    },
+    {
+        "kind": "protocol/member",
+        "name": "fuchsia.posix.socket.raw/Socket.SetTimestamp",
+        "ordinal": "2908592082776217657",
+        "type": "(fuchsia.posix.socket/TimestampOption value) -> (fuchsia.posix.socket/BaseSocket_SetTimestamp_Result result)"
+    },
+    {
+        "kind": "protocol/member",
+        "name": "fuchsia.posix.socket.raw/Socket.Shutdown",
+        "ordinal": "2629883065423938358",
+        "type": "(fuchsia.posix.socket/ShutdownMode mode) -> (fuchsia.posix.socket/BaseNetworkSocket_Shutdown_Result result)"
+    },
+    {
+        "kind": "protocol",
+        "name": "fuchsia.posix.socket.raw/Socket"
+    },
+    {
+        "kind": "table/member",
+        "name": "fuchsia.posix.socket.raw/SocketDescribeResponse.event",
+        "ordinal": "1",
+        "type": "zx/Handle:EVENTPAIR"
+    },
+    {
+        "kind": "table",
+        "name": "fuchsia.posix.socket.raw/SocketDescribeResponse",
+        "resourceness": "resource"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.posix.socket.raw/Socket_GetIcmpv6Filter_Response.filter",
+        "ordinal": "1",
+        "type": "fuchsia.posix.socket.raw/Icmpv6Filter"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.posix.socket.raw/Socket_GetIcmpv6Filter_Response"
+    },
+    {
+        "kind": "union/member",
+        "name": "fuchsia.posix.socket.raw/Socket_GetIcmpv6Filter_Result.err",
+        "ordinal": "2",
+        "type": "fuchsia.posix/Errno"
+    },
+    {
+        "kind": "union/member",
+        "name": "fuchsia.posix.socket.raw/Socket_GetIcmpv6Filter_Result.response",
+        "ordinal": "1",
+        "type": "fuchsia.posix.socket.raw/Socket_GetIcmpv6Filter_Response"
+    },
+    {
+        "kind": "union",
+        "name": "fuchsia.posix.socket.raw/Socket_GetIcmpv6Filter_Result",
+        "strictness": "strict"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.posix.socket.raw/Socket_GetInfo_Response.domain",
+        "ordinal": "1",
+        "type": "fuchsia.posix.socket/Domain"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.posix.socket.raw/Socket_GetInfo_Response.proto",
+        "ordinal": "2",
+        "type": "fuchsia.posix.socket.raw/ProtocolAssociation"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.posix.socket.raw/Socket_GetInfo_Response"
+    },
+    {
+        "kind": "union/member",
+        "name": "fuchsia.posix.socket.raw/Socket_GetInfo_Result.err",
+        "ordinal": "2",
+        "type": "fuchsia.posix/Errno"
+    },
+    {
+        "kind": "union/member",
+        "name": "fuchsia.posix.socket.raw/Socket_GetInfo_Result.response",
+        "ordinal": "1",
+        "type": "fuchsia.posix.socket.raw/Socket_GetInfo_Response"
+    },
+    {
+        "kind": "union",
+        "name": "fuchsia.posix.socket.raw/Socket_GetInfo_Result",
+        "strictness": "strict"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.posix.socket.raw/Socket_GetIpHeaderIncluded_Response.value",
+        "ordinal": "1",
+        "type": "bool"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.posix.socket.raw/Socket_GetIpHeaderIncluded_Response"
+    },
+    {
+        "kind": "union/member",
+        "name": "fuchsia.posix.socket.raw/Socket_GetIpHeaderIncluded_Result.err",
+        "ordinal": "2",
+        "type": "fuchsia.posix/Errno"
+    },
+    {
+        "kind": "union/member",
+        "name": "fuchsia.posix.socket.raw/Socket_GetIpHeaderIncluded_Result.response",
+        "ordinal": "1",
+        "type": "fuchsia.posix.socket.raw/Socket_GetIpHeaderIncluded_Response"
+    },
+    {
+        "kind": "union",
+        "name": "fuchsia.posix.socket.raw/Socket_GetIpHeaderIncluded_Result",
+        "strictness": "strict"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.posix.socket.raw/Socket_GetIpv6Checksum_Response.config",
+        "ordinal": "1",
+        "type": "fuchsia.posix.socket.raw/Ipv6ChecksumConfiguration"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.posix.socket.raw/Socket_GetIpv6Checksum_Response"
+    },
+    {
+        "kind": "union/member",
+        "name": "fuchsia.posix.socket.raw/Socket_GetIpv6Checksum_Result.err",
+        "ordinal": "2",
+        "type": "fuchsia.posix/Errno"
+    },
+    {
+        "kind": "union/member",
+        "name": "fuchsia.posix.socket.raw/Socket_GetIpv6Checksum_Result.response",
+        "ordinal": "1",
+        "type": "fuchsia.posix.socket.raw/Socket_GetIpv6Checksum_Response"
+    },
+    {
+        "kind": "union",
+        "name": "fuchsia.posix.socket.raw/Socket_GetIpv6Checksum_Result",
+        "strictness": "strict"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.posix.socket.raw/Socket_RecvMsg_Response.addr",
+        "ordinal": "1",
+        "type": "fuchsia.net/SocketAddress:optional"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.posix.socket.raw/Socket_RecvMsg_Response.control",
+        "ordinal": "3",
+        "type": "fuchsia.posix.socket/NetworkSocketRecvControlData"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.posix.socket.raw/Socket_RecvMsg_Response.data",
+        "ordinal": "2",
+        "type": "vector<uint8>"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.posix.socket.raw/Socket_RecvMsg_Response.truncated",
+        "ordinal": "4",
+        "type": "uint32"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.posix.socket.raw/Socket_RecvMsg_Response"
+    },
+    {
+        "kind": "union/member",
+        "name": "fuchsia.posix.socket.raw/Socket_RecvMsg_Result.err",
+        "ordinal": "2",
+        "type": "fuchsia.posix/Errno"
+    },
+    {
+        "kind": "union/member",
+        "name": "fuchsia.posix.socket.raw/Socket_RecvMsg_Result.response",
+        "ordinal": "1",
+        "type": "fuchsia.posix.socket.raw/Socket_RecvMsg_Response"
+    },
+    {
+        "kind": "union",
+        "name": "fuchsia.posix.socket.raw/Socket_RecvMsg_Result",
+        "strictness": "strict"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.posix.socket.raw/Socket_SendMsg_Response"
+    },
+    {
+        "kind": "union/member",
+        "name": "fuchsia.posix.socket.raw/Socket_SendMsg_Result.err",
+        "ordinal": "2",
+        "type": "fuchsia.posix/Errno"
+    },
+    {
+        "kind": "union/member",
+        "name": "fuchsia.posix.socket.raw/Socket_SendMsg_Result.response",
+        "ordinal": "1",
+        "type": "fuchsia.posix.socket.raw/Socket_SendMsg_Response"
+    },
+    {
+        "kind": "union",
+        "name": "fuchsia.posix.socket.raw/Socket_SendMsg_Result",
+        "strictness": "strict"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.posix.socket.raw/Socket_SetIcmpv6Filter_Response"
+    },
+    {
+        "kind": "union/member",
+        "name": "fuchsia.posix.socket.raw/Socket_SetIcmpv6Filter_Result.err",
+        "ordinal": "2",
+        "type": "fuchsia.posix/Errno"
+    },
+    {
+        "kind": "union/member",
+        "name": "fuchsia.posix.socket.raw/Socket_SetIcmpv6Filter_Result.response",
+        "ordinal": "1",
+        "type": "fuchsia.posix.socket.raw/Socket_SetIcmpv6Filter_Response"
+    },
+    {
+        "kind": "union",
+        "name": "fuchsia.posix.socket.raw/Socket_SetIcmpv6Filter_Result",
+        "strictness": "strict"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.posix.socket.raw/Socket_SetIpHeaderIncluded_Response"
+    },
+    {
+        "kind": "union/member",
+        "name": "fuchsia.posix.socket.raw/Socket_SetIpHeaderIncluded_Result.err",
+        "ordinal": "2",
+        "type": "fuchsia.posix/Errno"
+    },
+    {
+        "kind": "union/member",
+        "name": "fuchsia.posix.socket.raw/Socket_SetIpHeaderIncluded_Result.response",
+        "ordinal": "1",
+        "type": "fuchsia.posix.socket.raw/Socket_SetIpHeaderIncluded_Response"
+    },
+    {
+        "kind": "union",
+        "name": "fuchsia.posix.socket.raw/Socket_SetIpHeaderIncluded_Result",
+        "strictness": "strict"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.posix.socket.raw/Socket_SetIpv6Checksum_Response"
+    },
+    {
+        "kind": "union/member",
+        "name": "fuchsia.posix.socket.raw/Socket_SetIpv6Checksum_Result.err",
+        "ordinal": "2",
+        "type": "fuchsia.posix/Errno"
+    },
+    {
+        "kind": "union/member",
+        "name": "fuchsia.posix.socket.raw/Socket_SetIpv6Checksum_Result.response",
+        "ordinal": "1",
+        "type": "fuchsia.posix.socket.raw/Socket_SetIpv6Checksum_Response"
+    },
+    {
+        "kind": "union",
+        "name": "fuchsia.posix.socket.raw/Socket_SetIpv6Checksum_Result",
+        "strictness": "strict"
+    },
+    {
+        "kind": "library",
+        "name": "fuchsia.posix.socket.raw"
+    }
+]

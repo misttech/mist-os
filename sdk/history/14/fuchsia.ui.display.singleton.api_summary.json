@@ -1,0 +1,38 @@
+[
+    {
+        "kind": "protocol/member",
+        "name": "fuchsia.ui.display.singleton/Info.GetMetrics",
+        "ordinal": "7882165022234155198",
+        "type": "() -> (fuchsia.ui.display.singleton/Metrics info)"
+    },
+    {
+        "kind": "protocol",
+        "name": "fuchsia.ui.display.singleton/Info"
+    },
+    {
+        "kind": "table/member",
+        "name": "fuchsia.ui.display.singleton/Metrics.extent_in_mm",
+        "ordinal": "2",
+        "type": "fuchsia.math/SizeU"
+    },
+    {
+        "kind": "table/member",
+        "name": "fuchsia.ui.display.singleton/Metrics.extent_in_px",
+        "ordinal": "1",
+        "type": "fuchsia.math/SizeU"
+    },
+    {
+        "kind": "table/member",
+        "name": "fuchsia.ui.display.singleton/Metrics.recommended_device_pixel_ratio",
+        "ordinal": "3",
+        "type": "fuchsia.math/VecF"
+    },
+    {
+        "kind": "table",
+        "name": "fuchsia.ui.display.singleton/Metrics"
+    },
+    {
+        "kind": "library",
+        "name": "fuchsia.ui.display.singleton"
+    }
+]

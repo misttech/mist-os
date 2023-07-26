@@ -1,0 +1,504 @@
+[
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.driver.framework/BindRule.condition",
+        "ordinal": "2",
+        "type": "fuchsia.driver.framework/Condition"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.driver.framework/BindRule.key",
+        "ordinal": "1",
+        "type": "fuchsia.driver.framework/NodePropertyKey"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.driver.framework/BindRule.values",
+        "ordinal": "3",
+        "type": "vector<fuchsia.driver.framework/NodePropertyValue>:64"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.driver.framework/BindRule"
+    },
+    {
+        "kind": "protocol/member",
+        "name": "fuchsia.driver.framework/CompositeNodeManager.AddSpec",
+        "ordinal": "5930736293275290740",
+        "type": "(fuchsia.driver.framework/CompositeNodeSpec payload) -> (fuchsia.driver.framework/CompositeNodeManager_AddSpec_Result result)"
+    },
+    {
+        "kind": "protocol",
+        "name": "fuchsia.driver.framework/CompositeNodeManager"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.driver.framework/CompositeNodeManager_AddSpec_Response"
+    },
+    {
+        "kind": "union/member",
+        "name": "fuchsia.driver.framework/CompositeNodeManager_AddSpec_Result.err",
+        "ordinal": "2",
+        "type": "fuchsia.driver.framework/CompositeNodeSpecError"
+    },
+    {
+        "kind": "union/member",
+        "name": "fuchsia.driver.framework/CompositeNodeManager_AddSpec_Result.response",
+        "ordinal": "1",
+        "type": "fuchsia.driver.framework/CompositeNodeManager_AddSpec_Response"
+    },
+    {
+        "kind": "union",
+        "name": "fuchsia.driver.framework/CompositeNodeManager_AddSpec_Result",
+        "strictness": "strict"
+    },
+    {
+        "kind": "table/member",
+        "name": "fuchsia.driver.framework/CompositeNodeSpec.name",
+        "ordinal": "1",
+        "type": "string"
+    },
+    {
+        "kind": "table/member",
+        "name": "fuchsia.driver.framework/CompositeNodeSpec.parents",
+        "ordinal": "2",
+        "type": "vector<fuchsia.driver.framework/ParentSpec>"
+    },
+    {
+        "kind": "table",
+        "name": "fuchsia.driver.framework/CompositeNodeSpec"
+    },
+    {
+        "kind": "enum/member",
+        "name": "fuchsia.driver.framework/CompositeNodeSpecError.ALREADY_EXISTS",
+        "value": "3"
+    },
+    {
+        "kind": "enum/member",
+        "name": "fuchsia.driver.framework/CompositeNodeSpecError.EMPTY_NODES",
+        "value": "2"
+    },
+    {
+        "kind": "enum/member",
+        "name": "fuchsia.driver.framework/CompositeNodeSpecError.MISSING_ARGS",
+        "value": "1"
+    },
+    {
+        "kind": "enum",
+        "name": "fuchsia.driver.framework/CompositeNodeSpecError",
+        "strictness": "strict",
+        "type": "uint32"
+    },
+    {
+        "kind": "enum/member",
+        "name": "fuchsia.driver.framework/Condition.ACCEPT",
+        "value": "1"
+    },
+    {
+        "kind": "enum/member",
+        "name": "fuchsia.driver.framework/Condition.REJECT",
+        "value": "2"
+    },
+    {
+        "kind": "enum/member",
+        "name": "fuchsia.driver.framework/Condition.UNKNOWN",
+        "value": "0"
+    },
+    {
+        "kind": "enum",
+        "name": "fuchsia.driver.framework/Condition",
+        "strictness": "strict",
+        "type": "uint32"
+    },
+    {
+        "kind": "table/member",
+        "name": "fuchsia.driver.framework/DevfsAddArgs.class_name",
+        "ordinal": "2",
+        "type": "string:255"
+    },
+    {
+        "kind": "table/member",
+        "name": "fuchsia.driver.framework/DevfsAddArgs.connector",
+        "ordinal": "1",
+        "type": "fuchsia.device.fs/Connector"
+    },
+    {
+        "kind": "table/member",
+        "name": "fuchsia.driver.framework/DevfsAddArgs.inspect",
+        "ordinal": "3",
+        "type": "zx/Handle:VMO"
+    },
+    {
+        "kind": "table",
+        "name": "fuchsia.driver.framework/DevfsAddArgs",
+        "resourceness": "resource"
+    },
+    {
+        "kind": "table/member",
+        "name": "fuchsia.driver.framework/DriverStartArgs.config",
+        "ordinal": "7",
+        "type": "zx/Handle:VMO"
+    },
+    {
+        "kind": "table/member",
+        "name": "fuchsia.driver.framework/DriverStartArgs.incoming",
+        "ordinal": "5",
+        "type": "vector<fuchsia.component.runner/ComponentNamespaceEntry>:32"
+    },
+    {
+        "kind": "table/member",
+        "name": "fuchsia.driver.framework/DriverStartArgs.node",
+        "ordinal": "1",
+        "type": "client_end:fuchsia.driver.framework/Node"
+    },
+    {
+        "kind": "table/member",
+        "name": "fuchsia.driver.framework/DriverStartArgs.node_name",
+        "ordinal": "8",
+        "type": "string"
+    },
+    {
+        "kind": "table/member",
+        "name": "fuchsia.driver.framework/DriverStartArgs.outgoing_dir",
+        "ordinal": "6",
+        "type": "server_end:fuchsia.io/Directory"
+    },
+    {
+        "kind": "table/member",
+        "name": "fuchsia.driver.framework/DriverStartArgs.program",
+        "ordinal": "4",
+        "type": "fuchsia.data/Dictionary"
+    },
+    {
+        "kind": "table/member",
+        "name": "fuchsia.driver.framework/DriverStartArgs.symbols",
+        "ordinal": "2",
+        "type": "vector<fuchsia.driver.framework/NodeSymbol>:64"
+    },
+    {
+        "kind": "table/member",
+        "name": "fuchsia.driver.framework/DriverStartArgs.url",
+        "ordinal": "3",
+        "type": "string:4096"
+    },
+    {
+        "kind": "table",
+        "name": "fuchsia.driver.framework/DriverStartArgs",
+        "resourceness": "resource"
+    },
+    {
+        "kind": "const",
+        "name": "fuchsia.driver.framework/MAX_NAMESPACE_COUNT",
+        "type": "uint32",
+        "value": "32"
+    },
+    {
+        "kind": "const",
+        "name": "fuchsia.driver.framework/MAX_NODE_NAME_LENGTH",
+        "type": "uint8",
+        "value": "128"
+    },
+    {
+        "kind": "const",
+        "name": "fuchsia.driver.framework/MAX_OFFER_COUNT",
+        "type": "uint32",
+        "value": "128"
+    },
+    {
+        "kind": "const",
+        "name": "fuchsia.driver.framework/MAX_PROPERTY_COUNT",
+        "type": "uint8",
+        "value": "64"
+    },
+    {
+        "kind": "const",
+        "name": "fuchsia.driver.framework/MAX_SYMBOL_COUNT",
+        "type": "uint8",
+        "value": "64"
+    },
+    {
+        "kind": "const",
+        "name": "fuchsia.driver.framework/MAX_SYMBOL_NAME_LENGTH",
+        "type": "uint8",
+        "value": "128"
+    },
+    {
+        "kind": "protocol/member",
+        "name": "fuchsia.driver.framework/Node.AddChild",
+        "ordinal": "8633697350522413353",
+        "type": "(fuchsia.driver.framework/NodeAddArgs args,server_end:fuchsia.driver.framework/NodeController controller,server_end:<fuchsia.driver.framework/Node,optional> node) -> (fuchsia.driver.framework/Node_AddChild_Result result)"
+    },
+    {
+        "kind": "protocol",
+        "name": "fuchsia.driver.framework/Node"
+    },
+    {
+        "kind": "table/member",
+        "name": "fuchsia.driver.framework/NodeAddArgs.devfs_args",
+        "ordinal": "5",
+        "type": "fuchsia.driver.framework/DevfsAddArgs"
+    },
+    {
+        "kind": "table/member",
+        "name": "fuchsia.driver.framework/NodeAddArgs.name",
+        "ordinal": "1",
+        "type": "string:128"
+    },
+    {
+        "kind": "table/member",
+        "name": "fuchsia.driver.framework/NodeAddArgs.offers",
+        "ordinal": "2",
+        "type": "vector<fuchsia.component.decl/Offer>:128"
+    },
+    {
+        "kind": "table/member",
+        "name": "fuchsia.driver.framework/NodeAddArgs.properties",
+        "ordinal": "4",
+        "type": "vector<fuchsia.driver.framework/NodeProperty>:64"
+    },
+    {
+        "kind": "table/member",
+        "name": "fuchsia.driver.framework/NodeAddArgs.symbols",
+        "ordinal": "3",
+        "type": "vector<fuchsia.driver.framework/NodeSymbol>:64"
+    },
+    {
+        "kind": "table",
+        "name": "fuchsia.driver.framework/NodeAddArgs",
+        "resourceness": "resource"
+    },
+    {
+        "kind": "protocol/member",
+        "name": "fuchsia.driver.framework/NodeController.OnBind",
+        "ordinal": "5905369594807853098",
+        "type": " -> ()"
+    },
+    {
+        "kind": "protocol/member",
+        "name": "fuchsia.driver.framework/NodeController.Remove",
+        "ordinal": "6123359741742396225",
+        "type": "()"
+    },
+    {
+        "kind": "protocol/member",
+        "name": "fuchsia.driver.framework/NodeController.RequestBind",
+        "ordinal": "4735909333556220047",
+        "type": "(fuchsia.driver.framework/NodeControllerRequestBindRequest payload) -> (fuchsia.driver.framework/NodeController_RequestBind_Result result)"
+    },
+    {
+        "kind": "protocol",
+        "name": "fuchsia.driver.framework/NodeController"
+    },
+    {
+        "kind": "table/member",
+        "name": "fuchsia.driver.framework/NodeControllerRequestBindRequest.driver_url_suffix",
+        "ordinal": "2",
+        "type": "string"
+    },
+    {
+        "kind": "table/member",
+        "name": "fuchsia.driver.framework/NodeControllerRequestBindRequest.force_rebind",
+        "ordinal": "1",
+        "type": "bool"
+    },
+    {
+        "kind": "table",
+        "name": "fuchsia.driver.framework/NodeControllerRequestBindRequest"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.driver.framework/NodeController_RequestBind_Response"
+    },
+    {
+        "kind": "union/member",
+        "name": "fuchsia.driver.framework/NodeController_RequestBind_Result.err",
+        "ordinal": "2",
+        "type": "int32"
+    },
+    {
+        "kind": "union/member",
+        "name": "fuchsia.driver.framework/NodeController_RequestBind_Result.response",
+        "ordinal": "1",
+        "type": "fuchsia.driver.framework/NodeController_RequestBind_Response"
+    },
+    {
+        "kind": "union",
+        "name": "fuchsia.driver.framework/NodeController_RequestBind_Result",
+        "strictness": "strict"
+    },
+    {
+        "kind": "enum/member",
+        "name": "fuchsia.driver.framework/NodeError.INTERNAL",
+        "value": "1"
+    },
+    {
+        "kind": "enum/member",
+        "name": "fuchsia.driver.framework/NodeError.NAME_ALREADY_EXISTS",
+        "value": "5"
+    },
+    {
+        "kind": "enum/member",
+        "name": "fuchsia.driver.framework/NodeError.NAME_INVALID",
+        "value": "4"
+    },
+    {
+        "kind": "enum/member",
+        "name": "fuchsia.driver.framework/NodeError.NAME_MISSING",
+        "value": "3"
+    },
+    {
+        "kind": "enum/member",
+        "name": "fuchsia.driver.framework/NodeError.NODE_REMOVED",
+        "value": "2"
+    },
+    {
+        "kind": "enum/member",
+        "name": "fuchsia.driver.framework/NodeError.OFFER_REF_EXISTS",
+        "value": "7"
+    },
+    {
+        "kind": "enum/member",
+        "name": "fuchsia.driver.framework/NodeError.OFFER_SOURCE_NAME_MISSING",
+        "value": "6"
+    },
+    {
+        "kind": "enum/member",
+        "name": "fuchsia.driver.framework/NodeError.SYMBOL_ADDRESS_MISSING",
+        "value": "9"
+    },
+    {
+        "kind": "enum/member",
+        "name": "fuchsia.driver.framework/NodeError.SYMBOL_ALREADY_EXISTS",
+        "value": "10"
+    },
+    {
+        "kind": "enum/member",
+        "name": "fuchsia.driver.framework/NodeError.SYMBOL_NAME_MISSING",
+        "value": "8"
+    },
+    {
+        "kind": "enum",
+        "name": "fuchsia.driver.framework/NodeError",
+        "strictness": "strict",
+        "type": "uint32"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.driver.framework/NodeProperty.key",
+        "ordinal": "1",
+        "type": "fuchsia.driver.framework/NodePropertyKey"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.driver.framework/NodeProperty.value",
+        "ordinal": "2",
+        "type": "fuchsia.driver.framework/NodePropertyValue"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.driver.framework/NodeProperty"
+    },
+    {
+        "kind": "union/member",
+        "name": "fuchsia.driver.framework/NodePropertyKey.int_value",
+        "ordinal": "1",
+        "type": "uint32"
+    },
+    {
+        "kind": "union/member",
+        "name": "fuchsia.driver.framework/NodePropertyKey.string_value",
+        "ordinal": "2",
+        "type": "string:256"
+    },
+    {
+        "kind": "union",
+        "name": "fuchsia.driver.framework/NodePropertyKey",
+        "strictness": "strict"
+    },
+    {
+        "kind": "union/member",
+        "name": "fuchsia.driver.framework/NodePropertyValue.bool_value",
+        "ordinal": "3",
+        "type": "bool"
+    },
+    {
+        "kind": "union/member",
+        "name": "fuchsia.driver.framework/NodePropertyValue.enum_value",
+        "ordinal": "4",
+        "type": "string:256"
+    },
+    {
+        "kind": "union/member",
+        "name": "fuchsia.driver.framework/NodePropertyValue.int_value",
+        "ordinal": "1",
+        "type": "uint32"
+    },
+    {
+        "kind": "union/member",
+        "name": "fuchsia.driver.framework/NodePropertyValue.string_value",
+        "ordinal": "2",
+        "type": "string:256"
+    },
+    {
+        "kind": "union",
+        "name": "fuchsia.driver.framework/NodePropertyValue",
+        "strictness": "flexible"
+    },
+    {
+        "kind": "table/member",
+        "name": "fuchsia.driver.framework/NodeSymbol.address",
+        "ordinal": "2",
+        "type": "uint64"
+    },
+    {
+        "kind": "table/member",
+        "name": "fuchsia.driver.framework/NodeSymbol.name",
+        "ordinal": "1",
+        "type": "string:128"
+    },
+    {
+        "kind": "table",
+        "name": "fuchsia.driver.framework/NodeSymbol"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.driver.framework/Node_AddChild_Response"
+    },
+    {
+        "kind": "union/member",
+        "name": "fuchsia.driver.framework/Node_AddChild_Result.err",
+        "ordinal": "2",
+        "type": "fuchsia.driver.framework/NodeError"
+    },
+    {
+        "kind": "union/member",
+        "name": "fuchsia.driver.framework/Node_AddChild_Result.response",
+        "ordinal": "1",
+        "type": "fuchsia.driver.framework/Node_AddChild_Response"
+    },
+    {
+        "kind": "union",
+        "name": "fuchsia.driver.framework/Node_AddChild_Result",
+        "strictness": "strict"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.driver.framework/ParentSpec.bind_rules",
+        "ordinal": "1",
+        "type": "vector<fuchsia.driver.framework/BindRule>:64"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.driver.framework/ParentSpec.properties",
+        "ordinal": "2",
+        "type": "vector<fuchsia.driver.framework/NodeProperty>:64"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.driver.framework/ParentSpec"
+    },
+    {
+        "kind": "library",
+        "name": "fuchsia.driver.framework"
+    }
+]
