@@ -55,20 +55,32 @@ class NandDevice {
 
       // Get the new child.
       fbl::unique_fd dir(open(parent.Path(), O_RDONLY | O_DIRECTORY));
-      zx::result channel = device_watcher::RecursiveWaitForFile(dir.get(), "broker");
+      zx::result channel =
+          device_watcher::RecursiveWaitForFile(dir.get(), "broker/device_controller");
       if (channel.is_error()) {
         return channel.take_error();
       }
       controller = fidl::ClientEnd<fuchsia_device::Controller>(std::move(channel.value()));
     }
 
+    fidl::ClientEnd<fuchsia_nand::Broker> broker;
+    {
+      zx::result server = fidl::CreateEndpoints(&broker);
+      if (server.is_error()) {
+        return server.take_error();
+      }
+      fidl::OneWayStatus status =
+          fidl::WireCall(Get(controller))->ConnectToDeviceFidl(server->TakeChannel());
+      if (!status.ok()) {
+        return zx::error(status.status());
+      }
+    }
+
     if (parent.IsExternal()) {
       // This looks like using code under test to setup the test, but this
       // path is for external devices, not really the broker. The issue is that
       // ParentDevice cannot query a nand device for the actual parameters.
-      const fidl::WireResult result =
-          fidl::WireCall(fidl::UnownedClientEnd<fuchsia_nand::Broker>(Get(controller).channel()))
-              ->GetInfo();
+      const fidl::WireResult result = fidl::WireCall(broker)->GetInfo();
       if (!result.ok()) {
         printf("failed to query nand device: %s\n", result.FormatDescription().c_str());
         return zx::error(result.status());
@@ -101,21 +113,19 @@ class NandDevice {
     }
 
     uint32_t num_blocks = parent.NumBlocks();
-    ;
     bool full_device = num_blocks == parent.Info().num_blocks;
     if (!full_device) {
       // Not using the whole device, don't need to test all limits.
       num_blocks = std::min(num_blocks, kMinNumBlocks);
     }
-    return zx::ok(NandDevice(parent, std::move(controller), num_blocks, full_device));
+    return zx::ok(
+        NandDevice(parent, std::move(controller), std::move(broker), num_blocks, full_device));
   }
 
   fidl::UnownedClientEnd<fuchsia_device::Controller> controller() { return Get(controller_); }
 
   // Provides a channel to issue fidl calls.
-  fidl::UnownedClientEnd<fuchsia_nand::Broker> channel() {
-    return fidl::UnownedClientEnd<fuchsia_nand::Broker>(controller().channel());
-  }
+  fidl::UnownedClientEnd<fuchsia_nand::Broker> channel() { return broker_.borrow(); }
 
   // Wrappers for "queue" operations that take care of preserving the vmo's handle
   // and translating the request to the desired block range on the actual device.
@@ -149,9 +159,10 @@ class NandDevice {
   using MaybeOwned = std::variant<fidl::ClientEnd<Protocol>, fidl::UnownedClientEnd<Protocol>>;
 
   NandDevice(ParentDevice& parent, MaybeOwned<fuchsia_device::Controller> controller,
-             uint32_t num_blocks, bool full_device)
+             fidl::ClientEnd<fuchsia_nand::Broker> broker, uint32_t num_blocks, bool full_device)
       : parent_(parent),
         controller_(std::move(controller)),
+        broker_(std::move(broker)),
         num_blocks_(num_blocks),
         full_device_(full_device) {}
 
@@ -171,6 +182,7 @@ class NandDevice {
 
   ParentDevice& parent_;
   MaybeOwned<fuchsia_device::Controller> controller_;
+  fidl::ClientEnd<fuchsia_nand::Broker> broker_;
   const uint32_t num_blocks_;
   const bool full_device_;
 };

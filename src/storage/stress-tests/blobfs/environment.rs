@@ -74,7 +74,7 @@ impl BlobfsEnvironment {
         // Initialize blobfs on volume
         let controller = fuchsia_component::client::connect_to_protocol_at_path::<
             fidl_fuchsia_device::ControllerMarker,
-        >(volume_path.to_str().unwrap())
+        >(&format!("{}/device_controller", volume_path.to_str().unwrap()))
         .unwrap();
         let mut blobfs = Blobfs::new(controller);
         blobfs.format().await.unwrap();

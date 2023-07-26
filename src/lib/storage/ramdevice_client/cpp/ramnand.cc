@@ -68,10 +68,10 @@ zx_status_t RamNand::Create(fuchsia_hardware_nand::wire::RamNandInfo config,
 
 __EXPORT
 RamNand::~RamNand() {
-  if (unbind) {
+  if (unbind && controller_) {
     const fidl::WireResult result = fidl::WireCall(controller_)->ScheduleUnbind();
     if (!result.ok()) {
-      fprintf(stderr, "Could not unbind ram_nand: %s\n", result.FormatDescription().c_str());
+      fprintf(stderr, "Could not call unbind ram_nand: %s\n", result.FormatDescription().c_str());
       return;
     }
     const fit::result response = result.value();

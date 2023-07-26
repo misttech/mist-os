@@ -218,7 +218,7 @@ pub async fn set_up_partition(
             for entry in readdir(&dev_class_block_dir).await.context("readdir failed")? {
                 let entry_controller = connect_to_named_protocol_at_dir_root::<ControllerMarker>(
                     &dev_class_block_dir,
-                    &entry.name,
+                    &format!("{}/device_controller", entry.name),
                 )
                 .context("get_topo controller connect failed")?;
                 let topo_path = entry_controller
@@ -232,8 +232,10 @@ pub async fn set_up_partition(
                 }
                 if let Some(fvm_index) = topo_path.find("/block/fvm") {
                     let fvm_path = format!("{}/block", &topo_path[..fvm_index]);
-                    let fvm_controller = connect_to_protocol_at_path::<ControllerMarker>(&fvm_path)
-                        .context("new class path connect failed")?;
+                    let controller_path = format!("{fvm_path}/device_controller");
+                    let fvm_controller =
+                        connect_to_protocol_at_path::<ControllerMarker>(&controller_path)
+                            .context("new class path connect failed")?;
                     fvm_controller
                         .unbind_children()
                         .await
@@ -353,7 +355,7 @@ pub async fn find_partition(
         if &entry_name == partition_label {
             let controller_proxy = connect_to_named_protocol_at_dir_root::<ControllerMarker>(
                 &dev_class_block_dir,
-                &entry.name,
+                &format!("{}/device_controller", &entry.name),
             )?;
             return Ok(controller_proxy);
         }

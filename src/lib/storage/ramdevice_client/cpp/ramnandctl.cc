@@ -71,7 +71,9 @@ zx_status_t RamNandCtl::CreateRamNand(fuchsia_hardware_nand::wire::RamNandInfo c
   });
   fprintf(stderr, "Trying to open (%s)\n", path.c_str());
 
-  zx::result channel = device_watcher::RecursiveWaitForFile(devfs_root().get(), path.c_str());
+  std::string controller_path = std::string(path.c_str()) + "/device_controller";
+  zx::result channel =
+      device_watcher::RecursiveWaitForFile(devfs_root().get(), controller_path.c_str());
   if (channel.is_error()) {
     fprintf(stderr, "Could not open ram_nand device (%s): %s\n", path.c_str(),
             channel.status_string());

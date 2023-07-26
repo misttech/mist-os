@@ -26,7 +26,7 @@ void FakePaver::FindDataSink(FindDataSinkRequestView request,
 void FakePaver::UseBlockDevice(UseBlockDeviceRequestView request,
                                UseBlockDeviceCompleter::Sync& _completer) {
   auto result = fidl::WireCall(fidl::UnownedClientEnd<fuchsia_device::Controller>(
-                                   request->block_device.borrow().channel()))
+                                   request->block_controller.borrow().channel()))
                     ->GetTopologicalPath();
   if (!result.ok() || result->is_error()) {
     return;

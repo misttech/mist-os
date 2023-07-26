@@ -22,7 +22,8 @@ ParentDevice::ParentDevice(ramdevice_client::RamNand ram_nand, const TestConfig&
 
 zx::result<ParentDevice> ParentDevice::Create(const TestConfig& config) {
   if (config.path) {
-    zx::result controller = component::Connect<fuchsia_device::Controller>(config.path);
+    std::string controller_path = std::string(config.path) + "/device_controller";
+    zx::result controller = component::Connect<fuchsia_device::Controller>(controller_path);
     if (controller.is_error()) {
       return controller.take_error();
     }

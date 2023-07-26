@@ -402,7 +402,8 @@ zx_status_t Paver::InitPartitionTables(fuchsia_mem::wire::Buffer buffer) {
 
   auto result = data_sink->InitializePartitionTables();
   if (zx_status_t status = result.ok() ? result.value().status : result.status(); status != ZX_OK) {
-    fprintf(stderr, "netsvc: Unable to initialize partition tables.\n");
+    fprintf(stderr, "netsvc: Unable to initialize partition tables: %s\n",
+            zx_status_get_string(status));
     return status;
   }
   return ZX_OK;

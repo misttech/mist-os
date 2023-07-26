@@ -102,7 +102,15 @@ zx::result<std::tuple<VolumeHandle, ManagerHandle>> FindPartitions(DIR* dir) {
     if (std::equal(kFvmGuid.begin(), kFvmGuid.end(), guid->value.begin()) ||
         std::equal(kGptFvmGuid.begin(), kGptFvmGuid.end(), guid->value.begin())) {
       fuchsia::device::ControllerSyncPtr controller;
-      controller.Bind(partition.Unbind().TakeChannel());
+      std::string controller_path = std::string(entry->d_name) + "/device_controller";
+      zx_status_t status = fdio_service_connect_at(caller.borrow_channel(), controller_path.c_str(),
+                                                   controller.NewRequest().TakeChannel().release());
+      if (status != ZX_OK) {
+        FX_LOGS(ERROR) << "Failed to connect to '" << controller_path
+                       << "': " << zx_status_get_string(status);
+        return zx::error(status);
+      }
+
       fuchsia::device::Controller_GetTopologicalPath_Result topo_result;
       status = controller->GetTopologicalPath(&topo_result);
       if (status != ZX_OK || topo_result.is_err()) {

@@ -162,8 +162,11 @@ impl<FSC: Clone + FSConfig> FsEnvironment<FSC> {
         // Initialize the filesystem on a new volume
         let volume_guid = fvm.new_volume("default", &TYPE_GUID, Some(fvm.free_space().await)).await;
         let volume_path = get_volume_path(&volume_guid).await;
-        let controller =
-            connect_to_protocol_at_path::<ControllerMarker>(volume_path.to_str().unwrap()).unwrap();
+        let controller = connect_to_protocol_at_path::<ControllerMarker>(&format!(
+            "{}/device_controller",
+            volume_path.to_str().unwrap()
+        ))
+        .unwrap();
         let mut fs = Filesystem::new(controller, config.clone());
         fs.format().await.unwrap();
         let moniker = fs.get_component_moniker();
