@@ -232,7 +232,7 @@ unicode-xid = "0.2.0"
 utf8parse = "0.1"
 vm-device = "0.1.0"
 walkdir = "2.2.7"
-zerocopy = "0.7.0-alpha.4"
+zerocopy = { version = "0.7.0-alpha.4", features = ["default", "simd"] }
 zstd = "0.11.2"
 
 [dependencies.tracing-subscriber]

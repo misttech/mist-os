@@ -13068,6 +13068,7 @@ rust_library("zerocopy-v0_7_0-alpha_4") {
     "-Cextra-filename=-ed393f51636da2c3",
     "--cfg=feature=\"byteorder\"",
     "--cfg=feature=\"default\"",
+    "--cfg=feature=\"simd\"",
   ]
 
   visibility = [ ":*" ]
