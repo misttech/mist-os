@@ -164,11 +164,9 @@ class VPartitionAdapter final : public BlockDeviceAdapter {
                                                    const std::string& name, const Guid& guid,
                                                    const Guid& type);
 
-  const fbl::unique_fd& fd() const { return fd_; }
-
-  VPartitionAdapter(const fbl::unique_fd& devfs_root, const std::string& path, fbl::unique_fd fd,
+  VPartitionAdapter(const fbl::unique_fd& devfs_root, const std::string& path,
                     const std::string& name, const Guid& guid, const Guid& type)
-      : BlockDeviceAdapter(devfs_root, path), fd_(std::move(fd)), guid_(guid), type_(type) {
+      : BlockDeviceAdapter(devfs_root, path), guid_(guid), type_(type) {
     name_.Append(name.c_str());
   }
   VPartitionAdapter(const VPartitionAdapter&) = delete;
@@ -180,12 +178,11 @@ class VPartitionAdapter final : public BlockDeviceAdapter {
   // Adds |length| slices  at |offset| to the partition.
   zx_status_t Extend(uint64_t offset, uint64_t length);
 
-  zx_status_t Reconnect();
+  zx::result<fidl::ClientEnd<fuchsia_device::Controller>> GetController();
 
   Guid& guid() { return guid_; }
 
  private:
-  fbl::unique_fd fd_;
   fbl::StringBuffer<fvm::kMaxVPartitionNameLength> name_;
   Guid guid_;
   Guid type_;

@@ -46,12 +46,6 @@ zx::result<fidl::ClientEnd<fuchsia_device::Controller>> GetController(DeviceRef*
   return component::ConnectAt<fuchsia_device::Controller>(caller.directory(), controller_path);
 }
 
-template <typename Protocol>
-fidl::UnownedClientEnd<Protocol> GetChannel(VPartitionAdapter* device) {
-  fdio_cpp::UnownedFdioCaller caller(device->fd());
-  return caller.borrow_as<Protocol>();
-}
-
 zx_status_t RebindBlockDevice(DeviceRef* device) {
   // We need to create a DirWatcher to wait for the block device's child to disappear.
   fdio_cpp::UnownedFdioCaller caller(device->devfs_root_fd());
@@ -194,6 +188,10 @@ zx_status_t BlockDeviceAdapter::Rebind() {
   return ZX_OK;
 }
 
+zx::result<fidl::ClientEnd<fuchsia_device::Controller>> VPartitionAdapter::GetController() {
+  return fvm::GetController(device());
+}
+
 std::unique_ptr<VPartitionAdapter> VPartitionAdapter::Create(const fbl::unique_fd& devfs_root,
                                                              const std::string& name,
                                                              const Guid& guid, const Guid& type) {
@@ -211,20 +209,35 @@ std::unique_ptr<VPartitionAdapter> VPartitionAdapter::Create(const fbl::unique_f
     return nullptr;
   }
 
-  std::string out_path;
-
   fs_management::PartitionMatcher matcher{
       .type_guids = {uuid::Uuid(type.data())},
       .instance_guids = {uuid::Uuid(guid.data())},
   };
-  zx::result device_fd_or =
-      fs_management::OpenPartitionWithDevfsFd(devfs_root.get(), matcher, true, &out_path);
-  if (device_fd_or.is_error()) {
+  fdio_cpp::UnownedFdioCaller devfs_root_caller(devfs_root.get());
+  zx::result controller =
+      fs_management::OpenPartitionWithDevfs(devfs_root_caller.directory(), matcher, true);
+  if (controller.is_error()) {
     ADD_FAILURE("Unable to obtain handle for partition.");
     return nullptr;
   }
-  return std::make_unique<VPartitionAdapter>(devfs_root, out_path.c_str(),
-                                             std::move(device_fd_or.value()), name, guid, type);
+  fidl::WireResult topo_path = fidl::WireCall(controller.value())->GetTopologicalPath();
+  if (!topo_path.ok()) {
+    ADD_FAILURE("Failed to call topo path: %s", topo_path.status_string());
+    return nullptr;
+  }
+  if (topo_path->is_error()) {
+    ADD_FAILURE("Failed to get topo path: %d", topo_path->error_value());
+    return nullptr;
+  }
+  std::string relative_path = std::string(topo_path.value()->path.get());
+  constexpr std::string_view kDevPrefix = "/dev/";
+  if (!cpp20::starts_with(std::string_view(relative_path), kDevPrefix)) {
+    ADD_FAILURE("Bad topo path, doesn't start with /dev/: %s", relative_path.c_str());
+    return nullptr;
+  }
+  relative_path.erase(0, kDevPrefix.size());
+
+  return std::make_unique<VPartitionAdapter>(devfs_root, relative_path, name, guid, type);
 }
 
 VPartitionAdapter::~VPartitionAdapter() {
@@ -238,26 +251,16 @@ VPartitionAdapter::~VPartitionAdapter() {
 }
 
 zx_status_t VPartitionAdapter::Extend(uint64_t offset, uint64_t length) {
-  fidl::UnownedClientEnd channel = GetChannel<fuchsia_hardware_block_volume::Volume>(this);
-  const fidl::WireResult result = fidl::WireCall(channel)->Extend(offset, length);
+  zx::result channel = GetChannel<fuchsia_hardware_block_volume::Volume>(device());
+  if (channel.is_error()) {
+    return channel.error_value();
+  }
+  const fidl::WireResult result = fidl::WireCall(channel.value())->Extend(offset, length);
   if (!result.ok()) {
     return result.status();
   }
   const fidl::WireResponse response = result.value();
   return response.status;
-}
-
-zx_status_t VPartitionAdapter::Reconnect() {
-  fs_management::PartitionMatcher matcher{
-      .type_guids = {uuid::Uuid(type_.data())},
-      .instance_guids = {uuid::Uuid(guid_.data())},
-  };
-  zx::result fd = fs_management::OpenPartitionWithDevfsFd(devfs_root_.get(), matcher, true, &path_);
-  if (fd.is_error()) {
-    return fd.status_value();
-  }
-  fd_ = std::move(fd.value());
-  return ZX_OK;
 }
 
 std::unique_ptr<FvmAdapter> FvmAdapter::Create(const fbl::unique_fd& devfs_root,
@@ -395,9 +398,6 @@ zx_status_t FvmAdapter::Rebind(fbl::Vector<VPartitionAdapter*> vpartitions) {
   }
 
   for (auto* vpartition : vpartitions) {
-    if (zx_status_t status = vpartition->Reconnect(); status != ZX_OK) {
-      return status;
-    }
     if (zx_status_t status = vpartition->WaitUntilVisible(); status != ZX_OK) {
       return status;
     }

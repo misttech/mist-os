@@ -65,9 +65,9 @@ TEST_F(FvmVPartitionLoadTest, LoadPartitionWithPlaceHolderGuidIsUpdated) {
   // Save the topological path for rebinding.  The topological path will be
   // consistent after rebinding the ramdisk, whereas the
   // /dev/class/block/[NNN] will issue a new number.
-  fdio_cpp::UnownedFdioCaller caller(vpartition->fd());
-  const fidl::WireResult result =
-      fidl::WireCall(caller.borrow_as<fuchsia_device::Controller>())->GetTopologicalPath();
+  zx::result controller = vpartition->GetController();
+  ASSERT_OK(controller);
+  const fidl::WireResult result = fidl::WireCall(controller.value())->GetTopologicalPath();
   ASSERT_OK(result.status());
   const fit::result response = result.value();
   ASSERT_TRUE(response.is_ok(), "%s", zx_status_get_string(response.error_value()));

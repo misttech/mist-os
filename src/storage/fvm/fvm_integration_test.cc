@@ -166,7 +166,7 @@ class FvmTest : public zxtest::Test {
 
   fidl::UnownedClientEnd<fuchsia_device::Controller> ramdisk_controller_interface() const {
     return fidl::UnownedClientEnd<fuchsia_device::Controller>(
-        ramdisk_get_block_interface(ramdisk_));
+        ramdisk_get_block_controller_interface(ramdisk_));
   }
 
   fidl::UnownedClientEnd<fuchsia_hardware_block::Block> ramdisk_block_interface() const {
