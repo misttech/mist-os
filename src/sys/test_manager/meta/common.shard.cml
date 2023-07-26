@@ -127,13 +127,6 @@
             environment: "#test-env",
             durability: "transient",
         },
-
-        // TODO(https://fxbug.dev/130867) prefer src/sys/testing/meta/starnix-tests.shard.cml
-        {
-            name: "starnix-tests",
-            environment: "#test-env",
-            durability: "transient",
-        },
     ],
     capabilities: [
         {
@@ -213,8 +206,6 @@
             directory: "dev-builtin",
             from: "parent",
             to: [
-                // TODO(https://fxbug.dev/130867) prefer src/sys/testing/meta/starnix-tests.shard.cml
-                "#starnix-tests",
                 "#system-tests",
                 "#tests",
             ],
@@ -227,22 +218,9 @@
             ],
             from: "parent",
             to: [
-                // TODO(https://fxbug.dev/130867) prefer src/sys/testing/meta/starnix-tests.shard.cml
-                "#starnix-tests",
                 "#system-tests",
                 "#tests",
             ],
-        },
-
-        // TODO(https://fxbug.dev/130867) prefer src/sys/testing/meta/starnix-tests.shard.cml
-        {
-            event_stream: [
-                "capability_requested",
-                "directory_ready",
-            ],
-            from: "parent",
-            to: "#starnix-tests",
-            scope: "#starnix-tests",
         },
         {
             event_stream: [
@@ -364,8 +342,6 @@
             from: "parent",
             to: [ "#starnix_test_runners" ],
         },
-
-        // TODO(https://fxbug.dev/130867) prefer src/sys/testing/meta/starnix-tests.shard.cml
         {
             protocol: [
                 "fuchsia.kernel.Stats",
@@ -380,10 +356,7 @@
                 "fuchsia.vulkan.loader.Loader",
             ],
             from: "parent",
-            to: [
-                "#starnix-tests",
-                "#starnix_test_runners",
-            ],
+            to: [ "#starnix_test_runners" ],
         },
         {
             protocol: "fuchsia.process.Launcher",
@@ -463,8 +436,6 @@
             from: "self",
             as: "data",
             to: [
-                // TODO(https://fxbug.dev/130867) prefer src/sys/testing/meta/starnix-tests.shard.cml
-                "#starnix-tests",
                 "#system-tests",
                 "#tests",
             ],
@@ -512,9 +483,6 @@
             from: "self",
             to: [
                 "#g3_dart_jit_product_runner",
-
-                // TODO(https://fxbug.dev/130867) prefer src/sys/testing/meta/starnix-tests.shard.cml
-                "#starnix-tests",
                 "#starnix_test_runners",
                 "#system-tests",
                 "#tests",
@@ -524,8 +492,6 @@
             storage: "cache",
             from: "self",
             to: [
-                // TODO(https://fxbug.dev/130867) prefer src/sys/testing/meta/starnix-tests.shard.cml
-                "#starnix-tests",
                 "#system-tests",
                 "#tests",
             ],
@@ -595,8 +561,6 @@
             directory: "dev-gpu",
             from: "parent",
             to: [
-                // TODO(https://fxbug.dev/130867) prefer src/sys/testing/meta/starnix-tests.shard.cml
-                "#starnix-tests",
                 "#starnix_test_runners",
                 "#system-tests",
             ],

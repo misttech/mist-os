@@ -19,7 +19,6 @@ pub const CUSTOM_ARTIFACTS_CAPABILITY_NAME: &'static str = "custom_artifacts";
 // TODO(fxbug.dev/100034): Delete these once we no longer need to hard code these in the code.
 pub const TEST_ENVIRONMENT_NAME: &'static str = "test-env";
 pub const HERMETIC_TESTS_COLLECTION: &'static str = "tests";
-pub const STARNIX_TESTS_COLLECTION: &'static str = "starnix-tests";
 pub const SYSTEM_TESTS_COLLECTION: &'static str = "system-tests";
 pub const CTS_TESTS_COLLECTION: &'static str = "cts-tests";
 pub const VULKAN_TESTS_COLLECTION: &'static str = "vulkan-tests";
@@ -34,7 +33,6 @@ lazy_static! {
         ("chromium-system", CHROMIUM_SYSTEM_TESTS_COLLECTION),
         ("cts", CTS_TESTS_COLLECTION),
         ("google", GOOGLE_TESTS_COLLECTION),
-        ("starnix", STARNIX_TESTS_COLLECTION),
         ("system", SYSTEM_TESTS_COLLECTION),
         ("vulkan", VULKAN_TESTS_COLLECTION),
     ]
