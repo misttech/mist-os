@@ -30,13 +30,6 @@ import("sdk_molecule.gni")
 #     Describes the minimum category that atoms in this SDK must have.
 #     See //build/sdk/sdk_atom.gni for possible values.
 #
-#   export (optional)
-#     Whether to export the contents of this SDK to the output directory.
-#     This is useful when an SDK-like file structure is needed as part of the
-#     build, for example to port a language runtime which would otherwise rely
-#     on an official SDK.
-#     Defaults to false.
-#
 #   filter_api_host_tools (optional)
 #     Boolean. Set to true to ignore host tools declarations in the api file
 #     that do not belong to the current host toolchain. Useful when
@@ -59,7 +52,6 @@ template("sdk") {
   verify_meta_target_name = "${target_name}_meta_verify"
   archive_manifest_target_name = "${target_name}_archive_manifest"
   archive_target_name = "${target_name}_archive"
-  fidl_json_target_name = "${target_name}_fidl_json"
   export_target_name = "${target_name}_export"
 
   target_triple = target_cpu
@@ -357,17 +349,6 @@ template("sdk") {
         },
       ]
     }
-  }
-
-  fidl_json_file = "$target_gen_dir/$sdk_name.fidl_json.txt"
-
-  # Generate a helpful list of all of the JSON for the fidl in this SDK
-  generated_file(fidl_json_target_name) {
-    testonly = true
-    deps = [ ":$main_target_name" ]
-    outputs = [ "$fidl_json_file" ]
-    data_keys = [ "fidl_json" ]
-    walk_keys = [ "fidl_json_barrier" ]
   }
 
   stamp_file = "$target_gen_dir/$target_name.exported"
