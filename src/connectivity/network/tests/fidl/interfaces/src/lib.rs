@@ -18,7 +18,7 @@ use net_types::ip::IpVersion;
 use netemul::{RealmTcpListener as _, RealmTcpStream as _, RealmUdpSocket as _};
 use netstack_testing_common::{
     interfaces,
-    realms::{Netstack, Netstack2, NetstackVersion, TestSandboxExt as _},
+    realms::{Netstack, NetstackVersion, TestSandboxExt as _},
     Result,
 };
 use netstack_testing_macros::netstack_test;
@@ -1197,9 +1197,12 @@ async fn test_watcher_race<N: Netstack>(name: &str) {
 #[netstack_test]
 #[test_case(fidl_subnet!("abcd::1/64"))]
 #[test_case(fidl_subnet!("1.2.3.4/24"))]
-async fn addresses_while_offline(name: &str, addr_with_prefix: fidl_fuchsia_net::Subnet) {
+async fn addresses_while_offline<N: Netstack>(
+    name: &str,
+    addr_with_prefix: fidl_fuchsia_net::Subnet,
+) {
     let sandbox = netemul::TestSandbox::new().expect("create sandbox");
-    let realm = sandbox.create_netstack_realm::<Netstack2, _>(name).expect("create realm");
+    let realm = sandbox.create_netstack_realm::<N, _>(name).expect("create realm");
     let device = sandbox.create_endpoint(name).await.expect("create endpoint");
     let interface = realm
         .install_endpoint(device, Default::default())
@@ -1302,12 +1305,12 @@ async fn addresses_while_offline(name: &str, addr_with_prefix: fidl_fuchsia_net:
     .expect("failed to wait for address to be present");
 }
 
-// TODO(https://fxbug.dev/112627): Split this test up and run against NS3.
+// TODO(https://fxbug.dev/112627): Split this test up.
 /// Test interface changes are reported through the interface watcher.
 #[netstack_test]
-async fn watcher(name: &str) {
+async fn watcher<N: Netstack>(name: &str) {
     let sandbox = netemul::TestSandbox::new().expect("create sandbox");
-    let realm = sandbox.create_netstack_realm::<Netstack2, _>(name).expect("create realm");
+    let realm = sandbox.create_netstack_realm::<N, _>(name).expect("create realm");
     let stack =
         realm.connect_to_protocol::<fnet_stack::StackMarker>().expect("connect to protocol");
 

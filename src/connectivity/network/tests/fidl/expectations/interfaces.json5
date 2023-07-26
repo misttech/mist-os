@@ -1,0 +1,21 @@
+// Copyright 2022 The Fuchsia Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style license that can be
+// found in the LICENSE file.
+{
+    actions: [
+        {
+            type: "expect_pass",
+            matchers: [
+                "*",
+            ],
+        },
+        {
+            type: "expect_failure",
+            matchers: [
+                // TODO(https://fxbug.dev/112627): Standardize behavior when handling
+                // v6 LL addresses between NS2 and NS3.
+                "watcher_ns3",
+            ],
+        },
+    ],
+}
