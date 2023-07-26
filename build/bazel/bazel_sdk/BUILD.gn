@@ -2,11 +2,26 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
+import("//build/bazel/bazel_fuchsia_sdk.gni")
 import("//build/sdk/config.gni")
+import("//build/sdk/generate_final_idk.gni")
+import("//build/sdk/sdk_collection.gni")
 
-# This file contains GN targets to run the //build/bazel_sdk/tests
-# test suite against different input SDK/IDK content.
+# The list of target cpu architectures supported by @fuchsia_sdk.
+if (bazel_fuchsia_sdk_all_cpus) {
+  _fuchsia_sdk_target_cpus = idk_target_cpus
+} else {
+  _fuchsia_sdk_target_cpus = [ target_cpu ]
+}
+
+# Ensure that the //build/bazel/bazel_sdk:idk.exported target
+# populates `$OUTPUT_DIR/sdk/exported/bazel_fuchsia_sdk_idk`.
 #
+generate_final_idk("idk") {
+  output_name = "bazel_fuchsia_sdk_idk"
+  sdk_target_labels = bazel_fuchsia_sdk_deps
+  target_cpus = _fuchsia_sdk_target_cpus
+}
 
 # Run the //build/bazel_sdk/tests/scripts/bazel_test.sh
 # script, which runs the test suite for the Fuchsia Bazel
@@ -59,8 +74,38 @@ template("bazel_sdk_tests_for") {
     outputs = [ "$target_gen_dir/$target_name.stamp" ]
     depfile = "$target_gen_dir/$target_name.d"
 
-    _output_base = target_gen_dir + "/output_base"
-    _output_user_root = target_gen_dir + "/output_user_root"
+    # Provide a distinct output_base for each test. This is because the
+    # fuchsia_sdk_repository() rule call does not use a version file in
+    # //build/bazel_sdk/tests/WORKSPACE.bazel, and the content of @fuchsia_sdk
+    # will not be regenerated when we change the target cpu architecture.
+    #
+    # For example (assuming a shared output_base directory):
+    #
+    #   fx clean
+    #
+    #   # This populates @fuchsia_sdk//:generated_constants.bzl with
+    #   # constants = struct(host_cpus = ["x64"], target_cpus = ["x64"])
+    #   # the test suite passes though.
+    #   #
+    #   fx build bazel_sdk_tests
+    #
+    #   # This does not regenerate @fuchsia_sdk//:generated_constants.bzl
+    #   # but the test suite passes because it has the right target_cpus list.
+    #   #
+    #   fx build bazel_sdk_tests_idk_x64
+    #
+    #   # This does not regenerate @fuchsia_sdk//:generated_constants.bzl
+    #   # And Bazel complains there is not C++ toolchain for arm64 because
+    #   # register_clang_toolchains() uses the content of constants.target_cpus
+    #   # to declare C++ toolchains, and that one does not include an "arm64"
+    #   # item, even though the IDK provides all the necessary prebuilt
+    #   # binaries for it.
+    #   #
+    #   fx build bazel_sdk_tests_idk_arm64
+    #
+    #
+    _output_base = "${target_gen_dir}/${target_name}/output_base"
+    _output_user_root = "${target_gen_dir}/${target_name}/output_user_root"
 
     args = [
       "--verbose",
@@ -95,12 +140,24 @@ template("bazel_sdk_tests_for") {
 # Do not define the following targets in final_fuchsia_idk sub-builds to
 # avoid dependency recursion issues!
 if (!sdk_inside_idk_sub_build) {
-  # This target runs the test suite against the content of the Bazel
-  # @fuchsia_sdk repository created internally by the platform build.
-  # This only supports the current target_cpu, and includes the content
-  # of //sdk:core, //sdk:platform and //sdk:driver only.
-  # (see //build/bazel:generate_fuchsia_sdk_repository for details).
-  bazel_sdk_tests_for("bazel_sdk_tests") {
+  foreach(cpu, _fuchsia_sdk_target_cpus) {
+    # Run the test suite against the internal IDK used to populate
+    # @fuchsia_sdk, for the current target cpu only.
+    bazel_sdk_tests_for("bazel_sdk_tests_${cpu}") {
+      target_cpu = cpu
+    }
+  }
+
+  # Run the test suite against hte internal IDK used to populate
+  # @fuchsia_sdk, once per supported target CPU architecture, if
+  # bazel_fuchsia_sdk_all_cpus is set, otherwise only against
+  # the current target_cpu value.
+  group("bazel_sdk_tests") {
+    testonly = true
+    deps = []
+    foreach(cpu, _fuchsia_sdk_target_cpus) {
+      deps += [ ":bazel_sdk_tests_${cpu}" ]
+    }
   }
 
   foreach(cpu, idk_target_cpus) {
@@ -110,7 +167,7 @@ if (!sdk_inside_idk_sub_build) {
     # test suite with a build configuration that generates Fuchsia/arm64
     # binaries.
     #
-    # Note that the IDK does _not_ contain //sdk:platform or //sdk:driver
+    # Note that the IDK does _not_ contain //sdk:driver atoms.
     # (see //sdk:final_fuchsia_idk definition for details).
     bazel_sdk_tests_for("bazel_sdk_tests_idk_${cpu}") {
       target_cpu = cpu

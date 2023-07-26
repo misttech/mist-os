@@ -803,7 +803,8 @@ common --experimental_enable_bzlmod
 
     # Content hash file for @fuchsia_sdk.
     sdk_root = os.path.join(gn_output_dir, 'sdk', 'exported')
-    all_core_sdk_metas = all_sdk_metas(os.path.join(sdk_root, 'core'))
+    all_fuchsia_sdk_metas = all_sdk_metas(
+        os.path.join(sdk_root, 'bazel_fuchsia_sdk_idk'))
 
     # Content hash file for @internal_sdk
     all_internal_part_metas = all_sdk_metas(os.path.join(sdk_root, 'platform'))
@@ -853,7 +854,7 @@ common --experimental_enable_bzlmod
     ]
 
     # LINT.IfChange
-    generated_repositories_inputs['fuchsia_sdk'] = all_core_sdk_metas
+    generated_repositories_inputs['fuchsia_sdk'] = all_fuchsia_sdk_metas
     # LINT.ThenChange(../templates/template.WORKSPACE.bazel)
 
     # LINT.IfChange

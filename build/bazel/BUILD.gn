@@ -92,14 +92,13 @@ action("generate_main_workspace") {
     reproxy_config_file,
   ]
 
-  deps = [
-    # This dependency is required to properly populate @fuchsia_sdk and
-    # @internal_sdk for
-    # @fuchsia_workspace//:fuchsia/workspace/fuchsia_sdk_repository.bzl
-    "//sdk:core",
-    "//sdk:driver",
-    "//sdk:platform",
-  ]
+  # This dependency is needed to properly populate the @fuchsia_sdk repository.
+  deps = [ "//build/bazel/bazel_sdk:idk.exported" ]
+
+  # This dependency is needed to properly populate the @internal_sdk repository
+  # used experimentally to migrate non-SDK GN targets to Bazel
+  # (see https://fxbug.dev/112028).
+  deps += [ "//sdk:platform" ]
 
   depfile = "${target_gen_dir}/${target_name}.d"
 
@@ -145,12 +144,7 @@ action("generate_main_workspace") {
 action("generate_fuchsia_sdk_repository") {
   script = "//build/bazel/scripts/generate-fuchsia-sdk-symlink.py"
   outputs = [ "$bazel_main_top_dir/fuchsia_sdk" ]
-  deps = [
-    ":generate_main_workspace",
-    "//sdk:core",
-    "//sdk:driver",
-    "//sdk:platform",
-  ]
+  deps = [ ":generate_main_workspace" ]
   inputs = get_target_outputs(deps[0])
   args = [
     "--bazel-launcher",

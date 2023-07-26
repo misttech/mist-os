@@ -190,10 +190,7 @@ rules_fuchsia_deps()
 
 fuchsia_sdk_repository(
     name = "fuchsia_sdk",
-    local_paths = [
-        "{ninja_output_dir}/sdk/exported/core",
-        "{ninja_output_dir}/sdk/exported/driver",
-    ],
+    local_paths = ["{ninja_output_dir}/sdk/exported/bazel_fuchsia_sdk_idk"],
     # LINT.IfChange
     local_sdk_version_file = "//:generated_repository_hashes/fuchsia_sdk.hash",
     # LINT.ThenChange(../scripts/update-workspace.py)

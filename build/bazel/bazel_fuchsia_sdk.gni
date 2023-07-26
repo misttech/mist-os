@@ -1,0 +1,55 @@
+# Copyright 2023 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+declare_args() {
+  # Determines which set of SDK atoms are used to populage the @fuchsia_sdk
+  # Bazel external repository in the current build configuration. Possible
+  # values are "core" or "driver", see below for a description of each set.
+  # Note: this value will be changed to "core" once CI builders for the
+  # Fuchsia Bazel DDK are in place.
+  bazel_fuchsia_sdk_content = "driver"
+
+  # Set to true to populage the @fuchsia_sdk external repository with prebuilt
+  # binaries for all supported target CPU architectures. By default, only those
+  # for the current build configuration's `target_cpu` value will be generated
+  # to save about 3 minutes of build time when they are not needed.
+  bazel_fuchsia_sdk_all_cpus = false
+}
+
+# The list of valid values for bazel_fuchsia_sdk_content, where:
+#
+# - "core" corresponds to SDK atoms from the "core" IDK set, i.e. those with
+#   a stable and officially supported API and ABI, without any testonly
+#   elements.
+#
+#   This is due to a current but important limitations of our build system
+#   at the GN / Bazel boundary. See https://fxbug.dev/119057
+#
+# - "driver" corresponds to the "core" set above augmented with experimental
+#   driver-related atoms. These are currently not officially supported and their
+#   content may change at any time.
+#
+valid_bazel_fuchsia_sdk_content_values = [
+  "core",
+  "driver",
+]
+
+# A scope used to map a content set name to a list of //sdk: dependencies
+# Note that these lists cannot include testonly SDK atoms (https://fxbug.dev/119057)
+_fuchsia_sdk_deps_map = {
+  core = [ "//sdk:core" ]
+  driver = [
+    "//sdk:core",
+    "//sdk:driver",
+  ]
+}
+
+assert(
+    defined(_fuchsia_sdk_deps_map[bazel_fuchsia_sdk_content]),
+    "Invalid bazel_fuchsia_sdk_content value ($bazel_fuchsia_sdk_content'), " +
+        "should be one of: ${valid_bazel_fuchsia_sdk_content_values}")
+
+# The list of dependencies used to populate the IDK export directory
+# used to determine the content of the @fuchsia_sdk external repository.
+bazel_fuchsia_sdk_deps = _fuchsia_sdk_deps_map[bazel_fuchsia_sdk_content]
