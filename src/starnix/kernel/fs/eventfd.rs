@@ -76,7 +76,7 @@ impl FileOps for EventFdFileObject {
 
             // The maximum value of the counter is u64::MAX - 1
             let mut inner = self.inner.lock();
-            let headroom = u64::MAX - inner.value;
+            let headroom = u64::MAX - inner.value - 1;
             if headroom < add_value {
                 return error!(EAGAIN);
             }
