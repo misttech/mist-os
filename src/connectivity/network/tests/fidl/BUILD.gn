@@ -15,15 +15,13 @@ group("tests") {
   ]
 }
 
-tests = [
-  "neighbor",
-  "routes",
-]
+tests = [ "routes" ]
 
 tests_with_expectations = [
   "debug",
   "interfaces",
   "interfaces-admin",
+  "neighbor",
   "routes-admin",
 ]
 

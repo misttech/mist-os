@@ -1,0 +1,29 @@
+// Copyright 2022 The Fuchsia Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style license that can be
+// found in the LICENSE file.
+{
+    actions: [
+        {
+            type: "expect_pass",
+            matchers: [
+                "*",
+            ],
+        },
+        {
+            type: "expect_failure",
+            matchers: [
+                // TODO(https://fxbug.dev/124960): Support fuchsia.net.neighbor in NS3.
+                "cant_hang_twice_ns3",
+                "neigh_add_remove_entry_ns3",
+                "neigh_clear_entries_errors_ns3",
+                "neigh_clear_entries_ns3",
+                "neigh_list_entries_ns3",
+                "neigh_unreachability_config_errors_ns3",
+                "neigh_unreachability_config_ns3",
+                "neigh_unreachable_entries_ns3",
+                "neighbor_with_many_addresses_disconnects_ns3",
+                "remove_device_clears_neighbors_ns3",
+            ],
+        },
+    ],
+}
