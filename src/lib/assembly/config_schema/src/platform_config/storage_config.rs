@@ -13,4 +13,7 @@ pub struct StorageConfig {
 
     #[serde(default)]
     pub configure_fshost: bool,
+
+    #[serde(default)]
+    pub gpt_all: bool,
 }

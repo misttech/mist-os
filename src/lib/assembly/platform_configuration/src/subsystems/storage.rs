@@ -38,7 +38,7 @@ impl DefineSubsystemConfiguration<StorageConfig> for StorageSubsystemConfig {
                 .field("fvm", true)?
                 .field("ramdisk_image", false)?
                 .field("gpt", true)?
-                .field("gpt_all", false)?
+                .field("gpt_all", storage_config.gpt_all)?
                 .field("mbr", false)?
                 .field("netboot", false)?
                 .field("no_zxcrypt", false)?
