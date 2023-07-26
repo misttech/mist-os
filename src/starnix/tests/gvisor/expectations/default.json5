@@ -337,7 +337,9 @@
                 "All/MsyncNoFlagsTest.BothSyncAndAsyncFails/*",
 
                 // network_namespace_test
+                "NetworkNamespaceTest.BindMount",
                 "NetworkNamespaceTest.LoopbackExists",
+                "NetworkNamespaceTest.Setns",
 
                 // packet_socket_dgram_test
                 "AllInetTests/CookedPacketTest.BindDrop/*",
