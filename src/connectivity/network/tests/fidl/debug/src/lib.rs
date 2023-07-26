@@ -16,7 +16,7 @@ use futures::TryStreamExt as _;
 use net_declare::fidl_mac;
 use netstack_testing_common::{
     devices::{create_ip_tun_port, create_tun_device, install_device},
-    realms::{Netstack, Netstack2, TestRealmExt as _, TestSandboxExt as _},
+    realms::{Netstack, TestRealmExt as _, TestSandboxExt as _},
 };
 use netstack_testing_macros::netstack_test;
 
@@ -164,11 +164,10 @@ async fn add_pure_ip_interface(
     admin_control
 }
 
-// TODO(https://fxbug.dev/100871): Parameterize by Netstack to test NS3.
-#[fuchsia::test]
-async fn get_mac_pure_ip() {
+#[netstack_test]
+async fn get_mac_pure_ip<N: Netstack>(name: &str) {
     let sandbox = netemul::TestSandbox::new().expect("create sandbox");
-    let realm = sandbox.create_netstack_realm::<Netstack2, _>("get_mac").expect("create realm");
+    let realm = sandbox.create_netstack_realm::<N, _>(name).expect("create realm");
     let root_interfaces =
         realm.connect_to_protocol::<fnet_root::InterfacesMarker>().expect("connect to protocol");
 
