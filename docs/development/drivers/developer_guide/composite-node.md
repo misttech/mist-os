@@ -528,15 +528,15 @@ parent specifications' properties. A match is successful if the following
 is fulfilled:
 
 *   All parent specifications must match with a node in the composite bind rules
-*   All non-optional composite bind rules node must match with a node
-    representation
+*   All non-optional composite bind rules node must match with a parent
+    specification.
 
 Matching cannot be ambiguous:
 
 *   Each parent specification must correspond with only one composite bind rules
     node
-*   Node representations cannot match with the same node in the composite bind
-    rules
+*   Each composite bind rule node must match with at most one parent
+    specification. Optional bind rules may match zero parent specifications.
 *   Nodes do not need to be matched in order
 *   If an ambiguous case occurs, a warning message will be printed out.
 
