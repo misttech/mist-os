@@ -14,6 +14,7 @@ use ffx_writer::Writer;
 use fidl_fuchsia_developer_ffx_ext::RepositoryConfig;
 use sdk_metadata::ProductBundle;
 use std::io::Write;
+use utf8_path::path_relative_from;
 
 /// This plugin will get the path of image from the product bundle, based on the slot and image_type passed in.
 #[ffx_plugin("ffx_product_get_image_path")]
@@ -50,15 +51,23 @@ fn extract_image_path(
         Slot::R => product_bundle.system_r,
     };
     let system = system.ok_or_else(|| anyhow!("No image found in slot"))?;
-    let path = system.iter().find_map(|i| match (i, cmd.image_type) {
-        (Image::ZBI { path, .. }, ImageType::Zbi)
-        | (Image::VBMeta(path), ImageType::VBMeta)
-        | (Image::FVM(path), ImageType::Fvm)
-        | (Image::Fxfs { path, .. }, ImageType::Fxfs)
-        | (Image::QemuKernel(path), ImageType::QemuKernel) => Some(path.clone().into()),
-        _ => None,
-    });
-    Ok(path)
+    system
+        .iter()
+        .find_map(|i| match (i, cmd.image_type) {
+            (Image::ZBI { path, .. }, ImageType::Zbi)
+            | (Image::VBMeta(path), ImageType::VBMeta)
+            | (Image::FVM(path), ImageType::Fvm)
+            | (Image::Fxfs { path, .. }, ImageType::Fxfs)
+            | (Image::QemuKernel(path), ImageType::QemuKernel) => {
+                if cmd.relative_path {
+                    Some(path_relative_from(path, &cmd.product_bundle))
+                } else {
+                    Some(Ok(path.clone().into()))
+                }
+            }
+            _ => None,
+        })
+        .transpose()
 }
 
 #[cfg(test)]
@@ -77,7 +86,7 @@ mod tests {
             sdk_version: "".to_string(),
             system_a: Some(vec![
                 Image::ZBI { path: Utf8PathBuf::from("zbi/path"), signed: false },
-                Image::FVM(Utf8PathBuf::from("fvm/path")),
+                Image::FVM(Utf8PathBuf::from("/tmp/product_bundle/system_a/fvm.blk")),
                 Image::QemuKernel(Utf8PathBuf::from("qemu/path")),
             ]),
             system_b: None,
@@ -90,6 +99,7 @@ mod tests {
             product_bundle: Utf8PathBuf::new(),
             slot: Slot::A,
             image_type: ImageType::Zbi,
+            relative_path: false,
         };
         let path = extract_image_path(pb.clone(), cmd).unwrap().unwrap();
         let expected_path = Utf8PathBuf::from("zbi/path");
@@ -99,18 +109,20 @@ mod tests {
             product_bundle: Utf8PathBuf::new(),
             slot: Slot::A,
             image_type: ImageType::QemuKernel,
+            relative_path: false,
         };
         let path = extract_image_path(pb.clone(), cmd).unwrap().unwrap();
         let expected_path = Utf8PathBuf::from("qemu/path");
         assert_eq!(expected_path, path);
 
         let cmd = GetImagePathCommand {
-            product_bundle: Utf8PathBuf::new(),
+            product_bundle: Utf8PathBuf::from("/tmp/product_bundle"),
             slot: Slot::A,
             image_type: ImageType::Fvm,
+            relative_path: true,
         };
         let path = extract_image_path(pb.clone(), cmd).unwrap().unwrap();
-        let expected_path = Utf8PathBuf::from("fvm/path");
+        let expected_path = Utf8PathBuf::from("system_a/fvm.blk");
         assert_eq!(expected_path, path);
     }
 
@@ -136,6 +148,7 @@ mod tests {
             product_bundle: Utf8PathBuf::new(),
             slot: Slot::A,
             image_type: ImageType::VBMeta,
+            relative_path: false,
         };
         let path = extract_image_path(pb, cmd).unwrap();
         assert_eq!(None, path);

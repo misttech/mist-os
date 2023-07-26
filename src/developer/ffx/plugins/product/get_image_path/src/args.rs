@@ -69,4 +69,8 @@ pub struct GetImagePathCommand {
     /// the type of image.
     #[argh(option)]
     pub image_type: ImageType,
+
+    /// return relative path or not
+    #[argh(switch, short = 'r')]
+    pub relative_path: bool,
 }

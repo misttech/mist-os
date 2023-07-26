@@ -22,6 +22,7 @@ ffx_plugin("ffx_product_get_image_path") {
     "//src/developer/ffx/lib/fidl-fuchsia-developer-ffx-ext",
     "//src/developer/ffx/lib/writer:lib",
     "//src/lib/assembly/assembly_manifest",
+    "//src/lib/utf8_path",
     "//third_party/rust_crates:anyhow",
     "//third_party/rust_crates:camino",
   ]
