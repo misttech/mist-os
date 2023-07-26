@@ -8,7 +8,6 @@ group("tests") {
     "blob_writer:tests",
     "disk_inspector:tests",
     "ftl:tests",
-    "ftl-mtd:tests",
     "interval_tree:tests",
     "paver:tests",
     "sparse/c:tests",

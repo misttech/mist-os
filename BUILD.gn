@@ -975,9 +975,6 @@ build_api_module("tool_paths") {
     "//zircon/tools/zbi($host_toolchain)",
     "//zircon/tools/zither($host_toolchain)",
   ]
-  if (host_os == "linux") {
-    deps += [ "//zircon/tools/mtd-redundant-storage($host_toolchain)" ]
-  }
 }
 
 group("tool_paths.metadata") {

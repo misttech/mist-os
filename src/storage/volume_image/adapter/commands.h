@@ -118,9 +118,6 @@ struct CreateParams {
 fpromise::result<void, std::string> Create(const CreateParams& params);
 
 enum class TargetType {
-  // Device is a Memory Techonology Device. (Raw Nand)
-  kMtd,
-
   // Device is a block device.
   kBlockDevice,
 
@@ -156,10 +153,6 @@ struct PaveParams {
   // a sparse image when paved, cannot exceed such length. This consists on a limit
   // to the metadata and allocated slices size.
   std::optional<uint64_t> length;
-
-  // Maximum number of bad blocks in the underlying MTD device.
-  // This is required parameter for |type| = |kMtdDevice|.
-  std::optional<uint64_t> max_bad_blocks;
 
   // Pave options for the source image.
   FvmOptions fvm_options;

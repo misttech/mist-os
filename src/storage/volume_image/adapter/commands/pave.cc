@@ -15,8 +15,6 @@
 #include <fbl/unique_fd.h>
 
 #include "src/storage/volume_image/adapter/commands.h"
-#include "src/storage/volume_image/adapter/mtd_writer.h"
-#include "src/storage/volume_image/ftl/ftl_io.h"
 #include "src/storage/volume_image/fvm/fvm_descriptor.h"
 #include "src/storage/volume_image/fvm/fvm_sparse_image.h"
 #include "src/storage/volume_image/utils/block_writer.h"
@@ -129,24 +127,6 @@ fpromise::result<void, std::string> Pave(const PaveParams& params) {
       break;
     }
 
-    case TargetType::kMtd: {
-      MtdParams mtd_params;
-      mtd_params.offset = params.offset.value_or(0);
-      mtd_params.format = true;
-      if (!params.max_bad_blocks.has_value()) {
-        return fpromise::error("Pave to |kMtd| target, requires |max_bad_blocks| to be set.");
-      }
-      mtd_params.max_bad_blocks = params.max_bad_blocks.value();
-      FtlHandle handle;
-      auto mtd_writer_or = CreateMtdWriter(params.output_path, mtd_params, &handle);
-      if (mtd_writer_or.is_error()) {
-        return mtd_writer_or.take_error_result();
-      }
-      default_target_length = handle.instance().page_count() * handle.instance().page_size();
-      writer = mtd_writer_or.take_value();
-      break;
-    }
-
     case TargetType::kFile: {
       auto writer_or = FdWriter::Create(params.output_path);
       if (writer_or.is_error()) {
@@ -170,9 +150,7 @@ fpromise::result<void, std::string> Pave(const PaveParams& params) {
   auto length = params.length.value_or(default_target_length.value());
 
   if (params.is_output_embedded) {
-    // The MTD Writer handles the offset internally.
-    writer = std::make_unique<BoundedWriter>(
-        std::move(writer), (params.type == TargetType::kMtd) ? 0 : params.offset.value(), length);
+    writer = std::make_unique<BoundedWriter>(std::move(writer), params.offset.value(), length);
   }
 
   auto descriptor_or = FvmSparseReadImage(0, std::move(reader));

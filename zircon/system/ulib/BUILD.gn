@@ -46,7 +46,6 @@ group("tests") {
     "lockdep:tests",
     "mmio-ptr:tests",
     "mock-function:tests",
-    "nand-redundant-storage:tests",
     "perftest:tests",
     "pretty:tests",
     "ram-crashlog:tests",

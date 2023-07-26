@@ -351,16 +351,9 @@ fpromise::result<PaveParams, std::string> PaveParams::FromArguments(
     return result.take_error_result();
   }
 
-  if (auto result = GetSizeArgumentValue(arguments, "--max-bad-blocks", params.max_bad_blocks);
-      result.is_error()) {
-    return result.take_error_result();
-  }
-
   // Default is |File|.
   if (!target_type.has_value() || target_type.value() == "file") {
     params.type = TargetType::kFile;
-  } else if (target_type.value() == "mtd") {
-    params.type = TargetType::kMtd;
   } else if (target_type.value() == "block_device") {
     params.type = TargetType::kBlockDevice;
   }

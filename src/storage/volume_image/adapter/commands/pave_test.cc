@@ -186,34 +186,5 @@ TEST(PaveCommandTest, CreateEmbeddedFvmImageIsOk) {
   ASSERT_TRUE(fvm_checker.Validate());
 }
 
-// To run this test locally on a linux machine:
-//  * sudo modprobe nandsim id_bytes=0x2c,0xdc,0x90,0xa6,0x54,0x0 badblocks=5
-//  * chmod u=rw,og=rw /dev/mtd0
-// chmod is required so fx test may run the test for you.
-constexpr const char* kTestMtdDevicePath = "/dev/mtd0";
-
-TEST(PaveCommandTest, MtdWriterIsOk) {
-  // check that the mtd device and the block device are both present.
-  fbl::unique_fd mtd_fd(open(kTestMtdDevicePath, O_RDWR));
-
-  if (!mtd_fd.is_valid()) {
-    GTEST_SKIP() << "No MTD device availble. " << strerror(errno);
-  }
-
-  auto pave_params = MakeParams();
-  pave_params.output_path = kTestMtdDevicePath;
-  pave_params.type = TargetType::kMtd;
-  pave_params.is_output_embedded = true;
-  pave_params.offset = 0;
-  pave_params.max_bad_blocks = 41;
-  pave_params.length = kInitialImageSize;
-
-  pave_params.fvm_options.max_volume_size = 2 * kInitialImageSize;
-  pave_params.fvm_options.compression.schema = CompressionSchema::kNone;
-
-  auto pave_result = Pave(pave_params);
-  ASSERT_TRUE(pave_result.is_ok()) << pave_result.error();
-}
-
 }  // namespace
 }  // namespace storage::volume_image

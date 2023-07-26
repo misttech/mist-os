@@ -42,14 +42,12 @@
 
 enum DiskType {
   File = 0,
-  Mtd = 1,
-  BlockDevice = 2,
+  BlockDevice = 1,
 };
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wc99-designator"
 const char* kDiskTypeStr[] = {
     [DiskType::File] = "file",
-    [DiskType::Mtd] = "mtd",
     [DiskType::BlockDevice] = "block_device",
 };
 #pragma GCC diagnostic pop
@@ -95,10 +93,8 @@ int usage() {
           " --compress [type] - specify that file should be compressed (sparse and android sparse "
           "image only). Currently, the only supported type is \"lz4\".\n");
   fprintf(stderr, " --disk [bytes] - Size of target disk (valid for size command only)\n");
-  fprintf(stderr, " --disk-type [%s, %s OR %s] - Type of target disk (pave only)\n",
-          kDiskTypeStr[DiskType::File], kDiskTypeStr[DiskType::Mtd],
-          kDiskTypeStr[DiskType::BlockDevice]);
-  fprintf(stderr, " --max-bad-blocks [number] - Max bad blocks for FTL (pave on mtd only)\n");
+  fprintf(stderr, " --disk-type [%s OR %s] - Type of target disk (pave only)\n",
+          kDiskTypeStr[DiskType::File], kDiskTypeStr[DiskType::BlockDevice]);
   fprintf(stderr, "Input options:\n");
   fprintf(stderr, " --blob [path] [reserve options] - Add path as blob type (must be blobfs)\n");
   fprintf(stderr,
@@ -252,10 +248,6 @@ zx_status_t ParseDiskType(const char* type_str, DiskType* out) {
     *out = DiskType::File;
     return ZX_OK;
   }
-  if (!strcmp(type_str, kDiskTypeStr[DiskType::Mtd])) {
-    *out = DiskType::Mtd;
-    return ZX_OK;
-  }
   if (!strcmp(type_str, kDiskTypeStr[DiskType::BlockDevice])) {
     *out = DiskType::BlockDevice;
     return ZX_OK;
@@ -323,7 +315,6 @@ int main(int argc, char** argv) {
   size_t disk_size = 0;
 
   size_t max_disk_size = 0;
-  bool is_max_bad_blocks_set = false;
   DiskType disk_type = DiskType::File;
 
   size_t block_count = 0;
@@ -351,8 +342,6 @@ int main(int argc, char** argv) {
       if (ParseDiskType(argv[++i], &disk_type) != ZX_OK) {
         return EXIT_FAILURE;
       }
-    } else if (!strcmp(argv[i], "--max-bad-blocks")) {
-      is_max_bad_blocks_set = true;
     } else if (!strcmp(argv[i], "--disk")) {
       if (parse_size(argv[++i], &disk_size) < 0) {
         return EXIT_FAILURE;
@@ -632,15 +621,10 @@ int main(int argc, char** argv) {
     length = get_disk_size(path, offset);
   }
 
-  if (disk_type == DiskType::Mtd || disk_type == DiskType::BlockDevice) {
+  if (disk_type == DiskType::BlockDevice) {
     if (strcmp(command, "pave") != 0) {
       fprintf(stderr, "Only the pave command is supported for disk type %s.\n",
               kDiskTypeStr[disk_type]);
-      return EXIT_FAILURE;
-    }
-
-    if (!is_max_bad_blocks_set && disk_type == DiskType::Mtd) {
-      fprintf(stderr, "--max-bad-blocks is required when paving to MTD.\n");
       return EXIT_FAILURE;
     }
   }

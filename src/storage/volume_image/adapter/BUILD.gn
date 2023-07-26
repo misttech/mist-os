@@ -77,7 +77,6 @@ source_set("commands") {
     ":blobfs-partition",
     ":empty-partition",
     ":minfs-partition",
-    ":mtd-writer",
     "//src/storage/fvm",
     "//src/storage/volume_image/fvm:fvm-descriptor",
     "//src/storage/volume_image/fvm:fvm-image-extend",
@@ -86,27 +85,6 @@ source_set("commands") {
     "//src/storage/volume_image/utils:fd-io",
     "//src/storage/volume_image/utils:lz4-compression",
   ]
-}
-
-source_set("mtd-writer") {
-  public = [ "mtd_writer.h" ]
-  deps = [ "//src/storage/volume_image/utils:io-interfaces" ]
-  public_deps = [
-    "//sdk/lib/fit-promise",
-    "//src/storage/volume_image/ftl:ftl-io",
-    "//src/storage/volume_image/utils:block-io",
-  ]
-
-  if (current_os == "linux") {
-    sources = [ "mtd_writer_linux.cc" ]
-    deps += [
-      "//src/storage/lib/ftl-mtd",
-      "//zircon/system/ulib/mtd",
-      "//zircon/third_party/ulib/safemath",
-    ]
-  } else {
-    sources = [ "mtd_writer_default.cc" ]
-  }
 }
 
 test_blob_image_label = ":test-blobfs-image-gen($default_toolchain)"
@@ -330,15 +308,6 @@ source_set("adapter-tests") {
     "//third_party/googletest:gmock",
     "//third_party/googletest:gtest",
   ]
-
-  if (current_os == "linux") {
-    sources += [ "mtd_writer_test.cc" ]
-    deps += [
-      ":mtd-writer",
-      "//src/storage/lib/ftl-mtd",
-      "//zircon/system/ulib/mtd",
-    ]
-  }
 
   configs += [ ":test-image-path" ]
 

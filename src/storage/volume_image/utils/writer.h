@@ -15,8 +15,7 @@ namespace storage::volume_image {
 // Provides a reader interface to abstract platform, and devices particular nuisance to the image
 // process.
 //
-// The reader requires an explicit offset, to allow compatibility with non posix interfaces, such as
-// MTD.
+// The reader requires an explicit offset, to allow compatibility with non posix interfaces.
 class Writer {
  public:
   virtual ~Writer() = default;
