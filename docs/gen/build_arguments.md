@@ -298,6 +298,29 @@ The list of environment names to include in "basic_envs".
 
 From //build/testing/environments.gni:9
 
+### bazel_fuchsia_sdk_all_cpus
+
+Set to true to populage the @fuchsia_sdk external repository with prebuilt
+binaries for all supported target CPU architectures. By default, only those
+for the current build configuration's `target_cpu` value will be generated
+to save about 3 minutes of build time when they are not needed.
+
+**Current value (from the default):** `false`
+
+From //build/bazel/bazel_fuchsia_sdk.gni:17
+
+### bazel_fuchsia_sdk_content
+
+Determines which set of SDK atoms are used to populage the @fuchsia_sdk
+Bazel external repository in the current build configuration. Possible
+values are "core" or "driver", see below for a description of each set.
+Note: this value will be changed to "core" once CI builders for the
+Fuchsia Bazel DDK are in place.
+
+**Current value (from the default):** `"driver"`
+
+From //build/bazel/bazel_fuchsia_sdk.gni:11
+
 ### bazel_product_bundle_board
 
 **Current value (from the default):** `false`
@@ -822,19 +845,7 @@ From //build/images/args.gni:78
 
 ### bringup_fastboot_images_config_label
 
-**Current value for `target_cpu = "arm64"`:** `"//boards/images:bringup_fastboot_default"`
-
-From //boards/arm64.gni:45
-
-**Overridden from the default:** `false`
-
-From //build/board.gni:117
-
-**Current value for `target_cpu = "x64"`:** `"//boards/images:bringup_fastboot_default"`
-
-From //boards/x64.gni:85
-
-**Overridden from the default:** `false`
+**Current value (from the default):** `false`
 
 From //build/board.gni:117
 
@@ -952,11 +963,12 @@ From //build/product.gni:7
 
 Whether to build archives for sdk() targets by default.
 This is deprecated, archives should instead be created through
-generate_final_idk().
+generate_final_idk(). Moreover, the sdk() template is deprecated
+and its use replaced with sdk_collection() instead.
 
 **Current value (from the default):** `false`
 
-From //build/sdk/config.gni:9
+From //build/sdk/config.gni:10
 
 ### build_should_trace_actions
 
@@ -5375,7 +5387,7 @@ From //zircon/kernel/params.gni:142
 
 **Current value for `target_cpu = "arm64"`:** `["//out/not-default/fuchsia.esp.blk"]`
 
-From //boards/arm64.gni:47
+From //boards/arm64.gni:45
 
 **Overridden from the default:** `[]`
 
@@ -5383,7 +5395,7 @@ From //build/board.gni:133
 
 **Current value for `target_cpu = "x64"`:** `["//out/not-default/fuchsia.esp.blk"]`
 
-From //boards/x64.gni:87
+From //boards/x64.gni:85
 
 **Overridden from the default:** `[]`
 
@@ -5396,7 +5408,7 @@ product bundle.
 
 **Current value for `target_cpu = "arm64"`:** `"//boards/partitions:arm64"`
 
-From //boards/arm64.gni:46
+From //boards/arm64.gni:44
 
 **Overridden from the default:** `false`
 
@@ -5404,7 +5416,7 @@ From //build/board.gni:132
 
 **Current value for `target_cpu = "x64"`:** `"//boards/partitions:x64"`
 
-From //boards/x64.gni:86
+From //boards/x64.gni:84
 
 **Overridden from the default:** `false`
 
@@ -6837,7 +6849,7 @@ Usage: toolchain-controlled only
 
 **Current value (from the default):** `""`
 
-From //third_party/pigweed/src/pw_unit_test/test.gni:52
+From //third_party/pigweed/src/pw_unit_test/test.gni:53
 
 ### pw_unit_test_AUTOMATIC_RUNNER_ARGS
 
@@ -6848,7 +6860,7 @@ Usage: toolchain-controlled only
 
 **Current value (from the default):** `[]`
 
-From //third_party/pigweed/src/pw_unit_test/test.gni:58
+From //third_party/pigweed/src/pw_unit_test/test.gni:59
 
 ### pw_unit_test_AUTOMATIC_RUNNER_TIMEOUT
 
@@ -6857,7 +6869,7 @@ Timeout is in seconds. Defaults to empty which means no timeout.
 
 **Current value (from the default):** `""`
 
-From //third_party/pigweed/src/pw_unit_test/test.gni:62
+From //third_party/pigweed/src/pw_unit_test/test.gni:63
 
 ### pw_unit_test_CONFIG
 
@@ -6878,7 +6890,7 @@ Usage: toolchain-controlled only
 
 **Current value (from the default):** `"pw_executable"`
 
-From //third_party/pigweed/src/pw_unit_test/test.gni:91
+From //third_party/pigweed/src/pw_unit_test/test.gni:92
 
 ### pw_unit_test_EXECUTABLE_TARGET_TYPE_FILE
 
@@ -6893,7 +6905,7 @@ Usage: toolchain-controlled only
 
 **Current value (from the default):** `""`
 
-From //third_party/pigweed/src/pw_unit_test/test.gni:101
+From //third_party/pigweed/src/pw_unit_test/test.gni:102
 
 ### pw_unit_test_FACADE_TESTS_ENABLED
 
@@ -6924,7 +6936,7 @@ Usage: toolchain-controlled only
 
 **Current value (from the default):** `"//third_party/pigweed/src/pw_unit_test:light"`
 
-From //third_party/pigweed/src/pw_unit_test/test.gni:30
+From //third_party/pigweed/src/pw_unit_test/test.gni:31
 
 ### pw_unit_test_MAIN
 
@@ -6936,7 +6948,7 @@ Usage: toolchain-controlled only
 
 **Current value (from the default):** `"//third_party/pigweed/src/pw_unit_test:simple_printing_main"`
 
-From //third_party/pigweed/src/pw_unit_test/test.gni:37
+From //third_party/pigweed/src/pw_unit_test/test.gni:38
 
 ### pw_unit_test_POOL_DEPTH
 
@@ -6954,7 +6966,7 @@ Usage: toolchain-controlled only
 
 **Current value (from the default):** `0`
 
-From //third_party/pigweed/src/pw_unit_test/test.gni:75
+From //third_party/pigweed/src/pw_unit_test/test.gni:76
 
 ### pw_unit_test_POOL_TOOLCHAIN
 
@@ -6969,7 +6981,7 @@ Usage: toolchain-controlled only
 
 **Current value (from the default):** `""`
 
-From //third_party/pigweed/src/pw_unit_test/test.gni:85
+From //third_party/pigweed/src/pw_unit_test/test.gni:86
 
 ### qemu_boot_format
 
@@ -7482,8 +7494,9 @@ From //build/config/sanitizers/sanitizer_default_options.gni:82
 
 ### sdk_archive_labels
 
-Extra sdk() archive labels to be uploaded to the artifacts store. This is
-an extension mechanism for SDK bits outside of the main repository.
+Extra generate_final_idk() or sdk_collection() archive labels to be
+uploaded to the artifacts store. This is an extension mechanism for SDK
+bits outside of the main repository.
 
 **Current value for `target_cpu = "arm64"`:** `[]`
 
@@ -7491,7 +7504,7 @@ From //products/bringup.gni:16
 
 **Overridden from the default:** `[]`
 
-From //BUILD.gn:101
+From //BUILD.gn:102
 
 **Current value for `target_cpu = "x64"`:** `[]`
 
@@ -7499,7 +7512,7 @@ From //products/bringup.gni:16
 
 **Overridden from the default:** `[]`
 
-From //BUILD.gn:101
+From //BUILD.gn:102
 
 ### sdk_cross_compile_host_tools
 
@@ -7529,7 +7542,7 @@ actions.
 
 **Current value (from the default):** `false`
 
-From //build/sdk/config.gni:22
+From //build/sdk/config.gni:23
 
 ### sdk_no_host_tools
 
@@ -7537,7 +7550,7 @@ Whether to omit host tools from the generated IDKs.
 
 **Current value (from the default):** `false`
 
-From //build/sdk/config.gni:16
+From //build/sdk/config.gni:17
 
 ### select_variant
 
@@ -8661,7 +8674,7 @@ If false, any unacknowledged SDK change will cause a build failure.
 
 **Current value (from the default):** `false`
 
-From //build/sdk/config.gni:13
+From //build/sdk/config.gni:14
 
 ### wayland_bridge_protocol_logging
 
