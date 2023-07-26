@@ -65,7 +65,9 @@ ZirconLimboProvider::ZirconLimboProvider(fidl::UnownedClientEnd<fuchsia_io::Dire
   connection_.Bind(process_limbo.TakeClientEnd(), async_get_default_dispatcher());
 
   WatchActive();
-  WatchLimbo();
+  if (is_limbo_active_) {
+    WatchLimbo();
+  }
 
   valid_ = true;
 }
@@ -79,8 +81,11 @@ void ZirconLimboProvider::WatchActive() {
           return;
         }
         is_limbo_active_ = res->is_active();
-        if (!is_limbo_active_)
+        if (is_limbo_active_) {
+          WatchLimbo();
+        } else {
           limbo_.clear();
+        }
 
         // Re-issue the hanging get.
         WatchActive();
