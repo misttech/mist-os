@@ -163,7 +163,6 @@ async fn handle_command(
                 ntr_args::Dhcpv6ClientSubcommand::Start(ntr_args::Dhcpv6ClientStart {
                     interface_id,
                     address,
-                    stateful,
                     request_non_temporary_address,
                     request_dns_servers,
                     prefix_delegation_config,
@@ -179,20 +178,10 @@ async fn handle_command(
                                 },
                                 config: fnet_dhcpv6_ext::ClientConfig {
                                     information_config: fnet_dhcpv6_ext::InformationConfig {
-                                        // TODO(https://fxbug.dev/128250): Remove stateful to
-                                        // complete soft migration to use only request_dns_servers
-                                        // to configure stateless DHCPv6 client operation.
-                                        dns_servers: !(stateful.unwrap_or(false))
-                                            || request_dns_servers,
+                                        dns_servers: request_dns_servers,
                                     },
                                     non_temporary_address_config: fnet_dhcpv6_ext::AddressConfig {
-                                        // TODO(https://fxbug.dev/128250): Remove
-                                        // stateful to complete soft migration to use only
-                                        // request_non_temporary_address to configure DHCPv6
-                                        // client to request IA_NA.
-                                        address_count: if stateful.unwrap_or(false)
-                                            || request_non_temporary_address
-                                        {
+                                        address_count: if request_non_temporary_address {
                                             1
                                         } else {
                                             0
@@ -488,7 +477,6 @@ mod test {
                 subcommand: ntr_args::Dhcpv6ClientSubcommand::Start(ntr_args::Dhcpv6ClientStart {
                     interface_id: INTERFACE_ID,
                     address: DHCPV6_CLIENT_BIND_ADDR,
-                    stateful: None,
                     request_non_temporary_address: true,
                     request_dns_servers: true,
                     prefix_delegation_config: Some(Some(PD_HINT.into())),

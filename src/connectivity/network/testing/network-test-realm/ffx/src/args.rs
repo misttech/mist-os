@@ -199,12 +199,6 @@ pub struct Dhcpv6ClientStart {
     /// the link-local address the DHCPv6 client uses to communicate with servers
     pub address: fnet_ext::Ipv6Address,
 
-    // TODO(https://fxbug.dev/128250): Delete this once the network-conformance
-    // repo has been migrated to --request-non-temporary-address.
-    #[argh(option)]
-    /// whether the DHCPv6 client should run in stateful or stateless mode
-    pub stateful: Option<bool>,
-
     #[argh(switch)]
     /// request non-temporary address from servers
     pub request_non_temporary_address: bool,
