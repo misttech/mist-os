@@ -224,6 +224,7 @@ template("rustc_binary") {
                              "*",
                              [
                                "name",
+                               "disable_rustdoc",
                                "output_name",
                                "source_root",
                                "test_disable_rbe",

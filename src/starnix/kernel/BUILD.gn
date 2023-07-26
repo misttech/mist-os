@@ -378,6 +378,8 @@ rustc_binary("starnix_kernel_bin") {
   }
 
   configs += [ "//build/config/rust/lints:clippy_warn_all" ]
+
+  disable_rustdoc = false
 }
 
 # The starnix kernel manifest, used by all containers.
