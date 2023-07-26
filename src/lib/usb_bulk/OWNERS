@@ -1,3 +1,4 @@
+include /src/developer/ffx/OWNERS
+
 claridge@google.com
-konkers@google.com
 # Component: Power
