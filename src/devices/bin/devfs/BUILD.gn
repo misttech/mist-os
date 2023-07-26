@@ -25,11 +25,28 @@ executable("bin") {
 
 fuchsia_component("component") {
   component_name = "devfs"
+  manifest = "meta/devfs.cml"
+  deps = [ ":bin" ]
+}
+
+# Used for /bootstrap/devfs-with-pkg since that component should not be marked
+# `main_process_critical`
+fuchsia_component("component-non-critical") {
+  component_name = "devfs-pkg"
+  manifest = "meta/devfs-base.shard.cml"
+  deps = [ ":bin" ]
+}
+
+fuchsia_component("component-for-test") {
+  component_name = "devfs"
   manifest = "meta/devfs-base.shard.cml"
   deps = [ ":bin" ]
 }
 
 fuchsia_package("package") {
   package_name = "devfs"
-  deps = [ ":component" ]
+  deps = [
+    ":component",
+    ":component-non-critical",
+  ]
 }

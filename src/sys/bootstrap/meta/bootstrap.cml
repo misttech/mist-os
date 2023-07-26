@@ -34,7 +34,7 @@
             // #full-pkg-drivers should be stopped. Most components should prefer depending on
             // capabiliites provided by this component over #devfs.
             name: "devfs-with-pkg",
-            url: "fuchsia-boot:///devfs#meta/devfs.cm",
+            url: "fuchsia-boot:///devfs#meta/devfs-pkg.cm",
             environment: "#devfs-env",
         },
         {
