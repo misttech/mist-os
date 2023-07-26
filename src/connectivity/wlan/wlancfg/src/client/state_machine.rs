@@ -2117,6 +2117,13 @@ mod tests {
 
         exec.set_fake_time(fasync::Time::after(12.hours()));
 
+        // Receive PostConnectionScores first.
+        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
+        assert_variant!(
+            telemetry_receiver.try_next(),
+            Ok(Some(TelemetryEvent::PostConnectionScores { .. }))
+        );
+
         // SME notifies Policy of disconnection with SME-initiated reconnect
         let is_sme_reconnecting = true;
         let fidl_disconnect_info = generate_disconnect_info(is_sme_reconnecting);
@@ -2139,8 +2146,8 @@ mod tests {
         connect_txn_handle
             .send_on_connect_result(&connect_result)
             .expect("failed to send connect result event");
-        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
 
+        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
         assert_variant!(
             telemetry_receiver.try_next(),
             Ok(Some(TelemetryEvent::ConnectResult { .. }))
@@ -2957,6 +2964,14 @@ mod tests {
         // Check that after a while even without a change in RSSI there would be a roam scan.
         time = time + fasync::Duration::from_minutes(20);
         exec.set_fake_time(time);
+
+        // Receive PostConnectionScores first.
+        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
+        assert_variant!(
+            telemetry_receiver.try_next(),
+            Ok(Some(TelemetryEvent::PostConnectionScores { .. }))
+        );
+
         send_signal_report(rssi_1, snr, &connect_txn_handle);
         assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
 
@@ -2987,6 +3002,7 @@ mod tests {
 
     /// Get the next signal report telemetry event without verifying the values. The purpose is to
     /// pull the event from the channel in order to get later events that tests care about.
+    #[track_caller]
     fn poll_telemetry_signal_report_event(telemetry_receiver: &mut mpsc::Receiver<TelemetryEvent>) {
         assert_variant!(
             telemetry_receiver.try_next(),

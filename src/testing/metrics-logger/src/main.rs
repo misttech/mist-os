@@ -704,11 +704,8 @@ mod tests {
         // If the server has an active logging task, run until the next log and return true.
         // Otherwise, return false.
         fn iterate_logging_task(&mut self) -> bool {
-            let wakeup_time = match self.executor.wake_next_timer() {
-                Some(t) => t,
-                None => return false,
-            };
-            self.executor.set_fake_time(wakeup_time);
+            let Some(next_time) = self.executor.next_timer() else { return false };
+            self.executor.set_fake_time(next_time);
             assert_eq!(
                 futures::task::Poll::Pending,
                 self.executor.run_until_stalled(&mut self.server_task)
@@ -747,7 +744,7 @@ mod tests {
         let mut _query = runner.proxy.start_logging(
             "test",
             &[
-                Metric::CpuLoad(CpuLoad { interval_ms: 100 }),
+                Metric::CpuLoad(CpuLoad { interval_ms: 99 }),
                 Metric::Temperature(Temperature {
                     sampling_interval_ms: 100,
                     statistics_args: None,
@@ -791,7 +788,7 @@ mod tests {
                 MetricsLogger: {
                     test: {
                         CpuLoadLogger: {
-                            "elapsed time (ms)": 100i64,
+                            "elapsed time (ms)": 99i64,
                             "Cluster 0": {
                                 "Max perf scale": 0.5,
                                 "CPU usage (%)": 100.0,
@@ -827,7 +824,7 @@ mod tests {
                 MetricsLogger: {
                     test: {
                         CpuLoadLogger: {
-                            "elapsed time (ms)": 900i64,
+                            "elapsed time (ms)": 891i64,
                             "Cluster 0": {
                                 "Max perf scale": 0.5,
                                 "CPU usage (%)": 100.0,
@@ -852,7 +849,7 @@ mod tests {
         );
 
         // Run the last 2 tasks which hits `now >= self.end_time` and ends the logging.
-        for _ in 0..2 {
+        for _ in 0..3 {
             assert_eq!(runner.iterate_logging_task(), true);
         }
 
@@ -1073,7 +1070,7 @@ mod tests {
             &[
                 Metric::CpuLoad(CpuLoad { interval_ms: 300 }),
                 Metric::Temperature(Temperature {
-                    sampling_interval_ms: 200,
+                    sampling_interval_ms: 199,
                     statistics_args: None,
                 }),
             ],
@@ -1129,7 +1126,7 @@ mod tests {
                         CpuLoadLogger: {
                         },
                         TemperatureLogger: {
-                            "elapsed time (ms)": 200i64,
+                            "elapsed time (ms)": 199i64,
                             "cpu": {
                                 "data (°C)": 35.0,
                             },
@@ -1161,7 +1158,7 @@ mod tests {
                         CpuLoadLogger: {
                         },
                         TemperatureLogger: {
-                            "elapsed time (ms)": 200i64,
+                            "elapsed time (ms)": 199i64,
                             "cpu": {
                                 "data (°C)": 35.0,
                             },
@@ -1205,7 +1202,7 @@ mod tests {
                             }
                         },
                         TemperatureLogger: {
-                            "elapsed time (ms)": 200i64,
+                            "elapsed time (ms)": 199i64,
                             "cpu": {
                                 "data (°C)": 35.0,
                             },
@@ -1249,7 +1246,7 @@ mod tests {
                             }
                         },
                         TemperatureLogger: {
-                            "elapsed time (ms)": 400i64,
+                            "elapsed time (ms)": 398i64,
                             "cpu": {
                                 "data (°C)": 36.0,
                             },

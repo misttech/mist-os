@@ -550,7 +550,6 @@ mod tests {
         );
 
         // Wake the zero timer.
-        assert!(executor.wake_expired_timers());
         let _ = executor.run_until_stalled(&mut sync_task);
 
         // Validate that the file has been synced.
@@ -629,7 +628,6 @@ mod tests {
         );
 
         // Move executor past the sync interval.
-        assert!(executor.wake_expired_timers());
         let _ = executor.run_until_stalled(&mut sync_task);
 
         // Validate that the file has been synced.
@@ -699,7 +697,6 @@ mod tests {
 
         // Move executor to just after sync interval. It should run now.
         executor.set_fake_time(Time::from_nanos(MIN_FLUSH_INTERVAL_MS * 1_000_000));
-        assert!(executor.wake_expired_timers());
         let _ = executor.run_until_stalled(&mut sync_task);
 
         // Validate that the file has been synced.
@@ -848,7 +845,6 @@ mod tests {
 
         // Wake the initial time without advancing the clock. Confirms that the first write is
         // "immediate".
-        assert!(executor.wake_expired_timers());
         let _ = executor.run_until_stalled(&mut sync_task);
 
         // Validate that the file has been synced.
@@ -889,7 +885,6 @@ mod tests {
 
         // Move executor to just after sync interval.
         executor.set_fake_time(Time::from_nanos(MIN_FLUSH_INTERVAL_MS * 1_000_000));
-        assert!(executor.wake_expired_timers());
         let _ = executor.run_until_stalled(&mut sync_task);
 
         // Validate that the file has finally been synced.
@@ -978,7 +973,6 @@ mod tests {
                 - (i == retry_count - 1) as i64
         }) {
             executor.set_fake_time(Time::from_nanos(clock_nanos));
-            assert!(executor.wake_expired_timers());
             // Task should not complete while retrying.
             assert_eq!(executor.run_until_stalled(&mut task), Poll::Pending);
 
@@ -1007,7 +1001,6 @@ mod tests {
 
         executor.set_fake_time(Time::from_nanos(clock_nanos));
         // At this point the clock should be 1ns before the timer, so it shouldn't wake.
-        assert!(!executor.wake_expired_timers());
         assert_eq!(executor.run_until_stalled(&mut task), Poll::Pending);
 
         // Check that files don't exist.
@@ -1029,7 +1022,6 @@ mod tests {
         // Now pass the timer where we can read the result.
         clock_nanos += 1;
         executor.set_fake_time(Time::from_nanos(clock_nanos));
-        assert!(executor.wake_expired_timers());
         assert_eq!(executor.run_until_stalled(&mut task), Poll::Pending);
 
         // Check that the file now has data.

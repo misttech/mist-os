@@ -64,9 +64,10 @@ impl LocalExecutor {
     where
         F: Future,
     {
-        self.inner
-            .require_real_time()
-            .expect("Error: called `run_singlethreaded` on an executor using fake time");
+        assert!(
+            self.inner.is_real_time(),
+            "Error: called `run_singlethreaded` on an executor using fake time"
+        );
         let mut local_collector = self.inner.collector.create_local_collector();
 
         pin_mut!(main_future);
@@ -191,8 +192,8 @@ impl TestExecutor {
         self.local.run_singlethreaded(main_future)
     }
 
-    /// PollResult the future. If it is not ready, dispatch available packets and possibly try again.
-    /// Timers will not fire. Never blocks.
+    /// PollResult the future. If it is not ready, dispatch available packets and possibly try
+    /// again. Timers will only fire if this executor uses fake time. Never blocks.
     ///
     /// This function is for testing. DO NOT use this function in tests or applications that
     /// involve any interaction with other threads or processes, as those interactions
@@ -208,17 +209,27 @@ impl TestExecutor {
         let inner = self.local.inner.clone();
         let mut local_collector = inner.collector.create_local_collector();
         self.wake_main_future();
-        while let NextStep::NextPacket =
-            self.next_step(/*fire_timers:*/ false, &mut local_collector)
-        {
-            // Will not fail, because NextPacket means there is a
-            // packet ready to be processed.
-            let res = self.consume_packet(main_future, &mut local_collector);
-            if res.is_ready() {
-                return res;
+        loop {
+            match self.next_step(/*fire_timers:*/ !inner.is_real_time(), &mut local_collector) {
+                NextStep::WaitUntil(_) => return Poll::Pending,
+                NextStep::NextPacket => {
+                    // Will not fail, because NextPacket means there is a
+                    // packet ready to be processed.
+                    let res = self.consume_packet(main_future, &mut local_collector);
+                    if res.is_ready() {
+                        return res;
+                    }
+                }
+                NextStep::NextTimer => {
+                    let next_timer = with_local_timer_heap(|timer_heap| {
+                        // unwrap: will not fail because NextTimer
+                        // guarantees there is a timer in the heap.
+                        timer_heap.pop().unwrap()
+                    });
+                    next_timer.wake();
+                }
             }
         }
-        Poll::Pending
     }
 
     /// Schedule the main future for being woken up. This is useful in conjunction with

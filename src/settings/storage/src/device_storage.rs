@@ -500,18 +500,11 @@ mod tests {
     }
 
     /// Advances `future` until `executor` finishes. Panics if the end result was a stall.
-    fn advance_executor<F>(executor: &mut TestExecutor, mut future: &mut F)
+    fn advance_executor<F>(executor: &mut TestExecutor, future: &mut F)
     where
         F: Future + Unpin,
     {
-        loop {
-            executor.wake_main_future();
-            match executor.run_one_step(&mut future) {
-                Some(Poll::Ready(_)) => return,
-                None => panic!("TestExecutor stalled!"),
-                Some(Poll::Pending) => {}
-            }
-        }
+        assert!(executor.run_until_stalled(future).is_ready(), "TestExecutor stalled!");
     }
 
     /// Verifies that a SetValue call was sent to stash with the given value.
@@ -720,6 +713,9 @@ mod tests {
                 Poll::Ready(Result::Ok(_))
             );
         }
+
+        // Run all background tasks until stalled.
+        let _ = executor.run_until_stalled(&mut future::pending::<()>());
 
         let logger_handle = StashInspectLoggerHandle::new();
         let lock_future = logger_handle.logger.lock();

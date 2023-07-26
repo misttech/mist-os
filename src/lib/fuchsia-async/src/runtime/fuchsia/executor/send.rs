@@ -65,7 +65,7 @@ impl SendExecutor {
         F: Future + Send + 'static,
         F::Output: Send + 'static,
     {
-        self.inner.require_real_time().expect("Error: called `run` on an executor using fake time");
+        assert!(self.inner.is_real_time(), "Error: called `run` on an executor using fake time");
 
         let pair = Arc::new((Mutex::new(None), Condvar::new()));
         let pair2 = pair.clone();

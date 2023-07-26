@@ -720,7 +720,7 @@ mod tests {
                     temperature_handler_node: mock_temperature_handler_1.clone(),
                     onset_temperature: Celsius(0.0),
                     reboot_temperature: Celsius(50.0),
-                    poll_interval: Seconds(1.0),
+                    poll_interval: Seconds(1.99),
                     filter_time_constant: Seconds(10.0),
                 },
                 TemperatureInputConfig {
@@ -759,7 +759,7 @@ mod tests {
                     fake_driver_path_1: {
                         onset_temperature_c: 0.0,
                         reboot_temperature_c: 50.0,
-                        poll_interval_s: 1.0,
+                        poll_interval_s: 1.99,
                         filter_time_constant_s: 10.0,
                         thermal_load: 20u64
                     },

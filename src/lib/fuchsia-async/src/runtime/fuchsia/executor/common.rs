@@ -192,11 +192,8 @@ impl Inner {
         }
     }
 
-    pub fn require_real_time(&self) -> Result<(), ()> {
-        match self.time {
-            ExecutorTime::RealTime => Ok(()),
-            ExecutorTime::FakeTime(_) => Err(()),
-        }
+    pub fn is_real_time(&self) -> bool {
+        matches!(self.time, ExecutorTime::RealTime)
     }
 
     /// Must be called before `on_parent_drop`.
