@@ -55,12 +55,16 @@ void NodeRemovalTracker::CheckRemovalDone() {
       }
     }
   }
-  LOGF(DEBUG, "NodeRemovalTracker: %d pkg %d all remaining", pkg_count, all_count);
+
+  // TODO(fxb/130850): Remove logs or lower their severity once the ASAN issue is resolved.
+  LOGF(INFO, "NodeRemovalTracker: %d pkg %d all remaining", pkg_count, all_count);
   if (pkg_callback_ && pkg_count == 0) {
+    LOGF(INFO, "NodeRemovalTracker: package removal completed");
     pkg_callback_();
     pkg_callback_ = nullptr;
   }
   if (all_callback_ && all_count == 0) {
+    LOGF(INFO, "NodeRemovalTracker: all nodes removed");
     all_callback_();
     all_callback_ = nullptr;
     nodes_.clear();
