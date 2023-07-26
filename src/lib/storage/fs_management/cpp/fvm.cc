@@ -582,20 +582,9 @@ zx::result<fuchsia_hardware_block_volume::wire::VolumeManagerInfo> FvmQuery(int 
 }
 
 __EXPORT
-zx::result<fbl::unique_fd> OpenPartition(const PartitionMatcher& matcher, bool wait,
-                                         std::string* out_path) {
-  zx::result dir = component::Connect<fuchsia_io::Directory>(kBlockDevPath);
-  if (dir.is_error()) {
-    return dir.take_error();
-  }
-
-  return OpenPartitionImpl(*std::move(dir), kBlockDevPath, matcher, wait, out_path);
-}
-
-__EXPORT
-zx::result<fbl::unique_fd> OpenPartitionWithDevfs(int devfs_root_fd,
-                                                  const PartitionMatcher& matcher, bool wait,
-                                                  std::string* out_path_relative) {
+zx::result<fbl::unique_fd> OpenPartitionWithDevfsFd(int devfs_root_fd,
+                                                    const PartitionMatcher& matcher, bool wait,
+                                                    std::string* out_path_relative) {
   fdio_cpp::UnownedFdioCaller caller(devfs_root_fd);
   zx::result dir =
       component::ConnectAt<fuchsia_io::Directory>(caller.directory(), kBlockDevRelativePath);
@@ -632,18 +621,27 @@ zx::result<fidl::ClientEnd<fuchsia_device::Controller>> OpenPartitionWithDevfs(
 
 __EXPORT
 zx::result<> DestroyPartition(const PartitionMatcher& matcher, bool wait) {
-  zx::result fd = OpenPartition(matcher, wait, nullptr);
-  if (fd.is_error()) {
-    return fd.take_error();
+  zx::result controller = OpenPartition(matcher, wait);
+  if (controller.is_error()) {
+    return controller.take_error();
   }
-  fdio_cpp::FdioCaller caller(std::move(fd.value()));
-  return DestroyPartitionImpl(caller.borrow_as<fuchsia_hardware_block_volume::Volume>());
+  fidl::ClientEnd<fuchsia_hardware_block_volume::Volume> volume;
+  zx::result server = fidl::CreateEndpoints(&volume);
+  if (server.is_error()) {
+    return server.take_error();
+  }
+  if (fidl::OneWayStatus status =
+          fidl::WireCall(controller.value())->ConnectToDeviceFidl(server->TakeChannel());
+      !status.ok()) {
+    return zx::error(status.status());
+  }
+  return DestroyPartitionImpl(volume.borrow());
 }
 
 __EXPORT
 zx::result<> DestroyPartitionWithDevfs(int devfs_root_fd, const PartitionMatcher& matcher,
                                        bool wait) {
-  zx::result fd = OpenPartitionWithDevfs(devfs_root_fd, matcher, wait, nullptr);
+  zx::result fd = OpenPartitionWithDevfsFd(devfs_root_fd, matcher, wait, nullptr);
   if (fd.is_error()) {
     return fd.take_error();
   }

@@ -82,11 +82,10 @@ struct PartitionMatcher {
 };
 
 // Waits for a partition to appear which matches |matcher|, and opens it.
-zx::result<fbl::unique_fd> OpenPartition(const PartitionMatcher& matcher, bool wait,
-                                         std::string* out_path);
-zx::result<fbl::unique_fd> OpenPartitionWithDevfs(int devfs_root_fd,
-                                                  const PartitionMatcher& matcher, bool wait,
-                                                  std::string* out_path_relative);
+// TODO(https://fxbug.dev/127870): Use the non-fd versions of these functions.
+zx::result<fbl::unique_fd> OpenPartitionWithDevfsFd(int devfs_root_fd,
+                                                    const PartitionMatcher& matcher, bool wait,
+                                                    std::string* out_path_relative);
 
 zx::result<fidl::ClientEnd<fuchsia_device::Controller>> OpenPartition(
     const PartitionMatcher& matcher, bool wait = true);

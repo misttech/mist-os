@@ -128,12 +128,14 @@ TEST(FvmSparseImageReaderTest, PartitionsInImagePassFsck) {
       .type_guids = {GUID_DATA_VALUE},
   };
 
-  ASSERT_EQ(fs_management::OpenPartition(matcher, true, nullptr).status_value(), ZX_OK);
+  ASSERT_EQ(fs_management::OpenPartition(matcher, true).status_value(), ZX_OK);
 
   // Attempt to fsck minfs.
   {
-    std::string path;
-    ASSERT_EQ(fs_management::OpenPartition(matcher, true, &path).status_value(), ZX_OK);
+    zx::result partition = fs_management::OpenPartition(matcher, true);
+    ASSERT_EQ(ZX_OK, partition.status_value());
+    fidl::WireResult path = fidl::WireCall(partition.value())->GetTopologicalPath();
+    ASSERT_EQ(ZX_OK, path.status());
 
     // And finally run fsck on the volume.
     fs_management::FsckOptions options{
@@ -143,16 +145,20 @@ TEST(FvmSparseImageReaderTest, PartitionsInImagePassFsck) {
         .force = true,
     };
     auto component = fs_management::FsComponent::FromDiskFormat(fs_management::kDiskFormatMinfs);
-    EXPECT_EQ(fs_management::Fsck(path, component, options), ZX_OK);
+    EXPECT_EQ(fs_management::Fsck(path->value()->path.get(), component, options), ZX_OK);
   }
 
   // Attempt to fsck blobfs.
   {
-    std::string path;
     fs_management::PartitionMatcher matcher{
         .type_guids = {GUID_BLOB_VALUE},
     };
-    ASSERT_EQ(fs_management::OpenPartition(matcher, true, &path).status_value(), ZX_OK);
+    zx::result partition = fs_management::OpenPartition(matcher, true);
+    ASSERT_EQ(ZX_OK, partition.status_value());
+    fidl::WireResult path = fidl::WireCall(partition.value())->GetTopologicalPath();
+    ASSERT_EQ(ZX_OK, path.status());
+
+    ASSERT_EQ(fs_management::OpenPartition(matcher, true).status_value(), ZX_OK);
 
     // And finally run fsck on the volume.
     fs_management::FsckOptions options{
@@ -162,7 +168,7 @@ TEST(FvmSparseImageReaderTest, PartitionsInImagePassFsck) {
         .force = true,
     };
     auto component = fs_management::FsComponent::FromDiskFormat(fs_management::kDiskFormatBlobfs);
-    EXPECT_EQ(fs_management::Fsck(path, component, options), ZX_OK);
+    EXPECT_EQ(fs_management::Fsck(path->value()->path.get(), component, options), ZX_OK);
   }
 }
 

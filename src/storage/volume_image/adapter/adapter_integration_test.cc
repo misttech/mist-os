@@ -223,19 +223,26 @@ fpromise::result<storage::RamDisk, std::string> LaunchFvm(zx::vmo& fvm_vmo) {
 
 void CheckPartitionsInRamdisk(const FvmDescriptor& fvm_descriptor) {
   for (const auto& partition : fvm_descriptor.partitions()) {
-    std::string partition_path;
     fs_management::PartitionMatcher matcher{
         .type_guids = {uuid::Uuid(partition.volume().type.data())},
     };
-    auto partition_fd_or = fs_management::OpenPartition(matcher, true, &partition_path);
-    ASSERT_EQ(partition_fd_or.status_value(), ZX_OK);
+    zx::result partition_or = fs_management::OpenPartition(matcher, true);
+    ASSERT_EQ(partition_or.status_value(), ZX_OK);
+
+    fidl::WireResult topo_result = fidl::WireCall(partition_or.value())->GetTopologicalPath();
+    ASSERT_EQ(topo_result.status(), ZX_OK);
+    std::string partition_path = std::string(topo_result->value()->path.get());
 
     if (partition.volume().name == "my-empty-partition") {
       // Check that allocated slices are equal to the slice count for max bytes.
-      fdio_cpp::FdioCaller caller(std::move(partition_fd_or.value()));
-      zx::result channel = caller.take_as<fuchsia_hardware_block_volume::Volume>();
-      ASSERT_TRUE(channel.is_ok()) << channel.status_string();
-      zx::result device = block_client::RemoteBlockDevice::Create(std::move(channel.value()));
+      fidl::ClientEnd<fuchsia_hardware_block_volume::Volume> volume;
+      zx::result server = fidl::CreateEndpoints(&volume);
+      ASSERT_EQ(server.status_value(), ZX_OK);
+      ASSERT_EQ(
+          fidl::WireCall(partition_or.value())->ConnectToDeviceFidl(server->TakeChannel()).status(),
+          ZX_OK);
+
+      zx::result device = block_client::RemoteBlockDevice::Create(std::move(volume));
       ASSERT_TRUE(device.is_ok()) << device.status_string();
       std::unique_ptr<block_client::RemoteBlockDevice> block_device = std::move(device.value());
       std::array<uint64_t, 2> slice_start = {0, 2};
@@ -259,10 +266,14 @@ void CheckPartitionsInRamdisk(const FvmDescriptor& fvm_descriptor) {
 
     if (partition.volume().name == "internal") {
       // Check that allocated slices are equal to the slice count for max bytes.
-      fdio_cpp::FdioCaller caller(std::move(partition_fd_or.value()));
-      zx::result channel = caller.take_as<fuchsia_hardware_block_volume::Volume>();
-      ASSERT_TRUE(channel.is_ok()) << channel.status_string();
-      zx::result device = block_client::RemoteBlockDevice::Create(std::move(channel.value()));
+      fidl::ClientEnd<fuchsia_hardware_block_volume::Volume> volume;
+      zx::result server = fidl::CreateEndpoints(&volume);
+      ASSERT_EQ(server.status_value(), ZX_OK);
+      ASSERT_EQ(
+          fidl::WireCall(partition_or.value())->ConnectToDeviceFidl(server->TakeChannel()).status(),
+          ZX_OK);
+
+      zx::result device = block_client::RemoteBlockDevice::Create(std::move(volume));
       ASSERT_TRUE(device.is_ok()) << device.status_string();
       std::unique_ptr<block_client::RemoteBlockDevice> block_device = std::move(device.value());
       std::array<uint64_t, 2> slice_start = {0, 4};

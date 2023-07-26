@@ -84,6 +84,36 @@ size_t UsableSlicesCount(size_t disk_size, size_t slice_size) {
       .GetAllocationTableUsedEntryCount();
 }
 
+struct PartitionChannel {
+  fidl::UnownedClientEnd<fuchsia_hardware_block::Block> as_block() {
+    return fidl::UnownedClientEnd<fuchsia_hardware_block::Block>(partition.channel().borrow());
+  }
+
+  fidl::UnownedClientEnd<fuchsia_hardware_block_volume::Volume> as_volume() {
+    return fidl::UnownedClientEnd<fuchsia_hardware_block_volume::Volume>(
+        partition.channel().borrow());
+  }
+
+  static zx::result<PartitionChannel> Create(
+      fidl::ClientEnd<fuchsia_device::Controller> controller) {
+    PartitionChannel partition;
+    partition.controller = std::move(controller);
+    zx::result partition_server = fidl::CreateEndpoints(&partition.partition);
+    if (partition_server.is_error()) {
+      return partition_server.take_error();
+    }
+    if (fidl::OneWayStatus status = fidl::WireCall(partition.controller)
+                                        ->ConnectToDeviceFidl(partition_server->TakeChannel());
+        !status.ok()) {
+      return zx::error(status.status());
+    }
+    return zx::ok(std::move(partition));
+  }
+
+  fidl::ClientEnd<fuchsia_device::Controller> controller;
+  fidl::ClientEnd<fuchsia_hardware_block_partition::Partition> partition;
+};
+
 using driver_integration_test::IsolatedDevmgr;
 
 class FvmTest : public zxtest::Test {
@@ -151,36 +181,6 @@ class FvmTest : public zxtest::Test {
   void CreateFVM(uint64_t block_size, uint64_t block_count, uint64_t slice_size);
 
   void CreateRamdisk(uint64_t block_size, uint64_t block_count);
-
-  struct PartitionChannel {
-    fidl::UnownedClientEnd<fuchsia_hardware_block::Block> as_block() {
-      return fidl::UnownedClientEnd<fuchsia_hardware_block::Block>(partition.channel().borrow());
-    }
-
-    fidl::UnownedClientEnd<fuchsia_hardware_block_volume::Volume> as_volume() {
-      return fidl::UnownedClientEnd<fuchsia_hardware_block_volume::Volume>(
-          partition.channel().borrow());
-    }
-
-    static zx::result<PartitionChannel> Create(
-        fidl::ClientEnd<fuchsia_device::Controller> controller) {
-      PartitionChannel partition;
-      partition.controller = std::move(controller);
-      zx::result partition_server = fidl::CreateEndpoints(&partition.partition);
-      if (partition_server.is_error()) {
-        return partition_server.take_error();
-      }
-      if (fidl::OneWayStatus status = fidl::WireCall(partition.controller)
-                                          ->ConnectToDeviceFidl(partition_server->TakeChannel());
-          !status.ok()) {
-        return zx::error(status.status());
-      }
-      return zx::ok(std::move(partition));
-    }
-
-    fidl::ClientEnd<fuchsia_device::Controller> controller;
-    fidl::ClientEnd<fuchsia_hardware_block_partition::Partition> partition;
-  };
 
   zx::result<PartitionChannel> OpenPartition(const fs_management::PartitionMatcher& matcher) const {
     zx::result controller =
@@ -2008,6 +2008,7 @@ void CorruptMountHelper(const fbl::unique_fd& devfs_root, const char* partition_
                         const fs_management::MountOptions& mounting_options,
                         fs_management::DiskFormat disk_format, const size_t* vslice_start,
                         size_t vslice_count) {
+  fdio_cpp::UnownedFdioCaller devfs_caller(devfs_root.get());
   auto component = fs_management::FsComponent::FromDiskFormat(disk_format);
   // Format the VPart as |disk_format|.
   ASSERT_EQ(fs_management::Mkfs(partition_path, component, {}), ZX_OK);
@@ -2017,15 +2018,15 @@ void CorruptMountHelper(const fbl::unique_fd& devfs_root, const char* partition_
 
   // Check initial slice allocation.
   {
-    zx::result vp_fd_or =
-        fs_management::OpenPartitionWithDevfs(devfs_root.get(), kPartition1Matcher, true, nullptr);
-    ASSERT_OK(vp_fd_or);
-    fdio_cpp::FdioCaller partition_caller(std::move(vp_fd_or.value()));
+    zx::result controller =
+        fs_management::OpenPartitionWithDevfs(devfs_caller.directory(), kPartition1Matcher, true);
+    ASSERT_OK(controller);
+    zx::result vp = PartitionChannel::Create(std::move(controller.value()));
+    ASSERT_OK(vp);
 
-    const fidl::WireResult result =
-        fidl::WireCall(partition_caller.borrow_as<fuchsia_hardware_block_volume::Volume>())
-            ->QuerySlices(fidl::VectorView<uint64_t>::FromExternal(
-                const_cast<size_t*>(vslice_start), vslice_count));
+    const fidl::WireResult result = fidl::WireCall(vp->as_volume())
+                                        ->QuerySlices(fidl::VectorView<uint64_t>::FromExternal(
+                                            const_cast<size_t*>(vslice_start), vslice_count));
     ASSERT_OK(result.status());
     const fidl::WireResponse response = result.value();
     ASSERT_OK(response.status);
@@ -2041,9 +2042,7 @@ void CorruptMountHelper(const fbl::unique_fd& devfs_root, const char* partition_
     uint64_t offset = vslice_start[0] + response.response[0].count - 1;
     uint64_t length = 1;
     {
-      const fidl::WireResult result =
-          fidl::WireCall(partition_caller.borrow_as<fuchsia_hardware_block_volume::Volume>())
-              ->Shrink(offset, length);
+      const fidl::WireResult result = fidl::WireCall(vp->as_volume())->Shrink(offset, length);
       ASSERT_OK(result.status());
       const fidl::WireResponse response = result.value();
       ASSERT_OK(response.status);
@@ -2051,10 +2050,9 @@ void CorruptMountHelper(const fbl::unique_fd& devfs_root, const char* partition_
 
     // Check slice allocation after manual grow/shrink
     {
-      const fidl::WireResult result =
-          fidl::WireCall(partition_caller.borrow_as<fuchsia_hardware_block_volume::Volume>())
-              ->QuerySlices(fidl::VectorView<uint64_t>::FromExternal(
-                  const_cast<size_t*>(vslice_start), vslice_count));
+      const fidl::WireResult result = fidl::WireCall(vp->as_volume())
+                                          ->QuerySlices(fidl::VectorView<uint64_t>::FromExternal(
+                                              const_cast<size_t*>(vslice_start), vslice_count));
       ASSERT_OK(result.status());
       const fidl::WireResponse response = result.value();
       ASSERT_OK(response.status);
@@ -2066,39 +2064,36 @@ void CorruptMountHelper(const fbl::unique_fd& devfs_root, const char* partition_
     // Try to mount the VPart. Since this mount call is supposed to fail, we wait for the spawned
     // fs process to finish and associated fidl channels to close before continuing to try and
     // prevent race conditions with the later mount call.
-    zx::result device = partition_caller.take_as<fuchsia_hardware_block::Block>();
-    ASSERT_OK(device);
-    ASSERT_NE(
-        fs_management::Mount(std::move(device.value()), component, mounting_options).status_value(),
-        ZX_OK);
+    fidl::ClientEnd device =
+        fidl::ClientEnd<fuchsia_hardware_block::Block>(vp->partition.TakeChannel());
+    ASSERT_NE(fs_management::Mount(std::move(device), component, mounting_options).status_value(),
+              ZX_OK);
 
     // We can't reuse the component.
     component = fs_management::FsComponent::FromDiskFormat(disk_format);
   }
 
   {
-    zx::result vp_fd_or =
-        fs_management::OpenPartitionWithDevfs(devfs_root.get(), kPartition1Matcher, true, nullptr);
-    ASSERT_OK(vp_fd_or);
-    fdio_cpp::FdioCaller partition_caller(std::move(vp_fd_or.value()));
+    zx::result controller =
+        fs_management::OpenPartitionWithDevfs(devfs_caller.directory(), kPartition1Matcher, true);
+    ASSERT_OK(controller);
+    zx::result vp = PartitionChannel::Create(std::move(controller.value()));
+    ASSERT_OK(vp);
 
     // Grow back the slice we shrunk earlier.
     uint64_t offset = vslice_start[0];
     uint64_t length = 1;
     {
-      const fidl::WireResult result =
-          fidl::WireCall(partition_caller.borrow_as<fuchsia_hardware_block_volume::Volume>())
-              ->Extend(offset, length);
+      const fidl::WireResult result = fidl::WireCall(vp->as_volume())->Extend(offset, length);
       ASSERT_OK(result.status());
       const fidl::WireResponse response = result.value();
       ASSERT_OK(response.status);
     }
 
     // Verify grow was successful.
-    const fidl::WireResult result =
-        fidl::WireCall(partition_caller.borrow_as<fuchsia_hardware_block_volume::Volume>())
-            ->QuerySlices(fidl::VectorView<uint64_t>::FromExternal(
-                const_cast<size_t*>(vslice_start), vslice_count));
+    const fidl::WireResult result = fidl::WireCall(vp->as_volume())
+                                        ->QuerySlices(fidl::VectorView<uint64_t>::FromExternal(
+                                            const_cast<size_t*>(vslice_start), vslice_count));
     ASSERT_OK(result.status());
     const fidl::WireResponse response = result.value();
     ASSERT_OK(response.status);
@@ -2114,9 +2109,7 @@ void CorruptMountHelper(const fbl::unique_fd& devfs_root, const char* partition_
       uint64_t offset = vslice_start[i] + response.response[i].count;
       uint64_t length = vslice_count - i;
       {
-        const fidl::WireResult result =
-            fidl::WireCall(partition_caller.borrow_as<fuchsia_hardware_block_volume::Volume>())
-                ->Extend(offset, length);
+        const fidl::WireResult result = fidl::WireCall(vp->as_volume())->Extend(offset, length);
         ASSERT_OK(result.status());
         const fidl::WireResponse response = result.value();
         ASSERT_OK(response.status);
@@ -2125,10 +2118,9 @@ void CorruptMountHelper(const fbl::unique_fd& devfs_root, const char* partition_
 
     // Verify that the extensions were successful.
     {
-      const fidl::WireResult result =
-          fidl::WireCall(partition_caller.borrow_as<fuchsia_hardware_block_volume::Volume>())
-              ->QuerySlices(fidl::VectorView<uint64_t>::FromExternal(
-                  const_cast<size_t*>(vslice_start), vslice_count));
+      const fidl::WireResult result = fidl::WireCall(vp->as_volume())
+                                          ->QuerySlices(fidl::VectorView<uint64_t>::FromExternal(
+                                              const_cast<size_t*>(vslice_start), vslice_count));
       ASSERT_OK(result.status());
       const fidl::WireResponse response = result.value();
       ASSERT_OK(response.status);
@@ -2140,23 +2132,22 @@ void CorruptMountHelper(const fbl::unique_fd& devfs_root, const char* partition_
     }
 
     // Try mount again.
-    zx::result device = partition_caller.take_as<fuchsia_hardware_block::Block>();
-    ASSERT_OK(device);
-    ASSERT_EQ(
-        fs_management::Mount(std::move(device.value()), component, mounting_options).status_value(),
-        ZX_OK);
+    fidl::ClientEnd device =
+        fidl::ClientEnd<fuchsia_hardware_block::Block>(vp->partition.TakeChannel());
+    ASSERT_EQ(fs_management::Mount(std::move(device), component, mounting_options).status_value(),
+              ZX_OK);
   }
 
-  zx::result vp_fd_or =
-      fs_management::OpenPartitionWithDevfs(devfs_root.get(), kPartition1Matcher, true, nullptr);
-  ASSERT_OK(vp_fd_or);
-  fdio_cpp::FdioCaller partition_caller(std::move(vp_fd_or.value()));
+  zx::result controller =
+      fs_management::OpenPartitionWithDevfs(devfs_caller.directory(), kPartition1Matcher, true);
+  ASSERT_OK(controller);
+  zx::result vp = PartitionChannel::Create(std::move(controller.value()));
+  ASSERT_OK(vp);
 
   // Verify that slices were fixed on mount.
-  const fidl::WireResult result =
-      fidl::WireCall(partition_caller.borrow_as<fuchsia_hardware_block_volume::Volume>())
-          ->QuerySlices(fidl::VectorView<uint64_t>::FromExternal(const_cast<size_t*>(vslice_start),
-                                                                 vslice_count));
+  const fidl::WireResult result = fidl::WireCall(vp->as_volume())
+                                      ->QuerySlices(fidl::VectorView<uint64_t>::FromExternal(
+                                          const_cast<size_t*>(vslice_start), vslice_count));
   ASSERT_OK(result.status());
   const fidl::WireResponse response = result.value();
   ASSERT_OK(response.status);

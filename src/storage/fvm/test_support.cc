@@ -218,7 +218,7 @@ std::unique_ptr<VPartitionAdapter> VPartitionAdapter::Create(const fbl::unique_f
       .instance_guids = {uuid::Uuid(guid.data())},
   };
   zx::result device_fd_or =
-      fs_management::OpenPartitionWithDevfs(devfs_root.get(), matcher, true, &out_path);
+      fs_management::OpenPartitionWithDevfsFd(devfs_root.get(), matcher, true, &out_path);
   if (device_fd_or.is_error()) {
     ADD_FAILURE("Unable to obtain handle for partition.");
     return nullptr;
@@ -252,7 +252,7 @@ zx_status_t VPartitionAdapter::Reconnect() {
       .type_guids = {uuid::Uuid(type_.data())},
       .instance_guids = {uuid::Uuid(guid_.data())},
   };
-  zx::result fd = fs_management::OpenPartitionWithDevfs(devfs_root_.get(), matcher, true, &path_);
+  zx::result fd = fs_management::OpenPartitionWithDevfsFd(devfs_root_.get(), matcher, true, &path_);
   if (fd.is_error()) {
     return fd.status_value();
   }

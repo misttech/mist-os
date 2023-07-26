@@ -293,8 +293,7 @@ TEST(Flash, DeletePartition) {
   fs_management::PartitionMatcher matcher{
       .type_guids = {kTestPartGUID},
   };
-  ASSERT_STATUS(fs_management::OpenPartition(matcher, false, nullptr).status_value(),
-                ZX_ERR_NOT_FOUND);
+  ASSERT_STATUS(fs_management::OpenPartition(matcher, false).status_value(), ZX_ERR_NOT_FOUND);
 }
 
 }  // namespace
