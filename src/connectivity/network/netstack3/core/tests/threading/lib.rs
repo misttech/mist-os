@@ -185,7 +185,7 @@ impl TestIpExt for Ipv4 {
 
 impl TestIpExt for Ipv6 {
     const DEVICE_ADDR: Self::Addr = net_ip_v6!("2001:db8::1");
-    const DEVICE_SUBNET: Subnet<Self::Addr> = net_subnet_v6!("2001:db8::/128");
+    const DEVICE_SUBNET: Subnet<Self::Addr> = net_subnet_v6!("2001:db8::1/128");
     const DEVICE_GATEWAY: Subnet<Self::Addr> = net_subnet_v6!("2001:db8::/64");
     const NEIGHBOR_ADDR: Self::Addr = net_ip_v6!("2001:db8::2");
 
