@@ -53,11 +53,11 @@ use crate::{
         datagram::{
             self, AddrEntry, BoundSockets as DatagramBoundSockets, ConnState, ConnectError,
             DatagramBoundStateContext, DatagramFlowId, DatagramSocketSpec, DatagramSocketStateSpec,
-            DatagramStateContext, DatagramStateNonSyncContext, ExpectedConnError,
-            ExpectedUnboundError, FoundSockets, InUseError, ListenerState,
-            LocalIdentifierAllocator, MulticastMembershipInterfaceSelector,
-            SendError as DatagramSendError, SetMulticastMembershipError, Shutdown, ShutdownType,
-            SocketHopLimits, SocketInfo as DatagramSocketInfo, SocketState as DatagramSocketState,
+            DatagramStateContext, ExpectedConnError, ExpectedUnboundError, FoundSockets,
+            InUseError, ListenerState, LocalIdentifierAllocator,
+            MulticastMembershipInterfaceSelector, SendError as DatagramSendError,
+            SetMulticastMembershipError, Shutdown, ShutdownType, SocketHopLimits,
+            SocketInfo as DatagramSocketInfo, SocketState as DatagramSocketState,
             SocketsState as DatagramSocketsState,
         },
         AddrVec, Bound, BoundSocketMap, IncompatibleError, InsertError, RemoveResult,
@@ -399,6 +399,13 @@ impl<I: IpExt, D: WeakId> DatagramSocketSpec<I, D, IpPortSpec> for Udp<I, D> {
             *remote_port,
         ))
     }
+
+    fn try_alloc_listen_identifier(
+        rng: &mut impl crate::RngContext,
+        is_available: impl Fn(NonZeroU16) -> Result<(), InUseError>,
+    ) -> Option<NonZeroU16> {
+        try_alloc_listen_port::<I, D>(rng, is_available)
+    }
 }
 
 enum LookupResult<I: Ip, D: Id> {
@@ -685,8 +692,8 @@ fn lookup<'s, I: Ip + IpExt, D: WeakId>(
 /// Helper function to allocate a listen port.
 ///
 /// Finds a random ephemeral port that is not in the provided `used_ports` set.
-fn try_alloc_listen_port<I: IpExt, C: StateNonSyncContext<I>, D: WeakId>(
-    ctx: &mut C,
+fn try_alloc_listen_port<I: IpExt, D: WeakId>(
+    ctx: &mut impl RngContext,
     is_available: impl Fn(NonZeroU16) -> Result<(), InUseError>,
 ) -> Option<NonZeroU16> {
     let mut port = UdpBoundSocketMap::<I, D>::rand_ephemeral(&mut ctx.rng());
@@ -1585,17 +1592,6 @@ impl<I: IpExt, C: StateNonSyncContext<I>, SC: BoundStateContext<I, C>>
         cb: F,
     ) -> O {
         self.without_bound_sockets(cb)
-    }
-}
-
-impl<I: IpExt, D: WeakId, C: StateNonSyncContext<I>>
-    DatagramStateNonSyncContext<IpPortSpec, Udp<I, D>> for C
-{
-    fn try_alloc_listen_identifier(
-        &mut self,
-        is_available: impl Fn(NonZeroU16) -> Result<(), InUseError>,
-    ) -> Option<NonZeroU16> {
-        try_alloc_listen_port::<_, _, D>(self, is_available)
     }
 }
 

@@ -23,6 +23,7 @@ use thiserror::Error;
 
 use crate::{
     algorithm::ProtocolFlowId,
+    context::RngContext,
     data_structures::{
         id_map::{Entry as IdMapEntry, EntryKey, IdMap},
         socketmap::Tagged,
@@ -483,17 +484,9 @@ where
         -> O;
 }
 
-pub(crate) trait DatagramStateNonSyncContext<A: SocketMapAddrSpec, S: SocketMapStateSpec> {
-    /// Attempts to allocate an identifier for a listener.
-    ///
-    /// `is_available` checks whether the provided address could be used without
-    /// conflicting with any existing entries in state context's socket map,
-    /// returning an error otherwise.
-    fn try_alloc_listen_identifier(
-        &mut self,
-        is_available: impl Fn(A::LocalIdentifier) -> Result<(), InUseError>,
-    ) -> Option<A::LocalIdentifier>;
-}
+pub(crate) trait DatagramStateNonSyncContext<A: SocketMapAddrSpec, S>: RngContext {}
+
+impl<C: RngContext, A: SocketMapAddrSpec, S> DatagramStateNonSyncContext<A, S> for C {}
 
 pub(crate) trait BufferDatagramStateContext<
     I: IpExt,
@@ -700,6 +693,16 @@ pub(crate) trait DatagramSocketSpec<I: IpExt, D: Id, A: SocketMapAddrSpec>:
         body: B,
         addr: &ConnIpAddr<I::Addr, A::LocalIdentifier, A::RemoteIdentifier>,
     ) -> Self::Serializer<B>;
+
+    /// Attempts to allocate an identifier for a listener.
+    ///
+    /// `is_available` checks whether the provided address could be used without
+    /// conflicting with any existing entries in state context's socket map,
+    /// returning an error otherwise.
+    fn try_alloc_listen_identifier(
+        rng: &mut impl RngContext,
+        is_available: impl Fn(A::LocalIdentifier) -> Result<(), InUseError>,
+    ) -> Option<A::LocalIdentifier>;
 }
 
 pub(crate) struct InUseError;
@@ -866,7 +869,7 @@ where
         None => {
             let addr = addr.clone().map(|addr| addr.into_addr_zone().0);
             let sharing_options = Default::default();
-            ctx.try_alloc_listen_identifier(|identifier| {
+            S::try_alloc_listen_identifier(ctx, |identifier| {
                 let check_addr =
                     ListenerAddr { device: None, ip: ListenerIpAddr { identifier, addr } };
                 bound.listeners().could_insert(&check_addr, &sharing_options).map_err(|e| match e {
@@ -2115,6 +2118,12 @@ mod test {
         ) -> Self::Serializer<B> {
             body
         }
+        fn try_alloc_listen_identifier(
+            _ctx: &mut impl RngContext,
+            is_available: impl Fn(u8) -> Result<(), InUseError>,
+        ) -> Option<u8> {
+            (0..=u8::MAX).find(|i| is_available(*i).is_ok())
+        }
     }
 
     impl SocketMapAddrStateSpec for Id {
@@ -2276,18 +2285,6 @@ mod test {
         ) -> O {
             let Self { outer: _, inner } = self;
             cb(inner)
-        }
-    }
-
-    impl<I: DatagramIpExt + IpLayerIpExt, D: FakeStrongDeviceId + 'static>
-        DatagramStateNonSyncContext<FakeAddrSpec, FakeStateSpec<I, FakeWeakDeviceId<D>>>
-        for FakeNonSyncCtx<(), (), ()>
-    {
-        fn try_alloc_listen_identifier(
-            &mut self,
-            is_available: impl Fn(u8) -> Result<(), InUseError>,
-        ) -> Option<u8> {
-            (0..=u8::MAX).find(|i| is_available(*i).is_ok())
         }
     }
 
