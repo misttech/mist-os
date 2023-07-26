@@ -586,10 +586,12 @@ def main():
         cur = ""
         result = []
         for t in rust_targets:
+            disable = None
             if meta := project.rust_targets[t["label"]].get("metadata"):
-                if disable := meta.get("disable_rustdoc"):
-                    if disable == [True]:
-                        continue
+                disable = meta.get("disable_rustdoc")
+            if disable == [True] or (t["type"] == "executable" and
+                                     disable != [False]):
+                continue
             l = t["label"].replace(".actual", "")
             base = l.split("(")[0]
             is_host = "(//build/toolchain:host" in l
