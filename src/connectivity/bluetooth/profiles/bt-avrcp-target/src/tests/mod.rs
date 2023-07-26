@@ -485,11 +485,10 @@ fn test_media_and_avrcp_listener() -> Result<(), Error> {
         let res = watcher_client.session_updated(session1_id.0, &delta1).await;
         assert_eq!(Ok(()), res.map_err(|e| format!("{}", e)));
 
-        // We expect the `watch` future to have resolved now that an update has been received.
-        let expected = Notification { track_id: Some(0), ..Default::default() };
+        // We expect the `watch` future to resolve now that an update has been received.
         assert_eq!(
-            Poll::Ready(Ok(Ok(expected))),
-            futures::poll!(&mut watch).map_err(|e| format!("{}", e))
+            watch.await.map_err(|e| format!("{e}")),
+            Ok(Ok(Notification { track_id: Some(0), ..Default::default() }))
         );
 
         // Test the special case TrackPosChanged event.

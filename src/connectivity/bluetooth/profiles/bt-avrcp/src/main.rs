@@ -165,7 +165,6 @@ mod tests {
     use super::*;
     use bt_metrics::{respond_to_metrics_req_for_test, MetricsLogger};
     use fidl_fuchsia_metrics::*;
-    use fuchsia_async::{Time, WaitState};
 
     use crate::profile::{AvrcpControllerFeatures, AvrcpProtocolVersion};
 
@@ -206,7 +205,7 @@ mod tests {
 
         // Running the background task should empty out the executor of things to do.
         let _ = exec.run_until_stalled(&mut futures::future::pending::<()>());
-        assert_eq!(WaitState::Waiting(Time::INFINITE), exec.is_waiting());
+        assert_eq!(exec.next_timer(), None);
     }
 
     #[fuchsia::test]
@@ -237,6 +236,6 @@ mod tests {
 
         // Running the background task should empty out the executor of things to do.
         let _ = exec.run_until_stalled(&mut futures::future::pending::<()>());
-        assert_eq!(WaitState::Waiting(Time::INFINITE), exec.is_waiting());
+        assert_eq!(exec.next_timer(), None);
     }
 }

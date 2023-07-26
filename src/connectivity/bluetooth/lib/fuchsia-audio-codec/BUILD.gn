@@ -25,6 +25,7 @@ rustc_library("fuchsia-audio-codec") {
   ]
 
   test_deps = [
+    "//src/connectivity/bluetooth/lib/async-helpers:async-test-helpers",
     "//src/lib/fuchsia",
     "//src/lib/fuchsia-async",
     "//src/lib/testing/fixture",

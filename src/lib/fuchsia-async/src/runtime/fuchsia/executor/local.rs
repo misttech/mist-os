@@ -394,6 +394,11 @@ impl TestExecutor {
         })
     }
 
+    /// Returns the deadline for the next timer due to expire.
+    pub fn next_timer(&mut self) -> Option<Time> {
+        with_local_timer_heap(|timer_heap| timer_heap.next_deadline().map(|t| t.time()))
+    }
+
     #[cfg(test)]
     pub(crate) fn snapshot(&self) -> super::instrumentation::Snapshot {
         self.local.inner.collector.snapshot()

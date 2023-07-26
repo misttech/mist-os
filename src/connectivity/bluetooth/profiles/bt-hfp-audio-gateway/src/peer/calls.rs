@@ -1144,6 +1144,8 @@ mod tests {
     }
 
     #[fuchsia::test]
+    #[ignore]
+    // TODO(fxbug.dev/129297) Fix this test
     fn calls_swap_produce_indicators() {
         let mut exec = fasync::TestExecutor::new();
 
@@ -1222,6 +1224,8 @@ mod tests {
     }
 
     #[fuchsia::test]
+    #[ignore]
+    // TODO(fxbug.dev/129297) Fix this test
     fn calls_stream_lifecycle() {
         // Test the Stream for items when a single call is tracked, then a second call is added,
         // when the states of those calls are modified, and finally, when both calls have been

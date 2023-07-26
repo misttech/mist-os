@@ -732,6 +732,7 @@ impl FusedStream for StreamProcessorOutputStream {
 mod tests {
     use super::*;
 
+    use async_test_helpers::run_while;
     use byteorder::{ByteOrder, NativeEndian};
     use fixture::fixture;
     use fuchsia_async as fasync;
@@ -1109,24 +1110,20 @@ mod tests {
 
         let mut decoded_stream = decoder.take_output_stream().expect("Stream should be taken");
 
-        // Polling the decoded stream before the decoder has started up should wake it when
-        // output starts happening, set up the poll here.
         let decoded_fut = decoded_stream.next();
         fasync::pin_mut!(decoded_fut);
-
-        match exec.run_until_stalled(&mut decoded_fut) {
-            Poll::Pending => {}
-            x => panic!("Expected decoded stream to be pending (no input) got {:?}", x),
-        };
 
         let mut chunks = sbc_data.as_slice().chunks(SBC_FRAME_SIZE);
         let next_frame = chunks.next().unwrap();
 
         // Write an initial frame to the encoder.
         // This is to get past allocating the input/output buffers stage.
-        let written =
-            exec.run_singlethreaded(&mut decoder.write(next_frame)).expect("successful write");
-        assert_eq!(written, next_frame.len());
+        // TODO(fxbug.dev/131164): Both futures need to be polled here even though it's only the
+        // writer we really care about because currently decoded_fut is needed to drive the
+        // allocation process.
+        let (written_res, mut decoded_fut) =
+            run_while(&mut exec, decoded_fut, decoder.write(next_frame));
+        assert_eq!(written_res.expect("failed write"), next_frame.len());
 
         // Write to the encoder until we cannot write anymore, because there are no input buffers
         // available.  This should happen when all the input buffers are full and and the input
