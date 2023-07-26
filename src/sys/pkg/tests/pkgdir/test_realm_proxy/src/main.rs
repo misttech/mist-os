@@ -28,9 +28,8 @@ async fn main() -> Result<(), Error> {
     let system_image_package =
         SystemImageBuilder::new().static_packages(&[&test_package]).build().await;
     let blobfs = BlobfsRamdisk::start().await.expect("started blobfs");
-    let blobfs_root_dir = blobfs.root_dir().expect("getting blobfs root dir");
-    test_package.write_to_blobfs_dir(&blobfs_root_dir);
-    system_image_package.write_to_blobfs_dir(&blobfs_root_dir);
+    test_package.write_to_blobfs(&blobfs).await;
+    system_image_package.write_to_blobfs(&blobfs).await;
 
     let blobfs_client = blobfs.client();
     let (client, server) = fidl::endpoints::create_proxy()?;

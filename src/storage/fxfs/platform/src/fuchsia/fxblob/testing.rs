@@ -8,8 +8,10 @@ use {
         volume::FxVolume,
     },
     async_trait::async_trait,
-    delivery_blob::{delivery_blob_path, CompressionMode, Type1Blob},
+    blob_writer::BlobWriter,
+    delivery_blob::{CompressionMode, Type1Blob},
     fidl_fuchsia_io::{self as fio, MAX_TRANSFER_SIZE},
+    fuchsia_component::client::connect_to_protocol_at_dir_svc,
     fuchsia_merkle::{Hash, MerkleTreeBuilder},
     fxfs::object_store::{directory::Directory, DataObjectHandle, HandleOptions, ObjectStore},
     storage_device::{fake_device::FakeDevice, DeviceHolder},
@@ -39,25 +41,30 @@ impl BlobFixture for TestFixture {
         let hash = builder.finish().root();
         let delivery_data: Vec<u8> = Type1Blob::generate(&data, CompressionMode::Never);
 
-        let blob = open_file_checked(
-            self.root(),
-            fio::OpenFlags::CREATE
-                | fio::OpenFlags::RIGHT_READABLE
-                | fio::OpenFlags::RIGHT_WRITABLE,
-            &format!("{}", delivery_blob_path(hash)),
-        )
-        .await;
-        blob.resize(delivery_data.len() as u64)
-            .await
-            .expect("FIDL call failed")
-            .expect("truncate failed");
-        for chunk in delivery_data.chunks(MAX_TRANSFER_SIZE as usize) {
-            assert_eq!(
-                blob.write(&chunk).await.expect("FIDL call failed").expect("write failed"),
-                chunk.len() as u64
-            );
-        }
+        let (blob_volume_outgoing_dir, server_end) =
+            fidl::endpoints::create_proxy::<fio::DirectoryMarker>()
+                .expect("Create dir proxy to succeed");
 
+        self.volumes_directory()
+            .serve_volume(self.volume(), server_end, true, true)
+            .await
+            .expect("failed to create_and_serve the blob volume");
+        let blob_proxy = connect_to_protocol_at_dir_svc::<fidl_fuchsia_fxfs::BlobCreatorMarker>(
+            &blob_volume_outgoing_dir,
+        )
+        .expect("failed to connect to the Blob service");
+
+        let blob_writer_client_end = blob_proxy
+            .create(&hash.into(), false)
+            .await
+            .expect("transport error on create")
+            .expect("failed to create blob");
+
+        let writer = blob_writer_client_end.into_proxy().unwrap();
+        let mut blob_writer = BlobWriter::create(writer, delivery_data.len() as u64)
+            .await
+            .expect("failed to create BlobWriter");
+        blob_writer.write(&delivery_data).await.unwrap();
         hash
     }
 

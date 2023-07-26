@@ -18,8 +18,8 @@ async fn expose_pkgfs_ctl_validation_missing_file() {
         .unwrap();
     let system_image_package =
         SystemImageBuilder::new().static_packages(&[&base_package_with_missing_blob]).build().await;
-    base_package_with_missing_blob.write_to_blobfs_dir(&blobfs.root_dir().unwrap());
-    system_image_package.write_to_blobfs_dir(&blobfs.root_dir().unwrap());
+    base_package_with_missing_blob.write_to_blobfs(&blobfs).await;
+    system_image_package.write_to_blobfs(&blobfs).await;
     let mut missing_blob = None;
     for blob_info in base_package_with_missing_blob.content_blob_files() {
         let hash = blob_info.merkle.to_string();

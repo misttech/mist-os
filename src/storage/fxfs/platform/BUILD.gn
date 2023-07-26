@@ -97,6 +97,7 @@ rustc_library("platform") {
       "//src/storage/fxfs:lib",
       "//src/storage/fxfs-crypt:lib",
       "//src/storage/fxfs/crypto/insecure",
+      "//src/storage/lib/blob_writer:blob-writer",
       "//src/sys/pkg/lib/fuchsia-merkle",
       "//third_party/rust_crates:assert_matches",
       "//third_party/rust_crates:rand",

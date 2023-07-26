@@ -125,7 +125,7 @@ mod tests {
         async fn new(system_image: SystemImageBuilder<'_>) -> (Self, SystemImage) {
             let blobfs = blobfs_ramdisk::BlobfsRamdisk::start().await.unwrap();
             let system_image = system_image.build().await;
-            system_image.write_to_blobfs_dir(&blobfs.root_dir().unwrap());
+            system_image.write_to_blobfs(&blobfs).await;
             let root_dir =
                 RootDir::new(blobfs.client(), *system_image.meta_far_merkle_root()).await.unwrap();
             (Self { _blobfs: blobfs }, SystemImage { root_dir })

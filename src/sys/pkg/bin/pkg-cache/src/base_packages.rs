@@ -174,16 +174,15 @@ mod tests {
             let blobfs = blobfs_ramdisk::BlobfsRamdisk::start().await.unwrap();
             let blobfs_client = blobfs.client();
 
-            let blobfs_dir = blobfs.root_dir().unwrap();
             for p in static_packages.iter().chain(subpackages) {
-                p.write_to_blobfs_dir(&blobfs_dir);
+                p.write_to_blobfs(&blobfs).await;
             }
 
             let system_image = fuchsia_pkg_testing::SystemImageBuilder::new()
                 .static_packages(static_packages)
                 .build()
                 .await;
-            system_image.write_to_blobfs_dir(&blobfs_dir);
+            system_image.write_to_blobfs(&blobfs).await;
 
             let inspector = finspect::Inspector::default();
 
@@ -362,10 +361,9 @@ mod tests {
     async fn base_packages_fails_when_loading_fails() {
         let blobfs = blobfs_ramdisk::BlobfsRamdisk::start().await.unwrap();
         let blobfs_client = blobfs.client();
-        let blobfs_dir = blobfs.root_dir().unwrap();
         // system_image package has no data/static_packages file
         let system_image = PackageBuilder::new("system_image").build().await.unwrap();
-        system_image.write_to_blobfs_dir(&blobfs_dir);
+        system_image.write_to_blobfs(&blobfs).await;
 
         let inspector = finspect::Inspector::default();
 

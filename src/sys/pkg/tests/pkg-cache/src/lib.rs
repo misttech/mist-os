@@ -329,6 +329,7 @@ async fn verify_packages_cached(proxy: &fpkg::PackageCacheProxy, packages: &[Pac
 trait Blobfs {
     fn root_proxy(&self) -> fio::DirectoryProxy;
     fn svc_dir(&self) -> fio::DirectoryProxy;
+    fn blob_creator_proxy(&self) -> Option<ffxfs::BlobCreatorProxy>;
 }
 
 impl Blobfs for BlobfsRamdisk {
@@ -337,6 +338,9 @@ impl Blobfs for BlobfsRamdisk {
     }
     fn svc_dir(&self) -> fio::DirectoryProxy {
         self.svc_dir().unwrap().unwrap()
+    }
+    fn blob_creator_proxy(&self) -> Option<ffxfs::BlobCreatorProxy> {
+        self.blob_creator_proxy().unwrap()
     }
 }
 
@@ -357,7 +361,7 @@ impl TestEnvBuilder<BoxFuture<'static, (BlobfsRamdisk, Option<Hash>)>> {
                         fuchsia_pkg_testing::SystemImageBuilder::new().build().await;
                     let blobfs =
                         BlobfsRamdisk::builder().implementation(blob_impl).start().await.unwrap();
-                    let () = system_image_package.write_to_blobfs_dir(&blobfs.root_dir().unwrap());
+                    let () = system_image_package.write_to_blobfs(&blobfs).await;
                     (blobfs, Some(*system_image_package.meta_far_merkle_root()))
                 }
                 .boxed()
@@ -412,10 +416,9 @@ where
     ) -> TestEnvBuilder<future::Ready<(BlobfsRamdisk, Option<Hash>)>> {
         assert_eq!(self.blob_implementation, None);
         let blobfs = BlobfsRamdisk::builder().impl_from_env().start().await.unwrap();
-        let root_dir = blobfs.root_dir().unwrap();
-        let () = system_image.write_to_blobfs_dir(&root_dir);
+        let () = system_image.write_to_blobfs(&blobfs).await;
         for pkg in extra_packages {
-            let () = pkg.write_to_blobfs_dir(&root_dir);
+            let () = pkg.write_to_blobfs(&blobfs).await;
         }
         let system_image_hash = *system_image.meta_far_merkle_root();
 
@@ -845,7 +848,8 @@ impl<B: Blobfs> TestEnv<B> {
     }
 
     async fn write_to_blobfs(&self, hash: &Hash, contents: &[u8]) {
-        let blobfs = blobfs::Client::new(self.blobfs.root_proxy(), None);
+        let blobfs =
+            blobfs::Client::new(self.blobfs.root_proxy(), self.blobfs.blob_creator_proxy());
         // c++blobfs supports uncompressed and delivery blobs and FxBlob only supports delivery
         // blobs, so we always write delivery blobs.
         let () = compress_and_write_blob(

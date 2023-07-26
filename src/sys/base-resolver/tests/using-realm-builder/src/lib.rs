@@ -46,10 +46,9 @@ impl TestEnvBuilder {
             .await;
 
         let blobfs = BlobfsRamdisk::start().await.unwrap();
-        let root_dir = blobfs.root_dir().unwrap();
-        let () = system_image.write_to_blobfs_dir(&root_dir);
+        let () = system_image.write_to_blobfs(&blobfs).await;
         for pkg in static_packages {
-            let () = pkg.write_to_blobfs_dir(&root_dir);
+            let () = pkg.write_to_blobfs(&blobfs).await;
         }
 
         Self {

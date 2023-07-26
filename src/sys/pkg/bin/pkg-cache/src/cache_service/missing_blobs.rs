@@ -303,7 +303,7 @@ mod tests {
             .await
             .unwrap();
         let (meta_far, content_blobs) = pkg.contents();
-        blobfs.add_blob_from(&meta_far.merkle, meta_far.contents.as_slice()).unwrap();
+        blobfs.add_blob_from(meta_far.merkle, meta_far.contents.as_slice()).await.unwrap();
         let root_dir = RootDir::new(blobfs.client(), *pkg.meta_far_merkle_root()).await.unwrap();
 
         let (missing_blobs, recv) =
@@ -329,7 +329,7 @@ mod tests {
             .build()
             .await
             .unwrap();
-        pkg.write_to_blobfs_dir(&blobfs.root_dir().unwrap());
+        pkg.write_to_blobfs(&blobfs).await;
         let root_dir = RootDir::new(blobfs.client(), *pkg.meta_far_merkle_root()).await.unwrap();
 
         let (missing_blobs, recv) =
@@ -357,7 +357,7 @@ mod tests {
             .await
             .unwrap();
         let (meta_far, content_blobs) = pkg.contents();
-        blobfs.add_blob_from(&meta_far.merkle, meta_far.contents.as_slice()).unwrap();
+        blobfs.add_blob_from(meta_far.merkle, meta_far.contents.as_slice()).await.unwrap();
         let root_dir = RootDir::new(blobfs.client(), *pkg.meta_far_merkle_root()).await.unwrap();
 
         let (missing_blobs, recv) =
@@ -384,7 +384,7 @@ mod tests {
             .await
             .unwrap();
         let (meta_far, content_blobs) = subpackage.contents();
-        blobfs.add_blob_from(&meta_far.merkle, meta_far.contents.as_slice()).unwrap();
+        blobfs.add_blob_from(meta_far.merkle, meta_far.contents.as_slice()).await.unwrap();
 
         let superpackage = PackageBuilder::new("superpackage")
             .add_resource_at("duplicate", "blob-contents".as_bytes())
@@ -393,7 +393,7 @@ mod tests {
             .await
             .unwrap();
         let (meta_far, _) = superpackage.contents();
-        blobfs.add_blob_from(&meta_far.merkle, meta_far.contents.as_slice()).unwrap();
+        blobfs.add_blob_from(meta_far.merkle, meta_far.contents.as_slice()).await.unwrap();
         let superpackage_root_dir =
             RootDir::new(blobfs.client(), *superpackage.meta_far_merkle_root()).await.unwrap();
 
@@ -429,7 +429,7 @@ mod tests {
             .await
             .unwrap();
         let (meta_far, _) = superpackage.contents();
-        blobfs.add_blob_from(&meta_far.merkle, meta_far.contents.as_slice()).unwrap();
+        blobfs.add_blob_from(meta_far.merkle, meta_far.contents.as_slice()).await.unwrap();
         let superpackage_root_dir =
             RootDir::new(blobfs.client(), *superpackage.meta_far_merkle_root()).await.unwrap();
 
@@ -462,7 +462,7 @@ mod tests {
             .await
             .unwrap();
         let (meta_far, _) = subpackage.contents();
-        blobfs.add_blob_from(&meta_far.merkle, meta_far.contents.as_slice()).unwrap();
+        blobfs.add_blob_from(meta_far.merkle, meta_far.contents.as_slice()).await.unwrap();
 
         let superpackage = PackageBuilder::new("superpackage")
             .add_subpackage("my-subpackage", &subpackage)
@@ -470,7 +470,7 @@ mod tests {
             .await
             .unwrap();
         let (meta_far, _) = superpackage.contents();
-        blobfs.add_blob_from(&meta_far.merkle, meta_far.contents.as_slice()).unwrap();
+        blobfs.add_blob_from(meta_far.merkle, meta_far.contents.as_slice()).await.unwrap();
         let superpackage_root_dir =
             RootDir::new(blobfs.client(), *superpackage.meta_far_merkle_root()).await.unwrap();
 
@@ -509,7 +509,8 @@ mod tests {
             .unwrap();
         let (superpackage_meta_far, superpackage_content_blobs) = superpackage.contents();
         blobfs
-            .add_blob_from(&superpackage_meta_far.merkle, superpackage_meta_far.contents.as_slice())
+            .add_blob_from(superpackage_meta_far.merkle, superpackage_meta_far.contents.as_slice())
+            .await
             .unwrap();
         let superpackage_root_dir =
             RootDir::new(blobfs.client(), *superpackage.meta_far_merkle_root()).await.unwrap();
@@ -557,7 +558,8 @@ mod tests {
             .unwrap();
         let (superpackage_meta_far, _) = superpackage.contents();
         blobfs
-            .add_blob_from(&superpackage_meta_far.merkle, superpackage_meta_far.contents.as_slice())
+            .add_blob_from(superpackage_meta_far.merkle, superpackage_meta_far.contents.as_slice())
+            .await
             .unwrap();
         let superpackage_root_dir =
             RootDir::new(blobfs.client(), *superpackage.meta_far_merkle_root()).await.unwrap();
@@ -577,7 +579,8 @@ mod tests {
         // Upgrades the hash of the subsubpackage meta.far from a content blob to a subpackage hash
         // but doesn't re-send (only appears once in the receiver).
         blobfs
-            .add_blob_from(&subpackage_meta_far.merkle, subpackage_meta_far.contents.as_slice())
+            .add_blob_from(subpackage_meta_far.merkle, subpackage_meta_far.contents.as_slice())
+            .await
             .unwrap();
         let () = missing_blobs.cache(&subpackage_meta_far.merkle).await.unwrap();
         assert_eq!(missing_blobs.count_not_cached(), 2);

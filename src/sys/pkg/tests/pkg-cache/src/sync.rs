@@ -13,6 +13,9 @@ impl crate::Blobfs for BrokenBlobfs {
     fn svc_dir(&self) -> fio::DirectoryProxy {
         fidl::endpoints::create_proxy::<fio::DirectoryMarker>().unwrap().0
     }
+    fn blob_creator_proxy(&self) -> Option<fidl_fuchsia_fxfs::BlobCreatorProxy> {
+        None
+    }
 }
 
 #[fuchsia::test]

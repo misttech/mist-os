@@ -747,10 +747,10 @@ mod tests {
         let blobfs = blobfs_ramdisk::BlobfsRamdisk::start().await.unwrap();
         let blobfs_dir = blobfs.root_dir().unwrap();
 
-        present_package0.write_to_blobfs_dir(&blobfs_dir);
-        missing_content_blob.write_to_blobfs_dir(&blobfs_dir);
-        missing_meta_far.write_to_blobfs_dir(&blobfs_dir);
-        present_package1.write_to_blobfs_dir(&blobfs_dir);
+        present_package0.write_to_blobfs(&blobfs).await;
+        missing_content_blob.write_to_blobfs(&blobfs).await;
+        missing_meta_far.write_to_blobfs(&blobfs).await;
+        present_package1.write_to_blobfs(&blobfs).await;
 
         for (hash, _) in missing_content_blob.contents().1 {
             blobfs_dir.remove_file(hash.to_string()).unwrap();

@@ -335,7 +335,7 @@ impl TestEnvBuilder<future::BoxFuture<'static, (BlobfsRamdisk, Option<Hash>)>, f
                         fuchsia_pkg_testing::SystemImageBuilder::new().build().await;
                     let blobfs =
                         BlobfsRamdisk::builder().implementation(blob_impl).start().await.unwrap();
-                    let () = system_image_package.write_to_blobfs_dir(&blobfs.root_dir().unwrap());
+                    let () = system_image_package.write_to_blobfs(&blobfs).await;
                     (blobfs, Some(*system_image_package.meta_far_merkle_root()))
                 }
                 .boxed()
@@ -406,10 +406,9 @@ where
     ) -> TestEnvBuilder<future::Ready<(BlobfsRamdisk, Option<Hash>)>, MountsFn> {
         assert_eq!(self.blob_implementation, None);
         let blobfs = BlobfsRamdisk::start().await.unwrap();
-        let root_dir = blobfs.root_dir().unwrap();
-        let () = system_image.write_to_blobfs_dir(&root_dir);
+        let () = system_image.write_to_blobfs(&blobfs).await;
         for pkg in extra_packages {
-            let () = pkg.write_to_blobfs_dir(&root_dir);
+            let () = pkg.write_to_blobfs(&blobfs).await;
         }
         let system_image_hash = *system_image.meta_far_merkle_root();
 

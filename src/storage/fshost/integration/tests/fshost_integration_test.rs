@@ -1054,6 +1054,7 @@ async fn delivery_blob_support_disabled() {
 }
 
 #[fuchsia::test]
+#[cfg_attr(feature = "fxblob", ignore)]
 async fn delivery_blob_support_enabled() {
     let mut builder = new_builder();
     builder
@@ -1087,6 +1088,57 @@ async fn delivery_blob_support_enabled() {
     let blob = fuchsia_fs::directory::open_file(
         &fixture.dir("blob", fio::OpenFlags::RIGHT_READABLE),
         HASH,
+        fio::OpenFlags::RIGHT_READABLE,
+    )
+    .await
+    .expect("Failed to open delivery blob for reading.");
+    // Read the last 1024 bytes of the file and ensure the bytes match the original `data`.
+    let len: u64 = 1024;
+    let offset: u64 = data.len().checked_sub(1024).unwrap() as u64;
+    let contents = blob.read_at(len, offset).await.unwrap().map_err(zx::Status::from_raw).unwrap();
+    assert_eq!(contents.as_slice(), &data[offset as usize..]);
+
+    fixture.tear_down().await;
+}
+
+#[fuchsia::test]
+#[cfg(feature = "fxblob")]
+async fn delivery_blob_support_enabled_fxblob() {
+    let mut builder = new_builder();
+    builder
+        .fshost()
+        .set_config_value("blobfs_allow_delivery_blobs", true)
+        .set_config_value("blobfs_max_bytes", BLOBFS_MAX_BYTES);
+    builder.with_disk().format_volumes(volumes_spec());
+    let fixture = builder.build().await;
+
+    let data: Vec<u8> = vec![0xff; 65536];
+    let mut merkle_tree_builder = MerkleTreeBuilder::new();
+    merkle_tree_builder.write(&data);
+    let hash = merkle_tree_builder.finish().root();
+    let payload = Type1Blob::generate(&data, CompressionMode::Always);
+
+    let blob_creator = fixture
+        .realm
+        .root
+        .connect_to_protocol_at_exposed_dir::<BlobCreatorMarker>()
+        .expect("connect_to_protocol_at_exposed_dir failed");
+    let blob_writer_client_end = blob_creator
+        .create(&hash.into(), false)
+        .await
+        .expect("transport error on create")
+        .expect("failed to create blob");
+
+    let writer = blob_writer_client_end.into_proxy().unwrap();
+    let mut blob_writer = BlobWriter::create(writer, payload.len() as u64)
+        .await
+        .expect("failed to create BlobWriter");
+    blob_writer.write(&payload).await.unwrap();
+
+    // We should now be able to open the blob by its hash and read the contents back.
+    let blob = fuchsia_fs::directory::open_file(
+        &fixture.dir("blob", fio::OpenFlags::RIGHT_READABLE),
+        &hash.to_string(),
         fio::OpenFlags::RIGHT_READABLE,
     )
     .await

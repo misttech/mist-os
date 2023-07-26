@@ -205,7 +205,7 @@ mod tests {
         ) -> (Self, Validation) {
             let blobfs = BlobfsRamdisk::start().await.unwrap();
             for (hash, contents) in blobfs_contents.into_iter() {
-                blobfs.add_blob_from(&hash, contents.as_slice()).unwrap()
+                blobfs.add_blob_from(hash, contents.as_slice()).await.unwrap()
             }
             let validation = Validation::new(blobfs.client(), base_blobs);
             (Self { _blobfs: blobfs }, validation)

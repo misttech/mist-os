@@ -192,7 +192,8 @@ impl BlobfsRamdiskBuilder {
                     continue;
                 }
                 blobfs
-                    .write_blob_sync(&blob.merkle, &blob.contents)
+                    .write_blob(blob.merkle, &blob.contents)
+                    .await
                     .context(format!("writing {}", blob.merkle))?;
                 present_blobs.insert(blob.merkle);
             }
@@ -357,22 +358,58 @@ impl BlobfsRamdisk {
     }
 
     /// Writes the blob to blobfs.
-    pub fn add_blob_from(
+    pub async fn add_blob_from(
         &self,
-        merkle: &Hash,
+        merkle: Hash,
         mut source: impl std::io::Read,
     ) -> Result<(), Error> {
         let mut bytes = vec![];
         source.read_to_end(&mut bytes)?;
-        self.write_blob_sync(merkle, &bytes)
+        self.write_blob(merkle, &bytes).await
     }
 
-    fn write_blob_sync(&self, merkle: &Hash, bytes: &[u8]) -> Result<(), Error> {
-        use std::io::Write as _;
-        let mut file = self.root_dir().unwrap().new_file(delivery_blob_path(merkle), 0o600)?;
-        let compressed_data = Type1Blob::generate(bytes, CompressionMode::Always);
-        file.set_len(compressed_data.len().try_into().unwrap())?;
-        file.write_all(&compressed_data)?;
+    /// Writes a blob with hash `merkle` and blob contents `bytes` to blobfs. `bytes` should be
+    /// uncompressed. Ignores AlreadyExists errors.
+    pub async fn write_blob(&self, merkle: Hash, bytes: &[u8]) -> Result<(), Error> {
+        let compressed_data = Type1Blob::generate(bytes, CompressionMode::Attempt);
+        match self.fs {
+            ServingFilesystem::SingleVolume(_) => {
+                use std::io::Write as _;
+                let mut file =
+                    match self.root_dir().unwrap().new_file(delivery_blob_path(&merkle), 0o600) {
+                        Ok(file) => file,
+                        Err(e) if e.kind() == std::io::ErrorKind::AlreadyExists => {
+                            // blob is being written or already written
+                            return Ok(());
+                        }
+                        Err(e) => {
+                            return Err(e.into());
+                        }
+                    };
+                file.set_len(compressed_data.len().try_into().unwrap())?;
+                file.write_all(&compressed_data)?;
+            }
+            ServingFilesystem::MultiVolume(_) => {
+                let blob_creator = self.blob_creator_proxy()?.ok_or_else(|| {
+                    anyhow!("The filesystem does not expose the BlobCreator service")
+                })?;
+                let writer_client_end = match blob_creator.create(&merkle.into(), false).await? {
+                    Ok(writer_client_end) => writer_client_end,
+                    Err(ffxfs::CreateBlobError::AlreadyExists) => {
+                        return Ok(());
+                    }
+                    Err(e) => {
+                        return Err(anyhow!("create blob error {:?}", e));
+                    }
+                };
+                let writer = writer_client_end.into_proxy()?;
+                let mut blob_writer =
+                    blob_writer::BlobWriter::create(writer, compressed_data.len() as u64)
+                        .await
+                        .context("failed to create BlobWriter")?;
+                blob_writer.write(&compressed_data).await?;
+            }
+        }
         Ok(())
     }
 
@@ -697,9 +734,11 @@ mod tests {
         let root = blobfs.root_dir().unwrap();
 
         assert_eq!(list_blobs(&root), Vec::<String>::new());
+        let data = "Hello blobfs!".as_bytes();
+        let merkle = fuchsia_merkle::MerkleTree::from_reader(data).unwrap().root();
+        blobfs.write_blob(merkle, data).await.unwrap();
 
-        let hello_merkle = write_blob(&root, "Hello blobfs!".as_bytes());
-        assert_eq!(list_blobs(&root), vec![hello_merkle]);
+        assert_eq!(list_blobs(&root), vec![merkle.to_string()]);
 
         drop(root);
         blobfs.stop().await.unwrap();

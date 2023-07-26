@@ -3,11 +3,14 @@
 // found in the LICENSE file.
 
 use {
+    blob_writer::BlobWriter,
     delivery_blob::{delivery_blob_path, CompressionMode, Type1Blob},
     device_watcher::{recursive_wait_and_open, recursive_wait_and_open_directory},
     fidl::endpoints::{create_proxy, Proxy as _, ServerEnd},
     fidl_fuchsia_device::{ControllerMarker, ControllerProxy},
-    fidl_fuchsia_fxfs::{CryptManagementMarker, CryptMarker, KeyPurpose, MountOptions},
+    fidl_fuchsia_fxfs::{
+        BlobCreatorProxy, CryptManagementMarker, CryptMarker, KeyPurpose, MountOptions,
+    },
     fidl_fuchsia_hardware_block::BlockMarker,
     fidl_fuchsia_io as fio, fidl_fuchsia_logger as flogger,
     fs_management::{
@@ -15,7 +18,9 @@ use {
         format::constants::{F2FS_MAGIC, FXFS_MAGIC, MINFS_MAGIC},
         Blobfs, Fxfs, BLOBFS_TYPE_GUID, DATA_TYPE_GUID, FVM_TYPE_GUID_STR,
     },
-    fuchsia_component::client::connect_to_named_protocol_at_dir_root,
+    fuchsia_component::client::{
+        connect_to_named_protocol_at_dir_root, connect_to_protocol_at_dir_svc,
+    },
     fuchsia_component_test::{Capability, ChildOptions, RealmBuilder, RealmInstance, Ref, Route},
     fuchsia_hash::Hash,
     fuchsia_merkle::MerkleTreeBuilder,
@@ -349,8 +354,11 @@ impl DiskBuilder {
             .create_volume("blob", MountOptions { crypt: None, as_blob: true })
             .await
             .expect("failed to create blob volume");
-        let blob_volume_root = blob_volume.root();
-        self.blob_hash = Some(self.write_test_blob(blob_volume_root, &BLOB_CONTENTS, true).await);
+        let blob_creator = connect_to_protocol_at_dir_svc::<fidl_fuchsia_fxfs::BlobCreatorMarker>(
+            blob_volume.exposed_dir(),
+        )
+        .expect("failed to connect to the Blob service");
+        self.blob_hash = Some(self.write_test_blob_fxblob(blob_creator, &BLOB_CONTENTS).await);
 
         if self.data_spec.format.is_some() {
             self.init_data_fxfs(FxfsType::FxBlob(fs, crypt_realm)).await;
@@ -600,8 +608,7 @@ impl DiskBuilder {
         fs.shutdown().await.expect("shutdown failed");
     }
 
-    /// Write a blob to the fxfs blob volume to ensure that on format, the blob volume does not get
-    /// wiped.
+    /// Write a blob to blobfs to ensure that on format, blobfs doesn't get wiped.
     async fn write_test_blob(
         &self,
         blob_volume_root: &fio::DirectoryProxy,
@@ -634,6 +641,28 @@ impl DiskBuilder {
                 chunk.len() as u64
             );
         }
+        hash
+    }
+
+    /// Write a blob to the fxfs blob volume to ensure that on format, the blob volume does not get
+    /// wiped.
+    async fn write_test_blob_fxblob(&self, blob_creator: BlobCreatorProxy, data: &[u8]) -> Hash {
+        let mut builder = MerkleTreeBuilder::new();
+        builder.write(&data);
+        let hash = builder.finish().root();
+        let compressed_data = Type1Blob::generate(&data, CompressionMode::Always);
+
+        let blob_writer_client_end = blob_creator
+            .create(&hash.into(), false)
+            .await
+            .expect("transport error on create")
+            .expect("failed to create blob");
+
+        let writer = blob_writer_client_end.into_proxy().unwrap();
+        let mut blob_writer = BlobWriter::create(writer, compressed_data.len() as u64)
+            .await
+            .expect("failed to create BlobWriter");
+        blob_writer.write(&compressed_data).await.unwrap();
         hash
     }
 

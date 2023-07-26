@@ -9,16 +9,13 @@ use {
     crate::fuchsia::{
         directory::FxDirectory,
         errors::map_to_status,
-        fxblob::{
-            blob::FxBlob,
-            writer::{BlobWriterProtocol, FxDeliveryBlob},
-        },
+        fxblob::{blob::FxBlob, writer::FxDeliveryBlob},
         node::{FxNode, GetResult, OpenedNode},
         volume::{FxVolume, RootDir},
     },
-    anyhow::{bail, ensure, Context, Error},
+    anyhow::{bail, ensure, Error},
     async_trait::async_trait,
-    delivery_blob::{delivery_blob_path, DELIVERY_PATH_PREFIX},
+    delivery_blob::DELIVERY_PATH_PREFIX,
     fidl::endpoints::{create_proxy, ClientEnd, Proxy as _, ServerEnd},
     fidl_fuchsia_fxfs::{
         BlobCreatorRequest, BlobCreatorRequestStream, BlobWriterMarker, BlobWriterRequest,
@@ -54,7 +51,6 @@ use {
             traversal_position::TraversalPosition,
         },
         execution_scope::ExecutionScope,
-        file::FidlIoConnection,
         path::Path,
         ToObjectRequest,
     },
@@ -129,10 +125,7 @@ impl BlobDirectory {
         let store = self.store();
         let fs = store.filesystem();
         let name = path.next().unwrap();
-        let (name, is_delivery_blob) = name
-            .strip_prefix(DELIVERY_PATH_PREFIX)
-            .map(|name| (name, true))
-            .unwrap_or((name, false));
+        let name = name.strip_prefix(DELIVERY_PATH_PREFIX).unwrap_or(name);
         let hash = Hash::from_str(name).map_err(|_| FxfsError::InvalidArgs)?;
 
         // TODO(fxbug.dev/122125): Create the transaction here if we might need to create the object
@@ -163,12 +156,6 @@ impl BlobDirectory {
 
                 ensure!(flags.contains(fio::OpenFlags::CREATE), FxfsError::NotFound);
                 ensure!(flags.contains(fio::OpenFlags::RIGHT_WRITABLE), FxfsError::AccessDenied);
-
-                if !is_delivery_blob {
-                    return Err(FxfsError::NotSupported)
-                        .context("Only delivery blobs (RFC 0207) are supported.");
-                }
-
                 let mut transaction = fs.clone().new_transaction(&keys, Options::default()).await?;
 
                 let handle = ObjectStore::create_object(
@@ -268,7 +255,7 @@ impl BlobDirectory {
             | fio::OpenFlags::CREATE_IF_ABSENT
             | fio::OpenFlags::RIGHT_WRITABLE
             | fio::OpenFlags::RIGHT_READABLE;
-        let path = Path::validate_and_split(delivery_blob_path(hash.to_string())).map_err(|e| {
+        let path = Path::validate_and_split(hash.to_string()).map_err(|e| {
             tracing::error!("failed to validate path: {:?}", e);
             CreateBlobError::Internal
         })?;
@@ -411,7 +398,7 @@ impl DirectoryEntry for BlobDirectory {
     ) {
         flags.to_object_request(server_end).spawn(&scope.clone(), move |object_request| {
             async move {
-                let node = self.lookup(flags, path).await.map_err(|e| {
+                let node = self.lookup(flags, path.clone()).await.map_err(|e| {
                     debug!(?e, "lookup failed");
                     map_to_status(e)
                 })?;
@@ -426,13 +413,10 @@ impl DirectoryEntry for BlobDirectory {
                     let node = node.downcast::<FxBlob>().unwrap_or_else(|_| unreachable!());
                     FxBlob::create_connection_async(node, scope, flags, object_request)
                 } else if node.is::<FxDeliveryBlob>() {
-                    let node = node.downcast::<FxDeliveryBlob>().unwrap_or_else(|_| unreachable!());
-                    object_request.create_connection(
-                        scope,
-                        node.take(),
-                        flags,
-                        FidlIoConnection::create,
-                    )
+                    tracing::error!(
+                        "Tried to create a delivery blob via open(). Blob creation is only supported via the BlobCreator."
+                    );
+                    return Err(Status::NOT_SUPPORTED);
                 } else {
                     unreachable!();
                 }
@@ -499,13 +483,12 @@ impl From<object_store::Directory<FxVolume>> for BlobDirectory {
 mod tests {
     use {
         super::*,
-        crate::fuchsia::{
-            fxblob::testing::{new_blob_fixture, BlobFixture},
-            testing::open_file_checked,
-        },
+        crate::fuchsia::fxblob::testing::{new_blob_fixture, BlobFixture},
         assert_matches::assert_matches,
+        blob_writer::BlobWriter,
         delivery_blob::{delivery_blob_path, CompressionMode, Type1Blob},
         fuchsia_async::{self as fasync, DurationExt as _, TimeoutExt as _},
+        fuchsia_component::client::connect_to_protocol_at_dir_svc,
         fuchsia_fs::directory::{
             readdir_inclusive, DirEntry, DirentKind, WatchEvent, WatchMessage, Watcher,
         },
@@ -545,38 +528,41 @@ mod tests {
             builder.write(&data);
             hash = builder.finish().root();
             let compressed_data: Vec<u8> = Type1Blob::generate(&data, CompressionMode::Always);
-            let blob = open_file_checked(
-                fixture.root(),
-                fio::OpenFlags::CREATE
-                    | fio::OpenFlags::RIGHT_READABLE
-                    | fio::OpenFlags::RIGHT_WRITABLE,
-                &format!("{}", delivery_blob_path(hash)),
-            )
-            .await;
-            blob.resize(compressed_data.len() as u64)
+
+            let (blob_volume_outgoing_dir, server_end) =
+                fidl::endpoints::create_proxy::<fio::DirectoryMarker>()
+                    .expect("Create dir proxy to succeed");
+
+            fixture
+                .volumes_directory()
+                .serve_volume(fixture.volume(), server_end, true, true)
                 .await
-                .expect("FIDL call failed")
-                .expect("truncate failed");
-            assert_eq!(
-                blob.write(&compressed_data[..1])
-                    .await
-                    .expect("FIDL call failed")
-                    .expect("write failed"),
-                1u64
-            );
+                .expect("failed to create_and_serve the blob volume");
+            let blob_proxy =
+                connect_to_protocol_at_dir_svc::<fidl_fuchsia_fxfs::BlobCreatorMarker>(
+                    &blob_volume_outgoing_dir,
+                )
+                .expect("failed to connect to the Blob service");
+
+            let blob_writer_client_end = blob_proxy
+                .create(&hash.into(), false)
+                .await
+                .expect("transport error on create")
+                .expect("failed to create blob");
+
+            let writer = blob_writer_client_end.into_proxy().unwrap();
+            let mut blob_writer = BlobWriter::create(writer, compressed_data.len() as u64)
+                .await
+                .expect("failed to create BlobWriter");
+            blob_writer.write(&compressed_data[..1]).await.unwrap();
+
             // Before the blob is finished writing, it shouldn't appear in the directory.
             assert_eq!(
                 readdir_inclusive(fixture.root()).await.ok(),
                 Some(vec![DirEntry { name: ".".to_string(), kind: DirentKind::Directory }])
             );
 
-            assert_eq!(
-                blob.write(&compressed_data[1..])
-                    .await
-                    .expect("FIDL call failed")
-                    .expect("write failed"),
-                compressed_data.len() as u64 - 1
-            );
+            blob_writer.write(&compressed_data[1..]).await.unwrap();
         }
 
         assert_eq!(
@@ -616,39 +602,41 @@ mod tests {
             filenames.push(filename.clone());
 
             let compressed_data: Vec<u8> = Type1Blob::generate(&datum, CompressionMode::Always);
+            let (blob_volume_outgoing_dir, server_end) =
+                fidl::endpoints::create_proxy::<fio::DirectoryMarker>()
+                    .expect("Create dir proxy to succeed");
 
-            let blob = open_file_checked(
-                fixture.root(),
-                fio::OpenFlags::CREATE
-                    | fio::OpenFlags::RIGHT_READABLE
-                    | fio::OpenFlags::RIGHT_WRITABLE,
-                &format!("{}", delivery_blob_path(hash)),
-            )
-            .await;
-            blob.resize(compressed_data.len() as u64)
+            fixture
+                .volumes_directory()
+                .serve_volume(fixture.volume(), server_end, true, true)
                 .await
-                .expect("FIDL call failed")
-                .expect("truncate failed");
-            let len = compressed_data.len();
-            for chunk in compressed_data[..len - 1].chunks(fio::MAX_TRANSFER_SIZE as usize) {
-                assert_eq!(
-                    blob.write(chunk).await.expect("FIDL call failed").expect("write failed"),
-                    chunk.len() as u64
-                );
-            }
+                .expect("failed to create_and_serve the blob volume");
+            let blob_proxy =
+                connect_to_protocol_at_dir_svc::<fidl_fuchsia_fxfs::BlobCreatorMarker>(
+                    &blob_volume_outgoing_dir,
+                )
+                .expect("failed to connect to the Blob service");
+
+            let blob_writer_client_end = blob_proxy
+                .create(&hash.into(), false)
+                .await
+                .expect("transport error on create")
+                .expect("failed to create blob");
+
+            let writer = blob_writer_client_end.into_proxy().unwrap();
+            let mut blob_writer = BlobWriter::create(writer, compressed_data.len() as u64)
+                .await
+                .expect("failed to create BlobWriter");
+            blob_writer.write(&compressed_data[..compressed_data.len() - 1]).await.unwrap();
+
             // Before the blob is finished writing, we shouldn't see any watch events for it.
             assert_matches!(
                 watcher.next().on_timeout(500.millis().after_now(), || None).await,
                 None
             );
 
-            assert_eq!(
-                blob.write(&compressed_data[len - 1..])
-                    .await
-                    .expect("FIDL call failed")
-                    .expect("write failed"),
-                1u64
-            );
+            blob_writer.write(&compressed_data[compressed_data.len() - 1..]).await.unwrap();
+
             assert_eq!(
                 watcher.next().await,
                 Some(Ok(WatchMessage { event: WatchEvent::ADD_FILE, filename }))

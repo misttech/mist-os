@@ -107,9 +107,9 @@ async fn setup_test_env(
     };
     let system_image_package =
         SystemImageBuilder::new().static_packages(static_packages).build().await;
-    system_image_package.write_to_blobfs_dir(&blobfs.root_dir().unwrap());
+    system_image_package.write_to_blobfs(&blobfs).await;
     for pkg in static_packages {
-        pkg.write_to_blobfs_dir(&blobfs.root_dir().unwrap());
+        pkg.write_to_blobfs(&blobfs).await;
     }
 
     let env = TestEnv::builder()
@@ -384,13 +384,12 @@ async fn gc_frees_space_so_write_can_succeed(blob_implementation: blobfs_ramdisk
     let mut orphan_data = vec![0; 4 * 1024 * 1024];
     StdRng::from_seed([0u8; 32]).fill(&mut orphan_data[..]);
     let orphan_hash = fuchsia_merkle::MerkleTree::from_reader(&orphan_data[..]).unwrap().root();
-    let () = small_blobfs.add_blob_from(&orphan_hash, &orphan_data[..]).unwrap();
+    let () = small_blobfs.add_blob_from(orphan_hash, &orphan_data[..]).await.unwrap();
     assert!(small_blobfs.list_blobs().unwrap().contains(&orphan_hash));
 
     // Create a TestEnv using this blobfs.
     let system_image_package = SystemImageBuilder::new().build().await;
-    system_image_package
-        .write_to_blobfs_dir(&small_blobfs.root_dir().expect("wrote system image to blobfs"));
+    system_image_package.write_to_blobfs(&small_blobfs).await;
     let env = TestEnv::builder()
         .blobfs_and_system_image_hash(
             small_blobfs,

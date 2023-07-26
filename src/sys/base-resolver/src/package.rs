@@ -248,7 +248,7 @@ mod tests {
         let pkg = fuchsia_pkg_testing::PackageBuilder::new("name").build().await.unwrap();
         let blobfs = blobfs_ramdisk::BlobfsRamdisk::start().await.unwrap();
         let blobfs_client = blobfs.client();
-        pkg.write_to_blobfs_dir(&blobfs.root_dir().unwrap());
+        pkg.write_to_blobfs(&blobfs).await;
         let (proxy, server) = fidl::endpoints::create_proxy().unwrap();
 
         let _: fpkg::ResolutionContext = resolve(

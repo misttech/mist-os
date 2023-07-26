@@ -8,18 +8,13 @@
 use {
     crate::fuchsia::{
         directory::FxDirectory, errors::map_to_status, fxblob::directory::BlobDirectory,
-        node::FxNode, volume::info_to_filesystem_info, volume::FxVolume,
+        node::FxNode, volume::FxVolume,
     },
     anyhow::{anyhow, Context, Error},
     async_trait::async_trait,
     delivery_blob::{
         compression::{decode_archive, ChunkInfo, ChunkedDecompressor},
         Type1Blob,
-    },
-    fidl::endpoints::ServerEnd,
-    fidl_fuchsia_io::{
-        self as fio, FilesystemInfo, MutableNodeAttributes, NodeAttributeFlags, NodeAttributes,
-        NodeAttributes2, NodeAttributesQuery, NodeMarker,
     },
     fuchsia_hash::Hash,
     fuchsia_merkle::{MerkleTree, MerkleTreeBuilder},
@@ -42,14 +37,6 @@ use {
         atomic::{AtomicBool, AtomicUsize, Ordering},
         Arc,
     },
-    vfs::{
-        directory::entry::{DirectoryEntry, EntryInfo},
-        execution_scope::ExecutionScope,
-        file::{FidlIoConnection, File, FileIo, FileOptions, SyncMode},
-        node::Node,
-        path::Path,
-        ToObjectRequest,
-    },
 };
 
 lazy_static! {
@@ -57,17 +44,6 @@ lazy_static! {
 }
 
 const PAYLOAD_BUFFER_FLUSH_THRESHOLD: usize = 131_072; /* 128 KiB */
-
-/// Interface for the fuchsia.storage.fxfs.BlobWriter protocol that uses a ring buffer to transfer
-/// data using a VMO.
-#[async_trait]
-pub trait BlobWriterProtocol {
-    /// Get the VMO to write to for this blob, and prepare the blob to accept `size` bytes.
-    async fn get_vmo(&self, size: u64) -> Result<zx::Vmo, Error>;
-
-    /// Signal that `bytes_written` bytes can be read out of the VMO provided by `get_vmo`.
-    async fn bytes_ready(&self, bytes_written: u64) -> Result<(), Error>;
-}
 
 /// Represents an RFC-0207 compliant delivery blob that is being written.
 /// The blob cannot be read until writes complete and hash is verified.
@@ -304,27 +280,6 @@ impl FxDeliveryBlob {
     }
 }
 
-impl DirectoryEntry for FxDeliveryBlob {
-    fn open(
-        self: Arc<Self>,
-        scope: ExecutionScope,
-        flags: fio::OpenFlags,
-        path: Path,
-        server_end: ServerEnd<NodeMarker>,
-    ) {
-        flags.to_object_request(server_end).handle(|object_request| {
-            if !path.is_empty() {
-                return Err(Status::NOT_FILE);
-            }
-            object_request.spawn_connection(scope, self, flags, FidlIoConnection::create)
-        });
-    }
-
-    fn entry_info(&self) -> EntryInfo {
-        EntryInfo::new(self.object_id(), fio::DirentType::File)
-    }
-}
-
 #[async_trait]
 impl FxNode for FxDeliveryBlob {
     fn object_id(&self) -> u64 {
@@ -361,30 +316,7 @@ impl FxNode for FxDeliveryBlob {
     }
 }
 
-#[async_trait]
-impl Node for FxDeliveryBlob {
-    async fn get_attrs(&self) -> Result<NodeAttributes, Status> {
-        Err(Status::BAD_STATE)
-    }
-
-    async fn get_attributes(
-        &self,
-        _requested_attributes: NodeAttributesQuery,
-    ) -> Result<NodeAttributes2, Status> {
-        Err(Status::BAD_STATE)
-    }
-}
-
-#[async_trait]
-impl File for FxDeliveryBlob {
-    fn writable(&self) -> bool {
-        true
-    }
-
-    async fn open_file(&self, _options: &FileOptions) -> Result<(), Status> {
-        Ok(())
-    }
-
+impl FxDeliveryBlob {
     async fn truncate(&self, length: u64) -> Result<(), Status> {
         let mut inner = self.inner.lock().await;
         if let Some(previous_size) = inner.delivery_size {
@@ -397,113 +329,6 @@ impl File for FxDeliveryBlob {
         }
         inner.delivery_size = Some(length);
         Ok(())
-    }
-
-    async fn get_size(&self) -> Result<u64, Status> {
-        Err(Status::BAD_STATE)
-    }
-
-    async fn set_attrs(
-        &self,
-        _flags: NodeAttributeFlags,
-        _attrs: NodeAttributes,
-    ) -> Result<(), Status> {
-        Err(Status::BAD_STATE)
-    }
-
-    async fn update_attributes(&self, _attributes: MutableNodeAttributes) -> Result<(), Status> {
-        Err(Status::BAD_STATE)
-    }
-
-    async fn sync(&self, _mode: SyncMode) -> Result<(), Status> {
-        // TODO(fxbug.dev/122125): Implement sync.
-        Ok(())
-    }
-
-    fn query_filesystem(&self) -> Result<FilesystemInfo, Status> {
-        let store = self.handle.store();
-        Ok(info_to_filesystem_info(
-            store.filesystem().get_info(),
-            store.filesystem().block_size(),
-            store.object_count(),
-            self.handle.owner().id(),
-        ))
-    }
-
-    async fn get_backing_memory(&self, _flags: fio::VmoFlags) -> Result<zx::Vmo, Status> {
-        return Err(Status::BAD_STATE);
-    }
-}
-
-#[async_trait]
-impl BlobWriterProtocol for FxDeliveryBlob {
-    async fn get_vmo(&self, size: u64) -> Result<zx::Vmo, Error> {
-        self.truncate(size)
-            .await
-            .with_context(|| format!("Failed to truncate blob {} to size {}", self.hash, size))?;
-        let mut inner = self.inner.lock().await;
-        if inner.vmo.is_some() {
-            return Err(FxfsError::AlreadyExists)
-                .with_context(|| format!("VMO was already created for blob {}", self.hash));
-        }
-        let vmo = zx::Vmo::create(*RING_BUFFER_SIZE).with_context(|| {
-            format!("Failed to create VMO of size {} for writing", *RING_BUFFER_SIZE)
-        })?;
-        let vmo_dup = vmo
-            .duplicate_handle(zx::Rights::SAME_RIGHTS)
-            .context("Failed to duplicate VMO handle")?;
-        inner.vmo = Some(vmo);
-        Ok(vmo_dup)
-    }
-
-    async fn bytes_ready(&self, bytes_written: u64) -> Result<(), Error> {
-        // TODO(https://fxbug.dev/126617): Remove extra copy.
-        // TODO(https://fxbug.dev/127530): Share ring buffer code with FxUnsealedBlob.
-        if bytes_written > *RING_BUFFER_SIZE {
-            return Err(FxfsError::OutOfRange).with_context(|| {
-                format!(
-                    "bytes_written ({}) exceeds size of ring buffer ({})",
-                    bytes_written, *RING_BUFFER_SIZE
-                )
-            });
-        }
-        let mut buf = vec![0; bytes_written as usize];
-        let write_offset;
-        {
-            let inner = self.inner.lock().await;
-            let Some(ref vmo) = inner.vmo else {
-                return Err(anyhow!("get_vmo was not called before attempting to write bytes"));
-            };
-            write_offset = inner.delivery_bytes_written;
-            let vmo_offset = write_offset % *RING_BUFFER_SIZE;
-            if vmo_offset + bytes_written > *RING_BUFFER_SIZE {
-                let split = (*RING_BUFFER_SIZE - vmo_offset) as usize;
-                vmo.read(&mut buf[0..split], vmo_offset).context("failed to read from VMO")?;
-                vmo.read(&mut buf[split..], 0).context("failed to read from VMO")?;
-            } else {
-                vmo.read(&mut buf, vmo_offset).context("failed to read from VMO")?;
-            }
-        }
-        self.write_at(write_offset, &buf)
-            .await
-            .with_context(|| {
-                format!(
-            "failed to to write to blob {} (bytes_written = {}, write_offset = {}, buf.len() = {})",
-            self.hash, bytes_written, write_offset, buf.len()
-        )
-            })
-            .map_err(|err| {
-                eprintln!("{:?}", err);
-                err
-            })?;
-        Ok(())
-    }
-}
-
-#[async_trait]
-impl FileIo for FxDeliveryBlob {
-    async fn read_at(&self, _offset: u64, _buffer: &mut [u8]) -> Result<u64, Status> {
-        return Err(Status::BAD_STATE);
     }
 
     async fn write_at(&self, offset: u64, content: &[u8]) -> Result<u64, Status> {
@@ -613,8 +438,65 @@ impl FileIo for FxDeliveryBlob {
         Ok(content_len)
     }
 
-    async fn append(&self, _content: &[u8]) -> Result<(u64, u64), Status> {
-        unimplemented!("use write_at instead")
+    pub async fn get_vmo(&self, size: u64) -> Result<zx::Vmo, Error> {
+        self.truncate(size)
+            .await
+            .with_context(|| format!("Failed to truncate blob {} to size {}", self.hash, size))?;
+        let mut inner = self.inner.lock().await;
+        if inner.vmo.is_some() {
+            return Err(FxfsError::AlreadyExists)
+                .with_context(|| format!("VMO was already created for blob {}", self.hash));
+        }
+        let vmo = zx::Vmo::create(*RING_BUFFER_SIZE).with_context(|| {
+            format!("Failed to create VMO of size {} for writing", *RING_BUFFER_SIZE)
+        })?;
+        let vmo_dup = vmo
+            .duplicate_handle(zx::Rights::SAME_RIGHTS)
+            .context("Failed to duplicate VMO handle")?;
+        inner.vmo = Some(vmo);
+        Ok(vmo_dup)
+    }
+
+    pub async fn bytes_ready(&self, bytes_written: u64) -> Result<(), Error> {
+        // TODO(https://fxbug.dev/126617): Remove extra copy.
+        if bytes_written > *RING_BUFFER_SIZE {
+            return Err(FxfsError::OutOfRange).with_context(|| {
+                format!(
+                    "bytes_written ({}) exceeds size of ring buffer ({})",
+                    bytes_written, *RING_BUFFER_SIZE
+                )
+            });
+        }
+        let mut buf = vec![0; bytes_written as usize];
+        let write_offset;
+        {
+            let inner = self.inner.lock().await;
+            let Some(ref vmo) = inner.vmo else {
+                return Err(anyhow!("get_vmo was not called before attempting to write bytes"));
+            };
+            write_offset = inner.delivery_bytes_written;
+            let vmo_offset = write_offset % *RING_BUFFER_SIZE;
+            if vmo_offset + bytes_written > *RING_BUFFER_SIZE {
+                let split = (*RING_BUFFER_SIZE - vmo_offset) as usize;
+                vmo.read(&mut buf[0..split], vmo_offset).context("failed to read from VMO")?;
+                vmo.read(&mut buf[split..], 0).context("failed to read from VMO")?;
+            } else {
+                vmo.read(&mut buf, vmo_offset).context("failed to read from VMO")?;
+            }
+        }
+        self.write_at(write_offset, &buf)
+            .await
+            .with_context(|| {
+                format!(
+            "failed to to write to blob {} (bytes_written = {}, write_offset = {}, buf.len() = {})",
+            self.hash, bytes_written, write_offset, buf.len()
+        )
+            })
+            .map_err(|err| {
+                eprintln!("{:?}", err);
+                err
+            })?;
+        Ok(())
     }
 }
 
@@ -661,44 +543,18 @@ fn parse_seek_table(
 mod tests {
     use {
         super::*,
-        crate::fuchsia::{
-            fxblob::testing::{new_blob_fixture, BlobFixture},
-            testing::{open_file, open_file_checked, TestFixture},
-        },
+        crate::fuchsia::fxblob::testing::{new_blob_fixture, BlobFixture},
         core::ops::Range,
-        delivery_blob::{delivery_blob_path, CompressionMode, Type1Blob},
+        delivery_blob::{CompressionMode, Type1Blob},
         fidl_fuchsia_fxfs::CreateBlobError,
-        fidl_fuchsia_io::{
-            self as fio, NodeAttributeFlags, NodeAttributes, OpenFlags, VmoFlags, MAX_TRANSFER_SIZE,
-        },
+        fidl_fuchsia_io::{self as fio},
         fuchsia_async as fasync,
         fuchsia_component::client::connect_to_protocol_at_dir_svc,
-        fuchsia_merkle::{MerkleTree, MerkleTreeBuilder},
+        fuchsia_merkle::MerkleTreeBuilder,
         fuchsia_zircon::Status,
         fxfs::filesystem::Filesystem,
         rand::{thread_rng, Rng},
     };
-
-    async fn resize_and_write(
-        fixture: &TestFixture,
-        path: &str,
-        payload: &[u8],
-    ) -> Result<(), Status> {
-        let blob = open_file_checked(
-            fixture.root(),
-            OpenFlags::CREATE | OpenFlags::RIGHT_READABLE | OpenFlags::RIGHT_WRITABLE,
-            path,
-        )
-        .await;
-        blob.resize(payload.len() as u64).await.expect("fidl error").map_err(Status::from_raw)?;
-        for chunk in payload.chunks(MAX_TRANSFER_SIZE as usize) {
-            assert_eq!(
-                blob.write(&chunk).await.expect("fidl error").map_err(Status::from_raw)?,
-                chunk.len() as u64
-            );
-        }
-        Ok(())
-    }
 
     fn generate_list_of_writes(compressed_data_len: u64) -> Vec<Range<u64>> {
         let mut list_of_writes = vec![];
@@ -714,293 +570,6 @@ mod tests {
             list_of_writes.push(write_offset..write_offset + bytes_left_to_write);
         }
         list_of_writes
-    }
-
-    #[fasync::run(10, test)]
-    async fn test_write_uncompressed_empty() {
-        let fixture = new_blob_fixture().await;
-        let hash = MerkleTreeBuilder::new().finish().root();
-        let payload = Type1Blob::generate(&[], CompressionMode::Never);
-        resize_and_write(&fixture, &delivery_blob_path(hash), &payload).await.unwrap();
-        assert!(fixture.read_blob(&format!("{}", hash)).await.is_empty());
-        fixture.close().await;
-    }
-
-    #[fasync::run(10, test)]
-    async fn test_write_uncompressed_small() {
-        let fixture = new_blob_fixture().await;
-        let data = vec![3; 3_000];
-        let hash = MerkleTree::from_reader(data.as_slice()).unwrap().root();
-        let payload = Type1Blob::generate(&data, CompressionMode::Never);
-        resize_and_write(&fixture, &delivery_blob_path(hash), &payload).await.unwrap();
-        assert_eq!(fixture.read_blob(&format!("{}", hash)).await, data);
-        fixture.close().await;
-    }
-
-    #[fasync::run(10, test)]
-    async fn test_write_uncompressed_large() {
-        let fixture = new_blob_fixture().await;
-        let data = vec![3; 3_000_000];
-        let hash = MerkleTree::from_reader(data.as_slice()).unwrap().root();
-        let payload = Type1Blob::generate(&data, CompressionMode::Never);
-        resize_and_write(&fixture, &delivery_blob_path(hash), &payload).await.unwrap();
-        assert_eq!(fixture.read_blob(&format!("{}", hash)).await, data);
-        fixture.close().await;
-    }
-
-    #[fasync::run(10, test)]
-    async fn test_write_uncompressed_block_aligned() {
-        let fixture = new_blob_fixture().await;
-        const NUM_BLOCKS: usize = 4;
-        let amount = NUM_BLOCKS * fixture.fs().root_parent_store().block_size() as usize;
-        let data = vec![3; amount];
-        let hash = MerkleTree::from_reader(data.as_slice()).unwrap().root();
-        let payload = Type1Blob::generate(&data, CompressionMode::Never);
-        resize_and_write(&fixture, &delivery_blob_path(hash), &payload).await.unwrap();
-        assert_eq!(fixture.read_blob(&format!("{}", hash)).await, data);
-        fixture.close().await;
-    }
-
-    #[fasync::run(10, test)]
-    async fn test_write_uncompressed_chunks() {
-        let fixture = new_blob_fixture().await;
-        let data = vec![3; 50_000];
-        let hash = MerkleTree::from_reader(data.as_slice()).unwrap().root();
-        let payload = Type1Blob::generate(&data, CompressionMode::Never);
-        let blob = open_file_checked(
-            fixture.root(),
-            OpenFlags::CREATE | OpenFlags::RIGHT_READABLE | OpenFlags::RIGHT_WRITABLE,
-            &delivery_blob_path(hash),
-        )
-        .await;
-        blob.resize(payload.len() as u64)
-            .await
-            .expect("fidl error")
-            .map_err(Status::from_raw)
-            .unwrap();
-        // Write in batches of 4 bytes. This ensures we handle incomplete headers gracefully.
-        for chunk in payload.chunks(4) {
-            assert_eq!(
-                blob.write(&chunk).await.expect("fidl error").map_err(Status::from_raw).unwrap(),
-                chunk.len() as u64
-            );
-        }
-        assert_eq!(fixture.read_blob(&format!("{}", hash)).await, data);
-        fixture.close().await;
-    }
-
-    #[fasync::run(10, test)]
-    async fn test_write_compressed_empty() {
-        let fixture = new_blob_fixture().await;
-        let hash = MerkleTreeBuilder::new().finish().root();
-        let payload = Type1Blob::generate(&[], CompressionMode::Always);
-        resize_and_write(&fixture, &delivery_blob_path(hash), &payload).await.unwrap();
-        assert!(fixture.read_blob(&format!("{}", hash)).await.is_empty());
-        fixture.close().await;
-    }
-
-    #[fasync::run(10, test)]
-    async fn test_write_compressed_small() {
-        let fixture = new_blob_fixture().await;
-        let data = vec![3; 3_000];
-        let block_size = fixture.fs().root_parent_store().block_size() as usize;
-        assert!(data.len() <= block_size);
-        let hash = MerkleTree::from_reader(data.as_slice()).unwrap().root();
-        let payload = Type1Blob::generate(&data, CompressionMode::Always);
-        resize_and_write(&fixture, &delivery_blob_path(hash), &payload).await.unwrap();
-        assert_eq!(fixture.read_blob(&format!("{}", hash)).await, data);
-        fixture.close().await;
-    }
-
-    #[fasync::run(10, test)]
-    async fn test_write_compressed_small_data_large() {
-        let fixture = new_blob_fixture().await;
-        let data = vec![3; 500_000];
-        let hash = MerkleTree::from_reader(data.as_slice()).unwrap().root();
-        let payload = Type1Blob::generate(&data, CompressionMode::Always);
-        // `data` is highly compressible, so should fit within a single block.
-        let block_size = fixture.fs().root_parent_store().block_size() as usize;
-        assert!(payload.len() <= block_size);
-        resize_and_write(&fixture, &delivery_blob_path(hash), &payload).await.unwrap();
-        assert_eq!(fixture.read_blob(&format!("{}", hash)).await, data);
-        fixture.close().await;
-    }
-
-    #[fasync::run(10, test)]
-    async fn test_write_compressed_large() {
-        let fixture = new_blob_fixture().await;
-        let data: Vec<u8> = {
-            const DATA_LEN: usize = 3_000_000;
-            let range = rand::distributions::Uniform::<u8>::new_inclusive(0, 255);
-            rand::thread_rng().sample_iter(&range).take(DATA_LEN).collect()
-        };
-        let hash = MerkleTree::from_reader(data.as_slice()).unwrap().root();
-        let payload = Type1Blob::generate(&data, CompressionMode::Always);
-        // `data` is random, so even when compressed it should span multiple blocks.
-        let block_size = fixture.fs().root_parent_store().block_size() as usize;
-        assert!(payload.len() > block_size);
-        resize_and_write(&fixture, &delivery_blob_path(hash), &payload).await.unwrap();
-        assert_eq!(fixture.read_blob(&format!("{}", hash)).await, data);
-        fixture.close().await;
-    }
-
-    #[fasync::run(10, test)]
-    async fn test_write_compressed_chunks() {
-        let fixture = new_blob_fixture().await;
-        let data = vec![3; 50_000];
-        let hash = MerkleTree::from_reader(data.as_slice()).unwrap().root();
-        let payload = Type1Blob::generate(&data, CompressionMode::Always);
-        let blob = open_file_checked(
-            fixture.root(),
-            OpenFlags::CREATE | OpenFlags::RIGHT_READABLE | OpenFlags::RIGHT_WRITABLE,
-            &delivery_blob_path(hash),
-        )
-        .await;
-        blob.resize(payload.len() as u64)
-            .await
-            .expect("fidl error")
-            .map_err(Status::from_raw)
-            .unwrap();
-        // Write in batches of 4 bytes. This ensures we handle incomplete headers gracefully.
-        for chunk in payload.chunks(4) {
-            assert_eq!(
-                blob.write(&chunk).await.expect("fidl error").map_err(Status::from_raw).unwrap(),
-                chunk.len() as u64
-            );
-        }
-        assert_eq!(fixture.read_blob(&format!("{}", hash)).await, data);
-        fixture.close().await;
-    }
-
-    /// A blob should fail to write if the calculated Merkle root doesn't match the filename.
-    #[fasync::run(10, test)]
-    async fn test_reject_bad_hash() {
-        let fixture = new_blob_fixture().await;
-        let data = vec![3; 1_000];
-
-        let correct_hash = MerkleTree::from_reader(data.as_slice()).unwrap().root().to_string();
-        let incorrect_hash =
-            MerkleTree::from_reader(&data[..data.len() - 1]).unwrap().root().to_string();
-        assert_ne!(correct_hash, incorrect_hash);
-
-        let payload = Type1Blob::generate(&data, CompressionMode::Never);
-        let write_error =
-            resize_and_write(&fixture, &delivery_blob_path(&incorrect_hash), &payload)
-                .await
-                .unwrap_err();
-        assert_eq!(write_error, Status::IO_DATA_INTEGRITY);
-
-        // Ensure we can't open either hash.
-        assert!(open_file(fixture.root(), OpenFlags::RIGHT_READABLE, &correct_hash).await.is_err());
-        assert!(open_file(fixture.root(), OpenFlags::RIGHT_READABLE, &incorrect_hash)
-            .await
-            .is_err());
-
-        fixture.close().await;
-    }
-
-    #[fasync::run(10, test)]
-    async fn test_reject_write_too_many_bytes() {
-        let fixture = new_blob_fixture().await;
-        let data = vec![3; 1_000];
-        let hash = MerkleTree::from_reader(data.as_slice()).unwrap().root().to_string();
-        // Append some more bytes onto the end of payload.
-        let mut payload = Type1Blob::generate(&data, CompressionMode::Never);
-        let original_payload_len = payload.len() as u64;
-        payload.extend_from_slice(&[1, 2, 3, 4]);
-
-        let blob = open_file_checked(
-            fixture.root(),
-            OpenFlags::CREATE | OpenFlags::RIGHT_READABLE | OpenFlags::RIGHT_WRITABLE,
-            &delivery_blob_path(hash),
-        )
-        .await;
-        blob.resize(original_payload_len)
-            .await
-            .expect("fidl error")
-            .map_err(Status::from_raw)
-            .unwrap();
-        assert!(payload.len() < MAX_TRANSFER_SIZE as usize);
-        assert_eq!(
-            Status::BUFFER_TOO_SMALL,
-            blob.write(&payload).await.expect("fidl error").map_err(Status::from_raw).unwrap_err()
-        );
-
-        fixture.close().await;
-    }
-
-    /// We should fail early when truncating a delivery blob if the size is too small.
-    #[fasync::run(10, test)]
-    async fn test_reject_too_small() {
-        let fixture = new_blob_fixture().await;
-        let hash = MerkleTreeBuilder::new().finish().root();
-        // The smallest possible delivery blob should be an uncompressed null/empty Type 1 blob.
-        let payload = Type1Blob::generate(&[], CompressionMode::Never);
-
-        let blob = open_file_checked(
-            fixture.root(),
-            OpenFlags::CREATE | OpenFlags::RIGHT_READABLE | OpenFlags::RIGHT_WRITABLE,
-            &delivery_blob_path(&hash),
-        )
-        .await;
-
-        let resize_error = blob
-            .resize((payload.len() - 1) as u64)
-            .await
-            .expect("fidl error")
-            .map_err(Status::from_raw)
-            .unwrap_err();
-        assert_eq!(resize_error, Status::INVALID_ARGS);
-
-        fixture.close().await;
-    }
-
-    /// Ensure we cannot call certain fuchsia.io methods while a blob is being written.
-    #[fasync::run(10, test)]
-    async fn test_disallowed_io_methods() {
-        let fixture = new_blob_fixture().await;
-        let hash = MerkleTreeBuilder::new().finish().root();
-
-        let blob = open_file_checked(
-            fixture.root(),
-            OpenFlags::CREATE | OpenFlags::RIGHT_READABLE | OpenFlags::RIGHT_WRITABLE,
-            &delivery_blob_path(hash),
-        )
-        .await;
-
-        assert_eq!(
-            Status::BAD_STATE,
-            Status::from_raw(
-                blob.get_backing_memory(VmoFlags::READ).await.expect("fidl error").unwrap_err()
-            )
-        );
-
-        assert_eq!(
-            Status::BAD_STATE,
-            Status::from_raw(blob.get_attr().await.expect("fidl error").0)
-        );
-
-        assert_eq!(
-            Status::BAD_STATE,
-            Status::from_raw(
-                blob.set_attr(
-                    NodeAttributeFlags::CREATION_TIME,
-                    &NodeAttributes {
-                        mode: 0,
-                        id: 0,
-                        content_size: 0,
-                        storage_size: 0,
-                        link_count: 0,
-                        creation_time: 0,
-                        modification_time: 0,
-                    }
-                )
-                .await
-                .expect("fidl error")
-            )
-        );
-
-        fixture.close().await;
     }
 
     /// Tests for the new write API.
@@ -1060,6 +629,100 @@ mod tests {
             }
         }
         assert_eq!(fixture.read_blob(&format!("{}", hash)).await, data);
+        fixture.close().await;
+    }
+
+    /// We should fail early when truncating a delivery blob if the size is too small.
+    #[fasync::run(10, test)]
+    async fn test_reject_too_small() {
+        let fixture = new_blob_fixture().await;
+        let hash = MerkleTreeBuilder::new().finish().root();
+        // The smallest possible delivery blob should be an uncompressed null/empty Type 1 blob.
+        let delivery_data = Type1Blob::generate(&[], CompressionMode::Never);
+
+        {
+            let (blob_volume_outgoing_dir, server_end) =
+                fidl::endpoints::create_proxy::<fio::DirectoryMarker>()
+                    .expect("Create dir proxy to succeed");
+            fixture
+                .volumes_directory()
+                .serve_volume(fixture.volume(), server_end, true, true)
+                .await
+                .expect("failed to create_and_serve the blob volume");
+            let blob_proxy =
+                connect_to_protocol_at_dir_svc::<fidl_fuchsia_fxfs::BlobCreatorMarker>(
+                    &blob_volume_outgoing_dir,
+                )
+                .expect("failed to connect to the Blob service");
+            let blob_writer_client_end = blob_proxy
+                .create(&hash.into(), false)
+                .await
+                .expect("transport error on create")
+                .expect("failed to create blob");
+
+            let writer = blob_writer_client_end.into_proxy().unwrap();
+            assert_eq!(
+                writer
+                    .get_vmo(delivery_data.len() as u64 - 1)
+                    .await
+                    .expect("transport error on get_vmo")
+                    .map_err(Status::from_raw)
+                    .expect_err("get_vmo unexpectedly succeeded"),
+                zx::Status::INVALID_ARGS
+            );
+        }
+        fixture.close().await;
+    }
+
+    /// A blob should fail to write if the calculated Merkle root doesn't match the filename.
+    #[fasync::run(10, test)]
+    async fn test_reject_bad_hash() {
+        let fixture = new_blob_fixture().await;
+
+        let data = vec![3; 1_000];
+        let mut builder = MerkleTreeBuilder::new();
+        builder.write(&data[..data.len() - 1]);
+        let incorrect_hash = builder.finish().root();
+        let delivery_data = Type1Blob::generate(&data, CompressionMode::Never);
+
+        {
+            let (blob_volume_outgoing_dir, server_end) =
+                fidl::endpoints::create_proxy::<fio::DirectoryMarker>()
+                    .expect("Create dir proxy to succeed");
+            fixture
+                .volumes_directory()
+                .serve_volume(fixture.volume(), server_end, true, true)
+                .await
+                .expect("failed to create_and_serve the blob volume");
+            let blob_proxy =
+                connect_to_protocol_at_dir_svc::<fidl_fuchsia_fxfs::BlobCreatorMarker>(
+                    &blob_volume_outgoing_dir,
+                )
+                .expect("failed to connect to the Blob service");
+            let blob_writer_client_end = blob_proxy
+                .create(&incorrect_hash.into(), false)
+                .await
+                .expect("transport error on create")
+                .expect("failed to create blob");
+
+            let writer = blob_writer_client_end.into_proxy().unwrap();
+            let vmo = writer
+                .get_vmo(delivery_data.len() as u64)
+                .await
+                .expect("transport error on get_vmo")
+                .expect("failed to get vmo");
+            vmo.write(&delivery_data, 0).expect("failed to write to vmo");
+
+            assert_eq!(
+                writer
+                    .bytes_ready(delivery_data.len() as u64)
+                    .await
+                    .expect("transport error on bytes_ready")
+                    .map_err(Status::from_raw)
+                    .expect_err("write unexpectedly succeeded"),
+                zx::Status::IO_DATA_INTEGRITY
+            );
+        }
         fixture.close().await;
     }
 

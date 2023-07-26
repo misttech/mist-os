@@ -433,7 +433,7 @@ impl TestBlob {
 }
 
 impl BlobfsRamdisk {
-    async fn write_blob(&self, blob: &TestBlob) {
+    async fn create_and_write_blob(&self, blob: &TestBlob) {
         let proxy = self.root_dir_proxy().unwrap();
         create_blob(&proxy, &blob.merkle.to_string(), blob.contents).await.unwrap();
     }
@@ -455,9 +455,9 @@ async fn corrupt_blob() {
     // write a few blobs and verify they are valid
     let first = TestBlob::new(b"corrupt me bro");
     let second = TestBlob::new(b"don't corrupt me bro");
-    blobfs.write_blob(&first).await;
+    blobfs.create_and_write_blob(&first).await;
     assert_eq!(blobfs.verify_blob(&first).await, Ok(()));
-    blobfs.write_blob(&second).await;
+    blobfs.create_and_write_blob(&second).await;
     assert_eq!(blobfs.verify_blob(&second).await, Ok(()));
 
     // unmount blobfs, corrupt the first blob, and restart blobfs
@@ -484,7 +484,7 @@ async fn corrupt_blob_with_many_blobs() {
     // write many blobs to force blobfs to utilize more than 1 block of inodes
     for i in 1..LIPSUM.len() {
         let blob = TestBlob::new(&LIPSUM[..i]);
-        blobfs.write_blob(&blob).await;
+        blobfs.create_and_write_blob(&blob).await;
         assert_eq!(blobfs.verify_blob(&blob).await, Ok(()));
         ls.insert(blob.merkle);
         valid.push(blob);
@@ -492,14 +492,14 @@ async fn corrupt_blob_with_many_blobs() {
 
     // write the blob to corrupt
     let corrupt = TestBlob::new(b"corrupt me bro");
-    blobfs.write_blob(&corrupt).await;
+    blobfs.create_and_write_blob(&corrupt).await;
     assert_eq!(blobfs.verify_blob(&corrupt).await, Ok(()));
     ls.insert(corrupt.merkle);
 
     // write many more blobs after the blob to corrupt
     for i in 1..(LIPSUM.len() - 1) {
         let blob = TestBlob::new(&LIPSUM[i..]);
-        blobfs.write_blob(&blob).await;
+        blobfs.create_and_write_blob(&blob).await;
         assert_eq!(blobfs.verify_blob(&blob).await, Ok(()));
         ls.insert(blob.merkle);
         valid.push(blob);

@@ -284,10 +284,8 @@ async fn test_blobfs_out_of_space_does_not_fall_back_to_cache_packages_with_larg
         .start()
         .await
         .expect("started blobfs");
-    system_image_package
-        .write_to_blobfs_dir(&very_small_blobfs.root_dir().expect("wrote system image to blobfs"));
-    cache_pkg
-        .write_to_blobfs_dir(&very_small_blobfs.root_dir().expect("wrote cache package to blobfs"));
+    system_image_package.write_to_blobfs(&very_small_blobfs).await;
+    cache_pkg.write_to_blobfs(&very_small_blobfs).await;
 
     // A very large version of the same package, to put in the repo.
     // Critically, this package contains an incompressible 4MB asset in the meta.far,
@@ -363,10 +361,8 @@ async fn test_blobfs_out_of_space_does_not_fall_back_to_cache_packages() {
         .start()
         .await
         .expect("started blobfs");
-    system_image_package
-        .write_to_blobfs_dir(&very_small_blobfs.root_dir().expect("wrote system image to blobfs"));
-    cache_pkg
-        .write_to_blobfs_dir(&very_small_blobfs.root_dir().expect("wrote cache package to blobfs"));
+    system_image_package.write_to_blobfs(&very_small_blobfs).await;
+    cache_pkg.write_to_blobfs(&very_small_blobfs).await;
 
     // A very large version of the same package, to put in the repo.
     let mut rng = StdRng::from_seed([0u8; 32]);
@@ -421,7 +417,7 @@ async fn test_blobfs_out_of_space_does_not_fall_back_to_previous_ephemeral_packa
         .expect("started blobfs");
     let system_image_package = SystemImageBuilder::new();
     let system_image_package = system_image_package.build().await;
-    system_image_package.write_to_blobfs_dir(&very_small_blobfs.root_dir().unwrap());
+    system_image_package.write_to_blobfs(&very_small_blobfs).await;
 
     let env = TestEnvBuilder::new()
         .blobfs_and_system_image_hash(

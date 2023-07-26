@@ -6,6 +6,7 @@
 
 use {
     anyhow::{anyhow, format_err, Context as _, Error},
+    blobfs_ramdisk::BlobfsRamdisk,
     camino::{Utf8Path, Utf8PathBuf},
     fidl::endpoints::ServerEnd,
     fidl_fuchsia_io as fio,
@@ -18,7 +19,7 @@ use {
         collections::{BTreeMap, BTreeSet, HashMap, HashSet},
         convert::TryInto as _,
         fs::{self, File},
-        io::{self, Read, Write},
+        io::{self, Read},
         path::{Path, PathBuf},
     },
     tempfile::TempDir,
@@ -243,28 +244,34 @@ impl Package {
 
     /// Writes the meta.far and all content blobs to blobfs.
     /// Does not write the subpackage blobs, if any.
-    pub fn write_to_blobfs_dir_ignore_subpackages(&self, dir: &openat::Dir) {
+    pub async fn write_to_blobfs_ignore_subpackages(&self, blobfs_ramdisk: &BlobfsRamdisk) {
         fn read_file(file: &std::fs::File) -> Vec<u8> {
             let mut ret = vec![];
             std::io::BufReader::new(file).read_to_end(&mut ret).unwrap();
             ret
         }
 
-        write_blob(dir, self.meta_far_merkle_root(), &read_file(&self.meta_far().unwrap()));
+        blobfs_ramdisk
+            .write_blob(*self.meta_far_merkle_root(), &read_file(&self.meta_far().unwrap()))
+            .await
+            .expect("write_blob failed");
         for blob in self.content_blob_files() {
-            write_blob(dir, &blob.merkle, &read_file(&blob.file));
+            blobfs_ramdisk
+                .write_blob(blob.merkle, &read_file(&blob.file))
+                .await
+                .expect("write_blob failed");
         }
     }
 
     /// Writes the meta.far and all content and subpackage blobs to blobfs.
-    pub fn write_to_blobfs_dir(&self, dir: &openat::Dir) {
+    pub async fn write_to_blobfs(&self, blobfs_ramdisk: &BlobfsRamdisk) {
         let subpackage_blobs = self
             .subpackage_blobs
             .as_ref()
             .expect("package must know the subpackage blobs to write them");
-        let () = self.write_to_blobfs_dir_ignore_subpackages(dir);
+        let () = self.write_to_blobfs_ignore_subpackages(blobfs_ramdisk).await;
         for (hash, content) in subpackage_blobs {
-            write_blob(dir, hash, content);
+            blobfs_ramdisk.write_blob(*hash, content).await.expect("write_blob failed");
         }
     }
 
@@ -315,26 +322,6 @@ impl Package {
     pub fn subpackage_blobs(&self) -> Option<&HashMap<Hash, Vec<u8>>> {
         self.subpackage_blobs.as_ref()
     }
-}
-
-fn write_blob(dir: &openat::Dir, merkle: &fuchsia_merkle::Hash, content: &[u8]) {
-    use io::ErrorKind::*;
-    // c++blobfs supports uncompressed and delivery blobs and FxBlob only supports delivery blobs,
-    // so we always write a delivery blob.
-    #[allow(unknown_lints)] // TODO(fxbug.dev/130265): lint will be recognized after toolchain roll
-    #[allow(clippy::unnecessary_literal_unwrap)]
-    let mut file = match dir.new_file(delivery_blob::delivery_blob_path(merkle), 0o600) {
-        Ok(file) => file,
-        Err(e) if [AlreadyExists, PermissionDenied].contains(&e.kind()) => {
-            // blob is being written or already written
-            return;
-        }
-        Err(e) => Err(e).unwrap(),
-    };
-    let compressed =
-        delivery_blob::Type1Blob::generate(content, delivery_blob::CompressionMode::Attempt);
-    file.set_len(compressed.len().try_into().unwrap()).unwrap();
-    file.write_all(&compressed).unwrap();
 }
 
 async fn read_file(dir: &fio::DirectoryProxy, path: &str) -> Result<Vec<u8>, VerificationError> {
