@@ -26,25 +26,25 @@ impl DeviceType {
     pub const NONE: DeviceType = DeviceType(0);
 
     // MEM
-    pub const NULL: DeviceType = DeviceType::new(1, 3);
-    pub const ZERO: DeviceType = DeviceType::new(1, 5);
-    pub const FULL: DeviceType = DeviceType::new(1, 7);
-    pub const RANDOM: DeviceType = DeviceType::new(1, 8);
-    pub const URANDOM: DeviceType = DeviceType::new(1, 9);
-    pub const KMSG: DeviceType = DeviceType::new(1, 11);
+    pub const NULL: DeviceType = DeviceType::new(MEM_MAJOR, 3);
+    pub const ZERO: DeviceType = DeviceType::new(MEM_MAJOR, 5);
+    pub const FULL: DeviceType = DeviceType::new(MEM_MAJOR, 7);
+    pub const RANDOM: DeviceType = DeviceType::new(MEM_MAJOR, 8);
+    pub const URANDOM: DeviceType = DeviceType::new(MEM_MAJOR, 9);
+    pub const KMSG: DeviceType = DeviceType::new(MEM_MAJOR, 11);
 
     // TTY_ALT
-    pub const TTY: DeviceType = DeviceType::new(5, 0);
-    pub const PTMX: DeviceType = DeviceType::new(5, 2);
+    pub const TTY: DeviceType = DeviceType::new(TTY_ALT_MAJOR, 0);
+    pub const PTMX: DeviceType = DeviceType::new(TTY_ALT_MAJOR, 2);
 
     // MISC
-    pub const HW_RANDOM: DeviceType = DeviceType::new(10, 183);
-    pub const FUSE: DeviceType = DeviceType::new(10, 229);
-    pub const DEVICE_MAPPER: DeviceType = DeviceType::new(10, 236);
-    pub const LOOP_CONTROL: DeviceType = DeviceType::new(10, 237);
+    pub const HW_RANDOM: DeviceType = DeviceType::new(MISC_MAJOR, 183);
+    pub const FUSE: DeviceType = DeviceType::new(MISC_MAJOR, 229);
+    pub const DEVICE_MAPPER: DeviceType = DeviceType::new(MISC_MAJOR, 236);
+    pub const LOOP_CONTROL: DeviceType = DeviceType::new(MISC_MAJOR, 237);
 
     // Frame buffer
-    pub const FB0: DeviceType = DeviceType::new(29, 0);
+    pub const FB0: DeviceType = DeviceType::new(FB_MAJOR, 0);
 
     // Input
     pub const TOUCH_INPUT: DeviceType = DeviceType::new(INPUT_MAJOR, TOUCH_INPUT_MINOR);
