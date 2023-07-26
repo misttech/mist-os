@@ -370,7 +370,7 @@ impl ToResolveError for FetchError {
             Hyper { .. } => pkg::ResolveError::UnavailableBlob,
             Http { .. } => pkg::ResolveError::UnavailableBlob,
             Truncate(e) => e.to_resolve_error(),
-            Write(e) => e.to_resolve_error(),
+            Write { e, .. } => e.to_resolve_error(),
             BlobWritten(_) => pkg::ResolveError::Internal,
             NoMirrors => pkg::ResolveError::Internal,
             BlobUrl(_) => pkg::ResolveError::Internal,
@@ -864,7 +864,11 @@ async fn read_local_blob(
                 return Err(FetchError::BlobTooSmall { uri: merkle.to_string() });
             }
             inspect.state(inspect::LocalMirror::WriteBlob);
-            dest = match dest.write(&data).await.map_err(FetchError::Write)? {
+            dest = match dest
+                .write(&data)
+                .await
+                .map_err(|e| FetchError::Write { e, uri: merkle.to_string() })?
+            {
                 pkg::cache::BlobWriteSuccess::NeedsData(dest) => dest,
                 pkg::cache::BlobWriteSuccess::AllWritten(dest) => break dest,
             };
@@ -951,7 +955,7 @@ async fn download_blob(
                         },
                     )
                     .await
-                    .map_err(FetchError::Write)?
+                    .map_err(|e| FetchError::Write { e, uri: uri.to_string() })?
                 {
                     pkg::cache::BlobWriteSuccess::NeedsData(blob) => {
                         written += chunk.len() as u64;
@@ -1002,8 +1006,12 @@ pub enum FetchError {
     #[error("failed to truncate blob")]
     Truncate(#[source] pkg::cache::TruncateBlobError),
 
-    #[error("failed to write blob data")]
-    Write(#[source] pkg::cache::WriteBlobError),
+    #[error("Blob fetch of {uri}: failed to write blob data")]
+    Write {
+        #[source]
+        e: pkg::cache::WriteBlobError,
+        uri: String,
+    },
 
     #[error("error when telling pkg-cache the blob has been written")]
     BlobWritten(#[source] pkg::cache::BlobWrittenError),
@@ -1200,11 +1208,11 @@ impl FetchError {
         match self {
             CreateBlob(pkg::cache::OpenBlobError::Fidl(e))
             | Truncate(pkg::cache::TruncateBlobError::Fidl(e))
-            | Write(pkg::cache::WriteBlobError::Fidl(e))
+            | Write { e: pkg::cache::WriteBlobError::Fidl(e), .. }
             | BlobWritten(pkg::cache::BlobWrittenError::Fidl(e)) => Some(e),
             CreateBlob(_)
             | Truncate(_)
-            | Write(_)
+            | Write { .. }
             | BlobWritten(_)
             | FidlError { .. }
             | Hyper { .. }
