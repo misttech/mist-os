@@ -6,6 +6,7 @@
 //! Supports the following NETLINK_ROUTE requests: RTM_GETRULE, RTM_SETRULE, &
 //! RTM_DELRULE.
 
+use net_types::ip::IpVersion;
 use netlink_packet_route::rtnl::RuleMessage;
 
 use crate::{
@@ -41,6 +42,8 @@ pub(crate) enum RuleRequestArgs {
 pub(crate) struct RuleRequest<S: Sender<<NetlinkRoute as ProtocolFamily>::InnerMessage>> {
     /// The arguments for this request.
     pub(crate) args: RuleRequestArgs,
+    /// The IP Version of this request.
+    pub(crate) ip_version: IpVersion,
     /// The request's sequence number.
     pub(crate) sequence_number: u32,
     /// The client that made the request.
@@ -60,7 +63,7 @@ impl<S: Sender<<NetlinkRoute as ProtocolFamily>::InnerMessage>> RuleRequestHandl
     fn handle_request(&mut self, req: RuleRequest<S>) -> Result<(), Errno> {
         // TODO(https://issuetracker.google.com/283134947): Stub rule requests.
         #[allow(unused_variables)]
-        let RuleRequest { args, sequence_number, client } = req;
+        let RuleRequest { args, ip_version, sequence_number, client } = req;
         Ok(())
     }
 }

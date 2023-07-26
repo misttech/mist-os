@@ -58,6 +58,7 @@ pub mod route {
     use fidl_fuchsia_net_routes_ext as fnet_routes_ext;
 
     use assert_matches::assert_matches;
+    use either::Either;
     use futures::{
         channel::{mpsc, oneshot},
         sink::SinkExt as _,
@@ -882,24 +883,42 @@ pub mod route {
 
                     client.send_unicast(netlink_packet::new_done(req_header))
                 }
-                GetRule(_msg) => {
+                GetRule(msg) => {
                     if !is_dump {
                         client.send_unicast(
                             netlink_packet::new_error(Err(Errno::ENOTSUP), req_header)
                         );
                         return;
                     }
-                    let request = RuleRequest {
-                            args: RuleRequestArgs::DumpRules,
-                            sequence_number: req_header.sequence_number,
-                            client: client.clone(),
+                    let ip_versions = match msg.header.family.into() {
+                        AF_INET => Either::Left(std::iter::once(IpVersion::V4)),
+                        AF_INET6 => Either::Left(std::iter::once(IpVersion::V6)),
+                        AF_UNSPEC => Either::Right([IpVersion::V4, IpVersion::V6].into_iter()),
+                        family => {
+                            client.send_unicast(
+                                netlink_packet::new_error(Err(Errno::EAFNOSUPPORT), req_header)
+                            );
+                            log_debug!("received RTM_GETRULE req from {} with invalid address \
+                                family ({}): {:?}", client, family, msg);
+                            return;
+                        }
                     };
-                    match rules_request_handler.handle_request(request) {
-                        Ok(()) => client.send_unicast(netlink_packet::new_done(req_header)),
-                        Err(e) => client.send_unicast(
-                            netlink_packet::new_error(Err(e), req_header)
-                        )
+                    for ip_version in ip_versions.into_iter() {
+                        let request = RuleRequest {
+                                args: RuleRequestArgs::DumpRules,
+                                ip_version,
+                                sequence_number: req_header.sequence_number,
+                                client: client.clone(),
+                        };
+                        match rules_request_handler.handle_request(request) {
+                            Ok(()) => {},
+                            Err(e) => {
+                                client.send_unicast(netlink_packet::new_error(Err(e), req_header));
+                                return;
+                            }
+                        }
                     }
+                    client.send_unicast(netlink_packet::new_done(req_header))
                 }
                 NewRule(msg) => {
                     if is_replace {
@@ -909,8 +928,21 @@ pub mod route {
                         );
                         return;
                     }
+                    let ip_version = match msg.header.family.into() {
+                        AF_INET => IpVersion::V4,
+                        AF_INET6 => IpVersion::V6,
+                        family => {
+                            log_debug!("received RTM_NEWRULE req from {} with invalid address \
+                                family ({}): {:?}", client, family, msg);
+                            client.send_unicast(
+                                netlink_packet::new_error(Err(Errno::EAFNOSUPPORT), req_header)
+                            );
+                            return;
+                        }
+                    };
                     let request = RuleRequest {
                             args: RuleRequestArgs::New(msg),
+                            ip_version,
                             sequence_number: req_header.sequence_number,
                             client: client.clone(),
                     };
@@ -924,8 +956,21 @@ pub mod route {
                     }
                 }
                 DelRule(msg) => {
+                    let ip_version = match msg.header.family.into() {
+                        AF_INET => IpVersion::V4,
+                        AF_INET6 => IpVersion::V6,
+                        family => {
+                            log_debug!("received RTM_DELRULE req from {} with invalid address \
+                                family ({}): {:?}", client, family, msg);
+                            client.send_unicast(
+                                netlink_packet::new_error(Err(Errno::EAFNOSUPPORT), req_header)
+                            );
+                            return;
+                        }
+                    };
                     let request = RuleRequest {
                             args: RuleRequestArgs::Del(msg),
+                            ip_version,
                             sequence_number: req_header.sequence_number,
                             client: client.clone(),
                     };
@@ -1250,7 +1295,11 @@ pub(crate) mod testutil {
 mod test {
     use super::*;
 
-    use std::num::NonZeroU32;
+    use std::{
+        collections::VecDeque,
+        num::NonZeroU32,
+        sync::{Arc, Mutex},
+    };
 
     use fidl_fuchsia_net_routes_ext as fnet_routes_ext;
 
@@ -2888,90 +2937,299 @@ mod test {
         )
     }
 
+    /// Represents a single expected request, and the fake response.
+    #[derive(Debug)]
+    pub(crate) struct FakeRuleRequestResponse {
+        pub(crate) expected_request_args: RuleRequestArgs,
+        pub(crate) expected_ip_version: IpVersion,
+        pub(crate) response: Result<(), Errno>,
+    }
+
+    /// A fake implementation of [`RuleRequestHandler`].
+    ///
+    /// Handles a sequence of rule requests by pulling the expected request
+    /// and fake response from the front of `requests_and_responses`.
     #[derive(Clone, Debug)]
     pub(crate) struct FakeRuleRequestHandler {
-        pub(crate) expected_request_args: Option<RuleRequestArgs>,
-        pub(crate) response: Result<(), Errno>,
+        pub(crate) requests_and_responses: Arc<Mutex<VecDeque<FakeRuleRequestResponse>>>,
+    }
+
+    impl FakeRuleRequestHandler {
+        fn new(requests_and_responses: impl IntoIterator<Item = FakeRuleRequestResponse>) -> Self {
+            FakeRuleRequestHandler {
+                requests_and_responses: Arc::new(Mutex::new(VecDeque::from_iter(
+                    requests_and_responses,
+                ))),
+            }
+        }
     }
 
     impl<S: Sender<<NetlinkRoute as ProtocolFamily>::InnerMessage>> RuleRequestHandler<S>
         for FakeRuleRequestHandler
     {
         fn handle_request(&mut self, actual_request: RuleRequest<S>) -> Result<(), Errno> {
-            let Self { expected_request_args, response } = self;
-            let RuleRequest { args: actual_request_args, sequence_number: _, client: _ } =
-                actual_request;
-            assert_eq!(Some(actual_request_args), *expected_request_args);
-            *response
+            let Self { requests_and_responses } = self;
+            let FakeRuleRequestResponse { expected_request_args, expected_ip_version, response } =
+                requests_and_responses.lock().unwrap().pop_front().expect(
+                    "FakeRuleRequest handler should have a fake request/response pre-configured",
+                );
+            let RuleRequest { args, ip_version, sequence_number: _, client: _ } = actual_request;
+            assert_eq!(args, expected_request_args);
+            assert_eq!(ip_version, expected_ip_version);
+            response
         }
     }
+
+    fn default_rule_for_family(family: u16) -> RuleMessage {
+        let mut rule = RuleMessage::default();
+        rule.header.family = family.try_into().expect("address family should fit in a u8");
+        rule
+    }
+
+    const AF_INVALID: u16 = 255;
 
     #[test_case(
         RtnlMessage::GetRule,
         0,
-        None,
-        Ok(()),
+        AF_UNSPEC,
+        vec![],
         Some(ExpectedResponse::Error(Errno::ENOTSUP)); "get_rule_no_dump")]
     #[test_case(
         RtnlMessage::GetRule,
         NLM_F_DUMP,
-        Some(RuleRequestArgs::DumpRules),
-        Ok(()),
-        Some(ExpectedResponse::Done); "get_rule_dump")]
+        AF_INVALID,
+        vec![],
+        Some(ExpectedResponse::Error(Errno::EAFNOSUPPORT)); "get_rule_dump_invalid_address_family")]
     #[test_case(
         RtnlMessage::GetRule,
         NLM_F_DUMP,
-        Some(RuleRequestArgs::DumpRules),
-        Err(Errno::ENOTSUP),
-        Some(ExpectedResponse::Error(Errno::ENOTSUP)); "get_rule_dump_fails")]
+        AF_INET,
+        vec![FakeRuleRequestResponse{
+            expected_request_args: RuleRequestArgs::DumpRules,
+            expected_ip_version: IpVersion::V4,
+            response: Ok(()),
+        }],
+        Some(ExpectedResponse::Done); "get_rule_dump_v4")]
+    #[test_case(
+        RtnlMessage::GetRule,
+        NLM_F_DUMP,
+        AF_INET6,
+        vec![FakeRuleRequestResponse{
+            expected_request_args: RuleRequestArgs::DumpRules,
+            expected_ip_version: IpVersion::V6,
+            response: Ok(()),
+        }],
+        Some(ExpectedResponse::Done); "get_rule_dump_v6")]
+    #[test_case(
+        RtnlMessage::GetRule,
+        NLM_F_DUMP,
+        AF_UNSPEC,
+        vec![FakeRuleRequestResponse{
+            expected_request_args: RuleRequestArgs::DumpRules,
+            expected_ip_version: IpVersion::V4,
+            response: Ok(()),
+        },
+        FakeRuleRequestResponse{
+            expected_request_args: RuleRequestArgs::DumpRules,
+            expected_ip_version: IpVersion::V6,
+            response: Ok(()),
+        }],
+        Some(ExpectedResponse::Done); "get_rule_dump_af_unspec")]
+    #[test_case(
+        RtnlMessage::GetRule,
+        NLM_F_DUMP,
+        AF_INET,
+        vec![FakeRuleRequestResponse{
+            expected_request_args: RuleRequestArgs::DumpRules,
+            expected_ip_version: IpVersion::V4,
+            response: Err(Errno::ENOTSUP),
+        }],
+        Some(ExpectedResponse::Error(Errno::ENOTSUP)); "get_rule_dump_v4_fails")]
+    #[test_case(
+        RtnlMessage::GetRule,
+        NLM_F_DUMP,
+        AF_INET6,
+        vec![FakeRuleRequestResponse{
+            expected_request_args: RuleRequestArgs::DumpRules,
+            expected_ip_version: IpVersion::V6,
+            response: Err(Errno::ENOTSUP),
+        }],
+        Some(ExpectedResponse::Error(Errno::ENOTSUP)); "get_rule_dump_v6_fails")]
+    #[test_case(
+        RtnlMessage::GetRule,
+        NLM_F_DUMP,
+        AF_UNSPEC,
+        vec![FakeRuleRequestResponse{
+            expected_request_args: RuleRequestArgs::DumpRules,
+            expected_ip_version: IpVersion::V4,
+            response: Err(Errno::ENOTSUP),
+        }],
+        Some(ExpectedResponse::Error(Errno::ENOTSUP)); "get_rule_dump_af_unspec_v4_fails")]
+    #[test_case(
+        RtnlMessage::GetRule,
+        NLM_F_DUMP,
+        AF_UNSPEC,
+        vec![FakeRuleRequestResponse{
+            expected_request_args: RuleRequestArgs::DumpRules,
+            expected_ip_version: IpVersion::V4,
+            response: Ok(()),
+        },
+        FakeRuleRequestResponse{
+            expected_request_args: RuleRequestArgs::DumpRules,
+            expected_ip_version: IpVersion::V6,
+            response: Err(Errno::ENOTSUP),
+        }],
+        Some(ExpectedResponse::Error(Errno::ENOTSUP)); "get_rule_dump_af_unspec_v6_fails")]
     #[test_case(
         RtnlMessage::NewRule,
         0,
-        Some(RuleRequestArgs::New(RuleMessage::default())),
-        Ok(()),
-        None; "new_rule_succeeds")]
+        AF_INET,
+        vec![FakeRuleRequestResponse{
+            expected_request_args: RuleRequestArgs::New(default_rule_for_family(AF_INET)),
+            expected_ip_version: IpVersion::V4,
+            response: Ok(()),
+        }],
+        None; "new_rule_succeeds_v4")]
+    #[test_case(
+        RtnlMessage::NewRule,
+        0,
+        AF_INET6,
+        vec![FakeRuleRequestResponse{
+            expected_request_args: RuleRequestArgs::New(default_rule_for_family(AF_INET6)),
+            expected_ip_version: IpVersion::V6,
+            response: Ok(()),
+        }],
+        None; "new_rule_succeeds_v6")]
+    #[test_case(
+        RtnlMessage::NewRule,
+        0,
+        AF_UNSPEC,
+        vec![],
+        Some(ExpectedResponse::Error(Errno::EAFNOSUPPORT)); "new_rule_af_unspec_fails")]
     #[test_case(
         RtnlMessage::NewRule,
         NLM_F_ACK,
-        Some(RuleRequestArgs::New(RuleMessage::default())),
-        Ok(()),
-        Some(ExpectedResponse::Ack); "new_rule_succeeds_with_ack")]
+        AF_INET,
+        vec![FakeRuleRequestResponse{
+            expected_request_args: RuleRequestArgs::New(default_rule_for_family(AF_INET)),
+            expected_ip_version: IpVersion::V4,
+            response: Ok(()),
+        }],
+        Some(ExpectedResponse::Ack); "new_rule_v4_succeeds_with_ack")]
+    #[test_case(
+        RtnlMessage::NewRule,
+        NLM_F_ACK,
+        AF_INET6,
+        vec![FakeRuleRequestResponse{
+            expected_request_args: RuleRequestArgs::New(default_rule_for_family(AF_INET6)),
+            expected_ip_version: IpVersion::V6,
+            response: Ok(()),
+        }],
+        Some(ExpectedResponse::Ack); "new_rule_v6_succeeds_with_ack")]
     #[test_case(
         RtnlMessage::NewRule,
         0,
-        Some(RuleRequestArgs::New(RuleMessage::default())),
-        Err(Errno::ENOTSUP),
-        Some(ExpectedResponse::Error(Errno::ENOTSUP)); "new_rule_fails")]
+        AF_INET,
+        vec![FakeRuleRequestResponse{
+            expected_request_args: RuleRequestArgs::New(default_rule_for_family(AF_INET)),
+            expected_ip_version: IpVersion::V4,
+            response: Err(Errno::ENOTSUP),
+        }],
+        Some(ExpectedResponse::Error(Errno::ENOTSUP)); "new_rule_v4_fails")]
+    #[test_case(
+        RtnlMessage::NewRule,
+        0,
+        AF_INET6,
+        vec![FakeRuleRequestResponse{
+            expected_request_args: RuleRequestArgs::New(default_rule_for_family(AF_INET6)),
+            expected_ip_version: IpVersion::V6,
+            response: Err(Errno::ENOTSUP),
+        }],
+        Some(ExpectedResponse::Error(Errno::ENOTSUP)); "new_rule_v6_fails")]
     #[test_case(
         RtnlMessage::NewRule,
         NLM_F_REPLACE,
-        Some(RuleRequestArgs::New(RuleMessage::default())),
-        Ok(()),
-        Some(ExpectedResponse::Error(Errno::ENOTSUP)); "new_rule_replace_unimplemented")]
+        AF_INET,
+        vec![],
+        Some(ExpectedResponse::Error(Errno::ENOTSUP)); "new_rule_v4_replace_unimplemented")]
+    #[test_case(
+        RtnlMessage::NewRule,
+        NLM_F_REPLACE,
+        AF_INET6,
+        vec![],
+        Some(ExpectedResponse::Error(Errno::ENOTSUP)); "new_rule_v6_replace_unimplemented")]
     #[test_case(
         RtnlMessage::DelRule,
         0,
-        Some(RuleRequestArgs::Del(RuleMessage::default())),
-        Ok(()),
-        None; "del_rule_succeeds")]
+        AF_INET,
+        vec![FakeRuleRequestResponse{
+            expected_request_args: RuleRequestArgs::Del(default_rule_for_family(AF_INET)),
+            expected_ip_version: IpVersion::V4,
+            response: Ok(()),
+        }],
+        None; "del_rule_succeeds_v4")]
+    #[test_case(
+        RtnlMessage::DelRule,
+        0,
+        AF_INET6,
+        vec![FakeRuleRequestResponse{
+            expected_request_args: RuleRequestArgs::Del(default_rule_for_family(AF_INET6)),
+            expected_ip_version: IpVersion::V6,
+            response: Ok(()),
+        }],
+        None; "del_rule_succeeds_v6")]
+    #[test_case(
+        RtnlMessage::DelRule,
+        0,
+        AF_UNSPEC,
+        vec![],
+        Some(ExpectedResponse::Error(Errno::EAFNOSUPPORT)); "del_rule_af_unspec_fails")]
     #[test_case(
         RtnlMessage::DelRule,
         NLM_F_ACK,
-        Some(RuleRequestArgs::Del(RuleMessage::default())),
-        Ok(()),
-        Some(ExpectedResponse::Ack); "del_rule_succeeds_with_ack")]
+        AF_INET,
+        vec![FakeRuleRequestResponse{
+            expected_request_args: RuleRequestArgs::Del(default_rule_for_family(AF_INET)),
+            expected_ip_version: IpVersion::V4,
+            response: Ok(()),
+        }],
+        Some(ExpectedResponse::Ack); "del_rule_v4_succeeds_with_ack")]
+    #[test_case(
+        RtnlMessage::DelRule,
+        NLM_F_ACK,
+        AF_INET6,
+        vec![FakeRuleRequestResponse{
+            expected_request_args: RuleRequestArgs::Del(default_rule_for_family(AF_INET6)),
+            expected_ip_version: IpVersion::V6,
+            response: Ok(()),
+        }],
+        Some(ExpectedResponse::Ack); "del_rule_v6_succeeds_with_ack")]
     #[test_case(
         RtnlMessage::DelRule,
         0,
-        Some(RuleRequestArgs::Del(RuleMessage::default())),
-        Err(Errno::ENOTSUP),
-        Some(ExpectedResponse::Error(Errno::ENOTSUP)); "del_rule_fails")]
+        AF_INET,
+        vec![FakeRuleRequestResponse{
+            expected_request_args: RuleRequestArgs::Del(default_rule_for_family(AF_INET)),
+            expected_ip_version: IpVersion::V4,
+            response: Err(Errno::ENOTSUP),
+        }],
+        Some(ExpectedResponse::Error(Errno::ENOTSUP)); "del_rule_v4_fails")]
+    #[test_case(
+        RtnlMessage::DelRule,
+        0,
+        AF_INET6,
+        vec![FakeRuleRequestResponse{
+            expected_request_args: RuleRequestArgs::Del(default_rule_for_family(AF_INET6)),
+            expected_ip_version: IpVersion::V6,
+            response: Err(Errno::ENOTSUP),
+        }],
+        Some(ExpectedResponse::Error(Errno::ENOTSUP)); "del_rule_v6_fails")]
     #[fuchsia::test]
     async fn test_rule_request(
         rule_fn: fn(RuleMessage) -> RtnlMessage,
         flags: u16,
-        expected_request_args: Option<RuleRequestArgs>,
-        mocked_rule_response: Result<(), Errno>,
+        address_family: u16,
+        requests_and_responses: Vec<FakeRuleRequestResponse>,
         expected_response: Option<ExpectedResponse>,
     ) {
         let (interfaces_request_sink, _interfaces_request_stream) = mpsc::channel(0);
@@ -2982,10 +3240,7 @@ mod test {
             interfaces_request_sink,
             v4_routes_request_sink,
             v6_routes_request_sink,
-            rules_request_handler: FakeRuleRequestHandler {
-                expected_request_args,
-                response: mocked_rule_response,
-            },
+            rules_request_handler: FakeRuleRequestHandler::new(requests_and_responses),
         };
 
         let (mut client_sink, mut client) = {
@@ -3001,7 +3256,7 @@ mod test {
             .handle_request(
                 NetlinkMessage::new(
                     header,
-                    NetlinkPayload::InnerMessage(rule_fn(RuleMessage::default())),
+                    NetlinkPayload::InnerMessage(rule_fn(default_rule_for_family(address_family))),
                 ),
                 &mut client,
             )
