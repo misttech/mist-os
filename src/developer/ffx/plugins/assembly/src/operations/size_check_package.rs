@@ -17,6 +17,7 @@ use errors::ffx_bail;
 use ffx_assembly_args::PackageSizeCheckArgs;
 use fuchsia_hash::Hash;
 use fuchsia_pkg::PackageManifest;
+use num::bigint::BigInt;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use std::collections::{BTreeMap, HashMap, HashSet};
@@ -175,11 +176,15 @@ fn verify_budgets_with_tools(
         for budget in &config.resource_budgets {
             sum_of_budgets += budget.budget_bytes;
         }
+
+        // `BigInt` is used as subtraction is not closed in `u64`.
+        let diff = BigInt::from(sum_of_budgets) - BigInt::from(total);
         if sum_of_budgets != total {
             anyhow::bail!(
-                "Sum of budgets doesn't match total budget bytes: sum={}, total={}",
+                "Sum of budgets doesn't match total budget bytes: sum={}, total={}, diff=sum-total={}",
                 sum_of_budgets,
-                total
+                total,
+                diff,
             );
         }
     }
@@ -668,7 +673,10 @@ mod tests {
             Box::new(FakeToolProvider::default()),
         );
         assert_eq!(err.exit_code(), 1);
-        assert_failed(err, "Sum of budgets doesn't match total budget bytes:");
+        assert_failed(
+            err,
+            "Sum of budgets doesn't match total budget bytes: sum=101, total=100, diff=sum-total=1",
+        );
     }
 
     #[test]
@@ -716,7 +724,10 @@ mod tests {
             Box::new(FakeToolProvider::default()),
         );
         assert_eq!(err.exit_code(), 1);
-        assert_failed(err, "Sum of budgets doesn't match total budget bytes:");
+        assert_failed(
+            err,
+            "Sum of budgets doesn't match total budget bytes: sum=98, total=100, diff=sum-total=-2",
+        );
     }
 
     #[test]
