@@ -115,7 +115,7 @@ void TraceSession::AddProvider(TraceProviderBundle* provider) {
 
 void TraceSession::MarkInitialized() { TransitionToState(State::kInitialized); }
 
-void TraceSession::Terminate(fit::closure callback) {
+void TraceSession::Terminate(fit::function<void(controller::TerminateResult)> callback) {
   if (state_ == State::kTerminating) {
     FX_VLOGS(1) << "Ignoring terminate request, already terminating";
     return;
@@ -149,6 +149,9 @@ void TraceSession::Start(fuchsia::tracing::BufferDisposition buffer_disposition,
 
   start_callback_ = std::move(callback);
   session_start_timeout_.PostDelayed(async_get_default_dispatcher(), start_timeout_);
+
+  // Clear out any old trace stats before starting a new session.
+  trace_stats_.clear();
 
   // We haven't fully started at this point, we still have to wait for each
   // provider to indicate it they've started.
@@ -337,6 +340,11 @@ void TraceSession::OnProviderTerminated(TraceProviderBundle* bundle) {
         }
       }
     }
+    if (auto trace_stat = (*it)->GetStats(); trace_stat.has_value()) {
+      trace_stats_.push_back(std::move(trace_stat.value()));
+    } else {
+      FX_LOGS(WARNING) << "No stats generated for " << *bundle;
+    }
     tracees_.erase(it);
   }
 
@@ -359,9 +367,12 @@ void TraceSession::TerminateSessionIfEmpty() {
     FX_VLOGS(1) << "Marking session as terminated, no more tracees";
 
     session_terminate_timeout_.Cancel();
+
+    controller::TerminateResult terminate_result;
+    terminate_result.set_provider_stats(std::move(trace_stats_));
     auto callback = std::move(terminate_callback_);
     FX_DCHECK(callback);
-    callback();
+    callback(std::move(terminate_result));
   }
 }
 
@@ -372,13 +383,22 @@ void TraceSession::FinishTerminatingDueToTimeout() {
     FX_VLOGS(1) << "Marking session as terminated, timed out waiting for tracee(s)";
 
     for (auto& tracee : tracees_) {
-      if (tracee->state() != Tracee::State::kTerminated)
-        FX_LOGS(WARNING) << "Timed out waiting for trace provider " << *tracee->bundle()
+      if (tracee->state() != Tracee::State::kTerminated) {
+        FX_LOGS(WARNING) << "Timed out waiting for trace provider " << tracee->bundle()
                          << " to terminate";
+      } else {
+        if (auto trace_stat = tracee->GetStats(); trace_stat.has_value()) {
+          trace_stats_.push_back(std::move(trace_stat.value()));
+        } else {
+          FX_LOGS(WARNING) << "No stats generated for " << tracee->bundle();
+        }
+      }
     }
+    controller::TerminateResult terminate_result;
+    terminate_result.set_provider_stats(std::move(trace_stats_));
     auto callback = std::move(terminate_callback_);
     FX_DCHECK(callback);
-    callback();
+    callback(std::move(terminate_result));
   }
 }
 

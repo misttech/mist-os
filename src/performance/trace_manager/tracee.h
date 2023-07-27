@@ -71,6 +71,8 @@ class Tracee {
 
   void Stop(bool write_results);
 
+  std::optional<controller::ProviderStats> GetStats() const;
+
   // Transfer all collected records to |socket|.
   TransferStatus TransferRecords(const zx::socket& socket) const;
 
@@ -175,6 +177,9 @@ class Tracee {
   // Set to false when starting and true when results are written.
   // This is used to not save the results twice when terminating.
   mutable bool results_written_ = false;
+
+  // Final trace stats
+  mutable controller::ProviderStats provider_stats_;
 
   fxl::WeakPtrFactory<Tracee> weak_ptr_factory_;
 

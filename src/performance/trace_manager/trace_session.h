@@ -97,7 +97,7 @@ class TraceSession : public fxl::RefCountedThreadSafe<TraceSession> {
   // Stops tracing first if necessary (see |Stop()|).
   // If terminating providers takes longer than |stop_timeout_|, we forcefully
   // terminate tracing and invoke |callback|.
-  void Terminate(fit::closure callback);
+  void Terminate(fit::function<void(controller::TerminateResult)> callback);
 
   // Starts the trace.
   // Invokes |callback| when all providers in this session have
@@ -185,7 +185,7 @@ class TraceSession : public fxl::RefCountedThreadSafe<TraceSession> {
 
   controller::Controller::StartTracingCallback start_callback_;
   fit::closure stop_callback_;
-  fit::closure terminate_callback_;
+  fit::function<void(controller::TerminateResult)> terminate_callback_;
 
   fit::closure abort_handler_;
   AlertCallback alert_callback_;
@@ -197,6 +197,9 @@ class TraceSession : public fxl::RefCountedThreadSafe<TraceSession> {
 
   // If true then write results when the session terminates.
   bool write_results_on_terminate_ = true;
+
+  // Trace stats from each provider are stored here on terminate.
+  std::vector<controller::ProviderStats> trace_stats_;
 
   fxl::WeakPtrFactory<TraceSession> weak_ptr_factory_;
 

@@ -119,6 +119,7 @@ closed protocol Tracing {
         name string:255;
     }) -> (struct {
         target TargetInfo;
+        result fuchsia.tracing.controller.TerminateResult;
     }) error RecordingError;
 
     /// Reports the current status of all running traces.

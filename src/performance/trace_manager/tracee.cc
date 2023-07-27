@@ -480,6 +480,22 @@ TransferStatus Tracee::TransferRecords(const zx::socket& socket) const {
     return transfer_status;
   }
 
+  provider_stats_.set_name(bundle_->name.c_str());
+  provider_stats_.set_pid(bundle_->pid);
+  provider_stats_.set_buffering_mode(EngineBufferingModeToProviderMode(
+      static_cast<trace_buffering_mode_t>(header->buffering_mode())));
+  provider_stats_.set_buffer_wrapped_count(header->wrapped_count());
+  provider_stats_.set_records_dropped(header->num_records_dropped());
+  float durable_buffer_used = 0;
+  if (header->durable_buffer_size() > 0) {
+    durable_buffer_used = (static_cast<float>(header->durable_data_end()) /
+                           static_cast<float>(header->durable_buffer_size())) *
+                          100;
+  }
+  provider_stats_.set_percentage_durable_buffer_used(durable_buffer_used);
+  provider_stats_.set_non_durable_bytes_written(header->rolling_data_end(0) +
+                                                header->rolling_data_end(1));
+
   // Print some stats to assist things like buffer size calculations.
   // Don't print anything if nothing was written.
   // TODO(dje): Revisit this once stats are fully reported back to the client.
@@ -498,6 +514,13 @@ TransferStatus Tracee::TransferRecords(const zx::socket& socket) const {
   }
 
   return TransferStatus::kComplete;
+}
+
+std::optional<controller::ProviderStats> Tracee::GetStats() const {
+  if (state_ == State::kTerminated) {
+    return std::move(provider_stats_);
+  }
+  return std::nullopt;
 }
 
 void Tracee::TransferBuffer(const zx::socket& socket, uint32_t wrapped_count,

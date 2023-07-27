@@ -77,6 +77,13 @@ pub struct Stop {
     /// used as the method to stop the trace.
     #[argh(option)]
     pub output: Option<String>,
+
+    /// increase verbosity of command output. Defaults to false.
+    /// Enabling this prints stats from trace providers including the number
+    /// of records dropped, wrapped buffers count, % of durable buffer used and
+    /// non durable bytes written.
+    #[argh(switch, short = 'v')]
+    pub verbose: bool,
 }
 
 #[derive(FromArgs, PartialEq, Debug)]
@@ -173,6 +180,14 @@ pub struct Start {
     /// which means the trace will run in "interactive" mode.
     #[argh(switch)]
     pub background: bool,
+
+    /// increase verbosity of output on trace stop. Defaults to false.
+    /// This is ignored if duration is not set.
+    /// Enabling this prints stats from trace providers including the number
+    /// of records dropped, wrapped buffers count, % of durable buffer used and
+    /// non durable bytes written.
+    #[argh(switch, short = 'v')]
+    pub verbose: bool,
 
     /// a trigger consists of an alert leading to an action. An alert
     /// is written into the code being traced, and an action here is

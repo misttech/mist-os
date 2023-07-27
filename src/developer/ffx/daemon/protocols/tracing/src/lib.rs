@@ -30,6 +30,7 @@ struct TraceTask {
     config: trace::TraceConfig,
     proxy: trace::ControllerProxy,
     options: ffx::TraceOptions,
+    terminate_result: Rc<Mutex<trace::TerminateResult>>,
     start_time: Instant,
     task: Task<()>,
     trace_shutdown_complete: Rc<Mutex<bool>>,
@@ -123,7 +124,9 @@ enum TraceTaskStartError {
     GeneralError(#[from] anyhow::Error),
 }
 
-async fn trace_shutdown(proxy: &trace::ControllerProxy) -> Result<(), ffx::RecordingError> {
+async fn trace_shutdown(
+    proxy: &trace::ControllerProxy,
+) -> Result<trace::TerminateResult, ffx::RecordingError> {
     proxy
         .stop_tracing(&trace::StopOptions { write_results: Some(true), ..Default::default() })
         .await
@@ -140,8 +143,7 @@ async fn trace_shutdown(proxy: &trace::ControllerProxy) -> Result<(), ffx::Recor
         .map_err(|e| {
             tracing::warn!("terminating tracing: {:?}", e);
             ffx::RecordingError::RecordingStop
-        })?;
-    Ok(())
+        })
 }
 
 impl TraceTask {
@@ -185,15 +187,16 @@ impl TraceTask {
         let controller = proxy.clone();
         let triggers = options.triggers.clone();
         let trace_shutdown_complete = Rc::new(Mutex::new(false));
-        let trace_shutdown_complete_clone = trace_shutdown_complete.clone();
+        let terminate_result = Rc::new(Mutex::new(trace::TerminateResult::default()));
         Ok(Self {
             target_info: target_info.clone(),
             config,
             proxy,
             options,
+            terminate_result: terminate_result.clone(),
             start_time: Instant::now(),
             output_file: output_file.clone(),
-            trace_shutdown_complete,
+            trace_shutdown_complete: trace_shutdown_complete.clone(),
             task: Task::local(async move {
                 let mut timeout_fut = Box::pin(async move {
                     if let Some(duration) = duration {
@@ -206,10 +209,16 @@ impl TraceTask {
                 let mut pipe_fut = Box::pin(pipe_fut).fuse();
                 let shutdown_proxy = controller.clone();
                 let shutdown_fut = async move {
-                    let mut done = trace_shutdown_complete_clone.lock().await;
+                    let mut done = trace_shutdown_complete.lock().await;
                     if !*done {
-                        if let Err(e) = trace_shutdown(&shutdown_proxy).await {
-                            tracing::warn!("error shutting down trace: {:?}", e);
+                        match trace_shutdown(&shutdown_proxy).await {
+                            Ok(result) => {
+                                let mut terminate_result_guard = terminate_result.lock().await;
+                                *terminate_result_guard = result.into();
+                            }
+                            Err(e) => {
+                                tracing::warn!("error shutting down trace: {:?}", e);
+                            }
                         }
                         *done = true
                     }
@@ -254,13 +263,19 @@ impl TraceTask {
         })
     }
 
-    async fn shutdown(self) -> Result<(), ffx::RecordingError> {
+    async fn shutdown(self) -> Result<trace::TerminateResult, ffx::RecordingError> {
         {
             let mut trace_shutdown_done = self.trace_shutdown_complete.lock().await;
             if !*trace_shutdown_done {
-                if let Err(e) = trace_shutdown(&self.proxy).await {
-                    tracing::warn!("error shutting down trace: {:?}", e);
-                }
+                match trace_shutdown(&self.proxy).await {
+                    Ok(trace_result) => {
+                        let mut terminate_result_guard = self.terminate_result.lock().await;
+                        *terminate_result_guard = trace_result.into();
+                    }
+                    Err(e) => {
+                        tracing::warn!("error shutting down trace: {:?}", e);
+                    }
+                };
                 *trace_shutdown_done = true;
             }
         }
@@ -271,13 +286,15 @@ impl TraceTask {
         );
         let target_info_clone = self.target_info.clone();
         let output_file = self.output_file.clone();
+        let terminate_result = self.terminate_result.clone();
         self.await;
         tracing::trace!(
             "trace task {:?} -> {} shutdown await completed",
             target_info_clone,
             output_file
         );
-        Ok(())
+        let terminate_result_guard = terminate_result.lock().await;
+        Ok(terminate_result_guard.clone())
     }
 }
 
@@ -446,8 +463,12 @@ impl FidlProtocol for TracingProtocol {
                     }
                 };
                 let target_info = task.target_info.clone();
-                let res = task.shutdown().await.map(|_| &target_info);
-                responder.send(res).map_err(Into::into)
+                responder
+                    .send(match task.shutdown().await {
+                        Ok(ref result) => Ok((&target_info, result)),
+                        Err(e) => Err(e),
+                    })
+                    .map_err(Into::into)
             }
             ffx::TracingRequest::Status { iterator, responder } => {
                 let mut stream = iterator.into_stream()?;

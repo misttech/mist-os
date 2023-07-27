@@ -71,7 +71,7 @@ void TraceManager::OnEmptyControllerSet() {
     // tracing has ended.
     if (session_->state() != TraceSession::State::kTerminating) {
       FX_LOGS(INFO) << "Controller is gone, terminating trace";
-      session_->Terminate([this]() {
+      session_->Terminate([this](controller::TerminateResult result) {
         FX_LOGS(INFO) << "Trace terminated";
         session_ = nullptr;
       });
@@ -189,10 +189,9 @@ void TraceManager::TerminateTracing(controller::TerminateOptions options,
   }
 
   FX_LOGS(INFO) << "Terminating trace";
-  session_->Terminate([this, terminate_callback = std::move(terminate_callback)]() {
+  session_->Terminate([this, terminate_callback = std::move(terminate_callback)](
+                          controller::TerminateResult result) {
     FX_LOGS(INFO) << "Terminated trace";
-    controller::TerminateResult result;
-    // TODO(dje): Report stats back to user.
     terminate_callback(std::move(result));
     session_ = nullptr;
   });

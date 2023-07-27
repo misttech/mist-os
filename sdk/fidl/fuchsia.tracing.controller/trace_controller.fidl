@@ -152,10 +152,20 @@ type TerminateOptions = table {
     1: write_results bool;
 };
 
+type ProviderStats = table {
+    1: name string:fuchsia.tracing.MAX_PROVIDER_NAME_LENGTH;
+    2: pid zx.Koid;
+    3: buffering_mode fuchsia.tracing.BufferingMode;
+    4: buffer_wrapped_count uint32;
+    5: records_dropped uint64;
+    6: percentage_durable_buffer_used float32;
+    7: non_durable_bytes_written uint64;
+};
+
 /// Result of a terminate request.
 type TerminateResult = table {
-        // TODO(dje): Provider stats.
-        };
+    1: provider_stats vector<ProviderStats>:MAX_NUM_PROVIDERS;
+};
 
 /// Error codes from Start operations.
 type StartErrorCode = strict enum {
