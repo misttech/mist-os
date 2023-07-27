@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 use anyhow::{anyhow, Context, Result};
+use assembly_images_config::ImagesConfig;
 use assembly_util as util;
 use camino::{Utf8Path, Utf8PathBuf};
 use serde::{Deserialize, Serialize};
@@ -174,6 +175,12 @@ pub struct ImageAssemblyConfig {
     /// added to the BOOTFS in the ZBI.
     #[serde(default)]
     pub bootfs_packages: Vec<Utf8PathBuf>,
+
+    /// Which images to produce and how.
+    /// If specified, image assembly will assert that it is equivalent to any
+    /// images config passed to it via the command-line.
+    #[serde(default)]
+    pub images_config: Option<ImagesConfig>,
 }
 
 impl ImageAssemblyConfig {
@@ -193,6 +200,7 @@ impl ImageAssemblyConfig {
                 clock_backstop,
             },
             qemu_kernel: "path/to/qemu/kernel".into(),
+            images_config: None,
         }
     }
 
@@ -237,6 +245,7 @@ impl ImageAssemblyConfig {
             boot_args,
             bootfs_files,
             bootfs_packages,
+            images_config: None,
         })
     }
 }

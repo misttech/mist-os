@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use assembly_images_config::BoardFilesystemConfig;
 use camino::Utf8PathBuf;
 use serde::{Deserialize, Serialize};
 
@@ -21,6 +22,11 @@ pub struct BoardInformation {
     /// It's an unstable interface between the boards and the platform.
     #[serde(default)]
     pub provided_features: Vec<String>,
+
+    /// Configuration for the various filesystems that the product can choose to
+    /// include.
+    #[serde(default)]
+    pub filesystems: BoardFilesystemConfig,
 
     /// This is the bundle of board-specific artifacts that the Fuchsia platform
     /// needs added to the assembled system in order to be able to boot Fuchsia
@@ -105,6 +111,7 @@ mod test {
                     components: vec!["meta/foo.cm".into()],
                 }],
             }),
+            ..Default::default()
         };
 
         assert_eq!(parsed, expected);

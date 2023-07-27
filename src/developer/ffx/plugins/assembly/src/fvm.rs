@@ -369,6 +369,7 @@ mod tests {
             qemu_kernel: "path/to/qemu/kernel".into(),
             boot_args: Vec::new(),
             bootfs_files: Vec::new(),
+            images_config: None,
         };
         let mut assembly_manifest = AssemblyManifest::default();
         let base_package = BasePackage {
@@ -418,6 +419,7 @@ mod tests {
             qemu_kernel: "path/to/qemu/kernel".into(),
             boot_args: Vec::new(),
             bootfs_files: Vec::new(),
+            images_config: None,
         };
         let mut assembly_manifest = AssemblyManifest::default();
         let base_package = BasePackage {
@@ -485,6 +487,7 @@ mod tests {
             qemu_kernel: "path/to/qemu/kernel".into(),
             boot_args: Vec::new(),
             bootfs_files: Vec::new(),
+            images_config: None,
         };
         let mut assembly_manifest = AssemblyManifest::default();
         let base_package = BasePackage {
@@ -609,6 +612,7 @@ mod tests {
             qemu_kernel: "path/to/qemu/kernel".into(),
             boot_args: Vec::new(),
             bootfs_files: Vec::new(),
+            images_config: None,
         };
         let mut assembly_manifest = AssemblyManifest::default();
 
@@ -724,6 +728,7 @@ mod tests {
             qemu_kernel: "path/to/qemu/kernel".into(),
             boot_args: Vec::new(),
             bootfs_files: Vec::new(),
+            images_config: None,
         };
         let mut assembly_manifest = AssemblyManifest::default();
 

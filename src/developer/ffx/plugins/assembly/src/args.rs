@@ -315,6 +315,13 @@ pub struct ProductArgs {
     /// disable validation of the assembly's packages
     #[argh(option, default = "Default::default()")]
     pub package_validation: PackageValidationHandling,
+
+    /// the path to the filesystem config that declares which filesystems to
+    /// create and how to create them. If provided, then the config will be
+    /// merged with the information in the board and added to the image
+    /// assembly config.
+    #[argh(option)]
+    pub filesystem_config: Option<Utf8PathBuf>,
 }
 
 #[derive(Debug, Default, PartialEq)]

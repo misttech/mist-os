@@ -8,7 +8,7 @@ use crate::fxfs::{construct_fxfs, ConstructedFxfs};
 use crate::vbmeta;
 use crate::zbi;
 
-use anyhow::{anyhow, Context, Result};
+use anyhow::{anyhow, bail, Context, Result};
 use assembly_config_schema::ImageAssemblyConfig;
 use assembly_images_config::{Fvm, Fxfs, Image, ImagesConfig, VBMeta, Zbi};
 use assembly_manifest::AssemblyManifest;
@@ -18,6 +18,7 @@ use assembly_util as util;
 use camino::{Utf8Path, Utf8PathBuf};
 use ffx_assembly_args::{CreateSystemArgs, PackageMode};
 use fuchsia_pkg::{PackageManifest, PackagePath};
+use pretty_assertions::Comparison;
 use serde_json::ser;
 use std::collections::BTreeSet;
 use std::fs::File;
@@ -40,6 +41,12 @@ pub async fn create_system(args: CreateSystemArgs) -> Result<()> {
         .context("Failed to read the image assembly config")?;
     let images_config: ImagesConfig =
         util::read_config(images).context("Failed to read the images config")?;
+
+    if let Some(merged_images_config) = &image_assembly_config.images_config {
+        if images_config != *merged_images_config {
+            bail!("The images config passed to image assembly does not match the images config constructed by product assembly: {}", Comparison::new(&images_config, &merged_images_config));
+        }
+    }
 
     // Get the tool set.
     let tools = SdkToolProvider::try_new()?;
