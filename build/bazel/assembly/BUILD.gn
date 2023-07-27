@@ -6,12 +6,18 @@ import("//build/bazel/assembly/bazel_product_bundle.gni")
 import("//build/images/args.gni")
 import("//build/images/custom_signing.gni")
 import("//build/product.gni")
+import("//build/testing/verify_files_match.gni")
+
+# Only do drivers lists comparison when both GN and Bazel assembly are done in
+# the same build.
+_should_compare_driver_lists =
+    !use_bazel_images_only && bazel_product_bundle_target != "" && has_board
+
+_should_compare_tests_manifests =
+    !use_bazel_images_only && bazel_product_bundle_target != ""
 
 if (is_fuchsia) {
-  # Only do drivers lists comparison when both GN and Bazel assembly are done in
-  # the same build.
-  if (!use_bazel_images_only && bazel_product_bundle_target != "" &&
-      has_board) {
+  if (_should_compare_driver_lists) {
     import("//build/drivers/check_included_drivers.gni")
 
     check_included_drivers("bazel_drivers_check") {
@@ -50,9 +56,35 @@ if (is_fuchsia) {
         "//:drivers-check_metadata_check",
       ]
     }
-  } else {
-    group("compare_drivers_lists") {
+  }
+
+  if (_should_compare_tests_manifests) {
+    import("//build/config/build_api_module.gni")
+
+    build_api_module("bazel_assembly_verification_tests_manifest_gn") {
       testonly = true
+      data_keys = [ "tests" ]
+      walk_keys = [ "tests_barrier" ]
+      deps = [ "//build/images:main_assembly" ]
+    }
+
+    build_api_module("bazel_assembly_verification_tests_manifest_bazel") {
+      testonly = true
+      data_keys = [ "tests" ]
+      walk_keys = [ "tests_barrier" ]
+      deps = [ bazel_product_bundle_target ]
+    }
+
+    verify_files_match("compare_tests_manifests") {
+      testonly = true
+      first =
+          "${root_build_dir}/bazel_assembly_verification_tests_manifest_gn.json"
+      second = "${root_build_dir}/bazel_assembly_verification_tests_manifest_bazel.json"
+      display_text_diff_on_failure = true
+      deps = [
+        ":bazel_assembly_verification_tests_manifest_bazel",
+        ":bazel_assembly_verification_tests_manifest_gn",
+      ]
     }
   }
 
@@ -75,10 +107,14 @@ if (is_host) {
     # toolchain.
     deps = [ ":verifications($default_toolchain)" ]
 
-    if (has_board) {
+    if (_should_compare_driver_lists) {
       # Driver lists comparison depends on GN assembly, which requires default
       # toolchain.
       deps += [ ":compare_drivers_lists($default_toolchain)" ]
+    }
+
+    if (_should_compare_tests_manifests) {
+      deps += [ ":compare_tests_manifests($default_toolchain)" ]
     }
   }
 }
