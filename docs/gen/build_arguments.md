@@ -399,7 +399,7 @@ False means no limit.
 
 **Current value for `target_cpu = "arm64"`:** `10485760000`
 
-From //boards/common/arm64-common.gni:11
+From //boards/common/arm64-common.gni:14
 
 **Overridden from the default:** `false`
 
@@ -534,7 +534,7 @@ by the board definition rather than the product definition.
 
 **Current value for `target_cpu = "arm64"`:** `["//bundles/packages/prod:drivers-system"]`
 
-From //boards/common/arm64-common.gni:29
+From //boards/common/arm64-common.gni:32
 
 **Overridden from the default:** `[]`
 
@@ -593,7 +593,19 @@ From //build/board.gni:57
 
 BoardInformation file for use with Product Assembly
 
-**Current value (from the default):** `false`
+**Current value for `target_cpu = "arm64"`:** `"//boards/arm64/board_information.json5"`
+
+From //boards/common/arm64-common.gni:10
+
+**Overridden from the default:** `false`
+
+From //build/board.gni:101
+
+**Current value for `target_cpu = "x64"`:** `"//boards/x64/board_information.json5"`
+
+From //boards/x64.gni:12
+
+**Overridden from the default:** `false`
 
 From //build/board.gni:101
 
@@ -660,7 +672,7 @@ board definition rather than the product definition.
 
 **Current value for `target_cpu = "arm64"`:** `["//src/hwinfo:default_board_config", "//src/graphics/bin/vulkan_loader"]`
 
-From //boards/common/arm64-common.gni:31
+From //boards/common/arm64-common.gni:34
 
 **Overridden from the default:** `[]`
 
@@ -842,12 +854,6 @@ Each entry in the list is a scope containing:
 **Current value (from the default):** `[]`
 
 From //build/images/args.gni:78
-
-### bringup_fastboot_images_config_label
-
-**Current value (from the default):** `false`
-
-From //build/board.gni:117
 
 ### bringup_images_config_label
 
@@ -4559,7 +4565,7 @@ of how they are stored).
 
 **Current value for `target_cpu = "arm64"`:** `5216665600`
 
-From //boards/common/arm64-common.gni:13
+From //boards/common/arm64-common.gni:16
 
 **Overridden from the default:** `false`
 
@@ -4581,7 +4587,7 @@ TODO(b/291953514): Enforce this by implementing an image size checker.
 
 **Current value for `target_cpu = "arm64"`:** `16777216`
 
-From //boards/common/arm64-common.gni:36
+From //boards/common/arm64-common.gni:39
 
 **Overridden from the default:** `0`
 
@@ -4604,7 +4610,7 @@ From //src/diagnostics/log_listener/BUILD.gn:11
 
 **Current value for `target_cpu = "arm64"`:** `16777216`
 
-From //boards/common/arm64-common.gni:37
+From //boards/common/arm64-common.gni:40
 
 **Overridden from the default:** `0`
 
@@ -5391,7 +5397,7 @@ From //boards/arm64.gni:45
 
 **Overridden from the default:** `[]`
 
-From //build/board.gni:133
+From //build/board.gni:132
 
 **Current value for `target_cpu = "x64"`:** `["//out/not-default/fuchsia.esp.blk"]`
 
@@ -5399,7 +5405,7 @@ From //boards/x64.gni:85
 
 **Overridden from the default:** `[]`
 
-From //build/board.gni:133
+From //build/board.gni:132
 
 ### partitions_config_label
 
@@ -5412,7 +5418,7 @@ From //boards/arm64.gni:44
 
 **Overridden from the default:** `false`
 
-From //build/board.gni:132
+From //build/board.gni:131
 
 **Current value for `target_cpu = "x64"`:** `"//boards/partitions:x64"`
 
@@ -5420,7 +5426,7 @@ From //boards/x64.gni:84
 
 **Overridden from the default:** `false`
 
-From //build/board.gni:132
+From //build/board.gni:131
 
 ### perfetto_build_with_android
 
@@ -7012,7 +7018,7 @@ fully migrate assembly to Bazel.
 
 **Current value (from the default):** `false`
 
-From //build/board.gni:127
+From //build/board.gni:126
 
 ### recovery_label
 
@@ -7048,7 +7054,7 @@ From //build/images/args.gni:19
 
 **Current value (from the default):** `false`
 
-From //build/board.gni:128
+From //build/board.gni:127
 
 ### recovery_route_sources_config
 
