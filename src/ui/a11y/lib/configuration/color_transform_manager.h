@@ -14,6 +14,7 @@
 #include <math.h>
 
 #include <array>
+#include <optional>
 
 #include <src/lib/fxl/macros.h>
 
@@ -35,7 +36,12 @@ class ColorTransformManager : public fuchsia::accessibility::ColorTransform {
                             fuchsia::accessibility::ColorCorrectionMode color_correction_mode);
 
  private:
+  void MaybeSetColorTransformConfiguration();
+
   fidl::BindingSet<fuchsia::accessibility::ColorTransform> bindings_;
+
+  std::optional<fuchsia::accessibility::ColorTransformConfiguration>
+      cached_color_transform_configuration_;
 
   // Note that for now, this class supports exactly one color transform handler.
   fuchsia::accessibility::ColorTransformHandlerPtr color_transform_handler_ptr_;

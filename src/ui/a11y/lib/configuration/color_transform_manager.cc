@@ -4,6 +4,7 @@
 
 #include "color_transform_manager.h"
 
+#include <lib/fidl/cpp/clone.h>
 #include <lib/syslog/cpp/macros.h>
 #include <zircon/status.h>
 
@@ -117,6 +118,8 @@ void ColorTransformManager::RegisterColorTransformHandler(
     FX_LOGS(ERROR) << "ColorTransformHandler disconnected with status: "
                    << zx_status_get_string(status);
   });
+
+  MaybeSetColorTransformConfiguration();
 }
 
 void ColorTransformManager::ChangeColorTransform(
@@ -134,13 +137,21 @@ void ColorTransformManager::ChangeColorTransform(
   color_transform_configuration.set_color_adjustment_pre_offset(
       color_adjustment_args.color_adjustment_pre_offset);
 
-  if (!color_transform_handler_ptr_) {
-    FX_LOGS(ERROR) << "Dropping color transform because no handler is registered.";
+  cached_color_transform_configuration_ = std::move(color_transform_configuration);
+  MaybeSetColorTransformConfiguration();
+}
+
+void ColorTransformManager::MaybeSetColorTransformConfiguration() {
+  if (!color_transform_handler_ptr_ || !cached_color_transform_configuration_) {
     return;
   }
 
+  // The use of fidl::Clone here is preferred over std::move to handle the
+  // unlikely case in which ColorTransformHandler is re-bound. Color transform
+  // changes should be infrequent, so the performance penalty is worth the
+  // additional robustness.
   color_transform_handler_ptr_->SetColorTransformConfiguration(
-      std::move(color_transform_configuration),
+      fidl::Clone(*cached_color_transform_configuration_),
       [] { FX_LOGS(INFO) << "Color transform configuration changed."; });
 }
 
