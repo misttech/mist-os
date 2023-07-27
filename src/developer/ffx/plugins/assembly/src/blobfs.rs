@@ -63,7 +63,7 @@ mod tests {
     use super::construct_blobfs;
     use crate::base_package::BasePackage;
     use assembly_config_schema::ImageAssemblyConfig;
-    use assembly_images_config::{BlobFS, BlobFSLayout};
+    use assembly_images_config::{BlobFS, BlobfsLayout};
     use assembly_tool::testing::FakeToolProvider;
     use assembly_tool::{ToolCommandLog, ToolProvider};
     use camino::Utf8Path;
@@ -83,7 +83,7 @@ mod tests {
         let image_config = ImageAssemblyConfig::new_for_testing("kernel", 0);
         let blobfs_config = BlobFS {
             name: "blob".into(),
-            layout: BlobFSLayout::Compact,
+            layout: BlobfsLayout::Compact,
             maximum_bytes: None,
             minimum_data_bytes: None,
             minimum_inodes: None,
@@ -163,7 +163,7 @@ mod tests {
         let image_config = ImageAssemblyConfig::new_for_testing("kernel", 0);
         let blobfs_config = BlobFS {
             name: "blob".into(),
-            layout: BlobFSLayout::Compact,
+            layout: BlobfsLayout::Compact,
             maximum_bytes: None,
             minimum_data_bytes: None,
             minimum_inodes: None,

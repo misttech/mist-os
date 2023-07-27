@@ -2,17 +2,20 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use anyhow::{anyhow, Context, Result};
+use crate::board_filesystem_config as bfc;
+use crate::product_filesystem_config as pfc;
+use anyhow::{anyhow, bail, Context, Result};
+use bfc::{PostProcessingScript, VBMetaDescriptor, ZbiCompression};
 use camino::Utf8PathBuf;
+use pfc::BlobfsLayout;
 use serde::{Deserialize, Serialize};
 use std::convert::TryFrom;
 use std::fmt;
 use std::io::Read;
-use std::path::PathBuf;
 use std::str::FromStr;
 
 /// The configuration file specifying which images to generate and how.
-#[derive(Serialize, Deserialize, Debug, Default)]
+#[derive(Serialize, Deserialize, Debug, Default, PartialEq)]
 pub struct ImagesConfig {
     /// A list of images to generate.
     #[serde(default)]
@@ -20,7 +23,7 @@ pub struct ImagesConfig {
 }
 
 /// An image to generate.
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, PartialEq)]
 #[serde(tag = "type")]
 pub enum Image {
     /// A FVM image.
@@ -41,14 +44,14 @@ pub enum Image {
 }
 
 /// Parameters describing how to generate the ZBI.
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, PartialEq)]
 pub struct Zbi {
     /// The name to give the image file.
     #[serde(default = "default_zbi_name")]
     pub name: String,
 
     /// The compression format for the ZBI.
-    #[serde(default = "default_zbi_compression")]
+    #[serde(default)]
     pub compression: ZbiCompression,
 
     /// An optional script to post-process the ZBI.
@@ -59,22 +62,6 @@ pub struct Zbi {
 
 fn default_zbi_name() -> String {
     "fuchsia".into()
-}
-
-fn default_zbi_compression() -> ZbiCompression {
-    ZbiCompression::ZStd
-}
-
-/// The compression format for the ZBI.
-#[derive(Serialize, Deserialize, Debug, PartialEq)]
-pub enum ZbiCompression {
-    /// zstd compression.
-    #[serde(rename = "zstd")]
-    ZStd,
-
-    /// zstd.max compression.
-    #[serde(rename = "zstd.max")]
-    ZStdMax,
 }
 
 impl FromStr for ZbiCompression {
@@ -112,23 +99,8 @@ fn zbi_compression_from_str(s: &str) -> Result<ZbiCompression> {
     }
 }
 
-/// A script to process the ZBI after it is constructed.
-#[derive(Serialize, Deserialize, Debug)]
-pub struct PostProcessingScript {
-    /// The path to the script on host.
-    /// This script _musts_ take the following arguments:
-    ///   -z <path to ZBI>
-    ///   -o <output path>
-    ///   -B <build directory, relative to script's source directory>
-    pub path: PathBuf,
-
-    /// Additional arguments to pass to the script after the above arguments.
-    #[serde(default)]
-    pub args: Vec<String>,
-}
-
 /// The parameters describing how to create a VBMeta image.
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, PartialEq)]
 pub struct VBMeta {
     /// The name to give the image file.
     #[serde(default = "default_vbmeta_name")]
@@ -149,24 +121,8 @@ fn default_vbmeta_name() -> String {
     "fuchsia".into()
 }
 
-/// The parameters of a VBMeta descriptor to add to a VBMeta image.
-#[derive(Serialize, Deserialize, Debug)]
-pub struct VBMetaDescriptor {
-    /// Name of the partition.
-    pub name: String,
-
-    /// Size of the partition in bytes.
-    pub size: u64,
-
-    /// Custom VBMeta flags to add.
-    pub flags: u32,
-
-    /// Minimum AVB version to add.
-    pub min_avb_version: String,
-}
-
 /// The parameters describing how to create a FVM image.
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
 pub struct Fvm {
     /// The size of a slice within the FVM.
     #[serde(default = "default_fvm_slice_size")]
@@ -184,7 +140,7 @@ fn default_fvm_slice_size() -> u64 {
 }
 
 /// A single FVM filesystem that can be added to multiple outputs.
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
 #[serde(tag = "type")]
 pub enum FvmFilesystem {
     /// A blobfs volume for holding blobs.
@@ -203,15 +159,15 @@ pub enum FvmFilesystem {
 }
 
 /// Configuration for building a BlobFS volume.
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
 pub struct BlobFS {
     /// The name of the volume in the FVM.
     #[serde(default = "default_blobfs_name")]
     pub name: String,
 
     /// Optional deprecated layout.
-    #[serde(default = "default_blobfs_layout")]
-    pub layout: BlobFSLayout,
+    #[serde(default)]
+    pub layout: BlobfsLayout,
 
     /// Reserve |minimum_data_bytes| and |minimum_inodes| in the FVM, and ensure
     /// that the final reserved size does not exceed |maximum_bytes|.
@@ -235,16 +191,12 @@ fn default_blobfs_name() -> String {
     "blob".into()
 }
 
-fn default_blobfs_layout() -> BlobFSLayout {
-    BlobFSLayout::Compact
-}
-
 fn default_data_name() -> String {
     "data".into()
 }
 
 /// Configuration for building an EmptyData volume.
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
 pub struct EmptyData {
     /// The name of the volume in the FVM.
     #[serde(default = "default_data_name")]
@@ -252,7 +204,7 @@ pub struct EmptyData {
 }
 
 /// Configuration for building a Reserved volume.
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
 pub struct Reserved {
     /// The name of the volume in the FVM.
     #[serde(default = "default_reserved_name")]
@@ -266,55 +218,43 @@ fn default_reserved_name() -> String {
     "internal".into()
 }
 
-/// The internal layout of blobfs.
-#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
-pub enum BlobFSLayout {
-    /// A more compact layout than DeprecatedPadded.
-    #[serde(rename = "compact")]
-    Compact,
-
-    /// A layout that is deprecated, but kept for compatibility reasons.
-    #[serde(rename = "deprecated_padded")]
-    DeprecatedPadded,
-}
-
-impl FromStr for BlobFSLayout {
+impl FromStr for BlobfsLayout {
     type Err = anyhow::Error;
     fn from_str(s: &str) -> Result<Self> {
         blobfs_layout_from_str(s)
     }
 }
 
-impl TryFrom<&str> for BlobFSLayout {
+impl TryFrom<&str> for BlobfsLayout {
     type Error = anyhow::Error;
     fn try_from(s: &str) -> Result<Self> {
         blobfs_layout_from_str(s)
     }
 }
 
-impl fmt::Display for BlobFSLayout {
+impl fmt::Display for BlobfsLayout {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(
             f,
             "{}",
             match self {
-                BlobFSLayout::Compact => "compact",
-                BlobFSLayout::DeprecatedPadded => "deprecated_padded",
+                BlobfsLayout::Compact => "compact",
+                BlobfsLayout::DeprecatedPadded => "deprecated_padded",
             }
         )
     }
 }
 
-fn blobfs_layout_from_str(s: &str) -> Result<BlobFSLayout> {
+fn blobfs_layout_from_str(s: &str) -> Result<BlobfsLayout> {
     match s {
-        "compact" => Ok(BlobFSLayout::Compact),
-        "deprecated_padded" => Ok(BlobFSLayout::DeprecatedPadded),
+        "compact" => Ok(BlobfsLayout::Compact),
+        "deprecated_padded" => Ok(BlobfsLayout::DeprecatedPadded),
         _ => Err(anyhow!("invalid blobfs layout")),
     }
 }
 
 /// A FVM image to generate with a list of filesystems.
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
 #[serde(tag = "type")]
 pub enum FvmOutput {
     /// The default FVM type with no modifications.
@@ -342,7 +282,7 @@ impl std::fmt::Display for FvmOutput {
 }
 
 /// The default FVM type with no modifications.
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
 pub struct StandardFvm {
     /// The name to give the file.
     pub name: String,
@@ -364,7 +304,7 @@ pub struct StandardFvm {
 }
 
 /// A FVM that is compressed sparse.
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
 pub struct SparseFvm {
     /// The name to give the file.
     pub name: String,
@@ -380,7 +320,7 @@ pub struct SparseFvm {
 }
 
 /// A FVM prepared for a Nand partition.
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
 pub struct NandFvm {
     /// The name to give the file.
     pub name: String,
@@ -413,7 +353,7 @@ pub struct NandFvm {
 }
 
 /// The parameters describing how to create an Fxfs image.
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
 pub struct Fxfs {
     /// The size of Fxfs image to generate.  The base system's contents must not exceed this size.
     /// If unset, there's no limit, and the image will be an arbitrary size greater than or equal to
@@ -432,12 +372,457 @@ impl ImagesConfig {
         reader.read_to_string(&mut data).context("Cannot read the config")?;
         serde_json5::from_str(&data).context("Cannot parse the config")
     }
+
+    /// Merge a product and board to construct an ImagesConfig.
+    pub fn from_product_and_board(
+        product: &pfc::ProductFilesystemConfig,
+        board: &bfc::BoardFilesystemConfig,
+    ) -> Result<Self> {
+        let mut images = vec![];
+
+        // Add the zbi and optional vbmeta specified in the board.
+        images.push(Image::Zbi(Zbi {
+            name: product.image_name.0.clone(),
+            compression: board.zbi.compression.clone(),
+            postprocessing_script: board.zbi.postprocessing_script.clone(),
+        }));
+        if let Some(vbmeta) = &board.vbmeta {
+            let bfc::VBMeta { key, key_metadata, additional_descriptors } = vbmeta.clone();
+            images.push(Image::VBMeta(VBMeta {
+                name: product.image_name.0.clone(),
+                key,
+                key_metadata,
+                additional_descriptors,
+            }));
+        }
+
+        // Add the filesystems specified in the product.
+        match &product.volume {
+            pfc::VolumeConfig::NoVolume => {}
+            pfc::VolumeConfig::Fxfs => {
+                let size_bytes = board.fxfs.size_bytes;
+                images.push(Image::Fxfs(Fxfs { size_bytes }));
+            }
+            pfc::VolumeConfig::Fvm(fvm) => {
+                let slice_size = board.fvm.slice_size.0;
+
+                // Construct the list of FVM filesystems.
+                let mut filesystems = vec![];
+                let mut filesystem_names = vec![];
+                if let Some(pfc::BlobFvmVolumeConfig { blob_layout }) = &fvm.blob {
+                    filesystems.push(FvmFilesystem::BlobFS(BlobFS {
+                        name: "blob".into(),
+                        layout: blob_layout.clone(),
+                        maximum_bytes: board.fvm.blobfs.maximum_bytes,
+                        minimum_data_bytes: board.fvm.blobfs.minimum_data_bytes,
+                        minimum_inodes: board.fvm.blobfs.minimum_inodes,
+                        maximum_contents_size: board.fvm.blobfs.size_checker_maximum_bytes,
+                    }));
+                    filesystem_names.push("blob".to_string());
+                }
+                if let Some(_) = fvm.data {
+                    filesystems
+                        .push(FvmFilesystem::EmptyData(EmptyData { name: "empty-data".into() }));
+                    filesystem_names.push("empty-data".to_string());
+                }
+                if let Some(pfc::ReservedFvmVolumeConfig { reserved_bytes }) = fvm.reserved {
+                    filesystems.push(FvmFilesystem::Reserved(Reserved {
+                        name: "internal".into(),
+                        slices: reserved_bytes,
+                    }));
+                    filesystem_names.push("internal".to_string());
+                }
+
+                // Construct the list of FVM outputs.
+                let mut outputs = vec![];
+                outputs.push(FvmOutput::Standard(StandardFvm {
+                    name: "fvm".into(),
+                    filesystems: filesystem_names.clone(),
+                    compress: false,
+                    resize_image_file_to_fit: false,
+                    truncate_to_length: None,
+                }));
+                if let Some(sparse) = &board.fvm.sparse_output {
+                    outputs.push(FvmOutput::Sparse(SparseFvm {
+                        name: "fvm.sparse".into(),
+                        filesystems: filesystem_names.clone(),
+                        max_disk_size: sparse.max_disk_size.clone(),
+                    }));
+                }
+                if board.fvm.fastboot_output.is_some() && board.fvm.nand_output.is_some() {
+                    bail!("A board may only build either a fastboot or nand FVM but not both");
+                }
+                if let Some(fastboot) = &board.fvm.fastboot_output {
+                    outputs.push(FvmOutput::Standard(StandardFvm {
+                        name: "fvm.fastboot".into(),
+                        filesystems: filesystem_names.clone(),
+                        compress: fastboot.compress,
+                        resize_image_file_to_fit: true,
+                        truncate_to_length: fastboot.truncate_to_length.clone(),
+                    }));
+                } else if let Some(nand) = &board.fvm.nand_output {
+                    let bfc::NandFvmConfig {
+                        max_disk_size,
+                        compress,
+                        block_count,
+                        oob_size,
+                        page_size,
+                        pages_per_block,
+                    } = nand.clone();
+                    outputs.push(FvmOutput::Nand(NandFvm {
+                        name: "fvm.fastboot".into(),
+                        filesystems: filesystem_names.clone(),
+                        max_disk_size,
+                        compress,
+                        block_count,
+                        oob_size,
+                        page_size,
+                        pages_per_block,
+                    }));
+                }
+
+                // Add the FVM images.
+                images.push(Image::Fvm(Fvm { slice_size, filesystems, outputs }));
+            }
+        }
+
+        Ok(Self { images })
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
     use std::convert::TryInto;
+    use std::path::PathBuf;
+
+    fn test_board_config_fastboot() -> bfc::BoardFilesystemConfig {
+        bfc::BoardFilesystemConfig {
+            zbi: bfc::Zbi {
+                compression: bfc::ZbiCompression::ZStd,
+                postprocessing_script: Some(bfc::PostProcessingScript {
+                    path: "path/to/script".into(),
+                    args: vec!["arg1".into(), "arg2".into()],
+                }),
+            },
+            vbmeta: Some(bfc::VBMeta {
+                key: "path/to/key".into(),
+                key_metadata: "path/to/metadata".into(),
+                additional_descriptors: vec![],
+            }),
+            fxfs: bfc::Fxfs { size_bytes: Some(1234) },
+            fvm: bfc::Fvm {
+                slice_size: bfc::FvmSliceSize(5678),
+                blobfs: bfc::Blobfs {
+                    size_checker_maximum_bytes: Some(12),
+                    maximum_bytes: Some(34),
+                    minimum_inodes: Some(56),
+                    minimum_data_bytes: Some(78),
+                },
+                minfs: bfc::Minfs { maximum_bytes: Some(90) },
+                sparse_output: Some(bfc::SparseFvmConfig { max_disk_size: Some(2345) }),
+                nand_output: None,
+                fastboot_output: Some(bfc::FastbootFvmConfig {
+                    compress: true,
+                    truncate_to_length: Some(3456),
+                }),
+            },
+        }
+    }
+
+    fn test_board_config_nand() -> bfc::BoardFilesystemConfig {
+        bfc::BoardFilesystemConfig {
+            zbi: bfc::Zbi {
+                compression: bfc::ZbiCompression::ZStd,
+                postprocessing_script: Some(bfc::PostProcessingScript {
+                    path: "path/to/script".into(),
+                    args: vec!["arg1".into(), "arg2".into()],
+                }),
+            },
+            vbmeta: Some(bfc::VBMeta {
+                key: "path/to/key".into(),
+                key_metadata: "path/to/metadata".into(),
+                additional_descriptors: vec![],
+            }),
+            fxfs: bfc::Fxfs { size_bytes: Some(1234) },
+            fvm: bfc::Fvm {
+                slice_size: bfc::FvmSliceSize(5678),
+                blobfs: bfc::Blobfs {
+                    size_checker_maximum_bytes: Some(12),
+                    maximum_bytes: Some(34),
+                    minimum_inodes: Some(56),
+                    minimum_data_bytes: Some(78),
+                },
+                minfs: bfc::Minfs { maximum_bytes: Some(90) },
+                sparse_output: Some(bfc::SparseFvmConfig { max_disk_size: Some(2345) }),
+                nand_output: Some(bfc::NandFvmConfig {
+                    max_disk_size: Some(3456),
+                    compress: true,
+                    block_count: 1,
+                    oob_size: 2,
+                    page_size: 3,
+                    pages_per_block: 4,
+                }),
+                fastboot_output: None,
+            },
+        }
+    }
+
+    #[test]
+    fn from_product_and_board_no_volume() {
+        let board = test_board_config_fastboot();
+        let product = pfc::ProductFilesystemConfig {
+            image_name: pfc::ImageName("a-product".into()),
+            watch_for_nand: false,
+            format_data_on_corruption: pfc::FormatDataOnCorruption(true),
+            volume: pfc::VolumeConfig::NoVolume,
+        };
+
+        let images = ImagesConfig::from_product_and_board(&product, &board).unwrap();
+        assert_eq!(
+            images,
+            ImagesConfig {
+                images: vec![
+                    Image::Zbi(Zbi {
+                        name: "a-product".into(),
+                        compression: bfc::ZbiCompression::ZStd,
+                        postprocessing_script: Some(bfc::PostProcessingScript {
+                            path: "path/to/script".into(),
+                            args: vec!["arg1".into(), "arg2".into()],
+                        }),
+                    }),
+                    Image::VBMeta(VBMeta {
+                        name: "a-product".into(),
+                        key: "path/to/key".into(),
+                        key_metadata: "path/to/metadata".into(),
+                        additional_descriptors: vec![],
+                    }),
+                ],
+            }
+        );
+    }
+
+    #[test]
+    fn from_product_and_board_fxfs() {
+        let board = test_board_config_fastboot();
+        let product = pfc::ProductFilesystemConfig {
+            image_name: pfc::ImageName("a-product".into()),
+            watch_for_nand: false,
+            format_data_on_corruption: pfc::FormatDataOnCorruption(true),
+            volume: pfc::VolumeConfig::Fxfs,
+        };
+
+        let images = ImagesConfig::from_product_and_board(&product, &board).unwrap();
+        assert_eq!(
+            images,
+            ImagesConfig {
+                images: vec![
+                    Image::Zbi(Zbi {
+                        name: "a-product".into(),
+                        compression: bfc::ZbiCompression::ZStd,
+                        postprocessing_script: Some(bfc::PostProcessingScript {
+                            path: "path/to/script".into(),
+                            args: vec!["arg1".into(), "arg2".into()],
+                        }),
+                    }),
+                    Image::VBMeta(VBMeta {
+                        name: "a-product".into(),
+                        key: "path/to/key".into(),
+                        key_metadata: "path/to/metadata".into(),
+                        additional_descriptors: vec![],
+                    }),
+                    Image::Fxfs(Fxfs { size_bytes: Some(1234) }),
+                ],
+            }
+        );
+    }
+
+    #[test]
+    fn from_product_and_board_fvm_fastboot() {
+        let board = test_board_config_fastboot();
+        let product = pfc::ProductFilesystemConfig {
+            image_name: pfc::ImageName("a-product".into()),
+            watch_for_nand: false,
+            format_data_on_corruption: pfc::FormatDataOnCorruption(true),
+            volume: pfc::VolumeConfig::Fvm(pfc::FvmVolumeConfig {
+                data: Some(pfc::DataFvmVolumeConfig {
+                    use_disk_based_minfs_migration: true,
+                    data_filesystem_format: pfc::DataFilesystemFormat::Minfs,
+                }),
+                blob: Some(pfc::BlobFvmVolumeConfig { blob_layout: BlobfsLayout::Compact }),
+                reserved: Some(pfc::ReservedFvmVolumeConfig { reserved_bytes: 7 }),
+            }),
+        };
+
+        let images = ImagesConfig::from_product_and_board(&product, &board).unwrap();
+        assert_eq!(
+            images,
+            ImagesConfig {
+                images: vec![
+                    Image::Zbi(Zbi {
+                        name: "a-product".into(),
+                        compression: bfc::ZbiCompression::ZStd,
+                        postprocessing_script: Some(bfc::PostProcessingScript {
+                            path: "path/to/script".into(),
+                            args: vec!["arg1".into(), "arg2".into()],
+                        }),
+                    }),
+                    Image::VBMeta(VBMeta {
+                        name: "a-product".into(),
+                        key: "path/to/key".into(),
+                        key_metadata: "path/to/metadata".into(),
+                        additional_descriptors: vec![],
+                    }),
+                    Image::Fvm(Fvm {
+                        slice_size: 5678,
+                        filesystems: vec![
+                            FvmFilesystem::BlobFS(BlobFS {
+                                name: "blob".into(),
+                                layout: BlobfsLayout::Compact,
+                                maximum_bytes: Some(34),
+                                minimum_inodes: Some(56),
+                                minimum_data_bytes: Some(78),
+                                maximum_contents_size: Some(12),
+                            }),
+                            FvmFilesystem::EmptyData(EmptyData { name: "empty-data".into() }),
+                            FvmFilesystem::Reserved(Reserved {
+                                name: "internal".into(),
+                                slices: 7,
+                            }),
+                        ],
+                        outputs: vec![
+                            FvmOutput::Standard(StandardFvm {
+                                name: "fvm".into(),
+                                filesystems: vec![
+                                    "blob".to_string(),
+                                    "empty-data".to_string(),
+                                    "internal".to_string(),
+                                ],
+                                compress: false,
+                                resize_image_file_to_fit: false,
+                                truncate_to_length: None,
+                            }),
+                            FvmOutput::Sparse(SparseFvm {
+                                name: "fvm.sparse".into(),
+                                filesystems: vec![
+                                    "blob".to_string(),
+                                    "empty-data".to_string(),
+                                    "internal".to_string(),
+                                ],
+                                max_disk_size: Some(2345),
+                            }),
+                            FvmOutput::Standard(StandardFvm {
+                                name: "fvm.fastboot".into(),
+                                filesystems: vec![
+                                    "blob".to_string(),
+                                    "empty-data".to_string(),
+                                    "internal".to_string(),
+                                ],
+                                compress: true,
+                                resize_image_file_to_fit: true,
+                                truncate_to_length: Some(3456),
+                            }),
+                        ],
+                    }),
+                ],
+            }
+        );
+    }
+
+    #[test]
+    fn from_product_and_board_fvm_nand() {
+        let board = test_board_config_nand();
+        let product = pfc::ProductFilesystemConfig {
+            image_name: pfc::ImageName("a-product".into()),
+            watch_for_nand: false,
+            format_data_on_corruption: pfc::FormatDataOnCorruption(true),
+            volume: pfc::VolumeConfig::Fvm(pfc::FvmVolumeConfig {
+                data: Some(pfc::DataFvmVolumeConfig {
+                    use_disk_based_minfs_migration: true,
+                    data_filesystem_format: pfc::DataFilesystemFormat::Minfs,
+                }),
+                blob: Some(pfc::BlobFvmVolumeConfig { blob_layout: BlobfsLayout::Compact }),
+                reserved: Some(pfc::ReservedFvmVolumeConfig { reserved_bytes: 7 }),
+            }),
+        };
+
+        let images = ImagesConfig::from_product_and_board(&product, &board).unwrap();
+        assert_eq!(
+            images,
+            ImagesConfig {
+                images: vec![
+                    Image::Zbi(Zbi {
+                        name: "a-product".into(),
+                        compression: bfc::ZbiCompression::ZStd,
+                        postprocessing_script: Some(bfc::PostProcessingScript {
+                            path: "path/to/script".into(),
+                            args: vec!["arg1".into(), "arg2".into()],
+                        }),
+                    }),
+                    Image::VBMeta(VBMeta {
+                        name: "a-product".into(),
+                        key: "path/to/key".into(),
+                        key_metadata: "path/to/metadata".into(),
+                        additional_descriptors: vec![],
+                    }),
+                    Image::Fvm(Fvm {
+                        slice_size: 5678,
+                        filesystems: vec![
+                            FvmFilesystem::BlobFS(BlobFS {
+                                name: "blob".into(),
+                                layout: BlobfsLayout::Compact,
+                                maximum_bytes: Some(34),
+                                minimum_inodes: Some(56),
+                                minimum_data_bytes: Some(78),
+                                maximum_contents_size: Some(12),
+                            }),
+                            FvmFilesystem::EmptyData(EmptyData { name: "empty-data".into() }),
+                            FvmFilesystem::Reserved(Reserved {
+                                name: "internal".into(),
+                                slices: 7,
+                            }),
+                        ],
+                        outputs: vec![
+                            FvmOutput::Standard(StandardFvm {
+                                name: "fvm".into(),
+                                filesystems: vec![
+                                    "blob".to_string(),
+                                    "empty-data".to_string(),
+                                    "internal".to_string(),
+                                ],
+                                compress: false,
+                                resize_image_file_to_fit: false,
+                                truncate_to_length: None,
+                            }),
+                            FvmOutput::Sparse(SparseFvm {
+                                name: "fvm.sparse".into(),
+                                filesystems: vec![
+                                    "blob".to_string(),
+                                    "empty-data".to_string(),
+                                    "internal".to_string(),
+                                ],
+                                max_disk_size: Some(2345),
+                            }),
+                            FvmOutput::Nand(NandFvm {
+                                name: "fvm.fastboot".into(),
+                                filesystems: vec![
+                                    "blob".to_string(),
+                                    "empty-data".to_string(),
+                                    "internal".to_string(),
+                                ],
+                                max_disk_size: Some(3456),
+                                compress: true,
+                                block_count: 1,
+                                oob_size: 2,
+                                page_size: 3,
+                                pages_per_block: 4,
+                            }),
+                        ],
+                    }),
+                ],
+            }
+        );
+    }
 
     #[test]
     fn zbi_compression_try_from() {
@@ -463,27 +848,27 @@ mod tests {
 
     #[test]
     fn blobfs_layout_try_from() {
-        assert_eq!(BlobFSLayout::Compact, "compact".try_into().unwrap());
-        assert_eq!(BlobFSLayout::DeprecatedPadded, "deprecated_padded".try_into().unwrap());
-        let layout: Result<BlobFSLayout> = "else".try_into();
+        assert_eq!(BlobfsLayout::Compact, "compact".try_into().unwrap());
+        assert_eq!(BlobfsLayout::DeprecatedPadded, "deprecated_padded".try_into().unwrap());
+        let layout: Result<BlobfsLayout> = "else".try_into();
         assert!(layout.is_err());
     }
 
     #[test]
     fn blobfs_layout_from_string() {
-        assert_eq!(BlobFSLayout::Compact, BlobFSLayout::from_str("compact").unwrap());
+        assert_eq!(BlobfsLayout::Compact, BlobfsLayout::from_str("compact").unwrap());
         assert_eq!(
-            BlobFSLayout::DeprecatedPadded,
-            BlobFSLayout::from_str("deprecated_padded").unwrap()
+            BlobfsLayout::DeprecatedPadded,
+            BlobfsLayout::from_str("deprecated_padded").unwrap()
         );
-        let layout: Result<BlobFSLayout> = BlobFSLayout::from_str("else");
+        let layout: Result<BlobfsLayout> = BlobfsLayout::from_str("else");
         assert!(layout.is_err());
     }
 
     #[test]
     fn blobfs_layout_to_string() {
-        assert_eq!("compact".to_string(), BlobFSLayout::Compact.to_string());
-        assert_eq!("deprecated_padded".to_string(), BlobFSLayout::DeprecatedPadded.to_string());
+        assert_eq!("compact".to_string(), BlobfsLayout::Compact.to_string());
+        assert_eq!("deprecated_padded".to_string(), BlobfsLayout::DeprecatedPadded.to_string());
     }
 
     #[test]

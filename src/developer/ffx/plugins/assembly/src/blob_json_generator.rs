@@ -4,7 +4,7 @@
 
 use crate::operations::size_check_package::BlobJsonEntry;
 use anyhow::{Context, Result};
-use assembly_images_config::BlobFSLayout;
+use assembly_images_config::BlobfsLayout;
 use assembly_tool::ToolProvider;
 use assembly_util::read_config;
 use camino::Utf8Path;
@@ -14,14 +14,14 @@ use tempfile::TempDir;
 /// Collect all the blob size entries for a given set of packages.
 pub struct BlobJsonGenerator {
     /// The layout format of the blobs.
-    layout: BlobFSLayout,
+    layout: BlobfsLayout,
     /// The tools provider that contains the blobfs tool.
     tools: Box<dyn ToolProvider>,
 }
 
 impl BlobJsonGenerator {
     /// Reads the specified configuration and return an object capable to build blobfs.
-    pub fn new(tools: Box<dyn ToolProvider>, layout: BlobFSLayout) -> Result<BlobJsonGenerator> {
+    pub fn new(tools: Box<dyn ToolProvider>, layout: BlobfsLayout) -> Result<BlobJsonGenerator> {
         Ok(BlobJsonGenerator { layout, tools })
     }
 
@@ -55,7 +55,7 @@ impl BlobJsonGenerator {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use assembly_images_config::BlobFSLayout;
+    use assembly_images_config::BlobfsLayout;
     use assembly_tool::testing::FakeToolProvider;
     use assembly_util::write_json_file;
     use camino::Utf8Path;
@@ -116,7 +116,7 @@ mod tests {
                 )
                 .unwrap();
             }));
-        let gen = BlobJsonGenerator::new(tool_provider, BlobFSLayout::DeprecatedPadded).unwrap();
+        let gen = BlobJsonGenerator::new(tool_provider, BlobfsLayout::DeprecatedPadded).unwrap();
         let blob_entries = gen.build(&vec![&manifest_path]).unwrap();
         assert_eq!(
             vec!(BlobJsonEntry {

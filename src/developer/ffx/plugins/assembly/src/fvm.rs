@@ -338,7 +338,7 @@ mod tests {
     use crate::base_package::BasePackage;
     use assembly_config_schema::image_assembly_config::{ImageAssemblyConfig, KernelConfig};
     use assembly_images_config::{
-        BlobFS, BlobFSLayout, EmptyData, FvmFilesystem, FvmOutput, NandFvm, Reserved, SparseFvm,
+        BlobFS, BlobfsLayout, EmptyData, FvmFilesystem, FvmOutput, NandFvm, Reserved, SparseFvm,
         StandardFvm,
     };
     use assembly_manifest::AssemblyManifest;
@@ -649,7 +649,7 @@ mod tests {
         );
         builder.filesystem(FvmFilesystem::BlobFS(BlobFS {
             name: "blob".into(),
-            layout: BlobFSLayout::Compact,
+            layout: BlobfsLayout::Compact,
             maximum_bytes: None,
             minimum_data_bytes: None,
             minimum_inodes: None,
@@ -764,7 +764,7 @@ mod tests {
         );
         builder.filesystem(FvmFilesystem::BlobFS(BlobFS {
             name: "blob".into(),
-            layout: BlobFSLayout::Compact,
+            layout: BlobfsLayout::Compact,
             maximum_bytes: None,
             minimum_data_bytes: None,
             minimum_inodes: None,

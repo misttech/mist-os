@@ -168,7 +168,7 @@ pub async fn create_system(args: CreateSystemArgs) -> Result<()> {
         #[allow(clippy::single_match)]
         match &zbi_config.postprocessing_script {
             Some(script) => {
-                let signing_tool = tools.get_tool_with_path(script.path.clone())?;
+                let signing_tool = tools.get_tool_with_path(script.path.clone().into())?;
                 zbi::vendor_sign_zbi(
                     signing_tool,
                     &mut assembly_manifest,

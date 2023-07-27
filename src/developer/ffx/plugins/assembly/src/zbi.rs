@@ -177,7 +177,6 @@ mod tests {
     use std::collections::BTreeMap;
     use std::fs::File;
     use std::io::Write;
-    use std::path::PathBuf;
     use std::str::FromStr;
     use tempfile::tempdir;
 
@@ -314,7 +313,7 @@ mod tests {
             name: "fuchsia".into(),
             compression: ZbiCompression::ZStd,
             postprocessing_script: Some(PostProcessingScript {
-                path: PathBuf::from("fake"),
+                path: Utf8PathBuf::from("fake"),
                 args: vec!["arg1".into(), "arg2".into()],
             }),
         };

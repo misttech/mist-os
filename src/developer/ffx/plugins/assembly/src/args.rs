@@ -10,7 +10,7 @@ use std::path::Path;
 use std::path::PathBuf;
 use std::str::FromStr;
 
-use assembly_images_config::BlobFSLayout;
+use assembly_images_config::BlobfsLayout;
 
 #[ffx_command()]
 #[derive(FromArgs, Debug, PartialEq)]
@@ -191,7 +191,7 @@ pub struct PackageSizeCheckArgs {
     pub blob_sizes: Vec<Utf8PathBuf>,
     /// the layout of blobs in blobfs.
     #[argh(option, default = "default_blobfs_layout()")]
-    pub blobfs_layout: BlobFSLayout,
+    pub blobfs_layout: BlobfsLayout,
     /// path where to write the verification report, in JSON format.
     #[argh(option)]
     pub gerrit_output: Option<Utf8PathBuf>,
@@ -274,8 +274,8 @@ impl FromStr for AuthMode {
     }
 }
 
-fn default_blobfs_layout() -> BlobFSLayout {
-    BlobFSLayout::Compact
+fn default_blobfs_layout() -> BlobfsLayout {
+    BlobfsLayout::Compact
 }
 
 /// Arguments for performing a high-level product assembly operation.

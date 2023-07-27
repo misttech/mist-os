@@ -19,8 +19,10 @@ rustc_library("images_config") {
     "//third_party/rust_crates:serde_json5",
   ]
   sources = [
+    "src/board_filesystem_config.rs",
     "src/images_config.rs",
     "src/lib.rs",
+    "src/product_filesystem_config.rs",
   ]
 }
 
