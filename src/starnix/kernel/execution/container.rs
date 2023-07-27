@@ -53,6 +53,9 @@ struct ConfigWrapper {
 
     /// The svc directory of the container, used to access protocols from the container.
     svc_dir: Option<zx::Channel>,
+
+    /// The data directory of the container, used to persist data.
+    data_dir: Option<zx::Channel>,
 }
 
 impl std::ops::Deref for ConfigWrapper {
@@ -94,6 +97,7 @@ fn get_config_from_component_start_info(
     let mut ns = start_info.ns.take();
     let pkg_dir = get_ns_entry(&mut ns, "/pkg");
     let svc_dir = get_ns_entry(&mut ns, "/svc");
+    let data_dir = get_ns_entry(&mut ns, "/data");
     let outgoing_dir = start_info.outgoing_dir.take().map(|dir| dir.into_channel());
 
     ConfigWrapper {
@@ -101,6 +105,7 @@ fn get_config_from_component_start_info(
         pkg_dir,
         outgoing_dir,
         svc_dir,
+        data_dir,
     }
 }
 
@@ -263,6 +268,12 @@ async fn create_container(
         None
     };
 
+    let data_dir = if let Some(data_dir) = config.data_dir.take() {
+        Some(fio::DirectorySynchronousProxy::new(data_dir))
+    } else {
+        None
+    };
+
     let pkg_dir_proxy = fio::DirectorySynchronousProxy::new(config.pkg_dir.take().unwrap());
 
     let node = inspect::component::inspector().root().create_child("container");
@@ -271,6 +282,7 @@ async fn create_container(
         config.kernel_cmdline.as_bytes(),
         &config.features,
         svc_dir,
+        data_dir,
         node.create_child("kernel"),
     )
     .with_source_context(|| format!("creating Kernel: {}", &config.name))?;

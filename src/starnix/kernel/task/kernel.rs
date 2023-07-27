@@ -100,6 +100,9 @@ pub struct Kernel {
     /// The service directory of the container.
     container_svc: Option<fio::DirectoryProxy>,
 
+    /// The data directory of the container.
+    pub container_data_dir: Option<fio::DirectorySynchronousProxy>,
+
     /// The registry of active loop devices.
     ///
     /// See <https://man7.org/linux/man-pages/man4/loop.4.html>
@@ -196,6 +199,7 @@ impl Kernel {
         cmdline: &[u8],
         features: &[String],
         container_svc: Option<fio::DirectoryProxy>,
+        container_data_dir: Option<fio::DirectorySynchronousProxy>,
         inspect_node: fuchsia_inspect::Node,
     ) -> Result<Arc<Kernel>, zx::Status> {
         let unix_address_maker = Box::new(|x: Vec<u8>| -> SocketAddress { SocketAddress::Unix(x) });
@@ -230,6 +234,7 @@ impl Kernel {
             device_registry: DeviceRegistry::new(),
             features: HashSet::from_iter(features.iter().cloned()),
             container_svc,
+            container_data_dir,
             loop_device_registry: Default::default(),
             framebuffer,
             input_device,
