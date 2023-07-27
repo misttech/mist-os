@@ -22,7 +22,7 @@ use {
             },
             transaction::{
                 self, AssocObj, AssociatedObject, LockKey, Mutation, ObjectStoreMutation, Options,
-                Transaction,
+                ReadGuard, Transaction,
             },
             HandleOptions, HandleOwner, KeyUnwrapper, ObjectStore, StoreObjectHandle, TrimMode,
             TrimResult,
@@ -1388,11 +1388,53 @@ impl<S: HandleOwner> DataObjectHandle<S> {
     pub async fn read_from(
         &self,
         attribute_id: u64,
-        mut offset: u64,
+        offset: u64,
         mut buf: MutableBufferRef<'_>,
     ) -> Result<usize, Error> {
-        if buf.len() == 0 {
+        let fs = self.store().filesystem();
+        let guard = fs
+            .read_lock(&[LockKey::object_attribute(
+                self.store().store_object_id(),
+                self.object_id(),
+                attribute_id,
+            )])
+            .await;
+
+        let key = ObjectKey::attribute(self.object_id(), attribute_id, AttributeKey::Attribute);
+        let item = self.store().tree().find(&key).await?;
+        let size = match item {
+            Some(item) if item.key == key => match item.value {
+                ObjectValue::Attribute { size } => size,
+                _ => bail!(FxfsError::Inconsistent),
+            },
+            _ => return Ok(0),
+        };
+        if offset >= size {
             return Ok(0);
+        }
+        let length = min(buf.len() as u64, size - offset) as usize;
+        buf = buf.subslice_mut(0..length);
+        self.read_unchecked(attribute_id, offset, buf, &guard).await?;
+        Ok(length)
+    }
+
+    /// Read `buf.len()` bytes from the attribute `attribute_id`, starting at `offset`, into `buf`.
+    /// It's required that a read lock on this attribute id is taken before this is called.
+    ///
+    /// This function doesn't do any size checking - any portion of `buf` past the end of the file
+    /// will be filled with zeros. The caller is responsible for enforcing the file size on reads.
+    /// This is because, just looking at the extents, we can't tell the difference between the file
+    /// actually ending and there just being a section at the end with no data (since attributes
+    /// are sparse).
+    async fn read_unchecked(
+        &self,
+        attribute_id: u64,
+        mut offset: u64,
+        mut buf: MutableBufferRef<'_>,
+        _guard: &ReadGuard<'_>,
+    ) -> Result<(), Error> {
+        if buf.len() == 0 {
+            return Ok(());
         }
         // Whilst the read offset must be aligned to the filesystem block size, the buffer need only
         // be aligned to the device's block size.
@@ -1400,18 +1442,6 @@ impl<S: HandleOwner> DataObjectHandle<S> {
         let device_block_size = self.store().device.block_size() as u64;
         assert_eq!(offset % block_size, 0);
         assert_eq!(buf.range().start as u64 % device_block_size, 0);
-        let fs = self.store().filesystem();
-        let _guard = fs
-            .read_lock(&[LockKey::object_attribute(
-                self.store().store_object_id,
-                self.object_id(),
-                attribute_id,
-            )])
-            .await;
-        let size = self.get_size();
-        if offset >= size {
-            return Ok(0);
-        }
         let tree = &self.store().tree;
         let layer_set = tree.layer_set();
         let mut merger = layer_set.merger();
@@ -1422,9 +1452,7 @@ impl<S: HandleOwner> DataObjectHandle<S> {
                 offset..offset + 1,
             )))
             .await?;
-        let to_do = min(buf.len() as u64, size - offset) as usize;
-        buf = buf.subslice_mut(0..to_do);
-        let end_align = ((offset + to_do as u64) % block_size) as usize;
+        let end_align = ((offset + buf.len() as u64) % block_size) as usize;
         let trace = self.trace();
         let reads = FuturesUnordered::new();
         while let Some(ItemRef {
@@ -1507,7 +1535,7 @@ impl<S: HandleOwner> DataObjectHandle<S> {
         }
         reads.try_collect().await?;
         buf.as_mut_slice().fill(0);
-        Ok(to_do)
+        Ok(())
     }
 }
 
@@ -1581,8 +1609,24 @@ impl<S: HandleOwner> GetProperties for DataObjectHandle<S> {
 
 #[async_trait]
 impl<S: HandleOwner> ReadObjectHandle for DataObjectHandle<S> {
-    async fn read(&self, offset: u64, buf: MutableBufferRef<'_>) -> Result<usize, Error> {
-        self.read_from(self.attribute_id(), offset, buf).await
+    async fn read(&self, offset: u64, mut buf: MutableBufferRef<'_>) -> Result<usize, Error> {
+        let fs = self.store().filesystem();
+        let guard = fs
+            .read_lock(&[LockKey::object_attribute(
+                self.store().store_object_id,
+                self.object_id(),
+                self.attribute_id(),
+            )])
+            .await;
+
+        let size = self.get_size();
+        if offset >= size {
+            return Ok(0);
+        }
+        let length = min(buf.len() as u64, size - offset) as usize;
+        buf = buf.subslice_mut(0..length);
+        self.read_unchecked(self.attribute_id(), offset, buf, &guard).await?;
+        Ok(length)
     }
 
     fn get_size(&self) -> u64 {
@@ -1847,6 +1891,49 @@ mod tests {
         );
         assert_eq!(&buf.as_slice()[align..align + len], &vec![0u8; len]);
         assert_eq!(&buf.as_slice()[align + len..], &vec![123u8; buf.len() - align - len]);
+        fs.close().await.expect("Close failed");
+    }
+
+    #[fuchsia::test]
+    async fn test_beyond_eof_read_from() {
+        let (fs, object) = test_filesystem_and_object().await;
+        let offset = TEST_OBJECT_SIZE as usize - 2;
+        let align = offset % fs.block_size() as usize;
+        let len: usize = 2;
+        let mut buf = object.allocate_buffer(align + len + 1);
+        buf.as_mut_slice().fill(123u8);
+        assert_eq!(
+            object
+                .read_from(object.attribute_id(), (offset - align) as u64, buf.as_mut())
+                .await
+                .expect("read failed"),
+            align + len
+        );
+        assert_eq!(&buf.as_slice()[align..align + len], &vec![0u8; len]);
+        assert_eq!(&buf.as_slice()[align + len..], &vec![123u8; buf.len() - align - len]);
+        fs.close().await.expect("Close failed");
+    }
+
+    #[fuchsia::test]
+    async fn test_beyond_eof_read_unchecked() {
+        let (fs, object) = test_filesystem_and_object().await;
+        let offset = TEST_OBJECT_SIZE as usize - 2;
+        let align = offset % fs.block_size() as usize;
+        let len: usize = 2;
+        let mut buf = object.allocate_buffer(align + len + 1);
+        buf.as_mut_slice().fill(123u8);
+        let guard = fs
+            .read_lock(&[LockKey::object_attribute(
+                object.store().store_object_id,
+                object.object_id(),
+                object.attribute_id(),
+            )])
+            .await;
+        object
+            .read_unchecked(object.attribute_id(), (offset - align) as u64, buf.as_mut(), &guard)
+            .await
+            .expect("read failed");
+        assert_eq!(&buf.as_slice()[align..], &vec![0u8; len + 1]);
         fs.close().await.expect("Close failed");
     }
 
