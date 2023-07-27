@@ -1,4 +1,4 @@
-# proc
+# Starnix
 
 This directory contains a POSIX compatibility layer for Fuchsia.
 
