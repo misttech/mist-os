@@ -552,7 +552,11 @@ func TestCloseWithEpitaph(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer func() {
+		// TODO(https://fxrev.dev/891252): Expect err to only be nil.
 		err := client.Close()
+		if err == nil {
+			return
+		}
 		if err, ok := err.(*zx.Error); ok && err.Status == zx.ErrBadHandle {
 			return
 		}
