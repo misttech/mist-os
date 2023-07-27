@@ -16,6 +16,10 @@ rustc_library("surpass") {
     "//third_party/rust_crates:rustc-hash",
   ]
 
+  if (target_cpu == "x64" || target_cpu == "arm64") {
+    deps += [ "//third_party/rust_crates:zerocopy" ]
+  }
+
   # TODO(fxbug.dev/93309): Fix the leaks and remove this.
   test_deps = [
     "//build/config/sanitizers:suppress-lsan.DO-NOT-USE-THIS",

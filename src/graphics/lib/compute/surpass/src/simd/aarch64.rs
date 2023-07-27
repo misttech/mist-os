@@ -4,7 +4,7 @@
 
 use std::{
     arch::aarch64::*,
-    array, mem,
+    array,
     ops::{Add, AddAssign, BitAnd, BitOr, BitOrAssign, BitXor, Div, Mul, MulAssign, Neg, Not, Sub},
 };
 
@@ -136,7 +136,7 @@ impl u32x8 {
     }
 
     pub fn to_array(self) -> [u32; 8] {
-        unsafe { mem::transmute(self.0) }
+        zerocopy::transmute!(self.0)
     }
 
     pub fn mul_add(self, a: Self, b: Self) -> Self {
@@ -158,7 +158,7 @@ pub struct i8x16(int8x16_t);
 impl i8x16 {
     #[cfg(test)]
     pub fn as_mut_array(&mut self) -> &mut [i8; 16] {
-        unsafe { mem::transmute(&mut self.0) }
+        unsafe { std::mem::transmute(&mut self.0) }
     }
 
     pub fn splat(val: i8) -> Self {
@@ -381,7 +381,7 @@ impl f32x8 {
 
     #[cfg(test)]
     pub fn to_array(self) -> [f32; 8] {
-        unsafe { mem::transmute(self.0) }
+        zerocopy::transmute!(self.0)
     }
 
     pub fn eq(self, other: Self) -> m32x8 {

@@ -523,7 +523,7 @@ mod test {
                 b.raw_handle(),
                 write_buf.as_mut_ptr(),
                 2,
-                std::mem::transmute(handles_buf.as_mut_ptr()),
+                handles_buf.as_mut_ptr().cast(),
                 2,
             )
         };
@@ -684,7 +684,7 @@ mod test {
                 b.raw_handle(),
                 write_buf.as_mut_ptr(),
                 2,
-                std::mem::transmute(handles_buf.as_mut_ptr()),
+                handles_buf.as_mut_ptr().cast(),
                 2,
             )
         };

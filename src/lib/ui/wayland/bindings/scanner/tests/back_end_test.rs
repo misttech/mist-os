@@ -7,34 +7,26 @@ mod test {
     use fuchsia_wayland_core::{Arg, Enum, Fixed, FromArgs, IntoMessage};
     use fuchsia_zircon::{self as zx, HandleBased};
     use test_protocol_server_protocol::{test_interface, TestInterfaceEvent, TestInterfaceRequest};
-    use zerocopy::AsBytes;
 
     static SENDER_ID: u32 = 3;
 
-    // Force a compile error if value does not have the AsBytes trait.
-    fn is_as_bytes<T: AsBytes>(_: &T) {}
-
     macro_rules! message_bytes(
-        ($sender:expr, $opcode:expr, $val:expr) => {
-            unsafe {
-                is_as_bytes(&$val);
-                use std::mem;
-                let value: u32 = mem::transmute($val);
-                &[
-                    $sender as u8,
-                    ($sender >> 8) as u8,
-                    ($sender >> 16) as u8,
-                    ($sender >> 24) as u8,
-                    $opcode as u8,
-                    ($opcode >> 8) as u8, // opcode
-                    0x0c, 0x00, // length
-                    value as u8,
-                    (value >> 8) as u8,
-                    (value >> 16) as u8,
-                    (value >> 24) as u8,
-                ]
-            }
-        }
+        ($sender:expr, $opcode:expr, $val:expr) => {{
+            let value: u32 = zerocopy::transmute!($val);
+            &[
+                $sender as u8,
+                ($sender >> 8) as u8,
+                ($sender >> 16) as u8,
+                ($sender >> 24) as u8,
+                $opcode as u8,
+                ($opcode >> 8) as u8, // opcode
+                0x0c, 0x00, // length
+                value as u8,
+                (value >> 8) as u8,
+                (value >> 16) as u8,
+                (value >> 24) as u8,
+            ]
+        }}
     );
 
     macro_rules! assert_match(

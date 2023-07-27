@@ -8,6 +8,7 @@ use static_assertions::const_assert_eq;
 use std::fmt::{self, Debug};
 use std::hash::{Hash, Hasher};
 use std::sync::atomic::AtomicI32;
+use zerocopy::{AsBytes, FromBytes, FromZeroes};
 
 pub type zx_addr_t = usize;
 pub type zx_stream_seek_origin_t = u32;
@@ -490,7 +491,7 @@ multiconst!(u32, [
 /// safely initialized. These explicit padding fields are mirrored in the Rust struct definitions
 /// to minimize the opportunities for mistakes and inconsistencies.
 #[repr(C)]
-#[derive(Copy, Clone, Eq, Default)]
+#[derive(Copy, Clone, Eq, Default, FromZeroes, FromBytes, AsBytes)]
 pub struct PadByte(u8);
 
 impl PartialEq for PadByte {
@@ -969,7 +970,7 @@ multiconst!(zx_obj_type_t, [
 ]);
 
 #[repr(C)]
-#[derive(Debug, Copy, Clone, Eq, PartialEq)]
+#[derive(Debug, Copy, Clone, Eq, PartialEq, FromZeroes, FromBytes, AsBytes)]
 pub struct zx_exception_info_t {
     pub pid: zx_koid_t,
     pub tid: zx_koid_t,

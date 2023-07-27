@@ -21,6 +21,7 @@ rustc_library("fuchsia-fs") {
     "//third_party/rust_crates:rand",
     "//third_party/rust_crates:static_assertions",
     "//third_party/rust_crates:thiserror",
+    "//third_party/rust_crates:zerocopy",
   ]
 
   test_deps = [

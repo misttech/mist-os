@@ -25,6 +25,7 @@ use {
         process::Command,
         str::FromStr,
     },
+    zerocopy::AsBytes,
 };
 
 const fn part_type(guid: &'static str) -> PartType {
@@ -705,6 +706,7 @@ fn part_range(disk: &GptDisk<'_>, part_id: u32) -> Range<u64> {
 const MAX_TRIES: u8 = 7;
 const MAX_PRIORITY: u8 = 15;
 
+#[derive(AsBytes)]
 #[repr(C, packed)]
 #[derive(Default)]
 struct AbrData {
@@ -718,6 +720,7 @@ struct AbrData {
     // A CRC32 comes next.
 }
 
+#[derive(AsBytes)]
 #[repr(C, packed)]
 #[derive(Default)]
 struct AbrSlotData {
@@ -769,10 +772,10 @@ fn write_abr(disk: &mut File, offset: u64, boot_part: BootPart) -> Result<(), Er
         },
         ..Default::default()
     };
-    let data: [u8; std::mem::size_of::<AbrData>()] = unsafe { std::mem::transmute_copy(&data) };
+
     disk.seek(SeekFrom::Start(offset))?;
-    disk.write_all(&data)?;
-    disk.write_u32::<BigEndian>(crc32::checksum_ieee(&data))?;
+    disk.write_all(data.as_bytes())?;
+    disk.write_u32::<BigEndian>(crc32::checksum_ieee(data.as_bytes()))?;
     Ok(())
 }
 

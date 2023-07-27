@@ -12,8 +12,9 @@ use {
     fuchsia_zircon_status as zx_status,
     futures::future::BoxFuture,
     futures::stream::{self, BoxStream, StreamExt},
-    std::{collections::VecDeque, mem, str::Utf8Error},
+    std::{collections::VecDeque, str::Utf8Error},
     thiserror::Error,
+    zerocopy::{FromBytes, FromZeroes, LayoutVerified, Unaligned},
 };
 
 mod watcher;
@@ -592,6 +593,7 @@ pub async fn dir_contains_with_timeout(
 /// Returns either an error or a parsed entry for each entry in the supplied buffer (see
 /// read_dirents for the format of this buffer).
 pub fn parse_dir_entries(mut buf: &[u8]) -> Vec<Result<DirEntry, DecodeDirentError>> {
+    #[derive(FromZeroes, FromBytes, Unaligned)]
     #[repr(C, packed)]
     struct Dirent {
         /// The inode number of the entry.
@@ -603,29 +605,18 @@ pub fn parse_dir_entries(mut buf: &[u8]) -> Vec<Result<DirEntry, DecodeDirentErr
         // The unterminated name of the entry.  Length is the `size` field above.
         // char name[0],
     }
-    const DIRENT_SIZE: usize = mem::size_of::<Dirent>();
 
     let mut entries = vec![];
 
     while !buf.is_empty() {
-        // Don't read past the end of the buffer.
-        if DIRENT_SIZE > buf.len() {
+        let Some((dirent, rest)) = LayoutVerified::<_, Dirent>::new_unaligned_from_prefix(buf) else {
             entries.push(Err(DecodeDirentError::BufferOverrun));
             return entries;
-        }
-
-        // Read the dirent, and figure out how long the name is.
-        let (head, rest) = buf.split_at(DIRENT_SIZE);
+        };
 
         let entry = {
-            // Cast the dirent bytes into a `Dirent`, and extract out the size of the name and the
-            // entry type.
-            let (size, kind) = unsafe {
-                let dirent: &Dirent = mem::transmute(head.as_ptr());
-                (dirent.size as usize, dirent.kind)
-            };
-
             // Don't read past the end of the buffer.
+            let size = usize::from(dirent.size);
             if size > rest.len() {
                 entries.push(Err(DecodeDirentError::BufferOverrun));
                 return entries;
@@ -636,7 +627,7 @@ pub fn parse_dir_entries(mut buf: &[u8]) -> Vec<Result<DirEntry, DecodeDirentErr
             match String::from_utf8(rest[..size].to_vec()) {
                 Ok(name) => Ok(DirEntry {
                     name,
-                    kind: DirentKind::from_primitive(kind).unwrap_or(DirentKind::Unknown),
+                    kind: DirentKind::from_primitive(dirent.kind).unwrap_or(DirentKind::Unknown),
                 }),
                 Err(err) => Err(DecodeDirentError::InvalidUtf8(err.utf8_error())),
             }

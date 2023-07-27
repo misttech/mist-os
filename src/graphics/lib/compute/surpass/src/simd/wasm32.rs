@@ -139,7 +139,7 @@ impl u32x8 {
     }
 
     pub fn to_array(self) -> [u32; 8] {
-        unsafe { mem::transmute(self.0) }
+        zerocopy::transmute!(self.0)
     }
 
     pub fn mul_add(self, a: Self, b: Self) -> Self {
@@ -386,7 +386,7 @@ impl f32x8 {
 
     #[cfg(test)]
     pub fn to_array(self) -> [f32; 8] {
-        unsafe { mem::transmute(self.0) }
+        zerocopy::transmute!(self.0)
     }
 
     pub fn eq(self, other: Self) -> m32x8 {
