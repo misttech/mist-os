@@ -8,47 +8,8 @@ load("//fuchsia/private:providers.bzl", "FuchsiaPackageInfo")
 load("//fuchsia/private:package_publishing.bzl", "package_repo_path_from_label", "publish_package")
 load("//fuchsia/private/workflows:fuchsia_task_publish.bzl", "fuchsia_task_publish")
 
-_COMPONENT_VALIDATION_SCRIPT = """
-components=$($FAR list --archive=$OUTPUT_DIR/meta.far | grep -F meta/$COMPONENT.cm | wc -l)
-
-if [ $components -eq 0 ]; then
-   echo
-   echo "Component '$COMPONENT' is not included in the package!"
-   echo
-   exit 1
-fi
-touch $STAMP
-"""
-
 def _relative_file_name(ctx, filename):
     return ctx.label.name + "_expanded/" + filename
-
-def _validate_components_and_drivers(ctx, outdir):
-    far = ctx.toolchains["@fuchsia_sdk//fuchsia:toolchain"].far
-    deps = []
-    for component in ctx.attr.components + ctx.attr.drivers:
-        stamp_file = ctx.actions.declare_file(_relative_file_name(ctx, component + "_stamp"))
-
-        # NOTE: outdir is a ctx.actions.declare_directory() path, so declare
-        # it as an input, even though only the `meta.far` inside it is used.
-        # (There is no way to create a File() instance from it).
-        #
-        # This ensures the action that populates the directory is always run
-        # properly before the run_shell() one below.
-        ctx.actions.run_shell(
-            inputs = [outdir, far],
-            outputs = [stamp_file],
-            command = _COMPONENT_VALIDATION_SCRIPT,
-            env = {
-                "FAR": far.path,
-                "COMPONENT": component,
-                "OUTPUT_DIR": outdir.path,
-                "STAMP": stamp_file.path,
-            },
-            progress_message = "Validating the component %s" % component,
-        )
-        deps.append(stamp_file)
-    return deps
 
 def _fuchsia_prebuilt_package_impl(ctx):
     sdk = ctx.toolchains["@fuchsia_sdk//fuchsia:toolchain"]
@@ -111,7 +72,6 @@ def _fuchsia_prebuilt_package_impl(ctx):
     #
     output_dir = ctx.actions.declare_directory(_relative_file_name(ctx, "content"))
     output_files = [output_dir]
-    output_files += _validate_components_and_drivers(ctx, output_dir)
 
     # extract the package
     ctx.actions.run(

@@ -76,7 +76,7 @@ def _fuchsia_product_configuration_impl(ctx):
                 "components": dep[FuchsiaPackageInfo].drivers,
             },
         )
-        pkg_files.append(dep[FuchsiaPackageInfo].package_manifest)
+        pkg_files += _collect_file_deps(dep)
     product["base_drivers"] = base_driver_details
 
     product_config["product"] = product
