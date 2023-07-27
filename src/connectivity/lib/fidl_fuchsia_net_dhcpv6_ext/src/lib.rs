@@ -61,14 +61,12 @@ pub struct NewClientParams {
 #[derive(ValidFidlTable, Debug, Clone, PartialEq)]
 #[fidl_table_src(fidl_fuchsia_net_dhcpv6::ClientConfig)]
 pub struct ClientConfig {
-    #[fidl_field_type(default = InformationConfig { dns_servers: false })]
+    #[fidl_field_type(default)]
     /// Configuration for requesting configuration information.
     ///
     /// See [`fidl_fuchsia_net_dhcpv6::ClientConfig::information_config`].
     pub information_config: InformationConfig,
-    #[fidl_field_type(
-        default = AddressConfig { address_count: 0, preferred_addresses: Vec::new() }
-    )]
+    #[fidl_field_type(default)]
     /// Non-temporary address configuration.
     ///
     /// Configures the client to negotiate non-temporary
@@ -101,7 +99,7 @@ pub struct ClientConfig {
 #[derive(ValidFidlTable, Debug, Clone, PartialEq, Default)]
 #[fidl_table_src(fidl_fuchsia_net_dhcpv6::InformationConfig)]
 pub struct InformationConfig {
-    #[fidl_field_type(default = false)]
+    #[fidl_field_type(default)]
     /// See [`fidl_fuchsia_net_dhcpv6::InformationConfig::dns_servers`].
     pub dns_servers: bool,
 }
@@ -151,7 +149,7 @@ impl Validate<AddressConfig> for AddressConfigValidator {
 #[fidl_table_src(fidl_fuchsia_net_dhcpv6::AddressConfig)]
 #[fidl_table_validator(AddressConfigValidator)]
 pub struct AddressConfig {
-    #[fidl_field_type(default = 0)]
+    #[fidl_field_type(default)]
     /// Number of addresses.
     ///
     /// If the value is 0, the client will not negotiate
