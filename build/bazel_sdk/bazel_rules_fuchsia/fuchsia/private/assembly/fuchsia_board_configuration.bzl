@@ -7,11 +7,17 @@ load(
     ":providers.bzl",
     "FuchsiaBoardConfigInfo",
 )
+load(":util.bzl", "extract_labels", "replace_labels_with_files")
 
 def _fuchsia_board_configuration_impl(ctx):
+    filesystems = json.decode(ctx.attr.filesystems)
+    replace_labels_with_files(filesystems, ctx.attr.filesystems_labels)
+
     board_config = {}
     board_config["name"] = ctx.attr.board_name
     board_config["provided_features"] = ctx.attr.provided_features
+    if filesystems != {}:
+        board_config["filesystems"] = filesystems
 
     board_config_file = ctx.actions.declare_file(ctx.label.name + "_board_config.json")
     content = json.encode_indent(board_config, indent = "  ")
@@ -20,7 +26,7 @@ def _fuchsia_board_configuration_impl(ctx):
     return [
         DefaultInfo(
             files = depset(
-                direct = [board_config_file],
+                direct = [board_config_file] + ctx.files.filesystems_labels,
             ),
         ),
         FuchsiaBoardConfigInfo(
@@ -28,7 +34,7 @@ def _fuchsia_board_configuration_impl(ctx):
         ),
     ]
 
-fuchsia_board_configuration = rule(
+_fuchsia_board_configuration = rule(
     doc = """Generates a board configuration file.""",
     implementation = _fuchsia_board_configuration_impl,
     attrs = {
@@ -39,5 +45,29 @@ fuchsia_board_configuration = rule(
         "provided_features": attr.string_list(
             doc = "The features that this board provides to the product.",
         ),
+        "filesystems": attr.string(
+            doc = "The filesystem configuration options provided by the board.",
+            default = "{}",
+        ),
+        "filesystems_labels": attr.label_keyed_string_dict(
+            doc = """Map of labels to LABEL(label) strings in the filesystems config.""",
+            allow_files = True,
+            default = {},
+        ),
     },
 )
+
+def fuchsia_board_configuration(
+        name,
+        board_name,
+        provided_features = [],
+        filesystems = {}):
+    """A board configuration that takes a dict for the filesystems config."""
+    filesystem_labels = extract_labels(filesystems)
+    _fuchsia_board_configuration(
+        name = name,
+        board_name = board_name,
+        provided_features = provided_features,
+        filesystems = json.encode_indent(filesystems, indent = "    "),
+        filesystems_labels = filesystem_labels,
+    )
