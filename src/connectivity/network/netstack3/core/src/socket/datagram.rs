@@ -2010,7 +2010,7 @@ mod test {
         device::testutil::{FakeDeviceId, FakeStrongDeviceId, FakeWeakDeviceId, MultipleDevicesId},
         ip::{
             device::state::IpDeviceStateIpExt,
-            socket::testutil::{FakeBufferIpSocketCtx, FakeDeviceConfig, FakeIpSocketCtx},
+            socket::testutil::{FakeDeviceConfig, FakeIpSocketCtx},
             testutil::FakeIpDeviceIdCtx,
             IpLayerIpExt, SendIpPacketMeta, DEFAULT_HOP_LIMITS,
         },
@@ -2161,7 +2161,7 @@ mod test {
         SocketsState<I, FakeWeakDeviceId<D>, FakeAddrSpec, FakeStateSpec<I, FakeWeakDeviceId<D>>>;
 
     type FakeInnerSyncCtx<I, D> = crate::context::testutil::FakeSyncCtx<
-        FakeBufferIpSocketCtx<I, D>,
+        FakeIpSocketCtx<I, D>,
         SendIpPacketMeta<I, D, SpecifiedAddr<<I as Ip>::Addr>>,
         D,
     >;
@@ -2174,7 +2174,7 @@ mod test {
             Self {
                 outer: state,
                 inner: WrappedFakeSyncCtx::with_inner_and_outer_state(
-                    FakeBufferIpSocketCtx::with_ctx(FakeIpSocketCtx::default()),
+                    FakeIpSocketCtx::default(),
                     bound,
                 ),
             }
@@ -2356,11 +2356,11 @@ mod test {
         let mut sync_ctx = FakeSyncCtx::<I, _> {
             outer: FakeSocketsState::default(),
             inner: WrappedFakeSyncCtx::with_inner_and_outer_state(
-                FakeBufferIpSocketCtx::with_ctx(FakeIpSocketCtx::new([FakeDeviceConfig {
+                FakeIpSocketCtx::new([FakeDeviceConfig {
                     device: FakeDeviceId,
                     local_ips: Default::default(),
                     remote_ips: Default::default(),
-                }])),
+                }]),
                 Default::default(),
             ),
         };
@@ -2455,11 +2455,11 @@ mod test {
         let mut sync_ctx = FakeSyncCtx::<I, FakeDeviceId> {
             outer: Default::default(),
             inner: WrappedFakeSyncCtx::with_inner_and_outer_state(
-                FakeBufferIpSocketCtx::with_ctx(FakeIpSocketCtx::new([FakeDeviceConfig {
+                FakeIpSocketCtx::new([FakeDeviceConfig {
                     device: FakeDeviceId,
                     local_ips: vec![I::FAKE_CONFIG.local_ip],
                     remote_ips: vec![I::FAKE_CONFIG.remote_ip],
-                }])),
+                }]),
                 Default::default(),
             ),
         };
@@ -2489,11 +2489,11 @@ mod test {
         let mut sync_ctx = FakeSyncCtx::<I, _> {
             outer: Default::default(),
             inner: WrappedFakeSyncCtx::with_inner_and_outer_state(
-                FakeBufferIpSocketCtx::with_ctx(FakeIpSocketCtx::new([FakeDeviceConfig {
+                FakeIpSocketCtx::new([FakeDeviceConfig {
                     device: FakeDeviceId,
                     local_ips: vec![I::FAKE_CONFIG.local_ip],
                     remote_ips: vec![],
-                }])),
+                }]),
                 Default::default(),
             ),
         };

@@ -935,6 +935,18 @@ pub(crate) mod testutil {
         }
     }
 
+    impl<I: IpDeviceStateIpExt, D> AsRef<Self> for FakeIpSocketCtx<I, D> {
+        fn as_ref(&self) -> &Self {
+            self
+        }
+    }
+
+    impl<I: IpDeviceStateIpExt, D> AsMut<Self> for FakeIpSocketCtx<I, D> {
+        fn as_mut(&mut self) -> &mut Self {
+            self
+        }
+    }
+
     impl<
             I: IpExt + IpDeviceStateIpExt,
             C: CounterContext + InstantContext + TracingContext,
@@ -1191,66 +1203,28 @@ pub(crate) mod testutil {
         }
     }
 
-    pub(crate) struct FakeBufferIpSocketCtx<I: IpDeviceStateIpExt, D> {
-        ip_socket_ctx: FakeIpSocketCtx<I, D>,
-    }
-
-    impl<I: IpDeviceStateIpExt, D> FakeBufferIpSocketCtx<I, D> {
-        pub(crate) fn with_ctx(ip_socket_ctx: FakeIpSocketCtx<I, D>) -> Self {
-            Self { ip_socket_ctx }
-        }
-    }
-
-    impl<I: IpDeviceStateIpExt, D> AsMut<FakeIpSocketCtx<I, D>> for FakeBufferIpSocketCtx<I, D> {
-        fn as_mut(&mut self) -> &mut FakeIpSocketCtx<I, D> {
-            &mut self.ip_socket_ctx
-        }
-    }
-
-    impl<I: IpDeviceStateIpExt, D> AsRef<FakeIpSocketCtx<I, D>> for FakeBufferIpSocketCtx<I, D> {
-        fn as_ref(&self) -> &FakeIpSocketCtx<I, D> {
-            &self.ip_socket_ctx
-        }
-    }
-
-    impl<I: IpDeviceStateIpExt, D> AsRef<FakeIpDeviceIdCtx<D>> for FakeBufferIpSocketCtx<I, D> {
-        fn as_ref(&self) -> &FakeIpDeviceIdCtx<D> {
-            let this: &FakeIpSocketCtx<_, _> = self.as_ref();
-            this.as_ref()
-        }
-    }
-
-    impl<I: IpDeviceStateIpExt, D> AsMut<FakeIpDeviceIdCtx<D>> for FakeBufferIpSocketCtx<I, D> {
-        fn as_mut(&mut self) -> &mut FakeIpDeviceIdCtx<D> {
-            let this: &mut FakeIpSocketCtx<_, _> = self.as_mut();
-            this.as_mut()
-        }
-    }
-
     impl<
             I: IpExt + IpDeviceStateIpExt,
             C: CounterContext + InstantContext + TracingContext,
             D: FakeStrongDeviceId + 'static,
+            State: TransportIpContext<I, C, DeviceId = D>,
             Meta,
-        > TransportIpContext<I, C> for FakeSyncCtx<FakeBufferIpSocketCtx<I, D>, Meta, D>
+        > TransportIpContext<I, C> for FakeSyncCtx<State, Meta, D>
     where
         Self: IpSocketContext<I, C, DeviceId = D, WeakDeviceId = FakeWeakDeviceId<D>>,
     {
-        type DevicesWithAddrIter<'a> =
-            <FakeIpSocketCtx<I, D> as TransportIpContext<I, C>>::DevicesWithAddrIter<'a>
+        type DevicesWithAddrIter<'a> = State::DevicesWithAddrIter<'a>
             where Self: 'a;
 
         fn get_devices_with_assigned_addr(
             &mut self,
             addr: SpecifiedAddr<I::Addr>,
         ) -> Self::DevicesWithAddrIter<'_> {
-            let FakeBufferIpSocketCtx { ip_socket_ctx } = self.get_mut();
-            TransportIpContext::<I, C>::get_devices_with_assigned_addr(ip_socket_ctx, addr)
+            TransportIpContext::<I, C>::get_devices_with_assigned_addr(self.get_mut(), addr)
         }
 
         fn get_default_hop_limits(&mut self, device: Option<&Self::DeviceId>) -> HopLimits {
-            let FakeBufferIpSocketCtx { ip_socket_ctx } = self.get_mut();
-            TransportIpContext::<I, C>::get_default_hop_limits(ip_socket_ctx, device)
+            TransportIpContext::<I, C>::get_default_hop_limits(self.get_mut(), device)
         }
     }
 

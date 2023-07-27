@@ -2168,7 +2168,7 @@ mod tests {
         ip::{
             device::state::IpDeviceStateIpExt,
             icmp::{Icmpv4ErrorCode, Icmpv6ErrorCode},
-            socket::testutil::{FakeBufferIpSocketCtx, FakeDeviceConfig, FakeIpSocketCtx},
+            socket::testutil::{FakeDeviceConfig, FakeIpSocketCtx},
             testutil::FakeIpDeviceIdCtx,
             ResolveRouteError, SendIpPacketMeta,
         },
@@ -2198,8 +2198,8 @@ mod tests {
         err: I::ErrorCode,
     }
 
-    impl<I: TestIpExt> Default for FakeUdpSyncCtx<I, FakeDeviceId> {
-        fn default() -> Self {
+    impl<I: TestIpExt> FakeUdpSyncCtx<I, FakeDeviceId> {
+        fn new_fake_device() -> Self {
             Self::with_local_remote_ip_addrs(vec![local_ip::<I>()], vec![remote_ip::<I>()])
         }
     }
@@ -2209,14 +2209,12 @@ mod tests {
             local_ips: Vec<SpecifiedAddr<I::Addr>>,
             remote_ips: Vec<SpecifiedAddr<I::Addr>>,
         ) -> Self {
-            Self::with_state(FakeBufferIpSocketCtx::with_ctx(FakeIpSocketCtx::new_fake(
-                local_ips, remote_ips,
-            )))
+            Self::with_state(FakeIpSocketCtx::new_fake(local_ips, remote_ips))
         }
     }
 
     impl<I: Ip + TestIpExt, D: FakeStrongDeviceId> FakeUdpSyncCtx<I, D> {
-        fn with_state(state: FakeBufferIpSocketCtx<I, D>) -> Self {
+        fn with_state(state: FakeIpSocketCtx<I, D>) -> Self {
             Wrapped {
                 outer: Default::default(),
                 inner: WrappedFakeSyncCtx::with_inner_and_outer_state(state, Default::default()),
@@ -2233,7 +2231,7 @@ mod tests {
         SocketsState<I, FakeWeakDeviceId<D>>,
         WrappedFakeSyncCtx<
             BoundSockets<I, FakeWeakDeviceId<D>>,
-            FakeBufferIpSocketCtx<I, D>,
+            FakeIpSocketCtx<I, D>,
             SendIpPacketMeta<I, D, SpecifiedAddr<<I as Ip>::Addr>>,
             D,
         >,
@@ -2244,7 +2242,7 @@ mod tests {
     /// The FakeSyncCtx held as the inner state of the [`WrappedFakeSyncCtx`] that
     /// is [`FakeUdpSyncCtx`].
     type FakeBufferSyncCtx<I, D> = FakeSyncCtx<
-        FakeBufferIpSocketCtx<I, D>,
+        FakeIpSocketCtx<I, D>,
         SendIpPacketMeta<I, D, SpecifiedAddr<<I as Ip>::Addr>>,
         D,
     >;
@@ -2282,7 +2280,7 @@ mod tests {
     {
         type SocketStateCtx<'a> = WrappedFakeSyncCtx<
             BoundSockets<I, D::Weak>,
-            FakeBufferIpSocketCtx<I, D>,
+            FakeIpSocketCtx<I, D>,
             SendIpPacketMeta<I, D, SpecifiedAddr<<I as Ip>::Addr>>,
             D,
         >;
@@ -2316,7 +2314,7 @@ mod tests {
     impl<I: TestIpExt, D: FakeStrongDeviceId + 'static> BoundStateContext<I, FakeUdpNonSyncCtx<I>>
         for WrappedFakeSyncCtx<
             BoundSockets<I, FakeWeakDeviceId<D>>,
-            FakeBufferIpSocketCtx<I, D>,
+            FakeIpSocketCtx<I, D>,
             SendIpPacketMeta<I, D, SpecifiedAddr<<I as Ip>::Addr>>,
             D,
         >
@@ -2363,7 +2361,7 @@ mod tests {
         BufferBoundStateContext<I, FakeUdpNonSyncCtx<I>, B>
         for WrappedFakeSyncCtx<
             BoundSockets<I, FakeWeakDeviceId<D>>,
-            FakeBufferIpSocketCtx<I, D>,
+            FakeIpSocketCtx<I, D>,
             SendIpPacketMeta<I, D, SpecifiedAddr<<I as Ip>::Addr>>,
             D,
         >
@@ -2533,7 +2531,7 @@ mod tests {
     fn test_listen_udp<I: Ip + TestIpExt>() {
         set_logger_for_test();
         let UdpFakeDeviceCtx { mut sync_ctx, mut non_sync_ctx } =
-            UdpFakeDeviceCtx::with_sync_ctx(UdpFakeDeviceSyncCtx::<I>::default());
+            UdpFakeDeviceCtx::with_sync_ctx(UdpFakeDeviceSyncCtx::<I>::new_fake_device());
         let local_ip = local_ip::<I>();
         let remote_ip = remote_ip::<I>();
         let socket = SocketHandler::create_udp(&mut sync_ctx);
@@ -2626,7 +2624,7 @@ mod tests {
     fn test_udp_drop<I: Ip + TestIpExt>() {
         set_logger_for_test();
         let UdpFakeDeviceCtx { mut sync_ctx, mut non_sync_ctx } =
-            UdpFakeDeviceCtx::with_sync_ctx(UdpFakeDeviceSyncCtx::<I>::default());
+            UdpFakeDeviceCtx::with_sync_ctx(UdpFakeDeviceSyncCtx::<I>::new_fake_device());
         let local_ip = local_ip::<I>();
         let remote_ip = remote_ip::<I>();
 
@@ -2652,7 +2650,7 @@ mod tests {
     fn test_udp_conn_basic<I: Ip + TestIpExt>() {
         set_logger_for_test();
         let UdpFakeDeviceCtx { mut sync_ctx, mut non_sync_ctx } =
-            UdpFakeDeviceCtx::with_sync_ctx(UdpFakeDeviceSyncCtx::<I>::default());
+            UdpFakeDeviceCtx::with_sync_ctx(UdpFakeDeviceSyncCtx::<I>::new_fake_device());
         let local_ip = local_ip::<I>();
         let remote_ip = remote_ip::<I>();
         let socket = SocketHandler::create_udp(&mut sync_ctx);
@@ -2726,7 +2724,7 @@ mod tests {
     fn test_udp_conn_unroutable<I: Ip + TestIpExt>() {
         set_logger_for_test();
         let UdpFakeDeviceCtx { mut sync_ctx, mut non_sync_ctx } =
-            UdpFakeDeviceCtx::with_sync_ctx(UdpFakeDeviceSyncCtx::<I>::default());
+            UdpFakeDeviceCtx::with_sync_ctx(UdpFakeDeviceSyncCtx::<I>::new_fake_device());
         // Set fake context callback to treat all addresses as unroutable.
         let _local_ip = local_ip::<I>();
         let remote_ip = I::get_other_ip_address(127);
@@ -2750,7 +2748,7 @@ mod tests {
     fn test_udp_conn_cannot_bind<I: Ip + TestIpExt>() {
         set_logger_for_test();
         let UdpFakeDeviceCtx { mut sync_ctx, mut non_sync_ctx } =
-            UdpFakeDeviceCtx::with_sync_ctx(UdpFakeDeviceSyncCtx::<I>::default());
+            UdpFakeDeviceCtx::with_sync_ctx(UdpFakeDeviceSyncCtx::<I>::new_fake_device());
 
         // Use remote address to trigger IpSockCreationError::LocalAddrNotAssigned.
         let remote_ip = remote_ip::<I>();
@@ -2839,7 +2837,7 @@ mod tests {
     ) {
         set_logger_for_test();
         let UdpFakeDeviceCtx { mut sync_ctx, mut non_sync_ctx } =
-            UdpFakeDeviceCtx::with_sync_ctx(UdpFakeDeviceSyncCtx::<I>::default());
+            UdpFakeDeviceCtx::with_sync_ctx(UdpFakeDeviceSyncCtx::<I>::new_fake_device());
 
         let unbound = SocketHandler::create_udp(&mut sync_ctx);
         SocketHandler::set_device(&mut sync_ctx, &mut non_sync_ctx, unbound, Some(&FakeDeviceId))
@@ -2868,7 +2866,7 @@ mod tests {
     fn test_udp_conn_exhausted<I: Ip + TestIpExt>() {
         set_logger_for_test();
         let UdpFakeDeviceCtx { mut sync_ctx, mut non_sync_ctx } =
-            UdpFakeDeviceCtx::with_sync_ctx(UdpFakeDeviceSyncCtx::<I>::default());
+            UdpFakeDeviceCtx::with_sync_ctx(UdpFakeDeviceSyncCtx::<I>::new_fake_device());
 
         let local_ip = local_ip::<I>();
         // Exhaust local ports to trigger FailedToAllocateLocalPort error.
@@ -2903,7 +2901,7 @@ mod tests {
         set_logger_for_test();
 
         let UdpFakeDeviceCtx { mut sync_ctx, mut non_sync_ctx } =
-            UdpFakeDeviceCtx::with_sync_ctx(UdpFakeDeviceSyncCtx::<I>::default());
+            UdpFakeDeviceCtx::with_sync_ctx(UdpFakeDeviceSyncCtx::<I>::new_fake_device());
 
         let local_ip = local_ip::<I>();
         let remote_ip = remote_ip::<I>();
@@ -2970,7 +2968,7 @@ mod tests {
     fn test_connect_fails<I: Ip + TestIpExt>() {
         set_logger_for_test();
         let UdpFakeDeviceCtx { mut sync_ctx, mut non_sync_ctx } =
-            UdpFakeDeviceCtx::with_sync_ctx(UdpFakeDeviceSyncCtx::<I>::default());
+            UdpFakeDeviceCtx::with_sync_ctx(UdpFakeDeviceSyncCtx::<I>::new_fake_device());
         let local_ip = local_ip::<I>();
         let remote_ip = I::get_other_ip_address(127);
         let multicast_addr = I::get_multicast_addr(3);
@@ -3094,7 +3092,7 @@ mod tests {
     fn test_reconnect_udp_conn_fails<I: Ip + TestIpExt>() {
         set_logger_for_test();
         let UdpFakeDeviceCtx { mut sync_ctx, mut non_sync_ctx } =
-            UdpFakeDeviceCtx::with_sync_ctx(UdpFakeDeviceSyncCtx::<I>::default());
+            UdpFakeDeviceCtx::with_sync_ctx(UdpFakeDeviceSyncCtx::<I>::new_fake_device());
         let local_ip = ZonedAddr::Unzoned(local_ip::<I>());
         let remote_ip = ZonedAddr::Unzoned(remote_ip::<I>());
         let other_remote_ip = ZonedAddr::Unzoned(I::get_other_ip_address(3));
@@ -3213,7 +3211,7 @@ mod tests {
     fn test_send_udp_conn_failure<I: Ip + TestIpExt>() {
         set_logger_for_test();
         let UdpFakeDeviceCtx { mut sync_ctx, mut non_sync_ctx } =
-            UdpFakeDeviceCtx::with_sync_ctx(UdpFakeDeviceSyncCtx::<I>::default());
+            UdpFakeDeviceCtx::with_sync_ctx(UdpFakeDeviceSyncCtx::<I>::new_fake_device());
         let _local_ip = local_ip::<I>();
         let remote_ip = remote_ip::<I>();
         // Create a UDP connection with a specified local port and local IP.
@@ -3246,7 +3244,7 @@ mod tests {
     fn test_send_udp_conn_device_removed<I: Ip + TestIpExt>() {
         set_logger_for_test();
         let UdpFakeDeviceCtx { mut sync_ctx, mut non_sync_ctx } =
-            UdpFakeDeviceCtx::with_sync_ctx(UdpFakeDeviceSyncCtx::<I>::default());
+            UdpFakeDeviceCtx::with_sync_ctx(UdpFakeDeviceSyncCtx::<I>::new_fake_device());
         let remote_ip = remote_ip::<I>();
         let socket = SocketHandler::create_udp(&mut sync_ctx);
         SocketHandler::set_device(&mut sync_ctx, &mut non_sync_ctx, socket, Some(&FakeDeviceId))
@@ -3329,7 +3327,7 @@ mod tests {
         }
 
         let UdpFakeDeviceCtx { mut sync_ctx, mut non_sync_ctx } =
-            UdpFakeDeviceCtx::with_sync_ctx(UdpFakeDeviceSyncCtx::<I>::default());
+            UdpFakeDeviceCtx::with_sync_ctx(UdpFakeDeviceSyncCtx::<I>::new_fake_device());
         let remote_ip = ZonedAddr::Unzoned(remote_ip::<I>());
         const REMOTE_PORT: NonZeroU16 = const_unwrap_option(NonZeroU16::new(200));
         let send_to_ip = send_to.then_some(remote_ip);
@@ -3361,7 +3359,7 @@ mod tests {
         set_logger_for_test();
 
         let UdpFakeDeviceCtx { mut sync_ctx, mut non_sync_ctx } =
-            UdpFakeDeviceCtx::with_sync_ctx(UdpFakeDeviceSyncCtx::<I>::default());
+            UdpFakeDeviceCtx::with_sync_ctx(UdpFakeDeviceSyncCtx::<I>::new_fake_device());
         const REMOTE_PORT: NonZeroU16 = const_unwrap_option(NonZeroU16::new(200));
 
         let socket = SocketHandler::create_udp(&mut sync_ctx);
@@ -3603,7 +3601,7 @@ mod tests {
     fn test_wildcard_listeners<I: Ip + TestIpExt>() {
         set_logger_for_test();
         let UdpFakeDeviceCtx { mut sync_ctx, mut non_sync_ctx } =
-            UdpFakeDeviceCtx::with_sync_ctx(UdpFakeDeviceSyncCtx::<I>::default());
+            UdpFakeDeviceCtx::with_sync_ctx(UdpFakeDeviceSyncCtx::<I>::new_fake_device());
         let local_ip_a = I::get_other_ip_address(1);
         let local_ip_b = I::get_other_ip_address(2);
         let remote_ip_a = I::get_other_ip_address(70);
@@ -3676,7 +3674,7 @@ mod tests {
     fn test_receive_source_port_zero_on_listener<I: Ip + TestIpExt>() {
         set_logger_for_test();
         let UdpFakeDeviceCtx { mut sync_ctx, mut non_sync_ctx } =
-            UdpFakeDeviceCtx::with_sync_ctx(UdpFakeDeviceSyncCtx::<I>::default());
+            UdpFakeDeviceCtx::with_sync_ctx(UdpFakeDeviceSyncCtx::<I>::new_fake_device());
         let listener = SocketHandler::create_udp(&mut sync_ctx);
         SocketHandler::<I, _>::listen_udp(
             &mut sync_ctx,
@@ -3717,7 +3715,7 @@ mod tests {
     fn test_receive_source_addr_unspecified_on_listener<I: Ip + TestIpExt>() {
         set_logger_for_test();
         let UdpFakeDeviceCtx { mut sync_ctx, mut non_sync_ctx } =
-            UdpFakeDeviceCtx::with_sync_ctx(UdpFakeDeviceSyncCtx::<I>::default());
+            UdpFakeDeviceCtx::with_sync_ctx(UdpFakeDeviceSyncCtx::<I>::new_fake_device());
         let listener = SocketHandler::create_udp(&mut sync_ctx);
         SocketHandler::<I, _>::listen_udp(
             &mut sync_ctx,
@@ -3760,7 +3758,7 @@ mod tests {
     ) {
         set_logger_for_test();
         let UdpFakeDeviceCtx { mut sync_ctx, mut non_sync_ctx } =
-            UdpFakeDeviceCtx::with_sync_ctx(UdpFakeDeviceSyncCtx::<I>::default());
+            UdpFakeDeviceCtx::with_sync_ctx(UdpFakeDeviceSyncCtx::<I>::new_fake_device());
 
         for port in 1..=u16::MAX {
             let port = NonZeroU16::new(port).unwrap();
@@ -3873,10 +3871,10 @@ mod tests {
     type UdpMultipleDevicesSyncCtx<I> = FakeUdpSyncCtx<I, MultipleDevicesId>;
     type UdpMultipleDevicesNonSyncCtx<I> = FakeUdpNonSyncCtx<I>;
 
-    impl<I: TestIpExt> Default for FakeUdpSyncCtx<I, MultipleDevicesId> {
-        fn default() -> Self {
+    impl<I: TestIpExt> FakeUdpSyncCtx<I, MultipleDevicesId> {
+        fn new_multiple_devices() -> Self {
             let remote_ips = vec![I::get_other_remote_ip_address(1)];
-            Self::with_state(FakeBufferIpSocketCtx::with_ctx(FakeIpSocketCtx::new(
+            Self::with_state(FakeIpSocketCtx::new(
                 MultipleDevicesId::all().into_iter().enumerate().map(|(i, device)| {
                     FakeDeviceConfig {
                         device,
@@ -3884,7 +3882,7 @@ mod tests {
                         remote_ips: remote_ips.clone(),
                     }
                 }),
-            )))
+            ))
         }
     }
 
@@ -3894,7 +3892,9 @@ mod tests {
     fn test_bound_to_device_receive<I: Ip + TestIpExt>() {
         set_logger_for_test();
         let UdpMultipleDevicesCtx { mut sync_ctx, mut non_sync_ctx } =
-            UdpMultipleDevicesCtx::with_sync_ctx(UdpMultipleDevicesSyncCtx::<I>::default());
+            UdpMultipleDevicesCtx::with_sync_ctx(
+                UdpMultipleDevicesSyncCtx::<I>::new_multiple_devices(),
+            );
         let sync_ctx = &mut sync_ctx;
         let bound_first_device = SocketHandler::create_udp(sync_ctx);
         SocketHandler::listen_udp(
@@ -3979,7 +3979,9 @@ mod tests {
     fn test_bound_to_device_send<I: Ip + TestIpExt>() {
         set_logger_for_test();
         let UdpMultipleDevicesCtx { mut sync_ctx, mut non_sync_ctx } =
-            UdpMultipleDevicesCtx::with_sync_ctx(UdpMultipleDevicesSyncCtx::<I>::default());
+            UdpMultipleDevicesCtx::with_sync_ctx(
+                UdpMultipleDevicesSyncCtx::<I>::new_multiple_devices(),
+            );
         let sync_ctx = &mut sync_ctx;
         let bound_on_devices = MultipleDevicesId::all().map(|device| {
             let socket = SocketHandler::create_udp(sync_ctx);
@@ -4054,7 +4056,9 @@ mod tests {
     fn test_bind_unbind_device<I: Ip + TestIpExt>() {
         set_logger_for_test();
         let UdpMultipleDevicesCtx { mut sync_ctx, mut non_sync_ctx } =
-            UdpMultipleDevicesCtx::with_sync_ctx(UdpMultipleDevicesSyncCtx::<I>::default());
+            UdpMultipleDevicesCtx::with_sync_ctx(
+                UdpMultipleDevicesSyncCtx::<I>::new_multiple_devices(),
+            );
         let sync_ctx = &mut sync_ctx;
 
         // Start with `socket` bound to a device on all IPs.
@@ -4084,7 +4088,9 @@ mod tests {
     fn test_unbind_device_fails<I: Ip + TestIpExt>() {
         set_logger_for_test();
         let UdpMultipleDevicesCtx { mut sync_ctx, mut non_sync_ctx } =
-            UdpMultipleDevicesCtx::with_sync_ctx(UdpMultipleDevicesSyncCtx::<I>::default());
+            UdpMultipleDevicesCtx::with_sync_ctx(
+                UdpMultipleDevicesSyncCtx::<I>::new_multiple_devices(),
+            );
         let sync_ctx = &mut sync_ctx;
 
         let bound_on_devices = MultipleDevicesId::all().map(|device| {
@@ -4124,9 +4130,7 @@ mod tests {
         );
         let UdpMultipleDevicesCtx { mut sync_ctx, mut non_sync_ctx } =
             UdpMultipleDevicesCtx::with_sync_ctx(UdpMultipleDevicesSyncCtx::<I>::with_state(
-                FakeBufferIpSocketCtx::with_ctx(FakeIpSocketCtx::new(
-                    device_configs.iter().map(|(_, v)| v).cloned(),
-                )),
+                FakeIpSocketCtx::new(device_configs.iter().map(|(_, v)| v).cloned()),
             ));
 
         let socket = SocketHandler::create_udp(&mut sync_ctx);
@@ -4171,7 +4175,9 @@ mod tests {
         let multicast_addr = I::get_multicast_addr(0);
 
         let UdpMultipleDevicesCtx { mut sync_ctx, mut non_sync_ctx } =
-            UdpMultipleDevicesCtx::with_sync_ctx(UdpMultipleDevicesSyncCtx::<I>::default());
+            UdpMultipleDevicesCtx::with_sync_ctx(
+                UdpMultipleDevicesSyncCtx::<I>::new_multiple_devices(),
+            );
 
         // Create 3 sockets: one listener bound on each device and one not bound
         // to a device.
@@ -4243,7 +4249,7 @@ mod tests {
     fn test_conn_unspecified_local_ip<I: Ip + TestIpExt>() {
         set_logger_for_test();
         let UdpFakeDeviceCtx { mut sync_ctx, mut non_sync_ctx } =
-            UdpFakeDeviceCtx::with_sync_ctx(UdpFakeDeviceSyncCtx::<I>::default());
+            UdpFakeDeviceCtx::with_sync_ctx(UdpFakeDeviceSyncCtx::<I>::new_fake_device());
         let local_port = NonZeroU16::new(100).unwrap();
         let remote_port = NonZeroU16::new(200).unwrap();
         let socket = SocketHandler::create_udp(&mut sync_ctx);
@@ -4358,7 +4364,7 @@ mod tests {
     fn test_udp_retry_listen_after_removing_conflict<I: Ip + TestIpExt>() {
         set_logger_for_test();
         let UdpFakeDeviceCtx { mut sync_ctx, mut non_sync_ctx } =
-            UdpFakeDeviceCtx::with_sync_ctx(UdpFakeDeviceSyncCtx::<I>::default());
+            UdpFakeDeviceCtx::with_sync_ctx(UdpFakeDeviceSyncCtx::<I>::new_fake_device());
 
         fn listen_unbound<I: Ip + TestIpExt, C: StateNonSyncContext<I>>(
             sync_ctx: &mut impl StateContext<I, C>,
@@ -4401,7 +4407,7 @@ mod tests {
     #[ip_test]
     fn test_udp_listen_port_alloc<I: Ip + TestIpExt>() {
         let UdpFakeDeviceCtx { mut sync_ctx, mut non_sync_ctx } =
-            UdpFakeDeviceCtx::with_sync_ctx(UdpFakeDeviceSyncCtx::<I>::default());
+            UdpFakeDeviceCtx::with_sync_ctx(UdpFakeDeviceSyncCtx::<I>::new_fake_device());
         let local_ip = local_ip::<I>();
 
         let wildcard_list = SocketHandler::create_udp(&mut sync_ctx);
@@ -4450,7 +4456,7 @@ mod tests {
         let local_port = NonZeroU16::new(100).unwrap();
 
         let UdpFakeDeviceCtx { mut sync_ctx, mut non_sync_ctx } =
-            UdpFakeDeviceCtx::with_sync_ctx(UdpFakeDeviceSyncCtx::<I>::default());
+            UdpFakeDeviceCtx::with_sync_ctx(UdpFakeDeviceSyncCtx::<I>::new_fake_device());
         let listeners = [(), ()].map(|()| {
             let socket = SocketHandler::create_udp(&mut sync_ctx);
             SocketHandler::set_udp_posix_reuse_port(&mut sync_ctx, &mut non_sync_ctx, socket, true)
@@ -4484,7 +4490,7 @@ mod tests {
         let local_port = NonZeroU16::new(100).unwrap();
 
         let UdpFakeDeviceCtx { mut sync_ctx, mut non_sync_ctx } =
-            UdpFakeDeviceCtx::with_sync_ctx(UdpFakeDeviceSyncCtx::<I>::default());
+            UdpFakeDeviceCtx::with_sync_ctx(UdpFakeDeviceSyncCtx::<I>::new_fake_device());
         let _listener = {
             let unbound = SocketHandler::create_udp(&mut sync_ctx);
             SocketHandler::set_udp_posix_reuse_port(
@@ -4539,7 +4545,9 @@ mod tests {
         ),
     ) {
         let UdpMultipleDevicesCtx { mut sync_ctx, mut non_sync_ctx } =
-            UdpMultipleDevicesCtx::with_sync_ctx(UdpMultipleDevicesSyncCtx::<I>::default());
+            UdpMultipleDevicesCtx::with_sync_ctx(
+                UdpMultipleDevicesSyncCtx::<I>::new_multiple_devices(),
+            );
         let socket = SocketHandler::create_udp(&mut sync_ctx);
         set_up_socket(&mut sync_ctx, &mut non_sync_ctx, socket);
 
@@ -4560,7 +4568,7 @@ mod tests {
     #[ip_test]
     fn test_remove_udp_conn<I: Ip + TestIpExt>() {
         let UdpFakeDeviceCtx { mut sync_ctx, mut non_sync_ctx } =
-            UdpFakeDeviceCtx::with_sync_ctx(UdpFakeDeviceSyncCtx::<I>::default());
+            UdpFakeDeviceCtx::with_sync_ctx(UdpFakeDeviceSyncCtx::<I>::new_fake_device());
         let local_ip = ZonedAddr::Unzoned(local_ip::<I>());
         let remote_ip = ZonedAddr::Unzoned(remote_ip::<I>());
         let local_port = NonZeroU16::new(100).unwrap();
@@ -4600,7 +4608,7 @@ mod tests {
     #[ip_test]
     fn test_remove_udp_listener<I: Ip + TestIpExt>() {
         let UdpFakeDeviceCtx { mut sync_ctx, mut non_sync_ctx } =
-            UdpFakeDeviceCtx::with_sync_ctx(UdpFakeDeviceSyncCtx::<I>::default());
+            UdpFakeDeviceCtx::with_sync_ctx(UdpFakeDeviceSyncCtx::<I>::new_fake_device());
         let local_ip = ZonedAddr::Unzoned(local_ip::<I>());
         let local_port = NonZeroU16::new(100).unwrap();
 
@@ -4653,7 +4661,9 @@ mod tests {
     )
 where {
         let UdpMultipleDevicesCtx { mut sync_ctx, mut non_sync_ctx } =
-            UdpMultipleDevicesCtx::with_sync_ctx(UdpMultipleDevicesSyncCtx::<I>::default());
+            UdpMultipleDevicesCtx::with_sync_ctx(
+                UdpMultipleDevicesSyncCtx::<I>::new_multiple_devices(),
+            );
 
         let socket = SocketHandler::create_udp(&mut sync_ctx);
         set_up_socket(&mut sync_ctx, &mut non_sync_ctx, socket);
@@ -4811,7 +4821,7 @@ where {
     #[ip_test]
     fn test_multicast_membership_with_removed_device<I: Ip + TestIpExt>() {
         let UdpFakeDeviceCtx { mut sync_ctx, mut non_sync_ctx } =
-            UdpFakeDeviceCtx::with_sync_ctx(UdpFakeDeviceSyncCtx::<I>::default());
+            UdpFakeDeviceCtx::with_sync_ctx(UdpFakeDeviceSyncCtx::<I>::new_fake_device());
 
         let unbound = SocketHandler::create_udp(&mut sync_ctx);
         SocketHandler::set_device(&mut sync_ctx, &mut non_sync_ctx, unbound, Some(&FakeDeviceId))
@@ -4848,7 +4858,9 @@ where {
     #[ip_test]
     fn test_remove_udp_unbound_leaves_multicast_groups<I: Ip + TestIpExt>() {
         let UdpMultipleDevicesCtx { mut sync_ctx, mut non_sync_ctx } =
-            UdpMultipleDevicesCtx::with_sync_ctx(UdpMultipleDevicesSyncCtx::<I>::default());
+            UdpMultipleDevicesCtx::with_sync_ctx(
+                UdpMultipleDevicesSyncCtx::<I>::new_multiple_devices(),
+            );
 
         let unbound = SocketHandler::create_udp(&mut sync_ctx);
         let group = I::get_multicast_addr(4);
@@ -4883,7 +4895,9 @@ where {
     #[ip_test]
     fn test_remove_udp_listener_leaves_multicast_groups<I: Ip + TestIpExt>() {
         let UdpMultipleDevicesCtx { mut sync_ctx, mut non_sync_ctx } =
-            UdpMultipleDevicesCtx::with_sync_ctx(UdpMultipleDevicesSyncCtx::<I>::default());
+            UdpMultipleDevicesCtx::with_sync_ctx(
+                UdpMultipleDevicesSyncCtx::<I>::new_multiple_devices(),
+            );
         let local_ip = local_ip::<I>();
         let local_port = NonZeroU16::new(100).unwrap();
 
@@ -4939,7 +4953,9 @@ where {
     #[ip_test]
     fn test_remove_udp_connected_leaves_multicast_groups<I: Ip + TestIpExt>() {
         let UdpMultipleDevicesCtx { mut sync_ctx, mut non_sync_ctx } =
-            UdpMultipleDevicesCtx::with_sync_ctx(UdpMultipleDevicesSyncCtx::<I>::default());
+            UdpMultipleDevicesCtx::with_sync_ctx(
+                UdpMultipleDevicesSyncCtx::<I>::new_multiple_devices(),
+            );
         let local_ip = local_ip::<I>();
 
         let socket = SocketHandler::create_udp(&mut sync_ctx);
@@ -4996,7 +5012,7 @@ where {
     #[should_panic(expected = "listen again failed")]
     fn test_listen_udp_removes_unbound<I: Ip + TestIpExt>() {
         let UdpFakeDeviceCtx { mut sync_ctx, mut non_sync_ctx } =
-            UdpFakeDeviceCtx::with_sync_ctx(UdpFakeDeviceSyncCtx::<I>::default());
+            UdpFakeDeviceCtx::with_sync_ctx(UdpFakeDeviceSyncCtx::<I>::new_fake_device());
         let local_ip = local_ip::<I>();
         let socket = SocketHandler::create_udp(&mut sync_ctx);
 
@@ -5024,7 +5040,7 @@ where {
     #[ip_test]
     fn test_get_conn_info<I: Ip + TestIpExt>() {
         let UdpFakeDeviceCtx { mut sync_ctx, mut non_sync_ctx } =
-            UdpFakeDeviceCtx::with_sync_ctx(UdpFakeDeviceSyncCtx::<I>::default());
+            UdpFakeDeviceCtx::with_sync_ctx(UdpFakeDeviceSyncCtx::<I>::new_fake_device());
         let local_ip = ZonedAddr::Unzoned(local_ip::<I>());
         let remote_ip = ZonedAddr::Unzoned(remote_ip::<I>());
         // Create a UDP connection with a specified local port and local IP.
@@ -5056,7 +5072,7 @@ where {
     #[ip_test]
     fn test_get_listener_info<I: Ip + TestIpExt>() {
         let UdpFakeDeviceCtx { mut sync_ctx, mut non_sync_ctx } =
-            UdpFakeDeviceCtx::with_sync_ctx(UdpFakeDeviceSyncCtx::<I>::default());
+            UdpFakeDeviceCtx::with_sync_ctx(UdpFakeDeviceSyncCtx::<I>::new_fake_device());
         let local_ip = ZonedAddr::Unzoned(local_ip::<I>());
 
         // Check getting info on specified listener.
@@ -5093,7 +5109,7 @@ where {
     #[ip_test]
     fn test_get_reuse_port<I: Ip + TestIpExt>() {
         let UdpFakeDeviceCtx { mut sync_ctx, mut non_sync_ctx } =
-            UdpFakeDeviceCtx::with_sync_ctx(UdpFakeDeviceSyncCtx::<I>::default());
+            UdpFakeDeviceCtx::with_sync_ctx(UdpFakeDeviceSyncCtx::<I>::new_fake_device());
         let first = SocketHandler::create_udp(&mut sync_ctx);
         assert_eq!(
             SocketHandler::get_udp_posix_reuse_port(&mut sync_ctx, &non_sync_ctx, first),
@@ -5144,7 +5160,7 @@ where {
     #[ip_test]
     fn test_get_bound_device_unbound<I: Ip + TestIpExt>() {
         let UdpFakeDeviceCtx { mut sync_ctx, mut non_sync_ctx } =
-            UdpFakeDeviceCtx::with_sync_ctx(UdpFakeDeviceSyncCtx::<I>::default());
+            UdpFakeDeviceCtx::with_sync_ctx(UdpFakeDeviceSyncCtx::<I>::new_fake_device());
         let unbound = SocketHandler::create_udp(&mut sync_ctx);
 
         assert_eq!(
@@ -5163,7 +5179,7 @@ where {
     #[ip_test]
     fn test_get_bound_device_listener<I: Ip + TestIpExt>() {
         let UdpFakeDeviceCtx { mut sync_ctx, mut non_sync_ctx } =
-            UdpFakeDeviceCtx::with_sync_ctx(UdpFakeDeviceSyncCtx::<I>::default());
+            UdpFakeDeviceCtx::with_sync_ctx(UdpFakeDeviceSyncCtx::<I>::new_fake_device());
         let socket = SocketHandler::create_udp(&mut sync_ctx);
 
         SocketHandler::set_device(&mut sync_ctx, &mut non_sync_ctx, socket, Some(&FakeDeviceId))
@@ -5189,7 +5205,7 @@ where {
     #[ip_test]
     fn test_get_bound_device_connected<I: Ip + TestIpExt>() {
         let UdpFakeDeviceCtx { mut sync_ctx, mut non_sync_ctx } =
-            UdpFakeDeviceCtx::with_sync_ctx(UdpFakeDeviceSyncCtx::<I>::default());
+            UdpFakeDeviceCtx::with_sync_ctx(UdpFakeDeviceSyncCtx::<I>::new_fake_device());
         let socket = SocketHandler::create_udp(&mut sync_ctx);
 
         SocketHandler::set_device(&mut sync_ctx, &mut non_sync_ctx, socket, Some(&FakeDeviceId))
@@ -5214,7 +5230,7 @@ where {
     #[ip_test]
     fn test_listen_udp_forwards_errors<I: Ip + TestIpExt>() {
         let UdpFakeDeviceCtx { mut sync_ctx, mut non_sync_ctx } =
-            UdpFakeDeviceCtx::with_sync_ctx(UdpFakeDeviceSyncCtx::<I>::default());
+            UdpFakeDeviceCtx::with_sync_ctx(UdpFakeDeviceSyncCtx::<I>::new_fake_device());
         let remote_ip = remote_ip::<I>();
 
         // Check listening to a non-local IP fails.
@@ -5296,7 +5312,7 @@ where {
         let remote_ips = vec![remote_ip::<I>()];
         let UdpMultipleDevicesCtx { mut sync_ctx, mut non_sync_ctx } =
             UdpMultipleDevicesCtx::with_sync_ctx(UdpMultipleDevicesSyncCtx::<I>::with_state(
-                FakeBufferIpSocketCtx::with_ctx(FakeIpSocketCtx::new(
+                FakeIpSocketCtx::new(
                     [(MultipleDevicesId::A, ll_addr), (MultipleDevicesId::B, local_ip::<I>())].map(
                         |(device, local_ip)| FakeDeviceConfig {
                             device,
@@ -5304,7 +5320,7 @@ where {
                             remote_ips: remote_ips.clone(),
                         },
                     ),
-                )),
+                ),
             ));
 
         let socket = SocketHandler::create_udp(&mut sync_ctx);
@@ -5340,7 +5356,7 @@ where {
         let remote_ips = vec![remote_ip::<I>()];
         let UdpMultipleDevicesCtx { mut sync_ctx, mut non_sync_ctx } =
             UdpMultipleDevicesCtx::with_sync_ctx(UdpMultipleDevicesSyncCtx::<I>::with_state(
-                FakeBufferIpSocketCtx::with_ctx(FakeIpSocketCtx::new(
+                FakeIpSocketCtx::new(
                     [(MultipleDevicesId::A, ll_addr), (MultipleDevicesId::B, local_ip::<I>())].map(
                         |(device, local_ip)| FakeDeviceConfig {
                             device,
@@ -5348,7 +5364,7 @@ where {
                             remote_ips: remote_ips.clone(),
                         },
                     ),
-                )),
+                ),
             ));
 
         let socket = SocketHandler::create_udp(&mut sync_ctx);
@@ -5378,7 +5394,7 @@ where {
         let remote_ips = vec![remote_ip::<I>()];
         let UdpMultipleDevicesCtx { mut sync_ctx, mut non_sync_ctx } =
             UdpMultipleDevicesCtx::with_sync_ctx(UdpMultipleDevicesSyncCtx::<I>::with_state(
-                FakeBufferIpSocketCtx::with_ctx(FakeIpSocketCtx::new(
+                FakeIpSocketCtx::new(
                     [(MultipleDevicesId::A, ll_addr), (MultipleDevicesId::B, local_ip::<I>())].map(
                         |(device, local_ip)| FakeDeviceConfig {
                             device,
@@ -5386,7 +5402,7 @@ where {
                             remote_ips: remote_ips.clone(),
                         },
                     ),
-                )),
+                ),
             ));
 
         let socket = SocketHandler::create_udp(&mut sync_ctx);
@@ -5426,7 +5442,7 @@ where {
 
         let UdpMultipleDevicesCtx { mut sync_ctx, mut non_sync_ctx } =
             UdpMultipleDevicesCtx::with_sync_ctx(UdpMultipleDevicesSyncCtx::with_state(
-                FakeBufferIpSocketCtx::with_ctx(FakeIpSocketCtx::new([
+                FakeIpSocketCtx::new([
                     FakeDeviceConfig {
                         device: MultipleDevicesId::A,
                         local_ips: vec![
@@ -5440,7 +5456,7 @@ where {
                         local_ips: vec![SpecifiedAddr::new(net_ip_v6!("fe80::2")).unwrap()],
                         remote_ips: remote_ips.clone(),
                     },
-                ])),
+                ]),
             ));
 
         let socket = SocketHandler::create_udp(&mut sync_ctx);
@@ -5474,14 +5490,14 @@ where {
         let remote_ips = vec![remote_ip::<Ipv6>()];
         let UdpMultipleDevicesCtx { mut sync_ctx, mut non_sync_ctx } =
             UdpMultipleDevicesCtx::with_sync_ctx(UdpMultipleDevicesSyncCtx::<Ipv6>::with_state(
-                FakeBufferIpSocketCtx::with_ctx(FakeIpSocketCtx::new(
+                FakeIpSocketCtx::new(
                     [(MultipleDevicesId::A, ll_addr), (MultipleDevicesId::B, local_ip::<Ipv6>())]
                         .map(|(device, local_ip)| FakeDeviceConfig {
                             device,
                             local_ips: vec![local_ip],
                             remote_ips: remote_ips.clone(),
                         }),
-                )),
+                ),
             ));
 
         let socket = SocketHandler::create_udp(&mut sync_ctx);
@@ -5538,7 +5554,7 @@ where {
 
         let UdpMultipleDevicesCtx { mut sync_ctx, mut non_sync_ctx } =
             UdpMultipleDevicesCtx::with_sync_ctx(UdpMultipleDevicesSyncCtx::with_state(
-                FakeBufferIpSocketCtx::with_ctx(FakeIpSocketCtx::new([
+                FakeIpSocketCtx::new([
                     FakeDeviceConfig {
                         device: MultipleDevicesId::A,
                         local_ips: vec![SpecifiedAddr::new(net_ip_v6!("fe80::1")).unwrap()],
@@ -5549,7 +5565,7 @@ where {
                         local_ips: vec![SpecifiedAddr::new(net_ip_v6!("fe80::2")).unwrap()],
                         remote_ips: remote_ips.clone(),
                     },
-                ])),
+                ]),
             ));
 
         let socket = SocketHandler::create_udp(&mut sync_ctx);
@@ -5585,7 +5601,7 @@ where {
 
         let UdpMultipleDevicesCtx { mut sync_ctx, mut non_sync_ctx } =
             UdpMultipleDevicesCtx::with_sync_ctx(UdpMultipleDevicesSyncCtx::<I>::with_state(
-                FakeBufferIpSocketCtx::with_ctx(FakeIpSocketCtx::new(
+                FakeIpSocketCtx::new(
                     [
                         (MultipleDevicesId::A, loopback_addr),
                         (MultipleDevicesId::B, local_ip::<I>()),
@@ -5595,7 +5611,7 @@ where {
                         local_ips: vec![local_ip],
                         remote_ips: remote_ips.clone(),
                     }),
-                )),
+                ),
             ));
 
         let unbound = SocketHandler::create_udp(&mut sync_ctx);
@@ -5642,7 +5658,7 @@ where {
 
         let UdpMultipleDevicesCtx { mut sync_ctx, mut non_sync_ctx } =
             UdpMultipleDevicesCtx::with_sync_ctx(UdpMultipleDevicesSyncCtx::<Ipv6>::with_state(
-                FakeBufferIpSocketCtx::with_ctx(FakeIpSocketCtx::new(
+                FakeIpSocketCtx::new(
                     [
                         (MultipleDevicesId::A, Ipv6::get_other_ip_address(1)),
                         (MultipleDevicesId::B, Ipv6::get_other_ip_address(2)),
@@ -5652,7 +5668,7 @@ where {
                         local_ips: vec![local_ip],
                         remote_ips: vec![ll_addr, conn_remote_ip],
                     }),
-                )),
+                ),
             ));
 
         let socket = SocketHandler::create_udp(&mut sync_ctx);
@@ -5715,7 +5731,7 @@ where {
 
         let UdpMultipleDevicesCtx { mut sync_ctx, mut non_sync_ctx } =
             UdpMultipleDevicesCtx::with_sync_ctx(UdpMultipleDevicesSyncCtx::<Ipv6>::with_state(
-                FakeBufferIpSocketCtx::with_ctx(FakeIpSocketCtx::new(
+                FakeIpSocketCtx::new(
                     [
                         (MultipleDevicesId::A, device_a_local_ip),
                         (MultipleDevicesId::B, net_ip_v6!("fe80::2222")),
@@ -5725,7 +5741,7 @@ where {
                         local_ips: vec![LinkLocalAddr::new(local_ip).unwrap().into_specified()],
                         remote_ips: vec![ll_addr, conn_remote_ip],
                     }),
-                )),
+                ),
             ));
 
         let socket = SocketHandler::create_udp(&mut sync_ctx);
@@ -5925,7 +5941,7 @@ where {
     #[ip_test]
     fn test_remove_udp_unbound<I: Ip + TestIpExt>() {
         let UdpFakeDeviceCtx { mut sync_ctx, mut non_sync_ctx } =
-            UdpFakeDeviceCtx::with_sync_ctx(UdpFakeDeviceSyncCtx::<I>::default());
+            UdpFakeDeviceCtx::with_sync_ctx(UdpFakeDeviceSyncCtx::<I>::new_fake_device());
         let unbound = SocketHandler::create_udp(&mut sync_ctx);
         let _: SocketInfo<_, _> =
             SocketHandler::remove_udp(&mut sync_ctx, &mut non_sync_ctx, unbound);
@@ -6012,7 +6028,7 @@ where {
         // - A connection from the local IP to the remote IP on local port 2 and
         //   remote port 3
         fn initialize_context<I: TestIpExt>() -> InitializedContext<I> {
-            let mut ctx = UdpFakeDeviceCtx::with_sync_ctx(UdpFakeDeviceSyncCtx::default());
+            let mut ctx = UdpFakeDeviceCtx::with_sync_ctx(UdpFakeDeviceSyncCtx::new_fake_device());
             let UdpFakeDeviceCtx { sync_ctx, non_sync_ctx } = &mut ctx;
             let wildcard_listener = SocketHandler::create_udp(sync_ctx);
             SocketHandler::listen_udp(

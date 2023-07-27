@@ -3807,7 +3807,7 @@ mod tests {
             },
             icmp::{IcmpIpExt, Icmpv4ErrorCode, Icmpv6ErrorCode},
             socket::{
-                testutil::{FakeBufferIpSocketCtx, FakeDeviceConfig, FakeIpSocketCtx},
+                testutil::{FakeDeviceConfig, FakeIpSocketCtx},
                 MmsError, SendOptions,
             },
             BufferIpTransportContext as _, IpTransportContext, SendIpPacketMeta,
@@ -3840,7 +3840,7 @@ mod tests {
     }
 
     type FakeBufferIpTransportCtx<I, D> = FakeSyncCtx<
-        FakeBufferIpSocketCtx<I, D>,
+        FakeIpSocketCtx<I, D>,
         SendIpPacketMeta<I, D, SpecifiedAddr<<I as Ip>::Addr>>,
         D,
     >;
@@ -3866,7 +3866,7 @@ mod tests {
 
     type TcpSyncCtx<I, D> = WrappedFakeSyncCtx<
         FakeTcpState<I, D>,
-        FakeBufferIpSocketCtx<I, D>,
+        FakeIpSocketCtx<I, D>,
         SendIpPacketMeta<I, D, SpecifiedAddr<<I as Ip>::Addr>>,
         D,
     >;
@@ -4141,13 +4141,11 @@ mod tests {
     impl<I: TcpTestIpExt> TcpSyncCtx<I, FakeDeviceId> {
         fn new(addr: SpecifiedAddr<I::Addr>, peer: SpecifiedAddr<I::Addr>, prefix: u8) -> Self {
             Self::with_inner_and_outer_state(
-                FakeBufferIpSocketCtx::with_ctx(FakeIpSocketCtx::<I, _>::with_devices_state(
-                    core::iter::once((
-                        FakeDeviceId,
-                        I::new_device_state([*addr], prefix),
-                        alloc::vec![peer],
-                    )),
-                )),
+                FakeIpSocketCtx::<I, _>::with_devices_state(core::iter::once((
+                    FakeDeviceId,
+                    I::new_device_state([*addr], prefix),
+                    alloc::vec![peer],
+                ))),
                 FakeTcpState::default(),
             )
         }
@@ -4156,9 +4154,7 @@ mod tests {
     impl<I: TcpTestIpExt> TcpSyncCtx<I, MultipleDevicesId> {
         fn new_multiple_devices() -> Self {
             Self::with_inner_and_outer_state(
-                FakeBufferIpSocketCtx::with_ctx(FakeIpSocketCtx::<I, _>::with_devices_state(
-                    core::iter::empty(),
-                )),
+                FakeIpSocketCtx::<I, _>::with_devices_state(core::iter::empty()),
                 Default::default(),
             )
         }
@@ -4998,13 +4994,13 @@ mod tests {
 
         let TcpCtx { mut sync_ctx, mut non_sync_ctx } =
             TcpCtx::with_sync_ctx(TcpSyncCtx::<Ipv6, _>::with_inner_and_outer_state(
-                FakeBufferIpSocketCtx::with_ctx(FakeIpSocketCtx::new(
-                    MultipleDevicesId::all().into_iter().map(|device| FakeDeviceConfig {
+                FakeIpSocketCtx::new(MultipleDevicesId::all().into_iter().map(|device| {
+                    FakeDeviceConfig {
                         device,
                         local_ips: vec![ll_addr.into_specified()],
                         remote_ips: vec![ll_addr.into_specified()],
-                    }),
-                )),
+                    }
+                })),
                 Default::default(),
             ));
 
@@ -5033,13 +5029,13 @@ mod tests {
 
         let TcpCtx { mut sync_ctx, mut non_sync_ctx } =
             TcpCtx::with_sync_ctx(TcpSyncCtx::<Ipv6, _>::with_inner_and_outer_state(
-                FakeBufferIpSocketCtx::with_ctx(FakeIpSocketCtx::new(
-                    MultipleDevicesId::all().into_iter().map(|device| FakeDeviceConfig {
+                FakeIpSocketCtx::new(MultipleDevicesId::all().into_iter().map(|device| {
+                    FakeDeviceConfig {
                         device,
                         local_ips: vec![ll_addr.into_specified()],
                         remote_ips: vec![ll_addr.into_specified()],
-                    }),
-                )),
+                    }
+                })),
                 Default::default(),
             ));
 
@@ -5815,16 +5811,14 @@ mod tests {
         let addrs = [1, 2].map(|i| I::get_other_ip_address(i));
         let TcpCtx { mut sync_ctx, mut non_sync_ctx } =
             TcpCtx::<I, _>::with_sync_ctx(TcpSyncCtx::with_inner_and_outer_state(
-                FakeBufferIpSocketCtx::with_ctx(FakeIpSocketCtx::<I, _>::with_devices_state(
-                    core::iter::once((
-                        FakeDeviceId,
-                        I::new_device_state(
-                            addrs.iter().map(Witness::get),
-                            I::FAKE_CONFIG.subnet.prefix(),
-                        ),
-                        vec![],
-                    )),
-                )),
+                FakeIpSocketCtx::<I, _>::with_devices_state(core::iter::once((
+                    FakeDeviceId,
+                    I::new_device_state(
+                        addrs.iter().map(Witness::get),
+                        I::FAKE_CONFIG.subnet.prefix(),
+                    ),
+                    vec![],
+                ))),
                 FakeTcpState::default(),
             ));
 
