@@ -12,12 +12,12 @@ group("tests") {
   deps = []
 
   # //tools/emulator only works on linux.
-  if (host_os == "linux") {
+  if (host_os == "linux" && has_board) {
     deps += [ ":femu_usb_test($host_toolchain)" ]
   }
 }
 
-if (is_linux) {
+if (is_linux && has_board) {
   go_library("lib") {
     testonly = true
     sources = [ "femu_usb_test.go" ]

@@ -12,7 +12,7 @@ import("//src/starnix/tests/build/starnix_linux_test_component.gni")
 group("tests") {
   testonly = true
   deps = [ ":starnix_syscall_tests" ]
-  if (host_os == "linux") {
+  if (host_os == "linux" && has_board) {
     deps += [
       # These are Linux tests, so we can run them as host tests on our host Linux bot.
       ":syscalls_host_tests($host_toolchain)",
@@ -20,7 +20,7 @@ group("tests") {
   }
 }
 
-if (is_host) {
+if (is_host && has_board) {
   host_test("syscalls_host_tests") {
     binary_path = get_label_info(":syscalls_test_bin($target_linux_toolchain)",
                                  "root_out_dir") + "/syscalls_test_bin"

@@ -9,23 +9,27 @@ import("//build/rust/rustc_binary.gni")
 if (is_host) {
   group("host_tests") {
     testonly = true
-    deps = [ ":verify_ffx_component_create_parent_overrides" ]
+    if (has_board) {
+      deps = [ ":verify_ffx_component_create_parent_overrides" ]
+    }
   }
 
-  rustc_test("verify_ffx_component_create_parent_overrides") {
-    testonly = true
-    edition = "2021"
-    source_root = "src/parent_overrides.rs"
-    sources = [ source_root ]
-    deps = [
-      "//src/developer/ffx/lib/e2e_emu:ffx_e2e_emu",
-      "//src/lib/fuchsia",
-      "//third_party/rust_crates:tracing",
+  if (has_board) {
+    rustc_test("verify_ffx_component_create_parent_overrides") {
+      testonly = true
+      edition = "2021"
+      source_root = "src/parent_overrides.rs"
+      sources = [ source_root ]
+      deps = [
+        "//src/developer/ffx/lib/e2e_emu:ffx_e2e_emu",
+        "//src/lib/fuchsia",
+        "//third_party/rust_crates:tracing",
 
-      # This dependency won't get the package into the system image, but it is necessary to
-      # ensure the binary is rebuilt when needed by `fx test` invocations.
-      ":ffx_create_parent_overrides_echo($default_toolchain)",
-    ]
+        # This dependency won't get the package into the system image, but it is necessary to
+        # ensure the binary is rebuilt when needed by `fx test` invocations.
+        ":ffx_create_parent_overrides_echo($default_toolchain)",
+      ]
+    }
   }
 }
 

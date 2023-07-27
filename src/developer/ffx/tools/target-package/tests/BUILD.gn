@@ -9,25 +9,28 @@ import("//build/rust/rustc_binary.gni")
 if (is_host) {
   group("host_tests") {
     testonly = true
-    deps = [ ":verify_ffx_target_package_explore" ]
+    if (has_board) {
+      deps = [ ":verify_ffx_target_package_explore" ]
+    }
   }
-
-  rustc_test("verify_ffx_target_package_explore") {
-    testonly = true
-    edition = "2021"
-    source_root = "src/main.rs"
-    sources = [ source_root ]
-    deps = [
-      "//src/developer/ffx/lib/e2e_emu:ffx_e2e_emu",
-      "//src/developer/ffx/tools/target-package:ffx_target_package_test_data",
-      "//src/lib/fuchsia",
-      "//third_party/rust_crates:tracing",
-    ]
-    inputs = [
-      "testdata/package_file.txt",
-      "testdata/subpackage_file.txt",
-      "testdata/subsubpackage_file.txt",
-    ]
+  if (has_board) {
+    rustc_test("verify_ffx_target_package_explore") {
+      testonly = true
+      edition = "2021"
+      source_root = "src/main.rs"
+      sources = [ source_root ]
+      deps = [
+        "//src/developer/ffx/lib/e2e_emu:ffx_e2e_emu",
+        "//src/developer/ffx/tools/target-package:ffx_target_package_test_data",
+        "//src/lib/fuchsia",
+        "//third_party/rust_crates:tracing",
+      ]
+      inputs = [
+        "testdata/package_file.txt",
+        "testdata/subpackage_file.txt",
+        "testdata/subsubpackage_file.txt",
+      ]
+    }
   }
 }
 

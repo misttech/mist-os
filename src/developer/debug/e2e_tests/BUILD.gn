@@ -12,7 +12,7 @@ import("//build/zircon/c_utils.gni")
 import("//src/developer/ffx/config.gni")
 import("//zircon/system/ulib/c/libc_toolchain.gni")
 
-if (is_host) {
+if (is_host && has_board) {
   # Directory to store debug symbols, which are required for the e2e test to run.
   # The path is relative to the $root_out_dir, where zxdb_e2e_tests binary lives.
   symbol_dir = "test_data/zxdb_e2e_tests/build-id"
@@ -162,5 +162,7 @@ if (is_host) {
 group("tests") {
   testonly = true
 
-  deps = [ ":zxdb_e2e_tests($host_toolchain)" ]
+  if (has_board) {
+    deps = [ ":zxdb_e2e_tests($host_toolchain)" ]
+  }
 }

@@ -33,17 +33,15 @@ pub fn assemble(args: ProductArgs) -> Result<()> {
     let config: AssemblyConfig =
         util::read_config(&product).context("Loading product configuration")?;
 
-    let board_info = board_info
-        .map(|path| {
-            util::read_config::<BoardInformation>(path).context("Loading board information")
-        })
-        .transpose()?;
+    let board_info_path = board_info;
+    let board_info = util::read_config::<BoardInformation>(&board_info_path)
+        .context("Loading board information")?;
 
     let mut builder = ImageAssemblyConfigBuilder::default();
 
     // Get platform configuration based on the AssemblyConfig and the BoardInformation.
     let configuration =
-        assembly_platform_configuration::define_configuration(&config, board_info.as_ref())?;
+        assembly_platform_configuration::define_configuration(&config, &board_info)?;
 
     // Set the configuration for the rest of the packages.
     for (package, config) in configuration.package_configs {
@@ -109,9 +107,9 @@ pub fn assemble(args: ProductArgs) -> Result<()> {
     let mut image_assembly =
         builder.build(&outdir, &tools).context("Building Image Assembly config")?;
 
-    if let (Some(filesystem_config), Some(board_info)) = (&filesystem_config, &board_info) {
+    if let Some(filesystem_config) = &filesystem_config {
         let filesystem_config: ProductFilesystemConfig =
-            util::read_config(&filesystem_config).context("Loading filesystem configuration")?;
+            util::read_config(filesystem_config).context("Loading filesystem configuration")?;
         let images =
             ImagesConfig::from_product_and_board(&filesystem_config, &board_info.filesystems)
                 .context("Constructing images config")?;

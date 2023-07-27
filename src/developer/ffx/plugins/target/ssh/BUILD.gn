@@ -36,20 +36,24 @@ ffx_plugin("ffx_target_ssh") {
 }
 
 if (is_host) {
-  rustc_test("ffx_target_ssh_e2e_tests") {
-    edition = "2021"
-    source_root = "tests/e2e.rs"
-    sources = [ source_root ]
-    deps = [
-      "//src/developer/ffx/lib/e2e_emu:ffx_e2e_emu",
-      "//src/lib/fuchsia",
-      "//third_party/rust_crates:anyhow",
-      "//third_party/rust_crates:pretty_assertions",
-    ]
-  }
-
   group("host_tests") {
     testonly = true
-    deps = [ ":ffx_target_ssh_e2e_tests" ]
+    if (has_board) {
+      deps = [ ":ffx_target_ssh_e2e_tests" ]
+    }
+  }
+
+  if (has_board) {
+    rustc_test("ffx_target_ssh_e2e_tests") {
+      edition = "2021"
+      source_root = "tests/e2e.rs"
+      sources = [ source_root ]
+      deps = [
+        "//src/developer/ffx/lib/e2e_emu:ffx_e2e_emu",
+        "//src/lib/fuchsia",
+        "//third_party/rust_crates:anyhow",
+        "//third_party/rust_crates:pretty_assertions",
+      ]
+    }
   }
 }
