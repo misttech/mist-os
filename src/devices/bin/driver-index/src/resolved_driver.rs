@@ -19,7 +19,7 @@ use {
 pub const DEFAULT_DEVICE_CATEGORY: &str = "misc";
 
 // Cached drivers don't exist yet so we allow dead code.
-#[derive(Copy, Clone, Debug)]
+#[derive(Copy, Clone, Debug, PartialEq)]
 #[allow(dead_code)]
 pub enum DriverPackageType {
     Boot = 0,
