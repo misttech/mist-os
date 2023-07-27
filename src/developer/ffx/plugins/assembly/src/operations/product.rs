@@ -53,6 +53,14 @@ pub fn assemble(args: ProductArgs) -> Result<()> {
         builder.add_domain_config(package, config)?;
     }
 
+    // Add the board's Hardware Support Bundle, if it has one.
+    if let Some(main_support_bundle) = board_info.main_support_bundle {
+        let hsb_dir = board_info_path.parent().unwrap_or_else(|| ".".into());
+        builder
+            .add_hardware_support_bundle(&hsb_dir, main_support_bundle)
+            .context("Adding the board's main hardware support bundle from: {board_info_path}")?;
+    }
+
     // Add the platform Assembly Input Bundles that were chosen by the configuration.
     for platform_bundle_name in &configuration.bundles {
         let platform_bundle_path = make_bundle_path(&input_bundles_dir, platform_bundle_name);

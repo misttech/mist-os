@@ -8,6 +8,7 @@ use assembly_bootfs_file_map::BootfsFileMap;
 use assembly_config_data::ConfigDataBuilder;
 use assembly_config_schema::{
     assembly_config::{AssemblyInputBundle, CompiledPackageDefinition, ShellCommands},
+    board_config::{HardwareSupportBundle, PackagedDriverDetails},
     image_assembly_config::{PartialImageAssemblyConfig, PartialKernelConfig},
     product_config::{ProductConfigData, ProductPackageDetails, ProductPackagesConfig},
     DriverDetails, FileEntry,
@@ -102,6 +103,19 @@ impl PackageSets {
 impl Default for ImageAssemblyConfigBuilder {
     fn default() -> Self {
         Self::new()
+    }
+}
+
+/// Convert the PackageSet from config_schema to the PackageSets used
+/// internally in product assembly.
+// TODO: Remove this once the PackageSet in config_schema is used in
+// product assembly.
+impl From<assembly_config_schema::PackageSet> for PackageSets {
+    fn from(set: assembly_config_schema::PackageSet) -> Self {
+        match set {
+            assembly_config_schema::PackageSet::Base => PackageSets::BASE,
+            assembly_config_schema::PackageSet::BootFS => PackageSets::BOOTFS,
+        }
     }
 }
 
@@ -240,6 +254,47 @@ impl ImageAssemblyConfigBuilder {
             bundle.qemu_kernel.map(|p| bundle_path.join(p)),
             anyhow!("Only one input bundle can specify a qemu kernel path"),
         )?;
+
+        Ok(())
+    }
+
+    /// Add a Hardware Support Bundle to the builder, using the path to the
+    /// folder that contains it.
+    ///
+    /// If any of the items it's trying to add are duplicates (either of itself
+    /// or others, this will return an error).
+    pub fn add_hardware_support_bundle(
+        &mut self,
+        bundle_path: impl AsRef<Utf8Path>,
+        bundle: HardwareSupportBundle,
+    ) -> Result<()> {
+        let bundle_path = bundle_path.as_ref();
+
+        for PackagedDriverDetails { package, set, components } in bundle.drivers {
+            let driver_package_path = &bundle_path.join(&package);
+
+            // These need to be consolidated into a single type so that they are
+            // less cumbersome.
+            let (package_set, driver_package_type) = match &set {
+                assembly_config_schema::PackageSet::Base => {
+                    (PackageSets::BASE, DriverPackageType::Base)
+                }
+                assembly_config_schema::PackageSet::BootFS => {
+                    (PackageSets::BOOTFS, DriverPackageType::Boot)
+                }
+            };
+
+            self.add_unique_package_from_path(driver_package_path, &package_set)?;
+
+            let package_url =
+                DriverManifestBuilder::get_package_url(driver_package_type, driver_package_path)?;
+
+            let driver_set = match &set {
+                assembly_config_schema::PackageSet::Base => &mut self.base_drivers,
+                assembly_config_schema::PackageSet::BootFS => &mut self.boot_drivers,
+            };
+            driver_set.try_insert_unique(package_url, DriverDetails { package, components })?;
+        }
 
         Ok(())
     }
