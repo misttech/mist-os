@@ -133,6 +133,7 @@ def check_determinism_command(
         exec_root: Path,
         outputs: Sequence[Path],
         command: Sequence[Path] = None,
+        max_attempts: int = None,
         miscomparison_export_dir: Path = None,
         label: str = None) -> Sequence[str]:
     """Returns a command that checks for output determinism.
@@ -144,6 +145,8 @@ def check_determinism_command(
       exec_root: path to project root (relative or absolute).
       outputs: output files to compare.
       command: the command to execute.
+      max_attempts: number of times to re-run and compare.
+      miscomparison_export_dir: location to store mismatched outputs.
       label: build system identifier for diagnostics.
     """
     return [
@@ -152,7 +155,7 @@ def check_determinism_command(
         str(exec_root / _CHECK_DETERMINISM_SCRIPT),
     ] + ([f'--label={label}'] if label else []) + [
         '--check-repeatability',
-    ] + (
+    ] + ([f'--max-attempts={max_attempts}'] if max_attempts else []) + (
         [f'--miscomparison-export-dir={miscomparison_export_dir}']
         if miscomparison_export_dir else []) + [
             '--outputs',

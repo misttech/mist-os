@@ -383,6 +383,10 @@ class CxxRemoteAction(object):
         return self._main_args.check_determinism
 
     @property
+    def determinism_attempts(self) -> int:
+        return self._main_args.determinism_attempts
+
+    @property
     def miscomparison_export_dir(self) -> Optional[Path]:
         if self._main_args.miscomparison_export_dir:
             return self.working_dir / self._main_args.miscomparison_export_dir
@@ -418,6 +422,7 @@ class CxxRemoteAction(object):
                 exec_root=self.exec_root_rel,
                 outputs=self._remote_output_files(),
                 command=self.original_compile_command,
+                max_attempts=self.determinism_attempts,
                 miscomparison_export_dir=(
                     export_dir / self.build_subdir if export_dir else None),
                 label=self.label,

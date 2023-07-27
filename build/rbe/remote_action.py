@@ -840,6 +840,7 @@ class RemoteAction(object):
         diagnose_nonzero: bool = False,
         compare_with_local: bool = False,
         check_determinism: bool = False,
+        determinism_attempts: int = 1,
         miscomparison_export_dir: Path = None,
         post_remote_run_success_action: Callable[[], int] = None,
         remote_debug_command: Sequence[str] = None,
@@ -870,6 +871,7 @@ class RemoteAction(object):
           verbose: if true, print more information about what is happening.
           compare_with_local: if true, also run locally and compare outputs.
           check_determinism: if true, compare outputs of two local executions.
+          determinism_attempts: For check_determinism, re-run and compare N times.
           miscomparison_export_dir: copy unexpected differences found by
             --compare or --check-determinism to this directory, if given.
           save_temps: if true, keep around temporarily generated files after execution.
@@ -912,6 +914,7 @@ class RemoteAction(object):
         self._label = label
         self._compare_with_local = compare_with_local
         self._check_determinism = check_determinism
+        self._determinism_attempts = determinism_attempts
         self._miscomparison_export_dir = miscomparison_export_dir
         self._options = (options or [])
         self._post_remote_run_success_action = post_remote_run_success_action
@@ -1112,6 +1115,10 @@ class RemoteAction(object):
         return self._check_determinism
 
     @property
+    def determinism_attempts(self) -> int:
+        return self._determinism_attempts
+
+    @property
     def miscomparison_export_dir(self) -> Optional[Path]:
         if self._miscomparison_export_dir:
             return self.working_dir / self._miscomparison_export_dir
@@ -1280,6 +1287,7 @@ class RemoteAction(object):
             exec_root=self.exec_root_rel,
             outputs=self.output_files_relative_to_working_dir,
             label=self.label,
+            max_attempts=self.determinism_attempts,
             miscomparison_export_dir=export_dir,
             # no command, just prefix
         )
@@ -2046,7 +2054,14 @@ def inherit_main_arg_parser_flags(
         "--check-determinism",
         action="store_true",
         default=False,
-        help="Run locally twice and compare outputs [requires: --local].",
+        help="Run locally repeatedly and compare outputs [requires: --local].",
+    )
+    main_group.add_argument(
+        "--determinism-attempts",
+        type=int,
+        default=1,
+        help=
+        "For --check-determinism, re-run and compare this many times (max).",
     )
     main_group.add_argument(
         "--log",
@@ -2178,6 +2193,7 @@ def remote_action_from_args(
         label=main_args.label,
         compare_with_local=main_args.compare,
         check_determinism=main_args.check_determinism,
+        determinism_attempts=main_args.determinism_attempts,
         miscomparison_export_dir=main_args.miscomparison_export_dir,
         save_temps=main_args.save_temps,
         remote_log=main_args.remote_log,

@@ -49,6 +49,10 @@ _PROJECT_ROOT_REL = os.path.relpath(
 _DETAIL_DIFF_SCRIPT = Path('build/rbe/detail-diff.sh')
 
 
+def msg(text: str):
+    print(f"[{_SCRIPT_BASENAME}] {text}")
+
+
 def _partition(
         iterable: Iterable[Any],
         predicate: Callable[[Any],
@@ -90,8 +94,8 @@ def ensure_file_exists(path: Path):
         # Either the original command failed to produce this file, or something
         # could be wrong with file system synchronization or delays.
         # Flush writes, sleep, try again.
-        print(
-            f"[{_SCRIPT_BASENAME}] Expected output file not found: {path} (Retrying after {delay}s ...)"
+        msg(
+            f"Expected output file not found: {path} (Retrying after {delay}s ...)"
         )
         os.sync()
         time.sleep(delay)
@@ -111,6 +115,16 @@ def detail_diff(left: Path, right: Path):
         ])
 
 
+def remove_if_exists(path: Path):
+    if path.exists():
+        path.unlink()
+
+
+def execute_main_command(*args, **kwargs) -> int:
+    """Forwards to subprocess.call, for ease of mocking."""
+    return subprocess.call(*args, **kwargs)
+
+
 # TODO: de-dupe this from cl_utils after moving this source file
 def copy_preserve_subpath(src: Path, dest_dir: Path):
     """Like copy(), but preserves the relative path of src in the destination."""
@@ -128,8 +142,7 @@ def retry_file_op_once_with_delay(
         fileop()
     except FileNotFoundError:
         # one-time retry
-        print(
-            f'[{_SCRIPT_BASENAME}] {failmsg}  (Retrying once after {delay}s.)')
+        msg(f'{failmsg}  (Retrying once after {delay}s.)')
         time.sleep(delay)
         fileop()
         # If this fails again, exception will be raised.
@@ -150,12 +163,12 @@ def move_if_different(src: Path, dest: Path, verbose: bool = False) -> bool:
     ensure_file_exists(src)
     if not dest.exists() or not files_match(dest, src):
         if verbose:
-            print(f"  === Updated: {dest}")
+            msg(f"  === Updated: {dest}")
         src.rename(dest)
         return True
     else:
         if verbose:
-            print(f"  === Cached: {dest}")
+            msg(f"  === Cached: {dest}")
         src.unlink()
         return False
 
@@ -311,9 +324,9 @@ class Action(object):
 
         if verbose or dry_run:
             for orig, renamed in renamed_outputs.items():
-                print(f"=== renamed: {orig} -> {renamed}")
+                msg(f"=== renamed: {orig} -> {renamed}")
             cmd_str = " ".join(substituted_command)
-            print(f"=== substituted command: {cmd_str}")
+            msg(f"=== substituted command: {cmd_str}")
 
         if dry_run:
             return 0
@@ -324,7 +337,7 @@ class Action(object):
                 new_arg.parent.mkdir(parents=True, exist_ok=True)
 
         # Run the modified command.
-        retval = subprocess.call(substituted_command)
+        retval = execute_main_command(substituted_command)
 
         if retval != 0:
             # Option: clean-up .tmp files or leave them for inspection
@@ -342,11 +355,11 @@ class Action(object):
                     5,
                 )
             except FileNotFoundError as e:
-                print(e)
+                msg(str(e))
                 move_err = True
 
         if move_err:
-            print("  *** Aborting due to previous error.")
+            msg("  *** Aborting due to previous error.")
             return 1
 
         if verbose:
@@ -356,20 +369,21 @@ class Action(object):
                 # Having un-renamed outputs is not an error, but rather an indicator
                 # of a potentially missed opportunity to cache unchanged outputs.
                 unrenamed_formatted = " ".join(unrenamed_outputs)
-                print(f"  === Un-renamed outputs: {unrenamed_formatted}")
+                msg(f"  === Un-renamed outputs: {unrenamed_formatted}")
 
         return 0
 
-    def run_twice_and_compare_outputs(
+    def run_repeatedly_and_compare_outputs(
             self,
             tempfile_transform: TempFileTransform,
             diff_action: Callable[[Path, Path], Any],
+            max_attempts: int = 1,
             verbose: bool = False) -> int:
-        """Runs a command twice, copying declared outputs in between.
+        """Runs a command N times, copying declared outputs in between.
 
         Compare both sets of outputs, and error out if any differ.
         The advantage of this variant over others is that it eliminates
-        output-path sensitivities by running the *same* command twice.
+        output-path sensitivities by running the *same* command N times.
         One possible disadvantage is that this may expose behavioral
         differences due to the non/pre-existence of outputs ahead of
         running the command.
@@ -377,6 +391,7 @@ class Action(object):
         Args:
           tempfile_transform: used to rename backup copies of outputs.
           diff_action: action to run on files with differences.
+          max_attempts: number of times to re-run and compare (after the first).
           verbose: if True, print more diagnostics.
 
         Returns:
@@ -384,7 +399,7 @@ class Action(object):
         """
 
         # Run the command the first time.
-        retval = subprocess.call(self.command)
+        retval = execute_main_command(self.command)
 
         # If the command failed, skip re-running.
         if retval != 0:
@@ -412,19 +427,33 @@ class Action(object):
         # textual clock time differences, like __TIME__ in C-preprocessing.
         time.sleep(1)
 
-        rerun_retval = subprocess.call(self.command)
-        if rerun_retval != 0:
-            print(
-                f"""Re-run of command {self.command} failed, while first time succeeded!?"""
-            )
-            return rerun_retval
+        for i in range(max_attempts):
+            # Expect re-running command to overwrite existing outputs.
+            rerun_retval = execute_main_command(self.command)
+            if rerun_retval != 0:
+                msg(
+                    f"Re-run attempt {i} of command {self.command} failed, where previous runs succeeded!?"
+                )
+                return rerun_retval
 
-        return verify_files_match(
-            fileset=renamed_outputs,
-            label=self.label,
-            renamed=False,
-            diff_action=diff_action,
-        )
+            verify_status = verify_files_match(
+                fileset=renamed_outputs,
+                label=self.label,
+                renamed=False,
+                diff_action=diff_action,
+                # re-use for multiple attempts, clean up before returning.
+                keep_backups=True,
+            )
+            if verify_status != 0:
+                msg(f"Inconsistent output found on re-run attempt {i}/{max_attempts}.")
+                # Keep around mismatched outputs.
+                return verify_status
+
+        # Reaching this point means all re-runs produced identical outputs.
+        # On success, remove the backup copies to save space.
+        for backup in renamed_outputs.values():
+            remove_if_exists(backup)
+        return 0
 
     def run_twice_with_substitution_and_compare_outputs(
             self,
@@ -459,14 +488,14 @@ class Action(object):
                 new_arg.parent.mkdir(parents=True, exist_ok=True)
 
         # Run the original command.
-        retval = subprocess.call(self.command)
+        retval = execute_main_command(self.command)
 
         # If the command failed, skip re-running.
         if retval != 0:
             return retval
 
         # Otherwise command succeeded, re-run with different output locations.
-        rerun_retval = subprocess.call(substituted_command)
+        rerun_retval = execute_main_command(substituted_command)
         if rerun_retval != 0:
             print(
                 f"Re-run failed with substituted outputs of target [{self.label}]: {substituted_command}"
@@ -475,9 +504,10 @@ class Action(object):
 
         return verify_files_match(
             fileset=renamed_outputs,
+            diff_action=diff_action,
             label=self.label,
             renamed=True,
-            diff_action=diff_action,
+            keep_backups=False,
         )
 
 
@@ -486,6 +516,7 @@ def verify_files_match(
     diff_action: Callable[[Path, Path], Any],
     label: str,
     renamed: bool,
+    keep_backups: bool,
 ) -> int:
     """Compare outputs and report differences.
 
@@ -496,8 +527,10 @@ def verify_files_match(
         that match are removed to save space, while the .keys() files are kept.
       diff_action: action to run on files with differences, e.g. more
         detailed diff analysis, copy files.
-      renamed: True if files to compare were renamed.
       label: An identifier for the action that was run, for diagnostics.
+      renamed: True if files to compare were renamed.
+      keep_backups: If False, delete matching copies after comparison.
+
     Returns:
       exit code 0 if all files matched, else 1.
     """
@@ -507,9 +540,10 @@ def verify_files_match(
         # something is not working as expected.
         lambda pair: files_match(pair[0], pair[1]))
 
-    # Remove any files that matched to save space.
-    for _, temp_out in matching_files:
-        temp_out.unlink()
+    if not keep_backups:
+        # Remove any files that matched to save space.
+        for _, temp_out in matching_files:
+            temp_out.unlink()
 
     if different_files:
         label_text = ""
@@ -608,6 +642,12 @@ def _main_arg_parser() -> argparse.ArgumentParser:
         "Check for repeatability: run the command twice, with different outputs, and compare.",
     )
     parser.add_argument(
+        "--max-attempts",
+        type=int,
+        default=1,
+        help="For --check-repeatability, re-run and compare this many times.",
+    )
+    parser.add_argument(
         "--rename-outputs",
         action="store_true",
         default=False,
@@ -668,7 +708,7 @@ def main():
 
     # If disabled, run the original command as-is.
     if not wrap:
-        return subprocess.call(args.command)
+        return execute_main_command(args.command)
 
     # Otherwise, rewrite the command using temporary outputs.
     outputs = set(args.outputs)
@@ -711,9 +751,10 @@ def main():
         else:
             # This check will only find nondeterministic outputs.
             # For example, those affected by the current time.
-            return action.run_twice_and_compare_outputs(
+            return action.run_repeatedly_and_compare_outputs(
                 tempfile_transform=tempfile_transform,
                 diff_action=_diff_action,
+                max_attempts=args.max_attempts,
                 verbose=args.verbose,
             )
 
