@@ -138,6 +138,13 @@ async fn main() -> Result<(), Error> {
                 .propose_element(
                     element::Spec {
                         component_url: Some(config.main_element_url),
+                        annotations: Some(vec![element::Annotation {
+                            key: element::AnnotationKey {
+                                namespace: "element_manager".to_string(),
+                                value: "name".to_string(),
+                            },
+                            value: element::AnnotationValue::Text("main".to_string()),
+                        }]),
                         ..Default::default()
                     },
                     None,
