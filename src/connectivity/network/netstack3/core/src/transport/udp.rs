@@ -408,9 +408,9 @@ impl<I: IpExt, D: WeakId> DatagramSocketSpec<I, D, IpPortSpec> for Udp<I, D> {
     }
 }
 
-enum LookupResult<I: Ip, D: Id> {
-    Conn(SocketId<I>, ConnAddr<I::Addr, D, NonZeroU16, NonZeroU16>),
-    Listener(SocketId<I>, ListenerAddr<I::Addr, D, NonZeroU16>),
+enum LookupResult<'a, I: IpExt, D: Id> {
+    Conn(&'a SocketId<I>, ConnAddr<I::Addr, D, NonZeroU16, NonZeroU16>),
+    Listener(&'a SocketId<I>, ListenerAddr<I::Addr, D, NonZeroU16>),
 }
 
 #[derive(Hash, Copy, Clone)]
@@ -616,13 +616,13 @@ impl<T> AddrState<T> {
 
 impl<'a, I: Ip + IpExt, D: WeakId + 'a> AddrEntry<'a, I, D, IpPortSpec, Udp<I, D>> {
     /// Returns an iterator that yields a `LookupResult` for each contained ID.
-    fn collect_all_ids(self) -> impl Iterator<Item = LookupResult<I, D>> + 'a {
+    fn collect_all_ids(self) -> impl Iterator<Item = LookupResult<'a, I, D>> + 'a {
         match self {
             Self::Listen(state, l) => Either::Left(
-                state.collect_all_ids().map(move |id| LookupResult::Listener(*id, l.clone())),
+                state.collect_all_ids().map(move |id| LookupResult::Listener(id, l.clone())),
             ),
             Self::Conn(state, c) => Either::Right(
-                state.collect_all_ids().map(move |id| LookupResult::Conn(*id, c.clone())),
+                state.collect_all_ids().map(move |id| LookupResult::Conn(id, c.clone())),
             ),
         }
     }
@@ -631,10 +631,10 @@ impl<'a, I: Ip + IpExt, D: WeakId + 'a> AddrEntry<'a, I, D, IpPortSpec, Udp<I, D
     fn select_receiver<A: AsRef<I::Addr> + Hash>(
         self,
         selector: SocketSelectorParams<I, A>,
-    ) -> LookupResult<I, D> {
+    ) -> LookupResult<'a, I, D> {
         match self {
-            Self::Listen(state, l) => LookupResult::Listener(*state.select_receiver(selector), l),
-            Self::Conn(state, c) => LookupResult::Conn(*state.select_receiver(selector), c),
+            Self::Listen(state, l) => LookupResult::Listener(state.select_receiver(selector), l),
+            Self::Conn(state, c) => LookupResult::Conn(state.select_receiver(selector), c),
         }
     }
 }
@@ -650,7 +650,7 @@ fn lookup<'s, I: Ip + IpExt, D: WeakId>(
     (src_ip, src_port): (I::Addr, Option<NonZeroU16>),
     (dst_ip, dst_port): (SpecifiedAddr<I::Addr>, NonZeroU16),
     device: D,
-) -> impl Iterator<Item = LookupResult<I, D>> + 's {
+) -> impl Iterator<Item = LookupResult<'s, I, D>> + 's {
     let matching_entries = bound.iter_receivers((src_ip, src_port), (dst_ip, dst_port), device);
     match matching_entries {
         None => Either::Left(None),
@@ -993,20 +993,30 @@ impl<I: IpExt, C: StateNonSyncContext<I>, SC: StateContext<I, C>> IpTransportCon
         if let (Some(src_ip), Some(src_port), Some(dst_port)) =
             (src_ip, udp_packet.src_port(), udp_packet.dst_port())
         {
-            sync_ctx.with_sockets(|sync_ctx, sockets_state,  bound_sockets | {
-                let receiver =
-                    lookup(sockets_state, bound_sockets, (*dst_ip, Some(dst_port)), (src_ip, src_port), sync_ctx.downgrade_device_id(device))
-                    .next();
+            sync_ctx.with_sockets(|sync_ctx, sockets_state, bound_sockets| {
+                let receiver = lookup(
+                    sockets_state,
+                    bound_sockets,
+                    (*dst_ip, Some(dst_port)),
+                    (src_ip, src_port),
+                    sync_ctx.downgrade_device_id(device),
+                )
+                .next();
 
-            if let Some(id) = receiver {
-                let id = match id {
-                    LookupResult::Listener(id, _) | LookupResult::Conn(id, _) => id,
-                };
-                ctx.receive_icmp_error(id, err);
-            } else {
-                trace!("UdpIpTransportContext::receive_icmp_error: Got ICMP error message for nonexistent UDP socket; either the socket responsible has since been removed, or the error message was sent in error or corrupted");
-            }
-        });
+                if let Some(id) = receiver {
+                    let id = match id {
+                        LookupResult::Listener(id, _) | LookupResult::Conn(id, _) => id,
+                    };
+                    ctx.receive_icmp_error(*id, err);
+                } else {
+                    trace!(
+                        "UdpIpTransportContext::receive_icmp_error: Got ICMP error
+                        message for nonexistent UDP socket; either the socket
+                        responsible has since been removed, or the error message
+                        was sent in error or corrupted"
+                    );
+                }
+            });
         } else {
             trace!("UdpIpTransportContext::receive_icmp_error: Got ICMP error message for IP packet with an invalid source or destination IP or port");
         }
@@ -1068,13 +1078,13 @@ impl<
                                 device: _,
                             },
                         ) => ctx.receive_udp(
-                            id,
+                            *id,
                             dst_ip.get(),
                             (remote_ip.get(), Some(remote_port)),
                             &buffer,
                         ),
                         LookupResult::Listener(id, _) => {
-                            ctx.receive_udp(id, dst_ip.get(), (src_ip, src_port), &buffer)
+                            ctx.receive_udp(*id, dst_ip.get(), (src_ip, src_port), &buffer)
                         }
                     }
                 }
