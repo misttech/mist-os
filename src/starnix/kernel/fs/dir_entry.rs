@@ -428,6 +428,9 @@ impl DirEntry {
         name: &FsStr,
         child: &FsNodeHandle,
     ) -> Result<(), Errno> {
+        if child.is_dir() {
+            return error!(EPERM);
+        }
         self.create_entry(current_task, name, ExistsOption::DoNotReturnExisting, || {
             self.node.link(current_task, name, child)?;
             Ok(child.clone())

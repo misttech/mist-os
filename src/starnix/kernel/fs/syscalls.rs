@@ -753,10 +753,6 @@ pub fn sys_linkat(
     // TODO: AT_EMPTY_PATH requires CAP_DAC_READ_SEARCH.
     let flags = LookupFlags::from_bits(flags, AT_EMPTY_PATH | AT_SYMLINK_FOLLOW)?;
     let target = lookup_at(current_task, old_dir_fd, old_user_path, flags)?;
-    if target.entry.node.is_dir() {
-        return error!(EPERM);
-    }
-
     lookup_parent_at(current_task, new_dir_fd, new_user_path, |context, parent, basename| {
         // The path to a new link cannot end in `/`. That would imply that we are dereferencing
         // the link to a directory.
