@@ -79,6 +79,7 @@ async fn log_main(
                     show_tags: !cmd.hide_tags,
                     color: if cmd.no_color { LogTextColor::None } else { LogTextColor::BySeverity },
                     show_metadata: cmd.show_metadata,
+                    show_file: !cmd.hide_file,
                     show_full_moniker: cmd.show_full_moniker,
                     ..Default::default()
                 })
@@ -682,6 +683,114 @@ mod tests {
             "[00000.000000][ffx] INFO: Hello world!\u{1b}[m\n".to_string()
         );
         assert_matches!(event_stream.next().await, Some(TestEvent::SeverityChanged(s)) if s == severity);
+        assert_matches!(event_stream.next().await, Some(TestEvent::LogSettingsConnectionClosed));
+    }
+
+    #[fuchsia::test]
+    async fn logger_shows_file_names_by_default() {
+        let (rcs_proxy, rcs_server) = create_proxy::<RemoteControlMarker>().unwrap();
+        let (target_collection_proxy, target_collection_server) =
+            create_proxy::<TargetCollectionMarker>().unwrap();
+        let tool = LogTool {
+            cmd: LogCommand {
+                sub_command: Some(LogSubCommand::Dump(DumpCommand {
+                    session: log_command::SessionSpec::Relative(0),
+                })),
+                ..LogCommand::default()
+            },
+            rcs_proxy: rcs_proxy,
+            target_collection: target_collection_proxy,
+        };
+        let mut task_manager = TaskManager::new_with_config(Rc::new(Configuration {
+            messages: vec![LogsDataBuilder::new(BuilderArgs {
+                component_url: Some("ffx".into()),
+                moniker: "ffx".into(),
+                severity: Severity::Info,
+                timestamp_nanos: Timestamp::from(0),
+            })
+            .set_pid(1)
+            .set_tid(2)
+            .set_file("test_filename.cc")
+            .set_line(42)
+            .add_tag("test tag")
+            .set_message("Hello world!")
+            .build()],
+            ..Default::default()
+        }));
+        let mut event_stream = task_manager.take_event_stream().unwrap();
+        let scheduler = task_manager.get_scheduler();
+        task_manager.spawn(handle_rcs_connection(rcs_server, scheduler.clone()));
+        task_manager.spawn(handle_target_collection_connection(
+            target_collection_server,
+            scheduler.clone(),
+        ));
+        let test_buffers = TestBuffers::default();
+        let mut main_result = task_manager
+            .spawn_result(tool.main(MachineWriter::<LogEntry>::new_test(None, &test_buffers)));
+        // Run all tasks until exit.
+        task_manager.run().await;
+        // Ensure that main exited successfully.
+        main_result.next().await.unwrap().unwrap();
+
+        assert_eq!(
+            test_buffers.stdout.into_string(),
+            "[00000.000000][ffx][test tag] INFO: [test_filename.cc(42)] Hello world!\u{1b}[m\n"
+                .to_string()
+        );
+        assert_matches!(event_stream.next().await, Some(TestEvent::LogSettingsConnectionClosed));
+    }
+
+    #[fuchsia::test]
+    async fn logger_hides_filename_if_disabled() {
+        let (rcs_proxy, rcs_server) = create_proxy::<RemoteControlMarker>().unwrap();
+        let (target_collection_proxy, target_collection_server) =
+            create_proxy::<TargetCollectionMarker>().unwrap();
+        let tool = LogTool {
+            cmd: LogCommand {
+                sub_command: Some(LogSubCommand::Dump(DumpCommand {
+                    session: log_command::SessionSpec::Relative(0),
+                })),
+                hide_file: true,
+                ..LogCommand::default()
+            },
+            rcs_proxy: rcs_proxy,
+            target_collection: target_collection_proxy,
+        };
+        let mut task_manager = TaskManager::new_with_config(Rc::new(Configuration {
+            messages: vec![LogsDataBuilder::new(BuilderArgs {
+                component_url: Some("ffx".into()),
+                moniker: "ffx".into(),
+                severity: Severity::Info,
+                timestamp_nanos: Timestamp::from(0),
+            })
+            .set_pid(1)
+            .set_tid(2)
+            .set_file("test_filename.cc")
+            .set_line(42)
+            .add_tag("test tag")
+            .set_message("Hello world!")
+            .build()],
+            ..Default::default()
+        }));
+        let mut event_stream = task_manager.take_event_stream().unwrap();
+        let scheduler = task_manager.get_scheduler();
+        task_manager.spawn(handle_rcs_connection(rcs_server, scheduler.clone()));
+        task_manager.spawn(handle_target_collection_connection(
+            target_collection_server,
+            scheduler.clone(),
+        ));
+        let test_buffers = TestBuffers::default();
+        let mut main_result = task_manager
+            .spawn_result(tool.main(MachineWriter::<LogEntry>::new_test(None, &test_buffers)));
+        // Run all tasks until exit.
+        task_manager.run().await;
+        // Ensure that main exited successfully.
+        main_result.next().await.unwrap().unwrap();
+
+        assert_eq!(
+            test_buffers.stdout.into_string(),
+            "[00000.000000][ffx][test tag] INFO: Hello world!\u{1b}[m\n".to_string()
+        );
         assert_matches!(event_stream.next().await, Some(TestEvent::LogSettingsConnectionClosed));
     }
 
