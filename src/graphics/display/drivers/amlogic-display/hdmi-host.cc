@@ -8,6 +8,7 @@
 
 #include <limits>
 
+#include "src/graphics/display/drivers/amlogic-display/common.h"
 #include "src/graphics/display/drivers/amlogic-display/gpio-mux-regs.h"
 #include "src/graphics/display/drivers/amlogic-display/hhi-regs.h"
 #include "src/graphics/display/drivers/amlogic-display/vpu-regs.h"
@@ -69,9 +70,7 @@ zx_status_t HdmiHost::Init() {
     return status;
   }
 
-  // TODO(fxbug.com/130970): Switch MMIO_CBUS to MMIO_GPIO_MUX and update the
-  // board drivers.
-  status = pdev_.MapMmio(MMIO_CBUS, &gpio_mux_mmio_);
+  status = pdev_.MapMmio(MMIO_GPIO_MUX, &gpio_mux_mmio_);
   if (status != ZX_OK) {
     DISP_ERROR("Could not map GPIO MUX mmio %d\n", status);
     return status;

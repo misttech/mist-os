@@ -33,34 +33,40 @@ namespace fpbus = fuchsia_hardware_platform_bus;
 
 static const std::vector<fpbus::Mmio> display_mmios{
     {{
-        // VBUS/VPU
+        // VPU
         .base = A311D_VPU_BASE,
         .length = A311D_VPU_LENGTH,
     }},
     {{
-        // DSI Host Controller
+        // MIPI DSI "TOP"
         .base = A311D_TOP_MIPI_DSI_BASE,
         .length = A311D_TOP_MIPI_DSI_LENGTH,
     }},
     {{
-        // DSI PHY
+        // MIPI DSI PHY
         .base = A311D_DSI_PHY_BASE,
         .length = A311D_DSI_PHY_LENGTH,
     }},
     {{
-        // HHI
+        // HIU / HHI
         .base = A311D_HIU_BASE,
         .length = A311D_HIU_LENGTH,
     }},
     {{
         // AOBUS
+        // TODO(fxbug.dev/131170): Restrict range to RTI
         .base = A311D_AOBUS_BASE,
         .length = A311D_AOBUS_LENGTH,
     }},
     {{
-        // CBUS
-        .base = A311D_CBUS_BASE,
-        .length = A311D_CBUS_LENGTH,
+        // RESET
+        .base = A311D_RESET_BASE,
+        .length = A311D_RESET_LENGTH,
+    }},
+    {{
+        // PERIPHS_REGS (GPIO Multiplexer)
+        .base = A311D_GPIO_BASE,
+        .length = A311D_GPIO_LENGTH,
     }},
 };
 

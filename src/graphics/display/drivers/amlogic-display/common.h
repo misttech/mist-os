@@ -35,12 +35,13 @@
 
 // Should match display_mmios table in board driver
 enum {
-  MMIO_VPU,
-  MMIO_MPI_DSI,
-  MMIO_DSI_PHY,
-  MMIO_HHI,
-  MMIO_AOBUS,
-  MMIO_CBUS,
+  MMIO_VPU,       // VPU (Video Processing Unit)
+  MMIO_MPI_DSI,   // TOP_MIPI_DSI (DSI "top" host controller integration)
+  MMIO_DSI_PHY,   // DSI_PHY
+  MMIO_HHI,       // HIU (Host Interface Unit) / HHI
+  MMIO_AOBUS,     // RTI / AO_RTI / AOBUS_RTI
+  MMIO_RESET,     // RESET
+  MMIO_GPIO_MUX,  // PERIPHS_REGS (GPIO Multiplexing)
 };
 
 // Should match display_gpios table in board driver

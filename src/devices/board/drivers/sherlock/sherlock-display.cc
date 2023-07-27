@@ -23,6 +23,7 @@
 #include <bind/fuchsia/sysmem/cpp/bind.h>
 #include <ddk/metadata/display.h>
 #include <soc/aml-t931/t931-gpio.h>
+#include <soc/aml-t931/t931-hw.h>
 
 #include "sherlock-gpios.h"
 #include "sherlock.h"
@@ -34,34 +35,40 @@ namespace fpbus = fuchsia_hardware_platform_bus;
 namespace {
 static const std::vector<fpbus::Mmio> display_mmios{
     {{
-        // VBUS/VPU
+        // VPU
         .base = T931_VPU_BASE,
         .length = T931_VPU_LENGTH,
     }},
     {{
-        // DSI Host Controller
+        // MIPI DSI "TOP"
         .base = T931_TOP_MIPI_DSI_BASE,
         .length = T931_TOP_MIPI_DSI_LENGTH,
     }},
     {{
-        // DSI PHY
+        // MIPI DSI PHY
         .base = T931_DSI_PHY_BASE,
         .length = T931_DSI_PHY_LENGTH,
     }},
     {{
-        // HHI
+        // HIU / HHI
         .base = T931_HIU_BASE,
         .length = T931_HIU_LENGTH,
     }},
     {{
         // AOBUS
+        // TODO(fxbug.dev/131170): Restrict range to RTI
         .base = T931_AOBUS_BASE,
         .length = T931_AOBUS_LENGTH,
     }},
     {{
-        // CBUS
-        .base = T931_CBUS_BASE,
-        .length = T931_CBUS_LENGTH,
+        // RESET
+        .base = T931_RESET_BASE,
+        .length = T931_RESET_LENGTH,
+    }},
+    {{
+        // PERIPHS_REGS (GPIO Multiplexer)
+        .base = T931_GPIO_BASE,
+        .length = T931_GPIO_LENGTH,
     }},
 };
 

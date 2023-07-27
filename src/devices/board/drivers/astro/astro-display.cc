@@ -33,34 +33,40 @@ namespace fpbus = fuchsia_hardware_platform_bus;
 
 static const std::vector<fpbus::Mmio> display_mmios{
     {{
-        // VBUS/VPU
+        // VPU
         .base = S905D2_VPU_BASE,
         .length = S905D2_VPU_LENGTH,
     }},
     {{
-        // TOP DSI Host Controller (Amlogic Specific)
+        // MIPI DSI "TOP"
         .base = S905D2_MIPI_TOP_DSI_BASE,
         .length = S905D2_MIPI_TOP_DSI_LENGTH,
     }},
     {{
-        // DSI PHY
+        // MIPI DSI PHY
         .base = S905D2_DSI_PHY_BASE,
         .length = S905D2_DSI_PHY_LENGTH,
     }},
     {{
-        // HHI
+        // HIU / HHI
         .base = S905D2_HIU_BASE,
         .length = S905D2_HIU_LENGTH,
     }},
     {{
         // AOBUS
+        // TODO(fxbug.dev/131170): Restrict range to RTI
         .base = S905D2_AOBUS_BASE,
         .length = S905D2_AOBUS_LENGTH,
     }},
     {{
-        // CBUS
-        .base = S905D2_CBUS_BASE,
-        .length = S905D2_CBUS_LENGTH,
+        // RESET
+        .base = S905D2_RESET_BASE,
+        .length = S905D2_RESET_LENGTH,
+    }},
+    {{
+        // PERIPHS_REGS (GPIO Multiplexer)
+        .base = S905D2_GPIO_BASE,
+        .length = S905D2_GPIO_LENGTH,
     }},
 };
 

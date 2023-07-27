@@ -77,15 +77,11 @@ constexpr uint32_t capture_yuv2rgb_offset[3] = {0, 0, 0};
 // The following datasheets have matching information.
 // * S905D2, Section 6.7.2.1 "EE Reset", Section 6.1 "Memory Map"
 // * T931, Section 6.8.2.1 "EE Reset", Section 6.1 "Memory Map"
-//
-// TODO(fxbug.dev/130970): Offsets here are relative to 0xffd0'0000, which
-// belongs to a reserved block in all datasheets. Add an MMIO range for RESET
-// registers, and have these offsets be relative to that range.
-#define RESET0_LEVEL 0x1080
-#define RESET1_LEVEL 0x1084
-#define RESET2_LEVEL 0x1088
-#define RESET4_LEVEL 0x1090
-#define RESET7_LEVEL 0x109c
+#define RESET0_LEVEL 0x80
+#define RESET1_LEVEL 0x84
+#define RESET2_LEVEL 0x88
+#define RESET4_LEVEL 0x90
+#define RESET7_LEVEL 0x9c
 
 #define READ32_VPU_REG(a) vpu_mmio_->Read32(a)
 #define WRITE32_VPU_REG(a, v) vpu_mmio_->Write32(v, a)
@@ -126,9 +122,7 @@ zx_status_t Vpu::Init(ddk::PDevFidl& pdev) {
   }
 
   // Map RESET registers
-  // TODO(fxbug.com/130970): Switch MMIO_CBUS to MMIO_RESET and update the board
-  // drivers.
-  status = pdev.MapMmio(MMIO_CBUS, &reset_mmio_);
+  status = pdev.MapMmio(MMIO_RESET, &reset_mmio_);
   if (status != ZX_OK) {
     DISP_ERROR("vpu: Could not map RESET mmio\n");
     return status;
