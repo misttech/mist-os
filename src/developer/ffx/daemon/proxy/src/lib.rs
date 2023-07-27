@@ -2,10 +2,14 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use std::path::Path;
+use std::time::Duration;
+
 use anyhow::{Context as _, Result};
 use async_trait::async_trait;
 use async_utils::async_once::Once;
 use errors::{ffx_bail, ffx_error, FfxError};
+use ffx_command_error::FfxContext;
 use ffx_config::EnvironmentContext;
 use ffx_core::Injector;
 use ffx_daemon::{get_daemon_proxy_single_link, is_daemon_running_at_path, DaemonConfig};
@@ -68,6 +72,27 @@ impl Injection {
             daemon_once: Default::default(),
             remote_once: Default::default(),
         }
+    }
+
+    pub async fn initialize_overnet(
+        env_context: EnvironmentContext,
+        hoist_cache_dir: &Path,
+        router_interval: Option<Duration>,
+        daemon_check: DaemonVersionCheck,
+        format: Option<Format>,
+        target: Option<String>,
+    ) -> ffx_command_error::Result<Injection> {
+        // todo(fxbug.dev/287694609) we should get this in the environment context instead and leave the global
+        // hoist() unset for ffx but I'm leaving the last couple uses of it in place for the sake of
+        // avoiding complicated merge conflicts with isolation. Once we're ready for that, this should be
+        // `let Hoist = hoist::Hoist::new()...`
+        let hoist = hoist::init_hoist_with(Hoist::with_cache_dir_maybe_router(
+            hoist_cache_dir,
+            router_interval,
+        )?)
+        .bug_context("Failed to initialize overnet")?;
+        let target = ffx_target::maybe_inline_target(target, &env_context).await;
+        Ok(Injection::new(env_context, daemon_check, hoist.clone(), format, target))
     }
 
     fn is_default_target(&self) -> bool {

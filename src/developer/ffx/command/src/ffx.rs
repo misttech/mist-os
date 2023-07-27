@@ -7,17 +7,8 @@ use argh::FromArgs;
 use camino::Utf8PathBuf;
 use ffx_command_error::bug;
 use ffx_config::{environment::ExecutableKind, EnvironmentContext, FfxConfigBacked};
-use ffx_daemon_proxy::Injection;
 use ffx_writer::Format;
-use hoist::Hoist;
-use std::{
-    collections::HashMap,
-    fmt::Write,
-    path::{Path, PathBuf},
-    time::Duration,
-};
-
-pub use ffx_daemon_proxy::DaemonVersionCheck;
+use std::{collections::HashMap, fmt::Write, path::PathBuf};
 
 /// The environment variable name used for overriding the command name in help
 /// output.
@@ -267,26 +258,6 @@ impl Ffx {
             )
             .map_err(|e| user_error!(e)),
         }
-    }
-
-    pub async fn initialize_overnet(
-        &self,
-        env_context: EnvironmentContext,
-        hoist_cache_dir: &Path,
-        router_interval: Option<Duration>,
-        daemon_check: DaemonVersionCheck,
-    ) -> Result<Injection> {
-        // todo(fxb/108692) we should get this in the environment context instead and leave the global
-        // hoist() unset for ffx but I'm leaving the last couple uses of it in place for the sake of
-        // avoiding complicated merge conflicts with isolation. Once we're ready for that, this should be
-        // `let Hoist = hoist::Hoist::new()...`
-        let hoist = hoist::init_hoist_with(Hoist::with_cache_dir_maybe_router(
-            hoist_cache_dir,
-            router_interval,
-        )?)
-        .bug_context("Failed to initialize overnet")?;
-        let target = ffx_target::maybe_inline_target(self.target().await?, &env_context).await;
-        Ok(Injection::new(env_context, daemon_check, hoist.clone(), self.machine, target))
     }
 }
 

@@ -5,12 +5,12 @@
 use argh::{CommandInfo, FromArgs, SubCommand, SubCommands};
 use async_trait::async_trait;
 use ffx_command::{
-    DaemonVersionCheck, Error, FfxCommandLine, FfxContext, MetricsSession, Result, ToolRunner,
-    ToolSuite,
+    Error, FfxCommandLine, FfxContext, MetricsSession, Result, ToolRunner, ToolSuite,
 };
 use ffx_config::environment::ExecutableKind;
 use ffx_config::EnvironmentContext;
 use ffx_core::Injector;
+use ffx_daemon_proxy::{DaemonVersionCheck, Injection};
 use std::os::unix::process::ExitStatusExt;
 use std::process::ExitStatus;
 use std::sync::Arc;
@@ -152,15 +152,15 @@ impl<T: FfxTool> FhoTool<T> {
                 cache_path.display()
             ))?;
         let build_info = context.build_info();
-        let injector = ffx
-            .global
-            .initialize_overnet(
-                context.clone(),
-                hoist_cache_dir.path(),
-                None,
-                DaemonVersionCheck::SameVersionInfo(build_info),
-            )
-            .await?;
+        let injector = Injection::initialize_overnet(
+            context.clone(),
+            hoist_cache_dir.path(),
+            None,
+            DaemonVersionCheck::SameVersionInfo(build_info),
+            ffx.global.machine,
+            ffx.global.target().await?,
+        )
+        .await?;
         let redacted_args = ffx.redact_subcmd(&tool);
         let env = FhoEnvironment { ffx, context: context.clone(), injector: Arc::new(injector) };
         let main = T::from_env(env.clone(), tool).await?;

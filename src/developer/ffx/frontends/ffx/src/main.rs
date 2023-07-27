@@ -5,10 +5,10 @@
 use argh::{FromArgs, SubCommands};
 use errors::ffx_error;
 use ffx_command::{
-    DaemonVersionCheck, Error, FfxCommandLine, FfxContext, FfxToolInfo, MetricsSession, Result,
-    ToolRunner, ToolSuite,
+    Error, FfxCommandLine, FfxContext, FfxToolInfo, MetricsSession, Result, ToolRunner, ToolSuite,
 };
 use ffx_config::{environment::ExecutableKind, EnvironmentContext};
+use ffx_daemon_proxy::{DaemonVersionCheck, Injection};
 use ffx_lib_args::FfxBuiltIn;
 use ffx_lib_sub_command::SubCommand;
 use fho_search::ExternalSubToolSuite;
@@ -110,10 +110,15 @@ async fn run_legacy_subcommand(
         .and_then(|_| tempfile::tempdir_in(&cache_path))
         .user_message("Unable to create hoist cache directory")?;
     let daemon_version_string = DaemonVersionCheck::SameBuildId(context.daemon_version_string()?);
-    let injector = app
-        .global
-        .initialize_overnet(context, hoist_cache_dir.path(), router_interval, daemon_version_string)
-        .await?;
+    let injector = Injection::initialize_overnet(
+        context,
+        hoist_cache_dir.path(),
+        router_interval,
+        daemon_version_string,
+        app.global.machine,
+        app.global.target().await?,
+    )
+    .await?;
     let injector: Arc<dyn ffx_core::Injector> = Arc::new(injector);
     ffx_lib_suite::ffx_plugin_impl(&injector, subcommand).await
 }
