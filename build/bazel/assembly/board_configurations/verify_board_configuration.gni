@@ -3,6 +3,7 @@
 # found in the LICENSE file.
 
 import("//build/bazel/bazel_action.gni")
+import("//build/bazel/bazel_workspace.gni")
 import("//build/python/python_action.gni")
 
 template("verify_board_configuration") {
@@ -34,6 +35,8 @@ template("verify_board_configuration") {
     forward_variables_from(invoker, [ "visibility" ])
     testonly = true
 
+    depfile = "${target_gen_dir}/${target_name}.d"
+
     inputs = [
       "${target_out_dir}/${_bazel_board_config_file}",
       invoker.golden_json,
@@ -50,8 +53,14 @@ template("verify_board_configuration") {
     args = [
       "--generated_board_config",
       rebase_path(inputs[0], root_build_dir),
+      "--generated_root_dir",
+      bazel_main_top_dir_rebased + "/workspace",
       "--golden_json5",
       rebase_path(inputs[1], root_build_dir),
+      "--golden_root_dir",
+      ".",
+      "--depfile",
+      rebase_path(depfile, root_build_dir),
       "--output",
       rebase_path(outputs[0], root_build_dir),
     ]
