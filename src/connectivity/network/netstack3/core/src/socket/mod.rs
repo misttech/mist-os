@@ -136,9 +136,9 @@ pub(crate) trait SocketMapStateSpec {
     type AddrVecTag: Eq + Copy + Debug + 'static;
 
     /// An identifier for a listening socket.
-    type ListenerId: Clone + EntryKey + From<usize> + Debug;
+    type ListenerId: Clone + Debug;
     /// An identifier for a connected socket.
-    type ConnId: Clone + EntryKey + From<usize> + Debug;
+    type ConnId: Clone + Debug;
 
     /// The state stored for a listening socket that is used to determine
     /// whether sockets can share an address.
@@ -433,7 +433,13 @@ impl<S: SocketMapStateSpec> SocketId<S> {
     const CONNECTION_VARIANT: usize = 0;
 }
 
-impl<S: SocketMapStateSpec> IdMapCollectionKey for SocketId<S> {
+// TODO(https://fxbug.dev/126141): Remove this when it is no longer used for
+// TCP socket lookup.
+impl<S: SocketMapStateSpec> IdMapCollectionKey for SocketId<S>
+where
+    S::ListenerId: EntryKey,
+    S::ConnId: EntryKey,
+{
     const VARIANT_COUNT: NonZeroUsize = const_unwrap::const_unwrap_option(NonZeroUsize::new(2));
     fn get_id(&self) -> usize {
         match self {
@@ -544,7 +550,7 @@ impl<
 where
     Bound<S>: Tagged<AddrVec<I, D, A>>,
     SocketType::SharingState: Clone,
-    SocketType::Id: Clone + EntryKey,
+    SocketType::Id: Clone,
 {
     pub(crate) fn try_insert(
         self,
@@ -831,7 +837,7 @@ pub(crate) enum InsertError {
 /// Helper trait for converting between [`AddrVec`] and [`Bound`] and their
 /// variants.
 pub(crate) trait ConvertSocketMapState<I: Ip, D, A: SocketMapAddrSpec, S: SocketMapStateSpec> {
-    type Id: From<usize>;
+    type Id;
     type SharingState;
     type Addr: Debug;
     type AddrState: SocketMapAddrStateSpec<Id = Self::Id, SharingState = Self::SharingState>;
@@ -1113,23 +1119,9 @@ mod tests {
     #[derive(Copy, Clone, Eq, PartialEq, Debug, Hash)]
     struct Listener(usize);
 
-    impl EntryKey for Listener {
-        fn get_key_index(&self) -> usize {
-            let Listener(index) = self;
-            *index
-        }
-    }
-
     impl From<usize> for Listener {
         fn from(index: usize) -> Listener {
             Listener(index)
-        }
-    }
-
-    impl EntryKey for Conn {
-        fn get_key_index(&self) -> usize {
-            let Conn(index) = self;
-            *index
         }
     }
 
