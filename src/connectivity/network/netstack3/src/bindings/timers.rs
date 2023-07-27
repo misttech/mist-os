@@ -633,8 +633,8 @@ mod tests {
     use super::*;
     use crate::bindings::integration_tests::set_logger_for_test;
     use assert_matches::assert_matches;
-    use futures::{channel::mpsc, task::Poll, Future, StreamExt};
-    use std::sync::Arc;
+    use futures::{channel::mpsc, Future, StreamExt};
+    use std::{sync::Arc, task::Poll};
     use test_case::test_case;
 
     type TestDispatcher = TimerDispatcher<usize>;
@@ -696,13 +696,9 @@ mod tests {
         f: Fut,
     ) -> R {
         futures::pin_mut!(f);
-        loop {
-            executor.wake_main_future();
-            match executor.run_one_step(&mut f) {
-                Some(Poll::Ready(x)) => break x,
-                None => panic!("Executor stalled"),
-                Some(Poll::Pending) => (),
-            }
+        match executor.run_until_stalled(&mut f) {
+            Poll::Ready(r) => r,
+            Poll::Pending => panic!("Executor stalled"),
         }
     }
 
