@@ -26,10 +26,7 @@
             path: "/data",
         },
         {
-            protocol: [
-                "fuchsia.kernel.VmexResource",
-                "fuchsia.process.Launcher",
-            ],
+            protocol: [ "fuchsia.process.Launcher" ],
         },
     ],
     expose: [

@@ -75,8 +75,8 @@
             url: "rust-test-runner#meta/rust-test-runner.cm",
         },
         {
-            name: "starnix_test_runners",
-            url: "starnix-test-runners#meta/starnix_test_runners.cm",
+            name: "starnix_unit_test_runner",
+            url: "starnix-test-runners#meta/starnix_unit_test_runner.cm",
         },
         {
             name: "go_test_runner",
@@ -332,31 +332,10 @@
                 "#netemul_test_runner",
                 "#runner_memfs",
                 "#rust_test_runner",
-                "#starnix_test_runners",
+                "#starnix_unit_test_runner",
                 "#stress_test_runner",
                 "#test_tmpfs",
             ],
-        },
-        {
-            protocol: [ "fuchsia.tracing.provider.Registry" ],
-            from: "parent",
-            to: [ "#starnix_test_runners" ],
-        },
-        {
-            protocol: [
-                "fuchsia.kernel.Stats",
-                "fuchsia.kernel.VmexResource",
-                "fuchsia.posix.socket.Provider",
-                "fuchsia.posix.socket.raw.Provider",
-                "fuchsia.sysmem.Allocator",
-                "fuchsia.ui.composition.Allocator",
-                "fuchsia.ui.composition.Flatland",
-                "fuchsia.ui.input3.Keyboard",
-                "fuchsia.ui.scenic.Scenic",
-                "fuchsia.vulkan.loader.Loader",
-            ],
-            from: "parent",
-            to: [ "#starnix_test_runners" ],
         },
         {
             protocol: "fuchsia.process.Launcher",
@@ -373,7 +352,7 @@
                 "#netemul_test_runner",
                 "#rust_test_next_vdso_runner",
                 "#rust_test_runner",
-                "#starnix_test_runners",
+                "#starnix_unit_test_runner",
             ],
         },
         {
@@ -390,7 +369,7 @@
                 "#gunit_runner",
                 "#rust_test_next_vdso_runner",
                 "#rust_test_runner",
-                "#starnix_test_runners",
+                "#starnix_unit_test_runner",
             ],
         },
         {
@@ -428,7 +407,7 @@
                 "#gunit_runner",
                 "#rust_test_next_vdso_runner",
                 "#rust_test_runner",
-                "#starnix_test_runners",
+                "#starnix_unit_test_runner",
             ],
         },
         {
@@ -483,7 +462,6 @@
             from: "self",
             to: [
                 "#g3_dart_jit_product_runner",
-                "#starnix_test_runners",
                 "#system-tests",
                 "#tests",
             ],
@@ -560,10 +538,7 @@
         {
             directory: "dev-gpu",
             from: "parent",
-            to: [
-                "#starnix_test_runners",
-                "#system-tests",
-            ],
+            to: [ "#system-tests" ],
             rights: [ "r*" ],
         },
         {

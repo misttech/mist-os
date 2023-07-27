@@ -1285,62 +1285,6 @@
                     },
                 },
                 {
-                    using_node: "/core/test_manager/starnix_test_runners",
-                    capability: "fuchsia.ui.composition.Allocator",
-                    error: {
-                        error: {
-                            analyzer_model_error: {
-                                routing_error: {
-                                    availability_routing_error: "offer_from_void_to_required_target",
-                                },
-                            },
-                        },
-                        message: "Offer uses void source, but target requires the capability",
-                    },
-                },
-                {
-                    using_node: "/core/test_manager/starnix_test_runners",
-                    capability: "fuchsia.ui.composition.Flatland",
-                    error: {
-                        error: {
-                            analyzer_model_error: {
-                                routing_error: {
-                                    availability_routing_error: "offer_from_void_to_required_target",
-                                },
-                            },
-                        },
-                        message: "Offer uses void source, but target requires the capability",
-                    },
-                },
-                {
-                    using_node: "/core/test_manager/starnix_test_runners",
-                    capability: "fuchsia.ui.input3.Keyboard",
-                    error: {
-                        error: {
-                            analyzer_model_error: {
-                                routing_error: {
-                                    availability_routing_error: "offer_from_void_to_required_target",
-                                },
-                            },
-                        },
-                        message: "Offer uses void source, but target requires the capability",
-                    },
-                },
-                {
-                    using_node: "/core/test_manager/starnix_test_runners",
-                    capability: "fuchsia.ui.scenic.Scenic",
-                    error: {
-                        error: {
-                            analyzer_model_error: {
-                                routing_error: {
-                                    availability_routing_error: "offer_from_void_to_required_target",
-                                },
-                            },
-                        },
-                        message: "Offer uses void source, but target requires the capability",
-                    },
-                },
-                {
                     using_node: "/core/test_manager/netemul_test_runner/sandbox",
                     capability: "fuchsia.diagnostics.ArchiveAccessor",
                     error: {
