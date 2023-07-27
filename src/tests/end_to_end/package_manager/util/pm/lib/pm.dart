@@ -23,6 +23,7 @@ import 'package:test/test.dart';
 class PackageManagerRepo {
   final sl4f.Sl4f _sl4fDriver;
   final String _pmPath;
+  final String _ffxPath;
   final String _repoPath;
   final Logger _log;
   Optional<Process> _serveProcess;
@@ -66,8 +67,8 @@ class PackageManagerRepo {
     return _serveStderr.value.split();
   }
 
-  PackageManagerRepo._create(
-      this._sl4fDriver, this._pmPath, this._repoPath, this._log) {
+  PackageManagerRepo._create(this._sl4fDriver, this._pmPath, this._ffxPath,
+      this._repoPath, this._log) {
     _serveProcess = Optional.absent();
     _servePort = Optional.absent();
     _serveStdout = Optional.absent();
@@ -75,28 +76,30 @@ class PackageManagerRepo {
   }
 
   static Future<PackageManagerRepo> initRepo(
-      sl4f.Sl4f sl4fDriver, String pmPath, Logger log) async {
+      sl4f.Sl4f sl4fDriver, String pmPath, String ffxPath, Logger log) async {
     var repoPath = (await Directory.systemTemp.createTemp('repo')).path;
-    return PackageManagerRepo._create(sl4fDriver, pmPath, repoPath, log);
+    return PackageManagerRepo._create(
+        sl4fDriver, pmPath, ffxPath, repoPath, log);
   }
 
-  /// Create new repo using `pm newrepo`.
+  /// Create new repo using `ffx repository create`.
   ///
   /// Uses this command:
-  /// `pm newrepo -repo=<repo path>`
-  Future<ProcessResult> pmNewrepoRepo() async {
+  /// `ffx repository create <repo path>`
+  Future<ProcessResult> ffxRepositoryCreate() async {
     _log.info('Initializing repo: $_repoPath');
-    return Process.run(_pmPath, ['newrepo', '-repo=$_repoPath']);
+
+    return Process.run(_ffxPath, ['repository', 'create', _repoPath]);
   }
 
-  /// Publish an archive to a repo using `pm publish`.
+  /// Publish an archive to a repo using `ffx repository publish`.
   ///
   /// Uses this command:
-  /// `pm publish -a -f=<archive path> -repo=<repo path>`
-  Future<ProcessResult> pmPublishAFRepo(String archivePath) async {
+  /// `ffx repository publish --package-archive <archive path> <repo path>`
+  Future<ProcessResult> ffxRepositoryPublish(String archivePath) async {
     _log.info('Publishing $archivePath to repo.');
-    return Process.run(
-        _pmPath, ['publish', '-a', '-f=$archivePath', '-repo=$_repoPath']);
+    return Process.run(_ffxPath,
+        ['repository', 'publish', '--package-archive', archivePath, _repoPath]);
   }
 
   /// Create archive for a given manifest using `pm archive`.
@@ -392,7 +395,7 @@ class PackageManagerRepo {
 
   Future<bool> setupRepo(String farPath, String manifestPath) async {
     var responses =
-        await Future.wait([pmNewrepoRepo(), pmMArchive(manifestPath)]);
+        await Future.wait([ffxRepositoryCreate(), pmMArchive(manifestPath)]);
     expect(responses.length, 2);
     // Response for creating a new repo.
     expect(responses[0].exitCode, 0);
@@ -403,7 +406,7 @@ class PackageManagerRepo {
         Platform.script.resolve('runtime_deps/$farPath').toFilePath();
     _log.info(
         'Publishing package from archive: $archivePath to repo: $_repoPath');
-    final publishPackageResponse = await pmPublishAFRepo(archivePath);
+    final publishPackageResponse = await ffxRepositoryPublish(archivePath);
     expect(publishPackageResponse.exitCode, 0);
 
     return true;
