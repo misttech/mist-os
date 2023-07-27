@@ -8,6 +8,7 @@ load(
     "FuchsiaAssembledPackageInfo",
     "FuchsiaProductConfigInfo",
 )
+load(":util.bzl", "extract_labels", "replace_labels_with_files")
 load("//fuchsia/private:providers.bzl", "FuchsiaPackageInfo")
 
 # Define build types
@@ -48,21 +49,8 @@ def _collect_file_deps(dep):
     return dep[FuchsiaAssembledPackageInfo].files
 
 def _fuchsia_product_configuration_impl(ctx):
-    product_config = json.decode(ctx.attr.raw_config)
-
-    # Replace "Label(...)" strings in the product config with real label paths from raw_config_labels.
-    inverted_raw_config_labels = {}
-    for label, string in ctx.attr.raw_config_labels.items():
-        inverted_raw_config_labels[string] = label
-
-    def _replace_labels_visitor(dictionary, key, value):
-        if type(value) == "string" and value in inverted_raw_config_labels:
-            label = inverted_raw_config_labels.get(value)
-            label_files = label.files.to_list()
-            dictionary[key] = label_files[0].path
-
-    _walk_json(product_config, [_replace_labels_visitor])
-
+    product_config = json.decode(ctx.attr.product_config)
+    replace_labels_with_files(product_config, ctx.attr.product_config_labels)
     product = product_config.get("product", {})
     packages = {}
 
@@ -98,7 +86,7 @@ def _fuchsia_product_configuration_impl(ctx):
     ctx.actions.write(product_config_file, content)
 
     return [
-        DefaultInfo(files = depset(direct = [product_config_file] + pkg_files + ctx.files.raw_config_labels)),
+        DefaultInfo(files = depset(direct = [product_config_file] + pkg_files + ctx.files.product_config_labels)),
         FuchsiaProductConfigInfo(
             product_config = product_config_file,
         ),
@@ -109,9 +97,14 @@ _fuchsia_product_configuration = rule(
     implementation = _fuchsia_product_configuration_impl,
     toolchains = ["@fuchsia_sdk//fuchsia:toolchain"],
     attrs = {
-        "raw_config": attr.string(
+        "product_config": attr.string(
             doc = "Raw json config. Used as a base template for the config",
             default = "{}",
+        ),
+        "product_config_labels": attr.label_keyed_string_dict(
+            doc = """Map of labels to LABEL(label) strings in the product config.""",
+            allow_files = True,
+            default = {},
         ),
         "base_packages": attr.label_list(
             doc = "Fuchsia packages to be included in base.",
@@ -134,52 +127,8 @@ _fuchsia_product_configuration = rule(
             providers = [FuchsiaPackageInfo],
             default = [],
         ),
-        "raw_config_labels": attr.label_keyed_string_dict(
-            doc = """Used internally by fuchsia_product_configuration.
-Do not use otherwise""",
-            allow_files = True,
-            default = {},
-        ),
     },
 )
-
-def _walk_json(json_dict, visit_node_funcs):
-    """Walks a json dictionary, applying the functions in `visit_node_funcs` on every node.
-
-    Args:
-        json_dict: The dictionary to walk.
-        visit_node_funcs: A function that takes 3 arguments: dictionary, key, value.
-    """
-    nodes_to_visit = []
-
-    def _enqueue(dictionary, k, v):
-        nodes_to_visit.append(struct(
-            dictionary = dictionary,
-            key = k,
-            value = v,
-        ))
-
-    def _enqueue_dictionary_children(dictionary):
-        for key, value in dictionary.items():
-            _enqueue(dictionary, key, value)
-
-    _enqueue_dictionary_children(json_dict)
-
-    # Bazel doesn't support recursions, but we don't expect
-    # a json object with more than 100K nodes, so this iteration
-    # suffices.
-    max_nodes = 100000
-    for _unused in range(0, max_nodes):
-        if not len(nodes_to_visit):
-            break
-        node = nodes_to_visit.pop()
-        for visit_node_func in visit_node_funcs:
-            visit_node_func(dictionary = node.dictionary, key = node.key, value = node.value)
-        if type(node.value) == "dict":
-            _enqueue_dictionary_children(node.value)
-
-    if nodes_to_visit:
-        fail("More than %s nodes in the input json_dict" % max_nodes)
 
 def fuchsia_product_configuration(
         name,
@@ -220,37 +169,10 @@ def fuchsia_product_configuration(
     if type(json_config) != "dict":
         fail("expecting a dictionary")
 
-    extracted_raw_config_labels = {}
-
-    def _extract_labels_visitor(dictionary, key, value):
-        if type(value) == "string" and value.startswith("LABEL("):
-            if not value.endswith(")"):
-                fail("Syntax error: LABEL does not have closing bracket")
-            label = value[6:-1]
-            extracted_raw_config_labels[label] = value
-
-    def _remove_none_values_visitor(dictionary, key, value):
-        """Remove keys with a value of None.
-
-        Some optional keys will necessarily be supplied as 'None' value instead
-        of being omitted entirely, because Bazel doesn't allow the use of top-
-        level 'if' statements, instead, they can only be used within the value
-        of an expression:
-
-          "foo": value if foo else None
-
-        However, we want to strip those 'None' values before generating the json
-        from the nested dicts.
-        """
-        if value == None:
-            dictionary.pop(key)
-
-    _walk_json(json_config, [_remove_none_values_visitor, _extract_labels_visitor])
-
     _fuchsia_product_configuration(
         name = name,
-        raw_config = json.encode_indent(json_config, indent = "    "),
-        raw_config_labels = extracted_raw_config_labels,
+        product_config = json.encode_indent(json_config, indent = "    "),
+        product_config_labels = extract_labels(json_config),
         base_packages = base_packages,
         cache_packages = cache_packages,
         base_driver_packages = base_driver_packages,
