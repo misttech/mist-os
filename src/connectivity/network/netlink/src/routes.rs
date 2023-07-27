@@ -1649,23 +1649,39 @@ mod tests {
         assert_eq!(&other_sink.take_messages()[..], &[]);
 
         let route_client = &route_client;
-        let fut = futures::stream::iter(args).fold(
-            (Vec::new(), request_sink),
-            |(mut results, mut request_sink), args| async move {
-                let (completer, waiter) = oneshot::channel();
-                request_sink
-                    .send(Request {
-                        args,
-                        sequence_number: TEST_SEQUENCE_NUMBER,
-                        client: route_client.clone(),
-                        completer,
-                    })
-                    .await
-                    .unwrap();
-                results.push(waiter.await.unwrap());
-                (results, request_sink)
-            },
-        );
+        let fut = async {
+            let (results, _request_sink) = futures::stream::iter(args)
+                .fold(
+                    (Vec::new(), request_sink),
+                    |(mut results, mut request_sink), args| async move {
+                        let (completer, waiter) = oneshot::channel();
+                        request_sink
+                            .send(Request {
+                                args,
+                                sequence_number: TEST_SEQUENCE_NUMBER,
+                                client: route_client.clone(),
+                                completer,
+                            })
+                            .await
+                            .unwrap();
+                        results.push(waiter.await.unwrap());
+                        (results, request_sink)
+                    },
+                )
+                .await;
+
+            let messages = {
+                assert_eq!(&other_sink.take_messages()[..], &[]);
+                let mut messages = Vec::new();
+                while messages.len() < num_sink_messages {
+                    messages.push(route_sink.next_message().await);
+                }
+                assert_eq!(route_sink.next_message().now_or_never(), None);
+                messages
+            };
+
+            (messages, results)
+        };
 
         let route_set_fut = respond_to_route_set_modifications::<A::Version, _, _>(
             route_set_stream.by_ref(),
@@ -1676,20 +1692,14 @@ mod tests {
 
         let root_interfaces_fut = root_handler(interfaces_request_stream).fuse();
 
-        let waiter_results = futures::select! {
-            (results, _request_sink) = fut.fuse() => results,
+        let (messages, results) = futures::select! {
+            (messages, results) = fut.fuse() => (messages, results),
             res = futures::future::join3(route_set_fut, root_interfaces_fut, event_loop_fut) => {
                 unreachable!("eventloop/stream handlers should not return: {res:?}")
             }
         };
 
-        assert_eq!(&other_sink.take_messages()[..], &[]);
-        let mut messages = Vec::new();
-        while messages.len() < num_sink_messages {
-            messages.push(route_sink.next_message().await);
-        }
-        assert_eq!(route_sink.next_message().now_or_never(), None);
-        TestRequestResult { messages, waiter_results }
+        TestRequestResult { messages, waiter_results: results }
     }
 
     #[test_case(V4_SUB1, V4_NEXTHOP1, V4_NEXTHOP2; "v4_route_dump")]
