@@ -29,9 +29,6 @@ closed protocol Controller {
 type StartChildArgs = resource table {
     /// The numbered handles to pass to the component instance.
     ///
-    /// Only PA_FD and PA_USER* handles are valid arguments, and inclusion of
-    /// any other handles will result in an error.
-    ///
     /// If the runner for the component does not support the numbered handles it
     /// is expected to close the handles.
     ///

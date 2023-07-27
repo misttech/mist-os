@@ -62,7 +62,7 @@ use {
         root_stop_notifier::RootStopNotifier,
     },
     ::routing::{
-        config::RuntimeConfig,
+        config::{RuntimeConfig, VmexSource},
         environment::{DebugRegistry, RunnerRegistry},
     },
     anyhow::{format_err, Context as _, Error},
@@ -211,25 +211,43 @@ impl BuiltinEnvironmentBuilder {
     }
 
     pub async fn build(mut self) -> Result<BuiltinEnvironment, Error> {
+        let runtime_config = self
+            .runtime_config
+            .ok_or(format_err!("Runtime config is required for BuiltinEnvironment."))?;
+
         let system_resource_handle =
             take_startup_handle(HandleType::SystemResource.into()).map(zx::Resource::from);
         if let Some(bootfs_svc) = self.bootfs_svc {
             // Set up the Rust bootfs VFS, and bind to the '/boot' namespace. This should
             // happen as early as possible when building the component manager as other objects
             // may require reading from '/boot' for configuration, etc.
-            bootfs_svc
-                .ingest_bootfs_vmo(&system_resource_handle)?
-                .publish_kernel_vmo(get_stable_vdso_vmo()?)?
-                .publish_kernel_vmo(get_next_vdso_vmo()?)?
-                .publish_kernel_vmo(get_vdso_vmo(cstr!("vdso/test1"))?)?
-                .publish_kernel_vmo(get_vdso_vmo(cstr!("vdso/test2"))?)?
-                .publish_kernel_vmos(HandleType::KernelFileVmo, 0)?
-                .create_and_bind_vfs()?;
+            let bootfs_svc = match runtime_config.vmex_source {
+                VmexSource::SystemResource => bootfs_svc
+                    .ingest_bootfs_vmo_with_system_resource(&system_resource_handle)?
+                    .publish_kernel_vmo(get_stable_vdso_vmo()?)?
+                    .publish_kernel_vmo(get_next_vdso_vmo()?)?
+                    .publish_kernel_vmo(get_vdso_vmo(cstr!("vdso/test1"))?)?
+                    .publish_kernel_vmo(get_vdso_vmo(cstr!("vdso/test2"))?)?
+                    .publish_kernel_vmos(HandleType::KernelFileVmo, 0)?,
+                VmexSource::Namespace => {
+                    let mut bootfs_svc = bootfs_svc.ingest_bootfs_vmo_with_namespace_vmex().await?;
+                    // This is a nested component_manager - tolerate missing vdso's.
+                    for kernel_vmo in [
+                        get_stable_vdso_vmo(),
+                        get_next_vdso_vmo(),
+                        get_vdso_vmo(cstr!("vdso/test1")),
+                        get_vdso_vmo(cstr!("vdso/test2")),
+                    ]
+                    .into_iter()
+                    .filter_map(|v| v.ok())
+                    {
+                        bootfs_svc = bootfs_svc.publish_kernel_vmo(kernel_vmo)?;
+                    }
+                    bootfs_svc.publish_kernel_vmos(HandleType::KernelFileVmo, 0)?
+                }
+            };
+            bootfs_svc.create_and_bind_vfs()?;
         }
-
-        let runtime_config = self
-            .runtime_config
-            .ok_or(format_err!("Runtime config is required for BuiltinEnvironment."))?;
 
         let root_component_url = match runtime_config.root_component_url.as_ref() {
             Some(url) => url.clone(),

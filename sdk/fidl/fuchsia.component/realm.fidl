@@ -109,10 +109,6 @@ closed protocol Realm {
 type CreateChildArgs = resource table {
     /// The numbered handles to pass to the component instance.
     ///
-    /// Only PA_FD and PA_USER* handles are valid arguments, and inclusion of any other
-    /// handles will result in an error. This argument is only supported for components
-    /// in a collection with `SingleRun` durability.
-    ///
     /// If the runner for the component does not support the numbered handles it is
     /// expected to close the handles.
     1: numbered_handles vector<fuchsia.process.HandleInfo>:MAX_HANDLE_COUNT;

@@ -9,7 +9,7 @@
         "syslog/client.shard.cml",
     ],
     program: {
-        binary: "bin/component_manager_lib_test",
+        binary: "bin/component_manager_bin_test",
     },
     use: [
         {

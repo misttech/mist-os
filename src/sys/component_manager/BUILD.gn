@@ -12,10 +12,12 @@ import("//build/rust/rustc_library.gni")
 import("//build/testing/environments.gni")
 import("//tools/fidl/measure-tape/measure_tape.gni")
 
-rustc_library("lib") {
+rustc_binary("bin") {
   name = "component_manager"
   with_unit_tests = true
   edition = "2021"
+
+  configs += [ "//build/config/rust:bootfs" ]
 
   deps = [
     ":measure_tape_for_events",
@@ -38,6 +40,7 @@ rustc_library("lib") {
     "//src/lib/cstr",
     "//src/lib/diagnostics/inspect/runtime/rust",
     "//src/lib/diagnostics/inspect/rust",
+    "//src/lib/diagnostics/log/rust",
     "//src/lib/error/clonable_error",
     "//src/lib/fdio/rust:fdio",
     "//src/lib/fidl/rust/fidl",
@@ -81,6 +84,28 @@ rustc_library("lib") {
     "//third_party/rust_crates:rand",
     "//third_party/rust_crates:thiserror",
     "//third_party/rust_crates:tracing",
+  ]
+
+  test_deps = [
+    "//examples/components/routing/fidl:echo_rust",
+    "//sdk/fidl/fuchsia.data:fuchsia.data_rust",
+    "//src/lib/diagnostics/hierarchy/rust",
+    "//src/lib/diagnostics/log/message/rust",
+    "//src/lib/fuchsia",
+    "//src/lib/process_builder:test-util-fidl_rust",
+    "//src/sys/lib/cm_rust/testing",
+    "//src/sys/lib/component_id_index",
+    "//src/sys/lib/library_loader",
+    "//src/sys/lib/routing/testing:routing_test_helpers",
+    "//third_party/rust_crates:assert_matches",
+    "//third_party/rust_crates:byteorder",
+    "//third_party/rust_crates:paste",
+    "//third_party/rust_crates:pretty_assertions",
+    "//third_party/rust_crates:proptest",
+    "//third_party/rust_crates:serde_json",
+    "//third_party/rust_crates:tempfile",
+    "//third_party/rust_crates:test-case",
+    "//third_party/rust_crates:zerocopy",
   ]
 
   sources = [
@@ -137,7 +162,7 @@ rustc_library("lib") {
     "src/framework/realm.rs",
     "src/framework/realm_query.rs",
     "src/framework/route_validator.rs",
-    "src/lib.rs",
+    "src/main.rs",
     "src/model/actions/destroy.rs",
     "src/model/actions/destroy_child.rs",
     "src/model/actions/discover.rs",
@@ -198,58 +223,14 @@ rustc_library("lib") {
     "src/startup.rs",
   ]
 
-  test_deps = [
-    "//examples/components/routing/fidl:echo_rust",
-    "//sdk/fidl/fuchsia.data:fuchsia.data_rust",
-    "//src/lib/diagnostics/hierarchy/rust",
-    "//src/lib/diagnostics/log/message/rust",
-    "//src/lib/fuchsia",
-    "//src/lib/process_builder:test-util-fidl_rust",
-    "//src/sys/lib/cm_rust/testing",
-    "//src/sys/lib/component_id_index",
-    "//src/sys/lib/library_loader",
-    "//src/sys/lib/routing/testing:routing_test_helpers",
-    "//third_party/rust_crates:assert_matches",
-    "//third_party/rust_crates:byteorder",
-    "//third_party/rust_crates:paste",
-    "//third_party/rust_crates:pretty_assertions",
-    "//third_party/rust_crates:proptest",
-    "//third_party/rust_crates:serde_json",
-    "//third_party/rust_crates:tempfile",
-    "//third_party/rust_crates:test-case",
-    "//third_party/rust_crates:zerocopy",
-  ]
-
   # component_manager should not depend on json5
   assert_no_deps = [
+    # regex crate is large
+    "//third_party/rust_crates:regex",
+
     # component_manager should not depend on json5
     "//third_party/rust_crates:serde_json5",
-    # TODO(fxbug.dev/119607): remove dep on regex (there are still
-    # transitive deps)
-    #"//third_party/rust_crates:regex",
   ]
-}
-
-rustc_binary("bin") {
-  name = "component_manager"
-  edition = "2021"
-
-  configs += [ "//build/config/rust:bootfs" ]
-
-  deps = [
-    ":lib",
-    "//sdk/fidl/fuchsia.component.internal:fuchsia.component.internal_rust",
-    "//src/lib/diagnostics/log/rust",
-    "//src/lib/fuchsia-async",
-    "//src/lib/fuchsia-runtime",
-    "//src/lib/zircon/rust:fuchsia-zircon",
-    "//src/sys/component_manager/lib/logger",
-    "//src/sys/lib/routing",
-    "//third_party/rust_crates:anyhow",
-    "//third_party/rust_crates:tracing",
-  ]
-
-  sources = [ "src/main.rs" ]
 }
 
 # This v2 component bundles component manager with a config suitable for running
@@ -282,7 +263,7 @@ resource("component_manager_tests_invalid_manifest") {
 
 fuchsia_test_component("component-manager-tests-cmp") {
   deps = [
-    ":lib_test",
+    ":bin_test",
     "//src/lib/process_builder:test_util",
   ]
   component_name = "component_manager_tests"

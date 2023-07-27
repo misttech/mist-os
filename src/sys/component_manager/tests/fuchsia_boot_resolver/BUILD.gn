@@ -4,6 +4,7 @@
 
 import("//build/assembly/assembled_system.gni")
 import("//build/assembly/generated_images_config.gni")
+import("//build/component/config.gni")
 import("//build/components/fuchsia_package.gni")
 import("//build/testing/host_test_data.gni")
 import("//build/zircon/tools.gni")
@@ -15,12 +16,17 @@ rustc_test("resolve_bootfs_package") {
   source_root = "src/resolve_bootfs_package.rs"
 
   deps = [
-    "//sdk/fidl/fuchsia.component.resolution:fuchsia.component.resolution_rust",
+    "//sdk/fidl/fuchsia.component:fuchsia.component_rust",
     "//sdk/fidl/fuchsia.io:fuchsia.io_rust",
+    "//sdk/fidl/fuchsia.process:fuchsia.process_rust",
+    "//sdk/fidl/fuchsia.sys2:fuchsia.sys2_rust",
+    "//src/lib/fidl/rust/fidl",
     "//src/lib/fuchsia",
+    "//src/lib/fuchsia-component-test",
     "//src/lib/fuchsia-fs",
+    "//src/lib/fuchsia-runtime",
     "//src/lib/storage/vfs/rust:vfs",
-    "//src/sys/component_manager:lib",
+    "//src/lib/zircon/rust:fuchsia-zircon",
   ]
 
   sources = [ "src/resolve_bootfs_package.rs" ]
@@ -38,7 +44,7 @@ if (current_toolchain == default_toolchain) {
     assembly_images_config_label = ":images_config"
     product_assembly_config_label = "//build/assembly:default_product_config"
     use_bringup_platform_bundles_only = true
-    bootfs_labels = []
+    bootfs_labels = [ ":config" ]
     bootfs_package_labels = [ "//src/security/tests/pkg_test/assemblies/hello_world_v1:hello_world-package" ]
     base_packages = []
   }
@@ -84,6 +90,7 @@ if (current_toolchain == default_toolchain) {
       ":bootfs_resource",
       ":resolve_bootfs_package",
     ]
+    test_type = "system"
   }
 
   # This module tests the property that the FuchsiaBootResolver successfully
@@ -92,7 +99,23 @@ if (current_toolchain == default_toolchain) {
   # to generate a wellformed hermetic bootfs.
   fuchsia_test_package("fuchsia-boot-resolver-integration-tests") {
     test_components = [ ":resolve_bootfs_package-component" ]
-    deps = [ ":bootfs_resource" ]
+    deps = [
+      ":bootfs_resource",
+      ":component-manager-cmp",
+    ]
+  }
+
+  component_config("config") {
+    testonly = true
+    sources = [ "config.json5" ]
+    dest = "data/component_manager_config"
+  }
+
+  fuchsia_component("component-manager-cmp") {
+    testonly = true
+    component_name = "component_manager"
+    manifest = "meta/component_manager.cml"
+    deps = [ "//src/sys/component_manager:bin" ]
   }
 
   group("tests") {

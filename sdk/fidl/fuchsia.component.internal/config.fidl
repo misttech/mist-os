@@ -91,6 +91,10 @@ type Config = table {
     /// The enforcement and validation policy to apply to component target ABI revisions.
     /// If not present, defaults to `AbiRevisionPolicy::ALLOW_ALL`.
    19: abi_revision_policy AbiRevisionPolicy;
+
+    /// Where to obtain the vmex resource from, if this component_manager is hosting bootfs.
+    /// If not present, defaults to `VmexSource::SYSTEM_RESOURCE`.
+   20: vmex_source VmexSource;
 };
 
 /// The enforcement and validation policy to apply to component target ABI revisions.
@@ -105,6 +109,16 @@ type AbiRevisionPolicy = strict enum : uint8 {
     // Enforce that a target ABI revision must exist for every component and be compatible with the
     // current Fuchsia platform.
     ENFORCE_PRESENCE_AND_COMPATIBILITY = 3;
+};
+
+/// Where to obtain the vmex resource from, if this component_manager is hosting bootfs.
+type VmexSource = strict enum : uint8 {
+    /// Get it from the PA_SYSTEM_RESOURCE handle passed to component_manager
+    SYSTEM_RESOURCE = 1;
+
+    /// Get it from the /svc/fuchsia.kernel.VmexResource protocol in
+    /// component_manager's namespace.
+    NAMESPACE = 2;
 };
 
 /// The builtin resolver to use for the fuchsia-boot scheme, if any.

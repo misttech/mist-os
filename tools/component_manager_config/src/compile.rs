@@ -38,6 +38,7 @@ struct Config {
     realm_builder_resolver_and_runner: Option<RealmBuilderResolverAndRunner>,
     enable_introspection: Option<bool>,
     abi_revision_policy: Option<AbiRevisionPolicy>,
+    vmex_source: Option<VmexSource>,
 }
 
 #[derive(Deserialize, Debug)]
@@ -87,6 +88,15 @@ symmetrical_enums!(
     EnforcePresenceOnly,
     EnforcePresenceAndCompatibility
 );
+
+#[derive(Deserialize, Debug)]
+#[serde(rename_all = "snake_case")]
+pub enum VmexSource {
+    SystemResource,
+    Namespace,
+}
+
+symmetrical_enums!(VmexSource, component_internal::VmexSource, SystemResource, Namespace);
 
 #[derive(Deserialize, Debug, Default)]
 #[serde(deny_unknown_fields)]
@@ -254,6 +264,7 @@ impl TryFrom<Config> for component_internal::Config {
                 .realm_builder_resolver_and_runner
                 .map(Into::into),
             abi_revision_policy: config.abi_revision_policy.map(Into::into),
+            vmex_source: config.vmex_source.map(Into::into),
             ..Default::default()
         })
     }
@@ -385,6 +396,7 @@ impl Config {
                 realm_builder_resolver_and_runner
             ),
             abi_revision_policy: merge_field!(self, another, abi_revision_policy),
+            vmex_source: merge_field!(self, another, vmex_source),
         })
     }
 
@@ -579,6 +591,7 @@ mod tests {
             log_all_events: true,
             builtin_boot_resolver: "boot",
             realm_builder_resolver_and_runner: "namespace",
+            vmex_source: "namespace",
         }"#;
         let config = compile_str(input).expect("failed to compile");
         assert_eq!(
@@ -692,6 +705,7 @@ mod tests {
                 realm_builder_resolver_and_runner: Some(
                     component_internal::RealmBuilderResolverAndRunner::Namespace
                 ),
+                vmex_source: Some(component_internal::VmexSource::Namespace),
                 ..Default::default()
             }
         );

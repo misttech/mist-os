@@ -6,8 +6,13 @@
 /// resolves components that are encoded in a meta.far. This test is fully
 /// hermetic.
 use {
-    component_manager::{bootfs::BootfsSvc, builtin::fuchsia_boot_resolver::FuchsiaBootResolver},
-    fidl_fuchsia_component_resolution as fresolution, fidl_fuchsia_io as fio, fuchsia_fs,
+    fidl::endpoints,
+    fidl_fuchsia_component as fcomponent, fidl_fuchsia_io as fio, fidl_fuchsia_process as fprocess,
+    fidl_fuchsia_sys2 as fsys,
+    fuchsia_component_test::ScopedInstance,
+    fuchsia_fs,
+    fuchsia_runtime::{HandleInfo, HandleType},
+    fuchsia_zircon::HandleBased,
 };
 
 // macros
@@ -16,7 +21,6 @@ use vfs::assert_read_dirents;
 use vfs::directory::test_utils::DirentsSameInodeBuilder;
 
 const ZBI_PATH: &str = "/pkg/data/tests/uncompressed_bootfs";
-const HELLO_WORLD_URL: &str = "fuchsia-boot:///hello_world#meta/hello_world.cm";
 #[fuchsia::test]
 async fn package_resolution() {
     let bootfs_image = fuchsia_fs::file::open_in_namespace(
@@ -30,22 +34,42 @@ async fn package_resolution() {
         .await
         .unwrap()
         .unwrap();
+    let numbered_handles = vec![fprocess::HandleInfo {
+        handle: vmo.into_handle(),
+        id: HandleInfo::from(HandleType::BootfsVmo).as_raw(),
+    }];
+    let instance =
+        ScopedInstance::new("coll".into(), "#meta/component_manager.cm".into()).await.unwrap();
+    let args = fcomponent::StartChildArgs {
+        numbered_handles: Some(numbered_handles),
+        ..Default::default()
+    };
+    let _cm_controller = instance.start_with_args(args).await.unwrap();
 
-    let bootfs_svc = BootfsSvc::new_for_test(vmo).unwrap();
+    // Confirm root component (hello_world.cm) can start and exit.
+    let lifecycle_controller =
+        instance.connect_to_protocol_at_exposed_dir::<fsys::LifecycleControllerMarker>().unwrap();
+    let (_binder, server_end) = endpoints::create_proxy::<fcomponent::BinderMarker>().unwrap();
+    // Confirm root component (hello_world.cm) can be started.
+    lifecycle_controller.start_instance(".".into(), server_end).await.unwrap().unwrap();
 
-    bootfs_svc.ingest_bootfs_vmo_for_test().unwrap().create_and_bind_vfs().unwrap();
-
-    let boot_resolver = FuchsiaBootResolver::new("/boot").await.unwrap().unwrap();
-
-    let fresolution::Component { url, package, .. } =
-        boot_resolver.resolve_async(HELLO_WORLD_URL).await.unwrap();
-
-    assert_eq!(url.unwrap(), HELLO_WORLD_URL);
-
-    let package_url = &package.as_ref().unwrap().url.as_ref().unwrap();
-    assert_eq!(*package_url.to_owned(), "fuchsia-boot:///hello_world".to_string());
-
-    let dir_proxy = package.unwrap().directory.unwrap().into_proxy().unwrap();
+    // Verify the contents of hello_world's /pkg match what we expect.
+    let realm_query =
+        instance.connect_to_protocol_at_exposed_dir::<fsys::RealmQueryMarker>().unwrap();
+    let (dir_proxy, server_end) = endpoints::create_proxy::<fio::DirectoryMarker>().unwrap();
+    let server_end = endpoints::ServerEnd::new(server_end.into_channel());
+    realm_query
+        .open(
+            ".".into(),
+            fsys::OpenDirType::PackageDir,
+            fio::OpenFlags::RIGHT_READABLE,
+            fio::ModeType::empty(),
+            ".",
+            server_end,
+        )
+        .await
+        .unwrap()
+        .unwrap();
 
     let mut expected = DirentsSameInodeBuilder::new(fio::INO_UNKNOWN);
     expected

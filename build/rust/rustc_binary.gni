@@ -128,12 +128,15 @@ import("//build/toolchain/rbe.gni")
 #     The name of the target as it appears in the BUILD file. Enables tooling
 #     to find the template invocation in a BUILD file where this target was defined.
 #
-#    exclude_toolchain_tags (optional)
+#   exclude_toolchain_tags (optional)
 #     List of toolchain or variant tags to exclude this target from. This can be
 #     useful if the target is incompatible with a certain toolchain or variant.
 #     See build/toolchain/toolchain_tags.gni and build/toolchain/variant_tags.gni
 #     for a list of common tags.
 #
+#   assert_no_deps (optional)
+#     Ensure no deps on these targets, see [assert_no_deps](https://gn.googlesource.com/gn/+/main/docs/reference.md#var_assert_no_deps)
+
 # Example of usage:
 #
 #   rustc_binary("foo-bar") {
@@ -225,6 +228,7 @@ template("rustc_binary") {
                              [
                                "name",
                                "disable_rustdoc",
+                               "assert_no_deps",
                                "output_name",
                                "source_root",
                                "test_disable_rbe",
@@ -264,6 +268,7 @@ template("rustc_binary") {
 
     forward_variables_from(invoker,
                            [
+                             "assert_no_deps",
                              "disable_clippy",
                              "quiet_clippy",
                              "edition",

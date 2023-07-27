@@ -98,6 +98,9 @@ pub struct RuntimeConfig {
 
     /// The enforcement and validation policy to apply to component target ABI revisions.
     pub abi_revision_policy: AbiRevisionPolicy,
+
+    /// Where to get the vmex resource from.
+    pub vmex_source: VmexSource,
 }
 
 /// A single security policy allowlist entry.
@@ -351,6 +354,22 @@ impl AbiRevisionPolicy {
     }
 }
 
+/// Where to get the Vmex resource from, if this component_manager is hosting bootfs.
+/// Defaults to `SystemResource`.
+#[derive(Debug, PartialEq, Eq, Clone)]
+pub enum VmexSource {
+    SystemResource,
+    Namespace,
+}
+
+symmetrical_enums!(VmexSource, component_internal::VmexSource, SystemResource, Namespace);
+
+impl Default for VmexSource {
+    fn default() -> Self {
+        VmexSource::SystemResource
+    }
+}
+
 /// Allowlist key for capability routing policy. Part of the runtime
 /// security policy. This defines all the required keying information to lookup
 /// whether a capability exists in the policy map or not.
@@ -383,6 +402,7 @@ impl Default for RuntimeConfig {
             builtin_boot_resolver: BuiltinBootResolver::None,
             realm_builder_resolver_and_runner: RealmBuilderResolverAndRunner::None,
             abi_revision_policy: Default::default(),
+            vmex_source: Default::default(),
         }
     }
 }
@@ -550,6 +570,8 @@ impl TryFrom<component_internal::Config> for RuntimeConfig {
         let abi_revision_policy =
             config.abi_revision_policy.map(AbiRevisionPolicy::from).unwrap_or_default();
 
+        let vmex_source = config.vmex_source.map(VmexSource::from).unwrap_or_default();
+
         Ok(RuntimeConfig {
             list_children_batch_size,
             security_policy: Arc::new(security_policy),
@@ -579,6 +601,7 @@ impl TryFrom<component_internal::Config> for RuntimeConfig {
                 .realm_builder_resolver_and_runner
                 .unwrap_or(default.realm_builder_resolver_and_runner),
             abi_revision_policy,
+            vmex_source,
         })
     }
 }
@@ -938,6 +961,7 @@ mod tests {
                 builtin_boot_resolver: Some(component_internal::BuiltinBootResolver::None),
                 realm_builder_resolver_and_runner: Some(component_internal::RealmBuilderResolverAndRunner::None),
                 abi_revision_policy: Some(component_internal::AbiRevisionPolicy::AllowAll),
+                vmex_source: Some(component_internal::VmexSource::Namespace),
                 ..Default::default()
             },
             RuntimeConfig {
@@ -1062,6 +1086,7 @@ mod tests {
                 log_all_events: true,
                 builtin_boot_resolver: BuiltinBootResolver::None,
                 realm_builder_resolver_and_runner: RealmBuilderResolverAndRunner::None,
+                vmex_source: VmexSource::Namespace,
             }
         ),
     }
