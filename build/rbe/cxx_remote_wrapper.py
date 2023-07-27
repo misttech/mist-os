@@ -418,11 +418,23 @@ class CxxRemoteAction(object):
             self.vmsg(
                 "Running the original compile command (with -Wdate-time) locally twice and comparing outputs."
             )
+            output_files = self._remote_output_files()
+
+            max_attempts = self.determinism_attempts
+            # For http://fxbug.dev/130161, increase repetition count for
+            # known difficult-to-reproduce cases.
+            override_attempts = fuchsia.determinism_repetitions(output_files)
+            if override_attempts is not None:
+                msg(
+                    f"Notice: Overriding number of determinism repetitions: {override_attempts}"
+                )
+                max_attempts = override_attempts
+
             command = fuchsia.check_determinism_command(
                 exec_root=self.exec_root_rel,
-                outputs=self._remote_output_files(),
+                outputs=output_files,
                 command=self.original_compile_command,
-                max_attempts=self.determinism_attempts,
+                max_attempts=max_attempts,
                 miscomparison_export_dir=(
                     export_dir / self.build_subdir if export_dir else None),
                 label=self.label,

@@ -14,7 +14,7 @@ import os
 import platform
 import sys
 from pathlib import Path
-from typing import Callable, Iterable, Sequence
+from typing import Callable, Iterable, Optional, Sequence
 
 _SCRIPT_PATH = Path(__file__)
 _SCRIPT_BASENAME = _SCRIPT_PATH.name
@@ -160,6 +160,16 @@ def check_determinism_command(
         if miscomparison_export_dir else []) + [
             '--outputs',
         ] + [str(p) for p in outputs] + ['--'] + (command or [])
+
+
+def determinism_repetitions(paths: Iterable[Path]) -> Optional[int]:
+    """Override the maximum number of determinism repetitions for specific files."""
+    # For http://fxbug.dev/130161: Increase repetition count to increase
+    # chances of repro in infra.
+    if any('libminfs.vnode.cc' in str(path) for path in paths):
+        # Historically, this failed around 5% of the time in infra.
+        return 1000
+    return None
 
 
 # On platforms where ELF utils are unavailable, hardcode rustc's shlibs.
