@@ -1438,7 +1438,7 @@ func (ns *Netstack) addEndpoint(
 		return nil, fmt.Errorf("NIC %s: could not create NIC: %w", name, WrapTcpIpError(err))
 	}
 
-	_ = syslog.Infof("NIC %s added", name)
+	_ = syslog.Infof("NIC %s added as nicID (%d)", name, ifs.nicid)
 
 	if linkAddr := ep.LinkAddress(); len(linkAddr) > 0 {
 		dhcpClient := dhcp.NewClient(ns.stack, ifs.nicid, linkAddr, dhcpAcquisition, dhcpBackoff, dhcpRetransmission, ifs.dhcpAcquired)
