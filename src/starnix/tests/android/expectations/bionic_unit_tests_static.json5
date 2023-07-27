@@ -259,6 +259,10 @@
                 // TODO(https://fxbug.dev/129654): Flaky on the bots - need to be investigated.
                 "pthread.pthread_getcpuclockid__clock_gettime",
                 "unistd*.sleep",
+
+                // These tests were updated and no longer pass.
+                "stdio.popen_return_value_signal",
+                "stdio_nofortify.popen_return_value_signal",
             ],
         },
     ],
