@@ -918,7 +918,7 @@ pub(crate) mod testutil {
     pub(crate) struct FakeIpSocketCtx<I: IpDeviceStateIpExt, D> {
         pub(crate) table: ForwardingTable<I, D>,
         device_state: HashMap<D, IpDeviceState<FakeInstant, I>>,
-        ip_forwarding_ctx: FakeIpForwardingCtx<I, D>,
+        ip_forwarding_ctx: FakeIpForwardingCtx<D>,
     }
 
     impl<I: IpDeviceStateIpExt, D> AsRef<FakeIpDeviceIdCtx<D>> for FakeIpSocketCtx<I, D> {
