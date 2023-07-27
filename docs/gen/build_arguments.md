@@ -52,7 +52,7 @@ for all supported CPUs, not just $target_cpu.
 
 **Current value (from the default):** `false`
 
-From //zircon/kernel/BUILD.gn:25
+From //zircon/kernel/BUILD.gn:24
 
 ### all_cpu_phys_boot_tests
 
@@ -4226,7 +4226,7 @@ status of the fuchsia git repository.
 
 **Current value (from the default):** `""`
 
-From //zircon/kernel/lib/version/BUILD.gn:15
+From //zircon/kernel/lib/version/BUILD.gn:18
 
 ### kernel_zbi_extra_deps
 
@@ -4241,7 +4241,7 @@ the like can be listed here to be used as a ZBI-to-ZBI boot shim
 
 **Current value (from the default):** `[]`
 
-From //zircon/kernel/BUILD.gn:35
+From //zircon/kernel/BUILD.gn:34
 
 ### known_variants
 
