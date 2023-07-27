@@ -28,8 +28,7 @@ from honeydew.interfaces.device_classes import fuchsia_device
 _MOCK_ARGS: Dict[str, Any] = {
     "ffx_config":
         custom_types.FFXConfig(
-            isolate_dir=fuchsia_controller.IsolateDir(),
-            logs_dir="/tmp/logs"),
+            isolate_dir=fuchsia_controller.IsolateDir(), logs_dir="/tmp/logs"),
 }
 
 
@@ -435,7 +434,7 @@ class InitTests(unittest.TestCase):
         """Test case for honeydew.get_all_affordances() for a SL4F based
         device."""
         expected_affordances: List[str] = [
-            "bluetooth_gap", "component", "tracing"
+            "bluetooth_gap", "component", "tile", "tracing"
         ]
 
         self.assertEqual(
@@ -455,7 +454,7 @@ class InitTests(unittest.TestCase):
         """Test case for honeydew.get_all_affordances() for a Fuchsia-Controller
         based device."""
         expected_affordances: List[str] = [
-            "bluetooth_gap", "component", "tracing"
+            "bluetooth_gap", "component", "tile", "tracing"
         ]
 
         self.assertEqual(

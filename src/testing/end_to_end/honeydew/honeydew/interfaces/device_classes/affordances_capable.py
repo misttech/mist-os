@@ -10,6 +10,7 @@ from typing import Callable
 from honeydew.interfaces.affordances import component
 from honeydew.interfaces.affordances import tracing
 from honeydew.interfaces.affordances.bluetooth import bluetooth_gap
+from honeydew.interfaces.affordances.ui import tile
 from honeydew.interfaces.device_classes import fuchsia_device
 from honeydew.utils import properties
 
@@ -88,4 +89,18 @@ class TracingCapableDevice(abc.ABC):
 
         Returns:
             tracing.Tracing object
+        """
+
+
+class TileCapableDevice(abc.ABC):
+    """Abstract base class to be implemented by a device which supports the
+    Tile affordance."""
+
+    @properties.Affordance
+    @abc.abstractmethod
+    def tile(self) -> tile.Tile:
+        """Returns a tile affordance object.
+
+        Returns:
+            tile.Tile object
         """

@@ -123,6 +123,11 @@ class FuchsiaDeviceFCTests(unittest.TestCase):
         self.assertIsInstance(
             self.fd_obj, affordances_capable.RebootCapableDevice)
 
+    def test_fuchsia_device_is_tile_capable(self) -> None:
+        """Test case to make sure fuchsia device is tile capable"""
+        self.assertIsInstance(
+            self.fd_obj, affordances_capable.TileCapableDevice)
+
     def test_fuchsia_device_is_tracing_capable(self) -> None:
         """Test case to make sure fuchsia device is tracing capable"""
         self.assertIsInstance(

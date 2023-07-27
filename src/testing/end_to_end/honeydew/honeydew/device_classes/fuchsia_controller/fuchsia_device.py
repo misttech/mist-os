@@ -22,11 +22,13 @@ from honeydew.affordances.fuchsia_controller import component as component_fc
 from honeydew.affordances.fuchsia_controller import tracing as tracing_fc
 from honeydew.affordances.fuchsia_controller.bluetooth import \
     bluetooth_gap as bluetooth_gap_fc
+from honeydew.affordances.fuchsia_controller.ui import tile as tile_fc
 from honeydew.device_classes import base_fuchsia_device
 from honeydew.interfaces.affordances import component
 from honeydew.interfaces.affordances import tracing
 from honeydew.interfaces.affordances.bluetooth import \
     bluetooth_gap as bluetooth_gap_interface
+from honeydew.interfaces.affordances.ui import tile
 from honeydew.interfaces.device_classes import affordances_capable
 from honeydew.transports import ffx as ffx_transport
 from honeydew.utils import properties
@@ -84,6 +86,7 @@ def _connect_device_proxy(
 class FuchsiaDevice(base_fuchsia_device.BaseFuchsiaDevice,
                     affordances_capable.BluetoothGapCapableDevice,
                     affordances_capable.ComponentCapableDevice,
+                    affordances_capable.TileCapableDevice,
                     affordances_capable.TracingCapableDevice):
     """FuchsiaDevice abstract base class implementation using
     Fuchsia-Controller.
@@ -139,6 +142,15 @@ class FuchsiaDevice(base_fuchsia_device.BaseFuchsiaDevice,
             tracing.Tracing object
         """
         return tracing_fc.Tracing()
+
+    @properties.Affordance
+    def tile(self) -> tile.Tile:
+        """Returns a tile affordance object.
+
+        Returns:
+            tile.Tile object
+        """
+        return tile_fc.Tile()
 
     # List all the public methods in alphabetical order
     def close(self) -> None:

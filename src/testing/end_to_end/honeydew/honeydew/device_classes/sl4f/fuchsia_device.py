@@ -14,11 +14,13 @@ from honeydew.affordances.sl4f import component as component_sl4f
 from honeydew.affordances.sl4f import tracing as tracing_sl4f
 from honeydew.affordances.sl4f.bluetooth import \
     bluetooth_gap as bluetooth_gap_sl4f
+from honeydew.affordances.sl4f.ui import tile as tile_sl4f
 from honeydew.device_classes import base_fuchsia_device
 from honeydew.interfaces.affordances import component as component_interface
 from honeydew.interfaces.affordances import tracing as tracing_interface
 from honeydew.interfaces.affordances.bluetooth import \
     bluetooth_gap as bluetooth_gap_interface
+from honeydew.interfaces.affordances.ui import tile
 from honeydew.interfaces.device_classes import affordances_capable
 from honeydew.interfaces.device_classes import transports_capable
 from honeydew.transports import sl4f as sl4f_transport
@@ -45,6 +47,7 @@ _LOGGER: logging.Logger = logging.getLogger(__name__)
 class FuchsiaDevice(base_fuchsia_device.BaseFuchsiaDevice,
                     affordances_capable.BluetoothGapCapableDevice,
                     affordances_capable.ComponentCapableDevice,
+                    affordances_capable.TileCapableDevice,
                     affordances_capable.TracingCapableDevice,
                     transports_capable.SL4FCapableDevice):
     """FuchsiaDevice abstract base class implementation using SL4F.
@@ -117,6 +120,15 @@ class FuchsiaDevice(base_fuchsia_device.BaseFuchsiaDevice,
         """
         return tracing_sl4f.Tracing(
             device_name=self.device_name, sl4f=self.sl4f)
+
+    @properties.Affordance
+    def tile(self) -> tile.Tile:
+        """Returns a tile affordance object.
+
+        Returns:
+            tile.Tile object
+        """
+        return tile_sl4f.Tile()
 
     # List all the public methods in alphabetical order
     def close(self) -> None:
