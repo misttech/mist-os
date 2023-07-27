@@ -36,6 +36,7 @@ rustc_library("runner") {
   ]
 
   sources = [
+    "src/builtin.rs",
     "src/component_controller.rs",
     "src/lib.rs",
   ]

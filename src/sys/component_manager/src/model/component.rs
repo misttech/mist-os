@@ -45,7 +45,10 @@ use {
     async_trait::async_trait,
     cm_fidl_validator::error::DeclType,
     cm_moniker::{IncarnationId, InstancedChildName, InstancedMoniker},
-    cm_runner::{component_controller::ComponentController, NullRunner, RemoteRunner, Runner},
+    cm_runner::{
+        builtin::NullRunner, builtin::RemoteRunner, component_controller::ComponentController,
+        Runner,
+    },
     cm_rust::{
         self, ChildDecl, CollectionDecl, ComponentDecl, FidlIntoNative, NativeIntoFidl,
         OfferDeclCommon, UseDecl,
