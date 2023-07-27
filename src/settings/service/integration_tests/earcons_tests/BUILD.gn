@@ -11,6 +11,7 @@ rustc_library("common") {
   testonly = true
   edition = "2021"
   source_root = "src/common.rs"
+  disable_rustdoc = true
   sources = [
     "src/common.rs",
     "src/mock_audio_core_service.rs",

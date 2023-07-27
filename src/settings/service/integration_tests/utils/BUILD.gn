@@ -8,6 +8,7 @@ import("//build/rust/rustc_library.gni")
 rustc_library("utils") {
   testonly = true
   edition = "2021"
+  disable_rustdoc = true
 
   deps = [
     "//sdk/fidl/fuchsia.io:fuchsia.io_rust",

@@ -9,6 +9,7 @@ import("//build/rust/rustc_test.gni")
 
 rustc_library("light_realm") {
   testonly = true
+  disable_rustdoc = true
   edition = "2021"
   source_root = "src/light_realm.rs"
   sources = [ "src/light_realm.rs" ]
