@@ -8,7 +8,7 @@
 //! All new development is being done in this tool, and the legacy tool will be
 //! deprecated once this tool is feature complete.
 
-use diagnostics_data::{LogTextColor, LogTextDisplayOptions};
+use diagnostics_data::{LogTextColor, LogTextDisplayOptions, LogTimeDisplayFormat, Timezone};
 use error::LogError;
 use fho::{daemon_protocol, AvailabilityFlag, FfxMain, FfxTool, MachineWriter, ToolIO};
 use fidl::endpoints::create_proxy;
@@ -22,7 +22,7 @@ use log_command::{
         dump_logs_from_socket, BootTimeAccessor, DefaultLogFormatter, LogEntry, LogFormatter,
         LogFormatterOptions, WriterContainer,
     },
-    LogCommand, LogSubCommand, WatchCommand,
+    LogCommand, LogSubCommand, TimeFormat, WatchCommand,
 };
 use log_symbolizer::NoOpSymbolizer;
 use std::io::Write;
@@ -79,6 +79,21 @@ async fn log_main(
                     show_tags: !cmd.hide_tags,
                     color: if cmd.no_color { LogTextColor::None } else { LogTextColor::BySeverity },
                     show_metadata: cmd.show_metadata,
+                    time_format: match cmd.clock {
+                        TimeFormat::Monotonic => LogTimeDisplayFormat::Original,
+                        TimeFormat::Local => LogTimeDisplayFormat::WallTime {
+                            tz: Timezone::Local,
+                            // This will receive a correct value when logging actually starts,
+                            // see `set_boot_timestamp()` method on the log formatter.
+                            offset: 0,
+                        },
+                        TimeFormat::Utc => LogTimeDisplayFormat::WallTime {
+                            tz: Timezone::Utc,
+                            // This will receive a correct value when logging actually starts,
+                            // see `set_boot_timestamp()` method on the log formatter.
+                            offset: 0,
+                        },
+                    },
                     show_file: !cmd.hide_file,
                     show_full_moniker: cmd.show_full_moniker,
                     ..Default::default()
@@ -92,6 +107,7 @@ async fn log_main(
 }
 
 struct DeviceConnection {
+    boot_timestamp: u64,
     log_socket: fuchsia_async::Socket,
     log_settings_client: LogSettingsProxy,
 }
@@ -105,6 +121,8 @@ async fn connect_to_target(
 ) -> Result<DeviceConnection, LogError> {
     // Connect to device
     let rcs_client = connect_to_rcs(target_collection_proxy, query).await?;
+    let boot_timestamp =
+        rcs_client.identify_host().await??.boot_timestamp_nanos.ok_or(LogError::NoBootTimestamp)?;
     // Connect to ArchiveAccessor
     let (diagnostics_client, diagnostics_server) = create_proxy::<ArchiveAccessorMarker>()?;
     rcs::connect_with_timeout::<ArchiveAccessorMarker>(
@@ -140,6 +158,7 @@ async fn connect_to_target(
         )
         .await?;
     Ok(DeviceConnection {
+        boot_timestamp,
         log_socket: fuchsia_async::Socket::from_socket(local)?,
         log_settings_client,
     })
@@ -177,6 +196,7 @@ where
         if !cmd.select.is_empty() {
             connection.log_settings_client.set_interest(&cmd.select).await?;
         }
+        formatter.set_boot_timestamp(connection.boot_timestamp as i64);
         let maybe_err = dump_logs_from_socket(
             connection.log_socket,
             &mut formatter,
@@ -223,12 +243,16 @@ mod tests {
         TestEvent,
     };
     use assert_matches::assert_matches;
+    use chrono::{Local, TimeZone};
     use diagnostics_data::{BuilderArgs, LogsDataBuilder, Severity, Timestamp};
     use ffx_writer::{Format, TestBuffers};
     use fidl_fuchsia_developer_ffx::TargetCollectionMarker;
     use fidl_fuchsia_developer_remotecontrol::RemoteControlMarker;
     use futures::StreamExt;
-    use log_command::{log_formatter::LogData, parse_time, DumpCommand};
+    use log_command::{
+        log_formatter::{LogData, TIMESTAMP_FORMAT},
+        parse_time, DumpCommand,
+    };
     use selectors::parse_log_interest_selector;
     use std::rc::Rc;
 
@@ -435,6 +459,111 @@ mod tests {
         assert_eq!(
             test_buffers.stdout.into_string(),
             "[00000.000000][1][2][ffx] INFO: Hello world!\n".to_string()
+        );
+        assert_matches!(event_stream.next().await, Some(TestEvent::LogSettingsConnectionClosed));
+    }
+
+    #[fuchsia::test]
+    async fn logger_shows_utc_time_if_enabled() {
+        let (rcs_proxy, rcs_server) = create_proxy::<RemoteControlMarker>().unwrap();
+        let (target_collection_proxy, target_collection_server) =
+            create_proxy::<TargetCollectionMarker>().unwrap();
+        let tool = LogTool {
+            cmd: LogCommand {
+                sub_command: Some(LogSubCommand::Dump(DumpCommand {
+                    session: log_command::SessionSpec::Relative(0),
+                })),
+                clock: TimeFormat::Utc,
+                ..LogCommand::default()
+            },
+            rcs_proxy: rcs_proxy,
+            target_collection: target_collection_proxy,
+        };
+        let mut task_manager = TaskManager::new_with_config(Rc::new(Configuration {
+            messages: vec![LogsDataBuilder::new(BuilderArgs {
+                component_url: Some("ffx".into()),
+                moniker: "ffx".into(),
+                severity: Severity::Info,
+                timestamp_nanos: Timestamp::from(1),
+            })
+            .set_pid(1)
+            .set_tid(2)
+            .set_message("Hello world!")
+            .build()],
+            ..Default::default()
+        }));
+        let mut event_stream = task_manager.take_event_stream().unwrap();
+        let scheduler = task_manager.get_scheduler();
+        task_manager.spawn(handle_rcs_connection(rcs_server, scheduler.clone()));
+        task_manager.spawn(handle_target_collection_connection(
+            target_collection_server,
+            scheduler.clone(),
+        ));
+        let test_buffers = TestBuffers::default();
+        let mut main_result = task_manager
+            .spawn_result(tool.main(MachineWriter::<LogEntry>::new_test(None, &test_buffers)));
+        // Run all tasks until exit.
+        task_manager.run().await;
+        // Ensure that main exited successfully.
+        main_result.next().await.unwrap().unwrap();
+
+        assert_eq!(
+            test_buffers.stdout.into_string(),
+            "[1970-01-01 00:00:00.000][ffx] INFO: Hello world!\u{1b}[m\n".to_string()
+        );
+        assert_matches!(event_stream.next().await, Some(TestEvent::LogSettingsConnectionClosed));
+    }
+
+    #[fuchsia::test]
+    async fn logger_shows_local_time_if_enabled() {
+        let (rcs_proxy, rcs_server) = create_proxy::<RemoteControlMarker>().unwrap();
+        let (target_collection_proxy, target_collection_server) =
+            create_proxy::<TargetCollectionMarker>().unwrap();
+        let tool = LogTool {
+            cmd: LogCommand {
+                sub_command: Some(LogSubCommand::Dump(DumpCommand {
+                    session: log_command::SessionSpec::Relative(0),
+                })),
+                clock: TimeFormat::Local,
+                ..LogCommand::default()
+            },
+            rcs_proxy: rcs_proxy,
+            target_collection: target_collection_proxy,
+        };
+        let mut task_manager = TaskManager::new_with_config(Rc::new(Configuration {
+            messages: vec![LogsDataBuilder::new(BuilderArgs {
+                component_url: Some("ffx".into()),
+                moniker: "ffx".into(),
+                severity: Severity::Info,
+                timestamp_nanos: Timestamp::from(1),
+            })
+            .set_pid(1)
+            .set_tid(2)
+            .set_message("Hello world!")
+            .build()],
+            ..Default::default()
+        }));
+        let mut event_stream = task_manager.take_event_stream().unwrap();
+        let scheduler = task_manager.get_scheduler();
+        task_manager.spawn(handle_rcs_connection(rcs_server, scheduler.clone()));
+        task_manager.spawn(handle_target_collection_connection(
+            target_collection_server,
+            scheduler.clone(),
+        ));
+        let test_buffers = TestBuffers::default();
+        let mut main_result = task_manager
+            .spawn_result(tool.main(MachineWriter::<LogEntry>::new_test(None, &test_buffers)));
+        // Run all tasks until exit.
+        task_manager.run().await;
+        // Ensure that main exited successfully.
+        main_result.next().await.unwrap().unwrap();
+
+        assert_eq!(
+            test_buffers.stdout.into_string(),
+            format!(
+                "[{}][ffx] INFO: Hello world!\u{1b}[m\n",
+                Local.timestamp(0, 1).format(TIMESTAMP_FORMAT)
+            )
         );
         assert_matches!(event_stream.next().await, Some(TestEvent::LogSettingsConnectionClosed));
     }

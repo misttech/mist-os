@@ -19,7 +19,7 @@ use serde::{Deserialize, Serialize};
 use std::{fmt::Display, io::Write, time::SystemTime};
 use thiserror::Error;
 
-const TIMESTAMP_FORMAT: &str = "%Y-%m-%d %H:%M:%S.%3f";
+pub const TIMESTAMP_FORMAT: &str = "%Y-%m-%d %H:%M:%S.%3f";
 const NANOS_IN_SECOND: i64 = 1_000_000_000;
 const MALFORMED_TARGET_LOG: &str = "malformed target log: ";
 const LOGGER_STARTED: &str = "logger started.";

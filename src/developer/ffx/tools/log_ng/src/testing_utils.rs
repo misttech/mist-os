@@ -235,6 +235,7 @@ pub async fn handle_rcs_connection(
                 responder
                     .send(Ok(&IdentifyHostResponse {
                         nodename: Some(NODENAME.into()),
+                        boot_timestamp_nanos: Some(1),
                         ..Default::default()
                     }))
                     .unwrap();

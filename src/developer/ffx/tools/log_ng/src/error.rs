@@ -21,6 +21,8 @@ pub enum LogError {
     ConfigError(#[from] ConfigError),
     #[error(transparent)]
     FidlError(#[from] fidl::Error),
+    #[error("No boot timestamp")]
+    NoBootTimestamp,
     #[error("failed to connect: {:?}", error)]
     ConnectCapabilityError { error: ConnectCapabilityError },
     #[error(transparent)]
