@@ -20,6 +20,7 @@ mod user_buffer;
 
 pub mod as_any;
 pub mod errno;
+pub mod kcmp;
 pub mod range_ext;
 pub mod signals;
 pub mod uapi;

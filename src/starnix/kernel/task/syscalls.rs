@@ -17,6 +17,7 @@ use crate::{
     mm::*,
     syscalls::*,
     task::*,
+    types::kcmp::*,
 };
 
 pub fn do_clone(current_task: &CurrentTask, args: &clone_args) -> Result<pid_t, Errno> {
@@ -255,10 +256,25 @@ pub fn sys_getppid(current_task: &CurrentTask) -> Result<pid_t, Errno> {
     Ok(current_task.thread_group.read().get_ppid())
 }
 
+fn get_task_if_owner_or_has_capabilities(
+    current_task: &CurrentTask,
+    pid: pid_t,
+    capabilities: Capabilities,
+) -> Result<Arc<Task>, Errno> {
+    let task = current_task.get_task(pid).ok_or_else(|| errno!(ESRCH))?;
+    let current_creds = current_task.creds();
+    if task.creds().euid == current_creds.euid || current_creds.has_capability(capabilities) {
+        Ok(task)
+    } else {
+        error!(EPERM)
+    }
+}
+
 fn get_task_or_current(current_task: &CurrentTask, pid: pid_t) -> Result<Arc<Task>, Errno> {
     if pid == 0 {
         Ok(current_task.task_arc_clone())
     } else {
+        // TODO(security): Should this use get_task_if_owner_or_has_capabilities() ?
         current_task.get_task(pid).ok_or_else(|| errno!(ESRCH))
     }
 }
@@ -1269,6 +1285,57 @@ pub fn sys_unshare(current_task: &CurrentTask, flags: u32) -> Result<(), Errno> 
     }
 
     Ok(())
+}
+
+pub fn sys_kcmp(
+    current_task: &CurrentTask,
+    pid1: pid_t,
+    pid2: pid_t,
+    resource_type: u32,
+    index1: u64,
+    index2: u64,
+) -> Result<u32, Errno> {
+    let task1 = get_task_if_owner_or_has_capabilities(current_task, pid1, CAP_SYS_PTRACE)?;
+    let task2 = get_task_if_owner_or_has_capabilities(current_task, pid2, CAP_SYS_PTRACE)?;
+    let resource_type = KcmpResource::from_raw(resource_type)?;
+
+    // Output encoding (see <https://man7.org/linux/man-pages/man2/kcmp.2.html>):
+    //
+    //   0  v1 is equal to v2; in other words, the two processes share the resource.
+    //   1  v1 is less than v2.
+    //   2  v1 is greater than v2.
+    //   3  v1 is not equal to v2, but ordering information is unavailable.
+    //
+    fn encode_ordering(value: cmp::Ordering) -> u32 {
+        match value {
+            cmp::Ordering::Equal => 0,
+            cmp::Ordering::Less => 1,
+            cmp::Ordering::Greater => 2,
+        }
+    }
+
+    match resource_type {
+        KcmpResource::FILE => {
+            fn get_file(task: Arc<Task>, index: u64) -> Result<FileHandle, Errno> {
+                task.files.get(FdNumber::from_raw(index.try_into().map_err(|_| errno!(EBADF))?))
+            }
+            let file1 = get_file(task1, index1)?;
+            let file2 = get_file(task2, index2)?;
+            Ok(encode_ordering(Arc::as_ptr(&file1).cmp(&Arc::as_ptr(&file2))))
+        }
+        KcmpResource::FILES => Ok(encode_ordering(task1.files.id().cmp(&task2.files.id()))),
+        KcmpResource::FS => {
+            Ok(encode_ordering(Arc::as_ptr(&task1.fs()).cmp(&Arc::as_ptr(&task2.fs()))))
+        }
+        KcmpResource::SIGHAND => Ok(encode_ordering(
+            Arc::as_ptr(&task1.thread_group.signal_actions)
+                .cmp(&Arc::as_ptr(&task2.thread_group.signal_actions)),
+        )),
+        KcmpResource::VM => {
+            Ok(encode_ordering(Arc::as_ptr(&task1.mm).cmp(&Arc::as_ptr(&task2.mm))))
+        }
+        _ => error!(EINVAL),
+    }
 }
 
 #[cfg(test)]

@@ -36,6 +36,7 @@
 #include <linux/input.h>
 #include <linux/ip.h>
 #include <linux/ipv6.h>
+#include <linux/kcmp.h>
 #include <linux/limits.h>
 #include <linux/loop.h>
 #include <linux/magic.h>
@@ -65,8 +66,8 @@
 #include <linux/sysinfo.h>
 #include <linux/termios.h>
 #include <linux/time.h>
-#include <linux/times.h>
 #include <linux/timerfd.h>
+#include <linux/times.h>
 #include <linux/uio.h>
 #include <linux/un.h>
 #include <linux/unistd.h>

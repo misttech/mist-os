@@ -159,8 +159,6 @@
                 "ioprio_set01",
                 "ioprio_set02",
                 "ioprio_set03",
-                "kcmp01",
-                "kcmp02",
                 "keyctl01",
                 "keyctl03",
                 "keyctl05",

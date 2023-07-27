@@ -149,6 +149,7 @@ pub fn dispatch_syscall(
         #[cfg(target_arch = "x86_64")] inotify_init[0],
         inotify_rm_watch[2],
         ioctl[3],
+        kcmp[5],
         kill[2],
         #[cfg(target_arch = "x86_64")] lchown[3],
         lgetxattr[4],

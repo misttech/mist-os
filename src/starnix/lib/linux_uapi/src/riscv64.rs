@@ -10134,6 +10134,23 @@ pub const DEVCONF_NDISC_EVICT_NOCARRIER: _bindgen_ty_44 = 56;
 pub const DEVCONF_ACCEPT_UNTRACKED_NA: _bindgen_ty_44 = 57;
 pub const DEVCONF_MAX: _bindgen_ty_44 = 58;
 pub type _bindgen_ty_44 = crate::types::c_uint;
+pub const kcmp_type_KCMP_FILE: kcmp_type = 0;
+pub const kcmp_type_KCMP_VM: kcmp_type = 1;
+pub const kcmp_type_KCMP_FILES: kcmp_type = 2;
+pub const kcmp_type_KCMP_FS: kcmp_type = 3;
+pub const kcmp_type_KCMP_SIGHAND: kcmp_type = 4;
+pub const kcmp_type_KCMP_IO: kcmp_type = 5;
+pub const kcmp_type_KCMP_SYSVSEM: kcmp_type = 6;
+pub const kcmp_type_KCMP_EPOLL_TFD: kcmp_type = 7;
+pub const kcmp_type_KCMP_TYPES: kcmp_type = 8;
+pub type kcmp_type = crate::types::c_uint;
+#[repr(C)]
+#[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes, FromZeroes)]
+pub struct kcmp_epoll_slot {
+    pub efd: __u32,
+    pub tfd: __u32,
+    pub toff: __u32,
+}
 pub const LO_FLAGS_READ_ONLY: _bindgen_ty_45 = 1;
 pub const LO_FLAGS_AUTOCLEAR: _bindgen_ty_45 = 4;
 pub const LO_FLAGS_PARTSCAN: _bindgen_ty_45 = 8;

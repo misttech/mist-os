@@ -328,6 +328,7 @@ rustc_binary("starnix_kernel_bin") {
     "types/device_type.rs",
     "types/errno.rs",
     "types/file_mode.rs",
+    "types/kcmp.rs",
     "types/mod.rs",
     "types/mount_flags.rs",
     "types/open_flags.rs",
