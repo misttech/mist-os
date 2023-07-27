@@ -5,7 +5,7 @@
 import("//build/fidl/fidl.gni")
 
 fidl("fuchsia.net.masquerade") {
-  sdk_category = "experimental"
+  sdk_category = "internal"
   sources = [ "client.fidl" ]
   public_deps = [ "//sdk/fidl/fuchsia.net" ]
 }
