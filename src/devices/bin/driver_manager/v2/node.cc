@@ -444,6 +444,7 @@ zx::result<std::shared_ptr<Node>> Node::CreateCompositeNode(
 
 Node::~Node() {
   CloseIfExists(controller_ref_);
+  CloseIfExists(node_ref_);
   if (pending_bind_completer_.has_value()) {
     pending_bind_completer_.value()(zx::error(ZX_ERR_CANCELED));
     pending_bind_completer_.reset();
@@ -1081,14 +1082,20 @@ void Node::StartDriver(fuchsia_component_runner::wire::ComponentStartInfo start_
   }
   driver_component_.emplace(*this, std::string(url), std::move(controller),
                             std::move(driver_endpoints->client));
-  driver_host_.value()->Start(std::move(endpoints->client), name_, symbols, start_info,
-                              std::move(driver_endpoints->server),
-                              [this, cb = std::move(cb)](zx::result<> result) mutable {
-                                if (result.is_error()) {
-                                  driver_component_.reset();
-                                }
-                                cb(result);
-                              });
+  driver_host_.value()->Start(
+      std::move(endpoints->client), name_, symbols, start_info, std::move(driver_endpoints->server),
+      [weak_self = weak_from_this(), cb = std::move(cb)](zx::result<> result) mutable {
+        auto node_ptr = weak_self.lock();
+        if (!node_ptr) {
+          LOGF(WARNING, "Node freed before it is used");
+          cb(result);
+        }
+
+        if (result.is_error()) {
+          node_ptr->driver_component_.reset();
+        }
+        cb(result);
+      });
 }
 
 void Node::ScheduleStopComponent() {
