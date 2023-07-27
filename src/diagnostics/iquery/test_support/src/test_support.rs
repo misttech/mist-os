@@ -211,8 +211,8 @@ impl Default for MockRealmQuery {
                 ..Default::default()
             })])
             .add()
-            .when("foo/bar/thing")
-            .moniker("./foo/bar/thing")
+            .when("foo/bar/thing:instance")
+            .moniker("./foo/bar/thing:instance")
             .exposes(vec![Expose::Protocol(ExposeProtocol {
                 source: Some(Ref::Self_(SelfRef)),
                 target: Some(Ref::Parent(ParentRef)),
