@@ -13,11 +13,29 @@ import sys
 from typing import Any, Dict, List
 
 
-def file_sha1(path):
+def content_sha1(content):
     sha1 = hashlib.sha1()
-    with open(path, "rb") as f:
-        sha1.update(f.read())
+    sha1.update(content)
     return sha1.hexdigest()
+
+
+def package_manifest_sha1(path):
+    """Normalizes package manifest then calculate hash."""
+    with open(path, "r") as f:
+        raw_json = json.load(f)
+    if "blobs" in raw_json:
+        # Remove source paths from package manifest blobs because they can be
+        # different between GN and Bazel. This is OK because blobs still have
+        # merkles to verify content consistency.
+        for blob in raw_json["blobs"]:
+            blob.pop("source_path", None)
+    return content_sha1(json.dumps(raw_json).encode())
+
+
+def file_sha1(path):
+    """Hashes a file as-is."""
+    with open(path, "rb") as f:
+        return content_sha1(f.read())
 
 
 def normalize_file_in_config(
@@ -181,9 +199,15 @@ def normalize_product(
             packages[pkg_set].sort(key=lambda x: x["name"])
 
     if "base_drivers" in product:
-        # TODO(jayzhuang): Normalize `base_drivers` field when we have product
-        # configs with this field set for comparison.
-        pass
+        for base_driver in product["base_drivers"]:
+            # Replace package manifest paths with content hash. The packages are
+            # the same as long as they have the same package manifests.
+            p = os.path.join(root_dir, base_driver["package"])
+            base_driver.pop("package")
+            # Follow links for depfile entry. See https://fxbug.dev/122513.
+            p = os.path.relpath(os.path.realpath(p))
+            base_driver["package_manifest_sha1"] = package_manifest_sha1(p)
+            extra_files_read.append(p)
 
     return
 
