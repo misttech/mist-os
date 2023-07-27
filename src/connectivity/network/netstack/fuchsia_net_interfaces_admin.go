@@ -364,7 +364,9 @@ func (ci *adminControlImpl) AddAddress(_ fidl.Context, subnet net.Subnet, parame
 		cancelServe:  cancel,
 		protocolAddr: protocolAddr,
 	}
+	impl.mu.Lock()
 	impl.mu.eventProxy.Channel = request.Channel
+	impl.mu.Unlock()
 
 	addrDisp := &addressDispatcher{
 		watcherDisp: watcherAddressDispatcher{
@@ -373,7 +375,9 @@ func (ci *adminControlImpl) AddAddress(_ fidl.Context, subnet net.Subnet, parame
 			ch:           ifs.ns.interfaceEventChan,
 		},
 	}
+	addrDisp.mu.Lock()
 	addrDisp.mu.aspImpl = impl
+	addrDisp.mu.Unlock()
 	properties := stack.AddressProperties{
 		Temporary: parameters.GetTemporaryWithDefault(false),
 		Disp:      addrDisp,
@@ -390,6 +394,8 @@ func (ci *adminControlImpl) AddAddress(_ fidl.Context, subnet net.Subnet, parame
 	}
 	if reason != 0 {
 		defer cancel()
+		impl.mu.Lock()
+		defer impl.mu.Unlock()
 		if err := impl.mu.eventProxy.OnAddressRemoved(reason); err != nil {
 			var zxError *zx.Error
 			if !errors.As(err, &zxError) || (zxError.Status != zx.ErrPeerClosed && zxError.Status != zx.ErrBadHandle) {
