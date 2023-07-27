@@ -8,6 +8,7 @@
 #include <lib/fit/function.h>
 #include <lib/syslog/cpp/macros.h>
 
+#include <type_traits>
 #include <vector>
 
 #include "src/developer/debug/zxdb/common/err.h"
@@ -142,10 +143,6 @@ class JoinCallbacksBase : public fxl::RefCountedThreadSafe<JoinCallbacksBase> {
 // takes a vector of their parameters. The resulting vector will be in order that the callbacks
 // were CREATED (not issued).
 //
-// This implementation requires that the parameter type be default-constructible. This requirement
-// could be avoided but the alternatives add implementation complexity and some type of runtime
-// overhead or fragility.
-//
 // Supporting multiple parameters for each callback adds significant template complexity and
 // requires us either to store a std::tuple (which can be difficult to use) or have the caller
 // provide some container type (difficult to use in a different way). It also makes the common case
@@ -156,16 +153,10 @@ class JoinCallbacksBase : public fxl::RefCountedThreadSafe<JoinCallbacksBase> {
 template <typename T>
 class JoinCallbacks : public JoinCallbacksBase {
  public:
-  using ParamType = T;
-  using VectorType = std::vector<ParamType>;
-  using MainCallbackType = fit::callback<void(VectorType)>;
+  using MainCallbackType = fit::callback<void(std::vector<T>)>;
 
-  // See comment above. This flags the error before we get to a more obscure one trying to
-  // emplace_back() or assign below.
-  static_assert(std::is_default_constructible<T>::value,
-                "Type for JoinCallbacks must be default construtible.");
-  static_assert(std::is_move_assignable<T>::value,
-                "Type for JoinCallbacks must be move assignable.");
+  static_assert(std::is_move_constructible_v<T>,
+                "Type for JoinCallbacks must be move construtible.");
 
   fit::callback<void(T)> AddCallback() {
     TrackAdd();
@@ -178,7 +169,7 @@ class JoinCallbacks : public JoinCallbacksBase {
         // Save the parameter result. This shouldn't happen in the "done" case but TrackGotCallback
         // will assert below if that happens.
         FX_DCHECK(slot_index < ref->params_.size());
-        ref->params_[slot_index] = std::move(param);
+        new (&ref->params_[slot_index]) T(std::move(param));
       }
       ref->TrackGotCallback();
     };
@@ -195,11 +186,19 @@ class JoinCallbacks : public JoinCallbacksBase {
 
   JoinCallbacks() = default;
 
-  void Issue() override { cb_(std::move(params_)); }
+  void Issue() override {
+    std::vector<T> params;
+    params.reserve(params_.size());
+    for (auto& param : params_) {
+      params.emplace_back(std::move(reinterpret_cast<T&>(param)));
+      std::destroy_at(reinterpret_cast<T*>(&param));
+    }
+    cb_(std::move(params));
+  }
 
   MainCallbackType cb_;
 
-  std::vector<T> params_;
+  std::vector<std::aligned_storage_t<sizeof(T), alignof(T)>> params_;
 };
 
 // Specialization for when there are no callback parameters.
