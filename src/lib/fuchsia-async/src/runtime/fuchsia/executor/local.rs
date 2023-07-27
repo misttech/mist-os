@@ -151,7 +151,7 @@ pub struct TestExecutor {
     /// LocalExecutor used under the hood, since most of the logic is shared.
     local: LocalExecutor,
 
-    // A packet that has been dequeued but not processed. This is used by `run_one_step`.
+    // A packet that has been dequeued but not processed.
     next_packet: Option<zx::Packet>,
 }
 
@@ -238,49 +238,9 @@ impl TestExecutor {
         }
     }
 
-    /// Schedule the main future for being woken up. This is useful in conjunction with
-    /// `run_one_step`.
-    pub fn wake_main_future(&mut self) {
+    // Schedule the main future for being woken up.
+    fn wake_main_future(&mut self) {
         ArcWake::wake_by_ref(&self.local.main_task);
-    }
-
-    /// Run one iteration of the loop: dispatch the first available packet or timer. Returns `None`
-    /// if nothing has been dispatched, `Some(Poll::Pending)` if execution made progress but the
-    /// main future has not completed, and `Some(Poll::Ready(_))` if the main future has completed
-    /// at this step.
-    ///
-    /// For the main future to run, `wake_main_future` needs to have been called first.
-    /// This will fire timers that are in the past, but will not advance the executor's time.
-    ///
-    /// Unpin: this function requires all futures to be `Unpin`able, so any `!Unpin`
-    /// futures must first be pinned using the `pin_mut!` macro from the `pin-utils` crate.
-    ///
-    /// This function is meant to be used for reproducible integration tests: multiple async
-    /// processes can be run in a controlled way, dispatching events one at a time and randomly
-    /// (but reproducibly) choosing which process gets to advance at each step.
-    pub fn run_one_step<F>(&mut self, main_future: &mut F) -> Option<Poll<F::Output>>
-    where
-        F: Future + Unpin,
-    {
-        let inner = self.local.inner.clone();
-        let mut local_collector = inner.collector.create_local_collector();
-        match self.next_step(/*fire_timers:*/ true, &mut local_collector) {
-            NextStep::WaitUntil(_) => None,
-            NextStep::NextPacket => {
-                // Will not fail because NextPacket means there is a
-                // packet ready to be processed.
-                Some(self.consume_packet(main_future, &mut local_collector))
-            }
-            NextStep::NextTimer => {
-                let next_timer = with_local_timer_heap(|timer_heap| {
-                    // unwrap: will not fail because NextTimer
-                    // guarantees there is a timer in the heap.
-                    timer_heap.pop().unwrap()
-                });
-                next_timer.wake();
-                Some(Poll::Pending)
-            }
-        }
     }
 
     /// Consumes a packet that has already been dequeued from the port.
@@ -471,75 +431,48 @@ impl MainTask {
 mod tests {
     use super::{super::spawn, *};
     use crate::{handle::on_signals::OnSignals, Timer};
+    use assert_matches::assert_matches;
     use fuchsia_zircon::{self as zx, AsHandleRef, DurationNum};
-    use futures::{future, Future};
+    use futures::{future, task::LocalFutureObj};
     use pin_utils::pin_mut;
     use std::{
         cell::{Cell, RefCell},
-        rc::Rc,
         sync::atomic::{AtomicBool, Ordering},
-        task::{Context, Poll, Waker},
+        task::Poll,
     };
-
-    fn run_until_stalled<F>(executor: &mut TestExecutor, fut: &mut F)
-    where
-        F: Future + Unpin,
-    {
-        loop {
-            match executor.run_one_step(fut) {
-                None => return,
-                Some(Poll::Pending) => { /* continue */ }
-                Some(Poll::Ready(_)) => panic!("executor stopped"),
-            }
-        }
-    }
-
-    fn run_until_done<F>(executor: &mut TestExecutor, fut: &mut F) -> F::Output
-    where
-        F: Future + Unpin,
-    {
-        loop {
-            match executor.run_one_step(fut) {
-                None => panic!("executor stalled"),
-                Some(Poll::Pending) => { /* continue */ }
-                Some(Poll::Ready(res)) => return res,
-            }
-        }
-    }
 
     // Runs a future that suspends and returns after being resumed.
     #[test]
     fn stepwise_two_steps() {
-        let fut_step = Cell::new(0);
-        let fut_waker: Rc<RefCell<Option<Waker>>> = Rc::new(RefCell::new(None));
-        let fut_fn = |cx: &mut Context<'_>| {
-            fut_waker.borrow_mut().replace(cx.waker().clone());
-            match fut_step.get() {
+        let fut_step = Arc::new(Cell::new(0));
+        let fut_waker: Arc<RefCell<Option<Waker>>> = Arc::new(RefCell::new(None));
+        let fut_waker_clone = fut_waker.clone();
+        let fut_step_clone = fut_step.clone();
+        let fut_fn = move |cx: &mut Context<'_>| {
+            fut_waker_clone.borrow_mut().replace(cx.waker().clone());
+            match fut_step_clone.get() {
                 0 => {
-                    fut_step.set(1);
+                    fut_step_clone.set(1);
                     Poll::Pending
                 }
                 1 => {
-                    fut_step.set(2);
+                    fut_step_clone.set(2);
                     Poll::Ready(())
                 }
                 _ => panic!("future called after done"),
             }
         };
-        let fut = future::poll_fn(fut_fn);
-        pin_mut!(fut);
+        let fut = Box::new(future::poll_fn(fut_fn));
         let mut executor = TestExecutor::new_with_fake_time();
-        executor.wake_main_future();
-        assert_eq!(executor.is_waiting(), WaitState::Ready);
+        // Spawn the future rather than waking it the main task because run_until_stalled will wake
+        // the main future on every call, and we want to wake it ourselves using the waker.
+        executor.local.inner.spawn_local(LocalFutureObj::new(fut));
         assert_eq!(fut_step.get(), 0);
-        assert_eq!(executor.run_one_step(&mut fut), Some(Poll::Pending));
-        assert_eq!(executor.is_waiting(), WaitState::Waiting(Time::INFINITE));
-        assert_eq!(executor.run_one_step(&mut fut), None);
+        assert_eq!(executor.run_until_stalled(&mut future::pending::<()>()), Poll::Pending);
         assert_eq!(fut_step.get(), 1);
 
         fut_waker.borrow_mut().take().unwrap().wake();
-        assert_eq!(executor.is_waiting(), WaitState::Ready);
-        assert_eq!(executor.run_one_step(&mut fut), Some(Poll::Ready(())));
+        assert_eq!(executor.run_until_stalled(&mut future::pending::<()>()), Poll::Pending);
         assert_eq!(fut_step.get(), 2);
     }
 
@@ -550,16 +483,15 @@ mod tests {
         executor.set_fake_time(Time::from_nanos(0));
         let fut = Timer::new(Time::after(1000.nanos()));
         pin_mut!(fut);
-        executor.wake_main_future();
 
-        run_until_stalled(&mut executor, &mut fut);
+        let _ = executor.run_until_stalled(&mut fut);
         assert_eq!(Time::now(), Time::from_nanos(0));
         assert_eq!(executor.is_waiting(), WaitState::Waiting(Time::from_nanos(1000)));
 
         executor.set_fake_time(Time::from_nanos(1000));
         assert_eq!(Time::now(), Time::from_nanos(1000));
         assert_eq!(executor.is_waiting(), WaitState::Ready);
-        run_until_done(&mut executor, &mut fut);
+        assert!(executor.run_until_stalled(&mut fut).is_ready());
     }
 
     // Runs a future that waits on an event.
@@ -569,13 +501,12 @@ mod tests {
         let event = zx::Event::create();
         let fut = OnSignals::new(&event, zx::Signals::USER_0);
         pin_mut!(fut);
-        executor.wake_main_future();
 
-        run_until_stalled(&mut executor, &mut fut);
+        let _ = executor.run_until_stalled(&mut fut);
         assert_eq!(executor.is_waiting(), WaitState::Waiting(Time::INFINITE));
 
         event.signal_handle(zx::Signals::NONE, zx::Signals::USER_0).unwrap();
-        assert!(run_until_done(&mut executor, &mut fut).is_ok());
+        assert_matches!(executor.run_until_stalled(&mut fut), Poll::Ready(Ok(zx::Signals::USER_0)));
     }
 
     // Using `run_until_stalled` does not modify the order of events
