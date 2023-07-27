@@ -292,6 +292,14 @@ impl AnnotationHolder {
     pub fn get_annotations(&self) -> Result<Vec<felement::Annotation>, AnnotationError> {
         annotations_to_vec(&self.annotations).map_err(|e| e.into())
     }
+
+    pub fn get_annotation(
+        &self,
+        namespace: &str,
+        value: &str,
+    ) -> Option<&felement::AnnotationValue> {
+        self.annotations.get(&Key { namespace: namespace.to_string(), value: value.to_string() })
+    }
 }
 
 // Convenient function to handle an AnnotationControllerRequestStream.

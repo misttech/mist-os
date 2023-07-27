@@ -311,8 +311,16 @@ impl ElementManager {
             felement::ProposeElementError::InvalidArgs
         })?;
 
-        let mut child_name = Alphanumeric.sample_string(&mut thread_rng(), 16);
-        child_name.make_ascii_lowercase();
+        // If there is a name specified for the element, use it, otherwise generate a
+        // random name.
+        let child_name = match annotation_holder.get_annotation(ELEMENT_MANAGER_NS, "name") {
+            Some(felement::AnnotationValue::Text(name)) => name.clone(),
+            _ => {
+                let mut name = Alphanumeric.sample_string(&mut thread_rng(), 16);
+                name.make_ascii_lowercase();
+                name
+            }
+        };
 
         let mut element =
             self.launch_element(&component_url, &child_name).await.map_err(|err| match err {
