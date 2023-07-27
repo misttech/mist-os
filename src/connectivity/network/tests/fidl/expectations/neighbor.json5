@@ -14,6 +14,7 @@
             matchers: [
                 // TODO(https://fxbug.dev/124960): Support fuchsia.net.neighbor in NS3.
                 "cant_hang_twice_ns3",
+                "channel_is_closed_if_not_polled_ns3",
                 "neigh_add_remove_entry_ns3",
                 "neigh_clear_entries_errors_ns3",
                 "neigh_clear_entries_ns3",

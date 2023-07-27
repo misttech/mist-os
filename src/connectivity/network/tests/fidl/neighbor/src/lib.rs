@@ -1215,25 +1215,32 @@ async fn channel_is_closed_if_not_polled<N: Netstack>(name: &str) {
         .connect_to_protocol::<fidl_fuchsia_net_neighbor::ControllerMarker>()
         .expect("failed to connect to Controller");
 
-    let mut event_stream = iter.take_event_stream();
+    let create_and_remove_entry = || async {
+        controller
+            .add_entry(alice.ep.id(), &BOB_IP, &BOB_MAC)
+            .await
+            .expect("add_entry FIDL error")
+            .map_err(fuchsia_zircon::Status::from_raw)
+            .expect("add_entry failed");
+        controller
+            .remove_entry(alice.ep.id(), &BOB_IP)
+            .await
+            .expect("remove_entry FIDL error")
+            .map_err(fuchsia_zircon::Status::from_raw)
+            .expect("remove_entry failed");
+    };
+
+    // Ensure some entries exist before polling.
+    create_and_remove_entry().await;
     let create_entries = async {
         loop {
-            controller
-                .add_entry(alice.ep.id(), &BOB_IP, &BOB_MAC)
-                .await
-                .expect("add_entry FIDL error")
-                .map_err(fuchsia_zircon::Status::from_raw)
-                .expect("add_entry failed");
-            controller
-                .remove_entry(alice.ep.id(), &BOB_IP)
-                .await
-                .expect("remove_entry FIDL error")
-                .map_err(fuchsia_zircon::Status::from_raw)
-                .expect("remove_entry failed");
+            create_and_remove_entry().await
         }
     }
     .fuse();
     futures::pin_mut!(create_entries);
+
+    let mut event_stream = iter.take_event_stream();
     futures::select! {
         o = event_stream.next() => assert_matches::assert_matches!(o, None),
         _ = create_entries => unreachable!(),
