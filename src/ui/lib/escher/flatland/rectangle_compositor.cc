@@ -341,6 +341,12 @@ void RectangleCompositor::DrawBatch(CommandBuffer* cmd_buf,
   }
 }
 
+void RectangleCompositor::SetColorConversionParams(
+    const ColorConversionParams& color_conversion_params) {
+  FX_LOGS(INFO) << "Color conversion params applied.";
+  color_conversion_params_ = color_conversion_params;
+}
+
 // TODO(fxbug.dev/94252): It doesn't seem like all platforms actually support transient images.
 // So this is going to be a regular image for now.
 ImagePtr RectangleCompositor::CreateOrFindTransientImage(const ImagePtr& image) {

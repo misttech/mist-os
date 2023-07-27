@@ -134,12 +134,14 @@ void ColorTransformManager::ChangeColorTransform(
   color_transform_configuration.set_color_adjustment_pre_offset(
       color_adjustment_args.color_adjustment_pre_offset);
 
-  if (!color_transform_handler_ptr_)
+  if (!color_transform_handler_ptr_) {
+    FX_LOGS(ERROR) << "Dropping color transform because no handler is registered.";
     return;
+  }
 
   color_transform_handler_ptr_->SetColorTransformConfiguration(
       std::move(color_transform_configuration),
       [] { FX_LOGS(INFO) << "Color transform configuration changed."; });
 }
 
-} // namespace a11y
+}  // namespace a11y

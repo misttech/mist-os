@@ -58,9 +58,7 @@ class RectangleCompositor {
   // This data is used to apply a color-conversion post processing effect over the entire
   // rendered output, when making a call to |DrawBatch|. The color conversion formula
   // used is matrix * (color + preoffsets) + postoffsets.
-  void SetColorConversionParams(const ColorConversionParams& color_conversion_params) {
-    color_conversion_params_ = color_conversion_params;
-  }
+  void SetColorConversionParams(const ColorConversionParams& color_conversion_params);
 
   // Minimal image constraints to be set on textures and render targets passed into
   // DrawBatch. These are meant to also be compatible with AFBC
