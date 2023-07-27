@@ -5,5 +5,8 @@
 //! Fuchsia-native synchronization primitives.
 
 mod mutex;
+mod rwlock;
+mod zx;
 
 pub use mutex::*;
+pub use rwlock::*;

@@ -17,6 +17,7 @@ const SYNC_MUTEX_INIT: i32 = 0;
 pub struct RawSyncMutex(sys::zx_futex_t);
 
 impl RawSyncMutex {
+    #[inline]
     fn as_futex_ptr(&self) -> *const sys::zx_futex_t {
         std::ptr::addr_of!(self.0)
     }
@@ -31,6 +32,7 @@ unsafe impl lock_api::RawMutex for RawSyncMutex {
     // libsync does not require the lock / unlock operations to happen on the same thread.
     type GuardMarker = lock_api::GuardSend;
 
+    #[inline]
     fn lock(&self) {
         // SAFETY: This call requires we pass a non-null pointer to a valid futex.
         // This is guaranteed by using `self` through a shared reference.
@@ -39,12 +41,14 @@ unsafe impl lock_api::RawMutex for RawSyncMutex {
         }
     }
 
+    #[inline]
     fn try_lock(&self) -> bool {
         // SAFETY: This call requires we pass a non-null pointer to a valid futex.
         // This is guaranteed by using `self` through a shared reference.
         unsafe { sync_mutex_trylock(self.as_futex_ptr()) == sys::ZX_OK }
     }
 
+    #[inline]
     unsafe fn unlock(&self) {
         sync_mutex_unlock(self.as_futex_ptr())
     }
