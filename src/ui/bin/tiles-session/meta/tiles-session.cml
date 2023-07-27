@@ -21,6 +21,7 @@
         {
             name: "elements",
             durability: "transient",
+            persistent_storage: true,
         },
     ],
     capabilities: [
@@ -64,6 +65,11 @@
                 "fuchsia.ui.scenic.Scenic",
                 "fuchsia.vulkan.loader.Loader",
             ],
+            from: "parent",
+            to: "#elements",
+        },
+        {
+            storage: "data",
             from: "parent",
             to: "#elements",
         },
