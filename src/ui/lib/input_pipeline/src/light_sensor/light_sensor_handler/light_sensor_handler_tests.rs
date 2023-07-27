@@ -8,7 +8,7 @@ use super::{
     MAX_SATURATION_CLEAR, MAX_SATURATION_GREEN, MAX_SATURATION_RED,
 };
 use crate::input_device::{Handled, InputDeviceDescriptor, InputDeviceEvent, InputEvent};
-use crate::input_handler::InputHandler;
+use crate::input_handler::{InputHandler, InputHandlerStatus};
 use crate::light_sensor::calibrator::Calibrate;
 use crate::light_sensor::types::{AdjustmentSetting, Rgbc, SensorConfiguration};
 use crate::light_sensor_binding::{LightSensorDeviceDescriptor, LightSensorEvent};
@@ -382,7 +382,12 @@ fn light_sensor_handler_calculate_lux() {
 
     let inspector = fuchsia_inspect::Inspector::default();
     let test_node = inspector.root().create_child("test_node");
-    let handler = LightSensorHandler::new((), sensor_configuration, &test_node);
+    let inspect_status = InputHandlerStatus::new(
+        &test_node,
+        "light_sensor_handler",
+        /* generates_events */ false,
+    );
+    let handler = LightSensorHandler::new((), sensor_configuration, inspect_status);
     let lux = handler.calculate_lux(Rgbc { red: 11.0, green: 13.0, blue: 17.0, clear: 19.0 });
     assert_eq!(lux, 2.0 * 11.0 + 3.0 * 13.0 + 5.0 * 17.0 + 7.0 * 19.0);
 }
@@ -400,8 +405,13 @@ async fn light_sensor_handler_no_calibrator_returns_uncalibrated() {
     let (device_proxy, called, task) = get_mock_device_proxy();
     let inspector = fuchsia_inspect::Inspector::default();
     let test_node = inspector.root().create_child("test_node");
+    let inspect_status = InputHandlerStatus::new(
+        &test_node,
+        "light_sensor_handler",
+        /* generates_events */ false,
+    );
     let handler =
-        LightSensorHandler::<DoublingCalibrator>::new(None, sensor_configuration, &test_node);
+        LightSensorHandler::<DoublingCalibrator>::new(None, sensor_configuration, inspect_status);
     // The first reading is always saturated as it initializing the device settings.
     let reading = handler
         .get_calibrated_data(Rgbc { red: 1, green: 2, blue: 3, clear: 14747 }, device_proxy.clone())
@@ -499,7 +509,12 @@ async fn light_sensor_handler_get_calibrated_data() {
     let (device_proxy, called, task) = get_mock_device_proxy();
     let inspector = fuchsia_inspect::Inspector::default();
     let test_node = inspector.root().create_child("test_node");
-    let handler = LightSensorHandler::new(DoublingCalibrator, sensor_configuration, &test_node);
+    let inspect_status = InputHandlerStatus::new(
+        &test_node,
+        "light_sensor_handler",
+        /* generates_events */ false,
+    );
+    let handler = LightSensorHandler::new(DoublingCalibrator, sensor_configuration, inspect_status);
     // The first reading is always saturated as it initializing the device settings.
     let reading = handler
         .get_calibrated_data(Rgbc { red: 1, green: 2, blue: 3, clear: 14747 }, device_proxy.clone())
@@ -650,7 +665,12 @@ async fn light_sensor_handler_get_calibrated_data_should_proxy_error() {
         get_mock_device_proxy_with_response(None, Err(zx::sys::ZX_ERR_CONNECTION_RESET));
     let inspector = fuchsia_inspect::Inspector::default();
     let test_node = inspector.root().create_child("test_node");
-    let handler = LightSensorHandler::new(DoublingCalibrator, sensor_configuration, &test_node);
+    let inspect_status = InputHandlerStatus::new(
+        &test_node,
+        "light_sensor_handler",
+        /* generates_events */ false,
+    );
+    let handler = LightSensorHandler::new(DoublingCalibrator, sensor_configuration, inspect_status);
     let reading = handler
         .get_calibrated_data(Rgbc { red: 1, green: 2, blue: 3, clear: 4 }, device_proxy)
         .await;
@@ -671,7 +691,12 @@ async fn light_sensor_handler_input_event_handler() {
     let (device_proxy, _, task) = get_mock_device_proxy();
     let inspector = fuchsia_inspect::Inspector::default();
     let test_node = inspector.root().create_child("test_node");
-    let handler = LightSensorHandler::new(DoublingCalibrator, sensor_configuration, &test_node);
+    let inspect_status = InputHandlerStatus::new(
+        &test_node,
+        "light_sensor_handler",
+        /* generates_events */ false,
+    );
+    let handler = LightSensorHandler::new(DoublingCalibrator, sensor_configuration, inspect_status);
 
     let (sensor_proxy, stream): (SensorProxy, SensorRequestStream) =
         create_proxy_and_stream::<SensorMarker>().expect("should get proxy and streamns");
@@ -747,7 +772,12 @@ async fn light_sensor_handler_subscriber_queue() {
     let (device_proxy, _, task) = get_mock_device_proxy();
     let inspector = fuchsia_inspect::Inspector::default();
     let test_node = inspector.root().create_child("test_node");
-    let handler = LightSensorHandler::new(DoublingCalibrator, sensor_configuration, &test_node);
+    let inspect_status = InputHandlerStatus::new(
+        &test_node,
+        "light_sensor_handler",
+        /* generates_events */ false,
+    );
+    let handler = LightSensorHandler::new(DoublingCalibrator, sensor_configuration, inspect_status);
 
     let (sensor_proxy, stream): (SensorProxy, SensorRequestStream) =
         create_proxy_and_stream::<SensorMarker>().expect("should get proxy and streamns");
@@ -817,8 +847,13 @@ fn light_sensor_handler_initialized_with_inspect_node() {
     };
     let inspector = fuchsia_inspect::Inspector::default();
     let fake_handlers_node = inspector.root().create_child("input_handlers_node");
+    let inspect_status = InputHandlerStatus::new(
+        &fake_handlers_node,
+        "light_sensor_handler",
+        /* generates_events */ false,
+    );
     let _handler =
-        LightSensorHandler::new(DoublingCalibrator, sensor_configuration, &fake_handlers_node);
+        LightSensorHandler::new(DoublingCalibrator, sensor_configuration, inspect_status);
     fuchsia_inspect::assert_data_tree!(inspector, root: {
         input_handlers_node: {
             light_sensor_handler: {
@@ -851,8 +886,12 @@ async fn light_sensor_handler_inspect_counts_events() {
     let (device_proxy, _, _task) = get_mock_device_proxy();
     let inspector = fuchsia_inspect::Inspector::default();
     let fake_handlers_node = inspector.root().create_child("input_handlers_node");
-    let handler =
-        LightSensorHandler::new(DoublingCalibrator, sensor_configuration, &fake_handlers_node);
+    let inspect_status = InputHandlerStatus::new(
+        &fake_handlers_node,
+        "light_sensor_handler",
+        /* generates_events */ false,
+    );
+    let handler = LightSensorHandler::new(DoublingCalibrator, sensor_configuration, inspect_status);
 
     let (sensor_proxy, stream): (SensorProxy, SensorRequestStream) =
         create_proxy_and_stream::<SensorMarker>().expect("should get proxy and streamns");

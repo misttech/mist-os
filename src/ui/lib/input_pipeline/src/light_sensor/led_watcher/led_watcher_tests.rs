@@ -10,6 +10,7 @@ use crate::light_sensor::test_utils::{
 use fidl_fuchsia_settings::{LightGroup as LightGroupFidl, LightRequest, LightState, LightValue};
 use fidl_fuchsia_ui_brightness::ControlRequest;
 use fuchsia_async as fasync;
+use fuchsia_inspect;
 use futures::channel::{mpsc, oneshot};
 use futures::StreamExt;
 use std::cell::RefCell;
@@ -41,10 +42,16 @@ async fn led_watcher_updates_brightness_on_watch() {
     let (update_tx, mut update_rx) = mpsc::channel(0);
     let led_watcher = LedWatcher::new_with_sender(light_groups, update_tx);
     let (cancelation_tx, cancelation_rx) = oneshot::channel();
+
+    let inspector = fuchsia_inspect::Inspector::default();
+    let test_node = inspector.root().create_child("test_node");
+
     let (watcher_handle, task) = led_watcher.handle_light_groups_and_brightness_watch(
         light_proxy,
         brightness_proxy,
         cancelation_rx,
+        test_node.create_bool("light_proxy_receives_initial_response", false),
+        test_node.create_bool("brightness_proxy_receives_initial_response", false),
     );
 
     // Ensure default is set to zero.
@@ -104,10 +111,16 @@ async fn led_watcher_updates_light_groups_on_watch() {
     let (update_tx, mut update_rx) = mpsc::channel(0);
     let led_watcher = LedWatcher::new_with_sender(light_groups, update_tx);
     let (cancelation_tx, cancelation_rx) = oneshot::channel();
+
+    let inspector = fuchsia_inspect::Inspector::default();
+    let test_node = inspector.root().create_child("test_node");
+
     let (watcher_handle, task) = led_watcher.handle_light_groups_and_brightness_watch(
         light_proxy,
         brightness_proxy,
         cancelation_rx,
+        test_node.create_bool("light_proxy_receives_initial_response", false),
+        test_node.create_bool("brightness_proxy_receives_initial_response", false),
     );
 
     // Ensure default is disabled.

@@ -6,6 +6,7 @@ use async_utils::hanging_get::client::HangingGetStream;
 use fidl_fuchsia_settings::{LightGroup as LightGroupFidl, LightProxy, LightValue};
 use fidl_fuchsia_ui_brightness::ControlProxy;
 use fuchsia_async as fasync;
+use fuchsia_inspect::{self, Property};
 #[cfg(test)]
 use futures::channel::mpsc;
 use futures::channel::oneshot;
@@ -112,6 +113,8 @@ impl LedWatcher {
         light_proxy: LightProxy,
         brightness_proxy: ControlProxy,
         mut cancelation_rx: oneshot::Receiver<()>,
+        light_proxy_receives_initial_response: fuchsia_inspect::BoolProperty,
+        brightness_proxy_receives_initial_response: fuchsia_inspect::BoolProperty,
     ) -> (LedWatcherHandle, fasync::Task<()>) {
         let light_groups = Rc::clone(&self.light_groups);
         let backlight_brightness = Rc::clone(&self.backlight_brightness);
@@ -125,6 +128,7 @@ impl LedWatcher {
             loop {
                 futures::select! {
                     watch_result = light_group_fut => {
+                        light_proxy_receives_initial_response.set(true);
                         match watch_result {
                             Ok(light_groups) => self.update_light_groups(light_groups),
                             Err(e) => tracing::warn!("Failed to get light group update: {:?}", e),
@@ -132,6 +136,7 @@ impl LedWatcher {
                         light_group_fut = light_groups_stream.select_next_some()
                     }
                     watch_result = brightness_fut => {
+                        brightness_proxy_receives_initial_response.set(true);
                         match watch_result {
                             Ok(brightness) => self.update_brightness(brightness),
                             Err(e) => tracing::warn!("Failed to get brightness update: {:?}", e),

@@ -221,16 +221,28 @@ pub async fn make_light_sensor_handler_and_spawn_led_watcher(
     configuration: SensorConfiguration,
     input_handlers_node: &fuchsia_inspect::Node,
 ) -> Result<(Rc<CalibratedLightSensorHandler>, Option<CancelableTask>), Error> {
+    let inspect_status = InputHandlerStatus::new(
+        input_handlers_node,
+        "light_sensor_handler",
+        /* generates_events */ false,
+    );
     let (calibrator, watcher_task) = if let Some(calibration) = calibration {
         let light_groups =
             light_proxy.watch_light_groups().await.context("request initial light groups")?;
         let led_watcher = LedWatcher::new(light_groups);
         let (cancelation_tx, cancelation_rx) = oneshot::channel();
+        let light_proxy_receives_initial_response =
+            inspect_status.inspect_node.create_bool("light_proxy_receives_initial_response", false);
+        let brightness_proxy_receives_initial_response = inspect_status
+            .inspect_node
+            .create_bool("brightness_proxy_receives_initial_response", false);
         let (led_watcher_handle, watcher_task) = led_watcher
             .handle_light_groups_and_brightness_watch(
                 light_proxy,
                 brightness_proxy,
                 cancelation_rx,
+                light_proxy_receives_initial_response,
+                brightness_proxy_receives_initial_response,
             );
         let watcher_task = CancelableTask::new(cancelation_tx, watcher_task);
         let calibrator = Calibrator::new(calibration, led_watcher_handle);
@@ -238,14 +250,14 @@ pub async fn make_light_sensor_handler_and_spawn_led_watcher(
     } else {
         (None, None)
     };
-    Ok((LightSensorHandler::new(calibrator, configuration, input_handlers_node), watcher_task))
+    Ok((LightSensorHandler::new(calibrator, configuration, inspect_status), watcher_task))
 }
 
 impl<T> LightSensorHandler<T> {
     pub fn new(
         calibrator: impl Into<Option<T>>,
         configuration: SensorConfiguration,
-        input_handlers_node: &fuchsia_inspect::Node,
+        inspect_status: InputHandlerStatus,
     ) -> Rc<Self> {
         let calibrator = calibrator.into();
         let hanging_get = RefCell::new(HangingGet::new_unknown_state(Box::new(
@@ -258,11 +270,6 @@ impl<T> LightSensorHandler<T> {
         ) as NotifyFn));
         let active_setting =
             RefCell::new(ActiveSettingState::Uninitialized(configuration.settings));
-        let inspect_status = InputHandlerStatus::new(
-            input_handlers_node,
-            "light_sensor_handler",
-            /* generates_events */ false,
-        );
         let events_saturated_count =
             inspect_status.inspect_node.create_uint("events_saturated_count", 0);
         let clients_connected_count =
