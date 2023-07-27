@@ -9,6 +9,7 @@
 
 #include <inttypes.h>
 #include <lib/arch/paging.h>
+#include <lib/arch/x86/cpuid.h>
 #include <lib/stdcompat/span.h>
 #include <zircon/assert.h>
 
@@ -35,13 +36,16 @@ enum class X86PagingLevel {
 
 // Captures the system state influencing x86 paging.
 struct X86SystemPagingState {
-  template <typename MsrIoProvider>
-  static X86SystemPagingState Create(MsrIoProvider&& msr) {
+  template <class MsrIo, class CpuidIo>
+  static X86SystemPagingState Create(MsrIo&& msr, CpuidIo&& cpuid) {
     // Safety check; this should always be present.
     ZX_DEBUG_ASSERT(X86ExtendedFeatureEnableRegisterMsr::Get().ReadFrom(&msr).nxe());
 
-    return {};
+    return {.page1gb = cpuid.template Read<CpuidAmdFeatureFlagsD>().page1gb()};
   }
+
+  // Whether 1GiB pages are supported.
+  bool page1gb = false;
 };
 
 // Whether the given access permission are valid for an X86 page table entry.
@@ -247,6 +251,17 @@ struct X86PagingTraitsBase {
 
   static constexpr bool (*IsValidPageAccess)(const X86SystemPagingState&,
                                              const AccessPermissions&) = X86IsValidPageAccess;
+
+  template <X86PagingLevel Level>
+  static constexpr bool LevelCanBeTerminal(const X86SystemPagingState& state) {
+    if constexpr (Level == X86PagingLevel::kPml5Table || Level == X86PagingLevel::kPml4Table) {
+      return false;
+    } else if constexpr (Level == X86PagingLevel::kPageDirectoryPointerTable) {
+      return state.page1gb;
+    } else {
+      return true;
+    }
+  }
 };
 
 struct X86FourLevelPagingTraits : public X86PagingTraitsBase {

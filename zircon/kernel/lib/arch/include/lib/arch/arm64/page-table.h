@@ -704,6 +704,13 @@ struct ArmPagingTraits {
   static constexpr bool IsValidPageAccess(const ArmSystemPagingState&, const AccessPermissions&) {
     return true;
   }
+
+  template <ArmAddressTranslationLevel Level>
+  static constexpr bool LevelCanBeTerminal(const ArmSystemPagingState& state) {
+    using Page = typename TableEntry<Level>::Page;
+    using Block = typename TableEntry<Level>::Block;
+    return Page::kValid || Block::kValid;
+  }
 };
 
 }  // namespace arch

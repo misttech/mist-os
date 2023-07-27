@@ -6,6 +6,7 @@
 #ifndef ZIRCON_KERNEL_LIB_ARCH_INCLUDE_LIB_ARCH_PAGING_H_
 #define ZIRCON_KERNEL_LIB_ARCH_INCLUDE_LIB_ARCH_PAGING_H_
 
+#include <inttypes.h>
 #include <lib/fit/result.h>
 #include <lib/stdcompat/algorithm.h>
 #include <zircon/assert.h>
@@ -145,7 +146,11 @@ struct ExamplePagingTraits {
     return false;
   }
 
-  // TODO(fxbug.dev/129344): ...and more to support machine-independent paging.
+  /// Whether the given level can generally feature terminal entries.
+  template <LevelType Level>
+  static bool LevelCanBeTerminal(const SystemState& state) {
+    return false;
+  }
 };
 
 /// Settings relating to the access permissions of a page or pages that map
@@ -174,8 +179,48 @@ struct VirtualAddressBitRange {
 /// The page information associated with a given virtual address, returned by
 /// Paging's Query API below.
 struct PagingQueryResult {
+  struct Page {
+    uint64_t paddr = 0;
+    uint64_t size = 0;
+  };
+
+  /// The physical address to which the associated virtual address is mapped.
   uint64_t paddr = 0;
+
+  /// The page in which the associated virtual address is mapped.
+  Page page;
+
+  /// The access permissions of the associated page.
   AccessPermissions access;
+};
+
+/// A mapping error, returned by the mapping utilities below.
+struct MapError {
+  enum class Type {
+    /// An unknown error, given to a default-constructed error.
+    kUnknown,
+
+    /// The allocation of a page table was unsuccessful.
+    kAllocationFailure,
+
+    /// An attempt was made to map a previously-mapped virtual address.
+    kAlreadyMapped,
+  };
+
+  /// The physical address of at which the error occurred.
+  uint64_t paddr = 0;
+
+  /// The virtual address for the map attempt.
+  uint64_t vaddr = 0;
+
+  Type type = Type::kUnknown;
+};
+
+/// The settings to apply to each page mapped in the context of the mapping
+/// utilities below.
+struct MapSettings {
+  AccessPermissions access;
+  // TODO(fxbug.dev/129344): global, memory type.
 };
 
 /// Paging provides paging-related operations for a given a set of paging
@@ -188,6 +233,8 @@ class Paging : public PagingTraits {
 
   template <LevelType Level>
   using TableEntry = typename PagingTraits::template TableEntry<Level>;
+
+  using typename PagingTraits::SystemState;
 
   using PagingTraits::kLevels;
   static_assert(kLevels.size() > 0);
@@ -213,6 +260,21 @@ class Paging : public PagingTraits {
       PagingTraits::template kNumTableEntriesLog2<Level>;
 
   static constexpr LevelType kFirstLevel = kLevels.front();
+
+  /// A table's physical alignment at any level.
+  static constexpr uint64_t kTableAlignment = uint64_t{1u} << kTableAlignmentLog2;
+
+  /// The number of table entries at a given level.
+  template <LevelType Level>
+  static constexpr uint64_t kNumTableEntries = uint64_t{1u} << kNumTableEntriesLog2<Level>;
+
+  /// The size in bytes of an entry at a given level.
+  template <LevelType Level>
+  static constexpr uint64_t kEntrySize = sizeof(typename TableEntry<Level>::ValueType);
+
+  /// The size in bytes of a table at a given level.
+  template <LevelType Level>
+  static constexpr uint64_t kTableSize = kEntrySize<Level> * kNumTableEntries<Level>;
 
   /// The level after `Level`. Must be used in a constexpr context in
   /// which `Level` is not the last.
@@ -249,6 +311,10 @@ class Paging : public PagingTraits {
     return kRange;
   }();
 
+  /// The size of a would-be page if mapped from a given level.
+  template <LevelType Level>
+  static constexpr uint64_t kPageSize = uint64_t{1u} << kVirtualAddressBitRange<Level>.low;
+
   ///
   /// Main paging trait methods.
   ///
@@ -267,6 +333,7 @@ class Paging : public PagingTraits {
     ReadonlyTerminalVisitor visitor([vaddr](const auto& terminal) {
       return PagingQueryResult{
           .paddr = TerminalAddress(terminal, vaddr),
+          .page = PageInfo(terminal),
           .access =
               AccessPermissions{
                   .readable = terminal.readable(),
@@ -279,7 +346,62 @@ class Paging : public PagingTraits {
     return VisitPageTables(root_paddr, std::forward<PaddrToTableIo>(paddr_to_io), visitor, vaddr);
   }
 
-  // TODO(fxbug.dev/129344): Map().
+  /// Attempts to map `[input_vaddr, input_vaddr + size)` to
+  /// `[output_paddr, output_paddr + size)` with the provided settings.
+  /// `input_vaddr` and `output_vaddr` must both be aligned to the smallest
+  /// possible page size, and `size` must be a multiple of it. The mapping
+  /// must be a fresh one; this operation will return an error of type
+  /// `kAlreadyAllocated` if it encounters an existing mapping. The mapping
+  /// will proceed incrementally, mapping the largest possible page for each
+  /// increasing subrange.
+  ///
+  /// Page table allocation is abstracted by an `PageTableAllocator` callable
+  /// with a signature of
+  /// ```
+  /// std::optional<uint64_t>(uint64_t size, uint64_t alignment)
+  /// ```
+  /// std::nullopt being returned in the event of an allocation failure.
+  ///
+  /// `settings` represents the set of page-related settings to apply to a
+  /// new, zero-filled, terminal entry.
+  template <typename PaddrToIoProvider, typename PageTableAllocator>
+  static fit::result<MapError> Map(uint64_t root_paddr,              //
+                                   PaddrToIoProvider&& paddr_to_io,  //
+                                   PageTableAllocator allocator,     //
+                                   const SystemState& state,         //
+                                   uint64_t input_vaddr,             //
+                                   uint64_t size,                    //
+                                   uint64_t output_paddr,            //
+                                   const MapSettings& settings) {    //
+    static_assert(
+        std::is_invocable_r_v<std::optional<uint64_t>, PageTableAllocator, uint64_t, uint64_t>);
+
+    constexpr uint64_t kMinPageSize = kTableAlignment;
+    ZX_ASSERT_MSG((input_vaddr % kMinPageSize) == 0,
+                  "virtual address %#" PRIx64 " must be %#" PRIx64 "-aligned", input_vaddr,
+                  kMinPageSize);
+    ZX_ASSERT_MSG((output_paddr % kMinPageSize) == 0,
+                  "physical address %#" PRIx64 " must be %#" PRIx64 "-aligned", output_paddr,
+                  kMinPageSize);
+    ZX_ASSERT_MSG(size % kMinPageSize == 0, "size %#" PRIx64 " must be a multiple of %#" PRIx64,
+                  size, kMinPageSize);
+
+    // MappingVisitor tracks the range to be mapped, mapping and updating
+    // the current mappable window on successive calls.
+    //
+    // TODO(joshuaseaton): Repeated calls to VisitPageTables() does redundant
+    // walking. The current walk is also not conducive to marking adjacent
+    // entries as being part of the same contiguous mapping, when appropriate,
+    // in order to optimize the TLB use.
+    MappingVisitor mapper(std::move(allocator), state, input_vaddr, size, output_paddr, settings);
+    while (mapper.unmapped_size() > 0) {
+      auto result = VisitPageTables(root_paddr, paddr_to_io, mapper, mapper.next_vaddr());
+      if (result.is_error()) {
+        return result.take_error();
+      }
+    }
+    return fit::ok();
+  }
 
   ///
   /// Additional primitives.
@@ -416,6 +538,110 @@ class Paging : public PagingTraits {
   // TODO(fxbug.dev/131202): Once hwreg is constexpr-friendly, we can add a static
   // assert that zeroed entries at any level report as non-present.
 
+  /// A visitor tailor-made to help perform a mapping of
+  /// `[input_vaddr, input_vaddr + size)` to
+  /// `[output_paddr, output_paddr + size)` in the context of `Map()`. Calling
+  /// `VisitPageTables()` with this visitor will attempt to map the largest
+  /// possible page contained within the given virtual range, updating the
+  /// values describing the virtual and physical ranges provided on
+  /// construction. Repeated calls to `VisitPageTables()` can then be made to
+  /// fully map the region.
+  template <typename PageTableAllocator>
+  class MappingVisitor {
+   public:
+    using value_type = fit::result<MapError>;
+
+    MappingVisitor(PageTableAllocator page_table_allocator,  //
+                   const SystemState& state,                 //
+                   uint64_t input_vaddr,                     //
+                   uint64_t size,                            //
+                   uint64_t output_paddr,                    //
+                   const MapSettings& settings)              //
+        : allocator_(std::move(page_table_allocator)),
+          state_(state),
+          input_vaddr_(input_vaddr),
+          size_(size),
+          output_paddr_(output_paddr),
+          settings_(settings) {}
+
+    /// The size of the range yet to be mapped.
+    uint64_t unmapped_size() const { return size_; }
+
+    /// The next virtual address to be mapped.
+    uint64_t next_vaddr() const { return input_vaddr_; }
+
+    template <typename TableIo, LevelType Level>
+    std::optional<fit::result<MapError>> operator()(TableIo&& io, TableEntry<Level>& entry,
+                                                    uint64_t table_paddr) {
+      auto to_error = [entry_paddr = table_paddr + kEntrySize<Level> * entry.reg_addr(),
+                       vaddr = input_vaddr_](MapError::Type type) -> MapError {
+        return {.paddr = entry_paddr, .vaddr = vaddr, .type = type};
+      };
+
+      // If we reach a non-terminal entry, carry on with the translation.
+      // Otherwise, the desired mapping cannot be a fresh one.
+      if (entry.present()) {
+        if (entry.terminal()) {
+          return fit::error(to_error(MapError::Type::kAlreadyMapped));
+        }
+        return {};
+      }
+
+      constexpr uint64_t kMapSize = kPageSize<Level>;
+      bool terminal = PagingTraits::template LevelCanBeTerminal<Level>(state_) &&  //
+                      kMapSize <= size_ &&                                         //
+                      input_vaddr_ % kMapSize == 0;                                //
+
+      // We do not constrain the access permissions of intermediate entries,
+      // leaving that instead to terminal ones.
+      constexpr AccessPermissions kMaxIntermediateAccess = AccessPermissions{
+          .readable = true,
+          .writable = true,
+          .executable = true,
+          .user_accessible = true,
+      };
+
+      // At this point, the entry is not present. Unless we intend to terminate
+      // at this level, we will need to allocate the next level table.
+      PagingSettings settings{
+          .present = true,
+          .terminal = terminal,
+      };
+      if (terminal) {
+        settings.address = output_paddr_;
+        settings.access = settings_.access;
+      } else {
+        std::optional<uint64_t> new_table_paddr = allocator_(kTableAlignment, kTableSize<Level>);
+        if (!new_table_paddr) {
+          return fit::error(to_error(MapError::Type::kAllocationFailure));
+        }
+        settings.address = *new_table_paddr;
+        settings.access = kMaxIntermediateAccess;
+      }
+      entry.Set(state_, settings);
+      entry.WriteTo(&io);
+
+      if (terminal) {
+        input_vaddr_ += kMapSize;
+        output_paddr_ += kMapSize;
+        size_ -= kMapSize;
+        return fit::ok();
+      }
+      return {};
+    }
+
+   private:
+    PageTableAllocator allocator_;
+    const SystemState state_;
+    uint64_t input_vaddr_;
+    uint64_t size_;
+    uint64_t output_paddr_;
+    const MapSettings settings_;
+  };
+
+  template <typename PageTableAllocator>
+  MappingVisitor(PageTableAllocator, ...) -> MappingVisitor<PageTableAllocator>;
+
   /// A helper routine for `VisitPageTables()` starting a given level, allowing
   /// for a straightforward recursive(ish) definition.
   template <LevelType Level, typename PaddrToTableIo, typename Visitor>
@@ -424,6 +650,8 @@ class Paging : public PagingTraits {
       PaddrToTableIo&& paddr_to_io,  //
       Visitor&& visitor,             //
       uint64_t vaddr) {              //
+    static_assert(cpp20::find(kLevels.begin(), kLevels.end(), Level) != kLevels.end());
+
     ZX_DEBUG_ASSERT(table_paddr <= kMaxPhysicalAddress);
     auto io = paddr_to_io(table_paddr);
 
@@ -445,8 +673,18 @@ class Paging : public PagingTraits {
 
   template <LevelType Level>
   static constexpr uint64_t TerminalAddress(const TableEntry<Level>& terminal, uint64_t vaddr) {
+    ZX_DEBUG_ASSERT(terminal.terminal());
     constexpr uint64_t kAlignmentLog2 = kVirtualAddressBitRange<Level>.low;
     return terminal.address() | fbl::ExtractBits<kAlignmentLog2 - 1, 0, uint64_t>(vaddr);
+  }
+
+  template <LevelType Level>
+  static constexpr PagingQueryResult::Page PageInfo(const TableEntry<Level>& terminal) {
+    ZX_DEBUG_ASSERT(terminal.terminal());
+    return {
+        .paddr = terminal.address(),
+        .size = kPageSize<Level>,
+    };
   }
 };
 

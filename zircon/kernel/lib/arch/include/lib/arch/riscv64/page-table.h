@@ -9,6 +9,7 @@
 
 #include <inttypes.h>
 #include <lib/arch/paging.h>
+#include <lib/stdcompat/algorithm.h>
 #include <lib/stdcompat/span.h>
 #include <zircon/assert.h>
 
@@ -183,6 +184,11 @@ struct RiscvPagingTraitsBase {
 
   static constexpr bool (*IsValidPageAccess)(const RiscvSystemPagingState&,
                                              const AccessPermissions&) = RiscvIsValidPageAccess;
+
+  template <RiscvPagingLevel Level>
+  static constexpr bool LevelCanBeTerminal(const RiscvSystemPagingState& state) {
+    return true;
+  }
 };
 
 struct RiscvSv39PagingTraits : public RiscvPagingTraitsBase {
