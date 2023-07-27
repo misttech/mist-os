@@ -5,6 +5,7 @@
 #include "src/devices/bin/driver_manager/composite_node_spec/composite_node_spec_manager.h"
 
 #include <fidl/fuchsia.driver.framework/cpp/fidl.h>
+#include <lib/async-loop/cpp/loop.h>
 #include <lib/driver/component/cpp/composite_node_spec.h>
 #include <lib/driver/component/cpp/node_add_args.h>
 #include <lib/fit/defer.h>
@@ -107,13 +108,15 @@ class CompositeNodeSpecManagerTest : public zxtest::Test {
   }
 
   std::shared_ptr<dfv2::Node> CreateNode(const char* name) {
-    return std::make_shared<dfv2::Node>("node", std::vector<dfv2::Node*>{}, nullptr, nullptr,
+    return std::make_shared<dfv2::Node>("node", std::vector<dfv2::Node*>{}, nullptr,
+                                        loop_.dispatcher(),
                                         inspect_.CreateDevice(name, zx::vmo(), 0));
   }
 
   std::unique_ptr<CompositeNodeSpecManager> composite_node_spec_manager_;
   InspectManager inspect_ = InspectManager(nullptr);
   FakeDeviceManagerBridge bridge_;
+  async::Loop loop_{&kAsyncLoopConfigNeverAttachToThread};
 };
 
 TEST_F(CompositeNodeSpecManagerTest, TestAddMatchCompositeNodeSpec) {
