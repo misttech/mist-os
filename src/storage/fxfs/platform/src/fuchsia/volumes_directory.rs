@@ -15,8 +15,8 @@ use {
     fidl::endpoints::{DiscoverableProtocolMarker, ServerEnd},
     fidl_fuchsia_fs::{AdminMarker, AdminRequest, AdminRequestStream},
     fidl_fuchsia_fxfs::{
-        BlobCreatorMarker, CheckOptions, MountOptions, ProjectIdMarker, VolumeRequest,
-        VolumeRequestStream,
+        BlobCreatorMarker, BlobReaderMarker, CheckOptions, MountOptions, ProjectIdMarker,
+        VolumeRequest, VolumeRequestStream,
     },
     fidl_fuchsia_io as fio,
     fs_inspect::{FsInspectTree, FsInspectVolume},
@@ -307,9 +307,15 @@ impl VolumesDirectory {
             let root = volume.root().clone();
             svc_dir.add_entry(
                 BlobCreatorMarker::PROTOCOL_NAME,
-                vfs::service::host(move |r| root.clone().handle_blob_requests(r)),
+                vfs::service::host(move |r| root.clone().handle_blob_creator_requests(r)),
+            )?;
+            let root = volume.root().clone();
+            svc_dir.add_entry(
+                BlobReaderMarker::PROTOCOL_NAME,
+                vfs::service::host(move |r| root.clone().handle_blob_reader_requests(r)),
             )?;
         }
+
         // Use the volume's scope here which should be OK for now.  In theory the scope represents a
         // filesystem instance and the pseudo filesystem we are using is arguably a different
         // filesystem to the volume we are exporting.  The reality is that it only matters for

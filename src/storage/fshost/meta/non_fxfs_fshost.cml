@@ -30,5 +30,10 @@
             protocol: "fuchsia.fxfs.Volumes",
             from: "self",
         },
+        {
+            protocol: "fuchsia.fxfs.ReadBlob",
+            from: "void",
+            availability: "optional",
+        },
     ],
 }

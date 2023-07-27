@@ -6,6 +6,7 @@
 
 pub mod blob;
 mod directory;
+pub mod reader;
 mod writer;
 
 #[cfg(test)]

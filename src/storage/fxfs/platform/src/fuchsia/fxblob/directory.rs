@@ -6,20 +6,23 @@
 //! content-addressable blobs.
 
 use {
-    crate::fuchsia::{
-        directory::FxDirectory,
-        errors::map_to_status,
-        fxblob::{blob::FxBlob, writer::FxDeliveryBlob},
-        node::{FxNode, GetResult, OpenedNode},
-        volume::{FxVolume, RootDir},
+    crate::{
+        component::map_to_raw_status,
+        fuchsia::{
+            directory::FxDirectory,
+            errors::map_to_status,
+            fxblob::{blob::FxBlob, writer::FxDeliveryBlob},
+            node::{FxNode, GetResult, OpenedNode},
+            volume::{FxVolume, RootDir},
+        },
     },
     anyhow::{bail, ensure, Error},
     async_trait::async_trait,
     delivery_blob::DELIVERY_PATH_PREFIX,
     fidl::endpoints::{create_proxy, ClientEnd, Proxy as _, ServerEnd},
     fidl_fuchsia_fxfs::{
-        BlobCreatorRequest, BlobCreatorRequestStream, BlobWriterMarker, BlobWriterRequest,
-        CreateBlobError,
+        BlobCreatorRequest, BlobCreatorRequestStream, BlobReaderRequest, BlobReaderRequestStream,
+        BlobWriterMarker, BlobWriterRequest, CreateBlobError,
     },
     fidl_fuchsia_io::{
         self as fio, FilesystemInfo, MutableNodeAttributes, NodeAttributeFlags, NodeAttributes,
@@ -74,7 +77,7 @@ impl RootDir for BlobDirectory {
         self as Arc<dyn FxNode>
     }
 
-    async fn handle_blob_requests(self: Arc<Self>, mut requests: BlobCreatorRequestStream) {
+    async fn handle_blob_creator_requests(self: Arc<Self>, mut requests: BlobCreatorRequestStream) {
         while let Ok(Some(request)) = requests.try_next().await {
             match request {
                 BlobCreatorRequest::Create { responder, hash, .. } => {
@@ -90,6 +93,25 @@ impl RootDir for BlobDirectory {
                         });
                 }
             }
+        }
+    }
+
+    async fn handle_blob_reader_requests(self: Arc<Self>, mut requests: BlobReaderRequestStream) {
+        while let Ok(Some(request)) = requests.try_next().await {
+            match request {
+                BlobReaderRequest::GetVmo { blob_hash, responder } => {
+                    responder
+                        .send(
+                            self.clone()
+                                .get_blob_vmo(blob_hash.into())
+                                .await
+                                .map_err(map_to_raw_status),
+                        )
+                        .unwrap_or_else(|error| {
+                            tracing::error!(?error, "failed to send GetVmo response");
+                        });
+                }
+            };
         }
     }
 }
@@ -111,7 +133,7 @@ impl BlobDirectory {
         self.directory.store()
     }
 
-    async fn lookup(
+    pub async fn lookup(
         self: &Arc<Self>,
         flags: fio::OpenFlags,
         mut path: Path,

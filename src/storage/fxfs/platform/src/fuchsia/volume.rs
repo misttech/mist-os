@@ -18,8 +18,8 @@ use {
     anyhow::{bail, ensure, Error},
     async_trait::async_trait,
     fidl_fuchsia_fxfs::{
-        BlobCreatorRequestStream, BytesAndNodes, ProjectIdRequest, ProjectIdRequestStream,
-        ProjectIterToken,
+        BlobCreatorRequestStream, BlobReaderRequestStream, BytesAndNodes, ProjectIdRequest,
+        ProjectIdRequestStream, ProjectIterToken,
     },
     fidl_fuchsia_io as fio,
     fs_inspect::{FsInspectVolume, VolumeData},
@@ -393,7 +393,8 @@ pub trait RootDir: FxNode + DirectoryEntry {
 
     fn as_node(self: Arc<Self>) -> Arc<dyn FxNode>;
 
-    async fn handle_blob_requests(self: Arc<Self>, _requests: BlobCreatorRequestStream) {}
+    async fn handle_blob_creator_requests(self: Arc<Self>, _requests: BlobCreatorRequestStream) {}
+    async fn handle_blob_reader_requests(self: Arc<Self>, _requests: BlobReaderRequestStream) {}
 }
 
 #[derive(Clone)]

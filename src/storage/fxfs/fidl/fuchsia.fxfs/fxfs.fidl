@@ -274,3 +274,13 @@ closed protocol BlobWriter {
         bytes_written uint64;
     }) -> () error zx.Status;
 };
+
+@discoverable
+closed protocol BlobReader {
+    /// Given the hash of a blob, returns a VMO with its contents.
+    strict GetVmo(struct {
+        blob_hash array<uint8, 32>;
+    }) -> (resource struct {
+        vmo zx.Handle:VMO;
+    }) error zx.Status;
+};
