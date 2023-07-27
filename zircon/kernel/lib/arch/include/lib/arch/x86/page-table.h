@@ -9,8 +9,10 @@
 
 #include <inttypes.h>
 #include <lib/arch/paging.h>
+#include <lib/stdcompat/span.h>
 #include <zircon/assert.h>
 
+#include <array>
 #include <cstdint>
 #include <optional>
 
@@ -229,7 +231,20 @@ struct X86PagingTraitsBase {
 
   using SystemState = X86SystemPagingState;
 
+  static constexpr std::array kAllLevels = {
+      X86PagingLevel::kPml5Table,
+      X86PagingLevel::kPml4Table,
+      X86PagingLevel::kPageDirectoryPointerTable,
+      X86PagingLevel::kPageDirectory,
+      X86PagingLevel::kPageTable,
+  };
+
   static constexpr unsigned int kMaxPhysicalAddressSize = 52;
+
+  static constexpr unsigned int kTableAlignmentLog2 = 12;
+
+  template <X86PagingLevel Level>
+  static constexpr unsigned int kNumTableEntriesLog2 = 9;
 
   static constexpr bool kNonTerminalAccessPermissions = true;
 
@@ -237,9 +252,13 @@ struct X86PagingTraitsBase {
                                              const AccessPermissions&) = X86IsValidPageAccess;
 };
 
-struct X86FourLevelPagingTraits : public X86PagingTraitsBase {};
+struct X86FourLevelPagingTraits : public X86PagingTraitsBase {
+  static constexpr auto kLevels = cpp20::span{kAllLevels}.subspan(1);
+};
 
-struct X86FiveLevelPagingTraits : public X86PagingTraitsBase {};
+struct X86FiveLevelPagingTraits : public X86PagingTraitsBase {
+  static constexpr auto kLevels = cpp20::span{kAllLevels};
+};
 
 }  // namespace arch
 

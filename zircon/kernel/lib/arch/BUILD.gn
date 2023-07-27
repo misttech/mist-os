@@ -53,6 +53,7 @@ library_headers("common-headers") {
   ]
 
   if (is_kernel) {
+    # <lib/arch/arm64/page-table.h> has #include <fbl/bits.h>
     # <lib/arch/riscv64/page-table.h> has #include <fbl/bits.h>
     # <lib/arch/x86/page-table.h> has #include <fbl/bits.h>
     public_deps += [ "//zircon/system/ulib/fbl:headers" ]
@@ -69,6 +70,11 @@ static_library("arch") {
   if (is_fuchsia || is_kernel) {
     deps = [ zircon_cpu ]
   }
+}
+
+group("tests") {
+  testonly = true
+  deps = [ "test:tests" ]
 }
 
 hwreg_asm_header("gen-x86-msr-asm") {

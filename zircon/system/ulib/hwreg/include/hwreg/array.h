@@ -8,6 +8,7 @@
 #include <lib/stdcompat/span.h>
 
 #include <array>
+#include <atomic>
 #include <type_traits>
 
 #include "internal.h"
@@ -87,13 +88,11 @@ struct AtomicArray {
 // for hwreg register types.
 template <typename ElementType, size_t ElementCount>
 struct AlignedTableStorage {
-  constexpr auto table() const { return cpp20::span(table_); }
+  constexpr auto table() { return cpp20::span(table_); }
 
-  constexpr auto direct_io() const { return hwreg::ArrayIo(table()); }
+  constexpr auto direct_io() { return hwreg::ArrayIo(table()); }
 
-  constexpr auto atomic_io() const {
-    return hwreg::AtomicArray<std::memory_order_relaxed>::Io(table());
-  }
+  constexpr auto atomic_io() { return hwreg::AtomicArray<std::memory_order_relaxed>::Io(table()); }
 
  private:
   using Table = std::array<ElementType, ElementCount>;

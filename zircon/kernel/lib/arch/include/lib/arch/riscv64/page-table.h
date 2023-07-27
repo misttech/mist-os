@@ -9,8 +9,10 @@
 
 #include <inttypes.h>
 #include <lib/arch/paging.h>
+#include <lib/stdcompat/span.h>
 #include <zircon/assert.h>
 
+#include <array>
 #include <cstdint>
 
 #include <fbl/bits.h>
@@ -165,7 +167,17 @@ struct RiscvPagingTraitsBase {
 
   using SystemState = RiscvSystemPagingState;
 
+  static constexpr std::array kAllLevels = {
+      RiscvPagingLevel::k4, RiscvPagingLevel::k3, RiscvPagingLevel::k2,
+      RiscvPagingLevel::k1, RiscvPagingLevel::k0,
+  };
+
   static constexpr unsigned int kMaxPhysicalAddressSize = kRiscvMaxPhysicalAddressSize;
+
+  static constexpr unsigned int kTableAlignmentLog2 = 12;
+
+  template <RiscvPagingLevel Level>
+  static constexpr unsigned int kNumTableEntriesLog2 = 9;
 
   static constexpr bool kNonTerminalAccessPermissions = false;
 
@@ -173,11 +185,17 @@ struct RiscvPagingTraitsBase {
                                              const AccessPermissions&) = RiscvIsValidPageAccess;
 };
 
-struct RiscvSv39PagingTraits : public RiscvPagingTraitsBase {};
+struct RiscvSv39PagingTraits : public RiscvPagingTraitsBase {
+  static constexpr auto kLevels = cpp20::span{kAllLevels}.subspan(2);
+};
 
-struct RiscvSv48PagingTraits : public RiscvPagingTraitsBase {};
+struct RiscvSv48PagingTraits : public RiscvPagingTraitsBase {
+  static constexpr auto kLevels = cpp20::span{kAllLevels}.subspan(1);
+};
 
-struct RiscvSv57PagingTraits : public RiscvPagingTraitsBase {};
+struct RiscvSv57PagingTraits : public RiscvPagingTraitsBase {
+  static constexpr auto kLevels = cpp20::span{kAllLevels};
+};
 
 }  // namespace arch
 

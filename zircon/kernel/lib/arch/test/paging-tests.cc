@@ -4,16 +4,33 @@
 // license that can be found in the LICENSE file or at
 // https://opensource.org/licenses/MIT
 
+#include <inttypes.h>
 #include <lib/arch/arm64/page-table.h>
 #include <lib/arch/paging.h>
 #include <lib/arch/riscv64/page-table.h>
 #include <lib/arch/x86/page-table.h>
+#include <sys/types.h>
 
 #include <array>
 #include <cstddef>
 #include <cstdint>
+#include <cstdlib>
+#include <map>
+#include <memory>
 
 #include <gtest/gtest.h>
+#include <hwreg/array.h>
+
+//
+// The testing strategy for the PagingTraits API implementations and its
+// consumers is as follows:
+//
+// * First, we test the API implementations directly.
+//
+// * Second, we test arch::Paging against the implementations, taking the
+//   latter for granted (with the confidence gained from their exercise in the
+//   first round of testing).
+//
 
 namespace {
 
@@ -1483,5 +1500,449 @@ TEST(ArmPagingTraitTests, GetSetAddress) {
   TestArmGetSetAddress<ArmPagingLevel::k2>();
   TestArmGetSetAddress<ArmPagingLevel::k3>();
 }
+
+//
+class Table {
+ public:
+  using Io = hwreg::ArrayIo<uint64_t, 512>;
+
+  Io io() { return table_.direct_io(); }
+
+  uint64_t paddr() const { return reinterpret_cast<uint64_t>(&table_); }
+
+  void Set(uint64_t entry, size_t index) { table_.table()[index] = entry; }
+
+ private:
+  hwreg::AlignedTableStorage<uint64_t, 512> table_;
+};
+
+// A simple helper for managing table allocations and offering the
+// paddr-to-I/O-provider abstraction required of paging API.
+//
+// For simplicity, this class is intended to be used by paging schemes with
+// tables of 512 entries.
+template <class PagingTraits>
+class PagingHelper {
+ public:
+  using LevelType = typename PagingTraits::LevelType;
+
+  template <LevelType Level>
+  using TableEntry = typename PagingTraits::template TableEntry<Level>;
+
+  static constexpr auto kLevels = PagingTraits::kLevels;
+
+  Table& NewTable() {
+    std::unique_ptr<Table> table(new Table);
+    uint64_t addr = reinterpret_cast<uint64_t>(table.get());
+    auto [it, ok] = tables_.insert_or_assign(addr, std::move(table));
+    ZX_ASSERT(ok);
+    return *it->second;
+  }
+
+  auto MakePaddrToIo() {
+    return [this](uint64_t paddr) -> Table::Io {
+      auto it = tables_.find(paddr);
+      if (it == tables_.end()) {
+        bool first = true;
+        printf("unknown \"physical\" table address %#" PRIx64 "; known table addresses:", paddr);
+        for (const auto& [addr, table] : tables_) {
+          printf("%s %#" PRIx64, first ? "" : ",", addr);
+          first = false;
+        }
+        abort();
+      }
+      return it->second->io();
+    };
+  }
+
+  template <size_t LevelIndex>
+  TableEntry<kLevels[LevelIndex]> NewTableEntry() const {
+    return TableEntry<kLevels[LevelIndex]>{}.set_reg_value(0);
+  }
+
+ private:
+  static_assert(PagingTraits::kTableAlignmentLog2 == 12);
+
+  template <size_t... LevelIndex>
+  static constexpr bool Has512Entries(std::index_sequence<LevelIndex...>) {
+    return ((PagingTraits::template kNumTableEntriesLog2<kLevels[LevelIndex]> == 9) && ...);
+  }
+  static_assert(Has512Entries(std::make_index_sequence<kLevels.size()>()));
+
+  std::map<uint64_t, std::unique_ptr<Table>> tables_;
+};
+
+TEST(PagingTests, Compilation) {
+  // The point here is not really to check that the traits structs are empty,
+  // but rather to force the compiler to instantiate arch::Paging for each
+  // trait, which in turn checks that the traits meet the expected API.
+  static_assert(std::is_empty_v<arch::Paging<arch::ExamplePagingTraits>>);
+  static_assert(std::is_empty_v<arch::Paging<arch::RiscvSv39PagingTraits>>);
+  static_assert(std::is_empty_v<arch::Paging<arch::RiscvSv48PagingTraits>>);
+  static_assert(std::is_empty_v<arch::Paging<arch::RiscvSv57PagingTraits>>);
+  static_assert(std::is_empty_v<arch::Paging<arch::X86FourLevelPagingTraits>>);
+  static_assert(std::is_empty_v<arch::Paging<arch::X86FiveLevelPagingTraits>>);
+  static_assert(std::is_empty_v<arch::Paging<arch::ArmPagingTraits>>);
+}
+
+// The following macros are expected to be used on test cases given as
+// functions of the form
+// ```
+// template <class PagingTraits>
+// void CaseName(const typename PagingTraits::SystemState& state)
+// ```
+// stamping out test cases for each PagingTraits implementation under test.
+
+#define TEST_FOR_ALL_TRAITS(name) \
+  TEST_FOR_ARM(name)              \
+  TEST_FOR_RISCV(name)            \
+  TEST_FOR_X86(name)
+
+#define TEST_FOR_ARM(name) \
+  TEST(PagingTests, Arm##name) { name<arch::ArmPagingTraits>({}); }
+
+#define TEST_FOR_RISCV(name) \
+  TEST(PagingTests, RiscvSv48##name) { name<arch::RiscvSv48PagingTraits>({}); }
+
+#define TEST_FOR_X86(name)                                             \
+  TEST(PagingTests, X86##name##NxAllowed) {                            \
+    name<arch::X86FourLevelPagingTraits>(kX86SystemStateNxAllowed);    \
+  }                                                                    \
+  TEST(PagingTests, X86##name##NxDisallowed) {                         \
+    name<arch::X86FourLevelPagingTraits>(kX86SystemStateNxDisallowed); \
+  }
+
+template <class PagingTraits>
+void TranslationWith4KiBPages(const typename PagingTraits::SystemState& state) {
+  using Paging = arch::Paging<PagingTraits>;
+
+  //                                |---9---| |---9---| |---9---| |---9---| |----12----|
+  constexpr uint64_t kPageVaddr = 0b111111111'101010101'010101010'100100100'000000000000;
+  constexpr uint64_t kPagePaddr = 0xffff'ffff'1000;
+
+  PagingHelper<PagingTraits> helper;
+  Table& first = helper.NewTable();
+  Table& second = helper.NewTable();
+  Table& third = helper.NewTable();
+  Table& fourth = helper.NewTable();
+
+  {
+    auto entry = helper.template NewTableEntry<0>().Set(state, PagingSettings{
+                                                                   .address = second.paddr(),
+                                                                   .present = true,
+                                                                   .terminal = false,
+                                                                   .access = kRWXU,
+                                                               });
+    first.Set(entry.reg_value(), 0b111111111);
+  }
+  {
+    auto entry = helper.template NewTableEntry<1>().Set(state, PagingSettings{
+                                                                   .address = third.paddr(),
+                                                                   .present = true,
+                                                                   .terminal = false,
+                                                                   .access = kRWXU,
+                                                               });
+    second.Set(entry.reg_value(), 0b101010101);
+  }
+  {
+    auto entry = helper.template NewTableEntry<2>().Set(state, PagingSettings{
+                                                                   .address = fourth.paddr(),
+                                                                   .present = true,
+                                                                   .terminal = false,
+                                                                   .access = kRWXU,
+                                                               });
+    third.Set(entry.reg_value(), 0b010101010);
+  }
+  {
+    auto entry = helper.template NewTableEntry<3>().Set(state, PagingSettings{
+                                                                   .address = kPagePaddr,
+                                                                   .present = true,
+                                                                   .terminal = true,
+                                                                   .access = kRWXU,
+                                                               });
+    fourth.Set(entry.reg_value(), 0b100100100);
+  }
+
+  {
+    auto result = Paging::template Query(first.paddr(), helper.MakePaddrToIo(), kPageVaddr);
+    ASSERT_TRUE(result.is_ok());
+
+    auto [paddr, access] = std::move(result).value();
+    EXPECT_EQ(kPagePaddr, paddr);
+    EXPECT_TRUE(access.readable);
+    EXPECT_TRUE(access.writable);
+    EXPECT_TRUE(access.executable);
+    EXPECT_TRUE(access.user_accessible);
+  }
+  {
+    auto result = Paging::template Query(first.paddr(), helper.MakePaddrToIo(), kPageVaddr | 0xabc);
+    ASSERT_TRUE(result.is_ok());
+
+    auto [paddr, access] = std::move(result).value();
+    EXPECT_EQ(kPagePaddr | 0xabc, paddr);
+    EXPECT_TRUE(access.readable);
+    EXPECT_TRUE(access.writable);
+    EXPECT_TRUE(access.executable);
+    EXPECT_TRUE(access.user_accessible);
+  }
+  {
+    auto result = Paging::template Query(first.paddr(), helper.MakePaddrToIo(), kPageVaddr | 0xfff);
+    ASSERT_TRUE(result.is_ok());
+
+    auto [paddr, access] = std::move(result).value();
+    EXPECT_EQ(kPagePaddr | 0xfff, paddr);
+    EXPECT_TRUE(access.readable);
+    EXPECT_TRUE(access.writable);
+    EXPECT_TRUE(access.executable);
+    EXPECT_TRUE(access.user_accessible);
+  }
+}
+TEST_FOR_ALL_TRAITS(TranslationWith4KiBPages)
+
+template <class PagingTraits>
+void TranslationWith2MiBPages(const typename PagingTraits::SystemState& state) {
+  using Paging = arch::Paging<PagingTraits>;
+
+  //                                |---9---| |---9---| |---9---| |------12 + 9-------|
+  constexpr uint64_t kPageVaddr = 0b111111111'101010101'010101010'000000000000000000000;
+  constexpr uint64_t kPagePaddr = 0xffff'ff20'0000;
+
+  PagingHelper<PagingTraits> helper;
+  Table& first = helper.NewTable();
+  Table& second = helper.NewTable();
+  Table& third = helper.NewTable();
+
+  {
+    auto entry = helper.template NewTableEntry<0>().Set(state, PagingSettings{
+                                                                   .address = second.paddr(),
+                                                                   .present = true,
+                                                                   .terminal = false,
+                                                                   .access = kRWXU,
+                                                               });
+    first.Set(entry.reg_value(), 0b111111111);
+  }
+  {
+    auto entry = helper.template NewTableEntry<1>().Set(state, PagingSettings{
+                                                                   .address = third.paddr(),
+                                                                   .present = true,
+                                                                   .terminal = false,
+                                                                   .access = kRWXU,
+                                                               });
+    second.Set(entry.reg_value(), 0b101010101);
+  }
+  {
+    auto entry = helper.template NewTableEntry<2>().Set(state, PagingSettings{
+                                                                   .address = kPagePaddr,
+                                                                   .present = true,
+                                                                   .terminal = true,
+                                                                   .access = kRWXU,
+                                                               });
+    third.Set(entry.reg_value(), 0b010101010);
+  }
+
+  {
+    auto result = Paging::template Query(first.paddr(), helper.MakePaddrToIo(), kPageVaddr);
+    ASSERT_TRUE(result.is_ok());
+
+    auto [paddr, access] = std::move(result).value();
+    EXPECT_EQ(kPagePaddr, paddr);
+    EXPECT_TRUE(access.readable);
+    EXPECT_TRUE(access.writable);
+    EXPECT_TRUE(access.executable);
+    EXPECT_TRUE(access.user_accessible);
+  }
+  {
+    auto result =
+        Paging::template Query(first.paddr(), helper.MakePaddrToIo(), kPageVaddr | 0xabcde);
+    ASSERT_TRUE(result.is_ok());
+
+    auto [paddr, access] = std::move(result).value();
+    EXPECT_EQ(kPagePaddr | 0xabcde, paddr);
+    EXPECT_TRUE(access.readable);
+    EXPECT_TRUE(access.writable);
+    EXPECT_TRUE(access.executable);
+    EXPECT_TRUE(access.user_accessible);
+  }
+  {
+    auto result =
+        Paging::template Query(first.paddr(), helper.MakePaddrToIo(), kPageVaddr | 0x1f'ffff);
+    ASSERT_TRUE(result.is_ok());
+
+    auto [paddr, access] = std::move(result).value();
+    EXPECT_EQ(kPagePaddr | 0x1f'ffff, paddr);
+    EXPECT_TRUE(access.readable);
+    EXPECT_TRUE(access.writable);
+    EXPECT_TRUE(access.executable);
+    EXPECT_TRUE(access.user_accessible);
+  }
+}
+TEST_FOR_ALL_TRAITS(TranslationWith2MiBPages)
+
+template <class PagingTraits>
+void TranslationWith1GiBPages(const typename PagingTraits::SystemState& state) {
+  using Paging = arch::Paging<PagingTraits>;
+
+  //                                |---9---| |---9---| |---------12 + 9 + 9---------|
+  constexpr uint64_t kPageVaddr = 0b111111111'101010101'000000000000000000000000000000;
+  constexpr uint64_t kPagePaddr = 0xffff'4000'0000;
+
+  PagingHelper<PagingTraits> helper;
+  Table& first = helper.NewTable();
+  Table& second = helper.NewTable();
+
+  {
+    auto entry = helper.template NewTableEntry<0>().Set(state, PagingSettings{
+                                                                   .address = second.paddr(),
+                                                                   .present = true,
+                                                                   .terminal = false,
+                                                                   .access = kRWXU,
+                                                               });
+    first.Set(entry.reg_value(), 0b111111111);
+  }
+  {
+    auto entry = helper.template NewTableEntry<1>().Set(state, PagingSettings{
+                                                                   .address = kPagePaddr,
+                                                                   .present = true,
+                                                                   .terminal = true,
+                                                                   .access = kRWXU,
+                                                               });
+    second.Set(entry.reg_value(), 0b101010101);
+  }
+
+  {
+    auto result = Paging::template Query(first.paddr(), helper.MakePaddrToIo(), kPageVaddr);
+    ASSERT_TRUE(result.is_ok());
+
+    auto [paddr, access] = std::move(result).value();
+    EXPECT_EQ(kPagePaddr, paddr);
+    EXPECT_TRUE(access.readable);
+    EXPECT_TRUE(access.writable);
+    EXPECT_TRUE(access.executable);
+    EXPECT_TRUE(access.user_accessible);
+  }
+  {
+    auto result =
+        Paging::template Query(first.paddr(), helper.MakePaddrToIo(), kPageVaddr | 0xabc'def0);
+    ASSERT_TRUE(result.is_ok());
+
+    auto [paddr, access] = std::move(result).value();
+    EXPECT_EQ(kPagePaddr | 0xabc'def0, paddr);
+    EXPECT_TRUE(access.readable);
+    EXPECT_TRUE(access.writable);
+    EXPECT_TRUE(access.executable);
+    EXPECT_TRUE(access.user_accessible);
+  }
+  {
+    auto result =
+        Paging::template Query(first.paddr(), helper.MakePaddrToIo(), kPageVaddr | 0x3fff'ffff);
+    ASSERT_TRUE(result.is_ok());
+
+    auto [paddr, access] = std::move(result).value();
+    EXPECT_EQ(kPagePaddr | 0x3fff'ffff, paddr);
+    EXPECT_TRUE(access.readable);
+    EXPECT_TRUE(access.writable);
+    EXPECT_TRUE(access.executable);
+    EXPECT_TRUE(access.user_accessible);
+  }
+}
+TEST_FOR_ALL_TRAITS(TranslationWith1GiBPages)
+
+template <class PagingTraits>
+void TranslationFault(const typename PagingTraits::SystemState& state) {
+  using Paging = arch::Paging<PagingTraits>;
+
+  //                                |---9---| |---9---| |---9---| |---9---| |----12----|
+  constexpr uint64_t kPageVaddr = 0b111111111'101010101'010101010'100100100'000000000000;
+  constexpr uint64_t kPagePaddr = 0xffff'ffff'1000;
+
+  PagingHelper<PagingTraits> helper;
+  Table& first = helper.NewTable();
+  Table& second = helper.NewTable();
+  Table& third = helper.NewTable();
+  Table& fourth = helper.NewTable();
+
+  // Zero out the entries we expect a successful translation of kPageVaddr to
+  // walk.
+  first.Set(0, 0b111111111);
+  second.Set(0, 0b101010101);
+  third.Set(0, 0b010101010);
+  fourth.Set(0, 0b100100100);
+
+  //
+  // We should fault... and continue faulting till we properly fill out these
+  // entries to point to kPagePaddr.
+  //
+
+  {
+    auto result = Paging::template Query(first.paddr(), helper.MakePaddrToIo(), kPageVaddr);
+    EXPECT_TRUE(result.is_error());
+  }
+
+  {
+    auto entry = helper.template NewTableEntry<0>().Set(state, PagingSettings{
+                                                                   .address = second.paddr(),
+                                                                   .present = true,
+                                                                   .terminal = false,
+                                                                   .access = kRWXU,
+                                                               });
+    first.Set(entry.reg_value(), 0b111111111);
+  }
+
+  {
+    auto result = Paging::template Query(first.paddr(), helper.MakePaddrToIo(), kPageVaddr);
+    EXPECT_TRUE(result.is_error());
+  }
+
+  {
+    auto entry = helper.template NewTableEntry<1>().Set(state, PagingSettings{
+                                                                   .address = third.paddr(),
+                                                                   .present = true,
+                                                                   .terminal = false,
+                                                                   .access = kRWXU,
+                                                               });
+    second.Set(entry.reg_value(), 0b101010101);
+  }
+
+  {
+    auto result = Paging::template Query(first.paddr(), helper.MakePaddrToIo(), kPageVaddr);
+    EXPECT_TRUE(result.is_error());
+  }
+
+  {
+    auto entry = helper.template NewTableEntry<2>().Set(state, PagingSettings{
+                                                                   .address = fourth.paddr(),
+                                                                   .present = true,
+                                                                   .terminal = false,
+                                                                   .access = kRWXU,
+                                                               });
+    third.Set(entry.reg_value(), 0b010101010);
+  }
+
+  {
+    auto result = Paging::template Query(first.paddr(), helper.MakePaddrToIo(), kPageVaddr);
+    EXPECT_TRUE(result.is_error());
+  }
+
+  {
+    auto entry = helper.template NewTableEntry<3>().Set(state, PagingSettings{
+                                                                   .address = kPagePaddr,
+                                                                   .present = true,
+                                                                   .terminal = true,
+                                                                   .access = kRWXU,
+                                                               });
+    fourth.Set(entry.reg_value(), 0b100100100);
+  }
+
+  // All entries are filled in and point to kPagePaddr, so we should no longer
+  // see a fault.
+  {
+    auto result = Paging::template Query(first.paddr(), helper.MakePaddrToIo(), kPageVaddr);
+    ASSERT_TRUE(result.is_ok());
+    auto [paddr, access] = std::move(result).value();
+    EXPECT_EQ(kPagePaddr, paddr);
+  }
+}
+
+TEST_FOR_ALL_TRAITS(TranslationFault)
 
 }  // namespace

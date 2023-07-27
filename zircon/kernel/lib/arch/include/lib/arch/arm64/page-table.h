@@ -8,7 +8,6 @@
 #define ZIRCON_KERNEL_LIB_ARCH_INCLUDE_LIB_ARCH_ARM64_PAGE_TABLE_H_
 
 #include <lib/arch/paging.h>
-#include <lib/stdcompat/array.h>
 #include <zircon/assert.h>
 #include <zircon/compiler.h>
 
@@ -686,7 +685,19 @@ struct ArmPagingTraits {
   using TableEntry = ArmAddressTranslationDescriptor<Level, ArmGranuleSize::k4KiB,
                                                      ArmMaximumVirtualAddressWidth::k48Bits>;
 
+  static constexpr std::array kLevels = {
+      ArmAddressTranslationLevel::k0,
+      ArmAddressTranslationLevel::k1,
+      ArmAddressTranslationLevel::k2,
+      ArmAddressTranslationLevel::k3,
+  };
+
   static constexpr unsigned int kMaxPhysicalAddressSize = 48;
+
+  static constexpr unsigned int kTableAlignmentLog2 = 12;
+
+  template <ArmAddressTranslationLevel Level>
+  static constexpr unsigned int kNumTableEntriesLog2 = 9;
 
   static constexpr bool kNonTerminalAccessPermissions = true;
 

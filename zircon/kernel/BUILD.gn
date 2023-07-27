@@ -776,7 +776,7 @@ if (is_kernel) {
       "arch/$zircon_cpu/user-copy:tests",
       "dev/coresight/tests($host_toolchain)",
       "lib/acpi_lite:tests",
-      "lib/arch/test:tests",
+      "lib/arch:tests",
       "lib/boot-options/tests",
       "lib/devicetree/tests",
       "lib/efi:tests",

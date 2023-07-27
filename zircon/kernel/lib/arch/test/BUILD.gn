@@ -30,6 +30,7 @@ if (is_host) {
       "//third_party/googletest:gtest",
       "//zircon/kernel/lib/arch",
       "//zircon/kernel/lib/arch/testing",
+      "//zircon/system/ulib/hwreg",
       "//zircon/system/ulib/zx",
     ]
   }
