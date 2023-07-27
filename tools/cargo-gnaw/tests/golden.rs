@@ -70,124 +70,118 @@ fn main() {
     // https://doc.rust-lang.org/cargo/reference/environment-variables.html
     std::env::set_var("RUSTC", Path::new(&paths.rustc_binary_path).canonicalize().unwrap());
 
+    #[derive(Debug, Default)]
+    struct Options {
+        /// Fuchsia SDK metadata output path; relative to the base test directory.
+        sdk_metadata_path: Option<Vec<&'static str>>,
+        /// Fuchsia SDK metadata golden path; relative to the golden files directory.
+        sdk_metadata_golden_path: Option<Vec<&'static str>>,
+        /// Extra arguments to pass to gnaw.
+        extra_args: Vec<&'static str>,
+    }
     #[derive(Debug)]
     struct TestCase {
         /// Manifest file path (`Cargo.toml`); relative to the base test directory.
         manifest_path: Vec<&'static str>,
         /// Expected file (`BUILD.gn`); relative to the base test directory.
         golden_expected_filename: Vec<&'static str>,
-        /// Fuchsia SDK metadata output path; relative to the base test directory.
-        sdk_metadata_path: Option<Vec<&'static str>>,
-        /// Extra arguments to pass to gnaw.
-        extra_args: Vec<&'static str>,
+        /// Extra stuff not needed for most tests.
+        options: Options,
     }
 
     let tests = vec![
         TestCase {
             manifest_path: vec!["simple", "Cargo.toml"],
             golden_expected_filename: vec!["simple", "BUILD.gn"],
-            sdk_metadata_path: None,
-            extra_args: vec![],
+            options: Default::default(),
         },
         TestCase {
             manifest_path: vec!["simple_deps", "Cargo.toml"],
             golden_expected_filename: vec!["simple_deps", "BUILD.gn"],
-            sdk_metadata_path: None,
-            extra_args: vec![],
+            options: Default::default(),
         },
         TestCase {
             manifest_path: vec!["simple_deps", "Cargo.toml"],
             golden_expected_filename: vec!["simple_deps", "BUILD_WITH_NO_ROOT.gn"],
-            sdk_metadata_path: None,
-            extra_args: vec!["--skip-root"],
+            options: Options { extra_args: vec!["--skip-root"], ..Default::default() },
         },
         TestCase {
             manifest_path: vec!["platform_deps", "Cargo.toml"],
             golden_expected_filename: vec!["platform_deps", "BUILD.gn"],
-            sdk_metadata_path: None,
-            extra_args: vec!["--skip-root"],
+            options: Options { extra_args: vec!["--skip-root"], ..Default::default() },
         },
         TestCase {
             manifest_path: vec!["platform_features", "Cargo.toml"],
             golden_expected_filename: vec!["platform_features", "BUILD.gn"],
-            sdk_metadata_path: None,
-            extra_args: vec!["--skip-root"],
+            options: Options { extra_args: vec!["--skip-root"], ..Default::default() },
         },
         TestCase {
             manifest_path: vec!["binary", "Cargo.toml"],
             golden_expected_filename: vec!["binary", "BUILD.gn"],
-            sdk_metadata_path: None,
-            extra_args: vec![],
+            options: Default::default(),
         },
         TestCase {
             manifest_path: vec!["binary_with_tests", "Cargo.toml"],
             golden_expected_filename: vec!["binary_with_tests", "BUILD.gn"],
-            sdk_metadata_path: None,
-            extra_args: vec![],
+            options: Default::default(),
         },
         TestCase {
             manifest_path: vec!["multiple_crate_types", "Cargo.toml"],
             golden_expected_filename: vec!["multiple_crate_types", "BUILD.gn"],
-            sdk_metadata_path: None,
-            extra_args: vec![],
+            options: Default::default(),
         },
         TestCase {
             manifest_path: vec!["feature_review", "Cargo.toml"],
             golden_expected_filename: vec!["feature_review", "BUILD.gn"],
-            sdk_metadata_path: None,
-            extra_args: vec![],
+            options: Default::default(),
         },
         TestCase {
             manifest_path: vec!["cargo_features", "Cargo.toml"],
             golden_expected_filename: vec!["cargo_features", "BUILD-default.gn"],
-            sdk_metadata_path: None,
-            extra_args: vec![],
+            options: Default::default(),
         },
         TestCase {
             manifest_path: vec!["cargo_features", "Cargo.toml"],
             golden_expected_filename: vec!["cargo_features", "BUILD-all-features.gn"],
-            sdk_metadata_path: None,
-            extra_args: vec!["--all-features"],
+            options: Options { extra_args: vec!["--all-features"], ..Default::default() },
         },
         TestCase {
             manifest_path: vec!["cargo_features", "Cargo.toml"],
             golden_expected_filename: vec!["cargo_features", "BUILD-no-default-features.gn"],
-            sdk_metadata_path: None,
-            extra_args: vec!["--no-default-features"],
+            options: Options { extra_args: vec!["--no-default-features"], ..Default::default() },
         },
         TestCase {
             manifest_path: vec!["cargo_features", "Cargo.toml"],
             golden_expected_filename: vec!["cargo_features", "BUILD-featurefoo.gn"],
-            sdk_metadata_path: None,
-            extra_args: vec!["--features", "featurefoo"],
+            options: Options { extra_args: vec!["--features", "featurefoo"], ..Default::default() },
         },
         TestCase {
             manifest_path: vec!["visibility", "Cargo.toml"],
             golden_expected_filename: vec!["visibility", "BUILD.gn"],
-            sdk_metadata_path: None,
-            extra_args: vec!["--skip-root"],
+            options: Options { extra_args: vec!["--skip-root"], ..Default::default() },
         },
         TestCase {
             manifest_path: vec!["target_renaming", "Cargo.toml"],
             golden_expected_filename: vec!["target_renaming", "BUILD.gn"],
-            sdk_metadata_path: None,
-            extra_args: vec!["--skip-root"],
+            options: Options { extra_args: vec!["--skip-root"], ..Default::default() },
         },
         TestCase {
             manifest_path: vec!["sdk_metadata", "Cargo.toml"],
             golden_expected_filename: vec!["sdk_metadata", "BUILD.gn"],
-            sdk_metadata_path: Some(vec![
-                "sdk_metadata",
-                "sdk_metadata",
-                "sdk_metadata.sdk.meta.json",
-            ]),
-            extra_args: vec![],
+            options: Options {
+                sdk_metadata_path: Some(vec!["sdk_metas", "sdk_metadata.sdk.meta.json"]),
+                sdk_metadata_golden_path: Some(vec![
+                    "sdk_metadata",
+                    "sdk_metas",
+                    "sdk_metadata.sdk.meta.json",
+                ]),
+                ..Default::default()
+            },
         },
         TestCase {
             manifest_path: vec!["testonly", "Cargo.toml"],
             golden_expected_filename: vec!["testonly", "BUILD.gn"],
-            sdk_metadata_path: None,
-            extra_args: vec!["--skip-root"],
+            options: Options { extra_args: vec!["--skip-root"], ..Default::default() },
         },
     ];
 
@@ -258,10 +252,13 @@ fn main() {
     };
 
     for test in tests {
-        let (output, output_sdk_metadata) =
-            run_gnaw(&test.manifest_path, &test.extra_args, test.sdk_metadata_path.as_deref())
-                .with_context(|| format!("\n\ttest was: {:?}", &test))
-                .expect("gnaw_lib::run should succeed");
+        let (output, output_sdk_metadata) = run_gnaw(
+            &test.manifest_path,
+            &test.options.extra_args,
+            test.options.sdk_metadata_path.as_deref(),
+        )
+        .with_context(|| format!("\n\ttest was: {:?}", &test))
+        .expect("gnaw_lib::run should succeed");
 
         let test_base_dir = PathBuf::from(&paths.test_base_dir);
         let expected_path: PathBuf =
@@ -280,8 +277,9 @@ fn main() {
         );
 
         if let Some(output_sdk_metadata) = output_sdk_metadata {
-            let expected_sdk_metadata_path = test_base_dir
-                .join(test.sdk_metadata_path.as_ref().unwrap().iter().collect::<PathBuf>());
+            let expected_sdk_metadata_path = test_base_dir.join(
+                test.options.sdk_metadata_golden_path.as_ref().unwrap().iter().collect::<PathBuf>(),
+            );
             let expected_sdk_metadata = std::fs::read_to_string(&expected_sdk_metadata_path)
                 .with_context(|| {
                     format!("while reading sdk metadata: {}", expected_sdk_metadata_path.display())

@@ -19,7 +19,7 @@ if (current_toolchain == default_toolchain) {
   _sdk_prefix = ""
 } else if (is_host) {
   _generating_sdk = true
-  _sdk_prefix = "rust_proc_macros"
+  _sdk_prefix = "rust_proc_macros/"
 }
 
 group("sdk_metadata") {
@@ -31,7 +31,7 @@ if (_generating_sdk) {
     id = "sdk://${_sdk_prefix}third_party/rust_crates/sdk_metadata"
     category = "internal"
     meta = {
-      source = "sdk_metadata/sdk_metadata.sdk.meta.json"
+      source = "sdk_metas/sdk_metadata.sdk.meta.json"
       dest = "${_sdk_prefix}third_party/rust_crates/sdk_metadata/meta.json"
       schema = "3p_rust_library"
     }

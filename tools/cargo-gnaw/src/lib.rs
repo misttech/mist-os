@@ -300,10 +300,8 @@ pub fn generate_from_manifest<W: io::Write>(mut output: &mut W, opt: &Opt) -> Re
     let fuchsia_sdk_metadata_paths =
         opt.output_fuchsia_sdk_metadata.as_ref().map(|output_fuchsia_sdk_metadata| {
             let path_from_root_to_generated = output_fuchsia_sdk_metadata
-                .parent()
-                .unwrap()
-                .strip_prefix(&opt.project_root)
-                .expect("--project-root must be a parent of --output");
+                .strip_prefix(opt.output.parent().unwrap())
+                .expect("--output_fuchsia_sdk_metadata must be in the same directory as --output");
             (output_fuchsia_sdk_metadata, path_from_root_to_generated)
         });
     let mut emitted_metadata: Vec<CrateOutputMetadata> = Vec::new();

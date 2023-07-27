@@ -10,5 +10,5 @@ if (current_toolchain == default_toolchain) {{
   _sdk_prefix = ""
 }} else if (is_host) {{
   _generating_sdk = true
-  _sdk_prefix = "rust_proc_macros"
+  _sdk_prefix = "rust_proc_macros/"
 }}

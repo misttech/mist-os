@@ -129,11 +129,9 @@ pub fn write_fuchsia_sdk_metadata<W: io::Write>(
     writeln!(
         metadata_output,
         r#"{{
-    "contents": {{
-        "type": "{sdk_atom_type}",
-        "name": "{group_name}",
-        "version": "{version}"
-    }}
+    "type": "{sdk_atom_type}",
+    "name": "{group_name}",
+    "version": "{version}"
 }}"#,
         sdk_atom_type = if pkg.is_proc_macro() { "rust_3p_proc_macro" } else { "rust_3p_library" },
         group_name = pkg.name,
