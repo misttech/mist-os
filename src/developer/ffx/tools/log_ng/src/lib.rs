@@ -2,6 +2,12 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+//! # Next-generation log tool for ffx
+//!
+//! This tool is a replacement for the legacy 'ffx log' plugin.
+//! All new development is being done in this tool, and the legacy tool will be
+//! deprecated once this tool is feature complete.
+
 use diagnostics_data::{LogTextColor, LogTextDisplayOptions};
 use error::LogError;
 use fho::{daemon_protocol, AvailabilityFlag, FfxMain, FfxTool, MachineWriter, ToolIO};
