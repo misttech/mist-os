@@ -40,18 +40,18 @@ pub(crate) mod errno {
     ///
     /// Netlink errors are expected to be negative Errnos, with 0 used for ACKs.
     /// This type enforces that the contained code is NonZero & Negative.
-    #[derive(Copy, Clone, Debug)]
+    #[derive(Copy, Clone, Debug, PartialEq)]
     pub(crate) struct Errno(i32);
 
     impl Errno {
         pub(crate) const EADDRNOTAVAIL: Errno =
             const_unwrap_option(Errno::new(-libc::EADDRNOTAVAIL));
-        pub(crate) const EAFNOSUPPORT: Errno =
-            const_unwrap::const_unwrap_option(Errno::new(-libc::EAFNOSUPPORT));
-        pub(crate) const EBUSY: Errno = const_unwrap::const_unwrap_option(Errno::new(-libc::EBUSY));
+        pub(crate) const EAFNOSUPPORT: Errno = const_unwrap_option(Errno::new(-libc::EAFNOSUPPORT));
+        pub(crate) const EBUSY: Errno = const_unwrap_option(Errno::new(-libc::EBUSY));
         pub(crate) const EEXIST: Errno = const_unwrap_option(Errno::new(-libc::EEXIST));
         pub(crate) const EINVAL: Errno = const_unwrap_option(Errno::new(-libc::EINVAL));
         pub(crate) const ENODEV: Errno = const_unwrap_option(Errno::new(-libc::ENODEV));
+        pub(crate) const ENOENT: Errno = const_unwrap_option(Errno::new(-libc::ENOENT));
         pub(crate) const ENOTSUP: Errno = const_unwrap_option(Errno::new(-libc::ENOTSUP));
 
         /// Construct a new [`Errno`] from the given negative integer.
