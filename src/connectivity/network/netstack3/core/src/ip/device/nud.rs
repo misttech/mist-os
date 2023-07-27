@@ -94,9 +94,9 @@ pub(crate) enum DynamicNeighborState<D: LinkDevice> {
 }
 
 impl<D: LinkDevice> DynamicNeighborState<D> {
-    fn new_incomplete_with_pending_frame(remaining_tries: u8, frame: Buf<Vec<u8>>) -> Self {
+    fn new_incomplete_with_pending_frame(frame: Buf<Vec<u8>>) -> Self {
         DynamicNeighborState::Incomplete {
-            transmit_counter: NonZeroU8::new(remaining_tries),
+            transmit_counter: NonZeroU8::new(MAX_MULTICAST_SOLICIT - 1),
             pending_frames: [frame].into(),
         }
     }
@@ -766,7 +766,6 @@ impl<
                     Entry::Vacant(e) => {
                         let _: &mut NeighborState<_> = e.insert(NeighborState::Dynamic(
                             DynamicNeighborState::new_incomplete_with_pending_frame(
-                                MAX_MULTICAST_SOLICIT - 1,
                                 body.serialize_vec_outer()
                                     .map_err(|(_err, s)| s)?
                                     .map_a(|b| Buf::new(b.as_ref().to_vec(), ..))
