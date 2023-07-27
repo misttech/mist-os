@@ -50,9 +50,10 @@ int main() {
   fidl::WireSyncClient client{std::move(*client_end)};
 
   fidl::Arena arena;
-  auto wire_result = client->Start(fuchsia_driver_test::wire::RealmArgs::Builder(arena)
-                                       .root_driver("fuchsia-boot:///#meta/platform-bus.cm")
-                                       .Build());
+  auto wire_result =
+      client->Start(fuchsia_driver_test::wire::RealmArgs::Builder(arena)
+                        .root_driver("fuchsia-boot:///platform-bus#meta/platform-bus.cm")
+                        .Build());
   if (wire_result.status() != ZX_OK) {
     FX_SLOG(ERROR, "Failed to call to Realm:Start", KV("status", wire_result.status()));
     return 1;

@@ -2,7 +2,6 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-import("//build/assembly/bootfs_files_for_assembly.gni")
 import("//build/bind/bind.gni")
 import("//build/components.gni")
 import("//build/drivers.gni")
@@ -122,8 +121,9 @@ fuchsia_driver_component("sysmem") {
   manifest = "meta/sysmem.cml"
 }
 
-bootfs_files_for_assembly("bootfs") {
-  deps = [ ":sysmem" ]
+fuchsia_driver_package("package") {
+  package_name = "sysmem"
+  driver_components = [ ":sysmem" ]
 }
 
 test("sysmem-unittest-bin") {

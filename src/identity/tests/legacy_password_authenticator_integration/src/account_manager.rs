@@ -179,7 +179,7 @@ impl TestEnv {
 
         let realm_instance = builder.build().await.unwrap();
         let args = fidl_fuchsia_driver_test::RealmArgs {
-            root_driver: Some("fuchsia-boot:///#meta/platform-bus.cm".to_string()),
+            root_driver: Some("fuchsia-boot:///platform-bus#meta/platform-bus.cm".to_string()),
             ..Default::default()
         };
         realm_instance.driver_test_realm_start(args).await.unwrap();

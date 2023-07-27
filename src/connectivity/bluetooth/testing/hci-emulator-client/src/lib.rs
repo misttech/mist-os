@@ -273,7 +273,7 @@ mod tests {
             realm.driver_test_realm_setup().await.expect("driver test realm setup");
         let realm = realm.build().await.expect("failed to build realm");
         let args = fdt::RealmArgs {
-            root_driver: Some("fuchsia-boot:///#meta/platform-bus.cm".to_string()),
+            root_driver: Some("fuchsia-boot:///platform-bus#meta/platform-bus.cm".to_string()),
             ..Default::default()
         };
         realm.driver_test_realm_start(args).await.expect("driver test realm start");

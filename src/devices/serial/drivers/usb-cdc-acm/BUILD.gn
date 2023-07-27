@@ -2,7 +2,6 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-import("//build/assembly/bootfs_files_for_assembly.gni")
 import("//build/bind/bind.gni")
 import("//build/components.gni")
 import("//build/drivers.gni")
@@ -51,8 +50,9 @@ fuchsia_driver_component("usb-cdc-acm") {
   manifest = "meta/usb-cdc-acm.cml"
 }
 
-bootfs_files_for_assembly("bootfs") {
-  deps = [ ":usb-cdc-acm" ]
+fuchsia_driver_package("package") {
+  package_name = "usb-cdc-acm"
+  driver_components = [ ":usb-cdc-acm" ]
 }
 
 driver_bind_rules("usb_cdc_acm_function_bind") {

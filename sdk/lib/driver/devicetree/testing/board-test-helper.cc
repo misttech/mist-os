@@ -189,7 +189,7 @@ zx::result<> BoardTestHelper::StartRealm() {
   fidl::WireSyncClient driver_test_realm{std::move(*client)};
   fidl::Arena arena;
   auto builder = fdt::wire::RealmArgs::Builder(arena);
-  builder.root_driver("fuchsia-boot:///#meta/platform-bus.cm");
+  builder.root_driver("fuchsia-boot:///platform-bus#meta/platform-bus.cm");
   builder.use_driver_framework_v2(true);
 
   fdt::wire::RealmArgs args = builder.Build();

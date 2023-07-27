@@ -122,7 +122,7 @@ void HermeticAudioRealm::Create(Options options, async_dispatcher* dispatcher,
   fidl::SynchronousInterfacePtr<fuchsia::driver::test::Realm> driver_test_realm;
   ASSERT_EQ(ZX_OK, realm.component().Connect(driver_test_realm.NewRequest()));
   fuchsia::driver::test::RealmArgs realm_args;
-  realm_args.set_root_driver("fuchsia-boot:///#meta/platform-bus.cm");
+  realm_args.set_root_driver("fuchsia-boot:///platform-bus#meta/platform-bus.cm");
 
   fuchsia::driver::test::Realm_Start_Result realm_result;
   ASSERT_EQ(ZX_OK, driver_test_realm->Start(std::move(realm_args), &realm_result));

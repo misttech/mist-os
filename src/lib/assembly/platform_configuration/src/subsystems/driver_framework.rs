@@ -49,7 +49,7 @@ impl DefineSubsystemConfiguration<DriverFrameworkConfig> for DriverFrameworkSubs
             .field("verbose", false)?
             .field("use_driver_framework_v2", use_dfv2)?
             .field("driver_host_crash_policy", format!("{driver_host_crash_policy}"))?
-            .field("root_driver", "fuchsia-boot:///#meta/platform-bus.cm")?;
+            .field("root_driver", "fuchsia-boot:///platform-bus#meta/platform-bus.cm")?;
 
         Ok(())
     }

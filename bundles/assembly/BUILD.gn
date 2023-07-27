@@ -87,43 +87,6 @@ assembly_input_bundle("bootstrap") {
     "//src/bringup/bin/debuglog:bootfs",
     "//src/bringup/bin/dlog:bootfs",
     "//src/bringup/bin/waitfor:bootfs",
-
-    # drivers
-    "//src/connectivity/bluetooth/hci/transport/usb:bootfs",
-    "//src/connectivity/ethernet/drivers/asix-88179:bootfs",
-    "//src/connectivity/ethernet/drivers/asix-88772b:bootfs",
-    "//src/connectivity/ethernet/drivers/ethernet/netdevice-migration:bootfs",
-    "//src/connectivity/ethernet/drivers/usb-cdc-ecm:bootfs",
-    "//src/connectivity/network/drivers/network-device:bootfs",
-    "//src/devices/block/drivers/core:bootfs",
-    "//src/devices/block/drivers/gpt:bootfs",
-    "//src/devices/block/drivers/ramdisk:bootfs",
-    "//src/devices/block/drivers/sdmmc:bootfs",
-    "//src/devices/block/drivers/usb-mass-storage:bootfs",
-    "//src/devices/block/drivers/zxcrypt:bootfs",
-    "//src/devices/bus/drivers/platform:bootfs",
-    "//src/devices/clock/drivers/clock:bootfs",
-    "//src/devices/gpio/drivers/gpio:bootfs",
-    "//src/devices/i2c/drivers/i2c:bootfs",
-    "//src/devices/ml/drivers/usb-harriet:bootfs",
-    "//src/devices/power/drivers/power:bootfs",
-    "//src/devices/pwm/drivers/pwm:bootfs",
-    "//src/devices/serial/drivers/ftdi:bootfs",
-    "//src/devices/serial/drivers/serial:bootfs",
-    "//src/devices/serial/drivers/serial-async:bootfs",
-    "//src/devices/serial/drivers/usb-cdc-acm:bootfs",
-    "//src/devices/spi/drivers/spi:bootfs",
-    "//src/devices/sysmem/drivers/sysmem:bootfs",
-    "//src/devices/usb/drivers/usb-bus:bootfs",
-    "//src/devices/usb/drivers/usb-composite:bootfs",
-    "//src/devices/usb/drivers/usb-hub:bootfs",
-    "//src/graphics/display/drivers/coordinator:bootfs",
-    "//src/media/audio/drivers/usb-audio:bootfs",
-    "//src/storage/fvm/driver:bootfs",
-    "//src/ui/input/drivers/hid:bootfs",
-    "//src/ui/input/drivers/hid-buttons:bootfs",
-    "//src/ui/input/drivers/hid-input-report:bootfs",
-    "//src/ui/input/drivers/usb-hid:bootfs",
   ]
   bootfs_packages = [
     "//src/bringup/bin/svchost:pkg",
@@ -142,6 +105,153 @@ assembly_input_bundle("bootstrap") {
     "//src/power/shutdown-shim:package",
   ]
   kernel_cmdline = [ "blobfs.cache-eviction-policy=NEVER_EVICT" ]
+
+  boot_driver_packages = [
+    {
+      package_target = "//src/connectivity/bluetooth/hci/transport/usb:package"
+      driver_components = [ "meta/bt-transport-usb.cm" ]
+    },
+    {
+      package_target = "//src/connectivity/ethernet/drivers/asix-88179:package"
+      driver_components = [ "meta/asix-88179.cm" ]
+    },
+    {
+      package_target = "//src/connectivity/ethernet/drivers/asix-88772b:package"
+      driver_components = [ "meta/asix-88772b.cm" ]
+    },
+    {
+      package_target = "//src/connectivity/ethernet/drivers/ethernet/netdevice-migration:package"
+      driver_components = [ "meta/netdevice-migration.cm" ]
+    },
+    {
+      package_target = "//src/connectivity/ethernet/drivers/usb-cdc-ecm:package"
+      driver_components = [ "meta/usb-cdc-ecm.cm" ]
+    },
+    {
+      package_target =
+          "//src/connectivity/network/drivers/network-device:package"
+      driver_components = [ "meta/network-device.cm" ]
+    },
+    {
+      package_target = "//src/devices/block/drivers/core:package"
+      driver_components = [ "meta/block.core.cm" ]
+    },
+    {
+      package_target = "//src/devices/block/drivers/gpt:package"
+      driver_components = [ "meta/gpt.cm" ]
+    },
+    {
+      package_target = "//src/devices/block/drivers/ramdisk:package"
+      driver_components = [ "meta/ramdisk.cm" ]
+    },
+    {
+      package_target = "//src/devices/block/drivers/sdmmc:package"
+      driver_components = [ "meta/sdmmc.cm" ]
+    },
+    {
+      package_target = "//src/devices/block/drivers/usb-mass-storage:package"
+      driver_components = [ "meta/usb-mass-storage.cm" ]
+    },
+    {
+      package_target = "//src/devices/block/drivers/zxcrypt:package"
+      driver_components = [ "meta/zxcrypt.cm" ]
+    },
+    {
+      package_target = "//src/devices/bus/drivers/platform:package"
+      driver_components = [
+        "meta/platform-bus.cm",
+        "meta/platform-bus.proxy.cm",
+      ]
+    },
+    {
+      package_target = "//src/devices/clock/drivers/clock:package"
+      driver_components = [ "meta/clock.cm" ]
+    },
+    {
+      package_target = "//src/devices/gpio/drivers/gpio:package"
+      driver_components = [ "meta/gpio.cm" ]
+    },
+    {
+      package_target = "//src/devices/i2c/drivers/i2c:package"
+      driver_components = [ "meta/i2c.cm" ]
+    },
+    {
+      package_target = "//src/devices/ml/drivers/usb-harriet:package"
+      driver_components = [ "meta/usb-harriet.cm" ]
+    },
+    {
+      package_target = "//src/devices/power/drivers/power:package"
+      driver_components = [ "meta/power.cm" ]
+    },
+    {
+      package_target = "//src/devices/pwm/drivers/pwm:package"
+      driver_components = [ "meta/pwm.cm" ]
+    },
+    {
+      package_target = "//src/devices/serial/drivers/ftdi:package"
+      driver_components = [ "meta/ftdi.cm" ]
+    },
+    {
+      package_target = "//src/devices/serial/drivers/serial:package"
+      driver_components = [ "meta/serial.cm" ]
+    },
+    {
+      package_target = "//src/devices/serial/drivers/serial-async:package"
+      driver_components = [ "meta/serial-async.cm" ]
+    },
+    {
+      package_target = "//src/devices/serial/drivers/usb-cdc-acm:package"
+      driver_components = [ "meta/usb-cdc-acm.cm" ]
+    },
+    {
+      package_target = "//src/devices/spi/drivers/spi:package"
+      driver_components = [ "meta/spi.cm" ]
+    },
+    {
+      package_target = "//src/devices/sysmem/drivers/sysmem:package"
+      driver_components = [ "meta/sysmem.cm" ]
+    },
+    {
+      package_target = "//src/devices/usb/drivers/usb-bus:package"
+      driver_components = [ "meta/usb-bus.cm" ]
+    },
+    {
+      package_target = "//src/devices/usb/drivers/usb-composite:package"
+      driver_components = [ "meta/usb-composite.cm" ]
+    },
+    {
+      package_target = "//src/devices/usb/drivers/usb-hub:package"
+      driver_components = [ "meta/usb-hub.cm" ]
+    },
+    {
+      package_target = "//src/graphics/display/drivers/coordinator:package"
+      driver_components = [ "meta/display-coordinator.cm" ]
+    },
+    {
+      package_target = "//src/media/audio/drivers/usb-audio:package"
+      driver_components = [ "meta/usb-audio.cm" ]
+    },
+    {
+      package_target = "//src/storage/fvm/driver:package"
+      driver_components = [ "meta/fvm.cm" ]
+    },
+    {
+      package_target = "//src/ui/input/drivers/hid:package"
+      driver_components = [ "meta/hid.cm" ]
+    },
+    {
+      package_target = "//src/ui/input/drivers/hid-buttons:package"
+      driver_components = [ "meta/hid-buttons.cm" ]
+    },
+    {
+      package_target = "//src/ui/input/drivers/hid-input-report:package"
+      driver_components = [ "meta/hid-input-report.cm" ]
+    },
+    {
+      package_target = "//src/ui/input/drivers/usb-hid:package"
+      driver_components = [ "meta/usb-hid.cm" ]
+    },
+  ]
 }
 
 # The most-common, most-basic, AIB that is included in all userdebug and eng

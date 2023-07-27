@@ -21,8 +21,7 @@ const BOOTFS_READONLY_FILES: &[&str] =
     &["/boot/config/component_manager", "/boot/meta/base-resolver.cm"];
 const BOOTFS_DATA_DIRECTORY: &str = "/boot/data";
 const BOOTFS_EXECUTABLE_LIB_FILES: &[&str] = &["ld.so.1", "libdriver_runtime.so"];
-const BOOTFS_EXECUTABLE_NON_LIB_FILES: &[&str] =
-    &["/boot/driver/sysmem.so", "/boot/bin/component_manager"];
+const BOOTFS_EXECUTABLE_NON_LIB_FILES: &[&str] = &["/boot/bin/component_manager"];
 
 #[fuchsia::test]
 async fn basic_filenode_test() -> Result<(), Error> {

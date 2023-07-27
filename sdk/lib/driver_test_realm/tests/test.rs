@@ -183,7 +183,7 @@ async fn test_root_driver() -> Result<()> {
 
     let instance = realm.build().await?;
     let args = fdt::RealmArgs {
-        root_driver: Some("fuchsia-boot:///#meta/platform-bus.cm".to_string()),
+        root_driver: Some("fuchsia-boot:///platform-bus#meta/platform-bus.cm".to_string()),
         ..Default::default()
     };
 
@@ -218,7 +218,7 @@ async fn test_tunnel_boot_items() -> Result<()> {
 
     let instance = realm.build().await?;
     let args = fdt::RealmArgs {
-        root_driver: Some("fuchsia-boot:///#meta/platform-bus.cm".to_string()),
+        root_driver: Some("fuchsia-boot:///platform-bus#meta/platform-bus.cm".to_string()),
         ..Default::default()
     };
 

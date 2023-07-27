@@ -61,7 +61,7 @@ int main(int argc, char** argv) {
   fidl::Arena arena;
   const fidl::WireResult result =
       client->Start(fuchsia_driver_test::wire::RealmArgs::Builder(arena)
-                        .root_driver("fuchsia-boot:///#meta/platform-bus.cm")
+                        .root_driver("fuchsia-boot:///platform-bus#meta/platform-bus.cm")
                         .Build());
   if (!result.ok()) {
     fprintf(stderr, "Failed to call to Realm::Start: %s\n", result.FormatDescription().c_str());
