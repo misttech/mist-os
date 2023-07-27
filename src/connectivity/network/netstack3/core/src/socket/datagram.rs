@@ -35,7 +35,7 @@ use crate::{
             BufferIpSocketHandler, IpSock, IpSockCreateAndSendError, IpSockCreationError,
             IpSockSendError, IpSocketHandler as _, SendOptions,
         },
-        BufferTransportIpContext, EitherDeviceId, HopLimits, IpExt, MulticastMembershipHandler,
+        BufferTransportIpContext, EitherDeviceId, HopLimits, MulticastMembershipHandler,
         TransportIpContext,
     },
     socket::{
@@ -52,6 +52,9 @@ pub(crate) type BoundSockets<I, D, A, S> = BoundSocketMap<I, D, A, S>;
 
 /// Storage of state for all datagram sockets.
 pub(crate) type SocketsState<I, D, A, S> = IdMap<SocketState<I, D, A, S>>;
+
+pub(crate) trait IpExt: crate::ip::IpExt {}
+impl<I: crate::ip::IpExt> IpExt for I {}
 
 #[derive(Derivative)]
 #[derivative(Debug(bound = "D: Debug"))]

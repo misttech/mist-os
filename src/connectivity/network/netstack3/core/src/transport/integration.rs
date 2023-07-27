@@ -12,7 +12,7 @@ use packet::BufferMut;
 
 use crate::{
     device::WeakDeviceId,
-    ip::{device::IpDeviceNonSyncContext, BufferTransportIpContext, IpExt},
+    ip::{device::IpDeviceNonSyncContext, BufferTransportIpContext},
     transport::{
         tcp::{self, socket::isn::IsnGenerator, TcpState},
         udp,
@@ -232,8 +232,12 @@ impl<C: NonSyncContext, L: LockBefore<crate::lock_ordering::UdpBoundMap<Ipv6>>>
     }
 }
 
-impl<I: IpExt, B: BufferMut, C: udp::BufferNonSyncContext<I, B> + crate::NonSyncContext, L>
-    udp::BufferStateContext<I, C, B> for Locked<&SyncCtx<C>, L>
+impl<
+        I: udp::IpExt,
+        B: BufferMut,
+        C: udp::BufferNonSyncContext<I, B> + crate::NonSyncContext,
+        L,
+    > udp::BufferStateContext<I, C, B> for Locked<&SyncCtx<C>, L>
 where
     Self: udp::StateContext<I, C>,
     for<'a> Self::SocketStateCtx<'a>: udp::BufferBoundStateContext<I, C, B>,
@@ -241,8 +245,12 @@ where
     type BufferSocketStateCtx<'a> = Self::SocketStateCtx<'a>;
 }
 
-impl<I: IpExt, B: BufferMut, C: udp::BufferNonSyncContext<I, B> + crate::NonSyncContext, L>
-    udp::BufferBoundStateContext<I, C, B> for Locked<&SyncCtx<C>, L>
+impl<
+        I: udp::IpExt,
+        B: BufferMut,
+        C: udp::BufferNonSyncContext<I, B> + crate::NonSyncContext,
+        L,
+    > udp::BufferBoundStateContext<I, C, B> for Locked<&SyncCtx<C>, L>
 where
     Self: udp::BoundStateContext<I, C>,
     for<'a> Self::IpSocketsCtx<'a>: BufferTransportIpContext<I, C, B>,

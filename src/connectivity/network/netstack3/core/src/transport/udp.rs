@@ -33,6 +33,7 @@ use tracing::trace;
 
 use thiserror::Error;
 
+pub(crate) use crate::socket::datagram::IpExt;
 use crate::{
     algorithm::{PortAlloc, PortAllocImpl, ProtocolFlowId},
     context::{CounterContext, InstantContext, RngContext, TracingContext},
@@ -45,7 +46,7 @@ use crate::{
     ip::{
         icmp::IcmpIpExt,
         socket::{IpSockCreateAndSendError, IpSockCreationError, IpSockSendError},
-        BufferIpTransportContext, BufferTransportIpContext, IpExt, IpTransportContext,
+        BufferIpTransportContext, BufferTransportIpContext, IpTransportContext,
         MulticastMembershipHandler, TransportIpContext, TransportReceiveError,
     },
     socket::{
@@ -827,12 +828,12 @@ pub trait NonSyncContext<I: IcmpIpExt> {
 }
 
 /// The non-synchronized context for UDP.
-pub trait StateNonSyncContext<I: IpExt>:
+pub trait StateNonSyncContext<I: IcmpIpExt>:
     InstantContext + RngContext + NonSyncContext<I> + CounterContext + TracingContext
 {
 }
 impl<
-        I: IpExt,
+        I: IcmpIpExt,
         C: InstantContext + RngContext + NonSyncContext<I> + CounterContext + TracingContext,
     > StateNonSyncContext<I> for C
 {
@@ -910,7 +911,7 @@ pub(crate) trait StateContext<I: IpExt, C: StateNonSyncContext<I>>:
 /// [`send_udp_conn`] and [`send_udp_listener`]), and allows any generated
 /// link-layer frames to reuse that buffer rather than needing to always
 /// allocate a new one.
-pub trait BufferNonSyncContext<I: IpExt, B: BufferMut>: NonSyncContext<I> {
+pub trait BufferNonSyncContext<I: IcmpIpExt, B: BufferMut>: NonSyncContext<I> {
     /// Receives a UDP packet on a socket.
     fn receive_udp(
         &mut self,
@@ -922,7 +923,7 @@ pub trait BufferNonSyncContext<I: IpExt, B: BufferMut>: NonSyncContext<I> {
 }
 
 /// The non-synchronized context for UDP with a buffer.
-pub trait BufferStateNonSyncContext<I: IpExt, B: BufferMut>:
+pub trait BufferStateNonSyncContext<I: IcmpIpExt, B: BufferMut>:
     StateNonSyncContext<I> + BufferNonSyncContext<I, B>
 {
 }
@@ -1455,7 +1456,7 @@ impl<
 /// # Panics
 ///
 /// Panics if `id` is not a valid UDP socket identifier.
-pub fn send_udp<I: IpExt, B: BufferMut, C: crate::BufferNonSyncContext<B>>(
+pub fn send_udp<I: Ip, B: BufferMut, C: crate::BufferNonSyncContext<B>>(
     sync_ctx: &SyncCtx<C>,
     ctx: &mut C,
     id: &SocketId<I>,
@@ -1489,7 +1490,7 @@ pub fn send_udp<I: IpExt, B: BufferMut, C: crate::BufferNonSyncContext<B>>(
 /// # Panics
 ///
 /// Panics if `id` is not a valid UDP socket identifier.
-pub fn send_udp_to<I: IpExt, B: BufferMut, C: crate::BufferNonSyncContext<B>>(
+pub fn send_udp_to<I: Ip, B: BufferMut, C: crate::BufferNonSyncContext<B>>(
     sync_ctx: &SyncCtx<C>,
     ctx: &mut C,
     id: &SocketId<I>,
@@ -1627,7 +1628,7 @@ impl<I: IpExt, C: StateNonSyncContext<I>, D: WeakId>
 /// Creates an unbound UDP socket.
 ///
 /// `create_udp` creates a new UDP socket and returns an identifier for it.
-pub fn create_udp<I: IpExt, C: crate::NonSyncContext>(sync_ctx: &SyncCtx<C>) -> SocketId<I> {
+pub fn create_udp<I: Ip, C: crate::NonSyncContext>(sync_ctx: &SyncCtx<C>) -> SocketId<I> {
     let mut sync_ctx = Locked::new(sync_ctx);
     I::map_ip(
         IpInvariant(&mut sync_ctx),
@@ -1658,7 +1659,7 @@ pub fn create_udp<I: IpExt, C: crate::NonSyncContext>(sync_ctx: &SyncCtx<C>) -> 
 /// # Panics
 ///
 /// `connect` panics if `id` is not a valid [`UnboundId`].
-pub fn connect<I: IpExt, C: crate::NonSyncContext>(
+pub fn connect<I: Ip, C: crate::NonSyncContext>(
     sync_ctx: &SyncCtx<C>,
     ctx: &mut C,
     id: &SocketId<I>,
@@ -1690,7 +1691,7 @@ pub fn connect<I: IpExt, C: crate::NonSyncContext>(
 /// # Panics
 ///
 /// Panics if `id` is not a valid [`SocketId`].
-pub fn set_udp_device<I: IpExt, C: crate::NonSyncContext>(
+pub fn set_udp_device<I: Ip, C: crate::NonSyncContext>(
     sync_ctx: &SyncCtx<C>,
     ctx: &mut C,
     id: &SocketId<I>,
@@ -1714,7 +1715,7 @@ pub fn set_udp_device<I: IpExt, C: crate::NonSyncContext>(
 /// # Panics
 ///
 /// Panics if `id` is not a valid socket ID.
-pub fn get_udp_bound_device<I: IpExt, C: crate::NonSyncContext>(
+pub fn get_udp_bound_device<I: Ip, C: crate::NonSyncContext>(
     sync_ctx: &SyncCtx<C>,
     ctx: &C,
     id: &SocketId<I>,
@@ -1742,7 +1743,7 @@ pub fn get_udp_bound_device<I: IpExt, C: crate::NonSyncContext>(
 /// # Panics
 ///
 /// `set_udp_posix_reuse_port` panics if `id` is not a valid `SocketId`.
-pub fn set_udp_posix_reuse_port<I: IpExt, C: crate::NonSyncContext>(
+pub fn set_udp_posix_reuse_port<I: Ip, C: crate::NonSyncContext>(
     sync_ctx: &SyncCtx<C>,
     ctx: &mut C,
     id: &SocketId<I>,
@@ -1765,7 +1766,7 @@ pub fn set_udp_posix_reuse_port<I: IpExt, C: crate::NonSyncContext>(
 /// # Panics
 ///
 /// Panics if `id` is not a valid `SocketId`.
-pub fn get_udp_posix_reuse_port<I: IpExt, C: crate::NonSyncContext>(
+pub fn get_udp_posix_reuse_port<I: Ip, C: crate::NonSyncContext>(
     sync_ctx: &SyncCtx<C>,
     ctx: &C,
     id: &SocketId<I>,
@@ -1791,7 +1792,7 @@ pub fn get_udp_posix_reuse_port<I: IpExt, C: crate::NonSyncContext>(
 /// leaving a group that was not joined, or joining a group multiple times) or
 /// if the device to use to join is unspecified or conflicts with the existing
 /// socket state.
-pub fn set_udp_multicast_membership<I: IpExt, C: crate::NonSyncContext>(
+pub fn set_udp_multicast_membership<I: Ip, C: crate::NonSyncContext>(
     sync_ctx: &SyncCtx<C>,
     ctx: &mut C,
     id: &SocketId<I>,
@@ -1833,7 +1834,7 @@ pub fn set_udp_multicast_membership<I: IpExt, C: crate::NonSyncContext>(
 ///
 /// Sets the hop limit (IPv6) or TTL (IPv4) for outbound packets going to a
 /// unicast address.
-pub fn set_udp_unicast_hop_limit<I: IpExt, C: crate::NonSyncContext>(
+pub fn set_udp_unicast_hop_limit<I: Ip, C: crate::NonSyncContext>(
     sync_ctx: &SyncCtx<C>,
     ctx: &mut C,
     id: &SocketId<I>,
@@ -1866,7 +1867,7 @@ pub fn set_udp_unicast_hop_limit<I: IpExt, C: crate::NonSyncContext>(
 ///
 /// Sets the hop limit (IPv6) or TTL (IPv4) for outbound packets going to a
 /// unicast address.
-pub fn set_udp_multicast_hop_limit<I: IpExt, C: crate::NonSyncContext>(
+pub fn set_udp_multicast_hop_limit<I: Ip, C: crate::NonSyncContext>(
     sync_ctx: &SyncCtx<C>,
     ctx: &mut C,
     id: &SocketId<I>,
@@ -1896,7 +1897,7 @@ pub fn set_udp_multicast_hop_limit<I: IpExt, C: crate::NonSyncContext>(
 }
 
 /// Gets the hop limit for packets sent by the socket to a unicast destination.
-pub fn get_udp_unicast_hop_limit<I: IpExt, C: crate::NonSyncContext>(
+pub fn get_udp_unicast_hop_limit<I: Ip, C: crate::NonSyncContext>(
     sync_ctx: &SyncCtx<C>,
     ctx: &C,
     id: &SocketId<I>,
@@ -1919,7 +1920,7 @@ pub fn get_udp_unicast_hop_limit<I: IpExt, C: crate::NonSyncContext>(
 ///
 /// Sets the hop limit (IPv6) or TTL (IPv4) for outbound packets going to a
 /// unicast address.
-pub fn get_udp_multicast_hop_limit<I: IpExt, C: crate::NonSyncContext>(
+pub fn get_udp_multicast_hop_limit<I: Ip, C: crate::NonSyncContext>(
     sync_ctx: &SyncCtx<C>,
     ctx: &C,
     id: &SocketId<I>,
@@ -1950,7 +1951,7 @@ pub fn get_udp_multicast_hop_limit<I: IpExt, C: crate::NonSyncContext>(
 /// # Panics
 ///
 /// Panics if `id` is not a valid `SocketId`.
-pub fn disconnect_udp_connected<I: IpExt, C: crate::NonSyncContext>(
+pub fn disconnect_udp_connected<I: Ip, C: crate::NonSyncContext>(
     sync_ctx: &SyncCtx<C>,
     ctx: &mut C,
     id: &SocketId<I>,
@@ -1976,7 +1977,7 @@ pub fn disconnect_udp_connected<I: IpExt, C: crate::NonSyncContext>(
 /// # Panics
 ///
 /// Panics if `id` is not a valid `SocketId`.
-pub fn shutdown<I: IpExt, C: crate::NonSyncContext>(
+pub fn shutdown<I: Ip, C: crate::NonSyncContext>(
     sync_ctx: &SyncCtx<C>,
     ctx: &C,
     id: &SocketId<I>,
@@ -2003,7 +2004,7 @@ pub fn shutdown<I: IpExt, C: crate::NonSyncContext>(
 /// # Panics
 ///
 /// Panics if `id` is not a valid `SocketId`.
-pub fn get_shutdown<I: IpExt, C: crate::NonSyncContext>(
+pub fn get_shutdown<I: Ip, C: crate::NonSyncContext>(
     sync_ctx: &SyncCtx<C>,
     ctx: &C,
     id: &SocketId<I>,
@@ -2048,7 +2049,7 @@ impl<I: IpExt, D: WeakId> From<DatagramSocketInfo<I, D, IpPortSpec>> for SocketI
 /// # Panics
 ///
 /// `get_udp_info` panics if `id` is not a valid `SocketId`.
-pub fn get_udp_info<I: IpExt, C: crate::NonSyncContext>(
+pub fn get_udp_info<I: Ip, C: crate::NonSyncContext>(
     sync_ctx: &SyncCtx<C>,
     ctx: &mut C,
     id: &SocketId<I>,
@@ -2070,7 +2071,7 @@ pub fn get_udp_info<I: IpExt, C: crate::NonSyncContext>(
 /// # Panics
 ///
 /// Panics if `id` is not a valid [`SocketId`].
-pub fn remove_udp<I: IpExt, C: crate::NonSyncContext>(
+pub fn remove_udp<I: Ip, C: crate::NonSyncContext>(
     sync_ctx: &SyncCtx<C>,
     ctx: &mut C,
     id: SocketId<I>,
@@ -2107,7 +2108,7 @@ pub fn remove_udp<I: IpExt, C: crate::NonSyncContext>(
 /// # Panics
 ///
 /// `listen_udp` panics if `id` is not a valid [`SocketId`].
-pub fn listen_udp<I: IpExt, C: crate::NonSyncContext>(
+pub fn listen_udp<I: Ip, C: crate::NonSyncContext>(
     sync_ctx: &SyncCtx<C>,
     ctx: &mut C,
     id: &SocketId<I>,
