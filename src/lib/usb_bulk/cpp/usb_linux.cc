@@ -78,6 +78,14 @@ using namespace std::chrono_literals;
 #define DBG1(x...)
 #endif
 
+static void log_error(int err) {
+#ifdef TRACE_USB
+  char buf[256];
+  const char *errstr = strerror_r(err, buf, sizeof(buf));
+  DBG("%s (%d)\n", errstr, err);
+#endif
+}
+
 // Kernels before 3.3 have a 16KiB transfer limit. That limit was replaced
 // with a 16MiB global limit in 3.3, but each URB submitted required a
 // contiguous kernel allocation, so you would get ENOMEM if you tried to
@@ -120,6 +128,51 @@ class UsbInterface {
   // DISALLOW_COPY_AND_ASSIGN(UsbInterface);
 };
 
+class scoped_fd {
+ public:
+  int fd;
+
+  scoped_fd() : fd(-EBADF) {}
+
+  explicit scoped_fd(int fd) : fd(fd) {}
+
+  scoped_fd(scoped_fd &&other) : fd(other.release()) {}
+
+  ~scoped_fd() {
+    if (this->fd < 0)
+      return;
+    ::close(this->fd);
+  }
+
+  scoped_fd &operator=(scoped_fd &&other) {
+    this->close();
+    this->fd = other.release();
+    return *this;
+  }
+
+  int get() const { return this->fd; }
+
+  void log_error() {
+    if (this->fd >= 0)
+      return;
+    ::log_error(-this->fd);
+  }
+
+  int release() {
+    int fd = this->fd;
+    this->fd = -EBADF;
+    return fd;
+  }
+
+  void close() {
+    if (this->fd < 0)
+      return;
+    ::close(this->release());
+  }
+
+  operator bool() const { return fd >= 0; }
+};
+
 /* True if name isn't a valid name for a USB device in /sys/bus/usb/devices.
  * Device names are made up of numbers, dots, and dashes, e.g., '7-1.5'.
  * We reject interfaces (e.g., '7-1.5:1.0') and host controllers (e.g. 'usb1').
@@ -150,9 +203,9 @@ static int check(void *_desc, int len, unsigned type, int size) {
   return 0;
 }
 
-static int filter_usb_device(char *sysfs_name, char *ptr, int len, int writable,
-                             ifc_match_func callback, void *callback_data, int *ept_in_id,
-                             int *ept_out_id, int *ifc_id) {
+static int filter_usb_device(char *sysfs_name, scoped_fd &sysfs_dir, char *ptr, int len,
+                             int writable, ifc_match_func callback, void *callback_data,
+                             int *ept_in_id, int *ept_out_id, int *ifc_id) {
   struct usb_device_descriptor *dev;
   struct usb_config_descriptor *cfg;
   struct usb_interface_descriptor *ifc;
@@ -193,13 +246,7 @@ static int filter_usb_device(char *sysfs_name, char *ptr, int len, int writable,
    */
   info.serial_number[0] = '\0';
   if (dev->iSerialNumber) {
-    char path[80];
-    int fd;
-
-    snprintf(path, sizeof(path), "/sys/bus/usb/devices/%s/serial", sysfs_name);
-    path[sizeof(path) - 1] = '\0';
-
-    fd = open(path, O_RDONLY);
+    int fd = openat(sysfs_dir.get(), "serial", O_RDONLY);
     if (fd >= 0) {
       int chars_read = read(fd, info.serial_number, sizeof(info.serial_number) - 1);
       close(fd);
@@ -336,6 +383,15 @@ static int convert_to_devfs_name(const char *sysfs_name, char *devname, int devn
   return 0;
 }
 
+static ssize_t read_device_descriptors(scoped_fd &sysfs_dir, void *data, size_t count) {
+  scoped_fd fd(openat(sysfs_dir.get(), "descriptors", O_RDONLY));
+
+  if (!fd)
+    return fd.get();
+
+  return read(fd.get(), data, count);
+}
+
 static std::unique_ptr<usb_handle> find_usb_device(const char *base, ifc_match_func callback,
                                                    void *callback_data) {
   std::unique_ptr<usb_handle> usb;
@@ -344,7 +400,6 @@ static std::unique_ptr<usb_handle> find_usb_device(const char *base, ifc_match_f
   int n, in, out, ifc;
 
   struct dirent *de;
-  int fd;
   int writable;
 
   // Explicitly give closedir's type instead of using decltype in order to avoid
@@ -353,27 +408,57 @@ static std::unique_ptr<usb_handle> find_usb_device(const char *base, ifc_match_f
   if (busdir == 0)
     return 0;
 
+  int base_dir_fd = dirfd(busdir.get());
+  if (base_dir_fd < 0) {
+    DBG("Failed to get busdir as fd: ");
+    log_error(-base_dir_fd);
+    return 0;
+  }
+
   while ((de = readdir(busdir.get())) && (usb == nullptr)) {
     if (badname(de->d_name))
       continue;
 
+    scoped_fd sysfs_dir(openat(base_dir_fd, de->d_name, O_RDONLY));
+
+    if (!sysfs_dir) {
+      DBG("Failed to open device sysfs directory: ");
+      sysfs_dir.log_error();
+      continue;
+    }
+
     if (!convert_to_devfs_name(de->d_name, devname, sizeof(devname))) {
-      //            DBG("[ scanning %s ]\n", devname);
-      writable = 1;
-      if ((fd = open(devname, O_RDWR)) < 0) {
-        // Check if we have read-only access, so we can give a helpful
-        // diagnostic like "adb devices" does.
-        writable = 0;
-        if ((fd = open(devname, O_RDONLY)) < 0) {
-          continue;
-        }
+      DBG("[ scanning %s ]\n", devname);
+      // Check if we have read-only access, so we can give a helpful
+      // diagnostic like "adb devices" does.
+      if (access(devname, R_OK) != 0) {
+        DBG("Cannot access %s for reading\n", devname);
+        continue;
       }
 
-      n = read(fd, desc, sizeof(desc));
+      writable = access(devname, R_OK | W_OK) == 0;
 
-      if (filter_usb_device(de->d_name, desc, n, writable, callback, callback_data, &in, &out,
-                            &ifc) == 0) {
+      if (!writable) {
+        DBG("Cannot access %s for writing\n", devname);
+      }
+
+      // Reading the cached USB descriptor is several orders of magnitude faster
+      // than reading the descriptor directly from the device.
+      // For example, enumerating 15 devices goes from 900ms to <1ms.
+      ssize_t desc_sz = read_device_descriptors(sysfs_dir, desc, sizeof(desc));
+
+      if (desc_sz < 0) {
+        DBG("Failed to read device descriptors: ");
+        log_error(static_cast<int>(-desc_sz));
+        continue;
+      }
+
+      if (filter_usb_device(de->d_name, sysfs_dir, desc, desc_sz, writable, callback, callback_data,
+                            &in, &out, &ifc) == 0) {
         usb.reset(new usb_handle());
+
+        int fd = open(devname, O_RDWR);
+
         strcpy(usb->fname, devname);
         usb->ep_in = in;
         usb->ep_out = out;
@@ -385,8 +470,6 @@ static std::unique_ptr<usb_handle> find_usb_device(const char *base, ifc_match_f
           usb.reset();
           continue;
         }
-      } else {
-        close(fd);
       }
     }
   }
