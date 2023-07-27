@@ -14,29 +14,36 @@ load(
 )
 
 # LINT.IfChange
-fuchsia_product_configuration(
-    name = "product_config",
-    json_config = {
-        "platform": {
-            "build_type": BUILD_TYPES.ENG,
-            "development_support": {
-                "authorized_ssh_keys_path": "LABEL(%s)" % authorized_ssh_keys_label if authorized_ssh_keys_label else None,
-            },
-            "fonts": {
-                "enabled": False,
-            },
-            "input": {
-                "supported_input_devices": [
-                    INPUT_DEVICE_TYPE.BUTTON,
-                    INPUT_DEVICE_TYPE.TOUCHSCREEN,
-                ],
-            },
-            "storage": {
-                "configure_fshost": True,
-                "live_usb_enabled": False,
-            },
+_PRODUCT_CONFIG_BASE_JSON = {
+    "platform": {
+        "build_type": BUILD_TYPES.ENG,
+        "development_support": {
+            "authorized_ssh_keys_path": "LABEL(%s)" % authorized_ssh_keys_label if authorized_ssh_keys_label else None,
+        },
+        "fonts": {
+            "enabled": False,
+        },
+        "input": {
+            "supported_input_devices": [
+                INPUT_DEVICE_TYPE.BUTTON,
+                INPUT_DEVICE_TYPE.TOUCHSCREEN,
+            ],
+        },
+        "storage": {
+            "configure_fshost": True,
+            "live_usb_enabled": False,
         },
     },
+}
+
+fuchsia_product_configuration(
+    name = "product_config.default",
+    json_config = _PRODUCT_CONFIG_BASE_JSON,
+)
+
+fuchsia_product_configuration(
+    name = "product_config.x64",
+    json_config = _PRODUCT_CONFIG_BASE_JSON,
 )
 # LINT.ThenChange(//products/minimal/BUILD.gn)
 
@@ -46,7 +53,7 @@ fuchsia_product_image(
     image = "//build/bazel/assembly/images_configurations:fuchsia_x64",
     legacy_aib = "//build/bazel/assembly/assembly_input_bundles:legacy_fuchsia",
     platform_aibs = "//build/bazel/assembly/assembly_input_bundles:platform_eng",
-    product_config = ":product_config",
+    product_config = ":product_config.x64",
 )
 
 fuchsia_elf_sizes(
@@ -70,7 +77,7 @@ fuchsia_product_image(
     image = "//build/bazel/assembly/images_configurations:fuchsia_qemu-x64",
     legacy_aib = "//build/bazel/assembly/assembly_input_bundles:legacy_fuchsia",
     platform_aibs = "//build/bazel/assembly/assembly_input_bundles:platform_eng",
-    product_config = ":product_config",
+    product_config = ":product_config.default",
 )
 
 fuchsia_elf_sizes(
