@@ -135,10 +135,12 @@ size_t crashlog_to_string(ktl::span<char> target, zircon_crash_reason_t reason) 
 #elif defined(__riscv)
     const char* arch = "riscv64";
 #endif
+    ktl::string_view version = VersionString();
     fprintf(&outfile,
-            "VERSION\narch: %s\nbuild_id: %s\ndso: id=%s base=%#lx "
+            "VERSION\narch: %s\nbuild_id: %.*s\ndso: id=%s base=%#lx "
             "name=zircon.elf\n\n",
-            arch, version_string(), elf_build_id_string(), crashlog_base_address);
+            arch, static_cast<int>(version.size()), version.data(), elf_build_id_string(),
+            crashlog_base_address);
   }
 
   if (static_cast<bool>(regions & RenderRegion::RootJobCritical)) {

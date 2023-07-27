@@ -147,5 +147,5 @@ PhysBootTimes gBootTimes;
 #endif
     elf_kernel.Handoff<void(PhysHandoff*)>(handoff);
   };
-  prep.DoHandoff(uart, kernel_storage.zbi().storage(), start_elf_kernel);
+  prep.DoHandoff(uart, kernel_storage.zbi().storage(), package, start_elf_kernel);
 }

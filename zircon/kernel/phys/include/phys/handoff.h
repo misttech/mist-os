@@ -95,6 +95,9 @@ struct PhysHandoff {
   PhysBootTimes times;
   static_assert(ktl::is_default_constructible_v<PhysBootTimes>);
 
+  // TODO(fxbug.dev/84107): This will eventually be made a permanent pointer.
+  PhysHandoffTemporaryString version_string;
+
   // VMOs to be published to userland as is and not otherwise used by the
   // kernel proper.
   PhysHandoffTemporarySpan<const PhysVmo> vmos;

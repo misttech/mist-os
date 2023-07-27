@@ -546,11 +546,17 @@ if (current_toolchain != default_toolchain) {
     deps = [
       ":physboot-elf-kernel-hello-world-test($phys_toolchain)",
       ":physboot-elf-kernel-test-data.cmdline",
+      ":physboot-elf-kernel-test-data.version-string",
     ]
   }
 
   kernel_cmdline("physboot-elf-kernel-test-data.cmdline") {
     args = [ "kernel.select=physboot-elf-kernel-test-data" ]
+  }
+
+  generated_resource("physboot-elf-kernel-test-data.version-string") {
+    outputs = [ "version-string.txt" ]
+    contents = "fake-version-for-test"
   }
 
   zbi("physboot-elf-kernel-test-data.zbi") {

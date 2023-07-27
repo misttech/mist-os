@@ -531,6 +531,7 @@ if (toolchain_environment == "kernel.phys" ||
 
     public_deps = [
       ":handoff",
+      ":kernel-package",
       ":uart",
       ":zbitl-allocation",
       "//sdk/lib/fit",

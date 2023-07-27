@@ -13,7 +13,6 @@ import("//build/zircon/c_utils.gni")
 import("//build/zircon/zircon_cpu.gni")
 import("//src/devices/bus/drivers/pci/pci.gni")
 import("//zircon/kernel/lib/code-patching/code-patching.gni")
-import("//zircon/kernel/lib/version/version_string.gni")
 import("//zircon/kernel/phys/kernel_elf_binary.gni")
 import("kernel_package.gni")
 import("kernel_shell_script.gni")
@@ -568,19 +567,12 @@ if (is_kernel) {
     deps = [ ":raw" ]
   }
 
-  toolchain_utils_action("kernel-image.h") {
+  action("kernel-image.h") {
     visibility = [ ":*" ]
     outputs = [ "$target_gen_dir/$target_name" ]
     script = "gen-kernel-image-header.sh"
-    utils = [ "nm" ]
-    deps = [
-      ":image.rsp",
-      ":zircon.elf.rsp",
-    ]
-    sources = [
-      image_rspfile,
-      zircon_elf_rspfile,
-    ]
+    deps = [ ":image.rsp" ]
+    sources = [ image_rspfile ]
     depfile = "$target_gen_dir/$target_name.d"
     args = rebase_path(sources + outputs + [ depfile ], root_build_dir)
   }
@@ -640,7 +632,6 @@ if (is_kernel) {
       ":zircon.elf",
       ":zircon.elf.rsp",
       "//zircon/kernel/lib/arch:headers",
-      "//zircon/kernel/lib/version:headers",
     ]
 
     # TODO(fxbug.dev/27083): This dependency is conditional because when built
@@ -654,11 +645,6 @@ if (is_kernel) {
 
     sources = [ "arch/$zircon_cpu/image.S" ]
 
-    # kernel-image.inc includes this via .incbin, which doesn't get automatic
-    # dependency tracking.
-    inputs = [ kernel_version_string_file ]
-    deps += kernel_version_string_deps
-
     include_dirs = [ "." ]  # For kernel-image.inc.
 
     # These need to be here rather than in the config() below because they
@@ -667,7 +653,7 @@ if (is_kernel) {
       "-Wl,-T," + rebase_path("image.ld", root_build_dir),
       "-Wl,--just-symbols,@" + rebase_path(zircon_elf_rspfile, root_build_dir),
     ]
-    inputs += [
+    inputs = [
       "image.ld",
       zircon_elf_rspfile,
     ]
@@ -737,6 +723,9 @@ if (is_kernel) {
         ":zbizircon.input",
       ]
     }
+
+    # Embed the version-string.txt file directly in the package subdirectory.
+    deps += [ "//zircon/kernel/lib/version:version-string.txt" ]
   }
 
   # The final kernel ZBI combines physboot with that kernel storage payload.

@@ -22,6 +22,7 @@
 #include <ktl/span.h>
 #include <phys/handoff-ptr.h>
 #include <phys/handoff.h>
+#include <phys/kernel-package.h>
 #include <phys/uart.h>
 #include <phys/zbitl-allocation.h>
 
@@ -69,6 +70,16 @@ class HandoffPrep {
     return {};
   }
 
+  ktl::string_view New(PhysHandoffTemporaryString& handoff_string, fbl::AllocChecker& ac,
+                       ktl::string_view str) {
+    ktl::span chars = New(handoff_string, ac, str.size());
+    if (chars.empty()) {
+      return {};
+    }
+    ZX_DEBUG_ASSERT(chars.size() == str.size());
+    return {chars.data(), str.copy(chars.data(), chars.size())};
+  }
+
   // This does all the main work of preparing for the kernel, and then calls
   // `boot` to transfer control to the kernel entry point with the handoff()
   // pointer as its argument. The `boot` function should do nothing but hand
@@ -76,6 +87,7 @@ class HandoffPrep {
   // `uart` so no additional printing should be done at this stage.  Init()
   // must have been called first.
   [[noreturn]] void DoHandoff(UartDriver& uart, ktl::span<ktl::byte> zbi,
+                              const KernelStorage::Bootfs& kernel_package,
                               fit::inline_function<void(PhysHandoff*)> boot);
 
   // Add a generic VMO to be simply published to userland.  The kernel proper
@@ -119,6 +131,10 @@ class HandoffPrep {
   // Fills in handoff()->boot_options and returns the mutable reference to
   // update its fields later so that `.serial` can be transferred last.
   BootOptions& SetBootOptions(const BootOptions& boot_options);
+
+  // Fetch things to be handed off from other files in the kernel package.
+  void UsePackageFiles(const KernelStorage::Bootfs& kernel_package);
+  void SetVersionString(KernelStorage::Bootfs kernel_package);
 
   // Summarizes the provided data ZBI's miscellaneous simple items for the
   // kernel, filling in corresponding handoff()->item fields.  Certain fields,

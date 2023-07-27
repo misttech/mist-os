@@ -195,7 +195,7 @@ void SetConstants(const fbl::RefPtr<VmObject>& vmo) {
   ASSERT(ticks_to_mono_ratio.numerator() != 0);
   ASSERT(ticks_to_mono_ratio.denominator() != 0);
 
-  ktl::string_view version = version_string();
+  ktl::string_view version = VersionString();
   ASSERT_MSG(version.size() <= kMaxVersionString, "version string size %zu > max %zu: \"%.*s\"",
              version.size(), kMaxVersionString, static_cast<int>(version.size()), version.data());
 

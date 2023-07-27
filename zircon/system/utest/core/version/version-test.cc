@@ -4,6 +4,7 @@
 
 #include <zircon/syscalls.h>
 
+#include <cctype>
 #include <string>
 #include <string_view>
 
@@ -61,6 +62,16 @@ TEST(VersionTest, CXX14StdString) {
   EXPECT_TRUE(s == zxsv.c_str);
 
   EXPECT_TRUE(ReturnSystemGetVersionString() == s);
+}
+
+TEST(VersionTest, NonEmptyTrimmedPrintableString) {
+  std::string_view version = zx_system_get_version_string();
+  ASSERT_FALSE(version.empty());
+  EXPECT_FALSE(isspace(version.front()));
+  EXPECT_FALSE(isspace(version.back()));
+  for (char c : version) {
+    EXPECT_TRUE(isprint(c), "%#hhx", c);
+  }
 }
 
 }  // namespace

@@ -8,12 +8,14 @@
 #ifndef ZIRCON_KERNEL_LIB_VERSION_INCLUDE_LIB_VERSION_H_
 #define ZIRCON_KERNEL_LIB_VERSION_INCLUDE_LIB_VERSION_H_
 
-#include <ktl/span.h>
-#include <ktl/byte.h>
 #include <stdio.h>
 
+#include <ktl/byte.h>
+#include <ktl/span.h>
+#include <ktl/string_view.h>
+
 // This is the string returned by zx_system_get_version_string.
-const char* version_string();
+ktl::string_view VersionString();
 
 // This is a string of lowercase hexadecimal digits.
 const char* elf_build_id_string();

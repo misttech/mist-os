@@ -124,7 +124,8 @@ ChainBoot LoadZirconZbi(KernelStorage::Bootfs kernelfs) {
 }  // namespace
 
 [[noreturn]] void BootZircon(UartDriver& uart, KernelStorage kernel_storage) {
-  ChainBoot boot = LoadZirconZbi(kernel_storage.GetKernelPackage());
+  KernelStorage::Bootfs package = kernel_storage.GetKernelPackage();
+  ChainBoot boot = LoadZirconZbi(package);
 
   // Repurpose the storage item as a place to put the handoff payload.
   KernelStorage::Zbi::iterator handoff_item = kernel_storage.item();
@@ -176,7 +177,7 @@ ChainBoot LoadZirconZbi(KernelStorage::Bootfs kernelfs) {
   HandoffPrep prep;
   prep.Init(handoff_item->payload);
 
-  prep.DoHandoff(uart, zbi, [&boot](PhysHandoff* handoff) {
+  prep.DoHandoff(uart, zbi, package, [&boot](PhysHandoff* handoff) {
     // Even though the kernel is still a ZBI and mostly using the ZBI protocol
     // for booting, the PhysHandoff pointer (physical address) is now the
     // argument to the kernel, not the data ZBI address.
