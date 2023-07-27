@@ -11,6 +11,7 @@
 #include <stdarg.h>
 #include <stdlib.h>
 #include <string.h>
+#include <unistd.h>
 #include <zircon/assert.h>
 #include <zircon/compiler.h>
 #include <zircon/process.h>
@@ -138,7 +139,7 @@ size_t read_inferior_memory(zx_handle_t proc, uintptr_t vaddr, void* buf, size_t
     ZX_ASSERT(vaddr != 0);
     printf("zx_process_read_memory failed at %#" PRIxPTR "\n", vaddr);
     tu_fatal("read_inferior_memory", status);
-}
+  }
   return len;
 }
 
@@ -156,14 +157,16 @@ void setup_inferior(const char* name, springboard_t** out_sb, zx_handle_t* out_i
 
   const char* test_child_path = g_program_path;
   const char* const argv[] = {test_child_path, name};
-  zx_handle_t handles[4];
-  uint32_t handle_ids[4];
-  for (int fd = 0; fd < 3; ++fd) {
-    ASSERT_EQ(fdio_fd_clone(fd, &handles[fd]), ZX_OK);
-    handle_ids[fd] = PA_HND(PA_FD, fd);
-  }
-  handles[3] = channel2;
-  handle_ids[3] = PA_USER0;
+
+  // Only pass stdout and stderr.
+  zx_handle_t handles[3];
+  uint32_t handle_ids[3];
+  ASSERT_EQ(fdio_fd_clone(STDOUT_FILENO, &handles[0]), ZX_OK);
+  handle_ids[0] = PA_HND(PA_FD, STDOUT_FILENO);
+  ASSERT_EQ(fdio_fd_clone(STDERR_FILENO, &handles[1]), ZX_OK);
+  handle_ids[1] = PA_HND(PA_FD, STDERR_FILENO);
+  handles[2] = channel2;
+  handle_ids[2] = PA_USER0;
 
   printf("Creating process \"%s\"\n", name);
   springboard_t* sb = tu_launch_init(zx_job_default(), name, std::size(argv), argv, 0, NULL,

@@ -17,6 +17,7 @@ group("tests") {
     "cprng:tests",
     "ctor:tests",
     "dash:tests",
+    "debugger:tests",
     "device-enumeration:device-enumeration-tests",
     "dlopen-indirect-deps:tests",
     "errno:tests",

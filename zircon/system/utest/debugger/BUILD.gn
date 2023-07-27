@@ -2,13 +2,14 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
+import("//build/components.gni")
 import("//build/test.gni")
 import("//build/testing/bootfs_test.gni")
 
-# As of this writing, the best way to get this test on your system is to add //bundles/bringup:tests
-# to the base packages in your build. The binary ends up in /boot/test/sys/debugger-test
-test("debugger") {
-  output_name = "debugger-test"
+# To run this test, either
+#   * add debugger-test-pkg to your universe and run `fx test` (preferred).
+#   * add debugger-bootfs-test to dev_bootfs_labels and run `fx shell /boot/test/debugger-test`.
+test("debugger-test") {
   configs += [ "//build/config:all_source" ]
   sources = [
     "crash-and-recover.cc",
@@ -47,5 +48,16 @@ test("debugger") {
 
 bootfs_test("debugger-bootfs-test") {
   name = "debugger-test"
-  deps = [ ":debugger" ]
+  deps = [ ":debugger-test" ]
+}
+
+fuchsia_unittest_package("debugger-test-pkg") {
+  package_name = "debugger-test"
+  manifest = "meta/debugger-test.cml"
+  deps = [ ":debugger-test" ]
+}
+
+group("tests") {
+  testonly = true
+  deps = [ ":debugger-test-pkg" ]
 }
