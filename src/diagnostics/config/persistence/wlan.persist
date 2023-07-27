@@ -119,4 +119,14 @@
             'INSPECT:core/wlancfg:root/network_selector/network_selection:*',
         ],
     },
+    {
+        tag: 'wlancfg-scan-events',
+        service_name: 'wlan',
+        max_bytes: 500,
+        min_seconds_between_fetch: 60,
+        selectors: [
+            'INSPECT:core/wlancfg:root/client_stats/scan_events',
+            'INSPECT:core/wlancfg:root/client_stats/scan_events:*',
+        ],
+    },
 ]

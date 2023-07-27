@@ -8,7 +8,7 @@ use {
         client::types,
         config_management::SavedNetworksManagerApi,
         mode_management::iface_manager_api::{IfaceManagerApi, SmeForScan},
-        telemetry::{ScanIssue, TelemetryEvent, TelemetrySender},
+        telemetry::{ScanEventInspectData, ScanIssue, TelemetryEvent, TelemetrySender},
     },
     anyhow::{format_err, Error},
     async_trait::async_trait,
@@ -191,7 +191,7 @@ pub trait ScanResultUpdate: Sync + Send {
 async fn sme_scan(
     sme_proxy: &SmeForScan,
     scan_request: &fidl_sme::ScanRequest,
-    telemetry_sender: TelemetrySender,
+    scan_defects: &mut Vec<ScanIssue>,
 ) -> Result<Vec<wlan_common::scan::ScanResult>, types::ScanError> {
     debug!("Sending scan request to SME");
     let scan_result = sme_proxy.scan(scan_request).await.map_err(|error| {
@@ -220,7 +220,7 @@ async fn sme_scan(
                 .collect::<Vec<_>>())
         }
         Err(scan_error_code) => {
-            log_metric_for_scan_error(&scan_error_code, telemetry_sender);
+            log_metric_for_scan_error(&scan_error_code, scan_defects);
             match scan_error_code {
                 fidl_sme::ScanErrorCode::ShouldWait
                 | fidl_sme::ScanErrorCode::CanceledByDriverOrFirmware => {
@@ -245,6 +245,8 @@ async fn perform_scan(
     telemetry_sender: TelemetrySender,
 ) -> (fidl_sme::ScanRequest, Result<Vec<types::ScanResult>, types::ScanError>) {
     let mut bss_by_network: HashMap<SmeNetworkIdentifier, Vec<types::Bss>> = HashMap::new();
+    let mut scan_event_inspect_data = ScanEventInspectData::new();
+    let mut scan_defects: Vec<ScanIssue> = vec![];
 
     // If scan returns cancelled error code, wait and retry once.
     for iter in 0..2 {
@@ -256,13 +258,13 @@ async fn perform_scan(
             }
         };
         // TODO(fxbug.dev/111468) Log metrics when this times out so we are aware of the issue.
-        let scan_results = sme_scan(&sme_proxy, &scan_request, telemetry_sender.clone())
+        let scan_results = sme_scan(&sme_proxy, &scan_request, &mut scan_defects)
             .on_timeout(SCAN_TIMEOUT, || {
                 error!("Timed out waiting on scan response from SME");
                 Err(fidl_policy::ScanErrorCode::GeneralError)
             })
             .await;
-        report_scan_defect(&sme_proxy, &scan_results, &scan_request, &telemetry_sender).await;
+        report_scan_defects_to_sme(&sme_proxy, &scan_results, &scan_request).await;
 
         match scan_results {
             Ok(results) => {
@@ -274,7 +276,8 @@ async fn perform_scan(
                         .map(|s| types::Ssid::from_bytes_unchecked(s.to_vec()))
                         .collect(),
                 };
-                bss_by_network = bss_to_network_map(results, &target_ssids);
+                bss_by_network =
+                    bss_to_network_map(results, &target_ssids, &mut scan_event_inspect_data);
                 // TODO(fxbug.dev/123619): remove the SmeNetworkIdentifier type to simplify this.
                 // Consider passing in scan results and reading the "ScanObservation" from there.
                 // (creates a single source of truth for "ScanObservation")
@@ -307,6 +310,16 @@ async fn perform_scan(
             },
         }
     }
+
+    // If the passive scan results are empty, report an empty scan results metric.
+    if let fidl_sme::ScanRequest::Passive(_) = scan_request {
+        if bss_by_network.is_empty() {
+            scan_defects.push(ScanIssue::EmptyScanResults);
+        }
+    }
+
+    telemetry_sender
+        .send(TelemetryEvent::ScanEvent { inspect_data: scan_event_inspect_data, scan_defects });
 
     let scan_results = network_map_to_scan_result(bss_by_network);
     (scan_request, Ok(scan_results))
@@ -353,17 +366,18 @@ impl ScanResultUpdate for LocationSensorUpdater {
 fn bss_to_network_map(
     scan_result_list: Vec<wlan_common::scan::ScanResult>,
     target_ssids: &Vec<types::Ssid>,
+    scan_event_inspect_data: &mut ScanEventInspectData,
 ) -> HashMap<SmeNetworkIdentifier, Vec<types::Bss>> {
     let mut bss_by_network: HashMap<SmeNetworkIdentifier, Vec<types::Bss>> = HashMap::new();
     for scan_result in scan_result_list.into_iter() {
         let protection: types::SecurityTypeDetailed =
             scan_result.bss_description.protection().into();
         if (protection) == types::SecurityTypeDetailed::Unknown {
-            // Print a space-efficient version of the IEs
-            info!(
-                "Encountered unknown protection, ies: [{:?}]",
-                scan_result.bss_description.ies().iter().map(|n| n.to_string()).join(",")
-            );
+            // Log a space-efficient version of the IEs.
+            let readable_ie =
+                scan_result.bss_description.ies().iter().map(|n| n.to_string()).join(",");
+            debug!("Encountered unknown protection, ies: [{:?}]", readable_ie.clone());
+            scan_event_inspect_data.unknown_protection_ies.push(readable_ie);
         };
         let entry = bss_by_network
             .entry(SmeNetworkIdentifier {
@@ -421,7 +435,7 @@ fn network_map_to_scan_result(
     return scan_results;
 }
 
-fn log_metric_for_scan_error(reason: &fidl_sme::ScanErrorCode, telemetry_sender: TelemetrySender) {
+fn log_metric_for_scan_error(reason: &fidl_sme::ScanErrorCode, scan_defects: &mut Vec<ScanIssue>) {
     let metric_type = match *reason {
         fidl_sme::ScanErrorCode::NotSupported
         | fidl_sme::ScanErrorCode::InternalError
@@ -430,21 +444,19 @@ fn log_metric_for_scan_error(reason: &fidl_sme::ScanErrorCode, telemetry_sender:
         | fidl_sme::ScanErrorCode::CanceledByDriverOrFirmware => ScanIssue::AbortedScan,
     };
 
-    telemetry_sender.send(TelemetryEvent::ScanDefect(metric_type));
+    scan_defects.push(metric_type);
 }
 
-async fn report_scan_defect(
+async fn report_scan_defects_to_sme(
     sme_proxy: &SmeForScan,
     scan_result: &Result<Vec<wlan_common::scan::ScanResult>, types::ScanError>,
     scan_request: &fidl_sme::ScanRequest,
-    telemetry_sender: &TelemetrySender,
 ) {
     match scan_result {
         Ok(results) => {
             // If passive scan results are empty, report an empty scan results metric and defect.
             if results.is_empty() {
                 if let fidl_sme::ScanRequest::Passive(_) = scan_request {
-                    telemetry_sender.send(TelemetryEvent::ScanDefect(ScanIssue::EmptyScanResults));
                     sme_proxy.log_empty_scan_defect();
                 }
             }
@@ -482,9 +494,12 @@ mod tests {
         std::{convert::TryInto, sync::Arc},
         test_case::test_case,
         wlan_common::{
-            assert_variant, random_fidl_bss_description,
+            assert_variant, fake_bss_description,
+            ie::IeType,
+            random_fidl_bss_description,
             scan::{write_vmo, Compatibility},
             security::SecurityDescriptor,
+            test_utils::{fake_frames::fake_unknown_rsne, fake_stas::IesOverrides},
         },
     };
 
@@ -764,11 +779,11 @@ mod tests {
         let (sme_proxy, mut sme_stream) = exec.run_singlethreaded(create_sme_proxy());
         let (defect_sender, _) = mpsc::unbounded();
         let sme_proxy = SmeForScan::new(sme_proxy, 0, defect_sender);
-        let (telemetry_sender, mut telemetry_receiver) = create_telemetry_sender_and_receiver();
 
         // Issue request to scan.
         let scan_request = fidl_sme::ScanRequest::Passive(fidl_sme::PassiveScanRequest {});
-        let scan_fut = sme_scan(&sme_proxy, &scan_request, telemetry_sender);
+        let mut scan_defects = vec![];
+        let scan_fut = sme_scan(&sme_proxy, &scan_request, &mut scan_defects);
         pin_mut!(scan_fut);
 
         // Request scan data from SME
@@ -798,9 +813,6 @@ mod tests {
 
         // No further requests to the sme
         assert_variant!(exec.run_until_stalled(&mut sme_stream.next()), Poll::Pending);
-
-        // No metric should be logged since the scan was successful.
-        assert_variant!(telemetry_receiver.try_next(), Ok(None))
     }
 
     #[fuchsia::test]
@@ -809,7 +821,6 @@ mod tests {
         let (sme_proxy, mut sme_stream) = exec.run_singlethreaded(create_sme_proxy());
         let (defect_sender, _) = mpsc::unbounded();
         let sme_proxy = SmeForScan::new(sme_proxy, 0, defect_sender);
-        let (telemetry_sender, mut telemetry_receiver) = create_telemetry_sender_and_receiver();
 
         // Issue request to scan.
         let scan_request = fidl_sme::ScanRequest::Active(fidl_sme::ActiveScanRequest {
@@ -819,7 +830,8 @@ mod tests {
             ],
             channels: vec![1, 20],
         });
-        let scan_fut = sme_scan(&sme_proxy, &scan_request, telemetry_sender);
+        let mut scan_defects = vec![];
+        let scan_fut = sme_scan(&sme_proxy, &scan_request, &mut scan_defects);
         pin_mut!(scan_fut);
 
         // Request scan data from SME
@@ -849,9 +861,6 @@ mod tests {
 
         // No further requests to the sme
         assert_variant!(exec.run_until_stalled(&mut sme_stream.next()), Poll::Pending);
-
-        // No metric should be logged since the scan was successful.
-        assert_variant!(telemetry_receiver.try_next(), Ok(None))
     }
 
     #[fuchsia::test]
@@ -860,11 +869,11 @@ mod tests {
         let (sme_proxy, mut sme_stream) = exec.run_singlethreaded(create_sme_proxy());
         let (defect_sender, _) = mpsc::unbounded();
         let sme_proxy = SmeForScan::new(sme_proxy, 0, defect_sender);
-        let (telemetry_sender, mut telemetry_receiver) = create_telemetry_sender_and_receiver();
 
         // Issue request to scan.
         let scan_request = fidl_sme::ScanRequest::Passive(fidl_sme::PassiveScanRequest {});
-        let scan_fut = sme_scan(&sme_proxy, &scan_request, telemetry_sender);
+        let mut scan_defects = vec![];
+        let scan_fut = sme_scan(&sme_proxy, &scan_request, &mut scan_defects);
         pin_mut!(scan_fut);
 
         // Request scan data from SME
@@ -888,9 +897,6 @@ mod tests {
             let error = result.expect_err("did not expect scan results");
             assert_eq!(error, types::ScanError::GeneralError);
         });
-
-        // No metric should be logged since the interface went away.
-        assert_variant!(telemetry_receiver.try_next(), Ok(None))
     }
 
     #[fuchsia::test]
@@ -899,7 +905,6 @@ mod tests {
         let (client, mut sme_stream) = exec.run_singlethreaded(create_iface_manager());
         let saved_networks_manager = Arc::new(FakeSavedNetworksManager::new());
         let (telemetry_sender, mut telemetry_receiver) = create_telemetry_sender_and_receiver();
-
         // Issue request to scan.
         let sme_scan = passive_sme_req();
         let scan_fut =
@@ -931,7 +936,12 @@ mod tests {
 
         // Since the scanning process went off without a hitch, there should not be any defect
         // metrics logged.
-        assert_variant!(telemetry_receiver.try_next(), Ok(None));
+        assert_variant!(
+            telemetry_receiver.try_next(),
+            Ok(Some(TelemetryEvent::ScanEvent {inspect_data, scan_defects})) => {
+                assert_eq!(inspect_data, ScanEventInspectData::new());
+                assert_eq!(scan_defects, vec![]);
+        });
     }
 
     #[fuchsia::test]
@@ -975,8 +985,9 @@ mod tests {
         // Verify that an empty scan result has been logged
         assert_variant!(
             telemetry_receiver.try_next(),
-            Ok(Some(TelemetryEvent::ScanDefect(issue))) => {
-                assert_eq!(issue, ScanIssue::EmptyScanResults)
+            Ok(Some(TelemetryEvent::ScanEvent {inspect_data, scan_defects})) => {
+                assert_eq!(inspect_data, ScanEventInspectData::new());
+                assert_eq!(scan_defects, vec![ScanIssue::EmptyScanResults]);
         });
 
         // Verify that a defect was logged.
@@ -1025,7 +1036,9 @@ mod tests {
 
         // Verify that a scan defect has not been logged; this should only be logged for
         // passive scans because it is common for active scans.
-        assert_variant!(telemetry_receiver.try_next(), Ok(None));
+        assert_variant!(telemetry_receiver.try_next(), Ok(Some(TelemetryEvent::ScanEvent { scan_defects, .. })) => {
+            assert!(scan_defects.is_empty());
+        });
 
         // Verify that no defect was logged.
         let logged_defects = get_fake_defects(&mut exec, client);
@@ -1194,6 +1207,7 @@ mod tests {
                 })
                 .collect::<Vec<wlan_common::scan::ScanResult>>(),
             &vec![],
+            &mut ScanEventInspectData::new(),
         );
         assert_eq!(bss_by_network.len(), 1);
         assert_eq!(bss_by_network[&expected_id], expected_bss);
@@ -1390,14 +1404,9 @@ mod tests {
         scan_error: fidl_sme::ScanErrorCode,
         expected_issue: ScanIssue,
     ) {
-        let (telemetry_sender, mut telemetry_receiver) = create_telemetry_sender_and_receiver();
-        log_metric_for_scan_error(&scan_error, telemetry_sender);
-        assert_variant!(
-            telemetry_receiver.try_next(),
-            Ok(Some(TelemetryEvent::ScanDefect(issue))
-        ) => {
-            assert_eq!(issue, expected_issue)
-        });
+        let mut scan_defects = vec![];
+        log_metric_for_scan_error(&scan_error, &mut scan_defects);
+        assert_eq!(scan_defects, vec![expected_issue]);
     }
 
     #[test_case(Err(types::ScanError::GeneralError), Some(Defect::Iface(IfaceFailure::FailedScan { iface_id: 0 })))]
@@ -1418,7 +1427,6 @@ mod tests {
     ) {
         let mut exec = fasync::TestExecutor::new();
         let (iface_manager, _) = exec.run_singlethreaded(create_iface_manager());
-        let (telemetry_sender, _telemetry_receiver) = create_telemetry_sender_and_receiver();
         let scan_request = passive_sme_req();
 
         // Get the SME out of the IfaceManager.
@@ -1433,7 +1441,7 @@ mod tests {
         };
 
         // Report the desired scan error or success.
-        let fut = report_scan_defect(&sme, &scan_result, &scan_request, &telemetry_sender);
+        let fut = report_scan_defects_to_sme(&sme, &scan_result, &scan_request);
         pin_mut!(fut);
         assert_variant!(exec.run_until_stalled(&mut fut), Poll::Ready(()));
 
@@ -1746,5 +1754,67 @@ mod tests {
                 assert_eq!(results.len(), 2);
             }
         );
+    }
+
+    #[fuchsia::test]
+    fn scanning_loops_sends_inspect_data_to_telemetry() {
+        let mut exec = fasync::TestExecutor::new();
+        let (iface_mgr, mut sme_stream) = exec.run_singlethreaded(create_iface_manager());
+        let saved_networks_manager = Arc::new(FakeSavedNetworksManager::new());
+        let (telemetry_sender, mut telemetry_receiver) = create_telemetry_sender_and_receiver();
+        let (location_sensor, _, _) = MockScanResultConsumer::new();
+        let (scan_request_sender, scan_request_receiver) = mpsc::channel(100);
+        let scan_requester = Arc::new(ScanRequester { sender: scan_request_sender });
+        let scanning_loop = serve_scanning_loop(
+            iface_mgr.clone(),
+            saved_networks_manager.clone(),
+            telemetry_sender,
+            location_sensor,
+            scan_request_receiver,
+        );
+        pin_mut!(scanning_loop);
+
+        // Issue request to scan
+        let scan_req_fut = scan_requester.perform_scan(ScanReason::BssSelection, vec![], vec![]);
+        pin_mut!(scan_req_fut);
+        assert_variant!(exec.run_until_stalled(&mut scan_req_fut), Poll::Pending);
+        assert_variant!(exec.run_until_stalled(&mut scanning_loop), Poll::Pending);
+
+        // Prepare scan results with unknown protection IEs
+        let bss_description = fake_bss_description!(Wpa2, ies_overrides: IesOverrides::new().set(IeType::RSNE, fake_unknown_rsne()[2..].to_vec()));
+        let scan_result = fidl_sme::ScanResult {
+            bss_description: bss_description.into(),
+            ..generate_random_sme_scan_result()
+        };
+
+        // Send back scan results
+        assert_variant!(
+            exec.run_until_stalled(&mut sme_stream.next()),
+            Poll::Ready(Some(Ok(fidl_sme::ClientSmeRequest::Scan {
+                req, responder,
+            }))) => {
+                assert_eq!(req, passive_sme_req());
+                let vmo = write_vmo(vec![scan_result.clone()]).expect("failed to write VMO");
+                responder.send(Ok(vmo)).expect("failed to send scan data");
+            }
+        );
+
+        // Process scan handler
+        assert_variant!(exec.run_until_stalled(&mut scanning_loop), Poll::Pending);
+
+        // The scan request future should complete.
+        assert_variant!(exec.run_until_stalled(&mut scan_req_fut), Poll::Ready(Ok(results)) => {
+            assert_eq!(results.len(), 1);
+        });
+
+        // Verify inspect data was sent to telemetry module.
+        let readable_ie: String =
+            scan_result.bss_description.ies.iter().map(|n| n.to_string()).join(",");
+        assert_variant!(
+            telemetry_receiver.try_next(),
+            Ok(Some(TelemetryEvent::ScanEvent {inspect_data, scan_defects})) => {
+                assert_eq!(scan_defects, vec![]);
+                assert_eq!(inspect_data.unknown_protection_ies, vec![readable_ie]);
+        });
     }
 }

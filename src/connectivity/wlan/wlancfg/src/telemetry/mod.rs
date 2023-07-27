@@ -29,7 +29,7 @@ use {
         auto_persist::{self, AutoPersist},
         inspect_insert, inspect_log,
         inspectable::{InspectableBool, InspectableU64},
-        log::InspectBytes,
+        log::{InspectBytes, InspectList},
         make_inspect_loggable,
         nodes::BoundedListNode,
     },
@@ -187,6 +187,17 @@ impl DisconnectSourceExt for fidl_sme::DisconnectSource {
     }
 }
 
+#[derive(Debug, PartialEq)]
+pub struct ScanEventInspectData {
+    pub unknown_protection_ies: Vec<String>,
+}
+
+impl ScanEventInspectData {
+    pub fn new() -> Self {
+        Self { unknown_protection_ies: vec![] }
+    }
+}
+
 #[cfg_attr(test, derive(Debug))]
 pub enum TelemetryEvent {
     /// Request telemetry for the latest status
@@ -290,8 +301,6 @@ pub enum TelemetryEvent {
     IfaceCreationFailure,
     /// Notify the telemtry event loop that a PHY has failed to destroy an interface.
     IfaceDestructionFailure,
-    /// Notify telemetry that an unexpected issue occurred while scanning.
-    ScanDefect(ScanIssue),
     /// Notify telemetry that the AP failed to start.
     ApStartFailure,
     /// Record scan fulfillment time
@@ -309,6 +318,10 @@ pub enum TelemetryEvent {
         reason: client::types::ConnectReason,
         scored_candidates: Vec<(client::types::ScannedCandidate, i16)>,
         selected_candidate: Option<(client::types::ScannedCandidate, i16)>,
+    },
+    ScanEvent {
+        inspect_data: ScanEventInspectData,
+        scan_defects: Vec<ScanIssue>,
     },
 }
 
@@ -753,6 +766,7 @@ macro_rules! log_cobalt_1dot1_batch {
     }};
 }
 
+const INSPECT_SCAN_EVENTS_LIMIT: usize = 7;
 const INSPECT_CONNECT_EVENTS_LIMIT: usize = 7;
 const INSPECT_DISCONNECT_EVENTS_LIMIT: usize = 7;
 const INSPECT_EXTERNAL_DISCONNECT_EVENTS_LIMIT: usize = 2;
@@ -793,6 +807,7 @@ pub struct Telemetry {
     // Inspect properties/nodes that telemetry hangs onto
     inspect_node: InspectNode,
     get_iface_stats_fail_count: UintProperty,
+    scan_events_node: Mutex<AutoPersist<BoundedListNode>>,
     connect_events_node: Mutex<AutoPersist<BoundedListNode>>,
     disconnect_events_node: Mutex<AutoPersist<BoundedListNode>>,
     external_inspect_node: ExternalInspectNode,
@@ -827,6 +842,7 @@ impl Telemetry {
         let stats_logger = StatsLogger::new(cobalt_1dot1_proxy, &inspect_node);
         inspect_record_connection_status(&inspect_node, hasher.clone(), telemetry_sender.clone());
         let get_iface_stats_fail_count = inspect_node.create_uint("get_iface_stats_fail_count", 0);
+        let scan_events = inspect_node.create_child("scan_events");
         let connect_events = inspect_node.create_child("connect_events");
         let disconnect_events = inspect_node.create_child("disconnect_events");
         let external_inspect_node = ExternalInspectNode::new(external_inspect_node);
@@ -840,6 +856,11 @@ impl Telemetry {
             hasher,
             inspect_node,
             get_iface_stats_fail_count,
+            scan_events_node: Mutex::new(AutoPersist::new(
+                BoundedListNode::new(scan_events, INSPECT_SCAN_EVENTS_LIMIT),
+                "wlancfg-scan-events",
+                persistence_req_sender.clone(),
+            )),
             connect_events_node: Mutex::new(AutoPersist::new(
                 BoundedListNode::new(connect_events, INSPECT_CONNECT_EVENTS_LIMIT),
                 "wlancfg-connect-events",
@@ -1277,9 +1298,6 @@ impl Telemetry {
             TelemetryEvent::IfaceDestructionFailure => {
                 self.stats_logger.log_iface_destruction_failure().await;
             }
-            TelemetryEvent::ScanDefect(issue) => {
-                self.stats_logger.log_scan_issue(issue).await;
-            }
             TelemetryEvent::ApStartFailure => {
                 self.stats_logger.log_ap_start_failure().await;
             }
@@ -1305,6 +1323,20 @@ impl Telemetry {
                     .log_post_connection_score_deltas(connect_time, score_at_connect, scores)
                     .await;
             }
+            TelemetryEvent::ScanEvent { inspect_data, scan_defects } => {
+                self.log_scan_event_inspect(inspect_data);
+                for defect in scan_defects {
+                    self.stats_logger.log_scan_issue(defect).await;
+                }
+            }
+        }
+    }
+
+    pub fn log_scan_event_inspect(&self, scan_event_info: ScanEventInspectData) {
+        if !scan_event_info.unknown_protection_ies.is_empty() {
+            inspect_log!(self.scan_events_node.lock().get_mut(), {
+                unknown_protection_ies: InspectList(&scan_event_info.unknown_protection_ies)
+            });
         }
     }
 
@@ -6982,21 +7014,17 @@ mod tests {
         assert_eq!(logged_metrics.len(), 1);
     }
 
-    #[test_case(
-        TelemetryEvent::ScanDefect(ScanIssue::ScanFailure),
-        metrics::CLIENT_SCAN_FAILURE_METRIC_ID
-    )]
-    #[test_case(
-        TelemetryEvent::ScanDefect(ScanIssue::AbortedScan),
-        metrics::ABORTED_SCAN_METRIC_ID
-    )]
-    #[test_case(
-        TelemetryEvent::ScanDefect(ScanIssue::EmptyScanResults),
-        metrics::EMPTY_SCAN_RESULTS_METRIC_ID
-    )]
+    #[test_case(ScanIssue::ScanFailure, metrics::CLIENT_SCAN_FAILURE_METRIC_ID)]
+    #[test_case(ScanIssue::AbortedScan, metrics::ABORTED_SCAN_METRIC_ID)]
+    #[test_case(ScanIssue::EmptyScanResults, metrics::EMPTY_SCAN_RESULTS_METRIC_ID)]
     #[fuchsia::test(add_test_attr = false)]
-    fn test_scan_defect_metrics(event: TelemetryEvent, expected_metric_id: u32) {
+    fn test_scan_defect_metrics(scan_issue: ScanIssue, expected_metric_id: u32) {
         let (mut test_helper, mut test_fut) = setup_test();
+
+        let event = TelemetryEvent::ScanEvent {
+            inspect_data: ScanEventInspectData::new(),
+            scan_defects: vec![scan_issue],
+        };
 
         // Send a notification that interface creation has failed.
         test_helper.telemetry_sender.send(event);
