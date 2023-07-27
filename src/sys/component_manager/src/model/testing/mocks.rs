@@ -404,13 +404,13 @@ impl BuiltinRunnerFactory for MockRunner {
 impl Runner for MockRunner {
     async fn start(
         &self,
-        start_info: fcrunner::ComponentStartInfo,
+        start_info: cm_runner::StartInfo,
         server_end: ServerEnd<fcrunner::ComponentControllerMarker>,
     ) {
         let outgoing_host_fn;
         let runtime_host_fn;
         let runner_requests;
-        let resolved_url = start_info.resolved_url.unwrap();
+        let resolved_url = start_info.resolved_url;
 
         // The koid is the only unique piece of information we have about a
         // component start request. Two start requests for the same component
@@ -441,7 +441,7 @@ impl Runner for MockRunner {
             // Create a namespace for the component.
             state
                 .namespaces
-                .insert(resolved_url.clone(), Arc::new(Mutex::new(start_info.ns.unwrap())));
+                .insert(resolved_url.clone(), Arc::new(Mutex::new(start_info.namespace)));
 
             let abort_handle =
                 MockController::new(server_end, runner_requests, channel_koid).serve();

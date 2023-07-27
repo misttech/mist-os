@@ -15,15 +15,16 @@ use {
     },
     ::routing::{component_instance::ComponentInstanceInterface, policy::GlobalPolicyChecker},
     async_trait::async_trait,
-    cm_runner::Runner,
+    cm_runner::{Runner, StartInfo},
     config_encoder::ConfigFields,
     fidl::{
         endpoints::{self, Proxy, ServerEnd},
         Vmo,
     },
     fidl_fuchsia_component_decl as fdecl, fidl_fuchsia_component_runner as fcrunner,
-    fidl_fuchsia_io as fio, fidl_fuchsia_mem as fmem, fidl_fuchsia_process as fprocess,
-    fidl_fuchsia_sys2 as fsys, fuchsia_async as fasync, fuchsia_zircon as zx,
+    fidl_fuchsia_data as fdata, fidl_fuchsia_io as fio, fidl_fuchsia_mem as fmem,
+    fidl_fuchsia_process as fprocess, fidl_fuchsia_sys2 as fsys, fuchsia_async as fasync,
+    fuchsia_zircon as zx,
     futures::lock::Mutex,
     moniker::Moniker,
     std::sync::Arc,
@@ -78,7 +79,7 @@ impl Action for StartAction {
 
 struct StartContext {
     runner: Arc<dyn Runner>,
-    start_info: fcrunner::ComponentStartInfo,
+    start_info: StartInfo,
     controller_server_end: ServerEnd<fcrunner::ComponentControllerMarker>,
 }
 
@@ -258,12 +259,7 @@ async fn make_execution_runtime(
     numbered_handles: Vec<fprocess::HandleInfo>,
     additional_namespace_entries: Vec<fcrunner::ComponentNamespaceEntry>,
 ) -> Result<
-    (
-        Runtime,
-        fcrunner::ComponentStartInfo,
-        ServerEnd<fcrunner::ComponentControllerMarker>,
-        zx::EventPair,
-    ),
+    (Runtime, StartInfo, ServerEnd<fcrunner::ComponentControllerMarker>, zx::EventPair),
     StartActionError,
 > {
     // TODO(https://fxbug.dev/120713): Consider moving this check to ComponentInstance::add_child
@@ -333,16 +329,19 @@ async fn make_execution_runtime(
         execution_controller_task,
     );
     let (break_on_start_left, break_on_start_right) = zx::EventPair::create();
-    let start_info = fcrunner::ComponentStartInfo {
-        resolved_url: Some(url),
-        program: decl.program.as_ref().map(|p| p.info.clone()),
-        ns: Some(ns),
+    let start_info = StartInfo {
+        resolved_url: url,
+        program: decl
+            .program
+            .as_ref()
+            .map(|p| p.info.clone())
+            .unwrap_or_else(|| fdata::Dictionary::default()),
+        namespace: ns,
         outgoing_dir: Some(ServerEnd::new(outgoing_dir_server)),
         runtime_dir: Some(ServerEnd::new(runtime_dir_server)),
-        numbered_handles: if numbered_handles.is_empty() { None } else { Some(numbered_handles) },
+        numbered_handles,
         encoded_config,
         break_on_start: Some(break_on_start_left),
-        ..Default::default()
     };
 
     Ok((runtime, start_info, controller_server, break_on_start_right))

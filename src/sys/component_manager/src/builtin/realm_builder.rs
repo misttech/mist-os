@@ -16,7 +16,7 @@ use {
     ::routing::{capability_source::InternalCapability, policy::ScopedPolicyChecker},
     anyhow::Error,
     async_trait::async_trait,
-    cm_runner::Runner,
+    cm_runner::{builtin::RemoteRunner, Runner, StartInfo},
     fidl::endpoints::ServerEnd,
     fidl_fuchsia_component_resolution as fresolution, fidl_fuchsia_component_runner as fcrunner,
     fuchsia_component::client as fclient,
@@ -147,18 +147,17 @@ impl BuiltinCapability for RealmBuilderResolver {
 }
 
 pub struct RealmBuilderRunner {
-    runner_proxy: fcrunner::ComponentRunnerProxy,
+    remote_runner: RemoteRunner,
 }
 
 impl RealmBuilderRunner {
     /// Create a new RealmBuilderRunner. This opens connections to the needed protocols
     /// in the namespace.
     pub fn new() -> Result<RealmBuilderRunner, Error> {
-        Ok(RealmBuilderRunner {
-            runner_proxy: fclient::connect_to_protocol_at_path::<fcrunner::ComponentRunnerMarker>(
-                "/svc/fuchsia.component.runner.RealmBuilder",
-            )?,
-        })
+        let runner_proxy = fclient::connect_to_protocol_at_path::<fcrunner::ComponentRunnerMarker>(
+            "/svc/fuchsia.component.runner.RealmBuilder",
+        )?;
+        Ok(RealmBuilderRunner { remote_runner: RemoteRunner::new(runner_proxy) })
     }
 }
 
@@ -172,11 +171,9 @@ impl BuiltinRunnerFactory for RealmBuilderRunner {
 impl Runner for RealmBuilderRunner {
     async fn start(
         &self,
-        start_info: fcrunner::ComponentStartInfo,
+        start_info: StartInfo,
         server_end: ServerEnd<fcrunner::ComponentControllerMarker>,
     ) {
-        self.runner_proxy
-            .start(start_info, server_end)
-            .expect("failed to use realm builder runner");
+        self.remote_runner.start(start_info, server_end).await;
     }
 }

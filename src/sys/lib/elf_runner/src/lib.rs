@@ -205,30 +205,20 @@ impl ElfRunner {
 
     pub async fn start_component(
         &self,
-        start_info: fcrunner::ComponentStartInfo,
+        start_info: cm_runner::StartInfo,
         checker: &ScopedPolicyChecker,
     ) -> Result<ElfComponent, StartComponentError> {
-        let resolved_url = start_info
-            .resolved_url
-            .clone()
-            .ok_or(StartComponentError::StartInfoError(StartInfoError::MissingResolvedUrl))?;
-
         // This also checks relevant security policy for config that it wraps using the provided
         // PolicyChecker.
-        let program_config = start_info
-            .program
-            .as_ref()
-            .map(|program| ElfProgramConfig::parse_and_check(&program, &checker))
-            .ok_or(StartComponentError::StartInfoError(StartInfoError::MissingProgram))?
+        let program_config = ElfProgramConfig::parse_and_check(&start_info.program, &checker)
             .map_err(|err| {
                 StartComponentError::StartInfoError(StartInfoError::ProgramError(err))
             })?;
 
-        let url = resolved_url.clone();
+        let url = start_info.resolved_url.clone();
         let main_process_critical = program_config.main_process_critical;
-        let res: Result<ElfComponent, StartComponentError> = self
-            .start_component_helper(start_info, checker.scope.clone(), resolved_url, program_config)
-            .await;
+        let res: Result<ElfComponent, StartComponentError> =
+            self.start_component_helper(start_info, checker.scope.clone(), program_config).await;
         match res {
             Err(e) if main_process_critical => {
                 panic!("failed to launch component with a critical process ({:?}): {:?}", url, e)
@@ -239,9 +229,8 @@ impl ElfRunner {
 
     async fn start_component_helper(
         &self,
-        mut start_info: fcrunner::ComponentStartInfo,
+        mut start_info: cm_runner::StartInfo,
         moniker: Moniker,
-        resolved_url: String,
         program_config: ElfProgramConfig,
     ) -> Result<ElfComponent, StartComponentError> {
         // Connect to `fuchsia.process.Launcher`.
@@ -256,16 +245,14 @@ impl ElfRunner {
         crash_handler::run_exceptions_server(
             &job,
             moniker.clone(),
-            resolved_url.clone(),
+            start_info.resolved_url.clone(),
             self.crash_records.clone(),
         )
         .map_err(StartComponentError::ExceptionRegistrationFailed)?;
 
         // Convert the directories into proxies, so we can find "/pkg" and open "lib" and bin_path
-        let ns = runner::component::ComponentNamespace::try_from(
-            start_info.ns.take().unwrap_or_else(|| vec![]),
-        )
-        .map_err(StartComponentError::ComponentNamespaceError)?;
+        let namespace = runner::component::ComponentNamespace::try_from(start_info.namespace)
+            .map_err(StartComponentError::ComponentNamespaceError)?;
 
         let config_vmo = start_info
             .encoded_config
@@ -289,18 +276,12 @@ impl ElfRunner {
         };
 
         // Take the UTC clock handle out of `start_info.numbered_handles`, if available.
-        let utc_handle = start_info
-            .numbered_handles
-            .as_mut()
-            .map(|handles| {
-                handles
-                    .iter()
-                    .position(|handles| {
-                        handles.id == HandleInfo::new(HandleType::ClockUtc, 0).as_raw()
-                    })
-                    .map(|position| handles.swap_remove(position).handle)
-            })
-            .flatten();
+        let utc_handle = {
+            let position = start_info.numbered_handles.iter().position(|handles| {
+                handles.id == HandleInfo::new(HandleType::ClockUtc, 0).as_raw()
+            });
+            position.map(|position| start_info.numbered_handles.swap_remove(position).handle)
+        };
 
         let utc_clock = if let Some(handle) = utc_handle {
             zx::Clock::from(handle)
@@ -337,26 +318,27 @@ impl ElfRunner {
         );
 
         // Add stdout and stderr handles that forward to syslog.
-        let (stdout_and_stderr_tasks, stdout_and_stderr_handles) =
-            bind_streams_to_syslog(&ns, program_config.stdout_sink, program_config.stderr_sink);
+        let (stdout_and_stderr_tasks, stdout_and_stderr_handles) = bind_streams_to_syslog(
+            &namespace,
+            program_config.stdout_sink,
+            program_config.stderr_sink,
+        );
         handle_infos.extend(stdout_and_stderr_handles);
 
         // Add any external numbered handles.
-        if let Some(handles) = start_info.numbered_handles {
-            handle_infos.extend(handles);
-        }
+        handle_infos.extend(start_info.numbered_handles);
 
         // Configure the process launcher.
         let job_dup = job
             .duplicate_handle(zx::Rights::SAME_RIGHTS)
             .map_err(StartComponentError::JobDuplicateFailed)?;
 
-        let name = Path::new(&resolved_url)
+        let name = Path::new(&start_info.resolved_url)
             .file_name()
             .and_then(|filename| filename.to_str())
             .ok_or_else(|| {
                 StartComponentError::StartInfoError(StartInfoError::BadResolvedUrl(
-                    resolved_url.clone(),
+                    start_info.resolved_url.clone(),
                 ))
             })?;
 
@@ -366,7 +348,7 @@ impl ElfRunner {
                 name,
                 options: program_config.process_options(),
                 args: Some(program_config.args),
-                ns,
+                ns: namespace,
                 job: Some(job_dup),
                 handle_infos: Some(handle_infos),
                 name_infos: None,
@@ -435,7 +417,7 @@ impl ElfRunner {
             lifecycle_client,
             program_config.main_process_critical,
             stdout_and_stderr_tasks,
-            resolved_url.clone(),
+            start_info.resolved_url,
         ))
     }
 
@@ -460,11 +442,10 @@ impl Runner for ScopedElfRunner {
     /// Future to complete.
     async fn start(
         &self,
-        start_info: fcrunner::ComponentStartInfo,
+        start_info: cm_runner::StartInfo,
         server_end: ServerEnd<fcrunner::ComponentControllerMarker>,
     ) {
-        let resolved_url =
-            start_info.resolved_url.clone().unwrap_or_else(|| "<unknown>".to_string());
+        let resolved_url = start_info.resolved_url.clone();
 
         let elf_component = match self.runner.start_component(start_info, &self.checker).await {
             Ok(elf_component) => elf_component,
@@ -634,9 +615,7 @@ mod tests {
         ))
     }
 
-    fn hello_world_startinfo(
-        runtime_dir: ServerEnd<fio::DirectoryMarker>,
-    ) -> fcrunner::ComponentStartInfo {
+    fn hello_world_startinfo(runtime_dir: ServerEnd<fio::DirectoryMarker>) -> cm_runner::StartInfo {
         // Get a handle to /pkg
         let pkg_path = "/pkg".to_string();
         let pkg_chan = fuchsia_fs::directory::open_in_namespace(
@@ -649,17 +628,16 @@ mod tests {
         .into_zx_channel();
         let pkg_handle = ClientEnd::new(pkg_chan);
 
-        let ns = vec![fcrunner::ComponentNamespaceEntry {
+        let namespace = vec![fcrunner::ComponentNamespaceEntry {
             path: Some(pkg_path),
             directory: Some(pkg_handle),
             ..Default::default()
         }];
 
-        fcrunner::ComponentStartInfo {
-            resolved_url: Some(
-                "fuchsia-pkg://fuchsia.com/elf_runner_tests#meta/hello-world-rust.cm".to_string(),
-            ),
-            program: Some(fdata::Dictionary {
+        cm_runner::StartInfo {
+            resolved_url: "fuchsia-pkg://fuchsia.com/elf_runner_tests#meta/hello-world-rust.cm"
+                .to_string(),
+            program: fdata::Dictionary {
                 entries: Some(vec![
                     fdata::DictionaryEntry {
                         key: "args".to_string(),
@@ -676,18 +654,20 @@ mod tests {
                     },
                 ]),
                 ..Default::default()
-            }),
-            ns: Some(ns),
+            },
+            namespace,
             outgoing_dir: None,
             runtime_dir: Some(runtime_dir),
-            ..Default::default()
+            numbered_handles: vec![],
+            encoded_config: None,
+            break_on_start: None,
         }
     }
 
-    /// ComponentStartInfo that points to a non-existent binary.
+    /// StartInfo that points to a non-existent binary.
     fn invalid_binary_startinfo(
         runtime_dir: ServerEnd<fio::DirectoryMarker>,
-    ) -> fcrunner::ComponentStartInfo {
+    ) -> cm_runner::StartInfo {
         // Get a handle to /pkg
         let pkg_path = "/pkg".to_string();
         let pkg_chan = fuchsia_fs::directory::open_in_namespace(
@@ -700,17 +680,16 @@ mod tests {
         .into_zx_channel();
         let pkg_handle = ClientEnd::new(pkg_chan);
 
-        let ns = vec![fcrunner::ComponentNamespaceEntry {
+        let namespace = vec![fcrunner::ComponentNamespaceEntry {
             path: Some(pkg_path),
             directory: Some(pkg_handle),
             ..Default::default()
         }];
 
-        fcrunner::ComponentStartInfo {
-            resolved_url: Some(
-                "fuchsia-pkg://fuchsia.com/elf_runner_tests#meta/does-not-exist.cm".to_string(),
-            ),
-            program: Some(fdata::Dictionary {
+        cm_runner::StartInfo {
+            resolved_url: "fuchsia-pkg://fuchsia.com/elf_runner_tests#meta/does-not-exist.cm"
+                .to_string(),
+            program: fdata::Dictionary {
                 entries: Some(vec![fdata::DictionaryEntry {
                     key: "binary".to_string(),
                     value: Some(Box::new(fdata::DictionaryValue::Str(
@@ -718,20 +697,20 @@ mod tests {
                     ))),
                 }]),
                 ..Default::default()
-            }),
-            ns: Some(ns),
+            },
+            namespace,
             outgoing_dir: None,
             runtime_dir: Some(runtime_dir),
-            ..Default::default()
+            numbered_handles: vec![],
+            encoded_config: None,
+            break_on_start: None,
         }
     }
 
     /// Creates start info for a component which runs until told to exit. The
     /// ComponentController protocol can be used to stop the component when the
     /// test is done inspecting the launched component.
-    fn lifecycle_startinfo(
-        runtime_dir: ServerEnd<fio::DirectoryMarker>,
-    ) -> fcrunner::ComponentStartInfo {
+    fn lifecycle_startinfo(runtime_dir: ServerEnd<fio::DirectoryMarker>) -> cm_runner::StartInfo {
         // Get a handle to /pkg
         let pkg_path = "/pkg".to_string();
         let pkg_chan = fuchsia_fs::directory::open_in_namespace(
@@ -744,17 +723,16 @@ mod tests {
         .into_zx_channel();
         let pkg_handle = ClientEnd::new(pkg_chan);
 
-        let ns = vec![fcrunner::ComponentNamespaceEntry {
+        let namespace = vec![fcrunner::ComponentNamespaceEntry {
             path: Some(pkg_path),
             directory: Some(pkg_handle),
             ..Default::default()
         }];
 
-        fcrunner::ComponentStartInfo {
-            resolved_url: Some(
-                "fuchsia-pkg://fuchsia.com/lifecycle-example#meta/lifecycle.cm".to_string(),
-            ),
-            program: Some(fdata::Dictionary {
+        cm_runner::StartInfo {
+            resolved_url: "fuchsia-pkg://fuchsia.com/lifecycle-example#meta/lifecycle.cm"
+                .to_string(),
+            program: fdata::Dictionary {
                 entries: Some(vec![
                     fdata::DictionaryEntry {
                         key: "args".to_string(),
@@ -775,11 +753,13 @@ mod tests {
                     },
                 ]),
                 ..Default::default()
-            }),
-            ns: Some(ns),
+            },
+            namespace,
             outgoing_dir: None,
             runtime_dir: Some(runtime_dir),
-            ..Default::default()
+            numbered_handles: vec![],
+            encoded_config: None,
+            break_on_start: None,
         }
     }
 
@@ -1064,32 +1044,24 @@ mod tests {
         Ok(())
     }
 
-    fn with_mark_vmo_exec(
-        mut start_info: fcrunner::ComponentStartInfo,
-    ) -> fcrunner::ComponentStartInfo {
-        start_info.program.as_mut().map(|dict| {
-            dict.entries.as_mut().map(|entry| {
-                entry.push(fdata::DictionaryEntry {
-                    key: "job_policy_ambient_mark_vmo_exec".to_string(),
-                    value: Some(Box::new(fdata::DictionaryValue::Str("true".to_string()))),
-                });
-                entry
-            })
+    fn with_mark_vmo_exec(mut start_info: cm_runner::StartInfo) -> cm_runner::StartInfo {
+        start_info.program.entries.as_mut().map(|entry| {
+            entry.push(fdata::DictionaryEntry {
+                key: "job_policy_ambient_mark_vmo_exec".to_string(),
+                value: Some(Box::new(fdata::DictionaryValue::Str("true".to_string()))),
+            });
+            entry
         });
         start_info
     }
 
-    fn with_main_process_critical(
-        mut start_info: fcrunner::ComponentStartInfo,
-    ) -> fcrunner::ComponentStartInfo {
-        start_info.program.as_mut().map(|dict| {
-            dict.entries.as_mut().map(|entry| {
-                entry.push(fdata::DictionaryEntry {
-                    key: "main_process_critical".to_string(),
-                    value: Some(Box::new(fdata::DictionaryValue::Str("true".to_string()))),
-                });
-                entry
-            })
+    fn with_main_process_critical(mut start_info: cm_runner::StartInfo) -> cm_runner::StartInfo {
+        start_info.program.entries.as_mut().map(|entry| {
+            entry.push(fdata::DictionaryEntry {
+                key: "main_process_critical".to_string(),
+                value: Some(Box::new(fdata::DictionaryValue::Str("true".to_string()))),
+            });
+            entry
         });
         start_info
     }
@@ -1222,8 +1194,8 @@ mod tests {
 
     fn hello_world_startinfo_forward_stdout_to_log(
         runtime_dir: ServerEnd<fio::DirectoryMarker>,
-        mut ns: Vec<fcrunner::ComponentNamespaceEntry>,
-    ) -> fcrunner::ComponentStartInfo {
+        mut namespace: Vec<fcrunner::ComponentNamespaceEntry>,
+    ) -> cm_runner::StartInfo {
         let pkg_path = "/pkg".to_string();
         let pkg_chan = fuchsia_fs::directory::open_in_namespace(
             "/pkg",
@@ -1235,17 +1207,16 @@ mod tests {
         .into_zx_channel();
         let pkg_handle = ClientEnd::new(pkg_chan);
 
-        ns.push(fcrunner::ComponentNamespaceEntry {
+        namespace.push(fcrunner::ComponentNamespaceEntry {
             path: Some(pkg_path),
             directory: Some(pkg_handle),
             ..Default::default()
         });
 
-        fcrunner::ComponentStartInfo {
-            resolved_url: Some(
-                "fuchsia-pkg://fuchsia.com/hello-world#meta/hello-world-rust.cm".to_string(),
-            ),
-            program: Some(fdata::Dictionary {
+        cm_runner::StartInfo {
+            resolved_url: "fuchsia-pkg://fuchsia.com/hello-world#meta/hello-world-rust.cm"
+                .to_string(),
+            program: fdata::Dictionary {
                 entries: Some(vec![
                     fdata::DictionaryEntry {
                         key: "binary".to_string(),
@@ -1263,11 +1234,13 @@ mod tests {
                     },
                 ]),
                 ..Default::default()
-            }),
-            ns: Some(ns),
+            },
+            namespace,
             outgoing_dir: None,
             runtime_dir: Some(runtime_dir),
-            ..Default::default()
+            numbered_handles: vec![],
+            encoded_config: None,
+            break_on_start: None,
         }
     }
 
@@ -1486,10 +1459,10 @@ mod tests {
 
         let (_runtime_dir, runtime_dir_server) = create_proxy::<fio::DirectoryMarker>()?;
         let mut start_info = hello_world_startinfo(runtime_dir_server);
-        start_info.numbered_handles = Some(vec![fproc::HandleInfo {
+        start_info.numbered_handles = vec![fproc::HandleInfo {
             handle: clock.into_handle(),
             id: HandleInfo::new(HandleType::ClockUtc, 0).as_raw(),
-        }]);
+        }];
 
         // Start the component.
         let _ = runner
