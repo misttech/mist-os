@@ -5,6 +5,8 @@
 #ifndef SRC_DEVELOPER_DEBUG_ZXDB_EXPR_ABI_NULL_H_
 #define SRC_DEVELOPER_DEBUG_ZXDB_EXPR_ABI_NULL_H_
 
+#include <optional>
+
 #include "src/developer/debug/zxdb/expr/abi.h"
 
 namespace zxdb {
@@ -26,6 +28,10 @@ class AbiNull : public Abi {
   }
   std::optional<CollectionByValueReturn> GetCollectionReturnByValueLocation(
       const fxl::RefPtr<EvalContext>& eval_context, const Collection* collection) final {
+    return std::nullopt;
+  }
+
+  std::optional<std::vector<debug::RegisterID>> GetFunctionParameterRegisters() final {
     return std::nullopt;
   }
 };

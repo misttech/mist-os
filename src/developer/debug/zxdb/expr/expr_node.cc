@@ -28,6 +28,7 @@
 #include "src/developer/debug/zxdb/symbols/base_type.h"
 #include "src/developer/debug/zxdb/symbols/collection.h"
 #include "src/developer/debug/zxdb/symbols/data_member.h"
+#include "src/developer/debug/zxdb/symbols/function_call_info.h"
 #include "src/developer/debug/zxdb/symbols/modified_type.h"
 #include "src/developer/debug/zxdb/symbols/symbol_data_provider.h"
 #include "src/developer/debug/zxdb/symbols/symbol_utils.h"
@@ -471,20 +472,22 @@ void FunctionCallExprNode::EmitBytecode(VmStream& stream) const {
             return;
           }
 
-          auto err_or_fn = ResolveFunction(eval_context, fn_name, params);
+          ResolveFunction(
+              eval_context, fn_name, params,
+              [eval_context, cb = std::move(cb)](ErrOr<FunctionCallInfo> fn_call_info_or) mutable {
+                if (fn_call_info_or.has_error()) {
+                  return cb(fn_call_info_or.err());
+                }
 
-          if (err_or_fn.has_error()) {
-            return cb(err_or_fn.err());
-          }
+                auto call_info = fn_call_info_or.take_value();
+                eval_context->GetDataProvider()->MakeFunctionCall(
+                    call_info, [cb = std::move(cb)](const Err& err, fxl::RefPtr<Type> type,
+                                                    std::vector<uint8_t> data) mutable {
+                      if (err.has_error())
+                        return cb(err);
 
-          auto fn = err_or_fn.value();
-          eval_context->GetDataProvider()->MakeFunctionCall(
-              fn.get(), [cb = std::move(cb)](const Err& err, fxl::RefPtr<Type> type,
-                                             std::vector<uint8_t> data) mutable {
-                if (err.has_error())
-                  return cb(err);
-
-                cb(ExprValue(std::move(type), std::move(data)));
+                      cb(ExprValue(std::move(type), std::move(data)));
+                    });
               });
         }));
   } else {

@@ -27,10 +27,12 @@
 namespace zxdb {
 
 CallFunctionThreadController::CallFunctionThreadController(const AddressRanges& ranges,
+                                                           const std::vector<ExprValue>& parameters,
                                                            EvalCallback on_function_completed,
                                                            fit::deferred_callback on_done)
     : ThreadController(std::move(on_done)),
       address_ranges_(ranges),
+      parameters_(parameters),
       on_function_completed_(std::move(on_function_completed)),
       weak_factory_(this) {}
 
@@ -62,6 +64,40 @@ uint64_t CallFunctionThreadController::GetRegisterData(
     return 0;
 
   return reg_it->GetValue();
+}
+
+Err CallFunctionThreadController::WriteParametersToRegisters() {
+  auto arg_regs_opt = thread()->session()->arch_info().abi()->GetFunctionParameterRegisters();
+
+  if (!arg_regs_opt) {
+    return Err("Unknown ");
+  }
+
+  auto argument_registers = *arg_regs_opt;
+  if (parameters_.size() > argument_registers.size()) {
+    return Err("Only %zu arguments are supported functions on %s, but was given %zu",
+               argument_registers.size(), thread()->session()->arch_info().triple_name().c_str(),
+               parameters_.size());
+  }
+
+  for (size_t i = 0; i < parameters_.size(); i++) {
+    uint64_t promoted = 0;
+
+    if (parameters_[i].data().size() > sizeof(promoted)) {
+      return Err("Parameter %zu cannot fit in target register. Size is: %zu", i,
+                 parameters_[i].data().size());
+    }
+
+    if (auto err = parameters_[i].PromoteTo64(&promoted); err.has_error()) {
+      return err;
+    }
+
+    if (!WriteRegister(general_registers_, argument_registers[i], promoted)) {
+      return Err("Failed writing register %s", debug::RegisterIDToString(argument_registers[i]));
+    }
+  }
+
+  return Err();
 }
 
 void CallFunctionThreadController::WriteGeneralRegisters(fit::callback<void(const Err&)> cb) {

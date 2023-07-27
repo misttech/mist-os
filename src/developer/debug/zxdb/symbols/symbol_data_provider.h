@@ -26,6 +26,7 @@ namespace zxdb {
 
 class Err;
 class SymbolContext;
+struct FunctionCallInfo;
 
 // This interface is how the debugger backend provides memory and register data to the symbol system
 // to evaluate expressions.
@@ -143,7 +144,8 @@ class SymbolDataProvider : public fxl::RefCountedThreadSafe<SymbolDataProvider> 
   //
   // |fn| must be resolved to a concrete Function object before calling this function, see
   // ResolveFunction.
-  virtual void MakeFunctionCall(const Function* fn, FunctionCallCallback cb) const;
+  virtual void MakeFunctionCall(const struct FunctionCallInfo& call_info,
+                                FunctionCallCallback cb) const;
 
  protected:
   FRIEND_MAKE_REF_COUNTED(SymbolDataProvider);

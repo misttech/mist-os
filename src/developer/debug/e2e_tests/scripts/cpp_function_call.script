@@ -1,4 +1,6 @@
 ## require optimize=none
+# TODO(jruthe): remove this when the test is refactored into multiple scripts.
+## set timeout 5
 [zxdb] b $main
 Created Breakpoint 1 @ $main
 Pending: No current matches for location. It will be matched against new
@@ -66,6 +68,50 @@ true
 [zxdb] p GetCharPtr()
 🛑 main() • cpp_functions.cc:??
 Hello!
+
+# Simple types shouldn't be a problem
+[zxdb] p AddTwoInts(3, 5)
+🛑 main() • cpp_functions.cc:??
+8
+
+[zxdb] until 71
+🛑 main() • cpp_functions.cc:??
+
+[zxdb] locals
+lhs = 7
+rhs = 8
+
+[zxdb] p SwapPointedToValues(&lhs, &rhs)
+🛑 main() • cpp_functions.cc:??
+void
+
+[zxdb] locals
+lhs = 8
+rhs = 7
+
+# Coerce a char array to a char* implicitly
+[zxdb] p EchoCharPtr(kHello)
+🛑 main() • cpp_functions.cc:??
+void
+
+# Passing a simple char* should work
+[zxdb] p EchoCharPtr(kCharStar)
+🛑 main() • cpp_functions.cc:??
+void
+
+[zxdb] until 80
+🛑 main() • cpp_functions.cc:??
+
+[zxdb] locals
+s = {one = 1, two = 2, nums = {3, 4, 5, 6}}
+
+# User defined objects should be passable by pointer.
+[zxdb] p DoSomeStuff(&s)
+🛑 main() • cpp_functions.cc:??
+void
+
+[zxdb] locals
+s = {one = 2, two = 3, nums = {3, 4, 5}}
 
 # Let the program finish.
 [zxdb] c

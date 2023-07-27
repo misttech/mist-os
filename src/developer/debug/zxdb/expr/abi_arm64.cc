@@ -105,4 +105,17 @@ std::optional<Abi::CollectionByValueReturn> AbiArm64::GetCollectionReturnByValue
   return result;
 }
 
+std::optional<std::vector<debug::RegisterID>> AbiArm64::GetFunctionParameterRegisters() {
+  return std::vector({
+      debug::RegisterID::kARMv8_x0,
+      debug::RegisterID::kARMv8_x1,
+      debug::RegisterID::kARMv8_x2,
+      debug::RegisterID::kARMv8_x3,
+      debug::RegisterID::kARMv8_x4,
+      debug::RegisterID::kARMv8_x5,
+      debug::RegisterID::kARMv8_x6,
+      debug::RegisterID::kARMv8_x7,
+  });
+}
+
 }  // namespace zxdb

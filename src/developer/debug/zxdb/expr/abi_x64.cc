@@ -291,4 +291,15 @@ std::optional<Abi::CollectionByValueReturn> AbiX64::GetCollectionReturnByValueLo
   return AllocateRegistersForByValueReturning(collection->byte_size(), classes);
 }
 
+std::optional<std::vector<debug::RegisterID>> AbiX64::GetFunctionParameterRegisters() {
+  return std::vector({
+      debug::RegisterID::kX64_rdi,
+      debug::RegisterID::kX64_rsi,
+      debug::RegisterID::kX64_rdx,
+      debug::RegisterID::kX64_rcx,
+      debug::RegisterID::kX64_r8,
+      debug::RegisterID::kX64_r9,
+  });
+}
+
 }  // namespace zxdb

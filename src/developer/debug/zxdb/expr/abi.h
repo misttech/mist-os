@@ -81,6 +81,10 @@ class Abi {
   // The collection must be concrete. Returns nullopt if the debugger can't compute this.
   virtual std::optional<CollectionByValueReturn> GetCollectionReturnByValueLocation(
       const fxl::RefPtr<EvalContext>& eval_context, const Collection* collection) = 0;
+
+  // Returns the list of registers to use for function parameters, the order of registers must be
+  // in the order that is specified by the ABI.
+  virtual std::optional<std::vector<debug::RegisterID>> GetFunctionParameterRegisters() = 0;
 };
 
 }  // namespace zxdb

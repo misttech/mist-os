@@ -48,8 +48,9 @@ class CallFunctionThreadController : public ThreadController {
     std::vector<debug::RegisterValue> registers;
   };
 
-  CallFunctionThreadController(const AddressRanges& ranges, EvalCallback on_function_completed,
-                               fit::deferred_callback on_done);
+  CallFunctionThreadController(const AddressRanges& ranges,
+                               const std::vector<ExprValue>& parameters,
+                               EvalCallback on_function_completed, fit::deferred_callback on_done);
 
   // Finds |id| in |regs| and updates its value to |value|. Does not perform any
   // IPC. Returns false if |id| was not found in |regs|.
@@ -59,6 +60,11 @@ class CallFunctionThreadController : public ThreadController {
   // Returns the value of |id| in |regs| if found, 0 otherwise.
   static uint64_t GetRegisterData(const std::vector<debug::RegisterValue>& regs,
                                   debug::RegisterID id);
+
+  // Writes the contents of |parameters_| to registers. The ABI specific registers are given by the
+  // Abi implementation tied to the session, so it can be done in the base class rather than the ABI
+  // specific classes.
+  Err WriteParametersToRegisters();
 
   void SetRegisterCategory(debug::RegisterCategory category,
                            const std::vector<debug::RegisterValue>& regs) {
@@ -82,6 +88,10 @@ class CallFunctionThreadController : public ThreadController {
 
   // The address range of the function we're calling.
   AddressRanges address_ranges_;
+
+  // Function parameters given by the user, by the time they are passed to this class they have been
+  // validated and cast to the expected types.
+  std::vector<ExprValue> parameters_;
 
   // This finish controller will be responsible for getting through the
   // synthetic stack frame that the ABI thread controller creates.

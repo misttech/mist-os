@@ -20,8 +20,10 @@
 namespace zxdb {
 
 CallFunctionThreadControllerArm64::CallFunctionThreadControllerArm64(
-    const AddressRanges& range, EvalCallback on_function_completed, fit::deferred_callback on_done)
-    : CallFunctionThreadController(range, std::move(on_function_completed), std::move(on_done)),
+    const AddressRanges& range, const std::vector<ExprValue>& parameters,
+    EvalCallback on_function_completed, fit::deferred_callback on_done)
+    : CallFunctionThreadController(range, parameters, std::move(on_function_completed),
+                                   std::move(on_done)),
       weak_factory_(this) {}
 
 CallFunctionThreadControllerArm64::~CallFunctionThreadControllerArm64() = default;
@@ -73,6 +75,10 @@ void CallFunctionThreadControllerArm64::InitWithThread(Thread* thread,
                            function_start_addr)) {
           return cb(Err("Failed to find PC in the register set"));
         }
+
+        // Load all the parameters to registers, and then actually do the bulk register write.
+        // Currently parameters are only supported when passed via registers.
+        weak_this->WriteParametersToRegisters();
 
         return weak_this->WriteGeneralRegisters(std::move(cb));
       });

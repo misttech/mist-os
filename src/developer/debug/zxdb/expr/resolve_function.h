@@ -8,10 +8,11 @@
 #include "src/developer/debug/zxdb/expr/eval_callback.h"
 #include "src/developer/debug/zxdb/expr/expr_value.h"
 #include "src/developer/debug/zxdb/expr/parsed_identifier.h"
-#include "src/developer/debug/zxdb/symbols/location.h"
 #include "src/lib/fxl/memory/ref_ptr.h"
 
 namespace zxdb {
+
+struct FunctionCallInfo;
 
 // Tries to resolve and extract the given function name to a Function symbol.
 //
@@ -23,9 +24,9 @@ namespace zxdb {
 //
 // An error is also returned in the case where |fn_name| resolves to no
 // locations or the function has been inlined.
-ErrOr<fxl::RefPtr<Function>> ResolveFunction(const fxl::RefPtr<EvalContext>& eval_context,
-                                             const ParsedIdentifier& fn_name,
-                                             const std::vector<ExprValue>& params);
+void ResolveFunction(const fxl::RefPtr<EvalContext>& eval_context, const ParsedIdentifier& fn_name,
+                     const std::vector<ExprValue>& params,
+                     fit::callback<void(ErrOr<FunctionCallInfo>)> cb);
 }  // namespace zxdb
 
 #endif  // SRC_DEVELOPER_DEBUG_ZXDB_EXPR_RESOLVE_FUNCTION_H_

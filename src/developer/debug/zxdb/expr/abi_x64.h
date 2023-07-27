@@ -5,6 +5,7 @@
 #ifndef SRC_DEVELOPER_DEBUG_ZXDB_EXPR_ABI_X64_H_
 #define SRC_DEVELOPER_DEBUG_ZXDB_EXPR_ABI_X64_H_
 
+#include "src/developer/debug/shared/register_id.h"
 #include "src/developer/debug/zxdb/expr/abi.h"
 
 namespace zxdb {
@@ -23,6 +24,7 @@ class AbiX64 : public Abi {
       const Collection* collection) final;
   std::optional<CollectionByValueReturn> GetCollectionReturnByValueLocation(
       const fxl::RefPtr<EvalContext>& eval_context, const Collection* collection) final;
+  std::optional<std::vector<debug::RegisterID>> GetFunctionParameterRegisters() final;
 };
 
 }  // namespace zxdb

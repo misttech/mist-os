@@ -64,5 +64,43 @@ true
 🛑 rust_functions::main() • rust_functions.rs:??
 3.14159
 
+[zxdb] p rust_functions::add_two_ints(1, 3)
+🛑 rust_functions::main() • rust_functions.rs:??
+4
+
+[zxdb] until 86
+🛑 rust_functions::main() • rust_functions.rs:??
+
+[zxdb] p rust_functions::add_int_refs(&lhs, &rhs)
+🛑 rust_functions::main() • rust_functions.rs:??
+15
+
+[zxdb] until 90
+🛑 rust_functions::main() • rust_functions.rs:??
+
+[zxdb] locals
+lhs = 7
+rhs = 8
+
+[zxdb] p rust_functions::swap_i32_refs(&lhs, &rhs)
+🛑 rust_functions::main() • rust_functions.rs:??
+
+[zxdb] locals
+lhs = 8
+rhs = 7
+
+[zxdb] until 94
+🛑 rust_functions::main() • rust_functions.rs:??
+
+[zxdb] p s
+SomeStruct{one: 1, two: 2, nums: vec![3, 4, 5, 6]}
+
+[zxdb] p rust_functions::do_some_stuff(&s)
+🛑 rust_functions::main() • rust_functions.rs:??
+void
+
+[zxdb] p s
+SomeStruct{one: 2, two: 4, nums: vec![3, 4, 5]}
+
 [zxdb] c
 Process 1 exited with code 0.

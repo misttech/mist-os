@@ -18,10 +18,8 @@
 #include "src/developer/debug/zxdb/client/session.h"
 #include "src/developer/debug/zxdb/client/thread.h"
 #include "src/developer/debug/zxdb/common/err.h"
-#include "src/developer/debug/zxdb/common/err_or.h"
-#include "src/developer/debug/zxdb/expr/return_value.h"
-#include "src/developer/debug/zxdb/symbols/base_type.h"
 #include "src/developer/debug/zxdb/symbols/function.h"
+#include "src/developer/debug/zxdb/symbols/function_call_info.h"
 #include "src/lib/fxl/strings/string_printf.h"
 
 namespace zxdb {
@@ -35,13 +33,14 @@ Err RegisterUnavailableErr(debug::RegisterID id) {
 }
 
 std::unique_ptr<CallFunctionThreadController> MakeCallFunctionThreadController(
-    debug::Arch arch, const AddressRanges& ranges, EvalCallback on_function_completed) {
+    debug::Arch arch, const AddressRanges& ranges, const std::vector<ExprValue>& parameters,
+    EvalCallback on_function_completed) {
   switch (arch) {
     case debug::Arch::kX64:
-      return std::make_unique<CallFunctionThreadControllerX64>(ranges,
+      return std::make_unique<CallFunctionThreadControllerX64>(ranges, parameters,
                                                                std::move(on_function_completed));
     case debug::Arch::kArm64:
-      return std::make_unique<CallFunctionThreadControllerArm64>(ranges,
+      return std::make_unique<CallFunctionThreadControllerArm64>(ranges, parameters,
                                                                  std::move(on_function_completed));
     default:
       return nullptr;
@@ -154,12 +153,13 @@ uint64_t FrameSymbolDataProvider::GetCanonicalFrameAddress() const {
   return frame_->GetCanonicalFrameAddress();
 }
 
-void FrameSymbolDataProvider::MakeFunctionCall(const Function* fn, FunctionCallCallback cb) const {
+void FrameSymbolDataProvider::MakeFunctionCall(const FunctionCallInfo& call_info,
+                                               FunctionCallCallback cb) const {
   if (!frame_) {
     return cb(CallFrameDestroyedErr(), nullptr, {});
   } else if (!frame_->GetThread()) {
     return cb(Err("No thread."), nullptr, {});
-  } else if (!fn) {
+  } else if (!call_info.fn) {
     return cb(Err("Bad function."), nullptr, {});
   }
 
@@ -168,11 +168,12 @@ void FrameSymbolDataProvider::MakeFunctionCall(const Function* fn, FunctionCallC
     cb(Err("Thread must be stopped to call functions."), nullptr, {});
   }
 
-  AddressRanges range(fn->GetAbsoluteCodeRanges(
-      fn->GetSymbolContext(frame_->GetEvalContext()->GetProcessSymbols())));
+  AddressRanges range(call_info.fn->GetAbsoluteCodeRanges(
+      call_info.fn->GetSymbolContext(frame_->GetEvalContext()->GetProcessSymbols())));
 
   std::unique_ptr<CallFunctionThreadController> controller = MakeCallFunctionThreadController(
-      frame_->session()->arch(), range, [cb = std::move(cb)](ErrOrValue err_or_value) mutable {
+      frame_->session()->arch(), range, call_info.parameters,
+      [cb = std::move(cb)](ErrOrValue err_or_value) mutable {
         if (err_or_value.has_error()) {
           debug::MessageLoop::Current()->PostTask(
               FROM_HERE, [err = err_or_value.err(), cb = std::move(cb)]() mutable {

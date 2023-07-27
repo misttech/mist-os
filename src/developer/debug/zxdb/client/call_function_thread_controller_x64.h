@@ -14,7 +14,9 @@ class CallFunctionThreadControllerX64 : public CallFunctionThreadController {
   // Constructs the thread controller. |on_function_completed| is called once the thread state has
   // been restored to what it was before the function call, but before this controller has been
   // destroyed.
-  CallFunctionThreadControllerX64(const AddressRanges& range, EvalCallback on_function_completed,
+  CallFunctionThreadControllerX64(const AddressRanges& range,
+                                  const std::vector<ExprValue>& parameters,
+                                  EvalCallback on_function_completed,
                                   fit::deferred_callback on_done = {});
 
   ~CallFunctionThreadControllerX64() override;

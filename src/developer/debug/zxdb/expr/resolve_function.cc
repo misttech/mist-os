@@ -4,26 +4,150 @@
 
 #include "src/developer/debug/zxdb/expr/resolve_function.h"
 
-#include "src/developer/debug/shared/logging/logging.h"
+#include "src/developer/debug/zxdb/common/err.h"
 #include "src/developer/debug/zxdb/common/err_or.h"
+#include "src/developer/debug/zxdb/common/join_callbacks.h"
+#include "src/developer/debug/zxdb/expr/cast.h"
 #include "src/developer/debug/zxdb/expr/eval_context.h"
+#include "src/developer/debug/zxdb/symbols/base_type.h"
+#include "src/developer/debug/zxdb/symbols/dwarf_tag.h"
 #include "src/developer/debug/zxdb/symbols/function.h"
+#include "src/developer/debug/zxdb/symbols/function_call_info.h"
 #include "src/developer/debug/zxdb/symbols/input_location.h"
 #include "src/developer/debug/zxdb/symbols/process_symbols.h"
+#include "src/developer/debug/zxdb/symbols/type.h"
+#include "src/developer/debug/zxdb/symbols/variable.h"
+#include "src/lib/fxl/memory/ref_ptr.h"
 
 namespace zxdb {
 
-ErrOr<fxl::RefPtr<Function>> ResolveFunction(const fxl::RefPtr<EvalContext>& eval_context,
-                                             const ParsedIdentifier& fn_name,
-                                             const std::vector<ExprValue>& params) {
+namespace {
+bool TypeIsPointerOrArray(const Type* type) {
+  return DwarfTagIsPointerOrReference(type->tag()) || !!type->As<ArrayType>();
+}
+
+bool ImplicitTypeCastIsSupported(const Type* desired, const Type* given) {
+  // Only cast to a pointer if the given type is another pointer or an array (implying a pointer to
+  // the first element of the array). We will not implicitly convert an integer to a pointer (a user
+  // can manually cast it themselves if that's what they really want). CastExprValue below will do
+  // more robust checking of the pointed to types that we do not need to replicate here, but will
+  // allow any random integer to be cast to a pointer, which we don't want unless the user casts it
+  // themselves.
+  if (DwarfTagIsPointerOrReference(desired->tag())) {
+    if (!TypeIsPointerOrArray(given)) {
+      return false;
+    }
+  }
+
+  return true;
+}
+
+// Validate the given arguments against the types the function expects. We do some simple coercion
+// and casting to get the right types from what the user gave us. If all of the attempts fail the
+// callback will be issued reentrantly with an appropriate error. If the argument requires a full
+// cast that cannot be done synchronously, then an asynchronous cast will be kicked off. Preserving
+// the order of the arguments is important.
+void CollectArguments(const fxl::RefPtr<EvalContext>& eval_context, std::string_view fn_name,
+                      const std::vector<LazySymbol>& expected_types,
+                      const std::vector<ExprValue>& given_args,
+                      fit::callback<void(ErrOr<std::vector<ExprValue>>)> cb) {
+  if (expected_types.size() != given_args.size()) {
+    return cb(
+        Err("Function expects %zu arguments, got %zu", expected_types.size(), given_args.size()));
+  }
+
+  std::vector<ExprValue> results;
+  results.resize(given_args.size());
+  std::map<size_t, ExprValue> arg_map;
+
+  // This will collect the casted to types from below.
+  auto joiner = fxl::MakeRefCounted<JoinCallbacks<ErrOrValue>>();
+
+  for (size_t i = 0; i < expected_types.size(); i++) {
+    const Variable* var = expected_types[i].Get()->As<Variable>();
+
+    // This is the type the function expects. The corresponding ExprValue in |given_args| should
+    // either match this type or be castable to this type.
+    fxl::RefPtr<Type> desired_type = eval_context->GetConcreteType(var->type());
+
+    if (!desired_type) {
+      joiner->Abandon();
+      return cb(Err("Could not determine type of %s", var->GetAssignedName().c_str()));
+    }
+
+    if (desired_type->As<BaseType>()) {
+      if (desired_type->As<BaseType>()->base_type() == BaseType::kBaseTypeFloat) {
+        joiner->Abandon();
+        return cb(Err("Floating point arguments are not yet supported!"));
+      }
+    }
+
+    // Make sure the given parameter is supported.
+    if (given_args[i].type()->As<BaseType>() &&
+        given_args[i].type()->As<BaseType>()->base_type() == BaseType::kBaseTypeFloat) {
+      joiner->Abandon();
+      return cb(Err("Floating point arguments are not supported yet."));
+    }
+
+    // This is a bit tricky. The debugger can be helpful by forcing the given argument into the type
+    // the function expects, but if we are _too_ helpful, then we could end up calling a function
+    // with an argument that it was not expecting and produce a bogus result, or cause the program
+    // to crash. CastExprValue is powerful and will be more lenient than we can allow, so we have
+    // some restrictions to apply in ImplicitTypeCastIsSupported. For passing arrays as pointers, we
+    // can construct a new ExprValue with the address of the first element of the array.
+    // CastExprValue will refuse to do this, so it is done manually here.
+    if (DwarfTagIsPointerOrReference(desired_type->tag()) &&
+        given_args[i].type()->As<ArrayType>() &&
+        given_args[i].source().type() == ExprValueSource::Type::kMemory) {
+      arg_map[i] =
+          ExprValue(given_args[i].source().address(), desired_type, given_args[i].source());
+    } else if (ImplicitTypeCastIsSupported(desired_type.get(), given_args[i].type())) {
+      CastExprValue(eval_context, CastType::kImplicit, given_args[i], desired_type,
+                    given_args[i].source(),
+                    [&arg_map, i, cb = joiner->AddCallback()](ErrOrValue result) mutable {
+                      if (result.ok())
+                        arg_map[i] = result.take_value();
+                      cb(result);
+                    });
+    } else {
+      joiner->Abandon();
+      return cb(Err("Refusing to implicitly cast from %s to %s, try casting explicitly.",
+                    given_args[i].type()->GetFullName().c_str(),
+                    desired_type->GetFullName().c_str()));
+    }
+  }
+
+  joiner->Ready(
+      [results, arg_map, cb = std::move(cb)](const std::vector<ErrOrValue>& cast_results) mutable {
+        // If any of the casts failed, we cannot continue.
+        if (auto err_it = std::find_if(cast_results.begin(), cast_results.end(),
+                                       [](const ErrOrValue& result) { return result.has_error(); });
+            err_it != cast_results.end()) {
+          return cb(err_it->err());
+        }
+
+        for (auto& [i, expr_value] : arg_map) {
+          results[i] = std::move(expr_value);
+        }
+
+        cb(results);
+      });
+
+  // return results;
+}
+}  // namespace
+
+void ResolveFunction(const fxl::RefPtr<EvalContext>& eval_context, const ParsedIdentifier& fn_name,
+                     const std::vector<ExprValue>& params,
+                     fit::callback<void(ErrOr<FunctionCallInfo>)> cb) {
   std::vector<Location> locs =
       eval_context->GetProcessSymbols()->ResolveInputLocation(InputLocation(ToIdentifier(fn_name)));
 
   if (locs.empty()) {
-    return Err("Could not find function: " + fn_name.GetDebugName());
+    return cb(Err("Could not find function: " + fn_name.GetDebugName()));
   } else if (locs.size() > 1) {
     // TODO(https://fxbug.dev/5457): Handle overloads.
-    return Err("Function resolved to multiple locations.");
+    return cb(Err("Function resolved to multiple locations."));
   }
 
   // Resolve the symbol.
@@ -32,24 +156,26 @@ ErrOr<fxl::RefPtr<Function>> ResolveFunction(const fxl::RefPtr<EvalContext>& eva
   // None of the locations actually resolved to the function or the function was inlined, return an
   // error.
   if (!fn) {
-    return Err("Error casting symbol " + fn_name.GetDebugName() + " to function.");
+    return cb(Err("Error casting symbol " + fn_name.GetDebugName() + " to function."));
   } else if (fn->is_inline()) {
-    return Err(fn->GetFullName() + " has been inlined, and cannot be called from the debugger.");
+    return cb(
+        Err(fn->GetFullName() + " has been inlined, and cannot be called from the debugger."));
   }
 
-  // TODO(https://fxbug.dev/5457): support primitive type arguments.
-  // |fn->parameters()| holds what the symbol thinks the argument types should be.
-  // |params| has the list of parameters that were actually given to the expression.
-  // Right now if either of these are not empty, don't even bother calling the function since we
-  // only support void(void) type functions.
-  if (!fn->parameters().empty()) {
-    return Err(
-        "Functions with arguments are not supported yet. Track progress in https://fxbug.dev/5457 :)");
-  } else if (!params.empty()) {
-    return Err("This function takes no arguments but parameters were given in the expression.");
-  }
+  FunctionCallInfo call_info;
+  call_info.fn = RefPtrTo(fn);
 
-  return RefPtrTo(fn);
+  CollectArguments(
+      eval_context, fn->GetAssignedName(), fn->parameters(), params,
+      [call_info, cb = std::move(cb)](ErrOr<std::vector<ExprValue>> err_or_args) mutable {
+        if (err_or_args.has_error()) {
+          return cb(err_or_args.err());
+        }
+
+        call_info.parameters = err_or_args.take_value();
+
+        cb(call_info);
+      });
 }
 
 }  // namespace zxdb

@@ -13,6 +13,7 @@
 namespace zxdb {
 
 class Frame;
+struct FuntionCallInfo;
 
 // Implementation of SymbolDataProvider that links it to a frame. On top of the process' general
 // memory read/write, this adds stack information and the instruction pointer.
@@ -26,7 +27,7 @@ class FrameSymbolDataProvider : public ProcessSymbolDataProvider {
   std::optional<uint64_t> GetFrameBase() override;
   void GetFrameBaseAsync(GetFrameBaseCallback callback) override;
   uint64_t GetCanonicalFrameAddress() const override;
-  void MakeFunctionCall(const Function* fn, FunctionCallCallback cb) const override;
+  void MakeFunctionCall(const FunctionCallInfo& call_info, FunctionCallCallback cb) const override;
 
  private:
   FRIEND_MAKE_REF_COUNTED(FrameSymbolDataProvider);

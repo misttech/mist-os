@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 use std::f32::consts::PI;
+use std::vec::Vec;
 
 static mut SOME_GLOBAL: i32 = 0;
 
@@ -42,10 +43,53 @@ fn return_i32_box() -> Box<i32> {
     unsafe { Box::new(SOME_GLOBAL) }
 }
 
+#[inline(never)]
+fn add_two_ints(lhs: i32, rhs: i32) -> i32 {
+    lhs + rhs
+}
+
+#[inline(never)]
+fn add_int_refs(lhs: &i32, rhs: &i32) -> i32 {
+    lhs + rhs
+}
+
+#[inline(never)]
+fn swap_i32_refs<'a>(lhs: &'a mut i32, rhs: &'a mut i32) {
+    let tmp = *lhs;
+    *lhs = *rhs;
+    *rhs = tmp;
+}
+
+struct SomeStruct {
+    one: i32,
+    two: i32,
+    nums: Vec<i32>,
+}
+
+#[inline(never)]
+fn do_some_stuff(s: &mut SomeStruct) {
+    s.one += 1;
+    s.two += 2;
+    s.nums.pop();
+}
+
 fn main() {
     nested_no_args();
     print_hello();
     println!("{}", return_global_plus_one());
     println!("{}", return_i32_box());
     println!("{}", return_float());
+    println!("{}", add_two_ints(1, 3));
+
+    let lhs = 7i32;
+    let rhs = 8i32;
+    println!("{}", add_int_refs(&lhs, &rhs));
+
+    let mut lhsmut = lhs;
+    let mut rhsmut = rhs;
+    swap_i32_refs(&mut lhsmut, &mut rhsmut);
+    println!("{} {}", lhsmut, rhsmut);
+
+    let mut s = SomeStruct { one: 1, two: 2, nums: vec![3, 4, 5, 6] };
+    do_some_stuff(&mut s);
 }

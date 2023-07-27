@@ -41,6 +41,7 @@ static_library("symbols") {
     "enumeration.h",
     "file_line.h",
     "function.h",
+    "function_call_info.h",
     "function_type.h",
     "identifier.h",
     "identifier_base.h",

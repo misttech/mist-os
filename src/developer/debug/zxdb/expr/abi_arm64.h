@@ -23,6 +23,8 @@ class AbiArm64 : public Abi {
       const Collection* collection) final;
   std::optional<CollectionByValueReturn> GetCollectionReturnByValueLocation(
       const fxl::RefPtr<EvalContext>& eval_context, const Collection* collection) final;
+
+  std::optional<std::vector<debug::RegisterID>> GetFunctionParameterRegisters() final;
 };
 
 }  // namespace zxdb
