@@ -663,18 +663,23 @@ def verify_missing_legacy_input_dependencies(
 
         found = None
         for entry in legacy_inputs_manifest:
-            dst_dir = entry.get('dest_dir', '')
-            if src.startswith(dst_dir):
-                # This source file belongs to a bazel_input_resource_directory()
-                # target that the GN action should depend on. Verify that it
-                # exists.
-                found = entry
-                break
+            if 'dest_dir' in entry:
+                dst_dir = entry['dest_dir']
+                # Remove trailing / because src doesn't have it.
+                if dst_dir[-1] == '/':
+                    dst_dir = dst_dir[:-1]
+                if src.startswith(dst_dir):
+                    # This source file belongs to a
+                    # bazel_input_resource_directory() target that the GN action
+                    # should depend on. Verify that it exists.
+                    found = entry
+                    break
 
             for dst_file in entry.get('destinations', []):
                 if src == dst_file:
                     found = entry
                     break
+
             if found:
                 break
 
@@ -1149,7 +1154,6 @@ access when it is run.
 
         if _DEBUG:
             debug('DEPFILE[%s]\n' % depfile_content)
-
 
         os.makedirs(os.path.dirname(args.depfile), exist_ok=True)
         with open(args.depfile, 'w') as f:
