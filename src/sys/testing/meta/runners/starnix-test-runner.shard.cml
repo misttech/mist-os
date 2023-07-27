@@ -15,20 +15,7 @@
     ],
     offer: [
         {
-            protocol: [
-                "fuchsia.inspect.InspectSink",
-                "fuchsia.kernel.VmexResource",
-                "fuchsia.posix.socket.Provider",
-                "fuchsia.posix.socket.raw.Provider",
-                "fuchsia.process.Launcher",
-                "fuchsia.sysmem.Allocator",
-                "fuchsia.tracing.provider.Registry",
-                "fuchsia.ui.composition.Allocator",
-                "fuchsia.ui.composition.Flatland",
-                "fuchsia.ui.input3.Keyboard",
-                "fuchsia.ui.scenic.Scenic",
-                "fuchsia.vulkan.loader.Loader",
-            ],
+            protocol: [ "fuchsia.process.Launcher" ],
             from: "parent",
             to: [ "#starnix_test_runners" ],
         },
@@ -47,12 +34,6 @@
             storage: "tmp",
             from: "self",
             to: [ "#starnix_test_runners" ],
-        },
-        {
-            directory: "dev-gpu",
-            from: "parent",
-            to: [ "#starnix_test_runners" ],
-            rights: [ "r*" ],
         },
     ],
 }

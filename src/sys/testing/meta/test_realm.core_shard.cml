@@ -421,13 +421,6 @@
             to: "#testing",
         },
 
-        // Needed by Starnix tests.
-        {
-            protocol: "fuchsia.posix.socket.raw.Provider",
-            from: "#network",
-            to: "#testing",
-        },
-
         // Profiling tests need access to the ktrace data
         {
             protocol: [
